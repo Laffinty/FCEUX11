@@ -1,0 +1,75 @@
+# Build directories
+build/
+_build/
+*.build/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+CMakeLists.txt.user
+cmake_install.cmake
+Makefile
+*.cmake
+
+# Qt generated files
+*.autogen/
+*.qrc
+moc_*.cpp
+ui_*.h
+qrc_*.cpp
+
+# Compiled binaries
+*.exe
+*.dll
+*.lib
+*.a
+*.so
+*.dylib
+
+# Object files
+*.obj
+*.o
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.bak
+*.swp
+*.swo
+
+# Windows specific
+Thumbs.db
+.DS_Store
+*.lnk
+
+# IDE/Editor files
+.vscode/
+.vs/
+*.suo
+*.user
+*.sln
+*.vcxproj
+*.vcxproj.filters
+
+# Dependency directories
+dependencies/
+libs/
+
+# Generated documentation
+docs/html/
+docs/latex/
+
+# Git hooks
+.git/hooks/
+
+# Local configuration
+config.ini
+settings.ini
+*.ini
+
+# Emulator ROMs
+*.nes
+*.fds
+*.nsf
+*.unif
