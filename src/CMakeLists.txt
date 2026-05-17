@@ -30,6 +30,7 @@ find_package( Qt6 REQUIRED COMPONENTS Widgets OpenGL OpenGLWidgets ${QtHelpModul
      #include_directories( ${Qt5Widgets_INCLUDE_DIRS} )
      add_definitions( -D_CRT_SECURE_NO_WARNINGS )
      add_definitions( -D__SDL__  -D__QT_DRIVER__  -DQT_DEPRECATED_WARNINGS -DPSS_STYLE=2 )
+     add_definitions( -D_UNICODE -DUNICODE )
      add_definitions( -DFCEUDEF_DEBUGGER )
      add_definitions( -D_USE_LIBARCHIVE )
      if(MSVC)

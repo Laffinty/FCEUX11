@@ -104,6 +104,12 @@ int main( int argc, char *argv[] )
 
 	qInstallMessageHandler(MessageOutput);
 
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+	QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+	QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
+#endif
+	QApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
+
 	QApplication app(argc, argv);
 
 	QFont font("Segoe UI Variable", 9);
