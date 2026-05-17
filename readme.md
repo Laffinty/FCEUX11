@@ -1,6 +1,6 @@
 # FCEUX11
 
-A modernized Nintendo Entertainment System (NES) emulator, derived from [FCEUX](https://fceux.com) 2.6.6.
+A modernized Nintendo Entertainment System (NES) emulator, derived from [FCEUX](https://fceux.com).
 
 ## About This Project
 
@@ -107,7 +107,7 @@ For full license details, see the [`COPYING`](COPYING) file.
 
 # FCEUX11
 
-一款现代化的任天堂娱乐系统（NES）模拟器，基于 [FCEUX](https://fceux.com) 2.6.6 衍生开发。
+一款现代化的任天堂娱乐系统（NES）模拟器，基于 [FCEUX](https://fceux.com)衍生开发。
 
 ## 关于本项目
 
