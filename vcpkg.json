@@ -1,0 +1,39 @@
+{
+  "name": "fceux11",
+  "version": "0.1.0",
+  "description": "FCEUX11 - Windows 11 NES Emulator (derivative work based on FCEUX)",
+  "homepage": "https://github.com/fceux11/fceux11",
+  "license": "GPL-2.0-or-later",
+  "dependencies": [
+    {
+      "name": "qtbase",
+      "version">=6.0.0",
+      "features": ["opengl", "widgets"]
+    },
+    {
+      "name": "sdl2",
+      "version">=2.0.0"
+    },
+    {
+      "name": "libarchive",
+      "version">=3.0.0"
+    },
+    {
+      "name": "zlib",
+      "version">=1.2.0"
+    },
+    {
+      "name": "liblzma",
+      "version">=5.0.0"
+    }
+  ],
+  "default-features": [],
+  "features": {
+    "static": {
+      "dependencies": [
+        "qtbase[static]",
+        "libarchive[libarchivezip]"
+      ]
+    }
+  }
+}
