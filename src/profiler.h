@@ -40,10 +40,6 @@
 #include <map>
 
 
-#if defined(__linux__) || defined(__APPLE__) || defined(__unix__)
-#include <time.h>
-#endif
-
 #include "utils/mutex.h"
 #include "utils/timeStamp.h"
 

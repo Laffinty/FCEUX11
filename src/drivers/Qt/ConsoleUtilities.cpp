@@ -33,14 +33,7 @@
 #include <Windows.h>
 #include <direct.h>
 #else
-// unix, linux, or apple
-#include <unistd.h>
-#include <libgen.h>
-
-#ifdef __APPLE__
-#include <mach-o/dyld.h>
-#endif
-
+#error "Platform not supported"
 #endif
 
 #include "../../fceu.h"
@@ -252,45 +245,8 @@ static int _fceuExecutablePath( std::string &outputPath )
 	outputPath.assign( finalPath );
 
 	return 0;
-#elif __linux__ || __unix__
-	char exePath[ 2048 ];
-	ssize_t count = ::readlink( "/proc/self/exe", exePath, sizeof(exePath)-1 );
-
-	if ( count > 0 )
-	{
-		char *dir;
-		exePath[count] = 0;
-		//printf("EXE Path: '%s' \n", exePath );
-
-		dir = ::dirname( exePath );
-
-		if ( dir )
-		{
-			//printf("DIR Path: '%s' \n", dir );
-			outputPath.assign( dir );
-			return 0;
-		}
-	}
-#elif	  __APPLE__
-	char exePath[ 2048 ];
-	uint32_t bufSize = sizeof(exePath);
-	int result = _NSGetExecutablePath( exePath, &bufSize );
-
-	if ( result == 0 )
-	{
-		char *dir;
-		exePath[ sizeof(exePath)-1 ] = 0;
-		//printf("EXE Path: '%s' \n", exePath );
-
-		dir = ::dirname( exePath );
-
-		if ( dir )
-		{
-			//printf("DIR Path: '%s' \n", dir );
-			outputPath.assign( dir );
-			return 0;
-		}
-	}
+#else
+#error "Platform not supported"
 #endif
 	return -1;
 }

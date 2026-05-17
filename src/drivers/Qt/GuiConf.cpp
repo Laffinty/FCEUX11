@@ -620,14 +620,7 @@ QStyle *fceuStyle::styleBase(QStyle *style) const
 	if ( s.size() == 0 )
 	{
 		int i, idx = -1;
-#ifdef WIN32
-		//QString defaultStyle("windows"); // fusion is much more stable and consistent.
 		QString defaultStyle("fusion");
-#elif __APPLE__
-		QString defaultStyle("fusion");
-#else
-		QString defaultStyle("fusion");
-#endif
 
 		QStringList styleKeys = QStyleFactory::keys();
 

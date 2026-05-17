@@ -1,22 +1,9 @@
-#if defined(__linux__) || defined(__unix__) 
-#include <stdlib.h>
-#include <unistd.h>
-#define SetCurrentDir chdir
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <libgen.h>
-#elif   __APPLE__
-#include <stdlib.h>
-#include <unistd.h>
-#include <libgen.h>
-#include <mach-o/dyld.h>
-#define SetCurrentDir chdir
-#endif
-
 #ifdef WIN32
 #include <Windows.h>
 #include <direct.h>
 #define SetCurrentDir _chdir
+#else
+#error "Platform not supported"
 #endif
 
 #include "types.h"
@@ -211,23 +198,11 @@ void TaseditorDisableManualFunctionIfNeeded();
 
 #else
 int LuaKillMessageBox(void);
-#ifdef __linux__
-
-#ifndef __THROWNL
-#define __THROWNL throw () // Build fix Alpine Linux libc
-#endif
-int LuaPrintfToWindowConsole(const char *__restrict format, ...) 
-                  __THROWNL __attribute__ ((__format__ (__printf__, 1, 2)));
-#else
-
 #ifdef WIN32
 int LuaPrintfToWindowConsole(_In_z_ _Printf_format_string_ const char * format, ...);
 #else
-int LuaPrintfToWindowConsole(const char *__restrict format, ...) throw();
+#error "Platform not supported"
 #endif
-
-#endif
-
 #endif
 extern void PrintToWindowConsole(intptr_t hDlgAsInt, const char* str);
 extern void WinLuaOnStart(intptr_t hDlgAsInt);
@@ -569,45 +544,8 @@ static int emu_getdir(lua_State *L) {
 	lua_pushstring(L, finalPath);
 
 	return 1;
-#elif __linux__
-	char exePath[ 2048 ];
-	ssize_t count = ::readlink( "/proc/self/exe", exePath, sizeof(exePath)-1 );
-
-	if ( count > 0 )
-	{
-		char *dir;
-		exePath[count] = 0;
-		//printf("EXE Path: '%s' \n", exePath );
-
-		dir = ::dirname( exePath );
-
-		if ( dir )
-		{
-			//printf("DIR Path: '%s' \n", dir );
-	   	lua_pushstring(L, dir);
-			return 1;
-		}
-	}
-#elif	  __APPLE__
-	char exePath[ 2048 ];
-	uint32_t bufSize = sizeof(exePath);
-	int result = _NSGetExecutablePath( exePath, &bufSize );
-
-	if ( result == 0 )
-	{
-		char *dir;
-		exePath[ sizeof(exePath)-1 ] = 0;
-		//printf("EXE Path: '%s' \n", exePath );
-
-		dir = ::dirname( exePath );
-
-		if ( dir )
-		{
-			//printf("DIR Path: '%s' \n", dir );
-			lua_pushstring(L, dir);
-			return 1;
-		}
-	}
+#else
+#error "Platform not supported"
 #endif
 	return 0;
 }

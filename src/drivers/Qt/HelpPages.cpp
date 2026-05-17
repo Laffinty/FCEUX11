@@ -69,13 +69,6 @@ void consoleWin_t::OpenHelpWindow(std::string subpage)
 		helpFileName = "/usr/share/fceux/fceux.qhc";
 		#endif
 
-		#ifdef __APPLE__
-		if ( !QFile( QString::fromStdString(helpFileName) ).exists() )
-		{
-			// Search for MacOSX DragNDrop Resources
-			helpFileName = QApplication::applicationDirPath().toStdString() + "/../Resources/fceux.qhc";
-		}
-		#endif
 	}
 
 	if ( !QFile( QString::fromStdString(helpFileName) ).exists() )

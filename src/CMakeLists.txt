@@ -24,10 +24,10 @@ endif()
 
 find_package( Qt6 REQUIRED COMPONENTS Widgets OpenGL OpenGLWidgets ${QtHelpModule})
 
+     find_package(ZLIB REQUIRED)
+
      find_package(OpenGL REQUIRED)
-     #find_package(Qt5 COMPONENTS Widgets OpenGL REQUIRED)
-     #add_definitions( ${Qt5Widgets_DEFINITIONS}  )
-     #include_directories( ${Qt5Widgets_INCLUDE_DIRS} )
+     # Qt5 support removed in Phase 2 — Qt6 only
      add_definitions( -D_CRT_SECURE_NO_WARNINGS )
      add_definitions( -D__SDL__  -D__QT_DRIVER__  -DQT_DEPRECATED_WARNINGS -DPSS_STYLE=2 )
      add_definitions( -D_UNICODE -DUNICODE )
@@ -55,8 +55,7 @@ find_package( Qt6 REQUIRED COMPONENTS Widgets OpenGL OpenGLWidgets ${QtHelpModul
          set( SDL2_LDFLAGS  ${SDL_INSTALL_PREFIX}/SDL2/lib/x64/SDL2.lib )
          set( LIBARCHIVE_LDFLAGS  ${LIBARCHIVE_INSTALL_PREFIX}/libarchive/lib/archive.lib )
      endif()
-     include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/drivers/win/zlib )
-     set( SYS_LIBS  wsock32 ws2_32 vfw32 Htmlhelp )
+      set( SYS_LIBS  wsock32 ws2_32 vfw32 Htmlhelp )
      set(APP_ICON_RESOURCES_WINDOWS  ${CMAKE_SOURCE_DIR}/icons/fceux11.rc )
 
      if ( ${USE_LIBAV} )
@@ -128,23 +127,6 @@ else()
 
    message( STATUS "Using Internal zlib" )
 
-   set( ZLIB_SOURCE 
-       ${CMAKE_CURRENT_SOURCE_DIR}/drivers/win/zlib/adler32.c 
-       ${CMAKE_CURRENT_SOURCE_DIR}/drivers/win/zlib/compress.c 
-       ${CMAKE_CURRENT_SOURCE_DIR}/drivers/win/zlib/crc32.c 
-       ${CMAKE_CURRENT_SOURCE_DIR}/drivers/win/zlib/deflate.c 
-       ${CMAKE_CURRENT_SOURCE_DIR}/drivers/win/zlib/gzio.c 
-       ${CMAKE_CURRENT_SOURCE_DIR}/drivers/win/zlib/infblock.c 
-       ${CMAKE_CURRENT_SOURCE_DIR}/drivers/win/zlib/infcodes.c 
-       ${CMAKE_CURRENT_SOURCE_DIR}/drivers/win/zlib/inffast.c 
-       ${CMAKE_CURRENT_SOURCE_DIR}/drivers/win/zlib/inflate.c 
-       ${CMAKE_CURRENT_SOURCE_DIR}/drivers/win/zlib/inftrees.c 
-       ${CMAKE_CURRENT_SOURCE_DIR}/drivers/win/zlib/infutil.c 
-       ${CMAKE_CURRENT_SOURCE_DIR}/drivers/win/zlib/trees.c 
-       ${CMAKE_CURRENT_SOURCE_DIR}/drivers/win/zlib/uncompr.c 
-       ${CMAKE_CURRENT_SOURCE_DIR}/drivers/win/zlib/unzip.c 
-       ${CMAKE_CURRENT_SOURCE_DIR}/drivers/win/zlib/zutil.c 
-   	)
 endif()
 
 include_directories( ${CMAKE_SOURCE_DIR}/src )
@@ -183,7 +165,8 @@ set(SRC_CORE
   	${CMAKE_CURRENT_SOURCE_DIR}/wave.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/x6502.cpp
 	${LUA_ENGINE_SOURCE}
-	${ZLIB_SOURCE}
+	${CMAKE_CURRENT_SOURCE_DIR}/utils/ioapi.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/utils/unzip.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/01-222.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/09-034a.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/103.cpp

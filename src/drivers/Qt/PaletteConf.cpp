@@ -519,18 +519,6 @@ void PaletteConfDialog_t::openPaletteFile(void)
 			iniPath = d.absolutePath().toStdString();
 		}
 
-		#ifdef __APPLE__
-		// Search for MacOSX DragNDrop Resources
-		d.setPath(QString(exePath) + "/../Resources/palettes");
-
-		//printf("Looking for: '%s'\n", d.path().toStdString().c_str());
-
-		if (d.exists())
-		{
-			urls << QUrl::fromLocalFile(d.absolutePath());
-			iniPath = d.absolutePath().toStdString();
-		}
-		#endif
 	}
 #ifdef WIN32
 

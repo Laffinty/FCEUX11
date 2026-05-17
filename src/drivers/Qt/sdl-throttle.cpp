@@ -24,14 +24,6 @@
 #include "Qt/throttle.h"
 #include "utils/timeStamp.h"
 
-#if defined(__linux__) || defined(__APPLE__) || defined(__unix__)
-#include <time.h>
-#endif
-
-#ifdef __linux__
-#include <sys/timerfd.h>
-#endif
-
 static const double Slowest = 0.015625; // 1/64x speed (around 1 fps on NTSC)
 static const double Fastest = 32;       // 32x speed   (around 1920 fps on NTSC)
 static const double Normal  = 1.0;      // 1x speed    (around 60 fps on NTSC)
@@ -81,67 +73,13 @@ double getHighPrecTimeStamp(void)
 	return t;
 }
 
-#ifdef __linux__
-static char useTimerFD = 0;
-static int  timerfd = -1;
-
-static void setTimer( double hz )
-{
-	struct itimerspec ispec;
-
-	if ( !useTimerFD )
-	{
-		if ( timerfd != -1 )
-		{
-			::close( timerfd ); timerfd = -1;
-		}
-		return;
-	}
-
-	if ( timerfd == -1 )
-	{
-		timerfd = timerfd_create( CLOCK_REALTIME, 0 );
-
-		if ( timerfd == -1 )
-		{
-			perror("timerfd_create failed: ");
-			return;
-		}
-	}
-	ispec.it_interval.tv_sec  = 0;
-	ispec.it_interval.tv_nsec = (long)( 1.0e9 / hz );
-	ispec.it_value.tv_sec  = ispec.it_interval.tv_sec;
-	ispec.it_value.tv_nsec = ispec.it_interval.tv_nsec;
-
-	if ( timerfd_settime( timerfd, 0, &ispec, NULL ) == -1 )
-	{
-		perror("timerfd_settime failed: ");
-	}
-
-	//printf("Timer Set: %li ns\n", ispec.it_value.tv_nsec );
-
-	Lasttime.readNew();
-	Nexttime = Lasttime + DesiredFrameTime;
-	Latetime = Nexttime + HalfFrameTime;
-}
-#endif
-
 int getTimingMode(void)
 {
-#ifdef __linux__
-	if ( useTimerFD )
-	{
-		return 1;
-	}
-#endif
 	return 0;
 }
 
 int setTimingMode( int mode )
 {
-#ifdef __linux__
-	useTimerFD = (mode == 1);
-#endif
 	return 0;
 }
 
@@ -283,11 +221,6 @@ RefreshThrottleFPS(void)
 	Lasttime.zero();
 	Nexttime.zero();
 	InFrame=0;
-
-#ifdef __linux__
-	setTimer( hz * g_fpsScale );
-#endif
-
 }
 
 double getBaseFrameRate(void)
@@ -308,15 +241,7 @@ double getFrameRateAdjustmentRatio(void)
 static int highPrecSleep( FCEU::timeStampRecord &ts )
 {
 	int ret = 0;
-#if defined(__linux__) || defined(__APPLE__) || defined(__unix__)
-	struct timespec req, rem;
-	
-	req = ts.toTimeSpec();
-
-	ret = nanosleep( &req, &rem );
-#else
 	SDL_Delay( ts.toMilliSeconds() );
-#endif
 	return ret;
 }
 
@@ -372,33 +297,6 @@ SpeedThrottle(void)
 	//fprintf(stderr, "attempting to sleep %Ld ms, frame complete=%s\n",
 	//	time_left, InFrame?"no":"yes");
 
-#ifdef __linux__
-	if ( timerfd != -1 )
-	{
-		uint64_t val;
-
-		if ( read( timerfd, &val, sizeof(val) ) > 0 )
-		{
-			if ( val > 1 )
-			{
-				frameLateCounter += (val - 1);
-				//printf("Late Frame: %u \n", frameLateCounter);
-			}
-		}
-	}
-	else if ( !time_left.isZero() )
-	{
-		highPrecSleep( time_left );
-	}
-	else
-	{
-		if ( cur_time >= Latetime )
-		{
-			frameLateCounter++;
-			//printf("Late Frame: %u  - %llu ms\n", frameLateCounter, cur_time - Latetime);
-		}
-	}
-#else
 	if ( !time_left.isZero() )
 	{
 		highPrecSleep( time_left );
@@ -411,7 +309,6 @@ SpeedThrottle(void)
 			//printf("Late Frame: %u  - %llu ms\n", frameLateCounter, cur_time - Latetime);
 		}
 	}
-#endif
     
 	cur_time.readNew();
 

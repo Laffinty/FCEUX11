@@ -23,7 +23,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <limits.h>
-#include <unzip.h>
+#include "utils/unzip.h"
 
 #include <QFileInfo>
 #include <QStyleFactory>
