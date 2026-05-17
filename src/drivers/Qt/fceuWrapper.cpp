@@ -1,4 +1,4 @@
-/* FCE Ultra - NES/Famicom Emulator
+﻿/* FCE Ultra - NES/Famicom Emulator
  *
  * Copyright notice for this file:
  *  Copyright (C) 2020 mjbudd77
@@ -328,16 +328,6 @@ int LoadGame(const char *path, bool silent)
 	{
 		fullpath.assign( path );
 	}
-//#if defined(__linux__) || defined(__APPLE__) || defined(__unix__)
-//
-//	// Resolve absolute path to file
-//	if ( realpath( path, fullpath ) == NULL )
-//	{
-//		strcpy( fullpath, path );
-//	}
-//#else
-//	strcpy( fullpath, path );
-//#endif
 
 	//printf("Fullpath: %zi '%s'\n", sizeof(fullpath), fullpath );
 
@@ -1120,16 +1110,6 @@ int  fceuWrapperInit( int argc, char *argv[] )
 			//printf("FI: '%s'\n", fi.canonicalFilePath().toStdString().c_str() );
 			s = fi.canonicalFilePath().toStdString();
 		}
-//#if defined(__linux__) || defined(__APPLE__) || defined(__unix__)
-//
-//		// Resolve absolute path to file
-//		char fullpath[2048];
-//		if ( realpath( s.c_str(), fullpath ) != NULL )
-//		{
-//			printf("Fullpath: '%s'\n", fullpath );
-//			s.assign( fullpath );
-//		}
-//#endif
 		FCEU_LoadLuaCode(s.c_str());
 	}
 #endif

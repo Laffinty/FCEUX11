@@ -49,9 +49,6 @@
 #include "driver.h"
 #include "utils/xstring.h"
 
-#ifndef WIN32
-#include <zlib.h>
-#endif
 
 using namespace std;
 

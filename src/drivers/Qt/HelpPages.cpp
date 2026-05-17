@@ -1,4 +1,4 @@
-/* FCE Ultra - NES/Famicom Emulator
+﻿/* FCE Ultra - NES/Famicom Emulator
  *
  * Copyright notice for this file:
  *  Copyright (C) 2020 mjbudd77
@@ -50,9 +50,6 @@
 //#include <sys/wait.h>
 #endif
 
-//#if  defined(__linux__) || defined(__unix__) || defined(__APPLE__)
-//static int forkHelpFileViewer( const char *chmViewer, const char *filepath );
-//#endif
 
 void consoleWin_t::OpenHelpWindow(std::string subpage)
 {
@@ -207,26 +204,6 @@ std::string consoleWin_t::findHelpFile(void)
 	return filename.toStdString();
 }
 
-//#if  defined(__linux__) || defined(__unix__) || defined(__APPLE__)
-//static int forkHelpFileViewer( const char *chmViewer, const char *filepath )
-//{
-//	int pid = 0;
-//
-//	if ( chmViewer[0] == 0 )
-//	{
-//		return -1;
-//	}
-//
-//	pid = fork();
-//
-//	if ( pid == 0 )
-//	{  // Child process
-//		execl( chmViewer, chmViewer, filepath, NULL );
-//		exit(0);	
-//	}
-//	return pid;
-//}
-//#endif
 
 #ifdef _USE_QHELP
 //-----------------------------------------------------------------------------------------------

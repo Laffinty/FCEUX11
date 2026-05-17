@@ -47,9 +47,6 @@
 #endif
 
 //no stdint in win32 (but we could add it if we needed to)
-#ifndef WIN32
-#include <stdint.h>
-#endif
 
 #include <cstring>
 #include <cstdio>
