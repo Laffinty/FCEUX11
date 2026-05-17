@@ -1918,9 +1918,9 @@ void consoleWin_t::createMainMenu(void)
 	connect( helpMenu, SIGNAL(aboutToShow(void)), this, SLOT(mainMenuOpen(void)) );
 	connect( helpMenu, SIGNAL(aboutToHide(void)), this, SLOT(mainMenuClose(void)) );
 
-	// Help -> About FCEUX
-	aboutAct = new QAction(tr("&About FCEUX"), this);
-	aboutAct->setStatusTip(tr("About FCEUX"));
+	// Help -> About FCEUX11
+	aboutAct = new QAction(tr("&About FCEUX11"), this);
+	aboutAct->setStatusTip(tr("About FCEUX11"));
 	aboutAct->setIcon( style()->standardIcon( QStyle::SP_MessageBoxInformation ) );
 	connect(aboutAct, SIGNAL(triggered()), this, SLOT(aboutFCEUX(void)) );
 	

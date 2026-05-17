@@ -1,6 +1,6 @@
 include(GNUInstallDirs)
 
-set( APP_NAME fceux)
+set( APP_NAME fceux11 )
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
@@ -66,7 +66,7 @@ if(WIN32)
      endif()
      include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/drivers/win/zlib )
      set( SYS_LIBS  wsock32 ws2_32 vfw32 Htmlhelp )
-     set(APP_ICON_RESOURCES_WINDOWS  ${CMAKE_SOURCE_DIR}/icons/fceux.rc )
+     set(APP_ICON_RESOURCES_WINDOWS  ${CMAKE_SOURCE_DIR}/icons/fceux11.rc )
 
      if ( ${USE_LIBAV} )
         add_definitions( -D_USE_LIBAV ${LIBAV_CFLAGS} )

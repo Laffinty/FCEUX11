@@ -1,6 +1,10 @@
 # FCEUX11
 
-A Nintendo Entertainment System (NES) emulator project.
+A Windows 11-exclusive Nintendo Entertainment System (NES) emulator, derived from [FCEUX](https://fceux.com) 2.6.6.
+
+## About This Project
+
+FCEUX11 is a derivative work of the FCEUX emulator, created under the terms of the GNU General Public License Version 2 (GPLv2). This project focuses exclusively on the Windows 11 platform, leveraging modern Microsoft toolchains and UI frameworks to deliver a high-performance NES emulation experience.
 
 ## Development Status
 
@@ -8,54 +12,52 @@ This project is currently in active development. Key areas of focus include plat
 
 ## Development Goals
 
-- **Platform Focus**: Targeting Windows 11 as the primary supported platform
+- **Platform Focus**: Windows 11 as the sole supported platform
+- **Toolchain Modernization**: MSVC 2022+, Windows SDK 10.0.22621+, vcpkg
+- **UI Migration**: Qt6 with Windows 11 native styling (dark/light themes, Segoe UI)
 - **Code Modernization**: Gradual refactoring using Rust for performance-critical components
-- **Dependency Update**: Transitioning from Qt to modern UI frameworks
 - **General Improvements**: Code cleanup, performance optimizations, and quality-of-life enhancements
 
 ## Toolchain Requirements
 
 ### Required Tools
-- **MSYS2**: MinGW-w64 development environment
-- **CMake**: Build system (version 3.10 or later recommended)
-- **Qt5**: UI framework (for current implementation)
+- **Visual Studio 2022** (or later) with C++ workload
+- **CMake**: 3.28 or later
+- **Qt6**: UI framework (Widgets, OpenGL, OpenGLWidgets)
 - **SDL2**: Multimedia library
+- **vcpkg**: Dependency management
 
 ### Environment Setup
 
 ```powershell
-# Set environment variables
-$env:PATH = "D:\msys64\mingw64\bin;D:\msys64\usr\bin;$env:PATH"
-$env:MINGW_PREFIX = "D:\msys64\mingw64"
+# Ensure vcpkg is installed and integrated
+$env:VCPKG_ROOT = "C:\path\to\vcpkg"
 ```
 
 ## Building Instructions
 
-### Windows (MinGW)
+### Windows (MSVC)
 
 ```powershell
 # Create build directory
-Remove-Item -Path build -Recurse -Force
-New-Item -ItemType Directory -Force -Path build
+Remove-Item -Path build -Recurse -Force -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force -Path build | Out-Null
 cd build
 
 # Configure with CMake
-cmake .. -G "MinGW Makefiles" -DCMAKE_CXX_FLAGS="-DPSS_STYLE=2" -DCMAKE_C_FLAGS="-DPSS_STYLE=2"
+cmake .. -G "Visual Studio 17 2022" -A x64 `
+  -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake"
 
 # Build
-mingw32-make -j4
+cmake --build . --config Release
 
-# Copy dependencies
-cd ..
-& .\scripts\copy_dependencies.ps1 -Executable "build\src\fceux.exe" -OutputDir "build\src\dependencies"
-
-# Run
-& .\build\src\dependencies\run_fceux.bat
+# The executable will be located at:
+# .\src\Release\fceux11.exe
 ```
 
 ## License and Legal Statement
 
-This project is a derivative work based on the FCEUX emulator, distributed under the **GNU General Public License Version 2** (GPLv2).
+This project is a derivative work based on the [FCEUX](https://fceux.com) emulator, distributed under the **GNU General Public License Version 2** (GPLv2).
 
 ### Legality
 
@@ -65,16 +67,20 @@ This project is developed in compliance with the GPLv2 license. The right to cre
 
 - **License Compliance**: This project will remain licensed under GPLv2, ensuring all derivative works maintain the same licensing terms.
 - **Source Availability**: Complete source code will be maintained and made available alongside any distributed binaries.
-- **Attribution**: Proper attribution to original authors and contributors will be preserved in all distributions.
-- **Transparency**: Changes and modifications will be clearly documented in the project's version control history.
+- **Attribution**: Proper attribution to original FCEUX authors and contributors is preserved in all distributions.
+- **Transparency**: Changes and modifications are clearly documented in the project's version control history.
 
-For full license details, see the [LICENSE](LICENSE) file.
+For full license details, see the [`COPYING`](COPYING) file.
 
 ---
 
 # FCEUX11
 
-一个任天堂娱乐系统（NES）模拟器项目。
+一款专为 Windows 11 设计的任天堂娱乐系统（NES）模拟器，基于 [FCEUX](https://fceux.com) 2.6.6 衍生开发。
+
+## 关于本项目
+
+FCEUX11 是 FCEUX 模拟器的衍生作品，依据 GNU 通用公共许可证第 2 版（GPLv2）条款创建。本项目专注于 Windows 11 平台，利用现代微软工具链和 UI 框架，提供高性能的 NES 模拟体验。
 
 ## 开发状态
 
@@ -82,54 +88,52 @@ For full license details, see the [LICENSE](LICENSE) file.
 
 ## 开发方向
 
-- **平台聚焦**: 以 Windows 11 作为主要支持平台
+- **平台聚焦**: Windows 11 为唯一支持平台
+- **工具链现代化**: MSVC 2022+、Windows SDK 10.0.22621+、vcpkg
+- **UI 迁移**: Qt6 配合 Windows 11 原生样式（暗色/亮色主题、Segoe UI 字体）
 - **代码现代化**: 逐步使用 Rust 重构性能关键组件
-- **依赖更新**: 从 Qt 过渡到现代 UI 框架
 - **整体改进**: 代码清理、性能优化和用户体验增强
 
 ## 工具链要求
 
 ### 必需工具
-- **MSYS2**: MinGW-w64 开发环境
-- **CMake**: 构建系统（建议版本 3.10 或更高）
-- **Qt5**: UI 框架（当前实现使用）
+- **Visual Studio 2022**（或更高版本）及 C++ 工作负载
+- **CMake**: 3.28 或更高版本
+- **Qt6**: UI 框架（Widgets、OpenGL、OpenGLWidgets）
 - **SDL2**: 多媒体库
+- **vcpkg**: 依赖管理
 
 ### 环境配置
 
 ```powershell
-# 设置环境变量
-$env:PATH = "D:\msys64\mingw64\bin;D:\msys64\usr\bin;$env:PATH"
-$env:MINGW_PREFIX = "D:\msys64\mingw64"
+# 确保 vcpkg 已安装并完成集成
+$env:VCPKG_ROOT = "C:\path\to\vcpkg"
 ```
 
 ## 编译说明
 
-### Windows (MinGW)
+### Windows (MSVC)
 
 ```powershell
 # 创建构建目录
-Remove-Item -Path build -Recurse -Force
-New-Item -ItemType Directory -Force -Path build
+Remove-Item -Path build -Recurse -Force -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force -Path build | Out-Null
 cd build
 
 # 使用 CMake 配置
-cmake .. -G "MinGW Makefiles" -DCMAKE_CXX_FLAGS="-DPSS_STYLE=2" -DCMAKE_C_FLAGS="-DPSS_STYLE=2"
+cmake .. -G "Visual Studio 17 2022" -A x64 `
+  -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake"
 
 # 编译
-mingw32-make -j4
+cmake --build . --config Release
 
-# 复制依赖项
-cd ..
-& .\scripts\copy_dependencies.ps1 -Executable "build\src\fceux.exe" -OutputDir "build\src\dependencies"
-
-# 运行
-& .\build\src\dependencies\run_fceux.bat
+# 可执行文件位于：
+# .\src\Release\fceux11.exe
 ```
 
 ## 许可证与法律声明
 
-本项目是基于 FCEUX 模拟器的衍生作品，采用 **GNU 通用公共许可证第 2 版**（GPLv2）发布。
+本项目是基于 [FCEUX](https://fceux.com) 模拟器的衍生作品，采用 **GNU 通用公共许可证第 2 版**（GPLv2）发布。
 
 ### 合法性声明
 
@@ -139,7 +143,7 @@ cd ..
 
 - **许可证合规**: 本项目将始终采用 GPLv2 许可证，确保所有衍生作品遵循相同的许可条款。
 - **源代码可用性**: 完整源代码将与任何分发的二进制文件一起提供。
-- **署名尊重**: 在所有分发版本中保留对原始作者和贡献者的适当署名。
+- **署名尊重**: 在所有分发版本中保留对原始 FCEUX 作者和贡献者的适当署名。
 - **透明性**: 变更和修改将在项目的版本控制历史中清晰记录。
 
-有关完整许可证详情，请参阅 [LICENSE](LICENSE) 文件。
+有关完整许可证详情，请参阅 [`COPYING`](COPYING) 文件。

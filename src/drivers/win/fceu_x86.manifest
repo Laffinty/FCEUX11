@@ -3,11 +3,11 @@
   xmlns="urn:schemas-microsoft-com:asm.v1"
   manifestVersion="1.0">
 <assemblyIdentity
-    name="FCEUX"
+    name="FCEUX11"
     processorArchitecture="x86"
     version="1.0.0.0"
     type="win32"/>
-<description>FCEUX</description>
+<description>FCEUX11 - Windows 11 NES Emulator</description>
 <dependency>
     <dependentAssembly>
         <assemblyIdentity

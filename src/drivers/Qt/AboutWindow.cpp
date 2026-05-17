@@ -62,6 +62,8 @@ extern "C"
 #include "../../version.h"
 #include "../../fceu.h"
 
+// Original FCEUX authors listed below as required by GPLv2.
+// FCEUX11 is a derivative work based on FCEUX.
 static const char *Authors[] = {
 	"Linux/SDL Developers:",
 	"\t mjbudd77",
@@ -99,7 +101,7 @@ AboutWindow::AboutWindow(QWidget *parent)
 
 	pm2 = pm.scaled( 128, 128 );
 
-	setWindowTitle( tr("About fceuX") );
+	setWindowTitle( tr("About FCEUX11") );
 
 	resize( 512, 600 );
 
@@ -152,7 +154,7 @@ AboutWindow::AboutWindow(QWidget *parent)
 
 	hbox1 = new QHBoxLayout();
 	lbl = new QLabel();
-	lbl->setText("<a href=\"https://fceux.com\">Website</a>");
+	lbl->setText("<a href=\"https://fceux.com\">Original FCEUX Website</a>");
 	lbl->setTextInteractionFlags(Qt::TextBrowserInteraction);
 	lbl->setOpenExternalLinks(true);
 
@@ -162,7 +164,8 @@ AboutWindow::AboutWindow(QWidget *parent)
 	mainLayout->addLayout( hbox1 );
 
 	hbox1 = new QHBoxLayout();
-	lbl = new QLabel( tr("License: GPL") );
+	lbl = new QLabel();
+	lbl->setText("FCEUX11 - Windows 11 NES Emulator");
 
 	hbox1->addWidget( lbl );
 	hbox1->setAlignment( Qt::AlignCenter );
@@ -170,7 +173,23 @@ AboutWindow::AboutWindow(QWidget *parent)
 	mainLayout->addLayout( hbox1 );
 
 	hbox1 = new QHBoxLayout();
-	lbl = new QLabel( tr("© 2020 FceuX Development Team") );
+	lbl = new QLabel( tr("License: GPLv2") );
+
+	hbox1->addWidget( lbl );
+	hbox1->setAlignment( Qt::AlignCenter );
+
+	mainLayout->addLayout( hbox1 );
+
+	hbox1 = new QHBoxLayout();
+	lbl = new QLabel( tr("Based on FCEUX by the FCEUX Development Team") );
+
+	hbox1->addWidget( lbl );
+	hbox1->setAlignment( Qt::AlignCenter );
+
+	mainLayout->addLayout( hbox1 );
+
+	hbox1 = new QHBoxLayout();
+	lbl = new QLabel( tr("© 2026 FCEUX11 Contributors | License: GPLv2") );
 
 	hbox1->addWidget( lbl );
 	hbox1->setAlignment( Qt::AlignCenter );

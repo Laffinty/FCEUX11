@@ -1,0 +1,46 @@
+===========================================================================
+                         DERIVATIVE WORK NOTICE
+===========================================================================
+
+FCEUX11 is a derivative work based on the FCEUX emulator project.
+
+Original Project
+----------------
+Name:        FCEUX
+Website:     https://fceux.com
+License:     GNU General Public License Version 2 (GPLv2)
+
+FCEUX11 Project
+---------------
+Name:        FCEUX11
+Description: Windows 11 focused NES/Famicom emulator derivative
+License:     GNU General Public License Version 2 (GPLv2)
+
+This project is developed in full compliance with the GPLv2 license terms.
+The right to create derivative works, modify, and distribute software under
+GPLv2 is explicitly granted by the license terms.
+
+Original Authors and Contributors (Minimum Necessary Attribution)
+-----------------------------------------------------------------
+The following individuals and entities are credited as original authors
+and contributors to the upstream FCEUX project, as required by GPLv2:
+
+  Bero, Xodnizel, Aaron Oneal, Joe Nahmias, Paul Kuliniewicz,
+  Quietust, Ben Parnell, Parasyte & bbitmaster, blip & nitsuja,
+  SP, zeromus, adelikat, caH4e3, qfox, Luke Gustafson, _mz,
+  UncombedCoconut, DwEdit, AnS, rainwarrior, feos,
+  mjbudd77, Lukas Sabota //punkrockguy318, Soules, Bryan Cain,
+  radsaq, Shinydoofy,
+  Mitsutaka Okazaki, Andrea Mazzoleni, Gilles Vollant
+
+License Compliance Commitments
+------------------------------
+- This project will remain licensed under GPLv2.
+- Complete source code is maintained and made available alongside any
+  distributed binaries.
+- Proper attribution to original authors and contributors is preserved.
+- Changes and modifications are clearly documented in version control.
+
+For full license details, see the COPYING file in the project root.
+
+===========================================================================
