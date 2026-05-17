@@ -22,6 +22,7 @@
 #include <QApplication>
 #include <QSplashScreen>
 #include <QSettings>
+#include <QFile>
 //#include <QProxyStyle>
 
 #include "Qt/ConsoleWindow.h"
@@ -102,6 +103,7 @@ int main( int argc, char *argv[] )
 	fceuWrapperPreInit(argc, argv);
 
 	qInstallMessageHandler(MessageOutput);
+
 	QApplication app(argc, argv);
 
 	QFont font("Segoe UI Variable", 9);
@@ -109,6 +111,21 @@ int main( int argc, char *argv[] )
 	QApplication::setFont(font);
 
 	QApplication::setAttribute(Qt::AA_DontShowShortcutsInContextMenus, false);
+
+	#ifdef WIN32
+	QSettings themeSettings("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+	                        QSettings::NativeFormat);
+	bool isDarkMode = themeSettings.value("AppsUseLightTheme", 1).toInt() == 0;
+	if (isDarkMode)
+	{
+		QFile styleSheetFile(":/styles/dark.qss");
+		if (styleSheetFile.open(QFile::ReadOnly))
+		{
+			QString styleSheet = QLatin1String(styleSheetFile.readAll());
+			app.setStyleSheet(styleSheet);
+		}
+	}
+	#endif
 
 	QCoreApplication::setOrganizationName("TasEmulators");
 	QCoreApplication::setOrganizationDomain("TasEmulators.org");

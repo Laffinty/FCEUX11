@@ -851,7 +851,7 @@ InitConfig()
 	config->addOption("SDL.TasSaveCompact_GreenzoneSavingMode"         , tasCfg.saveCompact_GreenzoneSavingMode  );
 	config->addOption("SDL.TasLastAuthorName" , "");
 
-	config->addOption("_useNativeFileDialog", "SDL.UseNativeFileDialog", false);
+	config->addOption("_useNativeFileDialog", "SDL.UseNativeFileDialog", true);
 	config->addOption("_useNativeMenuBar"   , "SDL.UseNativeMenuBar", false);
 	config->addOption("SDL.PauseOnMainMenuAccess", false);
 	config->addOption("SDL.AutoHideMenuFullsreen", false);
