@@ -463,6 +463,12 @@ set(SRC_DRIVERS_QT
 
 set(SOURCES ${SRC_CORE} ${SRC_DRIVERS_COMMON} ${SRC_DRIVERS_QT})
 
+# Phase 7: Rust module integration
+add_subdirectory(rust)
+if(FCEUX11_RUST_ENABLED)
+    add_definitions(-DFCEUX11_RUST_ENABLED)
+endif()
+
 # Put build timestamp into BUILD_TS environment variable and from there into
 # the FCEUX_BUILD_TIMESTAMP preprocessor definition.
 # Note: with CMake >= 3.8.0, this will respect SOURCE_DATE_EPOCH. For more info,
@@ -481,6 +487,10 @@ add_executable(  ${APP_NAME}  ${SOURCES} ../resources.qrc
 	${CMAKE_CURRENT_BINARY_DIR}/fceux_git_info.cpp
 	${APP_ICON_RESOURCES_WINDOWS} )
 
+if(FCEUX11_RUST_ENABLED)
+    add_dependencies(${APP_NAME} fceux11_rust_build)
+endif()
+
 target_link_libraries( ${APP_NAME}
    ${ASAN_LDFLAGS}  ${GPROF_LDFLAGS}
    ${${Qt}Widgets_LIBRARIES}
@@ -492,6 +502,8 @@ target_link_libraries( ${APP_NAME}
 	${MINIZIP_LDFLAGS} ${ZLIB_LIBRARIES} ${LIBARCHIVE_LDFLAGS}
 	${LUA_LDFLAGS} ${X264_LDFLAGS} ${X265_LDFLAGS} ${LIBAV_LDFLAGS}
  	${SYS_LIBS}
+	${FCEUX11_RUST_STATIC_LIB}
+	$<$<AND:$<BOOL:${FCEUX11_RUST_ENABLED}>,$<BOOL:${MINGW}>>:ntdll>
 )
 
 if (WIN32)

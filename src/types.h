@@ -60,12 +60,9 @@ typedef signed int int32;
 #define PATH_MAX 260
 #else
 
-//mingw32 doesnt prototype this for some reason
-#ifdef __MINGW32__
-#ifndef alloca
-#define alloca __builtin_alloca
-#endif
-#endif
+// MinGW-w64 GCC 16+ provides alloca via <malloc.h> included from <stdlib.h>.
+// Manual definition is no longer needed and triggers -Wbuiltin-macro-redefined.
+
 
 //#include <typeinfo>
 

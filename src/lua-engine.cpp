@@ -136,8 +136,10 @@ extern "C"
  #define strnicmp strncasecmp
 
  #ifdef __GNUC__
-  #ifndef __forceinline
-   #define __forceinline __attribute__ ((always_inline))
+  #if __GNUC__ < 16
+   #ifndef __forceinline
+    #define __forceinline __attribute__ ((always_inline))
+   #endif
   #endif
  #else
   #ifndef __forceinline

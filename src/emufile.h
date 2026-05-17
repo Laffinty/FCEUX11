@@ -160,7 +160,7 @@ public:
 
 	u8* buf() {
 		if(size()==0) reserve(1);
-		return &(*vec)[0];
+		return vec->data();
 	}
 
 	std::vector<u8>* get_vec() { return vec; };

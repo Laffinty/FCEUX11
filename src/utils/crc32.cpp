@@ -21,13 +21,22 @@
 #include "../types.h"
 #include "crc32.h"
 
+#ifdef FCEUX11_RUST_ENABLED
+#include "../rust/fceux11_rust.h"
+#endif
+
 #include <zlib.h>
+
 uint32 CalcCRC32(uint32 crc, uint8 *buf, uint32 len)
 {
- return(crc32(crc,buf,len));
+#ifdef FCEUX11_RUST_ENABLED
+	return fceux11_rust_crc32(crc, buf, len);
+#else
+	return crc32(crc, buf, len);
+#endif
 }
 
 uint32 FCEUI_CRC32(uint32 crc, uint8 *buf, uint32 len)
 {
- return(CalcCRC32(crc,buf,len));
+	return CalcCRC32(crc, buf, len);
 }

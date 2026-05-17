@@ -1,0 +1,15 @@
+[package]
+name = "fceux11-rust"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["staticlib"]
+name = "fceux11_rust"
+
+[dependencies]
+crc32fast = "1.4"
+
+[profile.release]
+panic = "abort"
+lto = true
