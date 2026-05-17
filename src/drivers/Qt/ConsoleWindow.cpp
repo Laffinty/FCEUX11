@@ -168,11 +168,7 @@ consoleWin_t::consoleWin_t(QWidget *parent)
 	setAcceptDrops(true);
 
 	gameTimer  = new QTimer( this );
-#if QT_VERSION >= QT_VERSION_CHECK(6,0,0)
-	mutex      = new QRecursiveMutex();
-#else
-	mutex      = new QMutex( QMutex::Recursive );
-#endif
+mutex      = new QRecursiveMutex();
 	emulatorThread = new emulatorThread_t(this);
 
 	connect(emulatorThread, &QThread::finished, emulatorThread, &QObject::deleteLater);

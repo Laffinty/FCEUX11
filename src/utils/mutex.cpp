@@ -14,11 +14,7 @@ namespace FCEU
 mutex::mutex(void)
 {
 #ifdef __QT_DRIVER__
-	#if QT_VERSION >= QT_VERSION_CHECK(6,0,0)
 	mtx = new QRecursiveMutex();
-	#else
-	mtx = new QMutex( QMutex::Recursive );
-	#endif
 #endif
 
 }

@@ -6083,7 +6083,7 @@ void QPianoRoll::startDraggingMarker(int mouseX, int mouseY, int rowIndex, int c
 		markerDragCountdown = MARKER_DRAG_COUNTDOWN_MAX;
 		setCursor( Qt::ClosedHandCursor );
 
-		connect(mkrDrag, &QDialog::destroyed, this,[=]
+		connect(mkrDrag, &QDialog::destroyed, this, [=, this]()
 		{
 			if ( mkrDrag == sender() )
 			{

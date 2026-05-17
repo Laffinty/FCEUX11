@@ -104,6 +104,12 @@ int main( int argc, char *argv[] )
 	qInstallMessageHandler(MessageOutput);
 	QApplication app(argc, argv);
 
+	QFont font("Segoe UI Variable", 9);
+	font.setStyleHint(QFont::SansSerif);
+	QApplication::setFont(font);
+
+	QApplication::setAttribute(Qt::AA_DontShowShortcutsInContextMenus, false);
+
 	QCoreApplication::setOrganizationName("TasEmulators");
 	QCoreApplication::setOrganizationDomain("TasEmulators.org");
 	QCoreApplication::setApplicationName("fceux");
