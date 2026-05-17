@@ -304,14 +304,7 @@ void LuaControlDialog_t::openLuaScriptFile(void)
 			urls << QUrl::fromLocalFile(d.absolutePath());
 		}
 	}
-#ifndef WIN32
-	d.setPath("/usr/share/fceux/luaScripts");
 
-	if (d.exists())
-	{
-		urls << QUrl::fromLocalFile(d.absolutePath());
-	}
-#endif
 
 	luaPath = getenv("LUA_PATH");
 

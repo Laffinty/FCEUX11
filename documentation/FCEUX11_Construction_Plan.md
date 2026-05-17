@@ -401,7 +401,7 @@ Phase 8 ── 发布部署模块 ───── CI 管道 / MSIX / 签名 / �
   - 低风险分支：直接删除非 Windows 代码路径。
   - 复杂分支：以 `#ifdef _WIN32` 替代通用宏；无法直接移除的非 Windows 分支改为 `#error "Platform not supported"` 编译期防护。
   - 保留 `src/drivers/Qt/` 中必要的 `#ifdef WIN32` 代码（如 `AttachConsole`、`QWindowsWindowFunctions`）。
-- **基线发现补充**: `src/drivers/Qt/unix-netplay.cpp` 文件名即暴露其 Unix 起源，应在清理范围内。
+- **基线发现补充**: ~~`src/drivers/Qt/unix-netplay.cpp`~~ **已重命名**为 `QtNetplay.cpp` / `QtNetplay.h`（Phase 6 part 3）。
 
 ---
 

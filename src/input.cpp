@@ -36,25 +36,11 @@
 #include "fds.h"
 #include "driver.h"
 
-#if defined(WIN32) && !defined(__QT_DRIVER__)
-#include "drivers/win/main.h"
-#include "drivers/win/memwatch.h"
-#include "drivers/win/cheat.h"
-#include "drivers/win/debugger.h"
-#include "drivers/win/ppuview.h"
-#include "drivers/win/cdlogger.h"
-#include "drivers/win/tracer.h"
-#include "drivers/win/memview.h"
-#include "drivers/win/window.h"
-#include "drivers/win/ntview.h"
-#include "drivers/win/taseditor.h"
-
 #include <string>
 #include <ostream>
 #include <cstring>
 
 extern bool mustRewindNow;
-#endif // WIN32 && !__QT_DRIVER__
 
 //it is easier to declare these input drivers extern here than include a bunch of files
 //-------------

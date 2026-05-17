@@ -169,17 +169,7 @@ mutex      = new QRecursiveMutex();
 
 	if ( opt )
 	{
-		#ifndef WIN32
-		int policy, prio, nice;
 
-		g_config->getOption( "SDL.GuiSchedPolicy", &policy );
-		g_config->getOption( "SDL.GuiSchedPrioRt", &prio   );
-		g_config->getOption( "SDL.GuiSchedNice"  , &nice   );
-
-		setNicePriority( nice );
-
-		setSchedParam( policy, prio );
-		#endif
 	}
 
 

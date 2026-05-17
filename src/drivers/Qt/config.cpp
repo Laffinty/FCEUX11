@@ -34,7 +34,7 @@
 #include "Qt/sdl.h"
 #include "Qt/sdl-video.h"
 #include "Qt/AviRecord.h"
-#include "Qt/unix-netplay.h"
+#include "Qt/QtNetplay.h"
 #include "Qt/TasEditor/taseditor_config.h"
 
 #ifdef WIN32
@@ -410,7 +410,6 @@ CreateDirs(const std::string &dir)
 	std::string subdir;
 	int x=0;
 
-#if defined(WIN32) || defined(NEED_MINGW_HACKS)
 	mkdir(dir.c_str());
 	chmod(dir.c_str(), 755);
 	while ( subs[x] != NULL )
@@ -419,15 +418,6 @@ CreateDirs(const std::string &dir)
 		mkdir(subdir.c_str());
 		x++;
 	}
-#else
-	mkdir(dir.c_str(), S_IRWXU);
-	while ( subs[x] != NULL )
-	{
-		subdir = dir + PSS + subs[x];
-		mkdir(subdir.c_str(), S_IRWXU);
-		x++;
-	}
-#endif
 }
 
 /**
@@ -632,13 +622,7 @@ InitConfig()
 	config->addOption("SDL.AviDriver", AVI_DRIVER_LIBGWAVI);
 #endif
 
-#if    defined(WIN32)
 	config->addOption("SDL.AviVideoFormat", AVI_VFW);
-#elif  defined(_USE_X264)
-	config->addOption("SDL.AviVideoFormat", AVI_X264);
-#else
-	config->addOption("SDL.AviVideoFormat", AVI_RGB24);
-#endif
 	config->addOption("SDL.AviRecordAudio", 1);
 
 #ifdef _USE_LIBAV

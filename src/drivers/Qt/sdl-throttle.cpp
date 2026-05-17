@@ -24,6 +24,9 @@
 #include "Qt/throttle.h"
 #include "utils/timeStamp.h"
 
+#include <QElapsedTimer>
+#include <QThread>
+
 static const double Slowest = 0.015625; // 1/64x speed (around 1 fps on NTSC)
 static const double Fastest = 32;       // 32x speed   (around 1920 fps on NTSC)
 static const double Normal  = 1.0;      // 1x speed    (around 60 fps on NTSC)
@@ -240,9 +243,24 @@ double getFrameRateAdjustmentRatio(void)
 
 static int highPrecSleep( FCEU::timeStampRecord &ts )
 {
-	int ret = 0;
-	SDL_Delay( ts.toMilliSeconds() );
-	return ret;
+	QElapsedTimer timer;
+	timer.start();
+
+	const double targetSec = ts.toSeconds();
+	const qint64 targetMs = static_cast<qint64>(targetSec * 1000.0);
+
+	if (targetMs > 1)
+	{
+		QThread::msleep(targetMs - 1);
+	}
+
+	// Spin-wait for the remaining sub-millisecond time
+	while (timer.nsecsElapsed() < static_cast<qint64>(targetSec * 1.0e9))
+	{
+		// Busy wait for precision
+	}
+
+	return 0;
 }
 
 /**

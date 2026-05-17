@@ -24,7 +24,7 @@
 //#include "Qt/main.h"
 //#include "Qt/input.h"
 //#include "Qt/dface.h"
-#include "Qt/unix-netplay.h"
+#include "Qt/QtNetplay.h"
 
 #include "../../fceu.h"
 #include "../../driver.h"

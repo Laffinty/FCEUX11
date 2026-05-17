@@ -1,4 +1,3 @@
-include(GNUInstallDirs)
 
 set( APP_NAME fceux11 )
 set(CMAKE_AUTOMOC ON)
@@ -386,7 +385,7 @@ set(SRC_DRIVERS_COMMON
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/common/nes_ntsc.c
 )
 
-set(SRC_DRIVERS_SDL
+set(SRC_DRIVERS_QT
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/main.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleWindow.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleViewerGL.cpp  
@@ -436,7 +435,7 @@ set(SRC_DRIVERS_SDL
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/sdl-video.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/sdl-joystick.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/sdl-throttle.cpp  
-  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/unix-netplay.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/QtNetplay.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/AviRecord.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/AviRiffViewer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/avi/avi-utils.cpp
@@ -462,7 +461,7 @@ set(SRC_DRIVERS_SDL
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/TasEditor/markers.cpp
 )
 
-set(SOURCES ${SRC_CORE} ${SRC_DRIVERS_COMMON} ${SRC_DRIVERS_SDL})
+set(SOURCES ${SRC_CORE} ${SRC_DRIVERS_COMMON} ${SRC_DRIVERS_QT})
 
 # Put build timestamp into BUILD_TS environment variable and from there into
 # the FCEUX_BUILD_TIMESTAMP preprocessor definition.

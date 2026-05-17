@@ -36,7 +36,7 @@
 #include "Qt/sdl.h"
 #include "Qt/sdl-video.h"
 #include "Qt/nes_shm.h"
-#include "Qt/unix-netplay.h"
+#include "Qt/QtNetplay.h"
 #include "Qt/AviRecord.h"
 #include "Qt/HexEditor.h"
 #include "Qt/CheatsConf.h"
