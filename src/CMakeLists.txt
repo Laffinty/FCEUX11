@@ -9,13 +9,8 @@ if (${PUBLIC_RELEASE})
 	add_definitions( -DPUBLIC_RELEASE=1 )
 endif()
 
-if ( ${QT6} )
-	message( STATUS "GUI Frontend: Qt6")
-	set( Qt Qt6 )
-else()
-	message( STATUS "GUI Frontend: Qt5")
-	set( Qt Qt5 )
-endif()
+message( STATUS "GUI Frontend: Qt6")
+set( Qt Qt6 )
 
 if ( ${QHELP} )
 	set(QtHelpModule Help)
@@ -26,20 +21,9 @@ if ( ${FCEU_PROFILER_ENABLE} )
 	message( STATUS "FCEU Profiler Enabled")
 	add_definitions( -D__FCEU_PROFILER_ENABLE__ )
 endif()
-	
 
-if ( ${QT6} )
-	find_package( Qt6 REQUIRED COMPONENTS Widgets OpenGL OpenGLWidgets ${QtHelpModule})
-  	add_definitions( ${Qt6Widgets_DEFINITIONS} ${Qt6Help_DEFINITIONS} ${Qt6OpenGLWidgets_DEFINITIONS} )
-  	include_directories( ${Qt6Widgets_INCLUDE_DIRS} ${Qt6Help_INCLUDE_DIRS} ${Qt6OpenGLWidgets_INCLUDE_DIRS} )
-else()
-	find_package( Qt5 REQUIRED COMPONENTS Widgets OpenGL ${QtHelpModule})
-	add_definitions( ${Qt5Widgets_DEFINITIONS} ${Qt5Help_DEFINITIONS} )
-	include_directories( ${Qt5Widgets_INCLUDE_DIRS} ${Qt5Help_INCLUDE_DIRS} )
-endif()
+find_package( Qt6 REQUIRED COMPONENTS Widgets OpenGL OpenGLWidgets ${QtHelpModule})
 
-
-if(WIN32)
      find_package(OpenGL REQUIRED)
      #find_package(Qt5 COMPONENTS Widgets OpenGL REQUIRED)
      #add_definitions( ${Qt5Widgets_DEFINITIONS}  )
@@ -53,8 +37,14 @@ if(WIN32)
          #add_definitions( /wd4018 ) # Integer comparison sign mismatch warnings
      endif()
      if(MINGW)
-         include_directories( $ENV{MINGW_PREFIX}/include/SDL2 )
-         include_directories( $ENV{MINGW_PREFIX}/include )
+         find_path(SDL2_INCLUDE_DIR SDL.h PATH_SUFFIXES SDL2 PATHS $ENV{MINGW_PREFIX}/include D:/msys64/mingw64/include C:/msys64/mingw64/include)
+         find_path(MINGW_INCLUDE_DIR SDL2/SDL.h PATHS $ENV{MINGW_PREFIX}/include D:/msys64/mingw64/include C:/msys64/mingw64/include)
+         if(SDL2_INCLUDE_DIR)
+             include_directories( ${SDL2_INCLUDE_DIR} )
+         endif()
+         if(MINGW_INCLUDE_DIR)
+             include_directories( ${MINGW_INCLUDE_DIR} )
+         endif()
          set( OPENGL_LDFLAGS  -lopengl32 )
          set( SDL2_LDFLAGS  -lSDL2 )
          set( LIBARCHIVE_LDFLAGS  -larchive )
@@ -77,141 +67,6 @@ if(WIN32)
                         	 ${FFMPEG_INSTALL_PREFIX}/ffmpeg/lib/swscale.lib
                         	 ${FFMPEG_INSTALL_PREFIX}/ffmpeg/lib/swresample.lib )
      endif()
-
-else(WIN32)
-  # Non Windows System
-  # UNIX (Linux or Mac OSX)
-
-	if ( ${GLVND} )
-		message( STATUS "OpenGL preference: GLVND")
-		set (OpenGL_GL_PREFERENCE  GLVND)
-	else()
-		message( STATUS "OpenGL preference: LEGACY")
-		set (OpenGL_GL_PREFERENCE  LEGACY)
-	endif()
-
-  # Use the built-in cmake find_package functions to find dependencies
-  # Use package PkgConfig to detect headers/library what find_package cannot find.
-  find_package(PkgConfig REQUIRED)
-  find_package(OpenGL REQUIRED)
-  find_package(ZLIB REQUIRED)
-
-  add_definitions( -Wall  -Wno-write-strings  -Wno-parentheses  -Wno-unused-local-typedefs  -fPIC )
-  #add_definitions( -Wno-sign-compare )  # Integer comparison sign mismatch warnings
-  add_definitions( -DFCEUDEF_DEBUGGER )
-
-  #if ( ${QT6} )
-  #	find_package( Qt6 COMPONENTS Widgets OpenGL OpenGLWidgets REQUIRED)
-  #	add_definitions( ${Qt6Widgets_DEFINITIONS} ${Qt6OpenGLWidgets_DEFINITIONS} )
-  #	include_directories( ${Qt6Widgets_INCLUDE_DIRS} ${QtOpenGLWidgets_INCLUDE_DIRS} )
-  #else()
-  #	find_package( Qt5 COMPONENTS Widgets OpenGL REQUIRED)
-  #	add_definitions( ${Qt5Widgets_DEFINITIONS}  )
-  #	include_directories( ${Qt5Widgets_INCLUDE_DIRS} )
-  #endif()
-  add_definitions( -D__QT_DRIVER__  -DQT_DEPRECATED_WARNINGS )
-
-  if ( ${GPROF_ENABLE} )
-	add_definitions( -pg )
-	set( GPROF_LDFLAGS  -pg )
-	message( STATUS "GNU Profiling Enabled" )
-  endif()
-
-  if ( ${ASAN_ENABLE} )
-	add_definitions( -fsanitize=address -fsanitize=bounds-strict )
-	add_definitions( -fsanitize=undefined -fno-sanitize=vptr )
-	set( ASAN_LDFLAGS  -lasan -lubsan)
-	message( STATUS "Address Sanitizer Enabled" )
-  else()
-	message( STATUS "Address Sanitizer Disabled" )
-  endif()
-
-  # Check for libminizip
-  pkg_check_modules( MINIZIP REQUIRED minizip)
-
-  if ( ${MINIZIP_FOUND} )
-	  message( STATUS "Using System minizip ${MINIZIP_VERSION}" )
-	  add_definitions( -D_SYSTEM_MINIZIP ${MINIZIP_CFLAGS} )
-  endif()
-
-  pkg_check_modules( LIBARCHIVE libarchive)
-
-  if ( ${LIBARCHIVE_FOUND} )
-	  message( STATUS "Using System Libarchive Library ${LIBARCHIVE_VERSION}" )
-	  add_definitions( -D_USE_LIBARCHIVE ${LIBARCHIVE_CFLAGS} )
-  endif()
-
-  pkg_check_modules( X264 x264)
-
-  if ( ${X264_FOUND} )
-	  message( STATUS "Using System X264 Encoder Library ${X264_VERSION}" )
-	  add_definitions( -D_USE_X264 ${X264_CFLAGS} )
-  endif()
-
-  pkg_check_modules( X265 x265)
-
-  if ( ${X265_FOUND} )
-	  message( STATUS "Using System X265 Encoder Library ${X265_VERSION}" )
-	  add_definitions( -D_USE_X265 ${X265_CFLAGS} )
-  endif()
-
-  pkg_check_modules( LIBAV  libavcodec  libavformat  libavutil  libswresample  libswscale)
-
-  if ( ${LIBAV_FOUND} )
-	  message( STATUS "Using System Libav Library ${LIBAV_VERSION}" )
-	  add_definitions( -D_USE_LIBAV ${LIBAV_CFLAGS} )
-  endif()
-
-  #find_package(X11)
-  pkg_check_modules( X11 x11)
-
-  if ( ${X11_FOUND} )
-	message( STATUS "Has X11 Library ${X11_VERSION}" )
-	add_definitions( -D_HAS_X11 )
-	include_directories( ${X11_INCLUDE_DIR} )
-  endif()
-
-  pkg_check_modules( XKB xkbcommon)
-
-  if ( ${XKB_FOUND} )
-	message( STATUS "Has XKB Library ${XKB_VERSION}" )
-        add_definitions( -D_HAS_XKB ${XKB_CFLAGS} )
-  endif()
-
-  #pkg_check_modules( GL gl) # Use built in find package instead for OpenGL
-
-  # Check for OpenGL
-  if ( ${OPENGL_FOUND} )
-	include_directories( ${OPENGL_INCLUDE_DIR} )
-  endif()
-
-  # Check for SDL2
-  pkg_check_modules( SDL2 REQUIRED sdl2)
-
-  if ( ${SDL2_FOUND} )
-	  add_definitions( ${SDL2_CFLAGS} -D__SDL__ )
-  endif()
-
-  # Check for LUA
-  pkg_search_module( LUA lua5.1 lua-5.1 )
-
-  add_definitions( -DHAVE_ASPRINTF ) # What system wouldn't have this?
-  add_definitions( -DLUA_USE_LINUX ) # This needs to be set when link LUA internally for linux and macosx
-
-  if(APPLE)
-	set( OPENGL_LDFLAGS  "-framework OpenGL" )
-  else()
-	set( OPENGL_LDFLAGS  ${OPENGL_LIBRARIES} )
-	# OpenBSD  refuses  to  implement  the POSIX  realtime  interface  and
-	# refuses to provide a stub library for -ldl
-	if(${CMAKE_SYSTEM_NAME} STREQUAL "OpenBSD")
-	  	set( SYS_LIBS  -lpthread)
-        else()
-          	set( SYS_LIBS  -lrt  -lpthread  -ldl)
-        endif()
-  endif()
-
-endif(WIN32)
 
 if ( ${LUA_FOUND} )
    # Use System LUA
@@ -294,13 +149,6 @@ endif()
 include_directories( ${CMAKE_SOURCE_DIR}/src )
 include_directories( ${CMAKE_SOURCE_DIR}/src/drivers )
 
-if(APPLE)
-  add_definitions( -DPSS_STYLE=1 )
-else(APPLE)
-  if(UNIX)
-    add_definitions( -DPSS_STYLE=1 )
-  endif(UNIX)
-endif(APPLE)
 
 set(SRC_CORE
 	${CMAKE_CURRENT_SOURCE_DIR}/asm.cpp
@@ -639,37 +487,16 @@ set(SOURCES ${SRC_CORE} ${SRC_DRIVERS_COMMON} ${SRC_DRIVERS_SDL})
 string(TIMESTAMP BUILD_TS "%H:%M:%S  %b %d %Y" UTC)
 add_definitions( -DFCEUX_BUILD_TIMESTAMP=\"${BUILD_TS}\" )
 
-if (WIN32)
 add_custom_command( 
 	OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/fceux_git_info.cpp  
 	COMMAND  ${CMAKE_SOURCE_DIR}/scripts/genGitHdr.bat  ${CMAKE_CURRENT_BINARY_DIR} 
 	VERBATIM )
-else()
-add_custom_command( 
-	OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/fceux_git_info.cpp  
-	COMMAND  ${CMAKE_SOURCE_DIR}/scripts/genGitHdr.sh  ${CMAKE_CURRENT_BINARY_DIR} 
-	VERBATIM )
-endif()
 
 set_property(SOURCE ${CMAKE_CURRENT_BINARY_DIR}/fceux_git_info.cpp PROPERTY SKIP_AUTOGEN ON)
-
-if (APPLE)
-
-set(MACOSX_BUNDLE_ICON_FILE fceux.icns)
-set(APP_ICON  ${CMAKE_SOURCE_DIR}/fceux.icns )
-set_source_files_properties( ${APP_ICON} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources" )
-
-add_executable(  ${APP_NAME}  MACOSX_BUNDLE ${APP_ICON} ${SOURCES} ../resources.qrc 
-	${CMAKE_CURRENT_BINARY_DIR}/fceux_git_info.cpp)
-elseif (WIN32)
 
 add_executable(  ${APP_NAME}  ${SOURCES} ../resources.qrc 
 	${CMAKE_CURRENT_BINARY_DIR}/fceux_git_info.cpp
 	${APP_ICON_RESOURCES_WINDOWS} )
-else()
-add_executable(  ${APP_NAME}  ${SOURCES} ../resources.qrc 
-	${CMAKE_CURRENT_BINARY_DIR}/fceux_git_info.cpp)
-endif()
 
 target_link_libraries( ${APP_NAME}
    ${ASAN_LDFLAGS}  ${GPROF_LDFLAGS}
@@ -690,51 +517,3 @@ if (WIN32)
    set_target_properties(${APP_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
 endif()
 
-if (APPLE)
-
-install( TARGETS  ${APP_NAME}  
-	BUNDLE  DESTINATION  . COMPONENT Runtime 
-	RUNTIME  DESTINATION  bin COMPONENT Runtime )
-
-# Use \$ to defer expansion until install script is called; CPack will call it with its own CMAKE_INSTALL_PREFIX
-set(APP \${CMAKE_INSTALL_PREFIX}/${APP_NAME}.app)
-
-install( DIRECTORY ${CMAKE_SOURCE_DIR}/output/.
-	DESTINATION ${APP_NAME}.app/Contents/Resources COMPONENT Extra )
-
-set(CPACK_PACKAGE_ICON ${CMAKE_SOURCE_DIR}/fceux.icns )
-set(CPACK_GENERATOR "DragNDrop")
-include(CPACK)
-
-# macdeployqt tool that comes with Qt: https://doc.qt.io/qt-5/macos-deployment.html#macdeploy
-# Compared to fixup_bundle, correctly finds and installs Qt-specific resources as well as non-Qt dependencies
-find_program(MACDEPLOYQT macdeployqt)
-if(NOT MACDEPLOYQT)
-	message(FATAL_ERROR "Could not find macdeployqt executable")
-endif()
-
-find_package(Perl REQUIRED)
-
-install( CODE "
-	message(STATUS \"Deploying and fixing up dependencies in app: ${APP}\")
-	execute_process(COMMAND \"${MACDEPLOYQT}\" \"${APP}\" -verbose=1)
-	execute_process(COMMAND \"${PERL_EXECUTABLE}\"
-	                        \"${CMAKE_SOURCE_DIR}/scripts/macOSX_BundleFix.pl\"
-	                        \"${CMAKE_BINARY_DIR}/_CPack_Packages\")
-		"
-	COMPONENT Runtime
-	)
-
-else(APPLE)
-
-install( TARGETS  ${APP_NAME}  
-	RUNTIME  DESTINATION  bin )
-
-install( FILES     ${CMAKE_CURRENT_SOURCE_DIR}/auxlib.lua                DESTINATION share/fceux/luaScripts  )
-install( DIRECTORY ${CMAKE_SOURCE_DIR}/output/.                          DESTINATION share/fceux  )
-install( FILES     ${CMAKE_SOURCE_DIR}/fceux1.png                        DESTINATION share/pixmaps  )
-install( FILES     ${CMAKE_SOURCE_DIR}/fceux.desktop                     DESTINATION share/applications  )
-install( FILES     ${CMAKE_SOURCE_DIR}/documentation/fceux.6             DESTINATION ${CMAKE_INSTALL_MANDIR}/man6  )
-install( FILES     ${CMAKE_SOURCE_DIR}/documentation/fceux-net-server.6  DESTINATION ${CMAKE_INSTALL_MANDIR}/man6  )
-
-endif(APPLE)

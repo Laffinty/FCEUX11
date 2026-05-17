@@ -13,30 +13,61 @@ This project is currently in active development. Key areas of focus include plat
 ## Development Goals
 
 - **Platform Focus**: Windows 11 as the sole supported platform
-- **Toolchain Modernization**: MSVC 2022+, Windows SDK 10.0.22621+, vcpkg
+- **Toolchain Strategy**: MinGW-w64 via msys64 as the current primary build environment; MSVC 2022+ migration planned for the long term
 - **UI Migration**: Qt6 with Windows 11 native styling (dark/light themes, Segoe UI)
-- **Code Modernization**: Gradual refactoring using Rust for performance-critical components
+- **Code Modernization**: Gradual refactoring using Rust for performance-critical components (long-term)
 - **General Improvements**: Code cleanup, performance optimizations, and quality-of-life enhancements
 
 ## Toolchain Requirements
 
-### Required Tools
-- **Visual Studio 2022** (or later) with C++ workload
-- **CMake**: 3.28 or later
+### Required Tools (Current - msys64/MinGW-w64)
+- **msys2/msys64**: Primary build environment
+- **MinGW-w64 GCC**: 13.x or later (available via msys2 pacman)
+- **CMake**: 3.20 or later
 - **Qt6**: UI framework (Widgets, OpenGL, OpenGLWidgets)
 - **SDL2**: Multimedia library
+
+### Future Tools (Long-term - MSVC migration)
+- **Visual Studio 2022** (or later) with C++ workload
+- **CMake**: 3.28 or later
 - **vcpkg**: Dependency management
+
+> **Note**: The project currently builds and runs on msys64/MinGW-w64. MSVC support is a long-term goal and not yet ready for daily development.
 
 ### Environment Setup
 
 ```powershell
-# Ensure vcpkg is installed and integrated
+# Ensure vcpkg is installed and integrated (for long-term MSVC migration)
 $env:VCPKG_ROOT = "C:\path\to\vcpkg"
 ```
 
 ## Building Instructions
 
-### Windows (MSVC)
+### Windows (msys64/MinGW-w64) — Current Primary
+
+```bash
+# In MSYS2 MinGW64 shell
+pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake \
+  mingw-w64-x86_64-qt6-base mingw-w64-x86_64-SDL2 \
+  mingw-w64-x86_64-libarchive mingw-w64-x86_64-zlib
+
+# Create build directory
+rm -rf build
+mkdir build
+cd build
+
+# Configure with CMake
+cmake .. -G "MinGW Makefiles" \
+  -DCMAKE_BUILD_TYPE=Release
+
+# Build
+mingw32-make -j$(nproc)
+
+# The executable will be located at:
+# ./src/fceux11.exe
+```
+
+### Windows (MSVC) — Long-term Plan (Not Yet Ready)
 
 ```powershell
 # Create build directory
@@ -89,30 +120,61 @@ FCEUX11 是 FCEUX 模拟器的衍生作品，依据 GNU 通用公共许可证第
 ## 开发方向
 
 - **平台聚焦**: Windows 11 为唯一支持平台
-- **工具链现代化**: MSVC 2022+、Windows SDK 10.0.22621+、vcpkg
+- **工具链策略**: 近期以 msys64/MinGW-w64 为主力构建环境；MSVC 2022+ 迁移为远期计划
 - **UI 迁移**: Qt6 配合 Windows 11 原生样式（暗色/亮色主题、Segoe UI 字体）
-- **代码现代化**: 逐步使用 Rust 重构性能关键组件
+- **代码现代化**: 逐步使用 Rust 重构性能关键组件（远期计划）
 - **整体改进**: 代码清理、性能优化和用户体验增强
 
 ## 工具链要求
 
-### 必需工具
-- **Visual Studio 2022**（或更高版本）及 C++ 工作负载
-- **CMake**: 3.28 或更高版本
+### 必需工具（当前 - msys64/MinGW-w64）
+- **msys2/msys64**: 主力构建环境
+- **MinGW-w64 GCC**: 13.x 或更高版本（通过 msys2 pacman 安装）
+- **CMake**: 3.20 或更高版本
 - **Qt6**: UI 框架（Widgets、OpenGL、OpenGLWidgets）
 - **SDL2**: 多媒体库
+
+### 未来工具（远期 - MSVC 迁移）
+- **Visual Studio 2022**（或更高版本）及 C++ 工作负载
+- **CMake**: 3.28 或更高版本
 - **vcpkg**: 依赖管理
+
+> **注意**: 本项目当前基于 msys64/MinGW-w64 构建和运行。MSVC 支持是远期目标，尚不适合日常开发使用。
 
 ### 环境配置
 
 ```powershell
-# 确保 vcpkg 已安装并完成集成
+# 确保 vcpkg 已安装并完成集成（远期 MSVC 迁移时使用）
 $env:VCPKG_ROOT = "C:\path\to\vcpkg"
 ```
 
 ## 编译说明
 
-### Windows (MSVC)
+### Windows（msys64/MinGW-w64）—— 当前主力
+
+```bash
+# 在 MSYS2 MinGW64 终端中执行
+pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake \
+  mingw-w64-x86_64-qt6-base mingw-w64-x86_64-SDL2 \
+  mingw-w64-x86_64-libarchive mingw-w64-x86_64-zlib
+
+# 创建构建目录
+rm -rf build
+mkdir build
+cd build
+
+# 使用 CMake 配置
+cmake .. -G "MinGW Makefiles" \
+  -DCMAKE_BUILD_TYPE=Release
+
+# 编译
+mingw32-make -j$(nproc)
+
+# 可执行文件位于：
+# ./src/fceux11.exe
+```
+
+### Windows（MSVC）—— 远期计划（尚未就绪）
 
 ```powershell
 # 创建构建目录

@@ -11,7 +11,7 @@
 
 ### 1.1 项目定位
 
-FCEUX11 是基于 FCEUX（版本 2.6.6）的 Windows 11 独占型衍生作品。项目核心目标是在完整保留 NES/Famicom 模拟器核心准确性的前提下，全面拥抱 Windows 原生技术栈，对工具链、UI 框架和构建系统进行深度重构，最终建立仅面向 Windows 11 及后续 Windows 版本、基于微软系工具链（MSVC）的高性能、高兼容性、高可维护性的 NES 模拟器发行版。
+FCEUX11 是基于 FCEUX（版本 2.6.6）的 Windows 11 独占型衍生作品。项目核心目标是在完整保留 NES/Famicom 模拟器核心准确性的前提下，逐步推进 Windows 原生技术栈适配。**近期以保持 msys64/MinGW-w64 构建兼容为主**，在此基线上完成标识层更新、Qt6 迁移与代码现代化；向微软系工具链（MSVC）的迁移作为远期计划推进，最终建立面向 Windows 11 及后续 Windows 版本的高性能、高兼容性、高可维护性的 NES 模拟器发行版。
 
 **平台策略声明**：本项目不再视 Linux/macOS 为支持目标，所有跨平台兼容代码将在后续 Phase 中逐步移除或标记为废弃。
 
@@ -19,10 +19,10 @@ FCEUX11 是基于 FCEUX（版本 2.6.6）的 Windows 11 独占型衍生作品。
 
 | 原则 | 说明 |
 |------|------|
-| **平台聚焦** | Windows 11 为唯一支持平台，彻底移除 Linux/macOS 兼容代码，工具链统一向 MSVC 迁移。 |
+| **平台聚焦** | Windows 11 为唯一支持平台，彻底移除 Linux/macOS 兼容代码。工具链向 MSVC 迁移为远期计划，近期保持 msys64/MinGW-w64 兼容。 |
 | **合规优先** | 所有修改严格遵循 GPLv2 第 2 条（衍生作品条款），原作者版权声明以最小必要限度保留。 |
-| **工具链统一** | 以 MSVC 2022+ 为唯一推荐工具链，逐步弃用 MinGW-w64；构建配置全面简化，移除跨平台分支。 |
-| **工具链现代** | 统一采用微软系工具链（MSVC 2022+、Windows SDK 10.0.22621+、vcpkg），不再维护 MinGW-w64 构建路径。 |
+| **工具链统一** | 近期以 msys64/MinGW-w64 为主力构建环境，保持现有构建路径可用；远期计划逐步向 MSVC 2022+ 迁移，构建配置随之简化。 |
+| **工具链现代** | 远期目标为统一采用微软系工具链（MSVC 2022+、Windows SDK 10.0.22621+、vcpkg）。近期仍维护 MinGW-w64 构建路径，确保现有开发工作流不中断。 |
 | **模块聚焦** | 每个 Phase 仅聚焦单一模块，避免跨模块大爆炸式改动，确保每次作业范围可控、可回滚、可独立验证。 |
 
 ### 1.3 Phase 总览
@@ -30,8 +30,8 @@ FCEUX11 是基于 FCEUX（版本 2.6.6）的 Windows 11 独占型衍生作品。
 ```
 Phase 0 ── 基线与合规 ─────── 版权审计 / 衍生声明 / Git 标签
 Phase 1 ── 标识层模块 ─────── version.h / About / ConsoleWindow / 资源更名
-Phase 2 ── 构建系统模块 ───── CMake 升级 / 移除 Qt5 / 移除 MinGW / MSVC 统一
-Phase 3 ── 包管理模块 ─────── vcpkg 集成 / 废弃 MSYS2 脚本 / DLL 部署重构
+Phase 2 ── 构建系统模块 ───── CMake 升级 / Qt5 移除 / 保留 MinGW 兼容 / 远期 MSVC 统一
+Phase 3 ── 包管理模块 ─────── 远期 vcpkg 集成 / 保留 MSYS2 脚本 / DLL 部署优化
 Phase 4 ── Qt6 UI 模块 ────── 废弃 API 迁移 / 样式表 / 字体 / 可访问性
 Phase 5 ── Win11 平台模块 ─── DPI / 长路径 / 暗色模式 / 文件对话框 / Snap
 Phase 6 ── 遗留清理模块 ───── Win32 驱动废弃 / SDL 层废弃 / 跨平台宏清理
@@ -156,7 +156,7 @@ Phase 8 ── 发布部署模块 ───── CI 管道 / MSIX / 签名 / �
 ## 4. Phase 2：构建系统模块
 
 > **聚焦模块**: `CMakeLists.txt`、`src/CMakeLists.txt`  
-> **目标**: 升级 CMake，全面简化构建配置，移除所有非 MSVC/非 Windows 分支。
+> **目标**: 升级 CMake，全面简化构建配置，移除所有非 Windows 分支（Linux/macOS），同时保留 MinGW-w64/msys64 构建路径。
 
 ### P2-1 CMake 升级与项目名更新
 - **文件**: `CMakeLists.txt`
@@ -175,14 +175,16 @@ Phase 8 ── 发布部署模块 ───── CI 管道 / MSIX / 签名 / �
   - 统一为 `find_package( Qt6 REQUIRED COMPONENTS Widgets OpenGL OpenGLWidgets )`。
   - 删除 `Qt5Widgets_DEFINITIONS`、`Qt5Widgets_INCLUDE_DIRS` 等引用。
 
-### P2-3 移除 MinGW/MSYS2 构建分支
+### P2-3 保留 MinGW/MSYS2 构建分支（近期兼容要求）
 - **文件**: `src/CMakeLists.txt`
-- **修改**:
-  - 删除 `if(MINGW)` 全部逻辑（`MINGW_PREFIX` 头文件路径、`SDL2_LDFLAGS` 手动设置、`LIBARCHIVE_LDFLAGS` 手动设置）。
-  - 删除 `install_deps.bat/sh` 中的 pacman 调用逻辑（后续 Phase 3 彻底删除文件）。
-  - 构建系统仅保留 `if(MSVC)` 和通用逻辑。
+- **策略**: 近期必须保持 msys64/MinGW-w64 构建兼容，**不得删除 `if(MINGW)` 相关逻辑**。
+- **允许操作**:
+  - 清理 `MINGW_PREFIX` 等硬编码路径，改用更通用的查找方式。
+  - 与 `if(MSVC)` 分支并存，确保两者均可正常构建。
+  - `install_deps.bat/sh` 中的 pacman 调用逻辑予以保留并维护。
+- **禁止操作**: 在远期 MSVC 迁移计划明确前，不得移除 MinGW-w64 构建支持。
 
-### P2-4 移除非 Windows 构建分支与宏冲突修复
+### P2-4 移除 Linux/macOS 构建分支与宏冲突修复
 - **文件**: `src/CMakeLists.txt`、`src/types.h`、`src/lua-engine.cpp`
 - **修改**:
   - 删除 `else(WIN32)` 块内的全部 Linux/macOS 逻辑：
@@ -191,6 +193,7 @@ Phase 8 ── 发布部署模块 ───── CI 管道 / MSIX / 签名 / �
     - Unix 编译器标志（`-Wall -Wno-write-strings -fPIC`）
     - `GPROF_ENABLE`、`ASAN_ENABLE` 等仅适用于 Unix 的选项
   - 保留 Windows 块中的 `-D_CRT_SECURE_NO_WARNINGS`、`-D__SDL__`、`-D__QT_DRIVER__` 等定义。
+  - **保留 MinGW 分支**: `if(MINGW)` 及其相关逻辑继续保留，确保 msys64 环境可正常构建。
 - **基线发现 — 宏重定义冲突**:
   - `src/types.h:65`: `#define alloca __builtin_alloca` 与 MinGW GCC 16 `malloc.h` 冲突（300 次警告）。
     - **修复**: 增加 `#ifndef alloca` 守卫，或完全移除该宏定义。
@@ -198,20 +201,22 @@ Phase 8 ── 发布部署模块 ───── CI 管道 / MSIX / 签名 / �
     - **修复**: 增加 `#ifndef __forceinline` 守卫。
 - **MSVC 迁移预判**: MSVC 不支持 `__builtin_alloca`，需改用 `<malloc.h>` 提供的 `alloca`；`__attribute__` 语法需替换为 `__forceinline` 关键字。
 
-### P2-5 编译器标准升级与 MSVC 安全选项
+### P2-5 编译器标准升级与远期 MSVC 安全选项
 - **文件**: `src/CMakeLists.txt`
 - **修改**:
   ```cmake
   set(CMAKE_CXX_STANDARD 20)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
   ```
-- **移除警告屏蔽**: 逐步移除 `/wd4267 /wd4244`，改为代码中显式 `static_cast`。
-- **新增 MSVC 安全选项**:
-  ```cmake
-  add_compile_options(/guard:cf /GS /sdl /W4 /permissive-)
-  add_link_options(/GUARD:CF /CETCOMPAT)
-  ```
-- **基线发现 — 向 MSVC 迁移的额外风险**:
+- **MinGW 兼容**: 上述标准升级对 MinGW-w64 GCC 16.x 同样适用，保持现有构建路径可用。
+- **MSVC 安全选项（远期实施）**:
+  - 待 MSVC 迁移完成后，新增：
+    ```cmake
+    add_compile_options(/guard:cf /GS /sdl /W4 /permissive-)
+    add_link_options(/GUARD:CF /CETCOMPAT)
+    ```
+  - 现阶段 MinGW 构建继续沿用现有编译器标志。
+- **基线发现 — 向 MSVC 迁移的额外风险（远期评估）**:
   - POSIX 函数缺失：`strcasestr`、`strtok_r` 等需替换为 Windows 等效实现。
   - POSIX 类型缺失：`ssize_t` 需映射为 `SSIZE_T`。
   - 内联汇编：若存在 AT&T 语法 `asm` 块，MSVC x64 完全不支持内联汇编，需改为 compiler intrinsics。
@@ -221,9 +226,10 @@ Phase 8 ── 发布部署模块 ───── CI 管道 / MSIX / 签名 / �
 ## 5. Phase 3：包管理模块
 
 > **聚焦模块**: `vcpkg.json`、`scripts/copy_dependencies.ps1`、`install_deps.bat/sh`  
-> **目标**: 以 vcpkg 作为唯一依赖管理器，彻底弃用 MSYS2 生态。
+> **目标**: 评估 vcpkg 作为远期依赖管理器；**现阶段保留 MSYS2 生态**，确保 msys64 构建工作流不受影响。
 
-### P3-1 vcpkg 集成
+### P3-1 vcpkg 集成（远期计划）
+- **状态**: 远期实施项，待 MSVC 迁移时同步启用。
 - **输出文件**: `vcpkg.json`（项目根目录）
   ```json
   {
@@ -241,21 +247,23 @@ Phase 8 ── 发布部署模块 ───── CI 管道 / MSIX / 签名 / �
     set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
   endif()
   ```
+- **说明**: 在 MinGW-w64 仍为主力构建环境的阶段，vcpkg 相关配置以并行方式存在，不强制替代现有 MSYS2 依赖管理。
 
-### P3-2 废弃 MSYS2 安装脚本
+### P3-2 保留并维护 MSYS2 安装脚本
 - **操作**:
-  - `install_deps.bat` → 重命名为 `install_deps.bat.deprecated` 或删除。
-  - `install_deps.sh` → 删除（Linux/macOS 不再支持）。
-  - 新增 `setup_vcpkg.ps1`：一键安装 vcpkg 依赖的 PowerShell 脚本（基于 MSVC 环境）。
+  - `install_deps.bat` → **保留并维护**，作为 msys64/MinGW-w64 环境下的一键依赖安装脚本。
+  - `install_deps.sh` → 可删除（Linux/macOS 不再支持），但若内含 MinGW-w64 通用逻辑可酌情保留。
+  - 新增 `setup_vcpkg.ps1`（可选）：面向未来 MSVC 环境的 PowerShell 脚本，与现有 MSYS2 脚本并存，不互相替代。
 
-### P3-3 DLL 部署方案重构
+### P3-3 DLL 部署方案优化
 - **文件**: `scripts/copy_dependencies.ps1`
-- **问题**: 当前脚本硬编码 `D:\msys64\mingw64\bin` 路径，依赖 MSYS2。
-- **重构方案**:
+- **现状**: 当前脚本硬编码 `D:\msys64\mingw64\bin` 路径，在 msys64 环境下工作正常。
+- **近期策略**: 优化脚本路径检测逻辑，使其能自动识别常见 msys64 安装位置，降低硬编码依赖。
+- **远期重构方案（待 MSVC 迁移时实施）**:
   - 方案 A：使用 `dumpbin /DEPENDENTS` 分析依赖，从 vcpkg `installed/x64-windows/bin` 复制 DLL。
   - 方案 B：利用 CMake 的 `install(TARGETS)` + `install(IMPORTED_RUNTIME_ARTIFACTS)` 自动生成部署目录。
   - 方案 C：使用 vcpkg 的 `applocal` 目标（`vcpkg install --x-install-root`）。
-- **输出**: 新的 `scripts/deploy.ps1`，完全脱离 MSYS2 路径。
+- **输出**: 近期继续维护 `scripts/copy_dependencies.ps1`（兼容 msys64）；远期再引入 `scripts/deploy.ps1`（面向 MSVC）。
 
 ---
 
@@ -406,7 +414,7 @@ Phase 8 ── 发布部署模块 ───── CI 管道 / MSIX / 签名 / �
 - **文件**: `src/rust/CMakeLists.txt`、`src/rust/Cargo.toml`
 - **实施**:
   - 引入 Corrosion 或手动调用 `cargo`。
-  - Rust Edition 2024，**工具链锁定为 `stable-x86_64-pc-windows-msvc`**。
+  - Rust Edition 2024，**默认工具链锁定为 `stable-x86_64-pc-windows-msvc`**。
   - 目录结构:
     ```
     src/rust/
@@ -415,7 +423,8 @@ Phase 8 ── 发布部署模块 ───── CI 管道 / MSIX / 签名 / �
     └── src/
         └── lib.rs
     ```
-- **环境要求**: Visual Studio 2022 C++ 工具链 + `rustup`；不提供 MinGW target 支持。
+- **环境要求**: Visual Studio 2022 C++ 工具链 + `rustup`。
+- **兼容性说明**: Rust 模块集成属于远期计划，待 MSVC 迁移完成后实施。在 MinGW-w64 仍为主力构建环境的阶段，暂不强制引入 Rust 构建依赖。
 
 ### P7-2 FFI 边界设计与试点模块
 - **原则**: Rust 以 `staticlib` 形式暴露 C ABI，C++ 侧通过 `extern "C"` 调用。
@@ -445,14 +454,15 @@ Phase 8 ── 发布部署模块 ───── CI 管道 / MSIX / 签名 / �
 ### P8-1 GitHub Actions CI 管道
 - **文件**: `.github/workflows/build.yml`
 - **矩阵配置**:
-  - **唯一配置**: `windows-latest` + MSVC 2022 + vcpkg + Qt6
+  - **近期主配置**: `windows-latest` + MinGW-w64 (msys64) + Qt6
+  - **远期配置**: `windows-latest` + MSVC 2022 + vcpkg + Qt6（待迁移完成后启用）
 - **流水线阶段**:
   1. Checkout
-  2. 设置 MSVC 环境（`ilammy/msvc-dev-cmd`）
-  3. vcpkg 缓存恢复
+  2. 设置构建环境（msys64 或 MSVC）
+  3. 依赖缓存恢复（pacman 或 vcpkg）
   4. CMake 配置 + 构建
   5. 单元测试（如有）
-  6. DLL 部署（`deploy.ps1` 或 CMake install）
+  6. DLL 部署（`copy_dependencies.ps1` 或 `deploy.ps1`）
   7. Artifact 上传
 
 ### P8-2 MSIX 安装程序

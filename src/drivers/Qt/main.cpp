@@ -29,6 +29,7 @@
 #include "Qt/SplashScreen.h"
 
 #ifdef WIN32
+#include <windows.h>
 #include <QtPlatformHeaders/QWindowsWindowFunctions>
 #endif
 

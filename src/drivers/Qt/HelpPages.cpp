@@ -101,7 +101,7 @@ void consoleWin_t::OpenHelpWindow(std::string subpage)
 
 #ifdef WIN32
 	// Windows specific HtmlHelp library function
-	helpWin = HtmlHelp( HWND(winId()), helpFileName.c_str(), HH_DISPLAY_TOPIC, (DWORD)NULL);
+	helpWin = HtmlHelp( HWND(winId()), QString::fromStdString(helpFileName).toStdWString().c_str(), HH_DISPLAY_TOPIC, (DWORD)NULL);
 	if ( helpWin == NULL )
 	{
 		printf("Error: Failed to open help file '%s'\n", helpFileName.c_str() );
