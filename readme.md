@@ -1,6 +1,6 @@
 # FCEUX11
 
-A Windows 11-exclusive Nintendo Entertainment System (NES) emulator, derived from [FCEUX](https://fceux.com) 2.6.6.
+A modernized Nintendo Entertainment System (NES) emulator, derived from [FCEUX](https://fceux.com) 2.6.6, featuring a Qt6-based UI, high-DPI support, and native Windows integration.
 
 ## About This Project
 
@@ -107,7 +107,7 @@ For full license details, see the [`COPYING`](COPYING) file.
 
 # FCEUX11
 
-一款专为 Windows 11 设计的任天堂娱乐系统（NES）模拟器，基于 [FCEUX](https://fceux.com) 2.6.6 衍生开发。
+一款现代化的任天堂娱乐系统（NES）模拟器，基于 [FCEUX](https://fceux.com) 2.6.6 衍生开发，采用 Qt6 界面框架，支持高 DPI 缩放与原生 Windows 集成。
 
 ## 关于本项目
 
