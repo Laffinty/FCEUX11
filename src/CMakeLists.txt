@@ -511,6 +511,10 @@ set(SOURCES ${SRC_DRIVERS_QT})
 add_subdirectory(rust)
 if(FCEUX11_RUST_ENABLED)
     add_definitions(-DFCEUX11_RUST_ENABLED)
+    target_link_libraries(fceux11_utils PUBLIC ${FCEUX11_RUST_STATIC_LIB})
+    if(MINGW)
+        target_link_libraries(fceux11_utils PUBLIC ntdll)
+    endif()
 endif()
 
 # Put build timestamp into BUILD_TS environment variable and from there into
@@ -538,8 +542,6 @@ endif()
 target_link_libraries( ${APP_NAME}
    ${ASAN_LDFLAGS}  ${GPROF_LDFLAGS}
    fceux11_drivers_qt
-   ${FCEUX11_RUST_STATIC_LIB}
-   $<$<AND:$<BOOL:${FCEUX11_RUST_ENABLED}>,$<BOOL:${MINGW}>>:ntdll>
 )
 
 if (WIN32)

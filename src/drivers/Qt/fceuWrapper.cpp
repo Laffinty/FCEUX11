@@ -1,4 +1,4 @@
-﻿﻿/* FCE Ultra - NES/Famicom Emulator
+﻿/* FCE Ultra - NES/Famicom Emulator
  *
  * Copyright notice for this file:
  *  Copyright (C) 2020 mjbudd77
