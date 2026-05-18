@@ -18,28 +18,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-/*
-* The parser was heavily inspired by the following two websites:
-
-* http://www.cs.utsa.edu/~wagner/CS5363/rdparse.html
-* http://www.engr.mun.ca/~theo/Misc/exp_parsing.htm
-*
-* Grammar of the parser:
-*
-* P         -> Connect
-* Connect   -> Compare {('||' | '&&') Compare}
-* Compare   -> Sum {('==' | '!=' | '<=' | '>=' | '<' | '>') Sum}
-* Sum       -> Product {('+' | '-') Product}
-* Product   -> Primitive {('*' | '/') Primitive}
-* Primitive -> Number | Address | Register | Flag | PC Bank | '(' Connect ')'
-* Number    -> '#' [1-9A-F]*
-* Address   -> '$' [1-9A-F]* | '$' '[' Connect ']'
-* Register  -> 'A' | 'X' | 'Y' | 'P' | 'S'
-* Flag      -> 'N' | 'C' | 'Z' | 'I' | 'B' | 'V' | 'U' | 'D'
-* PC Bank   -> 'K'
-* Data Bank -> 'T'
-* Value     -> 'R' | 'W'
-*/
 
 #include "types.h"
 #include "conddebug.h"

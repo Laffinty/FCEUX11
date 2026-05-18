@@ -23,12 +23,6 @@
 static uint8 reg[8];
 static uint8 IRQa;
 static int16 IRQCount, IRQLatch;
-/*
-static uint8 *WRAM = NULL;
-static uint32 WRAMSIZE;
-static uint8 *CHRRAM = NULL;
-static uint32 CHRRAMSIZE;
-*/
 
 static SFORMAT StateRegs[] =
 {
@@ -55,16 +49,6 @@ static void MNNNPower(void) {
 static void MNNNReset(void) {
 }
 
-/*
-static void MNNNClose(void)
-{
-	if (WRAM)
-		FCEU_gfree(WRAM);
-	if (CHRRAM)
-		FCEU_gfree(CHRRAM);
-	WRAM = CHRRAM = NULL;
-}
-*/
 
 static void MNNNIRQHook() {
 	X6502_IRQBegin(FCEU_IQEXT);
@@ -80,20 +64,5 @@ void MapperNNN_Init(CartInfo *info) {
 //	info->Close = MNNNClose;
 	GameHBIRQHook = MNNNIRQHook;
 	GameStateRestore = StateRestore;
-/*
-	CHRRAMSIZE = 8192;
-	CHRRAM = (uint8*)FCEU_gmalloc(CHRRAMSIZE);
-	SetupCartCHRMapping(0x10, CHRRAM, CHRRAMSIZE, 1);
-	AddExState(CHRRAM, CHRRAMSIZE, 0, "CRAM");
-*/
-/*
-	WRAMSIZE = 8192;
-	WRAM = (uint8*)FCEU_gmalloc(WRAMSIZE);
-	SetupCartPRGMapping(0x10, WRAM, WRAMSIZE, 1);
-	AddExState(WRAM, WRAMSIZE, 0, "WRAM");
-	if (info->battery) {
-		info->addSaveGameBuf( WRAM, WRAMSIZE );
-	}
-*/
 	AddExState(&StateRegs, ~0, 0, 0);
 }

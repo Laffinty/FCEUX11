@@ -1196,26 +1196,6 @@ static void KeyboardCommands(void)
 	//		{
 	//			barcoder = 0;
 	//		}
-	/*
-#define SSM(x)
-do {                                              \
-	if(barcoder) {                                \
-		if(bbuft < 13) {                          \
-			bbuf[bbuft++] = '0' + x;              \
-			bbuf[bbuft] = 0;                      \
-		}                                         \
-		FCEUI_DispMessage("Barcode: %s",0, bbuf); \
-	}                                             \
-} while(0)
-
-		DIPSless:
-		for(int i=0; i<10;i++)
-		{
-			if (keyonly (i))
-				SSM (i);
-		}
-#undef SSM
-*/
 	//	}
 }
 

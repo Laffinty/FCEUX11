@@ -192,29 +192,6 @@ bool MovieRecord::Compare(MovieRecord& compareRec)
 	if (memcmp(this->zappers, compareRec.zappers, sizeof(zappers)))
 		return false;
 
-	/*
-	if (this->joysticks != compareRec.joysticks)
-		return false;
-
-	//if new commands are ever recordable, they need to be added here if we go with this method
-	if(this->command_reset() != compareRec.command_reset()) return false;
-	if(this->command_power() != compareRec.command_power()) return false;
-	if(this->command_fds_insert() != compareRec.command_fds_insert()) return false;
-	if(this->command_fds_select() != compareRec.command_fds_select()) return false;
-
-	if (this->zappers[0].x != compareRec.zappers[0].x) return false;
-	if (this->zappers[0].y != compareRec.zappers[0].y) return false;
-	if (this->zappers[0].zaphit != compareRec.zappers[0].zaphit) return false;
-	if (this->zappers[0].b != compareRec.zappers[0].b) return false;
-	if (this->zappers[0].bogo != compareRec.zappers[0].bogo) return false;
-
-	if (this->zappers[1].x != compareRec.zappers[1].x) return false;
-	if (this->zappers[1].y != compareRec.zappers[1].y) return false;
-	if (this->zappers[1].zaphit != compareRec.zappers[1].zaphit) return false;
-	if (this->zappers[1].b != compareRec.zappers[1].b) return false;
-	if (this->zappers[1].bogo != compareRec.zappers[1].bogo) return false;
-	*/
-
 	return true;
 }
 void MovieRecord::Clone(MovieRecord& sourceRec)
@@ -1475,49 +1452,6 @@ bool FCEUMOV_ReadState(EMUFILE* is, uint32 size)
 	//http://tasvideos.org/LawsOfTAS/OnSavestates.html
 	//----------------
 
-	/*
-	Playback or Recording + Read-only
-
-    * Check that GUID of movie and savestate-movie must match or else error
-          o on error: a message informing that the savestate doesn't belong to this movie. This is a GUID mismatch error. Give user a choice to load it anyway.
-                + failstate: if use declines, loadstate attempt canceled, movie can resume as if not attempted if user has backup savstates enabled else stop movie
-    * Check that movie and savestate-movie are in same timeline. If not then this is a wrong timeline error.
-          o on error: a message informing that the savestate doesn't belong to this movie
-                + failstate: loadstate attempt canceled, movie can resume as if not attempted if user has backup savestates enabled else stop movie
-    * Check that savestate-movie is not greater than movie. If it's greater then this is a future event error and is not allowed in read-only
-          o on error: message informing that the savestate is from a frame after the last frame of the movie
-                + failstate - loadstate attempt cancelled, movie can resume if user has backup savesattes enabled, else stop movie
-    * Check that savestate framcount <= savestate movie length. If not this is a post-movie savestate and is not allowed in read-only
-          o on error: message informing that the savestate is from a frame after the last frame of the savestated movie
-                + failstate - loadstate attempt cancelled, movie can resume if user has backup savesattes enabled, else stop movie
-    * All error checks have passed, state will be loaded
-    * Movie contained in the savestate will be discarded
-    * Movie is now in Playback mode
-
-	Playback, Recording + Read+write
-
-    * Check that GUID of movie and savestate-movie must match or else error
-          o on error: a message informing that the savestate doesn't belong to this movie. This is a GUID mismatch error. Give user a choice to load it anyway.
-                + failstate: if use declines, loadstate attempt canceled, movie can resume as if not attempted (stop movie if resume fails)canceled, movie can resume if backup savestates enabled else stopmovie
-    * Check that savestate framcount <= savestate movie length. If not this is a post-movie savestate
-          o on post-movie: See post-movie event section.
-    * savestate passed all error checks and will now be loaded in its entirety and replace movie (note: there will be no truncation yet)
-    * current framecount will be set to savestate framecount
-    * on the next frame of input, movie will be truncated to framecount
-          o (note: savestate-movie can be a future event of the movie timeline, or a completely new timeline and it is still allowed)
-    * Rerecord count of movie will be incremented
-    * Movie is now in record mode
-
-	Post-movie savestate event
-
-    * Whan a savestate is loaded and is determined that the savestate-movie length is less than the savestate framecount then it is a post-movie savestate. These occur when a savestate was made during Movie Finished mode.
-	* If read+write, the entire savestate movie will be loaded and replace current movie.
-    * If read-only, the savestate movie will be discarded
-    * Mode will be switched to Move Finished
-    * Savestate will be loaded
-    * Current framecount changes to savestate framecount
-    * User will have control of input as if Movie inactive mode
-	*/
 
 	if(movieMode == MOVIEMODE_PLAY || movieMode == MOVIEMODE_RECORD || movieMode == MOVIEMODE_FINISHED)
 	{

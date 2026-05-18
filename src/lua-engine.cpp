@@ -1610,29 +1610,6 @@ static void toCStringConverter(lua_State* L, int i, char*& ptr, int& remaining)
 		case LUA_TSTRING: APPENDPRINT "%s",lua_tostring(L,i) END break;
 		case LUA_TNUMBER: APPENDPRINT "%.12g",lua_tonumber(L,i) END break;
 		case LUA_TFUNCTION:
-			/*if((L->base + i-1)->value.gc->cl.c.isC)
-			{
-				//lua_CFunction func = lua_tocfunction(L, i);
-				//std::map<lua_CFunction, const char*>::iterator iter = s_cFuncInfoMap.find(func);
-				//if(iter == s_cFuncInfoMap.end())
-					goto defcase;
-				//APPENDPRINT "function(%s)", iter->second END
-			}
-			else
-			{
-				APPENDPRINT "function(" END
-				Proto* p = (L->base + i-1)->value.gc->cl.l.p;
-				int numParams = p->numparams + (p->is_vararg?1:0);
-				for (int n=0; n<p->numparams; n++)
-				{
-					APPENDPRINT "%s", getstr(p->locvars[n].varname) END
-					if(n != numParams-1)
-						APPENDPRINT "," END
-				}
-				if(p->is_vararg)
-					APPENDPRINT "..." END
-				APPENDPRINT ")" END
-			}*/
 			goto defcase;
 			break;
 defcase:default: APPENDPRINT "%s:%p",luaL_typename(L,i),lua_topointer(L,i) END break;
@@ -4356,43 +4333,6 @@ static void LuaDisplayString (const char *string, int y, int x, uint32 color, ui
 	gui_prepare();
 
 	PutTextInternal(string, strlen(string), x, y, color, outlineColor);
-/*
-	const char* ptr = string;
-	while(*ptr && y < LUA_SCREEN_HEIGHT)
-	{
-		int len = strlinelen(ptr);
-		int skip = 0;
-		if(len < 1) len = 1;
-
-		// break up the line if it's too long to display otherwise
-		if(len > 63)
-		{
-			len = 63;
-			const char* ptr2 = ptr + len-1;
-			for(int j = len-1; j; j--, ptr2--)
-			{
-				if(*ptr2 == ' ' || *ptr2 == '\t')
-				{
-					len = j;
-					skip = 1;
-					break;
-				}
-			}
-		}
-
-		int xl = 0;
-		int yl = 0;
-		int xh = (LUA_SCREEN_WIDTH - 1 - 1) - 4*len;
-		int yh = LUA_SCREEN_HEIGHT - 1;
-		int x2 = std::min(std::max(x,xl),xh);
-		int y2 = std::min(std::max(y,yl),yh);
-
-		PutTextInternal(ptr,len,x2,y2,color,outlineColor);
-
-		ptr += len + skip;
-		y += 8;
-	}
-*/
 }
 
 
