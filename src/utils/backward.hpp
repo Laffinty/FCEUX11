@@ -992,50 +992,6 @@ public:
 			// (trace.source.function). Let's see if we can get all the inlined
 			// calls along the way up to the initial call site.
 			trace.inliners = backtrace_inliners(fobj, *details_selected);
-
-#if 0
-			if (trace.inliners.size() == 0) {
-				// Maybe the trace was not inlined... or maybe it was and we
-				// are lacking the debug information. Let's try to make the
-				// world better and see if we can get the line number of the
-				// function (trace.source.function) now.
-				//
-				// We will get the location of where the function start (to be
-				// exact: the first instruction that really start the
-				// function), not where the name of the function is defined.
-				// This can be quite far away from the name of the function
-				// btw.
-				//
-				// If the source of the function is the same as the source of
-				// the trace, we cannot say if the trace was really inlined or
-				// not.  However, if the filename of the source is different
-				// between the function and the trace... we can declare it as
-				// an inliner.  This is not 100% accurate, but better than
-				// nothing.
-
-				if (symbol_info.dli_saddr) {
-					find_sym_result details = find_symbol_details(fobj,
-							symbol_info.dli_saddr,
-							symbol_info.dli_fbase);
-
-					if (details.found) {
-						ResolvedTrace::SourceLoc diy_inliner;
-						diy_inliner.line = details.line;
-						if (details.filename) {
-							diy_inliner.filename = details.filename;
-						}
-						if (details.funcname) {
-							diy_inliner.function = demangle(details.funcname);
-						} else {
-							diy_inliner.function = trace.source.function;
-						}
-						if (diy_inliner != trace.source) {
-							trace.inliners.push_back(diy_inliner);
-						}
-					}
-				}
-			}
-#endif
 		}
 
 		return trace;
@@ -2101,63 +2057,6 @@ public:
 };
 
 #endif // BACKWARD_SYSTEM_UNKNOWN
-
-#if 0
-void crit_err_hdlr(int sig_num, siginfo_t * info, void * ucontext)
-{
- void *             array[50];
- void *             caller_address;
- char **            messages;
- int                size, i;
- sig_ucontext_t *   uc;
-
- uc = (sig_ucontext_t *)ucontext;
-
- /* Get the address at the time the signal was raised from the EIP (x86) */
- caller_address = (void *) uc->uc_mcontext.eip;   
-
- fprintf(stderr, "signal %d (%s), address is %p from %p\n", 
-  sig_num, strsignal(sig_num), info->si_addr, 
-  (void *)caller_address);
-
- size = backtrace(array, 50);
-
- /* overwrite sigaction with caller's address */
- array[1] = caller_address;
-
- messages = backtrace_symbols(array, size);
-
-
-void sig_handler(int sig, siginfo_t* info, void* _ctx) {
-ucontext_t *context = (ucontext_t*) _ctx;
-
-psiginfo(info, "Shit hit the fan");
-exit(EXIT_FAILURE);
-}
-
-using namespace std;
-
-void badass() {
-cout << "baddass!" << endl;
-((char*)&badass)[0] = 42;
-}
-
-int main() {
-struct sigaction action;
-action.sa_flags = SA_SIGINFO;
-sigemptyset(&action.sa_mask);
-action.sa_sigaction = &sig_handler;
-int r = sigaction(SIGSEGV, &action, 0);
-if (r < 0) { err(errno, 0); }
-r = sigaction(SIGILL, &action, 0);
-if (r < 0) { err(errno, 0); }
-
-badass();
-return 0;
-}
-
-
-#endif
 
 // i want to get a stacktrace on:
 //  - abort

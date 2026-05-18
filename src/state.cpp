@@ -995,30 +995,6 @@ void FCEUI_LoadState(const char *fname, bool display_message)
 		newppu_hacky_emergency_reset();
 
 		//mbg todo netplay
-#if 0 
-		if(FCEUnetplay)
-		{
-			char *fn = strdup(FCEU_MakeFName(FCEUMKF_NPTEMP, 0, 0).c_str());
-			FILE *fp;
-
-			if((fp = fopen(fn," wb")))
-			{
-				if(FCEUSS_SaveFP(fp,0))
-				{
-					fclose(fp);
-					FCEUNET_SendFile(FCEUNPCMD_LOADSTATE, fn);
-				}
-				else
-				{
-					fclose(fp);
-				}
-
-				unlink(fn);
-			}
-
-			free(fn);
-		}
-#endif
 		freshMovie = false;		//The movie has been altered so it is no longer fresh
 	} else
 	{

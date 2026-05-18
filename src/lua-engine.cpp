@@ -4596,14 +4596,6 @@ static int gui_text(lua_State *L) {
 	//if (x < 0 || x >= LUA_SCREEN_WIDTH || y < 0 || y >= (LUA_SCREEN_HEIGHT - font_height))
 	//	luaL_error(L,"bad coordinates");
 
-#if 0
-	uint32 colour = gui_optcolour(L,4,LUA_BUILD_PIXEL(255, 255, 255, 255));
-	uint32 borderColour = gui_optcolour(L,5,LUA_BUILD_PIXEL(255, 0, 0, 0));
-
-	gui_prepare();
-
-	LuaDisplayString(msg, y, x, colour, borderColour);
-#else
 	uint32 color = gui_optcolour(L,4,LUA_BUILD_PIXEL(255, 255, 255, 255));
 	uint32 bgcolor = gui_optcolour(L,5,LUA_BUILD_PIXEL(255, 27, 18, 105));
 
@@ -4612,7 +4604,6 @@ static int gui_text(lua_State *L) {
 	LuaDrawTextTransWH(msg, l, x, y, color, bgcolor);
 
 	lua_pushinteger(L, x);
-#endif
 	return 1;
 
 }
