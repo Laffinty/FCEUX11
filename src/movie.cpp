@@ -24,7 +24,6 @@
 #include <algorithm>
 
 #ifdef CREATE_AVI
-#include "drivers/videolog/nesvideos-piece.h"
 #endif
 
 #ifdef WIN32

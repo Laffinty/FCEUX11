@@ -40,7 +40,6 @@
 #include "Qt/ConsoleWindow.h"
 
 #ifdef CREATE_AVI
-#include "../videolog/nesvideos-piece.h"
 #endif
 
 #include <cstdio>

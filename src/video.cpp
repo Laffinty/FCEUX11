@@ -43,7 +43,6 @@
 #endif
 
 #ifdef CREATE_AVI
-#include "drivers/videolog/nesvideos-piece.h"
 #endif
 
 //no stdint in win32 (but we could add it if we needed to)

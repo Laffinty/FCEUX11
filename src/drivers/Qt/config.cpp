@@ -730,9 +730,8 @@ InitConfig()
     #endif
     
     #ifdef CREATE_AVI
-	config->addOption("videolog",  "SDL.VideoLog",  "");
 	config->addOption("mute", "SDL.MuteCapture", 0);
-    #endif
+#endif
     
     // auto load/save on gameload/close
 	config->addOption("loadstate", "SDL.AutoLoadState", INVALID_STATE);

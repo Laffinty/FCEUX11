@@ -67,7 +67,6 @@
 #include "../../types.h"
 
 #ifdef CREATE_AVI
-#include "../videolog/nesvideos-piece.h"
 #endif
 
 #ifdef _MSC_VER 
@@ -668,7 +667,6 @@ static void ShowUsage(const char *prog)
 	puts ("--loadlua      f       Loads lua script from filename f.");
 #endif
 #ifdef CREATE_AVI
-	puts ("--videolog     c       Calls mencoder to grab the video and audio streams to\n                         encode them. Check the documentation for more on this.");
 	puts ("--mute        {0|1}    Mutes FCEUX while still passing the audio stream to\n                         mencoder during avi creation.");
 #endif
 	puts ("--style=KEY            Use Qt GUI Style based on supplied key. Available system style keys are:\n");
