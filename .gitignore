@@ -68,6 +68,10 @@ config.ini
 settings.ini
 *.ini
 
+# Rust module
+src/rust/target/
+src/rust/Cargo.lock
+
 # Emulator ROMs
 *.nes
 *.fds
