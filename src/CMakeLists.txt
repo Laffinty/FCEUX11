@@ -166,6 +166,9 @@ set(SRC_CORE
 	${LUA_ENGINE_SOURCE}
 	${CMAKE_CURRENT_SOURCE_DIR}/utils/ioapi.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/utils/unzip.cpp
+)
+
+set(SRC_BOARDS
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/01-222.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/09-034a.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/103.cpp
@@ -358,13 +361,16 @@ set(SRC_CORE
   	${CMAKE_CURRENT_SOURCE_DIR}/input/virtualboy.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/input/lcdcompzapper.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/input/zapper.cpp
+)
+
+set(SRC_UTILS
   	${CMAKE_CURRENT_SOURCE_DIR}/utils/backward.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/utils/xstring.cpp
-  	${CMAKE_CURRENT_SOURCE_DIR}/utils/crc32.cpp     
-  	${CMAKE_CURRENT_SOURCE_DIR}/utils/endian.cpp  
-  	${CMAKE_CURRENT_SOURCE_DIR}/utils/general.cpp  
-  	${CMAKE_CURRENT_SOURCE_DIR}/utils/guid.cpp    
-  	${CMAKE_CURRENT_SOURCE_DIR}/utils/md5.cpp  
+  	${CMAKE_CURRENT_SOURCE_DIR}/utils/crc32.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/utils/endian.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/utils/general.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/utils/guid.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/utils/md5.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/utils/memory.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/utils/mutex.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/utils/timeStamp.cpp
@@ -461,7 +467,45 @@ set(SRC_DRIVERS_QT
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/TasEditor/markers.cpp
 )
 
-set(SOURCES ${SRC_CORE} ${SRC_DRIVERS_COMMON} ${SRC_DRIVERS_QT})
+add_library(fceux11_utils STATIC ${SRC_UTILS})
+target_link_libraries(fceux11_utils PUBLIC Qt6::Widgets ${ZLIB_LIBRARIES})
+target_include_directories(fceux11_utils PUBLIC ${CMAKE_SOURCE_DIR}/src)
+
+add_library(fceux11_boards STATIC ${SRC_BOARDS})
+target_link_libraries(fceux11_boards PUBLIC fceux11_utils ${ZLIB_LIBRARIES})
+target_include_directories(fceux11_boards PUBLIC ${CMAKE_SOURCE_DIR}/src)
+
+add_library(fceux11_core STATIC ${SRC_CORE})
+target_link_libraries(fceux11_core PUBLIC fceux11_boards fceux11_utils ${ZLIB_LIBRARIES})
+target_include_directories(fceux11_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
+
+add_library(fceux11_drivers_common STATIC ${SRC_DRIVERS_COMMON})
+target_link_libraries(fceux11_drivers_common PUBLIC fceux11_core ${ZLIB_LIBRARIES})
+target_include_directories(fceux11_drivers_common PUBLIC ${CMAKE_SOURCE_DIR}/src)
+
+add_library(fceux11_drivers_qt STATIC ${SRC_DRIVERS_QT})
+target_link_libraries(fceux11_drivers_qt PUBLIC
+    fceux11_core
+    fceux11_drivers_common
+    Qt6::Widgets
+    Qt6::OpenGL
+    Qt6::OpenGLWidgets
+    ${OPENGL_LDFLAGS}
+    ${SDL2_LDFLAGS}
+    ${LIBARCHIVE_LDFLAGS}
+    ${LUA_LDFLAGS}
+    ${LIBAV_LDFLAGS}
+    ${SYS_LIBS}
+)
+if(${QHELP})
+    target_link_libraries(fceux11_drivers_qt PUBLIC Qt6::Help)
+endif()
+target_include_directories(fceux11_drivers_qt PUBLIC
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/drivers
+)
+
+set(SOURCES ${SRC_DRIVERS_QT})
 
 # Phase 7: Rust module integration
 add_subdirectory(rust)
@@ -493,22 +537,20 @@ endif()
 
 target_link_libraries( ${APP_NAME}
    ${ASAN_LDFLAGS}  ${GPROF_LDFLAGS}
-   ${${Qt}Widgets_LIBRARIES}
-   ${${Qt}Help_LIBRARIES}
-   ${${Qt}OpenGL_LIBRARIES}
-   ${${Qt}OpenGLWidgets_LIBRARIES}
-   ${OPENGL_LDFLAGS}  
- 	${SDL2_LDFLAGS}
-	${MINIZIP_LDFLAGS} ${ZLIB_LIBRARIES} ${LIBARCHIVE_LDFLAGS}
-	${LUA_LDFLAGS} ${X264_LDFLAGS} ${X265_LDFLAGS} ${LIBAV_LDFLAGS}
- 	${SYS_LIBS}
-	${FCEUX11_RUST_STATIC_LIB}
-	$<$<AND:$<BOOL:${FCEUX11_RUST_ENABLED}>,$<BOOL:${MINGW}>>:ntdll>
+   fceux11_drivers_qt
+   ${FCEUX11_RUST_STATIC_LIB}
+   $<$<AND:$<BOOL:${FCEUX11_RUST_ENABLED}>,$<BOOL:${MINGW}>>:ntdll>
 )
 
 if (WIN32)
 	#   target_link_libraries( ${APP_NAME} wsock32 ws2_32 )
 
    set_target_properties(${APP_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
+endif()
+
+if(FCEUX11_BUILD_TESTS)
+	enable_testing()
+	add_subdirectory(tests)
+	include(CTest)
 endif()
 
