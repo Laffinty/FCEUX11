@@ -117,7 +117,10 @@ static int s_sponge = 0;
 void FCEUD_VideoChanged(void)
 {
 	int buf;
-	g_config->getOption("SDL.PAL", &buf);
+	if (g_config)
+		g_config->getOption("SDL.PAL", &buf);
+	else
+		buf = 0;
 	if(buf == 1)
 		PAL = 1;
 	else

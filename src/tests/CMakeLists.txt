@@ -1,18 +1,13 @@
 
-if(FCEUX11_BUILD_TESTS)
-    add_executable(fceux11_smoke_test
-        smoke_test.cpp
-        git_info_stub.cpp
-    )
+# Shared link configuration for test executables
+function(fceux11_add_test_executable target_name)
+    add_executable(${target_name} ${ARGN})
 
-    # Use --start-group / --end-group to resolve circular dependencies between
-    # core and drivers. --allow-multiple-definition is needed because
-    # fceux11_drivers_qt statically includes main.cpp which defines main().
-    target_link_options(fceux11_smoke_test PRIVATE
+    target_link_options(${target_name} PRIVATE
         -Wl,--allow-multiple-definition
     )
 
-    target_link_libraries(fceux11_smoke_test PRIVATE
+    target_link_libraries(${target_name} PRIVATE
         -Wl,--start-group
         fceux11_drivers_qt
         fceux11_drivers_common
@@ -23,20 +18,44 @@ if(FCEUX11_BUILD_TESTS)
     )
 
     if(FCEUX11_RUST_ENABLED AND FCEUX11_RUST_STATIC_LIB)
-        add_dependencies(fceux11_smoke_test fceux11_rust_build)
-        target_link_libraries(fceux11_smoke_test PRIVATE
+        add_dependencies(${target_name} fceux11_rust_build)
+        target_link_libraries(${target_name} PRIVATE
             ${FCEUX11_RUST_STATIC_LIB}
         )
     endif()
 
     if(MINGW)
-        target_link_libraries(fceux11_smoke_test PRIVATE ntdll)
+        target_link_libraries(${target_name} PRIVATE ntdll)
     endif()
 
-    target_include_directories(fceux11_smoke_test PRIVATE
+    target_include_directories(${target_name} PRIVATE
         ${CMAKE_SOURCE_DIR}/src
         ${CMAKE_SOURCE_DIR}/src/drivers
     )
+endfunction()
 
+if(FCEUX11_BUILD_TESTS)
+    # Smoke test (Task 1.0)
+    fceux11_add_test_executable(fceux11_smoke_test
+        smoke_test.cpp
+        git_info_stub.cpp
+    )
     add_test(NAME smoke_test COMMAND fceux11_smoke_test)
+
+    # Mapper regression tests (Task 1.1)
+    fceux11_add_test_executable(fceux11_mapper_load_test
+        boards/mapper_load_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME mapper_load_test
+             COMMAND fceux11_mapper_load_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+    fceux11_add_test_executable(fceux11_mapper_reset_test
+        boards/mapper_reset_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME mapper_reset_test
+             COMMAND fceux11_mapper_reset_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
