@@ -1597,48 +1597,6 @@ static void initNameTableViewer(void)
 
 }
 //----------------------------------------------------
-//static void ChangeMirroring(void)
-//{
-//	switch (ntmirroring)
-//	{
-//		case NT_HORIZONTAL:
-//			vnapage[0] = vnapage[1] = &NTARAM[0x000];
-//			vnapage[2] = vnapage[3] = &NTARAM[0x400];
-//			break;
-//		case NT_VERTICAL:
-//			vnapage[0] = vnapage[2] = &NTARAM[0x000];
-//			vnapage[1] = vnapage[3] = &NTARAM[0x400];
-//			break;
-//		case NT_FOUR_SCREEN:
-//			vnapage[0] = &NTARAM[0x000];
-//			vnapage[1] = &NTARAM[0x400];
-//			if(ExtraNTARAM)
-//			{
-//				vnapage[2] = ExtraNTARAM;
-//				vnapage[3] = ExtraNTARAM + 0x400;
-//			}
-//			break;
-//		case NT_SINGLE_SCREEN_TABLE_0:
-//			vnapage[0] = vnapage[1] = vnapage[2] = vnapage[3] = &NTARAM[0x000];
-//			break;
-//		case NT_SINGLE_SCREEN_TABLE_1:
-//			vnapage[0] = vnapage[1] = vnapage[2] = vnapage[3] = &NTARAM[0x400];
-//			break;
-//		case NT_SINGLE_SCREEN_TABLE_2:
-//			if(ExtraNTARAM)
-//				vnapage[0] = vnapage[1] = vnapage[2] = vnapage[3] = ExtraNTARAM;
-//			break;
-//		case NT_SINGLE_SCREEN_TABLE_3:
-//			if(ExtraNTARAM)
-//				vnapage[0] = vnapage[1] = vnapage[2] = vnapage[3] = ExtraNTARAM + 0x400;
-//			break;
-//		default:
-//		case NT_NONE:
-//			break;
-//	}
-//	return;
-//}
-//----------------------------------------------------
 inline void DrawChr( ppuNameTableTile_t *tile, const uint8_t *chr, int pal)
 {
 	int y, x, tmp, index=0, p=0;

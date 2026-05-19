@@ -981,45 +981,7 @@ InitConfig()
 	prefix = "SDL.Input.FamicomPad2.";
 	config->addOption("rp2mic", prefix + "EnableMic", 0);
 
-	// TODO: use a better data structure to store the hotkeys or something
-	//			improve this code overall in the future to make it
-	//			easier to maintain
-	//const int Hotkeys[HK_MAX] = {
-	//	SDLK_F1, // cheat menu
-	//	SDLK_F2, // bind state
-	//	SDLK_F3, // load lua
-	//	SDLK_F4, // toggleBG
-	//	SDLK_F5, // save state
-	//	SDLK_F6, // fds select
-	//	SDLK_F7, // load state
-	//	SDLK_F8, // fds eject
-	//	SDLK_F6, // VS insert coin
-	//	SDLK_F8, // VS toggle dipswitch
-	//	SDLK_PERIOD, // toggle frame display
-	//	SDLK_F10, // toggle subtitle
-	//	SDLK_F11, // reset
-	//	SDLK_F12, // screenshot
-	//	SDLK_PAUSE, // pause
-	//	SDLK_MINUS, // speed++
-	//	SDLK_EQUALS, // speed--
-	//	SDLK_BACKSLASH, //frame advnace
-	//	SDLK_TAB, // turbo
-	//	SDLK_COMMA, // toggle input display
-	//	SDLK_q, // toggle movie RW
-	//	SDLK_QUOTE, // toggle mute capture
-	//	0, // quit // edit 10/11/11 - don't map to escape, it causes ugly things to happen to sdl.  can be manually appended to config
-	//	SDLK_DELETE, // frame advance lag skip
-	//	SDLK_SLASH, // lag counter display
-	//	SDLK_0, SDLK_1, SDLK_2, SDLK_3, SDLK_4, SDLK_5,
-	//	SDLK_6, SDLK_7, SDLK_8, SDLK_9,
-	//	SDLK_PAGEUP, // select state next
-	//	SDLK_PAGEDOWN, // select state prev
-	//	0, // Volume Down Internal 
-	//	0, // Volume Up Internal 
-	//	SDLK_SCROLLLOCK }; // FKB Enable Toggle
-
-
-	//Hotkeys[ HK_OPEN_ROM ].init( "OpenROM", QKeySequence(QKeySequence::Open) );
+	// TODO: use a better data structure to store the hotkeys in the future
 
 	prefix = "SDL.Hotkeys.";
 
