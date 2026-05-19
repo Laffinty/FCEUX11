@@ -32,6 +32,8 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QInputDialog>
+#include <QTranslator>
+#include <QActionGroup>
 #include <QDesktopServices>
 #include <QStyleFactory>
 #include <QApplication>
@@ -1184,7 +1186,36 @@ void consoleWin_t::createMainMenu(void)
 	connect(autoResume, SIGNAL(triggered()), this, SLOT(toggleAutoResume(void)) );
 
 	optMenu->addAction(autoResume);
-	
+
+	// Options -> Language
+	languageMenu = new QMenu(tr("&Language"), this);
+	languageActionGroup = new QActionGroup(this);
+
+	QAction *langEn = new QAction(tr("English"), languageActionGroup);
+	langEn->setCheckable(true);
+	langEn->setData("en");
+	languageMenu->addAction(langEn);
+
+	QAction *langZhCN = new QAction(tr("Simplified Chinese"), languageActionGroup);
+	langZhCN->setCheckable(true);
+	langZhCN->setData("zh_CN");
+	languageMenu->addAction(langZhCN);
+
+	QAction *langZhTW = new QAction(tr("Traditional Chinese"), languageActionGroup);
+	langZhTW->setCheckable(true);
+	langZhTW->setData("zh_TW");
+	languageMenu->addAction(langZhTW);
+
+	connect(languageActionGroup, &QActionGroup::triggered, this, [this](QAction *action) {
+		loadTranslation(action->data().toString());
+	});
+	optMenu->addMenu(languageMenu);
+
+	// Load saved language preference
+	QSettings settings;
+	QString savedLang = settings.value("General/Language", "en").toString();
+	loadTranslation(savedLang);
+
 	optMenu->addSeparator();
 
 	// Options -> Window Resize
@@ -4582,5 +4613,55 @@ bool autoFireMenuAction::isMatch( int on, int off )
 void autoFireMenuAction::setPattern(int on, int off)
 {
 	onFrames = on;  offFrames = off;
+}
+//-----------------------------------------------------------------------------
+static QTranslator *appTranslator = nullptr;
+
+void consoleWin_t::loadTranslation(const QString &langCode)
+{
+	if (!appTranslator)
+	{
+		appTranslator = new QTranslator(qApp);
+	}
+	qApp->removeTranslator(appTranslator);
+
+	// Load from Qt resource system (embedded in executable)
+	QString tsPath = QString(":/i18n/fceux11_%1.qm").arg(langCode);
+	if (appTranslator->load(tsPath))
+	{
+		qApp->installTranslator(appTranslator);
+	}
+
+	// Save preference
+	QSettings settings;
+	settings.setValue("General/Language", langCode);
+
+	// Update checkmark on language actions
+	for (auto action : languageActionGroup->actions())
+	{
+		action->setChecked(action->data().toString() == langCode);
+	}
+
+	retranslateUi();
+}
+
+void consoleWin_t::retranslateUi(void)
+{
+	// Refresh window title
+	setWindowTitle(tr("FCEUX11 v0.2.0"));
+
+	// Refresh top-level menus
+	if (fileMenu) fileMenu->setTitle(tr("&File"));
+	if (movieMenu) movieMenu->setTitle(tr("&Movie"));
+	if (optMenu) optMenu->setTitle(tr("&Options"));
+	if (emuMenu) emuMenu->setTitle(tr("&Emulation"));
+	if (toolsMenu) toolsMenu->setTitle(tr("&Tools"));
+	if (debugMenu) debugMenu->setTitle(tr("&Debug"));
+	if (helpMenu) helpMenu->setTitle(tr("&Help"));
+
+	if (languageMenu) languageMenu->setTitle(tr("&Language"));
+
+	// Refresh window title in case it was changed
+	setWindowTitle(tr("FCEUX11 v0.2.0"));
 }
 //-----------------------------------------------------------------------------

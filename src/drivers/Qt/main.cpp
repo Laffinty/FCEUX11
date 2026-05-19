@@ -23,6 +23,7 @@
 #include <QSplashScreen>
 #include <QSettings>
 #include <QFile>
+#include <QTranslator>
 //#include <QProxyStyle>
 
 #include "Qt/ConsoleWindow.h"
@@ -136,6 +137,36 @@ int main( int argc, char *argv[] )
 	QCoreApplication::setOrganizationName("TasEmulators");
 	QCoreApplication::setOrganizationDomain("TasEmulators.org");
 	QCoreApplication::setApplicationName("fceux");
+
+	// Auto-detect system language preference
+	// Simplified Chinese (zh_CN) or Traditional Chinese (zh_TW) -> use that
+	// All other languages -> default to English
+	QString systemLang = QLocale::system().name();
+	QString defaultLang = "en";
+	if (systemLang == "zh_CN" || systemLang.startsWith("zh_CN")) {
+		defaultLang = "zh_CN";
+	} else if (systemLang == "zh_TW" || systemLang == "zh_HK" || systemLang.startsWith("zh_TW")) {
+		defaultLang = "zh_TW";
+	}
+
+	// Load saved language preference, or use auto-detected default
+	QSettings settings;
+	QString savedLang = settings.value("General/Language", defaultLang).toString();
+	QTranslator *earlyTranslator = nullptr;
+	if (savedLang != "en")
+	{
+		earlyTranslator = new QTranslator(&app);
+		QString tsPath = QString(":/i18n/fceux11_%1.qm").arg(savedLang);
+		if (earlyTranslator->load(tsPath))
+		{
+			app.installTranslator(earlyTranslator);
+		}
+		else
+		{
+			delete earlyTranslator;
+			earlyTranslator = nullptr;
+		}
+	}
 
 	fceuSplashScreen *splash = NULL;
 	

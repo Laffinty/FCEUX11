@@ -505,6 +505,35 @@ target_include_directories(fceux11_drivers_qt PUBLIC
     ${CMAKE_SOURCE_DIR}/src/drivers
 )
 
+# i18n: Qt translation files
+set(TS_FILES
+    ${CMAKE_SOURCE_DIR}/assets/i18n/fceux11_en.ts
+    ${CMAKE_SOURCE_DIR}/assets/i18n/fceux11_zh_CN.ts
+    ${CMAKE_SOURCE_DIR}/assets/i18n/fceux11_zh_TW.ts
+)
+
+if(FCEUX11_ENABLE_I18N)
+    find_package(Qt6 REQUIRED COMPONENTS LinguistTools)
+
+    # Use lrelease-qt5 directly since Qt6 lrelease has issues
+    set(LRELEASE_EXECUTABLE /d/msys64/mingw64/bin/lrelease-qt5.exe)
+
+    # Run lrelease to generate .qm files from .ts files
+    foreach(ts_file ${TS_FILES})
+        string(REPLACE ".ts" ".qm" qm_file ${ts_file})
+        add_custom_command(
+            OUTPUT ${qm_file}
+            COMMAND ${LRELEASE_EXECUTABLE} ${ts_file} -qm ${qm_file}
+            DEPENDS ${ts_file}
+            COMMENT "Generating translation: ${qm_file}"
+        )
+        list(APPEND QM_FILES ${qm_file})
+    endforeach()
+
+    # Custom target to generate all translations
+    add_custom_target(translations ALL DEPENDS ${QM_FILES})
+endif()
+
 set(SOURCES ${SRC_DRIVERS_QT})
 
 # Phase 7: Rust module integration
@@ -531,7 +560,7 @@ add_custom_command(
 
 set_property(SOURCE ${CMAKE_CURRENT_BINARY_DIR}/fceux_git_info.cpp PROPERTY SKIP_AUTOGEN ON)
 
-add_executable(  ${APP_NAME}  ${SOURCES} ../resources.qrc 
+add_executable(  ${APP_NAME}  ${SOURCES} ${CMAKE_SOURCE_DIR}/resources.qrc 
 	${CMAKE_CURRENT_BINARY_DIR}/fceux_git_info.cpp
 	${APP_ICON_RESOURCES_WINDOWS} )
 

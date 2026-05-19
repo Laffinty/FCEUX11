@@ -38,8 +38,6 @@ AboutWindow::AboutWindow(QWidget *parent)
 	QPixmap pm(":fceux1.png");
 	QPixmap pm2;
 	QLabel *lbl;
-	QPushButton *viewLicenseButton;
-	QPushButton *closeButton;
 
 	pm2 = pm.scaled( 128, 128 );
 
@@ -57,29 +55,29 @@ AboutWindow::AboutWindow(QWidget *parent)
 	mainLayout->addLayout( hbox );
 
 	hbox = new QHBoxLayout();
-	lbl = new QLabel( tr("FCEUX11 v0.2.0") );
-	hbox->addWidget( lbl );
+	versionLabel = new QLabel( tr("FCEUX11 v0.2.0") );
+	hbox->addWidget( versionLabel );
 	hbox->setAlignment( Qt::AlignCenter );
 	mainLayout->addLayout( hbox );
 
 	hbox = new QHBoxLayout();
-	lbl = new QLabel( tr("Based on FCEUX | License: GPLv2") );
-	hbox->addWidget( lbl );
+	licenseLabel = new QLabel( tr("Based on FCEUX | License: GPLv2") );
+	hbox->addWidget( licenseLabel );
 	hbox->setAlignment( Qt::AlignCenter );
 	mainLayout->addLayout( hbox );
 
 	hbox = new QHBoxLayout();
-	lbl = new QLabel( tr("\u00A9 2026 FCEUX11 Contributors") );
-	hbox->addWidget( lbl );
+	copyrightLabel = new QLabel( tr("\u00A9 2026 FCEUX11 Contributors") );
+	hbox->addWidget( copyrightLabel );
 	hbox->setAlignment( Qt::AlignCenter );
 	mainLayout->addLayout( hbox );
 
 	hbox = new QHBoxLayout();
-	lbl = new QLabel();
-	lbl->setText("<a href=\"https://github.com/Laffinty/FCEUX11\">https://github.com/Laffinty/FCEUX11</a>");
-	lbl->setTextInteractionFlags(Qt::TextBrowserInteraction);
-	lbl->setOpenExternalLinks(true);
-	hbox->addWidget( lbl );
+	urlLabel = new QLabel();
+	urlLabel->setText("<a href=\"https://github.com/Laffinty/FCEUX11\">https://github.com/Laffinty/FCEUX11</a>");
+	urlLabel->setTextInteractionFlags(Qt::TextBrowserInteraction);
+	urlLabel->setOpenExternalLinks(true);
+	hbox->addWidget( urlLabel );
 	hbox->setAlignment( Qt::AlignCenter );
 	mainLayout->addLayout( hbox );
 
@@ -111,6 +109,15 @@ AboutWindow::~AboutWindow(void)
 
 }
 //----------------------------------------------------------------------------
+void AboutWindow::retranslateUi(void)
+{
+	if (versionLabel) versionLabel->setText(tr("FCEUX11 v0.2.0"));
+	if (licenseLabel) licenseLabel->setText(tr("Based on FCEUX | License: GPLv2"));
+	if (copyrightLabel) copyrightLabel->setText(tr("\u00A9 2026 FCEUX11 Contributors"));
+	if (viewLicenseButton) viewLicenseButton->setText(tr("View License"));
+	if (closeButton) closeButton->setText(tr("OK"));
+}
+//----------------------------------------------------------------------------
 void AboutWindow::openLicense(void)
 {
 	QDesktopServices::openUrl( QUrl::fromLocalFile("COPYING") );
@@ -127,5 +134,15 @@ void AboutWindow::closeWindow(void)
 {
 	done(0);
 	deleteLater();
+}
+//----------------------------------------------------------------------------
+void AboutWindow::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		setWindowTitle(tr("About FCEUX11"));
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------

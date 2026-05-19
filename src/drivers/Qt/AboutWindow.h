@@ -27,10 +27,19 @@ class AboutWindow : public QDialog
 		AboutWindow(QWidget *parent = 0);
 		~AboutWindow(void);
 
+		void retranslateUi(void);
+
 	protected:
 		void closeEvent(QCloseEvent *event);
+		void changeEvent(QEvent *event) override;
 
 	private:
+		QLabel *versionLabel;
+		QLabel *licenseLabel;
+		QLabel *copyrightLabel;
+		QLabel *urlLabel;
+		QPushButton *viewLicenseButton;
+		QPushButton *closeButton;
 
 	public slots:
 		void closeWindow(void);

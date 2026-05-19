@@ -180,6 +180,9 @@ class  consoleWin_t : public QMainWindow
 		QMenu *movieMenu;
 		QMenu *helpMenu;
 		QMenu *recentRomMenu;
+		QMenu *languageMenu;
+
+		QActionGroup *languageActionGroup;
 		
 		QAction *openROM;
 		QAction *closeROM;
@@ -310,6 +313,8 @@ class  consoleWin_t : public QMainWindow
 		void toggleMenuVis(void);
 		void recordMovie(void);
 		void winResizeIx(int iScale);
+		void loadTranslation(const QString &langCode);
+		void retranslateUi(void);
 	private slots:
 		void closeApp(void);
 		void openROMFile(void);
