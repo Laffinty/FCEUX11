@@ -63,6 +63,9 @@ docs/latex/
 # Git hooks
 .git/hooks/
 
+# Claude Code
+.claude/
+
 # Local configuration
 config.ini
 settings.ini
