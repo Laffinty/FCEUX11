@@ -1,2 +1,0 @@
-@echo off
-D:\msys64\msys2_shell.cmd -mingw64 -c "cd /c/Users/ikrx2/Desktop/project/FCEUX11 && rm -rf build && mkdir -p build && cd build && cmake .. -G 'MSYS Makefiles' -DCMAKE_BUILD_TYPE=Release 2>&1 && make 2>&1"
