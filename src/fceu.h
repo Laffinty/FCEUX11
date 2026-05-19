@@ -100,7 +100,6 @@ extern uint8 PAL;
 extern int dendy;
 extern bool movieSubtitles;
 
-//#include "driver.h"
 
 typedef struct fceu_settings_struct {
 	int PAL;

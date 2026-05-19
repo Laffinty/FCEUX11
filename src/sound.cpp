@@ -726,15 +726,7 @@ static void RDoSQLQ(void)
    else
    for(V=start;V<end;V++)
    {
-    //int tmpamp=0;
-    //if(RectDutyCount[0]<rthresh[0])
-    // tmpamp=amp[0];
-    //if(RectDutyCount[1]<rthresh[1])
-    // tmpamp+=amp[1];
-    //tmpamp=wlookup1[tmpamp];
-    //tmpamp = wlookup1[ ttable[0][RectDutyCount[0]] + ttable[1][RectDutyCount[1]] ];
-
-    Wave[V>>4]+=totalout; //tmpamp;
+    Wave[V>>4]+=totalout;
 
     sqacc[0]-=inie[0];
     sqacc[1]-=inie[1];
@@ -1083,8 +1075,6 @@ int FlushEmulateSound(void)
 
    SexyFilter(Wave,WaveFinal,end>>4);
 
-   //if(FSettings.lowpass)
-   // SexyFilter2(WaveFinal,end>>4);
    if(end&0xF)
     Wave[0]=Wave[(end>>4)];
    Wave[end>>4]=0;

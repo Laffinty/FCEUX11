@@ -25,10 +25,6 @@ static uint8 IRQa;
 static int16 IRQCount, IRQLatch;
 static uint8 *WRAM = NULL;
 static uint32 WRAMSIZE=0;
-/*
-static uint8 *CHRRAM = NULL;
-static uint32 CHRRAMSIZE;
-*/
 
 static SFORMAT StateRegs[] =
 {
@@ -58,24 +54,6 @@ static void Sync(void) {
 		setprg4r(0x10,0xb000,preg[3] & 0x7f);
 	else
 		setprg4(0xb000,preg[3] & 0x7f);
-/*
-	if(preg[4] & 0x80)
-		setprg4r(0x10,0xc000,preg[4] & 0x7f);
-	else
-		setprg4(0xc000,preg[4] & 0x7f);
-	if(preg[5] & 0x80)
-		setprg4r(0x10,0xd000,preg[5] & 0x7f);
-	else
-		setprg4(0xd000,preg[5] & 0x7f);
-	if(preg[6] & 0x80)
-		setprg4r(0x10,0xe000,preg[6] & 0x7f);
-	else
-		setprg4(0xe000,preg[6] & 0x7f);
-	if(preg[7] & 0x80)
-		setprg4r(0x10,0xf000,preg[7] & 0x7f);
-	else
-		setprg4(0xf000,preg[7] & 0x7f);
-*/
 	setprg16(0xC000,1);
 }
 
@@ -84,14 +62,9 @@ static DECLFR(UNLSB2000Read) {
 	case 0x4033:	// IRQ flags
 	    X6502_IRQEnd(FCEU_IQFCOUNT);
 		return 0xff;
-//	case 0x4204:	// unk
-//		return 0xff;
-//	case 0x4205:	// unk
-//		return 0xff;
 	default:
 		FCEU_printf("unk read: %04x\n",A);
-//		break;
-		return 0xff; // needed to prevent C4715 warning?
+		return 0xff;
 	}
 }
 
@@ -103,7 +76,6 @@ static DECLFW(UNLSB2000Write) {
 		break;
 	case 0x4032:	// IRQ mask
 		IRQa &= ~V;
-//		X6502_IRQEnd(FCEU_IQEXT);
 		break;
 	case 0x4040:
 	case 0x4041:
@@ -113,12 +85,10 @@ static DECLFW(UNLSB2000Write) {
 	case 0x4045:
 	case 0x4046:
 	case 0x4047:
-//		FCEU_printf("bank write: %04x:%02x\n",A,V);
 		preg[A&7] = V;
 		Sync();
 		break;
 	default:
-//		FCEU_printf("unk write: %04x:%02x\n",A,V);
 		break;
 	}
 }
@@ -133,8 +103,6 @@ static void UNLSB2000Reset(void) {
 	preg[6] = 6;
 	preg[7] = 7;
 	IRQa = 0;
-//	BWrite[0x4017](0x4017,0xC0);
-//	BWrite[0x4015](0x4015,0x1F);
 }
 
 static void UNLSB2000Power(void) {
@@ -152,17 +120,9 @@ static void UNLSB2000Close(void)
 {
 	if (WRAM)
 		FCEU_gfree(WRAM);
-/*
-	if (CHRRAM)
-		FCEU_gfree(CHRRAM);
-*/
-	WRAM = /*CHRRAM = */NULL;
+	WRAM = NULL;
 }
-/*
-static void UNLSB2000IRQHook() {
-	X6502_IRQBegin(FCEU_IQEXT);
-}
-*/
+
 static void StateRestore(int version) {
 	Sync();
 }
@@ -171,16 +131,7 @@ void UNLSB2000_Init(CartInfo *info) {
 	info->Reset = UNLSB2000Reset;
 	info->Power = UNLSB2000Power;
 	info->Close = UNLSB2000Close;
-//	GameHBIRQHook = UNLSB2000IRQHook;
 	GameStateRestore = StateRestore;
-/*
-	CHRRAMSIZE = 8192;
-	CHRRAM = (uint8*)FCEU_gmalloc(CHRRAMSIZE);
-	SetupCartCHRMapping(0x10, CHRRAM, CHRRAMSIZE, 1);
-	AddExState(CHRRAM, CHRRAMSIZE, 0, "CRAM");
-*/
-
-//	SetupCartCHRMapping(0, PRGptr[0], PRGsize[0], 0);
 
 	WRAMSIZE = 512 * 1024;
 	WRAM = (uint8*)FCEU_gmalloc(WRAMSIZE);
