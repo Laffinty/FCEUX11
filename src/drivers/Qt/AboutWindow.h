@@ -34,5 +34,6 @@ class AboutWindow : public QDialog
 
 	public slots:
 		void closeWindow(void);
+		void openLicense(void);
 
 };

@@ -1911,27 +1911,6 @@ void consoleWin_t::createMainMenu(void)
 	
 	helpMenu->addAction(msgLogAct);
 
-	// Help -> Documentation Online
-	subMenu = helpMenu->addMenu( tr("&Documentation") );
-	subMenu->setIcon( style()->standardIcon( QStyle::SP_DialogHelpButton ) );
-
-	// Help -> Documentation Online
-	act = new QAction(tr("&Online"), this);
-	act->setStatusTip(tr("Documentation"));
-	//act->setIcon( style()->standardIcon( QStyle::SP_DialogHelpButton ) );
-	connect(act, SIGNAL(triggered()), this, SLOT(openOnlineDocs(void)) );
-	
-	subMenu->addAction(act);
-
-#if  defined(WIN32) || defined(_USE_QHELP)
-	// Help -> Documentation Offline
-	act = new QAction(tr("&Local"), this);
-	act->setStatusTip(tr("Documentation"));
-	//act->setIcon( style()->standardIcon( QStyle::SP_DialogHelpButton ) );
-	connect(act, SIGNAL(triggered()), this, SLOT(openOfflineDocs(void)) );
-
-	subMenu->addAction(act);
-#endif
 };
 //---------------------------------------------------------------------------
 //---------------------------------------------------------------------------
