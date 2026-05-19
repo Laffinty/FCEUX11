@@ -1,38 +1,27 @@
 #!/bin/bash
-set -euo pipefail
-
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$SCRIPT_DIR"
-
-BUILD_DIR="build"
-MAX_RETRIES=2
-
-rm -rf "$BUILD_DIR"
-mkdir -p "$BUILD_DIR"
-cd "$BUILD_DIR"
-
-echo "=== CMake Configure ==="
-cmake .. -G "MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release
-if [ $? -ne 0 ]; then
-    echo "ERROR: CMake configuration failed" >&2
-    exit 1
+export PATH="/c/Users/ikrx2/.cargo/bin:$PATH"
+cd /c/Users/ikrx2/Desktop/project/FCEUX11
+rm -rf build
+mkdir -p build
+cd build
+echo "=== CMake Configuration ==="
+cmake .. -G 'MSYS Makefiles' -DCMAKE_BUILD_TYPE=Release 2>&1
+CMAKE_RC=$?
+if [ $CMAKE_RC -ne 0 ]; then
+    echo "CMake configuration failed with exit code $CMAKE_RC"
+    exit $CMAKE_RC
 fi
 
-echo "=== Build (attempt 1/${MAX_RETRIES}) ==="
-make -j$(nproc) 2>&1
-if [ $? -eq 0 ]; then
-    echo "=== Build succeeded ==="
-    exit 0
+echo ""
+echo "=== Building ==="
+make -j4 2>&1
+MAKE_RC=$?
+if [ $MAKE_RC -ne 0 ]; then
+    echo "Build failed with exit code $MAKE_RC"
+    exit $MAKE_RC
 fi
 
-for attempt in $(seq 2 $MAX_RETRIES); do
-    echo "=== Build failed, retrying (attempt ${attempt}/${MAX_RETRIES}) ==="
-    make -j$(nproc) 2>&1
-    if [ $? -eq 0 ]; then
-        echo "=== Build succeeded on attempt ${attempt} ==="
-        exit 0
-    fi
-done
-
-echo "ERROR: Build failed after ${MAX_RETRIES} attempts" >&2
-exit 1
+echo ""
+echo "=== Build Complete ==="
+ls -la src/fceux11.exe 2>/dev/null && echo "SUCCESS: fceux11.exe built" || echo "ERROR: fceux11.exe not found"
+exit $MAKE_RC
