@@ -45,7 +45,7 @@ ConsoleViewQWidget_t::ConsoleViewQWidget_t(QWidget *parent)
 
 	QPalette pal = palette();
 
-	pal.setColor(QPalette::Window, Qt::black);
+	pal.setColor(QPalette::Window, QColor(30, 69, 40));
 	setAutoFillBackground(true);
 	setPalette(pal);
 
@@ -54,7 +54,7 @@ ConsoleViewQWidget_t::ConsoleViewQWidget_t(QWidget *parent)
 	if ( win )
 	{
 		bgColor = win->getVideoBgColorPtr();
-		bgColor->setRgb( 0, 0, 0 );
+		bgColor->setRgb( 30, 69, 40 );
 	}
 
 	setMinimumWidth( 256 );
@@ -486,8 +486,28 @@ void ConsoleViewQWidget_t::paintEvent(QPaintEvent *event)
 	}
 	else
 	{
-		painter.fillRect( 0, 0, view_width, view_height, Qt::black );
+		painter.fillRect( 0, 0, view_width, view_height, QColor(30, 69, 40) );
 	}
+
+	extern FCEUGI *GameInfo;
+	if ( GameInfo == nullptr )
+	{
+		if ( bgPix.isNull() )
+		{
+			bgPix.load(":/icons/pic.png");
+		}
+		if ( !bgPix.isNull() )
+		{
+			int x = (view_width  - bgPix.width())  / 2;
+			int y = (view_height - bgPix.height()) / 2;
+			painter.drawPixmap(x, y, bgPix);
+		}
+		painter.end();
+		videoBufferSwapMark();
+		nes_shm->render_count++;
+		return;
+	}
+
 	painter.setRenderHint( QPainter::SmoothPixmapTransform, linearFilter );
 
 	int rowPitch = nesWidth * sizeof(uint32_t);

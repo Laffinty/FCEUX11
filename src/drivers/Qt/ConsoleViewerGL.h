@@ -9,6 +9,7 @@
 #include <QScreen>
 #include <QOpenGLWidget>
 #include <QOpenGLFunctions>
+#include <QPixmap>
 
 #include "Qt/ConsoleViewerInterface.h"
 
@@ -90,6 +91,7 @@ class ConsoleViewGL_t : public QOpenGLWidget, protected QOpenGLFunctions, public
 	unsigned int  textureType;
 	unsigned int  mouseButtonMask;
 	QColor *bgColor;
+	QPixmap bgPix;
 
 	uint32_t  *localBuf;
 	uint32_t   localBufSize;

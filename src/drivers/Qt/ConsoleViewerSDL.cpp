@@ -29,6 +29,7 @@
 #include "Qt/throttle.h"
 #include "Qt/fceuWrapper.h"
 #include "Qt/ConsoleViewerSDL.h"
+#include <QImage>
 #include "Qt/ConsoleUtilities.h"
 #include "Qt/ConsoleWindow.h"
 
@@ -42,7 +43,7 @@ ConsoleViewSDL_t::ConsoleViewSDL_t(QWidget *parent)
 
 	QPalette pal = palette();
 
-	pal.setColor(QPalette::Window, Qt::black);
+	pal.setColor(QPalette::Window, QColor(30, 69, 40));
 	setAutoFillBackground(true);
 	setPalette(pal);
 
@@ -51,7 +52,7 @@ ConsoleViewSDL_t::ConsoleViewSDL_t(QWidget *parent)
 	if ( win )
 	{
 		bgColor = win->getVideoBgColorPtr();
-		bgColor->setRgb( 0, 0, 0 );
+		bgColor->setRgb( 30, 69, 40 );
 	}
 
 	setMinimumWidth( 256 );
@@ -687,9 +688,39 @@ void ConsoleViewSDL_t::render(void)
 	}
 	else
 	{
-		SDL_SetRenderDrawColor( sdlRenderer, 0, 0, 0, 255 );
+		SDL_SetRenderDrawColor( sdlRenderer, 30, 69, 40, 255 );
 	}
 	SDL_RenderClear(sdlRenderer);
+
+	extern FCEUGI *GameInfo;
+	if ( GameInfo == nullptr )
+	{
+		if ( bgPix.isNull() )
+		{
+			bgPix.load(":/icons/pic.png");
+		}
+		if ( !bgPix.isNull() )
+		{
+			QImage img = bgPix.toImage().convertToFormat(QImage::Format_ARGB32);
+			SDL_Surface *surf = SDL_CreateRGBSurfaceFrom(
+				img.bits(), img.width(), img.height(), 32, img.bytesPerLine(),
+				0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
+			SDL_Texture *tex = SDL_CreateTextureFromSurface(sdlRenderer, surf);
+			SDL_FreeSurface(surf);
+			if (tex)
+			{
+				int x = (view_width  - bgPix.width())  / 2;
+				int y = (view_height - bgPix.height()) / 2;
+				SDL_Rect dst = { x, y, bgPix.width(), bgPix.height() };
+				SDL_RenderCopy(sdlRenderer, tex, nullptr, &dst);
+				SDL_DestroyTexture(tex);
+			}
+		}
+		SDL_RenderPresent(sdlRenderer);
+		videoBufferSwapMark();
+		nes_shm->render_count++;
+		return;
+	}
 
 	uint8_t *textureBuffer;
 	int rowPitch;

@@ -34,10 +34,10 @@
 #include <QInputDialog>
 #include <QTranslator>
 #include <QActionGroup>
+#include <QSignalBlocker>
 #include <QDesktopServices>
 #include <QStyleFactory>
 #include <QApplication>
-#include <QActionGroup>
 #include <QShortcut>
 #include <QUrl>
 
@@ -1211,11 +1211,6 @@ void consoleWin_t::createMainMenu(void)
 	});
 	optMenu->addMenu(languageMenu);
 
-	// Load saved language preference
-	QSettings settings;
-	QString savedLang = settings.value("General/Language", "en").toString();
-	loadTranslation(savedLang);
-
 	optMenu->addSeparator();
 
 	// Options -> Window Resize
@@ -1942,6 +1937,10 @@ void consoleWin_t::createMainMenu(void)
 	
 	helpMenu->addAction(msgLogAct);
 
+	// Load saved language preference (must be after all actions are created)
+	QSettings settings;
+	QString savedLang = settings.value("General/Language", "en").toString();
+	loadTranslation(savedLang);
 };
 //---------------------------------------------------------------------------
 //---------------------------------------------------------------------------
@@ -4616,6 +4615,7 @@ void autoFireMenuAction::setPattern(int on, int off)
 }
 //-----------------------------------------------------------------------------
 static QTranslator *appTranslator = nullptr;
+QTranslator *g_earlyTranslator = nullptr;
 
 void consoleWin_t::loadTranslation(const QString &langCode)
 {
@@ -4625,7 +4625,13 @@ void consoleWin_t::loadTranslation(const QString &langCode)
 	}
 	qApp->removeTranslator(appTranslator);
 
-	// Load from Qt resource system (embedded in executable)
+	if (g_earlyTranslator)
+	{
+		qApp->removeTranslator(g_earlyTranslator);
+		delete g_earlyTranslator;
+		g_earlyTranslator = nullptr;
+	}
+
 	QString tsPath = QString(":/i18n/fceux11_%1.qm").arg(langCode);
 	if (appTranslator->load(tsPath))
 	{
@@ -4636,7 +4642,8 @@ void consoleWin_t::loadTranslation(const QString &langCode)
 	QSettings settings;
 	settings.setValue("General/Language", langCode);
 
-	// Update checkmark on language actions
+	// Update checkmark on language actions (block signals to prevent setChecked from triggering loadTranslation)
+	QSignalBlocker blocker(languageActionGroup);
 	for (auto action : languageActionGroup->actions())
 	{
 		action->setChecked(action->data().toString() == langCode);
@@ -4645,12 +4652,19 @@ void consoleWin_t::loadTranslation(const QString &langCode)
 	retranslateUi();
 }
 
+void consoleWin_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QMainWindow::changeEvent(event);
+}
+
 void consoleWin_t::retranslateUi(void)
 {
-	// Refresh window title
 	setWindowTitle(tr("FCEUX11 v0.2.0"));
 
-	// Refresh top-level menus
 	if (fileMenu) fileMenu->setTitle(tr("&File"));
 	if (movieMenu) movieMenu->setTitle(tr("&Movie"));
 	if (optMenu) optMenu->setTitle(tr("&Options"));
@@ -4658,10 +4672,72 @@ void consoleWin_t::retranslateUi(void)
 	if (toolsMenu) toolsMenu->setTitle(tr("&Tools"));
 	if (debugMenu) debugMenu->setTitle(tr("&Debug"));
 	if (helpMenu) helpMenu->setTitle(tr("&Help"));
-
 	if (languageMenu) languageMenu->setTitle(tr("&Language"));
 
-	// Refresh window title in case it was changed
-	setWindowTitle(tr("FCEUX11 v0.2.0"));
+	if (openROM) openROM->setText(tr("&Open ROM"));
+	if (closeROM) closeROM->setText(tr("&Close ROM"));
+	if (recentRomMenu) recentRomMenu->setTitle(tr("&Recent ROMs"));
+	if (playNSF) playNSF->setText(tr("Play &NSF"));
+	if (loadStateAct) loadStateAct->setText(tr("Load State &From"));
+	if (saveStateAct) saveStateAct->setText(tr("Save State &As"));
+	if (quickLoadAct) quickLoadAct->setText(tr("Quick &Load"));
+	if (quickSaveAct) quickSaveAct->setText(tr("Quick &Save"));
+	if (loadLuaAct) loadLuaAct->setText(tr("Load &Lua Script"));
+	if (scrShotAct) scrShotAct->setText(tr("Screens&hot"));
+	if (quitAct) quitAct->setText(tr("&Quit"));
+
+	if (inputConfig) inputConfig->setText(tr("&Input Config"));
+	if (gamePadConfig) gamePadConfig->setText(tr("&GamePad Config"));
+	if (gameSoundConfig) gameSoundConfig->setText(tr("&Sound Config"));
+	if (gameVideoConfig) gameVideoConfig->setText(tr("&Video Config"));
+	if (hotkeyConfig) hotkeyConfig->setText(tr("Hot&Key Config"));
+	if (paletteConfig) paletteConfig->setText(tr("&Palette Config"));
+	if (guiConfig) guiConfig->setText(tr("G&UI Config"));
+	if (timingConfig) timingConfig->setText(tr("&Timing Config"));
+	if (stateRecordConfig) stateRecordConfig->setText(tr("&State Recorder Config"));
+	if (movieConfig) movieConfig->setText(tr("&Movie Options"));
+	if (autoResume) autoResume->setText(tr("Auto-&Resume Play"));
+	if (fullscreen) fullscreen->setText(tr("&Fullscreen"));
+
+	if (powerAct) powerAct->setText(tr("&Power"));
+	if (resetAct) resetAct->setText(tr("Hard &Reset"));
+	if (sresetAct) sresetAct->setText(tr("&Soft Reset"));
+	if (pauseAct) pauseAct->setText(tr("&Pause"));
+	if (gameGenieAct) gameGenieAct->setText(tr("Enable Game &Genie"));
+	if (loadGgROMAct) loadGgROMAct->setText(tr("Load Game Genie ROM"));
+	if (insCoinAct) insCoinAct->setText(tr("&Insert Coin"));
+	if (fdsSwitchAct) fdsSwitchAct->setText(tr("&Switch Disk"));
+	if (fdsEjectAct) fdsEjectAct->setText(tr("&Eject Disk"));
+	if (fdsLoadBiosAct) fdsLoadBiosAct->setText(tr("&Load BIOS"));
+
+	if (cheatsAct) cheatsAct->setText(tr("&Cheats..."));
+	if (ramSearchAct) ramSearchAct->setText(tr("RAM &Search..."));
+	if (ramWatchAct) ramWatchAct->setText(tr("RAM &Watch..."));
+	if (tasEditorAct) tasEditorAct->setText(tr("&TAS Editor ..."));
+
+	if (debuggerAct) debuggerAct->setText(tr("&Debugger..."));
+	if (hexEditAct) hexEditAct->setText(tr("&Hex Editor..."));
+	if (ppuViewAct) ppuViewAct->setText(tr("&PPU Viewer..."));
+	if (oamViewAct) oamViewAct->setText(tr("&Sprite Viewer..."));
+	if (ntViewAct) ntViewAct->setText(tr("&Name Table Viewer..."));
+	if (traceLogAct) traceLogAct->setText(tr("&Trace Logger..."));
+	if (codeDataLogAct) codeDataLogAct->setText(tr("&Code/Data Logger..."));
+	if (ggEncodeAct) ggEncodeAct->setText(tr("&Game Genie Encode/Decode"));
+	if (iNesEditAct) iNesEditAct->setText(tr("NES Header Edito&r..."));
+
+	if (openMovAct) openMovAct->setText(tr("Movie &Play"));
+	if (playMovBeginAct) playMovBeginAct->setText(tr("Movie Play From &Beginning"));
+	if (stopMovAct) stopMovAct->setText(tr("Movie &Stop"));
+	if (recMovAct) recMovAct->setText(tr("Movie &Record"));
+	if (recAviAct) recAviAct->setText(tr("AVI &Record"));
+	if (recAsAviAct) recAsAviAct->setText(tr("AVI Record &As"));
+	if (stopAviAct) stopAviAct->setText(tr("AVI &Stop"));
+	if (recWavAct) recWavAct->setText(tr("WAV &Record"));
+	if (recAsWavAct) recAsWavAct->setText(tr("WAV Record &As"));
+	if (stopWavAct) stopWavAct->setText(tr("WAV &Stop"));
+
+	if (aboutAct) aboutAct->setText(tr("&About FCEUX11"));
+	if (aboutActQt) aboutActQt->setText(tr("About &Qt"));
+	if (msgLogAct) msgLogAct->setText(tr("&Message Log"));
 }
 //-----------------------------------------------------------------------------

@@ -32,6 +32,7 @@
 #include <QScreen>
 #include <QWindow>
 #include <QMouseEvent>
+#include <QPainter>
 
 #if defined(QT_OPENGL_ES) || defined(QT_OPENGL_ES_2)
 #include <GL/gl.h>
@@ -79,7 +80,7 @@ ConsoleViewGL_t::ConsoleViewGL_t(QWidget *parent)
 	if ( win )
 	{
 		bgColor = win->getVideoBgColorPtr();
-		bgColor->setRgb( 0, 0, 0 );
+		bgColor->setRgb( 30, 69, 40 );
 	}
 	setMinimumWidth( 256 );
 	setMinimumHeight( 224 );
@@ -664,13 +665,30 @@ void ConsoleViewGL_t::paintGL(void)
 	glDisable(GL_DEPTH_TEST);
 	if ( bgColor )
 	{
-		glClearColor( bgColor->redF(), bgColor->greenF(), bgColor->blueF(), 1.0f);	// Background color to config value.
+		glClearColor( bgColor->redF(), bgColor->greenF(), bgColor->blueF(), 1.0f);
 	}
 	else
 	{
-		glClearColor( 0.0, 0.0, 0.0, 1.0f);	// Background color to config value.
+		glClearColor( 30.0/255.0, 69.0/255.0, 40.0/255.0, 1.0f);
 	}
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	extern FCEUGI *GameInfo;
+	if ( GameInfo == nullptr )
+	{
+		if ( bgPix.isNull() )
+		{
+			bgPix.load(":/icons/pic.png");
+		}
+		if ( !bgPix.isNull() )
+		{
+			QPainter painter(this);
+			int x = (view_width  - bgPix.width())  / 2;
+			int y = (view_height - bgPix.height()) / 2;
+			painter.drawPixmap(x, y, bgPix);
+		}
+		return;
+	}
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_ONE, GL_ZERO);

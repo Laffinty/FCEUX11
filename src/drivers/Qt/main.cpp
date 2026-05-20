@@ -141,30 +141,50 @@ int main( int argc, char *argv[] )
 	// Auto-detect system language preference
 	// Simplified Chinese (zh_CN) or Traditional Chinese (zh_TW) -> use that
 	// All other languages -> default to English
-	QString systemLang = QLocale::system().name();
 	QString defaultLang = "en";
-	if (systemLang == "zh_CN" || systemLang.startsWith("zh_CN")) {
-		defaultLang = "zh_CN";
-	} else if (systemLang == "zh_TW" || systemLang == "zh_HK" || systemLang.startsWith("zh_TW")) {
-		defaultLang = "zh_TW";
+	QLocale::Language sysLang = QLocale::system().language();
+	if (sysLang == QLocale::Chinese)
+	{
+		QLocale::Script script = QLocale::system().script();
+		if (script == QLocale::SimplifiedHanScript)
+		{
+			defaultLang = "zh_CN";
+		}
+		else if (script == QLocale::TraditionalHanScript)
+		{
+			defaultLang = "zh_TW";
+		}
+		else
+		{
+			QString systemLang = QLocale::system().name();
+			if (systemLang.startsWith("zh_CN") || systemLang.startsWith("zh_Hans"))
+			{
+				defaultLang = "zh_CN";
+			}
+			else
+			{
+				defaultLang = "zh_TW";
+			}
+		}
 	}
 
 	// Load saved language preference, or use auto-detected default
 	QSettings settings;
 	QString savedLang = settings.value("General/Language", defaultLang).toString();
-	QTranslator *earlyTranslator = nullptr;
+	extern QTranslator *g_earlyTranslator;
+	g_earlyTranslator = nullptr;
 	if (savedLang != "en")
 	{
-		earlyTranslator = new QTranslator(&app);
+		g_earlyTranslator = new QTranslator(&app);
 		QString tsPath = QString(":/i18n/fceux11_%1.qm").arg(savedLang);
-		if (earlyTranslator->load(tsPath))
+		if (g_earlyTranslator->load(tsPath))
 		{
-			app.installTranslator(earlyTranslator);
+			app.installTranslator(g_earlyTranslator);
 		}
 		else
 		{
-			delete earlyTranslator;
-			earlyTranslator = nullptr;
+			delete g_earlyTranslator;
+			g_earlyTranslator = nullptr;
 		}
 	}
 

@@ -9,6 +9,7 @@
 #include <QImage>
 #include <QPaintEvent>
 #include <QResizeEvent>
+#include <QPixmap>
 
 #include "Qt/ConsoleViewerInterface.h"
 
@@ -82,6 +83,7 @@ class ConsoleViewQWidget_t : public QWidget, public ConsoleViewerBase
 	bool forceAspect;
 	bool autoScaleEna;
 	QColor *bgColor;
+	QPixmap bgPix;
 
 	uint32_t  *localBuf;
 	uint32_t   localBufSize;

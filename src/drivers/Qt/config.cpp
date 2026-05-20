@@ -542,7 +542,7 @@ InitConfig()
 	// video controls
 	config->addOption('f', "fullscreen", "SDL.Fullscreen", 0);
 	config->addOption("videoDriver", "SDL.VideoDriver", 0);
-	config->addOption("SDL.VideoBgColor", "#000000");
+	config->addOption("SDL.VideoBgColor", "#1E4528");
 	config->addOption("SDL.UseBgPaletteForVideo", false);
 	config->addOption("SDL.VideoVsync", 1);
 

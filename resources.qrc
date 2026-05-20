@@ -1,0 +1,10 @@
+<!DOCTYPE RCC><RCC version="1.0">
+<qresource prefix="/i18n">
+    <file alias="fceux11_en.qm">assets/i18n/fceux11_en.qm</file>
+    <file alias="fceux11_zh_CN.qm">assets/i18n/fceux11_zh_CN.qm</file>
+    <file alias="fceux11_zh_TW.qm">assets/i18n/fceux11_zh_TW.qm</file>
+</qresource>
+<qresource prefix="/icons">
+    <file alias="pic.png">icons/pic.png</file>
+</qresource>
+</RCC>
