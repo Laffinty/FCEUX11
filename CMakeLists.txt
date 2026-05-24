@@ -3,8 +3,14 @@ cmake_minimum_required(VERSION 3.28)
 
 # v0.2.1: Auto-detect vcpkg toolchain
 if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
-    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-        CACHE STRING "")
+    # Prefer local vcpkg_installed (avoids manifest-mode re-build of Qt6 etc.)
+    if(EXISTS "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows")
+        list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows")
+        message(STATUS "Using local vcpkg_installed: ${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows")
+    else()
+        set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+            CACHE STRING "")
+    endif()
 endif()
 
 project(FCEUX11 VERSION 0.2.1 LANGUAGES CXX C)

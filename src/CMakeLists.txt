@@ -501,9 +501,14 @@ set(TS_FILES
 if(FCEUX11_ENABLE_I18N)
     find_package(Qt6 REQUIRED COMPONENTS LinguistTools)
 
-    # v0.2.1: Use Qt6 lrelease (vcpkg / MSVC toolchain)
-    find_program(LRELEASE_EXECUTABLE NAMES lrelease-qt6 lrelease lrelease.exe
-                 DOC "Qt lrelease translation compiler")
+    # v0.2.1: Use Qt6 lrelease from LinguistTools target (vcpkg / MSVC toolchain)
+    if(TARGET Qt6::lrelease)
+        get_target_property(LRELEASE_EXECUTABLE Qt6::lrelease IMPORTED_LOCATION)
+    endif()
+    if(NOT LRELEASE_EXECUTABLE)
+        find_program(LRELEASE_EXECUTABLE NAMES lrelease-qt6 lrelease lrelease.exe
+                     DOC "Qt lrelease translation compiler")
+    endif()
     if(NOT LRELEASE_EXECUTABLE)
         message(FATAL_ERROR "Qt lrelease not found. Ensure Qt6 LinguistTools is installed via vcpkg.")
     endif()

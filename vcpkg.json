@@ -7,7 +7,10 @@
   "dependencies": [
     {
       "name": "qtbase",
-      "features": ["opengl", "widgets"]
+      "features": [
+        "opengl",
+        "widgets"
+      ]
     },
     "qttools",
     "sdl2",
@@ -23,10 +26,13 @@
         {
           "name": "qtbase",
           "default-features": false,
-          "features": ["static"]
+          "features": [
+            "static"
+          ]
         },
         "libarchive"
       ]
     }
-  }
+  },
+  "builtin-baseline": "aa40adda5352e87655b8583cfb2451d5e9e276fd"
 }
