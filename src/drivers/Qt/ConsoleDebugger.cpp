@@ -7605,7 +7605,7 @@ DebuggerTabWidget::DebuggerTabWidget( int row, int col, QWidget *parent )
 		drag->setHotSpot(QPoint(10,0));
 		
 		//Drag is released after the mouse bounces up, at this time to judge whether it is dragged to the outside
-		connect(drag,&QDrag::destroyed,this,[=]{
+		connect(drag,&QDrag::destroyed,this,[=, this]{
 		    QPoint bar_point=bar->mapFromGlobal(QCursor::pos());
 		                 //Out of range, drag out
 		    if (!bar->contentsRect().contains(bar_point))

@@ -33,9 +33,7 @@ void *FCEU_amalloc(size_t size, size_t alignment)
 	size = (size + alignment - 1) & ~(alignment-1);
 
 	void *ret = nullptr;
-	#ifdef _MSC_VER
-	ret = _aligned_malloc(size,alignment);
-	#elif defined(__MINGW32__) || defined(__MINGW64__)
+	#if defined(_MSC_VER) || defined(__MINGW32__) || defined(__MINGW64__)
 	ret = _aligned_malloc(size,alignment);
 	#else
 	ret = aligned_alloc(alignment,size);
@@ -49,9 +47,7 @@ void *FCEU_amalloc(size_t size, size_t alignment)
 
 void FCEU_afree(void* ptr)
 {
-	#ifdef _MSC_VER
-	_aligned_free(ptr);
-	#elif defined(__MINGW32__) || defined(__MINGW64__)
+	#if defined(_MSC_VER) || defined(__MINGW32__) || defined(__MINGW64__)
 	_aligned_free(ptr);
 	#else
 	free(ptr);
