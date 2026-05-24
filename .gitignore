@@ -3,6 +3,7 @@ build/
 build_test/
 _build/
 *.build/
+out/
 
 # CMake generated files
 CMakeCache.txt
@@ -51,6 +52,11 @@ Thumbs.db
 *.sln
 *.vcxproj
 *.vcxproj.filters
+*.sdf
+*.opensdf
+*.VC.db
+*.VC.opendb
+ipch/
 
 # Dependency directories
 dependencies/

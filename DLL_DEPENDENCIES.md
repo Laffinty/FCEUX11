@@ -62,8 +62,3 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
----
-
-## Legacy Note
-
-Previous versions (pre-v0.2.1) required MSYS2/MinGW DLLs. This is no longer the case.

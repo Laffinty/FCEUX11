@@ -8,12 +8,12 @@
 
 ## 项目概述
 
-FCEUX11 是 FCEUX 的衍生作品，专注于 Windows 11 平台。v0.2.1 完成了从 MinGW/MSYS2 到 MSVC 2022+ 的工具链统一，所有依赖通过 vcpkg 管理，不再支持旧版 Windows。
+FCEUX11 是 FCEUX 的衍生作品，专注于 Windows 11 平台。v0.2.1 完成了工具链统一，全面迁移至 MSVC 2022+，所有依赖通过 vcpkg 管理，不再支持旧版 Windows。
 
 ### 与上游 FCEUX 的区别
 
 - **仅支持 Windows 11**：不保证 Windows 10/8/7 的兼容性
-- **工具链统一**：MSVC 2022+ 单一构建路径，移除 MinGW/MSYS2 支持
+- **工具链统一**：MSVC 2022+ 单一构建路径，旧版跨平台工具链支持已移除
 - **品牌独立**：自有版本号体系与发布周期
 
 ---
@@ -29,7 +29,7 @@ FCEUX11 是 FCEUX 的衍生作品，专注于 Windows 11 平台。v0.2.1 完成�
 | vcpkg | 最新 stable | 通过 `VCPKG_ROOT` 环境变量自动检测 |
 | Rust | stable-x86_64-pc-windows-msvc | 可选，未安装时自动跳过 Rust 模块 |
 
-> **注意**：MinGW-w64 / MSYS2 支持已在 v0.2.1 中移除，项目仅通过 MSVC 编译。
+> **注意**：旧版跨平台工具链支持已在 v0.2.1 中移除，项目仅通过 MSVC 编译。
 
 ### vcpkg 依赖
 
