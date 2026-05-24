@@ -1,5 +1,6 @@
 # Build directories
 build/
+build_test/
 _build/
 *.build/
 
@@ -13,7 +14,6 @@ Makefile
 
 # Qt generated files
 *.autogen/
-*.qrc
 moc_*.cpp
 ui_*.h
 qrc_*.cpp
@@ -55,13 +55,11 @@ Thumbs.db
 # Dependency directories
 dependencies/
 libs/
+vcpkg_installed/
 
 # Generated documentation
 docs/html/
 docs/latex/
-
-# Git hooks
-.git/hooks/
 
 # Claude Code
 .claude/
