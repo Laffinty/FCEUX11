@@ -4663,7 +4663,7 @@ void consoleWin_t::changeEvent(QEvent *event)
 
 void consoleWin_t::retranslateUi(void)
 {
-	setWindowTitle(tr("FCEUX11 v0.2.0"));
+	setWindowTitle(tr("FCEUX11 v0.2.1"));
 
 	if (fileMenu) fileMenu->setTitle(tr("&File"));
 	if (movieMenu) movieMenu->setTitle(tr("&Movie"));
