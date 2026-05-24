@@ -37,8 +37,6 @@
 #endif
 #endif
 
-consoleWin_t *consoleWindow = NULL;
-
 static void MessageOutput(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
     QByteArray localMsg = msg.toLocal8Bit();

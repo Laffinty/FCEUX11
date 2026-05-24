@@ -100,6 +100,8 @@
 #include "Qt/nes_shm.h"
 #include "Qt/TasEditor/TasEditorWindow.h"
 
+consoleWin_t *consoleWindow = NULL;
+
 consoleWin_t::consoleWin_t(QWidget *parent)
 	: QMainWindow( parent )
 {

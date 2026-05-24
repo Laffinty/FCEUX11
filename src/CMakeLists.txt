@@ -378,7 +378,6 @@ set(SRC_DRIVERS_COMMON
 )
 
 set(SRC_DRIVERS_QT
-  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/main.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleWindow.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleViewerGL.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleViewerSDL.cpp  
@@ -526,6 +525,7 @@ if(FCEUX11_ENABLE_I18N)
 endif()
 
 set(SOURCES ${SRC_DRIVERS_QT})
+list(APPEND SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/main.cpp)
 
 # Phase 7: Rust module integration
 add_subdirectory(rust)
