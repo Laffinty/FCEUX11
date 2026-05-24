@@ -5,14 +5,9 @@ if(NOT FCEUX11_ENABLE_RUST)
     return()
 endif()
 
-# Detect Rust target triple based on the active C++ compiler
-if(MSVC)
-    set(RUST_TARGET "x86_64-pc-windows-msvc")
-elseif(MINGW)
-    set(RUST_TARGET "x86_64-pc-windows-gnu")
-else()
-    message(FATAL_ERROR "Rust module: Unsupported C++ compiler. Only MSVC and MinGW-w64 are supported.")
-endif()
+# v0.2.1: Rust target locked to MSVC toolchain
+set(RUST_TARGET "x86_64-pc-windows-msvc" CACHE STRING "Rust target triple")
+set(RUST_TOOLCHAIN "stable" CACHE STRING "Rust toolchain")
 
 find_program(RUSTUP_EXE rustup)
 if(NOT RUSTUP_EXE)
@@ -37,11 +32,7 @@ endif()
 set(CARGO_MANIFEST ${CMAKE_CURRENT_SOURCE_DIR}/Cargo.toml)
 set(CARGO_TARGET_DIR ${CMAKE_CURRENT_BINARY_DIR}/rust)
 
-if(MSVC)
-    set(RUST_STATIC_LIB ${CARGO_TARGET_DIR}/${RUST_TARGET}/release/fceux11_rust.lib)
-else()
-    set(RUST_STATIC_LIB ${CARGO_TARGET_DIR}/${RUST_TARGET}/release/libfceux11_rust.a)
-endif()
+set(RUST_STATIC_LIB ${CARGO_TARGET_DIR}/${RUST_TARGET}/release/fceux11_rust.lib)
 
 add_custom_command(
     OUTPUT ${RUST_STATIC_LIB}

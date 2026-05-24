@@ -7,32 +7,24 @@
   "dependencies": [
     {
       "name": "qtbase",
-      "version">=6.0.0",
       "features": ["opengl", "widgets"]
     },
-    {
-      "name": "sdl2",
-      "version">=2.0.0"
-    },
-    {
-      "name": "libarchive",
-      "version">=3.0.0"
-    },
-    {
-      "name": "zlib",
-      "version">=1.2.0"
-    },
-    {
-      "name": "liblzma",
-      "version">=5.0.0"
-    }
+    "sdl2",
+    "libarchive",
+    "zlib",
+    "liblzma"
   ],
   "default-features": [],
   "features": {
     "static": {
+      "description": "Build with static linking",
       "dependencies": [
-        "qtbase[static]",
-        "libarchive[libarchivezip]"
+        {
+          "name": "qtbase",
+          "default-features": false,
+          "features": ["static"]
+        },
+        "libarchive"
       ]
     }
   }

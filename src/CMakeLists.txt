@@ -23,39 +23,25 @@ endif()
 
 find_package( Qt6 REQUIRED COMPONENTS Widgets OpenGL OpenGLWidgets ${QtHelpModule})
 
-     find_package(ZLIB REQUIRED)
+# v0.2.1: vcpkg-managed dependencies (MSVC toolchain only)
+find_package(SDL2 CONFIG REQUIRED)
+find_package(LibArchive REQUIRED)
+find_package(ZLIB REQUIRED)
+find_package(OpenGL REQUIRED)
 
-     find_package(OpenGL REQUIRED)
-     # Qt5 support removed in Phase 2 — Qt6 only
-     add_definitions( -D_CRT_SECURE_NO_WARNINGS )
-     add_definitions( -D__SDL__  -D__QT_DRIVER__  -DQT_DEPRECATED_WARNINGS -DPSS_STYLE=2 )
-     add_definitions( -D_UNICODE -DUNICODE )
-     add_definitions( -DFCEUDEF_DEBUGGER )
-     add_definitions( -D_USE_LIBARCHIVE )
-     if(MSVC)
-         add_definitions( /wd4267 /wd4244 )
-         #add_definitions( /wd4018 ) # Integer comparison sign mismatch warnings
-     endif()
-     if(MINGW)
-         find_path(SDL2_INCLUDE_DIR SDL.h PATH_SUFFIXES SDL2 PATHS $ENV{MINGW_PREFIX}/include D:/msys64/mingw64/include C:/msys64/mingw64/include)
-         find_path(MINGW_INCLUDE_DIR SDL2/SDL.h PATHS $ENV{MINGW_PREFIX}/include D:/msys64/mingw64/include C:/msys64/mingw64/include)
-         if(SDL2_INCLUDE_DIR)
-             include_directories( ${SDL2_INCLUDE_DIR} )
-         endif()
-         if(MINGW_INCLUDE_DIR)
-             include_directories( ${MINGW_INCLUDE_DIR} )
-         endif()
-         set( OPENGL_LDFLAGS  -lopengl32 )
-         set( SDL2_LDFLAGS  -lSDL2 )
-         set( LIBARCHIVE_LDFLAGS  -larchive )
-     else()
-         include_directories( ${SDL_INSTALL_PREFIX}/SDL2/include )
-         include_directories( ${LIBARCHIVE_INSTALL_PREFIX}/libarchive/include )
-         set( SDL2_LDFLAGS  ${SDL_INSTALL_PREFIX}/SDL2/lib/x64/SDL2.lib )
-         set( LIBARCHIVE_LDFLAGS  ${LIBARCHIVE_INSTALL_PREFIX}/libarchive/lib/archive.lib )
-     endif()
-      set( SYS_LIBS  wsock32 ws2_32 vfw32 Htmlhelp )
-     set(APP_ICON_RESOURCES_WINDOWS  ${CMAKE_SOURCE_DIR}/icons/fceux11.rc )
+# Qt5 support removed in Phase 2 — Qt6 only
+add_definitions( -D_CRT_SECURE_NO_WARNINGS )
+add_definitions( -D__SDL__  -D__QT_DRIVER__  -DQT_DEPRECATED_WARNINGS -DPSS_STYLE=2 )
+add_definitions( -D_UNICODE -DUNICODE )
+add_definitions( -DFCEUDEF_DEBUGGER )
+add_definitions( -D_USE_LIBARCHIVE )
+if(MSVC)
+    add_definitions( /wd4267 /wd4244 )
+    #add_definitions( /wd4018 ) # Integer comparison sign mismatch warnings
+endif()
+
+set( SYS_LIBS  wsock32 ws2_32 vfw32 Htmlhelp )
+set(APP_ICON_RESOURCES_WINDOWS  ${CMAKE_SOURCE_DIR}/icons/fceux11.rc )
 
      if ( ${USE_LIBAV} )
         add_definitions( -D_USE_LIBAV ${LIBAV_CFLAGS} )
@@ -490,9 +476,10 @@ target_link_libraries(fceux11_drivers_qt PUBLIC
     Qt6::Widgets
     Qt6::OpenGL
     Qt6::OpenGLWidgets
-    ${OPENGL_LDFLAGS}
-    ${SDL2_LDFLAGS}
-    ${LIBARCHIVE_LDFLAGS}
+    SDL2::SDL2
+    LibArchive::LibArchive
+    ZLIB::ZLIB
+    OpenGL::GL
     ${LUA_LDFLAGS}
     ${LIBAV_LDFLAGS}
     ${SYS_LIBS}
@@ -515,8 +502,12 @@ set(TS_FILES
 if(FCEUX11_ENABLE_I18N)
     find_package(Qt6 REQUIRED COMPONENTS LinguistTools)
 
-    # Use lrelease-qt5 directly since Qt6 lrelease has issues
-    set(LRELEASE_EXECUTABLE /d/msys64/mingw64/bin/lrelease-qt5.exe)
+    # v0.2.1: Use Qt6 lrelease (vcpkg / MSVC toolchain)
+    find_program(LRELEASE_EXECUTABLE NAMES lrelease-qt6 lrelease lrelease.exe
+                 DOC "Qt lrelease translation compiler")
+    if(NOT LRELEASE_EXECUTABLE)
+        message(FATAL_ERROR "Qt lrelease not found. Ensure Qt6 LinguistTools is installed via vcpkg.")
+    endif()
 
     # Run lrelease to generate .qm files from .ts files
     foreach(ts_file ${TS_FILES})
@@ -541,9 +532,6 @@ add_subdirectory(rust)
 if(FCEUX11_RUST_ENABLED)
     add_definitions(-DFCEUX11_RUST_ENABLED)
     target_link_libraries(fceux11_utils PUBLIC ${FCEUX11_RUST_STATIC_LIB})
-    if(MINGW)
-        target_link_libraries(fceux11_utils PUBLIC ntdll)
-    endif()
 endif()
 
 # Put build timestamp into BUILD_TS environment variable and from there into
