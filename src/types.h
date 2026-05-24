@@ -38,7 +38,7 @@
 #define DEBUG(X)
 #endif
 
-#ifdef MSVC
+#ifdef _MSC_VER
 typedef unsigned char uint8;
 typedef unsigned short uint16;
 typedef unsigned int uint32;
@@ -87,7 +87,7 @@ typedef uint32_t uint32;
  typedef long long int64;
  #define INLINE inline
  #define GINLINE inline
-#elif MSVC
+#elif defined(_MSC_VER)
  typedef __int64 int64;
  typedef unsigned __int64 uint64;
  #define __restrict__

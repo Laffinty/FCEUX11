@@ -73,7 +73,7 @@ void ColorMenuItem::setImageColor( QColor c )
 
 	lastColor = c;
 
-	b = parentWidget()->palette().color(QPalette::WindowText);
+	b = qobject_cast<QWidget*>(parent())->palette().color(QPalette::WindowText);
 
 	i=0;
 
@@ -140,7 +140,7 @@ void ColorMenuItem::openColorPicker(void)
 		qs = title;
 		qs.replace( "&", "", Qt::CaseInsensitive); // get rid of & accelerator characters
 
-		picker = new ColorMenuPickerDialog_t( colorPtr, qs.toStdString().c_str(), parentWidget() );
+		picker = new ColorMenuPickerDialog_t( colorPtr, qs.toStdString().c_str(), qobject_cast<QWidget*>(parent()) );
 
 		picker->show();
 

@@ -3,18 +3,12 @@
 function(fceux11_add_test_executable target_name)
     add_executable(${target_name} ${ARGN})
 
-    target_link_options(${target_name} PRIVATE
-        -Wl,--allow-multiple-definition
-    )
-
     target_link_libraries(${target_name} PRIVATE
-        -Wl,--start-group
         fceux11_drivers_qt
         fceux11_drivers_common
         fceux11_core
         fceux11_boards
         fceux11_utils
-        -Wl,--end-group
     )
 
     if(FCEUX11_RUST_ENABLED AND FCEUX11_RUST_STATIC_LIB)
@@ -24,7 +18,7 @@ function(fceux11_add_test_executable target_name)
         )
     endif()
 
-    if(MINGW)
+    if(WIN32)
         target_link_libraries(${target_name} PRIVATE ntdll)
     endif()
 

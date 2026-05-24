@@ -462,7 +462,7 @@ target_link_libraries(fceux11_boards PUBLIC fceux11_utils ${ZLIB_LIBRARIES})
 target_include_directories(fceux11_boards PUBLIC ${CMAKE_SOURCE_DIR}/src)
 
 add_library(fceux11_core STATIC ${SRC_CORE})
-target_link_libraries(fceux11_core PUBLIC fceux11_boards fceux11_utils ${ZLIB_LIBRARIES})
+target_link_libraries(fceux11_core PUBLIC fceux11_boards fceux11_utils ${ZLIB_LIBRARIES} SDL2::SDL2)
 target_include_directories(fceux11_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 
 add_library(fceux11_drivers_common STATIC ${SRC_DRIVERS_COMMON})
@@ -565,6 +565,8 @@ if (WIN32)
 	#   target_link_libraries( ${APP_NAME} wsock32 ws2_32 )
 
    set_target_properties(${APP_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
+   target_link_options(${APP_NAME} PRIVATE /MANIFEST:NO)
+   target_link_libraries(${APP_NAME} ntdll)
 endif()
 
 if(FCEUX11_BUILD_TESTS)

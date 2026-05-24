@@ -32,7 +32,9 @@
 
 #ifdef WIN32
 #include <windows.h>
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 #include <QtPlatformHeaders/QWindowsWindowFunctions>
+#endif
 #endif
 
 consoleWin_t *consoleWindow = NULL;
@@ -239,7 +241,9 @@ int main( int argc, char *argv[] )
 	// This function is needed to fix the issue referenced below. It adds a 1-pixel border
 	// around the fullscreen window due to some limitation in windows.
 	// https://doc.qt.io/qt-5/windows-issues.html#fullscreen-opengl-based-windows
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 	QWindowsWindowFunctions::setHasBorderInFullScreen( consoleWindow->windowHandle(), true);
+#endif
 #endif
 
 	if ( splash )

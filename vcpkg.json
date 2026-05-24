@@ -9,6 +9,7 @@
       "name": "qtbase",
       "features": ["opengl", "widgets"]
     },
+    "qttools",
     "sdl2",
     "libarchive",
     "zlib",
