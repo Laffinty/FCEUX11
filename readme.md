@@ -1,18 +1,18 @@
 # FCEUX11
 
-一款面向 Windows 11 的现代化 NES（任天堂娱乐系统）模拟器，基于 [FCEUX](https://fceux.com) 衍生开发。\
-*A modernized Nintendo Entertainment System (NES) emulator for Windows 11, derived from [FCEUX](https://fceux.com).*
+基于 [FCEUX](https://fceux.com) 的 NES 模拟器衍生项目，当前仅维护 Windows 11 版本。\
+*A derivative of the FCEUX NES emulator, currently maintained for Windows 11 only.*
 
-> **English Overview**: FCEUX11 is a derivative work of the FCEUX emulator, created under the GPLv2 license. It targets exclusively the Windows 11 platform, leveraging modern Microsoft toolchains and UI frameworks for high-performance NES emulation.
+> **English**: FCEUX11 is a derivative work of FCEUX licensed under GPLv2. Older Windows versions are no longer supported.
 
 ---
 
-## 1. 平台定位 Platform Focus
+## 1. 平台支持 Platform Support
 
-Windows 11 是唯一官方支持的平台。本项目充分利用 Windows 11 的现代 API 与视觉特性（如 Mica 材质、暗色/亮色主题、Segoe UI 可变字体），不提供对 Windows 10 或更早版本的兼容性保证。\
-*Windows 11 is the sole officially supported platform. The project leverages modern Windows 11 APIs and visual features; compatibility with Windows 10 or earlier is not guaranteed.*
+仅支持 Windows 11。未在 Windows 10 或更早版本上进行测试，不提供兼容性保证。\
+*Windows 11 only. Not tested on Windows 10 or earlier versions; compatibility is not guaranteed.*
 
-> **English**: Exclusive Windows 11 support with native dark/light theme integration and modern UI styling.
+> **English**: The project targets Windows 11 exclusively. No testing or support is provided for earlier Windows releases.
 
 ---
 
