@@ -1,146 +1,99 @@
 # FCEUX11
 
-基于 [FCEUX](https://fceux.com) 的 NES 模拟器衍生项目，Windows 11 专属维护版本。
+FCEUX11 是基于 [FCEUX](https://fceux.com) 的 NES/Famicom 模拟器衍生项目，面向 Windows 平台持续维护。
 
-**许可证**: GPLv2 | **工具链**: MSVC 2022+ + vcpkg | **状态**: 活跃开发
-
----
-
-## 项目概述
-
-FCEUX11 是 FCEUX 的衍生作品，专注于 Windows 11 平台。v0.2.1 完成了工具链统一，全面迁移至 MSVC 2022+，所有依赖通过 vcpkg 管理，不再支持旧版 Windows。
-
-### 与上游 FCEUX 的区别
-
-- **仅支持 Windows 11**：不保证 Windows 10/8/7 的兼容性
-- **工具链统一**：MSVC 2022+ 单一构建路径，旧版跨平台工具链支持已移除
-- **品牌独立**：自有版本号体系与发布周期
+FCEUX11 is a derivative of the [FCEUX](https://fceux.com) NES/Famicom emulator, actively maintained for Windows.
 
 ---
 
-## 环境要求
+## 简介
 
-### 必需工具
+本项目致力于在保留 FCEUX 核心模拟精度的基础上，提供现代化的 Windows 原生体验，包括 Qt6 图形界面、多语言支持以及完善的调试与 TAS 工具集。
 
-| 工具 | 版本要求 | 说明 |
-|------|----------|------|
-| Visual Studio 2022 | Build Tools 或更高 | 需要 "使用 C++ 的桌面开发" 工作负载 |
-| CMake | ≥ 3.28 | |
-| vcpkg | 最新 stable | 通过 `VCPKG_ROOT` 环境变量自动检测 |
-| Rust | stable-x86_64-pc-windows-msvc | 可选，未安装时自动跳过 Rust 模块 |
+This project aims to preserve the core emulation accuracy of FCEUX while providing a modern, native Windows experience, including a Qt6-based user interface, multi-language support, and comprehensive debugging and TAS tooling.
 
-> **注意**：旧版跨平台工具链支持已在 v0.2.1 中移除，项目仅通过 MSVC 编译。
+---
 
-### vcpkg 依赖
+## 主要功能
 
-依赖声明在项目根目录 `vcpkg.json`，CMake 配置时自动解析：
+- **精确模拟**：完整支持 NES、Famicom 及各类扩展芯片（Mapper）的游戏运行。
+- **调试工具**：内置 CPU/PPU 调试器、十六进制编辑器、内存搜索与监视、代码数据日志等。
+- **TAS 编辑器**：支持逐帧录制与编辑输入，便于制作工具辅助速通（Tool-Assisted Speedrun）。
+- **Lua 脚本**：通过 Lua 接口扩展功能，支持自定义 HUD、自动化测试等。
+- **录像回放**：录制与播放游戏过程，支持 AVI 导出。
+- **金手指**：支持 Game Genie 与原始金手指代码。
+- **联机对战**：通过网络进行双人联机游戏。
+- **多语言界面**：提供简体中文、繁体中文及英文界面。
+- **自定义调色板**：支持加载外部调色板文件，调整游戏色彩表现。
+- **存档管理**：支持即时存档/读档及自动存档记录。
 
-```
-qtbase[opengl,widgets]  ≥ 6.0.0    # Qt6 UI + OpenGL
-qttools[linguist]       ≥ 6.0.0    # 翻译工具
-sdl2                    ≥ 2.0.0    # 多媒体
-libarchive              ≥ 3.0.0    # 存档/压缩
-zlib                    ≥ 1.2.0
-liblzma                 ≥ 5.0.0
-```
+- **Accurate Emulation**: Full support for NES, Famicom, and various expansion chips (Mappers).
+- **Debugging Tools**: Built-in CPU/PPU debugger, hex editor, RAM search/watch, code/data logger, and more.
+- **TAS Editor**: Frame-by-frame recording and editing of inputs for Tool-Assisted Speedruns.
+- **Lua Scripting**: Extend functionality via Lua scripts, including custom HUDs and automated testing.
+- **Movie Recording**: Record and playback gameplay, with AVI export support.
+- **Cheats**: Support for Game Genie and raw cheat codes.
+- **Netplay**: Two-player online multiplayer over network.
+- **Multi-language UI**: Interface available in Simplified Chinese, Traditional Chinese, and English.
+- **Custom Palettes**: Load external palette files to adjust in-game color rendering.
+- **Save States**: Instant save/load with automatic state history.
+
+---
+
+## 系统要求
+
+### 运行环境
+
+- **操作系统**：Windows 10 版本 1809（2018年10月更新）或更高版本的 64 位系统。
+- **说明**：Windows 7、Windows 8 及 Windows 8.1 不支持。此限制由图形界面框架 Qt 6 的运行时依赖决定，并非人为划定。
+
+- **Operating System**: 64-bit Windows 10 version 1809 (October 2018 Update) or later.
+- **Note**: Windows 7, Windows 8, and Windows 8.1 are not supported. This limitation is determined by the runtime requirements of the Qt 6 GUI framework, not an arbitrary policy.
+
+### 构建环境
+
+如需从源码编译，请参阅 `docs/tech/Build_Guide_MSVC_vcpkg.md`。
+
+For building from source, please refer to `docs/tech/Build_Guide_MSVC_vcpkg.md`.
+
+---
+
+## 下载与安装
+
+预编译二进制文件可在 [GitHub Releases](https://github.com/fceux11/fceux11/releases) 页面获取。下载后解压至任意目录即可运行，无需安装。
+
+Precompiled binaries are available on the [GitHub Releases](https://github.com/fceux11/fceux11/releases) page. Simply extract the archive to any directory and run—no installation required.
+
+首次运行时，请确保目标目录具有写入权限，以便程序保存配置与存档文件。
+
+Ensure the target directory has write permissions on first run so the program can save configuration and save-state files.
 
 ---
 
 ## 快速开始
 
-### 一键编译
+1. 启动 `fceux11.exe`。
+2. 通过 **File → Open ROM** 加载游戏文件（支持 `.nes`、`.fds`、`.nsf`、`.unf` 等格式）。
+3. 使用键盘或手柄进行游戏；输入映射可在 **Options → Input Config** 中调整。
+4. 按 **F5** 快速存档，**F7** 快速读档。
 
-```powershell
-# 设置 vcpkg 路径（根据实际安装位置调整）
-$env:VCPKG_ROOT = "D:\vcpkg"
-
-# 运行构建脚本
-.\do_build.bat
-```
-
-构建产物：`build/src/fceux11.exe`
-
-### 手动编译
-
-```powershell
-# 1. 初始化 MSVC 环境
-& "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
-
-# 2. 配置（推荐 Ninja 生成器，支持并行编译）
-cmake -B build -G Ninja
-
-# 3. 编译
-cmake --build build --config Release --parallel
-```
-
-### 首次编译说明
-
-- **vcpkg 首次安装较慢**：首次 `cmake configure` 会下载并编译所有依赖，约 10~30 分钟
-- **BUILD_TS 时间戳**：每次 configure 都会变化，可能触发全量重编译，日常开发可临时注释 `src/CMakeLists.txt` 中的该宏
-- **lrelease 路径**：Qt6 LinguistTools 必须显式声明在 `vcpkg.json` 中（`qtbase` 不自带）
+1. Launch `fceux11.exe`.
+2. Load a game via **File → Open ROM** (supports `.nes`, `.fds`, `.nsf`, `.unf`, and more).
+3. Play using keyboard or gamepad; input mappings can be adjusted in **Options → Input Config**.
+4. Press **F5** for quick save and **F7** for quick load.
 
 ---
 
-## 项目架构
+## 支持与反馈
 
-```
-fceux11_utils        通用工具（字符串、CRC32/MD5、内存管理）
-fceux11_boards       NES 主板/Mapper 支持库
-fceux11_core         模拟器核心（CPU、PPU、APU、输入、存档）
-fceux11_drivers_common   跨平台驱动公共层（视频滤镜、参数解析）
-fceux11_drivers_qt   Qt6 前端（主窗口、调试器、TAS 编辑器、配置）
-fceux11_rust         Rust 性能模块（可选）
-fceux11              最终可执行文件
-```
+如遇问题或有功能建议，请通过 GitHub Issues 提交。提交前建议搜索现有议题，避免重复。
+
+For issues or feature suggestions, please use GitHub Issues. We recommend searching existing issues before opening a new one to avoid duplicates.
 
 ---
 
-## 技术栈
+## 许可
 
-| 组件 | 现状 | 说明 |
-|------|------|------|
-| **编译器** | MSVC 2022+ (v143) | `/permissive-` 强制标准合规 |
-| **C++ 标准** | C++20 | |
-| **UI 框架** | Qt6 (Widgets, OpenGL) | |
-| **多媒体** | SDL2 | |
-| **依赖管理** | vcpkg manifest 模式 | |
-| **安全编译** | `/W4 /guard:cf /GS /sdl` | |
-| **Rust 模块** | x86_64-pc-windows-msvc | 可选，未安装时自动禁用 |
+FCEUX11 基于 FCEUX 开发，采用 GNU GPLv2 许可证发布。完整许可证文本见 [COPYING](COPYING)。
 
----
-
-## 推荐开发流程
-
-```powershell
-# Ninja 生成器（推荐，日常开发）
-cmake -B build -G Ninja
-cmake --build build --parallel
-
-# Visual Studio 生成器（支持 IDE 调试）
-cmake -B build -G "Visual Studio 17 2022" -A x64
-cmake --build build --config Release --parallel
-```
-
----
-
-## 已知问题
-
-| 问题 | 状态 | 说明 |
-|------|------|------|
-| `asm.cpp.obj` 偶发缺失 | 已缓解 | NMake 单线程下 `cmake_cl_compile_depends` 偶发失败，使用 Ninja/VS 生成器可避免 |
-| `QWindowsWindowFunctions` | 已修复 | Qt6 已移除，添加 `#if QT_VERSION < 6.0.0` 条件编译 |
-| `QAction::parentWidget()` | 已修复 | 替换为 `qobject_cast<QWidget*>(parent())` |
-| Manifest 重复嵌入 | 已修复 | `.rc` 文件已包含 manifest，CMake 加了 `/MANIFEST:NO` |
-| `ntdll` 符号缺失 | 已修复 | Rust std 在 MSVC 下依赖 `ntdll`，已加入链接库 |
-
----
-
-## 许可证
-
-本项目基于 [FCEUX](https://fceux.com) 模拟器，采用 **GNU GPLv2** 发布。
-
-完整许可证文本参见 [`COPYING`](COPYING)。
-
----
-
-**v0.2.1 — MSVC + vcpkg Single-Track Build**
+FCEUX11 is based on FCEUX and distributed under the GNU GPLv2 license. The full license text is available in [COPYING](COPYING).
