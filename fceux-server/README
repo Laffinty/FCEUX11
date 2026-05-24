@@ -8,8 +8,8 @@ $ sudo make install
 To run, type this in shell:
 $ ./fceu-server
 
-To compile under MS Windows, you should use Cygwin.  I'm not
-going to change this server to use Win-old-dirty-smelly-sock natively.
+To compile under MS Windows, Cygwin was historically used.
+This is no longer recommended; the server is preserved as-is for reference.
 
 There are known issues with running fceux-server in mac OSX.  As a (somewhat extensive) workaround, you can run the server inside a Linux VM in bridged network mode.
 

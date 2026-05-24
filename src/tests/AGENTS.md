@@ -2,7 +2,7 @@
 
 ## Overview
 
-This directory contains the **headless regression test suite** for FCEUX11 core emulation behavior. It is designed to run **without Qt GUI initialization**, enabling fast CI validation of mapper loading, NES power-on/reset sequences, and core symbol integrity.
+This directory contains the **headless regression test suite** for FCEUX11 core emulation behavior. It runs **without Qt GUI initialization**, enabling fast CI validation of mapper loading, NES power-on/reset sequences, and core symbol integrity.
 
 ### Test Targets
 
@@ -15,12 +15,12 @@ This directory contains the **headless regression test suite** for FCEUX11 core 
 All targets are registered with CTest and runnable via:
 
 ```powershell
-$env:PATH = "D:/msys64/mingw64/bin;" + $env:PATH
+# From Developer PowerShell for VS 2022
 cd build
 ctest --output-on-failure
 ```
 
-> **Platform note**: Tests must be run from the **build root** (or with `D:/msys64/mingw64/bin` on PATH) because Qt6/MinGW DLLs are not copied to the test output directory.
+> **Platform note**: Tests are statically linked and do not require DLLs in PATH. Run via `ctest` from the build directory.
 
 ---
 
@@ -38,13 +38,7 @@ fceux11_boards
 fceux11_utils
 ```
 
-Because `fceux11_drivers_qt` statically includes `main.cpp` (which defines `main`), the linker flags include:
-
-- `-Wl,--start-group ... -Wl,--end-group` — resolves circular deps between core and drivers
-- `-Wl,--allow-multiple-definition` — allows the test's own `main()` to override the Qt driver's `main()`
-- `ntdll` (MinGW only) — required by the Rust static library
-
-> **Do not remove these flags** when adding new test targets.
+Because `main.cpp` is compiled into the main executable (not the static libraries), test targets provide their own `main()` without conflicts.
 
 ### `git_info_stub.cpp`
 
@@ -133,17 +127,14 @@ add_executable(fceux11_ppu_render_test
     git_info_stub.cpp          # REQUIRED
 )
 
-target_link_options(fceux11_ppu_render_test PRIVATE -Wl,--allow-multiple-definition)
 target_link_libraries(fceux11_ppu_render_test PRIVATE
-    -Wl,--start-group
     fceux11_drivers_qt
     fceux11_drivers_common
     fceux11_core
     fceux11_boards
     fceux11_utils
-    -Wl,--end-group
 )
-# ... Rust + ntdll logic same as existing targets ...
+# ... Rust logic same as existing targets ...
 
 add_test(NAME ppu_render_test COMMAND fceux11_ppu_render_test)
 ```
@@ -169,5 +160,4 @@ add_test(NAME ppu_render_test COMMAND fceux11_ppu_render_test)
 | `EXIT CODE: -1073741819` (0xC0000005) after ROM load | NULL `g_config` or similar Qt global in headless mode | Add null guard in Qt driver; see "Known Traps" above |
 | `Cannot find fixtures/mapper_*.nes` | Wrong working directory | Run from `build/src/tests/` or use `ctest` |
 | Link error: undefined `fceu_get_git_rev` | Missing `git_info_stub.cpp` | Add to test source list |
-| Link error: multiple definition of `main` | Missing `--allow-multiple-definition` | Add to `target_link_options` |
-| `cc1plus.exe` crashes during build | PATH missing MinGW DLLs | Prepend `D:/msys64/mingw64/bin` to PATH |
+| Link error: multiple definition of `main` | `main.cpp` linked into static lib | Ensure `main.cpp` is only in the executable target, not in `fceux11_drivers_qt` |
