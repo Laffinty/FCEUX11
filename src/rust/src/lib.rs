@@ -1,3 +1,4 @@
+mod general;
 mod guid;
 mod md5;
 
