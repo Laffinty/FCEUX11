@@ -1,6 +1,7 @@
 mod general;
 mod guid;
 mod md5;
+mod wave;
 
 use crc32fast::Hasher;
 use std::slice;

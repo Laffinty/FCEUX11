@@ -1,3 +1,10 @@
+/// \file
+/// \brief Wave Audio Export wrapper — delegates to Rust when FCEUX11_RUST_ENABLED,
+/// otherwise falls back to the original C++ implementation.
+///
+/// Phase 4 (v0.2.5): Rust module provides a memory-safe WAV file writer
+/// using `std::fs::File` and manual PCM header construction.
+
 #include "types.h"
 #include "fceu.h"
 
@@ -7,6 +14,62 @@
 
 #include <cstdio>
 #include <cstdlib>
+
+#ifdef FCEUX11_RUST_ENABLED
+#include "rust/fceux11_rust.h"
+
+void FCEU_WriteWaveData(int32 *Buffer, int Count)
+{
+	int16 *temp = (int16*)alloca(Count*2);
+	int16 *dest;
+	int x;
+
+#ifndef __WIN_DRIVER__
+	if(!fceux11_rust_wave_running()) return;
+#else
+	if(!fceux11_rust_wave_running() && !FCEUI_AviIsRecording()) return;
+#endif
+
+	dest=temp;
+	x=Count;
+
+	// Convert int32 samples to little-endian int16
+	while(x--)
+	{
+		int16 tmp=*Buffer;
+		*(uint8 *)dest=(((uint16)tmp)&255);
+		*(((uint8 *)dest)+1)=(((uint16)tmp)>>8);
+		dest++;
+		Buffer++;
+	}
+
+	if(fceux11_rust_wave_running())
+		fceux11_rust_wave_write(temp, Count);
+
+#ifdef __WIN_DRIVER__
+	if(FCEUI_AviIsRecording())
+	{
+		FCEUI_AviSoundUpdate((void*)temp, Count);
+	}
+#endif
+}
+
+int FCEUI_EndWaveRecord()
+{
+	return fceux11_rust_wave_end();
+}
+
+bool FCEUI_BeginWaveRecord(const char *fn)
+{
+	return fceux11_rust_wave_begin(fn, FSettings.SndRate);
+}
+
+bool FCEUI_WaveRecordRunning(void)
+{
+	return fceux11_rust_wave_running();
+}
+
+#else // !FCEUX11_RUST_ENABLED — original C++ implementation
 
 static FILE *soundlog=0;
 static long wsize;
@@ -129,3 +192,5 @@ bool FCEUI_WaveRecordRunning(void)
 {
 	return (soundlog != NULL);
 }
+
+#endif // !FCEUX11_RUST_ENABLED

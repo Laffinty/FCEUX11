@@ -30,6 +30,12 @@ void fceux11_rust_guid_new(struct FceuGuid *guid);
 char *fceux11_rust_guid_to_string(const struct FceuGuid *guid);
 void fceux11_rust_guid_scan(struct FceuGuid *guid, const char *str);
 
+/* === Wave Audio Export (v0.2.5) === */
+int fceux11_rust_wave_begin(const char *path, uint32_t sample_rate);
+int fceux11_rust_wave_running(void);
+int64_t fceux11_rust_wave_write(const int16_t *buffer, int32_t count);
+int32_t fceux11_rust_wave_end(void);
+
 #ifdef __cplusplus
 }
 #endif
