@@ -88,6 +88,7 @@ FCEUX 是一个拥有 20 余年历史的 C/C++ 模拟器核心，其 PPU/APU/CPU
 | **Rust 方案** | 使用 [`md-5`](https://crates.io/crates/md-5) crate（RustCrypto 生态，纯 Rust，零不安全依赖） |
 | **风险等级** | ★☆☆（极低） |
 | **收益** | 消除手写 MD5 的维护负担；利用 SIMD 优化（若 crate 支持）；统一哈希接口风格。 |
+| **状态** | ✅ 已完成（v0.2.2） |
 
 **实施要点**：
 - 保留 `md5_context` 结构体的 C 内存布局（`#[repr(C)]`），或改用 opaque pointer 模式。
@@ -104,10 +105,19 @@ FCEUX 是一个拥有 20 余年历史的 C/C++ 模拟器核心，其 PPU/APU/CPU
 | **Rust 方案** | 使用 [`uuid`](https://crates.io/crates/uuid) crate（v4 随机生成 + 解析） |
 | **风险等级** | ★☆☆（极低） |
 | **收益** | 消除 `rand()` 生成 GUID 的低质量随机性；标准 UUID 解析更健壮。 |
+| **状态** | ✅ 已完成（v0.2.3） |
 
 **实施要点**：
 - `FCEU_Guid` 继承自 `ValueArray<uint8,16>`，Rust 侧定义为 `#[repr(C)] struct FceuGuid { data: [u8; 16] }`。
-- `toString` 返回 `*const c_char` 时，使用 `CString` 管理生命周期，由 C++ 侧立即复制或约定由 Rust 在下次调用时释放（建议 C++ 侧立即 `std::string` 复制）。
+- `toString` 返回 `*const c_char` 时，使用 thread-local static buffer，调用方立即复制。
+- 内部字节存储使用 little-endian（与 C++ 原有 `FCEU_de32lsb`/`FCEU_en32lsb` 一致）。
+
+**变更文件**：
+- `src/rust/src/guid.rs`（新增）
+- `src/rust/src/lib.rs`（新增 `mod guid`）
+- `src/rust/Cargo.toml`（新增 `uuid = { version = "1.8", features = ["v4"] }`）
+- `src/rust/fceux11_rust.h`（新增 GUID FFI 声明）
+- `src/utils/guid.cpp`（wrapper 实现）
 
 ---
 

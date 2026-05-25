@@ -1,7 +1,7 @@
 option(FCEUX11_ENABLE_RUST "Enable Rust module integration" ON)
 
 if(NOT FCEUX11_ENABLE_RUST)
-    message(STATUS "Rust module disabled (FCEUX11_ENABLE_RUST=OFF)")
+    message(STATUS "Rust module disabled (FCEUX11_RUST_ENABLED=OFF)")
     return()
 endif()
 
@@ -30,9 +30,13 @@ if(RUST_TARGET_FOUND EQUAL -1)
 endif()
 
 set(CARGO_MANIFEST ${CMAKE_CURRENT_SOURCE_DIR}/Cargo.toml)
-set(CARGO_TARGET_DIR ${CMAKE_CURRENT_BINARY_DIR}/rust)
+# Use a dedicated 'target' subdirectory so Cargo artifacts don't mix with CMake files.
+set(CARGO_TARGET_DIR ${CMAKE_CURRENT_BINARY_DIR}/target)
 
 set(RUST_STATIC_LIB ${CARGO_TARGET_DIR}/${RUST_TARGET}/release/fceux11_rust.lib)
+
+# Track Rust source files so CMake rebuilds the staticlib when they change.
+file(GLOB RUST_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.rs)
 
 add_custom_command(
     OUTPUT ${RUST_STATIC_LIB}
@@ -40,6 +44,7 @@ add_custom_command(
         cargo build --manifest-path ${CARGO_MANIFEST}
                     --target ${RUST_TARGET}
                     --release
+    DEPENDS ${RUST_SOURCE_FILES} ${CARGO_MANIFEST}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Building Rust crate (target: ${RUST_TARGET})..."
     VERBATIM

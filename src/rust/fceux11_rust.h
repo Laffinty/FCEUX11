@@ -18,6 +18,15 @@ void fceux11_rust_md5_update(struct md5_context *ctx, uint8_t *input, uint32_t l
 void fceux11_rust_md5_finish(struct md5_context *ctx, uint8_t digest[16]);
 char *fceux11_rust_md5_asciistr(uint8_t md5[16]);
 
+/* === GUID (v0.2.3) === */
+struct FceuGuid {
+    uint8_t data[16];
+};
+
+void fceux11_rust_guid_new(struct FceuGuid *guid);
+char *fceux11_rust_guid_to_string(const struct FceuGuid *guid);
+void fceux11_rust_guid_scan(struct FceuGuid *guid, const char *str);
+
 #ifdef __cplusplus
 }
 #endif

@@ -1,6 +1,6 @@
 [package]
 name = "fceux11-rust"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2024"
 
 [lib]
@@ -9,6 +9,7 @@ name = "fceux11_rust"
 
 [dependencies]
 crc32fast = "1.4"
+uuid = { version = "1.8", features = ["v4"] }
 
 [dev-dependencies]
 md-5 = "0.10"

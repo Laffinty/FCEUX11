@@ -185,7 +185,9 @@ cmake --build build_rust_off --target fceux11
 
 | 产物 | 路径（相对于构建根） | 说明 |
 |------|---------------------|------|
-| Rust staticlib | `build/src/rust/x86_64-pc-windows-msvc/release/fceux11_rust.lib` | 由 `cargo` 生成，CMake 自动链接 |
+| Rust staticlib | `build/src/rust/target/x86_64-pc-windows-msvc/release/fceux11_rust.lib` | 由 `cargo` 生成，CMake 自动链接 |
+
+> **注意**：`src/rust/CMakeLists.txt` 中 `CARGO_TARGET_DIR` 应设为 `${CMAKE_CURRENT_BINARY_DIR}/target`（而非 `/rust`），因为 `CMAKE_CURRENT_BINARY_DIR` 本身已是 `build/src/rust`，再加 `/rust` 会导致路径嵌套成 `build/src/rust/rust/...`。
 | C++ utils lib | `build/src/fceux11_utils.lib` | 包含 MD5、CRC32 等 wrapper |
 | 主程序 | `build/src/fceux11.exe` | 最终可执行文件 |
 | 测试程序 | `build/src/tests/fceux11_smoke_test.exe` | 冒烟测试 |
@@ -199,6 +201,8 @@ cmake --build build_rust_off --target fceux11
 | `ninja: error: loading 'build.ninja': The system cannot find the file` | 未配置或使用了错误 generator | 重新运行 `cmake -S . -B build -G Ninja` |
 | `vcpkg package ... not found` | 本地 vcpkg 缓存未命中 | 运行 `.\scripts\setup_vcpkg.ps1` |
 | `Qt6LinguistTools not found` | vcpkg 未安装翻译工具 | 添加 `-DFCEUX11_ENABLE_I18N=OFF` |
+| `LNK2019: 无法解析的外部符号 fceux11_rust_*` | Rust staticlib 未重新编译，缺失新符号 | 删除旧 `.lib` 或确认 `add_custom_command` 带 `DEPENDS` |
+| `C2664: 无法从 FCEU_Guid* 转换为 FceuGuid*` | C++ 编译器不认为布局相同的独立类型指针兼容 | Wrapper 中使用 `reinterpret_cast<FceuGuid*>(this)` |
 
 ### 7. 新增 Rust 模块时的 Agent Checklist
 
@@ -209,8 +213,10 @@ cmake --build build_rust_off --target fceux11
 3. [ ] `src/rust/fceux11_rust.h` 追加新的 `extern "C"` 声明区块。
 4. [ ] C++ wrapper 文件（如 `src/utils/xxx.cpp`）保留 `#ifdef FCEUX11_RUST_ENABLED` 分支。
 5. [ ] Rust 侧编写至少一个 `#[test]`，并用成熟 crate（如 `md-5`、`uuid`）做交叉验证。
-6. [ ] CI 通过 **Rust=ON** 和 **Rust=OFF** 两种配置的全量构建。
-7. [ ] 更新本文档的「适用范围」版本号。
+6. [ ] `src/rust/CMakeLists.txt` 的 `add_custom_command` 必须声明 `DEPENDS ${RUST_SOURCE_FILES} ${CARGO_MANIFEST}`，否则修改 `.rs` 后不会触发 staticlib 重建。
+7. [ ] 若 Rust 侧暴露的是 `#[repr(C)] struct`，而 C++ 侧是**继承模板基类**的结构体（如 `FCEU_Guid : ValueArray<uint8,16>`），Wrapper 中必须使用 `reinterpret_cast` 进行指针转换，不能直接传 `this`。
+8. [ ] CI 通过 **Rust=ON** 和 **Rust=OFF** 两种配置的全量构建。
+9. [ ] 更新本文档的「适用范围」版本号。
 
 ---
 
