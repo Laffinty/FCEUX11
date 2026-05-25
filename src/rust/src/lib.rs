@@ -1,3 +1,5 @@
+mod md5;
+
 use crc32fast::Hasher;
 use std::slice;
 

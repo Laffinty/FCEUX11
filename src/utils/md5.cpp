@@ -1,16 +1,39 @@
 /// \file
-/// \brief RFC 1321 compliant MD5 implementation,
-/// RFC 1321 compliant MD5 implementation,
-/// by Christophe Devine <devine@cr0.net>;
-/// this program is licensed under the GPL.
-
-//Modified October 3, 2003, to remove testing code, and add include of "types.h".
-//Added simple MD5 to ASCII string conversion function.
-// -Xodnizel   
+/// \brief MD5 wrapper — delegates to Rust when FCEUX11_RUST_ENABLED,
+/// otherwise falls back to the original C++ implementation.
+///
+/// Phase 1 (v0.2.2): Rust module provides memory-safe equivalent,
+/// validated against the `md-5` crate (RustCrypto).
 
 #include <string.h>
 #include "../types.h"
 #include "md5.h"
+
+#ifdef FCEUX11_RUST_ENABLED
+#include "../rust/fceux11_rust.h"
+
+void md5_starts( struct md5_context *ctx )
+{
+	fceux11_rust_md5_starts(ctx);
+}
+
+void md5_update( struct md5_context *ctx, uint8 *input, uint32 length )
+{
+	fceux11_rust_md5_update(ctx, input, length);
+}
+
+void md5_finish( struct md5_context *ctx, uint8 digest[16] )
+{
+	fceux11_rust_md5_finish(ctx, digest);
+}
+
+/* Uses a static buffer, so beware of how it's used. */
+char *md5_asciistr(MD5DATA& md5)
+{
+	return fceux11_rust_md5_asciistr(md5.data);
+}
+
+#else // !FCEUX11_RUST_ENABLED — original C++ implementation
 
 #define GET_UINT32(n,b,i)           \
 {                 \
@@ -38,7 +61,7 @@ void md5_starts( struct md5_context *ctx )
     ctx->state[3] = 0x10325476;
 }
 
-void md5_process( struct md5_context *ctx, uint8 data[64] )
+static void md5_process( struct md5_context *ctx, uint8 data[64] )
 {
     uint32 A, B, C, D, X[16];
 
@@ -226,7 +249,6 @@ void md5_finish( struct md5_context *ctx, uint8 digest[16] )
     PUT_UINT32( ctx->state[3], digest, 12 );
 }
 
-
 /* Uses a static buffer, so beware of how it's used. */
 char *md5_asciistr(MD5DATA& md5)
 {
@@ -242,3 +264,5 @@ char *md5_asciistr(MD5DATA& md5)
  }
  return(str);
 }
+
+#endif // !FCEUX11_RUST_ENABLED

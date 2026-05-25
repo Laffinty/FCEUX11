@@ -1,6 +1,8 @@
 # Build directories
 build/
 build_test/
+build_no_rust/
+build_rust_*/
 _build/
 *.build/
 out/

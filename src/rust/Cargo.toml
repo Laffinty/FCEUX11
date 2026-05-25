@@ -1,6 +1,6 @@
 [package]
 name = "fceux11-rust"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2024"
 
 [lib]
@@ -9,6 +9,10 @@ name = "fceux11_rust"
 
 [dependencies]
 crc32fast = "1.4"
+
+[dev-dependencies]
+md-5 = "0.10"
+digest = "0.10"
 
 [profile.release]
 panic = "abort"
