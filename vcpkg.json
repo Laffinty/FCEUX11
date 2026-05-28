@@ -1,6 +1,6 @@
 {
   "name": "fceux11",
-  "version": "0.2.1",
+  "version": "0.2.8",
   "description": "FCEUX11 - Windows 11 NES Emulator (derivative work based on FCEUX)",
   "homepage": "https://github.com/fceux11/fceux11",
   "license": "GPL-2.0-or-later",

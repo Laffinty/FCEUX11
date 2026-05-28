@@ -51,6 +51,11 @@ int fceux11_rust_convert_utf16_to_utf32(const uint16_t **sourceStart, const uint
 int fceux11_rust_convert_utf32_to_utf16(const uint32_t **sourceStart, const uint32_t *sourceEnd, uint16_t **targetStart, uint16_t *targetEnd, int flags);
 int fceux11_rust_is_legal_utf8_sequence(const uint8_t *source, const uint8_t *sourceEnd);
 
+/* === Time Stamp (v0.2.8) === */
+uint64_t fceux11_rust_timestamp_now(void);
+uint64_t fceux11_rust_timestamp_freq(void);
+int32_t fceux11_rust_timestamp_init(void);
+
 #ifdef __cplusplus
 }
 #endif

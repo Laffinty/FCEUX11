@@ -36,8 +36,8 @@
         <translation>语言(&amp;L)</translation>
     </message>
     <message>
-        <source>FCEUX11 v0.2.0</source>
-        <translation>FCEUX11 v0.2.0</translation>
+        <source>FCEUX11 v0.2.8</source>
+        <translation>FCEUX11 v0.2.8</translation>
     </message>
     <message>
         <source>&amp;Open ROM</source>
