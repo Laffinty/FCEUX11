@@ -1,6 +1,8 @@
+mod convert_utf;
 mod general;
 mod guid;
 mod md5;
+mod os_utils;
 mod wave;
 
 use crc32fast::Hasher;

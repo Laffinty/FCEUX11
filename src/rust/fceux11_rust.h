@@ -36,6 +36,21 @@ int fceux11_rust_wave_running(void);
 int64_t fceux11_rust_wave_write(const int16_t *buffer, int32_t count);
 int32_t fceux11_rust_wave_end(void);
 
+/* === OS Utilities (v0.2.6) === */
+int fceux11_rust_mkdir(const char *path);
+int fceux11_rust_mkpath(const char *path);
+int fceux11_rust_file_exists(const char *filepath);
+int fceux11_rust_msleep(int ms);
+
+/* === Unicode Conversion (v0.2.7) === */
+int fceux11_rust_convert_utf8_to_utf16(const uint8_t **sourceStart, const uint8_t *sourceEnd, uint16_t **targetStart, uint16_t *targetEnd, int flags);
+int fceux11_rust_convert_utf16_to_utf8(const uint16_t **sourceStart, const uint16_t *sourceEnd, uint8_t **targetStart, uint8_t *targetEnd, int flags);
+int fceux11_rust_convert_utf8_to_utf32(const uint8_t **sourceStart, const uint8_t *sourceEnd, uint32_t **targetStart, uint32_t *targetEnd, int flags);
+int fceux11_rust_convert_utf32_to_utf8(const uint32_t **sourceStart, const uint32_t *sourceEnd, uint8_t **targetStart, uint8_t *targetEnd, int flags);
+int fceux11_rust_convert_utf16_to_utf32(const uint16_t **sourceStart, const uint16_t *sourceEnd, uint32_t **targetStart, uint32_t *targetEnd, int flags);
+int fceux11_rust_convert_utf32_to_utf16(const uint32_t **sourceStart, const uint32_t *sourceEnd, uint16_t **targetStart, uint16_t *targetEnd, int flags);
+int fceux11_rust_is_legal_utf8_sequence(const uint8_t *source, const uint8_t *sourceEnd);
+
 #ifdef __cplusplus
 }
 #endif

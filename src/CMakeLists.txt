@@ -351,6 +351,7 @@ set(SRC_BOARDS
 
 set(SRC_UTILS
   	${CMAKE_CURRENT_SOURCE_DIR}/utils/backward.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/utils/ConvertUTF.c
   	${CMAKE_CURRENT_SOURCE_DIR}/utils/xstring.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/utils/crc32.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/utils/endian.cpp
