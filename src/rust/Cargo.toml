@@ -1,20 +1,24 @@
+[workspace]
+members = [".", "crates/*"]
+resolver = "3"
+
+[workspace.package]
+version = "0.2.13"
+edition = "2024"
+
+[profile.release]
+panic = "abort"
+lto = true
+
 [package]
 name = "fceux11-rust"
-version = "0.2.11"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
 
 [lib]
 crate-type = ["staticlib"]
 name = "fceux11_rust"
 
 [dependencies]
-crc32fast = "1.4"
-uuid = { version = "1.8", features = ["v4"] }
-
-[dev-dependencies]
-md-5 = "0.10"
-digest = "0.10"
-
-[profile.release]
-panic = "abort"
-lto = true
+fceux11-utils = { path = "crates/fceux11-utils" }
+fceux11-media = { path = "crates/fceux11-media" }

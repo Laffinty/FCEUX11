@@ -1,0 +1,15 @@
+[package]
+name = "fceux11-utils"
+version = "0.2.13"
+edition = "2024"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+crc32fast = "1.4"
+uuid = { version = "1.8", features = ["v4"] }
+
+[dev-dependencies]
+md-5 = "0.10"
+digest = "0.10"

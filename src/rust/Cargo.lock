@@ -71,8 +71,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
+name = "fceux11-media"
+version = "0.2.13"
+
+[[package]]
 name = "fceux11-rust"
-version = "0.2.11"
+version = "0.2.13"
+dependencies = [
+ "fceux11-media",
+ "fceux11-utils",
+]
+
+[[package]]
+name = "fceux11-utils"
+version = "0.2.13"
 dependencies = [
  "crc32fast",
  "digest",

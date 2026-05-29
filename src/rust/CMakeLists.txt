@@ -36,7 +36,7 @@ set(CARGO_TARGET_DIR ${CMAKE_CURRENT_BINARY_DIR}/target)
 set(RUST_STATIC_LIB ${CARGO_TARGET_DIR}/${RUST_TARGET}/release/fceux11_rust.lib)
 
 # Track Rust source files so CMake rebuilds the staticlib when they change.
-file(GLOB RUST_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.rs)
+file(GLOB_RECURSE RUST_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.rs ${CMAKE_CURRENT_SOURCE_DIR}/crates/*.rs)
 
 add_custom_command(
     OUTPUT ${RUST_STATIC_LIB}
