@@ -210,11 +210,20 @@ FCEUX 是一个拥有 20 余年历史的 C/C++ 模拟器核心，其 PPU/APU/CPU
 | **Rust 方案** | 纯 Rust 实现性能计数器；或保留 C++ 宏，仅将统计后端（`std::map` / `std::vector` 管理）移至 Rust |
 | **风险等级** | ★★☆（中低） |
 | **收益** | 仅在 `__FCEU_PROFILER_ENABLE__` 定义时编译，**零影响 Release 构建**；适合作为"较复杂状态管理"的 Rust 重构试验场。 |
+| **状态** | ✅ 已完成（v0.2.9） |
 
 **实施要点**：
 - `FCEU_PROFILE_FUNC` 宏在 C++ 侧定义不变，因为它生成的是 `thread_local funcProfileRecord` + `profileFuncScoped` RAII 对象。
 - Rust 侧替换的是 `profilerFuncMap` 和 `profilerManager` 的底层存储（将 `std::map<std::string, funcProfileRecord*>` 改为 Rust `HashMap`）。
 - 这是首次涉及**跨语言的多线程/线程本地存储**交互，需验证 `mutex` 和 `thread_local` 的兼容性。
+
+**变更文件**：
+- `src/rust/src/profiler.rs`（新增）
+- `src/rust/src/lib.rs`（新增 `mod profiler`）
+- `src/rust/Cargo.toml`（版本 `0.2.9`）
+- `src/rust/fceux11_rust.h`（新增 Profiler FFI 声明）
+- `src/profiler.h`（类定义条件编译：`FCEUX11_RUST_ENABLED` 时用 `void* _rust_handle`）
+- `src/profiler.cpp`（wrapper 实现：`#ifdef FCEUX11_RUST_ENABLED` 时调用 Rust FFI）
 
 ---
 

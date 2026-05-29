@@ -19,6 +19,10 @@
  */
 // profiler.cpp
 //
+// Phase 8 (v0.2.9): profilerFuncMap & profilerManager backend moved to Rust.
+// C++ side retains the class shells, macros, and RAII scoping objects;
+// only the map/stack storage and thread-list management are delegated.
+//
 #ifdef __FCEU_PROFILER_ENABLE__
 
 #include <stdio.h>
@@ -27,9 +31,12 @@
 #include <QThread>
 #endif
 
-#include "utils/mutex.h"
 #include "fceu.h"
 #include "profiler.h"
+
+#ifdef FCEUX11_RUST_ENABLED
+#include "rust/fceux11_rust.h"
+#endif
 
 namespace FCEU
 {
@@ -172,9 +179,12 @@ void profileExecVector::update(void)
 profilerFuncMap::profilerFuncMap(void)
 {
 	//printf("profilerFuncMap Constructor: %p\n", this);
-	pMgr.addThreadProfiler(this);
-
+#ifdef FCEUX11_RUST_ENABLED
+	_rust_handle = fceux11_rust_profiler_map_create();
+#else
 	_map_it = _map.begin();
+#endif
+	pMgr.addThreadProfiler(this);
 }
 //-------------------------------------------------------------------------
 profilerFuncMap::~profilerFuncMap(void)
@@ -182,6 +192,9 @@ profilerFuncMap::~profilerFuncMap(void)
 	//printf("profilerFuncMap Destructor: %p\n", this);
 	pMgr.removeThreadProfiler(this);
 
+#ifdef FCEUX11_RUST_ENABLED
+	fceux11_rust_profiler_map_destroy(_rust_handle);
+#else
 	//{
 	//	autoScopedLock aLock(_mapMtx);
 
@@ -191,16 +204,25 @@ profilerFuncMap::~profilerFuncMap(void)
 	//	}
 	//	_map.clear();
 	//}
+#endif
 }
 //-------------------------------------------------------------------------
 void profilerFuncMap::pushStack(funcProfileRecord *rec)
 {
+#ifdef FCEUX11_RUST_ENABLED
+	fceux11_rust_profiler_map_push_stack(_rust_handle, rec);
+#else
 	stack.push_back(rec);
+#endif
 }
 //-------------------------------------------------------------------------
 void profilerFuncMap::popStack(funcProfileRecord *rec)
 {
+#ifdef FCEUX11_RUST_ENABLED
+	fceux11_rust_profiler_map_pop_stack(_rust_handle, rec);
+#else
 	stack.pop_back();
+#endif
 }
 //-------------------------------------------------------------------------
 int profilerFuncMap::addRecord(const char *fileNameStringLiteral,
@@ -209,6 +231,14 @@ int profilerFuncMap::addRecord(const char *fileNameStringLiteral,
 			      const char *commentStringLiteral,
 			      funcProfileRecord *rec )
 {
+#ifdef FCEUX11_RUST_ENABLED
+	return fceux11_rust_profiler_map_add_record(_rust_handle,
+						    fileNameStringLiteral,
+						    fileLineNumber,
+						    funcNameStringLiteral,
+						    commentStringLiteral,
+						    rec);
+#else
 	autoScopedLock aLock(_mapMtx);
 	char lineString[64];
 
@@ -221,14 +251,25 @@ int profilerFuncMap::addRecord(const char *fileNameStringLiteral,
 	_map[fname] = rec;
 
 	return 0;
+#endif
 }
 //-------------------------------------------------------------------------
 funcProfileRecord *profilerFuncMap::findRecord(const char *fileNameStringLiteral,
-					       const int   fileLineNumber,
-					       const char *funcNameStringLiteral,
-					       const char *commentStringLiteral,
-					       bool create)
+				       const int   fileLineNumber,
+				       const char *funcNameStringLiteral,
+				       const char *commentStringLiteral,
+				       bool create)
 {
+#ifdef FCEUX11_RUST_ENABLED
+	// Not implemented in Rust path; this function is unused in the
+	// current codebase and exists only for API completeness.
+	(void)fileNameStringLiteral;
+	(void)fileLineNumber;
+	(void)funcNameStringLiteral;
+	(void)commentStringLiteral;
+	(void)create;
+	return nullptr;
+#else
 	autoScopedLock aLock(_mapMtx);
 	char lineString[64];
 	funcProfileRecord *rec = nullptr;
@@ -255,10 +296,14 @@ funcProfileRecord *profilerFuncMap::findRecord(const char *fileNameStringLiteral
 		_map[fname] = rec;
 	}
 	return rec;
+#endif
 }
 //-------------------------------------------------------------------------
 funcProfileRecord *profilerFuncMap::iterateBegin(void)
 {
+#ifdef FCEUX11_RUST_ENABLED
+	return static_cast<funcProfileRecord*>(fceux11_rust_profiler_map_iterate_begin(_rust_handle));
+#else
 	autoScopedLock aLock(_mapMtx);
 	funcProfileRecord *rec = nullptr;
 
@@ -269,10 +314,14 @@ funcProfileRecord *profilerFuncMap::iterateBegin(void)
 		rec = _map_it->second;
 	}
 	return rec;
+#endif
 }
 //-------------------------------------------------------------------------
 funcProfileRecord *profilerFuncMap::iterateNext(void)
 {
+#ifdef FCEUX11_RUST_ENABLED
+	return static_cast<funcProfileRecord*>(fceux11_rust_profiler_map_iterate_next(_rust_handle));
+#else
 	autoScopedLock aLock(_mapMtx);
 	funcProfileRecord *rec = nullptr;
 
@@ -285,6 +334,7 @@ funcProfileRecord *profilerFuncMap::iterateNext(void)
 		rec = _map_it->second;
 	}
 	return rec;
+#endif
 }
 //-------------------------------------------------------------------------
 //-----  profilerManager class
@@ -313,10 +363,14 @@ profilerManager::profilerManager(void)
 profilerManager::~profilerManager(void)
 {
 	//printf("profilerManager Destructor\n");
+#ifdef FCEUX11_RUST_ENABLED
+	fceux11_rust_profiler_mgr_clear();
+#else
 	{
 		autoScopedLock aLock(threadListMtx);
 		threadList.clear();
 	}
+#endif
 
 	if (pLog && (pLog != stdout))
 	{
@@ -330,13 +384,20 @@ profilerManager::~profilerManager(void)
 
 int profilerManager::addThreadProfiler( profilerFuncMap *m )
 {
+#ifdef FCEUX11_RUST_ENABLED
+	return fceux11_rust_profiler_mgr_add(m);
+#else
 	autoScopedLock aLock(threadListMtx);
 	threadList.push_back(m);
 	return 0;
+#endif
 }
 
 int profilerManager::removeThreadProfiler( profilerFuncMap *m, bool shouldDestroy )
 {
+#ifdef FCEUX11_RUST_ENABLED
+	return fceux11_rust_profiler_mgr_remove(m, shouldDestroy ? 1 : 0);
+#else
 	int result = -1;
 	autoScopedLock aLock(threadListMtx);
 
@@ -354,6 +415,7 @@ int profilerManager::removeThreadProfiler( profilerFuncMap *m, bool shouldDestro
 		}
 	}
 	return result;
+#endif
 }
 //-------------------------------------------------------------------------
 } // namespace FCEU

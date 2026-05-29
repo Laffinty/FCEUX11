@@ -3,6 +3,7 @@ mod general;
 mod guid;
 mod md5;
 mod os_utils;
+mod profiler;
 mod timestamp;
 mod wave;
 

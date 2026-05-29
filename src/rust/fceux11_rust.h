@@ -56,6 +56,18 @@ uint64_t fceux11_rust_timestamp_now(void);
 uint64_t fceux11_rust_timestamp_freq(void);
 int32_t fceux11_rust_timestamp_init(void);
 
+/* === Profiler (v0.2.9) === */
+void *fceux11_rust_profiler_map_create(void);
+void fceux11_rust_profiler_map_destroy(void *handle);
+int fceux11_rust_profiler_map_add_record(void *handle, const char *file, int line, const char *func, const char *comment, void *rec);
+void fceux11_rust_profiler_map_push_stack(void *handle, void *rec);
+void fceux11_rust_profiler_map_pop_stack(void *handle, void *rec);
+void *fceux11_rust_profiler_map_iterate_begin(void *handle);
+void *fceux11_rust_profiler_map_iterate_next(void *handle);
+int fceux11_rust_profiler_mgr_add(void *cpp_ptr);
+int fceux11_rust_profiler_mgr_remove(void *cpp_ptr, int should_destroy);
+void fceux11_rust_profiler_mgr_clear(void);
+
 #ifdef __cplusplus
 }
 #endif
