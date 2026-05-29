@@ -5,6 +5,7 @@ mod general;
 mod guid;
 mod md5;
 mod os_utils;
+mod palette;
 mod profiler;
 mod timestamp;
 mod wave;

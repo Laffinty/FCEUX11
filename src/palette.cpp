@@ -30,6 +30,9 @@
 
 #include "palette.h"
 #include "palettes/palettes.h"
+#ifdef FCEUX11_RUST_ENABLED
+#include "rust/fceux11_rust.h"
+#endif
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -280,6 +283,9 @@ static void ApplyDeemphasisClassic(int entry, u8& r, u8& g, u8& b)
 
 static void ApplyDeemphasisComplete(pal* pal512)
 {
+#ifdef FCEUX11_RUST_ENABLED
+	fceux11_rust_palette_apply_deemphasis(reinterpret_cast<const Pal*>(pal512), reinterpret_cast<Pal*>(pal512));
+#else
 	//for each deemph level beyond 0
 	for(int i=0,idx=0;i<8;i++)
 	{
@@ -290,6 +296,7 @@ static void ApplyDeemphasisComplete(pal* pal512)
 			ApplyDeemphasisBisqwit(idx,pal512[idx].r,pal512[idx].g,pal512[idx].b);
 		}
 	}
+#endif
 }
 
 bool  FCEUI_GetUserPaletteAvail( void )
@@ -450,6 +457,9 @@ static void CalculatePalette(void)
  	if(!ntsccol_enable)
 		return;
 
+#ifdef FCEUX11_RUST_ENABLED
+	fceux11_rust_palette_calc_ntsc(ntsctint, ntschue, reinterpret_cast<Pal*>(palette_ntsc));
+#else
 	int x,z;
 	int r,g,b;
 	double s,luma,theta;
@@ -489,6 +499,7 @@ static void CalculatePalette(void)
 			palette_ntsc[(x<<4)+z].g=g;
 			palette_ntsc[(x<<4)+z].b=b;
 		}
+#endif
 
 	//can't call FCEU_ResetPalette(), it would be re-entrant
 	//see precondition for this function
@@ -535,6 +546,9 @@ static void ChoosePalette(void)
 		// allocate memory for grayscale palette
 		if (grayscaled_palo == NULL)
 			grayscaled_palo = (pal*)malloc(sizeof(pal) * 64 * 8);
+#ifdef FCEUX11_RUST_ENABLED
+		fceux11_rust_palette_make_grayscale(reinterpret_cast<const Pal*>(palo), reinterpret_cast<Pal*>(grayscaled_palo));
+#else
 		// make every color grayscale
 		for (int x = 0; x < 64 * 8; x++)
 		{
@@ -543,6 +557,7 @@ static void ChoosePalette(void)
 			grayscaled_palo[x].g = gray;
 			grayscaled_palo[x].b = gray;
 		}
+#endif
 		// apply new palette
 		palo = grayscaled_palo;
 	}
@@ -644,9 +659,7 @@ void FCEUI_NTSCSELTINT(void)
 
 void FCEU_DrawNTSCControlBars(uint8 *XBuf)
 {
-	uint8 *XBaf;
 	int which=0;
-	int x,x2;
 
 	if(!controllength) return;
 	controllength--;
@@ -663,17 +676,25 @@ void FCEU_DrawNTSCControlBars(uint8 *XBuf)
 		which=ntsctint<<1;
 	}
 
-	XBaf=XBuf+200*256;
-	for(x=0;x<which;x+=2)
+#ifdef FCEUX11_RUST_ENABLED
+	fceux11_rust_palette_draw_control_bars(XBuf, 256, which);
+#else
 	{
-		for(x2=6;x2>=-6;x2--)
+		uint8 *XBaf;
+		int x,x2;
+		XBaf=XBuf+200*256;
+		for(x=0;x<which;x+=2)
 		{
-			XBaf[x-256*x2]=0x85;
+			for(x2=6;x2>=-6;x2--)
+			{
+				XBaf[x-256*x2]=0x85;
+			}
+		}
+		for(;x<256;x+=2)
+		{
+			for(x2=2;x2>=-2;x2--)
+				XBaf[x-256*x2]=0x85;
 		}
 	}
-	for(;x<256;x+=2)
-	{
-		for(x2=2;x2>=-2;x2--)
-			XBaf[x-256*x2]=0x85;
-	}
+#endif
 }

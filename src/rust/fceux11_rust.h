@@ -77,6 +77,16 @@ int32_t fceux11_rust_filter_neo(struct FceuFilterState *state, int32_t *in, int3
 void fceux11_rust_filter_sexy(struct FceuFilterState *state, int32_t *in, int32_t *out, int32_t count, int32_t snd_rate, int32_t sound_volume, int soundq);
 void fceux11_rust_filter_sexy2(struct FceuFilterState *state, int32_t *in, int32_t count);
 
+/* === Palette (v0.2.11) === */
+struct Pal {
+    uint8_t r, g, b;
+};
+
+void fceux11_rust_palette_calc_ntsc(int32_t tint, int32_t hue, struct Pal *out);
+void fceux11_rust_palette_apply_deemphasis(const struct Pal *src, struct Pal *dst);
+void fceux11_rust_palette_make_grayscale(const struct Pal *src, struct Pal *dst);
+void fceux11_rust_palette_draw_control_bars(uint8_t *xbuf, int32_t width, int32_t which);
+
 #ifdef __cplusplus
 }
 #endif
