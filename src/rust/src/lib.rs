@@ -1,4 +1,6 @@
 mod convert_utf;
+mod fcoeffs;
+mod filter;
 mod general;
 mod guid;
 mod md5;

@@ -236,11 +236,21 @@ FCEUX 是一个拥有 20 余年历史的 C/C++ 模拟器核心，其 PPU/APU/CPU
 | **Rust 方案** | 直接翻译为 Rust，利用切片边界检查和固定长度数组类型安全；FIR 系数计算可用 `const fn` 在编译期处理 |
 | **风险等级** | ★★★（中等） |
 | **收益** | 位于音频渲染路径，但仅在 `Sound` 初始化后调用；Rust 的数组索引检查可消除潜在的 FIR 缓冲区溢出。 |
+| **状态** | ✅ 已完成（v0.2.10） |
 
 **实施要点**：
 - **全局状态处理**：`FSettings.SndRate`, `FSettings.SoundVolume`, `FSettings.soundq`, `FSettings.lowpass`, `PAL` / `NTSC_CPU`, `GameExpSound.NeoFill`。
-- **策略**：不直接让 Rust 读取这些全局变量。重构时修改 C++ 调用点，将所需参数（`sample_rate`, `volume`, `quality`, `is_pal`, `neo_fill_callback` 等）作为函数参数传入。这反而能**净化 C++ 侧的全局状态依赖**。
-- `SexyFilter` 和 `NeoFilterSound` 涉及 `static` 局部变量（`acc`, `mrindex`, `mrratio`），Rust 侧用 `static mut` + `unsafe` 或封装在 `struct FilterState` 中通过 opaque pointer 管理。
+- **策略**：Rust 不直接读取全局变量；C++ wrapper 在 `filter.cpp` 中读取 `FSettings` 后作为参数传入 Rust FFI。所有 `static` 状态（`sq2coeffs`, `coeffs`, `mrindex`, `mrratio`, `acc1/acc2`）封装在 opaque `FilterState` 中。
+- `SexyFilter` 和 `NeoFilterSound` 涉及 `static` 局部变量（`acc`, `mrindex`, `mrratio`），Rust 侧封装在 `struct FilterState` 中通过 opaque pointer 管理。
+- FIR 系数表（`fcoeffs.h` + `fir/*.h`）自动转换为 Rust `const` 数组 `src/rust/src/fcoeffs.rs`。
+
+**变更文件**：
+- `src/rust/src/filter.rs`（新增）
+- `src/rust/src/fcoeffs.rs`（新增，从 C++ 系数表自动转换）
+- `src/rust/src/lib.rs`（新增 `mod filter` / `mod fcoeffs`）
+- `src/rust/Cargo.toml`（版本 `0.2.10`）
+- `src/rust/fceux11_rust.h`（新增 Filter FFI 声明）
+- `src/filter.cpp`（wrapper 实现：`#ifdef FCEUX11_RUST_ENABLED` 时调用 Rust FFI）
 
 ---
 

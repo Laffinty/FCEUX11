@@ -68,6 +68,15 @@ int fceux11_rust_profiler_mgr_add(void *cpp_ptr);
 int fceux11_rust_profiler_mgr_remove(void *cpp_ptr, int should_destroy);
 void fceux11_rust_profiler_mgr_clear(void);
 
+/* === Audio Filter (v0.2.10) === */
+struct FceuFilterState;
+struct FceuFilterState *fceux11_rust_filter_state_create(void);
+void fceux11_rust_filter_state_destroy(struct FceuFilterState *state);
+void fceux11_rust_filter_make(struct FceuFilterState *state, int32_t rate, int soundq, int is_pal, double ntsc_cpu, double pal_cpu);
+int32_t fceux11_rust_filter_neo(struct FceuFilterState *state, int32_t *in, int32_t *out, uint32_t inlen, int32_t *leftover, int soundq, int lowpass, void (*neo_fill)(int32_t *, int32_t), int32_t snd_rate, int32_t sound_volume);
+void fceux11_rust_filter_sexy(struct FceuFilterState *state, int32_t *in, int32_t *out, int32_t count, int32_t snd_rate, int32_t sound_volume, int soundq);
+void fceux11_rust_filter_sexy2(struct FceuFilterState *state, int32_t *in, int32_t count);
+
 #ifdef __cplusplus
 }
 #endif
