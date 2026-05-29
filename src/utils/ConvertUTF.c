@@ -5,7 +5,6 @@
  */
 
 #include "ConvertUTF.h"
-#include "../rust/fceux11_rust.h"
 
 ConversionResult ConvertUTF8toUTF16(
 		const UTF8** sourceStart, const UTF8* sourceEnd,

@@ -1,11 +1,16 @@
 use crate::fcoeffs::*;
-use std::os::raw::c_void;
 use std::slice;
 
-/// Opaque handle for audio filter state.
+/// C-visible opaque type for audio filter state.
+#[repr(C)]
+pub struct FceuFilterState {
+    _private: [u8; 0],
+}
+
+/// Internal Rust state for audio filter.
 /// Replaces the C++ `static` variables: `sq2coeffs`, `coeffs`, `mrindex`,
 /// `mrratio`, and the `static` accumulators inside `SexyFilter` / `SexyFilter2`.
-pub struct FilterState {
+struct FilterState {
     sq2coeffs: [i32; SQ2NCOEFFS],
     coeffs: [i32; NCOEFFS],
     mrindex: u32,
@@ -29,19 +34,19 @@ impl Default for FilterState {
     }
 }
 
-/// C ABI: Create a new `FilterState` and return an opaque handle.
+/// C ABI: Create a new filter state and return an opaque handle.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_filter_state_create() -> *mut c_void {
+pub extern "C" fn fceux11_rust_filter_state_create() -> *mut FceuFilterState {
     let state = Box::new(FilterState::default());
-    Box::into_raw(state) as *mut c_void
+    Box::into_raw(state) as *mut FceuFilterState
 }
 
-/// C ABI: Destroy a `FilterState` handle.
+/// C ABI: Destroy a filter state handle.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_filter_state_destroy(handle: *mut c_void) {
+pub extern "C" fn fceux11_rust_filter_state_destroy(handle: *mut FceuFilterState) {
     if !handle.is_null() {
         unsafe {
-            let _ = Box::from_raw(handle as *mut FilterState);
+            let _ = Box::from_raw(handle.cast::<FilterState>());
         }
     }
 }
@@ -52,7 +57,7 @@ pub extern "C" fn fceux11_rust_filter_state_destroy(handle: *mut c_void) {
 /// (e.g. 1789772.727… for NTSC, 1662607.125 for PAL).
 #[unsafe(no_mangle)]
 pub extern "C" fn fceux11_rust_filter_make(
-    handle: *mut c_void,
+    handle: *mut FceuFilterState,
     rate: i32,
     soundq: i32,
     is_pal: i32,
@@ -62,7 +67,7 @@ pub extern "C" fn fceux11_rust_filter_make(
     if handle.is_null() {
         return;
     }
-    let state = unsafe { &mut *(handle as *mut FilterState) };
+    let state = unsafe { &mut *(handle.cast::<FilterState>()) };
 
     let nco = if soundq == 2 { SQ2NCOEFFS } else { NCOEFFS };
 
@@ -211,7 +216,7 @@ fn sexy_filter_out_of_place(
 /// `in_buf` and `out_buf` may point to the same memory.
 #[unsafe(no_mangle)]
 pub extern "C" fn fceux11_rust_filter_sexy(
-    handle: *mut c_void,
+    handle: *mut FceuFilterState,
     in_buf: *mut i32,
     out_buf: *mut i32,
     count: i32,
@@ -222,7 +227,7 @@ pub extern "C" fn fceux11_rust_filter_sexy(
     if handle.is_null() || in_buf.is_null() || out_buf.is_null() || count <= 0 {
         return;
     }
-    let state = unsafe { &mut *(handle as *mut FilterState) };
+    let state = unsafe { &mut *(handle.cast::<FilterState>()) };
     let in_slice = unsafe { slice::from_raw_parts_mut(in_buf, count as usize) };
     let out_slice = unsafe { slice::from_raw_parts_mut(out_buf, count as usize) };
     if in_buf == out_buf {
@@ -235,14 +240,14 @@ pub extern "C" fn fceux11_rust_filter_sexy(
 /// C ABI: `SexyFilter2` wrapper.
 #[unsafe(no_mangle)]
 pub extern "C" fn fceux11_rust_filter_sexy2(
-    handle: *mut c_void,
+    handle: *mut FceuFilterState,
     buf: *mut i32,
     count: i32,
 ) {
     if handle.is_null() || buf.is_null() || count <= 0 {
         return;
     }
-    let state = unsafe { &mut *(handle as *mut FilterState) };
+    let state = unsafe { &mut *(handle.cast::<FilterState>()) };
     let buf_slice = unsafe { slice::from_raw_parts_mut(buf, count as usize) };
     sexy_filter2(state, buf_slice);
 }
@@ -254,7 +259,7 @@ pub extern "C" fn fceux11_rust_filter_sexy2(
 /// end of `in` to the beginning of `in` on the next call.
 #[unsafe(no_mangle)]
 pub extern "C" fn fceux11_rust_filter_neo(
-    handle: *mut c_void,
+    handle: *mut FceuFilterState,
     in_buf: *mut i32,
     out_buf: *mut i32,
     inlen: u32,
@@ -268,7 +273,7 @@ pub extern "C" fn fceux11_rust_filter_neo(
     if handle.is_null() || in_buf.is_null() || out_buf.is_null() || inlen == 0 {
         return 0;
     }
-    let state = unsafe { &mut *(handle as *mut FilterState) };
+    let state = unsafe { &mut *(handle.cast::<FilterState>()) };
     let in_slice = unsafe { slice::from_raw_parts(in_buf, inlen as usize) };
     // out_buf must be at least as large as inlen; caller guarantees this.
     let out_slice = unsafe { slice::from_raw_parts_mut(out_buf, inlen as usize) };

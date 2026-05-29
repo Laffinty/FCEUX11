@@ -3,13 +3,7 @@
 
 #include "../types.h"
 #include "valuearray.h"
-
-struct md5_context
-{
-    uint32 total[2];
-    uint32 state[4];
-    uint8 buffer[64];
-};
+#include "../rust/fceux11_rust.h"
 
 typedef ValueArray<uint8,16> MD5DATA;
 

@@ -7,3 +7,5 @@ pub mod os_utils;
 pub mod profiler;
 pub mod slice;
 pub mod timestamp;
+
+pub use slice::{FceuSlice, FceuSliceMut};
