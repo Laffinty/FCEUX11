@@ -37,11 +37,7 @@
 #include <string>
 #include <vector>
 
-#ifndef FCEUX11_RUST_ENABLED
-#include <list>
-#include <map>
-#include "utils/mutex.h"
-#endif
+
 
 #include "utils/timeStamp.h"
 
@@ -117,15 +113,7 @@ namespace FCEU
 			void pushStack(funcProfileRecord *rec);
 			void popStack(funcProfileRecord *rec);
 		private:
-#ifdef FCEUX11_RUST_ENABLED
 			void* _rust_handle;
-#else
-			mutex  _mapMtx;
-			std::map<std::string, funcProfileRecord*> _map;
-			std::map<std::string, funcProfileRecord*>::iterator _map_it;
-
-			std::vector <funcProfileRecord*> stack;
-#endif
 	};
 
 	class profilerManager
@@ -142,10 +130,7 @@ namespace FCEU
 			static profilerManager *getInstance();
 		private:
 		
-#ifndef FCEUX11_RUST_ENABLED
-			mutex  threadListMtx;
-			std::list <profilerFuncMap*> threadList;
-#endif
+
 			static profilerManager *instance;
 	};
 }
