@@ -22,26 +22,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../types.h"
-
-#ifdef FCEUX11_RUST_ENABLED
 #include "../rust/fceux11_rust.h"
-#endif
 
 uint32 uppow2(uint32 n)
 {
-#ifdef FCEUX11_RUST_ENABLED
 	return fceux11_rust_uppow2(n);
-#else
-	int x;
-
-	for(x=31;x>=0;x--)
-	 if(n&(1u<<x))
-	 {
-	  if((1u<<x)!=n)
-	   return(1u<<(x+1));
-	  break;
-	 }
-	return n;
-#endif
 }
-
