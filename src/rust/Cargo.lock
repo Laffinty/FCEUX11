@@ -190,7 +190,7 @@ checksum = "9f1f227452a390804cdb637b74a86990f2a7d7ba4b7d5693aac9b4dd6defd8d6"
 
 [[package]]
 name = "fceux11-formats"
-version = "0.2.18"
+version = "0.2.19"
 
 [[package]]
 name = "fceux11-media"
@@ -206,7 +206,7 @@ dependencies = [
 
 [[package]]
 name = "fceux11-rust"
-version = "0.2.18"
+version = "0.2.19"
 dependencies = [
  "cbindgen",
  "fceux11-formats",

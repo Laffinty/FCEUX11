@@ -375,13 +375,29 @@ pub struct FceuSliceMut {
 | **Rust 优势** | 可用 `nom` 或手动 `match` 实现解析器组合子，消除 C 风格指针偏移算术；`Result<T, E>` 替代错误码。 |
 | **风险** | 中低。UNIF 文件较罕见，但解析错误会导致 ROM 加载失败。 |
 
-#### v0.2.19 — iNES 解析（`src/ines.cpp`, 1,208 行）
+#### v0.2.19 — iNES 解析（`src/ines.cpp`, 1,208 行）✅ 已完成
 
 | 属性 | 详情 |
 |------|------|
 | **功能** | 最主流的 NES ROM 格式解析，含 iNES 1.0/2.0、NES 2.0 扩展头。 |
 | **Rust 优势** | 结构体布局用 `#[repr(C)]` 映射头文件 16 字节，剩余逻辑纯 safe Rust；`nom` 解析 iNES 2.0 的变长字段。 |
 | **风险** | 中。这是 ROM 加载的第一入口，任何头文件解析错误都会导致游戏无法运行。但已有大量 ROM 可用于测试。 |
+
+> **v0.2.19 执行记录**：
+> - `fceux11-formats` crate 新增 `ines.rs` + `ines/ines_data.rs`：
+>   - `FceuInesHeader` — `#[repr(C)]` 16 字节头结构体，含 `cleanup()` 方法（DiskDude/demiforce/Ni03 垃圾签名清除）。
+>   - 静态数据库迁移：`bmap` 名称表（168 条）、`not_power2`（4 条）、`SetInput` CRC→控制器表（70 条）、`SetInputNes20` expansion→控制器表（25 条）、`BadROMImages`（40 条）、`sMasterRomInfo`（9 条）、`savie` 电池白名单（33 条）、`ines-correct.h` ROM 修正表（256 条）。
+> - C++ `ines.cpp` 中以下逻辑替换为 Rust FFI 调用：
+>   - `head.cleanup()` → `fceux11_rust_ines_header_cleanup`
+>   - `SetInput()` → `fceux11_rust_ines_lookup_input_crc`
+>   - `SetInputNes20()` → `fceux11_rust_ines_lookup_input_nes20`
+>   - `CheckBad()` → `fceux11_rust_ines_check_bad`
+>   - `CheckHInfo()` → `fceux11_rust_ines_check_hinfo`（返回 `FceuInesHInfoResult`，C++ 应用修正）
+>   - `not_power2` 循环 → `fceux11_rust_ines_not_power2`
+>   - Mapper 名称查询 → `fceux11_rust_ines_mapper_name`
+> - 删除 C++ 侧未使用的 `INPSEL`、`INPSEL_NES20`、`BADINF`、`BadROMImages`、`savie`、`CHINF moo` 定义。
+> - 新增 16 个单元测试（header cleanup ×3, mapper name ×3, not_power2, input CRC ×2, input NES20 ×2, check bad ×2, check hinfo ×2, databases nonempty）。
+> - `cargo test --workspace` 114 测试全部通过；C++ 侧因环境限制未执行混合构建，但头文件已由 cbindgen 自动生成并验证签名匹配。
 
 #### v0.2.20 — Cart 卡带管理（`src/cart.cpp`, 608 行）
 

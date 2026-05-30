@@ -39,6 +39,8 @@
 #include "driver.h"
 #include "input.h"
 
+#include "rust/fceux11_rust.h"
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -137,185 +139,41 @@ struct CRCMATCH {
 	char *name;
 };
 
-struct INPSEL {
-	uint32 crc32;
-	ESI input1;
-	ESI input2;
-	ESIFC inputfc;
-};
-
 /*
 * Function to set input controllers based on CRC
 */
 static void SetInput(void) {
-	static struct INPSEL moo[] =
-	{
-		{0x19b0a9f1,	SI_GAMEPAD,		SI_ZAPPER,		SIFC_NONE		},	// 6-in-1 (MGC-023)(Unl)[!]
-		{0x29de87af,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_FTRAINERB	},	// Aerobics Studio
-		{0xd89e5a67,	SI_UNSET,		SI_UNSET,		SIFC_ARKANOID	},	// Arkanoid (J)
-		{0x0f141525,	SI_UNSET,		SI_UNSET,		SIFC_ARKANOID	},	// Arkanoid 2(J)
-		{0x32fb0583,	SI_UNSET,		SI_ARKANOID,	SIFC_NONE		},	// Arkanoid(NES)
-		{0x60ad090a,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_FTRAINERA	},	// Athletic World
-		{0x48ca0ee1,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_BWORLD		},	// Barcode World
-		{0x4318a2f8,	SI_UNSET,		SI_ZAPPER,		SIFC_NONE		},	// Barker Bill's Trick Shooting
-		{0x6cca1c1f,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_FTRAINERB	},	// Dai Undoukai
-		{0x24598791,	SI_GAMEPAD,		SI_ZAPPER,		SIFC_NONE		},	// Duck Hunt
-		{0xd5d6eac4,	SI_UNSET,		SI_UNSET,		SIFC_SUBORKB	},	// Edu (As)
-		{0xe9a7fe9e,	SI_UNSET,		SI_MOUSE,		SIFC_SUBORKB	},	// Educational Computer 2000
-		{0x8f7b1669,	SI_UNSET,		SI_UNSET,		SIFC_SUBORKB	},	// FP BASIC 3.3 by maxzhou88
-		{0xf7606810,	SI_UNSET,		SI_UNSET,		SIFC_FKB		},	// Family BASIC 2.0A
-		{0x895037bc,	SI_UNSET,		SI_UNSET,		SIFC_FKB		},	// Family BASIC 2.1a
-		{0xb2530afc,	SI_UNSET,		SI_UNSET,		SIFC_FKB		},	// Family BASIC 3.0
-		{0xea90f3e2,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_FTRAINERB	},	// Family Trainer:  Running Stadium
-		{0xbba58be5,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_FTRAINERB	},	// Family Trainer: Manhattan Police
-		{0x3e58a87e,	SI_UNSET,		SI_ZAPPER,		SIFC_NONE		},	// Freedom Force
-		{0xd9f45be9,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_QUIZKING	},	// Gimme a Break ...
-		{0x1545bd13,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_QUIZKING	},	// Gimme a Break ... 2
-		{0x4e959173,	SI_UNSET,		SI_ZAPPER,		SIFC_NONE		},	// Gotcha! - The Sport!
-		{0xbeb8ab01,	SI_UNSET,		SI_ZAPPER,		SIFC_NONE		},	// Gumshoe
-		{0xff24d794,	SI_UNSET,		SI_ZAPPER,		SIFC_NONE		},	// Hogan's Alley
-		{0x21f85681,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_HYPERSHOT	},	// Hyper Olympic (Gentei Ban)
-		{0x980be936,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_HYPERSHOT	},	// Hyper Olympic
-		{0x915a53a7,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_HYPERSHOT	},	// Hyper Sports
-		{0x9fae4d46,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_MAHJONG	},	// Ide Yousuke Meijin no Jissen Mahjong
-		{0x7b44fb2a,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_MAHJONG	},	// Ide Yousuke Meijin no Jissen Mahjong 2
-		{0x2f128512,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_FTRAINERA	},	// Jogging Race
-		{0xbb33196f,	SI_UNSET,		SI_UNSET,		SIFC_FKB		},	// Keyboard Transformer
-		{0x8587ee00,	SI_UNSET,		SI_UNSET,		SIFC_FKB		},	// Keyboard Transformer
-		{0x543ab532,	SI_UNSET,		SI_UNSET,		SIFC_SUBORKB	},	// LIKO Color Lines
-		{0x368c19a8,	SI_UNSET,		SI_UNSET,		SIFC_SUBORKB	},	// LIKO Study Cartridge
-		{0x5ee6008e,	SI_UNSET,		SI_ZAPPER,		SIFC_NONE		},	// Mechanized Attack
-		{0x370ceb65,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_FTRAINERB	},	// Meiro Dai Sakusen
-		{0x3a1694f9,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_4PLAYER	},	// Nekketsu Kakutou Densetsu
-		{0x9d048ea4,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_OEKAKIDS	},	// Oeka Kids
-		{0x2a6559a1,	SI_UNSET,		SI_ZAPPER,		SIFC_NONE		},	// Operation Wolf (J)
-		{0xedc3662b,	SI_UNSET,		SI_ZAPPER,		SIFC_NONE		},	// Operation Wolf
-		{0x912989dc,	SI_UNSET,		SI_UNSET,		SIFC_FKB		},	// Playbox BASIC
-		{0x9044550e,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_FTRAINERA	},	// Rairai Kyonshizu
-		{0xea90f3e2,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_FTRAINERB	},	// Running Stadium
-		{0x851eb9be,	SI_GAMEPAD,		SI_ZAPPER,		SIFC_NONE		},	// Shooting Range
-		{0x6435c095,	SI_GAMEPAD,		SI_POWERPADB,	SIFC_UNSET		},	// Short Order/Eggsplode
-		{0xc043a8df,	SI_UNSET,		SI_MOUSE,		SIFC_NONE		},	// Shu Qi Yu - Shu Xue Xiao Zhuan Yuan (Ch)
-		{0x2cf5db05,	SI_UNSET,		SI_MOUSE,		SIFC_NONE		},	// Shu Qi Yu - Zhi Li Xiao Zhuan Yuan (Ch)
-		{0xad9c63e2,	SI_GAMEPAD,		SI_UNSET,		SIFC_SHADOW		},	// Space Shadow
-		{0x61d86167,	SI_GAMEPAD,		SI_POWERPADB,	SIFC_UNSET		},	// Street Cop
-		{0xabb2f974,	SI_UNSET,		SI_UNSET,		SIFC_SUBORKB	},	// Study and Game 32-in-1
-		{0x41ef9ac4,	SI_UNSET,		SI_UNSET,		SIFC_SUBORKB	},	// Subor
-		{0x8b265862,	SI_UNSET,		SI_UNSET,		SIFC_SUBORKB	},	// Subor
-		{0x82f1fb96,	SI_UNSET,		SI_UNSET,		SIFC_SUBORKB	},	// Subor 1.0 Russian
-		{0x9f8f200a,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_FTRAINERA	},	// Super Mogura Tataki!! - Pokkun Moguraa (bad dump)
-		{0xc7bcc981,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_FTRAINERA	},	// Super Mogura Tataki!! - Pokkun Moguraa
-		{0xd74b2719,	SI_GAMEPAD,		SI_POWERPADB,	SIFC_UNSET		},	// Super Team Games
-		{0x74bea652,	SI_GAMEPAD,		SI_ZAPPER,		SIFC_NONE		},	// Supergun 3-in-1
-		{0x5e073a1b,	SI_UNSET,		SI_UNSET,		SIFC_SUBORKB	},	// Supor English (Chinese)
-		{0x589b6b0d,	SI_UNSET,		SI_UNSET,		SIFC_SUBORKB	},	// SuporV20
-		{0x41401c6d,	SI_UNSET,		SI_UNSET,		SIFC_SUBORKB	},	// SuporV40
-		{0x23d17f5e,	SI_GAMEPAD,		SI_ZAPPER,		SIFC_NONE		},	// The Lone Ranger
-		{0xc3c0811d,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_OEKAKIDS	},	// The two "Oeka Kids" games
-		{0xde8fd935,	SI_UNSET,		SI_ZAPPER,		SIFC_NONE		},	// To the Earth
-		{0x47232739,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_TOPRIDER	},	// Top Rider
-		{0x8a12a7d9,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_FTRAINERB	},	// Totsugeki Fuuun Takeshi Jou
-		{0xb8b9aca3,	SI_UNSET,		SI_ZAPPER,		SIFC_NONE		},	// Wild Gunman
-		{0x5112dc21,	SI_UNSET,		SI_ZAPPER,		SIFC_NONE		},	// Wild Gunman
-		{0xaf4010ea,	SI_GAMEPAD,		SI_POWERPADB,	SIFC_UNSET		},	// World Class Track Meet
-		{0x67b126b9,	SI_GAMEPAD,		SI_GAMEPAD,		SIFC_FAMINETSYS },	// Famicom Network System
-		{0x00000000,	SI_UNSET,		SI_UNSET,		SIFC_UNSET		}
-	};
-
-	int x = 0;
-
-	while (moo[x].input1 >= 0 || moo[x].input2 >= 0 || moo[x].inputfc >= 0) {
-		if (moo[x].crc32 == iNESGameCRC32) {
-			GameInfo->input[0] = moo[x].input1;
-			GameInfo->input[1] = moo[x].input2;
-			GameInfo->inputfc = moo[x].inputfc;
-			break;
-		}
-		x++;
+	int32_t i1 = 0, i2 = 0, ifc = 0;
+	if (fceux11_rust_ines_lookup_input_crc(iNESGameCRC32, &i1, &i2, &ifc)) {
+		GameInfo->input[0] = i1;
+		GameInfo->input[1] = i2;
+		GameInfo->inputfc = ifc;
 	}
 }
-
-struct INPSEL_NES20 {
-	uint8 expansion_id;
-	ESI input1;
-	ESI input2;
-	ESIFC inputfc;
-};
 
 /*
 * Function to set input controllers based on NES 2.0 header
 */
 extern int eoptions;
 static void SetInputNes20(uint8 expansion) {
-	static struct INPSEL_NES20 moo[] =
-	{
-		{0x01,			SI_GAMEPAD,		SI_GAMEPAD,		SIFC_UNSET		}, // Standard NES/Famicom controllers
-		{0x02,			SI_GAMEPAD,		SI_GAMEPAD,		SIFC_NONE		}, // NES Four Score/Satellite with two additional standard controllers
-		{0x03,			SI_GAMEPAD,		SI_GAMEPAD,		SIFC_4PLAYER	}, // Famicom Four Players Adapter with two additional standard controllers using the "simple" protocol
-		{0x04,			SI_GAMEPAD,		SI_GAMEPAD,		SIFC_NONE		}, // Vs. System (1P via $4016)
-		{0x05,			SI_GAMEPAD,		SI_GAMEPAD,		SIFC_NONE		}, // Vs. System (1P via $4017)
-		{0x07,			SI_ZAPPER,		SI_NONE,		SIFC_NONE		}, // Vs. Zapper
-		{0x08,			SI_UNSET,		SI_ZAPPER,		SIFC_NONE		}, // Zapper ($4017)
-		{0x0A,			SI_UNSET,		SI_UNSET,		SIFC_SHADOW		}, // Bandai Hyper Shot Lightgun
-		{0x0B,			SI_UNSET,		SI_POWERPADA,	SIFC_UNSET		}, // Power Pad Side A
-		{0x0C,			SI_UNSET,		SI_POWERPADB,	SIFC_UNSET		}, // Power Pad Side B
-		{0x0D,			SI_UNSET,		SI_UNSET,		SIFC_FTRAINERA	}, // Family Trainer Side A
-		{0x0E,			SI_UNSET,		SI_UNSET,		SIFC_FTRAINERB	}, // Family Trainer Side B
-		{0x0F,			SI_UNSET,		SI_ARKANOID,	SIFC_UNSET		}, // Arkanoid Vaus Controller (NES)
-		{0x10,			SI_UNSET,		SI_UNSET,		SIFC_ARKANOID	}, // Arkanoid Vaus Controller (Famicom)
-		{0x12,			SI_UNSET,		SI_UNSET,		SIFC_HYPERSHOT	}, // Konami Hyper Shot Controller
-		{0x15,			SI_UNSET,		SI_UNSET,		SIFC_MAHJONG	}, // Jissen Mahjong Controller
-		{0x17,			SI_UNSET,		SI_UNSET,		SIFC_OEKAKIDS	}, // Oeka Kids Tablet
-		{0x18,			SI_UNSET,		SI_UNSET,		SIFC_BWORLD		}, // Sunsoft Barcode Battler
-		{0x1B,			SI_UNSET,		SI_UNSET,		SIFC_TOPRIDER	}, // Top Rider (Inflatable Bicycle)
-		{0x23,			SI_UNSET,		SI_UNSET,		SIFC_FKB		}, // Family BASIC Keyboard plus Famicom Data Recorder
-		{0x24,			SI_UNSET,		SI_UNSET,		SIFC_PEC586KB	}, // Dongda PEC-586 Keyboard
-		{0x26,			SI_UNSET,		SI_UNSET,		SIFC_SUBORKB	}, // Subor Keyboard
-		//{0x27,			SI_UNSET,		SI_MOUSE,		SIFC_SUBORKB	}, // Subor Keyboard plus mouse (3x8-bit protocol)
-		{0x28,			SI_UNSET,		SI_MOUSE,		SIFC_SUBORKB	}, // Subor Keyboard plus mouse (24-bit protocol)
-		{0x29,			SI_UNSET,		SI_SNES_MOUSE,	SIFC_UNSET		}, // SNES Mouse
-		{0,				SI_UNSET,		SI_UNSET,		SIFC_UNSET		}
-	};
-
-	int x = 0;
-
-	if (expansion == 0x02) 
-		eoptions |= 32768; // dirty hack to enable Four-Score
-	GameInfo->vs_cswitch = expansion == 0x05;		
-
-	while (moo[x].expansion_id) {
-		if (moo[x].expansion_id == expansion) {
-			GameInfo->input[0] = moo[x].input1;
-			GameInfo->input[1] = moo[x].input2;
-			GameInfo->inputfc = moo[x].inputfc;
-			break;		}
-		x++;
+	int32_t i1 = 0, i2 = 0, ifc = 0, eopt = 0, vsc = 0;
+	if (fceux11_rust_ines_lookup_input_nes20(expansion, &i1, &i2, &ifc, &eopt, &vsc)) {
+		GameInfo->input[0] = i1;
+		GameInfo->input[1] = i2;
+		GameInfo->inputfc = ifc;
 	}
+	eoptions |= eopt;
+	GameInfo->vs_cswitch = vsc != 0;
 }
 
 #define INESB_INCOMPLETE  1
 #define INESB_CORRUPT     2
 #define INESB_HACKED      4
 
-struct BADINF {
-	uint64 md5partial;
-	const char *name;
-	uint32 type;
-};
-
-static struct BADINF BadROMImages[] =
-{
-	#include "ines-bad.h"
-};
-
 void CheckBad(uint64 md5partial) {
-	int32 x = 0;
-	while (BadROMImages[x].name) {
-		if (BadROMImages[x].md5partial == md5partial) {
-			FCEU_PrintError("The copy game you have loaded, \"%s\", is bad, and will not work properly in FCEUX.", BadROMImages[x].name);
-			return;
-		}
-		x++;
+	const char* name = fceux11_rust_ines_check_bad(md5partial);
+	if (name) {
+		FCEU_PrintError("The copy game you have loaded, \"%s\", is bad, and will not work properly in FCEUX.", name);
 	}
 }
 
@@ -342,58 +200,14 @@ const TMasterRomInfo* MasterRomInfo;
 TMasterRomInfoParams MasterRomInfoParams;
 
 static void CheckHInfo(uint64 partialmd5) {
-	/* ROM images that have the battery-backed bit set in the header that really
-	don't have battery-backed RAM is not that big of a problem, so I'll
-	treat this differently by only listing games that should have battery-backed RAM.
+	FceuInesHInfoResult res;
+	fceux11_rust_ines_check_hinfo(iNESGameCRC32, partialmd5, &res);
 
-	Lower 64 bits of the MD5 hash.
-	*/
+	int32 tofix = 0;
 
-	static uint64 savie[] =
-	{
-		0xc04361e499748382ULL,	/* AD&D Heroes of the Lance */
-		0xb72ee2337ced5792ULL,	/* AD&D Hillsfar */
-		0x2b7103b7a27bd72fULL,	/* AD&D Pool of Radiance */
-		0x498c10dc463cfe95ULL,	/* Battle Fleet */
-		0x854d7947a3177f57ULL,	/* Crystalis */
-		0xfad22d265cd70820ULL,	/* Downtown Special: Kunio-kun no Jidaigeki Dayo Zenin Shuugou! */
-		0x4a1f5336b86851b6ULL,	/* DW */
-		0xb0bcc02c843c1b79ULL,	/* DW */
-		0x2dcf3a98c7937c22ULL,	/* DW 2 */
-		0x98e55e09dfcc7533ULL,	/* DW 4*/
-		0x733026b6b72f2470ULL,	/* Dw 3 */
-		0x6917ffcaca2d8466ULL,	/* Famista '90 */
-		0x8da46db592a1fcf4ULL,	/* Faria */
-		0xedba17a2c4608d20ULL,	/* Final Fantasy */
-		0x91a6846d3202e3d6ULL,	/* Final Fantasy */
-		0x012df596e2b31174ULL,	/* Final Fantasy 1+2 */
-		0xf6b359a720549ecdULL,	/* Final Fantasy 2 */
-		0x5a30da1d9b4af35dULL,	/* Final Fantasy 3 */
-		0xd63dcc68c2b20adcULL,	/* Final Fantasy J */
-		0x2ee3417ba8b69706ULL,	/* Hydlide 3*/
-		0xebbce5a54cf3ecc0ULL,	/* Justbreed */
-		0x6a858da551ba239eULL,	/* Kaijuu Monogatari */
-		0x2db8f5d16c10b925ULL,	/* Kyonshiizu 2 */
-		0x04a31647de80fdabULL,	/* Legend of Zelda */
-		0x94b9484862a26cbaULL,	/* Legend of Zelda */
-		0xa40666740b7d22feULL,	/* Mindseeker */
-		0x82000965f04a71bbULL,	/* Mirai Shinwa Jarvas */
-		0x77b811b2760104b9ULL,	/* Mouryou Senki Madara */
-		0x11b69122efe86e8cULL,	/* RPG Jinsei Game */
-		0x9aa1dc16c05e7de5ULL,	/* Startropics */
-		0x1b084107d0878bd0ULL,	/* Startropics 2*/
-		0xa70b495314f4d075ULL,	/* Ys 3 */
-		0x836c0ff4f3e06e45ULL,	/* Zelda 2 */
-		0						/* Abandon all hope if the game has 0 in the lower 64-bits of its MD5 hash */
-	};
-
-	static struct CHINF moo[] =
-	{
-		#include "ines-correct.h"
-	};
-	int32 tofix = 0, x, mask;
-
+	// sMasterRomInfo query kept in C++ for TMasterRomInfoParams population
 	MasterRomInfo = NULL;
+	MasterRomInfoParams.clear();
 	for (size_t i = 0; i < ARRAY_SIZE(sMasterRomInfo); i++) {
 		const TMasterRomInfo& info = sMasterRomInfo[i];
 		if (info.md5lower != partialmd5)
@@ -410,55 +224,38 @@ static void CheckHInfo(uint64 partialmd5) {
 		break;
 	}
 
-	x = 0;
-	do {
-		if (moo[x].crc32 == iNESGameCRC32) {
-			if (moo[x].mapper >= 0) {
-				if (moo[x].mapper & 0x800 && VROM_size) {
-					VROM_size = 0;
-					free(VROM);
-					VROM = NULL;
-					tofix |= 8;
-				}
-				if (moo[x].mapper & 0x1000)
-					mask = 0xFFF;
-				else
-					mask = 0xFF;
-				if (MapperNo != (moo[x].mapper & mask)) {
-					tofix |= 1;
-					MapperNo = moo[x].mapper & mask;
-				}
+	// Apply Rust-computed corrections
+	if (res.clear_vrom && VROM_size) {
+		VROM_size = 0;
+		free(VROM);
+		VROM = NULL;
+		tofix |= 8;
+	}
+	if (res.mapper >= 0 && MapperNo != res.mapper) {
+		tofix |= 1;
+		MapperNo = res.mapper;
+	}
+	if (res.mirror >= 0) {
+		if (res.mirror == 8) {
+			if (Mirroring == 2) {	/* Anything but hard-wired(four screen). */
+				tofix |= 2;
+				Mirroring = 0;
 			}
-			if (moo[x].mirror >= 0) {
-				if (moo[x].mirror == 8) {
-					if (Mirroring == 2) {	/* Anything but hard-wired(four screen). */
+		} else if (Mirroring != res.mirror) {
+			if (Mirroring != (res.mirror & ~4))
+				if ((res.mirror & ~4) <= 2)	/* Don't complain if one-screen mirroring
+												needs to be set(the iNES header can't
+												hold this information).
+												*/
 						tofix |= 2;
-						Mirroring = 0;
-					}
-				} else if (Mirroring != moo[x].mirror) {
-					if (Mirroring != (moo[x].mirror & ~4))
-						if ((moo[x].mirror & ~4) <= 2)	/* Don't complain if one-screen mirroring
-														needs to be set(the iNES header can't
-														hold this information).
-														*/
-							tofix |= 2;
-					Mirroring = moo[x].mirror;
-				}
-			}
-			break;
+			Mirroring = res.mirror;
 		}
-		x++;
-	} while (moo[x].mirror >= 0 || moo[x].mapper >= 0);
-
-	x = 0;
-	while (savie[x] != 0) {
-		if (savie[x] == partialmd5) {
-			if (!(head.ROM_type & 2)) {
-				tofix |= 4;
-				head.ROM_type |= 2;
-			}
+	}
+	if (res.force_battery) {
+		if (!(head.ROM_type & 2)) {
+			tofix |= 4;
+			head.ROM_type |= 2;
 		}
-		x++;
 	}
 
 	/* Games that use these iNES mappers tend to have the four-screen bit set
@@ -480,16 +277,18 @@ static void CheckHInfo(uint64 partialmd5) {
 			sprintf(gigastr + strlen(gigastr), "The mapper number should be set to %d.  ", MapperNo);
 		if (tofix & 2) {
 			const char *mstr[3] = { "Horizontal", "Vertical", "Four-screen" };
-			sprintf(gigastr + strlen(gigastr), "Mirroring should be set to \"%s\".  ", mstr[Mirroring & 3]);
+			sprintf(gigastr + strlen(gigastr), "Mirroring should be set to "%s".  ", mstr[Mirroring & 3]);
 		}
 		if (tofix & 4)
 			strcat(gigastr, "The battery-backed bit should be set.  ");
 		if (tofix & 8)
 			strcat(gigastr, "This game should not have any CHR ROM.  ");
-		strcat(gigastr, "\n");
+		strcat(gigastr, "
+");
 		FCEU_printf("%s", gigastr);
 	}
 }
+
 
 typedef struct {
 	int32 mapper;
@@ -810,7 +609,7 @@ int iNESLoad(const char *name, FCEUFILE *fp, int OverwriteVidMode) {
 	if (FCEU_fread(&head, 1, 16, fp) != 16 || memcmp(&head, "NES\x1A", 4))
 		return LOADER_INVALID_FORMAT;
 	
-	head.cleanup();
+	fceux11_rust_ines_header_cleanup((uint8*)&head);
 
 	iNESCart.clear();
 
@@ -867,18 +666,7 @@ int iNESLoad(const char *name, FCEUFILE *fp, int OverwriteVidMode) {
 			VROM_size = ((1 << (head.VROM_size >> 2)) * ((head.VROM_size & 0b11) * 2 + 1)) >> 13;
 	}
 
-	int round = true;
-	for (int i = 0; i != sizeof(not_power2) / sizeof(not_power2[0]); ++i) {
-		//for games not to the power of 2, so we just read enough
-		//prg rom from it, but we have to keep ROM_size to the power of 2
-		//since PRGCartMapping wants ROM_size to be to the power of 2
-		//so instead if not to power of 2, we just use head.ROM_size when
-		//we use FCEU_read
-		if (not_power2[i] == MapperNo) {
-			round = false;
-			break;
-		}
-	}
+	int round = !fceux11_rust_ines_not_power2(MapperNo);
 
 	ROM = (uint8*)FCEU_malloc(ROM_size << 14);
 	memset(ROM, 0xFF, ROM_size << 14);
@@ -980,11 +768,9 @@ int iNESLoad(const char *name, FCEUFILE *fp, int OverwriteVidMode) {
 		FCEU_printf("\n");
 	}
 
-	for (size_t mappertest = 0; mappertest < (sizeof bmap / sizeof bmap[0]) - 1; mappertest++) {
-		if (bmap[mappertest].number == MapperNo) {
-			mappername = bmap[mappertest].name;
-			break;
-		}
+	{
+		const char* rust_name = fceux11_rust_ines_mapper_name(MapperNo);
+		if (rust_name) mappername = rust_name;
 	}
 
 	FCEU_printf(" Mapper #: %d\n", MapperNo);

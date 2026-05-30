@@ -463,6 +463,14 @@ typedef struct EmuFileMem EmuFileMem;
  */
 typedef struct EmuFileMem *EmuFileMemHandle;
 
+typedef struct FceuInesHInfoResult {
+  int32_t mapper;
+  int32_t mapper_mask;
+  int32_t mirror;
+  int32_t force_battery;
+  int32_t clear_vrom;
+} FceuInesHInfoResult;
+
 typedef struct UnifBoardInfo {
   const char *name;
   int32_t flags;
@@ -592,6 +600,59 @@ uint64_t fceux11_rust_emufile_mem_read64le(EmuFileMemHandle handle);
  * Write a u64 LE.
  */
 void fceux11_rust_emufile_mem_write64le(EmuFileMemHandle handle, uint64_t val);
+
+/**
+ * Clean garbage signatures out of an iNES header.
+ * `header_bytes` must point to at least 16 writable bytes.
+ */
+void fceux11_rust_ines_header_cleanup(uint8_t *header_bytes);
+
+/**
+ * Return the human-readable name for a mapper number.
+ * Returns a pointer to a static string, or null if not found.
+ */
+const char *fceux11_rust_ines_mapper_name(int32_t mapper_no);
+
+/**
+ * Returns 1 if the mapper is in the not_power2 list.
+ */
+int32_t fceux11_rust_ines_not_power2(int32_t mapper_no);
+
+/**
+ * Look up default input controllers by ROM CRC32.
+ * Returns 1 if found, 0 otherwise. Results are written to out_* params.
+ */
+int32_t fceux11_rust_ines_lookup_input_crc(uint32_t crc32,
+                                           int32_t *out_input1,
+                                           int32_t *out_input2,
+                                           int32_t *out_inputfc);
+
+/**
+ * Look up default input controllers by NES 2.0 expansion device byte.
+ * Returns 1 if found, 0 otherwise.
+ * `out_eoptions_flag` is set to 32768 when expansion == 0x02 (Four-Score hack).
+ * `out_vs_cswitch` is set to 1 when expansion == 0x05.
+ */
+int32_t fceux11_rust_ines_lookup_input_nes20(uint8_t expansion,
+                                             int32_t *out_input1,
+                                             int32_t *out_input2,
+                                             int32_t *out_inputfc,
+                                             int32_t *out_eoptions_flag,
+                                             int32_t *out_vs_cswitch);
+
+/**
+ * Check whether a ROM is known to be bad/corrupt/hacked.
+ * Returns a pointer to a static description string, or null if OK.
+ */
+const char *fceux11_rust_ines_check_bad(uint64_t md5partial);
+
+/**
+ * Check ROM-correction databases and return recommended fixes.
+ * C++ applies the fixes to its global state.
+ */
+int32_t fceux11_rust_ines_check_hinfo(uint32_t crc32,
+                                      uint64_t partialmd5,
+                                      struct FceuInesHInfoResult *out);
 
 /**
  * Look up a UNIF board by name.
