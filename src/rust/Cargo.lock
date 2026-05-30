@@ -189,12 +189,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f1f227452a390804cdb637b74a86990f2a7d7ba4b7d5693aac9b4dd6defd8d6"
 
 [[package]]
+name = "fceux11-formats"
+version = "0.2.16"
+
+[[package]]
 name = "fceux11-media"
 version = "0.2.14"
 
 [[package]]
 name = "fceux11-rom-tests"
-version = "0.2.15"
+version = "0.2.16"
 dependencies = [
  "fceux11-media",
  "fceux11-utils",
@@ -202,9 +206,10 @@ dependencies = [
 
 [[package]]
 name = "fceux11-rust"
-version = "0.2.15"
+version = "0.2.16"
 dependencies = [
  "cbindgen",
+ "fceux11-formats",
  "fceux11-media",
  "fceux11-utils",
 ]

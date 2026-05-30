@@ -3,7 +3,7 @@ members = [".", "crates/*", "tests/*"]
 resolver = "3"
 
 [workspace.package]
-version = "0.2.15"
+version = "0.2.16"
 edition = "2024"
 
 [profile.release]
@@ -22,6 +22,7 @@ name = "fceux11_rust"
 [dependencies]
 fceux11-utils = { path = "crates/fceux11-utils" }
 fceux11-media = { path = "crates/fceux11-media" }
+fceux11-formats = { path = "crates/fceux11-formats" }
 
 [build-dependencies]
 cbindgen = "0.29.3"

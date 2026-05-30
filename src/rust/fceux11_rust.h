@@ -453,6 +453,129 @@ int64_t fceux11_rust_wave_write(const int16_t *buffer, int32_t count);
  * Returns 1 on success, 0 if no file was open.
  */
 int32_t fceux11_rust_wave_end(void);
+/**
+ * In-memory file buffer. Corresponds to C++ `EMUFILE_MEMORY`.
+ */
+typedef struct EmuFileMem EmuFileMem;
+
+/**
+ * Opaque handle for an in-memory file.
+ */
+typedef struct EmuFileMem *EmuFileMemHandle;
+
+/**
+ * Create a new in-memory EmuFile.
+ */
+EmuFileMemHandle fceux11_rust_emufile_mem_create(void);
+
+/**
+ * Create a new in-memory EmuFile with pre-allocated capacity.
+ */
+EmuFileMemHandle fceux11_rust_emufile_mem_create_with_capacity(uintptr_t capacity);
+
+/**
+ * Create a new in-memory EmuFile from raw bytes.
+ */
+EmuFileMemHandle fceux11_rust_emufile_mem_create_from_bytes(const uint8_t *ptr, uintptr_t len);
+
+/**
+ * Destroy an in-memory EmuFile handle.
+ */
+void fceux11_rust_emufile_mem_destroy(EmuFileMemHandle handle);
+
+/**
+ * Read bytes into C buffer. Returns bytes read.
+ */
+uintptr_t fceux11_rust_emufile_mem_fread(EmuFileMemHandle handle, uint8_t *ptr, uintptr_t bytes);
+
+/**
+ * Write bytes from C buffer. Returns bytes written.
+ */
+uintptr_t fceux11_rust_emufile_mem_fwrite(EmuFileMemHandle handle,
+                                          const uint8_t *ptr,
+                                          uintptr_t bytes);
+
+/**
+ * Seek within the memory file.
+ * origin: 0 = SEEK_SET, 1 = SEEK_CUR, 2 = SEEK_END
+ * Returns 0 on success, -1 on failure.
+ */
+int32_t fceux11_rust_emufile_mem_fseek(EmuFileMemHandle handle, int32_t offset, int32_t origin);
+
+/**
+ * Get current position.
+ */
+uint32_t fceux11_rust_emufile_mem_ftell(EmuFileMemHandle handle);
+
+/**
+ * Get size of memory buffer.
+ */
+uint32_t fceux11_rust_emufile_mem_size(EmuFileMemHandle handle);
+
+/**
+ * Truncate the memory buffer.
+ */
+void fceux11_rust_emufile_mem_truncate(EmuFileMemHandle handle, uint32_t length);
+
+/**
+ * Check fail bit (always false in Rust, kept for API parity).
+ */
+int32_t fceux11_rust_emufile_mem_fail(EmuFileMemHandle handle);
+
+/**
+ * Returns non-zero if at EOF.
+ */
+int32_t fceux11_rust_emufile_mem_eof(EmuFileMemHandle handle);
+
+/**
+ * Get read-only data pointer.
+ */
+const uint8_t *fceux11_rust_emufile_mem_data_ptr(EmuFileMemHandle handle);
+
+/**
+ * Ungetc: step position back by one.
+ */
+void fceux11_rust_emufile_mem_unget(EmuFileMemHandle handle);
+
+/**
+ * Read a u8 value.
+ */
+uint8_t fceux11_rust_emufile_mem_read8(EmuFileMemHandle handle);
+
+/**
+ * Write a u8 value.
+ */
+void fceux11_rust_emufile_mem_write8(EmuFileMemHandle handle, uint8_t val);
+
+/**
+ * Read a u16 LE.
+ */
+uint16_t fceux11_rust_emufile_mem_read16le(EmuFileMemHandle handle);
+
+/**
+ * Write a u16 LE.
+ */
+void fceux11_rust_emufile_mem_write16le(EmuFileMemHandle handle, uint16_t val);
+
+/**
+ * Read a u32 LE.
+ */
+uint32_t fceux11_rust_emufile_mem_read32le(EmuFileMemHandle handle);
+
+/**
+ * Write a u32 LE.
+ */
+void fceux11_rust_emufile_mem_write32le(EmuFileMemHandle handle, uint32_t val);
+
+/**
+ * Read a u64 LE.
+ */
+uint64_t fceux11_rust_emufile_mem_read64le(EmuFileMemHandle handle);
+
+/**
+ * Write a u64 LE.
+ */
+void fceux11_rust_emufile_mem_write64le(EmuFileMemHandle handle, uint64_t val);
 #ifdef __cplusplus
 }
 #endif

@@ -336,7 +336,7 @@ pub struct FceuSliceMut {
 - **调用扇出低**（不依赖复杂 C++ 模板/宏）
 - **有明确数据格式或状态机**（Rust 的 `match` 和类型系统优势大）
 
-#### v0.2.16 — EmuFile（`src/emufile.cpp`, 283 行）
+#### v0.2.16 — EmuFile（`src/emufile.cpp`, 283 行）✅ 已完成
 
 | 属性 | 详情 |
 |------|------|
@@ -344,6 +344,11 @@ pub struct FceuSliceMut {
 | **Rust 优势** | `std::io::Read` / `std::io::Write` trait 天然适合此抽象；可消除 `EMUFILE_MEMORY` / `EMUFILE_FILE` 的虚函数开销。 |
 | **风险** | 低。被 `state.cpp`、`movie.cpp` 等调用，但接口清晰（`fread` / `fwrite` / `fseek` 风格）。 |
 | **FFI 模式** | Opaque Pointer：返回 `*mut c_void` 作为文件 handle。 |
+
+> **v0.2.16 执行记录**：
+> - `fceux11-formats` crate 已创建，含 `EmuFileMem` + 23 个 FFI 函数 + 7 个单元测试（全部通过）。
+> - C++ `EMUFILE_MEMORY` 因 `buf()`/`get_vec()` 被 `state.cpp`/`file.cpp`/`lua-engine.cpp` 等 10 余处直接调用，**头文件级迁移暂缓**；C++ 侧保持原实现以确保稳定性。
+> - **决策变更**：v0.2.16 实证表明双 Agent 结对编程（Claude Code 编码 + Kimi 验证）在 MSVC 混合构建环境中修复开销大于收益，后续 v0.2.17–v0.2.30 统一由 Kimi Code CLI 负责编码、构建、测试与版本发布。详见 `docs/tech/rust_refactor_agent_spec.md`（已归档）。
 
 #### v0.2.17 — VS UniSystem（`src/vsuni.cpp`, 430 行）
 
