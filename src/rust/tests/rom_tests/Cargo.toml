@@ -1,0 +1,11 @@
+[package]
+name = "fceux11-rom-tests"
+version = "0.2.15"
+edition = "2024"
+
+[dependencies]
+fceux11-utils = { path = "../../crates/fceux11-utils" }
+fceux11-media = { path = "../../crates/fceux11-media" }
+
+[lib]
+crate-type = ["staticlib", "rlib"]

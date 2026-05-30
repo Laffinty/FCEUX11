@@ -1,4 +1,8 @@
 
+# Disable C++20 module scanning for test targets (not needed, avoids
+# MSVC standard-library header path issues in some environments).
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+
 # Shared link configuration for test executables
 function(fceux11_add_test_executable target_name)
     add_executable(${target_name} ${ARGN})
@@ -51,5 +55,14 @@ if(FCEUX11_BUILD_TESTS)
     )
     add_test(NAME mapper_reset_test
              COMMAND fceux11_mapper_reset_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+    # ROM regression test (v0.2.15)
+    fceux11_add_test_executable(fceux11_rom_regression_test
+        rom_regression_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME rom_regression_test
+             COMMAND fceux11_rom_regression_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endif()

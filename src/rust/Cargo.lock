@@ -193,8 +193,16 @@ name = "fceux11-media"
 version = "0.2.14"
 
 [[package]]
+name = "fceux11-rom-tests"
+version = "0.2.15"
+dependencies = [
+ "fceux11-media",
+ "fceux11-utils",
+]
+
+[[package]]
 name = "fceux11-rust"
-version = "0.2.14"
+version = "0.2.15"
 dependencies = [
  "cbindgen",
  "fceux11-media",
