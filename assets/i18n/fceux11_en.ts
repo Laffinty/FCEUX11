@@ -36,8 +36,8 @@
         <translation>&amp;Language</translation>
     </message>
     <message>
-        <source>FCEUX11 v0.2.8</source>
-        <translation>FCEUX11 v0.2.8</translation>
+        <source>FCEUX11 v0.2.21</source>
+        <translation>FCEUX11 v0.2.21</translation>
     </message>
     <message>
         <source>&amp;Open ROM</source>

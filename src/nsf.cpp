@@ -36,6 +36,7 @@
 #include "input.h"
 #include "state.h"
 #include "driver.h"
+#include "rust/fceux11_rust.h"
 #ifdef _S9XLUA_H
 #include "fceulua.h"
 #endif
@@ -173,32 +174,28 @@ static INLINE void BANKSET(uint32 A, uint32 bank)
 
 int NSFLoad(const char *name, FCEUFILE *fp)
 {
-	int x;
-
 	FCEU_fseek(fp,0,SEEK_SET);
 	FCEU_fread(&NSFHeader,1,0x80,fp);
-	if(memcmp(NSFHeader.ID,"NESM\x1a",5))
-		return LOADER_INVALID_FORMAT;
-	NSFHeader.SongName[31]=NSFHeader.Artist[31]=NSFHeader.Copyright[31]=0;
 
-	LoadAddr=NSFHeader.LoadAddressLow;
-	LoadAddr|=NSFHeader.LoadAddressHigh<<8;
+	if(!fceux11_rust_nsf_header_validate((FceuNsfHeader*)&NSFHeader, &LoadAddr, &InitAddr, &PlayAddr))
+		return LOADER_INVALID_FORMAT;
 
 	if(LoadAddr<0x6000)
 	{
 		FCEUD_PrintError("Invalid load address.");
 		return LOADER_HANDLED_ERROR;
 	}
-	InitAddr=NSFHeader.InitAddressLow;
-	InitAddr|=NSFHeader.InitAddressHigh<<8;
-
-	PlayAddr=NSFHeader.PlayAddressLow;
-	PlayAddr|=NSFHeader.PlayAddressHigh<<8;
 
 	NSFSize=FCEU_fgetsize(fp)-0x80;
 
-	NSFMaxBank=((NSFSize+(LoadAddr&0xfff)+4095)/4096);
-	NSFMaxBank=PRGsize[0]=uppow2(NSFMaxBank);
+	{
+		uint32 nsf_max_bank = 0;
+		uint8 bson = 0;
+		if(!fceux11_rust_nsf_compute_banks((FceuNsfHeader*)&NSFHeader, NSFSize, &nsf_max_bank, &bson, NSFHeader.BankSwitch))
+			return LOADER_HANDLED_ERROR;
+		NSFMaxBank=PRGsize[0]=nsf_max_bank;
+		BSon=bson;
+	}
 
 	if (!(NSFDATA = (uint8 *)FCEU_malloc(NSFMaxBank * 4096)))
 	{
@@ -212,49 +209,12 @@ int NSFLoad(const char *name, FCEUFILE *fp)
 
 	NSFMaxBank--;
 
-	BSon=0;
-	for(x=0;x<8;x++)
-	{
-		BSon|=NSFHeader.BankSwitch[x];
-	}
-
-	if(BSon==0)
-	{
-		BankCounter=0x00;
-
- 		if ((NSFHeader.LoadAddressHigh & 0x70) >= 0x70)
-		{
-			//Ice Climber, and other F000 base address tunes need this
-			BSon=0xFF;
-		}
-		else {
-			for(x=(NSFHeader.LoadAddressHigh & 0x70) / 0x10;x<8;x++)
-			{
-				NSFHeader.BankSwitch[x]=BankCounter;
-				BankCounter+=0x01;
-			}
-			BSon=0;
-			}
-	}
-
-	for(x=0;x<8;x++)
-		BSon|=NSFHeader.BankSwitch[x];
-
 	GameInfo->type=GIT_NSF;
 	GameInfo->input[0]=GameInfo->input[1]=SI_GAMEPAD;
 	GameInfo->cspecial=SIS_NSF;
 
-	for(x=0;;x++)
-	{
-		if(NSFROM[x]==0x20)
-		{
-			NSFROM[x+1]=InitAddr&0xFF;
-			NSFROM[x+2]=InitAddr>>8;
-			NSFROM[x+8]=PlayAddr&0xFF;
-			NSFROM[x+9]=PlayAddr>>8;
-			break;
-		}
-	}
+	if(!fceux11_rust_nsf_patch_nsfrom(NSFROM, sizeof(NSFROM), InitAddr, PlayAddr))
+		return LOADER_HANDLED_ERROR;
 
 	if(NSFHeader.VideoSystem==0)
 		GameInfo->vidsys=GIV_NTSC;
@@ -269,15 +229,13 @@ int NSFLoad(const char *name, FCEUFILE *fp)
 	FCEU_printf(" Name:       %s\n Artist:     %s\n Copyright:  %s\n\n",NSFHeader.SongName,NSFHeader.Artist,NSFHeader.Copyright);
 	if(NSFHeader.SoundChip)
 	{
-		static const char *tab[6]={"Konami VRCVI","Konami VRCVII","Nintendo FDS","Nintendo MMC5","Namco 106","Sunsoft FME-07"};
-
-		for(x=0;x<6;x++)
-			if(NSFHeader.SoundChip&(1<<x))
-			{
-				FCEU_printf(" Expansion hardware:  %s\n",tab[x]);
-				NSFHeader.SoundChip=1<<x;  /* Prevent confusing weirdness if more than one bit is set. */
-				break;
-			}
+		uint8 chip_mask = 0;
+		const char* chip_name = fceux11_rust_nsf_chip_name(NSFHeader.SoundChip, &chip_mask);
+		if(chip_name)
+		{
+			FCEU_printf(" Expansion hardware:  %s\n", chip_name);
+			NSFHeader.SoundChip = chip_mask;  /* Prevent confusing weirdness if more than one bit is set. */
+		}
 	}
 	if(BSon)
 		FCEU_printf(" Bank-switched.\n");
@@ -639,19 +597,12 @@ void FCEUI_NSFSetVis(int mode)
 
 int FCEUI_NSFChange(int amount)
 {
-	CurrentSong+=amount;
-	if(CurrentSong<1) CurrentSong=1;
-	else if(CurrentSong>NSFHeader.TotalSongs) CurrentSong=NSFHeader.TotalSongs;
-	SongReload=0xFF;
-
-	return(CurrentSong);
+	CurrentSong = fceux11_rust_nsf_change_song(CurrentSong, amount, NSFHeader.TotalSongs, &SongReload);
+	return CurrentSong;
 }
 
 //Returns total songs
 int FCEUI_NSFGetInfo(uint8 *name, uint8 *artist, uint8 *copyright, int maxlen)
 {
-	strncpy((char*)name,(char*)NSFHeader.SongName,maxlen); //mbg merge 7/17/06 added casts
-	strncpy((char*)artist,(char*)NSFHeader.Artist,maxlen); //mbg merge 7/17/06 added casts
-	strncpy((char*)copyright,(char*)NSFHeader.Copyright,maxlen); //mbg merge 7/17/06 added casts
-	return(NSFHeader.TotalSongs);
+	return fceux11_rust_nsf_get_info((FceuNsfHeader*)&NSFHeader, name, artist, copyright, maxlen);
 }

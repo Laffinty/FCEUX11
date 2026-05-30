@@ -514,6 +514,29 @@ typedef struct FceuInesHInfoResult {
   int32_t clear_vrom;
 } FceuInesHInfoResult;
 
+typedef struct FceuNsfHeader {
+  uint8_t id[5];
+  uint8_t version;
+  uint8_t total_songs;
+  uint8_t starting_song;
+  uint8_t load_address_low;
+  uint8_t load_address_high;
+  uint8_t init_address_low;
+  uint8_t init_address_high;
+  uint8_t play_address_low;
+  uint8_t play_address_high;
+  uint8_t song_name[32];
+  uint8_t artist[32];
+  uint8_t copyright[32];
+  uint8_t ntsc_speed[2];
+  uint8_t bank_switch[8];
+  uint8_t pal_speed[2];
+  uint8_t video_system;
+  uint8_t sound_chip;
+  uint8_t expansion[4];
+  uint8_t reserve[8];
+} FceuNsfHeader;
+
 typedef struct UnifBoardInfo {
   const char *name;
   int32_t flags;
@@ -740,6 +763,64 @@ const char *fceux11_rust_ines_check_bad(uint64_t md5partial);
 int32_t fceux11_rust_ines_check_hinfo(uint32_t crc32,
                                       uint64_t partialmd5,
                                       struct FceuInesHInfoResult *out);
+
+/**
+ * Validate an NSF header: check the "NESM\x1a" signature, ensure
+ * text fields are null-terminated, and extract 16-bit addresses.
+ * Returns `true` if the header is valid.
+ */
+bool fceux11_rust_nsf_header_validate(struct FceuNsfHeader *header,
+                                      uint16_t *out_load_addr,
+                                      uint16_t *out_init_addr,
+                                      uint16_t *out_play_addr);
+
+/**
+ * Compute NSFMaxBank (before the decrement) and BSon/BankSwitch
+ * from the header and raw NSF data size.
+ */
+bool fceux11_rust_nsf_compute_banks(const struct FceuNsfHeader *header,
+                                    uint32_t nsf_size,
+                                    uint32_t *out_nsf_max_bank,
+                                    uint8_t *out_bson,
+                                    uint8_t *out_bank_switch);
+
+/**
+ * Patch the NSFROM bootstrap ROM with Init and Play addresses.
+ * `nsfrom` must point to at least `nsfrom_len` bytes.
+ * Returns `true` if the patch was applied successfully.
+ */
+bool fceux11_rust_nsf_patch_nsfrom(uint8_t *nsfrom,
+                                   uintptr_t nsfrom_len,
+                                   uint16_t init_addr,
+                                   uint16_t play_addr);
+
+/**
+ * Return the expansion chip name for a sound chip bitmask.
+ * If a chip is recognised, writes the single-bit mask to `*out_mask`
+ * and returns a pointer to a static thread-local C string.
+ * Returns null if no recognised chip is set.
+ */
+const char *fceux11_rust_nsf_chip_name(uint8_t sound_chip, uint8_t *out_mask);
+
+/**
+ * Safely change the current song number.
+ * Returns the clamped new song number and sets `*out_reload` to 0xFF.
+ */
+int32_t fceux11_rust_nsf_change_song(int32_t current,
+                                     int32_t amount,
+                                     int32_t total,
+                                     uint8_t *out_reload);
+
+/**
+ * Copy NSF metadata strings into caller-provided buffers.
+ * `maxlen` is the maximum number of bytes to copy (including null terminator).
+ * Returns `TotalSongs`.
+ */
+int32_t fceux11_rust_nsf_get_info(const struct FceuNsfHeader *header,
+                                  uint8_t *name,
+                                  uint8_t *artist,
+                                  uint8_t *copyright,
+                                  uintptr_t maxlen);
 
 /**
  * Look up a UNIF board by name.

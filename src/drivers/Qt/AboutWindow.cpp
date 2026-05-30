@@ -55,7 +55,7 @@ AboutWindow::AboutWindow(QWidget *parent)
 	mainLayout->addLayout( hbox );
 
 	hbox = new QHBoxLayout();
-	versionLabel = new QLabel( tr("FCEUX11 v0.2.8") );
+	versionLabel = new QLabel( tr(FCEU_NAME_AND_VERSION) );
 	hbox->addWidget( versionLabel );
 	hbox->setAlignment( Qt::AlignCenter );
 	mainLayout->addLayout( hbox );
@@ -111,7 +111,7 @@ AboutWindow::~AboutWindow(void)
 //----------------------------------------------------------------------------
 void AboutWindow::retranslateUi(void)
 {
-	if (versionLabel) versionLabel->setText(tr("FCEUX11 v0.2.8"));
+	if (versionLabel) versionLabel->setText(tr(FCEU_NAME_AND_VERSION));
 	if (licenseLabel) licenseLabel->setText(tr("Based on FCEUX | License: GPLv2"));
 	if (copyrightLabel) copyrightLabel->setText(tr("\u00A9 2026 FCEUX11 Contributors"));
 	if (viewLicenseButton) viewLicenseButton->setText(tr("View License"));
