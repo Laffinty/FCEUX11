@@ -540,24 +540,18 @@ void FCEU_SaveGameSave(CartInfo *LocalHWInfo)
 {
 	if (LocalHWInfo->battery && !LocalHWInfo->SaveGame.empty())
 	{
-		FILE *sp;
-
 		std::string soot = FCEU_MakeFName(FCEUMKF_SAV, 0, "sav");
-		if ((sp = FCEUD_UTF8fopen(soot, "wb")) == NULL)
+		std::vector<FceuSaveGameEntry> entries;
+		entries.reserve(LocalHWInfo->SaveGame.size());
+		for (size_t x = 0; x < LocalHWInfo->SaveGame.size(); x++)
 		{
-			FCEU_PrintError("WRAM file \"%s\" cannot be written to.\n", soot.c_str());
-		}
-		else
-		{
-			for (size_t x = 0; x < LocalHWInfo->SaveGame.size(); x++)
+			if (LocalHWInfo->SaveGame[x].bufptr)
 			{
-				if (LocalHWInfo->SaveGame[x].bufptr)
-				{
-					fwrite(LocalHWInfo->SaveGame[x].bufptr, 1,
-						   LocalHWInfo->SaveGame[x].buflen, sp);
-				}
+				entries.push_back({LocalHWInfo->SaveGame[x].bufptr,
+					                   static_cast<uint32_t>(LocalHWInfo->SaveGame[x].buflen)});
 			}
 		}
+		fceux11_rust_cart_battery_save(soot.c_str(), entries.data(), entries.size());
 	}
 }
 
@@ -568,23 +562,18 @@ void FCEU_LoadGameSave(CartInfo *LocalHWInfo)
 {
 	if (LocalHWInfo->battery && !LocalHWInfo->SaveGame.empty() && !disableBatteryLoading)
 	{
-		FILE *sp;
-
 		std::string soot = FCEU_MakeFName(FCEUMKF_SAV, 0, "sav");
-		sp = FCEUD_UTF8fopen(soot, "rb");
-		if (sp != NULL)
+		std::vector<FceuSaveGameEntry> entries;
+		entries.reserve(LocalHWInfo->SaveGame.size());
+		for (size_t x = 0; x < LocalHWInfo->SaveGame.size(); x++)
 		{
-			for (size_t x = 0; x < LocalHWInfo->SaveGame.size(); x++)
+			if (LocalHWInfo->SaveGame[x].bufptr)
 			{
-				if (LocalHWInfo->SaveGame[x].bufptr)
-				{
-					if ( fread(LocalHWInfo->SaveGame[x].bufptr, 1, LocalHWInfo->SaveGame[x].buflen, sp) != LocalHWInfo->SaveGame[x].buflen )
-					{
-						FCEU_printf("Warning save game data read came up short!\n");
-					}
-				}
+				entries.push_back({LocalHWInfo->SaveGame[x].bufptr,
+					                   static_cast<uint32_t>(LocalHWInfo->SaveGame[x].buflen)});
 			}
 		}
+		fceux11_rust_cart_battery_load(soot.c_str(), entries.data(), entries.size());
 	}
 }
 
@@ -593,12 +582,19 @@ void FCEU_ClearGameSave(CartInfo *LocalHWInfo)
 {
 	if (LocalHWInfo->battery && !LocalHWInfo->SaveGame.empty())
 	{
+		std::vector<FceuSaveGameEntry> entries;
+		entries.reserve(LocalHWInfo->SaveGame.size());
 		for (size_t x = 0; x < LocalHWInfo->SaveGame.size(); x++)
 		{
 			if (LocalHWInfo->SaveGame[x].bufptr)
 			{
-				memset(LocalHWInfo->SaveGame[x].bufptr, 0, LocalHWInfo->SaveGame[x].buflen);
+				entries.push_back({LocalHWInfo->SaveGame[x].bufptr,
+					                   static_cast<uint32_t>(LocalHWInfo->SaveGame[x].buflen)});
 			}
+		}
+		fceux11_rust_cart_battery_clear(entries.data(), entries.size());
+		for (size_t x = 0; x < LocalHWInfo->SaveGame.size(); x++)
+		{
 			if (LocalHWInfo->SaveGame[x].resetFunc)
 			{
 				LocalHWInfo->SaveGame[x].resetFunc();

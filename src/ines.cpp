@@ -145,9 +145,9 @@ struct CRCMATCH {
 static void SetInput(void) {
 	int32_t i1 = 0, i2 = 0, ifc = 0;
 	if (fceux11_rust_ines_lookup_input_crc(iNESGameCRC32, &i1, &i2, &ifc)) {
-		GameInfo->input[0] = i1;
-		GameInfo->input[1] = i2;
-		GameInfo->inputfc = ifc;
+		GameInfo->input[0] = static_cast<ESI>(i1);
+		GameInfo->input[1] = static_cast<ESI>(i2);
+		GameInfo->inputfc = static_cast<ESIFC>(ifc);
 	}
 }
 
@@ -158,9 +158,9 @@ extern int eoptions;
 static void SetInputNes20(uint8 expansion) {
 	int32_t i1 = 0, i2 = 0, ifc = 0, eopt = 0, vsc = 0;
 	if (fceux11_rust_ines_lookup_input_nes20(expansion, &i1, &i2, &ifc, &eopt, &vsc)) {
-		GameInfo->input[0] = i1;
-		GameInfo->input[1] = i2;
-		GameInfo->inputfc = ifc;
+		GameInfo->input[0] = static_cast<ESI>(i1);
+		GameInfo->input[1] = static_cast<ESI>(i2);
+		GameInfo->inputfc = static_cast<ESIFC>(ifc);
 	}
 	eoptions |= eopt;
 	GameInfo->vs_cswitch = vsc != 0;
@@ -277,14 +277,14 @@ static void CheckHInfo(uint64 partialmd5) {
 			sprintf(gigastr + strlen(gigastr), "The mapper number should be set to %d.  ", MapperNo);
 		if (tofix & 2) {
 			const char *mstr[3] = { "Horizontal", "Vertical", "Four-screen" };
-			sprintf(gigastr + strlen(gigastr), "Mirroring should be set to "%s".  ", mstr[Mirroring & 3]);
+			sprintf(gigastr + strlen(gigastr), "Mirroring should be set to \"%s\".  ", mstr[Mirroring & 3]);
 		}
 		if (tofix & 4)
 			strcat(gigastr, "The battery-backed bit should be set.  ");
 		if (tofix & 8)
 			strcat(gigastr, "This game should not have any CHR ROM.  ");
-		strcat(gigastr, "
-");
+		strcat(gigastr, "\n");
+
 		FCEU_printf("%s", gigastr);
 	}
 }
@@ -636,35 +636,11 @@ int iNESLoad(const char *name, FCEUFILE *fp, int OverwriteVidMode) {
 	MirroringAs2bits = head.ROM_type & 1;
 	if (head.ROM_type & 8) MirroringAs2bits |= 2;
 
-	int not_round_size;
-	if (!iNES2)	{
-		not_round_size = head.ROM_size;
-	}
-	else {
-		if ((head.Upper_ROM_VROM_size & 0x0F) != 0x0F)
-			// simple notation
-			not_round_size = head.ROM_size | ((head.Upper_ROM_VROM_size & 0x0F) << 8);
-		else
-			// exponent-multiplier notation
-			not_round_size = ((1 << (head.ROM_size >> 2)) * ((head.ROM_size & 0b11) * 2 + 1)) >> 14;
-	}
-	
-	if (!head.ROM_size && !iNES2)
-		ROM_size = 256;
-	else
-		ROM_size = uppow2(not_round_size);
-
-	VROM_size = uppow2(head.VROM_size | (iNES2?((head.Upper_ROM_VROM_size & 0xF0)<<4):0));
-	if (!iNES2)	{
-		VROM_size = uppow2(head.VROM_size);
-	}
-	else {
-		if ((head.Upper_ROM_VROM_size & 0xF0) != 0xF0)
-			// simple notation
-			VROM_size = uppow2(head.VROM_size | ((head.Upper_ROM_VROM_size & 0xF0) << 4));
-		else
-			VROM_size = ((1 << (head.VROM_size >> 2)) * ((head.VROM_size & 0b11) * 2 + 1)) >> 13;
-	}
+	FceuRomSizes sizes;
+	fceux11_rust_cart_compute_rom_sizes((const FceuInesHeader*)&head, iNES2, &sizes);
+	ROM_size = sizes.rom_size_16kb;
+	VROM_size = sizes.vrom_size_8kb;
+	uint32 not_round_size = sizes.rom_size_raw;
 
 	int round = !fceux11_rust_ines_not_power2(MapperNo);
 
@@ -946,23 +922,12 @@ static int iNES_Init(int num) {
 		if (num == tmp->number) {
 			UNIFchrrama = NULL;	// need here for compatibility with UNIF mapper code
 			if (!VROM_size) {
-				if(!iNESCart.ines2)
+				CHRRAMSize = fceux11_rust_cart_compute_chrram_size(
+					num, iNESCart.ines2, iNESCart.vram_size,
+					iNESCart.battery_vram_size, false);
+				if (!iNESCart.ines2)
 				{
-					switch (num) {	// FIXME, mapper or game data base with the board parameters and ROM/RAM sizes
-					case 13:  CHRRAMSize = 16 * 1024; break;
-					case 6:
-					case 29:
-					case 30:
-					case 45:
-					case 96:  CHRRAMSize = 32 * 1024; break;
-					case 176: CHRRAMSize = 128 * 1024; break;
-					default:  CHRRAMSize = 8 * 1024; break;
-					}
 					iNESCart.vram_size = CHRRAMSize;
-				}
-				else
-				{
-					CHRRAMSize = iNESCart.battery_vram_size + iNESCart.vram_size;
 				}
 				if (CHRRAMSize > 0)
 				{

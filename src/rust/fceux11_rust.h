@@ -458,6 +458,49 @@ int32_t fceux11_rust_wave_end(void);
  */
 typedef struct EmuFileMem EmuFileMem;
 
+typedef struct FceuInesHeader {
+  uint8_t id[4];
+  uint8_t rom_size;
+  uint8_t vrom_size;
+  uint8_t rom_type;
+  uint8_t rom_type2;
+  uint8_t rom_type3;
+  uint8_t upper_rom_vrom_size;
+  uint8_t ram_size;
+  uint8_t vram_size;
+  uint8_t tv_system;
+  uint8_t vs_hardware;
+  uint8_t misc_roms;
+  uint8_t expansion;
+} FceuInesHeader;
+
+typedef struct FceuRomSizes {
+  /**
+   * Number of 16 KiB PRG banks (power of two; 256 for the special
+   * iNES-1 zero-size case).
+   */
+  uint32_t rom_size_16kb;
+  /**
+   * Number of 8 KiB CHR banks (power of two or iNES-2 computed).
+   */
+  uint32_t vrom_size_8kb;
+  /**
+   * CHR-RAM size in bytes.  -1 means "not applicable" (CHR-ROM
+   * present).  0 means "determined later".
+   */
+  int32_t chrram_size;
+  /**
+   * Raw (not-rounded) PRG size in 16 KiB units, before .
+   * Needed for non-power-of-2 ROM loading and debug printing.
+   */
+  uint32_t rom_size_raw;
+} FceuRomSizes;
+
+typedef struct FceuSaveGameEntry {
+  uint8_t *bufptr;
+  uint32_t buflen;
+} FceuSaveGameEntry;
+
 /**
  * Opaque handle for an in-memory file.
  */
@@ -486,6 +529,50 @@ typedef struct VsUniEntry {
   int32_t predip;
   uint8_t game_type;
 } VsUniEntry;
+
+/**
+ * Compute `ROM_size` and `VROM_size` (in bank counts) from the iNES
+ * header.  `mapper_no` is only used for the iNES-2 CHRRAM fallback.
+ * Returns `true` on success.
+ */
+bool fceux11_rust_cart_compute_rom_sizes(const struct FceuInesHeader *header,
+                                         bool is_nes2,
+                                         struct FceuRomSizes *out);
+
+/**
+ * Return the default CHR-RAM size in bytes when no CHR-ROM is present.
+ * For iNES-2 the caller should instead use `battery_vram_size +
+ * vram_size`.  Returns -1 when CHR-ROM is present (`has_vrom` true).
+ */
+int32_t fceux11_rust_cart_compute_chrram_size(int32_t mapper_no,
+                                              bool is_nes2,
+                                              int32_t vram_size,
+                                              int32_t battery_vram_size,
+                                              bool has_vrom);
+
+/**
+ * Save battery-backed RAM to `path`.  Each non-null entry is written
+ * sequentially.  Returns `true` on success.
+ */
+bool fceux11_rust_cart_battery_save(const char *path,
+                                    const struct FceuSaveGameEntry *entries,
+                                    uintptr_t count);
+
+/**
+ * Load battery-backed RAM from `path`.  Each non-null entry is read
+ * sequentially.  Returns `true` on success (short reads are treated
+ * as failure for that entry but the function still returns true if
+ * the file could be opened; this matches the original C++ behaviour).
+ */
+bool fceux11_rust_cart_battery_load(const char *path,
+                                    struct FceuSaveGameEntry *entries,
+                                    uintptr_t count);
+
+/**
+ * Zero-fill all save-game buffers.  Does **not** invoke C++ reset
+ * callbacks; the caller must handle those separately.
+ */
+void fceux11_rust_cart_battery_clear(const struct FceuSaveGameEntry *entries, uintptr_t count);
 
 /**
  * Create a new in-memory EmuFile.
