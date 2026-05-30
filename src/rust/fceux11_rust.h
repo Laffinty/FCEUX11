@@ -463,6 +463,11 @@ typedef struct EmuFileMem EmuFileMem;
  */
 typedef struct EmuFileMem *EmuFileMemHandle;
 
+typedef struct UnifBoardInfo {
+  const char *name;
+  int32_t flags;
+} UnifBoardInfo;
+
 typedef struct VsUniEntry {
   const char *name;
   uint64_t md5partial;
@@ -587,6 +592,23 @@ uint64_t fceux11_rust_emufile_mem_read64le(EmuFileMemHandle handle);
  * Write a u64 LE.
  */
 void fceux11_rust_emufile_mem_write64le(EmuFileMemHandle handle, uint64_t val);
+
+/**
+ * Look up a UNIF board by name.
+ * Returns a pointer to a static `UnifBoardInfo` if found, or null otherwise.
+ */
+const struct UnifBoardInfo *fceux11_rust_unif_lookup_board(const char *name);
+
+/**
+ * Return the hardware flags for a given UNIF board name.
+ * Returns -1 if the board is not found.
+ */
+int32_t fceux11_rust_unif_board_flags(const char *name);
+
+/**
+ * Compute CHR-RAM size in bytes from board flags.
+ */
+uint32_t fceux11_rust_unif_chrram_size(int32_t flags);
 
 /**
  * Look up a VS UniSystem game by its partial MD5 hash.
