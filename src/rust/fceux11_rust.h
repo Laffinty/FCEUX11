@@ -463,6 +463,17 @@ typedef struct EmuFileMem EmuFileMem;
  */
 typedef struct EmuFileMem *EmuFileMemHandle;
 
+typedef struct VsUniEntry {
+  const char *name;
+  uint64_t md5partial;
+  int32_t mapper;
+  uint8_t mirroring;
+  uint8_t ppu;
+  int32_t ioption;
+  int32_t predip;
+  uint8_t game_type;
+} VsUniEntry;
+
 /**
  * Create a new in-memory EmuFile.
  */
@@ -576,6 +587,33 @@ uint64_t fceux11_rust_emufile_mem_read64le(EmuFileMemHandle handle);
  * Write a u64 LE.
  */
 void fceux11_rust_emufile_mem_write64le(EmuFileMemHandle handle, uint64_t val);
+
+/**
+ * Look up a VS UniSystem game by its partial MD5 hash.
+ * Returns a pointer to a static `VsUniEntry` if found, or null otherwise.
+ */
+const struct VsUniEntry *fceux11_rust_vsuni_lookup(uint64_t md5partial);
+
+/**
+ * Toggle a DIP switch bit. Returns the new vsdip value.
+ */
+uint8_t fceux11_rust_vsuni_toggle_dip(uint8_t game_type, uint8_t vsdip, int32_t w);
+
+/**
+ * Return coin-on duration (6 frames) for a slot.
+ */
+uint8_t fceux11_rust_vsuni_coin(uint8_t game_type, uint8_t _slot);
+
+/**
+ * Return service-button duration (6 frames).
+ */
+uint8_t fceux11_rust_vsuni_service(uint8_t game_type);
+
+/**
+ * Draw the VS UniSystem DIP-switch overlay into the pixel buffer.
+ * Returns the decremented `dips_howlong` value (or -1 if nothing drawn).
+ */
+int32_t fceux11_rust_vsuni_draw(uint8_t *xbuf, uint8_t vsdip, int32_t dips_howlong);
 #ifdef __cplusplus
 }
 #endif

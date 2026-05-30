@@ -350,13 +350,22 @@ pub struct FceuSliceMut {
 > - C++ `EMUFILE_MEMORY` 因 `buf()`/`get_vec()` 被 `state.cpp`/`file.cpp`/`lua-engine.cpp` 等 10 余处直接调用，**头文件级迁移暂缓**；C++ 侧保持原实现以确保稳定性。
 > - **决策变更**：v0.2.16 实证表明双 Agent 结对编程（Claude Code 编码 + Kimi 验证）在 MSVC 混合构建环境中修复开销大于收益，后续 v0.2.17–v0.2.30 统一由 Kimi Code CLI 负责编码、构建、测试与版本发布。详见 `docs/tech/rust_refactor_agent_spec.md`（已归档）。
 
-#### v0.2.17 — VS UniSystem（`src/vsuni.cpp`, 430 行）
+#### v0.2.17 — VS UniSystem（`src/vsuni.cpp`, 430 行）✅ 已完成
 
 | 属性 | 详情 |
 |------|------|
 | **功能** | VS System（街机版 NES）的 DIP 开关、调色板、保护芯片模拟。 |
 | **Rust 优势** | DIP 开关状态机用 Rust `enum` + `match` 表达更安全；VS 调色板数据表用 `const` 数组。 |
 | **风险** | 低。仅在加载 VS 游戏时激活，常规 NES 游戏不触发。 |
+
+> **v0.2.17 执行记录**：
+> - `VSUniGames` 数据库（37 个游戏条目）迁移至 Rust `const` 数组，含 MD5 匹配、mapper/mirroring/PPU 类型信息。
+> - `FCEU_VSUniCheck` ROM 匹配逻辑通过 `fceux11_rust_vsuni_lookup` FFI 完成。
+> - `FCEU_VSUniDraw` DIP 状态绘制迁移至 Rust。
+> - `FCEU_VSUniToggleDIP`/`Coin`/`Service` 核心位操作迁移至 Rust，C++ wrapper 保留消息显示与全局变量更新。
+> - 全局状态（`vsdip`, `coinon`, `coinon2`, `service`）、`SFORMAT` 序列化、`SetReadHandler` 回调注册、保护芯片模拟保留在 C++。
+> - 新增 16 个单元测试（lookup_found/not_found/RBI/TKO, toggle_dip, coin, service, draw）。
+> - `cargo test --workspace` 81 测试通过；`cmake --build` 377/377 成功；`ctest` 4/4 通过（ROM 回归无退化）。
 
 #### v0.2.18 — UNIF 解析（`src/unif.cpp`, 642 行）
 
