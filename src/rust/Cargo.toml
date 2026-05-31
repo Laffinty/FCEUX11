@@ -23,6 +23,7 @@ name = "fceux11_rust"
 fceux11-utils = { path = "crates/fceux11-utils" }
 fceux11-media = { path = "crates/fceux11-media" }
 fceux11-formats = { path = "crates/fceux11-formats" }
+fceux11-debug = { path = "crates/fceux11-debug" }
 
 [build-dependencies]
 cbindgen = "0.29.3"

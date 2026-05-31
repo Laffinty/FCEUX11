@@ -1,0 +1,6 @@
+[package]
+name = "fceux11-debug"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

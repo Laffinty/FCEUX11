@@ -865,6 +865,34 @@ uint8_t fceux11_rust_vsuni_service(uint8_t game_type);
  * Returns the decremented `dips_howlong` value (or -1 if nothing drawn).
  */
 int32_t fceux11_rust_vsuni_draw(uint8_t *xbuf, uint8_t vsdip, int32_t dips_howlong);
+/**
+ * Assemble 6502 assembly text into opcode bytes.
+ * `output` must have room for at least 3 bytes.
+ * Returns 0 on success, 1 on error.
+ */
+int32_t fceux11_rust_asm_assemble(uint8_t *output, int32_t addr, const char *str);
+
+/**
+ * Disassemble a 6502 opcode into a string.
+ * Writes to `out_buf` with max `out_buf_size` bytes.
+ * Returns bytes written (including null terminator), or -1 on error.
+ */
+int32_t fceux11_rust_asm_disassemble(int32_t _addr,
+                                     const uint8_t *opcode,
+                                     char *out_buf,
+                                     int32_t out_buf_size);
+
+/**
+ * Parse a condition expression string into an AST.
+ * Returns an opaque pointer to the ConditionAst, or null on error.
+ * Format: <subject><op><value> where subject is a flag/register/address.
+ */
+void *fceux11_rust_conddebug_generate_condition(const char *str);
+
+/**
+ * Destroy a ConditionAst previously returned by fceux11_rust_conddebug_generate_condition.
+ */
+void fceux11_rust_conddebug_condition_destroy(void *condition);
 #ifdef __cplusplus
 }
 #endif
