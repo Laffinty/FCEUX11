@@ -893,6 +893,25 @@ void *fceux11_rust_conddebug_generate_condition(const char *str);
  * Destroy a ConditionAst previously returned by fceux11_rust_conddebug_generate_condition.
  */
 void fceux11_rust_conddebug_condition_destroy(void *condition);
+int fceux11_lua_init(void);
+
+int fceux11_lua_load_script(const char *path, const char *arg);
+
+void fceux11_lua_frame_boundary(void);
+
+void fceux11_lua_stop(void);
+
+int fceux11_lua_running(void);
+
+void fceux11_lua_gui(uint8_t *xbuf, int width, int height);
+
+uint8_t fceux11_lua_read_joypad(int controller, uint8_t original);
+
+int fceux11_lua_call_registered(int call_id);
+
+void fceux11_lua_call_mem_hook(unsigned int addr, int size, unsigned int value, int hook_type);
+
+int fceux11_lua_gui_pixel(int x, int y, unsigned int color);
 #ifdef __cplusplus
 }
 #endif
