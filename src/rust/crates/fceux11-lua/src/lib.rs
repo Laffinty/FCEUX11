@@ -20,6 +20,11 @@ fn get_engine<'a>() -> Option<&'a mut LuaEngine> {
     unsafe { (LUA_ENGINE_PTR as *mut LuaEngine).as_mut() }
 }
 
+#[unsafe(no_mangle)]
+pub(crate) fn get_engine_mut<'a>() -> Option<&'a mut LuaEngine> {
+    unsafe { (LUA_ENGINE_PTR as *mut LuaEngine).as_mut() }
+}
+
 // ---------------------------------------------------------------------------
 // FFI declarations for C++ hooks
 // ---------------------------------------------------------------------------
@@ -33,6 +38,32 @@ unsafe extern "C" {
     fn fceux11_lua_GetRomHash(which: i32) -> u32;
     fn fceux11_lua_ReadRomByte(addr: u32) -> u8;
     fn fceux11_lua_WriteRomByte(addr: u32, val: u8);
+    fn fceux11_lua_PPURead(addr: u32) -> u8;
+    fn fceux11_lua_movie_get_mode() -> i32;
+    fn fceux11_lua_movie_get_rerecordcount() -> i64;
+    fn fceux11_lua_movie_get_length() -> i64;
+    fn fceux11_lua_movie_stop();
+    fn fceux11_lua_movie_get_readonly() -> i32;
+    fn fceux11_lua_movie_set_readonly(val: i32);
+    fn fceux11_lua_movie_is_poweron() -> i32;
+    fn fceux11_lua_movie_is_from_savestate() -> i32;
+    fn fceux11_lua_movie_get_name() -> *const c_char;
+    fn fceux11_lua_movie_get_filename() -> *const c_char;
+    fn fceux11_lua_savestate_save_slot(slot: i32) -> i32;
+    fn fceux11_lua_savestate_load_slot(slot: i32) -> i32;
+    fn fceux11_lua_emu_get_framecount() -> i64;
+    fn fceux11_lua_emu_get_lagcount() -> i64;
+    fn fceux11_lua_emu_is_paused() -> i32;
+    fn fceux11_lua_emu_set_speedmode(mode: i32);
+    fn fceux11_lua_emu_poweron();
+    fn fceux11_lua_emu_softreset();
+    fn fceux11_lua_emu_message(msg: *const c_char);
+    fn fceux11_lua_emu_pause();
+    fn fceux11_lua_emu_unpause();
+    fn fceux11_lua_savestate_create_object(path: *const c_char, which: i32, anonymous: i32) -> i32;
+    fn fceux11_lua_savestate_delete_object(obj_id: i32);
+    fn fceux11_lua_gui_popup(msg: *const c_char);
+    fn fceux11_lua_gui_savescreenshot(filename: *const c_char);
 }
 
 // ---------------------------------------------------------------------------
@@ -92,6 +123,12 @@ impl LuaEngine {
         bindings::memory::register(&lua)?;
         bindings::joypad::register(&lua)?;
         bindings::rom::register(&lua)?;
+        bindings::ppu::register(&lua)?;
+        bindings::input::register(&lua)?;
+        bindings::sound::register(&lua)?;
+        bindings::movie::register(&lua)?;
+        bindings::savestate::register(&lua)?;
+        bindings::gui::register(&lua)?;
         Ok(Self {
             lua,
             gui_data: vec![0u8; 256 * 240 * 4],

@@ -6724,4 +6724,176 @@ void fceux11_lua_WriteRomByte(uint32_t addr, uint8_t val) {
 	FCEU_WriteRomByte(addr, val);
 }
 
+// v0.2.22.3: Additional FFI bridge for new Rust Lua bindings
+// ---------------------------------------------------------------------------
+
+uint8_t fceux11_lua_PPURead(uint32_t addr) {
+	return FFCEUX_PPURead(addr);
+}
+
+int32_t fceux11_lua_movie_get_mode() {
+	if (FCEUMOV_IsRecording()) return 1;   // record
+	if (FCEUMOV_IsPlaying()) return 2;      // playback
+	if (FCEUMOV_Mode(MOVIEMODE_TASEDITOR)) return 3; // finished
+	return 0; // none
+}
+
+int64_t fceux11_lua_movie_get_rerecordcount() {
+	return FCEUI_GetMovieRerecordCount();
+}
+
+int64_t fceux11_lua_movie_get_length() {
+	return FCEUI_GetMovieLength();
+}
+
+void fceux11_lua_movie_stop() {
+	FCEUI_StopMovie();
+}
+
+int32_t fceux11_lua_movie_get_readonly() {
+	return FCEUI_GetMovieToggleReadOnly() ? 1 : 0;
+}
+
+void fceux11_lua_movie_set_readonly(int32_t val) {
+	FCEUI_SetMovieToggleReadOnly(val != 0);
+}
+
+int32_t fceux11_lua_movie_is_poweron() {
+	extern MovieData currMovieData;
+	return (currMovieData.PowerOn != 0) ? 1 : 0;
+}
+
+int32_t fceux11_lua_movie_is_from_savestate() {
+	extern MovieData currMovieData;
+	return (currMovieData.fromSavestate != 0) ? 1 : 0;
+}
+
+const char* fceux11_lua_movie_get_name() {
+	// Returns internal movie name (from header or filename)
+	static std::string name;
+	name = FCEUI_GetMovieName();
+	return name.c_str();
+}
+
+const char* fceux11_lua_movie_get_filename() {
+	// Returns filename stripped of path
+	static std::string name;
+	name = FCEUI_GetMovieName();
+	int x = name.find_last_of("/\\") + 1;
+	if (x)
+		name = name.substr(x, name.length() - x);
+	return name.c_str();
+}
+
+// v0.2.22.4: savestate FFI
+// ---------------------------------------------------------------------------
+
+int32_t fceux11_lua_savestate_save_slot(int slot) {
+	// slot is 0-9 (C++ numbering)
+	FCEUSS_Save(FCEU_MakeFName(FCEUMKF_STATE, slot, 0).c_str(), false);
+	return 0;
+}
+
+int32_t fceux11_lua_savestate_load_slot(int slot) {
+	// slot is 0-9 (C++ numbering)
+	return FCEUSS_Load(FCEU_MakeFName(FCEUMKF_STATE, slot, 0).c_str(), false) ? 0 : -1;
+}
+
+// v0.2.22.4: savestate object lifecycle
+// LuaSaveState objects are managed by C++ but tracked via a simple ID map from Rust
+static std::map<int, LuaSaveState*> s_savestate_objects;
+static int s_next_savestate_id = 1;
+
+int32_t fceux11_lua_savestate_create_object(const char* path, int which, int anonymous) {
+	// which: 1-10 slot number, 0 = use path
+	// anonymous: 1 = temp file, 0 = persistent
+	int id = s_next_savestate_id++;
+	LuaSaveState* ss = new LuaSaveState();
+	if (which >= 1 && which <= 10) {
+		// Original numbering: 1-10 maps to slots 0-9
+		ss->filename = FCEU_MakeFName(FCEUMKF_STATE, which - 1, 0);
+	} else if (path && path[0]) {
+		ss->filename = path;
+	}
+	ss->anonymous = (anonymous != 0);
+	ss->persisted = false;
+	if (!ss->filename.empty() && !ss->anonymous) {
+		ss->ensureLoad();
+	}
+	s_savestate_objects[id] = ss;
+	return id;
+}
+
+void fceux11_lua_savestate_delete_object(int obj_id) {
+	auto it = s_savestate_objects.find(obj_id);
+	if (it != s_savestate_objects.end()) {
+		delete it->second;
+		s_savestate_objects.erase(it);
+	}
+}
+
+// v0.2.22.4: emu FFI (framecount/lagcount/paused/speedmode)
+// ---------------------------------------------------------------------------
+
+int64_t fceux11_lua_emu_get_framecount() {
+	return FCEUMOV_GetFrame();
+}
+
+int64_t fceux11_lua_emu_get_lagcount() {
+	return FCEUI_GetLagCount();
+}
+
+int32_t fceux11_lua_emu_is_paused() {
+	return FCEUI_EmulationPaused() ? 1 : 0;
+}
+
+void fceux11_lua_emu_set_speedmode(int mode) {
+	// mode: 0=normal, 1=nothrottle, 2=turbo, 3=maximum
+	extern int speedmode;
+	speedmode = mode;
+	if (mode == 0) {
+		FCEUD_SetEmulationSpeed(EMUSPEED_NORMAL);
+		FCEUD_TurboOff();
+	} else if (mode == 2) {
+		FCEUD_TurboOn();
+	} else {
+		FCEUD_SetEmulationSpeed(EMUSPEED_FASTEST);
+	}
+}
+
+void fceux11_lua_emu_poweron() {
+	if (GameInfo)
+		FCEUI_PowerNES();
+}
+
+void fceux11_lua_emu_softreset() {
+	if (GameInfo)
+		FCEUI_ResetNES();
+}
+
+void fceux11_lua_emu_message(const char* msg) {
+	FCEU_DispMessage("%s", 0, msg);
+}
+
+void fceux11_lua_emu_pause() {
+	if (!FCEUI_EmulationPaused())
+		FCEUI_ToggleEmulationPause();
+}
+
+void fceux11_lua_emu_unpause() {
+	if (FCEUI_EmulationPaused())
+		FCEUI_ToggleEmulationPause();
+}
+
+void fceux11_lua_gui_popup(const char* msg) {
+	FCEUD_Message(msg);
+}
+
+void fceux11_lua_gui_savescreenshot(const char* filename) {
+	if (filename && filename[0]) {
+		FCEUI_SetSnapshotAsName(filename);
+	}
+	FCEUI_SaveSnapshotAs();
+}
+
 } // extern "C"

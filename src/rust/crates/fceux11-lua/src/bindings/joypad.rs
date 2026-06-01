@@ -2,7 +2,7 @@
 //!
 //! Provides joypad input access: `get`, `set`.
 //!
-//! FFI bridge: reads/writes joypad state via C++ input system.
+//! FFI bridge: reads joypad state via C++ and sets override masks.
 
 use mlua::{Lua, Table, Result};
 
@@ -30,10 +30,49 @@ pub fn register(lua: &Lua) -> Result<Table> {
 
     joypad.set(
         "set",
-        lua.create_function(|_, (port, mask1, mask2): (i32, u32, u32)| {
+        lua.create_function(|_, (port, table): (i32, Table)| {
+            // Parse button table into mask1 (pass-through bits) and mask2 (force-on bits)
+            // mask1: 0 = block pass-through, 1 = allow pass-through (default all 1)
+            // mask2: 1 = force this button on
+            let mut mask1: u32 = 0xFF; // All pass-through by default
+            let mut mask2: u32 = 0x00; // Nothing forced on by default
+
+            let buttons = [
+                ("A", JOY_A),
+                ("B", JOY_B),
+                ("select", JOY_SELECT),
+                ("start", JOY_START),
+                ("up", JOY_UP),
+                ("down", JOY_DOWN),
+                ("left", JOY_LEFT),
+                ("right", JOY_RIGHT),
+            ];
+
+            for (name, bit) in buttons {
+                match table.get::<mlua::Value>(name) {
+                    Ok(val) => {
+                        if val.is_nil() {
+                            continue;
+                        }
+                        // In Lua, only nil and false are falsy
+                        let is_truthy = !matches!(val, mlua::Value::Nil | mlua::Value::Boolean(false));
+                        let is_string = matches!(&val, mlua::Value::String(_));
+
+                        if is_truthy {
+                            // Truthy → force this button on
+                            mask2 |= bit;
+                        }
+                        if !is_truthy || is_string {
+                            // False or string → block pass-through
+                            mask1 &= !bit;
+                        }
+                    }
+                    Err(_) => {}
+                }
+            }
+
             // Safety: FFI call into C++ input system. `SetJoypadOverride`
-            // stores mask1/mask2 in a global JoypadOverride struct accessed
-            // only during `FCEU_LuaReadJoypad` call in the input pipeline.
+            // stores mask1/mask2 in global luajoypads1/luajoypads2 arrays.
             unsafe { crate::fceux11_lua_SetJoypadOverride(port, mask1, mask2) };
             Ok(())
         })?,
@@ -42,11 +81,3 @@ pub fn register(lua: &Lua) -> Result<Table> {
     Ok(joypad)
 }
 
-// ---------------------------------------------------------------------------
-// FFI declarations (mirrored in lib.rs)
-// ---------------------------------------------------------------------------
-
-unsafe extern "C" {
-    fn fceux11_lua_GetJoypadState(port: i32) -> u32;
-    fn fceux11_lua_SetJoypadOverride(port: i32, mask1: u32, mask2: u32);
-}

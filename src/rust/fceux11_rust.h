@@ -909,6 +909,60 @@ extern uint8_t fceux11_lua_ReadRomByte(uint32_t addr);
 
 extern void fceux11_lua_WriteRomByte(uint32_t addr, uint8_t val);
 
+extern uint8_t fceux11_lua_PPURead(uint32_t addr);
+
+extern int32_t fceux11_lua_movie_get_mode(void);
+
+extern int64_t fceux11_lua_movie_get_rerecordcount(void);
+
+extern int64_t fceux11_lua_movie_get_length(void);
+
+extern void fceux11_lua_movie_stop(void);
+
+extern int32_t fceux11_lua_movie_get_readonly(void);
+
+extern void fceux11_lua_movie_set_readonly(int32_t val);
+
+extern int32_t fceux11_lua_movie_is_poweron(void);
+
+extern int32_t fceux11_lua_movie_is_from_savestate(void);
+
+extern const char *fceux11_lua_movie_get_name(void);
+
+extern const char *fceux11_lua_movie_get_filename(void);
+
+extern int32_t fceux11_lua_savestate_save_slot(int32_t slot);
+
+extern int32_t fceux11_lua_savestate_load_slot(int32_t slot);
+
+extern int64_t fceux11_lua_emu_get_framecount(void);
+
+extern int64_t fceux11_lua_emu_get_lagcount(void);
+
+extern int32_t fceux11_lua_emu_is_paused(void);
+
+extern void fceux11_lua_emu_set_speedmode(int32_t mode);
+
+extern void fceux11_lua_emu_poweron(void);
+
+extern void fceux11_lua_emu_softreset(void);
+
+extern void fceux11_lua_emu_message(const char *msg);
+
+extern void fceux11_lua_emu_pause(void);
+
+extern void fceux11_lua_emu_unpause(void);
+
+extern int32_t fceux11_lua_savestate_create_object(const char *path,
+                                                   int32_t which,
+                                                   int32_t anonymous);
+
+extern void fceux11_lua_savestate_delete_object(int32_t obj_id);
+
+extern void fceux11_lua_gui_popup(const char *msg);
+
+extern void fceux11_lua_gui_savescreenshot(const char *filename);
+
 int fceux11_lua_init(void);
 
 int fceux11_lua_load_script(const char *path, const char *arg);
@@ -928,10 +982,6 @@ int fceux11_lua_call_registered(int call_id);
 void fceux11_lua_call_mem_hook(unsigned int addr, int size, unsigned int value, int hook_type);
 
 int fceux11_lua_gui_pixel(int x, int y, unsigned int color);
-
-extern uint32_t fceux11_lua_GetJoypadState(int32_t port);
-
-extern void fceux11_lua_SetJoypadOverride(int32_t port, uint32_t mask1, uint32_t mask2);
 
 extern uint8_t fceux11_lua_ReadRomByte(uint32_t addr);
 
