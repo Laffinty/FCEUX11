@@ -64,6 +64,53 @@ unsafe extern "C" {
     fn fceux11_lua_savestate_delete_object(obj_id: i32);
     fn fceux11_lua_gui_popup(msg: *const c_char);
     fn fceux11_lua_gui_savescreenshot(filename: *const c_char);
+
+    // --- P3: Sound ---
+    fn fceux11_lua_sound_get_square1_volume() -> f64;
+    fn fceux11_lua_sound_get_square1_frequency() -> f64;
+    fn fceux11_lua_sound_get_square1_midikey() -> f64;
+    fn fceux11_lua_sound_get_square1_duty() -> i32;
+    fn fceux11_lua_sound_get_square1_regs() -> i32;
+    fn fceux11_lua_sound_get_square2_volume() -> f64;
+    fn fceux11_lua_sound_get_square2_frequency() -> f64;
+    fn fceux11_lua_sound_get_square2_midikey() -> f64;
+    fn fceux11_lua_sound_get_square2_duty() -> i32;
+    fn fceux11_lua_sound_get_square2_regs() -> i32;
+    fn fceux11_lua_sound_get_triangle_volume() -> f64;
+    fn fceux11_lua_sound_get_triangle_linear() -> i32;
+    fn fceux11_lua_sound_get_triangle_frequency() -> f64;
+    fn fceux11_lua_sound_get_triangle_midikey() -> f64;
+    fn fceux11_lua_sound_get_noise_volume() -> f64;
+    fn fceux11_lua_sound_get_noise_mode() -> i32;
+    fn fceux11_lua_sound_get_noise_regs() -> i32;
+    fn fceux11_lua_sound_get_noise_frequency() -> f64;
+    fn fceux11_lua_sound_get_noise_midikey() -> f64;
+    fn fceux11_lua_sound_get_dmc_volume() -> f64;
+    fn fceux11_lua_sound_get_dmc_rate() -> i32;
+    fn fceux11_lua_sound_get_dmc_regs() -> i32;
+    fn fceux11_lua_sound_get_dmc_frequency() -> f64;
+    fn fceux11_lua_sound_get_dmc_midikey() -> f64;
+    fn fceux11_lua_sound_get_dmc_address() -> i32;
+    fn fceux11_lua_sound_get_dmc_size() -> i32;
+    fn fceux11_lua_sound_get_dmc_loop() -> i32;
+    fn fceux11_lua_sound_get_dmc_seed() -> i32;
+    fn fceux11_lua_sound_get_frame_sequencer() -> i32;
+    fn fceux11_lua_sound_get_sample_rate() -> i32;
+    fn fceux11_lua_sound_get_length_count() -> i32;
+
+    // --- P3: Zapper ---
+    fn fceux11_lua_zapper_get_x() -> i32;
+    fn fceux11_lua_zapper_get_y() -> i32;
+    fn fceux11_lua_zapper_get_click() -> i32;
+    fn fceux11_lua_zapper_set(x: i32, y: i32, fire: i32);
+
+    // --- P3: Debugger ---
+    fn fceux11_lua_debugger_hitbreakpoint();
+    fn fceux11_lua_debugger_get_cycles_count() -> u64;
+    fn fceux11_lua_debugger_get_instructions_count() -> u64;
+    fn fceux11_lua_debugger_reset_cycles_count();
+    fn fceux11_lua_debugger_reset_instructions_count();
+    fn fceux11_lua_debugger_get_symbol_offset(name: *const c_char) -> i64;
 }
 
 // ---------------------------------------------------------------------------
@@ -129,6 +176,8 @@ impl LuaEngine {
         bindings::movie::register(&lua)?;
         bindings::savestate::register(&lua)?;
         bindings::gui::register(&lua)?;
+        bindings::zapper::register(&lua)?;
+        bindings::debugger::register(&lua)?;
         Ok(Self {
             lua,
             gui_data: vec![0u8; 256 * 240 * 4],

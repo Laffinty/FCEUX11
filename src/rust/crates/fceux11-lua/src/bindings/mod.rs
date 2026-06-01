@@ -9,3 +9,5 @@ pub mod sound;
 pub mod movie;
 pub mod savestate;
 pub mod gui;
+pub mod zapper;
+pub mod debugger;

@@ -6896,4 +6896,291 @@ void fceux11_lua_gui_savescreenshot(const char* filename) {
 	FCEUI_SaveSnapshotAs();
 }
 
+// v0.2.22.6: P3 sound/zapper/debugger FFI
+// ---------------------------------------------------------------------------
+
+// Sound: square1
+double fceux11_lua_sound_get_square1_volume() {
+    extern ENVUNIT EnvUnits[3];
+    extern int CheckFreq(uint32 cf, uint8 sr);
+    extern int32 curfreq[2];
+    extern uint8 PSG[0x10];
+    extern int32 lengthcount[4];
+    if (curfreq[0] < 8 || curfreq[0] > 0x7ff ||
+        CheckFreq(curfreq[0], PSG[1]) == 0 ||
+        lengthcount[0] == 0) return 0.0;
+    int mode = EnvUnits[0].Mode & 1;
+    double vol = mode ? EnvUnits[0].Speed : EnvUnits[0].decvolume;
+    return vol / 15.0;
+}
+
+double fceux11_lua_sound_get_square1_frequency() {
+    extern int32 curfreq[2];
+    extern uint8 PSG[0x10];
+    return ((PAL?PAL_CPU:NTSC_CPU)/16.0) / (curfreq[0] + 1);
+}
+
+double fceux11_lua_sound_get_square1_midikey() {
+    extern int32 curfreq[2];
+    double freq = ((PAL?PAL_CPU:NTSC_CPU)/16.0) / (curfreq[0] + 1);
+    return (log(freq / 440.0) * 12 / log(2.0)) + 69;
+}
+
+int fceux11_lua_sound_get_square1_duty() {
+    extern uint8 PSG[0x10];
+    return (PSG[0] & 0xC0) >> 6;
+}
+
+int fceux11_lua_sound_get_square1_regs() {
+    extern int32 curfreq[2];
+    return curfreq[0];
+}
+
+// Sound: square2
+double fceux11_lua_sound_get_square2_volume() {
+    extern ENVUNIT EnvUnits[3];
+    extern int CheckFreq(uint32 cf, uint8 sr);
+    extern int32 curfreq[2];
+    extern uint8 PSG[0x10];
+    extern int32 lengthcount[4];
+    if (curfreq[1] < 8 || curfreq[1] > 0x7ff ||
+        CheckFreq(curfreq[1], PSG[5]) == 0 ||
+        lengthcount[1] == 0) return 0.0;
+    int mode = EnvUnits[1].Mode & 1;
+    double vol = mode ? EnvUnits[1].Speed : EnvUnits[1].decvolume;
+    return vol / 15.0;
+}
+
+double fceux11_lua_sound_get_square2_frequency() {
+    extern int32 curfreq[2];
+    return ((PAL?PAL_CPU:NTSC_CPU)/16.0) / (curfreq[1] + 1);
+}
+
+double fceux11_lua_sound_get_square2_midikey() {
+    extern int32 curfreq[2];
+    double freq = ((PAL?PAL_CPU:NTSC_CPU)/16.0) / (curfreq[1] + 1);
+    return (log(freq / 440.0) * 12 / log(2.0)) + 69;
+}
+
+int fceux11_lua_sound_get_square2_duty() {
+    extern uint8 PSG[0x10];
+    return (PSG[4] & 0xC0) >> 6;
+}
+
+int fceux11_lua_sound_get_square2_regs() {
+    extern int32 curfreq[2];
+    return curfreq[1];
+}
+
+// Sound: triangle
+double fceux11_lua_sound_get_triangle_volume() {
+    extern int32 lengthcount[4];
+    extern uint8 TriCount;
+    if (lengthcount[2] == 0 || TriCount == 0) return 0.0;
+    return 1.0;
+}
+
+int fceux11_lua_sound_get_triangle_linear() {
+    extern uint8 PSG[0x10];
+    return PSG[0xa] | ((PSG[0xb] & 7) << 8);
+}
+
+// Sound: noise
+double fceux11_lua_sound_get_noise_volume() {
+    extern ENVUNIT EnvUnits[3];
+    extern int32 lengthcount[4];
+    if (lengthcount[3] == 0) return 0.0;
+    int mode = EnvUnits[2].Mode & 1;
+    double vol = mode ? EnvUnits[2].Speed : EnvUnits[2].decvolume;
+    return vol / 15.0;
+}
+
+int fceux11_lua_sound_get_noise_mode() {
+    extern uint8 PSG[0x10];
+    return (PSG[0xE] & 0x80) != 0 ? 1 : 0;
+}
+
+int fceux11_lua_sound_get_noise_regs() {
+    extern uint8 PSG[0x10];
+    return PSG[0xE] & 0xF;
+}
+
+// Sound: DMC
+double fceux11_lua_sound_get_dmc_volume() {
+    extern char DMCHaveSample;
+    return DMCHaveSample ? 1.0 : 0.0;
+}
+
+int fceux11_lua_sound_get_dmc_rate() {
+    extern int32 DMCPeriod;
+    return DMCPeriod;
+}
+
+int fceux11_lua_sound_get_dmc_regs() {
+    extern uint8 DMCFormat;
+    return DMCFormat & 0xF;
+}
+
+// Sound: frame sequencer
+int fceux11_lua_sound_get_frame_sequencer() {
+    return 0; // Frame sequencer runs at ~60/NTSC or ~50/PAL Hz, no direct read
+}
+
+// Sound: triangle frequency/midikey
+double fceux11_lua_sound_get_triangle_frequency() {
+    extern uint8 PSG[0x10];
+    int freqReg = PSG[0xa] | ((PSG[0xb] & 7) << 8);
+    return ((PAL?PAL_CPU:NTSC_CPU)/32.0) / (freqReg + 1);
+}
+
+double fceux11_lua_sound_get_triangle_midikey() {
+    extern uint8 PSG[0x10];
+    int freqReg = PSG[0xa] | ((PSG[0xb] & 7) << 8);
+    double freq = ((PAL?PAL_CPU:NTSC_CPU)/32.0) / (freqReg + 1);
+    return (log(freq / 440.0) * 12 / log(2.0)) + 69;
+}
+
+// Sound: noise frequency/midikey
+double fceux11_lua_sound_get_noise_frequency() {
+    extern uint8 PSG[0x10];
+    extern const uint32 NoiseFreqTableNTSC[0x10];
+    extern const uint32 NoiseFreqTablePAL[0x10];
+    int freqReg = PSG[0xE] & 0xF;
+    bool shortMode = ((PSG[0xE] & 0x80) != 0);
+    double freq = PAL ? PAL_CPU/NoiseFreqTablePAL[freqReg] : NTSC_CPU/NoiseFreqTableNTSC[freqReg];
+    if (shortMode) freq /= 93.0;
+    return freq;
+}
+
+double fceux11_lua_sound_get_noise_midikey() {
+    extern uint8 PSG[0x10];
+    extern const uint32 NoiseFreqTableNTSC[0x10];
+    extern const uint32 NoiseFreqTablePAL[0x10];
+    int freqReg = PSG[0xE] & 0xF;
+    bool shortMode = ((PSG[0xE] & 0x80) != 0);
+    double freq = PAL ? PAL_CPU/NoiseFreqTablePAL[freqReg] : NTSC_CPU/NoiseFreqTableNTSC[freqReg];
+    if (shortMode) freq /= 93.0;
+    return (log(freq / 440.0) * 12 / log(2.0)) + 69;
+}
+
+// Sound: DMC frequency/midikey/address/size/loop/seed
+double fceux11_lua_sound_get_dmc_frequency() {
+    extern int32 DMCPeriod;
+    return (PAL?PAL_CPU:NTSC_CPU) / (double)DMCPeriod;
+}
+
+double fceux11_lua_sound_get_dmc_midikey() {
+    extern int32 DMCPeriod;
+    double freq = (PAL?PAL_CPU:NTSC_CPU) / (double)DMCPeriod;
+    return (log(freq / 440.0) * 12 / log(2.0)) + 69;
+}
+
+int fceux11_lua_sound_get_dmc_address() {
+    extern uint8 DMCAddressLatch;
+    return 0xC000 + (DMCAddressLatch << 6);
+}
+
+int fceux11_lua_sound_get_dmc_size() {
+    extern uint8 DMCSizeLatch;
+    return (DMCSizeLatch << 4) + 1;
+}
+
+int fceux11_lua_sound_get_dmc_loop() {
+    extern uint8 DMCFormat;
+    return (DMCFormat & 0x40) != 0 ? 1 : 0;
+}
+
+int fceux11_lua_sound_get_dmc_seed() {
+    extern uint8 InitialRawDALatch;
+    return InitialRawDALatch;
+}
+
+// Sound: sample rate and length
+int fceux11_lua_sound_get_sample_rate() {
+    extern int32 curfreq[2];
+    return (int)((PAL?PAL_CPU:NTSC_CPU) / (curfreq[0] + 1));
+}
+
+int fceux11_lua_sound_get_length_count() {
+    extern int32 lengthcount[4];
+    return lengthcount[0];
+}
+
+// Zapper
+int fceux11_lua_zapper_get_x() {
+    extern int luazapperx;
+    if (luazapperx < 0) {
+        extern uint8 MouseData[3];
+        return MouseData[0];
+    }
+    return luazapperx;
+}
+
+int fceux11_lua_zapper_get_y() {
+    extern int luazapperx, luazappery;
+    if (luazapperx < 0) {
+        extern uint8 MouseData[3];
+        return MouseData[1];
+    }
+    return luazappery;
+}
+
+int fceux11_lua_zapper_get_click() {
+    extern int luazapperx, luazapperfire;
+    if (luazapperx < 0) {
+        extern uint8 MouseData[3];
+        int click = MouseData[2];
+        return click > 1 ? 1 : click;
+    }
+    return luazapperfire;
+}
+
+void fceux11_lua_zapper_set(int x, int y, int fire) {
+    extern int luazapperx, luazappery, luazapperfire;
+    luazapperx = x;
+    luazappery = y;
+    luazapperfire = fire;
+}
+
+// Debugger
+void fceux11_lua_debugger_hitbreakpoint() {
+    extern bool break_asap;
+    break_asap = true;
+}
+
+uint64 fceux11_lua_debugger_get_cycles_count() {
+    extern uint64 timestampbase;
+    extern uint64 total_cycles_base;
+    extern uint32 timestamp;
+    int64 counter_value = timestampbase + (uint64)timestamp - total_cycles_base;
+    if (counter_value < 0) {
+        extern void ResetDebugStatisticsCounters();
+        ResetDebugStatisticsCounters();
+        counter_value = 0;
+    }
+    return (uint64)counter_value;
+}
+
+uint64 fceux11_lua_debugger_get_instructions_count() {
+    extern uint64 total_instructions;
+    return total_instructions;
+}
+
+void fceux11_lua_debugger_reset_cycles_count() {
+    extern void ResetCyclesCounter();
+    ResetCyclesCounter();
+}
+
+void fceux11_lua_debugger_reset_instructions_count() {
+    extern void ResetInstructionsCounter();
+    ResetInstructionsCounter();
+}
+
+int64 fceux11_lua_debugger_get_symbol_offset(const char* name) {
+    if (!name || !name[0]) return -1;
+    extern debugSymbol_t* debugSymbolFind(const char* name);
+    debugSymbol_t* sym = debugSymbolFind(name);
+    return sym ? (int64)sym->addr : -1;
+}
+
 } // extern "C"
