@@ -4,7 +4,7 @@
 //!
 //! FFI bridge: reads zapper state from C++ via FCEU_LuaReadZapper / movie data.
 
-use mlua::{Lua, Table, Result};
+use mlua::{Lua, Result, Table};
 
 /// Register the `zapper` table into the Lua global namespace
 pub fn register(lua: &Lua) -> Result<Table> {

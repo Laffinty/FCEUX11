@@ -3,7 +3,7 @@
 //! Provides Lua 5.1 compatible bitwise operations: `tobit`, `bnot`, `band`,
 //! `bor`, `bxor`, `lshift`, `rshift`, `arshift`, `rol`, `ror`, `bswap`, `tohex`.
 
-use mlua::{Lua, Table, Result};
+use mlua::{Lua, Result, Table};
 
 /// Register the `bit` table into the Lua global namespace
 pub fn register(lua: &Lua) -> Result<Table> {
@@ -11,9 +11,18 @@ pub fn register(lua: &Lua) -> Result<Table> {
 
     bit.set("tobit", lua.create_function(|_, x: i64| Ok(x as i32))?)?;
     bit.set("bnot", lua.create_function(|_, x: i32| Ok(!x))?)?;
-    bit.set("band", lua.create_function(|_, (a, b): (i32, i32)| Ok(a & b))?)?;
-    bit.set("bor",  lua.create_function(|_, (a, b): (i32, i32)| Ok(a | b))?)?;
-    bit.set("bxor", lua.create_function(|_, (a, b): (i32, i32)| Ok(a ^ b))?)?;
+    bit.set(
+        "band",
+        lua.create_function(|_, (a, b): (i32, i32)| Ok(a & b))?,
+    )?;
+    bit.set(
+        "bor",
+        lua.create_function(|_, (a, b): (i32, i32)| Ok(a | b))?,
+    )?;
+    bit.set(
+        "bxor",
+        lua.create_function(|_, (a, b): (i32, i32)| Ok(a ^ b))?,
+    )?;
     bit.set(
         "lshift",
         lua.create_function(|_, (x, n): (i32, i32)| Ok(x.wrapping_shl(n as u32)))?,
@@ -24,9 +33,7 @@ pub fn register(lua: &Lua) -> Result<Table> {
     )?;
     bit.set(
         "arshift",
-        lua.create_function(|_, (x, n): (i32, i32)| {
-            Ok((x as i64 >> n) as i32)
-        })?,
+        lua.create_function(|_, (x, n): (i32, i32)| Ok((x as i64 >> n) as i32))?,
     )?;
     bit.set(
         "rol",
@@ -36,7 +43,10 @@ pub fn register(lua: &Lua) -> Result<Table> {
         "ror",
         lua.create_function(|_, (x, n): (i32, i32)| Ok(x.rotate_right(n as u32)))?,
     )?;
-    bit.set("bswap", lua.create_function(|_, x: i32| Ok(x.swap_bytes()))?)?;
+    bit.set(
+        "bswap",
+        lua.create_function(|_, x: i32| Ok(x.swap_bytes()))?,
+    )?;
     bit.set(
         "tohex",
         lua.create_function(|_, (x, n): (i32, Option<i32>)| {
@@ -136,9 +146,18 @@ mod tests {
     #[test]
     fn test_bit_tohex() {
         let lua = setup_lua();
-        assert_eq!("000000FF", lua.load(r#"bit.tohex(255)"#).eval::<String>().unwrap());
-        assert_eq!("FF", lua.load(r#"bit.tohex(255, 2)"#).eval::<String>().unwrap());
-        assert_eq!("ffff", lua.load(r#"bit.tohex(-1, 4)"#).eval::<String>().unwrap());
+        assert_eq!(
+            "000000FF",
+            lua.load(r#"bit.tohex(255)"#).eval::<String>().unwrap()
+        );
+        assert_eq!(
+            "FF",
+            lua.load(r#"bit.tohex(255, 2)"#).eval::<String>().unwrap()
+        );
+        assert_eq!(
+            "ffff",
+            lua.load(r#"bit.tohex(-1, 4)"#).eval::<String>().unwrap()
+        );
     }
 
     #[test]

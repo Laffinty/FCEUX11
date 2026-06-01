@@ -53,7 +53,13 @@ set(APP_ICON_RESOURCES_WINDOWS  ${CMAKE_SOURCE_DIR}/icons/fceux11.rc )
                         	 ${FFMPEG_INSTALL_PREFIX}/ffmpeg/lib/swresample.lib )
      endif()
 
-if ( ${LUA_FOUND} )
+option(FCEUX11_LUA_RUST_ENABLED "Use Rust Lua engine (mlua) instead of C++ Lua engine" OFF)
+
+if(FCEUX11_LUA_RUST_ENABLED AND FCEUX11_RUST_ENABLED)
+    message(STATUS "Using Rust Lua engine (mlua vendored Lua 5.1)")
+    add_definitions(-D_S9XLUA_H -DFCEUX11_LUA_RUST_ENABLED)
+    set(LUA_ENGINE_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/lua-engine.cpp)
+elseif ( ${LUA_FOUND} )
    # Use System LUA
         message( STATUS "Using System Lua ${LUA_VERSION}" )
 

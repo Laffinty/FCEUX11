@@ -4,7 +4,7 @@
 //!
 //! FFI bridge: calls C++ `FFCEUX_PPURead` from `ppu.cpp`.
 
-use mlua::{Lua, Table, Result};
+use mlua::{Lua, Result, Table};
 
 /// Register the `ppu` table into the Lua global namespace
 pub fn register(lua: &Lua) -> Result<Table> {

@@ -135,8 +135,28 @@ if ($targets -notmatch "x86_64-pc-windows-msvc") {
 | **标准 Debug** | Ninja | ON (默认) | `-DCMAKE_BUILD_TYPE=Debug` | 本地调试 |
 | **Rust OFF 回退验证** | Ninja | OFF | `-DFCEUX11_ENABLE_RUST=OFF` | 验证 C++ fallback 仍可编译 |
 | **仅 C++ 侧（无 Rust）** | Ninja | OFF | `-DFCEUX11_ENABLE_RUST=OFF` | 纯 C++ 调试、Rust 工具链缺失环境 |
+| **Rust Lua 引擎** | Ninja | ON | `-DFCEUX11_RUST_ENABLED=ON -DFCEUX11_LUA_RUST_ENABLED=ON` | 使用 mlua (Lua 5.1) 替代 C++ Lua 引擎 |
 
 > **规则**：每个涉及 Rust 重构的 Pull Request，CI 必须同时通过 **Rust=ON** 和 **Rust=OFF** 两种配置。
+
+### Rust Lua 引擎 (mlua)
+
+FCEUX11 支持使用 Rust `mlua` crate（vendored Lua 5.1）替代原有 C++ Lua 引擎。启用后：
+
+- `src/lua/*.c` 不再编译，由 `mlua` vendored Lua 替代
+- `src/lua-engine.cpp` 仅编译 FFI bridge 函数和共享状态（`#ifdef FCEUX11_LUA_RUST_ENABLED`）
+- Rust Lua 引擎实现在 `src/rust/crates/fceux11-lua/`
+
+```powershell
+# 启用 Rust Lua 引擎构建
+cmake -S . -B build-lua-rust -G Ninja `
+    -DFCEUX11_RUST_ENABLED=ON `
+    -DFCEUX11_LUA_RUST_ENABLED=ON `
+    -DCMAKE_BUILD_TYPE=Release
+cmake --build build-lua-rust
+```
+
+> **注意**：`FCEUX11_LUA_RUST_ENABLED` 需要 `FCEUX11_RUST_ENABLED=ON` 才会生效。
 
 ### 3. 增量编译与目标级构建
 
@@ -185,7 +205,7 @@ cmake --build build_rust_off --target fceux11
 
 | 产物 | 路径（相对于构建根） | 说明 |
 |------|---------------------|------|
-| Rust staticlib | `build/src/rust/target/x86_64-pc-windows-msvc/release/fceux11_rust.lib` | 由 `cargo` 生成，CMake 自动链接 |
+| Rust staticlib | `build/src/rust/target/x86_64-pc-windows-msvc/release/fceux11_rust.lib` | 由 `cargo` 生成，CMake 自动链接（含 fceux11-lua crate） |
 
 > **注意**：`src/rust/CMakeLists.txt` 中 `CARGO_TARGET_DIR` 应设为 `${CMAKE_CURRENT_BINARY_DIR}/target`（而非 `/rust`），因为 `CMAKE_CURRENT_BINARY_DIR` 本身已是 `build/src/rust`，再加 `/rust` 会导致路径嵌套成 `build/src/rust/rust/...`。
 | C++ utils lib | `build/src/fceux11_utils.lib` | 包含 MD5、CRC32 等 wrapper |

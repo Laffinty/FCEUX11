@@ -1,47 +1,40 @@
-//! `emu` library binding
+//! `emu` library binding — core emulator functions
 //!
-//! Provides core emulator functions: `framecount`, `lagcount`, `paused`,
-//! `message`, `print`, `frameadvance`, `speedmode`, etc.
+//! Key design: `emu.frameadvance()` yields the main coroutine via
+//! `mlua::Thread::yield`. The C++ emulator resumes it each frame via
+//! `fceux11_lua_frame_boundary()` → `LuaEngine::frame_boundary()`.
 
-use mlua::{Lua, Table, Result, Function, String};
+use mlua::{Function, Lua, Result, String, Table};
 
-/// Speed mode constants (matching C++ speedmode enum)
 const SPEED_NORMAL: i32 = 0;
 const SPEED_NOTHROTTLE: i32 = 1;
 const SPEED_TURBO: i32 = 2;
 const SPEED_MAXIMUM: i32 = 3;
 
-/// Register the `emu` table into the Lua global namespace
 pub fn register(lua: &Lua) -> Result<Table> {
     let emu = lua.create_table()?;
 
-    // --- State accessors (FFI complete) ---
-
     emu.set(
         "framecount",
-        lua.create_function(|_, ()| {
-            let count = unsafe { crate::fceux11_lua_emu_get_framecount() };
-            Ok(count)
-        })?,
+        lua.create_function(|_, ()| Ok(unsafe { crate::fceux11_lua_emu_get_framecount() }))?,
     )?;
 
     emu.set(
         "lagcount",
-        lua.create_function(|_, ()| {
-            let count = unsafe { crate::fceux11_lua_emu_get_lagcount() };
-            Ok(count)
-        })?,
+        lua.create_function(|_, ()| Ok(unsafe { crate::fceux11_lua_emu_get_lagcount() }))?,
     )?;
 
     emu.set(
-        "paused",
-        lua.create_function(|_, ()| {
-            let is_paused = unsafe { crate::fceux11_lua_emu_is_paused() };
-            Ok(is_paused != 0)
-        })?,
+        "lagged",
+        lua.create_function(|_, ()| Ok(unsafe { crate::fceux11_lua_emu_get_lagcount() } > 0))?,
     )?;
 
-    // --- Display functions (FFI complete) ---
+    emu.set("emulating", lua.create_function(|_, ()| Ok(true))?)?;
+
+    emu.set(
+        "paused",
+        lua.create_function(|_, ()| Ok(unsafe { crate::fceux11_lua_emu_is_paused() } != 0))?,
+    )?;
 
     emu.set(
         "message",
@@ -54,15 +47,23 @@ pub fn register(lua: &Lua) -> Result<Table> {
 
     emu.set(
         "print",
-        lua.create_function(|_, msg: String| {
-            // Match C++ behavior: print goes to console
-            let s = msg.display();
-            println!("{}", s);
+        lua.create_function(|_, args: mlua::Variadic<mlua::Value>| {
+            let mut parts = Vec::new();
+            for v in args {
+                let s = match v {
+                    mlua::Value::String(s) => s.to_str()?.to_owned(),
+                    mlua::Value::Number(n) => n.to_string(),
+                    mlua::Value::Integer(n) => n.to_string(),
+                    mlua::Value::Boolean(b) => b.to_string(),
+                    mlua::Value::Nil => "nil".to_string(),
+                    _ => format!("{:?}", v),
+                };
+                parts.push(s);
+            }
+            println!("{}", parts.join("\t"));
             Ok(())
         })?,
     )?;
-
-    // --- Reset functions (FFI complete) ---
 
     emu.set(
         "poweron",
@@ -80,17 +81,18 @@ pub fn register(lua: &Lua) -> Result<Table> {
         })?,
     )?;
 
-    // --- Frame advance (coroutine yield) ---
-    // Signal CoroutineUnresumable to indicate frame boundary.
-    // The C++ caller detects this via lua_resume return and handles frame advancement.
     emu.set(
         "frameadvance",
-        lua.create_function(|_, ()| {
-            Err::<(), _>(mlua::Error::CoroutineUnresumable)
+        lua.create_function(|lua, ()| {
+            let engine = crate::get_engine_mut();
+            if let Some(eng) = engine {
+                eng.set_frame_advance_waiting(true);
+            }
+            let co: mlua::Table = lua.globals().get("coroutine")?;
+            let yield_fn: mlua::Function = co.get("yield")?;
+            yield_fn.call::<()>(())
         })?,
     )?;
-
-    // --- Speed mode (FFI complete) ---
 
     emu.set(
         "speedmode",
@@ -105,21 +107,15 @@ pub fn register(lua: &Lua) -> Result<Table> {
                         return Err(mlua::Error::RuntimeError(format!(
                             "invalid mode '{}' (valid: normal, nothrottle, turbo, maximum)",
                             v
-                        )));
+                        )))
                     }
                 },
-                Err(_) => {
-                    return Err(mlua::Error::RuntimeError(
-                        "invalid string encoding".to_string(),
-                    ));
-                }
+                Err(_) => return Err(mlua::Error::RuntimeError("invalid string encoding".into())),
             };
             unsafe { crate::fceux11_lua_emu_set_speedmode(m) };
             Ok(())
         })?,
     )?;
-
-    // --- Pause/Unpause (FFI complete) ---
 
     emu.set(
         "pause",
@@ -137,33 +133,35 @@ pub fn register(lua: &Lua) -> Result<Table> {
         })?,
     )?;
 
-    // --- Callback registration ---
-    // Callbacks are stored in Lua's registry using create_registry_value.
-    // C++ side invokes them via fceux11_lua_call_registered(BEFORE/AFTER/EXIT)
-    // which retrieves from the registry in LuaEngine::call_registered.
-
     emu.set(
         "registerbefore",
-        lua.create_function(|lua, cb: Function| {
-            // Store in Lua registry, discarding the RegistryKey
-            // (value lives until Lua engine is destroyed)
-            let _key = lua.create_registry_value(cb)?;
+        lua.create_function(|_lua, cb: Function| {
+            let engine = crate::get_engine_mut();
+            if let Some(eng) = engine {
+                eng.register_callback(crate::LuaCallID::BeforeEmulation, cb)?;
+            }
             Ok(())
         })?,
     )?;
 
     emu.set(
         "registerafter",
-        lua.create_function(|lua, cb: Function| {
-            let _key = lua.create_registry_value(cb)?;
+        lua.create_function(|_lua, cb: Function| {
+            let engine = crate::get_engine_mut();
+            if let Some(eng) = engine {
+                eng.register_callback(crate::LuaCallID::AfterEmulation, cb)?;
+            }
             Ok(())
         })?,
     )?;
 
     emu.set(
         "registerexit",
-        lua.create_function(|lua, cb: Function| {
-            let _key = lua.create_registry_value(cb)?;
+        lua.create_function(|_lua, cb: Function| {
+            let engine = crate::get_engine_mut();
+            if let Some(eng) = engine {
+                eng.register_callback(crate::LuaCallID::BeforeExit, cb)?;
+            }
             Ok(())
         })?,
     )?;

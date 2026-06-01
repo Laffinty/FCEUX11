@@ -6,7 +6,7 @@
 //!
 //! FFI bridge: reads debug counters and state from C++ debug.cpp.
 
-use mlua::{Lua, Table, Result};
+use mlua::{Lua, Result, Table};
 
 /// Register the `debugger` table into the Lua global namespace
 pub fn register(lua: &Lua) -> Result<Table> {

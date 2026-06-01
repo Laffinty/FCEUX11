@@ -5,7 +5,7 @@
 //! The pixel buffer (256x240 ARGB) is stored in LuaEngine and blitted to XBuf
 //! at each frame boundary via `gui_overlay()`.
 
-use mlua::{Lua, Table, Result};
+use mlua::{Lua, Result, Table};
 
 /// 5x7 pixel font bitmap for ASCII characters 0x20-0x7F (space through ~)
 /// Each character is 5 bytes (one per column), bits top-to-bottom (bit 0 = top)
@@ -28,13 +28,7 @@ fn char_offset(c: char) -> Option<usize> {
 }
 
 /// Draw a single glyph column by column, top to bottom
-fn draw_glyph(
-    engine: &mut crate::LuaEngine,
-    x: i32,
-    y: i32,
-    glyph: &[u8],
-    color: u32,
-) {
+fn draw_glyph(engine: &mut crate::LuaEngine, x: i32, y: i32, glyph: &[u8], color: u32) {
     // glyph has GLYPH_WIDTH bytes, each bit 0=top
     for (col, &col_bits) in glyph.iter().enumerate() {
         let px = x + col as i32;
@@ -90,64 +84,68 @@ pub fn register(lua: &Lua) -> Result<Table> {
     // gui.line(x1, y1, x2, y2, color) — draw a line
     gui.set(
         "line",
-        lua.create_function(|_, (x1, y1, x2, y2, color): (i32, i32, i32, i32, Option<u32>)| {
-            let c = color.unwrap_or(0xFFFFFFFF);
-            let engine = crate::get_engine_mut();
-            if let Some(eng) = engine {
-                // Bresenham's line algorithm
-                let mut x1 = x1;
-                let mut y1 = y1;
-                let dx = (x2 - x1).abs();
-                let dy = -((y2 - y1).abs());
-                let sx = if x1 < x2 { 1 } else { -1 };
-                let sy = if y1 < y2 { 1 } else { -1 };
-                let mut err = dx + dy;
+        lua.create_function(
+            |_, (x1, y1, x2, y2, color): (i32, i32, i32, i32, Option<u32>)| {
+                let c = color.unwrap_or(0xFFFFFFFF);
+                let engine = crate::get_engine_mut();
+                if let Some(eng) = engine {
+                    // Bresenham's line algorithm
+                    let mut x1 = x1;
+                    let mut y1 = y1;
+                    let dx = (x2 - x1).abs();
+                    let dy = -((y2 - y1).abs());
+                    let sx = if x1 < x2 { 1 } else { -1 };
+                    let sy = if y1 < y2 { 1 } else { -1 };
+                    let mut err = dx + dy;
 
-                loop {
-                    let _ = eng.set_pixel(x1, y1, c);
-                    if x1 == x2 && y1 == y2 {
-                        break;
-                    }
-                    let e2 = 2 * err;
-                    if e2 >= dy {
-                        if x1 == x2 {
+                    loop {
+                        let _ = eng.set_pixel(x1, y1, c);
+                        if x1 == x2 && y1 == y2 {
                             break;
                         }
-                        err += dy;
-                        x1 += sx;
-                    }
-                    if e2 <= dx {
-                        if y1 == y2 {
-                            break;
+                        let e2 = 2 * err;
+                        if e2 >= dy {
+                            if x1 == x2 {
+                                break;
+                            }
+                            err += dy;
+                            x1 += sx;
                         }
-                        err += dx;
-                        y1 += sy;
+                        if e2 <= dx {
+                            if y1 == y2 {
+                                break;
+                            }
+                            err += dx;
+                            y1 += sy;
+                        }
                     }
                 }
-            }
-            Ok(())
-        })?,
+                Ok(())
+            },
+        )?,
     )?;
 
     // gui.box(x1, y1, x2, y2, color) — draw a rectangle outline
     gui.set(
         "box",
-        lua.create_function(|_, (x1, y1, x2, y2, color): (i32, i32, i32, i32, Option<u32>)| {
-            let c = color.unwrap_or(0xFFFFFFFF);
-            let engine = crate::get_engine_mut();
-            if let Some(eng) = engine {
-                // Draw 4 lines of the rectangle
-                for x in x1..=x2 {
-                    let _ = eng.set_pixel(x, y1, c);
-                    let _ = eng.set_pixel(x, y2, c);
+        lua.create_function(
+            |_, (x1, y1, x2, y2, color): (i32, i32, i32, i32, Option<u32>)| {
+                let c = color.unwrap_or(0xFFFFFFFF);
+                let engine = crate::get_engine_mut();
+                if let Some(eng) = engine {
+                    // Draw 4 lines of the rectangle
+                    for x in x1..=x2 {
+                        let _ = eng.set_pixel(x, y1, c);
+                        let _ = eng.set_pixel(x, y2, c);
+                    }
+                    for y in y1..=y2 {
+                        let _ = eng.set_pixel(x1, y, c);
+                        let _ = eng.set_pixel(x2, y, c);
+                    }
                 }
-                for y in y1..=y2 {
-                    let _ = eng.set_pixel(x1, y, c);
-                    let _ = eng.set_pixel(x2, y, c);
-                }
-            }
-            Ok(())
-        })?,
+                Ok(())
+            },
+        )?,
     )?;
 
     // gui.text(x, y, msg, color) — draw text using 5x7 pixel font
@@ -237,6 +235,36 @@ pub fn register(lua: &Lua) -> Result<Table> {
         lua.create_function(|_, msg: mlua::String| {
             let bytes = msg.as_bytes_with_nul();
             unsafe { crate::fceux11_lua_gui_popup(bytes.as_ptr() as *const i8) };
+            Ok(())
+        })?,
+    )?;
+
+    // gui.register(func) — register a GUI drawing callback (called each frame)
+    gui.set(
+        "register",
+        lua.create_function(|lua, cb: mlua::Function| {
+            let engine = crate::get_engine_mut();
+            if let Some(eng) = engine {
+                let key = lua.create_registry_value(cb.clone())?;
+                eng.callbacks().gui.push(crate::CallbackEntry {
+                    func: cb,
+                    _key: key,
+                });
+            }
+            Ok(())
+        })?,
+    )?;
+
+    // gui.clear() — clear the overlay buffer
+    gui.set(
+        "clear",
+        lua.create_function(|_, ()| {
+            let engine = crate::get_engine_mut();
+            if let Some(eng) = engine {
+                for b in &mut eng.gui_data {
+                    *b = 0;
+                }
+            }
             Ok(())
         })?,
     )?;

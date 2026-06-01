@@ -3,6 +3,7 @@ build/
 build_test/
 build_no_rust/
 build_rust_*/
+build-lua-rust/
 _build/
 *.build/
 out/
@@ -45,6 +46,7 @@ qrc_*.cpp
 Thumbs.db
 .DS_Store
 *.lnk
+nul
 
 # IDE/Editor files
 .vscode/

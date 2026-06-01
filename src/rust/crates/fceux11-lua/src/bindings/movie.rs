@@ -5,7 +5,7 @@
 //!
 //! FFI bridge: calls C++ `FCEUMOV_*` and `FCEUI_*` functions.
 
-use mlua::{Lua, Table, Result};
+use mlua::{Lua, Result, Table};
 
 /// Register the `movie` table into the Lua global namespace
 pub fn register(lua: &Lua) -> Result<Table> {

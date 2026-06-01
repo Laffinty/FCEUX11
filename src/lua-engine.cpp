@@ -77,6 +77,153 @@ void fceuWrapperRequestAppExit(void);
 
 #include "x6502abbrev.h"
 
+// ==========================================================================
+// FCEUX11_LUA_RUST_ENABLED: Rust mlua engine replaces C++ Lua engine.
+// When enabled, only FFI bridge functions and shared state are compiled.
+// The old C++ Lua engine code is excluded entirely.
+// ==========================================================================
+
+#ifdef FCEUX11_LUA_RUST_ENABLED
+
+extern bool turbo;
+extern int32 fps_scale;
+
+struct LuaSaveState {
+	std::string filename;
+	EMUFILE_MEMORY *data;
+	bool anonymous, persisted;
+	LuaSaveState()
+		: data(0)
+		, anonymous(false)
+		, persisted(false)
+	{}
+	~LuaSaveState() {
+		if(data) delete data;
+	}
+	void persist() {
+		persisted = true;
+		FILE* outf = fopen(filename.c_str(),"wb");
+		fwrite(data->buf(),1,data->size(),outf);
+		fclose(outf);
+	}
+	void ensureLoad() {
+		if(data) return;
+		persisted = true;
+		FILE* inf = fopen(filename.c_str(),"rb");
+		fseek(inf,0,SEEK_END);
+		long int len = ftell(inf);
+		fseek(inf,0,SEEK_SET);
+		data = new EMUFILE_MEMORY(len);
+		if ( fread(data->buf(),1,len,inf) != static_cast<size_t>(len) )
+		{
+			FCEU_printf("Warning: LuaSaveState::ensureLoad failed to load full buffer.\n");
+		}
+		fclose(inf);
+	}
+};
+
+static uint8 luajoypads1[4]= { 0xFF, 0xFF, 0xFF, 0xFF };
+static uint8 luajoypads2[4]= { 0x00, 0x00, 0x00, 0x00 };
+static int luazapperx = -1;
+static int luazappery = -1;
+static int luazapperfire = -1;
+static enum {SPEED_NORMAL, SPEED_NOTHROTTLE, SPEED_TURBO, SPEED_MAXIMUM} speedmode = SPEED_NORMAL;
+static int transparencyModifier = 255;
+
+static std::map<int, LuaSaveState*> s_savestate_objects;
+static int s_next_savestate_id = 1;
+
+// Rust FFI declarations — implemented in fceux11-lua crate
+extern "C" {
+    int fceux11_lua_init(void);
+    int fceux11_lua_load_script(const char *path, const char *arg);
+    void fceux11_lua_frame_boundary(void);
+    void fceux11_lua_stop(void);
+    int fceux11_lua_running(void);
+    void fceux11_lua_gui(uint8_t *xbuf, int width, int height);
+    uint8_t fceux11_lua_read_joypad(int controller, uint8_t original);
+    int fceux11_lua_call_registered(int call_id);
+    void fceux11_lua_call_mem_hook(unsigned int addr, int size, unsigned int value, int hook_type);
+}
+
+// Public C++ entry points — delegate to Rust FFI
+void FCEU_LuaFrameBoundary() {
+    fceux11_lua_frame_boundary();
+}
+
+int FCEU_LoadLuaCode(const char *filename, const char *arg) {
+    if (!fceux11_lua_running()) {
+        fceux11_lua_init();
+    }
+    return fceux11_lua_load_script(filename, arg);
+}
+
+void FCEU_ReloadLuaCode() {
+    // TODO: store last script path and reload
+}
+
+void FCEU_LuaStop() {
+    fceux11_lua_stop();
+}
+
+int FCEU_LuaRunning() {
+    return fceux11_lua_running();
+}
+
+void FCEU_LuaGui(uint8_t *XBuf) {
+    fceux11_lua_gui(XBuf, 256, 240);
+}
+
+uint8 FCEU_LuaReadJoypad(int controller, uint8 original) {
+    return fceux11_lua_read_joypad(controller, original);
+}
+
+int FCEU_LuaSpeed() {
+    return speedmode != SPEED_NORMAL;
+}
+
+int FCEU_LuaFrameskip() {
+    return 0;
+}
+
+int FCEU_LuaRerecordCountSkip() {
+    return 0;
+}
+
+void CallRegisteredLuaFunctions(LuaCallID calltype) {
+    fceux11_lua_call_registered(static_cast<int>(calltype));
+}
+
+void CallRegisteredLuaMemHook(unsigned int address, int size, unsigned int value, LuaMemHookType hookType) {
+    fceux11_lua_call_mem_hook(address, size, value, static_cast<int>(hookType));
+}
+
+void CallRegisteredLuaSaveFunctions(int savestateNumber, LuaSaveData& saveData) {
+    // TODO: FFI bridge for LuaSaveData serialization
+}
+
+void CallRegisteredLuaLoadFunctions(int savestateNumber, const LuaSaveData& saveData) {
+    // TODO: FFI bridge for LuaSaveData deserialization
+}
+
+void FCEU_LuaUpdatePalette() {
+    // Rust engine does not hook palette updates
+}
+
+struct lua_State* FCEU_GetLuaState() {
+    return nullptr;
+}
+
+char* FCEU_GetLuaScriptName() {
+    return nullptr;
+}
+
+void FCEU_LuaReadZapper(const uint32* mouse_in, uint32* mouse_out) {
+    // Zapper state managed via fceux11_lua_zapper_* FFI
+}
+
+#else /* !FCEUX11_LUA_RUST_ENABLED — full C++ Lua engine */
+
 bool CheckLua()
 {
 #ifdef __WIN_DRIVER__
@@ -6669,10 +6816,52 @@ char* FCEU_GetLuaScriptName() {
 	return luaScriptName;
 }
 
+#endif /* !FCEUX11_LUA_RUST_ENABLED */
+
 // ---------------------------------------------------------------------------
 // v0.2.22.2: Rust Lua FFI bridge functions
 // These are called from fceux11-lua (Rust) via FFI
 // ---------------------------------------------------------------------------
+
+// C++ forward declarations needed by FFI bridge functions
+// (must be outside extern "C" to get C++ name mangling)
+extern ENVUNIT EnvUnits[3];
+extern int CheckFreq(uint32 cf, uint8 sr);
+extern int32 curfreq[2];
+extern uint8 PSG[0x10];
+extern int32 lengthcount[4];
+extern uint8 TriCount;
+extern char DMCHaveSample;
+extern int32 DMCPeriod;
+extern uint8 DMCFormat;
+extern uint8 DMCAddressLatch;
+extern uint8 DMCSizeLatch;
+extern uint8 InitialRawDALatch;
+extern const uint32 NoiseFreqTableNTSC[0x10];
+extern const uint32 NoiseFreqTablePAL[0x10];
+extern uint64 timestampbase;
+extern uint64 total_cycles_base;
+extern uint32 timestamp;
+extern uint64 total_instructions;
+extern bool break_asap;
+extern void ResetDebugStatisticsCounters();
+extern void ResetCyclesCounter();
+extern void ResetInstructionsCounter();
+
+#ifdef FCEUX11_LUA_RUST_ENABLED
+// Taseditor stubs — full implementations are in the C++ Lua engine (#else block)
+void TaseditorAutoFunction() {}
+void TaseditorManualFunction() {}
+void ForceExecuteLuaFrameFunctions() {}
+#ifdef __QT_DRIVER__
+void TaseditorDisableManualFunctionIfNeeded() {}
+#endif
+
+// LuaSaveData method stubs — serialization stays in C++ for now
+void LuaSaveData::ExportRecords(void* fileV) const {}
+void LuaSaveData::ImportRecords(void* fileV) {}
+void LuaSaveData::ClearRecords() {}
+#endif
 
 extern "C" {
 
@@ -6759,13 +6948,11 @@ void fceux11_lua_movie_set_readonly(int32_t val) {
 }
 
 int32_t fceux11_lua_movie_is_poweron() {
-	extern MovieData currMovieData;
-	return (currMovieData.PowerOn != 0) ? 1 : 0;
+	return FCEUMOV_FromPoweron() ? 1 : 0;
 }
 
 int32_t fceux11_lua_movie_is_from_savestate() {
-	extern MovieData currMovieData;
-	return (currMovieData.fromSavestate != 0) ? 1 : 0;
+	return FCEUMOV_FromPoweron() ? 0 : 1;
 }
 
 const char* fceux11_lua_movie_get_name() {
@@ -6801,8 +6988,10 @@ int32_t fceux11_lua_savestate_load_slot(int slot) {
 
 // v0.2.22.4: savestate object lifecycle
 // LuaSaveState objects are managed by C++ but tracked via a simple ID map from Rust
+#ifndef FCEUX11_LUA_RUST_ENABLED
 static std::map<int, LuaSaveState*> s_savestate_objects;
 static int s_next_savestate_id = 1;
+#endif
 
 int32_t fceux11_lua_savestate_create_object(const char* path, int which, int anonymous) {
 	// which: 1-10 slot number, 0 = use path
@@ -6848,9 +7037,7 @@ int32_t fceux11_lua_emu_is_paused() {
 }
 
 void fceux11_lua_emu_set_speedmode(int mode) {
-	// mode: 0=normal, 1=nothrottle, 2=turbo, 3=maximum
-	extern int speedmode;
-	speedmode = mode;
+	speedmode = static_cast<decltype(speedmode)>(mode);
 	if (mode == 0) {
 		FCEUD_SetEmulationSpeed(EMUSPEED_NORMAL);
 		FCEUD_TurboOff();
@@ -6901,11 +7088,6 @@ void fceux11_lua_gui_savescreenshot(const char* filename) {
 
 // Sound: square1
 double fceux11_lua_sound_get_square1_volume() {
-    extern ENVUNIT EnvUnits[3];
-    extern int CheckFreq(uint32 cf, uint8 sr);
-    extern int32 curfreq[2];
-    extern uint8 PSG[0x10];
-    extern int32 lengthcount[4];
     if (curfreq[0] < 8 || curfreq[0] > 0x7ff ||
         CheckFreq(curfreq[0], PSG[1]) == 0 ||
         lengthcount[0] == 0) return 0.0;
@@ -6915,34 +7097,24 @@ double fceux11_lua_sound_get_square1_volume() {
 }
 
 double fceux11_lua_sound_get_square1_frequency() {
-    extern int32 curfreq[2];
-    extern uint8 PSG[0x10];
     return ((PAL?PAL_CPU:NTSC_CPU)/16.0) / (curfreq[0] + 1);
 }
 
 double fceux11_lua_sound_get_square1_midikey() {
-    extern int32 curfreq[2];
     double freq = ((PAL?PAL_CPU:NTSC_CPU)/16.0) / (curfreq[0] + 1);
     return (log(freq / 440.0) * 12 / log(2.0)) + 69;
 }
 
 int fceux11_lua_sound_get_square1_duty() {
-    extern uint8 PSG[0x10];
     return (PSG[0] & 0xC0) >> 6;
 }
 
 int fceux11_lua_sound_get_square1_regs() {
-    extern int32 curfreq[2];
     return curfreq[0];
 }
 
 // Sound: square2
 double fceux11_lua_sound_get_square2_volume() {
-    extern ENVUNIT EnvUnits[3];
-    extern int CheckFreq(uint32 cf, uint8 sr);
-    extern int32 curfreq[2];
-    extern uint8 PSG[0x10];
-    extern int32 lengthcount[4];
     if (curfreq[1] < 8 || curfreq[1] > 0x7ff ||
         CheckFreq(curfreq[1], PSG[5]) == 0 ||
         lengthcount[1] == 0) return 0.0;
@@ -6952,43 +7124,34 @@ double fceux11_lua_sound_get_square2_volume() {
 }
 
 double fceux11_lua_sound_get_square2_frequency() {
-    extern int32 curfreq[2];
     return ((PAL?PAL_CPU:NTSC_CPU)/16.0) / (curfreq[1] + 1);
 }
 
 double fceux11_lua_sound_get_square2_midikey() {
-    extern int32 curfreq[2];
     double freq = ((PAL?PAL_CPU:NTSC_CPU)/16.0) / (curfreq[1] + 1);
     return (log(freq / 440.0) * 12 / log(2.0)) + 69;
 }
 
 int fceux11_lua_sound_get_square2_duty() {
-    extern uint8 PSG[0x10];
     return (PSG[4] & 0xC0) >> 6;
 }
 
 int fceux11_lua_sound_get_square2_regs() {
-    extern int32 curfreq[2];
     return curfreq[1];
 }
 
 // Sound: triangle
 double fceux11_lua_sound_get_triangle_volume() {
-    extern int32 lengthcount[4];
-    extern uint8 TriCount;
     if (lengthcount[2] == 0 || TriCount == 0) return 0.0;
     return 1.0;
 }
 
 int fceux11_lua_sound_get_triangle_linear() {
-    extern uint8 PSG[0x10];
     return PSG[0xa] | ((PSG[0xb] & 7) << 8);
 }
 
 // Sound: noise
 double fceux11_lua_sound_get_noise_volume() {
-    extern ENVUNIT EnvUnits[3];
-    extern int32 lengthcount[4];
     if (lengthcount[3] == 0) return 0.0;
     int mode = EnvUnits[2].Mode & 1;
     double vol = mode ? EnvUnits[2].Speed : EnvUnits[2].decvolume;
@@ -6996,45 +7159,38 @@ double fceux11_lua_sound_get_noise_volume() {
 }
 
 int fceux11_lua_sound_get_noise_mode() {
-    extern uint8 PSG[0x10];
     return (PSG[0xE] & 0x80) != 0 ? 1 : 0;
 }
 
 int fceux11_lua_sound_get_noise_regs() {
-    extern uint8 PSG[0x10];
     return PSG[0xE] & 0xF;
 }
 
 // Sound: DMC
 double fceux11_lua_sound_get_dmc_volume() {
-    extern char DMCHaveSample;
     return DMCHaveSample ? 1.0 : 0.0;
 }
 
 int fceux11_lua_sound_get_dmc_rate() {
-    extern int32 DMCPeriod;
     return DMCPeriod;
 }
 
 int fceux11_lua_sound_get_dmc_regs() {
-    extern uint8 DMCFormat;
     return DMCFormat & 0xF;
 }
 
 // Sound: frame sequencer
 int fceux11_lua_sound_get_frame_sequencer() {
-    return 0; // Frame sequencer runs at ~60/NTSC or ~50/PAL Hz, no direct read
+    return 0;
 }
 
 // Sound: triangle frequency/midikey
 double fceux11_lua_sound_get_triangle_frequency() {
-    extern uint8 PSG[0x10];
     int freqReg = PSG[0xa] | ((PSG[0xb] & 7) << 8);
     return ((PAL?PAL_CPU:NTSC_CPU)/32.0) / (freqReg + 1);
 }
 
 double fceux11_lua_sound_get_triangle_midikey() {
-    extern uint8 PSG[0x10];
     int freqReg = PSG[0xa] | ((PSG[0xb] & 7) << 8);
     double freq = ((PAL?PAL_CPU:NTSC_CPU)/32.0) / (freqReg + 1);
     return (log(freq / 440.0) * 12 / log(2.0)) + 69;
@@ -7042,9 +7198,6 @@ double fceux11_lua_sound_get_triangle_midikey() {
 
 // Sound: noise frequency/midikey
 double fceux11_lua_sound_get_noise_frequency() {
-    extern uint8 PSG[0x10];
-    extern const uint32 NoiseFreqTableNTSC[0x10];
-    extern const uint32 NoiseFreqTablePAL[0x10];
     int freqReg = PSG[0xE] & 0xF;
     bool shortMode = ((PSG[0xE] & 0x80) != 0);
     double freq = PAL ? PAL_CPU/NoiseFreqTablePAL[freqReg] : NTSC_CPU/NoiseFreqTableNTSC[freqReg];
@@ -7053,9 +7206,6 @@ double fceux11_lua_sound_get_noise_frequency() {
 }
 
 double fceux11_lua_sound_get_noise_midikey() {
-    extern uint8 PSG[0x10];
-    extern const uint32 NoiseFreqTableNTSC[0x10];
-    extern const uint32 NoiseFreqTablePAL[0x10];
     int freqReg = PSG[0xE] & 0xF;
     bool shortMode = ((PSG[0xE] & 0x80) != 0);
     double freq = PAL ? PAL_CPU/NoiseFreqTablePAL[freqReg] : NTSC_CPU/NoiseFreqTableNTSC[freqReg];
@@ -7065,78 +7215,56 @@ double fceux11_lua_sound_get_noise_midikey() {
 
 // Sound: DMC frequency/midikey/address/size/loop/seed
 double fceux11_lua_sound_get_dmc_frequency() {
-    extern int32 DMCPeriod;
     return (PAL?PAL_CPU:NTSC_CPU) / (double)DMCPeriod;
 }
 
 double fceux11_lua_sound_get_dmc_midikey() {
-    extern int32 DMCPeriod;
     double freq = (PAL?PAL_CPU:NTSC_CPU) / (double)DMCPeriod;
     return (log(freq / 440.0) * 12 / log(2.0)) + 69;
 }
 
 int fceux11_lua_sound_get_dmc_address() {
-    extern uint8 DMCAddressLatch;
     return 0xC000 + (DMCAddressLatch << 6);
 }
 
 int fceux11_lua_sound_get_dmc_size() {
-    extern uint8 DMCSizeLatch;
     return (DMCSizeLatch << 4) + 1;
 }
 
 int fceux11_lua_sound_get_dmc_loop() {
-    extern uint8 DMCFormat;
     return (DMCFormat & 0x40) != 0 ? 1 : 0;
 }
 
 int fceux11_lua_sound_get_dmc_seed() {
-    extern uint8 InitialRawDALatch;
     return InitialRawDALatch;
 }
 
 // Sound: sample rate and length
 int fceux11_lua_sound_get_sample_rate() {
-    extern int32 curfreq[2];
     return (int)((PAL?PAL_CPU:NTSC_CPU) / (curfreq[0] + 1));
 }
 
 int fceux11_lua_sound_get_length_count() {
-    extern int32 lengthcount[4];
     return lengthcount[0];
 }
 
-// Zapper
+// Zapper — uses luazapperx/y/fire from lua-engine.cpp globals
 int fceux11_lua_zapper_get_x() {
-    extern int luazapperx;
-    if (luazapperx < 0) {
-        extern uint8 MouseData[3];
-        return MouseData[0];
-    }
+    if (luazapperx < 0) return 0;
     return luazapperx;
 }
 
 int fceux11_lua_zapper_get_y() {
-    extern int luazapperx, luazappery;
-    if (luazapperx < 0) {
-        extern uint8 MouseData[3];
-        return MouseData[1];
-    }
+    if (luazapperx < 0) return 0;
     return luazappery;
 }
 
 int fceux11_lua_zapper_get_click() {
-    extern int luazapperx, luazapperfire;
-    if (luazapperx < 0) {
-        extern uint8 MouseData[3];
-        int click = MouseData[2];
-        return click > 1 ? 1 : click;
-    }
+    if (luazapperx < 0) return 0;
     return luazapperfire;
 }
 
 void fceux11_lua_zapper_set(int x, int y, int fire) {
-    extern int luazapperx, luazappery, luazapperfire;
     luazapperx = x;
     luazappery = y;
     luazapperfire = fire;
@@ -7144,17 +7272,12 @@ void fceux11_lua_zapper_set(int x, int y, int fire) {
 
 // Debugger
 void fceux11_lua_debugger_hitbreakpoint() {
-    extern bool break_asap;
     break_asap = true;
 }
 
 uint64 fceux11_lua_debugger_get_cycles_count() {
-    extern uint64 timestampbase;
-    extern uint64 total_cycles_base;
-    extern uint32 timestamp;
     int64 counter_value = timestampbase + (uint64)timestamp - total_cycles_base;
     if (counter_value < 0) {
-        extern void ResetDebugStatisticsCounters();
         ResetDebugStatisticsCounters();
         counter_value = 0;
     }
@@ -7162,25 +7285,22 @@ uint64 fceux11_lua_debugger_get_cycles_count() {
 }
 
 uint64 fceux11_lua_debugger_get_instructions_count() {
-    extern uint64 total_instructions;
     return total_instructions;
 }
 
 void fceux11_lua_debugger_reset_cycles_count() {
-    extern void ResetCyclesCounter();
     ResetCyclesCounter();
 }
 
 void fceux11_lua_debugger_reset_instructions_count() {
-    extern void ResetInstructionsCounter();
     ResetInstructionsCounter();
 }
 
 int64 fceux11_lua_debugger_get_symbol_offset(const char* name) {
     if (!name || !name[0]) return -1;
-    extern debugSymbol_t* debugSymbolFind(const char* name);
-    debugSymbol_t* sym = debugSymbolFind(name);
-    return sym ? (int64)sym->addr : -1;
+    extern debugSymbolTable_t debugSymbolTable;
+    debugSymbol_t* sym = debugSymbolTable.getSymbolAtAnyBank(name);
+    return sym ? (int64)sym->offset() : -1;
 }
 
 } // extern "C"

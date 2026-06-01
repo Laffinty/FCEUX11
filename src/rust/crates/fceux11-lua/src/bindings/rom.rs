@@ -5,8 +5,8 @@
 //! FFI bridge: calls `FCEU_ReadRomByte` / `FCEU_WriteRomByte` and CRC32 from
 //! `fceux11-utils`.
 
-use mlua::{Lua, Table, Result};
 use crc32fast::Hasher;
+use mlua::{Lua, Result, Table};
 
 /// Hash type constants (matching C++ lua-engine.cpp)
 const HASH_MD5: i32 = 0;

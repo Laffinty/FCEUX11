@@ -4,7 +4,7 @@
 //!
 //! FFI bridge: reads joypad state via C++ and sets override masks.
 
-use mlua::{Lua, Table, Result};
+use mlua::{Lua, Result, Table};
 
 /// Button bitmask flags (matching FCEUX input.h)
 const JOY_A: u32 = 0x01;
@@ -55,7 +55,8 @@ pub fn register(lua: &Lua) -> Result<Table> {
                             continue;
                         }
                         // In Lua, only nil and false are falsy
-                        let is_truthy = !matches!(val, mlua::Value::Nil | mlua::Value::Boolean(false));
+                        let is_truthy =
+                            !matches!(val, mlua::Value::Nil | mlua::Value::Boolean(false));
                         let is_string = matches!(&val, mlua::Value::String(_));
 
                         if is_truthy {
@@ -80,4 +81,3 @@ pub fn register(lua: &Lua) -> Result<Table> {
 
     Ok(joypad)
 }
-
