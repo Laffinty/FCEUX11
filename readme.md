@@ -22,7 +22,6 @@ This project aims to preserve the core emulation accuracy of FCEUX while providi
 - **Lua 脚本**：通过 Lua 接口扩展功能，支持自定义 HUD、自动化测试等。
 - **录像回放**：录制与播放游戏过程，支持 AVI 导出。
 - **金手指**：支持 Game Genie 与原始金手指代码。
-- **联机对战**：通过网络进行双人联机游戏。
 - **多语言界面**：提供简体中文、繁体中文及英文界面。
 - **自定义调色板**：支持加载外部调色板文件，调整游戏色彩表现。
 - **存档管理**：支持即时存档/读档及自动存档记录。
@@ -33,7 +32,6 @@ This project aims to preserve the core emulation accuracy of FCEUX while providi
 - **Lua Scripting**: Extend functionality via Lua scripts, including custom HUDs and automated testing.
 - **Movie Recording**: Record and playback gameplay, with AVI export support.
 - **Cheats**: Support for Game Genie and raw cheat codes.
-- **Netplay**: Two-player online multiplayer over network.
 - **Multi-language UI**: Interface available in Simplified Chinese, Traditional Chinese, and English.
 - **Custom Palettes**: Load external palette files to adjust in-game color rendering.
 - **Save States**: Instant save/load with automatic state history.
@@ -52,17 +50,17 @@ This project aims to preserve the core emulation accuracy of FCEUX while providi
 
 ### 构建环境
 
-如需从源码编译，请参阅 `docs/tech/Build_Guide_MSVC_vcpkg.md`。
+如需从源码编译，请参阅 `docs/tech/Build_Guide.md`。
 
-For building from source, please refer to `docs/tech/Build_Guide_MSVC_vcpkg.md`.
+For building from source, please refer to `docs/tech/Build_Guide.md`.
 
 ---
 
 ## 下载与安装
 
-预编译二进制文件可在 [GitHub Releases](https://github.com/fceux11/fceux11/releases) 页面获取。下载后解压至任意目录即可运行，无需安装。
+预编译二进制文件可在 [GitHub Releases](https://github.com/Laffinty/FCEUX11/releases) 页面获取。下载后解压至任意目录即可运行，无需安装。
 
-Precompiled binaries are available on the [GitHub Releases](https://github.com/fceux11/fceux11/releases) page. Simply extract the archive to any directory and run—no installation required.
+Precompiled binaries are available on the [GitHub Releases](https://github.com/Laffinty/FCEUX11/releases) page. Simply extract the archive to any directory and run—no installation required.
 
 首次运行时，请确保目标目录具有写入权限，以便程序保存配置与存档文件。
 
@@ -75,12 +73,9 @@ Ensure the target directory has write permissions on first run so the program ca
 1. 启动 `fceux11.exe`。
 2. 通过 **File → Open ROM** 加载游戏文件（支持 `.nes`、`.fds`、`.nsf`、`.unf` 等格式）。
 3. 使用键盘或手柄进行游戏；输入映射可在 **Options → Input Config** 中调整。
-4. 按 **F5** 快速存档，**F7** 快速读档。
+4. 按 **I** 快速存档，**P** 快速读档。
 
-1. Launch `fceux11.exe`.
-2. Load a game via **File → Open ROM** (supports `.nes`, `.fds`, `.nsf`, `.unf`, and more).
-3. Play using keyboard or gamepad; input mappings can be adjusted in **Options → Input Config**.
-4. Press **F5** for quick save and **F7** for quick load.
+4. Press **I** for quick save and **P** for quick load.
 
 ---
 
