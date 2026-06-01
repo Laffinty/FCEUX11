@@ -354,57 +354,5 @@ unsafe extern "C" fn fceux11_lua_gui_pixel(x: c_int, y: c_int, color: c_uint) ->
     }
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use mlua::Lua;
-
-    #[test]
-    fn test_bit_bor() {
-        let lua = Lua::new();
-        let bit = bindings::bit::register(&lua).unwrap();
-        lua.globals().set("bit", bit).unwrap();
-        let result: i32 = lua.load("bit.bor(0xFF, 0x00)").eval().unwrap();
-        assert_eq!(result, 0xFF);
-    }
-
-    #[test]
-    fn test_bit_band() {
-        let lua = Lua::new();
-        let bit = bindings::bit::register(&lua).unwrap();
-        lua.globals().set("bit", bit).unwrap();
-        let result: i32 = lua.load("bit.band(0xFF, 0x0F)").eval().unwrap();
-        assert_eq!(result, 0x0F);
-    }
-
-    #[test]
-    fn test_bit_lshift() {
-        let lua = Lua::new();
-        let bit = bindings::bit::register(&lua).unwrap();
-        lua.globals().set("bit", bit).unwrap();
-        let result: i32 = lua.load("bit.lshift(1, 8)").eval().unwrap();
-        assert_eq!(result, 256);
-    }
-
-    #[test]
-    fn test_bit_rshift() {
-        let lua = Lua::new();
-        let bit = bindings::bit::register(&lua).unwrap();
-        lua.globals().set("bit", bit).unwrap();
-        let result: i32 = lua.load("bit.rshift(256, 8)").eval().unwrap();
-        assert_eq!(result, 1);
-    }
-
-    #[test]
-    fn test_bit_tohex() {
-        let lua = Lua::new();
-        let bit = bindings::bit::register(&lua).unwrap();
-        lua.globals().set("bit", bit).unwrap();
-        let result: String = lua.load(r#"bit.tohex(255)"#).eval().unwrap();
-        assert_eq!(result, "000000FF");
-    }
-}
+// Tests for bit operations live in bindings/bit.rs alongside the implementation.
+// All other bindings are tested via integration tests (tests/lua_scripts/).

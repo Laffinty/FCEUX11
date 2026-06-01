@@ -13,3 +13,8 @@ crc32fast = "1.4"
 
 [dev-dependencies]
 mlua = { version = "0.10", features = ["lua51", "vendored"] }
+
+# Unit tests for this crate require linking against the C++ fceux11_rust library.
+# Run `cargo test` from the workspace root (src/rust/) which excludes this crate
+# from `cargo test --workspace` via `--exclude fceux11-lua`. Full integration tests
+# are run via the CMake build system.
