@@ -37,7 +37,9 @@ unsafe extern "C" {
     fn fceux11_lua_SetJoypadOverride(port: i32, mask1: u32, mask2: u32);
     #[allow(dead_code)]
     fn fceux11_lua_GetRomHash(which: i32) -> u32;
+    #[allow(dead_code)]
     fn fceux11_lua_ReadRomByte(addr: u32) -> u8;
+    #[allow(dead_code)]
     fn fceux11_lua_WriteRomByte(addr: u32, val: u8);
     fn fceux11_lua_PPURead(addr: u32) -> u8;
     fn fceux11_lua_movie_get_mode() -> i32;
@@ -88,6 +90,7 @@ unsafe extern "C" {
     fn fceux11_lua_sound_get_noise_frequency() -> f64;
     fn fceux11_lua_sound_get_noise_midikey() -> f64;
     fn fceux11_lua_sound_get_dmc_volume() -> f64;
+    #[allow(dead_code)]
     fn fceux11_lua_sound_get_dmc_rate() -> i32;
     fn fceux11_lua_sound_get_dmc_regs() -> i32;
     fn fceux11_lua_sound_get_dmc_frequency() -> f64;
@@ -96,6 +99,7 @@ unsafe extern "C" {
     fn fceux11_lua_sound_get_dmc_size() -> i32;
     fn fceux11_lua_sound_get_dmc_loop() -> i32;
     fn fceux11_lua_sound_get_dmc_seed() -> i32;
+    #[allow(dead_code)]
     fn fceux11_lua_sound_get_frame_sequencer() -> i32;
     fn fceux11_lua_sound_get_sample_rate() -> i32;
     fn fceux11_lua_sound_get_length_count() -> i32;
@@ -149,12 +153,14 @@ pub enum SpeedMode {
 
 /// Joypad override state
 #[derive(Debug, Clone, Default)]
+#[allow(dead_code)]
 pub struct JoypadOverride {
     pub mask1: [u32; 4],
     pub mask2: [u32; 4],
 }
 
 /// The FCEUX Lua engine
+#[allow(dead_code)]
 pub struct LuaEngine {
     lua: Lua,
     gui_data: Vec<u8>,

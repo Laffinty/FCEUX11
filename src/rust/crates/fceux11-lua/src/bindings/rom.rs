@@ -75,6 +75,7 @@ pub fn register(lua: &Lua) -> Result<Table> {
 // FFI declarations (mirrored in lib.rs)
 // ---------------------------------------------------------------------------
 
+#[allow(dead_code)]
 unsafe extern "C" {
     fn fceux11_lua_ReadRomByte(addr: u32) -> u8;
     fn fceux11_lua_WriteRomByte(addr: u32, val: u8);
