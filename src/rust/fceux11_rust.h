@@ -893,6 +893,22 @@ void *fceux11_rust_conddebug_generate_condition(const char *str);
  * Destroy a ConditionAst previously returned by fceux11_rust_conddebug_generate_condition.
  */
 void fceux11_rust_conddebug_condition_destroy(void *condition);
+extern uint8_t fceux11_lua_GetMem(uint32_t addr);
+
+extern void fceux11_lua_BWrite(uint32_t addr, uint8_t val);
+
+extern uint16_t fceux11_lua_GetRegister(int32_t reg_id);
+
+extern uint32_t fceux11_lua_GetJoypadState(int32_t port);
+
+extern void fceux11_lua_SetJoypadOverride(int32_t port, uint32_t mask1, uint32_t mask2);
+
+extern uint32_t fceux11_lua_GetRomHash(int32_t which);
+
+extern uint8_t fceux11_lua_ReadRomByte(uint32_t addr);
+
+extern void fceux11_lua_WriteRomByte(uint32_t addr, uint8_t val);
+
 int fceux11_lua_init(void);
 
 int fceux11_lua_load_script(const char *path, const char *arg);
@@ -912,6 +928,14 @@ int fceux11_lua_call_registered(int call_id);
 void fceux11_lua_call_mem_hook(unsigned int addr, int size, unsigned int value, int hook_type);
 
 int fceux11_lua_gui_pixel(int x, int y, unsigned int color);
+
+extern uint32_t fceux11_lua_GetJoypadState(int32_t port);
+
+extern void fceux11_lua_SetJoypadOverride(int32_t port, uint32_t mask1, uint32_t mask2);
+
+extern uint8_t fceux11_lua_ReadRomByte(uint32_t addr);
+
+extern void fceux11_lua_WriteRomByte(uint32_t addr, uint8_t val);
 #ifdef __cplusplus
 }
 #endif

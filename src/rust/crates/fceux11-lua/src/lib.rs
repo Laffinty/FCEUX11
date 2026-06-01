@@ -21,6 +21,21 @@ fn get_engine<'a>() -> Option<&'a mut LuaEngine> {
 }
 
 // ---------------------------------------------------------------------------
+// FFI declarations for C++ hooks
+// ---------------------------------------------------------------------------
+
+unsafe extern "C" {
+    fn fceux11_lua_GetMem(addr: u32) -> u8;
+    fn fceux11_lua_BWrite(addr: u32, val: u8);
+    fn fceux11_lua_GetRegister(reg_id: i32) -> u16;
+    fn fceux11_lua_GetJoypadState(port: i32) -> u32;
+    fn fceux11_lua_SetJoypadOverride(port: i32, mask1: u32, mask2: u32);
+    fn fceux11_lua_GetRomHash(which: i32) -> u32;
+    fn fceux11_lua_ReadRomByte(addr: u32) -> u8;
+    fn fceux11_lua_WriteRomByte(addr: u32, val: u8);
+}
+
+// ---------------------------------------------------------------------------
 // LuaEngine
 // ---------------------------------------------------------------------------
 
@@ -74,6 +89,9 @@ impl LuaEngine {
         let lua = Lua::new();
         bindings::bit::register(&lua)?;
         bindings::emu::register(&lua)?;
+        bindings::memory::register(&lua)?;
+        bindings::joypad::register(&lua)?;
+        bindings::rom::register(&lua)?;
         Ok(Self {
             lua,
             gui_data: vec![0u8; 256 * 240 * 4],

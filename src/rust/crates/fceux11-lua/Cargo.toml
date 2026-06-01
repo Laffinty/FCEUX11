@@ -9,6 +9,7 @@ crate-type = ["rlib"]
 [dependencies]
 fceux11-utils = { path = "../fceux11-utils" }
 mlua = { version = "0.10", features = ["lua51", "vendored"] }
+crc32fast = "1.4"
 
 [dev-dependencies]
 mlua = { version = "0.10", features = ["lua51", "vendored"] }

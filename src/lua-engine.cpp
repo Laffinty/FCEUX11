@@ -23,6 +23,7 @@
 #include "utils/memory.h"
 #include "utils/crc32.h"
 #include "fceulua.h"
+#include "input.h"
 
 extern char FileBase[];
 
@@ -6667,3 +6668,60 @@ lua_State* FCEU_GetLuaState() {
 char* FCEU_GetLuaScriptName() {
 	return luaScriptName;
 }
+
+// ---------------------------------------------------------------------------
+// v0.2.22.2: Rust Lua FFI bridge functions
+// These are called from fceux11-lua (Rust) via FFI
+// ---------------------------------------------------------------------------
+
+extern "C" {
+
+uint8_t fceux11_lua_GetMem(uint32_t addr) {
+	return GetMem(static_cast<uint16_t>(addr & 0xFFFF));
+}
+
+void fceux11_lua_BWrite(uint32_t addr, uint8_t val) {
+	uint16_t a = static_cast<uint16_t>(addr & 0xFFFF);
+	if (a < 0x8000) {
+		// RAM/writable memory — call through BWrite handler
+		writefunc wf = BWrite[a];
+		if (wf) wf(a, val);
+	}
+}
+
+uint16_t fceux11_lua_GetRegister(int reg_id) {
+	// reg_id: 0=PC,1=A,2=X,3=Y,4=S,5=P
+	switch (reg_id) {
+		case 0: return X.PC;
+		case 1: return X.A;
+		case 2: return X.X;
+		case 3: return X.Y;
+		case 4: return X.S;
+		case 5: return X.P;
+		default: return 0;
+	}
+}
+
+uint32_t fceux11_lua_GetJoypadState(int port) {
+	// Returns current joypad state for port (0-3) from the joy[] array
+	if (port < 0 || port > 3) return 0;
+	return static_cast<uint32_t>(joy[port]);
+}
+
+void fceux11_lua_SetJoypadOverride(int port, uint32_t mask1, uint32_t mask2) {
+	// Sets the Lua joypad override masks (pass-through & force bits)
+	// luajoypads1 = pass-through mask, luajoypads2 = force-on mask
+	if (port < 0 || port > 3) return;
+	luajoypads1[port] = static_cast<uint8_t>(mask1 & 0xFF);
+	luajoypads2[port] = static_cast<uint8_t>(mask2 & 0xFF);
+}
+
+uint8_t fceux11_lua_ReadRomByte(uint32_t addr) {
+	return FCEU_ReadRomByte(addr);
+}
+
+void fceux11_lua_WriteRomByte(uint32_t addr, uint8_t val) {
+	FCEU_WriteRomByte(addr, val);
+}
+
+} // extern "C"

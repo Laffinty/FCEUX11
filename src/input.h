@@ -10,6 +10,7 @@ void LagCounterToggle(void);
 
 extern FILE* PlayInputFile;
 extern FILE* DumpInputFile;
+extern uint8 joy[4];
 
 
 class MovieRecord;
