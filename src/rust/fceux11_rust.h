@@ -963,6 +963,88 @@ extern void fceux11_lua_gui_popup(const char *msg);
 
 extern void fceux11_lua_gui_savescreenshot(const char *filename);
 
+extern double fceux11_lua_sound_get_square1_volume(void);
+
+extern double fceux11_lua_sound_get_square1_frequency(void);
+
+extern double fceux11_lua_sound_get_square1_midikey(void);
+
+extern int32_t fceux11_lua_sound_get_square1_duty(void);
+
+extern int32_t fceux11_lua_sound_get_square1_regs(void);
+
+extern double fceux11_lua_sound_get_square2_volume(void);
+
+extern double fceux11_lua_sound_get_square2_frequency(void);
+
+extern double fceux11_lua_sound_get_square2_midikey(void);
+
+extern int32_t fceux11_lua_sound_get_square2_duty(void);
+
+extern int32_t fceux11_lua_sound_get_square2_regs(void);
+
+extern double fceux11_lua_sound_get_triangle_volume(void);
+
+extern int32_t fceux11_lua_sound_get_triangle_linear(void);
+
+extern double fceux11_lua_sound_get_triangle_frequency(void);
+
+extern double fceux11_lua_sound_get_triangle_midikey(void);
+
+extern double fceux11_lua_sound_get_noise_volume(void);
+
+extern int32_t fceux11_lua_sound_get_noise_mode(void);
+
+extern int32_t fceux11_lua_sound_get_noise_regs(void);
+
+extern double fceux11_lua_sound_get_noise_frequency(void);
+
+extern double fceux11_lua_sound_get_noise_midikey(void);
+
+extern double fceux11_lua_sound_get_dmc_volume(void);
+
+extern int32_t fceux11_lua_sound_get_dmc_rate(void);
+
+extern int32_t fceux11_lua_sound_get_dmc_regs(void);
+
+extern double fceux11_lua_sound_get_dmc_frequency(void);
+
+extern double fceux11_lua_sound_get_dmc_midikey(void);
+
+extern int32_t fceux11_lua_sound_get_dmc_address(void);
+
+extern int32_t fceux11_lua_sound_get_dmc_size(void);
+
+extern int32_t fceux11_lua_sound_get_dmc_loop(void);
+
+extern int32_t fceux11_lua_sound_get_dmc_seed(void);
+
+extern int32_t fceux11_lua_sound_get_frame_sequencer(void);
+
+extern int32_t fceux11_lua_sound_get_sample_rate(void);
+
+extern int32_t fceux11_lua_sound_get_length_count(void);
+
+extern int32_t fceux11_lua_zapper_get_x(void);
+
+extern int32_t fceux11_lua_zapper_get_y(void);
+
+extern int32_t fceux11_lua_zapper_get_click(void);
+
+extern void fceux11_lua_zapper_set(int32_t x, int32_t y, int32_t fire);
+
+extern void fceux11_lua_debugger_hitbreakpoint(void);
+
+extern uint64_t fceux11_lua_debugger_get_cycles_count(void);
+
+extern uint64_t fceux11_lua_debugger_get_instructions_count(void);
+
+extern void fceux11_lua_debugger_reset_cycles_count(void);
+
+extern void fceux11_lua_debugger_reset_instructions_count(void);
+
+extern int64_t fceux11_lua_debugger_get_symbol_offset(const char *name);
+
 int fceux11_lua_init(void);
 
 int fceux11_lua_load_script(const char *path, const char *arg);
