@@ -57,7 +57,7 @@ pub fn register(lua: &Lua) -> Result<Table> {
     // which: slot number (1-10) or nil; anonymous: bool (default false)
     savestate.set(
         "create",
-        lua.create_function(|lua, (which, anonymous): (Option<i32>, Option<bool>)| {
+        lua.create_function(|_lua, (which, anonymous): (Option<i32>, Option<bool>)| {
             let slot = which.unwrap_or(-1);
             let anon = anonymous.unwrap_or(false) as i32;
             let id = unsafe {
@@ -75,7 +75,7 @@ pub fn register(lua: &Lua) -> Result<Table> {
     // savestate.object(path) — open existing savestate file by path
     savestate.set(
         "object",
-        lua.create_function(|lua, path: String| {
+        lua.create_function(|_lua, path: String| {
             let path_bytes = path.as_bytes_with_nul();
             let id = unsafe {
                 crate::fceux11_lua_savestate_create_object(

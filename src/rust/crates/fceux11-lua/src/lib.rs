@@ -35,6 +35,7 @@ unsafe extern "C" {
     fn fceux11_lua_GetRegister(reg_id: i32) -> u16;
     fn fceux11_lua_GetJoypadState(port: i32) -> u32;
     fn fceux11_lua_SetJoypadOverride(port: i32, mask1: u32, mask2: u32);
+    #[allow(dead_code)]
     fn fceux11_lua_GetRomHash(which: i32) -> u32;
     fn fceux11_lua_ReadRomByte(addr: u32) -> u8;
     fn fceux11_lua_WriteRomByte(addr: u32, val: u8);
@@ -61,6 +62,7 @@ unsafe extern "C" {
     fn fceux11_lua_emu_pause();
     fn fceux11_lua_emu_unpause();
     fn fceux11_lua_savestate_create_object(path: *const c_char, which: i32, anonymous: i32) -> i32;
+    #[allow(dead_code)]
     fn fceux11_lua_savestate_delete_object(obj_id: i32);
     fn fceux11_lua_gui_popup(msg: *const c_char);
     fn fceux11_lua_gui_savescreenshot(filename: *const c_char);

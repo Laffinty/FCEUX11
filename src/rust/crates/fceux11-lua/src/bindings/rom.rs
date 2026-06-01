@@ -10,7 +10,6 @@ use crc32fast::Hasher;
 
 /// Hash type constants (matching C++ lua-engine.cpp)
 const HASH_MD5: i32 = 0;
-const HASH_SHA1: i32 = 1;
 
 /// Register the `rom` table into the Lua global namespace
 pub fn register(lua: &Lua) -> Result<Table> {
