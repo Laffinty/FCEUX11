@@ -192,8 +192,8 @@ mod tests {
         let lua = Lua::new();
         let keys = [0u8; 256];
         let table = build_input_table(&lua, &keys, -1, -1, 0).unwrap();
-        let pairs: Vec<(String, mlua::Value)> = table.sequence_values().filter_map(|v| v.ok()).collect();
-        assert!(pairs.is_empty());
+        let count: i64 = table.len().unwrap();
+        assert_eq!(count, 0);
     }
 
     #[test]

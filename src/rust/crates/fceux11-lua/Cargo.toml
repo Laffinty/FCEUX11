@@ -6,6 +6,9 @@ edition.workspace = true
 [lib]
 crate-type = ["rlib"]
 
+[features]
+ffi-tests = []
+
 [dependencies]
 fceux11-utils = { path = "../fceux11-utils" }
 mlua = { version = "0.10", features = ["lua51", "vendored"] }
@@ -14,6 +17,6 @@ mlua = { version = "0.10", features = ["lua51", "vendored"] }
 mlua = { version = "0.10", features = ["lua51", "vendored"] }
 
 # Unit tests for this crate require linking against the C++ fceux11_rust library.
-# Run `cargo test` from the workspace root (src/rust/) which excludes this crate
-# from `cargo test --workspace` via `--exclude fceux11-lua`. Full integration tests
-# are run via the CMake build system.
+# Pure Rust tests (keys_for, etc.) always work. FFI-dependent tests need the
+# `ffi-tests` feature, which is only available during CMake integration builds.
+# Run `cargo test --workspace --exclude fceux11-lua` for pure Rust tests.

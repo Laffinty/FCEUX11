@@ -730,6 +730,14 @@ int  fceuWrapperInit( int argc, char *argv[] )
 
 	FCEUD_Message("Starting " FCEU_NAME_AND_VERSION "...\n");
 
+	extern void fceux11_lua_SetMouseDataCallback(void (*fn)(uint32_t *md));
+	extern void GetMouseData(uint32_t (&md)[3]);
+	fceux11_lua_SetMouseDataCallback([](uint32_t *md) {
+		uint32_t d[3];
+		GetMouseData(d);
+		md[0] = d[0]; md[1] = d[1]; md[2] = d[2];
+	});
+
 	/* SDL_INIT_VIDEO Needed for (joystick config) event processing? */
 	if (SDL_Init(SDL_INIT_VIDEO)) 
 	{

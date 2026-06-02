@@ -903,8 +903,6 @@ extern uint32_t fceux11_lua_GetJoypadState(int32_t port);
 
 extern void fceux11_lua_SetJoypadOverride(int32_t port, uint32_t mask1, uint32_t mask2);
 
-extern uint32_t fceux11_lua_GetRomHash(int32_t which);
-
 extern int32_t fceux11_lua_GetRomMD5(uint8_t *buf);
 
 extern uint8_t fceux11_lua_ReadRomByte(uint32_t addr);
@@ -960,6 +958,12 @@ extern int32_t fceux11_lua_savestate_create_object(const char *path,
                                                    int32_t anonymous);
 
 extern void fceux11_lua_savestate_delete_object(int32_t obj_id);
+
+extern int32_t fceux11_lua_savestate_object_save(int32_t obj_id);
+
+extern int32_t fceux11_lua_savestate_object_load(int32_t obj_id);
+
+extern int32_t fceux11_lua_savestate_object_persist(int32_t obj_id);
 
 extern void fceux11_lua_gui_popup(const char *msg);
 
@@ -1049,7 +1053,11 @@ extern int64_t fceux11_lua_debugger_get_symbol_offset(const char *name);
 
 extern int32_t fceux11_lua_GetKeyboardState(uint8_t *keys);
 
+extern void fceux11_lua_SetMouseDataCallback(void (*fn)(uint32_t *md));
+
 extern void fceux11_lua_GetMouseState(int32_t *x, int32_t *y, int32_t *click);
+
+extern void fceux11_lua_recalculate_mem_hook_regions(int hook_type);
 
 int fceux11_lua_init(void);
 

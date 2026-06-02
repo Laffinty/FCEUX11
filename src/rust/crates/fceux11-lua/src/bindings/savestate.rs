@@ -2,9 +2,29 @@
 //!
 //! `save`/`load` delegate to C++ FFI. `registersave`/`registerload` store
 //! callbacks persistently in the engine's `RegisteredCallbacks` via `RegistryKey`.
-//! `LuaSaveData` serialization stays in C++ (depends on Lua stack internals).
 
-use mlua::{Function, Lua, Result, String, Table};
+use mlua::{Function, Lua, Result, String, Table, UserData, UserDataMethods};
+
+pub struct SavestateObject(pub i32);
+
+impl UserData for SavestateObject {
+    fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("save", |_, obj, ()| {
+            let r = unsafe { crate::fceux11_lua_savestate_object_save(obj.0) };
+            if r != 0 {
+                return Err(mlua::Error::RuntimeError("savestate:save failed".into()));
+            }
+            Ok(())
+        });
+        methods.add_method("load", |_, obj, ()| {
+            let r = unsafe { crate::fceux11_lua_savestate_object_load(obj.0) };
+            if r != 0 {
+                return Err(mlua::Error::RuntimeError("savestate:load failed".into()));
+            }
+            Ok(())
+        });
+    }
+}
 
 pub fn register(lua: &Lua) -> Result<Table> {
     let savestate = lua.create_table()?;
@@ -51,7 +71,7 @@ pub fn register(lua: &Lua) -> Result<Table> {
 
     savestate.set(
         "create",
-        lua.create_function(|_, (which, anonymous): (Option<i32>, Option<bool>)| {
+        lua.create_function(|_lua, (which, anonymous): (Option<i32>, Option<bool>)| {
             let slot = which.unwrap_or(-1);
             let anon = anonymous.unwrap_or(false) as i32;
             let id =
@@ -59,13 +79,13 @@ pub fn register(lua: &Lua) -> Result<Table> {
             if id < 0 {
                 return Err(mlua::Error::RuntimeError("savestate.create failed".into()));
             }
-            Ok(id)
+            Ok(SavestateObject(id))
         })?,
     )?;
 
     savestate.set(
         "object",
-        lua.create_function(|_, path: String| {
+        lua.create_function(|_lua, path: String| {
             let path_bytes = path.as_bytes_with_nul();
             let id = unsafe {
                 crate::fceux11_lua_savestate_create_object(path_bytes.as_ptr() as *const i8, -1, 0)
@@ -73,20 +93,22 @@ pub fn register(lua: &Lua) -> Result<Table> {
             if id < 0 {
                 return Err(mlua::Error::RuntimeError("savestate.object failed".into()));
             }
-            Ok(id)
+            Ok(SavestateObject(id))
         })?,
     )?;
 
-    // persist: tell C++ to persist the savestate object to disk
     savestate.set(
         "persist",
-        lua.create_function(|_, _obj_id: i32| {
-            // TODO: FFI call to C++ savestate persist
+        lua.create_function(|_, ud: mlua::AnyUserData| {
+            let obj = ud.borrow::<SavestateObject>()?;
+            let r = unsafe { crate::fceux11_lua_savestate_object_persist(obj.0) };
+            if r != 0 {
+                return Err(mlua::Error::RuntimeError("savestate.persist failed".into()));
+            }
             Ok(())
         })?,
     )?;
 
-    // registersave: store callback persistently (not dropped after function returns)
     savestate.set(
         "registersave",
         lua.create_function(|lua, cb: Function| {
@@ -102,7 +124,6 @@ pub fn register(lua: &Lua) -> Result<Table> {
         })?,
     )?;
 
-    // registerload: store callback persistently
     savestate.set(
         "registerload",
         lua.create_function(|lua, cb: Function| {

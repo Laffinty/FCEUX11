@@ -195,11 +195,11 @@ void CallRegisteredLuaFunctions(LuaCallID calltype) {
 void CallRegisteredLuaMemHook(unsigned int address, int size, unsigned int value, LuaMemHookType hookType);
 
 void CallRegisteredLuaSaveFunctions(int savestateNumber, LuaSaveData& saveData) {
-    // TODO: FFI bridge for LuaSaveData serialization
+    fceux11_lua_call_registered(3); // LUACALL_BEFORESAVE = 3
 }
 
 void CallRegisteredLuaLoadFunctions(int savestateNumber, const LuaSaveData& saveData) {
-    // TODO: FFI bridge for LuaSaveData deserialization
+    fceux11_lua_call_registered(4); // LUACALL_AFTERLOAD = 4
 }
 
 void FCEU_LuaUpdatePalette() {
@@ -444,6 +444,12 @@ static void CalculateMemHookRegions(LuaMemHookType hookType)
 	hookedRegions[hookType].Calculate(hookedBytes);
 }
 
+extern "C" void fceux11_lua_recalculate_mem_hook_regions(int hook_type)
+{
+	if (hook_type >= 0 && hook_type < LUAMEMHOOK_COUNT)
+		CalculateMemHookRegions(static_cast<LuaMemHookType>(hook_type));
+}
+
 // Override the simple CallRegisteredLuaMemHook from the thin shell
 // with a TieredRegion fast-reject version
 #undef CallRegisteredLuaMemHook
@@ -595,10 +601,17 @@ int32_t fceux11_lua_GetKeyboardState(uint8_t* keys) {
 #endif
 }
 
+static void (*s_get_mouse_data_fn)(uint32_t *md) = nullptr;
+
+void fceux11_lua_SetMouseDataCallback(void (*fn)(uint32_t *md)) {
+	s_get_mouse_data_fn = fn;
+}
+
 void fceux11_lua_GetMouseState(int32_t* x, int32_t* y, int32_t* click) {
-	extern void GetMouseData(uint32_t (&md)[3]);
-	uint32_t MouseData[3];
-	GetMouseData(MouseData);
+	uint32_t MouseData[3] = {0, 0, 0};
+	if (s_get_mouse_data_fn) {
+		s_get_mouse_data_fn(MouseData);
+	}
 	if (x) *x = MouseData[0];
 	if (y) *y = MouseData[1];
 	if (click) *click = MouseData[2];
@@ -679,10 +692,6 @@ int32_t fceux11_lua_savestate_load_slot(int slot) {
 
 // v0.2.22.4: savestate object lifecycle
 // LuaSaveState objects are managed by C++ but tracked via a simple ID map from Rust
-#ifndef FCEUX11_LUA_RUST_ENABLED
-static std::map<int, LuaSaveState*> s_savestate_objects;
-static int s_next_savestate_id = 1;
-#endif
 
 int32_t fceux11_lua_savestate_create_object(const char* path, int which, int anonymous) {
 	// which: 1-10 slot number, 0 = use path
@@ -710,6 +719,31 @@ void fceux11_lua_savestate_delete_object(int obj_id) {
 		delete it->second;
 		s_savestate_objects.erase(it);
 	}
+}
+
+int32_t fceux11_lua_savestate_object_save(int obj_id) {
+	auto it = s_savestate_objects.find(obj_id);
+	if (it == s_savestate_objects.end()) return -1;
+	LuaSaveState* ss = it->second;
+	if (ss->filename.empty()) return -1;
+	FCEUSS_Save(ss->filename.c_str(), false);
+	if (!ss->anonymous) ss->ensureLoad();
+	return 0;
+}
+
+int32_t fceux11_lua_savestate_object_load(int obj_id) {
+	auto it = s_savestate_objects.find(obj_id);
+	if (it == s_savestate_objects.end()) return -1;
+	LuaSaveState* ss = it->second;
+	if (ss->filename.empty()) return -1;
+	return FCEUSS_Load(ss->filename.c_str(), false) ? 0 : -1;
+}
+
+int32_t fceux11_lua_savestate_object_persist(int obj_id) {
+	auto it = s_savestate_objects.find(obj_id);
+	if (it == s_savestate_objects.end()) return -1;
+	it->second->persist();
+	return 0;
 }
 
 // v0.2.22.4: emu FFI (framecount/lagcount/paused/speedmode)
