@@ -1,0 +1,49 @@
+// Legacy code: input.rs stub returning empty table (replaced by FFI bridge)
+// Phase A fix: added fceux11_lua_GetKeyboardState/fceux11_lua_GetMouseState FFI
+// Date: 2026-06-02
+
+use mlua::{Lua, Result, Table};
+
+pub fn register(lua: &Lua) -> Result<Table> {
+    let input = lua.create_table()?;
+
+    // STUB: Returns empty table instead of actual keyboard/mouse state
+    input.set(
+        "get",
+        lua.create_function(|lua, ()| {
+            // TODO (v0.2.22.3+): FFI call to get actual input state
+            // For now return an empty table
+            Ok(lua.create_table()?)
+        })?,
+    )?;
+
+    // STUB: Only prints to console instead of showing a popup
+    input.set(
+        "popup",
+        lua.create_function(|_, msg: String| {
+            // TODO (v0.2.22.4+): FFI call to C++ driver for popup
+            println!("[input.popup] {}", msg);
+            Ok(())
+        })?,
+    )?;
+
+    // STUB: Returns empty string instead of actual file dialog
+    input.set(
+        "openfilepopup",
+        lua.create_function(|_, _options: Table| {
+            // TODO (v0.2.22.4+): FFI call to C++ driver for file dialog
+            Ok(String::new())
+        })?,
+    )?;
+
+    // STUB: Returns empty string instead of actual file dialog
+    input.set(
+        "savefilepopup",
+        lua.create_function(|_, _options: Table| {
+            // TODO (v0.2.22.4+): FFI call to C++ driver for file dialog
+            Ok(String::new())
+        })?,
+    )?;
+
+    Ok(input)
+}

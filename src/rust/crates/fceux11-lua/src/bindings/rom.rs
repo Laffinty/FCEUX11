@@ -2,14 +2,25 @@
 //!
 //! Provides ROM data access: `gethash`, `readbyte`, `writebyte`.
 //!
-//! FFI bridge: calls `FCEU_ReadRomByte` / `FCEU_WriteRomByte` and CRC32 from
-//! `fceux11-utils`.
+//! FFI bridge: calls `FCEU_ReadRomByte` / `FCEU_WriteRomByte` and MD5 from
+//! `fceux11-utils` via C++ FFI.
 
-use crc32fast::Hasher;
 use mlua::{Lua, Result, Table};
 
-/// Hash type constants (matching C++ lua-engine.cpp)
 const HASH_MD5: i32 = 0;
+
+pub fn compute_md5_hex(buf: &[u8]) -> String {
+    let mut ctx = fceux11_utils::md5::Md5Context {
+        total: [0, 0],
+        state: [0, 0, 0, 0],
+        buffer: [0; 64],
+    };
+    let mut digest = [0u8; 16];
+    fceux11_utils::md5::fceux11_rust_md5_starts(&mut ctx);
+    fceux11_utils::md5::fceux11_rust_md5_update(&mut ctx, buf.as_ptr(), buf.len() as u32);
+    fceux11_utils::md5::fceux11_rust_md5_finish(&mut ctx, digest.as_mut_ptr());
+    digest.iter().map(|b| format!("{:02x}", b)).collect()
+}
 
 /// Register the `rom` table into the Lua global namespace
 pub fn register(lua: &Lua) -> Result<Table> {
@@ -24,29 +35,14 @@ pub fn register(lua: &Lua) -> Result<Table> {
                     "only MD5 hash is currently supported".to_string(),
                 ));
             }
-            // Read entire PRG ROM — 16 KB minimum, up to 512 KB
-            // We read 128 KB as a reasonable upper bound for MD5
-            const ROM_SIZE: usize = 128 * 1024;
-            let mut buf = vec![0u8; ROM_SIZE];
-            let mut total = 0usize;
-            for i in 0..ROM_SIZE {
-                let b = unsafe { crate::fceux11_lua_ReadRomByte(i as u32) };
-                if b == 0 && i > 0 {
-                    // Try to detect actual ROM size by looking for zeros
-                    // Only break if we've seen non-zero data first
-                    let non_zero = buf[..i].iter().any(|&v| v != 0);
-                    if non_zero && total > 0 {
-                        break;
-                    }
-                } else {
-                    buf[i] = b;
-                    total = i + 1;
-                }
+            let mut md5_buf = [0u8; 16];
+            let ok = unsafe { crate::fceux11_lua_GetRomMD5(md5_buf.as_mut_ptr()) };
+            if ok != 0 {
+                return Err(mlua::Error::RuntimeError(
+                    "failed to retrieve ROM MD5".to_string(),
+                ));
             }
-            let mut hasher = Hasher::new();
-            hasher.update(&buf[..total]);
-            let hash = hasher.finalize();
-            Ok(format!("{:08x}", hash))
+            Ok(md5_buf.iter().map(|b| format!("{:02x}", b)).collect::<String>())
         })?,
     )?;
 
@@ -71,12 +67,51 @@ pub fn register(lua: &Lua) -> Result<Table> {
     Ok(rom)
 }
 
-// ---------------------------------------------------------------------------
-// FFI declarations (mirrored in lib.rs)
-// ---------------------------------------------------------------------------
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[allow(dead_code)]
-unsafe extern "C" {
-    fn fceux11_lua_ReadRomByte(addr: u32) -> u8;
-    fn fceux11_lua_WriteRomByte(addr: u32, val: u8);
+    #[test]
+    fn test_compute_md5_hex_empty() {
+        let hash = compute_md5_hex(b"");
+        assert_eq!(hash.len(), 32);
+        assert_eq!(hash, "d41d8cd98f00b204e9800998ecf8427e");
+    }
+
+    #[test]
+    fn test_compute_md5_hex_fceux() {
+        let hash = compute_md5_hex(b"FCEUX");
+        assert_eq!(hash.len(), 32);
+        assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_md5_hex_format_lowercase() {
+        let hash = compute_md5_hex(b"test");
+        assert_eq!(hash, hash.to_lowercase());
+        assert_eq!(hash.len(), 32);
+    }
+
+    #[test]
+    fn test_md5_hex_vs_direct() {
+        let data = b"The quick brown fox jumps over the lazy dog";
+        let hash = compute_md5_hex(data);
+        let mut ctx = fceux11_utils::md5::Md5Context {
+            total: [0, 0],
+            state: [0, 0, 0, 0],
+            buffer: [0; 64],
+        };
+        let mut digest = [0u8; 16];
+        fceux11_utils::md5::fceux11_rust_md5_starts(&mut ctx);
+        fceux11_utils::md5::fceux11_rust_md5_update(&mut ctx, data.as_ptr(), data.len() as u32);
+        fceux11_utils::md5::fceux11_rust_md5_finish(&mut ctx, digest.as_mut_ptr());
+        let expected: String = digest.iter().map(|b| format!("{:02x}", b)).collect();
+        assert_eq!(hash, expected);
+    }
+
+    #[test]
+    fn test_md5_hex_32_chars() {
+        let hash = compute_md5_hex(b"NES ROM data");
+        assert_eq!(hash.len(), 32, "MD5 hex string must be exactly 32 characters");
+    }
 }

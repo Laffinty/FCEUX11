@@ -905,6 +905,8 @@ extern void fceux11_lua_SetJoypadOverride(int32_t port, uint32_t mask1, uint32_t
 
 extern uint32_t fceux11_lua_GetRomHash(int32_t which);
 
+extern int32_t fceux11_lua_GetRomMD5(uint8_t *buf);
+
 extern uint8_t fceux11_lua_ReadRomByte(uint32_t addr);
 
 extern void fceux11_lua_WriteRomByte(uint32_t addr, uint8_t val);
@@ -1045,6 +1047,10 @@ extern void fceux11_lua_debugger_reset_instructions_count(void);
 
 extern int64_t fceux11_lua_debugger_get_symbol_offset(const char *name);
 
+extern int32_t fceux11_lua_GetKeyboardState(uint8_t *keys);
+
+extern void fceux11_lua_GetMouseState(int32_t *x, int32_t *y, int32_t *click);
+
 int fceux11_lua_init(void);
 
 int fceux11_lua_load_script(const char *path, const char *arg);
@@ -1065,9 +1071,9 @@ void fceux11_lua_call_mem_hook(unsigned int addr, int size, unsigned int value, 
 
 int fceux11_lua_gui_pixel(int x, int y, unsigned int color);
 
-extern uint8_t fceux11_lua_ReadRomByte(uint32_t addr);
+int fceux11_lua_get_mem_hook_count(int hook_type);
 
-extern void fceux11_lua_WriteRomByte(uint32_t addr, uint8_t val);
+uint32_t fceux11_lua_get_mem_hook_address(int hook_type, int index);
 #ifdef __cplusplus
 }
 #endif

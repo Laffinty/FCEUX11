@@ -238,7 +238,6 @@ version = "0.2.21"
 name = "fceux11-lua"
 version = "0.2.22"
 dependencies = [
- "crc32fast",
  "fceux11-utils",
  "mlua",
 ]

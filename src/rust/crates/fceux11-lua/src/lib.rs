@@ -39,7 +39,7 @@ unsafe extern "C" {
     fn fceux11_lua_SetJoypadOverride(port: i32, mask1: u32, mask2: u32);
     #[allow(dead_code)]
     fn fceux11_lua_GetRomHash(which: i32) -> u32;
-    #[allow(dead_code)]
+    fn fceux11_lua_GetRomMD5(buf: *mut u8) -> i32;
     fn fceux11_lua_ReadRomByte(addr: u32) -> u8;
     #[allow(dead_code)]
     fn fceux11_lua_WriteRomByte(addr: u32, val: u8);
@@ -116,6 +116,9 @@ unsafe extern "C" {
     fn fceux11_lua_debugger_reset_cycles_count();
     fn fceux11_lua_debugger_reset_instructions_count();
     fn fceux11_lua_debugger_get_symbol_offset(name: *const c_char) -> i64;
+
+    fn fceux11_lua_GetKeyboardState(keys: *mut u8) -> i32;
+    fn fceux11_lua_GetMouseState(x: *mut i32, y: *mut i32, click: *mut i32);
 }
 
 // ---------------------------------------------------------------------------
@@ -622,5 +625,43 @@ unsafe extern "C" fn fceux11_lua_gui_pixel(x: c_int, y: c_int, color: c_uint) ->
             }
         },
         None => -1,
+    }
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn fceux11_lua_get_mem_hook_count(hook_type: c_int) -> c_int {
+    let ht = match hook_type {
+        0 => LuaMemHookType::Write,
+        1 => LuaMemHookType::Read,
+        2 => LuaMemHookType::Exec,
+        _ => return 0,
+    };
+    match get_engine() {
+        Some(engine) => engine.callbacks.mem_hooks.keys().filter(|( _, t)| *t == ht).count() as c_int,
+        None => 0,
+    }
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn fceux11_lua_get_mem_hook_address(hook_type: c_int, index: c_int) -> u32 {
+    let ht = match hook_type {
+        0 => LuaMemHookType::Write,
+        1 => LuaMemHookType::Read,
+        2 => LuaMemHookType::Exec,
+        _ => return 0,
+    };
+    match get_engine() {
+        Some(engine) => {
+            let addrs: Vec<u32> = engine.callbacks.mem_hooks.keys()
+                .filter(|(_, t)| *t == ht)
+                .map(|(addr, _)| *addr)
+                .collect();
+            if index >= 0 && (index as usize) < addrs.len() {
+                addrs[index as usize]
+            } else {
+                0
+            }
+        }
+        None => 0,
     }
 }

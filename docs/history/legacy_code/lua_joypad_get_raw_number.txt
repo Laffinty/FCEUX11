@@ -1,0 +1,73 @@
+// Legacy code: joypad.rs get returning raw number (replaced by Lua table)
+// Phase A fix: replaced Ok(state as i32) with bitmask_to_table(lua, state)
+// Date: 2026-06-02
+
+use mlua::{Lua, Result, Table};
+
+const JOY_A: u32 = 0x01;
+const JOY_B: u32 = 0x02;
+const JOY_SELECT: u32 = 0x04;
+const JOY_START: u32 = 0x08;
+const JOY_UP: u32 = 0x10;
+const JOY_DOWN: u32 = 0x20;
+const JOY_LEFT: u32 = 0x40;
+const JOY_RIGHT: u32 = 0x80;
+
+pub fn register(lua: &Lua) -> Result<Table> {
+    let joypad = lua.create_table()?;
+
+    // BUG: Returns raw bitmask as integer, not a Lua table
+    // This breaks all community scripts that expect joypad.get(1) to return {A=true, B=false, ...}
+    joypad.set(
+        "get",
+        lua.create_function(|_, port: i32| {
+            let state = unsafe { crate::fceux11_lua_GetJoypadState(port) };
+            Ok(state as i32)  // <-- WRONG: should return table
+        })?,
+    )?;
+
+    joypad.set(
+        "set",
+        lua.create_function(|_, (port, table): (i32, Table)| {
+            let mut mask1: u32 = 0xFF;
+            let mut mask2: u32 = 0x00;
+
+            let buttons = [
+                ("A", JOY_A),
+                ("B", JOY_B),
+                ("select", JOY_SELECT),
+                ("start", JOY_START),
+                ("up", JOY_UP),
+                ("down", JOY_DOWN),
+                ("left", JOY_LEFT),
+                ("right", JOY_RIGHT),
+            ];
+
+            for (name, bit) in buttons {
+                match table.get::<mlua::Value>(name) {
+                    Ok(val) => {
+                        if val.is_nil() {
+                            continue;
+                        }
+                        let is_truthy =
+                            !matches!(val, mlua::Value::Nil | mlua::Value::Boolean(false));
+                        let is_string = matches!(&val, mlua::Value::String(_));
+
+                        if is_truthy {
+                            mask2 |= bit;
+                        }
+                        if !is_truthy || is_string {
+                            mask1 &= !bit;
+                        }
+                    }
+                    Err(_) => {}
+                }
+            }
+
+            unsafe { crate::fceux11_lua_SetJoypadOverride(port, mask1, mask2) };
+            Ok(())
+        })?,
+    )?;
+
+    Ok(joypad)
+}
