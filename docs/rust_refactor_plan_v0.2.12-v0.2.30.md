@@ -349,6 +349,8 @@ pub struct FceuSliceMut {
 > - `fceux11-formats` crate 已创建，含 `EmuFileMem` + 23 个 FFI 函数 + 7 个单元测试（全部通过）。
 > - C++ `EMUFILE_MEMORY` 因 `buf()`/`get_vec()` 被 `state.cpp`/`file.cpp`/`lua-engine.cpp` 等 10 余处直接调用，**头文件级迁移暂缓**；C++ 侧保持原实现以确保稳定性。
 > - **决策变更**：v0.2.16 实证表明双 Agent 结对编程（Claude Code 编码 + Kimi 验证）在 MSVC 混合构建环境中修复开销大于收益，后续 v0.2.17–v0.2.30 统一由 Kimi Code CLI 负责编码、构建、测试与版本发布。详见 `docs/tech/rust_refactor_agent_spec.md`（已归档）。
+>
+> **v0.2.24.1 后续复核（2026-06-03）**：经审视，EMUFILE_MEMORY 的 C++ 调用方深度耦合 `std::vector<u8>` 内部结构 —— 例如 `src/state.cpp:674` 直接调用 `get_vec()->resize(totalsize)`，`src/file.cpp:70` 等多处直接读 `buf()` 返回的裸指针并基于其偏移做指针算术。完成头文件级迁移需要将所有调用方 API 从"操作 vector"切换为"通过 FFI handle 操作"，这会触及 `state.cpp`(1543 行)、`file.cpp`、`lua-engine.cpp`、`movie.cpp`(2041 行) 等大型文件。该工作已正式划入 **v0.3.x 范畴**（与 state 序列化整体重构合并），不视为 v0.2.x 阶段遗留缺陷。当前 Rust `EmuFileMem` 实现保留为 v0.3.x 直接复用的资产。
 
 #### v0.2.17 — VS UniSystem（`src/vsuni.cpp`, 430 行）✅ 已完成
 
@@ -439,6 +441,21 @@ pub struct FceuSliceMut {
 | **功能** | Game Genie / Pro Action Replay 作弊码解析与应用。 |
 | **Rust 优势** | 作弊码编码/解码算法纯计算；作弊列表管理用 `Vec<CheatEntry>` 替代动态链表。 |
 | **风险** | 中。涉及内存补丁（`write_byte` 到 CPU 地址空间），需确保 FFI 回调到 C++ 内存写入函数的行为一致。 |
+
+> **v0.2.24 执行记录（2026-06-03）**：
+> - 第一波（commit 2a591a7）：迁移纯计算部分到 Rust（`fceux11-debug::cheat`，1099 行）：
+>   - `FCEUI_DecodeGG` / `FCEUI_DecodePAR` 完整迁移到 Rust。
+>   - `FCEUI_FindCheatMapByte` / `SetCheatMapByte` / `CreateCheatMap` / `RefreshCheatMap` / `ReleaseCheatMap` 迁移；8 KiB 位缓冲区由 Rust `Mutex<Vec<u8>>` 拥有。
+>   - `FCEU_CalcCheatAffectedBytes` 改为调用 Rust。
+>   - 20 个新增 Rust 单元测试。
+> - 第二波（v0.2.24.1 follow-up）：完成 cheat 列表与搜索的彻底迁移：
+>   - 删除 C++ `CHEATF*` 链表全局（`cheats`、`cheatsl`），列表完全由 Rust `Vec<CheatEntry>` 拥有。
+>   - `AddCheatEntry` / `FCEUI_AddCheat` / `DelCheat` / `ToggleCheat` / `GetCheat` / `SetCheat` / `ListCheats` / `DisableAllCheats` / `DeleteAllCheats` 全部通过 `fceux11_rust_cheat_*` FFI。
+>   - `FCEU_ApplyPeriodicCheats`、`RebuildSubCheats`、`FCEU_SaveGameCheats` 改为通过 `fceux11_rust_cheat_count` + `fceux11_rust_cheat_get` 索引迭代。
+>   - 删除 C++ 端 `uint16 *CheatComp` 全局；CheatComp 64K 缓冲区由 Rust `Mutex<Vec<u16>>` 拥有。
+>   - `FCEUI_CheatSearchBegin` / `End` / `Get` / `GetRange` / `Count` / `SetCurrentAsOriginal` / `ShowExcluded` 改为：C++ 端用 `CheatRPtrs` 构建 64K 内存快照 + 64K presence 数组，传给 Rust 评估比较器。8 种 search type（specific/relative/any/known/gt/lt/gt_known/lt_known）的逻辑全部在 Rust 端实现。
+> - 保留 C++ 的部分：`SubCheatsRead`（x6502 读处理器）、`RebuildSubCheats`（`SetReadHandler` 安装与卸载）、`FCEU_CheatResetRAM` / `FCEU_CheatAddRAM`（`CheatRPtrs` 转换表）、`FCEU_CheatGetByte` / `SetByte`（`ARead` / `BWrite`）、`FCEU_LoadGameCheats` / `FlushGameCheats` 的文件 I/O 部分。
+> - 验收：`cargo test` 186/186 通过；`cmake --build` 成功；`ctest -C Release` 4/4 通过（含 ROM 回归无退化）。
 
 #### v0.2.25 — 调试系统双模块（`src/debug.cpp`, 993 行 + `src/debugsymboltable.cpp`, 1,002 行）
 
