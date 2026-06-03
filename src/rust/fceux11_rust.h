@@ -938,6 +938,62 @@ uint8_t fceux11_rust_vsuni_service(uint8_t game_type);
  */
 int32_t fceux11_rust_vsuni_draw(uint8_t *xbuf, uint8_t vsdip, int32_t dips_howlong);
 /**
+ * `0x10000 / 8` bytes — one bit per NES address.
+ */
+
+/**
+ * Flag bits packed into the high bits of each `CheatComp` slot.
+ */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/**
+ * Output struct for reading a cheat entry. Strings are returned as
+ * `*const c_char` pointing into Rust-owned storage; the pointer is valid
+ * until the next mutating cheat-list call.
+ */
+typedef struct FceuCheatEntryView {
+  const char *name_ptr;
+  uintptr_t name_len;
+  uint32_t addr;
+  uint8_t val;
+  int32_t compare;
+  int32_t status;
+  int32_t type_;
+} FceuCheatEntryView;
+
+/**
  * Assemble 6502 assembly text into opcode bytes.
  * `output` must have room for at least 3 bytes.
  * Returns 0 on success, 1 on error.
@@ -953,6 +1009,198 @@ int32_t fceux11_rust_asm_disassemble(int32_t _addr,
                                      const uint8_t *opcode,
                                      char *out_buf,
                                      int32_t out_buf_size);
+
+/**
+ * Add a new cheat entry. `name` may be NULL (treated as empty string).
+ * Returns the new entry index (always `>= 0`).
+ */
+int32_t fceux11_rust_cheat_add(const char *name,
+                               uint32_t addr,
+                               uint8_t val,
+                               int32_t compare,
+                               int32_t status,
+                               int32_t type_);
+
+/**
+ * Delete the cheat at `which`. Returns `1` on success, `0` if out of range.
+ */
+int32_t fceux11_rust_cheat_delete(uint32_t which);
+
+/**
+ * Toggle a cheat's enabled status. Returns the new status (`0`/`1`) or
+ * `-1` if the index is out of range.
+ */
+int32_t fceux11_rust_cheat_toggle(uint32_t which);
+
+/**
+ * Disable every cheat without removing them. Returns the count of cheats
+ * that were previously enabled (matches C++ behaviour).
+ */
+int32_t fceux11_rust_cheat_disable_all(void);
+
+/**
+ * Remove every cheat entry. Always returns `0`.
+ */
+int32_t fceux11_rust_cheat_delete_all(void);
+
+/**
+ * Return the current number of cheat entries.
+ */
+uint32_t fceux11_rust_cheat_count(void);
+
+/**
+ * Fetch the cheat at `which` into `out`. Returns `1` on success, `0` if out
+ * of range. The `name_ptr` field points into a thread-local cache and is
+ * invalidated by the next call.
+ */
+int32_t fceux11_rust_cheat_get(uint32_t which, struct FceuCheatEntryView *out);
+
+/**
+ * Update an existing cheat entry. Any negative arg leaves that field
+ * untouched (same convention as the original `FCEUI_SetCheat`).
+ *
+ * * `name` — NULL means "do not change".
+ * * `a`, `v`, `s` — values `< 0` mean "do not change".
+ * * `c` — values `< -1` mean "do not change"; `-1` clears compare.
+ * * `type_` is always applied.
+ *
+ * Returns `1` on success, `0` if out of range.
+ */
+int32_t fceux11_rust_cheat_set(uint32_t which,
+                               const char *name,
+                               int32_t a,
+                               int32_t v,
+                               int32_t c,
+                               int32_t s,
+                               int32_t type_);
+
+/**
+ * Set the `globalCheatDisabled` flag. Returns the prior value.
+ */
+int32_t fceux11_rust_cheat_set_global_disabled(int32_t disabled);
+
+/**
+ * Return the current `globalCheatDisabled` flag.
+ */
+int32_t fceux11_rust_cheat_get_global_disabled(void);
+
+/**
+ * Decode a Game Genie code. Returns `1` on success, `0` on failure.
+ */
+int32_t fceux11_rust_cheat_decode_gg(const char *str_ptr,
+                                     int32_t *a_out,
+                                     int32_t *v_out,
+                                     int32_t *c_out);
+
+/**
+ * Decode a Pro Action Replay code. Returns `1` on success, `0` on failure.
+ */
+int32_t fceux11_rust_cheat_decode_par(const char *str_ptr,
+                                      int32_t *a_out,
+                                      int32_t *v_out,
+                                      int32_t *c_out,
+                                      int32_t *type_out);
+
+/**
+ * Allocate the cheat-map buffer (8 KiB, one bit per address). Idempotent —
+ * repeat calls leave the existing buffer in place.
+ */
+void fceux11_rust_cheat_map_create(void);
+
+/**
+ * Release the cheat-map buffer. Idempotent.
+ */
+void fceux11_rust_cheat_map_release(void);
+
+/**
+ * Clear all cheat-map bits (without releasing the buffer). The caller must
+ * then re-mark currently-active cheats via `fceux11_rust_cheat_map_set`.
+ */
+void fceux11_rust_cheat_map_refresh_clear(void);
+
+/**
+ * Return `1` if the cheat bit for `address` is set, `0` otherwise.
+ * Returns `0` if the cheat map has not been created.
+ */
+int32_t fceux11_rust_cheat_map_find(uint16_t address);
+
+/**
+ * Set or toggle the cheat bit for `address`.
+ *
+ * The original C++ uses a ternary that is asymmetric:
+ * `cheat ? bitmap |= mask : bitmap ^= mask`. We preserve that exact
+ * behaviour — `cheat==1` sets, `cheat==0` toggles (XOR).
+ */
+void fceux11_rust_cheat_map_set(uint16_t address, int32_t cheat);
+
+/**
+ * Count the cheat-map bits set in the half-open range `[address, address+size)`.
+ */
+uint32_t fceux11_rust_cheat_map_count_affected(uint32_t address, uint32_t size);
+
+/**
+ * Allocate the cheat-comp buffer initialised to `CHEATC_NONE`. Idempotent —
+ * existing values are preserved.
+ */
+int32_t fceux11_rust_cheat_comp_init(void);
+
+/**
+ * Release the cheat-comp buffer (matches `FCEU_FlushGameCheats` cleanup).
+ */
+void fceux11_rust_cheat_comp_release(void);
+
+/**
+ * Return `1` if the cheat-comp buffer exists.
+ */
+int32_t fceux11_rust_cheat_comp_exists(void);
+
+/**
+ * Begin a search: for every address that has a backing RAM ptr in C++ (the
+ * caller passes `mem_present[i]` non-zero), store the current memory value;
+ * for addresses with no backing, store `CHEATC_NONE`.
+ *
+ * `mem` is a `0x10000`-byte snapshot of CPU memory.
+ * `mem_present` is a `0x10000`-byte boolean array: `1` if the address has a
+ * `CheatRPtrs` entry (i.e. is a real RAM byte), `0` otherwise.
+ */
+int32_t fceux11_rust_cheat_comp_search_begin(const uint8_t *mem, const uint8_t *mem_present);
+
+/**
+ * Set every non-NOSHOW slot to the current memory value (used when
+ * "Restart search" is requested without resetting flags).
+ *
+ * Mirrors C++ `FCEUI_CheatSearchSetCurrentAsOriginal`:
+ * for visible slots, `comp[x] = mem[x]` if backed, else OR-in `CHEATC_NONE`.
+ */
+int32_t fceux11_rust_cheat_comp_set_current_as_original(const uint8_t *mem,
+                                                        const uint8_t *mem_present);
+
+/**
+ * Clear the `CHEATC_EXCLUDED` flag from every slot.
+ */
+void fceux11_rust_cheat_comp_show_excluded(void);
+
+/**
+ * Return the number of "visible" search hits — slots that are neither
+ * NOSHOW nor masked by the C++ presence array.
+ */
+int32_t fceux11_rust_cheat_comp_count(const uint8_t *mem_present);
+
+/**
+ * Read a single `CheatComp` slot. Returns `0xFFFFFFFF` if the buffer is not
+ * allocated.
+ */
+uint32_t fceux11_rust_cheat_comp_get(uint32_t address);
+
+/**
+ * Apply a `FCEUI_CheatSearchEnd` filter using `type` and the operand bytes
+ * `v1`/`v2`. Marks excluded slots with `CHEATC_EXCLUDED`.
+ */
+int32_t fceux11_rust_cheat_comp_search_end(int32_t search_type,
+                                           uint8_t v1,
+                                           uint8_t v2,
+                                           const uint8_t *mem,
+                                           const uint8_t *mem_present);
 
 /**
  * Parse a condition expression string into an AST.

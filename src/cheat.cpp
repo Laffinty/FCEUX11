@@ -28,6 +28,8 @@
 #include "driver.h"
 #include "utils/memory.h"
 
+#include "rust/fceux11_rust.h"
+
 #include <string>
 #include <cstdlib>
 #include <cstring>
@@ -64,7 +66,12 @@ uint32 numsubcheats = 0;
 int globalCheatDisabled = 0;
 int disableAutoLSCheats = 0;
 bool disableShowGG = 0;
+// v0.2.24: cheat-map storage moved to Rust (fceux11_rust_cheat_map_*).
+// This pointer is repurposed as a presence sentinel — non-null when the
+// Rust-side buffer is allocated, NULL otherwise. The cheat code never
+// dereferences it (all reads/writes go through the FFI).
 static _8BYTECHEATMAP* cheatMap = NULL;
+static _8BYTECHEATMAP cheatMapSentinel = 0;  // dummy storage for the sentinel
 struct CHEATF *cheats = 0, *cheatsl = 0;
 
 
@@ -143,13 +150,10 @@ void FCEU_PowerCheats()
 }
 
 int FCEU_CalcCheatAffectedBytes(uint32 address, uint32 size) {
-
-	uint32 count = 0;
-	if (cheatMap)
-		for (uint32 i = 0; i < size; ++i)
-			if (FCEUI_FindCheatMapByte(address + i))
-				++count;
-	return count;
+	// v0.2.24: implementation migrated to Rust.
+	if (!cheatMap)
+		return 0;
+	return (int)fceux11_rust_cheat_map_count_affected(address, size);
 }
 
 static void AddCheatEntry(const char *name, uint32 addr, uint8 val, int compare, int status, int type);
@@ -479,110 +483,18 @@ int FCEUI_GetCheat(uint32 which, std::string *name, uint32 *a, uint8 *v, int *co
 	return(0);
 }
 
-static int GGtobin(char c)
-{
-	static char lets[16]={'A','P','Z','L','G','I','T','Y','E','O','X','U','K','S','V','N'};
-	int x;
-
-	for(x=0;x<16;x++)
-		if(lets[x] == toupper(c)) return(x);
-	return(0);
-}
-
 /* Returns 1 on success, 0 on failure. Sets *a,*v,*c. */
 int FCEUI_DecodeGG(const char *str, int *a, int *v, int *c)
 {
-	uint16 A;
-	uint8 V,C;
-	uint8 t;
-	int s;
-
-	A=0x8000;
-	V=0;
-	C=0;
-
-	s=strlen(str);
-	if(s!=6 && s!=8) return(0);
-
-	t=GGtobin(*str++);
-	V|=(t&0x07);
-	V|=(t&0x08)<<4;
-
-	t=GGtobin(*str++);
-	V|=(t&0x07)<<4;
-	A|=(t&0x08)<<4;
-
-	t=GGtobin(*str++);
-	A|=(t&0x07)<<4;
-	//if(t&0x08) return(0);	/* 8-character code?! */
-
-	t=GGtobin(*str++);
-	A|=(t&0x07)<<12;
-	A|=(t&0x08);
-
-	t=GGtobin(*str++);
-	A|=(t&0x07);
-	A|=(t&0x08)<<8;
-
-	if(s==6)
-	{
-		t=GGtobin(*str++);
-		A|=(t&0x07)<<8;
-		V|=(t&0x08);
-
-		*a=A;
-		*v=V;
-		*c=-1;
-		return(1);
-	}
-	else
-	{
-		t=GGtobin(*str++);
-		A|=(t&0x07)<<8;
-		C|=(t&0x08);
-
-		t=GGtobin(*str++);
-		C|=(t&0x07);
-		C|=(t&0x08)<<4;
-
-		t=GGtobin(*str++);
-		C|=(t&0x07)<<4;
-		V|=(t&0x08);
-		*a=A;
-		*v=V;
-		*c=C;
-		return(1);
-	}
-	return(0);
+	// v0.2.24: pure-computation algorithm migrated to Rust.
+	// (The legacy `GGtobin` lookup table now lives inside the Rust decoder.)
+	return fceux11_rust_cheat_decode_gg(str, a, v, c);
 }
 
 int FCEUI_DecodePAR(const char *str, int *a, int *v, int *c, int *type)
 {
-	unsigned int boo[4];
-	if(strlen(str)!=8) return(0);
-
-	sscanf(str,"%02x%02x%02x%02x",boo,boo+1,boo+2,boo+3);
-
-	*c=-1;
-
-	if(1)
-	{
-		*a=(boo[3]<<8)|(boo[2]+0x7F);
-		*v=0;
-	}
-	else
-	{
-		*v=boo[3];
-		*a=boo[2]|(boo[1]<<8);
-	}
-	/* Zero-page addressing modes don't go through the normal read/write handlers in FCEU, so
-	we must do the old hacky method of RAM cheats.
-	*/
-	if(*a<0x0100)
-		*type=0;
-	else
-		*type=1;
-	return(1);
+	// v0.2.24: pure-computation algorithm migrated to Rust.
+	return fceux11_rust_cheat_decode_par(str, a, v, c, type);
 }
 
 /* name can be NULL if the name isn't going to be changed. */
@@ -905,24 +817,34 @@ int FCEU_DeleteAllCheats(void)
 
 int FCEUI_FindCheatMapByte(uint16 address)
 {
-	return cheatMap[address / 8] >> (address % 8) & 1;
+	// v0.2.24: bit storage migrated to Rust.
+	return fceux11_rust_cheat_map_find(address);
 }
 
 void FCEUI_SetCheatMapByte(uint16 address, bool cheat)
 {
-	cheat ? cheatMap[address / 8] |= (1 << address % 8) : cheatMap[address / 8] ^= (1 << address % 8);
+	// v0.2.24: bit storage migrated to Rust. The original C++ ternary is
+	// `cheat ? OR : XOR` — preserved exactly inside the Rust impl.
+	fceux11_rust_cheat_map_set(address, cheat ? 1 : 0);
 }
 
 void FCEUI_CreateCheatMap(void)
 {
+	// v0.2.24: bit storage migrated to Rust. We keep `cheatMap` as a non-null
+	// presence sentinel so existing `if (cheatMap)` guards still work.
 	if (!cheatMap)
-		cheatMap = (unsigned char*)malloc(CHEATMAP_SIZE);
+	{
+		fceux11_rust_cheat_map_create();
+		cheatMap = &cheatMapSentinel;
+	}
 	FCEUI_RefreshCheatMap();
 }
 
 void FCEUI_RefreshCheatMap(void)
 {
-	memset(cheatMap, 0, CHEATMAP_SIZE);
+	// v0.2.24: zero the Rust-side buffer, then re-mark currently-active
+	// substitute cheats (same as the original C++ implementation).
+	fceux11_rust_cheat_map_refresh_clear();
 	for (uint32 i = 0; i < numsubcheats; ++i)
 		FCEUI_SetCheatMapByte(SubCheats[i].addr, true);
 }
@@ -931,7 +853,7 @@ void FCEUI_ReleaseCheatMap(void)
 {
 	if (cheatMap)
 	{
-		free(cheatMap);
+		fceux11_rust_cheat_map_release();
 		cheatMap = NULL;
 	}
 }
