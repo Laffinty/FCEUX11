@@ -320,6 +320,13 @@ uint64_t fceux11_rust_timestamp_freq(void);
  */
 int32_t fceux11_rust_timestamp_init(void);
 /**
+ * Number of glyphs encoded in `FONT6X7` (chars 0x20..=0x7A = 91 printable,
+ * but original C++ uses 99 to allow safe over-read for out-of-range chars).
+ */
+
+
+
+/**
  * C-visible opaque type for audio filter state.
  */
 typedef struct FceuFilterState {
@@ -331,6 +338,71 @@ typedef struct Pal {
   uint8_t g;
   uint8_t b;
 } Pal;
+
+/**
+ * Apply a 14-row dimmed background to a 256-wide pixel buffer.
+ *
+ * The C++ version writes `(dest[y*256+x] & 0x0F) | 0xC0` for `x` in
+ * `[offs, 256-offs)`, where `offs` comes from a symmetric `otable` lookup.
+ * Each row is at `y*256`, so `len` must be `>= 14 * 256 = 3584` bytes.
+ *
+ * `dest` may be null (no-op). Returns silently if `len` is too small.
+ */
+void fceux11_rust_drawing_draw_text_line_bg(uint8_t *dest, uintptr_t dest_len);
+
+/**
+ * Rasterize a NUL-terminated text string into `dest` using the 6×7 font.
+ *
+ * Equivalent to the C++ `DrawTextTrans` + `DrawTextTransWH` combo.
+ * `width` is the row stride in pixels (must be 256 for XBuf-style buffers).
+ * `fgcolor` is the foreground palette index. `max_w`/`max_h` clip the
+ * output rectangle; `border` (0/1/2) controls the soft shadow / outline
+ * weight (matching the original C++ behavior, including the historical
+ * `y<15` clamp bug preserved for bytewise equivalence).
+ */
+void fceux11_rust_drawing_draw_text_trans(uint8_t *dest,
+                                          uintptr_t dest_len,
+                                          const char *textmsg,
+                                          uint32_t width,
+                                          uint8_t fgcolor,
+                                          int max_w,
+                                          int max_h,
+                                          int border);
+
+/**
+ * Draw the 10-digit save-state status row into the pixel buffer.
+ *
+ * `xbaf` is the base pointer (already offset to `(LastSLine - 34) * 256 - 4`
+ * from `XBuf`, computed by the C++ wrapper). `nstatus[0..10]` flags which
+ * digits are active. `cur` highlights one of the 10 cells (border color 4).
+ *
+ * The C++ layout has a 21-byte tile overlap quirk that is preserved verbatim
+ * (see `SSTAT` doc comment).
+ */
+void fceux11_rust_drawing_draw_number_row(uint8_t *xbaf,
+                                          uintptr_t xbaf_len,
+                                          const int *nstatus,
+                                          int cur);
+
+/**
+ * Draw a status icon (play/record/pause/none) into the pixel buffer.
+ *
+ * `base` is the destination pointer (already offset to
+ * `(LastSLine - y) * 256 + 495 + x_offset` from the XBuf base, computed by
+ * the C++ wrapper). `base_len` is the remaining byte count from `base` to
+ * the end of XBuf — the worst-case write is `(14*256 + 14) = 3598` bytes
+ * below `base`, so we require at least that.
+ *
+ * `icon_kind`: 0 = none, 1 = play, 2 = record, 3 = pause. Each icon is
+ * drawn with a black inner pass and a color-4 outer pass (matching the
+ * C++ `drawstatus` two-pass shadow effect).
+ */
+void fceux11_rust_drawing_draw_status_icon(uint8_t *base, uintptr_t base_len, uint8_t icon_kind);
+
+/**
+ * Return the width (in pixels) of an ASCII character, or 0 for the spacebar.
+ */
+uint8_t fceux11_rust_drawing_font_width(uint8_t ch);
 
 /**
  * C ABI: Create a new filter state and return an opaque handle.
@@ -1052,8 +1124,6 @@ extern void fceux11_lua_debugger_reset_instructions_count(void);
 extern int64_t fceux11_lua_debugger_get_symbol_offset(const char *name);
 
 extern int32_t fceux11_lua_GetKeyboardState(uint8_t *keys);
-
-extern void fceux11_lua_SetMouseDataCallback(void (*fn)(uint32_t *md));
 
 extern void fceux11_lua_GetMouseState(int32_t *x, int32_t *y, int32_t *click);
 
