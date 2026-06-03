@@ -510,6 +510,21 @@ void TaseditorAutoFunction() {}
 void TaseditorManualFunction() {}
 void ForceExecuteLuaFrameFunctions() {}
 
+// v0.2.23 fix: s_get_mouse_data_fn and fceux11_lua_SetMouseDataCallback must
+// use C++ linkage (C++ name mangling), because the only caller is
+// `src/drivers/Qt/fceuWrapper.cpp` which declares the function with C++
+// linkage. Previously these were inside the `extern "C"` block below, which
+// made the linker look for an unmangled symbol that did not exist from the
+// C++ caller's perspective. `fceux11_lua_GetMouseState` (which IS called
+// from Rust) stays inside the `extern "C"` block; it can still access the
+// file-scope static because `extern "C"` only affects name mangling, not
+// accessibility of file-scope symbols.
+static void (*s_get_mouse_data_fn)(uint32_t *md) = nullptr;
+
+void fceux11_lua_SetMouseDataCallback(void (*fn)(uint32_t *md)) {
+	s_get_mouse_data_fn = fn;
+}
+
 extern "C" {
 
 uint8_t fceux11_lua_GetMem(uint32_t addr) {
@@ -599,12 +614,6 @@ int32_t fceux11_lua_GetKeyboardState(uint8_t* keys) {
 	memset(keys, 0, 256);
 	return -1;
 #endif
-}
-
-static void (*s_get_mouse_data_fn)(uint32_t *md) = nullptr;
-
-void fceux11_lua_SetMouseDataCallback(void (*fn)(uint32_t *md)) {
-	s_get_mouse_data_fn = fn;
 }
 
 void fceux11_lua_GetMouseState(int32_t* x, int32_t* y, int32_t* click) {
