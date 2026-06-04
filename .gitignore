@@ -4,6 +4,8 @@ build_test/
 build_no_rust/
 build_rust_*/
 build-lua-rust/
+build_v027/
+build_vs/
 _build/
 *.build/
 out/

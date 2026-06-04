@@ -327,6 +327,27 @@ int32_t fceux11_rust_timestamp_init(void);
 
 
 /**
+ * Filter byte prepended to each scanline: 0 = "None" (no filtering),
+ * matching `src/video.cpp:578` and `:677`.
+ */
+
+/**
+ * `XBuf` is always 256×256 (65536 bytes), but only the
+ * `[first_sline, last_sline]` rows are emitted to disk.
+ */
+
+
+
+/**
+ * NES palette: 64 colors × 3 channels = 192 bytes for `GetScreenPixel`'s
+ * caller-supplied PLTE-like buffer, OR 256 entries × 3 = 768 bytes for
+ * the indexed snapshot's PLTE chunk (always 256 entries per `src/video.cpp:660`).
+ */
+
+
+
+
+/**
  * C-visible opaque type for audio filter state.
  */
 typedef struct FceuFilterState {
@@ -338,6 +359,39 @@ typedef struct Pal {
   uint8_t g;
   uint8_t b;
 } Pal;
+
+/**
+ * Encode-time arguments shared by the RGB and indexed snapshot paths.
+ *
+ * The caller owns all pointers. All lengths are validated against the
+ * required minimums in the encoder functions. The output buffer
+ * (`out.ptr`, `out.len`) must be at least 256 KiB to hold the worst-case
+ * PNG (240 scanlines × 768 RGB + 12 byte scanline header + zlib overhead
+ * + chunk headers).
+ */
+typedef struct FceuVideoEncodeArgs {
+  /**
+   * 256×256 indexed pixel buffer (NES palette indices in the low 6
+   * bits, with deemph/overlay bits in the high bits).
+   */
+  const uint8_t *xbuf;
+  /**
+   * Must equal `FCEUX11_RUST_VIDEO_XBUF_SIZE`.
+   */
+  uintptr_t xbuf_len;
+  /**
+   * Inclusive first scanline index, 0..=255. Validated.
+   */
+  int32_t first_sline;
+  /**
+   * Inclusive last scanline index, must satisfy `first_sline <= last_sline <= 255`.
+   */
+  int32_t last_sline;
+  /**
+   * Caller-allocated output buffer.
+   */
+  FceuSliceMut out;
+} FceuVideoEncodeArgs;
 
 /**
  * Apply a 14-row dimmed background to a 256-wide pixel buffer.
@@ -490,6 +544,136 @@ void fceux11_rust_palette_make_grayscale(const struct Pal *src, struct Pal *dst)
  * `which` is the bar length in pixels (typically ntschue*2 or ntsctint*2).
  */
 void fceux11_rust_palette_draw_control_bars(uint8_t *xbuf, int width, int which);
+
+/**
+ * Encode an RGB snapshot PNG to the caller's output buffer.
+ *
+ * `args` carries the indexed XBuf, scanline range, and pre-allocated
+ * output buffer. `rgb_scanlines` is a `width * 3 * totallines`-byte
+ * buffer of pre-computed RGB triples (the C++ side runs
+ * `ModernDeemphColorMap` per pixel and packs them contiguously).
+ *
+ * # Returns
+ *
+ * Number of bytes written to `args.out` on success, or `0` on:
+ * - null `args` / null `xbuf` / null `out.ptr`
+ * - `args.xbuf_len < 65536`
+ * - `rgb_scanlines.len() < 256 * 3 * totallines`
+ * - `args.out.len < bytes_needed`
+ * - `first_sline`/`last_sline` out of `[0, 256)`
+ *
+ * # Safety
+ *
+ * All pointers in `args` and `rgb_scanlines` must be valid for the
+ * declared lengths. The caller may read from `args.xbuf` and
+ * `rgb_scanlines`; the caller may write to `args.out.ptr..out.ptr+out.len`.
+ */
+uintptr_t fceux11_rust_video_encode_png_rgb(const struct FceuVideoEncodeArgs *args,
+                                            FceuSlice rgb_scanlines);
+
+/**
+ * Encode an indexed (palette) snapshot PNG to the caller's output
+ * buffer.
+ *
+ * `args` carries the indexed XBuf, scanline range, and pre-allocated
+ * output buffer. `plte_rgb` is a 768-byte (256 entries × 3 channels)
+ * palette — one RGB triple per NES palette index.
+ *
+ * # Returns
+ *
+ * Number of bytes written to `args.out` on success, or `0` on:
+ * - null `args` / null `xbuf` / null `out.ptr`
+ * - `args.xbuf_len < 65536`
+ * - `plte_rgb.len() < 768`
+ * - `args.out.len < bytes_needed`
+ * - `first_sline`/`last_sline` out of `[0, 256)`
+ *
+ * # Safety
+ *
+ * Same as `fceux11_rust_video_encode_png_rgb`.
+ */
+uintptr_t fceux11_rust_video_encode_png_indexed(const struct FceuVideoEncodeArgs *args,
+                                                FceuSlice plte_rgb);
+
+/**
+ * Read a single screen pixel and return its 24-bit RGB value.
+ *
+ * Mirrors `src/video.cpp:489-503`'s `GetScreenPixel`. The caller
+ * supplies a 192-byte (64×3) NES palette; indexed pixel `p` is mapped
+ * to `palette[((p & 0x3F) * 3)..((p & 0x3F) * 3 + 3)]`.
+ *
+ * If `usebackup != 0`, reads from `xbackbuf` instead of `xbuf`.
+ *
+ * # Returns
+ *
+ * - `-1` on out-of-bounds (`x`/`y` not in `[0, 256)`).
+ * - `0` on success; the 24-bit RGB value is written to `rgb_out` (which
+ *   must be at least 3 bytes long).
+ *
+ * # Safety
+ *
+ * `xbuf`, `xbackbuf`, and `rgb_out` must be non-null and point to at
+ * least `xbuf_len` / `xbackbuf_len` / 3 readable/writable bytes
+ * respectively.
+ */
+int32_t fceux11_rust_video_get_screen_pixel(int32_t x,
+                                            int32_t y,
+                                            bool usebackup,
+                                            FceuSlice xbuf,
+                                            FceuSlice xbackbuf,
+                                            FceuSlice palette_64,
+                                            FceuSliceMut rgb_out);
+
+/**
+ * Read a single screen pixel's palette index (low 6 bits).
+ *
+ * Mirrors `src/video.cpp:505-515`'s `GetScreenPixelPalette`.
+ *
+ * # Returns
+ *
+ * - `-1` on out-of-bounds.
+ * - Otherwise, the palette index in the low 6 bits (`0..=63`).
+ *
+ * # Safety
+ *
+ * `xbuf` and `xbackbuf` must be non-null and point to at least
+ * `xbuf_len` / `xbackbuf_len` readable bytes.
+ */
+int32_t fceux11_rust_video_get_screen_pixel_palette(int32_t x,
+                                                    int32_t y,
+                                                    bool usebackup,
+                                                    FceuSlice xbuf,
+                                                    FceuSlice xbackbuf);
+
+/**
+ * Set the "save snapshot as" filename. The C++ side calls this from
+ * `FCEUI_SetSnapshotAsName`. Passing a null pointer or `name_len == 0`
+ * clears the name.
+ *
+ * # Safety
+ *
+ * If `name` is non-null, it must point to at least `name_len` valid
+ * UTF-8 bytes. The bytes need not be NUL-terminated.
+ */
+void fceux11_rust_video_set_snapshot_as_name(const char *name, uintptr_t name_len);
+
+/**
+ * Read the "save snapshot as" filename into the caller's buffer.
+ *
+ * # Returns
+ *
+ * Number of bytes copied (excluding any NUL terminator). Returns `0` if:
+ * - no name is set,
+ * - `buf` is null,
+ * - the name is too long for `buf_len` (in which case the name is
+ *   **truncated** to fit and `buf_len - 1` is returned).
+ *
+ * # Safety
+ *
+ * `buf` must point to at least `buf_len` writable bytes (or be null
+ * when `buf_len == 0`).
+ */
+uintptr_t fceux11_rust_video_get_snapshot_as_name(char *buf, uintptr_t buf_len);
 
 /**
  * C ABI: Begin recording a wave file.

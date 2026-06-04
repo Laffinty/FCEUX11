@@ -33,6 +33,7 @@
 #include "drawing.h"
 #include "driver.h"
 #include "drivers/common/vidblit.h"
+#include "rust/fceux11_rust.h"
 #ifdef _S9XLUA_H
 #include "fceulua.h"
 #endif
@@ -51,6 +52,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstdarg>
+#include <vector>
 #include <zlib.h>
 
 //XBuf:
@@ -78,10 +80,34 @@ bool oldInputDisplay = false;
 
 unsigned int lastu = 0;
 
-std::string AsSnapshotName ="";			//adelikat:this will set the snapshot name when for s savesnapshot as function
+// v0.2.27: AsSnapshotName is owned by Rust (fceux11_rust_video_*).
+// The C++ side is a thin pass-through — see FCEUI_SetSnapshotAsName /
+// FCEUI_GetSnapshotAsName below. The std::string global is gone.
 
-void FCEUI_SetSnapshotAsName(std::string name) { AsSnapshotName = name; }
-std::string FCEUI_GetSnapshotAsName() { return AsSnapshotName; }
+void FCEUI_SetSnapshotAsName(std::string name)
+{
+	// v0.2.27: name is now stored in Rust. Pass the underlying bytes
+	// (no NUL terminator needed by the FFI).
+	fceux11_rust_video_set_snapshot_as_name(
+		reinterpret_cast<const char*>(name.data()),
+		name.size());
+}
+
+std::string FCEUI_GetSnapshotAsName()
+{
+	// v0.2.27: read the name back from Rust. The C++ std::string
+	// constructor takes a (data, size) pair, matching the FFI contract
+	// (no implicit NUL terminator).
+	std::string out;
+	const size_t kBuf = 512; // matches the historical C++ 512-byte limit
+	std::vector<char> buf(kBuf, 0);
+	size_t n = fceux11_rust_video_get_snapshot_as_name(buf.data(), buf.size());
+	if (n > 0 && n < kBuf)
+	{
+		out.assign(buf.data(), n);
+	}
+	return out;
+}
 
 static void FCEU_DrawPauseCountDown(uint8 *XBuf);
 
@@ -452,258 +478,181 @@ void FCEU_ResetMessages()
 }
 
 
-static int WritePNGChunk(FILE *fp, uint32 size, const char *type, uint8 *data)
-{
-	uint32 crc;
+// v0.2.27: WritePNGChunk has moved to Rust
+// (fceux11_rust_video_encode_png_rgb / fceux11_rust_video_encode_png_indexed).
+// The C++ side just owns the file I/O, file-name resolution, and the
+// indexed→RGB deemph conversion. The PNG chunk layout, CRC32, and zlib
+// compression are now done in Rust.
+//
+// Reference: src/rust/crates/fceux11-media/src/video.rs.
+//
+// (Function body removed in v0.2.27; keep this comment block as a
+// breadcrumb in case someone greps for the symbol.)
 
-	uint8 tempo[4];
-
-	tempo[0]=size>>24;
-	tempo[1]=size>>16;
-	tempo[2]=size>>8;
-	tempo[3]=size;
-
-	if(fwrite(tempo,4,1,fp)!=1)
-		return 0;
-	if(fwrite(type,4,1,fp)!=1)
-		return 0;
-
-	if(size)
-		if(fwrite(data,1,size,fp)!=size)
-			return 0;
-
-	crc=CalcCRC32(0,(uint8 *)type,4);
-	if(size)
-		crc=CalcCRC32(crc,data,size);
-
-	tempo[0]=crc>>24;
-	tempo[1]=crc>>16;
-	tempo[2]=crc>>8;
-	tempo[3]=crc;
-
-	if(fwrite(tempo,4,1,fp)!=1)
-		return 0;
-	return 1;
-}
-
+// v0.2.27: 24-bit RGB access for a single pixel.
+//
+// The Rust FFI expects a 64-entry NES palette (3 bytes per index,
+// R then G then B). We build it on the stack from FCEUD_GetPalette, which
+// is the same source the original code used.
+//
+// Returns 0x00RRGGBB on success, ~0u on out-of-bounds.
 uint32 GetScreenPixel(int x, int y, bool usebackup) {
-
-	uint8 r,g,b;
-
 	if (((x < 0) || (x > 255)) || ((y < 0) || (y > 255)))
 		return -1;
 
-	if (usebackup)
-		FCEUD_GetPalette(XBackBuf[(y*256)+x],&r,&g,&b);
-	else
-		FCEUD_GetPalette(XBuf[(y*256)+x],&r,&g,&b);
+	uint8 palette_64[64 * 3];
+	for (int i = 0; i < 64; ++i)
+		FCEUD_GetPalette((uint8)i, &palette_64[i*3], &palette_64[i*3+1], &palette_64[i*3+2]);
 
+	FceuSlice xbuf_slice     = { XBuf,     XBuf     ? 256*256 : 0 };
+	FceuSlice xbackbuf_slice = { XBackBuf, XBackBuf ? 256*256 : 0 };
+	FceuSlice pal_slice      = { palette_64, sizeof(palette_64) };
+	uint8 rgb[3] = { 0, 0, 0 };
+	FceuSliceMut rgb_mut     = { rgb, sizeof(rgb) };
 
-	return ((int) (r) << 16) | ((int) (g) << 8) | (int) (b);
+	int32_t rc = fceux11_rust_video_get_screen_pixel(
+		(int32_t)x, (int32_t)y, usebackup,
+		xbuf_slice, xbackbuf_slice, pal_slice, rgb_mut);
+	if (rc != 0)
+		return (uint32_t)-1;
+	return ((uint32_t)rgb[0] << 16) | ((uint32_t)rgb[1] << 8) | (uint32_t)rgb[2];
 }
 
 int GetScreenPixelPalette(int x, int y, bool usebackup) {
-
 	if (((x < 0) || (x > 255)) || ((y < 0) || (y > 255)))
 		return -1;
 
-	if (usebackup)
-		return XBackBuf[(y*256)+x] & 0x3f;
-	else
-		return XBuf[(y*256)+x] & 0x3f;
+	FceuSlice xbuf_slice     = { XBuf,     XBuf     ? 256*256 : 0 };
+	FceuSlice xbackbuf_slice = { XBackBuf, XBackBuf ? 256*256 : 0 };
 
+	return fceux11_rust_video_get_screen_pixel_palette(
+		(int32_t)x, (int32_t)y, usebackup,
+		xbuf_slice, xbackbuf_slice);
+}
+
+// v0.2.27: Build the deemph-aware RGB scanline buffer that the
+// Rust encoder consumes. One scanline = 256 pixels × 3 channels,
+// totallines scanlines total. The conversion uses
+// ModernDeemphColorMap (from drivers/common/vidblit.cpp) which depends
+// on the XBuf + scanline pointer walk that the C++ side is best
+// positioned to perform.
+//
+// `out_rgb` must be at least 256 * 3 * totallines bytes. Returns
+// `out_rgb` on success, nullptr on bad input.
+static uint8 *video_build_rgb_scanlines(
+	int first_sline,
+	int totallines,
+	uint8 *out_rgb)
+{
+	if (!out_rgb || first_sline < 0 || totallines <= 0)
+		return nullptr;
+	uint8 *tmp = XBuf + first_sline * 256;
+	uint8 *dest = out_rgb;
+	for (int y = 0; y < totallines; ++y)
+	{
+		for (int x = 0; x < 256; ++x)
+		{
+			u32 color = ModernDeemphColorMap(tmp, XBuf, 1);
+			*dest++ = (color >> 0x10) & 0xFF;
+			*dest++ = (color >> 0x08) & 0xFF;
+			*dest++ = (color >> 0x00) & 0xFF;
+			tmp++;
+		}
+	}
+	return out_rgb;
 }
 
 int SaveSnapshot(void)
 {
-	int totallines=FSettings.LastSLine-FSettings.FirstSLine+1;
-	int x,u,y;
-	FILE *pp=NULL;
-	uint8 *compmem=NULL;
-	uLongf compmemsize=(totallines*263+12)*3;
+	int totallines = FSettings.LastSLine - FSettings.FirstSLine + 1;
+	unsigned int u;
+	FILE *pp = NULL;
 
-	if(!(compmem=(uint8 *)FCEU_malloc(compmemsize)))
-		return 0;
-
+	// Resolve the next free filename (matches the historical C++ loop).
 	for (u = lastu; u < 99999; ++u)
 	{
-		pp=FCEUD_UTF8fopen(FCEU_MakeFName(FCEUMKF_SNAP,u,"png").c_str(),"rb");
-		if(pp==NULL) break;
+		pp = FCEUD_UTF8fopen(FCEU_MakeFName(FCEUMKF_SNAP, u, "png").c_str(), "rb");
+		if (pp == NULL) break;
 		fclose(pp);
 	}
 	lastu = u;
 
-	if(!(pp=FCEUD_UTF8fopen(FCEU_MakeFName(FCEUMKF_SNAP,u,"png").c_str(),"wb")))
+	std::string outpath = FCEU_MakeFName(FCEUMKF_SNAP, u, "png");
+	pp = FCEUD_UTF8fopen(outpath.c_str(), "wb");
+	if (pp == NULL) return 0;
+
+	// Build the RGB scanlines (256 * 3 * totallines bytes).
+	const size_t rgb_bytes = (size_t)256 * 3 * (size_t)totallines;
+	std::vector<uint8> rgb(rgb_bytes, 0);
+	if (!video_build_rgb_scanlines(FSettings.FirstSLine, totallines, rgb.data()))
 	{
-		free(compmem);
+		fclose(pp);
 		return 0;
 	}
 
+	// Encode the PNG into a stack buffer. 256 KiB is well over the
+	// worst case (~190 KiB for 240 lines).
+	uint8 png_buf[256 * 1024];
+	FceuSlice rgb_slice = { rgb.data(), rgb.size() };
+	FceuSliceMut out_mut = { png_buf, sizeof(png_buf) };
+	FceuVideoEncodeArgs args = {};
+	args.xbuf       = XBuf;
+	args.xbuf_len   = XBuf ? 256 * 256 : 0;
+	args.first_sline = FSettings.FirstSLine;
+	args.last_sline  = FSettings.LastSLine;
+	args.out         = out_mut;
+	size_t n = fceux11_rust_video_encode_png_rgb(&args, rgb_slice);
+	if (n == 0 || n > sizeof(png_buf))
 	{
-		static const uint8 header[8]={137,80,78,71,13,10,26,10};
-		if(fwrite(header,8,1,pp)!=1)
-			goto PNGerr;
-	}
-
-	{
-		uint8 chunko[13];
-
-		chunko[0]=chunko[1]=chunko[3]=0;
-		chunko[2]=0x1;			// Width of 256
-
-		chunko[4]=chunko[5]=chunko[6]=0;
-		chunko[7]=totallines;			// Height
-
-		chunko[8]=8;				// 8 bits per sample(24 bits per pixel)
-		chunko[9]=2;				// Color type; RGB triplet
-		chunko[10]=0;				// compression: deflate
-		chunko[11]=0;				// Basic adapative filter set(though none are used).
-		chunko[12]=0;				// No interlace.
-
-		if(!WritePNGChunk(pp,13,"IHDR",chunko))
-			goto PNGerr;
-	}
-
-	{
-		uint8 *tmp=XBuf+FSettings.FirstSLine*256;
-		uint8 *dest,*mal,*mork;
-
-		int bufsize = (256*3+1)*totallines;
-		if(!(mal=mork=dest=(uint8 *)FCEU_dmalloc(bufsize)))
-			goto PNGerr;
-		//   mork=dest=XBuf;
-
-		for(y=0;y<totallines;y++)
-		{
-			*dest=0;			// No filter.
-			dest++;
-			for(x=256;x;x--)
-			{
-				u32 color = ModernDeemphColorMap(tmp,XBuf,1);
-				*dest++=(color>>0x10)&0xFF;
-				*dest++=(color>>0x08)&0xFF;
-				*dest++=(color>>0x00)&0xFF;
-				tmp++;
-			}
-		}
-
-		if(compress(compmem,&compmemsize,mork,bufsize)!=Z_OK)
-		{
-			if(mal) free(mal);
-			goto PNGerr;
-		}
-		if(mal) free(mal);
-		if(!WritePNGChunk(pp,compmemsize,"IDAT",compmem))
-			goto PNGerr;
-	}
-	if(!WritePNGChunk(pp,0,"IEND",0))
-		goto PNGerr;
-
-	free(compmem);
-	fclose(pp);
-
-	return u+1;
-
-
-PNGerr:
-	if(compmem)
-		free(compmem);
-	if(pp)
 		fclose(pp);
-	return(0);
+		return 0;
+	}
+
+	if (fwrite(png_buf, 1, n, pp) != n)
+	{
+		fclose(pp);
+		return 0;
+	}
+	fclose(pp);
+	return (int)(u + 1);
 }
 
 //overloaded SaveSnapshot for "Savesnapshot As" function
 int SaveSnapshot(char fileName[512])
 {
-	int totallines=FSettings.LastSLine-FSettings.FirstSLine+1;
-	int x,y;
-	FILE *pp=NULL;
-	uint8 *compmem=NULL;
-	uLongf compmemsize=totallines*263+12;
+	int totallines = FSettings.LastSLine - FSettings.FirstSLine + 1;
+	FILE *pp = FCEUD_UTF8fopen(fileName, "wb");
+	if (pp == NULL) return 0;
 
-	if(!(compmem=(uint8 *)FCEU_malloc(compmemsize)))
-		return 0;
+	// Build the 256-entry NES palette (768 bytes).
+	uint8 pdata[256 * 3];
+	for (int x = 0; x < 256; ++x)
+		FCEUD_GetPalette((uint8)x, pdata + x*3, pdata + x*3 + 1, pdata + x*3 + 2);
 
-	if(!(pp=FCEUD_UTF8fopen(fileName,"wb")))
+	// Encode the indexed PNG into a stack buffer.
+	uint8 png_buf[256 * 1024];
+	FceuSlice plte_slice = { pdata, sizeof(pdata) };
+	FceuSliceMut out_mut = { png_buf, sizeof(png_buf) };
+	FceuVideoEncodeArgs args = {};
+	args.xbuf       = XBuf;
+	args.xbuf_len   = XBuf ? 256 * 256 : 0;
+	args.first_sline = FSettings.FirstSLine;
+	args.last_sline  = FSettings.LastSLine;
+	args.out         = out_mut;
+	size_t n = fceux11_rust_video_encode_png_indexed(&args, plte_slice);
+	if (n == 0 || n > sizeof(png_buf))
 	{
-		free(compmem);
-		return 0;
-	}
-
-	{
-		static uint8 header[8]={137,80,78,71,13,10,26,10};
-		if(fwrite(header,8,1,pp)!=1)
-			goto PNGerr;
-	}
-
-	{
-		uint8 chunko[13];
-
-		chunko[0]=chunko[1]=chunko[3]=0;
-		chunko[2]=0x1;			// Width of 256
-
-		chunko[4]=chunko[5]=chunko[6]=0;
-		chunko[7]=totallines;			// Height
-
-		chunko[8]=8;				// bit depth
-		chunko[9]=3;				// Color type; indexed 8-bit
-		chunko[10]=0;				// compression: deflate
-		chunko[11]=0;				// Basic adapative filter set(though none are used).
-		chunko[12]=0;				// No interlace.
-
-		if(!WritePNGChunk(pp,13,"IHDR",chunko))
-			goto PNGerr;
-	}
-
-	{
-		uint8 pdata[256*3];
-		for(x=0;x<256;x++)
-			FCEUD_GetPalette(x,pdata+x*3,pdata+x*3+1,pdata+x*3+2);
-		if(!WritePNGChunk(pp,256*3,"PLTE",pdata))
-			goto PNGerr;
-	}
-
-	{
-		uint8 *tmp=XBuf+FSettings.FirstSLine*256;
-		uint8 *dest,*mal,*mork;
-
-		if(!(mal=mork=dest=(uint8 *)FCEU_dmalloc((totallines<<8)+totallines)))
-			goto PNGerr;
-		//   mork=dest=XBuf;
-
-		for(y=0;y<totallines;y++)
-		{
-			*dest=0;			// No filter.
-			dest++;
-			for(x=256;x;x--,tmp++,dest++)
-				*dest=*tmp;
-		}
-
-		if(compress(compmem,&compmemsize,mork,(totallines<<8)+totallines)!=Z_OK)
-		{
-			if(mal) free(mal);
-			goto PNGerr;
-		}
-		if(mal) free(mal);
-		if(!WritePNGChunk(pp,compmemsize,"IDAT",compmem))
-			goto PNGerr;
-	}
-	if(!WritePNGChunk(pp,0,"IEND",0))
-		goto PNGerr;
-
-	free(compmem);
-	fclose(pp);
-
-	return 0;
-
-
-PNGerr:
-	if(compmem)
-		free(compmem);
-	if(pp)
 		fclose(pp);
-	return(0);
+		return 0;
+	}
+
+	if (fwrite(png_buf, 1, n, pp) != n)
+	{
+		fclose(pp);
+		return 0;
+	}
+	fclose(pp);
+	return 0;
 }
 // called when another ROM is opened
 void ResetScreenshotsCounter()

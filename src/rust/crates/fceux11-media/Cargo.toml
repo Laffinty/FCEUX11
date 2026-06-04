@@ -7,3 +7,9 @@ edition.workspace = true
 crate-type = ["rlib"]
 
 [dependencies]
+fceux11-utils = { path = "../fceux11-utils" }
+miniz_oxide = "0.8"
+crc32fast = "1.4"
+
+[dev-dependencies]
+png = "0.17"
