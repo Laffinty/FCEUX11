@@ -33,6 +33,7 @@
 #include "netplay.h"
 #include "driver.h"
 #include "movie.h"
+#include "rust/fceux11_rust.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -122,9 +123,7 @@ static void FDSStateRestore(int version) {
 
 	if (version >= 9810)
 		for (x = 0; x < TotalSides; x++) {
-			int b;
-			for (b = 0; b < 65500; b++)
-				diskdata[x][b] ^= diskdatao[x][b];
+			fceux11_rust_fds_xor_disk_data(diskdata[x], diskdatao[x]);
 		}
 }
 
@@ -220,7 +219,7 @@ void FCEU_FDSSelect(void)
 	if (FCEUMOV_Mode(MOVIEMODE_RECORD))
 		FCEUMOV_AddCommand(FCEUNPCMD_FDSSELECT);
 
-	SelectDisk = ((SelectDisk + 1) % TotalSides) & 3;
+	SelectDisk = fceux11_rust_fds_compute_select_disk_next(SelectDisk, (uint8)TotalSides);
 	FCEU_DispMessage("Disk %d Side %c Selected", 0, SelectDisk >> 1, (SelectDisk & 1) ? 'B' : 'A');
 }
 
@@ -228,41 +227,37 @@ void FCEU_FDSSelect(void)
 #define IRQ_Enabled 0x02
 
 static void FDSFix(int a) {
-	if (IRQa & IRQ_Enabled) {
-		IRQCount -= a;
-		if (IRQCount <= 0) {
-			IRQCount = IRQLatch;
-			/* Puff Puff Golf notes:
-			Game freezes while music playing ingame after inserting Disk Side B.
-			IRQ is usually fired at scanline 169 and 183 for music to work.
-			
-			At some point after inserting disk B, an IRQ is fired at scanline 174 which
-			will just freeze game while music plays.
-			
-			If you ignore triggering IRQ altogether, game plays but no music
-			*/
-			X6502_IRQBegin(FCEU_IQEXT);
-			if (!(IRQa & IRQ_Repeat)) {
-				IRQa &= ~IRQ_Enabled;
-			}
-		}
-	}
-	if (DiskSeekIRQ > 0) {
-		DiskSeekIRQ -= a;
-		if (DiskSeekIRQ <= 0) {
-			if (FDSRegs[5] & 0x80) {
-				X6502_IRQBegin(FCEU_IQEXT2);
-			}
-		}
-	}
+	FceuFdsIrqState st;
+	st.irq_count = IRQCount;
+	st.irq_latch = IRQLatch;
+	st.irq_a = IRQa;
+	st.disk_seek_irq = DiskSeekIRQ;
+	st.fds_regs_5 = FDSRegs[5];
+
+	FceuFdsIrqTickResult r = fceux11_rust_fds_irq_tick(&st, a);
+
+	IRQCount = st.irq_count;
+	IRQLatch = st.irq_latch;
+	IRQa = st.irq_a;
+	DiskSeekIRQ = st.disk_seek_irq;
+
+	/* Puff Puff Golf notes:
+	Game freezes while music playing ingame after inserting Disk Side B.
+	IRQ is usually fired at scanline 169 and 183 for music to work.
+
+	At some point after inserting disk B, an IRQ is fired at scanline 174 which
+	will just freeze game while music plays.
+
+	If you ignore triggering IRQ altogether, game plays but no music
+	*/
+	if (r.timer_fire) X6502_IRQBegin(FCEU_IQEXT);
+	if (r.seek_fire)  X6502_IRQBegin(FCEU_IQEXT2);
 }
 
 static DECLFR(FDSRead4030) {
-	uint8 ret = 0;
-
-	/* Cheap hack. */
-	if (X.IRQlow & FCEU_IQEXT) ret |= 1;
-	if (X.IRQlow & FCEU_IQEXT2) ret |= 2;
+	uint8 ret = fceux11_rust_fds_read_4030_value(
+		(X.IRQlow & FCEU_IQEXT) != 0,
+		(X.IRQlow & FCEU_IQEXT2) != 0);
 
 	if (!fceuindbg) {
 		X6502_IRQEnd(FCEU_IQEXT);
@@ -312,15 +307,7 @@ static DECLFR(FDSRead4031) {
 }
 
 static DECLFR(FDSRead4032) {
-	uint8 ret;
-
-	ret = X.DB & ~7;
-	if (InDisk == 255)
-		ret |= 5;
-
-	if (InDisk == 255 || !(FDSRegs[5] & 1) || (FDSRegs[5] & 2))
-		ret |= 2;
-	return ret;
+	return fceux11_rust_fds_read_4032_value(InDisk, FDSRegs[5], X.DB);
 }
 
 static DECLFR(FDSRead4033) {
@@ -646,47 +633,38 @@ static DECLFW(FDSWrite) {
 		break;
 	case 0x4025:
 		X6502_IRQEnd(FCEU_IQEXT2);
-		if (mapperFDS_diskinsert) {
-			if (V & 0x40 && ~mapperFDS_control & 0x40) {
-				mapperFDS_diskaccess = 0;
+		{
+			FceuFdsWrite4025Result wr = fceux11_rust_fds_compute_write_4025(
+				mapperFDS_block,
+				mapperFDS_filesize,
+				mapperFDS_control,
+				V,
+				mapperFDS_diskinsert ? 1 : 0);
 
-				DiskSeekIRQ = 150;
+			if (mapperFDS_diskinsert) {
+				if (wr.motor_on_edge) {
+					mapperFDS_diskaccess = 0;
+					DiskSeekIRQ = 150;
 
-				// blockstart  - address of block on disk
-				// diskaddr    - address relative to blockstart
-				// _block -> _blockID ?
-				mapperFDS_blockstart += mapperFDS_diskaddr;
-				mapperFDS_diskaddr = 0;
+					// blockstart  - address of block on disk
+					// diskaddr    - address relative to blockstart
+					// _block -> _blockID ?
+					mapperFDS_blockstart += mapperFDS_diskaddr;
+					mapperFDS_diskaddr = 0;
 
-				mapperFDS_block++;
-				if (mapperFDS_block > DSK_FILEDATA)
-					mapperFDS_block = DSK_FILEHDR;
-
-				switch (mapperFDS_block) {
-					case DSK_VOLUME:
-						mapperFDS_blocklen = 0x38;
-						break;
-					case DSK_FILECNT:
-						mapperFDS_blocklen = 0x02;
-						break;
-					case DSK_FILEHDR:
-						mapperFDS_blocklen = 0x10;
-						break;
-					case DSK_FILEDATA:		 // <blockid><filedata>
-						mapperFDS_blocklen = 0x01 + mapperFDS_filesize;
-						break;
+					mapperFDS_block = wr.new_block;
+					mapperFDS_blocklen = wr.new_blocklen;
 				}
-			}
-
-			if (V & 0x02) { // transfer reset
-				mapperFDS_block = DSK_INIT;
-				mapperFDS_blockstart = 0;
-				mapperFDS_blocklen = 0;
-				mapperFDS_diskaddr = 0;
-				DiskSeekIRQ = 150;
-			}
-			if (V & 0x40) { // turn on motor
-				DiskSeekIRQ = 150;
+				if (wr.transfer_reset) { // transfer reset
+					mapperFDS_block = DSK_INIT;
+					mapperFDS_blockstart = 0;
+					mapperFDS_blocklen = 0;
+					mapperFDS_diskaddr = 0;
+					DiskSeekIRQ = 150;
+				}
+				if (wr.motor_on) { // turn on motor
+					DiskSeekIRQ = 150;
+				}
 			}
 		}
 		mapperFDS_control = V;
@@ -714,23 +692,23 @@ static int SubLoad(FCEUFILE *fp) {
 	FCEU_fseek(fp, 0, SEEK_SET);
 	FCEU_fread(header, 16, 1, fp);
 
-	if (memcmp(header, "FDS\x1a", 4)) {
-		if (!(memcmp(header + 1, "*NINTENDO-HVC*", 14))) {
-			long t;
-			t = FCEU_fgetsize(fp);
-			if (t < 65500)
-				t = 65500;
-			TotalSides = t / 65500;
-			FCEU_fseek(fp, 0, SEEK_SET);
-		} else
-			return 1;
-	} else
-		TotalSides = header[4];
+	FceuFdsHeaderInfo hi = fceux11_rust_fds_validate_header(header, 16);
+	if (hi.kind == 0) {
+		return 1;
+	}
+	if (hi.kind == 2) {
+		// Raw "*NINTENDO-HVC*" image: rewind to the very beginning so the
+		// per-side loop below reads from offset 0.
+		FCEU_fseek(fp, 0, SEEK_SET);
+	}
+
+	long file_size = FCEU_fgetsize(fp);
+	TotalSides = (int)fceux11_rust_fds_compute_total_sides(
+		(uintptr_t)file_size,
+		hi.advertised_sides,
+		hi.kind == 1 ? 1 : 0);
 
 	md5_starts(&md5);
-
-	if (TotalSides > 8) TotalSides = 8;
-	if (TotalSides < 1) TotalSides = 1;
 
 	for (x = 0; x < TotalSides; x++) {
 		if ((diskdata[x] = (uint8*)FCEU_malloc(65500)) == NULL) return 2;
@@ -744,18 +722,14 @@ static int SubLoad(FCEUFILE *fp) {
 static void PreSave(void) {
 	int x;
 	for (x = 0; x < TotalSides; x++) {
-		int b;
-		for (b = 0; b < 65500; b++)
-			diskdata[x][b] ^= diskdatao[x][b];
+		fceux11_rust_fds_xor_disk_data(diskdata[x], diskdatao[x]);
 	}
 }
 
 static void PostSave(void) {
 	int x;
 	for (x = 0; x < TotalSides; x++) {
-		int b;
-		for (b = 0; b < 65500; b++)
-			diskdata[x][b] ^= diskdatao[x][b];
+		fceux11_rust_fds_xor_disk_data(diskdata[x], diskdatao[x]);
 	}
 }
 

@@ -526,6 +526,119 @@ int64_t fceux11_rust_wave_write(const int16_t *buffer, int32_t count);
  */
 int32_t fceux11_rust_wave_end(void);
 /**
+ * One FDS disk side is exactly 65500 bytes of payload.
+ */
+
+/**
+ * FDS BIOS image size in bytes.
+ */
+
+/**
+ * FDS work RAM size, mapped at $6000–$DFFF.
+ */
+
+/**
+ * FDS CHR RAM size, mapped at $0000–$1FFF.
+ */
+
+/**
+ * Maximum number of disk sides supported per image.
+ */
+
+/**
+ * CPU cycles between motor-on/seek events and the disk-seek IRQ.
+ */
+
+/**
+ * Sentinel `InDisk` value meaning "no disk inserted".
+ */
+
+/**
+ * IRQa bit 0: when set, IRQ rearms on each fire.
+ */
+
+/**
+ * IRQa bit 1: master IRQ enable.
+ */
+
+/**
+ * Block-FSM: initial / no-block state.
+ */
+
+/**
+ * Block-FSM: disk volume label block (0x38 bytes).
+ */
+
+/**
+ * Block-FSM: file-count block (0x02 bytes).
+ */
+
+/**
+ * Block-FSM: file header block (0x10 bytes).
+ */
+
+/**
+ * Block-FSM: file data block (0x01 + file_size bytes).
+ */
+
+/**
+ * IRQ source bit for the FDS timer IRQ (mirrors C++ `FCEU_IQEXT`).
+ */
+
+/**
+ * IRQ source bit for the FDS disk-seek IRQ (mirrors C++ `FCEU_IQEXT2`).
+ */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/**
  * In-memory file buffer. Corresponds to C++ `EMUFILE_MEMORY`.
  */
 typedef struct EmuFileMem EmuFileMem;
@@ -577,6 +690,67 @@ typedef struct FceuSaveGameEntry {
  * Opaque handle for an in-memory file.
  */
 typedef struct EmuFileMem *EmuFileMemHandle;
+
+/**
+ * Result of header recognition on a 16-byte prefix.
+ *
+ * `kind`:
+ * - `0` = unrecognized format (caller should return LOADER_INVALID_FORMAT)
+ * - `1` = standard `FDS\x1a` header at offset 0 (16-byte header before
+ *   the first side's payload)
+ * - `2` = raw image with `*NINTENDO-HVC*` marker at offset 1 (no header
+ *   to skip; sides are derived from file size)
+ */
+typedef struct FceuFdsHeaderInfo {
+  uint8_t kind;
+  /**
+   * Bytes to skip before the first side's payload (16 for kind=1,
+   * 0 for kind=2, 0 for kind=0).
+   */
+  uint8_t header_size;
+  /**
+   * For kind=1, the side count advertised by header[4].
+   * For kind=0/2, set to 0.
+   */
+  uint8_t advertised_sides;
+} FceuFdsHeaderInfo;
+
+/**
+ * Decision returned by `fceux11_rust_fds_irq_tick`.
+ * C++ acts on these by calling `X6502_IRQBegin(FCEU_IQEXT)` and
+ * `X6502_IRQBegin(FCEU_IQEXT2)` respectively.
+ */
+typedef struct FceuFdsIrqTickResult {
+  bool timer_fire;
+  bool seek_fire;
+} FceuFdsIrqTickResult;
+
+/**
+ * Mirror of the C++ IRQ-related globals used by `FDSFix`.
+ * `irq_count` and `disk_seek_irq` may go negative after subtraction
+ * (the C++ comparison is `<= 0`).
+ */
+typedef struct FceuFdsIrqState {
+  int32_t irq_count;
+  int32_t irq_latch;
+  uint8_t irq_a;
+  int32_t disk_seek_irq;
+  uint8_t fds_regs_5;
+} FceuFdsIrqState;
+
+/**
+ * State delta to apply after a $4025 write.
+ * `new_block`/`new_blocklen` are meaningful only when `motor_on_edge`
+ * is true. If `transfer_reset` is set, C++ overrides the block to
+ * `DSK_INIT` and zeros `blockstart`/`blocklen`/`diskaddr` itself.
+ */
+typedef struct FceuFdsWrite4025Result {
+  bool motor_on_edge;
+  bool transfer_reset;
+  bool motor_on;
+  uint8_t new_block;
+  uint16_t new_blocklen;
+} FceuFdsWrite4025Result;
 
 typedef struct FceuInesHInfoResult {
   int32_t mapper;
@@ -782,6 +956,137 @@ uint64_t fceux11_rust_emufile_mem_read64le(EmuFileMemHandle handle);
  * Write a u64 LE.
  */
 void fceux11_rust_emufile_mem_write64le(EmuFileMemHandle handle, uint64_t val);
+
+/**
+ * Recognize FDS disk-image format from a 16-byte prefix.
+ *
+ * `buf` must be non-null and point to at least 16 readable bytes.
+ * `len` is the number of readable bytes available; a length below 16
+ * (or below 15 for raw images) causes the function to return
+ * `kind = 0`.
+ *
+ * Mirrors `src/fds.cpp:717–733`'s `memcmp` chain.
+ */
+struct FceuFdsHeaderInfo fceux11_rust_fds_validate_header(const uint8_t *buf, uintptr_t len);
+
+/**
+ * Clamp the side count to [1, FCEUX11_RUST_FDS_MAX_SIDES].
+ *
+ * If `has_fds_header != 0`, the `advertised` value is used as the
+ * starting point (the byte at header[4]).  Otherwise the side count
+ * is derived from `file_size / FCEUX11_RUST_FDS_DISK_SIDE_SIZE`,
+ * matching the C++ "raw image" code path (`src/fds.cpp:719–723`).
+ *
+ * The strange `if (t < 65500) t = 65500;` line in the original is
+ * preserved here: even a 0-byte raw image yields one side.
+ */
+uint8_t fceux11_rust_fds_compute_total_sides(uintptr_t file_size,
+                                             uint8_t advertised,
+                                             uint8_t has_fds_header);
+
+/**
+ * XOR the original disk image (`src`) into the current disk image
+ * (`dst`) in place — `dst[i] ^= src[i]` for `i` in
+ * `0..FCEUX11_RUST_FDS_DISK_SIDE_SIZE`.
+ *
+ * Used in three places to keep save-state binary identical regardless
+ * of the run-time disk-write state:
+ *   - `PreSave`  (src/fds.cpp:744)  — encode writes before serializing
+ *   - `PostSave` (src/fds.cpp:753)  — undo encoding after serializing
+ *   - `FDSStateRestore` (src/fds.cpp:118) — re-encode after load
+ *
+ * Both pointers must be non-null and point to at least
+ * `FCEUX11_RUST_FDS_DISK_SIDE_SIZE` bytes.
+ */
+void fceux11_rust_fds_xor_disk_data(uint8_t *dst, const uint8_t *src);
+
+/**
+ * Decrement IRQ counters and report which IRQs should fire.
+ *
+ * 1:1 translation of `FDSFix` (src/fds.cpp:230–258).  Mutates the
+ * caller's `state` in place so C++ can write the new values back to
+ * its globals.  Returns `timer_fire`/`seek_fire` so C++ can issue
+ * `X6502_IRQBegin(FCEU_IQEXT[2])` outside the FFI boundary.
+ *
+ * Puff Puff Golf notes (preserved verbatim from C++):
+ * > Game freezes while music playing ingame after inserting Disk Side B.
+ * > IRQ is usually fired at scanline 169 and 183 for music to work.
+ * > At some point after inserting disk B, an IRQ is fired at scanline
+ * > 174 which will just freeze game while music plays.
+ * > If you ignore triggering IRQ altogether, game plays but no music.
+ *
+ * This is a historical behaviour of the original C++ — do NOT add a
+ * suppression flag here.  The point of this migration is byte-for-byte
+ * equivalence.
+ *
+ * `delta_cycles` is the number of CPU cycles elapsed since the
+ * previous tick; the C++ caller (`MapIRQHook`) always passes a
+ * non-negative value, but we use `wrapping_sub` for defensiveness.
+ */
+struct FceuFdsIrqTickResult fceux11_rust_fds_irq_tick(struct FceuFdsIrqState *state,
+                                                      int32_t delta_cycles);
+
+/**
+ * Look up `mapperFDS_blocklen` for a given block type.
+ * Returns 0 for unknown block types (including `DSK_INIT`).
+ *
+ * Mirrors the switch in `FDSWrite` case 0x4025 (src/fds.cpp:665–678).
+ */
+int32_t fceux11_rust_fds_block_size(uint8_t block_type, uint16_t file_size);
+
+/**
+ * Advance the block FSM on a motor-on edge.
+ * 0→1, 1→2, 2→3, 3→4, 4→3, (>=5)→3 (FILEHDR clamp).
+ */
+uint8_t fceux11_rust_fds_block_advance_on_motor(uint8_t current_block);
+
+/**
+ * Compute the value returned by reading $4030.
+ * Mirrors `FDSRead4030` (src/fds.cpp:261–265) — the C++ wrapper
+ * retains the `fceuindbg`-guarded `X6502_IRQEnd` calls.
+ */
+uint8_t fceux11_rust_fds_read_4030_value(bool irq_low_ext, bool irq_low_ext2);
+
+/**
+ * Compute the value returned by reading $4032.
+ * Mirrors `FDSRead4032` (src/fds.cpp:314–324).
+ */
+uint8_t fceux11_rust_fds_read_4032_value(uint8_t in_disk, uint8_t fds_regs_5, uint8_t data_bus);
+
+/**
+ * Compute the next `SelectDisk` value after the user presses the
+ * disk-swap key.  Mirrors `FCEU_FDSSelect` line 223.
+ * Returns 0 if `total_sides == 0` (defensive — C++ already guards on
+ * that before calling, but the FFI must not divide by zero).
+ */
+uint8_t fceux11_rust_fds_compute_select_disk_next(uint8_t current, uint8_t total_sides);
+
+/**
+ * Compute the state changes for a write to $4025.
+ *
+ * The result describes three independent conditions, each of which
+ * the C++ side acts on in sequence:
+ *   - `motor_on_edge`: bit 6 transitioned 0→1.  C++ must reset
+ *     `mapperFDS_diskaccess` to 0, advance `mapperFDS_blockstart`
+ *     by the current `mapperFDS_diskaddr`, zero `mapperFDS_diskaddr`,
+ *     set `mapperFDS_block` to `new_block`, set `mapperFDS_blocklen`
+ *     to `new_blocklen`, and set `DiskSeekIRQ` to 150.
+ *   - `transfer_reset`: bit 1 is set.  C++ must zero
+ *     `mapperFDS_block`/`blockstart`/`blocklen`/`diskaddr` and set
+ *     `DiskSeekIRQ` to 150.  If both `motor_on_edge` and
+ *     `transfer_reset` fire, transfer-reset wins for the block fields.
+ *   - `motor_on`: bit 6 is set in the new value (regardless of edge).
+ *     C++ sets `DiskSeekIRQ = 150` (no-op if either of the above
+ *     already did so).
+ *
+ * If `disk_inserted == 0`, all three flags are false (the C++ guards
+ * the whole block on `mapperFDS_diskinsert`).
+ */
+struct FceuFdsWrite4025Result fceux11_rust_fds_compute_write_4025(uint8_t current_block,
+                                                                  uint16_t current_filesize,
+                                                                  uint8_t current_control,
+                                                                  uint8_t value,
+                                                                  uint8_t disk_inserted);
 
 /**
  * Clean garbage signatures out of an iNES header.

@@ -1,5 +1,6 @@
 pub mod cart;
 pub mod emufile;
+pub mod fds;
 pub mod ines;
 pub mod nsf;
 pub mod unif;
