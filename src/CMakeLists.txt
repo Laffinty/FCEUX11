@@ -140,7 +140,6 @@ set(SRC_CORE
   	${CMAKE_CURRENT_SOURCE_DIR}/filter.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/ines.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/input.cpp
-  	${CMAKE_CURRENT_SOURCE_DIR}/ld65dbg.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/movie.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/netplay.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/nsf.cpp

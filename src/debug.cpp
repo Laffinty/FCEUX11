@@ -9,6 +9,7 @@
 #include "debugsymboltable.h"
 #include "driver.h"
 #include "ppu.h"
+#include "rust/fceux11_rust.h"
 
 #include "x6502abbrev.h"
 
@@ -107,24 +108,7 @@ int offsetStringToInt(unsigned int type, const char* offsetBuffer, bool *convers
 
 int getValue(int type)
 {
-	switch (type)
-	{
-		case 'A': return _A;
-		case 'X': return _X;
-		case 'Y': return _Y;
-		case 'N': return _P & N_FLAG ? 1 : 0;
-		case 'V': return _P & V_FLAG ? 1 : 0;
-		case 'U': return _P & U_FLAG ? 1 : 0;
-		case 'B': return _P & B_FLAG ? 1 : 0;
-		case 'D': return _P & D_FLAG ? 1 : 0;
-		case 'I': return _P & I_FLAG ? 1 : 0;
-		case 'Z': return _P & Z_FLAG ? 1 : 0;
-		case 'C': return _P & C_FLAG ? 1 : 0;
-		case 'P': return _PC;
-		case 'S': return _S;
-	}
-
-	return 0;
+	return fceux11_rust_debug_get_value(type, _A, _X, _Y, _P, _PC, _S);
 }
 
 
@@ -375,28 +359,9 @@ uint8 GetPPUMem(uint8 A) {
 
 uint8 evaluateWrite(uint8 opcode, uint16 address)
 {
-	// predicts value written by this opcode
-	switch (opwrite[opcode])
-	{
-		default:
-		case  0: return 0; // no write
-		case  1: return _A; // STA, PHA
-		case  2: return _X; // STX
-		case  3: return _Y; // STY
-		case  4: return _P; // PHP
-		case  5: return GetMem(address) << 1; // ASL (SLO)
-		case  6: return GetMem(address) >> 1; // LSR (SRE)
-		case  7: return (GetMem(address) << 1) | (_P & 1); // ROL (RLA)
-		case  8: return (GetMem(address) >> 1) | ((_P & 1) << 7); // ROL (RRA)
-		case  9: return GetMem(address) + 1; // INC (ISC)
-		case 10: return GetMem(address) - 1; // DEC (DCP)
-		case 11: return _A & _X; // (SAX)
-		case 12: return _A&_X&(((address-_Y)>>8)+1); // (AHX)
-		case 13: return _Y&(((address-_X)>>8)+1); // (SHY)
-		case 14: return _X&(((address-_Y)>>8)+1); // (SHX)
-		case 15: return _S& (((address-_Y)>>8)+1); // (TAS)
-	}
-	return 0;
+	uint8 mem = GetMem(address);
+	return fceux11_rust_debug_evaluate_write(
+		opwrite[opcode], address, _A, _X, _Y, _P, _S, mem);
 }
 
 // Evaluates a condition
@@ -493,22 +458,17 @@ int debug_loggingCD = 0;
 
 //called by the cpu to perform logging if CDLogging is enabled
 void LogCDVectors(int which){
-	int j;
-	j = GetPRGAddress(which);
-	if(j == -1) return;
+	int j = GetPRGAddress(which);
+	if (j == -1) return;
 
-	if(!(cdloggerdata[j] & 2)){
-		cdloggerdata[j] |= 0x0E; // we're in the last bank and recording it as data so 0x1110 or 0xE should be what we need
-		datacount++;
-		if(!(cdloggerdata[j] & 1))undefinedcount--;
-	}
-	j++;
-
-	if(!(cdloggerdata[j] & 2)){
-		cdloggerdata[j] |= 0x0E;
-		datacount++;
-		if(!(cdloggerdata[j] & 1))undefinedcount--;
-	}
+	int32_t cc = codecount;
+	int32_t dc = datacount;
+	int32_t uc = undefinedcount;
+	fceux11_rust_debug_log_cd_vectors(
+		cdloggerdata, cdloggerdataSize, j, &cc, &dc, &uc);
+	codecount = cc;
+	datacount = dc;
+	undefinedcount = uc;
 }
 
 bool break_on_unlogged_code = false;
@@ -516,73 +476,35 @@ bool break_on_unlogged_data = false;
 
 void LogCDData(uint8 *opcode, uint16 A, int size)
 {
-	int i, j;
-	uint8 memop = 0;
-	bool newCodeHit = false, newDataHit = false;
+	int j_pc = GetPRGAddress(_PC);
+	int j_a  = GetPRGAddress(A);
 
-	if ((j = GetPRGAddress(_PC)) != -1)
+	int32_t cc = codecount;
+	int32_t dc = datacount;
+	int32_t uc = undefinedcount;
+
+	FceuLogCdDataResult r = fceux11_rust_debug_log_cd_data(
+		cdloggerdata, cdloggerdataSize,
+		j_pc, j_a, _PC, A,
+		opcode[0],
+		optype[opcode[0]],
+		opwrite[opcode[0]],
+		static_cast<uintptr_t>(size),
+		indirectnext != 0,
+		&cc, &dc, &uc);
+
+	codecount = cc;
+	datacount = dc;
+	undefinedcount = uc;
+	indirectnext = r.indirect_out ? 1 : 0;
+
+	if (break_on_unlogged_code && r.new_code_hit)
 	{
-		for (i = 0; i < size; i++)
-		{
-			if (cdloggerdata[j+i] & 1) continue; //this has been logged so skip
-			cdloggerdata[j+i] |= 1;
-			cdloggerdata[j+i] |= ((_PC + i) >> 11) & 0x0c;
-			cdloggerdata[j+i] |= ((_PC & 0x8000) >> 8) ^ 0x80;	// 19/07/14 used last reserved bit, if bit 7 is 1, then code is running from lowe area (6000)
-			if (indirectnext)cdloggerdata[j+i] |= 0x10;
-			codecount++;
-			if (!(cdloggerdata[j+i] & 2))undefinedcount--;
-			newCodeHit = true;
-		}
+		BreakHit(BREAK_TYPE_UNLOGGED_CODE);
 	}
-
-	//log instruction jumped to in an indirect jump
-	if(opcode[0] == 0x6c)
-		indirectnext = 1;
-	else
-		indirectnext = 0;
-
-	switch (optype[opcode[0]]) {
-		case 1:
-		case 4: memop = 0x20; break;
-	}
-
-	if ((j = GetPRGAddress(A)) != -1)
+	else if (break_on_unlogged_data && r.new_data_hit)
 	{
-		if (opwrite[opcode[0]] == 0)
-		{
-			if (!(cdloggerdata[j] & 2))
-			{
-				cdloggerdata[j] |= 2;
-				cdloggerdata[j] |= (A >> 11) & 0x0c;
-				cdloggerdata[j] |= memop;
-				cdloggerdata[j] |= ((A & 0x8000) >> 8) ^ 0x80;	
-				datacount++;
-				if (!(cdloggerdata[j] & 1))undefinedcount--;
-				newDataHit = true;
-			}
-		}
-		else
-		{
-			if (cdloggerdata[j] & 1)
-			{
-				codecount--;
-			}
-			if (cdloggerdata[j] & 2)
-			{
-				datacount--;
-			}
-			if ((cdloggerdata[j] & 3) != 0) undefinedcount++;
-			cdloggerdata[j] = 0;
-		}
-	}
-
-	if ( break_on_unlogged_code && newCodeHit )
-	{
-		BreakHit( BREAK_TYPE_UNLOGGED_CODE );
-	}
-	else if ( break_on_unlogged_data && newDataHit )
-	{
-		BreakHit( BREAK_TYPE_UNLOGGED_DATA );
+		BreakHit(BREAK_TYPE_UNLOGGED_DATA);
 	}
 }
 
@@ -606,9 +528,51 @@ uint64 delta_instructions = 0;
 bool break_on_instructions = false;
 uint64 break_instructions_limit = 0;
 
-static DebuggerState dbgstate;
+static DebuggerState dbgstate = {
+	/* step             */ { &fceux11_rust_debug_dbgstate_get_step,
+	                         &fceux11_rust_debug_dbgstate_set_step },
+	/* stepout          */ { &fceux11_rust_debug_dbgstate_get_stepout,
+	                         &fceux11_rust_debug_dbgstate_set_stepout },
+	/* runline          */ { &fceux11_rust_debug_dbgstate_get_runline,
+	                         &fceux11_rust_debug_dbgstate_set_runline },
+	/* runline_end_time */ { &fceux11_rust_debug_dbgstate_get_runline_end_time,
+	                         &fceux11_rust_debug_dbgstate_set_runline_end_time },
+	/* badopbreak       */ { &fceux11_rust_debug_dbgstate_get_badopbreak,
+	                         &fceux11_rust_debug_dbgstate_set_badopbreak },
+	/* jsrcount         */ { &fceux11_rust_debug_dbgstate_get_jsrcount,
+	                         &fceux11_rust_debug_dbgstate_set_jsrcount },
+};
 
 DebuggerState &FCEUI_Debugger() { return dbgstate; }
+
+void DebuggerState::reset()
+{
+	numWPs = 0;
+	fceux11_rust_debug_dbgstate_reset();
+}
+
+_DbgStateI32Proxy& _DbgStateI32Proxy::operator++()
+{
+	fceux11_rust_debug_dbgstate_jsrcount_inc();
+	return *this;
+}
+int _DbgStateI32Proxy::operator++(int)
+{
+	int prev = getter();
+	fceux11_rust_debug_dbgstate_jsrcount_inc();
+	return prev;
+}
+_DbgStateI32Proxy& _DbgStateI32Proxy::operator--()
+{
+	fceux11_rust_debug_dbgstate_jsrcount_dec();
+	return *this;
+}
+int _DbgStateI32Proxy::operator--(int)
+{
+	int prev = getter();
+	fceux11_rust_debug_dbgstate_jsrcount_dec();
+	return prev;
+}
 
 void ResetDebugStatisticsCounters()
 {

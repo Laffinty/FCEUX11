@@ -5,7 +5,10 @@
 #include <map>
 
 #include "utils/mutex.h"
-#include "ld65dbg.h"
+
+// Forward decl — defined in rust/fceux11_rust.h. We avoid that #include here
+// so this header stays lightweight; the .cpp includes the Rust header.
+struct FceuLd65Sym;
 
 class debugSymbolPage_t;
 class debugSymbolTable_t;
@@ -158,7 +161,7 @@ class debugSymbolTable_t
 
 		int ld65LoadDebugFile( const char *dbgFilePath );
 
-		void ld65_SymbolLoad( ld65::sym *s );
+		void ld65_SymbolLoad( const struct FceuLd65Sym *s );
 
 	private:
 		std::map <int, debugSymbolPage_t*> pageMap;

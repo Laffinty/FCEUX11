@@ -758,7 +758,11 @@ QMenuBar *ConsoleDebugger::buildMenuBar(void)
 	subMenu = debugMenu->addMenu(tr("&Break On..."));
 
 	// Debug -> Break on -> Bad Opcodes
-	g_config->getOption("SDL.DebuggerBreakOnBadOpcodes", &FCEUI_Debugger().badopbreak );
+	{
+		bool tmp = FCEUI_Debugger().badopbreak;
+		g_config->getOption("SDL.DebuggerBreakOnBadOpcodes", &tmp );
+		FCEUI_Debugger().badopbreak = tmp;
+	}
 
 	act = new QAction(tr("Bad &Opcodes"), this);
 	//act->setShortcut(QKeySequence( tr("F7") ) );

@@ -978,6 +978,19 @@ int32_t fceux11_rust_vsuni_draw(uint8_t *xbuf, uint8_t vsdip, int32_t dips_howlo
 
 
 
+
+
+
+
+
+
+
+
+/**
+ * Opaque handle for the .nl parser iterator.
+ */
+typedef struct NlParseIter NlParseIter;
+
 /**
  * Output struct for reading a cheat entry. Strings are returned as
  * `*const c_char` pointing into Rust-owned storage; the pointer is valid
@@ -992,6 +1005,57 @@ typedef struct FceuCheatEntryView {
   int32_t status;
   int32_t type_;
 } FceuCheatEntryView;
+
+/**
+ * POD bulk-transfer view of all six DebuggerState fields. Layout-compatible
+ * with the C++ `FceuDebuggerStateView` struct.
+ */
+typedef struct FceuDebuggerStateView {
+  bool step;
+  bool stepout;
+  bool runline;
+  uint64_t runline_end_time;
+  bool badopbreak;
+  int32_t jsrcount;
+} FceuDebuggerStateView;
+
+/**
+ * Result of one `log_cd_data` call. The C++ side uses these flags to
+ * decide whether to trigger `BreakHit` and to update its file-static
+ * `indirectnext`.
+ */
+typedef struct FceuLogCdDataResult {
+  bool new_code_hit;
+  bool new_data_hit;
+  bool indirect_out;
+} FceuLogCdDataResult;
+
+/**
+ * Layout-compatible POD view of one `Sym` for C++ consumption. All pointer
+ * fields borrow from the [`Database`] cache and remain valid until the
+ * containing [`ld65_close`] call.
+ */
+typedef struct FceuLd65Sym {
+  uint32_t id;
+  const char *name_ptr;
+  uintptr_t name_len;
+  int32_t size;
+  int32_t value;
+  /**
+   * `0` = IMPORT, `1` = LABEL, `2` = EQU.
+   */
+  int32_t sym_type;
+  /**
+   * Non-zero iff `segment_*` fields are populated.
+   */
+  int32_t has_segment;
+  int32_t segment_ofs;
+  const char *segment_name_ptr;
+  uintptr_t segment_name_len;
+  int32_t has_scope;
+  const char *scope_full_name_ptr;
+  uintptr_t scope_full_name_len;
+} FceuLd65Sym;
 
 /**
  * Assemble 6502 assembly text into opcode bytes.
@@ -1213,6 +1277,205 @@ void *fceux11_rust_conddebug_generate_condition(const char *str);
  * Destroy a ConditionAst previously returned by fceux11_rust_conddebug_generate_condition.
  */
 void fceux11_rust_conddebug_condition_destroy(void *condition);
+
+bool fceux11_rust_debug_dbgstate_get_step(void);
+
+void fceux11_rust_debug_dbgstate_set_step(bool v);
+
+bool fceux11_rust_debug_dbgstate_get_stepout(void);
+
+void fceux11_rust_debug_dbgstate_set_stepout(bool v);
+
+bool fceux11_rust_debug_dbgstate_get_runline(void);
+
+void fceux11_rust_debug_dbgstate_set_runline(bool v);
+
+uint64_t fceux11_rust_debug_dbgstate_get_runline_end_time(void);
+
+void fceux11_rust_debug_dbgstate_set_runline_end_time(uint64_t v);
+
+bool fceux11_rust_debug_dbgstate_get_badopbreak(void);
+
+void fceux11_rust_debug_dbgstate_set_badopbreak(bool v);
+
+int32_t fceux11_rust_debug_dbgstate_get_jsrcount(void);
+
+void fceux11_rust_debug_dbgstate_set_jsrcount(int32_t v);
+
+/**
+ * Pre-increment `jsrcount`. Returns the new value.
+ */
+int32_t fceux11_rust_debug_dbgstate_jsrcount_inc(void);
+
+/**
+ * Pre-decrement `jsrcount`. Returns the new value.
+ */
+int32_t fceux11_rust_debug_dbgstate_jsrcount_dec(void);
+
+/**
+ * Reset to defaults — equivalent to C++ `DebuggerState::reset()`:
+ * step=false, stepout=false, jsrcount=0. Note: the C++ reset does NOT
+ * touch runline / runline_end_time / badopbreak (matches C++).
+ */
+void fceux11_rust_debug_dbgstate_reset(void);
+
+/**
+ * Snapshot all six fields into `out`. Useful for the GUI Step-Out block in
+ * `ConsoleDebugger.cpp:3029-3055` which previously held a `DebuggerState&`.
+ */
+void fceux11_rust_debug_dbgstate_copy_out(struct FceuDebuggerStateView *out);
+
+/**
+ * Bulk-write all six fields.
+ */
+void fceux11_rust_debug_dbgstate_copy_in(const struct FceuDebuggerStateView *in_);
+
+uint8_t fceux11_rust_debug_evaluate_write(uint8_t opwrite_byte,
+                                          uint16_t address,
+                                          uint8_t a,
+                                          uint8_t x,
+                                          uint8_t y,
+                                          uint8_t p,
+                                          uint8_t s,
+                                          uint8_t mem_at_addr);
+
+int32_t fceux11_rust_debug_get_value(int32_t reg_or_flag,
+                                     uint8_t a,
+                                     uint8_t x,
+                                     uint8_t y,
+                                     uint8_t p,
+                                     uint16_t pc,
+                                     uint8_t s);
+
+void fceux11_rust_debug_log_cd_vectors(uint8_t *cdloggerdata,
+                                       uintptr_t cdloggerdata_size,
+                                       int32_t prg_addr,
+                                       int32_t *codecount,
+                                       int32_t *datacount,
+                                       int32_t *undefinedcount);
+
+struct FceuLogCdDataResult fceux11_rust_debug_log_cd_data(uint8_t *cdloggerdata,
+                                                          uintptr_t cdloggerdata_size,
+                                                          int32_t pc_prg_addr,
+                                                          int32_t a_prg_addr,
+                                                          uint16_t pc,
+                                                          uint16_t a,
+                                                          uint8_t opcode0,
+                                                          uint8_t optype_byte,
+                                                          uint8_t opwrite_byte,
+                                                          uintptr_t size,
+                                                          bool indirect_in,
+                                                          int32_t *codecount,
+                                                          int32_t *datacount,
+                                                          int32_t *undefinedcount);
+
+/**
+ * Generate the `.nl` filename for `(rom_file, bank)`. Writes the result into
+ * `out`/`out_cap` as a null-terminated string. Returns bytes written
+ * (excluding NUL), or `-1` on null pointer / zero capacity.
+ */
+int32_t fceux11_rust_debugsym_nl_filename_for_bank(const char *rom_file,
+                                                   int32_t bank,
+                                                   char *out,
+                                                   uintptr_t out_cap);
+
+/**
+ * Parse `.nl` content (UTF-8) and return an opaque iterator. Caller must
+ * call `parse_end` to free. `content_ptr` may be null only if `content_len == 0`.
+ */
+struct NlParseIter *fceux11_rust_debugsym_parse_begin(const char *content_ptr,
+                                                      uintptr_t content_len);
+
+/**
+ * Advance the iterator. Fills `out_ofs`, `out_name`, `out_comment` (each as
+ * null-terminated string into the given buffer). Returns `true` if an entry
+ * was produced, `false` if the iterator is exhausted or any output pointer
+ * is invalid.
+ */
+bool fceux11_rust_debugsym_parse_next(struct NlParseIter *it,
+                                      uint32_t *out_ofs,
+                                      char *out_name,
+                                      uintptr_t out_name_cap,
+                                      char *out_comment,
+                                      uintptr_t out_comment_cap);
+
+/**
+ * Free the iterator returned by `parse_begin`.
+ */
+void fceux11_rust_debugsym_parse_end(struct NlParseIter *it);
+
+/**
+ * Write `entries` to `path` as a `.nl` file. Returns `0` on success,
+ * `-1` on I/O failure or invalid argument.
+ */
+int32_t fceux11_rust_debugsym_save_nl_file(const char *path,
+                                           const uint32_t *ofs_arr,
+                                           const char *const *name_arr,
+                                           const char *const *comment_arr,
+                                           uintptr_t count);
+
+/**
+ * Number of register map entries.
+ */
+uint32_t fceux11_rust_debugsym_register_map_count(void);
+
+/**
+ * Fetch register map entry `idx`. Returns `true` on success.
+ */
+bool fceux11_rust_debugsym_register_map_get(uint32_t idx,
+                                            uint32_t *out_ofs,
+                                            char *out_name,
+                                            uintptr_t out_name_cap);
+
+/**
+ * Format `name[idx]` into `out`/`out_cap`. Returns bytes written.
+ */
+int32_t fceux11_rust_debugsym_format_array_index(const char *name,
+                                                 int32_t idx,
+                                                 char *out,
+                                                 uintptr_t out_cap);
+
+/**
+ * Trim trailing whitespace in a null-terminated C string in place.
+ * Returns the new length.
+ */
+int32_t fceux11_rust_debugsym_trim_trailing_inplace(char *buf);
+
+/**
+ * Open a `.dbg` file and parse it. Returns an opaque handle, or `NULL` on
+ * error (call [`ld65_last_error`] for the reason).
+ */
+void *fceux11_rust_ld65_open(const char *path);
+
+/**
+ * Free a database returned by [`ld65_open`].
+ */
+void fceux11_rust_ld65_close(void *db);
+
+/**
+ * Number of symbols in the database.
+ */
+uint32_t fceux11_rust_ld65_sym_count(void *db);
+
+/**
+ * Fill `out` with the symbol at index `idx`. Returns `true` on success.
+ */
+bool fceux11_rust_ld65_sym_get(void *db, uint32_t idx, struct FceuLd65Sym *out);
+
+/**
+ * Callback-style iteration matching the legacy `database::iterateSymbols`
+ * signature. `cb` is called once per symbol (in id order) with `user_data`
+ * echoed back. Returns the number of symbols iterated.
+ */
+uint32_t fceux11_rust_ld65_iterate(void *db,
+                                   void *user_data,
+                                   void (*cb)(void*, const struct FceuLd65Sym*));
+
+/**
+ * Return the most recent error message produced by [`ld65_open`], or `NULL`
+ * if there isn't one.
+ */
+const char *fceux11_rust_ld65_last_error(void);
 extern uint8_t fceux11_lua_GetMem(uint32_t addr);
 
 extern void fceux11_lua_BWrite(uint32_t addr, uint8_t val);

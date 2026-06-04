@@ -125,29 +125,49 @@ extern uint32 FCEUPPU_PeekAddress();
 extern uint8 READPAL_MOTHEROFALL(uint32 A);
 extern int numWPs;
 
-///encapsulates the operational state of the debugger core
+///encapsulates the operational state of the debugger core.
+///
+/// v0.2.25: All six fields now live in Rust (`fceux11-debug::debug` as
+/// lock-free atomics). To preserve the existing `FCEUI_Debugger().step = v` /
+/// `if (FCEUI_Debugger().step)` API across 30+ GUI call sites, each field is
+/// exposed as a proxy that overloads `operator T()` (read) and
+/// `operator=(T)` (write).
+struct _DbgStateBoolProxy {
+	bool (*getter)();
+	void (*setter)(bool);
+	operator bool() const { return getter(); }
+	_DbgStateBoolProxy& operator=(bool v) { setter(v); return *this; }
+};
+
+struct _DbgStateU64Proxy {
+	uint64 (*getter)();
+	void   (*setter)(uint64);
+	operator uint64() const { return getter(); }
+	_DbgStateU64Proxy& operator=(uint64 v) { setter(v); return *this; }
+};
+
+struct _DbgStateI32Proxy {
+	int (*getter)();
+	void (*setter)(int);
+	operator int() const { return getter(); }
+	_DbgStateI32Proxy& operator=(int v) { setter(v); return *this; }
+	_DbgStateI32Proxy& operator++();      // ++jsrcount  → Rust inc
+	int operator++(int);                  // jsrcount++ — returns old, then inc
+	_DbgStateI32Proxy& operator--();      // --jsrcount  → Rust dec
+	int operator--(int);                  // jsrcount-- — returns old, then dec
+};
+
 class DebuggerState {
 public:
-	///indicates whether the debugger is stepping through a single instruction
-	bool step;
-	///indicates whether the debugger is stepping out of a function call
-	bool stepout;
-	///indicates whether the debugger is running one line
-	bool runline;
-	///target timestamp for runline to stop at
-	uint64 runline_end_time;
-	///indicates whether the debugger should break on bad opcodes
-	bool badopbreak;
-	///counts the nest level of the call stack while stepping out
-	int jsrcount;
+	_DbgStateBoolProxy step;
+	_DbgStateBoolProxy stepout;
+	_DbgStateBoolProxy runline;
+	_DbgStateU64Proxy  runline_end_time;
+	_DbgStateBoolProxy badopbreak;
+	_DbgStateI32Proxy  jsrcount;
 
 	///resets the debugger state to an empty, non-debugging state
-	void reset() {
-		numWPs = 0;
-		step = false;
-		stepout = false;
-		jsrcount = 0;
-	}
+	void reset();
 };
 
 extern NSF_HEADER NSFHeader;
