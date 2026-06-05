@@ -827,6 +827,8 @@ int32_t fceux11_rust_wave_end(void);
  */
 typedef struct EmuFileMem EmuFileMem;
 
+typedef struct FceuMovieData FceuMovieData;
+
 typedef struct FceuInesHeader {
   uint8_t id[4];
   uint8_t rom_size;
@@ -943,6 +945,52 @@ typedef struct FceuInesHInfoResult {
   int32_t force_battery;
   int32_t clear_vrom;
 } FceuInesHInfoResult;
+
+/**
+ * C-compatible movie record layout.
+ */
+typedef struct FceuMovieRecord {
+  uint8_t joysticks[4];
+  uint8_t zapper_x[2];
+  uint8_t zapper_y[2];
+  uint8_t zapper_b[2];
+  uint8_t zapper_bogo[2];
+  uint64_t zapper_zaphit[2];
+  uint8_t commands;
+} FceuMovieRecord;
+
+/**
+ * C-compatible input descriptor for dumping a movie.
+ * All pointer fields may be null / zero when unused.
+ */
+typedef struct FceuMovieDataInput {
+  int32_t version;
+  int32_t emu_version;
+  int32_t fds;
+  bool pal_flag;
+  bool ppu_flag;
+  uint8_t rom_checksum[16];
+  const char *rom_filename;
+  const uint8_t *savestate;
+  uintptr_t savestate_len;
+  const uint8_t *saveram;
+  uintptr_t saveram_len;
+  const struct FceuMovieRecord *records;
+  uintptr_t records_count;
+  const char *const *comments;
+  uintptr_t comments_count;
+  const char *const *subtitles;
+  uintptr_t subtitles_count;
+  int32_t rerecord_count;
+  const char *guid;
+  bool binary_flag;
+  int32_t load_frame_count;
+  int32_t ports[3];
+  bool fourscore;
+  bool microphone;
+  int32_t ram_init_option;
+  int32_t ram_init_seed;
+} FceuMovieDataInput;
 
 typedef struct FceuNsfHeader {
   uint8_t id[5];
@@ -1324,6 +1372,90 @@ const char *fceux11_rust_ines_check_bad(uint64_t md5partial);
 int32_t fceux11_rust_ines_check_hinfo(uint32_t crc32,
                                       uint64_t partialmd5,
                                       struct FceuInesHInfoResult *out);
+
+/**
+ * Parse an FM2 file from raw bytes.
+ * Returns an opaque handle to `FceuMovieData`, or null on error.
+ */
+struct FceuMovieData *fceux11_rust_movie_load_fm2(const uint8_t *data,
+                                                  uintptr_t len,
+                                                  bool stop_after_header);
+
+/**
+ * Free a `FceuMovieData` handle obtained from `fceux11_rust_movie_load_fm2`.
+ */
+void fceux11_rust_movie_data_free(struct FceuMovieData *md);
+
+int32_t fceux11_rust_movie_data_version(const struct FceuMovieData *md);
+
+int32_t fceux11_rust_movie_data_emu_version(const struct FceuMovieData *md);
+
+int32_t fceux11_rust_movie_data_fds(const struct FceuMovieData *md);
+
+bool fceux11_rust_movie_data_pal_flag(const struct FceuMovieData *md);
+
+bool fceux11_rust_movie_data_ppu_flag(const struct FceuMovieData *md);
+
+int32_t fceux11_rust_movie_data_rerecord_count(const struct FceuMovieData *md);
+
+bool fceux11_rust_movie_data_binary_flag(const struct FceuMovieData *md);
+
+int32_t fceux11_rust_movie_data_load_frame_count(const struct FceuMovieData *md);
+
+bool fceux11_rust_movie_data_fourscore(const struct FceuMovieData *md);
+
+bool fceux11_rust_movie_data_microphone(const struct FceuMovieData *md);
+
+int32_t fceux11_rust_movie_data_ram_init_option(const struct FceuMovieData *md);
+
+int32_t fceux11_rust_movie_data_ram_init_seed(const struct FceuMovieData *md);
+
+void fceux11_rust_movie_data_ports(const struct FceuMovieData *md, int32_t *out);
+
+void fceux11_rust_movie_data_rom_checksum(const struct FceuMovieData *md, uint8_t *out);
+
+const char *fceux11_rust_movie_data_rom_filename(const struct FceuMovieData *md);
+
+const char *fceux11_rust_movie_data_guid(const struct FceuMovieData *md);
+
+uintptr_t fceux11_rust_movie_data_records_count(const struct FceuMovieData *md);
+
+bool fceux11_rust_movie_data_record_get(const struct FceuMovieData *md,
+                                        uintptr_t index,
+                                        struct FceuMovieRecord *out);
+
+uintptr_t fceux11_rust_movie_data_savestate_len(const struct FceuMovieData *md);
+
+uintptr_t fceux11_rust_movie_data_savestate_copy(const struct FceuMovieData *md,
+                                                 uint8_t *out,
+                                                 uintptr_t out_len);
+
+uintptr_t fceux11_rust_movie_data_saveram_len(const struct FceuMovieData *md);
+
+uintptr_t fceux11_rust_movie_data_saveram_copy(const struct FceuMovieData *md,
+                                               uint8_t *out,
+                                               uintptr_t out_len);
+
+uintptr_t fceux11_rust_movie_data_comments_count(const struct FceuMovieData *md);
+
+const char *fceux11_rust_movie_data_comment_get(const struct FceuMovieData *md, uintptr_t index);
+
+uintptr_t fceux11_rust_movie_data_subtitles_count(const struct FceuMovieData *md);
+
+const char *fceux11_rust_movie_data_subtitle_get(const struct FceuMovieData *md, uintptr_t index);
+
+/**
+ * Dump movie data to an `EmuFileMem` handle.
+ * Returns the number of bytes written, or -1 on error.
+ * If `seek_to_curr_frame_pos` is true and a frame position is recorded,
+ * `out_curr_frame_pos` is set to that position; otherwise it is set to -1.
+ */
+int32_t fceux11_rust_movie_data_dump(const struct FceuMovieDataInput *input,
+                                     struct EmuFileMem *out_handle,
+                                     bool binary,
+                                     bool seek_to_curr_frame_pos,
+                                     int32_t curr_frame_counter,
+                                     int32_t *out_curr_frame_pos);
 
 /**
  * Validate an NSF header: check the "NESM\x1a" signature, ensure

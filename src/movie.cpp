@@ -14,6 +14,7 @@
 #include "cart.h"
 #include "fds.h"
 #include "vsuni.h"
+#include "rust/fceux11_rust.h"
 #ifdef _S9XLUA_H
 #include "fceulua.h"
 #endif
@@ -467,67 +468,84 @@ void MovieData::installValue(std::string& key, std::string& val)
 
 int MovieData::dump(EMUFILE *os, bool binary, bool seekToCurrFramePos)
 {
-	int start = os->ftell();
-	os->fprintf("version %d\n", version);
-	os->fprintf("emuVersion %d\n", emuVersion);
-	os->fprintf("rerecordCount %d\n", rerecordCount);
-	os->fprintf("palFlag %d\n" , (palFlag?1:0) );
-	os->fprintf("romFilename %s\n" , romFilename.c_str() );
-	os->fprintf("romChecksum %s\n" , BytesToString(romChecksum.data,MD5DATA::size).c_str() );
-	os->fprintf("guid %s\n" , guid.toString().c_str() );
-	os->fprintf("fourscore %d\n" , (fourscore?1:0) );
-	os->fprintf("microphone %d\n" , (microphone?1:0) );
-	os->fprintf("port0 %d\n" , ports[0] );
-	os->fprintf("port1 %d\n" , ports[1] );
-	os->fprintf("port2 %d\n" , ports[2] );
-	os->fprintf("FDS %d\n" , fds?1:0 );
-	os->fprintf("NewPPU %d\n" , PPUflag?1:0 );
-	os->fprintf("RAMInitOption %d\n", RAMInitOption);
-	os->fprintf("RAMInitSeed %d\n", RAMInitSeed);
+	FceuMovieDataInput input;
+	memset(&input, 0, sizeof(input));
+	input.version = version;
+	input.emu_version = emuVersion;
+	input.fds = fds;
+	input.pal_flag = palFlag;
+	input.ppu_flag = PPUflag;
+	memcpy(input.rom_checksum, romChecksum.data, 16);
+	input.rom_filename = romFilename.c_str();
+	input.rerecord_count = rerecordCount;
+	input.guid = guid.toString().c_str();
+	input.binary_flag = binary;
+	input.load_frame_count = loadFrameCount;
+	input.ports[0] = ports[0];
+	input.ports[1] = ports[1];
+	input.ports[2] = ports[2];
+	input.fourscore = fourscore;
+	input.microphone = microphone;
+	input.ram_init_option = RAMInitOption;
+	input.ram_init_seed = RAMInitSeed;
 
-	for(uint32 i=0;i<comments.size();i++)
-		os->fprintf("comment %s\n" , wcstombs(comments[i]).c_str() );
+	input.savestate = savestate.empty() ? nullptr : savestate.data();
+	input.savestate_len = savestate.size();
+	input.saveram = saveram.empty() ? nullptr : saveram.data();
+	input.saveram_len = saveram.size();
 
-	for(uint32 i=0;i<subtitles.size();i++)
-		os->fprintf("subtitle %s\n" , subtitles[i].c_str() );
-
-	if(binary)
-		os->fprintf("binary 1\n" );
-
-	if(savestate.size())
-		os->fprintf("savestate %s\n" , BytesToString(&savestate[0],savestate.size()).c_str() );
-
-	if(saveram.size())
-		os->fprintf("saveram %s\n" , BytesToString(&saveram[0],saveram.size()).c_str() );
-
-	if (this->loadFrameCount >= 0)
-		os->fprintf("length %d\n" , this->loadFrameCount);
-
-	int currFramePos = -1;
-	if(binary)
-	{
-		//put one | to start the binary dump
-		os->fputc('|');
-		for (int i = 0; i < (int)records.size(); i++)
-		{
-			if (seekToCurrFramePos && currFrameCounter == i)
-				currFramePos = os->ftell();
-			records[i].dumpBinary(this, os, i);
-		}
-	} else
-	{
-		for (int i = 0; i < (int)records.size(); i++)
-		{
-			if (seekToCurrFramePos && currFrameCounter == i)
-				currFramePos = os->ftell();
-			records[i].dump(this, os, i);
-		}
+	std::vector<FceuMovieRecord> recs(records.size());
+	for (size_t i = 0; i < records.size(); i++) {
+		recs[i].joysticks[0] = records[i].joysticks[0];
+		recs[i].joysticks[1] = records[i].joysticks[1];
+		recs[i].joysticks[2] = records[i].joysticks[2];
+		recs[i].joysticks[3] = records[i].joysticks[3];
+		recs[i].zapper_x[0] = records[i].zappers[0].x;
+		recs[i].zapper_x[1] = records[i].zappers[1].x;
+		recs[i].zapper_y[0] = records[i].zappers[0].y;
+		recs[i].zapper_y[1] = records[i].zappers[1].y;
+		recs[i].zapper_b[0] = records[i].zappers[0].b;
+		recs[i].zapper_b[1] = records[i].zappers[1].b;
+		recs[i].zapper_bogo[0] = records[i].zappers[0].bogo;
+		recs[i].zapper_bogo[1] = records[i].zappers[1].bogo;
+		recs[i].zapper_zaphit[0] = records[i].zappers[0].zaphit;
+		recs[i].zapper_zaphit[1] = records[i].zappers[1].zaphit;
+		recs[i].commands = records[i].commands;
 	}
+	input.records = recs.data();
+	input.records_count = recs.size();
 
-	int end = os->ftell();
+	std::vector<const char*> commentPtrs;
+	std::vector<std::string> commentStrs;
+	for (auto& wc : comments) {
+		commentStrs.push_back(wcstombs(wc));
+		commentPtrs.push_back(commentStrs.back().c_str());
+	}
+	input.comments = commentPtrs.data();
+	input.comments_count = commentPtrs.size();
+
+	std::vector<const char*> subtitlePtrs;
+	for (auto& s : subtitles) {
+		subtitlePtrs.push_back(s.c_str());
+	}
+	input.subtitles = subtitlePtrs.data();
+	input.subtitles_count = subtitlePtrs.size();
+
+	EmuFileMem* mem = fceux11_rust_emufile_mem_create();
+	int currFramePos = -1;
+	int bytes = fceux11_rust_movie_data_dump(&input, mem, binary, seekToCurrFramePos, currFrameCounter, &currFramePos);
+
+	size_t memSize = fceux11_rust_emufile_mem_size(mem);
+	if (memSize > 0) {
+		std::vector<uint8> tmp(memSize);
+		fceux11_rust_emufile_mem_fread(mem, tmp.data(), memSize);
+		os->fwrite(tmp.data(), memSize);
+	}
+	fceux11_rust_emufile_mem_destroy(mem);
+
 	if (currFramePos >= 0)
 		os->fseek(currFramePos, SEEK_SET);
-	return end-start;
+	return bytes;
 }
 
 int FCEUMOV_GetFrame(void)
@@ -580,159 +598,95 @@ bool FCEUMOV_Mode(int modemask)
 	return FCEUMOV_Mode((EMOVIEMODE)modemask);
 }
 
-static void LoadFM2_binarychunk(MovieData& movieData, EMUFILE* fp, int size)
-{
-	int recordsize = 1; //1 for the command
-	if(movieData.fourscore)
-		recordsize += 4; //4 joysticks
-	else
-	{
-		for(int i=0;i<2;i++)
-		{
-			switch(movieData.ports[i])
-			{
-			case SI_GAMEPAD: recordsize++; break;
-			case SI_ZAPPER: recordsize+=12; break;
-			}
-		}
-	}
-
-	//find out how much remains in the file
-	int curr = fp->ftell();
-	fp->fseek(0,SEEK_END);
-	int end = fp->ftell();
-	int flen = end-curr;
-	fp->fseek(curr,SEEK_SET);
-
-	//the amount todo is the min of the limiting size we received and the remaining contents of the file
-	int todo = std::min<int>(size, flen);
-
-	int numRecords = todo/recordsize;
-	if (movieData.loadFrameCount!=-1 && movieData.loadFrameCount<numRecords)
-		numRecords=movieData.loadFrameCount;
-
-	movieData.records.resize(numRecords);
-	for(int i=0;i<numRecords;i++)
-	{
-		movieData.records[i].parseBinary(&movieData,fp);
-	}
-}
-
-//yuck... another custom text parser.
 bool LoadFM2(MovieData& movieData, EMUFILE* fp, int size, bool stopAfterHeader)
 {
-	// if there's no "binary" tag in the movie header, consider it as a movie in text format
-	movieData.binaryFlag = false;
-	// Non-TASEditor projects consume until EOF
-	movieData.loadFrameCount = -1;
-
 	std::ios::pos_type curr = fp->ftell();
+	fp->fseek(0, SEEK_END);
+	std::ios::pos_type end = fp->ftell();
+	fp->fseek(curr, SEEK_SET);
 
-	if (!stopAfterHeader)
-	{
-		// first, look for an fcm signature
-		char fcmbuf[3];
-		fp->fread(fcmbuf,3);
-		fp->fseek(curr,SEEK_SET);
-		if(!strncmp(fcmbuf,"FCM",3)) {
-			FCEU_PrintError("FCM File format is no longer supported. Please use Tools > Convert FCM");
-			return false;
-		}
-	}
+	int to_read = size;
+	if (size <= 0 || (end - curr) < (std::streamoff)size)
+		to_read = (int)(end - curr);
 
-	//movie must start with "version 3"
-	char buf[9];
-	curr = fp->ftell();
-	fp->fread(buf,9);
-	fp->fseek(curr,SEEK_SET);
-	if(fp->fail()) return false;
-	if(memcmp(buf,"version 3",9))
+	std::vector<uint8> buf(to_read);
+	if (to_read > 0)
+		fp->fread((char*)buf.data(), to_read);
+
+	FceuMovieData* rustMd = fceux11_rust_movie_load_fm2(buf.data(), buf.size(), stopAfterHeader);
+	if (!rustMd)
 		return false;
 
-	std::string key,value;
-	enum {
-		NEWLINE, KEY, SEPARATOR, VALUE, RECORD, COMMENT, SUBTITLE
-	} state = NEWLINE;
-	bool bail = false;
-	bool iswhitespace, isrecchar, isnewline;
-	int c;
-	for(;;)
-	{
-		if(size--<=0) goto bail;
-		c = fp->fgetc();
-		if(c == -1)
-			goto bail;
-		iswhitespace = (c==' '||c=='\t');
-		isrecchar = (c=='|');
-		isnewline = (c==10||c==13);
-		if(isrecchar && movieData.binaryFlag && !stopAfterHeader)
-		{
-			LoadFM2_binarychunk(movieData, fp, size);
-			return true;
-		} else if (isnewline && static_cast<size_t>(movieData.loadFrameCount) == movieData.records.size())
-			// exit prematurely if loaded the specified amound of records
-			return true;
-		switch(state)
-		{
-		case NEWLINE:
-			if(isnewline) goto done;
-			if(iswhitespace) goto done;
-			if(isrecchar)
-				goto dorecord;
-			//must be a key
-			key = "";
-			value = "";
-			goto dokey;
-			break;
-		case RECORD:
-			{
-				dorecord:
-				if (stopAfterHeader) return true;
-				int currcount = movieData.records.size();
-				movieData.records.resize(currcount+1);
-				int preparse = fp->ftell();
-				movieData.records[currcount].parse(&movieData, fp);
-				int postparse = fp->ftell();
-				size -= (postparse-preparse);
-				state = NEWLINE;
-				break;
-			}
+	movieData = MovieData();
+	movieData.version = fceux11_rust_movie_data_version(rustMd);
+	movieData.emuVersion = fceux11_rust_movie_data_emu_version(rustMd);
+	movieData.fds = fceux11_rust_movie_data_fds(rustMd);
+	movieData.palFlag = fceux11_rust_movie_data_pal_flag(rustMd);
+	movieData.PPUflag = fceux11_rust_movie_data_ppu_flag(rustMd);
+	movieData.rerecordCount = fceux11_rust_movie_data_rerecord_count(rustMd);
+	movieData.binaryFlag = fceux11_rust_movie_data_binary_flag(rustMd);
+	movieData.loadFrameCount = fceux11_rust_movie_data_load_frame_count(rustMd);
+	movieData.fourscore = fceux11_rust_movie_data_fourscore(rustMd);
+	movieData.microphone = fceux11_rust_movie_data_microphone(rustMd);
+	movieData.RAMInitOption = fceux11_rust_movie_data_ram_init_option(rustMd);
+	movieData.RAMInitSeed = fceux11_rust_movie_data_ram_init_seed(rustMd);
+	fceux11_rust_movie_data_ports(rustMd, movieData.ports);
+	fceux11_rust_movie_data_rom_checksum(rustMd, movieData.romChecksum.data);
 
-		case KEY:
-			dokey: //dookie
-			state = KEY;
-			if(iswhitespace) goto doseparator;
-			if(isnewline) goto commit;
-			key += c;
-			break;
-		case SEPARATOR:
-			doseparator:
-			state = SEPARATOR;
-			if(isnewline) goto commit;
-			if(!iswhitespace) goto dovalue;
-			break;
-		case VALUE:
-			dovalue:
-			state = VALUE;
-			if(isnewline) goto commit;
-			value += c;
-			break;
-		default:
-			break;
+	const char* romFilename = fceux11_rust_movie_data_rom_filename(rustMd);
+	if (romFilename) movieData.romFilename = romFilename;
+
+	const char* guid = fceux11_rust_movie_data_guid(rustMd);
+	if (guid) movieData.guid = FCEU_Guid::fromString(guid);
+
+	size_t recCount = fceux11_rust_movie_data_records_count(rustMd);
+	movieData.records.resize(recCount);
+	for (size_t i = 0; i < recCount; i++) {
+		FceuMovieRecord rec;
+		if (fceux11_rust_movie_data_record_get(rustMd, i, &rec)) {
+			movieData.records[i].joysticks[0] = rec.joysticks[0];
+			movieData.records[i].joysticks[1] = rec.joysticks[1];
+			movieData.records[i].joysticks[2] = rec.joysticks[2];
+			movieData.records[i].joysticks[3] = rec.joysticks[3];
+			movieData.records[i].zappers[0].x = rec.zapper_x[0];
+			movieData.records[i].zappers[0].y = rec.zapper_y[0];
+			movieData.records[i].zappers[0].b = rec.zapper_b[0];
+			movieData.records[i].zappers[0].bogo = rec.zapper_bogo[0];
+			movieData.records[i].zappers[0].zaphit = rec.zapper_zaphit[0];
+			movieData.records[i].zappers[1].x = rec.zapper_x[1];
+			movieData.records[i].zappers[1].y = rec.zapper_y[1];
+			movieData.records[i].zappers[1].b = rec.zapper_b[1];
+			movieData.records[i].zappers[1].bogo = rec.zapper_bogo[1];
+			movieData.records[i].zappers[1].zaphit = rec.zapper_zaphit[1];
+			movieData.records[i].commands = rec.commands;
 		}
-		goto done;
-
-		bail:
-		bail = true;
-		if(state == VALUE) goto commit;
-		goto done;
-		commit:
-		movieData.installValue(key,value);
-		state = NEWLINE;
-		done: ;
-		if(bail) break;
 	}
 
+	size_t ssLen = fceux11_rust_movie_data_savestate_len(rustMd);
+	if (ssLen > 0) {
+		movieData.savestate.resize(ssLen);
+		fceux11_rust_movie_data_savestate_copy(rustMd, movieData.savestate.data(), ssLen);
+	}
+
+	size_t srLen = fceux11_rust_movie_data_saveram_len(rustMd);
+	if (srLen > 0) {
+		movieData.saveram.resize(srLen);
+		fceux11_rust_movie_data_saveram_copy(rustMd, movieData.saveram.data(), srLen);
+	}
+
+	size_t commentCount = fceux11_rust_movie_data_comments_count(rustMd);
+	for (size_t i = 0; i < commentCount; i++) {
+		const char* c = fceux11_rust_movie_data_comment_get(rustMd, i);
+		if (c) movieData.comments.push_back(mbstowcs(c));
+	}
+
+	size_t subtitleCount = fceux11_rust_movie_data_subtitles_count(rustMd);
+	for (size_t i = 0; i < subtitleCount; i++) {
+		const char* s = fceux11_rust_movie_data_subtitle_get(rustMd, i);
+		if (s) movieData.subtitles.push_back(s);
+	}
+
+	fceux11_rust_movie_data_free(rustMd);
 	return true;
 }
 
