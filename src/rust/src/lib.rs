@@ -1,3 +1,4 @@
+pub use fceux11_core;
 pub use fceux11_debug;
 pub use fceux11_formats;
 pub use fceux11_lua;

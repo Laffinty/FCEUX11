@@ -2284,6 +2284,73 @@ int fceux11_lua_gui_pixel(int x, int y, unsigned int color);
 int fceux11_lua_get_mem_hook_count(int hook_type);
 
 uint32_t fceux11_lua_get_mem_hook_address(int hook_type, int index);
+/**
+ * Input chunk descriptor for saving.
+ */
+typedef struct FceuStateChunkInput {
+  uint8_t chunk_type;
+  const uint8_t *data;
+  uintptr_t len;
+} FceuStateChunkInput;
+
+/**
+ * Buffer descriptor returned by save / used by free.
+ */
+typedef struct FceuStateBuffer {
+  uint8_t *ptr;
+  uintptr_t len;
+  uintptr_t cap;
+} FceuStateBuffer;
+
+/**
+ * Output chunk descriptor for loading.
+ */
+typedef struct FceuStateChunkOutput {
+  uint8_t chunk_type;
+  uint8_t *data;
+  uintptr_t len;
+} FceuStateChunkOutput;
+
+/**
+ * Serialize chunks into a savestate file buffer.
+ *
+ * On success, returns `true` and writes a `FceuStateBuffer` to `out_buf`.
+ * The caller must free `out_buf.ptr` via `fceux11_rust_state_file_buf_free`.
+ */
+bool fceux11_rust_state_file_save(const struct FceuStateChunkInput *chunks,
+                                  uintptr_t chunk_count,
+                                  uint32_t version,
+                                  int32_t compression_level,
+                                  struct FceuStateBuffer *out_buf);
+
+/**
+ * Deserialize a savestate file buffer into chunks.
+ *
+ * On success, returns `true` and writes:
+ * * `out_chunks` — pointer to an array of `FceuStateChunkOutput`
+ * * `out_chunk_count` — number of chunks
+ * * `out_version` — savestate version from header
+ * * `out_totalsize` — uncompressed payload size
+ *
+ * The caller must free `out_chunks` via `fceux11_rust_state_file_chunks_free`.
+ */
+bool fceux11_rust_state_file_load(const uint8_t *file_data,
+                                  uintptr_t file_len,
+                                  struct FceuStateChunkOutput **out_chunks,
+                                  uintptr_t *out_chunk_count,
+                                  uint32_t *out_version,
+                                  uint32_t *out_totalsize);
+
+/**
+ * Free a buffer previously returned by `fceux11_rust_state_file_save`.
+ */
+void fceux11_rust_state_file_buf_free(struct FceuStateBuffer buf);
+
+/**
+ * Free chunks previously returned by `fceux11_rust_state_file_load`.
+ */
+void fceux11_rust_state_file_chunks_free(struct FceuStateChunkOutput *chunks,
+                                         uintptr_t chunk_count);
 #ifdef __cplusplus
 }
 #endif

@@ -1,0 +1,11 @@
+[package]
+name = "fceux11-core"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+fceux11-formats = { path = "../fceux11-formats" }
+flate2 = { version = "1.1", default-features = false, features = ["rust_backend"] }
