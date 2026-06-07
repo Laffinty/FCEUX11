@@ -315,7 +315,7 @@ pub extern "C" fn fceux11_rust_state_file_load(
 
             c_chunks.shrink_to_fit();
             let ptr = c_chunks.as_mut_ptr();
-            let cap = c_chunks.capacity();
+            let _cap = c_chunks.capacity();
             std::mem::forget(c_chunks);
 
             unsafe {
