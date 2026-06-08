@@ -1,23 +1,42 @@
 {
   "name": "fceux11",
-  "version": "0.2.22.9",
+  "version": "0.3.1",
   "description": "FCEUX11 - Windows 11 NES Emulator (derivative work based on FCEUX)",
   "homepage": "https://github.com/fceux11/fceux11",
   "license": "GPL-2.0-or-later",
   "dependencies": [
     {
       "name": "qtbase",
+      "version>=": "6.8.0",
       "features": [
         "opengl",
         "widgets"
       ]
     },
-    "qttools",
-    "sdl2",
-    "libarchive",
-    "zlib",
-    "liblzma",
-    "benchmark"
+    {
+      "name": "qttools",
+      "version>=": "6.8.0"
+    },
+    {
+      "name": "sdl2",
+      "version>=": "2.30.5"
+    },
+    {
+      "name": "libarchive"
+    },
+    {
+      "name": "zlib"
+    },
+    {
+      "name": "liblzma"
+    },
+    {
+      "name": "benchmark"
+    },
+    {
+      "name": "fmt",
+      "version>=": "10.0.0"
+    }
   ],
   "default-features": [],
   "features": {
@@ -35,5 +54,23 @@
       ]
     }
   },
+  "overrides": [
+    {
+      "name": "qtbase",
+      "version": "6.8.0"
+    },
+    {
+      "name": "qttools",
+      "version": "6.8.0"
+    },
+    {
+      "name": "sdl2",
+      "version": "2.30.5"
+    },
+    {
+      "name": "fmt",
+      "version": "10.2.1"
+    }
+  ],
   "builtin-baseline": "aa40adda5352e87655b8583cfb2451d5e9e276fd"
 }

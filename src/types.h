@@ -100,8 +100,7 @@ typedef uint32_t uint32;
 					*/
 
  #if _MSC_VER >= 1300
-  #pragma warning(disable:4244) //warning C4244: '=' : conversion from 'uint32' to 'uint8', possible loss of data
-  #pragma warning(disable:4996) //'strdup' was declared deprecated
+  // v0.3.1: Removed /wd4244 /wd4996 pragma suppression (now handled by /W4 /WX- at CMake level)
 #endif
 
  #if _MSC_VER < 1400

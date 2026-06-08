@@ -30,14 +30,14 @@ find_package(ZLIB REQUIRED)
 find_package(OpenGL REQUIRED)
 
 # Qt5 support removed in Phase 2 — Qt6 only
-add_definitions( -D_CRT_SECURE_NO_WARNINGS )
+# v0.3.1: Removed _CRT_SECURE_NO_WARNINGS; using standard secure APIs
 add_definitions( -D__SDL__  -D__QT_DRIVER__  -DQT_DEPRECATED_WARNINGS -DPSS_STYLE=2 )
 add_definitions( -D_UNICODE -DUNICODE )
 add_definitions( -DFCEUDEF_DEBUGGER )
 add_definitions( -D_USE_LIBARCHIVE )
+# v0.3.1: Soft warning level /W4 /WX-; /wd4267/4244 removed from here (see types.h cleanup)
 if(MSVC)
-    add_definitions( /wd4267 /wd4244 )
-    #add_definitions( /wd4018 ) # Integer comparison sign mismatch warnings
+    add_compile_options(/W4 /WX-)
 endif()
 
 set( SYS_LIBS  wsock32 ws2_32 vfw32 Htmlhelp )
@@ -469,6 +469,20 @@ target_include_directories(fceux11_boards PUBLIC ${CMAKE_SOURCE_DIR}/src)
 add_library(fceux11_core STATIC ${SRC_CORE})
 target_link_libraries(fceux11_core PUBLIC fceux11_boards fceux11_utils ${ZLIB_LIBRARIES} SDL2::SDL2)
 target_include_directories(fceux11_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
+# v0.3.1: PCH for core — types.h + driver.h + fceu.h (C++ only; C files skip PCH)
+target_precompile_headers(fceux11_core PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/types.h
+    ${CMAKE_SOURCE_DIR}/src/driver.h
+    ${CMAKE_SOURCE_DIR}/src/fceu.h
+)
+# Exclude C sources from C++ PCH to avoid STL1003 error
+set_source_files_properties(
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils/ConvertUTF.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/common/nes_ntsc.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/boards/emu2413.c
+    ${LUA_ENGINE_SOURCE}
+    PROPERTIES SKIP_PRECOMPILE_HEADERS ON
+)
 
 add_library(fceux11_drivers_common STATIC ${SRC_DRIVERS_COMMON})
 target_link_libraries(fceux11_drivers_common PUBLIC fceux11_core ${ZLIB_LIBRARIES})
@@ -495,6 +509,11 @@ endif()
 target_include_directories(fceux11_drivers_qt PUBLIC
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/drivers
+)
+# v0.3.1: PCH for Qt drivers — QtWidgets + QtOpenGL
+target_precompile_headers(fceux11_drivers_qt PRIVATE
+    <QtWidgets>
+    <QtOpenGL>
 )
 
 # i18n: Qt translation files

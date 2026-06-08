@@ -26,8 +26,20 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # v0.2.1: MSVC security and conformance options
-add_compile_options(/W4 /permissive- /guard:cf /GS /sdl)
+# v0.3.1: /W4 soft-start with /WX- (warnings are not errors yet; /WX pushed to v0.3.16)
+# v0.3.1: /wd4996 is transitional — will be removed after strcpy/sprintf/vsprintf cleanup in v0.3.5
+add_compile_options(/W4 /permissive- /guard:cf /GS /sdl /wd4996)
 add_link_options(/GUARD:CF /CETCOMPAT)
+
+# v0.3.1: ccache probe (Windows chocolatey path)
+find_program(CCACHE_PROGRAM ccache PATHS "C:/ProgramData/chocolatey/bin" "C:/Program Files/ccache" "C:/msys64/usr/bin")
+if(CCACHE_PROGRAM)
+    message(STATUS "ccache found: ${CCACHE_PROGRAM}")
+    set(CMAKE_C_COMPILER_LAUNCHER   "${CCACHE_PROGRAM}")
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+else()
+    message(STATUS "ccache not found — incremental builds will use compiler cache only")
+endif()
 
 option(FCEUX11_BUILD_TESTS "Build smoke and regression tests" ON)
 option(FCEUX11_ENABLE_I18N "Enable internationalization (i18n) support" ON)
