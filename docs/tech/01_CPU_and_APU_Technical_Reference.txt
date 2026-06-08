@@ -1,0 +1,199 @@
+================================================================================
+  FCEUX11 技术文档精简汇编 —— CPU / APU 技术参考
+  FCEUX11 Technical Digest — CPU / APU Technical Reference
+================================================================================
+
+【中文部分 | Chinese Content】
+================================================================================
+
+一、APU 帧计数器 ($4017)
+--------------------------
+来源：Ki (nesdev) / Brad Taylor nessound-4th
+
+- 向 $4017 写入任意值会重置帧计数器和时钟分频器；上电时也会重置，但系统复位不会重置。
+- $4017.7 = 0：4 步序列 (60Hz 帧 IRQ)
+- $4017.7 = 1：5 步序列 (48Hz，无帧 IRQ)
+
+步序 ($4017.7=0)：
+  1st → 2nd → 3rd → 4th(IRQ) → 5th(1st) → ...
+  7457 CPU 周期/步，共 29829 6/11 周期/帧
+
+步序 ($4017.7=1)：
+  1st(立即) → 2nd → 3rd → 4th → 5th(14914周期) → 6th(1st) → ...
+
+更新规则：
+  - 奇数次更新 (1st, 3rd, 5th...)：包络衰减、线性计数器更新
+  - 偶数次更新 (2nd, 4th, 6th...)：包络衰减、线性计数器、长度计数器、频率扫频更新
+
+- 系统复位后 I 标志为 1（禁止可屏蔽中断），因此默认帧 IRQ 不会触发。
+- 读取 $4015 可确认帧 IRQ 状态 ($4015.6)。
+
+
+二、DMC (Delta Modulation Channel)
+----------------------------------
+来源：Brad Taylor / DMC.TXT 1.0
+
+寄存器：
+  $4010：播放模式与 DMA 频率
+    bit 6-7：00=播放至长度结束；x1=循环；10=播放结束产生 IRQ
+    bit 3-0：频率控制 (0-F)，决定 DMA 取字节间隔 CPU 周期数
+  $4011：Delta 计数器加载（可直接写 7-bit PCM 数据）
+  $4012：DMA 起始地址 = $4012 << 6 | $C000
+  $4013：长度 = ($4013 << 4) + 1 字节
+  $4015：DMC 状态
+    bit 7(R)=IRQ 状态；bit 4(R)=是否正在播放；bit 4(W)=启用/禁用
+
+工作原理：
+  - DMC 通过 DMA 从内存取样本字节，每次取字节会暂停 CPU 1 周期。
+  - 取出的字节载入 8-bit 移位寄存器，以 8x DMA 频率移位输出。
+  - 每移出 1 位：1 → delta 计数器+1；0 → -1。
+  - 计数器 6-bit，输出到 7-bit DAC 的 6 个高位；bit 0 直接连 DAC LSB。
+  - 计数器到达 0 再减或到达 $3F 再加时，会“截断”而不环绕。
+
+系统复位：$4011 的 7 个有效位清零，IRQ 标志清除，通道禁用。
+
+
+三、2A03 声音通道硬件总览
+--------------------------
+来源：Brad Taylor / nessound.txt 1.8 & nessound-4th.txt
+
+通道概览：
+  - 方波 1 ($4000-$4003)：54.6 Hz ~ 12.4 kHz，支持扫频、占空比调节
+  - 方波 2 ($4004-$4007)：同上，但向下扫频公式不同（1's complement vs 2's complement）
+  - 三角波 ($4008-$400B)：27.3 Hz ~ 55.9 kHz，4-bit DAC，线性计数器
+  - 噪声 ($400C-$400F)：29.3 Hz ~ 447 kHz，15-bit LFSR 伪随机
+
+寄存器映射：
+  寄存器组 1 ($4000/$4004/$400C, $4008)：
+    方波/噪声：bit 0-3=音量/包络速率；bit 4=包络禁用；bit 5=长度时钟禁用/包络循环；bit 6-7=占空比
+    三角波：bit 0-6=线性计数器加载；bit 7=长度时钟禁用/线性计数器启动
+  寄存器组 2 ($4001/$4005)：
+    bit 0-2=右移量；bit 3=减/增波长；bit 4-6=扫频更新率；bit 7=扫频启用
+  寄存器组 3 ($4002/$4006/$400A, $400E)：
+    方波/三角波：8 LSB 波长
+    噪声：bit 0-3=播放采样率；bit 7=随机数类型 (0=32K模式, 1=93-bit模式)
+  寄存器组 4 ($4003/$4007/$400B/$400F)：
+    bit 0-2=波长 3 MSB；bit 3-7=长度计数器加载
+
+内部组件：
+  - 长度计数器：7-bit 减计数器，60Hz，到 0 时静音。
+  - 包络衰减：4-bit 减计数器，240Hz/(N+1)，到 0 后根据 bit 5 决定保持或环绕到 $F。
+  - 扫频单元：仅方波。每次刷新时更新波长 = Wavelength ± (Wavelength >> N)。
+    增加模式下若产生进位，或波长 < $008，则通道静音。
+  - 占空比发生器：4 种占空比 (2/14, 4/12, 8/8, 12/4)。
+  - 线性计数器：仅三角波。7-bit，240Hz，0.25*N 帧。load/count 两种模式。
+  - 随机数发生器：噪声。15-bit SR，XOR 抽头：32K 模式 tap 0,1；93-bit 模式 tap 0,6。
+  - 4-bit DAC：所有 4 个通道共用。
+
+长度计数器查找表（bit 3=0）：
+  bits 4-6 | bit7=0 | bit7=1
+  ---------|--------|--------
+  0        | 05     | 06
+  1        | 0A     | 0C
+  2        | 14     | 18
+  3        | 28     | 30
+  4        | 50     | 60
+  5        | 1E     | 24
+  6        | 07     | 08
+  7        | 0D     | 10
+
+(bit 3=1)：直接映射 00-0F → 7F,01,02,03,04,05,06,07,08,09,0A,0B,0C,0D,0E,0F 帧
+
+$4015 读写：
+  读：bit 0-3=各通道长度计数器状态；bit 4=DMC；bit 6=帧 IRQ；bit 7=DMC IRQ
+  写：bit 0-3=启用各通道；bit 4=启用 DMC
+
+首次启用声音通道后，有 2048 CPU 周期延迟才开始正常时钟。
+
+================================================================================
+【英文部分 | English Content】
+================================================================================
+
+I. APU Frame Counter ($4017)
+----------------------------
+Source: Ki (nesdev) / Brad Taylor nessound-4th
+
+- Any write to $4017 resets the frame counter and clock divider; power-on resets it, but system reset does NOT.
+- $4017.7 = 0: 4-step sequence (60Hz frame IRQ)
+- $4017.7 = 1: 5-step sequence (48Hz, no frame IRQ)
+
+Sequence ($4017.7=0):
+  1st → 2nd → 3rd → 4th(IRQ) → 5th(1st) → ...
+  7457 CPU cycles per step, total 29829 6/11 cycles/frame
+
+Sequence ($4017.7=1):
+  1st(immediate) → 2nd → 3rd → 4th → 5th(14914 cycles) → 6th(1st) → ...
+
+Update rules:
+  - Odd updates (1st, 3rd, 5th...): envelope decay and linear counter
+  - Even updates (2nd, 4th, 6th...): envelope decay, linear counter, length counter, frequency sweep
+
+- The I flag is 1 after system reset (maskable interrupts disabled), so frame IRQ does not fire by default.
+- Read $4015 to check frame IRQ status ($4015.6).
+
+
+II. DMC (Delta Modulation Channel)
+----------------------------------
+Source: Brad Taylor / DMC.TXT 1.0
+
+Registers:
+  $4010: Play mode & DMA frequency
+    bits 6-7: 00=play until length ends; x1=loop; 10=play then IRQ
+    bits 3-0: frequency control (0-F), sets DMA fetch interval in CPU cycles
+  $4011: Delta counter load (can be used for direct 7-bit PCM)
+  $4012: DMA start address = $4012 << 6 | $C000
+  $4013: Length = ($4013 << 4) + 1 bytes
+  $4015: DMC status
+    bit 7(R)=IRQ status; bit 4(R)=currently playing; bit 4(W)=enable/disable
+
+Operation:
+  - DMC fetches sample bytes via DMA, halting the CPU for 1 cycle per fetch.
+  - Fetched byte loaded into an 8-bit shift register, shifted at 8x DMA frequency.
+  - Each shifted bit: 1 → delta counter +1; 0 → -1.
+  - Counter is 6-bit, output to 6 MSB of 7-bit DAC; bit 0 directly connected to DAC LSB.
+  - Counter "clips" at 0 and $3F instead of wrapping.
+
+System reset: $4011 cleared, IRQ flag cleared, channel disabled.
+
+
+III. 2A03 Sound Channel Hardware Overview
+-----------------------------------------
+Source: Brad Taylor / nessound.txt 1.8 & nessound-4th.txt
+
+Channels:
+  - Square 1 ($4000-$4003): 54.6 Hz ~ 12.4 kHz, sweep, duty cycle
+  - Square 2 ($4004-$4007): same, but downward sweep uses 1's complement vs 2's complement
+  - Triangle ($4008-$400B): 27.3 Hz ~ 55.9 kHz, 4-bit DAC, linear counter
+  - Noise ($400C-$400F): 29.3 Hz ~ 447 kHz, 15-bit LFSR
+
+Register map:
+  Reg set 1 ($4000/$4004/$400C, $4008):
+    Sq/Noise: bits 0-3=volume/envelope rate; bit 4=envelope disable; bit 5=length clock disable/envelope loop; bits 6-7=duty cycle
+    Tri: bits 0-6=linear counter load; bit 7=length clock disable/linear counter start
+  Reg set 2 ($4001/$4005):
+    bits 0-2=right shift; bit 3=decrease/increase wavelength; bits 4-6=sweep rate; bit 7=sweep enable
+  Reg set 3 ($4002/$4006/$400A, $400E):
+    Sq/Tri: 8 LSB of wavelength
+    Noise: bits 0-3=playback rate; bit 7=random type (0=32K mode, 1=93-bit mode)
+  Reg set 4 ($4003/$4007/$400B/$400F):
+    bits 0-2=3 MSB wavelength; bits 3-7=length counter load
+
+Internal components:
+  - Length counter: 7-bit down counter, 60Hz, silences channel at 0.
+  - Envelope decay: 4-bit down counter, 240Hz/(N+1), holds or wraps to $F at 0 based on bit 5.
+  - Sweep unit: square only. Updates wavelength = Wavelength ± (Wavelength >> N).
+    Increase mode with carry, or wavelength < $008, silences channel.
+  - Duty cycle generator: 4 types (2/14, 4/12, 8/8, 12/4).
+  - Linear counter: triangle only. 7-bit, 240Hz, 0.25*N frames. Load/count modes.
+  - Random generator: noise. 15-bit SR. XOR taps: 32K mode (0,1); 93-bit mode (0,6).
+  - 4-bit DAC: shared by all 4 channels.
+
+$4015 read/write:
+  Read: bits 0-3=length counter status; bit 4=DMC; bit 6=frame IRQ; bit 7=DMC IRQ
+  Write: bits 0-3=enable channels; bit 4=enable DMC
+
+2048 CPU cycle delay before first sound hardware clock after channel activation.
+
+================================================================================
+  文档来源 Docs sourced from: cpu/4017.txt, cpu/dmc.txt, cpu/nessound.txt, cpu/nessound-4th.txt
+================================================================================

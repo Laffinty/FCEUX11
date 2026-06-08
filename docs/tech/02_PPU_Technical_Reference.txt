@@ -1,0 +1,215 @@
+================================================================================
+  FCEUX11 技术文档精简汇编 —— PPU 技术参考
+  FCEUX11 Technical Digest — PPU Technical Reference
+================================================================================
+
+【中文部分 | Chinese Content】
+================================================================================
+
+一、NTSC 2C02 技术操作概要
+---------------------------
+来源：Brad Taylor / NTSC 2C02 technical operation
+
+视频信号生成：
+  - 21.48 MHz 主时钟输入，经 3 级 Johnson 计数器产生 12 个 3.58 MHz 相位，用于 NTSC 色度生成。
+  - 调色板低 4 位选择 12 个色相位之一（色度）；bit 4-5 选择 4 级亮度偏移（亮度）。
+  - 色度值 14/15 始终为黑色；亮度 0 + 色度 13 为“超黑”，可能导致部分显示器画面扭曲。
+
+基础时序：
+  - PPU 主时钟 = 21.48 MHz / 4 = 5.37 MHz（1 像素 = 1 时钟周期）。
+  - 每扫描线 341 PPU 周期（≈ 113.67 CPU 周期）。
+  - 每帧 262 扫描线 = 341×262 PPU 周期。
+
+内存访问周期：
+  - 每次访问 2 PPU 周期：第 1 周期输出 A0-A7 + ALE 锁存；第 2 周期激活 /RD 或 /WR 并传输数据。
+
+帧渲染扫描线分布：
+  扫描线 0-19：VINT（垂直中断）期间，不访问外部内存。
+  扫描线 20：虚拟扫描线（dummy），按正常序列取背景数据但不输出像素。水平/垂直滚动计数器在周期 256 更新。
+  扫描线 21-260：实际输出 240 条可见扫描线。
+  扫描线 261：空闲扫描线，完成后设置 VINT 标志。
+
+单条扫描线的内存读取阶段：
+  阶段 1-128（32 次 × 4 取）：
+    1. Name table 字节
+    2. Attribute table 字节
+    3. Pattern table bitmap #0
+    4. Pattern table bitmap #1
+    - 实际屏幕上第 1-2 个 tile 的数据在上一扫描线末尾预取。
+    - 期间同时进行 64 个 sprite 的 Y 坐标范围判断（256 周期）。
+
+  阶段 129-160（8 次 × 4 取）：
+    - 取下一扫描线 sprite 的 pattern table 数据。
+    - 不足 8 个 sprite 时用透明假数据填充。
+    - 前两次 name table 读取为无效数据（garbage）。
+
+  阶段 161-168（2 次 × 4 取）：
+    - 预取下一扫描线第 1-2 个 tile 的背景数据。
+
+  阶段 169-170：
+    - 连续两次读取 name table 字节（原因不明，地址指向下一扫描线第 3 个 tile）。
+
+  阶段 170 之后：空闲 1 周期。
+
+精灵评估（In-range object evaluation）：
+  - 用 8-bit 比较器计算当前扫描线（减 21）与每个 OAM Y 坐标（加 1）的差值。
+  - 差值在 0-7（$2000.5=0，8×8 sprite）或 0-15（$2000.5=1，8×16 sprite）为范围内。
+  - 9-bit 比较结果意味着 Y 坐标 -1..-15 被解释为 241..255，不会出现在屏幕上。
+  - 最多 8 个 sprite 进入 sprite temporary memory；超过则置位 $2002.5（sprite overflow）。
+
+精灵渲染流水线：
+  - Sprite buffer memory 含 8 个条目，每个条目有：2 个 8-bit 移位寄存器（pattern 数据）、3-bit 锁存器（颜色/优先级）、8-bit 减计数器（X 坐标）。
+  - X 坐标计数器每像素减 1，到 0 时开始移位输出 pattern 数据。
+  - 优先级：低序号 sprite 优先；高优先级 sprite 的透明像素才让低优先级 sprite 显示。
+  - 多路选择器条件（显示 sprite 而非背景）：
+    (OBJpri=前景 或 PFpixel=透明) 且 OBJpixel≠透明
+
+主对象碰撞（Object 0 hit）：
+  - 当非透明背景像素与非透明 sprite 像素重叠，且主对象 present 标志为真时，置位 $2002.6。
+
+额外周期帧（Extra cycle frames）：
+  - 扫描线 20 在奇数帧只有 340 周期（末尾少 1 周期），用于改变 NTSC colorburst 相位。
+  - 这会导致静态 detailed 背景轻微闪烁；滚动时某些像素会“消失”。
+
+PPU 像素优先级怪癖：
+  - 由于先评估 sprite 优先级再与背景混合，可能出现：低优先级前景 sprite + 高优先级背景 sprite + 背景像素同时存在时，背景 sprite 胜出，结果只显示背景。
+
+MMC3 扫描线计数器：
+  - 基于 PPU A13 翻转次数计数，每扫描线 A13 从 0→1 恰好 42 次。
+  - 可通过反复写 $2006 手动触发 IRQ。
+
+
+二、NES 滚动机制（Loopy 文档）
+------------------------------
+来源：loopy (nesdev)
+
+相关寄存器：
+  - v：当前 VRAM 地址（16 bit，实际使用 15 bit），即 $2006。
+  - t：临时 VRAM 地址（16 bit）。
+  - x：fine X 偏移（3 bit）。
+
+写操作影响：
+  $2000 写：t:0000110000000000 = d:00000011（设置 name table 选择）
+  $2005 第 1 次写：t:0000000000011111 = d:11111000；x = d:00000111
+  $2005 第 2 次写：t:0000001111100000 = d:11111000；t:0111000000000000 = d:00000111
+  $2006 第 1 次写：t:0011111100000000 = d:00111111；t:1100000000000000 = 0
+  $2006 第 2 次写：t:0000000011111111 = d:11111111；v = t
+  扫描线开始（背景/精灵启用）：v:0000010000011111 = t:0000010000011111（复制水平偏移）
+  帧开始（线 0）：v = t（复制垂直偏移）
+
+注意：$2005 和 $2006 共用首次/二次写切换标志；读 $2002 清除该标志。
+
+VRAM 地址位含义：
+  - bit 0-4：X tile 坐标（×8 = 粗 X 滚动），从 31 回绕到 0 时翻转 bit 10（name table 水平切换）。
+  - bit 5-9：Y tile 坐标（×8 = 粗 Y 滚动），从 29 回绕到 0 时翻转 bit 11（name table 垂直切换）。
+  - 若手动设为大于 29 的值，29 的回绕不会发生，attribute 数据会被当作 name table 数据使用。
+  - bit 10：name table 水平选择；bit 11：name table 垂直选择。
+  - bit 12-14：fine Y 偏移（0-7 像素）。
+
+================================================================================
+【英文部分 | English Content】
+================================================================================
+
+I. NTSC 2C02 Technical Operation Summary
+----------------------------------------
+Source: Brad Taylor / NTSC 2C02 technical operation
+
+Video signal generation:
+  - 21.48 MHz master clock fed into a 3-stage Johnson counter, producing 12 phases at 3.58 MHz for NTSC chroma.
+  - Palette lower 4 bits select one of 12 color phases (chrominance); bits 4-5 select one of 4 luminance offsets.
+  - Chroma values 14/15 always black; luminance 0 + chroma 13 is "super black" and may distort some monitors.
+
+Base timing:
+  - PPU clock = 21.48 MHz / 4 = 5.37 MHz (1 pixel = 1 clock).
+  - 341 PPU cycles per scanline (~113.67 CPU cycles).
+  - 262 scanlines per frame = 341×262 PPU cycles.
+
+Memory access cycle:
+  - Each access is 2 PPU cycles: cycle 1 outputs A0-A7 + ALE latch; cycle 2 activates /RD or /WR and transfers data.
+
+Frame scanline layout:
+  Lines 0-19: VINT period, no external memory access.
+  Line 20: Dummy scanline, fetches background data but outputs no pixels. H/V scroll counters updated at cycle 256.
+  Lines 21-260: 240 visible scanlines rendered.
+  Line 261: Idle scanline, then VINT flag is set.
+
+Per-scanline memory fetch phases:
+  Phase 1-128 (32 iterations × 4 fetches):
+    1. Name table byte
+    2. Attribute table byte
+    3. Pattern table bitmap #0
+    4. Pattern table bitmap #1
+    - Tiles 1-2 on screen were prefetched at end of previous scanline.
+    - Simultaneously evaluates Y coordinates of all 64 sprites (256 cycles).
+
+  Phase 129-160 (8 iterations × 4 fetches):
+    - Fetches sprite pattern data for next scanline.
+    - Dummy fetches for missing sprites (discarded, replaced with transparent).
+    - First two name table fetches are garbage.
+
+  Phase 161-168 (2 iterations × 4 fetches):
+    - Prefetches background tiles 1-2 for next scanline.
+
+  Phase 169-170:
+    - Two consecutive name table reads (purpose unclear; address points to tile 3 of next scanline).
+
+  After phase 170: 1 idle cycle.
+
+In-range object evaluation:
+  - 8-bit comparator calculates difference between current scanline (minus 21) and each OAM Y coordinate (plus 1).
+  - In range if difference is 0-7 ($2000.5=0, 8×8 sprites) or 0-15 ($2000.5=1, 8×16 sprites).
+  - 9-bit result means Y coordinates -1..-15 are interpreted as 241..255, never on-screen.
+  - Up to 8 sprites enter sprite temporary memory; excess sets $2002.5 (sprite overflow).
+
+Sprite render pipeline:
+  - Sprite buffer memory holds 8 entries, each with: two 8-bit shift registers (pattern), 3-bit latch (color/priority), 8-bit down counter (X coordinate).
+  - X counter decrements each pixel; at 0, pattern data begins shifting out.
+  - Priority: lower-index sprites win; higher-priority sprite transparent pixels allow lower-priority sprites through.
+  - Multiplexer condition (show sprite over playfield):
+    (OBJpri=foreground OR PFpixel=transparent) AND OBJpixel≠transparent
+
+Object 0 hit:
+  - Set $2002.6 when non-transparent playfield pixel overlaps non-transparent sprite pixel while primary object present flag is true.
+
+Extra cycle frames:
+  - Scanline 20 on odd frames is 340 cycles (last cycle skipped) to shift NTSC colorburst phase.
+  - Causes slight flicker on static detailed backgrounds; some pixels appear invisible when scrolling.
+
+PPU pixel priority quirk:
+  - Because sprite priority is evaluated before playfield mixing, a low-priority foreground sprite + high-priority background sprite + playfield pixel can result in only the playfield being visible.
+
+MMC3 scanline counter:
+  - Counts PPU A13 0→1 transitions, exactly 42 per scanline.
+  - Can be manually triggered by writing $2006 repeatedly.
+
+
+II. NES Scrolling Mechanism (Loopy Docs)
+----------------------------------------
+Source: loopy (nesdev)
+
+Registers:
+  - v: current VRAM address (16 bits, 15 used), i.e. $2006.
+  - t: temporary VRAM address (16 bits).
+  - x: fine X offset (3 bits).
+
+Write effects:
+  $2000 write: t:0000110000000000 = d:00000011 (name table select)
+  $2005 1st write: t:0000000000011111 = d:11111000; x = d:00000111
+  $2005 2nd write: t:0000001111100000 = d:11111000; t:0111000000000000 = d:00000111
+  $2006 1st write: t:0011111100000000 = d:00111111; t:1100000000000000 = 0
+  $2006 2nd write: t:0000000011111111 = d:11111111; v = t
+  Scanline start (rendering on): v:0000010000011111 = t:0000010000011111 (copy horizontal)
+  Frame start (line 0): v = t (copy vertical)
+
+Note: $2005 and $2006 share the first/second-write toggle; reading $2002 clears it.
+
+VRAM address bit meanings:
+  - bits 0-4: X tile coordinate (×8 = coarse X scroll), wrapping 31→0 toggles bit 10 (horizontal name table switch).
+  - bits 5-9: Y tile coordinate (×8 = coarse Y scroll), wrapping 29→0 toggles bit 11 (vertical name table switch).
+  - If manually set above 29, the 29 wrap does not occur and attribute data is misinterpreted as name table data.
+  - bit 10: horizontal name table select; bit 11: vertical name table select.
+  - bits 12-14: fine Y offset (0-7 pixels).
+
+================================================================================
+  文档来源 Docs sourced from: ppu/2c02 technical operation.txt, ppu/loopy1.txt, ppu/loopy2.txt
+================================================================================

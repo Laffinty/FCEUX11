@@ -1,0 +1,366 @@
+================================================================================
+  FCEUX11 技术文档精简汇编 —— 文件格式规范
+  FCEUX11 Technical Digest — File Format Specifications
+================================================================================
+
+【中文部分 | Chinese Content】
+================================================================================
+
+一、FCS 存档格式 (FCE Ultra Save State)
+---------------------------------------
+来源：fcs.txt (Updated Mar 9, 2003)
+
+设计目标：最大程度的前向/后向兼容，基于 chunk（块）结构。
+所有多字节变量按 LSB（小端序）存储。
+
+主文件头（16 字节）：
+  字节 0-2："FCS" 字符串
+  字节 3：FCE Ultra 版本号（本文档适用于 0.53 及以上）
+  字节 4-7：文件总大小（不含 16 字节头）
+  其余：保留，填 0
+
+节 Chunk 头（5 字节）：
+  字节 0：节 ID
+  字节 1-4：节总大小（含 5 字节头）
+
+节定义：
+  1  = "CPU"     2 = "CPUC"(模拟器专用)
+  3  = "PPU"     4 = "CTLR"(控制器)
+  5  = "SND"    16 = "EXTRA"
+
+子节 Chunk 头（8 字节）：
+  字节 0-3：4 字节描述名（非 null 终止，不足补 0）
+  字节 4-7：数据大小
+
+核心子节内容：
+  CPU 节：PC(uint16), A(uint8), P(uint8), X(uint8), Y(uint8), S(uint8), RAM(uint8[0x800])
+  CPUC 节：JAMM(uint8, 卡死状态), IRQL(uint8, 持续 IRQ), ICoa(int32, 临时周期), ICou(int32, 周期计数)
+  PPU 节：NTAR(uint8[0x800]), PRAM(uint8[32]), SPRA(uint8[0x100]), PPU(uint8[4]),
+         XOFF(uint8), VTOG(uint8), RADD(uint16), TADD(uint16), VBUF(uint8), PGEN(uint8)
+  CTLR 节：J1RB(uint8), J2RB(uint8)
+  SND 节：NREG(uint16, 噪声 LFSR), P17(uint8), PBIN(uint8, DMC bit 索引),
+         PAIN(uint32, DMC 地址索引), PSIN(uint32, DMC 长度计数)
+  EXTRA 节（iNES）：WRAM(uint8[0x2000]), CHRR(uint8[0x2000]), EXNR(uint8[0x800]),
+         MIRR(uint8, 镜像方式), IRQC/IQL1/IQL2(uint32), IRQA(uint8),
+         PBL(uint8[4]), CBL(uint8[8])
+
+
+二、FM2 电影文件格式
+--------------------
+来源：fm2.txt / web/fm2_format.md
+
+FM2 是纯文本键值对格式，由 Header + Input Log 组成。
+
+必需 Header 字段：
+  version       整数   格式版本（当前为 3）
+  emuVersion    字符串 录制所用的模拟器版本
+  romFilename   字符串 ROM 文件名
+  guid          GUID   唯一标识符，用于验证 savestate 归属
+  romChecksum   字符串 ROM 的 MD5（base64 编码十六进制）
+  port0/port1   整数   端口设备类型 (0=无, 1=手柄, 2=光线枪)
+  port2         整数   FCExp 端口设备类型 (0=无)
+
+可选 Header 字段：
+  rerecordCount 整数   重录次数
+  palFlag       布尔   PAL 时序 (1=是)
+  fourscore     布尔   四玩家适配器
+  binary        布尔   输入日志为二进制格式
+  length        整数   电影帧数
+  comment       字符串 注释
+  subtitle      字符串 字幕
+  savestate     十六进制 若从存档开始录制则包含存档数据
+
+Input Log（文本格式）：
+  每帧一行，以 | 开头和结尾。
+  标准格式：|commands|port0|port1|port2|
+  Fourscore 格式：|commands|p1|p2|p3|p4|port2|
+
+commands 位字段：
+  1 = 软重置   2 = 硬重置/电源   4 = FDS 磁盘插入
+  8 = FDS 磁盘选择   16 = VS 投币
+
+SI_GAMEPAD 格式：
+  8 个字符，顺序 RLDUTSBA（Right, Left, Down, Up, Start, Select, B, A）。
+  非空格或 '.' 的字符表示按下。
+
+SI_ZAPPER 格式：XXX YYY B Q Z
+  XXX= X 坐标(%03d)  YYY= Y 坐标  B= 鼠标按钮  Q,Z= 内部值
+
+二进制格式：
+  每帧固定长度，commands 为第 1 字节（bit 0=软重置, bit 1=硬重置, bit 2=FDS 插入, bit 3=FDS 选择, bit 4=VS 投币）。
+  SI_GAMEPAD：1 字节，bit 0-7 = A, B, Select, Start, Up, Down, Left, Right
+  SI_ZAPPER：12 字节（X, Y, 按钮, Q, Z(uint64)）
+
+帧率常量：
+  NTSC: 60.099822938442230224609375 fps
+  PAL : 50.00698089599609375 fps
+
+
+三、FCM 到 FM2 转换指南
+-----------------------
+来源：web/fcm_to_fm2_conversion.md
+
+转换方法：
+  GUI：Tools > Convert .fcm to .fm2
+  命令行(SDL)：./fceux --fcmconvert filename.fcm
+
+FM2 相对 FCM 的改进：
+  - 纯文本格式，便于手动编辑和拼接
+  - 内置 GUID，确保 savestate 与电影文件对应
+  - 电源开启录制不再包含冗余 savestate
+  - 支持鼠标输入（Zapper / Arkanoid Paddle）
+
+常见不同步原因：
+  - 旧版 FCE Ultra 录制时 WRAM 已初始化；FCEUX 从全新电源开始。
+  - 解决方案：在 FM2 开头插入空帧模拟旧版行为。
+
+已知转换失败情况：
+  - FCEU 0.10 或更早版本的电影（Dragon's Lair、Powerblade）
+  - Dragon Warrior 4（VRAM 处理特殊）
+  - 从 savestate 开始的电影（格式不兼容）
+  - Battle Toads (FCEU 0.12，Mapper 7 重大改动)
+
+可通过添加帧修复：
+  Legend of Zelda "1st Quest" +3 帧
+  Vice: Project Doom +10 帧
+
+模拟旧版行为技巧：
+  在电影开头添加若干 |0||| 空帧，然后在第一帧添加重置标志 |2|||。
+
+
+四、NSF (NES Music Format) 规范
+--------------------------------
+来源：Kevin Horton / nsfspec.txt
+
+文件头（$00-$7F，128 字节）：
+  $0000-$0004："NESM", $1A
+  $0005：版本号（当前 $01）
+  $0006：总曲目数
+  $0007：起始曲目号
+  $0008-$0009：加载地址（低/高）
+  $000A-$000B：初始化地址（低/高）
+  $000C-$000D：播放地址（低/高）
+  $000E-$002D：曲名（32 字节，null 终止）
+  $002E-$004D：艺术家（32 字节）
+  $004E-$006D：版权（32 字节）
+  $006E-$006F：NTSC 播放速度（1/1000000 秒 tick 数，标准 60Hz = $411A）
+  $0070-$0077：Bank 切换初始值（全 0 表示无 bankswitching）
+  $0078-$0079：PAL 播放速度
+  $007A：PAL/NTSC 标志（bit 0=PAL, bit 1=双制式）
+  $007B：扩展音效芯片标志
+           bit 0=VRCVI   bit 1=VRCVII   bit 2=FDS Sound
+           bit 3=MMC5    bit 4=Namco 106  bit 5=Sunsoft FME-07
+  $007C-$007F：保留（必须为 0）
+  $0080+：音乐程序/数据
+
+加载方式：
+  - 无 bankswitching：直接加载到 6502 地址空间的指定加载地址。
+  - 有 bankswitching：加载到 RAM bank 的 (地址 & $0FFF) 偏移处，然后将 $0070-$0077 写入 $5FF8-$5FFF 设置初始 bank。
+
+初始化流程：
+  1. 清零 $0000-$07FF 和 $6000-$7FFF RAM。
+  2. 初始化声音寄存器：$4000-$400F=0, $4010=$10, $4011-$4013=0, $4015=$0F。
+  3. 若有 bank，写入 $5FF8-$5FFF。
+  4. A=曲目号-1, X=制式(0=NTSC, 1=PAL)。
+  5. 调用初始化例程（应执行 RTS 返回）。
+
+播放流程：
+  - 按速度字指定的周期定期调用播放地址。
+
+各扩展芯片寄存器位置：
+  VRCVI：$9000-$9002, $A000-$A002, $B000-$B002（只写）
+  VRCVII：$9010(索引), $9030(数据)（只写）
+  FDS Sound：$4040-$4092
+  MMC5：$5000-$5015, $5205, $5206, $5C00-$5FF5（只写）
+  Namco 106：$4800(数据), $F800(地址)（7-bit 地址+auto-inc 模式位）
+  Sunsoft FME-07：$C000(地址), $E000(数据)（类似 AY-3-8910）
+
+注意事项：
+  - 曲名/艺术家/版权字段最多 31 字符，必须留 1 字节 null。
+  - 未知字段填 "<?>"（不含引号）。
+  - 变量应仅使用 $0000-$07FF；栈位于 $1FF 向下增长。
+  - 调用 init/play 时不可假设任何寄存器/标志的初始状态（除 A 和 X）。
+
+================================================================================
+【英文部分 | English Content】
+================================================================================
+
+I. FCS Save State Format (FCE Ultra)
+------------------------------------
+Source: fcs.txt (Updated Mar 9, 2003)
+
+Design goal: maximum forward/backward compatibility via chunk-based structure.
+All multi-byte variables stored LSB-first (little-endian).
+
+Main file header (16 bytes):
+  bytes 0-2: "FCS" string
+  byte 3: FCE Ultra version (document applies to 0.53+)
+  bytes 4-7: total file size (excluding 16-byte header)
+  remainder: reserved, null
+
+Section chunk header (5 bytes):
+  byte 0: section ID
+  bytes 1-4: total section size (including 5-byte header)
+
+Section definitions:
+  1 = "CPU"     2 = "CPUC" (emulator specific)
+  3 = "PPU"     4 = "CTLR" (controller)
+  5 = "SND"    16 = "EXTRA"
+
+Subsection chunk header (8 bytes):
+  bytes 0-3: 4-byte description name (not null-terminated, pad with 0)
+  bytes 4-7: data size
+
+Core subsection contents:
+  CPU:  PC(uint16), A(uint8), P(uint8), X(uint8), Y(uint8), S(uint8), RAM(uint8[0x800])
+  CPUC: JAMM(uint8, jammed), IRQL(uint8, constant IRQ), ICoa(int32, temp cycles), ICou(int32, cycle count)
+  PPU:  NTAR(uint8[0x800]), PRAM(uint8[32]), SPRA(uint8[0x100]), PPU(uint8[4]),
+        XOFF(uint8), VTOG(uint8), RADD(uint16), TADD(uint16), VBUF(uint8), PGEN(uint8)
+  CTLR: J1RB(uint8), J2RB(uint8)
+  SND:  NREG(uint16, noise LFSR), P17(uint8), PBIN(uint8, DMC bit index),
+        PAIN(uint32, DMC address index), PSIN(uint32, DMC length counter)
+  EXTRA (iNES): WRAM(uint8[0x2000]), CHRR(uint8[0x2000]), EXNR(uint8[0x800]),
+        MIRR(uint8, mirroring), IRQC/IQL1/IQL2(uint32), IRQA(uint8),
+        PBL(uint8[4]), CBL(uint8[8])
+
+
+II. FM2 Movie File Format
+-------------------------
+Source: fm2.txt / web/fm2_format.md
+
+FM2 is a plain-text key-value format consisting of Header + Input Log.
+
+Required header fields:
+  version       int    format version (currently 3)
+  emuVersion    string emulator version used to record
+  romFilename   string ROM filename
+  guid          GUID   unique ID for savestate validation
+  romChecksum   string ROM MD5 (base64-encoded hex)
+  port0/port1   int    port device type (0=none, 1=gamepad, 2=zapper)
+  port2         int    FCExp port device type (0=none)
+
+Optional header fields:
+  rerecordCount int    rerecord count
+  palFlag       bool   PAL timing (1=yes)
+  fourscore     bool   four-score adapter
+  binary        bool   input log in binary format
+  length        int    movie frame count
+  comment       string comments
+  subtitle      string on-screen subtitles
+  savestate     hex    savestate blob if recorded from savestate
+
+Input Log (text format):
+  One line per frame, starting and ending with |.
+  Standard: |commands|port0|port1|port2|
+  Fourscore: |commands|p1|p2|p3|p4|port2|
+
+commands bitfield:
+  1 = soft reset   2 = hard reset/power   4 = FDS disk insert
+  8 = FDS disk select   16 = VS insert coin
+
+SI_GAMEPAD format:
+  8 characters, order RLDUTSBA (Right, Left, Down, Up, Start, Select, B, A).
+  Any character other than space or '.' means pressed.
+
+SI_ZAPPER format: XXX YYY B Q Z
+  XXX = X coord (%03d)  YYY = Y coord  B = mouse button  Q,Z = internal values
+
+Binary format:
+  Fixed-length records per frame. commands is byte 1 (bit 0=soft reset, bit 1=hard reset, bit 2=FDS insert, bit 3=FDS select, bit 4=VS coin).
+  SI_GAMEPAD: 1 byte, bits 0-7 = A, B, Select, Start, Up, Down, Left, Right
+  SI_ZAPPER: 12 bytes (X, Y, button, Q, Z as uint64)
+
+Framerate constants:
+  NTSC: 60.099822938442230224609375 fps
+  PAL : 50.00698089599609375 fps
+
+
+III. FCM to FM2 Conversion Guide
+--------------------------------
+Source: web/fcm_to_fm2_conversion.md
+
+Conversion methods:
+  GUI: Tools > Convert .fcm to .fm2
+  CLI (SDL): ./fceux --fcmconvert filename.fcm
+
+FM2 improvements over FCM:
+  - Plain text, easy manual editing and concatenation
+  - Built-in GUID to verify savestate ownership
+  - Power-on recordings no longer contain redundant savestate
+  - Mouse input support (Zapper / Arkanoid Paddle)
+
+Common desync causes:
+  - Old FCE Ultra recorded with WRAM already initialized; FCEUX starts from cold power-on.
+  - Solution: insert blank frames at beginning of FM2 to simulate old behavior.
+
+Known unconvertible cases:
+  - FCEU 0.10 or earlier movies (Dragon's Lair, Powerblade)
+  - Dragon Warrior 4 (special VRAM handling)
+  - Movies starting from savestate (incompatible formats)
+  - Battle Toads (FCEU 0.12, Mapper 7 major changes)
+
+Fixable by adding frames:
+  Legend of Zelda "1st Quest" +3 frames
+  Vice: Project Doom +10 frames
+
+Simulating old behavior:
+  Add blank |0||| frames at start, then reset flag |2||| on first real frame.
+
+
+IV. NSF (NES Music Format) Specification
+----------------------------------------
+Source: Kevin Horton / nsfspec.txt
+
+Header ($00-$7F, 128 bytes):
+  $0000-$0004: "NESM", $1A
+  $0005: version (currently $01)
+  $0006: total songs
+  $0007: starting song
+  $0008-$0009: load address (lo/hi)
+  $000A-$000B: init address (lo/hi)
+  $000C-$000D: play address (lo/hi)
+  $000E-$002D: song name (32 bytes, null-terminated)
+  $002E-$004D: artist (32 bytes)
+  $004E-$006D: copyright (32 bytes)
+  $006E-$006F: NTSC speed (1/1000000 sec ticks, standard 60Hz = $411A)
+  $0070-$0077: bank switch init values (all 0 = no bankswitching)
+  $0078-$0079: PAL speed
+  $007A: PAL/NTSC flags (bit 0=PAL, bit 1=dual)
+  $007B: expansion sound chip flags
+           bit 0=VRCVI   bit 1=VRCVII   bit 2=FDS Sound
+           bit 3=MMC5    bit 4=Namco 106  bit 5=Sunsoft FME-07
+  $007C-$007F: reserved (must be 0)
+  $0080+: music program/data
+
+Loading:
+  - No bankswitching: load directly into 6502 address space at load address.
+  - Bankswitching: load into RAM bank at (address & $0FFF), then write $0070-$0077 to $5FF8-$5FFF.
+
+Init procedure:
+  1. Clear $0000-$07FF and $6000-$7FFF RAM.
+  2. Init sound regs: $4000-$400F=0, $4010=$10, $4011-$4013=0, $4015=$0F.
+  3. If banked, write $5FF8-$5FFF.
+  4. A = song-1, X = standard (0=NTSC, 1=PAL).
+  5. Call init routine (should RTS).
+
+Playback:
+  - Call play address periodically at speed specified by speed word.
+
+Expansion chip register locations:
+  VRCVI:    $9000-$9002, $A000-$A002, $B000-$B002 (write only)
+  VRCVII:   $9010(index), $9030(data) (write only)
+  FDS:      $4040-$4092
+  MMC5:     $5000-$5015, $5205, $5206, $5C00-$5FF5 (write only)
+  Namco 106: $4800(data), $F800(address) (7-bit addr + auto-inc mode bit)
+  Sunsoft FME-07: $C000(addr), $E000(data) (AY-3-8910-like)
+
+Caveats:
+  - Name/artist/copyright max 31 chars, must leave 1 null byte.
+  - Unknown fields: "<?>" (without quotes).
+  - Variables should only use $0000-$07FF; stack at $1FF growing down.
+  - Do not assume any register/flag state on entry to init/play (except A and X).
+
+================================================================================
+  文档来源 Docs sourced from: fcs.txt, fm2.txt, nsfspec.txt,
+                         web/fcm_to_fm2_conversion.md, web/fm2_format.md
+================================================================================
