@@ -37,6 +37,8 @@ THE SOFTWARE.
 #include <cstdarg>
 #include <vector>
 #include <algorithm>
+#include <span>
+#include <cstddef>
 #include <string>
 
 class EMUFILE {
@@ -63,6 +65,11 @@ public:
 
 	size_t fread(const void *ptr, size_t bytes){
 		return _fread(ptr,bytes);
+	}
+
+	// v0.3.3: Internal std::span overload (public API unchanged until v0.3.10)
+	size_t fread(std::span<std::byte> buf){
+		return _fread(buf.data(), buf.size());
 	}
 
 	void unget() { fseek(-1,SEEK_CUR); }

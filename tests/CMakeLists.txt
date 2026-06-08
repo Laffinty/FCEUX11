@@ -66,6 +66,16 @@ if(FCEUX11_BUILD_TESTS)
              COMMAND fceux11_rom_regression_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
+    # v0.3.3 — tl::expected API tests
+    fceux11_add_test_executable(fceux11_expected_api_test
+        expected_api_test.cpp
+        git_info_stub.cpp
+        ${CMAKE_SOURCE_DIR}/src/utils/fceu11_expected.cpp
+    )
+    add_test(NAME expected_api_test
+             COMMAND fceux11_expected_api_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
     # -------------------------------------------------------------------------
     # v0.3.0 — Performance baseline benchmarks (Google Benchmark preferred)
     # -------------------------------------------------------------------------

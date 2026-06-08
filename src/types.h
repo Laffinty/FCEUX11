@@ -25,6 +25,17 @@
 #include <stdlib.h>
 #include <new>
 
+// v0.3.3: C++20 feature-test macros
+#ifdef __cplusplus
+  #include <cstdint>
+  #if __cpp_lib_span >= 202002L
+    #define FCEU11_HAS_STD_SPAN 1
+  #endif
+  #if __cpp_lib_format >= 201907L
+    #define FCEU11_HAS_STD_FORMAT 1
+  #endif
+#endif
+
 //enables a hack designed for debugging dragon warrior 3 which treats BRK as a 3-byte opcode
 //#define BRK_3BYTE_HACK
 
