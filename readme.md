@@ -1,8 +1,8 @@
 # FCEUX11
 
-FCEUX11 是基于 [FCEUX](https://fceux.com) 的 NES/Famicom 模拟器衍生项目，面向 Windows 平台持续维护。
+FCEUX11 是基于 [FCEUX](https://fceux.com) 的 NES/Famicom 模拟器衍生项目，面向 **Windows 11** 平台持续维护。
 
-FCEUX11 is a derivative of the [FCEUX](https://fceux.com) NES/Famicom emulator, actively maintained for Windows.
+FCEUX11 is a derivative of the [FCEUX](https://fceux.com) NES/Famicom emulator, actively maintained for **Windows 11**.
 
 ---
 
@@ -42,13 +42,20 @@ This project aims to preserve the core emulation accuracy of FCEUX while providi
 
 ### 运行环境
 
-- **操作系统**：Windows 10 版本 1809（2018年10月更新）或更高版本的 64 位系统。
-- **说明**：Windows 7、Windows 8 及 Windows 8.1 不支持。此限制由图形界面框架 Qt 6 的运行时依赖决定，并非人为划定。
+- **操作系统**：Windows 11 22H2 或更高版本的 64 位系统。
+- **说明**：Windows 7/8/8.1/10 不支持。此限制由 Qt 6.8 LTS 的运行时依赖及项目 v0.3.x 的 Win11 独占优化策略决定。
 
-- **Operating System**: 64-bit Windows 10 version 1809 (October 2018 Update) or later.
-- **Note**: Windows 7, Windows 8, and Windows 8.1 are not supported. This limitation is determined by the runtime requirements of the Qt 6 GUI framework, not an arbitrary policy.
+- **Operating System**: 64-bit Windows 11 22H2 or later.
+- **Note**: Windows 7, 8, 8.1, and 10 are not supported. This is determined by the Qt 6.8 LTS runtime requirements and the v0.3.x Win11-exclusive optimization strategy.
 
 ### 构建环境
+
+- **编译器**：MSVC 2022 19.36 (VS 17.6) 或更高
+- **CMake**：4.0+
+- **生成器**：Ninja（推荐）或 Visual Studio 2022
+- **包管理器**：vcpkg（manifest 模式）
+- **Qt**：6.8 LTS
+- **C++ 标准**：C++20
 
 如需从源码编译，请参阅 `docs/tech/Build_Guide.md`。
 
@@ -76,6 +83,14 @@ Ensure the target directory has write permissions on first run so the program ca
 4. 按 **I** 快速存档，**P** 快速读档。
 
 4. Press **I** for quick save and **P** for quick load.
+
+---
+
+## 版本历史
+
+详见 [CHANGELOG.md](CHANGELOG.md)。
+
+See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 ---
 

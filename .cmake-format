@@ -1,0 +1,17 @@
+# FCEUX11 v0.3.2 — CMake format configuration
+# Requires cmake-format (pip install cmake-format)
+
+format:
+  tab_size: 4
+  use_tabchars: true
+  max_subgroups_hwrap: 3
+  max_pargs_hwrap: 6
+  max_rows_cmdline: 2
+  separate_ctrl_name_with_space: false
+  separate_fn_name_with_space: false
+  dangle_parens: false
+  command_case: canonical
+  keyword_case: unchanged
+  always_wrap: []
+  enable_sort: true
+  autosort: false

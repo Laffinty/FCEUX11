@@ -1,5 +1,5 @@
 
-cmake_minimum_required(VERSION 3.28)
+cmake_minimum_required(VERSION 4.0)
 
 # v0.2.1: Auto-detect vcpkg toolchain
 if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
@@ -43,6 +43,10 @@ endif()
 
 option(FCEUX11_BUILD_TESTS "Build smoke and regression tests" ON)
 option(FCEUX11_ENABLE_I18N "Enable internationalization (i18n) support" ON)
+option(ENABLE_LINT "Enable static analysis targets (clang-tidy, cppcheck)" OFF)
+
+# v0.3.2: Export compile_commands.json for clang-tidy / IDE integration
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # i18n: Qt Linguist tools
 if(FCEUX11_ENABLE_I18N)
@@ -55,4 +59,37 @@ if(FCEUX11_BUILD_TESTS)
     enable_testing()
     add_subdirectory( tests )
     include(CTest)
+endif()
+
+# v0.3.2: Optional lint targets (clang-tidy / cppcheck)
+if(ENABLE_LINT)
+    find_program(CLANG_TIDY_PROG clang-tidy)
+    find_program(CPPCHECK_PROG cppcheck)
+
+    if(CLANG_TIDY_PROG AND EXISTS "${CMAKE_BINARY_DIR}/compile_commands.json")
+        add_custom_target(lint-clang-tidy
+            COMMAND ${CLANG_TIDY_PROG}
+                -p ${CMAKE_BINARY_DIR}
+                ${CMAKE_SOURCE_DIR}/src/*.cpp
+                ${CMAKE_SOURCE_DIR}/src/drivers/Qt/*.cpp
+                ${CMAKE_SOURCE_DIR}/src/utils/*.cpp
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            COMMENT "Running clang-tidy..."
+        )
+    endif()
+
+    if(CPPCHECK_PROG)
+        add_custom_target(lint-cppcheck
+            COMMAND ${CPPCHECK_PROG}
+                --enable=warning,style,performance,portability
+                --std=c++20 --language=c++ --template=gcc
+                --suppress=missingIncludeSystem
+                --suppress=unusedFunction
+                -I ${CMAKE_SOURCE_DIR}/src
+                -I ${CMAKE_SOURCE_DIR}/src/drivers
+                ${CMAKE_SOURCE_DIR}/src/
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            COMMENT "Running cppcheck..."
+        )
+    endif()
 endif()
