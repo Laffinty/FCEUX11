@@ -41,4 +41,6 @@ add_subdirectory( src )
 
 if(FCEUX11_BUILD_TESTS)
     enable_testing()
+    add_subdirectory( tests )
+    include(CTest)
 endif()

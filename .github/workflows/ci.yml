@@ -1,0 +1,75 @@
+# FCEUX11 v0.3.0 — CI Workflow
+# Four stages: build → ctest → rom_regression → benchmark
+
+name: CI
+
+on:
+  push:
+    branches: [main, topic/v0.3.x-*]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: |
+            vcpkg_installed
+            ${{ env.LOCALAPPDATA }}\vcpkg\archives
+          key: vcpkg-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            vcpkg-
+
+      - name: Setup MSVC
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Configure CMake
+        run: >
+          cmake -S . -B build
+          -G "Visual Studio 17 2022"
+          -A x64
+          -DCMAKE_BUILD_TYPE=Release
+          -DFCEUX11_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: CTest
+        run: ctest --test-dir build --build-config Release --output-on-failure
+
+      - name: ROM Regression Test
+        working-directory: ${{ github.workspace }}/tests
+        run: |
+          # Generate baseline if missing, then verify
+          $regTest = "../build/tests/Release/fceux11_rom_regression_test.exe"
+          if (-not (Test-Path "fixtures/golden_hashes.json")) {
+            & $regTest --generate
+          }
+          & $regTest
+        shell: pwsh
+
+      - name: Benchmark (smoke)
+        working-directory: ${{ github.workspace }}/tests
+        run: |
+          $benchDir = "../build/tests/Release"
+          & "$benchDir/fceux11_bench_ppu_render.exe"
+          & "$benchDir/fceux11_bench_x6502_exec.exe"
+          & "$benchDir/fceux11_bench_apu_mix.exe"
+        shell: pwsh
+
+      - name: Format Check
+        run: |
+          # clang-format is pre-installed on windows-2022 runners
+          bash tools/lint/format-check.sh clang-format
+        shell: bash

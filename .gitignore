@@ -85,8 +85,15 @@ settings.ini
 src/rust/target/
 src/rust/Cargo.lock
 
-# Emulator ROMs
+# Emulator ROMs (ignore outside tests/fixtures)
 *.nes
 *.fds
 *.nsf
 *.unif
+!tests/fixtures/*.nes
+!tests/fixtures/*.fds
+!tests/fixtures/*.nsf
+
+# Temporary build scripts
+scripts/build_*.ps1
+scripts/reconfig_*.ps1

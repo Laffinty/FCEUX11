@@ -580,9 +580,5 @@ if (WIN32)
    target_link_libraries(${APP_NAME} ntdll)
 endif()
 
-if(FCEUX11_BUILD_TESTS)
-	enable_testing()
-	add_subdirectory(tests)
-	include(CTest)
-endif()
+
 

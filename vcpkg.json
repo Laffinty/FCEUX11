@@ -16,7 +16,8 @@
     "sdl2",
     "libarchive",
     "zlib",
-    "liblzma"
+    "liblzma",
+    "benchmark"
   ],
   "default-features": [],
   "features": {
