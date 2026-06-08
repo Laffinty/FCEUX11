@@ -2,48 +2,12 @@
 #define __FCEU_ENDIAN
 
 #include <iosfwd>
+#include <bit>
 #include <stdio.h>
 #include "../types.h"
 #include "../emufile.h"
 
 class EMUFILE;
-
-inline uint64 double_to_u64(double d) {
-	union {
-		uint64 a;
-		double b;
-	} fuxor;
-	fuxor.b = d;
-	return fuxor.a;
-}
-
-inline double u64_to_double(uint64 u) {
-	union {
-		uint64 a;
-		double b;
-	} fuxor;
-	fuxor.a = u;
-	return fuxor.b;
-}
-
-inline uint32 float_to_u32(float f) {
-	union {
-		uint32 a;
-		float b;
-	} fuxor;
-	fuxor.b = f;
-	return fuxor.a;
-}
-
-inline float u32_to_float(uint32 u) {
-	union {
-		uint32 a;
-		float b;
-	} fuxor;
-	fuxor.a = u;
-	return fuxor.b;
-}
-
 
 int write16le(uint16 b, FILE *fp);
 int write32le(uint32 b, FILE *fp);
@@ -68,7 +32,7 @@ inline int write8le(uint8* b, EMUFILE *fp) { return write8le(*b,fp); }
 int write16le(uint16 b, EMUFILE* os);
 int write32le(uint32 b, EMUFILE* os);
 int write64le(uint64 b, EMUFILE* os);
-inline int write_double_le(double b, EMUFILE*is) { uint64 temp = double_to_u64(b); int ret = write64le(temp,is); return ret; }
+inline int write_double_le(double b, EMUFILE*is) { uint64 temp = std::bit_cast<uint64>(b); int ret = write64le(temp,is); return ret; }
 
 int read8le(uint8 *Bufo, EMUFILE*is);
 int read16le(uint16 *Bufo, EMUFILE*is);
@@ -76,7 +40,7 @@ inline int read16le(int16 *Bufo, EMUFILE*is) { return read16le((uint16*)Bufo,is)
 int read32le(uint32 *Bufo, EMUFILE*is);
 inline int read32le(int32 *Bufo, EMUFILE*is) { return read32le((uint32*)Bufo,is); }
 int read64le(uint64 *Bufo, EMUFILE*is);
-inline int read_double_le(double *Bufo, EMUFILE*is) { uint64 temp; int ret = read64le(&temp,is); *Bufo = u64_to_double(temp); return ret; }
+inline int read_double_le(double *Bufo, EMUFILE*is) { uint64 temp; int ret = read64le(&temp,is); *Bufo = std::bit_cast<double>(temp); return ret; }
 
 
 template<typename T>

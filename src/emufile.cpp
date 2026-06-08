@@ -14,6 +14,8 @@ FFI contract:
 #include "rust/fceux11_rust.h"
 #include "utils/xstring.h"
 
+#include <bit>
+
 #include <stdio.h>
 #include <vector>
 
@@ -163,11 +165,11 @@ u8 EMUFILE::read8le()
 
 void EMUFILE::writedouble(double* val)
 {
-    write64le(double_to_u64(*val));
+    write64le(std::bit_cast<u64>(*val));
 }
 void EMUFILE::writedouble(double val)
 {
-    write64le(double_to_u64(val));
+    write64le(std::bit_cast<u64>(val));
 }
 
 double EMUFILE::readdouble()
@@ -181,7 +183,7 @@ size_t EMUFILE::readdouble(double* val)
 {
     u64 temp=0;
     size_t ret = read64le(&temp);
-    *val = u64_to_double(temp);
+    *val = std::bit_cast<double>(temp);
     return ret;
 }
 
