@@ -22,6 +22,7 @@
 /// \brief implements a built-in NSF player.  This is a perk--not a part of the emu core
 
 #include "types.h"
+#include "utils/safe_string.h"
 #include "x6502.h"
 #include "fceu.h"
 #include "video.h"
@@ -223,7 +224,7 @@ int NSFLoad(const char *name, FCEUFILE *fp)
 
 	GameInterface=NSFGI;
 
-	strcpy(LoadedRomFName,name);
+	FCEU_strlcpy(LoadedRomFName, sizeof(LoadedRomFName), name);
 
 	FCEU_printf("\nNSF Loaded.\nFile information:\n");
 	FCEU_printf(" Name:       %s\n Artist:     %s\n Copyright:  %s\n\n",NSFHeader.SongName,NSFHeader.Artist,NSFHeader.Copyright);
@@ -539,7 +540,7 @@ void DrawNSF(uint8 *XBuf)
 	DrawTextTrans(ClipSidesOffset+XBuf+42*256+4+(((31-strlen((char*)NSFHeader.Copyright))<<2)), 256,NSFHeader.Copyright, kFgColor);
 
 	DrawTextTrans(ClipSidesOffset+XBuf+70*256+4+(((31-strlen("Song:"))<<2)), 256, (uint8*)"Song:", kFgColor);
-	sprintf(snbuf,"<%d/%d>",CurrentSong,NSFHeader.TotalSongs);
+	snprintf( snbuf, sizeof(snbuf),"<%d/%d>",CurrentSong,NSFHeader.TotalSongs);
 	DrawTextTrans(XBuf+82*256+4+(((31-strlen(snbuf))<<2)), 256, (uint8*)snbuf, kFgColor);
 
 	{

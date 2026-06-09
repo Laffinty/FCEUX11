@@ -27,6 +27,7 @@
 /****************************************************************/
 
 #include <stdio.h>
+#include "utils/safe_string.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -80,7 +81,7 @@ int ParseEA(int x, int argc, char *argv[], ARGPSTRUCT *argsps)
 							if(!( *(char **)argsps[y].subs=(char*)malloc(strlen(argv[x+1])+1) ))
 								break;
 						}	
-						strcpy(*(char **)argsps[y].subs,argv[x+1]);
+						FCEU_strlcpy(*(char **)argsps[y].subs, sizeof(*(char **)argsps[y].subs), argv[x+1]);
 						break;
 				}
 			}

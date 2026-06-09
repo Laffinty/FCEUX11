@@ -19,6 +19,7 @@
  */
 // FamilyKeyboard.cpp
 #include <SDL.h>
+#include "utils/safe_string.h"
 #include <QHeaderView>
 #include <QCloseEvent>
 #include <QFileDialog>
@@ -616,11 +617,11 @@ FKBConfigDialog::FKBConfigDialog(QWidget *parent)
 
 		if ( strcmp( keyNames[j], keyNames[j+1] ) == 0 )
 		{
-			sprintf( stmp, " %s     ", keyNames[j] );
+			snprintf( stmp, sizeof(stmp), " %s     ", keyNames[j] );
 		}
 		else
 		{
-			sprintf( stmp, " %s  -  %s   ", keyNames[j], keyNames[j+1] );
+			snprintf( stmp, sizeof(stmp), " %s  -  %s   ", keyNames[j], keyNames[j+1] );
 		}
 
 		item->setText(0, tr(stmp) );
@@ -921,7 +922,7 @@ void FKBConfigDialog::updateBindingList(void)
 		}
 		else
 		{
-			strcpy(keyNameStr, ButtonName(&fkbmap[i]));
+			FCEU_strlcpy( keyNameStr, sizeof(keyNameStr), ButtonName(&fkbmap[i]));
 		}
 		item->setText(1, tr(keyNameStr));
 	}
@@ -1161,8 +1162,8 @@ void FKBConfigDialog::mappingLoad(void)
 	dialog.setFilter( QDir::AllEntries | QDir::AllDirs | QDir::Hidden );
 	dialog.setLabelText( QFileDialog::Accept, tr("Load") );
 
-	strcpy( dir, FCEUI_GetBaseDirectory() );
-	strcat( dir, "/input/FamilyKeyboard");
+	FCEU_strlcpy( dir, sizeof(dir), FCEUI_GetBaseDirectory() );
+	safe_strcat( dir, sizeof(dir), "/input/FamilyKeyboard");
 
 	dialog.setDirectory( tr(dir) );
 
@@ -1331,26 +1332,26 @@ void FKBConfigDialog::mappingSave(void)
 			}
 			stmp[k] = 0;
 
-			//sprintf(stmp, "k%s", SDL_GetKeyName(bmap[c][i].ButtonNum));
+			//snprintf( stmp, sizeof(stmp), "k%s", SDL_GetKeyName(bmap[c][i].ButtonNum));
 		}
 		else
 		{
 			if (fkbmap[i].ButtonNum & 0x2000)
 			{
 				/* Hat "button" */
-				sprintf(stmp, "h%i.%i",
+				snprintf( stmp, sizeof(stmp), "h%i.%i",
 						(fkbmap[i].ButtonNum >> 8) & 0x1F, fkbmap[i].ButtonNum & 0xFF);
 			}
 			else if (fkbmap[i].ButtonNum & 0x8000)
 			{
 				/* Axis "button" */
-				sprintf(stmp, "%ca%i",
+				snprintf( stmp, sizeof(stmp), "%ca%i",
 						(fkbmap[i].ButtonNum & 0x4000) ? '-' : '+', fkbmap[i].ButtonNum & 0x3FFF);
 			}
 			else
 			{
 				/* Button */
-				sprintf(stmp, "b%i", fkbmap[i].ButtonNum);
+				snprintf( stmp, sizeof(stmp), "b%i", fkbmap[i].ButtonNum);
 			}
 		}
 		fprintf( fp, "%s=%s\n", FamilyKeyBoardNames[i], stmp );
@@ -1462,7 +1463,7 @@ FKBKeyMapDialog::FKBKeyMapDialog( int idx, QWidget *parent )
 
 	setLayout( mainLayout );
 
-	sprintf( stmp, "Press a key to set new physical mapping for the '%s' Key", keyNames[idx*2] );
+	snprintf( stmp, sizeof(stmp), "Press a key to set new physical mapping for the '%s' Key", keyNames[idx*2] );
 
 	msgLbl = new QLabel( tr(stmp) );
 
@@ -1473,7 +1474,7 @@ FKBKeyMapDialog::FKBKeyMapDialog( int idx, QWidget *parent )
 	}
 	else
 	{
-		strcpy(keyMapName, ButtonName(&fkbmap[ keyIdx ]));
+		FCEU_strlcpy(keyMapName, sizeof(keyMapName), ButtonName(&fkbmap[ keyIdx ]));
 	}
 
 	lbl       = new QLabel( tr("Current Mapping is:") );

@@ -22,6 +22,7 @@
 /// \brief various string manipulation utilities
 
 #include "xstring.h"
+#include "utils/safe_string.h"
 #include <string>
 
 ///Upper case routine. Returns number of characters modified
@@ -64,16 +65,16 @@ int str_ltrim(char *str, int flags) {
 	while (str[0]) {
 		if ((flags & STRIP_SP) && (str[0] == ' ')) {
 			i++;
-			strcpy(str,str+1);
+			FCEU_strlcpy(str, sizeof(str), str+1);
 		} else if ((flags & STRIP_TAB) && (str[0] == '\t')) {
 			i++;
-			strcpy(str,str+1);
+			FCEU_strlcpy(str, sizeof(str), str+1);
 		} else if ((flags & STRIP_CR) && (str[0] == '\r')) {
 			i++;
-			strcpy(str,str+1);
+			FCEU_strlcpy(str, sizeof(str), str+1);
 		} else if ((flags & STRIP_LF) && (str[0] == '\n')) {
 			i++;
-			strcpy(str,str+1);
+			FCEU_strlcpy(str, sizeof(str), str+1);
 		} else
 			break;
 	}
@@ -129,7 +130,7 @@ int str_strip(char *str, int flags) {
 		if (chr) astr[j++] = chr;
 	}
 	astr[j] = 0;
-	strcpy(str,astr);
+	FCEU_strlcpy(str, sizeof(str), astr);
 	free(astr);
 	return j;
 }
@@ -175,7 +176,7 @@ int str_replace(char *str, const char *search, const char *replace) {
 		else astr[j++] = str[i++];
 	}
 	astr[j] = 0;
-	strcpy(str,astr);
+	FCEU_strlcpy(str, sizeof(str), astr);
 	free(astr);
 	return j;
 }
@@ -207,13 +208,13 @@ std::string BytesToString(const void* data, int len)
 {
 	char temp[16];
 	if(len==1) {
-		sprintf(temp,"%d",*(const unsigned char*)data);
+		snprintf( temp, sizeof(temp),"%d",*(const unsigned char*)data);
 		return temp;
 	} else if(len==2) {
-		sprintf(temp,"%d",*(const unsigned short*)data);
+		snprintf( temp, sizeof(temp),"%d",*(const unsigned short*)data);
 		return temp;
 	} else if(len==4) {
-		sprintf(temp,"%d",*(const unsigned int*)data);
+		snprintf( temp, sizeof(temp),"%d",*(const unsigned int*)data);
 		return temp;		
 	}
 	
@@ -552,7 +553,7 @@ char *U8ToHexStr(uint8 a)
 std::string stditoa(int n)
 {
 	char tempbuf[16];
-	sprintf(tempbuf, "%d", n);
+	snprintf( tempbuf, sizeof(tempbuf), "%d", n);
 	return tempbuf;
 }
 
@@ -767,12 +768,12 @@ std::string wcstombs(std::wstring str) // UTF32->UTF8
 //TODO - dont we already have another  function that can do this
 std::string getExtension(const char* input) {
 	char buf[1024];
-	strcpy(buf,input);
+	FCEU_strlcpy(buf, sizeof(buf), input);
 	char* dot=strrchr(buf,'.');
 	if(!dot)
 		return "";
 	char ext [512];
-	strcpy(ext, dot+1);
+	FCEU_strlcpy(ext, sizeof(ext), dot+1);
 	int k, extlen=strlen(ext);
 	for(k=0;k<extlen;k++)
 		ext[k]=tolower(ext[k]);

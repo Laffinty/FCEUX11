@@ -26,6 +26,7 @@
 #include "file.h"
 #include "utils/md5.h"
 #include "utils/memory.h"
+#include "utils/safe_string.h"
 #include "state.h"
 #include "file.h"
 #include "cart.h"
@@ -827,7 +828,7 @@ int FDSLoad(const char *name, FCEUFILE *fp) {
 		free(fn);
 	}
 
-	strcpy(LoadedRomFName, name); //For the debugger list
+	FCEU_strlcpy(LoadedRomFName, sizeof(LoadedRomFName), name); //For the debugger list
 
 	GameInfo->type = GIT_FDS;
 	GameInterface = FDSGI;
@@ -841,7 +842,7 @@ int FDSLoad(const char *name, FCEUFILE *fp) {
 
 	for (x = 0; x < TotalSides; x++) {
 		char temp[5];
-		sprintf(temp, "DDT%d", x);
+		snprintf(temp, sizeof(temp), "DDT%d", x);
 		AddExState(diskdata[x], 65500, 0, temp);
 	}
 

@@ -995,7 +995,7 @@ void consoleWin_t::createMainMenu(void)
 	{
 	        char stmp[8];
 
-	        sprintf( stmp, "Slot &%i", i );
+	        snprintf( stmp, sizeof(stmp), "Slot &%i", i );
 
 	        state[i] = new QAction(tr(stmp), this);
 	        state[i]->setCheckable(true);
@@ -1222,7 +1222,7 @@ void consoleWin_t::createMainMenu(void)
 	{
 	        char stmp[8];
 
-	        sprintf( stmp, "&%ix", i+1 );
+	        snprintf( stmp, sizeof(stmp), "&%ix", i+1 );
 
 	        winSizeAct[i] = new QAction(tr(stmp), this);
 
@@ -1597,7 +1597,7 @@ void consoleWin_t::createMainMenu(void)
 
 		for (int j=1; j<=(6-i); j++)
 		{
-			sprintf( stmp, "%i On, %i Off", i, j );
+			snprintf( stmp, sizeof(stmp), "%i On, %i Off", i, j );
 			autoFireMenuAction *afAct = new autoFireMenuAction( i, j, tr(stmp), this);
 			afAct->setCheckable(true);
 			group->addAction(afAct);
@@ -2134,7 +2134,7 @@ void consoleWin_t::buildRecentRomMenu(void)
 
 	for (int i=0; i<10; i++)
 	{
-		sprintf(buf, "SDL.RecentRom%02i", i);
+		snprintf( buf, sizeof(buf), "SDL.RecentRom%02i", i);
 
 		g_config->getOption( buf, &s);
 
@@ -2169,7 +2169,7 @@ void consoleWin_t::saveRecentRomMenu(void)
 	for (it=romList.begin(); it != romList.end(); it++)
 	{
 		s = *it;
-		sprintf(buf, "SDL.RecentRom%02i", i);
+		snprintf( buf, sizeof(buf), "SDL.RecentRom%02i", i);
 
 		g_config->setOption( buf, s->c_str() );
 
@@ -3324,7 +3324,7 @@ void consoleWin_t::warnAmbiguousShortcut( QShortcut *shortcut)
 	std::string msg;
 	int c = 0;
 
-	sprintf( stmp, "Error: Ambiguous Shortcut Activation for Key Sequence: '%s'\n", shortcut->key().toString().toStdString().c_str() );
+	snprintf( stmp, sizeof(stmp), "Error: Ambiguous Shortcut Activation for Key Sequence: '%s'\n", shortcut->key().toString().toStdString().c_str() );
 
 	msg.assign( stmp );
 

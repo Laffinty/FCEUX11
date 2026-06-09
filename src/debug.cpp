@@ -1,6 +1,7 @@
 /// \file
 /// \brief Implements core debugging facilities
 #include "types.h"
+#include "utils/safe_string.h"
 #include "x6502.h"
 #include "fceu.h"
 #include "cart.h"
@@ -15,6 +16,8 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <charconv>
+#include <cctype>
 
 unsigned int debuggerPageSize = 14;
 int vblankScanLines = 0;	//Used to calculate scanlines 240-261 (vblank)
@@ -29,7 +32,12 @@ int offsetStringToInt(unsigned int type, const char* offsetBuffer, bool *convers
 		*conversionOk = false;
 	}
 
-	if (sscanf(offsetBuffer,"%7X",(unsigned int *)&offset) == EOF)
+	// Skip leading whitespace (sscanf behavior)
+	const char* p = offsetBuffer;
+	while (*p && std::isspace(static_cast<unsigned char>(*p))) ++p;
+
+	auto result = std::from_chars(p, p + std::strlen(p), offset, 16);
+	if (result.ec != std::errc() || result.ptr == p)
 	{
 		return -1;
 	}
@@ -165,7 +173,7 @@ int checkCondition(const char* condition, int num)
 			watchpoint[num].condText = (char*)malloc(strlen(condition) + 1);
 			if (!watchpoint[num].condText)
 				return 0;
-			strcpy(watchpoint[num].condText, condition);
+			FCEU_strlcpy(watchpoint[num].condText, sizeof(watchpoint[num].condText), condition);
 		}
 		else
 		{
@@ -230,7 +238,7 @@ unsigned int NewBreak(const char* name, int start, int end, unsigned int type, c
 		free(watchpoint[num].desc);
 
 	watchpoint[num].desc = (char*)malloc(strlen(name) + 1);
-	strcpy(watchpoint[num].desc, name);
+	FCEU_strlcpy(watchpoint[num].desc, sizeof(watchpoint[num].desc), name);
 
 	return checkCondition(condition, num);
 }

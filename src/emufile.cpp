@@ -10,6 +10,7 @@ FFI contract:
 */
 
 #include "emufile.h"
+#include "utils/safe_string.h"
 #include "emufile_types.h"
 #include "rust/fceux11_rust.h"
 #include "utils/xstring.h"
@@ -202,7 +203,7 @@ void EMUFILE_FILE::open(const char* fname, const char* mode)
             failbit = true;
     }
     this->fname = fname;
-    strcpy(this->mode,mode);
+    FCEU_strlcpy(this->mode, sizeof(this->mode), mode);
 }
 
 void EMUFILE_FILE::truncate(size_t length)

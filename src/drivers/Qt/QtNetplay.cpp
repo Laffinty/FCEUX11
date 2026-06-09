@@ -25,6 +25,7 @@
 //#include "Qt/input.h"
 //#include "Qt/dface.h"
 #include "Qt/QtNetplay.h"
+#include "utils/safe_string.h"
 
 #include "../../fceu.h"
 #include "../../driver.h"
@@ -352,7 +353,7 @@ FCEUD_NetplayText(uint8 *text)
 	char *tmp;
 	if (!tot)
 		return;
-	strcpy(tot, (const char *)text);
+	FCEU_strlcpy( tot, sizeof(tot), (const char *)text);
 	tmp = tot;
 
 	while(*tmp) {

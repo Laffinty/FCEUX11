@@ -21,6 +21,7 @@
 // RamSearch.cpp
 //
 #include <stdio.h>
+#include "utils/safe_string.h"
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
@@ -1322,7 +1323,7 @@ void RamSearchDialog_t::addCheatClicked(void)
 	{
 		return;
 	}
-	strcpy(desc, "Quick Cheat Add");
+	FCEU_strlcpy( desc, sizeof(desc), "Quick Cheat Add");
 
 	FCEU_WRAPPER_LOCK();
 
@@ -1342,7 +1343,7 @@ void RamSearchDialog_t::addRamWatchClicked(void)
 	{
 		return;
 	}
-	strcpy(desc, "Quick Watch Add");
+	FCEU_strlcpy( desc, sizeof(desc), "Quick Watch Add");
 
 	int size = 1;
 	switch (dpySize)
@@ -1962,10 +1963,10 @@ void QRamSearchView::paintEvent(QPaintEvent *event)
 	x = -pxLineXScroll;
 	y = pxLineSpacing;
 
-	strcpy(addrStr, "Address");
-	strcpy(valStr, "Value");
-	strcpy(prevStr, "Previous");
-	strcpy(chgStr, "Changes");
+	FCEU_strlcpy(addrStr, sizeof(addrStr), "Address");
+	FCEU_strlcpy(valStr, sizeof(valStr), "Value");
+	FCEU_strlcpy(prevStr, sizeof(prevStr), "Previous");
+	FCEU_strlcpy(chgStr, sizeof(chgStr), "Changes");
 
 	fieldText[0] = addrStr;
 	fieldText[1] = valStr;
@@ -2012,63 +2013,63 @@ void QRamSearchView::paintEvent(QPaintEvent *event)
 			painter.fillRect(0, y - pxLineSpacing + pxLineLead, viewWidth, pxLineSpacing, QColor("light blue"));
 		}
 
-		sprintf(addrStr, "$%04X", loc->addr);
+		snprintf( addrStr, sizeof(addrStr), "$%04X", loc->addr);
 
 		if (dpySize == 'd')
 		{
 			if (dpyType == 'h')
 			{
-				sprintf(valStr, "0x%08X", loc->val.v32.u);
-				sprintf(prevStr, "0x%08X", loc->hist.back().v32.u);
+				snprintf(valStr, sizeof(valStr), "0x%08X", loc->val.v32.u);
+				snprintf(prevStr, sizeof(prevStr), "0x%08X", loc->hist.back().v32.u);
 			}
 			else if (dpyType == 'u')
 			{
-				sprintf(valStr, "%u", loc->val.v32.u);
-				sprintf(prevStr, "%u", loc->hist.back().v32.u);
+				snprintf(valStr, sizeof(valStr), "%u", loc->val.v32.u);
+				snprintf(prevStr, sizeof(prevStr), "%u", loc->hist.back().v32.u);
 			}
 			else
 			{
-				sprintf(valStr, "%i", loc->val.v32.i);
-				sprintf(prevStr, "%i", loc->hist.back().v32.i);
+				snprintf(valStr, sizeof(valStr), "%i", loc->val.v32.i);
+				snprintf(prevStr, sizeof(prevStr), "%i", loc->hist.back().v32.i);
 			}
 		}
 		else if (dpySize == 'w')
 		{
 			if (dpyType == 'h')
 			{
-				sprintf(valStr, "0x%04X", loc->val.v16.u);
-				sprintf(prevStr, "0x%04X", loc->hist.back().v16.u);
+				snprintf(valStr, sizeof(valStr), "0x%04X", loc->val.v16.u);
+				snprintf(prevStr, sizeof(prevStr), "0x%04X", loc->hist.back().v16.u);
 			}
 			else if (dpyType == 'u')
 			{
-				sprintf(valStr, "%u", loc->val.v16.u);
-				sprintf(prevStr, "%u", loc->hist.back().v16.u);
+				snprintf(valStr, sizeof(valStr), "%u", loc->val.v16.u);
+				snprintf(prevStr, sizeof(prevStr), "%u", loc->hist.back().v16.u);
 			}
 			else
 			{
-				sprintf(valStr, "%i", loc->val.v16.i);
-				sprintf(prevStr, "%i", loc->hist.back().v16.i);
+				snprintf(valStr, sizeof(valStr), "%i", loc->val.v16.i);
+				snprintf(prevStr, sizeof(prevStr), "%i", loc->hist.back().v16.i);
 			}
 		}
 		else
 		{
 			if (dpyType == 'h')
 			{
-				sprintf(valStr, "0x%02X", loc->val.v8.u);
-				sprintf(prevStr, "0x%02X", loc->hist.back().v8.u);
+				snprintf(valStr, sizeof(valStr), "0x%02X", loc->val.v8.u);
+				snprintf(prevStr, sizeof(prevStr), "0x%02X", loc->hist.back().v8.u);
 			}
 			else if (dpyType == 'u')
 			{
-				sprintf(valStr, "%u", loc->val.v8.u);
-				sprintf(prevStr, "%u", loc->hist.back().v8.u);
+				snprintf(valStr, sizeof(valStr), "%u", loc->val.v8.u);
+				snprintf(prevStr, sizeof(prevStr), "%u", loc->hist.back().v8.u);
 			}
 			else
 			{
-				sprintf(valStr, "%i", loc->val.v8.i);
-				sprintf(prevStr, "%i", loc->hist.back().v8.i);
+				snprintf(valStr, sizeof(valStr), "%i", loc->val.v8.i);
+				snprintf(prevStr, sizeof(prevStr), "%i", loc->hist.back().v8.i);
 			}
 		}
-		sprintf(chgStr, "%u", loc->chgCount);
+		snprintf(chgStr, sizeof(chgStr), "%u", loc->chgCount);
 
 		for (i = 0; i < 4; i++)
 		{

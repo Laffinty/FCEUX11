@@ -20,6 +20,7 @@
 // MsgLogViewer.cpp
 //
 #include <stdio.h>
+#include "utils/safe_string.h"
 #include <stdlib.h>
 #include <string.h>
 #include <string>
@@ -55,14 +56,14 @@ public:
 		if (GetTempPathA(sizeof(filename), filename) > 0)
 		{
 			//printf("PATH: %s \n", filename );
-			strcat(filename, "fceux.log");
+			safe_strcat( filename, sizeof(filename), "fceux.log");
 		}
 		else
 		{
-			strcpy(filename, "fceux.log");
+			FCEU_strlcpy( filename, sizeof(filename), "fceux.log");
 		}
 #else
-		strcpy(filename, "/tmp/fceux.log");
+		FCEU_strlcpy( filename, sizeof(filename), "/tmp/fceux.log");
 #endif
 
 		fp = ::fopen(filename, "w+");

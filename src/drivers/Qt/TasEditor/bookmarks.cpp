@@ -20,6 +20,7 @@ Bookmarks/Branches - Manager of Bookmarks
 ------------------------------------------------------------------------------------ */
 
 #include <QToolTip>
+#include "utils/safe_string.h"
 
 #include <zlib.h>
 #include "utils/xstring.h"
@@ -658,7 +659,7 @@ void BOOKMARKS::paintEvent(QPaintEvent *event)
 		}
 
 		x = pxStartCol1 + pxCharWidth;
-		sprintf( txt, "%i", item );
+		snprintf(txt, sizeof(txt), "%i", item );
 
 		painter.drawText( x, y+pxLineTextOfs, tr(txt) );
 
@@ -672,7 +673,7 @@ void BOOKMARKS::paintEvent(QPaintEvent *event)
 
 			x = pxStartCol3 + pxCharWidth;
 
-			strcpy(txt, bookmarksArray[item].snapshot.description);
+			FCEU_strlcpy(txt, sizeof(txt), bookmarksArray[item].snapshot.description);
 
 			painter.drawText( x, y+pxLineTextOfs, tr(txt) );
 		}
@@ -983,7 +984,7 @@ int BOOKMARKS::getSelectedSlot()
 //			case BOOKMARKSLIST_COLUMN_TIME:
 //			{
 //				if (bookmarksArray[(item.iItem + 1) % TOTAL_BOOKMARKS].notEmpty)
-//					strcpy(item.pszText, bookmarksArray[(item.iItem + 1) % TOTAL_BOOKMARKS].snapshot.description);
+//					FCEU_strlcpy(item.pszText, sizeof(item.pszText), bookmarksArray[(item.iItem + 1) % TOTAL_BOOKMARKS].snapshot.description);
 //			}
 //			break;
 //		}

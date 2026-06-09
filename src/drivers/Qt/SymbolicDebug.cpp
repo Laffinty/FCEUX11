@@ -20,6 +20,7 @@
 //
 // SymbolicDebug.cpp
 #include <stdio.h>
+#include "utils/safe_string.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -63,30 +64,30 @@ debugSymbol_t *replaceSymbols( int flags, int addr, char *str )
 	{
 		if ( flags & ASM_DEBUG_REPLACE )
 		{
-			strcpy( str, sym->name().c_str() );
+			FCEU_strlcpy( str, sizeof(str), sym->name().c_str() );
 		}
 		else
 		{
 			if ( flags & ASM_DEBUG_ADDR_02X )
 			{
-				sprintf( str, "$%02X ", addr );
+				snprintf( str, sizeof(str), "$%02X ", addr );
 			}
 			else
 			{
-				sprintf( str, "$%04X ", addr );
+				snprintf( str, sizeof(str), "$%04X ", addr );
 			}
-			strcat( str, sym->name().c_str() );
+			safe_strcat( str, sizeof(str), sym->name().c_str() );
 		}
 	}
 	else
 	{
 		if ( flags & ASM_DEBUG_ADDR_02X )
 		{
-			sprintf( str, "$%02X", addr );
+			snprintf( str, sizeof(str), "$%02X", addr );
 		}
 		else
 		{
-			sprintf( str, "$%04X", addr );
+			snprintf( str, sizeof(str), "$%04X", addr );
 		}
 	}
 
@@ -133,51 +134,51 @@ int DisassembleWithDebug(int addr, uint8_t *opcode, int flags, char *str, debugS
 
 		#ifdef BRK_3BYTE_HACK
 			case 0x00:
-			sprintf(str,"BRK %02X %02X", opcode[1], opcode[2]);
+			snprintf( str, sizeof(str),"BRK %02X %02X", opcode[1], opcode[2]);
 			break;
 		#else
-			case 0x00: strcpy(str,"BRK"); break;
+			case 0x00: FCEU_strlcpy( str, sizeof(str),"BRK"); break;
 		#endif
 
 		//odd, 1-byte opcodes
-		case 0x08: strcpy(str,"PHP"); break;
-		case 0x0A: strcpy(str,"ASL"); break;
-		case 0x18: strcpy(str,"CLC"); break;
-		case 0x28: strcpy(str,"PLP"); break;
-		case 0x2A: strcpy(str,"ROL"); break;
-		case 0x38: strcpy(str,"SEC"); break;
-		case 0x40: strcpy(str,"RTI"); break;
-		case 0x48: strcpy(str,"PHA"); break;
-		case 0x4A: strcpy(str,"LSR"); break;
-		case 0x58: strcpy(str,"CLI"); break;
-		case 0x60: strcpy(str,"RTS"); break;
-		case 0x68: strcpy(str,"PLA"); break;
-		case 0x6A: strcpy(str,"ROR"); break;
-		case 0x78: strcpy(str,"SEI"); break;
-		case 0x88: strcpy(str,"DEY"); break;
-		case 0x8A: strcpy(str,"TXA"); break;
-		case 0x98: strcpy(str,"TYA"); break;
-		case 0x9A: strcpy(str,"TXS"); break;
-		case 0xA8: strcpy(str,"TAY"); break;
-		case 0xAA: strcpy(str,"TAX"); break;
-		case 0xB8: strcpy(str,"CLV"); break;
-		case 0xBA: strcpy(str,"TSX"); break;
-		case 0xC8: strcpy(str,"INY"); break;
-		case 0xCA: strcpy(str,"DEX"); break;
-		case 0xD8: strcpy(str,"CLD"); break;
-		case 0xE8: strcpy(str,"INX"); break;
-		case 0xEA: strcpy(str,"NOP"); break;
-		case 0xF8: strcpy(str,"SED"); break;
+		case 0x08: FCEU_strlcpy( str, sizeof(str),"PHP"); break;
+		case 0x0A: FCEU_strlcpy( str, sizeof(str),"ASL"); break;
+		case 0x18: FCEU_strlcpy( str, sizeof(str),"CLC"); break;
+		case 0x28: FCEU_strlcpy( str, sizeof(str),"PLP"); break;
+		case 0x2A: FCEU_strlcpy( str, sizeof(str),"ROL"); break;
+		case 0x38: FCEU_strlcpy( str, sizeof(str),"SEC"); break;
+		case 0x40: FCEU_strlcpy( str, sizeof(str),"RTI"); break;
+		case 0x48: FCEU_strlcpy( str, sizeof(str),"PHA"); break;
+		case 0x4A: FCEU_strlcpy( str, sizeof(str),"LSR"); break;
+		case 0x58: FCEU_strlcpy( str, sizeof(str),"CLI"); break;
+		case 0x60: FCEU_strlcpy( str, sizeof(str),"RTS"); break;
+		case 0x68: FCEU_strlcpy( str, sizeof(str),"PLA"); break;
+		case 0x6A: FCEU_strlcpy( str, sizeof(str),"ROR"); break;
+		case 0x78: FCEU_strlcpy( str, sizeof(str),"SEI"); break;
+		case 0x88: FCEU_strlcpy( str, sizeof(str),"DEY"); break;
+		case 0x8A: FCEU_strlcpy( str, sizeof(str),"TXA"); break;
+		case 0x98: FCEU_strlcpy( str, sizeof(str),"TYA"); break;
+		case 0x9A: FCEU_strlcpy( str, sizeof(str),"TXS"); break;
+		case 0xA8: FCEU_strlcpy( str, sizeof(str),"TAY"); break;
+		case 0xAA: FCEU_strlcpy( str, sizeof(str),"TAX"); break;
+		case 0xB8: FCEU_strlcpy( str, sizeof(str),"CLV"); break;
+		case 0xBA: FCEU_strlcpy( str, sizeof(str),"TSX"); break;
+		case 0xC8: FCEU_strlcpy( str, sizeof(str),"INY"); break;
+		case 0xCA: FCEU_strlcpy( str, sizeof(str),"DEX"); break;
+		case 0xD8: FCEU_strlcpy( str, sizeof(str),"CLD"); break;
+		case 0xE8: FCEU_strlcpy( str, sizeof(str),"INX"); break;
+		case 0xEA: FCEU_strlcpy( str, sizeof(str),"NOP"); break;
+		case 0xF8: FCEU_strlcpy( str, sizeof(str),"SED"); break;
 
 		//(Indirect,X)
-		case 0x01: strcpy(chr,"ORA"); goto _indirectx;
-		case 0x21: strcpy(chr,"AND"); goto _indirectx;
-		case 0x41: strcpy(chr,"EOR"); goto _indirectx;
-		case 0x61: strcpy(chr,"ADC"); goto _indirectx;
-		case 0x81: strcpy(chr,"STA"); goto _indirectx;
-		case 0xA1: strcpy(chr,"LDA"); goto _indirectx;
-		case 0xC1: strcpy(chr,"CMP"); goto _indirectx;
-		case 0xE1: strcpy(chr,"SBC"); goto _indirectx;
+		case 0x01: FCEU_strlcpy( chr, sizeof(chr),"ORA"); goto _indirectx;
+		case 0x21: FCEU_strlcpy( chr, sizeof(chr),"AND"); goto _indirectx;
+		case 0x41: FCEU_strlcpy( chr, sizeof(chr),"EOR"); goto _indirectx;
+		case 0x61: FCEU_strlcpy( chr, sizeof(chr),"ADC"); goto _indirectx;
+		case 0x81: FCEU_strlcpy( chr, sizeof(chr),"STA"); goto _indirectx;
+		case 0xA1: FCEU_strlcpy( chr, sizeof(chr),"LDA"); goto _indirectx;
+		case 0xC1: FCEU_strlcpy( chr, sizeof(chr),"CMP"); goto _indirectx;
+		case 0xE1: FCEU_strlcpy( chr, sizeof(chr),"SBC"); goto _indirectx;
 		_indirectx:
 			indirectX(tmp);
 
@@ -185,39 +186,39 @@ int DisassembleWithDebug(int addr, uint8_t *opcode, int flags, char *str, debugS
 			{
 				sym = replaceSymbols( flags, tmp, stmp );
 				showTrace
-					? sprintf(str,"%s ($%02X,X) @ %s = #$%02X", chr,opcode[1],stmp,GetMem(tmp))
-					: sprintf(str,"%s ($%02X,X)", chr,opcode[1]);
+					? snprintf( str, sizeof(str),"%s ($%02X,X) @ %s = #$%02X", chr,opcode[1],stmp,GetMem(tmp))
+					: snprintf( str, sizeof(str),"%s ($%02X,X)", chr,opcode[1]);
 			}
 			else
 			{
 				showTrace
-					? sprintf(str,"%s ($%02X,X) @ $%04X = #$%02X", chr,opcode[1],tmp,GetMem(tmp))
-					: sprintf(str,"%s ($%02X,X)", chr,opcode[1]);
+					? snprintf( str, sizeof(str),"%s ($%02X,X) @ $%04X = #$%02X", chr,opcode[1],tmp,GetMem(tmp))
+					: snprintf( str, sizeof(str),"%s ($%02X,X)", chr,opcode[1]);
 			}
 			break;
 
 		//Zero Page
-		case 0x05: strcpy(chr,"ORA"); goto _zeropage;
-		case 0x06: strcpy(chr,"ASL"); goto _zeropage;
-		case 0x24: strcpy(chr,"BIT"); goto _zeropage;
-		case 0x25: strcpy(chr,"AND"); goto _zeropage;
-		case 0x26: strcpy(chr,"ROL"); goto _zeropage;
-		case 0x45: strcpy(chr,"EOR"); goto _zeropage;
-		case 0x46: strcpy(chr,"LSR"); goto _zeropage;
-		case 0x65: strcpy(chr,"ADC"); goto _zeropage;
-		case 0x66: strcpy(chr,"ROR"); goto _zeropage;
-		case 0x84: strcpy(chr,"STY"); goto _zeropage;
-		case 0x85: strcpy(chr,"STA"); goto _zeropage;
-		case 0x86: strcpy(chr,"STX"); goto _zeropage;
-		case 0xA4: strcpy(chr,"LDY"); goto _zeropage;
-		case 0xA5: strcpy(chr,"LDA"); goto _zeropage;
-		case 0xA6: strcpy(chr,"LDX"); goto _zeropage;
-		case 0xC4: strcpy(chr,"CPY"); goto _zeropage;
-		case 0xC5: strcpy(chr,"CMP"); goto _zeropage;
-		case 0xC6: strcpy(chr,"DEC"); goto _zeropage;
-		case 0xE4: strcpy(chr,"CPX"); goto _zeropage;
-		case 0xE5: strcpy(chr,"SBC"); goto _zeropage;
-		case 0xE6: strcpy(chr,"INC"); goto _zeropage;
+		case 0x05: FCEU_strlcpy( chr, sizeof(chr),"ORA"); goto _zeropage;
+		case 0x06: FCEU_strlcpy( chr, sizeof(chr),"ASL"); goto _zeropage;
+		case 0x24: FCEU_strlcpy( chr, sizeof(chr),"BIT"); goto _zeropage;
+		case 0x25: FCEU_strlcpy( chr, sizeof(chr),"AND"); goto _zeropage;
+		case 0x26: FCEU_strlcpy( chr, sizeof(chr),"ROL"); goto _zeropage;
+		case 0x45: FCEU_strlcpy( chr, sizeof(chr),"EOR"); goto _zeropage;
+		case 0x46: FCEU_strlcpy( chr, sizeof(chr),"LSR"); goto _zeropage;
+		case 0x65: FCEU_strlcpy( chr, sizeof(chr),"ADC"); goto _zeropage;
+		case 0x66: FCEU_strlcpy( chr, sizeof(chr),"ROR"); goto _zeropage;
+		case 0x84: FCEU_strlcpy( chr, sizeof(chr),"STY"); goto _zeropage;
+		case 0x85: FCEU_strlcpy( chr, sizeof(chr),"STA"); goto _zeropage;
+		case 0x86: FCEU_strlcpy( chr, sizeof(chr),"STX"); goto _zeropage;
+		case 0xA4: FCEU_strlcpy( chr, sizeof(chr),"LDY"); goto _zeropage;
+		case 0xA5: FCEU_strlcpy( chr, sizeof(chr),"LDA"); goto _zeropage;
+		case 0xA6: FCEU_strlcpy( chr, sizeof(chr),"LDX"); goto _zeropage;
+		case 0xC4: FCEU_strlcpy( chr, sizeof(chr),"CPY"); goto _zeropage;
+		case 0xC5: FCEU_strlcpy( chr, sizeof(chr),"CMP"); goto _zeropage;
+		case 0xC6: FCEU_strlcpy( chr, sizeof(chr),"DEC"); goto _zeropage;
+		case 0xE4: FCEU_strlcpy( chr, sizeof(chr),"CPX"); goto _zeropage;
+		case 0xE5: FCEU_strlcpy( chr, sizeof(chr),"SBC"); goto _zeropage;
+		case 0xE6: FCEU_strlcpy( chr, sizeof(chr),"INC"); goto _zeropage;
 		_zeropage:
 		// ################################## Start of SP CODE ###########################
 		// Change width to %04X // don't!
@@ -225,57 +226,57 @@ int DisassembleWithDebug(int addr, uint8_t *opcode, int flags, char *str, debugS
 			{
 				sym = replaceSymbols( flags | ASM_DEBUG_ADDR_02X, opcode[1], stmp );
 				showTrace
-					? sprintf(str,"%s %s = #$%02X", chr,stmp,GetMem(opcode[1]))
-					: sprintf(str,"%s %s", chr,stmp);
+					? snprintf( str, sizeof(str),"%s %s = #$%02X", chr,stmp,GetMem(opcode[1]))
+					: snprintf( str, sizeof(str),"%s %s", chr,stmp);
 			}
 			else
 			{
 				showTrace
-					? sprintf(str,"%s $%02X = #$%02X", chr,opcode[1],GetMem(opcode[1]))
-					: sprintf(str,"%s $%02X", chr,opcode[1]);
+					? snprintf( str, sizeof(str),"%s $%02X = #$%02X", chr,opcode[1],GetMem(opcode[1]))
+					: snprintf( str, sizeof(str),"%s $%02X", chr,opcode[1]);
 			}
 		// ################################## End of SP CODE ###########################
 			break;
 
 		//#Immediate
-		case 0x09: strcpy(chr,"ORA"); goto _immediate;
-		case 0x29: strcpy(chr,"AND"); goto _immediate;
-		case 0x49: strcpy(chr,"EOR"); goto _immediate;
-		case 0x69: strcpy(chr,"ADC"); goto _immediate;
-		//case 0x89: strcpy(chr,"STA"); goto _immediate;  //baka, no STA #imm!!
-		case 0xA0: strcpy(chr,"LDY"); goto _immediate;
-		case 0xA2: strcpy(chr,"LDX"); goto _immediate;
-		case 0xA9: strcpy(chr,"LDA"); goto _immediate;
-		case 0xC0: strcpy(chr,"CPY"); goto _immediate;
-		case 0xC9: strcpy(chr,"CMP"); goto _immediate;
-		case 0xE0: strcpy(chr,"CPX"); goto _immediate;
-		case 0xE9: strcpy(chr,"SBC"); goto _immediate;
+		case 0x09: FCEU_strlcpy( chr, sizeof(chr),"ORA"); goto _immediate;
+		case 0x29: FCEU_strlcpy( chr, sizeof(chr),"AND"); goto _immediate;
+		case 0x49: FCEU_strlcpy( chr, sizeof(chr),"EOR"); goto _immediate;
+		case 0x69: FCEU_strlcpy( chr, sizeof(chr),"ADC"); goto _immediate;
+		//case 0x89: FCEU_strlcpy( chr, sizeof(chr),"STA"); goto _immediate;  //baka, no STA #imm!!
+		case 0xA0: FCEU_strlcpy( chr, sizeof(chr),"LDY"); goto _immediate;
+		case 0xA2: FCEU_strlcpy( chr, sizeof(chr),"LDX"); goto _immediate;
+		case 0xA9: FCEU_strlcpy( chr, sizeof(chr),"LDA"); goto _immediate;
+		case 0xC0: FCEU_strlcpy( chr, sizeof(chr),"CPY"); goto _immediate;
+		case 0xC9: FCEU_strlcpy( chr, sizeof(chr),"CMP"); goto _immediate;
+		case 0xE0: FCEU_strlcpy( chr, sizeof(chr),"CPX"); goto _immediate;
+		case 0xE9: FCEU_strlcpy( chr, sizeof(chr),"SBC"); goto _immediate;
 		_immediate:
-			sprintf(str,"%s #$%02X", chr,opcode[1]);
+			snprintf( str, sizeof(str),"%s #$%02X", chr,opcode[1]);
 			break;
 
 		//Absolute
-		case 0x0D: strcpy(chr,"ORA"); goto _absolute;
-		case 0x0E: strcpy(chr,"ASL"); goto _absolute;
-		case 0x2C: strcpy(chr,"BIT"); goto _absolute;
-		case 0x2D: strcpy(chr,"AND"); goto _absolute;
-		case 0x2E: strcpy(chr,"ROL"); goto _absolute;
-		case 0x4D: strcpy(chr,"EOR"); goto _absolute;
-		case 0x4E: strcpy(chr,"LSR"); goto _absolute;
-		case 0x6D: strcpy(chr,"ADC"); goto _absolute;
-		case 0x6E: strcpy(chr,"ROR"); goto _absolute;
-		case 0x8C: strcpy(chr,"STY"); goto _absolute;
-		case 0x8D: strcpy(chr,"STA"); goto _absolute;
-		case 0x8E: strcpy(chr,"STX"); goto _absolute;
-		case 0xAC: strcpy(chr,"LDY"); goto _absolute;
-		case 0xAD: strcpy(chr,"LDA"); goto _absolute;
-		case 0xAE: strcpy(chr,"LDX"); goto _absolute;
-		case 0xCC: strcpy(chr,"CPY"); goto _absolute;
-		case 0xCD: strcpy(chr,"CMP"); goto _absolute;
-		case 0xCE: strcpy(chr,"DEC"); goto _absolute;
-		case 0xEC: strcpy(chr,"CPX"); goto _absolute;
-		case 0xED: strcpy(chr,"SBC"); goto _absolute;
-		case 0xEE: strcpy(chr,"INC"); goto _absolute;
+		case 0x0D: FCEU_strlcpy( chr, sizeof(chr),"ORA"); goto _absolute;
+		case 0x0E: FCEU_strlcpy( chr, sizeof(chr),"ASL"); goto _absolute;
+		case 0x2C: FCEU_strlcpy( chr, sizeof(chr),"BIT"); goto _absolute;
+		case 0x2D: FCEU_strlcpy( chr, sizeof(chr),"AND"); goto _absolute;
+		case 0x2E: FCEU_strlcpy( chr, sizeof(chr),"ROL"); goto _absolute;
+		case 0x4D: FCEU_strlcpy( chr, sizeof(chr),"EOR"); goto _absolute;
+		case 0x4E: FCEU_strlcpy( chr, sizeof(chr),"LSR"); goto _absolute;
+		case 0x6D: FCEU_strlcpy( chr, sizeof(chr),"ADC"); goto _absolute;
+		case 0x6E: FCEU_strlcpy( chr, sizeof(chr),"ROR"); goto _absolute;
+		case 0x8C: FCEU_strlcpy( chr, sizeof(chr),"STY"); goto _absolute;
+		case 0x8D: FCEU_strlcpy( chr, sizeof(chr),"STA"); goto _absolute;
+		case 0x8E: FCEU_strlcpy( chr, sizeof(chr),"STX"); goto _absolute;
+		case 0xAC: FCEU_strlcpy( chr, sizeof(chr),"LDY"); goto _absolute;
+		case 0xAD: FCEU_strlcpy( chr, sizeof(chr),"LDA"); goto _absolute;
+		case 0xAE: FCEU_strlcpy( chr, sizeof(chr),"LDX"); goto _absolute;
+		case 0xCC: FCEU_strlcpy( chr, sizeof(chr),"CPY"); goto _absolute;
+		case 0xCD: FCEU_strlcpy( chr, sizeof(chr),"CMP"); goto _absolute;
+		case 0xCE: FCEU_strlcpy( chr, sizeof(chr),"DEC"); goto _absolute;
+		case 0xEC: FCEU_strlcpy( chr, sizeof(chr),"CPX"); goto _absolute;
+		case 0xED: FCEU_strlcpy( chr, sizeof(chr),"SBC"); goto _absolute;
+		case 0xEE: FCEU_strlcpy( chr, sizeof(chr),"INC"); goto _absolute;
 		_absolute:
 			absolute(tmp);
 
@@ -283,49 +284,49 @@ int DisassembleWithDebug(int addr, uint8_t *opcode, int flags, char *str, debugS
 			{
 				sym = replaceSymbols( flags, tmp, stmp );
 				showTrace
-					? sprintf(str,"%s %s = #$%02X", chr,stmp,GetMem(tmp))
-					: sprintf(str,"%s %s", chr,stmp);
+					? snprintf( str, sizeof(str),"%s %s = #$%02X", chr,stmp,GetMem(tmp))
+					: snprintf( str, sizeof(str),"%s %s", chr,stmp);
 			}
 			else
 			{
 				showTrace
-					? sprintf(str,"%s $%04X = #$%02X", chr,tmp,GetMem(tmp))
-					: sprintf(str,"%s $%04X", chr,tmp);
+					? snprintf( str, sizeof(str),"%s $%04X = #$%02X", chr,tmp,GetMem(tmp))
+					: snprintf( str, sizeof(str),"%s $%04X", chr,tmp);
 			}
 			break;
 
 		//branches
-		case 0x10: strcpy(chr,"BPL"); goto _branch;
-		case 0x30: strcpy(chr,"BMI"); goto _branch;
-		case 0x50: strcpy(chr,"BVC"); goto _branch;
-		case 0x70: strcpy(chr,"BVS"); goto _branch;
-		case 0x90: strcpy(chr,"BCC"); goto _branch;
-		case 0xB0: strcpy(chr,"BCS"); goto _branch;
-		case 0xD0: strcpy(chr,"BNE"); goto _branch;
-		case 0xF0: strcpy(chr,"BEQ"); goto _branch;
+		case 0x10: FCEU_strlcpy( chr, sizeof(chr),"BPL"); goto _branch;
+		case 0x30: FCEU_strlcpy( chr, sizeof(chr),"BMI"); goto _branch;
+		case 0x50: FCEU_strlcpy( chr, sizeof(chr),"BVC"); goto _branch;
+		case 0x70: FCEU_strlcpy( chr, sizeof(chr),"BVS"); goto _branch;
+		case 0x90: FCEU_strlcpy( chr, sizeof(chr),"BCC"); goto _branch;
+		case 0xB0: FCEU_strlcpy( chr, sizeof(chr),"BCS"); goto _branch;
+		case 0xD0: FCEU_strlcpy( chr, sizeof(chr),"BNE"); goto _branch;
+		case 0xF0: FCEU_strlcpy( chr, sizeof(chr),"BEQ"); goto _branch;
 		_branch:
 			relative(tmp);
 
 			if ( symDebugEnable )
 			{
 				sym = replaceSymbols( flags, tmp, stmp );
-				sprintf(str,"%s %s", chr,stmp);
+				snprintf( str, sizeof(str),"%s %s", chr,stmp);
 			}
 			else
 			{
-				sprintf(str,"%s $%04X", chr,tmp);
+				snprintf( str, sizeof(str),"%s $%04X", chr,tmp);
 			}
 			break;
 
 		//(Indirect),Y
-		case 0x11: strcpy(chr,"ORA"); goto _indirecty;
-		case 0x31: strcpy(chr,"AND"); goto _indirecty;
-		case 0x51: strcpy(chr,"EOR"); goto _indirecty;
-		case 0x71: strcpy(chr,"ADC"); goto _indirecty;
-		case 0x91: strcpy(chr,"STA"); goto _indirecty;
-		case 0xB1: strcpy(chr,"LDA"); goto _indirecty;
-		case 0xD1: strcpy(chr,"CMP"); goto _indirecty;
-		case 0xF1: strcpy(chr,"SBC"); goto _indirecty;
+		case 0x11: FCEU_strlcpy( chr, sizeof(chr),"ORA"); goto _indirecty;
+		case 0x31: FCEU_strlcpy( chr, sizeof(chr),"AND"); goto _indirecty;
+		case 0x51: FCEU_strlcpy( chr, sizeof(chr),"EOR"); goto _indirecty;
+		case 0x71: FCEU_strlcpy( chr, sizeof(chr),"ADC"); goto _indirecty;
+		case 0x91: FCEU_strlcpy( chr, sizeof(chr),"STA"); goto _indirecty;
+		case 0xB1: FCEU_strlcpy( chr, sizeof(chr),"LDA"); goto _indirecty;
+		case 0xD1: FCEU_strlcpy( chr, sizeof(chr),"CMP"); goto _indirecty;
+		case 0xF1: FCEU_strlcpy( chr, sizeof(chr),"SBC"); goto _indirecty;
 		_indirecty:
 			indirectY(tmp);
 
@@ -333,34 +334,34 @@ int DisassembleWithDebug(int addr, uint8_t *opcode, int flags, char *str, debugS
 			{
 				sym = replaceSymbols( flags, tmp, stmp );
 				showTrace
-					? sprintf(str,"%s ($%02X),Y @ %s = #$%02X", chr,opcode[1],stmp,GetMem(tmp))
-					: sprintf(str,"%s ($%02X),Y", chr,opcode[1]);
+					? snprintf( str, sizeof(str),"%s ($%02X),Y @ %s = #$%02X", chr,opcode[1],stmp,GetMem(tmp))
+					: snprintf( str, sizeof(str),"%s ($%02X),Y", chr,opcode[1]);
 			}
 			else
 			{
 				showTrace
-					? sprintf(str,"%s ($%02X),Y @ $%04X = #$%02X", chr,opcode[1],tmp,GetMem(tmp))
-					: sprintf(str,"%s ($%02X),Y", chr,opcode[1]);
+					? snprintf( str, sizeof(str),"%s ($%02X),Y @ $%04X = #$%02X", chr,opcode[1],tmp,GetMem(tmp))
+					: snprintf( str, sizeof(str),"%s ($%02X),Y", chr,opcode[1]);
 			}
 			break;
 
 		//Zero Page,X
-		case 0x15: strcpy(chr,"ORA"); goto _zeropagex;
-		case 0x16: strcpy(chr,"ASL"); goto _zeropagex;
-		case 0x35: strcpy(chr,"AND"); goto _zeropagex;
-		case 0x36: strcpy(chr,"ROL"); goto _zeropagex;
-		case 0x55: strcpy(chr,"EOR"); goto _zeropagex;
-		case 0x56: strcpy(chr,"LSR"); goto _zeropagex;
-		case 0x75: strcpy(chr,"ADC"); goto _zeropagex;
-		case 0x76: strcpy(chr,"ROR"); goto _zeropagex;
-		case 0x94: strcpy(chr,"STY"); goto _zeropagex;
-		case 0x95: strcpy(chr,"STA"); goto _zeropagex;
-		case 0xB4: strcpy(chr,"LDY"); goto _zeropagex;
-		case 0xB5: strcpy(chr,"LDA"); goto _zeropagex;
-		case 0xD5: strcpy(chr,"CMP"); goto _zeropagex;
-		case 0xD6: strcpy(chr,"DEC"); goto _zeropagex;
-		case 0xF5: strcpy(chr,"SBC"); goto _zeropagex;
-		case 0xF6: strcpy(chr,"INC"); goto _zeropagex;
+		case 0x15: FCEU_strlcpy( chr, sizeof(chr),"ORA"); goto _zeropagex;
+		case 0x16: FCEU_strlcpy( chr, sizeof(chr),"ASL"); goto _zeropagex;
+		case 0x35: FCEU_strlcpy( chr, sizeof(chr),"AND"); goto _zeropagex;
+		case 0x36: FCEU_strlcpy( chr, sizeof(chr),"ROL"); goto _zeropagex;
+		case 0x55: FCEU_strlcpy( chr, sizeof(chr),"EOR"); goto _zeropagex;
+		case 0x56: FCEU_strlcpy( chr, sizeof(chr),"LSR"); goto _zeropagex;
+		case 0x75: FCEU_strlcpy( chr, sizeof(chr),"ADC"); goto _zeropagex;
+		case 0x76: FCEU_strlcpy( chr, sizeof(chr),"ROR"); goto _zeropagex;
+		case 0x94: FCEU_strlcpy( chr, sizeof(chr),"STY"); goto _zeropagex;
+		case 0x95: FCEU_strlcpy( chr, sizeof(chr),"STA"); goto _zeropagex;
+		case 0xB4: FCEU_strlcpy( chr, sizeof(chr),"LDY"); goto _zeropagex;
+		case 0xB5: FCEU_strlcpy( chr, sizeof(chr),"LDA"); goto _zeropagex;
+		case 0xD5: FCEU_strlcpy( chr, sizeof(chr),"CMP"); goto _zeropagex;
+		case 0xD6: FCEU_strlcpy( chr, sizeof(chr),"DEC"); goto _zeropagex;
+		case 0xF5: FCEU_strlcpy( chr, sizeof(chr),"SBC"); goto _zeropagex;
+		case 0xF6: FCEU_strlcpy( chr, sizeof(chr),"INC"); goto _zeropagex;
 		_zeropagex:
 			zpIndex(tmp,RX);
 		// ################################## Start of SP CODE ###########################
@@ -369,28 +370,28 @@ int DisassembleWithDebug(int addr, uint8_t *opcode, int flags, char *str, debugS
 			{
 				sym = replaceSymbols( flags, tmp, stmp );
 				showTrace
-					? sprintf(str,"%s $%02X,X @ %s = #$%02X", chr,opcode[1],stmp,GetMem(tmp))
-					: sprintf(str,"%s $%02X,X", chr,opcode[1]);
+					? snprintf( str, sizeof(str),"%s $%02X,X @ %s = #$%02X", chr,opcode[1],stmp,GetMem(tmp))
+					: snprintf( str, sizeof(str),"%s $%02X,X", chr,opcode[1]);
 			}
 			else
 			{
 				showTrace
-					? sprintf(str,"%s $%02X,X @ $%04X = #$%02X", chr,opcode[1],tmp,GetMem(tmp))
-					: sprintf(str,"%s $%02X,X", chr,opcode[1]);
+					? snprintf( str, sizeof(str),"%s $%02X,X @ $%04X = #$%02X", chr,opcode[1],tmp,GetMem(tmp))
+					: snprintf( str, sizeof(str),"%s $%02X,X", chr,opcode[1]);
 			}
 		// ################################## End of SP CODE ###########################
 			break;
 
 		//Absolute,Y
-		case 0x19: strcpy(chr,"ORA"); goto _absolutey;
-		case 0x39: strcpy(chr,"AND"); goto _absolutey;
-		case 0x59: strcpy(chr,"EOR"); goto _absolutey;
-		case 0x79: strcpy(chr,"ADC"); goto _absolutey;
-		case 0x99: strcpy(chr,"STA"); goto _absolutey;
-		case 0xB9: strcpy(chr,"LDA"); goto _absolutey;
-		case 0xBE: strcpy(chr,"LDX"); goto _absolutey;
-		case 0xD9: strcpy(chr,"CMP"); goto _absolutey;
-		case 0xF9: strcpy(chr,"SBC"); goto _absolutey;
+		case 0x19: FCEU_strlcpy( chr, sizeof(chr),"ORA"); goto _absolutey;
+		case 0x39: FCEU_strlcpy( chr, sizeof(chr),"AND"); goto _absolutey;
+		case 0x59: FCEU_strlcpy( chr, sizeof(chr),"EOR"); goto _absolutey;
+		case 0x79: FCEU_strlcpy( chr, sizeof(chr),"ADC"); goto _absolutey;
+		case 0x99: FCEU_strlcpy( chr, sizeof(chr),"STA"); goto _absolutey;
+		case 0xB9: FCEU_strlcpy( chr, sizeof(chr),"LDA"); goto _absolutey;
+		case 0xBE: FCEU_strlcpy( chr, sizeof(chr),"LDX"); goto _absolutey;
+		case 0xD9: FCEU_strlcpy( chr, sizeof(chr),"CMP"); goto _absolutey;
+		case 0xF9: FCEU_strlcpy( chr, sizeof(chr),"SBC"); goto _absolutey;
 		_absolutey:
 			absolute(tmp);
 			tmp2=(tmp+RY);
@@ -399,33 +400,33 @@ int DisassembleWithDebug(int addr, uint8_t *opcode, int flags, char *str, debugS
 				sym  = replaceSymbols( flags, tmp , stmp  );
 				sym2 = replaceSymbols( flags, tmp2, stmp2 );
 				showTrace
-					? sprintf(str,"%s %s,Y @ %s = #$%02X", chr,stmp,stmp2,GetMem(tmp2))
-					: sprintf(str,"%s %s,Y", chr,stmp);
+					? snprintf( str, sizeof(str),"%s %s,Y @ %s = #$%02X", chr,stmp,stmp2,GetMem(tmp2))
+					: snprintf( str, sizeof(str),"%s %s,Y", chr,stmp);
 			}
 			else
 			{
 				showTrace
-					? sprintf(str,"%s $%04X,Y @ $%04X = #$%02X", chr,tmp,tmp2,GetMem(tmp2))
-					: sprintf(str,"%s $%04X,Y", chr,tmp);
+					? snprintf( str, sizeof(str),"%s $%04X,Y @ $%04X = #$%02X", chr,tmp,tmp2,GetMem(tmp2))
+					: snprintf( str, sizeof(str),"%s $%04X,Y", chr,tmp);
 			}
 			break;
 
 		//Absolute,X
-		case 0x1D: strcpy(chr,"ORA"); goto _absolutex;
-		case 0x1E: strcpy(chr,"ASL"); goto _absolutex;
-		case 0x3D: strcpy(chr,"AND"); goto _absolutex;
-		case 0x3E: strcpy(chr,"ROL"); goto _absolutex;
-		case 0x5D: strcpy(chr,"EOR"); goto _absolutex;
-		case 0x5E: strcpy(chr,"LSR"); goto _absolutex;
-		case 0x7D: strcpy(chr,"ADC"); goto _absolutex;
-		case 0x7E: strcpy(chr,"ROR"); goto _absolutex;
-		case 0x9D: strcpy(chr,"STA"); goto _absolutex;
-		case 0xBC: strcpy(chr,"LDY"); goto _absolutex;
-		case 0xBD: strcpy(chr,"LDA"); goto _absolutex;
-		case 0xDD: strcpy(chr,"CMP"); goto _absolutex;
-		case 0xDE: strcpy(chr,"DEC"); goto _absolutex;
-		case 0xFD: strcpy(chr,"SBC"); goto _absolutex;
-		case 0xFE: strcpy(chr,"INC"); goto _absolutex;
+		case 0x1D: FCEU_strlcpy( chr, sizeof(chr),"ORA"); goto _absolutex;
+		case 0x1E: FCEU_strlcpy( chr, sizeof(chr),"ASL"); goto _absolutex;
+		case 0x3D: FCEU_strlcpy( chr, sizeof(chr),"AND"); goto _absolutex;
+		case 0x3E: FCEU_strlcpy( chr, sizeof(chr),"ROL"); goto _absolutex;
+		case 0x5D: FCEU_strlcpy( chr, sizeof(chr),"EOR"); goto _absolutex;
+		case 0x5E: FCEU_strlcpy( chr, sizeof(chr),"LSR"); goto _absolutex;
+		case 0x7D: FCEU_strlcpy( chr, sizeof(chr),"ADC"); goto _absolutex;
+		case 0x7E: FCEU_strlcpy( chr, sizeof(chr),"ROR"); goto _absolutex;
+		case 0x9D: FCEU_strlcpy( chr, sizeof(chr),"STA"); goto _absolutex;
+		case 0xBC: FCEU_strlcpy( chr, sizeof(chr),"LDY"); goto _absolutex;
+		case 0xBD: FCEU_strlcpy( chr, sizeof(chr),"LDA"); goto _absolutex;
+		case 0xDD: FCEU_strlcpy( chr, sizeof(chr),"CMP"); goto _absolutex;
+		case 0xDE: FCEU_strlcpy( chr, sizeof(chr),"DEC"); goto _absolutex;
+		case 0xFD: FCEU_strlcpy( chr, sizeof(chr),"SBC"); goto _absolutex;
+		case 0xFE: FCEU_strlcpy( chr, sizeof(chr),"INC"); goto _absolutex;
 		_absolutex:
 			absolute(tmp);
 			tmp2=(tmp+RX);
@@ -434,38 +435,38 @@ int DisassembleWithDebug(int addr, uint8_t *opcode, int flags, char *str, debugS
 				sym  = replaceSymbols( flags, tmp , stmp  );
 				sym2 = replaceSymbols( flags, tmp2, stmp2 );
 				showTrace
-					? sprintf(str,"%s %s,X @ %s = #$%02X", chr,stmp,stmp2,GetMem(tmp2))
-					: sprintf(str,"%s %s,X", chr,stmp);
+					? snprintf( str, sizeof(str),"%s %s,X @ %s = #$%02X", chr,stmp,stmp2,GetMem(tmp2))
+					: snprintf( str, sizeof(str),"%s %s,X", chr,stmp);
 			}
 			else
 			{
 				showTrace
-					? sprintf(str,"%s $%04X,X @ $%04X = #$%02X", chr,tmp,tmp2,GetMem(tmp2))
-					: sprintf(str,"%s $%04X,X", chr,tmp);
+					? snprintf( str, sizeof(str),"%s $%04X,X @ $%04X = #$%02X", chr,tmp,tmp2,GetMem(tmp2))
+					: snprintf( str, sizeof(str),"%s $%04X,X", chr,tmp);
 			}
 			break;
 
 		//jumps
-		case 0x20: strcpy(chr,"JSR"); goto _jump;
-		case 0x4C: strcpy(chr,"JMP"); goto _jump;
-		case 0x6C: absolute(tmp); sprintf(str,"JMP ($%04X) = $%04X", tmp,GetMem(tmp)|GetMem(tmp+1)<<8); break;
+		case 0x20: FCEU_strlcpy( chr, sizeof(chr),"JSR"); goto _jump;
+		case 0x4C: FCEU_strlcpy( chr, sizeof(chr),"JMP"); goto _jump;
+		case 0x6C: absolute(tmp); snprintf( str, sizeof(str),"JMP ($%04X) = $%04X", tmp,GetMem(tmp)|GetMem(tmp+1)<<8); break;
 		_jump:
 			absolute(tmp);
 
 			if ( symDebugEnable )
 			{
 				sym = replaceSymbols( flags, tmp, stmp );
-				sprintf(str,"%s %s", chr,stmp);
+				snprintf( str, sizeof(str),"%s %s", chr,stmp);
 			}
 			else
 			{
-				sprintf(str,"%s $%04X", chr,tmp);
+				snprintf( str, sizeof(str),"%s $%04X", chr,tmp);
 			}
 			break;
 
 		//Zero Page,Y
-		case 0x96: strcpy(chr,"STX"); goto _zeropagey;
-		case 0xB6: strcpy(chr,"LDX"); goto _zeropagey;
+		case 0x96: FCEU_strlcpy( chr, sizeof(chr),"STX"); goto _zeropagey;
+		case 0xB6: FCEU_strlcpy( chr, sizeof(chr),"LDX"); goto _zeropagey;
 		_zeropagey:
 			zpIndex(tmp,RY);
 		// ################################## Start of SP CODE ###########################
@@ -474,20 +475,20 @@ int DisassembleWithDebug(int addr, uint8_t *opcode, int flags, char *str, debugS
 			{
 				sym = replaceSymbols( flags, tmp, stmp );
 				showTrace
-					? sprintf(str,"%s $%02X,Y @ %s = #$%02X", chr,opcode[1],stmp,GetMem(tmp))
-					: sprintf(str,"%s $%02X,Y", chr,opcode[1]);
+					? snprintf( str, sizeof(str),"%s $%02X,Y @ %s = #$%02X", chr,opcode[1],stmp,GetMem(tmp))
+					: snprintf( str, sizeof(str),"%s $%02X,Y", chr,opcode[1]);
 			}
 			else
 			{
 				showTrace
-					? sprintf(str,"%s $%02X,Y @ $%04X = #$%02X", chr,opcode[1],tmp,GetMem(tmp))
-					: sprintf(str,"%s $%02X,Y", chr,opcode[1]);
+					? snprintf( str, sizeof(str),"%s $%02X,Y @ $%04X = #$%02X", chr,opcode[1],tmp,GetMem(tmp))
+					: snprintf( str, sizeof(str),"%s $%02X,Y", chr,opcode[1]);
 			}
 		// ################################## End of SP CODE ###########################
 			break;
 
 		//UNDEFINED
-		default: strcpy(str,"ERROR"); break;
+		default: FCEU_strlcpy( str, sizeof(str),"ERROR"); break;
 
 	}
 
@@ -727,7 +728,7 @@ void SymbolEditWindow::setAddr( int addrIn )
 
 	addr = addrIn;
 
-	sprintf( stmp, "%04X", addr );
+	snprintf( stmp, sizeof(stmp), "%04X", addr );
 
 	addrEntry->setText( tr(stmp) );
 
@@ -906,7 +907,7 @@ void SymbolEditWindow::determineArrayStart(void)
 	{
 		return;
 	}
-	strcpy( stmp, nameEntry->text().toStdString().c_str() );
+	FCEU_strlcpy( stmp, sizeof(stmp), nameEntry->text().toStdString().c_str() );
 
 	// Find Current Array Braces
 	i=0;
@@ -949,7 +950,7 @@ void SymbolEditWindow::determineArrayStart(void)
 
 		if ( (val >= 0) && (val < 256) )
 		{
-			sprintf( digits, "%02X", val );
+			snprintf(digits, sizeof(digits), "%02X", val );
 
 			arrayInit->setText( tr(digits) );
 		}
@@ -967,7 +968,7 @@ void SymbolEditWindow::setSymNameWithArray(int idx)
 	{
 		return;
 	}
-	strcpy( stmp, nameEntry->text().toStdString().c_str() );
+	FCEU_strlcpy( stmp, sizeof(stmp), nameEntry->text().toStdString().c_str() );
 
 	// Remove Current Array Braces
 	i=0;

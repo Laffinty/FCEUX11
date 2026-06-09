@@ -26,6 +26,7 @@
 #ifdef __FCEU_PROFILER_ENABLE__
 
 #include <stdio.h>
+#include "utils/safe_string.h"
 
 #ifdef __QT_DRIVER__
 #include <QThread>
@@ -129,7 +130,7 @@ profileExecVector::profileExecVector(void)
 	char threadName[128];
 	char fileName[256];
 
-	strcpy( threadName, "MainThread");
+	FCEU_strlcpy(threadName, sizeof(threadName), "MainThread");
 
 #ifdef __QT_DRIVER__
 	QThread *thread = QThread::currentThread();
@@ -137,10 +138,10 @@ profileExecVector::profileExecVector(void)
 	if (thread)
 	{
 		//printf("Thread: %s\n", thread->objectName().toStdString().c_str());
-		strcpy( threadName, thread->objectName().toStdString().c_str());
+		FCEU_strlcpy(threadName, sizeof(threadName), thread->objectName().toStdString().c_str());
 	}
 #endif
-	sprintf( fileName, "fceux-profile-%s.log", threadName);
+	snprintf( fileName, sizeof(fileName), "fceux-profile-%s.log", threadName);
 
 	logFp = ::fopen(fileName, "w");
 

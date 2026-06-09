@@ -23,6 +23,7 @@
 /* Override stuff: CHR RAM instead of CHR ROM,   mirroring. */
 
 #include "types.h"
+#include "utils/safe_string.h"
 #include "fceu.h"
 #include "cart.h"
 #include "unif.h"
@@ -154,7 +155,7 @@ static int NAME(FCEUFILE *fp) {
 
 	if (!GameInfo->name) {
 		GameInfo->name = (uint8*)malloc(strlen(namebuf) + 1); //mbg merge 7/17/06 added cast
-		strcpy((char*)GameInfo->name, namebuf); //mbg merge 7/17/06 added cast
+		FCEU_strlcpy((char*)GameInfo->name, sizeof((char*)GameInfo->name), namebuf); //mbg merge 7/17/06 added cast
 	}
 	return(1);
 }
@@ -621,7 +622,7 @@ int UNIFLoad(const char *name, FCEUFILE *fp) {
 init_ok:
 
 	FCEU_LoadGameSave(&UNIFCart);
-	strcpy(LoadedRomFName, name); //For the debugger list
+	FCEU_strlcpy(LoadedRomFName, sizeof(LoadedRomFName), name); //For the debugger list
 	GameInterface = UNIFGI;
 	currCartInfo = &UNIFCart;
 	return LOADER_OK;

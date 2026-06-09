@@ -9,14 +9,14 @@
 
 class EMUFILE;
 
-int write16le(uint16 b, FILE *fp);
-int write32le(uint32 b, FILE *fp);
-int write32le(uint32 b, std::ostream* os);
-int write64le(uint64 b, std::ostream* os);
-int read64le(uint64 *Bufo, std::istream *is);
-int read32le(uint32 *Bufo, std::istream *is);
-int read32le(uint32 *Bufo, FILE *fp);
-int read16le(uint16 *Bufo, std::istream *is);
+int [[nodiscard]] write16le(uint16 b, FILE *fp);
+int [[nodiscard]] write32le(uint32 b, FILE *fp);
+int [[nodiscard]] write32le(uint32 b, std::ostream* os);
+int [[nodiscard]] write64le(uint64 b, std::ostream* os);
+int [[nodiscard]] read64le(uint64 *Bufo, std::istream *is);
+int [[nodiscard]] read32le(uint32 *Bufo, std::istream *is);
+int [[nodiscard]] read32le(uint32 *Bufo, FILE *fp);
+int [[nodiscard]] read16le(uint16 *Bufo, std::istream *is);
 
 void FlipByteOrder(uint8 *src, uint32 count);
 
@@ -27,24 +27,24 @@ uint32 FCEU_de32lsb(uint8 *morp);
 uint16 FCEU_de16lsb(uint8 *morp);
 
 //well. just for the sake of consistency
-int write8le(uint8 b, EMUFILE *fp);
-inline int write8le(uint8* b, EMUFILE *fp) { return write8le(*b,fp); }
-int write16le(uint16 b, EMUFILE* os);
-int write32le(uint32 b, EMUFILE* os);
-int write64le(uint64 b, EMUFILE* os);
-inline int write_double_le(double b, EMUFILE*is) { uint64 temp = std::bit_cast<uint64>(b); int ret = write64le(temp,is); return ret; }
+int [[nodiscard]] write8le(uint8 b, EMUFILE *fp);
+inline int [[nodiscard]] write8le(uint8* b, EMUFILE *fp) { return write8le(*b,fp); }
+int [[nodiscard]] write16le(uint16 b, EMUFILE* os);
+int [[nodiscard]] write32le(uint32 b, EMUFILE* os);
+int [[nodiscard]] write64le(uint64 b, EMUFILE* os);
+inline int [[nodiscard]] write_double_le(double b, EMUFILE*is) { uint64 temp = std::bit_cast<uint64>(b); int ret = write64le(temp,is); return ret; }
 
-int read8le(uint8 *Bufo, EMUFILE*is);
-int read16le(uint16 *Bufo, EMUFILE*is);
-inline int read16le(int16 *Bufo, EMUFILE*is) { return read16le((uint16*)Bufo,is); }
-int read32le(uint32 *Bufo, EMUFILE*is);
-inline int read32le(int32 *Bufo, EMUFILE*is) { return read32le((uint32*)Bufo,is); }
-int read64le(uint64 *Bufo, EMUFILE*is);
-inline int read_double_le(double *Bufo, EMUFILE*is) { uint64 temp; int ret = read64le(&temp,is); *Bufo = std::bit_cast<double>(temp); return ret; }
+int [[nodiscard]] read8le(uint8 *Bufo, EMUFILE*is);
+int [[nodiscard]] read16le(uint16 *Bufo, EMUFILE*is);
+inline int [[nodiscard]] read16le(int16 *Bufo, EMUFILE*is) { return read16le((uint16*)Bufo,is); }
+int [[nodiscard]] read32le(uint32 *Bufo, EMUFILE*is);
+inline int [[nodiscard]] read32le(int32 *Bufo, EMUFILE*is) { return read32le((uint32*)Bufo,is); }
+int [[nodiscard]] read64le(uint64 *Bufo, EMUFILE*is);
+inline int [[nodiscard]] read_double_le(double *Bufo, EMUFILE*is) { uint64 temp; int ret = read64le(&temp,is); *Bufo = std::bit_cast<double>(temp); return ret; }
 
 
 template<typename T>
-int readle(T *Bufo, EMUFILE*is)
+[[nodiscard]] int readle(T *Bufo, EMUFILE*is)
 {
 	CTASSERT(sizeof(T)==1||sizeof(T)==2||sizeof(T)==4||sizeof(T)==8);
 	switch(sizeof(T)) {
@@ -58,7 +58,7 @@ int readle(T *Bufo, EMUFILE*is)
 }
 
 template<typename T>
-int writele(T *Bufo, EMUFILE*os)
+[[nodiscard]] int writele(T *Bufo, EMUFILE*os)
 {
 	CTASSERT(sizeof(T)==1||sizeof(T)==2||sizeof(T)==4||sizeof(T)==8);
 	switch(sizeof(T)) {

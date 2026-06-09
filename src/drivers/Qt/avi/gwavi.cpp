@@ -35,6 +35,7 @@
  */
 
 #include <stdio.h>
+#include "utils/safe_string.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -127,7 +128,7 @@ gwavi_t::open(const char *filename, unsigned int width, unsigned int height,
 	unsigned int usec;
 
 	memset( this->fourcc, 0, sizeof(this->fourcc) );
-	strcpy( this->fourcc, fourcc );
+	FCEU_strlcpy(this->fourcc, sizeof(this->fourcc), fourcc);
 
 	if (check_fourcc(fourcc) != 0)
 	{
@@ -193,7 +194,7 @@ gwavi_t::open(const char *filename, unsigned int width, unsigned int height,
 	avi_header.buffer_size = size;
 
 	/* set stream header */
-	(void)strcpy(stream_header_v.data_type, "vids");
+	(void)FCEU_strlcpy(stream_header_v.data_type, sizeof(stream_header_v.data_type), "vids");
 	(void)memcpy(stream_header_v.codec, fourcc, 4);
 	stream_header_v.time_scale = usec;
 	stream_header_v.data_rate = 1000000;
@@ -222,7 +223,7 @@ gwavi_t::open(const char *filename, unsigned int width, unsigned int height,
 	stream_format_v.palette = 0;
 	stream_format_v.palette_count = 0;
 
-	strcpy( stream_index_v.chunkId, "00dc");
+	FCEU_strlcpy(stream_index_v.chunkId, sizeof(stream_index_v.chunkId), "00dc");
 	stream_index_v.streamId = 0;
 
 	audioEnabled = false;
@@ -255,7 +256,7 @@ gwavi_t::open(const char *filename, unsigned int width, unsigned int height,
 		stream_format_a.bits_per_sample = audio->bits;
 		stream_format_a.size = 0;
 
-		strcpy( stream_index_a.chunkId, "01wb");
+		FCEU_strlcpy(stream_index_a.chunkId, sizeof(stream_index_a.chunkId), "01wb");
 		stream_index_a.streamId = 1;
 		audioEnabled = true;
 	}
@@ -675,7 +676,7 @@ gwavi_t::set_codec( const char *fourcc)
 			      "be valid: %s\n", fourcc);
 	}
 	memset( this->fourcc, 0, sizeof(this->fourcc) );
-	strcpy( this->fourcc, fourcc );
+	FCEU_strlcpy(this->fourcc, sizeof(this->fourcc), fourcc);
 
 	memcpy(stream_header_v.codec, fourcc, 4);
 	stream_format_v.compression_type =

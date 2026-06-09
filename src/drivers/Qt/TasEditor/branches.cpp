@@ -21,6 +21,7 @@ Branches - Manager of Branches
 ------------------------------------------------------------------------------------ */
 
 #include <math.h>
+#include "utils/safe_string.h"
 #include <zlib.h>
 
 #include <QToolTip>
@@ -263,7 +264,7 @@ void BRANCHES::reset()
 
 	// set cloud_time and current_pos_time
 	setCurrentPosTimestamp();
-	strcpy(cloudTimestamp, currentPosTimestamp);
+	FCEU_strlcpy(cloudTimestamp, sizeof(cloudTimestamp), currentPosTimestamp);
 }
 void BRANCHES::resetVars()
 {
@@ -1023,11 +1024,11 @@ void BRANCHES::paintEvent(QPaintEvent *event)
 			char framenum_string[16] = {0};
 			if (bookmarks->itemUnderMouse < TOTAL_BOOKMARKS)
 			{
-				sprintf( framenum_string, "%07i", bookmarks->bookmarksArray[bookmarks->itemUnderMouse].snapshot.keyFrame );
+				snprintf(framenum_string, sizeof(framenum_string), "%07i", bookmarks->bookmarksArray[bookmarks->itemUnderMouse].snapshot.keyFrame );
 			}
 			else
 			{
-				sprintf( framenum_string, "%07i", currFrameCounter );
+				snprintf(framenum_string, sizeof(framenum_string), "%07i", currFrameCounter );
 			}
 			x = viewRect.x() + (2 * pxBoxWidth);
 			y = pxLineSpacing;

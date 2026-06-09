@@ -20,6 +20,7 @@
  */
 
 #include "types.h"
+#include "utils/safe_string.h"
 #include "x6502.h"
 #include "fceu.h"
 #include "cart.h"
@@ -272,18 +273,18 @@ static void CheckHInfo(uint64 partialmd5) {
 
 	if (tofix) {
 		char gigastr[768];
-		strcpy(gigastr, "The iNES header contains incorrect information.  For now, the information will be corrected in RAM.  ");
+		FCEU_strlcpy(gigastr, sizeof(gigastr), "The iNES header contains incorrect information.  For now, the information will be corrected in RAM.  ");
 		if (tofix & 1)
-			sprintf(gigastr + strlen(gigastr), "The mapper number should be set to %d.  ", MapperNo);
+			snprintf( gigastr + strlen(gigastr), sizeof(gigastr + strlen(gigastr)), "The mapper number should be set to %d.  ", MapperNo);
 		if (tofix & 2) {
 			const char *mstr[3] = { "Horizontal", "Vertical", "Four-screen" };
-			sprintf(gigastr + strlen(gigastr), "Mirroring should be set to \"%s\".  ", mstr[Mirroring & 3]);
+			snprintf( gigastr + strlen(gigastr), sizeof(gigastr + strlen(gigastr)), "Mirroring should be set to \"%s\".  ", mstr[Mirroring & 3]);
 		}
 		if (tofix & 4)
-			strcat(gigastr, "The battery-backed bit should be set.  ");
+			safe_strcat(gigastr, sizeof(gigastr), "The battery-backed bit should be set.  ");
 		if (tofix & 8)
-			strcat(gigastr, "This game should not have any CHR ROM.  ");
-		strcat(gigastr, "\n");
+			safe_strcat(gigastr, sizeof(gigastr), "This game should not have any CHR ROM.  ");
+		safe_strcat(gigastr, sizeof(gigastr), "\n");
 
 		FCEU_printf("%s", gigastr);
 	}
@@ -821,7 +822,7 @@ init_ok:
 	GameInfo->mappernum = MapperNo;
 	FCEU_LoadGameSave(&iNESCart);
 
-	strcpy(LoadedRomFName, name); //bbit edited: line added
+	FCEU_strlcpy(LoadedRomFName, sizeof(LoadedRomFName), name); //bbit edited: line added
 
 	// Extract Filename only. Should account for Windows/Unix this way.
 	if (strrchr(name, '/')) {
@@ -856,9 +857,9 @@ init_ok:
 int iNesSave(void) {
 	char name[2048];
 
-	strcpy(name, LoadedRomFName);
+	FCEU_strlcpy(name, sizeof(name), LoadedRomFName);
 	if (strcmp(name + strlen(name) - 4, ".nes") != 0) { //para edit
-		strcat(name, ".nes");
+		safe_strcat(name, sizeof(name), ".nes");
 	}
 
 	return iNesSaveAs(name);

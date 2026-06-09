@@ -21,6 +21,7 @@
 //  TODO: Add (better) file io error checking
 
 #include "version.h"
+#include "utils/safe_string.h"
 #include "types.h"
 #include "x6502.h"
 #include "fceu.h"
@@ -545,7 +546,7 @@ bool FCEUSS_LoadFP(EMUFILE* is, ENUM_SSLOADPARAMS params)
 		default:
 			if (!warned) {
 				char str[256];
-				sprintf(str, "Warning: Found unknown save chunk of type %d.\nThis could indicate the save state is corrupted\nor made with a different (incompatible) emulator version.", t);
+				snprintf( str, sizeof(str), "Warning: Found unknown save chunk of type %d.\nThis could indicate the save state is corrupted\nor made with a different (incompatible) emulator version.", t);
 				FCEUD_PrintError(str);
 				warned = true;
 			}
@@ -759,7 +760,7 @@ void AddExState(void *v, uint32 s, int type, const char *desc)
 	if(desc)
 	{
 		SFMDATA[SFEXINDEX].desc=(const char *)FCEU_malloc(strlen(desc)+1);
-		strcpy( (char*)SFMDATA[SFEXINDEX].desc,desc);
+		FCEU_strlcpy((char*)SFMDATA[SFEXINDEX].desc, sizeof((char*)SFMDATA[SFEXINDEX].desc), desc);
 	}
 	else
 		SFMDATA[SFEXINDEX].desc=0;

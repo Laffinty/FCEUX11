@@ -23,6 +23,7 @@
 /// \brief Handles joystick input using the SDL.
 
 #include <QDir>
+#include "utils/safe_string.h"
 #include "Qt/sdl.h"
 #include "Qt/sdl-joystick.h"
 #include "Qt/config.h"
@@ -304,8 +305,8 @@ int nesGamePadMap_t::parseMapping(const char *map)
 		}
 	}
 
-	strcpy(guid, id[0]); // GUID is always 1st field
-	strcpy(name, id[1]); // Name is always 2nd field
+	FCEU_strlcpy(guid, sizeof(guid), id[0]); // GUID is always 1st field
+	FCEU_strlcpy(name, sizeof(name), id[1]); // Name is always 2nd field
 
 	for (i = 0; i < k; i++)
 	{
@@ -314,7 +315,7 @@ int nesGamePadMap_t::parseMapping(const char *map)
 		//printf(" '%s' = '%s'  %i \n", id[i], val[i], bIdx );
 		if (bIdx >= 0)
 		{
-			strcpy( conf[c].btn[bIdx], val[i]);
+			FCEU_strlcpy(conf[c].btn[bIdx], sizeof(conf[c].btn[bIdx]), val[i]);
 		}
 		else if (strcmp(id[i], "config") == 0)
 		{
@@ -322,7 +323,7 @@ int nesGamePadMap_t::parseMapping(const char *map)
 		}
 		else if (strcmp(id[i], "platform") == 0)
 		{
-			strcpy(os, val[i]);
+			FCEU_strlcpy(os, sizeof(os), val[i]);
 		}
 	}
 	return 0;
@@ -723,19 +724,19 @@ int GamePad_t::loadHotkeyMapFromFile(const char *filename)
 			}
 			else if ( strcmp( id, "modifier" ) == 0 )
 			{
-				strcpy( modBtn, val );
+				FCEU_strlcpy(modBtn, sizeof(modBtn), val);
 			}
 			else if ( strcmp( id, "button" ) == 0 )
 			{
-				strcpy( priBtn, val );
+				FCEU_strlcpy(priBtn, sizeof(priBtn), val);
 			}
 			else if ( strcmp( id, "press" ) == 0 )
 			{
-				strcpy( onPressAct, val );
+				FCEU_strlcpy(onPressAct, sizeof(onPressAct), val);
 			}
 			else if ( strcmp( id, "release" ) == 0 )
 			{
-				strcpy( onReleaseAct, val );
+				FCEU_strlcpy(onReleaseAct, sizeof(onReleaseAct), val);
 			}
 
 
@@ -925,7 +926,7 @@ int GamePad_t::saveCurrentMapToFile(const char *name)
 		output.append(name);
 		output.append(",");
 		output.append("config:");
-		sprintf( stmp, "%i,", c );
+		snprintf( stmp, sizeof(stmp), "%i,", c );
 		output.append(stmp);
 
 		for (i = 0; i < GAMEPAD_NUM_BUTTONS; i++)
@@ -949,26 +950,26 @@ int GamePad_t::saveCurrentMapToFile(const char *name)
 				}
 				stmp[k] = 0;
 
-				//sprintf(stmp, "k%s", SDL_GetKeyName(bmap[c][i].ButtonNum));
+				//snprintf( stmp, sizeof(stmp), "k%s", SDL_GetKeyName(bmap[c][i].ButtonNum));
 			}
 			else
 			{
 				if (bmap[c][i].ButtonNum & 0x2000)
 				{
 					/* Hat "button" */
-					sprintf(stmp, "h%i.%i",
+					snprintf( stmp, sizeof(stmp), "h%i.%i",
 							(bmap[c][i].ButtonNum >> 8) & 0x1F, bmap[c][i].ButtonNum & 0xFF);
 				}
 				else if (bmap[c][i].ButtonNum & 0x8000)
 				{
 					/* Axis "button" */
-					sprintf(stmp, "%ca%i",
+					snprintf( stmp, sizeof(stmp), "%ca%i",
 							(bmap[c][i].ButtonNum & 0x4000) ? '-' : '+', bmap[c][i].ButtonNum & 0x3FFF);
 				}
 				else
 				{
 					/* Button */
-					sprintf(stmp, "b%i", bmap[c][i].ButtonNum);
+					snprintf( stmp, sizeof(stmp), "b%i", bmap[c][i].ButtonNum);
 				}
 			}
 			output.append(buttonNames[i]);
@@ -1013,26 +1014,26 @@ int GamePad_t::saveCurrentMapToFile(const char *name)
 							stmp[k] = keyName[j]; k++; j++;
 						}
 						stmp[k] = 0;
-						//sprintf(stmp, "k%s", SDL_GetKeyName(fk->bmap[i].ButtonNum));
+						//snprintf( stmp, sizeof(stmp), "k%s", SDL_GetKeyName(fk->bmap[i].ButtonNum));
 					}
 					else
 					{
 						if (fk->bmap[i].ButtonNum & 0x2000)
 						{
 							/* Hat "button" */
-							sprintf(stmp, "h%i.%i",
+							snprintf( stmp, sizeof(stmp), "h%i.%i",
 									(fk->bmap[i].ButtonNum >> 8) & 0x1F, fk->bmap[i].ButtonNum & 0xFF);
 						}
 						else if (fk->bmap[i].ButtonNum & 0x8000)
 						{
 							/* Axis "button" */
-							sprintf(stmp, "%ca%i",
+							snprintf( stmp, sizeof(stmp), "%ca%i",
 									(fk->bmap[i].ButtonNum & 0x4000) ? '-' : '+', fk->bmap[i].ButtonNum & 0x3FFF);
 						}
 						else
 						{
 							/* Button */
-							sprintf(stmp, "b%i", fk->bmap[i].ButtonNum);
+							snprintf( stmp, sizeof(stmp), "b%i", fk->bmap[i].ButtonNum);
 						}
 					}
 					if ( i == 0 )

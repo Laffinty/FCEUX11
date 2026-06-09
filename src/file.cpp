@@ -31,6 +31,7 @@
 #include "file.h"
 #include "utils/endian.h"
 #include "utils/memory.h"
+#include "utils/safe_string.h"
 #include "utils/md5.h"
 #ifdef _SYSTEM_MINIZIP
 #ifdef __linux
@@ -175,7 +176,7 @@ FileBaseInfo DetermineFileBase(const char *f) {
 	char drv[PATH_MAX], dir[PATH_MAX], name[PATH_MAX], ext[PATH_MAX];
 	splitpath(f,drv,dir,name,ext);
 
-        if(dir[0] == 0) strcpy(dir,".");
+        if(dir[0] == 0) FCEU_strlcpy(dir, sizeof(dir), ".");
 
 	return FileBaseInfo((std::string)drv + dir,name,ext);
 
@@ -742,7 +743,7 @@ std::string FCEU_MakeFName(int type, int id1, const char *cd1)
 				snprintf(ret, sizeof(ret),"%s" PSS "cheats" PSS "%s.cht",BaseDirectory.c_str(),FileBase);
 			break;
 		case FCEUMKF_IPS:
-			strcpy(ret,FCEU_MakeIpsFilename(CurrentFileBase()).c_str());
+			FCEU_strlcpy(ret, sizeof(ret), FCEU_MakeIpsFilename(CurrentFileBase()).c_str());
 			break;
 		case FCEUMKF_GGROM:snprintf(ret, sizeof(ret),"%s" PSS "gg.rom",BaseDirectory.c_str());break;
 		case FCEUMKF_FDSROM:
@@ -775,8 +776,8 @@ std::string FCEU_MakeFName(int type, int id1, const char *cd1)
 void GetFileBase(const char *f)
 {
 	FileBaseInfo fbi = DetermineFileBase(f);
-	strcpy(FileBase,fbi.filebase.c_str());
-	strcpy(FileBaseDirectory,fbi.filebasedirectory.c_str());
+	FCEU_strlcpy(FileBase, sizeof(FileBase), fbi.filebase.c_str());
+	FCEU_strlcpy(FileBaseDirectory, sizeof(FileBaseDirectory), fbi.filebasedirectory.c_str());
 }
 
 bool FCEU_isFileInArchive(const char *path)

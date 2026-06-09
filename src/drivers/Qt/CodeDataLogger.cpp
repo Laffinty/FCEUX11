@@ -20,6 +20,7 @@
 // CodeDataLogger.cpp
 //
 #include <QDir>
+#include "utils/safe_string.h"
 #include <QSettings>
 #include <QFileDialog>
 #include <QInputDialog>
@@ -364,22 +365,22 @@ void CodeDataLoggerDialog_t::updatePeriodic(void)
 
 	if (cdloggerdataSize > 0)
 	{
-		sprintf(str, "0x%06x  %.2f%%", codecount, (fcodecount / fromsize) * 100);
+		snprintf( str, sizeof(str), "0x%06x  %.2f%%", codecount, (fcodecount / fromsize) * 100);
 		prgLoggedCodeLabel->setText(tr(str));
 
-		sprintf(str, "0x%06x  %.2f%%", datacount, (fdatacount / fromsize) * 100);
+		snprintf( str, sizeof(str), "0x%06x  %.2f%%", datacount, (fdatacount / fromsize) * 100);
 		prgLoggedDataLabel->setText(tr(str));
 
-		sprintf(str, "0x%06x  %.2f%%", undefinedcount, (fundefinedcount / fromsize) * 100);
+		snprintf( str, sizeof(str), "0x%06x  %.2f%%", undefinedcount, (fundefinedcount / fromsize) * 100);
 		prgUnloggedLabel->setText(tr(str));
 
-		sprintf(str, "0x%06x  %.2f%%", rendercount, (frendercount / fvromsize) * 100);
+		snprintf( str, sizeof(str), "0x%06x  %.2f%%", rendercount, (frendercount / fvromsize) * 100);
 		chrLoggedCodeLabel->setText(tr(str));
 
-		sprintf(str, "0x%06x  %.2f%%", vromreadcount, (fvromreadcount / fvromsize) * 100);
+		snprintf( str, sizeof(str), "0x%06x  %.2f%%", vromreadcount, (fvromreadcount / fvromsize) * 100);
 		chrLoggedDataLabel->setText(tr(str));
 
-		sprintf(str, "0x%06x  %.2f%%", undefinedvromcount, (fundefinedvromcount / fvromsize) * 100);
+		snprintf( str, sizeof(str), "0x%06x  %.2f%%", undefinedvromcount, (fundefinedvromcount / fvromsize) * 100);
 		chrUnloggedLabel->setText(tr(str));
 	}
 	else
@@ -392,7 +393,7 @@ void CodeDataLoggerDialog_t::updatePeriodic(void)
 		chrUnloggedLabel->setText(tr("------"));
 	}
 
-	sprintf(str, "CDL File: %s", loadedcdfile);
+	snprintf( str, sizeof(str), "CDL File: %s", loadedcdfile);
 
 	cdlFileLabel->setText(tr(str));
 }
@@ -479,7 +480,7 @@ void CodeDataLoggerDialog_t::saveCdlFileAs(void)
 	//qDebug() << "selected file path : " << filename.toUtf8();
 
 	FCEU_WRAPPER_LOCK();
-	strcpy(loadedcdfile, filename.toStdString().c_str());
+	FCEU_strlcpy( loadedcdfile, sizeof(loadedcdfile), filename.toStdString().c_str());
 	SaveCDLogFile();
 	FCEU_WRAPPER_UNLOCK();
 }
@@ -972,7 +973,7 @@ void CDLoggerROMChanged(void)
 //----------------------------------------------------
 void RenameCDLog(const char *newName)
 {
-	strcpy(loadedcdfile, newName);
+	FCEU_strlcpy( loadedcdfile, sizeof(loadedcdfile), newName);
 }
 //----------------------------------------------------
 void SaveCDLogFile(void)

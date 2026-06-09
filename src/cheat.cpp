@@ -32,6 +32,7 @@
 // Everything else delegates to fceux11_rust_cheat_*.
 
 #include "types.h"
+#include "utils/safe_string.h"
 #include "x6502.h"
 #include "cheat.h"
 #include "fceu.h"
@@ -246,14 +247,14 @@ void FCEU_LoadGameCheats(FILE *override, int override_existing)
 			char *neo = &tbuf[4+2+2+1+1+1];
 			if(sscanf(tbuf, "%04x%*[:]%02x%*[:]%02x", &addr, &val, &compare) != 3)
 				continue;
-			strcpy(namebuf, neo);
+			FCEU_strlcpy(namebuf, sizeof(namebuf), neo);
 		}
 		else
 		{
 			char *neo = &tbuf[4+2+1+1];
 			if(sscanf(tbuf, "%04x%*[:]%02x", &addr, &val) != 2)
 				continue;
-			strcpy(namebuf, neo);
+			FCEU_strlcpy(namebuf, sizeof(namebuf), neo);
 		}
 
 		for(x = 0; x < (int)strlen(namebuf); x++)

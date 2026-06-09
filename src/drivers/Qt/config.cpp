@@ -18,6 +18,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 #include <QDir>
+#include "utils/safe_string.h"
 
 #include "Qt/main.h"
 #include "Qt/throttle.h"
@@ -381,16 +382,16 @@ LoadCPalette(const std::string &file)
 
 	if(!(fp = FCEUD_UTF8fopen(file.c_str(), "rb"))) {
 		char errorMsg[256];
-		strcpy(errorMsg, "Error loading custom palette from file: ");
-		strcat(errorMsg, file.c_str());
+		FCEU_strlcpy(errorMsg, sizeof(errorMsg), "Error loading custom palette from file: ");
+		safe_strcat(errorMsg, sizeof(errorMsg), file.c_str());
 		FCEUD_PrintError(errorMsg);
 		return 0;
 	}
 	size_t result = fread(tmpp, 1, 192, fp);
 	if(result != 192) {
 		char errorMsg[256];
-		strcpy(errorMsg, "Error loading custom palette from file: ");
-		strcat(errorMsg, file.c_str());
+		FCEU_strlcpy(errorMsg, sizeof(errorMsg), "Error loading custom palette from file: ");
+		safe_strcat(errorMsg, sizeof(errorMsg), file.c_str());
 		FCEUD_PrintError(errorMsg);
 		return 0;
 	}
@@ -767,7 +768,7 @@ InitConfig()
 	for (unsigned int i=0; i<10; i++)
 	{
 		char buf[128];
-		sprintf(buf, "SDL.RecentRom%02u", i);
+		snprintf( buf, sizeof(buf), "SDL.RecentRom%02u", i);
 
 		config->addOption( buf, "");
 	}
@@ -775,7 +776,7 @@ InitConfig()
 	for (unsigned int i=0; i<10; i++)
 	{
 		char buf[128];
-		sprintf(buf, "SDL.RecentTasProject%02u", i);
+		snprintf( buf, sizeof(buf), "SDL.RecentTasProject%02u", i);
 
 		config->addOption( buf, "");
 	}
@@ -996,7 +997,7 @@ InitConfig()
 
 		//keyText.assign(" mod=");
 
-		//sprintf( buf, "  key=%s", SDL_GetKeyName( Hotkeys[i] ) );
+		//snprintf( buf, sizeof(buf), "  key=%s", SDL_GetKeyName( Hotkeys[i] ) );
 
 		if ( hotKeyName[0] != 0 )
 		{

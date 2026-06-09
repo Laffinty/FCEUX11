@@ -349,9 +349,9 @@ static int clistcallb(const char *name, uint32 a, uint8 v, int compare, int s, i
  int ret;
 
  if(compare>=0)
-  sprintf(tmp,"%s   $%04x:%03u:%03d - %s",s?"*":" ",(unsigned int)a,(unsigned int)v,compare,name);
+  snprintf( tmp, sizeof(tmp),"%s   $%04x:%03u:%03d - %s",s?"*":" ",(unsigned int)a,(unsigned int)v,compare,name);
  else
-  sprintf(tmp,"%s   $%04x:%03u     - %s",s?"*":" ",(unsigned int)a,(unsigned int)v,name);
+  snprintf( tmp, sizeof(tmp),"%s   $%04x:%03u     - %s",s?"*":" ",(unsigned int)a,(unsigned int)v,name);
  if(type==1)
   tmp[2]='S';
  ret=AddToList(tmp,lid);
@@ -399,7 +399,7 @@ static void ResetSearch(void)
 static int srescallb(uint32 a, uint8 last, uint8 current, void *data)
 {
  char tmp[14];
- sprintf(tmp, "$%04x:%03u:%03u",(unsigned int)a,(unsigned int)last,(unsigned int)current);
+ snprintf( tmp, sizeof(tmp), "$%04x:%03u:%03u",(unsigned int)a,(unsigned int)last,(unsigned int)current);
  return(AddToList(tmp,a));
 }
 

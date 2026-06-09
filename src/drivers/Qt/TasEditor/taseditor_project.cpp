@@ -17,6 +17,7 @@ Project - Manager of working project
 ------------------------------------------------------------------------------------ */
 
 #include <QMessageBox>
+#include "utils/safe_string.h"
 #include <QProgressDialog>
 #include <QGuiApplication>
 
@@ -88,8 +89,8 @@ bool TASEDITOR_PROJECT::save(const char* differentName, bool inputInBinary, bool
 	// check MD5
 	char md5OfMovie[256];
 	char md5OfRom[256];
-	strcpy(md5OfMovie, md5_asciistr(currMovieData.romChecksum));
-	strcpy(md5OfRom, md5_asciistr(GameInfo->MD5));
+	FCEU_strlcpy(md5OfMovie, sizeof(md5OfMovie), md5_asciistr(currMovieData.romChecksum));
+	FCEU_strlcpy(md5OfRom, sizeof(md5OfRom), md5_asciistr(GameInfo->MD5));
 	if (strcmp(md5OfMovie, md5OfRom))
 	{
 		// checksums mismatch, check if they both aren't zero
@@ -235,8 +236,8 @@ bool TASEDITOR_PROJECT::load(const char* fullName)
 		// check MD5
 		char md5OfOriginal[256];
 		char md5OfCurrent[256];
-		strcpy(md5OfOriginal, md5_asciistr(tempMovieData.romChecksum));
-		strcpy(md5OfCurrent, md5_asciistr(GameInfo->MD5));
+		FCEU_strlcpy(md5OfOriginal, sizeof(md5OfOriginal), md5_asciistr(tempMovieData.romChecksum));
+		FCEU_strlcpy(md5OfCurrent, sizeof(md5OfCurrent), md5_asciistr(GameInfo->MD5));
 		if (strcmp(md5OfOriginal, md5OfCurrent))
 		{
 			// checksums mismatch, check if they both aren't zero
@@ -279,10 +280,10 @@ bool TASEDITOR_PROJECT::load(const char* fullName)
 				message.assign("This project was saved using different version of TAS Editor!\n\n");
 				message.append("Original version: ");
 				char versionNum[16];
-				sprintf( versionNum, "%u", projectFileVersion);
+				snprintf(versionNum, sizeof(versionNum), "%u", projectFileVersion);
 				message.append(versionNum);
 				message.append("\nCurrent version: ");
-				sprintf( versionNum, "%i", PROJECT_FILE_CURRENT_VERSION);
+				snprintf(versionNum, sizeof(versionNum), "%i", PROJECT_FILE_CURRENT_VERSION);
 				message.append(versionNum);
 				message.append("\n\nClick Yes to try loading all data from the file (may crash).\n");
 				message.append("Click No to only load movie data.\n");

@@ -19,6 +19,7 @@
  */
 
 #include <QFileDialog>
+#include "utils/safe_string.h"
 #include <QInputDialog>
 #include <QApplication>
 
@@ -327,27 +328,27 @@ int hotkey_t::getString(char *s)
 
 	if (shortcut)
 	{
-		strcpy(s, shortcut->key().toString().toStdString().c_str());
+		FCEU_strlcpy(s, sizeof(s), shortcut->key().toString().toStdString().c_str());
 	}
 	//if ( sdl.modifier != 0 )
 	//{
 	//	if ( sdl.modifier & (KMOD_LSHIFT | KMOD_RSHIFT) )
 	//	{
-	//		strcat( s, "Shift+" );
+	//		safe_strcat(s, sizeof(s), "Shift+");
 	//	}
 
 	//	if ( sdl.modifier & (KMOD_LALT | KMOD_RALT) )
 	//	{
-	//		strcat( s, "Alt+" );
+	//		safe_strcat(s, sizeof(s), "Alt+");
 	//	}
 
 	//	if ( sdl.modifier & (KMOD_LCTRL | KMOD_RCTRL) )
 	//	{
-	//		strcat( s, "Ctrl+" );
+	//		safe_strcat(s, sizeof(s), "Ctrl+");
 	//	}
 	//}
 
-	//strcat( s, SDL_GetKeyName(sdl.value) );
+	//safe_strcat(s, sizeof(s), SDL_GetKeyName(sdl.value) );
 
 	return 0;
 }
@@ -1176,7 +1177,7 @@ static void KeyboardCommands(void)
 	//				{
 	//					if (CurInputType[2] == SIFC_BWORLD)
 	//					{
-	//						strcpy ((char *) &BWorldData[1], (char *) bbuf);
+	//						FCEU_strlcpy((char *) &BWorldData[1], sizeof((char *) &BWorldData[1]), (char *) bbuf);
 	//						BWorldData[0] = 1;
 	//					}
 	//					else
@@ -2073,7 +2074,7 @@ const char *ButtonName(const ButtConfig *bc)
 			inputNum = bc->ButtonNum;
 			inputDirection = "";
 		}
-		sprintf(name, "js%i:%s%i%s", joyNum, inputType, inputNum, inputDirection);
+		snprintf(name, sizeof(name), "js%i:%s%i%s", joyNum, inputType, inputNum, inputDirection);
 	}
 	break;
 	}

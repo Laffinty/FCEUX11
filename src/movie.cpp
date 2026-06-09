@@ -21,6 +21,7 @@
 #include "utils/guid.h"
 #include "utils/memory.h"
 #include "utils/xstring.h"
+#include "utils/safe_string.h"
 #include <sstream>
 #include <algorithm>
 
@@ -1288,22 +1289,22 @@ void FCEU_DrawMovies(uint8 *XBuf)
 		
 		if (movieMode == MOVIEMODE_PLAY)
 		{
-			sprintf(counterbuf, "%d/%d%s%s", currFrameCounter, (int)currMovieData.records.size(), GetMovieRecordModeStr(), GetMovieReadOnlyStr());
+			snprintf(counterbuf, sizeof(counterbuf), "%d/%d%s%s", currFrameCounter, (int)currMovieData.records.size(), GetMovieRecordModeStr(), GetMovieReadOnlyStr());
 		} else if (movieMode == MOVIEMODE_RECORD)
 		{
 			if (movieRecordMode == MOVIE_RECORD_MODE_TRUNCATE)
-				sprintf(counterbuf, "%d%s%s (record)", currFrameCounter, GetMovieRecordModeStr(), GetMovieReadOnlyStr()); // nearly classic
+				snprintf(counterbuf, sizeof(counterbuf), "%d%s%s (record)", currFrameCounter, GetMovieRecordModeStr(), GetMovieReadOnlyStr()); // nearly classic
 			else
-				sprintf(counterbuf, "%d/%d%s%s (record)", currFrameCounter, (int)currMovieData.records.size(), GetMovieRecordModeStr(), GetMovieReadOnlyStr());
+				snprintf(counterbuf, sizeof(counterbuf), "%d/%d%s%s (record)", currFrameCounter, (int)currMovieData.records.size(), GetMovieRecordModeStr(), GetMovieReadOnlyStr());
 		} else if (movieMode == MOVIEMODE_FINISHED)
 		{
-			sprintf(counterbuf,"%d/%d%s%s (finished)",currFrameCounter,(int)currMovieData.records.size(), GetMovieRecordModeStr(), GetMovieReadOnlyStr());
+			snprintf(counterbuf, sizeof(counterbuf),"%d/%d%s%s (finished)",currFrameCounter,(int)currMovieData.records.size(), GetMovieRecordModeStr(), GetMovieReadOnlyStr());
 			color = 0x17; //Show red to get attention
 		} else if (movieMode == MOVIEMODE_TASEDITOR)
 		{
-			sprintf(counterbuf,"%d",currFrameCounter);
+			snprintf(counterbuf, sizeof(counterbuf),"%d",currFrameCounter);
 		} else
-			sprintf(counterbuf,"%d (no movie)",currFrameCounter);
+			snprintf(counterbuf, sizeof(counterbuf),"%d (no movie)",currFrameCounter);
 
 		if (counterbuf[0])
 			DrawTextTrans(ClipSidesOffset+XBuf+FCEU_TextScanlineOffsetFromBottom(30)+1, 256, (uint8*)counterbuf, color+0x80);
@@ -1311,7 +1312,7 @@ void FCEU_DrawMovies(uint8 *XBuf)
 	if (rerecord_display && movieMode != MOVIEMODE_INACTIVE)
 	{
 		char counterbuf[32] = {0};
-		sprintf(counterbuf, "%d", currMovieData.rerecordCount);
+		snprintf(counterbuf, sizeof(counterbuf), "%d", currMovieData.rerecordCount);
 
 		if (counterbuf[0])
 			DrawTextTrans(ClipSidesOffset+XBuf+FCEU_TextScanlineOffsetFromBottom(50)+1, 256, (uint8*)counterbuf, 0x28+0x80);
@@ -1324,7 +1325,7 @@ void FCEU_DrawLagCounter(uint8 *XBuf)
 	{
 		// If currently lagging - display red, else display green
 		uint8 color = (lagFlag) ? (0x16+0x80) : (0x2A+0x80);
-		sprintf(lagcounterbuf, "%d", lagCounter);
+		snprintf(lagcounterbuf, sizeof(lagcounterbuf), "%d", lagCounter);
 		if(lagcounterbuf[0])
 			DrawTextTrans(ClipSidesOffset + XBuf + FCEU_TextScanlineOffsetFromBottom(40) + 1, 256, (uint8*)lagcounterbuf, color);
 	}
@@ -1623,11 +1624,11 @@ void FCEUI_MovieToggleReadOnly()
 
 	movie_readonly = !movie_readonly;
 	if (movie_readonly)
-		strcpy(message, "Movie is now Read-Only");
+		FCEU_strlcpy(message, sizeof(message), "Movie is now Read-Only");
 	else
-		strcpy(message, "Movie is now Read+Write");
+		FCEU_strlcpy(message, sizeof(message), "Movie is now Read+Write");
 	
-	strcat(message, GetMovieModeStr());
+	safe_strcat(message, sizeof(message), GetMovieModeStr());
 	FCEU_DispMessage("%s",0,message);
 }
 
@@ -1636,24 +1637,24 @@ void FCEUI_MovieToggleRecording()
 	char message[260] = "";
 
 	if (movieMode == MOVIEMODE_INACTIVE)
-		strcpy(message, "Cannot toggle Recording");
+		FCEU_strlcpy(message, sizeof(message), "Cannot toggle Recording");
 	else if (currFrameCounter > (int)currMovieData.records.size())
 	{
 		movie_readonly = !movie_readonly;
 		if (movie_readonly)
-			strcpy(message, "Movie is now Read-Only (finished)");
+			FCEU_strlcpy(message, sizeof(message), "Movie is now Read-Only (finished)");
 		else
-			strcpy(message, "Movie is now Read+Write (finished)");
+			FCEU_strlcpy(message, sizeof(message), "Movie is now Read+Write (finished)");
 	} else if (movieMode == MOVIEMODE_PLAY || (movieMode == MOVIEMODE_FINISHED && currFrameCounter == (int)currMovieData.records.size()))
 	{
-		strcpy(message, "Movie is now Read+Write");
+		FCEU_strlcpy(message, sizeof(message), "Movie is now Read+Write");
 		movie_readonly = false;
 		FCEUMOV_IncrementRerecordCount();
 		movieMode = MOVIEMODE_RECORD;
 		RedumpWholeMovieFile(true);
 	} else if (movieMode == MOVIEMODE_RECORD)
 	{
-		strcpy(message, "Movie is now Read-Only");
+		FCEU_strlcpy(message, sizeof(message), "Movie is now Read-Only");
 		movie_readonly = true;
 		movieMode = MOVIEMODE_PLAY;
 		RedumpWholeMovieFile(true);
@@ -1668,9 +1669,9 @@ void FCEUI_MovieToggleRecording()
 				movieMode = MOVIEMODE_FINISHED;
 		}
 	} else
-		strcpy(message, "Nothing to do in this mode");
+		FCEU_strlcpy(message, sizeof(message), "Nothing to do in this mode");
 
-	strcat(message, GetMovieModeStr());
+	safe_strcat(message, sizeof(message), GetMovieModeStr());
 
 	FCEU_DispMessage("%s",0,message);
 }
@@ -1680,23 +1681,23 @@ void FCEUI_MovieInsertFrame()
 	char message[260] = "";
 
 	if (movieMode == MOVIEMODE_INACTIVE)
-		strcpy(message, "No movie to insert a frame.");
+		FCEU_strlcpy(message, sizeof(message), "No movie to insert a frame.");
 	else if (movie_readonly)
-		strcpy(message, "Cannot modify movie in Read-Only mode.");
+		FCEU_strlcpy(message, sizeof(message), "Cannot modify movie in Read-Only mode.");
 	else if (currFrameCounter > (int)currMovieData.records.size())
-		strcpy(message, "Cannot insert a frame here.");
+		FCEU_strlcpy(message, sizeof(message), "Cannot insert a frame here.");
 	else if (movieMode == MOVIEMODE_RECORD || movieMode == MOVIEMODE_PLAY || movieMode == MOVIEMODE_FINISHED)
 	{
-		strcpy(message, "1 frame inserted");
-		strcat(message, GetMovieModeStr());
+		FCEU_strlcpy(message, sizeof(message), "1 frame inserted");
+		safe_strcat(message, sizeof(message), GetMovieModeStr());
 		std::vector<MovieRecord>::iterator iter = currMovieData.records.begin();
 		currMovieData.records.insert(iter + currFrameCounter, MovieRecord());
 		FCEUMOV_IncrementRerecordCount();
 		RedumpWholeMovieFile();
 	} else
 	{
-		strcpy(message, "Nothing to do in this mode");
-		strcat(message, GetMovieModeStr());
+		FCEU_strlcpy(message, sizeof(message), "Nothing to do in this mode");
+		safe_strcat(message, sizeof(message), GetMovieModeStr());
 	}
 
 	FCEU_DispMessage("%s",0,message);
@@ -1707,14 +1708,14 @@ void FCEUI_MovieDeleteFrame()
 	char message[260] = "";
 
 	if (movieMode == MOVIEMODE_INACTIVE)
-		strcpy(message, "No movie to delete a frame.");
+		FCEU_strlcpy(message, sizeof(message), "No movie to delete a frame.");
 	else if (movie_readonly)
-		strcpy(message, "Cannot modify movie in Read-Only mode.");
+		FCEU_strlcpy(message, sizeof(message), "Cannot modify movie in Read-Only mode.");
 	else if (currFrameCounter >= (int)currMovieData.records.size())
-		strcpy(message, "Nothing to delete past movie end.");
+		FCEU_strlcpy(message, sizeof(message), "Nothing to delete past movie end.");
 	else if (movieMode == MOVIEMODE_RECORD || movieMode == MOVIEMODE_PLAY)
 	{
-		strcpy(message, "1 frame deleted");
+		FCEU_strlcpy(message, sizeof(message), "1 frame deleted");
 		std::vector<MovieRecord>::iterator iter = currMovieData.records.begin();
 		currMovieData.records.erase(iter + currFrameCounter);
 		FCEUMOV_IncrementRerecordCount();
@@ -1730,11 +1731,11 @@ void FCEUI_MovieDeleteFrame()
 			} else
 				movieMode = MOVIEMODE_FINISHED;
 		}
-		strcat(message, GetMovieModeStr());
+		safe_strcat(message, sizeof(message), GetMovieModeStr());
 	} else
 	{
-		strcpy(message, "Nothing to do in this mode");
-		strcat(message, GetMovieModeStr());
+		FCEU_strlcpy(message, sizeof(message), "Nothing to do in this mode");
+		safe_strcat(message, sizeof(message), GetMovieModeStr());
 	}
 
 	FCEU_DispMessage("%s",0,message);
@@ -1745,14 +1746,14 @@ void FCEUI_MovieTruncate()
 	char message[260] = "";
 
 	if (movieMode == MOVIEMODE_INACTIVE)
-		strcpy(message, "No movie to truncate.");
+		FCEU_strlcpy(message, sizeof(message), "No movie to truncate.");
 	else if (movie_readonly)
-		strcpy(message, "Cannot modify movie in Read-Only mode.");
+		FCEU_strlcpy(message, sizeof(message), "Cannot modify movie in Read-Only mode.");
 	else if (currFrameCounter >= (int)currMovieData.records.size())
-		strcpy(message, "Nothing to truncate past movie end.");
+		FCEU_strlcpy(message, sizeof(message), "Nothing to truncate past movie end.");
 	else if (movieMode == MOVIEMODE_RECORD || movieMode == MOVIEMODE_PLAY)
 	{
-		strcpy(message, "Movie truncated");
+		FCEU_strlcpy(message, sizeof(message), "Movie truncated");
 		currMovieData.truncateAt(currFrameCounter);
 		FCEUMOV_IncrementRerecordCount();
 		RedumpWholeMovieFile();
@@ -1768,11 +1769,11 @@ void FCEUI_MovieTruncate()
 			else
 				movieMode = MOVIEMODE_FINISHED;
 		}
-		strcat(message, GetMovieModeStr());
+		safe_strcat(message, sizeof(message), GetMovieModeStr());
 	} else
 	{
-		strcpy(message, "Nothing to do in this mode");
-		strcat(message, GetMovieModeStr());
+		FCEU_strlcpy(message, sizeof(message), "Nothing to do in this mode");
+		safe_strcat(message, sizeof(message), GetMovieModeStr());
 	}
 
 	FCEU_DispMessage("%s",0,message);

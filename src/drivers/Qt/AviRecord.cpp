@@ -21,6 +21,7 @@
 // AviRecord.cpp
 //
 #include <stdio.h>
+#include "utils/safe_string.h"
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdarg.h>
@@ -560,7 +561,7 @@ static int chooseConfig(int width, int height)
 
 	if ( fccHandlerString.size() > 0 )
 	{
-		strcpy( fccHandler, fccHandlerString.c_str() );
+		FCEU_strlcpy( fccHandler, sizeof(fccHandler), fccHandlerString.c_str() );
 		memcpy( &cmpvars.fccHandler, fccHandler, 4 );
 		cmpvars.dwFlags = ICMF_COMPVARS_VALID;
 	}
@@ -795,7 +796,7 @@ struct OutputStream
 		if ( writeError )
 		{
 			char msg[512];
-			sprintf( msg, "%s Stream Write Errors Detected.\nOutput may be incomplete or corrupt.\nSee log file '%s' for details\n",
+			snprintf( msg, sizeof(msg), "%s Stream Write Errors Detected.\nOutput may be incomplete or corrupt.\nSee log file '%s' for details\n",
 				       isAudio ? "Audio" : "Video", AV_LOG_FILE_NAME);
 			FCEUD_PrintError(msg);
 		}
@@ -2123,7 +2124,7 @@ int aviRecordLogOpen(void)
 		if ( avLogFp == NULL )
 		{
 			char msg[512];
-			sprintf( msg, "Error: Failed to open AV Recording log file for writing: %s\n", AV_LOG_FILE_NAME);
+			snprintf( msg, sizeof(msg), "Error: Failed to open AV Recording log file for writing: %s\n", AV_LOG_FILE_NAME);
 			FCEUD_PrintError(msg);
 			avLogFp = stdout;
 		}
@@ -2224,7 +2225,7 @@ int aviRecordOpenFile( const char *filepath )
 
 	avi_info.add_pair( "IMED", QSysInfo::prettyProductName().toStdString().c_str() );
 
-	sprintf( txt, "FCEUX %s", FCEU_VERSION_STRING );
+	snprintf( txt, sizeof(txt), "FCEUX %s", FCEU_VERSION_STRING );
 	avi_info.add_pair( "ITCH", txt );
 
 	romFile = getRomFile();
@@ -2271,18 +2272,18 @@ int aviRecordOpenFile( const char *filepath )
 
 	if ( videoFormat == AVI_I420 )
 	{
-		strcpy( fourcc, "I420");
+		FCEU_strlcpy( fourcc, sizeof(fourcc), "I420");
 	}
 	#ifdef _USE_X264
 	else if ( videoFormat == AVI_X264 )
 	{
-		strcpy( fourcc, "X264");
+		FCEU_strlcpy( fourcc, sizeof(fourcc), "X264");
 	}
 	#endif 
 	#ifdef _USE_X265
 	else if ( videoFormat == AVI_X265 )
 	{
-		strcpy( fourcc, "H265");
+		FCEU_strlcpy( fourcc, sizeof(fourcc), "H265");
 	}
 	#endif
 	#ifdef WIN32
@@ -2305,7 +2306,7 @@ int aviRecordOpenFile( const char *filepath )
 			char msg[512];
 			fprintf( avLogFp, "Error: Failed to open AVI file.\n");
 			recordEnable = false;
-			sprintf( msg, "Error: AV Recording Initialization Failed.\nSee %s for details...\n", AV_LOG_FILE_NAME);
+			snprintf( msg, sizeof(msg), "Error: AV Recording Initialization Failed.\nSee %s for details...\n", AV_LOG_FILE_NAME);
 			FCEUD_PrintError(msg);
 			return -1;
 		}
@@ -2320,7 +2321,7 @@ int aviRecordOpenFile( const char *filepath )
 			char msg[512];
 			fprintf( avLogFp, "Error: Failed to open AVI file.\n");
 			recordEnable = false;
-			sprintf( msg, "Error: AV Recording Initialization Failed.\nSee %s for details...\n", AV_LOG_FILE_NAME);
+			snprintf( msg, sizeof(msg), "Error: AV Recording Initialization Failed.\nSee %s for details...\n", AV_LOG_FILE_NAME);
 			FCEUD_PrintError(msg);
 			return -1;
 		}
@@ -3136,7 +3137,7 @@ void LibavOptionsPage::initSampleRateSelect( const char *codec_name )
 
 		while ( c->supported_samplerates[i] != 0 )
 		{
-			sprintf( rateName, "%i", c->supported_samplerates[i] );
+			snprintf( rateName, sizeof(rateName), "%i", c->supported_samplerates[i] );
 
 			audioSampleRate->addItem( tr(rateName), c->supported_samplerates[i] );
 
@@ -3386,7 +3387,7 @@ void LibavEncOptItem::setValueText(void)
 	{
 		if ( s != NULL )
 		{
-			strcpy( stmp, (char*)s );
+			FCEU_strlcpy( stmp, sizeof(stmp), (char*)s );
 		}
 	}
 	if ( s != NULL )
@@ -3410,22 +3411,22 @@ void LibavEncOptItem::setValueText(void)
 						if ( units[x]->default_val.i64 & i )
 						{
 							char stmp2[128];
-							sprintf( stmp2, "%s", units[x]->name );
+							snprintf( stmp2, sizeof(stmp2), "%s", units[x]->name );
 							if (j>0)
 							{
-								strcat( stmp, ",");
+								safe_strcat( stmp, sizeof(stmp), ",");
 							}
 							else
 							{
-								strcat( stmp, " (");
+								safe_strcat( stmp, sizeof(stmp), " (");
 							}
-							strcat( stmp, stmp2 );
+							safe_strcat( stmp, sizeof(stmp), stmp2 );
 							j++;
 						}
 					}
 					if ( j > 0 )
 					{
-						strcat( stmp, ")");
+						safe_strcat( stmp, sizeof(stmp), ")");
 					}
 				}
 			}
@@ -3445,8 +3446,8 @@ void LibavEncOptItem::setValueText(void)
 						if ( units[x]->default_val.i64 == i )
 						{
 							char stmp2[128];
-							sprintf( stmp2, " (%s)", units[x]->name );
-							strcat( stmp, stmp2 );
+							snprintf( stmp2, sizeof(stmp2), " (%s)", units[x]->name );
+							safe_strcat( stmp, sizeof(stmp), stmp2 );
 							break;
 						}
 					}
@@ -3481,12 +3482,12 @@ LibavEncOptWin::LibavEncOptWin(int type, QWidget *parent)
 	if ( type )
 	{
 		codec_name = LIBAV::audio_st.selEnc.c_str();
-		sprintf( title, "%s Audio Encoder Configuration", codec_name );
+		snprintf( title, sizeof(title), "%s Audio Encoder Configuration", codec_name );
 	}
 	else
 	{
 		codec_name = LIBAV::video_st.selEnc.c_str();
-		sprintf( title, "%s Video Encoder Configuration", codec_name );
+		snprintf( title, sizeof(title), "%s Video Encoder Configuration", codec_name );
 	}
 	setWindowTitle( title );
 	resize(512, 512);
@@ -3816,13 +3817,13 @@ LibavEncOptInputWin::LibavEncOptInputWin( LibavEncOptItem *itemIn, QWidget *pare
 
 			grid->addWidget( new QLabel( tr("Range:")   ), 2, 0 );
 
-			sprintf( stmp, "[ %.0f, %.0f ]", opt->min, opt->max );
+			snprintf( stmp, sizeof(stmp), "[ %.0f, %.0f ]", opt->min, opt->max );
 
 			grid->addWidget( new QLabel( tr(stmp)   ), 2, 1 );
 
 			grid->addWidget( new QLabel( tr("Default:")   ), 3, 0 );
 
-			sprintf( stmp, "%lli", (long long)opt->default_val.i64 );
+			snprintf( stmp, sizeof(stmp), "%lli", (long long)opt->default_val.i64 );
 
 			grid->addWidget( new QLabel( tr(stmp)   ), 3, 1 );
 
@@ -3838,12 +3839,12 @@ LibavEncOptInputWin::LibavEncOptInputWin( LibavEncOptItem *itemIn, QWidget *pare
 				{
 					if ( item->units[i]->help )
 					{
-						sprintf( stmp, "%3lli:  %s  -  %s", (long long)item->units[i]->default_val.i64,
+						snprintf( stmp, sizeof(stmp), "%3lli:  %s  -  %s", (long long)item->units[i]->default_val.i64,
 							item->units[i]->name, item->units[i]->help );
 					}
 					else
 					{
-						sprintf( stmp, "%3lli:  %s", (long long)item->units[i]->default_val.i64,
+						snprintf( stmp, sizeof(stmp), "%3lli:  %s", (long long)item->units[i]->default_val.i64,
 							item->units[i]->name );
 					}
 
@@ -3874,13 +3875,13 @@ LibavEncOptInputWin::LibavEncOptInputWin( LibavEncOptItem *itemIn, QWidget *pare
 
 			grid->addWidget( new QLabel( tr("Range:")   ), 2, 0 );
 
-			sprintf( stmp, "[ %e, %e ]", opt->min, opt->max );
+			snprintf( stmp, sizeof(stmp), "[ %e, %e ]", opt->min, opt->max );
 
 			grid->addWidget( new QLabel( tr(stmp)   ), 2, 1 );
 
 			grid->addWidget( new QLabel( tr("Default:")   ), 3, 0 );
 
-			sprintf( stmp, "%f", opt->default_val.dbl );
+			snprintf( stmp, sizeof(stmp), "%f", opt->default_val.dbl );
 
 			grid->addWidget( new QLabel( tr(stmp)   ), 3, 1 );
 
@@ -3905,7 +3906,7 @@ LibavEncOptInputWin::LibavEncOptInputWin( LibavEncOptItem *itemIn, QWidget *pare
 
 			if ( opt->default_val.str )
 			{
-				sprintf( stmp, "%s", opt->default_val.str );
+				snprintf( stmp, sizeof(stmp), "%s", opt->default_val.str );
 			}
 			grid->addWidget( new QLabel( tr(stmp)   ), 2, 1 );
 
@@ -3929,7 +3930,7 @@ LibavEncOptInputWin::LibavEncOptInputWin( LibavEncOptItem *itemIn, QWidget *pare
 
 			grid->addWidget( new QLabel( tr("Default:")   ), 2, 0 );
 
-			sprintf( stmp, "%i/%i", opt->default_val.q.num, opt->default_val.q.den );
+			snprintf( stmp, sizeof(stmp), "%i/%i", opt->default_val.q.num, opt->default_val.q.den );
 
 			grid->addWidget( new QLabel( tr(stmp)   ), 2, 1 );
 
@@ -3959,7 +3960,7 @@ LibavEncOptInputWin::LibavEncOptInputWin( LibavEncOptItem *itemIn, QWidget *pare
 
 			grid->addWidget( new QLabel( tr("Default:")   ), 2, 0 );
 
-			sprintf( stmp, "%s", opt->default_val.i64 ? "true" : "false" );
+			snprintf( stmp, sizeof(stmp), "%s", opt->default_val.i64 ? "true" : "false" );
 
 			grid->addWidget( new QLabel( tr(stmp)   ), 2, 1 );
 
@@ -3983,7 +3984,7 @@ LibavEncOptInputWin::LibavEncOptInputWin( LibavEncOptItem *itemIn, QWidget *pare
 
 			grid->addWidget( new QLabel( tr("Default:")   ), 2, 0 );
 
-			sprintf( stmp, "0x%08llX", (unsigned long long)opt->default_val.i64 );
+			snprintf( stmp, sizeof(stmp), "0x%08llX", (unsigned long long)opt->default_val.i64 );
 
 			grid->addWidget( new QLabel( tr(stmp)   ), 2, 1 );
 
@@ -3993,7 +3994,7 @@ LibavEncOptInputWin::LibavEncOptInputWin( LibavEncOptItem *itemIn, QWidget *pare
 
 				for (size_t i=0; i<item->units.size(); i++)
 				{
-					sprintf( stmp, "%s", item->units[i]->name );
+					snprintf( stmp, sizeof(stmp), "%s", item->units[i]->name );
 
 					c = new QCheckBox( tr(stmp) );
 

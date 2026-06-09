@@ -21,6 +21,7 @@
 // TraceLogger.cpp
 //
 #include <stdio.h>
+#include "utils/safe_string.h"
 #include <math.h>
 
 #ifdef WIN32
@@ -968,7 +969,7 @@ int traceRecord_t::convToText(char *txt, int *len)
 
 	if (skippedLines > 0)
 	{
-		sprintf(stmp, "(%d lines skipped) ", skippedLines);
+		snprintf( stmp, sizeof(stmp), "(%d lines skipped) ", skippedLines);
 
 		j = 0;
 		while (stmp[j] != 0)
@@ -982,7 +983,7 @@ int traceRecord_t::convToText(char *txt, int *len)
 	// Start filling the str_temp line: Frame count, Cycles count, Instructions count, AXYS state, Processor status, Tabs, Address, Data, Disassembly
 	if (logging_options & LOG_FRAMES_COUNT)
 	{
-		sprintf(stmp, "f%-6llu ", (long long unsigned int)frameCount);
+		snprintf( stmp, sizeof(stmp), "f%-6llu ", (long long unsigned int)frameCount);
 
 		j = 0;
 		while (stmp[j] != 0)
@@ -995,7 +996,7 @@ int traceRecord_t::convToText(char *txt, int *len)
 
 	if (logging_options & LOG_CYCLES_COUNT)
 	{
-		sprintf(stmp, "c%-11llu ", (long long unsigned int)cycleCount);
+		snprintf( stmp, sizeof(stmp), "c%-11llu ", (long long unsigned int)cycleCount);
 
 		j = 0;
 		while (stmp[j] != 0)
@@ -1008,7 +1009,7 @@ int traceRecord_t::convToText(char *txt, int *len)
 
 	if (logging_options & LOG_INSTRUCTIONS_COUNT)
 	{
-		sprintf(stmp, "i%-11llu ", (long long unsigned int)instrCount);
+		snprintf( stmp, sizeof(stmp), "i%-11llu ", (long long unsigned int)instrCount);
 
 		j = 0;
 		while (stmp[j] != 0)
@@ -1021,13 +1022,13 @@ int traceRecord_t::convToText(char *txt, int *len)
 
 	if (logging_options & LOG_REGISTERS)
 	{
-		sprintf(str_axystate, "A:%02X X:%02X Y:%02X S:%02X ", (cpu.A), (cpu.X), (cpu.Y), (cpu.S));
+		snprintf(str_axystate, sizeof(str_axystate), "A:%02X X:%02X Y:%02X S:%02X ", (cpu.A), (cpu.X), (cpu.Y), (cpu.S));
 	}
 
 	if (logging_options & LOG_PROCESSOR_STATUS)
 	{
 		int tmp = cpu.P ^ 0xFF;
-		sprintf(str_procstatus, "P:%c%c%c%c%c%c%c%c ",
+		snprintf(str_procstatus, sizeof(str_procstatus), "P:%c%c%c%c%c%c%c%c ",
 				'N' | (tmp & 0x80) >> 2,
 				'V' | (tmp & 0x40) >> 1,
 				'U' | (tmp & 0x20),
@@ -1084,16 +1085,16 @@ int traceRecord_t::convToText(char *txt, int *len)
 	{
 		if (cpu.PC >= 0x8000)
 		{
-			sprintf(stmp, "$%02X:%04X: ", bank, cpu.PC);
+			snprintf( stmp, sizeof(stmp), "$%02X:%04X: ", bank, cpu.PC);
 		}
 		else
 		{
-			sprintf(stmp, "  $%04X: ", cpu.PC);
+			snprintf( stmp, sizeof(stmp), "  $%04X: ", cpu.PC);
 		}
 	}
 	else
 	{
-		sprintf(stmp, "$%04X: ", cpu.PC);
+		snprintf( stmp, sizeof(stmp), "$%04X: ", cpu.PC);
 	}
 	j = 0;
 	while (stmp[j] != 0)
@@ -1131,7 +1132,7 @@ int traceRecord_t::convToText(char *txt, int *len)
 	}
 	if (callAddr >= 0)
 	{
-		sprintf(stmp, " (from $%04X)", callAddr);
+		snprintf( stmp, sizeof(stmp), " (from $%04X)", callAddr);
 
 		j = 0;
 		while (stmp[j] != 0)
@@ -1378,7 +1379,7 @@ void FCEUD_TraceInstruction(uint8 *opcode, int size)
 			olddatacount = datacount;
 			if (unloggedlines > 0)
 			{
-				//sprintf(str_result, "(%d lines skipped)", unloggedlines);
+				//snprintf(str_result, sizeof(str_result), "(%d lines skipped)", unloggedlines);
 				rec.skippedLines = unloggedlines;
 				unloggedlines = 0;
 			}
@@ -1399,8 +1400,8 @@ void FCEUD_TraceInstruction(uint8 *opcode, int size)
 
 	if ((addr + size) > 0xFFFF)
 	{
-		//sprintf(str_data, "%02X        ", opcode[0]);
-		//sprintf(str_disassembly, "OVERFLOW");
+		//snprintf(str_data, sizeof(str_data), "%02X        ", opcode[0]);
+		//snprintf(str_disassembly, sizeof(str_disassembly), "OVERFLOW");
 		rec.flags |= 0x01;
 	}
 	else
@@ -1409,7 +1410,7 @@ void FCEUD_TraceInstruction(uint8 *opcode, int size)
 		switch (size)
 		{
 		case 0:
-			//sprintf(str_disassembly,"UNDEFINED");
+			//snprintf(str_disassembly, sizeof(str_disassembly),"UNDEFINED");
 			rec.flags |= 0x02;
 			break;
 		case 1:
@@ -1707,7 +1708,7 @@ void QTraceLogView::calcTextSel(int x, int y)
 					selAddrChar = ax;
 					selAddrWidth = i;
 					selAddrValue = strtol(id, NULL, 16);
-					strcpy(selAddrText, id);
+					FCEU_strlcpy(selAddrText, sizeof(selAddrText), id);
 
 					//printf("Sel Addr: $%04X \n", selAddrValue );
 				}
@@ -2046,13 +2047,13 @@ void QTraceLogView::openBpEditWindow(int editIdx, watchpointinfo *wp, traceRecor
 			sprite_radio->setChecked(true);
 		}
 
-		sprintf(stmp, "%04X", wp->address);
+		snprintf( stmp, sizeof(stmp), "%04X", wp->address);
 
 		addr1->setText(tr(stmp));
 
 		if (wp->endaddress > 0)
 		{
-			sprintf(stmp, "%04X", wp->endaddress);
+			snprintf( stmp, sizeof(stmp), "%04X", wp->endaddress);
 
 			addr2->setText(tr(stmp));
 		}
@@ -2092,11 +2093,11 @@ void QTraceLogView::openBpEditWindow(int editIdx, watchpointinfo *wp, traceRecor
 					char str[64];
 					if ((wp->address == recp->cpu.PC) && (recp->bank >= 0))
 					{
-						sprintf(str, "K==#%02X", recp->bank);
+						snprintf( str, sizeof(str), "K==#%02X", recp->bank);
 					}
 					else
 					{
-						sprintf(str, "K==#%02X", getBank(wp->address));
+						snprintf( str, sizeof(str), "K==#%02X", getBank(wp->address));
 					}
 					cond->setText(tr(str));
 				}
@@ -2553,7 +2554,7 @@ void TraceLogDiskThread_t::run(void)
 	if ( logFile == INVALID_HANDLE_VALUE )
 	{
 		char stmp[1024];
-		sprintf( stmp, "Error: Failed to open log file for writing: %s", logFilePath.c_str() );
+		snprintf( stmp, sizeof(stmp), "Error: Failed to open log file for writing: %s", logFilePath.c_str() );
 		consoleWindow->QueueErrorMsgWindow(stmp);
 		return;
 	}
@@ -2564,7 +2565,7 @@ void TraceLogDiskThread_t::run(void)
 	if ( logFile == -1 )
 	{
 		char stmp[1024];
-		sprintf( stmp, "Error: Failed to open log file for writing: %s", logFilePath.c_str() );
+		snprintf( stmp, sizeof(stmp), "Error: Failed to open log file for writing: %s", logFilePath.c_str() );
 		consoleWindow->QueueErrorMsgWindow(stmp);
 		return;
 	}

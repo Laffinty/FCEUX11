@@ -22,6 +22,7 @@ History - History of movie modifications
 ------------------------------------------------------------------------------------ */
 
 #include "fceu.h"
+#include "utils/safe_string.h"
 #include "driver.h"
 #include "Qt/ConsoleWindow.h"
 #include "Qt/TasEditor/taseditor_project.h"
@@ -126,7 +127,7 @@ void HISTORY::reset()
 	SNAPSHOT snap;
 	snap.init(currMovieData, greenzone->lagLog, taseditorConfig->enableHotChanges);
 	snap.modificationType = MODTYPE_INIT;
-	strcat(snap.description, modCaptions[snap.modificationType]);
+	safe_strcat(snap.description, sizeof(snap.description), modCaptions[snap.modificationType]);
 	snap.keyFrame = -1;
 	snap.startFrame = 0;
 	snap.endFrame = snap.inputlog.size - 1;
@@ -490,7 +491,7 @@ int HISTORY::registerChanges(int mod_type, int start, int end, int size, const c
 		char framenum[16];
 		// fill description:
 		snap.modificationType = mod_type;
-		strcat(snap.description, modCaptions[snap.modificationType]);
+		safe_strcat(snap.description, sizeof(snap.description), modCaptions[snap.modificationType]);
 		// set keyframe
 		switch (mod_type)
 		{
@@ -522,8 +523,8 @@ int HISTORY::registerChanges(int mod_type, int start, int end, int size, const c
 		if (mod_type == MODTYPE_INSERTNUM)
 		{
 			snap.endFrame = start + size - 1;
-			sprintf( framenum, "%i", size);
-			strcat(snap.description, framenum);
+			snprintf(framenum, sizeof(framenum), "%i", size);
+			safe_strcat(snap.description, sizeof(snap.description), framenum);
 		} else
 		{
 			snap.endFrame = end;
@@ -539,19 +540,19 @@ int HISTORY::registerChanges(int mod_type, int start, int end, int size, const c
 			if (snap.endFrame < snapshots[real_pos].endFrame)
 				snap.endFrame = snapshots[real_pos].endFrame;
 			// add upper and lower frame to description
-			strcat(snap.description, " ");
-			sprintf( framenum, "%i", snap.startFrame);
-			strcat(snap.description, framenum);
+			safe_strcat(snap.description, sizeof(snap.description), " ");
+			snprintf(framenum, sizeof(framenum), "%i", snap.startFrame);
+			safe_strcat(snap.description, sizeof(snap.description), framenum);
 			if (snap.endFrame > snap.startFrame)
 			{
-				strcat(snap.description, "-");
-				sprintf( framenum, "%i", snap.endFrame);
-				strcat(snap.description, framenum);
+				safe_strcat(snap.description, sizeof(snap.description), "-");
+				snprintf(framenum, sizeof(framenum), "%i", snap.endFrame);
+				safe_strcat(snap.description, sizeof(snap.description), framenum);
 			}
 			// add comment if there is one specified
 			if (comment)
 			{
-				strcat(snap.description, " ");
+				safe_strcat(snap.description, sizeof(snap.description), " ");
 				strncat(snap.description, comment, SNAPSHOT_DESCRIPTION_MAX_LEN - strlen(snap.description) - 1);
 			}
 			// set hotchanges
@@ -569,19 +570,19 @@ int HISTORY::registerChanges(int mod_type, int start, int end, int size, const c
 		{
 			// don't combine
 			// add upper and lower frame to description
-			strcat(snap.description, " ");
-			sprintf( framenum, "%i", snap.startFrame);
-			strcat(snap.description, framenum);
+			safe_strcat(snap.description, sizeof(snap.description), " ");
+			snprintf(framenum, sizeof(framenum), "%i", snap.startFrame);
+			safe_strcat(snap.description, sizeof(snap.description), framenum);
 			if (snap.endFrame > snap.startFrame)
 			{
-				strcat(snap.description, "-");
-				sprintf( framenum, "%i", snap.endFrame);
-				strcat(snap.description, framenum);
+				safe_strcat(snap.description, sizeof(snap.description), "-");
+				snprintf(framenum, sizeof(framenum), "%i", snap.endFrame);
+				safe_strcat(snap.description, sizeof(snap.description), framenum);
 			}
 			// add comment if there is one specified
 			if (comment)
 			{
-				strcat(snap.description, " ");
+				safe_strcat(snap.description, sizeof(snap.description), " ");
 				strncat(snap.description, comment, SNAPSHOT_DESCRIPTION_MAX_LEN - strlen(snap.description) - 1);
 			}
 			// set hotchanges
@@ -647,7 +648,7 @@ int HISTORY::registerAdjustLag(int start, int size)
 		//if (current_snap.mod_type == MODTYPE_RECORD && size < 0 && current_snap.consecutivenessTag == first_changes) snap.consecutivenessTag--;		// make sure that consecutive Recordings work even when there's AdjustUp inbetween
 		snap.recordedJoypadDifferenceBits = current_snap.recordedJoypadDifferenceBits;
 		snap.modificationType = current_snap.modificationType;
-		strcpy(snap.description, current_snap.description);
+		FCEU_strlcpy(snap.description, sizeof(snap.description), current_snap.description);
 		// set hotchanges
 		if (taseditorConfig->enableHotChanges)
 		{
@@ -674,30 +675,30 @@ void HISTORY::registerMarkersChange(int modificationType, int start, int end, co
 	snap.init(currMovieData, greenzone->lagLog, taseditorConfig->enableHotChanges);
 	// fill description:
 	snap.modificationType = modificationType;
-	strcat(snap.description, modCaptions[modificationType]);
+	safe_strcat(snap.description, sizeof(snap.description), modCaptions[modificationType]);
 	snap.keyFrame = start;
 	snap.startFrame = start;
 	snap.endFrame = end;
 	// add the frame to description
 	char framenum[16];
-	strcat(snap.description, " ");
-	sprintf( framenum, "%i", snap.startFrame);
-	strcat(snap.description, framenum);
+	safe_strcat(snap.description, sizeof(snap.description), " ");
+	snprintf(framenum, sizeof(framenum), "%i", snap.startFrame);
+	safe_strcat(snap.description, sizeof(snap.description), framenum);
 	if (snap.endFrame > snap.startFrame || modificationType == MODTYPE_MARKER_DRAG || modificationType == MODTYPE_MARKER_SWAP)
 	{
 		if (modificationType == MODTYPE_MARKER_DRAG)
-			strcat(snap.description, "->");
+			safe_strcat(snap.description, sizeof(snap.description), "->");
 		else if (modificationType == MODTYPE_MARKER_SWAP)
-			strcat(snap.description, "<->");
+			safe_strcat(snap.description, sizeof(snap.description), "<->");
 		else
-			strcat(snap.description, "-");
-		sprintf( framenum, "%i", snap.endFrame);
-		strcat(snap.description, framenum);
+			safe_strcat(snap.description, sizeof(snap.description), "-");
+		snprintf(framenum, sizeof(framenum), "%i", snap.endFrame);
+		safe_strcat(snap.description, sizeof(snap.description), framenum);
 	}
 	// add comment if there is one specified
 	if (comment)
 	{
-		strcat(snap.description, " ");
+		safe_strcat(snap.description, sizeof(snap.description), " ");
 		strncat(snap.description, comment, SNAPSHOT_DESCRIPTION_MAX_LEN - strlen(snap.description) - 1);
 	}
 	// Hotchanges aren't changed
@@ -714,12 +715,12 @@ void HISTORY::registerBookmarkSet(int slot, BOOKMARK& backupCopy, int oldCurrent
 	snap.init(currMovieData, greenzone->lagLog, taseditorConfig->enableHotChanges);
 	// fill description: modification type + keyframe of the Bookmark
 	snap.modificationType = MODTYPE_BOOKMARK_0 + slot;
-	strcat(snap.description, modCaptions[snap.modificationType]);
+	safe_strcat(snap.description, sizeof(snap.description), modCaptions[snap.modificationType]);
 	snap.startFrame = snap.endFrame = snap.keyFrame = bookmarks->bookmarksArray[slot].snapshot.keyFrame;
 	char framenum[16];
-	strcat(snap.description, " ");
-	sprintf( framenum, "%i", snap.keyFrame);
-	strcat(snap.description, framenum);
+	safe_strcat(snap.description, sizeof(snap.description), " ");
+	snprintf(framenum, sizeof(framenum), "%i", snap.keyFrame);
+	safe_strcat(snap.description, sizeof(snap.description), framenum);
 	if (taseditorConfig->enableHotChanges)
 		snap.inputlog.copyHotChanges(&getCurrentSnapshot().inputlog);
 	addItemToHistoryLog(snap, oldCurrentBranch, backupCopy);
@@ -738,8 +739,8 @@ int HISTORY::registerBranching(int slot, bool markers_changed)
 		// differences found
 		// fill description: modification type + time of the Branch
 		snap.modificationType = MODTYPE_BRANCH_0 + slot;
-		strcat(snap.description, modCaptions[snap.modificationType]);
-		strcat(snap.description, bookmarks->bookmarksArray[slot].snapshot.description);
+		safe_strcat(snap.description, sizeof(snap.description), modCaptions[snap.modificationType]);
+		safe_strcat(snap.description, sizeof(snap.description), bookmarks->bookmarksArray[slot].snapshot.description);
 		snap.keyFrame = first_changes;
 		snap.startFrame = first_changes;
 		snap.endFrame = -1;
@@ -752,8 +753,8 @@ int HISTORY::registerBranching(int slot, bool markers_changed)
 	{
 		// fill description: modification type + time of the Branch
 		snap.modificationType = MODTYPE_BRANCH_MARKERS_0 + slot;
-		strcat(snap.description, modCaptions[snap.modificationType]);
-		strcat(snap.description, bookmarks->bookmarksArray[slot].snapshot.description);
+		safe_strcat(snap.description, sizeof(snap.description), modCaptions[snap.modificationType]);
+		safe_strcat(snap.description, sizeof(snap.description), bookmarks->bookmarksArray[slot].snapshot.description);
 		snap.keyFrame = bookmarks->bookmarksArray[slot].snapshot.keyFrame;
 		snap.startFrame = 0;
 		snap.endFrame = -1;
@@ -800,7 +801,7 @@ void HISTORY::registerRecording(int frameOfChange, uint32 joypadDifferenceBits)
 		SNAPSHOT* snap = &snapshots[real_pos];
 		snap->reinit(currMovieData, greenzone->lagLog, taseditorConfig->enableHotChanges, frameOfChange);
 		// refill description
-		strcat(snap->description, modCaptions[MODTYPE_RECORD]);
+		safe_strcat(snap->description, sizeof(snap->description), modCaptions[MODTYPE_RECORD]);
 		char framenum[11];
 		snap->endFrame = frameOfChange;
 		snap->consecutivenessTag = frameOfChange;
@@ -808,7 +809,7 @@ void HISTORY::registerRecording(int frameOfChange, uint32 joypadDifferenceBits)
 		uint32 current_mask = 1;
 		if ((snap->recordedJoypadDifferenceBits & current_mask))
 		{
-			strcat(snap->description, joypadCaptions[0]);
+			safe_strcat(snap->description, sizeof(snap->description), joypadCaptions[0]);
 		}
 		// add info which joypads were affected
 		int num = joysticksPerFrame[snap->inputlog.inputType];
@@ -817,17 +818,17 @@ void HISTORY::registerRecording(int frameOfChange, uint32 joypadDifferenceBits)
 		{
 			if ((snap->recordedJoypadDifferenceBits & current_mask))
 			{
-				strcat(snap->description, joypadCaptions[i + 1]);
+				safe_strcat(snap->description, sizeof(snap->description), joypadCaptions[i + 1]);
 			}
 			current_mask <<= 1;
 		}
 		// add upper and lower frame to description
-		strcat(snap->description, " ");
-		sprintf( framenum, "%i", snap->startFrame);
-		strcat(snap->description, framenum);
-		strcat(snap->description, "-");
-		sprintf( framenum, "%i", snap->endFrame);
-		strcat(snap->description, framenum);
+		safe_strcat(snap->description, sizeof(snap->description), " ");
+		snprintf(framenum, sizeof(framenum), "%i", snap->startFrame);
+		safe_strcat(snap->description, sizeof(snap->description), framenum);
+		safe_strcat(snap->description, sizeof(snap->description), "-");
+		snprintf(framenum, sizeof(framenum), "%i", snap->endFrame);
+		safe_strcat(snap->description, sizeof(snap->description), framenum);
 		// truncate history here
 		historyTotalItems = historyCursorPos+1;
 		updateList();
@@ -840,14 +841,14 @@ void HISTORY::registerRecording(int frameOfChange, uint32 joypadDifferenceBits)
 		snap.recordedJoypadDifferenceBits = joypadDifferenceBits;
 		// fill description:
 		snap.modificationType = MODTYPE_RECORD;
-		strcat(snap.description, modCaptions[MODTYPE_RECORD]);
+		safe_strcat(snap.description, sizeof(snap.description), modCaptions[MODTYPE_RECORD]);
 		char framenum[11];
 		snap.keyFrame = snap.startFrame = snap.endFrame = snap.consecutivenessTag = frameOfChange;
 		// add info if Commands were affected
 		uint32 current_mask = 1;
 		if ((snap.recordedJoypadDifferenceBits & current_mask))
 		{
-			strcat(snap.description, joypadCaptions[0]);
+			safe_strcat(snap.description, sizeof(snap.description), joypadCaptions[0]);
 		}
 		// add info which joypads were affected
 		int num = joysticksPerFrame[snap.inputlog.inputType];
@@ -855,13 +856,13 @@ void HISTORY::registerRecording(int frameOfChange, uint32 joypadDifferenceBits)
 		for (int i = 0; i < num; ++i)
 		{
 			if ((snap.recordedJoypadDifferenceBits & current_mask))
-				strcat(snap.description, joypadCaptions[i + 1]);
+				safe_strcat(snap.description, sizeof(snap.description), joypadCaptions[i + 1]);
 			current_mask <<= 1;
 		}
 		// add upper frame to description
-		strcat(snap.description, " ");
-		sprintf( framenum, "%i", frameOfChange);
-		strcat(snap.description, framenum);
+		safe_strcat(snap.description, sizeof(snap.description), " ");
+		snprintf(framenum, sizeof(framenum), "%i", frameOfChange);
+		safe_strcat(snap.description, sizeof(snap.description), framenum);
 		// set hotchanges
 		if (taseditorConfig->enableHotChanges)
 		{
@@ -889,9 +890,9 @@ int HISTORY::registerImport(MovieData& md, const char* filename)
 		snap.endFrame = snap.inputlog.size - 1;
 		// fill description:
 		snap.modificationType = MODTYPE_IMPORT;
-		strcat(snap.description, modCaptions[snap.modificationType]);
+		safe_strcat(snap.description, sizeof(snap.description), modCaptions[snap.modificationType]);
 		// add filename to description
-		strcat(snap.description, " ");
+		safe_strcat(snap.description, sizeof(snap.description), " ");
 		strncat(snap.description, filename, SNAPSHOT_DESCRIPTION_MAX_LEN - strlen(snap.description) - 1);
 		if (taseditorConfig->enableHotChanges)
 		{
@@ -929,21 +930,21 @@ int HISTORY::registerLuaChanges(const char* name, int start, bool insertionOrDel
 		if (name[0])
 		{
 			// user provided custom name of operation
-			strcat(snap.description, luaCaptionPrefix);
+			safe_strcat(snap.description, sizeof(snap.description), luaCaptionPrefix);
 			strncat(snap.description, name, LUACHANGES_NAME_MAX_LEN);
 		} else
 		{
 			// set default name
-			strcat(snap.description, modCaptions[snap.modificationType]);
+			safe_strcat(snap.description, sizeof(snap.description), modCaptions[snap.modificationType]);
 		}
 		snap.keyFrame = first_changes;
 		snap.startFrame = start;
 		snap.endFrame = -1;
 		// add upper frame to description
 		char framenum[16];
-		strcat(snap.description, " ");
-		sprintf( framenum, "%i", first_changes);
-		strcat(snap.description, framenum);
+		safe_strcat(snap.description, sizeof(snap.description), " ");
+		snprintf(framenum, sizeof(framenum), "%i", first_changes);
+		safe_strcat(snap.description, sizeof(snap.description), framenum);
 		// set hotchanges
 		if (taseditorConfig->enableHotChanges)
 		{
@@ -1119,7 +1120,7 @@ error:
 //{
 //	LVITEM& item = nmlvDispInfo->item;
 //	if (item.mask & LVIF_TEXT)
-//		strcpy(item.pszText, getItemDesc(item.iItem));
+//		FCEU_strlcpy(item.pszText, sizeof(item.pszText), getItemDesc(item.iItem));
 //}
 
 //LONG HISTORY::handleCustomDraw(NMLVCUSTOMDRAW* msg)

@@ -18,6 +18,7 @@ Splicer - Tool for montage
 ------------------------------------------------------------------------------------ */
 
 #include <sstream>
+#include "utils/safe_string.h"
 #include <QInputDialog>
 #include "Qt/TasEditor/inputlog.h"
 #include "Qt/TasEditor/taseditor_project.h"
@@ -67,31 +68,31 @@ void SPLICER::update(void)
 		{
 			char num[16];
 			char new_text[128];
-			//strcpy(new_text, selectionText);
+			//FCEU_strlcpy(new_text, sizeof(new_text), selectionText);
 
 			new_text[0] = 0;
 			// rows
 			if (size > 1)
 			{
-				sprintf( num, "%i", size);
-				strcat(new_text, num);
-				strcat(new_text, numTextRows);
+				snprintf(num, sizeof(num), "%i", size);
+				safe_strcat(new_text, sizeof(new_text), num);
+				safe_strcat(new_text, sizeof(new_text), numTextRows);
 			}
 			else
 			{
-				strcat(new_text, numTextRow);
+				safe_strcat(new_text, sizeof(new_text), numTextRow);
 			}
 			// columns
 			int columns = NUM_JOYPAD_BUTTONS * joysticksPerFrame[getInputType(currMovieData)];	// in future the number of columns will depend on selected columns
 			if (columns > 1)
 			{
-				sprintf( num, "%i", columns);
-				strcat(new_text, num);
-				strcat(new_text, numTextColumns);
+				snprintf(num, sizeof(num), "%i", columns);
+				safe_strcat(new_text, sizeof(new_text), num);
+				safe_strcat(new_text, sizeof(new_text), numTextColumns);
 			}
 			else
 			{
-				strcat(new_text, numTextColumn);
+				safe_strcat(new_text, sizeof(new_text), numTextColumn);
 			}
 			tasWin->selectionLbl->setText( QObject::tr(new_text) );
 			//SetWindowText(hwndSelectionInfo, new_text);
@@ -461,7 +462,7 @@ bool SPLICER::copySelectedInputToClipboard(RowsSelection* currentSelectionOverri
 		//	return false;
 		//}
 		//char *pGlobal = (char*)GlobalLock(hGlobal);
-		//strcpy(pGlobal, clipString.str().c_str());
+		//FCEU_strlcpy(pGlobal, sizeof(pGlobal), clipString.str().c_str());
 		//GlobalUnlock(hGlobal);
 		//SetClipboardData(CF_TEXT, hGlobal);
 
@@ -782,30 +783,30 @@ void SPLICER::redrawInfoAboutClipboard(void)
 		char num[16];
 		char new_text[128];
 
-		//strcpy(new_text, clipboardText);
+		//FCEU_strlcpy(new_text, sizeof(new_text), clipboardText);
 		new_text[0] = 0;
 		// rows
 		if (clipboardSelection.size() > 1)
 		{
-			sprintf( num, "%zi", clipboardSelection.size());
-			strcat(new_text, num);
-			strcat(new_text, numTextRows);
+			snprintf(num, sizeof(num), "%zi", clipboardSelection.size());
+			safe_strcat(new_text, sizeof(new_text), num);
+			safe_strcat(new_text, sizeof(new_text), numTextRows);
 		}
 		else
 		{
-			strcat(new_text, numTextRow);
+			safe_strcat(new_text, sizeof(new_text), numTextRow);
 		}
 		// columns
 		int columns = NUM_JOYPAD_BUTTONS * joysticksPerFrame[getInputType(currMovieData)];	// in future the number of columns will depend on selected columns
 		if (columns > 1)
 		{
-			sprintf( num, "%i", columns);
-			strcat(new_text, num);
-			strcat(new_text, numTextColumns);
+			snprintf(num, sizeof(num), "%i", columns);
+			safe_strcat(new_text, sizeof(new_text), num);
+			safe_strcat(new_text, sizeof(new_text), numTextColumns);
 		}
 		else
 		{
-			strcat(new_text, numTextColumn);
+			safe_strcat(new_text, sizeof(new_text), numTextColumn);
 		}
 		tasWin->clipboardLbl->setText( QObject::tr(new_text) );
 		//SetWindowText(hwndClipboardInfo, new_text);

@@ -15,6 +15,7 @@
  */
 
 #include "types.h"
+#include "utils/safe_string.h"
 #include "x6502.h"
 #include "fceu.h"
 #include "input.h"
@@ -194,30 +195,30 @@ void FCEU_VSUniCheck(uint64 md5partial, int *MapperNo, uint8 *Mirroring) {
 
     if (tofix) {
         char gigastr[768];
-        strcpy(gigastr, "The iNES header contains incorrect information.  For now, the information will be corrected in RAM.  ");
+        FCEU_strlcpy(gigastr, sizeof(gigastr), "The iNES header contains incorrect information.  For now, the information will be corrected in RAM.  ");
         if (tofix & 4) {
-            sprintf(gigastr + strlen(gigastr), "Game type should be set to Vs. System.  ");
+            snprintf( gigastr + strlen(gigastr), sizeof(gigastr + strlen(gigastr)), "Game type should be set to Vs. System.  ");
         }
         if (tofix & 1)
-            sprintf(gigastr + strlen(gigastr), "The mapper number should be set to %d.  ", *MapperNo);
+            snprintf( gigastr + strlen(gigastr), sizeof(gigastr + strlen(gigastr)), "The mapper number should be set to %d.  ", *MapperNo);
         if (tofix & 2) {
             const char* mstr[3] = { "Horizontal", "Vertical", "Four-screen" };
-            sprintf(gigastr + strlen(gigastr), "Mirroring should be set to \"%s\".  ", mstr[vs->mirroring & 3]);
+            snprintf( gigastr + strlen(gigastr), sizeof(gigastr + strlen(gigastr)), "Mirroring should be set to \"%s\".  ", mstr[vs->mirroring & 3]);
         }
         if (tofix & 8) {
             const char* mstr[4] = { "Normal", "RBI Baseball protection", "TKO Boxing protection", "Super Xevious protection"};
-            sprintf(gigastr + strlen(gigastr), "Vs. System type should be set to \"%s\".  ", mstr[vs->game_type]);
+            snprintf( gigastr + strlen(gigastr), sizeof(gigastr + strlen(gigastr)), "Vs. System type should be set to \"%s\".  ", mstr[vs->game_type]);
         }
         if (tofix & 16)
         {
             const char* mstr[10] = { "Default", "RP2C04-0001", "RP2C04-0002", "RP2C04-0003", "RP2C04-0004", "RC2C03B", "RC2C05-01", "RC2C05-02" , "RC2C05-03" , "RC2C05-04" };
-            sprintf(gigastr + strlen(gigastr), "Vs. System PPU should be set to \"%s\".  ", mstr[vs->ppu]);
+            snprintf( gigastr + strlen(gigastr), sizeof(gigastr + strlen(gigastr)), "Vs. System PPU should be set to \"%s\".  ", mstr[vs->ppu]);
         }
         if (tofix & 32)
-            sprintf(gigastr + strlen(gigastr), "The controller type should be set to zapper.  ");
+            snprintf( gigastr + strlen(gigastr), sizeof(gigastr + strlen(gigastr)), "The controller type should be set to zapper.  ");
         if (tofix & 64)
-            sprintf(gigastr + strlen(gigastr), "The controllers should be swapped.  ");
-        strcat(gigastr, "\n");
+            snprintf( gigastr + strlen(gigastr), sizeof(gigastr + strlen(gigastr)), "The controllers should be swapped.  ");
+        safe_strcat(gigastr, sizeof(gigastr), "\n");
         FCEU_printf("%s", gigastr);
     }
 }

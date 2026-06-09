@@ -8,6 +8,7 @@
 /// required by the Qt GUI (`dbg_asm_entry_t::sym` value-type embedding).
 
 #include "debugsymboltable.h"
+#include "utils/safe_string.h"
 
 #include "types.h"
 #include "debug.h"
@@ -103,11 +104,11 @@ debugSymbolPage_t::debugSymbolPage_t(int page)
 
 	if (page == -2)
 	{
-		strcpy( _pageName, "REG");
+		FCEU_strlcpy(_pageName, sizeof(_pageName), "REG");
 	}
 	else if (page == -1)
 	{
-		strcpy( _pageName, "RAM");
+		FCEU_strlcpy(_pageName, sizeof(_pageName), "RAM");
 	}
 	else
 	{

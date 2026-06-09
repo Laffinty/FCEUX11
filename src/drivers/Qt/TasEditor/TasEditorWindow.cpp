@@ -20,6 +20,7 @@
 // TasEditorWindow.cpp
 //
 #include <stdio.h>
+#include "utils/safe_string.h"
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -1678,7 +1679,7 @@ bool TasEditorWindow::saveProjectAs(bool save_compact)
 
 		if ( baseName[0] != 0 )
 		{
-			strcat( baseName, ".fm3");
+			safe_strcat(baseName, sizeof(baseName), ".fm3");
 
 			dialog.selectFile(baseName);
 		}
@@ -2031,7 +2032,7 @@ void TasEditorWindow::importMovieFile( const char *path )
 		// loaded successfully, now register Input changes
 		//char drv[512], dir[512], name[1024], ext[512];
 		//splitpath(filename.toStdString().c_str(), drv, dir, name, ext);
-		//strcat(name, ext);
+		//safe_strcat(name, sizeof(name), ext);
 		int result = history.registerImport(md, fi.fileName().toStdString().c_str() );
 		if (result >= 0)
 		{
@@ -2149,7 +2150,7 @@ void TasEditorWindow::importMovieFile(void)
 	//	// loaded successfully, now register Input changes
 	//	//char drv[512], dir[512], name[1024], ext[512];
 	//	//splitpath(filename.toStdString().c_str(), drv, dir, name, ext);
-	//	//strcat(name, ext);
+	//	//safe_strcat(name, sizeof(name), ext);
 	//	int result = history.registerImport(md, fi.fileName().toStdString().c_str() );
 	//	if (result >= 0)
 	//	{
@@ -2274,9 +2275,9 @@ void TasEditorWindow::exportMovieFile(void)
 			markerID = markersManager.getMarkerAtFrame(i);
 			if (markerID)
 			{
-				sprintf( framenum, "%i ", i );
+				snprintf(framenum, sizeof(framenum), "%i ", i );
 				//_itoa(i, framenum, 10);
-				//strcat(framenum, " ");
+				//safe_strcat(framenum, sizeof(framenum), " ");
 				subtitle = framenum;
 				subtitle.append(markersManager.getNoteCopy(markerID));
 				temp_md.subtitles.push_back(subtitle);
@@ -2293,22 +2294,22 @@ void TasEditorWindow::exportMovieFile(void)
 void TasEditorWindow::updateCaption(void)
 {
 	char newCaption[300];
-	strcpy(newCaption, "TAS Editor");
+	FCEU_strlcpy(newCaption, sizeof(newCaption), "TAS Editor");
 	if (!movie_readonly)
 	{
-		strcat(newCaption, recorder.getRecordingCaption());
+		safe_strcat(newCaption, sizeof(newCaption), recorder.getRecordingCaption());
 	}
 	// add project name
 	std::string projectname = project.getProjectName();
 	if (!projectname.empty())
 	{
-		strcat(newCaption, " - ");
-		strcat(newCaption, projectname.c_str());
+		safe_strcat(newCaption, sizeof(newCaption), " - ");
+		safe_strcat(newCaption, sizeof(newCaption), projectname.c_str());
 	}
 	// and * if project has unsaved changes
 	if (project.getProjectChanged())
 	{
-		strcat(newCaption, "*");
+		safe_strcat(newCaption, sizeof(newCaption), "*");
 	}
 	setWindowTitle( tr(newCaption) );
 	//SetWindowText(hwndTASEditor, newCaption);
@@ -2337,7 +2338,7 @@ void TasEditorWindow::buildRecentProjectMenu(void)
 
 	for (int i=0; i<10; i++)
 	{
-		sprintf(buf, "SDL.RecentTasProject%02i", i);
+		snprintf(buf, sizeof(buf), "SDL.RecentTasProject%02i", i);
 
 		g_config->getOption( buf, &s);
 
@@ -2373,7 +2374,7 @@ void TasEditorWindow::saveRecentProjectMenu(void)
 	for (it=projList.begin(); it != projList.end(); it++)
 	{
 		s = *it;
-		sprintf(buf, "SDL.RecentTasProject%02i", i);
+		snprintf(buf, sizeof(buf), "SDL.RecentTasProject%02i", i);
 
 		g_config->setOption( buf, s->c_str() );
 
@@ -2493,13 +2494,13 @@ bool TasEditorWindow::saveCompactGetFilename( QString &outputFilePath )
 	{
 		char baseName[512];
 
-		strcpy(baseName, project.getProjectName().c_str());
+		FCEU_strlcpy(baseName, sizeof(baseName), project.getProjectName().c_str());
 
 		if (strstr(baseName, "-compact") == NULL)
 		{
-			strcat(baseName, "-compact");
+			safe_strcat(baseName, sizeof(baseName), "-compact");
 		}
-		strcat( baseName, ".fm3");
+		safe_strcat(baseName, sizeof(baseName), ".fm3");
 
 		dialog.selectFile(baseName);
 	}
@@ -2512,9 +2513,9 @@ bool TasEditorWindow::saveCompactGetFilename( QString &outputFilePath )
 		{
 			if (strstr(baseName, "-compact") == NULL)
 			{
-				strcat(baseName, "-compact");
+				safe_strcat(baseName, sizeof(baseName), "-compact");
 			}
-			strcat( baseName, ".fm3");
+			safe_strcat(baseName, sizeof(baseName), ".fm3");
 
 			dialog.selectFile(baseName);
 		}
@@ -6181,7 +6182,7 @@ void QPianoRoll::finishDrag(void)
 							int destination_marker_id = markersManager->getMarkerAtFrame(rowUnderMouse);
 							// swap Notes of these Markers
 							char dragged_marker_note[MAX_NOTE_LEN];
-							strcpy(dragged_marker_note, markersManager->getNoteCopy(dragged_marker_id).c_str());
+							FCEU_strlcpy(dragged_marker_note, sizeof(dragged_marker_note), markersManager->getNoteCopy(dragged_marker_id).c_str());
 							if (strcmp(markersManager->getNoteCopy(destination_marker_id).c_str(), dragged_marker_note))
 							{
 								// notes are different, swap them
@@ -6651,7 +6652,7 @@ void QPianoRoll::paintEvent(QPaintEvent *event)
 
 		//rect = QRect( -pxLineXScroll + pxFrameColX, y, pxWidthFrameCol, pxLineSpacing );
 
-		sprintf( stmp, "%07i", lineNum );
+		snprintf(stmp, sizeof(stmp), "%07i", lineNum );
 
 		rect = painter.fontMetrics().boundingRect( tr(stmp) );
 
@@ -7492,7 +7493,7 @@ void markerDragPopup::paintEvent(QPaintEvent *event)
 	w = event->rect().width();
 	h = event->rect().height();
 
-	sprintf( txt, "%07i", rowIndex );
+	snprintf(txt, sizeof(txt), "%07i", rowIndex );
 
 	//painter.setFont(font);
 	//I want to make the title bar pasted on the content

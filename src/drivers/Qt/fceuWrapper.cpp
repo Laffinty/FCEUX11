@@ -20,6 +20,7 @@
 // fceuWrapper.cpp
 //
 #include <stdio.h>
+#include "utils/safe_string.h"
 #include <stdlib.h>
 #include <stdint.h>
 #include <limits.h>
@@ -561,11 +562,11 @@ int  fceuWrapperHardReset(void)
 
 		if ( GameInfo->archiveFilename )
 		{
-			strcpy( romPath, GameInfo->archiveFilename );
+			FCEU_strlcpy(romPath, sizeof(romPath), GameInfo->archiveFilename);
 		}
 		else if ( GameInfo->filename )
 		{
-			strcpy( romPath, GameInfo->filename );
+			FCEU_strlcpy(romPath, sizeof(romPath), GameInfo->filename);
 		}
 
 		if ( romPath[0] != 0 )
@@ -1242,7 +1243,7 @@ void fceuWrapperLock(const char *filename, int line, const char *func)
 			printf("Already Locked By: %s\n", lockFile.c_str() );
 			printf("Requested By: %s:%i - %s\n", filename, line, func );
 		}
-		sprintf( txt, ":%i - ", line );
+		snprintf( txt, sizeof(txt), ":%i - ", line );
 		lockFile.assign(filename);
 		lockFile.append(txt);
 		lockFile.append(func);
@@ -1269,7 +1270,7 @@ bool fceuWrapperTryLock(const char *filename, int line, const char *func, int ti
 	if ( lockAcq && debugMutexLock)
 	{
 		char txt[32];
-		sprintf( txt, ":%i - ", line );
+		snprintf( txt, sizeof(txt), ":%i - ", line );
 		lockFile.assign(filename);
 		lockFile.append(txt);
 		lockFile.append(func);

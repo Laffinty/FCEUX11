@@ -21,6 +21,7 @@ Playback - Player of emulation states
 ------------------------------------------------------------------------------------ */
 
 #include <QApplication>
+#include "utils/safe_string.h"
 
 #include "fceu.h"
 #include "driver.h"
@@ -444,15 +445,15 @@ void PLAYBACK::redrawMarkerData()
 	char new_text[MAX_NOTE_LEN] = {0};
 	if (displayedMarkerNumber <= 9999)		// if there's too many digits in the number then don't show the word "Marker" before the number
 	{
-		strcpy(new_text, upperMarkerText);
+		FCEU_strlcpy(new_text, sizeof(new_text), upperMarkerText);
 	}
 	char num[16];
-	sprintf( num, "%i", displayedMarkerNumber);
-	strcat(new_text, num);
-	strcat(new_text, " ");
+	snprintf(num, sizeof(num), "%i", displayedMarkerNumber);
+	safe_strcat(new_text, sizeof(new_text), num);
+	safe_strcat(new_text, sizeof(new_text), " ");
 	tasWin->upperMarkerLabel->setText( QObject::tr(new_text) );
 	// change Marker Note
-	strcpy(new_text, markersManager->getNoteCopy(displayedMarkerNumber).c_str());
+	FCEU_strlcpy(new_text, sizeof(new_text), markersManager->getNoteCopy(displayedMarkerNumber).c_str());
 	tasWin->upperMarkerNote->setText( QObject::tr(new_text) );
 	// reset search_similar_marker, because source Marker changed
 	markersManager->currentIterationOfFindSimilar = 0;

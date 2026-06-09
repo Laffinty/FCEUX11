@@ -23,6 +23,7 @@ Selection - Manager of selections
 ------------------------------------------------------------------------------------ */
 
 #include "fceu.h"
+#include "utils/safe_string.h"
 #include "Qt/TasEditor/inputlog.h"
 #include "Qt/TasEditor/playback.h"
 #include "Qt/TasEditor/taseditor_project.h"
@@ -190,16 +191,16 @@ void SELECTION::redrawMarkerData()
 	char new_text[MAX_NOTE_LEN] = {0};
 	if (displayedMarkerNumber <= 9999)		// if there's too many digits in the number then don't show the word "Marker" before the number
 	{
-		strcpy(new_text, lowerMarkerText);
+		FCEU_strlcpy(new_text, sizeof(new_text), lowerMarkerText);
 	}
 	char num[16];
-	sprintf( num, "%i", displayedMarkerNumber);
-	strcat(new_text, num);
-	strcat(new_text, " ");
+	snprintf(num, sizeof(num), "%i", displayedMarkerNumber);
+	safe_strcat(new_text, sizeof(new_text), num);
+	safe_strcat(new_text, sizeof(new_text), " ");
 	tasWin->lowerMarkerLabel->setText( QObject::tr(new_text) );
 
 	// change Marker Note
-	strcpy(new_text, markersManager->getNoteCopy(displayedMarkerNumber).c_str());
+	FCEU_strlcpy(new_text, sizeof(new_text), markersManager->getNoteCopy(displayedMarkerNumber).c_str());
 	tasWin->lowerMarkerNote->setText( QObject::tr(new_text) );
 
 	//printf("Marker %i: '%s'\n", displayedMarkerNumber, new_text );

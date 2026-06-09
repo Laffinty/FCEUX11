@@ -19,6 +19,7 @@
  */
 // ConsoleUtilities.cpp
 #include <stdio.h>
+#include "utils/safe_string.h"
 #include <stdlib.h>
 #include <string.h>
 #include <string>
@@ -145,7 +146,7 @@ int getFileBaseName( const char *filepath, char *base, char *suffix )
 		{
 			if ( suffix != NULL )
 			{
-				strcpy( suffix, &base[j] );
+				FCEU_strlcpy( suffix, sizeof(suffix), &base[j] );
 			}
 			end=j; base[j] = 0; break;
 		}
@@ -1295,7 +1296,7 @@ QString fceuGetOpcodeToolTip( uint8_t *opcode, int size )
 
 	for (int i=0; i<size; i++)
 	{
-		sprintf(stmp, "$%02X  ", opcode[i] );
+		snprintf( stmp, sizeof(stmp), "$%02X  ", opcode[i] );
 
 		text.append( stmp );
 	}
@@ -1303,7 +1304,7 @@ QString fceuGetOpcodeToolTip( uint8_t *opcode, int size )
 	text.append( addrMode );
 
 	text.append( "\nCycle Count:\t\t" );
-	sprintf( stmp, "%i", X6502_GetOpcodeCycles( opcode[0] ) );
+	snprintf( stmp, sizeof(stmp), "%i", X6502_GetOpcodeCycles( opcode[0] ) );
 	text.append( stmp );
 	text.append( "\n" );
 

@@ -1308,7 +1308,7 @@ void GuiPaletteColorSelect::setText(void)
 	{
 		return;
 	}
-	sprintf( stmp, "%s :: %s", gTxt, rTxt );
+	snprintf( stmp, sizeof(stmp), "%s :: %s", gTxt, rTxt );
 
 	lbl->setText( tr(stmp) );
 
@@ -1327,7 +1327,7 @@ void GuiPaletteColorSelect::updateColor(void)
 	{
 		txtColor.setRgb( 255, 255, 255 );
 	}
-	sprintf( stmp, "QLabel { background-color : %s; color : %s; border-color : black; }",
+	snprintf( stmp, sizeof(stmp), "QLabel { background-color : %s; color : %s; border-color : black; }",
 		       color.name().toStdString().c_str(), txtColor.name().toStdString().c_str() );
 
 	lbl->setStyleSheet( stmp );
