@@ -21,6 +21,7 @@
 #include "mapinc.h"
 
 static uint8 *WRAM = NULL;
+static FceuMallocPtr WRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint32 WRAMSIZE=0;
 
 unsigned int *GetKeyboard(void);	// FIXME: 10/28 - now implemented in SDL as well.  should we rename this to a FCEUI_* function?
@@ -77,9 +78,8 @@ static void TransformerPower(void) {
 }
 
 static void TransformerClose(void) {
-	if (WRAM)
-		FCEU_gfree(WRAM);
-	WRAM = NULL;
+	WRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	WRAM = nullptr;
 }
 
 void Transformer_Init(CartInfo *info) {
@@ -87,7 +87,8 @@ void Transformer_Init(CartInfo *info) {
 	info->Close = TransformerClose;
 
 	WRAMSIZE = 8192;
-	WRAM = (uint8*)FCEU_gmalloc(WRAMSIZE);
+	WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped
+	WRAM = WRAM_owner.get();
 	SetupCartPRGMapping(0x10, WRAM, WRAMSIZE, 1);
 	if (info->battery) {
 		info->addSaveGameBuf( WRAM, WRAMSIZE );

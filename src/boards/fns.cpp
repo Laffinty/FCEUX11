@@ -30,6 +30,7 @@ static uint8 Buffer, BufferShift;
 
 static uint32 WRAMSIZE=0;
 static uint8 *WRAM = NULL;
+static FceuMallocPtr WRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 
 static int kanji_pos, kanji_page, r40C0;
 static int IRQa, IRQCount;
@@ -239,9 +240,8 @@ static void FNS_Power(void) {
 }
 
 static void FNS_Close(void) {
-	if (WRAM)
-		FCEU_gfree(WRAM);
-	WRAM = NULL;
+	WRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	WRAM = nullptr;
 }
 
 void FNS_Init(CartInfo *info) {
@@ -252,7 +252,8 @@ void FNS_Init(CartInfo *info) {
 	MapIRQHook = NFC_IRQ;
 
 	WRAMSIZE = (8 + 32) * 1024;
-	WRAM = (uint8*)FCEU_gmalloc(WRAMSIZE);
+	WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped
+	WRAM = WRAM_owner.get();
 	SetupCartPRGMapping(0x10, WRAM, WRAMSIZE, 1);
 	AddExState(WRAM, WRAMSIZE, 0, "WRAM");
 

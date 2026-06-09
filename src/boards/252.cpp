@@ -23,8 +23,10 @@
 static uint8 creg[8], preg[2];
 static int32 IRQa, IRQCount, IRQClock, IRQLatch;
 static uint8 *WRAM = NULL;
+static FceuMallocPtr WRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint32 WRAMSIZE=0;
 static uint8 *CHRRAM = NULL;
+static FceuMallocPtr CHRRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint32 CHRRAMSIZE=0;
 
 static SFORMAT StateRegs[] =
@@ -101,10 +103,8 @@ static void M252IRQ(int a) {
 }
 
 static void M252Close(void) {
-	if (WRAM)
-		FCEU_gfree(WRAM);
-	if (CHRRAM)
-		FCEU_gfree(CHRRAM);
+	WRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	CHRRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
 	WRAM = CHRRAM = NULL;
 }
 
@@ -118,12 +118,14 @@ void Mapper252_Init(CartInfo *info) {
 	MapIRQHook = M252IRQ;
 
 	CHRRAMSIZE = 2048;
-	CHRRAM = (uint8*)FCEU_gmalloc(CHRRAMSIZE);
+	CHRRAM_owner = FCEU_gmalloc_unique(CHRRAMSIZE);  // v0.3.6: RAII-wrapped
+	CHRRAM = CHRRAM_owner.get();
 	SetupCartCHRMapping(0x10, CHRRAM, CHRRAMSIZE, 1);
 	AddExState(CHRRAM, CHRRAMSIZE, 0, "CRAM");
 
 	WRAMSIZE = 8192;
-	WRAM = (uint8*)FCEU_gmalloc(WRAMSIZE);
+	WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped
+	WRAM = WRAM_owner.get();
 	SetupCartPRGMapping(0x10, WRAM, WRAMSIZE, 1);
 	AddExState(WRAM, WRAMSIZE, 0, "WRAM");
 	if (info->battery) {

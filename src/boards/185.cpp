@@ -22,6 +22,7 @@
 #include "mapinc.h"
 
 static uint8 *DummyCHR = NULL;
+static FceuMallocPtr DummyCHR_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint8 datareg;
 static void (*Sync)(void);
 
@@ -71,9 +72,8 @@ static void MPower(void) {
 }
 
 static void MClose(void) {
-	if (DummyCHR)
-		FCEU_gfree(DummyCHR);
-	DummyCHR = NULL;
+	DummyCHR_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	DummyCHR = nullptr;
 }
 
 static void MRestore(int version) {
@@ -85,7 +85,8 @@ void Mapper185_Init(CartInfo *info) {
 	info->Power = MPower;
 	info->Close = MClose;
 	GameStateRestore = MRestore;
-	DummyCHR = (uint8*)FCEU_gmalloc(8192);
+	DummyCHR_owner = FCEU_gmalloc_unique(8192);  // v0.3.6: RAII-wrapped
+	DummyCHR = DummyCHR_owner.get();
 	int x;
 	for (x = 0; x < 8192; x++)
 		DummyCHR[x] = 0xff;
@@ -98,7 +99,8 @@ void Mapper181_Init(CartInfo *info) {
 	info->Power = MPower;
 	info->Close = MClose;
 	GameStateRestore = MRestore;
-	DummyCHR = (uint8*)FCEU_gmalloc(8192);
+	DummyCHR_owner = FCEU_gmalloc_unique(8192);  // v0.3.6: RAII-wrapped
+	DummyCHR = DummyCHR_owner.get();
 	int x;
 	for (x = 0; x < 8192; x++)
 		DummyCHR[x] = 0xff;

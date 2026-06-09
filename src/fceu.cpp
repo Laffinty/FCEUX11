@@ -266,6 +266,7 @@ int frameAdvance_Delay = FRAMEADVANCE_DELAY_DEFAULT;
 bool JustFrameAdvanced = false;
 
 static int *AutosaveStatus; //is it safe to load Auto-savestate
+static FceuMallocPtr AutosaveStatus_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static int AutosaveIndex = 0; //which Auto-savestate we're on
 int AutosaveQty = 4; // Number of Autosaves to store
 int AutosaveFrequency = 256; // Number of frames between autosaves
@@ -361,17 +362,19 @@ void SetWriteHandler(int32 start, int32 end, writefunc func) {
 }
 
 uint8 *RAM;
+static FceuMallocPtr RAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 
 //---------
 //windows might need to allocate these differently, so we have some special code
 
 static void AllocBuffers() {
-	RAM = (uint8*)FCEU_gmalloc(0x800);
+	RAM_owner = FCEU_gmalloc_unique(0x800);  // v0.3.6: RAII-wrapped
+	RAM = RAM_owner.get();
 }
 
 static void FreeBuffers() {
-	FCEU_free(RAM);
-    RAM = NULL;
+	RAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+    RAM = nullptr;
 }
 //------
 
@@ -464,7 +467,8 @@ FCEUGI *FCEUI_LoadGameVirtual(const char *name, int OverwriteVidMode, bool silen
 	MasterRomInfoParams = TMasterRomInfoParams();
 
 	if (!AutosaveStatus)
-		AutosaveStatus = (int*)FCEU_dmalloc(sizeof(int) * AutosaveQty);
+		AutosaveStatus_owner = FCEU_gmalloc_unique(sizeof(int) * AutosaveQty);  // v0.3.6: RAII-wrapped
+		AutosaveStatus = (int*)AutosaveStatus_owner.get();
 	for (AutosaveIndex = 0; AutosaveIndex < AutosaveQty; ++AutosaveIndex)
 		AutosaveStatus[AutosaveIndex] = 0;
 

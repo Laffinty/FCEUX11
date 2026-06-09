@@ -37,7 +37,9 @@ static uint16 CHRSIZE = 8192;
 // via the same registers with additional selector flags.
 static uint16 WRAMSIZE = 8192 + 8192;
 static uint8 *CHRRAM = NULL;
+static FceuMallocPtr CHRRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint8 *WRAM = NULL;
+static FceuMallocPtr WRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 
 static uint8 IRQa, K4IRQ;
 static uint32 IRQLatch, IRQCount;
@@ -155,12 +157,10 @@ static void QTAiPower(void) {
 }
 
 static void QTAiClose(void) {
-	if (CHRRAM)
-		FCEU_gfree(CHRRAM);
-	CHRRAM = NULL;
-	if (WRAM)
-		FCEU_gfree(WRAM);
-	WRAM = NULL;
+	CHRRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	CHRRAM = nullptr;
+	WRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	WRAM = nullptr;
 }
 
 static void StateRestore(int version) {
@@ -176,11 +176,13 @@ void QTAi_Init(CartInfo *info) {
 
 	MapIRQHook = VRC5IRQ;
 
-	CHRRAM = (uint8*)FCEU_gmalloc(CHRSIZE);
+	CHRRAM_owner = FCEU_gmalloc_unique(CHRSIZE);  // v0.3.6: RAII-wrapped
+	CHRRAM = CHRRAM_owner.get();
 	SetupCartCHRMapping(0x10, CHRRAM, CHRSIZE, 1);
 	AddExState(CHRRAM, CHRSIZE, 0, "CRAM");
 
-	WRAM = (uint8*)FCEU_gmalloc(WRAMSIZE);
+	WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped
+	WRAM = WRAM_owner.get();
 	SetupCartPRGMapping(0x10, WRAM, WRAMSIZE, 1);
 	AddExState(WRAM, WRAMSIZE, 0, "WRAM");
 

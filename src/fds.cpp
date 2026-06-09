@@ -71,10 +71,13 @@ static int32 IRQLatch, IRQCount;
 static uint8 IRQa;
 
 static uint8 *FDSRAM = NULL;
+static FceuMallocPtr FDSRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint32 FDSRAMSize;
 static uint8 *FDSBIOS = NULL;
+static FceuMallocPtr FDSBIOS_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint32 FDSBIOSsize;
 static uint8 *CHRRAM = NULL;
+static FceuMallocPtr CHRRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint32 CHRRAMSize;
 
 /* Original disk data backup, to help in creating save states. */
@@ -785,7 +788,8 @@ int FDSLoad(const char *name, FCEUFILE *fp) {
 	CHRRAM = NULL;
 
 	FDSBIOSsize = 8192;
-	FDSBIOS = (uint8*)FCEU_gmalloc(FDSBIOSsize);
+	FDSBIOS_owner = FCEU_gmalloc_unique(FDSBIOSsize);  // v0.3.6: RAII-wrapped
+	FDSBIOS = FDSBIOS_owner.get();
 	SetupCartPRGMapping(0, FDSBIOS, FDSBIOSsize, 0);
 
 	if (fread(FDSBIOS, 1, FDSBIOSsize, zp) != FDSBIOSsize) {
@@ -865,12 +869,14 @@ int FDSLoad(const char *name, FCEUFILE *fp) {
 	AddExState(&mapperFDS_diskaccess, 1, 0, "DACC");
 
 	CHRRAMSize = 8192;
-	CHRRAM = (uint8*)FCEU_gmalloc(CHRRAMSize);
+	CHRRAM_owner = FCEU_gmalloc_unique(CHRRAMSize);  // v0.3.6: RAII-wrapped
+	CHRRAM = CHRRAM_owner.get();
 	SetupCartCHRMapping(0, CHRRAM, CHRRAMSize, 1);
 	AddExState(CHRRAM, CHRRAMSize, 0, "CHRR");
 
 	FDSRAMSize = 32768;
-	FDSRAM = (uint8*)FCEU_gmalloc(FDSRAMSize);
+	FDSRAM_owner = FCEU_gmalloc_unique(FDSRAMSize);  // v0.3.6: RAII-wrapped
+	FDSRAM = FDSRAM_owner.get();
 	SetupCartPRGMapping(1, FDSRAM, FDSRAMSize, 1);
 	AddExState(FDSRAM, FDSRAMSize, 0, "FDSR");
 

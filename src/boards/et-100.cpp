@@ -42,6 +42,7 @@
 #include "mmc3.h"
 
 static uint8 *CHRRAM;
+static FceuMallocPtr CHRRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint32 CHRRAMSize;
 
 static void BMC1024CA1PW(uint32 A, uint8 V) {
@@ -83,15 +84,15 @@ static void BMC1024CA1Power(void) {
 }
 
 static void BMC1024CA1Close(void) {
-	if (CHRRAM)
-		FCEU_gfree(CHRRAM);
-	CHRRAM = NULL;
+	CHRRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	CHRRAM = nullptr;
 }
 
 void BMC1024CA1_Init(CartInfo *info) {
 	GenMMC3_Init(info, 256, 256, 8, 0);
 	CHRRAMSize = 8192;
-	CHRRAM = (uint8*)FCEU_gmalloc(CHRRAMSize);
+	CHRRAM_owner = FCEU_gmalloc_unique(CHRRAMSize);  // v0.3.6: RAII-wrapped
+	CHRRAM = CHRRAM_owner.get();
 	SetupCartCHRMapping(0x10, CHRRAM, CHRRAMSize, 1);
 	AddExState(CHRRAM, CHRRAMSize, 0, "CHRR");
 	pwrap = BMC1024CA1PW;

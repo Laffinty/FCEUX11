@@ -21,6 +21,12 @@
 /// \file
 /// \brief memory management services provided by FCEU core
 
+// v0.3.6: Suppress deprecation warnings inside the implementation file —
+// memory.cpp implements the deprecated FCEU_malloc/FCEU_free/FCEU_dmalloc/FCEU_dfree
+// shims. External callers (and the v0.3.6 mapper migrations) should still see
+// the warnings.
+#define FCEUX11_NO_DEPRECATION_WARNINGS
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

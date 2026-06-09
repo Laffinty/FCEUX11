@@ -49,6 +49,7 @@ static readfunc defapuread[64];
 
 static uint32 WRAMSIZE;
 static uint8 *WRAM = NULL;
+static FceuMallocPtr WRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 
 static SFORMAT StateRegs[] =
 {
@@ -127,7 +128,7 @@ static void Sync(void) {
 static DECLFW(UNLOneBusWriteCPU410X) {
 //	FCEU_printf("CPU %04x:%04x\n",A,V);
 	switch (A & 0xf) {
-	case 0x1: IRQLatch = V & 0xfe; break;	// не по даташиту
+	case 0x1: IRQLatch = V & 0xfe; break;	// пїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 	case 0x2: IRQReload = 1; break;
 	case 0x3: X6502_IRQEnd(FCEU_IQEXT); IRQa = 0; break;
 	case 0x4: IRQa = 1; break;
@@ -293,9 +294,8 @@ static void StateRestore(int version) {
 }
 
 void UNLOneBusClose(void) {
-	if (WRAM)
-		FCEU_gfree(WRAM);
-	WRAM = NULL;
+	WRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	WRAM = nullptr;
 }
 
 void UNLOneBus_Init(CartInfo *info) {
@@ -316,7 +316,8 @@ void UNLOneBus_Init(CartInfo *info) {
 	if (info->ines2)
 		WRAMSIZE = info->wram_size + info->battery_wram_size;
 	if (WRAMSIZE) {
-		WRAM = (uint8*)FCEU_gmalloc(WRAMSIZE);
+		WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped
+		WRAM = WRAM_owner.get();
 		SetupCartPRGMapping(0x10, WRAM, WRAMSIZE, 1);
 		AddExState(WRAM, WRAMSIZE, 0, "WRAM");
 		if (info->battery) {

@@ -22,6 +22,7 @@
 #include "mmc3.h"
 
 static uint8 *CHRRAM = NULL;
+static FceuMallocPtr CHRRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static int masko8[8] = { 63, 31, 15, 1, 3, 0, 0, 0 };
 
 static void Super24PW(uint32 A, uint8 V) {
@@ -74,9 +75,8 @@ static void Super24Reset(void) {
 }
 
 static void Super24Close(void) {
-	if (CHRRAM)
-		FCEU_gfree(CHRRAM);
-	CHRRAM = NULL;
+	CHRRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	CHRRAM = nullptr;
 }
 
 void Super24_Init(CartInfo *info) {
@@ -86,7 +86,8 @@ void Super24_Init(CartInfo *info) {
 	info->Close = Super24Close;
 	cwrap = Super24CW;
 	pwrap = Super24PW;
-	CHRRAM = (uint8*)FCEU_gmalloc(8192);
+	CHRRAM_owner = FCEU_gmalloc_unique(8192);  // v0.3.6: RAII-wrapped
+	CHRRAM = CHRRAM_owner.get();
 	SetupCartCHRMapping(0x10, CHRRAM, 8192, 1);
 	AddExState(CHRRAM, 8192, 0, "CHRR");
 	AddExState(EXPREGS, 3, 0, "BIG2");

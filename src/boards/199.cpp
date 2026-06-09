@@ -27,6 +27,7 @@
 #include "mmc3.h"
 
 static uint8 *CHRRAM = NULL;
+static FceuMallocPtr CHRRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint32 CHRRAMSIZE;
 
 static void M199PW(uint32 A, uint8 V) {
@@ -75,9 +76,8 @@ static void M199Power(void) {
 }
 
 static void M199Close(void) {
-	if (CHRRAM)
-		FCEU_gfree(CHRRAM);
-	CHRRAM = NULL;
+	CHRRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	CHRRAM = nullptr;
 }
 
 void Mapper199_Init(CartInfo *info) {
@@ -89,7 +89,8 @@ void Mapper199_Init(CartInfo *info) {
 	info->Close = M199Close;
 
 	CHRRAMSIZE = 8192;
-	CHRRAM = (uint8*)FCEU_gmalloc(CHRRAMSIZE);
+	CHRRAM_owner = FCEU_gmalloc_unique(CHRRAMSIZE);  // v0.3.6: RAII-wrapped
+	CHRRAM = CHRRAM_owner.get();
 	SetupCartCHRMapping(0x10, CHRRAM, CHRRAMSIZE, 1);
 	AddExState(CHRRAM, CHRRAMSIZE, 0, "CHRR");
 

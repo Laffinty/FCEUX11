@@ -24,6 +24,7 @@
 
 #include <stdlib.h>
 #include <new>
+#include <memory>  // v0.3.6: std::unique_ptr for fceuScopedPtr alias
 
 // v0.3.3: C++20 feature-test macros
 #ifdef __cplusplus
@@ -191,6 +192,11 @@ typedef uint8 (*readfunc)(uint32 A);
 // Scoped pointer ensures that memory pointed to by this object gets cleaned up
 // and deallocated when this object goes out of scope. Helps prevent memory leaks
 // on temporary memory allocations in functions with early outs.
+//
+// v0.3.6: fceuScopedPtr<T> deprecated in favor of std::unique_ptr<T> (with
+// custom deleters in utils/memory.h for malloc/free-backed allocations).
+// The legacy fceuAllocType enum is preserved as a no-op typedef for any
+// out-of-tree call sites that still reference it.
 enum fceuAllocType
 {
 	FCEU_ALLOC_TYPE_NEW = 0,
@@ -198,66 +204,18 @@ enum fceuAllocType
 	FCEU_ALLOC_TYPE_MALLOC
 };
 
-template <typename T> 
-class fceuScopedPtr
-{
-	public:
-		fceuScopedPtr( T *ptrIn = nullptr, enum  fceuAllocType allocType = FCEU_ALLOC_TYPE_NEW )
-		{
-			//printf("Scoped Pointer Constructor <%s>: %p\n", typeid(T).name(), ptrIn );
-			ptr = ptrIn;
-			_allocType = allocType;
-		}
-
-		~fceuScopedPtr(void)
-		{
-			//printf("Scoped Pointer Destructor <%s>: %p\n", typeid(T).name(), ptr );
-			Delete();
-		}
-
-		T* operator= (T *ptrIn)
-		{
-			ptr = ptrIn;
-			return ptr;
-		}
-
-		T* get(void)
-		{
-			return ptr;
-		}
-
-		void Delete(void)
-		{
-			if (ptr)
-			{
-				switch (_allocType)
-				{
-					case FCEU_ALLOC_TYPE_MALLOC:
-					{
-						::free(ptr);
-					}
-					break;
-					case FCEU_ALLOC_TYPE_NEW_ARRAY:
-					{
-						delete [] ptr;
-					}
-					break;
-					default:
-					case FCEU_ALLOC_TYPE_NEW:
-					{
-						delete ptr;
-					}
-					break;
-				}
-				ptr = nullptr;
-			}
-		}
-
-	private:
-		T *ptr;
-		enum fceuAllocType  _allocType;
-
-};
+// v0.3.6: legacy fceuScopedPtr replaced by std::unique_ptr. The new RAII
+// helper for malloc-backed buffers lives in utils/memory.h (FceuMallocPtr).
+// Existing call sites should migrate: `fceuScopedPtr<T> x = new T;` becomes
+// `std::unique_ptr<T> x(new T);`, and raw `fceuScopedPtr<T> x;` becomes
+// `std::unique_ptr<T> x;` (use x.reset(p) for assignment).
+#if !defined(FCEUX11_NO_DEPRECATION_WARNINGS)
+template <typename T>
+using fceuScopedPtr [[deprecated("fceuScopedPtr is deprecated since v0.3.6; use std::unique_ptr<T> (or FceuMallocPtr for malloc-backed buffers)")]] = std::unique_ptr<T>;
+#else
+template <typename T>
+using fceuScopedPtr = std::unique_ptr<T>;
+#endif
 
 #include "utils/endian.h"
 

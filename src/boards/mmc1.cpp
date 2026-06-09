@@ -34,7 +34,9 @@ static void (*MMC1CHRHook4)(uint32 A, uint8 V);
 static void (*MMC1PRGHook16)(uint32 A, uint8 V);
 
 static uint8 *WRAM = NULL;
+static FceuMallocPtr WRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint8 *CHRRAM = NULL;
+static FceuMallocPtr CHRRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static int is155, is171;
 
 static DECLFW(MBWRAM) {
@@ -283,10 +285,8 @@ static void GenMMC1Power(void) {
 }
 
 static void GenMMC1Close(void) {
-	if (CHRRAM)
-		FCEU_gfree(CHRRAM);
-	if (WRAM)
-		FCEU_gfree(WRAM);
+	CHRRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	WRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
 	CHRRAM = WRAM = NULL;
 }
 
@@ -302,7 +302,8 @@ static void GenMMC1Init(CartInfo *info, int prg, int chr, int wram, int bram) {
 	CHRmask8[0] &= (chr >> 13) - 1;
 
 	if (WRAMSIZE) {
-		WRAM = (uint8*)FCEU_gmalloc(WRAMSIZE);
+		WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped
+		WRAM = WRAM_owner.get();
 		SetupCartPRGMapping(0x10, WRAM, WRAMSIZE, 1);
 		AddExState(WRAM, WRAMSIZE, 0, "WRAM");
 		if (bram) {
@@ -310,7 +311,8 @@ static void GenMMC1Init(CartInfo *info, int prg, int chr, int wram, int bram) {
 		}
 	}
 	if (!chr) {
-		CHRRAM = (uint8*)FCEU_gmalloc(8192);
+		CHRRAM_owner = FCEU_gmalloc_unique(8192);  // v0.3.6: RAII-wrapped
+		CHRRAM = CHRRAM_owner.get();
 		SetupCartCHRMapping(0, CHRRAM, 8192, 1);
 		AddExState(CHRRAM, 8192, 0, "CHRR");
 	}

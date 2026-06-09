@@ -22,6 +22,7 @@
 #include "mmc3.h"
 
 static uint8 *CHRRAM;
+static FceuMallocPtr CHRRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint8 tekker;
 
 static void MSHCW(uint32 A, uint8 V) {
@@ -61,9 +62,8 @@ static void MSHPower(void) {
 }
 
 static void MSHClose(void) {
-	if (CHRRAM)
-		FCEU_gfree(CHRRAM);
-	CHRRAM = NULL;
+	CHRRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	CHRRAM = nullptr;
 }
 
 void UNLSHeroes_Init(CartInfo *info) {
@@ -72,7 +72,8 @@ void UNLSHeroes_Init(CartInfo *info) {
 	info->Power = MSHPower;
 	info->Reset = MSHReset;
 	info->Close = MSHClose;
-	CHRRAM = (uint8*)FCEU_gmalloc(8192);
+	CHRRAM_owner = FCEU_gmalloc_unique(8192);  // v0.3.6: RAII-wrapped
+	CHRRAM = CHRRAM_owner.get();
 	SetupCartCHRMapping(0x10, CHRRAM, 8192, 1);
 	AddExState(EXPREGS, 4, 0, "EXPR");
 	AddExState(&tekker, 1, 0, "DIPSW");

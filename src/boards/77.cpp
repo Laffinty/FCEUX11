@@ -23,6 +23,7 @@
 static uint8 latche;
 
 static uint8 *CHRRAM=NULL;
+static FceuMallocPtr CHRRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint32 CHRRAMSIZE;
 
 static SFORMAT StateRegs[] =
@@ -52,9 +53,8 @@ static void M77Power(void) {
 
 static void M77Close(void)
 {
-	if (CHRRAM)
-		FCEU_gfree(CHRRAM);
-	CHRRAM = NULL;
+	CHRRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	CHRRAM = nullptr;
 }
 
 static void StateRestore(int version) {
@@ -67,7 +67,8 @@ void Mapper77_Init(CartInfo *info) {
 	GameStateRestore = StateRestore;
 
 	CHRRAMSIZE = 6 * 1024;
-	CHRRAM = (uint8*)FCEU_gmalloc(CHRRAMSIZE);
+	CHRRAM_owner = FCEU_gmalloc_unique(CHRRAMSIZE);  // v0.3.6: RAII-wrapped
+	CHRRAM = CHRRAM_owner.get();
 	SetupCartCHRMapping(0x10, CHRRAM, CHRRAMSIZE, 1);
 	AddExState(CHRRAM, CHRRAMSIZE, 0, "CRAM");
 

@@ -26,6 +26,7 @@ static bool is_BMCFK23CA;
 static uint8 unromchr;
 static uint32 dipswitch;
 static uint8 *CHRRAM=NULL;
+static FceuMallocPtr CHRRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint32 CHRRAMSize;
 
 static void BMCFK23CCW(uint32 A, uint8 V)
@@ -237,8 +238,7 @@ static void BMCFK23CAPower(void)
 
 static void BMCFK23CAClose(void)
 {
-	if(CHRRAM)
-		FCEU_gfree(CHRRAM);
+	CHRRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
 	CHRRAM=NULL;
 }
 
@@ -274,7 +274,8 @@ void BMCFK23CA_Init(CartInfo *info)
 	info->Close=BMCFK23CAClose;
 
 	CHRRAMSize=8192;
-	CHRRAM=(uint8*)FCEU_gmalloc(CHRRAMSize);
+	CHRRAM_owner = FCEU_gmalloc_unique(CHRRAMSize);  // v0.3.6: RAII-wrapped
+	CHRRAM = CHRRAM_owner.get();
 	SetupCartCHRMapping(0x10, CHRRAM, CHRRAMSize, 1);
 	AddExState(CHRRAM, CHRRAMSize, 0, "CRAM");
 

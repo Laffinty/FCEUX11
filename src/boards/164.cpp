@@ -27,6 +27,7 @@
 static uint8 laststrobe, trigger;
 static uint8 reg[8];
 static uint8 *WRAM = NULL;
+static FceuMallocPtr WRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint32 WRAMSIZE=0;
 
 static writefunc pcmwrite;
@@ -107,9 +108,8 @@ static void Power(void) {
 }
 
 static void Close(void) {
-	if (WRAM)
-		FCEU_gfree(WRAM);
-	WRAM = NULL;
+	WRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	WRAM = nullptr;
 }
 
 void Mapper164_Init(CartInfo *info) {
@@ -118,7 +118,8 @@ void Mapper164_Init(CartInfo *info) {
 	WSync = Sync;
 
 	WRAMSIZE = 8192;
-	WRAM = (uint8*)FCEU_gmalloc(WRAMSIZE);
+	WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped
+	WRAM = WRAM_owner.get();
 	SetupCartPRGMapping(0x10, WRAM, WRAMSIZE, 1);
 	AddExState(WRAM, WRAMSIZE, 0, "WRAM");
 
@@ -166,7 +167,8 @@ void Mapper163_Init(CartInfo *info) {
 	GameHBIRQHook = M163HB;
 
 	WRAMSIZE = 8192;
-	WRAM = (uint8*)FCEU_gmalloc(WRAMSIZE);
+	WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped
+	WRAM = WRAM_owner.get();
 	SetupCartPRGMapping(0x10, WRAM, WRAMSIZE, 1);
 	AddExState(WRAM, WRAMSIZE, 0, "WRAM");
 
@@ -216,7 +218,8 @@ void UNLFS304_Init(CartInfo *info) {
 	WSync = Sync3;
 
 	WRAMSIZE = 8192;
-	WRAM = (uint8*)FCEU_gmalloc(WRAMSIZE);
+	WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped
+	WRAM = WRAM_owner.get();
 	SetupCartPRGMapping(0x10, WRAM, WRAMSIZE, 1);
 	AddExState(WRAM, WRAMSIZE, 0, "WRAM");
 

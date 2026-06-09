@@ -22,6 +22,10 @@ extern char romNameWhenClosingEmulator[];
 
 #define DECLFR(x) uint8 x (uint32 A)
 #define DECLFW(x) void x (uint32 A, uint8 V)
+// v0.3.6: DECLFW-decorated mapper write functions are protected by Control
+// Flow Guard (CFG) — /guard:cf is set globally in CMakeLists.txt. The
+// compiler emits the guard check at the indirect call site (SetWriteHandler
+// dispatch), so no per-function __declspec(guard_overwrite) is required.
 
 void FCEU_MemoryRand(uint8 *ptr, uint32 size, bool default_zero=false);
 void SetReadHandler(int32 start, int32 end, readfunc func);

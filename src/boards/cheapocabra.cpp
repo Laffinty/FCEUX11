@@ -34,6 +34,7 @@
 
 static uint8 reg;
 static uint8 *CHRRAM = NULL;
+static FceuMallocPtr CHRRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 const uint32 CHRRAMSIZE = 1024 * 32;
 
 static bool flash = false;
@@ -41,6 +42,7 @@ static uint8 flash_mode;
 static uint8 flash_sequence;
 static uint8 flash_id;
 static uint8 *FLASHROM = NULL;
+static FceuMallocPtr FLASHROM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 const uint32 FLASHROMSIZE = 1024 * 512;
 
 
@@ -224,13 +226,11 @@ static void M111Power(void) {
 }
 
 static void M111Close(void) {
-	if (CHRRAM)
-		FCEU_gfree(CHRRAM);
-	CHRRAM = NULL;
+	CHRRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	CHRRAM = nullptr;
 
-	if (FLASHROM)
-		FCEU_gfree(FLASHROM);
-	FLASHROM = NULL;
+	FLASHROM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	FLASHROM = nullptr;
 }
 
 static void StateRestore(int version) {
@@ -241,7 +241,8 @@ void Mapper111_Init(CartInfo *info) {
 	info->Power = M111Power;
 	info->Close = M111Close;
 
-	CHRRAM = (uint8*)FCEU_gmalloc(CHRRAMSIZE);
+	CHRRAM_owner = FCEU_gmalloc_unique(CHRRAMSIZE);  // v0.3.6: RAII-wrapped
+	CHRRAM = CHRRAM_owner.get();
 	SetupCartCHRMapping(0x10, CHRRAM, CHRRAMSIZE, 1);
 
 	GameStateRestore = StateRestore;
@@ -251,7 +252,8 @@ void Mapper111_Init(CartInfo *info) {
 	flash = (info->battery != 0);
 	if (flash)
 	{
-		FLASHROM = (uint8*)FCEU_gmalloc(FLASHROMSIZE);
+		FLASHROM_owner = FCEU_gmalloc_unique(FLASHROMSIZE);  // v0.3.6: RAII-wrapped
+		FLASHROM = FLASHROM_owner.get();
 		info->addSaveGameBuf( FLASHROM, FLASHROMSIZE );
 		AddExState(FLASHROM, FLASHROMSIZE, 0, "FROM");
 		AddExState(&FlashRegs, ~0, 0, 0);

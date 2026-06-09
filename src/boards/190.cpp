@@ -23,6 +23,7 @@
 
 static uint8 prgr, chrr[4];
 static uint8 *WRAM = NULL;
+static FceuMallocPtr WRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 
 static void Mapper190_Sync(void) {
 	setprg8r(0x10, 0x6000, 0);
@@ -74,7 +75,8 @@ void Mapper190_Init(CartInfo *info) {
 	info->Close = Mapper190_Close;
 	GameStateRestore = Mapper190_Restore;
 
-	WRAM = (uint8*)FCEU_gmalloc(0x2000);
+	WRAM_owner = FCEU_gmalloc_unique(0x2000);  // v0.3.6: RAII-wrapped
+	WRAM = WRAM_owner.get();
 	SetupCartPRGMapping(0x10, WRAM, 0x2000, 1);
 
 	chrr[0] = chrr[1] = chrr[2] = chrr[3] = prgr = 0;

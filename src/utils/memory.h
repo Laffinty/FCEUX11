@@ -19,12 +19,31 @@
  */
 
 /*        Various macros for faster memory stuff
-		(at least that's the idea) 
+		(at least that's the idea)
 */
+
+#include <memory>
 
 #define FCEU_dwmemset(d,c,n) {int _x; for(_x=n-4;_x>=0;_x-=4) *(uint32 *)&(d)[_x]=c;}
 
+// v0.3.6: deprecation annotation. Suppress with -DFCEUX11_NO_DEPRECATION_WARNINGS
+// (provided until v0.4.0, per the v0.3.x plan §6.3).
+#if !defined(FCEUX11_DEPRECATED)
+#  if defined(FCEUX11_NO_DEPRECATION_WARNINGS)
+#    define FCEUX11_DEPRECATED(msg)
+#  elif defined(__cplusplus) && __cplusplus >= 201402L
+#    define FCEUX11_DEPRECATED(msg) [[deprecated(msg)]]
+#  elif defined(_MSC_VER)
+#    define FCEUX11_DEPRECATED(msg) __declspec(deprecated(msg))
+#  else
+#    define FCEUX11_DEPRECATED(msg)
+#  endif
+#endif
+
 //returns a buffer initialized to 0
+//v0.3.6: deprecated — use std::make_unique_for_overwrite<uint8_t[]>(n) or
+//std::pmr::get_default_resource()->allocate(n)
+FCEUX11_DEPRECATED("FCEU_malloc is deprecated since v0.3.6; use std::make_unique_for_overwrite<uint8_t[]>(n) or std::pmr::get_default_resource()")
 void *FCEU_malloc(size_t size);
 
 //returns a buffer, with jumbled initial contents
@@ -42,16 +61,37 @@ void *FCEU_amalloc(size_t size, size_t alignment = 256);
 void FCEU_afree(void* ptr);
 
 //free memory allocated with FCEU_malloc
+//v0.3.6: deprecated — match it with std::unique_ptr<T, FceuMallocDeleter>
+FCEUX11_DEPRECATED("FCEU_free is deprecated since v0.3.6; use std::unique_ptr<T, FceuMallocDeleter>")
 void FCEU_free(void *ptr);
 
 //reallocate memory allocated with FCEU_malloc
 void* FCEU_realloc(void* ptr, size_t size);
 
 //don't use these. change them if you find them.
+//v0.3.6: deprecated — FCEU_dmalloc/dfree are merged with FCEU_malloc/free
+FCEUX11_DEPRECATED("FCEU_dmalloc is deprecated since v0.3.6; merged with FCEU_malloc. Use std::make_unique_for_overwrite<uint8_t[]>(n) or std::pmr::get_default_resource()")
 void *FCEU_dmalloc(size_t size);
 
 //don't use these. change them if you find them.
+//v0.3.6: deprecated — FCEU_dmalloc/dfree are merged with FCEU_malloc/free
+FCEUX11_DEPRECATED("FCEU_dfree is deprecated since v0.3.6; merged with FCEU_free. Use std::unique_ptr<T, FceuMallocDeleter>")
 void FCEU_dfree(void *ptr);
 
 //aborts the process for fatal errors
 void FCEU_abort(const char* message = nullptr);
+
+// v0.3.6: RAII deleter for FCEU_gmalloc-allocated buffers.
+// FCEU_gmalloc uses malloc() internally; the deleter must use the matching
+// deallocator (FCEU_gfree → free) — never replace with delete/delete[].
+struct FceuMallocDeleter {
+	void operator()(uint8_t* p) const noexcept { if (p) FCEU_gfree(p); }
+};
+using FceuMallocPtr = std::unique_ptr<uint8_t[], FceuMallocDeleter>;
+
+// v0.3.6: RAII helper for FCEU_gmalloc. Returns a unique_ptr that owns the
+// buffer and calls FCEU_gfree() on destruction. Replaces 98 raw FCEU_gmalloc
+// call sites in src/boards/*.cpp.
+inline FceuMallocPtr FCEU_gmalloc_unique(size_t size) {
+	return FceuMallocPtr(static_cast<uint8_t*>(FCEU_gmalloc(size)));
+}

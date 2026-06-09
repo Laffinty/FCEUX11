@@ -50,9 +50,11 @@ extern SFORMAT FCEUVSUNI_STATEINFO[];
 
 //mbg merge 6/29/06 - these need to be global
 uint8 *trainerpoo = NULL;
+static FceuMallocPtr trainerpoo_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 uint8 *ROM = NULL;
 uint8 *VROM = NULL;
 uint8 *ExtraNTARAM = NULL;
+static FceuMallocPtr ExtraNTARAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 iNES_HEADER head;
 
 static CartInfo iNESCart;
@@ -704,7 +706,8 @@ int iNESLoad(const char *name, FCEUFILE *fp, int OverwriteVidMode) {
 	}
 
 	if (head.ROM_type & 4) {	/* Trainer */
-		trainerpoo = (uint8*)FCEU_gmalloc(512);
+		trainerpoo_owner = FCEU_gmalloc_unique(512);  // v0.3.6: RAII-wrapped
+		trainerpoo = trainerpoo_owner.get();
 		FCEU_fread(trainerpoo, 512, 1, fp);
 	}
 
@@ -782,7 +785,8 @@ int iNESLoad(const char *name, FCEUFILE *fp, int OverwriteVidMode) {
 		SetupCartCHRMapping(0, VROM, VROM_size * 0x2000, 0);
 
 	if (Mirroring == 2) {
-		ExtraNTARAM = (uint8*)FCEU_gmalloc(2048);
+		ExtraNTARAM_owner = FCEU_gmalloc_unique(2048);  // v0.3.6: RAII-wrapped
+		ExtraNTARAM = ExtraNTARAM_owner.get();
 		SetupCartMirroring(4, 1, ExtraNTARAM);
 	} else if (Mirroring >= 0x10)
 		SetupCartMirroring(2 + (Mirroring & 1), 1, 0);

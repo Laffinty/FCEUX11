@@ -108,8 +108,11 @@ const int CFI_CHIP = 0x13;
 static int CHR_SIZE = 0;
 static uint32 WRAM_SIZE = 0;
 static uint8* WRAM = NULL;
+static FceuMallocPtr WRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint8* SAVE_FLASH = NULL;
+static FceuMallocPtr SAVE_FLASH_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint8* CFI;
+static FceuMallocPtr CFI_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 
 static uint8 sram_enabled = 0;
 static uint8 sram_page = 0;		// [1:0]
@@ -2217,12 +2220,9 @@ static void COOLGIRL_Power(void) {
 }
 
 static void COOLGIRL_Close(void) {
-	if (WRAM)
-		FCEU_gfree(WRAM);
-	if (SAVE_FLASH)
-		FCEU_gfree(SAVE_FLASH);
-	if (CFI)
-		FCEU_gfree(CFI);
+	WRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	SAVE_FLASH_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	CFI_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
 	WRAM = SAVE_FLASH = CFI = NULL;
 }
 
@@ -2238,7 +2238,8 @@ void COOLGIRL_Init(CartInfo* info) {
 
 	WRAM_SIZE = info->ines2 ? (info->wram_size + info->battery_wram_size) : (32 * 1024);
 	if (WRAM_SIZE > 0) {
-		WRAM = (uint8*)FCEU_gmalloc(WRAM_SIZE);
+		WRAM_owner = FCEU_gmalloc_unique(WRAM_SIZE);  // v0.3.6: RAII-wrapped
+		WRAM = WRAM_owner.get();
 		memset(WRAM, 0, WRAM_SIZE);
 		SetupCartPRGMapping(WRAM_CHIP, WRAM, WRAM_SIZE, 1);
 		AddExState(WRAM, 32 * 1024, 0, "SRAM");
@@ -2250,13 +2251,15 @@ void COOLGIRL_Init(CartInfo* info) {
 
 	if (info->battery)
 	{
-		SAVE_FLASH = (uint8*)FCEU_gmalloc(SAVE_FLASH_SIZE);
+		SAVE_FLASH_owner = FCEU_gmalloc_unique(SAVE_FLASH_SIZE);  // v0.3.6: RAII-wrapped
+		SAVE_FLASH = SAVE_FLASH_owner.get();
 		SetupCartPRGMapping(FLASH_CHIP, SAVE_FLASH, SAVE_FLASH_SIZE, 1);
 		AddExState(SAVE_FLASH, SAVE_FLASH_SIZE, 0, "SAVF");
 		info->addSaveGameBuf(SAVE_FLASH, SAVE_FLASH_SIZE);
 	}
 
-	CFI = (uint8*)FCEU_gmalloc(sizeof(cfi_data) * 2);
+	CFI_owner = FCEU_gmalloc_unique(sizeof(cfi_data) * 2);  // v0.3.6: RAII-wrapped
+	CFI = CFI_owner.get();
 	for (size_t i = 0; i < sizeof(cfi_data); i++)
 	{
 		CFI[i * 2] = CFI[i * 2 + 1] = cfi_data[i];

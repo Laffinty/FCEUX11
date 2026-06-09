@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.6] - 2026-06-10
+
+### Changed
+
+- **RAII 化 (异常安全 + unique_ptr 迁移)**: `FCEU_malloc` / `FCEU_free` /
+  `FCEU_dmalloc` / `FCEU_dfree` 标记 `[[deprecated]]`,指向
+  `std::make_unique_for_overwrite<uint8_t[]>(n)` /
+  `std::pmr::get_default_resource()->allocate(n)` (utils/memory.h).
+- **fceuScopedPtr 迁移**: 旧的 `fceuScopedPtr<T>` 类定义替换为
+  `using fceuScopedPtr = std::unique_ptr<T>` 别名(types.h);唯一使用点
+  `state.cpp:FCEUSS_Load` 改为 `std::unique_ptr<EMUFILE>`.
+- **Mapper PRG-RAM RAII**: 95 处 `FCEU_gmalloc` / `FCEU_dmalloc` 调用迁移为
+  `FCEU_gmalloc_unique` RAII 模式(static `FceuMallocPtr NAME_owner` +
+  `NAME_owner = FCEU_gmalloc_unique(N); NAME = NAME_owner.get();`)。
+  自动化:`tools/transform_v036.py` Python 脚本(幂等,处理嵌套括号
+  size 表达式、extern/bare/static 三种声明、跨文件 extern 指针保留原
+  FCEU_gfree、nes_ntsc_t*/uint32*/uint16*/float* 多类型 cast 保留)。
+- **CFG 验证文档化**: `fceu.h` 顶部添加注释,说明 DECLFW 标注的 mapper 写
+  函数已通过 `/guard:cf` 全局 CFG 保护,无需逐函数 `__declspec(guard_overwrite)`。
+- **fceu.cpp / ines.cpp / nsf.cpp / fds.cpp / vidblit.cpp**: 多文件手工迁移
+  + `transform_v036.py` 自动化补充,确保 `FreeBuffers()` 等关键路径无双重释放。
+- **docs/tech/v0.3.6_Release_Notes.md**: 完整交付记录(实施 + 五道闸验收 + 文件清单)。
+
+### Deprecated
+
+- `FCEU_malloc`, `FCEU_free`, `FCEU_dmalloc`, `FCEU_dfree` — 仍可用,但
+  编译期警告。`FCEUX11_NO_DEPRECATION_WARNINGS` 宏可在 v0.3.x 期间抑制。
+  实际删除推迟到 v0.4.0(per 计划 §6.3)。
+- `fceuScopedPtr<T>` 类 — 仍可用(typedef to `std::unique_ptr<T>`),编译期警告。
+
+### Testing
+
+- 5/5 ctest 通过(smoke_test, mapper_load_test, mapper_reset_test,
+  rom_regression_test, expected_api_test)。
+- 323/323 cargo test 通过(utils 92 + formats 135 + media 48 + debug 2 +
+  rom_tests 46)。
+- 字节级 savestate 哈希与 v0.3.0 基线 `tests/fixtures/golden_hashes.json` 一致。
+
 ## [0.3.5] - 2026-06-09
 
 ### Changed

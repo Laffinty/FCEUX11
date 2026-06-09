@@ -39,10 +39,12 @@ extern pal *palo;
 #include "../../ppu.h"  // for PPU[]
 
 nes_ntsc_t* nes_ntsc;
+static FceuMallocPtr nes_ntsc_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 uint8 burst_phase = 0;
 
 static uint32 CBM[3];
 static uint32 *palettetranslate=0;
+static FceuMallocPtr palettetranslate_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static int backBpp, backshiftr[3], backshiftl[3];
 static int silt;
 static int Bpp;	// BYTES per pixel
@@ -53,15 +55,20 @@ static uint16 *specbuf=NULL;		// 8bpp -> 16bpp, pre hq2x/hq3x
 static uint32 *specbuf32bpp= NULL;	// Buffer to hold output of hq2x/hq3x when converting to 16bpp and 24bpp
 static uint8  *specbuf8bpp = NULL;	// For 2xscale, 3xscale.
 static uint8  *ntscblit    = NULL;	// For nes_ntsc
+static FceuMallocPtr ntscblit_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint32 *prescalebuf = NULL;	// Prescale pointresizes to 2x-4x to allow less blur with hardware acceleration.
+static FceuMallocPtr prescalebuf_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 
 //////////////////////
 // PAL filter start //
 //////////////////////
 #define PAL_PHASES 108			// full vertical subcarrier cycle for 3x resolution (18) * full horizontal cycle (6)
 static uint32 *palrgb  = NULL;	// buffer for lookup values of RGB with applied moir phases
+static FceuMallocPtr palrgb_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint32 *palrgb2 = NULL;	// buffer for lookup values of blended moir phases
+static FceuMallocPtr palrgb2_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static float  *moire   = NULL;	// modulated signal
+static FceuMallocPtr moire_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 const  float   phasex  = (float) 5/18*2;
 const  float   phasey  = (float) 1/ 6*2;
 const  float   pi      = 3.14f;
@@ -129,12 +136,14 @@ int InitBlitToHigh(int b, uint32 rmask, uint32 gmask, uint32 bmask, int efx, int
 			break;			
 		}
 		
-		nes_ntsc = (nes_ntsc_t*) FCEU_dmalloc( sizeof (nes_ntsc_t) );
+		nes_ntsc_owner = FCEU_gmalloc_unique(sizeof (nes_ntsc_t));  // v0.3.6: RAII-wrapped
+		nes_ntsc = (nes_ntsc_t*)nes_ntsc_owner.get();
 		
 		if ( nes_ntsc )
 		{
 			nes_ntsc_init( nes_ntsc, &ntsc_setup, b );			
-			ntscblit = (uint8*)FCEU_dmalloc(602*257*b);
+			ntscblit_owner = FCEU_gmalloc_unique(602*257*b);  // v0.3.6: RAII-wrapped
+			ntscblit = ntscblit_owner.get();
 		}
 		
 	} // -Video Modes Tag-
@@ -199,13 +208,17 @@ int InitBlitToHigh(int b, uint32 rmask, uint32 gmask, uint32 bmask, int efx, int
 	else if (specfilt >= 6 && specfilt <= 8)
 	{
 		int multi = specfilt - 4; // magic assuming prescales are specfilt >= 6
-		prescalebuf = (uint32 *)FCEU_dmalloc(256*240*multi*sizeof(uint32));
+		prescalebuf_owner = FCEU_gmalloc_unique(256*240*multi*sizeof(uint32));  // v0.3.6: RAII-wrapped
+		prescalebuf = (uint32*)prescalebuf_owner.get();
 	}
 	else if (specfilt == 9)
 	{
-		palrgb     = (uint32 *)FCEU_dmalloc((256+512)*PAL_PHASES*sizeof(uint32));
-		palrgb2    = (uint32 *)FCEU_dmalloc((256+512)*PAL_PHASES*sizeof(uint32));
-		moire      = (float  *)FCEU_dmalloc(          PAL_PHASES*sizeof(float));
+		palrgb_owner = FCEU_gmalloc_unique((256+512)*PAL_PHASES*sizeof(uint32));  // v0.3.6: RAII-wrapped
+		palrgb = (uint32*)palrgb_owner.get();
+		palrgb2_owner = FCEU_gmalloc_unique((256+512)*PAL_PHASES*sizeof(uint32));  // v0.3.6: RAII-wrapped
+		palrgb2 = (uint32*)palrgb2_owner.get();
+		moire_owner = FCEU_gmalloc_unique(PAL_PHASES*sizeof(float));  // v0.3.6: RAII-wrapped
+		moire = (float*)moire_owner.get();
 		palupdate  = 1;
 	}
 
@@ -222,7 +235,8 @@ int InitBlitToHigh(int b, uint32 rmask, uint32 gmask, uint32 bmask, int efx, int
 		free(palettetranslate);
 		palettetranslate=NULL;
 	}
-	palettetranslate=(uint32*)FCEU_dmalloc(256*4 + 512*4);
+	palettetranslate_owner = FCEU_gmalloc_unique(256*4 + 512*4);  // v0.3.6: RAII-wrapped
+	palettetranslate = (uint32*)palettetranslate_owner.get();
 	
 	if(!palettetranslate)
 		return(0);
@@ -238,7 +252,7 @@ void KillBlitToHigh(void)
 {
 	if(palettetranslate)
 	{
-		FCEU_free(palettetranslate);
+		palettetranslate_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
 		palettetranslate=NULL;
 	}
 	
@@ -263,8 +277,8 @@ void KillBlitToHigh(void)
 		specbuf=NULL;
 	}
 	if (nes_ntsc) {
-		FCEU_free(nes_ntsc);
-		nes_ntsc = NULL;
+		nes_ntsc_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+		nes_ntsc = nullptr;
 	}
 	if (ntscblit) {
 		free(ntscblit);

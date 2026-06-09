@@ -24,6 +24,7 @@
 static uint8 latche=0, latcheinit=0, bus_conflict=0;
 static uint16 addrreg0=0, addrreg1=0;
 static uint8 *WRAM = NULL;
+static FceuMallocPtr WRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint32 WRAMSIZE=0;
 static void (*WSync)(void) = nullptr;
 static uint8 submapper;
@@ -51,9 +52,8 @@ static void LatchPower(void) {
 }
 
 static void LatchClose(void) {
-	if (WRAM)
-		FCEU_gfree(WRAM);
-	WRAM = NULL;
+	WRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	WRAM = nullptr;
 }
 
 static void StateRestore(int version) {
@@ -97,7 +97,8 @@ static void Latch_Init(CartInfo *info, void (*proc)(void), uint8 init, uint16 ad
 			
 			//this is more likely the only practical scenario
 			WRAMSIZE = 8192;
-			WRAM = (uint8*)FCEU_gmalloc(WRAMSIZE);
+			WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped
+			WRAM = WRAM_owner.get();
 			SetupCartPRGMapping(0x10, WRAM, WRAMSIZE, 1);
 			SetReadHandler(0x6000, 0x7FFF, CartBR);
 			SetWriteHandler(0x6000, 0x7FFF, CartBW);
@@ -110,7 +111,8 @@ static void Latch_Init(CartInfo *info, void (*proc)(void), uint8 init, uint16 ad
 		else
 		{
 			WRAMSIZE = 8192;
-			WRAM = (uint8*)FCEU_gmalloc(WRAMSIZE);
+			WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped
+			WRAM = WRAM_owner.get();
 			SetupCartPRGMapping(0x10, WRAM, WRAMSIZE, 1);
 			if (info->battery) {
 				info->addSaveGameBuf( WRAM, WRAMSIZE );
@@ -153,7 +155,8 @@ void NROM_Init(CartInfo *info) {
 	info->Close = LatchClose;
 
 	WRAMSIZE = 8192;
-	WRAM = (uint8*)FCEU_gmalloc(WRAMSIZE);
+	WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped
+	WRAM = WRAM_owner.get();
 	SetupCartPRGMapping(0x10, WRAM, WRAMSIZE, 1);
 	if (info->battery) {
 		info->addSaveGameBuf( WRAM, WRAMSIZE );

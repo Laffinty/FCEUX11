@@ -102,6 +102,7 @@ static uint32 WRAMSIZE = 0;
 static uint8 *WRAM = NULL;
 static uint8 *MMC5fill = NULL;
 static uint8 *ExRAM = NULL;
+static FceuMallocPtr ExRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint8 MMC5battery = 0;
 
 const int MMC5WRAMMAX = 1<<7; // 7 bits in register interface (real MMC5 has only 4 pins, however)
@@ -880,7 +881,8 @@ void Mapper5_ESI(void) {
 void NSFMMC5_Init(void) {
 	memset(&MMC5Sound, 0, sizeof(MMC5Sound));
 	mul[0] = mul[1] = 0;
-	ExRAM = (uint8*)FCEU_gmalloc(1024);
+	ExRAM_owner = FCEU_gmalloc_unique(1024);  // v0.3.6: RAII-wrapped
+	ExRAM = ExRAM_owner.get();
 	Mapper5_ESI();
 	SetWriteHandler(0x5c00, 0x5fef, MMC5_ExRAMWr);
 	SetReadHandler(0x5c00, 0x5fef, MMC5_ExRAMRd);

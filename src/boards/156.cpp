@@ -22,6 +22,7 @@
 
 static uint8 chrlo[8], chrhi[8], prg, mirr, mirrisused = 0;
 static uint8 *WRAM = NULL;
+static FceuMallocPtr WRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint32 WRAMSIZE;
 
 static SFORMAT StateRegs[] =
@@ -90,9 +91,8 @@ static void M156Power(void) {
 }
 
 static void M156Close(void) {
-	if (WRAM)
-		FCEU_gfree(WRAM);
-	WRAM = NULL;
+	WRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	WRAM = nullptr;
 }
 
 static void StateRestore(int version) {
@@ -105,7 +105,8 @@ void Mapper156_Init(CartInfo *info) {
 	info->Close = M156Close;
 
 	WRAMSIZE = 8192;
-	WRAM = (uint8*)FCEU_gmalloc(WRAMSIZE);
+	WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped
+	WRAM = WRAM_owner.get();
 	SetupCartPRGMapping(0x10, WRAM, WRAMSIZE, 1);
 	AddExState(WRAM, WRAMSIZE, 0, "WRAM");
 

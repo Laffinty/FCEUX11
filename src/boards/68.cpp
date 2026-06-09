@@ -24,6 +24,7 @@ static uint8 chr_reg[4];
 static uint8 kogame, prg_reg, nt1, nt2, mirr;
 
 static uint8 *WRAM = NULL;
+static FceuMallocPtr WRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint32 WRAMSIZE=0, count=0;
 
 static SFORMAT StateRegs[] =
@@ -138,9 +139,8 @@ static void M68Power(void) {
 }
 
 static void M68Close(void) {
-	if (WRAM)
-		FCEU_gfree(WRAM);
-	WRAM = NULL;
+	WRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	WRAM = nullptr;
 }
 
 static void StateRestore(int version) {
@@ -153,7 +153,8 @@ void Mapper68_Init(CartInfo *info) {
 	info->Close = M68Close;
 	GameStateRestore = StateRestore;
 	WRAMSIZE = 8192;
-	WRAM = (uint8*)FCEU_gmalloc(WRAMSIZE);
+	WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped
+	WRAM = WRAM_owner.get();
 	SetupCartPRGMapping(0x10, WRAM, WRAMSIZE, 1);
 	if (info->battery) {
 		info->addSaveGameBuf( WRAM, WRAMSIZE );

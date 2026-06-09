@@ -24,6 +24,7 @@ static uint8 vrc7idx, preg[3], creg[8], mirr;
 static uint8 IRQLatch, IRQa, IRQd, IRQMode;
 static int32 IRQCount, CycleCount;
 static uint8 *WRAM = NULL;
+static FceuMallocPtr WRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint32 WRAMSIZE=0;
 
 #include "emu2413.h"
@@ -160,9 +161,8 @@ static void VRC7Power(void) {
 
 static void VRC7Close(void)
 {
-	if (WRAM)
-		FCEU_gfree(WRAM);
-	WRAM = NULL;
+	WRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	WRAM = nullptr;
 }
 
 static void VRC7IRQHook(int a) {
@@ -200,7 +200,8 @@ void Mapper85_Init(CartInfo *info) {
 	info->Close = VRC7Close;
 	MapIRQHook = VRC7IRQHook;
 	WRAMSIZE = 8192;
-	WRAM = (uint8*)FCEU_gmalloc(WRAMSIZE);
+	WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped
+	WRAM = WRAM_owner.get();
 	SetupCartPRGMapping(0x10, WRAM, WRAMSIZE, 1);
 	AddExState(WRAM, WRAMSIZE, 0, "WRAM");
 	if (info->battery) {

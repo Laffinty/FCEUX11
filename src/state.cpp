@@ -583,7 +583,10 @@ bool FCEUSS_LoadFP(EMUFILE* is, ENUM_SSLOADPARAMS params)
 
 bool FCEUSS_Load(const char *fname, bool display_message)
 {
-	fceuScopedPtr <EMUFILE> st; // fceuScopedPtr will auto delete the allocated EMUFILE at function return.
+	// v0.3.6: std::unique_ptr<EMUFILE> replaces the deprecated fceuScopedPtr.
+	// The unique_ptr's default deleter calls `delete` on the owned EMUFILE,
+	// matching the previous FCEU_ALLOC_TYPE_NEW behavior.
+	std::unique_ptr<EMUFILE> st;
 	std::string fn;
 
 	//mbg movie - this needs to be overhauled
@@ -601,13 +604,13 @@ bool FCEUSS_Load(const char *fname, bool display_message)
 	}
 	if (fname)
 	{
-		st = FCEUD_UTF8_fstream(fname, "rb");
+		st.reset(FCEUD_UTF8_fstream(fname, "rb"));
 		fn.assign(fname);
 	}
 	else
 	{
 		fn = FCEU_MakeFName(FCEUMKF_STATE,CurrentState,fname);
-		st=FCEUD_UTF8_fstream(fn.c_str(),"rb");
+		st.reset(FCEUD_UTF8_fstream(fn.c_str(),"rb"));
         	lastLoadstateMade.assign(fn);
 	}
 

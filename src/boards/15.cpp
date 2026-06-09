@@ -24,6 +24,7 @@
 static uint16 latchea;
 static uint8 latched;
 static uint8 *WRAM = NULL;
+static FceuMallocPtr WRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint32 WRAMSIZE=0;
 static SFORMAT StateRegs[] =
 {
@@ -94,9 +95,8 @@ static void M15Reset(void) {
 }
 
 static void M15Close(void) {
-	if (WRAM)
-		FCEU_gfree(WRAM);
-	WRAM = NULL;
+	WRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	WRAM = nullptr;
 }
 
 void Mapper15_Init(CartInfo *info) {
@@ -105,7 +105,8 @@ void Mapper15_Init(CartInfo *info) {
 	info->Close = M15Close;
 	GameStateRestore = StateRestore;
 	WRAMSIZE = 8192;
-	WRAM = (uint8*)FCEU_gmalloc(WRAMSIZE);
+	WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped
+	WRAM = WRAM_owner.get();
 	SetupCartPRGMapping(0x10, WRAM, WRAMSIZE, 1);
 	if (info->battery) {
 		info->addSaveGameBuf( WRAM, WRAMSIZE );

@@ -45,6 +45,7 @@ const int FLASH_SECTOR_SIZE = 4 * 1024;
 static uint8 flash_save, flash_state, flash_id_mode, latche, bus_conflict;
 static uint16 latcha;
 static uint8 *flash_data;
+static FceuMallocPtr flash_data_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint16 flash_buffer_a[10];
 static uint8 flash_buffer_v[10];
 static uint8 flash_id[2];
@@ -163,9 +164,8 @@ static void UNROM512LatchPower(void) {
 }
 
 static void UNROM512LatchClose(void) {
-	if(flash_data)
-		FCEU_gfree(flash_data);
-	flash_data = NULL;
+	flash_data_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	flash_data = nullptr;
 }
 
 static void UNROM512_FlashReset(void)
@@ -211,7 +211,8 @@ void UNROM512_Init(CartInfo *info) {
 	{
 		// Allocate memory for flash
 		size_t flash_size = PRGsize[ROM_CHIP];
-		flash_data = (uint8*)FCEU_gmalloc(flash_size);
+		flash_data_owner = FCEU_gmalloc_unique(flash_size);  // v0.3.6: RAII-wrapped
+		flash_data = flash_data_owner.get();
 		// Copy ROM to flash data
 		for (size_t i = 0; i < flash_size; i++) {
 			flash_data[i] = PRGptr[ROM_CHIP][i];

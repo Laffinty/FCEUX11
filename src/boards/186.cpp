@@ -51,6 +51,7 @@
 
 static uint8 SWRAM[3072];
 static uint8 *WRAM = NULL;
+static FceuMallocPtr WRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint8 regs[4];
 
 static SFORMAT StateRegs[] =
@@ -102,9 +103,8 @@ static void M186Power(void) {
 }
 
 static void M186Close(void) {
-	if (WRAM)
-		FCEU_gfree(WRAM);
-	WRAM = NULL;
+	WRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	WRAM = nullptr;
 }
 
 static void M186Restore(int version) {
@@ -115,7 +115,8 @@ void Mapper186_Init(CartInfo *info) {
 	info->Power = M186Power;
 	info->Close = M186Close;
 	GameStateRestore = M186Restore;
-	WRAM = (uint8*)FCEU_gmalloc(32768);
+	WRAM_owner = FCEU_gmalloc_unique(32768);  // v0.3.6: RAII-wrapped
+	WRAM = WRAM_owner.get();
 	SetupCartPRGMapping(0x10, WRAM, 32768, 1);
 	AddExState(WRAM, 32768, 0, "WRAM");
 	AddExState(StateRegs, ~0, 0, 0);

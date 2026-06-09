@@ -130,6 +130,7 @@ NSF_HEADER NSFHeader; //mbg merge 6/29/06 - needs to be global
 
 void NSFMMC5_Close(void);
 static uint8 *ExWRAM=0;
+static FceuMallocPtr ExWRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 
 void NSFGI(GI h)
 {
@@ -250,7 +251,8 @@ int NSFLoad(const char *name, FCEUFILE *fp)
 		exwram_size = 32768+8192;
 	//lets just always use this size, for savestate simplicity
 	exwram_size = FIXED_EXWRAM_SIZE;
-	ExWRAM=(uint8*)FCEU_gmalloc(exwram_size);
+	ExWRAM_owner = FCEU_gmalloc_unique(exwram_size);  // v0.3.6: RAII-wrapped
+	ExWRAM = ExWRAM_owner.get();
 
 	FCEUI_SetVidSystem(NSFHeader.VideoSystem);
 

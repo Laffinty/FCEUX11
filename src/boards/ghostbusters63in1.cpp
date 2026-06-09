@@ -24,6 +24,7 @@
 static uint8 reg[2], bank;
 static uint8 banks[4] = { 0, 0, 1, 2 };
 static uint8 *CHRROM = NULL;
+static FceuMallocPtr CHRROM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint32 CHRROMSIZE;
 
 static SFORMAT StateRegs[] =
@@ -76,9 +77,8 @@ static void StateRestore(int version) {
 }
 
 static void BMCGhostbusters63in1Close(void) {
-	if (CHRROM)
-		FCEU_gfree(CHRROM);
-	CHRROM = NULL;
+	CHRROM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	CHRROM = nullptr;
 }
 
 void BMCGhostbusters63in1_Init(CartInfo *info) {
@@ -87,7 +87,8 @@ void BMCGhostbusters63in1_Init(CartInfo *info) {
 	info->Close = BMCGhostbusters63in1Close;
 
 	CHRROMSIZE = 8192; // dummy CHRROM, VRAM disable
-	CHRROM = (uint8*)FCEU_gmalloc(CHRROMSIZE);
+	CHRROM_owner = FCEU_gmalloc_unique(CHRROMSIZE);  // v0.3.6: RAII-wrapped
+	CHRROM = CHRROM_owner.get();
 	SetupCartPRGMapping(0x10, CHRROM, CHRROMSIZE, 0);
 	AddExState(CHRROM, CHRROMSIZE, 0, "CROM");
 

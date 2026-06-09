@@ -85,7 +85,9 @@ const uint32 FLASH_SECTOR_SIZE = 128 * 1024;
 
 extern uint8* WRAM;
 static uint8* CFI = NULL;
+static FceuMallocPtr CFI_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint8* Flash = NULL;
+static FceuMallocPtr Flash_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 
 static uint8 flash_save = 0;
 static uint8 flash_state = 0;
@@ -398,10 +400,8 @@ static void AA6023Restore(int version) {
 static void AA6023Close(void) {
 	if (WRAM)
 		FCEU_gfree(WRAM);
-	if (Flash)
-		FCEU_gfree(Flash);
-	if (CFI) 
-		FCEU_gfree(CFI);
+	Flash_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	CFI_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
 	WRAM = Flash = CFI = NULL;
 }
 
@@ -444,12 +444,14 @@ void CommonInit(CartInfo* info, int submapper)
 	flash_save = info->battery;
 
 	if (flash_save) {
-		CFI = (uint8*)FCEU_gmalloc(sizeof(cfi_data) * 2);
+		CFI_owner = FCEU_gmalloc_unique(sizeof(cfi_data) * 2);  // v0.3.6: RAII-wrapped
+		CFI = CFI_owner.get();
 		for (size_t i = 0; i < sizeof(cfi_data); i++) {
 			CFI[i * 2] = CFI[i * 2 + 1] = cfi_data[i];
 		}
 		SetupCartPRGMapping(CFI_CHIP, CFI, sizeof(cfi_data) * 2, 0);
-		Flash = (uint8*)FCEU_gmalloc(PRGsize[ROM_CHIP]);
+		Flash_owner = FCEU_gmalloc_unique(PRGsize[ROM_CHIP]);  // v0.3.6: RAII-wrapped
+		Flash = Flash_owner.get();
 		for (unsigned int i = 0; i < PRGsize[ROM_CHIP]; i++) {
 			Flash[i] = PRGptr[ROM_CHIP][i % PRGsize[ROM_CHIP]];
 		}
