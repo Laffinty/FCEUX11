@@ -2,10 +2,6 @@
 
 # FCEUX11
 
-**面向 Windows 11 的现代 NES/Famicom 模拟器**
-
-A Modern NES/Famicom Emulator for Windows 11
-
 [![Version](https://img.shields.io/badge/version-v0.3.5-blue)](https://github.com/Laffinty/FCEUX11/releases)
 [![License](https://img.shields.io/badge/license-GPL--v2-green)](COPYING)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?logo=windows)](https://www.microsoft.com/windows/windows-11)
