@@ -240,7 +240,7 @@ checksum = "9f1f227452a390804cdb637b74a86990f2a7d7ba4b7d5693aac9b4dd6defd8d6"
 
 [[package]]
 name = "fceux11-core"
-version = "0.2.27"
+version = "0.3.5"
 dependencies = [
  "fceux11-formats",
  "flate2",
@@ -248,15 +248,15 @@ dependencies = [
 
 [[package]]
 name = "fceux11-debug"
-version = "0.2.27"
+version = "0.3.5"
 
 [[package]]
 name = "fceux11-formats"
-version = "0.2.27"
+version = "0.3.5"
 
 [[package]]
 name = "fceux11-lua"
-version = "0.2.27"
+version = "0.3.5"
 dependencies = [
  "fceux11-utils",
  "mlua",
@@ -264,7 +264,7 @@ dependencies = [
 
 [[package]]
 name = "fceux11-media"
-version = "0.2.27"
+version = "0.3.5"
 dependencies = [
  "crc32fast",
  "fceux11-utils",
@@ -274,7 +274,7 @@ dependencies = [
 
 [[package]]
 name = "fceux11-rom-tests"
-version = "0.2.27"
+version = "0.3.5"
 dependencies = [
  "fceux11-media",
  "fceux11-utils",
@@ -282,7 +282,7 @@ dependencies = [
 
 [[package]]
 name = "fceux11-rust"
-version = "0.2.27"
+version = "0.3.5"
 dependencies = [
  "cbindgen",
  "fceux11-core",
@@ -295,7 +295,7 @@ dependencies = [
 
 [[package]]
 name = "fceux11-utils"
-version = "0.2.27"
+version = "0.3.5"
 dependencies = [
  "crc32fast",
  "digest",

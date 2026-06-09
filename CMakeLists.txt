@@ -13,7 +13,7 @@ if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
     endif()
 endif()
 
-project(FCEUX11 VERSION 0.2.26 LANGUAGES CXX C)
+project(FCEUX11 VERSION 0.3.5 LANGUAGES CXX C)
 
 # v0.2.1: Enforce MSVC toolchain; MinGW-w64 / MSYS2 support removed
 if(NOT MSVC)

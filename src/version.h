@@ -19,7 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-//#define PUBLIC_RELEASE		// uncomment this when making a public release, but comment back before committing
+#define PUBLIC_RELEASE		// uncomment this when making a public release, but comment back before committing
 
 #ifndef __FCEU_VERSION
 #define __FCEU_VERSION
@@ -61,8 +61,8 @@
 #endif
 
 #define FCEU_VERSION_MAJOR  0
-#define FCEU_VERSION_MINOR  2
-#define FCEU_VERSION_PATCH  27
+#define FCEU_VERSION_MINOR  3
+#define FCEU_VERSION_PATCH  5
 #define FCEU_VERSION_TWEAK  0
 
 #define FCEU_VERSION_NUMERIC  ( (FCEU_VERSION_MAJOR*10000) + (FCEU_VERSION_MINOR*100) + (FCEU_VERSION_PATCH) )
@@ -70,8 +70,8 @@
 #define FCEU_VERSION_MINOR_DECODE(x)  ( (x / 100) % 100 )
 #define FCEU_VERSION_PATCH_DECODE(x)    (x % 100)
 
-#define FCEU_VERSION_STRING "0.2.27"  FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
-#define FCEU_DISPLAY_VERSION "v0.2.27"
+#define FCEU_VERSION_STRING "0.3.5"  FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
+#define FCEU_DISPLAY_VERSION "v0.3.5"
 #define FCEU_NAME_AND_VERSION FCEU_NAME " " FCEU_DISPLAY_VERSION
 
 // FCEUX11 Contributors — Derivative work based on FCEUX
