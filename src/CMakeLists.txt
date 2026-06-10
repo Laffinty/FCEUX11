@@ -29,6 +29,39 @@ find_package(LibArchive REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(OpenGL REQUIRED)
 
+# v0.3.6.5: The vcpkg LibArchive port's CMake target LibArchive::LibArchive
+# only registers IMPORTED_LOCATION (no suffix) without IMPORTED_LOCATION_RELEASE
+# / _DEBUG / _RELWITHDEBINFO, and CMake's MAP_IMPORTED_CONFIG fallback does
+# NOT engage in this scenario for some target types — generator-time fails
+# with "IMPORTED_LOCATION not set for ...LibArchive... configuration X".
+# Bypass the imported target entirely under sanitizer builds and use the
+# raw library file (FindLibArchive sets LibArchive_LIBRARY / _LIBRARIES /
+# _INCLUDE_DIRS). The Release archive.lib is fine under our ASan / UB-substitute
+# build because the instrumentation lives in OUR object files, not LibArchive.
+if(FCEUX11_ASAN OR FCEUX11_UBSAN)
+    if(LibArchive_INCLUDE_DIRS)
+        include_directories(${LibArchive_INCLUDE_DIRS})
+    endif()
+    set(FCEUX11_LIBARCHIVE_LINK "${LibArchive_LIBRARIES}")
+    # OpenGL::GL has the same per-config IMPORTED_LOCATION issue under
+    # Debug/RelWithDebInfo. opengl32.lib is a system lib (in the Windows
+    # SDK), config-independent — link it by name to bypass the imported
+    # target machinery entirely.
+    set(FCEUX11_OPENGL_LINK opengl32)
+    # ZLIB::ZLIB likewise — vcpkg's z.lib is Release-only.
+    if(ZLIB_LIBRARIES)
+        set(FCEUX11_ZLIB_LINK "${ZLIB_LIBRARIES}")
+    else()
+        set(FCEUX11_ZLIB_LINK ZLIB::ZLIB)
+    endif()
+    message(STATUS "FCEUX11 v0.3.6.5: sanitizer build link bypasses imported targets:"
+            " LibArchive=${FCEUX11_LIBARCHIVE_LINK} ZLIB=${FCEUX11_ZLIB_LINK} OpenGL=${FCEUX11_OPENGL_LINK}")
+else()
+    set(FCEUX11_LIBARCHIVE_LINK LibArchive::LibArchive)
+    set(FCEUX11_OPENGL_LINK     OpenGL::GL)
+    set(FCEUX11_ZLIB_LINK       ZLIB::ZLIB)
+endif()
+
 # Qt5 support removed in Phase 2 — Qt6 only
 # v0.3.1: Removed _CRT_SECURE_NO_WARNINGS; using standard secure APIs
 add_definitions( -D__SDL__  -D__QT_DRIVER__  -DQT_DEPRECATED_WARNINGS -DPSS_STYLE=2 )
@@ -496,9 +529,9 @@ target_link_libraries(fceux11_drivers_qt PUBLIC
     Qt6::OpenGL
     Qt6::OpenGLWidgets
     SDL2::SDL2
-    LibArchive::LibArchive
-    ZLIB::ZLIB
-    OpenGL::GL
+    ${FCEUX11_LIBARCHIVE_LINK}
+    ${FCEUX11_ZLIB_LINK}
+    ${FCEUX11_OPENGL_LINK}
     ${LUA_LDFLAGS}
     ${LIBAV_LDFLAGS}
     ${SYS_LIBS}

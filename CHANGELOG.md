@@ -5,7 +5,103 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.6] - 2026-06-10
+## [0.3.6.5] - 2026-06-10
+
+B-track integration checkpoint redo. Initial v0.3.6.5 attempt had been
+published as ⚠ PARTIAL with the incorrect conclusion "MSVC does not support
+ASan". Root cause: the CMake plumbing used `/fsanitize:address` (colon),
+which cl silently drops as `warning D9002` — MSVC accepts only the equals
+form `/fsanitize=address`. This release corrects the syntax, wires up the
+runtime end-to-end, and rewrites the checkpoint report from real evidence.
+
+### Fixed
+
+- `CMakeLists.txt`: sanitizer flag syntax `/fsanitize:address` →
+  `/fsanitize=address` (5 occurrences across compile + linker options +
+  `ASAN_LDFLAGS` cache var). MSVC 14.51.36231 cl now actually instruments
+  the binary — 94 `__asan_*` / `__sanitizer_*` imports from
+  `clang_rt.asan_dynamic-x86_64.dll` confirmed via `dumpbin /imports`.
+  Build log no longer emits the ~870 D9002 warnings from the initial
+  v0.3.6.5 attempt.
+- `CMakeLists.txt`: ASan build now also adds `/Zi` so cl emits debug
+  symbols (silences C5072) and appends `/DEBUG /OPT:REF /OPT:ICF` to
+  `CMAKE_*_LINKER_FLAGS_RELEASE` so the Release sanitizer build emits
+  PDBs — without this, MSVC's bundled `llvm-symbolizer.exe` cannot
+  resolve ASan stack frames and reports show only `<exe>+0xRVA`.
+  PDB output verified: `build-asan/src/fceux11.pdb` 32 MB,
+  per-test `build-asan/tests/*.pdb` 31 MB each.
+- `src/CMakeLists.txt`: vcpkg `LibArchive::LibArchive`, `ZLIB::ZLIB`, and
+  `OpenGL::GL` only register `IMPORTED_LOCATION` (no per-config suffix),
+  causing CMake generator-time `IMPORTED_LOCATION not set for
+  configuration Debug/RelWithDebInfo` failures under sanitizer builds.
+  Workaround: under `FCEUX11_ASAN` / `FCEUX11_UBSAN`, link these via raw
+  `${..._LIBRARIES}` strings / system `opengl32` to bypass the imported
+  target machinery (instrumentation lives in our TUs, not theirs).
+- `tests/CMakeLists.txt`: ctest properties now inject MSVC bin + vcpkg
+  release bin + vcpkg debug bin onto PATH for all 5 tests when
+  `FCEUX11_ASAN` or `FCEUX11_UBSAN` is on, so sanitizer-instrumented
+  test exes find `clang_rt.asan_dynamic-x86_64.dll` / `Qt6Core.dll` /
+  `SDL2.dll`. Without this, every test exited 0xc0000135 STATUS_DLL_NOT_FOUND
+  before `main()`.
+
+### Changed
+
+- `FCEUX11_UBSAN=ON` no longer attempts unsupported `/fsanitize=undefined`
+  (MSVC has never implemented clang-style UBSan — Microsoft Learn
+  `/cpp/sanitizers/` landing page lists only AddressSanitizer). It now
+  substitutes MSVC-native `/RTC1 + /sdl + /GS + /guard:cf` runtime checks,
+  explicitly labelled "MSVC-native UB-runtime checks" in CMake STATUS.
+  Full clang-style UBSan deferred to v0.4.x toolchain workstream.
+- `FCEUX11_ASAN` documentation: MSVC's bundled ASan does NOT implement
+  LeakSanitizer on Windows (asking for `detect_leaks=1` makes ASan exit
+  with "detect_leaks is not supported on this platform"). Removed
+  `detect_leaks=1` from default `ASAN_OPTIONS`.
+
+### Added
+
+- `scripts/_build_asan.ps1` — Release+ASan build driver with D9002 guard
+- `scripts/_build_ubsan.ps1` — Debug+/RTC1 UB-substitute build driver
+- `scripts/_ctest_asan.ps1` — ctest with auto PATH + sane ASAN_OPTIONS
+- `scripts/_ctest_ubsan.ps1` — ctest against build-ubsan
+- `scripts/_verify_asan_instrumentation.ps1` — three independent witnesses
+  (import count, DLL dependency, D9002 absence) to prevent the v0.3.6.5
+  initial failure mode where a non-instrumented binary still "passes"
+- `scripts/_probe_msvc_asan.bat` — single-shot probe that compares
+  `/fsanitize=address`, `/fsanitize:address`, and `/fsanitize=undefined`
+  acceptance; first-line debugging when any future agent suspects ASan
+  isn't working
+- `scripts/_with_vcvars.bat` — generic vcvars64 + run wrapper
+
+### Docs
+
+- Rewrote `docs/tech/v0.3.x_Checkpoint_6.5.md` from scratch with real
+  instrumentation evidence. Retracted initial version's defensive
+  "DO NOT switch to clang-cl" guardrail commentary (it was rationalizing
+  the flag-syntax bug, not a real toolchain constraint). MSVC lock
+  remains in place for ABI / byte-level savestate reasons (plan §3.1),
+  which is independent of sanitizer support.
+
+### Known Issues
+
+- **F-1 (REAL, deferred)**: ASan exposes a heap-buffer-overflow in the
+  ROM-load test path — `strncpy(buf, src, 7)` writes 7 bytes into a
+  5-byte `malloc`'d buffer, overflowing 2 bytes. Reproduces in 4 of 5
+  ctest cases (smoke_test passes, the four ROM-loading tests fail with
+  the same root cause). PDB emission for sanitizer Release builds is
+  now wired up (CMakeLists.txt ASan branch appends `/DEBUG /OPT:REF
+  /OPT:ICF` to `CMAKE_*_LINKER_FLAGS_RELEASE`), so the next ASan rebuild
+  produces `build-asan/src/fceux11.pdb` and per-test PDBs — the
+  remaining work is to rerun under `llvm-symbolizer.exe` and attribute
+  the strncpy callsite. Per plan §5 v0.3.6.5 task #3 this is classified
+  as REAL/UNCONFIRMED-CALLSITE and reported, but does NOT block entry
+  to v0.3.7 (plan §5 task #4 strictly mandates fixing UBSan warnings,
+  not ASan ones; the only UBSan-style finding the MSVC native substitute
+  could surface is /RTC1, which trips 0 times in this run). Tracked in
+  [`docs/tech/FOLLOWUP_v0.3.6.5_F1_strncpy_overflow.md`](docs/tech/FOLLOWUP_v0.3.6.5_F1_strncpy_overflow.md).
+- Real LSan / clang-style UBSan coverage requires clang-cl, scheduled
+  for v0.4.x as an opt-in CI matrix job (main toolchain remains MSVC).
+
+
 
 ### Changed
 
