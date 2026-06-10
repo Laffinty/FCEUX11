@@ -18,23 +18,19 @@ project(FCEUX11 VERSION 0.3.6 LANGUAGES CXX C)
 # v0.2.1: Enforce MSVC toolchain; MinGW-w64 / MSYS2 support removed.
 # v0.3.1: Locked to MSVC 19.36+ (Visual Studio 17.6+) to avoid C++23
 # preview behavior drift — see docs/v0.3.x_Construction_Plan_v3.md §3.1.
-# v0.3.6.5: This MSVC lock is **non-negotiable** and applies even to the
-# sanitizer driver. Do NOT switch to clang-cl, gcc, MinGW, or any
-# non-MSVC toolchain — even with FCEUX11_ASAN=ON. Real ASan coverage
-# is a v0.4.x item (plan §10.2), and may require shipping pre-built
-# ASan-instrumented binaries in CI rather than changing the local
-# toolchain. If you are a future agent and you are reading this
-# because cmake configure failed, the correct action is to install
-# the MSVC toolchain matching the locked version, NOT to "loosen"
-# this check or set CMAKE_C_COMPILER=clang-cl.
+# v0.3.6.5: MSVC lock stays in place for ABI / byte-level savestate
+# reasons (plan §3.1, §1.3 "工具链锁定"). This is NOT because cl
+# cannot drive sanitizers — it can: /fsanitize=address has shipped
+# since VS 2019 v16.9 and is fully wired below. The only sanitizer
+# MSVC does not implement is /fsanitize=undefined (clang-only);
+# v0.3.6.5 substitutes that with native /RTC1 + /sdl + /GS + /guard:cf
+# (see UBSan block below). Full clang-style UBSan is a v0.4.x item.
 if(NOT MSVC)
     message(FATAL_ERROR
-        "FCEUX11 v0.2.1+ requires MSVC 2022+ toolchain. "
-        "MinGW-w64 / MSYS2 / clang-cl / gcc support has been removed. "
-        "Do NOT change CMAKE_C_COMPILER / CMAKE_CXX_COMPILER to bypass "
-        "this — the project is byte-level compatible with MSVC only. "
-        "See docs/tech/v0.3.x_Checkpoint_6.5.md §2 for why we accept "
-        "the ASan tooling limitation rather than switch compilers.")
+        "FCEUX11 v0.2.1+ requires the MSVC 2022+ toolchain for ABI and "
+        "byte-level savestate compatibility (plan §3.1). MinGW-w64 / "
+        "MSYS2 / clang-cl / gcc paths have been removed. Do NOT change "
+        "CMAKE_C_COMPILER / CMAKE_CXX_COMPILER to bypass this guard.")
 endif()
 
 set(CMAKE_CXX_STANDARD 20)
@@ -61,48 +57,50 @@ option(FCEUX11_BUILD_TESTS "Build smoke and regression tests" ON)
 option(FCEUX11_ENABLE_I18N "Enable internationalization (i18n) support" ON)
 option(ENABLE_LINT "Enable static analysis targets (clang-tidy, cppcheck)" OFF)
 
-# v0.3.6.5: B-track checkpoint — AddressSanitizer / UndefinedBehaviorSanitizer
-# Both are MSVC 19.36+ options (/fsanitize=address|undefined). On Windows
-# they require MSVC's `<experimental/>` ASan runtime and Debug-or-RelWithDebInfo.
+# v0.3.6.5: B-track checkpoint — AddressSanitizer (real, MSVC-native)
+# + UndefinedBehavior-substitute (MSVC-native runtime checks).
 #
-# UBSan: MSVC 19.36 implements a *subset* of the clang UBSan checks:
-#   bounds, enum, float-cast-overflow, float-divide-by-zero,
-#   integer-divide-by-zero, null, return, shift,
-#   signed-integer-overflow, unreachable, vla-bound, function, pointer-overflow.
-#   (alignment / object-size / builtin / vptr are NOT available.)
-# Clang-cl provides the full set; for now we expose the MSVC variant.
+# ASan — fully supported by cl since VS 2019 v16.9 via /fsanitize=address.
+# The runtime DLLs (clang_rt.asan_dynamic-x86_64.dll) and import libs
+# ship with every MSVC install in <VC>\bin\Hostx64\x64\ and
+# <VC>\lib\x64\. No extra component install is required.
 #
-# LSan (LeakSanitizer) is bundled with MSVC ASan — no separate flag required.
+# NOTE on flag syntax: MSVC accepts the `=` form ONLY. The earlier
+# v0.3.6.5 attempt used `/fsanitize:address` (colon), which cl silently
+# drops as D9002 "unknown option" — that's the original PARTIAL-PASS
+# root cause documented in docs/tech/v0.3.x_Checkpoint_6.5.md.
 #
-# ============================================================
-# ⚠  FUTURE-AGENT GUARDRAIL — DO NOT SWITCH TO CLANG-CL  ⚠
-# ============================================================
-# If you are reading this and CMake rejected your attempt to set
-# CMAKE_C_COMPILER=clang-cl "to make ASan work", DO NOT modify this
-# block to allow clang-cl. The MSVC-only lock above is intentional
-# (per plan §1.3 "工具链锁定: MSVC 19.36 + Qt 6.8 LTS 在 v0.3.16
-# 之前不升级"). On machines where cl 14.x actually rejects
-# /fsanitize:address with D9002 (silently dropping the flag), the
-# correct mitigation is one of:
-#   1. Document the limitation and ship without real ASan coverage
-#      (current v0.3.6.5 baseline — see docs/tech/v0.3.x_Checkpoint_6.5.md)
-#   2. Run a SEPARATE CI job with a pre-built clang-cl toolchain
-#      (out-of-tree, matrix-style; do NOT change the local default)
-#   3. Wait for v0.4.x to revisit the toolchain policy
-# Do NOT install LLVM clang-cl as a default system toolchain on the
-# assumption it will be picked up — that would silently change every
-# agent's CMAKE_C_COMPILER detection and break the MSVC-only stance.
-# ============================================================
+# UBSan — Microsoft has not implemented /fsanitize=undefined (the
+# Microsoft Learn /cpp/sanitizers/ landing page lists only
+# AddressSanitizer). v0.3.6.5 therefore substitutes a MSVC-native
+# set of UB-catching runtime checks under the FCEUX11_UBSAN switch:
+#
+#   /RTC1   — Debug-only: stack-frame integrity, uninitialized
+#             variable use, value truncation on cast (covers a
+#             subset of clang's `bool`/`enum`/`integer-divide-by-zero`).
+#   /sdl    — already on globally: extends /GS, adds checks for
+#             buffer overruns, integer overflow in `new[]`, etc.
+#   /GS     — already on globally: stack buffer security cookie.
+#   /guard:cf — already on globally: Control Flow Guard.
+#
+# These do NOT cover the full clang UBSan check set (alignment,
+# object-size, vptr, signed-integer-overflow on plain arithmetic,
+# float-divide-by-zero, etc.) — full clang-style UBSan is a v0.4.x
+# toolchain workstream item. The MSVC subset is treated as a
+# functional substitute for v0.3.6.5's "catch UB before v0.3.7" goal,
+# not as clang-UBSan parity.
+#
+# LSan (LeakSanitizer) is bundled with MSVC ASan — no separate flag
+# required; ASan exit reports leaks automatically.
 option(FCEUX11_ASAN  "Enable AddressSanitizer (and LSan) for the v0.3.6.5 checkpoint" OFF)
-option(FCEUX11_UBSAN "Enable UndefinedBehaviorSanitizer for the v0.3.6.5 checkpoint" OFF)
+option(FCEUX11_UBSAN "Enable MSVC-native UB runtime checks (/RTC1 + /sdl); clang-style UBSan deferred to v0.4.x" OFF)
 
 if(FCEUX11_ASAN OR FCEUX11_UBSAN)
     if(NOT MSVC)
         message(FATAL_ERROR
-            "FCEUX11_ASAN / FCEUX11_UBSAN currently require the MSVC toolchain "
-            "(uses /fsanitize=address|undefined). Clang-cl support is a v0.4.x item.")
+            "FCEUX11_ASAN / FCEUX11_UBSAN require the MSVC toolchain.")
     endif()
-    # Sanitizers require debug-friendly builds — opt-in by user, but recommend RelWithDebInfo.
+    # Sanitizers require debug-friendly builds — opt-in by user, but recommend RelWithDebInfo for ASan.
     if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug" AND
        NOT CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
         message(WARNING
@@ -112,29 +110,48 @@ if(FCEUX11_ASAN OR FCEUX11_UBSAN)
 endif()
 
 if(FCEUX11_ASAN)
-    message(STATUS "FCEUX11: AddressSanitizer ENABLED (/fsanitize:address, LSan bundled)")
-    add_compile_options(/fsanitize:address)
+    message(STATUS "FCEUX11: AddressSanitizer ENABLED (/fsanitize=address /Zi, LSan bundled)")
+    # /Zi: emit symbols so ASan stacks resolve to source lines (silences C5072).
+    add_compile_options(/fsanitize=address /Zi)
     # Use CMAKE_*_LINKER_FLAGS rather than add_link_options — Ninja
-    # misinterprets `/fsanitize:address` as a build input when injected
+    # misinterprets `/fsanitize=address` as a build input when injected
     # through the add_link_options() path (it sees the leading `/` as a
     # file dependency). CMAKE_*_LINKER_FLAGS go directly into the link
-    # rule's args, no escaping issues.
-    set(CMAKE_EXE_LINKER_FLAGS_DEBUG   "/fsanitize:address ${CMAKE_EXE_LINKER_FLAGS_DEBUG}")
-    set(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO "/fsanitize:address ${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO}")
-    set(CMAKE_SHARED_LINKER_FLAGS_DEBUG   "/fsanitize:address ${CMAKE_SHARED_LINKER_FLAGS_DEBUG}")
-    set(CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO "/fsanitize:address ${CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO}")
-    set(ASAN_LDFLAGS "/fsanitize:address" CACHE INTERNAL "ASan link flags")
+    # rule's args, no escaping issues. See [[test-runs-and-pitfalls]].
+    set(CMAKE_EXE_LINKER_FLAGS_DEBUG   "/fsanitize=address ${CMAKE_EXE_LINKER_FLAGS_DEBUG}")
+    set(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO "/fsanitize=address ${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO}")
+    set(CMAKE_SHARED_LINKER_FLAGS_DEBUG   "/fsanitize=address ${CMAKE_SHARED_LINKER_FLAGS_DEBUG}")
+    set(CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO "/fsanitize=address ${CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO}")
+    # v0.3.6.5 followup: Release defaults omit /DEBUG, so PDBs aren't
+    # emitted and ASan's bundled llvm-symbolizer can't resolve stack
+    # frames (the F-1 finding shows up as <exe>+0xRVA instead of
+    # file:line). Force /DEBUG on Release + ASan; /DEBUG flips OPT
+    # defaults to NOREF/NOICF which bloats the exe — restore Release
+    # size with explicit /OPT:REF /OPT:ICF. Only affects ASan Release;
+    # Debug/RelWithDebInfo already carry /DEBUG via CMake defaults.
+    set(CMAKE_EXE_LINKER_FLAGS_RELEASE
+        "/fsanitize=address /DEBUG /OPT:REF /OPT:ICF ${CMAKE_EXE_LINKER_FLAGS_RELEASE}")
+    set(CMAKE_SHARED_LINKER_FLAGS_RELEASE
+        "/fsanitize=address /DEBUG /OPT:REF /OPT:ICF ${CMAKE_SHARED_LINKER_FLAGS_RELEASE}")
+    set(ASAN_LDFLAGS "/fsanitize=address" CACHE INTERNAL "ASan link flags")
     add_definitions(-DFCEUX11_ASAN_ENABLED=1)
 endif()
 
 if(FCEUX11_UBSAN)
-    message(STATUS "FCEUX11: UndefinedBehaviorSanitizer ENABLED (/fsanitize:undefined)")
-    add_compile_options(/fsanitize:undefined)
-    set(CMAKE_EXE_LINKER_FLAGS_DEBUG   "/fsanitize:undefined ${CMAKE_EXE_LINKER_FLAGS_DEBUG}")
-    set(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO "/fsanitize:undefined ${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO}")
-    set(CMAKE_SHARED_LINKER_FLAGS_DEBUG   "/fsanitize:undefined ${CMAKE_SHARED_LINKER_FLAGS_DEBUG}")
-    set(CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO "/fsanitize:undefined ${CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO}")
-    set(UBSAN_LDFLAGS "/fsanitize:undefined" CACHE INTERNAL "UBSan link flags")
+    # MSVC-native UB-substitute. /RTC1 is Debug-only (cl rejects it
+    # with C4348 / C4651 against /O2). /sdl /GS /guard:cf already on.
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        message(STATUS "FCEUX11: UB-substitute ENABLED (/RTC1 + /sdl, Debug — full subset)")
+        add_compile_options(/RTC1)
+    else()
+        message(STATUS
+            "FCEUX11: UB-substitute partial — /RTC1 requires Debug build "
+            "(current: ${CMAKE_BUILD_TYPE}), falling back to /sdl + /GS + "
+            "/guard:cf already-on globally. Use -DCMAKE_BUILD_TYPE=Debug "
+            "for full coverage.")
+    endif()
+    # No linker-side flags for MSVC native UB checks.
+    set(UBSAN_LDFLAGS "" CACHE INTERNAL "UBSan link flags (MSVC native: none)")
     add_definitions(-DFCEUX11_UBSAN_ENABLED=1)
 endif()
 

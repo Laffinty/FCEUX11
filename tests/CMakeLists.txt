@@ -77,6 +77,38 @@ if(FCEUX11_BUILD_TESTS)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
     # -------------------------------------------------------------------------
+    # v0.3.6.5 — ASan runtime PATH injection
+    # MSVC ASan-instrumented binaries dynamically import
+    # clang_rt.asan_dynamic-x86_64.dll from the MSVC toolchain bin
+    # directory. Without it on PATH, every test exits with
+    # STATUS_DLL_NOT_FOUND (0xc0000135) before main() runs.
+    # We also surface vcpkg's Release + Debug DLLs (Qt6Core/SDL2/etc
+    # or their `d` debug variants) so the same plumbing works whether
+    # the sanitizer build is Release, RelWithDebInfo, or Debug.
+    # -------------------------------------------------------------------------
+    if(FCEUX11_ASAN OR FCEUX11_UBSAN)
+        get_filename_component(_FCEUX11_MSVC_BIN_DIR
+                               "${CMAKE_CXX_COMPILER}" DIRECTORY)
+        file(TO_NATIVE_PATH "${_FCEUX11_MSVC_BIN_DIR}"
+                            _FCEUX11_MSVC_BIN_NATIVE)
+        file(TO_NATIVE_PATH
+             "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows/bin"
+             _FCEUX11_VCPKG_REL_BIN_NATIVE)
+        file(TO_NATIVE_PATH
+             "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows/debug/bin"
+             _FCEUX11_VCPKG_DBG_BIN_NATIVE)
+        set_tests_properties(
+            smoke_test mapper_load_test mapper_reset_test
+            rom_regression_test expected_api_test
+            PROPERTIES ENVIRONMENT_MODIFICATION
+                "PATH=path_list_prepend:${_FCEUX11_MSVC_BIN_NATIVE};PATH=path_list_prepend:${_FCEUX11_VCPKG_REL_BIN_NATIVE};PATH=path_list_prepend:${_FCEUX11_VCPKG_DBG_BIN_NATIVE}"
+        )
+        message(STATUS
+            "FCEUX11 tests: PATH prepended for sanitizer runtime — "
+            "${_FCEUX11_MSVC_BIN_NATIVE}; ${_FCEUX11_VCPKG_REL_BIN_NATIVE}; ${_FCEUX11_VCPKG_DBG_BIN_NATIVE}")
+    endif()
+
+    # -------------------------------------------------------------------------
     # v0.3.0 — Performance baseline benchmarks (Google Benchmark preferred)
     # -------------------------------------------------------------------------
     find_package(benchmark CONFIG QUIET)

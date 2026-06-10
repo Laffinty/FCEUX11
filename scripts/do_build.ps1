@@ -1,5 +1,7 @@
-# FCEUX11 Build Script (v0.2.1)
+# FCEUX11 Build Script (v0.2.2)
 # Pure PowerShell — no MSYS2 / MinGW / POSIX dependencies
+# Lives under scripts/; resolves ProjectRoot via the parent of $PSScriptRoot
+# so it works regardless of the current working directory.
 param(
     [ValidateSet("Debug", "Release", "RelWithDebInfo")]
     [string]$Config = "Release",
@@ -9,7 +11,10 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$ProjectRoot = $PSScriptRoot
+$ProjectRoot = Split-Path -Parent $PSScriptRoot
+if (-not [System.IO.Path]::IsPathRooted($BuildDir)) {
+    $BuildDir = Join-Path $ProjectRoot $BuildDir
+}
 
 if ($Clean -and (Test-Path $BuildDir)) {
     Write-Host "[CLEAN] Removing $BuildDir" -ForegroundColor Yellow
