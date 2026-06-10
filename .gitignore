@@ -3,9 +3,9 @@ build/
 build_test/
 build_no_rust/
 build_rust_*/
-build-lua-rust/
 build_v027/
 build_vs/
+build-*/
 _build/
 *.build/
 out/
@@ -72,6 +72,10 @@ vcpkg_installed/
 # Generated documentation
 docs/html/
 docs/latex/
+
+# CI log archives and extracted contents
+docs/history/logs_*.zip
+docs/history/unpacked/
 
 # Claude Code
 .claude/
