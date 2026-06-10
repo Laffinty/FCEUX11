@@ -35,6 +35,13 @@ jobs:
       - name: Setup MSVC
         uses: microsoft/setup-msbuild@v2
 
+      # v0.3.2: Project requires CMake 4.0+; GitHub-hosted windows-2022 only ships
+      # with 3.31.6, so install CMake 4.0 via lukka/get-cmake and prepend it to PATH.
+      - name: Setup CMake 4.0
+        uses: lukka/get-cmake@latest
+        with:
+          cmake-version: '4.0.x'
+
       - name: Configure CMake (Ninja)
         run: >
           cmake -S . -B build

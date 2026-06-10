@@ -587,9 +587,16 @@ if(FCEUX11_RUST_ENABLED)
 endif()
 
 target_link_libraries( ${APP_NAME}
-   ${ASAN_LDFLAGS}  ${GPROF_LDFLAGS}
    fceux11_drivers_qt
 )
+
+# v0.3.6.5: link-time sanitizer flags. Use target_link_options (not
+# target_link_libraries with raw flag variables) — the latter triggers
+# a Ninja MSVC-generator bug where leading-`/` flags get put in the
+# build input list instead of the link rule's FLAGS.
+if(ASAN_LDFLAGS OR GPROF_LDFLAGS)
+    target_link_options(${APP_NAME} PRIVATE ${ASAN_LDFLAGS} ${GPROF_LDFLAGS})
+endif()
 
 if (WIN32)
 	#   target_link_libraries( ${APP_NAME} wsock32 ws2_32 )
