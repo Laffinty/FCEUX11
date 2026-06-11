@@ -76,6 +76,18 @@ if(FCEUX11_BUILD_TESTS)
              COMMAND fceux11_expected_api_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
+    # v0.3.8 — FCEU_ENUM_CLASS_BITFLAGS macro tests.
+    # Header-only / pure-C++ test: no engine link, no NES core init.
+    # Uses a standalone add_executable rather than
+    # fceux11_add_test_executable to skip the heavy engine link.
+    add_executable(fceux11_enum_class_bitflags_test
+        enum_class_bitflags_test.cpp
+    )
+    target_include_directories(fceux11_enum_class_bitflags_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/src)
+    add_test(NAME enum_class_bitflags_test
+             COMMAND fceux11_enum_class_bitflags_test)
+
     # -------------------------------------------------------------------------
     # v0.3.6.5 — ASan runtime PATH injection
     # MSVC ASan-instrumented binaries dynamically import
@@ -104,6 +116,7 @@ if(FCEUX11_BUILD_TESTS)
         set_tests_properties(
             smoke_test mapper_load_test mapper_reset_test
             rom_regression_test expected_api_test
+            enum_class_bitflags_test
             PROPERTIES ENVIRONMENT_MODIFICATION
                 "PATH=path_list_prepend:${_FCEUX11_MSVC_BIN_NATIVE};PATH=path_list_prepend:${_FCEUX11_VCPKG_REL_BIN_NATIVE};PATH=path_list_prepend:${_FCEUX11_VCPKG_DBG_BIN_NATIVE}"
         )

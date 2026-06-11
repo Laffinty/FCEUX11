@@ -209,9 +209,11 @@ int main(int argc, char** argv)
     }
 
     // Set up dummy input to prevent null driver dereference in FCEU_UpdateInput
-    FCEUI_SetInput(0, SI_NONE, nullptr, 0);
-    FCEUI_SetInput(1, SI_NONE, nullptr, 0);
-    FCEUI_SetInputFC(SIFC_NONE, nullptr, 0);
+    // v0.3.8: SI_*/SIFC_* are `inline constexpr int` aliases (back-compat);
+    // FCEUI_SetInput[FC] takes typed ESI/ESIFC (= fceu11::InputDevice[FC]).
+    FCEUI_SetInput(0, static_cast<ESI>(SI_NONE), nullptr, 0);
+    FCEUI_SetInput(1, static_cast<ESI>(SI_NONE), nullptr, 0);
+    FCEUI_SetInputFC(static_cast<ESIFC>(SIFC_NONE), nullptr, 0);
     FCEUI_SetInputFourscore(false);
 
     std::vector<std::vector<uint32>> collected_hashes;

@@ -5,6 +5,152 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.8] - 2026-06-12
+
+C-track continuation: scoped-enumeration modernisation per plan v3 §5 v0.3.8.
+Five categories of pre-v0.3.x C-style typing are replaced by `enum class`
+under the `fceu11::` namespace; all legacy spellings (`ESI`, `SI_*`, `ESIFC`,
+`SIFC_*`, `fceuAllocType`, `FCEU_ALLOC_TYPE_*`, `FCEUIOD_*`) are preserved
+as global `using` / `inline constexpr` aliases so the ~200 pre-existing call
+sites — including the Qt config-file `"SI_GAMEPAD"` string round-trip and
+the `switch(int_value) { case SI_*: }` patterns — keep compiling unchanged.
+A new `FCEU_ENUM_CLASS_BITFLAGS(E)` macro provides bitwise operators for
+future scoped flag enums; `fceu11::CpuFlag` is shipped as the macro's
+correctness witness (the live `_P|=Z_FLAG` hot path in `src/x6502.cpp`
+remains on the existing `#define N_FLAG..C_FLAG` masks per plan §5 v0.3.8's
+PPU/CPU bitflag exclusion).
+
+### Deviations from the plan v3 §5 v0.3.8 literal text
+
+- **Underlying type `: int8_t`, not `: u8`**. `ESI::Unset` / `ESIFC::Unset`
+  remain at sentinel value `-1` (used by ROM detection to mean "unknown
+  desired input"). Plan §1.3 iron-rule 1 (byte-level savestate consistency)
+  takes precedence over the `: u8` literal in §5; `int8_t` preserves the
+  sentinel while still being a 1-byte ABI.
+- **`fceuAllocType` is the actual symbol name** (plan calls it
+  `FCEU_ALLOC_TYPE` — written before the v0.3.7 split). Rewritten as
+  `fceu11::AllocKind`.
+- **`OldFceuApi = fceu11::v0_2_compat` shim deferred to v0.3.10**. Per
+  plan §6.1 phase-1 ("only NEW symbols enter `fceu11::`; OLD symbols stay
+  global"), v0.3.8 has no payload for the `v0_2_compat` sub-namespace —
+  every legacy alias is already in place at file scope (`git.h`,
+  `scoped_ptr.h`, `driver.h`). The sub-namespace lands when the
+  `FCEUI_*` mass-rename starts in v0.3.10.
+- **Mapper hook breadth: 35 files / 42 sites**, not the plan's "175"
+  (which predated the v0.3.4 dead-code cleanup).
+
+### Added
+
+- **`src/fceu11_core_types.h`** (28 lines, new): `namespace fceu11 { using
+  MapIRQHook = void(*)(int); }`. Strongly types the `extern void
+  (*MapIRQHook)(int a)` global without changing its linkage. The global
+  symbol `::MapIRQHook` keeps its pre-v0.3.x C-linkage contract used by
+  35 mapper `.cpp` files in `src/boards/`; only the extern declaration in
+  `src/x6502.h` is reformulated through the typedef. A `static_assert`
+  in `src/x6502.cpp` enforces that the definition and the extern
+  declaration agree at compile time.
+- **`src/utils/enum_class_bitflags.h`** (108 lines, new):
+  `FCEU_ENUM_CLASS_BITFLAGS(E)` macro emitting `operator|/&/^/~`,
+  `operator|=/&=/^=`, plus `has(E,E)` / `set(E&,E)` / `clear(E&,E)` free
+  functions for any scoped enumeration. SFINAE-restricted to
+  `enum class` via `std::is_enum_v` + `!std::is_convertible_v<E,int>`
+  static_asserts (plain `enum` types are rejected with a clear
+  diagnostic). Ships with `fceu11::CpuFlag` (`enum class : uint8_t`
+  with `N/V/U/B/D/I/Z/C` mirroring the 6502 P-register layout) as the
+  macro's correctness witness — `CpuFlag` does NOT participate in
+  `src/x6502.cpp`'s live `_P|=Z_FLAG` dispatch.
+- **`tests/enum_class_bitflags_test.cpp`** (115 lines, new): 9 unit
+  tests covering `operator|/&/^/~`, compound-assignment forms, `has` /
+  `set` / `clear`, and underlying-type invariants. Header-only test —
+  no NES core link, runs in milliseconds. Registered in
+  `tests/CMakeLists.txt` as `fceux11_enum_class_bitflags_test`.
+
+### Changed
+
+- **`src/git.h`** (179 → 246 lines): `enum ESI { SI_UNSET = -1, … }` and
+  `enum ESIFC { SIFC_UNSET = -1, … }` are now
+  `namespace fceu11 { enum class InputDevice : int8_t { Unset = -1, … };
+  enum class InputDeviceFC : int8_t { … }; }`. Global aliases provide:
+  `using ESI = fceu11::InputDevice;`, `using ESIFC = fceu11::InputDeviceFC;`,
+  and `inline constexpr int SI_*` / `SIFC_*` (int-typed to match the
+  pre-v0.3.8 storage convention — `static int CurInputType[3] = {SI_GAMEPAD,
+  …};` and `switch(int_value) { case SI_*: }` blocks compile verbatim).
+  Type safety lives at the API boundary: `FCEUI_SetInput(int, ESI, …)` and
+  `FCEUGI::input[2]` / `inputfc` keep typed signatures. `ESI_Name` /
+  `ESIFC_Name` index helpers replace implicit `names[esi]` with explicit
+  `static_cast<int>(esi)`.
+- **`src/utils/scoped_ptr.h`**: `enum fceuAllocType { … }` rewritten as
+  `namespace fceu11 { enum class AllocKind : uint8_t { New, NewArray,
+  Malloc }; }` + legacy `using fceuAllocType = fceu11::AllocKind` alias
+  and three `inline constexpr fceuAllocType FCEU_ALLOC_TYPE_*` constants.
+  Zero in-tree usage — `fceuAllocType` was already a phantom symbol kept
+  for out-of-tree ABI per v0.3.6's RAII migration; this just modernises
+  the storage form without functional change.
+- **`src/driver.h`**: the 13 `#define FCEUIOD_*` macros are rewritten as
+  `namespace fceu11 { enum class IoDir : uint8_t { Roms = 0, Nv, States,
+  FdsRom, Snaps, Cheats, Movies, MemW, BBot, Macro, Input, Lua, Avi,
+  Count = 13 }; }`. The legacy `FCEUIOD_*` names remain as
+  `inline constexpr int` (not `IoDir`-typed) so the 50+ array-index
+  sites in `src/file.cpp` (e.g. `odirs[FCEUIOD_STATES]`) require zero
+  per-site `static_cast<size_t>` decoration.
+- **`src/x6502.h`**: `extern void (*MapIRQHook)(int a);` →
+  `extern fceu11::MapIRQHook MapIRQHook;` (via the new
+  `fceu11_core_types.h` include). The `#define N_FLAG..C_FLAG` block
+  (P-register bit masks, ~600 in-tree usage sites in `x6502.cpp` macros)
+  is intentionally left unchanged — same rationale as plan §5 v0.3.8's
+  PPU[0..2] exclusion.
+- **`src/x6502.cpp`**: `static_assert` added below the
+  `void (*MapIRQHook)(int a);` definition to guard against future type
+  drift between the definition and the extern declaration.
+- **`src/input.h`**: `JOYPORT(int _w)` constructor's `type(SI_UNSET)`
+  initializer → `type(static_cast<ESI>(SI_UNSET))` (legacy `SI_*` are
+  now int aliases; `ESI type` field needs the enum-class form).
+
+### Adjusted (back-compat casts at int↔ESI boundaries)
+
+- **`src/fceu.cpp`, `src/nsf.cpp`, `src/unif.cpp`, `src/vsuni.cpp`**:
+  `GameInfo->input[X] = SI_*` and `GameInfo->inputfc = SIFC_*` assignments
+  gain `static_cast<ESI>` / `static_cast<ESIFC>` because `FCEUGI::input[]`
+  / `inputfc` is the typed form and `SI_*` / `SIFC_*` are int aliases.
+- **`src/drivers/Qt/input.cpp`**: 3 sites for `gi->input[] >= 0` /
+  `gi->inputfc >= 0` plus 3 paired `CurInputType[X] = gi->input[X]`
+  assignments now wrap with `static_cast<int>` (enum class doesn't
+  implicitly compare to or convert to int).
+- **`src/input.cpp`**: `switch(joyports[port].type)` and
+  `switch(portFC.type)` operands wrap with `static_cast<int>` because
+  the case labels are int aliases.
+- **`src/drivers/Qt/InputConf.cpp`**: 17 `QComboBox::addItem(text, SI_*)`
+  / `addItem(text, SIFC_*)` calls add `(int)` casts. Qt 6's `QVariant`
+  does not implicitly accept `enum class` values; the user-data int
+  contract is preserved.
+- **`src/movie.cpp`**: 3 `currMovieData.ports[X] = .type` assignments
+  cast to int (movie struct stores port type as `int[3]`).
+- **`src/tests/rom_regression_test.cpp`, `tests/expected_api_test.cpp`,
+  `tests/benchmark/{apu_mix,ppu_render,x6502_exec}_bench.cpp`**: 15
+  `FCEUI_SetInput(N, SI_NONE, …)` / `FCEUI_SetInputFC(SIFC_NONE, …)`
+  calls cast to `ESI` / `ESIFC` because the API signature is typed.
+
+### Notes
+
+- **Byte-level savestate consistency**: `FCEUGI` struct shrinks by ~5
+  bytes (`ESI input[2]` and `ESIFC inputfc` go from `int` to `int8_t`),
+  but `FCEUGI` is never serialized into savestate or movie files —
+  verified by absence of any `SFORMAT` mapping that references these
+  fields. The 5 ROM regression fixtures' SHA-256 hashes are expected
+  to remain identical to the v0.3.0 baseline.
+- **FFI / Rust ABI**: zero impact. The Rust `fceux11-formats` crate
+  exposes input-device IDs as `int32_t` out-params (`fceu11_rust_ines_lookup_input_crc`
+  and `_nes20`); the C++ receiver in `src/ines.cpp:151-166` already uses
+  `static_cast<ESI>(int32_t)` at the boundary, and the cast continues
+  to work after the enum-class change.
+- **Mapper sound callbacks named `*_ESI`** (`Mapper5_ESI`, `Mapper19_ESI`,
+  `VRC6_ESI`, `VRC7_ESI`, `Mapper69_ESI`, `FDS_ESI`) are local function
+  identifiers, NOT references to the `ESI` type — no migration needed.
+- **Migration path**: external code may add
+  `#define FCEUX11_NO_DEPRECATION_WARNINGS` before including project
+  headers to suppress any deprecation diagnostics; the same gate as the
+  v0.3.6 `fceuScopedPtr` deprecation, available until v0.4.0.
+
 ## [0.3.7] - 2026-06-11
 
 C-track start: `types.h` responsibility split per plan v3 §5 v0.3.7. The

@@ -204,12 +204,13 @@ static int CTRL(FCEUFILE *fp) {
 		better than nothing...maybe.
 		*/
 
+		// v0.3.8: GameInfo->input[] is ESI; SI_* are int aliases — cast.
 		if (t & 1)
-			GameInfo->input[0] = GameInfo->input[1] = SI_GAMEPAD;
+			GameInfo->input[0] = GameInfo->input[1] = static_cast<ESI>(SI_GAMEPAD);
 		else
-			GameInfo->input[0] = GameInfo->input[1] = SI_NONE;
+			GameInfo->input[0] = GameInfo->input[1] = static_cast<ESI>(SI_NONE);
 		if (t & 2)
-			GameInfo->input[1] = SI_ZAPPER;
+			GameInfo->input[1] = static_cast<ESI>(SI_ZAPPER);
 	} else {
 		FCEU_printf(" Incorrect Control Chunk Size (%d). Data is:", uchead.info);
 		for (i = 0; i < uchead.info; i++) {
@@ -217,7 +218,7 @@ static int CTRL(FCEUFILE *fp) {
 			FCEU_printf(" %02x", t);
 		}
 		FCEU_printf("\n");
-		GameInfo->input[0] = GameInfo->input[1] = SI_GAMEPAD;
+		GameInfo->input[0] = GameInfo->input[1] = static_cast<ESI>(SI_GAMEPAD);
 	}
 	return(1);
 }

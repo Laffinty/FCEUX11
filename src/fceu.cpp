@@ -486,8 +486,10 @@ FCEUGI *FCEUI_LoadGameVirtual(const char *name, int OverwriteVidMode, bool silen
 	GameInfo->name = 0;
 	GameInfo->type = GIT_CART;
 	GameInfo->vidsys = GIV_USER;
-	GameInfo->input[0] = GameInfo->input[1] = SI_UNSET;
-	GameInfo->inputfc = SIFC_UNSET;
+	// v0.3.8: GameInfo->input[] is ESI (enum class); SI_*/SIFC_* are
+	// `inline constexpr int` legacy aliases — cast at the boundary.
+	GameInfo->input[0] = GameInfo->input[1] = static_cast<ESI>(SI_UNSET);
+	GameInfo->inputfc = static_cast<ESIFC>(SIFC_UNSET);
 	GameInfo->cspecial = SIS_NONE;
 
 	//try to load each different format

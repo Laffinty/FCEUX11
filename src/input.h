@@ -75,7 +75,9 @@ struct INPUTCFC
 extern struct JOYPORT
 {
 	JOYPORT(int _w)
-		: w(_w), attrib(0), type(SI_UNSET), ptr(0), driver(0)
+		// v0.3.8: SI_UNSET is now `inline constexpr int` — ESI member
+		// needs explicit conversion. See git.h v0.3.8 comments.
+		: w(_w), attrib(0), type(static_cast<ESI>(SI_UNSET)), ptr(0), driver(0)
 	{}
 
 	int w;

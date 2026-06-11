@@ -874,9 +874,11 @@ void FCEUMOV_CreateCleanMovie()
 	currMovieData.guid.newGuid();
 	currMovieData.fourscore = FCEUI_GetInputFourscore();
 	currMovieData.microphone = FCEUI_GetInputMicrophone();
-	currMovieData.ports[0] = joyports[0].type;
-	currMovieData.ports[1] = joyports[1].type;
-	currMovieData.ports[2] = portFC.type;
+	// v0.3.8: currMovieData.ports[] is `int[3]`; .type is the typed
+	// fceu11::InputDevice / InputDeviceFC form — cast to int.
+	currMovieData.ports[0] = static_cast<int>(joyports[0].type);
+	currMovieData.ports[1] = static_cast<int>(joyports[1].type);
+	currMovieData.ports[2] = static_cast<int>(portFC.type);
 	currMovieData.fds = isFDS;
 	currMovieData.PPUflag = (newppu != 0);
 	currMovieData.RAMInitOption = RAMInitOption;

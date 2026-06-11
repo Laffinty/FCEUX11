@@ -21,6 +21,7 @@
 #ifndef _X6502H
 
 #include "x6502struct.h"
+#include "fceu11_core_types.h"
 
 extern X6502 X;
 
@@ -62,7 +63,11 @@ extern int scanline;
 #define Z_FLAG  0x02
 #define C_FLAG  0x01
 
-extern void (*MapIRQHook)(int a);
+// v0.3.8: declared via fceu11::MapIRQHook typedef for compile-time type
+// identity with the definition in x6502.cpp. Symbol stays at global
+// namespace to preserve linkage with 35 mapper .cpp files in src/boards/
+// that assign to it (see fceu11_core_types.h for full rationale).
+extern fceu11::MapIRQHook MapIRQHook;
 
 #define NTSC_CPU (dendy ? 1773447.467 : 1789772.7272727272727272)
 #define PAL_CPU  1662607.125

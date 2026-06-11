@@ -478,7 +478,11 @@ void InputScanlineHook(uint8 *bg, uint8 *spr, uint32 linets, int final)
 //binds JPorts[pad] to the driver specified in JPType[pad]
 static void SetInputStuff(int port)
 {
-	switch(joyports[port].type)
+	// v0.3.8: switch operand must be int because case labels (SI_*)
+	// are now `inline constexpr int` (matches int-storage usage in
+	// drivers/Qt/input.cpp:63-64 etc.). joyports[port].type is the
+	// typed fceu11::InputDevice form; cast to int for the switch.
+	switch(static_cast<int>(joyports[port].type))
 	{
 	case SI_GAMEPAD:
 		if (GameInfo)
@@ -530,7 +534,8 @@ static void SetInputStuff(int port)
 
 static void SetInputStuffFC()
 {
-	switch(portFC.type)
+	// v0.3.8: cast ESIFC to int — see SetInputStuff comment above.
+	switch(static_cast<int>(portFC.type))
 	{
 	case SIFC_NONE:
 	case SIFC_UNSET:

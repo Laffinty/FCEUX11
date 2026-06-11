@@ -212,7 +212,8 @@ int NSFLoad(const char *name, FCEUFILE *fp)
 	NSFMaxBank--;
 
 	GameInfo->type=GIT_NSF;
-	GameInfo->input[0]=GameInfo->input[1]=SI_GAMEPAD;
+	// v0.3.8: GameInfo->input[] is ESI; SI_GAMEPAD is int — cast.
+	GameInfo->input[0]=GameInfo->input[1]=static_cast<ESI>(SI_GAMEPAD);
 	GameInfo->cspecial=SIS_NSF;
 
 	if(!fceux11_rust_nsf_patch_nsfrom(NSFROM, sizeof(NSFROM), InitAddr, PlayAddr))

@@ -13,9 +13,9 @@ static bool g_core_initialized = false;
 
 static void ensure_core() {
     if (!nes_shm) nes_shm = open_nes_shm();
-    FCEUI_SetInput(0, SI_NONE, nullptr, 0);
-    FCEUI_SetInput(1, SI_NONE, nullptr, 0);
-    FCEUI_SetInputFC(SIFC_NONE, nullptr, 0);
+    FCEUI_SetInput(0, static_cast<ESI>(SI_NONE), nullptr, 0);
+    FCEUI_SetInput(1, static_cast<ESI>(SI_NONE), nullptr, 0);
+    FCEUI_SetInputFC(static_cast<ESIFC>(SIFC_NONE), nullptr, 0);
     FCEUI_SetInputFourscore(false);
     g_core_initialized = true;
 }

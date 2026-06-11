@@ -27,9 +27,9 @@ static double benchmark_render_frames(int frames)
     if (!nes_shm) {
         nes_shm = open_nes_shm();
     }
-    FCEUI_SetInput(0, SI_NONE, nullptr, 0);
-    FCEUI_SetInput(1, SI_NONE, nullptr, 0);
-    FCEUI_SetInputFC(SIFC_NONE, nullptr, 0);
+    FCEUI_SetInput(0, static_cast<ESI>(SI_NONE), nullptr, 0);
+    FCEUI_SetInput(1, static_cast<ESI>(SI_NONE), nullptr, 0);
+    FCEUI_SetInputFC(static_cast<ESIFC>(SIFC_NONE), nullptr, 0);
     FCEUI_SetInputFourscore(false);
 
     if (!FCEUI_LoadGame(ROM_PATH, 1, true)) {

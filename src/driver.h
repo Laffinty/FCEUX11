@@ -216,20 +216,51 @@ void FCEUI_CheatSearchShowExcluded(void);
 void FCEUI_CheatSearchSetCurrentAsOriginal(void);
 
 //.rom
-#define FCEUIOD_ROMS    0	//Roms
-#define FCEUIOD_NV      1	//NV = nonvolatile. save data.
-#define FCEUIOD_STATES  2	//savestates
-#define FCEUIOD_FDSROM  3	//disksys.rom
-#define FCEUIOD_SNAPS   4	//screenshots
-#define FCEUIOD_CHEATS  5	//cheats
-#define FCEUIOD_MOVIES  6	//.fm2 files
-#define FCEUIOD_MEMW    7	//memory watch fiels
-#define FCEUIOD_BBOT    8	//basicbot, obsolete
-#define FCEUIOD_MACRO   9	//macro files - old TASEdit v0.1 paradigm, not implemented, probably obsolete
-#define FCEUIOD_INPUT   10	//input presets
-#define FCEUIOD_LUA     11	//lua scripts
-#define FCEUIOD_AVI		12	//default file for avi output
-#define FCEUIOD__COUNT  13	//base directory override?
+// v0.3.8: directory-override tags. Per plan v3 §5 v0.3.8 task 3,
+// FCEUIOD_* are now fceu11::IoDir enumerators (`enum class : uint8_t`).
+// The legacy global names (FCEUIOD_ROMS..FCEUIOD_AVI, FCEUIOD__COUNT)
+// are preserved as `constexpr int` aliases so the 50+ array-index sites
+// in src/file.cpp (e.g. `odirs[FCEUIOD_STATES]`) keep working without
+// per-site `static_cast<size_t>(...)` decoration — IoDir doesn't
+// implicitly convert to size_t. Removal of the int aliases is planned
+// for v0.4.0; new code should use fceu11::IoDir directly together with
+// an explicit cast at array boundaries.
+namespace fceu11 {
+    enum class IoDir : uint8_t
+    {
+        Roms    = 0,   // ROM files
+        Nv      = 1,   // non-volatile save data
+        States  = 2,   // savestates
+        FdsRom  = 3,   // disksys.rom (FDS BIOS)
+        Snaps   = 4,   // screenshots
+        Cheats  = 5,   // cheats
+        Movies  = 6,   // .fm2 files
+        MemW    = 7,   // memory watch files
+        BBot    = 8,   // basicbot (obsolete)
+        Macro   = 9,   // old TASEdit v0.1 macro files (obsolete)
+        Input   = 10,  // input presets
+        Lua     = 11,  // lua scripts
+        Avi     = 12,  // default file for avi output
+        Count   = 13,  // sentinel (also == array length of odirs[])
+    };
+} // namespace fceu11
+
+// Legacy global aliases: integer-valued so they can be used as array
+// indices verbatim. Values match the original pre-v0.3.8 #define block.
+inline constexpr int FCEUIOD_ROMS    = static_cast<int>(fceu11::IoDir::Roms);
+inline constexpr int FCEUIOD_NV      = static_cast<int>(fceu11::IoDir::Nv);
+inline constexpr int FCEUIOD_STATES  = static_cast<int>(fceu11::IoDir::States);
+inline constexpr int FCEUIOD_FDSROM  = static_cast<int>(fceu11::IoDir::FdsRom);
+inline constexpr int FCEUIOD_SNAPS   = static_cast<int>(fceu11::IoDir::Snaps);
+inline constexpr int FCEUIOD_CHEATS  = static_cast<int>(fceu11::IoDir::Cheats);
+inline constexpr int FCEUIOD_MOVIES  = static_cast<int>(fceu11::IoDir::Movies);
+inline constexpr int FCEUIOD_MEMW    = static_cast<int>(fceu11::IoDir::MemW);
+inline constexpr int FCEUIOD_BBOT    = static_cast<int>(fceu11::IoDir::BBot);
+inline constexpr int FCEUIOD_MACRO   = static_cast<int>(fceu11::IoDir::Macro);
+inline constexpr int FCEUIOD_INPUT   = static_cast<int>(fceu11::IoDir::Input);
+inline constexpr int FCEUIOD_LUA     = static_cast<int>(fceu11::IoDir::Lua);
+inline constexpr int FCEUIOD_AVI     = static_cast<int>(fceu11::IoDir::Avi);
+inline constexpr int FCEUIOD__COUNT  = static_cast<int>(fceu11::IoDir::Count);
 
 void FCEUI_SetDirOverride(int which, char *n);
 

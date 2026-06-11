@@ -93,17 +93,21 @@ void ParseGIInput(FCEUGI *gi)
 	CurInputType[1] = UsrInputType[1];
 	CurInputType[2] = UsrInputType[2];
 
-	if (gi->input[0] >= 0)
+	// v0.3.8: gi->input[0..1] is fceu11::InputDevice (enum class) and
+	// gi->inputfc is fceu11::InputDeviceFC. Storage is int per the
+	// pre-v0.3.8 contract — cast explicitly. Sentinel test is "any
+	// non-negative value means valid"; ESI::Unset = -1.
+	if (static_cast<int>(gi->input[0]) >= 0)
 	{
-		CurInputType[0] = gi->input[0];
+		CurInputType[0] = static_cast<int>(gi->input[0]);
 	}
-	if (gi->input[1] >= 0)
+	if (static_cast<int>(gi->input[1]) >= 0)
 	{
-		CurInputType[1] = gi->input[1];
+		CurInputType[1] = static_cast<int>(gi->input[1]);
 	}
-	if (gi->inputfc >= 0)
+	if (static_cast<int>(gi->inputfc) >= 0)
 	{
-		CurInputType[2] = gi->inputfc;
+		CurInputType[2] = static_cast<int>(gi->inputfc);
 	}
 	cspec = gi->cspecial;
 }
@@ -1723,9 +1727,11 @@ void FCEUD_SetInput(bool fourscore, bool microphone, ESI port0, ESI port1,
 	else
 	{
 		// no Four Core emulation, check the config/movie file for controller types
-		CurInputType[0] = port0;
-		CurInputType[1] = port1;
-		CurInputType[2] = fcexp;
+		// v0.3.8: CurInputType[] is int; port0/port1/fcexp are typed
+		// fceu11::InputDevice / InputDeviceFC — cast at the boundary.
+		CurInputType[0] = static_cast<int>(port0);
+		CurInputType[1] = static_cast<int>(port1);
+		CurInputType[2] = static_cast<int>(fcexp);
 	}
 	if (CurInputType[2] != SIFC_FKB)
 	{

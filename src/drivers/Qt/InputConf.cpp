@@ -191,12 +191,17 @@ InputConfDialog_t::InputConfDialog_t(QWidget *parent)
 	for (int i = 0; i < 2; i++)
 	{
 		getInputSelection(i, &curNesInput[i], &usrNesInput[i]);
-		nesPortComboxBox[i]->addItem(tr("<None>"), SI_NONE);
-		nesPortComboxBox[i]->addItem(tr("Gamepad"), SI_GAMEPAD);
-		nesPortComboxBox[i]->addItem(tr("Zapper"), SI_ZAPPER);
-		nesPortComboxBox[i]->addItem(tr("Power Pad A"), SI_POWERPADA);
-		nesPortComboxBox[i]->addItem(tr("Power Pad B"), SI_POWERPADB);
-		nesPortComboxBox[i]->addItem(tr("Arkanoid Paddle"), SI_ARKANOID);
+		// v0.3.8: QVariant rejects enum class implicit conversion;
+		// SI_* are now `inline constexpr ESI` (= fceu11::InputDevice).
+		// Cast to int so QComboBox::addItem(text, userData) takes the
+		// numeric tag as before. itemData(j).toInt() consumers below
+		// stay unchanged.
+		nesPortComboxBox[i]->addItem(tr("<None>"), (int)SI_NONE);
+		nesPortComboxBox[i]->addItem(tr("Gamepad"), (int)SI_GAMEPAD);
+		nesPortComboxBox[i]->addItem(tr("Zapper"), (int)SI_ZAPPER);
+		nesPortComboxBox[i]->addItem(tr("Power Pad A"), (int)SI_POWERPADA);
+		nesPortComboxBox[i]->addItem(tr("Power Pad B"), (int)SI_POWERPADB);
+		nesPortComboxBox[i]->addItem(tr("Arkanoid Paddle"), (int)SI_ARKANOID);
 
 		for (int j = 0; j < nesPortComboxBox[i]->count(); j++)
 		{
@@ -212,17 +217,19 @@ InputConfDialog_t::InputConfDialog_t(QWidget *parent)
 	}
 
 	getInputSelection(2, &curNesInput[2], &usrNesInput[2]);
-	expPortComboxBox->addItem(tr("<None>"), SIFC_NONE);
-	expPortComboxBox->addItem(tr("Arkanoid Paddle"), SIFC_ARKANOID);
-	expPortComboxBox->addItem(tr("Shadow"), SIFC_SHADOW);
-	expPortComboxBox->addItem(tr("Hyper Shot Gun"), SIFC_HYPERSHOT);
-	expPortComboxBox->addItem(tr("Family Keyboard"), SIFC_FKB);
-	expPortComboxBox->addItem(tr("Mahjong"), SIFC_MAHJONG);
-	expPortComboxBox->addItem(tr("Quiz King Buzzers"), SIFC_QUIZKING);
-	expPortComboxBox->addItem(tr("Family Trainer A"), SIFC_FTRAINERA);
-	expPortComboxBox->addItem(tr("Family Trainer B"), SIFC_FTRAINERB);
-	expPortComboxBox->addItem(tr("Oeka Kids Tablet"), SIFC_OEKAKIDS);
-	expPortComboxBox->addItem(tr("Top Rider"), SIFC_TOPRIDER);
+	// v0.3.8: SIFC_* are now `inline constexpr ESIFC` (enum class) —
+	// cast to int for QVariant. See nesPortComboxBox block above.
+	expPortComboxBox->addItem(tr("<None>"), (int)SIFC_NONE);
+	expPortComboxBox->addItem(tr("Arkanoid Paddle"), (int)SIFC_ARKANOID);
+	expPortComboxBox->addItem(tr("Shadow"), (int)SIFC_SHADOW);
+	expPortComboxBox->addItem(tr("Hyper Shot Gun"), (int)SIFC_HYPERSHOT);
+	expPortComboxBox->addItem(tr("Family Keyboard"), (int)SIFC_FKB);
+	expPortComboxBox->addItem(tr("Mahjong"), (int)SIFC_MAHJONG);
+	expPortComboxBox->addItem(tr("Quiz King Buzzers"), (int)SIFC_QUIZKING);
+	expPortComboxBox->addItem(tr("Family Trainer A"), (int)SIFC_FTRAINERA);
+	expPortComboxBox->addItem(tr("Family Trainer B"), (int)SIFC_FTRAINERB);
+	expPortComboxBox->addItem(tr("Oeka Kids Tablet"), (int)SIFC_OEKAKIDS);
+	expPortComboxBox->addItem(tr("Top Rider"), (int)SIFC_TOPRIDER);
 
 	for (int j = 0; j < expPortComboxBox->count(); j++)
 	{

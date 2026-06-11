@@ -30,10 +30,21 @@
 #include "x6502abbrev.h"
 
 #include <cstring>
+#include <type_traits>
 X6502 X;
 uint32 timestamp;
 uint32 soundtimestamp;
 void (*MapIRQHook)(int a);
+
+// v0.3.8: compile-time guard that the global MapIRQHook's type still
+// matches the fceu11::MapIRQHook typedef used at the extern declaration
+// site (src/x6502.h:67). If a future refactor changes one without the
+// other, the link would succeed silently (C ABI symbols are typeless)
+// but the call sites would invoke UB. This static_assert turns that
+// into a compile error.
+static_assert(std::is_same_v<decltype(&MapIRQHook), fceu11::MapIRQHook*>,
+    "MapIRQHook type drift: definition in x6502.cpp and extern declaration "
+    "in x6502.h via fceu11::MapIRQHook must agree (v0.3.8 invariant).");
 
 #define ADDCYC(x) \
 {                 \

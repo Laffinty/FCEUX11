@@ -180,13 +180,14 @@ void FCEU_VSUniCheck(uint64 md5partial, int *MapperNo, uint8 *Mirroring) {
     }
     if ((vs->ioption & VS_OPTION_GUN) && !head.expansion) {
         tofix |= 32;
-        GameInfo->input[0] = SI_ZAPPER;
-        GameInfo->input[1] = SI_NONE;
-        GameInfo->inputfc = SIFC_NONE;
+        // v0.3.8: GameInfo->input[] is ESI; SI_*/SIFC_* are int — cast.
+        GameInfo->input[0] = static_cast<ESI>(SI_ZAPPER);
+        GameInfo->input[1] = static_cast<ESI>(SI_NONE);
+        GameInfo->inputfc = static_cast<ESIFC>(SIFC_NONE);
     }
     else if (!head.expansion) {
-        GameInfo->input[0] = GameInfo->input[1] = SI_GAMEPAD;
-        GameInfo->inputfc = SIFC_NONE;
+        GameInfo->input[0] = GameInfo->input[1] = static_cast<ESI>(SI_GAMEPAD);
+        GameInfo->inputfc = static_cast<ESIFC>(SIFC_NONE);
     }
     if ((vs->ioption & VS_OPTION_SWAPDIRAB) && !GameInfo->vs_cswitch) {
         tofix |= 64;

@@ -1,6 +1,8 @@
 #ifndef __FCEU_GIT
 #define __FCEU_GIT
 
+#include <cstdint>
+
 enum EGIT
 {
 	GIT_CART	= 0,  //Cart
@@ -47,24 +49,68 @@ enum ESIS
 	SIS_NSF			= 4,
 };
 
-//input device types for the standard joystick port
-enum ESI
-{
-	SI_UNSET		= -1,
-	SI_NONE			= 0,
-	SI_GAMEPAD		= 1,
-	SI_ZAPPER		= 2,
-	SI_POWERPADA	= 3,
-	SI_POWERPADB	= 4,
-	SI_ARKANOID		= 5,
-	SI_MOUSE		= 6,
-	SI_SNES			= 7,
-	SI_SNES_MOUSE	= 8,
-	SI_VIRTUALBOY	= 9,
-	SI_LCDCOMP_ZAPPER  = 10,
+//input device types for the standard joystick port.
+//
+// v0.3.8: per plan v3 §5 v0.3.8 task 1, the pre-v0.3.x `enum ESI {…}`
+// is now `enum class fceu11::InputDevice : int8_t`. Plan §5 specifies
+// `: u8` but the value list includes SI_UNSET = -1 (used by ROM
+// detection paths to mean "unknown desired input"), so we use int8_t
+// to preserve the sentinel. Byte-level savestate consistency (plan
+// §1.3 iron-rule 1) is unaffected because FCEUGI::input[2] / inputfc
+// are not in any SFORMAT serialization map.
+//
+// The legacy `ESI` type name and the SI_* enumerator names are
+// preserved as global `using` / `inline constexpr` aliases below per
+// plan §6.1 phase 1 ("only NEW symbols enter fceu11::; OLD symbols
+// stay global"). All 200+ in-tree call sites — switch labels,
+// strcmp("SI_GAMEPAD") round-trips in Qt config persistence, and the
+// static_cast in src/ines.cpp:153,166 — continue to compile unchanged.
+// Qt QComboBox::addItem(text, userData) call sites are the one
+// exception: QVariant rejects enum class values implicitly, so the
+// affected `addItem(..., SI_*)` lines in src/drivers/Qt/InputConf.cpp
+// and src/drivers/Qt/input.cpp gain explicit `(int)` casts.
+namespace fceu11 {
+    enum class InputDevice : int8_t
+    {
+        Unset        = -1,
+        None         = 0,
+        Gamepad      = 1,
+        Zapper       = 2,
+        PowerPadA    = 3,
+        PowerPadB    = 4,
+        Arkanoid     = 5,
+        Mouse        = 6,
+        Snes         = 7,
+        SnesMouse    = 8,
+        VirtualBoy   = 9,
+        LcdCompZapper = 10,
+        Count        = LcdCompZapper, // sentinel: highest valid value
+    };
+} // namespace fceu11
 
-	SI_COUNT = SI_LCDCOMP_ZAPPER
-};
+using ESI = fceu11::InputDevice;
+// Legacy SI_* constants — `inline constexpr int` (not ESI-typed). The
+// pre-v0.3.8 codebase routinely stores ESI values in `int` arrays
+// (e.g. src/drivers/Qt/input.cpp:63-64 `static int UsrInputType[…]` /
+// `CurInputType[…]`) and uses SI_* as case labels in `switch(int)` blocks.
+// Keeping the legacy constants as int — same pattern as FCEUIOD_*
+// (src/driver.h) — preserves the existing 100+ in-tree call sites
+// without a per-site cast cascade. Type safety lives at the API
+// boundary (FCEUI_SetInput / FCEUGI::input[]), which uses the
+// ESI / fceu11::InputDevice typed form.
+inline constexpr int SI_UNSET         = static_cast<int>(ESI::Unset);
+inline constexpr int SI_NONE          = static_cast<int>(ESI::None);
+inline constexpr int SI_GAMEPAD       = static_cast<int>(ESI::Gamepad);
+inline constexpr int SI_ZAPPER        = static_cast<int>(ESI::Zapper);
+inline constexpr int SI_POWERPADA     = static_cast<int>(ESI::PowerPadA);
+inline constexpr int SI_POWERPADB     = static_cast<int>(ESI::PowerPadB);
+inline constexpr int SI_ARKANOID      = static_cast<int>(ESI::Arkanoid);
+inline constexpr int SI_MOUSE         = static_cast<int>(ESI::Mouse);
+inline constexpr int SI_SNES          = static_cast<int>(ESI::Snes);
+inline constexpr int SI_SNES_MOUSE    = static_cast<int>(ESI::SnesMouse);
+inline constexpr int SI_VIRTUALBOY    = static_cast<int>(ESI::VirtualBoy);
+inline constexpr int SI_LCDCOMP_ZAPPER = static_cast<int>(ESI::LcdCompZapper);
+inline constexpr int SI_COUNT         = static_cast<int>(ESI::Count);
 
 
 
@@ -85,36 +131,63 @@ inline const char* ESI_Name(ESI esi)
 		"LCD Zapper (Advance)"
 	};
 
-	if(esi >= SI_NONE && esi <= SI_COUNT)
-		return names[esi];
+	// v0.3.8: enum class doesn't implicitly convert to size_t, so cast
+	// explicitly. The >= 0 guard rejects ESI::Unset (= -1) without UB.
+	const int idx = static_cast<int>(esi);
+	if (idx >= SI_NONE && idx <= SI_COUNT)
+		return names[idx];
 	else return "<invalid ESI>";
 }
 
 
-//input device types for the expansion port
-enum ESIFC
-{
-	SIFC_UNSET		= -1,
-	SIFC_NONE		= 0,
-	SIFC_ARKANOID	= 1,
-	SIFC_SHADOW		= 2,
-	SIFC_4PLAYER	= 3,
-	SIFC_FKB		= 4,
-	SIFC_SUBORKB	= 5,
-	SIFC_PEC586KB	= 6,
-	SIFC_HYPERSHOT	= 7,
-	SIFC_MAHJONG	= 8,
-	SIFC_QUIZKING	= 9,
-	SIFC_FTRAINERA	= 10,
-	SIFC_FTRAINERB	= 11,
-	SIFC_OEKAKIDS	= 12,
-	SIFC_BWORLD		= 13,
-	SIFC_TOPRIDER	= 14,
-	SIFC_FAMINETSYS = 15,
-	SIFC_HORI4PLAYER = 16,
+//input device types for the expansion port.
+// v0.3.8: same treatment as InputDevice — see comments above.
+namespace fceu11 {
+    enum class InputDeviceFC : int8_t
+    {
+        Unset            = -1,
+        None             = 0,
+        Arkanoid         = 1,
+        Shadow           = 2,
+        FourPlayer       = 3,
+        Fkb              = 4,
+        SuborKb          = 5,
+        Pec586Kb         = 6,
+        Hypershot        = 7,
+        Mahjong          = 8,
+        QuizKing         = 9,
+        FTrainerA        = 10,
+        FTrainerB        = 11,
+        OekaKids         = 12,
+        BWorld           = 13,
+        TopRider         = 14,
+        FamicomNetSystem = 15,
+        Hori4Player      = 16,
+        Count            = Hori4Player, // sentinel: highest valid value
+    };
+} // namespace fceu11
 
-	SIFC_COUNT = SIFC_HORI4PLAYER
-};
+using ESIFC = fceu11::InputDeviceFC;
+// Legacy SIFC_* constants — `inline constexpr int` (see SI_* comment).
+inline constexpr int SIFC_UNSET       = static_cast<int>(ESIFC::Unset);
+inline constexpr int SIFC_NONE        = static_cast<int>(ESIFC::None);
+inline constexpr int SIFC_ARKANOID    = static_cast<int>(ESIFC::Arkanoid);
+inline constexpr int SIFC_SHADOW      = static_cast<int>(ESIFC::Shadow);
+inline constexpr int SIFC_4PLAYER     = static_cast<int>(ESIFC::FourPlayer);
+inline constexpr int SIFC_FKB         = static_cast<int>(ESIFC::Fkb);
+inline constexpr int SIFC_SUBORKB     = static_cast<int>(ESIFC::SuborKb);
+inline constexpr int SIFC_PEC586KB    = static_cast<int>(ESIFC::Pec586Kb);
+inline constexpr int SIFC_HYPERSHOT   = static_cast<int>(ESIFC::Hypershot);
+inline constexpr int SIFC_MAHJONG     = static_cast<int>(ESIFC::Mahjong);
+inline constexpr int SIFC_QUIZKING    = static_cast<int>(ESIFC::QuizKing);
+inline constexpr int SIFC_FTRAINERA   = static_cast<int>(ESIFC::FTrainerA);
+inline constexpr int SIFC_FTRAINERB   = static_cast<int>(ESIFC::FTrainerB);
+inline constexpr int SIFC_OEKAKIDS    = static_cast<int>(ESIFC::OekaKids);
+inline constexpr int SIFC_BWORLD      = static_cast<int>(ESIFC::BWorld);
+inline constexpr int SIFC_TOPRIDER    = static_cast<int>(ESIFC::TopRider);
+inline constexpr int SIFC_FAMINETSYS  = static_cast<int>(ESIFC::FamicomNetSystem);
+inline constexpr int SIFC_HORI4PLAYER = static_cast<int>(ESIFC::Hori4Player);
+inline constexpr int SIFC_COUNT       = static_cast<int>(ESIFC::Count);
 
 
 inline const char* ESIFC_Name(ESIFC esifc)
@@ -140,8 +213,10 @@ inline const char* ESIFC_Name(ESIFC esifc)
 		"Hori 4-Player Adapter"
 	};
 
-	if(esifc >= SIFC_NONE && esifc <= SIFC_COUNT)
-		return names[esifc];
+	// v0.3.8: enum class doesn't implicitly convert to size_t — see ESI_Name.
+	const int idx = static_cast<int>(esifc);
+	if (idx >= SIFC_NONE && idx <= SIFC_COUNT)
+		return names[idx];
 	else return "<invalid ESIFC>";
 }
 
