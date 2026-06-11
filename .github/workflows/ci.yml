@@ -3,12 +3,20 @@
 # (lint stage removed 2026-06-11: project is MSVC-only, no clang toolchain;
 #  cppcheck-check.sh remains available locally under tools/lint/ but is not
 #  wired into CI.)
+#
+# v0.3.7: Replaced microsoft/setup-msbuild@v2 with ilammy/msvc-dev-cmd@v1.
+# setup-msbuild only locates MSBuild; it does not load vcvars64.bat, so
+# cl.exe is not on PATH for the downstream cmake configure step on newer
+# windows-2022 runner images (Image Version 20260607.193.1 onward). The
+# msvc-dev-cmd action runs vcvars64.bat and exports PATH/INCLUDE/LIB so
+# that `cmake -DCMAKE_CXX_COMPILER=cl ...` resolves cl. This is the only
+# difference from the v0.3.6.6 workflow.
 
 name: CI
 
 on:
   push:
-    branches: [main, topic/v0.3.x-*]
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -35,15 +43,24 @@ jobs:
           restore-keys: |
             vcpkg-
 
-      - name: Setup MSVC
-        uses: microsoft/setup-msbuild@v2
+      # v0.3.7: Load vcvars64.bat via msvc-dev-cmd so cl.exe is on PATH
+      # for the cmake configure step. The previous microsoft/setup-msbuild@v2
+      # only located MSBuild, not the C/C++ compiler toolchain; on
+      # windows-2022 Image 20260607.193.1 this caused the configure step to
+      # fail with "CMAKE_CXX_COMPILER: cl ... not found in the PATH".
+      - name: Setup MSVC dev cmd
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
 
       # v0.3.2: Project requires CMake 4.0+; GitHub-hosted windows-2022 only ships
       # with 3.31.6, so install CMake 4.0 via lukka/get-cmake and prepend it to PATH.
+      # v0.3.7: input name fixed to `cmakeVersion` (was `cmake-version`,
+      # which the action logs as an unrecognised input warning).
       - name: Setup CMake 4.0
         uses: lukka/get-cmake@latest
         with:
-          cmake-version: '4.0.x'
+          cmakeVersion: '4.0.x'
 
       - name: Configure CMake (Ninja)
         run: >
