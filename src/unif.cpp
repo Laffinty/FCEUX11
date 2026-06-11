@@ -154,8 +154,11 @@ static int NAME(FCEUFILE *fp) {
 	FCEU_printf("%s\n", namebuf);
 
 	if (!GameInfo->name) {
-		GameInfo->name = (uint8*)malloc(strlen(namebuf) + 1); //mbg merge 7/17/06 added cast
-		FCEU_strlcpy((char*)GameInfo->name, sizeof((char*)GameInfo->name), namebuf); //mbg merge 7/17/06 added cast
+		// v0.3.6.5-followup: same sizeof((char*)) bug class as state.cpp:766.
+		// Use the actual malloc'd buffer size, not sizeof a pointer.
+		const size_t name_len = strlen(namebuf) + 1;
+		GameInfo->name = (uint8*)malloc(name_len); //mbg merge 7/17/06 added cast
+		FCEU_strlcpy((char*)GameInfo->name, name_len, namebuf); //mbg merge 7/17/06 added cast
 	}
 	return(1);
 }

@@ -762,8 +762,14 @@ void AddExState(void *v, uint32 s, int type, const char *desc)
 
 	if(desc)
 	{
-		SFMDATA[SFEXINDEX].desc=(const char *)FCEU_malloc(strlen(desc)+1);
-		FCEU_strlcpy((char*)SFMDATA[SFEXINDEX].desc, sizeof((char*)SFMDATA[SFEXINDEX].desc), desc);
+		// v0.3.6.5-followup: capture the actual buffer size; do NOT use
+		// sizeof((char*)SFMDATA[SFEXINDEX].desc) — that is the size of a
+		// pointer (8 on x64), not the malloc'd buffer, and triggers an
+		// ASan heap-buffer-overflow for any desc shorter than 7 chars
+		// (e.g. the 4-char "CHRR"/"EXNR" tags registered during iNES_Init).
+		const size_t desc_len = strlen(desc) + 1;
+		SFMDATA[SFEXINDEX].desc = (const char *)FCEU_malloc(desc_len);
+		FCEU_strlcpy((char*)SFMDATA[SFEXINDEX].desc, desc_len, desc);
 	}
 	else
 		SFMDATA[SFEXINDEX].desc=0;

@@ -1,5 +1,8 @@
 # FCEUX11 v0.3.2 — CI Workflow
-# Stages: configure → build → lint → ctest → rom_regression → benchmark
+# Stages: configure → build → ctest → rom_regression → benchmark
+# (lint stage removed 2026-06-11: project is MSVC-only, no clang toolchain;
+#  cppcheck-check.sh remains available locally under tools/lint/ but is not
+#  wired into CI.)
 
 name: CI
 
@@ -54,11 +57,6 @@ jobs:
 
       - name: Build
         run: cmake --build build --config Release --parallel
-
-      - name: Lint (optional)
-        run: |
-          bash tools/lint/format-check.sh || true
-        shell: bash
 
       - name: CTest
         run: ctest --test-dir build --build-config Release --output-on-failure

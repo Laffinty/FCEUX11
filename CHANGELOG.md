@@ -28,8 +28,9 @@ runtime end-to-end, and rewrites the checkpoint report from real evidence.
   `CMAKE_*_LINKER_FLAGS_RELEASE` so the Release sanitizer build emits
   PDBs — without this, MSVC's bundled `llvm-symbolizer.exe` cannot
   resolve ASan stack frames and reports show only `<exe>+0xRVA`.
-  PDB output verified: `build-asan/src/fceux11.pdb` 32 MB,
-  per-test `build-asan/tests/*.pdb` 31 MB each.
+  (PDB wiring landed in v0.3.6.5; the first build that actually
+  consumes it to symbolise F-1 is part of the v0.3.6.5-followup
+  commit — see `FOLLOWUP_v0.3.6.5_F1_strncpy_overflow.md` §4.)
 - `src/CMakeLists.txt`: vcpkg `LibArchive::LibArchive`, `ZLIB::ZLIB`, and
   `OpenGL::GL` only register `IMPORTED_LOCATION` (no per-config suffix),
   causing CMake generator-time `IMPORTED_LOCATION not set for

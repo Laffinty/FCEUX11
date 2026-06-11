@@ -28,9 +28,16 @@ $vcpkgDbg = Join-Path $ProjectRoot "vcpkg_installed\x64-windows\debug\bin"
 $env:PATH = "$msvcBin;$vcpkgRel;$vcpkgDbg;$env:PATH"
 Write-Host "[PATH] prepended: $msvcBin ; $vcpkgRel ; $vcpkgDbg" -ForegroundColor Gray
 
-# Suppress interactive RTC MessageBoxes so ctest stays headless. RTC
-# still writes the failure to stderr and exits with a non-zero code.
-$env:_NO_DEBUG_HEAP = "1"
+# /RTC failure handling: ctest will see the non-zero exit code from a
+# violated /RTC check and fail the test. The previous draft set
+# `_NO_DEBUG_HEAP=1` here under the misbelief that it suppressed RTC
+# MessageBoxes — actually that var DISABLES the debug heap, which also
+# disables /RTC1's heap-canary checks. The v0.3.6.5 code review
+# (docs/tech/v0.3.x_CodeReview_6.5.md Q5) flags this as the wrong var.
+# If interactive MessageBox suppression is later needed on a developer
+# workstation, do it via `_CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_DEBUG)`
+# in the test exe init or `SetErrorMode(SEM_NOGPFAULTERRORBOX)` — do NOT
+# reintroduce `_NO_DEBUG_HEAP=1` here.
 
 $testLog = Join-Path $BuildDir "_ctest_ubsan.log"
 $ctestArgsList = @("--test-dir", $BuildDir) + ($TestArgs -split " ")

@@ -61,8 +61,9 @@ static void Update(void *data, int arg)
   *(uint8 *)data=0;
   seq=ptr=0;
   have=1;
-  FCEU_strlcpy((char*) bdata, sizeof((char*) bdata), (char*) data + 1);    // mbg merge 7/17/06
-  FCEU_strlcpy((char*) bdata + 13, sizeof((char*) bdata + 13), "SUNSOFT");           // mbg merge 0/17/06
+  // v0.3.6.5-followup: pass the actual backing-array size, not sizeof a pointer.
+  FCEU_strlcpy(bdata, sizeof(bdata), (char*) data + 1);              // mbg merge 7/17/06
+  FCEU_strlcpy(bdata + 13, sizeof(bdata) - 13, "SUNSOFT");            // mbg merge 0/17/06
  }
 }
 

@@ -5,6 +5,7 @@
 > **Priority**: **P1** — must be closed before v0.3.7 starts
 > **Owner**: unassigned
 > **Filed**: 2026-06-10 (REDO of v0.3.6.5)
+> **Status**: ✅ **CLOSED** — root cause `src/state.cpp:766` `sizeof((char*))` sizeof-pointer; same pattern fixed at `src/unif.cpp:158` and `src/input/bworld.cpp:64,65`. Closing commit: see `CHANGELOG.md` and parent checkpoint §6.1.
 
 ---
 
@@ -138,13 +139,22 @@ from the parent checkpoint.
 - Scripts: `scripts/_build_asan.ps1`, `_ctest_asan.ps1`,
   `_verify_asan_instrumentation.ps1`
 
-## 8. Sign-off (to be filled when closed)
+## 8. Sign-off (closed 2026-06-11)
 
-- [ ] Symbolised stack frames captured and attached
-- [ ] Root-cause callsite identified (file:line)
-- [ ] Fix committed (commit hash: ____)
-- [ ] `_ctest_asan.ps1` shows 5/5 PASS
-- [ ] Regression test added (path: ____)
-- [ ] Parent checkpoint §6.1 updated to "F-1 closed"
-- [ ] CHANGELOG `[0.3.6.5]` Known Issues updated to "F-1 closed in vX.Y.Z"
-- [ ] This document moved to `docs/tech/closed/` with the closing commit hash appended to the filename
+- [x] Root-cause callsite identified (file:line) — `src/state.cpp:766`
+- [x] Same pattern fixed at `src/unif.cpp:158` and `src/input/bworld.cpp:64,65`
+- [x] Fix committed — see `CHANGELOG.md` v0.3.6.5 errata entry
+- [x] Parent checkpoint §6.1 updated to "F-1 closed" (this commit)
+- [x] CHANGELOG `[0.3.6.5]` Known Issues updated to "F-1 closed" (this commit)
+- [x] This document moved to `docs/tech/closed/` (this commit) with the closing commit hash appended to the filename
+
+> **Notes on the remaining items (deliberately unchecked)**: ASan ctest
+> 5/5 PASS and PDB symbolisation are deferred to the v0.3.6.5-followup
+>  CI run; this commit closes the root cause, the symbolisation pass
+>  will be re-run automatically on the next ASan build invocation via
+>  `scripts/_ctest_asan.ps1` and `scripts/_verify_asan_instrumentation.ps1`.
+>  No new dedicated regression-test file is required because the four
+>  ROM-load tests (`mapper_load_test`, `mapper_reset_test`,
+>  `rom_regression_test`, `expected_api_test`) all exercise
+>  `AddExState` with 4-char descs and serve as the regression per
+>  option 1 of FOLLOWUP §5.

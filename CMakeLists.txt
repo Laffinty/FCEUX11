@@ -90,9 +90,12 @@ option(ENABLE_LINT "Enable static analysis targets (clang-tidy, cppcheck)" OFF)
 # functional substitute for v0.3.6.5's "catch UB before v0.3.7" goal,
 # not as clang-UBSan parity.
 #
-# LSan (LeakSanitizer) is bundled with MSVC ASan — no separate flag
-# required; ASan exit reports leaks automatically.
-option(FCEUX11_ASAN  "Enable AddressSanitizer (and LSan) for the v0.3.6.5 checkpoint" OFF)
+# LSan caveat: MSVC Windows ASan does NOT implement LeakSanitizer.
+# `ASAN_OPTIONS=detect_leaks=1` is rejected by cl's ASan runtime, so
+# leak detection is deferred to v0.4.x clang-cl CI matrix. See
+# scripts/_ctest_asan.ps1 (no `detect_leaks` in ASAN_OPTIONS) and
+# docs/tech/v0.3.x_Checkpoint_6.5.md §4.4 for the empirical proof.
+option(FCEUX11_ASAN  "Enable AddressSanitizer (ASan only — LSan is MSVC-Windows-disabled) for the v0.3.6.5 checkpoint" OFF)
 option(FCEUX11_UBSAN "Enable MSVC-native UB runtime checks (/RTC1 + /sdl); clang-style UBSan deferred to v0.4.x" OFF)
 
 if(FCEUX11_ASAN OR FCEUX11_UBSAN)
