@@ -5,6 +5,77 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.7] - 2026-06-11
+
+C-track start: `types.h` responsibility split per plan v3 §5 v0.3.7. The
+254-line pre-split header (222 lines after the v0.3.6 deprecations + the
+v0.3.6.6 `__clang__` removal) is reorganised into one thin fundamentals
+header plus three focused split headers. All 43 existing in-tree consumers
+of `#include "types.h"` keep working unchanged because the split headers
+are pulled in transitively at the bottom of `types.h`.
+
+This sub-version also introduces the first two symbols in the `fceu11::`
+namespace (`kPathSep` and `kPathSepStr`); the namespace machinery was
+prepared in v0.3.0/v0.3.6 for fceu11_format.h and fceu11_expected.{h,cpp}.
+
+### Added
+
+- **`src/utils/platform_compat.h`** (105 lines): POSIX compatibility
+  shims (MSVC `_dup`/`_stat`/`_mkdir`/`_alloca`/`_fstat`/`_vsnprintf`),
+  POSIX access-mode macros (`W_OK`/`R_OK`/`X_OK`/`F_OK`), `PATH_MAX`
+  constant, and the first two `fceu11::` namespace symbols —
+  `fceu11::kPathSep` (`char`) and `fceu11::kPathSepStr` (`const char[]`).
+  The legacy `PSS` / `PS` macros are preserved as direct string/char
+  literals (not `fceu11::` references — the C preprocessor does not
+  recognise a `const char[]` as a string literal for `"a" PSS "b"`
+  concatenation; switching the macros to `fceu11::kPathSepStr` would
+  break 12+ call sites in `src/file.cpp` and
+  `src/drivers/Qt/config.cpp`).
+- **`src/utils/scoped_ptr.h`** (46 lines): `fceuScopedPtr<T>` deprecated
+  alias for `std::unique_ptr<T>` (the v0.3.6 RAII migration kept it
+  here, gated by `FCEUX11_NO_DEPRECATION_WARNINGS`), and the
+  `fceuAllocType` enum preserved as a no-op for out-of-tree consumers.
+- **`src/utils/format.h`** (86 lines): `FCEU_CPP_HAS_STD` /
+  `FCEU_HAS_CPP_ATTRIBUTE` / `__FCEU_STRINGIZE` / `FCEU_UNUSED` /
+  `FCEU_MAYBE_UNUSED` / `__FCEU_PRINTF_FORMAT` /
+  `__FCEU_PRINTF_ATTRIBUTE` / `CTASSERT`. The `__clang__` defensive
+  branch of the printf format attribute was already removed in v0.3.6.6.
+
+### Changed
+
+- **`src/types.h`** (222 → 100 lines): now a thin fundamentals header
+  containing only (a) `<cstdint>` aliases (`uint8/16/32/64`,
+  `int8/16/32/64`), (b) `writefunc` / `readfunc` typedefs, (c) the
+  `DEBUG(X)` macro, (d) `INLINE` / `GINLINE` / `__restrict__` compiler
+  hints, (e) C++20 feature-test macros (`__cpp_lib_span` /
+  `__cpp_lib_format`), and (f) transitive includes of the three split
+  headers + `utils/endian.h`. Meets the plan v3 §5 v0.3.7 acceptance
+  target of `types.h ≤ 100 行`.
+
+### Notes
+
+- **PSS / PS migration path**: existing call sites keep using `PSS` /
+  `PS` macros unchanged. New code should use `fceu11::kPathSep` (char)
+  or `fceu11::kPathSepStr` (string). v0.3.10 (C-track API modernisation)
+  will switch the call sites to `fceu11::kPathSep(Str)` and remove the
+  `PSS` / `PS` macros.
+- **`fceu11::` namespace**: already used by `src/utils/fceu11_format.h`,
+  `src/utils/fceu11_expected.h`, `src/utils/fceu11_expected.cpp` (since
+  v0.3.3 / v0.3.6). The new `fceu11::kPathSep(Str)` symbols join these
+  in the same `fceu11` namespace — no name collisions.
+- **No source change required at any call site**: 43 `#include "types.h"`
+  consumers work unchanged. `scripts/_ctest_asan.ps1` is expected to
+  show 5/5 ctest passing on the next CI run.
+- **PSS_STYLE plumbing unchanged**: still injected by
+  `src/CMakeLists.txt:82` (`-DPSS_STYLE=2`); still defined in the
+  `_MSC_VER` branch of `src/types.h`; still read in
+  `src/utils/platform_compat.h` to select between `PSS "/"` and
+  `PSS "\\"`. v0.3.10 will replace this with
+  `std::filesystem::path::preferred_separator`.
+- **MSVC toolchain unchanged**: `CMakeLists.txt:28-34` still rejects
+  non-MSVC toolchains; `__clang__` defensive macros remain removed
+  per the v0.3.6.6 errata.
+
 ## [0.3.6.6] - 2026-06-11
 
 B-track errata: finish the cleanup of clang-toolchain residue that was started
