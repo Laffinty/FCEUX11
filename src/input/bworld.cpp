@@ -62,8 +62,10 @@ static void Update(void *data, int arg)
   seq=ptr=0;
   have=1;
   // v0.3.6.5-followup: pass the actual backing-array size, not sizeof a pointer.
-  FCEU_strlcpy(bdata, sizeof(bdata), (char*) data + 1);              // mbg merge 7/17/06
-  FCEU_strlcpy(bdata + 13, sizeof(bdata) - 13, "SUNSOFT");            // mbg merge 0/17/06
+  // The (char*) cast on bdata is load-bearing for FCEU_strlcpy's char* signature —
+  // bdata is uint8[32]. Sizeof uses the underlying array (32), not the cast pointer.
+  FCEU_strlcpy((char*) bdata, sizeof(bdata), (char*) data + 1);              // mbg merge 7/17/06
+  FCEU_strlcpy((char*) bdata + 13, sizeof(bdata) - 13, "SUNSOFT");            // mbg merge 0/17/06
  }
 }
 
