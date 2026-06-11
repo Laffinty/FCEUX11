@@ -5,6 +5,93 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.6.6] - 2026-06-11
+
+B-track errata: finish the cleanup of clang-toolchain residue that was started
+in the v0.3.6.5 errata commit, and close the 9 items (out of 12) deferred
+from the v0.3.6.5 code review that have not been touched since. Enshrines
+the two inviolable project principles: (1) MSVC-only toolchain (rejected
+toolchains: clang-cl, gcc, MinGW, MSYS2), and (2) `main` is the only
+permitted branch (the stale `release/v0.3.6.5` local branch was deleted in
+this commit).
+
+### Removed
+
+- **`CMakeLists.txt`**: deleted the `if(ENABLE_LINT)` block's clang-tidy half
+  (`find_program(CLANG_TIDY_PROG clang-tidy)` + `add_custom_target(lint-clang-tidy ...)`).
+  The project's toolchain is MSVC-only (plan §3.1); clang-tidy has no place in it.
+- **`src/drivers/Qt/fceuWrapper.cpp`**: deleted the `__clang__` branch of the
+  `__COMPILER__STRING__` ladder. `__GNUC__` and `_MSC_VER` branches stay.
+- **`src/types.h`**: deleted the `__clang__` predicate from the
+  `__FCEU_PRINTF_ATTRIBUTE` macro `#elif` chain. The `__GNUC__` /
+  `FCEU_HAS_CPP_ATTRIBUTE(format)` branches stay.
+
+### Changed
+
+- **`CMakeLists.txt`**: `option(ENABLE_LINT "Enable static analysis targets (clang-tidy, cppcheck)" OFF)` renamed to
+  `option(ENABLE_LINT_CPPCHECK "Enable cppcheck static analysis custom target (clang-tidy removed per v0.3.6.6 toolchain policy)" OFF)`.
+  The remaining `if(ENABLE_LINT_CPPCHECK)` block contains only the cppcheck
+  custom target (cppcheck is a separate, non-clang tool).
+- **`CMakeLists.txt`**: `compile_commands.json` comment changed from
+  "for clang-tidy / IDE integration" to "for IDE integration (Visual Studio
+  Code, CLion, Qt Creator, etc.)". The `set(CMAKE_EXPORT_COMPILE_COMMANDS ON)`
+  itself stays — IDEs need it.
+- **`scripts/_build_asan.ps1`, `scripts/_build_ubsan.ps1`, `.github/workflows/ci.yml`**: `-DENABLE_LINT=OFF` → `-DENABLE_LINT_CPPCHECK=OFF`.
+- **`src/CMakeLists.txt`**: the sanitizer-only LibArchive / OpenGL / ZLIB
+  imported-target link bypass has been refactored into a helper function
+  `fceux11_resolve_linked_lib` that engages in any non-Release build (Debug
+  / RelWithDebInfo) and during sanitizer builds. Fixes the underlying
+  "IMPORTED_LOCATION not set for configuration X" generator-time failure
+  mode (Q2 of the v0.3.6.5 code review).
+- **`scripts/_with_vcvars.bat`, `scripts/_probe_msvc_asan.bat`**: no longer
+  hard-code the VS 18 BuildTools vcvars path. New `scripts/_find_vcvars.bat`
+  helper provides the same 5-path fallback list as `scripts/do_build.ps1`.
+- **`scripts/_build_asan.ps1:27-32`, `scripts/_build_ubsan.ps1:23-26`**:
+  cache-wipe `[CLEAN]` message now explicitly mentions `-KeepCache` as the
+  opt-in and explains *why* the default wipe exists (stale sanitizer cache
+  may bake in the wrong `/fsanitize:` flag form).
+- **`scripts/_verify_asan_instrumentation.ps1:3-6`**: header comment now
+  says "dumpbin /imports finds at least one `__asan_*` / `__sanitizer_*` import"
+  (matching what the script body does). The earlier "dumpbin /symbols" line
+  was wrong — `__asan_*` lives in the import table, not the symbol table.
+- **`docs/v0.3.x_Construction_Plan_v3.md`**: added the v0.3.6.6 sub-section
+  to §5; normalised the 6 stale references to `.clang-format` / `.clang-tidy`
+  / `clang-tidy` / `clang-format` (v0.3.0 / v0.3.2 / §4.4 / §4.1 v0.3.2 row);
+  annotated the v0.3.2 row in §4.1 to flag the v0.3.6.6 废止.
+- **`docs/tech/v0.3.x_Checkpoint_6.5.md`**: line range `593-599` → `626-632`
+  (Q9); release date "2026-06-10 REDO" → "2026-06-11 REDO" (Q17).
+- **`CHANGELOG.md`**: the orphan `[0.3.6]` content block (RAII 化 /
+  fceuScopedPtr migration / Mapper PRG-RAM RAII / Deprecated / Testing)
+  now has the missing `## [0.3.6] - 2026-06-09` header (Q13).
+- **`CHANGELOG.md`**: F-1 entry rewritten from "F-1 (REAL, deferred)" to
+  "F-1 (REAL, CLOSED in v0.3.6.5 errata commit a606561)" with the root cause
+  (`sizeof((char*))` sizeof-pointer in `state.cpp:766` + `unif.cpp:158` +
+  `bworld.cpp:64,65`) and the fix details. The followup link now points to
+  `docs/tech/closed/FOLLOWUP_v0.3.6.5_F1_strncpy_overflow.md` (Q11).
+
+### Added
+
+- **`scripts/_find_vcvars.bat`**: new helper that tries the 5 standard
+  vcvars64.bat paths in order (VS 18 BuildTools, 2022 BuildTools, 2022
+  Enterprise, 2022 Professional, 2022 Community) and echoes the first one
+  that exists. Used by `_with_vcvars.bat` and `_probe_msvc_asan.bat`.
+- **`docs/tech/v0.3.x_CodeReview_6.6.md`**: the v0.3.6.6 errata code review
+  report (mirrors v0.3.6.5 CodeReview format).
+
+### Notes
+
+- No changes to the emulator hot path, mapper code, savestate layout, or
+  test fixtures. The five-gate regression (compile / ctest / byte-level
+  savestate / smoke / perf) is unaffected. v0.3.7 (C-track) may start with
+  confidence.
+- Third-party headers (`src/utils/tl/expected.hpp`, `src/utils/expected.hpp`,
+  `src/utils/backward.{hpp,cpp}`) still contain `__clang__` defensive
+  macros. They are upstream polyfills / libraries; modifying them would
+  diverge from upstream and is out of scope.
+- The `clang_rt.asan_dynamic-x86_64.dll` file-name reference is the MSVC
+  official ASan runtime file name and cannot be renamed; references in
+  scripts and `tests/CMakeLists.txt` are correct.
+
 ## [0.3.6.5] - 2026-06-10
 
 B-track integration checkpoint redo. Initial v0.3.6.5 attempt had been
@@ -84,25 +171,24 @@ runtime end-to-end, and rewrites the checkpoint report from real evidence.
 
 ### Known Issues
 
-- **F-1 (REAL, deferred)**: ASan exposes a heap-buffer-overflow in the
-  ROM-load test path — `strncpy(buf, src, 7)` writes 7 bytes into a
-  5-byte `malloc`'d buffer, overflowing 2 bytes. Reproduces in 4 of 5
-  ctest cases (smoke_test passes, the four ROM-loading tests fail with
-  the same root cause). PDB emission for sanitizer Release builds is
-  now wired up (CMakeLists.txt ASan branch appends `/DEBUG /OPT:REF
-  /OPT:ICF` to `CMAKE_*_LINKER_FLAGS_RELEASE`), so the next ASan rebuild
-  produces `build-asan/src/fceux11.pdb` and per-test PDBs — the
-  remaining work is to rerun under `llvm-symbolizer.exe` and attribute
-  the strncpy callsite. Per plan §5 v0.3.6.5 task #3 this is classified
-  as REAL/UNCONFIRMED-CALLSITE and reported, but does NOT block entry
-  to v0.3.7 (plan §5 task #4 strictly mandates fixing UBSan warnings,
-  not ASan ones; the only UBSan-style finding the MSVC native substitute
-  could surface is /RTC1, which trips 0 times in this run). Tracked in
-  [`docs/tech/FOLLOWUP_v0.3.6.5_F1_strncpy_overflow.md`](docs/tech/FOLLOWUP_v0.3.6.5_F1_strncpy_overflow.md).
+- **F-1 (REAL, CLOSED in v0.3.6.5 errata commit a606561)**: ASan exposed
+  a heap-buffer-overflow in the ROM-load test path — `strncpy(buf, src, 7)`
+  wrote 7 bytes into a 5-byte `malloc`'d buffer, overflowing 2 bytes.
+  Reproduced in 4 of 5 ctest cases. **Root cause**: three call sites
+  (`src/state.cpp:766`, `src/unif.cpp:158`, `src/input/bworld.cpp:64,65`)
+  passed `sizeof((char*))` (the pointer size, 8 on x64) to `FCEU_strlcpy`
+  instead of the actual malloc'd buffer size. **Fix**: pass the
+  runtime-computed `desc_len` / `name_len` / `sizeof(bdata)` instead.
+  Pattern audit: 0 instances of `sizeof((char*))` remain in real code.
+  Followup document is now archived at
+  [`docs/tech/closed/FOLLOWUP_v0.3.6.5_F1_strncpy_overflow.md`](docs/tech/closed/FOLLOWUP_v0.3.6.5_F1_strncpy_overflow.md).
+  v0.3.7 may start with confidence.
 - Real LSan / clang-style UBSan coverage requires clang-cl, scheduled
   for v0.4.x as an opt-in CI matrix job (main toolchain remains MSVC).
 
 
+
+## [0.3.6] - 2026-06-09
 
 ### Changed
 

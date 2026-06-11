@@ -21,7 +21,7 @@ if (-not [System.IO.Path]::IsPathRooted($BuildDir)) {
 }
 
 if ((-not $KeepCache) -and (Test-Path $BuildDir)) {
-    Write-Host "[CLEAN] Removing $BuildDir (stale cache may have buggy /fsanitize:undefined)" -ForegroundColor Yellow
+    Write-Host "[CLEAN] Removing $BuildDir (a stale sanitizer cache may bake in the wrong /fsanitize: flag form). Use -KeepCache to opt in to incremental builds." -ForegroundColor Yellow
     Remove-Item -Recurse -Force $BuildDir
 }
 
@@ -42,7 +42,7 @@ $cmakeArgs = @(
     "-DCMAKE_MAP_IMPORTED_CONFIG_DEBUG=RELEASE"
     "-DCMAKE_MAP_IMPORTED_CONFIG_RELWITHDEBINFO=RELEASE"
     "-DFCEUX11_BUILD_TESTS=ON"
-    "-DENABLE_LINT=OFF"
+    "-DENABLE_LINT_CPPCHECK=OFF"
     "-DFCEUX11_UBSAN=ON"
 )
 

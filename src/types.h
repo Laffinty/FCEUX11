@@ -179,8 +179,8 @@ typedef uint8 (*readfunc)(uint32 A);
 	#define  __FCEU_PRINTF_FORMAT  _In_z_ _Printf_format_string_
 	#define  __FCEU_PRINTF_ATTRIBUTE( fmt, va )
 
-#elif defined(__GNUC__) || defined(__clang__) || FCEU_HAS_CPP_ATTRIBUTE(format)
-	// GCC and Clang compilers will perform printf format type checks, useful for catching format errors.
+#elif defined(__GNUC__) || FCEU_HAS_CPP_ATTRIBUTE(format)
+	// GCC will perform printf format type checks, useful for catching format errors.
 	#define  __FCEU_PRINTF_FORMAT
 	#define  __FCEU_PRINTF_ATTRIBUTE( fmt, va )  __attribute__((__format__(__printf__, fmt, va)))
 

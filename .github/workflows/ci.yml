@@ -53,7 +53,7 @@ jobs:
           -DCMAKE_C_COMPILER=cl
           -DCMAKE_CXX_COMPILER=cl
           -DFCEUX11_BUILD_TESTS=ON
-          -DENABLE_LINT=OFF
+          -DENABLE_LINT_CPPCHECK=OFF
 
       - name: Build
         run: cmake --build build --config Release --parallel

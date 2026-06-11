@@ -91,6 +91,10 @@ if(FCEUX11_BUILD_TESTS)
                                "${CMAKE_CXX_COMPILER}" DIRECTORY)
         file(TO_NATIVE_PATH "${_FCEUX11_MSVC_BIN_DIR}"
                             _FCEUX11_MSVC_BIN_NATIVE)
+        # MSVC bin path goes through the same TO_NATIVE_PATH normalization
+        # as the vcpkg paths below; CMake handles forward-slash → backslash
+        # conversion on Windows either way, but uniformity makes the
+        # STATUS line readable on either shell.
         file(TO_NATIVE_PATH
              "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows/bin"
              _FCEUX11_VCPKG_REL_BIN_NATIVE)

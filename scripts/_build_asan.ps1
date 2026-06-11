@@ -24,10 +24,12 @@ if (-not [System.IO.Path]::IsPathRooted($BuildDir)) {
     $BuildDir = Join-Path $ProjectRoot $BuildDir
 }
 
-# Default behavior: wipe cache, since the prior v0.3.6.5 cache contains
-# the buggy `/fsanitize:address` flag baked into ASAN_LDFLAGS.
+# Default behavior: wipe the cache, since a prior v0.3.6.5 cache may
+# contain the buggy `/fsanitize:address` (colon) flag baked into the
+# cached ASAN_LDFLAGS / compile rules. Use -KeepCache to opt in to
+# incremental builds once you have a known-good sanitizer cache.
 if ((-not $KeepCache) -and (Test-Path $BuildDir)) {
-    Write-Host "[CLEAN] Removing $BuildDir (stale sanitizer cache may have buggy /fsanitize: form)" -ForegroundColor Yellow
+    Write-Host "[CLEAN] Removing $BuildDir (a stale sanitizer cache may bake in the wrong /fsanitize: flag form). Use -KeepCache to opt in to incremental builds." -ForegroundColor Yellow
     Remove-Item -Recurse -Force $BuildDir
 }
 
@@ -48,7 +50,7 @@ $cmakeArgs = @(
     "-DCMAKE_MAP_IMPORTED_CONFIG_DEBUG=RELEASE"
     "-DCMAKE_MAP_IMPORTED_CONFIG_RELWITHDEBINFO=RELEASE"
     "-DFCEUX11_BUILD_TESTS=ON"
-    "-DENABLE_LINT=OFF"
+    "-DENABLE_LINT_CPPCHECK=OFF"
     "-DFCEUX11_ASAN=ON"
 )
 

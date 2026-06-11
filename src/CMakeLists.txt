@@ -29,37 +29,52 @@ find_package(LibArchive REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(OpenGL REQUIRED)
 
-# v0.3.6.5: The vcpkg LibArchive port's CMake target LibArchive::LibArchive
-# only registers IMPORTED_LOCATION (no suffix) without IMPORTED_LOCATION_RELEASE
-# / _DEBUG / _RELWITHDEBINFO, and CMake's MAP_IMPORTED_CONFIG fallback does
+# v0.3.6.6: Refactor the v0.3.6.5 sanitizer-only link bypass into a helper
+# function so the same code path runs in any non-Release build (Debug,
+# RelWithDebInfo) and during sanitizer builds. The root cause is that the
+# vcpkg LibArchive port's CMake target only registers IMPORTED_LOCATION
+# (no per-config suffix), and CMake's MAP_IMPORTED_CONFIG fallback does
 # NOT engage in this scenario for some target types — generator-time fails
 # with "IMPORTED_LOCATION not set for ...LibArchive... configuration X".
-# Bypass the imported target entirely under sanitizer builds and use the
-# raw library file (FindLibArchive sets LibArchive_LIBRARY / _LIBRARIES /
-# _INCLUDE_DIRS). The Release archive.lib is fine under our ASan / UB-substitute
-# build because the instrumentation lives in OUR object files, not LibArchive.
-if(FCEUX11_ASAN OR FCEUX11_UBSAN)
-    if(LibArchive_INCLUDE_DIRS)
-        include_directories(${LibArchive_INCLUDE_DIRS})
-    endif()
-    set(FCEUX11_LIBARCHIVE_LINK "${LibArchive_LIBRARIES}")
-    # OpenGL::GL has the same per-config IMPORTED_LOCATION issue under
-    # Debug/RelWithDebInfo. opengl32.lib is a system lib (in the Windows
-    # SDK), config-independent — link it by name to bypass the imported
-    # target machinery entirely.
-    set(FCEUX11_OPENGL_LINK opengl32)
-    # ZLIB::ZLIB likewise — vcpkg's z.lib is Release-only.
-    if(ZLIB_LIBRARIES)
-        set(FCEUX11_ZLIB_LINK "${ZLIB_LIBRARIES}")
+# OpenGL::GL and ZLIB::ZLIB have the same per-config IMPORTED_LOCATION
+# issue. Bypass the imported target machinery in any non-Release build
+# (and during sanitizer builds) and link by raw library file.
+#
+# fceux11_resolve_linked_lib(<out_var> <pkg> <fallback_target> <raw_libraries_var>)
+#   - On Release (or sanitizer build on Release): use imported target
+#   - On Debug / RelWithDebInfo: use raw ${pkg}_LIBRARIES to avoid the
+#     IMPORTED_LOCATION_<CONFIG> lookup failure
+function(fceux11_resolve_linked_lib out_var pkg fallback_target raw_libraries_var)
+    if(CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT (FCEUX11_ASAN OR FCEUX11_UBSAN))
+        set(${out_var} ${fallback_target} PARENT_SCOPE)
     else()
-        set(FCEUX11_ZLIB_LINK ZLIB::ZLIB)
+        if(DEFINED ${raw_libraries_var})
+            set(${out_var} "${${raw_libraries_var}}" PARENT_SCOPE)
+        else()
+            set(${out_var} ${fallback_target} PARENT_SCOPE)
+        endif()
     endif()
-    message(STATUS "FCEUX11 v0.3.6.5: sanitizer build link bypasses imported targets:"
-            " LibArchive=${FCEUX11_LIBARCHIVE_LINK} ZLIB=${FCEUX11_ZLIB_LINK} OpenGL=${FCEUX11_OPENGL_LINK}")
-else()
-    set(FCEUX11_LIBARCHIVE_LINK LibArchive::LibArchive)
-    set(FCEUX11_OPENGL_LINK     OpenGL::GL)
-    set(FCEUX11_ZLIB_LINK       ZLIB::ZLIB)
+endfunction()
+
+if(FCEUX11_ASAN OR FCEUX11_UBSAN)
+    message(STATUS "FCEUX11 v0.3.6.6: sanitizer build selects raw-library link path")
+endif()
+
+if(LibArchive_INCLUDE_DIRS)
+    include_directories(${LibArchive_INCLUDE_DIRS})
+endif()
+fceux11_resolve_linked_lib(FCEUX11_LIBARCHIVE_LINK LibArchive LibArchive::LibArchive LibArchive_LIBRARIES)
+fceux11_resolve_linked_lib(FCEUX11_OPENGL_LINK     OpenGL     OpenGL::GL             OPENGL_LIBRARIES)
+fceux11_resolve_linked_lib(FCEUX11_ZLIB_LINK       ZLIB       ZLIB::ZLIB             ZLIB_LIBRARIES)
+
+# For non-system libraries (LibArchive, ZLIB), the raw var may contain a
+# full path. For OpenGL, prefer opengl32 (Windows SDK lib, config-independent).
+if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+    set(FCEUX11_OPENGL_LINK opengl32)
+    if(FCEUX11_ASAN OR FCEUX11_UBSAN)
+        message(STATUS "FCEUX11 v0.3.6.6: non-Release build uses raw-library link path:"
+                " LibArchive=${FCEUX11_LIBARCHIVE_LINK} ZLIB=${FCEUX11_ZLIB_LINK} OpenGL=${FCEUX11_OPENGL_LINK}")
+    endif()
 endif()
 
 # Qt5 support removed in Phase 2 — Qt6 only

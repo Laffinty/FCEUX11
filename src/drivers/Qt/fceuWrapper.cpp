@@ -171,8 +171,6 @@ EMUFILE_FILE* FCEUD_UTF8_fstream(const char *fn, const char *m)
  //re: http://72.14.203.104/search?q=cache:HG-okth5NGkJ:mail.python.org/pipermail/python-checkins/2002-November/030704.html+_msc_ver+compiler+version+string&hl=en&gl=us&ct=clnk&cd=5
 #elif defined(__GNUC__)
  #define __COMPILER__STRING__ "gcc " __VERSION__
-#elif defined(__clang__)
- #define __COMPILER__STRING__ "clang " __VERSION__
 #else
  #define __COMPILER__STRING__ "unknown"
 #endif

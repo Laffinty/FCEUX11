@@ -1,7 +1,7 @@
 # FCEUX11 v0.3.6.5 - Verify that the ASan build is actually instrumented.
 #
 # Three independent witnesses are required to claim "real ASan":
-#   1. dumpbin /symbols  finds at least one __asan_* symbol
+#   1. dumpbin /imports  finds at least one __asan_* / __sanitizer_* import
 #   2. dumpbin /imports  shows clang_rt.asan_dynamic-x86_64.dll
 #   3. _build_asan.log contains zero `warning D9002`
 #

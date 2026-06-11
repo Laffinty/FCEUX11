@@ -55,7 +55,12 @@ endif()
 
 option(FCEUX11_BUILD_TESTS "Build smoke and regression tests" ON)
 option(FCEUX11_ENABLE_I18N "Enable internationalization (i18n) support" ON)
-option(ENABLE_LINT "Enable static analysis targets (clang-tidy, cppcheck)" OFF)
+# v0.3.6.6: toolchain policy — MSVC-only. The prior `ENABLE_LINT` option was
+# implemented as a clang-tidy + cppcheck toggle; the clang-tidy half has been
+# removed (no .clang-format / .clang-tidy / clang-tidy in the toolchain per
+# v0.3.6.5 errata). cppcheck is a separate, non-clang tool and is retained.
+# Use ENABLE_LINT_CPPCHECK to wire the cppcheck custom target into the build.
+option(ENABLE_LINT_CPPCHECK "Enable cppcheck static analysis custom target (clang-tidy removed per v0.3.6.6 toolchain policy)" OFF)
 
 # v0.3.6.5: B-track checkpoint — AddressSanitizer (real, MSVC-native)
 # + UndefinedBehavior-substitute (MSVC-native runtime checks).
@@ -158,7 +163,10 @@ if(FCEUX11_UBSAN)
     add_definitions(-DFCEUX11_UBSAN_ENABLED=1)
 endif()
 
-# v0.3.2: Export compile_commands.json for clang-tidy / IDE integration
+# Export compile_commands.json for IDE integration (Visual Studio Code,
+# CLion, Qt Creator, etc.). The v0.3.2 wording said "for clang-tidy / IDE
+# integration" but clang-tidy has been removed from the toolchain per the
+# v0.3.6.6 policy; compile_commands.json is still useful for IDEs.
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # i18n: Qt Linguist tools
@@ -174,23 +182,15 @@ if(FCEUX11_BUILD_TESTS)
     include(CTest)
 endif()
 
-# v0.3.2: Optional lint targets (clang-tidy / cppcheck)
-if(ENABLE_LINT)
-    find_program(CLANG_TIDY_PROG clang-tidy)
+# v0.3.6.6: Optional lint target — cppcheck only.
+# The v0.3.2 `if(ENABLE_LINT)` block had two halves: a clang-tidy branch
+# (now removed — project is MSVC-only with no clang toolchain) and a
+# cppcheck branch. cppcheck is a separate, non-clang static analyzer and
+# stays in the build. Invoke with:
+#   cmake -S . -B build -DENABLE_LINT_CPPCHECK=ON
+#   cmake --build build --target lint-cppcheck
+if(ENABLE_LINT_CPPCHECK)
     find_program(CPPCHECK_PROG cppcheck)
-
-    if(CLANG_TIDY_PROG AND EXISTS "${CMAKE_BINARY_DIR}/compile_commands.json")
-        add_custom_target(lint-clang-tidy
-            COMMAND ${CLANG_TIDY_PROG}
-                -p ${CMAKE_BINARY_DIR}
-                ${CMAKE_SOURCE_DIR}/src/*.cpp
-                ${CMAKE_SOURCE_DIR}/src/drivers/Qt/*.cpp
-                ${CMAKE_SOURCE_DIR}/src/utils/*.cpp
-            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-            COMMENT "Running clang-tidy..."
-        )
-    endif()
-
     if(CPPCHECK_PROG)
         add_custom_target(lint-cppcheck
             COMMAND ${CPPCHECK_PROG}
@@ -204,5 +204,7 @@ if(ENABLE_LINT)
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
             COMMENT "Running cppcheck..."
         )
+    else()
+        message(STATUS "cppcheck not found in PATH — lint-cppcheck target disabled")
     endif()
 endif()

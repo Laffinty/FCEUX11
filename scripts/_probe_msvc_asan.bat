@@ -1,7 +1,14 @@
 @echo off
 REM Probe whether local cl accepts /fsanitize=address (= form, MSVC official)
-REM and /fsanitize=undefined (NOT expected — clang-only)
-call "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat" >nul 2>&1
+REM and /fsanitize=undefined (NOT expected — clang-only).
+REM v0.3.6.6: auto-discover vcvars64.bat via _find_vcvars.bat instead of
+REM hard-coding the VS 18 BuildTools path.
+for /f "delims=" %%v in ('call "%~dp0_find_vcvars.bat"') do set "VCVARS=%%v"
+if "%VCVARS%"=="" (
+    echo VCVARS_FAIL
+    exit /b 1
+)
+call "%VCVARS%" >nul 2>&1
 if errorlevel 1 (
     echo VCVARS_FAIL
     exit /b 1
