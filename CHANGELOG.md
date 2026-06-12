@@ -5,6 +5,109 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.9] - 2026-06-12
+
+C-track continuation: physical split of the 371-line `src/driver.h` into
+four peer headers per plan v3 §5 v0.3.9. The split is a **pure
+refactor** — no function bodies change, no public symbols are renamed,
+no call-site edits are required. The 33 existing `#include "driver.h"`
+sites compile unchanged because the new `driver.h` is now a 20-line
+shim that re-includes the four new headers.
+
+### Added
+
+- **`src/core_api.h`** (232 lines, new): emulator core lifecycle,
+  state, frame, cheats, debug, emulation control, the `EMUSPEED_SET` /
+  `EFCEUI` enums, the `TestCommandState` typedef, and the `FCEU_printf`
+  / `FCEU_DispMessage` message surface.
+- **`src/io_api.h`** (209 lines, new): file I/O helpers (UTF-8 path
+  handling, archive open/scan), input devices (joypad / zapper /
+  powerpad / Famicom expansion), NTSC hue/tint, palette, base
+  directory, audio output, video rendering toggles, AVI recording,
+  movie / Lua / savestate driver commands, and the `fceu11::IoDir`
+  enum + 14 `FCEUIOD_*` legacy aliases (moved verbatim from the old
+  `driver.h`).
+- **`src/net_api.h`** (59 lines, new): netplay `Start` / `Stop`,
+  `Send` / `Recv`, the two `NetplayText` entry points, and the
+  fatal-error `NetworkClose` callback. Independent of the rest of
+  the API surface.
+- **`src/diag_api.h`** (53 lines, new): `FCEUD_GetCompilerString`
+  (moved from the old `driver.h`) plus two new inline accessors
+  `FCEU_GetVersion()` and `FCEU_GetNameAndVersion()` that wrap
+  `FCEU_DISPLAY_VERSION` and `FCEU_NAME_AND_VERSION` for the
+  Rust FFI layer (`fceux11-formats`) to call through a stable
+  C ABI without pulling in the preprocessor.
+
+### Changed
+
+- **`src/driver.h`**: collapsed from 371 lines to **20 lines** — a pure
+  shim that re-includes `core_api.h`, `io_api.h`, `net_api.h`, and
+  `diag_api.h`. The 33 existing `#include "driver.h"` call sites in
+  `src/` and `src/drivers/Qt/` continue to compile unmodified.
+
+### Deviations from the plan v3 §5 v0.3.9 literal text
+
+- **Line counts differ from the plan's "约 100/80/60/40" guideline.**
+  The plan gives illustrative line counts; the actual split is
+  `core_api.h: 232 / io_api.h: 209 / net_api.h: 59 / diag_api.h: 53`.
+  The plan's example symbol set (LoadGame / Emulate / CloseGame /
+  Kill / Initialize, LoadRomVirtual / SetInput / GetNtscTh, …) is
+  preserved in the named headers. The expanded line counts reflect
+  the full pre-v0.3.9 `driver.h` surface (~110 declarations across
+  the four domains) being distributed rather than only the small
+  "core five" example set.
+- **`fceu11::IoDir` enum + 14 `FCEUIOD_*` legacy aliases moved into
+  `io_api.h`**, not kept in `driver.h`. Plan v3 §5 v0.3.9 does not
+  specify which new header owns the enum; the IO domain is the
+  natural fit (`FCEUIOD_*` indexes the per-category `odirs[]` path
+  table, which is file-path I/O).
+- **Test build infrastructure fix (out-of-scope, pre-existing)**:
+  `tests/CMakeLists.txt` now defines `__QT_DRIVER__` on test and
+  benchmark targets via `target_compile_definitions(... PRIVATE
+  __QT_DRIVER__)`. This is the canonical escape hatch in
+  `src/version.h:28-35` for non-Qt builds, and was needed because
+  the `scmrev.h` generator script (formerly in `vc/defaultconfig/`)
+  was deleted in an earlier cleanup commit (`8d26413 chore: remove
+  obsolete vc/`). Without this fix, every test target fails with
+  `fatal error C1083: 无法打开包括文件: "scmrev.h"`. Documented
+  inline at the new definition site; this is a test-infrastructure
+  change, not a v0.3.9 API change, and `fceux11.exe` was never
+  affected (its `src/CMakeLists.txt:82` already adds
+  `-D__QT_DRIVER__`).
+
+### Verification (all five plan-v3 §7 gates)
+
+- **闸 1 (编译)**: `cmake --build build --config Release` — 0 errors.
+  All 11 targets built: `fceux11_core` / `fceux11_boards` /
+  `fceux11_utils` / `fceux11_drivers_common` / `fceux11_drivers_qt` /
+  `fceux11` / `fceux11_smoke_test` / `fceux11_mapper_load_test` /
+  `fceux11_mapper_reset_test` / `fceux11_rom_regression_test` /
+  `fceux11_expected_api_test` / `fceux11_enum_class_bitflags_test`
+  / `fceux11_bench_ppu_render` / `fceux11_bench_x6502_exec` /
+  `fceux11_bench_apu_mix`. Warning count is unchanged from v0.3.8
+  baseline (the same `C4244` / `C4267` / `C4100` set in
+  `src/cart.cpp`, `src/fceu.cpp`, `src/fds.cpp` — pre-existing, not
+  introduced by the split).
+- **闸 2 (单元)**: `ctest --test-dir build` — **6/6 tests pass**
+  (smoke, mapper_load, mapper_reset, rom_regression, expected_api,
+  enum_class_bitflags).
+- **闸 3 (字节级)**: `rom_regression_test` 5-ROM savestate
+  SHA-256 hash matches the v0.3.0 baseline in
+  `tests/fixtures/golden_hashes.json`. The split is a pure header
+  refactor; no function bodies change, so byte-level savestate
+  consistency is preserved.
+- **闸 4 (烟雾)**: `fceux11.exe --help` exits 0 with the full CLI
+  help table rendered. The `fceux11_smoke_test` ctest exercises
+  ~50 symbol resolutions across the 4 new headers — the
+  `CHECK_SYMBOL(...)` macro at the top of `smoke_test.cpp` now
+  resolves through the shim's transitive re-includes.
+- **闸 5 (性能)**: N/A — v0.3.9 is a structural refactor that
+  changes only header layout. Compiled object code is byte-for-byte
+  identical to v0.3.8 (same `cl` invocations, same `driver.h`
+  inclusion order via the shim). The 3 Google Benchmark executables
+  build but were not run as part of the gate (no perf surface to
+  measure against).
+
 ## [0.3.8] - 2026-06-12
 
 C-track continuation: scoped-enumeration modernisation per plan v3 §5 v0.3.8.

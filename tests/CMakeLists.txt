@@ -30,6 +30,17 @@ function(fceux11_add_test_executable target_name)
         ${CMAKE_SOURCE_DIR}/src
         ${CMAKE_SOURCE_DIR}/src/drivers
     )
+
+    # v0.3.9: tests link against fceux11_core, which transitively pulls
+    # in version.h. Without __QT_DRIVER__ defined, version.h hits the
+    # MSVC-only `#include "scmrev.h"` branch (pre-existing build
+    # infrastructure gap; the generator script for scmrev.h was
+    # removed in the v0.2.x `vc/` cleanup). Defining __QT_DRIVER__ on
+    # test targets mirrors src/CMakeLists.txt:82 — the canonical
+    # escape hatch the header was designed for. See plan v3 §5
+    # v0.3.9 acceptance gate 2 (ctest pass) — unblocking this is a
+    # test-infrastructure fix, not a v0.3.9 API change.
+    target_compile_definitions(${target_name} PRIVATE __QT_DRIVER__)
 endfunction()
 
 if(FCEUX11_BUILD_TESTS)
@@ -137,6 +148,10 @@ if(FCEUX11_BUILD_TESTS)
             benchmark::benchmark
         )
         target_include_directories(fceux11_bench_ppu_render PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/drivers)
+        # v0.3.9: see comment in fceux11_add_test_executable — bench
+        # targets also need __QT_DRIVER__ to bypass the version.h
+        # scmrev.h include (pre-existing build infrastructure gap).
+        target_compile_definitions(fceux11_bench_ppu_render PRIVATE __QT_DRIVER__)
         if(WIN32)
             target_link_libraries(fceux11_bench_ppu_render PRIVATE ntdll)
         endif()
@@ -147,6 +162,7 @@ if(FCEUX11_BUILD_TESTS)
             benchmark::benchmark
         )
         target_include_directories(fceux11_bench_x6502_exec PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/drivers)
+        target_compile_definitions(fceux11_bench_x6502_exec PRIVATE __QT_DRIVER__)
         if(WIN32)
             target_link_libraries(fceux11_bench_x6502_exec PRIVATE ntdll)
         endif()
@@ -157,6 +173,7 @@ if(FCEUX11_BUILD_TESTS)
             benchmark::benchmark
         )
         target_include_directories(fceux11_bench_apu_mix PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/drivers)
+        target_compile_definitions(fceux11_bench_apu_mix PRIVATE __QT_DRIVER__)
         if(WIN32)
             target_link_libraries(fceux11_bench_apu_mix PRIVATE ntdll)
         endif()
