@@ -4148,7 +4148,7 @@ void QPianoRoll::save(EMUFILE *os, bool really_save)
 	{
 		updateLinesCount();
 		// write "PIANO_ROLL" string
-		os->fwrite(pianoRollSaveID, PIANO_ROLL_ID_LEN);
+		os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(pianoRollSaveID), PIANO_ROLL_ID_LEN));
 		// write current top item
 		int top_item = lineOffset;
 		write32le(top_item, os);

@@ -270,7 +270,7 @@ void SELECTION::save(EMUFILE *os, bool really_save)
 		setTasProjectProgressBar( 0, historyTotalItems );
 
 		// write "SELECTION" string
-		os->fwrite(selection_save_id, SELECTION_ID_LEN);
+		os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(selection_save_id), SELECTION_ID_LEN));
 		// write vars
 		write32le(historyCursorPos, os);
 		write32le(historyTotalItems, os);
@@ -294,7 +294,7 @@ void SELECTION::save(EMUFILE *os, bool really_save)
 	else
 	{
 		// write "SELECTIOX" string
-		os->fwrite(selection_skipsave_id, SELECTION_ID_LEN);
+		os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(selection_skipsave_id), SELECTION_ID_LEN));
 	}
 }
 // returns true if couldn't load
@@ -311,7 +311,7 @@ bool SELECTION::load(EMUFILE *is, unsigned int offset)
 	}
 	// read "SELECTION" string
 	char save_id[SELECTION_ID_LEN];
-	if ((int)is->fread(save_id, SELECTION_ID_LEN) < SELECTION_ID_LEN) goto error;
+	if ((int)is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(save_id), SELECTION_ID_LEN)) < SELECTION_ID_LEN) goto error;
 	if (!strcmp(selection_skipsave_id, save_id))
 	{
 		// string says to skip loading Selection

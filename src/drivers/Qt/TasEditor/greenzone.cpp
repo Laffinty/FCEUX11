@@ -250,7 +250,7 @@ void GREENZONE::save(EMUFILE *os, int save_type)
 		if (greenzoneSize > (int)savestates.size())
 			greenzoneSize = savestates.size();
 		// write "GREENZONE" string
-		os->fwrite(greenzone_save_id, GREENZONE_ID_LEN);
+		os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(greenzone_save_id), GREENZONE_ID_LEN));
 		// write LagLog
 		lagLog.save(os);
 		// write size
@@ -282,7 +282,7 @@ void GREENZONE::save(EMUFILE *os, int save_type)
 				// write savestate
 				size = savestates[frame].size();
 				write32le(size, os);
-				os->fwrite(&savestates[frame][0], size);
+				os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(savestates[frame].data()), size));
 			}
 			// write -1 as eof for greenzone
 			write32le(-1, os);
@@ -307,7 +307,7 @@ void GREENZONE::save(EMUFILE *os, int save_type)
 					// write savestate
 					size = savestates[frame].size();
 					write32le(size, os);
-					os->fwrite(&savestates[frame][0], size);
+					os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(savestates[frame].data()), size));
 				}
 			}
 			// write -1 as eof for greenzone
@@ -333,7 +333,7 @@ void GREENZONE::save(EMUFILE *os, int save_type)
 					// write savestate
 					size = savestates[frame].size();
 					write32le(size, os);
-					os->fwrite(&savestates[frame][0], size);
+					os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(savestates[frame].data()), size));
 				}
 			}
 			// write -1 as eof for greenzone
@@ -343,7 +343,7 @@ void GREENZONE::save(EMUFILE *os, int save_type)
 		case GREENZONE_SAVING_MODE_NO:
 		{
 			// write "GREENZONX" string
-			os->fwrite(greenzone_skipsave_id, GREENZONE_ID_LEN);
+			os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(greenzone_skipsave_id), GREENZONE_ID_LEN));
 			// write LagLog
 			lagLog.save(os);
 			// write Playback cursor position
@@ -354,7 +354,7 @@ void GREENZONE::save(EMUFILE *os, int save_type)
 				collectCurrentState();
 				int size = savestates[currFrameCounter].size();
 				write32le(size, os);
-				os->fwrite(&savestates[currFrameCounter][0], size);
+				os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(savestates[currFrameCounter].data()), size));
 			}
 			break;
 		}
@@ -384,7 +384,7 @@ bool GREENZONE::load(EMUFILE *is, unsigned int offset)
 		return false;
 	}
 	// read "GREENZONE" string
-	if (is->fread(save_id, GREENZONE_ID_LEN) < GREENZONE_ID_LEN) goto error;
+	if (is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(save_id), GREENZONE_ID_LEN)) < GREENZONE_ID_LEN) goto error;
 	if (!strcmp(greenzone_skipsave_id, save_id))
 	{
 		// string says to skip loading Greenzone
@@ -402,7 +402,7 @@ bool GREENZONE::load(EMUFILE *is, unsigned int offset)
 				if (read32le(&size, is) && size >= 0)
 				{
 					savestates[frame].resize(size);
-					if (is->fread(&savestates[frame][0], size) == size)
+					if (is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(savestates[frame].data()), size)) == size)
 					{
 						if (loadSavestateOfFrame(currFrameCounter))
 						{
@@ -470,7 +470,7 @@ bool GREENZONE::load(EMUFILE *is, unsigned int offset)
 					if ((int)savestates.size() <= frame)
 						savestates.resize(frame + 1);
 					savestates[frame].resize(size);
-					if (is->fread(&savestates[frame][0], size) < size) break;
+					if (is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(savestates[frame].data()), size)) < size) break;
 					prev_frame = frame;			// successfully read one Greenzone frame info
 				}
 			}

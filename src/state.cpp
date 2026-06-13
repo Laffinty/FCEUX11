@@ -147,7 +147,8 @@ static int SubWrite(EMUFILE* os, SFORMAT *sf)
 
 		if(os)			//Are we writing or calculating the size of this block?
 		{
-			os->fwrite(sf->desc,4);
+			os->fwrite(std::span<const std::byte>(
+				reinterpret_cast<const std::byte*>(sf->desc), 4));
 			write32le(sf->s&(~FCEUSTATE_FLAGS),os);
 
 #ifdef FCEU_BIG_ENDIAN
@@ -156,9 +157,11 @@ static int SubWrite(EMUFILE* os, SFORMAT *sf)
 #endif
 
 			if(sf->s&FCEUSTATE_INDIRECT)
-				os->fwrite(*(char **)sf->v,sf->s&(~FCEUSTATE_FLAGS));
+				os->fwrite(std::span<const std::byte>(
+					reinterpret_cast<const std::byte*>(*(char **)sf->v), sf->s&(~FCEUSTATE_FLAGS)));
 			else
-				os->fwrite((char*)sf->v,sf->s&(~FCEUSTATE_FLAGS));
+				os->fwrite(std::span<const std::byte>(
+					reinterpret_cast<const std::byte*>((char*)sf->v), sf->s&(~FCEUSTATE_FLAGS)));
 
 			//Now restore the original byte order.
 #ifdef FCEU_BIG_ENDIAN
@@ -204,7 +207,8 @@ static bool ReadStateChunk(EMUFILE* is, SFORMAT *sf, int size)
 	{
 		uint32 tsize;
 		char toa[4];
-		if(is->fread(toa,4)<4)
+		if(is->fread(std::span<std::byte>(
+				reinterpret_cast<std::byte*>(toa), 4)) < 4)
 			return false;
 
 		read32le(&tsize,is);
@@ -212,9 +216,11 @@ static bool ReadStateChunk(EMUFILE* is, SFORMAT *sf, int size)
 		if((tmp=CheckS(sf,tsize,toa)))
 		{
 			if(tmp->s&FCEUSTATE_INDIRECT)
-				is->fread(*(char **)tmp->v,tmp->s&(~FCEUSTATE_FLAGS));
+				is->fread(std::span<std::byte>(
+					reinterpret_cast<std::byte*>(*(char **)tmp->v), tmp->s&(~FCEUSTATE_FLAGS)));
 			else
-				is->fread((char *)tmp->v,tmp->s&(~FCEUSTATE_FLAGS));
+				is->fread(std::span<std::byte>(
+					reinterpret_cast<std::byte*>((char *)tmp->v), tmp->s&(~FCEUSTATE_FLAGS)));
 
 #ifdef FCEU_BIG_ENDIAN
 			if(tmp->s&RLSB)
@@ -293,7 +299,7 @@ bool FCEUSS_SaveMS(EMUFILE* outstream, int compressionLevel)
 		if (size > 0) {
 			std::vector<uint8_t> buf(size);
 			mem.fseek(0, SEEK_SET);
-			mem.fread(buf.data(), size);
+			mem.fread(std::span<std::byte>(reinterpret_cast<std::byte*>(buf.data()), size));
 			chunks.push_back({type, std::move(buf)});
 		}
 	};
@@ -316,7 +322,7 @@ bool FCEUSS_SaveMS(EMUFILE* outstream, int compressionLevel)
 			if (movSize > 0) {
 				std::vector<uint8_t> buf(movSize);
 				movMem.fseek(0, SEEK_SET);
-				movMem.fread(buf.data(), movSize);
+				movMem.fread(std::span<std::byte>(reinterpret_cast<std::byte*>(buf.data()), movSize));
 				chunks.push_back({7, std::move(buf)});
 			}
 		}
@@ -350,7 +356,8 @@ bool FCEUSS_SaveMS(EMUFILE* outstream, int compressionLevel)
 	);
 
 	if (ok && outbuf.ptr && outbuf.len > 0) {
-		outstream->fwrite((char*)outbuf.ptr, outbuf.len);
+		outstream->fwrite(std::span<const std::byte>(
+			reinterpret_cast<const std::byte*>(outbuf.ptr), outbuf.len));
 		fceux11_rust_state_file_buf_free(outbuf);
 	}
 
@@ -458,7 +465,7 @@ bool FCEUSS_LoadFP(EMUFILE* is, ENUM_SSLOADPARAMS params)
 	size_t fileSize = is->ftell();
 	is->fseek(0, SEEK_SET);
 	std::vector<uint8_t> fileData(fileSize);
-	is->fread(fileData.data(), fileSize);
+	is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(fileData.data()), fileSize));
 
 	// Detect old format for compatibility flags
 	bool isOldFormat = false;
