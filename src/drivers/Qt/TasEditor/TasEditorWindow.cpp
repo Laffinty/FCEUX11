@@ -4178,7 +4178,7 @@ bool QPianoRoll::load(EMUFILE *is, unsigned int offset)
 	}
 	// read "PIANO_ROLL" string
 	char save_id[PIANO_ROLL_ID_LEN];
-	if ((int)is->fread(save_id, PIANO_ROLL_ID_LEN) < PIANO_ROLL_ID_LEN) goto error;
+	if ((int)is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(save_id), PIANO_ROLL_ID_LEN)) < PIANO_ROLL_ID_LEN) goto error;
 	if (!strcmp(pianoRollSkipSaveID, save_id))
 	{
 		// string says to skip loading Piano Roll
