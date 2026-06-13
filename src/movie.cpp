@@ -217,7 +217,7 @@ void MovieRecord::dumpJoy(EMUFILE* os, uint8 joystate)
 		char mnemonic = mnemonics[bit];
 		//if the bit is set write the mnemonic
 		if(joystate & bitmask)
-			os->fwrite(&mnemonic,1);
+			os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(&mnemonic), 1));
 		else //otherwise write an unset bit
 			write8le('.',os);
 	}
@@ -226,7 +226,7 @@ void MovieRecord::dumpJoy(EMUFILE* os, uint8 joystate)
 void MovieRecord::parseJoy(EMUFILE* is, uint8& joystate)
 {
 	char buf[8];
-	is->fread(buf,8);
+	is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(buf), 8));
 	joystate = 0;
 	for(int i=0;i<8;i++)
 	{
@@ -287,7 +287,7 @@ bool MovieRecord::parseBinary(MovieData* md, EMUFILE* is)
 
 	if(md->fourscore)
 	{
-		is->fread((char*)&joysticks,4);
+		is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(&joysticks), 4));
 	}
 	else
 	{
@@ -316,14 +316,14 @@ void MovieRecord::dumpBinary(MovieData* md, EMUFILE* os, int index)
 	if(md->fourscore)
 	{
 		for(int i=0;i<4;i++)
-			os->fwrite(&joysticks[i],sizeof(joysticks[i]));
+			os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(&joysticks[i]), sizeof(joysticks[i])));
 	}
 	else
 	{
 		for(int port=0;port<2;port++)
 		{
 			if(md->ports[port] == SI_GAMEPAD)
-				os->fwrite(&joysticks[port],sizeof(joysticks[port]));
+				os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(&joysticks[port]), sizeof(joysticks[port])));
 			else if(md->ports[port] == SI_ZAPPER)
 			{
 				write8le(zappers[port].x,os);
@@ -540,7 +540,7 @@ int MovieData::dump(EMUFILE *os, bool binary, bool seekToCurrFramePos)
 	if (memSize > 0) {
 		std::vector<uint8> tmp(memSize);
 		fceux11_rust_emufile_mem_fread(mem, tmp.data(), memSize);
-		os->fwrite(tmp.data(), memSize);
+		os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(tmp.data()), memSize));
 	}
 	fceux11_rust_emufile_mem_destroy(mem);
 
@@ -612,7 +612,7 @@ bool LoadFM2(MovieData& movieData, EMUFILE* fp, int size, bool stopAfterHeader)
 
 	std::vector<uint8> buf(to_read);
 	if (to_read > 0)
-		fp->fread((char*)buf.data(), to_read);
+		fp->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(buf.data()), to_read));
 
 	FceuMovieData* rustMd = fceux11_rust_movie_load_fm2(buf.data(), buf.size(), stopAfterHeader);
 	if (!rustMd)
@@ -945,7 +945,7 @@ bool MovieData::loadSaveramFrom(std::vector<uint8>* buf)
 			return false;
 		}
 
-		ms.fread(currCartInfo->SaveGame[i].bufptr, len);
+		ms.fread(std::span<std::byte>(reinterpret_cast<std::byte*>(currCartInfo->SaveGame[i].bufptr), len));
 	}
 
 	return true;
@@ -966,7 +966,7 @@ void MovieData::dumpSaveramTo(std::vector<uint8>* buf, int compressionLevel)
 			continue;
 		}
 		ms.write32le( static_cast<uint32>(currCartInfo->SaveGame[i].buflen) );
-		ms.fwrite(currCartInfo->SaveGame[i].bufptr, currCartInfo->SaveGame[i].buflen);
+		ms.fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(currCartInfo->SaveGame[i].bufptr), currCartInfo->SaveGame[i].buflen));
 	}
 
 	buf->assign(reinterpret_cast<const uint8_t*>(tmp.data()),

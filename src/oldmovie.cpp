@@ -171,7 +171,7 @@ EFCM_CONVERTRESULT convert_fcm(MovieData& md, std::string fname)
 		return FCM_CONVERTRESULT_UNSUPPORTEDVERSION;
 	}
 
-	fp->fread((char*)&flags,4);
+	fp->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(&flags), 4));
 	read32le(&framecount, fp);
 	read32le(&rerecord_count, fp);
 	read32le(&moviedatasize, fp);
@@ -179,7 +179,7 @@ EFCM_CONVERTRESULT convert_fcm(MovieData& md, std::string fname)
 	read32le(&firstframeoffset, fp);
 
 	// read header values
-	fp->fread((char*)&md.romChecksum,16);
+	fp->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(&md.romChecksum), 16));
 	read32le((uint32*)&md.emuVersion,fp);
 
 	md.romFilename = readNullTerminatedAscii(fp);
@@ -218,7 +218,7 @@ EFCM_CONVERTRESULT convert_fcm(MovieData& md, std::string fname)
 		}
 		return FCM_CONVERTRESULT_REALLOC_FAIL;
 	}
-	fp->fread((char*)moviedata,moviedatasize);
+	fp->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(moviedata), moviedatasize));
 
 	frameptr = 0;
 	memset(joop,0,sizeof(joop));
