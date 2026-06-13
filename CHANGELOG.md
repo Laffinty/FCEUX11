@@ -378,16 +378,15 @@ this commit).
   to §5; normalised the 6 stale references to `.clang-format` / `.clang-tidy`
   / `clang-tidy` / `clang-format` (v0.3.0 / v0.3.2 / §4.4 / §4.1 v0.3.2 row);
   annotated the v0.3.2 row in §4.1 to flag the v0.3.6.6 废止.
-- **`docs/tech/v0.3.x_Checkpoint_6.5.md`**: line range `593-599` → `626-632`
-  (Q9); release date "2026-06-10 REDO" → "2026-06-11 REDO" (Q17).
+- **Checkpoint report refresh**: corrected stale line ranges and release date
+  in the archived v0.3.6.5 checkpoint notes (Q9, Q17).
 - **`CHANGELOG.md`**: the orphan `[0.3.6]` content block (RAII 化 /
   fceuScopedPtr migration / Mapper PRG-RAM RAII / Deprecated / Testing)
   now has the missing `## [0.3.6] - 2026-06-09` header (Q13).
 - **`CHANGELOG.md`**: F-1 entry rewritten from "F-1 (REAL, deferred)" to
   "F-1 (REAL, CLOSED in v0.3.6.5 errata commit a606561)" with the root cause
   (`sizeof((char*))` sizeof-pointer in `state.cpp:766` + `unif.cpp:158` +
-  `bworld.cpp:64,65`) and the fix details. The followup link now points to
-  `docs/tech/closed/FOLLOWUP_v0.3.6.5_F1_strncpy_overflow.md` (Q11).
+  `bworld.cpp:64,65`) and the fix details (Q11).
 
 ### Added
 
@@ -395,8 +394,8 @@ this commit).
   vcvars64.bat paths in order (VS 18 BuildTools, 2022 BuildTools, 2022
   Enterprise, 2022 Professional, 2022 Community) and echoes the first one
   that exists. Used by `_with_vcvars.bat` and `_probe_msvc_asan.bat`.
-- **`docs/tech/v0.3.x_CodeReview_6.6.md`**: the v0.3.6.6 errata code review
-  report (mirrors v0.3.6.5 CodeReview format).
+- **Code review archive**: v0.3.6.6 errata review recorded; 9 deferred items
+  from v0.3.6.5 closed, 3 intentionally skipped.
 
 ### Notes
 
@@ -482,12 +481,11 @@ runtime end-to-end, and rewrites the checkpoint report from real evidence.
 
 ### Docs
 
-- Rewrote `docs/tech/v0.3.x_Checkpoint_6.5.md` from scratch with real
-  instrumentation evidence. Retracted initial version's defensive
-  "DO NOT switch to clang-cl" guardrail commentary (it was rationalizing
-  the flag-syntax bug, not a real toolchain constraint). MSVC lock
-  remains in place for ABI / byte-level savestate reasons (plan §3.1),
-  which is independent of sanitizer support.
+- **Checkpoint report rewritten**: retracted the initial v0.3.6.5 report's
+  incorrect "MSVC does not support ASan" conclusion; the real root cause was
+  the `/fsanitize:address` (colon) syntax bug. MSVC remains the sole
+  supported toolchain for ABI / byte-level savestate consistency (plan §3.1),
+  independent of sanitizer support.
 
 ### Known Issues
 
@@ -500,8 +498,6 @@ runtime end-to-end, and rewrites the checkpoint report from real evidence.
   instead of the actual malloc'd buffer size. **Fix**: pass the
   runtime-computed `desc_len` / `name_len` / `sizeof(bdata)` instead.
   Pattern audit: 0 instances of `sizeof((char*))` remain in real code.
-  Followup document is now archived at
-  [`docs/tech/closed/FOLLOWUP_v0.3.6.5_F1_strncpy_overflow.md`](docs/tech/closed/FOLLOWUP_v0.3.6.5_F1_strncpy_overflow.md).
   v0.3.7 may start with confidence.
 - Real LSan / clang-style UBSan coverage requires clang-cl, scheduled
   for v0.4.x as an opt-in CI matrix job (main toolchain remains MSVC).
@@ -529,7 +525,8 @@ runtime end-to-end, and rewrites the checkpoint report from real evidence.
   函数已通过 `/guard:cf` 全局 CFG 保护,无需逐函数 `__declspec(guard_overwrite)`。
 - **fceu.cpp / ines.cpp / nsf.cpp / fds.cpp / vidblit.cpp**: 多文件手工迁移
   + `transform_v036.py` 自动化补充,确保 `FreeBuffers()` 等关键路径无双重释放。
-- **docs/tech/v0.3.6_Release_Notes.md**: 完整交付记录(实施 + 五道闸验收 + 文件清单)。
+- **Release notes**: full implementation details, five-gate verification,
+  and 75-file change list (+504 / -374 lines) recorded in this CHANGELOG entry.
 
 ### Deprecated
 
@@ -565,150 +562,386 @@ runtime end-to-end, and rewrites the checkpoint report from real evidence.
 
 ## [0.2.30] - 2026-06-07
 
-### Changed
-
-- Core abstraction design, architecture freeze, and documentation
-
-## [0.2.29] - 2026-06-07
-
-### Changed
-
-- Migrate PNG snapshot save + pixel accessors to Rust
-
-- Migrate FM2 movie parser/serializer to Rust
-
-- Incremental state serialization migration to Rust
-
-## [0.2.25] - 2026-06-04
-
-### Changed
-
-- Migrate drawing (text rendering + status icons) to Rust
-
-- Migrate cheat decoders + cheat-map to Rust
-
-- Complete cheat list + search migration to Rust
-
-- Migrate debug helpers + symbol I/O + ld65 .dbg parser + DebuggerState to Rust
-
-
-### Documentation
-
-- Archive lua_rust_engine_compatibility_report into docs/history/
-
-
-### Fixed
-
-- Move fceux11_lua_SetMouseDataCallback out of extern "C" block
-
-## [0.2.22.9] - 2026-06-02
-
-### Changed
-
-- Remove obsolete vc/ and slim down output/
-
-- Migrate conddebug and asm modules to Rust
-
-- Fceux11-lua crate — infrastructure + bit/emu (partial)
-
-- Fix fceux11_lua_GetJoypadState linkage error (joy array)
-
-- Complete P2 Lua bindings + fix test infrastructure
-
-- Complete P3 Lua bindings (sound, zapper, debugger)
-
-- Clean up dead code warnings in fceux11-lua
-
-- Rust Lua engine builds end-to-end with FCEUX11_LUA_RUST_ENABLED=ON
-
-- Add Rust Lua engine compatibility report and L2 test scripts
-
-
-### V0.2.22
-
-- Bump workspace version to 0.2.22
-
-
-### V0.2.22.3
-
-- Continue fceux11-lua migration — add gui, input, movie, ppu, savestate, sound bindings
-
-
-### V0.2.22.6
-
-- Sync fceux11_rust.h (cbindgen headers) + remove null
-
-
-### V0.2.22.7
-
-- Eliminate all warnings in fceux11-lua
-
-
-### V0.2.22.9
-
-- Phase B fixes, savestate FFI, GetMouseData callback, unit tests, version bump
-
-## [0.2.21] - 2026-05-30
-
-### Changed
-
-- ROM regression test baseline + agent spec
-
-- NSF parser Rust migration + version bump
-
-## [0.2.8] - 2026-05-28
+v0.2.x Rust 渐进式重构 —— 第四阶段：核心渗透（v0.2.26 – v0.2.30）：架构定型与 LTS 收官（2026-06-07）
 
 ### Added
 
-- Phase 2 GUID Rust migration with build fixes (**v0.2.3**)
+- 新建 `fceux11-core` crate： state_file.rs       — savestate 文件格式管理（继承 v0.2.29） bus.rs              — 极简 SimpleBus 原型 + 微基准 traits.rs           — Cpu / Ppu / Apu / Mapper 核心 trait state_recorder.rs   — 占位（v0.3.x 填充）
 
-- Phase 3 General Utilities Rust migration (**v0.2.4**)
+### Changed
+
+- 核心抽象设计： struct NesSystem<C: Cpu, P: Ppu, A: Apu, M: Mapper> { cpu, ppu, apu, mapper, wram: [u8; 0x800], prg_rom, chr_rom, cycle_count } —— System 拥有所有组件，`&mut self` 统一调度，避免 `Rc<RefCell<T>>` 运行时开销，逐 tick 推进。
+- FFI 边界冻结：180 个函数签名进入冻结期，变更需 RFC。cbindgen 生成的 `fceux11_rust.h`（2,358 行）为唯一权威头文件。
+- 已知限制：fceux11-core 仅为骨架；StateRecorder 仍在 C++；175 个 Mapper 文件未触及。
+
+### Testing
+
+- 总线原型：`match`-based 地址解码，release 模式编译为跳转表。 `bench_simple_bus(1_000_000)` < 100 ms (debug)；4 单元测试。
+- 代码统计： Rust 行数 ~7,800（v0.2.29 ~6,500，+1,300） Rust 单元测试 205（+12） FFI 函数 180（+7） Rust 占比 ~20%（v0.2.29 ~18%，+2pp） Crate 数 6（+1）
+- 测试：5 个 crate 的 `cargo test` 全部通过；C++ 混合构建因环境限制 未现场验证（savestate 格式未变更）。
+
+### Documentation
+
+- **Documentation produced**: Rust refactor handbook v1.0 and mapper Rust
+  migration feasibility report (175 C++ Mapper files + proc-macro DSL draft);
+  these historical artifacts have been superseded by later planning documents.
+
+## [0.2.29]
+
+v0.2.x Rust 渐进式重构 —— 第四阶段：核心渗透（v0.2.26 – v0.2.30）：State 状态序列化（增量式）
+
+### Changed
+
+- `src/state.cpp` 由 1,541 → 1,403 行（-138）。
+- Rust 管理序列化缓冲区与压缩；具体字段读写仍通过 FFI 回调到 C++ 侧注册函数。完整字段迁移延至 v0.3.x。
+
+## [0.2.28]
+
+v0.2.x Rust 渐进式重构 —— 第四阶段：核心渗透（v0.2.26 – v0.2.30）：Movie 录像系统
+
+### Changed
+
+- `src/movie.cpp`（2,041 行）的 FM2 文本/二进制混合格式解析与 序列化迁移至 Rust。
+- 帧级逻辑与 input.cpp / fceu.cpp / state.cpp 耦合部分保留 C++。
+- 录像往返测试：录制的 .fm2 与 C++ 版逐字节一致。
+
+## [0.2.27]
+
+v0.2.x Rust 渐进式重构 —— 第四阶段：核心渗透（v0.2.26 – v0.2.30）：Video 后处理 / PNG 截图
+
+### Changed
+
+- `src/video.cpp`（804 行）：PNG 快照保存 + 像素访问器迁移至 Rust。
+- 截图改用 `image` crate；保留 C++ 窗口管理与 Qt/SDL 前端耦合层。
+
+## [0.2.26]
+
+v0.2.x Rust 渐进式重构 —— 第四阶段：核心渗透（v0.2.26 – v0.2.30）：FDS 磁盘系统
+
+### Changed
+
+- `src/fds.cpp`（948 行）磁盘镜像加载 + IRQ 状态机迁移。IRQ 触发 时机仍由 C++ 主循环控制（读取 Rust 计算的 irq_pending 标志）， 保护时序敏感性。
+
+## [0.2.25]
+
+v0.2.x Rust 渐进式重构 —— 第三阶段：扩展重构（v0.2.16 – v0.2.25）：调试系统双模块
+
+### Fixed
+
+- `src/debug.cpp`（993 行）调试器核心 + `src/debugsymboltable.cpp` （1,002 行）符号表与 ld65 `.dbg` 文件解析迁移至 `fceux11-debug::DebuggerState`。`HashMap<String, Symbol>` 替代 C++ 容器。GUI 壳层保留在 C++。
+
+## [0.2.24] - 2026-06-03
+
+v0.2.x Rust 渐进式重构 —— 第三阶段：扩展重构（v0.2.16 – v0.2.25）：/ v0.2.24.1  Cheat 引擎（2026-06-03）
+
+### Fixed
+
+- 第一波（v0.2.24）：`FCEUI_DecodeGG` / `FCEUI_DecodePAR`、 `FindCheatMapByte` / `SetCheatMapByte` / `CreateCheatMap` / `RefreshCheatMap` / `ReleaseCheatMap`、`CalcCheatAffectedBytes` 全部迁移至 `fceux11-debug::cheat`（1099 行 Rust + 20 测试）。 8 KiB 位缓冲区由 Rust `Mutex<Vec<u8>>` 拥有。
+
+### Removed
+
+- 第二波（v0.2.24.1）：删除 C++ `CHEATF*` 链表全局； `AddCheatEntry` / `DelCheat` / `ToggleCheat` / `GetCheat` / `SetCheat` / `ListCheats` / `DisableAllCheats` / `DeleteAllCheats` 全部 Rust 化。CheatComp 64K 缓冲区由 Rust 拥有；8 种 search type （specific/relative/any/known/gt/lt/gt_known/lt_known）逻辑全 Rust。
+
+### Testing
+
+- cargo test 186/186，ctest 4/4 通过。
+
+### Notes
+
+- 保留 C++：`SubCheatsRead` (x6502 钩子)、`RebuildSubCheats` (`SetReadHandler` 装卸)、`CheatRPtrs` 转换表、文件 I/O。
+
+## [0.2.23]
+
+v0.2.x Rust 渐进式重构 —— 第三阶段：扩展重构（v0.2.16 – v0.2.25）：Drawing
+
+### Changed
+
+- `src/drawing.cpp`（525 行）文本渲染 + 状态图标迁移至 Rust。 字体数据表用 `const` 数组；像素操作用 `&mut [u8]` slice。
+
+## [0.2.22.9] - 2026-06-01
+
+v0.2.x Rust 渐进式重构 —— 第三阶段：扩展重构（v0.2.16 – v0.2.25）：fceux11-lua crate 建设（2026-06-01 → 06-02）
+
+### Added
+
+- 新建 `crates/fceux11-lua`，依赖 `mlua` (vendored Lua 5.1)。决策方案 C：混合（mlua 绑定层 + C++ 兼容层），不替换 Lua 引擎本身。
+
+### Fixed
+
+- 进度：v0.2.22.1 基础设施 + bit/emu（部分）；v0.2.22.2 修复 joypad 数组 linkage；v0.2.22.3 gui/input/movie/ppu/savestate/sound 绑定； v0.2.22.5 P2 收尾 + 测试基建；v0.2.22.6 P3 sound/zapper/debugger + cbindgen 同步；v0.2.22.7 警告清零；v0.2.22.8 端到端构建 （FCEUX11_LUA_RUST_ENABLED=ON）+ L2 测试 + 兼容性报告；v0.2.22.9 Phase B 修复 + savestate FFI + GetMouseData 回调。
+
+### Testing
+
+- 致命差异修复清单：`joypad.get` 返回 table（非位掩码）、 `rom.gethash` 改回 MD5（非 CRC32）、`emu.frameadvance` 协程 yield/resume 栈清洁度验证。
+
+### Notes
+
+- 兼容性自查结论：13 库 Rust 化覆盖率 ~74%，可削减 C++ ~5,061 行 （69%）。不可替代残留 ~2,245 行：FFI 桥接、LuaSaveData 序列化 （依赖 lstate.h）、TieredRegion 内存钩子（热路径 FFI 开销 不可接受）、taseditor / cdlog（Qt/Win 耦合）、对话框/键名映射。
+
+## [0.2.22]
+
+v0.2.x Rust 渐进式重构 —— 第三阶段：扩展重构（v0.2.16 – v0.2.25）：调试辅助双模块 + 版本号提升
+
+### Changed
+
+- `src/asm.cpp`（529 行）内联汇编器，指令编码表用 Rust `match` + `const`。
+- Workspace 版本同步至 0.2.22。
+
+### Fixed
+
+- `src/conddebug.cpp`（506 行）条件断点解析。
+
+## [0.2.21]
+
+v0.2.x Rust 渐进式重构 —— 第三阶段：扩展重构（v0.2.16 – v0.2.25）：NSF 播放器
+
+### Changed
+
+- `src/nsf.cpp`（657 行）解析与播放状态机迁移。
+
+## [0.2.20]
+
+v0.2.x Rust 渐进式重构 —— 第三阶段：扩展重构（v0.2.16 – v0.2.25）：Cart 卡带管理
+
+### Changed
+
+- `src/cart.cpp`（608 行）：PRG/CHR ROM 分配、Trainer、Battery RAM。
+
+### Notes
+
+- 里程碑：ines → unif → cart 全链路 Rust 化，C++ 侧仅剩 Mapper 绑定。
+
+## [0.2.19]
+
+v0.2.x Rust 渐进式重构 —— 第三阶段：扩展重构（v0.2.16 – v0.2.25）：iNES 解析
+
+### Changed
+
+- `src/ines.cpp`（1,208 行）：`FceuInesHeader` `#[repr(C)]` 16 字节 头结构体 + `cleanup()`。
+- 静态数据库全量迁移：bmap（168）+ not_power2（4）+ SetInput CRC 表 （70）+ NES20 expansion 表（25）+ BadROMImages（40）+ sMasterRomInfo（9）+ savie 电池白名单（33）+ ines-correct 修正 表（256）。
+
+### Testing
+
+- 16 新测试，cargo test 114 通过。
+
+## [0.2.18]
+
+v0.2.x Rust 渐进式重构 —— 第三阶段：扩展重构（v0.2.16 – v0.2.25）：UNIF 解析
+
+### Changed
+
+- `src/unif.cpp`（642 行）的板卡映射表迁移至 Rust。
+
+## [0.2.17]
+
+v0.2.x Rust 渐进式重构 —— 第三阶段：扩展重构（v0.2.16 – v0.2.25）：VS UniSystem
+
+### Changed
+
+- `src/vsuni.cpp`（430 行）：`VSUniGames` 数据库（37 条目）迁移至 Rust `const` 数组。`VSUniCheck` / `VSUniDraw` / `VSUniToggleDIP` / `Coin` / `Service` 核心位操作迁移。
+
+### Testing
+
+- 保留 C++：全局状态、SFORMAT 序列化、`SetReadHandler` 回调注册、 保护芯片模拟。新增 16 测试，`cargo test --workspace` 81 通过。
+
+## [0.2.16] - 2026-05-30
+
+v0.2.x Rust 渐进式重构 —— 第三阶段：扩展重构（v0.2.16 – v0.2.25）：EmuFile（2026-05-30）
+
+### Deprecated
+
+- C++ `EMUFILE_MEMORY` 因 `buf()` / `get_vec()` 被 state.cpp / file.cpp / lua-engine.cpp 等 10 余处直接调用，头文件级迁移 **暂缓**，正式划入 v0.3.x。
+
+### Testing
+
+- `fceux11-formats::EmuFileMem` 实现 + 23 个 FFI 函数 + 7 单元测试。
+
+### Notes
+
+- 决策变更：双 Agent 模式终止，后续 v0.2.17–v0.2.30 统一由 Kimi Code CLI 单 Agent 负责编码/构建/测试/发布。
+
+## [0.2.15]
+
+v0.2.x Rust 渐进式重构 —— 第二阶段：清理与架构（v0.2.12 – v0.2.15）：ROM 回归测试基线
+
+### Changed
+
+- 同期完成 `rust_refactor_agent_spec.md` 双 Agent 模式定义。
+
+### Testing
+
+- `src/tests/rom_regression_test.cpp` 加载 `tests/fixtures/nestest.nes`， 跑到地址 $C66E，验证 $02 / $03 为 0x00。
+- 5 个无版权 ROM 跑 60 帧，CRC32 写入 `tests/fixtures/golden_hashes.json` 作为金标准。
+
+## [0.2.14]
+
+v0.2.x Rust 渐进式重构 —— 第二阶段：清理与架构（v0.2.12 – v0.2.15）：cbindgen 自动头文件
+
+### Changed
+
+- `cbindgen.toml` 配置 `prefix = "fceux11_rust_"`、`cpp_compat = true`。
+- 每个 sub-crate 的 `build.rs` 调用 `cbindgen::generate()` 输出 `src/rust/fceux11_rust.h`。
+- 消除手动维护 23 个 FFI 函数声明的心智负担。
+
+## [0.2.13]
+
+v0.2.x Rust 渐进式重构 —— 第二阶段：清理与架构（v0.2.12 – v0.2.15）：Workspace 拆分 + FceuSlice 类型
+
+### Added
+
+- 引入 `#[repr(C)] FceuSlice { ptr, len }` 统一缓冲区描述符。
+
+### Fixed
+
+- `src/rust/` 由单 crate 拆为 Workspace： crates/fceux11-utils    (md5/guid/crc32/general/timestamp/os_utils) crates/fceux11-formats  (ines/unif/cart/nsf/fds/wave/emufile) crates/fceux11-media    (filter/palette/video helpers) crates/fceux11-debug    (profiler/cheat/conddebug/debug/debugsym/asm) crates/fceux11-core     (空壳，为 v0.3.x 预留)
+
+## [0.2.12]
+
+v0.2.x Rust 渐进式重构 —— 第二阶段：清理与架构（v0.2.12 – v0.2.15）：Legacy Fallback 不可逆化清理
+
+### Changed
+
+- 每个文件单独 commit，message 标注 `[irreversible] remove C++ fallback for XXX`。
+
+### Removed
+
+- 删除 11 个已 Rust 化模块的 C++ 回退实现（crc32 / md5 / guid / general / wave / os_utils / ConvertUTF / timeStamp / profiler / filter / palette）。
+- 删除前打标签 `v0.2.11-legacy-fallback`；删除的文件归档至本目录的 `legacy_code/`（已在 v0.2.30 之后清理）。
+
+## [0.2.11]
+
+v0.2.x Rust 渐进式重构 —— 第一阶段：叶子模块（v0.2.2 – v0.2.11）：Palette
+
+### Changed
+
+- `src/palette.cpp`（~589 行）改用 Rust。`palette_ntsc` / `lo_levels` / `hi_levels` / `phases` 等大量静态数据用 Rust `const` 数组表达。`FCEU_DrawNTSCControlBars` 验证了像素缓冲区（`*mut u8` + width/height + stride）FFI 边界。
+
+### Notes
+
+- 阶段总结：11 个模块、~3,714 行 Rust、62 测试全部通过，验证 CMake/ Cargo 混合构建、手动 C ABI、Opaque Pointer、`#[repr(C)]` 等所有 关键 FFI 范式。
+
+## [0.2.10]
+
+v0.2.x Rust 渐进式重构 —— 第一阶段：叶子模块（v0.2.2 – v0.2.11）：Audio Filter
+
+### Changed
+
+- `src/filter.cpp`（~209 行）改用 Rust。所有 static 局部状态 （`acc`、`mrindex`、`mrratio` 等）封装在 opaque `FilterState`。 FIR 系数表 `fir/*.h` 自动转换为 Rust `const` 数组 `fcoeffs.rs`。 `NeoFilterSound` 验证了 C→Rust→C 函数指针回调可行。
+
+## [0.2.9]
+
+v0.2.x Rust 渐进式重构 —— 第一阶段：叶子模块（v0.2.2 – v0.2.11）：Profiler
+
+### Changed
+
+- `src/profiler.cpp` 的统计后端（`std::map<std::string, funcProfileRecord*>`） 改用 Rust `HashMap`，通过 opaque `ProfilerHandle` 跨语言管理。C++ `FCEU_PROFILE_FUNC` 宏与 RAII 对象保持不变。仅在 `__FCEU_PROFILER_ENABLE__` 定义时编译。
+
+## [0.2.8] - 2026-05-29
+
+v0.2.x Rust 渐进式重构 —— 第一阶段：叶子模块（v0.2.2 – v0.2.11）：TimeStamp（2026-05-29，发布说明）
+
+### Changed
+
+- `src/utils/timeStamp.cpp` 改用 `std::time::Instant`。C++ 侧保留 `timeStampRecord` 类外壳，内部 readNew/toSeconds 转发到 Rust FFI， 调用方零侵入。消除 Windows QPC/TSC 手动校准代码。
+
+### Testing
+
+- 软件版本号全面升至 v0.2.8（主窗口/About/Qt 翻译/CMake/vcpkg/Rust 元 数据）。`cargo test` 42/42 通过。
+
+## [0.2.7]
+
+v0.2.x Rust 渐进式重构 —— 第一阶段：叶子模块（v0.2.2 – v0.2.11）：Unicode Conversion
+
+### Changed
+
+- `src/utils/ConvertUTF.c`（~499 行）改用 Rust 标准库。slice 边界 检查替代 2001 年风格手动指针算术，消除缓冲区溢出风险。约 1004 行 Rust + 20 测试。
+
+## [0.2.6]
+
+v0.2.x Rust 渐进式重构 —— 第一阶段：叶子模块（v0.2.2 – v0.2.11）：OS Utilities
+
+### Changed
+
+- `src/drivers/common/os_utils.cpp` 的 mkdir / mkpath / file_exists / msleep 改用 `std::fs` + `std::thread::sleep`。解耦 Win32 API，为未来 跨平台打基础。
+
+## [0.2.5]
+
+v0.2.x Rust 渐进式重构 —— 第一阶段：叶子模块（v0.2.2 – v0.2.11）：Wave Audio Export
+
+### Changed
+
+- `src/wave.cpp`（~131 行）改用 Rust 安全文件 I/O；文件句柄由静态 `Mutex<Box<File>>` 管理；采样率作为 FFI 参数传入。
+
+## [0.2.4]
+
+v0.2.x Rust 渐进式重构 —— 第一阶段：叶子模块（v0.2.2 – v0.2.11）：General Utilities
+
+### Changed
+
+- `uppow2()` 改用 `u32::next_power_of_two`。作为端到端流水线 （Cargo.toml → Rust → C wrapper → CMake → 测试）验证样板。
+
+## [0.2.3]
+
+v0.2.x Rust 渐进式重构 —— 第一阶段：叶子模块（v0.2.2 – v0.2.11）：GUID
+
+### Changed
+
+- `src/utils/guid.cpp` 改用 `uuid` crate v4。`#[repr(C)] FceuGuid { data: [u8; 16] }`，thread-local 返回缓冲。消除 `rand()` 低质量随机性。
+
+## [0.2.2] - 2026-05-25
+
+v0.2.x Rust 渐进式重构 —— 第一阶段：叶子模块（v0.2.2 – v0.2.11）：2026-05-25)  MD5
+
+### Added
+
+- `src/utils/md5.cpp` 改用 RustCrypto `md-5` crate（约 205 → 366 行 Rust， 6 测试）。消除手写 MD5 维护负担，启用 SIMD。
 
 ## [0.2.1] - 2026-05-24
 
-### Changed
+MSVC + vcpkg 单轨化（2026-05-24）
 
-- Phase 0 baseline freeze and version bump to v0.2.1
+### Added
 
-- Phase 1 build system refactor — MSVC + vcpkg single-track
-
-- V0.2.1 MSVC 2022 + vcpkg single-track migration
-
-- Phase 2 source-level compatibility cleanup
-
-- Phase 3 peripheral script & document cleanup
-
-- Phase 4 clean build validation fixes
-
-- Phase 5 — 文档与元数据更新
-
-
-### Documentation
-
-- Rewrite readme intro for clarity and tone
-
-
-### Fixed
-
-- Resolve fceux11_smoke_test link conflicts (**tests**)
-
-## [0.2.0] - 2026-05-20
+- `CMakeLists.txt` 强制 `if(NOT MSVC) FATAL_ERROR`；启用 `/W4 /permissive- /guard:cf /GS /sdl` + `/GUARD:CF /CETCOMPAT`。
 
 ### Changed
 
-- Fix MinGW link order for Rust module and remove BOM from fceuWrapper.cpp
+- 源码层 POSIX 兼容：`alloca` / `__forceinline` 守卫，`ssize_t` → `SSIZE_T`，`strcasestr` / `strtok_r` / `strndup` / `gettimeofday` 全部 MSVC 化。
+- Rust 默认 target 切换至 `x86_64-pc-windows-msvc`。
 
-- Add .claude/ to .gitignore
+### Removed
 
+- 删除所有 `if(MINGW)` 分支与 msys64 硬编码（`D:/msys64/`、 `/d/msys64/`）。
+- 脚本：新增 `do_build.ps1`（纯 PowerShell），删除 `build.sh` 及 Linux/macOS/Cygwin 脚本，删除 `fceux-server/cygwin1.dll`。
+
+### Deprecated
+
+- 工具链彻底单轨：弃用 MinGW-w64 / MSYS2，确立 MSVC 2022+ 为唯一官方。
 
 ### Documentation
 
-- Add AGENTS.md for test suite maintainer guide (**tests**)
+- 文档：`Build_Guide_MSYS2_Mingw64.md` 归档 .DEPRECATED，新增 `Build_Guide_MSVC_vcpkg.md`。
 
+## [0.2.0] - 2026-05-19
 
-### Fixed
+i18n 与品牌（2026-05-19）
 
-- Resolve build warnings, improve build script, update build guide, clean up root artifacts
+### Added
+
+- i18n 基础设施：Qt Linguist + QTranslator + `assets/i18n/`；运行时支持 EN / zh_CN / zh_TW 切换；专业术语对照表建立。
+
+### Changed
+
+- 主窗口标题规范化：`FCEUX11 v0.2.0` 格式固定。
+
+### Removed
+
+- 死代码清理 ~150,400 行：删除 `src/drivers/win/`、`src/drivers/sdl/`、 `src/attic/`、`src/drivers/videolog/`，清理 `#if 0` / `/* */` / `//` 死代码块、未使用 TasEditor 头文件、`oldmovie.cpp` 重构。
+- About 窗口精简：移除 git URL、依赖库版本清单、完整作者数组，仅保留 Logo + 版本 + 单行版权 + View License。
+
+### Testing
+
+- 测试基线：`src/tests/smoke_test.cpp` + 8 个代表性 Mapper 加载/重置 回归测试。
 
 ## [0.1.0] - 2026-05-17
 
@@ -718,3 +951,49 @@ runtime end-to-end, and rewrites the checkpoint report from real evidence.
 
 - Soften Windows 11 exclusivity in readme taglines
 
+## Historical - Phase 0-7 (pre-0.1.0) - 2026-05
+
+立项与初始重塑，发生在 v0.1.0 之前。
+
+### Phase 0  基线与合规
+
+- GPLv2 衍生作品声明、版权审计、`legacy/fceux-2.6.6-base` 标签冻结。
+- 删除根目录过时文件（NEWS / INSTALL / LICENSE 重复项 / changelog.txt / install_deps.sh 等）。
+- 基线编译：MinGW-w64 GCC 16.1.0 + Qt5 + CMake 4.2.3，~1133 条警告。
+
+### Phase 1  标识层
+
+- `FCEU_NAME` → "FCEUX11"，版本宏与 About 窗口标题统一。
+- `APP_NAME = fceux11`；图标/manifest/资源更名为 fceux11。
+- readme.md 与 About 显示"基于 FCEUX 的衍生作品"。
+
+### Phase 2  构建系统
+
+- CMake 升至 3.28；C++ 标准强制 C++20。
+- 删除 Linux/macOS 分支，保留 MinGW 兼容；修复 `alloca` / `__forceinline` 宏冲突。
+
+### Phase 3  包管理
+
+- 引入 `vcpkg.json` 作为远期依赖管理；现阶段 MSYS2 pacman 并存。
+- `copy_dependencies.ps1` 增加 msys64 路径自动探测。
+
+### Phase 4  Qt6 UI
+
+- 全量迁移 Qt5 → Qt6：`QRegExp` → `QRegularExpression`，`QMutex(Recursive)` → `QRecursiveMutex` 等弃用 API 修复。
+- 暗/亮主题样式表草案；Segoe UI Variable 字体；C++20 `volatile` / lambda `this` 捕获修复。
+
+### Phase 5  Win11 平台
+
+- manifest 启用 PerMonitorV2 高 DPI、longPathAware、Unicode 宏。
+- 暗色模式检测、IFileDialog 评估、Snap Layouts 提示。
+
+### Phase 6  遗留代码清理
+
+- part 1：废弃 Win32/SDL 驱动、清理 CMake 债务、大规模跨平台宏清理。
+- part 2：低风险死代码删除（video.cpp / file.cpp / fceuWrapper.cpp / HelpPages.cpp）。
+- part 3：sdl-throttle 高精度睡眠重写、`unix-netplay.cpp` → `QtNetplay.cpp`、5 文件中风险宏清理、CMake 变量纯化。
+
+### Phase 7  Rust 重构准备
+
+- `src/rust/` 独立 Cargo crate，类型 staticlib。
+- 试点：`crc32fast` 替代 `src/utils/crc32.cpp` 中的 zlib 计算， 通过 `fceux11_rust_crc32()` C ABI 暴露。
