@@ -113,9 +113,11 @@ template<typename T, int DIGITS, bool PAD> void putdec(EMUFILE* os, T dec)
 		dec /= 10;
 	}
 	if (!PAD)
-		os->fwrite(temp + (DIGITS - 1) - ctr, ctr + 1);
+		os->fwrite(std::span<const std::byte>(
+			reinterpret_cast<const std::byte*>(temp + (DIGITS - 1) - ctr), ctr + 1));
 	else
-		os->fwrite(temp, DIGITS);
+		os->fwrite(std::span<const std::byte>(
+			reinterpret_cast<const std::byte*>(temp), DIGITS));
 }
 
 std::string mass_replace(const std::string &source, const std::string &victim, const std::string &replacement);

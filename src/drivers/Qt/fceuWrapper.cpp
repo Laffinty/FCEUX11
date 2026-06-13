@@ -1587,7 +1587,7 @@ static FCEUFILE* minizip_OpenArchive(ArchiveScanRecord& asr, std::string &fname,
 	unzReadCurrentFile( zf, tmpMem, fi.uncompressed_size );
 	unzCloseCurrentFile( zf );
 
-	ms->fwrite( tmpMem, fi.uncompressed_size );
+	ms->fwrite(std::span<const std::byte>(static_cast<const std::byte*>(tmpMem), fi.uncompressed_size));
 
 	free( tmpMem );
 
@@ -1707,7 +1707,7 @@ static FCEUFILE* libarchive_OpenArchive( ArchiveScanRecord& asr, std::string& fn
 				break;
 			}
 			//printf("Read: %p   Size:%zu   Offset:%llu\n", buff, size, (long long int)offset);
-			ms->fwrite( buff, size );
+			ms->fwrite(std::span<const std::byte>(static_cast<const std::byte*>(buff), size));
 			totalSize += size;
 		}
 

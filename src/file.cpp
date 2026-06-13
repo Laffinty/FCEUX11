@@ -400,12 +400,16 @@ int FCEU_fclose(FCEUFILE *fp)
 
 uint64 FCEU_fread(void *ptr, size_t size, size_t nmemb, FCEUFILE *fp)
 {
-	return fp->stream->fread((char*)ptr,size*nmemb);
+	// v0.3.10: direct std::span virtual call (avoid [[deprecated]] shim).
+	return fp->stream->fread(std::span<std::byte>(
+		reinterpret_cast<std::byte*>(ptr), size * nmemb));
 }
 
 uint64 FCEU_fwrite(void *ptr, size_t size, size_t nmemb, FCEUFILE *fp)
 {
-	fp->stream->fwrite((char*)ptr,size*nmemb);
+	// v0.3.10: direct std::span virtual call (avoid [[deprecated]] shim).
+	fp->stream->fwrite(std::span<const std::byte>(
+		reinterpret_cast<const std::byte*>(ptr), size * nmemb));
 	//todo - how do we tell how many bytes we wrote?
 	return nmemb;
 }
