@@ -101,3 +101,6 @@ src/rust/Cargo.lock
 # Temporary build scripts
 scripts/build_*.ps1
 scripts/reconfig_*.ps1
+
+# CTest artifacts (cost data, last-test logs)
+Testing/
