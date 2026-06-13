@@ -111,9 +111,14 @@ void GREENZONE::collectCurrentState()
 	// if frame is not saved - log savestate
 	if (!savestates[currFrameCounter].size())
 	{
-		EMUFILE_MEMORY ms(&savestates[currFrameCounter]);
+		// v0.3.10: EMUFILE_MEMORY wraps std::vector<std::byte>. Convert at the
+		// boundary since savestates[] is std::vector<uint8_t>.
+		std::vector<std::byte> tmp;
+		EMUFILE_MEMORY ms(&tmp);
 		FCEUSS_SaveMS(&ms, Z_DEFAULT_COMPRESSION);
 		ms.trim();
+		savestates[currFrameCounter].assign(reinterpret_cast<const uint8_t*>(tmp.data()),
+		                                     reinterpret_cast<const uint8_t*>(tmp.data()) + tmp.size());
 	}
 	if (greenzoneSize <= currFrameCounter)
 		greenzoneSize = currFrameCounter + 1;
@@ -123,7 +128,10 @@ bool GREENZONE::loadSavestateOfFrame(unsigned int frame)
 {
 	if (frame >= savestates.size() || !savestates[frame].size())
 		return false;
-	EMUFILE_MEMORY ms(&savestates[frame]);
+	// v0.3.10: boundary conversion std::vector<uint8_t> -> std::vector<std::byte>.
+	std::vector<std::byte> tmp(reinterpret_cast<const std::byte*>(savestates[frame].data()),
+	                            reinterpret_cast<const std::byte*>(savestates[frame].data()) + savestates[frame].size());
+	EMUFILE_MEMORY ms(&tmp);
 	return FCEUSS_LoadFP(&ms, SSLOADPARAM_NOBACKUP);
 }
 

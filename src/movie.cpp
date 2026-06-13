@@ -895,20 +895,32 @@ bool FCEUMOV_FromPoweron()
 }
 bool MovieData::loadSavestateFrom(std::vector<uint8>* buf)
 {
-	EMUFILE_MEMORY ms(buf);
+	// v0.3.10: EMUFILE_MEMORY now wraps std::vector<std::byte>. Convert at
+	// the boundary so the std::vector<uint8> movie signature stays intact.
+	std::vector<std::byte> tmp(reinterpret_cast<const std::byte*>(buf->data()),
+	                            reinterpret_cast<const std::byte*>(buf->data()) + buf->size());
+	EMUFILE_MEMORY ms(&tmp);
 	return FCEUSS_LoadFP(&ms,SSLOADPARAM_BACKUP);
 }
 
 void MovieData::dumpSavestateTo(std::vector<uint8>* buf, int compressionLevel)
 {
-	EMUFILE_MEMORY ms(buf);
+	// v0.3.10: write into a temporary std::vector<std::byte> then copy back
+	// to the caller's std::vector<uint8>.
+	std::vector<std::byte> tmp;
+	EMUFILE_MEMORY ms(&tmp);
 	FCEUSS_SaveMS(&ms,compressionLevel);
 	ms.trim();
+	buf->assign(reinterpret_cast<const uint8_t*>(tmp.data()),
+	            reinterpret_cast<const uint8_t*>(tmp.data()) + tmp.size());
 }
 
 bool MovieData::loadSaveramFrom(std::vector<uint8>* buf)
 {
-	EMUFILE_MEMORY ms(buf);
+	// v0.3.10: boundary conversion at the std::vector<u8> -> std::vector<std::byte>.
+	std::vector<std::byte> tmp(reinterpret_cast<const std::byte*>(buf->data()),
+	                            reinterpret_cast<const std::byte*>(buf->data()) + buf->size());
+	EMUFILE_MEMORY ms(&tmp);
 
 	bool hasBattery = !!ms.read32le();
 	if(hasBattery != !!currCartInfo->battery)
@@ -941,7 +953,9 @@ bool MovieData::loadSaveramFrom(std::vector<uint8>* buf)
 
 void MovieData::dumpSaveramTo(std::vector<uint8>* buf, int compressionLevel)
 {
-	EMUFILE_MEMORY ms(buf);
+	// v0.3.10: write into std::vector<std::byte>, flush back at the end.
+	std::vector<std::byte> tmp;
+	EMUFILE_MEMORY ms(&tmp);
 
 	ms.write32le(currCartInfo->battery?1:0);
 	for(size_t i=0;i<currCartInfo->SaveGame.size();i++)
@@ -955,6 +969,8 @@ void MovieData::dumpSaveramTo(std::vector<uint8>* buf, int compressionLevel)
 		ms.fwrite(currCartInfo->SaveGame[i].bufptr, currCartInfo->SaveGame[i].buflen);
 	}
 
+	buf->assign(reinterpret_cast<const uint8_t*>(tmp.data()),
+	            reinterpret_cast<const uint8_t*>(tmp.data()) + tmp.size());
 }
 
 

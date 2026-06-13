@@ -51,7 +51,9 @@ expected<std::vector<uint8_t>> save_state(int compressionLevel) {
     if (!FCEUSS_SaveMS(&ms, compressionLevel)) {
         return unexpected(5);
     }
-    std::vector<uint8_t> buf(ms.buf(), ms.buf() + ms.size());
+    // v0.3.10: ms.buf() returns std::byte*; convert to uint8_t* for vector init.
+    std::vector<uint8_t> buf(reinterpret_cast<const uint8_t*>(ms.buf()),
+                             reinterpret_cast<const uint8_t*>(ms.buf()) + ms.size());
     return buf;
 }
 

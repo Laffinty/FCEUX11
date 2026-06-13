@@ -68,7 +68,9 @@ void ApplyIPS(FILE *ips, FCEUFILE* fp)
 	if(!ips) return;
 
 	char* buf = (char*)FCEU_malloc(fp->size);
-	memcpy(buf,fp->EnsureMemorystream()->buf(),fp->size);
+	// v0.3.10: buf() now returns std::byte*. Reinterpret for memcpy into
+	// the char* scratch buffer (both are 1-byte trivial types).
+	memcpy(buf, reinterpret_cast<const void*>(fp->EnsureMemorystream()->buf()), fp->size);
 
 
 	FCEU_printf(" Applying IPS...\n");
@@ -240,7 +242,8 @@ zpfail:
 
 		int size = ufo.uncompressed_size;
 		EMUFILE_MEMORY* ms = new EMUFILE_MEMORY(size);
-		unzReadCurrentFile(tz,ms->buf(),ufo.uncompressed_size);
+		// v0.3.10: unzReadCurrentFile takes void*; ms->buf() is std::byte*.
+		unzReadCurrentFile(tz, reinterpret_cast<void*>(ms->buf()), ufo.uncompressed_size);
 		unzCloseCurrentFile(tz);
 		unzClose(tz);
 
@@ -332,7 +335,8 @@ FCEUFILE * FCEU_fopen(const char *path, const char *ipsfn, const char *mode, cha
 						for(size=0; gzgetc(gzfile) != EOF; size++) {}
 						EMUFILE_MEMORY* ms = new EMUFILE_MEMORY(size);
 						gzseek(gzfile,0,SEEK_SET);
-						gzread(gzfile,ms->buf(),size);
+						// v0.3.10: gzread takes void*; ms->buf() is std::byte*.
+						gzread(gzfile, reinterpret_cast<void*>(ms->buf()), size);
 						gzclose(gzfile);
 
 						fceufp = new FCEUFILE();
