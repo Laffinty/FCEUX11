@@ -27,8 +27,8 @@ static const int NUM_TESTS = sizeof(tests) / sizeof(tests[0]);
 int main() {
     printf("=== Mapper Reset Test ===\n\n");
 
-    if (!FCEUI_Initialize()) {
-        printf("FAIL: FCEUI_Initialize() returned false\n");
+    if (!fceu11::Initialize()) {
+        printf("FAIL: fceu11::Initialize() returned false\n");
         return 1;
     }
 
@@ -40,7 +40,7 @@ int main() {
 
         printf("[%d/%d] Load + Reset %-30s ... ", i + 1, NUM_TESTS, path);
 
-        FCEUGI* gi = FCEUI_LoadGame(path, 1, true);
+        FCEUGI* gi = fceu11::LoadGame(path, 1, true);
         if (!gi) {
             printf("FAIL (load returned null)\n");
             failed = true;
@@ -48,14 +48,14 @@ int main() {
         }
 
         // Perform reset; if it crashes we won't reach the next line
-        FCEUI_ResetNES();
+        fceu11::ResetNES();
         printf("OK\n");
         ++passed;
 
-        FCEUI_CloseGame();
+        fceu11::CloseGame();
     }
 
-    FCEUI_Kill();
+    fceu11::Kill();
 
     printf("\n=== Results ===\n");
     printf("Passed: %d / %d\n", passed, NUM_TESTS);

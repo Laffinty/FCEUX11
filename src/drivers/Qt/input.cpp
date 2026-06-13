@@ -600,7 +600,7 @@ void gamepad_function_key_t::updateStatus(void)
   * */
 void TogglePause(void)
 {
-	FCEUI_ToggleEmulationPause();
+	fceu11::ToggleEmulationPause();
 
 	int no_cursor;
 	g_config->getOption("SDL.NoFullscreenCursor", &no_cursor);
@@ -629,9 +629,9 @@ static std::string GetFilename(const char *title, int mode, const char *filter)
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::DesktopLocation).first());
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::DownloadLocation).first());
-	urls << QUrl::fromLocalFile(QDir(FCEUI_GetBaseDirectory()).absolutePath());
+	urls << QUrl::fromLocalFile(QDir(fceu11::GetBaseDirectory()).absolutePath());
 
-	initPath.assign(FCEUI_GetBaseDirectory());
+	initPath.assign(fceu11::GetBaseDirectory());
 
 	switch (mode)
 	{
@@ -699,7 +699,7 @@ void FCEUD_MovieRecordTo(void)
 
 	//std::wstring author (s.begin (), s.end ());
 
-	//FCEUI_SaveMovie(fname.c_str(), MOVIE_FLAG_FROM_POWERON, author);
+	//fceu11::SaveMovie(fname.c_str(), MOVIE_FLAG_FROM_POWERON, author);
 	if ( consoleWindow )
 	{
 		consoleWindow->recordMovie();
@@ -715,7 +715,7 @@ void FCEUD_SaveStateAs(void)
 	if (!fname.size())
 		return; // no filename selected, quit the whole thing
 
-	FCEUI_SaveState(fname.c_str());
+	fceu11::SaveStateFile(fname.c_str());
 }
 
 /**
@@ -727,7 +727,7 @@ void FCEUD_LoadStateFrom(void)
 	if (!fname.size())
 		return; // no filename selected, quit the whole thing
 
-	FCEUI_LoadState(fname.c_str());
+	fceu11::LoadStateFile(fname.c_str());
 }
 
 /**
@@ -775,12 +775,12 @@ void toggleFamilyKeyboardFunc(void)
 	{
 		g_fkbEnabled = !g_fkbEnabled;
 
-		FCEUI_DispMessage("Family Keyboard %sabled.", 0,
+		FCEU_DispMessage("Family Keyboard %sabled.", 0,
 						  g_fkbEnabled ? "En" : "Dis");
 	}
 	else
 	{
-		FCEUI_DispMessage("Family Keyboard Not Active", 0);
+		FCEU_DispMessage("Family Keyboard Not Active", 0);
 		g_fkbEnabled = false;
 	}
 	FKB_CheckShortcutConflicts();
@@ -829,9 +829,9 @@ static void KeyboardCommands(void)
 	//{
 	//	bool fgOn, bgOn;
 
-	//	FCEUI_GetRenderPlanes( fgOn, bgOn );
+	//	fceu11::GetRenderPlanes( fgOn, bgOn );
 
-	//	FCEUI_SetRenderPlanes( fgOn, !bgOn );
+	//	fceu11::SetRenderPlanes( fgOn, !bgOn );
 	//}
 
 	// Alt-Enter to toggle full-screen
@@ -926,7 +926,7 @@ static void KeyboardCommands(void)
 	//			{
 	//				std::string movie_fname = FCEU_MakeFName (FCEUMKF_MOVIE, 0, 0);
 	//				FCEUI_printf ("Recording movie to %s\n", movie_fname.c_str() );
-	//				FCEUI_SaveMovie(movie_fname.c_str() , MOVIE_FLAG_NONE, L"");
+	//				fceu11::SaveMovie(movie_fname.c_str() , MOVIE_FLAG_NONE, L"");
 	//			}
 	//			else
 	//			{
@@ -962,7 +962,7 @@ static void KeyboardCommands(void)
 	//			}
 	//			else
 	//			{
-	//				FCEUI_LoadState(NULL);
+	//				fceu11::LoadStateFile(NULL);
 	//			}
 	//		}
 	//	}
@@ -1004,7 +1004,7 @@ static void KeyboardCommands(void)
 
 	//if ( Hotkeys[HK_PAUSE].getRisingEdge() )
 	//{
-	//	//FCEUI_ToggleEmulationPause();
+	//	//fceu11::ToggleEmulationPause();
 	//	// use the wrapper function instead of the fceui function directly
 	//	// so we can handle cursor grabbage
 	//	TogglePause ();
@@ -1027,7 +1027,7 @@ static void KeyboardCommands(void)
 		if (frameAdvancing == false)
 		{
 			frameAdvHoldTimer = 0;
-			FCEUI_FrameAdvance();
+			fceu11::FrameAdvance();
 			frameAdvancing = true;
 			//printf("Frame Advance Start\n");
 		}
@@ -1040,7 +1040,7 @@ static void KeyboardCommands(void)
 	{
 		if (frameAdvancing)
 		{
-			FCEUI_FrameAdvanceEnd();
+			fceu11::FrameAdvanceEnd();
 			frameAdvancing = false;
 			frameAdvHoldTimer = 0;
 			//printf("Frame Advance End\n");
@@ -1053,12 +1053,12 @@ static void KeyboardCommands(void)
 	//}
 	//if( Hotkeys[HK_POWER].getRisingEdge() )
 	//{
-	//    FCEUI_PowerNES();
+	//    fceu11::PowerNES();
 	//}
 	//	if ( Hotkeys[HK_QUIT].getRisingEdge() )
 	//	{
 	//		CloseGame();
-	//		FCEUI_Kill();
+	//		fceu11::Kill();
 	//		SDL_Quit();
 	//		exit(0);
 	//	}
@@ -1149,7 +1149,7 @@ static void KeyboardCommands(void)
 	//		for(int i=1; i<=8;i++)
 	//		{
 	//			if(keyonly(i))
-	//				FCEUI_VSUniToggleDIP(i-1);
+	//				fceu11::VSUniToggleDIP(i-1);
 	//		}
 	//	}
 	//	else
@@ -1515,9 +1515,9 @@ UpdateGamepad(void)
 			// if a+b+start+select is pressed, exit
 			if (four_button_exit && JS == 15)
 			{
-				FCEUI_printf("all buttons pressed, exiting\n");
+				FCEU_printf("all buttons pressed, exiting\n");
 				CloseGame();
-				FCEUI_Kill();
+				fceu11::Kill();
 				exit(0);
 			}
 
@@ -1786,7 +1786,7 @@ void InitInputInterface()
 			t |= 1;
 			break;
 		}
-		FCEUI_SetInput(x, (ESI)CurInputType[x], InputDPtr, attrib);
+		fceu11::SetInput(x, (ESI)CurInputType[x], InputDPtr, attrib);
 	}
 
 	attrib = 0;
@@ -1831,8 +1831,8 @@ void InitInputInterface()
 		break;
 	}
 
-	FCEUI_SetInputFC((ESIFC)CurInputType[2], InputDPtr, attrib);
-	FCEUI_SetInputFourscore((eoptions & EO_FOURSCORE) != 0);
+	fceu11::SetInputFC((ESIFC)CurInputType[2], InputDPtr, attrib);
+	fceu11::SetInputFourscore((eoptions & EO_FOURSCORE) != 0);
 }
 
 ButtConfig fkbmap[FAMILYKEYBOARD_NUM_BUTTONS] = {
@@ -2406,7 +2406,7 @@ int saveInputSettingsToFile(const char *filename)
 {
 	QDir dir;
 	std::string path;
-	const char *baseDir = FCEUI_GetBaseDirectory();
+	const char *baseDir = fceu11::GetBaseDirectory();
 	char base[512];
 
 	path = std::string(baseDir) + "/input/presets/";
@@ -2454,7 +2454,7 @@ int loadInputSettingsFromFile(const char *filename)
 {
 	QDir dir;
 	std::string path;
-	const char *baseDir = FCEUI_GetBaseDirectory();
+	const char *baseDir = fceu11::GetBaseDirectory();
 	char base[512], line[256];
 	char id[128], val[128];
 	int i, j;

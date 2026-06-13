@@ -231,10 +231,10 @@ static int TVCI(FCEUFILE *fp) {
 		const char *stuffo[3] = { "NTSC", "PAL", "NTSC and PAL" };
 		if (t == 0) {
 			GameInfo->vidsys = GIV_NTSC;
-			FCEUI_SetVidSystem(0);
+			fceu11::SetVidSystem(0);
 		} else if (t == 1) {
 			GameInfo->vidsys = GIV_PAL;
-			FCEUI_SetVidSystem(1);
+			fceu11::SetVidSystem(1);
 		}
 		FCEU_printf(" TV Standard Compatibility: %s\n", stuffo[t]);
 	}

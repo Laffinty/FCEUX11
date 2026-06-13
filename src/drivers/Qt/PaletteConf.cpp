@@ -88,7 +88,7 @@ PaletteConfDialog_t::PaletteConfDialog_t(QWidget *parent)
 
 	hbox1->addWidget(useCustom, 50);
 
-	useCustom->setChecked(FCEUI_GetUserPaletteAvail());
+	useCustom->setChecked(fceu11::GetUserPaletteAvail());
 	GrayScale->setChecked(force_grayscale);
 	deemphSwap->setChecked(paldeemphswap);
 
@@ -372,7 +372,7 @@ void PaletteConfDialog_t::hueChanged(int v)
 
 	if (fceuWrapperTryLock())
 	{
-		FCEUI_SetNTSCTH(c, t, v);
+		fceu11::SetNTSCTH(c, t, v);
 		fceuWrapperUnLock();
 	}
 }
@@ -393,7 +393,7 @@ void PaletteConfDialog_t::tintChanged(int v)
 
 	if (fceuWrapperTryLock())
 	{
-		FCEUI_SetNTSCTH(c, v, h);
+		fceu11::SetNTSCTH(c, v, h);
 		fceuWrapperUnLock();
 	}
 }
@@ -415,7 +415,7 @@ void PaletteConfDialog_t::use_Custom_Changed(int state)
 		}
 		else
 		{
-			FCEUI_SetUserPalette(NULL, 0);
+			fceu11::SetUserPalette(NULL, 0);
 		}
 		palupdate = 1;
 		fceuWrapperUnLock();
@@ -433,7 +433,7 @@ void PaletteConfDialog_t::force_GrayScale_Changed(int state)
 		g_config->getOption("SDL.Hue", &h);
 		g_config->getOption("SDL.Tint", &t);
 		force_grayscale = value ? true : false;
-		FCEUI_SetNTSCTH(e, t, h);
+		fceu11::SetNTSCTH(e, t, h);
 		palupdate = 1;
 		fceuWrapperUnLock();
 
@@ -452,7 +452,7 @@ void PaletteConfDialog_t::deemphswap_Changed(int state)
 		g_config->getOption("SDL.Hue", &h);
 		g_config->getOption("SDL.Tint", &t);
 		paldeemphswap = value ? true : false;
-		FCEUI_SetNTSCTH(e, t, h);
+		fceu11::SetNTSCTH(e, t, h);
 		fceuWrapperUnLock();
 
 		g_config->setOption("SDL.DeempBitSwap", paldeemphswap);
@@ -472,7 +472,7 @@ void PaletteConfDialog_t::use_NTSC_Changed(bool state)
 
 	if (fceuWrapperTryLock())
 	{
-		FCEUI_SetNTSCTH(value, t, h);
+		fceu11::SetNTSCTH(value, t, h);
 		//UpdateEMUCore (g_config);
 		fceuWrapperUnLock();
 	}
@@ -485,7 +485,7 @@ void PaletteConfDialog_t::clearPalette(void)
 
 	if (fceuWrapperTryLock())
 	{
-		FCEUI_SetUserPalette(NULL, 0);
+		fceu11::SetUserPalette(NULL, 0);
 		fceuWrapperUnLock();
 		useCustom->setChecked(false);
 	}
@@ -507,7 +507,7 @@ void PaletteConfDialog_t::openPaletteFile(void)
 	//urls = dialog.sidebarUrls();
 	urls << QUrl::fromLocalFile(QDir::rootPath());
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
-	urls << QUrl::fromLocalFile(QDir(FCEUI_GetBaseDirectory()).absolutePath());
+	urls << QUrl::fromLocalFile(QDir(fceu11::GetBaseDirectory()).absolutePath());
 
 	if (exePath[0] != 0)
 	{	// This is where the windows build expects the palettes to be
@@ -608,7 +608,7 @@ void PaletteConfDialog_t::openPaletteFile(void)
 		palupdate = 1;
 		fceuWrapperUnLock();
 
-		useCustom->setChecked(FCEUI_GetUserPaletteAvail());
+		useCustom->setChecked(fceu11::GetUserPaletteAvail());
 	}
 
 	return;

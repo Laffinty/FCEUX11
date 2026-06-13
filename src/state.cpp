@@ -797,16 +797,16 @@ void AddExState(void *v, uint32 s, int type, const char *desc)
 	SFMDATA[SFEXINDEX].v=0;		// End marker.
 }
 
-void FCEUI_SelectStateNext(int n)
+void fceu11::SelectStateNext(int n)
 {
 	if(n>0)
 		CurrentState=(CurrentState+1)%10;
 	else
 		CurrentState=(CurrentState+9)%10;
-	FCEUI_SelectState(CurrentState, 1);
+	fceu11::SelectStateSlot(CurrentState, 1);
 }
 
-int FCEUI_SelectState(int w, int show)
+int fceu11::SelectStateSlot(int w, int show)
 {
 	int oldstate=CurrentState;
 	FCEUSS_CheckStates();
@@ -821,7 +821,7 @@ int FCEUI_SelectState(int w, int show)
 	return oldstate;
 }
 
-void FCEUI_SaveState(const char *fname, bool display_message)
+void fceu11::SaveStateFile(const char *fname, bool display_message)
 {
 	if(!FCEU_IsValidUI(FCEUI_SAVESTATE)) return;
 
@@ -841,7 +841,7 @@ bool file_exists(const char * filename)
     }
     return false;
 }
-void FCEUI_LoadState(const char *fname, bool display_message)
+void fceu11::LoadStateFile(const char *fname, bool display_message)
 {
 	if(!FCEU_IsValidUI(FCEUI_LOADSTATE)) return;
 
@@ -921,15 +921,15 @@ void SwapSaveState()
 
 	if (lastSavestateMade.empty())
 	{
-		FCEUI_DispMessage("Can't Undo",0);
-		FCEUI_printf("Undo savestate was attempted but unsuccessful because there was not a recently used savestate.\n");
+		FCEU_DispMessage("Can't Undo",0);
+		FCEU_printf("Undo savestate was attempted but unsuccessful because there was not a recently used savestate.\n");
 		return;		//If there is no last savestate, can't undo
 	}
 	string backup = GenerateBackupSaveStateFn(lastSavestateMade.c_str());	//Get filename of backup state
 	if (!CheckFileExists(backup.c_str()))
 	{
-		FCEUI_DispMessage("Can't Undo",0);
-		FCEUI_printf("Undo savestate was attempted but unsuccessful because there was not a backup of the last used savestate.\n");
+		FCEU_DispMessage("Can't Undo",0);
+		FCEU_printf("Undo savestate was attempted but unsuccessful because there was not a backup of the last used savestate.\n");
 		return;		//If no backup, can't undo
 	}
 
@@ -949,8 +949,8 @@ void SwapSaveState()
 	else					//This was an undo function so next will be redo, so flag it
 		redoSS = true;
 
-	FCEUI_DispMessage("%s restored",0,backup.c_str());
-	FCEUI_printf("%s restored\n",backup.c_str());
+	FCEU_DispMessage("%s restored",0,backup.c_str());
+	FCEU_printf("%s restored\n",backup.c_str());
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1018,7 +1018,7 @@ void LoadBackup()
 		undoLS = false;						//Flag that LoadBackup cannot be run again
 	}
 	else
-		FCEUI_DispMessage("Error: Could not load %s",0,filename.c_str());
+		FCEU_DispMessage("Error: Could not load %s",0,filename.c_str());
 }
 
 void RedoLoadState()
@@ -1027,7 +1027,7 @@ void RedoLoadState()
 	if (!lastLoadstateMade.empty() && redoLS)
 	{
 		FCEUSS_Load(lastLoadstateMade.c_str());
-		FCEUI_printf("Redoing %s\n",lastLoadstateMade.c_str());
+		FCEU_printf("Redoing %s\n",lastLoadstateMade.c_str());
 	}
 	redoLS = false;		//Flag that RedoLoadState can not be run again
 	undoLS = true;		//Flag that LoadBackup can be run again
@@ -1092,7 +1092,7 @@ class StateRecorder
 
 				ringBufSize = static_cast<int>( fnumSnaps + 0.5f );
 
-				int32_t fps = FCEUI_GetDesiredFPS(); // Do >> 24 to get in Hz
+				int32_t fps = fceu11::GetDesiredFPS(); // Do >> 24 to get in Hz
 
 				double hz = ( ((double)fps) / 16777216.0 );
 
@@ -1103,7 +1103,7 @@ class StateRecorder
 			else
 			{
 				const double fhistMin  = config.historyDurationMinutes;
-				int32_t fps = FCEUI_GetDesiredFPS(); // Do >> 24 to get in Hz
+				int32_t fps = fceu11::GetDesiredFPS(); // Do >> 24 to get in Hz
 				double hz = ( ((double)fps) / 16777216.0 );
 
 				const double fsnapMin  = static_cast<double>(config.framesBetweenSnaps) / (hz * 60.0);
@@ -1199,12 +1199,12 @@ class StateRecorder
 			{
 				if (loadPauseTime > 0)
 				{	// Temporary pause after loading new state for user to have time to process
-					FCEUI_PauseForDuration(loadPauseTime);
+					fceu11::PauseForDuration(loadPauseTime);
 				}
 			}
 			else if (pauseOnLoad == StateRecorderConfigData::FULL_PAUSE)
 			{
-				FCEUI_SetEmulationPaused( EMULATIONPAUSED_PAUSED );
+				fceu11::SetEmulationPaused( EMULATIONPAUSED_PAUSED );
 			}
 			return 0;
 		}

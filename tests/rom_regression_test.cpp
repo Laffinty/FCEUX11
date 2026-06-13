@@ -198,8 +198,8 @@ int main(int argc, char** argv)
     printf("=== FCEUX11 ROM Regression Test ===\n");
     printf("Mode: %s\n\n", generateMode ? "GENERATE golden hashes" : "VERIFY against golden hashes");
 
-    if (!FCEUI_Initialize()) {
-        printf("FAIL: FCEUI_Initialize() returned false\n");
+    if (!fceu11::Initialize()) {
+        printf("FAIL: fceu11::Initialize() returned false\n");
         return 1;
     }
 
@@ -227,7 +227,7 @@ int main(int argc, char** argv)
 
         printf("[%d/%d] Testing %s (%s)\n", i + 1, NUM_TESTS, name, path);
 
-        FCEUGI* gi = FCEUI_LoadGame(path, 1, true);
+        FCEUGI* gi = fceu11::LoadGame(path, 1, true);
         if (!gi) {
             printf("  FAIL: could not load ROM\n");
             anyFailed = true;
@@ -241,7 +241,7 @@ int main(int argc, char** argv)
             uint8* xbuf = nullptr;
             int32* soundBuf = nullptr;
             int32 soundBufSize = 0;
-            FCEUI_Emulate(&xbuf, &soundBuf, &soundBufSize, 0);
+            fceu11::Emulate(&xbuf, &soundBuf, &soundBufSize, 0);
 
             if (xbuf) {
                 uint32 crc = computeFrameCRC32(xbuf, FRAME_BUF_SIZE);
@@ -251,14 +251,14 @@ int main(int argc, char** argv)
             }
         }
 
-        FCEUI_CloseGame();
+        fceu11::CloseGame();
 
         collected_names.push_back(name);
         collected_hashes.push_back(frameHashes);
         printf("  Collected %zu frame hashes\n", frameHashes.size());
     }
 
-    FCEUI_Kill();
+    fceu11::Kill();
 
     if (generateMode) {
         if (!writeGoldenHashes(GOLDEN_HASHES_PATH, collected_hashes, collected_names)) {

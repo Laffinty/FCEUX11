@@ -23,6 +23,10 @@
  */
 
 #include "mapinc.h"
+// v0.3.10 P4.1: DatachSet moved into fceu11:: namespace; pull in driver.h
+// for the declaration. mapinc.h doesn't transitively include the API
+// surface header.
+#include "../driver.h"
 
 static uint8 reg[16], is153, x24c02;
 static uint8 IRQa;
@@ -393,7 +397,7 @@ static uint32 BarcodeOut;
 
 // #define INTERL2OF5
 
-int FCEUI_DatachSet(uint8 *rcode) {
+int fceu11::DatachSet(uint8 *rcode) {
 	int prefix_parity_type[10][6] = {
 		{ 0, 0, 0, 0, 0, 0 }, { 0, 0, 1, 0, 1, 1 }, { 0, 0, 1, 1, 0, 1 }, { 0, 0, 1, 1, 1, 0 },
 		{ 0, 1, 0, 0, 1, 1 }, { 0, 1, 1, 0, 0, 1 }, { 0, 1, 1, 1, 0, 0 }, { 0, 1, 0, 1, 0, 1 },

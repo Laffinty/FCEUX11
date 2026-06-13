@@ -438,7 +438,7 @@ void TraceLoggerDialog_t::updatePeriodic(void)
 {
 	char traceViewDrawEnable;
 
-	if (FCEUI_EmulationPaused())
+	if (fceu11::IsEmulationPaused())
 	{
 		traceViewDrawEnable = 1;
 	}
@@ -2584,7 +2584,7 @@ void TraceLogDiskThread_t::run(void)
 
 	while ( !isInterruptionRequested() )
 	{
-		isPaused = FCEUI_EmulationPaused() ? true : false;
+		isPaused = fceu11::IsEmulationPaused() ? true : false;
 
 		while (logBufHead != logBufTail)
 		{

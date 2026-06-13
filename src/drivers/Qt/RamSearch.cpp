@@ -1327,7 +1327,7 @@ void RamSearchDialog_t::addCheatClicked(void)
 
 	FCEU_WRAPPER_LOCK();
 
-	FCEUI_AddCheat(desc, addr, GetMem(addr), -1, 1);
+	fceu11::AddCheat(desc, addr, GetMem(addr), -1, 1);
 
 	updateCheatDialog();
 

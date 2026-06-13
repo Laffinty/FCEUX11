@@ -1152,7 +1152,7 @@ void FKBConfigDialog::mappingLoad(void)
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::DesktopLocation).first());
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::DownloadLocation).first());
-	urls << QUrl::fromLocalFile( QDir( FCEUI_GetBaseDirectory() ).absolutePath() );
+	urls << QUrl::fromLocalFile( QDir( fceu11::GetBaseDirectory() ).absolutePath() );
 
 	dialog.setFileMode(QFileDialog::ExistingFile);
 
@@ -1162,7 +1162,7 @@ void FKBConfigDialog::mappingLoad(void)
 	dialog.setFilter( QDir::AllEntries | QDir::AllDirs | QDir::Hidden );
 	dialog.setLabelText( QFileDialog::Accept, tr("Load") );
 
-	FCEU_strlcpy( dir, sizeof(dir), FCEUI_GetBaseDirectory() );
+	FCEU_strlcpy( dir, sizeof(dir), fceu11::GetBaseDirectory() );
 	safe_strcat( dir, sizeof(dir), "/input/FamilyKeyboard");
 
 	dialog.setDirectory( tr(dir) );
@@ -1283,7 +1283,7 @@ void FKBConfigDialog::mappingLoad(const char *filepath)
 void FKBConfigDialog::mappingSave(void)
 {
 	const char *guid = "keyboard";
-	const char *baseDir = FCEUI_GetBaseDirectory();
+	const char *baseDir = fceu11::GetBaseDirectory();
 	std::string path;
 	FILE *fp;
 	char stmp[64];
@@ -1371,7 +1371,7 @@ void FKBConfigDialog::mappingSaveAs(void)
 	QList<QUrl> urls;
 	QDir d;
 
-	base = FCEUI_GetBaseDirectory();
+	base = fceu11::GetBaseDirectory();
 
 	urls << QUrl::fromLocalFile( QDir::rootPath() );
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());

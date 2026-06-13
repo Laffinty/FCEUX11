@@ -380,7 +380,7 @@ void GuiConfDialog_t::openQss(void)
 	//urls = dialog.sidebarUrls();
 	urls << QUrl::fromLocalFile(QDir::rootPath());
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
-	urls << QUrl::fromLocalFile(QDir(FCEUI_GetBaseDirectory()).absolutePath());
+	urls << QUrl::fromLocalFile(QDir(fceu11::GetBaseDirectory()).absolutePath());
 
 	if (exePath[0] != 0)
 	{
@@ -484,7 +484,7 @@ void GuiConfDialog_t::openQPal(void)
 	//urls = dialog.sidebarUrls();
 	urls << QUrl::fromLocalFile(QDir::rootPath());
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
-	urls << QUrl::fromLocalFile(QDir(FCEUI_GetBaseDirectory()).absolutePath());
+	urls << QUrl::fromLocalFile(QDir(fceu11::GetBaseDirectory()).absolutePath());
 
 	if (exePath[0] != 0)
 	{
@@ -1162,7 +1162,7 @@ void GuiPaletteEditDialog_t::paletteSaveAs(void)
 	//urls = dialog.sidebarUrls();
 	urls << QUrl::fromLocalFile(QDir::rootPath());
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
-	urls << QUrl::fromLocalFile(QDir(FCEUI_GetBaseDirectory()).absolutePath());
+	urls << QUrl::fromLocalFile(QDir(fceu11::GetBaseDirectory()).absolutePath());
 
 	if (exePath[0] != 0)
 	{

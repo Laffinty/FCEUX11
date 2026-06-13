@@ -205,18 +205,18 @@ typedef struct MENU {
 
 static void SetOC(void)
 {
- FCEUI_CheatSearchSetCurrentAsOriginal();
+ fceu11::CheatSearchSetCurrentAsOriginal();
 }
 
 static void UnhideEx(void)
 {
- FCEUI_CheatSearchShowExcluded();
+ fceu11::CheatSearchShowExcluded();
 }
 
 static void ToggleCheat(int num)
 {
  printf("Cheat %d %sabled.\n",1+num,
-  FCEUI_ToggleCheat(num)?"en":"dis");
+  fceu11::ToggleCheat(num)?"en":"dis");
 }
 
 static void ModifyCheat(int num)
@@ -232,7 +232,7 @@ static void ModifyCheat(int num)
  int s;
  int t;
 
- FCEUI_GetCheat(num, &name, &A, &V, &compare, &s, &type);
+ fceu11::GetCheat(num, &name, &A, &V, &compare, &s, &type);
 
  printf("Name [%s]: ",name.c_str());
  GetString(buf,256);
@@ -242,9 +242,9 @@ static void ModifyCheat(int num)
  */
 
  if(buf[0])
-	 pName=&name;	// Change name when FCEUI_SetCheat() is called.
+	 pName=&name;	// Change name when fceu11::SetCheat() is called.
  else
-  pName=nullptr;	// Don't change name when FCEUI_SetCheat() is called.
+  pName=nullptr;	// Don't change name when fceu11::SetCheat() is called.
 
  printf("Address [$%04x]: ",(unsigned int)A);
  A=GetH16(A);
@@ -263,7 +263,7 @@ static void ModifyCheat(int num)
  if(t=='Y' || t=='y') s=1;
  else if(t=='N' || t=='n') s=0;
 
- FCEUI_SetCheat(num,pName,A,V,compare,s,type);
+ fceu11::SetCheat(num,pName,A,V,compare,s,type);
 }
 
 
@@ -284,7 +284,7 @@ static void AddCheatGGPAR(int which)
  {
   if(which)
   {
-   if(!FCEUI_DecodePAR(code,&A,&V,&C,&type))
+   if(!fceu11::DecodePAR(code,&A,&V,&C,&type))
    {
     puts("Invalid Game Genie code.");
     return;
@@ -292,7 +292,7 @@ static void AddCheatGGPAR(int which)
   }
   else
   {
-   if(!FCEUI_DecodeGG(code,&A,&V,&C))
+   if(!fceu11::DecodeGG(code,&A,&V,&C))
    {
     puts("Invalid Game Genie code.");
     return;
@@ -300,7 +300,7 @@ static void AddCheatGGPAR(int which)
    type=1;
   }
 
-  if(FCEUI_AddCheat(name,A,V,C,type))
+  if(fceu11::AddCheat(name,A,V,C,type))
    puts("Cheat added.");
   else
    puts("Error adding cheat.");
@@ -330,7 +330,7 @@ static void AddCheatParam(uint32 A, uint8 V)
  printf("Add cheat \"%s\" for address $%04x with value %03u?",name,(unsigned int)A,(unsigned int)V);
  if(GetYN(0))
  {
-  if(FCEUI_AddCheat(name,A,V,-1,0))
+  if(fceu11::AddCheat(name,A,V,-1,0))
    puts("Cheat added.");
   else
    puts("Error adding cheat.");
@@ -365,7 +365,7 @@ static void ListCheats(void)
  lid=0;
 
  BeginListShow();
- FCEUI_ListCheats(clistcallb,0);
+ fceu11::ListCheats(clistcallb,0);
  which=EndListShow();
  if(which>=0)
  {
@@ -379,7 +379,7 @@ static void ListCheats(void)
   {
    case 't':ToggleCheat(which);
 	    break;
-   case 'd':if(!FCEUI_DelCheat(which))
+   case 'd':if(!fceu11::DelCheat(which))
  	     puts("Error deleting cheat!");
 	    else
 	     puts("Cheat has been deleted.");
@@ -392,7 +392,7 @@ static void ListCheats(void)
 
 static void ResetSearch(void)
 {
- FCEUI_CheatSearchBegin();
+ fceu11::CheatSearchBegin();
  puts("Done.");
 }
 
@@ -405,13 +405,13 @@ static int srescallb(uint32 a, uint8 last, uint8 current, void *data)
 
 static void ShowRes(void)
 {
- int n=FCEUI_CheatSearchGetCount();
+ int n=fceu11::CheatSearchGetCount();
  printf(" %d results:\n",n);
  if(n)
  {
   int which;
   BeginListShow();
-  FCEUI_CheatSearchGet(srescallb,0);
+  fceu11::CheatSearchGet(srescallb,0);
   which=EndListShow();
   if(which>=0)
    AddCheatParam(which,0);
@@ -491,7 +491,7 @@ static void DoSearch(void)
   printf("V2 [%03d]: ",v2);
   v2=Get8(v2);
  }
- FCEUI_CheatSearchEnd(method,v1,v2);
+ fceu11::CheatSearchEnd(method,v1,v2);
  puts("Search completed.\n");
 }
 

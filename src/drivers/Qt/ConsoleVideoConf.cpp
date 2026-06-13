@@ -543,7 +543,7 @@ void ConsoleVideoConfDialog_t::periodicUpdate(void)
 	int actRegion, selRegion;
        
 	// Keep region menu selection sync'd to actual state
-	actRegion = FCEUI_GetRegion();
+	actRegion = fceu11::GetRegion();
 	selRegion = regionSelect->currentIndex(); 
 
 	if ( actRegion != selRegion )
@@ -934,7 +934,7 @@ void ConsoleVideoConfDialog_t::scalerChanged(int index)
 void ConsoleVideoConfDialog_t::regionChanged(int index)
 {
 	int region;
-	int actRegion = FCEUI_GetRegion();
+	int actRegion = fceu11::GetRegion();
 	//printf("Region: %i : %i \n", index, regionSelect->itemData(index).toInt() );
 
 	region = regionSelect->itemData(index).toInt();

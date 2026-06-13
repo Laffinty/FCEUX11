@@ -465,12 +465,12 @@ std::string GetMfn() //Retrieves the movie filename from curMovieFilename (for a
 }
 
 /// Updates the base directory
-void FCEUI_SetBaseDirectory(std::string const & dir)
+void fceu11::SetBaseDirectory(std::string const & dir)
 {
 	BaseDirectory = dir;
 }
 /// Gets the base directory
-const char *FCEUI_GetBaseDirectory(void)
+const char *fceu11::GetBaseDirectory()
 {
 	return BaseDirectory.c_str();
 }

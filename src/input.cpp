@@ -594,7 +594,7 @@ static void SetInputStuffFC()
 	}
 }
 
-void FCEUI_SetInput(int port, ESI type, void *ptr, int attrib)
+void fceu11::SetInput(int port, ESI type, void *ptr, int attrib)
 {
 	joyports[port].attrib = attrib;
 	joyports[port].type = type;
@@ -602,7 +602,7 @@ void FCEUI_SetInput(int port, ESI type, void *ptr, int attrib)
 	SetInputStuff(port);
 }
 
-void FCEUI_SetInputFC(ESIFC type, void *ptr, int attrib)
+void fceu11::SetInputFC(ESIFC type, void *ptr, int attrib)
 {
 	portFC.attrib = attrib;
 	portFC.type = type;
@@ -635,15 +635,15 @@ void InitializeInput(void)
 }
 
 
-bool FCEUI_GetInputFourscore()
+bool fceu11::GetInputFourscore()
 {
 	return FSAttached;
 }
-bool FCEUI_GetInputMicrophone()
+bool fceu11::GetInputMicrophone()
 {
 	return replaceP2StartWithMicrophone;
 }
-void FCEUI_SetInputFourscore(bool attachFourscore)
+void fceu11::SetInputFourscore(bool attachFourscore)
 {
 	FSAttached = attachFourscore;
 }
@@ -697,7 +697,7 @@ void FCEU_QSimpleCommand(int cmd)
 	}
 }
 
-void FCEUI_FDSSelect(void)
+void fceu11::FDSSelect()
 {
 	if(!FCEU_IsValidUI(FCEUI_SWITCH_DISK))
 		return;
@@ -706,7 +706,7 @@ void FCEUI_FDSSelect(void)
 	FCEU_QSimpleCommand(FCEUNPCMD_FDSSELECT);
 }
 
-void FCEUI_FDSInsert(void)
+void fceu11::FDSInsert()
 {
 	if(!FCEU_IsValidUI(FCEUI_EJECT_DISK))
 		return;
@@ -715,12 +715,12 @@ void FCEUI_FDSInsert(void)
 	FCEU_QSimpleCommand(FCEUNPCMD_FDSINSERT);
 }
 
-void FCEUI_VSUniToggleDIP(int w)
+void fceu11::VSUniToggleDIP(int w)
 {
 	FCEU_QSimpleCommand(FCEUNPCMD_VSUNIDIP0 + w);
 }
 
-void FCEUI_VSUniCoin(void)
+void fceu11::VSUniCoin()
 {
 	if(!FCEU_IsValidUI(FCEUI_INSERT_COIN))
 		return;
@@ -728,7 +728,7 @@ void FCEUI_VSUniCoin(void)
 	FCEU_QSimpleCommand(FCEUNPCMD_VSUNICOIN);
 }
 
-void FCEUI_VSUniCoin2(void)
+void fceu11::VSUniCoin2()
 {
 	if (!FCEU_IsValidUI(FCEUI_INSERT_COIN))
 		return;
@@ -736,7 +736,7 @@ void FCEUI_VSUniCoin2(void)
 	FCEU_QSimpleCommand(FCEUNPCMD_VSUNICOIN2);
 }
 
-void FCEUI_VSUniService(void)
+void fceu11::VSUniService()
 {
 	if (!FCEU_IsValidUI(FCEUI_INSERT_COIN))
 		return;
@@ -753,7 +753,10 @@ extern EMOVIEMODE movieMode;
 }
 
 //Resets the NES
-void FCEUI_ResetNES(void)
+// v0.3.10 P4.1: definition lives in fceu11:: per plan v3 §5 v0.3.10;
+// the global FCEUI_ResetNES symbol is preserved via the inline reference
+// alias declared in core_api.h.
+void fceu11::ResetNES()
 {
 	if(!FCEU_IsValidUI(FCEUI_RESET))
 		return;
@@ -764,7 +767,8 @@ void FCEUI_ResetNES(void)
 }
 
 //Powers off the NES
-void FCEUI_PowerNES(void)
+// v0.3.10 P4.1: see ResetNES comment above.
+void fceu11::PowerNES()
 {
 	if(!FCEU_IsValidUI(FCEUI_POWER))
 		return;
@@ -1016,7 +1020,7 @@ void FCEUI_HandleEmuCommands(TestCommandState* testfn)
 static void CommandToggleDip(void)
 {
 	if (GameInfo->type==GIT_VSUNI)
-		FCEUI_VSUniToggleDIP(execcmd-EMUCMD_VSUNI_TOGGLE_DIP_0);
+		fceu11::VSUniToggleDIP(execcmd-EMUCMD_VSUNI_TOGGLE_DIP_0);
 }
 
 static void CommandEmulationSpeed(void)
@@ -1024,11 +1028,11 @@ static void CommandEmulationSpeed(void)
 	FCEUD_SetEmulationSpeed(EMUSPEED_SLOWEST+(execcmd-EMUCMD_SPEED_SLOWEST));
 }
 
-void FCEUI_SelectStateNext(int);
+void fceu11::SelectStateNext(int);
 
 static void ViewSlots(void)
 {
-	FCEUI_SelectState(CurrentState, 1);
+	fceu11::SelectStateSlot(CurrentState, 1);
 }
 
 static void CommandSelectSaveSlot(void)
@@ -1041,11 +1045,11 @@ static void CommandSelectSaveSlot(void)
 	} else
 	{
 		if(execcmd <= EMUCMD_SAVE_SLOT_9)
-			FCEUI_SelectState(execcmd - EMUCMD_SAVE_SLOT_0, 1);
+			fceu11::SelectStateSlot(execcmd - EMUCMD_SAVE_SLOT_0, 1);
 		else if(execcmd == EMUCMD_SAVE_SLOT_NEXT)
-			FCEUI_SelectStateNext(1);
+			fceu11::SelectStateNext(1);
 		else if(execcmd == EMUCMD_SAVE_SLOT_PREV)
-			FCEUI_SelectStateNext(-1);
+			fceu11::SelectStateNext(-1);
 	}
 }
 
@@ -1061,12 +1065,12 @@ static void CommandStateSave(void)
 		//	FCEU_PrintError("execcmd=%d, EMUCMD_SAVE_STATE_SLOT_0=%d, EMUCMD_SAVE_STATE_SLOT_9=%d", execcmd,EMUCMD_SAVE_STATE_SLOT_0,EMUCMD_SAVE_STATE_SLOT_9);
 		if(execcmd >= EMUCMD_SAVE_STATE_SLOT_0 && execcmd <= EMUCMD_SAVE_STATE_SLOT_9)
 		{
-			int oldslot=FCEUI_SelectState(execcmd-EMUCMD_SAVE_STATE_SLOT_0, 0);
-			FCEUI_SaveState(0);
-			FCEUI_SelectState(oldslot, 0);
+			int oldslot=fceu11::SelectStateSlot(execcmd-EMUCMD_SAVE_STATE_SLOT_0, 0);
+			fceu11::SaveStateFile(0);
+			fceu11::SelectStateSlot(oldslot, 0);
 		}
 		else
-			FCEUI_SaveState(0);
+			fceu11::SaveStateFile(0);
 	}
 }
 
@@ -1081,12 +1085,12 @@ static void CommandStateLoad(void)
 	{
 		if(execcmd >= EMUCMD_LOAD_STATE_SLOT_0 && execcmd <= EMUCMD_LOAD_STATE_SLOT_9)
 		{
-			int oldslot=FCEUI_SelectState(execcmd-EMUCMD_LOAD_STATE_SLOT_0, 0);
-			FCEUI_LoadState(0);
-			FCEUI_SelectState(oldslot, 0);
+			int oldslot=fceu11::SelectStateSlot(execcmd-EMUCMD_LOAD_STATE_SLOT_0, 0);
+			fceu11::LoadStateFile(0);
+			fceu11::SelectStateSlot(oldslot, 0);
 		}
 		else
-			FCEUI_LoadState(0);
+			fceu11::LoadStateFile(0);
 	}
 }
 
@@ -1106,23 +1110,23 @@ static void CommandSoundAdjust(void)
 
 static void CommandUsePreset(void)
 {
-	FCEUI_UseInputPreset(execcmd-EMUCMD_MISC_USE_INPUT_PRESET_1);
+	fceu11::UseInputPreset(execcmd-EMUCMD_MISC_USE_INPUT_PRESET_1);
 }
 
 static void BackgroundDisplayToggle(void)
 {
 	bool spr, bg;
-	FCEUI_GetRenderPlanes(spr,bg);
+	fceu11::GetRenderPlanes(spr,bg);
 	bg = !bg;
-	FCEUI_SetRenderPlanes(spr,bg);
+	fceu11::SetRenderPlanes(spr,bg);
 }
 
 static void ObjectDisplayToggle(void)
 {
 	bool spr, bg;
-	FCEUI_GetRenderPlanes(spr,bg);
+	fceu11::GetRenderPlanes(spr,bg);
 	spr = !spr;
-	FCEUI_SetRenderPlanes(spr,bg);
+	fceu11::SetRenderPlanes(spr,bg);
 }
 
 void LagCounterReset()
@@ -1292,7 +1296,7 @@ extern int globalCheatDisabled;
 extern unsigned int FrozenAddressCount;
 static void ToggleCheats()
 {
-	FCEUI_GlobalToggleCheat(globalCheatDisabled);
+	fceu11::GlobalToggleCheat(globalCheatDisabled);
 	FCEU_DispMessage("%d cheats active", 0, FrozenAddressCount);
 	#ifdef __WIN_DRIVER__
 	UpdateCheatRelatedWindow();

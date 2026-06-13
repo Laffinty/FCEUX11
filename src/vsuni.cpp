@@ -238,12 +238,12 @@ void FCEU_VSUniToggleDIP(int w) {
     FCEU_DispMessage("DIP switch %d is %s.", 0, w, vsdip & (1 << w) ? "on" : "off");
 }
 
-void FCEUI_VSUniSetDIP(int w, int state) {
+void fceu11::VSUniSetDIP(int w, int state) {
     if (((vsdip >> w) & 1) != state)
-        FCEUI_VSUniToggleDIP(w);
+        fceu11::VSUniToggleDIP(w);
 }
 
-uint8 FCEUI_VSUniGetDIPs(void) {
+uint8 fceu11::VSUniGetDIPs() {
     return(vsdip);
 }
 

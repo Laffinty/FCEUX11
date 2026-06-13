@@ -21,7 +21,7 @@ expected<std::vector<uint8_t>> load_file_bytes(const std::string& path) {
 }
 
 expected<void> initialize_core() {
-    if (!FCEUI_Initialize()) {
+    if (!fceu11::Initialize()) {
         return unexpected(2);
     }
     return {};
@@ -33,7 +33,7 @@ expected<MovieInfo> get_movie_info(const std::string& path, bool skipFrameCount)
         return unexpected(3);
     }
     MOVIE_INFO info{};
-    bool ok = FCEUI_MovieGetInfo(fp, info, skipFrameCount);
+    bool ok = fceu11::MovieGetInfo(fp, info, skipFrameCount);
     FCEU_fclose(fp);
     if (!ok) {
         return unexpected(4);

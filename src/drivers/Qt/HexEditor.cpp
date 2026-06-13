@@ -614,7 +614,7 @@ int HexBookMarkManager_t::loadFromFile(void)
 	QDir dir;
 	char line[256], fd[256], baseFile[512];
 	const char *romFile = getRomFile();
-	const char *baseDir = FCEUI_GetBaseDirectory();
+	const char *baseDir = fceu11::GetBaseDirectory();
 	std::string path;
 
 	if ( romFile == NULL )
@@ -711,7 +711,7 @@ int HexBookMarkManager_t::saveToFile(void)
 	QDir dir;
 	char baseFile[512];
 	const char *romFile = getRomFile();
-	const char *baseDir = FCEUI_GetBaseDirectory();
+	const char *baseDir = fceu11::GetBaseDirectory();
 	std::string path;
 
 	if ( romFile == NULL )
@@ -1481,7 +1481,7 @@ HexEditorDialog_t::HexEditorDialog_t(QWidget *parent)
 
 	populateBookmarkMenu();
 
-	FCEUI_CreateCheatMap();
+	fceu11::CreateCheatMap();
 
 	unloadTableAct->setEnabled( editor->charTable.customMapLoaded );
 
@@ -3288,7 +3288,7 @@ int QHexEdit::FreezeRam( const char *name, uint32_t a, uint8_t v, int c, int s, 
 
 				if ( s )
 				{
-					FCEUI_DelCheat( frzIdx );
+					fceu11::DelCheat( frzIdx );
 					frzRamAddr = -1;
 					return 0;
 				}
@@ -3305,7 +3305,7 @@ int QHexEdit::FreezeRam( const char *name, uint32_t a, uint8_t v, int c, int s, 
 			case 2: // Unfreeze
 				if ( s )
 				{
-					FCEUI_DelCheat( frzIdx );
+					fceu11::DelCheat( frzIdx );
 					frzRamAddr = -1;
 					return 0;
 				}
@@ -3321,7 +3321,7 @@ int QHexEdit::FreezeRam( const char *name, uint32_t a, uint8_t v, int c, int s, 
 	{
 		if ( s )
 		{
-			FCEUI_DelCheat( frzIdx );
+			fceu11::DelCheat( frzIdx );
 		}
 	}
 
@@ -3356,11 +3356,11 @@ void QHexEdit::frzRamSet(void)
 	}
 
 	FCEU_WRAPPER_LOCK();
-	FCEUI_ListCheats( RamFreezeCB, this);
+	fceu11::ListCheats( RamFreezeCB, this);
 
 	if ( (frzRamAddr >= 0) && (FrozenAddressCount < 256) )
 	{
-		FCEUI_AddCheat("", frzRamAddr, GetMem(frzRamAddr), -1, 1);
+		fceu11::AddCheat("", frzRamAddr, GetMem(frzRamAddr), -1, 1);
 	}
 	updateCheatDialog();
 	FCEU_WRAPPER_UNLOCK();
@@ -3377,7 +3377,7 @@ void QHexEdit::frzRamUnset(void)
 		return;
 	}
 	FCEU_WRAPPER_LOCK();
-	FCEUI_ListCheats( RamFreezeCB, this);
+	fceu11::ListCheats( RamFreezeCB, this);
 	updateCheatDialog();
 	FCEU_WRAPPER_UNLOCK();
 }
@@ -3409,11 +3409,11 @@ void QHexEdit::frzRamToggle(void)
 		return;
 	}
 	FCEU_WRAPPER_LOCK();
-	FCEUI_ListCheats( RamFreezeCB, this);
+	fceu11::ListCheats( RamFreezeCB, this);
 
 	if ( (frzRamAddr >= 0) && (FrozenAddressCount < 256) )
 	{
-		FCEUI_AddCheat("", frzRamAddr, GetMem(frzRamAddr), -1, 1);
+		fceu11::AddCheat("", frzRamAddr, GetMem(frzRamAddr), -1, 1);
 	}
 	updateCheatDialog();
 	FCEU_WRAPPER_UNLOCK();

@@ -843,16 +843,16 @@ init_ok:
 	// guess if the settings should be PAL or NTSC from the ROM name
 	// TODO: MD5 check against a list of all known PAL games instead?
 	if (iNES2) {
-		FCEUI_SetVidSystem(((head.TV_system & 3) == 1) ? 1 : 0);
+		fceu11::SetVidSystem(((head.TV_system & 3) == 1) ? 1 : 0);
 	} else if (OverwriteVidMode) {
 		if (strstr(name, "(E)") || strstr(name, "(e)")
 			|| strstr(name, "(Europe)") || strstr(name, "(PAL)")
 			|| strstr(name, "(F)") || strstr(name, "(f)")
 			|| strstr(name, "(G)") || strstr(name, "(g)")
 			|| strstr(name, "(I)") || strstr(name, "(i)"))
-			FCEUI_SetVidSystem(1);
+			fceu11::SetVidSystem(1);
 		else
-			FCEUI_SetVidSystem(0);
+			fceu11::SetVidSystem(0);
 	}
 	return LOADER_OK;
 }

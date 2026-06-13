@@ -162,7 +162,7 @@ void HISTORY::update()
 	// When CPU is idle, compress items from time to time
 	if (getTasEditorTime() > nextAutocompressTime)
 	{
-		if (FCEUI_EmulationPaused())
+		if (fceu11::IsEmulationPaused())
 		{
 			// search for the first occurrence of an item containing non-compressed snapshot
 			int real_pos;

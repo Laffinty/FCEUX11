@@ -255,7 +255,7 @@ ConsoleDebugger::~ConsoleDebugger(void)
 
 		if ( waitingAtBp )
 		{
-			FCEUI_SetEmulationPaused(0);
+			fceu11::SetEmulationPaused(0);
 		}
 
 		break_on_cycles        = false;
@@ -302,7 +302,7 @@ void ConsoleDebugger::ld65ImportDebug(void)
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::DesktopLocation).first());
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::DownloadLocation).first());
-	urls << QUrl::fromLocalFile( QDir( FCEUI_GetBaseDirectory() ).absolutePath() );
+	urls << QUrl::fromLocalFile( QDir( fceu11::GetBaseDirectory() ).absolutePath() );
 
 	romPath = getRomFile();
 
@@ -3009,27 +3009,27 @@ void ConsoleDebugger::pcSetPlaceCustom(void)
 //----------------------------------------------------------------------------
 void ConsoleDebugger::debugRunCB(void)
 {
-	if (FCEUI_EmulationPaused()) 
+	if (fceu11::IsEmulationPaused()) 
 	{
 		setRegsFromEntry();
-		FCEUI_ToggleEmulationPause();
+		fceu11::ToggleEmulationPause();
 		//DebuggerWasUpdated = false done in above function;
 	}
 }
 //----------------------------------------------------------------------------
 void ConsoleDebugger::debugStepIntoCB(void)
 {
-	if (FCEUI_EmulationPaused())
+	if (fceu11::IsEmulationPaused())
 	{
 		setRegsFromEntry();
 	}
 	FCEUI_Debugger().step = true;
-	FCEUI_SetEmulationPaused(0);
+	fceu11::SetEmulationPaused(0);
 }
 //----------------------------------------------------------------------------
 void ConsoleDebugger::debugStepOutCB(void)
 {
-	if (FCEUI_EmulationPaused() > 0) 
+	if (fceu11::IsEmulationPaused() > 0) 
 	{
 		DebuggerState &dbgstate = FCEUI_Debugger();
 		setRegsFromEntry();
@@ -3058,13 +3058,13 @@ void ConsoleDebugger::debugStepOutCB(void)
 			dbgstate.jsrcount = 0;
 		}
 		dbgstate.stepout = 1;
-		FCEUI_SetEmulationPaused(0);
+		fceu11::SetEmulationPaused(0);
 	}
 }
 //----------------------------------------------------------------------------
 void ConsoleDebugger::debugStepOverCB(void)
 {
-	if (FCEUI_EmulationPaused()) 
+	if (fceu11::IsEmulationPaused()) 
 	{
 		setRegsFromEntry();
 		int tmp=X.PC;
@@ -3092,13 +3092,13 @@ void ConsoleDebugger::debugStepOverCB(void)
 		{
 			FCEUI_Debugger().step = true;
 		}
-		FCEUI_SetEmulationPaused(0);
+		fceu11::SetEmulationPaused(0);
 	}
 }
 //----------------------------------------------------------------------------
 void ConsoleDebugger::debugStepBackCB(void)
 {
-	if (FCEUI_EmulationPaused()) 
+	if (fceu11::IsEmulationPaused()) 
 	{
 		FCEU_WRAPPER_LOCK();
 		FCEUD_TraceLoggerBackUpInstruction();
@@ -3117,7 +3117,7 @@ void ConsoleDebugger::debugRunToCursorCB(void)
 //----------------------------------------------------------------------------
 void ConsoleDebugger::debugRunLineCB(void)
 {
-	if (FCEUI_EmulationPaused())
+	if (fceu11::IsEmulationPaused())
 	{
 		setRegsFromEntry();
 	}
@@ -3128,12 +3128,12 @@ void ConsoleDebugger::debugRunLineCB(void)
 	//else vblankScanLines = 0;
 	FCEUI_Debugger().runline = true;
 	FCEUI_Debugger().runline_end_time=ts;
-	FCEUI_SetEmulationPaused(0);
+	fceu11::SetEmulationPaused(0);
 }
 //----------------------------------------------------------------------------
 void ConsoleDebugger::debugRunLine128CB(void)
 {
-	if (FCEUI_EmulationPaused())
+	if (fceu11::IsEmulationPaused())
 	{
 		setRegsFromEntry();
 	}
@@ -3146,7 +3146,7 @@ void ConsoleDebugger::debugRunLine128CB(void)
 		//if (scanline+128 >= 240 && scanline+128 <= 257) vblankScanLines = (scanline+128)-240;
 		//else vblankScanLines = 0;
 	}
-	FCEUI_SetEmulationPaused(0);
+	fceu11::SetEmulationPaused(0);
 }
 //----------------------------------------------------------------------------
 //void ConsoleDebugger::seekToCB (void)
@@ -3292,7 +3292,7 @@ void ConsoleDebugger::setLayoutOption( int opt )
 //----------------------------------------------------------------------------
 void ConsoleDebugger::seekPCCB (void)
 {
-	if (FCEUI_EmulationPaused())
+	if (fceu11::IsEmulationPaused())
 	{
 		setRegsFromEntry();
 		//updateAllDebugWindows();
@@ -3425,7 +3425,7 @@ void ConsoleDebugger::asmViewCtxMenuRunToCursor(void)
 	watchpoint[64].address = asmView->getCtxMenuAddr();
 	watchpoint[64].flags   = WP_E|WP_X;
 
-	FCEUI_SetEmulationPaused(0);
+	fceu11::SetEmulationPaused(0);
 	FCEU_WRAPPER_UNLOCK();
 }
 //----------------------------------------------------------------------------
@@ -3650,7 +3650,7 @@ void QAsmView::setBreakpointAtSelectedLine(void)
 		watchpoint[64].address = addr;
 		watchpoint[64].flags = WP_E|WP_X;
 		
-		FCEUI_SetEmulationPaused(0);
+		fceu11::SetEmulationPaused(0);
 		FCEU_WRAPPER_UNLOCK();
 	}
 }
@@ -4389,7 +4389,7 @@ void ConsoleDebugger::updatePeriodic(void)
 	}
 	asmView->update();
 
-	if ( FCEUI_EmulationPaused() && !FCEUI_EmulationFrameStepped())
+	if ( fceu11::IsEmulationPaused() && !fceu11::EmulationFrameStepped())
 	{
 		if ( waitingAtBp )
 		{
@@ -4442,7 +4442,7 @@ void ConsoleDebugger::updatePeriodic(void)
 		emuStatLbl->setStyleSheet("background-color: green; color: white;");
 	}
 
-	if ( FCEUI_EmulationPaused() )
+	if ( fceu11::IsEmulationPaused() )
 	{
 		dbgRunAct[0]->setEnabled(true);
 		dbgRunAct[1]->setEnabled(true);
@@ -4457,7 +4457,7 @@ void ConsoleDebugger::updatePeriodic(void)
 		dbgPauseAct[1]->setEnabled(true);
 	}
 
-	if ( FCEUD_TraceLoggerRunning() && FCEUI_EmulationPaused() )
+	if ( FCEUD_TraceLoggerRunning() && fceu11::IsEmulationPaused() )
 	{
 		stepBackMenuAct->setEnabled(true);
 		stepBackToolAct->setEnabled(true);
@@ -4631,7 +4631,7 @@ void FCEUD_DebugBreakpoint( int bpNum )
 	FCEU_WRAPPER_UNLOCK();
 
 	while ( nes_shm->runEmulator && bpDebugEnable &&
-			FCEUI_EmulationPaused() && !FCEUI_EmulationFrameStepped())
+			fceu11::IsEmulationPaused() && !fceu11::EmulationFrameStepped())
 	{
 		// HACK: break when Frame Advance is pressed
 		extern bool frameAdvanceRequested;
@@ -4641,7 +4641,7 @@ void FCEUD_DebugBreakpoint( int bpNum )
 		{
 			if ( (frameAdvance_Delay_count == 0) || (frameAdvance_Delay_count >= frameAdvance_Delay) )
 			{
-				FCEUI_SetEmulationPaused(EMULATIONPAUSED_FA);
+				fceu11::SetEmulationPaused(EMULATIONPAUSED_FA);
 			}
 			if (frameAdvance_Delay_count < frameAdvance_Delay)
 			{
@@ -7848,11 +7848,11 @@ DebugBreakOnDialog::DebugBreakOnDialog(int type, QWidget *parent )
 	
 	FCEU_WRAPPER_LOCK();
 
-	prevPauseState = FCEUI_EmulationPaused();
+	prevPauseState = fceu11::IsEmulationPaused();
 
 	if (prevPauseState == 0)
 	{
-		FCEUI_ToggleEmulationPause();
+		fceu11::ToggleEmulationPause();
 	}
 	FCEU_WRAPPER_UNLOCK();
 
@@ -8049,7 +8049,7 @@ DebugBreakOnDialog::DebugBreakOnDialog(int type, QWidget *parent )
 //----------------------------------------------------------------------------
 DebugBreakOnDialog::~DebugBreakOnDialog(void)
 {
-	FCEUI_SetEmulationPaused(prevPauseState);
+	fceu11::SetEmulationPaused(prevPauseState);
 }
 //----------------------------------------------------------------------------
 void DebugBreakOnDialog::closeEvent(QCloseEvent *event)

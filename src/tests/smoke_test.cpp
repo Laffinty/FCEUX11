@@ -58,13 +58,13 @@ int main() {
     CHECK_SYMBOL(FCEUI_CRC32);
 
     printf("\n--- Running Minimal Initialization ---\n");
-    if (!FCEUI_Initialize()) {
-        printf("FAIL: FCEUI_Initialize() returned false\n");
+    if (!fceu11::Initialize()) {
+        printf("FAIL: fceu11::Initialize() returned false\n");
         failed = true;
     } else {
-        printf("OK: FCEUI_Initialize() succeeded\n");
-        FCEUI_Kill();
-        printf("OK: FCEUI_Kill() completed\n");
+        printf("OK: fceu11::Initialize() succeeded\n");
+        fceu11::Kill();
+        printf("OK: fceu11::Kill() completed\n");
     }
 
     printf("\n=== Test Complete ===\n");

@@ -1262,49 +1262,49 @@ void SetSoundVariables(void)
   soundtsinc=(uint32)((uint64)(PAL?(long double)PAL_CPU*65536:(long double)NTSC_CPU*65536)/(FSettings.SndRate * 16));
 }
 
-void FCEUI_Sound(int Rate)
+void fceu11::Sound(int Rate)
 {
 	FSettings.SndRate=Rate;
 	SetSoundVariables();
 }
 
-void FCEUI_SetLowPass(int q)
+void fceu11::SetLowPass(int q)
 {
 	FSettings.lowpass=q;
 }
 
-void FCEUI_SetSoundQuality(int quality)
+void fceu11::SetSoundQuality(int quality)
 {
 	FSettings.soundq=quality;
 	SetSoundVariables();
 }
 
-void FCEUI_SetSoundVolume(uint32 volume)
+void fceu11::SetSoundVolume(uint32 volume)
 {
 	FSettings.SoundVolume=volume;
 }
 
-void FCEUI_SetTriangleVolume(uint32 volume)
+void fceu11::SetTriangleVolume(uint32 volume)
 {
 	FSettings.TriangleVolume=volume;
 }
 
-void FCEUI_SetSquare1Volume(uint32 volume)
+void fceu11::SetSquare1Volume(uint32 volume)
 {
 	FSettings.Square1Volume=volume;
 }
 
-void FCEUI_SetSquare2Volume(uint32 volume)
+void fceu11::SetSquare2Volume(uint32 volume)
 {
 	FSettings.Square2Volume=volume;
 }
 
-void FCEUI_SetNoiseVolume(uint32 volume)
+void fceu11::SetNoiseVolume(uint32 volume)
 {
 	FSettings.NoiseVolume=volume;
 }
 
-void FCEUI_SetPCMVolume(uint32 volume)
+void fceu11::SetPCMVolume(uint32 volume)
 {
 	FSettings.PCMVolume=volume;
 }

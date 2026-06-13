@@ -124,7 +124,7 @@ void RebuildSubCheats(void)
 	{
 		SetReadHandler(SubCheats[x].addr, SubCheats[x].addr, SubCheats[x].PrevRead);
 		if (cheatMap)
-			FCEUI_SetCheatMapByte(SubCheats[x].addr, false);
+			fceu11::SetCheatMapByte(SubCheats[x].addr, false);
 	}
 
 	numsubcheats = 0;
@@ -146,7 +146,7 @@ void RebuildSubCheats(void)
 				SubCheats[numsubcheats].compare = view.compare;
 				SetReadHandler((uint16)view.addr, (uint16)view.addr, SubCheatsRead);
 				if (cheatMap)
-					FCEUI_SetCheatMapByte(SubCheats[numsubcheats].addr, true);
+					fceu11::SetCheatMapByte(SubCheats[numsubcheats].addr, true);
 				numsubcheats++;
 			}
 		}
@@ -158,7 +158,7 @@ void FCEU_PowerCheats()
 {
 	numsubcheats = 0;	/* Quick hack to prevent setting of ancient read addresses. */
 	if (cheatMap)
-		FCEUI_RefreshCheatMap();
+		fceu11::RefreshCheatMap();
 	RebuildSubCheats();
 }
 
@@ -199,7 +199,7 @@ void FCEU_LoadGameCheats(FILE *override, int override_existing)
 	{
 		numsubcheats = 0;
 		if (cheatMap)
-			FCEUI_RefreshCheatMap();
+			fceu11::RefreshCheatMap();
 	}
 
 	if(override)
@@ -354,7 +354,7 @@ void FCEU_FlushGameCheats(FILE *override, int nosave)
 }
 
 
-int FCEUI_AddCheat(const char *name, uint32 addr, uint8 val, int compare, int type)
+int fceu11::AddCheat(const char *name, uint32 addr, uint8 val, int compare, int type)
 {
 	// v0.2.24.1: storage moved to Rust.
 	fceux11_rust_cheat_add(name, addr, val, compare, 1, type);
@@ -364,7 +364,7 @@ int FCEUI_AddCheat(const char *name, uint32 addr, uint8 val, int compare, int ty
 	return 1;
 }
 
-int FCEUI_DelCheat(uint32 which)
+int fceu11::DelCheat(uint32 which)
 {
 	// v0.2.24.1: storage moved to Rust.
 	if (!fceux11_rust_cheat_delete(which))
@@ -394,7 +394,7 @@ void FCEU_ApplyPeriodicCheats(void)
 }
 
 
-void FCEUI_ListCheats(int (*callb)(const char *name, uint32 a, uint8 v, int compare, int s, int type, void *data), void *data)
+void fceu11::ListCheats(int (*callb)(const char *name, uint32 a, uint8 v, int compare, int s, int type, void *data), void *data)
 {
 	// v0.2.24.1: iterate the Rust-owned cheat list.
 	uint32 count = fceux11_rust_cheat_count();
@@ -409,7 +409,7 @@ void FCEUI_ListCheats(int (*callb)(const char *name, uint32 a, uint8 v, int comp
 	}
 }
 
-int FCEUI_GetCheat(uint32 which, std::string *name, uint32 *a, uint8 *v, int *compare, int *s, int *type)
+int fceu11::GetCheat(uint32 which, std::string *name, uint32 *a, uint8 *v, int *compare, int *s, int *type)
 {
 	// v0.2.24.1: read from Rust-owned cheat list.
 	FceuCheatEntryView view;
@@ -431,14 +431,14 @@ int FCEUI_GetCheat(uint32 which, std::string *name, uint32 *a, uint8 *v, int *co
 }
 
 /* Returns 1 on success, 0 on failure. Sets *a,*v,*c. */
-int FCEUI_DecodeGG(const char *str, int *a, int *v, int *c)
+int fceu11::DecodeGG(const char *str, int *a, int *v, int *c)
 {
 	// v0.2.24: pure-computation algorithm migrated to Rust.
 	// (The legacy `GGtobin` lookup table now lives inside the Rust decoder.)
 	return fceux11_rust_cheat_decode_gg(str, a, v, c);
 }
 
-int FCEUI_DecodePAR(const char *str, int *a, int *v, int *c, int *type)
+int fceu11::DecodePAR(const char *str, int *a, int *v, int *c, int *type)
 {
 	// v0.2.24: pure-computation algorithm migrated to Rust.
 	return fceux11_rust_cheat_decode_par(str, a, v, c, type);
@@ -447,7 +447,7 @@ int FCEUI_DecodePAR(const char *str, int *a, int *v, int *c, int *type)
 /* name can be NULL if the name isn't going to be changed. */
 /* same goes for a, v, and s(except the values of each one must be <0) */
 
-int FCEUI_SetCheat(uint32 which, const std::string *name, int32 a, int32 v, int c, int s, int type)
+int fceu11::SetCheat(uint32 which, const std::string *name, int32 a, int32 v, int c, int s, int type)
 {
 	// v0.2.24.1: storage moved to Rust.
 	const char* namePtr = name ? name->c_str() : nullptr;
@@ -459,7 +459,7 @@ int FCEUI_SetCheat(uint32 which, const std::string *name, int32 a, int32 v, int 
 }
 
 /* Convenience function. */
-int FCEUI_ToggleCheat(uint32 which)
+int fceu11::ToggleCheat(uint32 which)
 {
 	// v0.2.24.1: storage moved to Rust.
 	int new_status = fceux11_rust_cheat_toggle(which);
@@ -470,7 +470,7 @@ int FCEUI_ToggleCheat(uint32 which)
 	return new_status;
 }
 
-int FCEUI_GlobalToggleCheat(int global_enabled)
+int fceu11::GlobalToggleCheat(int global_enabled)
 {
 	unsigned int _numsubcheats = numsubcheats;
 	globalCheatDisabled = !global_enabled;
@@ -504,7 +504,7 @@ void buildMemorySnapshot(uint8* mem, uint8* pres)
 }
 } // namespace
 
-void FCEUI_CheatSearchSetCurrentAsOriginal(void)
+void fceu11::CheatSearchSetCurrentAsOriginal(void)
 {
 	// v0.2.24.1: search snapshot lives in Rust.
 	static uint8 mem[0x10000];
@@ -521,13 +521,13 @@ void FCEUI_CheatSearchSetCurrentAsOriginal(void)
 	fceux11_rust_cheat_comp_set_current_as_original(mem, pres);
 }
 
-void FCEUI_CheatSearchShowExcluded(void)
+void fceu11::CheatSearchShowExcluded(void)
 {
 	fceux11_rust_cheat_comp_show_excluded();
 }
 
 
-int32 FCEUI_CheatSearchGetCount(void)
+int32 fceu11::CheatSearchGetCount(void)
 {
 	static uint8 mem[0x10000];
 	static uint8 pres[0x10000];
@@ -536,7 +536,7 @@ int32 FCEUI_CheatSearchGetCount(void)
 }
 
 /* This function will give the initial value of the search and the current value at a location. */
-void FCEUI_CheatSearchGet(int (*callb)(uint32 a, uint8 last, uint8 current, void *data),void *data)
+void fceu11::CheatSearchGet(int (*callb)(uint32 a, uint8 last, uint8 current, void *data),void *data)
 {
 	if (!fceux11_rust_cheat_comp_exists())
 	{
@@ -556,7 +556,7 @@ void FCEUI_CheatSearchGet(int (*callb)(uint32 a, uint8 last, uint8 current, void
 	}
 }
 
-void FCEUI_CheatSearchGetRange(uint32 first, uint32 last, int (*callb)(uint32 a, uint8 last, uint8 current))
+void fceu11::CheatSearchGetRange(uint32 first, uint32 last, int (*callb)(uint32 a, uint8 last, uint8 current))
 {
 	if (!fceux11_rust_cheat_comp_exists())
 	{
@@ -580,7 +580,7 @@ void FCEUI_CheatSearchGetRange(uint32 first, uint32 last, int (*callb)(uint32 a,
 	}
 }
 
-void FCEUI_CheatSearchBegin(void)
+void fceu11::CheatSearchBegin(void)
 {
 	static uint8 mem[0x10000];
 	static uint8 pres[0x10000];
@@ -593,7 +593,7 @@ void FCEUI_CheatSearchBegin(void)
 }
 
 
-void FCEUI_CheatSearchEnd(int type, uint8 v1, uint8 v2)
+void fceu11::CheatSearchEnd(int type, uint8 v1, uint8 v2)
 {
 	static uint8 mem[0x10000];
 	static uint8 pres[0x10000];
@@ -649,20 +649,20 @@ int FCEU_DeleteAllCheats(void)
 	return 0;
 }
 
-int FCEUI_FindCheatMapByte(uint16 address)
+int fceu11::FindCheatMapByte(uint16 address)
 {
 	// v0.2.24: bit storage migrated to Rust.
 	return fceux11_rust_cheat_map_find(address);
 }
 
-void FCEUI_SetCheatMapByte(uint16 address, bool cheat)
+void fceu11::SetCheatMapByte(uint16 address, bool cheat)
 {
 	// v0.2.24: bit storage migrated to Rust. The original C++ ternary is
 	// `cheat ? OR : XOR` — preserved exactly inside the Rust impl.
 	fceux11_rust_cheat_map_set(address, cheat ? 1 : 0);
 }
 
-void FCEUI_CreateCheatMap(void)
+void fceu11::CreateCheatMap(void)
 {
 	// v0.2.24: bit storage migrated to Rust. We keep `cheatMap` as a non-null
 	// presence sentinel so existing `if (cheatMap)` guards still work.
@@ -671,19 +671,19 @@ void FCEUI_CreateCheatMap(void)
 		fceux11_rust_cheat_map_create();
 		cheatMap = &cheatMapSentinel;
 	}
-	FCEUI_RefreshCheatMap();
+	fceu11::RefreshCheatMap();
 }
 
-void FCEUI_RefreshCheatMap(void)
+void fceu11::RefreshCheatMap(void)
 {
 	// v0.2.24: zero the Rust-side buffer, then re-mark currently-active
 	// substitute cheats (same as the original C++ implementation).
 	fceux11_rust_cheat_map_refresh_clear();
 	for (uint32 i = 0; i < numsubcheats; ++i)
-		FCEUI_SetCheatMapByte(SubCheats[i].addr, true);
+		fceu11::SetCheatMapByte(SubCheats[i].addr, true);
 }
 
-void FCEUI_ReleaseCheatMap(void)
+void fceu11::ReleaseCheatMap()
 {
 	if (cheatMap)
 	{

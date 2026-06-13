@@ -592,7 +592,7 @@ void StateRecorderDialog_t::recalcMemoryUsage(void)
 	}
 	else
 	{
-		int32_t fps = FCEUI_GetDesiredFPS(); // Do >> 24 to get in Hz
+		int32_t fps = fceu11::GetDesiredFPS(); // Do >> 24 to get in Hz
 		double hz = ( ((double)fps) / 16777216.0 );
 
 		fsnapMin  = static_cast<double>(snapFrames->value()) / (hz * 60.0);

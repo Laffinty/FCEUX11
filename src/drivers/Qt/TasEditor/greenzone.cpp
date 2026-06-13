@@ -545,7 +545,7 @@ void GREENZONE::adjustUp()
 		{
 			// custom invalidation procedure, not retriggering LostPosition/PauseFrame
 			invalidate(first_input_changes);
-			bool emu_was_paused = (FCEUI_EmulationPaused() != 0);
+			bool emu_was_paused = (fceu11::IsEmulationPaused() != 0);
 			int saved_pause_frame = playback->getPauseFrame();
 			playback->ensurePlaybackIsInsideGreenzone();
 			if (saved_pause_frame >= 0)
@@ -584,7 +584,7 @@ void GREENZONE::adjustDown()
 	{
 		// custom invalidation procedure, not retriggering LostPosition/PauseFrame
 		invalidate(first_input_changes);
-		bool emu_was_paused = (FCEUI_EmulationPaused() != 0);
+		bool emu_was_paused = (fceu11::IsEmulationPaused() != 0);
 		int saved_pause_frame = playback->getPauseFrame();
 		playback->ensurePlaybackIsInsideGreenzone();
 		if (saved_pause_frame >= 0)
@@ -639,7 +639,7 @@ void GREENZONE::invalidateAndUpdatePlayback(int after)
 			// either set Playback cursor to be inside the Greenzone or run seeking to restore Playback cursor position
 			if (currFrameCounter >= greenzoneSize)
 			{
-				if (playback->getPauseFrame() >= 0 && !FCEUI_EmulationPaused())
+				if (playback->getPauseFrame() >= 0 && !fceu11::IsEmulationPaused())
 				{
 					// emulator was running, so continue seeking, but don't follow the Playback cursor
 					playback->jump(playback->getPauseFrame(), false, true, false);

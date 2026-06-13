@@ -288,13 +288,32 @@ extern int input_display;
 //--------------------------------------------------
 void FCEUI_MakeBackupMovie(bool dispMessage);
 void FCEUI_CreateMovieFile(std::string fn);
-void FCEUI_SaveMovie(const char *fname, EMOVIE_FLAG flags, std::wstring author);
-bool FCEUI_LoadMovie(const char *fname, bool read_only, int _stopframe);
-void FCEUI_MoviePlayFromBeginning(void);
-void FCEUI_StopMovie(void);
-bool FCEUI_MovieGetInfo(FCEUFILE* fp, MOVIE_INFO& info, bool skipFrameCount = false);
-//char* FCEUI_MovieGetCurrentName(int addSlotNumber);
-void FCEUI_MovieToggleReadOnly(void);
+namespace fceu11 {
+    void SaveMovie(const char *fname, EMOVIE_FLAG flags, std::wstring author);
+    bool LoadMovie(const char *fname, bool read_only, int _stopframe);
+    void MoviePlayFromBeginning();
+    void StopMovie();
+    bool MovieGetInfo(FCEUFILE* fp, MOVIE_INFO& info, bool skipFrameCount = false);
+    void MovieToggleReadOnly();
+    bool GetMovieToggleReadOnly();
+    void SetMovieToggleReadOnly(bool which);
+    std::string GetMovieName();
+    void MovieToggleFrameDisplay();
+} // namespace fceu11
+
+inline void FCEUI_SaveMovie(const char *fname, EMOVIE_FLAG flags, std::wstring author) { fceu11::SaveMovie(fname, flags, author); }
+inline bool FCEUI_LoadMovie(const char *fname, bool read_only, int _stopframe) { return fceu11::LoadMovie(fname, read_only, _stopframe); }
+inline void FCEUI_MoviePlayFromBeginning(void) { fceu11::MoviePlayFromBeginning(); }
+inline void FCEUI_StopMovie(void) { fceu11::StopMovie(); }
+inline bool FCEUI_MovieGetInfo(FCEUFILE* fp, MOVIE_INFO& info, bool skipFrameCount = false) { return fceu11::MovieGetInfo(fp, info, skipFrameCount); }
+inline void FCEUI_MovieToggleReadOnly(void) { fceu11::MovieToggleReadOnly(); }
+inline bool FCEUI_GetMovieToggleReadOnly() { return fceu11::GetMovieToggleReadOnly(); }
+inline void FCEUI_SetMovieToggleReadOnly(bool which) { fceu11::SetMovieToggleReadOnly(which); }
+inline std::string FCEUI_GetMovieName(void) { return fceu11::GetMovieName(); }
+inline void FCEUI_MovieToggleFrameDisplay() { fceu11::MovieToggleFrameDisplay(); }
+
+void FCEUI_MakeBackupMovie(bool dispMessage);
+void FCEUI_CreateMovieFile(std::string fn);
 void FCEUI_MovieToggleRecording();
 void FCEUI_MovieInsertFrame();
 void FCEUI_MovieDeleteFrame();
@@ -304,12 +323,8 @@ void FCEUI_MoviePrevRecordMode();
 void FCEUI_MovieRecordModeTruncate();
 void FCEUI_MovieRecordModeOverwrite();
 void FCEUI_MovieRecordModeInsert();
-bool FCEUI_GetMovieToggleReadOnly();
-void FCEUI_SetMovieToggleReadOnly(bool which);
 int FCEUI_GetMovieLength();
 int FCEUI_GetMovieRerecordCount();
-std::string FCEUI_GetMovieName(void);
-void FCEUI_MovieToggleFrameDisplay();
 void FCEUI_MovieToggleRerecordDisplay();
 void FCEUI_ToggleInputDisplay(void);
 
