@@ -1,0 +1,38 @@
+{
+  "nrom": {
+    "hash": "6fa50f2aaf74c8dd91afa456ae2afc8e"
+  },
+  "mmc1": {
+    "hash": "f3258b147555c61739b2472d3427cfeb"
+  },
+  "uxrom": {
+    "hash": "56ea6834e2dcd83043da2062205210d4"
+  },
+  "cnrom": {
+    "hash": "7ee73c4965509fbb22e6fefaaa72f593"
+  },
+  "mmc3": {
+    "hash": "2a5bd63b07906220b96d47ae36abe77c"
+  },
+  "mmc5": {
+    "hash": "7707e6155fbf7cd6067c83762a4a4aa1"
+  },
+  "axrom": {
+    "hash": "56ea6834e2dcd83043da2062205210d4"
+  },
+  "colordreams": {
+    "hash": "56ea6834e2dcd83043da2062205210d4"
+  },
+  "gnrom": {
+    "hash": "56ea6834e2dcd83043da2062205210d4"
+  },
+  "vrc2and4": {
+    "hash": "018ea111b11bc44ab82ff6d50faf82e7"
+  },
+  "vrc6": {
+    "hash": "a5e0cc5167558d1a133603f0df8ebcd6"
+  },
+  "nestest": {
+    "hash": "e292cb11bec935bda46ec05f982aec43"
+  }
+}

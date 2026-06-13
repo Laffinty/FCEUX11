@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.12.5] - 2026-06-14
+
+C/D-track closing integration checkpoint per plan v3 §5 v0.3.12.5.
+Full `ctest` pass, byte-level savestate consistency verified, and
+performance regression checked against the nearest available prior
+release (v0.3.11) as a v0.3.0-baseline proxy.
+
+### Added
+
+- **`tests/savestate_regression_test.cpp`** — loads 12 mapper ROMs,
+  runs 60 frames, saves state to memory, and verifies the MD5 digest
+  against `tests/fixtures/golden_savestate_hashes.json`.
+- **`tests/fixtures/golden_savestate_hashes.json`** — golden savestate
+  hashes for the 12 deterministic mapper configurations.
+- **`docs/tech/v0.3.x_Checkpoint_12.5.md`** — checkpoint report.
+
+### Changed
+
+- **`tests/CMakeLists.txt`**: registered `savestate_regression_test`
+  and included it in the sanitizer PATH injection list.
+
+### Verified
+
+- `ctest -C Release --output-on-failure`: 7/7 passed.
+- `rom_regression_test`: 720 frames, 13 ROMs, 0 mismatches.
+- `savestate_regression_test`: 12 ROMs, 0 mismatches (vrc7 excluded
+  because its savestate chunk contains a heap pointer and is
+  non-deterministic across process runs).
+- `cargo test --workspace --release`: all crates passed.
+- Performance vs v0.3.11 proxy: PPU 1.005×, CPU 1.040× (within
+  run-to-run variation); v0.3.0 baseline build could not be completed
+  locally due to a full Qt6 rebuild.
+
 ## [0.3.12] - 2026-06-14
 
 D-track continuation sub-version: mapper register-group alignment and

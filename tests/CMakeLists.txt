@@ -77,6 +77,15 @@ if(FCEUX11_BUILD_TESTS)
              COMMAND fceux11_rom_regression_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
+    # v0.3.12.5 — byte-level savestate consistency test
+    fceux11_add_test_executable(fceux11_savestate_regression_test
+        savestate_regression_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME savestate_regression_test
+             COMMAND fceux11_savestate_regression_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
     # v0.3.3 — tl::expected API tests
     fceux11_add_test_executable(fceux11_expected_api_test
         expected_api_test.cpp
@@ -126,7 +135,7 @@ if(FCEUX11_BUILD_TESTS)
              _FCEUX11_VCPKG_DBG_BIN_NATIVE)
         set_tests_properties(
             smoke_test mapper_load_test mapper_reset_test
-            rom_regression_test expected_api_test
+            rom_regression_test savestate_regression_test expected_api_test
             enum_class_bitflags_test
             PROPERTIES ENVIRONMENT_MODIFICATION
                 "PATH=path_list_prepend:${_FCEUX11_MSVC_BIN_NATIVE};PATH=path_list_prepend:${_FCEUX11_VCPKG_REL_BIN_NATIVE};PATH=path_list_prepend:${_FCEUX11_VCPKG_DBG_BIN_NATIVE}"
