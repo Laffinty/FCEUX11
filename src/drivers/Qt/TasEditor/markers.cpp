@@ -33,7 +33,7 @@ void MARKERS::save(EMUFILE *os)
 	if (!alreadyCompressed)
 		compressData();
 	write32le(compressedMarkersArray.size(), os);
-	os->fwrite(&compressedMarkersArray[0], compressedMarkersArray.size());
+	os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(compressedMarkersArray.data()), compressedMarkersArray.size()));
 	// write notes
 	size = notes.size();
 	write32le(size, os);
@@ -42,7 +42,7 @@ void MARKERS::save(EMUFILE *os)
 		uint32_t len = notes[i].length() + 1;
 		if (len > MAX_NOTE_LEN) len = MAX_NOTE_LEN;
 		write32le(len, os);
-		os->fwrite(notes[i].c_str(), len);
+		os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(notes[i].c_str()), len));
 	}
 }
 // returns true if couldn't load
@@ -59,7 +59,7 @@ bool MARKERS::load(EMUFILE *is)
 		if (!read32le(&comprlen, is)) return true;
 		if (comprlen <= 0) return true;
 		compressedMarkersArray.resize(comprlen);
-		if (is->fread(&compressedMarkersArray[0], comprlen) != comprlen) return true;
+		if (is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(compressedMarkersArray.data()), comprlen)) != comprlen) return true;
 		int e = uncompress((uint8*)&markersArray[0], &destlen, &compressedMarkersArray[0], comprlen);
 		if (e != Z_OK && e != Z_BUF_ERROR) return true;
 		// read notes
@@ -70,7 +70,7 @@ bool MARKERS::load(EMUFILE *is)
 			for (unsigned int i = 0; i < size; ++i)
 			{
 				if (!read32le(&len, is) || (len > MAX_NOTE_LEN) ) return true;
-				if (is->fread(temp_str, len) < len) return true;
+				if (is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(temp_str), len)) < len) return true;
 				temp_str[sizeof(temp_str)-1] = 0;
 				notes[i] = temp_str;
 			}

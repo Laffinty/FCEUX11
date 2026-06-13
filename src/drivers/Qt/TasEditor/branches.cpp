@@ -480,7 +480,7 @@ void BRANCHES::save(EMUFILE *os)
 	setTasProjectProgressBar( 0, TOTAL_BOOKMARKS );
 
 	// write cloud time
-	os->fwrite(cloudTimestamp, TIMESTAMP_LENGTH);
+	os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(cloudTimestamp), TIMESTAMP_LENGTH));
 	// write current branch and flag of changes since it
 	write32le(currentBranch, os);
 	if (changesSinceCurrentBranch)
@@ -492,14 +492,14 @@ void BRANCHES::save(EMUFILE *os)
 		write8le((uint8)0, os);
 	}
 	// write current_position time
-	os->fwrite(currentPosTimestamp, TIMESTAMP_LENGTH);
+	os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(currentPosTimestamp), TIMESTAMP_LENGTH));
 	// write all 10 parents
 	for (int i = 0; i < TOTAL_BOOKMARKS; ++i)
 	{
 		write32le(parents[i], os);
 	}
 	// write cached_timelines
-	os->fwrite(&cachedTimelines[0], TOTAL_BOOKMARKS);
+	os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(cachedTimelines.data()), TOTAL_BOOKMARKS));
 	// write cached_first_difference
 	for (int i = 0; i < TOTAL_BOOKMARKS; ++i)
 	{
@@ -514,21 +514,21 @@ void BRANCHES::save(EMUFILE *os)
 bool BRANCHES::load(EMUFILE *is)
 {
 	// read cloud time
-	if ((int)is->fread(cloudTimestamp, TIMESTAMP_LENGTH) < TIMESTAMP_LENGTH) goto error;
+	if ((int)is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(cloudTimestamp), TIMESTAMP_LENGTH)) < TIMESTAMP_LENGTH) goto error;
 	// read current branch and flag of changes since it
 	uint8 tmp;
 	if (!read32le(&currentBranch, is)) goto error;
 	if (!read8le(&tmp, is)) goto error;
 	changesSinceCurrentBranch = (tmp != 0);
 	// read current_position time
-	if ((int)is->fread(currentPosTimestamp, TIMESTAMP_LENGTH) < TIMESTAMP_LENGTH) goto error;
+	if ((int)is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(currentPosTimestamp), TIMESTAMP_LENGTH)) < TIMESTAMP_LENGTH) goto error;
 	// read all 10 parents
 	for (int i = 0; i < TOTAL_BOOKMARKS; ++i)
 	{
 		if (!read32le(&parents[i], is)) goto error;
 	}
 	// read cached_timelines
-	if ((int)is->fread(&cachedTimelines[0], TOTAL_BOOKMARKS) < TOTAL_BOOKMARKS) goto error;
+	if ((int)is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(cachedTimelines.data()), TOTAL_BOOKMARKS)) < TOTAL_BOOKMARKS) goto error;
 	// read cached_first_difference
 	for (int i = 0; i < TOTAL_BOOKMARKS; ++i)
 	{

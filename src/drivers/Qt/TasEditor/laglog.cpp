@@ -68,7 +68,7 @@ void LAGLOG::save(EMUFILE *os)
 		if (!alreadyCompressed)
 			compressData();
 		write32le(compressedLagLog.size(), os);
-		os->fwrite(&compressedLagLog[0], compressedLagLog.size());
+		os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(compressedLagLog.data()), compressedLagLog.size()));
 	}
 }
 // returns true if couldn't load
@@ -87,7 +87,7 @@ bool LAGLOG::load(EMUFILE *is)
 			if (!read32le(&comprlen, is)) return true;
 			if (comprlen == 0) return true;
 			compressedLagLog.resize(comprlen);
-			if (is->fread(&compressedLagLog[0], comprlen) != comprlen) return true;
+			if (is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(compressedLagLog.data()), comprlen)) != comprlen) return true;
 			int e = uncompress((uint8*)&lagLog[0], &destlen, &compressedLagLog[0], comprlen);
 			if (e != Z_OK && e != Z_BUF_ERROR) return true;
 		}

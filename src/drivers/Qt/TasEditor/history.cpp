@@ -996,7 +996,7 @@ void HISTORY::save(EMUFILE *os, bool really_save)
 		setTasProjectProgressBar( 0, historyTotalItems );
 
 		// write "HISTORY" string
-		os->fwrite(historySaveID, HISTORY_ID_LEN);
+		os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(historySaveID), HISTORY_ID_LEN));
 		// write vars
 		write32le(historyCursorPos, os);
 		write32le(historyTotalItems, os);
@@ -1006,7 +1006,7 @@ void HISTORY::save(EMUFILE *os, bool really_save)
 			real_pos = (historyStartPos + i) % historySize;
 			snapshots[real_pos].save(os);
 			bookmarkBackups[real_pos].save(os);
-			os->fwrite(&currentBranchNumberBackups[real_pos], 1);
+			os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(&currentBranchNumberBackups[real_pos]), 1));
 			if (i / SAVING_HISTORY_PROGRESSBAR_UPDATE_RATE > last_tick)
 			{
 				setTasProjectProgressBar( i, historyTotalItems );
@@ -1019,7 +1019,7 @@ void HISTORY::save(EMUFILE *os, bool really_save)
 	else
 	{
 		// write "HISTORX" string
-		os->fwrite(historySkipSaveID, HISTORY_ID_LEN);
+		os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(historySkipSaveID), HISTORY_ID_LEN));
 	}
 }
 // returns true if couldn't load
@@ -1039,7 +1039,7 @@ bool HISTORY::load(EMUFILE *is, unsigned int offset)
 		return false;
 	}
 	// read "HISTORY" string
-	if ((int)is->fread(save_id, HISTORY_ID_LEN) < HISTORY_ID_LEN) goto error;
+	if ((int)is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(save_id), HISTORY_ID_LEN)) < HISTORY_ID_LEN) goto error;
 	if (!strcmp(historySkipSaveID, save_id))
 	{
 		// string says to skip loading History
@@ -1090,7 +1090,7 @@ bool HISTORY::load(EMUFILE *is, unsigned int offset)
 	{
 		if (snapshots[i].load(is)) goto error;
 		if (bookmarkBackups[i].load(is)) goto error;
-		if (is->fread(&currentBranchNumberBackups[i], 1) != 1) goto error;
+		if (is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(&currentBranchNumberBackups[i]), 1)) != 1) goto error;
 		setTasProjectProgressBar( i, historyTotalItems );
 		playback->setProgressbar(i, historyTotalItems);
 	}

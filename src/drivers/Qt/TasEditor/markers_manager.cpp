@@ -68,7 +68,7 @@ void MARKERS_MANAGER::save(EMUFILE *os, bool really_save)
 		setTasProjectProgressBar( 0, 100 );
 
 		// write "MARKERS" string
-		os->fwrite(markers_save_id, MARKERS_ID_LEN);
+		os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(markers_save_id), MARKERS_ID_LEN));
 		markers.resetCompressedStatus();		// must recompress data, because most likely it has changed since last compression
 		markers.save(os);
 		setTasProjectProgressBar( 100, 100 );
@@ -76,7 +76,7 @@ void MARKERS_MANAGER::save(EMUFILE *os, bool really_save)
        	else
 	{
 		// write "MARKERX" string, meaning that Markers are not saved
-		os->fwrite(markers_skipsave_id, MARKERS_ID_LEN);
+		os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(markers_skipsave_id), MARKERS_ID_LEN));
 	}
 }
 // returns true if couldn't load
@@ -92,7 +92,7 @@ bool MARKERS_MANAGER::load(EMUFILE *is, unsigned int offset)
 	}
 	// read "MARKERS" string
 	char save_id[MARKERS_ID_LEN];
-	if ((int)is->fread(save_id, MARKERS_ID_LEN) < MARKERS_ID_LEN) goto error;
+	if ((int)is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(save_id), MARKERS_ID_LEN)) < MARKERS_ID_LEN) goto error;
 	if (!strcmp(markers_skipsave_id, save_id))
 	{
 		// string says to skip loading Markers

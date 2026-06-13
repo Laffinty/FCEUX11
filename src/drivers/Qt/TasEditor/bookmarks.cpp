@@ -398,7 +398,7 @@ void BOOKMARKS::save(EMUFILE *os, bool really_save)
 		setTasProjectProgressBar( 0, TOTAL_BOOKMARKS );
 
 		// write "BOOKMARKS" string
-		os->fwrite(bookmarks_save_id, BOOKMARKS_ID_LEN);
+		os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(bookmarks_save_id), BOOKMARKS_ID_LEN));
 		// write all 10 bookmarks
 		for (int i = 0; i < TOTAL_BOOKMARKS; ++i)
 		{
@@ -412,7 +412,7 @@ void BOOKMARKS::save(EMUFILE *os, bool really_save)
 	} else
 	{
 		// write "BOOKMARKX" string
-		os->fwrite(bookmarks_skipsave_id, BOOKMARKS_ID_LEN);
+		os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(bookmarks_skipsave_id), BOOKMARKS_ID_LEN));
 	}
 }
 // returns true if couldn't load
@@ -429,7 +429,7 @@ bool BOOKMARKS::load(EMUFILE *is, unsigned int offset)
 	}
 	// read "BOOKMARKS" string
 	char save_id[BOOKMARKS_ID_LEN];
-	if ((int)is->fread(save_id, BOOKMARKS_ID_LEN) < BOOKMARKS_ID_LEN) goto error;
+	if ((int)is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(save_id), BOOKMARKS_ID_LEN)) < BOOKMARKS_ID_LEN) goto error;
 	if (!strcmp(bookmarks_skipsave_id, save_id))
 	{
 		// string says to skip loading Bookmarks

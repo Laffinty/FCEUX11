@@ -155,16 +155,16 @@ void INPUTLOG::save(EMUFILE *os)
 		compressData();
 	// save joysticks data
 	write32le(compressedJoysticks.size(), os);
-	os->fwrite(&compressedJoysticks[0], compressedJoysticks.size());
+	os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(compressedJoysticks.data()), compressedJoysticks.size()));
 	// save commands data
 	write32le(compressedCommands.size(), os);
-	os->fwrite(&compressedCommands[0], compressedCommands.size());
+	os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(compressedCommands.data()), compressedCommands.size()));
 	if (hasHotChanges)
 	{
 		write8le((uint8)1, os);
 		// save hot_changes data
 		write32le(compressedHotChanges.size(), os);
-		os->fwrite(&compressedHotChanges[0], compressedHotChanges.size());
+		os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(compressedHotChanges.data()), compressedHotChanges.size()));
 	} else
 	{
 		write8le((uint8)0, os);
@@ -189,7 +189,7 @@ bool INPUTLOG::load(EMUFILE *is)
 	if (!read32le(&comprlen, is)) return true;
 	if (comprlen == 0) return true;
 	compressedJoysticks.resize(comprlen);
-	if (is->fread(&compressedJoysticks[0], comprlen) != comprlen) return true;
+	if (is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(compressedJoysticks.data()), comprlen)) != comprlen) return true;
 	int e = uncompress(&joysticks[0], &destlen, &compressedJoysticks[0], comprlen);
 	if (e != Z_OK && e != Z_BUF_ERROR) return true;
 	// read and uncompress commands data
@@ -199,7 +199,7 @@ bool INPUTLOG::load(EMUFILE *is)
 	if (!read32le(&comprlen, is)) return true;
 	if (comprlen <= 0) return true;
 	compressedCommands.resize(comprlen);
-	if (is->fread(&compressedCommands[0], comprlen) != comprlen) return true;
+	if (is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(compressedCommands.data()), comprlen)) != comprlen) return true;
 	e = uncompress(&commands[0], &destlen, &compressedCommands[0], comprlen);
 	if (e != Z_OK && e != Z_BUF_ERROR) return true;
 	// read hotchanges
@@ -214,7 +214,7 @@ bool INPUTLOG::load(EMUFILE *is)
 		if (!read32le(&comprlen, is)) return true;
 		if (comprlen == 0) return true;
 		compressedHotChanges.resize(comprlen);
-		if (is->fread(&compressedHotChanges[0], comprlen) != comprlen) return true;
+		if (is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(compressedHotChanges.data()), comprlen)) != comprlen) return true;
 		e = uncompress(&hotChanges[0], &destlen, &compressedHotChanges[0], comprlen);
 		if (e != Z_OK && e != Z_BUF_ERROR) return true;
 	}
