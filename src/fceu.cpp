@@ -160,11 +160,11 @@ void FCEU_TogglePPU(void) {
 	newppu ^= 1;
 	if (newppu) {
 		FCEU_DispMessage("New PPU loaded", 0);
-		FCEUI_printf("New PPU loaded");
+		FCEU_printf("New PPU loaded");
 		overclock_enabled = 0;
 	} else {
 		FCEU_DispMessage("Old PPU loaded", 0);
-		FCEUI_printf("Old PPU loaded");
+		FCEU_printf("Old PPU loaded");
 	}
 	normalscanlines = (dendy ? 290 : 240)+newppu; // use flag as number!
 #ifdef __WIN_DRIVER__
@@ -212,7 +212,7 @@ static void FCEU_CloseGame(void)
 
 		FCEU_StateRecorderStop();
 
-		FCEUI_StopMovie();
+		fceu11::StopMovie();
 
 		ResetExState(0, 0);
 
@@ -422,7 +422,10 @@ int FDSLoad(const char *name, FCEUFILE *fp);
 int NSFLoad(const char *name, FCEUFILE *fp);
 
 //name should be UTF-8, hopefully, or else there may be trouble
-FCEUGI *FCEUI_LoadGameVirtual(const char *name, int OverwriteVidMode, bool silent)
+// v0.3.10 P4.1: definition lives in fceu11:: per plan v3 §5 v0.3.10;
+// the global FCEUI_LoadGameVirtual symbol is preserved via the inline
+// reference alias declared in core_api.h.
+FCEUGI *fceu11::LoadGameVirtual(const char *name, int OverwriteVidMode, bool silent)
 {
 	//----------
 	//attempt to open the files
@@ -530,7 +533,7 @@ FCEUGI *FCEUI_LoadGameVirtual(const char *name, int OverwriteVidMode, bool silen
 			FSettings.GameGenie && 
 			FCEU_OpenGenie())
 		{
-			FCEUI_SetGameGenie(false);
+			fceu11::SetGameGenie(false);
 #ifdef __WIN_DRIVER__
 			genie = 0;
 #endif
@@ -546,16 +549,16 @@ FCEUGI *FCEUI_LoadGameVirtual(const char *name, int OverwriteVidMode, bool silen
 
 		if (!lastpal && PAL) {
 			FCEU_DispMessage("PAL mode set", 0);
-			FCEUI_printf("PAL mode set\n");
+			FCEU_printf("PAL mode set\n");
 		}
 		else if (!lastdendy && dendy) {
 			// this won't happen, since we don't autodetect dendy, but maybe someday we will?
 			FCEU_DispMessage("Dendy mode set", 0);
-			FCEUI_printf("Dendy mode set\n");
+			FCEU_printf("Dendy mode set\n");
 		}
 		else if ((lastpal || lastdendy) && !(PAL || dendy)) {
 			FCEU_DispMessage("NTSC mode set", 0);
-			FCEUI_printf("NTSC mode set\n");
+			FCEU_printf("NTSC mode set\n");
 		}
 
 		if (GameInfo->type != GIT_NSF && !disableAutoLSCheats)
@@ -611,14 +614,16 @@ FCEUGI *FCEUI_LoadGameVirtual(const char *name, int OverwriteVidMode, bool silen
 	return GameInfo;
 }
 
-FCEUGI *FCEUI_LoadGame(const char *name, int OverwriteVidMode, bool silent)
+// v0.3.10 P4.1: see LoadGameVirtual comment above.
+FCEUGI *fceu11::LoadGame(const char *name, int OverwriteVidMode, bool silent)
 {
-	return FCEUI_LoadGameVirtual(name, OverwriteVidMode, silent);
+	return fceu11::LoadGameVirtual(name, OverwriteVidMode, silent);
 }
 
 
 //Return: Flag that indicates whether the function was succesful or not.
-bool FCEUI_Initialize() {
+// v0.3.10 P4.1: see LoadGameVirtual comment above.
+bool fceu11::Initialize() {
 	srand(time(0));
 
 	if (!FCEU_InitVirtualVideo()) {
@@ -651,7 +656,8 @@ bool FCEUI_Initialize() {
 	return true;
 }
 
-void FCEUI_Kill(void) {
+// v0.3.10 P4.1: see LoadGameVirtual comment above.
+void fceu11::Kill() {
 	#ifdef _S9XLUA_H
 	FCEU_LuaStop();
 	#endif
@@ -740,7 +746,12 @@ extern unsigned int frameAdvHoldTimer;
 ///Emulates a single frame.
 
 ///Skip may be passed in, if FRAMESKIP is #defined, to cause this to emulate more than one frame
-void FCEUI_Emulate(uint8 **pXBuf, int32 **SoundBuf, int32 *SoundBufSize, int skip) {
+// v0.3.10 P4.1: pre-declare extern globals at global scope BEFORE the
+// fceu11::Emulate definition, because an unqualified `extern int X;`
+// inside fceu11::Emulate would introduce fceu11::X per [basic.link]/7.
+extern int KillFCEUXonFrame;
+// v0.3.10 P4.1: see LoadGameVirtual comment above.
+void fceu11::Emulate(uint8 **pXBuf, int32 **SoundBuf, int32 *SoundBufSize, int skip) {
 	FCEU_PROFILE_FUNC(prof, "Emulate Single Frame");
 	//skip initiates frame skip if 1, or frame skip and sound skip if 2
 	FCEU_MAYBE_UNUSED int r;
@@ -862,13 +873,11 @@ void FCEUI_Emulate(uint8 **pXBuf, int32 **SoundBuf, int32 *SoundBufSize, int ski
 	UpdateTextHooker();
 	Update_RAM_Search(); // Update_RAM_Watch() is also called.
 	RamChange();
-	//FCEUI_AviVideoUpdate(XBuf);
+	//fceu11::AviVideoUpdate(XBuf);
 
-	extern int KillFCEUXonFrame;
 	if (KillFCEUXonFrame && (FCEUMOV_GetFrame() >= KillFCEUXonFrame))
 		DoFCEUExit();
 #else
-		extern int KillFCEUXonFrame;
 	if (KillFCEUXonFrame && (FCEUMOV_GetFrame() >= KillFCEUXonFrame))
 		exit(0);
 #endif
@@ -907,7 +916,8 @@ void FCEUI_Emulate(uint8 **pXBuf, int32 **SoundBuf, int32 *SoundBufSize, int ski
 		ProcessSubtitles();
 }
 
-void FCEUI_CloseGame(void) {
+// v0.3.10 P4.1: see LoadGameVirtual comment above.
+void fceu11::CloseGame() {
 	if (!FCEU_IsValidUI(FCEUI_CLOSEGAME))
 		return;
 
@@ -1126,7 +1136,7 @@ void FCEU_PrintError( __FCEU_PRINTF_FORMAT const char *format, ...)
 	va_end(ap);
 }
 
-void FCEUI_SetRenderedLines(int ntscf, int ntscl, int palf, int pall) {
+void fceu11::SetRenderedLines(int ntscf, int ntscl, int palf, int pall) {
 	FSettings.UsrFirstSLine[0] = ntscf;
 	FSettings.UsrLastSLine[0] = ntscl;
 	FSettings.UsrFirstSLine[1] = palf;
@@ -1140,7 +1150,7 @@ void FCEUI_SetRenderedLines(int ntscf, int ntscl, int palf, int pall) {
 	}
 }
 
-void FCEUI_SetVidSystem(int a) {
+void fceu11::SetVidSystem(int a) {
 	FSettings.PAL = a ? 1 : 0;
 	if (GameInfo) {
 		FCEU_ResetVidSys();
@@ -1149,7 +1159,7 @@ void FCEUI_SetVidSystem(int a) {
 	}
 }
 
-int FCEUI_GetCurrentVidSystem(int *slstart, int *slend) {
+int fceu11::GetCurrentVidSystem(int *slstart, int *slend) {
 	if (slstart)
 		*slstart = FSettings.FirstSLine;
 	if (slend)
@@ -1157,7 +1167,7 @@ int FCEUI_GetCurrentVidSystem(int *slstart, int *slend) {
 	return(PAL);
 }
 
-int  FCEUI_GetRegion(void)
+int fceu11::GetRegion()
 {
 	int region;
 
@@ -1176,7 +1186,7 @@ int  FCEUI_GetRegion(void)
 	return region;
 }
 
-void FCEUI_SetRegion(int region, int notify) 
+void fceu11::SetRegion(int region, int notify) 
 {
 	switch (region) {
 		case 0: // NTSC
@@ -1187,7 +1197,7 @@ void FCEUI_SetRegion(int region, int notify)
 			if (notify)
 			{
 				FCEU_DispMessage("NTSC mode set", 0);
-				FCEUI_printf("NTSC mode set\n");
+				FCEU_printf("NTSC mode set\n");
 			}
 			break;
 		case 1: // PAL
@@ -1198,7 +1208,7 @@ void FCEUI_SetRegion(int region, int notify)
 			if (notify)
 			{
 				FCEU_DispMessage("PAL mode set", 0);
-				FCEUI_printf("PAL mode set\n");
+				FCEU_printf("PAL mode set\n");
 			}
 			break;
 		case 2: // Dendy
@@ -1209,13 +1219,13 @@ void FCEUI_SetRegion(int region, int notify)
 			if (notify)
 			{
 				FCEU_DispMessage("Dendy mode set", 0);
-				FCEUI_printf("Dendy mode set\n");
+				FCEU_printf("Dendy mode set\n");
 			}
 			break;
 	}
 	normalscanlines += newppu;
 	totalscanlines = normalscanlines + (overclock_enabled ? postrenderscanlines : 0);
-	FCEUI_SetVidSystem(pal_emulation);
+	fceu11::SetVidSystem(pal_emulation);
 	RefreshThrottleFPS();
 #ifdef __WIN_DRIVER__
 	UpdateCheckedMenuItems();
@@ -1224,7 +1234,7 @@ void FCEUI_SetRegion(int region, int notify)
 }
 
 //Enable or disable Game Genie option.
-void FCEUI_SetGameGenie(bool a) {
+void fceu11::SetGameGenie(bool a) {
 	FSettings.GameGenie = a;
 }
 
@@ -1234,37 +1244,37 @@ void FCEUI_SetGameGenie(bool a) {
 //	FSettings.SnapName = a;
 //}
 
-int32 FCEUI_GetDesiredFPS(void) {
+int32 fceu11::GetDesiredFPS() {
 	if (PAL || dendy)
 		return(838977920);  // ~50.007
 	else
 		return(1008307711);  // ~60.1
 }
 
-int FCEUI_EmulationPaused(void)
+int fceu11::IsEmulationPaused()
 {
 	return (EmulationPaused & EMULATIONPAUSED_PAUSED);
 }
 
-int FCEUI_EmulationFrameStepped()
+int fceu11::EmulationFrameStepped()
 {
 	return (EmulationPaused & EMULATIONPAUSED_FA);
 }
 
-void FCEUI_ClearEmulationFrameStepped()
+void fceu11::ClearEmulationFrameStepped()
 {
 	EmulationPaused &= ~EMULATIONPAUSED_FA;
 }
 
 //mbg merge 7/18/06 added
 //ideally maybe we shouldnt be using this, but i need it for quick merging
-void FCEUI_SetEmulationPaused(int val) {
+void fceu11::SetEmulationPaused(int val) {
 	EmulationPaused = val;
 	if(EmulationPaused)
 		FCEUD_FlushTrace();
 }
 
-void FCEUI_ToggleEmulationPause(void)
+void fceu11::ToggleEmulationPause()
 {
 	EmulationPaused = (EmulationPaused & EMULATIONPAUSED_PAUSED) ^ EMULATIONPAUSED_PAUSED;
 	DebuggerWasUpdated = false;
@@ -1272,16 +1282,16 @@ void FCEUI_ToggleEmulationPause(void)
 		FCEUD_FlushTrace();
 }
 
-void FCEUI_FrameAdvanceEnd(void) {
+void fceu11::FrameAdvanceEnd() {
 	frameAdvanceRequested = false;
 }
 
-void FCEUI_FrameAdvance(void) {
+void fceu11::FrameAdvance() {
 	frameAdvance_Delay_count = 0;
 	frameAdvanceRequested = true;
 }
 
-void FCEUI_PauseForDuration(int secs)
+void fceu11::PauseForDuration(int secs)
 {
 	int framesPerSec;
 
@@ -1303,7 +1313,7 @@ void FCEUI_PauseForDuration(int secs)
 	EmulationPaused |= EMULATIONPAUSED_TIMER;
 }
 
-int FCEUI_PauseFramesRemaining(void)
+int fceu11::PauseFramesRemaining()
 {
 	return (EmulationPaused & EMULATIONPAUSED_TIMER) ? pauseTimer : 0;
 }
@@ -1386,7 +1396,7 @@ bool FCEU_IsValidUI(EFCEUI ui) {
 		return FCEUMOV_Mode(MOVIEMODE_PLAY | MOVIEMODE_RECORD);
 
 	case FCEUI_STOPAVI:
-		return FCEUI_AviIsRecording();
+		return fceu11::AviIsRecording();
 
 	case FCEUI_TASEDITOR:
 		if (!GameInfo) return false;

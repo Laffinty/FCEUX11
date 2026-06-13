@@ -108,11 +108,11 @@ void BOOKMARK::save(EMUFILE *os)
 		// write savestate
 		int size = savestate.size();
 		write32le(size, os);
-		os->fwrite(&savestate[0], size);
+		os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(savestate.data()), size));
 		// write saved_screenshot
 		size = savedScreenshot.size();
 		write32le(size, os);
-		os->fwrite(&savedScreenshot[0], size);
+		os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(savedScreenshot.data()), size));
 	} else write8le((uint8)0, os);
 }
 // returns true if couldn't load
@@ -129,11 +129,11 @@ bool BOOKMARK::load(EMUFILE *is)
 		int size;
 		if (!read32le(&size, is)) return true;
 		savestate.resize(size);
-		if ((int)is->fread(&savestate[0], size) < size) return true;
+		if ((int)is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(savestate.data()), size)) < size) return true;
 		// read saved_screenshot
 		if (!read32le(&size, is)) return true;
 		savedScreenshot.resize(size);
-		if ((int)is->fread(&savedScreenshot[0], size) < size) return true;
+		if ((int)is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(savedScreenshot.data()), size)) < size) return true;
 	} else
 	{
 		free();

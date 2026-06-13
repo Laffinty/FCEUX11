@@ -559,7 +559,7 @@ void GamePadConfDialog_t::loadMapList(void)
 {
 	QDir dir;
 	QStringList filters, fileList;
-	const char *baseDir = FCEUI_GetBaseDirectory();
+	const char *baseDir = fceu11::GetBaseDirectory();
 	const char *guid;
 	std::string path;
 	std::string prefix, mapName;

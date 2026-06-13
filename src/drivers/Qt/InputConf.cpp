@@ -458,7 +458,7 @@ void InputConfDialog_t::openLoadPresetFile(void)
 	QFileDialog dialog(this, tr("Load Preset From File"));
 	QDir dir;
 
-	baseDir = FCEUI_GetBaseDirectory();
+	baseDir = fceu11::GetBaseDirectory();
 
 	path = std::string(baseDir) + "/input/presets/";
 
@@ -516,7 +516,7 @@ void InputConfDialog_t::openSavePresetFile(void)
 	QFileDialog dialog(this, tr("Save Preset to File"));
 	QDir dir;
 
-	baseDir = FCEUI_GetBaseDirectory();
+	baseDir = fceu11::GetBaseDirectory();
 
 	path = std::string(baseDir) + "/input/presets/";
 

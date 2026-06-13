@@ -293,7 +293,7 @@ void LuaControlDialog_t::openLuaScriptFile(void)
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::DesktopLocation).first());
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::DownloadLocation).first());
-	urls << QUrl::fromLocalFile(QDir(FCEUI_GetBaseDirectory()).absolutePath());
+	urls << QUrl::fromLocalFile(QDir(fceu11::GetBaseDirectory()).absolutePath());
 
 	if (exePath[0] != 0)
 	{
@@ -366,7 +366,7 @@ void LuaControlDialog_t::openLuaScriptFile(void)
 	if (last.size() == 0)
 	{
 #ifdef WIN32
-		last.assign(FCEUI_GetBaseDirectory());
+		last.assign(fceu11::GetBaseDirectory());
 #else
 		last.assign("/usr/share/fceux/luaScripts");
 #endif

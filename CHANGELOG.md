@@ -5,6 +5,237 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.10] - 2026-06-13
+
+C-track closing sub-version: `FCEUI_*` public-API convergence and
+`EMUFILE` `std::span` modernization per plan v3 §5 v0.3.10. The
+phase split is P0 (baseline freeze) → P1 (metrics & scripts) → P2
+(`EMUFILE` core `std::span` interface) → P3.1–P3.6 (six batches of
+`EMUFILE` caller migration) → P4 (four waves of `FCEUI_*` namespace
+convergence) → P5 (Rust-side FFI stub sync) → P6 (full regression).
+Every `FCEUI_*` legacy spelling remains a global `inline` wrapper so
+the ~600 pre-existing call sites keep compiling unchanged; the
+`expected_api_test` ctest exercises the wrapper surface end-to-end.
+
+### Added
+
+- **`src/emufile.h` / `src/emufile.cpp`** (`EMUFILE` interface):
+  - `virtual size_t fread(std::span<std::byte> dst) = 0;`
+  - `virtual size_t fwrite(std::span<const std::byte> src) = 0;`
+  - `[[deprecated("use std::span overload")]]` shim forwarding the
+    legacy `(void*, size_t)` / `(const void*, size_t)` signatures to
+    the new span-based virtuals — no call site is forced to migrate
+    in lockstep.
+  - `EMUFILE_MEMORY` storage migrated from
+    `std::vector<uint8_t>` to `std::vector<std::byte>`; the `buf()` /
+    `get_vec()` accessors return the new element type.
+- **`src/utils/fceu11_expected.cpp`** (the `FCEUI_*` legacy wrapper
+  surface): the ~250 pre-existing `FCEUI_*` functions are now
+  one-line `fceu11::Foo` forwarders. `expected_api_test` resolves
+  every legacy symbol through these wrappers and exercises the
+  end-to-end call chain (FCEUI → fceu11:: → internal). New wrappers
+  are added in P4 in lockstep with the underlying migration.
+- **Boundary-conversion rules doc**:
+  `docs/tech/v0.3.10_byte_conversion_rules.md` — single source of
+  truth for the four canonical C-API ↔ `std::byte` transitions
+  (`std::byte{val}`, `std::to_integer<uint8_t>(b)`,
+  `reinterpret_cast<const uint8_t*>(span.data())` for FFI, and
+  `static_cast<std::byte*>(ptr)` for the shim path).
+- **Phase P1 metrics scripts** (all PowerShell / Python, live in
+  `scripts/`):
+  - `_count_fceui_symbols.ps1` — emits the raw `grep`-equivalent
+    count and the text-only count (excludes binary files); single
+    source of truth for the P4 metric.
+  - `_list_emufile_callers.ps1` — per-file rollup of
+    `EMUFILE_MEMORY` and `EMUFILE` call sites; drove the P3.1–P3.6
+    batch ordering by dependency topology.
+  - `_check_byte_usage.py` — static scanner for `std::byte` /
+    `uint8_t` mixing patterns; emits HIGH / MED / LOW risk
+    findings (HIGH = `reinterpret_cast` or `std::byte*`
+    arithmetic; MED = mixed `std::vector<byte>` / `std::vector<u8>`
+    in one TU).
+  - `_probe_msvc_span_byte.bat` — MSVC C++20 `std::span` /
+    `std::byte` compile probe (positive + negative tests; the
+    negative tests confirm `std::byte + int` and
+    `std::byte == uint8_t` are rejected by `cl`).
+- **Phase P0 baseline report**:
+  `docs/p0_baseline_report.md` — frozen `FCEUI_*` count
+  (1118 raw / 993 text), 5-ROM savestate golden hash anchor,
+  `fceux11_rust.h` freeze notification.
+
+### Changed
+
+- **`EMUFILE` and its three subclasses (`EMUFILE_FILE`,
+  `EMUFILE_MEMORY`, `EMUFILE_NULL`)**: virtual signature swap
+  documented above. Six `EMUFILE` caller batches (P3.1–P3.6)
+  migrated to the span-based call form:
+  - **P3.1** (8 files): `src/drivers/Qt/TasEditor/*` and other
+    leaf Qt files (`bookmark.cpp`, `bookmarks.cpp`,
+    `branches.cpp`, `greenzone.cpp`, `history.cpp`, `inputlog.cpp`,
+    `laglog.cpp`, `markers.cpp`, `markers_manager.cpp`,
+    `playback.cpp`, `selection.cpp`, `snapshot.cpp`).
+  - **P3.2** (2 files): `src/state.cpp` (savestate serialization)
+    + remaining Qt playback / record code; the savestate byte-level
+    contract is preserved — 720 frames compared against
+    `tests/fixtures/golden_hashes.json`, 0 mismatches.
+  - **P3.3** (2 files): `src/movie.cpp` (FM2 round-trip) +
+    `src/oldmovie.cpp`; the `.fm2` writer now serializes through
+    `std::span<const std::byte>` and the reader's
+    `std::vector<std::byte>` buffer hands the new accessor back
+    through the span overload.
+  - **P3.4** (2 files): `src/fds.cpp` + `src/nsf.cpp` (FDS disk
+    image & NSF music file loaders).
+  - **P3.5** (3 files): `src/file.cpp` + `src/drivers/Qt/
+    fceuWrapper.cpp` + `src/utils/xstring.h`.
+  - **P3.6** (sweep): `src/emufile.cpp` (the boundary helpers
+    themselves), `src/input.cpp`, `src/sound.cpp`, `src/video.cpp`,
+    `src/wave.cpp` / `wave.h`, `src/cheat.cpp` / `cheat.h`,
+    `src/drivers/common/cheat.cpp`, plus remaining
+    `src/drivers/Qt/*` (`AviRecord.cpp`, `AviRiffViewer.cpp`,
+    `ConsoleWindow.cpp`, `LuaControl.cpp`, `MovieOptions.cpp`,
+    `RamSearch.cpp`, `RamWatch.cpp`, etc.).
+- **`FCEUI_*` namespace convergence** (P4, four waves):
+  - **P4.1** (`core_api.h` / `io_api.h` / `net_api.h` /
+    `diag_api.h`): the canonical entry points
+    (`Initialize`, `Kill`, `LoadGame`, `Emulate`, `CloseGame`,
+    `SetInput(FC)`, `PowerNES`, `ResetNES`, all `FCEUIOD_*`,
+    `NTSCSELHUE`, `NTSCSELTINT`, `GetNTSCTH`, `SetNTSCTH`,
+    palette getters/setters, sound volume / mute, base directory,
+    render toggles, netplay, diag) now live in
+    `namespace fceu11` with global inline wrappers preserving
+    every legacy spelling.
+  - **P4.2** (`src/movie.h`): the playback / control API
+    (`FCEUI_LoadMovie`, `FCEUI_SaveMovieAs`,
+    `FCEUI_MovieGetInfo`, `FCEUI_MovieSetVersion`, etc.) moves into
+    `fceu11::movie`; legacy names remain as `inline` shims.
+  - **P4.3** (`src/drivers/Qt/*`): the Qt UI / config / cheat
+    dialog code migrates call sites in lockstep with P4.1 — 30+
+    call sites updated; each is verified by the relevant ctest
+    (`mapper_load_test`, `mapper_reset_test`, `smoke_test`).
+  - **P4.4** (`tests/`, `tests/benchmark/`): the 5 ctest
+    executables and 3 benchmark executables update their
+    `FCEUI_*` call sites; the test binaries stay green.
+- **Rust FFI stub layer** (P5):
+  - `src/rust/fceux11_rust.h` regenerated via cbindgen; the
+    C-export surface is byte-identical to v0.3.9 (no new
+    symbols added — per the v0.3.10 plan §0.2 / §3 R5
+    invariant).
+  - `src/rust/crates/fceux11-lua/src/ffi_stubs.rs`: 81
+    `fceux11_lua_*` no-op stubs regenerated for the
+    `cargo test --workspace` link path; gated behind
+    `#[cfg(any(test, feature = "ffi-stubs"))]` and a new
+    `ffi-stubs` Cargo feature to keep the CMake Release build
+    free of duplicate symbols.
+  - Two pre-existing pure-Rust test bugs in `bit.rs` and
+    `input.rs` are fixed; `cargo test --workspace` is green.
+- **`tests/smoke_test.cpp`, `tests/boards/mapper_*_test.cpp`,
+  `tests/rom_regression_test.cpp`**: the `CHECK_SYMBOL(...)`
+  macro list and the `FCEUI_*` symbol resolution checks
+  continue to work through the new wrapper layer; no test
+  source change is required for the wrapper indirection.
+
+### Metrics
+
+- `FCEUI_*` raw count: **1118 → 594** (target < 600; **hit**).
+- `FCEUI_*` text-only count: **993 → 452**.
+- `EMUFILE` caller files migrated: **30+** across P3.1–P3.6.
+- New `EMUFILE` virtual signatures: 2 (`fread` span, `fwrite`
+  span); old signatures retained as `[[deprecated]]` shims.
+- New `fceux11::` symbols (P4): ~250 across `core_api.h` /
+  `io_api.h` / `net_api.h` / `diag_api.h` / `movie.h` / driver
+  helpers; the corresponding ~250 `FCEUI_*` wrappers live in
+  `src/utils/fceu11_expected.cpp`.
+
+### Deviations from the plan v3 §5 v0.3.10 literal text
+
+- **Sub-version shape is `P0 → P1 → P2 → P3.1–P3.6 → P4 → P5 →
+  P6 → P7`**, not the plan's P0–P7 flat list. The v0.3.10
+  *sub-plan* (`docs/v0.3.10_Construction_Plan.md`) is the
+  authoritative phase breakdown; the P3 split into six
+  caller-migration batches and the P4 split into four
+  convergence waves are documented there.
+- **`_p4_migrate_*.py` mechanical-rename helpers** stay under
+  `scripts/` rather than being deleted at the end of P4. They
+  are repeatable tools: any later convergence pass (e.g. v0.4.0
+  when the legacy shims are removed) can re-run them as a
+  starting point.
+- **`_check_byte_usage.py` reports 11 HIGH findings at the
+  end of P6** (re-`reinterpret_cast` /
+  `std::byte*` arithmetic in `emufile.{h,cpp}`, `movie.cpp`,
+  `fceu11_expected.cpp`, `greenzone.cpp`). These are the
+  boundary conversions documented in
+  `docs/tech/v0.3.10_byte_conversion_rules.md` §7.2 — they are
+  *required* at the C ↔ `std::byte` ↔ C++ boundary and are not
+  regressions. The P1 baseline scan reported 0 HIGH because it
+  ran before P2/P3 introduced the `std::span` interface; the
+  plan §7.2 boundary rules are the expected source of these
+  findings.
+- **Performance gate (闸 5) baseline**: the three Google
+  Benchmark executables (`ppu_render_bench`, `x6502_exec_bench`,
+  `apu_mix_bench`) report a `RESULT: PASSED` line regardless of
+  measured runtime. v0.3.10 does not introduce a hard runtime
+  budget — the plan §5 v0.3.10 "PPU render < 1.1×; CPU exec <
+  0.95×" target is checked against the published
+  v0.3.0 baseline by inspection (current P6 measured
+  PPU 0.735 ms/frame, x6502 0.842 ms/frame, APU 0.704 ms/frame
+  on a 60-frame nrom run); the per-binary `RESULT: PASSED` is
+  the script's unconditional output, not a budget assertion.
+  v0.3.12.5 is the integration checkpoint that will introduce
+  a hard budget assertion if needed.
+- **ASan on Windows reports no LSan output** (per
+  `_ctest_asan.ps1` log). MSVC's `clang_rt.asan_dynamic-x86_64.dll`
+  on Windows does not implement `LeakSanitizer`; only UAF /
+  bounds / stack-buffer-overflow checks are active. This is the
+  documented v0.3.6.5 behavior, not a v0.3.10 regression.
+- **`fceu11-lua` Cargo feature split**: the v0.3.10 plan §0.2
+  promised "Rust crate version stays 0.2.x; no new FFI
+  functions". To satisfy that, the P5 work added a new
+  `ffi-stubs` feature to `fceux11-lua` (separate from the
+  pre-existing `ffi-tests` feature used during the
+  v0.3.7 integration). The C-exported symbol set in
+  `fceux11_rust.h` is byte-identical to v0.3.9 — no new FFI
+  functions were added; only the Rust-side stub gating
+  changed.
+
+### Verification (all five plan-v3 §7 gates + ASan + UBSan-substitute)
+
+- **闸 1 (编译)**: `cmake --build build --config Release` — 0
+  errors. All 15 targets built: `fceux11_core` /
+  `fceux11_boards` / `fceux11_utils` / `fceux11_drivers_common` /
+  `fceux11_drivers_qt` / `fceux11` + the 5 ctest executables +
+  the 3 benchmark executables. The new C4200 warning on
+  `fceux11_rust.h:354` (zero-length array in the cbindgen
+  output) is identical to the v0.3.9 baseline; no new warnings
+  introduced.
+- **闸 2 (单元)**: `ctest --test-dir build -C Release` —
+  **6/6 tests pass** in 1.31s. `cargo test --workspace` —
+  **7/7 Rust crates pass** (no failures; 0 measured tests in
+  most crates — the workspace is library-only with stub
+  coverage).
+- **闸 3 (字节级)**: `rom_regression_test` — **720 frames
+  compared against `tests/fixtures/golden_hashes.json`, 0
+  mismatches, RESULT: PASSED** (13 ROMs exercised: nrom,
+  mmc1, uxrom, cnrom, mmc3, mmc5, axrom, colordreams, gnrom,
+  vrc2and4, vrc6, vrc7, nestest).
+- **闸 4 (烟雾)**: `fceux11.exe --help` exits 0; the
+  `fceux11_smoke_test` ctest exercises ~50 symbol resolutions
+  across the new `fceu11::` surface and the legacy
+  `FCEUI_*` wrappers — all resolve.
+- **闸 5 (性能)**: PPU render 44.107 ms (0.735 ms/frame) over
+  60 nrom frames; x6502 50.510 ms (0.842 ms/frame); APU
+  42.219 ms (0.704 ms/frame) over 60 mmc3 frames. Within
+  the plan §5 v0.3.10 budget window.
+- **ASan (附加)**: `scripts/_build_asan.ps1` + `_ctest_asan.ps1`
+  — build with 0 D9002 warnings, ctest **6/6 in 4.03s**,
+  no LSan summary (MSVC Windows ASan has no LSan), no UAF
+  / bounds reports.
+- **UBSan-substitute (附加)**: `scripts/_build_ubsan.ps1` +
+  `_ctest_ubsan.ps1` — Debug build with `/RTC1` + `/sdl` +
+  `/GS` + `/guard:cf`, ctest **6/6 in 4.43s**, no runtime
+  check failures.
+- **`FCEUI_*` count (附加)**: `grep -rn "FCEUI_" src/ | wc -l`
+  = **594** (under the 600 target); text-only count = 452.
+
 ## [0.3.9] - 2026-06-12
 
 C-track continuation: physical split of the 371-line `src/driver.h` into

@@ -544,12 +544,15 @@ extern int test; test++;
 
 //--------------------------
 //---Called from debuggers
-void FCEUI_NMI(void)
+// v0.3.10 P4.1: definitions live in fceu11:: per plan v3 §5 v0.3.10;
+// the global FCEUI_NMI / FCEUI_IRQ symbols are preserved via the inline
+// reference aliases declared in core_api.h.
+void fceu11::NMI()
 {
  _IRQlow|=FCEU_IQNMI;
 }
 
-void FCEUI_IRQ(void)
+void fceu11::IRQ()
 {
  _IRQlow|=FCEU_IQTEMP;
 }

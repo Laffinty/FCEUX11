@@ -244,7 +244,7 @@ void AviRiffViewerDialog::openAviFileDialog(void)
 	dialog.setFilter( QDir::AllEntries | QDir::AllDirs | QDir::Hidden );
 	dialog.setLabelText( QFileDialog::Accept, tr("Open") );
 
-	base = FCEUI_GetBaseDirectory();
+	base = fceu11::GetBaseDirectory();
 
 	urls << QUrl::fromLocalFile( QDir::rootPath() );
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());

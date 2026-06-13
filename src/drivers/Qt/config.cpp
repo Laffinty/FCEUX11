@@ -395,7 +395,7 @@ LoadCPalette(const std::string &file)
 		FCEUD_PrintError(errorMsg);
 		return 0;
 	}
-	FCEUI_SetUserPalette(tmpp, result/3);
+	fceu11::SetUserPalette(tmpp, result/3);
 	fclose(fp);
 	return 1;
 }
@@ -489,7 +489,7 @@ InitConfig()
 
 	GetBaseDirectory(dir);
 
-	FCEUI_SetBaseDirectory(dir.c_str());
+	fceu11::SetBaseDirectory(dir.c_str());
 	CreateDirs(dir);
 
 	config = new Config(dir);
@@ -1035,7 +1035,7 @@ UpdateEMUCore(Config *config)
 	config->getOption("SDL.NTSCpalette", &ntsccol);
 	config->getOption("SDL.Tint", &ntsctint);
 	config->getOption("SDL.Hue", &ntschue);
-	FCEUI_SetNTSCTH(ntsccol, ntsctint, ntschue);
+	fceu11::SetNTSCTH(ntsccol, ntsctint, ntschue);
 
 	config->getOption("SDL.IntFrameRate"  , &useIntFrameRate);
 	config->getOption("SDL.ForceGrayScale", &force_grayscale);
@@ -1061,13 +1061,13 @@ UpdateEMUCore(Config *config)
 	config->getOption("SDL.FrameAdvanceDelay"   , &frameAdvance_Delay     );
 
 	config->getOption("SDL.PAL", &region);
-	FCEUI_SetRegion(region);
+	fceu11::SetRegion(region);
 
 	config->getOption("SDL.GameGenie", &flag);
-	FCEUI_SetGameGenie(flag ? 1 : 0);
+	fceu11::SetGameGenie(flag ? 1 : 0);
 
 	config->getOption("SDL.Sound.LowPass", &flag);
-	FCEUI_SetLowPass(flag ? 1 : 0);
+	fceu11::SetLowPass(flag ? 1 : 0);
 
 	config->getOption("SDL.DisableSpriteLimit", &flag);
 	FCEUI_DisableSpriteLimitation(flag ? 1 : 0);
@@ -1084,6 +1084,6 @@ UpdateEMUCore(Config *config)
 	}
 #endif
 
-	FCEUI_SetRenderedLines(startNTSC, endNTSC, startPAL, endPAL);
+	fceu11::SetRenderedLines(startNTSC, endNTSC, startPAL, endPAL);
 }
 

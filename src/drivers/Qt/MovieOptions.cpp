@@ -96,8 +96,8 @@ MovieOptionsDialog_t::MovieOptionsDialog_t(QWidget *parent)
 	putSubTitlesAvi->setChecked(subtitlesOnAVI);
 	autoBackUp->setChecked(autoMovieBackup);
 	loadFullStates->setChecked(fullSaveStateLoads);
-	aviEnableHUD->setChecked(FCEUI_AviEnableHUDrecording());
-	aviEnableMsg->setChecked(!FCEUI_AviDisableMovieMessages());
+	aviEnableHUD->setChecked(fceu11::AviEnableHUDrecording());
+	aviEnableMsg->setChecked(!fceu11::AviDisableMovieMessages());
 	aviEnableAudio->setChecked(aviGetAudioEnable());
 
 	closeButton = new QPushButton( tr("Close") );
@@ -236,7 +236,7 @@ void MovieOptionsDialog_t::setAviHudEnable(int state)
 {
 	bool checked = (state != Qt::Unchecked);
 
-	FCEUI_SetAviEnableHUDrecording( checked );
+	fceu11::SetAviEnableHUDrecording( checked );
 
 	g_config->setOption("SDL.RecordHUD", checked );
 }
@@ -245,7 +245,7 @@ void MovieOptionsDialog_t::setAviMsgEnable(int state)
 {
 	bool checked = (state != Qt::Unchecked);
 
-	FCEUI_SetAviDisableMovieMessages( !checked );
+	fceu11::SetAviDisableMovieMessages( !checked );
 
 	g_config->setOption("SDL.MovieMsg", checked );
 }

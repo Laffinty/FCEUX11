@@ -552,9 +552,9 @@ void GuiCheatsDialog_t::showCheatSearchResults(void)
 
 	srchResults->clear();
 
-	total_matches = FCEUI_CheatSearchGetCount();
+	total_matches = fceu11::CheatSearchGetCount();
 
-	FCEUI_CheatSearchGetRange(0, total_matches,
+	fceu11::CheatSearchGetRange(0, total_matches,
 							  ShowCheatSearchResultsCallB);
 
 	printf("Num Matches: %i \n", total_matches);
@@ -564,7 +564,7 @@ void GuiCheatsDialog_t::resetSearchCallback(void)
 {
 	FCEU_WRAPPER_LOCK();
 
-	FCEUI_CheatSearchBegin();
+	fceu11::CheatSearchBegin();
 
 	showCheatSearchResults();
 
@@ -596,7 +596,7 @@ void GuiCheatsDialog_t::knownValueCallback(void)
 
 	value = strtol(knownValEntry->displayText().toStdString().c_str(), NULL, 16);
 
-	FCEUI_CheatSearchEnd(FCEU_SEARCH_NEWVAL_KNOWN, value, 0);
+	fceu11::CheatSearchEnd(FCEU_SEARCH_NEWVAL_KNOWN, value, 0);
 
 	showCheatSearchResults();
 
@@ -608,7 +608,7 @@ void GuiCheatsDialog_t::equalValueCallback(void)
 	//printf("Cheat Search Equal!\n");
 	FCEU_WRAPPER_LOCK();
 
-	FCEUI_CheatSearchEnd(FCEU_SEARCH_PUERLY_RELATIVE_CHANGE, 0, 0);
+	fceu11::CheatSearchEnd(FCEU_SEARCH_PUERLY_RELATIVE_CHANGE, 0, 0);
 
 	showCheatSearchResults();
 
@@ -627,11 +627,11 @@ void GuiCheatsDialog_t::notEqualValueCallback(void)
 	{
 		value = strtol(neValEntry->displayText().toStdString().c_str(), NULL, 16);
 
-		FCEUI_CheatSearchEnd(FCEU_SEARCH_PUERLY_RELATIVE_CHANGE, 0, value);
+		fceu11::CheatSearchEnd(FCEU_SEARCH_PUERLY_RELATIVE_CHANGE, 0, value);
 	}
 	else
 	{
-		FCEUI_CheatSearchEnd(FCEU_SEARCH_ANY_CHANGE, 0, 0);
+		fceu11::CheatSearchEnd(FCEU_SEARCH_ANY_CHANGE, 0, 0);
 	}
 
 	showCheatSearchResults();
@@ -651,11 +651,11 @@ void GuiCheatsDialog_t::greaterThanValueCallback(void)
 	{
 		value = strtol(grValEntry->displayText().toStdString().c_str(), NULL, 16);
 
-		FCEUI_CheatSearchEnd(FCEU_SEARCH_NEWVAL_GT_KNOWN, 0, value);
+		fceu11::CheatSearchEnd(FCEU_SEARCH_NEWVAL_GT_KNOWN, 0, value);
 	}
 	else
 	{
-		FCEUI_CheatSearchEnd(FCEU_SEARCH_NEWVAL_GT, 0, 0);
+		fceu11::CheatSearchEnd(FCEU_SEARCH_NEWVAL_GT, 0, 0);
 	}
 
 	showCheatSearchResults();
@@ -675,11 +675,11 @@ void GuiCheatsDialog_t::lessThanValueCallback(void)
 	{
 		value = strtol(ltValEntry->displayText().toStdString().c_str(), NULL, 16);
 
-		FCEUI_CheatSearchEnd(FCEU_SEARCH_NEWVAL_LT_KNOWN, 0, value);
+		fceu11::CheatSearchEnd(FCEU_SEARCH_NEWVAL_LT_KNOWN, 0, value);
 	}
 	else
 	{
-		FCEUI_CheatSearchEnd(FCEU_SEARCH_NEWVAL_LT, 0, 0);
+		fceu11::CheatSearchEnd(FCEU_SEARCH_NEWVAL_LT, 0, 0);
 	}
 
 	showCheatSearchResults();
@@ -740,7 +740,7 @@ void GuiCheatsDialog_t::showActiveCheatList(bool redraw)
 	}
 	actvCheatIdx = 0;
 
-	FCEUI_ListCheats(::activeCheatListCB, (void *)this);
+	fceu11::ListCheats(::activeCheatListCB, (void *)this);
 
 	actvCheatList->viewport()->update();
 }
@@ -835,7 +835,7 @@ void GuiCheatsDialog_t::saveCheatFile(void)
 		dialog.selectFile(dir);
 	}
 
-	snprintf( dir, sizeof(dir), "%s/cheats", FCEUI_GetBaseDirectory());
+	snprintf( dir, sizeof(dir), "%s/cheats", fceu11::GetBaseDirectory());
 
 	dialog.setDirectory(tr(dir));
 
@@ -909,7 +909,7 @@ void GuiCheatsDialog_t::addActvCheat(void)
 	t = typeEntry->currentData().toInt();
 
 	FCEU_WRAPPER_LOCK();
-	FCEUI_AddCheat(name.c_str(), a, v, c, t);
+	fceu11::AddCheat(name.c_str(), a, v, c, t);
 	FCEU_WRAPPER_UNLOCK();
 
 	showActiveCheatList(true);
@@ -930,7 +930,7 @@ void GuiCheatsDialog_t::deleteActvCheat(void)
 	int row = actvCheatList->indexOfTopLevelItem(item);
 
 	FCEU_WRAPPER_LOCK();
-	FCEUI_DelCheat(row);
+	fceu11::DelCheat(row);
 	FCEU_WRAPPER_UNLOCK();
 
 	showActiveCheatList(true);
@@ -960,7 +960,7 @@ void GuiCheatsDialog_t::updateCheatParameters(void)
 
 	int row = actvCheatList->indexOfTopLevelItem(item);
 
-	if (FCEUI_GetCheat(row, NULL, &a, &v, &c, &s, &type) == 0)
+	if (fceu11::GetCheat(row, NULL, &a, &v, &c, &s, &type) == 0)
 	{
 		return;
 	}
@@ -992,7 +992,7 @@ void GuiCheatsDialog_t::updateCheatParameters(void)
 
 	FCEU_WRAPPER_LOCK();
 
-	FCEUI_SetCheat(row, &name, a, v, c, s, type);
+	fceu11::SetCheat(row, &name, a, v, c, s, type);
 
 	FCEU_WRAPPER_UNLOCK();
 
@@ -1011,7 +1011,7 @@ void GuiCheatsDialog_t::actvCheatItemClicked(QTreeWidgetItem *item, int column)
 
 	//printf("Row: %i Column: %i \n", row, column );
 
-	if (FCEUI_GetCheat(row, &name, &a, &v, &c, &s, &type) == 0)
+	if (fceu11::GetCheat(row, &name, &a, &v, &c, &s, &type) == 0)
 	{
 		return;
 	}
@@ -1023,7 +1023,7 @@ void GuiCheatsDialog_t::actvCheatItemClicked(QTreeWidgetItem *item, int column)
 		if (isChecked != s)
 		{
 			//printf("Toggle Cheat: %i\n", isChecked);
-			FCEUI_ToggleCheat(row);
+			fceu11::ToggleCheat(row);
 		}
 	}
 	snprintf( stmp, sizeof(stmp), "%04X", a);
@@ -1055,7 +1055,7 @@ void GuiCheatsDialog_t::globalEnableCheats(int state)
 	g_config->save();
 
 	FCEU_WRAPPER_LOCK();
-	FCEUI_GlobalToggleCheat(val);
+	fceu11::GlobalToggleCheat(val);
 	FCEU_WRAPPER_UNLOCK();
 }
 //----------------------------------------------------------------------------

@@ -202,7 +202,7 @@ void PLAYBACK::update()
 
 	// update seeking progressbar
 	emuPausedOldState = emuPausedState;
-	emuPausedState = (FCEUI_EmulationPaused() != 0);
+	emuPausedState = (fceu11::IsEmulationPaused() != 0);
 	if (pauseFrame)
 	{
 		if (oldStateOfShowPauseFrame != showPauseFrame)		// update progressbar from time to time
@@ -272,18 +272,18 @@ void PLAYBACK::updateProgressbar()
 
 void PLAYBACK::toggleEmulationPause()
 {
-	if (FCEUI_EmulationPaused())
+	if (fceu11::IsEmulationPaused())
 		unpauseEmulation();
 	else
 		pauseEmulation();
 }
 void PLAYBACK::pauseEmulation()
 {
-	FCEUI_SetEmulationPaused(EMULATIONPAUSED_PAUSED);
+	fceu11::SetEmulationPaused(EMULATIONPAUSED_PAUSED);
 }
 void PLAYBACK::unpauseEmulation()
 {
-	FCEUI_SetEmulationPaused(0);
+	fceu11::SetEmulationPaused(0);
 }
 void PLAYBACK::restoreLastPosition()
 {

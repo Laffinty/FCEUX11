@@ -859,7 +859,7 @@ int loadCodecConfig( int type, const char *codec_name, AVCodecContext *ctx)
 	char section[256], id[256], val[256];
 	void *obj, *child;
 	FILE *fp;
-	const char *baseDir = FCEUI_GetBaseDirectory();
+	const char *baseDir = fceu11::GetBaseDirectory();
 
 	snprintf( filename, sizeof(filename), "%s/avi/%s.conf", baseDir, codec_name );
 
@@ -997,7 +997,7 @@ int saveCodecConfig( int type, const char *codec_name, AVCodecContext *ctx)
 	char filename[4096];
 	const AVOption *opt;
 	bool useOpt;
-	const char *baseDir = FCEUI_GetBaseDirectory();
+	const char *baseDir = fceu11::GetBaseDirectory();
 
 	snprintf( filename, sizeof(filename), "%s/avi/%s.conf", baseDir, codec_name );
 
@@ -1162,7 +1162,7 @@ static int initVideoStream( const char *codec_name, OutputStream *ost )
 		ost->st->time_base.num =    usec;
 		ost->st->time_base.den = 1000000u;
 		//ost->st->time_base.num = (16*1024*1024) >> 3;
-		//ost->st->time_base.den = FCEUI_GetDesiredFPS() >> 3;
+		//ost->st->time_base.den = fceu11::GetDesiredFPS() >> 3;
 	}
 	c->time_base       = ost->st->time_base;
 	//c->pix_fmt       = AV_PIX_FMT_YUV420P; // Every video encoder seems to accept this
@@ -2162,7 +2162,7 @@ int aviRecordOpenFile( const char *filepath )
 		if ( romFile )
 		{
 			char base[512];
-			const char *baseDir = FCEUI_GetBaseDirectory();
+			const char *baseDir = fceu11::GetBaseDirectory();
 			std::string lastPath;
 
 			getFileBaseName( romFile, base );
@@ -2353,7 +2353,7 @@ int aviRecordAddFrame( void )
 	//{
 	//	return -1;
 	//}
-	if ( FCEUI_EmulationPaused() )
+	if ( fceu11::IsEmulationPaused() )
 	{
 		return 0;
 	}
@@ -2460,7 +2460,7 @@ bool aviRecordRunning(void)
 {
 	return recordEnable;
 }
-bool FCEUI_AviIsRecording(void)
+bool fceu11::AviIsRecording()
 {
 	return recordEnable;
 }
@@ -2476,7 +2476,7 @@ void FCEUD_AviStop(void)
 }
 //**************************************************************************************
 // // This function is implemented in sdl-video.cpp
-//void FCEUI_AviVideoUpdate(const unsigned char* buffer)
+//void fceu11::AviVideoUpdate(const unsigned char* buffer)
 //{
 //	return;
 //}

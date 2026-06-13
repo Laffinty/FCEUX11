@@ -430,7 +430,7 @@ void ConsoleSndConfDialog_t::volumeChanged(int value)
 
 	if (FCEU_WRAPPER_TRYLOCK(1000))
 	{
-		FCEUI_SetSoundVolume(value);
+		fceu11::SetSoundVolume(value);
 		FCEU_WRAPPER_UNLOCK();
 	}
 }
@@ -447,7 +447,7 @@ void ConsoleSndConfDialog_t::triangleChanged(int value)
 
 	if (FCEU_WRAPPER_TRYLOCK(1000))
 	{
-		FCEUI_SetTriangleVolume(value);
+		fceu11::SetTriangleVolume(value);
 		FCEU_WRAPPER_UNLOCK();
 	}
 }
@@ -464,7 +464,7 @@ void ConsoleSndConfDialog_t::square1Changed(int value)
 
 	if (FCEU_WRAPPER_TRYLOCK(1000))
 	{
-		FCEUI_SetSquare1Volume(value);
+		fceu11::SetSquare1Volume(value);
 		FCEU_WRAPPER_UNLOCK();
 	}
 }
@@ -481,7 +481,7 @@ void ConsoleSndConfDialog_t::square2Changed(int value)
 
 	if (FCEU_WRAPPER_TRYLOCK(1000))
 	{
-		FCEUI_SetSquare2Volume(value);
+		fceu11::SetSquare2Volume(value);
 		FCEU_WRAPPER_UNLOCK();
 	}
 }
@@ -498,7 +498,7 @@ void ConsoleSndConfDialog_t::noiseChanged(int value)
 
 	if (FCEU_WRAPPER_TRYLOCK(1000))
 	{
-		FCEUI_SetNoiseVolume(value);
+		fceu11::SetNoiseVolume(value);
 		FCEU_WRAPPER_UNLOCK();
 	}
 }
@@ -515,7 +515,7 @@ void ConsoleSndConfDialog_t::pcmChanged(int value)
 
 	if (FCEU_WRAPPER_TRYLOCK(1000))
 	{
-		FCEUI_SetPCMVolume(value);
+		fceu11::SetPCMVolume(value);
 		FCEU_WRAPPER_UNLOCK();
 	}
 }
@@ -558,7 +558,7 @@ void ConsoleSndConfDialog_t::enaSoundLowPassChange(int value)
 		g_config->setOption("SDL.Sound.LowPass", 1);
 
 		FCEU_WRAPPER_LOCK();
-		FCEUI_SetLowPass(1);
+		fceu11::SetLowPass(1);
 		FCEU_WRAPPER_UNLOCK();
 	}
 	else
@@ -566,7 +566,7 @@ void ConsoleSndConfDialog_t::enaSoundLowPassChange(int value)
 		g_config->setOption("SDL.Sound.LowPass", 0);
 
 		FCEU_WRAPPER_LOCK();
-		FCEUI_SetLowPass(0);
+		fceu11::SetLowPass(0);
 		FCEU_WRAPPER_UNLOCK();
 	}
 	g_config->save();

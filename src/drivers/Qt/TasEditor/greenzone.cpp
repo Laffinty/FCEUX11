@@ -111,9 +111,14 @@ void GREENZONE::collectCurrentState()
 	// if frame is not saved - log savestate
 	if (!savestates[currFrameCounter].size())
 	{
-		EMUFILE_MEMORY ms(&savestates[currFrameCounter]);
+		// v0.3.10: EMUFILE_MEMORY wraps std::vector<std::byte>. Convert at the
+		// boundary since savestates[] is std::vector<uint8_t>.
+		std::vector<std::byte> tmp;
+		EMUFILE_MEMORY ms(&tmp);
 		FCEUSS_SaveMS(&ms, Z_DEFAULT_COMPRESSION);
 		ms.trim();
+		savestates[currFrameCounter].assign(reinterpret_cast<const uint8_t*>(tmp.data()),
+		                                     reinterpret_cast<const uint8_t*>(tmp.data()) + tmp.size());
 	}
 	if (greenzoneSize <= currFrameCounter)
 		greenzoneSize = currFrameCounter + 1;
@@ -123,7 +128,10 @@ bool GREENZONE::loadSavestateOfFrame(unsigned int frame)
 {
 	if (frame >= savestates.size() || !savestates[frame].size())
 		return false;
-	EMUFILE_MEMORY ms(&savestates[frame]);
+	// v0.3.10: boundary conversion std::vector<uint8_t> -> std::vector<std::byte>.
+	std::vector<std::byte> tmp(reinterpret_cast<const std::byte*>(savestates[frame].data()),
+	                            reinterpret_cast<const std::byte*>(savestates[frame].data()) + savestates[frame].size());
+	EMUFILE_MEMORY ms(&tmp);
 	return FCEUSS_LoadFP(&ms, SSLOADPARAM_NOBACKUP);
 }
 
@@ -242,7 +250,7 @@ void GREENZONE::save(EMUFILE *os, int save_type)
 		if (greenzoneSize > (int)savestates.size())
 			greenzoneSize = savestates.size();
 		// write "GREENZONE" string
-		os->fwrite(greenzone_save_id, GREENZONE_ID_LEN);
+		os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(greenzone_save_id), GREENZONE_ID_LEN));
 		// write LagLog
 		lagLog.save(os);
 		// write size
@@ -274,7 +282,7 @@ void GREENZONE::save(EMUFILE *os, int save_type)
 				// write savestate
 				size = savestates[frame].size();
 				write32le(size, os);
-				os->fwrite(&savestates[frame][0], size);
+				os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(savestates[frame].data()), size));
 			}
 			// write -1 as eof for greenzone
 			write32le(-1, os);
@@ -299,7 +307,7 @@ void GREENZONE::save(EMUFILE *os, int save_type)
 					// write savestate
 					size = savestates[frame].size();
 					write32le(size, os);
-					os->fwrite(&savestates[frame][0], size);
+					os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(savestates[frame].data()), size));
 				}
 			}
 			// write -1 as eof for greenzone
@@ -325,7 +333,7 @@ void GREENZONE::save(EMUFILE *os, int save_type)
 					// write savestate
 					size = savestates[frame].size();
 					write32le(size, os);
-					os->fwrite(&savestates[frame][0], size);
+					os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(savestates[frame].data()), size));
 				}
 			}
 			// write -1 as eof for greenzone
@@ -335,7 +343,7 @@ void GREENZONE::save(EMUFILE *os, int save_type)
 		case GREENZONE_SAVING_MODE_NO:
 		{
 			// write "GREENZONX" string
-			os->fwrite(greenzone_skipsave_id, GREENZONE_ID_LEN);
+			os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(greenzone_skipsave_id), GREENZONE_ID_LEN));
 			// write LagLog
 			lagLog.save(os);
 			// write Playback cursor position
@@ -346,7 +354,7 @@ void GREENZONE::save(EMUFILE *os, int save_type)
 				collectCurrentState();
 				int size = savestates[currFrameCounter].size();
 				write32le(size, os);
-				os->fwrite(&savestates[currFrameCounter][0], size);
+				os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(savestates[currFrameCounter].data()), size));
 			}
 			break;
 		}
@@ -376,7 +384,7 @@ bool GREENZONE::load(EMUFILE *is, unsigned int offset)
 		return false;
 	}
 	// read "GREENZONE" string
-	if (is->fread(save_id, GREENZONE_ID_LEN) < GREENZONE_ID_LEN) goto error;
+	if (is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(save_id), GREENZONE_ID_LEN)) < GREENZONE_ID_LEN) goto error;
 	if (!strcmp(greenzone_skipsave_id, save_id))
 	{
 		// string says to skip loading Greenzone
@@ -394,7 +402,7 @@ bool GREENZONE::load(EMUFILE *is, unsigned int offset)
 				if (read32le(&size, is) && size >= 0)
 				{
 					savestates[frame].resize(size);
-					if (is->fread(&savestates[frame][0], size) == size)
+					if (is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(savestates[frame].data()), size)) == size)
 					{
 						if (loadSavestateOfFrame(currFrameCounter))
 						{
@@ -462,7 +470,7 @@ bool GREENZONE::load(EMUFILE *is, unsigned int offset)
 					if ((int)savestates.size() <= frame)
 						savestates.resize(frame + 1);
 					savestates[frame].resize(size);
-					if (is->fread(&savestates[frame][0], size) < size) break;
+					if (is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(savestates[frame].data()), size)) < size) break;
 					prev_frame = frame;			// successfully read one Greenzone frame info
 				}
 			}
@@ -537,7 +545,7 @@ void GREENZONE::adjustUp()
 		{
 			// custom invalidation procedure, not retriggering LostPosition/PauseFrame
 			invalidate(first_input_changes);
-			bool emu_was_paused = (FCEUI_EmulationPaused() != 0);
+			bool emu_was_paused = (fceu11::IsEmulationPaused() != 0);
 			int saved_pause_frame = playback->getPauseFrame();
 			playback->ensurePlaybackIsInsideGreenzone();
 			if (saved_pause_frame >= 0)
@@ -576,7 +584,7 @@ void GREENZONE::adjustDown()
 	{
 		// custom invalidation procedure, not retriggering LostPosition/PauseFrame
 		invalidate(first_input_changes);
-		bool emu_was_paused = (FCEUI_EmulationPaused() != 0);
+		bool emu_was_paused = (fceu11::IsEmulationPaused() != 0);
 		int saved_pause_frame = playback->getPauseFrame();
 		playback->ensurePlaybackIsInsideGreenzone();
 		if (saved_pause_frame >= 0)
@@ -631,7 +639,7 @@ void GREENZONE::invalidateAndUpdatePlayback(int after)
 			// either set Playback cursor to be inside the Greenzone or run seeking to restore Playback cursor position
 			if (currFrameCounter >= greenzoneSize)
 			{
-				if (playback->getPauseFrame() >= 0 && !FCEUI_EmulationPaused())
+				if (playback->getPauseFrame() >= 0 && !fceu11::IsEmulationPaused())
 				{
 					// emulator was running, so continue seeking, but don't follow the Playback cursor
 					playback->jump(playback->getPauseFrame(), false, true, false);

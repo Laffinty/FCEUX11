@@ -304,14 +304,14 @@ InitSound()
 	//frmRateSampleAdj = 0;
 	//printf("Sample Rate Adjustment: %+i\n", frmRateSampleAdj );
 
-	FCEUI_SetSoundVolume(soundvolume);
-	FCEUI_SetSoundQuality(soundq);
-	FCEUI_Sound(soundrate + frmRateSampleAdj);
-	FCEUI_SetTriangleVolume(soundtrianglevolume);
-	FCEUI_SetSquare1Volume(soundsquare1volume);
-	FCEUI_SetSquare2Volume(soundsquare2volume);
-	FCEUI_SetNoiseVolume(soundnoisevolume);
-	FCEUI_SetPCMVolume(soundpcmvolume);
+	fceu11::SetSoundVolume(soundvolume);
+	fceu11::SetSoundQuality(soundq);
+	fceu11::Sound(soundrate + frmRateSampleAdj);
+	fceu11::SetTriangleVolume(soundtrianglevolume);
+	fceu11::SetSquare1Volume(soundsquare1volume);
+	fceu11::SetSquare2Volume(soundsquare2volume);
+	fceu11::SetNoiseVolume(soundnoisevolume);
+	fceu11::SetPCMVolume(soundpcmvolume);
 	return 1;
 }
 
@@ -513,7 +513,7 @@ SilenceSound(int n)
 int
 KillSound(void)
 {
-	FCEUI_Sound(0);
+	fceu11::Sound(0);
 	SDL_CloseAudio();
 	SDL_QuitSubSystem(SDL_INIT_AUDIO);
 	if(s_Buffer) {
@@ -556,7 +556,7 @@ FCEUD_SoundVolumeAdjust(int n)
 	s_mute = false;
 	g_config->setOption("SDL.Sound.Mute", s_mute);
 
-	FCEUI_SetSoundVolume(soundvolume);
+	fceu11::SetSoundVolume(soundvolume);
 	g_config->setOption("SDL.Sound.Volume", soundvolume);
 
 	FCEU_DispMessage("Sound volume %d.",0, soundvolume);

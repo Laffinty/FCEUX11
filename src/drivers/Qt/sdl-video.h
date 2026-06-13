@@ -8,10 +8,11 @@
 
 uint32 PtoV(double x, double y);
 bool FCEUD_ShouldDrawInputAids();
-bool FCEUI_AviDisableMovieMessages();
-bool FCEUI_AviEnableHUDrecording();
-void FCEUI_SetAviEnableHUDrecording(bool enable);
-bool FCEUI_AviDisableMovieMessages();
-void FCEUI_SetAviDisableMovieMessages(bool disable);
+namespace fceu11 {
+    bool AviDisableMovieMessages();
+    bool AviEnableHUDrecording();
+    void SetAviEnableHUDrecording(bool enable);
+    void SetAviDisableMovieMessages(bool disable);
+} // namespace fceu11
 #endif
 

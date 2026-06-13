@@ -17,7 +17,7 @@ static const int FRAMES = 60;
 
 static double benchmark_apu_frames(int frames)
 {
-    if (!FCEUI_Initialize()) {
+    if (!fceu11::Initialize()) {
         fprintf(stderr, "FCEUI_Initialize failed\n");
         return -1.0;
     }
@@ -32,9 +32,9 @@ static double benchmark_apu_frames(int frames)
     // Enable sound so the APU path is exercised.
     FCEUI_Sound(48000);
 
-    if (!FCEUI_LoadGame(ROM_PATH, 1, true)) {
+    if (!fceu11::LoadGame(ROM_PATH, 1, true)) {
         fprintf(stderr, "Failed to load %s\n", ROM_PATH);
-        FCEUI_Kill();
+        fceu11::Kill();
         return -1.0;
     }
 
@@ -42,18 +42,18 @@ static double benchmark_apu_frames(int frames)
     int32* soundBuf = nullptr;
     int32 soundBufSize = 0;
 
-    FCEUI_Emulate(&xbuf, &soundBuf, &soundBufSize, 0); // warm-up
+    fceu11::Emulate(&xbuf, &soundBuf, &soundBufSize, 0); // warm-up
 
     auto t0 = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < frames; ++i) {
-        FCEUI_Emulate(&xbuf, &soundBuf, &soundBufSize, 0);
+        fceu11::Emulate(&xbuf, &soundBuf, &soundBufSize, 0);
     }
     auto t1 = std::chrono::high_resolution_clock::now();
 
     double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
 
-    FCEUI_CloseGame();
-    FCEUI_Kill();
+    fceu11::CloseGame();
+    fceu11::Kill();
     return ms;
 }
 

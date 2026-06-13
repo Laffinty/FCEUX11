@@ -6,7 +6,6 @@ void FCEU_CheatAddRAM(int s, uint32 A, uint8 *p);
 void FCEU_LoadGameCheats(FILE *override, int override_existing = 1);
 void FCEU_FlushGameCheats(FILE *override, int nosave);
 void FCEU_SaveGameCheats(FILE *fp, int release = 0);
-int FCEUI_GlobalToggleCheat(int global_enabled);
 void FCEU_ApplyPeriodicCheats(void);
 void FCEU_PowerCheats(void);
 int FCEU_CalcCheatAffectedBytes(uint32 address, uint32 size);
@@ -16,11 +15,19 @@ int FCEU_CalcCheatAffectedBytes(uint32 address, uint32 size);
 typedef unsigned char _8BYTECHEATMAP;
 #define CHEATMAP_SIZE 0x10000 / 8
 
-extern int FCEUI_FindCheatMapByte(uint16 address);
-extern void FCEUI_SetCheatMapByte(uint16 address, bool cheat);
-extern void FCEUI_CreateCheatMap(void);
-extern void FCEUI_RefreshCheatMap(void);
-extern void FCEUI_ReleaseCheatMap(void);
+namespace fceu11 {
+    int FindCheatMapByte(uint16 address);
+    void SetCheatMapByte(uint16 address, bool cheat);
+    void CreateCheatMap();
+    void RefreshCheatMap();
+    void ReleaseCheatMap();
+} // namespace fceu11
+
+inline int FCEUI_FindCheatMapByte(uint16 address) { return fceu11::FindCheatMapByte(address); }
+inline void FCEUI_SetCheatMapByte(uint16 address, bool cheat) { fceu11::SetCheatMapByte(address, cheat); }
+inline void FCEUI_CreateCheatMap() { fceu11::CreateCheatMap(); }
+inline void FCEUI_RefreshCheatMap() { fceu11::RefreshCheatMap(); }
+inline void FCEUI_ReleaseCheatMap() { fceu11::ReleaseCheatMap(); }
 extern unsigned int FrozenAddressCount;
 
 int FCEU_CheatGetByte(uint32 A);
@@ -74,3 +81,4 @@ struct SEARCHPOSSIBLE {
 #define FCEU_SEARCH_NEWVAL_LT_KNOWN         8
 
 #endif
+

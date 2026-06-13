@@ -223,14 +223,18 @@ uint16 FCEU_de16lsb(uint8 *morp)
 //well. just for the sake of consistency
 int write8le(u8 b, EMUFILE*os)
 {
-	os->fwrite((char*)&b,1);
+	// v0.3.10: std::span virtual directly (avoids [[deprecated]] shim).
+	os->fwrite(std::span<const std::byte>(
+		reinterpret_cast<const std::byte*>(&b), sizeof(b)));
 	return 1;
 }
 
 //well. just for the sake of consistency
 int read8le(u8 *Bufo, EMUFILE*is)
 {
-	if(is->_fread((char*)Bufo,1) != 1)
+	// v0.3.10: std::span virtual directly (avoids [[deprecated]] shim).
+	if(is->fread(std::span<std::byte>(
+		reinterpret_cast<std::byte*>(Bufo), sizeof(*Bufo))) != sizeof(*Bufo))
 		return 0;
 	return 1;
 }
@@ -241,7 +245,9 @@ int write16le(u16 b, EMUFILE *fp)
 	u8 s[2];
 	s[0]=(u8)b;
 	s[1]=(u8)(b>>8);
-	fp->fwrite(s,2);
+	// v0.3.10: std::span virtual directly.
+	fp->fwrite(std::span<const std::byte>(
+		reinterpret_cast<const std::byte*>(s), sizeof(s)));
 	return 2;
 }
 
@@ -254,7 +260,9 @@ int write32le(u32 b, EMUFILE *fp)
 	s[1]=(u8)(b>>8);
 	s[2]=(u8)(b>>16);
 	s[3]=(u8)(b>>24);
-	fp->fwrite(s,4);
+	// v0.3.10: std::span virtual directly.
+	fp->fwrite(std::span<const std::byte>(
+		reinterpret_cast<const std::byte*>(s), sizeof(s)));
 	return 4;
 }
 
@@ -271,7 +279,9 @@ int write64le(uint64 b, EMUFILE* os)
 	s[5]=(u8)(b>>40);
 	s[6]=(u8)(b>>48);
 	s[7]=(u8)(b>>56);
-	os->fwrite((char*)&s,8);
+	// v0.3.10: std::span virtual directly.
+	os->fwrite(std::span<const std::byte>(
+		reinterpret_cast<const std::byte*>(s), sizeof(s)));
 	return 8;
 }
 
@@ -279,7 +289,9 @@ int write64le(uint64 b, EMUFILE* os)
 int read32le(uint32 *Bufo, EMUFILE *fp)
 {
 	uint32 buf=0;
-	if(fp->_fread(&buf,4)<4)
+	// v0.3.10: std::span virtual directly.
+	if(fp->fread(std::span<std::byte>(
+		reinterpret_cast<std::byte*>(&buf), sizeof(buf))) < sizeof(buf))
 		return 0;
 #ifdef LOCAL_LE
 	*(u32*)Bufo=buf;
@@ -292,7 +304,9 @@ int read32le(uint32 *Bufo, EMUFILE *fp)
 int read16le(u16 *Bufo, EMUFILE *is)
 {
 	u16 buf=0;
-	if(is->_fread((char*)&buf,2) != 2)
+	// v0.3.10: std::span virtual directly.
+	if(is->fread(std::span<std::byte>(
+		reinterpret_cast<std::byte*>(&buf), sizeof(buf))) != sizeof(buf))
 		return 0;
 #ifdef LOCAL_LE
 	*Bufo=buf;
@@ -304,8 +318,10 @@ int read16le(u16 *Bufo, EMUFILE *is)
 
 int read64le(uint64 *Bufo, EMUFILE *is)
 {
-	uint64 buf=0;
-	if(is->_fread((char*)&buf,8) != 8)
+	u64 buf=0;
+	// v0.3.10: std::span virtual directly.
+	if(is->fread(std::span<std::byte>(
+		reinterpret_cast<std::byte*>(&buf), sizeof(buf))) != sizeof(buf))
 		return 0;
 #ifdef LOCAL_LE
 	*Bufo=buf;

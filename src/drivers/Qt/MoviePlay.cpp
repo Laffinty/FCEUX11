@@ -162,7 +162,7 @@ MoviePlayDialog_t::MoviePlayDialog_t(QWidget *parent)
 	}
 	else
 	{
-		replayReadOnlySetting = FCEUI_GetMovieToggleReadOnly();
+		replayReadOnlySetting = fceu11::GetMovieToggleReadOnly();
 	}
 	openReadOnly->setChecked(replayReadOnlySetting);
 
@@ -253,7 +253,7 @@ void MoviePlayDialog_t::updateMovieText(void)
 		clearMovieText();
 		return;
 	}
-	scanok = FCEUI_MovieGetInfo(fp, info, false);
+	scanok = fceu11::MovieGetInfo(fp, info, false);
 
 	if (scanok)
 	{
@@ -266,7 +266,7 @@ void MoviePlayDialog_t::updateMovieText(void)
 		movFramesLbl->setText(tr(stmp));
 		pauseAtFrameEntry->setText(tr(stmp));
 
-		div = (FCEUI_GetCurrentVidSystem(0, 0)) ? 50.006977968268290849 : 60.098813897440515532; // PAL timing
+		div = (fceu11::GetCurrentVidSystem(0, 0)) ? 50.006977968268290849 : 60.098813897440515532; // PAL timing
 		double tempCount = (info.num_frames / div) + 0.005;										 // +0.005s for rounding
 		int num_seconds = (int)tempCount;
 		int fraction = (int)((tempCount - num_seconds) * 100);
@@ -372,7 +372,7 @@ bool MoviePlayDialog_t::checkMD5Sum(const char *path, const char *md5)
 	{
 		return md5Match;
 	}
-	scanok = FCEUI_MovieGetInfo(fp, info, true);
+	scanok = fceu11::MovieGetInfo(fp, info, true);
 
 	if (scanok)
 	{
@@ -418,7 +418,7 @@ void MoviePlayDialog_t::doScan(void)
 {
 	std::string path, last;
 	const char *romFile;
-	const char *baseDir = FCEUI_GetBaseDirectory();
+	const char *baseDir = fceu11::GetBaseDirectory();
 	std::string lastDir;
 	char md5[256];
 
@@ -476,7 +476,7 @@ void MoviePlayDialog_t::playMovie(void)
 	}
 
 	FCEU_WRAPPER_LOCK();
-	if (FCEUI_LoadMovie(path.c_str(),
+	if (fceu11::LoadMovie(path.c_str(),
 						replayReadOnlySetting, pauseframe ? pauseframe : false) == false)
 	{
 		movieLoadError = true;

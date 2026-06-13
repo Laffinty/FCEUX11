@@ -20,7 +20,7 @@ static const int FRAMES = 60;
 // ---------------------------------------------------------------------------
 static double benchmark_render_frames(int frames)
 {
-    if (!FCEUI_Initialize()) {
+    if (!fceu11::Initialize()) {
         fprintf(stderr, "FCEUI_Initialize failed\n");
         return -1.0;
     }
@@ -32,9 +32,9 @@ static double benchmark_render_frames(int frames)
     FCEUI_SetInputFC(static_cast<ESIFC>(SIFC_NONE), nullptr, 0);
     FCEUI_SetInputFourscore(false);
 
-    if (!FCEUI_LoadGame(ROM_PATH, 1, true)) {
+    if (!fceu11::LoadGame(ROM_PATH, 1, true)) {
         fprintf(stderr, "Failed to load %s\n", ROM_PATH);
-        FCEUI_Kill();
+        fceu11::Kill();
         return -1.0;
     }
 
@@ -43,18 +43,18 @@ static double benchmark_render_frames(int frames)
     int32 soundBufSize = 0;
 
     // Warm-up: 1 frame to ensure caches are hot
-    FCEUI_Emulate(&xbuf, &soundBuf, &soundBufSize, 0);
+    fceu11::Emulate(&xbuf, &soundBuf, &soundBufSize, 0);
 
     auto t0 = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < frames; ++i) {
-        FCEUI_Emulate(&xbuf, &soundBuf, &soundBufSize, 0);
+        fceu11::Emulate(&xbuf, &soundBuf, &soundBufSize, 0);
     }
     auto t1 = std::chrono::high_resolution_clock::now();
 
     double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
 
-    FCEUI_CloseGame();
-    FCEUI_Kill();
+    fceu11::CloseGame();
+    fceu11::Kill();
     return ms;
 }
 

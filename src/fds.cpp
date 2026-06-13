@@ -182,7 +182,7 @@ void FCEU_FDSInsert(void)
 		return;
 	}
 
-	if (FCEUI_EmulationPaused())
+	if (fceu11::IsEmulationPaused())
 		EmulationPaused |= EMULATIONPAUSED_FA;
 
 	if (FCEUMOV_Mode(MOVIEMODE_RECORD))
@@ -217,7 +217,7 @@ void FCEU_FDSSelect(void)
 		return;
 	}
 
-	if (FCEUI_EmulationPaused())
+	if (fceu11::IsEmulationPaused())
 		EmulationPaused |= EMULATIONPAUSED_FA;
 
 	if (FCEUMOV_Mode(MOVIEMODE_RECORD))
@@ -884,7 +884,7 @@ int FDSLoad(const char *name, FCEUFILE *fp) {
 
 	FCEU_printf(" Sides: %d\n\n", TotalSides);
 
-	FCEUI_SetVidSystem(0);
+	fceu11::SetVidSystem(0);
 
 	return LOADER_OK;
 }

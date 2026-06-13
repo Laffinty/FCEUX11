@@ -176,12 +176,12 @@ void FCEU_PutImageDummy(void)
 #endif
 
 static int dosnapsave=0;
-void FCEUI_SaveSnapshot(void)
+void fceu11::SaveSnapshot()
 {
 	dosnapsave=1;
 }
 
-void FCEUI_SaveSnapshotAs(void)
+void fceu11::SaveSnapshotAs()
 {
 	dosnapsave=2;
 }
@@ -251,7 +251,7 @@ void FCEU_PutImage(void)
 	else
 	{
 		//Save backbuffer before overlay stuff is written.
-		if(!FCEUI_EmulationPaused())
+		if(!fceu11::IsEmulationPaused())
 			memcpy(XBackBuf, XBuf, 256*256);
 
 		//Some messages need to be displayed before the avi is dumped
@@ -269,7 +269,7 @@ void FCEU_PutImage(void)
 			dosnapsave=0;
 		}
 
-		if (!FCEUI_AviEnableHUDrecording()) snapAVI();
+		if (!fceu11::AviEnableHUDrecording()) snapAVI();
 
 		if(GameInfo->type==GIT_VSUNI)
 			FCEU_VSUniDraw(XBuf);
@@ -395,9 +395,9 @@ void FCEU_PutImage(void)
 		}
 	}
 
-	if (FCEUI_AviEnableHUDrecording())
+	if (fceu11::AviEnableHUDrecording())
 	{
-		if (FCEUI_AviDisableMovieMessages())
+		if (fceu11::AviDisableMovieMessages())
 		{
 			snapAVI();
 			DrawMessage(false);
@@ -412,8 +412,8 @@ void FCEU_PutImage(void)
 void snapAVI()
 {
 	//Update AVI
-	if(!FCEUI_EmulationPaused())
-		FCEUI_AviVideoUpdate(XBuf);
+	if(!fceu11::IsEmulationPaused())
+		fceu11::AviVideoUpdate(XBuf);
 }
 
 void FCEU_DispMessageOnMovie( __FCEU_PRINTF_FORMAT const char *format, ...)
@@ -431,7 +431,7 @@ void FCEU_DispMessageOnMovie( __FCEU_PRINTF_FORMAT const char *format, ...)
 	guiMessage.isMovieMessage = true;
 	guiMessage.linesFromBottom = 0;
 
-	if (FCEUI_AviIsRecording() && FCEUI_AviDisableMovieMessages())
+	if (fceu11::AviIsRecording() && fceu11::AviDisableMovieMessages())
 		guiMessage.howlong = 0;
 }
 
@@ -727,7 +727,7 @@ static void FCEU_DrawPauseCountDown(uint8 *XBuf)
 {
 	if (EmulationPaused & EMULATIONPAUSED_TIMER)
 	{
-		int pauseFramesLeft = FCEUI_PauseFramesRemaining();
+		int pauseFramesLeft = fceu11::PauseFramesRemaining();
 
 		if (showPauseCountDown && (pauseFramesLeft > 0) )
 		{

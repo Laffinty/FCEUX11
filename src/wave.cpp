@@ -25,7 +25,7 @@ void FCEU_WriteWaveData(int32 *Buffer, int Count)
 #ifndef __WIN_DRIVER__
 	if(!fceux11_rust_wave_running()) return;
 #else
-	if(!fceux11_rust_wave_running() && !FCEUI_AviIsRecording()) return;
+	if(!fceux11_rust_wave_running() && !fceu11::AviIsRecording()) return;
 #endif
 
 	dest=temp;
@@ -45,24 +45,24 @@ void FCEU_WriteWaveData(int32 *Buffer, int Count)
 		fceux11_rust_wave_write(temp, Count);
 
 #ifdef __WIN_DRIVER__
-	if(FCEUI_AviIsRecording())
+	if(fceu11::AviIsRecording())
 	{
 		FCEUI_AviSoundUpdate((void*)temp, Count);
 	}
 #endif
 }
 
-int FCEUI_EndWaveRecord()
+int fceu11::EndWaveRecord()
 {
 	return fceux11_rust_wave_end();
 }
 
-bool FCEUI_BeginWaveRecord(const char *fn)
+bool fceu11::BeginWaveRecord(const char *fn)
 {
 	return fceux11_rust_wave_begin(fn, FSettings.SndRate);
 }
 
-bool FCEUI_WaveRecordRunning(void)
+bool fceu11::WaveRecordRunning()
 {
 	return fceux11_rust_wave_running();
 }

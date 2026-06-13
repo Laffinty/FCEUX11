@@ -130,7 +130,7 @@ void CalcVideoDimensions(void)
 {
 	g_config->getOption("SDL.SpecialFilter", &s_sponge);
 
-	FCEUI_GetCurrentVidSystem(&s_srendline, &s_erendline);
+	fceu11::GetCurrentVidSystem(&s_srendline, &s_erendline);
 	s_tlines = s_erendline - s_srendline + 1;
 
 	//printf("Calc Video: %i -> %i \n", s_srendline, s_erendline );
@@ -195,7 +195,7 @@ int InitVideo(FCEUGI *gi)
 	int show_fps;
 	int startNTSC, endNTSC, startPAL, endPAL;
 
-	FCEUI_printf("Initializing video...");
+	FCEU_printf("Initializing video...");
 
 	// load the relevant configuration variables
 	g_config->getOption("SDL.Fullscreen", &s_fullscreen);
@@ -218,11 +218,11 @@ int InitVideo(FCEUGI *gi)
 
 	ClipSidesOffset = s_clipSides ? 8 : 0;
 
-	FCEUI_SetRenderedLines(startNTSC, endNTSC, startPAL, endPAL);
+	fceu11::SetRenderedLines(startNTSC, endNTSC, startPAL, endPAL);
 
 	// check the starting, ending, and total scan lines
 
-	FCEUI_GetCurrentVidSystem(&s_srendline, &s_erendline);
+	fceu11::GetCurrentVidSystem(&s_srendline, &s_erendline);
 	s_tlines = s_erendline - s_srendline + 1;
 
 	nes_shm->video.preScaler = s_sponge;
@@ -329,9 +329,9 @@ int InitVideo(FCEUGI *gi)
 void ToggleFS(void)
 {
     // pause while we we are making the switch
-	bool paused = FCEUI_EmulationPaused();
+	bool paused = fceu11::IsEmulationPaused();
 	if(!paused)
-		FCEUI_ToggleEmulationPause();
+		fceu11::ToggleEmulationPause();
 
 	// flip the fullscreen flag
 	g_config->setOption("SDL.Fullscreen", !s_fullscreen);
@@ -340,7 +340,7 @@ void ToggleFS(void)
 
 	// if we paused to make the switch; unpause
 	if(!paused)
-		FCEUI_ToggleEmulationPause();
+		fceu11::ToggleEmulationPause();
 }
 
 static SDL_Color s_psdl[256];
@@ -518,7 +518,7 @@ BlitScreen(uint8 *XBuf)
 	nes_shm->blitUpdated = 1;
 }
 
-void FCEUI_AviVideoUpdate(const unsigned char* buffer)
+void fceu11::AviVideoUpdate(const unsigned char* buffer)
 {	// This is not used by Qt Emulator, avi recording pulls from the post processed video buffer
 	// instead of emulation core video buffer. This allows for the video scaler effects
 	// and higher resolution to be seen in recording.
@@ -569,27 +569,27 @@ uint32 PtoV(double nx, double ny)
 }
 
 bool enableHUDrecording = false;
-bool FCEUI_AviEnableHUDrecording()
+bool fceu11::AviEnableHUDrecording()
 {
 	if (enableHUDrecording)
 		return true;
 
 	return false;
 }
-void FCEUI_SetAviEnableHUDrecording(bool enable)
+void fceu11::SetAviEnableHUDrecording(bool enable)
 {
 	enableHUDrecording = enable;
 }
 
 bool disableMovieMessages = false;
-bool FCEUI_AviDisableMovieMessages()
+bool fceu11::AviDisableMovieMessages()
 {
 	if (disableMovieMessages)
 		return true;
 
 	return false;
 }
-void FCEUI_SetAviDisableMovieMessages(bool disable)
+void fceu11::SetAviDisableMovieMessages(bool disable)
 {
 	disableMovieMessages = disable;
 }

@@ -255,7 +255,7 @@ int NSFLoad(const char *name, FCEUFILE *fp)
 	ExWRAM_owner = FCEU_gmalloc_unique(exwram_size);  // v0.3.6: RAII-wrapped
 	ExWRAM = ExWRAM_owner.get();
 
-	FCEUI_SetVidSystem(NSFHeader.VideoSystem);
+	fceu11::SetVidSystem(NSFHeader.VideoSystem);
 
 	return LOADER_OK;
 }
@@ -594,19 +594,19 @@ void DoNSFFrame(void)
 		TriggerNMI();
 }
 
-void FCEUI_NSFSetVis(int mode)
+void fceu11::NSFSetVis(int mode)
 {
 	vismode=mode;
 }
 
-int FCEUI_NSFChange(int amount)
+int fceu11::NSFChange(int amount)
 {
 	CurrentSong = fceux11_rust_nsf_change_song(CurrentSong, amount, NSFHeader.TotalSongs, &SongReload);
 	return CurrentSong;
 }
 
 //Returns total songs
-int FCEUI_NSFGetInfo(uint8 *name, uint8 *artist, uint8 *copyright, int maxlen)
+int fceu11::NSFGetInfo(uint8 *name, uint8 *artist, uint8 *copyright, int maxlen)
 {
 	return fceux11_rust_nsf_get_info((FceuNsfHeader*)&NSFHeader, name, artist, copyright, maxlen);
 }

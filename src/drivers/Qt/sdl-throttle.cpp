@@ -185,7 +185,7 @@ void
 RefreshThrottleFPS(void)
 {
 	double hz;
-	int32_t fps = FCEUI_GetDesiredFPS(); // Do >> 24 to get in Hz
+	int32_t fps = fceu11::GetDesiredFPS(); // Do >> 24 to get in Hz
 	int32_t T;
 
 	hz = ( ((double)fps) / 16777216.0 );

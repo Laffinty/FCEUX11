@@ -62,7 +62,8 @@ struct FCEUFILE {
 
 		//nope, we need to create it: copy the contents
 		ret = new EMUFILE_MEMORY(size);
-		stream->fread(ret->buf(),size);
+		// v0.3.10: direct std::span virtual call (buf() is now std::byte*).
+		stream->fread(std::span<std::byte>(ret->buf(), size));
 		delete stream;
 		stream = ret;
 		return ret;

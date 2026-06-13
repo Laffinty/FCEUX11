@@ -326,7 +326,7 @@ void PaletteEditorDialog_t::openPaletteFileDialog(void)
 	//urls = dialog.sidebarUrls();
 	urls << QUrl::fromLocalFile( QDir::rootPath() );
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
-	urls << QUrl::fromLocalFile( QDir( FCEUI_GetBaseDirectory() ).absolutePath() );
+	urls << QUrl::fromLocalFile( QDir( fceu11::GetBaseDirectory() ).absolutePath() );
 
 	if ( exePath[0] != 0 )
 	{
@@ -604,7 +604,7 @@ void nesPaletteView::setActivePalette(void)
 	}
 
 	FCEU_WRAPPER_LOCK();
-	FCEUI_SetUserPalette( pal, NUM_COLORS );
+	fceu11::SetUserPalette( pal, NUM_COLORS );
 	FCEU_WRAPPER_UNLOCK();
 }
 //----------------------------------------------------------------------------

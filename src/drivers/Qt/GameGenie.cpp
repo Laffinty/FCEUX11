@@ -278,7 +278,7 @@ void GameGenieDialog_t::addCheatClicked(void)
 	}
 
 	FCEU_WRAPPER_LOCK();
-	FCEUI_AddCheat( name.c_str(), a, v, c, 1 );
+	fceu11::AddCheat( name.c_str(), a, v, c, 1 );
 	updateCheatDialog();
 	FCEU_WRAPPER_UNLOCK();
 
@@ -364,7 +364,7 @@ void GameGenieDialog_t::ggChanged(const QString &s)
 
 	strncpy( gg, ggCode->text().toStdString().c_str(), 8 );
 
-	FCEUI_DecodeGG( gg, &a, &v, &c);
+	fceu11::DecodeGG( gg, &a, &v, &c);
 
 	if ( a >= 0 )
 	{

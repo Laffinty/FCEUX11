@@ -340,7 +340,7 @@ int LoadGame(const char *path, bool silent)
 	g_config->getOption ("SDL.RamInitMethod", &RAMInitOption);
 
 	// Load the game
-	if(!FCEUI_LoadGame(fullpath.c_str(), 1, silent)) {
+	if(!fceu11::LoadGame(fullpath.c_str(), 1, silent)) {
 		return 0;
 	}
 
@@ -374,8 +374,8 @@ int LoadGame(const char *path, bool silent)
 	int state_to_load;
 	g_config->getOption("SDL.AutoLoadState", &state_to_load);
 	if (state_to_load >= 0 && state_to_load < 10){
-	    FCEUI_SelectState(state_to_load, 0);
-	    FCEUI_LoadState(NULL, false);
+	    fceu11::SelectStateSlot(state_to_load, 0);
+	    fceu11::LoadStateFile(NULL, false);
 	}
 
 	g_config->getOption( "SDL.AutoInputPreset", &autoInputPreset );
@@ -399,7 +399,7 @@ int LoadGame(const char *path, bool silent)
 
 	if ( autoDetectPAL )
 	{
-		id = FCEUI_GetCurrentVidSystem(NULL, NULL);
+		id = fceu11::GetCurrentVidSystem(NULL, NULL);
 
 		if ( region == 2 )
 		{	// Dendy mode:
@@ -408,17 +408,17 @@ int LoadGame(const char *path, bool silent)
 			if ( id == 1 )
 			{
 				g_config->setOption("SDL.PAL", id);
-				FCEUI_SetRegion(id);
+				fceu11::SetRegion(id);
 			}
 			else
 			{
-				FCEUI_SetRegion(region);
+				fceu11::SetRegion(region);
 			}
 		}
 		else
 		{	// Run NTSC games as NTSC and PAL games as PAL
 			g_config->setOption("SDL.PAL", id);
-			FCEUI_SetRegion(id);
+			fceu11::SetRegion(id);
 		}
 	}
 	else
@@ -427,7 +427,7 @@ int LoadGame(const char *path, bool silent)
 		// Strictly enforce region GUI selection
 		// Does not matter what type of game is 
 		// loaded, the current region selection is used 
-		FCEUI_SetRegion(region);
+		fceu11::SetRegion(region);
 	}
 
 	// Always re-calculate video dimensions after setting region.
@@ -447,7 +447,7 @@ int LoadGame(const char *path, bool silent)
 	//g_config->getOption("SDL.Sound.RecordFile", &filename);
 	//if (filename.size()) 
 	//{
-	//	if (!FCEUI_BeginWaveRecord(filename.c_str())) {
+	//	if (!fceu11::BeginWaveRecord(filename.c_str())) {
 	//		g_config->setOption("SDL.Sound.RecordFile", "");
 	//	}
 	//}
@@ -509,8 +509,8 @@ CloseGame(void)
 	int state_to_save;
 	g_config->getOption("SDL.AutoSaveState", &state_to_save);
 	if (state_to_save < 10 && state_to_save >= 0){
-	    FCEUI_SelectState(state_to_save, 0);
-	    FCEUI_SaveState(NULL, false);
+	    fceu11::SelectStateSlot(state_to_save, 0);
+	    fceu11::SaveStateFile(NULL, false);
 	}
 
 	int autoInputPreset;
@@ -526,7 +526,7 @@ CloseGame(void)
 		tasWin->requestWindowClose();
 	}
 
-	FCEUI_CloseGame();
+	fceu11::CloseGame();
 
 	DriverKill();
 	isloaded = 0;
@@ -534,7 +534,7 @@ CloseGame(void)
 
 	g_config->getOption("SDL.Sound.RecordFile", &filename);
 	if(filename.size()) {
-		FCEUI_EndWaveRecord();
+		fceu11::EndWaveRecord();
 	}
 
 	InputUserActiveFix();
@@ -581,7 +581,7 @@ int  fceuWrapperTogglePause(void)
 {
 	if ( isloaded )
 	{
-		FCEUI_ToggleEmulationPause();
+		fceu11::ToggleEmulationPause();
 	}
 	return 0;
 }
@@ -758,7 +758,7 @@ int  fceuWrapperInit( int argc, char *argv[] )
 	}
 
 	// initialize the infrastructure
-	error = FCEUI_Initialize();
+	error = fceu11::Initialize();
 
 	if (error != 1) 
 	{
@@ -853,9 +853,9 @@ int  fceuWrapperInit( int argc, char *argv[] )
 	int rh;
 	g_config->getOption("SDL.RecordHUD", &rh);
 	if( rh )
-		FCEUI_SetAviEnableHUDrecording(true);
+		fceu11::SetAviEnableHUDrecording(true);
 	else
-		FCEUI_SetAviEnableHUDrecording(false);
+		fceu11::SetAviEnableHUDrecording(false);
 
 	g_config->getOption("SDL.SuggestReadOnlyReplay"  , &suggestReadOnlyReplay);
 	g_config->getOption("SDL.PauseAfterMoviePlayback", &pauseAfterPlayback);
@@ -869,9 +869,9 @@ int  fceuWrapperInit( int argc, char *argv[] )
 	int mm;
 	g_config->getOption("SDL.MovieMsg", &mm);
 	if( mm == 0)
-		FCEUI_SetAviDisableMovieMessages(true);
+		fceu11::SetAviDisableMovieMessages(true);
 	else
-		FCEUI_SetAviDisableMovieMessages(false);
+		fceu11::SetAviDisableMovieMessages(false);
   
 	g_config->getOption("SDL.AviVideoFormat", &opt);
 	aviSetSelVideoFormat(opt);
@@ -1078,14 +1078,14 @@ int  fceuWrapperInit( int argc, char *argv[] )
 			}
 			else
 			{
-				replayReadOnlySetting = FCEUI_GetMovieToggleReadOnly();
+				replayReadOnlySetting = fceu11::GetMovieToggleReadOnly();
 			}
-			FCEUI_printf("Playing back movie located at %s\n", s.c_str());
-			FCEUI_LoadMovie(s.c_str(), replayReadOnlySetting, pauseframe ? pauseframe : false);
+			FCEU_printf("Playing back movie located at %s\n", s.c_str());
+			fceu11::LoadMovie(s.c_str(), replayReadOnlySetting, pauseframe ? pauseframe : false);
 		}
 		else
 		{
-		  FCEUI_printf("Sorry, I don't know how to play back %s\n", s.c_str());
+		  FCEU_printf("Sorry, I don't know how to play back %s\n", s.c_str());
 		}
 		g_config->getOption("SDL.MovieLength",&KillFCEUXonFrame);
 		printf("KillFCEUXonFrame %d\n",KillFCEUXonFrame);
@@ -1095,7 +1095,7 @@ int  fceuWrapperInit( int argc, char *argv[] )
     g_config->getOption("SDL.PeriodicSaves", &periodic_saves);
     g_config->getOption("SDL.AutoSaveState", &save_state);
     if(periodic_saves && save_state < 10 && save_state >= 0){
-        FCEUI_SelectState(save_state, 0);
+        fceu11::SelectStateSlot(save_state, 0);
     } else {
         periodic_saves = 0;
     }
@@ -1130,7 +1130,7 @@ int  fceuWrapperClose( void )
 	CloseGame();
 
 	// exit the infrastructure
-	FCEUI_Kill();
+	fceu11::Kill();
 	SDL_Quit();
 
 	return 0;
@@ -1195,14 +1195,14 @@ static void DoFun(int frameskip, int periodic_saves)
 		{
 			if ( currFrameCounter >= runToFrameTarget )
 			{
-				FCEUI_SetEmulationPaused(EMULATIONPAUSED_PAUSED);
+				fceu11::SetEmulationPaused(EMULATIONPAUSED_PAUSED);
 				return;
 			}
 		}
 	}
     //TODO peroidic saves, working on it right now
     if (periodic_saves && FCEUD_GetTime() % PERIODIC_SAVE_INTERVAL < 30){
-        FCEUI_SaveState(NULL, false);
+        fceu11::SaveStateFile(NULL, false);
     }
 #ifdef FRAMESKIP
 	fskipc = (fskipc + 1) % (frameskip + 1);
@@ -1212,12 +1212,12 @@ static void DoFun(int frameskip, int periodic_saves)
 	{
 		gfx = 0;
 	}
-	FCEUI_Emulate(&gfx, &sound, &ssize, fskipc);
+	fceu11::Emulate(&gfx, &sound, &ssize, fskipc);
 	FCEUD_Update(gfx, sound, ssize);
 
-	//if(opause!=FCEUI_EmulationPaused()) 
+	//if(opause!=fceu11::IsEmulationPaused()) 
 	//{
-	//	opause=FCEUI_EmulationPaused();
+	//	opause=fceu11::IsEmulationPaused();
 	//	SilenceSound(opause);
 	//}
 	
@@ -1587,7 +1587,7 @@ static FCEUFILE* minizip_OpenArchive(ArchiveScanRecord& asr, std::string &fname,
 	unzReadCurrentFile( zf, tmpMem, fi.uncompressed_size );
 	unzCloseCurrentFile( zf );
 
-	ms->fwrite( tmpMem, fi.uncompressed_size );
+	ms->fwrite(std::span<const std::byte>(static_cast<const std::byte*>(tmpMem), fi.uncompressed_size));
 
 	free( tmpMem );
 
@@ -1707,7 +1707,7 @@ static FCEUFILE* libarchive_OpenArchive( ArchiveScanRecord& asr, std::string& fn
 				break;
 			}
 			//printf("Read: %p   Size:%zu   Offset:%llu\n", buff, size, (long long int)offset);
-			ms->fwrite( buff, size );
+			ms->fwrite(std::span<const std::byte>(static_cast<const std::byte*>(buff), size));
 			totalSize += size;
 		}
 
@@ -1834,9 +1834,9 @@ DUMMY(FCEUD_HideMenuToggle)
 DUMMY(FCEUD_MovieReplayFrom)
 //DUMMY(FCEUD_AviRecordTo)
 //DUMMY(FCEUD_AviStop)
-//void FCEUI_AviVideoUpdate(const unsigned char* buffer) { }
-//bool FCEUI_AviIsRecording(void) {return false;}
-void FCEUI_UseInputPreset(int preset) { }
+//void fceu11::AviVideoUpdate(const unsigned char* buffer) { }
+//bool fceu11::AviIsRecording(void) {return false;}
+void fceu11::UseInputPreset(int preset) { }
 bool FCEUD_PauseAfterPlayback() { return pauseAfterPlayback; }
 
 int FCEUD_ShowStatusIcon(void)

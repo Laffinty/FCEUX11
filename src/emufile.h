@@ -63,13 +63,22 @@ public:
 
 	bool eof() { return size() == static_cast<size_t>(ftell()); }
 
-	size_t fread(const void *ptr, size_t bytes){
-		return _fread(ptr,bytes);
-	}
+	// === v0.3.10: std::span virtual interface ===
+	// The new primary interface is std::span<std::byte>; old (void*, size_t)
+	// callers are funneled through [[deprecated]] inline shims below.
+	virtual size_t fread(std::span<std::byte> dst) = 0;
+	virtual size_t fwrite(std::span<const std::byte> src) = 0;
 
-	// v0.3.3: Internal std::span overload (public API unchanged until v0.3.10)
-	size_t fread(std::span<std::byte> buf){
-		return _fread(buf.data(), buf.size());
+	// [[deprecated]] shims. Forward to the std::span overloads so existing
+	// callers (and the 30+ call sites migrated in P3) keep compiling until
+	// they are ported. Removal targeted for v0.4.0.
+	[[deprecated("use std::span<std::byte> overload (v0.3.10)")]]
+	size_t fread(void* ptr, size_t bytes) {
+		return fread(std::span<std::byte>(static_cast<std::byte*>(ptr), bytes));
+	}
+	[[deprecated("use std::span<const std::byte> overload (v0.3.10)")]]
+	size_t fwrite(const void* ptr, size_t bytes) {
+		return fwrite(std::span<const std::byte>(static_cast<const std::byte*>(ptr), bytes));
 	}
 
 	void unget() { fseek(-1,SEEK_CUR); }
@@ -83,13 +92,6 @@ public:
 
 	virtual int fgetc() = 0;
 	virtual int fputc(int c) = 0;
-
-	virtual size_t _fread(const void *ptr, size_t bytes) = 0;
-
-	//removing these return values for now so we can find any code that might be using them and make sure
-	//they handle the return values correctly
-
-	virtual void fwrite(const void *ptr, size_t bytes) = 0;
 
 	void write64le(u64* val);
 	void write64le(u64 val);
@@ -128,7 +130,9 @@ public:
 //todo - handle read-only specially?
 class EMUFILE_MEMORY : public EMUFILE {
 protected:
-	std::vector<u8> *vec;
+	// v0.3.10: switched to std::byte for type-safe serialization semantics.
+	// Boundaries to u8 / void* use std::to_integer / std::bit_cast at the call.
+	std::vector<std::byte> *vec;
 	bool ownvec;
 	long int pos;
 	size_t len;
@@ -140,16 +144,16 @@ protected:
 
 public:
 
-	EMUFILE_MEMORY(std::vector<u8> *underlying) : vec(underlying), ownvec(false), pos(0), len((s32)underlying->size()) { }
-	EMUFILE_MEMORY(size_t preallocate) : vec(new std::vector<u8>()), ownvec(true), pos(0), len(0) {
+	EMUFILE_MEMORY(std::vector<std::byte> *underlying) : vec(underlying), ownvec(false), pos(0), len((s32)underlying->size()) { }
+	EMUFILE_MEMORY(size_t preallocate) : vec(new std::vector<std::byte>()), ownvec(true), pos(0), len(0) {
 		vec->resize(preallocate);
 		len = preallocate;
 	}
-	EMUFILE_MEMORY() : vec(new std::vector<u8>()), ownvec(true), pos(0), len(0) { vec->reserve(1024); }
-	EMUFILE_MEMORY(void* buf, size_t size) : vec(new std::vector<u8>()), ownvec(true), pos(0), len(size) {
+	EMUFILE_MEMORY() : vec(new std::vector<std::byte>()), ownvec(true), pos(0), len(0) { vec->reserve(1024); }
+	EMUFILE_MEMORY(const void* buf, size_t size) : vec(new std::vector<std::byte>()), ownvec(true), pos(0), len(size) {
 		vec->resize(size);
 		if(size != 0)
-			memcpy(&vec->front(),buf,size);
+			memcpy(vec->data(),buf,size);
 	}
 
 	~EMUFILE_MEMORY() {
@@ -165,12 +169,15 @@ public:
 		if (static_cast<size_t>(pos) > length) pos=static_cast<long int>(length);
 	}
 
-	u8* buf() {
+	// v0.3.10: returns std::byte*; external callers (file.cpp, FCEU_malloc'd
+	// memcpy targets, unzReadCurrentFile, gzread, fceu11_expected) convert
+	// explicitly at the boundary. P3 will sweep the leaf call sites.
+	std::byte* buf() {
 		if(size()==0) reserve(1);
 		return vec->data();
 	}
 
-	std::vector<u8>* get_vec() { return vec; };
+	std::vector<std::byte>* get_vec() { return vec; };
 
 	virtual FILE *get_fp() { return NULL; }
 
@@ -186,7 +193,9 @@ public:
 		va_start(argptr, format);
 		vsnprintf(tempbuf,amt+1,format,argptr);
 
-		fwrite(tempbuf,amt);
+		// v0.3.10: direct std::span virtual call (avoid [[deprecated]] shim).
+		fwrite(std::span<const std::byte>(
+			reinterpret_cast<const std::byte*>(tempbuf), amt));
 		delete[] tempbuf;
 
 		va_end(argptr);
@@ -197,7 +206,7 @@ public:
 		u8 temp;
 
 		//need an optimized codepath
-		//if(_fread(&temp,1) != 1)
+		//if(fread(&temp,1) != 1)
 		//	return EOF;
 		//else return temp;
 		size_t remain = len-pos;
@@ -205,30 +214,28 @@ public:
 			failbit = true;
 			return -1;
 		}
-		temp = buf()[pos];
+		temp = std::to_integer<u8>(buf()[pos]);
 		pos++;
 		return temp;
 	}
 	virtual int fputc(int c) {
 		u8 temp = (u8)c;
-		//TODO
-		//if(fwrite(&temp,1)!=1) return EOF;
-		fwrite(&temp,1);
-
+		// v0.3.10: direct std::span virtual call (avoid [[deprecated]] shim).
+		fwrite(std::span<const std::byte>(
+			reinterpret_cast<const std::byte*>(&temp), 1));
 		return 0;
 	}
 
-	virtual size_t _fread(const void *ptr, size_t bytes);
+	// v0.3.10: std::span virtual overrides
+	virtual size_t fread(std::span<std::byte> dst) override;
+	virtual size_t fwrite(std::span<const std::byte> src) override;
 
-	//removing these return values for now so we can find any code that might be using them and make sure
-	//they handle the return values correctly
-
-	virtual void fwrite(const void *ptr, size_t bytes){
-		reserve(pos+bytes);
-		memcpy(buf()+pos,ptr,bytes);
-		pos += static_cast<long>(bytes);
-		len = std::max<size_t>(pos,len);
-	}
+	// v0.3.10: Bring the [[deprecated]] (void*, size_t) shims from EMUFILE
+	// into scope. Without this, declaring fread(std::span<std::byte>) here
+	// hides the base-class overload (C++ name-hiding) and every P3 caller
+	// would fail to compile until migrated. P3 will sweep them away.
+	using EMUFILE::fread;
+	using EMUFILE::fwrite;
 
 	virtual int fseek(long int offset, int origin){
 		//work differently for read-only...?
@@ -313,20 +320,27 @@ public:
 		return ::fputc(c, fp);
 	}
 
-	virtual size_t _fread(const void *ptr, size_t bytes){
-		size_t ret = ::fread((void*)ptr, 1, bytes, fp);
-		if(ret < bytes)
+	// v0.3.10: bring [[deprecated]] (void*, size_t) shims into scope; see
+	// EMUFILE_MEMORY for rationale.
+	using EMUFILE::fread;
+	using EMUFILE::fwrite;
+
+	virtual size_t fread(std::span<std::byte> dst) override {
+		if(dst.empty()) return 0;
+		size_t ret = ::fread(dst.data(), 1, dst.size(), fp);
+		if(ret < dst.size())
 			failbit = true;
 		return ret;
 	}
 
-	//removing these return values for now so we can find any code that might be using them and make sure
-	//they handle the return values correctly
-
-	virtual void fwrite(const void *ptr, size_t bytes){
-		size_t ret = ::fwrite((void*)ptr, 1, bytes, fp);
-		if(ret < bytes)
+	// v0.3.10: std::span virtual override. Returns bytes written so callers
+	// can detect short writes; previously returned void.
+	virtual size_t fwrite(std::span<const std::byte> src) override {
+		if(src.empty()) return 0;
+		size_t ret = ::fwrite(src.data(), 1, src.size(), fp);
+		if(ret < src.size())
 			failbit = true;
+		return ret;
 	}
 
 	virtual int fseek(long int offset, int origin) {

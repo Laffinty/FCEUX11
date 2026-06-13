@@ -649,15 +649,15 @@ int64_t fceux11_lua_movie_get_length() {
 }
 
 void fceux11_lua_movie_stop() {
-	FCEUI_StopMovie();
+	fceu11::StopMovie();
 }
 
 int32_t fceux11_lua_movie_get_readonly() {
-	return FCEUI_GetMovieToggleReadOnly() ? 1 : 0;
+	return fceu11::GetMovieToggleReadOnly() ? 1 : 0;
 }
 
 void fceux11_lua_movie_set_readonly(int32_t val) {
-	FCEUI_SetMovieToggleReadOnly(val != 0);
+	fceu11::SetMovieToggleReadOnly(val != 0);
 }
 
 int32_t fceux11_lua_movie_is_poweron() {
@@ -671,14 +671,14 @@ int32_t fceux11_lua_movie_is_from_savestate() {
 const char* fceux11_lua_movie_get_name() {
 	// Returns internal movie name (from header or filename)
 	static std::string name;
-	name = FCEUI_GetMovieName();
+	name = fceu11::GetMovieName();
 	return name.c_str();
 }
 
 const char* fceux11_lua_movie_get_filename() {
 	// Returns filename stripped of path
 	static std::string name;
-	name = FCEUI_GetMovieName();
+	name = fceu11::GetMovieName();
 	int x = name.find_last_of("/\\") + 1;
 	if (x)
 		name = name.substr(x, name.length() - x);
@@ -767,7 +767,7 @@ int64_t fceux11_lua_emu_get_lagcount() {
 }
 
 int32_t fceux11_lua_emu_is_paused() {
-	return FCEUI_EmulationPaused() ? 1 : 0;
+	return fceu11::IsEmulationPaused() ? 1 : 0;
 }
 
 void fceux11_lua_emu_set_speedmode(int mode) {
@@ -784,12 +784,12 @@ void fceux11_lua_emu_set_speedmode(int mode) {
 
 void fceux11_lua_emu_poweron() {
 	if (GameInfo)
-		FCEUI_PowerNES();
+		fceu11::PowerNES();
 }
 
 void fceux11_lua_emu_softreset() {
 	if (GameInfo)
-		FCEUI_ResetNES();
+		fceu11::ResetNES();
 }
 
 void fceux11_lua_emu_message(const char* msg) {
@@ -797,13 +797,13 @@ void fceux11_lua_emu_message(const char* msg) {
 }
 
 void fceux11_lua_emu_pause() {
-	if (!FCEUI_EmulationPaused())
-		FCEUI_ToggleEmulationPause();
+	if (!fceu11::IsEmulationPaused())
+		fceu11::ToggleEmulationPause();
 }
 
 void fceux11_lua_emu_unpause() {
-	if (FCEUI_EmulationPaused())
-		FCEUI_ToggleEmulationPause();
+	if (fceu11::IsEmulationPaused())
+		fceu11::ToggleEmulationPause();
 }
 
 void fceux11_lua_gui_popup(const char* msg) {
@@ -814,7 +814,7 @@ void fceux11_lua_gui_savescreenshot(const char* filename) {
 	if (filename && filename[0]) {
 		FCEUI_SetSnapshotAsName(filename);
 	}
-	FCEUI_SaveSnapshotAs();
+	fceu11::SaveSnapshotAs();
 }
 
 // v0.2.22.6: P3 sound/zapper/debugger FFI

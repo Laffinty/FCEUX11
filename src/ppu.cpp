@@ -1048,12 +1048,12 @@ void FCEUPPU_LineUpdate(void) {
 
 static bool rendersprites = true, renderbg = true;
 
-void FCEUI_SetRenderPlanes(bool sprites, bool bg) {
+void fceu11::SetRenderPlanes(bool sprites, bool bg) {
 	rendersprites = sprites;
 	renderbg = bg;
 }
 
-void FCEUI_GetRenderPlanes(bool& sprites, bool& bg) {
+void fceu11::GetRenderPlanes(bool& sprites, bool& bg) {
 	sprites = rendersprites;
 	bg = renderbg;
 }

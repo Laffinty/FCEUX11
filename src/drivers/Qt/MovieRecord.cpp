@@ -185,7 +185,7 @@ void MovieRecordDialog_t::setLoadState(void)
 	QList<QUrl> urls;
 	QDir d;
 
-	base = FCEUI_GetBaseDirectory();
+	base = fceu11::GetBaseDirectory();
 
 	urls << QUrl::fromLocalFile( QDir::rootPath() );
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
@@ -270,7 +270,7 @@ void MovieRecordDialog_t::recordMovie(void)
 
 		if ( recordFrom >= 3 )
 		{
-			FCEUI_LoadState(ic_file.c_str());
+			fceu11::LoadStateFile(ic_file.c_str());
 			{
 				extern int loadStateFailed;
 
@@ -302,7 +302,7 @@ void MovieRecordDialog_t::recordMovie(void)
 		{
 			std::string s = authorEdit->text().toStdString();
 			std::wstring author (s.begin (), s.end ());
-			FCEUI_printf("Recording movie to %s\n", filepath.c_str ());
+			FCEU_printf("Recording movie to %s\n", filepath.c_str ());
 			FCEUI_SaveMovie (filepath.c_str(), flags, author);
 
 			done(0);

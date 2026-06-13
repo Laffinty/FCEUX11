@@ -7,6 +7,12 @@ edition.workspace = true
 crate-type = ["rlib"]
 
 [features]
+# Enables test-only FFI stubs so `cargo test` can link without the C++ objects.
+# This is automatically enabled for workspace test builds via fceux11-rust's
+# dev-dependency; it must NOT be enabled when building the production staticlib.
+ffi-stubs = []
+# Indicates real C++ FFI symbols are available (CMake integration builds).
+# Tests gated by `#[cfg(feature = "ffi-tests")]` require the full executable.
 ffi-tests = []
 
 [dependencies]

@@ -946,7 +946,7 @@ void RamWatchDialog_t::addCheatClicked(void)
 
 	if ( rw != NULL )
 	{
-		FCEUI_AddCheat( rw->name.c_str(), rw->addr, GetMem(rw->addr), -1, 1 );
+		fceu11::AddCheat( rw->name.c_str(), rw->addr, GetMem(rw->addr), -1, 1 );
 
       updateCheatDialog();
 	}

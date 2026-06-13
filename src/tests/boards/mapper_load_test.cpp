@@ -32,13 +32,13 @@ int main() {
     fflush(stdout);
 
     // Initialize emulator core (required before loading games)
-    printf("Calling FCEUI_Initialize()...\n");
+    printf("Calling fceu11::Initialize()...\n");
     fflush(stdout);
-    if (!FCEUI_Initialize()) {
-        printf("FAIL: FCEUI_Initialize() returned false\n");
+    if (!fceu11::Initialize()) {
+        printf("FAIL: fceu11::Initialize() returned false\n");
         return 1;
     }
-    printf("FCEUI_Initialize() OK\n");
+    printf("fceu11::Initialize() OK\n");
     fflush(stdout);
 
     bool failed = false;
@@ -51,7 +51,7 @@ int main() {
         printf("[%d/%d] Loading %-30s (expected mapper %3d) ... ",
                i + 1, NUM_TESTS, path, expected);
 
-        FCEUGI* gi = FCEUI_LoadGame(path, 1, true);
+        FCEUGI* gi = fceu11::LoadGame(path, 1, true);
         if (!gi) {
             printf("FAIL (load returned null)\n");
             failed = true;
@@ -67,10 +67,10 @@ int main() {
             ++passed;
         }
 
-        FCEUI_CloseGame();
+        fceu11::CloseGame();
     }
 
-    FCEUI_Kill();
+    fceu11::Kill();
 
     printf("\n=== Results ===\n");
     printf("Passed: %d / %d\n", passed, NUM_TESTS);

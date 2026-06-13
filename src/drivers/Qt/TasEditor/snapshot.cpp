@@ -104,7 +104,7 @@ void SNAPSHOT::save(EMUFILE *os)
 	// write description
 	int len = strlen(description);
 	write8le(len, os);
-	os->fwrite(&description[0], len);
+	os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(description), len));
 	// save InputLog data
 	inputlog.save(os);
 	// save LagLog data
@@ -126,7 +126,7 @@ bool SNAPSHOT::load(EMUFILE *is)
 	// read description
 	if (!read8le(&tmp, is)) return true;
 	if (tmp >= SNAPSHOT_DESCRIPTION_MAX_LEN) return true;
-	if (is->fread(&description[0], tmp) != tmp) return true;
+	if (is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(description), tmp)) != tmp) return true;
 	description[tmp] = 0;		// add '0' because it wasn't saved in the file
 	// load InputLog data
 	if (inputlog.load(is)) return true;

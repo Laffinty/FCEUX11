@@ -70,15 +70,24 @@ ArchiveScanRecord FCEUD_ScanArchive(std::string fname);
 // ---- Input devices ------------------------------------------------------
 // `attrib` is a per-port driver-specific cookie (e.g. poll function,
 // gamepad index). The driver is responsible for retaining it.
-void FCEUI_SetInput(int port, ESI type, void *ptr, int attrib);
-void FCEUI_SetInputFC(ESIFC type, void *ptr, int attrib);
-// Tells the emulator whether a fourscore is attached.
-void FCEUI_SetInputFourscore(bool attachFourscore);
-bool FCEUI_GetInputFourscore();
-bool FCEUI_GetInputMicrophone();
+namespace fceu11 {
+    void SetInput(int port, ESI type, void *ptr, int attrib);
+    void SetInputFC(ESIFC type, void *ptr, int attrib);
+    // Tells the emulator whether a fourscore is attached.
+    void SetInputFourscore(bool attachFourscore);
+    bool GetInputFourscore();
+    bool GetInputMicrophone();
 
-// Apply a built-in input preset (0=gamepad, 1=zapper, …).
-void FCEUI_UseInputPreset(int preset);
+    // Apply a built-in input preset (0=gamepad, 1=zapper, …).
+    void UseInputPreset(int preset);
+} // namespace fceu11
+
+inline void FCEUI_SetInput(int port, ESI type, void *ptr, int attrib) { fceu11::SetInput(port, type, ptr, attrib); }
+inline void FCEUI_SetInputFC(ESIFC type, void *ptr, int attrib) { fceu11::SetInputFC(type, ptr, attrib); }
+inline void FCEUI_SetInputFourscore(bool attachFourscore) { fceu11::SetInputFourscore(attachFourscore); }
+inline bool FCEUI_GetInputFourscore() { return fceu11::GetInputFourscore(); }
+inline bool FCEUI_GetInputMicrophone() { return fceu11::GetInputMicrophone(); }
+inline void FCEUI_UseInputPreset(int preset) { fceu11::UseInputPreset(preset); }
 
 // Driver-side batched input update — called once per frame from the
 // video/sound driver after polling hardware. `fourscore` selects the
@@ -90,21 +99,36 @@ void FCEUI_NTSCSELHUE(void);
 void FCEUI_NTSCSELTINT(void);
 void FCEUI_NTSCDEC(void);
 void FCEUI_NTSCINC(void);
-void FCEUI_GetNTSCTH(int *tint, int *hue);
-void FCEUI_SetNTSCTH(bool en, int tint, int hue);
+namespace fceu11 {
+    void GetNTSCTH(int *tint, int *hue);
+    void SetNTSCTH(bool en, int tint, int hue);
+} // namespace fceu11
+
+inline void FCEUI_GetNTSCTH(int *tint, int *hue) { fceu11::GetNTSCTH(tint, hue); }
+inline void FCEUI_SetNTSCTH(bool en, int tint, int hue) { fceu11::SetNTSCTH(en, tint, hue); }
 
 // ---- Palette ------------------------------------------------------------
 // Video interface — palette setters / getters.
 void FCEUD_SetPalette(uint8 index, uint8 r, uint8 g, uint8 b);
 void FCEUD_GetPalette(uint8 i, uint8 *r, uint8 *g, uint8 *b);
-bool FCEUI_GetUserPaletteAvail(void);
-void FCEUI_SetUserPalette(uint8 *pal, int nEntries);
+namespace fceu11 {
+    bool GetUserPaletteAvail();
+    void SetUserPalette(uint8 *pal, int nEntries);
+} // namespace fceu11
+
+inline bool FCEUI_GetUserPaletteAvail() { return fceu11::GetUserPaletteAvail(); }
+inline void FCEUI_SetUserPalette(uint8 *pal, int nEntries) { fceu11::SetUserPalette(pal, nEntries); }
 
 // ---- Base directory ----------------------------------------------------
 // Base directory (save states, snapshots, etc. are saved in subdirs of
 // this directory). Set once at startup from the OS-specific paths.
-void FCEUI_SetBaseDirectory(std::string const & dir);
-const char *FCEUI_GetBaseDirectory(void);
+namespace fceu11 {
+    void SetBaseDirectory(std::string const & dir);
+    const char *GetBaseDirectory();
+} // namespace fceu11
+
+inline void FCEUI_SetBaseDirectory(std::string const & dir) { fceu11::SetBaseDirectory(dir); }
+inline const char *FCEUI_GetBaseDirectory() { return fceu11::GetBaseDirectory(); }
 
 // Directory override slot for the per-category path table indexed by
 // `fceu11::IoDir` (roms / nv / states / fdsrom / snaps / cheats / movies /
@@ -159,41 +183,75 @@ void FCEUI_SetDirOverride(int which, char *n);
 // Sets up sound code to render sound at the specified rate, in samples
 // per second. Only sample rates of 44100, 48000, and 96000 are currently
 // supported. If `Rate` equals 0, sound is disabled.
-void FCEUI_Sound(int Rate);
-void FCEUI_SetSoundQuality(int quality);
-void FCEUI_SetSoundVolume(uint32 volume);
-void FCEUI_SetTriangleVolume(uint32 volume);
-void FCEUI_SetSquare1Volume(uint32 volume);
-void FCEUI_SetSquare2Volume(uint32 volume);
-void FCEUI_SetNoiseVolume(uint32 volume);
-void FCEUI_SetPCMVolume(uint32 volume);
+namespace fceu11 {
+    void Sound(int Rate);
+    void SetSoundQuality(int quality);
+    void SetSoundVolume(uint32 volume);
+    void SetTriangleVolume(uint32 volume);
+    void SetSquare1Volume(uint32 volume);
+    void SetSquare2Volume(uint32 volume);
+    void SetNoiseVolume(uint32 volume);
+    void SetPCMVolume(uint32 volume);
+} // namespace fceu11
+
+inline void FCEUI_Sound(int Rate) { fceu11::Sound(Rate); }
+inline void FCEUI_SetSoundQuality(int quality) { fceu11::SetSoundQuality(quality); }
+inline void FCEUI_SetSoundVolume(uint32 volume) { fceu11::SetSoundVolume(volume); }
+inline void FCEUI_SetTriangleVolume(uint32 volume) { fceu11::SetTriangleVolume(volume); }
+inline void FCEUI_SetSquare1Volume(uint32 volume) { fceu11::SetSquare1Volume(volume); }
+inline void FCEUI_SetSquare2Volume(uint32 volume) { fceu11::SetSquare2Volume(volume); }
+inline void FCEUI_SetNoiseVolume(uint32 volume) { fceu11::SetNoiseVolume(volume); }
+inline void FCEUI_SetPCMVolume(uint32 volume) { fceu11::SetPCMVolume(volume); }
 void FCEUD_SoundToggle(void);
 void FCEUD_SoundVolumeAdjust(int);
 
 // ---- Video rendering toggles -------------------------------------------
 // 0 to keep 8-sprites limitation, 1 to remove it.
 void FCEUI_DisableSpriteLimitation(int a);
-void FCEUI_SetRenderPlanes(bool sprites, bool bg);
-void FCEUI_GetRenderPlanes(bool& sprites, bool& bg);
+namespace fceu11 {
+    void SetRenderPlanes(bool sprites, bool bg);
+    void GetRenderPlanes(bool& sprites, bool& bg);
+} // namespace fceu11
+
+inline void FCEUI_SetRenderPlanes(bool sprites, bool bg) { fceu11::SetRenderPlanes(sprites, bg); }
+inline void FCEUI_GetRenderPlanes(bool& sprites, bool& bg) { fceu11::GetRenderPlanes(sprites, bg); }
 
 // Should input aids (crosshairs, lightgun reticles, etc.) be drawn?
 // Used in fullscreen mode where the menu is hidden.
 bool FCEUD_ShouldDrawInputAids();
 
 // ---- Wave (audio-only) recording ---------------------------------------
-bool FCEUI_BeginWaveRecord(const char *fn);
-int  FCEUI_EndWaveRecord(void);
+namespace fceu11 {
+    bool BeginWaveRecord(const char *fn);
+    int  EndWaveRecord();
+    bool WaveRecordRunning();
+} // namespace fceu11
+
+inline bool FCEUI_BeginWaveRecord(const char *fn) { return fceu11::BeginWaveRecord(fn); }
+inline int  FCEUI_EndWaveRecord() { return fceu11::EndWaveRecord(); }
+inline bool FCEUI_WaveRecordRunning() { return fceu11::WaveRecordRunning(); }
 
 // ---- AVI recording -----------------------------------------------------
 int  FCEUI_AviBegin(const char* fname);
 void FCEUI_AviEnd(void);
 void FCEUI_AviVideoUpdate(const unsigned char* buffer);
 void FCEUI_AviSoundUpdate(void* soundData, int soundLen);
-bool FCEUI_AviIsRecording();
-bool FCEUI_AviEnableHUDrecording();
-void FCEUI_SetAviEnableHUDrecording(bool enable);
-bool FCEUI_AviDisableMovieMessages();
-void FCEUI_SetAviDisableMovieMessages(bool disable);
+
+namespace fceu11 {
+    void AviVideoUpdate(const unsigned char* buffer);
+    bool AviIsRecording();
+    bool AviEnableHUDrecording();
+    void SetAviEnableHUDrecording(bool enable);
+    bool AviDisableMovieMessages();
+    void SetAviDisableMovieMessages(bool disable);
+} // namespace fceu11
+
+inline void FCEUI_AviVideoUpdate(const unsigned char* buffer) { fceu11::AviVideoUpdate(buffer); }
+inline bool FCEUI_AviIsRecording() { return fceu11::AviIsRecording(); }
+inline bool FCEUI_AviEnableHUDrecording() { return fceu11::AviEnableHUDrecording(); }
+inline void FCEUI_SetAviEnableHUDrecording(bool enable) { fceu11::SetAviEnableHUDrecording(enable); }
+inline bool FCEUI_AviDisableMovieMessages() { return fceu11::AviDisableMovieMessages(); }
+inline void FCEUI_SetAviDisableMovieMessages(bool disable) { fceu11::SetAviDisableMovieMessages(disable); }
 
 void FCEUD_AviRecordTo(void);
 void FCEUD_AviStop(void);

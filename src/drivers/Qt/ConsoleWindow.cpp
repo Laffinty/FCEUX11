@@ -725,7 +725,7 @@ void consoleWin_t::dropEvent(QDropEvent *event)
 		if (isStateSaveFile)
 		{
 			FCEU_WRAPPER_LOCK();
-			FCEUI_LoadState( filename.toStdString().c_str() );
+			fceu11::LoadStateFile( filename.toStdString().c_str() );
 			FCEU_WRAPPER_UNLOCK();
 
 			event->accept();
@@ -1379,7 +1379,7 @@ void consoleWin_t::createMainMenu(void)
 	        group->addAction(region[i]);
 		subMenu->addAction(region[i]);
 	}
-	region[ FCEUI_GetRegion() ]->setChecked(true);
+	region[ fceu11::GetRegion() ]->setChecked(true);
 
 	connect( region[0], SIGNAL(triggered(void)), this, SLOT(setRegionNTSC(void)) );
 	connect( region[1], SIGNAL(triggered(void)), this, SLOT(setRegionPAL(void)) );
@@ -2419,7 +2419,7 @@ void consoleWin_t::openROMFile(void)
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::DesktopLocation).first());
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::DownloadLocation).first());
-	urls << QUrl::fromLocalFile( QDir( FCEUI_GetBaseDirectory() ).absolutePath() );
+	urls << QUrl::fromLocalFile( QDir( fceu11::GetBaseDirectory() ).absolutePath() );
 
 	romDir = getenv("FCEUX_ROM_PATH");
 
@@ -2513,7 +2513,7 @@ void consoleWin_t::loadNSF(void)
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::DesktopLocation).first());
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::DownloadLocation).first());
-	urls << QUrl::fromLocalFile( QDir( FCEUI_GetBaseDirectory() ).absolutePath() );
+	urls << QUrl::fromLocalFile( QDir( fceu11::GetBaseDirectory() ).absolutePath() );
 
 	romDir = getenv("FCEUX_ROM_PATH");
 
@@ -2583,7 +2583,7 @@ void consoleWin_t::loadStateFrom(void)
 	QList<QUrl> urls;
 	QDir d;
 
-	base = FCEUI_GetBaseDirectory();
+	base = fceu11::GetBaseDirectory();
 
 	urls << QUrl::fromLocalFile( QDir::rootPath() );
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
@@ -2652,7 +2652,7 @@ void consoleWin_t::loadStateFrom(void)
 	g_config->setOption ("SDL.LastLoadStateFrom", filename.toStdString().c_str() );
 
 	FCEU_WRAPPER_LOCK();
-	FCEUI_LoadState( filename.toStdString().c_str() );
+	fceu11::LoadStateFile( filename.toStdString().c_str() );
 	FCEU_WRAPPER_UNLOCK();
 }
 
@@ -2667,7 +2667,7 @@ void consoleWin_t::saveStateAs(void)
 	QList<QUrl> urls;
 	QDir d;
 
-	base = FCEUI_GetBaseDirectory();
+	base = fceu11::GetBaseDirectory();
 
 	urls << QUrl::fromLocalFile( QDir::rootPath() );
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
@@ -2743,14 +2743,14 @@ void consoleWin_t::saveStateAs(void)
 	g_config->setOption ("SDL.LastSaveStateAs", filename.toStdString().c_str() );
 
 	FCEU_WRAPPER_LOCK();
-	FCEUI_SaveState( filename.toStdString().c_str() );
+	fceu11::SaveStateFile( filename.toStdString().c_str() );
 	FCEU_WRAPPER_UNLOCK();
 }
 
 void consoleWin_t::quickLoad(void)
 {
 	FCEU_WRAPPER_LOCK();
-	FCEUI_LoadState( NULL );
+	fceu11::LoadStateFile( NULL );
 	FCEU_WRAPPER_UNLOCK();
 }
 
@@ -2758,9 +2758,9 @@ void consoleWin_t::loadState(int slot)
 {
 	int prevState;
 	FCEU_WRAPPER_LOCK();
-	prevState = FCEUI_SelectState( slot, false );
-	FCEUI_LoadState( NULL, true );
-	FCEUI_SelectState( prevState, false );
+	prevState = fceu11::SelectStateSlot( slot, false );
+	fceu11::LoadStateFile( NULL, true );
+	fceu11::SelectStateSlot( prevState, false );
 	FCEU_WRAPPER_UNLOCK();
 }
 void consoleWin_t::loadState0(void){ loadState(0); }
@@ -2791,7 +2791,7 @@ void consoleWin_t::loadNextState(void)
 void consoleWin_t::quickSave(void)
 {
 	FCEU_WRAPPER_LOCK();
-	FCEUI_SaveState( NULL );
+	fceu11::SaveStateFile( NULL );
 	FCEU_WRAPPER_UNLOCK();
 }
 
@@ -2799,9 +2799,9 @@ void consoleWin_t::saveState(int slot)
 {
 	int prevState;
 	FCEU_WRAPPER_LOCK();
-	prevState = FCEUI_SelectState( slot, false );
-	FCEUI_SaveState( NULL, true );
-	FCEUI_SelectState( prevState, false );
+	prevState = fceu11::SelectStateSlot( slot, false );
+	fceu11::SaveStateFile( NULL, true );
+	fceu11::SelectStateSlot( prevState, false );
 	FCEU_WRAPPER_UNLOCK();
 }
 void consoleWin_t::saveState0(void){ saveState(0); }
@@ -2818,7 +2818,7 @@ void consoleWin_t::saveState9(void){ saveState(9); }
 void consoleWin_t::changeState(int slot)
 {
 	FCEU_WRAPPER_LOCK();
-	FCEUI_SelectState( slot, true );
+	fceu11::SelectStateSlot( slot, true );
 	FCEU_WRAPPER_UNLOCK();
 	state[slot]->setChecked(true);
 }
@@ -2836,14 +2836,14 @@ void consoleWin_t::changeState9(void){ changeState(9); }
 void consoleWin_t::incrementState(void)
 {
 	FCEU_WRAPPER_LOCK();
-	FCEUI_SelectStateNext(1);
+	fceu11::SelectStateNext(1);
 	FCEU_WRAPPER_UNLOCK();
 }
 
 void consoleWin_t::decrementState(void)
 {
 	FCEU_WRAPPER_LOCK();
-	FCEUI_SelectStateNext(-1);
+	fceu11::SelectStateNext(-1);
 	FCEU_WRAPPER_UNLOCK();
 }
 
@@ -2851,11 +2851,11 @@ void consoleWin_t::mainMenuOpen(void)
 {
 	//printf("Main Menu Open\n");
 
-	mainMenuEmuWasPaused = FCEUI_EmulationPaused() ? true : false;
+	mainMenuEmuWasPaused = fceu11::IsEmulationPaused() ? true : false;
 
 	if ( mainMenuPauseWhenActv && !mainMenuEmuPauseSet && !mainMenuEmuWasPaused )
 	{
-		FCEUI_ToggleEmulationPause();
+		fceu11::ToggleEmulationPause();
 		mainMenuEmuPauseSet  = true;
 	}
 }
@@ -2866,11 +2866,11 @@ void consoleWin_t::mainMenuClose(void)
 
 	if ( mainMenuEmuPauseSet )
 	{
-		bool isPaused = FCEUI_EmulationPaused() ? true : false;
+		bool isPaused = fceu11::IsEmulationPaused() ? true : false;
 
 		if ( isPaused != mainMenuEmuWasPaused )
 		{
-			FCEUI_ToggleEmulationPause();
+			fceu11::ToggleEmulationPause();
 		}
 		mainMenuEmuPauseSet = false;
 	}
@@ -2886,7 +2886,7 @@ void consoleWin_t::prepareScreenShot(void)
 //void consoleWin_t::takeScreenShot(void)
 //{
 //	FCEU_WRAPPER_LOCK();
-//	FCEUI_SaveSnapshot();
+//	fceu11::SaveSnapshot();
 //	FCEU_WRAPPER_UNLOCK();
 //}
 
@@ -3309,7 +3309,7 @@ extern int globalCheatDisabled;
 void consoleWin_t::toggleGlobalCheatEnable(void)
 {
 	FCEU_WRAPPER_LOCK();
-	FCEUI_GlobalToggleCheat(globalCheatDisabled);
+	fceu11::GlobalToggleCheat(globalCheatDisabled);
 	FCEU_WRAPPER_UNLOCK();
 
 	g_config->setOption("SDL.CheatsDisabled", globalCheatDisabled);
@@ -3356,7 +3356,7 @@ void consoleWin_t::warnAmbiguousShortcut( QShortcut *shortcut)
 void consoleWin_t::powerConsoleCB(void)
 {
 	FCEU_WRAPPER_LOCK();
-	FCEUI_PowerNES();
+	fceu11::PowerNES();
 	FCEU_WRAPPER_UNLOCK();
    return;
 }
@@ -3394,7 +3394,7 @@ void consoleWin_t::setRegion(int region)
 	g_config->setOption ("SDL.PAL", region);
 	g_config->save ();
 
-	currentRegion = FCEUI_GetRegion();
+	currentRegion = fceu11::GetRegion();
 
 	if ( currentRegion != region )
 	{
@@ -3542,7 +3542,7 @@ void consoleWin_t::openFamilyKeyboard(void)
 void consoleWin_t::insertCoin(void)
 {
 	FCEU_WRAPPER_LOCK();
-	FCEUI_VSUniCoin();
+	fceu11::VSUniCoin();
 	FCEU_WRAPPER_UNLOCK();
    return;
 }
@@ -3854,7 +3854,7 @@ void consoleWin_t::toggleMovieFrameDisplay(void)
 {
 	extern int frame_display;
 	FCEU_WRAPPER_LOCK();
-	FCEUI_MovieToggleFrameDisplay();
+	fceu11::MovieToggleFrameDisplay();
 	g_config->setOption("SDL.ShowFrameCount", frame_display );
 	FCEU_WRAPPER_UNLOCK();
 }
@@ -3863,7 +3863,7 @@ void consoleWin_t::toggleMovieReadWrite(void)
 {
 	FCEU_WRAPPER_LOCK();
 	//FCEUI_SetMovieToggleReadOnly (!FCEUI_GetMovieToggleReadOnly ());
-	FCEUI_MovieToggleReadOnly();
+	fceu11::MovieToggleReadOnly();
 
 	if ( tasWin != NULL )
 	{
@@ -3884,8 +3884,8 @@ void consoleWin_t::toggleBackground(void)
 {
 	bool fgOn, bgOn;
 	FCEU_WRAPPER_LOCK();
-	FCEUI_GetRenderPlanes( fgOn,  bgOn );
-	FCEUI_SetRenderPlanes( fgOn, !bgOn );
+	fceu11::GetRenderPlanes( fgOn,  bgOn );
+	fceu11::SetRenderPlanes( fgOn, !bgOn );
 	FCEU_WRAPPER_UNLOCK();
 }
 
@@ -3893,8 +3893,8 @@ void consoleWin_t::toggleForeground(void)
 {
 	bool fgOn, bgOn;
 	FCEU_WRAPPER_LOCK();
-	FCEUI_GetRenderPlanes(  fgOn, bgOn );
-	FCEUI_SetRenderPlanes( !fgOn, bgOn );
+	fceu11::GetRenderPlanes(  fgOn, bgOn );
+	fceu11::SetRenderPlanes( !fgOn, bgOn );
 	FCEU_WRAPPER_UNLOCK();
 }
 
@@ -3924,14 +3924,14 @@ void consoleWin_t::openMovie(void)
 void consoleWin_t::playMovieFromBeginning(void)
 {
 	FCEU_WRAPPER_LOCK();
-	FCEUI_MoviePlayFromBeginning();
+	fceu11::MoviePlayFromBeginning();
 	FCEU_WRAPPER_UNLOCK();
 }
 
 void consoleWin_t::stopMovie(void)
 {
 	FCEU_WRAPPER_LOCK();
-	FCEUI_StopMovie();
+	fceu11::StopMovie();
 	FCEU_WRAPPER_UNLOCK();
    return;
 }
@@ -3985,7 +3985,7 @@ void consoleWin_t::aviRecordAsStart(void)
 	dialog.setFilter( QDir::AllEntries | QDir::AllDirs | QDir::Hidden );
 	dialog.setLabelText( QFileDialog::Accept, tr("Save") );
 
-	base = FCEUI_GetBaseDirectory();
+	base = fceu11::GetBaseDirectory();
 
 	urls << QUrl::fromLocalFile( QDir::rootPath() );
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
@@ -4091,14 +4091,14 @@ void consoleWin_t::aviAudioEnableChange(bool checked)
 
 void consoleWin_t::setAviHudEnable(bool checked)
 {
-	FCEUI_SetAviEnableHUDrecording( checked );
+	fceu11::SetAviEnableHUDrecording( checked );
 
 	g_config->setOption("SDL.RecordHUD", checked );
 }
 
 void consoleWin_t::setAviMsgEnable(bool checked)
 {
-	FCEUI_SetAviDisableMovieMessages( !checked );
+	fceu11::SetAviDisableMovieMessages( !checked );
 
 	g_config->setOption("SDL.MovieMsg", checked );
 }
@@ -4110,7 +4110,7 @@ void consoleWin_t::aviVideoFormatChanged(int idx)
 
 void consoleWin_t::wavRecordStart(void)
 {
-	if ( !FCEUI_WaveRecordRunning() )
+	if ( !fceu11::WaveRecordRunning() )
 	{
 		const char *romFile;
 		std::string fileName;
@@ -4120,7 +4120,7 @@ void consoleWin_t::wavRecordStart(void)
 		if ( romFile )
 		{
 			char base[512];
-			const char *baseDir = FCEUI_GetBaseDirectory();
+			const char *baseDir = fceu11::GetBaseDirectory();
 			std::string lastPath;
 
 			getFileBaseName( romFile, base );
@@ -4150,14 +4150,14 @@ void consoleWin_t::wavRecordStart(void)
 			return;
 		}
 		FCEU_WRAPPER_LOCK();
-		FCEUI_BeginWaveRecord( fileName.c_str() );
+		fceu11::BeginWaveRecord( fileName.c_str() );
 		FCEU_WRAPPER_UNLOCK();
 	}
 }
 
 void consoleWin_t::wavRecordAsStart(void)
 {
-	if ( FCEUI_WaveRecordRunning() )
+	if ( fceu11::WaveRecordRunning() )
 	{
 		return;
 	}
@@ -4177,7 +4177,7 @@ void consoleWin_t::wavRecordAsStart(void)
 	dialog.setFilter( QDir::AllEntries | QDir::AllDirs | QDir::Hidden );
 	dialog.setLabelText( QFileDialog::Accept, tr("Save") );
 
-	base = FCEUI_GetBaseDirectory();
+	base = fceu11::GetBaseDirectory();
 
 	urls << QUrl::fromLocalFile( QDir::rootPath() );
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
@@ -4253,16 +4253,16 @@ void consoleWin_t::wavRecordAsStart(void)
 	}
 
 	FCEU_WRAPPER_LOCK();
-	FCEUI_BeginWaveRecord( filename.toStdString().c_str() );
+	fceu11::BeginWaveRecord( filename.toStdString().c_str() );
 	FCEU_WRAPPER_UNLOCK();
 }
 
 void consoleWin_t::wavRecordStop(void)
 {
-	if ( FCEUI_WaveRecordRunning() )
+	if ( fceu11::WaveRecordRunning() )
 	{
 		FCEU_WRAPPER_LOCK();
-		FCEUI_EndWaveRecord();
+		fceu11::EndWaveRecord();
 		FCEU_WRAPPER_UNLOCK();
 	}
 }
@@ -4406,7 +4406,7 @@ void consoleWin_t::updatePeriodic(void)
 	if ( (updateCounter % 30) == 0 )
 	{
 		// Keep region menu selection sync'd to actual state
-		int actRegion = FCEUI_GetRegion();
+		int actRegion = fceu11::GetRegion();
 
 		if ( !region[ actRegion ]->isChecked() )
 		{
@@ -4431,9 +4431,9 @@ void consoleWin_t::updatePeriodic(void)
 		recAviAct->setEnabled( FCEU_IsValidUI( FCEUI_RECORDMOVIE ) && !FCEU_IsValidUI( FCEUI_STOPAVI ) );
 		recAsAviAct->setEnabled( FCEU_IsValidUI( FCEUI_RECORDMOVIE ) && !FCEU_IsValidUI( FCEUI_STOPAVI ) );
 		stopAviAct->setEnabled( FCEU_IsValidUI( FCEUI_STOPAVI ) );
-		recWavAct->setEnabled( FCEU_IsValidUI( FCEUI_RECORDMOVIE ) && !FCEUI_WaveRecordRunning() );
-		recAsWavAct->setEnabled( FCEU_IsValidUI( FCEUI_RECORDMOVIE ) && !FCEUI_WaveRecordRunning() );
-		stopWavAct->setEnabled( FCEUI_WaveRecordRunning() );
+		recWavAct->setEnabled( FCEU_IsValidUI( FCEUI_RECORDMOVIE ) && !fceu11::WaveRecordRunning() );
+		recAsWavAct->setEnabled( FCEU_IsValidUI( FCEUI_RECORDMOVIE ) && !fceu11::WaveRecordRunning() );
+		stopWavAct->setEnabled( fceu11::WaveRecordRunning() );
 		tasEditorAct->setEnabled( FCEU_IsValidUI(FCEUI_TASEDITOR) );
 	}
 

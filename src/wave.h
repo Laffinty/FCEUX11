@@ -1,6 +1,9 @@
 #include "types.h"
 
-bool FCEUI_BeginWaveRecord(const char *fn);
-bool FCEUI_WaveRecordRunning(void);
+namespace fceu11 {
+    bool BeginWaveRecord(const char *fn);
+    bool WaveRecordRunning();
+    int  EndWaveRecord();
+} // namespace fceu11
+
 void FCEU_WriteWaveData(int32 *Buffer, int Count);
-int FCEUI_EndWaveRecord(void);

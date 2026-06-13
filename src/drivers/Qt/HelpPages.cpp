@@ -60,7 +60,7 @@ void consoleWin_t::OpenHelpWindow(std::string subpage)
 	if ( helpFileName.length() == 0 )
 	{
 		#ifdef WIN32
-		helpFileName = FCEUI_GetBaseDirectory();
+		helpFileName = fceu11::GetBaseDirectory();
 		helpFileName += "\\..\\doc\\fceux.chm";
 		#else
 		helpFileName = "/usr/share/fceux/fceux.qhc";
@@ -147,7 +147,7 @@ std::string consoleWin_t::findHelpFile(void)
 	urls << QUrl::fromLocalFile( QDir::rootPath() );
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::DownloadLocation).first());
-	urls << QUrl::fromLocalFile( QDir( FCEUI_GetBaseDirectory() ).absolutePath() );
+	urls << QUrl::fromLocalFile( QDir( fceu11::GetBaseDirectory() ).absolutePath() );
 
 	dialog.setFileMode(QFileDialog::ExistingFile);
 
@@ -171,7 +171,7 @@ std::string consoleWin_t::findHelpFile(void)
 	}
 	else
 	{
-		dialog.setDirectory( QDir( FCEUI_GetBaseDirectory() ).absolutePath() );
+		dialog.setDirectory( QDir( fceu11::GetBaseDirectory() ).absolutePath() );
 	}
 
 	// Check config option to use native file dialog or not

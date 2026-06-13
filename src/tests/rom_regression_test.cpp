@@ -190,8 +190,8 @@ int main(int argc, char** argv)
     printf("=== FCEUX11 ROM Regression Test ===\n");
     printf("Mode: %s\n\n", generateMode ? "GENERATE golden hashes" : "VERIFY against golden hashes");
 
-    if (!FCEUI_Initialize()) {
-        printf("FAIL: FCEUI_Initialize() returned false\n");
+    if (!fceu11::Initialize()) {
+        printf("FAIL: fceu11::Initialize() returned false\n");
         return 1;
     }
 
@@ -203,10 +203,10 @@ int main(int argc, char** argv)
     // Set up dummy input to prevent null driver dereference in FCEU_UpdateInput
     // v0.3.8: SI_*/SIFC_* are `inline constexpr int` aliases (back-compat);
     // FCEUI_SetInput[FC] takes typed ESI/ESIFC (= fceu11::InputDevice[FC]).
-    FCEUI_SetInput(0, static_cast<ESI>(SI_NONE), nullptr, 0);
-    FCEUI_SetInput(1, static_cast<ESI>(SI_NONE), nullptr, 0);
-    FCEUI_SetInputFC(static_cast<ESIFC>(SIFC_NONE), nullptr, 0);
-    FCEUI_SetInputFourscore(false);
+    fceu11::SetInput(0, static_cast<ESI>(SI_NONE), nullptr, 0);
+    fceu11::SetInput(1, static_cast<ESI>(SI_NONE), nullptr, 0);
+    fceu11::SetInputFC(static_cast<ESIFC>(SIFC_NONE), nullptr, 0);
+    fceu11::SetInputFourscore(false);
 
     std::vector<std::vector<uint32>> collected_hashes;
     std::vector<std::string> collected_names;
@@ -219,7 +219,7 @@ int main(int argc, char** argv)
 
         printf("[%d/%d] Testing %s (%s)\n", i + 1, NUM_TESTS, name, path);
 
-        FCEUGI* gi = FCEUI_LoadGame(path, 1, true);
+        FCEUGI* gi = fceu11::LoadGame(path, 1, true);
         if (!gi) {
             printf("  FAIL: could not load ROM\n");
             anyFailed = true;
@@ -233,7 +233,7 @@ int main(int argc, char** argv)
             uint8* xbuf = nullptr;
             int32* soundBuf = nullptr;
             int32 soundBufSize = 0;
-            FCEUI_Emulate(&xbuf, &soundBuf, &soundBufSize, 0);
+            fceu11::Emulate(&xbuf, &soundBuf, &soundBufSize, 0);
 
             if (xbuf) {
                 uint32 crc = computeFrameCRC32(xbuf, FRAME_BUF_SIZE);
@@ -243,14 +243,14 @@ int main(int argc, char** argv)
             }
         }
 
-        FCEUI_CloseGame();
+        fceu11::CloseGame();
 
         collected_names.push_back(name);
         collected_hashes.push_back(frameHashes);
         printf("  Collected %zu frame hashes\n", frameHashes.size());
     }
 
-    FCEUI_Kill();
+    fceu11::Kill();
 
     if (generateMode) {
         if (!writeGoldenHashes(GOLDEN_HASHES_PATH, collected_hashes, collected_names)) {

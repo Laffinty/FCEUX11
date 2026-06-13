@@ -7,6 +7,12 @@ FFI contract:
 - Rust owns the memory buffer for EMUFILE_MEMORY.
 - C++ never dereferences the Rust handle directly.
 - All EMUFILE_MEMORY operations go through FFI functions.
+
+[v0.3.10] EMUFILE::fread/fwrite virtuals migrated to std::span<std::byte>.
+The (void*, size_t) overloads remain as [[deprecated]] inline shims in
+emufile.h. Internal framework callers (write64le, fprintf, fputc, memwrap,
+etc.) bypass the shim and call the new virtuals directly to avoid
+self-deprecation warnings.
 */
 
 #include "emufile.h"
@@ -26,13 +32,18 @@ bool EMUFILE::readAllBytes(std::vector<u8>* dstbuf, const std::string& fname)
     if(file.fail()) return false;
     size_t size = file.size();
     dstbuf->resize(size);
-    file.fread(&dstbuf->at(0),size);
+    // v0.3.10: span-boundary conversion. dstbuf holds u8; EMUFILE::fread
+    // accepts std::span<std::byte>. reinterpret_cast is safe here because
+    // std::byte and uint8_t have identical size/alignment and we round-trip
+    // back via the same span.
+    std::span<std::byte> dst(reinterpret_cast<std::byte*>(dstbuf->data()), dstbuf->size());
+    file.fread(dst);
     return true;
 }
 
-size_t EMUFILE_MEMORY::_fread(const void *ptr, size_t bytes){
+size_t EMUFILE_MEMORY::fread(std::span<std::byte> dst){
     size_t remain = len-pos;
-    size_t todo = std::min<size_t>(remain,bytes);
+    size_t todo = std::min<size_t>(remain, dst.size());
     if(len==0)
     {
         failbit = true;
@@ -40,19 +51,27 @@ size_t EMUFILE_MEMORY::_fread(const void *ptr, size_t bytes){
     }
     if(todo<=4)
     {
-        u8* src = buf()+pos;
-        u8* dst = (u8*)ptr;
+        std::byte* src = buf()+pos;
+        std::byte* out = dst.data();
         for(size_t i=0;i<todo;i++)
-            *dst++ = *src++;
+            *out++ = *src++;
     }
     else
     {
-        memcpy((void*)ptr,buf()+pos,todo);
+        memcpy(dst.data(), buf()+pos, todo);
     }
     pos += todo;
-    if(todo<bytes)
+    if(todo<dst.size())
         failbit = true;
     return todo;
+}
+
+size_t EMUFILE_MEMORY::fwrite(std::span<const std::byte> src){
+    reserve(pos+src.size());
+    memcpy(buf()+pos, src.data(), src.size());
+    pos += static_cast<long>(src.size());
+    len = std::max<size_t>(pos,len);
+    return src.size();
 }
 
 EMUFILE* EMUFILE_MEMORY::memwrap()
@@ -67,13 +86,15 @@ void EMUFILE::write64le(u64* val)
 
 void EMUFILE::write64le(u64 val)
 {
-    fwrite(&val,8);
+    // v0.3.10: direct std::span virtual call to avoid the [[deprecated]]
+    // (void*, size_t) shim. u64 -> std::byte is well-defined via bit_cast.
+    fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(&val), sizeof(val)));
 }
 
 size_t EMUFILE::read64le(u64 *Bufo)
 {
     u64 buf=0;
-    if(fread((char*)&buf,8) != 8)
+    if(fread(std::span<std::byte>(reinterpret_cast<std::byte*>(&buf), sizeof(buf))) != sizeof(buf))
         return 0;
     *Bufo=buf;
     return 1;
@@ -93,7 +114,7 @@ void EMUFILE::write32le(u32* val)
 
 void EMUFILE::write32le(u32 val)
 {
-    fwrite(&val,4);
+    fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(&val), sizeof(val)));
 }
 
 size_t EMUFILE::read32le(s32* Bufo) { return read32le((u32*)Bufo); }
@@ -101,7 +122,7 @@ size_t EMUFILE::read32le(s32* Bufo) { return read32le((u32*)Bufo); }
 size_t EMUFILE::read32le(u32* Bufo)
 {
     u32 buf=0;
-    if(fread(&buf,4)<4)
+    if(fread(std::span<std::byte>(reinterpret_cast<std::byte*>(&buf), sizeof(buf)))<sizeof(buf))
         return 0;
     *(u32*)Bufo=buf;
     return 1;
@@ -121,7 +142,7 @@ void EMUFILE::write16le(u16* val)
 
 void EMUFILE::write16le(u16 val)
 {
-    fwrite(&val,2);
+    fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(&val), sizeof(val)));
 }
 
 size_t EMUFILE::read16le(s16* Bufo) { return read16le((u16*)Bufo); }
@@ -129,7 +150,7 @@ size_t EMUFILE::read16le(s16* Bufo) { return read16le((u16*)Bufo); }
 size_t EMUFILE::read16le(u16* Bufo)
 {
     u32 buf=0;
-    if(fread(&buf,2)<2)
+    if(fread(std::span<std::byte>(reinterpret_cast<std::byte*>(&buf), sizeof(buf)))<sizeof(buf))
         return 0;
     *(u16*)Bufo=buf;
     return 1;
@@ -149,18 +170,18 @@ void EMUFILE::write8le(u8* val)
 
 void EMUFILE::write8le(u8 val)
 {
-    fwrite(&val,1);
+    fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(&val), sizeof(val)));
 }
 
 size_t EMUFILE::read8le(u8* val)
 {
-    return fread(val,1);
+    return fread(std::span<std::byte>(reinterpret_cast<std::byte*>(val), sizeof(*val)));
 }
 
 u8 EMUFILE::read8le()
 {
     u8 temp = 0;
-    fread(&temp,1);
+    fread(std::span<std::byte>(reinterpret_cast<std::byte*>(&temp), sizeof(temp)));
     return temp;
 }
 
@@ -226,6 +247,7 @@ EMUFILE* EMUFILE_FILE::memwrap()
 {
     EMUFILE_MEMORY* mem = new EMUFILE_MEMORY(size());
     if(size()==0) return mem;
-    fread(mem->buf(),size());
+    // v0.3.10: direct std::span virtual call (avoids [[deprecated]] shim).
+    fread(std::span<std::byte>(mem->buf(), mem->size()));
     return mem;
 }

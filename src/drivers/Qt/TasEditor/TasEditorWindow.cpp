@@ -157,7 +157,7 @@ void applyMovieInputConfig(void)
 	{
 		dendy = 0;
 	}
-	FCEUI_SetVidSystem(pal_emulation);
+	fceu11::SetVidSystem(pal_emulation);
 	RefreshThrottleFPS();
 	//PushCurrentVideoSettings();
 	// update PPU type
@@ -1482,7 +1482,7 @@ int TasEditorWindow::initModules(void)
 			FCEUD_PrintError("This version of TAS Editor doesn't work with movies starting from savestate.");
 		}
 		// create new movie
-		FCEUI_StopMovie();
+		fceu11::StopMovie();
 		movieMode = MOVIEMODE_TASEDITOR;
 		FCEUMOV_CreateCleanMovie();
 		playback.restartPlaybackFromZeroGround();
@@ -1490,7 +1490,7 @@ int TasEditorWindow::initModules(void)
 	else
 	{
 		// use current movie to create a new project
-		FCEUI_StopMovie();
+		fceu11::StopMovie();
 		movieMode = MOVIEMODE_TASEDITOR;
 	}
 	// if movie length is less or equal to currFrame, pad it with empty frames
@@ -1642,7 +1642,7 @@ bool TasEditorWindow::saveProjectAs(bool save_compact)
 	dialog.setFilter( QDir::AllEntries | QDir::AllDirs | QDir::Hidden );
 	dialog.setLabelText( QFileDialog::Accept, tr("Save") );
 
-	base = FCEUI_GetBaseDirectory();
+	base = fceu11::GetBaseDirectory();
 
 	urls << QUrl::fromLocalFile( QDir::rootPath() );
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
@@ -1789,7 +1789,7 @@ void TasEditorWindow::openProject(void)
 	dialog.setFilter( QDir::AllEntries | QDir::AllDirs | QDir::Hidden );
 	dialog.setLabelText( QFileDialog::Accept, tr("Open") );
 
-	base = FCEUI_GetBaseDirectory();
+	base = fceu11::GetBaseDirectory();
 
 	urls << QUrl::fromLocalFile( QDir::rootPath() );
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
@@ -2072,7 +2072,7 @@ void TasEditorWindow::importMovieFile(void)
 	dialog.setFilter( QDir::AllEntries | QDir::AllDirs | QDir::Hidden );
 	dialog.setLabelText( QFileDialog::Accept, tr("Import") );
 
-	base = FCEUI_GetBaseDirectory();
+	base = fceu11::GetBaseDirectory();
 
 	urls << QUrl::fromLocalFile( QDir::rootPath() );
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
@@ -2192,7 +2192,7 @@ void TasEditorWindow::exportMovieFile(void)
 	dialog.setFilter( QDir::AllEntries | QDir::AllDirs | QDir::Hidden );
 	dialog.setLabelText( QFileDialog::Accept, tr("Export") );
 
-	base = FCEUI_GetBaseDirectory();
+	base = fceu11::GetBaseDirectory();
 
 	urls << QUrl::fromLocalFile( QDir::rootPath() );
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
@@ -2460,7 +2460,7 @@ bool TasEditorWindow::saveCompactGetFilename( QString &outputFilePath )
 	dialog.setFilter( QDir::AllEntries | QDir::AllDirs | QDir::Hidden );
 	dialog.setLabelText( QFileDialog::Accept, tr("Save") );
 
-	base = FCEUI_GetBaseDirectory();
+	base = fceu11::GetBaseDirectory();
 
 	urls << QUrl::fromLocalFile( QDir::rootPath() );
 	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
@@ -2720,7 +2720,7 @@ void TasEditorWindow::recordingChanged(int newState)
 
 	if ( newState != oldState )
 	{
-		FCEUI_MovieToggleReadOnly();
+		fceu11::MovieToggleReadOnly();
 	}
 }
 //----------------------------------------------------------------------------
@@ -4148,7 +4148,7 @@ void QPianoRoll::save(EMUFILE *os, bool really_save)
 	{
 		updateLinesCount();
 		// write "PIANO_ROLL" string
-		os->fwrite(pianoRollSaveID, PIANO_ROLL_ID_LEN);
+		os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(pianoRollSaveID), PIANO_ROLL_ID_LEN));
 		// write current top item
 		int top_item = lineOffset;
 		write32le(top_item, os);
@@ -4178,7 +4178,7 @@ bool QPianoRoll::load(EMUFILE *is, unsigned int offset)
 	}
 	// read "PIANO_ROLL" string
 	char save_id[PIANO_ROLL_ID_LEN];
-	if ((int)is->fread(save_id, PIANO_ROLL_ID_LEN) < PIANO_ROLL_ID_LEN) goto error;
+	if ((int)is->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(save_id), PIANO_ROLL_ID_LEN)) < PIANO_ROLL_ID_LEN) goto error;
 	if (!strcmp(pianoRollSkipSaveID, save_id))
 	{
 		// string says to skip loading Piano Roll
@@ -5167,7 +5167,7 @@ void QPianoRoll::wheelEvent(QWheelEvent *event)
 			delta *= PLAYBACK_WHEEL_BOOST;
 		}
 		int destination_frame;
-		if (FCEUI_EmulationPaused() || playback->getPauseFrame() < 0)
+		if (fceu11::IsEmulationPaused() || playback->getPauseFrame() < 0)
 		{
 			destination_frame = currFrameCounter - delta;
 		}

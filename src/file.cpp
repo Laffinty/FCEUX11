@@ -68,7 +68,9 @@ void ApplyIPS(FILE *ips, FCEUFILE* fp)
 	if(!ips) return;
 
 	char* buf = (char*)FCEU_malloc(fp->size);
-	memcpy(buf,fp->EnsureMemorystream()->buf(),fp->size);
+	// v0.3.10: buf() now returns std::byte*. Reinterpret for memcpy into
+	// the char* scratch buffer (both are 1-byte trivial types).
+	memcpy(buf, reinterpret_cast<const void*>(fp->EnsureMemorystream()->buf()), fp->size);
 
 
 	FCEU_printf(" Applying IPS...\n");
@@ -240,7 +242,8 @@ zpfail:
 
 		int size = ufo.uncompressed_size;
 		EMUFILE_MEMORY* ms = new EMUFILE_MEMORY(size);
-		unzReadCurrentFile(tz,ms->buf(),ufo.uncompressed_size);
+		// v0.3.10: unzReadCurrentFile takes void*; ms->buf() is std::byte*.
+		unzReadCurrentFile(tz, reinterpret_cast<void*>(ms->buf()), ufo.uncompressed_size);
 		unzCloseCurrentFile(tz);
 		unzClose(tz);
 
@@ -332,7 +335,8 @@ FCEUFILE * FCEU_fopen(const char *path, const char *ipsfn, const char *mode, cha
 						for(size=0; gzgetc(gzfile) != EOF; size++) {}
 						EMUFILE_MEMORY* ms = new EMUFILE_MEMORY(size);
 						gzseek(gzfile,0,SEEK_SET);
-						gzread(gzfile,ms->buf(),size);
+						// v0.3.10: gzread takes void*; ms->buf() is std::byte*.
+						gzread(gzfile, reinterpret_cast<void*>(ms->buf()), size);
 						gzclose(gzfile);
 
 						fceufp = new FCEUFILE();
@@ -396,12 +400,16 @@ int FCEU_fclose(FCEUFILE *fp)
 
 uint64 FCEU_fread(void *ptr, size_t size, size_t nmemb, FCEUFILE *fp)
 {
-	return fp->stream->fread((char*)ptr,size*nmemb);
+	// v0.3.10: direct std::span virtual call (avoid [[deprecated]] shim).
+	return fp->stream->fread(std::span<std::byte>(
+		reinterpret_cast<std::byte*>(ptr), size * nmemb));
 }
 
 uint64 FCEU_fwrite(void *ptr, size_t size, size_t nmemb, FCEUFILE *fp)
 {
-	fp->stream->fwrite((char*)ptr,size*nmemb);
+	// v0.3.10: direct std::span virtual call (avoid [[deprecated]] shim).
+	fp->stream->fwrite(std::span<const std::byte>(
+		reinterpret_cast<const std::byte*>(ptr), size * nmemb));
 	//todo - how do we tell how many bytes we wrote?
 	return nmemb;
 }
@@ -457,12 +465,12 @@ std::string GetMfn() //Retrieves the movie filename from curMovieFilename (for a
 }
 
 /// Updates the base directory
-void FCEUI_SetBaseDirectory(std::string const & dir)
+void fceu11::SetBaseDirectory(std::string const & dir)
 {
 	BaseDirectory = dir;
 }
 /// Gets the base directory
-const char *FCEUI_GetBaseDirectory(void)
+const char *fceu11::GetBaseDirectory()
 {
 	return BaseDirectory.c_str();
 }

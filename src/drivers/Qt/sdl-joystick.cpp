@@ -162,7 +162,7 @@ void jsDev_t::init(int idx)
 		QDir dir;
 		QFile defaultMapFile;
 		std::string path;
-		const char *baseDir = FCEUI_GetBaseDirectory();
+		const char *baseDir = fceu11::GetBaseDirectory();
 
 		path = std::string(baseDir) + "/input/" + guidStr;
 
@@ -781,7 +781,7 @@ int GamePad_t::loadHotkeyMapFromFile(const char *filename)
 //********************************************************************************
 int GamePad_t::getDefaultMap(const char *guid)
 {
-	const char *baseDir = FCEUI_GetBaseDirectory();
+	const char *baseDir = fceu11::GetBaseDirectory();
 	std::string path;
 	nesGamePadMap_t gpm;
 
@@ -856,7 +856,7 @@ int GamePad_t::loadDefaults(void)
 int GamePad_t::loadProfile(const char *name, const char *guid)
 {
 	nesGamePadMap_t gpm;
-	const char *baseDir = FCEUI_GetBaseDirectory();
+	const char *baseDir = fceu11::GetBaseDirectory();
 	std::string path;
 
 	if (devIdx < 0)
@@ -895,7 +895,7 @@ int GamePad_t::saveCurrentMapToFile(const char *name)
 	int i,c;
 	char stmp[256];
 	const char *guid = NULL;
-	const char *baseDir = FCEUI_GetBaseDirectory();
+	const char *baseDir = fceu11::GetBaseDirectory();
 	std::string path, output;
 	std::list <gamepad_function_key_t*>::iterator it;
 	QDir dir;
@@ -1090,7 +1090,7 @@ int GamePad_t::saveMappingToFile(const char *filename, const char *txtMap)
 int GamePad_t::createProfile(const char *name)
 {
 	const char *guid = NULL;
-	const char *baseDir = FCEUI_GetBaseDirectory();
+	const char *baseDir = fceu11::GetBaseDirectory();
 	std::string path;
 	QDir dir;
 
@@ -1129,7 +1129,7 @@ int GamePad_t::createProfile(const char *name)
 int GamePad_t::deleteMapping(const char *name)
 {
 	const char *guid = NULL;
-	const char *baseDir = FCEUI_GetBaseDirectory();
+	const char *baseDir = fceu11::GetBaseDirectory();
 	std::string path;
 
 	if (baseDir[0] == 0)

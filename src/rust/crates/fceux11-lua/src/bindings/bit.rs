@@ -25,7 +25,9 @@ pub fn register(lua: &Lua) -> Result<Table> {
     )?;
     bit.set(
         "lshift",
-        lua.create_function(|_, (x, n): (i32, i32)| Ok(x.wrapping_shl(n as u32)))?,
+        lua.create_function(|_, (x, n): (i32, i32)| {
+            Ok(if n < 0 || n >= 32 { 0 } else { x.wrapping_shl(n as u32) })
+        })?,
     )?;
     bit.set(
         "rshift",
@@ -51,7 +53,13 @@ pub fn register(lua: &Lua) -> Result<Table> {
         "tohex",
         lua.create_function(|_, (x, n): (i32, Option<i32>)| {
             let digits = n.unwrap_or(8);
-            Ok(format!("{:0>width$X}", x as u32, width = digits as usize))
+            let width = digits as usize;
+            let mask = if width >= 8 {
+                u32::MAX
+            } else {
+                (1u32 << (width * 4)).wrapping_sub(1)
+            };
+            Ok(format!("{:0>width$x}", (x as u32) & mask, width = width))
         })?,
     )?;
 
@@ -147,11 +155,11 @@ mod tests {
     fn test_bit_tohex() {
         let lua = setup_lua();
         assert_eq!(
-            "000000FF",
+            "000000ff",
             lua.load(r#"bit.tohex(255)"#).eval::<String>().unwrap()
         );
         assert_eq!(
-            "FF",
+            "ff",
             lua.load(r#"bit.tohex(255, 2)"#).eval::<String>().unwrap()
         );
         assert_eq!(

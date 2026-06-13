@@ -284,12 +284,12 @@ static void ApplyDeemphasisComplete(pal* pal512)
 	fceux11_rust_palette_apply_deemphasis(reinterpret_cast<const Pal*>(pal512), reinterpret_cast<Pal*>(pal512));
 }
 
-bool  FCEUI_GetUserPaletteAvail( void )
+bool fceu11::GetUserPaletteAvail()
 {
 	return palette_user_available;
 }
 
-void FCEUI_SetUserPalette(uint8 *pal, int nEntries)
+void fceu11::SetUserPalette(uint8 *pal, int nEntries)
 {
 	if(!pal)
 	{
@@ -329,7 +329,7 @@ void FCEU_LoadGamePalette(void)
 	FCEU_ResetPalette();
 }
 
-void FCEUI_SetNTSCTH(bool en, int tint, int hue)
+void fceu11::SetNTSCTH(bool en, int tint, int hue)
 {
 	ntsctint=tint;
 	ntschue=hue;
@@ -525,7 +525,7 @@ void WritePalette(void)
 	#endif
 }
 
-void FCEUI_GetNTSCTH(int *tint, int *hue)
+void fceu11::GetNTSCTH(int *tint, int *hue)
 {
 	*tint = ntsctint;
 	*hue = ntschue;
