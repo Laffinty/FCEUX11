@@ -82,8 +82,8 @@ extern int RAMInitOption;
 uint8 FCEU_ReadRomByte(uint32 i);
 void FCEU_WriteRomByte(uint32 i, uint8 value);
 
-extern readfunc ARead[0x10000];
-extern writefunc BWrite[0x10000];
+FCEUX11_CACHE_ALIGN extern readfunc ARead[0x10000];
+FCEUX11_CACHE_ALIGN extern writefunc BWrite[0x10000];
 
 enum GI {
 	GI_RESETM2	=1,

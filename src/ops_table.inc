@@ -1944,7 +1944,7 @@ static void x6502_op_FF(X6502* xp)
     return;
 }
 
-static const std::array<void(*)(X6502*), 256> x6502_dispatch = {{
+FCEUX11_CACHE_ALIGN static const std::array<void(*)(X6502*), 256> x6502_dispatch = {{
     x6502_op_00,    x6502_op_01,    x6502_op_02,    x6502_op_03,    x6502_op_04,    x6502_op_05,    x6502_op_06,    x6502_op_07,    x6502_op_08,    x6502_op_09,    x6502_op_0A,    x6502_op_0B,    x6502_op_0C,    x6502_op_0D,    x6502_op_0E,    x6502_op_0F,
     x6502_op_10,    x6502_op_11,    x6502_op_12,    x6502_op_13,    x6502_op_14,    x6502_op_15,    x6502_op_16,    x6502_op_17,    x6502_op_18,    x6502_op_19,    x6502_op_1A,    x6502_op_1B,    x6502_op_1C,    x6502_op_1D,    x6502_op_1E,    x6502_op_1F,
     x6502_op_20,    x6502_op_21,    x6502_op_22,    x6502_op_23,    x6502_op_24,    x6502_op_25,    x6502_op_26,    x6502_op_27,    x6502_op_28,    x6502_op_29,    x6502_op_2A,    x6502_op_2B,    x6502_op_2C,    x6502_op_2D,    x6502_op_2E,    x6502_op_2F,

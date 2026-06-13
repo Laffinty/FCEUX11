@@ -83,11 +83,11 @@ static INLINE void MMC5BGVROM_BANK8(uint32 V) {
 	}
 }
 
-static std::array<uint8,4> PRGBanks;
+FCEUX11_MAPPER_HOT static std::array<uint8,4> PRGBanks;
 static uint8 WRAMPage;
-static std::array<uint16,8> CHRBanksA;
-static std::array<uint16,4> CHRBanksB;
-static std::array<uint8,2> WRAMMaskEnable;
+FCEUX11_MAPPER_HOT static std::array<uint16,8> CHRBanksA;
+FCEUX11_MAPPER_HOT static std::array<uint16,4> CHRBanksB;
+FCEUX11_MAPPER_HOT static std::array<uint8,2> WRAMMaskEnable;
 uint8 mmc5ABMode;                /* A=0, B=1 */
 
 static uint8 IRQScanline, IRQEnable;
@@ -96,7 +96,7 @@ static uint8 CHRMode, NTAMirroring, NTFill, ATFill;
 static uint8 MMC5IRQR;
 static uint8 MMC5LineCounter;
 static uint8 mmc5psize, mmc5vsize;
-static std::array<uint8,2> mul;
+FCEUX11_MAPPER_HOT static std::array<uint8,2> mul;
 
 static uint32 WRAMSIZE = 0;
 static uint8 *WRAM = NULL;
@@ -109,8 +109,8 @@ const int MMC5WRAMMAX = 1<<7; // 7 bits in register interface (real MMC5 has onl
 static uint8 MMC5WRAMsize=0; //configuration, not state
 static uint8 MMC5WRAMIndex[MMC5WRAMMAX]; //configuration, not state
 
-static std::array<uint8,4> MMC5ROMWrProtect;
-static std::array<uint8,5> MMC5MemIn;
+FCEUX11_MAPPER_HOT static std::array<uint8,4> MMC5ROMWrProtect;
+FCEUX11_MAPPER_HOT static std::array<uint8,5> MMC5MemIn;
 
 static void MMC5CHRA(void);
 static void MMC5CHRB(void);

@@ -533,6 +533,8 @@ uint8 FASTCALL FFCEUX_PPURead_Default(uint32 A) {
 	if (PPU_hook) PPU_hook(A);
 
 	if (tmp < 0x2000) {
+		if ((tmp & 0x3FF) < (0x400 - 64))
+			FCEUX11_PREFETCH(&VPage[tmp >> 10][tmp + 64]);
 		return VPage[tmp >> 10][tmp];
 	} else if (tmp < 0x3F00) {
 		return vnapage[(tmp >> 10) & 0x3][tmp & 0x3FF];

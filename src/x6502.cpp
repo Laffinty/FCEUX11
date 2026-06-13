@@ -364,7 +364,7 @@ static uint8 ZNTable[256];
 
 #include "ops_table.inc"
 
-static uint8 CycTable[256] =
+FCEUX11_CACHE_ALIGN static uint8 CycTable[256] =
 {
 /*0x00*/ 7,6,2,8,3,3,5,5,3,2,2,2,4,4,6,6,
 /*0x10*/ 2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
@@ -571,7 +571,7 @@ void FCEUI_GetIVectors(uint16 *reset, uint16 *irq, uint16 *nmi)
 }
 
 //the opsize table is used to quickly grab the instruction sizes (in bytes)
-const uint8 opsize[256] = {
+FCEUX11_CACHE_ALIGN const uint8 opsize[256] = {
 #ifdef BRK_3BYTE_HACK
 /*0x00*/	3, //BRK
 #else
@@ -608,7 +608,7 @@ const uint8 opsize[256] = {
 //  7 = Absolute,X
 //  8 = Zero Page,Y
 //
-const uint8 optype[256] = {
+FCEUX11_CACHE_ALIGN const uint8 optype[256] = {
 /*0x00*/	0,1,0,1,2,2,2,2,0,0,0,0,3,3,3,3,
 /*0x10*/	0,4,0,3,5,5,5,5,0,6,0,6,7,7,7,7,
 /*0x20*/	0,1,0,1,2,2,2,2,0,0,0,0,3,3,3,3,
@@ -646,7 +646,7 @@ const uint8 optype[256] = {
 // 14 = (SHX)
 // 15 = (TAS)
 
-const uint8 opwrite[256] = {
+FCEUX11_CACHE_ALIGN const uint8 opwrite[256] = {
 /*0x00*/	 0, 0, 0, 5, 0, 0, 5, 5, 4, 0, 0, 0, 0, 0, 5, 5,
 /*0x10*/	 0, 0, 0, 5, 0, 0, 5, 5, 0, 0, 0, 5, 0, 0, 5, 5,
 /*0x20*/	 0, 0, 0, 7, 0, 0, 7, 7, 0, 0, 7, 0, 0, 0, 7, 7,

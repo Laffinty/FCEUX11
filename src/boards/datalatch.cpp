@@ -21,8 +21,8 @@
 #include "mapinc.h"
 #include "../ines.h"
 
-static uint8 latche=0, latcheinit=0, bus_conflict=0;
-static uint16 addrreg0=0, addrreg1=0;
+FCEUX11_MAPPER_HOT static uint8 latche=0, latcheinit=0, bus_conflict=0;
+FCEUX11_MAPPER_HOT static uint16 addrreg0=0, addrreg1=0;
 static uint8 *WRAM = NULL;
 static FceuMallocPtr WRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint32 WRAMSIZE=0;

@@ -248,8 +248,8 @@ FCEUGI *GameInfo = NULL;
 void (*GameInterface)(GI h);
 void (*GameStateRestore)(int version);
 
-readfunc ARead[0x10000];
-writefunc BWrite[0x10000];
+FCEUX11_CACHE_ALIGN readfunc ARead[0x10000];
+FCEUX11_CACHE_ALIGN writefunc BWrite[0x10000];
 static readfunc *AReadG;
 static writefunc *BWriteG;
 static int RWWrap = 0;

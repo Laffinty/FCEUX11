@@ -86,7 +86,7 @@ void FCEU_SaveGameSave(CartInfo *LocalHWInfo);
 void FCEU_LoadGameSave(CartInfo *LocalHWInfo);
 void FCEU_ClearGameSave(CartInfo *LocalHWInfo);
 
-extern uint8 *Page[32], *VPage[8], *MMC5SPRVPage[8], *MMC5BGVPage[8];
+FCEUX11_CACHE_ALIGN extern uint8 *Page[32], *VPage[8], *MMC5SPRVPage[8], *MMC5BGVPage[8];
 
 void ResetCartMapping(void);
 void SetupCartPRGMapping(int chip, uint8 *p, uint32 size, int ram);
@@ -97,25 +97,25 @@ DECLFR(CartBROB);
 DECLFR(CartBR);
 DECLFW(CartBW);
 
-extern uint8 PRGram[32];
-extern uint8 CHRram[32];
+FCEUX11_CACHE_ALIGN extern uint8 PRGram[32];
+FCEUX11_CACHE_ALIGN extern uint8 CHRram[32];
 
-extern uint8 *PRGptr[32];
-extern uint8 *CHRptr[32];
+FCEUX11_CACHE_ALIGN extern uint8 *PRGptr[32];
+FCEUX11_CACHE_ALIGN extern uint8 *CHRptr[32];
 
-extern uint32 PRGsize[32];
-extern uint32 CHRsize[32];
+FCEUX11_CACHE_ALIGN extern uint32 PRGsize[32];
+FCEUX11_CACHE_ALIGN extern uint32 CHRsize[32];
 
-extern uint32 PRGmask2[32];
-extern uint32 PRGmask4[32];
-extern uint32 PRGmask8[32];
-extern uint32 PRGmask16[32];
-extern uint32 PRGmask32[32];
+FCEUX11_CACHE_ALIGN extern uint32 PRGmask2[32];
+FCEUX11_CACHE_ALIGN extern uint32 PRGmask4[32];
+FCEUX11_CACHE_ALIGN extern uint32 PRGmask8[32];
+FCEUX11_CACHE_ALIGN extern uint32 PRGmask16[32];
+FCEUX11_CACHE_ALIGN extern uint32 PRGmask32[32];
 
-extern uint32 CHRmask1[32];
-extern uint32 CHRmask2[32];
-extern uint32 CHRmask4[32];
-extern uint32 CHRmask8[32];
+FCEUX11_CACHE_ALIGN extern uint32 CHRmask1[32];
+FCEUX11_CACHE_ALIGN extern uint32 CHRmask2[32];
+FCEUX11_CACHE_ALIGN extern uint32 CHRmask4[32];
+FCEUX11_CACHE_ALIGN extern uint32 CHRmask8[32];
 
 void setprg2(uint32 A, uint32 V);
 void setprg4(uint32 A, uint32 V);

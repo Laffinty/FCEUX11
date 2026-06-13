@@ -35,8 +35,8 @@ uint32 WRAMSIZE;
 uint8 *CHRRAM;
 static FceuMallocPtr CHRRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 uint32 CHRRAMSIZE;
-uint8 DRegBuf[8];
-uint8 EXPREGS[8];	/* For bootleg games, mostly. */
+FCEUX11_MAPPER_HOT uint8 DRegBuf[8];
+FCEUX11_MAPPER_HOT uint8 EXPREGS[8];	/* For bootleg games, mostly. */
 uint8 A000B, A001B;
 uint8 mmc3opts = 0;
 

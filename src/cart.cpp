@@ -38,34 +38,34 @@
 #include <cstdio>
 #include <climits>
 
-uint8 *Page[32], *VPage[8];
+FCEUX11_CACHE_ALIGN uint8 *Page[32], *VPage[8];
 uint8 **VPageR = VPage;
-uint8 *VPageG[8];
-uint8 *MMC5SPRVPage[8];
-uint8 *MMC5BGVPage[8];
+FCEUX11_CACHE_ALIGN uint8 *VPageG[8];
+FCEUX11_CACHE_ALIGN uint8 *MMC5SPRVPage[8];
+FCEUX11_CACHE_ALIGN uint8 *MMC5BGVPage[8];
 
-static uint8 PRGIsRAM[32];  /* This page is/is not PRG RAM. */
+FCEUX11_CACHE_ALIGN static uint8 PRGIsRAM[32];  /* This page is/is not PRG RAM. */
 
 /* 16 are (sort of) reserved for UNIF/iNES and 16 to map other stuff. */
-uint8 CHRram[32];
-uint8 PRGram[32];
+FCEUX11_CACHE_ALIGN uint8 CHRram[32];
+FCEUX11_CACHE_ALIGN uint8 PRGram[32];
 
-uint8 *PRGptr[32];
-uint8 *CHRptr[32];
+FCEUX11_CACHE_ALIGN uint8 *PRGptr[32];
+FCEUX11_CACHE_ALIGN uint8 *CHRptr[32];
 
-uint32 PRGsize[32];
-uint32 CHRsize[32];
+FCEUX11_CACHE_ALIGN uint32 PRGsize[32];
+FCEUX11_CACHE_ALIGN uint32 CHRsize[32];
 
-uint32 PRGmask2[32];
-uint32 PRGmask4[32];
-uint32 PRGmask8[32];
-uint32 PRGmask16[32];
-uint32 PRGmask32[32];
+FCEUX11_CACHE_ALIGN uint32 PRGmask2[32];
+FCEUX11_CACHE_ALIGN uint32 PRGmask4[32];
+FCEUX11_CACHE_ALIGN uint32 PRGmask8[32];
+FCEUX11_CACHE_ALIGN uint32 PRGmask16[32];
+FCEUX11_CACHE_ALIGN uint32 PRGmask32[32];
 
-uint32 CHRmask1[32];
-uint32 CHRmask2[32];
-uint32 CHRmask4[32];
-uint32 CHRmask8[32];
+FCEUX11_CACHE_ALIGN uint32 CHRmask1[32];
+FCEUX11_CACHE_ALIGN uint32 CHRmask2[32];
+FCEUX11_CACHE_ALIGN uint32 CHRmask4[32];
+FCEUX11_CACHE_ALIGN uint32 CHRmask8[32];
 
 int geniestage = 0;
 
@@ -141,7 +141,10 @@ void SetupCartCHRMapping(int chip, uint8 *p, uint32 size, int ram) {
 }
 
 DECLFR(CartBR) {
-	return Page[A >> 11][A];
+	uint8 *p = Page[A >> 11];
+	if ((A & 0x7FF) < (0x800 - 64))
+		FCEUX11_PREFETCH(&p[A + 64]);
+	return p[A];
 }
 
 DECLFW(CartBW) {
@@ -151,10 +154,12 @@ DECLFW(CartBW) {
 }
 
 DECLFR(CartBROB) {
-	if (!Page[A >> 11])
+	uint8 *p = Page[A >> 11];
+	if (!p)
 		return(X.DB);
-	else
-		return Page[A >> 11][A];
+	if ((A & 0x7FF) < (0x800 - 64))
+		FCEUX11_PREFETCH(&p[A + 64]);
+	return p[A];
 }
 
 void setprg2r(int r, uint32 A, uint32 V) {

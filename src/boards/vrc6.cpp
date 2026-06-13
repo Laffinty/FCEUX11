@@ -24,7 +24,7 @@
 #include "mapinc.h"
 
 static uint8 is26;
-static uint8 prg[2], chr[8], mirr;
+FCEUX11_MAPPER_HOT static uint8 prg[2], chr[8], mirr;
 static uint8 IRQLatch, IRQa, IRQd, IRQMode;
 static int32 IRQCount, CycleCount;
 static uint8 *WRAM = NULL;

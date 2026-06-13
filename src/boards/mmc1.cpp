@@ -24,7 +24,7 @@
 static void GenMMC1Power(void);
 static void GenMMC1Init(CartInfo *info, int prg, int chr, int wram, int bram);
 
-static uint8 DRegs[4];
+FCEUX11_MAPPER_HOT static uint8 DRegs[4];
 static uint8 Buffer, BufferShift;
 
 static uint32 WRAMSIZE;

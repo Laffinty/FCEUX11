@@ -20,8 +20,8 @@
 
 #include "mapinc.h"
 
-static uint16 latche, latcheinit;
-static uint16 addrreg0, addrreg1;
+FCEUX11_MAPPER_HOT static uint16 latche, latcheinit;
+FCEUX11_MAPPER_HOT static uint16 addrreg0, addrreg1;
 static uint8 dipswitch;
 static void (*WSync)(void);
 static readfunc defread;

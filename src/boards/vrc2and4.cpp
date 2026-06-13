@@ -24,8 +24,8 @@ static bool isPirate;
 static uint8 is22, reg1mask, reg2mask;
 static uint16 IRQCount;
 static uint8 IRQLatch, IRQa, IRQMode;
-static uint8 prgreg[2], chrreg[8];
-static uint16 chrhi[8];
+FCEUX11_MAPPER_HOT static uint8 prgreg[2], chrreg[8];
+FCEUX11_MAPPER_HOT static uint16 chrhi[8];
 static uint8 regcmd, irqcmd, mirr, big_bank;
 static uint16 acount = 0;
 

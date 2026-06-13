@@ -96,5 +96,6 @@ typedef uint8 (*readfunc)(uint32 A);
 #include "utils/format.h"
 
 #include "utils/endian.h"
+#include "utils/cache.h"
 
 #endif

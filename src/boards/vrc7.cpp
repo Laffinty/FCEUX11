@@ -20,7 +20,9 @@
 
 #include "mapinc.h"
 
-static uint8 vrc7idx, preg[3], creg[8], mirr;
+static uint8 vrc7idx;
+FCEUX11_MAPPER_HOT static uint8 preg[3], creg[8];
+static uint8 mirr;
 static uint8 IRQLatch, IRQa, IRQd, IRQMode;
 static int32 IRQCount, CycleCount;
 static uint8 *WRAM = NULL;

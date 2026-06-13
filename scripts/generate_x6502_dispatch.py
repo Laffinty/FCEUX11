@@ -99,7 +99,7 @@ def generate():
         out.append("}")
         out.append("")
 
-    out.append("static const std::array<void(*)(X6502*), 256> x6502_dispatch = {{")
+    out.append("FCEUX11_CACHE_ALIGN static const std::array<void(*)(X6502*), 256> x6502_dispatch = {{")
     row = []
     for i in range(256):
         row.append(f"    x6502_op_{i:02X}")

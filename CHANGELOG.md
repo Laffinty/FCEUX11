@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.12] - 2026-06-14
+
+D-track continuation sub-version: mapper register-group alignment and
+PRG/CHR switching-table prefetch hints per plan v3 §5 v0.3.12. No behavior
+change; all savestate hashes remain byte-identical to the v0.3.0 baseline.
+
+### Added
+
+- **`src/utils/cache.h`** — cache-line helpers:
+  - `fceu11::kCacheLineSize` (uses `std::hardware_destructive_interference_size`
+    with a 64-byte fallback).
+  - `FCEUX11_CACHE_ALIGN` and `FCEUX11_MAPPER_HOT` macros.
+  - `FCEUX11_PREFETCH(addr)` wrapper around `_mm_prefetch`.
+- **Aligned x6502 lookup tables** in `src/x6502.cpp`: `CycTable`, `opsize`,
+  `optype`, `opwrite`, and the `x6502_dispatch` table are now 64-byte aligned.
+
+### Changed
+
+- **`src/cart.h` / `src/cart.cpp`**: 64-byte aligned the global PRG/CHR
+  switching tables (`Page`, `VPage`, `VPageG`, `MMC5SPRVPage`, `MMC5BGVPage`,
+  `PRGptr`, `CHRptr`, size/mask arrays, `PRGram`, `CHRram`, `PRGIsRAM`).
+- **`src/fceu.h` / `src/fceu.cpp`**: 64-byte aligned the `ARead[0x10000]` and
+  `BWrite[0x10000]` CPU memory dispatch tables.
+- **Hot mapper register groups** annotated with `FCEUX11_MAPPER_HOT`:
+  `mmc1.cpp`, `mmc3.cpp`, `mmc5.cpp`, `vrc2and4.cpp`, `vrc6.cpp`, `vrc7.cpp`,
+  `datalatch.cpp`, `addrlatch.cpp`.
+- **`src/cart.cpp`**: added `_mm_prefetch` hints to `CartBR` and `CartBROB`
+  for the next cache line within the current 2 KiB PRG page.
+- **`src/ppu.cpp`**: added `_mm_prefetch` hints to `FFCEUX_PPURead_Default`
+  for the next CHR pattern-table cache line.
+- Bumped version metadata: `CMakeLists.txt` to 0.3.12, `src/version.h` patch
+  9 → 12.
+
+### Verified
+
+- `rom_regression_test`: 720 frames, 13 ROMs, 0 mismatches vs
+  `golden_hashes.json`.
+- `fceux11_bench_ppu_render`, `fceux11_bench_x6502_exec`, and
+  `fceux11_bench_apu_mix` all pass (stddev < 3%).
+- `cargo test --release`: ok.
+
 ## [0.3.11] - 2026-06-13
 
 D-track opening sub-version: PPU cache optimization and x6502 instruction
