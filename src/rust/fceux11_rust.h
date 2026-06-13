@@ -2284,6 +2284,168 @@ int fceux11_lua_gui_pixel(int x, int y, unsigned int color);
 int fceux11_lua_get_mem_hook_count(int hook_type);
 
 uint32_t fceux11_lua_get_mem_hook_address(int hook_type, int index);
+
+uint8_t fceux11_lua_GetMem(uint32_t _addr);
+
+void fceux11_lua_BWrite(uint32_t _addr, uint8_t _val);
+
+uint16_t fceux11_lua_GetRegister(int32_t _reg_id);
+
+uint32_t fceux11_lua_GetJoypadState(int32_t _port);
+
+void fceux11_lua_SetJoypadOverride(int32_t _port, uint32_t _mask1, uint32_t _mask2);
+
+int32_t fceux11_lua_GetRomMD5(uint8_t *_buf);
+
+uint8_t fceux11_lua_ReadRomByte(uint32_t _addr);
+
+void fceux11_lua_WriteRomByte(uint32_t _addr, uint8_t _val);
+
+uint8_t fceux11_lua_PPURead(uint32_t _addr);
+
+int32_t fceux11_lua_movie_get_mode(void);
+
+int64_t fceux11_lua_movie_get_rerecordcount(void);
+
+int64_t fceux11_lua_movie_get_length(void);
+
+void fceux11_lua_movie_stop(void);
+
+int32_t fceux11_lua_movie_get_readonly(void);
+
+void fceux11_lua_movie_set_readonly(int32_t _val);
+
+int32_t fceux11_lua_movie_is_poweron(void);
+
+int32_t fceux11_lua_movie_is_from_savestate(void);
+
+const char *fceux11_lua_movie_get_name(void);
+
+const char *fceux11_lua_movie_get_filename(void);
+
+int32_t fceux11_lua_savestate_save_slot(int32_t _slot);
+
+int32_t fceux11_lua_savestate_load_slot(int32_t _slot);
+
+int64_t fceux11_lua_emu_get_framecount(void);
+
+int64_t fceux11_lua_emu_get_lagcount(void);
+
+int32_t fceux11_lua_emu_is_paused(void);
+
+void fceux11_lua_emu_set_speedmode(int32_t _mode);
+
+void fceux11_lua_emu_poweron(void);
+
+void fceux11_lua_emu_softreset(void);
+
+void fceux11_lua_emu_message(const char *_msg);
+
+void fceux11_lua_emu_pause(void);
+
+void fceux11_lua_emu_unpause(void);
+
+int32_t fceux11_lua_savestate_create_object(const char *_path, int32_t _which, int32_t _anonymous);
+
+void fceux11_lua_savestate_delete_object(int32_t _obj_id);
+
+int32_t fceux11_lua_savestate_object_save(int32_t _obj_id);
+
+int32_t fceux11_lua_savestate_object_load(int32_t _obj_id);
+
+int32_t fceux11_lua_savestate_object_persist(int32_t _obj_id);
+
+void fceux11_lua_gui_popup(const char *_msg);
+
+void fceux11_lua_gui_savescreenshot(const char *_filename);
+
+double fceux11_lua_sound_get_square1_volume(void);
+
+double fceux11_lua_sound_get_square1_frequency(void);
+
+double fceux11_lua_sound_get_square1_midikey(void);
+
+int32_t fceux11_lua_sound_get_square1_duty(void);
+
+int32_t fceux11_lua_sound_get_square1_regs(void);
+
+double fceux11_lua_sound_get_square2_volume(void);
+
+double fceux11_lua_sound_get_square2_frequency(void);
+
+double fceux11_lua_sound_get_square2_midikey(void);
+
+int32_t fceux11_lua_sound_get_square2_duty(void);
+
+int32_t fceux11_lua_sound_get_square2_regs(void);
+
+double fceux11_lua_sound_get_triangle_volume(void);
+
+int32_t fceux11_lua_sound_get_triangle_linear(void);
+
+double fceux11_lua_sound_get_triangle_frequency(void);
+
+double fceux11_lua_sound_get_triangle_midikey(void);
+
+double fceux11_lua_sound_get_noise_volume(void);
+
+int32_t fceux11_lua_sound_get_noise_mode(void);
+
+int32_t fceux11_lua_sound_get_noise_regs(void);
+
+double fceux11_lua_sound_get_noise_frequency(void);
+
+double fceux11_lua_sound_get_noise_midikey(void);
+
+double fceux11_lua_sound_get_dmc_volume(void);
+
+int32_t fceux11_lua_sound_get_dmc_rate(void);
+
+int32_t fceux11_lua_sound_get_dmc_regs(void);
+
+double fceux11_lua_sound_get_dmc_frequency(void);
+
+double fceux11_lua_sound_get_dmc_midikey(void);
+
+int32_t fceux11_lua_sound_get_dmc_address(void);
+
+int32_t fceux11_lua_sound_get_dmc_size(void);
+
+int32_t fceux11_lua_sound_get_dmc_loop(void);
+
+int32_t fceux11_lua_sound_get_dmc_seed(void);
+
+int32_t fceux11_lua_sound_get_frame_sequencer(void);
+
+int32_t fceux11_lua_sound_get_sample_rate(void);
+
+int32_t fceux11_lua_sound_get_length_count(void);
+
+int32_t fceux11_lua_zapper_get_x(void);
+
+int32_t fceux11_lua_zapper_get_y(void);
+
+int32_t fceux11_lua_zapper_get_click(void);
+
+void fceux11_lua_zapper_set(int32_t _x, int32_t _y, int32_t _fire);
+
+void fceux11_lua_debugger_hitbreakpoint(void);
+
+uint64_t fceux11_lua_debugger_get_cycles_count(void);
+
+uint64_t fceux11_lua_debugger_get_instructions_count(void);
+
+void fceux11_lua_debugger_reset_cycles_count(void);
+
+void fceux11_lua_debugger_reset_instructions_count(void);
+
+int64_t fceux11_lua_debugger_get_symbol_offset(const char *_name);
+
+int32_t fceux11_lua_GetKeyboardState(uint8_t *_keys);
+
+void fceux11_lua_GetMouseState(int32_t *_x, int32_t *_y, int32_t *_click);
+
+void fceux11_lua_recalculate_mem_hook_regions(int _hook_type);
 /**
  * Input chunk descriptor for saving.
  */

@@ -269,7 +269,9 @@ mod tests {
         let lua = Lua::new();
         let mut keys = [0u8; 256];
         for (vk, _) in KEY_TO_NAME {
-            keys[vk] = 0x80;
+            // Toggle keys (CapsLock, NumLock, ScrollLock) use the low bit only.
+            let mask = if vk == 0x14 || vk == 0x90 || vk == 0x91 { 0x01 } else { 0x80 };
+            keys[vk] = mask;
         }
         let table = build_input_table(&lua, &keys, -1, -1, 0).unwrap();
         for (_, name) in KEY_TO_NAME {

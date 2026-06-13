@@ -9,6 +9,9 @@
 
 pub mod bindings;
 
+#[cfg(any(test, feature = "ffi-stubs"))]
+mod ffi_stubs;
+
 use std::collections::HashMap;
 use std::ffi::{c_char, c_int, c_void};
 use std::os::raw::c_uint;
