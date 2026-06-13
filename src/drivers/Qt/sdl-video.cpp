@@ -21,6 +21,8 @@
 /// \file
 /// \brief Handles the graphical game display for the SDL implementation.
 
+#include <array>
+
 #include "Qt/sdl.h"
 #include "Qt/nes_shm.h"
 #include "common/vidblit.h"
@@ -70,7 +72,7 @@ extern bool MaxSpeed;
 extern int input_display;
 extern int frame_display;
 extern int rerecord_display;
-extern uint8 PALRAM[0x20];
+extern std::array<uint8_t, 0x20> PALRAM;
 
 /**
  * Attempts to destroy the graphical video display.  Returns 0 on

@@ -37,6 +37,7 @@
 #include "driver.h"
 #include "debug.h"
 		 
+#include <array>
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
@@ -67,9 +68,9 @@ static void RefreshSprites(void);
 static void CopySprites(uint8 *target);
 
 static void Fixit1(void);
-static uint32 ppulut1[256];
-static uint32 ppulut2[256];
-static uint32 ppulut3[128];
+static alignas(64) std::array<uint32, 256> ppulut1;
+static alignas(64) std::array<uint32, 256> ppulut2;
+static alignas(64) std::array<uint32, 128> ppulut3;
 
 static bool new_ppu_reset = false;
 
@@ -374,8 +375,9 @@ static uint32 scanlines_per_frame;
 
 uint8 PPU[4];
 uint8 PPUSPL;
-uint8 NTARAM[0x800], PALRAM[0x20], SPRAM[0x100], SPRBUF[0x100];
-uint8 UPALRAM[0x03];//for 0x4/0x8/0xC addresses in palette, the ones in
+uint8 NTARAM[0x800], SPRAM[0x100], SPRBUF[0x100];
+alignas(64) std::array<uint8_t, 0x20> PALRAM;
+std::array<uint8_t, 3> UPALRAM;//for 0x4/0x8/0xC addresses in palette, the ones in
 					//0x20 are 0 to not break fceu rendering.
 
 #define MMC5SPRVRAMADR(V)   &MMC5SPRVPage[(V) >> 10][(V)]
@@ -572,7 +574,7 @@ void ppu_getScroll(int &xpos, int &ypos) {
 //---------------
 
 static DECLFR(A2002) {
-	if (newppu) {
+	if (newppu) [[unlikely]] {
 		//once we thought we clear latches here, but that caused midframe glitches.
 		//i think we should only reset the state machine for 2005/2006
 		//ppur.clear_latches();
@@ -597,7 +599,7 @@ static DECLFR(A2002) {
 }
 
 static DECLFR(A2004) {
-	if (newppu) {
+	if (newppu) [[unlikely]] {
 		if ((ppur.status.sl < 241) && PPUON) {
 			// from cycles 0 to 63, the
 			// 32 byte OAM buffer gets init
@@ -746,7 +748,7 @@ static DECLFR(A2007) {
 			DummyRead = 0;
 	}
 
-	if (newppu) {
+	if (newppu) [[unlikely]] {
 		ret = VRAMBuffer;
 		RefreshAddr = ppur.get_2007access() & 0x3FFF;
 		if ((RefreshAddr & 0x3F00) == 0x3F00) {
@@ -883,7 +885,7 @@ static DECLFW(B2003) {
 
 static DECLFW(B2004) {
 	PPUGenLatch = V;
-	if (newppu) {
+	if (newppu) [[unlikely]] {
 		//the attribute upper bits are not connected
 		//so AND them out on write, since reading them
 		//should return 0 in those bits.
@@ -1129,7 +1131,7 @@ static void RefreshLine(int lastpixel) {
 	else
 		vofs = ((PPU[0] & 0x10) << 8) | ((RefreshAddr >> 12) & 7);
 
-	if (!ScreenON && !SpriteON) {
+	if (!ScreenON && !SpriteON) [[unlikely]] {
 		uint32 tem;
 		tem = READPAL(0) | (READPAL(0) << 8) | (READPAL(0) << 16) | (READPAL(0) << 24);
 		tem |= 0x40404040;
@@ -1736,7 +1738,7 @@ void FCEUPPU_Power(void) {
 
 	// initialize PPU memory regions according to settings
 	FCEU_MemoryRand(NTARAM, 0x800, true);
-	FCEU_MemoryRand(PALRAM, 0x20, true);
+	FCEU_MemoryRand(PALRAM.data(), 0x20, true);
 	FCEU_MemoryRand(SPRAM, 0x100, true);
 	// palettes can only store values up to $3F, and PALRAM X4/X8/XC are mirrors of X0 for rendering purposes (UPALRAM is used for $2007 readback)
 	for (x = 0; x < 0x20; ++x) PALRAM[x] &= 0x3F;
@@ -1769,7 +1771,7 @@ void FCEUPPU_Power(void) {
 }
 
 int FCEUPPU_Loop(int skip) {
-	if ((newppu) && (GameInfo->type != GIT_NSF)) {
+	if ((newppu) && (GameInfo->type != GIT_NSF)) [[unlikely]] {
 		int FCEUX_PPU_Loop(int skip);
 		return FCEUX_PPU_Loop(skip);
 	}
@@ -1923,7 +1925,7 @@ void FCEUPPU_LoadState(int version) {
 
 SFORMAT FCEUPPU_STATEINFO[] = {
 	{ NTARAM, 0x800, "NTAR" },
-	{ PALRAM, 0x20, "PRAM" },
+	{ PALRAM.data(), 0x20, "PRAM" },
 	{ SPRAM, 0x100, "SPRA" },
 	{ PPU, 0x4, "PPUR" },
 	{ &kook, 1, "KOOK" },
@@ -2037,7 +2039,7 @@ struct BGData {
 			//vertical scroll at 251
 			ppu1[2] = PPU[1];
 			runppu(1);
-			if (PPUON) {
+			if (PPUON) [[likely]] {
 				ppur.increment_hsc();
 				if (ppur.status.cycle == 251)
 					ppur.increment_vs();

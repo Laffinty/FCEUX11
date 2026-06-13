@@ -1737,9 +1737,9 @@ void FCEUD_UpdateNTView(int scanline, bool drawall)
 	}
 
 	//update palette only if required
-	if (memcmp(palcache,PALRAM,32) != 0) 
+	if (memcmp(palcache,PALRAM.data(),32) != 0) 
 	{
-		memcpy(palcache,PALRAM,32);
+		memcpy(palcache,PALRAM.data(),32);
 		drawall = 1; //palette has changed, so redraw all
 	}
 

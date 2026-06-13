@@ -15,7 +15,7 @@ uint8 tmpd;
 #endif
 
 if (X1 >= 2) {
-	uint8 *S = PALRAM;
+	uint8 *S = PALRAM.data();
 	uint32 pixdata;
 
 	pixdata = ppulut1[(pshift[0] >> (8 - XOffset)) & 0xFF] | ppulut2[(pshift[1] >> (8 - XOffset)) & 0xFF];

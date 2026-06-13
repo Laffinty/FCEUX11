@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.11] - 2026-06-13
+
+D-track opening sub-version: PPU cache optimization and x6502 instruction
+function-pointer dispatch table per plan v3 §5 v0.3.11. No behavior change;
+all savestate hashes remain byte-identical to the v0.3.0 baseline.
+
+### Added
+
+- **`scripts/generate_x6502_dispatch.py`** — parses `src/ops.inc` and emits
+  `src/ops_table.inc`, a `std::array<void(*)(X6502*), 256>` opcode dispatch
+  table plus one handler per opcode.
+- **`tests/benchmark/ppu_simd_probe.cpp`** and
+  `scripts/run_ppu_simd_probe.ps1` — isolated Phase-2 SIMD probe for a
+  PPU-representative palette lookup workload. Report archived at
+  `docs/tech/v0.3.x_SIMD_Probe_Report.md`; conclusion keeps SIMD off the
+  v0.3.x / v0.4.x roadmap.
+
+### Changed
+
+- **`src/x6502.cpp`**:
+  - Replaced the giant `switch(b1) { #include "ops.inc" }` dispatcher with
+    `x6502_dispatch[b1](&X)`.
+  - Added `[[likely]]` / `[[unlikely]]` hints on the interrupt, mapper IRQ,
+    and overclocking branches in `X6502_Run`.
+- **`src/x6502struct.h`** and `src/x6502.cpp`: aligned the `X6502` struct and
+  the global `X` instance to 64 bytes with `alignas(64)`.
+- **`src/ppu.cpp`**:
+  - `ppulut1/2/3` are now `alignas(64) std::array<uint32_t, …>`.
+  - `PALRAM` is now `alignas(64) std::array<uint8_t, 0x20>` and `UPALRAM` is
+    `std::array<uint8_t, 3>`.
+  - Added `[[likely]]` / `[[unlikely]]` hints on new-PPU, screen-off, and
+    `PPUON` branches.
+- Updated all `PALRAM` / `UPALRAM` callers (`src/pputile.inc`,
+  `src/debug.h`, `src/drivers/Qt/*`, `src/boards/mmc5.cpp`) to use
+  `.data()` where a pointer is required.
+
+### Verified
+
+- `rom_regression_test`: 720 frames, 13 ROMs, 0 mismatches vs
+  `golden_hashes.json`.
+- `fceux11_bench_ppu_render` and `fceux11_bench_x6502_exec` both pass
+  (stddev < 3%).
+- `cargo test --release`: ok.
+
 ## [0.3.10] - 2026-06-13
 
 C-track closing sub-version: `FCEUI_*` public-API convergence and

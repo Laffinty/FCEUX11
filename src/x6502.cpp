@@ -29,9 +29,10 @@
 
 #include "x6502abbrev.h"
 
+#include <array>
 #include <cstring>
 #include <type_traits>
-X6502 X;
+alignas(64) X6502 X;
 uint32 timestamp;
 uint32 soundtimestamp;
 void (*MapIRQHook)(int a);
@@ -330,36 +331,38 @@ static uint8 ZNTable[256];
    redundant) on the variable "x".
 */
 
-#define RMW_A(op) {uint8 x=_A; op; _A=x; break; } /* Meh... */
-#define RMW_AB(op) {unsigned int A; uint8 x; GetAB(A); x=RdMem(A); WrMem(A,x); op; WrMem(A,x); break; }
-#define RMW_ABI(reg,op) {unsigned int A; uint8 x; GetABIWR(A,reg); x=RdMem(A); WrMem(A,x); op; WrMem(A,x); break; }
+#define RMW_A(op) {uint8 x=_A; op; _A=x;  } /* Meh... */
+#define RMW_AB(op) {unsigned int A; uint8 x; GetAB(A); x=RdMem(A); WrMem(A,x); op; WrMem(A,x);  }
+#define RMW_ABI(reg,op) {unsigned int A; uint8 x; GetABIWR(A,reg); x=RdMem(A); WrMem(A,x); op; WrMem(A,x);  }
 #define RMW_ABX(op)  RMW_ABI(_X,op)
 #define RMW_ABY(op)  RMW_ABI(_Y,op)
-#define RMW_IX(op)  {unsigned int A; uint8 x; GetIX(A); x=RdMem(A); WrMem(A,x); op; WrMem(A,x); break; }
-#define RMW_IY(op)  {unsigned int A; uint8 x; GetIYWR(A); x=RdMem(A); WrMem(A,x); op; WrMem(A,x); break; }
-#define RMW_ZP(op)  {uint8 A; uint8 x; GetZP(A); x=RdRAM(A); op; WrRAM(A,x); break; }
-#define RMW_ZPX(op) {uint8 A; uint8 x; GetZPI(A,_X); x=RdRAM(A); op; WrRAM(A,x); break;}
+#define RMW_IX(op)  {unsigned int A; uint8 x; GetIX(A); x=RdMem(A); WrMem(A,x); op; WrMem(A,x);  }
+#define RMW_IY(op)  {unsigned int A; uint8 x; GetIYWR(A); x=RdMem(A); WrMem(A,x); op; WrMem(A,x);  }
+#define RMW_ZP(op)  {uint8 A; uint8 x; GetZP(A); x=RdRAM(A); op; WrRAM(A,x);  }
+#define RMW_ZPX(op) {uint8 A; uint8 x; GetZPI(A,_X); x=RdRAM(A); op; WrRAM(A,x); }
 
-#define LD_IM(op)  {uint8 x; x=RdMem(_PC); _PC++; op; break;}
-#define LD_ZP(op)  {uint8 A; uint8 x; GetZP(A); x=RdRAM(A); op; break;}
-#define LD_ZPX(op)  {uint8 A; uint8 x; GetZPI(A,_X); x=RdRAM(A); op; break;}
-#define LD_ZPY(op)  {uint8 A; uint8 x; GetZPI(A,_Y); x=RdRAM(A); op; break;}
-#define LD_AB(op)  {unsigned int A; FCEU_MAYBE_UNUSED uint8 x; GetAB(A); x=RdMem(A); op; break; }
-#define LD_ABI(reg,op)  {unsigned int A; FCEU_MAYBE_UNUSED uint8 x; GetABIRD(A,reg); x=RdMem(A); op; break;}
+#define LD_IM(op)  {uint8 x; x=RdMem(_PC); _PC++; op; }
+#define LD_ZP(op)  {uint8 A; uint8 x; GetZP(A); x=RdRAM(A); op; }
+#define LD_ZPX(op)  {uint8 A; uint8 x; GetZPI(A,_X); x=RdRAM(A); op; }
+#define LD_ZPY(op)  {uint8 A; uint8 x; GetZPI(A,_Y); x=RdRAM(A); op; }
+#define LD_AB(op)  {unsigned int A; FCEU_MAYBE_UNUSED uint8 x; GetAB(A); x=RdMem(A); op;  }
+#define LD_ABI(reg,op)  {unsigned int A; FCEU_MAYBE_UNUSED uint8 x; GetABIRD(A,reg); x=RdMem(A); op; }
 #define LD_ABX(op)  LD_ABI(_X,op)
 #define LD_ABY(op)  LD_ABI(_Y,op)
-#define LD_IX(op)  {unsigned int A; uint8 x; GetIX(A); x=RdMem(A); op; break;}
-#define LD_IY(op)  {unsigned int A; uint8 x; GetIYRD(A); x=RdMem(A); op; break;}
+#define LD_IX(op)  {unsigned int A; uint8 x; GetIX(A); x=RdMem(A); op; }
+#define LD_IY(op)  {unsigned int A; uint8 x; GetIYRD(A); x=RdMem(A); op; }
 
-#define ST_ZP(r)  {uint8 A; GetZP(A); WrRAM(A,r); break;}
-#define ST_ZPX(r)  {uint8 A; GetZPI(A,_X); WrRAM(A,r); break;}
-#define ST_ZPY(r)  {uint8 A; GetZPI(A,_Y); WrRAM(A,r); break;}
-#define ST_AB(r)  {unsigned int A; GetAB(A); WrMem(A,r); break;}
-#define ST_ABI(reg,r)  {unsigned int A; GetABIWR(A,reg); WrMem(A,r); break; }
+#define ST_ZP(r)  {uint8 A; GetZP(A); WrRAM(A,r); }
+#define ST_ZPX(r)  {uint8 A; GetZPI(A,_X); WrRAM(A,r); }
+#define ST_ZPY(r)  {uint8 A; GetZPI(A,_Y); WrRAM(A,r); }
+#define ST_AB(r)  {unsigned int A; GetAB(A); WrMem(A,r); }
+#define ST_ABI(reg,r)  {unsigned int A; GetABIWR(A,reg); WrMem(A,r);  }
 #define ST_ABX(r)  ST_ABI(_X,r)
 #define ST_ABY(r)  ST_ABI(_Y,r)
-#define ST_IX(r)  {unsigned int A; GetIX(A); WrMem(A,r); break; }
-#define ST_IY(r)  {unsigned int A; GetIYWR(A); WrMem(A,r); break; }
+#define ST_IX(r)  {unsigned int A; GetIX(A); WrMem(A,r);  }
+#define ST_IY(r)  {unsigned int A; GetIYWR(A); WrMem(A,r);  }
+
+#include "ops_table.inc"
 
 static uint8 CycTable[256] =
 {
@@ -461,7 +464,7 @@ extern int test; test++;
    int32 temp;
    uint8 b1;
 
-   if(_IRQlow)
+   if(_IRQlow) [[unlikely]]
    {
     if(_IRQlow&FCEU_IQRESET)
     {
@@ -527,18 +530,15 @@ extern int test; test++;
 
    temp=_tcount;
    _tcount=0;
-   if(MapIRQHook) MapIRQHook(temp);
-   
-   if (!overclocking)
+   if(MapIRQHook) [[unlikely]] MapIRQHook(temp);
+
+   if (!overclocking) [[likely]]
     FCEU_SoundCPUHook(temp);
    #ifdef _S9XLUA_H
    CallRegisteredLuaMemHook(_PC, 1, 0, LUAMEMHOOK_EXEC);
    #endif
    _PC++;
-   switch(b1)
-   {
-    #include "ops.inc"
-   }
+   x6502_dispatch[b1](&X);
   }
 }
 

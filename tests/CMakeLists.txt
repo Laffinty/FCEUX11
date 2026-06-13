@@ -183,4 +183,14 @@ if(FCEUX11_BUILD_TESTS)
         fceux11_add_test_executable(fceux11_bench_x6502_exec   benchmark/x6502_exec_bench.cpp   git_info_stub.cpp)
         fceux11_add_test_executable(fceux11_bench_apu_mix      benchmark/apu_mix_bench.cpp      git_info_stub.cpp)
     endif()
+
+    # v0.3.11 Phase-2 SIMD probe — standalone, build-only, not registered as CTest.
+    add_executable(fceux11_ppu_simd_probe_scalar benchmark/ppu_simd_probe.cpp)
+    target_compile_definitions(fceux11_ppu_simd_probe_scalar PRIVATE SCALAR_PROBE)
+
+    add_executable(fceux11_ppu_simd_probe_sse42 benchmark/ppu_simd_probe.cpp)
+    target_compile_options(fceux11_ppu_simd_probe_sse42 PRIVATE /arch:SSE2)
+
+    add_executable(fceux11_ppu_simd_probe_avx2 benchmark/ppu_simd_probe.cpp)
+    target_compile_options(fceux11_ppu_simd_probe_avx2 PRIVATE /arch:AVX2)
 endif()

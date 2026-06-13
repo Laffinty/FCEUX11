@@ -151,8 +151,8 @@ uint8* MMC5BGVRAMADR(uint32 A)
 
 static void mmc5_PPUWrite(uint32 A, uint8 V) {
 	uint32 tmp = A;
-	extern uint8 PALRAM[0x20];
-	extern uint8 UPALRAM[0x03];
+	extern std::array<uint8_t, 0x20> PALRAM;
+	extern std::array<uint8_t, 3> UPALRAM;
 
 	if (tmp >= 0x3F00) {
 		if (!(tmp & 3)) {

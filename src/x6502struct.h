@@ -1,7 +1,11 @@
 #ifndef _X6502STRUCTH
 #define _X6502STRUCTH
 
-typedef struct __X6502 {
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4324)
+#endif
+typedef struct alignas(64) __X6502 {
   int32 tcount;     /* Temporary cycle counter */
   uint16 PC;        /* I'll change this to uint32 later... */
                                 /* I'll need to AND PC after increments to 0xFFFF */
@@ -23,5 +27,8 @@ typedef struct __X6502 {
 	#endif
 
 } X6502;
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #endif

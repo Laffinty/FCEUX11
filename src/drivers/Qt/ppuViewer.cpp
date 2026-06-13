@@ -1666,14 +1666,14 @@ void FCEUD_UpdatePPUView(int scanline, int refreshchr)
 	PPUViewSkip = 0;
 	
 	// update palette only if required
-	if ( (palo != NULL) && ( (memcmp(pallast, PALRAM, 32) != 0) || (memcmp(pallast+32, UPALRAM, 3) != 0) ))
+	if ( (palo != NULL) && ( (memcmp(pallast, PALRAM.data(), 32) != 0) || (memcmp(pallast+32, UPALRAM.data(), 3) != 0) ))
 	{
 		//printf("Updated PPU View Palette\n");
-		memcpy(pallast, PALRAM, 32);
-		memcpy(pallast+32, UPALRAM, 3);
+		memcpy(pallast, PALRAM.data(), 32);
+		memcpy(pallast+32, UPALRAM.data(), 3);
 
 		// cache palette content
-		memcpy(palcache,PALRAM,32);
+		memcpy(palcache,PALRAM.data(),32);
 		palcache[0x10] = palcache[0x00];
 		palcache[0x04] = palcache[0x14] = UPALRAM[0];
 		palcache[0x08] = palcache[0x18] = UPALRAM[1];
