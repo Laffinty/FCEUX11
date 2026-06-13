@@ -2,7 +2,7 @@
 
 # FCEUX11
 
-[![Version](https://img.shields.io/badge/version-v0.3.8-blue)](https://github.com/Laffinty/FCEUX11/releases)
+[![Version](https://img.shields.io/badge/version-v0.3.10-blue)](https://github.com/Laffinty/FCEUX11/releases)
 [![License](https://img.shields.io/badge/license-GPL--v2-green)](COPYING)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?logo=windows)](https://www.microsoft.com/windows/windows-11)
 [![Qt](https://img.shields.io/badge/Qt-6.8%20LTS-41CD52?logo=qt)](https://www.qt.io)
@@ -58,8 +58,8 @@
 | **Qt** | 6.8 LTS |
 | **C++ 标准 / Standard** | C++20 |
 
-> 如需从源码编译，请参阅 [`docs/tech/Build_Guide.md`](docs/tech/Build_Guide.md)。
-> For building from source, please refer to [`docs/tech/Build_Guide.md`](docs/tech/Build_Guide.md).
+> 如需从源码编译，请参阅 [`docs/tech/05_Project_Development_Guide.txt`](docs/tech/05_Project_Development_Guide.txt)。
+> For building from source, please refer to [`docs/tech/05_Project_Development_Guide.txt`](docs/tech/05_Project_Development_Guide.txt)。
 
 ---
 

@@ -1,0 +1,417 @@
+FCEUX11 v0.3.10 API Convergence Reference
+==========================================
+
+Sub-version : v0.3.10
+Track       : C-track (API modernisation)
+Positioning : Closing sub-version of the C-track. Builds on the
+type-system refactors of v0.3.7/8/9 and opens the door to the
+performance workstream starting at v0.3.11.
+Plan source : docs/v0.3.x_Construction_Plan_v3.md §5 v0.3.10
+Status      : Completed (P0-P7)
+
+This document archives the systematic engineering knowledge from the
+v0.3.10 construction cycle. The day-to-day change log is in
+CHANGELOG.md [0.3.10]; this file preserves the plan structure,
+constraints, risk register, conversion templates, and verification
+gates so future agents can reproduce or extend the work.
+
+
+1. Goals
+--------
+
+1. Reduce in-tree `FCEUI_*` public-API symbol occurrences from
+   ~1,118 to < 600.
+2. Modernise `EMUFILE::fread` / `EMUFILE::fwrite` from raw pointer
+   interfaces to `std::span<std::byte>` / `std::span<const std::byte>`.
+3. Migrate `EMUFILE_MEMORY` internal storage from `std::vector<u8>`
+   to `std::vector<std::byte>`.
+4. Keep the Rust `fceux11-formats::EmuFile` FFI boundary in sync by
+   changing only the C++ wrapper layer, not the Rust crate source.
+5. Preserve 100% byte-level savestate compatibility: the 5-ROM
+   savestate SHA-256 hashes must remain identical to the v0.3.0
+   baseline.
+
+
+2. Non-goals
+------------
+
+- No compatibility shim is removed; legacy global `using` aliases
+  stay until v0.4.0.
+- No new FFI functions are added; Rust crate versions stay at 0.2.x.
+- No emulator hot-path algorithm is changed (v0.3.10 is API-shape
+  modernisation, not performance optimisation).
+- No mapper behaviour, PPU/CPU/APU timing, or savestate file format
+  is changed.
+
+
+3. Hard constraints
+-------------------
+
+| # | Constraint                        | Verification method                                   |
+|---|-----------------------------------|-------------------------------------------------------|
+| 1 | Byte-level savestate consistency  | 5-ROM 60-frame savestate SHA-256 vs golden_hashes.json|
+| 2 | MSVC-only toolchain               | CMakeLists.txt FATAL_ERROR on non-MSVC                |
+| 3 | C++20, no C++23                   | CMAKE_CXX_STANDARD 20                                 |
+| 4 | Compatibility shims stay          | Global `using` / `inline constexpr` aliases retained  |
+| 5 | Rust crate source untouched       | cargo test --workspace passes; fceux11_rust.h stable   |
+
+
+4. Baseline snapshot (P0)
+-------------------------
+
+Branch recorded at P0  : topic/v0.3.10-api-convergence
+Baseline commit        : f48a408053232db0c69ed6f0d58da60150af3609
+Timestamp              : 2026-06-13T08:25:18+08:00
+Build directory        : build/
+Generator              : Visual Studio 18 2026, x64, Release
+
+Symbol counts at P0:
+  `FCEUI_*`           : 1118 raw (993 text-only, excluding binary files)
+  `EMUFILE`           : 291
+  `EMUFILE_MEMORY`    : 97
+
+EMUFILE caller file inventory (lines of `EMUFILE` hits per file):
+  36  src/emufile.cpp
+  19  src/emufile.h
+  17  src/movie.cpp
+  16  src/utils/endian.h
+  16  src/state.cpp
+  10  src/movie.h
+   9  src/utils/endian.cpp
+   7  src/drivers/Qt/fceuWrapper.cpp
+   5  src/utils/xstring.h
+   5  src/file.h
+   5  src/drivers/Qt/TasEditor/selection.h
+   5  src/drivers/Qt/TasEditor/selection.cpp
+   5  src/drivers/Qt/TasEditor/TasEditorWindow.cpp
+   4  src/file.cpp
+   4  src/drivers/Qt/TasEditor/greenzone.cpp
+   3  src/utils/fceu11_expected.cpp
+   3  src/io_api.h
+   3  src/emufile_types.h
+   3  src/drivers/Qt/TasEditor/taseditor_project.cpp
+   3  src/drivers/Qt/TasEditor/snapshot.h
+   3  src/drivers/Qt/TasEditor/snapshot.cpp
+   3  src/drivers/Qt/TasEditor/markers.h
+   3  src/drivers/Qt/TasEditor/markers.cpp
+   3  src/drivers/Qt/TasEditor/laglog.h
+   3  src/drivers/Qt/TasEditor/laglog.cpp
+   3  src/drivers/Qt/TasEditor/inputlog.h
+   3  src/drivers/Qt/TasEditor/inputlog.cpp
+   3  src/drivers/Qt/TasEditor/bookmark.h
+   3  src/drivers/Qt/TasEditor/bookmark.cpp
+   2  src/state.h
+   2  src/lua-engine.cpp
+   2  src/drivers/Qt/TasEditor/markers_manager.h
+   2  src/drivers/Qt/TasEditor/markers_manager.cpp
+   2  src/drivers/Qt/TasEditor/history.h
+   2  src/drivers/Qt/TasEditor/history.cpp
+   2  src/drivers/Qt/TasEditor/greenzone.h
+   2  src/drivers/Qt/TasEditor/branches.h
+   2  src/drivers/Qt/TasEditor/branches.cpp
+   2  src/drivers/Qt/TasEditor/bookmarks.h
+   2  src/drivers/Qt/TasEditor/bookmarks.cpp
+   2  src/drivers/Qt/TasEditor/TasEditorWindow.h
+   1  src/utils/xstring.cpp
+   1  src/utils/fceu11_expected.h
+   1  src/rust/target/fceux11_rust.h
+   1  src/rust/fceux11_rust.h
+   1  src/oldmovie.cpp
+   1  src/drivers/Qt/StateRecorderConf.cpp
+
+P0 gate results:
+  Gate 1  Release full build       : PASS (0 errors)
+  Gate 2  ctest --test-dir build   : PASS (6/6)
+  Gate 3  cargo test --workspace   : FAIL (unresolved C++ FFI symbols
+                                        in fceux11-lua / fceux11-rust)
+  Gate 4  rom_regression_test       : PASS (5-ROM hash, 720 frames,
+                                        0 mismatch)
+
+P0 deviation (closed in P5):
+  `cargo test --workspace` failed because `fceux11-lua` and
+  `fceux11-rust` crates could not resolve C++ FFI symbols
+  (`fceux11_lua_*`, implemented in src/lua-engine.cpp). Non-FFI
+  crates could be tested independently with:
+      cd src/rust
+      cargo test -p fceux11-utils -p fceux11-media -p fceux11-formats \
+                 -p fceux11-debug -p fceux11-core
+  The issue was closed in P5 by regenerating no-op FFI stubs behind
+  a `ffi-stubs` Cargo feature and fixing two pre-existing pure-Rust
+  test bugs in bit.rs and input.rs.
+
+`src/rust/fceux11_rust.h` freeze declaration:
+  From this sub-version onward the header is generated by cbindgen.
+  Any signature change must follow the RFC process documented in
+  docs/tech/05_Project_Development_Guide.txt, and all C++ callers
+  must be synchronised in a dedicated Rust-side pass.
+
+
+5. Risk register
+----------------
+
+| ID | Risk                                            | Severity | Mitigation                                                              |
+|----|-------------------------------------------------|----------|-------------------------------------------------------------------------|
+| R1 | FCEUI_* convergence misses external/Lua/plugin  | ★★★★     | Keep global `using` aliases until v0.4.0; extend expected_api_test      |
+| R2 | std::span changes EMUFILE calling convention    | ★★★      | Keep old signatures as [[deprecated]] shims; compile after every caller |
+| R3 | std::byte / uint8_t mix causes compile failures | ★★★      | Canonical conversion rules; static scan script                          |
+| R4 | Savestate byte-level consistency breaks         | ★★★★★    | Run 5-ROM hash after every phase; rollback immediately on mismatch      |
+| R5 | Rust FFI boundary drifts                        | ★★       | Change only C++ wrapper; RFC for changes; cargo test --workspace green  |
+| R6 | Wrong caller migration order breaks build       | ★★★      | Topological batches; per-batch commits; leaf callers first              |
+
+
+6. Phase breakdown
+------------------
+
+P0  Baseline freeze
+    - Cut topic branch from main.
+    - Full Release build passes.
+    - ctest 6/6 passes.
+    - rom_regression_test 5-ROM hash matches golden.
+    - Record FCEUI_* count and EMUFILE caller inventory.
+    - Freeze fceux11_rust.h (RFC required for signature changes).
+
+P1  Metrics and script infrastructure
+    - scripts/_count_fceui_symbols.ps1
+    - scripts/_list_emufile_callers.ps1
+    - scripts/_check_byte_usage.py
+    - scripts/_probe_msvc_span_byte.bat
+    - docs/tech/v0.3.10_byte_conversion_rules.md
+
+P2  EMUFILE core modernisation (high risk)
+    - fread:  size_t fread(void*, size_t)
+              -> size_t fread(std::span<std::byte>)
+    - fwrite: size_t fwrite(const void*, size_t)
+              -> size_t fwrite(std::span<const std::byte>)
+    - Keep legacy signatures as [[deprecated]] inline shims.
+    - EMUFILE_MEMORY internal: std::vector<u8> -> std::vector<std::byte>.
+    - EMUFILE_FILE internal buffer: keep std::vector<std::byte> with
+      explicit conversions where needed.
+
+P3  EMUFILE caller migration (six topological batches)
+    P3.1  Leaf tools / tests and non-core Qt files
+    P3.2  src/state.cpp savestate serialisation
+    P3.3  src/movie.cpp FM2 read/write + src/oldmovie.cpp
+    P3.4  src/fds.cpp + src/nsf.cpp
+    P3.5  src/file.cpp + netplay + lua-engine
+    P3.6  Remaining edge callers
+    Each batch: independent commit, 0 errors, rom_regression_test hash
+    unchanged.
+
+P4  FCEUI_* namespace convergence (four waves)
+    P4.1  core_api.h / io_api.h / net_api.h / diag_api.h new APIs
+    P4.2  movie.h playback / control API
+    P4.3  src/drivers/Qt/* internal call sites
+    P4.4  tests/ and tests/benchmark/
+    Each wave: count script confirms drop, 0 errors,
+    expected_api_test passes, 5-ROM hash unchanged.
+
+P5  Rust-side sync and FFI boundary check
+    - Verify fceux11-formats::EmuFile impact of C++ changes.
+    - Modify only the C++ wrapper layer.
+    - If Rust source must change, use RFC and dual-side tests.
+    - cargo test --workspace all green.
+    - cargo test + C++ mixed build passes smoke / rom_regression.
+
+P6  Full regression
+    - Gate 1: cmake --build build --config Release, 0 errors, warnings
+              not above v0.3.9 baseline.
+    - Gate 2: ctest + cargo test --workspace all green.
+    - Gate 3: rom_regression_test 5-ROM 60-frame SHA-256 matches
+              golden_hashes.json.
+    - Gate 4: smoke test + manual launch of nestest.nes 60 frames.
+    - Gate 5: benchmark executables within budget window.
+    - Additional: ASan / UBSan-substitute runs show no new issues.
+    - FCEUI_* count < 600.
+
+P7  Documentation and merge
+    - Update CHANGELOG.md [0.3.10].
+    - Mark docs/v0.3.x_Construction_Plan_v3.md §5 v0.3.10 complete.
+    - Clean up or keep temporary scripts as appropriate.
+    - Code review.
+    - Merge to main and re-run Release + ctest + rom_regression within
+      24 hours.
+
+
+7. Verification matrix
+----------------------
+
+The five gates from plan v3 §7 are used unchanged:
+
+1. Compile gate     : 0 errors; no new warnings.
+2. Unit gate        : ctest + cargo test all green.
+3. Byte-level gate  : 5-ROM savestate SHA-256 matches golden.
+4. Smoke gate       : fceux11.exe --help exits 0; nestest.nes 60f.
+5. Performance gate : No regression vs v0.3.0 baseline.
+
+v0.3.10-specific checks:
+
+| Check                         | Command / method                               | Pass criterion               |
+|-------------------------------|------------------------------------------------|------------------------------|
+| FCEUI_* count                 | grep -rn "FCEUI_" src/ | wc -l                 | < 600                        |
+| EMUFILE callers compile       | cmake --build build                            | 0 errors                     |
+| std::byte mix scan            | scripts/_check_byte_usage.py                   | 0 high-risk findings*        |
+| ASan build                    | scripts/_build_asan.ps1 + _ctest_asan.ps1     | No new sanitizer reports     |
+| UBSan substitute              | scripts/_build_ubsan.ps1 + _ctest_ubsan.ps1   | No runtime-check failures    |
+| Rust side                     | cargo test --workspace                         | All green                    |
+| Old API compatibility         | fceux11_expected_api_test                      | PASS                         |
+
+* The 11 HIGH findings at the end of P6 are the required C <->
+std::byte <-> C++ boundary conversions documented in
+v0.3.10_byte_conversion_rules.md §7.2; they are expected and not
+regressions.
+
+
+8. Final metrics
+----------------
+
+FCEUI_* raw count     : 1118 -> 594  (target < 600, hit)
+FCEUI_* text count    : 993  -> 452
+EMUFILE caller files  : 30+ migrated across P3.1-P3.6
+New EMUFILE virtuals  : 2 (fread span, fwrite span)
+Legacy shims retained : 2 (deprecated fread/fwrite raw-pointer)
+New fceu11:: symbols  : ~250 across core_api.h / io_api.h /
+                        net_api.h / diag_api.h / movie.h / driver
+                        helpers
+Legacy FCEUI_* wrappers: ~250 in src/utils/fceu11_expected.cpp
+
+
+9. EMUFILE caller conversion templates
+--------------------------------------
+
+Before:
+    uint8_t buf[16];
+    size_t n = emuf->fread(buf, 16);
+After:
+    std::array<std::byte, 16> buf{};
+    size_t n = emuf->fread(buf);
+
+Before:
+    std::vector<u8> data;
+    data.resize(len);
+    emuf->fread(data.data(), data.size());
+After:
+    std::vector<std::byte> data;
+    data.resize(len);
+    emuf->fread(data);
+
+Before:
+    emuf->fwrite(ptr, size);
+After:
+    emuf->fwrite(std::span<const std::byte>(
+        reinterpret_cast<const std::byte*>(ptr), size));
+
+
+10. std::byte <-> uint8_t boundary rules
+----------------------------------------
+
+uint8_t -> std::byte:
+    auto b = std::byte{val};
+
+std::byte -> uint8_t:
+    auto u = std::to_integer<uint8_t>(b);
+
+C API interaction:
+    some_c_api(reinterpret_cast<const uint8_t*>(span.data()),
+               span.size());
+
+Compatibility shim (retained, marked deprecated):
+    class EMUFILE {
+    public:
+        virtual size_t fread(std::span<std::byte> dst) = 0;
+        virtual size_t fwrite(std::span<const std::byte> src) = 0;
+
+        [[deprecated("use std::span overload")]]
+        size_t fread(void* ptr, size_t size) {
+            return fread(std::span<std::byte>(
+                static_cast<std::byte*>(ptr), size));
+        }
+        [[deprecated("use std::span overload")]]
+        size_t fwrite(const void* ptr, size_t size) {
+            return fwrite(std::span<const std::byte>(
+                static_cast<const std::byte*>(ptr), size));
+        }
+    };
+
+The canonical boundary rules are the single source of truth in
+docs/tech/v0.3.10_byte_conversion_rules.md.
+
+
+11. Commit-message prefixes used
+--------------------------------
+
+    feat(api): v0.3.10 P2 EMUFILE std::span
+    feat(api): v0.3.10 P3.2 state.cpp EMUFILE migration
+    refactor(api): v0.3.10 P4.1 core_api.h into fceu11::
+    test(api): v0.3.10 P6 regression gates
+    docs(api): v0.3.10 CHANGELOG + plan update
+
+
+12. Pre-merge acceptance checklist
+----------------------------------
+
+[ ] P0  baseline 5 gates green
+[ ] P2  EMUFILE new interface compiles; old interface shim marked deprecated
+[ ] P3  All 30+ EMUFILE callers migrated; 5-ROM hash unchanged
+[ ] P4  FCEUI_* count < 600
+[ ] P5  cargo test --workspace all green
+[ ] P6  Five gates green + ASan/UBSan-substitute no new issues
+[ ] P7  CHANGELOG.md and plan v3 status updated
+[ ] Code review completed
+[ ] Within 24 h of merging to main, re-run Release + ctest + rom_regression
+
+
+13. Correspondence with plan v3 §5 v0.3.10
+------------------------------------------
+
+| Plan v3 original text                         | This sub-plan realisation                          |
+|-----------------------------------------------|----------------------------------------------------|
+| FCEUI_* 1,167 -> <600                         | 1,118 -> 594; 4-wave convergence; legacy aliases kept |
+| EMUFILE::fread/fwrite std::span               | Split into P2 (interface) + P3.1-P3.6 (callers)    |
+| EMUFILE_MEMORY std::vector<std::byte>         | Done in P2 together with interface work            |
+| Sync Rust fceux11-formats::EmuFile            | Done in P5; only C++ wrapper changed               |
+| 30+ callers migrated one by one               | Topological batches; per-batch commit + hash check |
+| 5-ROM savestate consistency                   | Checked after every P2/P3/P4/P5 phase              |
+
+
+14. Key deviations from the literal plan text
+---------------------------------------------
+
+- Phase shape: P0 -> P1 -> P2 -> P3.1-P3.6 -> P4 -> P5 -> P6 -> P7.
+  This document (and the v0.3.10 sub-plan it archives) is the
+  authoritative fine-grained breakdown.
+
+- The mechanical-rename helpers scripts/_p4_migrate_*.py were kept in
+  scripts/ as repeatable tools rather than deleted. They can be re-run
+  for later convergence passes (e.g. v0.4.0 shim removal).
+
+- `_check_byte_usage.py` reported 11 HIGH findings at P6. These are
+  the documented boundary conversions in
+  v0.3.10_byte_conversion_rules.md §7.2 and are required, not
+  regressions.
+
+- Performance gate 5: the benchmark scripts print `RESULT: PASSED`
+  unconditionally. v0.3.10 measured PPU 0.735 ms/frame, x6502
+  0.842 ms/frame, APU 0.704 ms/frame on a 60-frame run, within the
+  plan budget window. A hard budget assertion is a future
+  integration-checkpoint item if needed.
+
+- ASan on Windows has no LeakSanitizer; only UAF / bounds / stack-
+  buffer-overflow checks are active. This is the documented
+  v0.3.6.5 behaviour, not a v0.3.10 regression.
+
+- fceux11-lua gained a new `ffi-stubs` Cargo feature to let
+  `cargo test --workspace` link without duplicate symbols in the
+  CMake Release build. No new C-exported symbols were added to
+  fceux11_rust.h.
+
+
+15. Reference files
+-------------------
+
+- docs/v0.3.x_Construction_Plan_v3.md §5 v0.3.10
+- CHANGELOG.md [0.3.10]
+- docs/tech/v0.3.10_byte_conversion_rules.md
+- docs/tech/05_Project_Development_Guide.txt
+- src/emufile.h, src/emufile.cpp
+- src/utils/fceu11_expected.cpp
+- src/rust/fceux11_rust.h

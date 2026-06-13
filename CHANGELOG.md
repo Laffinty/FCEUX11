@@ -58,10 +58,11 @@ the ~600 pre-existing call sites keep compiling unchanged; the
     `std::byte` compile probe (positive + negative tests; the
     negative tests confirm `std::byte + int` and
     `std::byte == uint8_t` are rejected by `cl`).
-- **Phase P0 baseline report**:
-  `docs/p0_baseline_report.md` — frozen `FCEUI_*` count
+- **Phase P0 baseline snapshot**: frozen `FCEUI_*` count
   (1118 raw / 993 text), 5-ROM savestate golden hash anchor,
-  `fceux11_rust.h` freeze notification.
+  `fceux11_rust.h` freeze notification. The full systematic
+  reference is archived in
+  `docs/tech/06_v0.3.10_API_Convergence_Reference.txt`.
 
 ### Changed
 
@@ -134,6 +135,28 @@ the ~600 pre-existing call sites keep compiling unchanged; the
   continue to work through the new wrapper layer; no test
   source change is required for the wrapper indirection.
 
+### P0 baseline snapshot
+
+The following measurements were frozen at the start of v0.3.10
+(baseline commit `f48a408053232db0c69ed6f0d58da60150af3609`,
+2026-06-13T08:25:18+08:00, Visual Studio 18 2026 generator, x64
+Release):
+
+- `FCEUI_*` raw count: **1118** (text-only: **993**).
+- `EMUFILE` occurrences: **291**; `EMUFILE_MEMORY` occurrences: **97**.
+- Release build: 0 errors.
+- `ctest --test-dir build`: **6/6 pass**.
+- `rom_regression_test`: 13 ROMs exercised, 720 frames compared,
+  **0 mismatches** against `tests/fixtures/golden_hashes.json`.
+- `cargo test --workspace`: failed at baseline because
+  `fceux11-lua` / `fceux11-rust` crates had unresolved external
+  references to C++ FFI symbols (`fceux11_lua_*`, implemented in
+  `src/lua-engine.cpp`). Non-FFI crates passed independently. This
+  was recorded as a baseline deviation and closed in P5.
+- `src/rust/fceux11_rust.h` was declared frozen: signature changes
+  require the RFC process documented in
+  `docs/tech/05_Project_Development_Guide.txt`.
+
 ### Metrics
 
 - `FCEUI_*` raw count: **1118 → 594** (target < 600; **hit**).
@@ -150,8 +173,8 @@ the ~600 pre-existing call sites keep compiling unchanged; the
 
 - **Sub-version shape is `P0 → P1 → P2 → P3.1–P3.6 → P4 → P5 →
   P6 → P7`**, not the plan's P0–P7 flat list. The v0.3.10
-  *sub-plan* (`docs/v0.3.10_Construction_Plan.md`) is the
-  authoritative phase breakdown; the P3 split into six
+  *sub-plan* (`docs/tech/06_v0.3.10_API_Convergence_Reference.txt`)
+  is the authoritative phase breakdown; the P3 split into six
   caller-migration batches and the P4 split into four
   convergence waves are documented there.
 - **`_p4_migrate_*.py` mechanical-rename helpers** stay under
