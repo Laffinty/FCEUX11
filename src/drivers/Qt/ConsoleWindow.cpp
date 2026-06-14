@@ -1952,9 +1952,11 @@ int consoleWin_t::unloadVideoDriver(void)
 
 	if (viewport_GL != NULL)
 	{
-		if ( viewport_GL == centralWidget() )
+		QWidget *container = centralWidget();
+		if ( container )
 		{
 			takeCentralWidget();
+			container->deleteLater();
 		}
 		else
 		{
@@ -2074,11 +2076,15 @@ int consoleWin_t::loadVideoDriver( int driverId, bool force )
 		break;
 		case ConsoleViewerBase::VIDEO_DRIVER_OPENGL:
 		{
-			viewport_GL = new ConsoleViewGL_t(this);
+			viewport_GL = new ConsoleViewGL_t();
 
 			viewport_Interface = static_cast<ConsoleViewerBase*>(viewport_GL);
 
-			setCentralWidget(viewport_GL);
+			QWidget *container = QWidget::createWindowContainer(viewport_GL, this);
+			container->setFocusPolicy(Qt::StrongFocus);
+			container->setMinimumSize( QSize(256, 224) );
+
+			setCentralWidget(container);
 
 			setViewportAspect();
 
@@ -2911,7 +2917,7 @@ void consoleWin_t::takeScreenShot(void)
 
 	if ( viewport_GL )
 	{
-		image = screen->grabWindow( viewport_GL->winId() );
+		image = QPixmap::fromImage( viewport_GL->grabFramebuffer() );
 	}
 	else if ( viewport_SDL )
 	{

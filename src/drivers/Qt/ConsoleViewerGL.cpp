@@ -17,7 +17,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
-// GameViewer.cpp
+// GameViewerGL.cpp
 //
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,14 +29,14 @@
 #endif
 
 #include <QApplication>
+#include <QImage>
+#include <QMatrix4x4>
+#include <QMouseEvent>
+#include <QOpenGLBuffer>
+#include <QOpenGLShaderProgram>
+#include <QOpenGLVertexArrayObject>
 #include <QScreen>
 #include <QWindow>
-#include <QMouseEvent>
-#include <QPainter>
-
-#if defined(QT_OPENGL_ES) || defined(QT_OPENGL_ES_2)
-#include <GL/gl.h>
-#endif
 
 #include "Qt/nes_shm.h"
 #include "Qt/throttle.h"
@@ -48,14 +48,35 @@
 extern unsigned int gui_draw_area_width;
 extern unsigned int gui_draw_area_height;
 
-ConsoleViewGL_t::ConsoleViewGL_t(QWidget *parent)
-	: QOpenGLWidget( parent )
-{
-	consoleWin_t *win = qobject_cast <consoleWin_t*>(parent);
+static const char *vertexShaderSource =
+    "#version 330 core\n"
+    "layout(location = 0) in vec2 aPos;\n"
+    "layout(location = 1) in vec2 aTexCoord;\n"
+    "out vec2 vTexCoord;\n"
+    "uniform mat4 uProjection;\n"
+    "void main()\n"
+    "{\n"
+    "    gl_Position = uProjection * vec4(aPos, 0.0, 1.0);\n"
+    "    vTexCoord = aTexCoord;\n"
+    "}\n";
 
+static const char *fragmentShaderSource =
+    "#version 330 core\n"
+    "in vec2 vTexCoord;\n"
+    "out vec4 FragColor;\n"
+    "uniform sampler2D uTexture;\n"
+    "void main()\n"
+    "{\n"
+    "    FragColor = texture(uTexture, vTexCoord);\n"
+    "}\n";
+
+ConsoleViewGL_t::ConsoleViewGL_t(QWindow *parent)
+	: QOpenGLWindow( QOpenGLWindow::NoPartialUpdate, parent )
+{
 	view_width  = 256;
 	view_height = 224;
 	gltexture   = 0;
+	bgTexture   = 0;
 	devPixRatio = 1.0f;
 	aspectRatio = 1.0f;
 	aspectX     = 1.0f;
@@ -71,21 +92,16 @@ ConsoleViewGL_t::ConsoleViewGL_t(QWidget *parent)
 	txtWidth  = 0;
 	txtHeight = 0;
 	mouseButtonMask = 0;
-	reqPwr2 = true;
-	textureType = GL_TEXTURE_2D;
-	//textureType = GL_TEXTURE_RECTANGLE;
 
 	bgColor = NULL;
 
-	if ( win )
+	if ( consoleWindow )
 	{
-		bgColor = win->getVideoBgColorPtr();
+		bgColor = consoleWindow->getVideoBgColorPtr();
 		bgColor->setRgb( 30, 69, 40 );
 	}
-	setMinimumWidth( 256 );
-	setMinimumHeight( 224 );
-	setFocusPolicy(Qt::StrongFocus);
-	//setAttribute(Qt::WA_OpaquePaintEvent);
+	setMinimumSize( QSize(256, 224) );
+	setMaximumSize( QSize(16777215, 16777215) );
 
 	localBufSize = (4 * GL_NES_WIDTH) * (4 * GL_NES_HEIGHT) * sizeof(uint32_t);
 
@@ -122,17 +138,16 @@ ConsoleViewGL_t::ConsoleViewGL_t(QWidget *parent)
 		g_config->getOption ("SDL.VideoVsync", &vsyncEnabled);
 	}
 
-	QSurfaceFormat fmt = format();
-
+	QSurfaceFormat fmt;
+	fmt.setRenderableType(QSurfaceFormat::OpenGL);
+	fmt.setProfile(QSurfaceFormat::CoreProfile);
+	fmt.setVersion(3, 3);
+	fmt.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
 	fmt.setSwapInterval( vsyncEnabled ? 1 : 0 );
 
 	setFormat(fmt);
 
 	connect( this, SIGNAL(frameSwapped(void)), this, SLOT(renderFinished(void)) );
-
-	//fmt = format();
-
-	//printf("Format Swap Interval: %i\n", fmt.swapInterval() );
 }
 
 ConsoleViewGL_t::~ConsoleViewGL_t(void)
@@ -167,15 +182,7 @@ void ConsoleViewGL_t::screenChanged( QScreen *screen )
 
 int ConsoleViewGL_t::init( void )
 {
-	QScreen *screen = NULL;
-
-	if ( window() != NULL )
-	{
-		if ( window()->windowHandle() != NULL )
-		{
-			screen = window()->windowHandle()->screen();
-		}
-	}
+	QScreen *screen = this->screen();
 
 	if ( screen != NULL )
 	{
@@ -192,29 +199,6 @@ void ConsoleViewGL_t::reset(void)
 	return;
 }
 
-int ConsoleViewGL_t::forcePwr2(int in)
-{
-	int out = 256;
-
-	if ( in > 1024 )
-	{
-		out = 2048;
-	}
-	else if ( in > 512 )
-	{
-		out = 1024;
-	}
-	else if ( in > 256 )
-	{
-		out = 512;
-	}
-	else
-	{
-		out = 256;
-	}
-	return out;
-}
-
 void ConsoleViewGL_t::buildTextures(void)
 {
 	int w, h;
@@ -225,126 +209,52 @@ void ConsoleViewGL_t::buildTextures(void)
 		gltexture=0;
 	}
 
-	if ( textureType == GL_TEXTURE_RECTANGLE )
-	{
-		//printf("Using GL_TEXTURE_RECTANGLE\n");
-		glEnable(GL_TEXTURE_RECTANGLE);
-		glGenTextures(1, &gltexture);
-		//printf("Linear Interpolation on GL Texture: %s \n", linearFilter ? "Enabled" : "Disabled");
+	glGenTextures(1, &gltexture);
 
-		glBindTexture( GL_TEXTURE_RECTANGLE, gltexture);
+	glBindTexture( GL_TEXTURE_2D, gltexture);
 
-		glTexParameteri( GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, linearFilter ? GL_LINEAR : GL_NEAREST );
-		glTexParameteri( GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, linearFilter ? GL_LINEAR : GL_NEAREST );
-		glTexParameteri( GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-		glTexParameteri( GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, linearFilter ? GL_LINEAR : GL_NEAREST );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, linearFilter ? GL_LINEAR : GL_NEAREST );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
 
-		txtWidth  = w = nes_shm->video.ncol;
-		txtHeight = h = nes_shm->video.nrow;
+	txtWidth  = w = nes_shm->video.ncol;
+	txtHeight = h = nes_shm->video.nrow;
 
-		glTexImage2D( GL_TEXTURE_RECTANGLE, 0, 
-				GL_RGBA8, w, h, 0,
-						GL_BGRA, GL_UNSIGNED_BYTE, 0 );
-	}
-	else
-	{
-		//printf("Using GL_TEXTURE_2D\n");
-		glEnable(GL_TEXTURE_2D);
-		glGenTextures(1, &gltexture);
-		//printf("Linear Interpolation on GL Texture: %s \n", linearFilter ? "Enabled" : "Disabled");
+	glTexImage2D( GL_TEXTURE_2D, 0, 
+			GL_RGBA8, w, h, 0,
+					GL_BGRA, GL_UNSIGNED_BYTE, 0 );
 
-		glBindTexture( GL_TEXTURE_2D, gltexture);
-
-		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, linearFilter ? GL_LINEAR : GL_NEAREST );
-		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, linearFilter ? GL_LINEAR : GL_NEAREST );
-		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
-
-		if ( reqPwr2 )
-		{
-			txtWidth  = w = forcePwr2( nes_shm->video.ncol );
-			txtHeight = h = forcePwr2( nes_shm->video.nrow );
-		}
-		else
-		{
-			txtWidth  = w = nes_shm->video.ncol;
-			txtHeight = h = nes_shm->video.nrow;
-		}
-
-		glTexImage2D( GL_TEXTURE_2D, 0, 
-				GL_RGBA8, w, h, 0,
-						GL_BGRA, GL_UNSIGNED_BYTE, 0 );
-	}
-
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_ONE, GL_ONE);
-	//glBlendFunc(GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	//printf("Texture Built: %ix%i\n", w, h);
 }
 
-void ConsoleViewGL_t::chkExtnsGL(void)
+void ConsoleViewGL_t::buildBgTexture(void)
 {
-
-	int i, j, NumberOfExtensions = 0;
-	char extName[256];
-  	const GLubyte *c;
-
-	glGetIntegerv(GL_NUM_EXTENSIONS, &NumberOfExtensions);
-
-	//printf("Number of GL Externsions: %i \n", NumberOfExtensions );
-
-  	c = glGetString( GL_VERSION );
-
-	if ( c != NULL )
+	if ( bgTexture )
 	{
-		printf("GL Version: %s \n", c );
+		glDeleteTextures(1, &bgTexture);
+		bgTexture = 0;
 	}
 
-  	c = glGetString( GL_EXTENSIONS );
-
-	if ( c != NULL )
+	if ( bgPix.isNull() )
 	{
-		i=0; j=0;
-
-		while ( c[i] != 0 )
-		{
-			j=0;
-			while ( isspace(c[i]) ) i++;
-
-			if ( isalnum(c[i]) || (c[i] == '_') )
-			{
-				while ( isalnum(c[i]) || (c[i] == '_') )
-				{
-					extName[j] = c[i]; i++; j++;
-				}
-				extName[j] = 0;
-			}
-			else
-			{
-				// Something is wrong if this is hit
-				break;
-			}
-
-			if ( j > 0 )
-			{
-				//printf("%s\n", extName );
-
-				if ( strcmp( extName, "GL_ARB_texture_rectangle" ) == 0 )
-				{
-					//printf("GL Has: %s\n", extName );
-					textureType = GL_TEXTURE_RECTANGLE;
-				}
-				else if ( strcmp( extName, "GL_ARB_texture_non_power_of_two" ) == 0 )
-				{
-					//printf("GL Has: %s\n", extName );
-					reqPwr2 = false;
-				}
-			}
-			while ( isspace(c[i]) ) i++;
-
-		}
+		bgPix.load(":/icons/pic.png");
+	}
+	if ( bgPix.isNull() )
+	{
+		return;
 	}
 
+	QImage img = bgPix.toImage().convertToFormat(QImage::Format_ARGB32);
+
+	glGenTextures(1, &bgTexture);
+	glBindTexture(GL_TEXTURE_2D, bgTexture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, img.width(), img.height(), 0,
+	             GL_BGRA, GL_UNSIGNED_BYTE, img.bits());
 }
 
 void ConsoleViewGL_t::initializeGL(void)
@@ -353,15 +263,47 @@ void ConsoleViewGL_t::initializeGL(void)
 
 	initializeOpenGLFunctions();
 	// Set up the rendering context, load shaders and other resources, etc.:
-	//QOpenGLFunctions *gl = QOpenGLContext::currentContext()->functions();
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-	chkExtnsGL();
-	 //printf("GL Init!\n");
+	const GLubyte *c = glGetString( GL_VERSION );
+	if ( c != NULL )
+	{
+		printf("GL Version: %s \n", c );
+	}
 
-	 buildTextures();
+	shaderProgram = new QOpenGLShaderProgram(this);
+	shaderProgram->addShaderFromSourceCode(QOpenGLShader::Vertex, vertexShaderSource);
+	shaderProgram->addShaderFromSourceCode(QOpenGLShader::Fragment, fragmentShaderSource);
+	shaderProgram->link();
 
-	 connect(context(), &QOpenGLContext::aboutToBeDestroyed, this, &ConsoleViewGL_t::cleanupGL);
+	vao = new QOpenGLVertexArrayObject(this);
+	vao->create();
+	vao->bind();
+
+	vbo = new QOpenGLBuffer(QOpenGLBuffer::VertexBuffer);
+	vbo->create();
+	vbo->bind();
+	vbo->setUsagePattern(QOpenGLBuffer::DynamicDraw);
+
+	ebo = new QOpenGLBuffer(QOpenGLBuffer::IndexBuffer);
+	ebo->create();
+	ebo->bind();
+	GLushort indices[] = { 0, 1, 2, 0, 2, 3 };
+	ebo->allocate(indices, sizeof(indices));
+
+	shaderProgram->bind();
+	shaderProgram->enableAttributeArray(0);
+	shaderProgram->setAttributeBuffer(0, GL_FLOAT, 0, 2, 4 * sizeof(float));
+	shaderProgram->enableAttributeArray(1);
+	shaderProgram->setAttributeBuffer(1, GL_FLOAT, 2 * sizeof(float), 2, 4 * sizeof(float));
+	shaderProgram->release();
+
+	vao->release();
+
+	buildTextures();
+	buildBgTexture();
+
+	connect(context(), &QOpenGLContext::aboutToBeDestroyed, this, &ConsoleViewGL_t::cleanupGL);
 }
 
 void ConsoleViewGL_t::cleanupGL(void)
@@ -378,6 +320,16 @@ void ConsoleViewGL_t::cleanupGL(void)
 	 	glDeleteTextures(1, &gltexture);
 	 	gltexture=0;
 	 }
+	 if (bgTexture) 
+	 {
+	 	glDeleteTextures(1, &bgTexture);
+	 	bgTexture=0;
+	 }
+
+	delete vao; vao = nullptr;
+	delete vbo; vbo = nullptr;
+	delete ebo; ebo = nullptr;
+	delete shaderProgram; shaderProgram = nullptr;
 
 	 doneCurrent();
 }
@@ -417,8 +369,6 @@ void ConsoleViewGL_t::setVsyncEnable( bool ena )
 		fmt.setSwapInterval( vsyncEnabled ? 1 : 0 );
 
 		setFormat(fmt);
-
-		buildTextures();
 	}
 }
 
@@ -569,7 +519,50 @@ void ConsoleViewGL_t::renderFinished(void)
 	videoBufferSwapMark();
 }
 
-void ConsoleViewGL_t::paintGL(void)
+void ConsoleViewGL_t::renderBg(void)
+{
+	if ( !bgTexture )
+	{
+		return;
+	}
+
+	int bgW = bgPix.width();
+	int bgH = bgPix.height();
+	int x = (view_width  - bgW) / 2;
+	int y = (view_height - bgH) / 2;
+
+	glViewport(0, 0, view_width, view_height);
+
+	projectionMatrix.setToIdentity();
+	projectionMatrix.ortho(0.0f, (float)view_width, 0.0f, (float)view_height, -1.0f, 1.0f);
+
+	float vertices[] = {
+		// pos                  // tex
+		(float)x,         (float)y,          0.0f, 1.0f,
+		(float)(x + bgW), (float)y,          1.0f, 1.0f,
+		(float)(x + bgW), (float)(y + bgH), 1.0f, 0.0f,
+		(float)x,         (float)(y + bgH), 0.0f, 0.0f
+	};
+
+	shaderProgram->bind();
+	vao->bind();
+	vbo->bind();
+	vbo->allocate(vertices, sizeof(vertices));
+	ebo->bind();
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, bgTexture);
+
+	shaderProgram->setUniformValue("uProjection", projectionMatrix);
+	shaderProgram->setUniformValue("uTexture", 0);
+
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, nullptr);
+
+	vao->release();
+	shaderProgram->release();
+}
+
+void ConsoleViewGL_t::renderFrame(void)
 {
 	int texture_width  = nes_shm->video.ncol;
 	int texture_height = nes_shm->video.nrow;
@@ -656,13 +649,43 @@ void ConsoleViewGL_t::paintGL(void)
 
 	glViewport(sx, sy, rw, rh);
 
-	glLoadIdentity();
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	glMatrixMode(GL_MODELVIEW);
-	glOrtho( 0.0,  rw,  0.0,  rh,  -1.0,  1.0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, gltexture);
+	glTexSubImage2D(GL_TEXTURE_2D, 0,
+		  	0, 0, texture_width, texture_height,
+				GL_BGRA, GL_UNSIGNED_BYTE, localBuf );
 
-	glDisable(GL_DEPTH_TEST);
+	projectionMatrix.setToIdentity();
+	projectionMatrix.ortho( 0.0,  rw,  0.0,  rh,  -1.0,  1.0);
+
+	float u = (float)texture_width  / (float)txtWidth;
+	float v = (float)texture_height / (float)txtHeight;
+
+	float vertices[] = {
+		// pos       // tex
+		0.0f, 0.0f,  0.0f, v,
+		(float)rw, 0.0f,  u, v,
+		(float)rw, (float)rh, u, 0.0f,
+		0.0f, (float)rh, 0.0f, 0.0f
+	};
+
+	shaderProgram->bind();
+	vao->bind();
+	vbo->bind();
+	vbo->allocate(vertices, sizeof(vertices));
+	ebo->bind();
+
+	shaderProgram->setUniformValue("uProjection", projectionMatrix);
+	shaderProgram->setUniformValue("uTexture", 0);
+
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, nullptr);
+
+	vao->release();
+	shaderProgram->release();
+}
+
+void ConsoleViewGL_t::paintGL(void)
+{
 	if ( bgColor )
 	{
 		glClearColor( bgColor->redF(), bgColor->greenF(), bgColor->blueF(), 1.0f);
@@ -671,88 +694,26 @@ void ConsoleViewGL_t::paintGL(void)
 	{
 		glClearColor( 30.0/255.0, 69.0/255.0, 40.0/255.0, 1.0f);
 	}
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT);
 
 	extern FCEUGI *GameInfo;
 	if ( GameInfo == nullptr )
 	{
-		if ( bgPix.isNull() )
-		{
-			bgPix.load(":/icons/pic.png");
-		}
-		if ( !bgPix.isNull() )
-		{
-			QPainter painter(this);
-			int x = (view_width  - bgPix.width())  / 2;
-			int y = (view_height - bgPix.height()) / 2;
-			painter.drawPixmap(x, y, bgPix);
-		}
+		renderBg();
+		nes_shm->render_count++;
 		return;
 	}
 
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_ONE, GL_ZERO);
-	//glBlendFunc(GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-	if ( textureType == GL_TEXTURE_RECTANGLE )
-	{
-		glDisable(GL_TEXTURE_2D);
-		glEnable(GL_TEXTURE_RECTANGLE);
-		glBindTexture(GL_TEXTURE_RECTANGLE, gltexture);
-	
-		glTexSubImage2D(GL_TEXTURE_RECTANGLE, 0,
-			  	0, 0, texture_width, texture_height,
-					GL_BGRA, GL_UNSIGNED_BYTE, localBuf );
-	
-		glBegin(GL_QUADS);
-		glTexCoord2f( l, b); // Bottom left of picture.
-		glVertex2f( 0.0, 0.0f);	// Bottom left of target.
-	
-		glTexCoord2f(r, b);// Bottom right of picture.
-		glVertex2f( rw, 0.0f);	// Bottom right of target.
-	
-		glTexCoord2f(r, t); // Top right of our picture.
-		glVertex2f( rw,  rh);	// Top right of target.
-	
-		glTexCoord2f(l, t);  // Top left of our picture.
-		glVertex2f( 0.0f,  rh);	// Top left of target.
-		glEnd();
-	}
-	else
-	{
-		float x1, y1, x2, y2;
-
-		x1 = 0.0; y1 = 1.0;
-		x2 = 1.0; y2 = 0.0;
-
-		x2 = (float)texture_width  / (float)txtWidth;
-		y1 = (float)texture_height / (float)txtHeight;
-
-		glDisable(GL_TEXTURE_RECTANGLE);
-		glEnable(GL_TEXTURE_2D);
-		glBindTexture(GL_TEXTURE_2D, gltexture);
-	
-		glTexSubImage2D(GL_TEXTURE_2D, 0,
-			  	0, 0, texture_width, texture_height,
-					GL_BGRA, GL_UNSIGNED_BYTE, localBuf );
-	
-		glBegin(GL_QUADS);
-		glTexCoord2f( x1, y1); // Bottom left of picture.
-		glVertex2f( 0.0, 0.0f);	// Bottom left of target.
-	
-		glTexCoord2f( x2, y1);// Bottom right of picture.
-		glVertex2f( rw, 0.0f);	// Bottom right of target.
-	
-		glTexCoord2f( x2, y2); // Top right of our picture.
-		glVertex2f( rw,  rh);	// Top right of target.
-	
-		glTexCoord2f( x1, y2);  // Top left of our picture.
-		glVertex2f( 0.0f,  rh);	// Top left of target.
-		glEnd();
-	}
-	glDisable(GL_TEXTURE_2D);
-	glDisable(GL_TEXTURE_RECTANGLE);
+	renderFrame();
 
 	nes_shm->render_count++;
 	 //printf("Paint GL!\n");
+}
+
+void ConsoleViewGL_t::calcPixRemap(void)
+{
+}
+
+void ConsoleViewGL_t::doRemap(void)
+{
 }

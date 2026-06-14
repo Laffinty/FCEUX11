@@ -6,66 +6,75 @@
 #include <stdint.h>
 
 #include <QColor>
-#include <QScreen>
-#include <QOpenGLWidget>
-#include <QOpenGLFunctions>
+#include <QCursor>
+#include <QMatrix4x4>
+#include <QOpenGLBuffer>
+#include <QOpenGLFunctions_3_3_Core>
+#include <QOpenGLShaderProgram>
+#include <QOpenGLVertexArrayObject>
+#include <QOpenGLWindow>
 #include <QPixmap>
+#include <QScreen>
+#include <QSize>
 
 #include "Qt/ConsoleViewerInterface.h"
 
-class ConsoleViewGL_t : public QOpenGLWidget, protected QOpenGLFunctions, public ConsoleViewerBase
+class ConsoleViewGL_t : public QOpenGLWindow,
+                        protected QOpenGLFunctions_3_3_Core,
+                        public ConsoleViewerBase
 {
     Q_OBJECT
 
 	public:
-		ConsoleViewGL_t(QWidget *parent = 0);
-		~ConsoleViewGL_t(void);
+		ConsoleViewGL_t(QWindow *parent = nullptr);
+		~ConsoleViewGL_t(void) override;
 
-		int  init(void);
-		void reset(void);
-		void queueRedraw(void){ update(); };
-		int  driver(void){ return VIDEO_DRIVER_OPENGL; };
+		int  init(void) override;
+		void reset(void) override;
+		void queueRedraw(void) override { update(); }
+		int  driver(void) override { return VIDEO_DRIVER_OPENGL; }
 
-		void transfer2LocalBuffer(void);
+		void transfer2LocalBuffer(void) override;
 
-		void setVsyncEnable( bool ena );
-		void setLinearFilterEnable( bool ena );
+		void setVsyncEnable( bool ena ) override;
+		void setLinearFilterEnable( bool ena ) override;
 
-		bool   getForceAspectOpt(void){ return forceAspect; };
-		void   setForceAspectOpt( bool val ){ forceAspect = val; return; };
-		bool   getAutoScaleOpt(void){ return autoScaleEna; };
-		void   setAutoScaleOpt( bool val ){ autoScaleEna = val; return; };
-		double getScaleX(void){ return xscale; };
-		double getScaleY(void){ return yscale; };
-		void   setScaleXY( double xs, double ys );
-		void   getNormalizedCursorPos( double &x, double &y );
-		bool   getMouseButtonState( unsigned int btn );
-		void   setAspectXY( double x, double y );
-		void   getAspectXY( double &x, double &y );
-		double getAspectRatio(void);
+		bool   getForceAspectOpt(void) override { return forceAspect; }
+		void   setForceAspectOpt( bool val ) override { forceAspect = val; return; }
+		bool   getAutoScaleOpt(void) override { return autoScaleEna; }
+		void   setAutoScaleOpt( bool val ) override { autoScaleEna = val; return; }
+		double getScaleX(void) override { return xscale; }
+		double getScaleY(void) override { return yscale; }
+		void   setScaleXY( double xs, double ys ) override;
+		void   getNormalizedCursorPos( double &x, double &y ) override;
+		bool   getMouseButtonState( unsigned int btn ) override;
+		void   setAspectXY( double x, double y ) override;
+		void   getAspectXY( double &x, double &y ) override;
+		double getAspectRatio(void) override;
 
 		void   screenChanged(QScreen *scr);
-		void   setBgColor( QColor &c );
-		void   setCursor(const QCursor &c){ QOpenGLWidget::setCursor(c); };
-		void   setCursor( Qt::CursorShape s ){ QOpenGLWidget::setCursor(s); };
+		void   setBgColor( QColor &c ) override;
+		void   setCursor(const QCursor &c) override { QOpenGLWindow::setCursor(c); }
+		void   setCursor( Qt::CursorShape s ) override { QOpenGLWindow::setCursor(s); }
 
-		QSize   size(void){ return QOpenGLWidget::size(); };
-		QCursor cursor(void){ return QOpenGLWidget::cursor(); };
-		void    setMinimumSize(const QSize &s){ return QOpenGLWidget::setMinimumSize(s); };
-		void    setMaximumSize(const QSize &s){ return QOpenGLWidget::setMaximumSize(s); };
+		QSize   size(void) override { return QOpenGLWindow::size(); }
+		QCursor cursor(void) override { return QOpenGLWindow::cursor(); }
+		void    setMinimumSize(const QSize &s) override { QOpenGLWindow::setMinimumSize(s); }
+		void    setMaximumSize(const QSize &s) override { QOpenGLWindow::setMaximumSize(s); }
 
 	protected:
-	void initializeGL(void);
-	void resizeGL(int w, int h);
-	void paintGL(void);
-	void mousePressEvent(QMouseEvent * event);
-	void mouseReleaseEvent(QMouseEvent * event);
+	void initializeGL(void) override;
+	void resizeGL(int w, int h) override;
+	void paintGL(void) override;
+	void mousePressEvent(QMouseEvent * event) override;
+	void mouseReleaseEvent(QMouseEvent * event) override;
 
 	void buildTextures(void);
+	void buildBgTexture(void);
 	void calcPixRemap(void);
 	void doRemap(void);
-	void chkExtnsGL(void);
-	int  forcePwr2( int in );
+	void renderBg(void);
+	void renderFrame(void);
 
 	double devPixRatio;
 	double aspectRatio;
@@ -82,13 +91,12 @@ class ConsoleViewGL_t : public QOpenGLWidget, protected QOpenGLFunctions, public
 	int  txtWidth;
 	int  txtHeight;
 	GLuint gltexture;
+	GLuint bgTexture;
 	bool   linearFilter;
 	bool   forceAspect;
 	bool   autoScaleEna;
-	bool   reqPwr2;
 	bool   vsyncEnabled;
 
-	unsigned int  textureType;
 	unsigned int  mouseButtonMask;
 	QColor *bgColor;
 	QPixmap bgPix;
@@ -96,8 +104,13 @@ class ConsoleViewGL_t : public QOpenGLWidget, protected QOpenGLFunctions, public
 	uint32_t  *localBuf;
 	uint32_t   localBufSize;
 
+	QOpenGLShaderProgram *shaderProgram;
+	QOpenGLVertexArrayObject *vao;
+	QOpenGLBuffer *vbo;
+	QOpenGLBuffer *ebo;
+	QMatrix4x4 projectionMatrix;
+
 	private slots:
 		void cleanupGL(void);
 		void renderFinished(void);
 };
-
