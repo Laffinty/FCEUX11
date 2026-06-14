@@ -19,9 +19,12 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <SDL.h>
 #include <QApplication>
 #include <QSplashScreen>
 #include <QSettings>
+#include <QSurfaceFormat>
+#include <QTimer>
 #include <QFile>
 #include <QTranslator>
 //#include <QProxyStyle>
@@ -32,6 +35,8 @@
 
 #ifdef WIN32
 #include <windows.h>
+#include <io.h>
+#include <fcntl.h>
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 #include <QtPlatformHeaders/QWindowsWindowFunctions>
 #endif
@@ -100,6 +105,21 @@ static bool showSplashScreen(void)
 int main( int argc, char *argv[] )
 {
 	int retval = 0;
+
+	// Set the default QSurfaceFormat BEFORE creating QApplication. The v0.3.14
+	// OpenGL backend uses QOpenGLWindow + #version 330 core shaders, which
+	// require a Core Profile OpenGL 3.3 context. Without this default format,
+	// Qt falls back to a Compatibility Profile 2.x context and the
+	// initializeOpenGLFunctions() call for QOpenGLFunctions_3_3_Core fails.
+	{
+		QSurfaceFormat defaultFmt;
+		defaultFmt.setRenderableType(QSurfaceFormat::OpenGL);
+		defaultFmt.setProfile(QSurfaceFormat::CoreProfile);
+		defaultFmt.setVersion(3, 3);
+		defaultFmt.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
+		defaultFmt.setSwapInterval(1);
+		QSurfaceFormat::setDefaultFormat(defaultFmt);
+	}
 
 	fceuWrapperPreInit(argc, argv);
 
@@ -189,7 +209,7 @@ int main( int argc, char *argv[] )
 	}
 
 	fceuSplashScreen *splash = NULL;
-	
+
 	if ( showSplashScreen() )
 	{
 		splash = new fceuSplashScreen();
@@ -198,10 +218,44 @@ int main( int argc, char *argv[] )
 	}
 
 	#ifdef WIN32
-	if (AttachConsole(ATTACH_PARENT_PROCESS))
+	// Attach to parent console if available, so that printf() / qDebug()
+	// output is visible when launched from a console (cmd.exe, PowerShell).
+	//
+	// Defensive: when the parent process is a pseudo-tty (e.g. MSYS2 mintty,
+	// WSL, or any non-Windows console), AttachConsole may claim success
+	// (returning non-zero) but the underlying CONOUT$ handle is invalid or
+	// shares a file descriptor with stderr. Calling freopen() on the shared
+	// stream in that situation crashes the process.
+	//
+	// Guard: only redirect when GetConsoleWindow() is non-NULL after attach,
+	// which indicates a real Windows console (not a pseudo-tty).
+	if (AttachConsole(ATTACH_PARENT_PROCESS) && GetConsoleWindow() != NULL)
 	{
-		freopen("CONOUT$", "w", stdout);
-		freopen("CONOUT$", "w", stderr);
+		HANDLE hConOut = CreateFileA("CONOUT$", GENERIC_WRITE, FILE_SHARE_WRITE,
+		                            NULL, OPEN_EXISTING, 0, NULL);
+		if (hConOut != INVALID_HANDLE_VALUE)
+		{
+			int conFd = _open_osfhandle((intptr_t)hConOut, _O_TEXT);
+			if (conFd != -1)
+			{
+				FILE *conFile = _fdopen(conFd, "w");
+				if (conFile != NULL)
+				{
+					*stdout = *conFile;
+					setvbuf(stdout, NULL, _IONBF, 0);
+				}
+			}
+			int conFd2 = _open_osfhandle((intptr_t)hConOut, _O_TEXT);
+			if (conFd2 != -1)
+			{
+				FILE *conFile2 = _fdopen(conFd2, "w");
+				if (conFile2 != NULL)
+				{
+					*stderr = *conFile2;
+					setvbuf(stderr, NULL, _IONBF, 0);
+				}
+			}
+		}
 	}
 	#endif
 	//app.setStyle( new MenuStyle() );
@@ -227,6 +281,36 @@ int main( int argc, char *argv[] )
 	//}
 
 	fceuWrapperInit( argc, argv );
+
+	// CRITICAL: Pump SDL events from the MAIN (Qt) thread.
+	//
+	// On Windows, keyboard (WM_INPUT) and other raw-input messages arrive in
+	// the foreground window's THREAD message queue. Qt is running the main
+	// event loop on the main thread, so Qt pumps those messages — but Qt
+	// does not know about SDL and never translates WM_INPUT to SDL events.
+	// The emulator thread's SDL_PumpEvents() can only drain its OWN thread
+	// queue, so SDL's keyboard (and similar) event queue stays empty, and
+	// no key press is ever delivered to fceu11's UpdatePhysicalInput().
+	//
+	// This regressed in v0.3.14: the OpenGL backend migrated from
+	// QOpenGLWidget to QOpenGLWindow + QWidget::createWindowContainer. With
+	// QOpenGLWidget, the widget was embedded inside the QMainWindow so Qt
+	// routed key events through the QMainWindow's QWidget::keyPressEvent,
+	// which fed g_keyState. With QOpenGLWindow, the GL surface is a separate
+	// top-level QWindow (with its own HWND), Qt no longer routes keys to
+	// fceu11's keyboard handling, and the only path is via SDL — which
+	// requires the main thread to pump events.
+	//
+	// Fix: a 0-ms QTimer fires every event-loop iteration, calling
+	// SDL_PumpEvents() on the main thread. This drains Windows messages
+	// from the main thread's queue and converts WM_INPUT into SDL events,
+	// which are then readable via SDL_PollEvent() from the emulator thread
+	// (where UpdatePhysicalInput runs).
+	QTimer *sdlPumpTimer = new QTimer(&app);
+	QObject::connect(sdlPumpTimer, &QTimer::timeout, []() {
+		SDL_PumpEvents();
+	});
+	sdlPumpTimer->start(0);
 
 	consoleWindow = new consoleWin_t();
 

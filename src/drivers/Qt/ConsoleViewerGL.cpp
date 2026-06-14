@@ -176,7 +176,34 @@ void ConsoleViewGL_t::screenChanged( QScreen *screen )
 	gui_draw_area_width = w;
 	gui_draw_area_height = h;
 
-	buildTextures();
+	// CRITICAL: buildTextures() invokes OpenGL functions (glGenTextures,
+	// glBindTexture, glTexImage2D, ...). On Windows, calling these without a
+	// current rendering context dereferences a NULL function-pointer table
+	// and segfaults the process.
+	//
+	// In the v0.3.14 QOpenGLWindow flow, the QMainWindow's showEvent fires
+	// BEFORE Qt has had a chance to make the QOpenGLWindow's GL context
+	// current (initializeGL has not run yet, so glFunctionsInitialized is
+	// false). The showEvent handler (consoleWin_t::initScreenHandler ->
+	// winScreenChanged -> this slot) used to call buildTextures
+	// unconditionally, crashing on the first glGenTextures call.
+	//
+	// Guard: only call buildTextures if the GL functions are initialized
+	// (i.e., initializeGL has run). The screen dimensions are stored in
+	// view_width/view_height above regardless, and initializeGL itself calls
+	// buildTextures(), so the first-frame texture will be correctly sized.
+	// Subsequent screen changes (e.g., window moved to a different monitor)
+	// arrive after initializeGL has run, so this guard does not affect them.
+	if (glFunctionsInitialized)
+	{
+		buildTextures();
+	}
+	else
+	{
+		// GL context not yet initialized. view_width/view_height are stored
+		// above; initializeGL() will call buildTextures() once the context
+		// is current, picking up the latest dimensions.
+	}
 
 	//printf("GL Ratio: %f  %ix%i\n", screen->devicePixelRatio(), w, h );
 }

@@ -1,0 +1,160 @@
+================================================================================
+FCEUX11 输入系统架构
+================================================================================
+
+适用：所有需要改输入处理、添加新输入后端、或者诊断"按键不响应"问题的
+开发。
+
+架构特点：后端无关抽象（InputManager）+ 多后端（SDL / XInput / 可选 WGI），
+新后端只需实现 InputBackend 接口。
+
+================================================================================
+1. 整体架构
+================================================================================
+
+┌─────────────────────────────────────────────────────────────┐
+│                    FCEUD_UpdateInput()                      │
+│                       (input.cpp)                           │
+└───────────────────────┬─────────────────────────────────────┘
+                        │ InputManager::pollAll()
+                        ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     InputManager                            │
+│  owns one InputBackend per underlying API                   │
+└───────┬───────────────┬───────────────────┬─────────────────┘
+        │ SDL           │ XInput            │ WGI (optional)
+        ▼               ▼                   ▼
+   SDLBackend      XInputBackend     WindowsGamingInputBackend
+        │               │                   │
+        ▼               ▼                   ▼
+    SDLDevice      XInputDevice        WGIDevice
+   (jsDev_t*)     (4 fixed slots)    (dynamic list)
+
+调用入口在 src/drivers/Qt/input.cpp，FCEUD_UpdateInput() 每一帧被主线程的
+120Hz QTimer（consoleWin_t::updatePeriodic）调用一次。
+
+================================================================================
+2. 设备编号方案
+================================================================================
+
+ButtConfig::DeviceNum 保持 int 类型，避免破坏配置文件序列化。
+后端按 32-slot 块划分：
+
+| 后端   | DeviceNum 范围  | 备注                          |
+|--------|-----------------|-------------------------------|
+| SDL    | 0 – 31          | 与旧版 MAX_JOYSTICKS 一致     |
+| XInput | 32 – 35         | 最多 4 个 XInput 用户槽位    |
+| WGI    | 36 – 39         | 枚举顺序的前 4 个 WGI 手柄   |
+
+InputManager::testButton() 用 kBackendFromDeviceNum() 和
+kLocalDeviceIndex() 把 DeviceNum 路由到对应后端。
+
+新增后端时：在 BackendId 枚举里追加，按 32-slot 对齐分配 DeviceNum 范围。
+
+================================================================================
+3. 后端细节
+================================================================================
+
+3.1 SDL 后端（src/drivers/Qt/input/sdl_backend.cpp）
+
+  • 初始化：SDL_INIT_JOYSTICK
+  • 复用既有 jsDev_t 数组（g_sdlJsDev[]），保留旧版映射和配置代码
+  • SDLDevice::button() 理解旧版按钮编码：
+      - 帽子按钮：0x2000
+      - 轴按钮：  0x8000
+      - 普通按钮：低字节
+  • pollAll() 调 SDL_PumpEvents()，让 SDL 内部 joystick 状态保持新鲜
+
+3.2 XInput 后端（src/drivers/Qt/input/xinput_backend.cpp）
+
+  • 运行时加载 xinput1_4.dll（不静态链接）
+  • 用 GetProcAddress 拿 XInputGetState / XInputSetState
+  • DLL 不存在时优雅降级（旧版 Windows 或裁剪环境）
+  • 按钮 ID 0-13 映射到：A/B/X/Y/LB/RB/Back/Start/LS/RS/DPadUp/DPadDown/
+    DPadLeft/DPadRight
+
+3.3 WGI 后端（src/drivers/Qt/input/wgi_backend.cpp）
+
+  • 仅在定义 FCEUX11_WGI_BACKEND 时编译
+  • 用 C++/WinRT projection headers（__has_include 探测）
+  • headers 缺失时降级为 no-op，build 仍能成功
+  • 用 Gamepad::SetVibration 启用高精度振动
+
+================================================================================
+4. UI / 配置
+================================================================================
+
+GamePadConf 现在把已连接的 XInput 手柄列在 Device 下拉框里（与 SDL
+joystick 并列）。选 XInput 设备时分配一个固定默认 NES 映射（A/B/Select/
+Start/D-pad/TurboA/TurboB 映射到对应 XInput 面部按钮）。
+
+GUID 在配置中存为 XInput_N。GamePad_t::init() 在下次启动时如果该控制器
+连着，会恢复设备索引和默认映射。
+
+约束：
+  - SDL 按钮学习（DWaitButton）只看到 SDL 事件
+  - XInput 定制目前只能编辑配置或用默认映射
+
+================================================================================
+5. 键盘事件路径
+================================================================================
+
+注意：键盘不走 InputManager，走单独的 SDL 路径。
+
+主线程：
+  - QApplication event loop 跑（Qt pump Windows 消息）
+  - 0ms QTimer 定时调 SDL_PumpEvents() 把主线程消息队列里的 WM_INPUT
+    转成 SDL 事件（详见 07_Qt_SDL_Windows_Integration_Debug_Methodology.txt
+    §3）
+  - consoleWin_t::updatePeriodic() 120Hz 调 FCEUD_UpdateInput
+
+SDL_KEYDOWN / KEYUP 事件：
+  - 在 UpdatePhysicalInput 里被 SDL_PollEvent 取出
+  - 更新 g_keyState[scancode]
+  - 调 KeyboardCommands（处理热键）
+
+FCEUD_UpdateInput 链路：
+  - InputManager::pollAll()  → SDL_PumpEvents（再 pump 一次）
+  - UpdatePhysicalInput    → SDL_PollEvent → g_keyState
+  - KeyboardCommands
+  - UpdateGamepad          → DTestButton（查 g_keyState）→ JS bit
+
+================================================================================
+6. 迁移注意
+================================================================================
+
+• 现有输入预设和保存的配置文件能无修改加载，因为 ButtConfig 布局没变
+• 新代码应通过 InputManager::testButton() 查询输入，不要直接读 SDL
+  joystick 状态
+• DTestButtonJoy() 保留为兼容 wrapper，新代码优先用 testButton()
+
+================================================================================
+7. 常见故障诊断
+================================================================================
+
+症状 1：手柄/键盘都不响应
+  - 检查 SDL_PumpEvents 是否在主线程（详见 07 §3）
+  - 检查 FCEUD_UpdateInput 是否被调用（120Hz QTimer 是不是被 disarm）
+  - 打印 JSreturn 看是否有 bit 被置位
+
+症状 2：键盘 OK 手柄不响应
+  - 检查 DTestButtonJoy / testButton 路径
+  - 检查 InputManager::backends_ 是否非空
+  - 用 fceu11::input::InputManager::instance().printState() 看后端列表
+
+症状 3：手柄 OK 键盘不响应
+  - 这是案例 B（07 §3）—— 0ms QTimer 没装
+  - g_keyState 永远 0，JS 永远 0
+
+症状 4：XInput 手柄默认映射错位
+  - 检查 xinputMap[] 数组（sdl-joystick.cpp:384）
+  - 改完后必须更新 fceux11_input_regression_test
+
+症状 5：FCEUD_UpdateInput 死锁
+  - 看 fceuWrapper.cpp line 1377 注释掉的 FCEUD_UpdateInput
+  - 确认 updatePeriodic / emuFrameFinish 路径都通
+  - 排查 fceuWrapperTryLock 互斥锁
+
+================================================================================
+文件结束
+================================================================================

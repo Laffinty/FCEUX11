@@ -1,0 +1,644 @@
+================================================================================
+FCEUX11 Qt + SDL + Windows 集成调试方法论
+================================================================================
+
+适用：FCEUX11 系列（任何 MSVC + Qt6 + SDL2 + OpenGL + Rust FFI 的 GUI 应用，
+可推广到所有跨语言 GUI 模拟器/游戏机/重放工具）。
+
+本文档记录在 v0.3.14 调试 GUI 启动崩溃 + 键盘失效的两个 BUG 时沉淀下来的
+通用方法论、关键陷阱与可复用的修复模式。FCEUX11 的项目历史与本次 BUG 修
+复的版本号无关，因此不写"v0.3.14 修复了 X / Y"这种 changelog 句式，而按
+"问题 / 根因 / 模式"组织，让后人遇到类似症状时可以直接按目录索引。
+
+修订原则：本文件是技术知识库，不是 changelog。后续若出现新的同类问题，
+应在对应章节追加"案例 + 修复"段落，**不要**改写为"v0.X.Y 修复了…"的版本
+叙述。
+
+================================================================================
+目录
+================================================================================
+
+1. 调试方法论总览（黄金 5 步）
+2. 案例 A：QOpenGLWindow 启动崩溃（OpenGL 上下文未 makeCurrent 时调用 GL 函数）
+3. 案例 B：SDL 键盘事件被 Qt 主线程吞掉（WM_INPUT 跨线程问题）
+4. 案例 C：AttachConsole + freopen 在 MSYS2/伪终端下崩溃
+5. 模式库：可复用修复模板
+6. 反模式：不要再踩的坑
+7. 工具速查：Qt / SDL / Windows 调试开关
+8. 自动化测试：SendInput + Win32 API 仿真键盘
+
+================================================================================
+1. 调试方法论总览（黄金 5 步）
+================================================================================
+
+GUI 启动崩溃或输入失效类问题的标准排查流程：
+
+  Step 1 ── 复现 + 缩小窗口
+    • 用 timeout 限制运行时间，避免挂起。
+    • 把 stdout / stderr 重定向到文件（Start-Process -RedirectStandardOutput）。
+      注意：某些场景 AttachConsole 会把 stdout 重写到 CONOUT$，导致文件为空。
+      解决：让调试打印走 stderr（fprintf(stderr, ...)），或用 console 父进程
+      直接 bash 启动看输出。
+    • 第一目标是**判断症状分类**：
+        A. 程序根本不启动（exit code 非 0）
+        B. 程序启动后立刻崩溃（segfault，exit 139 / SIGSEGV）
+        C. 程序启动但 GUI 不显示
+        D. GUI 显示但输入失效
+        E. GUI 显示且部分输入能工作
+
+  Step 2 ── 加诊断打印二分定位
+    • 在可疑调用链的每个关键节点加 fprintf(stderr, "[DBG] xxx\n"); fflush(stderr);
+    • **必须 fflush**，否则崩溃前缓冲区未刷出，丢失关键的最后几行。
+    • 重要：打印添加要**集中**（如 main.cpp / 一处 wrapper），不要每加一个
+      print 都重新构建完整项目；只改一个 TU，重编秒级完成。
+    • 逐步收窄：从 main() 一路打印到崩溃点。崩溃发生在 print A 之后、
+      print B 之前 → 病灶在 A 与 B 之间。
+
+  Step 3 ── 启用平台诊断开关
+    • Qt：
+        QT_DEBUG_PLUGINS=1        打印所有 Qt 插件加载
+        QT_LOGGING_RULES="qt.qpa.*=true;js=true"   打印 QPA 平台抽象层 + JS
+        QT_OPENGL=desktop         强制用桌面 OpenGL（绕过 ANGLE）
+        QSG_INFO=1                打印 Qt Quick 场景图信息
+    • SDL：
+        SDL_VIDEO_DRIVER=xxx      强制指定 SDL 视频驱动
+        SDL_VIDEODRIVER=xxx       同上（旧名字）
+    • Windows：
+        [Debug] Win + R → dxdiag  检查 GPU / 驱动
+        Get-Process → MainWindowHandle 看实际主窗口句柄
+        EnumWindows + GetWindowText 枚举所有窗口找正确的 HWND
+
+  Step 4 ── 隔离对比（A/B 测试）
+    • 替换某个子系统为已知良好的替代方案：
+        - 视频后端：OpenGL (QOpenGLWindow) → OpenGL (QPAINTER) → 软件光栅
+        - 输入后端：SDL → Qt 原生 → Win32 Raw Input
+        - 渲染管线：QWidget → QML → 自绘
+    • 如果替代方案能工作，故障域就锁死在原方案。
+    • 例：本案例中把视频后端从 OpenGL 切到 QPAINTER，崩溃消失，确诊
+      "QOpenGLWindow 路径有问题"。
+
+  Step 5 ── 验证修复（回归测试 + 端到端）
+    • ctest 全部通过（已有的 7 个测试目标）。
+    • 端到端：双击 / 命令行启动 + SendInput 模拟按键 + 检查事件是否到达
+      fceu 核心（JSreturn 等状态变量）。
+    • 端到端测试要做成脚本，固化到 CI 或本地一键验证。
+
+================================================================================
+2. 案例 A：QOpenGLWindow 启动崩溃（OpenGL 上下文未 makeCurrent 时调用 GL 函数）
+================================================================================
+
+【症状】
+  • consoleWin_t 创建完成（构造成功），show() 内部某处 segfault（exit 139）。
+  • GUI 永不显示，进程立即死。
+  • ctest 全部通过（ctest 不跑 GUI 路径）。
+
+【二分定位过程】
+  • 在 main.cpp 加 [DBG] 打印：fceuWrapperInit 完成、consoleWin_t 创建完成、
+    show() 进入、show() 返回。崩溃发生在 show() 内部。
+  • 继续往下钻：在 consoleWin_t::showEvent 加 [DBG] entry/exit。
+    崩溃在 entry 之后、exit 之前 → 在 showEvent 的 initScreenHandler →
+    winScreenChanged → viewport_GL->screenChanged() 调用链中。
+  • 在 ConsoleViewerGL::screenChanged 加 [DBG] 守护，**跳过** buildTextures()
+    调用 → 崩溃消失。
+  • 结论：buildTextures() 是病灶。
+
+【根因】
+  Windows 平台下，调用任何 OpenGL 函数（glGenTextures / glDeleteTextures /
+  glBindTexture / glTexParameteri / glTexImage2D 等）都需要一个 current 的
+  Rendering Context (RC)。RC 通过 wglMakeCurrent() 激活。
+
+  调用链时序：
+
+      consoleWindow->show()
+        └─ Qt 主事件循环开始
+             ├─ QMainWindow 平台窗口被创建
+             ├─ QWidget::createWindowContainer 内的 QOpenGLWindow 平台窗口被创建
+             ├─ Qt 内部 schedule 一个 initializeGL() 回调（**延后**到首次 makeCurrent）
+             └─ consoleWin_t::showEvent 触发  ←  此时 GL 上下文尚未 makeCurrent
+                  └─ initScreenHandler → winScreenChanged → screenChanged
+                       └─ buildTextures() ─── glGenTextures() CRASH
+                            │
+                            └─ 没有 current RC，wgl 拿不到函数指针
+                               （WNDCLASS 里 GL 函数指针是 NULL）
+                               ───► 段错误
+
+  关键点：**Qt 的 QOpenGLWindow 设计**就是"先 show，show 完成后再异步
+  初始化 GL 上下文"——任何在 show 链路上同步调用 GL 函数的代码都会崩。
+
+  原 v0.3.13 之前用 QOpenGLWidget 不存在这个问题，因为 QOpenGLWidget 在
+  paintEvent 之前已经隐式 makeCurrent。
+
+【修复模式：gl-functions-not-initialized 守护】
+
+  在类里加一个 bool 成员 `glFunctionsInitialized`，initializeGL() 成功
+  设置为 true；任何想在 initializeGL 之外调用 GL 函数的代码都先检查这个
+  flag，未初始化就跳过（让 initializeGL 自己负责重建）：
+
+      void ConsoleViewGL_t::screenChanged(QScreen *screen)
+      {
+          // ... 更新 view_width / view_height 永远做（不影响 GL）
+          if (glFunctionsInitialized) {
+              buildTextures();
+          }
+          // 否则跳过 —— initializeGL() 会自己调用 buildTextures()
+      }
+
+  void ConsoleViewGL_t::initializeGL(void) {
+      if (!initializeOpenGLFunctions()) {
+          glFunctionsInitialized = false;
+          return;
+      }
+      glFunctionsInitialized = true;
+      // ... 真正的 GL 初始化（shader / VBO / texture / FBO）
+  }
+
+  void ConsoleViewGL_t::paintGL(void) {
+      if (!glFunctionsInitialized) {
+          return;   // 静默跳过，不绘制但也不崩
+      }
+      // ... 正常绘制
+  }
+
+  通用规则：QOpenGLWindow 的所有 GL 调用路径（paint / resize / 自定义槽）
+  都要有这个守卫，**只** initializeGL() 设为 true，析构时设为 false。
+
+【辅助修复：QSurfaceFormat::setDefaultFormat()】
+
+  v0.3.14 commit 4d328fb 把 QOpenGLWidget 换成 QOpenGLWindow + 用
+  #version 330 core shader，**但忘了**设置默认 QSurfaceFormat。Qt 默认
+  给的 surface format 是 1.x / 2.x 兼容 profile，3.3 Core Profile 的请求
+  可能 fallback 失败。
+
+      // 在 QApplication app(argc, argv); 之前
+      QSurfaceFormat defaultFmt;
+      defaultFmt.setRenderableType(QSurfaceFormat::OpenGL);
+      defaultFmt.setProfile(QSurfaceFormat::CoreProfile);
+      defaultFmt.setVersion(3, 3);
+      defaultFmt.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
+      defaultFmt.setSwapInterval(1);
+      QSurfaceFormat::setDefaultFormat(defaultFmt);
+
+  setDefaultFormat() 必须在 QApplication ctor 之前调用，Qt 只在那一刻
+  读这个值。
+
+================================================================================
+3. 案例 B：SDL 键盘事件被 Qt 主线程吞掉（WM_INPUT 跨线程问题）
+================================================================================
+
+【症状】
+  • 修完案例 A 之后，GUI 能显示，OpenGL 渲染正常。
+  • ctest 仍然全过。
+  • **手动双击 .nes ROM 进入游戏，按方向键 / Enter / 空格，游戏完全无反应**。
+  • 但 ctest 的 mapper 测试不涉及输入，所以测试套件覆盖不到。
+
+【二分定位】
+  • 自动化 SendInput 测试（PowerShell + keybd_event 模拟按键）：
+    - 第一个 F 按键成功被 fceux 收到（DBG_KB 打印 SDL_KEYDOWN）
+    - 后续按键 SetForegroundWindow 失效，事件去了 PowerShell 窗口
+  • 给 SDL_KEYDOWN / KEYUP 加打印确认事件确实进了 SDL 队列
+    → 确认事件能进队列
+  • 给 UpdateGamepad() 加 DBG_JS 打印 JSreturn
+    → 确认 JSreturn 永远 = 0x00000000
+  • 给 DTestButton 加 DBG_DTB 打印 g_keyState[scancode]
+    → 看到 g_keyState[scancode] 永远 = 0，即使上一帧 SDL_KEYDOWN 刚把它设为 1
+
+  矛盾点：上一帧 SDL_KEYDOWN 把 g_keyState[9] = 1，
+  下一帧 DTestButton 读 g_keyState[9] = 0。差一帧。
+
+【根因】
+
+  Windows 上 SDL 接收键盘走的是 **raw input (WM_INPUT)** 路径，事件被
+  投递到**前台窗口所在线程**的消息队列。
+
+  在 Qt 应用里：
+
+      主线程（Qt）                模拟器线程（emulatorThread）
+      ─────────────               ──────────────────────────
+      Qt 事件循环运行              emulatorThread_t::run()
+      ├─ pump 所有 Win32 MSG       ├─ fceuWrapperUpdate()
+      ├─ 不知道 SDL 存在             ├─ FCEUD_UpdateInput()
+      ├─ WM_INPUT 进队列了,            ├─ UpdatePhysicalInput
+      │  但 Qt 不转 SDL event            │  └─ SDL_PollEvent() ─┐
+      │                                    └─ UpdateGamepad      │
+      └─ (SDL_PumpEvents               └─ DTestButton()         │
+          从未在主线程被调用!)              g_keyState[9] 永远是 0
+
+  SDL_PumpEvents() 的作用是把线程消息队列里的 WM_INPUT 转成 SDL 事件并
+  入 SDL 队列。它**只能 pump 调用者所在线程的**消息队列。
+
+  fceu11 把 FCEUD_UpdateInput 注释掉（fceuWrapper.cpp line 1377 注释），
+  改到主线程的 120Hz QTimer（consoleWin_t::updatePeriodic）调用，理由
+  是"在主线程处理输入，macOS SDL2 要求"。这逻辑在 macOS 是对的，
+  但在 Windows 上：Qt 主线程已经在 pump 自己的消息，但**它不知道要 pump
+  SDL 事件**。
+
+  后果：WM_INPUT 累积在主线程消息队列，SDL 队列永远是空的，
+  SDL_PollEvent() 永远拿不到键盘事件。
+
+【修复模式：Qt 主线程定时 SDL_PumpEvents】
+
+  最简洁的修法是让 SDL 事件 pump 跟 Qt 事件循环同节拍：
+
+      // main.cpp, QApplication app(argc, argv); 之后, consoleWindow->show() 之前
+      QTimer *sdlPumpTimer = new QTimer(&app);
+      QObject::connect(sdlPumpTimer, &QTimer::timeout, []() {
+          SDL_PumpEvents();
+      });
+      sdlPumpTimer->start(0);  // 0ms = 尽快触发，每个事件循环一次
+
+  0ms 的 QTimer 在 Qt 主线程的事件循环里被调度，每次回调都跑在主线程
+  → 完美解决"主线程 WM_INPUT 没被 pump"的问题。
+
+  关键点：
+  - 必须用 0ms 间隔（或者 1ms），用 8ms / 16ms 会有输入延迟。
+  - start(0) 不会真的 0ms 触发，而是"尽快"，受 Qt 事件循环节奏约束。
+  - QTimer 必须以 &app 为 parent，自动随 app 析构。
+
+  【替代方案：QAbstractNativeEventFilter】
+  更彻底的方式是安装一个 native event filter，在主线程的 nativeEvent
+  回调里把 WM_KEYDOWN / WM_KEYUP 转成 SDL_PushEvent 入队。优点是
+  完全无延迟，缺点是代码量大、要处理虚拟键到 SDL 键码的转换。
+
+      class SDLEventFilter : public QAbstractNativeEventFilter {
+      public:
+          bool nativeEventFilter(const QByteArray &eventType, void *message, qintptr *) {
+              if (eventType == "windows_generic_MSG" || eventType == "windows_dispatcher_MSG") {
+                  MSG *msg = static_cast<MSG*>(message);
+                  if (msg->message == WM_KEYDOWN || msg->message == WM_KEYUP) {
+                      SDL_Event e;
+                      e.type = (msg->message == WM_KEYDOWN) ? SDL_KEYDOWN : SDL_KEYUP;
+                      e.key.keysym.sym = SDL_KeyFromVirtualKey(msg->wParam);
+                      e.key.keysym.scancode = SDL_GetScancodeFromVirtualKey(msg->wParam);
+                      SDL_PushEvent(&e);
+                      return false;  // 不拦截，让 Qt 也收到
+                  }
+              }
+              return false;
+          }
+      };
+
+      // 安装
+      QGuiApplication::instance()->installNativeEventFilter(new SDLEventFilter());
+
+  实测中，0ms QTimer + SDL_PumpEvents 模式已经足够流畅。如果将来发现
+  按键延迟（如格斗游戏需要 1 frame 内响应），再升级到 native event
+  filter。
+
+【附加诊断：FCEUD_UpdateInput 调用位置】
+
+  fceu11 历史上把 FCEUD_UpdateInput 从 emulator 线程挪到了主线程的
+  120Hz QTimer，理由是 macOS 兼容性。这是 fceu11 的设计选择。
+
+  调试时的检查点：
+  - fceuWrapper.cpp line 1377：注释掉的 FCEUD_UpdateInput() 调用
+  - ConsoleWindow.cpp line 4406：updatePeriodic() 内调 FCEUD_UpdateInput
+  - consoleWin_t::emuFrameFinish()：处理 frameFinished 信号，也调
+    FCEUD_UpdateInput
+
+  任何一条调用链生效即可。**关键不在哪调 FCEUD_UpdateInput，而在
+  哪个线程 pump SDL 事件**。
+
+================================================================================
+4. 案例 C：AttachConsole + freopen 在 MSYS2/伪终端下崩溃
+================================================================================
+
+【症状】
+  • 从 MSYS2 bash / mintty 启动 fceux11.exe，进程立刻 segfault。
+  • 从 cmd.exe / PowerShell 启动则正常。
+  • 从 Explorer 双击启动（无父控制台）也正常。
+
+【根因】
+
+  原代码：
+
+      if (AttachConsole(ATTACH_PARENT_PROCESS)) {
+          freopen("CONOUT$", "w", stdout);
+          freopen("CONOUT$", "w", stderr);
+      }
+
+  AttachConsole(ATTACH_PARENT_PROCESS) 在 MSYS2 / mintty / WSL / Cygwin
+  等"伪终端"父进程下会**返回 TRUE（成功）**，因为 Windows 层面它确实
+  attach 到了父进程（PowerShell.exe 或 mintty.exe 都通过 AllocConsole
+  / AttachConsole 维护一个假控制台）。
+
+  但这个"假控制台"没有真实的 CONOUT$ 设备句柄。stdout 和 stderr 在
+  CRT 层共享同一个底层 OS 文件描述符（Windows 上 stdout(1) 和
+  stderr(2) 默认同 fd）。调用 freopen("CONOUT$", "w", stdout) 会
+  改写 stdout 内部 FILE 结构，但底层 fd 已被 stderr 持有，导致下一次
+  freopen("CONOUT$", "w", stderr) 操作无效的 stream 状态 → segfault。
+
+  症状特征：
+  - 仅在"父进程 = 伪终端"时崩
+  - freopen stdout 成功（不崩）
+  - freopen stderr 时崩
+  - 如果把两次 freopen 顺序调换，第一次崩
+
+【修复模式：GetConsoleWindow() 守护 + _open_osfhandle 替换 FILE 结构】
+
+  方案 A（最简单）：
+
+      if (AttachConsole(ATTACH_PARENT_PROCESS) && GetConsoleWindow() != NULL) {
+          freopen("CONOUT$", "w", stdout);
+          freopen("CONOUT$", "w", stderr);
+      }
+
+  GetConsoleWindow() 在 mintty 等伪终端下返回 NULL，跳过整个块。
+  缺点：仍有 freopen 共享 fd 的隐患。
+
+  方案 B（推荐）：绕开 freopen，直接覆盖 FILE*：
+
+      if (AttachConsole(ATTACH_PARENT_PROCESS) && GetConsoleWindow() != NULL) {
+          HANDLE hConOut = CreateFileA("CONOUT$", GENERIC_WRITE, FILE_SHARE_WRITE,
+                                        NULL, OPEN_EXISTING, 0, NULL);
+          if (hConOut != INVALID_HANDLE_VALUE) {
+              int conFd = _open_osfhandle((intptr_t)hConOut, _O_TEXT);
+              if (conFd != -1) {
+                  FILE *conFile = _fdopen(conFd, "w");
+                  if (conFile != NULL) {
+                      *stdout = *conFile;  // 拷贝 FILE 结构体
+                      setvbuf(stdout, NULL, _IONBF, 0);
+                  }
+              }
+              int conFd2 = _open_osfhandle((intptr_t)hConOut, _O_TEXT);
+              if (conFd2 != -1) {
+                  FILE *conFile2 = _fdopen(conFd2, "w");
+                  if (conFile2 != NULL) {
+                      *stderr = *conFile2;
+                      setvbuf(stderr, NULL, _IONBF, 0);
+                  }
+              }
+          }
+      }
+
+  关键点：
+  - 用 `*stdout = *conFile` 拷贝 FILE 结构体，不走 freopen 的打开-重
+    新注册路径，避免共享 fd 冲突。
+  - 必须 setvbuf 设为 unbuffered，否则 printf 跨进程会丢失。
+  - 需要 <io.h> 和 <fcntl.h> 头文件。
+  - 整个块用 #ifdef WIN32 包裹（仅 Windows 需要）。
+
+  必需的 include：
+
+      #ifdef WIN32
+      #include <windows.h>
+      #include <io.h>
+      #include <fcntl.h>
+      #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+      #include <QtPlatformHeaders/QWindowsWindowFunctions>
+      #endif
+      #endif
+
+================================================================================
+5. 模式库：可复用修复模板
+================================================================================
+
+5.1 QOpenGLWindow + Qt Widget 容器初始化模板
+─────────────────────────────────────────────
+1. 构造 QOpenGLWindow（无 parent 或 nullptr parent）
+2. 用 QWidget::createWindowContainer 包装，setCentralWidget
+3. 调 setFormat(QSurfaceFormat) —— 必须在 ctor 里，show 之前
+4. 在 initializeGL() 里做所有 GL 初始化；用 bool 守护 glFunctionsInitialized
+5. 在 show() 之前**绝对不要**调用任何 GL 函数（构造、showEvent、screenChanged
+   都不行）
+6. 调 QSurfaceFormat::setDefaultFormat() 在 QApplication ctor 之前
+
+5.2 Qt 主线程 + SDL 事件集成模板
+─────────────────────────────────────────────
+方案 A（简单）：
+
+  - 用 0ms QTimer 在主线程定时 SDL_PumpEvents
+  - FCEUD_UpdateInput 等输入处理也在主线程调
+  - 适用于一般游戏输入（< 1 frame 延迟可接受）
+
+方案 B（高性能）：
+
+  - 实现 QAbstractNativeEventFilter
+  - 在 nativeEventFilter 里把 WM_KEYDOWN / WM_KEYUP 转 SDL_PushEvent
+  - FCEUD_UpdateInput 仍在主线程调
+  - 适用于帧同步输入（格斗、连击判定）
+
+5.3 多线程 Rust FFI 静态初始化顺序
+─────────────────────────────────────────────
+Rust FFI 函数（extern "C"）在 C++ 静态初始化器里调用有 SIOF（static
+initialization order fiasco）风险：
+
+  - Rust 标准库需要 runtime 初始化（thread-local storage 等）
+  - C++ 文件级 static 构造时，Rust runtime 可能未就绪
+  - 直接调 FFI 函数会 segfault
+
+解决方案：把 FFI 初始化**延后到 main() 内**，绝不在 C++ 静态构造里调：
+
+  // bad: src/utils/timeStamp.cpp
+  static timeStampModule module;  // ctor 调 Rust FFI
+  //                       ↑
+  //                       此时 Rust runtime 不一定 ready
+
+  // good: 在 main() 第一行调
+  FCEU::timeStampModuleInit();
+  // 然后再创建 QApplication、开始事件循环
+
+诊断方法：在 Rust FFI 函数入口加 fprintf(stderr, "enter fn\n"); fflush;
+观察是否进入。如果不进入，FFI 调用没拿到控制权（signature mismatch 或
+calling convention 问题）。如果进入后立即 segfault，多半是 Rust runtime
+未初始化。
+
+5.4 Windows + 伪终端 stdout 重定向模板
+─────────────────────────────────────────────
+见 §4 案例 C 的"方案 B"代码模板。复制粘贴即可。
+
+5.5 GUI 端到端输入测试（PowerShell + Win32 SendInput）
+─────────────────────────────────────────────
+见 §8 自动化测试章节。
+
+================================================================================
+6. 反模式：不要再踩的坑
+================================================================================
+
+R1. **不要**把 GL 函数调用放在 QOpenGLWindow 的 show 链路上
+   （构造、showEvent、screenChanged、resize 都不行）
+   等 initializeGL。
+
+R2. **不要**依赖 SDL 自己在后台 pump 事件
+   跨平台 Qt + SDL 集成必须显式 pump。
+
+R3. **不要**用 freopen("CONOUT$", "w", stderr) 紧接 freopen("CONOUT$", "w", stdout)
+   stdout 和 stderr 在 Windows CRT 共享 fd，会冲突。
+
+R4. **不要**在 C++ 文件级 static 构造里调 Rust FFI
+   Rust runtime 未就绪。
+
+R5. **不要**忘记 QSurfaceFormat::setDefaultFormat()
+   QOpenGLWindow 用 #version 330 core shader 时必须设 Core Profile 3.3。
+
+R6. **不要**用 SDL_PumpEvents 期望 0ms 周期
+   QTimer::start(0) 是"尽快"，实际受事件循环约束。如果需要 60+Hz
+   输入响应，再用 1ms / 2ms start()。
+
+R7. **不要**在 main.cpp 的 fceuWrapperPreInit 之后才装 Qt
+   Qt 的 platform plugin 在 QApplication ctor 时加载；SDL_Init 也类似。
+   顺序错了会导致 plugin 加载竞争。
+
+R8. **不要**假设 ctest 能覆盖 GUI / 输入路径
+   ctest 通常只测纯逻辑（mapper / savestate / rom_regression）。
+   GUI 启动、输入响应、窗口渲染必须端到端测。
+
+================================================================================
+7. 工具速查：Qt / SDL / Windows 调试开关
+================================================================================
+
+Qt:
+  QT_DEBUG_PLUGINS=1
+      打印所有 Qt 插件加载过程（platforms / imageformats / sqldrivers）。
+      适合查 "platform plugin not found" 类问题。
+
+  QT_LOGGING_RULES="qt.qpa.*=true;js=true"
+      打印 QPA 平台抽象层日志（窗口创建、屏幕事件、platform window）。
+      适合查 "窗口创建失败 / focus 问题"。
+
+  QT_OPENGL=desktop
+      强制 Qt 用桌面 OpenGL（wgl）而不是 ANGLE（d3d）。
+      ANGLE 只支持 OpenGL ES，3.3 Core Profile 必须用 desktop OpenGL。
+
+  QT_QPA_PLATFORM=minimal
+      用 minimal QPA（不创建真实窗口），适合无头测试。
+
+  QT_QPA_PLATFORM=offscreen
+      用 offscreen QPA，可渲染但不显示。
+
+SDL:
+  SDL_VIDEO_DRIVER=windows
+      强制 SDL 用 Windows 视频驱动。
+
+  SDL_AUDIODRIVER=wasapi
+      强制 SDL 音频用 wasapi（Windows 默认）。
+
+  SDL_VIDEODRIVER=dummy
+      无头 SDL 视频驱动，不创建真实窗口。
+
+Windows:
+  Get-Process fceux11 | Select-Object Id, MainWindowHandle, MainWindowTitle
+      看主窗口句柄。
+
+  EnumWindows + GetWindowText
+      枚举所有窗口找正确的 HWND（fceux11.exe 有 10+ 个窗口，包括 Qt
+      helper 窗口、IME、TitleBar 等）。
+
+  [Console]::WriteLine([System.Windows.Forms.SystemInformation]::MonitorCount)
+      PowerShell 查显示器数量。
+
+================================================================================
+8. 自动化测试：SendInput + Win32 API 仿真键盘
+================================================================================
+
+GUI 应用的键盘输入必须做端到端测试。FCEUX11 用以下 PowerShell 脚本验证
+"事件能进 SDL 队列"和"事件能反映到 JSreturn"两段链路：
+
+8.1 基础 SendInput 脚本
+────────────────────────
+  $cs = @"
+  using System;
+  using System.Runtime.InteropServices;
+  public class WinInput {
+      [DllImport("user32.dll")] static extern void keybd_event(byte v, byte s, uint f, UIntPtr e);
+      [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+      [DllImport("user32.dll")] static extern bool EnumWindows(EnumWindowsProc p, IntPtr l);
+      delegate bool EnumWindowsProc(IntPtr h, IntPtr l);
+      [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+      [DllImport("user32.dll", CharSet=CharSet.Auto)] public static extern int GetWindowText(IntPtr h, System.Text.StringBuilder s, int n);
+      public static IntPtr FindByPid(uint pid, string titleContains) {
+          IntPtr found = IntPtr.Zero;
+          EnumWindows(delegate(IntPtr h, IntPtr l) {
+              uint p; GetWindowThreadProcessId(h, out p);
+              if (p != pid) return true;
+              var sb = new System.Text.StringBuilder(256);
+              GetWindowText(h, sb, 256);
+              if (sb.ToString().Contains(titleContains)) { found = h; return false; }
+              return true;
+          }, IntPtr.Zero);
+          return found;
+      }
+      public static void Tap(byte vk) { keybd_event(vk, 0, 0, (UIntPtr)0); Thread.Sleep(150); keybd_event(vk, 0, 2, (UIntPtr)0); }
+  }
+  "@
+  Add-Type -TypeDefinition $cs -Language CSharp
+
+  # 启动进程
+  $p = Start-Process -FilePath ".\fceux11.exe" -ArgumentList ".\game.nes" `
+        -RedirectStandardOutput "out.txt" -RedirectStandardError "err.txt" -PassThru
+  Start-Sleep -Seconds 5   # 等窗口稳定
+
+  # 找 FCEUX11 主窗口（class 通常是 Qt6xxxQWindowIcon，title 含 FCEUX）
+  $h = [WinInput]::FindByPid([uint32]$p.Id, "FCEUX")
+  if ($h -eq [IntPtr]::Zero) { Write-Error "Window not found"; exit 1 }
+
+  # 关键：每次按键前重新 SetForegroundWindow，否则焦点会漂走
+  for ($i=0; $i -lt 6; $i++) {
+      [WinInput]::SetForegroundWindow($h) | Out-Null
+      Start-Sleep -Milliseconds 200
+      [WinInput]::Tap(0x46)   # F key
+      Start-Sleep -Seconds 1
+  }
+
+8.2 验证钩子
+────────────────────────
+  - 给 fceu 关键函数加 fprintf(stderr, "[DBG_KB] sc=%d sym=%d\n", ...)
+  - 跑测试后 grep err.txt 里的 [DBG_KB] 行
+  - 若看到 1 次 key 收到、后续没收到 → 焦点问题（SetForegroundWindow 失败）
+  - 若一次都没收到 → 主线程没 pump SDL 事件
+  - 若收到但 JSreturn 不变 → bmap 没初始化 / g_keyState 索引错
+
+8.3 注意事项
+────────────────────────
+  - Start-Process -RedirectStandardOutput 会接管 stdout 管道。
+    如果 fceux 用 AttachConsole + freopen 把 stdout 改写到 CONOUT$，
+    重定向文件会**空**。解决：fceu 调试打印改走 stderr。
+  - 测试 ROM 必须是 mapper_nrom.nes 这种简单 ROM，复杂度高会有副作用。
+  - 自动化测试不能替代人工测试。GUI 焦点、菜单交互、画面正确性仍
+    需要目视。
+
+================================================================================
+附录 A：FCEUX11 关键路径速查
+================================================================================
+
+main()                              src/drivers/Qt/main.cpp:103
+  fceuWrapperPreInit                 src/drivers/Qt/fceuWrapper.cpp:708
+  QSurfaceFormat::setDefaultFormat   (本文件 §2 修复模式)
+  QApplication app                    src/drivers/Qt/main.cpp:114
+  SDL_PumpEvents 0ms QTimer          (本文件 §3 修复模式)
+  AttachConsole + GetConsoleWindow   (本文件 §4 修复模式)
+  fceuWrapperInit                    src/drivers/Qt/fceuWrapper.cpp:731
+  consoleWin_t                       src/drivers/Qt/ConsoleWindow.cpp:105
+    loadVideoDriver                  src/drivers/Qt/ConsoleWindow.cpp:2043
+      QOpenGLWindow                   src/drivers/Qt/ConsoleViewerGL.cpp:73
+      QWidget::createWindowContainer  src/drivers/Qt/ConsoleWindow.cpp:2083
+    emulatorThread start
+  consoleWindow->show()               ── 触发 showEvent → screenChanged
+                                           (本文件 §2 修复模式: glFunctions 守护)
+  app.exec()
+
+FCEUD_UpdateInput                    src/drivers/Qt/input.cpp:1624
+  updateGamePadKeyMappings           src/drivers/Qt/input.cpp:1603
+  InputManager::pollAll               (SDL_PumpEvents)
+  UpdatePhysicalInput                 (SDL_PollEvent → g_keyState)
+  KeyboardCommands
+  UpdateGamepad                       src/drivers/Qt/input.cpp:1458
+    DTestButton                       src/drivers/Qt/input.cpp:1393
+      g_keyState[SDL_GetScancodeFromKey(bc->ButtonNum)]
+    JS |= (1 << x) << (wg << 3)
+  JSreturn = JS                      (被 emulator 核心读取)
+
+附录 B：术语表
+================================================================================
+  RC        Rendering Context（OpenGL 上下文）
+  WGL       Windows GL（Windows 上的 OpenGL native API）
+  QPA       Qt Platform Abstraction（Qt 平台抽象层）
+  QSS       Qt Style Sheet
+  MOC       Qt Meta-Object Compiler
+  SIOF      Static Initialization Order Fiasco（C++ 静态初始化顺序坑）
+  ANGLE     Almost Native Graphics Layer Engine（Google 的 OpenGL ES → D3D 翻译层）
+  FFI       Foreign Function Interface（跨语言函数调用）
+  QPC       QueryPerformanceCounter（Windows 高精度计时）
+
+================================================================================
+文件结束
+================================================================================
