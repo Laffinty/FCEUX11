@@ -96,6 +96,7 @@ class ConsoleViewGL_t : public QOpenGLWindow,
 	bool   forceAspect;
 	bool   autoScaleEna;
 	bool   vsyncEnabled;
+	bool   glFunctionsInitialized;
 
 	unsigned int  mouseButtonMask;
 	QColor *bgColor;

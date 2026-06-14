@@ -114,6 +114,7 @@ ConsoleViewGL_t::ConsoleViewGL_t(QWindow *parent)
 
 	vsyncEnabled = true;
 	linearFilter = false;
+	glFunctionsInitialized = false;
 
 	if ( g_config )
 	{
@@ -259,9 +260,16 @@ void ConsoleViewGL_t::buildBgTexture(void)
 
 void ConsoleViewGL_t::initializeGL(void)
 {
-	//printf("initializeGL\n");
+	printf("initializeGL start\n");
 
-	initializeOpenGLFunctions();
+	if ( !initializeOpenGLFunctions() )
+	{
+		printf("Error: Failed to initialize OpenGL 3.3 Core functions\n");
+		glFunctionsInitialized = false;
+		return;
+	}
+	glFunctionsInitialized = true;
+
 	// Set up the rendering context, load shaders and other resources, etc.:
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
@@ -686,6 +694,12 @@ void ConsoleViewGL_t::renderFrame(void)
 
 void ConsoleViewGL_t::paintGL(void)
 {
+	if ( !glFunctionsInitialized )
+	{
+		printf("paintGL skipped: OpenGL functions not initialized\n");
+		return;
+	}
+
 	if ( bgColor )
 	{
 		glClearColor( bgColor->redF(), bgColor->greenF(), bgColor->blueF(), 1.0f);
