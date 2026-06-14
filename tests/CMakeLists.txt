@@ -109,40 +109,48 @@ if(FCEUX11_BUILD_TESTS)
              COMMAND fceux11_enum_class_bitflags_test)
 
     # -------------------------------------------------------------------------
-    # v0.3.6.5 — ASan runtime PATH injection
+    # v0.3.6.5 / v0.3.14 — Windows test runtime PATH injection
     # MSVC ASan-instrumented binaries dynamically import
     # clang_rt.asan_dynamic-x86_64.dll from the MSVC toolchain bin
-    # directory. Without it on PATH, every test exits with
-    # STATUS_DLL_NOT_FOUND (0xc0000135) before main() runs.
-    # We also surface vcpkg's Release + Debug DLLs (Qt6Core/SDL2/etc
-    # or their `d` debug variants) so the same plumbing works whether
-    # the sanitizer build is Release, RelWithDebInfo, or Debug.
+    # directory. All Windows test executables dynamically import vcpkg
+    # DLLs (Qt6Core/SDL2/etc or their `d` debug variants). Without these
+    # directories on PATH, every test exits with STATUS_DLL_NOT_FOUND
+    # (0xc0000135) before main() runs. The PATH injection is therefore
+    # required on Win32 regardless of sanitizer settings.
     # -------------------------------------------------------------------------
-    if(FCEUX11_ASAN OR FCEUX11_UBSAN)
-        get_filename_component(_FCEUX11_MSVC_BIN_DIR
-                               "${CMAKE_CXX_COMPILER}" DIRECTORY)
-        file(TO_NATIVE_PATH "${_FCEUX11_MSVC_BIN_DIR}"
-                            _FCEUX11_MSVC_BIN_NATIVE)
-        # MSVC bin path goes through the same TO_NATIVE_PATH normalization
-        # as the vcpkg paths below; CMake handles forward-slash → backslash
-        # conversion on Windows either way, but uniformity makes the
-        # STATUS line readable on either shell.
+    if(WIN32)
         file(TO_NATIVE_PATH
              "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows/bin"
              _FCEUX11_VCPKG_REL_BIN_NATIVE)
         file(TO_NATIVE_PATH
              "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows/debug/bin"
              _FCEUX11_VCPKG_DBG_BIN_NATIVE)
+
+        if(FCEUX11_ASAN OR FCEUX11_UBSAN)
+            get_filename_component(_FCEUX11_MSVC_BIN_DIR
+                                   "${CMAKE_CXX_COMPILER}" DIRECTORY)
+            file(TO_NATIVE_PATH "${_FCEUX11_MSVC_BIN_DIR}"
+                                _FCEUX11_MSVC_BIN_NATIVE)
+            set(_FCEUX11_TEST_PATH_MODIFICATIONS
+                "PATH=path_list_prepend:${_FCEUX11_MSVC_BIN_NATIVE};PATH=path_list_prepend:${_FCEUX11_VCPKG_REL_BIN_NATIVE};PATH=path_list_prepend:${_FCEUX11_VCPKG_DBG_BIN_NATIVE}")
+            message(STATUS
+                "FCEUX11 tests: PATH prepended for sanitizer runtime — "
+                "${_FCEUX11_MSVC_BIN_NATIVE}; ${_FCEUX11_VCPKG_REL_BIN_NATIVE}; ${_FCEUX11_VCPKG_DBG_BIN_NATIVE}")
+        else()
+            set(_FCEUX11_TEST_PATH_MODIFICATIONS
+                "PATH=path_list_prepend:${_FCEUX11_VCPKG_REL_BIN_NATIVE};PATH=path_list_prepend:${_FCEUX11_VCPKG_DBG_BIN_NATIVE}")
+            message(STATUS
+                "FCEUX11 tests: PATH prepended for vcpkg runtime — "
+                "${_FCEUX11_VCPKG_REL_BIN_NATIVE}; ${_FCEUX11_VCPKG_DBG_BIN_NATIVE}")
+        endif()
+
         set_tests_properties(
             smoke_test mapper_load_test mapper_reset_test
             rom_regression_test savestate_regression_test expected_api_test
             enum_class_bitflags_test
             PROPERTIES ENVIRONMENT_MODIFICATION
-                "PATH=path_list_prepend:${_FCEUX11_MSVC_BIN_NATIVE};PATH=path_list_prepend:${_FCEUX11_VCPKG_REL_BIN_NATIVE};PATH=path_list_prepend:${_FCEUX11_VCPKG_DBG_BIN_NATIVE}"
+                "${_FCEUX11_TEST_PATH_MODIFICATIONS}"
         )
-        message(STATUS
-            "FCEUX11 tests: PATH prepended for sanitizer runtime — "
-            "${_FCEUX11_MSVC_BIN_NATIVE}; ${_FCEUX11_VCPKG_REL_BIN_NATIVE}; ${_FCEUX11_VCPKG_DBG_BIN_NATIVE}")
     endif()
 
     # -------------------------------------------------------------------------
