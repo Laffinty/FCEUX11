@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.14] - 2026-06-14
+
+E-track sub-version: video backend modernization per plan v3 §5 v0.3.14.
+OpenGL backend migrated to Core Profile 3.3 and `QOpenGLWindow`. No change
+to emulation timing or savestate layout.
+
+### Added
+
+- **`src/drivers/Qt/ConsoleViewerGL.cpp/.h`** — new OpenGL 3.3 Core Profile
+  rendering pipeline:
+  - `#version 330 core` vertex + fragment shaders with orthographic projection.
+  - VAO/VBO/EBO based quad drawing; replaces immediate mode `glBegin/glEnd`.
+  - `QOpenGLFunctions_3_3_Core` for all GL calls.
+  - Background image (`:/icons/pic.png`) drawn as a centered GL texture quad.
+- **`QOpenGLWindow` integration** — `ConsoleViewGL_t` now inherits
+  `QOpenGLWindow` instead of `QOpenGLWidget` for tighter vertical-sync control.
+
+### Changed
+
+- **`src/drivers/Qt/ConsoleWindow.cpp`**: OpenGL backend is embedded into the
+  main window with `QWidget::createWindowContainer()`; `unloadVideoDriver()`
+  destroys the container before the `QOpenGLWindow`; screenshots use
+  `QOpenGLWindow::grabFramebuffer()`.
+- **`src/drivers/Qt/ConsoleViewerGL.cpp`**: removed all fixed-function calls
+  (`glMatrixMode`, `glLoadIdentity`, `glOrtho`, `glEnable(GL_TEXTURE_2D)`,
+  `GL_TEXTURE_RECTANGLE` branch, `glGetString(GL_EXTENSIONS)` extension probe).
+- **`tests/CMakeLists.txt`**: vcpkg DLL PATH injection is now applied on all
+  Win32 builds, not only sanitizer builds, so `ctest` can find Qt6/SDL2 runtime
+  DLLs in standard RelWithDebInfo/Release configurations.
+
+### Verified
+
+- `cmake --build build --config RelWithDebInfo`: 0 errors.
+- `ctest -C RelWithDebInfo --output-on-failure`: 7/7 passed.
+- `rom_regression_test`: 720 frames, 13 ROMs, 0 mismatches.
+- `savestate_regression_test`: 12 ROMs, 0 mismatches.
+- `cargo test`: ok.
+- `fceux11_bench_ppu_render`: 60 frames ≈ 58 ms total (≈ 0.97 ms/frame),
+  well under the 4 ms/frame threshold.
+
 ## [0.3.13] - 2026-06-14
 
 E-track sub-version: input system refactor with pluggable backends per plan
