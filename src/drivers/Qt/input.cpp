@@ -37,6 +37,8 @@
 #include "Qt/sdl.h"
 #include "Qt/sdl-video.h"
 #include "Qt/sdl-joystick.h"
+#include "input/input_manager.h"
+#include "input/sdl_backend.h"
 
 #include "common/cheat.h"
 #include "../../movie.h"
@@ -1630,6 +1632,8 @@ void FCEUD_UpdateInput(void)
 	}
 
 	updateGamePadKeyMappings();
+
+	fceu11::input::InputManager::instance().pollAll();
 
 	UpdatePhysicalInput();
 	KeyboardCommands();

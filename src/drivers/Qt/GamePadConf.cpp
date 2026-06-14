@@ -38,6 +38,8 @@
 #include "Qt/config.h"
 #include "Qt/keyscan.h"
 #include "Qt/sdl-joystick.h"
+#include "input/input_manager.h"
+#include "input/xinput_backend.h"
 #include "Qt/fceuWrapper.h"
 
 struct GamePadConfigLocalData_t
@@ -68,6 +70,44 @@ static GamePadConfigLocalData_t lcl[GAMEPAD_NUM_DEVICES];
 
 static GamePadConfDialog_t *gamePadConfWin = NULL;
 static bool updateRemapTree = false;
+
+// v0.3.13 helpers for non-SDL (XInput/WGI) device support.
+static bool isXInputDevice(int deviceNum)
+{
+	int xinBase = fceu11::input::kBackendOffset(fceu11::input::BackendId::XInput);
+	return deviceNum >= xinBase &&
+	       deviceNum < xinBase + fceu11::input::XInputBackend::MAX_DEVICES;
+}
+
+static void loadXInputDefaultMapping(int portNum, int deviceNum)
+{
+	// NES button order: A, B, Select, Start, Up, Down, Left, Right, TurboA, TurboB
+	// XInput button ids: A=0, B=1, X=2, Y=3, LB=4, RB=5, Back=6, Start=7,
+	//                     LS=8, RS=9, DPadUp=10, DPadDown=11, DPadLeft=12, DPadRight=13
+	static const int xinputMap[GAMEPAD_NUM_BUTTONS] = {
+		1,  // NES A      -> XInput B
+		0,  // NES B      -> XInput A
+		6,  // NES Select -> XInput Back
+		7,  // NES Start  -> XInput Start
+		10, // NES Up     -> XInput DPadUp
+		11, // NES Down   -> XInput DPadDown
+		12, // NES Left   -> XInput DPadLeft
+		13, // NES Right  -> XInput DPadRight
+		2,  // NES TurboA -> XInput X
+		3   // NES TurboB -> XInput Y
+	};
+
+	for (int c = 0; c < GamePad_t::NUM_CONFIG; c++)
+	{
+		for (int b = 0; b < GAMEPAD_NUM_BUTTONS; b++)
+		{
+			GamePad[portNum].bmap[c][b].ButtType = BUTTC_JOYSTICK;
+			GamePad[portNum].bmap[c][b].DeviceNum = deviceNum;
+			GamePad[portNum].bmap[c][b].ButtonNum = xinputMap[b];
+			GamePad[portNum].bmap[c][b].state = 0;
+		}
+	}
+}
 
 //----------------------------------------------------
 int openGamePadConfWindow(QWidget *parent)
@@ -208,6 +248,7 @@ GamePadConfDialog_t::GamePadConfDialog_t(QWidget *parent)
 
 	devSel->addItem(tr("Keyboard"), -1);
 
+	// SDL joysticks (legacy device numbers 0..MAX_JOYSTICKS-1)
 	for (int i = 0; i < MAX_JOYSTICKS; i++)
 	{
 		jsDev_t *js = getJoystickDevice(i);
@@ -218,6 +259,26 @@ GamePadConfDialog_t::GamePadConfDialog_t(QWidget *parent)
 			{
 				snprintf( stmp, sizeof(stmp), "%i: %s", i, js->getName());
 				devSel->addItem(tr(stmp), i);
+			}
+		}
+	}
+
+	// XInput gamepads (v0.3.13: device numbers 32..35)
+	{
+		int xinBase = fceu11::input::kBackendOffset(fceu11::input::BackendId::XInput);
+		fceu11::input::InputBackend *xin = fceu11::input::InputManager::instance().backend(
+			fceu11::input::BackendId::XInput);
+		if (xin)
+		{
+			for (int i = 0; i < fceu11::input::XInputBackend::MAX_DEVICES; i++)
+			{
+				fceu11::input::InputDevice *dev = xin->device(i);
+				if (dev && dev->connected())
+				{
+					int devNum = xinBase + i;
+					snprintf(stmp, sizeof(stmp), "%i: %s", devNum, dev->name());
+					devSel->addItem(tr(stmp), devNum);
+				}
 			}
 		}
 	}
@@ -799,6 +860,15 @@ void GamePadConfDialog_t::deviceSelect(int index)
 	}
 	GamePad[portNum].setDeviceIndex(devIdx);
 
+	// v0.3.13: XInput devices use a fixed default mapping because the
+	// legacy SDL event-based button-learning path does not see them.
+	if (isXInputDevice(devIdx))
+	{
+		loadXInputDefaultMapping(portNum, devIdx);
+		int xinBase = fceu11::input::kBackendOffset(fceu11::input::BackendId::XInput);
+		guidLbl->setText(QString("XInput slot %1").arg(devIdx - xinBase));
+	}
+
 	guid = GamePad[portNum].getGUID();
 	if ( guid )
 	{
@@ -868,24 +938,33 @@ void GamePadConfDialog_t::changeButton(int padNo, int x)
 	{   // Joystick/Gamepad
 		if ( bmap.ButtType == BUTTC_JOYSTICK )
 		{
-			jsDev_t *js1 = getJoystickDevice(devIdx);
-			jsDev_t *js2 = getJoystickDevice(bmap.DeviceNum);
-
-			if ( (js1 == NULL) || (js2 == NULL) )
+			// v0.3.13: XInput devices have no GUID and use a fixed default
+			// mapping, so skip the GUID consistency check for them.
+			if ( isXInputDevice(devIdx) || isXInputDevice(bmap.DeviceNum) )
 			{
-				mappingValid = false;
+				// mappingValid stays true
 			}
 			else
 			{
-				if ( (devIdx != bmap.DeviceNum) &&
-					( strcmp( js1->getGUID(), js2->getGUID() ) != 0 ) )
+				jsDev_t *js1 = getJoystickDevice(devIdx);
+				jsDev_t *js2 = getJoystickDevice(bmap.DeviceNum);
+
+				if ( (js1 == NULL) || (js2 == NULL) )
 				{
-					char stmp[256];
-					snprintf( stmp, sizeof(stmp), "Joystick device GUID MisMatch\n\nSelected device is: \n\t%s\n\nbut button mapping is from: \n\t%s",
-							js1->getName(), js2->getName() );
-					QMessageBox::warning( this, tr("Mapping Error"), tr(stmp),
-						QMessageBox::Cancel, QMessageBox::Cancel );
 					mappingValid = false;
+				}
+				else
+				{
+					if ( (devIdx != bmap.DeviceNum) &&
+						( strcmp( js1->getGUID(), js2->getGUID() ) != 0 ) )
+					{
+						char stmp[256];
+						snprintf( stmp, sizeof(stmp), "Joystick device GUID MisMatch\n\nSelected device is: \n\t%s\n\nbut button mapping is from: \n\t%s",
+								js1->getName(), js2->getName() );
+						QMessageBox::warning( this, tr("Mapping Error"), tr(stmp),
+							QMessageBox::Cancel, QMessageBox::Cancel );
+						mappingValid = false;
+					}
 				}
 			}
 		}

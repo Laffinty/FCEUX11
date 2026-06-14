@@ -83,6 +83,9 @@ add_definitions( -D__SDL__  -D__QT_DRIVER__  -DQT_DEPRECATED_WARNINGS -DPSS_STYL
 add_definitions( -D_UNICODE -DUNICODE )
 add_definitions( -DFCEUDEF_DEBUGGER )
 add_definitions( -D_USE_LIBARCHIVE )
+if(FCEUX11_WGI_BACKEND)
+    add_definitions( -DFCEUX11_WGI_BACKEND )
+endif()
 # v0.3.1: Soft warning level /W4 /WX-; /wd4267/4244 removed from here (see types.h cleanup)
 if(MSVC)
     add_compile_options(/W4 /WX-)
@@ -102,6 +105,7 @@ set(APP_ICON_RESOURCES_WINDOWS  ${CMAKE_SOURCE_DIR}/icons/fceux11.rc )
      endif()
 
 option(FCEUX11_LUA_RUST_ENABLED "Use Rust Lua engine (mlua) instead of C++ Lua engine" ON)
+option(FCEUX11_WGI_BACKEND "Enable Windows.Gaming.Input backend (requires WinRT/C++/WinRT)" OFF)
 
 if(FCEUX11_LUA_RUST_ENABLED AND FCEUX11_RUST_ENABLED)
     message(STATUS "Using Rust Lua engine (mlua vendored Lua 5.1)")
@@ -479,6 +483,9 @@ set(SRC_DRIVERS_QT
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/sdl-sound.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/sdl-video.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/sdl-joystick.cpp  
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/input/input_manager.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/input/sdl_backend.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/input/xinput_backend.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/sdl-throttle.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/QtNetplay.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/AviRecord.cpp
@@ -505,6 +512,10 @@ set(SRC_DRIVERS_QT
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/TasEditor/snapshot.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/TasEditor/markers.cpp
 )
+
+if(FCEUX11_WGI_BACKEND)
+  list(APPEND SRC_QT ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/input/wgi_backend.cpp)
+endif()
 
 add_library(fceux11_utils STATIC ${SRC_UTILS})
 target_link_libraries(fceux11_utils PUBLIC Qt6::Widgets ${ZLIB_LIBRARIES})
@@ -553,6 +564,9 @@ target_link_libraries(fceux11_drivers_qt PUBLIC
 )
 if(${QHELP})
     target_link_libraries(fceux11_drivers_qt PUBLIC Qt6::Help)
+endif()
+if(FCEUX11_WGI_BACKEND)
+    target_link_libraries(fceux11_drivers_qt PUBLIC WindowsApp)
 endif()
 target_include_directories(fceux11_drivers_qt PUBLIC
     ${CMAKE_SOURCE_DIR}/src

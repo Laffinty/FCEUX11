@@ -34,6 +34,7 @@
 #include "Qt/dface.h"
 #include "Qt/fceuWrapper.h"
 #include "Qt/input.h"
+#include "input/input_manager.h"
 #include "Qt/sdl.h"
 #include "Qt/sdl-video.h"
 #include "Qt/nes_shm.h"
@@ -231,6 +232,10 @@ FCEUD_GetTimeFreq(void)
 static int
 DriverInitialize(FCEUGI *gi)
 {
+	// v0.3.13: register input backend plugins (XInput, SDL, optional WGI)
+	// before any legacy joystick initialization path runs.
+	fceu11::input::InputManager::instance().registerDefaultBackends();
+
 	if (InitVideo(gi) < 0)
 	{
 		return 0;
@@ -269,6 +274,7 @@ DriverKill()
 		g_config->save();
 
 	KillJoysticks();
+	fceu11::input::InputManager::instance().shutdownAll();
 
 	if(inited&4)
 		KillVideo();

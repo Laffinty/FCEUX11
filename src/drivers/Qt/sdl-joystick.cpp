@@ -27,6 +27,9 @@
 #include "Qt/sdl.h"
 #include "Qt/sdl-joystick.h"
 #include "Qt/config.h"
+#include "input/sdl_backend.h"
+#include "input/input_manager.h"
+#include "input/xinput_backend.h"
 
 #include <cstdlib>
 //#include <unistd.h>
@@ -43,7 +46,7 @@ GamePad_t GamePad[4];
 static int sdlButton2NesGpIdx(const char *id);
 
 // Static Variables
-static int s_jinited = 0;
+static int fceu11::input::g_sdlJInited = 0;
 
 static const char *buttonNames[GAMEPAD_NUM_BUTTONS] =
 	{
@@ -221,7 +224,7 @@ void jsDev_t::print(void)
 	}
 }
 
-static jsDev_t jsDev[MAX_JOYSTICKS];
+static jsDev_t fceu11::input::g_sdlJsDev[MAX_JOYSTICKS];
 
 //********************************************************************************
 nesGamePadMap_t::nesGamePadMap_t(void)
@@ -363,24 +366,56 @@ int GamePad_t::init(int port, const char *guid, const char *profile)
 
 	//printf("Init: %i   %s   %s \n", port, guid, profile );
 
+	// v0.3.13: handle XInput GUIDs stored as "XInput_N".
+	if (guid && strncmp(guid, "XInput_", 7) == 0)
+	{
+		int slot = atoi(guid + 7);
+		fceu11::input::InputBackend *xin = fceu11::input::InputManager::instance().backend(
+			fceu11::input::BackendId::XInput);
+		if (xin && slot >= 0 && slot < fceu11::input::XInputBackend::MAX_DEVICES)
+		{
+			fceu11::input::InputDevice *dev = xin->device(slot);
+			if (dev && dev->connected())
+			{
+				int xinBase = fceu11::input::kBackendOffset(fceu11::input::BackendId::XInput);
+				setDeviceIndex(xinBase + slot);
+				// Default XInput mapping.
+				static const int xinputMap[GAMEPAD_NUM_BUTTONS] = {
+					1, 0, 6, 7, 10, 11, 12, 13, 2, 3
+				};
+				for (int c = 0; c < NUM_CONFIG; c++)
+				{
+					for (int b = 0; b < GAMEPAD_NUM_BUTTONS; b++)
+					{
+						bmap[c][b].ButtType = BUTTC_JOYSTICK;
+						bmap[c][b].DeviceNum = xinBase + slot;
+						bmap[c][b].ButtonNum = xinputMap[b];
+						bmap[c][b].state = 0;
+					}
+				}
+				return 0;
+			}
+		}
+	}
+
 	// First look for a controller that matches the specific GUID
 	// that is not already in use by another port.
 	if (devIdx < 0)
 	{
 		for (i = 0; i < MAX_JOYSTICKS; i++)
 		{
-			mask = jsDev[i].getBindPorts();
+			mask = fceu11::input::g_sdlJsDev[i].getBindPorts();
 
 			if (mask != 0)
 			{
 				continue;
 			}
-			if (!jsDev[i].isConnected())
+			if (!fceu11::input::g_sdlJsDev[i].isConnected())
 			{
 				continue;
 			}
 
-			if (strcmp(jsDev[i].getGUID(), guid) == 0)
+			if (strcmp(fceu11::input::g_sdlJsDev[i].getGUID(), guid) == 0)
 			{
 				setDeviceIndex(i);
 				if (loadProfile(profile, guid))
@@ -399,14 +434,14 @@ int GamePad_t::init(int port, const char *guid, const char *profile)
 	{
 		for (i = 0; i < MAX_JOYSTICKS; i++)
 		{
-			mask = jsDev[i].getBindPorts();
+			mask = fceu11::input::g_sdlJsDev[i].getBindPorts();
 
 			if (mask != 0)
 			{
 				continue;
 			}
 
-			if (jsDev[i].isGameController())
+			if (fceu11::input::g_sdlJsDev[i].isGameController())
 			{
 				setDeviceIndex(i);
 				if (loadProfile(profile))
@@ -433,16 +468,18 @@ int GamePad_t::init(int port, const char *guid, const char *profile)
 //********************************************************************************
 int GamePad_t::setDeviceIndex(int in)
 {
-	if (devIdx >= 0)
+	// Only bind/unbind SDL devices.  XInput/WGI device numbers are
+	// outside the SDL range and do not use jsDev port binding.
+	if (devIdx >= 0 && devIdx < MAX_JOYSTICKS)
 	{
-		jsDev[devIdx].unbindPort(portNum);
+		fceu11::input::g_sdlJsDev[devIdx].unbindPort(portNum);
 	}
 
 	devIdx = in;
 
-	if (devIdx >= 0)
+	if (devIdx >= 0 && devIdx < MAX_JOYSTICKS)
 	{
-		jsDev[devIdx].bindPort(portNum);
+		fceu11::input::g_sdlJsDev[devIdx].bindPort(portNum);
 	}
 	return 0;
 }
@@ -453,9 +490,28 @@ const char *GamePad_t::getGUID(void)
 	{
 		return "keyboard";
 	}
-	if (jsDev[devIdx].isConnected())
+	if (devIdx >= 0 && devIdx < MAX_JOYSTICKS)
 	{
-		return jsDev[devIdx].getGUID();
+		if (fceu11::input::g_sdlJsDev[devIdx].isConnected())
+		{
+			return fceu11::input::g_sdlJsDev[devIdx].getGUID();
+		}
+	}
+	else
+	{
+		fceu11::input::BackendId backendId = fceu11::input::kBackendFromDeviceNum(devIdx);
+		int localIdx = fceu11::input::kLocalDeviceIndex(devIdx);
+		fceu11::input::InputBackend *be = fceu11::input::InputManager::instance().backend(backendId);
+		if (be)
+		{
+			fceu11::input::InputDevice *dev = be->device(localIdx);
+			if (dev && dev->connected())
+			{
+				static char guid[64];
+				snprintf(guid, sizeof(guid), "%s_%d", be->name(), localIdx);
+				return guid;
+			}
+		}
 	}
 	return NULL;
 }
@@ -791,9 +847,9 @@ int GamePad_t::getDefaultMap(const char *guid)
 	}
 	if (guid == NULL)
 	{
-		if (jsDev[devIdx].isConnected())
+		if (fceu11::input::g_sdlJsDev[devIdx].isConnected())
 		{
-			guid = jsDev[devIdx].getGUID();
+			guid = fceu11::input::g_sdlJsDev[devIdx].getGUID();
 		}
 	}
 	if (guid == NULL)
@@ -813,11 +869,11 @@ int GamePad_t::getDefaultMap(const char *guid)
 
 	if (devIdx >= 0)
 	{
-		if (jsDev[devIdx].gc)
+		if (fceu11::input::g_sdlJsDev[devIdx].gc)
 		{
 			char *sdlMapping;
 
-			sdlMapping = SDL_GameControllerMapping(jsDev[devIdx].gc);
+			sdlMapping = SDL_GameControllerMapping(fceu11::input::g_sdlJsDev[devIdx].gc);
 
 			if (sdlMapping == NULL)
 				return -1;
@@ -865,9 +921,9 @@ int GamePad_t::loadProfile(const char *name, const char *guid)
 	}
 	if (guid == NULL)
 	{
-		if (jsDev[devIdx].isConnected())
+		if (fceu11::input::g_sdlJsDev[devIdx].isConnected())
 		{
-			guid = jsDev[devIdx].getGUID();
+			guid = fceu11::input::g_sdlJsDev[devIdx].getGUID();
 		}
 	}
 	if (guid == NULL)
@@ -902,12 +958,12 @@ int GamePad_t::saveCurrentMapToFile(const char *name)
 
 	if (devIdx >= 0)
 	{
-		if (!jsDev[devIdx].isConnected())
+		if (!fceu11::input::g_sdlJsDev[devIdx].isConnected())
 		{
 			printf("Error: JS%i Not Connected\n", devIdx);
 			return -1;
 		}
-		guid = jsDev[devIdx].getGUID();
+		guid = fceu11::input::g_sdlJsDev[devIdx].getGUID();
 	}
 	else
 	{
@@ -1101,12 +1157,12 @@ int GamePad_t::createProfile(const char *name)
 	}
 	if (devIdx >= 0)
 	{
-		if (!jsDev[devIdx].isConnected())
+		if (!fceu11::input::g_sdlJsDev[devIdx].isConnected())
 		{
 			printf("Error: JS%i Not Connected\n", devIdx);
 			return -1;
 		}
-		guid = jsDev[devIdx].getGUID();
+		guid = fceu11::input::g_sdlJsDev[devIdx].getGUID();
 	}
 	else
 	{
@@ -1139,12 +1195,12 @@ int GamePad_t::deleteMapping(const char *name)
 	}
 	if (devIdx >= 0)
 	{
-		if (!jsDev[devIdx].isConnected())
+		if (!fceu11::input::g_sdlJsDev[devIdx].isConnected())
 		{
 			printf("Error: JS%i Not Connected\n", devIdx);
 			return -1;
 		}
-		guid = jsDev[devIdx].getGUID();
+		guid = fceu11::input::g_sdlJsDev[devIdx].getGUID();
 	}
 	else
 	{
@@ -1162,7 +1218,7 @@ jsDev_t *getJoystickDevice(int devNum)
 {
 	if ((devNum >= 0) && (devNum < MAX_JOYSTICKS))
 	{
-		return &jsDev[devNum];
+		return &fceu11::input::g_sdlJsDev[devNum];
 	}
 	return NULL;
 }
@@ -1173,66 +1229,16 @@ jsDev_t *getJoystickDevice(int devNum)
  */
 int DTestButtonJoy(ButtConfig *bc)
 {
-	SDL_Joystick *js;
-
-	if (bc->ButtonNum == -1)
-	{
-		return 0;
-	}
-	if (bc->DeviceNum < 0)
-	{
-		return 0;
-	}
-	js = jsDev[bc->DeviceNum].getJS();
-
-	if (bc->ButtonNum & 0x2000)
-	{
-		/* Hat "button" */
-		if (SDL_JoystickGetHat(js,
-							   ((bc->ButtonNum >> 8) & 0x1F)) &
-			(bc->ButtonNum & 0xFF))
-		{
-			bc->state = 1;
-			return 1;
-		}
-		else
-		{
-			bc->state = 0;
-		}
-	}
-	else if (bc->ButtonNum & 0x8000)
-	{
-		/* Axis "button" */
-		int pos;
-		pos = SDL_JoystickGetAxis(js,
-								  bc->ButtonNum & 0x3FFF);
-		if ((bc->ButtonNum & 0x4000) && pos <= -16383)
-		{
-			bc->state = 1;
-			return 1;
-		}
-		else if (!(bc->ButtonNum & 0x4000) && pos >= 16363)
-		{
-			bc->state = 1;
-			return 1;
-		}
-		else
-		{
-			bc->state = 0;
-		}
-	}
-	else if (SDL_JoystickGetButton(js,
-								   bc->ButtonNum))
-	{
-		bc->state = 1;
-		return 1;
-	}
-	else
+	if (bc->ButtonNum == -1 || bc->DeviceNum < 0)
 	{
 		bc->state = 0;
+		return 0;
 	}
 
-	return 0;
+	bool pressed = fceu11::input::InputManager::instance().testButton(
+		bc->DeviceNum, bc->ButtonNum);
+	bc->state = pressed ? 1 : 0;
+	return bc->state;
 }
 //********************************************************************************
 
@@ -1241,7 +1247,7 @@ int DTestButtonJoy(ButtConfig *bc)
 //	char guidStr[64];
 //   SDL_Joystick *js;
 //
-//	js = jsDev[i].getJS();
+//	js = fceu11::input::g_sdlJsDev[i].getJS();
 //
 //	SDL_JoystickGUID guid = SDL_JoystickGetGUID( js );
 //
@@ -1264,18 +1270,18 @@ int KillJoysticks(void)
 {
 	int n; /* joystick index */
 
-	if (!s_jinited)
+	if (!fceu11::input::g_sdlJInited)
 	{
 		return -1;
 	}
 
 	for (n = 0; n < MAX_JOYSTICKS; n++)
 	{
-		jsDev[n].close();
+		fceu11::input::g_sdlJsDev[n].close();
 	}
 	SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
 
-	s_jinited = 0;
+	fceu11::input::g_sdlJInited = 0;
 
 	return 0;
 }
@@ -1284,7 +1290,7 @@ int KillJoysticks(void)
 int AddJoystick(int which)
 {
 	//printf("Add Joystick: %i \n", which );
-	if (jsDev[which].isConnected())
+	if (fceu11::input::g_sdlJsDev[which].isConnected())
 	{
 		//printf("Error: Joystick already exists at device index %i \n", which );
 		return -1;
@@ -1293,9 +1299,9 @@ int AddJoystick(int which)
 	{
 		if (SDL_IsGameController(which))
 		{
-			jsDev[which].gc = SDL_GameControllerOpen(which);
+			fceu11::input::g_sdlJsDev[which].gc = SDL_GameControllerOpen(which);
 
-			if (jsDev[which].gc == NULL)
+			if (fceu11::input::g_sdlJsDev[which].gc == NULL)
 			{
 				printf("Could not open game controller %d: %s.\n",
 					   which, SDL_GetError());
@@ -1303,16 +1309,16 @@ int AddJoystick(int which)
 			else
 			{
 				//printf("Added Joystick: %i \n", which );
-				jsDev[which].init(which);
-				//jsDev[which].print();
+				fceu11::input::g_sdlJsDev[which].init(which);
+				//fceu11::input::g_sdlJsDev[which].print();
 				//printJoystick( s_Joysticks[which] );
 			}
 		}
 		else
 		{
-			jsDev[which].js = SDL_JoystickOpen(which);
+			fceu11::input::g_sdlJsDev[which].js = SDL_JoystickOpen(which);
 
-			if (jsDev[which].js == NULL)
+			if (fceu11::input::g_sdlJsDev[which].js == NULL)
 			{
 				printf("Could not open joystick %d: %s.\n",
 					   which, SDL_GetError());
@@ -1320,8 +1326,8 @@ int AddJoystick(int which)
 			else
 			{
 				//printf("Added Joystick: %i \n", which );
-				jsDev[which].init(which);
-				//jsDev[which].print();
+				fceu11::input::g_sdlJsDev[which].init(which);
+				//fceu11::input::g_sdlJsDev[which].print();
 				//printJoystick( s_Joysticks[which] );
 			}
 		}
@@ -1336,12 +1342,12 @@ int RemoveJoystick(int which)
 
 	for (int i = 0; i < MAX_JOYSTICKS; i++)
 	{
-		if (jsDev[i].isConnected())
+		if (fceu11::input::g_sdlJsDev[i].isConnected())
 		{
-			if (SDL_JoystickInstanceID(jsDev[i].getJS()) == which)
+			if (SDL_JoystickInstanceID(fceu11::input::g_sdlJsDev[i].getJS()) == which)
 			{
 				printf("Remove Joystick: %i \n", which);
-				jsDev[i].close();
+				fceu11::input::g_sdlJsDev[i].close();
 				return 0;
 			}
 		}
@@ -1354,9 +1360,9 @@ int FindJoystickByInstanceID( int which )
 {
 	for (int i = 0; i < MAX_JOYSTICKS; i++)
 	{
-		if (jsDev[i].isConnected())
+		if (fceu11::input::g_sdlJsDev[i].isConnected())
 		{
-			if (SDL_JoystickInstanceID(jsDev[i].getJS()) == which)
+			if (SDL_JoystickInstanceID(fceu11::input::g_sdlJsDev[i].getJS()) == which)
 			{
 				return i;
 			}
@@ -1373,7 +1379,7 @@ int InitJoysticks(void)
 	int n; /* joystick index */
 	int total;
 
-	if (s_jinited)
+	if (fceu11::input::g_sdlJInited)
 	{
 		return 1;
 	}
@@ -1391,7 +1397,7 @@ int InitJoysticks(void)
 		AddJoystick(n);
 	}
 
-	s_jinited = 1;
+	fceu11::input::g_sdlJInited = 1;
 	return 1;
 }
 //********************************************************************************

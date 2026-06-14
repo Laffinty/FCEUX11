@@ -5,6 +5,58 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.13] - 2026-06-14
+
+E-track sub-version: input system refactor with pluggable backends per plan
+v3 §5 v0.3.13. No change to emulation timing or savestate layout.
+
+### Added
+
+- **`src/drivers/Qt/input/`** — new input backend abstraction layer:
+  - `input_device.h` / `input_backend.h` — `fceu11::input::InputDevice` and
+    `fceu11::input::InputBackend` interfaces.
+  - `input_manager.h/.cpp` — singleton `InputManager` that registers backends,
+    polls them once per frame, and routes button queries by device number.
+  - `sdl_backend.h/.cpp` — SDL joystick/gamecontroller backend; wraps the
+    existing `jsDev_t` array so legacy code keeps working.
+  - `xinput_backend.h/.cpp` — XInput backend with **dynamic loading** of
+    `xinput1_4.dll` via `LoadLibraryW`/`GetProcAddress`; no static link to
+    `xinput.lib`.
+  - `wgi_backend.h/.cpp` — optional `Windows.Gaming.Input` backend, controlled
+    by the `FCEUX11_WGI_BACKEND` CMake option (default `OFF`).
+- **`FCEUX11_WGI_BACKEND`** CMake option in `src/CMakeLists.txt`. When enabled,
+  `wgi_backend.cpp` is compiled and `WindowsApp.lib` is linked.
+- **`docs/tech/v0.3.13_Input_System_Refactor.md`** — design and migration notes.
+- **`tests/fixtures/golden_savestate_hashes.json`** — regenerated for
+  `0.3.13` because `FCEU_VERSION_NUMERIC` is stored in the savestate header.
+
+### Changed
+
+- **`src/drivers/Qt/input.cpp`**: `FCEUD_UpdateInput()` now calls
+  `InputManager::pollAll()` before SDL event processing so XInput/WGI devices
+  are sampled every frame.
+- **`src/drivers/Qt/sdl-joystick.cpp`**: legacy global `jsDev[]` / `s_jinited`
+  renamed to `fceu11::input::g_sdlJsDev` / `g_sdlJInited` and shared with
+  `SDLBackend`; `DTestButtonJoy()` now routes through `InputManager` so the
+  same code path serves SDL, XInput and WGI devices.
+- **`src/drivers/Qt/fceuWrapper.cpp`**: `DriverInitialize()` registers default
+  input backends; `DriverKill()` shuts the manager down.
+- **`src/drivers/Qt/GamePadConf.cpp`**: XInput gamepads now appear in the
+  device list with a fixed default NES mapping; GUID stored as `XInput_N`.
+- **`src/CMakeLists.txt`**: added the new input backend sources to
+  `SRC_DRIVERS_QT` and defined `FCEUX11_WGI_BACKEND`.
+
+### Verified
+
+- `cmake --build build --config Release`: 0 errors.
+- `ctest -C Release --output-on-failure`: 7/7 passed.
+- `rom_regression_test`: 60 frames, 13 ROMs, 0 mismatches.
+- `savestate_regression_test`: 12 ROMs, 0 mismatches（golden 哈希已随
+  版本号更新而重新生成）。
+- `cargo test`: ok.
+- `fceux11_bench_ppu_render` / `fceux11_bench_x6502_exec`: passed
+  (stddev < 3%).
+
 ## [0.3.12.5] - 2026-06-14
 
 C/D-track closing integration checkpoint per plan v3 §5 v0.3.12.5.
