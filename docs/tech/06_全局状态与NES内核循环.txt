@@ -1,0 +1,307 @@
+================================================================================
+  FCEUX11 技术文档 / 全局状态与 NES 内核循环
+  Global State & NES Emulator Inner Loop
+================================================================================
+
+【写在前面 / Preface】
+================================================================================
+
+  上一章我们了解了硬件原理，这一章解释 FCEUX11 怎么把这些硬件
+  「粘合」成一个完整的模拟器：谁拥有全局状态、CPU 怎么分派内存
+  访问、mapper 怎么挂到总线上、open-bus 是什么。
+
+  本章目标：
+    1. 解释 X6502 X 全局单例的设计取舍
+    2. 解释 ARead[] / BWrite[] 函数指针分派表
+    3. 解释 Page[] / VPage[] 内存页表与 open-bus 语义
+    4. 拆解 FCEUI_FrameBoundary 主循环
+    5. 解释 MapIRQHook / timestamp / soundtimestamp 协作
+    6. 解释 mapper 初始化与切换的协议
+
+  阅读时间：约 30 分钟。
+  前置知识：01–04 章；懂 C++ 静态成员、函数指针、虚函数。
+
+================================================================================
+1. 全局单例：为什么 X6502 是全局变量？
+================================================================================
+
+  src/x6502.cpp:
+
+    alignas(64) X6502 X;
+
+  这是个故意保留的「反 OO」设计：CPU 整个状态就是单个全局结构体。
+  原因：
+
+    1. 性能：x6502 调度循环是模拟器热路径，每条指令读 / 写 X 的字段
+       数千次。全局变量对编译器最友好，寄存器优化空间最大。
+    2. mapper / PPU / APU 都会调用 CPU 的中断 / 暂停接口，全局访问
+       比传参 11 个 context pointer 干净。
+    3. 与 FCEUX 上游一致，避免重构引入差异 bug。
+
+  缺点：无法做多实例。v0.3.8 通过 enum class 化 fceu11::MapIRQHook
+  typedef 加了类型安全护栏，但仍保留单实例。
+
+  alignas(64) 让 X 不与 mapper 寄存器组（DRegBuf[] 等）共占 cache line，
+  避免 false sharing。
+
+================================================================================
+2. 内存读取分派：ARead[0x10000] 表
+================================================================================
+
+  src/fceu.cpp:
+
+    readfunc ARead[0x10000];
+    writefunc BWrite[0x10000];
+
+  这是「整张 64 KiB 内存空间都索引」的函数指针表。CPU 任何内存读：
+
+    static INLINE uint8 RdMem(unsigned int A) {
+        _DB = ARead[A](A);
+        return _DB;
+    }
+
+  ARead[A] 返回一个函数指针，立即调用。这是模拟器最热的内联函数之一。
+
+  2.1 谁设置 ARead[]？
+
+  多个层级（按优先级从低到高）：
+
+    1. 默认：src/fceu.cpp 提供的 fceu 默认 handler（读 PRG-ROM / WRAM / PPU 寄存器）
+    2. mapper：通过 SetReadHandler(start, end, callback) 覆盖某段范围
+    3. debugger：通过调试器临时安装「监视」handler（读时触发断点）
+    4. Lua 脚本：通过 CallRegisteredLuaMemHook 注册 Lua 回调
+
+  2.2 性能关键
+
+  SetReadHandler(start, end, callback) 必须遍历 [start, end] 范围写入
+  函数指针表。若 mapper 频繁切换（如 MMC3 每 8 周期重映射），开销
+  显著。v0.3.x 通过减少 Page[] 重写（vrc6.cpp 等）来缓解。
+
+  实际 90% 访问走 Page[] 间接 + 简单指针解引用（无函数指针调用），
+  仅 mapper 接口段走 ARead[A](A)。详见 §3 与 §4。
+
+================================================================================
+3. Page[] / VPage[]：优化"快速路径"的页表
+================================================================================
+
+  src/cart.cpp:
+
+    uint8 *Page[32];          // CPU 视角的 32 个 2 KiB 页
+    uint8 *VPage[8];          // PPU 视角的 8 个 1 KiB CHR 页
+    uint8 *VPageG[8];         // PPU 视角的 GFX mode CHR 页（MMC5）
+
+  Page[i] 指向「CPU 读取 0x800 + i*0x800 时实际读到的字节」。
+
+  3.1 Page[] 的妙用
+
+  实际 90% 的内存访问是 ROM 读。设个指针表做间接，访问比函数指针快：
+
+    static INLINE uint8 CartBR(uint32 A) {
+        int np = A >> 11;
+        uint8* p = Page[np];
+        if (p) {
+            // 软件预取下一 cache line
+            _mm_prefetch((const char*)&p[A + 64], _MM_HINT_T0);
+            return p[A];
+        }
+        return CartBROB(A);  // open-bus 语义
+    }
+
+  3.2 setprg / setchr 在做什么
+
+    void setprg(uint8 bank, uint8 page) {
+        Page[page] = PRGptr[bank] - 0x8000 - page*0x2000;
+        // 注意：Page[page] 是"指向 PRGptr[bank] 但偏移到 page 起点"的指针
+        // 这样读 Page[page][A] 等价于 PRGptr[bank][A - page*0x2000]
+    }
+
+  详见 10 章关于 cache 对齐与软件预取的深度讨论。
+
+================================================================================
+4. open-bus 是什么？为什么需要 CartBROB？
+================================================================================
+
+  NES 总线有个奇怪的语义：当 CPU 读「没有设备响应」的地址时，
+  返回的是"总线最后一次值"（浮空线在电容上保持的电平）。
+  这叫 open-bus behavior。
+
+  FCEUX11 必须如实模拟，否则一些游戏会崩溃：
+    - Mapper 没设置 Page[i]（值为 null）→ 返回 CartBROB(A)
+    - CartBROB 返回 X.DB（外部总线的"最后值"）
+    - X.DB 在每次 RdMem / WrMem 时被更新
+
+  派生表陷阱（10 章会展开）：
+    不能简单建一个 32 KiB 的"派生查找表"加速 open-bus 读
+    → 因为 PRG-RAM 写、bank 切换、open-bus 状态变化都得同步
+    → 维护成本 > 收益
+
+================================================================================
+5. FCEUI_FrameBoundary：模拟器主循环
+================================================================================
+
+  src/fceu.cpp 的 FCEUI_FrameBoundary 是"跑完一帧"的总入口。
+
+    void FCEUI_FrameBoundary(...) {
+        // 1. 跑 CPU + 子系统 timestamp 周期
+        timestamp = 0;
+        while (timestamp < total) {       // total = PPU 一帧周期
+            X6502_Run();                   // 跑 1 条指令
+            // X6502_Run 内部会更新 timestamp
+        }
+
+        // 2. 跑 PPU / APU / 输入
+        FCEUPPU_FrameBoundary(...);        // PPU 一帧结束
+        DoSound();                          // APU 一帧
+        FCEUD_UpdateInput();                // 输入采样
+
+        // 3. 录像同步
+        FCEUMOV_HandlePlayback();
+        FCEUMOV_HandleRecording();
+    }
+
+  5.1 timestamp / soundtimestamp 是什么？
+
+  timestamp：模拟器内部"CPU 周期计数器"
+  soundtimestamp：APU 的"声音周期计数器"
+  FCEUPPU_LineUpdate：每条扫描线推进 PPU
+  X6502_Run：每条指令推进 timestamp
+  DoSound：根据 soundtimestamp 累积生成输出样本
+
+  5.2 X6502_Run 内部循环
+
+    void X6502_Run() {
+        while (X.count > 0) {
+            uint8 op = RdMem(X.PC++);
+            // 派发指令
+            int extra = ops_table[op](&X);
+            ADDCYC(extra);
+        }
+    }
+
+  X.count 由 FCEUPPU_LineUpdate 递减到 0，触发 X6502_Run 返回。
+
+  整个模拟器一帧大约 89,342 PPU 周期 = 29,780 CPU 周期。
+  对应 1 条指令平均 ~4-5 周期，每帧约 5000-8000 条指令。
+
+================================================================================
+6. MapIRQHook：mapper 怎么触发 CPU 中断？
+================================================================================
+
+  src/x6502.cpp:
+
+    void (*MapIRQHook)(int a);   // 全局函数指针
+    static_assert(std::is_same_v<decltype(&MapIRQHook), fceu11::MapIRQHook*>,
+        "MapIRQHook type drift guard (v0.3.8)");
+
+  mapper（如 MMC3）在 IRQCount == 0 时调用：
+
+    MapIRQHook(FCEU_IQEXT);
+
+  CPU 内部：
+
+    void FCEU_IQEXT(int a) {
+        if (a) X.P |= I_FLAG;        // 屏蔽
+        else X.P &= ~I_FLAG;
+        IRQlow |= FCEU_IQEXT_BIT;
+    }
+
+  static_assert 保护 v0.3.8 enum class 化后的 typedef 漂移：
+  如果未来有人改了 x6502.h 的 fceu11::MapIRQHook 而忘了改 x6502.cpp，
+  编译期就会爆。
+
+================================================================================
+7. mapper 初始化协议
+================================================================================
+
+  src/cart.cpp: iNES_Load() 或 unif_load() 完成后会：
+
+    1. 解析 mapper ID
+    2. 查 mapper 表 (src/boards/0xx.cpp 中的 MapperTable[])
+    3. 调 mapper 的 Init() 函数
+    4. Init() 会：
+       a. 分配 PRG-RAM / CHR-RAM（如有）
+       b. 注册 SetReadHandler / SetWriteHandler
+       c. 注册 AddExState（savestate 字段）
+       d. 设置初始 Page[] / VPage[]
+       e. 注册 Power / Reset callback
+    5. mapper 安装完成
+
+  7.1 mapper 切 bank 的标准 API
+
+    setprg(bank, page)   PRG bank 切换
+    setchr(bank, page)   CHR bank 切换
+    setmirror(m)         镜像方式 (0=horiz, 1=vert, 2=4-screen)
+
+  7.2 mapper 怎么与 SFORMAT 协作
+
+    static SFORMAT Mapper_StateRegs[] = {
+        { &reg, sizeof(reg), "REG0" },
+        { 0 }
+    };
+    AddExState(Mapper_StateRegs, ~0, 0);
+
+  AddExState 把 mapper 状态字段注册到全局列表，FCEUSS_Save / Load
+  遍历所有 mapper 字段做序列化。
+
+================================================================================
+8. 主循环内的"事件驱动"模拟
+================================================================================
+
+  整个 FCEUX11 内核是个单线程的事件循环：
+    - 跑 CPU 直到 timestamp >= total
+    - PPU / APU / 输入在同一线程"轮询"式更新
+    - 录像 / 调试 / Lua hook 在主循环内的固定位置触发
+
+  不像现代游戏机的多线程并行，NES 模拟是「单线程模拟并行硬件」。
+  这给调试带来好处：可以随时暂停、注入指令、回放 savestate。
+
+================================================================================
+9. 全局状态一览
+================================================================================
+
+  | 全局变量         | 文件               | 用途                           |
+  |------------------|--------------------|--------------------------------|
+  | X                | src/x6502.cpp      | CPU 状态                        |
+  | timestamp        | src/x6502.cpp      | CPU 周期计数                    |
+  | soundtimestamp   | src/x6502.cpp      | APU 周期计数                    |
+  | MapIRQHook       | src/x6502.cpp      | mapper→CPU IRQ 钩子            |
+  | ARead[0x10000]   | src/fceu.cpp       | CPU 读函数指针表                |
+  | BWrite[0x10000]  | src/fceu.cpp       | CPU 写函数指针表                |
+  | Page[32]         | src/cart.cpp       | CPU 2 KiB 页基址                |
+  | VPage[8]         | src/cart.cpp       | PPU 1 KiB CHR 页基址            |
+  | GameInfo         | src/fceu.cpp       | 当前加载的 ROM 信息             |
+
+  几乎所有修改都通过"修改 + AddExState 注册"双步骤做，缺一不可。
+
+================================================================================
+10. 性能关键路径
+================================================================================
+
+  按开销从大到小：
+
+  1. CPU dispatch (x6502.cpp 指令循环) — ~30% 时间
+  2. PPU scanline update (ppu.cpp FCEUPPU_LineUpdate) — ~25% 时间
+  3. APU mixing (sound.cpp DoSound) — ~15% 时间
+  4. 内存读 CartBR / CartBROB — ~15% 时间
+  5. mapper 各种 callback — ~10% 时间
+  6. 其他（Lua, debugging, input）— ~5% 时间
+
+  优化策略：
+    - alignas(64) + 软件预取（10 章）
+    - 减少 Page[] 重写
+    - v0.3.x 的"按需 mapper 调度"实验
+    - 暂时不引入多线程（同步复杂度太高）
+
+================================================================================
+11. 跳到具体章节
+================================================================================
+
+  想看 open-bus：src/cart.cpp: CartBROB
+  想看 Page[] 操作：src/cart.cpp: setprg
+  想看 ARead 初始化：src/cart.cpp: SetReadHandler
+  想看主循环：src/fceu.cpp: FCEUI_FrameBoundary
+  想看 mapper 框架：04 章 + src/boards/mapinc.h
+
+================================================================================
+文件结束 / End of File
+================================================================================

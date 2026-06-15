@@ -1,0 +1,338 @@
+================================================================================
+  FCEUX11 技术文档 / 构建系统与 CI 矩阵
+  Build System & CI Matrix
+================================================================================
+
+【写在前面 / Preface】
+================================================================================
+
+  FCEUX11 用 CMake + MSVC + Ninja + vcpkg + Rust 构建。本章
+  拆解构建系统的每一步、CI 矩阵的设计、ASan / UBSan 构建、
+  vcpkg 集成。
+
+  本章目标：
+    1. 解释 CMake 关键配置
+    2. 解释 MSVC 工具链锁定与理由
+    3. 解释 vcpkg 工作流
+    4. 解释 Rust=ON / OFF 矩阵
+    5. 拆解 ASan / UBSan 构建流程
+    6. 解释 PowerShell 构建脚本的自动化
+
+  阅读时间：约 25 分钟。
+  前置知识：懂 CMake 基础；懂 PowerShell / Bash。
+
+================================================================================
+1. 工具链：MSVC-only
+================================================================================
+
+  v0.2.1 起，CMakeLists.txt:28-34 强制 MSVC：
+
+    if(NOT MSVC)
+        message(FATAL_ERROR
+            "FCEUX11 v0.2.1+ requires the MSVC 2022+ toolchain for ABI and "
+            "byte-level savestate compatibility (plan §3.1). MinGW-w64 / "
+            "MSYS2 / clang-cl / gcc paths have been removed. Do NOT change "
+            "CMAKE_C_COMPILER / CMAKE_CXX_COMPILER to bypass this guard.")
+    endif()
+
+  锁定原因：
+    1. ABI 稳定性：savestate 字节布局依赖 MSVC struct 内存布局。
+       gcc / clang 对 alignas / empty base 的处理与 MSVC 不同。
+    2. vcpkg 集成：vcpkg 默认 x64-windows 用 MSVC ABI。
+    3. Qt 6.8 LTS：官方仅保证 MSVC 兼容。
+
+  不接受 clang-cl 的"等价 ABI" 理由：
+    - 标量 layout 大体一致，但 #pragma pack(1) 边缘行为略不同
+    - v0.4.x 才考虑加 clang-cl CI 矩阵
+
+  v0.3.1 进一步锁定 MSVC 19.36+（VS 17.6+）以避免 C++23 preview
+  行为漂移。
+
+================================================================================
+2. CMake 关键配置
+================================================================================
+
+  CMakeLists.txt 顶部：
+
+    cmake_minimum_required(VERSION 4.0)
+
+    # v0.2.1: Auto-detect vcpkg toolchain
+    if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+        if(EXISTS "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows")
+            list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows")
+            message(STATUS "Using local vcpkg_installed: ...")
+        else()
+            set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+                CACHE STRING "")
+        endif()
+    endif()
+
+    project(FCEUX11 VERSION 0.3.13 LANGUAGES CXX C)
+
+    set(CMAKE_CXX_STANDARD 20)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
+    set(CMAKE_CXX_EXTENSIONS OFF)
+
+  2.1 vcpkg 优先用本地
+
+  vcpkg_installed/x64-windows 已下载好的包在 build 目录复用，避免
+  重新编译 Qt 等大包。
+
+  2.2 安全选项
+
+    add_compile_options(/W4 /permissive- /guard:cf /GS /sdl /wd4996)
+    add_link_options(/GUARD:CF /CETCOMPAT)
+
+    /W4         警告级别 4（v0.3.16 才加 /WX）
+    /permissive-  严格 C++ 模式（禁用 MSVC 扩展）
+    /guard:cf   Control Flow Guard（间接调用检查）
+    /GS         栈 buffer 安全 cookie
+    /sdl        扩展 /GS，额外加 buffer overrun / new[] 整数溢出检查
+    /CETCOMPAT  CET 兼容（Control-flow Enforcement Technology）
+
+  2.3 选项开关
+
+    option(FCEUX11_BUILD_TESTS     "Build smoke and regression tests" ON)
+    option(FCEUX11_ENABLE_I18N     "Enable internationalization support" ON)
+    option(ENABLE_LINT_CPPCHECK    "Enable cppcheck static analysis" OFF)
+    option(FCEUX11_ASAN            "Enable AddressSanitizer"               OFF)
+    option(FCEUX11_UBSAN           "Enable MSVC-native UB runtime checks"   OFF)
+    option(FCEUX11_RUST_ENABLED    "Build Rust crates"                      ON)
+    option(FCEUX11_LUA_RUST_ENABLED "Use Rust mlua instead of C++ Lua"     ON)
+
+================================================================================
+3. 快速构建
+================================================================================
+
+  3.1 自动化脚本
+
+  scripts/do_build.ps1 是推荐入口（纯 PowerShell，无 MSYS2 依赖）。
+
+    .\scripts\do_build.ps1 -Config Release
+    .\scripts\do_build.ps1 -Config Release -Clean    # 干净重建
+
+  内部步骤：
+    1. 探测工具链（Ninja → nmake → VS 2022 BuildTools）
+    2. 加载 vcvars64.bat
+    3. 调 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+    4. 调 cmake --build build
+    5. 可选：跑 ctest
+
+  3.2 手动构建
+
+    .\scripts\setup_vcpkg.ps1        # 首次安装依赖（1-2 小时）
+    cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+    cmake --build build
+    ctest --test-dir build --output-on-failure
+
+  3.3 产物
+
+  - 主程序：build\src\fceux11.exe
+  - 冒烟测试：build\src\tests\fceux11_smoke_test.exe
+  - Mapper 测试：build\src\tests\fceux11_mapper_load_test.exe
+
+  3.4 部署
+
+    cmake --install build --prefix dist    # 复制 exe 与所需 DLL
+
+================================================================================
+4. vcpkg 集成
+================================================================================
+
+  4.1 vcpkg.json
+
+    {
+      "name": "fceux11",
+      "version-string": "0.3.13",
+      "dependencies": [
+        "qt5-base",       // (理论上) 或 "qt6-base"
+        "sdl2",
+        "sdl2-image",
+        "libarchive",
+        "zlib",
+        "minizip",
+        "luajit"
+      ]
+    }
+
+  4.2 工作流
+
+  - 首次：setup_vcpkg.ps1 拉源码 + bootstrap + 装包（1-2 小时）
+  - 后续：cmake 优先用 vcpkg_installed/x64-windows/，跳过重装
+  - 加新依赖：编辑 vcpkg.json + 跑 vcpkg install
+
+  4.3 Sanitizer 与 vcpkg
+
+  Debug ASan 构建时，vcpkg 的 LibArchive / ZLIB / OpenGL 用
+  CMAKE_MAP_IMPORTED_CONFIG_DEBUG=RELEASE 强制链接 release 版，
+  避免 Debug 版的 STL 冲突。
+
+================================================================================
+5. Rust 集成：5 个 FFI 模式
+================================================================================
+
+  5.1 Cargo workspace
+
+  src/rust/Cargo.toml:
+
+    [workspace]
+    members = [
+        "crates/fceux11-utils",
+        "crates/fceux11-formats",
+        "crates/fceux11-media",
+        "crates/fceux11-debug",
+        "crates/fceux11-lua",
+        "crates/fceux11-core",
+    ]
+
+  5.2 CMake add_custom_command
+
+  CMakeLists.txt:
+
+    add_custom_command(
+        OUTPUT ${CMAKE_SOURCE_DIR}/src/rust/fceux11_rust.h
+        ${CMAKE_BINARY_DIR}/fceux11_rust.lib
+        COMMAND ${CARGO} build --release --manifest-path ...
+        DEPENDS ...      # 所有 .rs 文件
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/src/rust
+    )
+
+  5.3 头文件生成
+
+  src/rust/build.rs 调 cbindgen，把所有 crate 的子头合并成
+  fceux11_rust.h。C++ 侧 #include "rust/fceux11_rust.h" 即可用。
+
+================================================================================
+6. CI 矩阵：Rust=ON / OFF + ASan / UBSan
+================================================================================
+
+  | 配置                        | 何时跑           | 失败时动作            |
+  |-----------------------------|------------------|-----------------------|
+  | Release, Rust=ON            | 每个 PR          | 阻止合并              |
+  | Release, Rust=OFF           | 每个 PR          | 阻止合并              |
+  | Debug,   Rust=ON            | 每个 PR          | 阻止合并              |
+  | Release, ASan                | 每晚 + release 前 | 阻止发布             |
+  | Release, UBSan               | 每晚 + release 前 | 阻止发布             |
+  | Release, ASan + i386-soft-float| 不跑（MSVC only）| n/a                   |
+
+  Rust=OFF 路径保留的真正理由：
+    - 某些用户环境（容器/裁剪镜像）可能无 Rust 工具链
+    - 验证"无 Rust" 路径不依赖任何 cbindgen 产物
+    - 强制"C++ 兼容 shim" 在 Rust=OFF 时能完整工作
+
+================================================================================
+7. ASan / UBSan 构建流程
+================================================================================
+
+  7.1 ASan
+
+  scripts/_build_asan.ps1:
+
+    cmake -S . -B build-asan `
+        -G Ninja `
+        -DCMAKE_BUILD_TYPE=Debug `
+        -DFCEUX11_ASAN=ON `
+        ...
+    cmake --build build-asan
+
+  7.2 UBSan
+
+  scripts/_build_ubsan.ps1:
+
+    cmake -S . -B build-ubsan `
+        -G Ninja `
+        -DCMAKE_BUILD_TYPE=Debug `
+        -DFCEUX11_UBSAN=ON `
+        ...
+    cmake --build build-ubsan
+
+  7.3 跑测试
+
+  scripts/_ctest_asan.ps1:
+
+    set PATH=%CD%\..\vcpkg_installed\x64-windows\bin;%PATH%
+    cd build-asan
+    ctest -C Debug --output-on-failure
+
+  7.4 已知限制
+
+  - ASan LSan 在 MSVC Windows 上不存在（见 12 §8.3）
+  - UBSan 仅为 MSVC 子集（RTC1 + /sdl + /GS + /guard:cf）
+  - 完整 clang-style UBSan + LSan 是 v0.4.x 工作流
+
+================================================================================
+8. 常见构建错误与修复
+================================================================================
+
+  8.1 Rust target 缺失
+
+  现象：linker error "x86_64-pc-windows-msvc target not found"
+  修复：rustup target add x86_64-pc-windows-msvc
+
+  8.2 Generator 不匹配
+
+  现象：CMake Error "CMakeCache.txt is for a different generator"
+  修复：删除 build/ 目录重新配置
+
+  8.3 vcpkg 包未找到
+
+  现象：Could NOT find SDL2 (missing: ... )
+  修复：运行 setup_vcpkg.ps1 或设置 VCPKG_ROOT
+
+  8.4 Qt6LinguistTools 未找到
+
+  现象：Could NOT find Qt6LinguistTools
+  修复：添加 -DFCEUX11_ENABLE_I18N=OFF
+
+  8.5 未解析外部符号 fceux11_rust_*
+
+  现象：LNK2019 unresolved external
+  修复：删除旧 .lib 或确认 CMakeLists.txt 的 DEPENDS
+
+================================================================================
+9. Agent 标准化编译规范（PR 提交者必读）
+================================================================================
+
+  强制检查工具：cmake, ninja, cl, vcpkg, rustup, cargo
+  编译配置矩阵：
+    Release (Rust ON) | Debug (Rust ON) | Rust OFF 回退验证 |
+    纯 C++ | Rust Lua 引擎
+
+  增量构建目标：
+    fceux11_rust_build / fceux11_utils / fceux11_core / fceux11
+
+  Feature-Gate 范式：
+    C++ 保留同名 wrapper，内部 #ifdef FCEUX11_RUST_ENABLED 分支
+
+  每个 Rust 重构 PR 必须通过 Rust=ON 和 Rust=OFF 两种 CI 配置。
+
+  Rust Lua 引擎：
+    - 使用 Rust mlua crate（vendored Lua 5.1）替代 C++ Lua
+    - 启用：-DFCEUX11_RUST_ENABLED=ON -DFCEUX11_LUA_RUST_ENABLED=ON
+
+================================================================================
+10. 新增 Rust 模块 Checklist
+================================================================================
+
+  1. Cargo.toml 版本号递增
+  2. 新依赖记录并附注释
+  3. fceux11_rust.h 追加 extern "C" 声明（自动由 cbindgen 生成）
+  4. C++ wrapper 保留 #ifdef 分支
+  5. Rust 侧编写至少一个 #[test]
+  6. CMakeLists.txt add_custom_command 声明 DEPENDS
+  7. 继承模板基类结构体使用 reinterpret_cast
+  8. CI 通过 Rust=ON/OFF 全量构建
+  9. 更新本文档适用范围版本号
+
+================================================================================
+11. 跳到具体章节
+================================================================================
+
+  想看 FFI 细节：09 章
+  想看测试方法：12 章
+  想看 v0.3.x 演进：14 章
+  想看 build_v0314 日志：build_v0314.log / build_release_v0314.log
+
+================================================================================
+文件结束 / End of File
+================================================================================

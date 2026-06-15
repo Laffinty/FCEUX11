@@ -1,0 +1,410 @@
+================================================================================
+  FCEUX11 技术文档 / 文件格式与存档机制
+  NES File Format Specifications & Save State Mechanism
+================================================================================
+
+【写在前面 / Preface】
+================================================================================
+
+  NES 生态有 5 个核心文件格式：iNES（ROM 镜像）、UNIF（统一 ROM 格式）、
+  FCS（存档）、FM2（录像）、NSF（音乐）。本章把它们一次性讲清楚，
+  并附带 FCEUX11 实现位置。
+
+  本章目标：
+    1. 详解 iNES / NES 2.0 头结构与 PRG/CHR 段布局
+    2. 详解 FCS chunk-based 存档格式
+    3. 详解 FM2 录像格式（文本 / 二进制）
+    4. 详解 NSF 音乐格式
+    5. 解释 EMUFILE 抽象与 std::span 边界
+    6. 解释 savestate 字节级一致性约束
+
+  阅读时间：约 35 分钟。
+  前置知识：懂字节序（little-endian vs big-endian）、C struct 内存布局。
+
+================================================================================
+1. iNES 格式（.nes）
+================================================================================
+
+  1.1 总体结构
+
+    ┌────────────────────────┐
+    │ iNES 头 (16 字节)       │  必须位于文件最开头
+    ├────────────────────────┤
+    │ Trainer (512 字节)      │  可选
+    ├────────────────────────┤
+    │ PRG-ROM (N × 16 KiB)   │  N = 头里的 PRG bank 数
+    ├────────────────────────┤
+    │ CHR-ROM (M × 8 KiB)    │  M = 头里的 CHR bank 数；=0 表示 CHR-RAM
+    └────────────────────────┘
+
+  1.2 iNES 头（16 字节）布局
+
+    字节 0-3   : "NES\x1A" （ASCII 0x4E 0x45 0x53 0x1A）
+    字节 4     : PRG-ROM bank 数（16 KiB 为单位）
+    字节 5     : CHR-ROM bank 数（8 KiB 为单位；0 = CHR-RAM）
+    字节 6     : flags 6
+                  bit 0 : 镜像 (0=horizontal, 1=vertical)
+                  bit 1 : battery-backed PRG-RAM (1=有电池)
+                  bit 2 : trainer (1=有 512 字节 trainer)
+                  bit 3 : 4-screen VRAM 镜像（覆盖 bit 0）
+                  bit 4-7 : mapper ID 低 4 位
+    字节 7     : flags 7
+                  bit 0 : VS Unisystem（罕见）
+                  bit 1 : PlayChoice 10（罕见）
+                  bit 2-3 : NES 2.0 标识（10b = NES 2.0）
+                  bit 4-7 : mapper ID 高 4 位
+    字节 8     : PRG-RAM 大小（8 KiB 为单位；通常填 1）
+    字节 9     : CHR-RAM 大小（8 KiB 为单位；通常填 0 或 1）
+    字节 10    : flags 10（CPU/PPU timing）
+    字节 11    : flags 11（TV system）
+    字节 12-15: 保留，必须为 0
+
+  1.3 NES 2.0 扩展（flags 7 bit 2-3 == 10b）
+
+    字节 8     : PRG-RAM 大小（8 KiB 为单位）
+    字节 9     : CHR-RAM 大小（8 KiB 为单位）
+    字节 10    : PRG-ROM bank 数的高字节 → 实际 24-bit
+    字节 11    : CHR-ROM bank 数的高字节
+    字节 12    : 0x00 = NTSC; 0x01 = PAL; 0x02 = multi
+    字节 13    : VS Unisystem 扩展（0 = normal）
+    字节 14-15: 保留
+
+  NES 2.0 解决了老 iNES 的"PRG bank 数量只能 0-255"问题。
+
+  1.4 FCEUX11 实现位置
+
+    src/ines.cpp
+      iNES::ReadHeader()           ← 解析头
+      iNES::Load()                 ← 加载 PRG/CHR
+      iNES::MapperInit()           ← 根据 mapper ID 实例化
+
+================================================================================
+2. UNIF 格式（.unf）—— 更现代的 ROM 容器
+================================================================================
+
+  UNIF 是 FCE Ultra 设计的"通用" ROM 格式，支持任意 bank 大小、
+  任意 mapper 描述，但游戏社区用得少。
+
+  结构：
+    ┌────────────────────┐
+    │ "UNIF" + 4 字节 ver │  8 字节
+    ├────────────────────┤
+    │ Chunk 序列          │  每块有 type / size / data
+    └────────────────────┘
+
+  常见 chunk type：
+    "PRG0"-"PRG7"   PRG bank（大小任意）
+    "CHR0"-"CHR7"   CHR bank
+    "MIRR"          镜像方式
+    "MAPR"          mapper 名称（字符串）
+    "NAME"          ROM 名称
+    "BATR"          battery flag
+
+  FCEUX11 实现：src/unif.cpp
+
+================================================================================
+3. FCS 存档格式（.fc0, .fcs）
+================================================================================
+
+  FCS = FCE Ultra Save State，设计目标是「前向 / 后向兼容」。
+
+  3.1 主文件头（16 字节）
+
+    字节 0-2   : "FCS" 字符串（0x46 0x43 0x53）
+    字节 3     : FCE Ultra 版本号（本文档适用于 0.53+）
+    字节 4-7   : 文件总大小（不含 16 字节头；32-bit little-endian）
+    字节 8-15  : 保留（全 0）
+
+  3.2 Section Chunk 头（5 字节）
+
+    字节 0     : section ID
+    字节 1-4   : section 总大小（含 5 字节头）
+
+  Section ID：
+    1   = CPU
+    2   = CPUC（模拟器专用状态）
+    3   = PPU
+    4   = CTLR（控制器）
+    5   = SND（声音）
+    16  = EXTRA（卡带相关）
+
+  3.3 Subsection Chunk 头（8 字节）
+
+    字节 0-3   : 4 字节描述名（非 null 终止，不足补 0）
+    字节 4-7   : 数据大小（little-endian）
+
+  3.4 各 section 的子节内容
+
+  CPU 节：
+    PC        uint16
+    A         uint8
+    P         uint8
+    X         uint8
+    Y         uint8
+    S         uint8
+    RAM       uint8[0x800]    （2 KiB 内部 RAM）
+
+  CPUC 节（v0.3.8 enum class 化后类型名变化）：
+    JAMM      uint8   （卡死状态）
+    IRQL      uint8   （持续 IRQ）
+    ICoa      int32   （临时 cycle）
+    ICou      int32   （cycle 计数）
+    MapIRQHook 用函数指针，重启时需要重新注册
+
+  PPU 节：
+    NTAR      uint8[0x800]   （2 name tables）
+    PRAM      uint8[32]      （palette）
+    SPRA      uint8[0x100]   （OAM）
+    PPU       uint8[4]       （4 个 PPU 寄存器）
+    XOFF      uint8          （fine X）
+    VTOG      uint8          （first/second write toggle）
+    RADD      uint16         （读取地址）
+    TADD      uint16         （临时地址）
+    VBUF      uint8          （读缓冲）
+    PGEN      uint8          （背景生成器）
+
+  CTLR 节：J1RB, J2RB  (手柄按钮状态)
+
+  SND 节：
+    NREG      uint16  （噪声 LFSR）
+    P17       uint8   （$4017 状态）
+    PBIN      uint8   （DMC bit 索引）
+    PAIN      uint32  （DMC 地址索引）
+    PSIN      uint32  （DMC 长度计数）
+
+  EXTRA 节（按 iNES/UNIF 差异）：
+    WRAM      uint8[0x2000]  （卡带 WRAM）
+    CHRR      uint8[0x2000]  （CHR-RAM 镜像）
+    EXNR      uint8[0x800]   （扩展 name table）
+    MIRR      uint8          （镜像方式）
+    IRQC/IQL1/IQL2 uint32
+    IRQA      uint8
+    PBL       uint8[4]       （PRG bank list）
+    CBL       uint8[8]       （CHR bank list）
+
+  3.5 字节序
+
+  所有多字节字段都是 little-endian（LSB 在前）。FCEUX11 的
+  EMUFILE 抽象统一处理字节序转换（src/utils/endian.h）。
+
+  3.6 FCEUX11 实现位置
+
+    src/state.cpp
+      FCEUSS_Save() / FCEUSS_Load()      ← 主入口
+      SFORMAT 数组在各模块的 *StateRegs[] 声明
+
+================================================================================
+4. FM2 录像格式（.fm2, .fcm）
+================================================================================
+
+  FM2 是纯文本键值对格式，由 Header + Input Log 组成。
+  FCM 是 FCE Ultra 旧版的二进制录像格式（v0.3.10 起视为遗留）。
+
+  4.1 必需 Header 字段
+
+    version       int    格式版本（当前 3）
+    emuVersion    string 录制所用的模拟器版本
+    romFilename   string ROM 文件名
+    guid          GUID   唯一标识符，用于验证 savestate 归属
+    romChecksum   string ROM 的 MD5（base64 编码十六进制）
+    port0/port1   int    端口设备类型 (0=无, 1=手柄, 2=光线枪)
+    port2         int    FCExp 端口设备类型 (0=无)
+
+  4.2 可选 Header 字段
+
+    rerecordCount int    重录次数
+    palFlag       bool   PAL 时序 (1=是)
+    fourscore     bool   四玩家适配器
+    binary        bool   输入日志为二进制格式
+    length        int    电影帧数
+    comment       string 注释
+    subtitle      string 字幕
+    savestate     hex    若从存档开始录制则包含存档数据
+
+  4.3 Input Log（文本格式）
+
+    每帧一行，以 | 开头和结尾。
+    标准格式：|commands|port0|port1|port2|
+    Fourscore 格式：|commands|p1|p2|p3|p4|port2|
+
+  commands 位字段：
+    1 = 软重置   2 = 硬重置/电源   4 = FDS 磁盘插入
+    8 = FDS 磁盘选择   16 = VS 投币
+
+  SI_GAMEPAD 格式：
+    8 个字符，顺序 RLDUTSBA
+    (Right, Left, Down, Up, Start, Select, B, A)
+    非空格或 '.' 的字符表示按下。
+    例：|0|RLDU..BA|.......A|0| 表示第 0 帧 D-pad 全按 + A 按
+
+  SI_ZAPPER 格式：XXX YYY B Q Z
+    XXX= X 坐标(%03d)  YYY= Y 坐标
+    B= 鼠标按钮  Q,Z= 内部值
+
+  4.4 二进制格式（binary=true）
+
+    每帧固定长度，commands 为第 1 字节：
+      bit 0 = 软重置, bit 1 = 硬重置, bit 2 = FDS 插入,
+      bit 3 = FDS 选择, bit 4 = VS 投币。
+    SI_GAMEPAD：1 字节，bit 0-7 = A, B, Select, Start, Up, Down, Left, Right
+    SI_ZAPPER：12 字节（X, Y, 按钮, Q, Z(uint64)）
+
+  4.5 帧率常量
+
+    NTSC: 60.099822938442230224609375 fps
+    PAL : 50.00698089599609375 fps
+
+  4.6 FCM → FM2 转换
+
+  GUI 入口：Tools > Convert .fcm to .fm2
+  CLI 入口：./fceux --fcmconvert filename.fcm
+
+  转换失败的常见情况：
+    - FCEU 0.10 或更早版本的电影
+    - Dragon Warrior 4（VRAM 处理特殊）
+    - 从 savestate 开始的电影（格式不兼容）
+    - Battle Toads (FCEU 0.12，Mapper 7 重大改动)
+
+  修复方法：在电影开头添加若干空帧 |0|||，
+  然后在第一帧添加重置标志 |2|||。
+
+  4.7 FCEUX11 实现位置
+
+    src/movie.cpp
+      FCEUMOV_* 函数集
+      FM2 解析与序列化
+    src/oldmovie.cpp
+      FCM 遗留支持
+
+================================================================================
+5. NSF 音乐格式（.nsf）
+================================================================================
+
+  NSF = NES Sound Format。封装 NES 音乐程序，模拟器跑"音乐程序"
+  本身而不是 ROM。
+
+  5.1 头部（$00-$7F，128 字节）
+
+    $0000-$0004  "NESM" + 0x1A
+    $0005        版本号（当前 $01）
+    $0006        总曲目数
+    $0007        起始曲目号
+    $0008-$0009  加载地址（低/高）
+    $000A-$000B  初始化地址
+    $000C-$000D  播放地址
+    $000E-$002D  曲名（32 字节，null 终止）
+    $002E-$004D  艺术家（32 字节）
+    $004E-$006D  版权（32 字节）
+    $006E-$006F  NTSC 播放速度（1/1000000 秒 tick 数，标准 60Hz = $411A）
+    $0070-$0077  Bank 切换初始值（全 0 表示无 bankswitching）
+    $0078-$0079  PAL 播放速度
+    $007A        PAL/NTSC 标志（bit 0=PAL, bit 1=双制式）
+    $007B        扩展音效芯片标志
+                  bit 0=VRCVI   bit 1=VRCVII   bit 2=FDS Sound
+                  bit 3=MMC5    bit 4=Namco 106  bit 5=Sunsoft FME-07
+    $007C-$007F  保留（必须为 0）
+    $0080+       音乐程序/数据
+
+  5.2 NSF 加载方式
+
+    无 bankswitching：直接加载到 6502 地址空间的指定加载地址。
+    有 bankswitching：加载到 RAM bank 的 (地址 & $0FFF) 偏移处，
+                      然后将 $0070-$0077 写入 $5FF8-$5FFF 设置初始 bank。
+
+  5.3 初始化流程
+
+    1. 清零 $0000-$07FF 和 $6000-$7FFF RAM
+    2. 初始化声音寄存器
+    3. 若有 bank，写入 $5FF8-$5FFF
+    4. A=曲目号-1, X=制式(0=NTSC, 1=PAL)
+    5. 调用初始化例程（应执行 RTS 返回）
+
+  5.4 注意事项
+
+    - 曲名/艺术家/版权字段最多 31 字符，必须留 1 字节 null
+    - 未知字段填 "<?>"（不含引号）
+    - 变量应仅使用 $0000-$07FF；栈位于 $1FF 向下增长
+    - 调用 init/play 时不可假设任何寄存器/标志的初始状态（除 A 和 X）
+
+  5.5 FCEUX11 实现位置
+
+    src/nsf.cpp
+      NSFLoader + NSFRun
+    src/fds.cpp  ←  FDS 音乐（Famicom Disk System）
+    src/sound.cpp ←  通用 APU
+
+================================================================================
+6. EMUFILE 抽象：跨格式统一 I/O
+================================================================================
+
+  EMUFILE 是 FCEUX11 对「文件 / 内存 / 流」的统一抽象。
+  所有 FCS / FM2 / iNES / NSF 解析都通过 EMUFILE 接口做 I/O。
+
+  6.1 类层次
+
+    class EMUFILE {
+    public:
+        virtual size_t fread(std::span<std::byte> dst) = 0;
+        virtual size_t fwrite(std::span<const std::byte> src) = 0;
+        virtual FILE* get_fp() = 0;
+        // ... read32le / write32le / read16le / etc
+    };
+
+    class EMUFILE_FILE : public EMUFILE { ... };  // 真文件
+    class EMUFILE_MEMORY : public EMUFILE { ... }; // 内存 buffer
+
+  6.2 v0.3.10 重大变更
+
+  旧接口：size_t fread(void* ptr, size_t size)
+  新接口：size_t fread(std::span<std::byte> dst)
+
+  旧接口保留为 [[deprecated]] 兼容 shim。详见 09 章。
+
+  6.3 字节序工具
+
+  src/utils/endian.h 提供：
+    write32le / read32le   32-bit little-endian
+    write16le / read16le   16-bit little-endian
+    write8le  / read8le    8-bit 直传
+
+  这是所有 FCS/FM2 子段解析的基础。
+
+================================================================================
+7. savestate 字节级一致性：硬约束
+================================================================================
+
+  7.1 为什么必须字节级一致？
+
+  TAS（Tool-Assisted Speedrun）玩家在不同机器、不同模拟器版本间
+  分享 .fc0 存档。若 FCEUX11 升级后 savestate 字节布局变化，
+  所有玩家的存档都报废。这是不可接受的。
+
+  7.2 强制约束
+
+  - 不可在 SFORMAT 已存在的字段中间插新字段
+  - 不可改已有字段的类型（uint8 → uint16）
+  - 不可改 mapper 寄存器组的 struct 字段顺序
+  - 对齐（alignas）不改变 sizeof，但必须用 FCEUX11_MAPPER_HOT 标注
+  - v0.3.10 引入的 std::span 化不能改变 fread/fwrite 的实际字节序
+
+  7.3 验证方法
+
+  - 720 帧 rom_regression_test 帧 CRC 与 golden_hashes.json 一致
+  - 12 ROM savestate_regression_test MD5 与 golden_savestate_hashes.json 一致
+  - vrc7 是个例外（见 05 §vrc7 例外）
+
+  详见 12 章。
+
+================================================================================
+8. 跳到具体章节
+================================================================================
+
+  想看 iNES 解析源码：src/ines.cpp
+  想看 FCS 序列化：src/state.cpp
+  想看 FM2 解析：src/movie.cpp
+  想看 EMUFILE std::span 迁移：09 章
+  想看 savestate 测试：12 章
+
+================================================================================
+文件结束 / End of File
+================================================================================

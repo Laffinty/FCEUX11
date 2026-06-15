@@ -1,0 +1,513 @@
+================================================================================
+  FCEUX11 技术文档 / GUI 启动崩溃调试案例库
+  GUI Startup Crash & Keyboard Debugging Case Library
+================================================================================
+
+【写在前面 / Preface】
+================================================================================
+
+  本章沉淀 v0.3.14 调试 GUI 启动崩溃 + 键盘失效两个 BUG 时的
+  通用方法论、关键陷阱与可复用修复模式。FCEUX11 的项目历史与
+  修复版本号无关，按"问题 / 根因 / 模式"组织，让后人遇到类似
+  症状时可以直接按目录索引。
+
+  修订原则：本章是技术知识库，不是 changelog。后续若出现新的
+  同类问题，应在对应章节追加"案例 + 修复"段落，不要改写为
+  "v0.X.Y 修复了…"的版本叙述。
+
+  本章目标：
+    1. 给出 GUI / 输入类问题的"黄金 5 步"调试方法论
+    2. 拆解 3 个经典案例的根因 + 修复
+    3. 沉淀可复用的修复模式
+    4. 沉淀反模式（不要再踩的坑）
+    5. 给出端到端自动化测试方案
+
+  阅读时间：约 30 分钟。
+  前置知识：08 章 GUI 集成；07 章 输入系统；懂 Windows 消息机制。
+
+================================================================================
+目录
+================================================================================
+
+  1. 调试方法论总览（黄金 5 步）
+  2. 案例 A：QOpenGLWindow 启动崩溃
+  3. 案例 B：SDL 键盘事件被 Qt 主线程吞掉
+  4. 案例 C：AttachConsole + freopen 在 MSYS2/伪终端下崩溃
+  5. 模式库：可复用修复模板
+  6. 反模式：不要再踩的坑
+  7. 工具速查：Qt / SDL / Windows 调试开关
+  8. 自动化测试：SendInput + Win32 API 仿真键盘
+
+================================================================================
+1. 调试方法论总览（黄金 5 步）
+================================================================================
+
+  GUI 启动崩溃或输入失效类问题的标准排查流程：
+
+  Step 1 ── 复现 + 缩小窗口
+    • 用 timeout 限制运行时间，避免挂起。
+    • 把 stdout / stderr 重定向到文件（Start-Process -RedirectStandardOutput）。
+      注意：某些场景 AttachConsole 会把 stdout 重写到 CONOUT$，导致文件为空。
+      解决：让调试打印走 stderr（fprintf(stderr, ...)），或用 console 父进程
+      直接 bash 启动看输出。
+    • 第一目标是判断症状分类：
+        A. 程序根本不启动（exit code 非 0）
+        B. 程序启动后立刻崩溃（segfault，exit 139 / SIGSEGV）
+        C. 程序启动但 GUI 不显示
+        D. GUI 显示但输入失效
+        E. GUI 显示且部分输入能工作
+
+  Step 2 ── 加诊断打印二分定位
+    • 在可疑调用链的每个关键节点加 fprintf(stderr, "[DBG] xxx\n"); fflush(stderr);
+    • 必须 fflush，否则崩溃前缓冲区未刷出，丢失关键的最后几行。
+    • 重要：打印添加要集中（如 main.cpp / 一处 wrapper），不要每加一个
+      print 都重新构建完整项目；只改一个 TU，重编秒级完成。
+    • 逐步收窄：从 main() 一路打印到崩溃点。崩溃发生在 print A 之后、
+      print B 之前 → 病灶在 A 与 B 之间。
+
+  Step 3 ── 启用平台诊断开关
+    • Qt：
+        QT_DEBUG_PLUGINS=1        打印所有 Qt 插件加载
+        QT_LOGGING_RULES="qt.qpa.*=true;js=true"   打印 QPA 平台抽象层 + JS
+        QT_OPENGL=desktop         强制用桌面 OpenGL（绕过 ANGLE）
+        QSG_INFO=1                打印 Qt Quick 场景图信息
+    • SDL：
+        SDL_VIDEO_DRIVER=xxx      强制指定 SDL 视频驱动
+        SDL_VIDEODRIVER=xxx       同上（旧名字）
+    • Windows：
+        [Debug] Win + R → dxdiag  检查 GPU / 驱动
+        Get-Process → MainWindowHandle 看实际主窗口句柄
+        EnumWindows + GetWindowText 枚举所有窗口找正确的 HWND
+
+  Step 4 ── 隔离对比（A/B 测试）
+    • 替换某个子系统为已知良好的替代方案：
+        - 视频后端：OpenGL (QOpenGLWindow) → OpenGL (QPAINTER) → 软件光栅
+        - 输入后端：SDL → Qt 原生 → Win32 Raw Input
+        - 渲染管线：QWidget → QML → 自绘
+    • 如果替代方案能工作，故障域就锁死在原方案。
+    • 例：把视频后端从 OpenGL 切到 QPAINTER，崩溃消失，确诊
+      "QOpenGLWindow 路径有问题"。
+
+  Step 5 ── 验证修复（回归测试 + 端到端）
+    • ctest 全部通过（已有的 7 个测试目标）。
+    • 端到端：双击 / 命令行启动 + SendInput 模拟按键 + 检查事件是否到达
+      fceu 核心（JSreturn 等状态变量）。
+    • 端到端测试要做成脚本，固化到 CI 或本地一键验证。
+
+================================================================================
+2. 案例 A：QOpenGLWindow 启动崩溃
+================================================================================
+
+  【症状】
+    • consoleWin_t 创建完成（构造成功），show() 内部某处 segfault（exit 139）。
+    • GUI 永不显示，进程立即死。
+    • ctest 全部通过（ctest 不跑 GUI 路径）。
+
+  【二分定位过程】
+    • 在 main.cpp 加 [DBG] 打印：fceuWrapperInit 完成、consoleWin_t 创建完成、
+      show() 进入、show() 返回。崩溃发生在 show() 内部。
+    • 继续往下钻：在 consoleWin_t::showEvent 加 [DBG] entry/exit。
+      崩溃在 entry 之后、exit 之前 → 在 showEvent 的 initScreenHandler →
+      winScreenChanged → viewport_GL->screenChanged() 调用链中。
+    • 最后在 ConsoleViewGL_t::screenChanged 加 [DBG]，发现崩溃在调用
+      glTexSubImage2D 时。OpenGL 上下文未 makeCurrent！
+
+  【根因】
+
+  QOpenGLWindow 第一次 paintGL() 时如果 OpenGL 上下文还没"makeCurrent"
+  就调 GL 函数，会 segfault。这是因为：
+
+    1. QOpenGLWindow 是 QWindow 子类，OpenGL 上下文在第一次 expose event
+       才 makeCurrent。
+    2. 若在 show() 路径里主动调 paintGL()（screenChanged 触发），此时
+       上下文可能尚未 makeCurrent。
+    3. GL 函数调用走的是"线程当前上下文"指针，nullptr deref → segfault。
+
+  【修复模式】
+
+  把所有 GL 初始化移进 initializeGL()（Qt 保证此时上下文已激活）：
+
+    void ConsoleViewGL_t::initializeGL() {
+        QOpenGLFunctions_3_3_Core::initializeOpenGLFunctions();
+        // 初始化纹理、VAO、VBO —— 此时 makeCurrent 已生效
+    }
+
+  不要在 paintGL() 里初始化 GL 对象。paintGL 假设资源已就绪。
+
+  【教训】
+
+    - QOpenGLWindow 的生命周期: ctor → show → expose event → initializeGL → paintGL
+    - 任何"主动触发 paintGL"的代码（update() / setSize / 屏幕旋转）都应
+      假设 initializeGL 已完成。
+    - ctest 无法发现这类问题，必须手动启动或加 GUI 端到端测试。
+
+================================================================================
+3. 案例 B：SDL 键盘事件被 Qt 主线程吞掉
+================================================================================
+
+  【症状】
+    • GUI 启动正常，菜单可点。
+    • 按键盘（包括方向键、Z、X、Enter）无任何反应。
+    • 鼠标点击 OK。
+    • 控制器手柄 OK。
+    • ROM 加载 OK，但游戏内按键不响应。
+
+  【二分定位过程】
+    • 在 UpdatePhysicalInput 加 [DBG] 打印 SDL_PollEvent 返回值 → 永远是 0。
+    • 在 InputManager::pollAll 加 [DBG] → pollAll 被调用了，但 SDL_PollEvent
+      永远返回 0。
+    • 检查 SDL_PumpEvents 调用位置 → 之前在 EmuThread（模拟器线程）调。
+    • EmuThread 调 SDL_PumpEvents 时，主线程的 WM_INPUT 事件并没有
+      被 SDL 捕获（因为 SDL_PumpEvents 必须在创建 SDL 窗口的线程调，
+      或更准确：必须在 SDL_Init / SDL_CreateWindow 所在的线程调）。
+
+  【根因】
+
+  Windows 的 WM_INPUT raw input 默认只发到"有焦点的 HWND 所在线程"。
+  Qt 6 把焦点 HWND 放在 UI 线程，所以 SDL_PumpEvents() 也必须在
+  UI 线程调。
+
+  之前 EmuThread 调 SDL_PumpEvents 是为了让 SDL 内部 joystick 状态
+  保持新鲜——但代价是 WM_INPUT 跨线程路由丢失。
+
+  【修复模式：键盘事件双路径】
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ 路径 A — SDL_PumpEvents (raw input 层)                          │
+  │                                                                 │
+  │ 主线程：                                                         │
+  │   1. QApplication event loop 跑（Qt pump Windows 消息）          │
+  │   2. 0ms QTimer 定时调 SDL_PumpEvents()                         │
+  │      把主线程消息队列里的 WM_INPUT 转成 SDL 事件                  │
+  │   3. consoleWin_t::updatePeriodic() 120Hz 调 FCEUD_UpdateInput  │
+  └─────────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ 路径 B — QOpenGLWindow keyPressEvent (Qt 事件层)                  │
+  │                                                                 │
+  │ QOpenGLWindow 是独立顶层 QWindow，焦点在其上时 Qt 把            │
+  │ QKeyEvent 派发给它而非 QMainWindow。                              │
+  │ ConsoleViewGL_t override 了 keyPressEvent / keyReleaseEvent,    │
+  │ 调用 pushKeyEvent()（keyscan.cpp:1309）将 QKeyEvent 转换为       │
+  │ SDL_Event 并通过 SDL_PushEvent() 推入 SDL 队列。                  │
+  └─────────────────────────────────────────────────────────────────┘
+
+  双路径总图：
+
+    WM_INPUT ── SDL_PumpEvents ──┐
+    (0ms QTimer, 路径 A)         │
+                                ▼
+    QKeyEvent ── pushKeyEvent ──► SDL 事件队列 ──► SDL_PollEvent()
+    (QOpenGLWindow, 路径 B)               │      (UpdatePhysicalInput)
+                                         ▼
+                                  g_keyState[scancode]
+                                         │
+                                         ▼
+                                  DTestButton → JSreturn
+
+  两条路径不冲突：SDL_PushEvent 是线程安全的，两个路径可同时推事件
+  入队。UpdatePhysicalInput 用 SDL_PollEvent 统一消费。
+
+  【关键代码】
+
+  // 0ms QTimer
+  QTimer* zeroTimer = new QTimer(this);
+  zeroTimer->setInterval(0);
+  connect(zeroTimer, &QTimer::timeout, this, []() {
+      SDL_PumpEvents();
+  });
+  zeroTimer->start();
+
+  // QOpenGLWindow override
+  void ConsoleViewGL_t::keyPressEvent(QKeyEvent* event) {
+      pushKeyEvent(event, true);
+      event->accept();   // 关键：阻止事件再传到 QMainWindow
+  }
+  void ConsoleViewGL_t::keyReleaseEvent(QKeyEvent* event) {
+      pushKeyEvent(event, false);
+      event->accept();
+  }
+
+  【教训】
+
+    - SDL_PumpEvents 必须在创建 SDL 窗口的线程（即 UI 线程）调用。
+    - Qt 的 QKeyEvent 通过 QWindow 焦点路由，对独立 QOpenGLWindow 需要
+      自己 override keyPressEvent/keyReleaseEvent。
+    - 跨线程 SDL_PushEvent 是线程安全的（SDL 内部加锁）。
+    - "看起来无关"的两个症状（GUI 显示 + 部分输入 OK + 键盘失效）
+      通常意味着"焦点 HWND 路由"出问题。
+
+================================================================================
+4. 案例 C：AttachConsole + freopen 在 MSYS2/伪终端下崩溃
+================================================================================
+
+  【症状】
+    • 在 MSYS2 / 伪终端下启动 fceux11.exe → 启动失败 / 输出混乱。
+    • 在 cmd.exe / Windows Terminal 下启动 → 正常。
+    • 调试 fprintf 信息消失。
+
+  【根因】
+
+  AttachConsole(ATTACH_PARENT_PROCESS) 把 stdout 重写到 CONOUT$（父进程
+  控制台），但若父进程是伪终端 / pipe，CONOUT$ 不可写，导致 freopen 失败。
+
+  【修复模式】
+
+    // 旧（可能崩溃）
+    AttachConsole(ATTACH_PARENT_PROCESS);
+    freopen("CONOUT$", "w", stdout);
+    freopen("CONOUT$", "w", stderr);
+
+    // 新（graceful）
+    if (AttachConsole(ATTACH_PARENT_PROCESS)) {
+        FILE* fp = freopen("CONOUT$", "w", stdout);
+        if (!fp) { /* 父进程可能没 console，忽略 */ }
+        fp = freopen("CONOUT$", "w", stderr);
+        if (!fp) { /* 同上 */ }
+    }
+
+  或者更简单：所有调试输出走 stderr，stderr 至少写到 startup log 文件。
+
+  【教训】
+
+    - AttachConsole 后立刻检查返回值。
+    - freopen 失败时不要 panic，回到默认输出。
+    - 调试打印用 stderr 比 stdout 更稳。
+
+================================================================================
+5. 模式库：可复用修复模板
+================================================================================
+
+  5.1 Qt event loop + 后台工作线程
+
+    // 1. UI 线程
+    QThread* bgThread = new QThread(this);
+    bgThread->start();
+
+    // 2. 把工作对象 moveToThread
+    auto worker = new EmuWorker();
+    worker->moveToThread(bgThread);
+
+    // 3. 通信用 signal/slot，跨线程自动 queued
+    connect(bgThread, &QThread::started, worker, &EmuWorker::run);
+    connect(worker, &EmuWorker::frameDone, this, [this](uint8* xbuf) {
+        this->xbuf_ = xbuf;  // 必须在 UI 线程访问 QOpenGLWindow
+        this->update();
+    });
+
+  5.2 跨线程 PPU 输出拷贝
+
+    // 共享缓冲 + mutex
+    std::mutex xbufMutex;
+    uint8_t xbufShared[256*240*4];
+
+    // EmuThread 写
+    {
+        std::lock_guard<std::mutex> lock(xbufMutex);
+        memcpy(xbufShared, ppu_output, sizeof(xbufShared));
+    }
+
+    // UI 线程读
+    {
+        std::lock_guard<std::mutex> lock(xbufMutex);
+        glTexSubImage2D(..., xbufShared);
+    }
+
+  5.3 QOpenGLWindow OpenGL 初始化
+
+    void MyGLWindow::initializeGL() {
+        // 必须先 initializeOpenGLFunctions 才能用任何 GL API
+        QOpenGLFunctions_3_3_Core::initializeOpenGLFunctions();
+        glGenTextures(1, &tex_);
+        glBindTexture(GL_TEXTURE_2D, tex_);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 256, 240, 0,
+                     GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    }
+
+  5.4 SendInput 模拟键盘
+
+    void SendKey(WORD vk, bool down) {
+        INPUT input = {};
+        input.type = INPUT_KEYBOARD;
+        input.ki.wVk = vk;
+        input.ki.dwFlags = down ? 0 : KEYEVENTF_KEYUP;
+        SendInput(1, &input, sizeof(input));
+    }
+
+    // 用法
+    SendKey('Z', true);
+    Sleep(50);
+    SendKey('Z', false);
+
+================================================================================
+6. 反模式：不要再踩的坑
+================================================================================
+
+  6.1 在 paintGL 里初始化 GL 对象
+
+  错误：paintGL 里 glGenTextures + glTexImage2D
+  结果：第一次 paintGL 上下文未 makeCurrent，崩溃
+  正确：所有 GL 初始化放 initializeGL
+
+  6.2 在非 UI 线程调 SDL_PumpEvents
+
+  错误：EmuThread 调 SDL_PumpEvents()
+  结果：WM_INPUT 路由失败，键盘失效
+  正确：0ms QTimer 在 UI 线程调 SDL_PumpEvents
+
+  6.3 假设 QMainWindow 焦点 = QOpenGLWindow 焦点
+
+  错误：依赖 QMainWindow 的快捷键
+  结果：QOpenGLWindow 独立 HWND，焦点在它上时快捷键失效
+  正确：override keyPressEvent + pushKeyEvent
+
+  6.4 假设 QKeyEvent 走 QWidget 链
+
+  错误：把 QKeyEvent 监听装在 QMainWindow 上
+  结果：QOpenGLWindow 焦点时事件不过去
+  正确：在 QOpenGLWindow 子类 override
+
+  6.5 不 fflush 就崩溃
+
+  错误：fprintf(stderr, "..."); 后没 fflush，进程崩溃
+  结果：丢失最后几行关键日志
+  正确：fprintf 后立刻 fflush(stderr)
+
+  6.6 ctest 全过就以为 GUI 也对
+
+  错误：merge 前 ctest 全过就 merge
+  结果：GUI 启动崩溃没被发现
+  正确：加 GUI 端到端测试（启动 + 加载 ROM + 模拟按键）
+
+  6.7 跨线程直接写 QOpenGLWindow 状态
+
+  错误：EmuThread 直接 xbuf_ = ...; update();
+  结果：race condition，间歇性崩溃或花屏
+  正确：QMetaObject::invokeMethod queued 到 UI 线程
+
+================================================================================
+7. 工具速查：Qt / SDL / Windows 调试开关
+================================================================================
+
+  7.1 Qt 环境变量
+
+    QT_DEBUG_PLUGINS=1                  # 打印所有 Qt 插件加载
+    QT_LOGGING_RULES="qt.qpa.*=true"    # 打印 QPA 平台抽象层
+    QT_OPENGL=desktop                   # 强制桌面 OpenGL（绕过 ANGLE）
+    QT_OPENGL=software                  # 强制软件 OpenGL（彻底隔离）
+    QSG_INFO=1                          # 打印 Qt Quick 场景图
+    QSG_RHI_BACKEND=opengl              # 显式 RHI 后端
+
+  7.2 SDL 环境变量
+
+    SDL_VIDEO_DRIVER=windows            # 强制 Windows 视频驱动
+    SDL_VIDEO_DRIVER=dummy              # 强制 dummy（隔离测试）
+    SDL_AUDIODRIVER=dummy               # 强制 dummy 音频
+    SDL_VIDEODRIVER=xxx                 # 旧名字（同 VIDEO_DRIVER）
+
+  7.3 Windows 工具
+
+    dxdiag                              # GPU / 驱动信息
+    Get-Process | Select MainWindowHandle   # 主窗口句柄
+    EnumWindows + GetWindowText         # 枚举所有窗口
+    Spy++                               # Visual Studio 自带，消息跟踪
+
+================================================================================
+8. 自动化测试：SendInput + Win32 API 仿真键盘
+================================================================================
+
+  8.1 端到端测试脚本（PowerShell）
+
+    # 启动应用
+    $proc = Start-Process -FilePath "build\src\fceux11.exe" `
+        -RedirectStandardOutput "stdout.log" `
+        -RedirectStandardError "stderr.log" `
+        -PassThru
+
+    Start-Sleep -Seconds 3   # 等 GUI 启动
+
+    # 模拟按键
+    Add-Type -TypeDefinition @"
+    using System;
+    using System.Runtime.InteropServices;
+    public class K {
+        [DllImport("user32.dll")]
+        public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);
+    }
+    "@
+
+    [K]::keybd_event(0x5A, 0, 0, 0)   # 'Z' down
+    Start-Sleep -Milliseconds 50
+    [K]::keybd_event(0x5A, 0, 2, 0)   # 'Z' up
+
+    Start-Sleep -Seconds 1
+
+    # 检查状态（通过 debug pipe 或共享文件）
+    if (Test-Path "debug_state.json") {
+        $state = Get-Content "debug_state.json" | ConvertFrom-Json
+        if ($state.JSreturn -band 0x80) {  # A 按钮位
+            Write-Host "PASS: A button pressed correctly"
+        } else {
+            Write-Host "FAIL: A button not detected"
+        }
+    }
+
+    Stop-Process -Id $proc.Id -Force
+
+  8.2 用 SendInput API（更现代）
+
+    Add-Type -TypeDefinition @"
+    using System;
+    using System.Runtime.InteropServices;
+    public class I {
+        [DllImport("user32.dll")]
+        public static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+        [StructLayout(LayoutKind.Sequential)]
+        public struct INPUT { public uint type; public KEYBDINPUT ki; }
+        [StructLayout(LayoutKind.Sequential)]
+        public struct KEYBDINPUT {
+            public ushort wVk; public ushort wScan; public uint dwFlags;
+            public uint time; public IntPtr dwExtraInfo;
+        }
+        public const uint INPUT_KEYBOARD = 1;
+        public const uint KEYEVENTF_KEYUP = 0x0002;
+        public static void Key(ushort vk, bool down) {
+            var input = new INPUT {
+                type = INPUT_KEYBOARD,
+                ki = new KEYBDINPUT { wVk = vk, dwFlags = down ? 0u : KEYEVENTF_KEYUP }
+            };
+            SendInput(1, new[] { input }, System.Runtime.InteropServices.Marshal.SizeOf<INPUT>());
+        }
+    }
+    "@
+
+    [I]::Key(0x5A, $true)   # 'Z' down
+    Start-Sleep -Milliseconds 50
+    [I]::Key(0x5A, $false)  # 'Z' up
+
+  8.3 集成到 CI
+
+  .github/workflows/gui-e2e.yml:
+
+    - name: GUI E2E test
+      run: |
+        cd build
+        $proc = Start-Process src\fceux11.exe ...
+        # 模拟按键 + 检查状态
+        # ...
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+
+  GUI 端到端测试是 release 前的最后一道防线。
+
+================================================================================
+9. 跳到具体章节
+================================================================================
+
+  想看 GUI 集成架构：08 章
+  想看输入系统：07 章
+  想看 QOpenGLWindow 上下文：08 §3
+  想看 SendInput + Win32 API 例子：本章 §8
+
+================================================================================
+文件结束 / End of File
+================================================================================

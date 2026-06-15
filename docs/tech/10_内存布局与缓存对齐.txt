@@ -1,0 +1,249 @@
+================================================================================
+  FCEUX11 技术文档 / 内存布局与缓存对齐
+  Memory Layout & Cache Alignment for Hot Paths
+================================================================================
+
+【写在前面 / Preface】
+================================================================================
+
+  FCEUX11 的 CPU dispatch、CartBR、PPU Read 是绝对热路径——每秒
+  被调用几千万次。任何 1% 的性能优化都值得。本章讲 FCEUX11 怎么
+  利用「现代 x86 cache line 64 字节」做软件预取与对齐。
+
+  本章目标：
+    1. 解释现代 CPU cache 层次与 false sharing
+    2. 拆解 FCEUX11 的 alignas(64) 标注策略
+    3. 解释 CartBR / CartBROB 的软件预取 trick
+    4. 解释 open-bus 派生表陷阱（为什么不建查找表）
+    5. 给出 FCEUX11_MAPPER_HOT 宏的使用方法
+    6. 解释 savestate 兼容性约束
+
+  阅读时间：约 30 分钟。
+  前置知识：知道 L1/L2/L3 cache 概念；懂 C++ alignas。
+
+================================================================================
+1. 背景：为什么需要关心 cache？
+================================================================================
+
+  现代 x86 CPU 的 cache 层次（以 Intel Core i7-12700 为例）：
+
+  ┌─────────────┬──────────┬───────────┬──────────────┐
+  │ 层级        │ 大小     │ 延迟      │ 关联性        │
+  ├─────────────┼──────────┼───────────┼──────────────┤
+  │ L1d         │ 32 KiB   │ ~4 cycle  │ 8-way        │
+  │ L2          │ 1 MiB    │ ~12 cycle │ 8-way        │
+  │ L3          │ 30 MiB   │ ~40 cycle │ 16-way       │
+  │ DRAM        │ 32 GiB   │ ~80 ns    │ n/a          │
+  └─────────────┴──────────┴───────────┴──────────────┘
+
+  L1d cache line = 64 字节（8 个 64-bit 值）。
+  L2/L3 cache line = 同样 64 字节。
+
+  关键事实：
+    - L1 hit  ~ 1 ns
+    - L1 miss, L2 hit  ~ 3 ns
+    - L1+L2 miss, L3 hit  ~ 10 ns
+    - L1+L2+L3 miss, DRAM  ~ 80 ns
+
+  模拟器热路径函数（CartBR、PPURead、CPU dispatch）每秒被调用几千万
+  次，DRAM miss 会让帧时间暴涨。
+
+================================================================================
+2. 假共享（false sharing）陷阱
+================================================================================
+
+  cache line 是"同步"单位：两个 CPU 核写同一 cache line 的不同字节，
+  硬件会让 cache line 在两个核之间反复失效，性能可能比单核慢 10 倍。
+
+  例：X6502 X 与 mapper 寄存器组 DRegBuf[] 在不同 cache line：
+    - 多线程场景（v0.3.x 之前的实验）：CPU 核 0 改 X，mapper 核 1 改 DRegBuf
+    - 若它们共占同一 cache line → 反复失效 → 性能雪崩
+
+  FCEUX11 解决：X 和 mapper 寄存器组都 alignas(64)，强制独占 cache line。
+
+================================================================================
+3. 对齐的数组清单
+================================================================================
+
+  src/cart.cpp / src/cart.h:
+    Page[32]                          # PRG 页面基址
+    VPage[8], VPageG[8]               # PPU VROM 页面基址
+    MMC5SPRVPage[8], MMC5BGVPage[8]  # MMC5 专用
+    PRGptr[32], CHRptr[32]            # 实际指针
+    PRGsize[32], CHRsize[32]          # 页面大小
+    PRGmask2/4/8/16/32[32]            # 各种 PRG mask 表
+    CHRmask1/2/4/8[32]                # 各种 CHR mask 表
+    PRGram[32], CHRram[32], PRGIsRAM[32]
+
+  src/fceu.cpp / src/fceu.h:
+    ARead[0x10000]                    # CPU 读总线表
+    BWrite[0x10000]                   # CPU 写总线表
+
+  src/x6502.cpp / src/ops_table.inc:
+    alignas(64) X6502 X;              # CPU 状态（独占 cache line）
+    CycTable[256]                      # 每条指令的 cycle 数
+    opsize[256], optype[256], opwrite[256]  # 指令元数据
+    x6502_dispatch                    # 256 个函数指针的 std::array
+
+================================================================================
+4. mapper 寄存器组标注宏
+================================================================================
+
+  src/utils/cache.h:
+
+    #include <new>
+    #include <immintrin.h>
+
+    namespace fceu11 {
+    inline constexpr std::size_t kCacheLineSize =
+    #ifdef __cpp_lib_hardware_interference_size
+        std::hardware_destructive_interference_size;
+    #else
+        64;
+    #endif
+    } // namespace fceu11
+
+    #define FCEUX11_CACHE_ALIGN alignas(fceu11::kCacheLineSize)
+    #define FCEUX11_MAPPER_HOT FCEUX11_CACHE_ALIGN
+    #define FCEUX11_PREFETCH(addr) \
+        _mm_prefetch(reinterpret_cast<const char*>(addr), _MM_HINT_T0)
+
+  std::hardware_destructive_interference_size 是 C++17 引入的常量，
+  x86 上 = 64 字节。MSVC 14.30+ 完全支持。
+
+  4.1 已标注的 mapper 寄存器组
+
+  src/boards/mmc1.cpp       DRegs[4]
+  src/boards/mmc3.cpp       DRegBuf[8], EXPREGS[8]
+  src/boards/mmc5.cpp       PRGBanks, CHRBanksA, CHRBanksB, WRAMMaskEnable,
+                            mul, MMC5ROMWrProtect, MMC5MemIn
+  src/boards/vrc2and4.cpp   prgreg[2], chrreg[8], chrhi[8]
+  src/boards/vrc6.cpp       prg[2], chr[8]
+  src/boards/vrc7.cpp       preg[3], creg[8]
+  src/boards/datalatch.cpp  latche, latcheinit, addrreg0/1
+  src/boards/addrlatch.cpp latche, latcheinit, addrreg0/1
+
+  4.2 新增 mapper 时
+
+  把 mapper 寄存器组 struct 用 FCEUX11_MAPPER_HOT 标注。
+  验证 savestate 字节布局不变（FCEUX11_ALIGN 的 struct 字段顺序不能改）。
+
+================================================================================
+5. 软件预取：CartBR / CartBROB
+================================================================================
+
+  src/cart.cpp:
+
+    static inline uint8 CartBR(uint32 A) {
+        int np = A >> 11;
+        uint8* p = Page[np];
+        if (p) {
+            FCEUX11_PREFETCH(&p[A + 64]);   // 提前拽下一 cache line
+            return p[A];
+        }
+        return CartBROB(A);
+    }
+
+  FCEUPPURead_Default:
+
+    在当前 1 KiB CHR 页面内预取下一 cache line
+    （&VPage[tmp >> 10][tmp + 64]）。
+
+  5.1 为什么是 +64？
+
+  - 现代 x86 L1d cache line = 64 字节
+  - PRG 读通常顺序访问，A 和 A+64 大概率在同 cache line 的不同子行
+  - 提前把下一行拽进 L1d，访问 A+64 时是 L1 hit
+
+  5.2 边界检查
+
+  预取必须做边界检查，避免跨页：
+    - A = 0x9F00，A+64 = 0x9F40，仍在同 2 KiB 页（p[0x9F00..0x9FFF]）→ OK
+    - A = 0x9FC0，A+64 = 0xA000，跨 2 KiB 页（不同 Page[]）→ 不要预取
+
+  实际 FCEUX11 用 A+64 不检查，因为 Page[] 数组 64 字节对齐，
+  即使越界也只读到下一个 PRG bank 的字节，硬件语义上"无害"。
+  但严格场景应该：if (A & 0x7F) < 0xC0 才预取。
+
+================================================================================
+6. open-bus 派生表陷阱（重要！）
+================================================================================
+
+  看似自然的优化：建一个 32 KiB PRG 字节预取表
+    uint8_t prg_prefetch[32768];
+  每次 PRG 读时直接查表。听起来比"Page[] 间接 + 预取"更快？
+
+  实际上不行。理由：
+
+  1. PRG 内存 ≠ 32 KiB。PRG-ROM 可能 128 KiB / 256 KiB / 512 KiB，
+     预取表得建 512 KiB。open-bus 还会让"未映射区域"返回 X.DB
+     而非 ROM 数据。
+  2. bank 切换时整个表要重写。CartBR 调用频率高，bank 切换也
+     频繁（MMC3 切换 PRG 每条指令多次），维护成本 > 收益。
+  3. PRG-RAM 写时表也得同步。MMC3 的 PRG-RAM 写入会改变"读什么"，
+     同步开销大。
+  4. open-bus 状态（X.DB）在每次写操作时变化，预取表无法跟踪。
+
+  结论：派生表会让 savestate 字节级一致性塌掉（详见 12 章）。
+  FCEUX11 走"保守方案"——64 字节对齐 + 软件预取，无派生表。
+
+================================================================================
+7. savestate 兼容性约束
+================================================================================
+
+  对齐**只**改变对象的地址对齐，**不**改变类型大小（sizeof 不变）。
+  SFORMAT 按字节大小序列化：
+
+  - 已保存的 state chunk 大小不变（已发布的 .fc0 / sav 文件可读）
+  - 720 帧 rom_regression_test CRC 与 golden_hashes.json 保持一致
+  - 没有新增需要序列化的派生表，loadstate 后无需重建额外状态
+
+  绝对禁止：
+  - 在 FCEUX11_MAPPER_HOT 标注的 struct 中插入新字段（破坏 savestate）
+  - 把已有 std::array 改成 std::vector（破坏 savestate 字节布局）
+  - 用 __attribute__((packed)) 覆盖对齐（破坏 L1d 性能）
+
+================================================================================
+8. 实测性能数据（参考）
+================================================================================
+
+  v0.3.12 实测（i7-12700, DDR5-4800, 单线程 NES 模拟）：
+
+  | 操作                        | 不优化 | 64B 对齐 + 预取 | 加速比 |
+  |-----------------------------|--------|-----------------|--------|
+  | CartBR 单次调用              |  4.2ns |  3.1ns          | 1.35×  |
+  | CPU dispatch 1000 指令      | 1.0ms  |  0.85ms         | 1.18×  |
+  | PPU 240 扫描线              |  5.3ms |  4.8ms          | 1.10×  |
+
+  性能提升有限（10-30%），但每帧仍能省 1-2ms，对 60Hz 帧率有帮助。
+
+================================================================================
+9. 验证流程
+================================================================================
+
+  新增 mapper / 改 cart.cpp 后必须跑：
+
+    ctest --test-dir build --build-config Release
+    tests/fceux11_rom_regression_test.exe       # 720 帧 0 mismatch
+    tests/fceux11_savestate_regression_test.exe # 12 ROM 0 mismatch
+    tests/fceux11_bench_ppu_render.exe          # 性能基线
+    tests/fceux11_bench_x6502_exec.exe
+    tests/fceux11_bench_apu_mix.exe
+    cd src/rust && cargo test --workspace --release
+
+  vrc7 例外：其 OPLL 音源状态通过 FCEUSTATE_INDIRECT 保存，chunk 中
+  包含堆指针 sintbl，每次进程启动地址不同，导致 savestate 字节级
+  非确定性。vrc7 仍由 rom_regression_test 帧 CRC 覆盖行为正确性，
+  不进 savestate 哈希回归。
+
+================================================================================
+10. 跳到具体章节
+================================================================================
+
+  想看 PPU 渲染性能：11 章 SIMD 探测
+  想看 savestate 字节级：12 章 测试方法论
+  想看 mapper 寄存器组：04 章 + src/boards/
+
+================================================================================
+文件结束 / End of File
+================================================================================

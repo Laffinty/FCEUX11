@@ -58,8 +58,8 @@
 | **Qt** | 6.8 LTS |
 | **C++ 标准 / Standard** | C++20 |
 
-> 如需从源码编译，请参阅 [`docs/tech/05_Project_Development_Guide.txt`](docs/tech/05_Project_Development_Guide.txt)。
-> For building from source, please refer to [`docs/tech/05_Project_Development_Guide.txt`](docs/tech/05_Project_Development_Guide.txt)。
+> 如需从源码编译，请参阅 [`docs/tech/13_构建系统与CI矩阵.txt`](docs/tech/13_构建系统与CI矩阵.txt) 与 [`docs/tech/00_NES架构与FCEUX11项目导览.txt`](docs/tech/00_NES架构与FCEUX11项目导览.txt)。
+> For building from source, please refer to [`docs/tech/13_构建系统与CI矩阵.txt`](docs/tech/13_构建系统与CI矩阵.txt) and [`docs/tech/00_NES架构与FCEUX11项目导览.txt`](docs/tech/00_NES架构与FCEUX11项目导览.txt).
 
 ---
 
