@@ -284,6 +284,56 @@ GUI 启动崩溃或输入失效类问题的标准排查流程：
   按键延迟（如格斗游戏需要 1 frame 内响应），再升级到 native event
   filter。
 
+【修复模式 C：QOpenGLWindow keyPressEvent → pushKeyEvent 直达桥接】
+
+  上述 SDL_PumpEvents 方案（方案 A）解决的是"WM_INPUT 原始输入没被 pump"
+  的问题。但 QOpenGLWindow 迁移还引入了另一个键盘路径断裂：
+
+  QOpenGLWindow 是独立的顶层 QWindow（拥有自己的 HWND）。当焦点落在
+  QOpenGLWindow 上时，Qt 把 QKeyEvent 派发到 QOpenGLWindow，而不是
+  QMainWindow。旧版 QMainWindow::keyPressEvent → pushKeyEvent →
+  SDL_PushEvent 这条路断了。
+
+  修复：在 QOpenGLWindow 子类（ConsoleViewGL_t）里 override
+  keyPressEvent / keyReleaseEvent，调用已有的 pushKeyEvent() 桥接函数：
+
+      // ConsoleViewerGL.h
+      class ConsoleViewGL_t : public QOpenGLWindow, ... {
+          void keyPressEvent(QKeyEvent *event) override;
+          void keyReleaseEvent(QKeyEvent *event) override;
+      };
+
+      // ConsoleViewerGL.cpp
+      #include "Qt/keyscan.h"
+
+      void ConsoleViewGL_t::keyPressEvent(QKeyEvent *event) {
+          pushKeyEvent(event, 1);
+          event->accept();
+      }
+
+      void ConsoleViewGL_t::keyReleaseEvent(QKeyEvent *event) {
+          pushKeyEvent(event, 0);
+          event->accept();
+      }
+
+  pushKeyEvent()（keyscan.cpp:1309）把 QKeyEvent 转换为 SDL_Event
+  （SDL_KEYDOWN / KEYUP），通过 SDL_PushEvent() 推入 SDL 事件队列。
+  UpdatePhysicalInput 在 SDL_PollEvent 里就能取到。
+
+  与 SDL_PumpEvents 方案的关系：
+  - SDL_PumpEvents（方案 A）：主线程 pump WM_INPUT → SDL 事件队列
+    处理 Windows raw input 层
+  - pushKeyEvent（方案 C）：Qt QKeyEvent → SDL_PushEvent → SDL 事件队列
+    处理 Qt 事件层（QOpenGLWindow 焦点场景）
+  - 两者互补，不冲突。SDL_PushEvent 是线程安全的，两个路径可同时
+    推事件入队。UpdatePhysicalInput 用 SDL_PollEvent 统一消费。
+
+  关键点：
+  - 必须 event->accept()，否则 Qt 会继续向父窗口传播，导致重复处理
+  - pushKeyEvent 已处理 Qt key → SDL key 的映射（含 nativeVirtualKey
+    降级、nativeScanCode 降级），不需要手动转换
+  - 需 #include "Qt/keyscan.h"
+
 【附加诊断：FCEUD_UpdateInput 调用位置】
 
   fceu11 历史上把 FCEUD_UpdateInput 从 emulator 线程挪到了主线程的
@@ -450,6 +500,59 @@ calling convention 问题）。如果进入后立即 segfault，多半是 Rust r
 ─────────────────────────────────────────────
 见 §8 自动化测试章节。
 
+5.6 QOpenGLWindow 键盘事件转发模板
+─────────────────────────────────────────────
+QOpenGLWindow 是独立顶层 QWindow，焦点在其上时 Qt 把 QKeyEvent
+派发给它而非 QMainWindow。必须在 QOpenGLWindow 子类里 override
+keyPressEvent / keyReleaseEvent，调用 pushKeyEvent 转发到 SDL 队列：
+
+  class ConsoleViewGL_t : public QOpenGLWindow, ... {
+      void keyPressEvent(QKeyEvent *event) override;
+      void keyReleaseEvent(QKeyEvent *event) override;
+  };
+
+  void ConsoleViewGL_t::keyPressEvent(QKeyEvent *event) {
+      pushKeyEvent(event, 1);
+      event->accept();
+  }
+
+  void ConsoleViewGL_t::keyReleaseEvent(QKeyEvent *event) {
+      pushKeyEvent(event, 0);
+      event->accept();
+  }
+
+  需要 #include "Qt/keyscan.h"
+
+  如果不做这个 override，QOpenGLWindow 获得焦点时键盘输入全部丢失。
+  这与 SDL_PumpEvents（§3 方案 A）是不同层次的修复：
+    - SDL_PumpEvents 解决 raw input (WM_INPUT) 层面事件泵缺失
+    - pushKeyEvent 解决 Qt 事件层面路由断裂
+  两者互补，缺一不可。
+
+5.7 键盘输入双路径总图
+─────────────────────────────────────────────
+
+  Windows 消息                    Qt 事件层
+  ────────────                    ─────────
+  WM_INPUT ─────┐                 QKeyEvent ─────┐
+  WM_KEYDOWN ───┤                                │
+                ▼                                │
+  主线程消息队列                                 QOpenGLWindow::keyPressEvent
+        │                                              │
+        ▼                                              ▼
+  SDL_PumpEvents()  ◄── 0ms QTimer            pushKeyEvent()
+  (方案 A, §3)                                (方案 C, §3)
+        │                                              │
+        └──────────────┬───────────────────────────────┘
+                       ▼
+                 SDL 事件队列 (SDL_PushEvent / 内部队列)
+                       │
+                       ▼
+              SDL_PollEvent() (UpdatePhysicalInput)
+                       │
+                       ▼
+              g_keyState[scancode] → DTestButton → JSreturn
+
 ================================================================================
 6. 反模式：不要再踩的坑
 ================================================================================
@@ -481,6 +584,11 @@ R7. **不要**在 main.cpp 的 fceuWrapperPreInit 之后才装 Qt
 R8. **不要**假设 ctest 能覆盖 GUI / 输入路径
    ctest 通常只测纯逻辑（mapper / savestate / rom_regression）。
    GUI 启动、输入响应、窗口渲染必须端到端测。
+
+R9. **不要**在 QOpenGLWindow 子类里省略 keyPressEvent / keyReleaseEvent
+   QOpenGLWindow 是独立顶层 QWindow，焦点在其上时 Qt 把 QKeyEvent
+   派发给它，不再经过 QMainWindow。不 override 就丢失所有键盘输入。
+   必须调用 pushKeyEvent(event, pressDown) + event->accept()。
 
 ================================================================================
 7. 工具速查：Qt / SDL / Windows 调试开关

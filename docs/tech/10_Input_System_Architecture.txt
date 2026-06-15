@@ -99,16 +99,43 @@ GUID 在配置中存为 XInput_N。GamePad_t::init() 在下次启动时如果该
 5. 键盘事件路径
 ================================================================================
 
-注意：键盘不走 InputManager，走单独的 SDL 路径。
+注意：键盘不走 InputManager，走单独的 SDL 路径。键盘输入有两条互补
+路径（均为 v0.3.14 修复后建立），任一路径都能独立将按键送达
+g_keyState：
 
-主线程：
-  - QApplication event loop 跑（Qt pump Windows 消息）
-  - 0ms QTimer 定时调 SDL_PumpEvents() 把主线程消息队列里的 WM_INPUT
-    转成 SDL 事件（详见 07_Qt_SDL_Windows_Integration_Debug_Methodology.txt
-    §3）
-  - consoleWin_t::updatePeriodic() 120Hz 调 FCEUD_UpdateInput
+路径 A ── SDL_PumpEvents（raw input 层）
+  主线程：
+    - QApplication event loop 跑（Qt pump Windows 消息）
+    - 0ms QTimer 定时调 SDL_PumpEvents() 把主线程消息队列里的 WM_INPUT
+      转成 SDL 事件（详见 07_Qt_SDL_Windows_Integration_Debug_Methodology.txt
+      §3 方案 A）
+    - consoleWin_t::updatePeriodic() 120Hz 调 FCEUD_UpdateInput
 
-SDL_KEYDOWN / KEYUP 事件：
+路径 B ── QOpenGLWindow keyPressEvent（Qt 事件层）
+  QOpenGLWindow 是独立顶层 QWindow，焦点在其上时 Qt 把 QKeyEvent
+  派发给它而非 QMainWindow。ConsoleViewGL_t override 了
+  keyPressEvent / keyReleaseEvent，调用 pushKeyEvent()（keyscan.cpp:1309）
+  将 QKeyEvent 转换为 SDL_Event 并通过 SDL_PushEvent() 推入 SDL 队列。
+
+  详见 07_Qt_SDL_Windows_Integration_Debug_Methodology.txt §3 方案 C。
+
+双路径总图：
+
+  WM_INPUT ──── SDL_PumpEvents ──┐
+  (0ms QTimer, 路径 A)           │
+                                 ▼
+  QKeyEvent ── pushKeyEvent ──► SDL 事件队列 ──► SDL_PollEvent()
+  (QOpenGLWindow, 路径 B)                │     (UpdatePhysicalInput)
+                                         ▼
+                                  g_keyState[scancode]
+                                         │
+                                         ▼
+                                  DTestButton → JSreturn
+
+两条路径不冲突：SDL_PushEvent 是线程安全的，两个路径可同时推事件
+入队。UpdatePhysicalInput 用 SDL_PollEvent 统一消费。
+
+SDL_KEYDOWN / KEYUP 事件（两条路径最终都汇入此队列）：
   - 在 UpdatePhysicalInput 里被 SDL_PollEvent 取出
   - 更新 g_keyState[scancode]
   - 调 KeyboardCommands（处理热键）
@@ -154,6 +181,11 @@ FCEUD_UpdateInput 链路：
   - 看 fceuWrapper.cpp line 1377 注释掉的 FCEUD_UpdateInput
   - 确认 updatePeriodic / emuFrameFinish 路径都通
   - 排查 fceuWrapperTryLock 互斥锁
+
+症状 6：QOpenGLWindow 焦点时键盘丢失（MID 面板 / ROM 列表区键盘正常）
+  - 检查 ConsoleViewGL_t 是否 override 了 keyPressEvent / keyReleaseEvent
+  - 检查是否调用 pushKeyEvent(event, pressDown) + event->accept()
+  - 这是 07 §3 方案 C —— QOpenGLWindow 独立 HWND 导致 Qt 事件路由断裂
 
 ================================================================================
 文件结束

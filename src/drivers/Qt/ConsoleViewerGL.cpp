@@ -44,6 +44,7 @@
 #include "Qt/ConsoleViewerGL.h"
 #include "Qt/ConsoleUtilities.h"
 #include "Qt/ConsoleWindow.h"
+#include "Qt/keyscan.h"
 
 extern unsigned int gui_draw_area_width;
 extern unsigned int gui_draw_area_height;
@@ -508,6 +509,18 @@ void ConsoleViewGL_t::mouseReleaseEvent(QMouseEvent * event)
 	//		event->pos().x(), event->pos().y(), event->button(), event->buttons() );
 
 	mouseButtonMask = event->buttons();
+}
+
+void ConsoleViewGL_t::keyPressEvent(QKeyEvent *event)
+{
+	pushKeyEvent(event, 1);
+	event->accept();
+}
+
+void ConsoleViewGL_t::keyReleaseEvent(QKeyEvent *event)
+{
+	pushKeyEvent(event, 0);
+	event->accept();
 }
 
 bool ConsoleViewGL_t::getMouseButtonState( unsigned int btn )
