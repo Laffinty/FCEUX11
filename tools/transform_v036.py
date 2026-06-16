@@ -20,7 +20,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO = Path(r"C:\Users\ikrx2\Desktop\project\FCEUX11")
+# Resolve the repo root from this script's location: tools/ is one level below
+# the project root, so go up one parent. Avoids hardcoding the user's path.
+REPO = Path(__file__).resolve().parent.parent
 BOARDS_DIR = REPO / "src" / "boards"
 EXTRA_FILES = [
     REPO / "src" / "fceu.cpp",
