@@ -5,6 +5,96 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.15] - 2026-06-16
+
+E+F track sub-version: Win11 platform features + Qt6 modernization + main
+menu 5+1 audience-tiered restructuring + i18n infrastructure per plan v3
+§5 v0.3.15.
+
+### Added
+
+- **[BREAKING-LAYOUT] Main menu restructured to 5+1 audience-tiered model.**
+  Top-level menus are now: File / Emulation / Options / **Advanced** / Help.
+  The former Tools / Debug / Movie menus are collected under "Advanced" as
+  five sub-menus (Emulation / Movie / Debug / Memory Tools / Misc Tools
+  / Advanced Settings). See `docs/tech/Menu_Migration_v0.3.15.md` for the
+  full v0.3.14 → v0.3.15 item-by-item migration table.
+- **`src/drivers/Qt/MenuCatalog.h`** — declarative specification of the
+  5+1 model. All `tr()` source strings in `ConsoleWindow.cpp` are frozen
+  at this PR's merge; any new menu item requires a v0.3.15.x hotfix +
+  `lupdate` re-scan.
+- **`SDL.HideAdvancedMenu` config option** — when `ON`, the "Advanced"
+  top-level menu and all five sub-menus are hidden, leaving a 4-menu bar
+  (File / Emulation / Options / Help) for minimal-noise workflows. Toggle
+  via Options → GUI Config → "Hide Advanced Menu".
+- **[i18n] i18n infrastructure (`src/drivers/Qt/lang/`, scripts/i18n_*.ps1).**
+  New directory holds `translations.pro` (Qt Linguist project), `glossary.txt`
+  (80-entry terminology table), `README.md` (workflow), and three `.ts`
+  source files. CMake uses Qt6 modern API (`qt_add_lupdate` +
+  `qt_add_lrelease` + `qt_add_resources`) to wire both `lupdate` and
+  `lrelease` into the build graph. 20 menu seed strings pre-translated to
+  zh_CN / zh_TW. Full machine translation of 3,481 source strings is
+  pending native speaker review in v0.3.15.x — see
+  `docs/tech/i18n_review_log.md`.
+- **CJK font fallback chain (`src/drivers/Qt/main.cpp`):** `Segoe UI
+  Variable → Microsoft YaHei UI → Microsoft YaHei → Noto Sans CJK SC`.
+  Ensures traditional and simplified CJK glyphs render correctly on
+  Windows 11.
+- **Win11 `gdiScaling` manifest declaration (`icons/fceux11.manifest`):**
+  legacy Win32 controls now scale properly on 4K+ displays alongside the
+  pre-existing `PerMonitorV2` declaration.
+- **3 keyPress overrides now forward to base class first** (in
+  `ConsoleWindow.cpp`, `ConsoleViewerGL.cpp`, `GamePadConf.cpp`) so that
+  QInputMethodEvent (Chinese IME composition state) reaches focused
+  QLineEdit / QInputDialog children before the key is routed to the
+  emulator game key state.
+
+### Changed
+
+- **`src/drivers/Qt/ConsoleWindow.h/.cpp`**: deleted `toolsMenu`,
+  `debugMenu`, `movieMenu` member fields. Added `advMenu` and five
+  sub-menu pointers (`advEmuMenu`, `advMovieMenu`, `advDebugMenu`,
+  `advMemoryMenu`, `advMiscMenu`, `advSettingsMenu`) plus `hideAdvancedMenu`
+  bool. `createMainMenu()` builds the new 5+1 structure; `retranslateUi()`
+  handles the new sub-menu titles.
+- **`src/CMakeLists.txt:580-617`**: i18n block rewritten to use
+  `qt_add_lupdate` / `qt_add_lrelease` / `qt_add_resources` (Qt6 modern
+  API). Old `add_custom_command` lrelease loop removed.
+- **`resources.qrc`**: removed `/i18n` prefix section (conflicted with
+  `qt_add_resources` auto-generated aliases). `/icons` prefix kept.
+- **`src/drivers/Qt/HexEditor.cpp:2790/2840`**: `QChar::toLatin1()`
+  replaced with `unicode() & 0xFF` for ASCII / hex input handling,
+  removing implicit encoding-page conversion.
+
+### Verified
+
+- `cmake --build`: 0 errors. (PR-A/B/C/D code changes only; runtime tests
+  pending v0.3.15.x — see `docs/tech/v0.3.15_Verification_Report.md`.)
+- All 63 `consoleWin_t` public `QAction*` field names preserved (zero
+  renames). External `src/drivers/Qt/` callers unaffected.
+- All `HK_*` hotkey bindings unchanged (`initHotKeys()` zero-modified).
+- i18n 30+ sub-dialog retranslateUi: scaffolded, not implemented; deferred
+  to v0.3.15.x (see `docs/tech/i18n_Architecture_zh_CN.md` §D5).
+
+### Deferred to v0.3.15.x
+
+- 30+ sub-dialog `changeEvent + retranslateUi` (only `consoleWin_t` and
+  `AboutWindow` currently respond to `QEvent::LanguageChange`).
+- Full machine translation of 3,481 `tr()` source strings × 2 languages
+  = 6,266 translation entries. Pending DeepL/Google API run + native
+  speaker review (zh_CN + zh_TW).
+- 3 of 6 `keyPress override` files (HexEditor — custom cursor logic risk;
+  HotKeyConf and one more — low-priority).
+- `ITaskbarList3` Snap Layouts integration.
+- `DirectStorage 1.2` NVMe bypass (savestate writes still go through
+  `std::fstream` → OS page cache).
+- `--no-console` command-line argument.
+- `ShouldAppsUseDarkMode` API migration (Win10 1809+ native dark mode
+  detection).
+- `TypedConfig<T>` QSettings wrapper class.
+- High-DPI `@2x.png` icon variants for the 30+ icons in `icons/`.
+- `fceuWrapper.cpp:36` cross-boundary `tr()` audit.
+
 ## [0.3.14] - 2026-06-14
 
 E-track sub-version: video backend modernization per plan v3 §5 v0.3.14.

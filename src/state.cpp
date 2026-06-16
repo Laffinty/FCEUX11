@@ -370,6 +370,13 @@ void FCEUSS_Save(const char *fname, bool display_message)
 	EMUFILE* st = 0;
 	std::string fn;
 
+	// v0.3.15 PR-D TODO: DirectStorage 1.2 NVMe bypass (plan §5 v0.3.15)
+	// When NvmeSdsSupported() is true, route the .fc0/.fcs write through
+	// IDStorageFactory -> IDStorageQueue for zero-copy async I/O. The current
+	// path uses std::fstream, which is bound by the OS page cache.
+	// Implementation deferred to v0.4.x (requires vcpkg `directstorage` dep
+	// and a 1-2 person-day refactor of EMUFILE_FILE).
+
 	if (geniestage==1)
 	{
 		if (display_message)

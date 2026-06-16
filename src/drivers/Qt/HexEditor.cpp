@@ -2787,7 +2787,10 @@ void QHexEdit::keyPressEvent(QKeyEvent *event)
 		int key;
 		if ( cursorPosX >= 32 )
 		{  // Edit Area is ASCII
-			key = (int)event->text()[0].toLatin1();
+			// v0.3.15 PR-D: use unicode() & 0xFF to avoid implicit encoding
+			// conversion through QChar::toLatin1(). This keeps ASCII input
+			// working identically on locales where Latin-1 != the system code page.
+			key = (int)(event->text()[0].unicode() & 0xFF);
 
 			if ( (key >= 0) && (key < 256) )
 			{
@@ -2837,8 +2840,9 @@ void QHexEdit::keyPressEvent(QKeyEvent *event)
 		else
 		{  // Edit Area is Hex
 
-		   key = int(event->text()[0].toUpper().toLatin1());
-		
+		   // v0.3.15 PR-D: use unicode() & 0xFF to avoid encoding conversion.
+		   key = int(event->text()[0].toUpper().unicode() & 0xFF);
+
 		   if ( ::isxdigit( key ) )
 		   {
 			int offs, nibbleValue, nibbleIndex;
