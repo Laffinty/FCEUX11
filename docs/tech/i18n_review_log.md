@@ -1,8 +1,26 @@
-# FCEUX11 i18n Native Speaker Review Log
+# FCEUX11 i18n Translation Log
 
-> Status: **PHASE-1 in progress** (v0.3.15.x, 2026-06-16)
+> Status: **PHASE-1 complete** (v0.3.15.x, 2026-06-16) — native review **waived** per user decision 2026-06-17
 > Scope: zh_CN (Simplified) and zh_TW (Traditional) full translation review
 > Reference: [`docs/v0.3.15_Build_Plan.md`](../v0.3.15_Build_Plan.md) §PHASE-1
+
+---
+
+## 0. Native Review Policy (waived 2026-06-17)
+
+Per user decision 2026-06-17:
+
+> 放弃「母语审校」，后期如果发现错误慢慢改就可以
+
+The native speaker review gate from plan v3 §11 is **permanently waived** for
+v0.3.15.x. LLM-direct translation (commit bda72e6) is the final translation
+source-of-truth. Any errors found post-release can be fixed incrementally via
+follow-up commits. No external reviewer recruitment, no sign-off table
+required, no `--needs-review` attribute handling.
+
+This decision supersedes plan v3 §11's "母语审校：必须 zh_CN + zh_TW 各 1 名
+签字" requirement and the v0.3.15_Build_Plan.md §PHASE-1 任务 1.3 / 1.5
+narrative.
 
 ---
 
@@ -10,15 +28,17 @@
 
 | Language | Role | GitHub ID | Sign-off Date | Scope Reviewed | Notes |
 |----------|------|-----------|---------------|----------------|-------|
-| zh_CN | 简体母语审校者 | TBD (LLM-translated + self-reviewed) | — | full 1,911 source strings (LLM-translated 2026-06-16) | NES debugger (507) + TAS Editor (521) require priority human review before release tag |
-| zh_TW | 繁體母語審校者 | TBD (LLM-translated + self-reviewed) | — | full 1,911 source strings (LLM-translated 2026-06-16) | NES debugger (507) + TAS Editor (521) require priority human review before release tag |
+| zh_CN | *(waived)* | — | — | — | Native review waived 2026-06-17; LLM translation is final |
+| zh_TW | *(waived)* | — | — | — | Native review waived 2026-06-17; LLM translation is final |
 
-**Sign-off protocol:**
-1. Reviewer opens `src/drivers/Qt/lang/fceux11_zh_CN.ts` (or `_zh_TW.ts`) in Qt Linguist
-2. Filters by context: `consoleDebugger`, `tasEditorWindow` — verify each entry
-3. Removes `type="needs-review"` attribute from confirmed translations
-4. Saves file, opens PR with title `[i18n-review] zh_CN native review by @<id>`
-5. CI gate: `scripts/i18n_coverage.ps1` must still report ≥ 90%
+**Sign-off protocol:** *(deprecated — see §0)*
+
+If errors are reported post-release, the workflow is:
+
+1. Open an issue with the offending English source + the mistranslated target.
+2. Patch `src/drivers/Qt/lang/fceux11_zh_CN.ts` (or `_zh_TW.ts`) directly.
+3. Run `scripts/i18n_release.ps1` to regenerate `.qm`.
+4. Open a PR titled `[i18n-fix] <description>`.
 
 ---
 
@@ -33,7 +53,7 @@
 | zh_CN simp/trad contamination | 0 forbidden traditional chars | 0 | ✅ PASS |
 | zh_TW simp/trad contamination | 0 forbidden simplified chars | 0 | ✅ PASS |
 | LLM translator | claude-opus-4-8 / minimax-m3 (manual session, 2026-06-16) | — | — |
-| Native review | Self-reviewed in same session (no external reviewer) | Required for v0.3.15.x | ⚠️ Pending official sign-off |
+| Native review | **Waived** per user 2026-06-17 | Was: required for v0.3.15.x | ✅ **N/A** |
 
 **NOTE — plan estimate vs actual:**
 The original `docs/v0.3.15_Build_Plan.md` PHASE-1 Task 1.1 estimated
