@@ -1,9 +1,17 @@
-# i18n_coverage.ps1 - v0.3.15 PR-B
+﻿# i18n_coverage.ps1 - v0.3.15 PHASE-1
 # Parse .ts files and report the unfinished-translation percentage per
 # language. CI gate: zh_CN and zh_TW must both be >= 90% translated.
 #
 # Usage:
 #   powershell scripts/i18n_coverage.ps1
+#
+# v0.3.15 PHASE-1 fix: rewritten to use XPath so attribute access works
+# correctly on XmlElement (the previous version relied on PowerShell's
+# automatic child-element text extraction, which returned String objects
+# instead of XmlElement and broke GetAttribute calls).
+
+[CmdletBinding()]
+param()
 
 $ErrorActionPreference = "Stop"
 
@@ -17,6 +25,7 @@ $Languages = @{
 }
 
 $ExitCode = 0
+$XmlNsMgr = New-Object System.Xml.XmlNamespaceManager(@(New-Object System.Xml.NameTable))
 
 foreach ($lang in $Languages.Keys) {
     $tsPath = Join-Path $LangDir "fceux11_$lang.ts"
@@ -26,30 +35,34 @@ foreach ($lang in $Languages.Keys) {
         continue
     }
 
-    [xml]$xml = Get-Content $tsPath
+    $xmlDoc = New-Object System.Xml.XmlDocument
+    $xmlDoc.Load($tsPath)
+
     $totalMessages = 0
     $unfinished = 0
-    foreach ($ctx in $xml.TS.context) {
-        foreach ($msg in $ctx.message) {
-            $totalMessages++
-            $tr = $msg.translation
-            $isUnfinished = $false
-            if ($null -eq $tr) {
+
+    # Select all <message> elements anywhere in the doc
+    $messageNodes = $xmlDoc.SelectNodes("//message")
+    foreach ($msg in $messageNodes) {
+        $totalMessages++
+        $tr = $msg.SelectSingleNode("translation")
+        $isUnfinished = $false
+        if ($null -eq $tr) {
+            $isUnfinished = $true
+        } else {
+            # Check the 'type' attribute on <translation>
+            $trType = $tr.GetAttribute("type")
+            if ($trType -eq "unfinished" -or $trType -eq "needs-review") {
                 $isUnfinished = $true
-            } else {
-                # If translation has type="unfinished" attribute
-                if ($tr.GetAttribute('type') -eq 'unfinished') {
-                    $isUnfinished = $true
-                }
-                # If translation text is empty
-                if ([string]::IsNullOrEmpty($tr.'#text')) {
-                    $isUnfinished = $true
-                }
             }
-            if ($isUnfinished) {
-                $unfinished++
+            # Check inner text is empty/whitespace
+            $innerText = ""
+            if ($null -ne $tr.InnerText) { $innerText = $tr.InnerText.Trim() }
+            if ($innerText.Length -eq 0) {
+                $isUnfinished = $true
             }
         }
+        if ($isUnfinished) { $unfinished++ }
     }
 
     $translated = $totalMessages - $unfinished
@@ -60,11 +73,15 @@ foreach ($lang in $Languages.Keys) {
     }
 
     $gate = $Languages[$lang]
-    $status = if ($pct -ge $gate) { "PASS" } else { "FAIL" }
-    if ($status -eq "FAIL") { $ExitCode = 1 }
+    if ($pct -ge $gate) {
+        $status = "PASS"
+    } else {
+        $status = "FAIL"
+        $ExitCode = 1
+    }
 
-    Write-Host ("[{0}] {1}: {2}/{3} translated ({4}%) -- gate {5}% [{6}]" -f `
-        $status, $lang, $translated, $totalMessages, $pct, $gate, $status)
+    Write-Host ("[{0}] {1}: {2}/{3} translated ({4}%) -- gate {5}%" -f `
+        $status, $lang, $translated, $totalMessages, $pct, $gate)
 }
 
 if ($ExitCode -ne 0) {
