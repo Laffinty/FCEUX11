@@ -51,6 +51,7 @@ GuiConfDialog_t::GuiConfDialog_t(QWidget *parent)
 	int useNativeFileDialogVal;
 	int useNativeMenuBarVal, pauseOnMenuAccessVal;
 	int useCustomQssVal, useCustomQPalVal, contextMenuEnable;
+	int hideAdvancedMenuVal;  // v0.3.15 PR-A
 	QVBoxLayout *mainLayout, *vbox1, *vbox2;
 	QHBoxLayout *hbox, *hbox1;
 	QPushButton *closeButton, *button;
@@ -77,6 +78,7 @@ GuiConfDialog_t::GuiConfDialog_t(QWidget *parent)
 	g_config->getOption("SDL.UseCustomQPal", &useCustomQPalVal);
 	g_config->getOption("SDL.PauseOnMainMenuAccess", &pauseOnMenuAccessVal);
 	g_config->getOption("SDL.ContextMenuEnable", &contextMenuEnable);
+	g_config->getOption("SDL.HideAdvancedMenu", &hideAdvancedMenuVal);  // v0.3.15 PR-A
 
 	setWindowTitle(tr("GUI Config"));
 
@@ -130,18 +132,21 @@ GuiConfDialog_t::GuiConfDialog_t(QWidget *parent)
 	pauseOnMenuAccess   = new QCheckBox(tr("Pause On Main Menu Access"));
 	ctxMenuEnable       = new QCheckBox(tr("Context Menu Enable"));
 	showSplashScreen    = new QCheckBox(tr("Show Splash Screen at Startup"));
+	hideAdvancedMenu    = new QCheckBox(tr("Hide Advanced Menu"));  // v0.3.15 PR-A
 
 	useNativeFileDialog->setChecked(useNativeFileDialogVal);
 	useNativeMenuBar->setChecked(useNativeMenuBarVal);
 	pauseOnMenuAccess->setChecked(pauseOnMenuAccessVal);
 	ctxMenuEnable->setChecked(contextMenuEnable);
 	showSplashScreen->setChecked( settings.value("mainWindow/showSplashScreen", false).toBool() );
+	hideAdvancedMenu->setChecked( hideAdvancedMenuVal );  // v0.3.15 PR-A
 
 	connect(useNativeFileDialog, SIGNAL(stateChanged(int)), this, SLOT(useNativeFileDialogChanged(int)));
 	connect(useNativeMenuBar   , SIGNAL(stateChanged(int)), this, SLOT(useNativeMenuBarChanged(int)));
 	connect(pauseOnMenuAccess  , SIGNAL(stateChanged(int)), this, SLOT(pauseOnMenuAccessChanged(int)));
 	connect(ctxMenuEnable      , SIGNAL(stateChanged(int)), this, SLOT(contextMenuEnableChanged(int)));
 	connect(showSplashScreen   , SIGNAL(stateChanged(int)), this, SLOT(showSplashScreenChanged(int)));
+	connect(hideAdvancedMenu   , SIGNAL(stateChanged(int)), this, SLOT(hideAdvancedMenuChanged(int)));  // v0.3.15 PR-A
 
 	styleComboBox = new QComboBox();
 
@@ -244,6 +249,7 @@ GuiConfDialog_t::GuiConfDialog_t(QWidget *parent)
 	vbox1->addWidget(pauseOnMenuAccess, 1);
 	vbox1->addWidget(ctxMenuEnable, 1);
 	vbox1->addWidget(showSplashScreen, 1);
+	vbox1->addWidget(hideAdvancedMenu, 1);  // v0.3.15 PR-A
 	vbox1->addStretch(10);
 
 	closeButton = new QPushButton( tr("Close") );
@@ -322,6 +328,15 @@ void GuiConfDialog_t::showSplashScreenChanged(int state)
 
 	settings.setValue("mainWindow/showSplashScreen", value );
 	settings.sync();
+}
+//----------------------------------------------------
+// v0.3.15 PR-A: when this is toggled, the change takes effect on next
+// application start (ConsoleWindow reads SDL.HideAdvancedMenu during
+// createMainMenu construction). Live hide/show is deferred to v0.4.x.
+void GuiConfDialog_t::hideAdvancedMenuChanged(int state)
+{
+	int value = (state == Qt::Unchecked) ? 0 : 1;
+	g_config->setOption("SDL.HideAdvancedMenu", value);
 }
 //----------------------------------------------------
 void GuiConfDialog_t::useCustomStyleChanged(int state)

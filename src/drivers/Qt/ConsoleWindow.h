@@ -28,6 +28,7 @@
 #endif
 
 #include "Qt/ColorMenu.h"
+#include "Qt/MenuCatalog.h"
 #include "Qt/ConsoleViewerGL.h"
 #include "Qt/ConsoleViewerSDL.h"
 #include "Qt/ConsoleViewerQWidget.h"
@@ -175,12 +176,19 @@ class  consoleWin_t : public QMainWindow
 		QMenu *fileMenu;
 		QMenu *optMenu;
 		QMenu *emuMenu;
-		QMenu *toolsMenu;
-		QMenu *debugMenu;
-		QMenu *movieMenu;
 		QMenu *helpMenu;
 		QMenu *recentRomMenu;
 		QMenu *languageMenu;
+		// v0.3.15 PR-A: 5+1 audience-tiered menu model.
+		// Tools / Debug / Movie are collected under one "Advanced" top-level
+		// menu with sub-menus. Hidden by SDL.HideAdvancedMenu = ON.
+		QMenu *advMenu;
+		QMenu *advEmuMenu;     // soft reset / GG / FKB / FDS / VS / RAM init / AutoFire
+		QMenu *advMovieMenu;   // full movie + AVI/WAV record
+		QMenu *advDebugMenu;   // debugger / hex / ppu / sprite / nt / trace / cdl / gg encode / iNes
+		QMenu *advMemoryMenu;  // cheats / RAM search / RAM watch
+		QMenu *advMiscMenu;    // frame timing / palette editor / avi riff / tas editor
+		QMenu *advSettingsMenu; // input / gamepad / hotkey / palette / timing / stateRec / movieOpt / autoResume
 
 		QActionGroup *languageActionGroup;
 		
@@ -265,6 +273,9 @@ class  consoleWin_t : public QMainWindow
 		bool        contextMenuEnable;
 		bool        soundUseGlobalFocus;
 		bool        autoHideMenuFullscreen;
+		// v0.3.15 PR-A: when true, hide the "Advanced" top-level menu
+		// and collapse back to 4 top-level menus (File / Emulation / Options / Help).
+		bool        hideAdvancedMenu;
 
 		std::list <std::string*> romList;
 		std::vector <autoFireMenuAction*> afActList;
