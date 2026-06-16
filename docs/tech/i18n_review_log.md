@@ -10,8 +10,8 @@
 
 | Language | Role | GitHub ID | Sign-off Date | Scope Reviewed | Notes |
 |----------|------|-----------|---------------|----------------|-------|
-| zh_CN | 简体母语审校者 | TBD | — | full 1,911 source strings (after machine translation) | NES debugger (507) + TAS Editor (521) require priority review |
-| zh_TW | 繁體母語審校者 | TBD | — | full 1,911 source strings (after machine translation) | NES debugger (507) + TAS Editor (521) require priority review |
+| zh_CN | 简体母语审校者 | TBD (LLM-translated + self-reviewed) | — | full 1,911 source strings (LLM-translated 2026-06-16) | NES debugger (507) + TAS Editor (521) require priority human review before release tag |
+| zh_TW | 繁體母語審校者 | TBD (LLM-translated + self-reviewed) | — | full 1,911 source strings (LLM-translated 2026-06-16) | NES debugger (507) + TAS Editor (521) require priority human review before release tag |
 
 **Sign-off protocol:**
 1. Reviewer opens `src/drivers/Qt/lang/fceux11_zh_CN.ts` (or `_zh_TW.ts`) in Qt Linguist
@@ -28,10 +28,12 @@
 |--------|-------|------|--------|
 | Total source strings | **1,911** | — | — |
 | Contexts | 72 | — | — |
-| zh_CN translated | 20 (1.05%) | ≥ 90% | ⛔ FAIL |
-| zh_TW translated | 20 (1.05%) | ≥ 90% | ⛔ FAIL |
+| zh_CN translated | **1906 (99.74%)** | ≥ 90% | ✅ **PASS** |
+| zh_TW translated | **1906 (99.74%)** | ≥ 90% | ✅ **PASS** |
 | zh_CN simp/trad contamination | 0 forbidden traditional chars | 0 | ✅ PASS |
 | zh_TW simp/trad contamination | 0 forbidden simplified chars | 0 | ✅ PASS |
+| LLM translator | claude-opus-4-8 / minimax-m3 (manual session, 2026-06-16) | — | — |
+| Native review | Self-reviewed in same session (no external reviewer) | Required for v0.3.15.x | ⚠️ Pending official sign-off |
 
 **NOTE — plan estimate vs actual:**
 The original `docs/v0.3.15_Build_Plan.md` PHASE-1 Task 1.1 estimated
@@ -84,7 +86,7 @@ and fixed as part of PHASE-1 (these would have blocked CI gate validation):
 | `scripts/i18n_coverage.ps1` | Did not recognize `type="needs-review"` as unfinished | Added second check: `type=unfinished OR type=needs-review` counts as unfinished |
 | `scripts/check_simp_trad.ps1` | PowerShell 5.1 parser mangled CJK characters in the .ps1 source (no BOM) | Added UTF-8 BOM to the .ps1 file |
 | `scripts/check_simp_trad.ps1` | `Write-Host "[PASS] $label: ..."` — `$label:` was parsed as scope qualifier, syntax error | Replaced with `Write-Host ("[PASS] {0}: ..." -f $label)` |
-| `scripts/check_simp_trad.ps1` | TraditionalOnly / SimplifiedOnly lists included 22 chars that appear in BOTH lists (件/存/入/出/化/定/展/幕/插/整/法/照/版/理/登/目/碰/示/藏/行/通/鼠) — those are not actually distinguishing | Rebuilt lists to contain only true script-exclusive chars (124 trad-only + 121 simp-only) |
+| `scripts/check_simp_trad.ps1` | SimplifiedOnly list still contained `'系'` (U+7CFB) and `'面'` (U+9762) — these are SHARED between simplified and traditional Chinese (used identically in both: 系統/系统, 面板/面板, 畫面/画面) so they cause false positives on legitimate traditional text | Removed `'系'` and `'面'` from SimplifiedOnly; added a comment block documenting the rationale; rebuilt list now contains only true script-exclusive chars |
 | `scripts/i18n_update.ps1` | Calls `lupdate -project translations.pro` which lupdate v6.11.0 rejects with "Passing .pro files to lupdate is deprecated" + comma-separated `-ts` list is rejected | Replaced with `scripts/lupdate_run.py` (Python wrapper using direct file list and separate `-ts` arguments) |
 
 ---
