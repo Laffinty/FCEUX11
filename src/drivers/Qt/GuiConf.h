@@ -67,13 +67,19 @@ class guiColorPickerDialog_t : public QDialog
 		guiColorPickerDialog_t( QColor *c, QWidget *parent = 0);
 		~guiColorPickerDialog_t(void);
 
+		void retranslateUi(void);
+
 	protected:
 		void closeEvent(QCloseEvent *event);
+		void changeEvent(QEvent *event) override;
 
 	private:
 		QColorDialog *colorDialog;
 		QColor *colorPtr;
 		QColor  origColor;
+		QPushButton *okButton;
+		QPushButton *cancelButton;
+		QPushButton *resetButton;
 
 	public slots:
 		void closeWindow(void);
@@ -119,8 +125,11 @@ public:
 	GuiPaletteEditDialog_t(QWidget *parent = 0);
 	~GuiPaletteEditDialog_t(void);
 
+	void retranslateUi(void);
+
 protected:
 	void closeEvent(QCloseEvent *event);
+	void changeEvent(QEvent *event) override;
 public slots:
 	void closeWindow(void);
 	void paletteSaveAs(void);
@@ -135,8 +144,11 @@ public:
 	GuiConfDialog_t(QWidget *parent = 0);
 	~GuiConfDialog_t(void);
 
+	void retranslateUi(void);
+
 protected:
 	void closeEvent(QCloseEvent *event);
+	void changeEvent(QEvent *event) override;
 
 	//void loadQss( const char *filepath );
 
@@ -151,6 +163,7 @@ protected:
 	QComboBox *styleComboBox;
 	QLineEdit *custom_qss_path;
 	QLineEdit *custom_qpal_path;
+	QPushButton *closeButton;
 
 private:
 public slots:

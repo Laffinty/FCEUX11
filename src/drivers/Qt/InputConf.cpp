@@ -62,7 +62,6 @@ InputConfDialog_t::InputConfDialog_t(QWidget *parent)
 	QHBoxLayout *hbox;
 	QGroupBox *nesInputFrame, *port1Frame, *port2Frame;
 	QGroupBox *presetFrame, *expansionPortFrame;
-	QPushButton *closeButton;
 	QPalette pal;
 	QColor color;
 	char stmp[256];
@@ -74,7 +73,7 @@ InputConfDialog_t::InputConfDialog_t(QWidget *parent)
 
 	connect(inputTimer, &QTimer::timeout, this, &InputConfDialog_t::updatePeriodic);
 
-	setWindowTitle("Input Configuration");
+	setWindowTitle(tr("Input Configuration"));
 
 	mainLayout = new QVBoxLayout();
 
@@ -178,7 +177,8 @@ InputConfDialog_t::InputConfDialog_t(QWidget *parent)
 	nesPortLabel[1]->setStyleSheet(stmp);
 	expPortLabel->setStyleSheet(stmp);
 
-	closeButton = new QPushButton( tr("Close") );
+	closeButton = new QPushButton(this);
+	closeButton->setText( tr("Close") );
 	closeButton->setIcon(style()->standardIcon(QStyle::SP_DialogCloseButton));
 
 	hbox = new QHBoxLayout();
@@ -288,6 +288,32 @@ void InputConfDialog_t::closeWindow(void)
 	//printf("Close Window\n");
 	done(0);
 	deleteLater();
+}
+//----------------------------------------------------------------------------
+void InputConfDialog_t::retranslateUi(void)
+{
+	if (fourScoreEna) fourScoreEna->setText(tr("Attach 4-Score (Implies four gamepads)"));
+	if (port2Mic)     port2Mic->setText(tr("Replace Port 2 Start with Microphone"));
+	if (autoPreset)   autoPreset->setText(tr("Auto Load/Save Presets at ROM Open/Close"));
+	if (nesPortLabel[0])  nesPortLabel[0]->setText(tr("<None>"));
+	if (nesPortLabel[1])  nesPortLabel[1]->setText(tr("<None>"));
+	if (expPortLabel)     expPortLabel->setText(tr("<None>"));
+	if (nesPortConfButton[0]) nesPortConfButton[0]->setText(tr("Configure"));
+	if (nesPortConfButton[1]) nesPortConfButton[1]->setText(tr("Configure"));
+	if (expPortConfButton)    expPortConfButton->setText(tr("Configure"));
+	if (loadConfigButton) loadConfigButton->setText(tr("Load"));
+	if (saveConfigButton) saveConfigButton->setText(tr("Save"));
+	if (closeButton)      closeButton->setText(tr("Close"));
+}
+//----------------------------------------------------------------------------
+void InputConfDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		setWindowTitle(tr("Input Configuration"));
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------
 void InputConfDialog_t::setInputs(void)

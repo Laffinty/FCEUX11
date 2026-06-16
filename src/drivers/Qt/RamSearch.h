@@ -72,8 +72,11 @@ class RamSearchDialog_t : public QDialog
 		RamSearchDialog_t(QWidget *parent = 0);
 		~RamSearchDialog_t(void);
 
+		void retranslateUi(void);
+
 	protected:
 		void closeEvent(QCloseEvent *event);
+		void changeEvent(QEvent *event) override;
 
 		QRamSearchView *ramView;
 		QScrollBar  *vbar;

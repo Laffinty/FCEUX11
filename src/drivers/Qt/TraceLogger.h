@@ -163,7 +163,9 @@ public:
 	TraceLogDiskThread_t *diskThread;
 
 	void showBufferWarning(void);
+	void retranslateUi(void);
 protected:
+	void changeEvent(QEvent *event) override;
 	QTimer *updateTimer;
 	QLabel    *logLastLbl;
 	QCheckBox *logFileCbox;

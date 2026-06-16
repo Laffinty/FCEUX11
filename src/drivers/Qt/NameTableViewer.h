@@ -183,9 +183,11 @@ class ppuNameTableViewerDialog_t : public QDialog
 		~ppuNameTableViewerDialog_t(void);
 
 		void setPropertyLabels( int TileID, int TileX, int TileY, int NameTable, int PPUAddress, int AttAddress, int Attrib, int palAddr );
+		void retranslateUi(void);
 
 	protected:
 		void closeEvent(QCloseEvent *bar);
+		void changeEvent(QEvent *event) override;
 
 		void changeRate( int divider );
 
@@ -208,6 +210,16 @@ class ppuNameTableViewerDialog_t : public QDialog
 		QLineEdit *attrDataLbl;
 		QLineEdit *attrAddrLbl;
 		QLineEdit *palAddrLbl;
+		QLabel    *ppuAddrTitleLbl;
+		QLabel    *nameTableTitleLbl;
+		QLabel    *locationTitleLbl;
+		QLabel    *tileIndexTitleLbl;
+		QLabel    *tileAddrTitleLbl;
+		QLabel    *attrDataTitleLbl;
+		QLabel    *attrAddrTitleLbl;
+		QLabel    *palAddrTitleLbl;
+		QLabel    *scanLineLbl;
+		QLabel    *mirroringTypeLbl;
 		QAction *showScrollLineAct;
 		QAction *showTileGridAct;
 		QAction *showAttrGridAct;
@@ -217,6 +229,7 @@ class ppuNameTableViewerDialog_t : public QDialog
 		QAction *rateAct[5];
 		QAction *focusAct[2];
 		QLabel  *mirrorLbl;
+		QGroupBox *tileInfoFrame;
 
 		int      cycleCount;
 

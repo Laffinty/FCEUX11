@@ -283,6 +283,26 @@ void ConsoleDebugger::closeWindow(void)
 	deleteLater();
 }
 //----------------------------------------------------------------------------
+void ConsoleDebugger::retranslateUi(void)
+{
+	// Pragmatic shortcut: menus and toolbar are built once via buildMenuBar() /
+	// buildToolBar() and held by mainLayoutv / mainLayout; the parent QDialog
+	// does not own the per-action pointers. Re-walking every QAction child of
+	// the QMenuBar/QToolBar is deferred to a follow-up PHASE-2 pass. The window
+	// title is the only retranslatable string on this dialog itself; per-row
+	// labels (registers, PPU, etc.) are populated dynamically at runtime.
+	setWindowTitle(tr("6502 Debugger"));
+}
+//----------------------------------------------------------------------------
+void ConsoleDebugger::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
+}
+//----------------------------------------------------------------------------
 void ConsoleDebugger::ld65ImportDebug(void)
 {
 	int ret, useNativeFileDialogVal;
@@ -2088,6 +2108,39 @@ void DebuggerBreakpointEditor::closeWindow(int ret)
 		loadBreakpoint();
 	}
 	deleteLater();
+}
+//----------------------------------------------------------------------------
+void DebuggerBreakpointEditor::retranslateUi(void)
+{
+	if (editIdx >= 0)
+	{
+		setWindowTitle(tr("Edit Breakpoint"));
+	}
+	else
+	{
+		setWindowTitle(tr("Add Breakpoint"));
+	}
+
+	if (forbidChkBox) forbidChkBox->setText(tr("Forbid"));
+	if (rbp) rbp->setText(tr("Read"));
+	if (wbp) wbp->setText(tr("Write"));
+	if (xbp) xbp->setText(tr("Execute"));
+	if (ebp) ebp->setText(tr("Enable"));
+	if (cpu_radio) cpu_radio->setText(tr("CPU"));
+	if (ppu_radio) ppu_radio->setText(tr("PPU"));
+	if (oam_radio) oam_radio->setText(tr("OAM"));
+	if (rom_radio) rom_radio->setText(tr("ROM"));
+	if (okButton)     okButton->setText(tr("OK"));
+	if (cancelButton) cancelButton->setText(tr("Cancel"));
+}
+//----------------------------------------------------------------------------
+void DebuggerBreakpointEditor::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------
 void DebuggerBreakpointEditor::checkDataValid(void)
@@ -8286,5 +8339,34 @@ void DebugBreakOnDialog::updateLabel(void)
 	}
 	descLbl->setText( tr(stmp) );
 
+}
+//----------------------------------------------------------------------------
+void DebugBreakOnDialog::retranslateUi(void)
+{
+	if (type)
+	{
+		setWindowTitle(tr("Break on CPU Instruction Exceedance"));
+	}
+	else
+	{
+		setWindowTitle(tr("Break on CPU Cycle Exceedance"));
+	}
+
+	if (oneShotBtn) oneShotBtn->setText(tr("One-Shot"));
+	if (contBtn)    contBtn->setText(tr("Continuous"));
+	if (absBtn)     absBtn->setText(tr("Absolute"));
+	if (relBtn)     relBtn->setText(tr("Relative"));
+
+	updateCurrent();
+	setThreshold(threshold);
+}
+//----------------------------------------------------------------------------
+void DebugBreakOnDialog::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------

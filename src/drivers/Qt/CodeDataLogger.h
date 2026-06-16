@@ -24,7 +24,10 @@ public:
 	CodeDataLoggerDialog_t(QWidget *parent = 0);
 	~CodeDataLoggerDialog_t(void);
 
+	void retranslateUi(void);
+
 protected:
+	void changeEvent(QEvent *event) override;
 	QTimer *updateTimer;
 	QLabel *prgLoggedCodeLabel;
 	QLabel *prgLoggedDataLabel;

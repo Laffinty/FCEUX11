@@ -27,8 +27,11 @@ class ConsoleVideoConfDialog_t : public QDialog
 		ConsoleVideoConfDialog_t(QWidget *parent = 0);
 		~ConsoleVideoConfDialog_t(void);
 
+		void retranslateUi(void);
+
 	protected:
 		void closeEvent(QCloseEvent *bar);
+		void changeEvent(QEvent *event) override;
 
 		QTimer      *updateTimer;
 		QComboBox   *driverSelect;
@@ -67,6 +70,29 @@ class ConsoleVideoConfDialog_t : public QDialog
 		QLineEdit      *winSizeReadout;
 		QLineEdit      *vpSizeReadout;
 		QLineEdit      *scrRateReadout;
+
+		QLabel    *driverLabel;
+		QLabel    *scalerLabel;
+		QLabel    *regionLabel;
+		QLabel    *aspectLabel;
+		QLabel    *aspectGroupLabel;
+		QGroupBox *overlayOptionsBox;
+		QGroupBox *showControllersBox;
+		QGroupBox *testPatternBox;
+		QGroupBox *drawingAreaBox;
+		QGroupBox *currentDimsBox;
+		QGroupBox *viewportCursorBox;
+		QGroupBox *screenBox;
+		QPushButton *applyButton;
+		QPushButton *closeButton;
+		QLabel *ntscLabel;
+		QLabel *palLabel;
+		QLabel *firstLineLabel;
+		QLabel *lastLineLabel;
+		QLabel *windowLabel;
+		QLabel *viewportLabel;
+		QLabel *shapeLabel;
+		QLabel *refreshRateLabel;
 
 		void  setCheckBoxFromProperty( QCheckBox *cbx, const char *property );
 		void  setComboBoxFromProperty( QComboBox *cbx, const char *property );

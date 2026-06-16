@@ -968,9 +968,7 @@ HexEditorFindDialog_t::HexEditorFindDialog_t(QWidget *parent)
 {
 	QVBoxLayout *mainLayout, *vbox;
 	QHBoxLayout *hbox;
-	QPushButton *nextBtn;
-	QGroupBox   *dirGroup, *typeGroup;
-	
+
 	QDialog::setWindowTitle( tr("Find") );
 
 	this->parent = (HexEditorDialog_t*)parent;
@@ -978,12 +976,18 @@ HexEditorFindDialog_t::HexEditorFindDialog_t(QWidget *parent)
 	mainLayout = new QVBoxLayout();
 	hbox       = new QHBoxLayout();
 
-	searchBox = new QLineEdit();
-	nextBtn   = new QPushButton( tr("Find Next") );
-	dirGroup  = new QGroupBox( tr("Direction") );
-	typeGroup = new QGroupBox( tr("Type") );
+	searchBox   = new QLineEdit();
+	nextBtn     = new QPushButton( this );
+	dirGroup    = new QGroupBox( this );
+	typeGroup   = new QGroupBox( this );
+	findWhatLbl = new QLabel( this );
 
-	hbox->addWidget( new QLabel( tr("Find What:") ) );
+	nextBtn->setText( tr("Find Next") );
+	dirGroup->setTitle( tr("Direction") );
+	typeGroup->setTitle( tr("Type") );
+	findWhatLbl->setText( tr("Find What:") );
+
+	hbox->addWidget( findWhatLbl );
 	hbox->addWidget( searchBox );
 	hbox->addWidget( nextBtn   );
 
@@ -998,8 +1002,11 @@ HexEditorFindDialog_t::HexEditorFindDialog_t(QWidget *parent)
 	mainLayout->addLayout( hbox );
 
 	vbox   = new QVBoxLayout();
-	upBtn  = new QRadioButton( tr("Up") );
-	dnBtn  = new QRadioButton( tr("Down") );
+	upBtn  = new QRadioButton( this );
+	dnBtn  = new QRadioButton( this );
+
+	upBtn->setText( tr("Up") );
+	dnBtn->setText( tr("Down") );
 
 	dnBtn->setChecked(true);
 
@@ -1009,8 +1016,11 @@ HexEditorFindDialog_t::HexEditorFindDialog_t(QWidget *parent)
 	dirGroup->setLayout( vbox );
 
 	vbox   = new QVBoxLayout();
-	hexBtn = new QRadioButton( tr("Hex") );
-	txtBtn = new QRadioButton( tr("Text") );
+	hexBtn = new QRadioButton( this );
+	txtBtn = new QRadioButton( this );
+
+	hexBtn->setText( tr("Hex") );
+	txtBtn->setText( tr("Text") );
 
 	vbox->addWidget( hexBtn );
 	vbox->addWidget( txtBtn );
@@ -1022,6 +1032,29 @@ HexEditorFindDialog_t::HexEditorFindDialog_t(QWidget *parent)
 	setLayout( mainLayout );
 
 	connect( nextBtn, SIGNAL(clicked(void)), this, SLOT(runSearch(void)) );
+}
+//----------------------------------------------------------------------------
+void HexEditorFindDialog_t::retranslateUi(void)
+{
+	QDialog::setWindowTitle( tr("Find") );
+
+	if (nextBtn)     nextBtn->setText( tr("Find Next") );
+	if (dirGroup)    dirGroup->setTitle( tr("Direction") );
+	if (typeGroup)   typeGroup->setTitle( tr("Type") );
+	if (findWhatLbl) findWhatLbl->setText( tr("Find What:") );
+	if (upBtn)       upBtn->setText( tr("Up") );
+	if (dnBtn)       dnBtn->setText( tr("Down") );
+	if (hexBtn)      hexBtn->setText( tr("Hex") );
+	if (txtBtn)      txtBtn->setText( tr("Text") );
+}
+//----------------------------------------------------------------------------
+void HexEditorFindDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------
 HexEditorFindDialog_t::~HexEditorFindDialog_t(void)
@@ -1510,6 +1543,29 @@ HexEditorDialog_t::~HexEditorDialog_t(void)
 		}
 	}
 	FCEU_WRAPPER_UNLOCK();
+}
+//----------------------------------------------------------------------------
+void HexEditorDialog_t::retranslateUi(void)
+{
+	// Update the dynamic title that includes the active view name and
+	// current address. setWindowTitle() re-applies the tr() wrapper.
+	setWindowTitle();
+
+	// QAction labels and ColorMenuItem labels are auto-translated by
+	// Qt on LanguageChange events; we only retranslate widgets here.
+	if (findDialog)
+	{
+		findDialog->retranslateUi();
+	}
+}
+//----------------------------------------------------------------------------
+void HexEditorDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------
 void HexEditorDialog_t::setWindowTitle(void)
@@ -2602,7 +2658,14 @@ int QHexEdit::convPixToAddr( QPoint p )
 void QHexEdit::keyPressEvent(QKeyEvent *event)
 {
 	//printf("Hex Window Key Press: 0x%x \n", event->key() );
-	
+
+	// Forward the event to the base class first so that IME composition
+	// (Chinese/Japanese/Korean text input) and other framework key handling
+	// can run. Only do custom hex-editor handling if the base class did not
+	// accept the event.
+	QWidget::keyPressEvent(event);
+	if (event->isAccepted()) { return; }
+
 	if (event->matches(QKeySequence::MoveToNextChar))
 	{
 		if ( cursorPosX < 32 )

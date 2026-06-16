@@ -408,7 +408,9 @@ ppuNameTableViewerDialog_t::ppuNameTableViewerDialog_t(QWidget *parent)
 	vbox1  = new QVBoxLayout();
 	vbox2  = new QVBoxLayout();
 	vbox3  = new QVBoxLayout();
-	frame  = new QGroupBox( tr("Tile Info") );
+	tileInfoFrame = new QGroupBox( this );
+	tileInfoFrame->setTitle( tr("Tile Info") );
+	frame = tileInfoFrame;
 	ntView = new ppuNameTableView_t(this);
 	grid   = new QGridLayout();
 
@@ -431,37 +433,45 @@ ppuNameTableViewerDialog_t::ppuNameTableViewerDialog_t(QWidget *parent)
 	frame->setLayout( vbox3 );
 	vbox3->addLayout( grid );
 
-	lbl = new QLabel( tr("PPU Addr:") );
-	lbl->setFont( font );
-	grid->addWidget( lbl, 0, 0, Qt::AlignLeft );
+	ppuAddrTitleLbl = new QLabel( this );
+	ppuAddrTitleLbl->setText( tr("PPU Addr:") );
+	ppuAddrTitleLbl->setFont( font );
+	grid->addWidget( ppuAddrTitleLbl, 0, 0, Qt::AlignLeft );
 
-	lbl = new QLabel( tr("Name Table:") );
-	lbl->setFont( font );
-	grid->addWidget( lbl, 1, 0, Qt::AlignLeft );
+	nameTableTitleLbl = new QLabel( this );
+	nameTableTitleLbl->setText( tr("Name Table:") );
+	nameTableTitleLbl->setFont( font );
+	grid->addWidget( nameTableTitleLbl, 1, 0, Qt::AlignLeft );
 
-	lbl = new QLabel( tr("Location:") );
-	lbl->setFont( font );
-	grid->addWidget( lbl, 2, 0, Qt::AlignLeft );
+	locationTitleLbl = new QLabel( this );
+	locationTitleLbl->setText( tr("Location:") );
+	locationTitleLbl->setFont( font );
+	grid->addWidget( locationTitleLbl, 2, 0, Qt::AlignLeft );
 
-	lbl = new QLabel( tr("Tile Index:") );
-	lbl->setFont( font );
-	grid->addWidget( lbl, 3, 0, Qt::AlignLeft );
+	tileIndexTitleLbl = new QLabel( this );
+	tileIndexTitleLbl->setText( tr("Tile Index:") );
+	tileIndexTitleLbl->setFont( font );
+	grid->addWidget( tileIndexTitleLbl, 3, 0, Qt::AlignLeft );
 
-	lbl = new QLabel( tr("Tile Addr:") );
-	lbl->setFont( font );
-	grid->addWidget( lbl, 4, 0, Qt::AlignLeft );
+	tileAddrTitleLbl = new QLabel( this );
+	tileAddrTitleLbl->setText( tr("Tile Addr:") );
+	tileAddrTitleLbl->setFont( font );
+	grid->addWidget( tileAddrTitleLbl, 4, 0, Qt::AlignLeft );
 
-	lbl = new QLabel( tr("Attribute Data:") );
-	lbl->setFont( font );
-	grid->addWidget( lbl, 5, 0, Qt::AlignLeft );
+	attrDataTitleLbl = new QLabel( this );
+	attrDataTitleLbl->setText( tr("Attribute Data:") );
+	attrDataTitleLbl->setFont( font );
+	grid->addWidget( attrDataTitleLbl, 5, 0, Qt::AlignLeft );
 
-	lbl = new QLabel( tr("Attribute Addr:") );
-	lbl->setFont( font );
-	grid->addWidget( lbl, 6, 0, Qt::AlignLeft );
+	attrAddrTitleLbl = new QLabel( this );
+	attrAddrTitleLbl->setText( tr("Attribute Addr:") );
+	attrAddrTitleLbl->setFont( font );
+	grid->addWidget( attrAddrTitleLbl, 6, 0, Qt::AlignLeft );
 
-	lbl = new QLabel( tr("Palette Addr:") );
-	lbl->setFont( font );
-	grid->addWidget( lbl, 7, 0, Qt::AlignLeft );
+	palAddrTitleLbl = new QLabel( this );
+	palAddrTitleLbl->setText( tr("Palette Addr:") );
+	palAddrTitleLbl->setFont( font );
+	grid->addWidget( palAddrTitleLbl, 7, 0, Qt::AlignLeft );
 
 	grid->setColumnMinimumWidth( 1, pxCharWidth * 6 );
 
@@ -503,11 +513,16 @@ ppuNameTableViewerDialog_t::ppuNameTableViewerDialog_t(QWidget *parent)
 	vbox3->addWidget( selTileView );
 	vbox3->addWidget( selTilePalView );
 
-	showScrollLineCbox = new QCheckBox( tr("Show Scroll Lines") );
-	showTileGridCbox   = new QCheckBox( tr("Show Tile Grid") );
-	showAttrGridCbox   = new QCheckBox( tr("Show Attr Grid") );
-	showAttrbCbox      = new QCheckBox( tr("Show Attributes") );
-	ignorePaletteCbox  = new QCheckBox( tr("Ignore Palette") );
+	showScrollLineCbox = new QCheckBox( this );
+	showScrollLineCbox->setText( tr("Show Scroll Lines") );
+	showTileGridCbox   = new QCheckBox( this );
+	showTileGridCbox->setText( tr("Show Tile Grid") );
+	showAttrGridCbox   = new QCheckBox( this );
+	showAttrGridCbox->setText( tr("Show Attr Grid") );
+	showAttrbCbox      = new QCheckBox( this );
+	showAttrbCbox->setText( tr("Show Attributes") );
+	ignorePaletteCbox  = new QCheckBox( this );
+	ignorePaletteCbox->setText( tr("Ignore Palette") );
 
 	showScrollLineCbox->setChecked( drawScrollLines );
 	showTileGridCbox->setChecked( drawTileGridLines );
@@ -533,10 +548,12 @@ ppuNameTableViewerDialog_t::ppuNameTableViewerDialog_t(QWidget *parent)
 
 	vbox1->addLayout( hbox1, 1);
 
-	lbl       = new QLabel( tr("Mirroring Type:") );
-	mirrorLbl = new QLabel( tr("Vertical") );
-	hbox->addWidget( lbl      , 1, Qt::AlignRight );
-	hbox->addWidget( mirrorLbl, 1, Qt::AlignLeft );
+	mirroringTypeLbl = new QLabel( this );
+	mirroringTypeLbl->setText( tr("Mirroring Type:") );
+	mirrorLbl = new QLabel( this );
+	mirrorLbl->setText( tr("Vertical") );
+	hbox->addWidget( mirroringTypeLbl, 1, Qt::AlignRight );
+	hbox->addWidget( mirrorLbl       , 1, Qt::AlignLeft );
 
 	hbox1->addLayout( hbox, 1 );
 
@@ -547,7 +564,9 @@ ppuNameTableViewerDialog_t::ppuNameTableViewerDialog_t(QWidget *parent)
 	scanLineEdit = new QSpinBox();
 	scanLineEdit->setRange( 0, 255 );
 	scanLineEdit->setValue( NTViewScanline );
-	hbox->addWidget( new QLabel( tr("Display on Scanline:") ), 1, Qt::AlignRight );
+	scanLineLbl  = new QLabel( this );
+	scanLineLbl->setText( tr("Display on Scanline:") );
+	hbox->addWidget( scanLineLbl, 1, Qt::AlignRight );
 	hbox->addWidget( scanLineEdit, 1, Qt::AlignLeft );
 
 	hbox1->addLayout( hbox, 1 );
@@ -594,6 +613,37 @@ void ppuNameTableViewerDialog_t::closeEvent(QCloseEvent *event)
 	done(0);
 	deleteLater();
 	event->accept();
+}
+//----------------------------------------------------
+void ppuNameTableViewerDialog_t::retranslateUi(void)
+{
+	setWindowTitle( tr("Name Table Viewer") );
+
+	if (tileInfoFrame)        tileInfoFrame->setTitle( tr("Tile Info") );
+	if (ppuAddrTitleLbl)      ppuAddrTitleLbl->setText( tr("PPU Addr:") );
+	if (nameTableTitleLbl)    nameTableTitleLbl->setText( tr("Name Table:") );
+	if (locationTitleLbl)     locationTitleLbl->setText( tr("Location:") );
+	if (tileIndexTitleLbl)    tileIndexTitleLbl->setText( tr("Tile Index:") );
+	if (tileAddrTitleLbl)     tileAddrTitleLbl->setText( tr("Tile Addr:") );
+	if (attrDataTitleLbl)     attrDataTitleLbl->setText( tr("Attribute Data:") );
+	if (attrAddrTitleLbl)     attrAddrTitleLbl->setText( tr("Attribute Addr:") );
+	if (palAddrTitleLbl)      palAddrTitleLbl->setText( tr("Palette Addr:") );
+	if (showScrollLineCbox)   showScrollLineCbox->setText( tr("Show Scroll Lines") );
+	if (showTileGridCbox)     showTileGridCbox->setText( tr("Show Tile Grid") );
+	if (showAttrGridCbox)     showAttrGridCbox->setText( tr("Show Attr Grid") );
+	if (showAttrbCbox)        showAttrbCbox->setText( tr("Show Attributes") );
+	if (ignorePaletteCbox)    ignorePaletteCbox->setText( tr("Ignore Palette") );
+	if (mirroringTypeLbl)     mirroringTypeLbl->setText( tr("Mirroring Type:") );
+	if (scanLineLbl)          scanLineLbl->setText( tr("Display on Scanline:") );
+}
+//----------------------------------------------------
+void ppuNameTableViewerDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------
 void ppuNameTableViewerDialog_t::closeWindow(void)

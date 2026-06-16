@@ -30,8 +30,11 @@ class iNesHeaderEditor_t : public QDialog
 		~iNesHeaderEditor_t(void);
 
 		bool  isInitialized(void){ return initOK; };
+
+		void retranslateUi(void);
 	protected:
 		void closeEvent(QCloseEvent *event);
+		void changeEvent(QEvent *event) override;
 
 		QFont         font;
 		QRadioButton *iNes1Btn;

@@ -82,6 +82,7 @@ ConsoleVideoConfDialog_t::ConsoleVideoConfDialog_t(QWidget *parent)
 
 	// Video Driver Select
 	lbl = new QLabel( tr("Driver:") );
+	driverLabel = lbl;
 
 	driverSelect = new QComboBox();
 
@@ -98,6 +99,7 @@ ConsoleVideoConfDialog_t::ConsoleVideoConfDialog_t(QWidget *parent)
 
 	// Video Driver Select
 	lbl = new QLabel( tr("Scaler:") );
+	scalerLabel = lbl;
 
 	scalerSelect = new QComboBox();
 
@@ -130,6 +132,7 @@ ConsoleVideoConfDialog_t::ConsoleVideoConfDialog_t(QWidget *parent)
 
 	// Region Select
 	lbl = new QLabel( tr("Region:") );
+	regionLabel = lbl;
 
 	regionSelect = new QComboBox();
 
@@ -284,6 +287,7 @@ ConsoleVideoConfDialog_t::ConsoleVideoConfDialog_t(QWidget *parent)
 	connect(aspectSelect, SIGNAL(currentIndexChanged(int)), this, SLOT(aspectChanged(int)) );
 
 	aspectSelectLabel = new QLabel( tr("Aspect:") );
+	aspectGroupLabel = aspectSelectLabel;
 
 	hbox1 = new QHBoxLayout();
 	hbox1->addWidget( aspectSelectLabel );
@@ -342,11 +346,13 @@ ConsoleVideoConfDialog_t::ConsoleVideoConfDialog_t(QWidget *parent)
 	hbox1 = new QHBoxLayout();
 
 	button = new QPushButton( tr("Apply") );
+	applyButton = button;
 	hbox1->addWidget( button );
 	connect(button, SIGNAL(clicked()), this, SLOT(applyChanges(void)) );
 	button->setIcon( style->standardIcon( QStyle::SP_DialogApplyButton ) );
 
 	button = new QPushButton( tr("Close") );
+	closeButton = button;
 	hbox1->addWidget( button );
 	button->setIcon( style->standardIcon( QStyle::SP_DialogCloseButton ) );
 	connect(button, SIGNAL(clicked()), this, SLOT(closeWindow(void)) );
@@ -354,6 +360,7 @@ ConsoleVideoConfDialog_t::ConsoleVideoConfDialog_t(QWidget *parent)
 	main_vbox->addLayout( hbox1 );
 
 	gbox  = new QGroupBox( tr("Overlay Options") );
+	overlayOptionsBox = gbox;
 	vbox3 = new QVBoxLayout();
 	vbox4 = new QVBoxLayout();
 	vbox5 = new QVBoxLayout();
@@ -371,16 +378,19 @@ ConsoleVideoConfDialog_t::ConsoleVideoConfDialog_t(QWidget *parent)
 	vbox->addWidget( showRerecordCount_cbx );
 
 	gbox  = new QGroupBox( tr("Show Controllers:") );
+	showControllersBox = gbox;
 	gbox->setLayout( vbox4 );
 	vbox->addWidget( gbox  );
 	vbox4->addWidget( inputDisplaySel );
 
 	gbox  = new QGroupBox( tr("Test Pattern:") );
+	testPatternBox = gbox;
 	gbox->setLayout( vbox5 );
 	vbox->addWidget( gbox  );
 	vbox5->addWidget( videoTest );
 
 	gbox  = new QGroupBox( tr("Drawing Area") );
+	drawingAreaBox = gbox;
 	vbox2 = new QVBoxLayout();
 	grid  = new QGridLayout();
 
@@ -447,6 +457,7 @@ ConsoleVideoConfDialog_t::ConsoleVideoConfDialog_t(QWidget *parent)
 	grid->addWidget( clipSidesCbx, 3, 0, 1, 3);
 
 	gbox  = new QGroupBox( tr("Current Dimensions") );
+	currentDimsBox = gbox;
 	grid  = new QGridLayout();
 
 	vbox2->addWidget( gbox, 1 );
@@ -468,6 +479,7 @@ ConsoleVideoConfDialog_t::ConsoleVideoConfDialog_t(QWidget *parent)
 	grid->addWidget( vpSizeReadout, 1, 1, Qt::AlignLeft);
 
 	gbox  = new QGroupBox( tr("Viewport Cursor") );
+	viewportCursorBox = gbox;
 	grid  = new QGridLayout();
 	cursorSelect = new QComboBox();
 
@@ -496,6 +508,7 @@ ConsoleVideoConfDialog_t::ConsoleVideoConfDialog_t(QWidget *parent)
 	vbox  = new QVBoxLayout();
 	hbox  = new QHBoxLayout();
 	gbox  = new QGroupBox( tr("Screen") );
+	screenBox = gbox;
 	gbox->setLayout( vbox );
 
 	scrRateReadout = new QLineEdit();
@@ -528,6 +541,116 @@ ConsoleVideoConfDialog_t::~ConsoleVideoConfDialog_t(void)
 	//printf("Destroy Video Config Window\n");
 
 	updateTimer->stop();
+}
+//----------------------------------------------------------------------------
+void ConsoleVideoConfDialog_t::retranslateUi(void)
+{
+	if (driverLabel)       driverLabel->setText(tr("Driver:"));
+	if (scalerLabel)       scalerLabel->setText(tr("Scaler:"));
+	if (regionLabel)       regionLabel->setText(tr("Region:"));
+	if (aspectSelectLabel) aspectSelectLabel->setText(tr("Aspect:"));
+	if (aspectGroupLabel)  aspectGroupLabel->setText(tr("Aspect:"));
+
+	if (gl_LF_chkBox)       gl_LF_chkBox->setText(tr("Enable OpenGL Linear Filter"));
+	if (autoRegion)         autoRegion->setText(tr("Region Auto Detect"));
+	if (new_PPU_ena)        new_PPU_ena->setText(tr("Enable New PPU"));
+	if (frmskipcbx)         frmskipcbx->setText(tr("Enable Frameskip"));
+	if (vsync_ena)          vsync_ena->setText(tr("Enable Vertical Sync"));
+	if (intFrameRateCbx)    intFrameRateCbx->setText(tr("Use Integer Frame Rate"));
+	if (sprtLimCbx)         sprtLimCbx->setText(tr("Disable Sprite Limit"));
+	if (clipSidesCbx)       clipSidesCbx->setText(tr("Clip Left/Right Sides (8 px on each)"));
+	if (showGuiMsgs_cbx)    showGuiMsgs_cbx->setText(tr("GUI Messages"));
+	if (showFPS_cbx)        showFPS_cbx->setText(tr("Frames Per Second"));
+	if (showFrameCount_cbx) showFrameCount_cbx->setText(tr("Frame Count"));
+	if (showLagCount_cbx)   showLagCount_cbx->setText(tr("Lag Count"));
+	if (showRerecordCount_cbx) showRerecordCount_cbx->setText(tr("Re-Record Count"));
+	if (autoScaleCbx)       autoScaleCbx->setText(tr("Auto Scale on Resize"));
+	if (aspectCbx)          aspectCbx->setText(tr("Force Aspect Ratio"));
+	if (drawInputAidsCbx)   drawInputAidsCbx->setText(tr("Draw Input Aids"));
+	if (cursorVisCbx)       cursorVisCbx->setText(tr("Visible"));
+
+	if (applyButton)        applyButton->setText(tr("Apply"));
+	if (closeButton)        closeButton->setText(tr("Close"));
+
+	if (overlayOptionsBox)   overlayOptionsBox->setTitle(tr("Overlay Options"));
+	if (showControllersBox)  showControllersBox->setTitle(tr("Show Controllers:"));
+	if (testPatternBox)      testPatternBox->setTitle(tr("Test Pattern:"));
+	if (drawingAreaBox)      drawingAreaBox->setTitle(tr("Drawing Area"));
+	if (currentDimsBox)      currentDimsBox->setTitle(tr("Current Dimensions"));
+	if (viewportCursorBox)   viewportCursorBox->setTitle(tr("Viewport Cursor"));
+	if (screenBox)           screenBox->setTitle(tr("Screen"));
+
+	if (driverSelect)
+	{
+		driverSelect->setItemText(0, tr("OpenGL"));
+		driverSelect->setItemText(1, tr("SDL"));
+		driverSelect->setItemText(2, tr("QPainter"));
+	}
+	if (scalerSelect)
+	{
+		scalerSelect->setItemText(0, tr("None"));
+		scalerSelect->setItemText(1, tr("hq2x"));
+		scalerSelect->setItemText(2, tr("scale2x"));
+		scalerSelect->setItemText(3, tr("NTSC 2x"));
+		scalerSelect->setItemText(4, tr("hq3x"));
+		scalerSelect->setItemText(5, tr("scale3x"));
+		scalerSelect->setItemText(6, tr("Prescale 2x"));
+		scalerSelect->setItemText(7, tr("Prescale 3x"));
+		scalerSelect->setItemText(8, tr("Prescale 4x"));
+		scalerSelect->setItemText(9, tr("PAL 3x"));
+	}
+	if (regionSelect)
+	{
+		regionSelect->setItemText(0, tr("NTSC"));
+		regionSelect->setItemText(1, tr("PAL"));
+		regionSelect->setItemText(2, tr("Dendy"));
+	}
+	if (aspectSelect)
+	{
+		aspectSelect->setItemText(0, tr("Square Pixels (1:1)"));
+		aspectSelect->setItemText(1, tr("NTSC (8:7)"));
+		aspectSelect->setItemText(2, tr("PAL (11:8)"));
+		aspectSelect->setItemText(3, tr("Standard (4:3)"));
+		aspectSelect->setItemText(4, tr("Widescreen (16:9)"));
+	}
+	if (inputDisplaySel)
+	{
+		inputDisplaySel->setItemText(0, tr("None"));
+		inputDisplaySel->setItemText(1, tr("1"));
+		inputDisplaySel->setItemText(2, tr("1 & 2"));
+		inputDisplaySel->setItemText(3, tr("1, 2, 3 & 4"));
+	}
+	if (videoTest)
+	{
+		videoTest->setItemText(0, tr("None"));
+		videoTest->setItemText(1, tr("Vertical Sync"));
+	}
+	if (cursorSelect)
+	{
+		cursorSelect->setItemText(0, tr("Arrow"));
+		cursorSelect->setItemText(1, tr("Cross"));
+		cursorSelect->setItemText(2, tr("Blank"));
+		cursorSelect->setItemText(3, tr("Reticle 1x"));
+		cursorSelect->setItemText(4, tr("Reticle 2x"));
+	}
+	if (xScaleLabel)
+	{
+		xScaleLabel->setText(aspectCbx && aspectCbx->isChecked() ? tr("Scale:") : tr("X Scale:"));
+	}
+	if (yScaleLabel)
+	{
+		yScaleLabel->setText(tr("Y Scale:"));
+	}
+}
+//----------------------------------------------------------------------------
+void ConsoleVideoConfDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		setWindowTitle(tr("Video Config"));
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------
 void ConsoleVideoConfDialog_t::closeEvent(QCloseEvent *event)

@@ -129,8 +129,13 @@ class bookmarkPreviewPopup : public QDialog
 
 	   static bookmarkPreviewPopup *currentInstance(void);
 
+	protected:
+		void changeEvent(QEvent *event) override;
+
 	private:
 		int loadImage(int index);
+
+		void retranslateUi(void);
 
 		int alpha;
 		int imageIndex;
@@ -354,8 +359,11 @@ class TasFindNoteWindow : public QDialog
 		TasFindNoteWindow(QWidget *parent = 0);
 		~TasFindNoteWindow(void);
 
+		void retranslateUi(void);
+
 	protected:
 		void closeEvent(QCloseEvent *event);
+		void changeEvent(QEvent *event) override;
 
 		QLineEdit     *searchPattern;
 		QCheckBox     *matchCase;
@@ -363,6 +371,7 @@ class TasFindNoteWindow : public QDialog
 		QRadioButton  *down;
 		QPushButton   *nextBtn;
 		QPushButton   *closeBtn;
+		QGroupBox     *dirGbox;
 
 	public slots:
 		void closeWindow(void);
@@ -396,6 +405,8 @@ class TasEditorWindow : public QDialog
 	public:
 		TasEditorWindow(QWidget *parent = 0);
 		~TasEditorWindow(void);
+
+		void retranslateUi(void);
 
 		QPianoRoll  *pianoRoll;
 
@@ -433,11 +444,14 @@ class TasEditorWindow : public QDialog
 
 	protected:
 		void closeEvent(QCloseEvent *event);
+		void changeEvent(QEvent *event) override;
 
 		QMenuBar  *buildMenuBar(void);
 		void buildPianoRollDisplay(void);
 		void buildSideControlPanel(void);
 		void initPatterns(void);
+
+		void retranslateMenuBar(void);
 
 		QMenu     *recentProjectMenu;
 		QAction   *followUndoAct;

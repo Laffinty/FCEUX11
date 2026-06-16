@@ -190,7 +190,7 @@ iNesHeaderEditor_t::iNesHeaderEditor_t(QWidget *parent)
     fontCharWidth = fm.width(QLatin1Char('2'));
 #endif
 
-	setWindowTitle("NES Header Editor");
+	setWindowTitle(tr("NES Header Editor"));
 
 	//resize( 512, 512 );
 
@@ -555,6 +555,20 @@ void iNesHeaderEditor_t::closeEvent(QCloseEvent *event)
 	done(0);
 	deleteLater();
 	event->accept();
+}
+//----------------------------------------------------------------------------
+void iNesHeaderEditor_t::retranslateUi(void)
+{
+	setWindowTitle(tr("NES Header Editor"));
+}
+//----------------------------------------------------------------------------
+void iNesHeaderEditor_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------
 void iNesHeaderEditor_t::closeWindow(void)

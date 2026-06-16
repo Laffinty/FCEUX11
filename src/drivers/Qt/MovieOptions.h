@@ -27,8 +27,11 @@ public:
 	MovieOptionsDialog_t(QWidget *parent = 0);
 	~MovieOptionsDialog_t(void);
 
+	void retranslateUi(void);
+
 protected:
 	void closeEvent(QCloseEvent *event);
+	void changeEvent(QEvent *event) override;
 
 	QCheckBox *readOnlyReplay;
 	QCheckBox *pauseAfterPlay;
@@ -43,6 +46,11 @@ protected:
 	QCheckBox *aviEnableAudio;
 	QComboBox *aviBackend;
 	QStackedWidget *aviPageStack;
+
+	QPushButton *closeButton;
+	QLabel *aviDriverLabel;
+	QLabel *infoLabel;
+	QGroupBox *aviGroupBox;
 
 private:
 public slots:

@@ -68,8 +68,11 @@ public:
 
 	int riffWalkCallback( int type, long long int fpos, const char *fourcc, size_t size );
 
+	void retranslateUi(void);
+
 protected:
 	void closeEvent(QCloseEvent *event);
+	void changeEvent(QEvent *event) override;
 
 	QMenuBar *buildMenuBar(void);
 
@@ -85,6 +88,7 @@ protected:
 
 	QTabWidget *tabs;
 	QProgressDialog *progressDialog;
+	QPushButton *closeButton;
 
 private:
 public slots:

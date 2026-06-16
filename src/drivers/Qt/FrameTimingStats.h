@@ -27,8 +27,11 @@ public:
 	FrameTimingDialog_t(QWidget *parent = 0);
 	~FrameTimingDialog_t(void);
 
+	void retranslateUi(void);
+
 protected:
 	void closeEvent(QCloseEvent *event);
+	void changeEvent(QEvent *event) override;
 
 	QTimer *updateTimer;
 	QCheckBox *timingEnable;
@@ -43,6 +46,9 @@ protected:
 	QGroupBox *statFrame;
 
 	QTreeWidget *tree;
+	QPushButton *resetButton;
+	QPushButton *closeButton;
+	QTreeWidgetItem *headerItem;
 
 private:
 	void updateTimingStats(void);

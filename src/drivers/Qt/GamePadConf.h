@@ -62,8 +62,12 @@ public:
 	~HotKeySelectDialog_t(void);
 
 	int  getSelHotKey(void){ return hotKeyIdx; };
+
+	void retranslateUi(void);
+
 protected:
 	void closeEvent(QCloseEvent *bar);
+	void changeEvent(QEvent *event) override;
 
 	QTreeWidget *tree;
 	QPushButton *okButton;
@@ -87,8 +91,11 @@ public:
 	GamePadFuncConfigDialog( int portNum, gamepad_function_key_t *fk, QWidget *parent = 0);
 	~GamePadFuncConfigDialog(void);
 
+	void retranslateUi(void);
+
 protected:
 	void closeEvent(QCloseEvent *bar);
+	void changeEvent(QEvent *event) override;
 
 	void changeButton(int x);
 
@@ -98,6 +105,19 @@ protected:
 	GamePadConfigButton_t  *b[2];
 	GamePadConfigHotKey_t  *hk[2];
 	gamepad_function_key_t *k;
+
+	QGroupBox *sequenceFrame;
+	QGroupBox *keySeqFrame;
+	QLabel *modifierBtnLabel;
+	QLabel *primaryBtnLabel;
+	QLabel *onPressLabel;
+	QLabel *onReleaseLabel;
+	QPushButton *okButton;
+	QPushButton *cancelButton;
+	QPushButton *clearButton0Btn;
+	QPushButton *clearButton1Btn;
+	QPushButton *clearButton2Btn;
+	QPushButton *clearButton3Btn;
 
 	int  portNum;
 	int  buttonConfigStatus;
@@ -161,8 +181,11 @@ public:
 	GamePadConfDialog_t(QWidget *parent = 0);
 	~GamePadConfDialog_t(void);
 
+	void retranslateUi(void);
+
 protected:
 	void resizeEvent(QResizeEvent *event);
+	void changeEvent(QEvent *event) override;
 
 	QWidget *mainWidget;
 	QTimer *inputTimer;
@@ -171,10 +194,16 @@ protected:
 	QComboBox *mapSel;
 	QComboBox *profSel;
 	QCheckBox *efs_chkbox;
+	QCheckBox *udlr_chkbox;
 	QGroupBox *advOptLayout;
+	QGroupBox *profileFrame;
+	QGroupBox *mappingsFrame;
 	QPropertyAnimation *advOptWidthAnimation;
 	QLabel *guidLbl;
 	QLabel *mapMsg;
+	QLabel *portLabel;
+	QLabel *devLabel;
+	QLabel *guidLabel;
 	QLabel *keyName[GAMEPAD_NUM_BUTTONS];
 	QLabel *keyState[GAMEPAD_NUM_BUTTONS];
 	GamePadConfigButton_t *button[GAMEPAD_NUM_BUTTONS];
@@ -184,7 +213,20 @@ protected:
 	QPushButton *newKeyBindBtn;
 	QPushButton *editKeyBindBtn;
 	QPushButton *delKeyBindBtn;
+	QPushButton *newProfileButton;
+	QPushButton *saveProfileButton;
+	QPushButton *applyProfileButton;
+	QPushButton *removeProfileButton;
+	QPushButton *clearAllButton;
+	QPushButton *closeButton;
+	QPushButton *changeSeqButton;
+	QPushButton *clearButtonArr[GAMEPAD_NUM_BUTTONS];
 	QTreeWidget *keyBindTree;
+	QMenuBar *menuBar;
+	QMenu *fileMenu;
+	QMenu *extMenu;
+	QAction *closeAct;
+	QAction *showAdvBindAct;
 
 	int portNum;
 	int configIndex;

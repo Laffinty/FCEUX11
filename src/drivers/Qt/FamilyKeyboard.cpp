@@ -358,6 +358,9 @@ void FamilyKeyboardWidget::ctxChangeToggleOnPress(void)
 //*********************************************************************************
 void FamilyKeyboardWidget::keyPressEvent(QKeyEvent *event)
 {
+	// Forward to base class to allow IME composition events to be handled
+	QWidget::keyPressEvent(event);
+
 	//printf("Key Press: 0x%x \n", event->key() );
 	pushKeyEvent( event, 1 );
 
@@ -581,7 +584,7 @@ FKBConfigDialog::FKBConfigDialog(QWidget *parent)
 	QSettings    settings;
 	char stmp[64];
 
-	setWindowTitle( "Family Keyboard" );
+	setWindowTitle( tr("Family Keyboard") );
 
 	mainVbox = new QVBoxLayout();
 	setLayout( mainVbox );
@@ -998,6 +1001,21 @@ void FKBConfigDialog::closeEvent(QCloseEvent *event)
 	done(0);
 	deleteLater();
 	event->accept();
+}
+//----------------------------------------------------------------------------
+void FKBConfigDialog::retranslateUi(void)
+{
+	setWindowTitle(tr("Family Keyboard"));
+	if (fkbEnaBtn) fkbEnaBtn->setText(tr("Enable"));
+}
+//----------------------------------------------------------------------------
+void FKBConfigDialog::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------
 void FKBConfigDialog::closeWindow(void)
@@ -1535,6 +1553,21 @@ void FKBKeyMapDialog::closeEvent(QCloseEvent *event)
 	}
 	event->accept();
 }
+//----------------------------------------------------------------------------
+void FKBKeyMapDialog::retranslateUi(void)
+{
+	setWindowTitle(tr("Family Keyboard Key Mapping"));
+	if (msgLbl) msgLbl->setText(tr("Press a key to map..."));
+}
+//----------------------------------------------------------------------------
+void FKBKeyMapDialog::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
+}
 //*********************************************************************************
 void FKBKeyMapDialog::closeWindow(void)
 {
@@ -1550,6 +1583,9 @@ void FKBKeyMapDialog::closeWindow(void)
 //*********************************************************************************
 void FKBKeyMapDialog::keyPressEvent(QKeyEvent *event)
 {
+	// Forward to base class to allow IME composition events to be handled
+	QDialog::keyPressEvent(event);
+
 	//printf("Key Press: 0x%x \n", event->key() );
 	pushKeyEvent( event, 1 );
 

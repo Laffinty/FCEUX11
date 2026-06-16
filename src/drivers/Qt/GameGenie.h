@@ -28,8 +28,10 @@ class GameGenieDialog_t : public QDialog
 		GameGenieDialog_t(QWidget *parent = 0);
 		~GameGenieDialog_t(void);
 
+		void retranslateUi(void);
 	protected:
 		void closeEvent(QCloseEvent *event);
+		void changeEvent(QEvent *event) override;
 
 		fceuHexIntValidtor *addrValidator;
 		fceuHexIntValidtor *cmpValidator;

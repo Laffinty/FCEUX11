@@ -216,7 +216,7 @@ RamSearchDialog_t::RamSearchDialog_t(QWidget *parent)
 	int useNativeMenuBar;
 	QSettings settings;
 
-	setWindowTitle("RAM Search");
+	setWindowTitle(tr("RAM Search"));
 
 	menuBar = new QMenuBar(this);
 
@@ -542,6 +542,28 @@ void RamSearchDialog_t::closeWindow(void)
 	//printf("Close Window\n");
 	done(0);
 	deleteLater();
+}
+//----------------------------------------------------------------------------
+void RamSearchDialog_t::retranslateUi(void)
+{
+	if (searchButton)      searchButton->setText(tr("Search"));
+	if (resetButton)       resetButton->setText(tr("Reset"));
+	if (clearChangeButton) clearChangeButton->setText(tr("Clear Change"));
+	if (undoButton)        undoButton->setText(tr("Undo"));
+	if (elimButton)        elimButton->setText(tr("Eliminate"));
+	if (watchButton)       watchButton->setText(tr("Watch"));
+	if (addCheatButton)    addCheatButton->setText(tr("Add Cheat"));
+	if (hexEditButton)     hexEditButton->setText(tr("Hex Editor"));
+}
+//----------------------------------------------------------------------------
+void RamSearchDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		setWindowTitle(tr("RAM Search"));
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------
 void RamSearchDialog_t::periodicUpdate(void)

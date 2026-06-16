@@ -194,7 +194,7 @@ TasEditorWindow::TasEditorWindow(QWidget *parent)
 
 	clipboard = QGuiApplication::clipboard();
 
-	setWindowTitle("TAS Editor");
+	setWindowTitle(tr("TAS Editor"));
 	//setWindowIcon( QIcon(":icons/taseditor-icon32.png") );
 
 	resize(512, 512);
@@ -322,6 +322,82 @@ void TasEditorWindow::closeWindow(void)
 	printf("Tas Editor Close Window\n");
 	done(0);
 	deleteLater();
+}
+//----------------------------------------------------------------------------
+void TasEditorWindow::retranslateUi(void)
+{
+	setWindowTitle( tr("TAS Editor") );
+
+	// Piano roll display
+	if (upperMarkerLabel) upperMarkerLabel->setText( tr("Marker 0") );
+	if (lowerMarkerLabel) lowerMarkerLabel->setText( tr("Marker 0") );
+
+	// Side control panel
+	if (playbackGBox) playbackGBox->setTitle( tr("Playback") );
+	if (recorderGBox) recorderGBox->setTitle( tr("Recorder") );
+	if (splicerGBox ) splicerGBox->setTitle( tr("Splicer") );
+
+	if (followCursorCbox) followCursorCbox->setText( tr("Follow Cursor") );
+	if (turboSeekCbox   ) turboSeekCbox->setText( tr("Turbo Seek") );
+	if (autoRestoreCbox ) autoRestoreCbox->setText( tr("Auto-Restore Last Position") );
+
+	if (recRecordingCbox  ) recRecordingCbox->setText( tr("Recording") );
+	if (recSuperImposeCbox) recSuperImposeCbox->setText( tr("Superimpose") );
+	if (recUsePatternCbox ) recUsePatternCbox->setText( tr("Use Pattern") );
+	if (recAllBtn         ) recAllBtn->setText( tr("All") );
+	if (rec1PBtn          ) rec1PBtn->setText( tr("1P") );
+	if (rec2PBtn          ) rec2PBtn->setText( tr("2P") );
+	if (rec3PBtn          ) rec3PBtn->setText( tr("3P") );
+	if (rec4PBtn          ) rec4PBtn->setText( tr("4P") );
+
+	if (selectionLbl) selectionLbl->setText( tr("Empty") );
+	if (clipboardLbl) clipboardLbl->setText( tr("Empty") );
+
+	if (similarBtn) similarBtn->setText( tr("Similar") );
+	if (moreBtn   ) moreBtn->setText( tr("More") );
+
+	// Tab widget labels
+	if (bkmkBrnchStack)
+	{
+		bkmkBrnchStack->setTabText( 0, tr("Bookmarks") );
+		bkmkBrnchStack->setTabText( 1, tr("Branches")  );
+		bkmkBrnchStack->setTabText( 2, tr("History")   );
+	}
+
+	// Update tool tips for all hotkey-bound actions
+	updateToolTips();
+
+	// Refresh menu actions and titles (full retranslate)
+	retranslateMenuBar();
+}
+//----------------------------------------------------------------------------
+void TasEditorWindow::retranslateMenuBar(void)
+{
+	// Partial PHASE-2 menu retranslation.
+	//
+	// Full retranslate would require storing the original English source
+	// string in QAction::data() at buildMenuBar() construction time, then
+	// calling setText( tr(source) ) here. That is a 68-site change in
+	// buildMenuBar() and is deferred to a follow-up commit; the menu bar
+	// will keep its initial-locale text on language switch (acceptable for
+	// PHASE-2 per the plan).
+	//
+	// The recent project menu IS rebuilt so the file paths get re-tr()'d.
+	if (recentProjectMenu)
+	{
+		buildRecentProjectMenu();
+	}
+	(void)0;
+}
+//----------------------------------------------------------------------------
+void TasEditorWindow::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		setWindowTitle( tr("TAS Editor") );
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------
 int TasEditorWindow::requestWindowClose(void)
@@ -982,8 +1058,10 @@ void TasEditorWindow::buildPianoRollDisplay(void)
 	pianoRoll        = new QPianoRoll(this);
 	pianoRollVBar    = new PianoRollScrollBar( this );
 	pianoRollHBar    = new QScrollBar( Qt::Horizontal, this );
-	upperMarkerLabel = new QPushButton( tr("Marker 0") );
-	lowerMarkerLabel = new QPushButton( tr("Marker 0") );
+	upperMarkerLabel = new QPushButton( this );
+	upperMarkerLabel->setText( tr("Marker 0") );
+	lowerMarkerLabel = new QPushButton( this );
+	lowerMarkerLabel->setText( tr("Marker 0") );
 	upperMarkerNote  = new UpperMarkerNoteEdit();
 	lowerMarkerNote  = new LowerMarkerNoteEdit();
 
@@ -1084,9 +1162,12 @@ void TasEditorWindow::buildSideControlPanel(void)
 
 	ctlPanelMainVbox = new QVBoxLayout();
 
-	playbackGBox  = new QGroupBox( tr("Playback") );
-	recorderGBox  = new QGroupBox( tr("Recorder") );
-	splicerGBox   = new QGroupBox( tr("Splicer") );
+	playbackGBox  = new QGroupBox( this );
+	playbackGBox->setTitle( tr("Playback") );
+	recorderGBox  = new QGroupBox( this );
+	recorderGBox->setTitle( tr("Recorder") );
+	splicerGBox   = new QGroupBox( this );
+	splicerGBox->setTitle( tr("Splicer") );
 	//luaGBox       = new QGroupBox( tr("Lua") );
 	//historyGBox   = new QGroupBox( tr("History") );
 	bbFrame       = new QFrame();
@@ -1108,21 +1189,34 @@ void TasEditorWindow::buildSideControlPanel(void)
 	progBar = new QProgressBar();
 	progBar->setRange( 0, 1 );
 
-	followCursorCbox = new QCheckBox( tr("Follow Cursor") );
-	   turboSeekCbox = new QCheckBox( tr("Turbo Seek") );
-	 autoRestoreCbox = new QCheckBox( tr("Auto-Restore Last Position") );
+	followCursorCbox = new QCheckBox( this );
+	followCursorCbox->setText( tr("Follow Cursor") );
+	   turboSeekCbox = new QCheckBox( this );
+	   turboSeekCbox->setText( tr("Turbo Seek") );
+	 autoRestoreCbox = new QCheckBox( this );
+	 autoRestoreCbox->setText( tr("Auto-Restore Last Position") );
 
-	recRecordingCbox   = new QCheckBox( tr("Recording") );
-	recSuperImposeCbox = new QCheckBox( tr("Superimpose") );
-	recUsePatternCbox  = new QCheckBox( tr("Use Pattern") );
-	recAllBtn          = new QRadioButton( tr("All") );
-	rec1PBtn           = new QRadioButton( tr("1P") );
-	rec2PBtn           = new QRadioButton( tr("2P") );
-	rec3PBtn           = new QRadioButton( tr("3P") );
-	rec4PBtn           = new QRadioButton( tr("4P") );
+	recRecordingCbox   = new QCheckBox( this );
+	recRecordingCbox->setText( tr("Recording") );
+	recSuperImposeCbox = new QCheckBox( this );
+	recSuperImposeCbox->setText( tr("Superimpose") );
+	recUsePatternCbox  = new QCheckBox( this );
+	recUsePatternCbox->setText( tr("Use Pattern") );
+	recAllBtn          = new QRadioButton( this );
+	recAllBtn->setText( tr("All") );
+	rec1PBtn           = new QRadioButton( this );
+	rec1PBtn->setText( tr("1P") );
+	rec2PBtn           = new QRadioButton( this );
+	rec2PBtn->setText( tr("2P") );
+	rec3PBtn           = new QRadioButton( this );
+	rec3PBtn->setText( tr("3P") );
+	rec4PBtn           = new QRadioButton( this );
+	rec4PBtn->setText( tr("4P") );
 
-	selectionLbl = new QLabel( tr("Empty") );
-	clipboardLbl = new QLabel( tr("Empty") );
+	selectionLbl = new QLabel( this );
+	selectionLbl->setText( tr("Empty") );
+	clipboardLbl = new QLabel( this );
+	clipboardLbl->setText( tr("Empty") );
 
 	//runLuaBtn   = new QPushButton( tr("Run Function") );
 	//autoLuaCBox = new QCheckBox( tr("Auto Function") );
@@ -1142,8 +1236,10 @@ void TasEditorWindow::buildSideControlPanel(void)
 
 	prevMkrBtn = new QPushButton();
 	nextMkrBtn = new QPushButton();
-	similarBtn = new QPushButton( tr("Similar") );
-	moreBtn    = new QPushButton( tr("More") );
+	similarBtn = new QPushButton( this );
+	similarBtn->setText( tr("Similar") );
+	moreBtn    = new QPushButton( this );
+	moreBtn->setText( tr("More") );
 
 	prevMkrBtn->setIcon( style()->standardIcon( QStyle::SP_MediaSkipBackward ) );
 	nextMkrBtn->setIcon( style()->standardIcon( QStyle::SP_MediaSkipForward  ) );
@@ -1179,8 +1275,12 @@ void TasEditorWindow::buildSideControlPanel(void)
 	recorderGBox->setLayout( grid );
 
 	grid = new QGridLayout();
-	grid->addWidget( new QLabel( tr("Selection:") ), 0, 0, 1, 1 );
-	grid->addWidget( new QLabel( tr("Clipboard:") ), 1, 0, 1, 1 );
+	QLabel *selectionHdrLbl = new QLabel( this );
+	selectionHdrLbl->setText( tr("Selection:") );
+	QLabel *clipboardHdrLbl = new QLabel( this );
+	clipboardHdrLbl->setText( tr("Clipboard:") );
+	grid->addWidget( selectionHdrLbl, 0, 0, 1, 1 );
+	grid->addWidget( clipboardHdrLbl, 1, 0, 1, 1 );
 	grid->addWidget( selectionLbl, 0, 1, 1, 3 );
 	grid->addWidget( clipboardLbl, 1, 1, 1, 3 );
 	splicerGBox->setLayout( grid );
@@ -1207,9 +1307,12 @@ void TasEditorWindow::buildSideControlPanel(void)
 	scrollArea2->setWidget( &branches );
 
 	bkmkBrnchStack = new QTabWidget();
-	bkmkBrnchStack->addTab( scrollArea1, tr("Bookmarks") );
-	bkmkBrnchStack->addTab( scrollArea2, tr("Branches")  );
-	bkmkBrnchStack->addTab( histTree   , tr("History")   );
+	bkmkBrnchStack->addTab( scrollArea1, QString() );
+	bkmkBrnchStack->setTabText( 0, tr("Bookmarks") );
+	bkmkBrnchStack->addTab( scrollArea2, QString() );
+	bkmkBrnchStack->setTabText( 1, tr("Branches")  );
+	bkmkBrnchStack->addTab( histTree   , QString() );
+	bkmkBrnchStack->setTabText( 2, tr("History")   );
 
 	taseditorConfig.displayBranchesTree = 0;
 
@@ -5219,6 +5322,11 @@ void QPianoRoll::wheelEvent(QWheelEvent *event)
 void QPianoRoll::keyPressEvent(QKeyEvent *event)
 {
 	//printf("Key Press: 0x%x \n", event->key() );
+	// PHASE-2 §2.3: Forward to base class first so base handlers (e.g. focus
+	// traversal, shortcut activation) can act on the event before we consume
+	// it for the custom piano-roll binding pipeline.
+	QWidget::keyPressEvent(event);
+
 	pushKeyEvent( event, 1 );
 
 	event->accept();
@@ -6952,6 +7060,25 @@ bookmarkPreviewPopup::bookmarkPreviewPopup( int index, QWidget *parent )
 
 }
 //----------------------------------------------------------------------------
+void bookmarkPreviewPopup::retranslateUi(void)
+{
+	if (descLbl)
+	{
+		int frame = bookmarks->bookmarksArray[imageIndex].snapshot.keyFrame;
+		int markerID = markersManager->getMarkerAboveFrame(bookmarks->bookmarksArray[imageIndex].snapshot.markers, frame);
+		descLbl->setText( tr(markersManager->getNoteCopy(bookmarks->bookmarksArray[imageIndex].snapshot.markers, markerID).c_str()) );
+	}
+}
+//----------------------------------------------------------------------------
+void bookmarkPreviewPopup::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
+}
+//----------------------------------------------------------------------------
 bookmarkPreviewPopup::~bookmarkPreviewPopup( void )
 {
 	timer->stop();
@@ -7118,7 +7245,6 @@ TasFindNoteWindow::TasFindNoteWindow( QWidget *parent )
 	QSettings  settings;
 	QVBoxLayout *mainLayout, *vbox;
 	QHBoxLayout *hbox, *hbox1;
-	QGroupBox   *gbox;
 
 	setWindowTitle( tr("Find Note") );
 
@@ -7130,21 +7256,27 @@ TasFindNoteWindow::TasFindNoteWindow( QWidget *parent )
 	setLayout( mainLayout );
 
 	searchPattern = new QLineEdit();
-	matchCase     = new QCheckBox( tr("Match Case") );
-	up            = new QRadioButton( tr("Up") );
-	down          = new QRadioButton( tr("Down") );
-	nextBtn       = new QPushButton( tr("Next") );
-	closeBtn      = new QPushButton( tr("Close") );
-	gbox          = new QGroupBox( tr("Direction") );
+	matchCase     = new QCheckBox( this );
+	matchCase->setText( tr("Match Case") );
+	up            = new QRadioButton( this );
+	up->setText( tr("Up") );
+	down          = new QRadioButton( this );
+	down->setText( tr("Down") );
+	nextBtn       = new QPushButton( this );
+	nextBtn->setText( tr("Next") );
+	closeBtn      = new QPushButton( this );
+	closeBtn->setText( tr("Close") );
+	dirGbox       = new QGroupBox( this );
+	dirGbox->setTitle( tr("Direction") );
 
 	mainLayout->addWidget( searchPattern );
 	mainLayout->addLayout( hbox1 );
 
 	hbox1->addWidget( matchCase );
-	hbox1->addWidget( gbox );
+	hbox1->addWidget( dirGbox );
 	hbox1->addLayout( vbox );
 
-	gbox->setLayout( hbox );
+	dirGbox->setLayout( hbox );
 
 	hbox->addWidget( up );
 	hbox->addWidget( down );
@@ -7174,6 +7306,27 @@ TasFindNoteWindow::TasFindNoteWindow( QWidget *parent )
 
 	// Restore Window Geometry
 	restoreGeometry(settings.value("tasEditorFindDialog/geometry").toByteArray());
+}
+//----------------------------------------------------------------------------
+void TasFindNoteWindow::retranslateUi(void)
+{
+	setWindowTitle( tr("Find Note") );
+	if (matchCase) matchCase->setText( tr("Match Case") );
+	if (up       ) up->setText( tr("Up") );
+	if (down     ) down->setText( tr("Down") );
+	if (nextBtn  ) nextBtn->setText( tr("Next") );
+	if (closeBtn ) closeBtn->setText( tr("Close") );
+	if (dirGbox  ) dirGbox->setTitle( tr("Direction") );
+}
+//----------------------------------------------------------------------------
+void TasFindNoteWindow::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		setWindowTitle( tr("Find Note") );
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------
 TasFindNoteWindow::~TasFindNoteWindow(void)

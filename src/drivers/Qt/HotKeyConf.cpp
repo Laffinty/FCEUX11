@@ -48,7 +48,7 @@ HotKeyConfDialog_t::HotKeyConfDialog_t(QWidget *parent)
 	std::string prefix = "SDL.Hotkeys.";
 	const char *hkName, *hkKeySeq, *hkTitle, *hkGroup;
 
-	setWindowTitle("Hotkey Configuration");
+	setWindowTitle(tr("Hotkey Configuration"));
 
 	resize(512, 512);
 
@@ -113,6 +113,20 @@ void HotKeyConfDialog_t::closeEvent(QCloseEvent *event)
 	done(0);
 	deleteLater();
 	event->accept();
+}
+//----------------------------------------------------------------------------
+void HotKeyConfDialog_t::retranslateUi(void)
+{
+	setWindowTitle(tr("Hotkey Configuration"));
+}
+//----------------------------------------------------------------------------
+void HotKeyConfDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------
 void HotKeyConfDialog_t::closeWindow(void)
@@ -249,6 +263,9 @@ void HotKeyConfDialog_t::resetDefaultsCB(void)
 //----------------------------------------------------------------------------
 void HotKeyConfDialog_t::keyPressEvent(QKeyEvent *event)
 {
+	// Forward to base class to allow IME composition events to be handled
+	QDialog::keyPressEvent(event);
+
 	//printf("Hotkey Window Key Press: 0x%x \n", event->key() );
 	event->accept();
 }
@@ -318,7 +335,7 @@ HotKeyConfSetDialog_t::HotKeyConfSetDialog_t( int discardNum, HotKeyConfTreeItem
 	item = itemIn;
 	discardCount = discardNum;
 
-	setWindowTitle("Set Hot Key");
+	setWindowTitle(tr("Set Hot Key"));
 
 	mainLayout = new QVBoxLayout();
 	hbox       = new QHBoxLayout();
@@ -359,6 +376,20 @@ void HotKeyConfSetDialog_t::closeEvent(QCloseEvent *event)
 	event->accept();
 }
 //----------------------------------------------------------------------------
+void HotKeyConfSetDialog_t::retranslateUi(void)
+{
+	setWindowTitle(tr("Set Hot Key"));
+}
+//----------------------------------------------------------------------------
+void HotKeyConfSetDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
+}
+//----------------------------------------------------------------------------
 void HotKeyConfSetDialog_t::closeWindow(void)
 {
 	//printf("Close Window\n");
@@ -368,6 +399,9 @@ void HotKeyConfSetDialog_t::closeWindow(void)
 //----------------------------------------------------------------------------
 void HotKeyConfSetDialog_t::keyPressEvent(QKeyEvent *event)
 {
+	// Forward to base class to allow IME composition events to be handled
+	QDialog::keyPressEvent(event);
+
 	//printf("Hotkey Window Key Press: 0x%x \n", event->key() );
 	if ( discardCount == 0 )
 	{

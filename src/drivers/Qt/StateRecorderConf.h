@@ -30,8 +30,11 @@ public:
 	StateRecorderDialog_t(QWidget *parent = 0);
 	~StateRecorderDialog_t(void);
 
+	void retranslateUi(void);
+
 protected:
 	void closeEvent(QCloseEvent *event);
+	void changeEvent(QEvent *event) override;
 
 	QSpinBox     *snapMinutes;
 	QSpinBox     *snapSeconds;
@@ -56,6 +59,28 @@ protected:
 	QPushButton  *startStopButton;
 	QProgressBar *bufUsage;
 	QTimer       *updateTimer;
+
+	QLabel       *historyMinutesLbl;
+	QLabel       *frameRangeLbl;
+	QLabel       *timeMinutesLbl;
+	QLabel       *timeSecondsLbl;
+	QLabel       *pauseDurationLbl;
+	QLabel       *numSnapsHeaderLbl;
+	QLabel       *snapSizeHeaderLbl;
+	QLabel       *totalSizeHeaderLbl;
+	QLabel       *stateHeaderLbl;
+	QLabel       *bufSizeHeaderLbl;
+	QLabel       *snapshotSaveTimeLbl;
+	QLabel       *stateRecorderTitleLbl;
+	QGroupBox    *retainHistoryFrame;
+	QGroupBox    *compressionFrame;
+	QGroupBox    *snapshotTimingFrame;
+	QGroupBox    *pauseOnLoadFrame;
+	QGroupBox    *durationFrame;
+	QGroupBox    *memUsageFrame;
+	QGroupBox    *cpuUsageFrame;
+	QGroupBox    *recorderStatusFrame;
+	QGroupBox    *bufferUseFrame;
 
 	double       saveTimeMs;
 	bool         snapUseTime;

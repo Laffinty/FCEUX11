@@ -120,7 +120,7 @@ GameGenieDialog_t::GameGenieDialog_t(QWidget *parent)
     charWidth = fm.width(QLatin1Char('2'));
 #endif
 
-	setWindowTitle("Game Genie Encoder/Decoder Tool");
+	setWindowTitle(tr("Game Genie Encoder/Decoder Tool"));
 
 	mainLayout = new QVBoxLayout();
 	vbox  = new QVBoxLayout();
@@ -248,6 +248,21 @@ void GameGenieDialog_t::closeEvent(QCloseEvent *event)
 	done(0);
 	deleteLater();
 	event->accept();
+}
+//----------------------------------------------------------------------------
+void GameGenieDialog_t::retranslateUi(void)
+{
+	setWindowTitle(tr("Game Genie Encoder/Decoder Tool"));
+	if (addCheatBtn) addCheatBtn->setText(tr("Add Cheat"));
+}
+//----------------------------------------------------------------------------
+void GameGenieDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------
 void GameGenieDialog_t::closeWindow(void)

@@ -115,8 +115,11 @@ public:
 
 	void enterButtonLoop(void);
 
+	void retranslateUi(void);
+
 protected:
 	void closeEvent(QCloseEvent *event) override;
+	void changeEvent(QEvent *event) override;
 	void keyPressEvent(QKeyEvent *event) override;
 	void keyReleaseEvent(QKeyEvent *event) override;
 
@@ -142,8 +145,11 @@ public:
 
 	void updateBindingList(void);
 
+	void retranslateUi(void);
+
 protected:
 	void closeEvent(QCloseEvent *event);
+	void changeEvent(QEvent *event) override;
 
 	QMenuBar *buildMenuBar(void);
 

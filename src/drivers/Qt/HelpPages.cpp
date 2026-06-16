@@ -250,7 +250,7 @@ HelpDialog::HelpDialog( const char *helpFileName, QWidget *parent)
 	fileMenu = menuBar->addMenu(tr("&File"));
 
 	// File -> Close
-	act = new QAction(tr("&Close"), this);
+	closeAction = act = new QAction(tr("&Close"), this);
 	act->setShortcut(QKeySequence::Close);
 	act->setStatusTip(tr("Close Window"));
 	connect(act, SIGNAL(triggered()), this, SLOT(closeWindow(void)) );
@@ -333,6 +333,39 @@ void HelpDialog::closeEvent(QCloseEvent *event)
 	done(0);
 	deleteLater();
 	event->accept();
+}
+//-----------------------------------------------------------------------------------------------
+void HelpDialog::retranslateUi(void)
+{
+	if (backButton)
+	{
+		backButton->setText(tr("&Backward"));
+		backButton->setToolTip(tr("Navigate Backward"));
+	}
+	if (forwardButton)
+	{
+		forwardButton->setText(tr("&Forward"));
+		forwardButton->setToolTip(tr("Navigate Forward"));
+	}
+	if (closeAction)
+	{
+		closeAction->setText(tr("&Close"));
+		closeAction->setStatusTip(tr("Close Window"));
+	}
+	if (tabWgt)
+	{
+		tabWgt->setTabText(0, tr("Contents"));
+		tabWgt->setTabText(1, tr("Index"));
+	}
+}
+//-----------------------------------------------------------------------------------------------
+void HelpDialog::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //-----------------------------------------------------------------------------------------------
 void HelpDialog::closeWindow(void)

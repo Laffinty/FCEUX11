@@ -49,7 +49,7 @@ StateRecorderDialog_t::StateRecorderDialog_t(QWidget *parent)
 	QSettings settings;
 	int opt;
 
-	setWindowTitle("State Recorder Config");
+	setWindowTitle(tr("State Recorder Config"));
 
 	mainLayout = new QVBoxLayout();
 	      grid = new QGridLayout();
@@ -354,6 +354,27 @@ void StateRecorderDialog_t::closeEvent(QCloseEvent *event)
 		deleteLater();
 		event->accept();
 	}
+}
+//----------------------------------------------------------------------------
+void StateRecorderDialog_t::retranslateUi(void)
+{
+	setWindowTitle(tr("State Recorder Config"));
+	if (recorderEnable) recorderEnable->setText(tr("Auto Start Recorder at ROM Load"));
+	if (snapFrameSelBtn) snapFrameSelBtn->setText(tr("By Frames"));
+	if (snapTimeSelBtn) snapTimeSelBtn->setText(tr("By Time"));
+	if (snapFramesGroup) snapFramesGroup->setTitle(tr("Frames Between Snapshots:"));
+	if (snapTimeGroup) snapTimeGroup->setTitle(tr("Time Between Snapshots:"));
+	if (closeButton) closeButton->setText(tr("Close"));
+	if (applyButton) applyButton->setText(tr("Apply"));
+}
+//----------------------------------------------------------------------------
+void StateRecorderDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------
 void StateRecorderDialog_t::closeWindow(void)

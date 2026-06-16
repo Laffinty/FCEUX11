@@ -92,7 +92,7 @@ RamWatchDialog_t::RamWatchDialog_t(QWidget *parent)
     fontCharWidth = 2 * fm.width(QLatin1Char('2'));
 #endif
 
-	setWindowTitle("RAM Watch");
+	setWindowTitle(tr("RAM Watch"));
 
 	resize( 512, 512 );
 
@@ -249,9 +249,10 @@ RamWatchDialog_t::RamWatchDialog_t(QWidget *parent)
 
 	vbox1 = new QVBoxLayout();
 	vbox  = new QVBoxLayout();
-	frame = new QGroupBox( tr("Watches") );
-	vbox1->addWidget( frame );
-	frame->setLayout( vbox  );
+	watchesFrame = new QGroupBox(this);
+	watchesFrame->setTitle( tr("Watches") );
+	vbox1->addWidget( watchesFrame );
+	watchesFrame->setLayout( vbox  );
 
 	up_btn = new QPushButton( tr("Up") );
 	vbox->addWidget( up_btn );
@@ -342,6 +343,29 @@ void RamWatchDialog_t::closeWindow(void)
 	settings.setValue("ramWatch/geometry", saveGeometry());
 	done(0);
 	deleteLater();
+}
+//----------------------------------------------------------------------------
+void RamWatchDialog_t::retranslateUi(void)
+{
+	if (watchesFrame) watchesFrame->setTitle(tr("Watches"));
+	if (up_btn)   up_btn->setText(tr("Up"));
+	if (down_btn) down_btn->setText(tr("Down"));
+	if (edit_btn) edit_btn->setText(tr("Edit"));
+	if (del_btn)  del_btn->setText(tr("Remove"));
+	if (new_btn)  new_btn->setText(tr("New"));
+	if (dup_btn)  dup_btn->setText(tr("Duplicate"));
+	if (sep_btn)  sep_btn->setText(tr("Separator"));
+	if (cht_btn)  cht_btn->setText(tr("Add Cheat"));
+}
+//----------------------------------------------------------------------------
+void RamWatchDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		setWindowTitle(tr("RAM Watch"));
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------
 void RamWatchDialog_t::periodicUpdate(void)

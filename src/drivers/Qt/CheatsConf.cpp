@@ -95,7 +95,7 @@ GuiCheatsDialog_t::GuiCheatsDialog_t(QWidget *parent)
 	fontCharWidth = 2 * fm.width(QLatin1Char('2'));
 #endif
 
-	setWindowTitle("Cheat Search");
+	setWindowTitle(tr("Cheat Search"));
 
 	pauseWhileActive = false;
 	wasPausedByCheats = false;
@@ -500,6 +500,40 @@ void GuiCheatsDialog_t::closeEvent(QCloseEvent *event)
 	done(0);
 	deleteLater();
 	event->accept();
+}
+//----------------------------------------------------------------------------
+void GuiCheatsDialog_t::retranslateUi(void)
+{
+	setWindowTitle(tr("Cheat Search"));
+	if (actCheatFrame) actCheatFrame->setTitle(tr("Active Cheats"));
+	if (cheatSearchFrame) cheatSearchFrame->setTitle(tr("Cheat Search"));
+	if (cheatResultFrame) cheatResultFrame->setTitle(tr("Search Results"));
+	if (addCheatBtn) addCheatBtn->setText(tr("Add Cheat"));
+	if (delCheatBtn) delCheatBtn->setText(tr("Delete"));
+	if (modCheatBtn) modCheatBtn->setText(tr("Update"));
+	if (importCheatFileBtn) importCheatFileBtn->setText(tr("Import"));
+	if (exportCheatFileBtn) exportCheatFileBtn->setText(tr("Export"));
+	if (srchResetBtn) srchResetBtn->setText(tr("Reset"));
+	if (knownValBtn) knownValBtn->setText(tr("Known Value"));
+	if (eqValBtn) eqValBtn->setText(tr("Equal"));
+	if (neValBtn) neValBtn->setText(tr("Not Equal"));
+	if (grValBtn) grValBtn->setText(tr("Greater Than"));
+	if (ltValBtn) ltValBtn->setText(tr("Less Than"));
+	if (useNeVal) useNeVal->setText(tr("Not Equal Search"));
+	if (useGrVal) useGrVal->setText(tr("Greater Than Search"));
+	if (useLtVal) useLtVal->setText(tr("Less Than Search"));
+	if (enaCheats) enaCheats->setText(tr("Enable Cheats"));
+	if (autoSave) autoSave->setText(tr("Auto Load/Save Cheats"));
+	if (pauseBox) pauseBox->setText(tr("Pause While Active"));
+}
+//----------------------------------------------------------------------------
+void GuiCheatsDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------
 void GuiCheatsDialog_t::closeWindow(void)

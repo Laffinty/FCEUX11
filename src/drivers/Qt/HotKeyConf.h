@@ -43,8 +43,10 @@ public:
 	HotKeyConfSetDialog_t( int discardNum, HotKeyConfTreeItem_t *itemIn = 0, QWidget *parent = 0);
 	~HotKeyConfSetDialog_t(void);
 
+	void retranslateUi(void);
 protected:
 	void closeEvent(QCloseEvent *event);
+	void changeEvent(QEvent *event) override;
 	void keyPressEvent(QKeyEvent *event);
 	void keyReleaseEvent(QKeyEvent *event);
 	void assignHotkey(QKeyEvent *event);
@@ -94,8 +96,10 @@ public:
 	HotKeyConfDialog_t(QWidget *parent = 0);
 	~HotKeyConfDialog_t(void);
 
+	void retranslateUi(void);
 protected:
 	void closeEvent(QCloseEvent *event);
+	void changeEvent(QEvent *event) override;
 	void keyPressEvent(QKeyEvent *event);
 	void keyReleaseEvent(QKeyEvent *event);
 

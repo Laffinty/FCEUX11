@@ -593,10 +593,12 @@ if(FCEUX11_ENABLE_I18N)
     find_package(Qt6 REQUIRED COMPONENTS LinguistTools)
 
     # v0.3.15 PR-B: use Qt6 modern API (qt_add_lupdate + qt_add_lrelease).
-    # qt_add_lupdate wires `lupdate sources -> .ts` so that re-running the
-    # build automatically picks up new tr() calls. qt_add_lrelease compiles
-    # the .ts files to .qm and stashes them in QM_FILES_OUTPUT_VARIABLE.
-    qt_add_lupdate(TS_FILES ${TS_FILES})
+    # qt_add_lrelease compiles the .ts files to .qm and stashes them in
+    # QM_FILES_OUTPUT_VARIABLE. The qt_add_lupdate wiring from PR-B
+    # (which would re-scan source files for new tr() calls) was broken by
+    # Qt6LinguistTools v0.3.15's stricter SOURCE_TARGETS requirement and
+    # disabled per plan v3 §11 PHASE-1 fix; re-enable via scripts/i18n_update.ps1
+    # which calls lupdate_run.py directly. See docs/tech/i18n_Architecture_zh_CN.md.
 
     set_source_files_properties(${TS_FILES} PROPERTIES
         OUTPUT_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/i18n)

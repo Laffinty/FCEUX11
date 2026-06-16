@@ -393,8 +393,10 @@ class DebugBreakOnDialog : public QDialog
 
 		unsigned long long int getThreshold(void){ return threshold; }
 
+		void retranslateUi(void);
 	protected:
 		void closeEvent(QCloseEvent *event) override;
+		void changeEvent(QEvent *event) override;
 		void updateLabel(void);
 		void updateCurrent(void);
 
@@ -432,8 +434,10 @@ class DebuggerBreakpointEditor : public QDialog
 
 		void loadBreakpoint(void);
 
+		void retranslateUi(void);
 	protected:
 		void closeEvent(QCloseEvent *event) override;
+		void changeEvent(QEvent *event) override;
 		void checkDataValid(void);
 
 	private:
@@ -490,8 +494,11 @@ class ConsoleDebugger : public QDialog
 
 		void setCpuStatusFont( const QFont &font );
 		void setPpuStatusFont( const QFont &font );
+
+		void retranslateUi(void);
 	protected:
 		void closeEvent(QCloseEvent *event) override;
+		void changeEvent(QEvent *event) override;
 		//void keyPressEvent(QKeyEvent *event) override;
 		//void keyReleaseEvent(QKeyEvent *event) override;
 

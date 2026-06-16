@@ -28,8 +28,11 @@ public:
 	TimingConfDialog_t(QWidget *parent = 0);
 	~TimingConfDialog_t(void);
 
+	void retranslateUi(void);
+
 protected:
 	void closeEvent(QCloseEvent *event);
+	void changeEvent(QEvent *event) override;
 
 	QCheckBox *emuPrioCtlEna;
 #ifdef WIN32

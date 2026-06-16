@@ -28,6 +28,8 @@ public:
 	GuiCheatsDialog_t(QWidget *parent = 0);
 	~GuiCheatsDialog_t(void);
 
+	void retranslateUi(void);
+
 	int addSearchResult(uint32_t a, uint8_t last, uint8_t current);
 
 	int activeCheatListCB(const char *name, uint32 a, uint8 v, int c, int s, int type, void *data);
@@ -36,6 +38,7 @@ public:
 
 protected:
 	void closeEvent(QCloseEvent *event);
+	void changeEvent(QEvent *event) override;
 
 	QGroupBox *actCheatFrame;
 	QGroupBox *cheatSearchFrame;

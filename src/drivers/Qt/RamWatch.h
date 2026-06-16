@@ -205,8 +205,11 @@ class RamWatchDialog_t : public QDialog
 		RamWatchDialog_t(QWidget *parent = 0);
 		~RamWatchDialog_t(void);
 
+		void retranslateUi(void);
+
 	protected:
 		void closeEvent(QCloseEvent *event);
+		void changeEvent(QEvent *event) override;
 		void loadWatchFile (const char *filename, int append = 0);
 		void saveWatchFile (const char *filename, int append = 0);
 
@@ -221,6 +224,7 @@ class RamWatchDialog_t : public QDialog
 		QPushButton *sep_btn;
 		QPushButton *cht_btn;
 		QTimer      *updateTimer;
+		QGroupBox   *watchesFrame;
 
 		std::string  saveFileName;
 

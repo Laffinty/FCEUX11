@@ -71,7 +71,7 @@ PaletteEditorDialog_t::PaletteEditorDialog_t(QWidget *parent)
 	QAction *act;
 	int useNativeMenuBar;
 
-	setWindowTitle("Palette Editor");
+	setWindowTitle( tr("Palette Editor") );
 	//resize( 512, 512 );
 
 	menuBar = new QMenuBar(this);
@@ -204,6 +204,21 @@ void PaletteEditorDialog_t::closeEvent(QCloseEvent *event)
 	done(0);
 	deleteLater();
 	event->accept();
+}
+//----------------------------------------------------------------------------
+void PaletteEditorDialog_t::retranslateUi(void)
+{
+	setWindowTitle( tr("Palette Editor") );
+	// QAction labels are auto-translated by Qt on LanguageChange events.
+}
+//----------------------------------------------------------------------------
+void PaletteEditorDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------
 void PaletteEditorDialog_t::closeWindow(void)

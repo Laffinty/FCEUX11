@@ -91,7 +91,6 @@ AviRiffViewerDialog::AviRiffViewerDialog(QWidget *parent)
 	QMenuBar    *menuBar;
 	QVBoxLayout *mainLayout;
 	QHBoxLayout *hbox;
-	QPushButton *closeButton;
 	QTreeWidgetItem *item;
 
 	avi = NULL;
@@ -100,7 +99,7 @@ AviRiffViewerDialog::AviRiffViewerDialog(QWidget *parent)
 	progressDialog = NULL;
 	memset( strhType, 0, sizeof(strhType) );
 
-	setWindowTitle("AVI RIFF Viewer");
+	setWindowTitle( tr("AVI RIFF Viewer") );
 
 	resize(512, 512);
 
@@ -136,7 +135,8 @@ AviRiffViewerDialog::AviRiffViewerDialog(QWidget *parent)
 
 	mainLayout->addWidget(tabs);
 
-	closeButton = new QPushButton( tr("Close") );
+	closeButton = new QPushButton( this );
+	closeButton->setText( tr("Close") );
 	closeButton->setIcon(style()->standardIcon(QStyle::SP_DialogCloseButton));
 	connect(closeButton, SIGNAL(clicked(void)), this, SLOT(closeWindow(void)));
 
@@ -145,6 +145,40 @@ AviRiffViewerDialog::AviRiffViewerDialog(QWidget *parent)
 	hbox->addWidget( closeButton, 1 );
 	mainLayout->addLayout( hbox );
 
+}
+//----------------------------------------------------------------------------
+void AviRiffViewerDialog::retranslateUi(void)
+{
+	setWindowTitle( tr("AVI RIFF Viewer") );
+
+	if (tabs)
+	{
+		tabs->setTabText( 0, tr("RIFF TREE") );
+	}
+	if (riffTree)
+	{
+		QTreeWidgetItem *hdr = riffTree->headerItem();
+		if (hdr)
+		{
+			hdr->setText( 0, tr("Block") );
+			hdr->setText( 1, tr("FCC") );
+			hdr->setText( 2, tr("Size") );
+			hdr->setText( 3, tr("FilePos") );
+		}
+	}
+	if (closeButton)
+	{
+		closeButton->setText( tr("Close") );
+	}
+}
+//----------------------------------------------------------------------------
+void AviRiffViewerDialog::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------
 AviRiffViewerDialog::~AviRiffViewerDialog(void)

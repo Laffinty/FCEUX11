@@ -108,6 +108,20 @@ if(FCEUX11_BUILD_TESTS)
     add_test(NAME enum_class_bitflags_test
              COMMAND fceux11_enum_class_bitflags_test)
 
+    # v0.3.15 PHASE-2: i18n regression test (coverage + simp/trad + widget
+    # retranslateUi/changeEvent/keyPress static-analysis gate). Standalone
+    # executable — does not link fceux11_drivers_qt (which would pull in
+    # the full Qt application and require a display server / OpenGL ctx
+    # to construct). The test reads .ts files and source files only.
+    add_executable(fceux11_i18n_regression_test
+        i18n_regression_test.cpp
+    )
+    target_include_directories(fceux11_i18n_regression_test PRIVATE
+        ${CMAKE_SOURCE_DIR})
+    add_test(NAME i18n_regression_test
+             COMMAND fceux11_i18n_regression_test
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
     # -------------------------------------------------------------------------
     # v0.3.6.5 / v0.3.14 — Windows test runtime PATH injection
     # MSVC ASan-instrumented binaries dynamically import

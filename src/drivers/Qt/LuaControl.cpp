@@ -229,6 +229,23 @@ void LuaControlDialog_t::closeEvent(QCloseEvent *event)
 	event->accept();
 }
 //----------------------------------------------------
+void LuaControlDialog_t::retranslateUi(void)
+{
+	setWindowTitle(tr("Lua Script Control"));
+	if (browseButton) browseButton->setText(tr("Browse"));
+	if (startButton) startButton->setText(tr("Start"));
+	if (stopButton) stopButton->setText(tr("Stop"));
+}
+//----------------------------------------------------
+void LuaControlDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
+}
+//----------------------------------------------------
 void LuaControlDialog_t::closeWindow(void)
 {
 	//printf("Lua Control Close Window\n");

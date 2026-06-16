@@ -25,8 +25,11 @@ public:
 	PaletteConfDialog_t(QWidget *parent = 0);
 	~PaletteConfDialog_t(void);
 
+	void retranslateUi(void);
+
 protected:
 	void closeEvent(QCloseEvent *event);
+	void changeEvent(QEvent *event) override;
 
 	QLineEdit *custom_palette_path;
 	QCheckBox *useCustom;
@@ -51,6 +54,7 @@ protected:
 	QGroupBox *contrastFrame;
 	QGroupBox *brightnessFrame;
 	QTimer    *updateTimer;
+	QPushButton *closeButton;
 
 private:
 public slots:

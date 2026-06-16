@@ -48,11 +48,10 @@ MovieOptionsDialog_t::MovieOptionsDialog_t(QWidget *parent)
 	QHBoxLayout *mainLayout;
 	QHBoxLayout *hbox;
 	QVBoxLayout *vbox1, *vbox2;
-	QPushButton *closeButton;
 	std::vector <std::string> aviDriverList;
 	int aviDriver=0;
 
-	setWindowTitle("Movie Options");
+	setWindowTitle(tr("Movie Options"));
 
 	mainLayout = new QHBoxLayout();
 	vbox1      = new QVBoxLayout();
@@ -60,20 +59,33 @@ MovieOptionsDialog_t::MovieOptionsDialog_t(QWidget *parent)
 
 	mainLayout->addLayout(vbox1);
 
-	readOnlyReplay = new QCheckBox(tr("Always Suggest Read-Only Replay"));
-	pauseAfterPlay = new QCheckBox(tr("Pause After Playback"));
-	closeAfterPlay = new QCheckBox(tr("Close After Playback"));
-	bindSaveStates = new QCheckBox(tr("Bind Save-States to Movies"));
-	dpySubTitles = new QCheckBox(tr("Display Movie Subtitles"));
-	putSubTitlesAvi = new QCheckBox(tr("Put Movie Subtitles in AVI"));
-	autoBackUp = new QCheckBox(tr("Automatically Backup Movies"));
-	loadFullStates = new QCheckBox(tr("Load Full Save-State Movies:"));
-	aviEnableHUD = new QCheckBox(tr("AVI Enable HUD Recording"));
-	aviEnableMsg = new QCheckBox(tr("AVI Enable Msg Recording"));
-	aviEnableAudio = new QCheckBox(tr("AVI Enable Audio Recording"));
+	readOnlyReplay = new QCheckBox(this);
+	readOnlyReplay->setText(tr("Always Suggest Read-Only Replay"));
+	pauseAfterPlay = new QCheckBox(this);
+	pauseAfterPlay->setText(tr("Pause After Playback"));
+	closeAfterPlay = new QCheckBox(this);
+	closeAfterPlay->setText(tr("Close After Playback"));
+	bindSaveStates = new QCheckBox(this);
+	bindSaveStates->setText(tr("Bind Save-States to Movies"));
+	dpySubTitles = new QCheckBox(this);
+	dpySubTitles->setText(tr("Display Movie Subtitles"));
+	putSubTitlesAvi = new QCheckBox(this);
+	putSubTitlesAvi->setText(tr("Put Movie Subtitles in AVI"));
+	autoBackUp = new QCheckBox(this);
+	autoBackUp->setText(tr("Automatically Backup Movies"));
+	loadFullStates = new QCheckBox(this);
+	loadFullStates->setText(tr("Load Full Save-State Movies:"));
+	aviEnableHUD = new QCheckBox(this);
+	aviEnableHUD->setText(tr("AVI Enable HUD Recording"));
+	aviEnableMsg = new QCheckBox(this);
+	aviEnableMsg->setText(tr("AVI Enable Msg Recording"));
+	aviEnableAudio = new QCheckBox(this);
+	aviEnableAudio->setText(tr("AVI Enable Audio Recording"));
 
-	lbl = new QLabel(tr("Loading states in record mode will not immediately truncate movie, next frame input will. (VBA-rr and SNES9x style)"));
-	lbl->setWordWrap(true);
+	infoLabel = new QLabel(this);
+	infoLabel->setText(tr("Loading states in record mode will not immediately truncate movie, next frame input will. (VBA-rr and SNES9x style)"));
+	infoLabel->setWordWrap(true);
+	lbl = infoLabel;
 
 	vbox1->addWidget(readOnlyReplay);
 	vbox1->addWidget(pauseAfterPlay);
@@ -100,7 +112,8 @@ MovieOptionsDialog_t::MovieOptionsDialog_t(QWidget *parent)
 	aviEnableMsg->setChecked(!fceu11::AviDisableMovieMessages());
 	aviEnableAudio->setChecked(aviGetAudioEnable());
 
-	closeButton = new QPushButton( tr("Close") );
+	closeButton = new QPushButton(this);
+	closeButton->setText(tr("Close"));
 	closeButton->setIcon(style()->standardIcon(QStyle::SP_DialogCloseButton));
 	connect(closeButton, SIGNAL(clicked(void)), this, SLOT(closeWindow(void)));
 
@@ -111,13 +124,17 @@ MovieOptionsDialog_t::MovieOptionsDialog_t(QWidget *parent)
 
 	FCEUD_AviGetDriverList( aviDriverList );
 
-	gbox = new QGroupBox( tr("AVI Recording Options") );
+	aviGroupBox = new QGroupBox(this);
+	aviGroupBox->setTitle(tr("AVI Recording Options"));
+	gbox = aviGroupBox;
 	gbox->setLayout(vbox2);
 	mainLayout->addWidget(gbox);
 	hbox = new QHBoxLayout();
 	aviBackend = new QComboBox();
 	aviPageStack = new QStackedWidget();
-	lbl = new QLabel(tr("AVI Backend Driver:"));
+	aviDriverLabel = new QLabel(this);
+	aviDriverLabel->setText(tr("AVI Backend Driver:"));
+	lbl = aviDriverLabel;
 	hbox->addWidget( lbl );
 	hbox->addWidget( aviBackend );
 	vbox2->addLayout( hbox );
@@ -181,6 +198,36 @@ void MovieOptionsDialog_t::closeEvent(QCloseEvent *event)
 	done(0);
 	deleteLater();
 	event->accept();
+}
+//----------------------------------------------------------------------------
+void MovieOptionsDialog_t::retranslateUi(void)
+{
+	setWindowTitle(tr("Movie Options"));
+
+	if (readOnlyReplay) readOnlyReplay->setText(tr("Always Suggest Read-Only Replay"));
+	if (pauseAfterPlay) pauseAfterPlay->setText(tr("Pause After Playback"));
+	if (closeAfterPlay) closeAfterPlay->setText(tr("Close After Playback"));
+	if (bindSaveStates) bindSaveStates->setText(tr("Bind Save-States to Movies"));
+	if (dpySubTitles) dpySubTitles->setText(tr("Display Movie Subtitles"));
+	if (putSubTitlesAvi) putSubTitlesAvi->setText(tr("Put Movie Subtitles in AVI"));
+	if (autoBackUp) autoBackUp->setText(tr("Automatically Backup Movies"));
+	if (loadFullStates) loadFullStates->setText(tr("Load Full Save-State Movies:"));
+	if (aviEnableHUD) aviEnableHUD->setText(tr("AVI Enable HUD Recording"));
+	if (aviEnableMsg) aviEnableMsg->setText(tr("AVI Enable Msg Recording"));
+	if (aviEnableAudio) aviEnableAudio->setText(tr("AVI Enable Audio Recording"));
+	if (infoLabel) infoLabel->setText(tr("Loading states in record mode will not immediately truncate movie, next frame input will. (VBA-rr and SNES9x style)"));
+	if (aviGroupBox) aviGroupBox->setTitle(tr("AVI Recording Options"));
+	if (aviDriverLabel) aviDriverLabel->setText(tr("AVI Backend Driver:"));
+	if (closeButton) closeButton->setText(tr("Close"));
+}
+//----------------------------------------------------------------------------
+void MovieOptionsDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------
 void MovieOptionsDialog_t::closeWindow(void)

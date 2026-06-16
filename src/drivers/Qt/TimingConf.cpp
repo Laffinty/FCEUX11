@@ -56,14 +56,17 @@ TimingConfDialog_t::TimingConfDialog_t(QWidget *parent)
 	QPushButton *closeButton;
 	QGroupBox *emuPrioBox, *guiPrioBox;
 
-	setWindowTitle("Timing Configuration");
+	setWindowTitle(tr("Timing Configuration"));
 
 	mainLayout = new QVBoxLayout();
 
-	emuPrioCtlEna = new QCheckBox(tr("Set Scheduling Parameters at Startup"));
+	emuPrioCtlEna = new QCheckBox(this);
+	emuPrioCtlEna->setText(tr("Set Scheduling Parameters at Startup"));
 
-	emuPrioBox = new QGroupBox(tr("EMU Thread Scheduling Parameters"));
-	guiPrioBox = new QGroupBox(tr("GUI Thread Scheduling Parameters"));
+	emuPrioBox = new QGroupBox(this);
+	emuPrioBox->setTitle(tr("EMU Thread Scheduling Parameters"));
+	guiPrioBox = new QGroupBox(this);
+	guiPrioBox->setTitle(tr("GUI Thread Scheduling Parameters"));
 	grid = new QGridLayout();
 	emuPrioBox->setLayout(grid);
 
@@ -109,7 +112,8 @@ TimingConfDialog_t::TimingConfDialog_t(QWidget *parent)
 
 	vbox = new QVBoxLayout();
 	grid = new QGridLayout();
-	ppuOverClockBox = new QGroupBox( tr("Overclocking (Old PPU Only)") );
+	ppuOverClockBox = new QGroupBox(this);
+	ppuOverClockBox->setTitle( tr("Overclocking (Old PPU Only)") );
 	ppuOverClockBox->setCheckable(true);
 	ppuOverClockBox->setChecked(overclock_enabled);
 	ppuOverClockBox->setEnabled(!newppu);
@@ -118,7 +122,8 @@ TimingConfDialog_t::TimingConfDialog_t(QWidget *parent)
 
 	postRenderBox      = new QSpinBox();
 	vblankScanlinesBox = new QSpinBox();
-	no7bitSamples      = new QCheckBox( tr("Don't Overclock 7-bit Samples") );
+	no7bitSamples      = new QCheckBox(this);
+	no7bitSamples->setText( tr("Don't Overclock 7-bit Samples") );
 
 	postRenderBox->setRange(0, 999);
 	vblankScanlinesBox->setRange(0, 999);
@@ -128,13 +133,18 @@ TimingConfDialog_t::TimingConfDialog_t(QWidget *parent)
 	no7bitSamples->setChecked( skip_7bit_overclocking );
 
 	vbox->addLayout( grid );
-	grid->addWidget( new QLabel( tr("Post-render") ), 0, 0 );
-	grid->addWidget( new QLabel( tr("Vblank Scanlines") ), 1, 0 );
+	QLabel *postRenderLabel = new QLabel(this);
+	postRenderLabel->setText( tr("Post-render") );
+	QLabel *vblankScanlinesLabel = new QLabel(this);
+	vblankScanlinesLabel->setText( tr("Vblank Scanlines") );
+	grid->addWidget( postRenderLabel, 0, 0 );
+	grid->addWidget( vblankScanlinesLabel, 1, 0 );
 	grid->addWidget( postRenderBox, 0, 1 );
 	grid->addWidget( vblankScanlinesBox, 1, 1 );
 	vbox->addWidget( no7bitSamples );
 
-	closeButton = new QPushButton( tr("Close") );
+	closeButton = new QPushButton(this);
+	closeButton->setText( tr("Close") );
 	closeButton->setIcon(style()->standardIcon(QStyle::SP_DialogCloseButton));
 	connect(closeButton, SIGNAL(clicked(void)), this, SLOT(closeWindow(void)));
 
@@ -376,5 +386,22 @@ void TimingConfDialog_t::updateOverclocking(void)
 {
 	ppuOverClockBox->setEnabled( !newppu );
 	ppuOverClockBox->setChecked( overclock_enabled );
+}
+//----------------------------------------------------------------------------
+void TimingConfDialog_t::retranslateUi(void)
+{
+	if (emuPrioCtlEna) emuPrioCtlEna->setText(tr("Set Scheduling Parameters at Startup"));
+	if (ppuOverClockBox) ppuOverClockBox->setTitle(tr("Overclocking (Old PPU Only)"));
+	if (no7bitSamples) no7bitSamples->setText(tr("Don't Overclock 7-bit Samples"));
+}
+//----------------------------------------------------------------------------
+void TimingConfDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		setWindowTitle(tr("Timing Configuration"));
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------

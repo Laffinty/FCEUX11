@@ -235,14 +235,20 @@ ppuViewerDialog_t::ppuViewerDialog_t(QWidget *parent)
 	grid              = new QGridLayout;
 	patternVbox[0]    = new QVBoxLayout();
 	patternVbox[1]    = new QVBoxLayout();
-	patternFrame[0]   = new QGroupBox( tr("Pattern Table 0") );
-	patternFrame[1]   = new QGroupBox( tr("Pattern Table 1") );
+	patternFrame[0]   = new QGroupBox( this );
+	patternFrame[0]->setTitle( tr("Pattern Table 0") );
+	patternFrame[1]   = new QGroupBox( this );
+	patternFrame[1]->setTitle( tr("Pattern Table 1") );
 	patternView[0]    = new ppuPatternView_t( 0, this);
 	patternView[1]    = new ppuPatternView_t( 1, this);
-	sprite8x16Cbox[0] = new QCheckBox( tr("Sprites 8x16 Mode") );
-	sprite8x16Cbox[1] = new QCheckBox( tr("Sprites 8x16 Mode") );
-	tileLabel[0]      = new QLabel( tr("Tile:") );
-	tileLabel[1]      = new QLabel( tr("Tile:") );
+	sprite8x16Cbox[0] = new QCheckBox( this );
+	sprite8x16Cbox[0]->setText( tr("Sprites 8x16 Mode") );
+	sprite8x16Cbox[1] = new QCheckBox( this );
+	sprite8x16Cbox[1]->setText( tr("Sprites 8x16 Mode") );
+	tileLabel[0]      = new QLabel( this );
+	tileLabel[0]->setText( tr("Tile:") );
+	tileLabel[1]      = new QLabel( this );
+	tileLabel[1]->setText( tr("Tile:") );
 
 	g_config->getOption("SDL.PPU_View1_8x16", &PPUView_sprite16Mode[0]);
 	g_config->getOption("SDL.PPU_View2_8x16", &PPUView_sprite16Mode[1]);
@@ -266,8 +272,10 @@ ppuViewerDialog_t::ppuViewerDialog_t(QWidget *parent)
 	mainLayout->addLayout( hbox, 10 );
 	mainLayout->addLayout( grid,  1 );
 
-	maskUnusedCbox = new QCheckBox( tr("Mask unused Graphics (Code/Data Logger)") );
-	invertMaskCbox = new QCheckBox( tr("Invert the Mask (Code/Data Logger)") );
+	maskUnusedCbox = new QCheckBox( this );
+	maskUnusedCbox->setText( tr("Mask unused Graphics (Code/Data Logger)") );
+	invertMaskCbox = new QCheckBox( this );
+	invertMaskCbox->setText( tr("Invert the Mask (Code/Data Logger)") );
 
 	g_config->getOption("SDL.PPU_MaskUnused", &PPUView_maskUnusedGraphics);
 	g_config->getOption("SDL.PPU_InvertMask", &PPUView_invertTheMask);
@@ -282,9 +290,13 @@ ppuViewerDialog_t::ppuViewerDialog_t(QWidget *parent)
 
 	hbox           = new QHBoxLayout();
 	refreshSlider  = new QSlider( Qt::Horizontal );
-	hbox->addWidget( new QLabel( tr("Refresh: More") ) );
+	refreshMoreLbl = new QLabel( this );
+	refreshMoreLbl->setText( tr("Refresh: More") );
+	refreshLessLbl = new QLabel( this );
+	refreshLessLbl->setText( tr("Less") );
+	hbox->addWidget( refreshMoreLbl );
 	hbox->addWidget( refreshSlider );
-	hbox->addWidget( new QLabel( tr("Less") ) );
+	hbox->addWidget( refreshLessLbl );
 
 	grid->addWidget( maskUnusedCbox, 0, 0, Qt::AlignLeft );
 	grid->addWidget( invertMaskCbox, 1, 0, Qt::AlignLeft );
@@ -292,13 +304,16 @@ ppuViewerDialog_t::ppuViewerDialog_t(QWidget *parent)
 
 	hbox         = new QHBoxLayout();
 	scanLineEdit = new QSpinBox();
-	hbox->addWidget( new QLabel( tr("Display on Scanline:") ) );
+	scanLineLbl  = new QLabel( this );
+	scanLineLbl->setText( tr("Display on Scanline:") );
+	hbox->addWidget( scanLineLbl );
 	hbox->addWidget( scanLineEdit );
 	grid->addLayout( hbox, 1, 1, Qt::AlignRight );
 
 	vbox         = new QVBoxLayout();
 	//paletteFrame = new QGroupBox( tr("Palettes: ---- Top Row: Background ---- Bottom Row: Sprites") );
-	paletteFrame = new QGroupBox( tr("Palettes:") );
+	paletteFrame = new QGroupBox( this );
+	paletteFrame->setTitle( tr("Palettes:") );
 	//paletteView  = new ppuPalatteView_t(this);
 
 	hbox1        = new QHBoxLayout();
@@ -477,6 +492,33 @@ void ppuViewerDialog_t::closeEvent(QCloseEvent *event)
 	done(0);
 	deleteLater();
 	event->accept();
+}
+//----------------------------------------------------
+void ppuViewerDialog_t::retranslateUi(void)
+{
+	setWindowTitle( tr("PPU Viewer") );
+
+	if (patternFrame[0])   patternFrame[0]->setTitle( tr("Pattern Table 0") );
+	if (patternFrame[1])   patternFrame[1]->setTitle( tr("Pattern Table 1") );
+	if (sprite8x16Cbox[0]) sprite8x16Cbox[0]->setText( tr("Sprites 8x16 Mode") );
+	if (sprite8x16Cbox[1]) sprite8x16Cbox[1]->setText( tr("Sprites 8x16 Mode") );
+	if (tileLabel[0])      tileLabel[0]->setText( tr("Tile:") );
+	if (tileLabel[1])      tileLabel[1]->setText( tr("Tile:") );
+	if (maskUnusedCbox)    maskUnusedCbox->setText( tr("Mask unused Graphics (Code/Data Logger)") );
+	if (invertMaskCbox)    invertMaskCbox->setText( tr("Invert the Mask (Code/Data Logger)") );
+	if (refreshMoreLbl)    refreshMoreLbl->setText( tr("Refresh: More") );
+	if (refreshLessLbl)    refreshLessLbl->setText( tr("Less") );
+	if (scanLineLbl)       scanLineLbl->setText( tr("Display on Scanline:") );
+	if (paletteFrame)      paletteFrame->setTitle( tr("Palettes:") );
+}
+//----------------------------------------------------
+void ppuViewerDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------
 void ppuViewerDialog_t::closeWindow(void)

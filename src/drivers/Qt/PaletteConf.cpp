@@ -57,7 +57,6 @@ PaletteConfDialog_t::PaletteConfDialog_t(QWidget *parent)
 	QHBoxLayout *hbox1, *hbox2, *hbox;
 	QGridLayout *grid;
 	QGroupBox *frame;
-	QPushButton *closeButton;
 	QPushButton *button;
 	QTextEdit *comments;
 	QStyle *style;
@@ -305,7 +304,8 @@ PaletteConfDialog_t::PaletteConfDialog_t(QWidget *parent)
 
 	mainLayout->addWidget(comments);
 
-	closeButton = new QPushButton( tr("Close") );
+	closeButton = new QPushButton(this);
+	closeButton->setText( tr("Close") );
 	closeButton->setIcon(style->standardIcon(QStyle::SP_DialogCloseButton));
 	connect(closeButton, SIGNAL(clicked(void)), this, SLOT(closeWindow(void)));
 
@@ -343,6 +343,28 @@ void PaletteConfDialog_t::closeWindow(void)
 	//printf("Close Window\n");
 	done(0);
 	deleteLater();
+}
+//----------------------------------------------------
+void PaletteConfDialog_t::retranslateUi(void)
+{
+	if (useCustom) useCustom->setText(tr("Use Custom Palette"));
+	if (GrayScale) GrayScale->setText(tr("Force Grayscale"));
+	if (deemphSwap) deemphSwap->setText(tr("De-emphasis Bit Swap"));
+	if (ntscFrame) ntscFrame->setTitle(tr("NTSC Palette Control:"));
+	if (palFrame) palFrame->setTitle(tr("PAL Emulation:"));
+	if (ntscReset) ntscReset->setText(tr("Reset"));
+	if (palReset) palReset->setText(tr("Reset"));
+	if (closeButton) closeButton->setText(tr("Close"));
+}
+//----------------------------------------------------
+void PaletteConfDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		setWindowTitle(tr("Palette Config"));
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------
 void PaletteConfDialog_t::updatePeriodic(void)

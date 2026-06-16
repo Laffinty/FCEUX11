@@ -26,8 +26,11 @@ public:
 	MoviePlayDialog_t(QWidget *parent = 0);
 	~MoviePlayDialog_t(void);
 
+	void retranslateUi(void);
+
 protected:
 	void closeEvent(QCloseEvent *event);
+	void changeEvent(QEvent *event) override;
 
 	QComboBox *movSelBox;
 	QPushButton *movBrowseBtn;
@@ -45,6 +48,31 @@ protected:
 	QLabel *emuUsedLbl;
 	QLabel *palUsedLbl;
 	QLabel *newppuUsedLbl;
+
+	QLabel *fileLabel;
+	QLabel *lengthLabel;
+	QLabel *framesLabel;
+	QLabel *recordCountLabel;
+	QLabel *recordedFromLabel;
+	QLabel *romUsedLabel;
+	QLabel *romChecksumLabel;
+	QLabel *currentRomSumLabel;
+	QLabel *emulatorUsedLabel;
+	QLabel *palLabel;
+	QLabel *newPpuLabel;
+	QLabel *movLenHeaderLbl;
+	QLabel *movFramesHeaderLbl;
+	QLabel *recCountHeaderLbl;
+	QLabel *recFromHeaderLbl;
+	QLabel *romUsedHeaderLbl;
+	QLabel *romCsumHeaderLbl;
+	QLabel *curCsumHeaderLbl;
+	QLabel *emuUsedHeaderLbl;
+	QLabel *palUsedHeaderLbl;
+	QLabel *newppuUsedHeaderLbl;
+	QGroupBox *paramFrame;
+	QPushButton *okButton;
+	QPushButton *cancelButton;
 
 	fceuDecIntValidtor *validator;
 

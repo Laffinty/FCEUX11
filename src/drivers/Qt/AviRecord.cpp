@@ -2963,6 +2963,21 @@ LibavOptionsPage::~LibavOptionsPage(void)
 {
 	updateTimer->stop();
 }
+//----------------------------------------------------------------------------
+void LibavOptionsPage::retranslateUi(void)
+{
+	if (videoGbox) videoGbox->setTitle(tr("Video"));
+	if (audioGbox) audioGbox->setTitle(tr("Audio"));
+}
+//----------------------------------------------------------------------------
+void LibavOptionsPage::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QWidget::changeEvent(event);
+}
 //-----------------------------------------------------
 void LibavOptionsPage::periodicUpdate(void)
 {
@@ -3677,6 +3692,20 @@ void LibavEncOptWin::closeEvent(QCloseEvent *event)
 	event->accept();
 }
 //----------------------------------------------------------------------------
+void LibavEncOptWin::retranslateUi(void)
+{
+	// Libav encoder option tree has dynamic keys; left as-is.
+}
+//----------------------------------------------------------------------------
+void LibavEncOptWin::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
+}
+//----------------------------------------------------------------------------
 void LibavEncOptWin::closeWindow(void)
 {
 	//printf("Close Window\n");
@@ -4061,6 +4090,22 @@ void LibavEncOptInputWin::closeEvent(QCloseEvent *event)
 	event->accept();
 }
 //----------------------------------------------------------------------------
+void LibavEncOptInputWin::retranslateUi(void)
+{
+	if (okButton) okButton->setText(tr("OK"));
+	if (cancelButton) cancelButton->setText(tr("Cancel"));
+	if (resetDefaults) resetDefaults->setText(tr("Reset Defaults"));
+}
+//----------------------------------------------------------------------------
+void LibavEncOptInputWin::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
+}
+//----------------------------------------------------------------------------
 void LibavEncOptInputWin::closeWindow(void)
 {
 	//printf("Close Window\n");
@@ -4341,6 +4386,21 @@ LibgwaviOptionsPage::LibgwaviOptionsPage(QWidget *parent)
 LibgwaviOptionsPage::~LibgwaviOptionsPage(void)
 {
 	updateTimer->stop();
+}
+//----------------------------------------------------------------------------
+void LibgwaviOptionsPage::retranslateUi(void)
+{
+	if (videoGbox) videoGbox->setTitle(tr("Video"));
+	if (audioGbox) audioGbox->setTitle(tr("Audio"));
+}
+//----------------------------------------------------------------------------
+void LibgwaviOptionsPage::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QWidget::changeEvent(event);
 }
 //-----------------------------------------------------
 void LibgwaviOptionsPage::periodicUpdate(void)

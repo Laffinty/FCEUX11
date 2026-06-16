@@ -307,6 +307,30 @@ void CodeDataLoggerDialog_t::closeEvent(QCloseEvent *event)
 	cdlWin = NULL;
 }
 //----------------------------------------------------
+void CodeDataLoggerDialog_t::retranslateUi(void)
+{
+	setWindowTitle(tr("Code Data Logger"));
+	if (prgLoggedCodeLabel) prgLoggedCodeLabel->setText(tr("PRG Logged Code:"));
+	if (prgLoggedDataLabel) prgLoggedDataLabel->setText(tr("PRG Logged Data:"));
+	if (prgUnloggedLabel) prgUnloggedLabel->setText(tr("PRG Unmapped:"));
+	if (chrLoggedCodeLabel) chrLoggedCodeLabel->setText(tr("CHR Logged Code:"));
+	if (chrLoggedDataLabel) chrLoggedDataLabel->setText(tr("CHR Logged Data:"));
+	if (chrUnloggedLabel) chrUnloggedLabel->setText(tr("CHR Unmapped:"));
+	if (cdlFileLabel) cdlFileLabel->setText(tr("CDL File:"));
+	if (autoSaveCdlCbox) autoSaveCdlCbox->setText(tr("Auto Save CDL"));
+	if (autoLoadCdlCbox) autoLoadCdlCbox->setText(tr("Auto Load CDL"));
+	if (autoResumeLogCbox) autoResumeLogCbox->setText(tr("Auto Resume Logging"));
+}
+//----------------------------------------------------
+void CodeDataLoggerDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
+}
+//----------------------------------------------------
 void CodeDataLoggerDialog_t::closeWindow(void)
 {
 	QSettings settings;

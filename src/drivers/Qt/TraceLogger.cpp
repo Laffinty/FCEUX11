@@ -425,6 +425,37 @@ void TraceLoggerDialog_t::closeEvent(QCloseEvent *event)
 	event->accept();
 }
 //----------------------------------------------------
+void TraceLoggerDialog_t::retranslateUi(void)
+{
+	setWindowTitle(tr("Trace Logger"));
+	if (logFileCbox) logFileCbox->setText(tr("Log to File"));
+	if (autoUpdateCbox) autoUpdateCbox->setText(tr("Auto Update"));
+	if (logRegCbox) logRegCbox->setText(tr("Log Registers"));
+	if (logFrameCbox) logFrameCbox->setText(tr("Log Frame Counter"));
+	if (logEmuMsgCbox) logEmuMsgCbox->setText(tr("Log Emu Messages"));
+	if (logProcStatFlagCbox) logProcStatFlagCbox->setText(tr("Log Status Flags"));
+	if (logCyclesCountCbox) logCyclesCountCbox->setText(tr("Log Cycle Count"));
+	if (logBreakpointCbox) logBreakpointCbox->setText(tr("Log Breakpoint Hits"));
+	if (useStackPointerCbox) useStackPointerCbox->setText(tr("Use Stack Pointer"));
+	if (toLeftDisassemblyCbox) toLeftDisassemblyCbox->setText(tr("Disasm Left"));
+	if (logInstrCountCbox) logInstrCountCbox->setText(tr("Log Instruction Count"));
+	if (logBankNumCbox) logBankNumCbox->setText(tr("Log Bank Number"));
+	if (symTraceEnaCbox) symTraceEnaCbox->setText(tr("Symbolic Trace"));
+	if (logNewMapCodeCbox) logNewMapCodeCbox->setText(tr("Log New Mapped Code"));
+	if (logNewMapDataCbox) logNewMapDataCbox->setText(tr("Log New Mapped Data"));
+	if (selLogFileButton) selLogFileButton->setText(tr("Select Log File"));
+	if (clearButton) clearButton->setText(tr("Clear"));
+}
+//----------------------------------------------------
+void TraceLoggerDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
+}
+//----------------------------------------------------
 void TraceLoggerDialog_t::closeWindow(void)
 {
 	QSettings settings;

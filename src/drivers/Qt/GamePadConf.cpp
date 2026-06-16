@@ -141,28 +141,35 @@ GamePadConfDialog_t::GamePadConfDialog_t(QWidget *parent)
 	QHBoxLayout *hbox, *hbox1, *hbox2;
 	QVBoxLayout *vbox, *vbox1, *vbox2;
 	QGridLayout *grid, *grid1;
-	QCheckBox *udlr_chkbox;
 	QGroupBox *frame1, *frame2;
 	QLabel *label;
-	QPushButton *newProfileButton;
-	QPushButton *saveProfileButton;
-	QPushButton *applyProfileButton;
-	QPushButton *removeProfileButton;
-	QPushButton *clearAllButton;
-	QPushButton *closebutton;
-	QPushButton *changeSeqButton = nullptr;
-	QPushButton *clearButton[GAMEPAD_NUM_BUTTONS];
 	QScrollArea *scroll = NULL;
 	QStyle *style;
 	std::string prefix;
 	char stmp[256];
 	bool useScroll = false;
 	int useNativeMenuBar;
-	QMenuBar *menuBar;
-	QMenu *fileMenu, *extMenu;
-	QAction *act;
 	QTreeWidgetItem *item;
 	const char *guid;
+
+	// Initialize member pointers
+	for (int i = 0; i < GAMEPAD_NUM_BUTTONS; i++)
+	{
+		clearButtonArr[i] = nullptr;
+	}
+	newProfileButton   = nullptr;
+	saveProfileButton  = nullptr;
+	applyProfileButton = nullptr;
+	removeProfileButton = nullptr;
+	clearAllButton     = nullptr;
+	closeButton        = nullptr;
+	changeSeqButton    = nullptr;
+	udlr_chkbox        = nullptr;
+	profileFrame       = nullptr;
+	mappingsFrame      = nullptr;
+	portLabel          = nullptr;
+	devLabel           = nullptr;
+	guidLabel          = nullptr;
 
 	style = this->style();
 
@@ -201,24 +208,24 @@ GamePadConfDialog_t::GamePadConfDialog_t(QWidget *parent)
 	fileMenu = menuBar->addMenu(tr("&File"));
 
 	// File -> Close
-	act = new QAction(tr("&Close"), this);
-	act->setShortcut(QKeySequence::Close);
-	act->setStatusTip(tr("Close Window"));
-	connect(act, SIGNAL(triggered()), this, SLOT(closeWindow(void)) );
-	
-	fileMenu->addAction(act);
+	closeAct = new QAction(tr("&Close"), this);
+	closeAct->setShortcut(QKeySequence::Close);
+	closeAct->setStatusTip(tr("Close Window"));
+	connect(closeAct, SIGNAL(triggered()), this, SLOT(closeWindow(void)) );
+
+	fileMenu->addAction(closeAct);
 
 	// Extensions
 	extMenu = menuBar->addMenu(tr("&Extensions"));
 
 	// Extensions -> Show Adv Bindings
-	act = new QAction(tr("&Show Adv Bindings"), this);
-	//act->setShortcut(QKeySequence::Close);
-	act->setStatusTip(tr("Show Adv Bindings"));
-	act->setCheckable(true);
-	connect(act, SIGNAL(triggered(bool)), this, SLOT(advBindingViewChanged(bool)) );
-	
-	extMenu->addAction(act);
+	showAdvBindAct = new QAction(tr("&Show Adv Bindings"), this);
+	//showAdvBindAct->setShortcut(QKeySequence::Close);
+	showAdvBindAct->setStatusTip(tr("Show Adv Bindings"));
+	showAdvBindAct->setCheckable(true);
+	connect(showAdvBindAct, SIGNAL(triggered(bool)), this, SLOT(advBindingViewChanged(bool)) );
+
+	extMenu->addAction(showAdvBindAct);
 
 	//-----------------------------------------------------------------------
 	// Menu End
@@ -232,6 +239,7 @@ GamePadConfDialog_t::GamePadConfDialog_t(QWidget *parent)
 	hbox2 = new QHBoxLayout();
 
 	label = new QLabel(tr("Console Port:"));
+	portLabel = label;
 	portSel = new QComboBox();
 	grid1->addWidget(label, 0, 0);
 	grid1->addWidget(portSel, 0, 1);
@@ -242,6 +250,7 @@ GamePadConfDialog_t::GamePadConfDialog_t(QWidget *parent)
 	portSel->addItem(tr("4"), 3);
 
 	label = new QLabel(tr("Device:"));
+	devLabel = label;
 	devSel = new QComboBox();
 	grid1->addWidget(label, 1, 0);
 	grid1->addWidget(devSel, 1, 1);
@@ -291,6 +300,7 @@ GamePadConfDialog_t::GamePadConfDialog_t(QWidget *parent)
 	}
 
 	label = new QLabel(tr("GUID:"));
+	guidLabel = label;
 	guidLbl = new QLabel();
 
 	grid1->addWidget(label, 2, 0);
@@ -303,6 +313,7 @@ GamePadConfDialog_t::GamePadConfDialog_t(QWidget *parent)
 	}
 
 	frame1 = new QGroupBox(tr("Mapping Profile:"));
+	profileFrame = frame1;
 	//grid   = new QGridLayout();
 	vbox = new QVBoxLayout();
 
@@ -365,6 +376,7 @@ GamePadConfDialog_t::GamePadConfDialog_t(QWidget *parent)
 
 	confTabBar = new QTabBar();
 	frame2 = new QGroupBox(tr("Current Active Button Mappings:"));
+	mappingsFrame = frame2;
 	grid = new QGridLayout();
 
 	confTabBar->addTab( tr("Pri") );
@@ -401,28 +413,28 @@ GamePadConfDialog_t::GamePadConfDialog_t(QWidget *parent)
 		//keyState[i]    = new QLabel( tr("F") );
 		//label          = new QLabel( tr("State:") );
 		button[i] = new GamePadConfigButton_t(i);
-		clearButton[i] = new QPushButton(tr("Clear"));
+		clearButtonArr[i] = new QPushButton(tr("Clear"));
 
 		grid->addWidget(buttonName, i, 0, Qt::AlignCenter);
 		grid->addWidget(keyName[i], i, 1, Qt::AlignCenter);
 		//grid->addWidget( label         , i, 2, Qt::AlignCenter );
 		//grid->addWidget( keyState[i]   , i, 3, Qt::AlignCenter );
 		grid->addWidget(button[i], i, 2, Qt::AlignCenter);
-		grid->addWidget(clearButton[i], i, 3, Qt::AlignCenter);
+		grid->addWidget(clearButtonArr[i], i, 3, Qt::AlignCenter);
 	}
 	updateCntrlrDpy();
 
 	clearAllButton = new QPushButton(tr("Clear All"));
-	closebutton = new QPushButton(tr("Close"));
+	closeButton = new QPushButton(tr("Close"));
 	changeSeqButton = new QPushButton(tr("Change Sequentially"));
 
 	clearAllButton->setIcon(style->standardIcon(QStyle::SP_LineEditClearButton));
-	closebutton->setIcon(style->standardIcon(QStyle::SP_DialogCloseButton));
+	closeButton->setIcon(style->standardIcon(QStyle::SP_DialogCloseButton));
 	changeSeqButton->setIcon(style->standardIcon(QStyle::QStyle::SP_ArrowDown));
 
 	hbox1->addWidget(clearAllButton);
 	hbox1->addWidget(changeSeqButton);
-	hbox1->addWidget(closebutton);
+	hbox1->addWidget(closeButton);
 
 	connect(button[0], SIGNAL(clicked()), this, SLOT(changeButton0(void)));
 	connect(button[1], SIGNAL(clicked()), this, SLOT(changeButton1(void)));
@@ -435,16 +447,16 @@ GamePadConfDialog_t::GamePadConfDialog_t(QWidget *parent)
 	connect(button[8], SIGNAL(clicked()), this, SLOT(changeButton8(void)));
 	connect(button[9], SIGNAL(clicked()), this, SLOT(changeButton9(void)));
 
-	connect(clearButton[0], SIGNAL(clicked()), this, SLOT(clearButton0(void)));
-	connect(clearButton[1], SIGNAL(clicked()), this, SLOT(clearButton1(void)));
-	connect(clearButton[2], SIGNAL(clicked()), this, SLOT(clearButton2(void)));
-	connect(clearButton[3], SIGNAL(clicked()), this, SLOT(clearButton3(void)));
-	connect(clearButton[4], SIGNAL(clicked()), this, SLOT(clearButton4(void)));
-	connect(clearButton[5], SIGNAL(clicked()), this, SLOT(clearButton5(void)));
-	connect(clearButton[6], SIGNAL(clicked()), this, SLOT(clearButton6(void)));
-	connect(clearButton[7], SIGNAL(clicked()), this, SLOT(clearButton7(void)));
-	connect(clearButton[8], SIGNAL(clicked()), this, SLOT(clearButton8(void)));
-	connect(clearButton[9], SIGNAL(clicked()), this, SLOT(clearButton9(void)));
+	connect(clearButtonArr[0], SIGNAL(clicked()), this, SLOT(clearButton0(void)));
+	connect(clearButtonArr[1], SIGNAL(clicked()), this, SLOT(clearButton1(void)));
+	connect(clearButtonArr[2], SIGNAL(clicked()), this, SLOT(clearButton2(void)));
+	connect(clearButtonArr[3], SIGNAL(clicked()), this, SLOT(clearButton3(void)));
+	connect(clearButtonArr[4], SIGNAL(clicked()), this, SLOT(clearButton4(void)));
+	connect(clearButtonArr[5], SIGNAL(clicked()), this, SLOT(clearButton5(void)));
+	connect(clearButtonArr[6], SIGNAL(clicked()), this, SLOT(clearButton6(void)));
+	connect(clearButtonArr[7], SIGNAL(clicked()), this, SLOT(clearButton7(void)));
+	connect(clearButtonArr[8], SIGNAL(clicked()), this, SLOT(clearButton8(void)));
+	connect(clearButtonArr[9], SIGNAL(clicked()), this, SLOT(clearButton9(void)));
 
 	connect(newProfileButton, SIGNAL(clicked()), this, SLOT(newProfileCallback(void)));
 	connect(applyProfileButton, SIGNAL(clicked()), this, SLOT(loadProfileCallback(void)));
@@ -452,7 +464,7 @@ GamePadConfDialog_t::GamePadConfDialog_t(QWidget *parent)
 	connect(removeProfileButton, SIGNAL(clicked()), this, SLOT(deleteProfileCallback(void)));
 
 	connect(clearAllButton, SIGNAL(clicked()), this, SLOT(clearAllCallback(void)));
-	connect(closebutton, SIGNAL(clicked()), this, SLOT(closeWindow(void)));
+	connect(closeButton, SIGNAL(clicked()), this, SLOT(closeWindow(void)));
 	connect(changeSeqButton, SIGNAL(clicked()), this, SLOT(changeSequentallyCallback(void)));
 
 	connect(portSel, SIGNAL(activated(int)), this, SLOT(portSelect(int)));
@@ -597,6 +609,101 @@ GamePadConfDialog_t::~GamePadConfDialog_t(void)
 	gamePadConfWin = NULL;
 
 	printf("GamePad Window Deleted\n");
+}
+
+//----------------------------------------------------
+void GamePadConfDialog_t::retranslateUi(void)
+{
+	if (portLabel)    portLabel->setText(tr("Console Port:"));
+	if (devLabel)     devLabel->setText(tr("Device:"));
+	if (guidLabel)    guidLabel->setText(tr("GUID:"));
+	if (profileFrame) profileFrame->setTitle(tr("Mapping Profile:"));
+	if (mappingsFrame) mappingsFrame->setTitle(tr("Current Active Button Mappings:"));
+
+	if (efs_chkbox) efs_chkbox->setText(tr("Enable Four Score"));
+	if (udlr_chkbox) udlr_chkbox->setText(tr("Allow Up+Down/Left+Right"));
+
+	if (applyProfileButton) applyProfileButton->setText(tr("Load"));
+	if (saveProfileButton)  saveProfileButton->setText(tr("Save"));
+	if (newProfileButton)   newProfileButton->setText(tr("New"));
+	if (removeProfileButton) removeProfileButton->setText(tr("Delete"));
+
+	if (applyProfileButton)
+	{
+		applyProfileButton->setWhatsThis(tr("Sets Current Active Map to the Selected Profile"));
+		applyProfileButton->setToolTip(tr("Load selected configuration profile into current active mapping"));
+	}
+	if (saveProfileButton)
+	{
+		saveProfileButton->setWhatsThis(tr("Stores Current Active Map to the Selected Profile"));
+		saveProfileButton->setToolTip(tr("Save current active mapping to selected configuration profile"));
+	}
+	if (newProfileButton)
+	{
+		newProfileButton->setWhatsThis(tr("Create a New Map Profile"));
+		newProfileButton->setToolTip(tr("Create a new named configuration profile"));
+	}
+	if (removeProfileButton)
+	{
+		removeProfileButton->setWhatsThis(tr("Deletes the Selected Map Profile"));
+		removeProfileButton->setToolTip(tr("Delete selected configuration profile"));
+	}
+
+	if (mapSel)
+	{
+		mapSel->setToolTip(tr("Selected button mapping profile for use with Load/Save/Delete operations"));
+		mapSel->setWhatsThis(tr("Combo box for selection of a saved button mapping profile for the selected device"));
+	}
+
+	if (confTabBar)
+	{
+		confTabBar->setTabText(0, tr("Pri"));
+		confTabBar->setTabText(1, tr("Alt 1"));
+		confTabBar->setTabText(2, tr("Alt 2"));
+		confTabBar->setTabText(3, tr("Alt 3"));
+		confTabBar->setTabToolTip(0, tr("Primary Button Map"));
+		confTabBar->setTabToolTip(1, tr("Alternate Button Map #1"));
+		confTabBar->setTabToolTip(2, tr("Alternate Button Map #2"));
+		confTabBar->setTabToolTip(3, tr("Alternate Button Map #3"));
+	}
+
+	if (clearAllButton)  clearAllButton->setText(tr("Clear All"));
+	if (closeButton)     closeButton->setText(tr("Close"));
+	if (changeSeqButton) changeSeqButton->setText(tr("Change Sequentially"));
+
+	if (advOptLayout)    advOptLayout->setTitle(tr("Advanced Key Bindings"));
+
+	if (newKeyBindBtn)   newKeyBindBtn->setText(tr("New"));
+	if (editKeyBindBtn)  editKeyBindBtn->setText(tr("Edit"));
+	if (delKeyBindBtn)   delKeyBindBtn->setText(tr("Delete"));
+
+	if (fileMenu)    fileMenu->setTitle(tr("&File"));
+	if (extMenu)     extMenu->setTitle(tr("&Extensions"));
+	if (closeAct)
+	{
+		closeAct->setText(tr("&Close"));
+		closeAct->setStatusTip(tr("Close Window"));
+	}
+	if (showAdvBindAct)
+	{
+		showAdvBindAct->setText(tr("&Show Adv Bindings"));
+		showAdvBindAct->setStatusTip(tr("Show Adv Bindings"));
+	}
+
+	for (int i = 0; i < GAMEPAD_NUM_BUTTONS; i++)
+	{
+		if (clearButtonArr[i]) clearButtonArr[i]->setText(tr("Clear"));
+	}
+}
+//----------------------------------------------------
+void GamePadConfDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		setWindowTitle(tr("GamePad Config"));
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 
 void GamePadConfDialog_t::resizeEvent(QResizeEvent *event)
@@ -1609,12 +1716,14 @@ GamePadConfigButton_t::GamePadConfigButton_t(int i)
 void GamePadConfigButton_t::keyPressEvent(QKeyEvent *event)
 {
 	//printf("GamePad Button Key Press: 0x%x \n", event->key() );
+	QPushButton::keyPressEvent(event);
 	pushKeyEvent(event, 1);
 }
 
 void GamePadConfigButton_t::keyReleaseEvent(QKeyEvent *event)
 {
 	//printf("GamePad Button Key Release: 0x%x \n", event->key() );
+	QPushButton::keyReleaseEvent(event);
 	pushKeyEvent(event, 0);
 }
 //----------------------------------------------------
@@ -1946,7 +2055,6 @@ GamePadFuncConfigDialog::GamePadFuncConfigDialog( int portNumIn, gamepad_functio
 	QGridLayout *grid;
 	//QLabel *lbl;
 	QGroupBox *frame;
-	QPushButton *okButton, *cancelButton;
 	QPushButton *clearButton[4];
 	const char *keyNameStr;
 
@@ -1997,11 +2105,17 @@ GamePadFuncConfigDialog::GamePadFuncConfigDialog( int portNumIn, gamepad_functio
 	clearButton[2] = new QPushButton( tr("Clear") );
 	clearButton[3] = new QPushButton( tr("Clear") );
 
+	clearButton0Btn = clearButton[0];
+	clearButton1Btn = clearButton[1];
+	clearButton2Btn = clearButton[2];
+	clearButton3Btn = clearButton[3];
+
 	mainLayout = new QVBoxLayout();
 
 	setLayout(mainLayout);
 
 	frame = new QGroupBox( tr("Game Pad Button Sequence:") );
+	sequenceFrame = frame;
 	mainLayout->addWidget( frame );
 
 	grid = new QGridLayout();
@@ -2009,28 +2123,33 @@ GamePadFuncConfigDialog::GamePadFuncConfigDialog( int portNumIn, gamepad_functio
 
 	//grid->setColumnMinimumWidth( 1, 20 );
 
-	grid->addWidget( new QLabel( tr("Modifier Button:") ), 0, 0 );
+	modifierBtnLabel = new QLabel( tr("Modifier Button:") );
+	grid->addWidget( modifierBtnLabel, 0, 0 );
 	grid->addWidget( btnLbl[0], 0, 1 );
 	grid->addWidget( b[0], 0, 2 );
 	grid->addWidget( clearButton[0], 0, 3 );
 
-	grid->addWidget( new QLabel( tr("Primary Button:") ), 1, 0 );
+	primaryBtnLabel = new QLabel( tr("Primary Button:") );
+	grid->addWidget( primaryBtnLabel, 1, 0 );
 	grid->addWidget( btnLbl[1], 1, 1 );
 	grid->addWidget( b[1], 1, 2 );
 	grid->addWidget( clearButton[1], 1, 3 );
 
 	frame = new QGroupBox( tr("Maps to Key Sequence:") );
+	keySeqFrame = frame;
 	mainLayout->addWidget( frame );
 
 	grid = new QGridLayout();
 	frame->setLayout( grid );
 
-	grid->addWidget( new QLabel( tr("On Press:") ), 0, 0 );
+	onPressLabel = new QLabel( tr("On Press:") );
+	grid->addWidget( onPressLabel, 0, 0 );
 	grid->addWidget( keySeqLbl[0], 0, 1 );
 	grid->addWidget( hk[0], 0, 2 );
 	grid->addWidget( clearButton[2], 0, 3 );
 
-	grid->addWidget( new QLabel( tr("On Release:") ), 1, 0 );
+	onReleaseLabel = new QLabel( tr("On Release:") );
+	grid->addWidget( onReleaseLabel, 1, 0 );
 	grid->addWidget( keySeqLbl[1], 1, 1 );
 	grid->addWidget( hk[1], 1, 2 );
 	grid->addWidget( clearButton[3], 1, 3 );
@@ -2078,6 +2197,32 @@ GamePadFuncConfigDialog::GamePadFuncConfigDialog( int portNumIn, gamepad_functio
 
 	keySeqLbl[0]->setText( QString::fromStdString(k->keySeq[0].name) );
 	keySeqLbl[1]->setText( QString::fromStdString(k->keySeq[1].name) );
+}
+//----------------------------------------------------
+void GamePadFuncConfigDialog::retranslateUi(void)
+{
+	if (sequenceFrame)  sequenceFrame->setTitle(tr("Game Pad Button Sequence:"));
+	if (keySeqFrame)    keySeqFrame->setTitle(tr("Maps to Key Sequence:"));
+	if (modifierBtnLabel) modifierBtnLabel->setText(tr("Modifier Button:"));
+	if (primaryBtnLabel)  primaryBtnLabel->setText(tr("Primary Button:"));
+	if (onPressLabel)     onPressLabel->setText(tr("On Press:"));
+	if (onReleaseLabel)   onReleaseLabel->setText(tr("On Release:"));
+	if (okButton)         okButton->setText(tr("OK"));
+	if (cancelButton)     cancelButton->setText(tr("Cancel"));
+	if (clearButton0Btn)  clearButton0Btn->setText(tr("Clear"));
+	if (clearButton1Btn)  clearButton1Btn->setText(tr("Clear"));
+	if (clearButton2Btn)  clearButton2Btn->setText(tr("Clear"));
+	if (clearButton3Btn)  clearButton3Btn->setText(tr("Clear"));
+}
+//----------------------------------------------------
+void GamePadFuncConfigDialog::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		setWindowTitle(editMode ? tr("Edit Gamepad Key Mapping") : tr("Add Gamepad Key Mapping"));
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------
 GamePadFuncConfigDialog::~GamePadFuncConfigDialog(void)
@@ -2309,7 +2454,9 @@ void GamePadConfigHotKey_t::keyPressEvent(QKeyEvent *event)
 {
 	bool isModifier;
 	//printf("GamePad Hot Key Press: 0x%x  '%s'\n", event->key(), event->text().toStdString().c_str() );
-	
+
+	QPushButton::keyPressEvent(event);
+
 	isModifier = (event->key() == Qt::Key_Shift   ) ||
 	             (event->key() == Qt::Key_Control ) ||
 	             (event->key() == Qt::Key_Meta    ) ||
@@ -2337,6 +2484,7 @@ void GamePadConfigHotKey_t::keyPressEvent(QKeyEvent *event)
 void GamePadConfigHotKey_t::keyReleaseEvent(QKeyEvent *event)
 {
 	//printf("GamePad Hot Key Release: 0x%x \n", event->key() );
+	QPushButton::keyReleaseEvent(event);
 }
 //----------------------------------------------------
 // Hot Key Selection Dialog
@@ -2351,7 +2499,7 @@ HotKeySelectDialog_t::HotKeySelectDialog_t( QWidget *parent )
 
 	hotKeyIdx = -1;
 
-	setWindowTitle("Hotkey Select");
+	setWindowTitle(tr("Hotkey Select"));
 
 	resize(512, 512);
 
@@ -2416,6 +2564,22 @@ HotKeySelectDialog_t::HotKeySelectDialog_t( QWidget *parent )
 	mainLayout->addLayout( hbox );
 
 	setLayout(mainLayout);
+}
+//----------------------------------------------------
+void HotKeySelectDialog_t::retranslateUi(void)
+{
+	if (okButton)     okButton->setText(tr("Ok"));
+	if (cancelButton) cancelButton->setText(tr("Cancel"));
+}
+//----------------------------------------------------
+void HotKeySelectDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		setWindowTitle(tr("Hotkey Select"));
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------
 HotKeySelectDialog_t::~HotKeySelectDialog_t(void)

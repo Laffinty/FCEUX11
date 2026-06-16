@@ -127,8 +127,10 @@ public:
 	LibavEncOptInputWin( LibavEncOptItem *item, QWidget *parent = 0);
 	~LibavEncOptInputWin(void);
 
+	void retranslateUi(void);
 protected:
 	void closeEvent(QCloseEvent *event);
+	void changeEvent(QEvent *event) override;
 
 	LibavEncOptItem *item;
 	QComboBox       *combo;
@@ -157,8 +159,10 @@ public:
 	LibavEncOptWin(int type, QWidget *parent = 0);
 	~LibavEncOptWin(void);
 
+	void retranslateUi(void);
 protected:
 	void closeEvent(QCloseEvent *event);
+	void changeEvent(QEvent *event) override;
 	void updateItems(void);
 	void sortItems(void);
 
@@ -185,7 +189,9 @@ class  LibavOptionsPage : public QWidget
 		LibavOptionsPage(QWidget *parent = nullptr);
 		~LibavOptionsPage(void);
 
+		void retranslateUi(void);
 	protected:
+		void changeEvent(QEvent *event) override;
 		QComboBox  *videoEncSel;
 		QComboBox  *videoPixfmt;
 		QComboBox  *audioEncSel;
@@ -225,7 +231,9 @@ class  LibgwaviOptionsPage : public QWidget
 		LibgwaviOptionsPage(QWidget *parent = nullptr);
 		~LibgwaviOptionsPage(void);
 
+		void retranslateUi(void);
 	protected:
+		void changeEvent(QEvent *event) override;
 		QComboBox  *videoEncSel;
 		QComboBox  *videoPixfmt;
 		QComboBox  *audioEncSel;

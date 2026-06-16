@@ -44,20 +44,19 @@ FrameTimingDialog_t::FrameTimingDialog_t(QWidget *parent)
 {
 	QVBoxLayout *mainLayout, *vbox;
 	QHBoxLayout *hbox;
-	QTreeWidgetItem *item;
-	QPushButton *resetBtn, *closeButton;
 	struct frameTimingStat_t stats;
 	QSettings settings;
 
 	getFrameTimingStats(&stats);
 
-	setWindowTitle("Frame Timing Statistics");
+	setWindowTitle(tr("Frame Timing Statistics"));
 
 	resize(512, 512);
 
 	mainLayout = new QVBoxLayout();
 	vbox = new QVBoxLayout();
-	statFrame = new QGroupBox(tr("Timing Statistics"));
+	statFrame = new QGroupBox(this);
+	statFrame->setTitle(tr("Timing Statistics"));
 	statFrame->setLayout(vbox);
 
 	tree = new QTreeWidget();
@@ -65,19 +64,19 @@ FrameTimingDialog_t::FrameTimingDialog_t(QWidget *parent)
 
 	tree->setColumnCount(4);
 
-	item = new QTreeWidgetItem();
-	item->setText(0, tr("Parameter"));
-	item->setText(1, tr("Target"));
-	item->setText(2, tr("Current"));
-	item->setText(3, tr("Minimum"));
-	item->setText(4, tr("Maximum"));
-	item->setTextAlignment(0, Qt::AlignLeft);
-	item->setTextAlignment(1, Qt::AlignCenter);
-	item->setTextAlignment(2, Qt::AlignCenter);
-	item->setTextAlignment(3, Qt::AlignCenter);
-	item->setTextAlignment(4, Qt::AlignCenter);
+	headerItem = new QTreeWidgetItem();
+	headerItem->setText(0, tr("Parameter"));
+	headerItem->setText(1, tr("Target"));
+	headerItem->setText(2, tr("Current"));
+	headerItem->setText(3, tr("Minimum"));
+	headerItem->setText(4, tr("Maximum"));
+	headerItem->setTextAlignment(0, Qt::AlignLeft);
+	headerItem->setTextAlignment(1, Qt::AlignCenter);
+	headerItem->setTextAlignment(2, Qt::AlignCenter);
+	headerItem->setTextAlignment(3, Qt::AlignCenter);
+	headerItem->setTextAlignment(4, Qt::AlignCenter);
 
-	tree->setHeaderItem(item);
+	tree->setHeaderItem(headerItem);
 	tree->header()->setSectionResizeMode(QHeaderView::Stretch);
 	tree->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
 
@@ -133,23 +132,26 @@ FrameTimingDialog_t::FrameTimingDialog_t(QWidget *parent)
 	}
 
 	hbox = new QHBoxLayout();
-	timingEnable = new QCheckBox(tr("Enable Timing Statistics Calculations"));
-	resetBtn = new QPushButton(tr("Reset"));
-	resetBtn->setIcon(style()->standardIcon(QStyle::SP_DialogResetButton));
+	timingEnable = new QCheckBox(this);
+	timingEnable->setText(tr("Enable Timing Statistics Calculations"));
+	resetButton = new QPushButton(this);
+	resetButton->setText(tr("Reset"));
+	resetButton->setIcon(style()->standardIcon(QStyle::SP_DialogResetButton));
 
 	timingEnable->setChecked(stats.enabled);
 	statFrame->setEnabled(stats.enabled);
 
 	hbox->addWidget(timingEnable);
-	hbox->addWidget(resetBtn);
+	hbox->addWidget(resetButton);
 
 	connect(timingEnable, SIGNAL(stateChanged(int)), this, SLOT(timingEnableChanged(int)));
-	connect(resetBtn, SIGNAL(clicked(void)), this, SLOT(resetTimingClicked(void)));
+	connect(resetButton, SIGNAL(clicked(void)), this, SLOT(resetTimingClicked(void)));
 
 	mainLayout->addLayout(hbox);
 	mainLayout->addWidget(statFrame);
 
-	closeButton = new QPushButton( tr("Close") );
+	closeButton = new QPushButton(this);
+	closeButton->setText(tr("Close"));
 	closeButton->setIcon(style()->standardIcon(QStyle::SP_DialogCloseButton));
 	connect(closeButton, SIGNAL(clicked(void)), this, SLOT(closeWindow(void)));
 
@@ -187,6 +189,41 @@ void FrameTimingDialog_t::closeEvent(QCloseEvent *event)
 	done(0);
 	deleteLater();
 	event->accept();
+}
+//----------------------------------------------------------------------------
+void FrameTimingDialog_t::retranslateUi(void)
+{
+	setWindowTitle(tr("Frame Timing Statistics"));
+
+	if (statFrame) statFrame->setTitle(tr("Timing Statistics"));
+	if (headerItem)
+	{
+		headerItem->setText(0, tr("Parameter"));
+		headerItem->setText(1, tr("Target"));
+		headerItem->setText(2, tr("Current"));
+		headerItem->setText(3, tr("Minimum"));
+		headerItem->setText(4, tr("Maximum"));
+	}
+	if (frameTimeAbs) frameTimeAbs->setText(0, tr("Frame Period ms"));
+	if (frameTimeDel) frameTimeDel->setText(0, tr("Frame Delta ms"));
+	if (frameTimeWork) frameTimeWork->setText(0, tr("Frame Work ms"));
+	if (frameTimeIdle) frameTimeIdle->setText(0, tr("Frame Idle ms"));
+	if (frameTimeWorkPct) frameTimeWorkPct->setText(0, tr("Frame Work %"));
+	if (frameTimeIdlePct) frameTimeIdlePct->setText(0, tr("Frame Idle %"));
+	if (frameLateCount) frameLateCount->setText(0, tr("Frame Late Count"));
+	if (videoTimeAbs) videoTimeAbs->setText(0, tr("Video Period ms"));
+	if (timingEnable) timingEnable->setText(tr("Enable Timing Statistics Calculations"));
+	if (resetButton) resetButton->setText(tr("Reset"));
+	if (closeButton) closeButton->setText(tr("Close"));
+}
+//----------------------------------------------------------------------------
+void FrameTimingDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------
 void FrameTimingDialog_t::closeWindow(void)

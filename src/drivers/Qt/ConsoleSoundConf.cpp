@@ -38,11 +38,18 @@ ConsoleSndConfDialog_t::ConsoleSndConfDialog_t(QWidget *parent)
 	int buf;
 	QHBoxLayout *hbox, *hbox1, *hbox2;
 	QVBoxLayout *mainLayout, *vbox1, *vbox2;
-	QPushButton *closeButton;
-	QPushButton *resetCountBtn;
 	QLabel *lbl;
 	QGroupBox *frame;
 	QSlider *vslider;
+
+	// Initialize member pointers
+	closeBtn  = nullptr;
+	resetBtn  = nullptr;
+	frame1    = nullptr;
+	frame2    = nullptr;
+	frame3    = nullptr;
+	qualitySelect = nullptr;
+	rateSelect = nullptr;
 
 	sndQuality = 1;
 
@@ -262,21 +269,21 @@ ConsoleSndConfDialog_t::ConsoleSndConfDialog_t(QWidget *parent)
 
 	connect(pcmSlider, SIGNAL(valueChanged(int)), this, SLOT(pcmChanged(int)));
 
-	closeButton = new QPushButton( tr("Close") );
-	closeButton->setIcon(style()->standardIcon(QStyle::SP_DialogCloseButton));
-	connect(closeButton, SIGNAL(clicked(void)), this, SLOT(closeWindow(void)));
+	closeBtn = new QPushButton( tr("Close") );
+	closeBtn->setIcon(style()->standardIcon(QStyle::SP_DialogCloseButton));
+	connect(closeBtn, SIGNAL(clicked(void)), this, SLOT(closeWindow(void)));
 
 	starveLbl = new QLabel( tr("Sink Starve Count:") );
 	starveLbl->setToolTip( tr("Running count of the number of samples that the audio sink is starved of.") );
-	resetCountBtn = new QPushButton( tr("Reset Counter") );
-	resetCountBtn->setIcon(style()->standardIcon(QStyle::SP_DialogResetButton));
-	connect(resetCountBtn, SIGNAL(clicked(void)), this, SLOT(resetCounters(void)));
+	resetBtn = new QPushButton( tr("Reset Counter") );
+	resetBtn->setIcon(style()->standardIcon(QStyle::SP_DialogResetButton));
+	connect(resetBtn, SIGNAL(clicked(void)), this, SLOT(resetCounters(void)));
 
 	hbox = new QHBoxLayout();
-	hbox->addWidget(resetCountBtn, 1);
+	hbox->addWidget(resetBtn, 1);
 	hbox->addWidget(starveLbl,1);
 	hbox->addStretch(5);
-	hbox->addWidget( closeButton, 1 );
+	hbox->addWidget( closeBtn, 1 );
 
 	mainLayout->addLayout(hbox1);
 	mainLayout->addLayout( hbox );
@@ -295,6 +302,47 @@ ConsoleSndConfDialog_t::~ConsoleSndConfDialog_t(void)
 {
 	//printf("Destroy Sound Config Window\n");
 	updateTimer->stop();
+}
+//----------------------------------------------------------------------------
+void ConsoleSndConfDialog_t::retranslateUi(void)
+{
+	if (enaChkbox)     enaChkbox->setText(tr("Enable Sound"));
+	if (muteChkbox)    muteChkbox->setText(tr("Mute Speaker Output"));
+	if (enaLowPass)    enaLowPass->setText(tr("Enable Low Pass Filter"));
+	if (swapDutyChkbox) swapDutyChkbox->setText(tr("Swap Duty Cycles"));
+	if (useGlobalFocus) useGlobalFocus->setText(tr("Use Global Focus"));
+	if (closeBtn)      closeBtn->setText(tr("Close"));
+	if (resetBtn)      resetBtn->setText(tr("Reset Counter"));
+
+	if (qualitySelect)
+	{
+		qualitySelect->setItemText(0, tr("Low"));
+		qualitySelect->setItemText(1, tr("High"));
+		qualitySelect->setItemText(2, tr("Very High"));
+	}
+	if (rateSelect)
+	{
+		rateSelect->setItemText(0, tr("11025"));
+		rateSelect->setItemText(1, tr("22050"));
+		rateSelect->setItemText(2, tr("44100"));
+		rateSelect->setItemText(3, tr("48000"));
+		rateSelect->setItemText(4, tr("96000"));
+	}
+
+	if (starveLbl)
+	{
+		starveLbl->setToolTip(tr("Running count of the number of samples that the audio sink is starved of."));
+	}
+}
+//----------------------------------------------------------------------------
+void ConsoleSndConfDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		setWindowTitle(tr("Sound Config"));
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------
 void ConsoleSndConfDialog_t::closeEvent(QCloseEvent *event)

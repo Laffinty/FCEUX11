@@ -28,8 +28,10 @@ class HelpDialog : public QDialog
 		HelpDialog( const char *helpFileName, QWidget *parent = 0);
 		~HelpDialog(void);
 
+		void retranslateUi(void);
 	protected:
 		void closeEvent(QCloseEvent *event);
+		void changeEvent(QEvent *event) override;
 
 		QHelpEngine  *helpEngine;
 		QSplitter    *hsplitter;
@@ -37,6 +39,7 @@ class HelpDialog : public QDialog
 		HelpBrowser  *textViewer;
 		QAction      *backButton;
 		QAction      *forwardButton;
+		QAction      *closeAction;
 
 	public slots:
 		void closeWindow(void);

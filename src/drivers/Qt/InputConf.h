@@ -28,8 +28,11 @@ public:
 	InputConfDialog_t(QWidget *parent = 0);
 	~InputConfDialog_t(void);
 
+	void retranslateUi(void);
+
 protected:
 	void closeEvent(QCloseEvent *event);
+	void changeEvent(QEvent *event) override;
 
 	QTimer *inputTimer;
 	QCheckBox *fourScoreEna;
@@ -43,6 +46,7 @@ protected:
 	QComboBox *expPortComboxBox;
 	QPushButton *loadConfigButton;
 	QPushButton *saveConfigButton;
+	QPushButton *closeButton;
 
 	int curNesInput[3];
 	int usrNesInput[3];

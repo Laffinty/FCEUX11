@@ -54,7 +54,7 @@ GuiConfDialog_t::GuiConfDialog_t(QWidget *parent)
 	int hideAdvancedMenuVal;  // v0.3.15 PR-A
 	QVBoxLayout *mainLayout, *vbox1, *vbox2;
 	QHBoxLayout *hbox, *hbox1;
-	QPushButton *closeButton, *button;
+	QPushButton *button;
 	QMenuBar    *menuBar;
 	QMenu       *fileMenu, *colorMenu;
 	QAction     *act;
@@ -252,7 +252,8 @@ GuiConfDialog_t::GuiConfDialog_t(QWidget *parent)
 	vbox1->addWidget(hideAdvancedMenu, 1);  // v0.3.15 PR-A
 	vbox1->addStretch(10);
 
-	closeButton = new QPushButton( tr("Close") );
+	closeButton = new QPushButton(this);
+	closeButton->setText( tr("Close") );
 	closeButton->setIcon(style()->standardIcon(QStyle::SP_DialogCloseButton));
 	connect(closeButton, SIGNAL(clicked(void)), this, SLOT(closeWindow(void)));
 
@@ -285,6 +286,29 @@ void GuiConfDialog_t::closeWindow(void)
 	//printf("Close Window\n");
 	done(0);
 	deleteLater();
+}
+//----------------------------------------------------
+void GuiConfDialog_t::retranslateUi(void)
+{
+	if (useNativeFileDialog) useNativeFileDialog->setText(tr("Use Native OS File Dialog"));
+	if (useNativeMenuBar)    useNativeMenuBar->setText(tr("Use Native OS Menu Bar"));
+	if (pauseOnMenuAccess)   pauseOnMenuAccess->setText(tr("Pause On Main Menu Access"));
+	if (ctxMenuEnable)       ctxMenuEnable->setText(tr("Context Menu Enable"));
+	if (showSplashScreen)    showSplashScreen->setText(tr("Show Splash Screen at Startup"));
+	if (hideAdvancedMenu)    hideAdvancedMenu->setText(tr("Hide Advanced Menu"));
+	if (useCustomStyle)      useCustomStyle->setText(tr("Use Custom Stylesheet"));
+	if (useCustomPalette)    useCustomPalette->setText(tr("Use Custom QPalette"));
+	if (closeButton)         closeButton->setText(tr("Close"));
+}
+//----------------------------------------------------
+void GuiConfDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		setWindowTitle(tr("GUI Config"));
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------
 void GuiConfDialog_t::useNativeFileDialogChanged(int state)
@@ -1160,6 +1184,21 @@ void GuiPaletteEditDialog_t::closeWindow(void)
 	deleteLater();
 }
 //----------------------------------------------------
+void GuiPaletteEditDialog_t::retranslateUi(void)
+{
+	// Menu strings are picked up via tr() at construction; only window title is unique here.
+}
+//----------------------------------------------------
+void GuiPaletteEditDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		setWindowTitle(tr("GUI Color Palette Edit"));
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
+}
+//----------------------------------------------------
 void GuiPaletteEditDialog_t::paletteSaveAs(void)
 {
 	int ret, useNativeFileDialogVal; //, useCustom;
@@ -1381,14 +1420,11 @@ guiColorPickerDialog_t::guiColorPickerDialog_t( QColor *c, QWidget *parent )
 {
 	QVBoxLayout *mainLayout;
 	QHBoxLayout *hbox;
-	QPushButton *okButton;
-	QPushButton *cancelButton;
-	QPushButton *resetButton;
 	QStyle *style;
 
 	style = this->style();
 
-	setWindowTitle( "Pick Palette Color" );
+	setWindowTitle( tr("Pick Palette Color") );
 
 	colorPtr = c;
 	origColor = *c;
@@ -1405,7 +1441,7 @@ guiColorPickerDialog_t::guiColorPickerDialog_t( QColor *c, QWidget *parent )
 	colorDialog->setOption( QColorDialog::DontUseNativeDialog, true );
 	colorDialog->setOption( QColorDialog::NoButtons, true );
 	colorDialog->setCurrentColor( *c );
-	
+
 	connect( colorDialog, SIGNAL(colorSelected(const QColor &))      , this, SLOT(colorChanged( const QColor &)) );
 	connect( colorDialog, SIGNAL(currentColorChanged(const QColor &)), this, SLOT(colorChanged( const QColor &)) );
 
@@ -1415,9 +1451,12 @@ guiColorPickerDialog_t::guiColorPickerDialog_t( QColor *c, QWidget *parent )
 	hbox = new QHBoxLayout();
 	mainLayout->addLayout( hbox );
 
-	okButton     = new QPushButton( tr("OK") );
-	cancelButton = new QPushButton( tr("Cancel") );
-	resetButton  = new QPushButton( tr("Reset") );
+	okButton     = new QPushButton(this);
+	okButton->setText( tr("OK") );
+	cancelButton = new QPushButton(this);
+	cancelButton->setText( tr("Cancel") );
+	resetButton  = new QPushButton(this);
+	resetButton->setText( tr("Reset") );
 
 	okButton->setIcon( style->standardIcon( QStyle::SP_DialogApplyButton ) );
 	cancelButton->setIcon( style->standardIcon( QStyle::SP_DialogCancelButton ) );
@@ -1451,6 +1490,23 @@ void guiColorPickerDialog_t::closeWindow(void)
 	//printf("Close Window\n");
 	done(0);
 	deleteLater();
+}
+//----------------------------------------------------------------------------
+void guiColorPickerDialog_t::retranslateUi(void)
+{
+	if (okButton)     okButton->setText(tr("OK"));
+	if (cancelButton) cancelButton->setText(tr("Cancel"));
+	if (resetButton)  resetButton->setText(tr("Reset"));
+}
+//----------------------------------------------------------------------------
+void guiColorPickerDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		setWindowTitle(tr("Pick Palette Color"));
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------
 void guiColorPickerDialog_t::colorChanged( const QColor &color )

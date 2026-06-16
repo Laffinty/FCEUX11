@@ -50,38 +50,40 @@ MoviePlayDialog_t::MoviePlayDialog_t(QWidget *parent)
 {
 	QVBoxLayout *mainLayout, *vbox;
 	QHBoxLayout *hbox;
-	QGroupBox *frame;
 	QGridLayout *grid;
-	QLabel *lbl;
-	QPushButton *okButton, *cancelButton;
 	bool replayReadOnlySetting;
 	QSettings settings;
 
-	setWindowTitle("Movie Play");
+	setWindowTitle(tr("Movie Play"));
 
 	mainLayout = new QVBoxLayout();
 	hbox = new QHBoxLayout();
 
-	lbl = new QLabel(tr("File:"));
+	fileLabel = new QLabel(this);
+	fileLabel->setText(tr("File:"));
 	movSelBox = new QComboBox();
-	movBrowseBtn = new QPushButton(tr("Browse"));
+	movBrowseBtn = new QPushButton(this);
+	movBrowseBtn->setText(tr("Browse"));
 
 	movSelBox->setMaximumWidth(512);
 
-	hbox->addWidget(lbl, 1);
+	hbox->addWidget(fileLabel, 1);
 	hbox->addWidget(movSelBox, 100);
 	hbox->addWidget(movBrowseBtn, 1);
 
 	mainLayout->addLayout(hbox);
 
-	frame = new QGroupBox(tr("Parameters:"));
+	paramFrame = new QGroupBox(this);
+	paramFrame->setTitle(tr("Parameters:"));
 	vbox = new QVBoxLayout();
 	hbox = new QHBoxLayout();
 
-	frame->setLayout(vbox);
+	paramFrame->setLayout(vbox);
 
-	openReadOnly = new QCheckBox(tr("Open Read-Only"));
-	pauseAtFrame = new QCheckBox(tr("Pause Movie At Frame"));
+	openReadOnly = new QCheckBox(this);
+	openReadOnly->setText(tr("Open Read-Only"));
+	pauseAtFrame = new QCheckBox(this);
+	pauseAtFrame->setText(tr("Pause Movie At Frame"));
 
 	validator = new fceuDecIntValidtor(0, 100000000, this);
 
@@ -94,7 +96,7 @@ MoviePlayDialog_t::MoviePlayDialog_t(QWidget *parent)
 	hbox->addWidget(pauseAtFrame);
 	hbox->addWidget(pauseAtFrameEntry);
 
-	mainLayout->addWidget(frame);
+	mainLayout->addWidget(paramFrame);
 
 	grid = new QGridLayout();
 	grid->setColumnStretch(0, 1);
@@ -113,16 +115,37 @@ MoviePlayDialog_t::MoviePlayDialog_t(QWidget *parent)
 	palUsedLbl = new QLabel();
 	newppuUsedLbl = new QLabel();
 
-	grid->addWidget(new QLabel(tr("Length:")), 0, 0, Qt::AlignRight);
-	grid->addWidget(new QLabel(tr("Frames:")), 1, 0, Qt::AlignRight);
-	grid->addWidget(new QLabel(tr("Record Count:")), 2, 0, Qt::AlignRight);
-	grid->addWidget(new QLabel(tr("Recorded From:")), 3, 0, Qt::AlignRight);
-	grid->addWidget(new QLabel(tr("ROM Used:")), 4, 0, Qt::AlignRight);
-	grid->addWidget(new QLabel(tr("ROM Checksum:")), 5, 0, Qt::AlignRight);
-	grid->addWidget(new QLabel(tr("Current ROM Sum:")), 6, 0, Qt::AlignRight);
-	grid->addWidget(new QLabel(tr("Emulator Used:")), 7, 0, Qt::AlignRight);
-	grid->addWidget(new QLabel(tr("PAL:")), 8, 0, Qt::AlignRight);
-	grid->addWidget(new QLabel(tr("New PPU:")), 9, 0, Qt::AlignRight);
+	movLenHeaderLbl = new QLabel(this);
+	movLenHeaderLbl->setText(tr("Length:"));
+	movFramesHeaderLbl = new QLabel(this);
+	movFramesHeaderLbl->setText(tr("Frames:"));
+	recCountHeaderLbl = new QLabel(this);
+	recCountHeaderLbl->setText(tr("Record Count:"));
+	recFromHeaderLbl = new QLabel(this);
+	recFromHeaderLbl->setText(tr("Recorded From:"));
+	romUsedHeaderLbl = new QLabel(this);
+	romUsedHeaderLbl->setText(tr("ROM Used:"));
+	romCsumHeaderLbl = new QLabel(this);
+	romCsumHeaderLbl->setText(tr("ROM Checksum:"));
+	curCsumHeaderLbl = new QLabel(this);
+	curCsumHeaderLbl->setText(tr("Current ROM Sum:"));
+	emuUsedHeaderLbl = new QLabel(this);
+	emuUsedHeaderLbl->setText(tr("Emulator Used:"));
+	palUsedHeaderLbl = new QLabel(this);
+	palUsedHeaderLbl->setText(tr("PAL:"));
+	newppuUsedHeaderLbl = new QLabel(this);
+	newppuUsedHeaderLbl->setText(tr("New PPU:"));
+
+	grid->addWidget(movLenHeaderLbl, 0, 0, Qt::AlignRight);
+	grid->addWidget(movFramesHeaderLbl, 1, 0, Qt::AlignRight);
+	grid->addWidget(recCountHeaderLbl, 2, 0, Qt::AlignRight);
+	grid->addWidget(recFromHeaderLbl, 3, 0, Qt::AlignRight);
+	grid->addWidget(romUsedHeaderLbl, 4, 0, Qt::AlignRight);
+	grid->addWidget(romCsumHeaderLbl, 5, 0, Qt::AlignRight);
+	grid->addWidget(curCsumHeaderLbl, 6, 0, Qt::AlignRight);
+	grid->addWidget(emuUsedHeaderLbl, 7, 0, Qt::AlignRight);
+	grid->addWidget(palUsedHeaderLbl, 8, 0, Qt::AlignRight);
+	grid->addWidget(newppuUsedHeaderLbl, 9, 0, Qt::AlignRight);
 
 	grid->addWidget(movLenLbl, 0, 1, Qt::AlignLeft);
 	grid->addWidget(movFramesLbl, 1, 1, Qt::AlignLeft);
@@ -136,8 +159,10 @@ MoviePlayDialog_t::MoviePlayDialog_t(QWidget *parent)
 	grid->addWidget(newppuUsedLbl, 9, 1, Qt::AlignLeft);
 
 	hbox = new QHBoxLayout();
-	okButton = new QPushButton(tr("Play"));
-	cancelButton = new QPushButton(tr("Cancel"));
+	okButton = new QPushButton(this);
+	okButton->setText(tr("Play"));
+	cancelButton = new QPushButton(this);
+	cancelButton->setText(tr("Cancel"));
 	hbox->addWidget(cancelButton);
 	hbox->addWidget(okButton);
 	okButton->setDefault(true);
@@ -187,6 +212,38 @@ void MoviePlayDialog_t::closeEvent(QCloseEvent *event)
 	done(0);
 	deleteLater();
 	event->accept();
+}
+//----------------------------------------------------------------------------
+void MoviePlayDialog_t::retranslateUi(void)
+{
+	setWindowTitle(tr("Movie Play"));
+
+	if (fileLabel) fileLabel->setText(tr("File:"));
+	if (movBrowseBtn) movBrowseBtn->setText(tr("Browse"));
+	if (paramFrame) paramFrame->setTitle(tr("Parameters:"));
+	if (openReadOnly) openReadOnly->setText(tr("Open Read-Only"));
+	if (pauseAtFrame) pauseAtFrame->setText(tr("Pause Movie At Frame"));
+	if (movLenHeaderLbl) movLenHeaderLbl->setText(tr("Length:"));
+	if (movFramesHeaderLbl) movFramesHeaderLbl->setText(tr("Frames:"));
+	if (recCountHeaderLbl) recCountHeaderLbl->setText(tr("Record Count:"));
+	if (recFromHeaderLbl) recFromHeaderLbl->setText(tr("Recorded From:"));
+	if (romUsedHeaderLbl) romUsedHeaderLbl->setText(tr("ROM Used:"));
+	if (romCsumHeaderLbl) romCsumHeaderLbl->setText(tr("ROM Checksum:"));
+	if (curCsumHeaderLbl) curCsumHeaderLbl->setText(tr("Current ROM Sum:"));
+	if (emuUsedHeaderLbl) emuUsedHeaderLbl->setText(tr("Emulator Used:"));
+	if (palUsedHeaderLbl) palUsedHeaderLbl->setText(tr("PAL:"));
+	if (newppuUsedHeaderLbl) newppuUsedHeaderLbl->setText(tr("New PPU:"));
+	if (okButton) okButton->setText(tr("Play"));
+	if (cancelButton) cancelButton->setText(tr("Cancel"));
+}
+//----------------------------------------------------------------------------
+void MoviePlayDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------
 void MoviePlayDialog_t::closeWindow(void)

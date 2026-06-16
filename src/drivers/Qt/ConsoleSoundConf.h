@@ -26,8 +26,11 @@ public:
 	ConsoleSndConfDialog_t(QWidget *parent = 0);
 	~ConsoleSndConfDialog_t(void);
 
+	void retranslateUi(void);
+
 protected:
 	void closeEvent(QCloseEvent *event);
+	void changeEvent(QEvent *event) override;
 
 	int  sndQuality;
 	QCheckBox *enaChkbox;
@@ -51,6 +54,11 @@ protected:
 	QSlider *pcmSlider;
 	QProgressBar *bufUsage;
 	QTimer       *updateTimer;
+	QPushButton *resetBtn;
+	QPushButton *closeBtn;
+	QGroupBox *frame1;
+	QGroupBox *frame2;
+	QGroupBox *frame3;
 
 	void setCheckBoxFromProperty(QCheckBox *cbx, const char *property);
 	void setComboBoxFromProperty(QComboBox *cbx, const char *property);

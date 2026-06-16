@@ -269,6 +269,8 @@ class HexEditorFindDialog_t : public QDialog
 		HexEditorFindDialog_t(QWidget *parent = 0);
 		~HexEditorFindDialog_t(void);
 
+		void retranslateUi(void);
+
 		QLineEdit    *searchBox;
 		QRadioButton *upBtn;
 		QRadioButton *dnBtn;
@@ -276,6 +278,12 @@ class HexEditorFindDialog_t : public QDialog
 		QRadioButton *txtBtn;
 	protected:
 		void closeEvent(QCloseEvent *bar);
+		void changeEvent(QEvent *event) override;
+
+		QPushButton  *nextBtn;
+		QGroupBox    *dirGroup;
+		QGroupBox    *typeGroup;
+		QLabel       *findWhatLbl;
 
 		HexEditorDialog_t *parent;
 
@@ -296,6 +304,7 @@ class HexEditorDialog_t : public QDialog
 		void populateBookmarkMenu(void);
 		void setWindowTitle(void);
 		void openDebugSymbolEditWindow( int addr );
+		void retranslateUi(void);
 
 		int  getRefreshRate(void){ return refreshRateOpt; }
 
@@ -304,6 +313,7 @@ class HexEditorDialog_t : public QDialog
 
 	protected:
 		void closeEvent(QCloseEvent *bar);
+		void changeEvent(QEvent *event) override;
 
 		QScrollBar *vbar;
 		QScrollBar *hbar;

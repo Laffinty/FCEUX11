@@ -99,8 +99,10 @@ class PaletteEditorDialog_t : public QDialog
 
 		nesPaletteView  *palView;
 
+		void retranslateUi(void);
 	protected:
 		void closeEvent(QCloseEvent *event);
+		void changeEvent(QEvent *event) override;
 
 		QAction *undoAct;
 		QAction *redoAct;

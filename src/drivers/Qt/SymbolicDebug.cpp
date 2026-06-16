@@ -675,6 +675,27 @@ void SymbolEditWindow::closeEvent(QCloseEvent *event)
 	event->accept();
 }
 //--------------------------------------------------------------
+void SymbolEditWindow::retranslateUi(void)
+{
+	setWindowTitle(tr("Symbolic Debug Naming"));
+	if (isArrayBox) isArrayBox->setText(tr("Is Array"));
+	if (arrayNameOverWrite) arrayNameOverWrite->setText(tr("Overwrite Name"));
+	if (arrayCommentOverWrite) arrayCommentOverWrite->setText(tr("Overwrite Comment"));
+	if (commentHeadOnly) commentHeadOnly->setText(tr("Comment Head Only"));
+	if (deleteBox) deleteBox->setText(tr("Delete"));
+	if (okButton) okButton->setText(tr("OK"));
+	if (cancelButton) cancelButton->setText(tr("Cancel"));
+}
+//--------------------------------------------------------------
+void SymbolEditWindow::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
+}
+//--------------------------------------------------------------
 void SymbolEditWindow::closeWindow(void)
 {
 	//printf("Close Window\n");

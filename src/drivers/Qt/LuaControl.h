@@ -30,9 +30,11 @@ public:
 	~LuaControlDialog_t(void);
 
 	void refreshState(void);
+	void retranslateUi(void);
 
 protected:
 	void closeEvent(QCloseEvent *bar);
+	void changeEvent(QEvent *event) override;
 	void openLuaKillMessageBox(void);
 
 	QTimer *periodicTimer;

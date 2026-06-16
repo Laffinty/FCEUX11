@@ -266,9 +266,12 @@ class ppuViewerDialog_t : public QDialog
 
 		ppuPatternView_t  *patternView[2];
 		tilePaletteView_t *tilePalView[8];
+
+		void retranslateUi(void);
 	protected:
 
 		void closeEvent(QCloseEvent *bar);
+		void changeEvent(QEvent *event) override;
 	private:
 
 		QGroupBox  *patternFrame[2];
@@ -279,6 +282,9 @@ class ppuViewerDialog_t : public QDialog
 		QCheckBox  *invertMaskCbox;
 		QSlider    *refreshSlider;
 		QSpinBox   *scanLineEdit;
+		QLabel     *refreshMoreLbl;
+		QLabel     *refreshLessLbl;
+		QLabel     *scanLineLbl;
 		QTimer     *updateTimer;
 
 		int         cycleCount;

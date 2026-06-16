@@ -368,3 +368,26 @@ void MovieRecordDialog_t::browseFiles(void)
 	return;
 }
 //----------------------------------------------------------------------------
+//----------------------------------------------------------------------------
+void MovieRecordDialog_t::retranslateUi(void)
+{
+	setWindowTitle(tr("Record Input Movie"));
+	if (fileBrowse)   fileBrowse->setText(tr("..."));
+	if (okButton)     okButton->setText(tr("OK"));
+	if (cancelButton) cancelButton->setText(tr("Cancel"));
+	if (pathLabel)    pathLabel->setText(tr("Path:"));
+	if (fileLabel)    fileLabel->setText(tr("File:"));
+	if (recordLabel)  recordLabel->setText(tr("Record:"));
+	if (authorLabel)  authorLabel->setText(tr("Author:"));
+}
+//----------------------------------------------------------------------------
+void MovieRecordDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		setWindowTitle(tr("Record Input Movie"));
+		retranslateUi();
+	}
+	QDialog::changeEvent(event);
+}
+//----------------------------------------------------------------------------

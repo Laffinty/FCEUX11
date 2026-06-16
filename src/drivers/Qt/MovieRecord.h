@@ -26,8 +26,11 @@ public:
 	MovieRecordDialog_t(QWidget *parent = 0);
 	~MovieRecordDialog_t(void);
 
+	void retranslateUi(void);
+
 protected:
 	void closeEvent(QCloseEvent *event);
+	void changeEvent(QEvent *event) override;
 
 	QLineEdit   *dirEdit;
 	QLineEdit   *fileEdit;
@@ -36,6 +39,10 @@ protected:
 	QPushButton *okButton;
 	QPushButton *cancelButton;
 	QComboBox   *stateSel;
+	QLabel      *pathLabel;
+	QLabel      *fileLabel;
+	QLabel      *recordLabel;
+	QLabel      *authorLabel;
 	std::string  filepath;
 	std::string  ic_file;
 
