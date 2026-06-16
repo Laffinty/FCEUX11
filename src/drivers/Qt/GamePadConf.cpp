@@ -607,6 +607,8 @@ void GamePadConfDialog_t::resizeEvent(QResizeEvent *event)
 void GamePadConfDialog_t::keyPressEvent(QKeyEvent *event)
 {
 	//printf("GamePad Window Key Press: 0x%x \n", event->key() );
+	// v0.3.15 PR-B: forward to base class first (IME composition support).
+	QDialog::keyPressEvent(event);
 	pushKeyEvent(event, 1);
 }
 

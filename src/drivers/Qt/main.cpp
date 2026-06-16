@@ -133,8 +133,16 @@ int main( int argc, char *argv[] )
 
 	QApplication app(argc, argv);
 
+	// v0.3.15 PR-B: CJK fallback chain so that traditional/simplified
+	// CJK glyphs render in the UI even when Segoe UI Variable lacks
+	// the specific code point. Microsoft YaHei UI is the Windows 11
+	// default CJK UI font; Noto Sans CJK SC is a free alternative.
 	QFont font("Segoe UI Variable", 9);
 	font.setStyleHint(QFont::SansSerif);
+	font.setFamilies(QStringList{"Segoe UI Variable",
+	                             "Microsoft YaHei UI",
+	                             "Microsoft YaHei",
+	                             "Noto Sans CJK SC"});
 	QApplication::setFont(font);
 
 	QApplication::setAttribute(Qt::AA_DontShowShortcutsInContextMenus, false);

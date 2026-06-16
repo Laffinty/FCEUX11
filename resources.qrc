@@ -1,9 +1,11 @@
 <!DOCTYPE RCC><RCC version="1.0">
-<qresource prefix="/i18n">
-    <file alias="fceux11_en.qm">assets/i18n/fceux11_en.qm</file>
-    <file alias="fceux11_zh_CN.qm">assets/i18n/fceux11_zh_CN.qm</file>
-    <file alias="fceux11_zh_TW.qm">assets/i18n/fceux11_zh_TW.qm</file>
-</qresource>
+<!--
+  v0.3.15 PR-B: /i18n prefix removed.
+  The .qm files are now embedded by qt_add_resources() in src/CMakeLists.txt
+  (see FCEUX11_ENABLE_I18N block). The legacy /i18n prefix conflicted with
+  the modern API's auto-generated aliases.
+  /icons prefix is kept for backwards compatibility.
+-->
 <qresource prefix="/icons">
     <file alias="pic.png">icons/pic.png</file>
 </qresource>

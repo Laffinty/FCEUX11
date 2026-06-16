@@ -513,12 +513,18 @@ void ConsoleViewGL_t::mouseReleaseEvent(QMouseEvent * event)
 
 void ConsoleViewGL_t::keyPressEvent(QKeyEvent *event)
 {
+	// v0.3.15 PR-B: forward to base class so QInputMethodEvent reaches
+	// the focused QLineEdit (Chinese IME composition) before routing
+	// the key to the game key state.
+	QOpenGLWindow::keyPressEvent(event);
 	pushKeyEvent(event, 1);
 	event->accept();
 }
 
 void ConsoleViewGL_t::keyReleaseEvent(QKeyEvent *event)
 {
+	// v0.3.15 PR-B: same IME forwarding rationale as keyPressEvent.
+	QOpenGLWindow::keyReleaseEvent(event);
 	pushKeyEvent(event, 0);
 	event->accept();
 }

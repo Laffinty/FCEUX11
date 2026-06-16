@@ -578,42 +578,39 @@ target_precompile_headers(fceux11_drivers_qt PRIVATE
     <QtOpenGL>
 )
 
-# i18n: Qt translation files
+# i18n: Qt translation files (v0.3.15 PR-B)
+# Source-of-truth: src/drivers/Qt/lang/fceux11_*.ts
+# Note: assets/i18n/ pre-v0.3.15 hand-written files are deprecated.
+# Lupdate is wired to the source tree so that re-running it refreshes
+# the .ts file with all current tr() calls (no manual file sync).
 set(TS_FILES
-    ${CMAKE_SOURCE_DIR}/assets/i18n/fceux11_en.ts
-    ${CMAKE_SOURCE_DIR}/assets/i18n/fceux11_zh_CN.ts
-    ${CMAKE_SOURCE_DIR}/assets/i18n/fceux11_zh_TW.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/lang/fceux11_en.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/lang/fceux11_zh_CN.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/lang/fceux11_zh_TW.ts
 )
 
 if(FCEUX11_ENABLE_I18N)
     find_package(Qt6 REQUIRED COMPONENTS LinguistTools)
 
-    # v0.2.1: Use Qt6 lrelease from LinguistTools target (vcpkg / MSVC toolchain)
-    if(TARGET Qt6::lrelease)
-        get_target_property(LRELEASE_EXECUTABLE Qt6::lrelease IMPORTED_LOCATION)
-    endif()
-    if(NOT LRELEASE_EXECUTABLE)
-        find_program(LRELEASE_EXECUTABLE NAMES lrelease-qt6 lrelease lrelease.exe
-                     DOC "Qt lrelease translation compiler")
-    endif()
-    if(NOT LRELEASE_EXECUTABLE)
-        message(FATAL_ERROR "Qt lrelease not found. Ensure Qt6 LinguistTools is installed via vcpkg.")
-    endif()
+    # v0.3.15 PR-B: use Qt6 modern API (qt_add_lupdate + qt_add_lrelease).
+    # qt_add_lupdate wires `lupdate sources -> .ts` so that re-running the
+    # build automatically picks up new tr() calls. qt_add_lrelease compiles
+    # the .ts files to .qm and stashes them in QM_FILES_OUTPUT_VARIABLE.
+    qt_add_lupdate(TS_FILES ${TS_FILES})
 
-    # Run lrelease to generate .qm files from .ts files
-    foreach(ts_file ${TS_FILES})
-        string(REPLACE ".ts" ".qm" qm_file ${ts_file})
-        add_custom_command(
-            OUTPUT ${qm_file}
-            COMMAND ${LRELEASE_EXECUTABLE} ${ts_file} -qm ${qm_file}
-            DEPENDS ${ts_file}
-            COMMENT "Generating translation: ${qm_file}"
-        )
-        list(APPEND QM_FILES ${qm_file})
-    endforeach()
+    set_source_files_properties(${TS_FILES} PROPERTIES
+        OUTPUT_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/i18n)
 
-    # Custom target to generate all translations
-    add_custom_target(translations ALL DEPENDS ${QM_FILES})
+    qt_add_lrelease(TS_FILES ${TS_FILES} QM_FILES_OUTPUT_VARIABLE qm_files)
+
+    # Embed .qm files into Qt resources under :/i18n/. The legacy
+    # resources.qrc /i18n prefix is removed in PR-B to avoid a
+    # conflicting alias (resources.qrc:2-6).
+    if(qm_files)
+        qt_add_resources(fceux11_i18n "i18n"
+            PREFIX "/i18n"
+            FILES ${qm_files})
+    endif()
 endif()
 
 set(SOURCES ${SRC_DRIVERS_QT})

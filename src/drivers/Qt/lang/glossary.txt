@@ -1,0 +1,112 @@
+# FCEUX11 i18n Glossary (v0.3.15 PR-B)
+# Format: source_term [tab] zh_CN [tab] zh_TW
+# Used by DeepL / Google Translate custom glossary for terminology
+# consistency across machine translation.
+#
+# Rules:
+#   - TAS / ROM / NES / mapper / CPU / PPU / APU / FPS / RAM / PRG / CHR
+#     must NOT be translated (emulator community convention).
+#   - File extensions (.nes, .fm2, .fcm, .fcs) are kept verbatim.
+#   - Shortcut mnemonics (&) are kept in source.
+#
+# When a translator overrides a term here, they should also update
+# scripts/check_simp_trad.ps1 to ensure the override doesn't violate
+# the simplified/traditional glyph separation rule.
+
+gamepad        	游戏手柄	遊戲手把
+save state     	存档	存檔
+load state     	读档	讀檔
+quick load     	快速读档	快速讀檔
+quick save     	快速存档	快速存檔
+frame advance  	逐帧推进	逐格推進
+movie          	录像	錄影
+TAS editor     	TAS 编辑器	TAS 編輯器
+debugger       	调试器	除錯器
+breakpoint     	断点	中斷點
+cheat          	作弊码	作弊碼
+Game Genie     	金手指	金手指
+sprite         	精灵	精靈
+nametable      	名称表	名稱表
+palette        	调色板	調色盤
+ROM            	ROM	ROM
+NES            	NES	NES
+mapper         	映射器	映射器
+CPU            	CPU	CPU
+PPU            	PPU	PPU
+APU            	APU	APU
+RAM            	RAM	RAM
+PRG            	PRG	PRG
+CHR            	CHR	CHR
+hex editor     	十六进制编辑器	十六進位編輯器
+hex address    	十六进制地址	十六進位地址
+frame          	帧	幀
+input          	输入	輸入
+video          	视频	視訊
+audio / sound  	音频	音訊
+region         	区域	區域
+NTSC           	NTSC	NTSC
+PAL            	PAL	PAL
+Dendy          	Dendy	Dendy
+FDS            	FDS	FDS
+Game Boy       	Game Boy	Game Boy
+VS System      	VS System	VS System
+load state from	从文件载入存档	從檔案載入存檔
+save state as  	另存为	另存新檔
+screenshot     	截图	截圖
+recent ROMs    	最近的 ROM	最近的 ROM
+speed up       	加速	加速
+slow down      	减速	減速
+turbo          	极速	極速
+normal speed   	正常速度	正常速度
+slowest        	最慢	最慢
+auto resume    	自动续玩	自動續玩
+pause          	暂停	暫停
+reset          	重置	重置
+power          	电源	電源
+settings       	设置	設定
+preferences    	首选项	偏好設定
+hotkey         	快捷键	快捷鍵
+keyboard       	键盘	鍵盤
+language       	语言	語言
+simplified     	简体	簡體
+traditional    	繁体	繁體
+window         	窗口	視窗
+background     	背景	背景
+color          	颜色	顏色
+theme          	主题	主題
+light theme    	浅色主题	淺色主題
+dark theme     	深色主题	深色主題
+virtual keyboard	虚拟键盘	虛擬鍵盤
+family keyboard	家用机键盘	家用機鍵盤
+coin           	投币	投幣
+disk           	磁盘	磁碟
+eject          	弹出	退出
+insert         	插入	插入
+search         	搜索	搜尋
+watch          	监视	監視
+trace          	跟踪	追蹤
+logger         	记录器	記錄器
+enable         	启用	啟用
+disable        	禁用	停用
+about          	关于	關於
+quit           	退出	退出
+close          	关闭	關閉
+open           	打开	開啟
+new            	新建	新增
+delete         	删除	刪除
+edit           	编辑	編輯
+find           	查找	尋找
+replace        	替换	取代
+undo           	撤销	復原
+redo           	重做	重做
+copy           	复制	複製
+paste          	粘贴	貼上
+cut            	剪切	剪下
+select all     	全选	全選
+help           	帮助	說明
+information    	信息	資訊
+warning        	警告	警告
+error          	错误	錯誤
+question       	问题	問題
+message log    	消息日志	訊息記錄
+about Qt       	关于 Qt	關於 Qt
