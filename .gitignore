@@ -17,6 +17,7 @@ CMakeLists.txt.user
 cmake_install.cmake
 Makefile
 *.cmake
+DartConfiguration.tcl
 
 # Qt generated files
 *.autogen/
@@ -56,6 +57,7 @@ nul
 *.suo
 *.user
 *.sln
+*.slnx
 *.vcxproj
 *.vcxproj.filters
 *.sdf
