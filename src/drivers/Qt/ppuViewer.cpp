@@ -59,6 +59,9 @@
 #include "Qt/PaletteEditor.h"
 #include "Qt/ColorMenu.h"
 
+// v0.3.15.x PHASE-4: TypedConfig<T> wrapper for QSettings.
+#include "Qt/ConfigStore.h"
+
 #define PATTERNWIDTH          128
 #define PATTERNHEIGHT         128
 #define PATTERNBITWIDTH       PATTERNWIDTH*3
@@ -467,7 +470,17 @@ ppuViewerDialog_t::ppuViewerDialog_t(QWidget *parent)
 
 	updateTimer->start( 33 ); // 30hz
 
-	restoreGeometry(settings.value("ppuViewer/geometry").toByteArray());
+	// v0.3.15.x PHASE-4: TypedConfig<QByteArray>::get replaces
+	// bare QSettings value().toByteArray() for window-geometry
+	// restore. The QSettings local declared at the top of this
+	// constructor is still used by the menu / dialog setup below
+	// (e.g. menu item check state restoration) and remains in
+	// place.
+	{
+		static const fceu11::qt::TypedConfig<QByteArray> kGeometry(
+			"ppuViewer/geometry", QByteArray());
+		restoreGeometry(kGeometry.get());
+	}
 
 	connect( this, SIGNAL(rejected(void)), this, SLOT(deleteLater(void)));
 }
@@ -475,20 +488,27 @@ ppuViewerDialog_t::ppuViewerDialog_t(QWidget *parent)
 //----------------------------------------------------
 ppuViewerDialog_t::~ppuViewerDialog_t(void)
 {
-	QSettings settings;
-
 	updateTimer->stop();
 	ppuViewWindow = NULL;
 
-	//printf("PPU Viewer Window Deleted\n");
-	settings.setValue("ppuViewer/geometry", saveGeometry());
+	// v0.3.15.x PHASE-4: TypedConfig<QByteArray> replaces bare
+	// QSettings setValue for the window-geometry slot. QByteArray
+	// is a built-in QVariant-coercible type, so no Q_DECLARE_METATYPE
+	// is needed.
+	static const fceu11::qt::TypedConfig<QByteArray> kGeometry(
+		"ppuViewer/geometry", QByteArray());
+	kGeometry.set(saveGeometry());
 }
 //----------------------------------------------------
 void ppuViewerDialog_t::closeEvent(QCloseEvent *event)
 {
-	QSettings settings;
-	//printf("PPU Viewer Close Window Event\n");
-	settings.setValue("ppuViewer/geometry", saveGeometry());
+	// v0.3.15.x PHASE-4: TypedConfig<QByteArray> replaces bare
+	// QSettings setValue. Same key as the dtor above; the static
+	// is shared, so the dtor's set becomes the same underlying
+	// QSettings entry.
+	static const fceu11::qt::TypedConfig<QByteArray> kGeometry(
+		"ppuViewer/geometry", QByteArray());
+	kGeometry.set(saveGeometry());
 	done(0);
 	deleteLater();
 	event->accept();
@@ -1935,7 +1955,6 @@ void tilePaletteView_t::exportPaletteFileDialog(void)
 	{
 	   return;
 	}
-	//qDebug() << "selected file path : " << filename.toUtf8();
 
 	exportActivePaletteACT( filename.toStdString().c_str() );
 }

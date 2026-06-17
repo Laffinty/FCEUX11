@@ -1208,7 +1208,6 @@ void FKBConfigDialog::mappingLoad(void)
 	{
 	   return;
 	}
-	//qDebug() << "selected file path : " << filename.toUtf8();
 
 	mappingLoad( filename.toStdString().c_str() );
 

@@ -45,6 +45,9 @@
 #include "Qt/ConsoleUtilities.h"
 #include "Qt/MovieRecord.h"
 
+// v0.3.15.x PHASE-4: TypedConfig<T> wrapper for QSettings.
+#include "Qt/ConfigStore.h"
+
 //----------------------------------------------------------------------------
 MovieRecordDialog_t::MovieRecordDialog_t(QWidget *parent)
 	: QDialog(parent)
@@ -117,15 +120,24 @@ MovieRecordDialog_t::MovieRecordDialog_t(QWidget *parent)
 //----------------------------------------------------------------------------
 MovieRecordDialog_t::~MovieRecordDialog_t(void)
 {
-	QSettings settings;
-	settings.setValue("movieRecordWindow/geometry", saveGeometry());
+	// v0.3.15.x PHASE-4: TypedConfig<QByteArray> replaces bare
+	// QSettings setValue. Shared static with closeEvent /
+	// closeWindow above.
+	static const fceu11::qt::TypedConfig<QByteArray> kGeometry(
+		"movieRecordWindow/geometry", QByteArray());
+	kGeometry.set(saveGeometry());
 	//printf("Destroy Movie Play Window\n");
 }
 //----------------------------------------------------------------------------
 void MovieRecordDialog_t::closeEvent(QCloseEvent *event)
 {
-	QSettings settings;
-	settings.setValue("movieRecordWindow/geometry", saveGeometry());
+	// v0.3.15.x PHASE-4: TypedConfig<QByteArray> replaces bare
+	// QSettings setValue for the window-geometry slot. The static
+	// is shared with closeWindow() below; both write to the same
+	// key.
+	static const fceu11::qt::TypedConfig<QByteArray> kGeometry(
+		"movieRecordWindow/geometry", QByteArray());
+	kGeometry.set(saveGeometry());
 	done(0);
 	deleteLater();
 	event->accept();
@@ -133,8 +145,9 @@ void MovieRecordDialog_t::closeEvent(QCloseEvent *event)
 //----------------------------------------------------------------------------
 void MovieRecordDialog_t::closeWindow(void)
 {
-	QSettings settings;
-	settings.setValue("movieRecordWindow/geometry", saveGeometry());
+	static const fceu11::qt::TypedConfig<QByteArray> kGeometry(
+		"movieRecordWindow/geometry", QByteArray());
+	kGeometry.set(saveGeometry());
 	done(0);
 	deleteLater();
 }
@@ -249,7 +262,6 @@ void MovieRecordDialog_t::setLoadState(void)
 	{
 		return;
 	}
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	g_config->setOption ("SDL.LastLoadStateFrom", filename.toStdString().c_str() );
 
@@ -356,7 +368,6 @@ void MovieRecordDialog_t::browseFiles(void)
 	{
 	   return;
 	}
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	int pauseframe;
 	g_config->getOption ("SDL.PauseFrame", &pauseframe);

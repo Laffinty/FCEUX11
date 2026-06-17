@@ -329,7 +329,6 @@ void AviRiffViewerDialog::openAviFileDialog(void)
 	{
 	   return;
 	}
-	//qDebug() << "selected file path : " << filename.toUtf8();
 
 	printf( "AVI Debug movie %s\n", filename.toStdString().c_str() );
 

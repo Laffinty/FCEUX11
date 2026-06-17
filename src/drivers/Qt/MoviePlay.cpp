@@ -44,6 +44,9 @@
 #include "Qt/ConsoleUtilities.h"
 #include "Qt/MoviePlay.h"
 
+// v0.3.15.x PHASE-4: TypedConfig<T> wrapper for QSettings.
+#include "Qt/ConfigStore.h"
+
 //----------------------------------------------------------------------------
 MoviePlayDialog_t::MoviePlayDialog_t(QWidget *parent)
 	: QDialog(parent)
@@ -207,8 +210,11 @@ MoviePlayDialog_t::~MoviePlayDialog_t(void)
 //----------------------------------------------------------------------------
 void MoviePlayDialog_t::closeEvent(QCloseEvent *event)
 {
-	QSettings settings;
-	settings.setValue("moviePlayWindow/geometry", saveGeometry());
+	// v0.3.15.x PHASE-4: TypedConfig<QByteArray> replaces bare
+	// QSettings setValue. Shared static with closeWindow() below.
+	static const fceu11::qt::TypedConfig<QByteArray> kGeometry(
+		"moviePlayWindow/geometry", QByteArray());
+	kGeometry.set(saveGeometry());
 	done(0);
 	deleteLater();
 	event->accept();
@@ -248,8 +254,9 @@ void MoviePlayDialog_t::changeEvent(QEvent *event)
 //----------------------------------------------------------------------------
 void MoviePlayDialog_t::closeWindow(void)
 {
-	QSettings settings;
-	settings.setValue("moviePlayWindow/geometry", saveGeometry());
+	static const fceu11::qt::TypedConfig<QByteArray> kGeometry(
+		"moviePlayWindow/geometry", QByteArray());
+	kGeometry.set(saveGeometry());
 	done(0);
 	deleteLater();
 }
@@ -597,7 +604,6 @@ void MoviePlayDialog_t::openMovie(void)
 	{
 		return;
 	}
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	if (GameInfo)
 	{

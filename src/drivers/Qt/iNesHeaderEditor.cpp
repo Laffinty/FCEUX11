@@ -838,7 +838,6 @@ bool iNesHeaderEditor_t::openFile(void)
    {
       return false;
    }
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	if ( GameInfo == NULL )
 	{
@@ -892,7 +891,6 @@ void iNesHeaderEditor_t::saveFileAs(void)
    {
       return;
    }
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	WriteHeaderData( iNesHdr );
 

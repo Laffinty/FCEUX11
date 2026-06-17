@@ -1829,7 +1829,6 @@ bool TasEditorWindow::saveProjectAs(bool save_compact)
 			return false;
 		}
 	}
-	//qDebug() << "selected file path : " << filename.toUtf8();
 
 	project.renameProject( filename.toStdString().c_str(), true);
 	if (save_compact)
@@ -1956,7 +1955,6 @@ void TasEditorWindow::openProject(void)
 	{
 	   return;
 	}
-	//qDebug() << "selected file path : " << filename.toUtf8();
 
 	loadProject( filename.toStdString().c_str());
 
@@ -2239,7 +2237,6 @@ void TasEditorWindow::importMovieFile(void)
 	{
 	   return;
 	}
-	//qDebug() << "selected file path : " << filename.toUtf8();
 
 	importMovieFile( filename.toStdString().c_str() );
 
@@ -2667,7 +2664,6 @@ bool TasEditorWindow::saveCompactGetFilename( QString &outputFilePath )
 	}
 	outputFilePath = filename;
 
-	//qDebug() << "selected file path : " << filename.toUtf8();
 
 	return true;
 }

@@ -373,7 +373,6 @@ void ConsoleDebugger::ld65ImportDebug(void)
 	{
 	   return;
 	}
-	//qDebug() << "selected file path : " << filename.toUtf8();
 
 	if (debugSymbolTable.numSymbols() > 0)
 	{

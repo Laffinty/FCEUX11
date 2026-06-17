@@ -614,7 +614,6 @@ void PaletteConfDialog_t::openPaletteFile(void)
 	{
 		return;
 	}
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	if (fceuWrapperTryLock())
 	{

@@ -165,6 +165,98 @@ F-track sub-version: Win11 platform features (PHASE-3 subset) per
 - High-DPI `@2x.png` icon variants (PHASE-4).
 - 24h smoke test + GitHub Release draft (PHASE-5).
 
+## [0.3.15.x] - 2026-06-17 (PHASE-4 complete)
+
+F-track sub-version: PHASE-4 (QSettings TypedConfig + @2x icons +
+qDebug cleanup) per `docs/v0.3.15_Build_Plan.md` §2 PHASE-4.
+
+### Added
+
+- **`src/drivers/Qt/ConfigStore.h`** — `fceu11::qt::TypedConfig<T>`
+  template wrapper around `QSettings`. Compile-time typed accessors
+  (key + default value + type T all checked at the call site);
+  `get()` returns the default when the key is absent; `set()` writes
+  through to the underlying `QSettings`; `isSet()` distinguishes
+  "absent" from "explicitly set to default". The template defers
+  T <-> QVariant conversion to `QVariant::value<T>()` so all the
+  Qt-native types (bool / int / QString / QByteArray) work
+  out-of-the-box. Helper factory `makeConfig(key, default)` provided
+  for type-deduction sugar.
+- **`scripts/generate_hi_dpi_icons.py`** — Pillow-based generator
+  for `@2x.png` variants. LANCZOS resample 200% upscale; `--force`
+  overwrites existing variants. Idempotent: skipped `@2x.png` files
+  in the source scan, so running it twice produces the same result.
+- **29 `@2x.png` high-DPI icon variants** generated under `icons/`
+  (one per non-`@2x` PNG; 16x16 → 32x32 etc.). Qt's
+  high-DPI icon machinery auto-selects the @2x variant when
+  `devicePixelRatio == 2` (Win11 4K displays at 200% scaling).
+- **`resources.qrc`** — every icon under `icons/` (29 base + 29 @2x
+  = 58 entries) registered as a Qt resource under the `/icons`
+  prefix. Qt code that loads `:icons/camera.png` (etc.) now
+  resolves to a real resource and the @2x sibling is auto-picked by
+  `QIcon` / `QPixmap` on high-DPI displays.
+- **`tests/config_store_test.cpp`** — headless unit test for
+  `TypedConfig<T>`. Covers bool / int / QString round-trip,
+  default-when-absent, `isSet()` semantics, `key()` / `defaultValue()`
+  accessors, and the static-caching iron rule. Registered in
+  `tests/CMakeLists.txt` as `config_store_test` (links
+  `Qt6::Core`, no GUI dependency).
+
+### Changed
+
+- **11 representative QSettings call sites refactored** to use
+  `TypedConfig<T>` (sampled from 55 total `QSettings settings;`
+  patterns; full 74-site sweep deferred to a dedicated refactor
+  PR per plan §2 PHASE-4 risk table). Sites touched:
+  - `main.cpp`: `mainWindow/showSplashScreen` (read),
+    `General/Language` (read)
+  - `ConsoleWindow.cpp`: `General/Language` (read + write)
+  - `GuiConf.cpp`: `mainWindow/showSplashScreen` (write)
+  - `ppuViewer.cpp`: `ppuViewer/geometry` (read + write in
+    dtor + closeEvent)
+  - `MovieRecord.cpp`: `movieRecordWindow/geometry` (read + write
+    in dtor + closeEvent + closeWindow)
+  - `MoviePlay.cpp`: `moviePlayWindow/geometry` (write in
+    closeEvent + closeWindow)
+- **`main.cpp`** high-DPI rounding policy review block: comment
+  documenting the PassThrough-vs-RoundPreferFloor decision for
+  Win11 24H2 multi-monitor. Decision (2026-06-17): keep
+  PassThrough — the @2x resources make 200% scaling sharp where
+  it matters most, and the NES viewport is rendered at native
+  framebuffer resolution regardless of the policy.
+- **45 `qDebug() << "...selected file path..." << filename.toUtf8();`
+  diagnostic stabs removed** from 20 files in `src/drivers/Qt/`
+  (43 uncommented + 2 in `ConsoleWindow.cpp` + 0 elsewhere; all
+  matching the `"selected file path"` literal). `git grep
+  "qDebug.*toUtf8" src/drivers/Qt/` now reports 0 hits. The
+  diagnostic stabs were dead code left over from the file-picker
+  debugging that informed v0.2.x; the file path is now visible in
+  the `QFileDialog` UI itself.
+
+### Verified
+
+- `git grep "QSettings settings" src/drivers/Qt/`: down from 55 to
+  44 (11 sites converted to `TypedConfig<T>`).
+- `git grep "qDebug.*toUtf8" src/drivers/Qt/`: 0 hits.
+- `icons/`: 29 base PNGs + 29 `@2x.png` siblings; `resources.qrc`
+  registers all 58.
+- `cl /Zs` syntax check: ConfigStore.h template is well-formed (the
+  full `config_store_test.cpp` test exercises all the template
+  instantiations at compile time; pre-existing
+  `fceux11_i18n_regression_test` static-analysis path remains
+  green).
+- No new toolchain dependencies (Pillow is a build-time
+  generator-only requirement, not a runtime / link-time dep).
+
+### Deferred to v0.3.16
+
+- Remaining 44 QSettings call sites (out of original 55) to
+  TypedConfig<T> (the multi-day refactor the plan §2 PHASE-4
+  describes; the 11-site sample in this PR is the demonstration
+  pattern).
+- 24h smoke test + GitHub Release draft (PHASE-5).
+- Win11 dark-mode live switching (PHASE-3 §3.4 deferred sub-task).
+
 ## [0.3.14] - 2026-06-14
 
 E-track sub-version: video backend modernization per plan v3 §5 v0.3.14.

@@ -602,7 +602,6 @@ void RamWatchDialog_t::openListCB(void)
    {
       return;
    }
-	//qDebug() << "selected file path : " << filename.toUtf8();
 
 	loadWatchFile ( filename.toStdString().c_str() );
 
@@ -662,7 +661,6 @@ void RamWatchDialog_t::appendListCB(void)
    {
       return;
    }
-	//qDebug() << "selected file path : " << filename.toUtf8();
 
 	loadWatchFile( filename.toStdString().c_str(), 1 );
 }
@@ -741,7 +739,6 @@ void RamWatchDialog_t::saveListAs(void)
    {
       return;
    }
-	//qDebug() << "selected file path : " << filename.toUtf8();
 
 	saveWatchFile( filename.toStdString().c_str() );
 }

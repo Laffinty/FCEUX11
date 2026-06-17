@@ -431,7 +431,6 @@ void PaletteEditorDialog_t::openPaletteFileDialog(void)
 	{
 	   return;
 	}
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	palView->loadFromFile( filename.toStdString().c_str() );
 	g_config->setOption ("SDL.Palette", filename.toStdString().c_str() );
@@ -484,7 +483,6 @@ void PaletteEditorDialog_t::savePaletteFileDialog(void)
 	{
 	   return;
 	}
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	palView->saveToFile( filename.toStdString().c_str() );
 }
@@ -534,7 +532,6 @@ void PaletteEditorDialog_t::exportPaletteFileDialog(void)
 	{
 	   return;
 	}
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	palView->exportToFileACT( filename.toStdString().c_str() );
 }

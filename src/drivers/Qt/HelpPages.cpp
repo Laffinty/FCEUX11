@@ -197,7 +197,6 @@ std::string consoleWin_t::findHelpFile(void)
 	{
 		return last;
 	}
-	//qDebug() << "selected file path : " << filename.toUtf8();
 
 	g_config->setOption ("SDL.HelpFilePath", filename.toStdString().c_str() );
 

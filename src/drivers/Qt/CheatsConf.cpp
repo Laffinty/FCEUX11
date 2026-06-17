@@ -824,7 +824,6 @@ void GuiCheatsDialog_t::openCheatFile(void)
 	{
 		return;
 	}
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	g_config->setOption("SDL.LastOpenFile", filename.toStdString().c_str());
 
@@ -895,7 +894,6 @@ void GuiCheatsDialog_t::saveCheatFile(void)
 	{
 		return;
 	}
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	//g_config->setOption ("SDL.LastOpenFile", filename.toStdString().c_str() );
 

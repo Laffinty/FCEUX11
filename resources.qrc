@@ -5,8 +5,71 @@
   (see FCEUX11_ENABLE_I18N block). The legacy /i18n prefix conflicted with
   the modern API's auto-generated aliases.
   /icons prefix is kept for backwards compatibility.
+
+  v0.3.15.x PHASE-4: @2x.png variants for every icon under icons/ are
+  added as Qt resource aliases. Qt's high-DPI icon machinery
+  auto-selects the @2x variant when devicePixelRatio == 2 (Win11 4K
+  displays at 200% scaling). Generate / refresh the @2x files with
+  scripts/generate_hi_dpi_icons.py.
 -->
 <qresource prefix="/icons">
+    <file alias="JumpTarget.png">icons/JumpTarget.png</file>
+    <file alias="JumpTarget@2x.png">icons/JumpTarget@2x.png</file>
+    <file alias="RunPpuFrame.png">icons/RunPpuFrame.png</file>
+    <file alias="RunPpuFrame@2x.png">icons/RunPpuFrame@2x.png</file>
+    <file alias="RunPpuHalfFrame.png">icons/RunPpuHalfFrame.png</file>
+    <file alias="RunPpuHalfFrame@2x.png">icons/RunPpuHalfFrame@2x.png</file>
+    <file alias="RunPpuScanline.png">icons/RunPpuScanline.png</file>
+    <file alias="RunPpuScanline@2x.png">icons/RunPpuScanline@2x.png</file>
+    <file alias="StepBack.png">icons/StepBack.png</file>
+    <file alias="StepBack@2x.png">icons/StepBack@2x.png</file>
+    <file alias="StepInto.png">icons/StepInto.png</file>
+    <file alias="StepInto@2x.png">icons/StepInto@2x.png</file>
+    <file alias="StepOut.png">icons/StepOut.png</file>
+    <file alias="StepOut@2x.png">icons/StepOut@2x.png</file>
+    <file alias="StepOver.png">icons/StepOver.png</file>
+    <file alias="StepOver@2x.png">icons/StepOver@2x.png</file>
+    <file alias="Undo.png">icons/Undo.png</file>
+    <file alias="Undo@2x.png">icons/Undo@2x.png</file>
+    <file alias="application-exit.png">icons/application-exit.png</file>
+    <file alias="application-exit@2x.png">icons/application-exit@2x.png</file>
+    <file alias="arrow-cursor.png">icons/arrow-cursor.png</file>
+    <file alias="arrow-cursor@2x.png">icons/arrow-cursor@2x.png</file>
+    <file alias="branch_spritesheet.png">icons/branch_spritesheet.png</file>
+    <file alias="branch_spritesheet@2x.png">icons/branch_spritesheet@2x.png</file>
+    <file alias="camera.png">icons/camera.png</file>
+    <file alias="camera@2x.png">icons/camera@2x.png</file>
+    <file alias="cloud.png">icons/cloud.png</file>
+    <file alias="cloud@2x.png">icons/cloud@2x.png</file>
+    <file alias="debug-pause.png">icons/debug-pause.png</file>
+    <file alias="debug-pause@2x.png">icons/debug-pause@2x.png</file>
+    <file alias="debug-run.png">icons/debug-run.png</file>
+    <file alias="debug-run@2x.png">icons/debug-run@2x.png</file>
+    <file alias="find.png">icons/find.png</file>
+    <file alias="find@2x.png">icons/find@2x.png</file>
+    <file alias="graphics-palette.png">icons/graphics-palette.png</file>
+    <file alias="graphics-palette@2x.png">icons/graphics-palette@2x.png</file>
+    <file alias="input-gaming-symbolic.png">icons/input-gaming-symbolic.png</file>
+    <file alias="input-gaming-symbolic@2x.png">icons/input-gaming-symbolic@2x.png</file>
+    <file alias="input-gaming.png">icons/input-gaming.png</file>
+    <file alias="input-gaming@2x.png">icons/input-gaming@2x.png</file>
+    <file alias="input-keyboard.png">icons/input-keyboard.png</file>
+    <file alias="input-keyboard@2x.png">icons/input-keyboard@2x.png</file>
+    <file alias="media-record.png">icons/media-record.png</file>
+    <file alias="media-record@2x.png">icons/media-record@2x.png</file>
+    <file alias="movie.png">icons/movie.png</file>
+    <file alias="movie@2x.png">icons/movie@2x.png</file>
     <file alias="pic.png">icons/pic.png</file>
+    <file alias="pic@2x.png">icons/pic@2x.png</file>
+    <file alias="power.png">icons/power.png</file>
+    <file alias="power@2x.png">icons/power@2x.png</file>
+    <file alias="reticle.png">icons/reticle.png</file>
+    <file alias="reticle@2x.png">icons/reticle@2x.png</file>
+    <file alias="taseditor-icon32.png">icons/taseditor-icon32.png</file>
+    <file alias="taseditor-icon32@2x.png">icons/taseditor-icon32@2x.png</file>
+    <file alias="timer.png">icons/timer.png</file>
+    <file alias="timer@2x.png">icons/timer@2x.png</file>
+    <file alias="view-fullscreen.png">icons/view-fullscreen.png</file>
+    <file alias="view-fullscreen@2x.png">icons/view-fullscreen@2x.png</file>
 </qresource>
 </RCC>

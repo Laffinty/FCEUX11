@@ -27,6 +27,9 @@
 #include <QWindow>
 #include <QScreen>
 #include <QSettings>
+
+// v0.3.15.x PHASE-4: TypedConfig<T> wrapper for QSettings.
+#include "ConfigStore.h"
 #include <QHeaderView>
 #include <QFileInfo>
 #include <QFileDialog>
@@ -2024,8 +2027,13 @@ void consoleWin_t::createMainMenu(void)
 	helpMenu->addAction(msgLogAct);
 
 	// Load saved language preference (must be after all actions are created)
-	QSettings settings;
-	QString savedLang = settings.value("General/Language", "en").toString();
+	// v0.3.15.x PHASE-4: TypedConfig<QString> replaces bare QSettings.
+	QString savedLang;
+	{
+		static const fceu11::qt::TypedConfig<QString> kLanguage(
+			"General/Language", QStringLiteral("en"));
+		savedLang = kLanguage.get();
+	}
 	loadTranslation(savedLang);
 };
 //---------------------------------------------------------------------------
@@ -2560,7 +2568,6 @@ void consoleWin_t::openROMFile(void)
 	{
 	   return;
 	}
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	g_config->setOption ("SDL.LastOpenFile", filename.toStdString().c_str() );
 
@@ -2653,7 +2660,6 @@ void consoleWin_t::loadNSF(void)
    {
       return;
    }
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	g_config->setOption ("SDL.LastOpenNSF", filename.toStdString().c_str() );
 
@@ -2737,7 +2743,6 @@ void consoleWin_t::loadStateFrom(void)
    {
       return;
    }
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	g_config->setOption ("SDL.LastLoadStateFrom", filename.toStdString().c_str() );
 
@@ -2828,7 +2833,6 @@ void consoleWin_t::saveStateAs(void)
 	{
 	   return;
 	}
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	g_config->setOption ("SDL.LastSaveStateAs", filename.toStdString().c_str() );
 
@@ -3644,7 +3648,6 @@ void consoleWin_t::loadGameGenieROM(void)
 	{
 	   return;
 	}
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	g_config->setOption ("SDL.LastOpenFile", filename.toStdString().c_str() );
 
@@ -3739,7 +3742,6 @@ void consoleWin_t::fdsLoadBiosFile(void)
 	{
 	   return;
 	}
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	// copy BIOS file to proper place (~/.fceux/disksys.rom)
 	std::ifstream fdsBios (filename.toStdString().c_str(), std::fstream::binary);
@@ -4174,7 +4176,6 @@ void consoleWin_t::aviRecordAsStart(void)
 	{
 	   return;
 	}
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	FCEUI_printf ("AVI Recording movie to %s\n", filename.toStdString().c_str() );
 
@@ -4366,7 +4367,6 @@ void consoleWin_t::wavRecordAsStart(void)
 	{
 	   return;
 	}
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	FCEUI_printf ("WAV Recording movie to %s\n", filename.toStdString().c_str() );
 
@@ -4766,8 +4766,14 @@ void consoleWin_t::loadTranslation(const QString &langCode)
 	}
 
 	// Save preference
-	QSettings settings;
-	settings.setValue("General/Language", langCode);
+	// v0.3.15.x PHASE-4: TypedConfig<QString>::set replaces bare
+	// QSettings::setValue. Same key path, same value, same
+	// QSettings backend, no behavioural change.
+	{
+		static const fceu11::qt::TypedConfig<QString> kLanguage(
+			"General/Language", QStringLiteral("en"));
+		kLanguage.set(langCode);
+	}
 
 	// Update checkmark on language actions (block signals to prevent setChecked from triggering loadTranslation)
 	QSignalBlocker blocker(languageActionGroup);

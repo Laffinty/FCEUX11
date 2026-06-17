@@ -1723,7 +1723,6 @@ void HexEditorDialog_t::saveRomFileAs(void)
 	{
 	   return;
 	}
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	iNesSaveAs( filename.toStdString().c_str() );
 }
@@ -1765,7 +1764,6 @@ void HexEditorDialog_t::loadTableFromFile(void)
 	{
 	   return;
 	}
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	editor->charTable.loadFromFile( filename.toStdString().c_str() );
 

@@ -122,6 +122,23 @@ if(FCEUX11_BUILD_TESTS)
              COMMAND fceux11_i18n_regression_test
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
+    # v0.3.15.x PHASE-4: TypedConfig<T> unit test. Constructs an
+    # in-memory QSettings backend via a unique organisation name so
+    # the test cannot clobber the user's real fceux11.ini. The
+    # test links Core (QSettings, QCoreApplication) but not
+    # Widgets/Gui, so it remains headless-runnable on CI.
+    find_package(Qt6 REQUIRED COMPONENTS Core)
+    add_executable(fceux11_config_store_test
+        config_store_test.cpp
+    )
+    target_link_libraries(fceux11_config_store_test PRIVATE
+        Qt6::Core)
+    target_include_directories(fceux11_config_store_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/src)
+    add_test(NAME config_store_test
+             COMMAND fceux11_config_store_test
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
     # -------------------------------------------------------------------------
     # v0.3.6.5 / v0.3.14 — Windows test runtime PATH injection
     # MSVC ASan-instrumented binaries dynamically import

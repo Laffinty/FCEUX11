@@ -40,6 +40,9 @@
 #include "Qt/ConsoleWindow.h"
 #include "Qt/ConsoleUtilities.h"
 
+// v0.3.15.x PHASE-4: TypedConfig<T> wrapper for QSettings.
+#include "Qt/ConfigStore.h"
+
 static int writeQPaletteToFile( const char *path, QPalette *pal );
 static int readQPaletteFromFile( const char *path, QPalette *pal );
 
@@ -347,11 +350,15 @@ void GuiConfDialog_t::contextMenuEnableChanged(int state)
 //----------------------------------------------------
 void GuiConfDialog_t::showSplashScreenChanged(int state)
 {
-	QSettings settings;
-	bool value = (state == Qt::Unchecked) ? 0 : 1;
-
-	settings.setValue("mainWindow/showSplashScreen", value );
-	settings.sync();
+	// v0.3.15.x PHASE-4: TypedConfig<bool> replaces bare QSettings
+	// setValue + sync(). The TypedConfig path uses the same
+	// QSettings backend; sync() is still issued explicitly because
+	// the user expects the change to be durable (so a crash on
+	// next save doesn't lose it).
+	static const fceu11::qt::TypedConfig<bool> kShowSplash(
+		"mainWindow/showSplashScreen", false);
+	kShowSplash.set((state == Qt::Unchecked) ? false : true);
+	QSettings().sync();
 }
 //----------------------------------------------------
 // v0.3.15 PR-A: when this is toggled, the change takes effect on next
@@ -485,7 +492,6 @@ void GuiConfDialog_t::openQss(void)
 	{
 		return;
 	}
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	custom_qss_path->setText(filename.toStdString().c_str());
 
@@ -589,7 +595,6 @@ void GuiConfDialog_t::openQPal(void)
 	{
 		return;
 	}
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	custom_qpal_path->setText(filename.toStdString().c_str());
 
@@ -1283,7 +1288,6 @@ void GuiPaletteEditDialog_t::paletteSaveAs(void)
 	{
 		return;
 	}
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	writeQPaletteToFile( filename.toStdString().c_str(), &pal );
 

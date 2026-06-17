@@ -501,7 +501,6 @@ void CodeDataLoggerDialog_t::saveCdlFileAs(void)
 	{
 		return;
 	}
-	//qDebug() << "selected file path : " << filename.toUtf8();
 
 	FCEU_WRAPPER_LOCK();
 	FCEU_strlcpy( loadedcdfile, sizeof(loadedcdfile), filename.toStdString().c_str());
@@ -556,7 +555,6 @@ void CodeDataLoggerDialog_t::loadCdlFile(void)
 	{
 		return;
 	}
-	//qDebug() << "selected file path : " << filename.toUtf8();
 
 	FCEU_WRAPPER_LOCK();
 	LoadCDLog(filename.toStdString().c_str());
@@ -640,7 +638,6 @@ void CodeDataLoggerDialog_t::SaveStrippedROM(int invert)
 	{
 		return;
 	}
-	//qDebug() << "selected file path : " << filename.toUtf8();
 
 	FILE *fp = fopen(filename.toStdString().c_str(), "wb");
 	if (!fp)

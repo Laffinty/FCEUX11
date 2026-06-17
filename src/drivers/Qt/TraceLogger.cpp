@@ -644,7 +644,6 @@ void TraceLoggerDialog_t::openLogFile(void)
 	{
 		return;
 	}
-	//qDebug() << "selected file path : " << filename.toUtf8();
 
 	logFilePath = filename.toStdString();
 

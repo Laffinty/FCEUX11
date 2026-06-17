@@ -416,7 +416,6 @@ void LuaControlDialog_t::openLuaScriptFile(void)
 	{
 		return;
 	}
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	g_config->setOption("SDL.LastLoadLua", filename.toStdString().c_str());
 

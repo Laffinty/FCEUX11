@@ -522,7 +522,6 @@ void InputConfDialog_t::openLoadPresetFile(void)
 	{
 		return;
 	}
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	FCEU_WRAPPER_LOCK();
 	loadInputSettingsFromFile(filename.toStdString().c_str());
@@ -594,7 +593,6 @@ void InputConfDialog_t::openSavePresetFile(void)
 	{
 		return;
 	}
-	qDebug() << "selected file path : " << filename.toUtf8();
 
 	saveInputSettingsToFile(filename.toStdString().c_str());
 }
