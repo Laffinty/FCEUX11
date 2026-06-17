@@ -279,8 +279,6 @@ void TaseditorAutoFunction(void);
 void TaseditorManualFunction(void);
 #endif
 
-#endif //__FCEU_CORE_API_H_
-
 namespace fceu11 {
     int DecodePAR(const char *code, int *a, int *v, int *c, int *type);
     int DecodeGG(const char *str, int *a, int *v, int *c);
@@ -316,3 +314,5 @@ inline int FCEUI_GetCheat(uint32 which, std::string *name, uint32 *a, uint8 *v, 
 inline int FCEUI_SetCheat(uint32 which, const std::string *name, int32 a, int32 v, int compare, int s, int type) { return fceu11::SetCheat(which, name, a, v, compare, s, type); }
 inline void FCEUI_CheatSearchShowExcluded(void) { fceu11::CheatSearchShowExcluded(); }
 inline void FCEUI_CheatSearchSetCurrentAsOriginal(void) { fceu11::CheatSearchSetCurrentAsOriginal(); }
+
+#endif //__FCEU_CORE_API_H_

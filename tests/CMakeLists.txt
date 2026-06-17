@@ -134,7 +134,8 @@ if(FCEUX11_BUILD_TESTS)
     target_link_libraries(fceux11_config_store_test PRIVATE
         Qt6::Core)
     target_include_directories(fceux11_config_store_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/src)
+        ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_SOURCE_DIR}/src/drivers)
     add_test(NAME config_store_test
              COMMAND fceux11_config_store_test
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -178,7 +179,7 @@ if(FCEUX11_BUILD_TESTS)
         set_tests_properties(
             smoke_test mapper_load_test mapper_reset_test
             rom_regression_test savestate_regression_test expected_api_test
-            enum_class_bitflags_test
+            enum_class_bitflags_test config_store_test
             PROPERTIES ENVIRONMENT_MODIFICATION
                 "${_FCEUX11_TEST_PATH_MODIFICATIONS}"
         )
