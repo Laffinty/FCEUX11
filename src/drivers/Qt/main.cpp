@@ -215,32 +215,57 @@ int main( int argc, char *argv[] )
 	// Auto-detect system language preference
 	// Simplified Chinese (zh_CN) or Traditional Chinese (zh_TW) -> use that
 	// All other languages -> default to English
-	QString defaultLang = "en";
-	QLocale::Language sysLang = QLocale::system().language();
-	if (sysLang == QLocale::Chinese)
-	{
-		QLocale::Script script = QLocale::system().script();
-		if (script == QLocale::SimplifiedHanScript)
-		{
-			defaultLang = "zh_CN";
+	//
+	// v0.3.15.x PHASE-5 fix: QLocale::system().script() on Windows
+	// does NOT always reflect the "Simplified" vs "Traditional"
+	// distinction when the system locale is a regional variant
+	// (e.g. zh_HK). We now also inspect the BCP-47 name string and
+	// any language list preferred by the user, and fall back to the
+	// country code when the script tag is unavailable. This keeps
+	// zh_CN / zh_TW / zh_HK / zh_MO mappings consistent across Win10
+	// 21H2 and Win11 24H2.
+	auto detectSystemLang = []() -> QString {
+		QLocale sys = QLocale::system();
+		if (sys.language() != QLocale::Chinese) {
+			return QStringLiteral("en");
 		}
-		else if (script == QLocale::TraditionalHanScript)
-		{
-			defaultLang = "zh_TW";
+		QLocale::Script script = sys.script();
+		if (script == QLocale::SimplifiedHanScript) {
+			return QStringLiteral("zh_CN");
 		}
-		else
-		{
-			QString systemLang = QLocale::system().name();
-			if (systemLang.startsWith("zh_CN") || systemLang.startsWith("zh_Hans"))
-			{
-				defaultLang = "zh_CN";
+		if (script == QLocale::TraditionalHanScript) {
+			return QStringLiteral("zh_TW");
+		}
+		// No usable script tag — fall back to locale name + UI
+		// languages list. The UI list is the user's preferred
+		// language chain from the Windows Regional Settings
+		// ("Formats / Preferred languages"), which is the same
+		// source the Win11 Settings app uses.
+		const QStringList uiLangs = sys.uiLanguages();
+		for (const QString &l : uiLangs) {
+			QString low = l.toLower();
+			if (low.startsWith("zh-cn") || low.startsWith("zh-hans") ||
+			    low.startsWith("zh-sg") || low.startsWith("zh-my")) {
+				return QStringLiteral("zh_CN");
 			}
-			else
-			{
-				defaultLang = "zh_TW";
+			if (low.startsWith("zh-tw") || low.startsWith("zh-hk") ||
+			    low.startsWith("zh-mo") || low.startsWith("zh-hant")) {
+				return QStringLiteral("zh_TW");
 			}
 		}
-	}
+		QString name = sys.name().toLower();
+		if (name.startsWith("zh_cn") || name.startsWith("zh_hans") ||
+		    name.startsWith("zh_sg") || name.startsWith("zh_my")) {
+			return QStringLiteral("zh_CN");
+		}
+		if (name.startsWith("zh_tw") || name.startsWith("zh_hk") ||
+		    name.startsWith("zh_mo") || name.startsWith("zh_hant")) {
+			return QStringLiteral("zh_TW");
+		}
+		return QStringLiteral("zh_CN"); // CJK + ambiguous script -> default to Simplified
+	};
+	QString defaultLang = detectSystemLang();
+	qDebug("i18n: auto-detected system language = %s", qUtf8Printable(defaultLang));
 
 	// Load saved language preference, or use auto-detected default
 	// v0.3.15.x PHASE-4: TypedConfig<QString> replaces bare QSettings
@@ -248,24 +273,46 @@ int main( int argc, char *argv[] )
 	// the static const caches the key, the default-override is
 	// applied at call time so the auto-detect still wins on first
 	// run.
+	//
+	// PHASE-5: A saved value of "" or "auto" re-runs auto-detection
+	// every startup. This lets users who flip Windows regional
+	// settings recover Chinese UI without manually re-picking the
+	// language in the Options menu.
 	QString savedLang;
 	{
 		static const fceu11::qt::TypedConfig<QString> kLanguage(
 			"General/Language", defaultLang);
 		savedLang = kLanguage.get();
 	}
+	if (savedLang.isEmpty() || savedLang.compare("auto", Qt::CaseInsensitive) == 0) {
+		savedLang = defaultLang;
+	}
 	extern QTranslator *g_earlyTranslator;
 	g_earlyTranslator = nullptr;
 	if (savedLang != "en")
 	{
 		g_earlyTranslator = new QTranslator(&app);
-		QString tsPath = QString(":/i18n/fceux11_%1.qm").arg(savedLang);
-		if (g_earlyTranslator->load(tsPath))
-		{
-			app.installTranslator(g_earlyTranslator);
+		QStringList candidates;
+		candidates << QString(":/i18n/fceux11_%1.qm").arg(savedLang);
+		candidates << QString(":/i18n/fceux11_%1").arg(savedLang);
+		QString exeDir = QCoreApplication::applicationDirPath();
+		candidates << exeDir + "/lang/fceux11_" + savedLang + ".qm";
+		candidates << exeDir + "/i18n/fceux11_" + savedLang + ".qm";
+		candidates << exeDir + "/../share/fceux11/i18n/fceux11_" + savedLang + ".qm";
+		candidates << exeDir + "/../lang/fceux11_" + savedLang + ".qm";
+		bool loaded = false;
+		for (const QString &path : candidates) {
+			if (g_earlyTranslator->load(path)) {
+				loaded = true;
+				qDebug("i18n: early translator loaded %s", qUtf8Printable(path));
+				break;
+			}
 		}
-		else
-		{
+		if (loaded) {
+			app.installTranslator(g_earlyTranslator);
+		} else {
+			qWarning("i18n: early translator failed to load fceux11_%s.qm; UI will start in English.",
+			         qUtf8Printable(savedLang));
 			delete g_earlyTranslator;
 			g_earlyTranslator = nullptr;
 		}

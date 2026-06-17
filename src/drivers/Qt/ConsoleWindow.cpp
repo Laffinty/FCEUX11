@@ -1163,6 +1163,21 @@ void consoleWin_t::createMainMenu(void)
 	// The advanced config dialogs (Input / GamePad / HotKey / Palette /
 	// Timing / State Recorder / Movie / Auto-Resume) are collected in
 	// the "Advanced -> Advanced Settings" sub-menu (built later).
+	//
+	// v0.3.15.x PHASE-5: Input Config is also promoted to the top of
+	// the Options menu (as its first action) so it is one click away
+	// from the menu bar without having to drill through Advanced.
+	// The same QAction is reused — the same QAction can live in
+	// multiple menus at once — so the entry in
+	// Advanced -> Advanced Settings remains accessible.
+
+	// Options -> Input Config (first row)
+	inputConfig = new QAction(tr("&Input Config"), this);
+	inputConfig->setStatusTip(tr("Input Configure"));
+	inputConfig->setIcon( QIcon(":icons/input-gaming.png") );
+	connect(inputConfig, SIGNAL(triggered()), this, SLOT(openInputConfWin(void)) );
+
+	optMenu->addAction(inputConfig);
 
 	// Options -> Sound Config
 	gameSoundConfig = new QAction(tr("&Sound Config"), this);
@@ -1640,12 +1655,13 @@ void consoleWin_t::createMainMenu(void)
 	connect( advSettingsMenu, SIGNAL(aboutToHide(void)), this, SLOT(mainMenuClose(void)) );
 
 	// Advanced -> Advanced Settings -> Input Config
-	inputConfig = new QAction(tr("&Input Config"), this);
-	inputConfig->setStatusTip(tr("Input Configure"));
-	inputConfig->setIcon( QIcon(":icons/input-gaming.png") );
-	connect(inputConfig, SIGNAL(triggered()), this, SLOT(openInputConfWin(void)) );
-
-	advSettingsMenu->addAction(inputConfig);
+	// v0.3.15.x PHASE-5: inputConfig is now created in the top-level
+	// Options menu (its first row) — re-use the same QAction here so
+	// the dialog is also reachable from Advanced without duplicating
+	// the trigger wiring.
+	if (inputConfig) {
+		advSettingsMenu->addAction(inputConfig);
+	}
 
 	// Advanced -> Advanced Settings -> GamePad Config
 	gamePadConfig = new QAction(tr("&GamePad Config"), this);
@@ -4744,6 +4760,42 @@ void autoFireMenuAction::setPattern(int on, int off)
 static QTranslator *appTranslator = nullptr;
 QTranslator *g_earlyTranslator = nullptr;
 
+// v0.3.15.x PHASE-5 fix: previously, if the embedded :/i18n/...
+// resource was missing (e.g. the qt_add_resources() target was
+// not linked into the executable, or the .qm was deleted from
+// the build tree), QTranslator::load() silently returned false
+// and the UI stayed in English. We now try the resource first,
+// then fall back to a sibling-of-exe lookup
+// ("<exe-dir>/lang/fceux11_<lang>.qm" and a few common dev/build
+// locations) so a half-installed build still translates when run
+// from the build output tree. We also emit a qWarning() so the
+// failure is visible in --debug logs.
+static bool loadQmWithFallback(QTranslator *translator, const QString &langCode)
+{
+	QStringList candidates;
+	candidates << QString(":/i18n/fceux11_%1.qm").arg(langCode);
+	candidates << QString(":/i18n/fceux11_%1").arg(langCode);
+
+	const QApplication *app = qobject_cast<QApplication *>(QCoreApplication::instance());
+	if (app) {
+		QString exeDir = QCoreApplication::applicationDirPath();
+		candidates << exeDir + "/lang/fceux11_" + langCode + ".qm";
+		candidates << exeDir + "/i18n/fceux11_" + langCode + ".qm";
+		candidates << exeDir + "/../share/fceux11/i18n/fceux11_" + langCode + ".qm";
+		candidates << exeDir + "/../lang/fceux11_" + langCode + ".qm";
+	}
+
+	for (const QString &path : candidates) {
+		if (translator->load(path)) {
+			qDebug("i18n: loaded %s", qUtf8Printable(path));
+			return true;
+		}
+	}
+	qWarning("i18n: failed to load any fceux11_%s.qm candidate; UI will stay in English.",
+	         qUtf8Printable(langCode));
+	return false;
+}
+
 void consoleWin_t::loadTranslation(const QString &langCode)
 {
 	if (!appTranslator)
@@ -4759,27 +4811,31 @@ void consoleWin_t::loadTranslation(const QString &langCode)
 		g_earlyTranslator = nullptr;
 	}
 
-	QString tsPath = QString(":/i18n/fceux11_%1.qm").arg(langCode);
-	if (appTranslator->load(tsPath))
+	if (loadQmWithFallback(appTranslator, langCode))
 	{
 		qApp->installTranslator(appTranslator);
 	}
 
-	// Save preference
+	// Save preference (skip the QSettings write for the implicit
+	// "en" sentinel so the auto-detect path keeps winning on
+	// future startups when the user has not explicitly chosen
+	// a language).
 	// v0.3.15.x PHASE-4: TypedConfig<QString>::set replaces bare
 	// QSettings::setValue. Same key path, same value, same
 	// QSettings backend, no behavioural change.
-	{
+	if (!langCode.isEmpty()) {
 		static const fceu11::qt::TypedConfig<QString> kLanguage(
 			"General/Language", QStringLiteral("en"));
 		kLanguage.set(langCode);
 	}
 
 	// Update checkmark on language actions (block signals to prevent setChecked from triggering loadTranslation)
-	QSignalBlocker blocker(languageActionGroup);
-	for (auto action : languageActionGroup->actions())
-	{
-		action->setChecked(action->data().toString() == langCode);
+	if (languageActionGroup) {
+		QSignalBlocker blocker(languageActionGroup);
+		for (auto action : languageActionGroup->actions())
+		{
+			action->setChecked(action->data().toString() == langCode);
+		}
 	}
 
 	retranslateUi();

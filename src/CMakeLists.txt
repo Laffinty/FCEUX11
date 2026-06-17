@@ -606,36 +606,29 @@ target_precompile_headers(fceux11_drivers_qt PRIVATE
 # Note: assets/i18n/ pre-v0.3.15 hand-written files are deprecated.
 # Lupdate is wired to the source tree so that re-running it refreshes
 # the .ts file with all current tr() calls (no manual file sync).
+#
+# v0.3.15.x PHASE-5: the previous qt_add_resources() flow produced
+# a separate static-lib target (fceux11_i18n) that the main fceux11
+# executable never linked against, leaving QTranslator::load()
+# returning false at runtime. We now run lrelease and copy the
+# .qm output into assets/i18n/ at build time, where resources.qrc
+# picks them up via CMAKE_AUTORCC — one less custom target, no
+# link-step risk.
 set(TS_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/lang/fceux11_en.ts
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/lang/fceux11_zh_CN.ts
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/lang/fceux11_zh_TW.ts
 )
 
+set(I18N_OUT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../assets/i18n)
+
 if(FCEUX11_ENABLE_I18N)
     find_package(Qt6 REQUIRED COMPONENTS LinguistTools)
 
-    # v0.3.15 PR-B: use Qt6 modern API (qt_add_lupdate + qt_add_lrelease).
-    # qt_add_lrelease compiles the .ts files to .qm and stashes them in
-    # QM_FILES_OUTPUT_VARIABLE. The qt_add_lupdate wiring from PR-B
-    # (which would re-scan source files for new tr() calls) was broken by
-    # Qt6LinguistTools v0.3.15's stricter SOURCE_TARGETS requirement and
-    # disabled per plan v3 §11 PHASE-1 fix; re-enable via scripts/i18n_update.ps1
-    # which calls lupdate_run.py directly. See docs/tech/i18n_Architecture_zh_CN.md.
-
     set_source_files_properties(${TS_FILES} PROPERTIES
-        OUTPUT_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/i18n)
+        OUTPUT_LOCATION ${I18N_OUT_DIR})
 
     qt_add_lrelease(TS_FILES ${TS_FILES} QM_FILES_OUTPUT_VARIABLE qm_files)
-
-    # Embed .qm files into Qt resources under :/i18n/. The legacy
-    # resources.qrc /i18n prefix is removed in PR-B to avoid a
-    # conflicting alias (resources.qrc:2-6).
-    if(qm_files)
-        qt_add_resources(fceux11_i18n "i18n"
-            PREFIX "/i18n"
-            FILES ${qm_files})
-    endif()
 endif()
 
 set(SOURCES ${SRC_DRIVERS_QT})

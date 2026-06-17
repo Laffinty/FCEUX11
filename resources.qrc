@@ -1,9 +1,13 @@
 <!DOCTYPE RCC><RCC version="1.0">
 <!--
-  v0.3.15 PR-B: /i18n prefix removed.
-  The .qm files are now embedded by qt_add_resources() in src/CMakeLists.txt
-  (see FCEUX11_ENABLE_I18N block). The legacy /i18n prefix conflicted with
-  the modern API's auto-generated aliases.
+  v0.3.15.x PHASE-5: /i18n prefix restored and now references the
+  .qm files at src/drivers/Qt/lang/. The previous qt_add_resources()
+  approach (which created a separate fceux11_i18n static-lib target
+  that was never linked into the executable) left QTranslator::load
+  returning false at runtime, so the UI silently fell back to
+  English even on a Chinese host. Listing the .qm files here puts
+  them through CMAKE_AUTORCC along with the icons — one less link
+  step, no "target was never linked" risk.
   /icons prefix is kept for backwards compatibility.
 
   v0.3.15.x PHASE-4: @2x.png variants for every icon under icons/ are
@@ -71,5 +75,10 @@
     <file alias="timer@2x.png">icons/timer@2x.png</file>
     <file alias="view-fullscreen.png">icons/view-fullscreen.png</file>
     <file alias="view-fullscreen@2x.png">icons/view-fullscreen@2x.png</file>
+</qresource>
+<qresource prefix="/i18n">
+    <file alias="fceux11_en.qm">assets/i18n/fceux11_en.qm</file>
+    <file alias="fceux11_zh_CN.qm">assets/i18n/fceux11_zh_CN.qm</file>
+    <file alias="fceux11_zh_TW.qm">assets/i18n/fceux11_zh_TW.qm</file>
 </qresource>
 </RCC>
