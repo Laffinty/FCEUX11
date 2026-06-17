@@ -35,6 +35,11 @@
 #include "Qt/GamePadConf.h"
 #include "Qt/AviRecord.h"
 
+#ifdef _WIN32
+// v0.3.15.x PHASE-3: ITaskbarList3 wrapper for Snap Layouts.
+#include "platform/win11/TaskbarProgress.h"
+#endif
+
 class  emulatorThread_t : public QThread
 {
 	Q_OBJECT
@@ -285,6 +290,11 @@ class  consoleWin_t : public QMainWindow
 		unsigned int updateCounter;
 #ifdef WIN32
 		HWND   helpWin;
+		// v0.3.15.x PHASE-3: ITaskbarList3 wrapper for Snap Layouts
+		// progress + overlay icon. Owned by consoleWin_t; init() is
+		// called from the constructor once the QMainWindow has a
+		// stable HWND, and release() runs in the destructor.
+		fceu11::platform::win11::TaskbarProgress *taskbarProgress;
 #else
 		int    helpWin;
 #endif
@@ -378,6 +388,16 @@ class  consoleWin_t : public QMainWindow
 		void consoleHardReset(void);
 		void consoleSoftReset(void);
 		void consolePause(void);
+
+#ifdef _WIN32
+		// v0.3.15.x PHASE-3: drive the Windows taskbar progress bar
+		// from long-running operations. pct in [0.0, 1.0]; pct < 0
+		// clears the bar. Safe to call from any thread; internally
+		// no-op when the ITaskbarList3 wrapper is not bound.
+		void setTaskbarProgress(double pct);
+		// Drive the progress state (TBPF_* constants from shobjidl.h).
+		void setTaskbarState(int tbpfState);
+#endif
 		void toggleGameGenie(bool checked);
 		void loadGameGenieROM(void);
 		void loadMostRecentROM(void);

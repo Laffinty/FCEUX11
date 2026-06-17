@@ -100,6 +100,17 @@ unsigned int gui_draw_area_height  = 256;
 // global configuration object
 Config *g_config = NULL;
 
+// v0.3.15.x PHASE-3: --no-console flag, parsed in fceuWrapperPreInit.
+bool g_noConsole = false;
+
+#ifdef _WIN32
+// v0.3.15.x PHASE-3: DirectStorage probe cache. Populated once at
+// fceuWrapperInit() entry; state.cpp and any other savestate I/O
+// code reads it without performing the probe again. The actual
+// IDStorageFactory takeover is deferred to v0.4.x.
+#include "platform/win11/DirectStorageProbe.h"
+#endif
+
 static int inited = 0;
 static int noconfig=0;
 static int frameskip=0;
@@ -675,6 +686,10 @@ static void ShowUsage(const char *prog)
 	puts ("--mute        {0|1}    Mutes FCEUX while still passing the audio stream to\n                         mencoder during avi creation.");
 #endif
 	puts ("--style=KEY            Use Qt GUI Style based on supplied key. Available system style keys are:\n");
+	puts ("--no-console           Skip AttachConsole + freopen redirection. Useful when launched from a\n");
+	puts ("                       pseudo-tty parent (MSYS2 mintty, WSL) to avoid the v0.3.14 BUG C\n");
+	puts ("                       crash, or when double-clicked from Explorer and you do not want\n");
+	puts ("                       the existing console window to receive stdout/stderr.\n");
 
 	QStringList styleList = QStyleFactory::keys();
 
@@ -724,6 +739,14 @@ int  fceuWrapperPreInit( int argc, char *argv[] )
 			printf("%i.%i.%i\n", FCEU_VERSION_MAJOR, FCEU_VERSION_MINOR, FCEU_VERSION_PATCH);
 			exit(0);
 		}
+		// v0.3.15.x PHASE-3: --no-console skips the AttachConsole +
+		// freopen redirection in main.cpp. Useful when the launcher is
+		// double-clicked from Explorer on a non-pseudo-tty parent (e.g.
+		// cmd.exe) so the existing console window is not hijacked.
+		else if ( strcmp(argv[i], "--no-console") == 0)
+		{
+			g_noConsole = true;
+		}
 	}
 	return 0;
 }
@@ -753,6 +776,26 @@ int  fceuWrapperInit( int argc, char *argv[] )
 	{
 		printf("Error setting SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS\n");
 	}
+
+#ifdef _WIN32
+	// v0.3.15.x PHASE-3: populate the cached DirectStorage probe
+	// result once at startup so state.cpp's FCEUSS_Save() can read
+	// g_directStorageCaps without paying the probe cost on every
+	// savestate write. The result is logged at INFO level so the
+	// build verification report can record the host capability.
+	{
+		const auto caps = fceu11::platform::win11::probeDirectStorage();
+		fceu11::platform::win11::g_directStorageCaps = caps;
+		if (caps.isSupported) {
+			FCEUD_Message("DirectStorage 1.2 NVMe probe: SUPPORTED");
+		} else {
+			std::string msg = "DirectStorage 1.2 NVMe probe: unsupported (";
+			msg += caps.errorReason;
+			msg += ")";
+			FCEUD_Message(msg.c_str());
+		}
+	}
+#endif
 
 	// Initialize the configuration system
 	g_config = InitConfig();

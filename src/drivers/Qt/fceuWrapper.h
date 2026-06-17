@@ -26,6 +26,13 @@ extern unsigned int emulatorCycleCount;
 // global configuration object
 extern Config *g_config;
 
+// v0.3.15.x PHASE-3: --no-console command-line flag.
+// When true, main.cpp skips the AttachConsole + freopen redirection
+// entirely, so the process never touches the parent console handles
+// (avoids pseudo-tty crash on MSYS2/WSL when the launcher is
+// double-clicked from Explorer).
+extern bool g_noConsole;
+
 int LoadGame(const char *path, bool silent = false);
 int CloseGame(void);
 int reloadLastGame(void);

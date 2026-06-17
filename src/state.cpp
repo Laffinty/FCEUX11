@@ -39,6 +39,13 @@
 #include "video.h"
 #include "input.h"
 #include "driver.h"
+
+#ifdef _WIN32
+// v0.3.15.x PHASE-3: DirectStorage probe scaffold. Only compiled in
+// on Windows; the entire namespace is empty on other platforms
+// (see src/platform/win11/DirectStorageProbe.h).
+#include "platform/win11/DirectStorageProbe.h"
+#endif
 #ifdef _S9XLUA_H
 #include "fceulua.h"
 #endif
@@ -370,12 +377,18 @@ void FCEUSS_Save(const char *fname, bool display_message)
 	EMUFILE* st = 0;
 	std::string fn;
 
-	// v0.3.15 PR-D TODO: DirectStorage 1.2 NVMe bypass (plan §5 v0.3.15)
-	// When NvmeSdsSupported() is true, route the .fc0/.fcs write through
-	// IDStorageFactory -> IDStorageQueue for zero-copy async I/O. The current
-	// path uses std::fstream, which is bound by the OS page cache.
-	// Implementation deferred to v0.4.x (requires vcpkg `directstorage` dep
-	// and a 1-2 person-day refactor of EMUFILE_FILE).
+	// v0.3.15.x PHASE-3: DirectStorage probe scaffold added.
+	// probeDirectStorage() in src/platform/win11/DirectStorageProbe.cpp
+	// is invoked once during fceuWrapperInit() and the result is
+	// cached in fceu11::platform::win11::g_directStorageCaps. When
+	// caps.isSupported is true, the v0.4.x takeover will route the
+	// .fc0/.fcs write through IDStorageFactory -> IDStorageQueue for
+	// zero-copy async I/O. The current path uses std::fstream, which
+	// is bound by the OS page cache. Implementation deferred to v0.4.x
+	// (requires vcpkg `directstorage` dep and a 1-2 person-day
+	// refactor of EMUFILE_FILE).
+	extern fceu11::platform::win11::DirectStorageCaps g_directStorageCaps;
+	(void)g_directStorageCaps; // referenced for future v0.4.x takeover
 
 	if (geniestage==1)
 	{

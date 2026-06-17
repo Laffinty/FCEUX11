@@ -148,9 +148,36 @@ int main( int argc, char *argv[] )
 	QApplication::setAttribute(Qt::AA_DontShowShortcutsInContextMenus, false);
 
 	#ifdef WIN32
-	QSettings themeSettings("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
-	                        QSettings::NativeFormat);
-	bool isDarkMode = themeSettings.value("AppsUseLightTheme", 1).toInt() == 0;
+	// v0.3.15.x PHASE-3: detect system dark mode via the Win10 1809+
+	// uxtheme.dll!ShouldAppsUseDarkMode (ordinal 132) instead of the
+	// QSettings registry path. The native API is faster (no registry
+	// round-trip) and survives if the Personalize key is ever renamed
+	// in a future Windows release. Falls back to the registry path on
+	// Windows builds that do not export the ordinal.
+	bool isDarkMode = false;
+	bool usedNativeApi = false;
+	{
+		HMODULE hUxtheme = LoadLibraryW(L"uxtheme.dll");
+		if (hUxtheme != nullptr) {
+			using ShouldAppsUseDarkModeFn = bool (WINAPI*)();
+			auto pfn = reinterpret_cast<ShouldAppsUseDarkModeFn>(
+				GetProcAddress(hUxtheme, MAKEINTRESOURCEA(132)));
+			if (pfn != nullptr) {
+				isDarkMode = pfn();
+				usedNativeApi = true;
+			}
+			FreeLibrary(hUxtheme);
+		}
+		if (!usedNativeApi) {
+			// Fallback: registry detection for Win10 1809- / shells
+			// that do not export the ordinal. This branch runs at
+			// most once per process (on startup).
+			QSettings themeSettings(
+				"HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+				QSettings::NativeFormat);
+			isDarkMode = themeSettings.value("AppsUseLightTheme", 1).toInt() == 0;
+		}
+	}
 	if (isDarkMode)
 	{
 		QFile styleSheetFile(":/styles/dark.qss");
@@ -237,7 +264,12 @@ int main( int argc, char *argv[] )
 	//
 	// Guard: only redirect when GetConsoleWindow() is non-NULL after attach,
 	// which indicates a real Windows console (not a pseudo-tty).
-	if (AttachConsole(ATTACH_PARENT_PROCESS) && GetConsoleWindow() != NULL)
+	//
+	// v0.3.15.x PHASE-3: --no-console command-line argument skips the
+	// entire AttachConsole + freopen block. The flag is parsed in
+	// fceuWrapperPreInit (which runs before main reaches this point).
+	extern bool g_noConsole;
+	if (!g_noConsole && AttachConsole(ATTACH_PARENT_PROCESS) && GetConsoleWindow() != NULL)
 	{
 		HANDLE hConOut = CreateFileA("CONOUT$", GENERIC_WRITE, FILE_SHARE_WRITE,
 		                            NULL, OPEN_EXISTING, 0, NULL);

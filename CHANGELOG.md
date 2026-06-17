@@ -95,6 +95,76 @@ menu 5+1 audience-tiered restructuring + i18n infrastructure per plan v3
 - High-DPI `@2x.png` icon variants for the 30+ icons in `icons/`.
 - `fceuWrapper.cpp:36` cross-boundary `tr()` audit.
 
+## [0.3.15.x] - 2026-06-17 (PHASE-3 partial)
+
+F-track sub-version: Win11 platform features (PHASE-3 subset) per
+`docs/v0.3.15_Build_Plan.md` §2 PHASE-3.
+
+### Added
+
+- **`--no-console` command-line argument.** Parsed in
+  `fceuWrapperPreInit` (sets `g_noConsole = true`); `main.cpp` skips the
+  `AttachConsole` + `freopen` redirection block when set. Useful when
+  the launcher is double-clicked from Explorer on a non-pseudo-tty
+  parent and you do not want stdout/stderr to leak into the existing
+  console window. Listed in `--help` output.
+- **`src/platform/win11/DirectStorageProbe.h/.cpp`** — probe-only
+  DirectStorage 1.2 NVMe scaffold. `probeDirectStorage()` invokes
+  `NvmeSdsSupported()` (resolved via `GetProcAddress` to avoid a hard
+  link-time dependency on `nvme.lib`) and verifies `dstorage.dll` is
+  loadable. Result is cached in a function-local static
+  (`g_directStorageCaps`); logged at startup with
+  `FCEUD_Message`. Actual I/O takeover of `.fc0` / `.fcs` writes is
+  deferred to v0.4.x. The TODO comment block in `state.cpp:373` was
+  updated to reference the cached caps.
+- **`src/platform/win11/TaskbarProgress.h/.cpp`** — `ITaskbarList3`
+  wrapper exposing `setProgress(double)` / `setState(int)` /
+  `setOverlayIcon(HICON, LPCWSTR)` / `setThumbnailTooltip(LPCWSTR)`.
+  `consoleWin_t` allocates and binds the wrapper in its constructor
+  (HWND via `winId()`), releases in the destructor. `consolePause()`
+  toggles the overlay icon and the `TBPF_PAUSED` state. Public
+  helpers `setTaskbarProgress()` / `setTaskbarState()` are exposed
+  for the TAS Editor and savestate paths to drive the bar.
+- **Win10 1809+ `ShouldAppsUseDarkMode` native detection.** `main.cpp`
+  now resolves the uxtheme.dll ordinal 132 at startup; falls back to
+  the existing QSettings `AppsUseLightTheme` registry path only when
+  the ordinal is unavailable (Win10 1809- or shells that do not
+  export it).
+
+### Changed
+
+- **`src/CMakeLists.txt`**: new `FCEUX11_DIRECT_STORAGE_PROBE` option
+  (default `ON`); when `ON` and `WIN32`, builds the
+  `fceu11_direct_storage_probe` static library containing
+  `DirectStorageProbe.cpp` and `TaskbarProgress.cpp`, then links it
+  into `fceux11_drivers_qt`. The library intentionally does NOT link
+  `nvme.lib` because the probe resolves `NvmeSdsSupported()` at
+  runtime to keep the toolchain dependency-free.
+- **`src/state.cpp`**: include guard added for
+  `platform/win11/DirectStorageProbe.h`; the `g_directStorageCaps`
+  extern declaration references the cached probe result for the
+  future v0.4.x savestate fast path.
+
+### Verified
+
+- `cl /Zs` syntax check: `DirectStorageProbe.cpp`,
+  `TaskbarProgress.cpp`, and `main.cpp` all compile clean (encoding
+  warning `C4819` only).
+- No regression to v0.3.14 BUG A/B/C fixes (the `--no-console`
+  addition only adds a guard; the `freopen` path is preserved on
+  the default invocation).
+- Iron rule 9 honoured: MSVC toolchain only, no new compiler
+  dependencies.
+
+### Deferred to v0.3.15.x (remaining PHASE-1~5)
+
+- 30+ sub-dialog `changeEvent + retranslateUi` (PHASE-2).
+- Full machine translation of 3,481 `tr()` source strings (PHASE-1).
+- 3 of 6 `keyPress override` files (PHASE-2).
+- `TypedConfig<T>` QSettings wrapper (PHASE-4).
+- High-DPI `@2x.png` icon variants (PHASE-4).
+- 24h smoke test + GitHub Release draft (PHASE-5).
+
 ## [0.3.14] - 2026-06-14
 
 E-track sub-version: video backend modernization per plan v3 §5 v0.3.14.

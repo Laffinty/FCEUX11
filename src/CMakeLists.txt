@@ -106,6 +106,12 @@ set(APP_ICON_RESOURCES_WINDOWS  ${CMAKE_SOURCE_DIR}/icons/fceux11.rc )
 
 option(FCEUX11_LUA_RUST_ENABLED "Use Rust Lua engine (mlua) instead of C++ Lua engine" ON)
 option(FCEUX11_WGI_BACKEND "Enable Windows.Gaming.Input backend (requires WinRT/C++/WinRT)" OFF)
+# v0.3.15.x PHASE-3: probe-only DirectStorage scaffold. The probe
+# detects NvmeSdsSupported() + dstorage.dll availability at startup
+# but does not take over any I/O. Actual takeover of .fc0/.fcs
+# writes is deferred to v0.4.x per docs/v0.3.15_Build_Plan.md
+# PHASE-3 task 3.2.
+option(FCEUX11_DIRECT_STORAGE_PROBE "Enable DirectStorage 1.2 NVMe probe (Windows only)" ON)
 
 if(FCEUX11_LUA_RUST_ENABLED AND FCEUX11_RUST_ENABLED)
     message(STATUS "Using Rust Lua engine (mlua vendored Lua 5.1)")
@@ -517,6 +523,20 @@ if(FCEUX11_WGI_BACKEND)
   list(APPEND SRC_QT ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/input/wgi_backend.cpp)
 endif()
 
+# v0.3.15.x PHASE-3: DirectStorage 1.2 NVMe probe scaffold. Compiled
+# into a separate library so the probe code can be disabled via
+# -DFCEUX11_DIRECT_STORAGE_PROBE=OFF without touching the rest of
+# the build. The library is linked in below; note that we do NOT
+# link nvme.lib because the probe resolves NvmeSdsSupported() at
+# runtime via GetProcAddress to keep the toolchain dependency-free.
+if(FCEUX11_DIRECT_STORAGE_PROBE AND WIN32)
+  add_library(fceu11_direct_storage_probe STATIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/platform/win11/DirectStorageProbe.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/platform/win11/TaskbarProgress.cpp)
+  target_include_directories(fceu11_direct_storage_probe PUBLIC
+    ${CMAKE_SOURCE_DIR}/src)
+endif()
+
 add_library(fceux11_utils STATIC ${SRC_UTILS})
 target_link_libraries(fceux11_utils PUBLIC Qt6::Widgets ${ZLIB_LIBRARIES})
 target_include_directories(fceux11_utils PUBLIC ${CMAKE_SOURCE_DIR}/src)
@@ -567,6 +587,9 @@ if(${QHELP})
 endif()
 if(FCEUX11_WGI_BACKEND)
     target_link_libraries(fceux11_drivers_qt PUBLIC WindowsApp)
+endif()
+if(FCEUX11_DIRECT_STORAGE_PROBE AND WIN32)
+    target_link_libraries(fceux11_drivers_qt PUBLIC fceu11_direct_storage_probe)
 endif()
 target_include_directories(fceux11_drivers_qt PUBLIC
     ${CMAKE_SOURCE_DIR}/src

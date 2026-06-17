@@ -50,6 +50,7 @@
 #include "../../state.h"
 #include "../../profiler.h"
 #include "../../version.h"
+#include "../../core_api.h"
 #include "common/os_utils.h"
 #include "utils/timeStamp.h"
 
@@ -140,6 +141,15 @@ consoleWin_t::consoleWin_t(QWidget *parent)
 	mainMenuPauseWhenActv  = false;
 	autoHideMenuFullscreen = false;
 
+#ifdef _WIN32
+	// v0.3.15.x PHASE-3: bind the ITaskbarList3 wrapper to the
+	// QMainWindow's HWND. The wrap is non-owning and lives for the
+	// lifetime of consoleWin_t; the destructor releases the COM
+	// reference. Failure to bind is non-fatal (older Windows / non-
+	// shell processes), so we just leave taskbarProgress == nullptr.
+	taskbarProgress = nullptr;
+#endif
+
 	createMainMenu();
 
 	g_config->getOption( "SDL.PauseOnMainMenuAccess", &mainMenuPauseWhenActv );
@@ -153,6 +163,21 @@ consoleWin_t::consoleWin_t(QWidget *parent)
 	setWindowTitle( tr(FCEU_NAME_AND_VERSION) );
 	setWindowIcon(QIcon(":fceux1.png"));
 	setAcceptDrops(true);
+
+#ifdef _WIN32
+	// v0.3.15.x PHASE-3: Snap Layouts / taskbar progress hookup.
+	// The QMainWindow is fully constructed by this point and has a
+	// stable HWND, so we can hand it to ITaskbarList3. We allocate
+	// the wrapper on the heap so the dtor release() runs at a
+	// deterministic point (consoleWin_t dtor below).
+	{
+		taskbarProgress = new fceu11::platform::win11::TaskbarProgress();
+		if (!taskbarProgress->init( (HWND)winId() )) {
+			delete taskbarProgress;
+			taskbarProgress = nullptr;
+		}
+	}
+#endif
 
 	gameTimer  = new QTimer( this );
 mutex      = new QRecursiveMutex();
@@ -280,7 +305,20 @@ consoleWin_t::~consoleWin_t(void)
 	// Signal Emulator Thread to Stop
 	nes_shm->runEmulator = 0;
 
-	gameTimer->stop(); 
+#ifdef _WIN32
+	// v0.3.15.x PHASE-3: release the ITaskbarList3 wrapper before
+	// the QMainWindow HWND is destroyed (the wrapper holds the
+	// HWND; if we let the QObject parent destructor free the
+	// wrapper first, the HWND is still valid because Qt tears down
+	// children after this dtor, so the order is safe).
+	if (taskbarProgress) {
+		taskbarProgress->release();
+		delete taskbarProgress;
+		taskbarProgress = nullptr;
+	}
+#endif
+
+	gameTimer->stop();
 
 	closeGamePadConfWindow();
 
@@ -3436,8 +3474,43 @@ void consoleWin_t::consolePause(void)
 	FCEU_WRAPPER_UNLOCK();
 
 	mainMenuEmuPauseSet = false;
+
+#ifdef _WIN32
+	// v0.3.15.x PHASE-3: update the taskbar overlay icon and
+	// progress state to reflect the new pause state. We deliberately
+	// do NOT add a custom HICON resource here; the existing icon
+	// is cleared (nullptr) and the progress state is switched to
+	// TBPF_PAUSED so the bar shows the standard Windows paused
+	// (yellow) accent.
+	if (taskbarProgress) {
+		const bool nowPaused = FCEUI_EmulationPaused() != 0;
+		taskbarProgress->setOverlayIcon(nullptr,
+			nowPaused ? L"Paused" : L"");
+		if (nowPaused) {
+			taskbarProgress->setState(TBPF_PAUSED);
+		} else {
+			taskbarProgress->setState(TBPF_NOPROGRESS);
+		}
+	}
+#endif
    return;
 }
+
+#ifdef _WIN32
+void consoleWin_t::setTaskbarProgress(double pct)
+{
+	if (taskbarProgress) {
+		taskbarProgress->setProgress(pct);
+	}
+}
+
+void consoleWin_t::setTaskbarState(int tbpfState)
+{
+	if (taskbarProgress) {
+		taskbarProgress->setState(tbpfState);
+	}
+}
+#endif
 
 void consoleWin_t::setRegion(int region)
 {
