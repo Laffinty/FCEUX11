@@ -8,8 +8,8 @@
 //
 // Scope: this is the progress + overlay icon subset of ITaskbarList3.
 // Snap Layouts hover prompts (SetThumbnailTooltip) and the Win11
-// 22H2+ taskbar progress accent policies are deferred to v0.4.x per
-// docs/v0.3.15_Build_Plan.md PHASE-3 task 3.3.
+// 22H2+ taskbar progress accent policies are deferred to v2.0 per
+// v0.3.x construction plan v3 §5 v0.3.15 PHASE-3 task 3.3.
 
 #pragma once
 

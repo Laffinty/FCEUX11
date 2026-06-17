@@ -1,0 +1,304 @@
+================================================================================
+  FCEUX11 技术文档 / 24 小时烟雾测试方法与监控指标
+  24-Hour Smoke Test Methodology & Monitoring Metrics
+================================================================================
+
+【写在前面 / Preface】
+================================================================================
+
+  本章讲 FCEUX11 release-day 的「最后一道闸」：24 小时不间断烟雾
+  测试。它是 plan v3 §7 闸 4（烟雾闸）的物理延伸，但 24 小时墙钟
+  无法压缩进单次 agent session，所以本章以「protocol 文档 + 操作
+  模板」形式落地，release engineer 拿着它上 release hardware 跑。
+
+  本章目标：
+    1. 拆解 24h 烟雾测试要抓的 6 类异常
+    2. 给出 6 ROM × 4 循环 × 1 小时的标准 protocol
+    3. 列出 5 类监控指标 + 4 类日志
+    4. 给出 8 条 pass/fail 判定标准
+    5. 解释如何把烟雾测试异常归并进 15 章「崩溃案例库」
+
+  阅读时间：约 20 分钟。
+  前置知识：跑过 fceux11.exe + nestest.nes；知道 ctest 通过 release
+            闸 1~5；懂 PowerShell + Get-Process。
+
+================================================================================
+1. 24h 烟雾测试的 6 类目标异常
+================================================================================
+
+  1.1 内存泄漏 (Memory Leak)
+
+    24h 内反复加载/卸载同一 ROM，监测 RSS（Resident Set Size）轨迹。
+    干净运行：RSS 在 ±5 MB 稳态基线内波动，无单调上升趋势。
+    异常模式：每次 savestate 写后 RSS 单调 +1~2 MB → Qt QObject
+              父子链泄漏。
+
+  1.2 GPU 驱动故障 (GPU Driver Fault)
+
+    Win11 DWM (Desktop Window Manager) 或 OpenGL 上下文丢失事件。
+    监测来源：Windows Event Log 的 Application hang /
+              DXGI_ERROR_DEVICE_REMOVED + 应用内 OpenGL 错误日志。
+    目标：24h 内 0 事件。
+
+  1.3 音频欠载 (Audio Buffer Underrun)
+
+    SDL2 + WinMM 后端在长时运行下偶发欠载（音频撕裂 / 噪声爆音）。
+    监测来源：FCEUI_DispMessage 输出的 underrun 日志。
+    目标：启动后 5s 暖机结束后 0 欠载。
+
+  1.4 存档完整性 (Save-State Integrity)
+
+    每 60s 写一次 savestate，事后加载到干净的 fceux11 实例，验证：
+      - 帧计数器 = 记录值
+      - PPU 帧缓冲 hash = Gate 3 参考值
+      - 无 "Save-state version mismatch" 错误
+    任何不一致 = savestate 回归 → release blocker。
+
+  1.5 休眠/唤醒崩溃 (Sleep/Wake Crash)
+
+    笔记本合盖休眠后唤醒是否崩溃。FCEUX11 历史上 QObject 跨进程
+    状态恢复出过问题（详见 15 章「案例 B 键盘事件丢失」）。
+    监测：在 24h 中段（hour 12）模拟一次合盖/唤醒。
+
+  1.6 语言切换崩溃 (Language-Switch Crash)
+
+    i18n 是 v0.3.15 主版本的新增功能，runtime 切语言是
+    i18n_regression_test 静态门控覆盖不到的部分。
+    监测：每 15 分钟 en → zh_CN → zh_TW → en 切一轮，24h 共 96 轮。
+    目标：96/96 不崩溃。
+
+================================================================================
+2. 测试设施（硬件 + 软件 profile）
+================================================================================
+
+  2.1 硬件 profile 模板
+
+    在执行前填写以下信息（任何空格都要填，unknown 也要写）：
+
+      CPU:       <e.g. AMD Ryzen 7 7840U>
+      GPU:       <e.g. Intel Arc / NVIDIA RTX 4060>
+      RAM:       <e.g. 32 GB>
+      OS:        Windows 11 24H2 (build 26100.xxxx)
+      Display:   <e.g. 3840×2160 @ 200% scaling>
+      Power:     <AC mains 或 电池 + 续航时间>
+
+  2.2 软件 profile 模板
+
+      Binary:    build/src/fceux11.exe  (PHASE-5 build, Release)
+      Config:    C:\Users\<op>\AppData\Roaming\FCEUX11\fceux11.ini
+      VC++ Runtime: latest stable (VC_redist.x64)
+      Qt:        6.8.0 LTS (vcpkg)
+      SDL2:      2.30.5 (vcpkg)
+
+  2.3 工具链就绪
+
+    必备工具（PowerShell Gallery 或 winget 安装）：
+
+      # 进程监控
+      Get-Process fceux11
+
+      # GPU 引擎占用（需 GPUView 或 RenderDoc）
+      RenderDoc /gpuview
+
+      # 应用日志（崩溃记录）
+      Get-WinEvent -LogName Application -FilterXPath '*[System[Provider[@Name="Application Error"]]]'
+
+      # savestate hash 验证
+      sha256sum C:\smoke\*.fc0
+
+================================================================================
+3. ROM 名单（6 个，覆盖主要 mapper 类别）
+================================================================================
+
+  +------+-----------------------------+--------+--------------------+
+  | 槽  | ROM                         | Mapper | 用途               |
+  +------+-----------------------------+--------+--------------------+
+  | 1    | fixtures/nestest.nes        | NROM-256 | CPU stress + hash  |
+  | 2    | fixtures/mapper_nrom.nes    | NROM   | idle NMI 循环泄漏  |
+  | 3    | fixtures/mapper_mmc3.nes    | MMC3   | IRQ + scanline 时序|
+  | 4    | fixtures/smb1.nes           | MMC3   | 全系统集成         |
+  | 5    | fixtures/zelda1.nes         | MMC3   | 每 60s savestate   |
+  | 6    | fixtures/contra.nes         | MMC3   | 4-player input     |
+  +------+-----------------------------+--------+--------------------+
+
+  若 fixtures 缺 smb1/zelda1/contra，从已知好 CI corpus 替换；
+  跑前 sha256 记录基线，事后 bit-rot 可被排除。
+
+  ROM 名单设计的覆盖度：
+    NROM 是最简单的 mapper，nestest 覆盖 CPU 全部指令；
+    smb1/zelda1/contra 是真实游戏，触发 mapper IRQ + 大量
+    PPU 写入 + APU 混合，是「现实世界」压力源。
+
+================================================================================
+4. 单 ROM 循环 protocol（1 小时）
+================================================================================
+
+  每个 ROM 跑 1 小时，6 个 ROM × 4 循环 = 24 小时：
+
+      For each ROM in roster:
+          Launch:    fceux11.exe --no-console <rom>
+          Wait 5s    (boot + rom init)
+          Record:    RAM working set (Get-Process fceux11)
+                     GPU engine utilization (RenderDoc / GPUView)
+          Loop for 60 minutes:
+              Every 60s:
+                  Save-state to C:\smoke\<rom>-<cycle>-<minute>.fc0
+                  Take window screenshot (PowerShell + System.Drawing)
+                  Record RSS / CPU% / GPU%
+              Every 5 minutes:
+                  Rotate input A/B button 100 times (game pad stress)
+              Every 15 minutes:
+                  Switch language: en → zh_CN → zh_TW → en
+                  Open ConsoleDebugger → close
+                  Open HexEditor → search for "FF FF" → close
+                  Open TasEditor → close
+          At 60-minute mark:
+              Stop the process
+              Hash all saved states (sha256sum *.fc0 > <rom>-<cycle>.sha256)
+              Verify hashes match the v0.3.14 reference hashes
+              Restart and proceed to next ROM
+
+  4.1 protocol 的设计依据
+
+    5s boot wait：模拟真实用户的「点开 → 看一眼」场景。
+    60s savestate：每分钟 1 次 × 60 分钟 = 60 个 savestate / ROM，
+                   共 60 × 6 × 4 = 1440 个 savestate。任意一个坏
+                   都能被 hash 校验抓到。
+    5min input rotation：模拟长时间游戏的手柄微动；SDL 事件队列
+                        满载测试。
+    15min language switch：96 轮覆盖 v0.3.15 全部语言切换路径
+                          + widget retranslate 触发。
+
+  4.2 4 循环的设置
+
+    Cycle 1: initial baseline（首次稳定性）
+    Cycle 2: post-cycle-1 stability（确认 cycle 1 的释放不影响 cycle 2）
+    Cycle 3: post-cycle-2 stability
+    Cycle 4: final pre-release stability
+
+    任何 cycle 出现 crash / leak / 性能抖动 → 立即 abort 整个
+    24h 流程，回到闸 1~5 重跑。
+
+================================================================================
+5. 监控指标（5 类）+ 日志（4 类）
+================================================================================
+
+  5.1 内存（RSS）轨迹
+
+    工具：Get-Process fceux11 | Select WorkingSet
+    频率：每 60s
+    记录：Hour 0 RSS, Hour 1 RSS, Δ
+    判定：Δ < ±5 MB → 干净；单调上升 → 泄漏。
+
+  5.2 GPU / DWM 故障
+
+    工具：Windows Event Log + 应用内 OpenGL 错误流
+    频率：实时
+    记录：GL_INVALID_FRAMEBUFFER_OPERATION 事件数，
+          DXGI_ERROR_DEVICE_REMOVED 事件数
+    判定：0 事件 → 通过；任何事件 → release blocker。
+
+  5.3 音频欠载
+
+    工具：FCEUI_DispMessage 日志 + ffmpeg 录音
+    频率：实时
+    记录：欠载事件数
+    判定：启动 5s 暖机后 0 欠载 → 通过。
+
+  5.4 崩溃计数
+
+    工具：Get-WinEvent -LogName Application
+    频率：实时
+    记录：每次崩溃的 stack signature（带 PDB 才能解析）
+    判定：24h 内 0 崩溃 → 通过。崩溃若在 v0.3.14 clean build 也
+         能复现，标记为 pre-existing，不阻断 release。
+
+  5.5 savestate 完整性
+
+    工具：sha256sum + 加载到 fresh fceux11.exe --no-console
+    频率：每个 savestate 写后立即
+    记录：frame counter, PPU hash
+    判定：与 Gate 3 参考值完全一致 → 通过。
+
+  5.6 日志归档
+
+    4 类日志必须留底供事后分析：
+
+      L1. Get-WinEvent Application 日志（崩溃）
+      L2. FCEUI_DispMessage 输出（应用内 warning/error）
+      L3. RSS / CPU% / GPU% 时间序列（CSV 文件）
+      L4. savestate hash 清单（sha256sum 文件）
+
+================================================================================
+6. 8 条 Pass/Fail 判定
+================================================================================
+
+  +----+------------------------------------+-------+
+  | #  | 判定                               | 结果 |
+  +----+------------------------------------+-------+
+  | 1  | 24h uptime 无 crash                | ☐/☐ |
+  | 2  | 6 ROM × 4 cycle RSS ±5 MB 稳态     | ☐/☐ |
+  | 3  | 0 GPU / DWM 故障                   | ☐/☐ |
+  | 4  | 0 音频欠载（启动 5s 后）           | ☐/☐ |
+  | 5  | 所有 savestate 加载后 hash 一致    | ☐/☐ |
+  | 6  | 96 轮语言切换无崩溃                | ☐/☐ |
+  | 7  | 6 ROM 全部跑完 1h 标记             | ☐/☐ |
+  | 8  | 无新崩溃模式加入 15 章案例库       | ☐/☐ |
+  +----+------------------------------------+-------+
+
+  8 条全过 = PASS → ship v0.3.15.x
+  任何 1 条不过 = FAIL → hotfix 到 v0.3.15.x+1，回到闸 1~5 重跑
+
+================================================================================
+7. 异常崩溃归并到 15 章「崩溃案例库」
+================================================================================
+
+  24h 烟雾测试中遇到任何新崩溃，按以下工序归并：
+
+  1. 用 Get-WinEvent 取 stack signature（含 PDB 路径）
+  2. 复制 15 章「案例 B」模板（详见 docs/tech/15_GUI启动崩溃调试案例库.txt）
+  3. 填写：
+      - 复现 ROM（slot 1-6）
+      - 触发阶段（boot / 5min input / 15min language / 60min savestate）
+      - Stack signature
+      - 修复 commit hash（若有）
+  4. PR 合入 15 章，commit message: docs(crash-case): add 24h smoke
+     finding <category> in v0.3.15.x
+
+================================================================================
+8. 物理约束：为何 protocol 文档化但不在 agent session 内跑
+================================================================================
+
+  24h 墙钟的本质约束：
+
+  - 单次 agent session 通常 < 1h（最长 2-3h），24h 物理上无法
+    压缩到单 session。
+  - agent 跑 24h 等同于「hang 进程 24h 等待退出码」，浪费 token
+    与 GPU 配额，无任何额外信号。
+  - 真正的 24h 烟雾测试是 release engineer 在专用 release hardware
+    上跑的，由 GitHub Actions matrix 或人工执行。
+
+  v0.4.x 展望（不在 v0.3.15.x 范围）：
+    - GitHub Actions Win11 runner 支持后，24h 烟雾测试可改成
+      scheduled job，每周自动跑，结果自动 publish 到 artifacts。
+    - WinAppDriver / Appium 把闸 4 的动态部分（GUI 视觉验证）
+      自动化，移除「release-day 手动跑」的人工成本。
+    - bench + ASan 二合一：bench 脚本同时输出 ms/frame 与
+      __asan_* 触发计数，节省一次 build。
+
+================================================================================
+9. 总结
+================================================================================
+
+  24h 烟雾测试是 plan v3 §7 闸 4 的物理延伸，抓 6 类异常（内存
+  泄漏 / GPU 故障 / 音频欠载 / savestate 完整性 / 休眠唤醒 /
+  语言切换）。Protocol 本身（6 ROM × 4 cycle × 1h）是固定模板，
+  8 条 pass/fail 判定是 release contract。物理约束决定它不能
+  在 agent session 内跑，只能以「protocol 文档 + 操作模板」
+  形式落地，release engineer 拿着上 release hardware。
+
+  相关文档：
+    - docs/tech/12_测试方法论与质量门控.txt  §1 测试金字塔
+    - docs/tech/15_GUI启动崩溃调试案例库.txt  崩溃模板
+    - docs/tech/16_五道闸验证方法与铁律审计.txt  闸 4 介绍
+    - CHANGELOG.md  [0.3.15.x] (PHASE-5 complete)  5-gate 收官

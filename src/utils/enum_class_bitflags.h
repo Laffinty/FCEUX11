@@ -1,6 +1,6 @@
 // FCEUX11 — Bitflag helpers for scoped enumerations (v0.3.8)
 //
-// Per docs/v0.3.x_Construction_Plan_v3.md §5 v0.3.8 task 5: introduce a
+// Per v0.3.x construction plan v3 §5 v0.3.8 task 5: introduce a
 // FCEU_ENUM_CLASS_BITFLAGS(E) macro (akin to magic_enum's bit-flags
 // pattern) that auto-generates the bitwise operator set for a scoped
 // enumeration so callers can write idiomatic

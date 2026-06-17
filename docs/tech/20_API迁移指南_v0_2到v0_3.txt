@@ -1,0 +1,406 @@
+================================================================================
+  FCEUX11 技术文档 / API 迁移指南 v0.2 → v0.3
+  API Migration Guide from v0.2 to v0.3
+================================================================================
+
+【写在前面 / Preface】
+================================================================================
+
+  本章面向使用 FCEUX11 公共 API 的外部用户（mapper 扩展作者、GUI
+  插件开发者、脚本嵌入者）。v0.3.x 期间（v0.3.7 ~ v0.3.16）做了
+  大量 API 现代化，按 plan v3 §6.1 三阶段策略推进：
+    - 阶段 1：仅新符号入 fceu11:: 命名空间（旧符号保留全局）
+    - 阶段 2：新 API 头中 FCEUI_* 改 fceu11::Foo，通过 using
+              别名保留旧名
+    - 阶段 3：v0.4.0 删除 using 别名（旧符号全部迁出）
+
+  本章目标：
+    1. 列出 v0.2 → v0.3 的所有 API 变更点（按文件分组）
+    2. 给出「机械替换 + 行为验证」两步迁移路径
+    3. 解释为什么 v0.3.x 期间不删除旧符号（plan §6.1 兼容策略）
+    4. 提供 4 类典型场景的迁移实例
+
+  阅读时间：约 30 分钟。
+  前置知识：知道 FCEUX11 v0.2.x 公共 API（FCEUI_* 符号）；用过
+            src/core_api.h / src/io_api.h / src/movie.h。
+
+================================================================================
+1. v0.3.x API 变更总览
+================================================================================
+
+  1.1 三大变更类别
+
+    A. 类型现代化 (v0.3.7 ~ v0.3.8)
+       - 旧 C-style enum → enum class
+       - 旧 unscoped 常量 → inline constexpr int
+       - 旧 typedef → using
+
+    B. 命名空间迁移 (v0.3.10 P4)
+       - FCEUI_* 符号 → fceu11::Foo
+       - 旧符号通过 inline using 保留为全局别名
+
+    C. 接口现代化 (v0.3.5 ~ v0.3.10)
+       - FCEU_malloc/free/dmalloc/dfree → std::unique_ptr
+       - EMUFILE (void*, size_t) → std::span<std::byte>
+       - driver.h 物理拆分（core_api.h / io_api.h / net_api.h /
+         diag_api.h）
+
+  1.2 旧符号保留状态（v0.3.16 LTS 视角）
+
+  +---------------------+--------------------+----------------------+
+  | 旧符号              | v0.3.16 状态        | 实际删除版本         |
+  +---------------------+--------------------+----------------------+
+  | FCEUI_*  (250+)     | inline shim, 走     | v0.4.0              |
+  |                     | fceu11::Foo         |                      |
+  | fceuScopedPtr<T>    | [[deprecated]]      | v0.4.0              |
+  |                     | alias               |                      |
+  | FCEU_malloc/free    | [[deprecated]]      | v0.4.0              |
+  | FCEU_dmalloc/dfree  | [[deprecated]]      | v0.4.0              |
+  | ESI / SI_*          | using ESI = fceu11:: | 不删（v0.3.8 起     |
+  |                     | InputDevice; SI_*   | 是 backward 兼容） |
+  |                     | 是 int constexpr    |                      |
+  | ESIFC / SIFC_*      | 同 ESI              | 不删                |
+  | FCEU_ALLOC_TYPE_*   | using fceuAllocType | 不删                |
+  |                     | = fceu11::AllocKind |                      |
+  | FCEUIOD_*           | inline constexpr    | 不删（数组下标需  |
+  |                     | int (非 enum-typed) | int 兼容）          |
+  | EMUFILE (void*,size_t) | [[deprecated]]    | v0.4.0              |
+  |                     | shim, 走 span 重载  |                      |
+  | MapIRQHook          | extern typed (C-    | 不删                |
+  |                     | linkage 不变)       |                      |
+  +---------------------+--------------------+----------------------+
+
+  1.3 编译期「可见 deprecation warning」开关
+
+    默认 v0.3.x 编译时所有 deprecation 警告被宏抑制：
+      FCEUX11_NO_DEPRECATION_WARNINGS=ON（CMake 默认）
+    外部用户想看警告：
+      cmake -DFCEUX11_SHOW_DEPRECATION_WARNINGS=ON ...
+    警告形式：[[deprecated("use fceu11::Foo")]]
+    注意：当前 in-tree build 默认是 OFF（抑制），让 v0.3.x 编译干净。
+
+================================================================================
+2. 类别 A 迁移：类型现代化
+================================================================================
+
+  2.1 ESI / SI_* → fceu11::InputDevice（v0.3.8）
+
+    旧代码：
+    ```cpp
+    #include "git.h"
+    void setInput(int port) {
+        if (CurInputType[port] == SI_GAMEPAD) {
+            // ...
+        }
+    }
+    ```
+
+    迁移路径（两步）：
+    Step 1: 立即可编 — 不改任何代码，v0.3.8 起 `using ESI = fceu11::InputDevice`，
+            `SI_GAMEPAD` 是 `inline constexpr int = 1`，所以旧代码照编。
+    Step 2: 推荐 — 改成 typed form：
+    ```cpp
+    #include "git.h"
+    void setInput(int port) {
+        if (CurInputType[port] == static_cast<int>(ESI::Gamepad)) {
+            // ...
+        }
+    }
+    ```
+
+    边界处理：FCEUI_SetInput(N, ESI, ...) API boundary 已经是 typed form，
+              不需要 cast。
+
+  2.2 FCEUIOD_* → fceu11::IoDir（v0.3.8）
+
+    旧代码：
+    ```cpp
+    const char* dir = odirs[FCEUIOD_STATES];  // 数组下标
+    ```
+
+    迁移路径：
+    Step 1: 立即可编 — FCEUIOD_* 是 inline constexpr int，odirs[] 是
+            C 数组，下标兼容。
+    Step 2: 推荐 — 用 enum-typed form + 显式 cast：
+    ```cpp
+    const char* dir = odirs[static_cast<size_t>(fceu11::IoDir::States)];
+    ```
+
+    为什么不删：odirs[FCEUIOD_STATES] 在 src/file.cpp 有 50+ 处，
+    一次性迁移风险大。v0.4.0 才一并改。
+
+  2.3 FCEU_ALLOC_TYPE_* → fceu11::AllocKind（v0.3.8）
+
+    旧代码：v0.3.8 起 FCEU_ALLOC_TYPE_* 是 inline constexpr
+            fceu11::AllocKind。0 个 in-tree 调用点（fceuAllocType
+            是 v0.3.6 RAII 迁移后的 phantom symbol，保留仅做 out-of-tree
+            ABI 兼容）。
+
+================================================================================
+3. 类别 B 迁移：命名空间迁移
+================================================================================
+
+  3.1 FCEUI_LoadGame / FCEUI_Emulate / FCEUI_Kill → fceu11:: 版本
+
+    旧代码：
+    ```cpp
+    FCEUGI* g = FCEUI_LoadGame("nestest.nes", 0);
+    FCEUI_Emulate(&xbuf, &sbuf, &ssize, 0);
+    FCEUI_Kill();
+    ```
+
+    v0.3.16 编译：完全可编（旧 FCEUI_* 是 inline wrapper，转发到 fceu11:: 版本）。
+    推荐 v0.4.0 迁移：
+    ```cpp
+    fceu11::FCEUGI* g = fceu11::LoadGame("nestest.nes", 0);
+    fceu11::Emulate(&xbuf, &sbuf, &ssize, 0);
+    fceu11::Kill();
+    ```
+
+    注意：
+      - FCEUGI 是 fceu11::FCEUGI 的全局 alias（v0.3.10 P4.1）
+      - 函数名 fceu11::LoadGame 不带 FCEUI_ 前缀（plan §6.1 phase 2 风格）
+
+  3.2 FCEUI_SetInput / FCEUI_GetNtscTh → fceu11:: 版本
+
+    旧代码：
+    ```cpp
+    FCEUI_SetInput(0, SI_GAMEPAD, &joypad_input);
+    int th = FCEUI_GetNtscTH();
+    ```
+
+    迁移：
+    ```cpp
+    fceu11::SetInput(0, ESI::Gamepad, &joypad_input);
+    int th = fceu11::GetNtscTH();
+    ```
+
+    SI_GAMEPAD 是 int 1，ESI::Gamepad 是 enum class value。
+    旧调用 FCEUI_SetInput(0, SI_GAMEPAD, ...) 通过 static_cast<ESI>
+    隐式转换，v0.3.16 编译干净。
+    新调用 fceu11::SetInput(0, ESI::Gamepad, ...) 是 typed form。
+
+  3.3 FCEUIOD_ 数组下标 vs fceu11::IoDir
+
+    旧代码：odirs[FCEUIOD_STATES]
+    新代码：odirs[static_cast<size_t>(fceu11::IoDir::States)]
+    数组本身：保持 `const char* odirs[13]` 不变（v0.3.8 起的形式）。
+
+================================================================================
+4. 类别 C 迁移：接口现代化
+================================================================================
+
+  4.1 FCEU_malloc/free → std::unique_ptr
+
+    旧代码：
+    ```cpp
+    uint8* buf = (uint8*)FCEU_malloc(1024);
+    memset(buf, 0, 1024);
+    FCEU_free(buf);
+    ```
+
+    迁移（v0.3.6+）：
+    ```cpp
+    auto buf = std::make_unique_for_overwrite<uint8_t[]>(1024);
+    memset(buf.get(), 0, 1024);
+    // buf 析构自动 free
+    ```
+
+    或对 malloc 路径（src/utils/memory.h 提供）：
+    ```cpp
+    auto buf = FCEU_gmalloc_unique(1024);  // RAII 包装
+    ```
+
+  4.2 EMUFILE (void*, size_t) → std::span<std::byte>
+
+    旧代码（v0.3.9）：
+    ```cpp
+    uint8 buf[256];
+    emufile.fread(buf, 256);
+    ```
+
+    迁移（v0.3.10+）：
+    ```cpp
+    std::array<std::byte, 256> buf;
+    emufile.fread(buf);  // std::span 重载
+    ```
+
+    或保留 raw 指针：
+    ```cpp
+    std::byte buf[256];
+    emufile.fread(std::span<std::byte>(buf));
+    ```
+
+    v0.3.10 提供的 [[deprecated]] shim 把 (void*, size_t) 转发到
+    span 重载，所以旧代码 v0.3.16 编译干净（带 deprecation warning
+    若 FCEUX11_SHOW_DEPRECATION_WARNINGS=ON）。
+
+  4.3 driver.h 物理拆分（v0.3.9）
+
+    旧代码：#include "driver.h"（包含 250+ 声明）
+    新代码：可拆分为：
+      #include "core_api.h"  // 核心生命周期
+      #include "io_api.h"    // 文件 I/O / 输入 / 调色板
+      #include "net_api.h"   // netplay
+      #include "diag_api.h"  // FCEU_GetCompilerString 等
+
+    旧代码继续工作：src/driver.h 是 20 行 shim，重新 include 4 个新头。
+    不需要修改任何 #include。
+
+================================================================================
+5. 4 类典型场景的迁移实例
+================================================================================
+
+  5.1 场景 A：自定义 mapper 扩展
+
+    旧 mapper 代码（v0.2.30 风格）：
+    ```cpp
+    #include "mapinc.h"
+    DECLFW(WritePRG) {
+        // ...
+    }
+    void MyMapper_Init(CartInfo* info) {
+        info->PRG = (uint8*)FCEU_malloc(32768);
+        // ...
+    }
+    ```
+
+    v0.3.16 迁移：
+    ```cpp
+    #include "mapinc.h"
+    DECLFW(WritePRG) {
+        // ...  无需改
+    }
+    #include "utils/memory.h"  // FCEUX11_DEPRECATED macro
+    void MyMapper_Init(CartInfo* info) {
+        info->PRG = (uint8*)FCEU_gmalloc(32768);  // gmalloc 没 deprecated
+        // 或 v0.4.0 推荐写法：
+        auto prg = FCEU_gmalloc_unique(32768);
+        info->PRG = prg.release();  // mapper 接管 ownership
+    }
+    ```
+
+  5.2 场景 B：GUI 插件
+
+    旧 GUI 代码：
+    ```cpp
+    #include "driver.h"  // 全部 250+ 声明
+    void onLoadROM() {
+        FCEUI_LoadGame(qPrintable(filePath), 0);
+    }
+    ```
+
+    v0.3.16 迁移（双轨）：
+    ```cpp
+    // 旧 #include "driver.h" 继续工作（20 行 shim）
+    // 新代码：拆出明确的 include
+    #include "core_api.h"   // LoadGame
+    #include "io_api.h"     // 文件 I/O helpers
+    void onLoadROM() {
+        fceu11::LoadGame(qPrintable(filePath), 0);  // 推荐 v0.4.0 form
+        // 或 v0.3.16 仍可用：FCEUI_LoadGame(qPrintable(filePath), 0);
+    }
+    ```
+
+  5.3 场景 C：脚本嵌入（Lua mlua）
+
+    旧脚本 binding：
+    ```cpp
+    extern "C" int fceux11_lua_get_input(int port) {
+        return CurInputType[port];  // int
+    }
+    ```
+
+    v0.3.16：CurInputType[port] 仍是 int，binding 无需改。
+    v0.4.0 推荐：
+    ```cpp
+    extern "C" int fceux11_lua_get_input(int port) {
+        return static_cast<int>(fceu11::InputDevice(CurInputType[port]));
+    }
+    ```
+
+  5.4 场景 D：用户配置 INI 读取
+
+    旧代码（src/drivers/Qt/ConfigStore.h v0.3.15 PHASE-4）：
+    ```cpp
+    QSettings s;
+    bool showSplash = s.value("mainWindow/showSplashScreen", true).toBool();
+    ```
+
+    v0.3.16 推荐：
+    ```cpp
+    #include "Qt/ConfigStore.h"
+    using fceu11::qt::makeConfig;
+    constexpr auto kShowSplash = makeConfig("mainWindow/showSplashScreen", true);
+    bool showSplash = kShowSplash.get();
+    ```
+
+    编译期类型检查（TypedConfig<T> 的核心价值）。
+
+================================================================================
+6. 迁移检查清单（v0.4.0 之前）
+================================================================================
+
+  - [ ] 所有 FCEUI_* 调用确认可编译（默认 250+ 都能用）
+  - [ ] 启动 cmake -DFCEUX11_SHOW_DEPRECATION_WARNINGS=ON 看警告
+  - [ ] 警告来源统计：哪些是 FCEUI_* / 哪些是 FCEU_malloc* /
+        哪些是 EMUFILE shim
+  - [ ] mapper 扩展代码：FCEU_gmalloc 保留（不 deprecated），
+        FCEU_malloc 改 std::unique_ptr
+  - [ ] GUI 插件：#include "driver.h" 可保留（shim），
+        推荐拆分为 core_api.h / io_api.h
+  - [ ] Lua binding：保持 (int) ↔ (enum class) 显式 cast
+  - [ ] 配置读取：QSettings 改 TypedConfig<T>（PHASE-4 11 站点示范）
+  - [ ] Qt widget 字符串：tr() 源串冻结期间不新增
+
+================================================================================
+7. v0.4.0 移除旧符号时的预期 breaking changes
+================================================================================
+
+  v0.4.0 计划删除（plan §6.1 phase 3）：
+    - FCEUI_* 250+ 符号（全部）
+    - fceuScopedPtr<T> 模板
+    - FCEU_malloc/free/dmalloc/dfree
+    - EMUFILE (void*, size_t) 重载
+    - driver.h shim（拆分为 4 个新头，强制显式 include）
+
+  不删除（永久保留）：
+    - ESI / SI_* / ESIFC / SIFC_*（typed enum + int alias 共存）
+    - FCEUIOD_*（数组下标必须 int 兼容）
+    - FCEU_ALLOC_TYPE_* / fceuAllocType（out-of-tree ABI）
+    - MapIRQHook（C-linkage 兼容）
+
+  预期外部代码破坏量：
+    - Mapper 扩展：~10 行 / mapper（FCEU_malloc 改 unique_ptr）
+    - GUI 插件：~30 行（#include 拆分 + 命名空间）
+    - Lua binding：~5 行（static_cast 加固）
+    - 配置读取：~50 行（QSettings 改 TypedConfig）
+
+  v0.3.16 LTS 给外部 ≥ 1 个 major 版本迁移期，符合 plan §6.3 弃用流程。
+
+================================================================================
+8. 总结
+================================================================================
+
+  v0.3.x API 现代化按 plan §6.1 三阶段推进，v0.3.16 处于阶段 2 末
+  期：旧符号全部 inline shim 化，新代码推荐用 fceu11::Foo 形式。
+  250+ FCEUI_* 符号保留，删 FCEU_malloc*/fceuScopedPtr/EMUFILE 旧
+  重载的时机是 v0.4.0。外部用户的迁移压力分摊到 v0.3.x 整个周期
+  + v0.4.0 移除后 1 个 major 版本。
+
+  关键经验：
+    1. deprecation 警告默认抑制（避免 in-tree 编译噪音），外部
+       用户主动 cmake -DFCEUX11_SHOW_DEPRECATION_WARNINGS=ON 看。
+    2. 命名空间迁移是纯外观变化（inline wrapper），可逐步切换，
+       不需要 big-bang rewrite。
+    3. 数组下标 / 存储兼容的常量化（如 FCEUIOD_*、SI_*）永久
+       保留，不删。
+    4. 删符号要等外部 ≥ 1 个 major 版本（plan §6.3），LTS 收官
+       不删任何东西。
+
+  相关文档：
+    - docs/tech/14_版本演进与API收敛.txt  完整 v0.3.x 演进史
+    - docs/v0.3.x_Construction_Plan_v3.md  §6.1 命名空间策略
+    - src/utils/memory.h  FCEUX11_DEPRECATED 宏定义
+    - src/utils/scoped_ptr.h  fceuScopedPtr 迁移指南
+    - CHANGELOG.md  [0.3.16] (LTS)  兼容策略与 deprecation 总览

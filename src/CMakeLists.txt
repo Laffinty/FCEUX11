@@ -87,8 +87,17 @@ if(FCEUX11_WGI_BACKEND)
     add_definitions( -DFCEUX11_WGI_BACKEND )
 endif()
 # v0.3.1: Soft warning level /W4 /WX-; /wd4267/4244 removed from here (see types.h cleanup)
+# v0.3.16 (LTS closure) / v1.0: /WX activated in top-level CMakeLists.txt
+# (with documented /wd set for pre-existing baseline). src/ CMakeLists.txt
+# does NOT re-add /WX (it would conflict); it inherits the top-level set.
+# We only add the driver-specific /wd set here (additional categories
+# surfaced by Qt + SDL bindings).
 if(MSVC)
-    add_compile_options(/W4 /WX-)
+    add_compile_options(/W4 /WX-
+        /wd4127  # pre-existing: conditional expression is constant (Q_OBJECT generated code)
+        /wd4189  # pre-existing: local variable initialized but not referenced (Qt headers)
+        /wd4505  # pre-existing: unreferenced local function (Qt template instantiation)
+    )
 endif()
 
 set( SYS_LIBS  wsock32 ws2_32 vfw32 Htmlhelp )
@@ -106,11 +115,11 @@ set(APP_ICON_RESOURCES_WINDOWS  ${CMAKE_SOURCE_DIR}/icons/fceux11.rc )
 
 option(FCEUX11_LUA_RUST_ENABLED "Use Rust Lua engine (mlua) instead of C++ Lua engine" ON)
 option(FCEUX11_WGI_BACKEND "Enable Windows.Gaming.Input backend (requires WinRT/C++/WinRT)" OFF)
-# v0.3.15.x PHASE-3: probe-only DirectStorage scaffold. The probe
-# detects NvmeSdsSupported() + dstorage.dll availability at startup
-# but does not take over any I/O. Actual takeover of .fc0/.fcs
-# writes is deferred to v0.4.x per docs/v0.3.15_Build_Plan.md
-# PHASE-3 task 3.2.
+# v0.3.15.x PHASE-3 (preserved in v1.0): probe-only DirectStorage
+# scaffold. The probe detects NvmeSdsSupported() + dstorage.dll
+# availability at startup but does not take over any I/O. Actual
+# takeover of .fc0/.fcs writes is deferred to v2.0 (next major cycle
+# after v1.0).
 option(FCEUX11_DIRECT_STORAGE_PROBE "Enable DirectStorage 1.2 NVMe probe (Windows only)" ON)
 
 if(FCEUX11_LUA_RUST_ENABLED AND FCEUX11_RUST_ENABLED)

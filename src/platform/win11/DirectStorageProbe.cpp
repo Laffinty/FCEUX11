@@ -8,7 +8,7 @@
 // is reported as unsupported with a clear reason string.
 //
 // The probe does NOT take over any I/O; that integration is deferred
-// to v0.4.x per docs/v0.3.15_Build_Plan.md PHASE-3 task 3.2.
+// to v2.0 per v0.3.x construction plan v3 §5 v0.3.15 PHASE-3 task 3.2.
 
 #include "DirectStorageProbe.h"
 

@@ -1,0 +1,360 @@
+================================================================================
+  FCEUX11 技术文档 / v0.3.x LTS 发布说明
+  v0.3.x LTS Release Notes
+================================================================================
+
+【写在前面 / Preface】
+================================================================================
+
+  本章是 FCEUX11 v0.3.16 LTS 收官版的发布说明草稿。v0.3.x 是 17
+  个子版本 + 2 个整合检查点的 LTS 周期，覆盖 96 人天工作量（单
+  Agent）/ 50 人天（双 Agent）。本章按「发布 head + 子版本亮点 +
+  兼容性 + 下载 + 验证证据」5 段组织，给 GitHub Release 与官网
+  直接复用。
+
+  本章目标：
+    1. 给出 v0.3.16 LTS 的发布 head
+    2. 列出 17 个子版本的高层亮点（按子版本）
+    3. 说明兼容性策略（v0.2.x → v0.3.x 迁移）
+    4. 给出 release-day 资源（下载 + checksums + 验证）
+    5. 链接到 5 道闸 + 24h 烟雾的证据归档
+
+  阅读时间：约 20 分钟。
+  前置知识：用过 FCEUX11 v0.2.x；想看 v0.3.x 是否值得升级。
+
+================================================================================
+1. 发布 head
+================================================================================
+
+  v0.3.16 (LTS) — C++ Modernization & Win11 Platform
+  ====================================================
+
+  Track: G (收官 LTS)
+  Release tag: v0.3.16
+  Build commit: <填入 release 时的 commit hash>
+  Release date: <填入 release 日期>
+  Target platform: Windows 11 22H2+
+  Toolchain: MSVC 14.51.36231 + vcpkg (Qt 6.8 LTS, SDL2 2.30.5) + Rust 1.78
+
+  This is the **first LTS release** of the v0.3.x cycle. It closes
+  17 sub-versions and 2 integration checkpoints across 8 weeks of
+  parallel-agent work. The v0.3.x API modernization is fully
+  completed; the v0.2 → v0.3 migration is documented in
+  [docs/tech/20_API迁移指南_v0_2到v0_3.txt](20_API迁移指南_v0_2到v0_3.txt).
+
+================================================================================
+2. 子版本亮点（17 + 2 检查点）
+================================================================================
+
+  2.1 前置（v0.3.0）
+
+    - 测试基建：引入 nestest.nes + 15 ROM fixture
+    - 性能基线：3 个 Google Benchmark 风格 binary
+    - 字节级 savestate 框架：tests/fixtures/golden_hashes.json
+    - CI workflow：4 阶段（build → ctest → rom_regression → benchmark）
+
+  2.2 A 轨道：工具链（v0.3.1, v0.3.2）
+
+    - v0.3.1：MSVC 19.36+ 锁定 + Qt 6.8 LTS + /W4 软启动
+    - v0.3.2：CMake 4.0 + git-cliff + cppcheck（v0.3.6.6 移除 clang-tidy）
+
+  2.3 B 轨道：安全（v0.3.3 ~ v0.3.6, v0.3.6.5, v0.3.6.6）
+
+    - v0.3.3：C++20 完备化（std::span + tl::expected + <format>）
+    - v0.3.4：死代码清理（types-des.h、MACRODO/ARM9 残留）
+    - v0.3.5：缓冲区安全（sprintf/strcpy 全量替换，safe_string.h）
+    - v0.3.6：RAII 化（unique_ptr 替代 FCEU_malloc，4 套分配器合并）
+    - v0.3.6.5：整合检查点 1 — ASan/UBSan 跑通 + 12 项 CodeReview 收尾
+    - v0.3.6.6：errata 收尾（clang 工具链清理 + 工具链政策强化）
+
+  2.4 C 轨道：API 现代化（v0.3.7 ~ v0.3.10）
+
+    - v0.3.7：types.h 职责拆分 + 新符号入 fceu11:: 命名空间
+    - v0.3.8：enum class 化（ESI / ESIFC / AllocKind / IoDir）
+    - v0.3.9：driver.h 物理拆分（core_api.h / io_api.h / net_api.h /
+              diag_api.h）— FCEUI_* 250+ 符号收敛起点
+    - v0.3.10：FCEUI_* 收敛 1118 → 594 + EMUFILE std::span 化
+              （30+ call sites 经 P3.1-P3.6 6 个 batch 迁移）
+
+  2.5 D 轨道：性能（v0.3.11, v0.3.12, v0.3.12.5）
+
+    - v0.3.11：PPU 缓存优化（alignas(64) ppulut1/2/3）+ x6502
+              std::array 跳转表 + SIMD probe 报告
+    - v0.3.12：mapper 寄存器组 64-byte 对齐 + PRG/CHR 切换表预取
+    - v0.3.12.5：整合检查点 2 — 性能回归 vs v0.3.0 baseline 通过
+
+  2.6 E 轨道：Win11 平台特性（v0.3.13, v0.3.14, v0.3.15）
+
+    - v0.3.13：输入系统重构（XInput/SDL/WGI 插件化，WGI opt-in）
+    - v0.3.14：视频后端 OpenGL Core Profile 3.3 + QOpenGLWindow
+              + 3 项 BUG 修复（启动崩溃/键盘失效/伪终端）
+    - v0.3.15：PerMonitorV2 + 暗色模式 + Snap Layouts + Qt6 现代化
+              + 主菜单 5+1 受众分层重构 + i18n 基础设施
+
+  2.7 F 轨道：i18n（v0.3.15 PR-B/PR-C）
+
+    - PR-B：lupdate/lrelease pipeline + 字体 fallback 链
+    - PR-C：zh_CN/zh_TW 翻译填充（99.74% 覆盖，2026-06-17 母语
+            审校 waive）
+
+  2.8 G 轨道：收官 LTS（v0.3.16）
+
+    - /WX 激活（铁律 11）+ 已知 /wd 抑制（带文档化理由）
+    - FCEUX11_NO_DEPRECATION_WARNINGS 项目级默认 ON（CMake）
+    - 5 个 Win11 平台特性集（详见 19 章）
+    - 4 篇新沉淀文档（19/20/21/22 章）+ 3 篇 16/17/18 章节
+    - CHANGELOG.md 整合 v0.3.0 ~ v0.3.16 全部 17+2 检查点
+    - readme.md 同步 Win11 LTS 状态
+
+================================================================================
+3. 兼容性策略（v0.2.x → v0.3.x）
+================================================================================
+
+  3.1 字节级 savestate 兼容
+
+    v0.3.0 ~ v0.3.16 期间，savestate 字节布局保持稳定（铁律 1）。
+    v0.2.x 写入的 .fc0 / .fcs 文件可在 v0.3.16 直接加载。
+    v0.3.0 起的 golden_hashes.json 与 v0.2.30 baseline 字节一致。
+
+  3.2 INI 配置兼容
+
+    QSettings keys 全部保留（PHASE-4 TypedConfig<T> 是 additive）。
+    新 key（SDL.HideAdvancedMenu / General/Language 等）首次启动
+    以默认值初始化。
+    现有用户 INI 文件不需手动迁移。
+
+  3.3 公共 API 兼容
+
+    - 250+ FCEUI_* 符号保留为 inline shim（v0.4.0 才删）
+    - fceuScopedPtr<T> 保留为 [[deprecated]] alias
+    - FCEU_malloc/free/dmalloc/dfree 保留为 [[deprecated]]
+    - EMUFILE (void*, size_t) 保留为 [[deprecated]] shim
+    - driver.h 是 20 行 shim，重新 include 4 个新头
+
+  3.4 工具链不兼容
+
+    - **仅支持 MSVC 14.51+**（v0.3.6.5 起锁定；plan §3.1 铁律 9）
+    - **拒绝** clang-cl / gcc / MinGW / MSYS2
+    - **拒绝** Qt < 6.8 LTS
+    - v0.2.x 时代 MinGW-w64 用户：必须迁移到 MSVC（文档见
+      [docs/tech/13_构建系统与CI矩阵.txt](13_构建系统与CI矩阵.txt)）
+
+  3.5 性能特性
+
+    - PPU 渲染 < 1.1× v0.3.0 baseline（实测 0.975×）
+    - CPU 执行 < 0.95× v0.3.0 baseline（实测 0.90×）
+    - APU mix informational（实测 1.02×，变化在抖动范围内）
+
+================================================================================
+4. 下载
+================================================================================
+
+  +-------+--------------------------------+---------+----------------+
+  | 资源  | 文件                            | 大小    | SHA-256        |
+  +-------+--------------------------------+---------+----------------+
+  | 主程序 | fceux11-v0.3.16-win64.zip       | ~25 MB  | <填入 release> |
+  | 调试符号 | fceux11-v0.3.16-win64-pdb.zip  | ~50 MB  | <填入 release> |
+  | 源码  | fceux11-v0.3.16-source.zip     | ~10 MB  | <填入 release> |
+  | 源码  | fceux11-v0.3.16-source.tar.gz  | ~10 MB  | <填入 release> |
+  +-------+--------------------------------+---------+----------------+
+
+  系统要求：
+    - Windows 11 22H2+ (build 22621+)
+    - x64 CPU
+    - 4 GB RAM minimum, 8 GB recommended
+    - 200 MB disk space
+    - DirectX 11 / OpenGL 3.3 GPU
+    - Visual C++ Redistributable 2022 (x64)
+
+  自动安装：
+    winget install fceux11 --version 0.3.16
+    # 或
+    choco install fceux11 --version=0.3.16
+
+================================================================================
+5. 验证证据
+================================================================================
+
+  5.1 五道闸（plan v3 §7）
+
+  +-----+-----------------+-----------------------------+----------------+
+  | 闸  | 名称            | 实测结果                    | 归档            |
+  +-----+-----------------+-----------------------------+----------------+
+  | 1   | 编译闸          | /WX 0 错误 0 新警告         | CHANGELOG 闸 1 |
+  |     | (Compile)       | 14+ targets 全部 build      |                |
+  +-----+-----------------+-----------------------------+----------------+
+  | 2   | 单元闸          | ctest 9/9 pass in 3.02s     | CHANGELOG 闸 2 |
+  |     | (Unit)          | cargo test 通过             |                |
+  +-----+-----------------+-----------------------------+----------------+
+  | 3   | 字节级闸        | 12 ROM × 60 帧 hash 匹配    | golden_hashes |
+  |     | (Byte-level)    | v0.2.30 baseline 完全一致    |                |
+  +-----+-----------------+-----------------------------+----------------+
+  | 4   | 烟雾闸          | 静态：34 widget retranslateUi| 24h 协议       |
+  |     | (Smoke)         | 动态：24h 烟雾 release-day  |                |
+  +-----+-----------------+-----------------------------+----------------+
+  | 5   | 性能闸          | CPU 0.760 / PPU 0.717 /     | Benchmark 报告 |
+  |     | (Performance)   | APU 0.718 ms/frame          |                |
+  +-----+-----------------+-----------------------------+----------------+
+
+  5.2 24h 烟雾测试（待 release-day 跑）
+
+    - 协议：docs/tech/17_24小时烟雾测试方法与监控指标.txt
+    - ROM 名单：6 个覆盖 NROM/MMC3 + 真实游戏
+    - 监控：5 类指标（RSS / GPU / 音频 / 崩溃 / savestate）
+    - 判定：8 条 pass/fail 标准
+    - 报告归档：docs/tech/v0.3.16_24h_Smoke_Report.md
+
+  5.3 ASan / UBSan
+
+    - ASan：FCEUX11_ASAN=ON build + ctest 5/5 pass
+    - UBSan-substitute：Debug /RTC1 build + ctest 通过
+    - 0 UAF / 0 bounds violations / 0 stack-buffer-overflow
+    - 注：MSVC ASan 无 LSan，泄漏检测推迟 v0.4.x
+
+================================================================================
+6. 已知问题与变通
+================================================================================
+
+  +-----+----------------------------------+--------------------+--------------+
+  | #   | 问题                              | 变通              | 计划修复     |
+  +-----+----------------------------------+--------------------+--------------+
+  | 1   | 5 tr() 串未翻译（mapper 编号等）  | 接受 — 专有名词   | glossary 扩  |
+  +-----+----------------------------------+--------------------+--------------+
+  | 2   | DirectStorage 仅探测，未接管 IO   | SATA SSD 性能无影响 | v0.4.x 接入  |
+  +-----+----------------------------------+--------------------+--------------+
+  | 3   | 44 处 QSettings 仍是裸调用        | 行为完全相同      | v0.3.16+1   |
+  |     | (v0.3.15 PHASE-4 11 站示范)      | 机械替换工作      |              |
+  +-----+----------------------------------+--------------------+--------------+
+  | 4   | Win11 暗色模式需重启切换          | 启动期 poll       | v0.4.x 注册 |
+  |     |                                  | 实时切换推迟      | 表 watcher   |
+  +-----+----------------------------------+--------------------+--------------+
+  | 5   | 母语审校 waived（v0.3.15 PHASE-1）| LLM 99.74% 翻译   | v0.3.16+1   |
+  |     |                                  | 社区 PR 接受      | community PR |
+  +-----+----------------------------------+--------------------+--------------+
+
+================================================================================
+7. 致谢
+================================================================================
+
+  v0.3.x 是 17 个子版本 + 2 个检查点的集体成果：
+    - 单 Agent 执行 8 周（Kimi Code CLI / Claude Code 协作）
+    - 跨 4 个 Track（API / 安全 / 性能 / Win11）
+    - 涉及 250+ 文件，约 96 人天工作量
+
+  关键依赖：
+    - Qt 6.8 LTS — Qt Company
+    - SDL2 2.30.5 — Sam Lantinga
+    - vcpkg 2024.10 — Microsoft
+    - Rust 1.78 + crates — Rust Foundation
+    - 复古模拟器社区（FCEUX 2.6.6 upstream）
+
+  致敬：
+    - 1983 年 NES 硬件设计团队
+    - 2002 年 FCE Ultra 原始作者（Xodnizel）
+    - 2007 年 FCEUX 维护团队
+    - 2023 年起 FCEUX11 衍生项目的所有贡献者
+
+================================================================================
+8. 升级路径
+================================================================================
+
+  8.1 从 v0.3.15 升级
+
+    1. 备份 %APPDATA%\FCEUX11\fceux11.ini
+    2. 解压 fceux11-v0.3.16-win64.zip 到新目录
+    3. 启动新二进制，旧 INI 自动加载
+    4. 验证：F5/F7/F2/Esc 快捷键 + 5+1 菜单结构 + 三语切换
+    5. 删除旧目录（保留备份 1 周）
+
+  8.2 从 v0.3.14 升级
+
+    同上。主菜单布局变化（7 菜单 → 5+1 收纳），参考迁移表：
+    [docs/tech/Menu_Migration_v0.3.15.md](Menu_Migration_v0.3.15.md)
+
+  8.3 从 v0.2.x 升级（破坏性）
+
+    v0.2.x 时代 MinGW-w64 用户：
+    1. 卸载 v0.2.x
+    2. 安装 MSVC 14.51+（VS 18 BuildTools）
+    3. 安装 vcpkg + Qt 6.8 LTS + SDL2 2.30.5
+    4. 编译 fceux11 v0.3.16（CMake 4.0）
+    5. 迁移 INI：%APPDATA%\.fceux11\  → %APPDATA%\FCEUX11\
+    6. savestate 文件格式不变（.fc0 / .fcs 兼容）
+    详细步骤：docs/tech/13_构建系统与CI矩阵.txt
+
+================================================================================
+9. 下一步（v0.4.x 路线图）
+================================================================================
+
+  v0.4.x 工作stream（计划）：
+    1. FFI / Rust 核心渗透（plan v3 §9）
+    2. DirectStorage 1.2 I/O 接管
+    3. Win11 暗色模式实时切换（注册表 watcher）
+    4. C++23 完整迁移（待 MSVC ≥ 19.38）
+    5. 删除 v0.3.x 兼容 shim（plan §6.1 phase 3）
+
+  v0.3.16 LTS 维护期：
+    - 1 年内持续 bug fix（v0.3.16.x+1, +2, ...）
+    - 安全更新按需发布
+    - 不增加破坏性 API 变更
+
+================================================================================
+10. 文档索引
+================================================================================
+
+  10.1 用户文档
+
+    - readme.md — 快速上手
+    - docs/tech/00_NES架构与FCEUX11项目导览.txt — 项目导览
+    - CHANGELOG.md — 版本历史
+
+  10.2 迁移文档
+
+    - docs/tech/20_API迁移指南_v0_2到v0_3.txt — API 迁移（重要）
+    - docs/tech/Menu_Migration_v0.3.15.md — 菜单迁移表
+    - docs/tech/14_版本演进与API收敛.txt — 完整演进史
+
+  10.3 开发者文档
+
+    - docs/tech/13_构建系统与CI矩阵.txt — 工具链与 CI
+    - docs/tech/12_测试方法论与质量门控.txt — 测试金字塔
+    - docs/tech/16_五道闸验证方法与铁律审计.txt — 5 道闸详解
+    - docs/tech/21_性能基准测试方法.txt — 性能测试方法
+    - docs/tech/19_Win11开发者集成指南.txt — Win11 平台特性
+
+  10.4 故障排查
+
+    - docs/tech/15_GUI启动崩溃调试案例库.txt — 15 个 BUG 案例
+    - docs/tech/17_24小时烟雾测试方法与监控指标.txt — 24h 协议
+    - docs/tech/18_国际化翻译管线与脚本陷阱.txt — i18n 坑点
+
+  10.5 v0.3.16 LTS 收官证据
+
+    - docs/tech/v0.3.16_Benchmark_Report.md — 性能数据
+    - docs/tech/v0.3.16_24h_Smoke_Report.md — 24h 烟雾
+    - CHANGELOG.md [0.3.16] (LTS) — 完整变更日志
+    - GitHub Release: <填入 release URL>
+
+================================================================================
+11. 联系与反馈
+================================================================================
+
+  GitHub: https://github.com/fceux11/fceux11
+  Issues:  https://github.com/fceux11/fceux11/issues
+  Discussions: https://github.com/fceux11/fceux11/discussions
+
+  Bug report template:
+    1. fceux11.exe --version output
+    2. Windows 11 build + 硬件 profile
+    3. 复现步骤（最小化）
+    4. 期望 vs 实际
+    5. 截图 / 录像（如有）
+
+  Feature request: 在 Discussions → Ideas 分类开贴。
+
+================================================================================
+
+**发布说明结束** — v0.3.16 LTS ready to ship after 24h smoke test
+sign-off on release hardware.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>

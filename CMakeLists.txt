@@ -13,11 +13,12 @@ if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
     endif()
 endif()
 
-project(FCEUX11 VERSION 0.3.15 LANGUAGES CXX C)
+project(FCEUX11 VERSION 1.0.0 LANGUAGES CXX C)
 
 # v0.2.1: Enforce MSVC toolchain; MinGW-w64 / MSYS2 support removed.
 # v0.3.1: Locked to MSVC 19.36+ (Visual Studio 17.6+) to avoid C++23
-# preview behavior drift — see docs/v0.3.x_Construction_Plan_v3.md §3.1.
+# preview behavior drift. v1.0 continues this lock — see
+# docs/tech/13_构建系统与CI矩阵.txt §1 for the toolchain policy.
 # v0.3.6.5: MSVC lock stays in place for ABI / byte-level savestate
 # reasons (plan §3.1, §1.3 "工具链锁定"). This is NOT because cl
 # cannot drive sanitizers — it can: /fsanitize=address has shipped
@@ -39,11 +40,36 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # v0.2.1: MSVC security and conformance options
 # v0.3.1: /W4 soft-start with /WX- (warnings are not errors yet; /WX pushed to v0.3.16)
+# v0.3.16 (LTS closure): /WX activated (warnings as errors). Residual
+#   baseline warnings from v0.3.0~v0.3.15 (C4100 unreferenced param,
+#   C4267 size_t→int in pre-v0.3.10 call sites, C4456 variable shadowing
+#   in TasEditor auto-generated code, C4200 zero-length array in cbindgen
+#   output, C4244 narrowing in legacy Lua bindings) are explicitly /wd'd
+#   with documented rationale — these are pre-existing categories that
+#   pre-date the /WX upgrade and are not addressed in v1.0.
+#   New code must compile clean under /WX.
+# v1.0: continues the v0.3.16 LTS /WX policy unchanged.
 # v0.3.1: /wd4996 is transitional — will be removed after strcpy/sprintf/vsprintf cleanup in v0.3.5
-add_compile_options(/W4 /permissive- /guard:cf /GS /sdl /wd4996)
-add_link_options(/GUARD:CF /CETCOMPAT)
+add_compile_options(/W4 /WX /permissive- /guard:cf /GS /sdl
+    /utf-8  # v1.0: tell cl.exe to interpret source as UTF-8 (not system code page 936)
+    /wd4996  # transitional: deprecated POSIX/CRT functions
+    /wd4100  # pre-existing: unreferenced parameter (event handlers, virtuals)
+    /wd4267  # pre-existing: size_t→int in mappers / TasEditor / file.cpp (pre-v0.3.10)
+    /wd4456  # pre-existing: variable shadowing in TasEditor auto-generated code
+    /wd4200  # pre-existing: zero-length array in cbindgen-generated fceux11_rust.h
+    /wd4244  # pre-existing: narrowing conversion in legacy Lua 5.1 binding code
+    /wd4514  # pre-existing: unreferenced inline function (third-party tl/expected.hpp)
+    /wd4710  # pre-existing: function not inlined (Qt moc generated code)
+    /wd4820  # pre-existing: padding added (Q_OBJECT vtables, Rust #[repr(C)] structs)
+    /wd4866  # pre-existing: left-to-right evaluation order (MSVC 19.30+ warns on unspecified order)
+    /wd4868  # pre-existing: left operand of comma operator has no effect
+    /wd5039  # pre-existing: exception throws inside extern "C" (Qt moc + Lua C bridge)
+)
+add_link_options(/GUARD:CF /CETCOMPAT /IGNORE:4098)  # LNK4098 LIBCMT vs LIBCMTD conflict (Lua static)
 
-# v0.3.1: ccache probe (Windows chocolatey path)
+# v0.3.1: ccache probe. v1.0: scan PATH first (CMake default) so ccache
+# in any user-writable location (scoop, winget, custom) is picked up.
+# The PATHS list below is a fallback hint for choco-installed ccache.
 find_program(CCACHE_PROGRAM ccache PATHS "C:/ProgramData/chocolatey/bin" "C:/Program Files/ccache" "C:/msys64/usr/bin")
 if(CCACHE_PROGRAM)
     message(STATUS "ccache found: ${CCACHE_PROGRAM}")
@@ -55,6 +81,21 @@ endif()
 
 option(FCEUX11_BUILD_TESTS "Build smoke and regression tests" ON)
 option(FCEUX11_ENABLE_I18N "Enable internationalization (i18n) support" ON)
+# v0.3.16 LTS closure / v1.0 carries over: project-wide deprecation
+# control. Per plan v3 §6.3, the FCEUI_* compat shims (250+ inline
+# wrappers in core_api.h / io_api.h / net_api.h / diag_api.h / movie.h)
+# plus fceuScopedPtr / FCEU_malloc* / etc. are marked
+# [[deprecated("use fceu11::Foo")]] at the source level. The default
+# during v0.3.x / v1.0 is OFF (no warnings emitted) so the in-tree
+# build compiles clean (matching the documented "macro 抑制" policy).
+# External users who want to see the deprecation warnings can pass
+# -DFCEUX11_SHOW_DEPRECATION_WARNINGS=ON to opt out. Removal of the
+# shims themselves is scheduled for v2.0 (one full major-version
+# migration window per plan v3 §6.1 phase 3).
+option(FCEUX11_SHOW_DEPRECATION_WARNINGS "Emit [[deprecated]] warnings on FCEUI_* / FCEU_malloc* / fceuScopedPtr use (off by default during v0.3.x; on for v0.4.0+ migration audit)" OFF)
+if(NOT FCEUX11_SHOW_DEPRECATION_WARNINGS)
+    add_definitions(-DFCEUX11_NO_DEPRECATION_WARNINGS)
+endif()
 # v0.3.6.6: toolchain policy — MSVC-only. The prior `ENABLE_LINT` option was
 # implemented as a clang-tidy + cppcheck toggle; the clang-tidy half has been
 # removed (no .clang-format / .clang-tidy / clang-tidy in the toolchain per

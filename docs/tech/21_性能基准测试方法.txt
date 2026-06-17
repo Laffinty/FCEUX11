@@ -1,0 +1,295 @@
+================================================================================
+  FCEUX11 技术文档 / 性能基准测试方法
+  Performance Benchmark Methodology
+================================================================================
+
+【写在前面 / Preface】
+================================================================================
+
+  本章是 plan v3 §5 v0.3.16 任务要求的「Benchmark_Methodology」沉淀
+  文档。FCEUX11 用 3 个手写基准测 CPU / PPU / APU 三条热路径耗时，
+  作为「性能闸 5」的实测依据。本章讲每个 benchmark 的设计、跑法、
+  数据收集、解读、避免的误报。
+
+  本章目标：
+    1. 解释 FCEUX11 性能基线的来源（v0.3.0 实测）
+    2. 拆解 3 个 benchmark 的设计与度量指标
+    3. 给出跑法、判定、避坑
+    4. 解释如何把 benchmark 数据与 v0.3.11/v0.3.12 性能优化关联
+    5. 给出 release-day bench 套跑流程
+
+  阅读时间：约 20 分钟。
+  前置知识：知道 Google Benchmark 风格（手写 stddev / best / average
+            三指标）；跑过 ctest -R bench_。
+
+================================================================================
+1. FCEUX11 性能基线（v0.3.0 实测）
+================================================================================
+
+  1.1 v0.3.0 启动期的实测值
+
+    +--------------+----------------+-----------+----------------+
+    | 组件         | 每帧耗时       | ROM       | 测试方法       |
+    +--------------+----------------+-----------+----------------+
+    | x6502 CPU    | 0.842 ms/frame | nestest   | x6502_exec_bench|
+    | PPU render   | 0.735 ms/frame | nrom      | ppu_render_bench|
+    | APU mix      | 0.704 ms/frame | mmc3      | apu_mix_bench  |
+    +--------------+----------------+-----------+----------------+
+
+    测试硬件：Win11 24H2 Build 26100，x64，MSVC 14.51.36231。
+    ROM 跑 60 帧取平均（避免单帧抖动）。
+
+  1.2 阈值的来源
+
+    plan v3 §5 v0.3.12.5 规定的性能门：
+      - PPU 渲染 < 1.1× baseline
+      - CPU 执行 < 0.95× baseline
+    这两个阈值是「回归检测」用，不是「性能预算」用：
+      - PPU 1.1× = 8% 余量（容忍 0.06-0.08 ms 抖动）
+      - CPU 0.95× = 实际要求 5% 改善（v0.3.11 cache 优化目标）
+    v0.3.16 实测值（v0.3.15.x PHASE-5 闸 5）：
+      - x6502: 0.760 ms/frame（< 0.95× baseline ✓）
+      - PPU:   0.717 ms/frame（< 1.1× baseline ✓）
+      - APU:   0.718 ms/frame（informational ✓）
+
+================================================================================
+2. 三个 benchmark 详解
+================================================================================
+
+  2.1 x6502_exec_bench
+
+    度量：1 帧内 x6502 CPU 模拟总耗时
+    ROM：nestest.nes（NROM-256，覆盖全部 6502 指令）
+    帧数：60
+    触发路径：
+      FCEUI_Emulate(...) → fceu11::Emulate(...) → X6502_Run() 循环
+                           → 6502 指令 dispatch (v0.3.11: std::array 跳转表)
+                           → ARead[]/BWrite[] 内存 dispatch
+                           → mapper hook (MMC3 IRQ 等)
+    度量代码：
+      auto t0 = std::chrono::high_resolution_clock::now();
+      for (int i = 0; i < 60; ++i) FCEUI_Emulate(...);
+      auto t1 = std::chrono::high_resolution_clock::now();
+      auto ms = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count() / 1000.0;
+      printf("Average: %.3f ms  (%.3f ms/frame)\n", ms, ms / 60.0);
+
+    解读：
+      - 大头是 x6502 指令 dispatch（v0.3.11 std::array 跳转表优化前
+        是 switch 巨块，v0.3.11 后是 256-entry 跳转表）
+      - 中头是 mapper IRQ / scanline 计时（MMC3 在 nestest.nes 不触发，
+        所以 nestest 不能测 MMC3 mapper IRQ 开销）
+
+  2.2 ppu_render_bench
+
+    度量：1 帧内 PPU 渲染总耗时
+    ROM：nrom（最简单 mapper，CPU 路径最小化）
+    帧数：60
+    触发路径：
+      FCEUI_Emulate(...) → PPU emulation loop
+                           → FCEUPPU_LineUpdate() 每条扫描线
+                           → ppulut1/2/3 调色板查表（v0.3.11 alignas(64)）
+                           → PPU 寄存器写
+    度量代码：同 2.1，针对 PPU 路径取窗口
+
+    解读：
+      - 大头是 ppulut1/2/3 调色板查表（v0.3.11 64-byte 对齐后 L1d miss
+        减少）
+      - 中头是 sprite 0 hit / mid-frame 滚动 / 灰度模式（nestest.nes
+        几乎不触发这些，所以 baseline 偏低）
+
+  2.3 apu_mix_bench
+
+    度量：1 帧内 APU 音频混合总耗时
+    ROM：mmc3（mapper IRQ 触发会驱动 APU 写入）
+    帧数：60
+    触发路径：
+      FCEUI_Emulate(...) → APU emulation
+                           → 5 通道混合（2 方波 + 三角波 + 噪声 + DMC）
+                           → NeoFilterSound 滤波（v0.2.10 Rust 化）
+                           → SDL2 audio buffer 填充
+    度量代码：同 2.1，针对 APU 路径取窗口
+
+    解读：
+      - 大头是 NeoFilterSound IIR 滤波（Rust 实现，FFI 边界有 ~50ns 开销）
+      - 中头是 SDL2 audio callback（采样率 44100Hz × buffer size）
+    - v0.3.16 APU 性能不在硬阈值内（informational only）
+
+================================================================================
+3. 跑法与数据收集
+================================================================================
+
+  3.1 跑单个 benchmark
+
+    cd build/tests/
+    set PATH=%CD%\..\..\vcpkg_installed\x64-windows\bin;%PATH%
+    fceux11_bench_x6502_exec.exe --benchmark_min_time=0.5s
+
+    输出：
+      === FCEUX11 x6502 CPU Benchmark (v0.3.0 baseline) ===
+      ROM: fixtures/nestest.nes
+      Frames per iteration: 60
+      ...
+      Average: 45.582 ms  (0.760 ms/frame)
+      Best:    45.124 ms
+      Worst:   45.794 ms
+      StdDev:  0.234 ms (0.5%)
+      RESULT:  PASSED
+
+  3.2 跑全套
+
+    cd build/tests/
+    set PATH=%CD%\..\..\vcpkg_installed\x64-windows\bin;%PATH%
+    ctest -C Release -R bench_ --output-on-failure
+
+    期望：
+      bench_x6502_exec ............ Passed
+      bench_ppu_render ............ Passed
+      bench_apu_mix ............... Passed
+      bench_x6502_exec_scalar ..... Passed  (SIMD probe)
+      bench_x6502_exec_sse42 ...... Passed  (SIMD probe)
+      bench_x6502_exec_avx2 ....... Passed  (SIMD probe)
+
+  3.3 收集 release-day 数据
+
+    每个 benchmark 跑 5 次取中位数：
+      for i in 1..5:
+        fceux11_bench_x6502_exec.exe --benchmark_min_time=0.5s > bench_x6502_run${i}.log
+    取中位数（避免极端值）。
+
+    收集文件：
+      bench_x6502_run{1..5}.log
+      bench_ppu_render_run{1..5}.log
+      bench_apu_mix_run{1..5}.log
+      bench_ppu_simd_scalar_run.log
+      bench_ppu_simd_sse42_run.log
+      bench_ppu_simd_avx2_run.log
+    归档到 docs/tech/v0.3.16_Benchmark_Report.md。
+
+================================================================================
+4. 解读与避坑
+================================================================================
+
+  4.1 三个数字的含义
+
+    Best: 单次最佳（噪音最低）
+    Average: 5 次平均（含系统噪音）
+    StdDev: 抖动（> 5% 视为不稳定）
+
+    主要看 Average，但要检查 StdDev < 3%（否则测量噪声盖过真实差异）。
+
+  4.2 常见误报
+
+    误报 1：第一次跑比后续快 5-10%
+      原因：cold cache（OS page cache 冷），x6502 dispatch 表还没
+            预热进 L1i。
+      解决：丢弃第一次数据，从第 2 次开始统计。
+
+    误报 2：背景进程干扰（Dropbox / OneDrive 同步）
+      原因：后台 I/O 抢占 L3 cache。
+      解决：跑 bench 前关闭所有非必要后台进程。
+
+    误报 3：电源管理（笔记本 turbo boost 波动）
+      原因：CPU 频率动态调整。
+      解决：插电、关 turbo boost（电源选项 → 高性能）。
+
+    误报 4：v0.3.15 编译选项不同
+      原因：/O2 vs /Od，PGO vs no-PGO。
+      解决：固定 -DCMAKE_BUILD_TYPE=Release + /O2（v0.3.16 默认）。
+
+  4.3 跨硬件可比性
+
+    不同 Win11 SKU（Intel vs AMD、笔记本 vs 桌面）性能差异 ±20%。
+    FCEUX11 性能门「同硬件前后对比」是 release contract，不做
+    跨硬件 A/B。
+    跨硬件对比需要重新采集 baseline（v0.3.0 → v0.3.16 同硬件）。
+
+================================================================================
+5. 与 v0.3.11 / v0.3.12 性能优化的关联
+================================================================================
+
+  5.1 v0.3.11（PPU 缓存 + x6502 dispatch 表）的预期收益
+
+    PPU 缓存优化（alignas(64) ppulut1/2/3 + PALRAM）：
+      - L1d cache miss 降低 ≥ 10%（plan v3 §5 v0.3.11 验收）
+      - 反映在 ppu_render_bench 应 < 0.66 ms/frame（0.735 × 0.9）
+    x6502 指令 dispatch 改 std::array 跳转表：
+      - branch prediction 命中率提高
+      - 反映在 x6502_exec_bench 应 < 0.80 ms/frame（0.842 × 0.95）
+
+  5.2 v0.3.12（mapper 寄存器组对齐 + 预取）的预期收益
+
+    PRG/CHR 切换表 64-byte 对齐 + _mm_prefetch 提示：
+      - 反映在 x6502_exec_bench 进一步 < 0.76 ms/frame
+    PPU PRG/CHR 缓存预取：
+      - 反映在 ppu_render_bench 进一步 < 0.66 ms/frame
+
+  5.3 v0.3.15.x / v0.3.16 的实测对照
+
+    v0.3.15.x PHASE-5 闸 5 实测：
+      - x6502: 0.760 ms/frame（vs 0.842 baseline = 0.90×，plan 阈值 0.95× ✓）
+      - PPU:   0.717 ms/frame（vs 0.735 baseline = 0.975×，plan 阈值 1.1× ✓）
+    v0.3.16 期望：维持或更好（无破坏性重构）。
+
+================================================================================
+6. release-day bench 套跑流程
+================================================================================
+
+  Step 1: 准备 release binary
+    cd build_release
+    cmake --build . --config Release
+    # 期望 /WX 0 错误 0 警告（v0.3.16 铁律 11）
+
+  Step 2: 跑全套 benchmark 5 次
+    cd tests/
+    for i in 1..5; do
+      fceux11_bench_x6502_exec.exe --benchmark_min_time=0.5s > ../logs/bench_x6502_run${i}.log
+      fceux11_bench_ppu_render.exe --benchmark_min_time=0.5s > ../logs/bench_ppu_run${i}.log
+      fceux11_bench_apu_mix.exe --benchmark_min_time=0.5s > ../logs/bench_apu_run${i}.log
+    done
+
+  Step 3: 验证闸 5 通过
+    grep "RESULT:" ../logs/*.log
+    # 期望全部 RESULT: PASSED
+
+  Step 4: 归档到 docs/tech/v0.3.16_Benchmark_Report.md
+    中位数写入报告，附硬件 / 软件 profile + 阈值对照表。
+
+  Step 5: 标记 release 完成
+    闸 5 通过 → 闸 1-5 全部通过 → 可以打 release tag
+    详见 16 章「五道闸验证方法」。
+
+================================================================================
+7. 性能优化在 v0.4.x 的展望
+================================================================================
+
+  - SIMD 化 PPU 调色板查表（v0.3.11 SIMD probe 结论：当前不收益，
+    推迟 v0.4.x 重议）。
+  - 64-byte 对齐 PPU framebuffer 写入（减少 L1d miss）。
+  - Rust 端 APU mix 的 SIMD 化（mlua 与 APU 边界）。
+  - DirectStorage 1.2 I/O 接管（savestate 写入从 std::fstream 改
+    IDStorageQueue，减少 OS page cache 开销）。
+
+================================================================================
+8. 总结
+================================================================================
+
+  FCEUX11 性能门 5 由 3 个手写 benchmark（x6502 / PPU / APU）+ 3 个
+  SIMD probe benchmark 共同支撑。v0.3.0 baseline 数值是 0.842 /
+  0.735 / 0.704 ms/frame，v0.3.15.x PHASE-5 实测 0.760 / 0.717 /
+  0.718（全部满足 plan §5 v0.3.12.5 阈值）。bench 数据是 release
+  contract 的一部分，release-day 5 次中位数采集 + 归档到
+  docs/tech/v0.3.16_Benchmark_Report.md。
+
+  关键经验：
+    1. Average 配 StdDev < 3%，StdDev 偏高说明测量噪声盖过真实差异。
+    2. 跨硬件 ±20% 不可比，必须同硬件前后对比。
+    3. 冷 cache / 后台进程 / 电源管理是三大常见误报源，跑前要
+       clean state。
+    4. 性能优化 v0.3.11 / v0.3.12 的预期收益可直接对照 bench 数值。
+
+  相关文档：
+    - docs/tech/12_测试方法论与质量门控.txt  §6 性能基准简介
+    - docs/tech/16_五道闸验证方法与铁律审计.txt  闸 5 操作
+    - docs/tech/10_内存布局与缓存对齐.txt  v0.3.11 缓存优化
+    - docs/tech/11_SIMD性能探测方法.txt  SIMD probe 报告
+    - CHANGELOG.md  [0.3.15.x] (PHASE-5 complete)  5-gate 闸 5 数据

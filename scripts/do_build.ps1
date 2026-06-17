@@ -36,15 +36,34 @@ if ($ninjaOk) {
 } elseif (Get-Command nmake -ErrorAction SilentlyContinue) {
     $generator = "NMake Makefiles"
 } else {
-    # Attempt to auto-load VS 2022+ BuildTools environment
-    $vcvarsPaths = @(
-        "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
-        "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
-        "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-        "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars64.bat"
-        "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
-    )
-    $vcvars = $vcvarsPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+    # Attempt to auto-load VS 2017+ BuildTools environment.
+    # v1.0: prefer vswhere.exe (Microsoft-recommended discovery — works on
+    # any drive letter and any VS edition). Fall back to 5 hard paths for
+    # edge cases where vswhere is missing. This makes the script portable
+    # to users who install Visual Studio on D:\ / E:\ or use a custom path.
+    $vcvars = $null
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+    if (Test-Path $vswhere) {
+        try {
+            $installPath = & $vswhere -latest -products * `
+                -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+                -property installationPath 2>$null
+            if ($installPath) {
+                $candidate = Join-Path $installPath "VC\Auxiliary\Build\vcvars64.bat"
+                if (Test-Path $candidate) { $vcvars = $candidate }
+            }
+        } catch {}
+    }
+    if (-not $vcvars) {
+        $vcvarsPaths = @(
+            "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+            "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+            "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+            "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars64.bat"
+            "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+        )
+        $vcvars = $vcvarsPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+    }
     if ($vcvars) {
         Write-Host "[ENV] Loading VS environment from $vcvars" -ForegroundColor Yellow
         $envVars = (& cmd /c "`"$vcvars`" >nul 2>&1 && set") -split "`r?`n"

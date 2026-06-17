@@ -16,7 +16,8 @@
 //     forward base class" before the manual GUI smoke test.
 //
 // The runtime translation switch is covered by the manual GUI smoke test
-// (docs/tech/v0.3.15_Verification_Report.md gate 4).
+// (plan v3 §7 gate 4 — see docs/tech/16_五道闸验证方法与铁律审计.txt §4
+// for the v1.0-era replacement spec).
 //
 // Style: matches smoke_test.cpp (printf-based, return 0/1).
 

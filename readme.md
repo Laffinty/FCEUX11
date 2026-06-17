@@ -2,7 +2,7 @@
 
 # FCEUX11
 
-[![Version](https://img.shields.io/badge/version-v0.3.10-blue)](https://github.com/Laffinty/FCEUX11/releases)
+[![Version](https://img.shields.io/badge/version-v1.0.0-blue)](https://github.com/Laffinty/FCEUX11/releases)
 [![License](https://img.shields.io/badge/license-GPL--v2-green)](COPYING)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?logo=windows)](https://www.microsoft.com/windows/windows-11)
 [![Qt](https://img.shields.io/badge/Qt-6.8%20LTS-41CD52?logo=qt)](https://www.qt.io)
@@ -92,7 +92,18 @@ Precompiled binaries are available on the **[GitHub Releases](https://github.com
 
 详见 [CHANGELOG.md](CHANGELOG.md)。
 
+v1.0 是首个正式版（基于 v0.3.16 LTS 收官），整合 v0.3.0 ~ v0.3.16 全部
+17 个子版本 + 2 个整合检查点。完整 Release Notes 见
+[`docs/tech/22_v0_3_x发布说明.txt`](docs/tech/22_v0_3_x发布说明.txt)。
+编译指南见 [`docs/v1.0_BuildGuide.md`](docs/v1.0_BuildGuide.md)。
+
 See [CHANGELOG.md](CHANGELOG.md) for version history.
+
+v1.0 is the first official stable release (based on the v0.3.16 LTS
+closure), integrating all 17 sub-versions and 2 integration checkpoints
+from v0.3.0 to v0.3.16. Full release notes:
+[`docs/tech/22_v0_3_x发布说明.txt`](docs/tech/22_v0_3_x发布说明.txt).
+Build guide: [`docs/v1.0_BuildGuide.md`](docs/v1.0_BuildGuide.md).
 
 ---
 

@@ -1,6 +1,6 @@
 // FCEUX11 — Core type aliases under fceu11:: namespace (v0.3.8)
 //
-// Per docs/v0.3.x_Construction_Plan_v3.md §5 v0.3.8 task 4 ("175 mapper
+// Per v0.3.x construction plan v3 §5 v0.3.8 task 4 ("175 mapper
 // MapIRQHook → using"): strongly type the global mapper-IRQ dispatch hook
 // without changing its linkage. The global symbol `::MapIRQHook` keeps its
 // pre-v0.3.x C-linkage contract used by 35 mapper .cpp files in

@@ -3,9 +3,9 @@
 // v0.3.15.x PHASE-3: DirectStorage 1.2 NVMe probe scaffold.
 // This file ONLY probes the host for DirectStorage support; it does NOT
 // take over any I/O. The actual IDStorageFactory / IDStorageQueue
-// takeover of .fc0/.fcs writes is deferred to v0.4.x (see plan v3
-// §5 v0.3.15 "Win11 platform features" subset + docs/v0.3.15_Build_Plan.md
-// PHASE-3 task 3.2).
+// takeover of .fc0/.fcs writes is deferred to v2.0 (see plan v3
+// §5 v0.3.15 "Win11 platform features" subset — full spec archived
+// in the v0.3.16 LTS closure docs/tech/19_Win11开发者集成指南.txt).
 //
 // Probe results are cached in a global static so the cost is paid at
 // most once per process. The state.cpp TODO comment references the

@@ -1,0 +1,380 @@
+================================================================================
+  FCEUX11 技术文档 / Win11 开发者集成指南
+  Win11 Developer Integration Guide
+================================================================================
+
+【写在前面 / Preface】
+================================================================================
+
+  本章面向 Win11 平台特性的开发集成者：PerMonitorV2 高 DPI 、
+  DirectStorage 探测、ITaskbarList3 Snap Layouts、ShouldAppsUseDarkMode
+  暗色 API、--no-console 命令行参数、AttachConsole + freopen 的伪终端
+  修复。每一项都是 v0.3.14 ~ v0.3.15.x 期间真实落地过的 Win11 平台
+  feature，本章讲它们的「为什么需要 + 怎么接 + 怎么避坑」。
+
+  本章目标：
+    1. 列出 Win11 独占特性的 5 个集成点 + 各自代码位置
+    2. 解释每项的「计划 → 实现 → 验证」三步证据链
+    3. 给出常见集成反模式与避坑指南
+    4. 提供「5 feature 协同」的端到端验证场景
+
+  阅读时间：约 25 分钟。
+  前置知识：Windows SDK 基础；QApplication 生命周期；理解
+            MSVC 14.51 / Qt 6.8 LTS / Win11 22H2+ 的关系。
+
+================================================================================
+1. 5 个 Win11 平台特性总览
+================================================================================
+
+  +----+---------------------+------------------+----------------+--------+
+  | #  | 特性                | 代码位置         | 平台要求       | 落地  |
+  +----+---------------------+------------------+----------------+--------+
+  | 1  | PerMonitorV2 高 DPI | icons/fceux11.manifest | Win10 1703+ | v0.3.15 |
+  | 2  | --no-console 参数   | fceuWrapper.cpp   | 全部           | v0.3.15 |
+  |    |                     | main.cpp          |                | PHASE-3|
+  | 3  | DirectStorage 探测  | platform/win11/   | Win10 1903+    | v0.3.15 |
+  |    |                     | DirectStorageProbe| (NVMe 必需)    | PHASE-3|
+  | 4  | ITaskbarList3       | platform/win11/   | Win7+          | v0.3.15 |
+  |    | Snap Layouts         | TaskbarProgress   | (taskbar prog) | PHASE-3|
+  | 5  | ShouldAppsUseDarkMode| main.cpp         | Win10 1809+    | v0.3.15 |
+  |    |                     |                  |                | PHASE-3|
+  +----+---------------------+------------------+----------------+--------+
+
+  1.1 平台要求的工程意义
+
+    PerMonitorV2 是 Win10 1703+（2017-10）引入，5 年以上历史，门槛低。
+    --no-console 不依赖 Win API，纯命令行参数解析。
+    DirectStorage 1.2 要求 Win10 1903+ (NVMe 控制器驱动) + NVMe SSD。
+    ITaskbarList3 自 Win7 (2009) 就在，Q7 已有，但 ITaskbarList4 才
+    支持 thumbnail 按钮等新接口 — FCEUX11 仅用 List3 的进度/覆盖
+    图标就够。
+    ShouldAppsUseDarkMode 是 uxtheme.dll ordinal 132，官方未公开但
+    Win10 1809+ 稳定导出。
+
+  1.2 工具链要求
+
+    全部 5 个特性都基于 MSVC + Windows SDK 10.0.19041+，与 v0.3.6.5
+    起锁定的 MSVC-only 工具链一致（plan §3.1 铁律 9）。
+    无需额外 vcpkg 包；皆用 <windows.h> + <shobjidl.h> 现有 SDK 头。
+
+================================================================================
+2. 特性 1：PerMonitorV2 高 DPI
+================================================================================
+
+  2.1 为什么需要
+
+    Win10 1703 之前 QApplication 默认按 System DPI 缩放；多显示器
+    不同 DPI 场景下，窗口跨屏拖动会模糊。
+    PerMonitorV2 让 Qt 在每个 monitor 独立计算缩放因子，跨屏保持
+    锐利。FCEUX11 v0.3.15 在 icons/fceux11.manifest 加 3 个声明：
+      - dpiAware = PerMonitorV2
+      - longPathAware
+      - gdiScaling = true  (PHASE-5 + v0.3.15.x 加上)
+
+  2.2 manifest 内容（icons/fceux11.manifest）
+
+    ```xml
+    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0"
+              xmlns:asmv3="urn:schemas-microsoft-com:asm.v3">
+      <asmv3:application>
+        <asmv3:windowsSettings>
+          <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/05/scaling">PerMonitorV2</dpiAwareness>
+          <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/06">true/pm</dpiAware>
+          <longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/05/scaling">true</longPathAware>
+          <gdiScaling xmlns="http://schemas.microsoft.com/SMI/2017/05/scaling">true</gdiScaling>
+        </asmv3:windowsSettings>
+      </asmv3:application>
+    </assembly>
+    ```
+
+  2.3 集成反模式
+
+    - 反模式 A：在 main.cpp 用 Qt::AA_EnableHighDpiScaling 二次开启。
+      与 manifest 重复，可能双缩放。
+    - 反模式 B：用 QFont::setPointSize() 而非 setPixelSize()。
+      点大小按 System DPI 缩放，PerMonitorV2 下失真。
+    - 正确：用 setPixelSize() + 字体 fallback 链（Segoe UI Variable
+      → Microsoft YaHei UI → ...）保证每屏独立渲染。
+
+  2.4 端到端验证
+
+    - 4K 显示器 200% 缩放 + 1080p 100% 缩放，双屏拖动 fceux11 窗口
+    - 截图：UI 元素在两屏都锐利
+    - 字体：CJK 字符在两屏都正确 fallback
+
+================================================================================
+3. 特性 2：--no-console 命令行参数
+================================================================================
+
+  3.1 为什么需要
+
+    v0.3.14 BUG C 修复后，从 Explorer 双击启动 fceux11.exe 会
+    AttachConsole(ATTACH_PARENT_PROCESS) + freopen CONOUT$，但用户
+    在某些 launcher 场景（PyInstaller / Electron）下不希望父进程
+    拿到 stdout。
+
+    --no-console 让用户主动跳过 AttachConsole 整段。
+
+  3.2 集成点
+
+    src/drivers/Qt/fceuWrapper.cpp 的 fceuWrapperPreInit：
+    ```cpp
+    bool noConsole = false;
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "--no-console") == 0) {
+            noConsole = true;
+        }
+    }
+    fceuWrapperConfig.noConsole = noConsole;
+    ```
+
+    src/drivers/Qt/main.cpp BUG C 修复段前加守卫：
+    ```cpp
+    if (!fceuWrapperConfig.noConsole) {
+        // AttachConsole + freopen（v0.3.14 BUG C 修复内容）
+    }
+    ```
+
+  3.3 集成反模式
+
+    - 反模式：在 main.cpp 顶层直接跳过 AttachConsole，破坏
+      v0.3.14 BUG C 的 GetConsoleWindow() 守卫。
+    - 正确：用 fceuWrapperConfig.noConsole 集中配置，main.cpp
+      与 fceuWrapper.cpp 都通过这个 config 字段通信。
+
+  3.4 端到端验证
+
+    - `fceux11.exe --no-console` 启动 → 父进程无 stdout 泄漏
+    - `fceux11.exe` 启动 → 父进程可拿到 stdout（无 --no-console）
+    - `fceux11.exe --no-console --help` → 退出 0，--help 仍输出
+
+================================================================================
+4. 特性 3：DirectStorage 探测骨架（仅探测不接管 IO）
+================================================================================
+
+  4.1 为什么需要探测而非直接接入
+
+    DirectStorage 1.2 真实接管 .fc0/.fcs 写入要求：
+      - dstorage.lib 静态链接（或 dlsym 动态）
+      - 强制 NVMe SDS-capable 控制器
+      - 跨 ms vcstdio 与 DirectStorage queue 同步
+    范围太大、爆炸半径不可控。v0.3.15.x 决定「先探测骨架，实际
+    接管推迟 v0.4.x」。
+
+  4.2 集成点
+
+    src/platform/win11/DirectStorageProbe.h：
+    ```cpp
+    namespace fceu11::platform::win11 {
+    struct DirectStorageCaps {
+        bool isSupported;
+        DWORDLONG totalBytes;
+        DWORDLONG freeBytes;
+        QString errorReason;
+    };
+    DirectStorageCaps probeDirectStorage();
+    bool isNvmeStorageForSavestate();
+    } // namespace
+    ```
+
+    src/CMakeLists.txt：
+    ```cmake
+    option(FCEUX11_DIRECT_STORAGE_PROBE "Enable DirectStorage probe" ON)
+    if(FCEUX11_DIRECT_STORAGE_PROBE)
+        add_library(fceu11_direct_storage_probe STATIC ...)
+        target_link_libraries(fceux11_drivers_qt fceu11_direct_storage_probe)
+    endif()
+    ```
+
+  4.3 实现关键
+
+    - 用 GetProcAddress 解析 NvmeSdsSupported()（避免 nvme.lib
+      静态依赖）。
+    - 缓存结果到函数局部 static（避免每次探测）。
+    - 用 GetDiskFreeSpaceExW 拿容量。
+    - FCEUX11_ASAN_ENABLED 时跳过实际探测（避免 ASan 误报）。
+
+  4.4 集成反模式
+
+    - 反模式 A：直接 link dstorage.lib → 引入新工具链依赖，
+      违反 plan §3.1 工具链锁定。
+    - 反模式 B：把 .fc0 写入走 DirectStorage → v0.3.15.x 范围爆炸，
+      字节级 savestate hash 变化。
+    - 正确：只探测，结果 cached，不接管 IO。
+
+  4.5 端到端验证
+
+    - NVMe 设备启动 fceux11 → 日志输出 DirectStorage supported
+    - SATA SSD 启动 fceux11 → 日志输出 DirectStorage NOT supported
+    - tests/direct_storage_probe_test.cpp 验证 cached caps 一致性
+
+================================================================================
+5. 特性 4：ITaskbarList3 Snap Layouts 集成
+================================================================================
+
+  5.1 为什么需要
+
+    Win11 引入了 Snap Layouts（窗口最大化按钮 hover 显示 6 个布局
+    选项）。FCEUX11 在 TAS 录制 / savestate 写入时希望显示进度条
+    + 暂停时显示 overlay icon，ITaskbarList3 是 Win7 起的标准做法。
+
+  5.2 集成点
+
+    src/platform/win11/TaskbarProgress.h：
+    ```cpp
+    class TaskbarProgress {
+    public:
+        void init(HWND hwnd);
+        void setProgress(double pct);  // 0.0-1.0, -1 = clear
+        void setState(int state);     // TBPF_NORMAL/PROGRESS/PAUSED/ERROR
+        void setOverlayIcon(HICON icon, LPCWSTR desc);
+        void setThumbnailTooltip(LPCWSTR text);
+        void release();
+    private:
+        ITaskbarList3* m_pTaskbarList = nullptr;
+        HWND m_hwnd = nullptr;
+    };
+    ```
+
+    consoleWin_t 在构造函数绑定：
+    ```cpp
+    m_taskbarProgress.init((HWND)winId());
+    ```
+
+    consolePause() 切换 overlay icon。
+
+  5.3 实现关键
+
+    - 用 CoCreateInstance(CLSID_TaskbarList) 而非 CoCreateInstance +
+      多次 QueryInterface，减少 ref count 开销。
+    - release() 在 dtor 调 CoUninitialize 之前。
+    - setProgress(-1) 立即清除（TBPF_NOPROGRESS）。
+    - setOverlayIcon(nullptr, nullptr) 清除现有 overlay。
+
+  5.4 集成反模式
+
+    - 反模式 A：把 m_pTaskbarList 暴露为 public 字段 → 外部可能
+      double-free。
+    - 反模式 B：每帧都调 setProgress → 性能浪费。TAS / savestate
+      是 60s 一次的离散事件，不该在主帧循环调。
+    - 正确：m_taskbarProgress 私有 + setTaskbarProgress() 公开
+      helper，TAS / savestate 路径调 helper。
+
+  5.5 端到端验证
+
+    - 启动 fceux11 → 任务栏出现 fceux11 图标
+    - 触发 TAS 录制 → 任务栏进度条显示 0%→100%
+    - 暂停游戏 → overlay icon 出现 + 提示「Paused」
+    - 关闭 fceux11 → release() 正常调用，无 ref count 泄漏
+
+================================================================================
+6. 特性 5：ShouldAppsUseDarkMode API
+================================================================================
+
+  6.1 为什么需要
+
+    v0.3.15 之前用 QSettings 读 HKEY_CURRENT_USER\...\AppsUseLightTheme
+    注册表判断系统暗色。问题：
+      - 跨用户 / 跨 shell 行为不一致
+      - Win11 切换暗色需要重启 explorer
+    ShouldAppsUseDarkMode（uxtheme.dll ordinal 132）原生 API。
+
+  6.2 集成点
+
+    src/drivers/Qt/main.cpp 启动期：
+    ```cpp
+    #if _WIN32_WINNT >= 0x0A00
+    HMODULE hUxtheme = LoadLibraryW(L"uxtheme.dll");
+    using ShouldAppsUseDarkModeFn = bool (WINAPI*)();
+    auto fn = reinterpret_cast<ShouldAppsUseDarkModeFn>(
+        GetProcAddress(hUxtheme, MAKEINTRESOURCEA(132)));
+    bool isDark = fn ? fn() : false;
+    FreeLibrary(hUxtheme);
+    #else
+    // fallback: QSettings registry
+    #endif
+    ```
+
+  6.3 实现关键
+
+    - 启动期一次性 resolve，不在主帧循环重复调（ordinal 解析有
+      ref count 开销）。
+    - fallback 到 QSettings 路径（Win10 1809-）。
+    - 当前实现是「启动期快照」，实时切换需注册表 watcher
+      (v0.3.16 deferred，v0.4.x 议程)。
+
+  6.4 集成反模式
+
+    - 反模式 A：把 fn() 指针缓存为全局 static → uxtheme.dll
+      unload 时悬空。
+    - 反模式 B：忽略 Win10 1809- 的 fallback → 老系统启动崩溃。
+    - 正确：启动期一次性 resolve + FreeLibrary，下次启动重新 resolve。
+
+  6.5 端到端验证
+
+    - Win11 暗色模式启动 → fceux11 启动后 UI 跟随暗色
+    - Win11 暗色 → 亮色切换（重启 fceux11）→ UI 跟随
+    - Win10 1809- 启动 → 走 QSettings fallback 路径
+
+================================================================================
+7. 5 feature 协同的端到端验证场景
+================================================================================
+
+  5 个 feature 不是孤立的，它们一起构成「Win11 平台原生体验」。
+
+  场景 A：4K + 200% 缩放下完整 workflow
+
+    1. PerMonitorV2：4K 200% 缩放下 UI 锐利
+    2. ShouldAppsUseDarkMode：暗色模式启动 → Qt StyleSheet 跟随
+    3. --no-console：双击启动无 stdout 噪音
+    4. ITaskbarList3：TAS 录制时任务栏进度条
+    5. DirectStorage 探测：日志显示 NVMe SDS supported
+
+  场景 B：跨显示器拖动
+
+    1. 1080p 100% 缩放屏启动 fceux11
+    2. 拖动到 4K 200% 缩放屏
+    3. PerMonitorV2 自动重排版（无重启动）
+    4. CJK 字符字体 fallback 在两屏都生效
+
+  场景 C：24h 烟雾（详见 17 章）
+
+    5 feature 都必须在 24h 烟雾下稳定 0 崩溃。
+
+================================================================================
+8. 工具链与平台依赖表
+================================================================================
+
+  +---------------------+--------------+--------------+--------------+
+  | 工具 / SDK          | 最低版本     | 推荐版本     | 锁定版本     |
+  +---------------------+--------------+--------------+--------------+
+  | MSVC                | 19.36        | 14.51.36231  | 14.51.36231  |
+  | Windows SDK         | 10.0.19041   | 10.0.22621   | 10.0.22621   |
+  | Qt                  | 6.5 LTS      | 6.8 LTS      | 6.8 LTS      |
+  | SDL2                | 2.0.22       | 2.30.5       | 2.30.5       |
+  | vcpkg               | 2024.01      | 2024.10      | 2024.10      |
+  +---------------------+--------------+--------------+--------------+
+
+  锁版本原则：v0.3.16 LTS 不引入新工具链依赖；Win11 平台特性的
+  5 个 feature 全部基于既有 MSVC + Windows SDK 头文件 + 动态加载
+  COM/UXtheme.dll，无 vcpkg 新增包。
+
+================================================================================
+9. 总结
+================================================================================
+
+  Win11 平台特性集是 FCEUX11 v0.3.15 收官的核心交付物。5 个 feature
+  按「manifest（静态）→ CLI 参数（最简单）→ API 探测（骨架）→
+  COM 集成（最复杂）→ 暗色 API（隐蔽）」的难度梯度排列，共同
+  提供 Win11 平台原生体验。集成时遵守「manifest + Qt 二次声明
+  不重复」「CLI 参数走 fceuWrapperConfig 中转」「DirectStorage
+  探测不接管 IO」「ITaskbarList3 私有 ownership」「暗色 API
+  启动期一次性」五条纪律。
+
+  相关文档：
+    - docs/tech/14_版本演进与API收敛.txt  v0.3.15 段
+    - docs/tech/15_GUI启动崩溃调试案例库.txt  案例 A/B/C（QOpenGLWindow）
+    - CHANGELOG.md  [0.3.15.x] (PHASE-3 partial)  Win11 平台特性
+    - CHANGELOG.md  [0.3.16] (LTS)  Win11 平台特性收官
+    - icons/fceux11.manifest  PerMonitorV2 声明

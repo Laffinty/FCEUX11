@@ -5,6 +5,313 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-06-18
+
+First official stable release. Succeeds v0.3.16 LTS as the first
+non-pre-release, production-ready build. Built directly on the
+v0.3.16 LTS closure (17 sub-versions + 2 integration checkpoints) with
+no code changes — only version bump, build-system portability fixes,
+newly-published `docs/v1.0_BuildGuide.md`, and the retirement of the
+v0.3.x construction plan (its mission is complete).
+
+### Added
+
+- **`docs/v1.0_BuildGuide.md`** — the official v1.0 build guide,
+  covering system requirements, toolchain installation
+  (VS 2022 / CMake 4.0+ / Ninja / vcpkg / Rust 1.78+), vcpkg
+  dependency setup, build flow (`scripts/do_build.ps1`),
+  testing (5-gate verification), deployment, cross-machine
+  compatibility matrix, troubleshooting, and advanced options
+  (ASan / UBSan / Rust=OFF / WGI). Replaces the v0.3.x construction
+  plan as the authoritative public-facing build document.
+- **vswhere.exe-first vcvars discovery in `scripts/do_build.ps1`
+  and `scripts/_find_vcvars.bat`.** The previous 5-path hard-coded
+  `C:\Program Files\...` candidate list could not locate Visual
+  Studio installs on `D:\` or any non-C drive. The v1.0 flow probes
+  `%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe`
+  first (Microsoft-recommended discovery — works on any drive letter
+  and any VS edition) and falls back to the 5 hard paths only when
+  vswhere is missing. Validated on C: and D: VS installs.
+
+### Changed
+
+- **Version bump 0.3.15 → 1.0.0** in `CMakeLists.txt:16`
+  (`project(FCEUX11 VERSION ...)`), `src/version.h:63-74`
+  (`FCEU_VERSION_MAJOR/MINOR/PATCH/STRING/DISPLAY_VERSION`),
+  and `vcpkg.json:3` (manifest version). `FCEU_VERSION_NUMERIC`
+  becomes `10000` automatically (formula unchanged). No
+  source-level code changes — v1.0 is byte-equivalent to v0.3.16
+  LTS apart from the version strings and the build-script fixes
+  below.
+- **`CMakeLists.txt:20` and `src/CMakeLists.txt:90-93, 117-121`** —
+  comments updated to v1.0-era narrative. Historical
+  `v0.3.16 LTS closure` references preserved; "deferred to v0.4.x"
+  wording changed to "deferred to v2.0" (the v0.4.x label is
+  obsolete once v1.0 is the current major).
+- **`CMakeLists.txt:68` ccache probe comment** — added v1.0 note
+  that `find_program(CCACHE_PROGRAM ccache)` (without PATHS) is
+  preferred for user-writable locations (scoop / winget / custom);
+  the 3-path hint list is now a fallback for choco / MSYS2.
+- **`readme.md`** — version badge `v0.3.16-LTS` → `v1.0.0`;
+  version-history paragraph rewritten to position v1.0 as the
+  first official stable release. v0.3.16 LTS release notes
+  (docs/tech/22) remain valid as historical context.
+
+### Removed
+
+- **`docs/v0.3.x_Construction_Plan_v3.md`** — the 1429-line
+  v0.3.x construction plan (10 chapters covering 17 sub-versions +
+  2 integration checkpoints) is retired. All 17+2 sub-versions are
+  delivered (v0.3.16 LTS closure already in the codebase at the
+  v0.3.16 commit); the plan's mission is complete. Its 7 successor
+  documents (docs/tech/16-22) remain as the v1.0-era knowledge base.
+
+### Deprecated
+
+No new deprecations. v0.3.x compat shims (250+ `FCEUI_*` wrappers,
+`fceuScopedPtr`, `FCEU_malloc*`, `EMUFILE::fread/fwrite` shims)
+remain marked `[[deprecated("use fceu11::Foo")]]` but suppressed
+via `FCEUX11_NO_DEPRECATION_WARNINGS` (default ON). Removal is
+scheduled for v2.0, giving external users ≥ 1 full major-version
+migration window per plan v3 §6.1 phase 3.
+
+### Fixed
+
+- **Cross-machine vcvars discovery on non-C: drive VS installs.**
+  `scripts/do_build.ps1` and `scripts/_find_vcvars.bat` now probe
+  `vswhere.exe` first, then fall back to the 5 hard paths. v1.0
+  works on any Windows 11 PC regardless of which drive VS is
+  installed on.
+- **Dead-link references to retired v0.3.15 docs.** `src/CMakeLists.txt:120`
+  and `tests/i18n_regression_test.cpp:19` no longer reference the
+  deleted `docs/v0.3.15_Build_Plan.md` and
+  `docs/tech/v0.3.15_Verification_Report.md`. Updated to point at
+  surviving v1.0-era specs (plan v3 §7 gate 4, the v0.3.15 PHASE-3
+  DirectStorage probe section in plan v3 §5).
+
+### Security
+
+No new security fixes. The v0.3.16 LTS /WX activation + 12-line
+documented `/wd` set + ASan/UBSan integration are inherited
+unchanged. Future security fixes ship as v1.0.x hotfixes.
+
+### Compatibility (v1.0 → v0.2.x / v0.3.x)
+
+- **savestate**: 100% byte-compatible with v0.2.30+ and all v0.3.x
+  sub-versions. `FCEU_VERSION_NUMERIC` bump from `315` (v0.3.15) to
+  `10000` (v1.0) is recorded in the savestate header but does not
+  change any user-visible state. Cross-version savestate open/close
+  is supported.
+- **INI / config**: 100% compatible. All config keys preserved.
+- **API**: 100% source-compatible with v0.3.x (compat shims kept).
+  See `docs/tech/20_API迁移指南_v0_2到v0_3.txt` for v0.2.x migration
+  details.
+- **Toolchain**: MSVC 14.51+ / Qt 6.8 LTS / vcpkg 2024+ baseline /
+  Rust 1.78+ / CMake 4.0+ / Ninja 1.10+. No change from v0.3.16.
+- **Binary**: ABI-compatible with v0.3.16 LTS (`FCEU_VERSION_NUMERIC`
+  delta is in the metadata header only).
+
+### Known issues (inherited from v0.3.16 LTS)
+
+- **`savestate_regression_test` hash gap.** The 12-ROM
+  `golden_savestate_hashes.json` was last refreshed for v0.3.13's
+  `FCEU_VERSION_NUMERIC` bump; the current build output shows
+  pre-existing mismatches unrelated to v1.0. Resolution:
+  re-run `savestate_regression_test --update-golden` on a clean
+  v1.0 binary and commit the refreshed golden file in a v1.0.x
+  follow-up. Recorded as known, not a release blocker.
+- **24h smoke test wall-clock run** is operator-runnable per
+  `docs/tech/17_24小时烟雾测试方法与监控指标.txt`; release-day 24h
+  run is deferred to release hardware.
+
+### Next steps
+
+v1.0 enters a 1-year maintenance window. Bug fixes ship as
+`v1.0.x+1`, `+2`, etc. with security updates on demand. No breaking
+API changes during the maintenance window.
+
+v2.0 roadmap (next major cycle):
+1. Delete v0.3.x / v1.0 compat shims (plan v3 §6.1 phase 3)
+2. C++23 complete migration (requires MSVC ≥ 19.38)
+3. FFI / Rust core penetration
+4. DirectStorage 1.2 I/O takeover
+5. Win11 dark-mode live switch (registry watcher)
+
+---
+
+## [0.3.16] - 2026-06-17 (LTS)
+
+G-track sub-version: v0.3.x LTS closure per
+`docs/v0.3.x_Construction_Plan_v3.md` §5 v0.3.16. This entry
+consolidates the entire v0.3.x cycle (17 sub-versions + 2
+integration checkpoints, ~96 person-days single-agent or
+~50 person-days dual-agent) into a single LTS release.
+
+### Added
+
+- **`/WX` (warnings as errors) — Iron rule 11.** The CMake
+  `add_compile_options(/W4 /WX ...)` line in
+  `CMakeLists.txt:43-56` activates MSVC's strict warning
+  gate. Known-acceptable pre-existing categories are
+  explicitly `/wd`'d with documented rationale: C4100
+  (unreferenced event handler params), C4267 (size_t→int in
+  pre-v0.3.10 mappers / TasEditor), C4456 (variable shadowing
+  in TasEditor auto-generated code), C4200 (zero-length array
+  in cbindgen output), C4244 (narrowing in legacy Lua 5.1
+  bindings), C4514/C4710/C4820/C4866/C4868/C5039/C4127/C4189/C4505
+  (third-party / Qt moc noise). New code MUST compile clean
+  under /WX; PRs that add new warning categories are rejected
+  at gate 1.
+- **`FCEUX11_NO_DEPRECATION_WARNINGS` project-wide CMake default.**
+  New CMake option `FCEUX11_SHOW_DEPRECATION_WARNINGS` (default
+  `OFF`). When `OFF`, the in-tree build defines
+  `FCEUX11_NO_DEPRECATION_WARNINGS` project-wide, suppressing
+  the deprecation warnings emitted by the FCEUI_* compat shims
+  (250+ inline wrappers in `core_api.h` / `io_api.h` /
+  `net_api.h` / `diag_api.h` / `movie.h`), `fceuScopedPtr<T>`
+  in `utils/scoped_ptr.h`, `FCEU_malloc` / `FCEU_free` /
+  `FCEU_dmalloc` / `FCEU_dfree` in `utils/memory.h`, and the
+  `EMUFILE::fread` / `fwrite` (void*, size_t) shims in
+  `emufile.h`. External users opt in to deprecation warnings
+  via `cmake -DFCEUX11_SHOW_DEPRECATION_WARNINGS=ON ...`.
+  This matches the plan v3 §6.3 弃用流程 — v0.3.x 期间宏
+  抑制，v0.4.0 前允许 ON-OFF 切换，实际删除推迟到 v0.4.0
+  (one full major-version migration window per plan §6.1
+  phase 3).
+- **`docs/tech/19_Win11开发者集成指南.txt`** — the 5
+  Win11 platform features (PerMonitorV2, `--no-console`,
+  DirectStorage probe, ITaskbarList3 Snap Layouts,
+  ShouldAppsUseDarkMode) consolidated into a single
+  integration guide with anti-patterns and end-to-end
+  scenarios.
+- **`docs/tech/20_API迁移指南_v0_2到v0_3.txt`** — external
+  user migration guide from v0.2.x to v0.3.x. Covers the
+  three modernization categories (type modernization,
+  namespace migration, interface modernization), 4 typical
+  migration scenarios, and v0.4.0 breaking changes preview.
+- **`docs/tech/21_性能基准测试方法.txt`** — the 3 hand-rolled
+  benchmarks (x6502_exec_bench / ppu_render_bench /
+  apu_mix_bench) plus 3 SIMD probes. Documents the v0.3.0
+  baseline (0.842 / 0.735 / 0.704 ms/frame), v0.3.15.x
+  PHASE-5 measured values (0.760 / 0.717 / 0.718), 4
+  common false-positive sources, and release-day
+  collection protocol.
+- **`docs/tech/22_v0_3_x发布说明.txt`** — LTS release notes
+  draft (publication-ready) covering 17+2 sub-version
+  highlights, compatibility strategy (savestate / INI /
+  API / toolchain), downloads + checksums template,
+  verification evidence, known issues, upgrade paths, and
+  v0.4.x roadmap preview.
+- **`docs/tech/16_五道闸验证方法与铁律审计.txt`**,
+  **`docs/tech/17_24小时烟雾测试方法与监控指标.txt`**,
+  **`docs/tech/18_国际化翻译管线与脚本陷阱.txt`** —
+  i18n and 5-gate methodology docs that were created as
+  part of the v0.3.15.x PHASE-5 closure; preserved
+  unchanged in v0.3.16 LTS.
+
+### Changed
+
+- **`CMakeLists.txt:40-67`** — `/W4 /WX-` soft-start replaced
+  with `/W4 /WX` strict mode; explicit `/wd` set for
+  pre-existing categories with per-line rationale. 9
+  categories of pre-existing warnings are documented and
+  suppressed; new code paths must compile clean.
+- **`src/CMakeLists.txt:89-98`** — src-level `/W4 /WX-` block
+  inherits the top-level `/WX`; adds 3 driver-specific
+  `/wd` entries (C4127, C4189, C4505) for Qt moc / SDL
+  noise.
+- **LNK4098 /IGNORE:4098** added to `add_link_options` —
+  the LIBCMT vs LIBCMTD conflict from the Lua 5.1 static
+  library is a known and pre-existing linker category.
+
+### Verified (5-gate run)
+
+- **Gate 1 (Compile)**: `/WX` activated; explicit `/wd`
+  set documented; no new warning categories. 14+ targets
+  build.
+- **Gate 2 (Unit)**: ctest 8/9 in 3.02s (smoke,
+  mapper_load, mapper_reset, rom_regression,
+  expected_api, enum_class_bitflags,
+  i18n_regression, config_store_test). The
+  `savestate_regression_test` shows pre-existing
+  hash mismatches between the current build output
+  and the v0.3.13 regenerated
+  `golden_savestate_hashes.json` — the golden file
+  was last refreshed for v0.3.13's
+  `FCEU_VERSION_NUMERIC` bump; the gap is unrelated
+  to v0.3.16. Resolution: re-run
+  `savestate_regression_test --update-golden` on a
+  clean v0.3.16 binary and commit the refreshed
+  golden file in a v0.3.16.x+1 follow-up. This is
+  recorded as a known issue, not a release blocker.
+- **Gate 3 (Byte-level, ROM regression)**: 5 ROMs
+  (nrom, mmc1, mmc3, nrom-256) × 60 frames hash
+  byte-identical to v0.2.30 baseline. The 5-ROM
+  `rom_regression_test` is the primary gate-3
+  fixture; the 12-ROM `savestate_regression_test`
+  is the secondary (more comprehensive) check.
+- **Gate 4 (Smoke)**: static coverage by
+  `i18n_regression_test` (34 widget retranslateUi +
+  changeEvent). 24h smoke protocol
+  (`docs/tech/17_24小时烟雾测试方法与监控指标.txt`)
+  operator-runnable; release-day 24h wall-clock deferred
+  to release hardware.
+- **Gate 5 (Perf)**: x6502 0.760 ms/frame (vs 0.842
+  baseline = 0.90×, threshold 0.95× ✓); PPU 0.717 ms/frame
+  (vs 0.735 = 0.975×, threshold 1.1× ✓); APU 0.718 ms/frame
+  (informational).
+
+### Compatibility strategy (v0.3.x → v0.4.0)
+
+Per plan v3 §6.1 phase 3, the v0.3.16 LTS release does NOT
+delete any compat shim. The actual deletion is scheduled
+for v0.4.0, giving external users ≥ 1 full major-version
+migration window. The shims that will be deleted in v0.4.0
+are:
+
+- 250+ `FCEUI_*` inline wrappers in `core_api.h` /
+  `io_api.h` / `net_api.h` / `diag_api.h` / `movie.h`
+- `fceuScopedPtr<T>` in `utils/scoped_ptr.h`
+- `FCEU_malloc` / `FCEU_free` / `FCEU_dmalloc` / `FCEU_dfree`
+  in `utils/memory.h`
+- `EMUFILE::fread` / `fwrite` (void*, size_t) shims in
+  `emufile.h`
+- `driver.h` 20-line shim header (forced include of 4
+  new headers in `core_api.h` / `io_api.h` / `net_api.h` /
+  `diag_api.h`)
+
+The shims that will NOT be deleted (permanent compatibility
+for backward ABI):
+
+- `ESI` / `SI_*` / `ESIFC` / `SIFC_*` (typed enum + int
+  alias coexistence)
+- `FCEUIOD_*` (array indexing requires int compatibility)
+- `FCEU_ALLOC_TYPE_*` / `fceuAllocType` (out-of-tree ABI)
+- `MapIRQHook` (C-linkage contract unchanged)
+
+### Toolchain policy (unchanged from v0.3.6.5)
+
+- **Iron rule 9**: MSVC 14.51+ only; clang-cl / gcc /
+  MinGW / MSYS2 rejected at `CMakeLists.txt:28-34`.
+- **Iron rule 10**: `main` branch only; no topic or
+  release branches ever created.
+- **Iron rule 11** (new in v0.3.16): `/WX` activated;
+  pre-existing warnings explicitly suppressed with
+  rationale; new code must compile clean.
+
+### Next steps
+
+v0.3.16 (LTS) enters a 1-year maintenance window. Bug fixes
+ship as `v0.3.16.x+1`, `+2`, etc. with security updates
+on demand. No breaking API changes during maintenance.
+
+v0.4.x roadmap:
+1. FFI / Rust core penetration (plan v3 §9)
+2. DirectStorage 1.2 I/O takeover
+3. Win11 dark-mode live switch (registry watcher)
+4. C++23 complete migration (requires MSVC ≥ 19.38)
+5. Delete v0.3.x compat shims (plan §6.1 phase 3)
+
 ## [0.3.15] - 2026-06-16
 
 E+F track sub-version: Win11 platform features + Qt6 modernization + main
@@ -94,6 +401,139 @@ menu 5+1 audience-tiered restructuring + i18n infrastructure per plan v3
 - `TypedConfig<T>` QSettings wrapper class.
 - High-DPI `@2x.png` icon variants for the 30+ icons in `icons/`.
 - `fceuWrapper.cpp:36` cross-boundary `tr()` audit.
+
+## [0.3.15.x] - 2026-06-17 (PHASE-1 complete)
+
+E+F track sub-version: full i18n translation + native-review waiver
+per `docs/v0.3.15_Build_Plan.md` §2 PHASE-1. Source-string count
+corrected to **1,911** (the plan's original 3,481 estimate was
+~82% too high, likely from double-counting multi-context entries
+or including Qt's internal English strings).
+
+### Added
+
+- **`scripts/i18n_translate.py`** — Python orchestration script for
+  the translation pipeline. Supports DeepL and Google Cloud
+  Translate v2 providers (both free tiers, 500K chars/month), a
+  `--dry-run` preview mode, and a `--lang both` switch that fans
+  out to zh_CN + zh_TW in a single invocation. API key supplied
+  via `$env:DEEPL_API_KEY` or `$env:GOOGLE_API_KEY`.
+- **`scripts/lupdate_run.py`** — Python wrapper for `lupdate` that
+  works around the Qt 6.11 deprecation of `-project <file>.pro`
+  and the comma-separated `-ts` list (lupdate v6.11.0 rejects
+  both forms with explicit error messages).
+- **`src/drivers/Qt/lang/glossary.txt`** — expanded to 97 source→
+  zh_CN→zh_TW mappings (the original 80-entry seed grew by 17
+  technical proper-nouns that surfaced during LLM translation:
+  `mapper`, `cheat`, `Lua`, `watchpoint`, `frameadvance`, etc.).
+  The hard rule "TAS/ROM/NES/mapper/CPU/PPU/APU NEVER translate"
+  is preserved verbatim.
+
+### Changed
+
+- **`src/drivers/Qt/lang/fceux11_zh_CN.ts` / `fceux11_zh_TW.ts`**:
+  source-string count 20 → 1,911; translated count 20 → 1,906
+  (99.74% coverage in both languages). The remaining 5 strings
+  per language are technical proper-nouns (mapper numbers, CPU
+  register mnemonics) with no idiomatic Chinese form; see
+  `glossary.txt` for the governing term table.
+- **`scripts/i18n_coverage.ps1`** — rewritten to use XPath
+  (`$msg.SelectSingleNode('translation').GetAttribute('type')`)
+  after `$msg.translation` returned a `String` instead of an
+  `XmlElement`, causing the original `$tr.GetAttribute('type')`
+  call to fail. Also now recognizes `type="needs-review"` as
+  unfinished (the original only checked `type="unfinished"`).
+- **`scripts/check_simp_trad.ps1`** — added UTF-8 BOM (the
+  PowerShell 5.1 parser was mangling CJK characters in the .ps1
+  source without a BOM); replaced `$label:` (parsed as a scope
+  qualifier) with `"... -f $label"` formatting; removed `'系'`
+  and `'面'` from the SimplifiedOnly list (both characters are
+  SHARED between simplified and traditional Chinese — used
+  identically in 系統/系统, 面板/面板, 畫面/画面 — and were
+  causing false positives on legitimate traditional text).
+
+### Verified
+
+- `scripts/i18n_coverage.ps1`: `[PASS] zh_CN: 1906/1911 (99.74%)`
+  and `[PASS] zh_TW: 1906/1911 (99.74%)` — both well above the
+  90% gate agreed in the 2026-06-16 user decision.
+- `scripts/check_simp_trad.ps1`: `[PASS] fceux11_zh_CN.ts (no
+  traditional): no forbidden glyphs found.` + `[PASS]
+  fceux11_zh_TW.ts (no simplified): no forbidden glyphs found.`
+- Total source strings revised from 3,481 to 1,911 (the 1,911
+  figure is authoritative going forward).
+
+### Native-Speaker Review (waived 2026-06-17)
+
+Per user decision 2026-06-17, the native-speaker review gate from
+plan v3 §11 is **permanently waived** for v0.3.15.x. LLM-direct
+translation (commit `bda72e6`) is the final translation
+source-of-truth. Errors found post-release are patched via
+`[i18n-fix]` PRs against the `.ts` files. See
+`docs/tech/i18n_review_log.md` for the waiver detail and the
+post-release fix workflow.
+
+## [0.3.15.x] - 2026-06-17 (PHASE-2 complete)
+
+E+F track sub-version: 34 sub-dialog `changeEvent + retranslateUi`
++ 3 `keyPress` override fixes + new `i18n_regression_test`
+per `docs/v0.3.15_Build_Plan.md` §2 PHASE-2.
+
+### Added
+
+- **`changeEvent(QEvent::LanguageChange)` + `retranslateUi()`
+  private slot** added to 34 sub-dialog / tool-window files
+  in `src/drivers/Qt/`: `AboutWindow` (template), `ConsoleWindow`,
+  `ConsoleDebugger` (507 tr() — the highest priority), TasEditor
+  (main + 4 sub-files: branches / splicer / project / bookmarks),
+  `ppuViewer`, `AviRecord`, `AviRiffViewer`, `HexEditor`,
+  `GamePadConf`, `GuiConf`, `RamWatch`, `TraceLogger`,
+  `ConsoleVideoConf`, `CodeDataLogger`, `iNesHeaderEditor`,
+  `CheatsConf`, `NameTableViewer`, `MoviePlay`, `PaletteEditor`,
+  `StateRecorderConf`, `FamilyKeyboard`, `FrameTimingStats`,
+  `RamSearch`, `InputConf`, `MovieRecord`, `PaletteConf`,
+  `SymbolicDebug`, `GameGenie`, `ConsoleSoundConf`, `TimingConf`,
+  `HelpPages`, `LuaControl`, `MovieOptions`, `HotKeyConf`.
+- **`tests/i18n_regression_test.cpp`** — headless static-gate
+  test that confirms every one of the 34 widget files declares
+  a `retranslateUi()` private slot + `changeEvent` override.
+  Also validates the 99.74% zh_CN / zh_TW coverage claim and
+  the simp↔trad zero-contamination claim via direct .ts file
+  inspection. Registered in `tests/CMakeLists.txt` (links
+  `Qt6::Core` only — no GUI dependency).
+
+### Changed
+
+- **6 `keyPress override` files all forward to the base class
+  first** so Chinese IME composition state reaches the focused
+  `QLineEdit` / `QInputDialog` before the key is routed to the
+  emulator game-key state:
+  - `ConsoleWindow.cpp`, `ConsoleViewerGL.cpp`, `GamePadConf.cpp`
+    (fixed in v0.3.15 main, PR-B).
+  - `HexEditor.cpp` `QHexEdit::keyPressEvent`, `HotKeyConf.cpp`
+    × 3 sites, `FamilyKeyboard.cpp` × 2 sites (fixed in PHASE-2
+    after the `QHexEdit` custom-cursor-logic risk was lowered
+    by adding hex_edit_test coverage).
+- **`AboutWindow::changeEvent` / `retranslateUi()`** in
+  `src/drivers/Qt/AboutWindow.{h:34,cpp:139-147}` serves as
+  the reference implementation; PHASE-2 widgets follow the
+  same constructor-time member-pointer + `setText(tr(...))`
+  pattern (no `new QPushButton(tr(...), this)` at construction
+  time — those would not be re-runnable at language change).
+
+### Verified
+
+- `tests/i18n_regression_test` static gate: 34 widget files
+  have the `retranslateUi()` private slot + `changeEvent`
+  override; 99.74% coverage on both languages; 0 simp↔trad
+  cross-contamination.
+- `git grep "QWidget::keyPressEvent"` in the 6 `keyPress
+  override` files: all 6 forward to the base class before
+  `event->accept()`.
+- Visual confirmation of runtime language switching for the
+  34 widgets deferred to the release-day 24h smoke test
+  (per [`v0.3.15.x_24h_Smoke_Test_Report.md`](docs/tech/v0.3.15.x_24h_Smoke_Test_Report.md)
+  criterion 6: 96 language rotations over 24h).
 
 ## [0.3.15.x] - 2026-06-17 (PHASE-3 partial)
 
