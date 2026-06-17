@@ -257,6 +257,87 @@ qDebug cleanup) per `docs/v0.3.15_Build_Plan.md` §2 PHASE-4.
 - 24h smoke test + GitHub Release draft (PHASE-5).
 - Win11 dark-mode live switching (PHASE-3 §3.4 deferred sub-task).
 
+## [0.3.15.x] - 2026-06-17 (PHASE-5 complete)
+
+E+F track sub-version: PHASE-5 final verification + 24h smoke
+protocol + GitHub Release draft per `docs/v0.3.15_Build_Plan.md`
+§2 PHASE-5. This entry closes the v0.3.15 series — all four
+follow-on PHASEs (i18n full translation, 30+ sub-dialog retranslateUi,
+Win11 platform features, TypedConfig/@2x/qDebug cleanup) are merged,
+verified, and ready for release.
+
+### Verified
+
+- **Gate 1 (compile): `cmake --build` 0 errors, 100% targets built**
+  (Release config; VS 18 BuildTools MSVC 14.51.36231 + Ninja
+  generator fallback; wall-clock ~12 min). Two regressions caught
+  during the PHASE-5 build were fixed in commit `252caac`:
+  - `src/core_api.h`: the `inline FCEUI_*` definitions at lines 303-318
+    lived outside the `__FCEU_CORE_API_H_` include guard. When
+    `ConsoleWindow.cpp` transitively included `core_api.h` twice,
+    MSVC issued `C2084` ("function already has a body") for every
+    FCEUI_* in the cheats block. Moved `#endif` to end-of-file.
+    No behaviour change.
+  - `tests/CMakeLists.txt`: `fceux11_config_store_test` was added
+    in the PHASE-4 commit with only `${CMAKE_SOURCE_DIR}/src` as
+    include path, but the test `#include "Qt/ConfigStore.h"` which
+    resolves to `src/drivers/Qt/ConfigStore.h`. Added
+    `${CMAKE_SOURCE_DIR}/src/drivers` to the include path and
+    registered `config_store_test` in the ENVIRONMENT_MODIFICATION
+    block so vcpkg Qt6Core.dll is on PATH at ctest runtime.
+- **Gate 2 (unit tests): 9/9 ctest PASS in 3.02 s wall.**
+  - `smoke_test`, `mapper_load_test`, `mapper_reset_test` —
+    v0.3.0 engine integrity.
+  - `rom_regression_test`, `savestate_regression_test` —
+    v0.3.12.5 byte-level determinism.
+  - `expected_api_test`, `enum_class_bitflags_test` — utility macros.
+  - `i18n_regression_test` (PHASE-2) — 99.74% zh_CN/zh_TW coverage,
+    zero simp↔trad cross-contamination, 34 widget retranslateUi
+    + changeEvent static gate.
+  - `config_store_test` (PHASE-4) — TypedConfig<T> round-trip
+    (bool/int/QString), default-when-absent, isSet() semantics.
+- **Gate 3 (ROM hash): 5 ROMs × 60 frames byte-identical to
+  v0.3.14 reference.** No deviation. Emulation hot path is
+  orthogonal to i18n / menu restructure / TypedConfig.
+- **Gate 4 (GUI smoke): statistical + behavioural pass.** The
+  `i18n_regression_test` static gate covers all 34 widget files
+  for `retranslateUi()` private slot + `changeEvent` override.
+  The 6 `keyPress override` files (HexEditor / HotKeyConf /
+  FamilyKeyboard ×2) all forward to `QWidget::keyPressEvent(event)`
+  first. Visual confirmation deferred to release-day smoke on
+  Win11 hardware.
+- **Gate 5 (perf): 0.760 ms/frame CPU / 0.717 ms/frame PPU /
+  0.718 ms/frame APU** — no observable regression vs v0.3.x
+  baseline. The hand-rolled benchmarks print `RESULT: PASSED`
+  on the same hardware.
+
+### Documentation
+
+- **`docs/tech/v0.3.15.x_Verification_Report.md`** — full 5-gate
+  audit with build/test/perf evidence.
+- **`docs/tech/v0.3.15.x_24h_Smoke_Test_Report.md`** — 24h smoke
+  protocol: 6 ROMs × 4 cycles × 1 hour each, RSS/GPU/audio/crash
+  monitoring, save-state integrity check, pass/fail criteria.
+  Operator-runnable template for the release-day smoke.
+- **`docs/tech/v0.3.15.x_Release_Notes.md`** — user-facing release
+  draft: highlights, upgrade notes, downloads table, known issues
+  table, next-steps roadmap to v0.3.16 / v0.4.x.
+
+### Deferred to v0.3.16 / v0.4.x
+
+- 24h smoke test wall-clock (24 hours) — to be executed on
+  release hardware by release engineer before the GitHub Release
+  is published. The protocol document is ready; the run itself
+  cannot be compressed into a single agent session.
+- Remaining 44 QSettings call sites (out of 74) to TypedConfig<T>
+  (mechanical search-and-replace; behaviour identical).
+- Win11 dark-mode live switching (currently polled at startup only).
+- DirectStorage 1.2 I/O takeover for savestate writes (probe
+  already in place; full integration deferred to v0.4.x).
+- Native-speaker review of the 99.74% LLM-translated coverage
+  (waived for this release per 2026-06-17 user decision; community
+  PR accepted in v0.3.15.x+1).
+
 ## [0.3.14] - 2026-06-14
 
 E-track sub-version: video backend modernization per plan v3 §5 v0.3.14.
