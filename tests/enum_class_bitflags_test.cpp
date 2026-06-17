@@ -18,7 +18,7 @@ using fceu11::CpuFlag;
 static bool test_or_basic() {
     printf("[test] operator| ... ");
     constexpr CpuFlag both = CpuFlag::N | CpuFlag::Z;
-    if (static_cast<uint8_t>(both) != 0x82) {
+    if constexpr (static_cast<uint8_t>(both) != 0x82) {
         printf("FAIL (got 0x%02x, expected 0x82)\n", static_cast<uint8_t>(both));
         return false;
     }
@@ -30,7 +30,7 @@ static bool test_or_basic() {
 static bool test_or_chain() {
     printf("[test] operator| chain ... ");
     constexpr CpuFlag all_three = CpuFlag::N | CpuFlag::V | CpuFlag::C;
-    if (static_cast<uint8_t>(all_three) != 0xC1) {
+    if constexpr (static_cast<uint8_t>(all_three) != 0xC1) {
         printf("FAIL (got 0x%02x, expected 0xC1)\n", static_cast<uint8_t>(all_three));
         return false;
     }
@@ -42,7 +42,7 @@ static bool test_or_chain() {
 static bool test_and() {
     printf("[test] operator& ... ");
     constexpr CpuFlag v = (CpuFlag::N | CpuFlag::Z | CpuFlag::C) & CpuFlag::Z;
-    if (static_cast<uint8_t>(v) != 0x02) {
+    if constexpr (static_cast<uint8_t>(v) != 0x02) {
         printf("FAIL (got 0x%02x)\n", static_cast<uint8_t>(v));
         return false;
     }
@@ -54,7 +54,7 @@ static bool test_and() {
 static bool test_not() {
     printf("[test] operator~ ... ");
     constexpr CpuFlag inv = ~CpuFlag::N;       // ~0x80 = 0x7F (uint8_t)
-    if (static_cast<uint8_t>(inv) != 0x7F) {
+    if constexpr (static_cast<uint8_t>(inv) != 0x7F) {
         printf("FAIL (got 0x%02x, expected 0x7F)\n", static_cast<uint8_t>(inv));
         return false;
     }
@@ -68,7 +68,7 @@ static bool test_xor() {
     constexpr CpuFlag a = CpuFlag::N | CpuFlag::Z;        // 0x82
     constexpr CpuFlag b = CpuFlag::N | CpuFlag::C;        // 0x81
     constexpr CpuFlag x = a ^ b;                          // 0x03
-    if (static_cast<uint8_t>(x) != 0x03) {
+    if constexpr (static_cast<uint8_t>(x) != 0x03) {
         printf("FAIL (got 0x%02x, expected 0x03)\n", static_cast<uint8_t>(x));
         return false;
     }
