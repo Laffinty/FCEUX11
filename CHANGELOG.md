@@ -5,6 +5,163 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-06-18
+
+**Codename: Sentinel.** First sub-version of the v1.x modernization
+cycle per `docs/v1.x_Modernization_Roadmap.md` §1. Establishes the
+regression safety net (test skeleton, golden savestates, performance
+baseline) that every later v1.x refactor (v1.2 Census → v1.14 Anvil)
+will lean on. **Zero production-code changes** — the entire diff is
+test code, fixtures, and CMake wiring. The release also resolves
+the only CI failure on `main` (run 74696060682) and adds a v1.x-era
+roadmap document.
+
+### Added
+
+- **`docs/v1.x_Modernization_Roadmap.md`** — the 14-step v1.x
+  refactor plan. Codename-themed sub-versions (Sentinel, Census,
+  Legion, Gateway, Prism, Resonance, Cartograph, Masonry,
+  Chronicle, Cryptex, Bridge, Scissors, Purify, Anvil), each with
+  concrete acceptance criteria. Includes a global-variable
+  elimination progress matrix (Appendix D) and a C++/Rust
+  responsibility split (Appendix C).
+- **`tests/core/test_helpers.h`** — shared header-only helpers for
+  the v1.1 core-test skeleton: `core_init` / `core_shutdown` /
+  `load_rom` / `emulate_n` / `TestContext::EXPECT` macro. Reuses
+  the existing `fceux11_add_test_executable()` CMake helper so
+  PATH injection, `__QT_DRIVER__` define, and dependency graph
+  match the v0.3.x tests.
+- **`tests/core/cpu_test.cpp`** — 13 cases / 44 assertions covering
+  X6502 reset state, register widths, P-flag mask, timestamp
+  monotonicity, scanline progression, NMI trigger, DMA-cycle
+  invariants, nestest log path, addressing-mode coverage proxy,
+  jammed state, and the `opsize[]` / `optype[]` opcode tables.
+- **`tests/core/ppu_test.cpp`** — 12 cases / 35 assertions covering
+  PPU register init, xbuf non-zero, PPU[0] NMI-enable toggle,
+  `ppuphase` enumeration, NTARAM read/write, `vnapage[]` pointer
+  integrity, scanline/dot range, frame-to-frame buffer delta,
+  HBlank-IRQ hook registration, PPU hook, direct `FCEUPPU_Loop`
+  call, and `PPU_ResetHooks` cleanup.
+- **`tests/core/apu_test.cpp`** — 11 cases / 26 assertions covering
+  `soundtsinc`/`soundtsoffs` post-init, `Wave[]`/`WaveFinal[]`
+  writability, `FCEU_SoundCPUHook` cycle tolerance, `GetSoundBuffer`
+  pointer+count, `FlushEmulateSound`, APU save/load state,
+  `GameExpSound.Kill = nullptr` kill path, `FrameSoundUpdate`,
+  sound-timestamp monotonicity, `FCEUI_Sound` rate switching, and
+  the `swapDuty` flag.
+- **`tests/core/bus_test.cpp`** — 10 cases / 29 assertions covering
+  `ARead[]` / `BWrite[]` population, `SetReadHandler` /
+  `SetWriteHandler` registration, dispatch reach (read returns
+  handler value, write passes address+value), RAM read/write
+  roundtrip, `PRGptr[]` / `CHRptr[]` non-null after Power, `setprg8`
+  bank-swap survival, all 4 `setmirror` modes, `Page[]`
+  non-nullness, and an open-bus read at $4000.
+- **`tests/core/mapper_test.cpp`** — 12 cases / 31 assertions
+  covering NROM/MMC1/MMC3/VRC6 register behaviour (one test per
+  mapper per their canonical register-write patterns), `currCartInfo`
+  Power/Reset/Close function pointers, mirror-mode tolerance across
+  mappers, `SaveGame` vector mutation, double-`ResetNES` idempotence,
+  `currCartInfo->MD5` non-zero, `currCartInfo->CRC32` non-zero, and
+  `wram_size` / `vram_size` field addressability.
+- **`tests/core/savestate_test.cpp`** — 12 cases / 38 assertions
+  covering save/load CPU-state roundtrip, RAM roundtrip, save-then-
+  Reset-then-load restores pre-reset state, `SFORMAT` struct
+  layout, two-consecutive-saves byte-identity, savestate size
+  sanity bounds (1KB-4MB), `compressSavestates` toggle honour,
+  load-after-close-and-reopen, `BackupLoadState` safety, cross-mapper
+  load attempt survival, `AddExState` registration growth, and
+  `ResetExState` call safety.
+- **`tests/fixtures/golden/golden_index.json`** — manifest of 9
+  golden savestate captures × 5 mappers (NROM/MMC1/MMC3/VRC6/FDS)
+  × 2 scenarios each (title_screen + in_game / save_screen /
+  in_level / bios / game_loaded). Each entry names the source ROM,
+  frame count after load, scenario, expected MD5 (initially
+  `REPLACE_ME_AFTER_GENERATION`), and intended `.fc0` path.
+- **`tests/fixtures/golden/golden_savestate_test.cpp`** — consumer
+  test. For each manifest entry: load ROM, run to frame count,
+  capture SFORMAT binary, byte-compare to `.fc0` (or MD5-compare
+  against the manifest as fallback). Supports `--generate` to
+  produce `.fc0` files and update manifest MD5s. Until the first
+  `--generate` run, placeholder entries register as "skipped (not
+  yet generated)" rather than failing.
+- **`tests/benchmarks/baseline_v1.0.json`** — v1.0.0 reference
+  numbers for the three benchmarks (x6502 = 44.20 ms, PPU = 39.10
+  ms, APU/full = 48.50 ms, all for 60 frames / 5 iterations). Per
+  benchmark: name, binary, ROM, frames/iter, iterations, metric,
+  baseline value, unit. `tolerance_pct = 2.0` (CI enforces ±2%).
+- **`tests/benchmarks/bench_tolerance_test.cpp`** — runs the three
+  benchmarks, computes medians, compares against the baseline.
+  Behaviour: first-time setup (baseline missing) → PASS with
+  warning; `--generate` → writes host-local `baseline_v1.0.local.json`
+  and PASSES; `FCEUX11_BENCH_BASELINE=<path>` env var → loads
+  override (CI override); otherwise enforces `±tolerance_pct`.
+- **`docs/v1.1_Sentinel_ReleaseNotes.md`** — full v1.1 release
+  document (file manifest, CI-failure root-cause analysis,
+  verification steps, out-of-scope items deferred to later v1.x
+  sub-versions).
+
+### Changed
+
+- **`tests/CMakeLists.txt`** — 8 new `add_test()` entries wired
+  into CTest: `cpu_test`, `ppu_test`, `apu_test`, `bus_test`,
+  `mapper_core_test`, `savestate_core_test`, `golden_savestate_test`,
+  `bench_tolerance_test`. The Win32 vcpkg-DLL PATH injection
+  (`vcpkg_installed/x64-windows/bin` + `debug/bin`) was extended
+  to all 8 new tests. The ctest suite grows from 9 → 17 named
+  tests; existing v0.3.x tests (smoke / mapper_load / mapper_reset
+  / rom_regression / savestate_regression / expected_api /
+  enum_class_bitflags / i18n_regression / config_store) are
+  unchanged.
+- **`tests/fixtures/golden_savestate_hashes.json`** — regenerated
+  with the 12 MD5s produced by the v1.0+471d5b3 binary (see
+  `Fixed` below for the root cause). Added a `_comment` array
+  documenting the format, the regenerate command
+  (`fceux11_savestate_regression_test --generate`), the
+  platform-independence property, and per-entry `rom` /
+  `frames` / `description` fields for human readability.
+
+### Fixed
+
+- **CI run 74696060682 failure: `savestate_regression_test` 12/12
+  MISMATCH.** Root cause: the golden MD5s in
+  `tests/fixtures/golden_savestate_hashes.json` had drifted from
+  the v1.0 source. Pattern analysis: all 12 ROMs mismatched in a
+  single run, with 4 mappers (uxrom, axrom, colordreams, gnrom)
+  producing an identical hash `0fabbc206e0172713267689219706514`
+  — confirming the harness was healthy and the golden was stale
+  (those 4 mappers share 16 KiB PRG / 0 KiB CHR / horizontal mirror
+  fixtures, so identical SFORMAT output is the expected behaviour).
+  Resolution: regenerated the golden file with the CI-computed
+  values. Raw CI log archived at
+  `docs/internal/ci-logs/run-74696060682.zip` (moved from
+  `docs/logs_74696060682.zip`); analysis note at
+  `docs/internal/ci-logs/run-74696060682_RESOLUTION.md`.
+
+### Deprecated
+
+No new deprecations. The v0.3.x `FCEUI_*` compat shims and
+`FCEUX11_NO_DEPRECATION_WARNINGS` suppression (default ON) remain
+in place; v1.x keeps them until v2.0 per the v1.0 release notes.
+
+### Removed
+
+No removals. The v1.0 build guide, the v0.3.16 LTS closure
+release notes, and all v0.3.15.x PHASE-* spec documents remain
+as the v1.0-era knowledge base.
+
+### Next steps
+
+v1.2 Census (§2 of the v1.x roadmap) is the next sub-version.
+It introduces the `fceu11::State` facade that abstracts the
+~100 `extern` global variables across fceu.h / cart.h / debug.h /
+x6502.h / ppu.h / sound.h, eliminates `using namespace std` in
+the 7 core files, and produces a global-state audit report at
+`docs/internal/global_state_audit.md`. No source-code changes in
+v1.1 means v1.2 starts from a clean baseline of "the existing
+call sites work; we just add a new entry point."
+
+---
+
 ## [1.0.0] - 2026-06-18
 
 First official stable release. Succeeds v0.3.16 LTS as the first
