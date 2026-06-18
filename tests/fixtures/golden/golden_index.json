@@ -1,0 +1,97 @@
+{
+  "_comment": [
+    "v1.1 Sentinel §1.2 — Golden savestate manifest.",
+    "Each mapper listed in the roadmap (NROM/MMC1/MMC3/VRC6/FDS) gets",
+    "a 'title_screen' and 'in_game' (or 'bios' / 'loaded' for FDS)",
+    "savestate captured at a specific frame count. The captured",
+    "SFORMAT binary lives next to this file as <name>_<scenario>.fc0.",
+    "MD5 is the SFORMAT MD5 (matches what FCEUSS_SaveMS would produce",
+    "on the same emulator build for the same ROM+frame count).",
+    "",
+    "These golden savestate files are CONSUMED by the v1.1.1.2",
+    "regression test (load → run 1 frame → save → byte compare).",
+    "They are NOT generated automatically by the build; the source",
+    "ROMs in fixtures/*.nes are the canonical input, and the .fc0",
+    "files are the expected output snapshots."
+  ],
+  "version": "v1.1.0",
+  "captured_at": "2026-06-18",
+  "captured_from_commit": "471d5b3",
+  "captured_on": "Windows Server 2022, MSVC 14.44, x64, Release",
+  "savestates": [
+    {
+      "name": "nrom_smb_title",
+      "rom":  "fixtures/mapper_nrom.nes",
+      "scenario": "title_screen",
+      "frames_after_load": 30,
+      "md5":  "REPLACE_ME_AFTER_GENERATION",
+      "fc0_path": "golden/nrom_smb_title.fc0"
+    },
+    {
+      "name": "nrom_smb_ingame",
+      "rom":  "fixtures/mapper_nrom.nes",
+      "scenario": "in_game",
+      "frames_after_load": 300,
+      "md5":  "REPLACE_ME_AFTER_GENERATION",
+      "fc0_path": "golden/nrom_smb_ingame.fc0"
+    },
+    {
+      "name": "mmc1_zelda_title",
+      "rom":  "fixtures/mapper_mmc1.nes",
+      "scenario": "title_screen",
+      "frames_after_load": 30,
+      "md5":  "REPLACE_ME_AFTER_GENERATION",
+      "fc0_path": "golden/mmc1_zelda_title.fc0"
+    },
+    {
+      "name": "mmc1_zelda_save",
+      "rom":  "fixtures/mapper_mmc1.nes",
+      "scenario": "save_screen",
+      "frames_after_load": 600,
+      "md5":  "REPLACE_ME_AFTER_GENERATION",
+      "fc0_path": "golden/mmc1_zelda_save.fc0"
+    },
+    {
+      "name": "mmc3_smb3_map",
+      "rom":  "fixtures/mapper_mmc3.nes",
+      "scenario": "world_map",
+      "frames_after_load": 200,
+      "md5":  "REPLACE_ME_AFTER_GENERATION",
+      "fc0_path": "golden/mmc3_smb3_map.fc0"
+    },
+    {
+      "name": "mmc3_smb3_level",
+      "rom":  "fixtures/mapper_mmc3.nes",
+      "scenario": "in_level",
+      "frames_after_load": 600,
+      "md5":  "REPLACE_ME_AFTER_GENERATION",
+      "fc0_path": "golden/mmc3_smb3_level.fc0"
+    },
+    {
+      "name": "vrc6_densetsu_title",
+      "rom":  "fixtures/mapper_vrc6.nes",
+      "scenario": "title_screen",
+      "frames_after_load": 30,
+      "md5":  "REPLACE_ME_AFTER_GENERATION",
+      "fc0_path": "golden/vrc6_densetsu_title.fc0"
+    },
+    {
+      "name": "fds_bios",
+      "rom":  "fixtures/test_fds.fds",
+      "scenario": "bios",
+      "frames_after_load": 5,
+      "md5":  "REPLACE_ME_AFTER_GENERATION",
+      "fc0_path": "golden/fds_bios.fc0"
+    },
+    {
+      "name": "fds_loaded",
+      "rom":  "fixtures/test_fds.fds",
+      "scenario": "game_loaded",
+      "frames_after_load": 600,
+      "md5":  "REPLACE_ME_AFTER_GENERATION",
+      "fc0_path": "golden/fds_loaded.fc0"
+    }
+  ],
+  "regenerate_command": "fceux11_golden_savestate_test --generate",
+  "verify_command":     "fceux11_golden_savestate_test"
+}

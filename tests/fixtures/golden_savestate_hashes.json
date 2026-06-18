@@ -1,38 +1,89 @@
 {
+  "_comment": [
+    "v1.1 Sentinel — savestate MD5 golden file.",
+    "Each entry is the MD5 of the SFORMAT binary produced by",
+    "FCEUSS_SaveMS after loading the corresponding ROM and running",
+    "60 emulation frames. Generated from a v1.0+471d5b3 build on",
+    "Windows Server 2022 (GitHub Actions runner, x64, MSVC 14.44).",
+    "The hash is platform-independent (SFORMAT is integer-only), so",
+    "the same values should match on any x64 host.",
+    "",
+    "If a future code change alters the savestate binary format",
+    "(e.g. adding/removing SFORMAT entries in v1.9 Chronicle's",
+    "V2 format), regenerate with:",
+    "    fceux11_savestate_regression_test --generate",
+    "and review the diff in source control before committing."
+  ],
   "nrom": {
-    "hash": "641a5898898f5ba88fe41757a55de5dd"
+    "rom":          "fixtures/mapper_nrom.nes",
+    "frames":       60,
+    "description":  "NROM, mapper 0, horizontal mirror, 16 KiB PRG, 0 KiB CHR (CHRRAM)",
+    "hash":         "81b997f1e500ca1e7a7c69420f67b5a6"
   },
   "mmc1": {
-    "hash": "7f8b0e17e72da21d764b037c626cdf0f"
+    "rom":          "fixtures/mapper_mmc1.nes",
+    "frames":       60,
+    "description":  "MMC1, mapper 1, horizontal mirror, 16 KiB PRG, 0 KiB CHR (CHRRAM)",
+    "hash":         "6dd25cd967023716bbb52b96b40fdadf"
   },
   "uxrom": {
-    "hash": "8565586437c981a496ec299400a9e64d"
+    "rom":          "fixtures/mapper_uxrom.nes",
+    "frames":       60,
+    "description":  "UNROM, mapper 2, horizontal mirror, 16 KiB PRG, 0 KiB CHR (CHRRAM)",
+    "hash":         "0fabbc206e0172713267689219706514"
   },
   "cnrom": {
-    "hash": "0884d80ccdcc9ab451c1ec8df92cdac4"
+    "rom":          "fixtures/mapper_cnrom.nes",
+    "frames":       60,
+    "description":  "CNROM, mapper 3, horizontal mirror, 16 KiB PRG, 0 KiB CHR (CHRRAM)",
+    "hash":         "07fcffff42206df14549ed065b7e41a4"
   },
   "mmc3": {
-    "hash": "a85a72151349d182841cbc805399ad96"
+    "rom":          "fixtures/mapper_mmc3.nes",
+    "frames":       60,
+    "description":  "MMC3, mapper 4, horizontal mirror, 16 KiB PRG, 0 KiB CHR (CHRRAM)",
+    "hash":         "ff70601d844f5453db6f1b1307210d8c"
   },
   "mmc5": {
-    "hash": "7fefd2c330086c398df5f74642be79b6"
+    "rom":          "fixtures/mapper_mmc5.nes",
+    "frames":       60,
+    "description":  "MMC5, mapper 5, horizontal mirror, 16 KiB PRG, 0 KiB CHR (CHRRAM)",
+    "hash":         "28cb64fbbbf691d01c2d1e5ff7618545"
   },
   "axrom": {
-    "hash": "8565586437c981a496ec299400a9e64d"
+    "rom":          "fixtures/mapper_axrom.nes",
+    "frames":       60,
+    "description":  "ANROM, mapper 7, horizontal mirror, 16 KiB PRG, 0 KiB CHR (CHRRAM)",
+    "hash":         "0fabbc206e0172713267689219706514"
   },
   "colordreams": {
-    "hash": "8565586437c981a496ec299400a9e64d"
+    "rom":          "fixtures/mapper_colordreams.nes",
+    "frames":       60,
+    "description":  "Color Dreams, mapper 11, horizontal mirror, 16 KiB PRG, 0 KiB CHR (CHRRAM)",
+    "hash":         "0fabbc206e0172713267689219706514"
   },
   "gnrom": {
-    "hash": "8565586437c981a496ec299400a9e64d"
+    "rom":          "fixtures/mapper_gnrom.nes",
+    "frames":       60,
+    "description":  "MHROM (GNROM variant), mapper 66, horizontal mirror, 16 KiB PRG, 0 KiB CHR (CHRRAM)",
+    "hash":         "0fabbc206e0172713267689219706514"
   },
   "vrc2and4": {
-    "hash": "b29d262cbfdb410b3b6e9c1d3a5aae2d"
+    "rom":          "fixtures/mapper_vrc2and4.nes",
+    "frames":       60,
+    "description":  "Konami VRC2/VRC4 A, mapper 21, horizontal mirror, 16 KiB PRG, 0 KiB CHR (CHRRAM)",
+    "hash":         "72b507ef4a896cfe5d98b1e4a0c9b4a5"
   },
   "vrc6": {
-    "hash": "dec491117916d918bcb504be0b974b55"
+    "rom":          "fixtures/mapper_vrc6.nes",
+    "frames":       60,
+    "description":  "Konami VRC6 Rev. A, mapper 24, horizontal mirror, 16 KiB PRG, 0 KiB CHR (CHRRAM)",
+    "hash":         "db64ed40df9206edd3ce236890aaceb1"
   },
   "nestest": {
-    "hash": "7d8344620c4d6fae13df310fa7448144"
+    "rom":          "fixtures/nestest.nes",
+    "frames":       60,
+    "description":  "nestest, mapper 0, 16 KiB PRG, 8 KiB CHR (CPU test ROM)",
+    "hash":         "b9bdfd3919097917921eefd4fd24b69d"
   }
 }

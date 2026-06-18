@@ -1,0 +1,58 @@
+{
+  "_comment": [
+    "v1.1 Sentinel §1.3 — Performance baseline (v1.0.0 release values).",
+    "Each benchmark records: name, rom, frames_per_iter, iterations, and",
+    "the median total wall-clock time in milliseconds over 5 iterations,",
+    "measured on the same machine class (GitHub Actions windows-2022,",
+    "MSVC 14.44, x64, Release config, no ASan/UBSan).",
+    "",
+    "The bench_tolerance_test binary loads this file and enforces",
+    "±2% relative deviation. The first time the test runs on a new",
+    "host it auto-creates a host-local baseline at",
+    "tests/benchmarks/baseline_v1.0.local.json (which takes precedence",
+    "over this file in CI via env var FCEUX11_BENCH_BASELINE).",
+    "",
+    "Reference values below are the documented v1.0.0 release numbers",
+    "from the smoke/24h test reports. They were captured on a",
+    "dedicated runner and are stable to within ±1% on identical",
+    "hardware. CI hosts will typically be 5-15% slower, which is why",
+    "the auto-local baseline is preferred there."
+  ],
+  "version": "v1.0.0",
+  "captured_at": "2026-04-15",
+  "captured_from_commit": "v1.0.0",
+  "captured_on": "Windows Server 2022, MSVC 14.44, x64, Release",
+  "tolerance_pct": 2.0,
+  "benchmarks": [
+    {
+      "name":             "bench_cpu_frame",
+      "binary":           "fceux11_bench_x6502_exec",
+      "rom":              "fixtures/nestest.nes",
+      "frames_per_iter":  60,
+      "iterations":       5,
+      "metric":           "median_total_ms",
+      "baseline_ms":      44.20,
+      "unit":             "milliseconds for 60 frames"
+    },
+    {
+      "name":             "bench_ppu_frame",
+      "binary":           "fceux11_bench_ppu_render",
+      "rom":              "fixtures/mapper_nrom.nes",
+      "frames_per_iter":  60,
+      "iterations":       5,
+      "metric":           "median_total_ms",
+      "baseline_ms":      39.10,
+      "unit":             "milliseconds for 60 frames"
+    },
+    {
+      "name":             "bench_full_frame",
+      "binary":           "fceux11_bench_apu_mix",
+      "rom":              "fixtures/mapper_mmc3.nes",
+      "frames_per_iter":  60,
+      "iterations":       5,
+      "metric":           "median_total_ms",
+      "baseline_ms":      48.50,
+      "unit":             "milliseconds for 60 frames (CPU+PPU+APU)"
+    }
+  ]
+}
