@@ -67,7 +67,8 @@
 #include <vector>
 #include <fstream>
 
-using namespace std;
+// v1.2 Census §2.3: `using namespace std` removed; all std types below
+// are explicitly qualified with std::.
 
 static void (*SPreSave)(void) = NULL;
 static void (*SPostSave)(void) = NULL;
@@ -912,10 +913,10 @@ void FCEU_DrawSaveStates(uint8 *XBuf)
 //(Used when making savestates)
 //*************************************************************************
 
-string GenerateBackupSaveStateFn(const char *fname)
+std::string GenerateBackupSaveStateFn(const char *fname)
 {
 	//This backup is for the backup "slot" for any savestate made.  Example: smb.fc0 becomes smb-bak.fc0
-	string filename;
+	std::string filename;
 	filename = fname;	//Convert fname to a string object
 	int x = filename.find_last_of("."); //Find file extension
 	filename.insert(x,"-bak");		//add "-bak" before the dot.
@@ -926,7 +927,7 @@ string GenerateBackupSaveStateFn(const char *fname)
 
 void CreateBackupSaveState(const char *fname)
 {
-	string newFilename = GenerateBackupSaveStateFn(fname);	//Get backup savestate filename
+	std::string newFilename = GenerateBackupSaveStateFn(fname);	//Get backup savestate filename
 	if (CheckFileExists(newFilename.c_str()))				//See if backup already exists
 		remove(newFilename.c_str())	;						//If so, delete it
 	rename(fname,newFilename.c_str());						//Rename savestate to backup filename
@@ -945,7 +946,7 @@ void SwapSaveState()
 		FCEU_printf("Undo savestate was attempted but unsuccessful because there was not a recently used savestate.\n");
 		return;		//If there is no last savestate, can't undo
 	}
-	string backup = GenerateBackupSaveStateFn(lastSavestateMade.c_str());	//Get filename of backup state
+	std::string backup = GenerateBackupSaveStateFn(lastSavestateMade.c_str());	//Get filename of backup state
 	if (!CheckFileExists(backup.c_str()))
 	{
 		FCEU_DispMessage("Can't Undo",0);
@@ -956,7 +957,7 @@ void SwapSaveState()
 	//--------------------------------------------------------------------------------------------
 	//So both exists, now swap the last savestate and its backup
 	//--------------------------------------------------------------------------------------------
-	string temp = backup;					//Put backup filename in temp
+	std::string temp = backup;					//Put backup filename in temp
 	temp.append("x");						//Add x
 
 	rename(backup.c_str(),temp.c_str());			//rename backup file to temp file
@@ -979,11 +980,11 @@ void SwapSaveState()
 //(Used when Loading savestates)
 //*************************************************************************
 
-string GetBackupFileName()
+std::string GetBackupFileName()
 {
 	//This backup savestate is a special one specifically made whenever a loadstate occurs so that the user's place in a movie/game is never lost
 	//particularly from unintentional loadstating
-	string filename;
+	std::string filename;
 	int x;
 
 	filename = FCEU_MakeFName(FCEUMKF_STATE,CurrentState,0);	//Generate normal savestate filename
@@ -998,11 +999,11 @@ bool CheckBackupSaveStateExist()
 {
 	//This function simply checks to see if the backup loadstate exists, the backup loadstate is a special savestate
 	//That is made before loading any state, so that the user never loses his data
-	string filename = GetBackupFileName(); //Get backup savestate filename
+	std::string filename = GetBackupFileName(); //Get backup savestate filename
 
 	//Check if this filename exists
-	fstream test;
-	test.open(filename.c_str(),fstream::in);
+	std::fstream test;
+	test.open(filename.c_str(),std::fstream::in);
 
 	if (test.fail())
 	{
@@ -1018,7 +1019,7 @@ bool CheckBackupSaveStateExist()
 
 void BackupLoadState()
 {
-	string filename = GetBackupFileName();
+	std::string filename = GetBackupFileName();
 	internalSaveLoad = true;
 	FCEUSS_Save(filename.c_str());
 	internalSaveLoad = false;
@@ -1028,7 +1029,7 @@ void BackupLoadState()
 void LoadBackup()
 {
 	if (!undoLS) return;
-	string filename = GetBackupFileName();	//Get backup filename
+	std::string filename = GetBackupFileName();	//Get backup filename
 	if (CheckBackupSaveStateExist())
 	{
 		//internalSaveLoad = true;

@@ -58,7 +58,8 @@ extern int RAMInitSeed;
 #include <cstdarg>
 #include <zlib.h>
 
-using namespace std;
+// v1.2 Census §2.3: `using namespace std` removed; std types below are
+// explicitly qualified with std::.
 
 #define MOVIE_VERSION           3
 
@@ -66,7 +67,7 @@ extern char FileBase[];
 extern bool AutoSS;		//Declared in fceu.cpp, keeps track if a auto-savestate has been made
 
 std::vector<int> subtitleFrames;		//Frame numbers for subtitle messages
-std::vector<string> subtitleMessages;	//Messages of subtitles
+std::vector<std::string> subtitleMessages;	//Messages of subtitles
 
 bool subtitlesOnAVI = false;
 bool autoMovieBackup = false; //Toggle that determines if movies should be backed up automatically before altering them
@@ -1003,7 +1004,7 @@ bool fceu11::LoadMovie(const char *fname, bool _read_only, int _pauseframe)
 	//Fix relative path if necessary and then add to the recent movie menu
 	extern std::string BaseDirectory;
 
-	string name = fname;
+	std::string name = fname;
 	if (IsRelativePath(fname))
 	{
 		name = ConvertRelativePath(name);
@@ -1848,7 +1849,7 @@ void fceu11::MoviePlayFromBeginning(void)
 		else
 		{
 			// movie starting from savestate - reload movie file
-			string str = curMovieFilename;
+			std::string str = curMovieFilename;
 			fceu11::StopMovie();
 			if (fceu11::LoadMovie(str.c_str(), 1, 0))
 			{
@@ -1899,7 +1900,7 @@ void LoadSubtitles(MovieData &moviedata)
 {
 	subtitleFrames.resize(0);
 	subtitleMessages.resize(0);
-	extern std::vector<string> subtitles;
+	extern std::vector<std::string> subtitles;
 	for(uint32 i=0; i < moviedata.subtitles.size() ; i++)
 	{
 		std::string& subtitle = moviedata.subtitles[i];
@@ -1961,7 +1962,7 @@ void FCEUI_MakeBackupMovie(bool dispMessage)
 	std::string currentFn;					//Current movie fillename
 	std::string backupFn;					//Target backup filename
 	std::string tempFn;						//temp used in back filename creation
-	stringstream stream;
+	std::stringstream stream;
 	int x;								//Temp variable for string manip
 	bool exist = false;					//Used to test if filename exists
 	bool overflow = false;				//Used for special situation when backup numbering exceeds limit

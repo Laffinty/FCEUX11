@@ -197,6 +197,7 @@ set(SRC_CORE
   	${CMAKE_CURRENT_SOURCE_DIR}/cheat.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/conddebug.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/config.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/core_state.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/debug.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/debugsymboltable.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/drawing.cpp

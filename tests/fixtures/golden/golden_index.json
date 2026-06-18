@@ -16,15 +16,15 @@
   ],
   "version": "v1.1.0",
   "captured_at": "2026-06-18",
-  "captured_from_commit": "471d5b3",
-  "captured_on": "Windows Server 2022, MSVC 14.44, x64, Release",
+  "captured_from_commit": "017d1bb",
+  "captured_on": "Windows 11, MSVC 14.51, x64, Release",
   "savestates": [
     {
       "name": "nrom_smb_title",
       "rom":  "fixtures/mapper_nrom.nes",
       "scenario": "title_screen",
       "frames_after_load": 30,
-      "md5":  "REPLACE_ME_AFTER_GENERATION",
+      "md5":  "818c896145029753321dceeb3983dbd3",
       "fc0_path": "golden/nrom_smb_title.fc0"
     },
     {
@@ -32,7 +32,7 @@
       "rom":  "fixtures/mapper_nrom.nes",
       "scenario": "in_game",
       "frames_after_load": 300,
-      "md5":  "REPLACE_ME_AFTER_GENERATION",
+      "md5":  "1093a2fb83ff455d84b5880a62780d61",
       "fc0_path": "golden/nrom_smb_ingame.fc0"
     },
     {
@@ -40,7 +40,7 @@
       "rom":  "fixtures/mapper_mmc1.nes",
       "scenario": "title_screen",
       "frames_after_load": 30,
-      "md5":  "REPLACE_ME_AFTER_GENERATION",
+      "md5":  "75c3c192f15e0edb230cccf27872b92a",
       "fc0_path": "golden/mmc1_zelda_title.fc0"
     },
     {
@@ -48,7 +48,7 @@
       "rom":  "fixtures/mapper_mmc1.nes",
       "scenario": "save_screen",
       "frames_after_load": 600,
-      "md5":  "REPLACE_ME_AFTER_GENERATION",
+      "md5":  "e4d05d671476be13eb5768aaf5a4c582",
       "fc0_path": "golden/mmc1_zelda_save.fc0"
     },
     {
@@ -56,7 +56,7 @@
       "rom":  "fixtures/mapper_mmc3.nes",
       "scenario": "world_map",
       "frames_after_load": 200,
-      "md5":  "REPLACE_ME_AFTER_GENERATION",
+      "md5":  "8f3720a91dd9e19774cd74248d9afb02",
       "fc0_path": "golden/mmc3_smb3_map.fc0"
     },
     {
@@ -64,7 +64,7 @@
       "rom":  "fixtures/mapper_mmc3.nes",
       "scenario": "in_level",
       "frames_after_load": 600,
-      "md5":  "REPLACE_ME_AFTER_GENERATION",
+      "md5":  "ca9ff253f67e487028ad1099280a600c",
       "fc0_path": "golden/mmc3_smb3_level.fc0"
     },
     {
@@ -72,7 +72,7 @@
       "rom":  "fixtures/mapper_vrc6.nes",
       "scenario": "title_screen",
       "frames_after_load": 30,
-      "md5":  "REPLACE_ME_AFTER_GENERATION",
+      "md5":  "6b83a9f21e62d7c6a3c53b5f297655d9",
       "fc0_path": "golden/vrc6_densetsu_title.fc0"
     },
     {

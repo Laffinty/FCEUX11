@@ -51,7 +51,8 @@
 #include "utils/xstring.h"
 
 
-using namespace std;
+// v1.2 Census §2.3: `using namespace std` removed; this file already
+// qualifies all std types with std:: throughout.
 
 bool bindSavestate = true;	//Toggle that determines if a savestate filename will include the movie filename
 static std::string BaseDirectory;
@@ -597,13 +598,13 @@ std::string FCEU_MakePath(int type, const char* filebase)
 	{
 		case FCEUMKF_MOVIE:
 			if(odirs[FCEUIOD_MOVIES])
-				return (string)odirs[FCEUIOD_MOVIES] + PSS + filebase;
+				return (std::string)odirs[FCEUIOD_MOVIES] + PSS + filebase;
 			else
 				return BaseDirectory + PSS + "movies" + PSS + filebase;
 			break;
 		case FCEUMKF_STATE:
 			if(odirs[FCEUIOD_STATES])
-				return (string)odirs[FCEUIOD_STATES] + PSS + filebase;
+				return (std::string)odirs[FCEUIOD_STATES] + PSS + filebase;
 			else
 				return BaseDirectory + PSS + "fcs" + PSS + filebase;
 			break;

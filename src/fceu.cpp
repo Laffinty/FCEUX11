@@ -93,7 +93,8 @@ extern void RefreshThrottleFPS();
 #include <cstdarg>
 #include <ctime>
 
-using namespace std;
+// v1.2 Census §2.3: `using namespace std` removed; std types below are
+// explicitly qualified with std::.
 
 //-----------
 //overclocking-related
@@ -144,8 +145,8 @@ FCEUGI::~FCEUGI()
 bool CheckFileExists(const char* filename) {
 	//This function simply checks to see if the given filename exists
 	if (!filename) return false;
-	fstream test;
-	test.open(filename, fstream::in);
+	std::fstream test;
+	test.open(filename, std::fstream::in);
 
 	if (test.fail()) {
 		test.close();

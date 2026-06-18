@@ -19,7 +19,8 @@
 
 #include <fstream>
 
-using namespace std;
+// v1.2 Census §2.3: `using namespace std` removed; std types in this
+// file are already explicitly qualified with std::.
 
 // FCM\x1a
 #define MOVIE_MAGIC             0x1a4d4346

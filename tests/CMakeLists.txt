@@ -77,7 +77,11 @@ if(FCEUX11_BUILD_TESTS)
              COMMAND fceux11_rom_regression_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-    # v0.3.12.5 — byte-level savestate consistency test
+    # v0.3.12.5 — byte-level savestate consistency test.
+    # 12 ROMs × 60 frames ≈ 720 frames of emulation. On slow CI nodes this
+    # can exceed ctest's default 1500s timeout, so we set an explicit
+    # 2400s (40min) limit. If you raise FRAMES_TO_RUN above 60 in the
+    # source file, revisit this value.
     fceux11_add_test_executable(fceux11_savestate_regression_test
         savestate_regression_test.cpp
         git_info_stub.cpp
@@ -85,6 +89,7 @@ if(FCEUX11_BUILD_TESTS)
     add_test(NAME savestate_regression_test
              COMMAND fceux11_savestate_regression_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    set_tests_properties(savestate_regression_test PROPERTIES TIMEOUT 2400)
 
     # v0.3.3 — tl::expected API tests
     fceux11_add_test_executable(fceux11_expected_api_test
@@ -121,6 +126,19 @@ if(FCEUX11_BUILD_TESTS)
     add_test(NAME i18n_regression_test
              COMMAND fceux11_i18n_regression_test
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+    # v1.2 Census §2.2 — facade wiring test. Pure compile/link check;
+    # does not call fceu11::Initialize() so it can run without a Qt event
+    # loop. Verifies that every accessor returns a reference whose address
+    # matches the underlying extern symbol, and that global_state() is a
+    # true singleton.
+    fceux11_add_test_executable(fceux11_core_state_test
+        core_state_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME core_state_test
+             COMMAND fceux11_core_state_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
     # -------------------------------------------------------------------------
     # v1.1 Sentinel — core unit-test skeleton (§1.1).
@@ -185,6 +203,11 @@ if(FCEUX11_BUILD_TESTS)
         fixtures/golden/golden_savestate_test.cpp
         git_info_stub.cpp
     )
+    # v1.2 Census: golden_savestate_test lives under fixtures/golden/, so it
+    # needs an extra include directory to reach core/test_helpers.h.
+    target_include_directories(fceux11_golden_savestate_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/tests/core
+    )
     add_test(NAME golden_savestate_test
              COMMAND fceux11_golden_savestate_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
@@ -196,6 +219,11 @@ if(FCEUX11_BUILD_TESTS)
     fceux11_add_test_executable(fceux11_bench_tolerance_test
         benchmarks/bench_tolerance_test.cpp
         git_info_stub.cpp
+    )
+    # v1.2 Census: benchmarks/bench_tolerance_test is one directory deep;
+    # needs tests/core in the include path to reach test_helpers.h.
+    target_include_directories(fceux11_bench_tolerance_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/tests/core
     )
     add_test(NAME bench_tolerance_test
              COMMAND fceux11_bench_tolerance_test
@@ -259,6 +287,7 @@ if(FCEUX11_BUILD_TESTS)
             smoke_test mapper_load_test mapper_reset_test
             rom_regression_test savestate_regression_test expected_api_test
             enum_class_bitflags_test config_store_test
+            core_state_test
             cpu_test ppu_test apu_test bus_test mapper_core_test
             savestate_core_test golden_savestate_test bench_tolerance_test
             PROPERTIES ENVIRONMENT_MODIFICATION

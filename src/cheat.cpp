@@ -49,11 +49,12 @@
 #include <cstdio>
 #include <cctype>
 
-using namespace std;
+// v1.2 Census §2.3: `using namespace std` removed; all std types below
+// are explicitly qualified with std::.
 
 static uint8 *CheatRPtrs[64];
 
-vector<uint16> FrozenAddresses;			//List of addresses that are currently frozen
+std::vector<uint16> FrozenAddresses;			//List of addresses that are currently frozen
 unsigned int FrozenAddressCount = 0;		//Keeps up with the Frozen address count, necessary for using in other dialogs (such as hex editor)
 
 void FCEU_CheatResetRAM(void)

@@ -50,8 +50,8 @@ void test_aread_bwrite_populated(TestContext& ctx) {
     for (int i = 0; i < 0x10000; ++i) {
         if (BWrite[i] == nullptr) { all_write = false; break; }
     }
-    FCEU11_EXPECT(&ctx, all_read,  "ARead[0..0xFFFF] all populated after Power");
-    FCEU11_EXPECT(&ctx, all_write, "BWrite[0..0xFFFF] all populated after Power");
+    FCEU11_EXPECT(ctx, all_read,  "ARead[0..0xFFFF] all populated after Power");
+    FCEU11_EXPECT(ctx, all_write, "BWrite[0..0xFFFF] all populated after Power");
 }
 
 void test_register_handler(TestContext& ctx) {
@@ -61,35 +61,35 @@ void test_register_handler(TestContext& ctx) {
     g_test_read_storage = 0x42;
     SetReadHandler(0x5000, 0x5FFF, test_read_fn);
     SetWriteHandler(0x5000, 0x5FFF, test_write_fn);
-    FCEU11_EXPECT(&ctx, GetReadHandler(0x5000)  == test_read_fn,  "GetReadHandler returns registered fn");
-    FCEU11_EXPECT(&ctx, GetReadHandler(0x5500)  == test_read_fn,  "GetReadHandler is uniform across range");
-    FCEU11_EXPECT(&ctx, GetWriteHandler(0x5000) == test_write_fn, "GetWriteHandler returns registered fn");
+    FCEU11_EXPECT(ctx, GetReadHandler(0x5000)  == test_read_fn,  "GetReadHandler returns registered fn");
+    FCEU11_EXPECT(ctx, GetReadHandler(0x5500)  == test_read_fn,  "GetReadHandler is uniform across range");
+    FCEU11_EXPECT(ctx, GetWriteHandler(0x5000) == test_write_fn, "GetWriteHandler returns registered fn");
 }
 
 void test_dispatch_read(TestContext& ctx) {
     g_test_read_called = 0;
     g_test_read_storage = 0xA5;
     uint8_t v = ARead[0x5000](0x5000);
-    FCEU11_EXPECT(&ctx, v == 0xA5, "ARead[0x5000] returns handler value");
-    FCEU11_EXPECT(&ctx, g_test_read_called == 1, "ARead handler called exactly once");
+    FCEU11_EXPECT(ctx, v == 0xA5, "ARead[0x5000] returns handler value");
+    FCEU11_EXPECT(ctx, g_test_read_called == 1, "ARead handler called exactly once");
 }
 
 void test_dispatch_write(TestContext& ctx) {
     g_test_write_called = 0;
     BWrite[0x5500](0x5500, 0x77);
-    FCEU11_EXPECT(&ctx, g_test_write_called == 1, "BWrite handler called exactly once");
-    FCEU11_EXPECT(&ctx, g_test_write_last_addr == 0x5500, "BWrite handler received correct address");
-    FCEU11_EXPECT(&ctx, g_test_write_last_val == 0x77, "BWrite handler received correct value");
+    FCEU11_EXPECT(ctx, g_test_write_called == 1, "BWrite handler called exactly once");
+    FCEU11_EXPECT(ctx, g_test_write_last_addr == 0x5500, "BWrite handler received correct address");
+    FCEU11_EXPECT(ctx, g_test_write_last_val == 0x77, "BWrite handler received correct value");
 }
 
 void test_ram_rw(TestContext& ctx) {
     // RAM is the 2KB internal CPU RAM. Read/write roundtrip.
     extern uint8* RAM;
-    FCEU11_EXPECT(&ctx, RAM != nullptr, "RAM pointer non-null");
+    FCEU11_EXPECT(ctx, RAM != nullptr, "RAM pointer non-null");
     if (!RAM) return;
     uint8_t orig = RAM[0x0100];
     RAM[0x0100] = 0xCC;
-    FCEU11_EXPECT(&ctx, RAM[0x0100] == 0xCC, "RAM[0x0100] write/readback");
+    FCEU11_EXPECT(ctx, RAM[0x0100] == 0xCC, "RAM[0x0100] write/readback");
     RAM[0x0100] = orig;
 }
 
@@ -104,8 +104,8 @@ void test_prg_chr_pointers(TestContext& ctx) {
     for (int i = 0; i < 32; ++i) {
         if (CHRptr[i]) { any_chr = true; break; }
     }
-    FCEU11_EXPECT(&ctx, any_prg, "PRGptr[] has at least one non-null entry after Power");
-    FCEU11_EXPECT(&ctx, true,    "CHRptr[] presence is mapper-dependent (best-effort)");
+    FCEU11_EXPECT(ctx, any_prg, "PRGptr[] has at least one non-null entry after Power");
+    FCEU11_EXPECT(ctx, true,    "CHRptr[] presence is mapper-dependent (best-effort)");
     (void)any_chr;
 }
 
@@ -120,7 +120,7 @@ void test_setprg(TestContext& ctx) {
     // 8K PRG swap doesn't corrupt RAM.
     setprg8(0x8000, 0);
     extern uint8* RAM;
-    FCEU11_EXPECT(&ctx, RAM != nullptr, "RAM pointer still valid after setprg8");
+    FCEU11_EXPECT(ctx, RAM != nullptr, "RAM pointer still valid after setprg8");
 }
 
 void test_setmirror(TestContext& ctx) {
@@ -130,7 +130,7 @@ void test_setmirror(TestContext& ctx) {
     setmirror(MI_V);
     setmirror(MI_0);
     setmirror(MI_1);
-    FCEU11_EXPECT(&ctx, true, "setmirror accepts {H, V, 0, 1}");
+    FCEU11_EXPECT(ctx, true, "setmirror accepts {H, V, 0, 1}");
 }
 
 void test_page_vpage(TestContext& ctx) {
@@ -141,7 +141,7 @@ void test_page_vpage(TestContext& ctx) {
     for (int i = 0; i < 32; ++i) {
         if (Page[i]) ++nonnull;
     }
-    FCEU11_EXPECT(&ctx, nonnull >= 8, "Page[] has at least 8 non-null entries (CPU address space)");
+    FCEU11_EXPECT(ctx, nonnull >= 8, "Page[] has at least 8 non-null entries (CPU address space)");
 }
 
 void test_open_bus(TestContext& ctx) {
@@ -150,7 +150,7 @@ void test_open_bus(TestContext& ctx) {
     // over a previously empty region, the handler is invoked.
     SetReadHandler(0x4000, 0x4001, test_read_fn);
     uint8_t v = ARead[0x4000](0x4000);
-    FCEU11_EXPECT(&ctx, true, "ARead[0x4000] dispatches to test handler");
+    FCEU11_EXPECT(ctx, true, "ARead[0x4000] dispatches to test handler");
     (void)v;
 }
 
@@ -166,16 +166,16 @@ int main() {
     FCEUGI* gi = load_rom(kRom);
     if (!gi) { core_shutdown(); return 1; }
 
-    test_aread_bwrite_populated(&ctx);
-    test_register_handler(&ctx);
-    test_dispatch_read(&ctx);
-    test_dispatch_write(&ctx);
-    test_ram_rw(&ctx);
-    test_prg_chr_pointers(&ctx);
-    test_setprg(&ctx);
-    test_setmirror(&ctx);
-    test_page_vpage(&ctx);
-    test_open_bus(&ctx);
+    test_aread_bwrite_populated(ctx);
+    test_register_handler(ctx);
+    test_dispatch_read(ctx);
+    test_dispatch_write(ctx);
+    test_ram_rw(ctx);
+    test_prg_chr_pointers(ctx);
+    test_setprg(ctx);
+    test_setmirror(ctx);
+    test_page_vpage(ctx);
+    test_open_bus(ctx);
 
     fceu11::CloseGame();
     core_shutdown();

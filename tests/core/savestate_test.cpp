@@ -59,21 +59,21 @@ void test_save_load_preserves_cpu(TestContext& ctx) {
     std::vector<std::byte> buf;
     EMUFILE_MEMORY f(&buf);
     bool save_ok = FCEUSS_SaveMS(&f, 0) != 0;
-    FCEU11_EXPECT(&ctx, save_ok, "FCEUSS_SaveMS returns non-zero on success");
+    FCEU11_EXPECT(ctx, save_ok, "FCEUSS_SaveMS returns non-zero on success");
     if (!save_ok) return;
 
     // Advance 5 more frames; state should differ.
     emulate_n(5);
     CpuSnap advanced = snap_cpu();
-    FCEU11_EXPECT(&ctx, !cpu_eq(before, advanced),
+    FCEU11_EXPECT(ctx, !cpu_eq(before, advanced),
                   "CPU state differs after 5 more frames");
 
     // Reload the saved state.
     EMUFILE_MEMORY r(buf.data(), buf.size());
     bool load_ok = FCEUSS_LoadFP(&r, SSLOADPARAM_NOBACKUP);
-    FCEU11_EXPECT(&ctx, load_ok, "FCEUSS_LoadFP returns true");
+    FCEU11_EXPECT(ctx, load_ok, "FCEUSS_LoadFP returns true");
     CpuSnap after = snap_cpu();
-    FCEU11_EXPECT(&ctx, cpu_eq(before, after),
+    FCEU11_EXPECT(ctx, cpu_eq(before, after),
                   "CPU state after load matches saved state");
 }
 
@@ -88,8 +88,8 @@ void test_save_load_preserves_ram(TestContext& ctx) {
     RAM[0x0201] = 0xEE;
     EMUFILE_MEMORY r(buf.data(), buf.size());
     FCEUSS_LoadFP(&r, SSLOADPARAM_NOBACKUP);
-    FCEU11_EXPECT(&ctx, RAM[0x0200] == 0x11, "RAM[0x0200] restored from save");
-    FCEU11_EXPECT(&ctx, RAM[0x0201] == 0x22, "RAM[0x0201] restored from save");
+    FCEU11_EXPECT(ctx, RAM[0x0200] == 0x11, "RAM[0x0200] restored from save");
+    FCEU11_EXPECT(ctx, RAM[0x0201] == 0x22, "RAM[0x0201] restored from save");
     RAM[0x0200] = 0; RAM[0x0201] = 0;
 }
 
@@ -105,13 +105,13 @@ void test_save_load_after_reset(TestContext& ctx) {
     ResetNES();
     emulate_n(1);
     CpuSnap after_reset = snap_cpu();
-    FCEU11_EXPECT(&ctx, !cpu_eq(before_reset, after_reset),
+    FCEU11_EXPECT(ctx, !cpu_eq(before_reset, after_reset),
                   "ResetNES changes CPU state");
     EMUFILE_MEMORY r(buf.data(), buf.size());
     bool load_ok = FCEUSS_LoadFP(&r, SSLOADPARAM_NOBACKUP);
-    FCEU11_EXPECT(&ctx, load_ok, "Load after Reset succeeds");
+    FCEU11_EXPECT(ctx, load_ok, "Load after Reset succeeds");
     CpuSnap after_reload = snap_cpu();
-    FCEU11_EXPECT(&ctx, cpu_eq(before_reset, after_reload),
+    FCEU11_EXPECT(ctx, cpu_eq(before_reset, after_reload),
                   "Load restores pre-reset CPU state");
 }
 
@@ -119,9 +119,9 @@ void test_sformat_struct(TestContext& ctx) {
     // SFORMAT must be a POD with v/s/desc. We construct one and
     // verify the offsets are non-overlapping.
     SFORMAT sf = { nullptr, 0, "test" };
-    FCEU11_EXPECT(&ctx, sf.v == nullptr, "SFORMAT.v initial value");
-    FCEU11_EXPECT(&ctx, sf.s == 0,       "SFORMAT.s initial value");
-    FCEU11_EXPECT(&ctx, std::strcmp(sf.desc, "test") == 0, "SFORMAT.desc initial value");
+    FCEU11_EXPECT(ctx, sf.v == nullptr, "SFORMAT.v initial value");
+    FCEU11_EXPECT(ctx, sf.s == 0,       "SFORMAT.s initial value");
+    FCEU11_EXPECT(ctx, std::strcmp(sf.desc, "test") == 0, "SFORMAT.desc initial value");
 }
 
 void test_save_load_byte_identical(TestContext& ctx) {
@@ -133,8 +133,8 @@ void test_save_load_byte_identical(TestContext& ctx) {
     FCEUSS_SaveMS(&fa, 0);
     EMUFILE_MEMORY fb(&b);
     FCEUSS_SaveMS(&fb, 0);
-    FCEU11_EXPECT(&ctx, a.size() == b.size(), "two consecutive saves have equal size");
-    FCEU11_EXPECT(&ctx, a == b,
+    FCEU11_EXPECT(ctx, a.size() == b.size(), "two consecutive saves have equal size");
+    FCEU11_EXPECT(ctx, a == b,
                   "two consecutive saves have byte-identical contents");
 }
 
@@ -144,9 +144,9 @@ void test_save_load_size_sanity(TestContext& ctx) {
     std::vector<std::byte> buf;
     EMUFILE_MEMORY f(&buf);
     FCEUSS_SaveMS(&f, 0);
-    FCEU11_EXPECT(&ctx, buf.size() > 1024,
+    FCEU11_EXPECT(ctx, buf.size() > 1024,
                   "savestate is at least 1KB (sanity lower bound)");
-    FCEU11_EXPECT(&ctx, buf.size() < 4 * 1024 * 1024,
+    FCEU11_EXPECT(ctx, buf.size() < 4 * 1024 * 1024,
                   "savestate is at most 4MB (sanity upper bound)");
 }
 
@@ -163,10 +163,10 @@ void test_compress_toggle(TestContext& ctx) {
     std::vector<std::byte> compressed;
     EMUFILE_MEMORY fc(&compressed);
     bool c = FCEUSS_SaveMS(&fc, 0) != 0;
-    FCEU11_EXPECT(&ctx, u && c, "save works in both compression modes");
+    FCEU11_EXPECT(ctx, u && c, "save works in both compression modes");
     // The compressed variant should be strictly smaller for a
     // non-trivial state (RAM is mostly zeros, CPU state is small).
-    FCEU11_EXPECT(&ctx, compressed.size() <= uncompressed.size(),
+    FCEU11_EXPECT(ctx, compressed.size() <= uncompressed.size(),
                   "compressed save is no larger than uncompressed");
     compressSavestates = orig;
 }
@@ -181,13 +181,13 @@ void test_load_after_close(TestContext& ctx) {
     FCEUSS_SaveMS(&f, 0);
     fceu11::CloseGame();
     FCEUGI* gi = load_rom(kRom);
-    FCEU11_EXPECT(&ctx, gi != nullptr, "re-load after CloseGame succeeds");
+    FCEU11_EXPECT(ctx, gi != nullptr, "re-load after CloseGame succeeds");
     EMUFILE_MEMORY r(buf.data(), buf.size());
     bool load_ok = FCEUSS_LoadFP(&r, SSLOADPARAM_NOBACKUP);
-    FCEU11_EXPECT(&ctx, true, "load after close/reopen returns without crash");
+    FCEU11_EXPECT(ctx, true, "load after close/reopen returns without crash");
     (void)load_ok;
     emulate_n(2);
-    FCEU11_EXPECT(&ctx, X.PC != 0xFFFF, "PC still in valid range after cross-instance load");
+    FCEU11_EXPECT(ctx, X.PC != 0xFFFF, "PC still in valid range after cross-instance load");
 }
 
 void test_backup_load_state(TestContext& ctx) {
@@ -196,7 +196,7 @@ void test_backup_load_state(TestContext& ctx) {
     // must be safe.
     emulate_n(2);
     BackupLoadState();
-    FCEU11_EXPECT(&ctx, true, "BackupLoadState does not crash");
+    FCEU11_EXPECT(ctx, true, "BackupLoadState does not crash");
 }
 
 void test_savestate_two_roms(TestContext& ctx) {
@@ -209,11 +209,11 @@ void test_savestate_two_roms(TestContext& ctx) {
     FCEUSS_SaveMS(&f, 0);
     fceu11::CloseGame();
     FCEUGI* mmc1 = load_rom("fixtures/mapper_mmc1.nes");
-    FCEU11_EXPECT(&ctx, mmc1 != nullptr, "MMC1 ROM loaded for cross-mapper test");
+    FCEU11_EXPECT(ctx, mmc1 != nullptr, "MMC1 ROM loaded for cross-mapper test");
     EMUFILE_MEMORY r(buf.data(), buf.size());
     FCEUSS_LoadFP(&r, SSLOADPARAM_NOBACKUP);
     emulate_n(2);
-    FCEU11_EXPECT(&ctx, X.PC != 0xFFFF, "engine still runs after cross-mapper load attempt");
+    FCEU11_EXPECT(ctx, X.PC != 0xFFFF, "engine still runs after cross-mapper load attempt");
 }
 
 void test_add_ex_state(TestContext& ctx) {
@@ -236,7 +236,7 @@ void test_add_ex_state(TestContext& ctx) {
         FCEUSS_SaveMS(&f, 0);
         after = tmp.size();
     }
-    FCEU11_EXPECT(&ctx, after > before,
+    FCEU11_EXPECT(ctx, after > before,
                   "AddExState registration makes subsequent save larger");
 }
 
@@ -245,7 +245,7 @@ void test_resetexstate(TestContext& ctx) {
     // and verify the engine survives.
     ResetExState(nullptr, nullptr);
     emulate_n(2);
-    FCEU11_EXPECT(&ctx, true, "engine survives ResetExState call");
+    FCEU11_EXPECT(ctx, true, "engine survives ResetExState call");
 }
 
 int main() {
@@ -260,18 +260,18 @@ int main() {
     FCEUGI* gi = load_rom(kRom);
     if (!gi) { core_shutdown(); return 1; }
 
-    test_save_load_preserves_cpu(&ctx);
-    test_save_load_preserves_ram(&ctx);
-    test_save_load_after_reset(&ctx);
-    test_sformat_struct(&ctx);
-    test_save_load_byte_identical(&ctx);
-    test_save_load_size_sanity(&ctx);
-    test_compress_toggle(&ctx);
-    test_load_after_close(&ctx);
-    test_backup_load_state(&ctx);
-    test_savestate_two_roms(&ctx);
-    test_add_ex_state(&ctx);
-    test_resetexstate(&ctx);
+    test_save_load_preserves_cpu(ctx);
+    test_save_load_preserves_ram(ctx);
+    test_save_load_after_reset(ctx);
+    test_sformat_struct(ctx);
+    test_save_load_byte_identical(ctx);
+    test_save_load_size_sanity(ctx);
+    test_compress_toggle(ctx);
+    test_load_after_close(ctx);
+    test_backup_load_state(ctx);
+    test_savestate_two_roms(ctx);
+    test_add_ex_state(ctx);
+    test_resetexstate(ctx);
 
     fceu11::CloseGame();
     core_shutdown();
