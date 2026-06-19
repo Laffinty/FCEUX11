@@ -15,7 +15,6 @@
 pub struct EmuFileMem {
     buf: Vec<u8>,
     pos: usize,
-    own_buf: bool,
 }
 
 impl EmuFileMem {
@@ -24,7 +23,6 @@ impl EmuFileMem {
         Self {
             buf: buf.to_vec(),
             pos: 0,
-            own_buf: false,
         }
     }
 
@@ -36,7 +34,6 @@ impl EmuFileMem {
         Self {
             buf,
             pos: 0,
-            own_buf: true,
         }
     }
 
@@ -47,7 +44,6 @@ impl EmuFileMem {
         Self {
             buf,
             pos: 0,
-            own_buf: true,
         }
     }
 
@@ -56,7 +52,6 @@ impl EmuFileMem {
         Self {
             buf: data.to_vec(),
             pos: 0,
-            own_buf: true,
         }
     }
 

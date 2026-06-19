@@ -381,12 +381,14 @@ unsafe fn cstr_to_bytes(ptr: *const c_char) -> &'static [u8] {
     if ptr.is_null() {
         return &[];
     }
-    // Compute length by scanning for NUL.
-    let mut len = 0usize;
-    while *ptr.add(len) != 0 {
-        len += 1;
+    unsafe {
+        // Compute length by scanning for NUL.
+        let mut len = 0usize;
+        while *ptr.add(len) != 0 {
+            len += 1;
+        }
+        std::slice::from_raw_parts(ptr as *const u8, len)
     }
-    std::slice::from_raw_parts(ptr as *const u8, len)
 }
 
 // ---------------------------------------------------------------------------
@@ -439,7 +441,7 @@ pub extern "C" fn fceux11_rust_drawing_draw_text_trans(
     textmsg: *const c_char,
     width: u32,
     fgcolor: u8,
-    max_w: c_int,
+    _max_w: c_int,
     max_h: c_int,
     border: c_int,
 ) {
@@ -451,11 +453,6 @@ pub extern "C" fn fceux11_rust_drawing_draw_text_trans(
     }
 
     let text = unsafe { cstr_to_bytes(textmsg) };
-    let mut mw = max_w;
-    let mut mh = max_h;
-    if mw > 256 { mw = 256; }
-    if mh > 64 { mh = 64; }
-
     let width = width as usize;
 
     // Zero the scratch buffer.
@@ -485,7 +482,6 @@ pub extern "C" fn fceux11_rust_drawing_draw_text_trans(
                 y += 8;
             }
 
-            let mut ny: i32 = 0;
             for ny_i in 0..7 {
                 let d = FONT6X7[ch * 8 + 1 + ny_i as usize];
                 for nx in 0..wid {
@@ -494,8 +490,6 @@ pub extern "C" fn fceux11_rust_drawing_draw_text_trans(
                     let tx = (x + nx) as usize;
                     if ty >= 62 {
                         // Out of vertical space (matches C++ goto textoverflow).
-                        ny = ny_i;
-                        last_ny = ny;
                         // Force break out of both loops.
                         return;
                     }
@@ -504,9 +498,8 @@ pub extern "C" fn fceux11_rust_drawing_draw_text_trans(
                     } else {
                         target[ty * 256 + tx] = 1;
                     }
-                    last_ny = ny_i;
                 }
-                ny = ny_i;
+                last_ny = ny_i;
             }
             x += wid;
             if max_x < x {
