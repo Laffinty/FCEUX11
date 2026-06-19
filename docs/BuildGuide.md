@@ -1,16 +1,16 @@
-# FCEUX11 v1.0 正式版编译指南 / v1.0 Build Guide
+# FCEUX11 v1.2 正式版编译指南 / v1.2 Build Guide
 
-> **适用版本**：FCEUX11 v1.0（首个正式版，基于 v0.3.16 LTS 收官）
+> **适用版本**：FCEUX11 v1.2（正式版）
 > **目标平台**：Windows 11 22H2+（64-bit）独占
 > **工具链**：MSVC 2022 19.36+ (VS 17.6+) + CMake 4.0+ + Ninja + vcpkg + Rust 1.78+
 > **Qt**：6.8 LTS
-> **最后更新**：2026-06-18
+> **最后更新**：2026-06-19
 
 ---
 
 ## 0. 文档导读
 
-本指南面向所有想从源码编译 FCEUX11 v1.0 的开发者 / 用户。每一步都
+本指南面向所有想从源码编译 FCEUX11 v1.2 的开发者 / 用户。每一步都
 经过实测，**任意一台符合系统要求 + 已按本章第 3 节装好工具链的 Windows
 11 电脑**都可以照搬命令完成编译。
 
@@ -57,7 +57,7 @@
 | Qt 翻译 | `build\src\drivers\Qt\lang\fceux11_*.qm` | 编译后的翻译（en/zh_CN/zh_TW）|
 | 部署脚本 | `build\cmake_install.cmake` | 给 `cmake --install` 用 |
 
-**程序版本号**：执行 `fceux11.exe --version` 应输出 `1.0.0`（或 `v1.0.0`）。
+**程序版本号**：执行 `fceux11.exe --version` 应输出 `1.2`（或 `v1.2`）。
 
 ---
 
@@ -193,7 +193,7 @@ winget install --id Rustlang.Rustup -e
 
 ## 4. vcpkg 依赖安装
 
-FCEUX11 v1.0 通过 vcpkg 管理 9 个 C++ 包 + Qt 6.8。
+FCEUX11 v1.2 通过 vcpkg 管理 9 个 C++ 包 + Qt 6.8。
 
 ### 4.1 方式 A：一键脚本（推荐）
 
@@ -355,7 +355,7 @@ cmake --build build-dev
 ctest --test-dir build --output-on-failure
 ```
 
-**期望结果**（v1.0）：8/9 通过。
+**期望结果**（v1.2）：8/9 通过。
 
 9 个 ctest 测试：
 | 测试 | 状态 | 说明 |
@@ -368,9 +368,9 @@ ctest --test-dir build --output-on-failure
 | `enum_class_bitflags_test` | ✅ 通过 | v0.3.8 enum class 化 |
 | `i18n_regression_test` | ✅ 通过 | i18n 静态分析（≥ 90% 覆盖）|
 | `config_store_test` | ✅ 通过 | TypedConfig<T> 包装类 |
-| `savestate_regression_test` | ⚠️ 已知 hash gap | 12 ROM × 60 帧 hash 与 v0.3.13 重生成的 golden 文件不一致；从 v0.3.16 继承的已知问题（CHANGELOG 闸 2 已记录）。v1.0.x hotfix 计划刷新 golden 文件。|
+| `savestate_regression_test` | ⚠️ 已知 hash gap | 12 ROM × 60 帧 hash 与 v0.3.13 重生成的 golden 文件不一致；从 v0.3.16 继承的已知问题（CHANGELOG 闸 2 已记录）。v1.2.x hotfix 计划刷新 golden 文件。|
 
-### 6.2 性能基线（v1.0 = v0.3.16 LTS 数据）
+### 6.2 性能基线（v1.2 = v0.3.16 LTS 数据）
 
 ```powershell
 # 跑 3 个 Google Benchmark
@@ -380,7 +380,7 @@ ctest --test-dir build --output-on-failure
 ```
 
 **期望**（vs v0.3.0 baseline）：
-- x6502 CPU：≤ 0.95×（0.842 ms/frame → 0.760 ms/frame，v1.0 保持）
+- x6502 CPU：≤ 0.95×（0.842 ms/frame → 0.760 ms/frame，v1.2 保持）
 - PPU 渲染：≤ 1.1×（0.735 ms/frame → 0.717 ms/frame）
 - APU 混音：informational（0.704 → 0.718 ms/frame）
 
@@ -394,16 +394,16 @@ ctest --test-dir build -R rom_regression --output-on-failure
 ```
 
 **期望**：5 ROM（nrom / mmc1 / mmc3 / nrom-256 / fds）哈希与 v0.2.30 baseline
-完全一致（v0.3.0 起的基线，v0.3.x 17 个子版本逐版本累计验证，v1.0 继承）。
+完全一致（v0.3.0 起的基线，v0.3.x 17 个子版本逐版本累计验证，v1.2 继承）。
 
 ### 6.4 版本号确认
 
 ```powershell
 .\build\src\fceux11.exe --version
 # 期望输出（任一形式）：
-#   1.0.0
-#   v1.0.0
-#   FCEUX11 v1.0.0
+#   1.2
+#   v1.2
+#   FCEUX11 v1.2
 ```
 
 ---
@@ -435,18 +435,18 @@ cmake --install build --prefix dist
 ### 7.3 压缩成 zip / 7z 分发
 
 ```powershell
-Compress-Archive -Path dist\* -DestinationPath FCEUX11-v1.0.0-win64.zip
+Compress-Archive -Path dist\* -DestinationPath FCEUX11-v1.2-win64.zip
 ```
 
 ### 7.4 端到端验证
 
 ```powershell
 # 1) 解压到临时目录
-Expand-Archive FCEUX11-v1.0.0-win64.zip -DestinationPath C:\TestFCEUX11
+Expand-Archive FCEUX11-v1.2-win64.zip -DestinationPath C:\TestFCEUX11
 
 # 2) 运行
 cd C:\TestFCEUX11
-.\fceux11.exe --version    # 期望：1.0.0
+.\fceux11.exe --version    # 期望：1.2
 .\fceux11.exe               # 启动 GUI，加载 .nes ROM 测试
 ```
 
@@ -454,7 +454,7 @@ cd C:\TestFCEUX11
 
 ## 8. 跨机兼容性验证清单
 
-v1.0 在任意符合 §1 系统要求 + §3 工具链装好的 Windows 11 电脑上必过
+v1.2 在任意符合 §1 系统要求 + §3 工具链装好的 Windows 11 电脑上必过
 **5 条硬指标**：
 
 | # | 指标 | 验证方法 | 期望 |
@@ -465,7 +465,7 @@ v1.0 在任意符合 §1 系统要求 + §3 工具链装好的 Windows 11 电脑
 | 4 | ccache 未装不阻塞 | 卸载 ccache，跑 `do_build.ps1` | CMake 警告但通过 |
 | 5 | 全新 git clone 可跑 | 在新目录 `git clone ... && cd FCEUX11 && do_build.ps1` | configure + build 通过 |
 
-**已通过验证的环境**（v0.3.16 LTS 期间 + v1.0 沿用）：
+**已通过验证的环境**（v0.3.16 LTS 期间 + v1.x 沿用）：
 - ✅ Windows 11 22H2 / 23H2 / 24H2
 - ✅ MSVC 19.36 (VS 17.6) / 19.38 (VS 17.8) / 19.40 (VS 17.10)
 - ✅ Ninja 1.10 / 1.11 / 1.12
@@ -631,29 +631,29 @@ endif()
 
 ## 11. 版本与升级
 
-| 项 | v1.0 状态 |
+| 项 | v1.2 状态 |
 |----|-----------|
-| 主版本 | **1.0.0**（首个正式版）|
+| 主版本 | **1.2**（正式版）|
 | 工具链 | MSVC 19.36+ / Qt 6.8 LTS / vcpkg 2024+ baseline / Rust 1.78+ |
 | API 兼容 | 与 v0.3.x 完全兼容（兼容 shim 保留到 v2.0）|
 | savestate 兼容 | 与 v0.2.x / v0.3.x 完全兼容 |
 | INI 兼容 | 与 v0.2.x / v0.3.x 完全兼容 |
 | Rust crate 版本 | 0.2.x 不变（与产品版本解耦）|
-| 下一里程碑 | v1.0.x hotfix 维护期 → v2.0 大版本（删除 compat shim）|
+| 下一里程碑 | v1.2.x hotfix 维护期 → v2.0 大版本（删除 compat shim）|
 
 ### 11.1 升级路径
 
-**从 v0.3.16 LTS 升级到 v1.0**：
+**从 v0.3.16 LTS 升级到 v1.2**：
 - 替换 `fceux11.exe` 即可，savestate / INI / 配置完全兼容
 - 无需重新配置控制器 / 快捷键
 
-**从 v0.2.x 升级到 v1.0**：
+**从 v0.2.x 升级到 v1.2**：
 - 详见 `docs/tech/20_API迁移指南_v0_2到v0_3.txt`
 - savestate 兼容；可能需要重新配置控制器（API 变化）
 
-### 11.2 降级路径（v1.0 → v0.3.16）
+### 11.2 降级路径（v1.2 → v0.3.16）
 
-v1.0 savestate 完全兼容 v0.3.16。直接用 v0.3.16 的 `fceux11.exe` 打开 v1.0
+v1.2 savestate 完全兼容 v0.3.16。直接用 v0.3.16 的 `fceux11.exe` 打开 v1.2
 保存的 savestate 即可。
 
 ---
@@ -684,9 +684,9 @@ v1.0 savestate 完全兼容 v0.3.16。直接用 v0.3.16 的 `fceux11.exe` 打开
 - **24h 烟雾测试**：`docs/tech/17_24小时烟雾测试方法与监控指标.txt`
 - **Win11 平台特性**：`docs/tech/19_Win11开发者集成指南.txt`
 - **性能基线**：`docs/tech/21_性能基准测试方法.txt`
-- **v0.3.x → v1.0 发布说明**：`docs/tech/22_v0_3_x发布说明.txt`
+- **v0.3.x → v1.x 发布说明**：`docs/tech/22_v0_3_x发布说明.txt`
 - **i18n 翻译管线**：`docs/tech/18_国际化翻译管线与脚本陷阱.txt`
 
 ---
 
-**文档结束** — FCEUX11 v1.0 正式版编译指南。生效版本：v1.0.0（2026-06-17）。
+**文档结束** — FCEUX11 v1.2 正式版编译指南。生效版本：v1.2（2026-06-19）。
