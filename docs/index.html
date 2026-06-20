@@ -5,12 +5,47 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="dark" />
 <meta name="theme-color" content="#080a09" />
-<title>FCEUX11 — NES emulator for Windows 11</title>
-<meta name="description" content="A small, modern NES/Famicom emulator for Windows 11. Built on Qt 6.8 and C++20." />
+<title>FCEUX11 — NES/Famicom Emulator Optimized for Windows</title>
+<meta name="description" content="FCEUX11 is a modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 — accurate emulation, debugging tools, TAS editor, and Lua scripting." />
+<meta name="keywords" content="FCEUX11, FCEUX, NES emulator, Famicom emulator, Windows emulator, TAS editor, Qt6, C++20, game emulator, 8-bit" />
+<meta name="author" content="Laffinty" />
+<meta name="robots" content="index, follow, max-image-preview:large" />
+<meta name="generator" content="FCEUX11" />
+<link rel="canonical" href="https://laffinty.github.io/FCEUX11/" />
 <link rel="icon" type="image/x-icon" href="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
+<meta property="og:site_name" content="FCEUX11" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="FCEUX11 — NES/Famicom Emulator for Windows" />
+<meta property="og:description" content="A modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 — accurate emulation, debugging, TAS, Lua." />
+<meta property="og:url" content="https://laffinty.github.io/FCEUX11/" />
+<meta property="og:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
+<meta property="og:locale" content="en_US" />
+<meta property="og:locale:alternate" content="zh_CN" />
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="FCEUX11 — NES/Famicom Emulator for Windows" />
+<meta name="twitter:description" content="A modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20." />
+<meta name="twitter:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<script type="application/ld+json">
+{
+  "@context":"https://schema.org",
+  "@type":"SoftwareApplication",
+  "name":"FCEUX11",
+  "applicationCategory":"GameApplication",
+  "operatingSystem":"Windows",
+  "description":"A modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 with accurate emulation, debugging tools, TAS editor, and Lua scripting.",
+  "softwareVersion":"1.2.0",
+  "license":"https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt",
+  "url":"https://laffinty.github.io/FCEUX11/",
+  "downloadUrl":"https://github.com/Laffinty/FCEUX11/releases",
+  "codeRepository":"https://github.com/Laffinty/FCEUX11",
+  "image":"https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico",
+  "author":{"@type":"Person","name":"Laffinty"},
+  "offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}
+}
+</script>
 <style>
   :root{
     --bg:#080a09;
@@ -139,9 +174,9 @@
 
 <header class="hero" id="top">
   <div class="wrap">
-    <div class="pill reveal"><span class="dot"></span><span data-i18n="pill">v1.1.0 · Sentinel</span></div>
+    <div class="pill reveal"><span class="dot"></span><span data-i18n="pill">v1.2.0 · Census</span></div>
     <h1 class="reveal"><span class="grad">FCEUX</span><span class="dim">11</span></h1>
-    <p class="tagline reveal" data-i18n="tagline">A FCEUX-based NES/Famicom emulator for Windows 11 — core accuracy, modern native experience.</p>
+    <p class="tagline reveal" data-i18n="tagline">A FCEUX-based NES/Famicom emulator optimized for Windows — core accuracy, modern native experience.</p>
     <div class="cta reveal">
       <a class="btn btn-primary" href="https://github.com/Laffinty/FCEUX11/releases" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -186,7 +221,7 @@
       <h2 data-i18n="about.t">Introduction</h2>
     </div>
     <div class="about-body reveal">
-      <p data-i18n="about.a1">FCEUX11 is a derivative of the FCEUX NES/Famicom emulator, actively maintained for <em>Windows 11</em>.</p>
+      <p data-i18n="about.a1">FCEUX11 is a derivative of the FCEUX NES/Famicom emulator, actively maintained and optimized for <em>Windows</em>.</p>
       <p data-i18n="about.a2">It preserves the core emulation accuracy of FCEUX while providing a modern, native Windows experience, including a <em>Qt6-based</em> user interface, multi-language support, and comprehensive debugging and TAS tooling.</p>
     </div>
   </div>
@@ -200,26 +235,26 @@
 
 <script>
 const I18N={
-  en:{pill:"v1.1.0 · Sentinel",
-      tagline:"A FCEUX-based NES/Famicom emulator for Windows 11 — core accuracy, modern native experience.",
+  en:{pill:"v1.2.0 · Census",
+      tagline:"A FCEUX-based NES/Famicom emulator optimized for Windows — core accuracy, modern native experience.",
       download:"Download",changelog:"Changelog",
       "f1.t":"Accurate Emulation","f1.d":"Full NES, Famicom &amp; mapper support",
       "f2.t":"Debugging Tools","f2.d":"CPU/PPU debugger, hex, RAM watch",
       "f3.t":"TAS Editor","f3.d":"Frame-by-frame input recording",
       "f4.t":"Lua Scripting","f4.d":"Custom HUDs &amp; automation",
       "about.k":"About","about.t":"Introduction",
-      "about.a1":"FCEUX11 is a derivative of the FCEUX NES/Famicom emulator, actively maintained for <em>Windows 11</em>.",
+      "about.a1":"FCEUX11 is a derivative of the FCEUX NES/Famicom emulator, actively maintained and optimized for <em>Windows</em>.",
       "about.a2":"It preserves the core emulation accuracy of FCEUX while providing a modern, native Windows experience, including a <em>Qt6-based</em> user interface, multi-language support, and comprehensive debugging and TAS tooling.",
       foot:"based on FCEUX"},
-  zh:{pill:"v1.1.0 · Sentinel",
-      tagline:"基于 FCEUX、面向 Windows 11 的 NES/Famicom 模拟器——保留核心精度，提供现代原生体验。",
+  zh:{pill:"v1.2.0 · Census",
+      tagline:"基于 FCEUX 的 NES/Famicom 模拟器，为 Windows 平台优化——保留核心精度，提供现代原生体验。",
       download:"下载",changelog:"更新日志",
       "f1.t":"精确模拟","f1.d":"完整支持 NES、Famicom 及扩展芯片",
       "f2.t":"调试工具","f2.d":"CPU/PPU 调试器、十六进制、内存监视",
       "f3.t":"TAS 编辑器","f3.d":"逐帧录制与编辑输入",
       "f4.t":"Lua 脚本","f4.d":"自定义 HUD 与自动化测试",
       "about.k":"关于","about.t":"简介",
-      "about.a1":"FCEUX11 是基于 FCEUX 的 NES/Famicom 模拟器衍生项目，面向 <em>Windows 11</em> 平台持续维护。",
+      "about.a1":"FCEUX11 是基于 FCEUX 的 NES/Famicom 模拟器衍生项目，持续维护并为 <em>Windows</em> 平台优化。",
       "about.a2":"在保留 FCEUX 核心模拟精度的基础上，提供现代化的 Windows 原生体验，包括 <em>Qt6 图形界面</em>、多语言支持以及完善的调试与 TAS 工具集。",
       foot:"基于 FCEUX"}
 };
