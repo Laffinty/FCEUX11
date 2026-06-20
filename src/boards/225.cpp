@@ -69,7 +69,7 @@ static DECLFW(M225LoWrite) {
 
 static DECLFR(M225LoRead) {
 	if (A & 0x800) return extraRAM[A & 3];
-	return X.DB;
+	return g_cpu.native_layout().DB;
 }
 
 static void M225Power(void) {

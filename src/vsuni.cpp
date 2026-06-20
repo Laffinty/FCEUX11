@@ -56,7 +56,7 @@ uint8 service = 0;
 
 static DECLFR(VSSecRead) {
     switch (A) {
-    case 0x5e00: VSindex = 0; return X.DB;
+    case 0x5e00: VSindex = 0; return g_cpu.native_layout().DB;
     case 0x5e01: return(secptr[(VSindex++) & 0x1F]);
     }
     return(0x00);
@@ -92,7 +92,7 @@ static DECLFR(XevRead) {
         xevselect ^= 1;
         return(xevselect ? 0x37 : 0x3E);
     }
-    return(X.DB);
+    return(g_cpu.native_layout().DB);
 }
 
 void FCEU_VSUniSwap(uint8 *j0, uint8 *j1) {

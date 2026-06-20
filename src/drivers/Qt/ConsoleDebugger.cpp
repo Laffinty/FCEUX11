@@ -3101,7 +3101,7 @@ void ConsoleDebugger::debugStepOutCB(void)
 			}
 			//printf("Step out reset\n");
 		}
-		if (GetMem(X.PC) == 0x20)
+		if (GetMem(g_cpu.native_layout().PC) == 0x20)
 		{
 			dbgstate.jsrcount = 1;
 		}
@@ -3119,8 +3119,8 @@ void ConsoleDebugger::debugStepOverCB(void)
 	if (fceu11::IsEmulationPaused()) 
 	{
 		setRegsFromEntry();
-		int tmp=X.PC;
-		uint8 opcode = GetMem(X.PC);
+		int tmp=g_cpu.native_layout().PC;
+		uint8 opcode = GetMem(g_cpu.native_layout().PC);
 		bool jsr = opcode==0x20;
 		bool call = jsr;
 		#ifdef BRK_3BYTE_HACK
@@ -3174,7 +3174,7 @@ void ConsoleDebugger::debugRunLineCB(void)
 		setRegsFromEntry();
 	}
 	uint64 ts=timestampbase;
-	ts+=timestamp;
+	ts+=g_cpu.timestamp_ref();
 	ts+=341/3;
 	//if (scanline == 240) vblankScanLines++;
 	//else vblankScanLines = 0;
@@ -3192,7 +3192,7 @@ void ConsoleDebugger::debugRunLine128CB(void)
 	FCEUI_Debugger().runline = true;
 	{
 		uint64 ts=timestampbase;
-		ts+=timestamp;
+		ts+=g_cpu.timestamp_ref();
 		ts+=128*341/3;
 		FCEUI_Debugger().runline_end_time=ts;
 		//if (scanline+128 >= 240 && scanline+128 <= 257) vblankScanLines = (scanline+128)-240;
@@ -3378,7 +3378,7 @@ void ConsoleDebugger::openChangePcDialog(void)
 	sbox = new QSpinBox();
 	sbox->setRange(0x0000, 0xFFFF);
 	sbox->setDisplayIntegerBase(16);
-	sbox->setValue( X.PC );
+	sbox->setValue( g_cpu.native_layout().PC );
 
 	QFont font = sbox->font();
 	font.setCapitalization(QFont::AllUppercase);
@@ -3401,7 +3401,7 @@ void ConsoleDebugger::openChangePcDialog(void)
 
 	if ( QDialog::Accepted == ret )
 	{
-		X.PC = sbox->value();
+		g_cpu.native_layout().PC = sbox->value();
 	
 		windowUpdateReq = QAsmView::UPDATE_ALL;
 	}
@@ -3433,7 +3433,7 @@ void ConsoleDebugger::openGotoAddrDialog(void)
 	sbox = new QSpinBox();
 	sbox->setRange(0x0000, 0xFFFF);
 	sbox->setDisplayIntegerBase(16);
-	sbox->setValue( X.PC );
+	sbox->setValue( g_cpu.native_layout().PC );
 
 	QFont font = sbox->font();
 	font.setCapitalization(QFont::AllUppercase);
@@ -3889,7 +3889,7 @@ void  QAsmView::updateAssemblyView(void)
 	dbg_asm_entry_t *a, *d;
 	char pc_found = 0;
 
-	start_address_lp = starting_address = X.PC;
+	start_address_lp = starting_address = g_cpu.native_layout().PC;
 
 	for (int i=0; i < 0xFFFF; i++)
 	{
@@ -3974,13 +3974,13 @@ void  QAsmView::updateAssemblyView(void)
 
 		if ( !pc_found )
 		{
-			if (addr > X.PC)
+			if (addr > g_cpu.native_layout().PC)
 			{
 				asmPC = a;
 				line.append(">");
 				pc_found = 1;
 			}
-			else if (addr == X.PC)
+			else if (addr == g_cpu.native_layout().PC)
 			{
 				asmPC = a;
 				line.append(">");
@@ -4189,8 +4189,8 @@ void ConsoleDebugger::setRegsFromEntry(void)
 	{
 		i = 0;
 	}
-	X.PC = i;
-	//printf("Set PC: '%s'  %04X\n", s.c_str(), X.PC );
+	g_cpu.native_layout().PC = i;
+	//printf("Set PC: '%s'  %04X\n", s.c_str(), g_cpu.native_layout().PC );
 
 	s = regAEntry->displayText().toStdString();
 
@@ -4202,8 +4202,8 @@ void ConsoleDebugger::setRegsFromEntry(void)
 	{
 		i = 0;
 	}
-	X.A  = i;
-	//printf("Set A: '%s'  %02X\n", s.c_str(), X.A );
+	g_cpu.native_layout().A  = i;
+	//printf("Set A: '%s'  %02X\n", s.c_str(), g_cpu.native_layout().A );
 
 	s = regXEntry->displayText().toStdString();
 
@@ -4215,8 +4215,8 @@ void ConsoleDebugger::setRegsFromEntry(void)
 	{
 		i = 0;
 	}
-	X.X  = i;
-	//printf("Set X: '%s'  %02X\n", s.c_str(), X.X );
+	g_cpu.native_layout().X  = i;
+	//printf("Set X: '%s'  %02X\n", s.c_str(), g_cpu.native_layout().X );
 
 	s = regYEntry->displayText().toStdString();
 
@@ -4228,8 +4228,8 @@ void ConsoleDebugger::setRegsFromEntry(void)
 	{
 		i = 0;
 	}
-	X.Y  = i;
-	//printf("Set Y: '%s'  %02X\n", s.c_str(), X.Y );
+	g_cpu.native_layout().Y  = i;
+	//printf("Set Y: '%s'  %02X\n", s.c_str(), g_cpu.native_layout().Y );
 
 	i=0;
 	if ( N_chkbox->isChecked() )
@@ -4264,7 +4264,7 @@ void ConsoleDebugger::setRegsFromEntry(void)
 	{
 		i |= C_FLAG;
 	}
-	X.P = i;
+	g_cpu.native_layout().P = i;
 
 }
 //----------------------------------------------------------------------------
@@ -4274,44 +4274,44 @@ void  ConsoleDebugger::updateRegisterView(void)
 	char stmp[64];
 	char str[32], str2[32];
 
-	snprintf( stmp, sizeof(stmp), "%04X", X.PC );
+	snprintf( stmp, sizeof(stmp), "%04X", g_cpu.native_layout().PC );
 
 	pcEntry->setText( tr(stmp) );
 
-	snprintf( stmp, sizeof(stmp), "%02X", X.A );
+	snprintf( stmp, sizeof(stmp), "%02X", g_cpu.native_layout().A );
 
 	regAEntry->setText( tr(stmp) );
 
-	snprintf( stmp, sizeof(stmp), "%02X", X.X );
+	snprintf( stmp, sizeof(stmp), "%02X", g_cpu.native_layout().X );
 
 	regXEntry->setText( tr(stmp) );
 
-	snprintf( stmp, sizeof(stmp), "%02X", X.Y );
+	snprintf( stmp, sizeof(stmp), "%02X", g_cpu.native_layout().Y );
 
 	regYEntry->setText( tr(stmp) );
 
-	snprintf( stmp, sizeof(stmp), "%02X", X.P );
+	snprintf( stmp, sizeof(stmp), "%02X", g_cpu.native_layout().P );
 
 	regPEntry->setText( tr(stmp) );
 
-	N_chkbox->setChecked( (X.P & N_FLAG) ? true : false );
-	V_chkbox->setChecked( (X.P & V_FLAG) ? true : false );
-	U_chkbox->setChecked( (X.P & U_FLAG) ? true : false );
-	B_chkbox->setChecked( (X.P & B_FLAG) ? true : false );
-	D_chkbox->setChecked( (X.P & D_FLAG) ? true : false );
-	I_chkbox->setChecked( (X.P & I_FLAG) ? true : false );
-	Z_chkbox->setChecked( (X.P & Z_FLAG) ? true : false );
-	C_chkbox->setChecked( (X.P & C_FLAG) ? true : false );
+	N_chkbox->setChecked( (g_cpu.native_layout().P & N_FLAG) ? true : false );
+	V_chkbox->setChecked( (g_cpu.native_layout().P & V_FLAG) ? true : false );
+	U_chkbox->setChecked( (g_cpu.native_layout().P & U_FLAG) ? true : false );
+	B_chkbox->setChecked( (g_cpu.native_layout().P & B_FLAG) ? true : false );
+	D_chkbox->setChecked( (g_cpu.native_layout().P & D_FLAG) ? true : false );
+	I_chkbox->setChecked( (g_cpu.native_layout().P & I_FLAG) ? true : false );
+	Z_chkbox->setChecked( (g_cpu.native_layout().P & Z_FLAG) ? true : false );
+	C_chkbox->setChecked( (g_cpu.native_layout().P & C_FLAG) ? true : false );
 
-	stackPtr = X.S | 0x0100;
+	stackPtr = g_cpu.native_layout().S | 0x0100;
 
 	snprintf( stmp, sizeof(stmp), "Stack: $%04X", stackPtr );
 	stackFrame->setTitle( tr(stmp) );
 	stackText->updateText();
 
 	// update counters
-	int64 counter_value1 = timestampbase + (uint64)timestamp - total_cycles_base;
-	int64 counter_value2 = timestampbase + (uint64)timestamp - delta_cycles_base;
+	int64 counter_value1 = timestampbase + (uint64)g_cpu.timestamp_ref() - total_cycles_base;
+	int64 counter_value2 = timestampbase + (uint64)g_cpu.timestamp_ref() - delta_cycles_base;
 
 	if (counter_value1 < 0)	// sanity check
 	{
@@ -4346,7 +4346,7 @@ void  ConsoleDebugger::updateRegisterView(void)
 	oamAddrDsp->setText( tr(stmp) );
 
 	extern int linestartts;
-	#define GETLASTPIXEL    (PAL?((timestamp*48-linestartts)/15) : ((timestamp*48-linestartts)/16) )
+	#define GETLASTPIXEL    (PAL?((g_cpu.timestamp_ref()*48-linestartts)/15) : ((g_cpu.timestamp_ref()*48-linestartts)/16) )
 	
 	int ppupixel = GETLASTPIXEL;
 
@@ -4354,26 +4354,26 @@ void  ConsoleDebugger::updateRegisterView(void)
 		ppupixel = 0;	//Currently pixel display is borked until Run 128 lines is clicked, this keeps garbage from displaying
 
 	// If not in the 0-239 pixel range, make special cases for display
-	if (scanline == 240 && vblankScanLines < (PAL?72:22))
+	if (g_cpu.scanline_ref() == 240 && vblankScanLines < (PAL?72:22))
 	{
 		if (!vblankScanLines)
 		{
 			// Idle scanline (240)
-			snprintf( str, sizeof(str), "%d", scanline);	// was "Idle %d"
-		} else if (scanline + vblankScanLines == (PAL?311:261))
+			snprintf( str, sizeof(str), "%d", g_cpu.scanline_ref());	// was "Idle %d"
+		} else if (g_cpu.scanline_ref() + vblankScanLines == (PAL?311:261))
 		{
 			// Pre-render
 			snprintf( str, sizeof(str), "-1");	// was "Prerender -1"
 		} else
 		{
 			// Vblank lines (241-260/310)
-			snprintf( str, sizeof(str), "%d", scanline + vblankScanLines);	// was "Vblank %d"
+			snprintf( str, sizeof(str), "%d", g_cpu.scanline_ref() + vblankScanLines);	// was "Vblank %d"
 		}
 		snprintf( str2, sizeof(str2), "%d", vblankPixel);
 	} else
 	{
 		// Scanlines 0 - 239
-		snprintf( str, sizeof(str), "%d", scanline);
+		snprintf( str, sizeof(str), "%d", g_cpu.scanline_ref());
 		snprintf( str2, sizeof(str2), "%d", ppupixel);
 	}
 
@@ -4649,7 +4649,7 @@ void FCEUD_DebugBreakpoint( int bpNum )
 		{
 			if ( breakOnCycleMode )
 			{
-				long long int totalCount = timestampbase + (uint64)timestamp - total_cycles_base;
+				long long int totalCount = timestampbase + (uint64)g_cpu.timestamp_ref() - total_cycles_base;
 
 				if (totalCount < 0)	// sanity check
 				{
@@ -7220,7 +7220,7 @@ void DebuggerStackDisplay::sel4BytesPerLine(void)
 void DebuggerStackDisplay::updateText(void)
 {
    char stmp[128];
-   int stackPtr = X.S | 0x0100;
+   int stackPtr = g_cpu.native_layout().S | 0x0100;
    std::string stackLine;
 
 	stackPtr++;
@@ -7928,8 +7928,8 @@ DebugBreakOnDialog::DebugBreakOnDialog(int type, QWidget *parent )
 	}
 	else
 	{
-		totalCount = timestampbase + (uint64)timestamp - total_cycles_base;
-		deltaCount = timestampbase + (uint64)timestamp - delta_cycles_base;
+		totalCount = timestampbase + (uint64)g_cpu.timestamp_ref() - total_cycles_base;
+		deltaCount = timestampbase + (uint64)g_cpu.timestamp_ref() - delta_cycles_base;
 
 		if (totalCount < 0)	// sanity check
 		{
@@ -8181,8 +8181,8 @@ void DebugBreakOnDialog::updateCurrent(void)
 	}
 	else
 	{
-		totalCount = timestampbase + (uint64)timestamp - total_cycles_base;
-		deltaCount = timestampbase + (uint64)timestamp - delta_cycles_base;
+		totalCount = timestampbase + (uint64)g_cpu.timestamp_ref() - total_cycles_base;
+		deltaCount = timestampbase + (uint64)g_cpu.timestamp_ref() - delta_cycles_base;
 
 		if (totalCount < 0)	// sanity check
 		{

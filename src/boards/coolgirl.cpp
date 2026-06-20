@@ -1914,7 +1914,7 @@ static DECLFR(MAFRAM) {
 	if (map_rom_on_6000 && (A >= 0x6000) && (A < 0x8000))
 		return CartBR(A);          // PRG
 
-	return X.DB; // Open bus
+	return g_cpu.native_layout().DB; // Open bus
 }
 
 static void COOLGIRL_ScanlineCounter(void) {

@@ -125,9 +125,9 @@ static DECLFW(M178WriteSnd) {
 
 static DECLFR(M178ReadSnd) {
 	if (A == 0x5800)
-		return (X.DB & 0xBF) | ((pcm_enable ^ 1) << 6);
+		return (g_cpu.native_layout().DB & 0xBF) | ((pcm_enable ^ 1) << 6);
 	else
-		return X.DB;
+		return g_cpu.native_layout().DB;
 }
 
 static DECLFR(M178ReadSensor) {

@@ -589,7 +589,7 @@ void ResetDebugStatisticsCounters()
 }
 void ResetCyclesCounter()
 {
-	total_cycles_base = delta_cycles_base = timestampbase + (uint64)timestamp;
+	total_cycles_base = delta_cycles_base = timestampbase + (uint64)g_cpu.timestamp_ref();
 }
 void ResetInstructionsCounter()
 {
@@ -597,7 +597,7 @@ void ResetInstructionsCounter()
 }
 void ResetDebugStatisticsDeltaCounters()
 {
-	delta_cycles_base = timestampbase + (uint64)timestamp;
+	delta_cycles_base = timestampbase + (uint64)g_cpu.timestamp_ref();
 	delta_instructions = 0;
 }
 void IncrementInstructionsCounters()
@@ -663,7 +663,7 @@ static void breakpoint(uint8 *opcode, uint16 A, int size) {
 		BreakHit(BREAK_TYPE_LUA);
 	}
 
-	if (break_on_cycles && ((timestampbase + (uint64)timestamp - total_cycles_base) > break_cycles_limit))
+	if (break_on_cycles && ((timestampbase + (uint64)g_cpu.timestamp_ref() - total_cycles_base) > break_cycles_limit))
 		BreakHit(BREAK_TYPE_CYCLES_EXCEED);
 	if (break_on_instructions && (total_instructions > break_instructions_limit))
 		BreakHit(BREAK_TYPE_INSTRUCTIONS_EXCEED);
@@ -696,7 +696,7 @@ static void breakpoint(uint8 *opcode, uint16 A, int size) {
 	//if we're running for a scanline, we want to check if we've hit the cycle limit
 	if (dbgstate.runline) {
 		uint64 ts = timestampbase;
-		ts+=timestamp;
+		ts+=g_cpu.timestamp_ref();
 		int diff = dbgstate.runline_end_time-ts;
 		if (diff<=0)
 		{
@@ -721,16 +721,16 @@ static void breakpoint(uint8 *opcode, uint16 A, int size) {
 	switch (opcode[0]) {
 		//Push Ops
 		case 0x08: //Fall to next
-		case 0x48: debugLastAddress=stackopstartaddr=stackopendaddr=X.S-1; stackop=WP_W; StackAddrBackup = X.S; StackNextIgnorePC=_PC+1; break;
+		case 0x48: debugLastAddress=stackopstartaddr=stackopendaddr=g_cpu.native_layout().S-1; stackop=WP_W; StackAddrBackup = g_cpu.native_layout().S; StackNextIgnorePC=_PC+1; break;
 		//Pull Ops
 		case 0x28: //Fall to next
-		case 0x68: debugLastAddress=stackopstartaddr=stackopendaddr=X.S+1; stackop=WP_R; StackAddrBackup = X.S; StackNextIgnorePC=_PC+1; break;
+		case 0x68: debugLastAddress=stackopstartaddr=stackopendaddr=g_cpu.native_layout().S+1; stackop=WP_R; StackAddrBackup = g_cpu.native_layout().S; StackNextIgnorePC=_PC+1; break;
 		//JSR (Includes return address - 1)
-		case 0x20: stackopstartaddr=stackopendaddr=X.S-1; stackop=WP_W; StackAddrBackup = X.S; StackNextIgnorePC=(opcode[1]|opcode[2]<<8); break;
+		case 0x20: stackopstartaddr=stackopendaddr=g_cpu.native_layout().S-1; stackop=WP_W; StackAddrBackup = g_cpu.native_layout().S; StackNextIgnorePC=(opcode[1]|opcode[2]<<8); break;
 		//RTI (Includes processor status, and exact return address)
-		case 0x40: stackopstartaddr=X.S+1; stackopendaddr=X.S+3; stackop=WP_R; StackAddrBackup = X.S; StackNextIgnorePC=(GetMem(X.S+2|0x0100)|GetMem(X.S+3|0x0100)<<8); break;
+		case 0x40: stackopstartaddr=g_cpu.native_layout().S+1; stackopendaddr=g_cpu.native_layout().S+3; stackop=WP_R; StackAddrBackup = g_cpu.native_layout().S; StackNextIgnorePC=(GetMem(g_cpu.native_layout().S+2|0x0100)|GetMem(g_cpu.native_layout().S+3|0x0100)<<8); break;
 		//RTS (Includes return address - 1)
-		case 0x60: stackopstartaddr=X.S+1; stackopendaddr=X.S+2; stackop=WP_R; StackAddrBackup = X.S; StackNextIgnorePC=(GetMem(stackopstartaddr|0x0100)|GetMem(stackopendaddr|0x0100)<<8)+1; break;
+		case 0x60: stackopstartaddr=g_cpu.native_layout().S+1; stackopendaddr=g_cpu.native_layout().S+2; stackop=WP_R; StackAddrBackup = g_cpu.native_layout().S; StackNextIgnorePC=(GetMem(stackopstartaddr|0x0100)|GetMem(stackopendaddr|0x0100)<<8)+1; break;
 		default: break;
 	}
 
@@ -841,13 +841,13 @@ static void breakpoint(uint8 *opcode, uint16 A, int size) {
 						StackNextIgnorePC = 0xFFFF;
 					} else
 					{
-						if (StackAddrBackup != -1 && (X.S < StackAddrBackup) && (stackop==0))
+						if (StackAddrBackup != -1 && (g_cpu.native_layout().S < StackAddrBackup) && (stackop==0))
 						{
 							// Unannounced stack mem breaks
 							// Pushes to stack
 							if (watchpoint[i].flags & WP_W)
 							{
-								for (j = (X.S|0x0100); j < (static_cast<unsigned int>(StackAddrBackup)|0x0100); j++)
+								for (j = (g_cpu.native_layout().S|0x0100); j < (static_cast<unsigned int>(StackAddrBackup)|0x0100); j++)
 								{
 									if (watchpoint[i].endaddress)
 									{
@@ -860,12 +860,12 @@ static void breakpoint(uint8 *opcode, uint16 A, int size) {
 									}
 								}
 							}
-						} else if (StackAddrBackup != -1 && (StackAddrBackup < X.S) && (stackop==0))
+						} else if (StackAddrBackup != -1 && (StackAddrBackup < g_cpu.native_layout().S) && (stackop==0))
 						{
 							// Pulls from stack
 							if (watchpoint[i].flags & WP_R)
 							{
-								for (j = (StackAddrBackup|0x0100); j < (static_cast<unsigned int>(X.S)|0x0100); j++)
+								for (j = (StackAddrBackup|0x0100); j < (static_cast<unsigned int>(g_cpu.native_layout().S)|0x0100); j++)
 								{
 									if (watchpoint[i].endaddress)
 									{
@@ -890,13 +890,13 @@ STOPCHECKING:
 	
 	//Update the stack address with the current one, now that changes have registered.
 	//ZEROMUS THINKS IT MAKES MORE SENSE HERE
-	StackAddrBackup = X.S;
+	StackAddrBackup = g_cpu.native_layout().S;
 
 	if(breakHit != -1)
 		BreakHit(i);
 
 	////Update the stack address with the current one, now that changes have registered.
-	//StackAddrBackup = X.S;
+	//StackAddrBackup = g_cpu.native_layout().S;
 }
 //bbit edited: this is the end of the inserted code
 
@@ -906,12 +906,12 @@ void DebugCycle()
 	uint16 A = 0, tmp;
 	int size;
 
-	if (scanline == 240)
+	if (g_cpu.scanline_ref() == 240)
 	{
-		vblankScanLines = (PAL?int((double)timestamp / ((double)341 / (double)3.2)):timestamp / 114);	//114 approximates the number of timestamps per scanline during vblank.  Approx 2508. NTSC: (341 / 3.0) PAL: (341 / 3.2). Uses (3.? * cpu_cycles) / 341.0, and assumes 1 cpu cycle.
+		vblankScanLines = (PAL?int((double)g_cpu.timestamp_ref() / ((double)341 / (double)3.2)):g_cpu.timestamp_ref() / 114);	//114 approximates the number of timestamps per scanline during vblank.  Approx 2508. NTSC: (341 / 3.0) PAL: (341 / 3.2). Uses (3.? * cpu_cycles) / 341.0, and assumes 1 cpu cycle.
 		if (vblankScanLines) vblankPixel = 341 / vblankScanLines;	//341 pixels per scanline
 		//FCEU_printf("vbPixel = %d",vblankPixel);					     //Debug
-		//FCEU_printf("ts: %d line: %d\n", timestamp, vblankScanLines); //Debug
+		//FCEU_printf("ts: %d line: %d\n", g_cpu.timestamp_ref(), vblankScanLines); //Debug
 	}
 	else
 		vblankScanLines = 0;

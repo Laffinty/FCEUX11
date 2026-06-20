@@ -146,7 +146,7 @@ static void FDSInit(void) {
 	setprg32r(1, 0x6000, 0);	// 32KB RAM
 	setchr8(0);					// 8KB CHR RAM
 
-	MapIRQHook = FDSFix;
+	g_cpu.map_irq_hook_ref() = FDSFix;
 	GameStateRestore = FDSStateRestore;
 
 	SetReadHandler(0x4030, 0x4030, FDSRead4030);
@@ -311,7 +311,7 @@ static DECLFR(FDSRead4031) {
 }
 
 static DECLFR(FDSRead4032) {
-	return fceux11_rust_fds_read_4032_value(InDisk, FDSRegs[5], X.DB);
+	return fceux11_rust_fds_read_4032_value(InDisk, FDSRegs[5], g_cpu.native_layout().DB);
 }
 
 static DECLFR(FDSRead4033) {
@@ -370,10 +370,10 @@ void FDSSoundStateAdd(void) {
 
 static DECLFR(FDSSRead) {
 	switch (A & 0xF) {
-	case 0x0: return(amplitude[0] | (X.DB & 0xC0));
-	case 0x2: return(amplitude[1] | (X.DB & 0xC0));
+	case 0x0: return(amplitude[0] | (g_cpu.native_layout().DB & 0xC0));
+	case 0x2: return(amplitude[1] | (g_cpu.native_layout().DB & 0xC0));
 	}
-	return(X.DB);
+	return(g_cpu.native_layout().DB);
 }
 
 static DECLFW(FDSSWrite) {
@@ -436,7 +436,7 @@ static void DoEnv() {
 }
 
 static DECLFR(FDSWaveRead) {
-	return(fdso.cwave[A & 0x3f] | (X.DB & 0xC0));
+	return(fdso.cwave[A & 0x3f] | (g_cpu.native_layout().DB & 0xC0));
 }
 
 static DECLFW(FDSWaveWrite) {

@@ -66,7 +66,7 @@ static DECLFW(M69WRAMWrite) {
 
 static DECLFR(M69WRAMRead) {
 	if ((preg[3] & 0xC0) == 0x40)
-		return X.DB;
+		return g_cpu.native_layout().DB;
 	else
 		return CartBR(A);
 }

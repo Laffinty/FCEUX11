@@ -140,7 +140,7 @@ static DECLFW(M83Write) {
 }
 
 static DECLFR(UNLYOKOReadDip) {
-	return (X.DB & 0xFC) | dip;
+	return (g_cpu.native_layout().DB & 0xFC) | dip;
 }
 
 static DECLFR(UNLYOKOReadLow) {

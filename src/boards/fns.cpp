@@ -44,7 +44,7 @@ static DECLFW(MBWRAM) {
 FCEU_MAYBE_UNUSED
 static DECLFR(MAWRAM) {
 	if (DRegs[3] & 0x10)
-		return X.DB;
+		return g_cpu.native_layout().DB;
 	return(Page[A >> 11][A]);
 }
 
@@ -101,7 +101,7 @@ static DECLFW(MMC1_write) {
 	Buffer |= (V & 1) << (BufferShift++);
 
 	if (BufferShift == 5) {
-		FCEU_printf("MMC1 REG%d:%02x (PC %04x)\n", n, Buffer, X.PC);
+		FCEU_printf("MMC1 REG%d:%02x (PC %04x)\n", n, Buffer, g_cpu.native_layout().PC);
 		DRegs[n] = Buffer;
 		BufferShift = Buffer = 0;
 		switch (n) {
@@ -156,13 +156,13 @@ static DECLFW(FNC_cmd_write) {
 		break;
 	}
 	case 0x40C0: {
-		FCEU_printf("FNS W %04x:%02x (PC %04x)\n", A, V, X.PC);
+		FCEU_printf("FNS W %04x:%02x (PC %04x)\n", A, V, g_cpu.native_layout().PC);
 		r40C0 = V;
 		MMC1CHR();
 		break;
 	}
 	default:
-		FCEU_printf("FNS W %04x:%02x (PC %04x)\n", A, V, X.PC);
+		FCEU_printf("FNS W %04x:%02x (PC %04x)\n", A, V, g_cpu.native_layout().PC);
 	}
 }
 
@@ -182,20 +182,20 @@ static DECLFR(FNC_stat_read) {
 		return 0;
 	}
 	case 0x40C0: {
-		FCEU_printf("FNS R %04x (PC %04x)\n", A, X.PC);
+		FCEU_printf("FNS R %04x (PC %04x)\n", A, g_cpu.native_layout().PC);
 		int ret = r40C0;
 		r40C0 &= 0;
 		return ret;
 	}
 	default: {
-		FCEU_printf("FNS R %04x (PC %04x)\n", A, X.PC);
+		FCEU_printf("FNS R %04x (PC %04x)\n", A, g_cpu.native_layout().PC);
 		return 0xff;
 	}
 	}
 }
 
 static DECLFR(FNC_cart_i2c_read) {
-	FCEU_printf("I2C R %04x (PC %04x)\n", A, X.PC);
+	FCEU_printf("I2C R %04x (PC %04x)\n", A, g_cpu.native_layout().PC);
 	return 0;
 }
 

@@ -56,7 +56,7 @@ static DECLFW(BMCGhostbusters63in1Write) {
 
 static DECLFR(BMCGhostbusters63in1Read) {
 	if (bank == 1)
-		return X.DB;
+		return g_cpu.native_layout().DB;
 	else
 		return CartBR(A);
 }

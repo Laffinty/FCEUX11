@@ -1362,16 +1362,16 @@ void FCEUD_TraceInstruction(uint8 *opcode, int size)
 	traceRecord_t rec;
 
 	char asmTxt[256];
-	unsigned int addr = X.PC;
+	unsigned int addr = g_cpu.native_layout().PC;
 	static int unloggedlines = 0;
 	int asmFlags = ASM_DEBUG_TRACES;
 
-	rec.cpu.PC = X.PC;
-	rec.cpu.A = X.A;
-	rec.cpu.X = X.X;
-	rec.cpu.Y = X.Y;
-	rec.cpu.S = X.S;
-	rec.cpu.P = X.P;
+	rec.cpu.PC = g_cpu.native_layout().PC;
+	rec.cpu.A = g_cpu.native_layout().A;
+	rec.cpu.X = g_cpu.native_layout().X;
+	rec.cpu.Y = g_cpu.native_layout().Y;
+	rec.cpu.S = g_cpu.native_layout().S;
+	rec.cpu.P = g_cpu.native_layout().P;
 
 	for (int i = 0; i < size; i++)
 	{
@@ -1384,7 +1384,7 @@ void FCEUD_TraceInstruction(uint8 *opcode, int size)
 	rec.frameCount = currFrameCounter;
 	rec.instrCount = total_instructions;
 
-	int64 counter_value = timestampbase + (uint64)timestamp - total_cycles_base;
+	int64 counter_value = timestampbase + (uint64)g_cpu.timestamp_ref() - total_cycles_base;
 	if (counter_value < 0) // sanity check
 	{
 		ResetDebugStatisticsCounters();
@@ -1450,7 +1450,7 @@ void FCEUD_TraceInstruction(uint8 *opcode, int size)
 			if (opcode[0] == 0x60)
 			{
 				// add the beginning address of the subroutine that we exit from
-				unsigned int caller_addr = GetMem(((X.S) + 1) | 0x0100) + (GetMem(((X.S) + 2) | 0x0100) << 8) - 0x2;
+				unsigned int caller_addr = GetMem(((g_cpu.native_layout().S) + 1) | 0x0100) + (GetMem(((g_cpu.native_layout().S) + 2) | 0x0100) << 8) - 0x2;
 				if (GetMem(caller_addr) == 0x20)
 				{
 					// this was a JSR instruction - take the subroutine address from it
@@ -1497,24 +1497,24 @@ void FCEUD_TraceInstruction(uint8 *opcode, int size)
 		break;
 		// Indirect X
 		case 0x81: // STA - Store A Register
-			rec.writeAddr = (opcode[1] + X.X) & 0xFF;
+			rec.writeAddr = (opcode[1] + g_cpu.native_layout().X) & 0xFF;
 			rec.writeAddr = GetMem((rec.writeAddr)) | (GetMem(((rec.writeAddr)+1)&0xff))<<8;
 		break;
 		// Indirect Y
 		case 0x91: // STA - Store A Register
 			rec.writeAddr  = GetMem(opcode[1]) | (GetMem((opcode[1]+1)&0xff))<<8;
-			rec.writeAddr += X.Y;
+			rec.writeAddr += g_cpu.native_layout().Y;
 		break;
 		// Zero Page X
 		case 0x95: // STA - Store Accumulator
 		case 0x94: // STY - Store Y Register
 		case 0xD6: // DEC - Decrement Memory
 		case 0xF6: // INC - Increment Memory
-			rec.writeAddr = (opcode[1]+ X.X) & 0xFF;
+			rec.writeAddr = (opcode[1]+ g_cpu.native_layout().X) & 0xFF;
 		break;
 		// Zero Page Y
 		case 0x96: // STX - Store X Register
-			rec.writeAddr = (opcode[1]+ X.Y) & 0xFF;
+			rec.writeAddr = (opcode[1]+ g_cpu.native_layout().Y) & 0xFF;
 		break;
 		default:
 			rec.writeAddr = -1;
@@ -2717,12 +2717,12 @@ static int undoInstruction( traceRecord_t &rec )
 {
 	// TODO Undo memory writes
 	//printf("BackUp (Undo) Instruction\n");
-	X.PC = rec.cpu.PC;
-	X.A  = rec.cpu.A;
-	X.X  = rec.cpu.X;
-	X.Y  = rec.cpu.Y;
-	X.S  = rec.cpu.S;
-	X.P  = rec.cpu.P;
+	g_cpu.native_layout().PC = rec.cpu.PC;
+	g_cpu.native_layout().A  = rec.cpu.A;
+	g_cpu.native_layout().X  = rec.cpu.X;
+	g_cpu.native_layout().Y  = rec.cpu.Y;
+	g_cpu.native_layout().S  = rec.cpu.S;
+	g_cpu.native_layout().P  = rec.cpu.P;
 
 	if ( rec.writeAddr >= 0 )
 	{

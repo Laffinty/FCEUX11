@@ -283,9 +283,9 @@ static DECLFW(BandaiWrite) {
 
 static DECLFR(BandaiRead) {
 	if(x24c02)
-		return (X.DB & 0xEF) | (x24c02_out << 4);
+		return (g_cpu.native_layout().DB & 0xEF) | (x24c02_out << 4);
 	else
-		return (X.DB & 0xEF) | (x24c01_out << 4);
+		return (g_cpu.native_layout().DB & 0xEF) | (x24c01_out << 4);
 }
 
 static void BandaiIRQHook(int a) {
@@ -575,7 +575,7 @@ static void BarcodeIRQHook(int a) {
 }
 
 static DECLFR(BarcodeRead) {
-	return (X.DB & 0xE7) | ((x24c02_out | x24c01_out) << 4) | BarcodeOut;
+	return (g_cpu.native_layout().DB & 0xE7) | ((x24c02_out | x24c01_out) << 4) | BarcodeOut;
 }
 
 static void M157Power(void) {

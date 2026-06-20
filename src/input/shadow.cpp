@@ -51,7 +51,7 @@ static void ZapperFrapper(uint8 *bg, uint8 *spr, uint32  linets, int final)
  
  if(xe>256) xe=256;
  
- if(scanline>=(zy-4) && scanline<=(zy+4))
+ if(g_cpu.scanline_ref()>=(zy-4) && g_cpu.scanline_ref()<=(zy+4))
  {
   while(xs<xe)
   {
@@ -88,7 +88,7 @@ static INLINE int CheckColor(void)
 { 
  FCEUPPU_LineUpdate();
  
- if((ZD.zaphit+10)>=(timestampbase+timestamp)) return(0);
+ if((ZD.zaphit+10)>=(timestampbase+g_cpu.timestamp_ref())) return(0);
  
  return(1);   
 }

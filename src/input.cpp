@@ -142,7 +142,7 @@ static DECLFR(JPRead)
 	if(DumpInputFile)
 		fputc(ret,DumpInputFile);
 
-	ret|=X.DB&0xC0;
+	ret|=g_cpu.native_layout().DB&0xC0;
 
 	return(ret);
 }

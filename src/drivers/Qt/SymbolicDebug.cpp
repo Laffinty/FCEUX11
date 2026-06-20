@@ -107,8 +107,8 @@ int DisassembleWithDebug(int addr, uint8_t *opcode, int flags, char *str, debugS
 	showTrace      = (flags & ASM_DEBUG_TRACES) ? true : false;
 
 	//these may be replaced later with passed-in values to make a lighter-weight disassembly mode that may not query the referenced values
-	#define RX (X.X)
-	#define RY (X.Y)
+	#define RX (g_cpu.native_layout().X)
+	#define RY (g_cpu.native_layout().Y)
 
 	switch (opcode[0]) 
 	{
