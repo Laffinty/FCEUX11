@@ -225,12 +225,12 @@ static void MMC3_hb(void) {
 }
 
 static void MMC3_hb_KickMasterHack(void) {
-	if (scanline == 238) ClockMMC3Counter();
+	if (g_cpu.scanline_ref() == 238) ClockMMC3Counter();
 	ClockMMC3Counter();
 }
 
 static void MMC3_hb_PALStarWarsHack(void) {
-	if (scanline == 240) ClockMMC3Counter();
+	if (g_cpu.scanline_ref() == 240) ClockMMC3Counter();
 	ClockMMC3Counter();
 }
 
@@ -536,9 +536,9 @@ static DECLFW(M45Write) {
 static DECLFR(M45Read) {
 	uint32 addr = 1 << (EXPREGS[5] + 4);
 	if (A & (addr | (addr - 1)))
-		return X.DB | 1;
+		return g_cpu.native_layout().DB | 1;
 	else
-		return X.DB;
+		return g_cpu.native_layout().DB;
 }
 
 static void M45Reset(void) {

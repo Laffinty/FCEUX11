@@ -3,12 +3,14 @@
 
 #include <array>
 
-// Per-opcode handlers. Each shadows the global X with a local reference
-// so the existing _PC / _A / ... macros from x6502abbrev.h keep working.
+// Per-opcode handlers. v1.3 Legion Phase 2: the _PC / _A / ... macros
+// from x6502abbrev.h now route through g_cpu.native_layout(), so the
+// X6502* parameter is kept only for the existing function-pointer table
+// signature. It is explicitly void-cast to avoid unused-parameter warnings.
 
 static void x6502_op_00(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
                 _PC++;
                 PUSH(_PC>>8);
                 PUSH(_PC);
@@ -22,14 +24,14 @@ static void x6502_op_00(X6502* xp)
 
 static void x6502_op_01(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IX(ORA);
     return;
 }
 
 static void x6502_op_02(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
     ADDCYC(0xFF);
               _jammed=1;
     	  _PC--;
@@ -40,63 +42,63 @@ static void x6502_op_02(X6502* xp)
 
 static void x6502_op_03(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_IX(ASL;ORA);
     return;
 }
 
 static void x6502_op_04(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      _PC++;
     return;
 }
 
 static void x6502_op_05(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ZP(ORA);
     return;
 }
 
 static void x6502_op_06(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ZP(ASL);
     return;
 }
 
 static void x6502_op_07(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ZP(ASL;ORA);
     return;
 }
 
 static void x6502_op_08(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
                PUSH(_P|U_FLAG|B_FLAG);
     return;
 }
 
 static void x6502_op_09(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IM(ORA);
     return;
 }
 
 static void x6502_op_0A(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_A(ASL);
     return;
 }
 
 static void x6502_op_0B(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IM(AND;_P&=~C_FLAG;_P|=_A>>7);
     /* AAX */
     return;
@@ -104,35 +106,35 @@ static void x6502_op_0B(X6502* xp)
 
 static void x6502_op_0C(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_AB(;);
     return;
 }
 
 static void x6502_op_0D(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_AB(ORA);
     return;
 }
 
 static void x6502_op_0E(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_AB(ASL);
     return;
 }
 
 static void x6502_op_0F(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_AB(ASL;ORA);
     return;
 }
 
 static void x6502_op_10(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      JR(!(_P&N_FLAG)); 
     /* BVC */
     return;
@@ -140,14 +142,14 @@ static void x6502_op_10(X6502* xp)
 
 static void x6502_op_11(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IY(ORA);
     return;
 }
 
 static void x6502_op_12(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
     ADDCYC(0xFF);
               _jammed=1;
     	  _PC--;
@@ -158,7 +160,7 @@ static void x6502_op_12(X6502* xp)
 
 static void x6502_op_13(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_IY(ASL;ORA);
     /* SRE */
     return;
@@ -166,49 +168,49 @@ static void x6502_op_13(X6502* xp)
 
 static void x6502_op_14(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      _PC++;
     return;
 }
 
 static void x6502_op_15(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ZPX(ORA);
     return;
 }
 
 static void x6502_op_16(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ZPX(ASL);
     return;
 }
 
 static void x6502_op_17(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ZPX(ASL;ORA);
     return;
 }
 
 static void x6502_op_18(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
                _P&=~C_FLAG;
     return;
 }
 
 static void x6502_op_19(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ABY(ORA);
     return;
 }
 
 static void x6502_op_1A(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      
     /* RLA */
     return;
@@ -216,14 +218,14 @@ static void x6502_op_1A(X6502* xp)
 
 static void x6502_op_1B(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ABY(ASL;ORA);
     return;
 }
 
 static void x6502_op_1C(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ABX(;);
     /* XAA - BIG QUESTION MARK HERE */
     return;
@@ -231,28 +233,28 @@ static void x6502_op_1C(X6502* xp)
 
 static void x6502_op_1D(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ABX(ORA);
     return;
 }
 
 static void x6502_op_1E(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ABX(ASL);
     return;
 }
 
 static void x6502_op_1F(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ABX(ASL;ORA);
     return;
 }
 
 static void x6502_op_20(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
     	   {
     	    uint8 npc;
     	    npc=RdMem(_PC);
@@ -267,14 +269,14 @@ static void x6502_op_20(X6502* xp)
 
 static void x6502_op_21(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IX(AND);
     return;
 }
 
 static void x6502_op_22(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
     ADDCYC(0xFF);
               _jammed=1;
     	  _PC--;
@@ -285,63 +287,63 @@ static void x6502_op_22(X6502* xp)
 
 static void x6502_op_23(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_IX(ROL;AND);
     return;
 }
 
 static void x6502_op_24(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ZP(BIT);
     return;
 }
 
 static void x6502_op_25(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ZP(AND);
     return;
 }
 
 static void x6502_op_26(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ZP(ROL);
     return;
 }
 
 static void x6502_op_27(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ZP(ROL;AND);
     return;
 }
 
 static void x6502_op_28(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
                _P=POP();
     return;
 }
 
 static void x6502_op_29(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IM(AND);
     return;
 }
 
 static void x6502_op_2A(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_A(ROL);
     return;
 }
 
 static void x6502_op_2B(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IM(AND;_P&=~C_FLAG;_P|=_A>>7);
     /* AAX */
     return;
@@ -349,35 +351,35 @@ static void x6502_op_2B(X6502* xp)
 
 static void x6502_op_2C(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_AB(BIT);
     return;
 }
 
 static void x6502_op_2D(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_AB(AND);
     return;
 }
 
 static void x6502_op_2E(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_AB(ROL);
     return;
 }
 
 static void x6502_op_2F(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_AB(ROL;AND);
     return;
 }
 
 static void x6502_op_30(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      JR(_P&N_FLAG); 
     /* BPL */
     return;
@@ -385,14 +387,14 @@ static void x6502_op_30(X6502* xp)
 
 static void x6502_op_31(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IY(AND);
     return;
 }
 
 static void x6502_op_32(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
     ADDCYC(0xFF);
               _jammed=1;
     	  _PC--;
@@ -403,7 +405,7 @@ static void x6502_op_32(X6502* xp)
 
 static void x6502_op_33(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_IY(ROL;AND);
     /* RRA */
     return;
@@ -411,49 +413,49 @@ static void x6502_op_33(X6502* xp)
 
 static void x6502_op_34(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      _PC++;
     return;
 }
 
 static void x6502_op_35(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ZPX(AND);
     return;
 }
 
 static void x6502_op_36(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ZPX(ROL);
     return;
 }
 
 static void x6502_op_37(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ZPX(ROL;AND);
     return;
 }
 
 static void x6502_op_38(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
                _P|=C_FLAG;
     return;
 }
 
 static void x6502_op_39(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ABY(AND);
     return;
 }
 
 static void x6502_op_3A(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      
     /* RLA */
     return;
@@ -461,14 +463,14 @@ static void x6502_op_3A(X6502* xp)
 
 static void x6502_op_3B(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ABY(ROL;AND);
     return;
 }
 
 static void x6502_op_3C(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ABX(;);
     /* XAA - BIG QUESTION MARK HERE */
     return;
@@ -476,28 +478,28 @@ static void x6502_op_3C(X6502* xp)
 
 static void x6502_op_3D(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ABX(AND);
     return;
 }
 
 static void x6502_op_3E(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ABX(ROL);
     return;
 }
 
 static void x6502_op_3F(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ABX(ROL;AND);
     return;
 }
 
 static void x6502_op_40(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
                 _P=POP();
     	    /* _PI=_P; This is probably incorrect, so it's commented out. */
     	    _PI = _P;
@@ -508,14 +510,14 @@ static void x6502_op_40(X6502* xp)
 
 static void x6502_op_41(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IX(EOR);
     return;
 }
 
 static void x6502_op_42(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
     ADDCYC(0xFF);
               _jammed=1;
     	  _PC--;
@@ -526,63 +528,63 @@ static void x6502_op_42(X6502* xp)
 
 static void x6502_op_43(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_IX(LSR;EOR);
     return;
 }
 
 static void x6502_op_44(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      _PC++;
     return;
 }
 
 static void x6502_op_45(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ZP(EOR);
     return;
 }
 
 static void x6502_op_46(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ZP(LSR);
     return;
 }
 
 static void x6502_op_47(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ZP(LSR;EOR);
     return;
 }
 
 static void x6502_op_48(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
                PUSH(_A);
     return;
 }
 
 static void x6502_op_49(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IM(EOR);
     return;
 }
 
 static void x6502_op_4A(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_A(LSR);
     return;
 }
 
 static void x6502_op_4B(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IM(AND;LSRA);
     /* ATX(OAL) Is this(OR with $EE) correct? Blargg did some test
        and found the constant to be OR with is $FF for NES */
@@ -591,7 +593,7 @@ static void x6502_op_4B(X6502* xp)
 
 static void x6502_op_4C(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
     	  {
     	   uint16 ptmp=_PC;
     	   unsigned int npc;
@@ -606,28 +608,28 @@ static void x6502_op_4C(X6502* xp)
 
 static void x6502_op_4D(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_AB(EOR);
     return;
 }
 
 static void x6502_op_4E(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_AB(LSR);
     return;
 }
 
 static void x6502_op_4F(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_AB(LSR;EOR);
     return;
 }
 
 static void x6502_op_50(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      JR(!(_P&V_FLAG)); 
     /* BVS */
     return;
@@ -635,14 +637,14 @@ static void x6502_op_50(X6502* xp)
 
 static void x6502_op_51(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IY(EOR);
     return;
 }
 
 static void x6502_op_52(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
     ADDCYC(0xFF);
               _jammed=1;
     	  _PC--;
@@ -653,7 +655,7 @@ static void x6502_op_52(X6502* xp)
 
 static void x6502_op_53(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_IY(LSR;EOR);
     /* AXA - SHA */
     return;
@@ -661,49 +663,49 @@ static void x6502_op_53(X6502* xp)
 
 static void x6502_op_54(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      _PC++;
     return;
 }
 
 static void x6502_op_55(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ZPX(EOR);
     return;
 }
 
 static void x6502_op_56(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ZPX(LSR);
     return;
 }
 
 static void x6502_op_57(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ZPX(LSR;EOR);
     return;
 }
 
 static void x6502_op_58(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
                _P&=~I_FLAG;
     return;
 }
 
 static void x6502_op_59(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ABY(EOR);
     return;
 }
 
 static void x6502_op_5A(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      
     /* RLA */
     return;
@@ -711,14 +713,14 @@ static void x6502_op_5A(X6502* xp)
 
 static void x6502_op_5B(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ABY(LSR;EOR);
     return;
 }
 
 static void x6502_op_5C(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ABX(;);
     /* XAA - BIG QUESTION MARK HERE */
     return;
@@ -726,28 +728,28 @@ static void x6502_op_5C(X6502* xp)
 
 static void x6502_op_5D(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ABX(EOR);
     return;
 }
 
 static void x6502_op_5E(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ABX(LSR);
     return;
 }
 
 static void x6502_op_5F(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ABX(LSR;EOR);
     return;
 }
 
 static void x6502_op_60(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
                 _PC=POP();
                 _PC|=POP()<<8;
                 _PC++;
@@ -756,14 +758,14 @@ static void x6502_op_60(X6502* xp)
 
 static void x6502_op_61(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IX(ADC);
     return;
 }
 
 static void x6502_op_62(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
     ADDCYC(0xFF);
               _jammed=1;
     	  _PC--;
@@ -774,42 +776,42 @@ static void x6502_op_62(X6502* xp)
 
 static void x6502_op_63(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_IX(ROR;ADC);
     return;
 }
 
 static void x6502_op_64(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      _PC++;
     return;
 }
 
 static void x6502_op_65(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ZP(ADC);
     return;
 }
 
 static void x6502_op_66(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ZP(ROR);
     return;
 }
 
 static void x6502_op_67(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ZP(ROR;ADC);
     return;
 }
 
 static void x6502_op_68(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
                _A=POP();
                X_ZN(_A);
     return;
@@ -817,21 +819,21 @@ static void x6502_op_68(X6502* xp)
 
 static void x6502_op_69(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IM(ADC);
     return;
 }
 
 static void x6502_op_6A(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_A(ROR);
     return;
 }
 
 static void x6502_op_6B(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      {
     	     uint8 arrtmp;
     	     LD_IM(AND;_P&=~V_FLAG;_P|=(_A^(_A>>1))&0x40;arrtmp=_A>>7;_A>>=1;_A|=(_P&C_FLAG)<<7;_P&=~C_FLAG;_P|=arrtmp;X_ZN(_A));
@@ -842,7 +844,7 @@ static void x6502_op_6B(X6502* xp)
 
 static void x6502_op_6C(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
     	   {
     	    uint32 tmp;
     	    GetAB(tmp);
@@ -854,28 +856,28 @@ static void x6502_op_6C(X6502* xp)
 
 static void x6502_op_6D(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_AB(ADC);
     return;
 }
 
 static void x6502_op_6E(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_AB(ROR);
     return;
 }
 
 static void x6502_op_6F(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_AB(ROR;ADC);
     return;
 }
 
 static void x6502_op_70(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      JR(_P&V_FLAG); 
     //default: printf("Bad %02x at $%04x\n",b1,X.PC);
     //ifdef moo
@@ -888,14 +890,14 @@ static void x6502_op_70(X6502* xp)
 
 static void x6502_op_71(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IY(ADC);
     return;
 }
 
 static void x6502_op_72(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
     ADDCYC(0xFF);
               _jammed=1;
     	  _PC--;
@@ -906,7 +908,7 @@ static void x6502_op_72(X6502* xp)
 
 static void x6502_op_73(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_IY(ROR;ADC);
     /* SLO */
     return;
@@ -914,49 +916,49 @@ static void x6502_op_73(X6502* xp)
 
 static void x6502_op_74(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      _PC++;
     return;
 }
 
 static void x6502_op_75(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ZPX(ADC);
     return;
 }
 
 static void x6502_op_76(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ZPX(ROR);
     return;
 }
 
 static void x6502_op_77(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ZPX(ROR;ADC);
     return;
 }
 
 static void x6502_op_78(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
                _P|=I_FLAG;
     return;
 }
 
 static void x6502_op_79(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ABY(ADC);
     return;
 }
 
 static void x6502_op_7A(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      
     /* RLA */
     return;
@@ -964,14 +966,14 @@ static void x6502_op_7A(X6502* xp)
 
 static void x6502_op_7B(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ABY(ROR;ADC);
     return;
 }
 
 static void x6502_op_7C(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ABX(;);
     /* XAA - BIG QUESTION MARK HERE */
     return;
@@ -979,49 +981,49 @@ static void x6502_op_7C(X6502* xp)
 
 static void x6502_op_7D(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ABX(ADC);
     return;
 }
 
 static void x6502_op_7E(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ABX(ROR);
     return;
 }
 
 static void x6502_op_7F(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ABX(ROR;ADC);
     return;
 }
 
 static void x6502_op_80(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      _PC++;
     return;
 }
 
 static void x6502_op_81(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      ST_IX(_A);
     return;
 }
 
 static void x6502_op_82(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      _PC++;
     return;
 }
 
 static void x6502_op_83(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      ST_IX(_A&_X);
     /* ARR - ARGH, MATEY! */
     return;
@@ -1029,35 +1031,35 @@ static void x6502_op_83(X6502* xp)
 
 static void x6502_op_84(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      ST_ZP(_Y);
     return;
 }
 
 static void x6502_op_85(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      ST_ZP(_A);
     return;
 }
 
 static void x6502_op_86(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      ST_ZP(_X);
     return;
 }
 
 static void x6502_op_87(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      ST_ZP(_A&_X);
     return;
 }
 
 static void x6502_op_88(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
                _Y--;
                X_ZN(_Y);
     return;
@@ -1065,14 +1067,14 @@ static void x6502_op_88(X6502* xp)
 
 static void x6502_op_89(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      _PC++;
     return;
 }
 
 static void x6502_op_8A(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
                _A=_X;
                X_ZN(_A);
     return;
@@ -1080,7 +1082,7 @@ static void x6502_op_8A(X6502* xp)
 
 static void x6502_op_8B(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      _A|=0xEE; _A&=_X; LD_IM(AND);
     //endif
     return;
@@ -1088,7 +1090,7 @@ static void x6502_op_8B(X6502* xp)
 
 static void x6502_op_8C(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      ST_AB(_Y);
     /* BCC */
     return;
@@ -1096,28 +1098,28 @@ static void x6502_op_8C(X6502* xp)
 
 static void x6502_op_8D(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      ST_AB(_A);
     return;
 }
 
 static void x6502_op_8E(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      ST_AB(_X);
     return;
 }
 
 static void x6502_op_8F(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      ST_AB(_A&_X);
     return;
 }
 
 static void x6502_op_90(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      JR(!(_P&C_FLAG)); 
     /* BCS */
     return;
@@ -1125,14 +1127,14 @@ static void x6502_op_90(X6502* xp)
 
 static void x6502_op_91(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      ST_IY(_A);
     return;
 }
 
 static void x6502_op_92(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
     ADDCYC(0xFF);
               _jammed=1;
     	  _PC--;
@@ -1143,42 +1145,42 @@ static void x6502_op_92(X6502* xp)
 
 static void x6502_op_93(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      ST_IY(_A&_X&(((A-_Y)>>8)+1));
     return;
 }
 
 static void x6502_op_94(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      ST_ZPX(_Y);
     return;
 }
 
 static void x6502_op_95(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      ST_ZPX(_A);
     return;
 }
 
 static void x6502_op_96(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      ST_ZPY(_X);
     return;
 }
 
 static void x6502_op_97(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      ST_ZPY(_A&_X);
     return;
 }
 
 static void x6502_op_98(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
                _A=_Y;
                X_ZN(_A);
     return;
@@ -1186,21 +1188,21 @@ static void x6502_op_98(X6502* xp)
 
 static void x6502_op_99(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      ST_ABY(_A);
     return;
 }
 
 static void x6502_op_9A(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
                _S=_X;
     return;
 }
 
 static void x6502_op_9B(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      _S=_A&_X;ST_ABY(_S& (((A-_Y)>>8)+1) );
     /* TOP */
     return;
@@ -1208,7 +1210,7 @@ static void x6502_op_9B(X6502* xp)
 
 static void x6502_op_9C(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
     {
        unsigned int A; GetABIWR(A,_X); A = ((_Y&((A>>8)+1)) << 8) | (A & 0xff); WrMem(A,A>>8); 
     }
@@ -1218,14 +1220,14 @@ static void x6502_op_9C(X6502* xp)
 
 static void x6502_op_9D(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      ST_ABX(_A);
     return;
 }
 
 static void x6502_op_9E(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
     {
        unsigned int A; GetABIWR(A,_Y); A = ((_X&((A>>8)+1)) << 8) | (A & 0xff); WrMem(A,A>>8); 
     }
@@ -1235,7 +1237,7 @@ static void x6502_op_9E(X6502* xp)
 
 static void x6502_op_9F(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      ST_ABY(_A&_X&(((A-_Y)>>8)+1));
     /* SYA */
     return;
@@ -1243,63 +1245,63 @@ static void x6502_op_9F(X6502* xp)
 
 static void x6502_op_A0(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IM(LDY);
     return;
 }
 
 static void x6502_op_A1(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IX(LDA);
     return;
 }
 
 static void x6502_op_A2(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IM(LDX);
     return;
 }
 
 static void x6502_op_A3(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IX(LDA;LDX);
     return;
 }
 
 static void x6502_op_A4(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ZP(LDY);
     return;
 }
 
 static void x6502_op_A5(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ZP(LDA);
     return;
 }
 
 static void x6502_op_A6(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ZP(LDX);
     return;
 }
 
 static void x6502_op_A7(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ZP(LDA;LDX);
     return;
 }
 
 static void x6502_op_A8(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
                _Y=_A;
                X_ZN(_A);
     return;
@@ -1307,14 +1309,14 @@ static void x6502_op_A8(X6502* xp)
 
 static void x6502_op_A9(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IM(LDA);
     return;
 }
 
 static void x6502_op_AA(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
                _X=_A;
                X_ZN(_A);
     return;
@@ -1322,7 +1324,7 @@ static void x6502_op_AA(X6502* xp)
 
 static void x6502_op_AB(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IM(_A|=0xFF;AND;_X=_A);
     /* AXS */
     return;
@@ -1330,35 +1332,35 @@ static void x6502_op_AB(X6502* xp)
 
 static void x6502_op_AC(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_AB(LDY);
     return;
 }
 
 static void x6502_op_AD(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_AB(LDA);
     return;
 }
 
 static void x6502_op_AE(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_AB(LDX);
     return;
 }
 
 static void x6502_op_AF(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_AB(LDA;LDX);
     return;
 }
 
 static void x6502_op_B0(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      JR(_P&C_FLAG); 
     /* BEQ */
     return;
@@ -1366,14 +1368,14 @@ static void x6502_op_B0(X6502* xp)
 
 static void x6502_op_B1(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IY(LDA);
     return;
 }
 
 static void x6502_op_B2(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
     ADDCYC(0xFF);
               _jammed=1;
     	  _PC--;
@@ -1384,7 +1386,7 @@ static void x6502_op_B2(X6502* xp)
 
 static void x6502_op_B3(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IY(LDA;LDX);
     /* NOP */
     return;
@@ -1392,49 +1394,49 @@ static void x6502_op_B3(X6502* xp)
 
 static void x6502_op_B4(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ZPX(LDY);
     return;
 }
 
 static void x6502_op_B5(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ZPX(LDA);
     return;
 }
 
 static void x6502_op_B6(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ZPY(LDX);
     return;
 }
 
 static void x6502_op_B7(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ZPY(LDA;LDX);
     return;
 }
 
 static void x6502_op_B8(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
                _P&=~V_FLAG;
     return;
 }
 
 static void x6502_op_B9(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ABY(LDA);
     return;
 }
 
 static void x6502_op_BA(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
                _X=_S;
                X_ZN(_X);
     return;
@@ -1442,7 +1444,7 @@ static void x6502_op_BA(X6502* xp)
 
 static void x6502_op_BB(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ABY(_S&=x;_A=_X=_S;X_ZN(_X));
     /* LAX */
     return;
@@ -1450,91 +1452,91 @@ static void x6502_op_BB(X6502* xp)
 
 static void x6502_op_BC(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ABX(LDY);
     return;
 }
 
 static void x6502_op_BD(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ABX(LDA);
     return;
 }
 
 static void x6502_op_BE(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ABY(LDX);
     return;
 }
 
 static void x6502_op_BF(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ABY(LDA;LDX);
     return;
 }
 
 static void x6502_op_C0(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IM(CPY);
     return;
 }
 
 static void x6502_op_C1(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IX(CMP);
     return;
 }
 
 static void x6502_op_C2(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      _PC++;
     return;
 }
 
 static void x6502_op_C3(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_IX(DEC;CMP);
     return;
 }
 
 static void x6502_op_C4(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ZP(CPY);
     return;
 }
 
 static void x6502_op_C5(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ZP(CMP);
     return;
 }
 
 static void x6502_op_C6(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ZP(DEC);
     return;
 }
 
 static void x6502_op_C7(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ZP(DEC;CMP);
     return;
 }
 
 static void x6502_op_C8(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
                _Y++;
                X_ZN(_Y);
     return;
@@ -1542,14 +1544,14 @@ static void x6502_op_C8(X6502* xp)
 
 static void x6502_op_C9(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IM(CMP);
     return;
 }
 
 static void x6502_op_CA(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
                _X--;
                X_ZN(_X);
     return;
@@ -1557,7 +1559,7 @@ static void x6502_op_CA(X6502* xp)
 
 static void x6502_op_CB(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IM(AXS);
     /* DCP */
     return;
@@ -1565,35 +1567,35 @@ static void x6502_op_CB(X6502* xp)
 
 static void x6502_op_CC(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_AB(CPY);
     return;
 }
 
 static void x6502_op_CD(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_AB(CMP);
     return;
 }
 
 static void x6502_op_CE(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_AB(DEC);
     return;
 }
 
 static void x6502_op_CF(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_AB(DEC;CMP);
     return;
 }
 
 static void x6502_op_D0(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      JR(!(_P&Z_FLAG)); 
     /* BMI */
     return;
@@ -1601,14 +1603,14 @@ static void x6502_op_D0(X6502* xp)
 
 static void x6502_op_D1(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IY(CMP);
     return;
 }
 
 static void x6502_op_D2(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
     ADDCYC(0xFF);
               _jammed=1;
     	  _PC--;
@@ -1619,7 +1621,7 @@ static void x6502_op_D2(X6502* xp)
 
 static void x6502_op_D3(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_IY(DEC;CMP);
     /* ISB */
     return;
@@ -1627,49 +1629,49 @@ static void x6502_op_D3(X6502* xp)
 
 static void x6502_op_D4(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      _PC++;
     return;
 }
 
 static void x6502_op_D5(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ZPX(CMP);
     return;
 }
 
 static void x6502_op_D6(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ZPX(DEC);
     return;
 }
 
 static void x6502_op_D7(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ZPX(DEC;CMP);
     return;
 }
 
 static void x6502_op_D8(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
                _P&=~D_FLAG;
     return;
 }
 
 static void x6502_op_D9(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ABY(CMP);
     return;
 }
 
 static void x6502_op_DA(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      
     /* RLA */
     return;
@@ -1677,14 +1679,14 @@ static void x6502_op_DA(X6502* xp)
 
 static void x6502_op_DB(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ABY(DEC;CMP);
     return;
 }
 
 static void x6502_op_DC(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ABX(;);
     /* XAA - BIG QUESTION MARK HERE */
     return;
@@ -1692,84 +1694,84 @@ static void x6502_op_DC(X6502* xp)
 
 static void x6502_op_DD(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ABX(CMP);
     return;
 }
 
 static void x6502_op_DE(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ABX(DEC);
     return;
 }
 
 static void x6502_op_DF(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ABX(DEC;CMP);
     return;
 }
 
 static void x6502_op_E0(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IM(CPX);
     return;
 }
 
 static void x6502_op_E1(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IX(SBC);
     return;
 }
 
 static void x6502_op_E2(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      _PC++;
     return;
 }
 
 static void x6502_op_E3(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_IX(INC;SBC);
     return;
 }
 
 static void x6502_op_E4(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ZP(CPX);
     return;
 }
 
 static void x6502_op_E5(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ZP(SBC);
     return;
 }
 
 static void x6502_op_E6(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ZP(INC);
     return;
 }
 
 static void x6502_op_E7(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ZP(INC;SBC);
     return;
 }
 
 static void x6502_op_E8(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
                _X++;
                X_ZN(_X);
     return;
@@ -1777,55 +1779,55 @@ static void x6502_op_E8(X6502* xp)
 
 static void x6502_op_E9(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IM(SBC);
     return;
 }
 
 static void x6502_op_EA(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
     return;
 }
 
 static void x6502_op_EB(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IM(SBC);
     return;
 }
 
 static void x6502_op_EC(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_AB(CPX);
     return;
 }
 
 static void x6502_op_ED(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_AB(SBC);
     return;
 }
 
 static void x6502_op_EE(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_AB(INC);
     return;
 }
 
 static void x6502_op_EF(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_AB(INC;SBC);
     return;
 }
 
 static void x6502_op_F0(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      JR(_P&Z_FLAG); 
     /* BNE */
     return;
@@ -1833,14 +1835,14 @@ static void x6502_op_F0(X6502* xp)
 
 static void x6502_op_F1(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_IY(SBC);
     return;
 }
 
 static void x6502_op_F2(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
     ADDCYC(0xFF);
               _jammed=1;
     	  _PC--;
@@ -1851,7 +1853,7 @@ static void x6502_op_F2(X6502* xp)
 
 static void x6502_op_F3(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_IY(INC;SBC);
     /* DOP */
     return;
@@ -1859,7 +1861,7 @@ static void x6502_op_F3(X6502* xp)
 
 static void x6502_op_F4(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      _PC++;
     /* KIL */
     return;
@@ -1867,42 +1869,42 @@ static void x6502_op_F4(X6502* xp)
 
 static void x6502_op_F5(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ZPX(SBC);
     return;
 }
 
 static void x6502_op_F6(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ZPX(INC);
     return;
 }
 
 static void x6502_op_F7(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ZPX(INC;SBC);
     return;
 }
 
 static void x6502_op_F8(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
                _P|=D_FLAG;
     return;
 }
 
 static void x6502_op_F9(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ABY(SBC);
     return;
 }
 
 static void x6502_op_FA(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      
     /* RLA */
     return;
@@ -1910,14 +1912,14 @@ static void x6502_op_FA(X6502* xp)
 
 static void x6502_op_FB(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ABY(INC;SBC);
     return;
 }
 
 static void x6502_op_FC(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ABX(;);
     /* XAA - BIG QUESTION MARK HERE */
     return;
@@ -1925,21 +1927,21 @@ static void x6502_op_FC(X6502* xp)
 
 static void x6502_op_FD(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      LD_ABX(SBC);
     return;
 }
 
 static void x6502_op_FE(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ABX(INC);
     return;
 }
 
 static void x6502_op_FF(X6502* xp)
 {
-    X6502& X = *xp;
+    (void)xp;
      RMW_ABX(INC;SBC);
     return;
 }

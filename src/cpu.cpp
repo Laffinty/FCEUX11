@@ -35,7 +35,7 @@ bool Cpu::jammed() const noexcept { return layout_.jammed != 0; }
 void Cpu::init() noexcept { X6502_Init(); }
 void Cpu::reset() noexcept { X6502_Reset(); }
 void Cpu::power() noexcept { X6502_Power(); }
-void Cpu::run(int32_t cycles) { X6502_RunDebug(cycles); }
+void Cpu::run(int32_t cycles) { X6502_RunDebug(*this, cycles); }
 
 // ---------------------------------------------------------------------------
 // Interrupts

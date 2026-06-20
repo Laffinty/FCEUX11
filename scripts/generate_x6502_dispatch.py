@@ -82,15 +82,17 @@ def generate():
            "",
            "#include <array>",
            "",
-           "// Per-opcode handlers. Each shadows the global X with a local reference",
-           "// so the existing _PC / _A / ... macros from x6502abbrev.h keep working.",
+           "// Per-opcode handlers. v1.3 Legion Phase 2: the _PC / _A / ... macros",
+           "// from x6502abbrev.h now route through g_cpu.native_layout(), so the",
+           "// X6502* parameter is kept only for the existing function-pointer table",
+           "// signature. It is explicitly void-cast to avoid unused-parameter warnings.",
            ""]
 
     for i in range(256):
         body = bodies[i]
         out.append(f"static void x6502_op_{i:02X}(X6502* xp)")
         out.append("{")
-        out.append("    X6502& X = *xp;")
+        out.append("    (void)xp;")
         if body:
             # Preserve relative indentation from ops.inc.
             for ln in body.splitlines():

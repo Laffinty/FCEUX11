@@ -47,14 +47,10 @@ static_assert(std::is_same_v<decltype(&MapIRQHook), fceu11::MapIRQHook*>,
     "MapIRQHook type drift: definition in x6502.cpp and extern declaration "
     "in x6502.h via fceu11::MapIRQHook must agree (v0.3.8 invariant).");
 
-#define ADDCYC(x) \
-{                 \
- int __x=x;       \
- _tcount+=__x;    \
- _count-=__x*48;  \
- timestamp+=__x;  \
- if(!overclocking) soundtimestamp+=__x; \
-}
+// v1.3 Legion Phase 3: cycle accounting is now a method on fceu11::Cpu.
+// The macro is kept so that the opcode handlers in ops_table.inc do not
+// need to be rewritten; the hot path remains inline-able.
+#define ADDCYC(x) g_cpu.add_cycles(x)
 
 //normal memory read
 static INLINE uint8 RdMem(unsigned int A)
@@ -421,7 +417,7 @@ void X6502_Init(void)
 	unsigned int i;
 
 	// Initialize the CPU structure
-	memset((void *)&X,0,sizeof(X));
+	memset((void *)&g_cpu.native_layout(),0,sizeof(g_cpu.native_layout()));
 
 	for(i = 0; i < sizeof(ZNTable); i++)
 	{
@@ -445,12 +441,12 @@ void X6502_Power(void)
 {
  _count=_tcount=_IRQlow=_PC=_A=_X=_Y=_P=_PI=_DB=_jammed=0;
  _S=0xFD;
- timestamp=soundtimestamp=0;
+ g_cpu.timestamp_ref()=g_cpu.sound_timestamp_ref()=0;
  X6502_Reset();
  StackAddrBackup = -1;
 }
 
-void X6502_Run(int32 cycles)
+void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
 {
   if(PAL)
    cycles*=15;    // 15*4=60
@@ -530,7 +526,7 @@ extern int test; test++;
 
    temp=_tcount;
    _tcount=0;
-   if(MapIRQHook) [[unlikely]] MapIRQHook(temp);
+   if(g_cpu.map_irq_hook_ref()) [[unlikely]] g_cpu.map_irq_hook_ref()(temp);
 
    if (!overclocking) [[likely]]
     FCEU_SoundCPUHook(temp);
@@ -538,7 +534,7 @@ extern int test; test++;
    CallRegisteredLuaMemHook(_PC, 1, 0, LUAMEMHOOK_EXEC);
    #endif
    _PC++;
-   x6502_dispatch[b1](&X);
+   x6502_dispatch[b1](&cpu.native_layout());
   }
 }
 

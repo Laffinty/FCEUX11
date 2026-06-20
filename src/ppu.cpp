@@ -369,9 +369,8 @@ uint32 TempAddr = 0, RefreshAddr = 0, DummyRead = 0, NTRefreshAddr = 0;
 static int maxsprites = 8;
 
 //scanline is equal to the current visible scanline we're on.
-// v1.3 Legion Phase 1: scanline is now an inline reference alias into
-// fceu11::cpu_instance().scanline_ref() (see src/x6502.h). Its storage
-// lives in cpu.cpp as a member of fceu11::Cpu.
+// v1.3 Legion Phase 2: code below accesses it via g_cpu.scanline_ref();
+// the global inline alias in src/x6502.h is kept for files not yet migrated.
 int g_rasterpos;
 static uint32 scanlines_per_frame;
 
@@ -826,7 +825,7 @@ static DECLFR(A2007) {
 		if (!fceuindbg)
 	#endif
 		{
-			if ((ScreenON || SpriteON) && (scanline < 240)) {
+			if ((ScreenON || SpriteON) && (g_cpu.scanline_ref() < 240)) {
 				uint32 rad = RefreshAddr;
 				if ((rad & 0x7000) == 0x7000) {
 					rad ^= 0x7000;
@@ -1018,7 +1017,7 @@ static DECLFW(B4014) {
 
 #define PAL(c)  ((c) + cc)
 
-#define GETLASTPIXEL    (PAL ? ((timestamp * 48 - linestartts) / 15) : ((timestamp * 48 - linestartts) >> 4))
+#define GETLASTPIXEL    (PAL ? ((g_cpu.timestamp_ref() * 48 - linestartts) / 15) : ((g_cpu.timestamp_ref() * 48 - linestartts) >> 4))
 
 static uint8 *Pline, *Plinef;
 static int firsttile;
@@ -1031,7 +1030,7 @@ static void ResetRL(uint8 *target) {
 	Plinef = target;
 	Pline = target;
 	firsttile = 0;
-	linestartts = timestamp * 48 + X.count;
+	linestartts = g_cpu.timestamp_ref() * 48 + g_cpu.native_layout().count;
 	tofix = 0;
 	FCEUPPU_LineUpdate();
 	tofix = 1;
@@ -1318,18 +1317,18 @@ static void Fixit1(void) {
 
 void MMC5_hb(int);		//Ugh ugh ugh.
 static void DoLine(void) {
-	if (scanline >= 240 && scanline != totalscanlines) {
+	if (g_cpu.scanline_ref() >= 240 && g_cpu.scanline_ref() != totalscanlines) {
 		X6502_Run(256 + 69);
-		scanline++;
+		g_cpu.scanline_ref()++;
 		X6502_Run(16);
 		return;
 	}
 
 	int x;
-	uint8 *target = XBuf + ((scanline < 240 ? scanline : 240) << 8);
-	u8* dtarget = XDBuf + ((scanline < 240 ? scanline : 240) << 8);
+	uint8 *target = XBuf + ((g_cpu.scanline_ref() < 240 ? g_cpu.scanline_ref() : 240) << 8);
+	u8* dtarget = XDBuf + ((g_cpu.scanline_ref() < 240 ? g_cpu.scanline_ref() : 240) << 8);
 
-	if (MMC5Hack) MMC5_hb(scanline);
+	if (MMC5Hack) MMC5_hb(g_cpu.scanline_ref());
 
 	X6502_Run(256);
 	EndRL();
@@ -1393,15 +1392,15 @@ static void DoLine(void) {
 			GameHBIRQHook();
 	}
 
-	DEBUG(FCEUD_UpdateNTView(scanline, 0));
+	DEBUG(FCEUD_UpdateNTView(g_cpu.scanline_ref(), 0));
 
 	if (SpriteON)
 		RefreshSprites();
 	if (GameHBIRQHook2 && (ScreenON || SpriteON))
 		GameHBIRQHook2();
-	scanline++;
-	if (scanline < 240) {
-		ResetRL(XBuf + (scanline << 8));
+	g_cpu.scanline_ref()++;
+	if (g_cpu.scanline_ref() < 240) {
+		ResetRL(XBuf + (g_cpu.scanline_ref() << 8));
 	}
 	X6502_Run(16);
 }
@@ -1441,7 +1440,7 @@ static void FetchSpriteData(void) {
 
 	if (!PPU_hook)
 		for (n = 63; n >= 0; n--, spr++) {
-			if ((uint32)(scanline - spr->y) >= H) continue;
+			if ((uint32)(g_cpu.scanline_ref() - spr->y) >= H) continue;
 			if (ns < maxsprites) {
 				if (n == 63) sb = 1;
 
@@ -1451,7 +1450,7 @@ static void FetchSpriteData(void) {
 					int t;
 					uint32 vadr;
 
-					t = (int)scanline - (spr->y);
+					t = (int)g_cpu.scanline_ref() - (spr->y);
 
 					if (Sprite16)
 						vadr = ((spr->no & 1) << 12) + ((spr->no & 0xFE) << 4);
@@ -1494,7 +1493,7 @@ static void FetchSpriteData(void) {
 		}
 	else
 		for (n = 63; n >= 0; n--, spr++) {
-			if ((uint32)(scanline - spr->y) >= H) continue;
+			if ((uint32)(g_cpu.scanline_ref() - spr->y) >= H) continue;
 
 			if (ns < maxsprites) {
 				if (n == 63) sb = 1;
@@ -1505,7 +1504,7 @@ static void FetchSpriteData(void) {
 					int t;
 					uint32 vadr;
 
-					t = (int)scanline - (spr->y);
+					t = (int)g_cpu.scanline_ref() - (spr->y);
 
 					if (Sprite16)
 						vadr = ((spr->no & 1) << 12) + ((spr->no & 0xFE) << 4);
@@ -1851,11 +1850,11 @@ int FCEUPPU_Loop(int skip) {
 			PPU_status |= 0x20;	// Fixes "Bee 52".  Does it break anything?
 			if (GameHBIRQHook) {
 				X6502_Run(256);
-				for (scanline = 0; scanline < 240; scanline++) {
+				for (g_cpu.scanline_ref() = 0; g_cpu.scanline_ref() < 240; g_cpu.scanline_ref()++) {
 					if (ScreenON || SpriteON)
 						GameHBIRQHook();
-					if (scanline == y && SpriteON) PPU_status |= 0x40;
-					X6502_Run((scanline == 239) ? 85 : (256 + 85));
+					if (g_cpu.scanline_ref() == y && SpriteON) PPU_status |= 0x40;
+					X6502_Run((g_cpu.scanline_ref() == 239) ? 85 : (256 + 85));
 				}
 			} else if (y < 240) {
 				X6502_Run((256 + 85) * y);
@@ -1874,15 +1873,15 @@ int FCEUPPU_Loop(int skip) {
 			else
 				totalscanlines = normalscanlines + (overclock_enabled ? postrenderscanlines : 0);
 
-			for (scanline = 0; scanline < totalscanlines; ) {	//scanline is incremented in  DoLine.  Evil. :/
+			for (g_cpu.scanline_ref() = 0; g_cpu.scanline_ref() < totalscanlines; ) {	//scanline is incremented in  DoLine.  Evil. :/
 				deempcnt[deemp]++;
 
-				if (scanline < 240)
-					DEBUG(FCEUD_UpdatePPUView(scanline, 1));
+				if (g_cpu.scanline_ref() < 240)
+					DEBUG(FCEUD_UpdatePPUView(g_cpu.scanline_ref(), 1));
 
 				DoLine();
 
-				if (scanline < normalscanlines || scanline == totalscanlines)
+				if (g_cpu.scanline_ref() < normalscanlines || g_cpu.scanline_ref() == totalscanlines)
 					overclocking = 0;
 				else {
 					if (DMC_7bit && skip_7bit_overclocking) // 7bit sample started after 240th line
@@ -1892,7 +1891,7 @@ int FCEUPPU_Loop(int skip) {
 			}
 			DMC_7bit = 0;
 
-			if (MMC5Hack) MMC5_hb(scanline);
+			if (MMC5Hack) MMC5_hb(g_cpu.scanline_ref());
 
 			//deemph nonsense, kept for complicated reasons (see SetNESDeemph_OldHacky implementation)
 			int maxref = 0;
@@ -2193,15 +2192,15 @@ int FCEUX_PPU_Loop(int skip) {
 			g_rasterpos = 0;
 			ppur.status.sl = sl;
 
-			linestartts = timestamp * 48 + X.count; // pixel timestamp for debugger
+			linestartts = g_cpu.timestamp_ref() * 48 + g_cpu.native_layout().count; // pixel timestamp for debugger
 
 			const int yp = sl - 1;
 			ppuphase = PPUPHASE_BG;
 
 			if (sl != 0 && sl < 241)  // ignore the invisible
 			{
-				DEBUG(FCEUD_UpdatePPUView(scanline = yp, 1));
-				DEBUG(FCEUD_UpdateNTView(scanline = yp, 1));
+				DEBUG(FCEUD_UpdatePPUView(g_cpu.scanline_ref() = yp, 1));
+				DEBUG(FCEUD_UpdateNTView(g_cpu.scanline_ref() = yp, 1));
 			}
 
 			//hack to fix SDF ship intro screen with split. is it right?

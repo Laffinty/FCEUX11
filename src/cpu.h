@@ -20,6 +20,9 @@
 #include "x6502struct.h"
 #include "fceu11_core_types.h"
 
+// Legacy global still read by Cpu::add_cycles.
+extern bool overclocking;
+
 namespace fceu11 {
 
 class alignas(64) Cpu {
@@ -53,6 +56,16 @@ public:
     // Timestamps
     int32_t timestamp() const noexcept;
     uint64_t timestamp_base() const noexcept;
+
+    // Cycle accounting (v1.3 Legion Phase 3).
+    // Replaces the ADDCYC macro so the CPU hot path can operate on a Cpu&
+    // parameter without going through the legacy global aliases.
+    void add_cycles(int32_t c) noexcept {
+        layout_.tcount += c;
+        layout_.count -= c * 48;
+        timestamp_ += c;
+        if (!overclocking) sound_timestamp_ += c;
+    }
 
     // Savestate compatibility: only serialization code should use this.
     X6502& native_layout() noexcept;

@@ -51,8 +51,10 @@ void X6502_Debug(void (*CPUHook)(X6502 *),
 //#else
 //void X6502_Run(int32 cycles);
 //#endif
-void X6502_RunDebug(int32 cycles);
-#define X6502_Run(x) X6502_RunDebug(x)
+// v1.3 Legion Phase 3: X6502_RunDebug now operates on the Cpu object
+// directly. The macro keeps the old call sites working.
+void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles);
+#define X6502_Run(cycles) X6502_RunDebug(g_cpu, cycles)
 //------------
 
 inline auto& timestamp = fceu11::cpu_instance().timestamp_ref();
