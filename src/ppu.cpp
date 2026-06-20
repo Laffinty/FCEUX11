@@ -369,7 +369,9 @@ uint32 TempAddr = 0, RefreshAddr = 0, DummyRead = 0, NTRefreshAddr = 0;
 static int maxsprites = 8;
 
 //scanline is equal to the current visible scanline we're on.
-int scanline;
+// v1.3 Legion Phase 1: scanline is now an inline reference alias into
+// fceu11::cpu_instance().scanline_ref() (see src/x6502.h). Its storage
+// lives in cpu.cpp as a member of fceu11::Cpu.
 int g_rasterpos;
 static uint32 scanlines_per_frame;
 

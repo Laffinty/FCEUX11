@@ -22,8 +22,13 @@
 
 #include "x6502struct.h"
 #include "fceu11_core_types.h"
+#include "cpu.h"
 
-extern X6502 X;
+// v1.3 Legion Phase 1: legacy CPU-state globals are now inline reference
+// aliases into the single fceu11::Cpu instance. Existing source files that
+// read/write X, timestamp, soundtimestamp, scanline or MapIRQHook continue
+// to compile and link without changes.
+inline auto& X = fceu11::cpu_instance().native_layout();
 
 
 //the opsize table is used to quickly grab the instruction sizes (in bytes)
@@ -50,9 +55,9 @@ void X6502_RunDebug(int32 cycles);
 #define X6502_Run(x) X6502_RunDebug(x)
 //------------
 
-extern uint32 timestamp;
-extern uint32 soundtimestamp;
-extern int scanline;
+inline auto& timestamp = fceu11::cpu_instance().timestamp_ref();
+inline auto& soundtimestamp = fceu11::cpu_instance().sound_timestamp_ref();
+inline auto& scanline = fceu11::cpu_instance().scanline_ref();
 
 #define N_FLAG  0x80
 #define V_FLAG  0x40
@@ -63,11 +68,10 @@ extern int scanline;
 #define Z_FLAG  0x02
 #define C_FLAG  0x01
 
-// v0.3.8: declared via fceu11::MapIRQHook typedef for compile-time type
-// identity with the definition in x6502.cpp. Symbol stays at global
-// namespace to preserve linkage with 35 mapper .cpp files in src/boards/
-// that assign to it (see fceu11_core_types.h for full rationale).
-extern fceu11::MapIRQHook MapIRQHook;
+// v0.3.8/v1.3: declared via fceu11::MapIRQHook typedef for compile-time type
+// identity. The symbol stays at global namespace as an inline alias so the
+// 35 mapper .cpp files in src/boards/ that assign to it keep linking.
+inline auto& MapIRQHook = fceu11::cpu_instance().map_irq_hook_ref();
 
 #define NTSC_CPU (dendy ? 1773447.467 : 1789772.7272727272727272)
 #define PAL_CPU  1662607.125

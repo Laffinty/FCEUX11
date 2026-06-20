@@ -32,10 +32,10 @@
 #include <array>
 #include <cstring>
 #include <type_traits>
-alignas(64) X6502 X;
-uint32 timestamp;
-uint32 soundtimestamp;
-void (*MapIRQHook)(int a);
+
+// v1.3 Legion Phase 1: X, timestamp, soundtimestamp and MapIRQHook are now
+// inline reference aliases into fceu11::cpu_instance() (see src/cpu.h and
+// src/x6502.h). Their storage lives in cpu.cpp as members of fceu11::Cpu.
 
 // v0.3.8: compile-time guard that the global MapIRQHook's type still
 // matches the fceu11::MapIRQHook typedef used at the extern declaration

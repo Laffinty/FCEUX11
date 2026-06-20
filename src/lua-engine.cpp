@@ -499,7 +499,6 @@ extern const uint32 NoiseFreqTableNTSC[0x10];
 extern const uint32 NoiseFreqTablePAL[0x10];
 extern uint64 timestampbase;
 extern uint64 total_cycles_base;
-extern uint32 timestamp;
 extern uint64 total_instructions;
 extern bool break_asap;
 extern void ResetDebugStatisticsCounters();
