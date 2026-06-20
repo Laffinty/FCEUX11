@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="dark" />
+<meta name="theme-color" content="#080a09" />
+<title>FCEUX11 — NES emulator for Windows 11</title>
+<meta name="description" content="A small, modern NES/Famicom emulator for Windows 11. Built on Qt 6.8 and C++20." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080a09'/%3E%3Cpath d='M20 22h24M20 32h24M20 42h24' stroke='%2334d399' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#080a09;
+    --surface:rgba(255,255,255,.04);
+    --surface-2:rgba(255,255,255,.07);
+    --border:rgba(255,255,255,.08);
+    --border-strong:rgba(255,255,255,.16);
+    --text:#eef2ee;
+    --muted:#8a958c;
+    --muted-2:#5d665e;
+    --green:#34d399;
+    --green-soft:rgba(52,211,153,.14);
+    --grad:linear-gradient(135deg,#6ee7b7 0%,#34d399 45%,#10b981 100%);
+    --font-sans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+    --font-display:'Space Grotesk','Inter',sans-serif;
+    --font-mono:'JetBrains Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+  body{
+    font-family:var(--font-sans);
+    background:var(--bg);
+    color:var(--text);
+    line-height:1.6;
+    overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    position:relative;
+  }
+  /* background — single subtle orb + faint grid */
+  .bg{position:fixed;inset:0;z-index:-2;pointer-events:none;overflow:hidden}
+  .orb{position:absolute;width:560px;height:560px;border-radius:50%;background:radial-gradient(circle,rgba(52,211,153,.18),transparent 65%);top:-180px;left:50%;transform:translateX(-50%);filter:blur(70px)}
+  .grid{position:absolute;inset:0;
+    background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
+    background-size:64px 64px;
+    mask-image:radial-gradient(ellipse 80% 60% at 50% 0%,#000 20%,transparent 75%);
+    -webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 0%,#000 20%,transparent 75%);
+    animation:shift 40s linear infinite}
+  @keyframes shift{to{background-position:64px 64px,64px 64px}}
+
+  .wrap{max-width:780px;margin:0 auto;padding:0 24px}
+
+  /* nav — minimal */
+  nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);background:rgba(8,10,9,.6);border-bottom:1px solid transparent;transition:.3s}
+  nav.scrolled{border-color:var(--border)}
+  .nav-inner{display:flex;align-items:center;justify-content:space-between;height:60px}
+  .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);font-family:var(--font-display);font-weight:600;font-size:16px;letter-spacing:-.01em}
+  .brand .mark{width:26px;height:26px;display:grid;place-items:center;border-radius:8px;background:var(--grad);box-shadow:0 0 22px rgba(52,211,153,.3)}
+  .brand .mark svg{width:15px;height:15px}
+  .nav-right{display:flex;align-items:center;gap:6px}
+  .lang{font-family:var(--font-mono);font-size:12px;color:var(--muted);border:1px solid var(--border);background:transparent;padding:6px 10px;border-radius:8px;cursor:pointer;transition:.2s}
+  .lang:hover{color:var(--text);border-color:var(--border-strong)}
+  .gh{display:grid;place-items:center;width:34px;height:34px;color:var(--muted);border:1px solid var(--border);border-radius:8px;transition:.2s}
+  .gh:hover{color:var(--green);border-color:var(--green)}
+  .gh svg{width:16px;height:16px}
+
+  /* hero — compact, centered */
+  .hero{padding:104px 0 60px;text-align:center}
+  .pill{display:inline-flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:12px;color:var(--muted);padding:5px 13px;border:1px solid var(--border);border-radius:100px;background:var(--surface);margin-bottom:30px}
+  .pill .dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);animation:pulse 2.4s ease-in-out infinite}
+  @keyframes pulse{50%{opacity:.35;transform:scale(.6)}}
+  h1{font-family:var(--font-display);font-weight:700;font-size:clamp(56px,13vw,120px);line-height:.92;letter-spacing:-.04em;margin-bottom:22px}
+  h1 .grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  h1 .dim{color:var(--muted-2);font-weight:500}
+  .tagline{font-size:clamp(16px,2.1vw,19px);color:var(--muted);max-width:520px;margin:0 auto 36px}
+  .cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;gap:9px;font-size:14px;font-weight:500;text-decoration:none;padding:13px 22px;border-radius:11px;transition:.25s;border:1px solid transparent;cursor:pointer;font-family:inherit}
+  .btn-primary{color:#06120c;background:var(--grad);box-shadow:0 8px 30px rgba(52,211,153,.22)}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 14px 40px rgba(52,211,153,.35)}
+  .btn-ghost{color:var(--text);background:var(--surface);border-color:var(--border)}
+  .btn-ghost:hover{background:var(--surface-2);border-color:var(--border-strong);transform:translateY(-2px)}
+  .btn svg{width:15px;height:15px}
+
+  /* features — one inline row, minimal */
+  .features{padding:54px 0}
+  .feat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+  @media(max-width:680px){.feat-row{grid-template-columns:repeat(2,1fr)}}
+  .feat{padding:26px 18px;border-right:1px solid var(--border);text-align:center;transition:.25s}
+  .feat:last-child{border-right:none}
+  @media(max-width:680px){.feat:nth-child(2){border-right:none}.feat:nth-child(-n+2){border-bottom:1px solid var(--border)}}
+  .feat:hover{background:var(--green-soft)}
+  .feat .ico{width:34px;height:34px;margin:0 auto 12px;color:var(--green)}
+  .feat .ico svg{width:100%;height:100%}
+  .feat h3{font-family:var(--font-display);font-size:14px;font-weight:600;margin-bottom:4px}
+  .feat p{font-size:12px;color:var(--muted)}
+
+  /* about — short prose, refined */
+  .about{padding:60px 0 30px}
+  .about-head{text-align:center;margin-bottom:36px}
+  .about-head .kicker{font-family:var(--font-mono);font-size:11px;color:var(--green);text-transform:uppercase;letter-spacing:.16em;margin-bottom:9px}
+  .about-head h2{font-family:var(--font-display);font-size:24px;font-weight:600;letter-spacing:-.02em}
+  .about-body{max-width:560px;margin:0 auto}
+  .about-body p{font-size:15px;color:var(--muted);margin-bottom:18px}
+  .about-body p:last-child{margin-bottom:0}
+  .about-body em{color:var(--green);font-style:normal;font-weight:500}
+
+  /* footer — single line */
+  footer{padding:40px 0 50px;text-align:center;border-top:1px solid var(--border);margin-top:30px}
+  footer p{font-family:var(--font-mono);font-size:12px;color:var(--muted-2)}
+  footer p a{color:var(--muted);text-decoration:none;transition:.2s}
+  footer p a:hover{color:var(--green)}
+
+  .reveal{opacity:0;transform:translateY(18px);transition:opacity .6s cubic-bezier(.2,.7,.2,1),transform .6s cubic-bezier(.2,.7,.2,1)}
+  .reveal.in{opacity:1;transform:none}
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.reveal{opacity:1;transform:none}}
+  ::selection{background:rgba(52,211,153,.3);color:#fff}
+</style>
+</head>
+<body>
+
+<div class="bg"><div class="orb"></div><div class="grid"></div></div>
+
+<nav id="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top">
+      <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M6 7h12M6 12h12M6 17h12" stroke="#06120c" stroke-width="2.4" stroke-linecap="round"/></svg></span>
+      FCEUX11
+    </a>
+    <div class="nav-right">
+      <button class="lang" id="langBtn" aria-label="Switch language">中文</button>
+      <a class="gh" href="https://github.com/Laffinty/FCEUX11" target="_blank" rel="noopener" aria-label="GitHub">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.76.41-1.27.74-1.56-2.56-.29-5.26-1.28-5.26-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.43-2.7 5.41-5.27 5.69.42.36.8 1.08.8 2.18v3.23c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/></svg>
+      </a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="pill reveal"><span class="dot"></span><span data-i18n="pill">v1.1.0 · Sentinel</span></div>
+    <h1 class="reveal"><span class="grad">FCEUX</span><span class="dim">11</span></h1>
+    <p class="tagline reveal" data-i18n="tagline">A FCEUX-based NES/Famicom emulator for Windows 11 — core accuracy, modern native experience.</p>
+    <div class="cta reveal">
+      <a class="btn btn-primary" href="https://github.com/Laffinty/FCEUX11/releases" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span data-i18n="download">Download</span>
+      </a>
+      <a class="btn btn-ghost" href="https://github.com/Laffinty/FCEUX11/blob/main/CHANGELOG.md" target="_blank" rel="noopener" data-i18n="changelog">Changelog</a>
+    </div>
+  </div>
+</header>
+
+<section class="features">
+  <div class="wrap">
+    <div class="feat-row reveal">
+      <div class="feat">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 2v6h6V2M7 8h10l2 12H5z"/></svg></div>
+        <h3 data-i18n="f1.t">Accurate Emulation</h3>
+        <p data-i18n="f1.d">Full NES, Famicom &amp; mapper support</p>
+      </div>
+      <div class="feat">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m8 2-4 6 4 6M16 2l4 6-4 6M14 4l-4 16"/></svg></div>
+        <h3 data-i18n="f2.t">Debugging Tools</h3>
+        <p data-i18n="f2.d">CPU/PPU debugger, hex, RAM watch</p>
+      </div>
+      <div class="feat">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+        <h3 data-i18n="f3.t">TAS Editor</h3>
+        <p data-i18n="f3.d">Frame-by-frame input recording</p>
+      </div>
+      <div class="feat">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3 4 7v5c0 4.5 3.2 7.5 8 9 4.8-1.5 8-4.5 8-9V7z"/></svg></div>
+        <h3 data-i18n="f4.t">Lua Scripting</h3>
+        <p data-i18n="f4.d">Custom HUDs &amp; automation</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="about">
+  <div class="wrap">
+    <div class="about-head reveal">
+      <div class="kicker" data-i18n="about.k">About</div>
+      <h2 data-i18n="about.t">Introduction</h2>
+    </div>
+    <div class="about-body reveal">
+      <p data-i18n="about.a1">FCEUX11 is a derivative of the FCEUX NES/Famicom emulator, actively maintained for <em>Windows 11</em>.</p>
+      <p data-i18n="about.a2">It preserves the core emulation accuracy of FCEUX while providing a modern, native Windows experience, including a <em>Qt6-based</em> user interface, multi-language support, and comprehensive debugging and TAS tooling.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>© 2026 FCEUX11 · GPLv2 · <a href="https://github.com/Laffinty/FCEUX11" target="_blank" rel="noopener">GitHub</a> · <span data-i18n="foot">based on FCEUX</span></p>
+  </div>
+</footer>
+
+<script>
+const I18N={
+  en:{pill:"v1.1.0 · Sentinel",
+      tagline:"A FCEUX-based NES/Famicom emulator for Windows 11 — core accuracy, modern native experience.",
+      download:"Download",changelog:"Changelog",
+      "f1.t":"Accurate Emulation","f1.d":"Full NES, Famicom &amp; mapper support",
+      "f2.t":"Debugging Tools","f2.d":"CPU/PPU debugger, hex, RAM watch",
+      "f3.t":"TAS Editor","f3.d":"Frame-by-frame input recording",
+      "f4.t":"Lua Scripting","f4.d":"Custom HUDs &amp; automation",
+      "about.k":"About","about.t":"Introduction",
+      "about.a1":"FCEUX11 is a derivative of the FCEUX NES/Famicom emulator, actively maintained for <em>Windows 11</em>.",
+      "about.a2":"It preserves the core emulation accuracy of FCEUX while providing a modern, native Windows experience, including a <em>Qt6-based</em> user interface, multi-language support, and comprehensive debugging and TAS tooling.",
+      foot:"based on FCEUX"},
+  zh:{pill:"v1.1.0 · Sentinel",
+      tagline:"基于 FCEUX、面向 Windows 11 的 NES/Famicom 模拟器——保留核心精度，提供现代原生体验。",
+      download:"下载",changelog:"更新日志",
+      "f1.t":"精确模拟","f1.d":"完整支持 NES、Famicom 及扩展芯片",
+      "f2.t":"调试工具","f2.d":"CPU/PPU 调试器、十六进制、内存监视",
+      "f3.t":"TAS 编辑器","f3.d":"逐帧录制与编辑输入",
+      "f4.t":"Lua 脚本","f4.d":"自定义 HUD 与自动化测试",
+      "about.k":"关于","about.t":"简介",
+      "about.a1":"FCEUX11 是基于 FCEUX 的 NES/Famicom 模拟器衍生项目，面向 <em>Windows 11</em> 平台持续维护。",
+      "about.a2":"在保留 FCEUX 核心模拟精度的基础上，提供现代化的 Windows 原生体验，包括 <em>Qt6 图形界面</em>、多语言支持以及完善的调试与 TAS 工具集。",
+      foot:"基于 FCEUX"}
+};
+let lang='en';
+function apply(l){
+  lang=l;
+  document.documentElement.lang=l==='zh'?'zh-CN':'en';
+  document.querySelectorAll('[data-i18n]').forEach(e=>{const k=e.getAttribute('data-i18n');if(I18N[l][k])e.innerHTML=I18N[l][k];});
+  document.getElementById('langBtn').textContent=l==='zh'?'EN':'中文';
+}
+document.getElementById('langBtn').addEventListener('click',()=>apply(lang==='zh'?'en':'zh'));
+
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}}),{threshold:.12,rootMargin:'0px 0px -30px 0px'});
+document.querySelectorAll('.reveal').forEach(e=>io.observe(e));
+const nav=document.getElementById('nav');
+addEventListener('scroll',()=>nav.classList.toggle('scrolled',scrollY>8),{passive:true});
+</script>
+</body>
+</html>
