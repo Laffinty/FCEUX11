@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#080a09" />
 <title>FCEUX11 — NES emulator for Windows 11</title>
 <meta name="description" content="A small, modern NES/Famicom emulator for Windows 11. Built on Qt 6.8 and C++20." />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080a09'/%3E%3Cpath d='M20 22h24M20 32h24M20 42h24' stroke='%2334d399' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E" />
+<link rel="icon" type="image/x-icon" href="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
@@ -58,8 +58,7 @@
   nav.scrolled{border-color:var(--border)}
   .nav-inner{display:flex;align-items:center;justify-content:space-between;height:60px}
   .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);font-family:var(--font-display);font-weight:600;font-size:16px;letter-spacing:-.01em}
-  .brand .mark{width:26px;height:26px;display:grid;place-items:center;border-radius:8px;background:var(--grad);box-shadow:0 0 22px rgba(52,211,153,.3)}
-  .brand .mark svg{width:15px;height:15px}
+  .brand .mark{width:26px;height:26px;border-radius:6px;display:block;object-fit:contain}
   .nav-right{display:flex;align-items:center;gap:6px}
   .lang{font-family:var(--font-mono);font-size:12px;color:var(--muted);border:1px solid var(--border);background:transparent;padding:6px 10px;border-radius:8px;cursor:pointer;transition:.2s}
   .lang:hover{color:var(--text);border-color:var(--border-strong)}
@@ -126,7 +125,7 @@
 <nav id="nav">
   <div class="wrap nav-inner">
     <a class="brand" href="#top">
-      <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M6 7h12M6 12h12M6 17h12" stroke="#06120c" stroke-width="2.4" stroke-linecap="round"/></svg></span>
+      <img class="mark" src="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" alt="" width="26" height="26" />
       FCEUX11
     </a>
     <div class="nav-right">
