@@ -9,6 +9,7 @@
 #include <cstring>
 #include <vector>
 #include <string>
+#include <chrono>
 
 #include "types.h"
 #include "fceu.h"
@@ -17,8 +18,11 @@
 #include "emufile.h"
 #include "utils/md5.h"
 #include "drivers/Qt/nes_shm.h"
+#include "x6502.h"
+#include "ppu.h"
 
 static const int FRAMES_TO_RUN = 60;
+static const double WATCHDOG_SECONDS_PER_FRAME = 30.0;
 static const char* GOLDEN_HASHES_PATH = "fixtures/golden_savestate_hashes.json";
 
 struct RomTestCase {
@@ -178,9 +182,17 @@ static std::string computeSavestateHash(const char* romPath)
         fprintf(stderr, "FCEUI_Initialize failed\n");
         return "";
     }
-    if (!nes_shm) {
-        nes_shm = open_nes_shm();
-    }
+    // Defensive re-initialization: close any stale SHM from a prior
+    // Initialize/Kill cycle, then open a fresh one. This prevents headless
+    // test hangs caused by reusing a partially-torn-down shared-memory block.
+    close_nes_shm();
+    nes_shm = open_nes_shm();
+
+    // Make sure interactive/background features that may block in a GUI-less
+    // CI runner are explicitly disabled.
+    AutoResumePlay = false;
+    FCEU_StateRecorderSetEnabled(false);
+
     FCEUI_SetInput(0, static_cast<ESI>(SI_NONE), nullptr, 0);
     FCEUI_SetInput(1, static_cast<ESI>(SI_NONE), nullptr, 0);
     FCEUI_SetInputFC(static_cast<ESIFC>(SIFC_NONE), nullptr, 0);
@@ -196,7 +208,18 @@ static std::string computeSavestateHash(const char* romPath)
     int32* soundBuf = nullptr;
     int32 soundBufSize = 0;
     for (int i = 0; i < FRAMES_TO_RUN; ++i) {
+        auto frame_start = std::chrono::steady_clock::now();
         fceu11::Emulate(&xbuf, &soundBuf, &soundBufSize, 0);
+        auto frame_elapsed = std::chrono::steady_clock::now() - frame_start;
+        double seconds = std::chrono::duration<double>(frame_elapsed).count();
+        if (seconds > WATCHDOG_SECONDS_PER_FRAME) {
+            fprintf(stderr,
+                    "WATCHDOG: frame %d took %.1f seconds (limit %.1f). "
+                    "PC=%04X scanline=%d timestamp=%u\n",
+                    i, seconds, WATCHDOG_SECONDS_PER_FRAME,
+                    X.PC, scanline, timestamp);
+            abort();
+        }
     }
 
     std::vector<std::byte> buffer;

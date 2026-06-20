@@ -79,9 +79,8 @@ if(FCEUX11_BUILD_TESTS)
 
     # v0.3.12.5 — byte-level savestate consistency test.
     # 12 ROMs × 60 frames ≈ 720 frames of emulation. On slow CI nodes this
-    # can exceed ctest's default 1500s timeout, so we set an explicit
-    # 2400s (40min) limit. If you raise FRAMES_TO_RUN above 60 in the
-    # source file, revisit this value.
+    # Phase 0: per-frame watchdog now aborts hangs early, so the CTest
+    # timeout can be tightened to 300s (5min) for fast CI failure.
     fceux11_add_test_executable(fceux11_savestate_regression_test
         savestate_regression_test.cpp
         git_info_stub.cpp
@@ -89,7 +88,7 @@ if(FCEUX11_BUILD_TESTS)
     add_test(NAME savestate_regression_test
              COMMAND fceux11_savestate_regression_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-    set_tests_properties(savestate_regression_test PROPERTIES TIMEOUT 2400)
+    set_tests_properties(savestate_regression_test PROPERTIES TIMEOUT 300)
 
     # v0.3.3 — tl::expected API tests
     fceux11_add_test_executable(fceux11_expected_api_test

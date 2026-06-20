@@ -78,6 +78,7 @@ extern void RefreshThrottleFPS();
 #else
 #ifdef __QT_DRIVER__
 #include "drivers/Qt/sdl.h"
+#include "drivers/Qt/nes_shm.h"
 #else
 #include "drivers/sdl/sdl.h"
 #endif
@@ -470,9 +471,10 @@ FCEUGI *fceu11::LoadGameVirtual(const char *name, int OverwriteVidMode, bool sil
 	//reset parameters so they're cleared just in case a format's loader doesn't know to do the clearing
 	MasterRomInfoParams = TMasterRomInfoParams();
 
-	if (!AutosaveStatus)
+	if (!AutosaveStatus) {
 		AutosaveStatus_owner = FCEU_gmalloc_unique(sizeof(int) * AutosaveQty);  // v0.3.6: RAII-wrapped
 		AutosaveStatus = (int*)AutosaveStatus_owner.get();
+	}
 	for (AutosaveIndex = 0; AutosaveIndex < AutosaveQty; ++AutosaveIndex)
 		AutosaveStatus[AutosaveIndex] = 0;
 

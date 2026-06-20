@@ -419,7 +419,7 @@ void fceux11_rust_drawing_draw_text_trans(uint8_t *dest,
                                           const char *textmsg,
                                           uint32_t width,
                                           uint8_t fgcolor,
-                                          int max_w,
+                                          int _max_w,
                                           int max_h,
                                           int border);
 

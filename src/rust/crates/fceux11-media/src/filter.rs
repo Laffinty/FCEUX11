@@ -327,9 +327,7 @@ pub extern "C" fn fceux11_rust_filter_neo(
     let left = if soundq == 2 { SQ2NCOEFFS + 1 } else { NCOEFFS + 1 };
 
     if let Some(fill) = neo_fill {
-        unsafe {
-            fill(out_slice.as_mut_ptr(), out_idx as i32);
-        }
+        fill(out_slice.as_mut_ptr(), out_idx as i32);
     }
 
     // Apply SexyFilter in-place on the output (in == out)

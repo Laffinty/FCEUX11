@@ -360,11 +360,7 @@ fn parse_text_record(md: &FceuMovieData, data: &[u8]) -> Result<MovieRecord, &'s
         }
     }
 
-    // fcexp pipe (no data logged)
-    if pos < data.len() && data[pos] == b'|' {
-        pos += 1;
-    }
-
+    // fcexp pipe (no data logged) — pos is not consumed past this function.
     Ok(rec)
 }
 
@@ -517,6 +513,7 @@ fn load_fm2(data: &[u8], stop_after_header: bool) -> Result<FceuMovieData, &'sta
 // Core FM2 serializer
 // ============================================================
 
+#[allow(dead_code)]
 fn dump_text_record_to_vec(md: &FceuMovieData, rec: &MovieRecord, _index: usize, out: &mut Vec<u8>) {
     out.push(b'|');
     write_dec_varlen(rec.commands as u64, out);
@@ -554,6 +551,7 @@ fn dump_text_record_to_vec(md: &FceuMovieData, rec: &MovieRecord, _index: usize,
     out.push(b'\n');
 }
 
+#[allow(dead_code)]
 fn dump_binary_record_to_vec(md: &FceuMovieData, rec: &MovieRecord, out: &mut Vec<u8>) {
     out.push(rec.commands);
 
@@ -580,6 +578,7 @@ fn dump_binary_record_to_vec(md: &FceuMovieData, rec: &MovieRecord, out: &mut Ve
     }
 }
 
+#[allow(dead_code)]
 fn dump_fm2(md: &FceuMovieData, binary: bool) -> Vec<u8> {
     let mut out = Vec::new();
 

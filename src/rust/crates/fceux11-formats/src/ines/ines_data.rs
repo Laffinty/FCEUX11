@@ -357,7 +357,9 @@ pub static BAD_ROMS: &[BadRomEntry] = &[
 ];
 
 /// Master ROM info database (formerly CheckHInfo -> sMasterRomInfo)
+#[allow(dead_code)]
 pub struct MasterRomInfo { pub md5lower: u64, pub params: &'static str }
+#[allow(dead_code)]
 pub static MASTER_ROM_INFO: &[MasterRomInfo] = &[
     MasterRomInfo { md5lower: 0x62b51b108a01d2beu64, params: "bonus=0" },
     MasterRomInfo { md5lower: 0x8bb48490d8d22711u64, params: "bonus=0" },

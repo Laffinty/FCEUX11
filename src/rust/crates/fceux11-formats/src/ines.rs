@@ -4,7 +4,7 @@
 //! `src/ines.cpp`. C++ retains `iNESLoad`, `iNES_Init`, and the `bmap[]`
 //! function-pointer table; Rust owns all pure-data lookup and parsing logic.
 
-use std::ffi::{c_char, CStr};
+use std::ffi::c_char;
 
 mod ines_data;
 
