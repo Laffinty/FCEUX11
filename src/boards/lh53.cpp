@@ -96,7 +96,7 @@ static void StateRestore(int version) {
 void LH53_Init(CartInfo *info) {
 	info->Power = LH53Power;
 	info->Close = LH53Close;
-	MapIRQHook = LH53IRQ;
+	g_cpu.map_irq_hook_ref() = LH53IRQ;
 	GameStateRestore = StateRestore;
 
 	WRAMSIZE = 8192;

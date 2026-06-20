@@ -123,7 +123,7 @@ static void StateRestore(int version) {
 void Mapper73_Init(CartInfo *info) {
 	info->Power = M73Power;
 	info->Close = M73Close;
-	MapIRQHook = M73IRQHook;
+	g_cpu.map_irq_hook_ref() = M73IRQHook;
 
 	WRAMSIZE = 8192;
 	WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped

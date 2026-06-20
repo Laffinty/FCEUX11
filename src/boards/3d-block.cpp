@@ -89,7 +89,7 @@ static void StateRestore(int version) {
 void UNL3DBlock_Init(CartInfo *info) {
 	info->Power = UNL3DBlockPower;
 	info->Reset = UNL3DBlockReset;
-	MapIRQHook = UNL3DBlockIRQHook;
+	g_cpu.map_irq_hook_ref() = UNL3DBlockIRQHook;
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }

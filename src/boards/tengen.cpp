@@ -49,7 +49,7 @@ static void M64IRQHook(int a) {
 }
 
 static void M64HBHook(void) {
-	if ((!IRQmode) && (scanline != 240)) {
+	if ((!IRQmode) && (g_cpu.scanline_ref() != 240)) {
 		rmode = 0;
 		IRQCount--;
 		if (IRQCount == 0xFF) {
@@ -133,7 +133,7 @@ static void StateRestore(int version) {
 void Mapper64_Init(CartInfo *info) {
 	info->Power = M64Power;
 	GameHBIRQHook = M64HBHook;
-	MapIRQHook = M64IRQHook;
+	g_cpu.map_irq_hook_ref() = M64IRQHook;
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }

@@ -552,8 +552,8 @@ static DECLFW(COOLGIRL_WRITE) {
 		COOLGIRL_Flash_Write(A, V);
 
 	// block two writes in a row
-	if ((timestampbase + timestamp) < (lreset + 2))	return;
-	lreset = timestampbase + timestamp;
+	if ((timestampbase + g_cpu.timestamp_ref()) < (lreset + 2))	return;
+	lreset = timestampbase + g_cpu.timestamp_ref();
 
 	if (A >= 0x5000 && A < 0x6000 && !lockout)
 	{
@@ -1889,7 +1889,7 @@ static DECLFR(MAFRAM) {
 	if ((mapper == 0b001111) && (A == 0x5204))
 	{
 		int ppuon = (PPU[1] & 0x18);
-		uint8 r = (!ppuon || scanline + 1 >= 241) ? 0 : 1;
+		uint8 r = (!ppuon || g_cpu.scanline_ref() + 1 >= 241) ? 0 : 1;
 		uint8 p = mmc5_irq_out;
 		X6502_IRQEnd(FCEU_IQEXT);
 		mmc5_irq_out = 0;
@@ -1930,7 +1930,7 @@ static void COOLGIRL_ScanlineCounter(void) {
 		X6502_IRQBegin(FCEU_IQEXT);
 
 	// for MMC5
-	if (mmc5_irq_line == scanline + 1)
+	if (mmc5_irq_line == g_cpu.scanline_ref() + 1)
 	{
 		if (mmc5_irq_enabled)
 		{
@@ -1940,12 +1940,12 @@ static void COOLGIRL_ScanlineCounter(void) {
 	}
 
 	// for mapper #163
-	if (scanline == 239)
+	if (g_cpu.scanline_ref() == 239)
 	{
 		mapper_163_latch = 0;
 		COOLGIRL_Sync_CHR();
 	}
-	else if (scanline == 127)
+	else if (g_cpu.scanline_ref() == 127)
 	{
 		mapper_163_latch = 1;
 		COOLGIRL_Sync_CHR();
@@ -2214,7 +2214,7 @@ static void COOLGIRL_Power(void) {
 	SetReadHandler(0x8000, 0xFFFF, CartBR);
 	SetWriteHandler(0x4020, 0xFFFF, COOLGIRL_WRITE);
 	GameHBIRQHook = COOLGIRL_ScanlineCounter;
-	MapIRQHook = COOLGIRL_CpuCounter;
+	g_cpu.map_irq_hook_ref() = COOLGIRL_CpuCounter;
 	PPU_hook = COOLGIRL_PPUHook;
 	COOLGIRL_Reset();
 }

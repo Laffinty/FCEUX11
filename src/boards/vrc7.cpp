@@ -200,7 +200,7 @@ static void StateRestore(int version) {
 void Mapper85_Init(CartInfo *info) {
 	info->Power = VRC7Power;
 	info->Close = VRC7Close;
-	MapIRQHook = VRC7IRQHook;
+	g_cpu.map_irq_hook_ref() = VRC7IRQHook;
 	WRAMSIZE = 8192;
 	WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped
 	WRAM = WRAM_owner.get();

@@ -174,7 +174,7 @@ void QTAi_Init(CartInfo *info) {
 	info->Close = QTAiClose;
 	GameStateRestore = StateRestore;
 
-	MapIRQHook = VRC5IRQ;
+	g_cpu.map_irq_hook_ref() = VRC5IRQ;
 
 	CHRRAM_owner = FCEU_gmalloc_unique(CHRSIZE);  // v0.3.6: RAII-wrapped
 	CHRRAM = CHRRAM_owner.get();

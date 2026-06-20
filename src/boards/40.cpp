@@ -80,7 +80,7 @@ static void StateRestore(int version) {
 void Mapper40_Init(CartInfo *info) {
 	info->Reset = M40Reset;
 	info->Power = M40Power;
-	MapIRQHook = M40IRQHook;
+	g_cpu.map_irq_hook_ref() = M40IRQHook;
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }

@@ -87,14 +87,14 @@ static void MMC1MIRROR(void) {
 static uint64 lreset;
 static DECLFW(MMC1_write) {
 	int n = (A >> 13) - 4;
-	if ((timestampbase + timestamp) < (lreset + 2))
+	if ((timestampbase + g_cpu.timestamp_ref()) < (lreset + 2))
 		return;
 
 	if (V & 0x80) {
 		DRegs[0] |= 0xC;
 		BufferShift = Buffer = 0;
 		MMC1PRG();
-		lreset = timestampbase + timestamp;
+		lreset = timestampbase + g_cpu.timestamp_ref();
 		return;
 	}
 
@@ -249,7 +249,7 @@ void FNS_Init(CartInfo *info) {
 	info->Power = FNS_Power;
 
 	GameStateRestore = MMC1_Restore;
-	MapIRQHook = NFC_IRQ;
+	g_cpu.map_irq_hook_ref() = NFC_IRQ;
 
 	WRAMSIZE = (8 + 32) * 1024;
 	WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped
