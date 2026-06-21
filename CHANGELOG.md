@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Phase 5 (Legion) — Rust workspace clippy clean.** The entire
+  `src/rust` workspace now passes `cargo clippy --all-targets -- -D warnings`
+  without warnings or errors. Raw-pointer FFI functions are marked `unsafe`
+  and documented with `# Safety` requirements; corresponding test helpers
+  are wrapped in `unsafe` blocks. No business logic was changed.
+- Regenerated `src/rust/fceux11_rust.h` via cbindgen to reflect the new
+  Rust safety documentation.
+
+### Fixed
+
+- Fixed dominant clippy categories across all Rust crates:
+  `not_unsafe_ptr_arg_deref`, `missing_safety_doc`,
+  `manual_range_contains`, `needless_range_loop`, `manual_clamp`,
+  `collapsible_if`, `unnecessary_cast`, `too_many_arguments`,
+  `dead_code`, and unused imports.
+
 ## [1.1.0] - 2026-06-18
 
 **Codename: Sentinel.** First sub-version of the v1.x modernization
