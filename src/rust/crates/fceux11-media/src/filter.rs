@@ -105,14 +105,12 @@ pub extern "C" fn fceux11_rust_filter_make(
 
     let half = nco >> 1;
     if soundq == 2 {
-        for x in 0..half {
-            let v = tmp[x];
+        for (x, &v) in tmp.iter().take(half).enumerate() {
             state.sq2coeffs[x] = v;
             state.sq2coeffs[SQ2NCOEFFS - 1 - x] = v;
         }
     } else {
-        for x in 0..half {
-            let v = tmp[x];
+        for (x, &v) in tmp.iter().take(half).enumerate() {
             state.coeffs[x] = v;
             state.coeffs[NCOEFFS - 1 - x] = v;
         }
@@ -151,18 +149,13 @@ fn sexy_filter_in_place(
     let mut acc1 = state.sexy_acc1;
     let mut acc2 = state.sexy_acc2;
 
-    for i in 0..buf.len() {
-        let ino64 = (buf[i] as i64) * vmul;
+    for sample in buf.iter_mut() {
+        let ino64 = (*sample as i64) * vmul;
         acc1 += ((ino64 - acc1) * mul1) >> 16;
         acc2 += ((ino64 - acc1 - acc2) * mul2) >> 16;
         let mut t = ((acc1 - ino64 + acc2) >> 16) as i32;
-        if t > 32767 {
-            t = 32767;
-        }
-        if t < -32768 {
-            t = -32768;
-        }
-        buf[i] = t;
+        t = t.clamp(-32768, 32767);
+        *sample = t;
     }
 
     state.sexy_acc1 = acc1;
@@ -192,19 +185,14 @@ fn sexy_filter_out_of_place(
     let mut acc1 = state.sexy_acc1;
     let mut acc2 = state.sexy_acc2;
 
-    for i in 0..in_buf.len() {
-        let ino64 = (in_buf[i] as i64) * vmul;
+    for (in_sample, out_sample) in in_buf.iter_mut().zip(out_buf.iter_mut()) {
+        let ino64 = (*in_sample as i64) * vmul;
         acc1 += ((ino64 - acc1) * mul1) >> 16;
         acc2 += ((ino64 - acc1 - acc2) * mul2) >> 16;
         let mut t = ((acc1 - ino64 + acc2) >> 16) as i32;
-        if t > 32767 {
-            t = 32767;
-        }
-        if t < -32768 {
-            t = -32768;
-        }
-        out_buf[i] = t;
-        in_buf[i] = 0;
+        t = t.clamp(-32768, 32767);
+        *out_sample = t;
+        *in_sample = 0;
     }
 
     state.sexy_acc1 = acc1;
@@ -214,8 +202,12 @@ fn sexy_filter_out_of_place(
 /// C ABI: `SexyFilter` wrapper.
 ///
 /// `in_buf` and `out_buf` may point to the same memory.
+///
+/// # Safety
+/// `handle` must be a valid filter state handle.
+/// `in_buf` and `out_buf` must each point to at least `count` valid `i32`s.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_filter_sexy(
+pub unsafe extern "C" fn fceux11_rust_filter_sexy(
     handle: *mut FceuFilterState,
     in_buf: *mut i32,
     out_buf: *mut i32,
@@ -238,8 +230,12 @@ pub extern "C" fn fceux11_rust_filter_sexy(
 }
 
 /// C ABI: `SexyFilter2` wrapper.
+///
+/// # Safety
+/// `handle` must be a valid filter state handle.
+/// `buf` must point to at least `count` valid `i32`s.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_filter_sexy2(
+pub unsafe extern "C" fn fceux11_rust_filter_sexy2(
     handle: *mut FceuFilterState,
     buf: *mut i32,
     count: i32,
@@ -257,8 +253,14 @@ pub extern "C" fn fceux11_rust_filter_sexy2(
 /// Returns the number of samples written to `out`.
 /// `leftover` is set to the number of samples that must be copied from the
 /// end of `in` to the beginning of `in` on the next call.
+///
+/// # Safety
+/// `handle` must be a valid filter state handle.
+/// `in_buf` and `out_buf` must each point to at least `inlen` valid `i32`s.
+/// `leftover`, when non-null, must point to a writable `i32`.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_filter_neo(
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn fceux11_rust_filter_neo(
     handle: *mut FceuFilterState,
     in_buf: *mut i32,
     out_buf: *mut i32,
@@ -278,8 +280,7 @@ pub extern "C" fn fceux11_rust_filter_neo(
     // out_buf must be at least as large as inlen; caller guarantees this.
     let out_slice = unsafe { slice::from_raw_parts_mut(out_buf, inlen as usize) };
 
-    let inlen_u = inlen as u32;
-    let max = (inlen_u - 1) << 16;
+    let max = (inlen - 1) << 16;
     let mut out_idx = 0usize;
 
     if soundq == 2 {
@@ -324,7 +325,11 @@ pub extern "C" fn fceux11_rust_filter_neo(
         state.mrindex += (NCOEFFS * 65536) as u32;
     }
 
-    let left = if soundq == 2 { SQ2NCOEFFS + 1 } else { NCOEFFS + 1 };
+    let left = if soundq == 2 {
+        SQ2NCOEFFS + 1
+    } else {
+        NCOEFFS + 1
+    };
 
     if let Some(fill) = neo_fill {
         fill(out_slice.as_mut_ptr(), out_idx as i32);
@@ -339,7 +344,9 @@ pub extern "C" fn fceux11_rust_filter_neo(
     }
 
     if !leftover.is_null() {
-        unsafe { *leftover = left as i32; }
+        unsafe {
+            *leftover = left as i32;
+        }
     }
     out_idx as i32
 }
@@ -350,77 +357,89 @@ mod tests {
 
     #[test]
     fn test_filter_state_create_destroy() {
-        let h = fceux11_rust_filter_state_create();
-        assert!(!h.is_null());
-        fceux11_rust_filter_state_destroy(h);
+        unsafe {
+            let h = fceux11_rust_filter_state_create();
+            assert!(!h.is_null());
+            fceux11_rust_filter_state_destroy(h);
+        }
     }
 
     #[test]
     fn test_filter_make() {
-        let h = fceux11_rust_filter_state_create();
-        fceux11_rust_filter_make(h, 44100, 0, 0, 1789772.727, 1662607.125);
-        let state = unsafe { &*(h as *mut FilterState) };
-        assert_ne!(state.mrratio, 0);
-        assert_eq!(state.coeffs[0], 285);
-        assert_eq!(state.coeffs[NCOEFFS - 1], 285);
-        fceux11_rust_filter_state_destroy(h);
+        unsafe {
+            let h = fceux11_rust_filter_state_create();
+            fceux11_rust_filter_make(h, 44100, 0, 0, 1789772.727, 1662607.125);
+            let state = unsafe { &*(h as *mut FilterState) };
+            assert_ne!(state.mrratio, 0);
+            assert_eq!(state.coeffs[0], 285);
+            assert_eq!(state.coeffs[NCOEFFS - 1], 285);
+            fceux11_rust_filter_state_destroy(h);
+        }
     }
 
     #[test]
     fn test_filter_sexy() {
-        let h = fceux11_rust_filter_state_create();
-        let mut buf = [1000i32; 4];
-        let mut out = [0i32; 4];
-        fceux11_rust_filter_sexy(h, buf.as_mut_ptr(), out.as_mut_ptr(), 4, 44100, 100, 0);
-        // input should be zeroed because in != out
-        assert_eq!(buf, [0, 0, 0, 0]);
-        // output should be non-zero (clamped)
-        assert!(out.iter().any(|&v| v != 0));
-        fceux11_rust_filter_state_destroy(h);
+        unsafe {
+            let h = fceux11_rust_filter_state_create();
+            let mut buf = [1000i32; 4];
+            let mut out = [0i32; 4];
+            fceux11_rust_filter_sexy(h, buf.as_mut_ptr(), out.as_mut_ptr(), 4, 44100, 100, 0);
+            // input should be zeroed because in != out
+            assert_eq!(buf, [0, 0, 0, 0]);
+            // output should be non-zero (clamped)
+            assert!(out.iter().any(|&v| v != 0));
+            fceux11_rust_filter_state_destroy(h);
+        }
     }
 
     #[test]
     fn test_filter_sexy_same_ptr() {
-        let h = fceux11_rust_filter_state_create();
-        let mut buf = [1000i32; 4];
-        fceux11_rust_filter_sexy(h, buf.as_mut_ptr(), buf.as_mut_ptr(), 4, 44100, 100, 0);
-        // input should NOT be zeroed because in == out
-        assert!(buf.iter().any(|&v| v != 0));
-        fceux11_rust_filter_state_destroy(h);
+        unsafe {
+            let h = fceux11_rust_filter_state_create();
+            let mut buf = [1000i32; 4];
+            fceux11_rust_filter_sexy(h, buf.as_mut_ptr(), buf.as_mut_ptr(), 4, 44100, 100, 0);
+            // input should NOT be zeroed because in == out
+            assert!(buf.iter().any(|&v| v != 0));
+            fceux11_rust_filter_state_destroy(h);
+        }
     }
 
     #[test]
     fn test_filter_sexy2() {
-        let h = fceux11_rust_filter_state_create();
-        let mut buf = [1000i32; 4];
-        fceux11_rust_filter_sexy2(h, buf.as_mut_ptr(), 4);
-        // output should be modified
-        assert!(buf.iter().any(|&v| v != 1000));
-        fceux11_rust_filter_state_destroy(h);
+        unsafe {
+            let h = fceux11_rust_filter_state_create();
+            let mut buf = [1000i32; 4];
+            fceux11_rust_filter_sexy2(h, buf.as_mut_ptr(), 4);
+            // output should be modified
+            assert!(buf.iter().any(|&v| v != 1000));
+            fceux11_rust_filter_state_destroy(h);
+        }
     }
 
     #[test]
     fn test_filter_neo_basic() {
-        let h = fceux11_rust_filter_state_create();
-        fceux11_rust_filter_make(h, 44100, 0, 0, 1789772.727, 1662607.125);
-        let mut input = [0i32; 1024];
-        input[500] = 10000;
-        let mut output = [0i32; 1024];
-        let mut leftover = 0i32;
-        let count = fceux11_rust_filter_neo(
-            h,
-            input.as_mut_ptr(),
-            output.as_mut_ptr(),
-            1024,
-            &mut leftover,
-            0,
-            0,
-            None,
-            44100,
-            100,
-        );
-        assert!(count > 0);
-        assert_eq!(leftover, (NCOEFFS + 1) as i32);
-        fceux11_rust_filter_state_destroy(h);
+        unsafe {
+            let h = fceux11_rust_filter_state_create();
+            fceux11_rust_filter_make(h, 44100, 0, 0, 1789772.727, 1662607.125);
+            let mut input = [0i32; 1024];
+            input[500] = 10000;
+            let mut output = [0i32; 1024];
+            let mut leftover = 0i32;
+            let count = fceux11_rust_filter_neo(
+                h,
+                input.as_mut_ptr(),
+                output.as_mut_ptr(),
+                1024,
+                &mut leftover,
+                0,
+                0,
+                None,
+                44100,
+                100,
+            );
+            assert!(count > 0);
+            assert_eq!(leftover, (NCOEFFS + 1) as i32);
+            fceux11_rust_filter_state_destroy(h);
+        }
     }
 }

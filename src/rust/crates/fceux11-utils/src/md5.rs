@@ -41,7 +41,7 @@ fn i(x: u32, y: u32, z: u32) -> u32 {
 }
 
 fn rotate_left(x: u32, n: u32) -> u32 {
-    (x << n) | ((x & 0xFFFFFFFF) >> (32 - n))
+    x.rotate_left(n)
 }
 
 fn md5_process(ctx: &mut Md5Context, data: &[u8; 64]) {
@@ -56,8 +56,20 @@ fn md5_process(ctx: &mut Md5Context, data: &[u8; 64]) {
     let mut d = ctx.state[3];
 
     // Round 1
-    let step = |f: fn(u32, u32, u32) -> u32, a: &mut u32, b: u32, c: u32, d: u32, k: usize, s: u32, t: u32| {
-        *a = b.wrapping_add(rotate_left(a.wrapping_add(f(b, c, d)).wrapping_add(x[k]).wrapping_add(t), s));
+    let step = |f: fn(u32, u32, u32) -> u32,
+                a: &mut u32,
+                b: u32,
+                c: u32,
+                d: u32,
+                k: usize,
+                s: u32,
+                t: u32| {
+        *a = b.wrapping_add(rotate_left(
+            a.wrapping_add(f(b, c, d))
+                .wrapping_add(x[k])
+                .wrapping_add(t),
+            s,
+        ));
     };
 
     step(f, &mut a, b, c, d, 0, 7, 0xD76AA478);
@@ -138,16 +150,15 @@ fn md5_process(ctx: &mut Md5Context, data: &[u8; 64]) {
 }
 
 const MD5_PADDING: [u8; 64] = [
-    0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0,
 ];
 
 /// # Safety
 /// `ctx` must point to a valid, writable `Md5Context`.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_md5_starts(ctx: *mut Md5Context) {
+pub unsafe extern "C" fn fceux11_rust_md5_starts(ctx: *mut Md5Context) {
     let ctx = unsafe { &mut *ctx };
     ctx.total = [0, 0];
     ctx.state = [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476];
@@ -158,13 +169,17 @@ pub extern "C" fn fceux11_rust_md5_starts(ctx: *mut Md5Context) {
 /// `ctx` must point to a valid, writable `Md5Context`.
 /// `input` must point to at least `length` valid bytes, or be NULL when `length` is 0.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_md5_update(ctx: *mut Md5Context, input: *const u8, length: u32) {
+pub unsafe extern "C" fn fceux11_rust_md5_update(
+    ctx: *mut Md5Context,
+    input: *const u8,
+    length: u32,
+) {
     if input.is_null() || length == 0 {
         return;
     }
     let ctx = unsafe { &mut *ctx };
     let input = unsafe { slice::from_raw_parts(input, length as usize) };
-    let mut length = length as u32;
+    let mut length = length;
     let mut input_offset = 0usize;
 
     let mut left = ((ctx.total[0] >> 3) & 0x3F) as usize;
@@ -203,7 +218,7 @@ pub extern "C" fn fceux11_rust_md5_update(ctx: *mut Md5Context, input: *const u8
 /// `ctx` must point to a valid, writable `Md5Context`.
 /// `digest` must point to at least 16 writable bytes.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_md5_finish(ctx: *mut Md5Context, digest: *mut u8) {
+pub unsafe extern "C" fn fceux11_rust_md5_finish(ctx: *mut Md5Context, digest: *mut u8) {
     let ctx = unsafe { &mut *ctx };
     let digest = unsafe { slice::from_raw_parts_mut(digest, 16) };
 
@@ -214,8 +229,8 @@ pub extern "C" fn fceux11_rust_md5_finish(ctx: *mut Md5Context, digest: *mut u8)
     put_uint32_le!(ctx.total[0], msglen, 0);
     put_uint32_le!(ctx.total[1], msglen, 4);
 
-    fceux11_rust_md5_update(ctx, MD5_PADDING.as_ptr(), padn as u32);
-    fceux11_rust_md5_update(ctx, msglen.as_ptr(), 8);
+    unsafe { fceux11_rust_md5_update(ctx, MD5_PADDING.as_ptr(), padn as u32) };
+    unsafe { fceux11_rust_md5_update(ctx, msglen.as_ptr(), 8) };
 
     put_uint32_le!(ctx.state[0], digest, 0);
     put_uint32_le!(ctx.state[1], digest, 4);
@@ -232,12 +247,15 @@ thread_local! {
 /// `md5` must point to a valid 16-byte MD5 digest.
 /// Returns a pointer to a thread-local static buffer. Caller should copy immediately.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_md5_asciistr(md5: *const u8) -> *const c_char {
+pub unsafe extern "C" fn fceux11_rust_md5_asciistr(md5: *const u8) -> *const c_char {
     if md5.is_null() {
         return std::ptr::null();
     }
     let md5 = unsafe { slice::from_raw_parts(md5, 16) };
-    let trans: [u8; 16] = [b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'a', b'b', b'c', b'd', b'e', b'f'];
+    let trans: [u8; 16] = [
+        b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'a', b'b', b'c', b'd', b'e',
+        b'f',
+    ];
 
     MD5_ASCII_STR.with(|s| {
         let mut s = s.borrow_mut();
@@ -253,20 +271,22 @@ pub extern "C" fn fceux11_rust_md5_asciistr(md5: *const u8) -> *const c_char {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use md5::Md5;
     use digest::Digest;
+    use md5::Md5;
 
     fn rust_md5_compute(data: &[u8]) -> [u8; 16] {
-        let mut ctx = Md5Context {
-            total: [0, 0],
-            state: [0, 0, 0, 0],
-            buffer: [0; 64],
-        };
-        let mut digest = [0u8; 16];
-        fceux11_rust_md5_starts(&mut ctx);
-        fceux11_rust_md5_update(&mut ctx, data.as_ptr(), data.len() as u32);
-        fceux11_rust_md5_finish(&mut ctx, digest.as_mut_ptr());
-        digest
+        unsafe {
+            let mut ctx = Md5Context {
+                total: [0, 0],
+                state: [0, 0, 0, 0],
+                buffer: [0; 64],
+            };
+            let mut digest = [0u8; 16];
+            fceux11_rust_md5_starts(&mut ctx);
+            fceux11_rust_md5_update(&mut ctx, data.as_ptr(), data.len() as u32);
+            fceux11_rust_md5_finish(&mut ctx, digest.as_mut_ptr());
+            digest
+        }
     }
 
     fn crate_md5_compute(data: &[u8]) -> [u8; 16] {
@@ -277,90 +297,106 @@ mod tests {
 
     #[test]
     fn test_md5_empty() {
-        let digest = rust_md5_compute(b"");
-        let expected = crate_md5_compute(b"");
-        assert_eq!(digest, expected);
+        unsafe {
+            let digest = rust_md5_compute(b"");
+            let expected = crate_md5_compute(b"");
+            assert_eq!(digest, expected);
+        }
     }
 
     #[test]
     fn test_md5_the_quick_brown_fox() {
-        let digest = rust_md5_compute(b"The quick brown fox jumps over the lazy dog");
-        let expected = crate_md5_compute(b"The quick brown fox jumps over the lazy dog");
-        assert_eq!(digest, expected);
+        unsafe {
+            let digest = rust_md5_compute(b"The quick brown fox jumps over the lazy dog");
+            let expected = crate_md5_compute(b"The quick brown fox jumps over the lazy dog");
+            assert_eq!(digest, expected);
+        }
     }
 
     #[test]
     fn test_md5_asciistr() {
-        let digest: [u8; 16] = [
-            0xd4, 0x1d, 0x8c, 0xd9, 0x8f, 0x00, 0xb2, 0x04,
-            0xe9, 0x80, 0x09, 0x98, 0xec, 0xf8, 0x42, 0x7e,
-        ];
-        let ptr = fceux11_rust_md5_asciistr(digest.as_ptr());
-        let cstr = unsafe { std::ffi::CStr::from_ptr(ptr) };
-        assert_eq!(cstr.to_str().unwrap(), "d41d8cd98f00b204e9800998ecf8427e");
+        unsafe {
+            let digest: [u8; 16] = [
+                0xd4, 0x1d, 0x8c, 0xd9, 0x8f, 0x00, 0xb2, 0x04, 0xe9, 0x80, 0x09, 0x98, 0xec, 0xf8,
+                0x42, 0x7e,
+            ];
+            let ptr = fceux11_rust_md5_asciistr(digest.as_ptr());
+            let cstr = unsafe { std::ffi::CStr::from_ptr(ptr) };
+            assert_eq!(cstr.to_str().unwrap(), "d41d8cd98f00b204e9800998ecf8427e");
+        }
     }
 
     #[test]
     fn test_md5_multi_update() {
-        let mut ctx = Md5Context {
-            total: [0, 0],
-            state: [0, 0, 0, 0],
-            buffer: [0; 64],
-        };
-        fceux11_rust_md5_starts(&mut ctx);
-        fceux11_rust_md5_update(&mut ctx, b"The quick ".as_ptr(), 10);
-        fceux11_rust_md5_update(&mut ctx, b"brown fox jumps over the lazy dog".as_ptr(), 33);
-        let mut digest = [0u8; 16];
-        fceux11_rust_md5_finish(&mut ctx, digest.as_mut_ptr());
-        let expected = crate_md5_compute(b"The quick brown fox jumps over the lazy dog");
-        assert_eq!(digest, expected);
-    }
-
-    #[test]
-    fn test_md5_large_input() {
-        // 1 MiB of zeros — stresses multi-block path
-        let data = vec![0u8; 1024 * 1024];
-        let digest = rust_md5_compute(&data);
-        let expected = crate_md5_compute(&data);
-        assert_eq!(digest, expected);
-    }
-
-    #[test]
-    fn test_md5_chunked_update() {
-        // Deterministic pseudo-random data using LCG (no external crate)
-        let mut data = vec![0u8; 4096];
-        let mut seed: u32 = 12345;
-        for b in data.iter_mut() {
-            seed = seed.wrapping_mul(1103515245).wrapping_add(12345);
-            *b = (seed >> 16) as u8;
-        }
-
-        let expected = crate_md5_compute(&data);
-
-        // Incremental updates with varying chunk sizes
-        let mut ctx = Md5Context {
-            total: [0, 0],
-            state: [0, 0, 0, 0],
-            buffer: [0; 64],
-        };
-        fceux11_rust_md5_starts(&mut ctx);
-        let chunk_sizes: [usize; 12] = [1, 3, 7, 15, 31, 63, 127, 255, 511, 1023, 2047, 4096];
-        for &chunk_size in &chunk_sizes {
-            let mut offset = 0usize;
-            let mut ctx2 = Md5Context {
+        unsafe {
+            let mut ctx = Md5Context {
                 total: [0, 0],
                 state: [0, 0, 0, 0],
                 buffer: [0; 64],
             };
-            fceux11_rust_md5_starts(&mut ctx2);
-            while offset < data.len() {
-                let end = (offset + chunk_size).min(data.len());
-                fceux11_rust_md5_update(&mut ctx2, data[offset..end].as_ptr(), (end - offset) as u32);
-                offset = end;
-            }
+            fceux11_rust_md5_starts(&mut ctx);
+            fceux11_rust_md5_update(&mut ctx, b"The quick ".as_ptr(), 10);
+            fceux11_rust_md5_update(&mut ctx, b"brown fox jumps over the lazy dog".as_ptr(), 33);
             let mut digest = [0u8; 16];
-            fceux11_rust_md5_finish(&mut ctx2, digest.as_mut_ptr());
-            assert_eq!(digest, expected, "mismatch for chunk_size={}", chunk_size);
+            fceux11_rust_md5_finish(&mut ctx, digest.as_mut_ptr());
+            let expected = crate_md5_compute(b"The quick brown fox jumps over the lazy dog");
+            assert_eq!(digest, expected);
+        }
+    }
+
+    #[test]
+    fn test_md5_large_input() {
+        unsafe {
+            // 1 MiB of zeros — stresses multi-block path
+            let data = vec![0u8; 1024 * 1024];
+            let digest = rust_md5_compute(&data);
+            let expected = crate_md5_compute(&data);
+            assert_eq!(digest, expected);
+        }
+    }
+
+    #[test]
+    fn test_md5_chunked_update() {
+        unsafe {
+            // Deterministic pseudo-random data using LCG (no external crate)
+            let mut data = vec![0u8; 4096];
+            let mut seed: u32 = 12345;
+            for b in data.iter_mut() {
+                seed = seed.wrapping_mul(1103515245).wrapping_add(12345);
+                *b = (seed >> 16) as u8;
+            }
+
+            let expected = crate_md5_compute(&data);
+
+            // Incremental updates with varying chunk sizes
+            let mut ctx = Md5Context {
+                total: [0, 0],
+                state: [0, 0, 0, 0],
+                buffer: [0; 64],
+            };
+            fceux11_rust_md5_starts(&mut ctx);
+            let chunk_sizes: [usize; 12] = [1, 3, 7, 15, 31, 63, 127, 255, 511, 1023, 2047, 4096];
+            for &chunk_size in &chunk_sizes {
+                let mut offset = 0usize;
+                let mut ctx2 = Md5Context {
+                    total: [0, 0],
+                    state: [0, 0, 0, 0],
+                    buffer: [0; 64],
+                };
+                fceux11_rust_md5_starts(&mut ctx2);
+                while offset < data.len() {
+                    let end = (offset + chunk_size).min(data.len());
+                    fceux11_rust_md5_update(
+                        &mut ctx2,
+                        data[offset..end].as_ptr(),
+                        (end - offset) as u32,
+                    );
+                    offset = end;
+                }
+                let mut digest = [0u8; 16];
+                fceux11_rust_md5_finish(&mut ctx2, digest.as_mut_ptr());
+                assert_eq!(digest, expected, "mismatch for chunk_size={}", chunk_size);
+            }
         }
     }
 }

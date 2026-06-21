@@ -107,7 +107,7 @@ pub fn register(lua: &Lua) -> Result<Table> {
                         return Err(mlua::Error::RuntimeError(format!(
                             "invalid mode '{}' (valid: normal, nothrottle, turbo, maximum)",
                             v
-                        )))
+                        )));
                     }
                 },
                 Err(_) => return Err(mlua::Error::RuntimeError("invalid string encoding".into())),

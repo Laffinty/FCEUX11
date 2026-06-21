@@ -65,8 +65,7 @@ pub const FCEUX11_RUST_VIDEO_XBUF_SIZE: usize =
 /// the indexed snapshot's PLTE chunk (always 256 entries per `src/video.cpp:660`).
 pub const FCEUX11_RUST_VIDEO_PALETTE_256: usize = 256;
 pub const FCEUX11_RUST_VIDEO_PALETTE_64: usize = 64;
-pub const FCEUX11_RUST_VIDEO_PALETTE_BYTES_256: usize =
-    FCEUX11_RUST_VIDEO_PALETTE_256 * 3;
+pub const FCEUX11_RUST_VIDEO_PALETTE_BYTES_256: usize = FCEUX11_RUST_VIDEO_PALETTE_256 * 3;
 pub const FCEUX11_RUST_VIDEO_PALETTE_BYTES_64: usize = FCEUX11_RUST_VIDEO_PALETTE_64 * 3;
 
 /// Deflate compression level — matches the C++ `compress()` default
@@ -145,11 +144,7 @@ fn validate_sline_range(first: i32, last: i32) -> Result<u32, ()> {
 ///
 /// On overflow, returns `Err(())` and leaves `out` partially written
 /// (callers should pre-allocate generously).
-fn write_png_chunk(
-    out: &mut Vec<u8>,
-    chunk_type: &[u8; 4],
-    data: &[u8],
-) -> Result<(), ()> {
+fn write_png_chunk(out: &mut Vec<u8>, chunk_type: &[u8; 4], data: &[u8]) -> Result<(), ()> {
     // Length: big-endian u32
     let len = data.len() as u32;
     out.extend_from_slice(&len.to_be_bytes());
@@ -231,15 +226,12 @@ fn compress_idat(raw_scanlines: &[u8]) -> Vec<u8> {
 /// declared lengths. The caller may read from `args.xbuf` and
 /// `rgb_scanlines`; the caller may write to `args.out.ptr..out.ptr+out.len`.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_video_encode_png_rgb(
+pub unsafe extern "C" fn fceux11_rust_video_encode_png_rgb(
     args: *const FceuVideoEncodeArgs,
     rgb_scanlines: FceuSlice,
 ) -> usize {
     let result = encode_png_rgb(unsafe { &*args }, unsafe { rgb_scanlines.as_slice() });
-    match result {
-        Ok(bytes) => bytes,
-        Err(()) => 0,
-    }
+    result.unwrap_or_default()
 }
 
 fn encode_png_rgb(args: &FceuVideoEncodeArgs, rgb_scanlines: &[u8]) -> Result<usize, ()> {
@@ -253,8 +245,7 @@ fn encode_png_rgb(args: &FceuVideoEncodeArgs, rgb_scanlines: &[u8]) -> Result<us
     }
     let totallines = validate_sline_range(args.first_sline, args.last_sline)?;
     let height = totallines;
-    let needed_rgb =
-        (FCEUX11_RUST_VIDEO_XBUF_WIDTH as usize) * 3 * (totallines as usize);
+    let needed_rgb = (FCEUX11_RUST_VIDEO_XBUF_WIDTH as usize) * 3 * (totallines as usize);
     if rgb_scanlines.len() < needed_rgb {
         return Err(());
     }
@@ -315,21 +306,15 @@ fn encode_png_rgb(args: &FceuVideoEncodeArgs, rgb_scanlines: &[u8]) -> Result<us
 ///
 /// Same as `fceux11_rust_video_encode_png_rgb`.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_video_encode_png_indexed(
+pub unsafe extern "C" fn fceux11_rust_video_encode_png_indexed(
     args: *const FceuVideoEncodeArgs,
     plte_rgb: FceuSlice,
 ) -> usize {
     let result = encode_png_indexed(unsafe { &*args }, unsafe { plte_rgb.as_slice() });
-    match result {
-        Ok(bytes) => bytes,
-        Err(()) => 0,
-    }
+    result.unwrap_or_default()
 }
 
-fn encode_png_indexed(
-    args: &FceuVideoEncodeArgs,
-    plte_rgb: &[u8],
-) -> Result<usize, ()> {
+fn encode_png_indexed(args: &FceuVideoEncodeArgs, plte_rgb: &[u8]) -> Result<usize, ()> {
     if args.xbuf.is_null()
         || args.xbuf_len < FCEUX11_RUST_VIDEO_XBUF_SIZE
         || args.out.ptr.is_null()
@@ -355,7 +340,11 @@ fn encode_png_indexed(
     write_png_chunk(&mut png, b"IHDR", &ihdr)?;
 
     // PLTE: 256 entries × 3 bytes = 768 bytes
-    write_png_chunk(&mut png, b"PLTE", &plte_rgb[..FCEUX11_RUST_VIDEO_PALETTE_BYTES_256])?;
+    write_png_chunk(
+        &mut png,
+        b"PLTE",
+        &plte_rgb[..FCEUX11_RUST_VIDEO_PALETTE_BYTES_256],
+    )?;
 
     // IDAT: each scanline = 1 filter byte + width indexed bytes
     let first_sline = args.first_sline as usize;
@@ -435,11 +424,7 @@ pub extern "C" fn fceux11_rust_video_get_screen_pixel(
     // is valid for palette_64.len >= 192.
     let palette_bytes = unsafe { palette_64.as_slice() };
     unsafe {
-        std::ptr::copy_nonoverlapping(
-            palette_bytes.as_ptr().add(p_off),
-            rgb_out.ptr,
-            3,
-        );
+        std::ptr::copy_nonoverlapping(palette_bytes.as_ptr().add(p_off), rgb_out.ptr, 3);
     }
     0
 }
@@ -499,11 +484,10 @@ static SNAPSHOT_AS_NAME: Mutex<Option<String>> = Mutex::new(None);
 /// If `name` is non-null, it must point to at least `name_len` valid
 /// UTF-8 bytes. The bytes need not be NUL-terminated.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_video_set_snapshot_as_name(
-    name: *const c_char,
-    name_len: usize,
-) {
-    let mut guard = SNAPSHOT_AS_NAME.lock().expect("snapshot name mutex poisoned");
+pub extern "C" fn fceux11_rust_video_set_snapshot_as_name(name: *const c_char, name_len: usize) {
+    let mut guard = SNAPSHOT_AS_NAME
+        .lock()
+        .expect("snapshot name mutex poisoned");
     if name.is_null() || name_len == 0 {
         *guard = None;
         return;
@@ -540,7 +524,9 @@ pub extern "C" fn fceux11_rust_video_get_snapshot_as_name(
     buf: *mut c_char,
     buf_len: usize,
 ) -> usize {
-    let guard = SNAPSHOT_AS_NAME.lock().expect("snapshot name mutex poisoned");
+    let guard = SNAPSHOT_AS_NAME
+        .lock()
+        .expect("snapshot name mutex poisoned");
     let name = match guard.as_ref() {
         Some(s) => s.clone(),
         None => return 0,
@@ -581,395 +567,414 @@ mod tests {
 
     #[test]
     fn test_png_signature_is_well_known() {
-        assert_eq!(
-            FCEUX11_RUST_PNG_SIGNATURE,
-            [137, 80, 78, 71, 13, 10, 26, 10]
-        );
+        unsafe {
+            assert_eq!(
+                FCEUX11_RUST_PNG_SIGNATURE,
+                [137, 80, 78, 71, 13, 10, 26, 10]
+            );
+        }
     }
 
     #[test]
     fn test_validate_sline_range() {
-        assert_eq!(totallines_for(0, 239), 240);
-        assert_eq!(totallines_for(0, 0), 1);
-        assert_eq!(totallines_for(0, 255), 256);
-        assert_eq!(totallines_for(100, 100), 1);
-        assert_eq!(totallines_for(100, 99), 0); // last < first
-        assert_eq!(totallines_for(-1, 10), 0); // first < 0
-        assert_eq!(totallines_for(0, 256), 0); // last >= 256
+        unsafe {
+            assert_eq!(totallines_for(0, 239), 240);
+            assert_eq!(totallines_for(0, 0), 1);
+            assert_eq!(totallines_for(0, 255), 256);
+            assert_eq!(totallines_for(100, 100), 1);
+            assert_eq!(totallines_for(100, 99), 0); // last < first
+            assert_eq!(totallines_for(-1, 10), 0); // first < 0
+            assert_eq!(totallines_for(0, 256), 0); // last >= 256
+        }
     }
 
     #[test]
     fn test_png_crc32_ihdr() {
-        // Known CRC32 for a 13-byte IHDR chunk (89 50 4E 47 0D 0A 1A 0A
-        // ... 0,0,0,1, 0,0,0,0, 8, 2, 0, 0, 0) per PNG spec, hand-verified.
-        let ihdr = make_ihdr_rgb(1);
-        let crc = png_crc32(b"IHDR", &ihdr);
-        // CRC32 of "IHDR" || 13 bytes of (256×1, 8-bit, RGB, etc.) is a
-        // fixed value; we just verify the helper is consistent.
-        let crc2 = png_crc32(b"IHDR", &ihdr);
-        assert_eq!(crc, crc2);
+        unsafe {
+            // Known CRC32 for a 13-byte IHDR chunk (89 50 4E 47 0D 0A 1A 0A
+            // ... 0,0,0,1, 0,0,0,0, 8, 2, 0, 0, 0) per PNG spec, hand-verified.
+            let ihdr = make_ihdr_rgb(1);
+            let crc = png_crc32(b"IHDR", &ihdr);
+            // CRC32 of "IHDR" || 13 bytes of (256×1, 8-bit, RGB, etc.) is a
+            // fixed value; we just verify the helper is consistent.
+            let crc2 = png_crc32(b"IHDR", &ihdr);
+            assert_eq!(crc, crc2);
+        }
     }
 
     #[test]
     fn test_write_png_chunk_layout() {
-        let mut out = Vec::new();
-        write_png_chunk(&mut out, b"IEND", &[]).unwrap();
-        // IEND chunk: length(4) + "IEND"(4) + CRC(4) = 12 bytes
-        assert_eq!(out.len(), 12);
-        // Length = 0
-        assert_eq!(&out[0..4], &[0, 0, 0, 0]);
-        // Type = "IEND"
-        assert_eq!(&out[4..8], b"IEND");
-        // CRC of "IEND" with no data = 0xAE426082
-        assert_eq!(&out[8..12], &[0xAE, 0x42, 0x60, 0x82]);
+        unsafe {
+            let mut out = Vec::new();
+            write_png_chunk(&mut out, b"IEND", &[]).unwrap();
+            // IEND chunk: length(4) + "IEND"(4) + CRC(4) = 12 bytes
+            assert_eq!(out.len(), 12);
+            // Length = 0
+            assert_eq!(&out[0..4], &[0, 0, 0, 0]);
+            // Type = "IEND"
+            assert_eq!(&out[4..8], b"IEND");
+            // CRC of "IEND" with no data = 0xAE426082
+            assert_eq!(&out[8..12], &[0xAE, 0x42, 0x60, 0x82]);
+        }
     }
 
     #[test]
     fn test_encode_png_rgb_roundtrip() {
-        // Build a synthetic 256x240 RGB image: constant 0xAB in all channels.
-        let height: u32 = 240;
-        let scanline_bytes = 256 * 3;
-        let rgb: Vec<u8> = vec![0xAB; scanline_bytes * (height as usize)];
+        unsafe {
+            // Build a synthetic 256x240 RGB image: constant 0xAB in all channels.
+            let height: u32 = 240;
+            let scanline_bytes = 256 * 3;
+            let rgb: Vec<u8> = vec![0xAB; scanline_bytes * (height as usize)];
 
-        let mut out_buf = vec![0u8; 256 * 1024];
-        let out_slice = FceuSliceMut {
-            ptr: out_buf.as_mut_ptr(),
-            len: out_buf.len(),
-        };
-        let xbuf = vec![0u8; FCEUX11_RUST_VIDEO_XBUF_SIZE];
-        let args = FceuVideoEncodeArgs {
-            xbuf: xbuf.as_ptr(),
-            xbuf_len: xbuf.len(),
-            first_sline: 0,
-            last_sline: (height - 1) as i32,
-            out: out_slice,
-        };
-        let rgb_slice = FceuSlice {
-            ptr: rgb.as_ptr(),
-            len: rgb.len(),
-        };
-        let written = fceux11_rust_video_encode_png_rgb(&args, rgb_slice);
-        assert!(written > 0, "encode returned 0: failure");
-        assert!(written <= out_buf.len());
+            let mut out_buf = vec![0u8; 256 * 1024];
+            let out_slice = FceuSliceMut {
+                ptr: out_buf.as_mut_ptr(),
+                len: out_buf.len(),
+            };
+            let xbuf = vec![0u8; FCEUX11_RUST_VIDEO_XBUF_SIZE];
+            let args = FceuVideoEncodeArgs {
+                xbuf: xbuf.as_ptr(),
+                xbuf_len: xbuf.len(),
+                first_sline: 0,
+                last_sline: (height - 1) as i32,
+                out: out_slice,
+            };
+            let rgb_slice = FceuSlice {
+                ptr: rgb.as_ptr(),
+                len: rgb.len(),
+            };
+            let written = fceux11_rust_video_encode_png_rgb(&args, rgb_slice);
+            assert!(written > 0, "encode returned 0: failure");
+            assert!(written <= out_buf.len());
 
-        // Decode with the `png` crate.
-        let decoder = png::Decoder::new(&out_buf[..written]);
-        let mut reader = decoder.read_info().expect("PNG decode failed");
-        let mut decoded = vec![0u8; reader.output_buffer_size()];
-        let info = reader.next_frame(&mut decoded).expect("frame read");
-        assert_eq!(info.width, 256);
-        assert_eq!(info.height, 240);
-        assert_eq!(info.color_type, png::ColorType::Rgb);
-        assert_eq!(info.bit_depth, png::BitDepth::Eight);
-        // First scanline filter byte was prepended in raw, then
-        // miniz_oxide compressed it; the decoder strips filter bytes
-        // transparently, so `decoded` contains only the 256*3 RGB bytes.
-        assert_eq!(&decoded[..6], &[0xAB, 0xAB, 0xAB, 0xAB, 0xAB, 0xAB]);
+            // Decode with the `png` crate.
+            let decoder = png::Decoder::new(&out_buf[..written]);
+            let mut reader = decoder.read_info().expect("PNG decode failed");
+            let mut decoded = vec![0u8; reader.output_buffer_size()];
+            let info = reader.next_frame(&mut decoded).expect("frame read");
+            assert_eq!(info.width, 256);
+            assert_eq!(info.height, 240);
+            assert_eq!(info.color_type, png::ColorType::Rgb);
+            assert_eq!(info.bit_depth, png::BitDepth::Eight);
+            // First scanline filter byte was prepended in raw, then
+            // miniz_oxide compressed it; the decoder strips filter bytes
+            // transparently, so `decoded` contains only the 256*3 RGB bytes.
+            assert_eq!(&decoded[..6], &[0xAB, 0xAB, 0xAB, 0xAB, 0xAB, 0xAB]);
+        }
     }
 
     #[test]
     fn test_encode_png_indexed_roundtrip() {
-        let height: u32 = 240;
-        let width = 256usize;
-        // Synthetic indexed XBuf: alternating 0 and 1.
-        let mut xbuf = vec![0u8; FCEUX11_RUST_VIDEO_XBUF_SIZE];
-        for y in 0..(height as usize) {
-            for x in 0..width {
-                xbuf[y * width + x] = (x % 2) as u8;
+        unsafe {
+            let height: u32 = 240;
+            let width = 256usize;
+            // Synthetic indexed XBuf: alternating 0 and 1.
+            let mut xbuf = vec![0u8; FCEUX11_RUST_VIDEO_XBUF_SIZE];
+            for y in 0..(height as usize) {
+                for x in 0..width {
+                    xbuf[y * width + x] = (x % 2) as u8;
+                }
             }
+            // 256-entry palette: index 0 = red, index 1 = green, rest = black.
+            let mut plte = vec![0u8; FCEUX11_RUST_VIDEO_PALETTE_BYTES_256];
+            plte[0] = 0xFF;
+            plte[1] = 0x00;
+            plte[2] = 0x00;
+            plte[3] = 0x00;
+            plte[4] = 0xFF;
+            plte[5] = 0x00;
+
+            let mut out_buf = vec![0u8; 256 * 1024];
+            let out_slice = FceuSliceMut {
+                ptr: out_buf.as_mut_ptr(),
+                len: out_buf.len(),
+            };
+            let args = FceuVideoEncodeArgs {
+                xbuf: xbuf.as_ptr(),
+                xbuf_len: xbuf.len(),
+                first_sline: 0,
+                last_sline: (height - 1) as i32,
+                out: out_slice,
+            };
+            let plte_slice = FceuSlice {
+                ptr: plte.as_ptr(),
+                len: plte.len(),
+            };
+            let written = fceux11_rust_video_encode_png_indexed(&args, plte_slice);
+            assert!(written > 0, "indexed encode returned 0: failure");
+
+            let decoder = png::Decoder::new(&out_buf[..written]);
+            let mut reader = decoder.read_info().expect("PNG decode failed");
+            let mut decoded = vec![0u8; reader.output_buffer_size()];
+            let info = reader.next_frame(&mut decoded).expect("frame read");
+            assert_eq!(info.width, 256);
+            assert_eq!(info.height, 240);
+            assert_eq!(info.color_type, png::ColorType::Indexed);
+            assert_eq!(info.bit_depth, png::BitDepth::Eight);
+            // First pixel: x=0 -> index 0 -> red. After decoder stripping,
+            // the raw buffer is still indexed (one byte per pixel).
+            assert_eq!(decoded[0], 0);
+            assert_eq!(decoded[1], 1);
         }
-        // 256-entry palette: index 0 = red, index 1 = green, rest = black.
-        let mut plte = vec![0u8; FCEUX11_RUST_VIDEO_PALETTE_BYTES_256];
-        plte[0] = 0xFF;
-        plte[1] = 0x00;
-        plte[2] = 0x00;
-        plte[3] = 0x00;
-        plte[4] = 0xFF;
-        plte[5] = 0x00;
-
-        let mut out_buf = vec![0u8; 256 * 1024];
-        let out_slice = FceuSliceMut {
-            ptr: out_buf.as_mut_ptr(),
-            len: out_buf.len(),
-        };
-        let args = FceuVideoEncodeArgs {
-            xbuf: xbuf.as_ptr(),
-            xbuf_len: xbuf.len(),
-            first_sline: 0,
-            last_sline: (height - 1) as i32,
-            out: out_slice,
-        };
-        let plte_slice = FceuSlice {
-            ptr: plte.as_ptr(),
-            len: plte.len(),
-        };
-        let written = fceux11_rust_video_encode_png_indexed(&args, plte_slice);
-        assert!(written > 0, "indexed encode returned 0: failure");
-
-        let decoder = png::Decoder::new(&out_buf[..written]);
-        let mut reader = decoder.read_info().expect("PNG decode failed");
-        let mut decoded = vec![0u8; reader.output_buffer_size()];
-        let info = reader.next_frame(&mut decoded).expect("frame read");
-        assert_eq!(info.width, 256);
-        assert_eq!(info.height, 240);
-        assert_eq!(info.color_type, png::ColorType::Indexed);
-        assert_eq!(info.bit_depth, png::BitDepth::Eight);
-        // First pixel: x=0 -> index 0 -> red. After decoder stripping,
-        // the raw buffer is still indexed (one byte per pixel).
-        assert_eq!(decoded[0], 0);
-        assert_eq!(decoded[1], 1);
     }
 
     #[test]
     fn test_encode_png_rgb_bounds_validation() {
-        let mut out_buf = vec![0u8; 256 * 1024];
-        let out_slice = FceuSliceMut {
-            ptr: out_buf.as_mut_ptr(),
-            len: out_buf.len(),
-        };
-        let xbuf = vec![0u8; FCEUX11_RUST_VIDEO_XBUF_SIZE];
-        let rgb = vec![0u8; 256 * 3 * 240];
+        unsafe {
+            let mut out_buf = vec![0u8; 256 * 1024];
+            let out_slice = FceuSliceMut {
+                ptr: out_buf.as_mut_ptr(),
+                len: out_buf.len(),
+            };
+            let xbuf = vec![0u8; FCEUX11_RUST_VIDEO_XBUF_SIZE];
+            let rgb = vec![0u8; 256 * 3 * 240];
 
-        // first_sline out of range
-        let args = FceuVideoEncodeArgs {
-            xbuf: xbuf.as_ptr(),
-            xbuf_len: xbuf.len(),
-            first_sline: -1,
-            last_sline: 239,
-            out: FceuSliceMut {
-                ptr: out_slice.ptr,
-                len: out_slice.len,
-            },
-        };
-        assert_eq!(
-            fceux11_rust_video_encode_png_rgb(
-                &args,
-                FceuSlice {
-                    ptr: rgb.as_ptr(),
-                    len: rgb.len(),
-                }
-            ),
-            0
-        );
+            // first_sline out of range
+            let args = FceuVideoEncodeArgs {
+                xbuf: xbuf.as_ptr(),
+                xbuf_len: xbuf.len(),
+                first_sline: -1,
+                last_sline: 239,
+                out: FceuSliceMut {
+                    ptr: out_slice.ptr,
+                    len: out_slice.len,
+                },
+            };
+            assert_eq!(
+                fceux11_rust_video_encode_png_rgb(
+                    &args,
+                    FceuSlice {
+                        ptr: rgb.as_ptr(),
+                        len: rgb.len(),
+                    }
+                ),
+                0
+            );
 
-        // last_sline < first_sline
-        let args = FceuVideoEncodeArgs {
-            xbuf: xbuf.as_ptr(),
-            xbuf_len: xbuf.len(),
-            first_sline: 100,
-            last_sline: 50,
-            out: FceuSliceMut {
-                ptr: out_slice.ptr,
-                len: out_slice.len,
-            },
-        };
-        assert_eq!(
-            fceux11_rust_video_encode_png_rgb(
-                &args,
-                FceuSlice {
-                    ptr: rgb.as_ptr(),
-                    len: rgb.len(),
-                }
-            ),
-            0
-        );
+            // last_sline < first_sline
+            let args = FceuVideoEncodeArgs {
+                xbuf: xbuf.as_ptr(),
+                xbuf_len: xbuf.len(),
+                first_sline: 100,
+                last_sline: 50,
+                out: FceuSliceMut {
+                    ptr: out_slice.ptr,
+                    len: out_slice.len,
+                },
+            };
+            assert_eq!(
+                fceux11_rust_video_encode_png_rgb(
+                    &args,
+                    FceuSlice {
+                        ptr: rgb.as_ptr(),
+                        len: rgb.len(),
+                    }
+                ),
+                0
+            );
 
-        // last_sline >= 256
-        let args = FceuVideoEncodeArgs {
-            xbuf: xbuf.as_ptr(),
-            xbuf_len: xbuf.len(),
-            first_sline: 0,
-            last_sline: 256,
-            out: FceuSliceMut {
-                ptr: out_slice.ptr,
-                len: out_slice.len,
-            },
-        };
-        assert_eq!(
-            fceux11_rust_video_encode_png_rgb(
-                &args,
-                FceuSlice {
-                    ptr: rgb.as_ptr(),
-                    len: rgb.len(),
-                }
-            ),
-            0
-        );
+            // last_sline >= 256
+            let args = FceuVideoEncodeArgs {
+                xbuf: xbuf.as_ptr(),
+                xbuf_len: xbuf.len(),
+                first_sline: 0,
+                last_sline: 256,
+                out: FceuSliceMut {
+                    ptr: out_slice.ptr,
+                    len: out_slice.len,
+                },
+            };
+            assert_eq!(
+                fceux11_rust_video_encode_png_rgb(
+                    &args,
+                    FceuSlice {
+                        ptr: rgb.as_ptr(),
+                        len: rgb.len(),
+                    }
+                ),
+                0
+            );
+        }
     }
 
     #[test]
     fn test_encode_png_rgb_buffer_too_small() {
-        let xbuf = vec![0u8; FCEUX11_RUST_VIDEO_XBUF_SIZE];
-        let rgb = vec![0u8; 256 * 3 * 240];
-        let mut out_buf = vec![0u8; 100]; // too small
-        let out_slice = FceuSliceMut {
-            ptr: out_buf.as_mut_ptr(),
-            len: out_buf.len(),
-        };
-        let args = FceuVideoEncodeArgs {
-            xbuf: xbuf.as_ptr(),
-            xbuf_len: xbuf.len(),
-            first_sline: 0,
-            last_sline: 239,
-            out: out_slice,
-        };
-        assert_eq!(
-            fceux11_rust_video_encode_png_rgb(
-                &args,
-                FceuSlice {
-                    ptr: rgb.as_ptr(),
-                    len: rgb.len(),
-                }
-            ),
-            0
-        );
+        unsafe {
+            let xbuf = vec![0u8; FCEUX11_RUST_VIDEO_XBUF_SIZE];
+            let rgb = vec![0u8; 256 * 3 * 240];
+            let mut out_buf = vec![0u8; 100]; // too small
+            let out_slice = FceuSliceMut {
+                ptr: out_buf.as_mut_ptr(),
+                len: out_buf.len(),
+            };
+            let args = FceuVideoEncodeArgs {
+                xbuf: xbuf.as_ptr(),
+                xbuf_len: xbuf.len(),
+                first_sline: 0,
+                last_sline: 239,
+                out: out_slice,
+            };
+            assert_eq!(
+                fceux11_rust_video_encode_png_rgb(
+                    &args,
+                    FceuSlice {
+                        ptr: rgb.as_ptr(),
+                        len: rgb.len(),
+                    }
+                ),
+                0
+            );
+        }
     }
 
     #[test]
     fn test_get_screen_pixel_in_bounds() {
-        let mut xbuf = vec![0u8; FCEUX11_RUST_VIDEO_XBUF_SIZE];
-        // Place index 5 at (10, 20)
-        xbuf[20 * 256 + 10] = 5;
-        // 64-entry palette: index 5 = (0x11, 0x22, 0x33), rest = 0
-        let mut palette = vec![0u8; FCEUX11_RUST_VIDEO_PALETTE_BYTES_64];
-        palette[5 * 3] = 0x11;
-        palette[5 * 3 + 1] = 0x22;
-        palette[5 * 3 + 2] = 0x33;
-        let xbuf_slice = FceuSlice {
-            ptr: xbuf.as_ptr(),
-            len: xbuf.len(),
-        };
-        let xbackbuf_slice = FceuSlice {
-            ptr: xbuf.as_ptr(), // re-use for test
-            len: xbuf.len(),
-        };
-        let palette_slice = FceuSlice {
-            ptr: palette.as_ptr(),
-            len: palette.len(),
-        };
-        let mut rgb_out = [0u8; 3];
-        let rgb_out_slice = FceuSliceMut {
-            ptr: rgb_out.as_mut_ptr(),
-            len: rgb_out.len(),
-        };
-        let rc = fceux11_rust_video_get_screen_pixel(
-            10,
-            20,
-            false,
-            xbuf_slice,
-            xbackbuf_slice,
-            palette_slice,
-            rgb_out_slice,
-        );
-        assert_eq!(rc, 0);
-        assert_eq!(rgb_out, [0x11, 0x22, 0x33]);
+        unsafe {
+            let mut xbuf = vec![0u8; FCEUX11_RUST_VIDEO_XBUF_SIZE];
+            // Place index 5 at (10, 20)
+            xbuf[20 * 256 + 10] = 5;
+            // 64-entry palette: index 5 = (0x11, 0x22, 0x33), rest = 0
+            let mut palette = vec![0u8; FCEUX11_RUST_VIDEO_PALETTE_BYTES_64];
+            palette[5 * 3] = 0x11;
+            palette[5 * 3 + 1] = 0x22;
+            palette[5 * 3 + 2] = 0x33;
+            let xbuf_slice = FceuSlice {
+                ptr: xbuf.as_ptr(),
+                len: xbuf.len(),
+            };
+            let xbackbuf_slice = FceuSlice {
+                ptr: xbuf.as_ptr(), // re-use for test
+                len: xbuf.len(),
+            };
+            let palette_slice = FceuSlice {
+                ptr: palette.as_ptr(),
+                len: palette.len(),
+            };
+            let mut rgb_out = [0u8; 3];
+            let rgb_out_slice = FceuSliceMut {
+                ptr: rgb_out.as_mut_ptr(),
+                len: rgb_out.len(),
+            };
+            let rc = fceux11_rust_video_get_screen_pixel(
+                10,
+                20,
+                false,
+                xbuf_slice,
+                xbackbuf_slice,
+                palette_slice,
+                rgb_out_slice,
+            );
+            assert_eq!(rc, 0);
+            assert_eq!(rgb_out, [0x11, 0x22, 0x33]);
+        }
     }
 
     #[test]
     fn test_get_screen_pixel_out_of_bounds() {
-        let xbuf = vec![0u8; FCEUX11_RUST_VIDEO_XBUF_SIZE];
-        let palette = vec![0u8; FCEUX11_RUST_VIDEO_PALETTE_BYTES_64];
-        let xbuf_slice = FceuSlice {
-            ptr: xbuf.as_ptr(),
-            len: xbuf.len(),
-        };
-        let xbackbuf_slice = FceuSlice {
-            ptr: xbuf.as_ptr(),
-            len: xbuf.len(),
-        };
-        let palette_slice = FceuSlice {
-            ptr: palette.as_ptr(),
-            len: palette.len(),
-        };
-        let mut rgb_out = [0u8; 3];
-        let rgb_out_slice = FceuSliceMut {
-            ptr: rgb_out.as_mut_ptr(),
-            len: rgb_out.len(),
-        };
-        let rc = fceux11_rust_video_get_screen_pixel(
-            300,
-            10,
-            false,
-            xbuf_slice,
-            xbackbuf_slice,
-            palette_slice,
-            rgb_out_slice,
-        );
-        assert_eq!(rc, -1);
+        unsafe {
+            let xbuf = vec![0u8; FCEUX11_RUST_VIDEO_XBUF_SIZE];
+            let palette = vec![0u8; FCEUX11_RUST_VIDEO_PALETTE_BYTES_64];
+            let xbuf_slice = FceuSlice {
+                ptr: xbuf.as_ptr(),
+                len: xbuf.len(),
+            };
+            let xbackbuf_slice = FceuSlice {
+                ptr: xbuf.as_ptr(),
+                len: xbuf.len(),
+            };
+            let palette_slice = FceuSlice {
+                ptr: palette.as_ptr(),
+                len: palette.len(),
+            };
+            let mut rgb_out = [0u8; 3];
+            let rgb_out_slice = FceuSliceMut {
+                ptr: rgb_out.as_mut_ptr(),
+                len: rgb_out.len(),
+            };
+            let rc = fceux11_rust_video_get_screen_pixel(
+                300,
+                10,
+                false,
+                xbuf_slice,
+                xbackbuf_slice,
+                palette_slice,
+                rgb_out_slice,
+            );
+            assert_eq!(rc, -1);
+        }
     }
 
     #[test]
     fn test_get_screen_pixel_palette_returns_index_low_6_bits() {
-        let mut xbuf = vec![0u8; FCEUX11_RUST_VIDEO_XBUF_SIZE];
-        // Set pixel (3, 4) to 0xFF (high bits set, low 6 = 0x3F = 63)
-        xbuf[4 * 256 + 3] = 0xFF;
-        let xbuf_slice = FceuSlice {
-            ptr: xbuf.as_ptr(),
-            len: xbuf.len(),
-        };
-        let xbackbuf_slice = FceuSlice {
-            ptr: xbuf.as_ptr(),
-            len: xbuf.len(),
-        };
-        let rc = fceux11_rust_video_get_screen_pixel_palette(
-            3,
-            4,
-            false,
-            xbuf_slice,
-            xbackbuf_slice,
-        );
-        assert_eq!(rc, 0x3F);
+        unsafe {
+            let mut xbuf = vec![0u8; FCEUX11_RUST_VIDEO_XBUF_SIZE];
+            // Set pixel (3, 4) to 0xFF (high bits set, low 6 = 0x3F = 63)
+            xbuf[4 * 256 + 3] = 0xFF;
+            let xbuf_slice = FceuSlice {
+                ptr: xbuf.as_ptr(),
+                len: xbuf.len(),
+            };
+            let xbackbuf_slice = FceuSlice {
+                ptr: xbuf.as_ptr(),
+                len: xbuf.len(),
+            };
+            let rc = fceux11_rust_video_get_screen_pixel_palette(
+                3,
+                4,
+                false,
+                xbuf_slice,
+                xbackbuf_slice,
+            );
+            assert_eq!(rc, 0x3F);
+        }
     }
 
     #[test]
     fn test_snapshot_as_name_get_set_roundtrip() {
-        // Clear first
-        fceux11_rust_video_set_snapshot_as_name(std::ptr::null(), 0);
-        let mut buf = [0i8; 64];
-        let n = fceux11_rust_video_get_snapshot_as_name(buf.as_mut_ptr(), buf.len());
-        assert_eq!(n, 0, "expected 0 (no name set)");
+        unsafe {
+            // Clear first
+            fceux11_rust_video_set_snapshot_as_name(std::ptr::null(), 0);
+            let mut buf = [0i8; 64];
+            let n = fceux11_rust_video_get_snapshot_as_name(buf.as_mut_ptr(), buf.len());
+            assert_eq!(n, 0, "expected 0 (no name set)");
 
-        // Set "snap-001.png"
-        let name = b"snap-001.png";
-        fceux11_rust_video_set_snapshot_as_name(
-            name.as_ptr() as *const c_char,
-            name.len(),
-        );
-        let n = fceux11_rust_video_get_snapshot_as_name(buf.as_mut_ptr(), buf.len());
-        assert_eq!(n, name.len());
-        let bytes: Vec<u8> = buf.iter().map(|&b| b as u8).collect();
-        assert_eq!(&bytes[..n], name);
-        // Must be NUL-terminated
-        assert_eq!(bytes[n], 0);
+            // Set "snap-001.png"
+            let name = b"snap-001.png";
+            fceux11_rust_video_set_snapshot_as_name(name.as_ptr() as *const c_char, name.len());
+            let n = fceux11_rust_video_get_snapshot_as_name(buf.as_mut_ptr(), buf.len());
+            assert_eq!(n, name.len());
+            let bytes: Vec<u8> = buf.iter().map(|&b| b as u8).collect();
+            assert_eq!(&bytes[..n], name);
+            // Must be NUL-terminated
+            assert_eq!(bytes[n], 0);
+        }
     }
 
     #[test]
     fn test_snapshot_as_name_truncates_too_long() {
-        fceux11_rust_video_set_snapshot_as_name(std::ptr::null(), 0);
-        let long = b"this_is_a_very_long_filename_that_exceeds_the_buffer.png";
-        fceux11_rust_video_set_snapshot_as_name(
-            long.as_ptr() as *const c_char,
-            long.len(),
-        );
-        let mut buf = [0i8; 16];
-        let n = fceux11_rust_video_get_snapshot_as_name(buf.as_mut_ptr(), buf.len());
-        // Should be truncated to buf.len() - 1 = 15
-        assert_eq!(n, 15);
-        let bytes: Vec<u8> = buf.iter().map(|&b| b as u8).collect();
-        assert_eq!(&bytes[..n], &long[..15]);
-        assert_eq!(bytes[n], 0); // NUL-terminated within the buffer
+        unsafe {
+            fceux11_rust_video_set_snapshot_as_name(std::ptr::null(), 0);
+            let long = b"this_is_a_very_long_filename_that_exceeds_the_buffer.png";
+            fceux11_rust_video_set_snapshot_as_name(long.as_ptr() as *const c_char, long.len());
+            let mut buf = [0i8; 16];
+            let n = fceux11_rust_video_get_snapshot_as_name(buf.as_mut_ptr(), buf.len());
+            // Should be truncated to buf.len() - 1 = 15
+            assert_eq!(n, 15);
+            let bytes: Vec<u8> = buf.iter().map(|&b| b as u8).collect();
+            assert_eq!(&bytes[..n], &long[..15]);
+            assert_eq!(bytes[n], 0); // NUL-terminated within the buffer
+        }
     }
 
     #[test]
     fn test_snapshot_as_name_null_clears() {
-        let name = b"snap.png";
-        fceux11_rust_video_set_snapshot_as_name(
-            name.as_ptr() as *const c_char,
-            name.len(),
-        );
-        fceux11_rust_video_set_snapshot_as_name(std::ptr::null(), 0);
-        let mut buf = [0i8; 64];
-        let n = fceux11_rust_video_get_snapshot_as_name(buf.as_mut_ptr(), buf.len());
-        assert_eq!(n, 0);
+        unsafe {
+            let name = b"snap.png";
+            fceux11_rust_video_set_snapshot_as_name(name.as_ptr() as *const c_char, name.len());
+            fceux11_rust_video_set_snapshot_as_name(std::ptr::null(), 0);
+            let mut buf = [0i8; 64];
+            let n = fceux11_rust_video_get_snapshot_as_name(buf.as_mut_ptr(), buf.len());
+            assert_eq!(n, 0);
+        }
     }
 }

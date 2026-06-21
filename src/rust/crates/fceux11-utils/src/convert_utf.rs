@@ -1,8 +1,7 @@
-/// Rust implementation of Unicode UTF conversion routines.
-/// Replaces src/utils/ConvertUTF.c with a memory-safe equivalent.
-///
-/// Phase 6 (v0.2.7): Unicode Conversion
-
+//! Rust implementation of Unicode UTF conversion routines.
+//! Replaces src/utils/ConvertUTF.c with a memory-safe equivalent.
+//!
+//! Phase 6 (v0.2.7): Unicode Conversion
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ConversionResult {
@@ -78,9 +77,7 @@ fn decode_utf8_char(source: &[u8]) -> Result<(u32, usize), ConversionResult> {
         if b0 == 0xED && b1 > 0x9F {
             return Err(ConversionResult::SourceIllegal);
         }
-        let ch = ((b0 & 0x0F) as u32) << 12
-            | ((b1 & 0x3F) as u32) << 6
-            | (b2 & 0x3F) as u32;
+        let ch = ((b0 & 0x0F) as u32) << 12 | ((b1 & 0x3F) as u32) << 6 | (b2 & 0x3F) as u32;
         return Ok((ch, 3));
     }
 
@@ -130,10 +127,7 @@ fn utf8_bytes_for_codepoint(ch: u32) -> usize {
 /// Encode a single codepoint into a UTF-8 buffer.
 /// The buffer must be large enough (caller checks).
 fn encode_utf8(ch: u32, buf: &mut [u8]) -> usize {
-    let c = match char::from_u32(ch) {
-        Some(c) => c,
-        None => '\u{FFFD}',
-    };
+    let c = char::from_u32(ch).unwrap_or('\u{FFFD}');
     c.encode_utf8(buf).len()
 }
 
@@ -146,7 +140,7 @@ fn encode_utf8(ch: u32, buf: &mut [u8]) -> usize {
 /// # Safety
 /// All pointer parameters must be valid and non-null (except as noted).
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_convert_utf8_to_utf16(
+pub unsafe extern "C" fn fceux11_rust_convert_utf8_to_utf16(
     source_start: *mut *const u8,
     source_end: *const u8,
     target_start: *mut *mut u16,
@@ -161,9 +155,8 @@ pub extern "C" fn fceux11_rust_convert_utf8_to_utf16(
     let mut target = unsafe { *target_start };
 
     while (source as usize) < (source_end as usize) {
-        let source_slice = unsafe {
-            std::slice::from_raw_parts(source, source_end as usize - source as usize)
-        };
+        let source_slice =
+            unsafe { std::slice::from_raw_parts(source, source_end as usize - source as usize) };
 
         let (ch, consumed) = match decode_utf8_char(source_slice) {
             Ok(v) => v,
@@ -184,7 +177,7 @@ pub extern "C" fn fceux11_rust_convert_utf8_to_utf16(
                 }
                 return ConversionResult::TargetExhausted;
             }
-            let write_val = if ch >= UNI_SUR_HIGH_START && ch <= UNI_SUR_LOW_END {
+            let write_val = if (UNI_SUR_HIGH_START..=UNI_SUR_LOW_END).contains(&ch) {
                 if flags == ConversionFlags::StrictConversion {
                     unsafe {
                         *source_start = source;
@@ -252,7 +245,7 @@ pub extern "C" fn fceux11_rust_convert_utf8_to_utf16(
 /// # Safety
 /// All pointer parameters must be valid and non-null.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_convert_utf16_to_utf8(
+pub unsafe extern "C" fn fceux11_rust_convert_utf16_to_utf8(
     source_start: *mut *const u16,
     source_end: *const u16,
     target_start: *mut *mut u8,
@@ -271,13 +264,11 @@ pub extern "C" fn fceux11_rust_convert_utf16_to_utf8(
         let mut ch = unsafe { *source } as u32;
         source = unsafe { source.add(1) };
 
-        if ch >= UNI_SUR_HIGH_START && ch <= UNI_SUR_HIGH_END {
+        if (UNI_SUR_HIGH_START..=UNI_SUR_HIGH_END).contains(&ch) {
             if (source as usize) < (source_end as usize) {
                 let ch2 = unsafe { *source } as u32;
-                if ch2 >= UNI_SUR_LOW_START && ch2 <= UNI_SUR_LOW_END {
-                    ch = ((ch - UNI_SUR_HIGH_START) << 10)
-                        + (ch2 - UNI_SUR_LOW_START)
-                        + 0x10000;
+                if (UNI_SUR_LOW_START..=UNI_SUR_LOW_END).contains(&ch2) {
+                    ch = ((ch - UNI_SUR_HIGH_START) << 10) + (ch2 - UNI_SUR_LOW_START) + 0x10000;
                     source = unsafe { source.add(1) };
                 } else if flags == ConversionFlags::StrictConversion {
                     source = old_source;
@@ -295,15 +286,15 @@ pub extern "C" fn fceux11_rust_convert_utf16_to_utf8(
                 }
                 return ConversionResult::SourceExhausted;
             }
-        } else if flags == ConversionFlags::StrictConversion {
-            if ch >= UNI_SUR_LOW_START && ch <= UNI_SUR_LOW_END {
-                source = old_source;
-                unsafe {
-                    *source_start = source;
-                    *target_start = target;
-                }
-                return ConversionResult::SourceIllegal;
+        } else if flags == ConversionFlags::StrictConversion
+            && (UNI_SUR_LOW_START..=UNI_SUR_LOW_END).contains(&ch)
+        {
+            source = old_source;
+            unsafe {
+                *source_start = source;
+                *target_start = target;
             }
+            return ConversionResult::SourceIllegal;
         }
 
         let bytes_to_write = utf8_bytes_for_codepoint(ch);
@@ -336,7 +327,7 @@ pub extern "C" fn fceux11_rust_convert_utf16_to_utf8(
 /// # Safety
 /// All pointer parameters must be valid and non-null.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_convert_utf8_to_utf32(
+pub unsafe extern "C" fn fceux11_rust_convert_utf8_to_utf32(
     source_start: *mut *const u8,
     source_end: *const u8,
     target_start: *mut *mut u32,
@@ -351,9 +342,8 @@ pub extern "C" fn fceux11_rust_convert_utf8_to_utf32(
     let mut target = unsafe { *target_start };
 
     while (source as usize) < (source_end as usize) {
-        let source_slice = unsafe {
-            std::slice::from_raw_parts(source, source_end as usize - source as usize)
-        };
+        let source_slice =
+            unsafe { std::slice::from_raw_parts(source, source_end as usize - source as usize) };
 
         let (ch, consumed) = match decode_utf8_char(source_slice) {
             Ok(v) => v,
@@ -375,7 +365,7 @@ pub extern "C" fn fceux11_rust_convert_utf8_to_utf32(
         }
 
         if ch <= UNI_MAX_LEGAL_UTF32 {
-            if ch >= UNI_SUR_HIGH_START && ch <= UNI_SUR_LOW_END {
+            if (UNI_SUR_HIGH_START..=UNI_SUR_LOW_END).contains(&ch) {
                 if flags == ConversionFlags::StrictConversion {
                     unsafe {
                         *source_start = source;
@@ -422,7 +412,7 @@ pub extern "C" fn fceux11_rust_convert_utf8_to_utf32(
 /// # Safety
 /// All pointer parameters must be valid and non-null.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_convert_utf32_to_utf8(
+pub unsafe extern "C" fn fceux11_rust_convert_utf32_to_utf8(
     source_start: *mut *const u32,
     source_end: *const u32,
     target_start: *mut *mut u8,
@@ -440,14 +430,14 @@ pub extern "C" fn fceux11_rust_convert_utf32_to_utf8(
     while (source as usize) < (source_end as usize) {
         let mut ch = unsafe { *source };
 
-        if flags == ConversionFlags::StrictConversion {
-            if ch >= UNI_SUR_HIGH_START && ch <= UNI_SUR_LOW_END {
-                unsafe {
-                    *source_start = source;
-                    *target_start = target;
-                }
-                return ConversionResult::SourceIllegal;
+        if flags == ConversionFlags::StrictConversion
+            && (UNI_SUR_HIGH_START..=UNI_SUR_LOW_END).contains(&ch)
+        {
+            unsafe {
+                *source_start = source;
+                *target_start = target;
             }
+            return ConversionResult::SourceIllegal;
         }
 
         let bytes_to_write = if ch < 0x80 {
@@ -492,7 +482,7 @@ pub extern "C" fn fceux11_rust_convert_utf32_to_utf8(
 /// # Safety
 /// All pointer parameters must be valid and non-null.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_convert_utf16_to_utf32(
+pub unsafe extern "C" fn fceux11_rust_convert_utf16_to_utf32(
     source_start: *mut *const u16,
     source_end: *const u16,
     target_start: *mut *mut u32,
@@ -511,13 +501,11 @@ pub extern "C" fn fceux11_rust_convert_utf16_to_utf32(
         let mut ch = unsafe { *source } as u32;
         source = unsafe { source.add(1) };
 
-        if ch >= UNI_SUR_HIGH_START && ch <= UNI_SUR_HIGH_END {
+        if (UNI_SUR_HIGH_START..=UNI_SUR_HIGH_END).contains(&ch) {
             if (source as usize) < (source_end as usize) {
                 let ch2 = unsafe { *source } as u32;
-                if ch2 >= UNI_SUR_LOW_START && ch2 <= UNI_SUR_LOW_END {
-                    ch = ((ch - UNI_SUR_HIGH_START) << 10)
-                        + (ch2 - UNI_SUR_LOW_START)
-                        + 0x10000;
+                if (UNI_SUR_LOW_START..=UNI_SUR_LOW_END).contains(&ch2) {
+                    ch = ((ch - UNI_SUR_HIGH_START) << 10) + (ch2 - UNI_SUR_LOW_START) + 0x10000;
                     source = unsafe { source.add(1) };
                 } else if flags == ConversionFlags::StrictConversion {
                     source = old_source;
@@ -535,15 +523,15 @@ pub extern "C" fn fceux11_rust_convert_utf16_to_utf32(
                 }
                 return ConversionResult::SourceExhausted;
             }
-        } else if flags == ConversionFlags::StrictConversion {
-            if ch >= UNI_SUR_LOW_START && ch <= UNI_SUR_LOW_END {
-                source = old_source;
-                unsafe {
-                    *source_start = source;
-                    *target_start = target;
-                }
-                return ConversionResult::SourceIllegal;
+        } else if flags == ConversionFlags::StrictConversion
+            && (UNI_SUR_LOW_START..=UNI_SUR_LOW_END).contains(&ch)
+        {
+            source = old_source;
+            unsafe {
+                *source_start = source;
+                *target_start = target;
             }
+            return ConversionResult::SourceIllegal;
         }
 
         if target as usize >= target_end as usize {
@@ -573,7 +561,7 @@ pub extern "C" fn fceux11_rust_convert_utf16_to_utf32(
 /// # Safety
 /// All pointer parameters must be valid and non-null.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_convert_utf32_to_utf16(
+pub unsafe extern "C" fn fceux11_rust_convert_utf32_to_utf16(
     source_start: *mut *const u32,
     source_end: *const u32,
     target_start: *mut *mut u16,
@@ -598,7 +586,7 @@ pub extern "C" fn fceux11_rust_convert_utf32_to_utf16(
                 }
                 return ConversionResult::TargetExhausted;
             }
-            if ch >= UNI_SUR_HIGH_START && ch <= UNI_SUR_LOW_END {
+            if (UNI_SUR_HIGH_START..=UNI_SUR_LOW_END).contains(&ch) {
                 if flags == ConversionFlags::StrictConversion {
                     unsafe {
                         *source_start = source;
@@ -668,16 +656,15 @@ pub extern "C" fn fceux11_rust_convert_utf32_to_utf16(
 /// # Safety
 /// `source` and `source_end` must be valid pointers with `source <= source_end`.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_is_legal_utf8_sequence(
+pub unsafe extern "C" fn fceux11_rust_is_legal_utf8_sequence(
     source: *const u8,
     source_end: *const u8,
 ) -> u8 {
     if source.is_null() || source_end.is_null() || source >= source_end {
         return 0;
     }
-    let slice = unsafe {
-        std::slice::from_raw_parts(source, source_end as usize - source as usize)
-    };
+    let slice =
+        unsafe { std::slice::from_raw_parts(source, source_end as usize - source as usize) };
     match decode_utf8_char(slice) {
         Ok((_, _)) => 1,
         Err(_) => 0,
@@ -694,311 +681,379 @@ mod tests {
 
     #[test]
     fn test_decode_utf8_ascii() {
-        assert_eq!(decode_utf8_char(b"A"), Ok((0x41, 1)));
+        unsafe {
+            assert_eq!(decode_utf8_char(b"A"), Ok((0x41, 1)));
+        }
     }
 
     #[test]
     fn test_decode_utf8_2byte() {
-        assert_eq!(decode_utf8_char("é".as_bytes()), Ok((0xE9, 2)));
+        unsafe {
+            assert_eq!(decode_utf8_char("é".as_bytes()), Ok((0xE9, 2)));
+        }
     }
 
     #[test]
     fn test_decode_utf8_3byte() {
-        assert_eq!(decode_utf8_char("中".as_bytes()), Ok((0x4E2D, 3)));
+        unsafe {
+            assert_eq!(decode_utf8_char("中".as_bytes()), Ok((0x4E2D, 3)));
+        }
     }
 
     #[test]
     fn test_decode_utf8_4byte() {
-        assert_eq!(decode_utf8_char("𐍈".as_bytes()), Ok((0x10348, 4)));
+        unsafe {
+            assert_eq!(decode_utf8_char("𐍈".as_bytes()), Ok((0x10348, 4)));
+        }
     }
 
     #[test]
     fn test_decode_utf8_overlong() {
-        // C0 80 is an overlong encoding of U+0000
-        assert_eq!(decode_utf8_char(&[0xC0, 0x80]), Err(ConversionResult::SourceIllegal));
+        unsafe {
+            // C0 80 is an overlong encoding of U+0000
+            assert_eq!(
+                decode_utf8_char(&[0xC0, 0x80]),
+                Err(ConversionResult::SourceIllegal)
+            );
+        }
     }
 
     #[test]
     fn test_decode_utf8_surrogate() {
-        // ED A0 80 is UTF-8 encoding of U+D800 (surrogate)
-        assert_eq!(decode_utf8_char(&[0xED, 0xA0, 0x80]), Err(ConversionResult::SourceIllegal));
+        unsafe {
+            // ED A0 80 is UTF-8 encoding of U+D800 (surrogate)
+            assert_eq!(
+                decode_utf8_char(&[0xED, 0xA0, 0x80]),
+                Err(ConversionResult::SourceIllegal)
+            );
+        }
     }
 
     #[test]
     fn test_decode_utf8_beyond_max() {
-        // F4 90 80 80 is beyond U+10FFFF
-        assert_eq!(decode_utf8_char(&[0xF4, 0x90, 0x80, 0x80]), Err(ConversionResult::SourceIllegal));
+        unsafe {
+            // F4 90 80 80 is beyond U+10FFFF
+            assert_eq!(
+                decode_utf8_char(&[0xF4, 0x90, 0x80, 0x80]),
+                Err(ConversionResult::SourceIllegal)
+            );
+        }
     }
 
     #[test]
     fn test_decode_utf8_incomplete() {
-        assert_eq!(decode_utf8_char(&[0xE4, 0xB8]), Err(ConversionResult::SourceExhausted));
+        unsafe {
+            assert_eq!(
+                decode_utf8_char(&[0xE4, 0xB8]),
+                Err(ConversionResult::SourceExhausted)
+            );
+        }
     }
 
     #[test]
     fn test_utf8_to_utf16_basic() {
-        let input: [u8; 3] = [0xE4, 0xB8, 0xAD]; // 中
-        let mut source = input.as_ptr();
-        let source_end = unsafe { source.add(input.len()) };
-        let mut output: [u16; 2] = [0; 2];
-        let mut target = output.as_mut_ptr();
-        let target_end = unsafe { target.add(2) };
+        unsafe {
+            let input: [u8; 3] = [0xE4, 0xB8, 0xAD]; // 中
+            let mut source = input.as_ptr();
+            let source_end = unsafe { source.add(input.len()) };
+            let mut output: [u16; 2] = [0; 2];
+            let mut target = output.as_mut_ptr();
+            let target_end = unsafe { target.add(2) };
 
-        let res = fceux11_rust_convert_utf8_to_utf16(
-            &mut source,
-            source_end,
-            &mut target,
-            target_end,
-            ConversionFlags::StrictConversion,
-        );
-        assert_eq!(res, ConversionResult::ConversionOK);
-        assert_eq!(source, source_end);
-        assert_eq!(target, unsafe { output.as_mut_ptr().add(1) });
-        assert_eq!(output[0], 0x4E2D);
+            let res = fceux11_rust_convert_utf8_to_utf16(
+                &mut source,
+                source_end,
+                &mut target,
+                target_end,
+                ConversionFlags::StrictConversion,
+            );
+            assert_eq!(res, ConversionResult::ConversionOK);
+            assert_eq!(source, source_end);
+            assert_eq!(target, unsafe { output.as_mut_ptr().add(1) });
+            assert_eq!(output[0], 0x4E2D);
+        }
     }
 
     #[test]
     fn test_utf8_to_utf16_surrogate_strict() {
-        // ED A0 80 = U+D800 (surrogate) in UTF-8
-        let input: [u8; 3] = [0xED, 0xA0, 0x80];
-        let mut source = input.as_ptr();
-        let source_end = unsafe { source.add(input.len()) };
-        let mut output: [u16; 2] = [0; 2];
-        let mut target = output.as_mut_ptr();
-        let target_end = unsafe { target.add(2) };
+        unsafe {
+            // ED A0 80 = U+D800 (surrogate) in UTF-8
+            let input: [u8; 3] = [0xED, 0xA0, 0x80];
+            let mut source = input.as_ptr();
+            let source_end = unsafe { source.add(input.len()) };
+            let mut output: [u16; 2] = [0; 2];
+            let mut target = output.as_mut_ptr();
+            let target_end = unsafe { target.add(2) };
 
-        let res = fceux11_rust_convert_utf8_to_utf16(
-            &mut source,
-            source_end,
-            &mut target,
-            target_end,
-            ConversionFlags::StrictConversion,
-        );
-        assert_eq!(res, ConversionResult::SourceIllegal);
-        assert_eq!(source, input.as_ptr());
+            let res = fceux11_rust_convert_utf8_to_utf16(
+                &mut source,
+                source_end,
+                &mut target,
+                target_end,
+                ConversionFlags::StrictConversion,
+            );
+            assert_eq!(res, ConversionResult::SourceIllegal);
+            assert_eq!(source, input.as_ptr());
+        }
     }
 
     #[test]
     fn test_utf8_to_utf16_surrogate_lenient() {
-        let input: [u8; 3] = [0xED, 0xA0, 0x80];
-        let mut source = input.as_ptr();
-        let source_end = unsafe { source.add(input.len()) };
-        let mut output: [u16; 2] = [0; 2];
-        let mut target = output.as_mut_ptr();
-        let target_end = unsafe { target.add(2) };
+        unsafe {
+            let input: [u8; 3] = [0xED, 0xA0, 0x80];
+            let mut source = input.as_ptr();
+            let source_end = unsafe { source.add(input.len()) };
+            let mut output: [u16; 2] = [0; 2];
+            let mut target = output.as_mut_ptr();
+            let target_end = unsafe { target.add(2) };
 
-        let res = fceux11_rust_convert_utf8_to_utf16(
-            &mut source,
-            source_end,
-            &mut target,
-            target_end,
-            ConversionFlags::LenientConversion,
-        );
-        // ED A0 80 is an invalid UTF-8 sequence (surrogate), rejected even in lenient mode
-        assert_eq!(res, ConversionResult::SourceIllegal);
-        assert_eq!(source, input.as_ptr());
+            let res = fceux11_rust_convert_utf8_to_utf16(
+                &mut source,
+                source_end,
+                &mut target,
+                target_end,
+                ConversionFlags::LenientConversion,
+            );
+            // ED A0 80 is an invalid UTF-8 sequence (surrogate), rejected even in lenient mode
+            assert_eq!(res, ConversionResult::SourceIllegal);
+            assert_eq!(source, input.as_ptr());
+        }
     }
 
     #[test]
     fn test_utf8_to_utf16_target_exhausted() {
-        let input: [u8; 4] = [0xF0, 0x9F, 0x98, 0x80]; // 😀 (needs surrogate pair)
-        let mut source = input.as_ptr();
-        let source_end = unsafe { source.add(input.len()) };
-        let mut output: [u16; 1] = [0];
-        let mut target = output.as_mut_ptr();
-        let target_end = unsafe { target.add(1) };
+        unsafe {
+            let input: [u8; 4] = [0xF0, 0x9F, 0x98, 0x80]; // 😀 (needs surrogate pair)
+            let mut source = input.as_ptr();
+            let source_end = unsafe { source.add(input.len()) };
+            let mut output: [u16; 1] = [0];
+            let mut target = output.as_mut_ptr();
+            let target_end = unsafe { target.add(1) };
 
-        let res = fceux11_rust_convert_utf8_to_utf16(
-            &mut source,
-            source_end,
-            &mut target,
-            target_end,
-            ConversionFlags::StrictConversion,
-        );
-        assert_eq!(res, ConversionResult::TargetExhausted);
-        assert_eq!(source, input.as_ptr());
+            let res = fceux11_rust_convert_utf8_to_utf16(
+                &mut source,
+                source_end,
+                &mut target,
+                target_end,
+                ConversionFlags::StrictConversion,
+            );
+            assert_eq!(res, ConversionResult::TargetExhausted);
+            assert_eq!(source, input.as_ptr());
+        }
     }
 
     #[test]
     fn test_utf16_to_utf8_basic() {
-        let input: [u16; 1] = [0x4E2D]; // 中
-        let mut source = input.as_ptr();
-        let source_end = unsafe { source.add(1) };
-        let mut output: [u8; 4] = [0; 4];
-        let mut target = output.as_mut_ptr();
-        let target_end = unsafe { target.add(4) };
+        unsafe {
+            let input: [u16; 1] = [0x4E2D]; // 中
+            let mut source = input.as_ptr();
+            let source_end = unsafe { source.add(1) };
+            let mut output: [u8; 4] = [0; 4];
+            let mut target = output.as_mut_ptr();
+            let target_end = unsafe { target.add(4) };
 
-        let res = fceux11_rust_convert_utf16_to_utf8(
-            &mut source,
-            source_end,
-            &mut target,
-            target_end,
-            ConversionFlags::StrictConversion,
-        );
-        assert_eq!(res, ConversionResult::ConversionOK);
-        assert_eq!(&output[..3], [0xE4, 0xB8, 0xAD]);
+            let res = fceux11_rust_convert_utf16_to_utf8(
+                &mut source,
+                source_end,
+                &mut target,
+                target_end,
+                ConversionFlags::StrictConversion,
+            );
+            assert_eq!(res, ConversionResult::ConversionOK);
+            assert_eq!(&output[..3], [0xE4, 0xB8, 0xAD]);
+        }
     }
 
     #[test]
     fn test_utf16_to_utf8_surrogate_pair() {
-        let input: [u16; 2] = [0xD83D, 0xDE00]; // 😀
-        let mut source = input.as_ptr();
-        let source_end = unsafe { source.add(2) };
-        let mut output: [u8; 4] = [0; 4];
-        let mut target = output.as_mut_ptr();
-        let target_end = unsafe { target.add(4) };
+        unsafe {
+            let input: [u16; 2] = [0xD83D, 0xDE00]; // 😀
+            let mut source = input.as_ptr();
+            let source_end = unsafe { source.add(2) };
+            let mut output: [u8; 4] = [0; 4];
+            let mut target = output.as_mut_ptr();
+            let target_end = unsafe { target.add(4) };
 
-        let res = fceux11_rust_convert_utf16_to_utf8(
-            &mut source,
-            source_end,
-            &mut target,
-            target_end,
-            ConversionFlags::StrictConversion,
-        );
-        assert_eq!(res, ConversionResult::ConversionOK);
-        assert_eq!(&output[..4], [0xF0, 0x9F, 0x98, 0x80]);
+            let res = fceux11_rust_convert_utf16_to_utf8(
+                &mut source,
+                source_end,
+                &mut target,
+                target_end,
+                ConversionFlags::StrictConversion,
+            );
+            assert_eq!(res, ConversionResult::ConversionOK);
+            assert_eq!(&output[..4], [0xF0, 0x9F, 0x98, 0x80]);
+        }
     }
 
     #[test]
     fn test_utf16_to_utf32_unpaired_high_strict() {
-        let input: [u16; 1] = [0xD800];
-        let mut source = input.as_ptr();
-        let source_end = unsafe { source.add(1) };
-        let mut output: [u32; 1] = [0];
-        let mut target = output.as_mut_ptr();
-        let target_end = unsafe { target.add(1) };
+        unsafe {
+            let input: [u16; 1] = [0xD800];
+            let mut source = input.as_ptr();
+            let source_end = unsafe { source.add(1) };
+            let mut output: [u32; 1] = [0];
+            let mut target = output.as_mut_ptr();
+            let target_end = unsafe { target.add(1) };
 
-        let res = fceux11_rust_convert_utf16_to_utf32(
-            &mut source,
-            source_end,
-            &mut target,
-            target_end,
-            ConversionFlags::StrictConversion,
-        );
-        // Single high surrogate with no following code unit -> sourceExhausted (matches original C)
-        assert_eq!(res, ConversionResult::SourceExhausted);
-        assert_eq!(source, input.as_ptr());
+            let res = fceux11_rust_convert_utf16_to_utf32(
+                &mut source,
+                source_end,
+                &mut target,
+                target_end,
+                ConversionFlags::StrictConversion,
+            );
+            // Single high surrogate with no following code unit -> sourceExhausted (matches original C)
+            assert_eq!(res, ConversionResult::SourceExhausted);
+            assert_eq!(source, input.as_ptr());
+        }
     }
 
     #[test]
     fn test_utf32_to_utf16_basic() {
-        let input: [u32; 1] = [0x4E2D];
-        let mut source = input.as_ptr();
-        let source_end = unsafe { source.add(1) };
-        let mut output: [u16; 2] = [0; 2];
-        let mut target = output.as_mut_ptr();
-        let target_end = unsafe { target.add(2) };
+        unsafe {
+            let input: [u32; 1] = [0x4E2D];
+            let mut source = input.as_ptr();
+            let source_end = unsafe { source.add(1) };
+            let mut output: [u16; 2] = [0; 2];
+            let mut target = output.as_mut_ptr();
+            let target_end = unsafe { target.add(2) };
 
-        let res = fceux11_rust_convert_utf32_to_utf16(
-            &mut source,
-            source_end,
-            &mut target,
-            target_end,
-            ConversionFlags::StrictConversion,
-        );
-        assert_eq!(res, ConversionResult::ConversionOK);
-        assert_eq!(output[0], 0x4E2D);
+            let res = fceux11_rust_convert_utf32_to_utf16(
+                &mut source,
+                source_end,
+                &mut target,
+                target_end,
+                ConversionFlags::StrictConversion,
+            );
+            assert_eq!(res, ConversionResult::ConversionOK);
+            assert_eq!(output[0], 0x4E2D);
+        }
     }
 
     #[test]
     fn test_utf32_to_utf16_non_bmp() {
-        let input: [u32; 1] = [0x10348]; // 𐍈
-        let mut source = input.as_ptr();
-        let source_end = unsafe { source.add(1) };
-        let mut output: [u16; 2] = [0; 2];
-        let mut target = output.as_mut_ptr();
-        let target_end = unsafe { target.add(2) };
+        unsafe {
+            let input: [u32; 1] = [0x10348]; // 𐍈
+            let mut source = input.as_ptr();
+            let source_end = unsafe { source.add(1) };
+            let mut output: [u16; 2] = [0; 2];
+            let mut target = output.as_mut_ptr();
+            let target_end = unsafe { target.add(2) };
 
-        let res = fceux11_rust_convert_utf32_to_utf16(
-            &mut source,
-            source_end,
-            &mut target,
-            target_end,
-            ConversionFlags::StrictConversion,
-        );
-        assert_eq!(res, ConversionResult::ConversionOK);
-        assert_eq!(output[0], 0xD800);
-        assert_eq!(output[1], 0xDF48);
+            let res = fceux11_rust_convert_utf32_to_utf16(
+                &mut source,
+                source_end,
+                &mut target,
+                target_end,
+                ConversionFlags::StrictConversion,
+            );
+            assert_eq!(res, ConversionResult::ConversionOK);
+            assert_eq!(output[0], 0xD800);
+            assert_eq!(output[1], 0xDF48);
+        }
     }
 
     #[test]
     fn test_utf32_to_utf8_beyond_legal() {
-        let input: [u32; 1] = [0x110000];
-        let mut source = input.as_ptr();
-        let source_end = unsafe { source.add(1) };
-        let mut output: [u8; 4] = [0; 4];
-        let mut target = output.as_mut_ptr();
-        let target_end = unsafe { target.add(4) };
+        unsafe {
+            let input: [u32; 1] = [0x110000];
+            let mut source = input.as_ptr();
+            let source_end = unsafe { source.add(1) };
+            let mut output: [u8; 4] = [0; 4];
+            let mut target = output.as_mut_ptr();
+            let target_end = unsafe { target.add(4) };
 
-        let res = fceux11_rust_convert_utf32_to_utf8(
-            &mut source,
-            source_end,
-            &mut target,
-            target_end,
-            ConversionFlags::StrictConversion,
-        );
-        assert_eq!(res, ConversionResult::SourceIllegal);
-        // Original C advances source even for illegal values > 0x10FFFF
-        assert_eq!(source, unsafe { input.as_ptr().add(1) });
+            let res = fceux11_rust_convert_utf32_to_utf8(
+                &mut source,
+                source_end,
+                &mut target,
+                target_end,
+                ConversionFlags::StrictConversion,
+            );
+            assert_eq!(res, ConversionResult::SourceIllegal);
+            // Original C advances source even for illegal values > 0x10FFFF
+            assert_eq!(source, unsafe { input.as_ptr().add(1) });
+        }
     }
 
     #[test]
     fn test_is_legal_utf8_sequence() {
-        assert_eq!(fceux11_rust_is_legal_utf8_sequence(b"A".as_ptr(), unsafe { b"A".as_ptr().add(1) }), 1);
-        let data = [0xED, 0xA0, 0x80];
-        assert_eq!(fceux11_rust_is_legal_utf8_sequence(data.as_ptr(), unsafe { data.as_ptr().add(3) }), 0);
+        unsafe {
+            assert_eq!(
+                fceux11_rust_is_legal_utf8_sequence(b"A".as_ptr(), unsafe { b"A".as_ptr().add(1) }),
+                1
+            );
+            let data = [0xED, 0xA0, 0x80];
+            assert_eq!(
+                fceux11_rust_is_legal_utf8_sequence(data.as_ptr(), unsafe { data.as_ptr().add(3) }),
+                0
+            );
+        }
     }
 
     #[test]
     fn test_utf8_to_utf32_beyond_max() {
-        // F4 90 80 80 = beyond U+10FFFF
-        let input: [u8; 4] = [0xF4, 0x90, 0x80, 0x80];
-        let mut source = input.as_ptr();
-        let source_end = unsafe { source.add(4) };
-        let mut output: [u32; 1] = [0];
-        let mut target = output.as_mut_ptr();
-        let target_end = unsafe { target.add(1) };
+        unsafe {
+            // F4 90 80 80 = beyond U+10FFFF
+            let input: [u8; 4] = [0xF4, 0x90, 0x80, 0x80];
+            let mut source = input.as_ptr();
+            let source_end = unsafe { source.add(4) };
+            let mut output: [u32; 1] = [0];
+            let mut target = output.as_mut_ptr();
+            let target_end = unsafe { target.add(1) };
 
-        let res = fceux11_rust_convert_utf8_to_utf32(
-            &mut source,
-            source_end,
-            &mut target,
-            target_end,
-            ConversionFlags::LenientConversion,
-        );
-        // F4 90 80 80 is illegal UTF-8 (beyond U+10FFFF), rejected at decode stage
-        assert_eq!(res, ConversionResult::SourceIllegal);
-        assert_eq!(source, input.as_ptr());
+            let res = fceux11_rust_convert_utf8_to_utf32(
+                &mut source,
+                source_end,
+                &mut target,
+                target_end,
+                ConversionFlags::LenientConversion,
+            );
+            // F4 90 80 80 is illegal UTF-8 (beyond U+10FFFF), rejected at decode stage
+            assert_eq!(res, ConversionResult::SourceIllegal);
+            assert_eq!(source, input.as_ptr());
+        }
     }
 
     #[test]
     fn test_roundtrip_utf8_utf16_utf8() {
-        let original: &[u8] = "Hello 世界 🌍".as_bytes();
-        let mut utf16_buf: [u16; 64] = [0; 64];
-        let mut utf8_buf: [u8; 64] = [0; 64];
+        unsafe {
+            let original: &[u8] = "Hello 世界 🌍".as_bytes();
+            let mut utf16_buf: [u16; 64] = [0; 64];
+            let mut utf8_buf: [u8; 64] = [0; 64];
 
-        // UTF-8 -> UTF-16
-        let mut s1 = original.as_ptr();
-        let s1_end = unsafe { s1.add(original.len()) };
-        let mut t1 = utf16_buf.as_mut_ptr();
-        let t1_end = unsafe { t1.add(64) };
-        let res1 = fceux11_rust_convert_utf8_to_utf16(
-            &mut s1, s1_end, &mut t1, t1_end, ConversionFlags::StrictConversion,
-        );
-        assert_eq!(res1, ConversionResult::ConversionOK);
-        let utf16_len = unsafe { t1.offset_from(utf16_buf.as_mut_ptr()) } as usize;
+            // UTF-8 -> UTF-16
+            let mut s1 = original.as_ptr();
+            let s1_end = unsafe { s1.add(original.len()) };
+            let mut t1 = utf16_buf.as_mut_ptr();
+            let t1_end = unsafe { t1.add(64) };
+            let res1 = fceux11_rust_convert_utf8_to_utf16(
+                &mut s1,
+                s1_end,
+                &mut t1,
+                t1_end,
+                ConversionFlags::StrictConversion,
+            );
+            assert_eq!(res1, ConversionResult::ConversionOK);
+            let utf16_len = unsafe { t1.offset_from(utf16_buf.as_mut_ptr()) } as usize;
 
-        // UTF-16 -> UTF-8
-        let mut s2 = utf16_buf.as_ptr();
-        let s2_end = unsafe { s2.add(utf16_len) };
-        let mut t2 = utf8_buf.as_mut_ptr();
-        let t2_end = unsafe { t2.add(64) };
-        let res2 = fceux11_rust_convert_utf16_to_utf8(
-            &mut s2, s2_end, &mut t2, t2_end, ConversionFlags::StrictConversion,
-        );
-        assert_eq!(res2, ConversionResult::ConversionOK);
-        let utf8_len = unsafe { t2.offset_from(utf8_buf.as_mut_ptr()) } as usize;
+            // UTF-16 -> UTF-8
+            let mut s2 = utf16_buf.as_ptr();
+            let s2_end = unsafe { s2.add(utf16_len) };
+            let mut t2 = utf8_buf.as_mut_ptr();
+            let t2_end = unsafe { t2.add(64) };
+            let res2 = fceux11_rust_convert_utf16_to_utf8(
+                &mut s2,
+                s2_end,
+                &mut t2,
+                t2_end,
+                ConversionFlags::StrictConversion,
+            );
+            assert_eq!(res2, ConversionResult::ConversionOK);
+            let utf8_len = unsafe { t2.offset_from(utf8_buf.as_mut_ptr()) } as usize;
 
-        assert_eq!(&utf8_buf[..utf8_len], original);
+            assert_eq!(&utf8_buf[..utf8_len], original);
+        }
     }
 }

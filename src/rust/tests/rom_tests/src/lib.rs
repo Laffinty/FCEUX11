@@ -8,8 +8,8 @@
 //! hashing happens in `src/tests/rom_regression_test.cpp`.  Once the CPU /
 //! PPU / APU are migrated to Rust, the hashing logic will move here.
 
-pub use fceux11_utils;
 pub use fceux11_media;
+pub use fceux11_utils;
 
 #[cfg(test)]
 mod tests {

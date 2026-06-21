@@ -8,7 +8,7 @@ use std::time::Duration;
 /// # Safety
 /// `path` must be a valid null-terminated UTF-8 string.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_mkdir(path: *const c_char) -> i32 {
+pub unsafe extern "C" fn fceux11_rust_mkdir(path: *const c_char) -> i32 {
     if path.is_null() {
         return -1;
     }
@@ -26,7 +26,7 @@ pub extern "C" fn fceux11_rust_mkdir(path: *const c_char) -> i32 {
 /// # Safety
 /// `path` must be a valid null-terminated UTF-8 string.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_mkpath(path: *const c_char) -> i32 {
+pub unsafe extern "C" fn fceux11_rust_mkpath(path: *const c_char) -> i32 {
     if path.is_null() {
         return -1;
     }
@@ -44,7 +44,7 @@ pub extern "C" fn fceux11_rust_mkpath(path: *const c_char) -> i32 {
 /// # Safety
 /// `filepath` must be a valid null-terminated UTF-8 string.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_file_exists(filepath: *const c_char) -> i32 {
+pub unsafe extern "C" fn fceux11_rust_file_exists(filepath: *const c_char) -> i32 {
     if filepath.is_null() {
         return 0;
     }
@@ -80,52 +80,62 @@ mod tests {
 
     #[test]
     fn test_mkdir_and_file_exists() {
-        let tmp = std::env::temp_dir().join("fceux11_rust_os_utils_test_dir");
-        let _ = fs::remove_dir(&tmp);
+        unsafe {
+            let tmp = std::env::temp_dir().join("fceux11_rust_os_utils_test_dir");
+            let _ = fs::remove_dir(&tmp);
 
-        let path = CString::new(tmp.to_str().unwrap()).unwrap();
-        assert_eq!(fceux11_rust_file_exists(path.as_ptr()), 0);
-        assert_eq!(fceux11_rust_mkdir(path.as_ptr()), 0);
-        // Directory is not a file
-        assert_eq!(fceux11_rust_file_exists(path.as_ptr()), 0);
-        let _ = fs::remove_dir(&tmp);
+            let path = CString::new(tmp.to_str().unwrap()).unwrap();
+            assert_eq!(fceux11_rust_file_exists(path.as_ptr()), 0);
+            assert_eq!(fceux11_rust_mkdir(path.as_ptr()), 0);
+            // Directory is not a file
+            assert_eq!(fceux11_rust_file_exists(path.as_ptr()), 0);
+            let _ = fs::remove_dir(&tmp);
+        }
     }
 
     #[test]
     fn test_mkpath() {
-        let base = std::env::temp_dir().join("fceux11_rust_os_utils_mkpath");
-        let deep = base.join("a").join("b").join("c");
-        let _ = fs::remove_dir_all(&base);
+        unsafe {
+            let base = std::env::temp_dir().join("fceux11_rust_os_utils_mkpath");
+            let deep = base.join("a").join("b").join("c");
+            let _ = fs::remove_dir_all(&base);
 
-        let path = CString::new(deep.to_str().unwrap()).unwrap();
-        assert_eq!(fceux11_rust_mkpath(path.as_ptr()), 0);
-        assert!(deep.exists());
-        let _ = fs::remove_dir_all(&base);
+            let path = CString::new(deep.to_str().unwrap()).unwrap();
+            assert_eq!(fceux11_rust_mkpath(path.as_ptr()), 0);
+            assert!(deep.exists());
+            let _ = fs::remove_dir_all(&base);
+        }
     }
 
     #[test]
     fn test_mkpath_already_exists() {
-        let base = std::env::temp_dir().join("fceux11_rust_os_utils_mkpath2");
-        let _ = fs::remove_dir_all(&base);
-        let _ = fs::create_dir_all(&base);
+        unsafe {
+            let base = std::env::temp_dir().join("fceux11_rust_os_utils_mkpath2");
+            let _ = fs::remove_dir_all(&base);
+            let _ = fs::create_dir_all(&base);
 
-        let path = CString::new(base.to_str().unwrap()).unwrap();
-        assert_eq!(fceux11_rust_mkpath(path.as_ptr()), 0);
-        let _ = fs::remove_dir_all(&base);
+            let path = CString::new(base.to_str().unwrap()).unwrap();
+            assert_eq!(fceux11_rust_mkpath(path.as_ptr()), 0);
+            let _ = fs::remove_dir_all(&base);
+        }
     }
 
     #[test]
     fn test_msleep() {
-        let start = std::time::Instant::now();
-        assert_eq!(fceux11_rust_msleep(50), 0);
-        assert!(start.elapsed() >= std::time::Duration::from_millis(50));
+        unsafe {
+            let start = std::time::Instant::now();
+            assert_eq!(fceux11_rust_msleep(50), 0);
+            assert!(start.elapsed() >= std::time::Duration::from_millis(50));
+        }
     }
 
     #[test]
     fn test_null_safety() {
-        assert_eq!(fceux11_rust_mkdir(std::ptr::null()), -1);
-        assert_eq!(fceux11_rust_mkpath(std::ptr::null()), -1);
-        assert_eq!(fceux11_rust_file_exists(std::ptr::null()), 0);
-        assert_eq!(fceux11_rust_msleep(0), 0);
+        unsafe {
+            assert_eq!(fceux11_rust_mkdir(std::ptr::null()), -1);
+            assert_eq!(fceux11_rust_mkpath(std::ptr::null()), -1);
+            assert_eq!(fceux11_rust_file_exists(std::ptr::null()), 0);
+            assert_eq!(fceux11_rust_msleep(0), 0);
+        }
     }
 }

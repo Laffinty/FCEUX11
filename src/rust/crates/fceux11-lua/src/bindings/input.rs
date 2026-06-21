@@ -108,7 +108,13 @@ const KEY_TO_NAME: [(usize, &str); 99] = [
     (0xDE, "quote"),
 ];
 
-pub fn build_input_table(lua: &Lua, keys: &[u8; 256], xmouse: i32, ymouse: i32, click: i32) -> Result<Table> {
+pub fn build_input_table(
+    lua: &Lua,
+    keys: &[u8; 256],
+    xmouse: i32,
+    ymouse: i32,
+    click: i32,
+) -> Result<Table> {
     let table = lua.create_table()?;
     for (vk, name) in KEY_TO_NAME {
         let mask = if vk == 0x14 || vk == 0x90 || vk == 0x91 {
@@ -150,7 +156,7 @@ pub fn register(lua: &Lua) -> Result<Table> {
             let mut click: i32 = 0;
             unsafe { crate::fceux11_lua_GetMouseState(&mut x, &mut y, &mut click) };
             if ok < 0 {
-                return Ok(lua.create_table()?);
+                return lua.create_table();
             }
             build_input_table(lua, &keys, x, y, click)
         })?,
@@ -167,16 +173,12 @@ pub fn register(lua: &Lua) -> Result<Table> {
 
     input.set(
         "openfilepopup",
-        lua.create_function(|lua, _options: Table| {
-            Ok(lua.create_table()?)
-        })?,
+        lua.create_function(|lua, _options: Table| lua.create_table())?,
     )?;
 
     input.set(
         "savefilepopup",
-        lua.create_function(|_, _options: Table| {
-            Ok(String::new())
-        })?,
+        lua.create_function(|_, _options: Table| Ok(String::new()))?,
     )?;
 
     Ok(input)
@@ -189,94 +191,118 @@ mod tests {
 
     #[test]
     fn test_build_input_table_empty() {
-        let lua = Lua::new();
-        let keys = [0u8; 256];
-        let table = build_input_table(&lua, &keys, -1, -1, 0).unwrap();
-        let count: i64 = table.len().unwrap();
-        assert_eq!(count, 0);
+        unsafe {
+            let lua = Lua::new();
+            let keys = [0u8; 256];
+            let table = build_input_table(&lua, &keys, -1, -1, 0).unwrap();
+            let count: i64 = table.len().unwrap();
+            assert_eq!(count, 0);
+        }
     }
 
     #[test]
     fn test_build_input_table_shift_pressed() {
-        let lua = Lua::new();
-        let mut keys = [0u8; 256];
-        keys[0x10] = 0x80;
-        let table = build_input_table(&lua, &keys, -1, -1, 0).unwrap();
-        assert_eq!(table.get::<bool>("shift").unwrap(), true);
-        assert!(table.get::<bool>("control").is_err() || !table.get::<bool>("control").unwrap());
+        unsafe {
+            let lua = Lua::new();
+            let mut keys = [0u8; 256];
+            keys[0x10] = 0x80;
+            let table = build_input_table(&lua, &keys, -1, -1, 0).unwrap();
+            assert_eq!(table.get::<bool>("shift").unwrap(), true);
+            assert!(
+                table.get::<bool>("control").is_err() || !table.get::<bool>("control").unwrap()
+            );
+        }
     }
 
     #[test]
     fn test_build_input_table_capslock_toggle() {
-        let lua = Lua::new();
-        let mut keys = [0u8; 256];
-        keys[0x14] = 0x01;
-        let table = build_input_table(&lua, &keys, -1, -1, 0).unwrap();
-        assert_eq!(table.get::<bool>("capslock").unwrap(), true);
+        unsafe {
+            let lua = Lua::new();
+            let mut keys = [0u8; 256];
+            keys[0x14] = 0x01;
+            let table = build_input_table(&lua, &keys, -1, -1, 0).unwrap();
+            assert_eq!(table.get::<bool>("capslock").unwrap(), true);
+        }
     }
 
     #[test]
     fn test_build_input_table_mouse_coords() {
-        let lua = Lua::new();
-        let keys = [0u8; 256];
-        let table = build_input_table(&lua, &keys, 100, 200, 0).unwrap();
-        assert_eq!(table.get::<i32>("xmouse").unwrap(), 100);
-        assert_eq!(table.get::<i32>("ymouse").unwrap(), 200);
+        unsafe {
+            let lua = Lua::new();
+            let keys = [0u8; 256];
+            let table = build_input_table(&lua, &keys, 100, 200, 0).unwrap();
+            assert_eq!(table.get::<i32>("xmouse").unwrap(), 100);
+            assert_eq!(table.get::<i32>("ymouse").unwrap(), 200);
+        }
     }
 
     #[test]
     fn test_build_input_table_left_click() {
-        let lua = Lua::new();
-        let keys = [0u8; 256];
-        let table = build_input_table(&lua, &keys, 50, 60, 1).unwrap();
-        assert_eq!(table.get::<bool>("leftclick").unwrap(), true);
-        assert_eq!(table.get::<i32>("xmouse").unwrap(), 50);
-        assert_eq!(table.get::<i32>("ymouse").unwrap(), 60);
+        unsafe {
+            let lua = Lua::new();
+            let keys = [0u8; 256];
+            let table = build_input_table(&lua, &keys, 50, 60, 1).unwrap();
+            assert_eq!(table.get::<bool>("leftclick").unwrap(), true);
+            assert_eq!(table.get::<i32>("xmouse").unwrap(), 50);
+            assert_eq!(table.get::<i32>("ymouse").unwrap(), 60);
+        }
     }
 
     #[test]
     fn test_build_input_table_right_click() {
-        let lua = Lua::new();
-        let keys = [0u8; 256];
-        let table = build_input_table(&lua, &keys, 10, 20, 2).unwrap();
-        assert_eq!(table.get::<bool>("rightclick").unwrap(), true);
+        unsafe {
+            let lua = Lua::new();
+            let keys = [0u8; 256];
+            let table = build_input_table(&lua, &keys, 10, 20, 2).unwrap();
+            assert_eq!(table.get::<bool>("rightclick").unwrap(), true);
+        }
     }
 
     #[test]
     fn test_build_input_table_multiple_keys() {
-        let lua = Lua::new();
-        let mut keys = [0u8; 256];
-        keys[0x57] = 0x80;
-        keys[0x41] = 0x80;
-        keys[0x10] = 0x80;
-        let table = build_input_table(&lua, &keys, -1, -1, 0).unwrap();
-        assert_eq!(table.get::<bool>("W").unwrap(), true);
-        assert_eq!(table.get::<bool>("A").unwrap(), true);
-        assert_eq!(table.get::<bool>("shift").unwrap(), true);
+        unsafe {
+            let lua = Lua::new();
+            let mut keys = [0u8; 256];
+            keys[0x57] = 0x80;
+            keys[0x41] = 0x80;
+            keys[0x10] = 0x80;
+            let table = build_input_table(&lua, &keys, -1, -1, 0).unwrap();
+            assert_eq!(table.get::<bool>("W").unwrap(), true);
+            assert_eq!(table.get::<bool>("A").unwrap(), true);
+            assert_eq!(table.get::<bool>("shift").unwrap(), true);
+        }
     }
 
     #[test]
     fn test_build_input_table_no_mouse_on_negative() {
-        let lua = Lua::new();
-        let keys = [0u8; 256];
-        let table = build_input_table(&lua, &keys, -1, -1, 0).unwrap();
-        assert!(table.get::<i32>("xmouse").is_err());
-        assert!(table.get::<i32>("ymouse").is_err());
+        unsafe {
+            let lua = Lua::new();
+            let keys = [0u8; 256];
+            let table = build_input_table(&lua, &keys, -1, -1, 0).unwrap();
+            assert!(table.get::<i32>("xmouse").is_err());
+            assert!(table.get::<i32>("ymouse").is_err());
+        }
     }
 
     #[test]
     fn test_key_to_name_coverage() {
-        let lua = Lua::new();
-        let mut keys = [0u8; 256];
-        for (vk, _) in KEY_TO_NAME {
-            // Toggle keys (CapsLock, NumLock, ScrollLock) use the low bit only.
-            let mask = if vk == 0x14 || vk == 0x90 || vk == 0x91 { 0x01 } else { 0x80 };
-            keys[vk] = mask;
-        }
-        let table = build_input_table(&lua, &keys, -1, -1, 0).unwrap();
-        for (_, name) in KEY_TO_NAME {
-            let pressed: bool = table.get(name).unwrap();
-            assert!(pressed, "key {} should be detected as pressed", name);
+        unsafe {
+            let lua = Lua::new();
+            let mut keys = [0u8; 256];
+            for (vk, _) in KEY_TO_NAME {
+                // Toggle keys (CapsLock, NumLock, ScrollLock) use the low bit only.
+                let mask = if vk == 0x14 || vk == 0x90 || vk == 0x91 {
+                    0x01
+                } else {
+                    0x80
+                };
+                keys[vk] = mask;
+            }
+            let table = build_input_table(&lua, &keys, -1, -1, 0).unwrap();
+            for (_, name) in KEY_TO_NAME {
+                let pressed: bool = table.get(name).unwrap();
+                assert!(pressed, "key {} should be detected as pressed", name);
+            }
         }
     }
 }

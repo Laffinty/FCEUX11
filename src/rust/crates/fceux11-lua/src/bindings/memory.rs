@@ -70,7 +70,7 @@ pub fn register(lua: &Lua) -> Result<Table> {
                     return Err(mlua::Error::RuntimeError(format!(
                         "unknown register: {}",
                         s
-                    )))
+                    )));
                 }
             };
             Ok(val as i32)

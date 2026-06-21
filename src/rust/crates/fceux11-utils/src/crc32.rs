@@ -6,7 +6,7 @@ use std::slice;
 /// # Safety
 /// `buf` must point to at least `len` valid bytes, or be NULL when `len` is 0.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_crc32(crc: u32, buf: *const u8, len: u32) -> u32 {
+pub unsafe extern "C" fn fceux11_rust_crc32(crc: u32, buf: *const u8, len: u32) -> u32 {
     if buf.is_null() || len == 0 {
         return crc;
     }

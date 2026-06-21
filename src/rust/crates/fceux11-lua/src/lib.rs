@@ -218,6 +218,7 @@ pub struct LuaEngine {
     main_thread: Thread,
     gui_data: Vec<u8>,
     joypad_state: JoypadOverride,
+    #[allow(dead_code)]
     speed_mode: SpeedMode,
     transparency_modifier: u8,
     running: bool,
@@ -439,7 +440,7 @@ impl LuaEngine {
     }
 
     pub fn read_joypad(&self, controller: i32, original: u8) -> u8 {
-        if controller < 0 || controller > 3 {
+        if !(0..=3).contains(&controller) {
             return original;
         }
         let i = controller as usize;
@@ -489,7 +490,7 @@ impl LuaEngine {
     }
 
     pub fn set_joypad_override(&mut self, port: i32, mask1: u32, mask2: u32) {
-        if port >= 0 && port < 4 {
+        if (0..4).contains(&port) {
             self.joypad_state.mask1[port as usize] = mask1;
             self.joypad_state.mask2[port as usize] = mask2;
         }
@@ -543,10 +544,10 @@ unsafe extern "C" fn fceux11_lua_load_script(path: *const c_char, arg: *const c_
 
 #[unsafe(no_mangle)]
 unsafe extern "C" fn fceux11_lua_frame_boundary() {
-    if let Some(engine) = get_engine() {
-        if let Err(e) = engine.frame_boundary() {
-            eprintln!("fceux11_lua_frame_boundary failed: {:?}", e);
-        }
+    if let Some(engine) = get_engine()
+        && let Err(e) = engine.frame_boundary()
+    {
+        eprintln!("fceux11_lua_frame_boundary failed: {:?}", e);
     }
 }
 
@@ -651,7 +652,12 @@ unsafe extern "C" fn fceux11_lua_get_mem_hook_count(hook_type: c_int) -> c_int {
         _ => return 0,
     };
     match get_engine() {
-        Some(engine) => engine.callbacks.mem_hooks.keys().filter(|( _, t)| *t == ht).count() as c_int,
+        Some(engine) => engine
+            .callbacks
+            .mem_hooks
+            .keys()
+            .filter(|(_, t)| *t == ht)
+            .count() as c_int,
         None => 0,
     }
 }
@@ -666,7 +672,10 @@ unsafe extern "C" fn fceux11_lua_get_mem_hook_address(hook_type: c_int, index: c
     };
     match get_engine() {
         Some(engine) => {
-            let addrs: Vec<u32> = engine.callbacks.mem_hooks.keys()
+            let addrs: Vec<u32> = engine
+                .callbacks
+                .mem_hooks
+                .keys()
                 .filter(|(_, t)| *t == ht)
                 .map(|(addr, _)| *addr)
                 .collect();
@@ -691,134 +700,159 @@ mod tests {
 
     #[test]
     fn test_keys_for_before_save() {
-        let mut callbacks = RegisteredCallbacks::new();
-        let lua = Lua::new();
-        let func = lua.create_function(|_, ()| Ok(())).unwrap();
-        let key = lua.create_registry_value(func.clone()).unwrap();
-        callbacks.savestate_save.push(CallbackEntry { func, _key: key });
-        assert_eq!(callbacks.keys_for(LuaCallID::BeforeSave).len(), 1);
+        unsafe {
+            let mut callbacks = RegisteredCallbacks::new();
+            let lua = Lua::new();
+            let func = lua.create_function(|_, ()| Ok(())).unwrap();
+            let key = lua.create_registry_value(func.clone()).unwrap();
+            callbacks
+                .savestate_save
+                .push(CallbackEntry { func, _key: key });
+            assert_eq!(callbacks.keys_for(LuaCallID::BeforeSave).len(), 1);
+        }
     }
 
     #[test]
     fn test_keys_for_after_load() {
-        let mut callbacks = RegisteredCallbacks::new();
-        let lua = Lua::new();
-        let func = lua.create_function(|_, ()| Ok(())).unwrap();
-        let key = lua.create_registry_value(func.clone()).unwrap();
-        callbacks.savestate_load.push(CallbackEntry { func, _key: key });
-        assert_eq!(callbacks.keys_for(LuaCallID::AfterLoad).len(), 1);
+        unsafe {
+            let mut callbacks = RegisteredCallbacks::new();
+            let lua = Lua::new();
+            let func = lua.create_function(|_, ()| Ok(())).unwrap();
+            let key = lua.create_registry_value(func.clone()).unwrap();
+            callbacks
+                .savestate_load
+                .push(CallbackEntry { func, _key: key });
+            assert_eq!(callbacks.keys_for(LuaCallID::AfterLoad).len(), 1);
+        }
     }
 
     #[test]
     fn test_keys_for_before_emulation_unchanged() {
-        let mut callbacks = RegisteredCallbacks::new();
-        let lua = Lua::new();
-        let func = lua.create_function(|_, ()| Ok(())).unwrap();
-        let key = lua.create_registry_value(func.clone()).unwrap();
-        callbacks.before.push(CallbackEntry { func, _key: key });
-        assert_eq!(callbacks.keys_for(LuaCallID::BeforeEmulation).len(), 1);
+        unsafe {
+            let mut callbacks = RegisteredCallbacks::new();
+            let lua = Lua::new();
+            let func = lua.create_function(|_, ()| Ok(())).unwrap();
+            let key = lua.create_registry_value(func.clone()).unwrap();
+            callbacks.before.push(CallbackEntry { func, _key: key });
+            assert_eq!(callbacks.keys_for(LuaCallID::BeforeEmulation).len(), 1);
+        }
     }
 
     #[cfg(feature = "ffi-tests")]
     #[test]
     fn test_gui_callbacks_invoked_in_frame_boundary() {
-        let lua = Lua::new();
-        let mut engine = LuaEngine::new().unwrap();
-        let gui_table = bindings::gui::register(&lua).unwrap();
-        lua.globals().set("gui", gui_table).unwrap();
+        unsafe {
+            let lua = Lua::new();
+            let mut engine = LuaEngine::new().unwrap();
+            let gui_table = bindings::gui::register(&lua).unwrap();
+            lua.globals().set("gui", gui_table).unwrap();
 
-        let called = std::rc::Rc::new(std::cell::Cell::new(false));
-        let called_clone = called.clone();
-        lua.globals().set("check_gui", lua.create_function(move |_, ()| {
-            called_clone.set(true);
-            Ok(())
-        }).unwrap()).unwrap();
-        lua.load("gui.register(check_gui)").exec().unwrap();
+            let called = std::rc::Rc::new(std::cell::Cell::new(false));
+            let called_clone = called.clone();
+            lua.globals()
+                .set(
+                    "check_gui",
+                    lua.create_function(move |_, ()| {
+                        called_clone.set(true);
+                        Ok(())
+                    })
+                    .unwrap(),
+                )
+                .unwrap();
+            lua.load("gui.register(check_gui)").exec().unwrap();
 
-        let func = lua.create_function(|_, ()| {
-            Ok(mlua::Value::Nil)
-        }).unwrap();
-        let co = lua.create_thread(func).unwrap();
-        engine.running = true;
-        engine.frame_advance_waiting = true;
-        engine.main_thread = co;
+            let func = lua.create_function(|_, ()| Ok(mlua::Value::Nil)).unwrap();
+            let co = lua.create_thread(func).unwrap();
+            engine.running = true;
+            engine.frame_advance_waiting = true;
+            engine.main_thread = co;
 
-        let _ = engine.frame_boundary();
+            let _ = engine.frame_boundary();
 
-        assert!(called.get(), "GUI callback should have been called during frame_boundary");
+            assert!(
+                called.get(),
+                "GUI callback should have been called during frame_boundary"
+            );
+        }
     }
 
     #[cfg(feature = "ffi-tests")]
     #[test]
     fn test_savestate_object_userdata_has_methods() {
-        let lua = Lua::new();
-        let _savestate_table = bindings::savestate::register(&lua).unwrap();
-        lua.globals().set("savestate", _savestate_table).unwrap();
+        unsafe {
+            let lua = Lua::new();
+            let _savestate_table = bindings::savestate::register(&lua).unwrap();
+            lua.globals().set("savestate", _savestate_table).unwrap();
 
-        let obj = bindings::savestate::SavestateObject(42);
-        lua.globals().set("ss_obj", obj).unwrap();
+            let obj = bindings::savestate::SavestateObject(42);
+            lua.globals().set("ss_obj", obj).unwrap();
 
-        let has_save: bool = lua.load("return ss_obj.save ~= nil").eval().unwrap();
-        let has_load: bool = lua.load("return ss_obj.load ~= nil").eval().unwrap();
-        assert!(has_save, "SavestateObject should have :save() method");
-        assert!(has_load, "SavestateObject should have :load() method");
+            let has_save: bool = lua.load("return ss_obj.save ~= nil").eval().unwrap();
+            let has_load: bool = lua.load("return ss_obj.load ~= nil").eval().unwrap();
+            assert!(has_save, "SavestateObject should have :save() method");
+            assert!(has_load, "SavestateObject should have :load() method");
+        }
     }
 
     #[cfg(feature = "ffi-tests")]
     #[test]
     fn test_mem_hook_registration_triggers_recalc() {
-        let lua = Lua::new();
-        let engine = LuaEngine::new().unwrap();
-        unsafe { LUA_ENGINE_PTR = Box::into_raw(Box::new(engine)) as *mut c_void };
-
-        let memory_table = bindings::memory::register(&lua).unwrap();
-        lua.globals().set("memory", memory_table).unwrap();
-
-        let func = lua.create_function(|_, ()| Ok(())).unwrap();
-        let result = {
-            let eng = get_engine().unwrap();
-            eng.register_mem_hook(0x1000, LuaMemHookType::Write, func)
-        };
-        assert!(result.is_ok(), "register_mem_hook should succeed");
-
-        let count = unsafe { fceux11_lua_get_mem_hook_count(0) };
-        assert_eq!(count, 1, "Should have 1 write hook registered");
-
         unsafe {
-            if let Some(eng) = (LUA_ENGINE_PTR as *mut LuaEngine).as_mut() {
-                eng.stop();
+            let lua = Lua::new();
+            let engine = LuaEngine::new().unwrap();
+            unsafe { LUA_ENGINE_PTR = Box::into_raw(Box::new(engine)) as *mut c_void };
+
+            let memory_table = bindings::memory::register(&lua).unwrap();
+            lua.globals().set("memory", memory_table).unwrap();
+
+            let func = lua.create_function(|_, ()| Ok(())).unwrap();
+            let result = {
+                let eng = get_engine().unwrap();
+                eng.register_mem_hook(0x1000, LuaMemHookType::Write, func)
+            };
+            assert!(result.is_ok(), "register_mem_hook should succeed");
+
+            let count = unsafe { fceux11_lua_get_mem_hook_count(0) };
+            assert_eq!(count, 1, "Should have 1 write hook registered");
+
+            unsafe {
+                if let Some(eng) = (LUA_ENGINE_PTR as *mut LuaEngine).as_mut() {
+                    eng.stop();
+                }
+                let _ = Box::from_raw(LUA_ENGINE_PTR as *mut LuaEngine);
+                LUA_ENGINE_PTR = std::ptr::null_mut();
             }
-            let _ = Box::from_raw(LUA_ENGINE_PTR as *mut LuaEngine);
-            LUA_ENGINE_PTR = std::ptr::null_mut();
         }
     }
 
     #[cfg(feature = "ffi-tests")]
     #[test]
     fn test_mem_hook_count_by_type() {
-        let lua = Lua::new();
-        let engine = LuaEngine::new().unwrap();
-        unsafe { LUA_ENGINE_PTR = Box::into_raw(Box::new(engine)) as *mut c_void };
-
-        let func1 = lua.create_function(|_, ()| Ok(())).unwrap();
-        let func2 = lua.create_function(|_, ()| Ok(())).unwrap();
-
-        {
-            let eng = get_engine().unwrap();
-            let _ = eng.register_mem_hook(0x100, LuaMemHookType::Write, func1);
-            let _ = eng.register_mem_hook(0x200, LuaMemHookType::Read, func2);
-        }
-
-        assert_eq!(unsafe { fceux11_lua_get_mem_hook_count(0) }, 1);
-        assert_eq!(unsafe { fceux11_lua_get_mem_hook_count(1) }, 1);
-        assert_eq!(unsafe { fceux11_lua_get_mem_hook_count(2) }, 0);
-
         unsafe {
-            if let Some(eng) = (LUA_ENGINE_PTR as *mut LuaEngine).as_mut() {
-                eng.stop();
+            let lua = Lua::new();
+            let engine = LuaEngine::new().unwrap();
+            unsafe { LUA_ENGINE_PTR = Box::into_raw(Box::new(engine)) as *mut c_void };
+
+            let func1 = lua.create_function(|_, ()| Ok(())).unwrap();
+            let func2 = lua.create_function(|_, ()| Ok(())).unwrap();
+
+            {
+                let eng = get_engine().unwrap();
+                let _ = eng.register_mem_hook(0x100, LuaMemHookType::Write, func1);
+                let _ = eng.register_mem_hook(0x200, LuaMemHookType::Read, func2);
             }
-            let _ = Box::from_raw(LUA_ENGINE_PTR as *mut LuaEngine);
-            LUA_ENGINE_PTR = std::ptr::null_mut();
+
+            assert_eq!(unsafe { fceux11_lua_get_mem_hook_count(0) }, 1);
+            assert_eq!(unsafe { fceux11_lua_get_mem_hook_count(1) }, 1);
+            assert_eq!(unsafe { fceux11_lua_get_mem_hook_count(2) }, 0);
+
+            unsafe {
+                if let Some(eng) = (LUA_ENGINE_PTR as *mut LuaEngine).as_mut() {
+                    eng.stop();
+                }
+                let _ = Box::from_raw(LUA_ENGINE_PTR as *mut LuaEngine);
+                LUA_ENGINE_PTR = std::ptr::null_mut();
+            }
         }
     }
 }

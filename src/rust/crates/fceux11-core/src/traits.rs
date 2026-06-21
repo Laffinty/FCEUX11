@@ -64,7 +64,7 @@ pub struct CpuRegs {
     pub y: u8,
     pub s: u8,
     pub p: u8,
-    pub db: u8,      // data bus "cache"
+    pub db: u8, // data bus "cache"
     pub irq_low: u32,
     pub tcount: i32,
     pub count: i32,
@@ -135,16 +135,16 @@ pub struct PpuTickResult {
 /// Serializable PPU state (for savestates).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PpuSnapshot {
-    pub ctrl: u8,       // $2000
-    pub mask: u8,       // $2001
-    pub status: u8,     // $2002
-    pub oam_addr: u8,   // $2003
+    pub ctrl: u8,        // $2000
+    pub mask: u8,        // $2001
+    pub status: u8,      // $2002
+    pub oam_addr: u8,    // $2003
     pub scroll: [u8; 2], // $2005
-    pub addr: [u8; 2],  // $2006
-    pub v: u16,         // current VRAM address
-    pub t: u16,         // temporary VRAM address
-    pub x: u8,          // fine X scroll
-    pub w: bool,        // write toggle
+    pub addr: [u8; 2],   // $2006
+    pub v: u16,          // current VRAM address
+    pub t: u16,          // temporary VRAM address
+    pub x: u8,           // fine X scroll
+    pub w: bool,         // write toggle
 }
 
 /// Ricoh 2A03 APU / DMC interface.

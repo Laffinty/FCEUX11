@@ -32,7 +32,7 @@ pub fn register(lua: &Lua) -> Result<Table> {
     savestate.set(
         "save",
         lua.create_function(|_, slot: i32| {
-            if slot < 1 || slot > 10 {
+            if !(1..=10).contains(&slot) {
                 return Err(mlua::Error::RuntimeError(format!(
                     "invalid savestate slot {} (valid range 1-10)",
                     slot
@@ -52,7 +52,7 @@ pub fn register(lua: &Lua) -> Result<Table> {
     savestate.set(
         "load",
         lua.create_function(|_, slot: i32| {
-            if slot < 1 || slot > 10 {
+            if !(1..=10).contains(&slot) {
                 return Err(mlua::Error::RuntimeError(format!(
                     "invalid savestate slot {} (valid range 1-10)",
                     slot

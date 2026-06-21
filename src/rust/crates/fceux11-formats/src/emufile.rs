@@ -17,6 +17,12 @@ pub struct EmuFileMem {
     pos: usize,
 }
 
+impl Default for EmuFileMem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EmuFileMem {
     /// Create with a caller-provided buffer (borrowed).
     pub fn from_buf(buf: &[u8]) -> Self {
@@ -28,21 +34,16 @@ impl EmuFileMem {
 
     /// Create with a pre-allocated buffer.
     pub fn with_capacity(capacity: usize) -> Self {
-        let mut buf = Vec::new();
-        buf.reserve(capacity);
-        buf.resize(capacity, 0);
         Self {
-            buf,
+            buf: vec![0; capacity],
             pos: 0,
         }
     }
 
     /// Create an empty buffer with default reserve.
     pub fn new() -> Self {
-        let mut buf = Vec::new();
-        buf.reserve(1024);
         Self {
-            buf,
+            buf: Vec::with_capacity(1024),
             pos: 0,
         }
     }
@@ -80,7 +81,7 @@ impl EmuFileMem {
     }
 
     /// Read up to `bytes` into `ptr`. Returns bytes actually read.
-    pub fn read_into(&mut self, ptr: *mut u8, bytes: usize) -> usize {
+    pub(crate) fn read_into(&mut self, ptr: *mut u8, bytes: usize) -> usize {
         if ptr.is_null() || bytes == 0 {
             return 0;
         }
@@ -108,7 +109,7 @@ impl EmuFileMem {
     }
 
     /// Write bytes from `ptr` into the buffer. Grows if needed.
-    pub fn write_from(&mut self, ptr: *const u8, bytes: usize) -> usize {
+    pub(crate) fn write_from(&mut self, ptr: *const u8, bytes: usize) -> usize {
         if ptr.is_null() || bytes == 0 {
             return 0;
         }
@@ -202,13 +203,21 @@ pub extern "C" fn fceux11_rust_emufile_mem_create() -> EmuFileMemHandle {
 
 /// Create a new in-memory EmuFile with pre-allocated capacity.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_emufile_mem_create_with_capacity(capacity: usize) -> EmuFileMemHandle {
+pub extern "C" fn fceux11_rust_emufile_mem_create_with_capacity(
+    capacity: usize,
+) -> EmuFileMemHandle {
     Box::into_raw(Box::new(EmuFileMem::with_capacity(capacity)))
 }
 
 /// Create a new in-memory EmuFile from raw bytes.
+/// # Safety
+/// The caller must ensure that any opaque handle passed to this function is either
+/// null or a valid handle obtained from this crate's constructor functions.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_emufile_mem_create_from_bytes(ptr: *const u8, len: usize) -> EmuFileMemHandle {
+pub unsafe extern "C" fn fceux11_rust_emufile_mem_create_from_bytes(
+    ptr: *const u8,
+    len: usize,
+) -> EmuFileMemHandle {
     if ptr.is_null() {
         return std::ptr::null_mut();
     }
@@ -217,6 +226,9 @@ pub extern "C" fn fceux11_rust_emufile_mem_create_from_bytes(ptr: *const u8, len
 }
 
 /// Destroy an in-memory EmuFile handle.
+/// # Safety
+/// The caller must ensure that any opaque handle passed to this function is either
+/// null or a valid handle obtained from this crate's constructor functions.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_emufile_mem_destroy(handle: EmuFileMemHandle) {
     if !handle.is_null() {
@@ -225,6 +237,9 @@ pub unsafe extern "C" fn fceux11_rust_emufile_mem_destroy(handle: EmuFileMemHand
 }
 
 /// Read bytes into C buffer. Returns bytes read.
+/// # Safety
+/// The caller must ensure that any opaque handle passed to this function is either
+/// null or a valid handle obtained from this crate's constructor functions.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_emufile_mem_fread(
     handle: EmuFileMemHandle,
@@ -239,6 +254,9 @@ pub unsafe extern "C" fn fceux11_rust_emufile_mem_fread(
 }
 
 /// Write bytes from C buffer. Returns bytes written.
+/// # Safety
+/// The caller must ensure that any opaque handle passed to this function is either
+/// null or a valid handle obtained from this crate's constructor functions.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_emufile_mem_fwrite(
     handle: EmuFileMemHandle,
@@ -255,6 +273,9 @@ pub unsafe extern "C" fn fceux11_rust_emufile_mem_fwrite(
 /// Seek within the memory file.
 /// origin: 0 = SEEK_SET, 1 = SEEK_CUR, 2 = SEEK_END
 /// Returns 0 on success, -1 on failure.
+/// # Safety
+/// The caller must ensure that any opaque handle passed to this function is either
+/// null or a valid handle obtained from this crate's constructor functions.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_emufile_mem_fseek(
     handle: EmuFileMemHandle,
@@ -271,14 +292,13 @@ pub unsafe extern "C" fn fceux11_rust_emufile_mem_fseek(
         2 => mem.seek_end(offset as isize),
         _ => return -1,
     };
-    if ok {
-        0
-    } else {
-        -1
-    }
+    if ok { 0 } else { -1 }
 }
 
 /// Get current position.
+/// # Safety
+/// The caller must ensure that any opaque handle passed to this function is either
+/// null or a valid handle obtained from this crate's constructor functions.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_emufile_mem_ftell(handle: EmuFileMemHandle) -> u32 {
     if handle.is_null() {
@@ -289,6 +309,9 @@ pub unsafe extern "C" fn fceux11_rust_emufile_mem_ftell(handle: EmuFileMemHandle
 }
 
 /// Get size of memory buffer.
+/// # Safety
+/// The caller must ensure that any opaque handle passed to this function is either
+/// null or a valid handle obtained from this crate's constructor functions.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_emufile_mem_size(handle: EmuFileMemHandle) -> u32 {
     if handle.is_null() {
@@ -299,6 +322,9 @@ pub unsafe extern "C" fn fceux11_rust_emufile_mem_size(handle: EmuFileMemHandle)
 }
 
 /// Truncate the memory buffer.
+/// # Safety
+/// The caller must ensure that any opaque handle passed to this function is either
+/// null or a valid handle obtained from this crate's constructor functions.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_emufile_mem_truncate(handle: EmuFileMemHandle, length: u32) {
     if !handle.is_null() {
@@ -308,6 +334,9 @@ pub unsafe extern "C" fn fceux11_rust_emufile_mem_truncate(handle: EmuFileMemHan
 }
 
 /// Check fail bit (always false in Rust, kept for API parity).
+/// # Safety
+/// The caller must ensure that any opaque handle passed to this function is either
+/// null or a valid handle obtained from this crate's constructor functions.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_emufile_mem_fail(handle: EmuFileMemHandle) -> i32 {
     if handle.is_null() {
@@ -317,20 +346,22 @@ pub unsafe extern "C" fn fceux11_rust_emufile_mem_fail(handle: EmuFileMemHandle)
 }
 
 /// Returns non-zero if at EOF.
+/// # Safety
+/// The caller must ensure that any opaque handle passed to this function is either
+/// null or a valid handle obtained from this crate's constructor functions.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_emufile_mem_eof(handle: EmuFileMemHandle) -> i32 {
     if handle.is_null() {
         return 1;
     }
     let mem = unsafe { &*handle };
-    if mem.eof() {
-        1
-    } else {
-        0
-    }
+    if mem.eof() { 1 } else { 0 }
 }
 
 /// Get read-only data pointer.
+/// # Safety
+/// The caller must ensure that any opaque handle passed to this function is either
+/// null or a valid handle obtained from this crate's constructor functions.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_emufile_mem_data_ptr(handle: EmuFileMemHandle) -> *const u8 {
     if handle.is_null() {
@@ -341,6 +372,9 @@ pub unsafe extern "C" fn fceux11_rust_emufile_mem_data_ptr(handle: EmuFileMemHan
 }
 
 /// Ungetc: step position back by one.
+/// # Safety
+/// The caller must ensure that any opaque handle passed to this function is either
+/// null or a valid handle obtained from this crate's constructor functions.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_emufile_mem_unget(handle: EmuFileMemHandle) {
     if handle.is_null() {
@@ -357,6 +391,9 @@ pub unsafe extern "C" fn fceux11_rust_emufile_mem_unget(handle: EmuFileMemHandle
 // ============================================================
 
 /// Read a u8 value.
+/// # Safety
+/// The caller must ensure that any opaque handle passed to this function is either
+/// null or a valid handle obtained from this crate's constructor functions.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_emufile_mem_read8(handle: EmuFileMemHandle) -> u8 {
     if handle.is_null() {
@@ -372,6 +409,9 @@ pub unsafe extern "C" fn fceux11_rust_emufile_mem_read8(handle: EmuFileMemHandle
 }
 
 /// Write a u8 value.
+/// # Safety
+/// The caller must ensure that any opaque handle passed to this function is either
+/// null or a valid handle obtained from this crate's constructor functions.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_emufile_mem_write8(handle: EmuFileMemHandle, val: u8) {
     if handle.is_null() {
@@ -382,6 +422,9 @@ pub unsafe extern "C" fn fceux11_rust_emufile_mem_write8(handle: EmuFileMemHandl
 }
 
 /// Read a u16 LE.
+/// # Safety
+/// The caller must ensure that any opaque handle passed to this function is either
+/// null or a valid handle obtained from this crate's constructor functions.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_emufile_mem_read16le(handle: EmuFileMemHandle) -> u16 {
     if handle.is_null() {
@@ -400,6 +443,9 @@ pub unsafe extern "C" fn fceux11_rust_emufile_mem_read16le(handle: EmuFileMemHan
 }
 
 /// Write a u16 LE.
+/// # Safety
+/// The caller must ensure that any opaque handle passed to this function is either
+/// null or a valid handle obtained from this crate's constructor functions.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_emufile_mem_write16le(handle: EmuFileMemHandle, val: u16) {
     if handle.is_null() {
@@ -417,6 +463,9 @@ pub unsafe extern "C" fn fceux11_rust_emufile_mem_write16le(handle: EmuFileMemHa
 }
 
 /// Read a u32 LE.
+/// # Safety
+/// The caller must ensure that any opaque handle passed to this function is either
+/// null or a valid handle obtained from this crate's constructor functions.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_emufile_mem_read32le(handle: EmuFileMemHandle) -> u32 {
     if handle.is_null() {
@@ -437,6 +486,9 @@ pub unsafe extern "C" fn fceux11_rust_emufile_mem_read32le(handle: EmuFileMemHan
 }
 
 /// Write a u32 LE.
+/// # Safety
+/// The caller must ensure that any opaque handle passed to this function is either
+/// null or a valid handle obtained from this crate's constructor functions.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_emufile_mem_write32le(handle: EmuFileMemHandle, val: u32) {
     if handle.is_null() {
@@ -457,6 +509,9 @@ pub unsafe extern "C" fn fceux11_rust_emufile_mem_write32le(handle: EmuFileMemHa
 }
 
 /// Read a u64 LE.
+/// # Safety
+/// The caller must ensure that any opaque handle passed to this function is either
+/// null or a valid handle obtained from this crate's constructor functions.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_emufile_mem_read64le(handle: EmuFileMemHandle) -> u64 {
     if handle.is_null() {
@@ -477,6 +532,9 @@ pub unsafe extern "C" fn fceux11_rust_emufile_mem_read64le(handle: EmuFileMemHan
 }
 
 /// Write a u64 LE.
+/// # Safety
+/// The caller must ensure that any opaque handle passed to this function is either
+/// null or a valid handle obtained from this crate's constructor functions.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_emufile_mem_write64le(handle: EmuFileMemHandle, val: u64) {
     if handle.is_null() {
@@ -501,109 +559,142 @@ mod tests {
 
     #[test]
     fn test_create_destroy() {
-        let h = fceux11_rust_emufile_mem_create();
-        assert!(!h.is_null());
-        unsafe { fceux11_rust_emufile_mem_destroy(h) };
+        unsafe {
+            let h = fceux11_rust_emufile_mem_create();
+            assert!(!h.is_null());
+            unsafe { fceux11_rust_emufile_mem_destroy(h) };
+        }
     }
 
     #[test]
     fn test_write_read_bytes() {
-        let h = fceux11_rust_emufile_mem_create();
-        let data = [1u8, 2, 3, 4, 5];
-        let wrote = unsafe { fceux11_rust_emufile_mem_fwrite(h, data.as_ptr(), data.len()) };
-        assert_eq!(wrote, 5);
+        unsafe {
+            let h = fceux11_rust_emufile_mem_create();
+            let data = [1u8, 2, 3, 4, 5];
+            let wrote = unsafe { fceux11_rust_emufile_mem_fwrite(h, data.as_ptr(), data.len()) };
+            assert_eq!(wrote, 5);
 
-        unsafe { fceux11_rust_emufile_mem_fseek(h, 0, 0) };
+            unsafe { fceux11_rust_emufile_mem_fseek(h, 0, 0) };
 
-        let mut buf = [0u8; 5];
-        let read = unsafe { fceux11_rust_emufile_mem_fread(h, buf.as_mut_ptr(), 5) };
-        assert_eq!(read, 5);
-        assert_eq!(buf, data);
+            let mut buf = [0u8; 5];
+            let read = unsafe { fceux11_rust_emufile_mem_fread(h, buf.as_mut_ptr(), 5) };
+            assert_eq!(read, 5);
+            assert_eq!(buf, data);
 
-        unsafe { fceux11_rust_emufile_mem_destroy(h) };
+            unsafe { fceux11_rust_emufile_mem_destroy(h) };
+        }
     }
 
     #[test]
     fn test_eof() {
-        let h = fceux11_rust_emufile_mem_create();
-        assert!(unsafe { fceux11_rust_emufile_mem_eof(h) } != 0);
+        unsafe {
+            let h = fceux11_rust_emufile_mem_create();
+            assert!(unsafe { fceux11_rust_emufile_mem_eof(h) } != 0);
 
-        let data = [42u8];
-        unsafe { fceux11_rust_emufile_mem_fwrite(h, data.as_ptr(), 1) };
+            let data = [42u8];
+            unsafe { fceux11_rust_emufile_mem_fwrite(h, data.as_ptr(), 1) };
 
-        unsafe { fceux11_rust_emufile_mem_fseek(h, 0, 0) };
-        assert!(unsafe { fceux11_rust_emufile_mem_eof(h) } == 0);
+            unsafe { fceux11_rust_emufile_mem_fseek(h, 0, 0) };
+            assert!(unsafe { fceux11_rust_emufile_mem_eof(h) } == 0);
 
-        unsafe { fceux11_rust_emufile_mem_fseek(h, 0, 0) };
-        let mut buf = [0u8];
-        unsafe { fceux11_rust_emufile_mem_fread(h, buf.as_mut_ptr(), 1) };
-        assert!(unsafe { fceux11_rust_emufile_mem_eof(h) } != 0);
+            unsafe { fceux11_rust_emufile_mem_fseek(h, 0, 0) };
+            let mut buf = [0u8];
+            unsafe { fceux11_rust_emufile_mem_fread(h, buf.as_mut_ptr(), 1) };
+            assert!(unsafe { fceux11_rust_emufile_mem_eof(h) } != 0);
 
-        unsafe { fceux11_rust_emufile_mem_destroy(h) };
+            unsafe { fceux11_rust_emufile_mem_destroy(h) };
+        }
     }
 
     #[test]
     fn test_scalar_read_write() {
-        let h = fceux11_rust_emufile_mem_create();
+        unsafe {
+            let h = fceux11_rust_emufile_mem_create();
 
-        unsafe { fceux11_rust_emufile_mem_write8(h, 0xAB) };
-        unsafe { fceux11_rust_emufile_mem_write16le(h, 0x1234) };
-        unsafe { fceux11_rust_emufile_mem_write32le(h, 0x56789ABC) };
-        unsafe { fceux11_rust_emufile_mem_write64le(h, 0xDEADBEEF01234567) };
+            unsafe { fceux11_rust_emufile_mem_write8(h, 0xAB) };
+            unsafe { fceux11_rust_emufile_mem_write16le(h, 0x1234) };
+            unsafe { fceux11_rust_emufile_mem_write32le(h, 0x56789ABC) };
+            unsafe { fceux11_rust_emufile_mem_write64le(h, 0xDEADBEEF01234567) };
 
-        unsafe { fceux11_rust_emufile_mem_fseek(h, 0, 0) };
+            unsafe { fceux11_rust_emufile_mem_fseek(h, 0, 0) };
 
-        assert_eq!(unsafe { fceux11_rust_emufile_mem_read8(h) }, 0xAB);
-        assert_eq!(unsafe { fceux11_rust_emufile_mem_read16le(h) }, 0x1234);
-        assert_eq!(unsafe { fceux11_rust_emufile_mem_read32le(h) }, 0x56789ABC);
-        assert_eq!(unsafe { fceux11_rust_emufile_mem_read64le(h) }, 0xDEADBEEF01234567);
+            assert_eq!(unsafe { fceux11_rust_emufile_mem_read8(h) }, 0xAB);
+            assert_eq!(unsafe { fceux11_rust_emufile_mem_read16le(h) }, 0x1234);
+            assert_eq!(unsafe { fceux11_rust_emufile_mem_read32le(h) }, 0x56789ABC);
+            assert_eq!(
+                unsafe { fceux11_rust_emufile_mem_read64le(h) },
+                0xDEADBEEF01234567
+            );
 
-        unsafe { fceux11_rust_emufile_mem_destroy(h) };
+            unsafe { fceux11_rust_emufile_mem_destroy(h) };
+        }
     }
 
     #[test]
     fn test_truncate() {
-        let h = fceux11_rust_emufile_mem_create();
-        let data = [1u8, 2, 3, 4, 5];
-        unsafe { fceux11_rust_emufile_mem_fwrite(h, data.as_ptr(), data.len()) };
+        unsafe {
+            let h = fceux11_rust_emufile_mem_create();
+            let data = [1u8, 2, 3, 4, 5];
+            unsafe { fceux11_rust_emufile_mem_fwrite(h, data.as_ptr(), data.len()) };
 
-        unsafe { fceux11_rust_emufile_mem_truncate(h, 3) };
-        assert_eq!(unsafe { fceux11_rust_emufile_mem_size(h) }, 3);
+            unsafe { fceux11_rust_emufile_mem_truncate(h, 3) };
+            assert_eq!(unsafe { fceux11_rust_emufile_mem_size(h) }, 3);
 
-        unsafe { fceux11_rust_emufile_mem_destroy(h) };
+            unsafe { fceux11_rust_emufile_mem_destroy(h) };
+        }
     }
 
     #[test]
     fn test_null_safety() {
-        // Operations on null handle return safe defaults
-        assert_eq!(unsafe { fceux11_rust_emufile_mem_fread(std::ptr::null_mut(), std::ptr::null_mut(), 10) }, 0);
-        assert_eq!(unsafe { fceux11_rust_emufile_mem_fwrite(std::ptr::null_mut(), std::ptr::null(), 10) }, 0);
-        assert_eq!(unsafe { fceux11_rust_emufile_mem_ftell(std::ptr::null_mut()) }, 0);
-        assert_eq!(unsafe { fceux11_rust_emufile_mem_size(std::ptr::null_mut()) }, 0);
-        assert!(unsafe { fceux11_rust_emufile_mem_eof(std::ptr::null_mut()) } != 0);
+        unsafe {
+            // Operations on null handle return safe defaults
+            assert_eq!(
+                unsafe {
+                    fceux11_rust_emufile_mem_fread(std::ptr::null_mut(), std::ptr::null_mut(), 10)
+                },
+                0
+            );
+            assert_eq!(
+                unsafe {
+                    fceux11_rust_emufile_mem_fwrite(std::ptr::null_mut(), std::ptr::null(), 10)
+                },
+                0
+            );
+            assert_eq!(
+                unsafe { fceux11_rust_emufile_mem_ftell(std::ptr::null_mut()) },
+                0
+            );
+            assert_eq!(
+                unsafe { fceux11_rust_emufile_mem_size(std::ptr::null_mut()) },
+                0
+            );
+            assert!(unsafe { fceux11_rust_emufile_mem_eof(std::ptr::null_mut()) } != 0);
+        }
     }
 
     #[test]
     fn test_determinism() {
-        // Same data always produces same result
-        let h1 = fceux11_rust_emufile_mem_create();
-        let h2 = fceux11_rust_emufile_mem_create();
-        let data = [0xDEu8, 0xAD, 0xBE, 0xEF];
-
         unsafe {
-            fceux11_rust_emufile_mem_fwrite(h1, data.as_ptr(), data.len());
-            fceux11_rust_emufile_mem_fwrite(h2, data.as_ptr(), data.len());
-            fceux11_rust_emufile_mem_fseek(h1, 0, 0);
-            fceux11_rust_emufile_mem_fseek(h2, 0, 0);
+            // Same data always produces same result
+            let h1 = fceux11_rust_emufile_mem_create();
+            let h2 = fceux11_rust_emufile_mem_create();
+            let data = [0xDEu8, 0xAD, 0xBE, 0xEF];
 
-            let mut buf1 = [0u8; 4];
-            let mut buf2 = [0u8; 4];
-            fceux11_rust_emufile_mem_fread(h1, buf1.as_mut_ptr(), 4);
-            fceux11_rust_emufile_mem_fread(h2, buf2.as_mut_ptr(), 4);
+            unsafe {
+                fceux11_rust_emufile_mem_fwrite(h1, data.as_ptr(), data.len());
+                fceux11_rust_emufile_mem_fwrite(h2, data.as_ptr(), data.len());
+                fceux11_rust_emufile_mem_fseek(h1, 0, 0);
+                fceux11_rust_emufile_mem_fseek(h2, 0, 0);
 
-            assert_eq!(buf1, buf2);
-            fceux11_rust_emufile_mem_destroy(h1);
-            fceux11_rust_emufile_mem_destroy(h2);
+                let mut buf1 = [0u8; 4];
+                let mut buf2 = [0u8; 4];
+                fceux11_rust_emufile_mem_fread(h1, buf1.as_mut_ptr(), 4);
+                fceux11_rust_emufile_mem_fread(h2, buf2.as_mut_ptr(), 4);
+
+                assert_eq!(buf1, buf2);
+                fceux11_rust_emufile_mem_destroy(h1);
+                fceux11_rust_emufile_mem_destroy(h2);
+            }
         }
     }
 }
