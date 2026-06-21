@@ -3,18 +3,21 @@
 
 //include this file LAST, or else the #defines will overwrite CRT and STL symbols
 
-#define _PC        X.PC
-#define _A         X.A
-#define _X         X.X
-#define _Y         X.Y
-#define _S         X.S
-#define _P         X.P
-#define _PI        X.mooPI
-#define _DB        X.DB
-#define _count     X.count
-#define _tcount    X.tcount
-#define _IRQlow    X.IRQlow
-#define _jammed    X.jammed
+// v1.3 Legion Phase 2: these abbreviations now route through g_cpu so the
+// X6502 state object is fully owned by fceu11::Cpu. The global `X` inline
+// alias in x6502.h is kept for files that have not yet been migrated.
+#define _PC        g_cpu.native_layout().PC
+#define _A         g_cpu.native_layout().A
+#define _X         g_cpu.native_layout().X
+#define _Y         g_cpu.native_layout().Y
+#define _S         g_cpu.native_layout().S
+#define _P         g_cpu.native_layout().P
+#define _PI        g_cpu.native_layout().mooPI
+#define _DB        g_cpu.native_layout().DB
+#define _count     g_cpu.native_layout().count
+#define _tcount    g_cpu.native_layout().tcount
+#define _IRQlow    g_cpu.native_layout().IRQlow
+#define _jammed    g_cpu.native_layout().jammed
 
 
 #endif

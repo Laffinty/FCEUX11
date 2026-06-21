@@ -30,9 +30,8 @@ struct ProfilerManagerState {
 unsafe impl Send for ProfilerManagerState {}
 unsafe impl Sync for ProfilerManagerState {}
 
-static PROFILER_MANAGER: Mutex<ProfilerManagerState> = Mutex::new(ProfilerManagerState {
-    maps: Vec::new(),
-});
+static PROFILER_MANAGER: Mutex<ProfilerManagerState> =
+    Mutex::new(ProfilerManagerState { maps: Vec::new() });
 
 /// C ABI: Create a new `ProfilerFuncMap` and return an opaque handle.
 #[unsafe(no_mangle)]
@@ -58,7 +57,9 @@ pub extern "C" fn fceux11_rust_profiler_map_destroy(handle: *mut c_void) {
 
 /// C ABI: Register a `funcProfileRecord*` under the key `file:line`.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_profiler_map_add_record(
+/// # Safety
+/// Callers must ensure all raw pointer arguments passed to `fceux11_rust_profiler_map_add_record` are valid.
+pub unsafe extern "C" fn fceux11_rust_profiler_map_add_record(
     handle: *mut c_void,
     file: *const c_char,
     line: c_int,
@@ -103,8 +104,11 @@ pub extern "C" fn fceux11_rust_profiler_map_iterate_begin(handle: *mut c_void) -
     let map = unsafe { &mut *(handle as *mut ProfilerFuncMap) };
     map.iter_keys = map.records.keys().cloned().collect();
     map.iter_index = 0;
-    if let Some(key) = map.iter_keys.get(0) {
-        map.records.get(key).copied().unwrap_or(std::ptr::null_mut())
+    if let Some(key) = map.iter_keys.first() {
+        map.records
+            .get(key)
+            .copied()
+            .unwrap_or(std::ptr::null_mut())
     } else {
         std::ptr::null_mut()
     }
@@ -119,7 +123,10 @@ pub extern "C" fn fceux11_rust_profiler_map_iterate_next(handle: *mut c_void) ->
     let map = unsafe { &mut *(handle as *mut ProfilerFuncMap) };
     map.iter_index = map.iter_index.saturating_add(1);
     if let Some(key) = map.iter_keys.get(map.iter_index) {
-        map.records.get(key).copied().unwrap_or(std::ptr::null_mut())
+        map.records
+            .get(key)
+            .copied()
+            .unwrap_or(std::ptr::null_mut())
     } else {
         std::ptr::null_mut()
     }
@@ -163,74 +170,82 @@ mod tests {
 
     #[test]
     fn test_profiler_map_create_destroy() {
-        let h = fceux11_rust_profiler_map_create();
-        assert!(!h.is_null());
-        fceux11_rust_profiler_map_destroy(h);
+        unsafe {
+            let h = fceux11_rust_profiler_map_create();
+            assert!(!h.is_null());
+            fceux11_rust_profiler_map_destroy(h);
+        }
     }
 
     #[test]
     fn test_profiler_map_add_and_iterate() {
-        let h = fceux11_rust_profiler_map_create();
-        assert!(!h.is_null());
+        unsafe {
+            let h = fceux11_rust_profiler_map_create();
+            assert!(!h.is_null());
 
-        let rec1: *mut c_void = 0x1234 as *mut c_void;
-        let rec2: *mut c_void = 0x5678 as *mut c_void;
+            let rec1: *mut c_void = 0x1234 as *mut c_void;
+            let rec2: *mut c_void = 0x5678 as *mut c_void;
 
-        fceux11_rust_profiler_map_add_record(
-            h,
-            b"file.cpp\0".as_ptr() as *const c_char,
-            42,
-            std::ptr::null(),
-            std::ptr::null(),
-            rec1,
-        );
-        fceux11_rust_profiler_map_add_record(
-            h,
-            b"other.cpp\0".as_ptr() as *const c_char,
-            10,
-            std::ptr::null(),
-            std::ptr::null(),
-            rec2,
-        );
+            fceux11_rust_profiler_map_add_record(
+                h,
+                b"file.cpp\0".as_ptr() as *const c_char,
+                42,
+                std::ptr::null(),
+                std::ptr::null(),
+                rec1,
+            );
+            fceux11_rust_profiler_map_add_record(
+                h,
+                b"other.cpp\0".as_ptr() as *const c_char,
+                10,
+                std::ptr::null(),
+                std::ptr::null(),
+                rec2,
+            );
 
-        let first = fceux11_rust_profiler_map_iterate_begin(h);
-        assert!(first == rec1 || first == rec2);
+            let first = fceux11_rust_profiler_map_iterate_begin(h);
+            assert!(first == rec1 || first == rec2);
 
-        let second = fceux11_rust_profiler_map_iterate_next(h);
-        assert!(second == rec1 || second == rec2);
-        assert_ne!(first, second);
+            let second = fceux11_rust_profiler_map_iterate_next(h);
+            assert!(second == rec1 || second == rec2);
+            assert_ne!(first, second);
 
-        let third = fceux11_rust_profiler_map_iterate_next(h);
-        assert!(third.is_null());
+            let third = fceux11_rust_profiler_map_iterate_next(h);
+            assert!(third.is_null());
 
-        fceux11_rust_profiler_map_destroy(h);
+            fceux11_rust_profiler_map_destroy(h);
+        }
     }
 
     #[test]
     fn test_profiler_map_stack() {
-        let h = fceux11_rust_profiler_map_create();
-        let rec1: *mut c_void = 0x1 as *mut c_void;
-        let rec2: *mut c_void = 0x2 as *mut c_void;
+        unsafe {
+            let h = fceux11_rust_profiler_map_create();
+            let rec1: *mut c_void = 0x1 as *mut c_void;
+            let rec2: *mut c_void = 0x2 as *mut c_void;
 
-        fceux11_rust_profiler_map_push_stack(h, rec1);
-        fceux11_rust_profiler_map_push_stack(h, rec2);
-        fceux11_rust_profiler_map_pop_stack(h, rec2);
-        fceux11_rust_profiler_map_pop_stack(h, rec1);
+            fceux11_rust_profiler_map_push_stack(h, rec1);
+            fceux11_rust_profiler_map_push_stack(h, rec2);
+            fceux11_rust_profiler_map_pop_stack(h, rec2);
+            fceux11_rust_profiler_map_pop_stack(h, rec1);
 
-        fceux11_rust_profiler_map_destroy(h);
+            fceux11_rust_profiler_map_destroy(h);
+        }
     }
 
     #[test]
     fn test_profiler_mgr_add_remove() {
-        let ptr1: *mut c_void = 0xABCD as *mut c_void;
-        let ptr2: *mut c_void = 0xEF01 as *mut c_void;
+        unsafe {
+            let ptr1: *mut c_void = 0xABCD as *mut c_void;
+            let ptr2: *mut c_void = 0xEF01 as *mut c_void;
 
-        assert_eq!(fceux11_rust_profiler_mgr_add(ptr1), 0);
-        assert_eq!(fceux11_rust_profiler_mgr_add(ptr2), 0);
-        assert_eq!(fceux11_rust_profiler_mgr_remove(ptr1, 0), 0);
-        assert_eq!(fceux11_rust_profiler_mgr_remove(ptr2, 0), 0);
-        assert_eq!(fceux11_rust_profiler_mgr_remove(ptr1, 0), -1);
+            assert_eq!(fceux11_rust_profiler_mgr_add(ptr1), 0);
+            assert_eq!(fceux11_rust_profiler_mgr_add(ptr2), 0);
+            assert_eq!(fceux11_rust_profiler_mgr_remove(ptr1, 0), 0);
+            assert_eq!(fceux11_rust_profiler_mgr_remove(ptr2, 0), 0);
+            assert_eq!(fceux11_rust_profiler_mgr_remove(ptr1, 0), -1);
 
-        fceux11_rust_profiler_mgr_clear();
+            fceux11_rust_profiler_mgr_clear();
+        }
     }
 }

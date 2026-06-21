@@ -11,8 +11,8 @@
 //!   pointers) and calls `fceux11_rust_movie_data_dump`, which writes directly to
 //!   an `EmuFileMem` handle.
 
-use std::ffi::{c_char, CStr};
 use crate::emufile::EmuFileMem;
+use std::ffi::{CStr, c_char};
 
 // ============================================================
 // Internal Rust types
@@ -95,7 +95,7 @@ fn encode_hex(data: &[u8]) -> String {
 
 fn decode_hex(s: &str) -> Option<Vec<u8>> {
     let bytes: Vec<u8> = s.bytes().filter(|&b| b != b' ' && b != b'\t').collect();
-    if bytes.len() % 2 != 0 {
+    if !bytes.len().is_multiple_of(2) {
         return None;
     }
     let mut out = Vec::with_capacity(bytes.len() / 2);
@@ -119,7 +119,7 @@ fn hex_digit(b: u8) -> Option<u8> {
 const BASE64_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 fn encode_base64(data: &[u8]) -> String {
-    let mut out = String::with_capacity((data.len() + 2) / 3 * 4);
+    let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
     let mut i = 0;
     while i + 3 <= data.len() {
         let b0 = data[i];
@@ -138,7 +138,7 @@ fn encode_base64(data: &[u8]) -> String {
         out.push(BASE64_CHARS[(b0 >> 2) as usize] as char);
         out.push(BASE64_CHARS[(((b0 & 0x3) << 4) | (b1 >> 4)) as usize] as char);
         if rem == 2 {
-            out.push(BASE64_CHARS[(((b1 & 0xF) << 2)) as usize] as char);
+            out.push(BASE64_CHARS[((b1 & 0xF) << 2) as usize] as char);
         } else {
             out.push('=');
         }
@@ -148,7 +148,10 @@ fn encode_base64(data: &[u8]) -> String {
 }
 
 fn decode_base64(s: &str) -> Option<Vec<u8>> {
-    let bytes: Vec<u8> = s.bytes().filter(|&b| b != b' ' && b != b'\t' && b != b'\n' && b != b'\r').collect();
+    let bytes: Vec<u8> = s
+        .bytes()
+        .filter(|&b| b != b' ' && b != b'\t' && b != b'\n' && b != b'\r')
+        .collect();
     if bytes.is_empty() {
         return Some(Vec::new());
     }
@@ -259,7 +262,7 @@ fn parse_uint_dec(data: &[u8], pos: &mut usize) -> u64 {
     let mut pre = true;
     while *pos < data.len() {
         let c = data[*pos];
-        if c >= b'0' && c <= b'9' {
+        if c.is_ascii_digit() {
             pre = false;
             val = val * 10 + (c - b'0') as u64;
             *pos += 1;
@@ -412,18 +415,22 @@ fn parse_binary_chunk(md: &mut FceuMovieData, data: &[u8]) -> Result<(), &'stati
                             pos += 1;
                         }
                     }
-                    1 => {
-                        if pos + 12 <= data.len() {
-                            rec.zappers[port].0 = data[pos];
-                            rec.zappers[port].1 = data[pos + 1];
-                            rec.zappers[port].2 = data[pos + 2];
-                            rec.zappers[port].3 = data[pos + 3];
-                            rec.zappers[port].4 = u64::from_le_bytes([
-                                data[pos + 4], data[pos + 5], data[pos + 6], data[pos + 7],
-                                data[pos + 8], data[pos + 9], data[pos + 10], data[pos + 11],
-                            ]);
-                            pos += 12;
-                        }
+                    1 if pos + 12 <= data.len() => {
+                        rec.zappers[port].0 = data[pos];
+                        rec.zappers[port].1 = data[pos + 1];
+                        rec.zappers[port].2 = data[pos + 2];
+                        rec.zappers[port].3 = data[pos + 3];
+                        rec.zappers[port].4 = u64::from_le_bytes([
+                            data[pos + 4],
+                            data[pos + 5],
+                            data[pos + 6],
+                            data[pos + 7],
+                            data[pos + 8],
+                            data[pos + 9],
+                            data[pos + 10],
+                            data[pos + 11],
+                        ]);
+                        pos += 12;
                     }
                     _ => {}
                 }
@@ -436,9 +443,11 @@ fn parse_binary_chunk(md: &mut FceuMovieData, data: &[u8]) -> Result<(), &'stati
 }
 
 fn load_fm2(data: &[u8], stop_after_header: bool) -> Result<FceuMovieData, &'static str> {
-    let mut md = FceuMovieData::default();
-    md.version = 3;
-    md.load_frame_count = -1;
+    let mut md = FceuMovieData {
+        version: 3,
+        load_frame_count: -1,
+        ..Default::default()
+    };
 
     // Check FCM signature
     if data.len() >= 3 && &data[..3] == b"FCM" {
@@ -514,7 +523,12 @@ fn load_fm2(data: &[u8], stop_after_header: bool) -> Result<FceuMovieData, &'sta
 // ============================================================
 
 #[allow(dead_code)]
-fn dump_text_record_to_vec(md: &FceuMovieData, rec: &MovieRecord, _index: usize, out: &mut Vec<u8>) {
+fn dump_text_record_to_vec(
+    md: &FceuMovieData,
+    rec: &MovieRecord,
+    _index: usize,
+    out: &mut Vec<u8>,
+) {
     out.push(b'|');
     write_dec_varlen(rec.commands as u64, out);
     out.push(b'|');
@@ -637,14 +651,13 @@ fn dump_fm2(md: &FceuMovieData, binary: bool) -> Vec<u8> {
     out
 }
 
-
 // ============================================================
 // FFI: C-compatible types
 // ============================================================
 
 /// C-compatible movie record layout.
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct FceuMovieRecord {
     pub joysticks: [u8; 4],
     pub zapper_x: [u8; 2],
@@ -653,20 +666,6 @@ pub struct FceuMovieRecord {
     pub zapper_bogo: [u8; 2],
     pub zapper_zaphit: [u64; 2],
     pub commands: u8,
-}
-
-impl Default for FceuMovieRecord {
-    fn default() -> Self {
-        Self {
-            joysticks: [0; 4],
-            zapper_x: [0; 2],
-            zapper_y: [0; 2],
-            zapper_b: [0; 2],
-            zapper_bogo: [0; 2],
-            zapper_zaphit: [0; 2],
-            commands: 0,
-        }
-    }
 }
 
 impl From<&MovieRecord> for FceuMovieRecord {
@@ -688,8 +687,20 @@ impl From<&FceuMovieRecord> for MovieRecord {
         Self {
             joysticks: r.joysticks,
             zappers: [
-                (r.zapper_x[0], r.zapper_y[0], r.zapper_b[0], r.zapper_bogo[0], r.zapper_zaphit[0]),
-                (r.zapper_x[1], r.zapper_y[1], r.zapper_b[1], r.zapper_bogo[1], r.zapper_zaphit[1]),
+                (
+                    r.zapper_x[0],
+                    r.zapper_y[0],
+                    r.zapper_b[0],
+                    r.zapper_bogo[0],
+                    r.zapper_zaphit[0],
+                ),
+                (
+                    r.zapper_x[1],
+                    r.zapper_y[1],
+                    r.zapper_b[1],
+                    r.zapper_bogo[1],
+                    r.zapper_zaphit[1],
+                ),
             ],
             commands: r.commands,
         }
@@ -732,44 +743,42 @@ fn cstr_to_string(ptr: *const c_char) -> String {
     if ptr.is_null() {
         return String::new();
     }
-    unsafe {
-        CStr::from_ptr(ptr).to_string_lossy().into_owned()
-    }
+    unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() }
 }
 
 fn movie_data_from_input(input: &FceuMovieDataInput) -> FceuMovieData {
-    let mut md = FceuMovieData::default();
-    md.version = input.version;
-    md.emu_version = input.emu_version;
-    md.fds = input.fds;
-    md.pal_flag = input.pal_flag;
-    md.ppu_flag = input.ppu_flag;
-    md.rom_checksum = input.rom_checksum;
-    md.rom_filename = cstr_to_string(input.rom_filename);
-    md.rerecord_count = input.rerecord_count;
-    md.guid = cstr_to_string(input.guid);
-    md.binary_flag = input.binary_flag;
-    md.load_frame_count = input.load_frame_count;
-    md.ports = input.ports;
-    md.fourscore = input.fourscore;
-    md.microphone = input.microphone;
-    md.ram_init_option = input.ram_init_option;
-    md.ram_init_seed = input.ram_init_seed;
+    let mut md = FceuMovieData {
+        version: input.version,
+        emu_version: input.emu_version,
+        fds: input.fds,
+        pal_flag: input.pal_flag,
+        ppu_flag: input.ppu_flag,
+        rom_checksum: input.rom_checksum,
+        rom_filename: cstr_to_string(input.rom_filename),
+        rerecord_count: input.rerecord_count,
+        guid: cstr_to_string(input.guid),
+        binary_flag: input.binary_flag,
+        load_frame_count: input.load_frame_count,
+        ports: input.ports,
+        fourscore: input.fourscore,
+        microphone: input.microphone,
+        ram_init_option: input.ram_init_option,
+        ram_init_seed: input.ram_init_seed,
+        ..Default::default()
+    };
 
     if !input.savestate.is_null() && input.savestate_len > 0 {
-        md.savestate = unsafe {
-            std::slice::from_raw_parts(input.savestate, input.savestate_len).to_vec()
-        };
+        md.savestate =
+            unsafe { std::slice::from_raw_parts(input.savestate, input.savestate_len).to_vec() };
     }
     if !input.saveram.is_null() && input.saveram_len > 0 {
-        md.saveram = unsafe {
-            std::slice::from_raw_parts(input.saveram, input.saveram_len).to_vec()
-        };
+        md.saveram =
+            unsafe { std::slice::from_raw_parts(input.saveram, input.saveram_len).to_vec() };
     }
 
     if !input.records.is_null() && input.records_count > 0 {
         let slice = unsafe { std::slice::from_raw_parts(input.records, input.records_count) };
-        md.records = slice.iter().map(|r| MovieRecord::from(r)).collect();
+        md.records = slice.iter().map(MovieRecord::from).collect();
     }
 
     if !input.comments.is_null() && input.comments_count > 0 {
@@ -791,8 +800,10 @@ fn movie_data_from_input(input: &FceuMovieDataInput) -> FceuMovieData {
 
 /// Parse an FM2 file from raw bytes.
 /// Returns an opaque handle to `FceuMovieData`, or null on error.
+/// # Safety
+/// The caller must ensure that `data` points to at least `len` readable bytes.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_movie_load_fm2(
+pub unsafe extern "C" fn fceux11_rust_movie_load_fm2(
     data: *const u8,
     len: usize,
     stop_after_header: bool,
@@ -808,6 +819,9 @@ pub extern "C" fn fceux11_rust_movie_load_fm2(
 }
 
 /// Free a `FceuMovieData` handle obtained from `fceux11_rust_movie_load_fm2`.
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_free(md: *mut FceuMovieData) {
     if !md.is_null() {
@@ -817,66 +831,115 @@ pub unsafe extern "C" fn fceux11_rust_movie_data_free(md: *mut FceuMovieData) {
 
 // --- Scalar getters ---
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_version(md: *const FceuMovieData) -> i32 {
     unsafe { md.as_ref() }.map(|m| m.version).unwrap_or(3)
 }
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_emu_version(md: *const FceuMovieData) -> i32 {
     unsafe { md.as_ref() }.map(|m| m.emu_version).unwrap_or(0)
 }
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_fds(md: *const FceuMovieData) -> i32 {
     unsafe { md.as_ref() }.map(|m| m.fds).unwrap_or(0)
 }
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_pal_flag(md: *const FceuMovieData) -> bool {
     unsafe { md.as_ref() }.map(|m| m.pal_flag).unwrap_or(false)
 }
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_ppu_flag(md: *const FceuMovieData) -> bool {
     unsafe { md.as_ref() }.map(|m| m.ppu_flag).unwrap_or(false)
 }
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_rerecord_count(md: *const FceuMovieData) -> i32 {
-    unsafe { md.as_ref() }.map(|m| m.rerecord_count).unwrap_or(0)
+    unsafe { md.as_ref() }
+        .map(|m| m.rerecord_count)
+        .unwrap_or(0)
 }
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_binary_flag(md: *const FceuMovieData) -> bool {
-    unsafe { md.as_ref() }.map(|m| m.binary_flag).unwrap_or(false)
+    unsafe { md.as_ref() }
+        .map(|m| m.binary_flag)
+        .unwrap_or(false)
 }
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_load_frame_count(md: *const FceuMovieData) -> i32 {
-    unsafe { md.as_ref() }.map(|m| m.load_frame_count).unwrap_or(-1)
+    unsafe { md.as_ref() }
+        .map(|m| m.load_frame_count)
+        .unwrap_or(-1)
 }
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_fourscore(md: *const FceuMovieData) -> bool {
     unsafe { md.as_ref() }.map(|m| m.fourscore).unwrap_or(false)
 }
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_microphone(md: *const FceuMovieData) -> bool {
-    unsafe { md.as_ref() }.map(|m| m.microphone).unwrap_or(false)
+    unsafe { md.as_ref() }
+        .map(|m| m.microphone)
+        .unwrap_or(false)
 }
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_ram_init_option(md: *const FceuMovieData) -> i32 {
-    unsafe { md.as_ref() }.map(|m| m.ram_init_option).unwrap_or(0)
+    unsafe { md.as_ref() }
+        .map(|m| m.ram_init_option)
+        .unwrap_or(0)
 }
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_ram_init_seed(md: *const FceuMovieData) -> i32 {
     unsafe { md.as_ref() }.map(|m| m.ram_init_seed).unwrap_or(0)
 }
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_ports(md: *const FceuMovieData, out: *mut i32) {
     if let (Some(m), Some(o)) = (unsafe { md.as_ref() }, unsafe { out.as_mut() }) {
@@ -885,6 +948,9 @@ pub unsafe extern "C" fn fceux11_rust_movie_data_ports(md: *const FceuMovieData,
     }
 }
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_rom_checksum(
     md: *const FceuMovieData,
@@ -898,9 +964,12 @@ pub unsafe extern "C" fn fceux11_rust_movie_data_rom_checksum(
 
 // --- String getters (thread_local buffer) ---
 
-fn with_thread_local_buf<F: FnOnce(&mut [u8; 512]) -> *const c_char>(s: &str, f: F) -> *const c_char {
+fn with_thread_local_buf<F: FnOnce(&mut [u8; 512]) -> *const c_char>(
+    s: &str,
+    f: F,
+) -> *const c_char {
     thread_local! {
-        static BUF: std::cell::RefCell<[u8; 512]> = std::cell::RefCell::new([0u8; 512]);
+        static BUF: std::cell::RefCell<[u8; 512]> = const { std::cell::RefCell::new([0u8; 512]) };
     }
     BUF.with(|buf| {
         let mut b = buf.borrow_mut();
@@ -908,49 +977,75 @@ fn with_thread_local_buf<F: FnOnce(&mut [u8; 512]) -> *const c_char>(s: &str, f:
         let len = bytes.len().min(511);
         b[..len].copy_from_slice(&bytes[..len]);
         b[len] = 0;
-        f(&mut *b)
+        f(&mut b)
     })
 }
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fceux11_rust_movie_data_rom_filename(md: *const FceuMovieData) -> *const c_char {
-    let s = unsafe { md.as_ref() }.map(|m| m.rom_filename.as_str()).unwrap_or("");
+pub unsafe extern "C" fn fceux11_rust_movie_data_rom_filename(
+    md: *const FceuMovieData,
+) -> *const c_char {
+    let s = unsafe { md.as_ref() }
+        .map(|m| m.rom_filename.as_str())
+        .unwrap_or("");
     with_thread_local_buf(s, |b| b.as_ptr() as *const c_char)
 }
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_guid(md: *const FceuMovieData) -> *const c_char {
-    let s = unsafe { md.as_ref() }.map(|m| m.guid.as_str()).unwrap_or("");
+    let s = unsafe { md.as_ref() }
+        .map(|m| m.guid.as_str())
+        .unwrap_or("");
     with_thread_local_buf(s, |b| b.as_ptr() as *const c_char)
 }
 
 // --- Vector getters ---
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_records_count(md: *const FceuMovieData) -> usize {
     unsafe { md.as_ref() }.map(|m| m.records.len()).unwrap_or(0)
 }
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_record_get(
     md: *const FceuMovieData,
     index: usize,
     out: *mut FceuMovieRecord,
 ) -> bool {
-    if let (Some(m), Some(o)) = (unsafe { md.as_ref() }, unsafe { out.as_mut() }) {
-        if let Some(rec) = m.records.get(index) {
-            *o = FceuMovieRecord::from(rec);
-            return true;
-        }
+    if let (Some(m), Some(o)) = (unsafe { md.as_ref() }, unsafe { out.as_mut() })
+        && let Some(rec) = m.records.get(index)
+    {
+        *o = FceuMovieRecord::from(rec);
+        return true;
     }
     false
 }
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_savestate_len(md: *const FceuMovieData) -> usize {
-    unsafe { md.as_ref() }.map(|m| m.savestate.len()).unwrap_or(0)
+    unsafe { md.as_ref() }
+        .map(|m| m.savestate.len())
+        .unwrap_or(0)
 }
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_savestate_copy(
     md: *const FceuMovieData,
@@ -966,11 +1061,17 @@ pub unsafe extern "C" fn fceux11_rust_movie_data_savestate_copy(
     0
 }
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_saveram_len(md: *const FceuMovieData) -> usize {
     unsafe { md.as_ref() }.map(|m| m.saveram.len()).unwrap_or(0)
 }
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_saveram_copy(
     md: *const FceuMovieData,
@@ -986,11 +1087,19 @@ pub unsafe extern "C" fn fceux11_rust_movie_data_saveram_copy(
     0
 }
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_comments_count(md: *const FceuMovieData) -> usize {
-    unsafe { md.as_ref() }.map(|m| m.comments.len()).unwrap_or(0)
+    unsafe { md.as_ref() }
+        .map(|m| m.comments.len())
+        .unwrap_or(0)
 }
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_comment_get(
     md: *const FceuMovieData,
@@ -1003,11 +1112,21 @@ pub unsafe extern "C" fn fceux11_rust_movie_data_comment_get(
     with_thread_local_buf(s, |b| b.as_ptr() as *const c_char)
 }
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fceux11_rust_movie_data_subtitles_count(md: *const FceuMovieData) -> usize {
-    unsafe { md.as_ref() }.map(|m| m.subtitles.len()).unwrap_or(0)
+pub unsafe extern "C" fn fceux11_rust_movie_data_subtitles_count(
+    md: *const FceuMovieData,
+) -> usize {
+    unsafe { md.as_ref() }
+        .map(|m| m.subtitles.len())
+        .unwrap_or(0)
 }
 
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_subtitle_get(
     md: *const FceuMovieData,
@@ -1028,6 +1147,9 @@ pub unsafe extern "C" fn fceux11_rust_movie_data_subtitle_get(
 /// Returns the number of bytes written, or -1 on error.
 /// If `seek_to_curr_frame_pos` is true and a frame position is recorded,
 /// `out_curr_frame_pos` is set to that position; otherwise it is set to -1.
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_movie_data_dump(
     input: *const FceuMovieDataInput,
@@ -1139,7 +1261,12 @@ pub unsafe extern "C" fn fceux11_rust_movie_data_dump(
     (end - start) as i32
 }
 
-fn dump_text_record_to_emufile(md: &FceuMovieData, rec: &MovieRecord, _index: usize, out: &mut EmuFileMem) {
+fn dump_text_record_to_emufile(
+    md: &FceuMovieData,
+    rec: &MovieRecord,
+    _index: usize,
+    out: &mut EmuFileMem,
+) {
     out.write_from(b"|".as_ptr(), 1);
     let mut buf = Vec::new();
     write_dec_varlen(rec.commands as u64, &mut buf);
@@ -1219,7 +1346,6 @@ fn dump_binary_record_to_emufile(md: &FceuMovieData, rec: &MovieRecord, out: &mu
     }
 }
 
-
 // ============================================================
 // Unit tests
 // ============================================================
@@ -1228,6 +1354,7 @@ fn dump_binary_record_to_emufile(md: &FceuMovieData, rec: &MovieRecord, out: &mu
 mod tests {
     use super::*;
 
+    #[allow(clippy::field_reassign_with_default)]
     fn make_test_movie() -> FceuMovieData {
         let mut md = FceuMovieData::default();
         md.version = 3;
@@ -1260,316 +1387,353 @@ mod tests {
 
     #[test]
     fn test_hex_roundtrip() {
-        let data = [0xABu8, 0xCD, 0xEF, 0x01];
-        let s = encode_hex(&data);
-        assert_eq!(s, "ABCDEF01");
-        let decoded = decode_hex(&s).unwrap();
-        assert_eq!(decoded, data);
+        unsafe {
+            let data = [0xABu8, 0xCD, 0xEF, 0x01];
+            let s = encode_hex(&data);
+            assert_eq!(s, "ABCDEF01");
+            let decoded = decode_hex(&s).unwrap();
+            assert_eq!(decoded, data);
+        }
     }
 
     #[test]
     fn test_base64_roundtrip() {
-        let data = b"Hello World! This is a test.";
-        let s = encode_base64(data);
-        let decoded = decode_base64(&s).unwrap();
-        assert_eq!(decoded, data.as_slice());
+        unsafe {
+            let data = b"Hello World! This is a test.";
+            let s = encode_base64(data);
+            let decoded = decode_base64(&s).unwrap();
+            assert_eq!(decoded, data.as_slice());
+        }
     }
 
     #[test]
     fn test_base64_empty() {
-        let s = encode_base64(b"");
-        assert_eq!(s, "");
-        assert_eq!(decode_base64(&s).unwrap(), b"".as_slice());
+        unsafe {
+            let s = encode_base64(b"");
+            assert_eq!(s, "");
+            assert_eq!(decode_base64(&s).unwrap(), b"".as_slice());
+        }
     }
 
     #[test]
     fn test_parse_joy_bits() {
-        // C++ mnemonics[8] = {'A','B','S','T','U','D','L','R'}
-        // dumpJoy outputs bit7..bit0, so position0='R'(bit7), pos1='L'(bit6), etc.
-        let data = b"R.D..S.A";
-        let mut pos = 0;
-        let joy = parse_joy_bits(data, &mut pos);
-        // R=1(bit7), .=0(bit6), D=1(bit5), .=0(bit4), .=0(bit3), S=1(bit2), .=0(bit1), A=1(bit0)
-        // binary: 1 0 1 0 0 1 0 1 = 0xA5
-        assert_eq!(joy, 0xA5);
-        assert_eq!(pos, 8);
+        unsafe {
+            // C++ mnemonics[8] = {'A','B','S','T','U','D','L','R'}
+            // dumpJoy outputs bit7..bit0, so position0='R'(bit7), pos1='L'(bit6), etc.
+            let data = b"R.D..S.A";
+            let mut pos = 0;
+            let joy = parse_joy_bits(data, &mut pos);
+            // R=1(bit7), .=0(bit6), D=1(bit5), .=0(bit4), .=0(bit3), S=1(bit2), .=0(bit1), A=1(bit0)
+            // binary: 1 0 1 0 0 1 0 1 = 0xA5
+            assert_eq!(joy, 0xA5);
+            assert_eq!(pos, 8);
+        }
     }
 
     #[test]
     fn test_parse_uint_dec() {
-        let data = b"123|";
-        let mut pos = 0;
-        assert_eq!(parse_uint_dec(data, &mut pos), 123);
-        assert_eq!(pos, 3);
+        unsafe {
+            let data = b"123|";
+            let mut pos = 0;
+            assert_eq!(parse_uint_dec(data, &mut pos), 123);
+            assert_eq!(pos, 3);
+        }
     }
 
     #[test]
     fn test_dump_joy_bits() {
-        let mut out = Vec::new();
-        dump_joy_bits(0xA5, &mut out);
-        // 0xA5 = 0b10100101 -> R.D..S.A
-        assert_eq!(&out, b"R.D..S.A");
+        unsafe {
+            let mut out = Vec::new();
+            dump_joy_bits(0xA5, &mut out);
+            // 0xA5 = 0b10100101 -> R.D..S.A
+            assert_eq!(&out, b"R.D..S.A");
+        }
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_text_record_roundtrip() {
-        let mut md = FceuMovieData::default();
-        md.fourscore = false;
-        md.ports = [0, 0, 0];
+        unsafe {
+            let mut md = FceuMovieData::default();
+            md.fourscore = false;
+            md.ports = [0, 0, 0];
 
-        let mut rec = MovieRecord::default();
-        rec.joysticks[0] = 0b10010001; // bit7=1(R), bit4=1(U), bit0=1(A)
-        rec.joysticks[1] = 0b01001010; // bit6=1(L), bit3=1(T), bit1=1(B)
-        rec.commands = 5;
+            let mut rec = MovieRecord::default();
+            rec.joysticks[0] = 0b10010001; // bit7=1(R), bit4=1(U), bit0=1(A)
+            rec.joysticks[1] = 0b01001010; // bit6=1(L), bit3=1(T), bit1=1(B)
+            rec.commands = 5;
 
-        let mut buf = Vec::new();
-        dump_text_record_to_vec(&md, &rec, 0, &mut buf);
-        let line = String::from_utf8(buf).unwrap();
-        // bit7..bit0 -> R..U...A and .L..T.B.
-        assert_eq!(line, "|5|R..U...A|.L..T.B.||\n");
+            let mut buf = Vec::new();
+            dump_text_record_to_vec(&md, &rec, 0, &mut buf);
+            let line = String::from_utf8(buf).unwrap();
+            // bit7..bit0 -> R..U...A and .L..T.B.
+            assert_eq!(line, "|5|R..U...A|.L..T.B.||\n");
 
-        // Parse it back
-        let parsed = parse_text_record(&md, b"5|R..U...A|.L..T.B.|").unwrap();
-        assert_eq!(parsed.commands, 5);
-        assert_eq!(parsed.joysticks[0], 0b10010001);
-        assert_eq!(parsed.joysticks[1], 0b01001010);
+            // Parse it back
+            let parsed = parse_text_record(&md, b"5|R..U...A|.L..T.B.|").unwrap();
+            assert_eq!(parsed.commands, 5);
+            assert_eq!(parsed.joysticks[0], 0b10010001);
+            assert_eq!(parsed.joysticks[1], 0b01001010);
+        }
     }
 
     #[test]
     fn test_fm2_dump_and_load_text() {
-        let md = make_test_movie();
-        let dumped = dump_fm2(&md, false);
-        let dumped_str = String::from_utf8(dumped.clone()).unwrap();
-        assert!(dumped_str.contains("version 3\n"));
-        assert!(dumped_str.contains("romFilename test.nes\n"));
-        // port0=gamepad, port1=zapper -> first record joy0=R..U...A, zapper=000 000 0 0 0
-        assert!(dumped_str.contains("|0|R..U...A|000 000 0 0 0|"));
+        unsafe {
+            let md = make_test_movie();
+            let dumped = dump_fm2(&md, false);
+            let dumped_str = String::from_utf8(dumped.clone()).unwrap();
+            assert!(dumped_str.contains("version 3\n"));
+            assert!(dumped_str.contains("romFilename test.nes\n"));
+            // port0=gamepad, port1=zapper -> first record joy0=R..U...A, zapper=000 000 0 0 0
+            assert!(dumped_str.contains("|0|R..U...A|000 000 0 0 0|"));
 
-        let loaded = load_fm2(&dumped, false).unwrap();
-        assert_eq!(loaded.version, md.version);
-        assert_eq!(loaded.emu_version, md.emu_version);
-        assert_eq!(loaded.rerecord_count, md.rerecord_count);
-        assert_eq!(loaded.rom_filename, md.rom_filename);
-        assert_eq!(loaded.rom_checksum, md.rom_checksum);
-        assert_eq!(loaded.guid, md.guid);
-        assert_eq!(loaded.records.len(), md.records.len());
-        assert_eq!(loaded.records[0].joysticks[0], md.records[0].joysticks[0]);
+            let loaded = load_fm2(&dumped, false).unwrap();
+            assert_eq!(loaded.version, md.version);
+            assert_eq!(loaded.emu_version, md.emu_version);
+            assert_eq!(loaded.rerecord_count, md.rerecord_count);
+            assert_eq!(loaded.rom_filename, md.rom_filename);
+            assert_eq!(loaded.rom_checksum, md.rom_checksum);
+            assert_eq!(loaded.guid, md.guid);
+            assert_eq!(loaded.records.len(), md.records.len());
+            assert_eq!(loaded.records[0].joysticks[0], md.records[0].joysticks[0]);
+        }
     }
 
     #[test]
     fn test_fm2_binary_roundtrip() {
-        let mut md = make_test_movie();
-        md.binary_flag = true;
-        md.fourscore = false;
-        md.ports = [0, 0, 0];
+        unsafe {
+            let mut md = make_test_movie();
+            md.binary_flag = true;
+            md.fourscore = false;
+            md.ports = [0, 0, 0];
 
-        // Add a third record with zapper data (ports=[0,0,0] so both gamepads)
-        let mut rec3 = MovieRecord::default();
-        rec3.joysticks[0] = 0x55;
-        rec3.joysticks[1] = 0xAA;
-        md.records.push(rec3);
+            // Add a third record with zapper data (ports=[0,0,0] so both gamepads)
+            let mut rec3 = MovieRecord::default();
+            rec3.joysticks[0] = 0x55;
+            rec3.joysticks[1] = 0xAA;
+            md.records.push(rec3);
 
-        let dumped = dump_fm2(&md, true);
-        let loaded = load_fm2(&dumped, false).unwrap();
-        assert_eq!(loaded.records.len(), md.records.len());
-        assert_eq!(loaded.binary_flag, true);
-        assert_eq!(loaded.records[2].joysticks[0], 0x55);
-        assert_eq!(loaded.records[2].joysticks[1], 0xAA);
+            let dumped = dump_fm2(&md, true);
+            let loaded = load_fm2(&dumped, false).unwrap();
+            assert_eq!(loaded.records.len(), md.records.len());
+            assert!(loaded.binary_flag);
+            assert_eq!(loaded.records[2].joysticks[0], 0x55);
+            assert_eq!(loaded.records[2].joysticks[1], 0xAA);
+        }
     }
 
     #[test]
     fn test_fm2_stop_after_header() {
-        let md = make_test_movie();
-        let dumped = dump_fm2(&md, false);
-        let loaded = load_fm2(&dumped, true).unwrap();
-        assert_eq!(loaded.records.len(), 0);
-        assert_eq!(loaded.rom_filename, "test.nes");
+        unsafe {
+            let md = make_test_movie();
+            let dumped = dump_fm2(&md, false);
+            let loaded = load_fm2(&dumped, true).unwrap();
+            assert_eq!(loaded.records.len(), 0);
+            assert_eq!(loaded.rom_filename, "test.nes");
+        }
     }
 
     #[test]
     fn test_fm2_load_frame_count() {
-        let mut md = make_test_movie();
-        md.load_frame_count = 1;
-        let dumped = dump_fm2(&md, false);
-        let loaded = load_fm2(&dumped, false).unwrap();
-        assert_eq!(loaded.records.len(), 1);
+        unsafe {
+            let mut md = make_test_movie();
+            md.load_frame_count = 1;
+            let dumped = dump_fm2(&md, false);
+            let loaded = load_fm2(&dumped, false).unwrap();
+            assert_eq!(loaded.records.len(), 1);
+        }
     }
 
     #[test]
     fn test_fm2_comments_and_subtitles() {
-        let mut md = make_test_movie();
-        md.comments.push("author test".to_string());
-        md.subtitles.push("60 Hello".to_string());
-        let dumped = dump_fm2(&md, false);
-        let loaded = load_fm2(&dumped, false).unwrap();
-        assert_eq!(loaded.comments.len(), 1);
-        assert_eq!(loaded.comments[0], "author test");
-        assert_eq!(loaded.subtitles.len(), 1);
-        assert_eq!(loaded.subtitles[0], "60 Hello");
+        unsafe {
+            let mut md = make_test_movie();
+            md.comments.push("author test".to_string());
+            md.subtitles.push("60 Hello".to_string());
+            let dumped = dump_fm2(&md, false);
+            let loaded = load_fm2(&dumped, false).unwrap();
+            assert_eq!(loaded.comments.len(), 1);
+            assert_eq!(loaded.comments[0], "author test");
+            assert_eq!(loaded.subtitles.len(), 1);
+            assert_eq!(loaded.subtitles[0], "60 Hello");
+        }
     }
 
     #[test]
     fn test_fm2_savestate_roundtrip() {
-        let mut md = make_test_movie();
-        md.savestate = vec![0x01, 0x02, 0x03, 0x04, 0x05];
-        let dumped = dump_fm2(&md, false);
-        let loaded = load_fm2(&dumped, false).unwrap();
-        assert_eq!(loaded.savestate, md.savestate);
+        unsafe {
+            let mut md = make_test_movie();
+            md.savestate = vec![0x01, 0x02, 0x03, 0x04, 0x05];
+            let dumped = dump_fm2(&md, false);
+            let loaded = load_fm2(&dumped, false).unwrap();
+            assert_eq!(loaded.savestate, md.savestate);
+        }
     }
 
     #[test]
     fn test_invalid_fm2_fcm() {
-        let data = b"FCM\x00version 3\n";
-        assert!(load_fm2(data, false).is_err());
+        unsafe {
+            let data = b"FCM\x00version 3\n";
+            assert!(load_fm2(data, false).is_err());
+        }
     }
 
     #[test]
     fn test_invalid_fm2_no_version() {
-        let data = b"hello world\n";
-        assert!(load_fm2(data, false).is_err());
+        unsafe {
+            let data = b"hello world\n";
+            assert!(load_fm2(data, false).is_err());
+        }
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_fourscore_record() {
-        let mut md = FceuMovieData::default();
-        md.fourscore = true;
-        md.ports = [0, 0, 0];
+        unsafe {
+            let mut md = FceuMovieData::default();
+            md.fourscore = true;
+            md.ports = [0, 0, 0];
 
-        let mut rec = MovieRecord::default();
-        // 0x81=R......A, 0x42=.L....B., 0x24=..D..S.., 0x18=...UT...
-        rec.joysticks = [0x81, 0x42, 0x24, 0x18];
-        rec.commands = 0;
+            let mut rec = MovieRecord::default();
+            // 0x81=R......A, 0x42=.L....B., 0x24=..D..S.., 0x18=...UT...
+            rec.joysticks = [0x81, 0x42, 0x24, 0x18];
+            rec.commands = 0;
 
-        let mut buf = Vec::new();
-        dump_text_record_to_vec(&md, &rec, 0, &mut buf);
-        let line = String::from_utf8(buf).unwrap();
-        assert_eq!(line, "|0|R......A|.L....B.|..D..S..|...UT...||\n");
+            let mut buf = Vec::new();
+            dump_text_record_to_vec(&md, &rec, 0, &mut buf);
+            let line = String::from_utf8(buf).unwrap();
+            assert_eq!(line, "|0|R......A|.L....B.|..D..S..|...UT...||\n");
 
-        let parsed = parse_text_record(&md, b"0|R......A|.L....B.|..D..S..|...UT...|").unwrap();
-        assert_eq!(parsed.joysticks, [0x81, 0x42, 0x24, 0x18]);
+            let parsed = parse_text_record(&md, b"0|R......A|.L....B.|..D..S..|...UT...|").unwrap();
+            assert_eq!(parsed.joysticks, [0x81, 0x42, 0x24, 0x18]);
+        }
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_binary_fourscore() {
-        let mut md = FceuMovieData::default();
-        md.version = 3;
-        md.binary_flag = true;
-        md.fourscore = true;
-        md.ports = [0, 0, 0];
+        unsafe {
+            let mut md = FceuMovieData::default();
+            md.version = 3;
+            md.binary_flag = true;
+            md.fourscore = true;
+            md.ports = [0, 0, 0];
 
-        let mut rec = MovieRecord::default();
-        rec.joysticks = [1, 2, 3, 4];
-        rec.commands = 5;
-        md.records.push(rec);
+            let mut rec = MovieRecord::default();
+            rec.joysticks = [1, 2, 3, 4];
+            rec.commands = 5;
+            md.records.push(rec);
 
-        let dumped = dump_fm2(&md, true);
-        // Header + "binary 1\n" + "|" + 5 bytes per record
-        let loaded = load_fm2(&dumped, false).unwrap();
-        assert_eq!(loaded.records.len(), 1);
-        assert_eq!(loaded.records[0].commands, 5);
-        assert_eq!(loaded.records[0].joysticks, [1, 2, 3, 4]);
+            let dumped = dump_fm2(&md, true);
+            // Header + "binary 1\n" + "|" + 5 bytes per record
+            let loaded = load_fm2(&dumped, false).unwrap();
+            assert_eq!(loaded.records.len(), 1);
+            assert_eq!(loaded.records[0].commands, 5);
+            assert_eq!(loaded.records[0].joysticks, [1, 2, 3, 4]);
+        }
     }
 
     #[test]
     fn test_ffi_load_and_get() {
-        let md = make_test_movie();
-        let dumped = dump_fm2(&md, false);
-        let handle = fceux11_rust_movie_load_fm2(dumped.as_ptr(), dumped.len(), false);
-        assert!(!handle.is_null());
-
         unsafe {
-            assert_eq!(fceux11_rust_movie_data_version(handle), 3);
-            assert_eq!(fceux11_rust_movie_data_emu_version(handle), 9813);
-            assert_eq!(fceux11_rust_movie_data_rerecord_count(handle), 42);
-            assert_eq!(fceux11_rust_movie_data_records_count(handle), 2);
+            let md = make_test_movie();
+            let dumped = dump_fm2(&md, false);
+            let handle =
+                unsafe { fceux11_rust_movie_load_fm2(dumped.as_ptr(), dumped.len(), false) };
+            assert!(!handle.is_null());
 
-            let mut rec = FceuMovieRecord::default();
-            assert!(fceux11_rust_movie_data_record_get(handle, 0, &mut rec));
-            assert_eq!(rec.joysticks[0], 0b10010001);
+            unsafe {
+                assert_eq!(fceux11_rust_movie_data_version(handle), 3);
+                assert_eq!(fceux11_rust_movie_data_emu_version(handle), 9813);
+                assert_eq!(fceux11_rust_movie_data_rerecord_count(handle), 42);
+                assert_eq!(fceux11_rust_movie_data_records_count(handle), 2);
 
-            let name = CStr::from_ptr(fceux11_rust_movie_data_rom_filename(handle)).to_string_lossy();
-            assert_eq!(name, "test.nes");
+                let mut rec = FceuMovieRecord::default();
+                assert!(fceux11_rust_movie_data_record_get(handle, 0, &mut rec));
+                assert_eq!(rec.joysticks[0], 0b10010001);
 
-            fceux11_rust_movie_data_free(handle);
+                let name =
+                    CStr::from_ptr(fceux11_rust_movie_data_rom_filename(handle)).to_string_lossy();
+                assert_eq!(name, "test.nes");
+
+                fceux11_rust_movie_data_free(handle);
+            }
         }
     }
 
     #[test]
     fn test_ffi_dump() {
-        let rom_filename = std::ffi::CString::new("test.nes").unwrap();
-        let guid = std::ffi::CString::new("test-guid").unwrap();
-
-        let mut input = FceuMovieDataInput {
-            version: 3,
-            emu_version: 9813,
-            fds: 0,
-            pal_flag: false,
-            ppu_flag: false,
-            rom_checksum: [0u8; 16],
-            rom_filename: rom_filename.as_ptr(),
-            savestate: std::ptr::null(),
-            savestate_len: 0,
-            saveram: std::ptr::null(),
-            saveram_len: 0,
-            records: std::ptr::null(),
-            records_count: 0,
-            comments: std::ptr::null(),
-            comments_count: 0,
-            subtitles: std::ptr::null(),
-            subtitles_count: 0,
-            rerecord_count: 0,
-            guid: guid.as_ptr(),
-            binary_flag: false,
-            load_frame_count: -1,
-            ports: [0, 0, 0],
-            fourscore: false,
-            microphone: false,
-            ram_init_option: 0,
-            ram_init_seed: 0,
-        };
-
-        let rec = FceuMovieRecord {
-            joysticks: [0x81, 0, 0, 0], // R......A
-            ..Default::default()
-        };
-        input.records = &rec;
-        input.records_count = 1;
-
-        let out_handle = crate::emufile::fceux11_rust_emufile_mem_create();
-        assert!(!out_handle.is_null());
-
         unsafe {
-            let mut curr_frame_pos = -1i32;
-            let bytes = fceux11_rust_movie_data_dump(
-                &input,
-                out_handle,
-                false,
-                false,
-                0,
-                &mut curr_frame_pos,
-            );
-            assert!(bytes > 0);
+            let rom_filename = std::ffi::CString::new("test.nes").unwrap();
+            let guid = std::ffi::CString::new("test-guid").unwrap();
 
-            // seek back to start before reading
-            crate::emufile::fceux11_rust_emufile_mem_fseek(out_handle, 0, 0);
+            let mut input = FceuMovieDataInput {
+                version: 3,
+                emu_version: 9813,
+                fds: 0,
+                pal_flag: false,
+                ppu_flag: false,
+                rom_checksum: [0u8; 16],
+                rom_filename: rom_filename.as_ptr(),
+                savestate: std::ptr::null(),
+                savestate_len: 0,
+                saveram: std::ptr::null(),
+                saveram_len: 0,
+                records: std::ptr::null(),
+                records_count: 0,
+                comments: std::ptr::null(),
+                comments_count: 0,
+                subtitles: std::ptr::null(),
+                subtitles_count: 0,
+                rerecord_count: 0,
+                guid: guid.as_ptr(),
+                binary_flag: false,
+                load_frame_count: -1,
+                ports: [0, 0, 0],
+                fourscore: false,
+                microphone: false,
+                ram_init_option: 0,
+                ram_init_seed: 0,
+            };
 
-            let size = crate::emufile::fceux11_rust_emufile_mem_size(out_handle) as usize;
-            let mut buf = vec![0u8; size];
-            crate::emufile::fceux11_rust_emufile_mem_fread(
-                out_handle,
-                buf.as_mut_ptr(),
-                size,
-            );
+            let rec = FceuMovieRecord {
+                joysticks: [0x81, 0, 0, 0], // R......A
+                ..Default::default()
+            };
+            input.records = &rec;
+            input.records_count = 1;
 
-            let s = String::from_utf8(buf).unwrap();
-            assert!(s.contains("version 3\n"));
-            assert!(s.contains("romFilename test.nes\n"));
-            // ports=[0,0,0] -> both gamepads; joy1 defaults to 0 -> "........"
-            assert!(s.contains("|0|R......A|........||\n"));
+            let out_handle = crate::emufile::fceux11_rust_emufile_mem_create();
+            assert!(!out_handle.is_null());
 
-            crate::emufile::fceux11_rust_emufile_mem_destroy(out_handle);
+            unsafe {
+                let mut curr_frame_pos = -1i32;
+                let bytes = fceux11_rust_movie_data_dump(
+                    &input,
+                    out_handle,
+                    false,
+                    false,
+                    0,
+                    &mut curr_frame_pos,
+                );
+                assert!(bytes > 0);
+
+                // seek back to start before reading
+                crate::emufile::fceux11_rust_emufile_mem_fseek(out_handle, 0, 0);
+
+                let size = crate::emufile::fceux11_rust_emufile_mem_size(out_handle) as usize;
+                let mut buf = vec![0u8; size];
+                crate::emufile::fceux11_rust_emufile_mem_fread(out_handle, buf.as_mut_ptr(), size);
+
+                let s = String::from_utf8(buf).unwrap();
+                assert!(s.contains("version 3\n"));
+                assert!(s.contains("romFilename test.nes\n"));
+                // ports=[0,0,0] -> both gamepads; joy1 defaults to 0 -> "........"
+                assert!(s.contains("|0|R......A|........||\n"));
+
+                crate::emufile::fceux11_rust_emufile_mem_destroy(out_handle);
+            }
         }
     }
 }
-
-

@@ -96,7 +96,7 @@ void Mapper106_Init(CartInfo *info) {
 	info->Reset = M106Reset;
 	info->Power = M106Power;
 	info->Close = M106Close;
-	MapIRQHook = M106CpuHook;
+	g_cpu.map_irq_hook_ref() = M106CpuHook;
 	GameStateRestore = StateRestore;
 
 	WRAMSIZE = 8192;

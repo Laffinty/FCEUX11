@@ -13,8 +13,11 @@ use std::ffi::c_char;
 /// Assemble 6502 assembly text into opcode bytes.
 /// `output` must have room for at least 3 bytes.
 /// Returns 0 on success, 1 on error.
+///
+/// # Safety
+/// `output` must point to at least 3 writable bytes and `str` must be a valid NUL-terminated C string.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_asm_assemble(
+pub unsafe extern "C" fn fceux11_rust_asm_assemble(
     output: *mut u8,
     addr: i32,
     str: *const c_char,
@@ -49,9 +52,13 @@ pub extern "C" fn fceux11_rust_asm_assemble(
     // After extracting ins="LDA", the rest can be " #$12" or just "#$12" etc.
     // We need to allow operands that start with '#', '$', '(', etc.
     let after_ins = astr_str[3..].trim_start();
-    if !after_ins.is_empty() && !after_ins.starts_with(' ')
-        && !after_ins.starts_with('#') && !after_ins.starts_with('$')
-        && !after_ins.starts_with('(') && !after_ins.starts_with('[') {
+    if !after_ins.is_empty()
+        && !after_ins.starts_with(' ')
+        && !after_ins.starts_with('#')
+        && !after_ins.starts_with('$')
+        && !after_ins.starts_with('(')
+        && !after_ins.starts_with('[')
+    {
         return 1;
     }
 
@@ -59,16 +66,17 @@ pub extern "C" fn fceux11_rust_asm_assemble(
     let astr_clean: String = astr_str.chars().filter(|c| !c.is_whitespace()).collect();
 
     // Basic syntax repairs: brackets to parens, comments to null
-    let mut astr_fixed: String = astr_clean.chars().map(|c| {
-        match c {
+    let mut astr_fixed: String = astr_clean
+        .chars()
+        .map(|c| match c {
             '[' => '(',
             ']' => ')',
             '{' => '(',
             '}' => ')',
             ';' => '\0',
             _ => c,
-        }
-    }).collect();
+        })
+        .collect();
     // Remove 0X prefix in favor of $
     astr_fixed = astr_fixed.replace("0X", "$");
     if let Some(null_pos) = astr_fixed.find('\0') {
@@ -182,8 +190,8 @@ pub extern "C" fn fceux11_rust_asm_assemble(
     // Immediate: #$12 or #12 or #$ABCD
     if operand.starts_with('#') {
         // Handle #$, #$12, #$
-        let hex_part = if operand.starts_with("#$") {
-            &operand[2..] // skip #$
+        let hex_part = if let Some(stripped) = operand.strip_prefix("#$") {
+            stripped // skip #$
         } else {
             operand.trim_start_matches('#')
         };
@@ -193,9 +201,8 @@ pub extern "C" fn fceux11_rust_asm_assemble(
         if let Ok(val) = u8::from_str_radix(clean_hex, 16) {
             // Check if instruction allows immediate mode (rejection list)
             match output_slice[0] {
-                0x06 | 0x10 | 0x20 | 0x24 | 0x26 | 0x30 |
-                0x46 | 0x4C | 0x50 | 0x66 | 0x70 | 0x81 |
-                0x84 | 0x86 | 0x90 | 0xC6 | 0xE6 => return 1,
+                0x06 | 0x10 | 0x20 | 0x24 | 0x26 | 0x30 | 0x46 | 0x4C | 0x50 | 0x66 | 0x70
+                | 0x81 | 0x84 | 0x86 | 0x90 | 0xC6 | 0xE6 => return 1,
                 _ => {}
             }
             // A0, A2, C0, E0 don't get immediate bit set
@@ -212,37 +219,38 @@ pub extern "C" fn fceux11_rust_asm_assemble(
     if operand.starts_with('$') && !operand.contains('(') {
         let hex_part = operand.trim_start_matches('$');
         let hex_len = hex_part.len();
-        if hex_len <= 4 && hex_part.chars().all(|c| c.is_ascii_hexdigit()) {
-            if let Ok(val) = u32::from_str_radix(hex_part, 16) {
-                match output_slice[0] {
-                    0x20 | 0x4C => {
-                        // Jumps - always absolute
+        if hex_len <= 4
+            && hex_part.chars().all(|c| c.is_ascii_hexdigit())
+            && let Ok(val) = u32::from_str_radix(hex_part, 16)
+        {
+            match output_slice[0] {
+                0x20 | 0x4C => {
+                    // Jumps - always absolute
+                    output_slice[1] = (val & 0xFF) as u8;
+                    output_slice[2] = (val >> 8) as u8;
+                    return 0;
+                }
+                0x10 | 0x30 | 0x50 | 0x70 | 0x90 | 0xB0 | 0xD0 | 0xF0 => {
+                    // Branches - 1 byte relative offset
+                    let offset = (val as i32).wrapping_sub(addr + 2);
+                    if !(-128..=127).contains(&offset) {
+                        return 1;
+                    }
+                    output_slice[1] = (offset & 0xFF) as u8;
+                    return 0;
+                }
+                _ => {
+                    if val > 0xFF {
+                        // Absolute
+                        output_slice[0] |= 0x0C;
                         output_slice[1] = (val & 0xFF) as u8;
                         output_slice[2] = (val >> 8) as u8;
-                        return 0;
+                    } else {
+                        // Zero Page
+                        output_slice[0] |= 0x04;
+                        output_slice[1] = val as u8;
                     }
-                    0x10 | 0x30 | 0x50 | 0x70 | 0x90 | 0xB0 | 0xD0 | 0xF0 => {
-                        // Branches - 1 byte relative offset
-                        let offset = (val as i32).wrapping_sub(addr + 2);
-                        if offset < -128 || offset > 127 {
-                            return 1;
-                        }
-                        output_slice[1] = (offset & 0xFF) as u8;
-                        return 0;
-                    }
-                    _ => {
-                        if val > 0xFF {
-                            // Absolute
-                            output_slice[0] |= 0x0C;
-                            output_slice[1] = (val & 0xFF) as u8;
-                            output_slice[2] = (val >> 8) as u8;
-                        } else {
-                            // Zero Page
-                            output_slice[0] |= 0x04;
-                            output_slice[1] = val as u8;
-                        }
-                        return 0;
-                    }
+                    return 0;
                 }
             }
         }
@@ -258,8 +266,11 @@ pub extern "C" fn fceux11_rust_asm_assemble(
 /// Disassemble a 6502 opcode into a string.
 /// Writes to `out_buf` with max `out_buf_size` bytes.
 /// Returns bytes written (including null terminator), or -1 on error.
+///
+/// # Safety
+/// `opcode` must point to at least one readable byte and `out_buf` must point to `out_buf_size` writable bytes.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_asm_disassemble(
+pub unsafe extern "C" fn fceux11_rust_asm_disassemble(
     _addr: i32,
     opcode: *const u8,
     out_buf: *mut c_char,
@@ -272,6 +283,7 @@ pub extern "C" fn fceux11_rust_asm_disassemble(
     let op = unsafe { *opcode };
 
     // Common instruction name lookup table
+    #[allow(unreachable_patterns)]
     let name = match op {
         0x00 => "BRK",
         0x08 => "PHP",
@@ -330,11 +342,11 @@ pub extern "C" fn fceux11_rust_asm_disassemble(
     };
 
     // Build output string based on addressing mode
+    #[allow(unreachable_patterns)]
     let result = match op {
         // Implied / Accumulator
-        0x00 | 0x08 | 0x0A | 0x18 | 0x28 | 0x2A | 0x38 | 0x40
-        | 0x48 | 0x4A | 0x58 | 0x60 | 0x68 | 0x6A | 0x78 | 0x88
-        | 0x8A | 0x98 | 0x9A | 0xA8 | 0xAA | 0xB8 | 0xBA | 0xC8
+        0x00 | 0x08 | 0x0A | 0x18 | 0x28 | 0x2A | 0x38 | 0x40 | 0x48 | 0x4A | 0x58 | 0x60
+        | 0x68 | 0x6A | 0x78 | 0x88 | 0x8A | 0x98 | 0x9A | 0xA8 | 0xAA | 0xB8 | 0xBA | 0xC8
         | 0xCA | 0xD8 | 0xE8 | 0xEA | 0xF8 => name.to_string(),
 
         // Immediate
@@ -344,17 +356,15 @@ pub extern "C" fn fceux11_rust_asm_disassemble(
         }
 
         // Zero Page
-        0x05 | 0x06 | 0x24 | 0x25 | 0x26 | 0x45 | 0x46 | 0x65 | 0x66
-        | 0x84 | 0x85 | 0x86 | 0xA4 | 0xA5 | 0xA6 | 0xC4 | 0xC5 | 0xC6
-        | 0xE4 | 0xE5 | 0xE6 => {
+        0x05 | 0x06 | 0x24 | 0x25 | 0x26 | 0x45 | 0x46 | 0x65 | 0x66 | 0x84 | 0x85 | 0x86
+        | 0xA4 | 0xA5 | 0xA6 | 0xC4 | 0xC5 | 0xC6 | 0xE4 | 0xE5 | 0xE6 => {
             let val = unsafe { *opcode.add(1) };
             format!("{} ${:02X}", name, val)
         }
 
         // Absolute (JMP, LDA, etc.)
-        0x0D | 0x0E | 0x2C | 0x2D | 0x2E | 0x4C | 0x4D | 0x4E | 0x6D | 0x6E
-        | 0x8C | 0x8D | 0x8E | 0xAC | 0xAD | 0xAE | 0xCC | 0xCD | 0xCE
-        | 0xEC | 0xED | 0xEE => {
+        0x0D | 0x0E | 0x2C | 0x2D | 0x2E | 0x4C | 0x4D | 0x4E | 0x6D | 0x6E | 0x8C | 0x8D
+        | 0x8E | 0xAC | 0xAD | 0xAE | 0xCC | 0xCD | 0xCE | 0xEC | 0xED | 0xEE => {
             let lo = unsafe { *opcode.add(1) };
             let hi = unsafe { *opcode.add(2) };
             format!("{} ${:02X}{:02X}", name, hi, lo)
@@ -363,7 +373,7 @@ pub extern "C" fn fceux11_rust_asm_disassemble(
         // Branches (relative)
         0x10 | 0x30 | 0x50 | 0x70 | 0x90 | 0xB0 | 0xD0 | 0xF0 => {
             let offset = unsafe { *opcode.add(1) } as i8;
-            let target = (_addr as i32 + 2 + offset as i32) as u16;
+            let target = (_addr + 2 + offset as i32) as u16;
             format!("{} ${:04X}", name, target)
         }
 
@@ -374,8 +384,8 @@ pub extern "C" fn fceux11_rust_asm_disassemble(
         }
 
         // Zero Page,X
-        0x15 | 0x16 | 0x35 | 0x36 | 0x55 | 0x56 | 0x75 | 0x76
-        | 0x94 | 0x95 | 0xB4 | 0xB5 | 0xD5 | 0xD6 | 0xF5 | 0xF6 => {
+        0x15 | 0x16 | 0x35 | 0x36 | 0x55 | 0x56 | 0x75 | 0x76 | 0x94 | 0x95 | 0xB4 | 0xB5
+        | 0xD5 | 0xD6 | 0xF5 | 0xF6 => {
             let zp = unsafe { *opcode.add(1) };
             format!("{} ${:02X},X", name, zp)
         }
@@ -392,7 +402,8 @@ pub extern "C" fn fceux11_rust_asm_disassemble(
             let hi = unsafe { *opcode.add(2) };
             format!("{} ${:02X}{:02X},Y", name, hi, lo)
         }
-        0x1D | 0x1E | 0x3D | 0x3E | 0x5D | 0x5E | 0x7D | 0x7E | 0x9D | 0xBD | 0xDD | 0xDE | 0xFD | 0xFE => {
+        0x1D | 0x1E | 0x3D | 0x3E | 0x5D | 0x5E | 0x7D | 0x7E | 0x9D | 0xBD | 0xDD | 0xDE
+        | 0xFD | 0xFE => {
             let lo = unsafe { *opcode.add(1) };
             let hi = unsafe { *opcode.add(2) };
             format!("{} ${:02X}{:02X},X", name, hi, lo)
@@ -440,121 +451,127 @@ mod tests {
 
     #[test]
     fn test_assemble_nop() {
-        let mut output = [0u8; 3];
-        let result = unsafe {
-            fceux11_rust_asm_assemble(
-                output.as_mut_ptr(),
-                0xC000,
-                std::ffi::CString::new("NOP").unwrap().as_ptr(),
-            )
-        };
-        assert_eq!(result, 0);
-        assert_eq!(output[0], 0xEA);
+        unsafe {
+            let mut output = [0u8; 3];
+            let result = unsafe {
+                fceux11_rust_asm_assemble(
+                    output.as_mut_ptr(),
+                    0xC000,
+                    std::ffi::CString::new("NOP").unwrap().as_ptr(),
+                )
+            };
+            assert_eq!(result, 0);
+            assert_eq!(output[0], 0xEA);
+        }
     }
 
     #[test]
     fn test_assemble_brk() {
-        let mut output = [0u8; 3];
-        let result = unsafe {
-            fceux11_rust_asm_assemble(
-                output.as_mut_ptr(),
-                0xC000,
-                std::ffi::CString::new("BRK").unwrap().as_ptr(),
-            )
-        };
-        assert_eq!(result, 0);
-        assert_eq!(output[0], 0x00);
+        unsafe {
+            let mut output = [0u8; 3];
+            let result = unsafe {
+                fceux11_rust_asm_assemble(
+                    output.as_mut_ptr(),
+                    0xC000,
+                    std::ffi::CString::new("BRK").unwrap().as_ptr(),
+                )
+            };
+            assert_eq!(result, 0);
+            assert_eq!(output[0], 0x00);
+        }
     }
 
     #[test]
     fn test_assemble_lda_immediate() {
-        let mut output = [0u8; 3];
-        let result = unsafe {
-            fceux11_rust_asm_assemble(
-                output.as_mut_ptr(),
-                0xC000,
-                std::ffi::CString::new("LDA #$12").unwrap().as_ptr(),
-            )
-        };
-        assert_eq!(result, 0);
-        assert_eq!(output[0], 0xA9);
-        assert_eq!(output[1], 0x12);
+        unsafe {
+            let mut output = [0u8; 3];
+            let result = unsafe {
+                fceux11_rust_asm_assemble(
+                    output.as_mut_ptr(),
+                    0xC000,
+                    std::ffi::CString::new("LDA #$12").unwrap().as_ptr(),
+                )
+            };
+            assert_eq!(result, 0);
+            assert_eq!(output[0], 0xA9);
+            assert_eq!(output[1], 0x12);
+        }
     }
 
     #[test]
     fn test_assemble_jmp_absolute() {
-        let mut output = [0u8; 3];
-        let result = unsafe {
-            fceux11_rust_asm_assemble(
-                output.as_mut_ptr(),
-                0xC000,
-                std::ffi::CString::new("JMP $C000").unwrap().as_ptr(),
-            )
-        };
-        assert_eq!(result, 0);
-        assert_eq!(output[0], 0x4C);
-        assert_eq!(output[1], 0x00);
-        assert_eq!(output[2], 0xC0);
+        unsafe {
+            let mut output = [0u8; 3];
+            let result = unsafe {
+                fceux11_rust_asm_assemble(
+                    output.as_mut_ptr(),
+                    0xC000,
+                    std::ffi::CString::new("JMP $C000").unwrap().as_ptr(),
+                )
+            };
+            assert_eq!(result, 0);
+            assert_eq!(output[0], 0x4C);
+            assert_eq!(output[1], 0x00);
+            assert_eq!(output[2], 0xC0);
+        }
     }
 
     #[test]
     fn test_assemble_invalid() {
-        let mut output = [0u8; 3];
-        let result = unsafe {
-            fceux11_rust_asm_assemble(
-                output.as_mut_ptr(),
-                0xC000,
-                std::ffi::CString::new("").unwrap().as_ptr(),
-            )
-        };
-        assert_eq!(result, 1); // error
+        unsafe {
+            let mut output = [0u8; 3];
+            let result = unsafe {
+                fceux11_rust_asm_assemble(
+                    output.as_mut_ptr(),
+                    0xC000,
+                    std::ffi::CString::new("").unwrap().as_ptr(),
+                )
+            };
+            assert_eq!(result, 1); // error
+        }
     }
 
     #[test]
     fn test_disassemble_nop() {
-        let mut buf = [0i8; 64];
-        let result = unsafe {
-            fceux11_rust_asm_disassemble(
-                0xC000,
-                [0xEA].as_ptr(),
-                buf.as_mut_ptr(),
-                64,
-            )
-        };
-        assert!(result > 0);
-        let s = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr()) }.to_string_lossy();
-        assert_eq!(s, "NOP");
+        unsafe {
+            let mut buf = [0i8; 64];
+            let result = unsafe {
+                fceux11_rust_asm_disassemble(0xC000, [0xEA].as_ptr(), buf.as_mut_ptr(), 64)
+            };
+            assert!(result > 0);
+            let s = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr()) }.to_string_lossy();
+            assert_eq!(s, "NOP");
+        }
     }
 
     #[test]
     fn test_disassemble_lda_immediate() {
-        let mut buf = [0i8; 64];
-        let result = unsafe {
-            fceux11_rust_asm_disassemble(
-                0xC000,
-                [0xA9, 0x42].as_ptr(),
-                buf.as_mut_ptr(),
-                64,
-            )
-        };
-        assert!(result > 0);
-        let s = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr()) }.to_string_lossy();
-        assert_eq!(s, "LDA #$42");
+        unsafe {
+            let mut buf = [0i8; 64];
+            let result = unsafe {
+                fceux11_rust_asm_disassemble(0xC000, [0xA9, 0x42].as_ptr(), buf.as_mut_ptr(), 64)
+            };
+            assert!(result > 0);
+            let s = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr()) }.to_string_lossy();
+            assert_eq!(s, "LDA #$42");
+        }
     }
 
     #[test]
     fn test_disassemble_jmp() {
-        let mut buf = [0i8; 64];
-        let result = unsafe {
-            fceux11_rust_asm_disassemble(
-                0xC000,
-                [0x4C, 0x00, 0x80].as_ptr(),
-                buf.as_mut_ptr(),
-                64,
-            )
-        };
-        assert!(result > 0);
-        let s = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr()) }.to_string_lossy();
-        assert_eq!(s, "JMP $8000");
+        unsafe {
+            let mut buf = [0i8; 64];
+            let result = unsafe {
+                fceux11_rust_asm_disassemble(
+                    0xC000,
+                    [0x4C, 0x00, 0x80].as_ptr(),
+                    buf.as_mut_ptr(),
+                    64,
+                )
+            };
+            assert!(result > 0);
+            let s = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr()) }.to_string_lossy();
+            assert_eq!(s, "JMP $8000");
+        }
     }
 }

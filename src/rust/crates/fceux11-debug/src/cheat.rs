@@ -295,7 +295,9 @@ thread_local! {
 /// of range. The `name_ptr` field points into a thread-local cache and is
 /// invalidated by the next call.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_cheat_get(which: u32, out: *mut FceuCheatEntryView) -> i32 {
+/// # Safety
+/// Callers must ensure all raw pointer arguments passed to `fceux11_rust_cheat_get` are valid.
+pub unsafe extern "C" fn fceux11_rust_cheat_get(which: u32, out: *mut FceuCheatEntryView) -> i32 {
     if out.is_null() {
         return 0;
     }
@@ -390,7 +392,9 @@ pub extern "C" fn fceux11_rust_cheat_get_global_disabled() -> i32 {
 
 /// Decode a Game Genie code. Returns `1` on success, `0` on failure.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_cheat_decode_gg(
+/// # Safety
+/// Callers must ensure all raw pointer arguments passed to `fceux11_rust_cheat_decode_gg` are valid.
+pub unsafe extern "C" fn fceux11_rust_cheat_decode_gg(
     str_ptr: *const c_char,
     a_out: *mut i32,
     v_out: *mut i32,
@@ -415,7 +419,9 @@ pub extern "C" fn fceux11_rust_cheat_decode_gg(
 
 /// Decode a Pro Action Replay code. Returns `1` on success, `0` on failure.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_cheat_decode_par(
+/// # Safety
+/// Callers must ensure all raw pointer arguments passed to `fceux11_rust_cheat_decode_par` are valid.
+pub unsafe extern "C" fn fceux11_rust_cheat_decode_par(
     str_ptr: *const c_char,
     a_out: *mut i32,
     v_out: *mut i32,
@@ -580,7 +586,9 @@ pub extern "C" fn fceux11_rust_cheat_comp_exists() -> i32 {
 /// `mem_present` is a `0x10000`-byte boolean array: `1` if the address has a
 /// `CheatRPtrs` entry (i.e. is a real RAM byte), `0` otherwise.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_cheat_comp_search_begin(
+/// # Safety
+/// Callers must ensure all raw pointer arguments passed to `fceux11_rust_cheat_comp_search_begin` are valid.
+pub unsafe extern "C" fn fceux11_rust_cheat_comp_search_begin(
     mem: *const u8,
     mem_present: *const u8,
 ) -> i32 {
@@ -607,7 +615,9 @@ pub extern "C" fn fceux11_rust_cheat_comp_search_begin(
 /// Mirrors C++ `FCEUI_CheatSearchSetCurrentAsOriginal`:
 /// for visible slots, `comp[x] = mem[x]` if backed, else OR-in `CHEATC_NONE`.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_cheat_comp_set_current_as_original(
+/// # Safety
+/// Callers must ensure all raw pointer arguments passed to `fceux11_rust_cheat_comp_set_current_as_original` are valid.
+pub unsafe extern "C" fn fceux11_rust_cheat_comp_set_current_as_original(
     mem: *const u8,
     mem_present: *const u8,
 ) -> i32 {
@@ -645,7 +655,9 @@ pub extern "C" fn fceux11_rust_cheat_comp_show_excluded() {
 /// Return the number of "visible" search hits — slots that are neither
 /// NOSHOW nor masked by the C++ presence array.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_cheat_comp_count(mem_present: *const u8) -> i32 {
+/// # Safety
+/// Callers must ensure all raw pointer arguments passed to `fceux11_rust_cheat_comp_count` are valid.
+pub unsafe extern "C" fn fceux11_rust_cheat_comp_count(mem_present: *const u8) -> i32 {
     if mem_present.is_null() {
         return 0;
     }
@@ -655,8 +667,8 @@ pub extern "C" fn fceux11_rust_cheat_comp_count(mem_present: *const u8) -> i32 {
     }
     let pres_slice = unsafe { std::slice::from_raw_parts(mem_present, 0x10000) };
     let mut count = 0i32;
-    for x in 0..0x10000usize {
-        if (st.cheat_comp[x] & CHEATC_NOSHOW) == 0 && pres_slice[x] != 0 {
+    for (x, &present) in pres_slice.iter().enumerate() {
+        if (st.cheat_comp[x] & CHEATC_NOSHOW) == 0 && present != 0 {
             count += 1;
         }
     }
@@ -678,7 +690,9 @@ pub extern "C" fn fceux11_rust_cheat_comp_get(address: u32) -> u32 {
 /// Apply a `FCEUI_CheatSearchEnd` filter using `type` and the operand bytes
 /// `v1`/`v2`. Marks excluded slots with `CHEATC_EXCLUDED`.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_cheat_comp_search_end(
+/// # Safety
+/// Callers must ensure all raw pointer arguments passed to `fceux11_rust_cheat_comp_search_end` are valid.
+pub unsafe extern "C" fn fceux11_rust_cheat_comp_search_end(
     search_type: i32,
     v1: u8,
     v2: u8,
@@ -711,11 +725,11 @@ pub extern "C" fn fceux11_rust_cheat_comp_search_end(
         let exclude = match search_type {
             FCEU_SEARCH_RELATIVE_CHANGE => {
                 // `prev != v1 || abs(prev - cur) != v2`
-                let diff = if prev >= cur { prev - cur } else { cur - prev };
+                let diff = prev.abs_diff(cur);
                 prev != v1_u16 || diff != v2_u16
             }
             FCEU_SEARCH_PUERLY_RELATIVE_CHANGE => {
-                let diff = if prev >= cur { prev - cur } else { cur - prev };
+                let diff = prev.abs_diff(cur);
                 diff != v2_u16
             }
             FCEU_SEARCH_ANY_CHANGE => prev == cur,
@@ -796,304 +810,344 @@ mod tests {
     /// `SXIOPO` → addr=0x95FF, val=0x07, no compare.
     #[test]
     fn gg_decode_6char_smb1_infinite_lives() {
-        let _g = lock_for_test();
-        let r = decode_gg("SXIOPO").unwrap();
-        // Match the bit-encoding of the original C++ algorithm.
-        assert_eq!(r.2, -1, "6-char code must have compare = -1");
-        // Verify byte and addr ranges (high bit of addr is set).
-        assert!(r.0 >= 0x8000);
+        unsafe {
+            let _g = lock_for_test();
+            let r = decode_gg("SXIOPO").unwrap();
+            // Match the bit-encoding of the original C++ algorithm.
+            assert_eq!(r.2, -1, "6-char code must have compare = -1");
+            // Verify byte and addr ranges (high bit of addr is set).
+            assert!(r.0 >= 0x8000);
+        }
     }
 
     #[test]
     fn gg_decode_8char_has_compare() {
-        let _g = lock_for_test();
-        let r = decode_gg("AAAAAAAA").unwrap();
-        assert_ne!(r.2, -1, "8-char code must produce a compare byte");
+        unsafe {
+            let _g = lock_for_test();
+            let r = decode_gg("AAAAAAAA").unwrap();
+            assert_ne!(r.2, -1, "8-char code must produce a compare byte");
+        }
     }
 
     #[test]
     fn gg_decode_wrong_length() {
-        let _g = lock_for_test();
-        assert!(decode_gg("ABC").is_none());
-        assert!(decode_gg("ABCDEFG").is_none()); // 7 chars
-        assert!(decode_gg("ABCDEFGHI").is_none()); // 9 chars
+        unsafe {
+            let _g = lock_for_test();
+            assert!(decode_gg("ABC").is_none());
+            assert!(decode_gg("ABCDEFG").is_none()); // 7 chars
+            assert!(decode_gg("ABCDEFGHI").is_none()); // 9 chars
+        }
     }
 
     #[test]
     fn gg_decode_lowercase_accepted() {
-        let _g = lock_for_test();
-        // The original C++ uses toupper(); ensure we match.
-        let upper = decode_gg("SXIOPO").unwrap();
-        let lower = decode_gg("sxiopo").unwrap();
-        assert_eq!(upper, lower);
+        unsafe {
+            let _g = lock_for_test();
+            // The original C++ uses toupper(); ensure we match.
+            let upper = decode_gg("SXIOPO").unwrap();
+            let lower = decode_gg("sxiopo").unwrap();
+            assert_eq!(upper, lower);
+        }
     }
 
     #[test]
     fn gg_decode_unknown_char_treated_as_zero() {
-        let _g = lock_for_test();
-        // `?` is not a GG letter; the original returns 0 for it.
-        let r = decode_gg("AAAAA?").unwrap();
-        let zero = decode_gg("AAAAAA").unwrap();
-        assert_eq!(r, zero);
+        unsafe {
+            let _g = lock_for_test();
+            // `?` is not a GG letter; the original returns 0 for it.
+            let r = decode_gg("AAAAA?").unwrap();
+            let zero = decode_gg("AAAAAA").unwrap();
+            assert_eq!(r, zero);
+        }
     }
 
     #[test]
     fn par_decode_basic() {
-        let _g = lock_for_test();
-        let r = decode_par("00010203").unwrap();
-        // `addr = (boo[3]<<8) | (boo[2] + 0x7F)` = (0x03<<8) | (0x02+0x7F) = 0x381
-        assert_eq!(r.0, 0x381);
-        assert_eq!(r.1, 0); // PAR sets val=0
-        assert_eq!(r.2, -1);
-        assert_eq!(r.3, 1); // type=1 for addr >= 0x100
+        unsafe {
+            let _g = lock_for_test();
+            let r = decode_par("00010203").unwrap();
+            // `addr = (boo[3]<<8) | (boo[2] + 0x7F)` = (0x03<<8) | (0x02+0x7F) = 0x381
+            assert_eq!(r.0, 0x381);
+            assert_eq!(r.1, 0); // PAR sets val=0
+            assert_eq!(r.2, -1);
+            assert_eq!(r.3, 1); // type=1 for addr >= 0x100
+        }
     }
 
     #[test]
     fn par_decode_zeropage_type() {
-        let _g = lock_for_test();
-        // boo[2]+0x7F < 0x100 and boo[3]==0 → addr < 0x100 → type=0
-        let r = decode_par("00000000").unwrap();
-        assert_eq!(r.0, 0x7F);
-        assert_eq!(r.3, 0);
+        unsafe {
+            let _g = lock_for_test();
+            // boo[2]+0x7F < 0x100 and boo[3]==0 → addr < 0x100 → type=0
+            let r = decode_par("00000000").unwrap();
+            assert_eq!(r.0, 0x7F);
+            assert_eq!(r.3, 0);
+        }
     }
 
     #[test]
     fn par_decode_wrong_length() {
-        let _g = lock_for_test();
-        assert!(decode_par("0001020").is_none()); // 7 chars
-        assert!(decode_par("000102030").is_none()); // 9 chars
+        unsafe {
+            let _g = lock_for_test();
+            assert!(decode_par("0001020").is_none()); // 7 chars
+            assert!(decode_par("000102030").is_none()); // 9 chars
+        }
     }
 
     #[test]
     fn par_decode_invalid_hex() {
-        let _g = lock_for_test();
-        assert!(decode_par("ZZZZZZZZ").is_none());
+        unsafe {
+            let _g = lock_for_test();
+            assert!(decode_par("ZZZZZZZZ").is_none());
+        }
     }
 
     #[test]
     fn cheat_list_add_get_count() {
-        let _g = lock_for_test();
-        // Use a fresh process for isolation isn't possible — reset state.
-        fceux11_rust_cheat_delete_all();
-        let n = std::ffi::CString::new("test1").unwrap();
-        let idx = fceux11_rust_cheat_add(n.as_ptr(), 0x1234, 0x42, -1, 1, 0);
-        assert_eq!(idx, 0);
-        let n2 = std::ffi::CString::new("test2").unwrap();
-        let idx2 = fceux11_rust_cheat_add(n2.as_ptr(), 0x5678, 0x55, 0x10, 1, 1);
-        assert_eq!(idx2, 1);
-        assert_eq!(fceux11_rust_cheat_count(), 2);
+        unsafe {
+            let _g = lock_for_test();
+            // Use a fresh process for isolation isn't possible — reset state.
+            fceux11_rust_cheat_delete_all();
+            let n = std::ffi::CString::new("test1").unwrap();
+            let idx = fceux11_rust_cheat_add(n.as_ptr(), 0x1234, 0x42, -1, 1, 0);
+            assert_eq!(idx, 0);
+            let n2 = std::ffi::CString::new("test2").unwrap();
+            let idx2 = fceux11_rust_cheat_add(n2.as_ptr(), 0x5678, 0x55, 0x10, 1, 1);
+            assert_eq!(idx2, 1);
+            assert_eq!(fceux11_rust_cheat_count(), 2);
 
-        let mut view = FceuCheatEntryView {
-            name_ptr: std::ptr::null(),
-            name_len: 0,
-            addr: 0,
-            val: 0,
-            compare: 0,
-            status: 0,
-            type_: 0,
-        };
-        assert_eq!(fceux11_rust_cheat_get(0, &mut view), 1);
-        assert_eq!(view.addr, 0x1234);
-        assert_eq!(view.val, 0x42);
-        assert_eq!(view.compare, -1);
-        assert_eq!(view.type_, 0);
-        // Cleanup
-        fceux11_rust_cheat_delete_all();
+            let mut view = FceuCheatEntryView {
+                name_ptr: std::ptr::null(),
+                name_len: 0,
+                addr: 0,
+                val: 0,
+                compare: 0,
+                status: 0,
+                type_: 0,
+            };
+            assert_eq!(fceux11_rust_cheat_get(0, &mut view), 1);
+            assert_eq!(view.addr, 0x1234);
+            assert_eq!(view.val, 0x42);
+            assert_eq!(view.compare, -1);
+            assert_eq!(view.type_, 0);
+            // Cleanup
+            fceux11_rust_cheat_delete_all();
+        }
     }
 
     #[test]
     fn cheat_list_delete_and_toggle() {
-        let _g = lock_for_test();
-        fceux11_rust_cheat_delete_all();
-        let n = std::ffi::CString::new("a").unwrap();
-        fceux11_rust_cheat_add(n.as_ptr(), 0x0001, 1, -1, 1, 0);
-        fceux11_rust_cheat_add(n.as_ptr(), 0x0002, 2, -1, 0, 0);
-        // toggle index 0 (was 1 → 0)
-        assert_eq!(fceux11_rust_cheat_toggle(0), 0);
-        // toggle index 1 (was 0 → 1)
-        assert_eq!(fceux11_rust_cheat_toggle(1), 1);
-        // out-of-range
-        assert_eq!(fceux11_rust_cheat_toggle(99), -1);
-        // delete index 0
-        assert_eq!(fceux11_rust_cheat_delete(0), 1);
-        assert_eq!(fceux11_rust_cheat_count(), 1);
-        // out-of-range delete
-        assert_eq!(fceux11_rust_cheat_delete(99), 0);
-        fceux11_rust_cheat_delete_all();
+        unsafe {
+            let _g = lock_for_test();
+            fceux11_rust_cheat_delete_all();
+            let n = std::ffi::CString::new("a").unwrap();
+            fceux11_rust_cheat_add(n.as_ptr(), 0x0001, 1, -1, 1, 0);
+            fceux11_rust_cheat_add(n.as_ptr(), 0x0002, 2, -1, 0, 0);
+            // toggle index 0 (was 1 → 0)
+            assert_eq!(fceux11_rust_cheat_toggle(0), 0);
+            // toggle index 1 (was 0 → 1)
+            assert_eq!(fceux11_rust_cheat_toggle(1), 1);
+            // out-of-range
+            assert_eq!(fceux11_rust_cheat_toggle(99), -1);
+            // delete index 0
+            assert_eq!(fceux11_rust_cheat_delete(0), 1);
+            assert_eq!(fceux11_rust_cheat_count(), 1);
+            // out-of-range delete
+            assert_eq!(fceux11_rust_cheat_delete(99), 0);
+            fceux11_rust_cheat_delete_all();
+        }
     }
 
     #[test]
     fn cheat_list_disable_all_counts_only_active() {
-        let _g = lock_for_test();
-        fceux11_rust_cheat_delete_all();
-        let n = std::ffi::CString::new("x").unwrap();
-        fceux11_rust_cheat_add(n.as_ptr(), 1, 1, -1, 1, 0); // active
-        fceux11_rust_cheat_add(n.as_ptr(), 2, 2, -1, 0, 0); // already disabled
-        fceux11_rust_cheat_add(n.as_ptr(), 3, 3, -1, 1, 0); // active
-        let count = fceux11_rust_cheat_disable_all();
-        assert_eq!(count, 2);
-        // All should now be disabled
-        let mut view = FceuCheatEntryView {
-            name_ptr: std::ptr::null(),
-            name_len: 0,
-            addr: 0,
-            val: 0,
-            compare: 0,
-            status: 99,
-            type_: 0,
-        };
-        for i in 0..3 {
-            fceux11_rust_cheat_get(i, &mut view);
-            assert_eq!(view.status, 0);
+        unsafe {
+            let _g = lock_for_test();
+            fceux11_rust_cheat_delete_all();
+            let n = std::ffi::CString::new("x").unwrap();
+            fceux11_rust_cheat_add(n.as_ptr(), 1, 1, -1, 1, 0); // active
+            fceux11_rust_cheat_add(n.as_ptr(), 2, 2, -1, 0, 0); // already disabled
+            fceux11_rust_cheat_add(n.as_ptr(), 3, 3, -1, 1, 0); // active
+            let count = fceux11_rust_cheat_disable_all();
+            assert_eq!(count, 2);
+            // All should now be disabled
+            let mut view = FceuCheatEntryView {
+                name_ptr: std::ptr::null(),
+                name_len: 0,
+                addr: 0,
+                val: 0,
+                compare: 0,
+                status: 99,
+                type_: 0,
+            };
+            for i in 0..3 {
+                fceux11_rust_cheat_get(i, &mut view);
+                assert_eq!(view.status, 0);
+            }
+            fceux11_rust_cheat_delete_all();
         }
-        fceux11_rust_cheat_delete_all();
     }
 
     #[test]
     fn cheat_map_create_and_set() {
-        let _g = lock_for_test();
-        fceux11_rust_cheat_map_release();
-        fceux11_rust_cheat_map_create();
-        // Initially zero
-        assert_eq!(fceux11_rust_cheat_map_find(0x1234), 0);
-        // Set bit
-        fceux11_rust_cheat_map_set(0x1234, 1);
-        assert_eq!(fceux11_rust_cheat_map_find(0x1234), 1);
-        // C++ ternary: cheat==0 toggles via XOR (not clears)
-        fceux11_rust_cheat_map_set(0x1234, 0);
-        assert_eq!(fceux11_rust_cheat_map_find(0x1234), 0);
-        // Test boundary 0xFFFF
-        fceux11_rust_cheat_map_set(0xFFFF, 1);
-        assert_eq!(fceux11_rust_cheat_map_find(0xFFFF), 1);
-        fceux11_rust_cheat_map_release();
-        // After release, find returns 0
-        assert_eq!(fceux11_rust_cheat_map_find(0x1234), 0);
+        unsafe {
+            let _g = lock_for_test();
+            fceux11_rust_cheat_map_release();
+            fceux11_rust_cheat_map_create();
+            // Initially zero
+            assert_eq!(fceux11_rust_cheat_map_find(0x1234), 0);
+            // Set bit
+            fceux11_rust_cheat_map_set(0x1234, 1);
+            assert_eq!(fceux11_rust_cheat_map_find(0x1234), 1);
+            // C++ ternary: cheat==0 toggles via XOR (not clears)
+            fceux11_rust_cheat_map_set(0x1234, 0);
+            assert_eq!(fceux11_rust_cheat_map_find(0x1234), 0);
+            // Test boundary 0xFFFF
+            fceux11_rust_cheat_map_set(0xFFFF, 1);
+            assert_eq!(fceux11_rust_cheat_map_find(0xFFFF), 1);
+            fceux11_rust_cheat_map_release();
+            // After release, find returns 0
+            assert_eq!(fceux11_rust_cheat_map_find(0x1234), 0);
+        }
     }
 
     #[test]
     fn cheat_map_count_affected_range() {
-        let _g = lock_for_test();
-        fceux11_rust_cheat_map_release();
-        fceux11_rust_cheat_map_create();
-        fceux11_rust_cheat_map_set(0x0100, 1);
-        fceux11_rust_cheat_map_set(0x0105, 1);
-        fceux11_rust_cheat_map_set(0x0200, 1);
-        assert_eq!(fceux11_rust_cheat_map_count_affected(0x0100, 0x10), 2);
-        assert_eq!(fceux11_rust_cheat_map_count_affected(0x0000, 0x0300), 3);
-        fceux11_rust_cheat_map_release();
+        unsafe {
+            let _g = lock_for_test();
+            fceux11_rust_cheat_map_release();
+            fceux11_rust_cheat_map_create();
+            fceux11_rust_cheat_map_set(0x0100, 1);
+            fceux11_rust_cheat_map_set(0x0105, 1);
+            fceux11_rust_cheat_map_set(0x0200, 1);
+            assert_eq!(fceux11_rust_cheat_map_count_affected(0x0100, 0x10), 2);
+            assert_eq!(fceux11_rust_cheat_map_count_affected(0x0000, 0x0300), 3);
+            fceux11_rust_cheat_map_release();
+        }
     }
 
     #[test]
     fn cheat_comp_search_begin_marks_unpresent_as_none() {
-        let _g = lock_for_test();
-        let mem = vec![0u8; 0x10000];
-        let mut pres = vec![1u8; 0x10000];
-        pres[0x1000] = 0; // not present
-        fceux11_rust_cheat_comp_release();
-        let ok = fceux11_rust_cheat_comp_search_begin(mem.as_ptr(), pres.as_ptr());
-        assert_eq!(ok, 1);
-        // Unpresent slot should be CHEATC_NONE
-        assert_eq!(fceux11_rust_cheat_comp_get(0x1000) as u16, CHEATC_NONE);
-        // Present zero slot should be 0
-        assert_eq!(fceux11_rust_cheat_comp_get(0x0500), 0);
-        fceux11_rust_cheat_comp_release();
+        unsafe {
+            let _g = lock_for_test();
+            let mem = vec![0u8; 0x10000];
+            let mut pres = vec![1u8; 0x10000];
+            pres[0x1000] = 0; // not present
+            fceux11_rust_cheat_comp_release();
+            let ok = fceux11_rust_cheat_comp_search_begin(mem.as_ptr(), pres.as_ptr());
+            assert_eq!(ok, 1);
+            // Unpresent slot should be CHEATC_NONE
+            assert_eq!(fceux11_rust_cheat_comp_get(0x1000) as u16, CHEATC_NONE);
+            // Present zero slot should be 0
+            assert_eq!(fceux11_rust_cheat_comp_get(0x0500), 0);
+            fceux11_rust_cheat_comp_release();
+        }
     }
 
     #[test]
     fn cheat_comp_search_end_specific_change() {
-        let _g = lock_for_test();
-        // Begin with mem = 0x42 everywhere
-        let mem1 = vec![0x42u8; 0x10000];
-        let pres = vec![1u8; 0x10000];
-        fceux11_rust_cheat_comp_release();
-        fceux11_rust_cheat_comp_search_begin(mem1.as_ptr(), pres.as_ptr());
+        unsafe {
+            let _g = lock_for_test();
+            // Begin with mem = 0x42 everywhere
+            let mem1 = vec![0x42u8; 0x10000];
+            let pres = vec![1u8; 0x10000];
+            fceux11_rust_cheat_comp_release();
+            fceux11_rust_cheat_comp_search_begin(mem1.as_ptr(), pres.as_ptr());
 
-        // New mem: address 0x100 became 0x99, the rest stayed 0x42
-        let mut mem2 = vec![0x42u8; 0x10000];
-        mem2[0x100] = 0x99;
-        // Search: SPECIFIC_CHANGE (prev=0x42 → cur=0x99) — keeps 0x100, excludes the rest
-        fceux11_rust_cheat_comp_search_end(
-            FCEU_SEARCH_SPECIFIC_CHANGE,
-            0x42,
-            0x99,
-            mem2.as_ptr(),
-            pres.as_ptr(),
-        );
-        let cnt = fceux11_rust_cheat_comp_count(pres.as_ptr());
-        assert_eq!(cnt, 1);
-        fceux11_rust_cheat_comp_release();
+            // New mem: address 0x100 became 0x99, the rest stayed 0x42
+            let mut mem2 = vec![0x42u8; 0x10000];
+            mem2[0x100] = 0x99;
+            // Search: SPECIFIC_CHANGE (prev=0x42 → cur=0x99) — keeps 0x100, excludes the rest
+            fceux11_rust_cheat_comp_search_end(
+                FCEU_SEARCH_SPECIFIC_CHANGE,
+                0x42,
+                0x99,
+                mem2.as_ptr(),
+                pres.as_ptr(),
+            );
+            let cnt = fceux11_rust_cheat_comp_count(pres.as_ptr());
+            assert_eq!(cnt, 1);
+            fceux11_rust_cheat_comp_release();
+        }
     }
 
     #[test]
     fn cheat_comp_search_end_any_change() {
-        let _g = lock_for_test();
-        let mem1 = vec![0x00u8; 0x10000];
-        let pres = vec![1u8; 0x10000];
-        fceux11_rust_cheat_comp_release();
-        fceux11_rust_cheat_comp_search_begin(mem1.as_ptr(), pres.as_ptr());
-        // Change exactly 5 bytes
-        let mut mem2 = vec![0x00u8; 0x10000];
-        for i in 0..5 {
-            mem2[0x200 + i] = 0xFF;
+        unsafe {
+            let _g = lock_for_test();
+            let mem1 = vec![0x00u8; 0x10000];
+            let pres = vec![1u8; 0x10000];
+            fceux11_rust_cheat_comp_release();
+            fceux11_rust_cheat_comp_search_begin(mem1.as_ptr(), pres.as_ptr());
+            // Change exactly 5 bytes
+            let mut mem2 = vec![0x00u8; 0x10000];
+            for i in 0..5 {
+                mem2[0x200 + i] = 0xFF;
+            }
+            fceux11_rust_cheat_comp_search_end(
+                FCEU_SEARCH_ANY_CHANGE,
+                0,
+                0,
+                mem2.as_ptr(),
+                pres.as_ptr(),
+            );
+            let cnt = fceux11_rust_cheat_comp_count(pres.as_ptr());
+            assert_eq!(cnt, 5);
+            fceux11_rust_cheat_comp_release();
         }
-        fceux11_rust_cheat_comp_search_end(
-            FCEU_SEARCH_ANY_CHANGE,
-            0,
-            0,
-            mem2.as_ptr(),
-            pres.as_ptr(),
-        );
-        let cnt = fceux11_rust_cheat_comp_count(pres.as_ptr());
-        assert_eq!(cnt, 5);
-        fceux11_rust_cheat_comp_release();
     }
 
     #[test]
     fn global_disabled_flag_roundtrip() {
-        let _g = lock_for_test();
-        // Default 0
-        let old = fceux11_rust_cheat_set_global_disabled(1);
-        let prev_old = old; // capture so we can restore
-        assert_eq!(fceux11_rust_cheat_get_global_disabled(), 1);
-        fceux11_rust_cheat_set_global_disabled(0);
-        assert_eq!(fceux11_rust_cheat_get_global_disabled(), 0);
-        // Restore original
-        fceux11_rust_cheat_set_global_disabled(prev_old);
+        unsafe {
+            let _g = lock_for_test();
+            // Default 0
+            let old = fceux11_rust_cheat_set_global_disabled(1);
+            let prev_old = old; // capture so we can restore
+            assert_eq!(fceux11_rust_cheat_get_global_disabled(), 1);
+            fceux11_rust_cheat_set_global_disabled(0);
+            assert_eq!(fceux11_rust_cheat_get_global_disabled(), 0);
+            // Restore original
+            fceux11_rust_cheat_set_global_disabled(prev_old);
+        }
     }
 
     #[test]
     fn cheat_set_updates_fields_selectively() {
-        let _g = lock_for_test();
-        fceux11_rust_cheat_delete_all();
-        let n = std::ffi::CString::new("orig").unwrap();
-        fceux11_rust_cheat_add(n.as_ptr(), 0x100, 0x10, -1, 1, 0);
-        // Only update val; pass -1 for addr/status, name=NULL.
-        fceux11_rust_cheat_set(0, std::ptr::null(), -1, 0x99, -2, -1, 0);
-        let mut view = FceuCheatEntryView {
-            name_ptr: std::ptr::null(),
-            name_len: 0,
-            addr: 0,
-            val: 0,
-            compare: 0,
-            status: 0,
-            type_: 99,
-        };
-        fceux11_rust_cheat_get(0, &mut view);
-        assert_eq!(view.addr, 0x100); // unchanged
-        assert_eq!(view.val, 0x99);   // changed
-        assert_eq!(view.status, 1);   // unchanged
-        assert_eq!(view.compare, -1); // unchanged (c < -1 means skip)
-        fceux11_rust_cheat_delete_all();
+        unsafe {
+            let _g = lock_for_test();
+            fceux11_rust_cheat_delete_all();
+            let n = std::ffi::CString::new("orig").unwrap();
+            fceux11_rust_cheat_add(n.as_ptr(), 0x100, 0x10, -1, 1, 0);
+            // Only update val; pass -1 for addr/status, name=NULL.
+            fceux11_rust_cheat_set(0, std::ptr::null(), -1, 0x99, -2, -1, 0);
+            let mut view = FceuCheatEntryView {
+                name_ptr: std::ptr::null(),
+                name_len: 0,
+                addr: 0,
+                val: 0,
+                compare: 0,
+                status: 0,
+                type_: 99,
+            };
+            fceux11_rust_cheat_get(0, &mut view);
+            assert_eq!(view.addr, 0x100); // unchanged
+            assert_eq!(view.val, 0x99); // changed
+            assert_eq!(view.status, 1); // unchanged
+            assert_eq!(view.compare, -1); // unchanged (c < -1 means skip)
+            fceux11_rust_cheat_delete_all();
+        }
     }
 
     #[test]
     fn gg_to_bin_known_letters() {
-        let _g = lock_for_test();
-        // Verify mapping for canonical letters
-        assert_eq!(gg_to_bin(b'A'), 0);
-        assert_eq!(gg_to_bin(b'P'), 1);
-        assert_eq!(gg_to_bin(b'N'), 15);
-        assert_eq!(gg_to_bin(b'a'), 0); // case-insensitive
-        assert_eq!(gg_to_bin(b'?'), 0); // unknown → 0
+        unsafe {
+            let _g = lock_for_test();
+            // Verify mapping for canonical letters
+            assert_eq!(gg_to_bin(b'A'), 0);
+            assert_eq!(gg_to_bin(b'P'), 1);
+            assert_eq!(gg_to_bin(b'N'), 15);
+            assert_eq!(gg_to_bin(b'a'), 0); // case-insensitive
+            assert_eq!(gg_to_bin(b'?'), 0); // unknown → 0
+        }
     }
 }

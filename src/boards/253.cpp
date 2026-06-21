@@ -131,7 +131,7 @@ static void StateRestore(int version) {
 void Mapper253_Init(CartInfo *info) {
 	info->Power = M253Power;
 	info->Close = M253Close;
-	MapIRQHook = M253IRQ;
+	g_cpu.map_irq_hook_ref() = M253IRQ;
 	GameStateRestore = StateRestore;
 
 	CHRRAMSIZE = 2048;

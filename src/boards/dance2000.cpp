@@ -56,7 +56,7 @@ static DECLFW(UNLD2000Write) {
 
 static DECLFR(UNLD2000Read) {
 	if (prg & 0x40)
-		return X.DB;
+		return g_cpu.native_layout().DB;
 	else
 		return CartBR(A);
 }

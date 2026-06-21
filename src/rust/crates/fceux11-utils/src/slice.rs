@@ -33,7 +33,7 @@ impl FceuSliceMut {
     ///
     /// # Safety
     /// `ptr` must be valid for `len` bytes or null.
-    pub unsafe fn as_mut_slice(&self) -> &mut [u8] {
+    pub unsafe fn as_mut_slice(&mut self) -> &mut [u8] {
         if self.ptr.is_null() || self.len == 0 {
             &mut []
         } else {
@@ -48,34 +48,40 @@ mod tests {
 
     #[test]
     fn test_fceu_slice() {
-        let data = [1u8, 2, 3];
-        let s = FceuSlice {
-            ptr: data.as_ptr(),
-            len: data.len(),
-        };
-        let sl = unsafe { s.as_slice() };
-        assert_eq!(sl, &[1, 2, 3]);
+        unsafe {
+            let data = [1u8, 2, 3];
+            let s = FceuSlice {
+                ptr: data.as_ptr(),
+                len: data.len(),
+            };
+            let sl = unsafe { s.as_slice() };
+            assert_eq!(sl, &[1, 2, 3]);
+        }
     }
 
     #[test]
     fn test_fceu_slice_null() {
-        let s = FceuSlice {
-            ptr: std::ptr::null(),
-            len: 0,
-        };
-        let sl = unsafe { s.as_slice() };
-        assert!(sl.is_empty());
+        unsafe {
+            let s = FceuSlice {
+                ptr: std::ptr::null(),
+                len: 0,
+            };
+            let sl = unsafe { s.as_slice() };
+            assert!(sl.is_empty());
+        }
     }
 
     #[test]
     fn test_fceu_slice_mut() {
-        let mut data = [1u8, 2, 3];
-        let s = FceuSliceMut {
-            ptr: data.as_mut_ptr(),
-            len: data.len(),
-        };
-        let sl = unsafe { s.as_mut_slice() };
-        sl[0] = 42;
-        assert_eq!(data[0], 42);
+        unsafe {
+            let mut data = [1u8, 2, 3];
+            let mut s = FceuSliceMut {
+                ptr: data.as_mut_ptr(),
+                len: data.len(),
+            };
+            let sl = unsafe { s.as_mut_slice() };
+            sl[0] = 42;
+            assert_eq!(data[0], 42);
+        }
     }
 }

@@ -66,7 +66,7 @@ static void Sync(void) {
 static DECLFR(M235Read) {
 	if (openbus) {
 		openbus = 0;
-		return X.DB;
+		return g_cpu.native_layout().DB;
 	}
 	return CartBR(A);
 }

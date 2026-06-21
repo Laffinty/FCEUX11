@@ -39,7 +39,7 @@ static DECLFW(M170ProtW) {
 }
 
 static DECLFR(M170ProtR) {
-	return reg | (X.DB & 0x7F);
+	return reg | (g_cpu.native_layout().DB & 0x7F);
 }
 
 static void M170Power(void) {

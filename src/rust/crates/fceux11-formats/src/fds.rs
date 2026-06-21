@@ -155,8 +155,11 @@ fn advance_block(current: u8) -> u8 {
 /// `kind = 0`.
 ///
 /// Mirrors `src/fds.cpp:717–733`'s `memcmp` chain.
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_fds_validate_header(
+pub unsafe extern "C" fn fceux11_rust_fds_validate_header(
     buf: *const u8,
     len: usize,
 ) -> FceuFdsHeaderInfo {
@@ -235,8 +238,11 @@ pub extern "C" fn fceux11_rust_fds_compute_total_sides(
 ///
 /// Both pointers must be non-null and point to at least
 /// `FCEUX11_RUST_FDS_DISK_SIDE_SIZE` bytes.
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_fds_xor_disk_data(dst: *mut u8, src: *const u8) {
+pub unsafe extern "C" fn fceux11_rust_fds_xor_disk_data(dst: *mut u8, src: *const u8) {
     if dst.is_null() || src.is_null() {
         return;
     }
@@ -273,8 +279,11 @@ pub extern "C" fn fceux11_rust_fds_xor_disk_data(dst: *mut u8, src: *const u8) {
 /// `delta_cycles` is the number of CPU cycles elapsed since the
 /// previous tick; the C++ caller (`MapIRQHook`) always passes a
 /// non-negative value, but we use `wrapping_sub` for defensiveness.
+/// # Safety
+/// The caller must ensure that all raw pointers are non-null, properly aligned, and
+/// point to valid memory regions of the expected size for the duration of the call.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_fds_irq_tick(
+pub unsafe extern "C" fn fceux11_rust_fds_irq_tick(
     state: *mut FceuFdsIrqState,
     delta_cycles: i32,
 ) -> FceuFdsIrqTickResult {
@@ -338,10 +347,7 @@ pub extern "C" fn fceux11_rust_fds_block_advance_on_motor(current_block: u8) -> 
 /// Mirrors `FDSRead4030` (src/fds.cpp:261–265) — the C++ wrapper
 /// retains the `fceuindbg`-guarded `X6502_IRQEnd` calls.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_fds_read_4030_value(
-    irq_low_ext: bool,
-    irq_low_ext2: bool,
-) -> u8 {
+pub extern "C" fn fceux11_rust_fds_read_4030_value(irq_low_ext: bool, irq_low_ext2: bool) -> u8 {
     let mut ret: u8 = 0;
     if irq_low_ext {
         ret |= 1;
@@ -364,10 +370,7 @@ pub extern "C" fn fceux11_rust_fds_read_4032_value(
     if in_disk == FCEUX11_RUST_FDS_NOT_INSERTED {
         ret |= 5;
     }
-    if in_disk == FCEUX11_RUST_FDS_NOT_INSERTED
-        || (fds_regs_5 & 1) == 0
-        || (fds_regs_5 & 2) != 0
-    {
+    if in_disk == FCEUX11_RUST_FDS_NOT_INSERTED || (fds_regs_5 & 1) == 0 || (fds_regs_5 & 2) != 0 {
         ret |= 2;
     }
     ret
@@ -382,10 +385,7 @@ pub extern "C" fn fceux11_rust_fds_read_4032_value(
 /// Returns 0 if `total_sides == 0` (defensive — C++ already guards on
 /// that before calling, but the FFI must not divide by zero).
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_fds_compute_select_disk_next(
-    current: u8,
-    total_sides: u8,
-) -> u8 {
+pub extern "C" fn fceux11_rust_fds_compute_select_disk_next(current: u8, total_sides: u8) -> u8 {
     if total_sides == 0 {
         return 0;
     }
@@ -467,501 +467,602 @@ mod tests {
 
     #[test]
     fn xor_disk_data_null_safe() {
-        // Must not crash on null inputs.
-        fceux11_rust_fds_xor_disk_data(std::ptr::null_mut(), std::ptr::null());
-        let mut buf = vec![0u8; FCEUX11_RUST_FDS_DISK_SIDE_SIZE as usize];
-        fceux11_rust_fds_xor_disk_data(buf.as_mut_ptr(), std::ptr::null());
-        fceux11_rust_fds_xor_disk_data(std::ptr::null_mut(), buf.as_ptr());
+        unsafe {
+            // Must not crash on null inputs.
+            unsafe { fceux11_rust_fds_xor_disk_data(std::ptr::null_mut(), std::ptr::null()) };
+            let mut buf = vec![0u8; FCEUX11_RUST_FDS_DISK_SIDE_SIZE as usize];
+            unsafe { fceux11_rust_fds_xor_disk_data(buf.as_mut_ptr(), std::ptr::null()) };
+            unsafe { fceux11_rust_fds_xor_disk_data(std::ptr::null_mut(), buf.as_ptr()) };
+        }
     }
 
     #[test]
     fn xor_disk_data_self_inverse() {
-        // dst ^= src twice → original dst.
-        let mut dst = vec![0xA5u8; FCEUX11_RUST_FDS_DISK_SIDE_SIZE as usize];
-        let src = vec![0x5Au8; FCEUX11_RUST_FDS_DISK_SIDE_SIZE as usize];
-        let original = dst.clone();
-        fceux11_rust_fds_xor_disk_data(dst.as_mut_ptr(), src.as_ptr());
-        fceux11_rust_fds_xor_disk_data(dst.as_mut_ptr(), src.as_ptr());
-        assert_eq!(dst, original);
+        unsafe {
+            // dst ^= src twice → original dst.
+            let mut dst = vec![0xA5u8; FCEUX11_RUST_FDS_DISK_SIDE_SIZE as usize];
+            let src = vec![0x5Au8; FCEUX11_RUST_FDS_DISK_SIDE_SIZE as usize];
+            let original = dst.clone();
+            unsafe { fceux11_rust_fds_xor_disk_data(dst.as_mut_ptr(), src.as_ptr()) };
+            unsafe { fceux11_rust_fds_xor_disk_data(dst.as_mut_ptr(), src.as_ptr()) };
+            assert_eq!(dst, original);
+        }
     }
 
     #[test]
     fn xor_disk_data_zero_identity() {
-        let mut dst = vec![0xFFu8; FCEUX11_RUST_FDS_DISK_SIDE_SIZE as usize];
-        let src = vec![0u8; FCEUX11_RUST_FDS_DISK_SIDE_SIZE as usize];
-        let original = dst.clone();
-        fceux11_rust_fds_xor_disk_data(dst.as_mut_ptr(), src.as_ptr());
-        assert_eq!(dst, original); // XOR with zero is identity
+        unsafe {
+            let mut dst = vec![0xFFu8; FCEUX11_RUST_FDS_DISK_SIDE_SIZE as usize];
+            let src = vec![0u8; FCEUX11_RUST_FDS_DISK_SIDE_SIZE as usize];
+            let original = dst.clone();
+            unsafe { fceux11_rust_fds_xor_disk_data(dst.as_mut_ptr(), src.as_ptr()) };
+            assert_eq!(dst, original); // XOR with zero is identity
+        }
     }
 
     // ----- validate_header ----------------------------------------------
 
     #[test]
     fn validate_header_fds_magic() {
-        let mut hdr = [0u8; 16];
-        hdr[0..4].copy_from_slice(b"FDS\x1a");
-        hdr[4] = 4;
-        let info = fceux11_rust_fds_validate_header(hdr.as_ptr(), 16);
-        assert_eq!(info.kind, 1);
-        assert_eq!(info.header_size, 16);
-        assert_eq!(info.advertised_sides, 4);
+        unsafe {
+            let mut hdr = [0u8; 16];
+            hdr[0..4].copy_from_slice(b"FDS\x1a");
+            hdr[4] = 4;
+            let info = unsafe { fceux11_rust_fds_validate_header(hdr.as_ptr(), 16) };
+            assert_eq!(info.kind, 1);
+            assert_eq!(info.header_size, 16);
+            assert_eq!(info.advertised_sides, 4);
+        }
     }
 
     #[test]
     fn validate_header_raw_magic() {
-        let mut hdr = [0u8; 16];
-        hdr[1..15].copy_from_slice(b"*NINTENDO-HVC*");
-        let info = fceux11_rust_fds_validate_header(hdr.as_ptr(), 16);
-        assert_eq!(info.kind, 2);
-        assert_eq!(info.header_size, 0);
-        assert_eq!(info.advertised_sides, 0);
+        unsafe {
+            let mut hdr = [0u8; 16];
+            hdr[1..15].copy_from_slice(b"*NINTENDO-HVC*");
+            let info = unsafe { fceux11_rust_fds_validate_header(hdr.as_ptr(), 16) };
+            assert_eq!(info.kind, 2);
+            assert_eq!(info.header_size, 0);
+            assert_eq!(info.advertised_sides, 0);
+        }
     }
 
     #[test]
     fn validate_header_no_magic() {
-        let hdr = [0u8; 16];
-        let info = fceux11_rust_fds_validate_header(hdr.as_ptr(), 16);
-        assert_eq!(info.kind, 0);
+        unsafe {
+            let hdr = [0u8; 16];
+            let info = unsafe { fceux11_rust_fds_validate_header(hdr.as_ptr(), 16) };
+            assert_eq!(info.kind, 0);
+        }
     }
 
     #[test]
     fn validate_header_too_short() {
-        let hdr = [0u8; 4];
-        let info = fceux11_rust_fds_validate_header(hdr.as_ptr(), 4);
-        assert_eq!(info.kind, 0);
+        unsafe {
+            let hdr = [0u8; 4];
+            let info = unsafe { fceux11_rust_fds_validate_header(hdr.as_ptr(), 4) };
+            assert_eq!(info.kind, 0);
+        }
     }
 
     #[test]
     fn validate_header_null_safe() {
-        let info = fceux11_rust_fds_validate_header(std::ptr::null(), 16);
-        assert_eq!(info.kind, 0);
+        unsafe {
+            let info = unsafe { fceux11_rust_fds_validate_header(std::ptr::null(), 16) };
+            assert_eq!(info.kind, 0);
+        }
     }
 
     // ----- compute_total_sides ------------------------------------------
 
     #[test]
     fn compute_total_sides_fds_header_within_range() {
-        assert_eq!(fceux11_rust_fds_compute_total_sides(0, 4, 1), 4);
-        assert_eq!(fceux11_rust_fds_compute_total_sides(0, 1, 1), 1);
-        assert_eq!(fceux11_rust_fds_compute_total_sides(0, 8, 1), 8);
+        unsafe {
+            assert_eq!(fceux11_rust_fds_compute_total_sides(0, 4, 1), 4);
+            assert_eq!(fceux11_rust_fds_compute_total_sides(0, 1, 1), 1);
+            assert_eq!(fceux11_rust_fds_compute_total_sides(0, 8, 1), 8);
+        }
     }
 
     #[test]
     fn compute_total_sides_fds_header_clamps() {
-        assert_eq!(fceux11_rust_fds_compute_total_sides(0, 0, 1), 1);
-        assert_eq!(fceux11_rust_fds_compute_total_sides(0, 9, 1), 8);
-        assert_eq!(fceux11_rust_fds_compute_total_sides(0, 255, 1), 8);
+        unsafe {
+            assert_eq!(fceux11_rust_fds_compute_total_sides(0, 0, 1), 1);
+            assert_eq!(fceux11_rust_fds_compute_total_sides(0, 9, 1), 8);
+            assert_eq!(fceux11_rust_fds_compute_total_sides(0, 255, 1), 8);
+        }
     }
 
     #[test]
     fn compute_total_sides_raw_small_file() {
-        // Even 0-byte file gets 1 side (matches C++ `if t < 65500: t = 65500`).
-        assert_eq!(fceux11_rust_fds_compute_total_sides(0, 0, 0), 1);
-        assert_eq!(fceux11_rust_fds_compute_total_sides(1000, 0, 0), 1);
-        assert_eq!(fceux11_rust_fds_compute_total_sides(65499, 0, 0), 1);
+        unsafe {
+            // Even 0-byte file gets 1 side (matches C++ `if t < 65500: t = 65500`).
+            assert_eq!(fceux11_rust_fds_compute_total_sides(0, 0, 0), 1);
+            assert_eq!(fceux11_rust_fds_compute_total_sides(1000, 0, 0), 1);
+            assert_eq!(fceux11_rust_fds_compute_total_sides(65499, 0, 0), 1);
+        }
     }
 
     #[test]
     fn compute_total_sides_raw_exact_multiples() {
-        assert_eq!(fceux11_rust_fds_compute_total_sides(65500, 0, 0), 1);
-        assert_eq!(fceux11_rust_fds_compute_total_sides(131000, 0, 0), 2);
-        assert_eq!(fceux11_rust_fds_compute_total_sides(65500 * 4, 0, 0), 4);
+        unsafe {
+            assert_eq!(fceux11_rust_fds_compute_total_sides(65500, 0, 0), 1);
+            assert_eq!(fceux11_rust_fds_compute_total_sides(131000, 0, 0), 2);
+            assert_eq!(fceux11_rust_fds_compute_total_sides(65500 * 4, 0, 0), 4);
+        }
     }
 
     #[test]
     fn compute_total_sides_raw_clamps_to_8() {
-        assert_eq!(fceux11_rust_fds_compute_total_sides(65500 * 8, 0, 0), 8);
-        assert_eq!(fceux11_rust_fds_compute_total_sides(65500 * 99, 0, 0), 8);
+        unsafe {
+            assert_eq!(fceux11_rust_fds_compute_total_sides(65500 * 8, 0, 0), 8);
+            assert_eq!(fceux11_rust_fds_compute_total_sides(65500 * 99, 0, 0), 8);
+        }
     }
 
     // ----- block_size ---------------------------------------------------
 
     #[test]
     fn block_size_known_types() {
-        assert_eq!(fceux11_rust_fds_block_size(FCEUX11_RUST_FDS_DSK_VOLUME, 0), 0x38);
-        assert_eq!(fceux11_rust_fds_block_size(FCEUX11_RUST_FDS_DSK_FILECNT, 0), 0x02);
-        assert_eq!(fceux11_rust_fds_block_size(FCEUX11_RUST_FDS_DSK_FILEHDR, 0), 0x10);
+        unsafe {
+            assert_eq!(
+                fceux11_rust_fds_block_size(FCEUX11_RUST_FDS_DSK_VOLUME, 0),
+                0x38
+            );
+            assert_eq!(
+                fceux11_rust_fds_block_size(FCEUX11_RUST_FDS_DSK_FILECNT, 0),
+                0x02
+            );
+            assert_eq!(
+                fceux11_rust_fds_block_size(FCEUX11_RUST_FDS_DSK_FILEHDR, 0),
+                0x10
+            );
+        }
     }
 
     #[test]
     fn block_size_filedata_uses_filesize() {
-        assert_eq!(
-            fceux11_rust_fds_block_size(FCEUX11_RUST_FDS_DSK_FILEDATA, 0),
-            0x01
-        );
-        assert_eq!(
-            fceux11_rust_fds_block_size(FCEUX11_RUST_FDS_DSK_FILEDATA, 100),
-            0x65
-        );
-        assert_eq!(
-            fceux11_rust_fds_block_size(FCEUX11_RUST_FDS_DSK_FILEDATA, 0xFFFF),
-            0x10000
-        );
+        unsafe {
+            assert_eq!(
+                fceux11_rust_fds_block_size(FCEUX11_RUST_FDS_DSK_FILEDATA, 0),
+                0x01
+            );
+            assert_eq!(
+                fceux11_rust_fds_block_size(FCEUX11_RUST_FDS_DSK_FILEDATA, 100),
+                0x65
+            );
+            assert_eq!(
+                fceux11_rust_fds_block_size(FCEUX11_RUST_FDS_DSK_FILEDATA, 0xFFFF),
+                0x10000
+            );
+        }
     }
 
     #[test]
     fn block_size_dsk_init_is_zero() {
-        assert_eq!(fceux11_rust_fds_block_size(FCEUX11_RUST_FDS_DSK_INIT, 0), 0);
+        unsafe {
+            assert_eq!(fceux11_rust_fds_block_size(FCEUX11_RUST_FDS_DSK_INIT, 0), 0);
+        }
     }
 
     #[test]
     fn block_size_unknown_type_is_zero() {
-        assert_eq!(fceux11_rust_fds_block_size(99, 0), 0);
+        unsafe {
+            assert_eq!(fceux11_rust_fds_block_size(99, 0), 0);
+        }
     }
 
     // ----- block_advance_on_motor ---------------------------------------
 
     #[test]
     fn block_advance_walks_normal_sequence() {
-        assert_eq!(
-            fceux11_rust_fds_block_advance_on_motor(FCEUX11_RUST_FDS_DSK_INIT),
-            FCEUX11_RUST_FDS_DSK_VOLUME
-        );
-        assert_eq!(
-            fceux11_rust_fds_block_advance_on_motor(FCEUX11_RUST_FDS_DSK_VOLUME),
-            FCEUX11_RUST_FDS_DSK_FILECNT
-        );
-        assert_eq!(
-            fceux11_rust_fds_block_advance_on_motor(FCEUX11_RUST_FDS_DSK_FILECNT),
-            FCEUX11_RUST_FDS_DSK_FILEHDR
-        );
-        assert_eq!(
-            fceux11_rust_fds_block_advance_on_motor(FCEUX11_RUST_FDS_DSK_FILEHDR),
-            FCEUX11_RUST_FDS_DSK_FILEDATA
-        );
+        unsafe {
+            assert_eq!(
+                fceux11_rust_fds_block_advance_on_motor(FCEUX11_RUST_FDS_DSK_INIT),
+                FCEUX11_RUST_FDS_DSK_VOLUME
+            );
+            assert_eq!(
+                fceux11_rust_fds_block_advance_on_motor(FCEUX11_RUST_FDS_DSK_VOLUME),
+                FCEUX11_RUST_FDS_DSK_FILECNT
+            );
+            assert_eq!(
+                fceux11_rust_fds_block_advance_on_motor(FCEUX11_RUST_FDS_DSK_FILECNT),
+                FCEUX11_RUST_FDS_DSK_FILEHDR
+            );
+            assert_eq!(
+                fceux11_rust_fds_block_advance_on_motor(FCEUX11_RUST_FDS_DSK_FILEHDR),
+                FCEUX11_RUST_FDS_DSK_FILEDATA
+            );
+        }
     }
 
     #[test]
     fn block_advance_wraps_filedata_to_filehdr() {
-        assert_eq!(
-            fceux11_rust_fds_block_advance_on_motor(FCEUX11_RUST_FDS_DSK_FILEDATA),
-            FCEUX11_RUST_FDS_DSK_FILEHDR
-        );
+        unsafe {
+            assert_eq!(
+                fceux11_rust_fds_block_advance_on_motor(FCEUX11_RUST_FDS_DSK_FILEDATA),
+                FCEUX11_RUST_FDS_DSK_FILEHDR
+            );
+        }
     }
 
     #[test]
     fn block_advance_clamps_out_of_range() {
-        assert_eq!(
-            fceux11_rust_fds_block_advance_on_motor(99),
-            FCEUX11_RUST_FDS_DSK_FILEHDR
-        );
+        unsafe {
+            assert_eq!(
+                fceux11_rust_fds_block_advance_on_motor(99),
+                FCEUX11_RUST_FDS_DSK_FILEHDR
+            );
+        }
     }
 
     // ----- read_4030_value ----------------------------------------------
 
     #[test]
     fn read_4030_combinations() {
-        assert_eq!(fceux11_rust_fds_read_4030_value(false, false), 0);
-        assert_eq!(fceux11_rust_fds_read_4030_value(true, false), 1);
-        assert_eq!(fceux11_rust_fds_read_4030_value(false, true), 2);
-        assert_eq!(fceux11_rust_fds_read_4030_value(true, true), 3);
+        unsafe {
+            assert_eq!(fceux11_rust_fds_read_4030_value(false, false), 0);
+            assert_eq!(fceux11_rust_fds_read_4030_value(true, false), 1);
+            assert_eq!(fceux11_rust_fds_read_4030_value(false, true), 2);
+            assert_eq!(fceux11_rust_fds_read_4030_value(true, true), 3);
+        }
     }
 
     // ----- read_4032_value ----------------------------------------------
 
     #[test]
     fn read_4032_ejected() {
-        // InDisk == 255 forces both '5' and '2' bits.
-        let ret = fceux11_rust_fds_read_4032_value(255, 0, 0xFF);
-        assert_eq!(ret, (0xFFu8 & !7) | 5 | 2);
+        unsafe {
+            // InDisk == 255 forces both '5' and '2' bits.
+            let ret = fceux11_rust_fds_read_4032_value(255, 0, 0xFF);
+            assert_eq!(ret, !7 | 5 | 2);
+        }
     }
 
     #[test]
     fn read_4032_inserted_motor_off() {
-        // FDSRegs[5] & 1 == 0 → set bit 2
-        let ret = fceux11_rust_fds_read_4032_value(0, 0, 0);
-        assert_eq!(ret, 2);
+        unsafe {
+            // FDSRegs[5] & 1 == 0 → set bit 2
+            let ret = fceux11_rust_fds_read_4032_value(0, 0, 0);
+            assert_eq!(ret, 2);
+        }
     }
 
     #[test]
     fn read_4032_inserted_motor_on_bit2_clear() {
-        // FDSRegs[5] = 0x01 → bit 0 set (motor), bit 1 clear → bit 2 NOT set
-        let ret = fceux11_rust_fds_read_4032_value(0, 0x01, 0);
-        assert_eq!(ret, 0);
+        unsafe {
+            // FDSRegs[5] = 0x01 → bit 0 set (motor), bit 1 clear → bit 2 NOT set
+            let ret = fceux11_rust_fds_read_4032_value(0, 0x01, 0);
+            assert_eq!(ret, 0);
+        }
     }
 
     #[test]
     fn read_4032_inserted_motor_on_bit2_set() {
-        // FDSRegs[5] = 0x03 → both bits set → bit 2 of return set
-        let ret = fceux11_rust_fds_read_4032_value(0, 0x03, 0);
-        assert_eq!(ret, 2);
+        unsafe {
+            // FDSRegs[5] = 0x03 → both bits set → bit 2 of return set
+            let ret = fceux11_rust_fds_read_4032_value(0, 0x03, 0);
+            assert_eq!(ret, 2);
+        }
     }
 
     #[test]
     fn read_4032_data_bus_preserved() {
-        // Bits ≥3 of data_bus should pass through.
-        let ret = fceux11_rust_fds_read_4032_value(0, 0x01, 0xF8);
-        assert_eq!(ret & 0xF8, 0xF8);
+        unsafe {
+            // Bits ≥3 of data_bus should pass through.
+            let ret = fceux11_rust_fds_read_4032_value(0, 0x01, 0xF8);
+            assert_eq!(ret & 0xF8, 0xF8);
+        }
     }
 
     // ----- compute_select_disk_next -------------------------------------
 
     #[test]
     fn select_disk_next_cycles() {
-        assert_eq!(fceux11_rust_fds_compute_select_disk_next(0, 2), 1);
-        assert_eq!(fceux11_rust_fds_compute_select_disk_next(1, 2), 0);
+        unsafe {
+            assert_eq!(fceux11_rust_fds_compute_select_disk_next(0, 2), 1);
+            assert_eq!(fceux11_rust_fds_compute_select_disk_next(1, 2), 0);
+        }
     }
 
     #[test]
     fn select_disk_next_total_4_with_mask() {
-        // total=4 cycles through 0..3 (& 3 is a no-op on values <4)
-        assert_eq!(fceux11_rust_fds_compute_select_disk_next(3, 4), 0);
+        unsafe {
+            // total=4 cycles through 0..3 (& 3 is a no-op on values <4)
+            assert_eq!(fceux11_rust_fds_compute_select_disk_next(3, 4), 0);
+        }
     }
 
     #[test]
     fn select_disk_next_total_8_mask_clips() {
-        // total=8, current=3 → (4 % 8) & 3 = 0
-        assert_eq!(fceux11_rust_fds_compute_select_disk_next(3, 8), 0);
-        // current=6 → (7 % 8) & 3 = 3
-        assert_eq!(fceux11_rust_fds_compute_select_disk_next(6, 8), 3);
+        unsafe {
+            // total=8, current=3 → (4 % 8) & 3 = 0
+            assert_eq!(fceux11_rust_fds_compute_select_disk_next(3, 8), 0);
+            // current=6 → (7 % 8) & 3 = 3
+            assert_eq!(fceux11_rust_fds_compute_select_disk_next(6, 8), 3);
+        }
     }
 
     #[test]
     fn select_disk_next_zero_total_safe() {
-        assert_eq!(fceux11_rust_fds_compute_select_disk_next(7, 0), 0);
+        unsafe {
+            assert_eq!(fceux11_rust_fds_compute_select_disk_next(7, 0), 0);
+        }
     }
 
     // ----- irq_tick -----------------------------------------------------
 
     #[test]
     fn irq_tick_null_safe() {
-        let r = fceux11_rust_fds_irq_tick(std::ptr::null_mut(), 10);
-        assert!(!r.timer_fire);
-        assert!(!r.seek_fire);
+        unsafe {
+            let r = unsafe { fceux11_rust_fds_irq_tick(std::ptr::null_mut(), 10) };
+            assert!(!r.timer_fire);
+            assert!(!r.seek_fire);
+        }
     }
 
     #[test]
     fn irq_tick_disabled_is_noop_for_timer() {
-        let mut s = FceuFdsIrqState {
-            irq_count: 100,
-            irq_latch: 200,
-            irq_a: 0, // disabled
-            disk_seek_irq: 0,
-            fds_regs_5: 0,
-        };
-        let r = fceux11_rust_fds_irq_tick(&mut s, 10);
-        assert!(!r.timer_fire);
-        assert_eq!(s.irq_count, 100); // unchanged
-        assert_eq!(s.irq_a, 0);
+        unsafe {
+            let mut s = FceuFdsIrqState {
+                irq_count: 100,
+                irq_latch: 200,
+                irq_a: 0, // disabled
+                disk_seek_irq: 0,
+                fds_regs_5: 0,
+            };
+            let r = unsafe { fceux11_rust_fds_irq_tick(&mut s, 10) };
+            assert!(!r.timer_fire);
+            assert_eq!(s.irq_count, 100); // unchanged
+            assert_eq!(s.irq_a, 0);
+        }
     }
 
     #[test]
     fn irq_tick_enabled_decrements_only() {
-        let mut s = FceuFdsIrqState {
-            irq_count: 100,
-            irq_latch: 200,
-            irq_a: FCEUX11_RUST_FDS_IRQ_ENABLED,
-            disk_seek_irq: 0,
-            fds_regs_5: 0,
-        };
-        let r = fceux11_rust_fds_irq_tick(&mut s, 10);
-        assert!(!r.timer_fire);
-        assert_eq!(s.irq_count, 90);
-        assert_eq!(s.irq_a, FCEUX11_RUST_FDS_IRQ_ENABLED); // still enabled
+        unsafe {
+            let mut s = FceuFdsIrqState {
+                irq_count: 100,
+                irq_latch: 200,
+                irq_a: FCEUX11_RUST_FDS_IRQ_ENABLED,
+                disk_seek_irq: 0,
+                fds_regs_5: 0,
+            };
+            let r = unsafe { fceux11_rust_fds_irq_tick(&mut s, 10) };
+            assert!(!r.timer_fire);
+            assert_eq!(s.irq_count, 90);
+            assert_eq!(s.irq_a, FCEUX11_RUST_FDS_IRQ_ENABLED); // still enabled
+        }
     }
 
     #[test]
     fn irq_tick_enabled_no_repeat_fires_once_and_disables() {
-        let mut s = FceuFdsIrqState {
-            irq_count: 5,
-            irq_latch: 200,
-            irq_a: FCEUX11_RUST_FDS_IRQ_ENABLED, // no IRQ_REPEAT
-            disk_seek_irq: 0,
-            fds_regs_5: 0,
-        };
-        let r = fceux11_rust_fds_irq_tick(&mut s, 10);
-        assert!(r.timer_fire);
-        assert_eq!(s.irq_count, 200); // reloaded from latch
-        assert_eq!(s.irq_a, 0); // ENABLED cleared
+        unsafe {
+            let mut s = FceuFdsIrqState {
+                irq_count: 5,
+                irq_latch: 200,
+                irq_a: FCEUX11_RUST_FDS_IRQ_ENABLED, // no IRQ_REPEAT
+                disk_seek_irq: 0,
+                fds_regs_5: 0,
+            };
+            let r = unsafe { fceux11_rust_fds_irq_tick(&mut s, 10) };
+            assert!(r.timer_fire);
+            assert_eq!(s.irq_count, 200); // reloaded from latch
+            assert_eq!(s.irq_a, 0); // ENABLED cleared
+        }
     }
 
     #[test]
     fn irq_tick_enabled_repeat_keeps_firing() {
-        let mut s = FceuFdsIrqState {
-            irq_count: 5,
-            irq_latch: 200,
-            irq_a: FCEUX11_RUST_FDS_IRQ_ENABLED | FCEUX11_RUST_FDS_IRQ_REPEAT,
-            disk_seek_irq: 0,
-            fds_regs_5: 0,
-        };
-        let r = fceux11_rust_fds_irq_tick(&mut s, 10);
-        assert!(r.timer_fire);
-        assert_eq!(s.irq_count, 200);
-        // Both ENABLED and REPEAT still set
-        assert_eq!(
-            s.irq_a,
-            FCEUX11_RUST_FDS_IRQ_ENABLED | FCEUX11_RUST_FDS_IRQ_REPEAT
-        );
+        unsafe {
+            let mut s = FceuFdsIrqState {
+                irq_count: 5,
+                irq_latch: 200,
+                irq_a: FCEUX11_RUST_FDS_IRQ_ENABLED | FCEUX11_RUST_FDS_IRQ_REPEAT,
+                disk_seek_irq: 0,
+                fds_regs_5: 0,
+            };
+            let r = unsafe { fceux11_rust_fds_irq_tick(&mut s, 10) };
+            assert!(r.timer_fire);
+            assert_eq!(s.irq_count, 200);
+            // Both ENABLED and REPEAT still set
+            assert_eq!(
+                s.irq_a,
+                FCEUX11_RUST_FDS_IRQ_ENABLED | FCEUX11_RUST_FDS_IRQ_REPEAT
+            );
+        }
     }
 
     #[test]
     fn irq_tick_seek_fires_when_motor_bit_set() {
-        let mut s = FceuFdsIrqState {
-            irq_count: 0,
-            irq_latch: 0,
-            irq_a: 0,
-            disk_seek_irq: 5,
-            fds_regs_5: 0x80, // motor running, seek IRQ enabled
-        };
-        let r = fceux11_rust_fds_irq_tick(&mut s, 10);
-        assert!(r.seek_fire);
-        assert_eq!(s.disk_seek_irq, -5);
+        unsafe {
+            let mut s = FceuFdsIrqState {
+                irq_count: 0,
+                irq_latch: 0,
+                irq_a: 0,
+                disk_seek_irq: 5,
+                fds_regs_5: 0x80, // motor running, seek IRQ enabled
+            };
+            let r = unsafe { fceux11_rust_fds_irq_tick(&mut s, 10) };
+            assert!(r.seek_fire);
+            assert_eq!(s.disk_seek_irq, -5);
+        }
     }
 
     #[test]
     fn irq_tick_seek_no_fire_when_motor_bit_clear() {
-        let mut s = FceuFdsIrqState {
-            irq_count: 0,
-            irq_latch: 0,
-            irq_a: 0,
-            disk_seek_irq: 5,
-            fds_regs_5: 0x00, // motor bit clear
-        };
-        let r = fceux11_rust_fds_irq_tick(&mut s, 10);
-        assert!(!r.seek_fire);
-        assert_eq!(s.disk_seek_irq, -5);
+        unsafe {
+            let mut s = FceuFdsIrqState {
+                irq_count: 0,
+                irq_latch: 0,
+                irq_a: 0,
+                disk_seek_irq: 5,
+                fds_regs_5: 0x00, // motor bit clear
+            };
+            let r = unsafe { fceux11_rust_fds_irq_tick(&mut s, 10) };
+            assert!(!r.seek_fire);
+            assert_eq!(s.disk_seek_irq, -5);
+        }
     }
 
     #[test]
     fn irq_tick_seek_not_yet_zero() {
-        let mut s = FceuFdsIrqState {
-            irq_count: 0,
-            irq_latch: 0,
-            irq_a: 0,
-            disk_seek_irq: 100,
-            fds_regs_5: 0x80,
-        };
-        let r = fceux11_rust_fds_irq_tick(&mut s, 10);
-        assert!(!r.seek_fire);
-        assert_eq!(s.disk_seek_irq, 90);
+        unsafe {
+            let mut s = FceuFdsIrqState {
+                irq_count: 0,
+                irq_latch: 0,
+                irq_a: 0,
+                disk_seek_irq: 100,
+                fds_regs_5: 0x80,
+            };
+            let r = unsafe { fceux11_rust_fds_irq_tick(&mut s, 10) };
+            assert!(!r.seek_fire);
+            assert_eq!(s.disk_seek_irq, 90);
+        }
     }
 
     #[test]
     fn irq_tick_zero_cycles_is_noop_for_decrement() {
-        let mut s = FceuFdsIrqState {
-            irq_count: 50,
-            irq_latch: 200,
-            irq_a: FCEUX11_RUST_FDS_IRQ_ENABLED,
-            disk_seek_irq: 50,
-            fds_regs_5: 0x80,
-        };
-        let r = fceux11_rust_fds_irq_tick(&mut s, 0);
-        assert!(!r.timer_fire);
-        assert!(!r.seek_fire);
-        assert_eq!(s.irq_count, 50);
-        assert_eq!(s.disk_seek_irq, 50);
+        unsafe {
+            let mut s = FceuFdsIrqState {
+                irq_count: 50,
+                irq_latch: 200,
+                irq_a: FCEUX11_RUST_FDS_IRQ_ENABLED,
+                disk_seek_irq: 50,
+                fds_regs_5: 0x80,
+            };
+            let r = unsafe { fceux11_rust_fds_irq_tick(&mut s, 0) };
+            assert!(!r.timer_fire);
+            assert!(!r.seek_fire);
+            assert_eq!(s.irq_count, 50);
+            assert_eq!(s.disk_seek_irq, 50);
+        }
     }
 
     // ----- compute_write_4025 -------------------------------------------
 
     #[test]
     fn write_4025_disk_not_inserted_noop() {
-        let r = fceux11_rust_fds_compute_write_4025(
-            FCEUX11_RUST_FDS_DSK_INIT,
-            0,
-            0,
-            0x42, // motor on edge would normally fire
-            0,    // disk_inserted = false
-        );
-        assert!(!r.motor_on_edge);
-        assert!(!r.transfer_reset);
-        assert!(!r.motor_on);
+        unsafe {
+            let r = fceux11_rust_fds_compute_write_4025(
+                FCEUX11_RUST_FDS_DSK_INIT,
+                0,
+                0,
+                0x42, // motor on edge would normally fire
+                0,    // disk_inserted = false
+            );
+            assert!(!r.motor_on_edge);
+            assert!(!r.transfer_reset);
+            assert!(!r.motor_on);
+        }
     }
 
     #[test]
     fn write_4025_motor_on_edge_advances_block() {
-        // Current control bit 6 = 0, value bit 6 = 1 → edge
-        let r = fceux11_rust_fds_compute_write_4025(
-            FCEUX11_RUST_FDS_DSK_INIT,
-            0,
-            0x00, // current_control bit 6 = 0
-            0x40, // value bit 6 = 1
-            1,    // disk_inserted
-        );
-        assert!(r.motor_on_edge);
-        assert!(!r.transfer_reset);
-        assert!(r.motor_on);
-        assert_eq!(r.new_block, FCEUX11_RUST_FDS_DSK_VOLUME);
-        assert_eq!(r.new_blocklen, 0x38);
+        unsafe {
+            // Current control bit 6 = 0, value bit 6 = 1 → edge
+            let r = fceux11_rust_fds_compute_write_4025(
+                FCEUX11_RUST_FDS_DSK_INIT,
+                0,
+                0x00, // current_control bit 6 = 0
+                0x40, // value bit 6 = 1
+                1,    // disk_inserted
+            );
+            assert!(r.motor_on_edge);
+            assert!(!r.transfer_reset);
+            assert!(r.motor_on);
+            assert_eq!(r.new_block, FCEUX11_RUST_FDS_DSK_VOLUME);
+            assert_eq!(r.new_blocklen, 0x38);
+        }
     }
 
     #[test]
     fn write_4025_motor_on_no_edge() {
-        // Both old and new have bit 6 set → no edge
-        let r = fceux11_rust_fds_compute_write_4025(
-            FCEUX11_RUST_FDS_DSK_VOLUME,
-            0,
-            0x40, // current_control bit 6 = 1
-            0x40, // value bit 6 = 1
-            1,
-        );
-        assert!(!r.motor_on_edge);
-        assert!(!r.transfer_reset);
-        assert!(r.motor_on); // motor is on but no edge
-        assert_eq!(r.new_block, FCEUX11_RUST_FDS_DSK_VOLUME); // unchanged
+        unsafe {
+            // Both old and new have bit 6 set → no edge
+            let r = fceux11_rust_fds_compute_write_4025(
+                FCEUX11_RUST_FDS_DSK_VOLUME,
+                0,
+                0x40, // current_control bit 6 = 1
+                0x40, // value bit 6 = 1
+                1,
+            );
+            assert!(!r.motor_on_edge);
+            assert!(!r.transfer_reset);
+            assert!(r.motor_on); // motor is on but no edge
+            assert_eq!(r.new_block, FCEUX11_RUST_FDS_DSK_VOLUME); // unchanged
+        }
     }
 
     #[test]
     fn write_4025_transfer_reset() {
-        let r = fceux11_rust_fds_compute_write_4025(
-            FCEUX11_RUST_FDS_DSK_FILEHDR,
-            100,
-            0x00,
-            0x02, // bit 1 = transfer reset
-            1,
-        );
-        assert!(!r.motor_on_edge);
-        assert!(r.transfer_reset);
-        assert!(!r.motor_on);
+        unsafe {
+            let r = fceux11_rust_fds_compute_write_4025(
+                FCEUX11_RUST_FDS_DSK_FILEHDR,
+                100,
+                0x00,
+                0x02, // bit 1 = transfer reset
+                1,
+            );
+            assert!(!r.motor_on_edge);
+            assert!(r.transfer_reset);
+            assert!(!r.motor_on);
+        }
     }
 
     #[test]
     fn write_4025_filedata_blocklen_uses_filesize() {
-        // FILEHDR → FILEDATA on motor edge with filesize
-        let r = fceux11_rust_fds_compute_write_4025(
-            FCEUX11_RUST_FDS_DSK_FILEHDR,
-            0x100, // file size = 256
-            0x00,
-            0x40,
-            1,
-        );
-        assert!(r.motor_on_edge);
-        assert_eq!(r.new_block, FCEUX11_RUST_FDS_DSK_FILEDATA);
-        assert_eq!(r.new_blocklen, 0x101);
+        unsafe {
+            // FILEHDR → FILEDATA on motor edge with filesize
+            let r = fceux11_rust_fds_compute_write_4025(
+                FCEUX11_RUST_FDS_DSK_FILEHDR,
+                0x100, // file size = 256
+                0x00,
+                0x40,
+                1,
+            );
+            assert!(r.motor_on_edge);
+            assert_eq!(r.new_block, FCEUX11_RUST_FDS_DSK_FILEDATA);
+            assert_eq!(r.new_blocklen, 0x101);
+        }
     }
 
     #[test]
     fn write_4025_motor_off_clears_motor_on() {
-        let r = fceux11_rust_fds_compute_write_4025(
-            FCEUX11_RUST_FDS_DSK_VOLUME,
-            0,
-            0x40,
-            0x00, // bit 6 cleared
-            1,
-        );
-        assert!(!r.motor_on_edge);
-        assert!(!r.motor_on);
+        unsafe {
+            let r = fceux11_rust_fds_compute_write_4025(
+                FCEUX11_RUST_FDS_DSK_VOLUME,
+                0,
+                0x40,
+                0x00, // bit 6 cleared
+                1,
+            );
+            assert!(!r.motor_on_edge);
+            assert!(!r.motor_on);
+        }
     }
 
     // ----- constants smoke check ----------------------------------------
 
     #[test]
     fn constants_match_spec() {
-        assert_eq!(FCEUX11_RUST_FDS_DISK_SIDE_SIZE, 65500);
-        assert_eq!(FCEUX11_RUST_FDS_BIOS_SIZE, 8192);
-        assert_eq!(FCEUX11_RUST_FDS_RAM_SIZE, 32768);
-        assert_eq!(FCEUX11_RUST_FDS_CHR_RAM_SIZE, 8192);
-        assert_eq!(FCEUX11_RUST_FDS_MAX_SIDES, 8);
-        assert_eq!(FCEUX11_RUST_FDS_DISK_SEEK_CYCLES, 150);
-        assert_eq!(FCEUX11_RUST_FDS_NOT_INSERTED, 255);
-        assert_eq!(FCEUX11_RUST_FDS_IRQ_REPEAT, 0x01);
-        assert_eq!(FCEUX11_RUST_FDS_IRQ_ENABLED, 0x02);
-        assert_eq!(FCEUX11_RUST_FDS_DSK_INIT, 0);
-        assert_eq!(FCEUX11_RUST_FDS_DSK_VOLUME, 1);
-        assert_eq!(FCEUX11_RUST_FDS_DSK_FILECNT, 2);
-        assert_eq!(FCEUX11_RUST_FDS_DSK_FILEHDR, 3);
-        assert_eq!(FCEUX11_RUST_FDS_DSK_FILEDATA, 4);
-        assert_eq!(FCEUX11_RUST_FDS_FCEU_IQEXT, 0x01);
-        assert_eq!(FCEUX11_RUST_FDS_FCEU_IQEXT2, 0x02);
+        unsafe {
+            assert_eq!(FCEUX11_RUST_FDS_DISK_SIDE_SIZE, 65500);
+            assert_eq!(FCEUX11_RUST_FDS_BIOS_SIZE, 8192);
+            assert_eq!(FCEUX11_RUST_FDS_RAM_SIZE, 32768);
+            assert_eq!(FCEUX11_RUST_FDS_CHR_RAM_SIZE, 8192);
+            assert_eq!(FCEUX11_RUST_FDS_MAX_SIDES, 8);
+            assert_eq!(FCEUX11_RUST_FDS_DISK_SEEK_CYCLES, 150);
+            assert_eq!(FCEUX11_RUST_FDS_NOT_INSERTED, 255);
+            assert_eq!(FCEUX11_RUST_FDS_IRQ_REPEAT, 0x01);
+            assert_eq!(FCEUX11_RUST_FDS_IRQ_ENABLED, 0x02);
+            assert_eq!(FCEUX11_RUST_FDS_DSK_INIT, 0);
+            assert_eq!(FCEUX11_RUST_FDS_DSK_VOLUME, 1);
+            assert_eq!(FCEUX11_RUST_FDS_DSK_FILECNT, 2);
+            assert_eq!(FCEUX11_RUST_FDS_DSK_FILEHDR, 3);
+            assert_eq!(FCEUX11_RUST_FDS_DSK_FILEDATA, 4);
+            assert_eq!(FCEUX11_RUST_FDS_FCEU_IQEXT, 0x01);
+            assert_eq!(FCEUX11_RUST_FDS_FCEU_IQEXT2, 0x02);
+        }
     }
 }

@@ -22,10 +22,9 @@
 //!   [4..8] totalsize (u32 LE)
 //!   payload is uncompressed.
 
-use std::ffi::c_void;
 use flate2::Compression;
-use flate2::write::ZlibEncoder;
 use flate2::read::ZlibDecoder;
+use flate2::write::ZlibEncoder;
 
 /// Maximum uncompressed size we are willing to accept (safety limit).
 const MAX_UNCOMPRESSED_SIZE: usize = 64 * 1024 * 1024; // 64 MiB
@@ -87,7 +86,9 @@ pub fn save_state_file(
         let mut encoder = ZlibEncoder::new(Vec::new(), level);
         std::io::Write::write_all(&mut encoder, &payload)
             .map_err(|_| StateError::CompressionFailed)?;
-        let compressed = encoder.finish().map_err(|_| StateError::CompressionFailed)?;
+        let compressed = encoder
+            .finish()
+            .map_err(|_| StateError::CompressionFailed)?;
         let comprlen_u32 = compressed.len() as u32;
         (compressed, comprlen_u32)
     };
@@ -230,7 +231,9 @@ pub struct FceuStateBuffer {
 /// On success, returns `true` and writes a `FceuStateBuffer` to `out_buf`.
 /// The caller must free `out_buf.ptr` via `fceux11_rust_state_file_buf_free`.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_state_file_save(
+/// # Safety
+/// Callers must ensure all raw pointer arguments passed to `fceux11_rust_state_file_save` are valid.
+pub unsafe extern "C" fn fceux11_rust_state_file_save(
     chunks: *const FceuStateChunkInput,
     chunk_count: usize,
     version: u32,
@@ -264,7 +267,9 @@ pub extern "C" fn fceux11_rust_state_file_save(
                 cap: vec.capacity(),
             };
             std::mem::forget(vec);
-            unsafe { *out_buf = buf; }
+            unsafe {
+                *out_buf = buf;
+            }
             true
         }
         Err(_) => false,
@@ -285,7 +290,9 @@ pub extern "C" fn fceux11_rust_state_file_save(
 ///
 /// The caller must free `out_chunks` via `fceux11_rust_state_file_chunks_free`.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_state_file_load(
+/// # Safety
+/// Callers must ensure all raw pointer arguments passed to `fceux11_rust_state_file_load` are valid.
+pub unsafe extern "C" fn fceux11_rust_state_file_load(
     file_data: *const u8,
     file_len: usize,
     out_chunks: *mut *mut FceuStateChunkOutput,
@@ -350,7 +357,9 @@ pub extern "C" fn fceux11_rust_state_file_buf_free(buf: FceuStateBuffer) {
 
 /// Free chunks previously returned by `fceux11_rust_state_file_load`.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_state_file_chunks_free(
+/// # Safety
+/// Callers must ensure all raw pointer arguments passed to `fceux11_rust_state_file_chunks_free` are valid.
+pub unsafe extern "C" fn fceux11_rust_state_file_chunks_free(
     chunks: *mut FceuStateChunkOutput,
     chunk_count: usize,
 ) {
@@ -395,164 +404,178 @@ mod tests {
 
     #[test]
     fn test_roundtrip_uncompressed() {
-        let chunks = make_test_chunks();
-        let file = save_state_file(&chunks, 0x020400, 0).unwrap();
+        unsafe {
+            let chunks = make_test_chunks();
+            let file = save_state_file(&chunks, 0x020400, 0).unwrap();
 
-        assert!(file.len() >= 16);
-        assert_eq!(&file[0..4], b"FCSX");
+            assert!(file.len() >= 16);
+            assert_eq!(&file[0..4], b"FCSX");
 
-        let (version, loaded_chunks, totalsize) = load_state_file(&file).unwrap();
-        assert_eq!(version, 0x020400);
-        assert_eq!(loaded_chunks, chunks);
-        assert_eq!(totalsize as usize, file.len() - 16);
+            let (version, loaded_chunks, totalsize) = load_state_file(&file).unwrap();
+            assert_eq!(version, 0x020400);
+            assert_eq!(loaded_chunks, chunks);
+            assert_eq!(totalsize as usize, file.len() - 16);
+        }
     }
 
     #[test]
     fn test_roundtrip_compressed() {
-        let chunks = make_test_chunks();
-        let file_compressed = save_state_file(&chunks, 0x020400, 6).unwrap();
-        let file_uncompressed = save_state_file(&chunks, 0x020400, 0).unwrap();
+        unsafe {
+            let chunks = make_test_chunks();
+            let file_compressed = save_state_file(&chunks, 0x020400, 6).unwrap();
+            let file_uncompressed = save_state_file(&chunks, 0x020400, 0).unwrap();
 
-        // Compressed should be smaller (or equal) for this tiny payload
-        // Actually tiny data may compress larger; just verify it parses.
-        let (version, loaded_chunks, _) = load_state_file(&file_compressed).unwrap();
-        assert_eq!(version, 0x020400);
-        assert_eq!(loaded_chunks, chunks);
+            // Compressed should be smaller (or equal) for this tiny payload
+            // Actually tiny data may compress larger; just verify it parses.
+            let (version, loaded_chunks, _) = load_state_file(&file_compressed).unwrap();
+            assert_eq!(version, 0x020400);
+            assert_eq!(loaded_chunks, chunks);
 
-        let (_, loaded2, _) = load_state_file(&file_uncompressed).unwrap();
-        assert_eq!(loaded2, chunks);
+            let (_, loaded2, _) = load_state_file(&file_uncompressed).unwrap();
+            assert_eq!(loaded2, chunks);
+        }
     }
 
     #[test]
     fn test_old_format_load() {
-        // Legacy header: "FCS" + version byte + totalsize + padding
-        let mut header = vec![b'F', b'C', b'S', 0x63]; // version = 99 * 100 = 9900
-        // payload = chunk1(1+4+4) + chunk2(1+4+3) = 17 bytes
-        header.extend_from_slice(&17u32.to_le_bytes());
-        header.extend_from_slice(&[0u8; 8]); // padding
+        unsafe {
+            // Legacy header: "FCS" + version byte + totalsize + padding
+            let mut header = vec![b'F', b'C', b'S', 0x63]; // version = 99 * 100 = 9900
+            // payload = chunk1(1+4+4) + chunk2(1+4+3) = 17 bytes
+            header.extend_from_slice(&17u32.to_le_bytes());
+            header.extend_from_slice(&[0u8; 8]); // padding
 
-        // chunk type=1, size=4, data=[AA BB CC DD]
-        header.push(1);
-        header.extend_from_slice(&4u32.to_le_bytes());
-        header.extend_from_slice(&[0xAA, 0xBB, 0xCC, 0xDD]);
-        // chunk type=2, size=3, data=[11 22 33]
-        header.push(2);
-        header.extend_from_slice(&3u32.to_le_bytes());
-        header.extend_from_slice(&[0x11, 0x22, 0x33]);
+            // chunk type=1, size=4, data=[AA BB CC DD]
+            header.push(1);
+            header.extend_from_slice(&4u32.to_le_bytes());
+            header.extend_from_slice(&[0xAA, 0xBB, 0xCC, 0xDD]);
+            // chunk type=2, size=3, data=[11 22 33]
+            header.push(2);
+            header.extend_from_slice(&3u32.to_le_bytes());
+            header.extend_from_slice(&[0x11, 0x22, 0x33]);
 
-        let (version, chunks, totalsize) = load_state_file(&header).unwrap();
-        assert_eq!(version, 9900);
-        assert_eq!(totalsize, 17);
-        assert_eq!(chunks.len(), 2);
-        assert_eq!(chunks[0].chunk_type, 1);
-        assert_eq!(chunks[0].data, vec![0xAA, 0xBB, 0xCC, 0xDD]);
-        assert_eq!(chunks[1].chunk_type, 2);
-        assert_eq!(chunks[1].data, vec![0x11, 0x22, 0x33]);
+            let (version, chunks, totalsize) = load_state_file(&header).unwrap();
+            assert_eq!(version, 9900);
+            assert_eq!(totalsize, 17);
+            assert_eq!(chunks.len(), 2);
+            assert_eq!(chunks[0].chunk_type, 1);
+            assert_eq!(chunks[0].data, vec![0xAA, 0xBB, 0xCC, 0xDD]);
+            assert_eq!(chunks[1].chunk_type, 2);
+            assert_eq!(chunks[1].data, vec![0x11, 0x22, 0x33]);
+        }
     }
 
     #[test]
     fn test_old_format_0xff_version() {
-        let mut header = vec![b'F', b'C', b'S', 0xFF];
-        header.extend_from_slice(&5u32.to_le_bytes()); // totalsize
-        header.extend_from_slice(&12345u32.to_le_bytes()); // version
-        header.extend_from_slice(&[0u8; 4]);
+        unsafe {
+            let mut header = vec![b'F', b'C', b'S', 0xFF];
+            header.extend_from_slice(&5u32.to_le_bytes()); // totalsize
+            header.extend_from_slice(&12345u32.to_le_bytes()); // version
+            header.extend_from_slice(&[0u8; 4]);
 
-        // 5 bytes payload
-        header.push(1);
-        header.extend_from_slice(&0u32.to_le_bytes());
+            // 5 bytes payload
+            header.push(1);
+            header.extend_from_slice(&0u32.to_le_bytes());
 
-        let (version, chunks, _) = load_state_file(&header).unwrap();
-        assert_eq!(version, 12345);
-        assert_eq!(chunks.len(), 1);
-        assert_eq!(chunks[0].chunk_type, 1);
-        assert_eq!(chunks[0].data.len(), 0);
+            let (version, chunks, _) = load_state_file(&header).unwrap();
+            assert_eq!(version, 12345);
+            assert_eq!(chunks.len(), 1);
+            assert_eq!(chunks[0].chunk_type, 1);
+            assert_eq!(chunks[0].data.len(), 0);
+        }
     }
 
     #[test]
     fn test_invalid_header() {
-        assert!(load_state_file(b"BAD").is_err());
-        assert!(load_state_file(b"FCSX\x00\x00\x00\x00").is_err()); // too short
+        unsafe {
+            assert!(load_state_file(b"BAD").is_err());
+            assert!(load_state_file(b"FCSX\x00\x00\x00\x00").is_err()); // too short
+        }
     }
 
     #[test]
     fn test_empty_chunks() {
-        let chunks: Vec<StateChunk> = vec![];
-        let file = save_state_file(&chunks, 1, 0).unwrap();
-        let (version, loaded, totalsize) = load_state_file(&file).unwrap();
-        assert_eq!(version, 1);
-        assert_eq!(totalsize, 0);
-        assert!(loaded.is_empty());
+        unsafe {
+            let chunks: Vec<StateChunk> = vec![];
+            let file = save_state_file(&chunks, 1, 0).unwrap();
+            let (version, loaded, totalsize) = load_state_file(&file).unwrap();
+            assert_eq!(version, 1);
+            assert_eq!(totalsize, 0);
+            assert!(loaded.is_empty());
+        }
     }
 
     #[test]
     fn test_ffi_save_load_roundtrip() {
-        let input_data1 = [0xAAu8, 0xBB, 0xCC];
-        let input_data2 = [0x11u8, 0x22];
-        let inputs = [
-            FceuStateChunkInput {
-                chunk_type: 1,
-                data: input_data1.as_ptr(),
-                len: input_data1.len(),
-            },
-            FceuStateChunkInput {
-                chunk_type: 2,
-                data: input_data2.as_ptr(),
-                len: input_data2.len(),
-            },
-        ];
-
-        let mut out_buf = FceuStateBuffer {
-            ptr: std::ptr::null_mut(),
-            len: 0,
-            cap: 0,
-        };
-
-        assert!(fceux11_rust_state_file_save(
-            inputs.as_ptr(),
-            inputs.len(),
-            42,
-            0,
-            &mut out_buf,
-        ));
-
-        assert!(!out_buf.ptr.is_null());
-        assert!(out_buf.len >= 16);
-
-        let mut out_chunks: *mut FceuStateChunkOutput = std::ptr::null_mut();
-        let mut out_chunk_count: usize = 0;
-        let mut out_version: u32 = 0;
-        let mut out_totalsize: u32 = 0;
-
-        assert!(fceux11_rust_state_file_load(
-            out_buf.ptr,
-            out_buf.len,
-            &mut out_chunks,
-            &mut out_chunk_count,
-            &mut out_version,
-            &mut out_totalsize,
-        ));
-
-        assert_eq!(out_version, 42);
-        assert_eq!(out_chunk_count, 2);
-        assert!(!out_chunks.is_null());
-
         unsafe {
-            let slice = std::slice::from_raw_parts(out_chunks, out_chunk_count);
-            assert_eq!(slice[0].chunk_type, 1);
-            assert_eq!(slice[0].len, 3);
-            assert_eq!(
-                std::slice::from_raw_parts(slice[0].data, slice[0].len),
-                &[0xAA, 0xBB, 0xCC]
-            );
-            assert_eq!(slice[1].chunk_type, 2);
-            assert_eq!(slice[1].len, 2);
-            assert_eq!(
-                std::slice::from_raw_parts(slice[1].data, slice[1].len),
-                &[0x11, 0x22]
-            );
-        }
+            let input_data1 = [0xAAu8, 0xBB, 0xCC];
+            let input_data2 = [0x11u8, 0x22];
+            let inputs = [
+                FceuStateChunkInput {
+                    chunk_type: 1,
+                    data: input_data1.as_ptr(),
+                    len: input_data1.len(),
+                },
+                FceuStateChunkInput {
+                    chunk_type: 2,
+                    data: input_data2.as_ptr(),
+                    len: input_data2.len(),
+                },
+            ];
 
-        fceux11_rust_state_file_chunks_free(out_chunks, out_chunk_count);
-        fceux11_rust_state_file_buf_free(out_buf);
+            let mut out_buf = FceuStateBuffer {
+                ptr: std::ptr::null_mut(),
+                len: 0,
+                cap: 0,
+            };
+
+            assert!(fceux11_rust_state_file_save(
+                inputs.as_ptr(),
+                inputs.len(),
+                42,
+                0,
+                &mut out_buf,
+            ));
+
+            assert!(!out_buf.ptr.is_null());
+            assert!(out_buf.len >= 16);
+
+            let mut out_chunks: *mut FceuStateChunkOutput = std::ptr::null_mut();
+            let mut out_chunk_count: usize = 0;
+            let mut out_version: u32 = 0;
+            let mut out_totalsize: u32 = 0;
+
+            assert!(fceux11_rust_state_file_load(
+                out_buf.ptr,
+                out_buf.len,
+                &mut out_chunks,
+                &mut out_chunk_count,
+                &mut out_version,
+                &mut out_totalsize,
+            ));
+
+            assert_eq!(out_version, 42);
+            assert_eq!(out_chunk_count, 2);
+            assert!(!out_chunks.is_null());
+
+            unsafe {
+                let slice = std::slice::from_raw_parts(out_chunks, out_chunk_count);
+                assert_eq!(slice[0].chunk_type, 1);
+                assert_eq!(slice[0].len, 3);
+                assert_eq!(
+                    std::slice::from_raw_parts(slice[0].data, slice[0].len),
+                    &[0xAA, 0xBB, 0xCC]
+                );
+                assert_eq!(slice[1].chunk_type, 2);
+                assert_eq!(slice[1].len, 2);
+                assert_eq!(
+                    std::slice::from_raw_parts(slice[1].data, slice[1].len),
+                    &[0x11, 0x22]
+                );
+            }
+
+            fceux11_rust_state_file_chunks_free(out_chunks, out_chunk_count);
+            fceux11_rust_state_file_buf_free(out_buf);
+        }
     }
 }

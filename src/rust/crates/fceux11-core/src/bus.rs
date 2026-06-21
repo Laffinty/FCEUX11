@@ -16,7 +16,6 @@ use std::time::Instant;
 pub struct SimpleBus {
     pub wram: [u8; 0x800],
     pub prg_rom: Vec<u8>,
-
 }
 
 impl SimpleBus {
@@ -77,7 +76,7 @@ pub fn bench_simple_bus(iterations: usize) -> std::time::Duration {
     for i in 0..iterations {
         let addr = ((i * 7 + 0x2000) & 0xFFFF) as u16;
         acc = acc.wrapping_add(bus.read_u8(addr));
-        bus.write_u8((addr & 0x7FF), acc);
+        bus.write_u8(addr & 0x7FF, acc);
     }
     // Prevent the compiler from eliminating the loop.
     std::hint::black_box(acc);
@@ -90,53 +89,67 @@ mod tests {
 
     #[test]
     fn test_wram_mirror() {
-        let mut bus = SimpleBus::new(vec![0u8; 32 * 1024]);
-        bus.write_u8(0x0000, 0xAB);
-        assert_eq!(bus.read_u8(0x0000), 0xAB);
-        assert_eq!(bus.read_u8(0x0800), 0xAB);
-        assert_eq!(bus.read_u8(0x1000), 0xAB);
-        assert_eq!(bus.read_u8(0x1800), 0xAB);
+        unsafe {
+            let mut bus = SimpleBus::new(vec![0u8; 32 * 1024]);
+            bus.write_u8(0x0000, 0xAB);
+            assert_eq!(bus.read_u8(0x0000), 0xAB);
+            assert_eq!(bus.read_u8(0x0800), 0xAB);
+            assert_eq!(bus.read_u8(0x1000), 0xAB);
+            assert_eq!(bus.read_u8(0x1800), 0xAB);
+        }
     }
 
     #[test]
     fn test_prg_rom_read() {
-        let mut rom = vec![0u8; 32 * 1024];
-        rom[0] = 0xDE;
-        rom[1] = 0xAD;
-        rom[2] = 0xBE;
-        rom[3] = 0xEF;
-        rom[0x3FFF] = 0xCA; // index at $BFFF
-        let bus = SimpleBus::new(rom);
-        assert_eq!(bus.read_u8(0x8000), 0xDE);
-        assert_eq!(bus.read_u8(0x8001), 0xAD);
-        assert_eq!(bus.read_u8(0xBFFF), 0xCA); // $BFFF - $8000 = $3FFF
+        unsafe {
+            let mut rom = vec![0u8; 32 * 1024];
+            rom[0] = 0xDE;
+            rom[1] = 0xAD;
+            rom[2] = 0xBE;
+            rom[3] = 0xEF;
+            rom[0x3FFF] = 0xCA; // index at $BFFF
+            let bus = SimpleBus::new(rom);
+            assert_eq!(bus.read_u8(0x8000), 0xDE);
+            assert_eq!(bus.read_u8(0x8001), 0xAD);
+            assert_eq!(bus.read_u8(0xBFFF), 0xCA); // $BFFF - $8000 = $3FFF
+        }
     }
 
     #[test]
     fn test_prg_rom_wrap() {
-        let mut rom = vec![0u8; 16 * 1024]; // 16 KiB → mirrors at $8000-$BFFF and $C000-$FFFF
-        rom[0] = 0x42;
-        let bus = SimpleBus::new(rom);
-        assert_eq!(bus.read_u8(0x8000), 0x42);
-        assert_eq!(bus.read_u8(0xC000), 0x42);
+        unsafe {
+            let mut rom = vec![0u8; 16 * 1024]; // 16 KiB → mirrors at $8000-$BFFF and $C000-$FFFF
+            rom[0] = 0x42;
+            let bus = SimpleBus::new(rom);
+            assert_eq!(bus.read_u8(0x8000), 0x42);
+            assert_eq!(bus.read_u8(0xC000), 0x42);
+        }
     }
 
     #[test]
     fn test_bus_decode_stub_regions() {
-        let mut bus = SimpleBus::new(vec![0u8; 32 * 1024]);
-        // PPU region should be a read stub (returns 0, no panic)
-        assert_eq!(bus.read_u8(0x2002), 0);
-        // APU region should be a write stub (no panic)
-        bus.write_u8(0x4000, 0xFF);
-        // Expansion region
-        assert_eq!(bus.read_u8(0x5000), 0);
+        unsafe {
+            let mut bus = SimpleBus::new(vec![0u8; 32 * 1024]);
+            // PPU region should be a read stub (returns 0, no panic)
+            assert_eq!(bus.read_u8(0x2002), 0);
+            // APU region should be a write stub (no panic)
+            bus.write_u8(0x4000, 0xFF);
+            // Expansion region
+            assert_eq!(bus.read_u8(0x5000), 0);
+        }
     }
 
     #[test]
     fn bench_runs_without_panic() {
-        let dur = bench_simple_bus(1_000_000);
-        // On a modern x86_64, 1M iterations should finish in < 1 ms.
-        // This is a sanity check, not a strict performance gate.
-        assert!(dur.as_millis() < 100, "bus benchmark unexpectedly slow: {:?}", dur);
+        unsafe {
+            let dur = bench_simple_bus(1_000_000);
+            // On a modern x86_64, 1M iterations should finish in < 1 ms.
+            // This is a sanity check, not a strict performance gate.
+            assert!(
+                dur.as_millis() < 100,
+                "bus benchmark unexpectedly slow: {:?}",
+                dur
+            );
+        }
     }
 }

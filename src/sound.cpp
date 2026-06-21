@@ -565,7 +565,7 @@ void FCEU_SoundCPUHook(int cycles)
    /* Unbelievably ugly hack */
    if(FSettings.SndRate)
    {
-		const uint32 fudge = std::min<uint32>(-DMCacc, soundtsoffs + timestamp);
+		const uint32 fudge = std::min<uint32>(-DMCacc, soundtsoffs + g_cpu.timestamp_ref());
 		soundtsoffs -= fudge;
 		DoPCM();
 		soundtsoffs += fudge;
@@ -1031,7 +1031,7 @@ int FlushEmulateSound(void)
   int x;
   int32 end,left;
 
-  if(!soundtimestamp) return(0);
+  if(!g_cpu.sound_timestamp_ref()) return(0);
 
   if(!FSettings.SndRate)
   {
@@ -1052,7 +1052,7 @@ int FlushEmulateSound(void)
 
    if(GameExpSound.HiFill) GameExpSound.HiFill();
 
-   for(x=soundtimestamp;x;x--)
+   for(x=g_cpu.sound_timestamp_ref();x;x--)
    {
     uint32 b=*tmpo;
     *tmpo=(b&65535)+wlookup2[(b>>16)&255]+wlookup1[b>>24];

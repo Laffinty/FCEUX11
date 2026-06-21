@@ -23,7 +23,7 @@ pub fn register(lua: &Lua) -> Result<Table> {
                 3 => String::from("finished"),
                 _ => String::from("none"),
             };
-            Ok(lua.create_string(&s)?)
+            lua.create_string(&s)
         })?,
     )?;
 
@@ -60,12 +60,12 @@ pub fn register(lua: &Lua) -> Result<Table> {
         lua.create_function(|lua, ()| {
             let ptr = unsafe { crate::fceux11_lua_movie_get_filename() };
             if ptr.is_null() {
-                return Ok(lua.create_string("")?);
+                return lua.create_string("");
             }
             let s = unsafe { std::ffi::CStr::from_ptr(ptr) }
                 .to_string_lossy()
                 .into_owned();
-            Ok(lua.create_string(&s)?)
+            lua.create_string(&s)
         })?,
     )?;
 
@@ -75,12 +75,12 @@ pub fn register(lua: &Lua) -> Result<Table> {
         lua.create_function(|lua, ()| {
             let ptr = unsafe { crate::fceux11_lua_movie_get_name() };
             if ptr.is_null() {
-                return Ok(lua.create_string("")?);
+                return lua.create_string("");
             }
             let s = unsafe { std::ffi::CStr::from_ptr(ptr) }
                 .to_string_lossy()
                 .into_owned();
-            Ok(lua.create_string(&s)?)
+            lua.create_string(&s)
         })?,
     )?;
 

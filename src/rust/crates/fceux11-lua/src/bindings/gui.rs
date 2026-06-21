@@ -9,7 +9,7 @@ use mlua::{Lua, Result, Table};
 
 /// 5x7 pixel font bitmap for ASCII characters 0x20-0x7F (space through ~)
 /// Each character is 5 bytes (one per column), bits top-to-bottom (bit 0 = top)
-const FONT_DATA: &'static [u8] = include_bytes!("font5x7.bin");
+const FONT_DATA: &[u8] = include_bytes!("font5x7.bin");
 
 /// Character glyph width in pixels
 const GLYPH_WIDTH: i32 = 5;
@@ -21,7 +21,7 @@ const CHAR_SPACING: i32 = 1;
 /// Lookup offset for ASCII char in FONT_DATA (space = 0x20)
 fn char_offset(c: char) -> Option<usize> {
     let code = c as u32;
-    if code < 0x20 || code > 0x7F {
+    if !(0x20..=0x7F).contains(&code) {
         return None;
     }
     Some((code - 0x20) as usize * (GLYPH_WIDTH as usize))

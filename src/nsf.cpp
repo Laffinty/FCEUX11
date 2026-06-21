@@ -268,7 +268,7 @@ static DECLFR(NSFVectorRead)
 		else if(A==0xFFFB) return(0x38);
 		else if(A==0xFFFC) return(0x20);
 		else if(A==0xFFFD) {doreset=0;return(0x38);}
-		return(X.DB);
+		return(g_cpu.native_layout().DB);
 	}
 	else
 		return(CartBR(A));

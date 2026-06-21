@@ -76,7 +76,7 @@ static DECLFW(M222Write) {
 //	case 0xF002: FCEU_printf("%04x:%02x %d\n",A,V,scanline); break;
 //	case 0xD001: IRQa=V; X6502_IRQEnd(FCEU_IQEXT); FCEU_printf("%04x:%02x %d\n",A,V,scanline); break;
 //	case 0xC001: IRQPre=16; FCEU_printf("%04x:%02x %d\n",A,V,scanline); break;
-	case 0xF000: IRQa = IRQCount = V; if (scanline < 240) IRQCount -= 8; else IRQCount += 4; X6502_IRQEnd(FCEU_IQEXT); break;
+	case 0xF000: IRQa = IRQCount = V; if (g_cpu.scanline_ref() < 240) IRQCount -= 8; else IRQCount += 4; X6502_IRQEnd(FCEU_IQEXT); break;
 	}
 	Sync();
 }

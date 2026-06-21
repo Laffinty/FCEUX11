@@ -19,6 +19,7 @@
  */
 
 #include "types.h"
+#include "cpu.h"
 #include "x6502.h"
 #include "fceu.h"
 #include "ppu.h"
@@ -285,7 +286,7 @@ static DECLFW(BNull) {
 }
 
 static DECLFR(ANull) {
-	return(X.DB);
+	return(g_cpu.native_layout().DB);
 }
 
 int AllocGenieRW(void) {
@@ -410,7 +411,7 @@ void ResetGameLoaded(void) {
 	if (GameExpSound.Kill)
 		GameExpSound.Kill();
 	memset(&GameExpSound, 0, sizeof(GameExpSound));
-	MapIRQHook = NULL;
+	g_cpu.map_irq_hook_ref() = nullptr;
 	MMC5Hack = 0;
 	PEC586Hack = 0;
 	QTAIHack = 0;
@@ -654,7 +655,7 @@ bool fceu11::Initialize() {
 
 	FCEUPPU_Init();
 
-	X6502_Init();
+	g_cpu.init();
 
 	return true;
 }
@@ -885,9 +886,9 @@ void fceu11::Emulate(uint8 **pXBuf, int32 **SoundBuf, int32 *SoundBufSize, int s
 		exit(0);
 #endif
 
-	timestampbase += timestamp;
-	timestamp = 0;
-	soundtimestamp = 0;
+	timestampbase += g_cpu.timestamp_ref();
+	g_cpu.timestamp_ref() = 0;
+	g_cpu.sound_timestamp_ref() = 0;
 
 	*pXBuf = skip ? 0 : XBuf;
 	if (skip == 2) { //If skip = 2, then bypass sound
@@ -933,7 +934,7 @@ void ResetNES(void) {
 	GameInterface(GI_RESETM2);
 	FCEUSND_Reset();
 	FCEUPPU_Reset();
-	X6502_Reset();
+	g_cpu.reset();
 
 	// clear back baffer
 	extern uint8 *XBackBuf;
@@ -1069,7 +1070,7 @@ void PowerNES(void) {
 		GameInterface(GI_RESETSAVE);
 
 	timestampbase = 0;
-	X6502_Power();
+	g_cpu.power();
 #ifdef __WIN_DRIVER__
 	ResetDebugStatisticsCounters();
 #endif

@@ -81,7 +81,7 @@ static DECLFW(UNLPEC586Write) {
 
 static DECLFR(UNLPEC586Read) {
 //	FCEU_printf("read %04x\n", A);
-	return (X.DB & 0xD8) | br_tbl[reg[4] >> 4];
+	return (g_cpu.native_layout().DB & 0xD8) | br_tbl[reg[4] >> 4];
 }
 
 static DECLFR(UNLPEC586ReadHi) {

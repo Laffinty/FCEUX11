@@ -75,6 +75,7 @@ fn is_register(c: u8) -> bool {
     matches!(c, b'A' | b'X' | b'Y' | b'P' | b'S')
 }
 
+#[allow(dead_code)]
 fn is_hexdigit(c: u8) -> bool {
     c.is_ascii_hexdigit()
 }
@@ -87,7 +88,11 @@ fn is_hexdigit(c: u8) -> bool {
 /// Returns an opaque pointer to the ConditionAst, or null on error.
 /// Format: <subject><op><value> where subject is a flag/register/address.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_conddebug_generate_condition(str: *const c_char) -> *mut std::ffi::c_void {
+/// # Safety
+/// Callers must ensure all raw pointer arguments passed to `fceux11_rust_conddebug_generate_condition` are valid.
+pub unsafe extern "C" fn fceux11_rust_conddebug_generate_condition(
+    str: *const c_char,
+) -> *mut std::ffi::c_void {
     if str.is_null() {
         return ptr::null_mut();
     }
@@ -117,12 +122,12 @@ pub extern "C" fn fceux11_rust_conddebug_generate_condition(str: *const c_char) 
         op_str = "||";
         op_code = OP_OR;
     }
-    if let Some(pos) = input.find("&&") {
-        if op_pos.map(|p| pos < p).unwrap_or(true) {
-            op_pos = Some(pos);
-            op_str = "&&";
-            op_code = OP_AND;
-        }
+    if let Some(pos) = input.find("&&")
+        && op_pos.map(|p| pos < p).unwrap_or(true)
+    {
+        op_pos = Some(pos);
+        op_str = "&&";
+        op_code = OP_AND;
     }
 
     // Then plain = (equality) - but NOT if it's part of ==
@@ -215,7 +220,11 @@ pub extern "C" fn fceux11_rust_conddebug_generate_condition(str: *const c_char) 
             // Plain number
             cond.type2 = TYPE_NUM;
             if right.starts_with("0x") || right.starts_with("0X") {
-                cond.value2 = u32::from_str_radix(right.trim_start_matches("0x").trim_start_matches("0X"), 16).unwrap_or(0);
+                cond.value2 = u32::from_str_radix(
+                    right.trim_start_matches("0x").trim_start_matches("0X"),
+                    16,
+                )
+                .unwrap_or(0);
             } else {
                 cond.value2 = right.parse().unwrap_or(0);
             }
@@ -242,8 +251,10 @@ mod tests {
     use super::*;
 
     fn parse(s: &str) -> *mut ConditionAst {
-        let c_str = std::ffi::CString::new(s).unwrap();
-        fceux11_rust_conddebug_generate_condition(c_str.as_ptr()) as *mut ConditionAst
+        unsafe {
+            let c_str = std::ffi::CString::new(s).unwrap();
+            fceux11_rust_conddebug_generate_condition(c_str.as_ptr()) as *mut ConditionAst
+        }
     }
 
     fn destroy(c: *mut ConditionAst) {
@@ -254,89 +265,105 @@ mod tests {
 
     #[test]
     fn test_simple_flag() {
-        let c = parse("N=1");
-        assert!(!c.is_null(), "N=1 should parse");
         unsafe {
-            assert_eq!((*c).type1, TYPE_FLAG);
-            assert_eq!((*c).value1, b'N' as u32);
-            assert_eq!((*c).op, OP_EQ);
-            assert_eq!((*c).type2, TYPE_NUM);
-            assert_eq!((*c).value2, 1);
+            let c = parse("N=1");
+            assert!(!c.is_null(), "N=1 should parse");
+            unsafe {
+                assert_eq!((*c).type1, TYPE_FLAG);
+                assert_eq!((*c).value1, b'N' as u32);
+                assert_eq!((*c).op, OP_EQ);
+                assert_eq!((*c).type2, TYPE_NUM);
+                assert_eq!((*c).value2, 1);
+            }
+            destroy(c);
         }
-        destroy(c);
     }
 
     #[test]
     fn test_register_address() {
-        let c = parse("A=$FF");
-        assert!(!c.is_null(), "A=$FF should parse");
         unsafe {
-            assert_eq!((*c).type1, TYPE_REG);
-            assert_eq!((*c).value1, b'A' as u32);
-            assert_eq!((*c).op, OP_EQ);
-            assert_eq!((*c).type2, TYPE_ADDR);
-            assert_eq!((*c).value2, 0xFF);
+            let c = parse("A=$FF");
+            assert!(!c.is_null(), "A=$FF should parse");
+            unsafe {
+                assert_eq!((*c).type1, TYPE_REG);
+                assert_eq!((*c).value1, b'A' as u32);
+                assert_eq!((*c).op, OP_EQ);
+                assert_eq!((*c).type2, TYPE_ADDR);
+                assert_eq!((*c).value2, 0xFF);
+            }
+            destroy(c);
         }
-        destroy(c);
     }
 
     #[test]
     fn test_address_condition() {
-        let c = parse("$C000=0");
-        assert!(!c.is_null(), "$C000=0 should parse");
         unsafe {
-            assert_eq!((*c).type1, TYPE_ADDR);
-            assert_eq!((*c).value1, 0xC000);
-            assert_eq!((*c).op, OP_EQ);
-            assert_eq!((*c).type2, TYPE_NUM);
-            assert_eq!((*c).value2, 0);
+            let c = parse("$C000=0");
+            assert!(!c.is_null(), "$C000=0 should parse");
+            unsafe {
+                assert_eq!((*c).type1, TYPE_ADDR);
+                assert_eq!((*c).value1, 0xC000);
+                assert_eq!((*c).op, OP_EQ);
+                assert_eq!((*c).type2, TYPE_NUM);
+                assert_eq!((*c).value2, 0);
+            }
+            destroy(c);
         }
-        destroy(c);
     }
 
     #[test]
     fn test_compound_or() {
-        let c = parse("Z=0||N=1");
-        assert!(!c.is_null(), "Z=0||N=1 should parse");
         unsafe {
-            assert_eq!((*c).op, OP_OR);
+            let c = parse("Z=0||N=1");
+            assert!(!c.is_null(), "Z=0||N=1 should parse");
+            unsafe {
+                assert_eq!((*c).op, OP_OR);
+            }
+            destroy(c);
         }
-        destroy(c);
     }
 
     #[test]
     fn test_compound_and() {
-        let c = parse("A=5&&B=3");
-        assert!(!c.is_null(), "A=5&&B=3 should parse");
         unsafe {
-            assert_eq!((*c).op, OP_AND);
+            let c = parse("A=5&&B=3");
+            assert!(!c.is_null(), "A=5&&B=3 should parse");
+            unsafe {
+                assert_eq!((*c).op, OP_AND);
+            }
+            destroy(c);
         }
-        destroy(c);
     }
 
     #[test]
     fn test_pc_bank() {
-        let c = parse("K=1");
-        assert!(!c.is_null(), "K=1 should parse");
         unsafe {
-            assert_eq!((*c).type1, TYPE_PC_BANK);
-            assert_eq!((*c).value1, b'K' as u32);
+            let c = parse("K=1");
+            assert!(!c.is_null(), "K=1 should parse");
+            unsafe {
+                assert_eq!((*c).type1, TYPE_PC_BANK);
+                assert_eq!((*c).value1, b'K' as u32);
+            }
+            destroy(c);
         }
-        destroy(c);
     }
 
     #[test]
     fn test_invalid_empty() {
-        assert!(parse("").is_null(), "empty string should return null");
+        unsafe {
+            assert!(parse("").is_null(), "empty string should return null");
+        }
     }
 
     #[test]
     fn test_value_read() {
-        let c = parse("R=$1000");
-        assert!(!c.is_null());
         unsafe {
-            assert_eq!((*c).type1, TYPE_VALUE_READ);
+            let c = parse("R=$1000");
+            assert!(!c.is_null());
+            unsafe {
+                assert_eq!((*c).type1, TYPE_VALUE_READ);
+            }
+            destroy(c);
         }
-        destroy(c);
     }
 }

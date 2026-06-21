@@ -499,7 +499,6 @@ extern const uint32 NoiseFreqTableNTSC[0x10];
 extern const uint32 NoiseFreqTablePAL[0x10];
 extern uint64 timestampbase;
 extern uint64 total_cycles_base;
-extern uint32 timestamp;
 extern uint64 total_instructions;
 extern bool break_asap;
 extern void ResetDebugStatisticsCounters();
@@ -543,12 +542,12 @@ void fceux11_lua_BWrite(uint32_t addr, uint8_t val) {
 uint16_t fceux11_lua_GetRegister(int reg_id) {
 	// reg_id: 0=PC,1=A,2=X,3=Y,4=S,5=P
 	switch (reg_id) {
-		case 0: return X.PC;
-		case 1: return X.A;
-		case 2: return X.X;
-		case 3: return X.Y;
-		case 4: return X.S;
-		case 5: return X.P;
+		case 0: return g_cpu.native_layout().PC;
+		case 1: return g_cpu.native_layout().A;
+		case 2: return g_cpu.native_layout().X;
+		case 3: return g_cpu.native_layout().Y;
+		case 4: return g_cpu.native_layout().S;
+		case 5: return g_cpu.native_layout().P;
 		default: return 0;
 	}
 }
@@ -1010,7 +1009,7 @@ void fceux11_lua_debugger_hitbreakpoint() {
 }
 
 uint64 fceux11_lua_debugger_get_cycles_count() {
-    int64 counter_value = timestampbase + (uint64)timestamp - total_cycles_base;
+    int64 counter_value = timestampbase + (uint64)g_cpu.timestamp_ref() - total_cycles_base;
     if (counter_value < 0) {
         ResetDebugStatisticsCounters();
         counter_value = 0;

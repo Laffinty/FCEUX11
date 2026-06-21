@@ -46,7 +46,7 @@ static DECLFW(MBWRAM) {
 
 static DECLFR(MAWRAM) {
 	if ((DRegs[3] & 0x10) && !is155)
-		return X.DB;          // WRAM is disabled
+		return g_cpu.native_layout().DB;          // WRAM is disabled
 	return(Page[A >> 11][A]);
 }
 
@@ -133,14 +133,14 @@ static DECLFW(MMC1_write) {
 		precision isn't that great), but this should still work to
 		deal with 2 writes in a row from a single RMW instruction.
 	*/
-	if ((timestampbase + timestamp) < (lreset + 2))
+	if ((timestampbase + g_cpu.timestamp_ref()) < (lreset + 2))
 		return;
 //	FCEU_printf("Write %04x:%02x\n",A,V);
 	if (V & 0x80) {
 		DRegs[0] |= 0xC;
 		BufferShift = Buffer = 0;
 		MMC1PRG();
-		lreset = timestampbase + timestamp;
+		lreset = timestampbase + g_cpu.timestamp_ref();
 		return;
 	}
 
@@ -260,7 +260,7 @@ void Mapper105_Init(CartInfo *info) {
 	GenMMC1Init(info, 256, 256, 8, 0);
 	MMC1CHRHook4 = NWCCHRHook;
 	MMC1PRGHook16 = NWCPRGHook;
-	MapIRQHook = NWCIRQHook;
+	g_cpu.map_irq_hook_ref() = NWCIRQHook;
 	info->Power = NWCPower;
 }
 

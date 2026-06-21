@@ -133,7 +133,7 @@ void Mapper6_Init(CartInfo *info) {
 
 	info->Power = FFEPower;
 	info->Close = FFEClose;
-	MapIRQHook = FFEIRQHook;
+	g_cpu.map_irq_hook_ref() = FFEIRQHook;
 	GameStateRestore = StateRestore;
 
 	WRAMSIZE = 8192;

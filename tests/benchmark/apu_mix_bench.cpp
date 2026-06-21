@@ -1,9 +1,11 @@
 // FCEUX11 v0.3.0 — APU Audio Mix Benchmark
 // Measures audio generation throughput by emulating 60 frames and capturing
 // the sound buffer output size.
+// v1.3 Legion Phase 7.3: added --json output for bench_baseline.json generation.
 
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <cmath>
 #include <chrono>
 
@@ -59,20 +61,26 @@ static double benchmark_apu_frames(int frames)
 
 int main(int argc, char** argv)
 {
-    (void)argc;
-    (void)argv;
+    bool json_mode = false;
+    for (int i = 1; i < argc; ++i) {
+        if (std::strcmp(argv[i], "--json") == 0) json_mode = true;
+    }
 
-    printf("=== FCEUX11 APU Mix Benchmark (v0.3.0 baseline) ===\n");
-    printf("ROM: %s\n", ROM_PATH);
-    printf("Frames per iteration: %d\n\n", FRAMES);
+    if (!json_mode) {
+        printf("=== FCEUX11 APU Mix Benchmark (v0.3.0 baseline) ===\n");
+        printf("ROM: %s\n", ROM_PATH);
+        printf("Frames per iteration: %d\n\n", FRAMES);
+    }
 
     const int iterations = 5;
     double best = 1e9, worst = 0.0, total = 0.0;
     for (int i = 0; i < iterations; ++i) {
         double ms = benchmark_apu_frames(FRAMES);
         if (ms < 0.0) return 1;
-        printf("Iteration %d/%d: %.3f ms (%.3f ms/frame)\n",
-               i + 1, iterations, ms, ms / FRAMES);
+        if (!json_mode) {
+            printf("Iteration %d/%d: %.3f ms (%.3f ms/frame)\n",
+                   i + 1, iterations, ms, ms / FRAMES);
+        }
         if (ms < best) best = ms;
         if (ms > worst) worst = ms;
         total += ms;
@@ -86,6 +94,31 @@ int main(int argc, char** argv)
         stddev += diff * diff;
     }
     stddev = std::sqrt(stddev / iterations);
+
+    if (json_mode) {
+        // v1.3 Legion Phase 7.3: see x6502_exec_bench.cpp for the
+        // format contract. Same JSON shape, different name/binary.
+        printf(
+            "{"
+            "\"name\":\"bench_full_frame\","
+            "\"binary\":\"fceux11_bench_apu_mix\","
+            "\"rom\":\"%s\","
+            "\"frames_per_iter\":%d,"
+            "\"iterations\":%d,"
+            "\"metric\":\"median_total_ms\","
+            "\"median_total_ms\":%.3f,"
+            "\"best_ms\":%.3f,"
+            "\"worst_ms\":%.3f,"
+            "\"stddev_ms\":%.3f,"
+            "\"stddev_pct\":%.1f,"
+            "\"unit\":\"milliseconds for %d frames (CPU+PPU+APU)\""
+            "}\n",
+            ROM_PATH, FRAMES, iterations,
+            avg, best, worst, stddev,
+            (stddev / avg) * 100.0,
+            FRAMES);
+        return 0;
+    }
 
     printf("\n--- Summary ---\n");
     printf("Average: %.3f ms  (%.3f ms/frame)\n", avg, avg / FRAMES);

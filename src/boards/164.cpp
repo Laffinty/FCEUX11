@@ -66,15 +66,15 @@ static DECLFR(ReadLow) {
 
 static void M163HB(void) {
 	if (reg[1] & 0x80) {
-		if (scanline == 239) {
+		if (g_cpu.scanline_ref() == 239) {
 			setchr4(0x0000, 0);
 			setchr4(0x1000, 0);
-		} else if (scanline == 127) {
+		} else if (g_cpu.scanline_ref() == 127) {
 			setchr4(0x0000, 1);
 			setchr4(0x1000, 1);
 		}
 /*
-			if(scanline>=127)     // Hu Lu Jin Gang (NJ039) (Ch) [!] don't like it
+			if(g_cpu.scanline_ref()>=127)     // Hu Lu Jin Gang (NJ039) (Ch) [!] don't like it
 			{
 				setchr4(0x0000,1);
 				setchr4(0x1000,1);
@@ -142,7 +142,7 @@ static DECLFW(Write2) {
 	else
 		switch (A & 0x7300) {
 		case 0x5200: reg[0] = V; WSync(); break;
-		case 0x5000: reg[1] = V; WSync(); if (!(reg[1] & 0x80) && (scanline < 128)) setchr8(0); /* setchr8(0); */ break;
+		case 0x5000: reg[1] = V; WSync(); if (!(reg[1] & 0x80) && (g_cpu.scanline_ref() < 128)) setchr8(0); /* setchr8(0); */ break;
 		case 0x5300: reg[2] = V; break;
 		case 0x5100: reg[3] = V; WSync(); break;
 		}

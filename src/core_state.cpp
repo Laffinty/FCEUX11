@@ -8,7 +8,8 @@
 
 #include "core_state.h"
 
-#include "x6502.h"      // X6502, ::X, ::timestamp, ::soundtimestamp, ::scanline, ::MapIRQHook
+#include "cpu.h"        // fceu11::cpu_instance()
+#include "x6502.h"      // X6502, legacy inline aliases
 #include "x6502struct.h" // X6502 (struct definition)
 #include "ppu.h"        // ::PPU, ::NTARAM, ::vnapage, ::VPage, ::PPUNTARAM, ::PPUCHRRAM, ::ppuphase, ::PPU_hook, ::GameHBIRQHook
 #include "sound.h"      // ::Wave, ::WaveFinal, ::WaveHi, ::nesincsize, ::soundtsinc, ::soundtsoffs, ::swapDuty, ::GameExpSound
@@ -22,11 +23,11 @@ namespace fceu11 {
 // ---------------------------------------------------------------------------
 // CpuView
 // ---------------------------------------------------------------------------
-__X6502& CpuView::reg() noexcept { return ::X; }
-uint32_t& CpuView::timestamp() noexcept { return ::timestamp; }
-uint32_t& CpuView::sound_timestamp() noexcept { return ::soundtimestamp; }
-int& CpuView::scanline() noexcept { return ::scanline; }
-void (*& CpuView::irq_hook())(int) noexcept { return ::MapIRQHook; }
+__X6502& CpuView::reg() noexcept { return fceu11::cpu_instance().native_layout(); }
+uint32_t& CpuView::timestamp() noexcept { return fceu11::cpu_instance().timestamp_ref(); }
+uint32_t& CpuView::sound_timestamp() noexcept { return fceu11::cpu_instance().sound_timestamp_ref(); }
+int& CpuView::scanline() noexcept { return fceu11::cpu_instance().scanline_ref(); }
+void (*& CpuView::irq_hook())(int) noexcept { return fceu11::cpu_instance().map_irq_hook_ref(); }
 
 uint64_t& CpuView::timestamp_base() noexcept { return ::timestampbase; }
 int& CpuView::normal_scanlines() noexcept { return ::normalscanlines; }

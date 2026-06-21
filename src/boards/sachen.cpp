@@ -57,10 +57,10 @@ static DECLFW(S74LS374NWrite) {
 static DECLFR(S74LS374NRead) {
 	uint8 ret;
 	if ((A & 0x4100) == 0x4100)
-//		ret=(X.DB&0xC0)|((~cmd)&0x3F);
+//		ret=(g_cpu.native_layout().DB&0xC0)|((~cmd)&0x3F);
 		ret = ((~cmd) & 0x3F) ^ dip;
 	else
-		ret = X.DB;
+		ret = g_cpu.native_layout().DB;
 	return ret;
 }
 
@@ -363,7 +363,7 @@ static DECLFW(TCU02Write) {
 }
 
 static DECLFR(TCU02Read) {
-	return (latch[0] & 0x3F) | (X.DB & 0xC0);
+	return (latch[0] & 0x3F) | (g_cpu.native_layout().DB & 0xC0);
 }
 
 static void TCU02Power(void) {
@@ -389,9 +389,9 @@ void TCU02_Init(CartInfo *info) {
 static DECLFR(TCA01Read) {
 	uint8 ret;
 	if ((A & 0x4100) == 0x4100)
-		ret = (X.DB & 0xC0) | ((~A) & 0x3F);
+		ret = (g_cpu.native_layout().DB & 0xC0) | ((~A) & 0x3F);
 	else
-		ret = X.DB;
+		ret = g_cpu.native_layout().DB;
 	return ret;
 }
 

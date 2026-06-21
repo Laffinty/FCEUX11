@@ -45,7 +45,7 @@ static void ZapperFrapper(int w, uint8 *bg, uint8 *spr, uint32 linets, int final
 
 	if(xe>256) xe=256;
 
-	if(scanline>=(zy-4) && scanline<=(zy+4))
+	if(g_cpu.scanline_ref()>=(zy-4) && g_cpu.scanline_ref()<=(zy+4))
 	{
 		while(xs<xe)
 		{
@@ -95,7 +95,7 @@ static INLINE int CheckColor(int w)
         bool  block = (b&2)!=0;
 
         int mousetime = y*256+x;
-        int nowtime = scanline*256 + g_rasterpos;
+        int nowtime = g_cpu.scanline_ref()*256 + g_rasterpos;
 
         if(!block && mousetime < nowtime && mousetime >= nowtime - 384)
         {
@@ -116,7 +116,7 @@ static INLINE int CheckColor(int w)
     }
 
 
-    if((ZD[w].zaphit+100)>=(timestampbase+timestamp))
+    if((ZD[w].zaphit+100)>=(timestampbase+g_cpu.timestamp_ref()))
     {
         return 0;
     }

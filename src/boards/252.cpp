@@ -115,7 +115,7 @@ static void StateRestore(int version) {
 void Mapper252_Init(CartInfo *info) {
 	info->Power = M252Power;
 	info->Close = M252Close;
-	MapIRQHook = M252IRQ;
+	g_cpu.map_irq_hook_ref() = M252IRQ;
 
 	CHRRAMSIZE = 2048;
 	CHRRAM_owner = FCEU_gmalloc_unique(CHRRAMSIZE);  // v0.3.6: RAII-wrapped

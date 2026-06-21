@@ -26,7 +26,7 @@ fn write_hex_u16(val: u16, out: &mut [c_char]) {
 /// # Safety
 /// `guid` must point to a valid, writable `FceuGuid`.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_guid_new(guid: *mut FceuGuid) {
+pub unsafe extern "C" fn fceux11_rust_guid_new(guid: *mut FceuGuid) {
     let guid = unsafe { &mut *guid };
     let id = uuid::Uuid::new_v4();
     guid.data.copy_from_slice(id.as_bytes());
@@ -38,7 +38,7 @@ pub extern "C" fn fceux11_rust_guid_new(guid: *mut FceuGuid) {
 /// `guid` must point to a valid 16-byte GUID.
 /// Returns a pointer to a thread-local static buffer. Caller should copy immediately.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_guid_to_string(guid: *const FceuGuid) -> *const c_char {
+pub unsafe extern "C" fn fceux11_rust_guid_to_string(guid: *const FceuGuid) -> *const c_char {
     if guid.is_null() {
         return std::ptr::null();
     }
@@ -100,7 +100,7 @@ pub extern "C" fn fceux11_rust_guid_to_string(guid: *const FceuGuid) -> *const c
 /// `guid` must point to a valid, writable `FceuGuid`.
 /// `str` must point to a null-terminated string in the format "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX".
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_guid_scan(guid: *mut FceuGuid, str: *const c_char) {
+pub unsafe extern "C" fn fceux11_rust_guid_scan(guid: *mut FceuGuid, str: *const c_char) {
     if guid.is_null() || str.is_null() {
         return;
     }
@@ -163,39 +163,43 @@ mod tests {
 
     #[test]
     fn test_guid_roundtrip() {
-        let mut guid = FceuGuid { data: [0; 16] };
-        fceux11_rust_guid_new(&mut guid);
+        unsafe {
+            let mut guid = FceuGuid { data: [0; 16] };
+            fceux11_rust_guid_new(&mut guid);
 
-        let ptr = fceux11_rust_guid_to_string(&guid);
-        let cstr = unsafe { std::ffi::CStr::from_ptr(ptr) };
-        let s = cstr.to_str().unwrap();
-        let bytes = s.as_bytes();
+            let ptr = fceux11_rust_guid_to_string(&guid);
+            let cstr = unsafe { std::ffi::CStr::from_ptr(ptr) };
+            let s = cstr.to_str().unwrap();
+            let bytes = s.as_bytes();
 
-        // Verify format: 8-4-4-4-12
-        assert_eq!(s.len(), 36);
-        assert_eq!(bytes[8], b'-');
-        assert_eq!(bytes[13], b'-');
-        assert_eq!(bytes[18], b'-');
-        assert_eq!(bytes[23], b'-');
+            // Verify format: 8-4-4-4-12
+            assert_eq!(s.len(), 36);
+            assert_eq!(bytes[8], b'-');
+            assert_eq!(bytes[13], b'-');
+            assert_eq!(bytes[18], b'-');
+            assert_eq!(bytes[23], b'-');
 
-        // Parse it back
-        let mut guid2 = FceuGuid { data: [0; 16] };
-        fceux11_rust_guid_scan(&mut guid2, s.as_ptr() as *const c_char);
+            // Parse it back
+            let mut guid2 = FceuGuid { data: [0; 16] };
+            fceux11_rust_guid_scan(&mut guid2, s.as_ptr() as *const c_char);
 
-        assert_eq!(guid.data, guid2.data);
+            assert_eq!(guid.data, guid2.data);
+        }
     }
 
     #[test]
     fn test_guid_scan_format() {
-        let mut guid = FceuGuid { data: [0; 16] };
-        let test_str = "12345678-1234-1234-1234-123456789012";
-        fceux11_rust_guid_scan(&mut guid, test_str.as_ptr() as *const c_char);
+        unsafe {
+            let mut guid = FceuGuid { data: [0; 16] };
+            let test_str = "12345678-1234-1234-1234-123456789012";
+            fceux11_rust_guid_scan(&mut guid, test_str.as_ptr() as *const c_char);
 
-        // Verify it can be converted back
-        let ptr = fceux11_rust_guid_to_string(&guid);
-        let cstr = unsafe { std::ffi::CStr::from_ptr(ptr) };
-        let result = cstr.to_str().unwrap();
+            // Verify it can be converted back
+            let ptr = fceux11_rust_guid_to_string(&guid);
+            let cstr = unsafe { std::ffi::CStr::from_ptr(ptr) };
+            let result = cstr.to_str().unwrap();
 
-        assert_eq!(result, test_str);
+            assert_eq!(result, test_str);
+        }
     }
 }

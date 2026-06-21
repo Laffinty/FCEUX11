@@ -110,13 +110,13 @@ extern SFORMAT FCEUMOV_STATEINFO[];
 //why two separate CPU structs?? who knows
 
 SFORMAT SFCPU[]={
-	{ &X.PC, 2|RLSB, "PC\0"},
-	{ &X.A, 1, "A\0\0"},
-	{ &X.X, 1, "X\0\0"},
-	{ &X.Y, 1, "Y\0\0"},
-	{ &X.S, 1, "S\0\0"},
-	{ &X.P, 1, "P\0\0"},
-	{ &X.DB, 1, "DB\0"},
+	{ &g_cpu.native_layout().PC, 2|RLSB, "PC\0"},
+	{ &g_cpu.native_layout().A, 1, "A\0\0"},
+	{ &g_cpu.native_layout().X, 1, "X\0\0"},
+	{ &g_cpu.native_layout().Y, 1, "Y\0\0"},
+	{ &g_cpu.native_layout().S, 1, "S\0\0"},
+	{ &g_cpu.native_layout().P, 1, "P\0\0"},
+	{ &g_cpu.native_layout().DB, 1, "DB\0"},
 	{ &RAM, 0x800 | FCEUSTATE_INDIRECT, "RAM", },
 	{ 0 }
 };

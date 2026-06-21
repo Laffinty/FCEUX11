@@ -21,12 +21,6 @@ typedef struct FceuSliceMut {
   size_t len;
 } FceuSliceMut;
 
-/**
- * Rust implementation of Unicode UTF conversion routines.
- * Replaces src/utils/ConvertUTF.c with a memory-safe equivalent.
- *
- * Phase 6 (v0.2.7): Unicode Conversion
- */
 typedef enum ConversionResult {
   ConversionOK = 0,
   SourceExhausted = 1,
@@ -250,6 +244,8 @@ void fceux11_rust_profiler_map_destroy(void *handle);
 
 /**
  * C ABI: Register a `funcProfileRecord*` under the key `file:line`.
+ * # Safety
+ * Callers must ensure all raw pointer arguments passed to `fceux11_rust_profiler_map_add_record` are valid.
  */
 int fceux11_rust_profiler_map_add_record(void *handle,
                                          const char *file,
@@ -401,6 +397,9 @@ typedef struct FceuVideoEncodeArgs {
  * Each row is at `y*256`, so `len` must be `>= 14 * 256 = 3584` bytes.
  *
  * `dest` may be null (no-op). Returns silently if `len` is too small.
+ *
+ * # Safety
+ * `dest` must point to at least `dest_len` writable bytes, or be null.
  */
 void fceux11_rust_drawing_draw_text_line_bg(uint8_t *dest, uintptr_t dest_len);
 
@@ -413,6 +412,10 @@ void fceux11_rust_drawing_draw_text_line_bg(uint8_t *dest, uintptr_t dest_len);
  * output rectangle; `border` (0/1/2) controls the soft shadow / outline
  * weight (matching the original C++ behavior, including the historical
  * `y<15` clamp bug preserved for bytewise equivalence).
+ *
+ * # Safety
+ * `dest` must point to at least `dest_len` writable bytes.
+ * `textmsg` must be a valid NUL-terminated C string when non-null.
  */
 void fceux11_rust_drawing_draw_text_trans(uint8_t *dest,
                                           uintptr_t dest_len,
@@ -432,6 +435,10 @@ void fceux11_rust_drawing_draw_text_trans(uint8_t *dest,
  *
  * The C++ layout has a 21-byte tile overlap quirk that is preserved verbatim
  * (see `SSTAT` doc comment).
+ *
+ * # Safety
+ * `xbaf` must point to at least `xbaf_len` writable bytes.
+ * `nstatus` must point to at least 10 valid `c_int` values.
  */
 void fceux11_rust_drawing_draw_number_row(uint8_t *xbaf,
                                           uintptr_t xbaf_len,
@@ -450,6 +457,9 @@ void fceux11_rust_drawing_draw_number_row(uint8_t *xbaf,
  * `icon_kind`: 0 = none, 1 = play, 2 = record, 3 = pause. Each icon is
  * drawn with a black inner pass and a color-4 outer pass (matching the
  * C++ `drawstatus` two-pass shadow effect).
+ *
+ * # Safety
+ * `base` must point to at least `base_len` writable bytes.
  */
 void fceux11_rust_drawing_draw_status_icon(uint8_t *base, uintptr_t base_len, uint8_t icon_kind);
 
@@ -485,6 +495,10 @@ void fceux11_rust_filter_make(struct FceuFilterState *handle,
  * C ABI: `SexyFilter` wrapper.
  *
  * `in_buf` and `out_buf` may point to the same memory.
+ *
+ * # Safety
+ * `handle` must be a valid filter state handle.
+ * `in_buf` and `out_buf` must each point to at least `count` valid `i32`s.
  */
 void fceux11_rust_filter_sexy(struct FceuFilterState *handle,
                               int32_t *in_buf,
@@ -496,6 +510,10 @@ void fceux11_rust_filter_sexy(struct FceuFilterState *handle,
 
 /**
  * C ABI: `SexyFilter2` wrapper.
+ *
+ * # Safety
+ * `handle` must be a valid filter state handle.
+ * `buf` must point to at least `count` valid `i32`s.
  */
 void fceux11_rust_filter_sexy2(struct FceuFilterState *handle, int32_t *buf, int32_t count);
 
@@ -505,6 +523,11 @@ void fceux11_rust_filter_sexy2(struct FceuFilterState *handle, int32_t *buf, int
  * Returns the number of samples written to `out`.
  * `leftover` is set to the number of samples that must be copied from the
  * end of `in` to the beginning of `in` on the next call.
+ *
+ * # Safety
+ * `handle` must be a valid filter state handle.
+ * `in_buf` and `out_buf` must each point to at least `inlen` valid `i32`s.
+ * `leftover`, when non-null, must point to a writable `i32`.
  */
 int32_t fceux11_rust_filter_neo(struct FceuFilterState *handle,
                                 int32_t *in_buf,
@@ -519,29 +542,37 @@ int32_t fceux11_rust_filter_neo(struct FceuFilterState *handle,
 
 /**
  * Compute the 64-entry NTSC base palette from tint and hue.
- * `out` must point to at least 64 `Pal` entries.
+ *
+ * # Safety
+ * `out` must point to at least 64 valid, writable `Pal` entries.
  */
 void fceux11_rust_palette_calc_ntsc(int tint, int hue, struct Pal *out);
 
 /**
  * Expand a 64-entry base palette into 512 entries with de-emphasis applied.
- * `src` must point to 64 `Pal` entries.
- * `dst` must point to 512 `Pal` entries.
  * It is safe for `src == dst` (in-place expansion).
+ *
+ * # Safety
+ * `src` must point to 64 valid `Pal` entries.
+ * `dst` must point to 512 valid, writable `Pal` entries.
  */
 void fceux11_rust_palette_apply_deemphasis(const struct Pal *src, struct Pal *dst);
 
 /**
  * Convert a 512-entry palette to grayscale.
- * `src` and `dst` must each point to 512 `Pal` entries.
+ *
+ * # Safety
+ * `src` and `dst` must each point to 512 valid, writable `Pal` entries.
  */
 void fceux11_rust_palette_make_grayscale(const struct Pal *src, struct Pal *dst);
 
 /**
  * Draw the NTSC tint/hue control bars into a pixel buffer.
- * `xbuf` must be a non-null pointer to an 8-bit indexed pixel buffer.
  * `width` is the horizontal stride (typically 256).
  * `which` is the bar length in pixels (typically ntschue*2 or ntsctint*2).
+ *
+ * # Safety
+ * `xbuf` must be a non-null pointer to a valid, writable 8-bit indexed pixel buffer.
  */
 void fceux11_rust_palette_draw_control_bars(uint8_t *xbuf, int width, int which);
 
@@ -1035,6 +1066,9 @@ typedef struct VsUniEntry {
  * Compute `ROM_size` and `VROM_size` (in bank counts) from the iNES
  * header.  `mapper_no` is only used for the iNES-2 CHRRAM fallback.
  * Returns `true` on success.
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
  */
 bool fceux11_rust_cart_compute_rom_sizes(const struct FceuInesHeader *header,
                                          bool is_nes2,
@@ -1054,6 +1088,9 @@ int32_t fceux11_rust_cart_compute_chrram_size(int32_t mapper_no,
 /**
  * Save battery-backed RAM to `path`.  Each non-null entry is written
  * sequentially.  Returns `true` on success.
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
  */
 bool fceux11_rust_cart_battery_save(const char *path,
                                     const struct FceuSaveGameEntry *entries,
@@ -1064,6 +1101,9 @@ bool fceux11_rust_cart_battery_save(const char *path,
  * sequentially.  Returns `true` on success (short reads are treated
  * as failure for that entry but the function still returns true if
  * the file could be opened; this matches the original C++ behaviour).
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
  */
 bool fceux11_rust_cart_battery_load(const char *path,
                                     struct FceuSaveGameEntry *entries,
@@ -1072,6 +1112,9 @@ bool fceux11_rust_cart_battery_load(const char *path,
 /**
  * Zero-fill all save-game buffers.  Does **not** invoke C++ reset
  * callbacks; the caller must handle those separately.
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
  */
 void fceux11_rust_cart_battery_clear(const struct FceuSaveGameEntry *entries, uintptr_t count);
 
@@ -1087,21 +1130,33 @@ EmuFileMemHandle fceux11_rust_emufile_mem_create_with_capacity(uintptr_t capacit
 
 /**
  * Create a new in-memory EmuFile from raw bytes.
+ * # Safety
+ * The caller must ensure that any opaque handle passed to this function is either
+ * null or a valid handle obtained from this crate's constructor functions.
  */
 EmuFileMemHandle fceux11_rust_emufile_mem_create_from_bytes(const uint8_t *ptr, uintptr_t len);
 
 /**
  * Destroy an in-memory EmuFile handle.
+ * # Safety
+ * The caller must ensure that any opaque handle passed to this function is either
+ * null or a valid handle obtained from this crate's constructor functions.
  */
 void fceux11_rust_emufile_mem_destroy(EmuFileMemHandle handle);
 
 /**
  * Read bytes into C buffer. Returns bytes read.
+ * # Safety
+ * The caller must ensure that any opaque handle passed to this function is either
+ * null or a valid handle obtained from this crate's constructor functions.
  */
 uintptr_t fceux11_rust_emufile_mem_fread(EmuFileMemHandle handle, uint8_t *ptr, uintptr_t bytes);
 
 /**
  * Write bytes from C buffer. Returns bytes written.
+ * # Safety
+ * The caller must ensure that any opaque handle passed to this function is either
+ * null or a valid handle obtained from this crate's constructor functions.
  */
 uintptr_t fceux11_rust_emufile_mem_fwrite(EmuFileMemHandle handle,
                                           const uint8_t *ptr,
@@ -1111,81 +1166,129 @@ uintptr_t fceux11_rust_emufile_mem_fwrite(EmuFileMemHandle handle,
  * Seek within the memory file.
  * origin: 0 = SEEK_SET, 1 = SEEK_CUR, 2 = SEEK_END
  * Returns 0 on success, -1 on failure.
+ * # Safety
+ * The caller must ensure that any opaque handle passed to this function is either
+ * null or a valid handle obtained from this crate's constructor functions.
  */
 int32_t fceux11_rust_emufile_mem_fseek(EmuFileMemHandle handle, int32_t offset, int32_t origin);
 
 /**
  * Get current position.
+ * # Safety
+ * The caller must ensure that any opaque handle passed to this function is either
+ * null or a valid handle obtained from this crate's constructor functions.
  */
 uint32_t fceux11_rust_emufile_mem_ftell(EmuFileMemHandle handle);
 
 /**
  * Get size of memory buffer.
+ * # Safety
+ * The caller must ensure that any opaque handle passed to this function is either
+ * null or a valid handle obtained from this crate's constructor functions.
  */
 uint32_t fceux11_rust_emufile_mem_size(EmuFileMemHandle handle);
 
 /**
  * Truncate the memory buffer.
+ * # Safety
+ * The caller must ensure that any opaque handle passed to this function is either
+ * null or a valid handle obtained from this crate's constructor functions.
  */
 void fceux11_rust_emufile_mem_truncate(EmuFileMemHandle handle, uint32_t length);
 
 /**
  * Check fail bit (always false in Rust, kept for API parity).
+ * # Safety
+ * The caller must ensure that any opaque handle passed to this function is either
+ * null or a valid handle obtained from this crate's constructor functions.
  */
 int32_t fceux11_rust_emufile_mem_fail(EmuFileMemHandle handle);
 
 /**
  * Returns non-zero if at EOF.
+ * # Safety
+ * The caller must ensure that any opaque handle passed to this function is either
+ * null or a valid handle obtained from this crate's constructor functions.
  */
 int32_t fceux11_rust_emufile_mem_eof(EmuFileMemHandle handle);
 
 /**
  * Get read-only data pointer.
+ * # Safety
+ * The caller must ensure that any opaque handle passed to this function is either
+ * null or a valid handle obtained from this crate's constructor functions.
  */
 const uint8_t *fceux11_rust_emufile_mem_data_ptr(EmuFileMemHandle handle);
 
 /**
  * Ungetc: step position back by one.
+ * # Safety
+ * The caller must ensure that any opaque handle passed to this function is either
+ * null or a valid handle obtained from this crate's constructor functions.
  */
 void fceux11_rust_emufile_mem_unget(EmuFileMemHandle handle);
 
 /**
  * Read a u8 value.
+ * # Safety
+ * The caller must ensure that any opaque handle passed to this function is either
+ * null or a valid handle obtained from this crate's constructor functions.
  */
 uint8_t fceux11_rust_emufile_mem_read8(EmuFileMemHandle handle);
 
 /**
  * Write a u8 value.
+ * # Safety
+ * The caller must ensure that any opaque handle passed to this function is either
+ * null or a valid handle obtained from this crate's constructor functions.
  */
 void fceux11_rust_emufile_mem_write8(EmuFileMemHandle handle, uint8_t val);
 
 /**
  * Read a u16 LE.
+ * # Safety
+ * The caller must ensure that any opaque handle passed to this function is either
+ * null or a valid handle obtained from this crate's constructor functions.
  */
 uint16_t fceux11_rust_emufile_mem_read16le(EmuFileMemHandle handle);
 
 /**
  * Write a u16 LE.
+ * # Safety
+ * The caller must ensure that any opaque handle passed to this function is either
+ * null or a valid handle obtained from this crate's constructor functions.
  */
 void fceux11_rust_emufile_mem_write16le(EmuFileMemHandle handle, uint16_t val);
 
 /**
  * Read a u32 LE.
+ * # Safety
+ * The caller must ensure that any opaque handle passed to this function is either
+ * null or a valid handle obtained from this crate's constructor functions.
  */
 uint32_t fceux11_rust_emufile_mem_read32le(EmuFileMemHandle handle);
 
 /**
  * Write a u32 LE.
+ * # Safety
+ * The caller must ensure that any opaque handle passed to this function is either
+ * null or a valid handle obtained from this crate's constructor functions.
  */
 void fceux11_rust_emufile_mem_write32le(EmuFileMemHandle handle, uint32_t val);
 
 /**
  * Read a u64 LE.
+ * # Safety
+ * The caller must ensure that any opaque handle passed to this function is either
+ * null or a valid handle obtained from this crate's constructor functions.
  */
 uint64_t fceux11_rust_emufile_mem_read64le(EmuFileMemHandle handle);
 
 /**
  * Write a u64 LE.
+ * # Safety
+ * The caller must ensure that any opaque handle passed to this function is either
+ * null or a valid handle obtained from this crate's constructor functions.
  */
 void fceux11_rust_emufile_mem_write64le(EmuFileMemHandle handle, uint64_t val);
 
@@ -1198,6 +1301,9 @@ void fceux11_rust_emufile_mem_write64le(EmuFileMemHandle handle, uint64_t val);
  * `kind = 0`.
  *
  * Mirrors `src/fds.cpp:717–733`'s `memcmp` chain.
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
  */
 struct FceuFdsHeaderInfo fceux11_rust_fds_validate_header(const uint8_t *buf, uintptr_t len);
 
@@ -1229,6 +1335,9 @@ uint8_t fceux11_rust_fds_compute_total_sides(uintptr_t file_size,
  *
  * Both pointers must be non-null and point to at least
  * `FCEUX11_RUST_FDS_DISK_SIDE_SIZE` bytes.
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
  */
 void fceux11_rust_fds_xor_disk_data(uint8_t *dst, const uint8_t *src);
 
@@ -1254,6 +1363,9 @@ void fceux11_rust_fds_xor_disk_data(uint8_t *dst, const uint8_t *src);
  * `delta_cycles` is the number of CPU cycles elapsed since the
  * previous tick; the C++ caller (`MapIRQHook`) always passes a
  * non-negative value, but we use `wrapping_sub` for defensiveness.
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
  */
 struct FceuFdsIrqTickResult fceux11_rust_fds_irq_tick(struct FceuFdsIrqState *state,
                                                       int32_t delta_cycles);
@@ -1323,6 +1435,9 @@ struct FceuFdsWrite4025Result fceux11_rust_fds_compute_write_4025(uint8_t curren
 /**
  * Clean garbage signatures out of an iNES header.
  * `header_bytes` must point to at least 16 writable bytes.
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
  */
 void fceux11_rust_ines_header_cleanup(uint8_t *header_bytes);
 
@@ -1340,6 +1455,9 @@ int32_t fceux11_rust_ines_not_power2(int32_t mapper_no);
 /**
  * Look up default input controllers by ROM CRC32.
  * Returns 1 if found, 0 otherwise. Results are written to out_* params.
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
  */
 int32_t fceux11_rust_ines_lookup_input_crc(uint32_t crc32,
                                            int32_t *out_input1,
@@ -1351,6 +1469,9 @@ int32_t fceux11_rust_ines_lookup_input_crc(uint32_t crc32,
  * Returns 1 if found, 0 otherwise.
  * `out_eoptions_flag` is set to 32768 when expansion == 0x02 (Four-Score hack).
  * `out_vs_cswitch` is set to 1 when expansion == 0x05.
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
  */
 int32_t fceux11_rust_ines_lookup_input_nes20(uint8_t expansion,
                                              int32_t *out_input1,
@@ -1368,6 +1489,9 @@ const char *fceux11_rust_ines_check_bad(uint64_t md5partial);
 /**
  * Check ROM-correction databases and return recommended fixes.
  * C++ applies the fixes to its global state.
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
  */
 int32_t fceux11_rust_ines_check_hinfo(uint32_t crc32,
                                       uint64_t partialmd5,
@@ -1376,6 +1500,8 @@ int32_t fceux11_rust_ines_check_hinfo(uint32_t crc32,
 /**
  * Parse an FM2 file from raw bytes.
  * Returns an opaque handle to `FceuMovieData`, or null on error.
+ * # Safety
+ * The caller must ensure that `data` points to at least `len` readable bytes.
  */
 struct FceuMovieData *fceux11_rust_movie_load_fm2(const uint8_t *data,
                                                   uintptr_t len,
@@ -1383,65 +1509,198 @@ struct FceuMovieData *fceux11_rust_movie_load_fm2(const uint8_t *data,
 
 /**
  * Free a `FceuMovieData` handle obtained from `fceux11_rust_movie_load_fm2`.
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
  */
 void fceux11_rust_movie_data_free(struct FceuMovieData *md);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 int32_t fceux11_rust_movie_data_version(const struct FceuMovieData *md);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 int32_t fceux11_rust_movie_data_emu_version(const struct FceuMovieData *md);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 int32_t fceux11_rust_movie_data_fds(const struct FceuMovieData *md);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 bool fceux11_rust_movie_data_pal_flag(const struct FceuMovieData *md);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 bool fceux11_rust_movie_data_ppu_flag(const struct FceuMovieData *md);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 int32_t fceux11_rust_movie_data_rerecord_count(const struct FceuMovieData *md);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 bool fceux11_rust_movie_data_binary_flag(const struct FceuMovieData *md);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 int32_t fceux11_rust_movie_data_load_frame_count(const struct FceuMovieData *md);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 bool fceux11_rust_movie_data_fourscore(const struct FceuMovieData *md);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 bool fceux11_rust_movie_data_microphone(const struct FceuMovieData *md);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 int32_t fceux11_rust_movie_data_ram_init_option(const struct FceuMovieData *md);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 int32_t fceux11_rust_movie_data_ram_init_seed(const struct FceuMovieData *md);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 void fceux11_rust_movie_data_ports(const struct FceuMovieData *md, int32_t *out);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 void fceux11_rust_movie_data_rom_checksum(const struct FceuMovieData *md, uint8_t *out);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 const char *fceux11_rust_movie_data_rom_filename(const struct FceuMovieData *md);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 const char *fceux11_rust_movie_data_guid(const struct FceuMovieData *md);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 uintptr_t fceux11_rust_movie_data_records_count(const struct FceuMovieData *md);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 bool fceux11_rust_movie_data_record_get(const struct FceuMovieData *md,
                                         uintptr_t index,
                                         struct FceuMovieRecord *out);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 uintptr_t fceux11_rust_movie_data_savestate_len(const struct FceuMovieData *md);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 uintptr_t fceux11_rust_movie_data_savestate_copy(const struct FceuMovieData *md,
                                                  uint8_t *out,
                                                  uintptr_t out_len);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 uintptr_t fceux11_rust_movie_data_saveram_len(const struct FceuMovieData *md);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 uintptr_t fceux11_rust_movie_data_saveram_copy(const struct FceuMovieData *md,
                                                uint8_t *out,
                                                uintptr_t out_len);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 uintptr_t fceux11_rust_movie_data_comments_count(const struct FceuMovieData *md);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 const char *fceux11_rust_movie_data_comment_get(const struct FceuMovieData *md, uintptr_t index);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 uintptr_t fceux11_rust_movie_data_subtitles_count(const struct FceuMovieData *md);
 
+/**
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
+ */
 const char *fceux11_rust_movie_data_subtitle_get(const struct FceuMovieData *md, uintptr_t index);
 
 /**
@@ -1449,6 +1708,9 @@ const char *fceux11_rust_movie_data_subtitle_get(const struct FceuMovieData *md,
  * Returns the number of bytes written, or -1 on error.
  * If `seek_to_curr_frame_pos` is true and a frame position is recorded,
  * `out_curr_frame_pos` is set to that position; otherwise it is set to -1.
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
  */
 int32_t fceux11_rust_movie_data_dump(const struct FceuMovieDataInput *input,
                                      struct EmuFileMem *out_handle,
@@ -1461,6 +1723,9 @@ int32_t fceux11_rust_movie_data_dump(const struct FceuMovieDataInput *input,
  * Validate an NSF header: check the "NESM\x1a" signature, ensure
  * text fields are null-terminated, and extract 16-bit addresses.
  * Returns `true` if the header is valid.
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
  */
 bool fceux11_rust_nsf_header_validate(struct FceuNsfHeader *header,
                                       uint16_t *out_load_addr,
@@ -1470,6 +1735,9 @@ bool fceux11_rust_nsf_header_validate(struct FceuNsfHeader *header,
 /**
  * Compute NSFMaxBank (before the decrement) and BSon/BankSwitch
  * from the header and raw NSF data size.
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
  */
 bool fceux11_rust_nsf_compute_banks(const struct FceuNsfHeader *header,
                                     uint32_t nsf_size,
@@ -1481,6 +1749,9 @@ bool fceux11_rust_nsf_compute_banks(const struct FceuNsfHeader *header,
  * Patch the NSFROM bootstrap ROM with Init and Play addresses.
  * `nsfrom` must point to at least `nsfrom_len` bytes.
  * Returns `true` if the patch was applied successfully.
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
  */
 bool fceux11_rust_nsf_patch_nsfrom(uint8_t *nsfrom,
                                    uintptr_t nsfrom_len,
@@ -1492,12 +1763,18 @@ bool fceux11_rust_nsf_patch_nsfrom(uint8_t *nsfrom,
  * If a chip is recognised, writes the single-bit mask to `*out_mask`
  * and returns a pointer to a static thread-local C string.
  * Returns null if no recognised chip is set.
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
  */
 const char *fceux11_rust_nsf_chip_name(uint8_t sound_chip, uint8_t *out_mask);
 
 /**
  * Safely change the current song number.
  * Returns the clamped new song number and sets `*out_reload` to 0xFF.
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
  */
 int32_t fceux11_rust_nsf_change_song(int32_t current,
                                      int32_t amount,
@@ -1508,6 +1785,9 @@ int32_t fceux11_rust_nsf_change_song(int32_t current,
  * Copy NSF metadata strings into caller-provided buffers.
  * `maxlen` is the maximum number of bytes to copy (including null terminator).
  * Returns `TotalSongs`.
+ * # Safety
+ * The caller must ensure that all raw pointers are non-null, properly aligned, and
+ * point to valid memory regions of the expected size for the duration of the call.
  */
 int32_t fceux11_rust_nsf_get_info(const struct FceuNsfHeader *header,
                                   uint8_t *name,
@@ -1518,12 +1798,16 @@ int32_t fceux11_rust_nsf_get_info(const struct FceuNsfHeader *header,
 /**
  * Look up a UNIF board by name.
  * Returns a pointer to a static `UnifBoardInfo` if found, or null otherwise.
+ * # Safety
+ * The caller must ensure that `name` is a valid, null-terminated C string.
  */
 const struct UnifBoardInfo *fceux11_rust_unif_lookup_board(const char *name);
 
 /**
  * Return the hardware flags for a given UNIF board name.
  * Returns -1 if the board is not found.
+ * # Safety
+ * The caller must ensure that `name` is a valid, null-terminated C string.
  */
 int32_t fceux11_rust_unif_board_flags(const char *name);
 
@@ -1556,6 +1840,8 @@ uint8_t fceux11_rust_vsuni_service(uint8_t game_type);
 /**
  * Draw the VS UniSystem DIP-switch overlay into the pixel buffer.
  * Returns the decremented `dips_howlong` value (or -1 if nothing drawn).
+ * # Safety
+ * The caller must ensure that `xbuf` points to a writable 256x240 pixel buffer.
  */
 int32_t fceux11_rust_vsuni_draw(uint8_t *xbuf, uint8_t vsdip, int32_t dips_howlong);
 /**
@@ -1682,13 +1968,21 @@ typedef struct FceuLd65Sym {
  * Assemble 6502 assembly text into opcode bytes.
  * `output` must have room for at least 3 bytes.
  * Returns 0 on success, 1 on error.
+ *
+ * # Safety
+ * `output` must point to at least 3 writable bytes and `str` must be a valid NUL-terminated C string.
  */
-int32_t fceux11_rust_asm_assemble(uint8_t *output, int32_t addr, const char *str);
+int32_t fceux11_rust_asm_assemble(uint8_t *output,
+                                  int32_t addr,
+                                  const char *str);
 
 /**
  * Disassemble a 6502 opcode into a string.
  * Writes to `out_buf` with max `out_buf_size` bytes.
  * Returns bytes written (including null terminator), or -1 on error.
+ *
+ * # Safety
+ * `opcode` must point to at least one readable byte and `out_buf` must point to `out_buf_size` writable bytes.
  */
 int32_t fceux11_rust_asm_disassemble(int32_t _addr,
                                      const uint8_t *opcode,
@@ -1737,6 +2031,8 @@ uint32_t fceux11_rust_cheat_count(void);
  * Fetch the cheat at `which` into `out`. Returns `1` on success, `0` if out
  * of range. The `name_ptr` field points into a thread-local cache and is
  * invalidated by the next call.
+ * # Safety
+ * Callers must ensure all raw pointer arguments passed to `fceux11_rust_cheat_get` are valid.
  */
 int32_t fceux11_rust_cheat_get(uint32_t which, struct FceuCheatEntryView *out);
 
@@ -1771,6 +2067,8 @@ int32_t fceux11_rust_cheat_get_global_disabled(void);
 
 /**
  * Decode a Game Genie code. Returns `1` on success, `0` on failure.
+ * # Safety
+ * Callers must ensure all raw pointer arguments passed to `fceux11_rust_cheat_decode_gg` are valid.
  */
 int32_t fceux11_rust_cheat_decode_gg(const char *str_ptr,
                                      int32_t *a_out,
@@ -1779,6 +2077,8 @@ int32_t fceux11_rust_cheat_decode_gg(const char *str_ptr,
 
 /**
  * Decode a Pro Action Replay code. Returns `1` on success, `0` on failure.
+ * # Safety
+ * Callers must ensure all raw pointer arguments passed to `fceux11_rust_cheat_decode_par` are valid.
  */
 int32_t fceux11_rust_cheat_decode_par(const char *str_ptr,
                                       int32_t *a_out,
@@ -1847,8 +2147,11 @@ int32_t fceux11_rust_cheat_comp_exists(void);
  * `mem` is a `0x10000`-byte snapshot of CPU memory.
  * `mem_present` is a `0x10000`-byte boolean array: `1` if the address has a
  * `CheatRPtrs` entry (i.e. is a real RAM byte), `0` otherwise.
+ * # Safety
+ * Callers must ensure all raw pointer arguments passed to `fceux11_rust_cheat_comp_search_begin` are valid.
  */
-int32_t fceux11_rust_cheat_comp_search_begin(const uint8_t *mem, const uint8_t *mem_present);
+int32_t fceux11_rust_cheat_comp_search_begin(const uint8_t *mem,
+                                             const uint8_t *mem_present);
 
 /**
  * Set every non-NOSHOW slot to the current memory value (used when
@@ -1856,6 +2159,8 @@ int32_t fceux11_rust_cheat_comp_search_begin(const uint8_t *mem, const uint8_t *
  *
  * Mirrors C++ `FCEUI_CheatSearchSetCurrentAsOriginal`:
  * for visible slots, `comp[x] = mem[x]` if backed, else OR-in `CHEATC_NONE`.
+ * # Safety
+ * Callers must ensure all raw pointer arguments passed to `fceux11_rust_cheat_comp_set_current_as_original` are valid.
  */
 int32_t fceux11_rust_cheat_comp_set_current_as_original(const uint8_t *mem,
                                                         const uint8_t *mem_present);
@@ -1868,6 +2173,8 @@ void fceux11_rust_cheat_comp_show_excluded(void);
 /**
  * Return the number of "visible" search hits — slots that are neither
  * NOSHOW nor masked by the C++ presence array.
+ * # Safety
+ * Callers must ensure all raw pointer arguments passed to `fceux11_rust_cheat_comp_count` are valid.
  */
 int32_t fceux11_rust_cheat_comp_count(const uint8_t *mem_present);
 
@@ -1880,6 +2187,8 @@ uint32_t fceux11_rust_cheat_comp_get(uint32_t address);
 /**
  * Apply a `FCEUI_CheatSearchEnd` filter using `type` and the operand bytes
  * `v1`/`v2`. Marks excluded slots with `CHEATC_EXCLUDED`.
+ * # Safety
+ * Callers must ensure all raw pointer arguments passed to `fceux11_rust_cheat_comp_search_end` are valid.
  */
 int32_t fceux11_rust_cheat_comp_search_end(int32_t search_type,
                                            uint8_t v1,
@@ -1891,6 +2200,8 @@ int32_t fceux11_rust_cheat_comp_search_end(int32_t search_type,
  * Parse a condition expression string into an AST.
  * Returns an opaque pointer to the ConditionAst, or null on error.
  * Format: <subject><op><value> where subject is a flag/register/address.
+ * # Safety
+ * Callers must ensure all raw pointer arguments passed to `fceux11_rust_conddebug_generate_condition` are valid.
  */
 void *fceux11_rust_conddebug_generate_condition(const char *str);
 
@@ -1943,11 +2254,15 @@ void fceux11_rust_debug_dbgstate_reset(void);
 /**
  * Snapshot all six fields into `out`. Useful for the GUI Step-Out block in
  * `ConsoleDebugger.cpp:3029-3055` which previously held a `DebuggerState&`.
+ * # Safety
+ * Callers must ensure all raw pointer arguments passed to `fceux11_rust_debug_dbgstate_copy_out` are valid.
  */
 void fceux11_rust_debug_dbgstate_copy_out(struct FceuDebuggerStateView *out);
 
 /**
  * Bulk-write all six fields.
+ * # Safety
+ * Callers must ensure all raw pointer arguments passed to `fceux11_rust_debug_dbgstate_copy_in` are valid.
  */
 void fceux11_rust_debug_dbgstate_copy_in(const struct FceuDebuggerStateView *in_);
 
@@ -1968,6 +2283,10 @@ int32_t fceux11_rust_debug_get_value(int32_t reg_or_flag,
                                      uint16_t pc,
                                      uint8_t s);
 
+/**
+ * # Safety
+ * Callers must ensure all raw pointer arguments passed to `fceux11_rust_debug_log_cd_vectors` are valid.
+ */
 void fceux11_rust_debug_log_cd_vectors(uint8_t *cdloggerdata,
                                        uintptr_t cdloggerdata_size,
                                        int32_t prg_addr,
@@ -1975,6 +2294,10 @@ void fceux11_rust_debug_log_cd_vectors(uint8_t *cdloggerdata,
                                        int32_t *datacount,
                                        int32_t *undefinedcount);
 
+/**
+ * # Safety
+ * Callers must ensure all raw pointer arguments passed to `fceux11_rust_debug_log_cd_data` are valid.
+ */
 struct FceuLogCdDataResult fceux11_rust_debug_log_cd_data(uint8_t *cdloggerdata,
                                                           uintptr_t cdloggerdata_size,
                                                           int32_t pc_prg_addr,
@@ -2003,6 +2326,11 @@ int32_t fceux11_rust_debugsym_nl_filename_for_bank(const char *rom_file,
 /**
  * Parse `.nl` content (UTF-8) and return an opaque iterator. Caller must
  * call `parse_end` to free. `content_ptr` may be null only if `content_len == 0`.
+ *
+ * # Safety
+ *
+ * `content_ptr` must be either null (when `content_len == 0`) or a valid,
+ * readable pointer to `content_len` bytes of UTF-8 text.
  */
 struct NlParseIter *fceux11_rust_debugsym_parse_begin(const char *content_ptr,
                                                       uintptr_t content_len);
@@ -2012,6 +2340,12 @@ struct NlParseIter *fceux11_rust_debugsym_parse_begin(const char *content_ptr,
  * null-terminated string into the given buffer). Returns `true` if an entry
  * was produced, `false` if the iterator is exhausted or any output pointer
  * is invalid.
+ *
+ * # Safety
+ *
+ * `it` must be a valid pointer returned by `parse_begin` that has not been
+ * freed. `out_ofs`, `out_name`, and `out_comment` must be valid, writable
+ * pointers (the two string buffers must have the corresponding capacities).
  */
 bool fceux11_rust_debugsym_parse_next(struct NlParseIter *it,
                                       uint32_t *out_ofs,
@@ -2022,12 +2356,23 @@ bool fceux11_rust_debugsym_parse_next(struct NlParseIter *it,
 
 /**
  * Free the iterator returned by `parse_begin`.
+ *
+ * # Safety
+ *
+ * `it` must be either null or a valid pointer returned by `parse_begin` that
+ * has not already been freed.
  */
 void fceux11_rust_debugsym_parse_end(struct NlParseIter *it);
 
 /**
  * Write `entries` to `path` as a `.nl` file. Returns `0` on success,
  * `-1` on I/O failure or invalid argument.
+ *
+ * # Safety
+ *
+ * `path` must be a valid, null-terminated C string. `ofs_arr`, `name_arr`,
+ * and `comment_arr` must be valid, readable pointers to `count` elements
+ * (the two string arrays must contain valid, null-terminated C strings).
  */
 int32_t fceux11_rust_debugsym_save_nl_file(const char *path,
                                            const uint32_t *ofs_arr,
@@ -2042,6 +2387,11 @@ uint32_t fceux11_rust_debugsym_register_map_count(void);
 
 /**
  * Fetch register map entry `idx`. Returns `true` on success.
+ *
+ * # Safety
+ *
+ * `out_ofs` must be a valid, writable pointer. `out_name` must be a valid,
+ * writable pointer to at least `out_name_cap` bytes.
  */
 bool fceux11_rust_debugsym_register_map_get(uint32_t idx,
                                             uint32_t *out_ofs,
@@ -2059,27 +2409,49 @@ int32_t fceux11_rust_debugsym_format_array_index(const char *name,
 /**
  * Trim trailing whitespace in a null-terminated C string in place.
  * Returns the new length.
+ *
+ * # Safety
+ *
+ * `buf` must be a valid, writable pointer to a null-terminated C string.
  */
 int32_t fceux11_rust_debugsym_trim_trailing_inplace(char *buf);
 
 /**
  * Open a `.dbg` file and parse it. Returns an opaque handle, or `NULL` on
  * error (call [`ld65_last_error`] for the reason).
+ *
+ * # Safety
+ *
+ * `path` must be a valid, null-terminated C string.
  */
 void *fceux11_rust_ld65_open(const char *path);
 
 /**
  * Free a database returned by [`ld65_open`].
+ *
+ * # Safety
+ *
+ * `db` must be either null or a valid pointer returned by `ld65_open` that
+ * has not already been freed.
  */
 void fceux11_rust_ld65_close(void *db);
 
 /**
  * Number of symbols in the database.
+ *
+ * # Safety
+ *
+ * `db` must be either null or a valid pointer returned by `ld65_open`.
  */
 uint32_t fceux11_rust_ld65_sym_count(void *db);
 
 /**
  * Fill `out` with the symbol at index `idx`. Returns `true` on success.
+ *
+ * # Safety
+ *
+ * `db` must be either null or a valid pointer returned by `ld65_open`.
+ * `out` must be a valid, writable pointer to a `FceuLd65Sym`.
  */
 bool fceux11_rust_ld65_sym_get(void *db, uint32_t idx, struct FceuLd65Sym *out);
 
@@ -2087,6 +2459,12 @@ bool fceux11_rust_ld65_sym_get(void *db, uint32_t idx, struct FceuLd65Sym *out);
  * Callback-style iteration matching the legacy `database::iterateSymbols`
  * signature. `cb` is called once per symbol (in id order) with `user_data`
  * echoed back. Returns the number of symbols iterated.
+ *
+ * # Safety
+ *
+ * `db` must be either null or a valid pointer returned by `ld65_open`.
+ * The callback `cb` must uphold the safety requirements for the `FceuLd65Sym`
+ * pointer it receives (it is valid only for the duration of the call).
  */
 uint32_t fceux11_rust_ld65_iterate(void *db,
                                    void *user_data,
@@ -2478,6 +2856,8 @@ typedef struct FceuStateChunkOutput {
  *
  * On success, returns `true` and writes a `FceuStateBuffer` to `out_buf`.
  * The caller must free `out_buf.ptr` via `fceux11_rust_state_file_buf_free`.
+ * # Safety
+ * Callers must ensure all raw pointer arguments passed to `fceux11_rust_state_file_save` are valid.
  */
 bool fceux11_rust_state_file_save(const struct FceuStateChunkInput *chunks,
                                   uintptr_t chunk_count,
@@ -2495,6 +2875,8 @@ bool fceux11_rust_state_file_save(const struct FceuStateChunkInput *chunks,
  * * `out_totalsize` — uncompressed payload size
  *
  * The caller must free `out_chunks` via `fceux11_rust_state_file_chunks_free`.
+ * # Safety
+ * Callers must ensure all raw pointer arguments passed to `fceux11_rust_state_file_load` are valid.
  */
 bool fceux11_rust_state_file_load(const uint8_t *file_data,
                                   uintptr_t file_len,
@@ -2510,6 +2892,8 @@ void fceux11_rust_state_file_buf_free(struct FceuStateBuffer buf);
 
 /**
  * Free chunks previously returned by `fceux11_rust_state_file_load`.
+ * # Safety
+ * Callers must ensure all raw pointer arguments passed to `fceux11_rust_state_file_chunks_free` are valid.
  */
 void fceux11_rust_state_file_chunks_free(struct FceuStateChunkOutput *chunks,
                                          uintptr_t chunk_count);

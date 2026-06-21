@@ -50,6 +50,7 @@ pub const C_FLAG: u8 = 0x01;
 ///
 /// `opwrite_byte` is `opwrite[opcode]` from `src/x6502.cpp:635` — supplied
 /// by the caller rather than duplicating the 256-entry table here.
+#[allow(clippy::too_many_arguments)]
 pub fn evaluate_write(
     opwrite_byte: u8,
     address: u16,
@@ -112,15 +113,7 @@ pub fn evaluate_write(
 
 /// Return the current value of a register or P-flag, indexed by ASCII char
 /// constant (see `src/debug.cpp:108-128`).
-pub fn get_value(
-    reg_or_flag: i32,
-    a: u8,
-    x: u8,
-    y: u8,
-    p: u8,
-    pc: u16,
-    s: u8,
-) -> i32 {
+pub fn get_value(reg_or_flag: i32, a: u8, x: u8, y: u8, p: u8, pc: u16, s: u8) -> i32 {
     match reg_or_flag as u8 as char {
         'A' => a as i32,
         'X' => x as i32,
@@ -206,6 +199,7 @@ pub struct FceuLogCdDataResult {
 /// * `indirect_in` — previous value of C++ `indirectnext` (file-static).
 ///
 /// Returns the three flags the C++ caller acts on.
+#[allow(clippy::too_many_arguments)]
 pub fn log_cd_data(
     cdloggerdata: &mut [u8],
     pc_prg_addr: i32,
@@ -399,7 +393,9 @@ pub extern "C" fn fceux11_rust_debug_dbgstate_reset() {
 /// Snapshot all six fields into `out`. Useful for the GUI Step-Out block in
 /// `ConsoleDebugger.cpp:3029-3055` which previously held a `DebuggerState&`.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_debug_dbgstate_copy_out(out: *mut FceuDebuggerStateView) {
+/// # Safety
+/// Callers must ensure all raw pointer arguments passed to `fceux11_rust_debug_dbgstate_copy_out` are valid.
+pub unsafe extern "C" fn fceux11_rust_debug_dbgstate_copy_out(out: *mut FceuDebuggerStateView) {
     if out.is_null() {
         return;
     }
@@ -415,7 +411,9 @@ pub extern "C" fn fceux11_rust_debug_dbgstate_copy_out(out: *mut FceuDebuggerSta
 
 /// Bulk-write all six fields.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_debug_dbgstate_copy_in(in_: *const FceuDebuggerStateView) {
+/// # Safety
+/// Callers must ensure all raw pointer arguments passed to `fceux11_rust_debug_dbgstate_copy_in` are valid.
+pub unsafe extern "C" fn fceux11_rust_debug_dbgstate_copy_in(in_: *const FceuDebuggerStateView) {
     if in_.is_null() {
         return;
     }
@@ -460,7 +458,9 @@ pub extern "C" fn fceux11_rust_debug_get_value(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_debug_log_cd_vectors(
+/// # Safety
+/// Callers must ensure all raw pointer arguments passed to `fceux11_rust_debug_log_cd_vectors` are valid.
+pub unsafe extern "C" fn fceux11_rust_debug_log_cd_vectors(
     cdloggerdata: *mut u8,
     cdloggerdata_size: usize,
     prg_addr: i32,
@@ -484,7 +484,9 @@ pub extern "C" fn fceux11_rust_debug_log_cd_vectors(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_debug_log_cd_data(
+/// # Safety
+/// Callers must ensure all raw pointer arguments passed to `fceux11_rust_debug_log_cd_data` are valid.
+pub unsafe extern "C" fn fceux11_rust_debug_log_cd_data(
     cdloggerdata: *mut u8,
     cdloggerdata_size: usize,
     pc_prg_addr: i32,
@@ -549,302 +551,363 @@ mod tests {
 
     #[test]
     fn ew_no_write_opcodes_return_zero() {
-        assert_eq!(evaluate_write(0, 0, 1, 2, 3, 4, 5, 6), 0);
+        unsafe {
+            assert_eq!(evaluate_write(0, 0, 1, 2, 3, 4, 5, 6), 0);
+        }
     }
 
     #[test]
     fn ew_sta_returns_a() {
-        assert_eq!(evaluate_write(1, 0, 0x42, 0, 0, 0, 0, 0), 0x42);
+        unsafe {
+            assert_eq!(evaluate_write(1, 0, 0x42, 0, 0, 0, 0, 0), 0x42);
+        }
     }
 
     #[test]
     fn ew_stx_returns_x() {
-        assert_eq!(evaluate_write(2, 0, 0, 0x55, 0, 0, 0, 0), 0x55);
+        unsafe {
+            assert_eq!(evaluate_write(2, 0, 0, 0x55, 0, 0, 0, 0), 0x55);
+        }
     }
 
     #[test]
     fn ew_sty_returns_y() {
-        assert_eq!(evaluate_write(3, 0, 0, 0, 0x66, 0, 0, 0), 0x66);
+        unsafe {
+            assert_eq!(evaluate_write(3, 0, 0, 0, 0x66, 0, 0, 0), 0x66);
+        }
     }
 
     #[test]
     fn ew_php_returns_p() {
-        assert_eq!(evaluate_write(4, 0, 0, 0, 0, 0xAB, 0, 0), 0xAB);
+        unsafe {
+            assert_eq!(evaluate_write(4, 0, 0, 0, 0, 0xAB, 0, 0), 0xAB);
+        }
     }
 
     #[test]
     fn ew_asl_shifts_mem_left() {
-        // ASL of 0x81 = 0x02 (high bit lost in u8 shift)
-        assert_eq!(evaluate_write(5, 0, 0, 0, 0, 0, 0, 0x81), 0x02);
+        unsafe {
+            // ASL of 0x81 = 0x02 (high bit lost in u8 shift)
+            assert_eq!(evaluate_write(5, 0, 0, 0, 0, 0, 0, 0x81), 0x02);
+        }
     }
 
     #[test]
     fn ew_lsr_shifts_mem_right() {
-        assert_eq!(evaluate_write(6, 0, 0, 0, 0, 0, 0, 0x80), 0x40);
+        unsafe {
+            assert_eq!(evaluate_write(6, 0, 0, 0, 0, 0, 0, 0x80), 0x40);
+        }
     }
 
     #[test]
     fn ew_rol_includes_carry() {
-        // mem = 0x40, C set → (0x40 << 1) | 1 = 0x81
-        assert_eq!(evaluate_write(7, 0, 0, 0, 0, C_FLAG, 0, 0x40), 0x81);
+        unsafe {
+            // mem = 0x40, C set → (0x40 << 1) | 1 = 0x81
+            assert_eq!(evaluate_write(7, 0, 0, 0, 0, C_FLAG, 0, 0x40), 0x81);
+        }
     }
 
     #[test]
     fn ew_ror_includes_carry() {
-        // mem = 0x02, C set → (0x02 >> 1) | (1 << 7) = 0x81
-        assert_eq!(evaluate_write(8, 0, 0, 0, 0, C_FLAG, 0, 0x02), 0x81);
+        unsafe {
+            // mem = 0x02, C set → (0x02 >> 1) | (1 << 7) = 0x81
+            assert_eq!(evaluate_write(8, 0, 0, 0, 0, C_FLAG, 0, 0x02), 0x81);
+        }
     }
 
     #[test]
     fn ew_inc() {
-        assert_eq!(evaluate_write(9, 0, 0, 0, 0, 0, 0, 0xFF), 0x00); // wrap
-        assert_eq!(evaluate_write(9, 0, 0, 0, 0, 0, 0, 0x10), 0x11);
+        unsafe {
+            assert_eq!(evaluate_write(9, 0, 0, 0, 0, 0, 0, 0xFF), 0x00); // wrap
+            assert_eq!(evaluate_write(9, 0, 0, 0, 0, 0, 0, 0x10), 0x11);
+        }
     }
 
     #[test]
     fn ew_dec() {
-        assert_eq!(evaluate_write(10, 0, 0, 0, 0, 0, 0, 0x00), 0xFF); // wrap
+        unsafe {
+            assert_eq!(evaluate_write(10, 0, 0, 0, 0, 0, 0, 0x00), 0xFF); // wrap
+        }
     }
 
     #[test]
     fn ew_sax_and() {
-        assert_eq!(evaluate_write(11, 0, 0xF0, 0x0F, 0, 0, 0, 0), 0x00);
-        assert_eq!(evaluate_write(11, 0, 0xFF, 0x0F, 0, 0, 0, 0), 0x0F);
+        unsafe {
+            assert_eq!(evaluate_write(11, 0, 0xF0, 0x0F, 0, 0, 0, 0), 0x00);
+            assert_eq!(evaluate_write(11, 0, 0xFF, 0x0F, 0, 0, 0, 0), 0x0F);
+        }
     }
 
     // ---- get_value ------------------------------------------------------
 
     #[test]
     fn gv_registers() {
-        assert_eq!(get_value('A' as i32, 0x10, 0, 0, 0, 0, 0), 0x10);
-        assert_eq!(get_value('X' as i32, 0, 0x20, 0, 0, 0, 0), 0x20);
-        assert_eq!(get_value('Y' as i32, 0, 0, 0x30, 0, 0, 0), 0x30);
-        assert_eq!(get_value('P' as i32, 0, 0, 0, 0, 0x1234, 0), 0x1234);
-        assert_eq!(get_value('S' as i32, 0, 0, 0, 0, 0, 0xFD), 0xFD);
+        unsafe {
+            assert_eq!(get_value('A' as i32, 0x10, 0, 0, 0, 0, 0), 0x10);
+            assert_eq!(get_value('X' as i32, 0, 0x20, 0, 0, 0, 0), 0x20);
+            assert_eq!(get_value('Y' as i32, 0, 0, 0x30, 0, 0, 0), 0x30);
+            assert_eq!(get_value('P' as i32, 0, 0, 0, 0, 0x1234, 0), 0x1234);
+            assert_eq!(get_value('S' as i32, 0, 0, 0, 0, 0, 0xFD), 0xFD);
+        }
     }
 
     #[test]
     fn gv_flags() {
-        let p = N_FLAG | Z_FLAG | C_FLAG;
-        assert_eq!(get_value('N' as i32, 0, 0, 0, p, 0, 0), 1);
-        assert_eq!(get_value('V' as i32, 0, 0, 0, p, 0, 0), 0);
-        assert_eq!(get_value('U' as i32, 0, 0, 0, p, 0, 0), 0);
-        assert_eq!(get_value('B' as i32, 0, 0, 0, p, 0, 0), 0);
-        assert_eq!(get_value('D' as i32, 0, 0, 0, p, 0, 0), 0);
-        assert_eq!(get_value('I' as i32, 0, 0, 0, p, 0, 0), 0);
-        assert_eq!(get_value('Z' as i32, 0, 0, 0, p, 0, 0), 1);
-        assert_eq!(get_value('C' as i32, 0, 0, 0, p, 0, 0), 1);
+        unsafe {
+            let p = N_FLAG | Z_FLAG | C_FLAG;
+            assert_eq!(get_value('N' as i32, 0, 0, 0, p, 0, 0), 1);
+            assert_eq!(get_value('V' as i32, 0, 0, 0, p, 0, 0), 0);
+            assert_eq!(get_value('U' as i32, 0, 0, 0, p, 0, 0), 0);
+            assert_eq!(get_value('B' as i32, 0, 0, 0, p, 0, 0), 0);
+            assert_eq!(get_value('D' as i32, 0, 0, 0, p, 0, 0), 0);
+            assert_eq!(get_value('I' as i32, 0, 0, 0, p, 0, 0), 0);
+            assert_eq!(get_value('Z' as i32, 0, 0, 0, p, 0, 0), 1);
+            assert_eq!(get_value('C' as i32, 0, 0, 0, p, 0, 0), 1);
+        }
     }
 
     #[test]
     fn gv_unknown_returns_zero() {
-        assert_eq!(get_value('?' as i32, 1, 2, 3, 4, 5, 6), 0);
+        unsafe {
+            assert_eq!(get_value('?' as i32, 1, 2, 3, 4, 5, 6), 0);
+        }
     }
 
     // ---- log_cd_vectors -------------------------------------------------
 
     #[test]
     fn lcv_two_bytes_marked() {
-        let mut buf = vec![0u8; 16];
-        let mut cc = 0;
-        let mut dc = 0;
-        let mut uc = 2; // pretend both bytes were undefined
-        log_cd_vectors(&mut buf, 4, &mut cc, &mut dc, &mut uc);
-        assert_eq!(buf[4] & 0x0E, 0x0E);
-        assert_eq!(buf[5] & 0x0E, 0x0E);
-        assert_eq!(dc, 2);
-        assert_eq!(uc, 0); // both bytes were undefined → now defined
+        unsafe {
+            let mut buf = vec![0u8; 16];
+            let mut cc = 0;
+            let mut dc = 0;
+            let mut uc = 2; // pretend both bytes were undefined
+            log_cd_vectors(&mut buf, 4, &mut cc, &mut dc, &mut uc);
+            assert_eq!(buf[4] & 0x0E, 0x0E);
+            assert_eq!(buf[5] & 0x0E, 0x0E);
+            assert_eq!(dc, 2);
+            assert_eq!(uc, 0); // both bytes were undefined → now defined
+        }
     }
 
     #[test]
     fn lcv_already_data_skipped() {
-        let mut buf = vec![0u8; 16];
-        buf[4] = 0x02; // already data
-        let mut cc = 0;
-        let mut dc = 0;
-        let mut uc = 1;
-        log_cd_vectors(&mut buf, 4, &mut cc, &mut dc, &mut uc);
-        // buf[4] not modified (already had data bit set); buf[5] gets marked
-        assert_eq!(buf[4], 0x02);
-        assert_eq!(buf[5] & 0x0E, 0x0E);
-        assert_eq!(dc, 1);
+        unsafe {
+            let mut buf = vec![0u8; 16];
+            buf[4] = 0x02; // already data
+            let mut cc = 0;
+            let mut dc = 0;
+            let mut uc = 1;
+            log_cd_vectors(&mut buf, 4, &mut cc, &mut dc, &mut uc);
+            // buf[4] not modified (already had data bit set); buf[5] gets marked
+            assert_eq!(buf[4], 0x02);
+            assert_eq!(buf[5] & 0x0E, 0x0E);
+            assert_eq!(dc, 1);
+        }
     }
 
     #[test]
     fn lcv_negative_addr_no_op() {
-        let mut buf = vec![0u8; 16];
-        let (mut cc, mut dc, mut uc) = (0, 0, 0);
-        log_cd_vectors(&mut buf, -1, &mut cc, &mut dc, &mut uc);
-        assert_eq!(buf, vec![0u8; 16]);
-        assert_eq!(dc, 0);
+        unsafe {
+            let mut buf = vec![0u8; 16];
+            let (mut cc, mut dc, mut uc) = (0, 0, 0);
+            log_cd_vectors(&mut buf, -1, &mut cc, &mut dc, &mut uc);
+            assert_eq!(buf, vec![0u8; 16]);
+            assert_eq!(dc, 0);
+        }
     }
 
     // ---- log_cd_data ----------------------------------------------------
 
     #[test]
     fn lcd_marks_new_code() {
-        let mut buf = vec![0u8; 256];
-        let mut cc = 0;
-        let mut dc = 0;
-        let mut uc = 3; // pretend 3 bytes were undefined
-        let r = log_cd_data(
-            &mut buf, 0x10, -1, 0x8000, 0, 0xEA, 0, 0, 3, false, &mut cc, &mut dc, &mut uc,
-        );
-        assert!(r.new_code_hit);
-        assert!(!r.new_data_hit);
-        assert!(!r.indirect_out);
-        // All 3 bytes marked as code
-        for i in 0x10..0x13 {
-            assert!(buf[i] & 1 != 0);
+        unsafe {
+            let mut buf = vec![0u8; 256];
+            let mut cc = 0;
+            let mut dc = 0;
+            let mut uc = 3; // pretend 3 bytes were undefined
+            let r = log_cd_data(
+                &mut buf, 0x10, -1, 0x8000, 0, 0xEA, 0, 0, 3, false, &mut cc, &mut dc, &mut uc,
+            );
+            assert!(r.new_code_hit);
+            assert!(!r.new_data_hit);
+            assert!(!r.indirect_out);
+            // All 3 bytes marked as code
+            for i in 0x10..0x13 {
+                assert!(buf[i] & 1 != 0);
+            }
+            assert_eq!(cc, 3);
+            assert_eq!(uc, 0);
         }
-        assert_eq!(cc, 3);
-        assert_eq!(uc, 0);
     }
 
     #[test]
     fn lcd_already_code_skipped() {
-        let mut buf = vec![0u8; 256];
-        buf[0x10] = 0x01; // already code
-        let (mut cc, mut dc, mut uc) = (0, 0, 0);
-        let r = log_cd_data(
-            &mut buf, 0x10, -1, 0x8000, 0, 0xEA, 0, 0, 1, false, &mut cc, &mut dc, &mut uc,
-        );
-        assert!(!r.new_code_hit);
-        assert_eq!(cc, 0);
+        unsafe {
+            let mut buf = vec![0u8; 256];
+            buf[0x10] = 0x01; // already code
+            let (mut cc, mut dc, mut uc) = (0, 0, 0);
+            let r = log_cd_data(
+                &mut buf, 0x10, -1, 0x8000, 0, 0xEA, 0, 0, 1, false, &mut cc, &mut dc, &mut uc,
+            );
+            assert!(!r.new_code_hit);
+            assert_eq!(cc, 0);
+        }
     }
 
     #[test]
     fn lcd_indirect_jmp_returns_indirect_out() {
-        let mut buf = vec![0u8; 256];
-        let (mut cc, mut dc, mut uc) = (0, 0, 0);
-        let r = log_cd_data(
-            &mut buf, -1, -1, 0x8000, 0, 0x6C, 0, 0, 3, false, &mut cc, &mut dc, &mut uc,
-        );
-        assert!(r.indirect_out);
+        unsafe {
+            let mut buf = vec![0u8; 256];
+            let (mut cc, mut dc, mut uc) = (0, 0, 0);
+            let r = log_cd_data(
+                &mut buf, -1, -1, 0x8000, 0, 0x6C, 0, 0, 3, false, &mut cc, &mut dc, &mut uc,
+            );
+            assert!(r.indirect_out);
+        }
     }
 
     #[test]
     fn lcd_marks_data_for_read_opcode() {
-        let mut buf = vec![0u8; 256];
-        let (mut cc, mut dc, mut uc) = (0, 0, 0);
-        // Read instruction (opwrite=0) targeting addr 0x50, mapped at j=0x50
-        let r = log_cd_data(
-            &mut buf, -1, 0x50, 0x8000, 0x50, 0xAD, 0, 0, 3, false, &mut cc, &mut dc, &mut uc,
-        );
-        assert!(r.new_data_hit);
-        assert!(buf[0x50] & 2 != 0);
+        unsafe {
+            let mut buf = vec![0u8; 256];
+            let (mut cc, mut dc, mut uc) = (0, 0, 0);
+            // Read instruction (opwrite=0) targeting addr 0x50, mapped at j=0x50
+            let r = log_cd_data(
+                &mut buf, -1, 0x50, 0x8000, 0x50, 0xAD, 0, 0, 3, false, &mut cc, &mut dc, &mut uc,
+            );
+            assert!(r.new_data_hit);
+            assert!(buf[0x50] & 2 != 0);
+        }
     }
 
     #[test]
     fn lcd_write_clears_slot() {
-        let mut buf = vec![0u8; 256];
-        buf[0x50] = 0x03; // both code and data set
-        let mut cc = 1;
-        let mut dc = 1;
-        let mut uc = 0;
-        // Write opcode (opwrite=1) at 0x50, no PC mapping
-        let r = log_cd_data(
-            &mut buf, -1, 0x50, 0x8000, 0x50, 0x8D, 0, 1, 3, false, &mut cc, &mut dc, &mut uc,
-        );
-        assert_eq!(buf[0x50], 0);
-        assert_eq!(cc, 0);
-        assert_eq!(dc, 0);
-        assert_eq!(uc, 1);
-        // new_data_hit is false on the write branch.
-        assert!(!r.new_data_hit);
+        unsafe {
+            let mut buf = vec![0u8; 256];
+            buf[0x50] = 0x03; // both code and data set
+            let mut cc = 1;
+            let mut dc = 1;
+            let mut uc = 0;
+            // Write opcode (opwrite=1) at 0x50, no PC mapping
+            let r = log_cd_data(
+                &mut buf, -1, 0x50, 0x8000, 0x50, 0x8D, 0, 1, 3, false, &mut cc, &mut dc, &mut uc,
+            );
+            assert_eq!(buf[0x50], 0);
+            assert_eq!(cc, 0);
+            assert_eq!(dc, 0);
+            assert_eq!(uc, 1);
+            // new_data_hit is false on the write branch.
+            assert!(!r.new_data_hit);
+        }
     }
 
     // ---- DebuggerState atomics & FFI ------------------------------------
 
     #[test]
     fn dbg_state_reset() {
-        let _g = DBG_TEST_LOCK.lock().unwrap();
-        fceux11_rust_debug_dbgstate_set_step(true);
-        fceux11_rust_debug_dbgstate_set_stepout(true);
-        fceux11_rust_debug_dbgstate_set_jsrcount(99);
-        fceux11_rust_debug_dbgstate_reset();
-        assert!(!fceux11_rust_debug_dbgstate_get_step());
-        assert!(!fceux11_rust_debug_dbgstate_get_stepout());
-        assert_eq!(fceux11_rust_debug_dbgstate_get_jsrcount(), 0);
+        unsafe {
+            let _g = DBG_TEST_LOCK.lock().unwrap();
+            fceux11_rust_debug_dbgstate_set_step(true);
+            fceux11_rust_debug_dbgstate_set_stepout(true);
+            fceux11_rust_debug_dbgstate_set_jsrcount(99);
+            fceux11_rust_debug_dbgstate_reset();
+            assert!(!fceux11_rust_debug_dbgstate_get_step());
+            assert!(!fceux11_rust_debug_dbgstate_get_stepout());
+            assert_eq!(fceux11_rust_debug_dbgstate_get_jsrcount(), 0);
+        }
     }
 
     #[test]
     fn dbg_state_jsr_inc_dec() {
-        let _g = DBG_TEST_LOCK.lock().unwrap();
-        fceux11_rust_debug_dbgstate_set_jsrcount(0);
-        assert_eq!(fceux11_rust_debug_dbgstate_jsrcount_inc(), 1);
-        assert_eq!(fceux11_rust_debug_dbgstate_jsrcount_inc(), 2);
-        assert_eq!(fceux11_rust_debug_dbgstate_jsrcount_dec(), 1);
-        assert_eq!(fceux11_rust_debug_dbgstate_get_jsrcount(), 1);
-        // Reset for other tests
-        fceux11_rust_debug_dbgstate_set_jsrcount(0);
+        unsafe {
+            let _g = DBG_TEST_LOCK.lock().unwrap();
+            fceux11_rust_debug_dbgstate_set_jsrcount(0);
+            assert_eq!(fceux11_rust_debug_dbgstate_jsrcount_inc(), 1);
+            assert_eq!(fceux11_rust_debug_dbgstate_jsrcount_inc(), 2);
+            assert_eq!(fceux11_rust_debug_dbgstate_jsrcount_dec(), 1);
+            assert_eq!(fceux11_rust_debug_dbgstate_get_jsrcount(), 1);
+            // Reset for other tests
+            fceux11_rust_debug_dbgstate_set_jsrcount(0);
+        }
     }
 
     #[test]
     fn dbg_state_copy_out_in_roundtrip() {
-        let _g = DBG_TEST_LOCK.lock().unwrap();
-        fceux11_rust_debug_dbgstate_set_step(true);
-        fceux11_rust_debug_dbgstate_set_stepout(false);
-        fceux11_rust_debug_dbgstate_set_runline(true);
-        fceux11_rust_debug_dbgstate_set_runline_end_time(0xDEADBEEF_CAFEBABE);
-        fceux11_rust_debug_dbgstate_set_badopbreak(true);
-        fceux11_rust_debug_dbgstate_set_jsrcount(42);
+        unsafe {
+            let _g = DBG_TEST_LOCK.lock().unwrap();
+            fceux11_rust_debug_dbgstate_set_step(true);
+            fceux11_rust_debug_dbgstate_set_stepout(false);
+            fceux11_rust_debug_dbgstate_set_runline(true);
+            fceux11_rust_debug_dbgstate_set_runline_end_time(0xDEADBEEF_CAFEBABE);
+            fceux11_rust_debug_dbgstate_set_badopbreak(true);
+            fceux11_rust_debug_dbgstate_set_jsrcount(42);
 
-        let mut view = FceuDebuggerStateView::default();
-        fceux11_rust_debug_dbgstate_copy_out(&mut view);
-        assert!(view.step);
-        assert!(!view.stepout);
-        assert!(view.runline);
-        assert_eq!(view.runline_end_time, 0xDEADBEEF_CAFEBABE);
-        assert!(view.badopbreak);
-        assert_eq!(view.jsrcount, 42);
+            let mut view = FceuDebuggerStateView::default();
+            fceux11_rust_debug_dbgstate_copy_out(&mut view);
+            assert!(view.step);
+            assert!(!view.stepout);
+            assert!(view.runline);
+            assert_eq!(view.runline_end_time, 0xDEADBEEF_CAFEBABE);
+            assert!(view.badopbreak);
+            assert_eq!(view.jsrcount, 42);
 
-        // Modify view and write back
-        view.step = false;
-        view.jsrcount = -7;
-        fceux11_rust_debug_dbgstate_copy_in(&view);
-        assert!(!fceux11_rust_debug_dbgstate_get_step());
-        assert_eq!(fceux11_rust_debug_dbgstate_get_jsrcount(), -7);
+            // Modify view and write back
+            view.step = false;
+            view.jsrcount = -7;
+            fceux11_rust_debug_dbgstate_copy_in(&view);
+            assert!(!fceux11_rust_debug_dbgstate_get_step());
+            assert_eq!(fceux11_rust_debug_dbgstate_get_jsrcount(), -7);
 
-        // Restore defaults
-        fceux11_rust_debug_dbgstate_reset();
-        fceux11_rust_debug_dbgstate_set_runline(false);
-        fceux11_rust_debug_dbgstate_set_runline_end_time(0);
-        fceux11_rust_debug_dbgstate_set_badopbreak(false);
+            // Restore defaults
+            fceux11_rust_debug_dbgstate_reset();
+            fceux11_rust_debug_dbgstate_set_runline(false);
+            fceux11_rust_debug_dbgstate_set_runline_end_time(0);
+            fceux11_rust_debug_dbgstate_set_badopbreak(false);
+        }
     }
 
     #[test]
     fn ffi_evaluate_write_matches_logic() {
-        assert_eq!(
-            fceux11_rust_debug_evaluate_write(1, 0, 0xAA, 0, 0, 0, 0, 0),
-            0xAA
-        );
+        unsafe {
+            assert_eq!(
+                fceux11_rust_debug_evaluate_write(1, 0, 0xAA, 0, 0, 0, 0, 0),
+                0xAA
+            );
+        }
     }
 
     #[test]
     fn ffi_get_value_matches_logic() {
-        assert_eq!(fceux11_rust_debug_get_value('A' as i32, 0xAA, 0, 0, 0, 0, 0), 0xAA);
+        unsafe {
+            assert_eq!(
+                fceux11_rust_debug_get_value('A' as i32, 0xAA, 0, 0, 0, 0, 0),
+                0xAA
+            );
+        }
     }
 
     #[test]
     fn ffi_log_cd_data_null_safe() {
-        // Null buffer / null counters → no-op default result.
-        let r = fceux11_rust_debug_log_cd_data(
-            std::ptr::null_mut(),
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            false,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-        );
-        assert!(!r.new_code_hit && !r.new_data_hit && !r.indirect_out);
+        unsafe {
+            // Null buffer / null counters → no-op default result.
+            let r = fceux11_rust_debug_log_cd_data(
+                std::ptr::null_mut(),
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            );
+            assert!(!r.new_code_hit && !r.new_data_hit && !r.indirect_out);
+        }
     }
 }

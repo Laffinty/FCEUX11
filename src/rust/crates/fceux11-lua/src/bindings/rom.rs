@@ -16,9 +16,11 @@ pub fn compute_md5_hex(buf: &[u8]) -> String {
         buffer: [0; 64],
     };
     let mut digest = [0u8; 16];
-    fceux11_utils::md5::fceux11_rust_md5_starts(&mut ctx);
-    fceux11_utils::md5::fceux11_rust_md5_update(&mut ctx, buf.as_ptr(), buf.len() as u32);
-    fceux11_utils::md5::fceux11_rust_md5_finish(&mut ctx, digest.as_mut_ptr());
+    unsafe {
+        fceux11_utils::md5::fceux11_rust_md5_starts(&mut ctx);
+        fceux11_utils::md5::fceux11_rust_md5_update(&mut ctx, buf.as_ptr(), buf.len() as u32);
+        fceux11_utils::md5::fceux11_rust_md5_finish(&mut ctx, digest.as_mut_ptr());
+    }
     digest.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
@@ -42,7 +44,10 @@ pub fn register(lua: &Lua) -> Result<Table> {
                     "failed to retrieve ROM MD5".to_string(),
                 ));
             }
-            Ok(md5_buf.iter().map(|b| format!("{:02x}", b)).collect::<String>())
+            Ok(md5_buf
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>())
         })?,
     )?;
 
@@ -73,45 +78,59 @@ mod tests {
 
     #[test]
     fn test_compute_md5_hex_empty() {
-        let hash = compute_md5_hex(b"");
-        assert_eq!(hash.len(), 32);
-        assert_eq!(hash, "d41d8cd98f00b204e9800998ecf8427e");
+        unsafe {
+            let hash = compute_md5_hex(b"");
+            assert_eq!(hash.len(), 32);
+            assert_eq!(hash, "d41d8cd98f00b204e9800998ecf8427e");
+        }
     }
 
     #[test]
     fn test_compute_md5_hex_fceux() {
-        let hash = compute_md5_hex(b"FCEUX");
-        assert_eq!(hash.len(), 32);
-        assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
+        unsafe {
+            let hash = compute_md5_hex(b"FCEUX");
+            assert_eq!(hash.len(), 32);
+            assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
+        }
     }
 
     #[test]
     fn test_md5_hex_format_lowercase() {
-        let hash = compute_md5_hex(b"test");
-        assert_eq!(hash, hash.to_lowercase());
-        assert_eq!(hash.len(), 32);
+        unsafe {
+            let hash = compute_md5_hex(b"test");
+            assert_eq!(hash, hash.to_lowercase());
+            assert_eq!(hash.len(), 32);
+        }
     }
 
     #[test]
     fn test_md5_hex_vs_direct() {
-        let data = b"The quick brown fox jumps over the lazy dog";
-        let hash = compute_md5_hex(data);
-        let mut ctx = fceux11_utils::md5::Md5Context {
-            total: [0, 0],
-            state: [0, 0, 0, 0],
-            buffer: [0; 64],
-        };
-        let mut digest = [0u8; 16];
-        fceux11_utils::md5::fceux11_rust_md5_starts(&mut ctx);
-        fceux11_utils::md5::fceux11_rust_md5_update(&mut ctx, data.as_ptr(), data.len() as u32);
-        fceux11_utils::md5::fceux11_rust_md5_finish(&mut ctx, digest.as_mut_ptr());
-        let expected: String = digest.iter().map(|b| format!("{:02x}", b)).collect();
-        assert_eq!(hash, expected);
+        unsafe {
+            let data = b"The quick brown fox jumps over the lazy dog";
+            let hash = compute_md5_hex(data);
+            let mut ctx = fceux11_utils::md5::Md5Context {
+                total: [0, 0],
+                state: [0, 0, 0, 0],
+                buffer: [0; 64],
+            };
+            let mut digest = [0u8; 16];
+            fceux11_utils::md5::fceux11_rust_md5_starts(&mut ctx);
+            fceux11_utils::md5::fceux11_rust_md5_update(&mut ctx, data.as_ptr(), data.len() as u32);
+            fceux11_utils::md5::fceux11_rust_md5_finish(&mut ctx, digest.as_mut_ptr());
+            let expected: String = digest.iter().map(|b| format!("{:02x}", b)).collect();
+            assert_eq!(hash, expected);
+        }
     }
 
     #[test]
     fn test_md5_hex_32_chars() {
-        let hash = compute_md5_hex(b"NES ROM data");
-        assert_eq!(hash.len(), 32, "MD5 hex string must be exactly 32 characters");
+        unsafe {
+            let hash = compute_md5_hex(b"NES ROM data");
+            assert_eq!(
+                hash.len(),
+                32,
+                "MD5 hex string must be exactly 32 characters"
+            );
+        }
     }
 }

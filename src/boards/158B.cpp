@@ -54,7 +54,7 @@ static DECLFW(UNL158BProtWrite) {
 }
 
 static DECLFR(UNL158BProtRead) {
-	return X.DB | lut[A & 7];
+	return g_cpu.native_layout().DB | lut[A & 7];
 }
 
 static void UNL158BPower(void) {

@@ -190,9 +190,7 @@ fn parse_kv_pairs(body: &str) -> Vec<(String, String)> {
 
         // Read key (alphanumeric / underscore).
         let key_start = i;
-        while i < bytes.len()
-            && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_')
-        {
+        while i < bytes.len() && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
             i += 1;
         }
         if i == key_start {
@@ -205,7 +203,9 @@ fn parse_kv_pairs(body: &str) -> Vec<(String, String)> {
             }
             continue;
         }
-        let key = std::str::from_utf8(&bytes[key_start..i]).unwrap_or("").to_string();
+        let key = std::str::from_utf8(&bytes[key_start..i])
+            .unwrap_or("")
+            .to_string();
 
         // Skip whitespace, then expect '='.
         while i < bytes.len() && (bytes[i] as char).is_ascii_whitespace() {
@@ -449,8 +449,12 @@ fn c_str_to_string(ptr: *const c_char) -> String {
 
 /// Open a `.dbg` file and parse it. Returns an opaque handle, or `NULL` on
 /// error (call [`ld65_last_error`] for the reason).
+///
+/// # Safety
+///
+/// `path` must be a valid, null-terminated C string.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_ld65_open(path: *const c_char) -> *mut c_void {
+pub unsafe extern "C" fn fceux11_rust_ld65_open(path: *const c_char) -> *mut c_void {
     if path.is_null() {
         set_last_error("null path");
         return std::ptr::null_mut();
@@ -469,16 +473,25 @@ pub extern "C" fn fceux11_rust_ld65_open(path: *const c_char) -> *mut c_void {
 }
 
 /// Free a database returned by [`ld65_open`].
+///
+/// # Safety
+///
+/// `db` must be either null or a valid pointer returned by `ld65_open` that
+/// has not already been freed.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_ld65_close(db: *mut c_void) {
+pub unsafe extern "C" fn fceux11_rust_ld65_close(db: *mut c_void) {
     if !db.is_null() {
         unsafe { drop(Box::from_raw(db as *mut Database)) };
     }
 }
 
 /// Number of symbols in the database.
+///
+/// # Safety
+///
+/// `db` must be either null or a valid pointer returned by `ld65_open`.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_ld65_sym_count(db: *mut c_void) -> u32 {
+pub unsafe extern "C" fn fceux11_rust_ld65_sym_count(db: *mut c_void) -> u32 {
     if db.is_null() {
         return 0;
     }
@@ -487,8 +500,13 @@ pub extern "C" fn fceux11_rust_ld65_sym_count(db: *mut c_void) -> u32 {
 }
 
 /// Fill `out` with the symbol at index `idx`. Returns `true` on success.
+///
+/// # Safety
+///
+/// `db` must be either null or a valid pointer returned by `ld65_open`.
+/// `out` must be a valid, writable pointer to a `FceuLd65Sym`.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_ld65_sym_get(
+pub unsafe extern "C" fn fceux11_rust_ld65_sym_get(
     db: *mut c_void,
     idx: u32,
     out: *mut FceuLd65Sym,
@@ -504,31 +522,33 @@ pub extern "C" fn fceux11_rust_ld65_sym_get(
     let sym = &db_ref.syms[i];
     let name_cstr = &db_ref.sym_name_cstrings[i];
 
-    let mut view = FceuLd65Sym::default();
-    view.id = sym.id;
-    view.name_ptr = name_cstr.as_ptr();
-    view.name_len = name_cstr.as_bytes().len();
-    view.size = sym.size;
-    view.value = sym.value;
-    view.sym_type = sym.sym_type.clone() as i32;
+    let name_len = name_cstr.as_bytes().len();
+    let mut view = FceuLd65Sym {
+        id: sym.id,
+        name_ptr: name_cstr.as_ptr(),
+        name_len,
+        size: sym.size,
+        value: sym.value,
+        sym_type: sym.sym_type.clone() as i32,
+        ..Default::default()
+    };
 
-    if let Some(seg_id) = sym.segment_id {
-        if let Some(seg) = db_ref.segments.get(&seg_id) {
-            if let Some(seg_cstr) = db_ref.seg_name_cstrings.get(&seg_id) {
-                view.has_segment = 1;
-                view.segment_ofs = seg.ofs;
-                view.segment_name_ptr = seg_cstr.as_ptr();
-                view.segment_name_len = seg_cstr.as_bytes().len();
-            }
-        }
+    if let Some(seg_id) = sym.segment_id
+        && let Some(seg) = db_ref.segments.get(&seg_id)
+        && let Some(seg_cstr) = db_ref.seg_name_cstrings.get(&seg_id)
+    {
+        view.has_segment = 1;
+        view.segment_ofs = seg.ofs;
+        view.segment_name_ptr = seg_cstr.as_ptr();
+        view.segment_name_len = seg_cstr.as_bytes().len();
     }
 
-    if let Some(scope_id) = sym.scope_id {
-        if let Some(scope_cstr) = db_ref.scope_full_name_cstrings.get(&scope_id) {
-            view.has_scope = 1;
-            view.scope_full_name_ptr = scope_cstr.as_ptr();
-            view.scope_full_name_len = scope_cstr.as_bytes().len();
-        }
+    if let Some(scope_id) = sym.scope_id
+        && let Some(scope_cstr) = db_ref.scope_full_name_cstrings.get(&scope_id)
+    {
+        view.has_scope = 1;
+        view.scope_full_name_ptr = scope_cstr.as_ptr();
+        view.scope_full_name_len = scope_cstr.as_bytes().len();
     }
 
     unsafe { std::ptr::write(out, view) };
@@ -538,8 +558,14 @@ pub extern "C" fn fceux11_rust_ld65_sym_get(
 /// Callback-style iteration matching the legacy `database::iterateSymbols`
 /// signature. `cb` is called once per symbol (in id order) with `user_data`
 /// echoed back. Returns the number of symbols iterated.
+///
+/// # Safety
+///
+/// `db` must be either null or a valid pointer returned by `ld65_open`.
+/// The callback `cb` must uphold the safety requirements for the `FceuLd65Sym`
+/// pointer it receives (it is valid only for the duration of the call).
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_ld65_iterate(
+pub unsafe extern "C" fn fceux11_rust_ld65_iterate(
     db: *mut c_void,
     user_data: *mut c_void,
     cb: Option<extern "C" fn(*mut c_void, *const FceuLd65Sym)>,
@@ -550,10 +576,10 @@ pub extern "C" fn fceux11_rust_ld65_iterate(
     if db.is_null() {
         return 0;
     }
-    let count = fceux11_rust_ld65_sym_count(db);
+    let count = unsafe { fceux11_rust_ld65_sym_count(db) };
     for i in 0..count {
         let mut view = FceuLd65Sym::default();
-        if fceux11_rust_ld65_sym_get(db, i, &mut view) {
+        if unsafe { fceux11_rust_ld65_sym_get(db, i, &mut view) } {
             callback(user_data, &view);
         }
     }
@@ -595,54 +621,65 @@ mod tests {
 
     #[test]
     fn parse_kv_basic() {
-        let r = parse_kv_pairs("\tid=5,name=\"foo\",val=0x1234");
-        assert_eq!(
-            r,
-            vec![
-                ("id".to_string(), "5".to_string()),
-                ("name".to_string(), "foo".to_string()),
-                ("val".to_string(), "0x1234".to_string()),
-            ]
-        );
+        unsafe {
+            let r = parse_kv_pairs("\tid=5,name=\"foo\",val=0x1234");
+            assert_eq!(
+                r,
+                vec![
+                    ("id".to_string(), "5".to_string()),
+                    ("name".to_string(), "foo".to_string()),
+                    ("val".to_string(), "0x1234".to_string()),
+                ]
+            );
+        }
     }
 
     #[test]
     fn parse_kv_string_with_comma_inside() {
-        // Quoted comma should NOT split the value.
-        let r = parse_kv_pairs("\tname=\"a,b,c\",id=1");
-        assert_eq!(r[0].0, "name");
-        assert_eq!(r[0].1, "a,b,c"); // commas preserved inside quotes
-        assert_eq!(r[1].0, "id");
+        unsafe {
+            // Quoted comma should NOT split the value.
+            let r = parse_kv_pairs("\tname=\"a,b,c\",id=1");
+            assert_eq!(r[0].0, "name");
+            assert_eq!(r[0].1, "a,b,c"); // commas preserved inside quotes
+            assert_eq!(r[1].0, "id");
+        }
     }
 
     #[test]
     fn parse_int_handles_hex_and_decimal() {
-        assert_eq!(parse_int("0x10"), Some(16));
-        assert_eq!(parse_int("42"), Some(42));
-        assert_eq!(parse_int(""), None);
-        assert_eq!(parse_int("garbage"), None);
+        unsafe {
+            assert_eq!(parse_int("0x10"), Some(16));
+            assert_eq!(parse_int("42"), Some(42));
+            assert_eq!(parse_int(""), None);
+            assert_eq!(parse_int("garbage"), None);
+        }
     }
 
     #[test]
     fn load_empty_file() {
-        let path = write_temp_dbg("");
-        let db = load_from_path(path.to_str().unwrap()).unwrap();
-        assert_eq!(db.syms.len(), 0);
-        let _ = std::fs::remove_file(&path);
+        unsafe {
+            let path = write_temp_dbg("");
+            let db = load_from_path(path.to_str().unwrap()).unwrap();
+            assert_eq!(db.syms.len(), 0);
+            let _ = std::fs::remove_file(&path);
+        }
     }
 
     #[test]
     fn load_version_info_only() {
-        let content = "version\tmajor=2,minor=0\ninfo\tcsym=0,file=0,lib=0\n";
-        let path = write_temp_dbg(content);
-        let db = load_from_path(path.to_str().unwrap()).unwrap();
-        assert_eq!(db.syms.len(), 0);
-        let _ = std::fs::remove_file(&path);
+        unsafe {
+            let content = "version\tmajor=2,minor=0\ninfo\tcsym=0,file=0,lib=0\n";
+            let path = write_temp_dbg(content);
+            let db = load_from_path(path.to_str().unwrap()).unwrap();
+            assert_eq!(db.syms.len(), 0);
+            let _ = std::fs::remove_file(&path);
+        }
     }
 
     #[test]
     fn load_full_record_set() {
-        let content = "\
+        unsafe {
+            let content = "\
 version\tmajor=2,minor=0
 info\tsym=1,seg=1,scope=1
 seg\tid=0,name=\"CODE\",ooffs=16
@@ -650,111 +687,125 @@ scope\tid=0,name=\"global\",size=0
 sym\tid=0,name=\"main\",size=0,val=0x8000,scope=0,seg=0,type=lab
 sym\tid=1,name=\"reset\",val=0x8050,type=lab
 ";
-        let path = write_temp_dbg(content);
-        let db = load_from_path(path.to_str().unwrap()).unwrap();
-        assert_eq!(db.syms.len(), 2);
-        assert_eq!(db.syms[0].name, "main");
-        assert_eq!(db.syms[0].value, 0x8000);
-        assert_eq!(db.syms[0].sym_type, SymType::Label);
-        assert_eq!(db.syms[1].name, "reset");
-        assert_eq!(db.syms[1].value, 0x8050);
-        assert_eq!(db.segments.len(), 1);
-        assert_eq!(db.segments[&0].name, "CODE");
-        assert_eq!(db.segments[&0].ofs, 16);
-        assert_eq!(db.scopes.len(), 1);
-        assert_eq!(db.scopes[&0].name, "global");
-        let _ = std::fs::remove_file(&path);
+            let path = write_temp_dbg(content);
+            let db = load_from_path(path.to_str().unwrap()).unwrap();
+            assert_eq!(db.syms.len(), 2);
+            assert_eq!(db.syms[0].name, "main");
+            assert_eq!(db.syms[0].value, 0x8000);
+            assert_eq!(db.syms[0].sym_type, SymType::Label);
+            assert_eq!(db.syms[1].name, "reset");
+            assert_eq!(db.syms[1].value, 0x8050);
+            assert_eq!(db.segments.len(), 1);
+            assert_eq!(db.segments[&0].name, "CODE");
+            assert_eq!(db.segments[&0].ofs, 16);
+            assert_eq!(db.scopes.len(), 1);
+            assert_eq!(db.scopes[&0].name, "global");
+            let _ = std::fs::remove_file(&path);
+        }
     }
 
     #[test]
     fn load_nested_scope_chain() {
-        let content = "\
+        unsafe {
+            let content = "\
 scope\tid=0,name=\"A\",size=0
 scope\tid=1,name=\"B\",size=0,parent=0
 scope\tid=2,name=\"C\",size=0,parent=1
 sym\tid=10,name=\"x\",val=0x100,scope=2,type=lab
 ";
-        let path = write_temp_dbg(content);
-        let db = load_from_path(path.to_str().unwrap()).unwrap();
-        assert_eq!(db.syms.len(), 1);
-        let full = db.build_full_scope_name(2);
-        assert_eq!(full, "A::B::C::");
-        let _ = std::fs::remove_file(&path);
+            let path = write_temp_dbg(content);
+            let db = load_from_path(path.to_str().unwrap()).unwrap();
+            assert_eq!(db.syms.len(), 1);
+            let full = db.build_full_scope_name(2);
+            assert_eq!(full, "A::B::C::");
+            let _ = std::fs::remove_file(&path);
+        }
     }
 
     #[test]
     fn load_unknown_records_skipped() {
-        let content = "\
+        unsafe {
+            let content = "\
 mod\tid=0,name=\"foo.o\"
 file\tid=0,name=\"foo.s\"
 line\tid=0,file=0,line=42
 span\tid=0,seg=0,start=0,size=3
 sym\tid=99,name=\"only_sym\",val=0xC000,type=lab
 ";
-        let path = write_temp_dbg(content);
-        let db = load_from_path(path.to_str().unwrap()).unwrap();
-        assert_eq!(db.syms.len(), 1);
-        assert_eq!(db.syms[0].name, "only_sym");
-        let _ = std::fs::remove_file(&path);
+            let path = write_temp_dbg(content);
+            let db = load_from_path(path.to_str().unwrap()).unwrap();
+            assert_eq!(db.syms.len(), 1);
+            assert_eq!(db.syms[0].name, "only_sym");
+            let _ = std::fs::remove_file(&path);
+        }
     }
 
     #[test]
     fn sym_type_classification() {
-        let content = "\
+        unsafe {
+            let content = "\
 sym\tid=0,name=\"a\",val=0,type=lab
 sym\tid=1,name=\"b\",val=0,type=equ
 sym\tid=2,name=\"c\",val=0,type=imp
 ";
-        let path = write_temp_dbg(content);
-        let db = load_from_path(path.to_str().unwrap()).unwrap();
-        assert_eq!(db.syms[0].sym_type, SymType::Label);
-        assert_eq!(db.syms[1].sym_type, SymType::Equ);
-        assert_eq!(db.syms[2].sym_type, SymType::Import); // default
-        let _ = std::fs::remove_file(&path);
+            let path = write_temp_dbg(content);
+            let db = load_from_path(path.to_str().unwrap()).unwrap();
+            assert_eq!(db.syms[0].sym_type, SymType::Label);
+            assert_eq!(db.syms[1].sym_type, SymType::Equ);
+            assert_eq!(db.syms[2].sym_type, SymType::Import); // default
+            let _ = std::fs::remove_file(&path);
+        }
     }
 
     #[test]
     fn open_nonexistent_returns_null_and_sets_error() {
-        let bad = CString::new("Z:/this/path/does/not/exist.dbg").unwrap();
-        let db = fceux11_rust_ld65_open(bad.as_ptr());
-        assert!(db.is_null());
-        let err = fceux11_rust_ld65_last_error();
-        assert!(!err.is_null());
+        unsafe {
+            let bad = CString::new("Z:/this/path/does/not/exist.dbg").unwrap();
+            let db = unsafe { fceux11_rust_ld65_open(bad.as_ptr()) };
+            assert!(db.is_null());
+            let err = fceux11_rust_ld65_last_error();
+            assert!(!err.is_null());
+        }
     }
 
     #[test]
     fn ffi_open_iterate_close_roundtrip() {
-        let content = "\
+        unsafe {
+            let content = "\
 seg\tid=5,name=\"DATA\",ooffs=100
 scope\tid=7,name=\"ns\",size=0
 sym\tid=42,name=\"label1\",val=0xC0DE,scope=7,seg=5,type=lab
 ";
-        let path = write_temp_dbg(content);
-        let cpath = CString::new(path.to_str().unwrap()).unwrap();
-        let db = fceux11_rust_ld65_open(cpath.as_ptr());
-        assert!(!db.is_null());
-        let count = fceux11_rust_ld65_sym_count(db);
-        assert_eq!(count, 1);
-        let mut view = FceuLd65Sym::default();
-        let ok = fceux11_rust_ld65_sym_get(db, 0, &mut view);
-        assert!(ok);
-        assert_eq!(view.id, 42);
-        assert_eq!(view.value, 0xC0DE);
-        assert_eq!(view.sym_type, 1); // LABEL
-        assert!(view.has_segment != 0);
-        assert_eq!(view.segment_ofs, 100);
-        let seg_name =
-            unsafe { CStr::from_ptr(view.segment_name_ptr).to_string_lossy().into_owned() };
-        assert_eq!(seg_name, "DATA");
-        assert!(view.has_scope != 0);
-        let scope_full = unsafe {
-            CStr::from_ptr(view.scope_full_name_ptr)
-                .to_string_lossy()
-                .into_owned()
-        };
-        assert_eq!(scope_full, "ns::");
+            let path = write_temp_dbg(content);
+            let cpath = CString::new(path.to_str().unwrap()).unwrap();
+            let db = unsafe { fceux11_rust_ld65_open(cpath.as_ptr()) };
+            assert!(!db.is_null());
+            let count = unsafe { fceux11_rust_ld65_sym_count(db) };
+            assert_eq!(count, 1);
+            let mut view = FceuLd65Sym::default();
+            let ok = unsafe { fceux11_rust_ld65_sym_get(db, 0, &mut view) };
+            assert!(ok);
+            assert_eq!(view.id, 42);
+            assert_eq!(view.value, 0xC0DE);
+            assert_eq!(view.sym_type, 1); // LABEL
+            assert!(view.has_segment != 0);
+            assert_eq!(view.segment_ofs, 100);
+            let seg_name = unsafe {
+                CStr::from_ptr(view.segment_name_ptr)
+                    .to_string_lossy()
+                    .into_owned()
+            };
+            assert_eq!(seg_name, "DATA");
+            assert!(view.has_scope != 0);
+            let scope_full = unsafe {
+                CStr::from_ptr(view.scope_full_name_ptr)
+                    .to_string_lossy()
+                    .into_owned()
+            };
+            assert_eq!(scope_full, "ns::");
 
-        fceux11_rust_ld65_close(db);
-        let _ = std::fs::remove_file(&path);
+            unsafe { fceux11_rust_ld65_close(db) };
+            let _ = std::fs::remove_file(&path);
+        }
     }
 }

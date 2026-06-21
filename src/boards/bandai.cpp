@@ -283,9 +283,9 @@ static DECLFW(BandaiWrite) {
 
 static DECLFR(BandaiRead) {
 	if(x24c02)
-		return (X.DB & 0xEF) | (x24c02_out << 4);
+		return (g_cpu.native_layout().DB & 0xEF) | (x24c02_out << 4);
 	else
-		return (X.DB & 0xEF) | (x24c01_out << 4);
+		return (g_cpu.native_layout().DB & 0xEF) | (x24c01_out << 4);
 }
 
 static void BandaiIRQHook(int a) {
@@ -319,7 +319,7 @@ void Mapper16_Init(CartInfo *info) {
 	x24c02 = 1;
 	is153 = 0;
 	info->Power = BandaiPower;
-	MapIRQHook = BandaiIRQHook;
+	g_cpu.map_irq_hook_ref() = BandaiIRQHook;
 
 	info->battery = 1;
 	info->addSaveGameBuf( x24c0x_data + 256, 256 );
@@ -334,7 +334,7 @@ void Mapper159_Init(CartInfo *info) {
 	x24c02 = 0;
 	is153 = 0;
 	info->Power = BandaiPower;
-	MapIRQHook = BandaiIRQHook;
+	g_cpu.map_irq_hook_ref() = BandaiIRQHook;
 
 	info->battery = 1;
 	info->addSaveGameBuf( x24c0x_data, 128 );
@@ -372,7 +372,7 @@ void Mapper153_Init(CartInfo *info) {
 	is153 = 1;
 	info->Power = M153Power;
 	info->Close = M153Close;
-	MapIRQHook = BandaiIRQHook;
+	g_cpu.map_irq_hook_ref() = BandaiIRQHook;
 
 	WRAMSIZE = 8192;
 	WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped
@@ -575,7 +575,7 @@ static void BarcodeIRQHook(int a) {
 }
 
 static DECLFR(BarcodeRead) {
-	return (X.DB & 0xE7) | ((x24c02_out | x24c01_out) << 4) | BarcodeOut;
+	return (g_cpu.native_layout().DB & 0xE7) | ((x24c02_out | x24c01_out) << 4) | BarcodeOut;
 }
 
 static void M157Power(void) {
@@ -597,7 +597,7 @@ static void M157Power(void) {
 void Mapper157_Init(CartInfo *info) {
 	x24c02 = 1;
 	info->Power = M157Power;
-	MapIRQHook = BarcodeIRQHook;
+	g_cpu.map_irq_hook_ref() = BarcodeIRQHook;
 
 	GameInfo->cspecial = SIS_DATACH;
 	info->battery = 1;

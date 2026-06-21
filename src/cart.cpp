@@ -156,7 +156,7 @@ DECLFW(CartBW) {
 DECLFR(CartBROB) {
 	uint8 *p = Page[A >> 11];
 	if (!p)
-		return(X.DB);
+		return(g_cpu.native_layout().DB);
 	if ((A & 0x7FF) < (0x800 - 64))
 		FCEUX11_PREFETCH(&p[A + 64]);
 	return p[A];

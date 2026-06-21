@@ -580,7 +580,7 @@ static DECLFR(MMC5_ReadROMRAM) {
 	if (MMC5MemIn[(A - 0x6000) >> 13])
 		return Page[A >> 11][A];
 	else
-		return X.DB;
+		return g_cpu.native_layout().DB;
 }
 
 static DECLFW(MMC5_WriteROMRAM) {
@@ -617,7 +617,7 @@ static DECLFR(MMC5_read) {
 	case 0x5206:
 		return((mul[0] * mul[1]) >> 8);
 	}
-	return(X.DB);
+	return(g_cpu.native_layout().DB);
 }
 
 void MMC5Synco(void) {

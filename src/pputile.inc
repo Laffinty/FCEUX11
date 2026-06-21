@@ -10,7 +10,7 @@ uint8 tmpd;
 #else
 	uint8 xs, ys;
 	xs = X1;
-	ys = ((scanline >> 3) + MMC5HackSPScroll) & 0x1F;
+	ys = ((g_cpu.scanline_ref() >> 3) + MMC5HackSPScroll) & 0x1F;
 	if (ys >= 0x1E) ys -= 0x1E;
 #endif
 

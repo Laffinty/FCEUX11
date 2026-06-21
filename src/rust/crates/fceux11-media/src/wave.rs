@@ -28,11 +28,11 @@ fn build_wav_header(sample_rate: u32, data_size: u32) -> [u8; 44] {
     // fmt sub-chunk
     h[12..16].copy_from_slice(b"fmt ");
     h[16..20].copy_from_slice(&16u32.to_le_bytes()); // SubChunk1Size (PCM)
-    h[20..22].copy_from_slice(&1u16.to_le_bytes());  // AudioFormat (PCM)
-    h[22..24].copy_from_slice(&1u16.to_le_bytes());  // NumChannels (Mono)
+    h[20..22].copy_from_slice(&1u16.to_le_bytes()); // AudioFormat (PCM)
+    h[22..24].copy_from_slice(&1u16.to_le_bytes()); // NumChannels (Mono)
     h[24..28].copy_from_slice(&sample_rate.to_le_bytes());
     h[28..32].copy_from_slice(&byte_rate.to_le_bytes());
-    h[32..34].copy_from_slice(&2u16.to_le_bytes());  // BlockAlign
+    h[32..34].copy_from_slice(&2u16.to_le_bytes()); // BlockAlign
     h[34..36].copy_from_slice(&16u16.to_le_bytes()); // BitsPerSample
 
     // data sub-chunk
@@ -50,7 +50,7 @@ fn build_wav_header(sample_rate: u32, data_size: u32) -> [u8; 44] {
 /// # Safety
 /// `path` must be a valid null-terminated UTF-8 string.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_wave_begin(path: *const c_char, sample_rate: u32) -> bool {
+pub unsafe extern "C" fn fceux11_rust_wave_begin(path: *const c_char, sample_rate: u32) -> bool {
     if path.is_null() {
         return false;
     }
@@ -66,11 +66,11 @@ pub extern "C" fn fceux11_rust_wave_begin(path: *const c_char, sample_rate: u32)
     state.data_size = 0;
 
     let header = build_wav_header(sample_rate, 0);
-    if let Some(ref mut f) = state.file {
-        if f.write_all(&header).is_err() {
-            state.file = None;
-            return false;
-        }
+    if let Some(ref mut f) = state.file
+        && f.write_all(&header).is_err()
+    {
+        state.file = None;
+        return false;
     }
 
     true
@@ -90,7 +90,7 @@ pub extern "C" fn fceux11_rust_wave_running() -> bool {
 /// # Safety
 /// `buffer` must point to at least `count` valid `i16` samples, or be NULL when `count` is 0.
 #[unsafe(no_mangle)]
-pub extern "C" fn fceux11_rust_wave_write(buffer: *const i16, count: i32) -> i64 {
+pub unsafe extern "C" fn fceux11_rust_wave_write(buffer: *const i16, count: i32) -> i64 {
     if count <= 0 || buffer.is_null() {
         return 0;
     }
@@ -106,7 +106,7 @@ pub extern "C" fn fceux11_rust_wave_write(buffer: *const i16, count: i32) -> i64
     let bytes = unsafe {
         std::slice::from_raw_parts(
             samples.as_ptr() as *const u8,
-            samples.len() * std::mem::size_of::<i16>(),
+            std::mem::size_of_val(samples),
         )
     };
 
@@ -162,64 +162,73 @@ mod tests {
 
     #[test]
     fn test_wave_roundtrip() {
-        let tmp = std::env::temp_dir().join("fceux11_rust_wave_test.wav");
-        let _ = fs::remove_file(&tmp);
+        unsafe {
+            let tmp = std::env::temp_dir().join("fceux11_rust_wave_test.wav");
+            let _ = fs::remove_file(&tmp);
 
-        let path = CString::new(tmp.to_str().unwrap()).unwrap();
-        assert!(fceux11_rust_wave_begin(path.as_ptr(), 48000));
-        assert!(fceux11_rust_wave_running());
+            let path = CString::new(tmp.to_str().unwrap()).unwrap();
+            assert!(fceux11_rust_wave_begin(path.as_ptr(), 48000));
+            assert!(fceux11_rust_wave_running());
 
-        let samples: [i16; 4] = [0, 16384, -16384, 32767];
-        assert_eq!(fceux11_rust_wave_write(samples.as_ptr(), samples.len() as i32), 8);
+            let samples: [i16; 4] = [0, 16384, -16384, 32767];
+            assert_eq!(
+                fceux11_rust_wave_write(samples.as_ptr(), samples.len() as i32),
+                8
+            );
 
-        assert_eq!(fceux11_rust_wave_end(), 1);
-        assert!(!fceux11_rust_wave_running());
+            assert_eq!(fceux11_rust_wave_end(), 1);
+            assert!(!fceux11_rust_wave_running());
 
-        let data = fs::read(&tmp).unwrap();
-        assert_eq!(data.len(), 44 + 8);
+            let data = fs::read(&tmp).unwrap();
+            assert_eq!(data.len(), 44 + 8);
 
-        // Verify header fields
-        assert_eq!(&data[0..4], b"RIFF");
-        let riff_size = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
-        assert_eq!(riff_size, 36 + 8);
-        assert_eq!(&data[8..12], b"WAVE");
-        assert_eq!(&data[12..16], b"fmt ");
-        let fmt_size = u32::from_le_bytes([data[16], data[17], data[18], data[19]]);
-        assert_eq!(fmt_size, 16);
-        let audio_format = u16::from_le_bytes([data[20], data[21]]);
-        assert_eq!(audio_format, 1); // PCM
-        let channels = u16::from_le_bytes([data[22], data[23]]);
-        assert_eq!(channels, 1); // mono
-        let rate = u32::from_le_bytes([data[24], data[25], data[26], data[27]]);
-        assert_eq!(rate, 48000);
-        let byte_rate = u32::from_le_bytes([data[28], data[29], data[30], data[31]]);
-        assert_eq!(byte_rate, 48000 * 2);
-        let block_align = u16::from_le_bytes([data[32], data[33]]);
-        assert_eq!(block_align, 2);
-        let bits = u16::from_le_bytes([data[34], data[35]]);
-        assert_eq!(bits, 16);
-        assert_eq!(&data[36..40], b"data");
-        let data_size = u32::from_le_bytes([data[40], data[41], data[42], data[43]]);
-        assert_eq!(data_size, 8);
+            // Verify header fields
+            assert_eq!(&data[0..4], b"RIFF");
+            let riff_size = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
+            assert_eq!(riff_size, 36 + 8);
+            assert_eq!(&data[8..12], b"WAVE");
+            assert_eq!(&data[12..16], b"fmt ");
+            let fmt_size = u32::from_le_bytes([data[16], data[17], data[18], data[19]]);
+            assert_eq!(fmt_size, 16);
+            let audio_format = u16::from_le_bytes([data[20], data[21]]);
+            assert_eq!(audio_format, 1); // PCM
+            let channels = u16::from_le_bytes([data[22], data[23]]);
+            assert_eq!(channels, 1); // mono
+            let rate = u32::from_le_bytes([data[24], data[25], data[26], data[27]]);
+            assert_eq!(rate, 48000);
+            let byte_rate = u32::from_le_bytes([data[28], data[29], data[30], data[31]]);
+            assert_eq!(byte_rate, 48000 * 2);
+            let block_align = u16::from_le_bytes([data[32], data[33]]);
+            assert_eq!(block_align, 2);
+            let bits = u16::from_le_bytes([data[34], data[35]]);
+            assert_eq!(bits, 16);
+            assert_eq!(&data[36..40], b"data");
+            let data_size = u32::from_le_bytes([data[40], data[41], data[42], data[43]]);
+            assert_eq!(data_size, 8);
 
-        // Verify sample bytes are little-endian
-        assert_eq!(data[44..46], [0x00, 0x00]);       // 0
-        assert_eq!(data[46..48], [0x00, 0x40]);       // 16384 = 0x4000
-        assert_eq!(data[48..50], [0x00, 0xC0]);       // -16384 = 0xC000
-        assert_eq!(data[50..52], [0xFF, 0x7F]);       // 32767 = 0x7FFF
+            // Verify sample bytes are little-endian
+            assert_eq!(data[44..46], [0x00, 0x00]); // 0
+            assert_eq!(data[46..48], [0x00, 0x40]); // 16384 = 0x4000
+            assert_eq!(data[48..50], [0x00, 0xC0]); // -16384 = 0xC000
+            assert_eq!(data[50..52], [0xFF, 0x7F]); // 32767 = 0x7FFF
 
-        let _ = fs::remove_file(&tmp);
+            let _ = fs::remove_file(&tmp);
+        }
     }
 
     #[test]
     fn test_wave_end_without_begin() {
-        // Ensure calling end without begin is safe and returns 0
-        assert_eq!(fceux11_rust_wave_end(), 0);
+        unsafe {
+            // Ensure calling end without begin is safe and returns 0
+            assert_eq!(fceux11_rust_wave_end(), 0);
+        }
     }
 
     #[test]
     fn test_wave_write_without_begin() {
-        let samples: [i16; 2] = [100, 200];
-        assert_eq!(fceux11_rust_wave_write(samples.as_ptr(), 2), 0);
+        unsafe {
+            let samples: [i16; 2] = [100, 200];
+            assert_eq!(fceux11_rust_wave_write(samples.as_ptr(), 2), 0);
+        }
     }
 }

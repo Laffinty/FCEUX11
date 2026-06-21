@@ -82,7 +82,7 @@ static void StateRestore(int version) {
 
 void UNLKS7032_Init(CartInfo *info) {
 	info->Power = UNLKS7032Power;
-	MapIRQHook = UNLSMB2JIRQHook;
+	g_cpu.map_irq_hook_ref() = UNLSMB2JIRQHook;
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }
