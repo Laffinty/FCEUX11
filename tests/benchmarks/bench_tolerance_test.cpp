@@ -102,22 +102,61 @@ static std::string readFile(const char* path, bool* ok) {
     return s;
 }
 
+// v1.3 Legion Phase 7.3: The hand-rolled parser previously searched
+// for the literal substring `"name": "X"` (single space after colon),
+// which fails to match the columnar-style JSON where authors align
+// values with `"name":             "X"`. The same bug silently
+// affected baseline_v1.0.json from the start. The fix below scans
+// for the key, then skips any horizontal whitespace (space/tab, but
+// NOT newline — we want the value to be on the same line for sane
+// diagnostics) before the colon, then any whitespace after the colon.
+static const char* skip_hspace(const char* p) {
+    while (*p == ' ' || *p == '\t') ++p;
+    return p;
+}
+
 static double find_baseline_ms(const std::string& json, const std::string& name) {
-    // Find the "name": "X" entry, then the following "baseline_ms": N.
-    std::string needle = "\"name\": \"" + name + "\"";
-    size_t pos = json.find(needle);
-    if (pos == std::string::npos) return -1.0;
-    std::string bk = "\"baseline_ms\":";
-    size_t bpos = json.find(bk, pos);
-    if (bpos == std::string::npos) return -1.0;
-    return std::atof(json.c_str() + bpos + bk.size());
+    // Find the "name" key followed by an optional space-aligned colon.
+    // We look for any occurrence of `"name"` and then verify the value.
+    const std::string key = "\"name\"";
+    size_t pos = 0;
+    while ((pos = json.find(key, pos)) != std::string::npos) {
+        const char* p = json.c_str() + pos + key.size();
+        p = skip_hspace(p);
+        if (*p != ':') { ++pos; continue; }
+        ++p;
+        p = skip_hspace(p);
+        if (*p != '"') { ++pos; continue; }
+        ++p;
+        size_t vlen = 0;
+        while (p[vlen] && p[vlen] != '"') ++vlen;
+        if (vlen == name.size() && std::memcmp(p, name.data(), vlen) == 0) {
+            // Match. Now find the "baseline_ms" key AFTER this position.
+            std::string bk = "\"baseline_ms\"";
+            size_t bpos = json.find(bk, pos);
+            if (bpos == std::string::npos) return -1.0;
+            const char* q = json.c_str() + bpos + bk.size();
+            q = skip_hspace(q);
+            if (*q != ':') return -1.0;
+            ++q;
+            q = skip_hspace(q);
+            return std::atof(q);
+        }
+        ++pos;
+    }
+    return -1.0;
 }
 
 static double find_tolerance_pct(const std::string& json) {
-    std::string bk = "\"tolerance_pct\":";
+    std::string bk = "\"tolerance_pct\"";
     size_t bpos = json.find(bk);
     if (bpos == std::string::npos) return 2.0;
-    return std::atof(json.c_str() + bpos + bk.size());
+    const char* p = json.c_str() + bpos + bk.size();
+    p = skip_hspace(p);
+    if (*p != ':') return 2.0;
+    ++p;
+    p = skip_hspace(p);
+    return std::atof(p);
 }
 
 int main(int argc, char** argv) {
@@ -132,10 +171,17 @@ int main(int argc, char** argv) {
     std::printf("Mode: %s\n\n", generate ? "GENERATE local baseline"
                                          : "VERIFY against baseline");
 
-    // Pick baseline path: env var > v1.0 default.
+    // Pick baseline path: env var > v1.3 default > v1.0 fallback.
+    // v1.3 Legion Phase 7.3: the v1.3 baseline (fixtures/bench_baseline.json)
+    // is the canonical 1%-tolerance reference. The v1.0 baseline
+    // (benchmarks/baseline_v1.0.json) remains as a historical fallback
+    // — measured on a much faster dedicated runner, so typical CI
+    // hosts will sit ~40-80% above it and is therefore useless for
+    // regression detection unless the v1.0 baseline is also being
+    // treated as an "absolute speed floor" rather than a peer.
     const char* baseline_path = std::getenv("FCEUX11_BENCH_BASELINE");
     if (!baseline_path || !*baseline_path) {
-        baseline_path = "benchmarks/baseline_v1.0.json";
+        baseline_path = "fixtures/bench_baseline.json";
     }
     const char* local_path = "benchmarks/baseline_v1.0.local.json";
 
