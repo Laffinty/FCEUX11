@@ -95,8 +95,8 @@ void test_ram_rw(TestContext& ctx) {
 
 void test_prg_chr_pointers(TestContext& ctx) {
     // PRGptr[0..N] and CHRptr[0..N] are populated by mapper Power.
-    extern uint8* PRGptr[32];
-    extern uint8* CHRptr[32];
+    // (v1.4 Gateway Phase 2: these are inline reference-to-array
+    // aliases in bus.h, visible via fceu.h. No local extern needed.)
     bool any_prg = false, any_chr = false;
     for (int i = 0; i < 32; ++i) {
         if (PRGptr[i]) { any_prg = true; break; }
@@ -135,8 +135,8 @@ void test_setmirror(TestContext& ctx) {
 
 void test_page_vpage(TestContext& ctx) {
     // Page[32] is the CPU address space page pointer table. After
-    // Power, every page that's addressable must be non-null.
-    extern uint8* Page[32];
+    // Power, every page that's addressable must be non-null. (v1.4
+    // Gateway Phase 2: inline reference-to-array alias in bus.h.)
     int nonnull = 0;
     for (int i = 0; i < 32; ++i) {
         if (Page[i]) ++nonnull;

@@ -93,17 +93,13 @@ struct ApuView {
 };
 
 // ---------------------------------------------------------------------------
-// Bus view (分类 D — owned by cart.cpp / fceu.cpp; v1.4 will fold into Bus)
+// Bus (分类 D — folded into fceu11::Bus in v1.4 Gateway Phase 2).
+// core_state.h forward-declares the class; the full definition is in
+// bus.h. State::bus() returns a reference to fceu11::bus_instance().
+// (Forward decl is placed inside the outer namespace fceu11; no
+// extra `namespace fceu11 { ... }` wrapper needed.)
 // ---------------------------------------------------------------------------
-struct BusView {
-    readfunc  (& aread()  noexcept)[0x10000]; // ::ARead
-    writefunc (& bwrite() noexcept)[0x10000]; // ::BWrite
-    uint8_t* (& page()  noexcept)[32];        // ::Page (CPU page table)
-    uint8_t* (& vpage() noexcept)[8];         // ::VPage (PPU page table; shared with PpuView)
-
-    uint8_t* (& mmc5_spr_vpage() noexcept)[8];
-    uint8_t* (& mmc5_bg_vpage()  noexcept)[8];
-};
+class Bus;
 
 // ---------------------------------------------------------------------------
 // Cart view (分类 E — owned by ines/unif + cart.cpp; v1.7 will fold into Cart)
@@ -205,7 +201,7 @@ public:
     CpuView&   cpu()    noexcept { return cpu_;    }
     PpuView&   ppu()    noexcept { return ppu_;    }
     ApuView&   apu()    noexcept { return apu_;    }
-    BusView&   bus()    noexcept { return bus_;    }
+    Bus&       bus()    noexcept;  // defined in core_state.cpp; returns bus_instance()
     CartView&  cart()   noexcept { return cart_;   }
     ConfigView& config() noexcept { return config_; }
     DebugView& debug()  noexcept { return debug_;  }
@@ -217,7 +213,6 @@ private:
     CpuView    cpu_{};
     PpuView    ppu_{};
     ApuView    apu_{};
-    BusView    bus_{};
     CartView   cart_{};
     ConfigView config_{};
     DebugView  debug_{};

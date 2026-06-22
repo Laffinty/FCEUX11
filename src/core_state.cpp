@@ -8,6 +8,7 @@
 
 #include "core_state.h"
 
+#include "bus.h"        // fceu11::bus_instance() (State::bus()), inline aliases for ::ARead/::BWrite/::Page/::VPage/::PRGptr/::CHRptr
 #include "cpu.h"        // fceu11::cpu_instance()
 #include "x6502.h"      // X6502, legacy inline aliases
 #include "x6502struct.h" // X6502 (struct definition)
@@ -69,15 +70,12 @@ bool&     ApuView::swap_duty() noexcept { return ::swapDuty; }
 // struct EXPSOUND& ApuView::exp_sound() noexcept { return ::GameExpSound; }
 
 // ---------------------------------------------------------------------------
-// BusView — VPage is shared with PpuView; both views reference the same
-// underlying array. (v1.4 Bus will own it; v1.5 Ppu will adopt a Bus ref.)
+// State::bus() — v1.4 Gateway: returns the Bus singleton. BusView is
+// retired; the underlying accessors (`bus_instance().aread_table()`
+// etc.) cover the same surface and are accessible from any TU via
+// bus.h. CartView (below) keeps the related cart-owned tables.
 // ---------------------------------------------------------------------------
-readfunc  (& BusView::aread()  noexcept)[0x10000] { return ::ARead; }
-writefunc (& BusView::bwrite() noexcept)[0x10000] { return ::BWrite; }
-uint8_t* (& BusView::page()  noexcept)[32] { return ::Page; }
-uint8_t* (& BusView::vpage() noexcept)[8]  { return ::VPage; }
-uint8_t* (& BusView::mmc5_spr_vpage() noexcept)[8] { return ::MMC5SPRVPage; }
-uint8_t* (& BusView::mmc5_bg_vpage()  noexcept)[8] { return ::MMC5BGVPage; }
+Bus& State::bus() noexcept { return fceu11::bus_instance(); }
 
 // ---------------------------------------------------------------------------
 // CartView

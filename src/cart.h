@@ -3,6 +3,14 @@
 
 #include <vector>
 
+// Pull in Bus — provides the inline global aliases (ARead, BWrite,
+// Page, VPage, PRGptr, CHRptr, PRGsize, CHRmask*, etc.) and inline
+// forwarders for setprg8/16/32, setchr1/4/8, setmirror/setmirrorw/
+// setntamem, SetupCart*Mapping, SetupCartMirroring, ResetCartMapping.
+// v1.4 Gateway Phase 2: the bus now owns the data; cart.h keeps
+// only the non-Bus surface (CartInfo, the `r` variants, Genie).
+#include "bus.h"
+
 struct CartInfo
 {
 	// Set by mapper/board code:
@@ -57,7 +65,7 @@ struct CartInfo
 	{
 		clear();
 	}
-	
+
 	void clear(void)
 	{
 		Power = nullptr;
@@ -86,62 +94,31 @@ void FCEU_SaveGameSave(CartInfo *LocalHWInfo);
 void FCEU_LoadGameSave(CartInfo *LocalHWInfo);
 void FCEU_ClearGameSave(CartInfo *LocalHWInfo);
 
-FCEUX11_CACHE_ALIGN extern uint8 *Page[32], *VPage[8], *MMC5SPRVPage[8], *MMC5BGVPage[8];
-
-void ResetCartMapping(void);
-void SetupCartPRGMapping(int chip, uint8 *p, uint32 size, int ram);
-void SetupCartCHRMapping(int chip, uint8 *p, uint32 size, int ram);
-void SetupCartMirroring(int m, int hard, uint8 *extra);
-
+// Page-table read/write handlers (read from / write to the bus's
+// Page[] / PRGIsRAM[] — both now Bus-owned via inline aliases).
 DECLFR(CartBROB);
 DECLFR(CartBR);
 DECLFW(CartBW);
 
-FCEUX11_CACHE_ALIGN extern uint8 PRGram[32];
-FCEUX11_CACHE_ALIGN extern uint8 CHRram[32];
+// `r` variants of the bank-switching free functions. The plain
+// (non-r) setprg8/16/32, setchr1/4/8, setmirror/setmirrorw/setntamem
+// are inline forwarders in bus.h (Bus methods). The r-variants stay
+// as free functions in cart.cpp because the v1.4 Bus class spec
+// doesn't list them and no board file in the v1.4 migration batches
+// uses them.
+void setprg2  (uint32 A, uint32 V);
+void setprg4  (uint32 A, uint32 V);
+void setprg2r (int r, unsigned int A, unsigned int V);
+void setprg4r (int r, unsigned int A, unsigned int V);
+void setprg8r (int r, uint32 A, uint32 V);
+void setprg16r(int r, uint32 A, uint32 V);
+void setprg32r(int r, uint32 A, uint32 V);
 
-FCEUX11_CACHE_ALIGN extern uint8 *PRGptr[32];
-FCEUX11_CACHE_ALIGN extern uint8 *CHRptr[32];
-
-FCEUX11_CACHE_ALIGN extern uint32 PRGsize[32];
-FCEUX11_CACHE_ALIGN extern uint32 CHRsize[32];
-
-FCEUX11_CACHE_ALIGN extern uint32 PRGmask2[32];
-FCEUX11_CACHE_ALIGN extern uint32 PRGmask4[32];
-FCEUX11_CACHE_ALIGN extern uint32 PRGmask8[32];
-FCEUX11_CACHE_ALIGN extern uint32 PRGmask16[32];
-FCEUX11_CACHE_ALIGN extern uint32 PRGmask32[32];
-
-FCEUX11_CACHE_ALIGN extern uint32 CHRmask1[32];
-FCEUX11_CACHE_ALIGN extern uint32 CHRmask2[32];
-FCEUX11_CACHE_ALIGN extern uint32 CHRmask4[32];
-FCEUX11_CACHE_ALIGN extern uint32 CHRmask8[32];
-
-void setprg2(uint32 A, uint32 V);
-void setprg4(uint32 A, uint32 V);
-void setprg8(uint32 A, uint32 V);
-void setprg16(uint32 A, uint32 V);
-void setprg32(uint32 A, uint32 V);
-
-void setprg2r(int r, unsigned int A, unsigned int V);
-void setprg4r(int r, unsigned int A, unsigned int V);
-void setprg8r(int r, unsigned int A, unsigned int V);
-void setprg16r(int r, unsigned int A, unsigned int V);
-void setprg32r(int r, unsigned int A, unsigned int V);
-
-void setchr1r(int r, unsigned int A, unsigned int V);
-void setchr2r(int r, unsigned int A, unsigned int V);
-void setchr4r(int r, unsigned int A, unsigned int V);
-void setchr8r(int r, unsigned int V);
-
-void setchr1(unsigned int A, unsigned int V);
-void setchr2(unsigned int A, unsigned int V);
-void setchr4(unsigned int A, unsigned int V);
-void setchr8(unsigned int V);
-
-void setmirror(int t);
-void setmirrorw(int a, int b, int c, int d);
-void setntamem(uint8 *p, int ram, uint32 b);
+void setchr1r (int r, unsigned int A, unsigned int V);
+void setchr2  (uint32 A, uint32 V);
+void setchr2r (int r, unsigned int A, unsigned int V);
+void setchr4r (int r, unsigned int A, unsigned int V);
+void setchr8r (int r, uint32 V);
 
 #define MI_H 0
 #define MI_V 1

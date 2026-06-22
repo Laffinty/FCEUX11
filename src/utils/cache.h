@@ -23,7 +23,14 @@ inline constexpr std::size_t kCacheLineSize =
 } // namespace fceu11
 
 // Place an object / array at a cache-line boundary.
-#define FCEUX11_CACHE_ALIGN alignas(fceu11::kCacheLineSize)
+// Use the leading `::` so the macro works correctly when expanded
+// inside `namespace fceu11 { ... }` blocks (otherwise the qualified
+// name `fceu11::kCacheLineSize` resolves to `fceu11::fceu11::...`
+// which doesn't exist). All existing call sites in cart.cpp,
+// fceu.cpp, bus.cpp etc. are at file scope, where `::fceu11::` and
+// `fceu11::` resolve to the same symbol, so this change is
+// backward-compatible.
+#define FCEUX11_CACHE_ALIGN alignas(::fceu11::kCacheLineSize)
 
 // Mark a mapper register group as hot for cache-line alignment.
 #define FCEUX11_MAPPER_HOT FCEUX11_CACHE_ALIGN

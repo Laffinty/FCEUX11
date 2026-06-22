@@ -2,6 +2,11 @@
 #define _FCEUH
 
 #include "types.h"
+#include "bus.h"   // inline reference-to-array aliases for ::ARead / ::BWrite /
+                   // ::Page / ::VPage / ::PRGptr / ::CHRptr / etc., plus
+                   // inline forwarders for setprg8/16/32, setchr1/4/8,
+                   // setmirror/setmirrorw/setntamem, and SetupCart* /
+                   // ResetCartMapping. v1.4 Gateway Phase 2.
 
 extern int fceuindbg;
 extern int newppu;
@@ -82,8 +87,11 @@ extern int RAMInitOption;
 uint8 FCEU_ReadRomByte(uint32 i);
 void FCEU_WriteRomByte(uint32 i, uint8 value);
 
-FCEUX11_CACHE_ALIGN extern readfunc ARead[0x10000];
-FCEUX11_CACHE_ALIGN extern writefunc BWrite[0x10000];
+// ARead[] / BWrite[] are now inline reference-to-array aliases
+// declared in bus.h. fceu.h used to declare them as extern arrays;
+// those declarations are removed because the inline alias is the
+// sole definition. Files that include fceu.h (or transitively
+// include bus.h via cart.h) see the same ARead / BWrite symbols.
 
 enum GI {
 	GI_RESETM2	=1,

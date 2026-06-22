@@ -1,57 +1,66 @@
 {
-  "_comment": [
-    "v1.3 Legion Phase 7.3 - Performance baseline for v1.3.0.",
-    "Same shape as tests/benchmarks/baseline_v1.0.json so the",
-    "bench_tolerance_test can load either one. bench_tolerance_test",
-    "defaults to the v1.0 baseline; set FCEUX11_BENCH_BASELINE to",
-    "this file to verify against v1.3 instead.",
-    "",
-    "Each benchmark records: name, rom, frames_per_iter, iterations,",
-    "and the median total wall-clock time in milliseconds over 5",
-    "iterations, measured on the same machine class.",
-    "",
-    "The 1 percent tolerance gate from v1.3 Legion is the ASPIRATIONAL",
-    "target; the practical tolerance is 2.5 percent because back-to-back",
-    "runs of unchanged code on a shared CI runner have ~2 percent natural",
-    "noise from scheduling, thermal, and cache-state effects. We use 2.5",
-    "percent here so a clean build stays green; tighten to 1 percent only",
-    "on a dedicated runner with no other workloads."
-  ],
-  "version":             "v1.3.0",
-  "captured_at":         "2026-06-22",
-  "captured_from_commit": "0ee4bbff07ba6ac14e8dc0445f5c96451f2d55dc",
-  "captured_on":         "Windows_NT, Microsoft Windows 10.0.26200 , AMD64",
-  "tolerance_pct":       2.5,
-  "benchmarks": [
-    {
-      "name":             "bench_cpu_frame",
-      "binary":           "fceux11_bench_x6502_exec",
-      "rom":              "fixtures/nestest.nes",
-      "frames_per_iter":  60,
-      "iterations":       5,
-      "metric":           "median_total_ms",
-      "baseline_ms":      66.230,
-      "unit":             "milliseconds for 60 frames"
-    },
-    {
-      "name":             "bench_ppu_frame",
-      "binary":           "fceux11_bench_ppu_render",
-      "rom":              "fixtures/mapper_nrom.nes",
-      "frames_per_iter":  60,
-      "iterations":       5,
-      "metric":           "median_total_ms",
-      "baseline_ms":      68.678,
-      "unit":             "milliseconds for 60 frames"
-    },
-    {
-      "name":             "bench_full_frame",
-      "binary":           "fceux11_bench_apu_mix",
-      "rom":              "fixtures/mapper_mmc3.nes",
-      "frames_per_iter":  60,
-      "iterations":       5,
-      "metric":           "median_total_ms",
-      "baseline_ms":      67.842,
-      "unit":             "milliseconds for 60 frames (CPU+PPU+APU)"
-    }
-  ]
+    "_comment": [
+        "Asymmetric gate (v1.4 Gateway Phase 2): tolerance_pct = max acceptable",
+        "REGRESSION (slowdown). Speedups (faster than baseline) always pass \u2014",
+        "perf improvements are celebrated, not flagged as tolerance violations.",
+        "See tests/benchmarks/bench_tolerance_test.cpp for the check logic.",
+        "",
+        "v1.4 Gateway Phase 2 baseline. Re-captured on the v1.4 build; bus",
+        "class alignas(64) + inline reference-to-array aliases give 3-5%",
+        "improvement over v1.3 (66.230/68.678/67.842 ms).",
+        "",
+        "v1.3 Legion Phase 7.3 - Performance baseline for v1.3.0.",
+        "Same shape as tests/benchmarks/baseline_v1.0.json so the",
+        "bench_tolerance_test can load either one. bench_tolerance_test",
+        "defaults to the v1.0 baseline; set FCEUX11_BENCH_BASELINE to",
+        "this file to verify against v1.4 (or v1.3) instead.",
+        "",
+        "Each benchmark records: name, rom, frames_per_iter, iterations,",
+        "and the median total wall-clock time in milliseconds over 5",
+        "iterations, measured on the same machine class.",
+        "",
+        "The 1 percent tolerance gate from v1.3 Legion is the ASPIRATIONAL",
+        "target; the practical tolerance is 2.5 percent because back-to-back",
+        "runs of unchanged code on a shared CI runner have ~2 percent natural",
+        "noise from scheduling, thermal, and cache-state effects. We use 2.5",
+        "percent here so a clean build stays green; tighten to 1 percent only",
+        "on a dedicated runner with no other workloads."
+    ],
+    "version": "v1.4-phase2",
+    "captured_at": "2026-06-22",
+    "captured_from_commit": "0ee4bbff07ba6ac14e8dc0445f5c96451f2d55dc",
+    "captured_on": "Windows_NT, Microsoft Windows 10.0.26200 , AMD64",
+    "tolerance_pct": 2.5,
+    "benchmarks": [
+        {
+            "name": "bench_cpu_frame",
+            "binary": "fceux11_bench_x6502_exec",
+            "rom": "fixtures/nestest.nes",
+            "frames_per_iter": 60,
+            "iterations": 5,
+            "metric": "median_total_ms",
+            "baseline_ms": 63.622,
+            "unit": "milliseconds for 60 frames"
+        },
+        {
+            "name": "bench_ppu_frame",
+            "binary": "fceux11_bench_ppu_render",
+            "rom": "fixtures/mapper_nrom.nes",
+            "frames_per_iter": 60,
+            "iterations": 5,
+            "metric": "median_total_ms",
+            "baseline_ms": 65.381,
+            "unit": "milliseconds for 60 frames"
+        },
+        {
+            "name": "bench_full_frame",
+            "binary": "fceux11_bench_apu_mix",
+            "rom": "fixtures/mapper_mmc3.nes",
+            "frames_per_iter": 60,
+            "iterations": 5,
+            "metric": "median_total_ms",
+            "baseline_ms": 65.63,
+            "unit": "milliseconds for 60 frames (CPU+PPU+APU)"
+        }
+    ]
 }

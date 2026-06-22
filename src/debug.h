@@ -121,7 +121,12 @@ extern void IncrementInstructionsCounters();
 //-------------
 
 //internal variables that debuggers will want access to
-extern uint8 *vnapage[4],*VPage[8];
+// VPage moved to fceu11::Bus in v1.4 Gateway Phase 2. The legacy
+// global `VPage` is now an inline reference-to-array alias in
+// bus.h that binds to bus_instance().vpage(). Declarations in
+// debug.h (and anywhere else that included the old `extern
+// uint8* VPage[8]`) are removed.
+extern uint8 *vnapage[4];
 extern uint8 PPU[4],SPRAM[0x100],VRAMBuffer,PPUGenLatch,XOffset;
 extern std::array<uint8_t, 0x20> PALRAM;
 extern std::array<uint8_t, 3> UPALRAM;

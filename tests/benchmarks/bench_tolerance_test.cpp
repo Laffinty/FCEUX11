@@ -1,7 +1,7 @@
 // FCEUX11 v1.1 Sentinel §1.3 — Performance tolerance test.
 //
 // Runs each of the three benchmarks (x6502 / PPU / APU) and compares
-// the median wall-clock time against the v1.0 baseline.
+// the median wall-clock time against the loaded baseline.
 //
 // Behaviour:
 //   * If tests/benchmarks/baseline_v1.0.json is missing → test PASSES
@@ -12,8 +12,17 @@
 //     first run because we have no reference).
 //   * If the env var FCEUX11_BENCH_BASELINE points to a JSON file, that
 //     file is loaded instead of the v1.0 baseline (CI override).
-//   * Otherwise the v1.0 baseline is loaded, and a regression of more
-//     than ±2% on any benchmark fails the test.
+//   * Otherwise the v1.3/v1.4 baseline (fixtures/bench_baseline.json)
+//     is loaded and a **regression** of more than `tolerance_pct` on
+//     any benchmark fails the test.
+//
+// Asymmetric gate (v1.4 Gateway Phase 2): a SPEEDUP (current run
+// faster than baseline) is always considered a pass — performance
+// improvements are celebrated, not treated as "exceeding tolerance
+// in the negative direction". Only a SLOWDOWN (current run slower
+// than baseline by more than `tolerance_pct`) is a failure. The
+// `tolerance_pct` field in the baseline JSON therefore now means
+// "max acceptable regression", not "± deviation".
 //
 // We deliberately use the same ROM/frame/iteration counts as the
 // existing benchmark binaries (x6502_exec_bench.cpp / ppu_render_bench.cpp
@@ -228,14 +237,22 @@ int main(int argc, char** argv) {
             continue;
         }
         double dev_pct = (ms - base_ms) / base_ms * 100.0;
-        bool within = std::fabs(dev_pct) <= tolerance_pct;
-        std::printf("  baseline: %.3f ms  deviation: %+.2f%%  tolerance: ±%.1f%%\n",
-                    base_ms, dev_pct, tolerance_pct);
+        // Asymmetric gate: speedups (dev < 0) always pass; only
+        // slowdowns (dev > 0) must stay within `tolerance_pct`.
+        bool is_speedup = (dev_pct < 0.0);
+        bool within     = is_speedup || (dev_pct <= tolerance_pct);
+        if (is_speedup) {
+            std::printf("  baseline: %.3f ms  deviation: %+.2f%%  (speedup; no upper limit)\n",
+                        base_ms, dev_pct);
+        } else {
+            std::printf("  baseline: %.3f ms  deviation: %+.2f%%  max-regression: +%.1f%%\n",
+                        base_ms, dev_pct, tolerance_pct);
+        }
         if (within) {
             std::printf("  PASS\n");
             ++ctx.passed;
         } else {
-            std::printf("  FAIL: regression exceeds tolerance\n");
+            std::printf("  FAIL: regression exceeds max-regression threshold\n");
             ++ctx.failed;
         }
     }
