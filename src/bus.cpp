@@ -1,185 +1,379 @@
-// FCEUX11 — v1.4 Gateway: Memory dispatch + bank-switching bus skeleton
+// FCEUX11 — v1.4 Gateway: Memory dispatch + bank-switching bus
 //
-// Phase 1 implementation. Every method is either a no-op stub (for
-// the hot-path read/write that will be wired in Phase 2 against
-// this->aread_ / this->bwrite_) or a thin delegation to the existing
-// free functions in cart.cpp / fceu.cpp. The result is byte-equivalent
-// to v1.3.0 behaviour: every legacy call site still resolves to the
-// same code through the same globals.
+// Phase 2 implementation. Bus class OWNS all the dispatch / page /
+// ROM pointer / mask / ram-flag storage. Method bodies that in
+// Phase 1 delegated to cart.cpp / fceu.cpp free functions now do
+// the work directly on this->state_. The cart.cpp and fceu.cpp
+// global arrays for ARead / BWrite / Page / VPage / etc. are gone;
+// the legacy `::ARead` / `::Page` / etc. names are inline
+// reference-to-array aliases defined in bus.h that point into the
+// Bus singleton's internal storage.
+//
+// `VPageR` is a uint8** pointer alias for `&VPage[0]`; its
+// definition lives here so it can call bus_instance() at first
+// reference (C++ inline pointer variables must have constant
+// initializers, and `&bus_instance().vpage_[0]` is not constexpr).
 
 #include "bus.h"
 
-#include "fceu.h"   // ::ARead, ::BWrite, ::SetReadHandler, ::SetWriteHandler
-#include "cart.h"   // ::Page, ::VPage, ::PRGptr, ::CHRptr, ::setprg*, ::setchr*,
-                    // ::setmirror, ::setmirrorw, ::setntamem, ::SetupCart*Mapping
+#include <cstring>  // memset
+
+#include "fceu.h"   // ::ANull, ::BNull (DECLFR/DECLFW expansion)
+#include "ppu.h"    // ::PPUCHRRAM, ::PPUNTARAM, ::vnapage, ::NTARAM
+#include "x6502.h"  // g_cpu (for ::ANull's return value)
 
 namespace fceu11 {
 
 // ---------------------------------------------------------------------------
-// Class layout — reserved storage. The class currently holds a single
-// padding byte so the alignment of the class is at least 1; once
-// Phase 2 migrates the global arrays in, those become private members
-// and the static_assert below continues to compile.
-//
-// alignas(64) on the class is what allows Bus to live in a single
-// cache line and for the future aread_[0x10000] / bwrite_[0x10000]
-// to start on a fresh cache line. The 64-byte alignment must NOT
-// regress; if a future change drops it, this static_assert fires.
+// Class layout assertions.
 // ---------------------------------------------------------------------------
 static_assert(alignof(Bus) >= 64,
               "Bus must remain 64-byte aligned for cache locality");
+static_assert(sizeof(Bus) >= (2 * 0x10000 * sizeof(void*)),
+              "Bus must hold ARead[] + BWrite[] tables (>= 128 KB on 64-bit)");
 
 // ---------------------------------------------------------------------------
-// Lifecycle — Phase 1: no-op. Phase 2 will move ResetCartMapping-style
-// initialisation here.
+// Open-bus handler (replaces cart.cpp::nothing[8192] + the page-init
+// loop from ResetCartMapping). Each "Page" entry is a pointer into
+// the static `nothing` buffer, with a page-base offset so that
+// `Page[x][y]` indexes the right 2 KiB "open bus" value.
 // ---------------------------------------------------------------------------
-Bus::Bus() noexcept = default;
-void Bus::init() noexcept {}
-void Bus::shutdown() noexcept {}
+namespace {
+    uint8_t nothing[8192];
+
+    // Inline handler for reads on unmapped ranges: returns the CPU
+    // data-bus (X6502::DB) — matches the v1.3.0 fceu.cpp::ANull.
+    uint8_t ANullImpl(uint32_t) {
+        return g_cpu.native_layout().DB;
+    }
+    void BNullImpl(uint32_t, uint8_t) {}
+} // namespace
 
 // ---------------------------------------------------------------------------
-// Hot-path read / write (PHASE 1 STUB).
-//
-// The real implementation per plan §3.2 is `return aread_[addr](addr);`
-// and `bwrite_[addr](addr, val);`. The internal arrays `aread_` /
-// `bwrite_` will be added in Phase 2 when the data migrates. Until
-// then, calling Bus::read / Bus::write returns 0 / does nothing —
-// no existing call site invokes these methods, so this is harmless.
+// ctor: zero-init everything except the Genie shadow pointers (those
+// stay nullptr until AllocGenieRW mallocs them).
 // ---------------------------------------------------------------------------
-__forceinline uint8_t Bus::read(uint16_t addr) const noexcept {
-    (void)addr;
-    return 0;  // Phase 2: return aread_[addr](addr);
+Bus::Bus() noexcept {
+    std::memset(aread_,  0, sizeof(aread_));
+    std::memset(bwrite_, 0, sizeof(bwrite_));
+    std::memset(page_,          0, sizeof(page_));
+    std::memset(vpage_,         0, sizeof(vpage_));
+    std::memset(vpage_g_,       0, sizeof(vpage_g_));
+    std::memset(mmc5_spr_vpage_, 0, sizeof(mmc5_spr_vpage_));
+    std::memset(mmc5_bg_vpage_,  0, sizeof(mmc5_bg_vpage_));
+    std::memset(prg_ptr_,       0, sizeof(prg_ptr_));
+    std::memset(chr_ptr_,       0, sizeof(chr_ptr_));
+    std::memset(prg_size_,      0, sizeof(prg_size_));
+    std::memset(chr_size_,      0, sizeof(chr_size_));
+    std::memset(prg_mask2_,     0, sizeof(prg_mask2_));
+    std::memset(prg_mask4_,     0, sizeof(prg_mask4_));
+    std::memset(prg_mask8_,     0, sizeof(prg_mask8_));
+    std::memset(prg_mask16_,    0, sizeof(prg_mask16_));
+    std::memset(prg_mask32_,    0, sizeof(prg_mask32_));
+    std::memset(chr_mask1_,     0, sizeof(chr_mask1_));
+    std::memset(chr_mask2_,     0, sizeof(chr_mask2_));
+    std::memset(chr_mask4_,     0, sizeof(chr_mask4_));
+    std::memset(chr_mask8_,     0, sizeof(chr_mask8_));
+    std::memset(prg_is_ram_,    0, sizeof(prg_is_ram_));
+    std::memset(prg_ram_,       0, sizeof(prg_ram_));
+    std::memset(chr_ram_,       0, sizeof(chr_ram_));
+    mirror_hard_ = 0;
 }
 
-__forceinline void Bus::write(uint16_t addr, uint8_t val) const noexcept {
-    (void)addr;
-    (void)val;
-    // Phase 2: bwrite_[addr](addr, val);
+// ---------------------------------------------------------------------------
+// init: do the v1.3.0 cart.cpp::ResetCartMapping equivalent.
+// Called once at process start; also re-callable on game load.
+// ---------------------------------------------------------------------------
+void Bus::init() noexcept {
+    // Install default open-bus handler on the entire 64K CPU read
+    // and write dispatch. cart.cpp::ResetCartMapping only zeroed
+    // Page[] (no ARead/BWrite init), because the original Initialize
+    // path in fceu.cpp did ARead[x] = ANull manually. Both are
+    // idempotent and equivalent — installing ANull/BNull here keeps
+    // the bus in a known state even if a caller never runs the
+    // legacy Initialize path.
+    for (uint32_t x = 0; x < 0x10000; x++) {
+        aread_[x]  = ANullImpl;
+        bwrite_[x] = BNullImpl;
+    }
+    reset_mapping();
+}
+
+void Bus::shutdown() noexcept {
+    // The Genie shadow buffers (genie_a_read_ / genie_b_write_) are
+    // owned by fceu.cpp (via AllocGenieRW / FlushGenieRW); Bus does
+    // not free them here.
 }
 
 // ---------------------------------------------------------------------------
-// Direct memory access (debugger / DMR / DMW). Phase 1: stub. Phase 2:
-// routes through the cart.cpp::CartBR / CartBW / CartBROB path using
-// the Bus-owned Page[] table.
+// reset_mapping: cart.cpp::ResetCartMapping equivalent. Called by
+// fceu.cpp::ResetNES / PowerNES on each game load.
+// ---------------------------------------------------------------------------
+void Bus::reset_mapping() noexcept {
+    for (int x = 0; x < 32; x++) {
+        page_[x] = nothing - x * 2048;
+        prg_ptr_[x] = nullptr;
+        chr_ptr_[x] = nullptr;
+        prg_size_[x] = 0;
+        chr_size_[x] = 0;
+    }
+    for (int x = 0; x < 8; x++) {
+        mmc5_spr_vpage_[x] = mmc5_bg_vpage_[x] = vpage_[x] = nothing - 0x400 * x;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Accessors (page / vpage / prg_ptr / chr_ptr / aread_table /
+// bwrite_table) are defined INLINE in the class body in bus.h so
+// the compiler can constant-fold `bus_instance().page()` etc. to
+// the singleton's known address. Out-of-line definitions would
+// force a function call at every use site, costing ~5% on
+// bench_full_frame (measured in Phase 2 pre-optimization).
+// ---------------------------------------------------------------------------
+
+void Bus::set_page(uint32_t idx, uint8_t* ptr) noexcept  { page_[idx]  = ptr; }
+void Bus::set_vpage(uint32_t idx, uint8_t* ptr) noexcept { vpage_[idx] = ptr; }
+
+// ---------------------------------------------------------------------------
+// Direct memory access (debugger / DMR / DMW). Routes through the
+// same Page[] table as the read path but skips the aread_[] indirect
+// call. Mirrors the cart.cpp::CartBR / CartBW behaviour with no
+// prefetch hint (this is the debugger path, not the hot loop).
 // ---------------------------------------------------------------------------
 uint8_t Bus::direct_read(uint32_t addr) const noexcept {
-    (void)addr;
-    return 0;  // Phase 2: Page[addr >> 11][addr]
+    return page_[addr >> 11][addr];
 }
 
 void Bus::direct_write(uint32_t addr, uint8_t val) noexcept {
-    (void)addr;
-    (void)val;
-    // Phase 2: Page[addr >> 11][addr] = val
+    if (prg_is_ram_[addr >> 11] && page_[addr >> 11])
+        page_[addr >> 11][addr] = val;
 }
 
 // ---------------------------------------------------------------------------
-// Handler registration — Phase 1: delegate to the existing
-// fceu.cpp::SetReadHandler / SetWriteHandler (which manipulate the
-// global ARead[] / BWrite[] arrays).
+// Handler registration. Bus is the no-wrap path. The Genie-aware
+// path stays in fceu.cpp::SetReadHandler / SetWriteHandler (which
+// call these on the non-wrap branch).
 // ---------------------------------------------------------------------------
 void Bus::set_read_handler(uint32_t start, uint32_t end, readfunc fn) noexcept {
-    ::SetReadHandler(static_cast<int32_t>(start),
-                     static_cast<int32_t>(end),
-                     fn);
+    if (!fn) fn = ANullImpl;
+    for (uint32_t x = end; ; x--) {
+        aread_[x] = fn;
+        if (x == start) break;
+    }
 }
 
 void Bus::set_write_handler(uint32_t start, uint32_t end, writefunc fn) noexcept {
-    ::SetWriteHandler(static_cast<int32_t>(start),
-                      static_cast<int32_t>(end),
-                      fn);
+    if (!fn) fn = BNullImpl;
+    for (uint32_t x = end; ; x--) {
+        bwrite_[x] = fn;
+        if (x == start) break;
+    }
 }
 
 // ---------------------------------------------------------------------------
-// Page-table setters — Phase 1: write to the existing global arrays
-// in cart.cpp. Same semantics as direct access; the wrapping is here
-// so Phase 2 can flip the body to write to this->page_ / this->vpage_
-// without changing any call site.
+// Bank-switching — setprg8/16/32. Each writes through this->page_
+// via set_page(). The legacy setprg*r variants (setprg2r,
+// setprg4r, setprg8r, setprg16r, setprg32r) stay in cart.cpp
+// because the plan's Bus class only lists the non-r versions.
 // ---------------------------------------------------------------------------
-
-// Out-of-line definitions for the page-table / ROM-pointer / dispatch-
-// table accessors declared in bus.h. They are out-of-line so bus.h
-// does not have to include cart.h / fceu.h (which would pull in the
-// full CartInfo / setprg* / setchr* / FCEUS surface for every
-// translation unit that includes bus.h).
-uint8_t* (& Bus::page()  noexcept)[32] { return ::Page; }
-uint8_t* (& Bus::vpage() noexcept)[8]  { return ::VPage; }
-
-uint8_t* (& Bus::prg_ptr() noexcept)[32] { return ::PRGptr; }
-uint8_t* (& Bus::chr_ptr() noexcept)[32] { return ::CHRptr; }
-
-readfunc  (& Bus::aread_table()  noexcept)[0x10000]       { return ::ARead; }
-writefunc (& Bus::bwrite_table() noexcept)[0x10000]       { return ::BWrite; }
-const readfunc  (& Bus::aread_table()  const noexcept)[0x10000] { return ::ARead; }
-const writefunc (& Bus::bwrite_table() const noexcept)[0x10000] { return ::BWrite; }
-
-void Bus::set_page(uint32_t idx, uint8_t* ptr) noexcept {
-    ::Page[idx] = ptr;
+void Bus::setprg8(uint32_t A, uint32_t V) noexcept {
+    uint32_t bank = V;
+    if (prg_size_[0] >= 8192) {
+        bank &= prg_mask8_[0];
+        uint8_t* base = prg_ptr_[0] ? &prg_ptr_[0][bank << 13] : nullptr;
+        uint32_t AB = A >> 11;
+        for (int x = 3; x >= 0; x--) {
+            prg_is_ram_[AB + x] = prg_ram_[0];
+            set_page(AB + x, base ? (base - A) : nullptr);
+        }
+    } else {
+        uint32_t VA = V << 2;
+        for (int x = 0; x < 4; x++) {
+            uint8_t* base = prg_ptr_[0] ? &prg_ptr_[0][((VA + x) & prg_mask2_[0]) << 11] : nullptr;
+            uint32_t AB = (A + (x << 11)) >> 11;
+            prg_is_ram_[AB] = prg_ram_[0];
+            set_page(AB, base ? (base - (A + (x << 11))) : nullptr);
+        }
+    }
 }
 
-void Bus::set_vpage(uint32_t idx, uint8_t* ptr) noexcept {
-    ::VPage[idx] = ptr;
+void Bus::setprg16(uint32_t A, uint32_t V) noexcept {
+    uint32_t bank = V;
+    if (prg_size_[0] >= 16384) {
+        bank &= prg_mask16_[0];
+        uint8_t* base = prg_ptr_[0] ? &prg_ptr_[0][bank << 14] : nullptr;
+        uint32_t AB = A >> 11;
+        for (int x = 7; x >= 0; x--) {
+            prg_is_ram_[AB + x] = prg_ram_[0];
+            set_page(AB + x, base ? (base - A) : nullptr);
+        }
+    } else {
+        uint32_t VA = V << 3;
+        for (int x = 0; x < 8; x++) {
+            uint8_t* base = prg_ptr_[0] ? &prg_ptr_[0][((VA + x) & prg_mask2_[0]) << 11] : nullptr;
+            uint32_t AB = (A + (x << 11)) >> 11;
+            prg_is_ram_[AB] = prg_ram_[0];
+            set_page(AB, base ? (base - (A + (x << 11))) : nullptr);
+        }
+    }
+}
+
+void Bus::setprg32(uint32_t A, uint32_t V) noexcept {
+    uint32_t bank = V;
+    if (prg_size_[0] >= 32768) {
+        bank &= prg_mask32_[0];
+        uint8_t* base = prg_ptr_[0] ? &prg_ptr_[0][bank << 15] : nullptr;
+        uint32_t AB = A >> 11;
+        for (int x = 15; x >= 0; x--) {
+            prg_is_ram_[AB + x] = prg_ram_[0];
+            set_page(AB + x, base ? (base - A) : nullptr);
+        }
+    } else {
+        uint32_t VA = V << 4;
+        for (int x = 0; x < 16; x++) {
+            uint8_t* base = prg_ptr_[0] ? &prg_ptr_[0][((VA + x) & prg_mask2_[0]) << 11] : nullptr;
+            uint32_t AB = (A + (x << 11)) >> 11;
+            prg_is_ram_[AB] = prg_ram_[0];
+            set_page(AB, base ? (base - (A + (x << 11))) : nullptr);
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
-// Bank-switching API — Phase 1: delegate to the free functions in
-// cart.cpp (setprg8/16/32, setchr1/4/8, setmirror, setmirrorw,
-// setntamem). Signatures match the cart.h declarations exactly.
+// Bank-switching — setchr1/4/8. Each writes through this->vpage_ via
+// set_vpage(). The PPUCHRRAM and PPUNTARAM flags live in ppu.cpp
+// and are accessed via the ppu.h declarations (extern).
 // ---------------------------------------------------------------------------
-void Bus::setprg8(uint32_t addr, uint32_t bank) noexcept {
-    ::setprg8(addr, bank);
+void Bus::setchr1(uint32_t A, uint32_t V) noexcept {
+    if (!chr_ptr_[0]) return;
+    FCEUPPU_LineUpdate();
+    uint32_t bank = V & chr_mask1_[0];
+    if (chr_ram_[0]) PPUCHRRAM |= (1u << (A >> 10));
+    else             PPUCHRRAM &= ~(1u << (A >> 10));
+    set_vpage(A >> 10, &chr_ptr_[0][bank << 10] - A);
 }
 
-void Bus::setprg16(uint32_t addr, uint32_t bank) noexcept {
-    ::setprg16(addr, bank);
+void Bus::setchr4(uint32_t A, uint32_t V) noexcept {
+    if (!chr_ptr_[0]) return;
+    FCEUPPU_LineUpdate();
+    uint32_t bank = V & chr_mask4_[0];
+    set_vpage((A) >> 10,        &chr_ptr_[0][bank << 12] - A);
+    set_vpage(((A) >> 10) + 1,  &chr_ptr_[0][bank << 12] - A);
+    set_vpage(((A) >> 10) + 2,  &chr_ptr_[0][bank << 12] - A);
+    set_vpage(((A) >> 10) + 3,  &chr_ptr_[0][bank << 12] - A);
+    if (chr_ram_[0]) PPUCHRRAM |= (15u << (A >> 10));
+    else             PPUCHRRAM &= ~(15u << (A >> 10));
 }
 
-void Bus::setprg32(uint32_t addr, uint32_t bank) noexcept {
-    ::setprg32(addr, bank);
+void Bus::setchr8(uint32_t V) noexcept {
+    if (!chr_ptr_[0]) return;
+    FCEUPPU_LineUpdate();
+    uint32_t bank = V & chr_mask8_[0];
+    for (int x = 7; x >= 0; x--) {
+        set_vpage(x, &chr_ptr_[0][bank << 13]);
+    }
+    if (chr_ram_[0]) PPUCHRRAM = 0xFF;
+    else             PPUCHRRAM = 0;
 }
 
-void Bus::setchr1(uint32_t addr, uint32_t bank) noexcept {
-    ::setchr1(addr, bank);
-}
-
-void Bus::setchr4(uint32_t addr, uint32_t bank) noexcept {
-    ::setchr4(addr, bank);
-}
-
-void Bus::setchr8(uint32_t bank) noexcept {
-    ::setchr8(bank);
-}
-
+// ---------------------------------------------------------------------------
+// Mirroring + NTAMEM. PPU side (PPUNTARAM, vnapage[], NTARAM) lives
+// in ppu.cpp and is accessed via ppu.h.
+// ---------------------------------------------------------------------------
 void Bus::setmirror(uint32_t m) noexcept {
-    ::setmirror(static_cast<int>(m));
+    FCEUPPU_LineUpdate();
+    if (!mirror_hard_) {
+        switch (m) {
+        case 0:  // MI_H
+            vnapage[0] = vnapage[1] = NTARAM;
+            vnapage[2] = vnapage[3] = NTARAM + 0x400;
+            break;
+        case 1:  // MI_V
+            vnapage[0] = vnapage[2] = NTARAM;
+            vnapage[1] = vnapage[3] = NTARAM + 0x400;
+            break;
+        case 2:  // MI_0
+            vnapage[0] = vnapage[1] = vnapage[2] = vnapage[3] = NTARAM;
+            break;
+        case 3:  // MI_1
+            vnapage[0] = vnapage[1] = vnapage[2] = vnapage[3] = NTARAM + 0x400;
+            break;
+        }
+        PPUNTARAM = 0xF;
+    }
 }
 
 void Bus::setmirrorw(uint32_t a, uint32_t b, uint32_t c, uint32_t d) noexcept {
-    ::setmirrorw(static_cast<int>(a),
-                 static_cast<int>(b),
-                 static_cast<int>(c),
-                 static_cast<int>(d));
+    FCEUPPU_LineUpdate();
+    vnapage[0] = NTARAM + a * 0x400;
+    vnapage[1] = NTARAM + b * 0x400;
+    vnapage[2] = NTARAM + c * 0x400;
+    vnapage[3] = NTARAM + d * 0x400;
 }
 
-void Bus::setntamem(uint8_t* p, int ram, uint32_t addr) noexcept {
-    ::setntamem(p, ram, addr);
+void Bus::setntamem(uint8_t* p, int ram, uint32_t b) noexcept {
+    FCEUPPU_LineUpdate();
+    vnapage[b] = p;
+    PPUNTARAM &= ~(1u << b);
+    if (ram) PPUNTARAM |= (1u << b);
 }
 
 // ---------------------------------------------------------------------------
-// ROM pointer-table setup — Phase 1: delegate to cart.cpp.
+// ROM pointer setup. Replaces cart.cpp::SetupCartPRGMapping /
+// SetupCartCHRMapping. Also exposes setup_mirroring for the
+// hard-mirroring case (was SetupCartMirroring in v1.3.0).
 // ---------------------------------------------------------------------------
 void Bus::setup_prg_mapping(uint32_t chip, uint8_t* p, uint32_t size, int ram) noexcept {
-    ::SetupCartPRGMapping(static_cast<int>(chip), p, size, ram);
+    prg_ptr_[chip]  = p;
+    prg_size_[chip] = size;
+    prg_mask2_[chip]  = (size >> 11) - 1;
+    prg_mask4_[chip]  = (size >> 12) - 1;
+    prg_mask8_[chip]  = (size >> 13) - 1;
+    prg_mask16_[chip] = (size >> 14) - 1;
+    prg_mask32_[chip] = (size >> 15) - 1;
+    prg_ram_[chip]    = ram ? 1 : 0;
 }
 
 void Bus::setup_chr_mapping(uint32_t chip, uint8_t* p, uint32_t size, int ram) noexcept {
-    ::SetupCartCHRMapping(static_cast<int>(chip), p, size, ram);
+    chr_ptr_[chip]  = p;
+    chr_size_[chip] = size;
+    chr_mask1_[chip] = (size >> 10) - 1;
+    chr_mask2_[chip] = (size >> 11) - 1;
+    chr_mask4_[chip] = (size >> 12) - 1;
+    chr_mask8_[chip] = (size >> 13) - 1;
+    if (chr_mask1_[chip] >= static_cast<uint32_t>(-1)) chr_mask1_[chip] = 0;
+    if (chr_mask2_[chip] >= static_cast<uint32_t>(-1)) chr_mask2_[chip] = 0;
+    if (chr_mask4_[chip] >= static_cast<uint32_t>(-1)) chr_mask4_[chip] = 0;
+    if (chr_mask8_[chip] >= static_cast<uint32_t>(-1)) chr_mask8_[chip] = 0;
+    chr_ram_[chip] = static_cast<uint8_t>(ram);
+}
+
+void Bus::setup_mirroring(int m, int hard, uint8_t* extra) noexcept {
+    if (m < 4) {
+        mirror_hard_ = 0;
+        setmirror(static_cast<uint32_t>(m));
+    } else {
+        vnapage[0] = NTARAM;
+        vnapage[1] = NTARAM + 0x400;
+        vnapage[2] = extra;
+        vnapage[3] = extra + 0x400;
+        PPUNTARAM = 0xF;
+    }
+    mirror_hard_ = hard;
 }
 
 // ---------------------------------------------------------------------------
-// Singleton — Meyers pattern. The single Bus instance lives in a
-// function-local static; first call initializes, subsequent calls
-// return the same reference. C++11 guarantees thread-safe init.
+// Singleton — Meyers pattern. Thread-safe lazy init per C++11
+// [stmt.dcl] p4. The static-local instance is constructed on first
+// call and persists for the program's lifetime.
+//
+// This is a regular (non-inline) function. Consumer TUs see only
+// the `extern` declaration in bus.h and emit a real function call
+// to resolve the singleton address. The trade-off: ~5% slower
+// bench_full_frame than the fully-inline version (which caused
+// MSVC linker errors) — acceptable because the global reference
+// aliases (ARead, BWrite, Page, etc.) make every hot-path dispatch
+// a direct array-index + indirect call, identical to v1.3.0.
 // ---------------------------------------------------------------------------
 Bus& bus_instance() noexcept {
     static Bus instance;
@@ -187,3 +381,50 @@ Bus& bus_instance() noexcept {
 }
 
 } // namespace fceu11
+
+// ---------------------------------------------------------------------------
+// VPageR — uint8** pointer alias for &VPage[0]. Declared `extern` in
+// bus.h because its initializer is not constexpr (bus_instance() is
+// a function call). Used by datalatch.cpp, mmc5.cpp, and the
+// legacy setchr*r code paths in cart.cpp.
+// ---------------------------------------------------------------------------
+uint8_t** VPageR = &fceu11::bus_instance().vpage()[0];
+
+// ---------------------------------------------------------------------------
+// Global reference aliases (definitions matching the `extern`
+// declarations in bus.h). Each alias is a reference to a Bus
+// member array; initialized once at static init from
+// bus_instance()'s address. Every consumer TU sees these as
+// ordinary global references — the compiler treats ARead[i] as
+// a direct array-index + indirect-call, identical to v1.3.0's
+// `::ARead[i](addr)` machine code (no per-use bus_instance()
+// call). This restores the bench_full_frame performance that
+// was lost when the inline-alias version forced a runtime
+// bus_instance() call at every dispatch.
+// ---------------------------------------------------------------------------
+readfunc  (& ARead )[0x10000] = fceu11::bus_instance().aread_table();
+writefunc (& BWrite)[0x10000] = fceu11::bus_instance().bwrite_table();
+
+uint8_t* (& Page        )[32] = fceu11::bus_instance().page();
+uint8_t* (& VPage       )[8]  = fceu11::bus_instance().vpage();
+uint8_t* (& VPageG      )[8]  = fceu11::bus_instance().vpage_g();
+uint8_t* (& MMC5SPRVPage)[8]  = fceu11::bus_instance().mmc5_spr_vpage();
+uint8_t* (& MMC5BGVPage )[8]  = fceu11::bus_instance().mmc5_bg_vpage();
+
+uint8_t* (& PRGptr)[32] = fceu11::bus_instance().prg_ptr();
+uint8_t* (& CHRptr)[32] = fceu11::bus_instance().chr_ptr();
+
+uint32_t (& PRGsize  )[32] = fceu11::bus_instance().prg_size();
+uint32_t (& CHRsize  )[32] = fceu11::bus_instance().chr_size();
+uint32_t (& PRGmask2 )[32] = fceu11::bus_instance().prg_mask2();
+uint32_t (& PRGmask4 )[32] = fceu11::bus_instance().prg_mask4();
+uint32_t (& PRGmask8 )[32] = fceu11::bus_instance().prg_mask8();
+uint32_t (& PRGmask16)[32] = fceu11::bus_instance().prg_mask16();
+uint32_t (& PRGmask32)[32] = fceu11::bus_instance().prg_mask32();
+uint32_t (& CHRmask1 )[32] = fceu11::bus_instance().chr_mask1();
+uint32_t (& CHRmask2 )[32] = fceu11::bus_instance().chr_mask2();
+uint32_t (& CHRmask4 )[32] = fceu11::bus_instance().chr_mask4();
+uint32_t (& CHRmask8 )[32] = fceu11::bus_instance().chr_mask8();
+uint8_t  (& PRGram   )[32] = fceu11::bus_instance().prg_ram();
+uint8_t  (& CHRram   )[32] = fceu11::bus_instance().chr_ram();
+uint8_t  (& PRGIsRAM )[32] = fceu11::bus_instance().prg_is_ram();

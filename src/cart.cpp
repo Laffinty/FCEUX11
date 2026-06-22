@@ -38,34 +38,13 @@
 #include <cstdio>
 #include <climits>
 
-FCEUX11_CACHE_ALIGN uint8 *Page[32], *VPage[8];
-uint8 **VPageR = VPage;
-FCEUX11_CACHE_ALIGN uint8 *VPageG[8];
-FCEUX11_CACHE_ALIGN uint8 *MMC5SPRVPage[8];
-FCEUX11_CACHE_ALIGN uint8 *MMC5BGVPage[8];
-
-FCEUX11_CACHE_ALIGN static uint8 PRGIsRAM[32];  /* This page is/is not PRG RAM. */
-
-/* 16 are (sort of) reserved for UNIF/iNES and 16 to map other stuff. */
-FCEUX11_CACHE_ALIGN uint8 CHRram[32];
-FCEUX11_CACHE_ALIGN uint8 PRGram[32];
-
-FCEUX11_CACHE_ALIGN uint8 *PRGptr[32];
-FCEUX11_CACHE_ALIGN uint8 *CHRptr[32];
-
-FCEUX11_CACHE_ALIGN uint32 PRGsize[32];
-FCEUX11_CACHE_ALIGN uint32 CHRsize[32];
-
-FCEUX11_CACHE_ALIGN uint32 PRGmask2[32];
-FCEUX11_CACHE_ALIGN uint32 PRGmask4[32];
-FCEUX11_CACHE_ALIGN uint32 PRGmask8[32];
-FCEUX11_CACHE_ALIGN uint32 PRGmask16[32];
-FCEUX11_CACHE_ALIGN uint32 PRGmask32[32];
-
-FCEUX11_CACHE_ALIGN uint32 CHRmask1[32];
-FCEUX11_CACHE_ALIGN uint32 CHRmask2[32];
-FCEUX11_CACHE_ALIGN uint32 CHRmask4[32];
-FCEUX11_CACHE_ALIGN uint32 CHRmask8[32];
+// Phase 2 (v1.4 Gateway): all the page / ROM-pointer / mask /
+// RAM-flag storage moved to fceu11::Bus. The legacy global names
+// (Page, VPage, VPageG, MMC5SPRVPage, MMC5BGVPage, PRGptr, CHRptr,
+// PRGram, CHRram, PRGsize, CHRsize, PRGmask2-32, CHRmask1-8, PRGIsRAM,
+// VPageR) are now inline reference-to-array aliases declared in
+// bus.h. cart.cpp only retains the non-Bus surface (CartInfo, the
+// r-variant setprg*/setchr* free functions, Genie state).
 
 int geniestage = 0;
 
@@ -92,52 +71,6 @@ static INLINE void setpageptr(int s, uint32 A, uint8 *p, int ram) {
 			PRGIsRAM[AB + x] = 0;
 			Page[AB + x] = 0;
 		}
-}
-
-static uint8 nothing[8192];
-void ResetCartMapping(void) {
-	int x;
-
-	PPU_ResetHooks();
-
-	for (x = 0; x < 32; x++) {
-		Page[x] = nothing - x * 2048;
-		PRGptr[x] = CHRptr[x] = 0;
-		PRGsize[x] = CHRsize[x] = 0;
-	}
-	for (x = 0; x < 8; x++) {
-		MMC5SPRVPage[x] = MMC5BGVPage[x] = VPageR[x] = nothing - 0x400 * x;
-	}
-}
-
-void SetupCartPRGMapping(int chip, uint8 *p, uint32 size, int ram) {
-	PRGptr[chip] = p;
-	PRGsize[chip] = size;
-
-	PRGmask2[chip] = (size >> 11) - 1;
-	PRGmask4[chip] = (size >> 12) - 1;
-	PRGmask8[chip] = (size >> 13) - 1;
-	PRGmask16[chip] = (size >> 14) - 1;
-	PRGmask32[chip] = (size >> 15) - 1;
-
-	PRGram[chip] = ram ? 1 : 0;
-}
-
-void SetupCartCHRMapping(int chip, uint8 *p, uint32 size, int ram) {
-	CHRptr[chip] = p;
-	CHRsize[chip] = size;
-
-	CHRmask1[chip] = (size >> 10) - 1;
-	CHRmask2[chip] = (size >> 11) - 1;
-	CHRmask4[chip] = (size >> 12) - 1;
-	CHRmask8[chip] = (size >> 13) - 1;
-
-	if (CHRmask1[chip] >= (unsigned int)(-1)) CHRmask1[chip] = 0;
-	if (CHRmask2[chip] >= (unsigned int)(-1)) CHRmask2[chip] = 0;
-	if (CHRmask4[chip] >= (unsigned int)(-1)) CHRmask4[chip] = 0;
-	if (CHRmask8[chip] >= (unsigned int)(-1)) CHRmask8[chip] = 0;
-
-	CHRram[chip] = ram;
 }
 
 DECLFR(CartBR) {
@@ -192,10 +125,6 @@ void setprg8r(int r, uint32 A, uint32 V) {
 	}
 }
 
-void setprg8(uint32 A, uint32 V) {
-	setprg8r(0, A, V);
-}
-
 void setprg16r(int r, uint32 A, uint32 V) {
 	if (PRGsize[r] >= 16384) {
 		V &= PRGmask16[r];
@@ -209,10 +138,6 @@ void setprg16r(int r, uint32 A, uint32 V) {
 	}
 }
 
-void setprg16(uint32 A, uint32 V) {
-	setprg16r(0, A, V);
-}
-
 void setprg32r(int r, uint32 A, uint32 V) {
 	if (PRGsize[r] >= 32768) {
 		V &= PRGmask32[r];
@@ -224,10 +149,6 @@ void setprg32r(int r, uint32 A, uint32 V) {
 		for (x = 0; x < 16; x++)
 			setpageptr(2, A + (x << 11), PRGptr[r] ? (&PRGptr[r][((VA + x) & PRGmask2[r]) << 11]) : 0, PRGram[r]);
 	}
-}
-
-void setprg32(uint32 A, uint32 V) {
-	setprg32r(0, A, V);
 }
 
 void setchr1r(int r, uint32 A, uint32 V) {
@@ -278,75 +199,17 @@ void setchr8r(int r, uint32 V) {
 		PPUCHRRAM = 0;
 }
 
-void setchr1(uint32 A, uint32 V) {
-	setchr1r(0, A, V);
-}
-
 void setchr2(uint32 A, uint32 V) {
 	setchr2r(0, A, V);
 }
 
-void setchr4(uint32 A, uint32 V) {
-	setchr4r(0, A, V);
-}
+/* setchr1/4/8, setntamem, setmirror, setmirrorw, SetupCartMirroring
+ * are now Bus member functions (see bus.h / bus.cpp). The inline
+ * forwarders in bus.h preserve the legacy call-site syntax. */
 
-void setchr8(uint32 V) {
-	setchr8r(0, V);
-}
-
-/* This function can be called without calling SetupCartMirroring(). */
-
-void setntamem(uint8 *p, int ram, uint32 b) {
-	FCEUPPU_LineUpdate();
-	vnapage[b] = p;
-	PPUNTARAM &= ~(1 << b);
-	if (ram)
-		PPUNTARAM |= 1 << b;
-}
-
-static int mirrorhard = 0;
-void setmirrorw(int a, int b, int c, int d) {
-	FCEUPPU_LineUpdate();
-	vnapage[0] = NTARAM + a * 0x400;
-	vnapage[1] = NTARAM + b * 0x400;
-	vnapage[2] = NTARAM + c * 0x400;
-	vnapage[3] = NTARAM + d * 0x400;
-}
-
-void setmirror(int t) {
-	FCEUPPU_LineUpdate();
-	if (!mirrorhard) {
-		switch (t) {
-		case MI_H:
-			vnapage[0] = vnapage[1] = NTARAM; vnapage[2] = vnapage[3] = NTARAM + 0x400;
-			break;
-		case MI_V:
-			vnapage[0] = vnapage[2] = NTARAM; vnapage[1] = vnapage[3] = NTARAM + 0x400;
-			break;
-		case MI_0:
-			vnapage[0] = vnapage[1] = vnapage[2] = vnapage[3] = NTARAM;
-			break;
-		case MI_1:
-			vnapage[0] = vnapage[1] = vnapage[2] = vnapage[3] = NTARAM + 0x400;
-			break;
-		}
-		PPUNTARAM = 0xF;
-	}
-}
-
-void SetupCartMirroring(int m, int hard, uint8 *extra) {
-	if (m < 4) {
-		mirrorhard = 0;
-		setmirror(m);
-	} else {
-		vnapage[0] = NTARAM;
-		vnapage[1] = NTARAM + 0x400;
-		vnapage[2] = extra;
-		vnapage[3] = extra + 0x400;
-		PPUNTARAM = 0xF;
-	}
-	mirrorhard = hard;
-}
+/* The `nothing[8192]` open-bus buffer used to live here; it moved
+ * to bus.cpp's anonymous namespace where Bus::reset_mapping() and
+ * the hot-path ANull handler reference it. */
 
 static uint8 *GENIEROM = 0;
 

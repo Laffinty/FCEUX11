@@ -93,14 +93,29 @@ int main() {
         if (reinterpret_cast<void*>(&v.vpage())   != reinterpret_cast<void*>(&::VPage))   { printf("FAIL: PpuView::vpage()\n");   failed = true; } else printf("OK:   PpuView::vpage() == ::VPage (%p)\n",   static_cast<void*>(&v.vpage()));
     }
 
-    // BusView — VPage is shared with PpuView (v1.4 Bus will own it).
-    printf("\n--- BusView ---\n");
+    // State::bus() — v1.4 Gateway Phase 2. BusView was retired; the
+    // facade now returns the fceu11::Bus singleton directly. The
+    // underlying tables (::ARead, ::BWrite, ::Page, ::VPage, etc.)
+    // are now inline reference-to-array aliases that bind to
+    // bus_instance(); the pointer-identity check below verifies
+    // that the aliasing still works end-to-end.
+    printf("\n--- State::bus() (v1.4 Bus) ---\n");
     {
-        auto& v = s.bus();
-        if (reinterpret_cast<void*>(&v.aread())  != reinterpret_cast<void*>(&::ARead))  { printf("FAIL: BusView::aread()\n");  failed = true; } else printf("OK:   BusView::aread() == ::ARead (%p)\n",  static_cast<void*>(&v.aread()));
-        if (reinterpret_cast<void*>(&v.bwrite()) != reinterpret_cast<void*>(&::BWrite)) { printf("FAIL: BusView::bwrite()\n"); failed = true; } else printf("OK:   BusView::bwrite() == ::BWrite (%p)\n", static_cast<void*>(&v.bwrite()));
-        if (reinterpret_cast<void*>(&v.page())   != reinterpret_cast<void*>(&::Page))   { printf("FAIL: BusView::page()\n");   failed = true; } else printf("OK:   BusView::page() == ::Page (%p)\n",   static_cast<void*>(&v.page()));
-        if (reinterpret_cast<void*>(&v.vpage())  != reinterpret_cast<void*>(&::VPage))  { printf("FAIL: BusView::vpage()\n");  failed = true; } else printf("OK:   BusView::vpage() == ::VPage (%p)\n",  static_cast<void*>(&v.vpage()));
+        auto& b = s.bus();
+        // Sanity: the State facade hands back the same Bus singleton.
+        if (&b != &fceu11::bus_instance()) {
+            printf("FAIL: State::bus() != bus_instance()\n");
+            failed = true;
+        } else {
+            printf("OK:   State::bus() == bus_instance() (%p)\n",
+                   static_cast<void*>(&b));
+        }
+        // Pointer-identity: the global alias ::ARead is bus_instance()'s
+        // aread_ array, by definition of the inline reference.
+        if (reinterpret_cast<void*>(&b.aread_table())  != reinterpret_cast<void*>(&::ARead))  { printf("FAIL: Bus::aread_table()\n");  failed = true; } else printf("OK:   Bus::aread_table() == ::ARead (%p)\n",  static_cast<void*>(&b.aread_table()));
+        if (reinterpret_cast<void*>(&b.bwrite_table()) != reinterpret_cast<void*>(&::BWrite)) { printf("FAIL: Bus::bwrite_table()\n"); failed = true; } else printf("OK:   Bus::bwrite_table() == ::BWrite (%p)\n", static_cast<void*>(&b.bwrite_table()));
+        if (reinterpret_cast<void*>(&b.page())   != reinterpret_cast<void*>(&::Page))   { printf("FAIL: Bus::page()\n");   failed = true; } else printf("OK:   Bus::page() == ::Page (%p)\n",   static_cast<void*>(&b.page()));
+        if (reinterpret_cast<void*>(&b.vpage())  != reinterpret_cast<void*>(&::VPage))  { printf("FAIL: Bus::vpage()\n");  failed = true; } else printf("OK:   Bus::vpage() == ::VPage (%p)\n",  static_cast<void*>(&b.vpage()));
     }
 
     // CartView

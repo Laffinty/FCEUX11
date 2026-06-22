@@ -251,8 +251,12 @@ FCEUGI *GameInfo = NULL;
 void (*GameInterface)(GI h);
 void (*GameStateRestore)(int version);
 
-FCEUX11_CACHE_ALIGN readfunc ARead[0x10000];
-FCEUX11_CACHE_ALIGN writefunc BWrite[0x10000];
+// ARead[] / BWrite[] are inline reference-to-array aliases
+// declared in bus.h. Their storage lives on fceu11::bus_instance().
+// The Genie-shadow state (AReadG / BWriteG / RWWrap) stays here
+// because AllocGenieRW / FlushGenieRW own the heap-allocated
+// 32K shadow buffers and the SetReadHandler/SetWriteHandler
+// Genie-aware code path lives in this translation unit.
 static readfunc *AReadG;
 static writefunc *BWriteG;
 static int RWWrap = 0;
