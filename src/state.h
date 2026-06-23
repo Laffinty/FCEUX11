@@ -52,6 +52,13 @@ struct SFORMAT
 void ResetExState(void (*PreSave)(void),void (*PostSave)(void));
 void AddExState(void *v, uint32 s, int type, const char *desc);
 
+// v1.4 Gateway Phase 6: per-board hook for the SFORMAT pre-save
+// trampoline. Used by vrc7.cpp to copy OPLL scalar state into a
+// pointer-free snapshot buffer (eliminating the FCEUSTATE_INDIRECT
+// pointer-serialising registration on the VRC7 OPLL struct).
+// Chains with whatever PreSave ResetExState set earlier.
+void FCEU_SetStatePreSave(void (*PreSave)(void));
+
 //indicates that the value is a multibyte integer that needs to be put in the correct byte order
 #define FCEUSTATE_RLSB            0x80000000
 

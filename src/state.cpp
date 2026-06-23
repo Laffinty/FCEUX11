@@ -760,6 +760,16 @@ void ResetExState(void (*PreSave)(void), void (*PostSave)(void))
 	SFEXINDEX=0;
 }
 
+// v1.4 Gateway Phase 6: per-board PreSave setter. Replaces SPreSave
+// directly without disturbing the SFORMAT registration table, so
+// board mappers like vrc7.cpp can install a PreSave trampoline that
+// copies pointer-laden state into a snapshot buffer before the SFORMAT
+// walker serialises.
+void FCEU_SetStatePreSave(void (*PreSave)(void))
+{
+	SPreSave = PreSave;
+}
+
 void AddExState(void *v, uint32 s, int type, const char *desc)
 {
 	//do not accept extra state information if a null pointer was provided for v, so list won't terminate early
