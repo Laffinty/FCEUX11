@@ -227,6 +227,13 @@ if(FCEUX11_BUILD_TESTS)
     add_test(NAME bench_tolerance_test
              COMMAND fceux11_bench_tolerance_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    # v1.4: wall-clock perf benchmarks are advisory on shared CI runners.
+    # Inter-runner variance on GitHub Actions (20%+) dwarfs the 2.5%
+    # tolerance, so gating the build on them produces flaky failures
+    # unrelated to code changes. The "perf" label lets CI exclude this
+    # test from the gating ctest run (`ctest -LE perf`) and run it as a
+    # continue-on-error advisory step that still reports the numbers.
+    set_tests_properties(bench_tolerance_test PROPERTIES LABELS "perf")
 
     # v0.3.15.x PHASE-4: TypedConfig<T> unit test. Constructs an
     # in-memory QSettings backend via a unique organisation name so

@@ -76,7 +76,11 @@ jobs:
         run: cmake --build build --config Release --parallel
 
       - name: CTest
-        run: ctest --test-dir build --build-config Release --output-on-failure
+        # -LE perf excludes the "perf"-labelled bench_tolerance_test from the
+        # gating run. Wall-clock benchmarks are advisory on shared runners
+        # (inter-host variance >> tolerance); they are run separately in the
+        # "Bench tolerance gate" step below with continue-on-error.
+        run: ctest --test-dir build --build-config Release --output-on-failure -LE perf
 
       # v1.3 Legion Phase 7.2: Golden savestate drift check.
       # If any of the SFORMAT-emitting sources have changed, the golden
@@ -254,6 +258,11 @@ jobs:
       # 2.5% tolerance is the practical floor; tighten to 1% only after
       # moving to a dedicated runner with no other workloads.
       - name: Bench tolerance gate
+        # Advisory only: GitHub Actions runner hardware variance routinely
+        # exceeds the 2.5% tolerance, so a failure here is not actionable as
+        # a code regression. The step still runs and surfaces the numbers
+        # (and FAIL line) in the log for visibility.
+        continue-on-error: true
         working-directory: ${{ github.workspace }}/tests
         run: |
           if (Test-Path "../build/tests/fceux11_bench_tolerance_test.exe") {
