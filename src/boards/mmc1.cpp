@@ -41,13 +41,13 @@ static int is155, is171;
 
 static DECLFW(MBWRAM) {
 	if (!(DRegs[3] & 0x10) || is155)
-		Page[A >> 11][A] = V;  // WRAM is enabled.
+		fceu11::g_bus.page()[A >> 11][A] = V;  // WRAM is enabled.
 }
 
 static DECLFR(MAWRAM) {
 	if ((DRegs[3] & 0x10) && !is155)
 		return g_cpu.native_layout().DB;          // WRAM is disabled
-	return(Page[A >> 11][A]);
+	return(fceu11::g_bus.page()[A >> 11][A]);
 }
 
 static void MMC1CHR(void) {
