@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark" />
 <meta name="theme-color" content="#080a09" />
 <title>FCEUX11 — NES/Famicom Emulator Optimized for Windows</title>
-<meta name="description" content="FCEUX11 is a modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 — accurate emulation, debugging tools, TAS editor, and Lua scripting." />
+<meta name="description" content="FCEUX11 v1.4 Gateway — a modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 — accurate emulation, debugging tools, TAS editor, and Lua scripting." />
 <meta name="keywords" content="FCEUX11, FCEUX, NES emulator, Famicom emulator, Windows emulator, TAS editor, Qt6, C++20, game emulator, 8-bit" />
 <meta name="author" content="Laffinty" />
 <meta name="robots" content="index, follow, max-image-preview:large" />
@@ -15,15 +15,15 @@
 <link rel="icon" type="image/x-icon" href="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <meta property="og:site_name" content="FCEUX11" />
 <meta property="og:type" content="website" />
-<meta property="og:title" content="FCEUX11 — NES/Famicom Emulator for Windows" />
-<meta property="og:description" content="A modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 — accurate emulation, debugging, TAS, Lua." />
+<meta property="og:title" content="FCEUX11 v1.4 Gateway — NES/Famicom Emulator for Windows" />
+<meta property="og:description" content="FCEUX11 v1.4 Gateway — modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 — accurate emulation, debugging, TAS, Lua." />
 <meta property="og:url" content="https://laffinty.github.io/FCEUX11/" />
 <meta property="og:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <meta property="og:locale" content="en_US" />
 <meta property="og:locale:alternate" content="zh_CN" />
 <meta name="twitter:card" content="summary" />
-<meta name="twitter:title" content="FCEUX11 — NES/Famicom Emulator for Windows" />
-<meta name="twitter:description" content="A modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20." />
+<meta name="twitter:title" content="FCEUX11 v1.4 Gateway — NES/Famicom Emulator for Windows" />
+<meta name="twitter:description" content="FCEUX11 v1.4 Gateway — modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20." />
 <meta name="twitter:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -35,8 +35,8 @@
   "name":"FCEUX11",
   "applicationCategory":"GameApplication",
   "operatingSystem":"Windows",
-  "description":"A modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 with accurate emulation, debugging tools, TAS editor, and Lua scripting.",
-  "softwareVersion":"1.2.0",
+  "description":"A modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 with accurate emulation, debugging tools, TAS editor, and Lua scripting. v1.4 Gateway: improved mapper compatibility, long-session stability, and v1.2/v1.3 savestate backward compatibility.",
+  "softwareVersion":"1.4",
   "license":"https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt",
   "url":"https://laffinty.github.io/FCEUX11/",
   "downloadUrl":"https://github.com/Laffinty/FCEUX11/releases",
@@ -143,6 +143,22 @@
   .about-body p:last-child{margin-bottom:0}
   .about-body em{color:var(--green);font-style:normal;font-weight:500}
 
+  /* whatsnew — single column, numbered list, changelog-style */
+  .whatsnew{padding:60px 0 30px;border-top:1px solid var(--border);margin-top:30px}
+  .whatsnew-head{text-align:center;margin-bottom:32px}
+  .whatsnew-head .kicker{font-family:var(--font-mono);font-size:11px;color:var(--green);text-transform:uppercase;letter-spacing:.16em;margin-bottom:9px}
+  .whatsnew-head h2{font-family:var(--font-display);font-size:24px;font-weight:600;letter-spacing:-.02em;margin-bottom:6px}
+  .whatsnew-head .sub{font-family:var(--font-mono);font-size:12px;color:var(--muted-2)}
+  .whatsnew-list{max-width:620px;margin:0 auto;display:grid;gap:18px}
+  .wn-item{display:grid;grid-template-columns:36px 1fr;gap:14px;align-items:start;padding:14px 16px;border:1px solid var(--border);border-radius:12px;background:var(--surface);transition:.2s}
+  .wn-item:hover{border-color:var(--border-strong);background:var(--surface-2)}
+  .wn-num{font-family:var(--font-mono);font-size:12px;color:var(--green);font-weight:600;padding-top:2px;letter-spacing:.04em}
+  .wn-text h3{font-family:var(--font-display);font-size:14px;font-weight:600;margin-bottom:4px;letter-spacing:-.01em}
+  .wn-text p{font-size:13px;color:var(--muted);line-height:1.55}
+  .wn-cta{text-align:center;margin-top:24px}
+  .wn-cta a{font-family:var(--font-mono);font-size:12px;color:var(--muted);text-decoration:none;border-bottom:1px solid var(--border);padding-bottom:2px;transition:.2s}
+  .wn-cta a:hover{color:var(--green);border-color:var(--green)}
+
   /* footer — single line */
   footer{padding:40px 0 50px;text-align:center;border-top:1px solid var(--border);margin-top:30px}
   footer p{font-family:var(--font-mono);font-size:12px;color:var(--muted-2)}
@@ -176,7 +192,7 @@
 
 <header class="hero" id="top">
   <div class="wrap">
-    <div class="pill reveal"><span class="dot"></span><span data-i18n="pill">v1.2 · Census</span></div>
+    <div class="pill reveal"><span class="dot"></span><span data-i18n="pill">v1.4 · Gateway</span></div>
     <h1 class="reveal"><span class="grad">FCEUX</span><span class="dim">11</span></h1>
     <p class="tagline reveal" data-i18n="tagline"><span class="tagline-title">A FCEUX-based NES/Famicom emulator optimized for Windows</span><br>core accuracy, modern native experience.</p>
     <div class="cta reveal">
@@ -229,6 +245,49 @@
   </div>
 </section>
 
+<section class="whatsnew">
+  <div class="wrap">
+    <div class="whatsnew-head reveal">
+      <div class="kicker" data-i18n="wn.k">What's new</div>
+      <h2 data-i18n="wn.t">v1.4 · Gateway</h2>
+      <div class="sub" data-i18n="wn.sub">Released 2026-06-23 · since v1.2 (Census)</div>
+    </div>
+    <div class="whatsnew-list reveal">
+      <div class="wn-item">
+        <div class="wn-num">01</div>
+        <div class="wn-text">
+          <h3 data-i18n="wn1.t">Compatibility improved</h3>
+          <p data-i18n="wn1.d">Mapper dispatch paths unified across all 175 board files. Start-up crashes, mapper misdetection and other v1.2 corner-case issues are reduced for most cartridges.</p>
+        </div>
+      </div>
+      <div class="wn-item">
+        <div class="wn-num">02</div>
+        <div class="wn-text">
+          <h3 data-i18n="wn2.t">Long-session stability</h3>
+          <p data-i18n="wn2.d">CPU dispatch and memory paths rewritten. Speedrun, continuous movie playback and overnight idle sessions run noticeably longer without stutter or crash.</p>
+        </div>
+      </div>
+      <div class="wn-item">
+        <div class="wn-num">03</div>
+        <div class="wn-text">
+          <h3 data-i18n="wn3.t">v1.2 / v1.3 savestates still load</h3>
+          <p data-i18n="wn3.d">Existing .fc0 and .fm2 files load and run unchanged; saving produces a v1.4-format state that re-loads cleanly. No manual migration required.</p>
+        </div>
+      </div>
+      <div class="wn-item">
+        <div class="wn-num">04</div>
+        <div class="wn-text">
+          <h3 data-i18n="wn4.t">Full Chinese UI preserved</h3>
+          <p data-i18n="wn4.d">Simplified Chinese, Traditional Chinese and English still switchable from the title bar. IME, CJK fonts and translations from v1.2 carried over with 100% coverage.</p>
+        </div>
+      </div>
+    </div>
+    <div class="wn-cta reveal">
+      <a href="https://github.com/Laffinty/FCEUX11/blob/main/docs/v1.4_release_notes.md" target="_blank" rel="noopener" data-i18n="wn.cta">Read the full v1.4 release notes →</a>
+    </div>
+  </div>
+</section>
+
 <footer>
   <div class="wrap">
     <p>© 2026 FCEUX11 · GPLv2 · <a href="https://github.com/Laffinty/FCEUX11" target="_blank" rel="noopener">GitHub</a> · <span data-i18n="foot">based on FCEUX</span></p>
@@ -237,7 +296,7 @@
 
 <script>
 const I18N={
-  en:{pill:"v1.2 · Census",
+  en:{pill:"v1.4 · Gateway",
       tagline:"<span class=\"tagline-title\">A FCEUX-based NES/Famicom emulator optimized for Windows</span><br>core accuracy, modern native experience.",
       download:"Download",changelog:"Changelog",
       "f1.t":"Accurate Emulation","f1.d":"Full NES, Famicom &amp; mapper support",
@@ -247,8 +306,14 @@ const I18N={
       "about.k":"About","about.t":"Introduction",
       "about.a1":"FCEUX11 is a derivative of the FCEUX NES/Famicom emulator, actively maintained and optimized for <em>Windows</em>.",
       "about.a2":"It preserves the core emulation accuracy of FCEUX while providing a modern, native Windows experience, including a <em>Qt6-based</em> user interface, multi-language support, and comprehensive debugging and TAS tooling.",
+      "wn.k":"What's new","wn.t":"v1.4 · Gateway","wn.sub":"Released 2026-06-23 · since v1.2 (Census)",
+      "wn1.t":"Compatibility improved","wn1.d":"Mapper dispatch paths unified across all 175 board files. Start-up crashes, mapper misdetection and other v1.2 corner-case issues are reduced for most cartridges.",
+      "wn2.t":"Long-session stability","wn2.d":"CPU dispatch and memory paths rewritten. Speedrun, continuous movie playback and overnight idle sessions run noticeably longer without stutter or crash.",
+      "wn3.t":"v1.2 / v1.3 savestates still load","wn3.d":"Existing .fc0 and .fm2 files load and run unchanged; saving produces a v1.4-format state that re-loads cleanly. No manual migration required.",
+      "wn4.t":"Full Chinese UI preserved","wn4.d":"Simplified Chinese, Traditional Chinese and English still switchable from the title bar. IME, CJK fonts and translations from v1.2 carried over with 100% coverage.",
+      "wn.cta":"Read the full v1.4 release notes →",
       foot:"based on FCEUX"},
-  zh:{pill:"v1.2 · Census",
+  zh:{pill:"v1.4 · Gateway",
       tagline:"<span class=\"tagline-title\">基于 FCEUX 的 NES/Famicom 模拟器，为 Windows 平台优化</span><br>保留核心精度，提供现代原生体验。",
       download:"下载",changelog:"更新日志",
       "f1.t":"精确模拟","f1.d":"完整支持 NES、Famicom 及扩展芯片",
@@ -258,6 +323,12 @@ const I18N={
       "about.k":"关于","about.t":"简介",
       "about.a1":"FCEUX11 是基于 FCEUX 的 NES/Famicom 模拟器衍生项目，持续维护并为 <em>Windows</em> 平台优化。",
       "about.a2":"在保留 FCEUX 核心模拟精度的基础上，提供现代化的 Windows 原生体验，包括 <em>Qt6 图形界面</em>、多语言支持以及完善的调试与 TAS 工具集。",
+      "wn.k":"本次更新","wn.t":"v1.4 · Gateway","wn.sub":"2026-06-23 发布 · 上一个版本 v1.2 (Census)",
+      "wn1.t":"兼容性提升","wn1.d":"175 个 mapper board 文件的内存分发路径统一收口，启动崩溃、mapper 识别错误等 v1.2 偶发问题大幅减少。",
+      "wn2.t":"长时间运行更稳","wn2.d":"CPU 调度与内存通路重写。Speedrun、连续录像回放、整夜挂机等场景的卡顿与崩溃显著减少。",
+      "wn3.t":"v1.2 / v1.3 存档继续可用","wn3.d":"既有的 .fc0 与 .fm2 文件无需迁移即可加载运行；新保存的存档为 v1.4 格式，格式相互兼容。",
+      "wn4.t":"中文界面继续保留","wn4.d":"简繁英三语仍可从标题栏切换，中文输入法与 CJK 字体正确显示，翻译覆盖度保持 v1.2 的 100%。",
+      "wn.cta":"查看完整 v1.4 发布说明 →",
       foot:"基于 FCEUX"}
 };
 let lang='en';
