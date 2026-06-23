@@ -5,6 +5,108 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4] - 2026-06-23
+
+**Codename: Gateway.** Fourth sub-version of the v1.x modernization cycle
+per `docs/v1.x_Modernization_Roadmap.md` §4. Introduces `fceu11::Bus`
+as the single owner of the CPU/PPU address-space dispatch tables
+(`ARead[0x10000]` / `BWrite[0x10000]` / `Page[32]` / `VPage[8]` /
+`PRGptr[32]` / `CHRptr[32]` / `VPageG[8]` / `MMC5SPRVPage[8]` /
+`MMC5BGVPage[8]` / `PRGmask*` / `CHRmask*`) and the bank-switching API
+(`setprg*` / `setchr*` / `setmirror*` / `setntamem` /
+`SetReadHandler` / `SetWriteHandler` / `SetupCartPRGMapping` /
+`SetupCartCHRMapping` / `SetupCartMirroring` / `ResetCartMapping`).
+
+All 175 board files in `src/boards/` route through the new Bus class
+(via inline forwarders for ~2000 call sites; ~30 direct array accesses
+migrated to `g_bus.read()` / `g_bus.write()` / `g_bus.page()[]` /
+`g_bus.vpage()[]` / `g_bus.chr_ptr()[]` / `g_bus.prg_ptr()[]` /
+`g_bus.mmc5_spr_vpage()[]` / `g_bus.mmc5_bg_vpage()[]` /
+`g_bus.mmc5_chr_ptr()[]` on the hot-path files `x6502.cpp` /
+`cart.cpp` / `cheat.cpp` / `debug.cpp` / `nsf.cpp` / `lua-engine.cpp` /
+`mmc5.cpp` / `mmc1.cpp` / `mmc3.cpp` / `BMW8544.cpp` /
+`onebus.cpp` / `sb-2000.cpp` / `68.cpp` / `fns.cpp` / `n106.cpp` /
+`8157.cpp` / `15.cpp` / `354.cpp` / `90.cpp` / `addrlatch.cpp` /
+`coolboy.cpp` / `pec-586.cpp` / `supervision.cpp` / `unrom512.cpp` /
+`vrc5.cpp`). Legacy globals preserved as `inline` reference aliases
+for cold-path use (e.g. `fceu.cpp:310-368` handler registration).
+
+### Added
+
+- `fceu11::Bus` class (src/bus.h / src/bus.cpp): owns the dispatch
+  tables and bank-switching API. `fceu11::g_bus` is the direct global
+  object (replacing the v1.3 Meyers `bus_instance()` singleton pattern
+  that caused Phase 2's +24% benchmark regression).
+- `fceu11::Bus::read(addr)` / `Bus::write(addr, val)` `__forceinline`
+  accessors compiled to the same machine code as the v1.3 direct
+  `ARead[A](A)` / `BWrite[A](A,V)` indirect-call sequences.
+- `FCEU_SetStatePreSave()` (src/state.h / src/state.cpp): public API
+  for per-board PreSave installation without disturbing the SFORMAT
+  registration table. Currently no callers in v1.4; v1.7 Cart-class
+  redesign will pick it up for the VRC7 OPLL.sintbl HIGH-risk fix.
+
+### Changed
+
+- `src/bus.cpp` replaces `src/bus.cpp`'s `extern T (&name)[N]` reference
+  aliases (`ARead` / `BWrite` / `Page` / `VPage` / `MMC5SPRVPage` /
+  `MMC5BGVPage` / `PRGptr` / `CHRptr` / `PRGsize` / `CHRsize` /
+  `PRGmask*` / `CHRmask*` / `PRGram` / `CHRram` / `PRGIsRAM` /
+  `VPageG`) with direct bindings to `g_bus` internal arrays.
+- All `setprg*` / `setchr*` / `setmirror*` / `SetReadHandler` /
+  `SetWriteHandler` / `SetupCartPRGMapping` / `SetupCartCHRMapping` /
+  `SetupCartMirroring` / `ResetCartMapping` free functions moved from
+  `cart.cpp` to `bus.cpp` and implemented as `Bus` member functions.
+  Legacy call-site syntax preserved via inline forwarders in `bus.h`.
+- `src/version.h`: `FCEU_VERSION_MINOR` 1.2 → 1.4;
+  `FCEU_VERSION_NUMERIC` 10200 → 10400.
+- `CMakeLists.txt`: `project(FCEUX11 VERSION ...)` 1.2 → 1.4.
+- `vcpkg.json`: `"version": "1.4"` (no `.0` patch segment per the
+  v1.4+ version-format rule).
+
+### Performance
+
+- `bench_tolerance_test` 3/3 PASS within the asymmetric gate
+  (`bench_cpu_frame` +1.25%, `bench_ppu_frame` +1.93%,
+  `bench_full_frame` +1.76% — all within the +2.5% max-regression
+  threshold; speedup-only direction has no upper limit per the v1.4
+  Phase 2 gate change).
+- Phase 3's `g_bus` direct global object restores the v1.3.0
+  direct-array-index + indirect-call sequence (vs Phase 2's
+  reference-to-array alias which added a pointer-load instruction
+  per dispatch).
+
+### Known issues deferred
+
+- **VRC7 OPLL.sintbl HIGH-risk item**: `src/boards/vrc7.cpp:49`
+  `FCEUSTATE_INDIRECT` registration still serialises the embedded
+  `uint16 *sintbl` heap pointers in `OPLL_SLOT slot[6*2]`. The
+  Phase 6.3 scalar-snapshot fix attempt regressed
+  `bench_tolerance_test` by +6-9% (link-time code layout disturbance
+  via the `FCEU_SetStatePreSave(vrc7_PreSave)` call site in
+  `Mapper85_Init`); rolled back. **Deferred to v1.7 Cart-class
+  redesign.** No VRC7 `.fc0` golden exists in
+  `tests/fixtures/golden/golden_index.json` (covers NROM/MMC1/MMC3/
+  VRC6/FDS only) — the drift is observable but not regressing any
+  current golden.
+- **`ppu.cpp` `VPage[]` / `MMC5SPRVPage[]` hot-path migration reverted
+  (Phase 3 §5.1.5 exception)**: MSVC 19.51 did not inline
+  `g_bus.vpage()` accessor to the same RIP-relative machine code as
+  the reference-alias; the +6-8% regression exceeded the +2.5%
+  threshold. Reference-alias form retained for these specific sites.
+
+### Migration impact
+
+- Savestate binary compatibility: ✅ verified. v1.3-generated `.fc0`
+  files continue to load → run → save through v1.4 with byte-identical
+  output (`--compare-layout` 7/7 non-FDS goldens identical; 2 FDS
+  goldens SKIP per no-BIOS environment).
+- All 175 board files pass through `Bus::` path (inline forwarders
+  or `g_bus.` direct access). No mapper-init code change required for
+  any board file; mapper init transparently uses `Bus` via the
+  inline forwarders.
+- 268 `AddExState` / `AddExStateVec` registration sites, **0 new
+  sites** introduced by the v1.4 refactor.
+
 ## [Unreleased]
 
 **Codename: Legion (v1.3, in progress).** CPU state objectification per

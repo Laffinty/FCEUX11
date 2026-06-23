@@ -131,6 +131,98 @@ jobs:
               Write-Host "::warning::$exe not built; skipping layout compare."
           }
 
+      # v1.4 Gateway Phase 7.4: Bus dispatch site drift check.
+      # If any of the bus-surface sources have changed, mapper_core_test
+      # regression coverage is the canary. We surface the changed files
+      # to the PR author so they remember to verify mapper_core_test.
+      - name: Bus dispatch site drift check
+        if: github.event_name == 'pull_request'
+        working-directory: ${{ github.workspace }}
+        shell: pwsh
+        run: |
+          $changed = git diff --name-only origin/${{ github.base_ref }}...HEAD | Where-Object {
+              $_ -match '^src/boards/.*\.cpp$' -or
+              $_ -match '^src/bus\.(cpp|h)$' -or
+              $_ -match '^src/cart\.(cpp|h)$'
+          }
+          if ($changed) {
+              Write-Host "::warning::Bus-relevant files changed; verify mapper_core_test stays green."
+              Write-Host "::warning::Changed files:"
+              $changed | ForEach-Object { Write-Host "  - $_" }
+              Write-Host "::warning::Run locally:"
+              Write-Host "::warning::  ctest --test-dir build -C Release -R mapper_core_test"
+          } else {
+              Write-Host "No bus-surface sources changed; coverage still applies."
+          }
+
+      # v1.4 Gateway Phase 7.4: hot-path reference-alias drift check.
+      # Phase 3 committed to keeping ARead[] / BWrite[] / VPage[] /
+      # MMC5SPRVPage[] / MMC5BGVVPage[] direct indexing out of the hot-
+      # path files. The ppu.cpp VPage[] / MMC5SPRVPage[] retention and
+      # the fceu.cpp handler-registration retention are documented
+      # exceptions (§5.1.5 and §5.3.3 of v1.4_Gateway_Build_Plan.md).
+      # Any new direct indexing outside these exceptions is a
+      # regression of the Phase 3 hot-path migration and should fail
+      # the build.
+      - name: Hot-path reference-alias drift check
+        if: github.event_name == 'pull_request'
+        working-directory: ${{ github.workspace }}/src
+        shell: pwsh
+        run: |
+          $hits = git grep -n "ARead\[\|BWrite\[\|VPage\[\|MMC5SPRVPage\[\|MMC5BGVPage\[" -- x6502.cpp ppu.cpp cart.cpp cheat.cpp debug.cpp nsf.cpp lua-engine.cpp 2>$null
+          if ($hits) {
+              # Documented exceptions:
+              # - fceu.cpp (cold-path handler registration)
+              # - ppu.cpp VPage[] / MMC5SPRVPage[] (Phase 3 §5.1.5 retention)
+              $hotHits = $hits | Where-Object {
+                  $_ -notmatch 'fceu\.cpp' -and
+                  -not ($_ -match 'ppu\.cpp' -and $_ -match 'VPage\[|MMC5SPRVPage\[')
+              }
+              if ($hotHits) {
+                  Write-Host "::error::Direct reference-alias indexing in hot-path files (must use g_bus.):"
+                  $hotHits | ForEach-Object { Write-Host "  $_" }
+                  exit 1
+              } else {
+                  Write-Host "Only documented exceptions present (fceu.cpp cold path + ppu.cpp VPage/MMC5SPRVPage hot-path retention)."
+              }
+          } else {
+              Write-Host "No direct ARead[]/BWrite[]/VPage[]/MMC5SPRVPage[]/MMC5BGVPage[] indexing in hot-path files. ✓"
+          }
+
+      # v1.4 Gateway Phase 7.4: board-file direct-array drift check.
+      # All 175 board files should route through Bus (inline forwarders
+      # or g_bus. direct access). Direct ARead[] / BWrite[] / Page[] /
+      # VPage[] / VPageG[] / PRGptr[] / CHRptr[] / MMC5SPRVPage[] /
+      # MMC5BGVPage[] / VPageR[] indexing in board files is a
+      # regression of the Phase 4 / Phase 5 board migration batches.
+      - name: Board-file direct-array drift check
+        if: github.event_name == 'pull_request'
+        working-directory: ${{ github.workspace }}/src
+        shell: pwsh
+        run: |
+          $hits = git grep -n "ARead\[\|BWrite\[\|Page\[\|VPage\[\|VPageG\[\|PRGptr\[\|CHRptr\[\|MMC5SPRVPage\[\|MMC5BGVPage\[\|VPageR\[" -- boards/ 2>$null
+          if ($hits) {
+              # Documented exceptions:
+              # - boards/datalatch.cpp VPageR (rule 3 preserved uint8_t** alias)
+              # - boards/fns.cpp commented-out PRGptr/CHRptr (lines 207/210 are //)
+              # - boards/n106.cpp NTAPage (local static array, not global)
+              $boardHits = $hits | Where-Object {
+                  $_ -notmatch 'boards/datalatch\.cpp' -and
+                  $_ -notmatch 'boards/fns\.cpp:20[78]:' -and
+                  $_ -notmatch 'boards/fns\.cpp:21[08]:' -and
+                  $_ -notmatch 'boards/n106\.cpp.*NTAPage\['
+              }
+              if ($boardHits) {
+                  Write-Host "::error::Direct array indexing in board files (must use g_bus.):"
+                  $boardHits | ForEach-Object { Write-Host "  $_" }
+                  exit 1
+              } else {
+                  Write-Host "Only documented exceptions present (datalatch VPageR / fns comments / n106 NTAPage)."
+              }
+          } else {
+              Write-Host "No direct array indexing in board files. ✓"
+          }
+
       - name: ROM Regression Test
         working-directory: ${{ github.workspace }}/tests
         run: |
