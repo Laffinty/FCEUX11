@@ -238,7 +238,7 @@ static void UNLOneBusCpuHook(int a) {
 				X6502_IRQBegin(FCEU_IQEXT);
 			} else {
 				uint16 addr = pcm_addr | ((apu40xx[0x30]^3) << 14);
-				uint8 raw_pcm = ARead[addr](addr) >> 1;
+				uint8 raw_pcm = fceu11::g_bus.read(addr) >> 1;
 				defapuwrite[0x11](0x4011, raw_pcm);
 				pcm_addr++;
 				pcm_addr &= 0x7FFF;
