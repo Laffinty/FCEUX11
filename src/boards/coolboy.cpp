@@ -319,7 +319,7 @@ static DECLFW(AA6023FlashWrite) {
 			(flash_buffer_a[3] == 0x0AAA) && (flash_buffer_v[3] == 0xAA) &&
 			(flash_buffer_a[4] == 0x0555) && (flash_buffer_v[4] == 0x55) &&
 			(flash_buffer_v[5] == 0x30)) {
-			int offset = &Page[A >> 11][A] - Flash;
+			int offset = &fceu11::g_bus.page()[A >> 11][A] - Flash;
 			int sector = offset / FLASH_SECTOR_SIZE;
 			for (uint32 i = sector * FLASH_SECTOR_SIZE; i < (sector + 1) * FLASH_SECTOR_SIZE; i++)
 				Flash[i % PRGsize[ROM_CHIP]] = 0xFF;
@@ -345,7 +345,7 @@ static DECLFW(AA6023FlashWrite) {
 			(flash_buffer_a[0] == 0x0AAA) && (flash_buffer_v[0] == 0xAA) &&
 			(flash_buffer_a[1] == 0x0555) && (flash_buffer_v[1] == 0x55) &&
 			(flash_buffer_a[2] == 0x0AAA) && (flash_buffer_v[2] == 0xA0)) {
-			int offset = &Page[A >> 11][A] - Flash;
+			int offset = &fceu11::g_bus.page()[A >> 11][A] - Flash;
 			if (CartBR(A) != 0xFF) {
 				FCEU_PrintError("Error: can't write to 0x%08x, flash sector is not erased.\n", offset);
 			}
@@ -453,7 +453,7 @@ void CommonInit(CartInfo* info, int submapper)
 		Flash_owner = FCEU_gmalloc_unique(PRGsize[ROM_CHIP]);  // v0.3.6: RAII-wrapped
 		Flash = Flash_owner.get();
 		for (unsigned int i = 0; i < PRGsize[ROM_CHIP]; i++) {
-			Flash[i] = PRGptr[ROM_CHIP][i % PRGsize[ROM_CHIP]];
+			Flash[i] = fceu11::g_bus.prg_ptr()[ROM_CHIP][i % PRGsize[ROM_CHIP]];
 		}
 		SetupCartPRGMapping(FLASH_CHIP, Flash, PRGsize[ROM_CHIP], 1);
 		info->addSaveGameBuf( Flash, PRGsize[ROM_CHIP] );

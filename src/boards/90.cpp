@@ -79,7 +79,7 @@ static void mira(void)
     if(tkcom[0]&0x40)        // Name tables are ROM-only
     {
       for(x=0;x<4;x++)
-         setntamem(CHRptr[0]+(((names[x])&CHRmask1[0])<<10),0,x);
+         setntamem(fceu11::g_bus.chr_ptr()[0]+(((names[x])&CHRmask1[0])<<10),0,x);
     }
     else                        // Name tables can be RAM or ROM.
     {
@@ -88,7 +88,7 @@ static void mira(void)
         if((tkcom[1]&0x80)==(names[x]&0x80))        // RAM selected.
           setntamem(NTARAM+((names[x]&0x1)<<10),1,x);
         else
-          setntamem(CHRptr[0]+(((names[x])&CHRmask1[0])<<10),0,x);
+          setntamem(fceu11::g_bus.chr_ptr()[0]+(((names[x])&CHRmask1[0])<<10),0,x);
       }
     }
   }

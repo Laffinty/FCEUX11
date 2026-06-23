@@ -117,7 +117,7 @@ static void DoNTARAMROM(int w, uint8 V) {
 		setntamem(NTARAM + ((V & 1) << 10), 1, w);
 	else{
 		V &= CHRmask1[0];
-		setntamem(CHRptr[0] + (V << 10), 0, w);
+		setntamem(fceu11::g_bus.chr_ptr()[0] + (V << 10), 0, w);
 	}
 }
 

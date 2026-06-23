@@ -370,9 +370,9 @@ static void M227Sync(void) {
 // on non battery-enabled carts.
 	if (!hasBattery && (latche & 0x80) == 0x80)
 		/* CHR-RAM write protect hack, needed for some multicarts */
-		SetupCartCHRMapping(0, CHRptr[0], 0x2000, 0);
+		SetupCartCHRMapping(0, fceu11::g_bus.chr_ptr()[0], 0x2000, 0);
 	else
-		SetupCartCHRMapping(0, CHRptr[0], 0x2000, 1);
+		SetupCartCHRMapping(0, fceu11::g_bus.chr_ptr()[0], 0x2000, 1);
 
 	if ((latche >> 7) & 1) {
 		if (S) {

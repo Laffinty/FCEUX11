@@ -44,18 +44,18 @@ static void M68NTfix(void) {
 		PPUNTARAM = 0;
 		switch (mirr & 3) {
 		case 0:
-			vnapage[0] = vnapage[2] = CHRptr[0] + (((nt1 | 128) & CHRmask1[0]) << 10);
-			vnapage[1] = vnapage[3] = CHRptr[0] + (((nt2 | 128) & CHRmask1[0]) << 10);
+			vnapage[0] = vnapage[2] = fceu11::g_bus.chr_ptr()[0] + (((nt1 | 128) & CHRmask1[0]) << 10);
+			vnapage[1] = vnapage[3] = fceu11::g_bus.chr_ptr()[0] + (((nt2 | 128) & CHRmask1[0]) << 10);
 			break;
 		case 1:
-			vnapage[0] = vnapage[1] = CHRptr[0] + (((nt1 | 128) & CHRmask1[0]) << 10);
-			vnapage[2] = vnapage[3] = CHRptr[0] + (((nt2 | 128) & CHRmask1[0]) << 10);
+			vnapage[0] = vnapage[1] = fceu11::g_bus.chr_ptr()[0] + (((nt1 | 128) & CHRmask1[0]) << 10);
+			vnapage[2] = vnapage[3] = fceu11::g_bus.chr_ptr()[0] + (((nt2 | 128) & CHRmask1[0]) << 10);
 			break;
 		case 2:
-			vnapage[0] = vnapage[1] = vnapage[2] = vnapage[3] = CHRptr[0] + (((nt1 | 128) & CHRmask1[0]) << 10);
+			vnapage[0] = vnapage[1] = vnapage[2] = vnapage[3] = fceu11::g_bus.chr_ptr()[0] + (((nt1 | 128) & CHRmask1[0]) << 10);
 			break;
 		case 3:
-			vnapage[0] = vnapage[1] = vnapage[2] = vnapage[3] = CHRptr[0] + (((nt2 | 128) & CHRmask1[0]) << 10);
+			vnapage[0] = vnapage[1] = vnapage[2] = vnapage[3] = fceu11::g_bus.chr_ptr()[0] + (((nt2 | 128) & CHRmask1[0]) << 10);
 			break;
 		}
 	} else
@@ -73,7 +73,7 @@ static void Sync(void) {
 	setchr2(0x1000, chr_reg[2]);
 	setchr2(0x1800, chr_reg[3]);
 	setprg8r(0x10, 0x6000, 0);
-	setprg16r((PRGptr[1]) ? kogame : 0, 0x8000, prg_reg);
+	setprg16r((fceu11::g_bus.prg_ptr()[1]) ? kogame : 0, 0x8000, prg_reg);
 	setprg16(0xC000, ~0);
 }
 
@@ -89,7 +89,7 @@ static DECLFR(M68Read) {
 static DECLFW(M68WriteLo) {
 	if (!V) {
 		count = 0;
-		setprg16r((PRGptr[1]) ? kogame : 0, 0x8000, prg_reg);
+		setprg16r((fceu11::g_bus.prg_ptr()[1]) ? kogame : 0, 0x8000, prg_reg);
 	}
 	CartBW(A, V);
 }

@@ -90,7 +90,7 @@ static DECLFW(UNROM512FlashWrite)
 			(flash_buffer_a[3] == 0x5555) && (flash_buffer_v[3] == 0xAA) &&
 			(flash_buffer_a[4] == 0x2AAA) && (flash_buffer_v[4] == 0x55) &&
 			(flash_buffer_v[5] == 0x30)) {
-			int offset = &Page[A >> 11][A] - flash_data;
+			int offset = &fceu11::g_bus.page()[A >> 11][A] - flash_data;
 			int sector = offset / FLASH_SECTOR_SIZE;
 			for (int i = sector * FLASH_SECTOR_SIZE; i < (sector + 1) * FLASH_SECTOR_SIZE; i++)
 				flash_data[i % PRGsize[ROM_CHIP]] = 0xFF;
@@ -115,7 +115,7 @@ static DECLFW(UNROM512FlashWrite)
 			(flash_buffer_a[0] == 0x5555) && (flash_buffer_v[0] == 0xAA) &&
 			(flash_buffer_a[1] == 0x2AAA) && (flash_buffer_v[1] == 0x55) &&
 			(flash_buffer_a[2] == 0x5555) && (flash_buffer_v[2] == 0xA0)) {
-			int offset = &Page[A >> 11][A] - flash_data;
+			int offset = &fceu11::g_bus.page()[A >> 11][A] - flash_data;
 			if (CartBR(A) != 0xFF) {
 				FCEU_PrintError("Error: can't write to 0x%08x, flash sector is not erased.\n", offset);
 			}
@@ -175,7 +175,7 @@ static void UNROM512_FlashReset(void)
 		size_t flash_size = PRGsize[ROM_CHIP];
 		// Copy ROM to flash data
 		for (size_t i = 0; i < flash_size; i++) {
-			flash_data[i] = PRGptr[ROM_CHIP][i];
+			flash_data[i] = fceu11::g_bus.prg_ptr()[ROM_CHIP][i];
 		}
 	}
 }
@@ -215,7 +215,7 @@ void UNROM512_Init(CartInfo *info) {
 		flash_data = flash_data_owner.get();
 		// Copy ROM to flash data
 		for (size_t i = 0; i < flash_size; i++) {
-			flash_data[i] = PRGptr[ROM_CHIP][i];
+			flash_data[i] = fceu11::g_bus.prg_ptr()[ROM_CHIP][i];
 		}
 		SetupCartPRGMapping(FLASH_CHIP, flash_data, flash_size, 1);
 		info->addSaveGameBuf( flash_data, flash_size, UNROM512_FlashReset );

@@ -38,14 +38,14 @@ static int IRQa, IRQCount;
 FCEU_MAYBE_UNUSED
 static DECLFW(MBWRAM) {
 	if (!(DRegs[3] & 0x10))
-		Page[A >> 11][A] = V;
+		fceu11::g_bus.page()[A >> 11][A] = V;
 }
 
 FCEU_MAYBE_UNUSED
 static DECLFR(MAWRAM) {
 	if (DRegs[3] & 0x10)
 		return g_cpu.native_layout().DB;
-	return(Page[A >> 11][A]);
+	return(fceu11::g_bus.page()[A >> 11][A]);
 }
 
 static void MMC1CHR(void) {

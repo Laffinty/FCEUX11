@@ -66,9 +66,9 @@ static DECLFW(M15Write) {
 	// and another implified version for subor/waixing chinese originals and hacks with no different modes, working only in mode 0 and which does not
 	// expect there is any CHR write protection. protecting CHR writes only for mode 3 fixes the problem, all roms may be run on the same source again.
 	if((latchea & 3) == 3)
-		SetupCartCHRMapping(0, CHRptr[0], 0x2000, 0);
+		SetupCartCHRMapping(0, fceu11::g_bus.chr_ptr()[0], 0x2000, 0);
 	else
-		SetupCartCHRMapping(0, CHRptr[0], 0x2000, 1);
+		SetupCartCHRMapping(0, fceu11::g_bus.chr_ptr()[0], 0x2000, 1);
 	Sync();
 }
 

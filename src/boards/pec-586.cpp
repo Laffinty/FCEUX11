@@ -88,7 +88,7 @@ static DECLFR(UNLPEC586ReadHi) {
 	if((reg[0] & 0x10) || ((reg[0] & 0x40) && (A < 0xA000)))
 		return CartBR(A);
 	else
-		return PRGptr[0][((0x0107 | ((A >> 7) & 0x0F8)) << 10) | (A & 0x3FF)];
+		return fceu11::g_bus.prg_ptr()[0][((0x0107 | ((A >> 7) & 0x0F8)) << 10) | (A & 0x3FF)];
 }
 
 static void UNLPEC586Power(void) {
