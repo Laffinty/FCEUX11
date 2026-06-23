@@ -63,13 +63,13 @@ static INLINE void setpageptr(int s, uint32 A, uint8 *p, int ram) {
 
 	if (p)
 		for (x = (s >> 1) - 1; x >= 0; x--) {
-			PRGIsRAM[AB + x] = ram;
-			Page[AB + x] = p - A;
+			fceu11::g_bus.prg_is_ram()[AB + x] = ram;
+			fceu11::g_bus.page()[AB + x] = p - A;
 		}
 	else
 		for (x = (s >> 1) - 1; x >= 0; x--) {
-			PRGIsRAM[AB + x] = 0;
-			Page[AB + x] = 0;
+			fceu11::g_bus.prg_is_ram()[AB + x] = 0;
+			fceu11::g_bus.page()[AB + x] = 0;
 		}
 }
 
@@ -96,8 +96,8 @@ DECLFR(CartBROB) {
 }
 
 void setprg2r(int r, uint32 A, uint32 V) {
-	V &= PRGmask2[r];
-	setpageptr(2, A, PRGptr[r] ? (&PRGptr[r][V << 11]) : 0, PRGram[r]);
+	V &= fceu11::g_bus.prg_mask2()[r];
+	setpageptr(2, A, fceu11::g_bus.prg_ptr()[r] ? (&fceu11::g_bus.prg_ptr()[r][V << 11]) : 0, fceu11::g_bus.prg_ram()[r]);
 }
 
 void setprg2(uint32 A, uint32 V) {
@@ -105,8 +105,8 @@ void setprg2(uint32 A, uint32 V) {
 }
 
 void setprg4r(int r, uint32 A, uint32 V) {
-	V &= PRGmask4[r];
-	setpageptr(4, A, PRGptr[r] ? (&PRGptr[r][V << 12]) : 0, PRGram[r]);
+	V &= fceu11::g_bus.prg_mask4()[r];
+	setpageptr(4, A, fceu11::g_bus.prg_ptr()[r] ? (&fceu11::g_bus.prg_ptr()[r][V << 12]) : 0, fceu11::g_bus.prg_ram()[r]);
 }
 
 void setprg4(uint32 A, uint32 V) {
@@ -114,72 +114,72 @@ void setprg4(uint32 A, uint32 V) {
 }
 
 void setprg8r(int r, uint32 A, uint32 V) {
-	if (PRGsize[r] >= 8192) {
-		V &= PRGmask8[r];
-		setpageptr(8, A, PRGptr[r] ? (&PRGptr[r][V << 13]) : 0, PRGram[r]);
+	if (fceu11::g_bus.prg_size()[r] >= 8192) {
+		V &= fceu11::g_bus.prg_mask8()[r];
+		setpageptr(8, A, fceu11::g_bus.prg_ptr()[r] ? (&fceu11::g_bus.prg_ptr()[r][V << 13]) : 0, fceu11::g_bus.prg_ram()[r]);
 	} else {
 		uint32 VA = V << 2;
 		int x;
 		for (x = 0; x < 4; x++)
-			setpageptr(2, A + (x << 11), PRGptr[r] ? (&PRGptr[r][((VA + x) & PRGmask2[r]) << 11]) : 0, PRGram[r]);
+			setpageptr(2, A + (x << 11), fceu11::g_bus.prg_ptr()[r] ? (&fceu11::g_bus.prg_ptr()[r][((VA + x) & fceu11::g_bus.prg_mask2()[r]) << 11]) : 0, fceu11::g_bus.prg_ram()[r]);
 	}
 }
 
 void setprg16r(int r, uint32 A, uint32 V) {
-	if (PRGsize[r] >= 16384) {
-		V &= PRGmask16[r];
-		setpageptr(16, A, PRGptr[r] ? (&PRGptr[r][V << 14]) : 0, PRGram[r]);
+	if (fceu11::g_bus.prg_size()[r] >= 16384) {
+		V &= fceu11::g_bus.prg_mask16()[r];
+		setpageptr(16, A, fceu11::g_bus.prg_ptr()[r] ? (&fceu11::g_bus.prg_ptr()[r][V << 14]) : 0, fceu11::g_bus.prg_ram()[r]);
 	} else {
 		uint32 VA = V << 3;
 		int x;
 
 		for (x = 0; x < 8; x++)
-			setpageptr(2, A + (x << 11), PRGptr[r] ? (&PRGptr[r][((VA + x) & PRGmask2[r]) << 11]) : 0, PRGram[r]);
+			setpageptr(2, A + (x << 11), fceu11::g_bus.prg_ptr()[r] ? (&fceu11::g_bus.prg_ptr()[r][((VA + x) & fceu11::g_bus.prg_mask2()[r]) << 11]) : 0, fceu11::g_bus.prg_ram()[r]);
 	}
 }
 
 void setprg32r(int r, uint32 A, uint32 V) {
-	if (PRGsize[r] >= 32768) {
-		V &= PRGmask32[r];
-		setpageptr(32, A, PRGptr[r] ? (&PRGptr[r][V << 15]) : 0, PRGram[r]);
+	if (fceu11::g_bus.prg_size()[r] >= 32768) {
+		V &= fceu11::g_bus.prg_mask32()[r];
+		setpageptr(32, A, fceu11::g_bus.prg_ptr()[r] ? (&fceu11::g_bus.prg_ptr()[r][V << 15]) : 0, fceu11::g_bus.prg_ram()[r]);
 	} else {
 		uint32 VA = V << 4;
 		int x;
 
 		for (x = 0; x < 16; x++)
-			setpageptr(2, A + (x << 11), PRGptr[r] ? (&PRGptr[r][((VA + x) & PRGmask2[r]) << 11]) : 0, PRGram[r]);
+			setpageptr(2, A + (x << 11), fceu11::g_bus.prg_ptr()[r] ? (&fceu11::g_bus.prg_ptr()[r][((VA + x) & fceu11::g_bus.prg_mask2()[r]) << 11]) : 0, fceu11::g_bus.prg_ram()[r]);
 	}
 }
 
 void setchr1r(int r, uint32 A, uint32 V) {
-	if (!CHRptr[r]) return;
+	if (!fceu11::g_bus.chr_ptr()[r]) return;
 	FCEUPPU_LineUpdate();
-	V &= CHRmask1[r];
-	if (CHRram[r])
+	V &= fceu11::g_bus.chr_mask1()[r];
+	if (fceu11::g_bus.chr_ram()[r])
 		PPUCHRRAM |= (1 << (A >> 10));
 	else
 		PPUCHRRAM &= ~(1 << (A >> 10));
-	VPageR[(A) >> 10] = &CHRptr[r][(V) << 10] - (A);
+	VPageR[(A) >> 10] = &fceu11::g_bus.chr_ptr()[r][(V) << 10] - (A);
 }
 
 void setchr2r(int r, uint32 A, uint32 V) {
-	if (!CHRptr[r]) return;
+	if (!fceu11::g_bus.chr_ptr()[r]) return;
 	FCEUPPU_LineUpdate();
-	V &= CHRmask2[r];
-	VPageR[(A) >> 10] = VPageR[((A) >> 10) + 1] = &CHRptr[r][(V) << 11] - (A);
-	if (CHRram[r])
+	V &= fceu11::g_bus.chr_mask2()[r];
+	VPageR[(A) >> 10] = VPageR[((A) >> 10) + 1] = &fceu11::g_bus.chr_ptr()[r][(V) << 11] - (A);
+	if (fceu11::g_bus.chr_ram()[r])
 		PPUCHRRAM |= (3 << (A >> 10));
 	else
 		PPUCHRRAM &= ~(3 << (A >> 10));
 }
 
 void setchr4r(int r, unsigned int A, unsigned int V) {
-	if (!CHRptr[r]) return;
+	if (!fceu11::g_bus.chr_ptr()[r]) return;
 	FCEUPPU_LineUpdate();
-	V &= CHRmask4[r];
+	V &= fceu11::g_bus.chr_mask4()[r];
 	VPageR[(A) >> 10] = VPageR[((A) >> 10) + 1] =
-							VPageR[((A) >> 10) + 2] = VPageR[((A) >> 10) + 3] = &CHRptr[r][(V) << 12] - (A);
-	if (CHRram[r])
+							VPageR[((A) >> 10) + 2] = VPageR[((A) >> 10) + 3] = &fceu11::g_bus.chr_ptr()[r][(V) << 12] - (A);
+	if (fceu11::g_bus.chr_ram()[r])
 		PPUCHRRAM |= (15 << (A >> 10));
 	else
 		PPUCHRRAM &= ~(15 << (A >> 10));
@@ -188,12 +188,12 @@ void setchr4r(int r, unsigned int A, unsigned int V) {
 void setchr8r(int r, uint32 V) {
 	int x;
 
-	if (!CHRptr[r]) return;
+	if (!fceu11::g_bus.chr_ptr()[r]) return;
 	FCEUPPU_LineUpdate();
-	V &= CHRmask8[r];
+	V &= fceu11::g_bus.chr_mask8()[r];
 	for (x = 7; x >= 0; x--)
-		VPageR[x] = &CHRptr[r][V << 13];
-	if (CHRram[r])
+		VPageR[x] = &fceu11::g_bus.chr_ptr()[r][V << 13];
+	if (fceu11::g_bus.chr_ram()[r])
 		PPUCHRRAM |= (255);
 	else
 		PPUCHRRAM = 0;
@@ -364,7 +364,7 @@ void FixGenieMap(void) {
 	geniestage = 2;
 
 	for (x = 0; x < 8; x++)
-		VPage[x] = VPageG[x];
+		fceu11::g_bus.vpage()[x] = fceu11::g_bus.vpage_g()[x];
 
 	VPageR = VPage;
 	FlushGenieRW();
@@ -395,7 +395,7 @@ void FCEU_GeniePower(void) {
 	SetReadHandler(0x8000, 0xFFFF, GenieRead);
 
 	for (x = 0; x < 8; x++)
-		VPage[x] = GENIEROM + 4096 - 0x400 * x;
+		fceu11::g_bus.vpage()[x] = GENIEROM + 4096 - 0x400 * x;
 
 	if (AllocGenieRW())
 		VPageR = VPageG;
