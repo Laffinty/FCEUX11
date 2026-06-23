@@ -251,8 +251,8 @@ FCEUGI *GameInfo = NULL;
 void (*GameInterface)(GI h);
 void (*GameStateRestore)(int version);
 
-// ARead[] / BWrite[] are inline reference-to-array aliases
-// declared in bus.h. Their storage lives on fceu11::bus_instance().
+// ARead[] / BWrite[] are `extern` reference-to-array aliases
+// declared in bus.h. Their storage lives on fceu11::g_bus.
 // The Genie-shadow state (AReadG / BWriteG / RWWrap) stays here
 // because AllocGenieRW / FlushGenieRW own the heap-allocated
 // 32K shadow buffers and the SetReadHandler/SetWriteHandler

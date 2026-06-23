@@ -95,7 +95,7 @@ struct ApuView {
 // ---------------------------------------------------------------------------
 // Bus (分类 D — folded into fceu11::Bus in v1.4 Gateway Phase 2).
 // core_state.h forward-declares the class; the full definition is in
-// bus.h. State::bus() returns a reference to fceu11::bus_instance().
+// bus.h. State::bus() returns a reference to fceu11::g_bus.
 // (Forward decl is placed inside the outer namespace fceu11; no
 // extra `namespace fceu11 { ... }` wrapper needed.)
 // ---------------------------------------------------------------------------
@@ -201,7 +201,7 @@ public:
     CpuView&   cpu()    noexcept { return cpu_;    }
     PpuView&   ppu()    noexcept { return ppu_;    }
     ApuView&   apu()    noexcept { return apu_;    }
-    Bus&       bus()    noexcept;  // defined in core_state.cpp; returns bus_instance()
+    Bus&       bus()    noexcept;  // defined in core_state.cpp; returns g_bus
     CartView&  cart()   noexcept { return cart_;   }
     ConfigView& config() noexcept { return config_; }
     DebugView& debug()  noexcept { return debug_;  }

@@ -1,18 +1,17 @@
 // FCEUX11 — v1.4 Gateway: Memory dispatch + bank-switching bus
 //
-// Phase 2 implementation. Bus class OWNS all the dispatch / page /
-// ROM pointer / mask / ram-flag storage. Method bodies that in
-// Phase 1 delegated to cart.cpp / fceu.cpp free functions now do
-// the work directly on this->state_. The cart.cpp and fceu.cpp
+// Phase 3 implementation. Bus class OWNS all the dispatch / page /
+// ROM pointer / mask / ram-flag storage. Method bodies do the
+// work directly on this->state_. The cart.cpp and fceu.cpp
 // global arrays for ARead / BWrite / Page / VPage / etc. are gone;
-// the legacy `::ARead` / `::Page` / etc. names are inline
-// reference-to-array aliases defined in bus.h that point into the
-// Bus singleton's internal storage.
+// the legacy `::ARead` / `::Page` / etc. names are `extern`
+// reference-to-array aliases defined in bus.h that bind to
+// g_bus's internal storage.
 //
-// `VPageR` is a uint8** pointer alias for `&VPage[0]`; its
-// definition lives here so it can call bus_instance() at first
-// reference (C++ inline pointer variables must have constant
-// initializers, and `&bus_instance().vpage_[0]` is not constexpr).
+// `VPageR` is a uint8** pointer alias for `&g_bus.vpage_[0]`; its
+// definition lives here so it can take the address of g_bus's
+// member at static init (C++ inline pointer variables must have
+// constant initializers, and `&g_bus.vpage_[0]` is not constexpr).
 
 #include "bus.h"
 
@@ -125,8 +124,8 @@ void Bus::reset_mapping() noexcept {
 // ---------------------------------------------------------------------------
 // Accessors (page / vpage / prg_ptr / chr_ptr / aread_table /
 // bwrite_table) are defined INLINE in the class body in bus.h so
-// the compiler can constant-fold `bus_instance().page()` etc. to
-// the singleton's known address. Out-of-line definitions would
+// the compiler can constant-fold `g_bus.page()` etc. to the
+// global's known address. Out-of-line definitions would
 // force a function call at every use site, costing ~5% on
 // bench_full_frame (measured in Phase 2 pre-optimization).
 // ---------------------------------------------------------------------------
@@ -363,68 +362,64 @@ void Bus::setup_mirroring(int m, int hard, uint8_t* extra) noexcept {
 }
 
 // ---------------------------------------------------------------------------
-// Singleton — Meyers pattern. Thread-safe lazy init per C++11
-// [stmt.dcl] p4. The static-local instance is constructed on first
-// call and persists for the program's lifetime.
+// Direct global instance (v1.4 Phase 3 §5.1.1). Replaces the Phase 2
+// Meyers singleton `bus_instance()` because a non-inline function
+// call to resolve the singleton address costs ~5% on bench_full_frame.
+// `g_bus` is constructed during static init (zero-init at program
+// load, then Bus::Bus() runs). Declared `extern` in bus.h.
 //
-// This is a regular (non-inline) function. Consumer TUs see only
-// the `extern` declaration in bus.h and emit a real function call
-// to resolve the singleton address. The trade-off: ~5% slower
-// bench_full_frame than the fully-inline version (which caused
-// MSVC linker errors) — acceptable because the global reference
-// aliases (ARead, BWrite, Page, etc.) make every hot-path dispatch
-// a direct array-index + indirect call, identical to v1.3.0.
+// IMPORTANT: g_bus must be declared BEFORE the reference-alias
+// definitions below so the static-init order in this TU is well
+// defined (g_bus is fully constructed by the time the aliases
+// bind to its members).
 // ---------------------------------------------------------------------------
-Bus& bus_instance() noexcept {
-    static Bus instance;
-    return instance;
-}
+Bus g_bus;
 
 } // namespace fceu11
 
 // ---------------------------------------------------------------------------
 // VPageR — uint8** pointer alias for &VPage[0]. Declared `extern` in
-// bus.h because its initializer is not constexpr (bus_instance() is
-// a function call). Used by datalatch.cpp, mmc5.cpp, and the
+// bus.h because its initializer is not constexpr (g_bus is a global
+// object, not a constant). Used by datalatch.cpp, mmc5.cpp, and the
 // legacy setchr*r code paths in cart.cpp.
 // ---------------------------------------------------------------------------
-uint8_t** VPageR = &fceu11::bus_instance().vpage()[0];
+uint8_t** VPageR = &fceu11::g_bus.vpage()[0];
 
 // ---------------------------------------------------------------------------
 // Global reference aliases (definitions matching the `extern`
-// declarations in bus.h). Each alias is a reference to a Bus
-// member array; initialized once at static init from
-// bus_instance()'s address. Every consumer TU sees these as
-// ordinary global references — the compiler treats ARead[i] as
-// a direct array-index + indirect-call, identical to v1.3.0's
-// `::ARead[i](addr)` machine code (no per-use bus_instance()
-// call). This restores the bench_full_frame performance that
-// was lost when the inline-alias version forced a runtime
-// bus_instance() call at every dispatch.
+// declarations in bus.h). Each alias is a reference to a g_bus
+// member array; initialized once at static init. Every consumer TU
+// sees these as ordinary global references — the compiler treats
+// ARead[i] as a direct array-index + indirect-call, identical to
+// v1.3.0's `::ARead[i](addr)` machine code (no per-use g_bus
+// indirection — the link-time address is fixed). This restores
+// the bench_full_frame performance that was lost when the
+// Phase 2 inline-alias version forced a runtime function call
+// at every dispatch.
 // ---------------------------------------------------------------------------
-readfunc  (& ARead )[0x10000] = fceu11::bus_instance().aread_table();
-writefunc (& BWrite)[0x10000] = fceu11::bus_instance().bwrite_table();
+readfunc  (& ARead )[0x10000] = fceu11::g_bus.aread_table();
+writefunc (& BWrite)[0x10000] = fceu11::g_bus.bwrite_table();
 
-uint8_t* (& Page        )[32] = fceu11::bus_instance().page();
-uint8_t* (& VPage       )[8]  = fceu11::bus_instance().vpage();
-uint8_t* (& VPageG      )[8]  = fceu11::bus_instance().vpage_g();
-uint8_t* (& MMC5SPRVPage)[8]  = fceu11::bus_instance().mmc5_spr_vpage();
-uint8_t* (& MMC5BGVPage )[8]  = fceu11::bus_instance().mmc5_bg_vpage();
+uint8_t* (& Page        )[32] = fceu11::g_bus.page();
+uint8_t* (& VPage       )[8]  = fceu11::g_bus.vpage();
+uint8_t* (& VPageG      )[8]  = fceu11::g_bus.vpage_g();
+uint8_t* (& MMC5SPRVPage)[8]  = fceu11::g_bus.mmc5_spr_vpage();
+uint8_t* (& MMC5BGVPage )[8]  = fceu11::g_bus.mmc5_bg_vpage();
 
-uint8_t* (& PRGptr)[32] = fceu11::bus_instance().prg_ptr();
-uint8_t* (& CHRptr)[32] = fceu11::bus_instance().chr_ptr();
+uint8_t* (& PRGptr)[32] = fceu11::g_bus.prg_ptr();
+uint8_t* (& CHRptr)[32] = fceu11::g_bus.chr_ptr();
 
-uint32_t (& PRGsize  )[32] = fceu11::bus_instance().prg_size();
-uint32_t (& CHRsize  )[32] = fceu11::bus_instance().chr_size();
-uint32_t (& PRGmask2 )[32] = fceu11::bus_instance().prg_mask2();
-uint32_t (& PRGmask4 )[32] = fceu11::bus_instance().prg_mask4();
-uint32_t (& PRGmask8 )[32] = fceu11::bus_instance().prg_mask8();
-uint32_t (& PRGmask16)[32] = fceu11::bus_instance().prg_mask16();
-uint32_t (& PRGmask32)[32] = fceu11::bus_instance().prg_mask32();
-uint32_t (& CHRmask1 )[32] = fceu11::bus_instance().chr_mask1();
-uint32_t (& CHRmask2 )[32] = fceu11::bus_instance().chr_mask2();
-uint32_t (& CHRmask4 )[32] = fceu11::bus_instance().chr_mask4();
-uint32_t (& CHRmask8 )[32] = fceu11::bus_instance().chr_mask8();
-uint8_t  (& PRGram   )[32] = fceu11::bus_instance().prg_ram();
-uint8_t  (& CHRram   )[32] = fceu11::bus_instance().chr_ram();
-uint8_t  (& PRGIsRAM )[32] = fceu11::bus_instance().prg_is_ram();
+uint32_t (& PRGsize  )[32] = fceu11::g_bus.prg_size();
+uint32_t (& CHRsize  )[32] = fceu11::g_bus.chr_size();
+uint32_t (& PRGmask2 )[32] = fceu11::g_bus.prg_mask2();
+uint32_t (& PRGmask4 )[32] = fceu11::g_bus.prg_mask4();
+uint32_t (& PRGmask8 )[32] = fceu11::g_bus.prg_mask8();
+uint32_t (& PRGmask16)[32] = fceu11::g_bus.prg_mask16();
+uint32_t (& PRGmask32)[32] = fceu11::g_bus.prg_mask32();
+uint32_t (& CHRmask1 )[32] = fceu11::g_bus.chr_mask1();
+uint32_t (& CHRmask2 )[32] = fceu11::g_bus.chr_mask2();
+uint32_t (& CHRmask4 )[32] = fceu11::g_bus.chr_mask4();
+uint32_t (& CHRmask8 )[32] = fceu11::g_bus.chr_mask8();
+uint8_t  (& PRGram   )[32] = fceu11::g_bus.prg_ram();
+uint8_t  (& CHRram   )[32] = fceu11::g_bus.chr_ram();
+uint8_t  (& PRGIsRAM )[32] = fceu11::g_bus.prg_is_ram();

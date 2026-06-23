@@ -349,7 +349,7 @@ uint8 GetMem(uint16 A) {
 	if (GameInfo) {							//adelikat: 11/17/09: Prevent crash if this is called with no game loaded.
 		uint32 ret;
 		fceuindbg=1;
-		ret = ARead[A](A);
+		ret = fceu11::g_bus.read(static_cast<uint16_t>(A));
 		fceuindbg=0;
 		return ret;
 	} else return 0;
@@ -358,7 +358,7 @@ uint8 GetMem(uint16 A) {
 uint8 GetPPUMem(uint8 A) {
 	uint16 tmp = FCEUPPU_PeekAddress() & 0x3FFF;
 
-	if (tmp<0x2000) return VPage[tmp>>10][tmp];
+	if (tmp<0x2000) return fceu11::g_bus.vpage()[tmp>>10][tmp];
 	if (tmp>=0x3F00) return PALRAM[tmp&0x1F];
 	return vnapage[(tmp>>10)&0x3][tmp&0x3FF];
 }

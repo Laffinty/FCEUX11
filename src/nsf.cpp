@@ -405,23 +405,23 @@ static DECLFR(NSF_read)
 		{
 			memset(RAM,0x00,0x800);
 
-			BWrite[0x4015](0x4015,0x0);
+			fceu11::g_bus.write(0x4015, 0x0);
 			for(x=0;x<0x14;x++)
-				BWrite[0x4000+x](0x4000+x,0);
-			BWrite[0x4015](0x4015,0xF);
+				fceu11::g_bus.write(static_cast<uint16_t>(0x4000+x), 0);
+			fceu11::g_bus.write(0x4015, 0xF);
 
 			if(NSFHeader.SoundChip&4)
 			{
-				BWrite[0x4017](0x4017,0xC0);  /* FDS BIOS writes $C0 */
-				BWrite[0x4089](0x4089,0x80);
-				BWrite[0x408A](0x408A,0xE8);
+				fceu11::g_bus.write(0x4017, 0xC0);  /* FDS BIOS writes $C0 */
+				fceu11::g_bus.write(0x4089, 0x80);
+				fceu11::g_bus.write(0x408A, 0xE8);
 			}
 			else
 			{
 				memset(ExWRAM,0x00,8192);
-				BWrite[0x4017](0x4017,0xC0);
-				BWrite[0x4017](0x4017,0xC0);
-				BWrite[0x4017](0x4017,0x40);
+				fceu11::g_bus.write(0x4017, 0xC0);
+				fceu11::g_bus.write(0x4017, 0xC0);
+				fceu11::g_bus.write(0x4017, 0x40);
 			}
 
 			if(BSon)

@@ -534,7 +534,7 @@ void fceux11_lua_BWrite(uint32_t addr, uint8_t val) {
 	uint16_t a = static_cast<uint16_t>(addr & 0xFFFF);
 	if (a < 0x8000) {
 		// RAM/writable memory — call through BWrite handler
-		writefunc wf = BWrite[a];
+		writefunc wf = fceu11::g_bus.bwrite_table()[a];
 		if (wf) wf(a, val);
 	}
 }

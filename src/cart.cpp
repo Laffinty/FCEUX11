@@ -74,7 +74,7 @@ static INLINE void setpageptr(int s, uint32 A, uint8 *p, int ram) {
 }
 
 DECLFR(CartBR) {
-	uint8 *p = Page[A >> 11];
+	uint8 *p = fceu11::g_bus.page()[A >> 11];
 	if ((A & 0x7FF) < (0x800 - 64))
 		FCEUX11_PREFETCH(&p[A + 64]);
 	return p[A];
@@ -82,12 +82,12 @@ DECLFR(CartBR) {
 
 DECLFW(CartBW) {
 	//printf("Ok: %04x:%02x, %d\n",A,V,PRGIsRAM[A>>11]);
-	if (PRGIsRAM[A >> 11] && Page[A >> 11])
-		Page[A >> 11][A] = V;
+	if (fceu11::g_bus.prg_is_ram()[A >> 11] && fceu11::g_bus.page()[A >> 11])
+		fceu11::g_bus.page()[A >> 11][A] = V;
 }
 
 DECLFR(CartBROB) {
-	uint8 *p = Page[A >> 11];
+	uint8 *p = fceu11::g_bus.page()[A >> 11];
 	if (!p)
 		return(g_cpu.native_layout().DB);
 	if ((A & 0x7FF) < (0x800 - 64))

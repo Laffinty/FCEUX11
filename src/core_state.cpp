@@ -8,7 +8,7 @@
 
 #include "core_state.h"
 
-#include "bus.h"        // fceu11::bus_instance() (State::bus()), inline aliases for ::ARead/::BWrite/::Page/::VPage/::PRGptr/::CHRptr
+#include "bus.h"        // fceu11::g_bus (State::bus()), inline aliases for ::ARead/::BWrite/::Page/::VPage/::PRGptr/::CHRptr
 #include "cpu.h"        // fceu11::cpu_instance()
 #include "x6502.h"      // X6502, legacy inline aliases
 #include "x6502struct.h" // X6502 (struct definition)
@@ -70,12 +70,12 @@ bool&     ApuView::swap_duty() noexcept { return ::swapDuty; }
 // struct EXPSOUND& ApuView::exp_sound() noexcept { return ::GameExpSound; }
 
 // ---------------------------------------------------------------------------
-// State::bus() — v1.4 Gateway: returns the Bus singleton. BusView is
-// retired; the underlying accessors (`bus_instance().aread_table()`
+// State::bus() — v1.4 Gateway: returns the Bus global. BusView is
+// retired; the underlying accessors (`g_bus.aread_table()`
 // etc.) cover the same surface and are accessible from any TU via
 // bus.h. CartView (below) keeps the related cart-owned tables.
 // ---------------------------------------------------------------------------
-Bus& State::bus() noexcept { return fceu11::bus_instance(); }
+Bus& State::bus() noexcept { return fceu11::g_bus; }
 
 // ---------------------------------------------------------------------------
 // CartView

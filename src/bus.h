@@ -1,11 +1,17 @@
 // FCEUX11 — v1.4 Gateway: Memory dispatch + bank-switching bus
 //
-// Phase 2: Bus class now OWNS all the data (ARead[] / BWrite[] / Page[]
+// Phase 3: Bus class OWNS all the data (ARead[] / BWrite[] / Page[]
 // / VPage[] / VPageG[] / MMC5SPRVPage[] / MMC5BGVPage[] / PRGptr[] /
 // CHRptr[] / PRGram[] / CHRram[] / PRGsize[] / CHRsize[] / PRGmask*[]
 // / CHRmask*[] / PRGIsRAM[] / mirror_hard_). The legacy global names
-// are now `inline` reference-to-array aliases pointing into
-// bus_instance(); existing call sites continue to compile unchanged.
+// are `extern` reference-to-array aliases pointing into g_bus;
+// existing call sites continue to compile unchanged.
+//
+// g_bus is a direct global object (replaces the Phase 2 Meyers
+// singleton `bus_instance()`) so the compiler folds every hot-path
+// `g_bus.aread_[addr]` / `g_bus.bwrite_[addr]` to a direct
+// array-index + indirect-call sequence, identical to v1.3.0's
+// `::ARead[addr](addr)` machine code.
 //
 // v1.4 Roadmap §4.1 inline-forwarder pattern (mirrors v1.3 Cpu/g_cpu).
 // The hot-path `read()` / `write()` are `__forceinline` against
@@ -75,8 +81,8 @@ public:
     // address of the singleton's page_[] member — same machine code
     // as the v1.3.0 `::Page[i]` direct global access.
     // -----------------------------------------------------------------
-    uint8_t* (& page()  noexcept)[32] { return page_; }
-    uint8_t* (& vpage() noexcept)[8]  { return vpage_; }
+    __forceinline uint8_t* (& page()  noexcept)[32] { return page_; }
+    __forceinline uint8_t* (& vpage() noexcept)[8]  { return vpage_; }
 
     void set_page(uint32_t idx, uint8_t* ptr) noexcept;
     void set_vpage(uint32_t idx, uint8_t* ptr) noexcept;
@@ -104,30 +110,30 @@ public:
     // ROM pointer tables + bank-mask setup. Inline in the class
     // body (see comment on page()/vpage() above).
     // -----------------------------------------------------------------
-    uint8_t* (& prg_ptr() noexcept)[32] { return prg_ptr_; }
-    uint8_t* (& chr_ptr() noexcept)[32] { return chr_ptr_; }
+    __forceinline uint8_t* (& prg_ptr() noexcept)[32] { return prg_ptr_; }
+    __forceinline uint8_t* (& chr_ptr() noexcept)[32] { return chr_ptr_; }
 
     // Mask / size / RAM-flag tables (the cart.cpp globals that board
     // files index directly: PRGsize[chip], CHRmask1[chip], etc.).
-    uint32_t (& prg_size() noexcept)[32]   { return prg_size_; }
-    uint32_t (& chr_size() noexcept)[32]   { return chr_size_; }
-    uint32_t (& prg_mask2()  noexcept)[32] { return prg_mask2_;  }
-    uint32_t (& prg_mask4()  noexcept)[32] { return prg_mask4_;  }
-    uint32_t (& prg_mask8()  noexcept)[32] { return prg_mask8_;  }
-    uint32_t (& prg_mask16() noexcept)[32] { return prg_mask16_; }
-    uint32_t (& prg_mask32() noexcept)[32] { return prg_mask32_; }
-    uint32_t (& chr_mask1()  noexcept)[32] { return chr_mask1_;  }
-    uint32_t (& chr_mask2()  noexcept)[32] { return chr_mask2_;  }
-    uint32_t (& chr_mask4()  noexcept)[32] { return chr_mask4_;  }
-    uint32_t (& chr_mask8()  noexcept)[32] { return chr_mask8_;  }
-    uint8_t  (& prg_ram()  noexcept)[32]   { return prg_ram_;  }
-    uint8_t  (& chr_ram()  noexcept)[32]   { return chr_ram_;  }
-    uint8_t  (& prg_is_ram() noexcept)[32]  { return prg_is_ram_; }
+    __forceinline uint32_t (& prg_size() noexcept)[32]   { return prg_size_; }
+    __forceinline uint32_t (& chr_size() noexcept)[32]   { return chr_size_; }
+    __forceinline uint32_t (& prg_mask2() noexcept)[32] { return prg_mask2_;  }
+    __forceinline uint32_t (& prg_mask4() noexcept)[32] { return prg_mask4_;  }
+    __forceinline uint32_t (& prg_mask8() noexcept)[32] { return prg_mask8_;  }
+    __forceinline uint32_t (& prg_mask16() noexcept)[32] { return prg_mask16_; }
+    __forceinline uint32_t (& prg_mask32() noexcept)[32] { return prg_mask32_; }
+    __forceinline uint32_t (& chr_mask1() noexcept)[32] { return chr_mask1_;  }
+    __forceinline uint32_t (& chr_mask2() noexcept)[32] { return chr_mask2_;  }
+    __forceinline uint32_t (& chr_mask4() noexcept)[32] { return chr_mask4_;  }
+    __forceinline uint32_t (& chr_mask8() noexcept)[32] { return chr_mask8_;  }
+    __forceinline uint8_t  (& prg_ram()  noexcept)[32]   { return prg_ram_;  }
+    __forceinline uint8_t  (& chr_ram()  noexcept)[32]   { return chr_ram_;  }
+    __forceinline uint8_t  (& prg_is_ram() noexcept)[32]  { return prg_is_ram_; }
 
     // Other special page tables (Genie overlay, MMC5 split banks).
-    uint8_t* (& vpage_g()         noexcept)[8] { return vpage_g_; }
-    uint8_t* (& mmc5_spr_vpage()  noexcept)[8] { return mmc5_spr_vpage_; }
-    uint8_t* (& mmc5_bg_vpage()   noexcept)[8] { return mmc5_bg_vpage_; }
+    __forceinline uint8_t* (& vpage_g()         noexcept)[8] { return vpage_g_; }
+    __forceinline uint8_t* (& mmc5_spr_vpage()  noexcept)[8] { return mmc5_spr_vpage_; }
+    __forceinline uint8_t* (& mmc5_bg_vpage()   noexcept)[8] { return mmc5_bg_vpage_; }
 
     void setup_prg_mapping(uint32_t chip, uint8_t* p, uint32_t size, int ram) noexcept;
     void setup_chr_mapping(uint32_t chip, uint8_t* p, uint32_t size, int ram) noexcept;
@@ -202,23 +208,31 @@ private:
     int        genie_r_wrap_  = 0;
 };
 
-// Meyers singleton: thread-safe lazy init per C++11 [stmt.dcl] p4.
-Bus& bus_instance() noexcept;
+// Direct global instance (v1.4 Phase 3 §5.1.1). Replaces the
+// Phase 2 Meyers singleton `bus_instance()` because a non-inline
+// function-call to resolve the singleton address at every consumer
+// TU costs ~5% on bench_full_frame. `g_bus` is a real global
+// object defined in bus.cpp; the linker gives it a fixed address,
+// so `g_bus.read(addr)` / `g_bus.aread_[addr]` compiles to a
+// direct array-index + indirect-call sequence identical to
+// v1.3.0's `::ARead[addr](addr)` machine code.
+extern Bus g_bus;
 
 } // namespace fceu11
 
 // ---------------------------------------------------------------------------
 // Global reference aliases (v1.4 plan §4.1 pattern). Each alias is
 // a real `extern` reference-to-array global; the canonical
-// initializer (binding to bus_instance().member_) lives in bus.cpp
-// and runs once during static init. Any code that does
-// `ARead[x] = func` writes through to bus_instance().aread_[x] —
-// the data lives in exactly one place (the Bus singleton), with
-// these names as thin references for call-site compat.
+// initializer (binding to g_bus.member_) lives in bus.cpp
+// and runs once during static init (g_bus is declared first in
+// bus.cpp, so the references below bind to its already-constructed
+// members). Any code that does `ARead[x] = func` writes through to
+// g_bus.aread_[x] — the data lives in exactly one place (g_bus),
+// with these names as thin references for call-site compat.
 //
-// Why `extern` (not `inline`): when the inline alias's initializer
-// calls `bus_instance()` (non-inline, defined in bus.cpp), the
-// compiler at every consumer TU emits a real function call to
+// Why `extern` (not `inline`): when an inline alias's initializer
+// would call a non-inline function (the Phase 2 `bus_instance()`),
+// the compiler at every consumer TU emits a real function call to
 // resolve the table base — that cost ~5% on bench_full_frame in
 // Phase 2 pre-optimization. By moving the initialization to bus.cpp
 // (one TU) and using `extern` aliases in the header, every other TU
@@ -257,42 +271,42 @@ extern uint8_t  (& PRGIsRAM )[32];
 // ---------------------------------------------------------------------------
 // Inline forwarders for the 9 free functions in v1.4 plan §3.2 / §4.1.
 // All call sites that used `setprg8(...)` etc. now route through
-// bus_instance().method_ without an extra function-call frame — the
-// compiler folds the bus_instance() singleton lookup and the
-// member-function call into the same machine code as the v1.3.0
-// free-function path.
+// g_bus.method_ without an extra function-call frame — the
+// compiler folds the member-function call into the same machine
+// code as the v1.3.0 free-function path (g_bus is a real global,
+// so its address is known at link time).
 // ---------------------------------------------------------------------------
-inline void setprg8 (uint32_t A, uint32_t V) noexcept { fceu11::bus_instance().setprg8 (A, V); }
-inline void setprg16(uint32_t A, uint32_t V) noexcept { fceu11::bus_instance().setprg16(A, V); }
-inline void setprg32(uint32_t A, uint32_t V) noexcept { fceu11::bus_instance().setprg32(A, V); }
-inline void setchr1 (uint32_t A, uint32_t V) noexcept { fceu11::bus_instance().setchr1 (A, V); }
-inline void setchr4 (uint32_t A, uint32_t V) noexcept { fceu11::bus_instance().setchr4 (A, V); }
-inline void setchr8 (uint32_t V)          noexcept { fceu11::bus_instance().setchr8 (V); }
-inline void setmirror (int t)              noexcept { fceu11::bus_instance().setmirror (static_cast<uint32_t>(t)); }
+inline void setprg8 (uint32_t A, uint32_t V) noexcept { fceu11::g_bus.setprg8 (A, V); }
+inline void setprg16(uint32_t A, uint32_t V) noexcept { fceu11::g_bus.setprg16(A, V); }
+inline void setprg32(uint32_t A, uint32_t V) noexcept { fceu11::g_bus.setprg32(A, V); }
+inline void setchr1 (uint32_t A, uint32_t V) noexcept { fceu11::g_bus.setchr1 (A, V); }
+inline void setchr4 (uint32_t A, uint32_t V) noexcept { fceu11::g_bus.setchr4 (A, V); }
+inline void setchr8 (uint32_t V)          noexcept { fceu11::g_bus.setchr8 (V); }
+inline void setmirror (int t)              noexcept { fceu11::g_bus.setmirror (static_cast<uint32_t>(t)); }
 inline void setmirrorw(int a, int b, int c, int d) noexcept {
-    fceu11::bus_instance().setmirrorw(static_cast<uint32_t>(a),
-                                      static_cast<uint32_t>(b),
-                                      static_cast<uint32_t>(c),
-                                      static_cast<uint32_t>(d));
+    fceu11::g_bus.setmirrorw(static_cast<uint32_t>(a),
+                             static_cast<uint32_t>(b),
+                             static_cast<uint32_t>(c),
+                             static_cast<uint32_t>(d));
 }
 inline void setntamem(uint8_t* p, int ram, uint32_t b) noexcept {
-    fceu11::bus_instance().setntamem(p, ram, b);
+    fceu11::g_bus.setntamem(p, ram, b);
 }
 
 // Cart setup / reset (replaces the cart.cpp::SetupCart* and
 // ResetCartMapping free functions). All board files that called
-// SetupCartPRGMapping(...) now route through bus_instance().
+// SetupCartPRGMapping(...) now route through g_bus.
 inline void SetupCartPRGMapping(int chip, uint8_t* p, uint32_t size, int ram) noexcept {
-    fceu11::bus_instance().setup_prg_mapping(static_cast<uint32_t>(chip), p, size, ram);
+    fceu11::g_bus.setup_prg_mapping(static_cast<uint32_t>(chip), p, size, ram);
 }
 inline void SetupCartCHRMapping(int chip, uint8_t* p, uint32_t size, int ram) noexcept {
-    fceu11::bus_instance().setup_chr_mapping(static_cast<uint32_t>(chip), p, size, ram);
+    fceu11::g_bus.setup_chr_mapping(static_cast<uint32_t>(chip), p, size, ram);
 }
 inline void SetupCartMirroring(int m, int hard, uint8_t* extra) noexcept {
-    fceu11::bus_instance().setup_mirroring(m, hard, extra);
+    fceu11::g_bus.setup_mirroring(m, hard, extra);
 }
 inline void ResetCartMapping() noexcept {
-    fceu11::bus_instance().reset_mapping();
+    fceu11::g_bus.reset_mapping();
 }
 
 // VPageR (uint8** pointer alias for VPage[0]) is declared separately

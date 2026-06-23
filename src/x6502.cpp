@@ -23,6 +23,7 @@
 #include "fceu.h"
 #include "debug.h"
 #include "sound.h"
+#include "bus.h"   // v1.4 Gateway Phase 3 §5.1.3: hot-path g_bus.read/write
 #ifdef _S9XLUA_H
 #include "fceulua.h"
 #endif
@@ -55,7 +56,7 @@ static_assert(std::is_same_v<decltype(&MapIRQHook), fceu11::MapIRQHook*>,
 //normal memory read
 static INLINE uint8 RdMem(unsigned int A)
 {
- _DB=ARead[A](A);
+ _DB=fceu11::g_bus.read(static_cast<uint16_t>(A));
  #ifdef _S9XLUA_H
  CallRegisteredLuaMemHook(A, 1, _DB, LUAMEMHOOK_READ);
  #endif
@@ -65,7 +66,7 @@ static INLINE uint8 RdMem(unsigned int A)
 //normal memory write
 static INLINE void WrMem(unsigned int A, uint8 V)
 {
-	BWrite[A](A,V);
+	fceu11::g_bus.write(static_cast<uint16_t>(A), V);
 	#ifdef _S9XLUA_H
 	CallRegisteredLuaMemHook(A, 1, V, LUAMEMHOOK_WRITE);
 	#endif
@@ -74,7 +75,7 @@ static INLINE void WrMem(unsigned int A, uint8 V)
 
 static INLINE uint8 RdRAM(unsigned int A)
 {
-  _DB=ARead[A](A);
+  _DB=fceu11::g_bus.read(static_cast<uint16_t>(A));
   #ifdef _S9XLUA_H
   CallRegisteredLuaMemHook(A, 1, _DB, LUAMEMHOOK_READ);
   #endif
@@ -95,7 +96,7 @@ static INLINE void WrRAM(unsigned int A, uint8 V)
 uint8 X6502_DMR(uint32 A)
 {
  ADDCYC(1);
- _DB=ARead[A](A);
+ _DB=fceu11::g_bus.read(static_cast<uint16_t>(A));
  #ifdef _S9XLUA_H
  CallRegisteredLuaMemHook(A, 1, _DB, LUAMEMHOOK_READ);
  #endif
@@ -105,7 +106,7 @@ uint8 X6502_DMR(uint32 A)
 void X6502_DMW(uint32 A, uint8 V)
 {
  ADDCYC(1);
- BWrite[A](A,V);
+ fceu11::g_bus.write(static_cast<uint16_t>(A), V);
  #ifdef _S9XLUA_H
  CallRegisteredLuaMemHook(A, 1, V, LUAMEMHOOK_WRITE);
  #endif

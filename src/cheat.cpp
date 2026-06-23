@@ -615,7 +615,7 @@ int FCEU_CheatGetByte(uint32 A)
 	if(A < 0x10000) {
 		uint32 ret;
 		fceuindbg=1;
-		ret = ARead[A](A);
+		ret = fceu11::g_bus.read(static_cast<uint16_t>(A));
 		fceuindbg=0;
 		return ret;
 	} else
@@ -627,7 +627,7 @@ void FCEU_CheatSetByte(uint32 A, uint8 V)
    if(CheatRPtrs[A>>10])
     CheatRPtrs[A>>10][A]=V;
    else if(A < 0x10000)
-    BWrite[A](A, V);
+    fceu11::g_bus.write(static_cast<uint16_t>(A), V);
 }
 
 // disable all cheats
