@@ -171,19 +171,25 @@ jobs:
         run: |
           $hits = git grep -n "ARead\[\|BWrite\[\|VPage\[\|MMC5SPRVPage\[\|MMC5BGVPage\[" -- x6502.cpp ppu.cpp cart.cpp cheat.cpp debug.cpp nsf.cpp lua-engine.cpp 2>$null
           if ($hits) {
-              # Documented exceptions:
+              # Documented exceptions (per plan §5.3.4 + §5.1.5):
               # - fceu.cpp (cold-path handler registration)
-              # - ppu.cpp VPage[] / MMC5SPRVPage[] (Phase 3 §5.1.5 retention)
+              # - ppu.cpp VPage[] / MMC5SPRVPage[] (Phase 3 §5.1.5 retention:
+              #   MSVC did not inline g_bus.vpage() to the same RIP-relative
+              #   machine code as the reference-alias; +6-8% bench regression
+              #   caused migration to be rolled back)
+              # - ppu.cpp ARead[x]/BWrite[x] lines 1756-1773: PPU register
+              #   init (cold path, runs once on Power())
               $hotHits = $hits | Where-Object {
                   $_ -notmatch 'fceu\.cpp' -and
-                  -not ($_ -match 'ppu\.cpp' -and $_ -match 'VPage\[|MMC5SPRVPage\[')
+                  -not ($_ -match 'ppu\.cpp' -and $_ -match 'VPage\[|MMC5SPRVPage\[') -and
+                  -not ($_ -match 'ppu\.cpp:17[5-7]\d:' -and $_ -match 'ARead\[|BWrite\[')
               }
               if ($hotHits) {
                   Write-Host "::error::Direct reference-alias indexing in hot-path files (must use g_bus.):"
                   $hotHits | ForEach-Object { Write-Host "  $_" }
                   exit 1
               } else {
-                  Write-Host "Only documented exceptions present (fceu.cpp cold path + ppu.cpp VPage/MMC5SPRVPage hot-path retention)."
+                  Write-Host "Only documented exceptions present (fceu.cpp cold path + ppu.cpp VPage/MMC5SPRVPage hot-path retention + ppu.cpp PPU-register-init handler registration)."
               }
           } else {
               Write-Host "No direct ARead[]/BWrite[]/VPage[]/MMC5SPRVPage[]/MMC5BGVPage[] indexing in hot-path files. ✓"
