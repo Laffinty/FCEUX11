@@ -24,8 +24,8 @@
 
 #include <array>
 
-#define ABANKS MMC5SPRVPage
-#define BBANKS MMC5BGVPage
+#define ABANKS fceu11::g_bus.mmc5_spr_vpage()
+#define BBANKS fceu11::g_bus.mmc5_bg_vpage()
 #define SpriteON    (PPU[1] & 0x10)	//Show Sprite
 #define ScreenON    (PPU[1] & 0x08)	//Show screen
 #define PPUON       (PPU[1] & 0x18)	//PPU should operate
@@ -38,48 +38,48 @@ void MMC5RunSound(int Count);
 void MMC5RunSoundHQ(void);
 
 static INLINE void MMC5SPRVROM_BANK1(uint32 A, uint32 V) {
-	if (CHRptr[0]) {
+	if (fceu11::g_bus.chr_ptr()[0]) {
 		V &= CHRmask1[0];
-		MMC5SPRVPage[(A) >> 10] = &CHRptr[0][(V) << 10] - (A);
+		fceu11::g_bus.mmc5_spr_vpage()[(A) >> 10] = &fceu11::g_bus.chr_ptr()[0][(V) << 10] - (A);
 	}
 }
 
 static INLINE void MMC5BGVROM_BANK1(uint32 A, uint32 V) {
-	if (CHRptr[0]) {
-		V &= CHRmask1[0]; MMC5BGVPage[(A) >> 10] = &CHRptr[0][(V) << 10] - (A);
+	if (fceu11::g_bus.chr_ptr()[0]) {
+		V &= CHRmask1[0]; fceu11::g_bus.mmc5_bg_vpage()[(A) >> 10] = &fceu11::g_bus.chr_ptr()[0][(V) << 10] - (A);
 	}
 }
 
 static INLINE void MMC5SPRVROM_BANK2(uint32 A, uint32 V) {
-	if (CHRptr[0]) {
-		V &= CHRmask2[0]; MMC5SPRVPage[(A) >> 10] = MMC5SPRVPage[((A) >> 10) + 1] = &CHRptr[0][(V) << 11] - (A);
+	if (fceu11::g_bus.chr_ptr()[0]) {
+		V &= CHRmask2[0]; fceu11::g_bus.mmc5_spr_vpage()[(A) >> 10] = fceu11::g_bus.mmc5_spr_vpage()[((A) >> 10) + 1] = &fceu11::g_bus.chr_ptr()[0][(V) << 11] - (A);
 	}
 }
 static INLINE void MMC5BGVROM_BANK2(uint32 A, uint32 V) {
-	if (CHRptr[0]) {
-		V &= CHRmask2[0]; MMC5BGVPage[(A) >> 10] = MMC5BGVPage[((A) >> 10) + 1] = &CHRptr[0][(V) << 11] - (A);
+	if (fceu11::g_bus.chr_ptr()[0]) {
+		V &= CHRmask2[0]; fceu11::g_bus.mmc5_bg_vpage()[(A) >> 10] = fceu11::g_bus.mmc5_bg_vpage()[((A) >> 10) + 1] = &fceu11::g_bus.chr_ptr()[0][(V) << 11] - (A);
 	}
 }
 
 static INLINE void MMC5SPRVROM_BANK4(uint32 A, uint32 V) {
-	if (CHRptr[0]) {
-		V &= CHRmask4[0]; MMC5SPRVPage[(A) >> 10] = MMC5SPRVPage[((A) >> 10) + 1] = MMC5SPRVPage[((A) >> 10) + 2] = MMC5SPRVPage[((A) >> 10) + 3] = &CHRptr[0][(V) << 12] - (A);
+	if (fceu11::g_bus.chr_ptr()[0]) {
+		V &= CHRmask4[0]; fceu11::g_bus.mmc5_spr_vpage()[(A) >> 10] = fceu11::g_bus.mmc5_spr_vpage()[((A) >> 10) + 1] = fceu11::g_bus.mmc5_spr_vpage()[((A) >> 10) + 2] = fceu11::g_bus.mmc5_spr_vpage()[((A) >> 10) + 3] = &fceu11::g_bus.chr_ptr()[0][(V) << 12] - (A);
 	}
 }
 static INLINE void MMC5BGVROM_BANK4(uint32 A, uint32 V) {
-	if (CHRptr[0]) {
-		V &= CHRmask4[0]; MMC5BGVPage[(A) >> 10] = MMC5BGVPage[((A) >> 10) + 1] = MMC5BGVPage[((A) >> 10) + 2] = MMC5BGVPage[((A) >> 10) + 3] = &CHRptr[0][(V) << 12] - (A);
+	if (fceu11::g_bus.chr_ptr()[0]) {
+		V &= CHRmask4[0]; fceu11::g_bus.mmc5_bg_vpage()[(A) >> 10] = fceu11::g_bus.mmc5_bg_vpage()[((A) >> 10) + 1] = fceu11::g_bus.mmc5_bg_vpage()[((A) >> 10) + 2] = fceu11::g_bus.mmc5_bg_vpage()[((A) >> 10) + 3] = &fceu11::g_bus.chr_ptr()[0][(V) << 12] - (A);
 	}
 }
 
 static INLINE void MMC5SPRVROM_BANK8(uint32 V) {
-	if (CHRptr[0]) {
-		V &= CHRmask8[0]; MMC5SPRVPage[0] = MMC5SPRVPage[1] = MMC5SPRVPage[2] = MMC5SPRVPage[3] = MMC5SPRVPage[4] = MMC5SPRVPage[5] = MMC5SPRVPage[6] = MMC5SPRVPage[7] = &CHRptr[0][(V) << 13];
+	if (fceu11::g_bus.chr_ptr()[0]) {
+		V &= CHRmask8[0]; fceu11::g_bus.mmc5_spr_vpage()[0] = fceu11::g_bus.mmc5_spr_vpage()[1] = fceu11::g_bus.mmc5_spr_vpage()[2] = fceu11::g_bus.mmc5_spr_vpage()[3] = fceu11::g_bus.mmc5_spr_vpage()[4] = fceu11::g_bus.mmc5_spr_vpage()[5] = fceu11::g_bus.mmc5_spr_vpage()[6] = fceu11::g_bus.mmc5_spr_vpage()[7] = &fceu11::g_bus.chr_ptr()[0][(V) << 13];
 	}
 }
 static INLINE void MMC5BGVROM_BANK8(uint32 V) {
-	if (CHRptr[0]) {
-		V &= CHRmask8[0]; MMC5BGVPage[0] = MMC5BGVPage[1] = MMC5BGVPage[2] = MMC5BGVPage[3] = MMC5BGVPage[4] = MMC5BGVPage[5] = MMC5BGVPage[6] = MMC5BGVPage[7] = &CHRptr[0][(V) << 13];
+	if (fceu11::g_bus.chr_ptr()[0]) {
+		V &= CHRmask8[0]; fceu11::g_bus.mmc5_bg_vpage()[0] = fceu11::g_bus.mmc5_bg_vpage()[1] = fceu11::g_bus.mmc5_bg_vpage()[2] = fceu11::g_bus.mmc5_bg_vpage()[3] = fceu11::g_bus.mmc5_bg_vpage()[4] = fceu11::g_bus.mmc5_bg_vpage()[5] = fceu11::g_bus.mmc5_bg_vpage()[6] = fceu11::g_bus.mmc5_bg_vpage()[7] = &fceu11::g_bus.chr_ptr()[0][(V) << 13];
 	}
 }
 
@@ -120,7 +120,7 @@ typedef struct __cartdata {
 	uint8 size;
 } cartdata;
 
-#define MMC5SPRVRAMADR(V)   &MMC5SPRVPage[(V) >> 10][(V)]
+#define MMC5SPRVRAMADR(V)   &fceu11::g_bus.mmc5_spr_vpage()[(V) >> 10][(V)]
 
 uint8* MMC5BGVRAMADR(uint32 A)
 {
@@ -166,7 +166,7 @@ static void mmc5_PPUWrite(uint32 A, uint8 V) {
 			PALRAM[tmp & 0x1F] = V & 0x3F;
 	} else if (tmp < 0x2000) {
 		if (PPUCHRRAM & (1 << (tmp >> 10)))
-			VPage[tmp >> 10][tmp] = V;
+			fceu11::g_bus.vpage()[tmp >> 10][tmp] = V;
 	} else {
 		if (PPUNTARAM & (1 << ((tmp & 0xF00) >> 10)))
 			vnapage[((tmp & 0xF00) >> 10)][tmp & 0x3FF] = V;
@@ -578,7 +578,7 @@ static DECLFW(Mapper5_write) {
 
 static DECLFR(MMC5_ReadROMRAM) {
 	if (MMC5MemIn[(A - 0x6000) >> 13])
-		return Page[A >> 11][A];
+		return fceu11::g_bus.page()[A >> 11][A];
 	else
 		return g_cpu.native_layout().DB;
 }
@@ -588,7 +588,7 @@ static DECLFW(MMC5_WriteROMRAM) {
 			return;
 	if (MMC5MemIn[(A - 0x6000) >> 13])
 		if (((WRAMMaskEnable[0] & 3) | ((WRAMMaskEnable[1] & 3) << 2)) == 6)
-			Page[A >> 11][A] = V;
+			fceu11::g_bus.page()[A >> 11][A] = V;
 }
 
 static DECLFW(MMC5_ExRAMWr) {
@@ -1045,7 +1045,7 @@ static void GenMMC5_Init(CartInfo *info, int wsize, int battery) {
 	MMC5HackVROMMask = CHRmask4[0];
 	MMC5HackExNTARAMPtr = ExRAM;
 	MMC5Hack = 1;
-	MMC5HackVROMPTR = CHRptr[0];
+	MMC5HackVROMPTR = fceu11::g_bus.chr_ptr()[0];
 	MMC5HackCHRMode = 0;
 	MMC5HackSPMode = MMC5HackSPScroll = MMC5HackSPPage = 0;
 	Mapper5_ESI();
