@@ -22,11 +22,30 @@ static_assert(alignof(Cpu) == 64,
 uint16_t Cpu::pc() const noexcept { return layout_.PC; }
 void Cpu::set_pc(uint16_t v) noexcept { layout_.PC = v; }
 uint8_t Cpu::a() const noexcept { return layout_.A; }
+void Cpu::set_a(uint8_t v) noexcept { layout_.A = v; }
 uint8_t Cpu::x() const noexcept { return layout_.X; }
+void Cpu::set_x(uint8_t v) noexcept { layout_.X = v; }
 uint8_t Cpu::y() const noexcept { return layout_.Y; }
+void Cpu::set_y(uint8_t v) noexcept { layout_.Y = v; }
 uint8_t Cpu::s() const noexcept { return layout_.S; }
+void Cpu::set_s(uint8_t v) noexcept { layout_.S = v; }
 uint8_t Cpu::p() const noexcept { return layout_.P; }
+void Cpu::set_p(uint8_t v) noexcept { layout_.P = v; }
 bool Cpu::jammed() const noexcept { return layout_.jammed != 0; }
+
+// v1.4 Post-Release Optimization Plan §2.2 — non-A/X/Y/S/P
+// accessors. `db()` is the data-bus "cache" that ::ANull readback
+// uses; `pi()` covers the legacy "mooPI" register. Other modules
+// (Bus::ANullImpl, savestate, etc.) should call these instead of
+// reaching into native_layout() for plain register reads/writes.
+uint8_t Cpu::db() const noexcept { return layout_.DB; }
+void Cpu::set_db(uint8_t v) noexcept { layout_.DB = v; }
+uint8_t Cpu::pi() const noexcept { return layout_.mooPI; }
+void Cpu::set_pi(uint8_t v) noexcept { layout_.mooPI = v; }
+
+// v1.4 Post-Release Optimization Plan §2.1 — overclocking state.
+bool Cpu::overclocking() const noexcept { return overclocking_; }
+void Cpu::set_overclocking(bool v) noexcept { overclocking_ = v; }
 
 // ---------------------------------------------------------------------------
 // Lifecycle — delegate to the existing free functions while globals are
@@ -45,21 +64,15 @@ void Cpu::trigger_irq(uint32_t source) noexcept { ::X6502_IRQBegin(static_cast<i
 void Cpu::clear_irq(uint32_t source) noexcept { ::X6502_IRQEnd(static_cast<int>(source)); }
 
 // ---------------------------------------------------------------------------
-// Debug hooks
-// ---------------------------------------------------------------------------
-void Cpu::set_cpu_hook(std::function<void()> fn) { cpu_hook_ = std::move(fn); }
-void Cpu::set_read_hook(std::function<void(uint32_t)> fn) { read_hook_ = std::move(fn); }
-void Cpu::set_write_hook(std::function<void(uint32_t, uint8_t)> fn) { write_hook_ = std::move(fn); }
-
-// ---------------------------------------------------------------------------
 // Timestamps
 // ---------------------------------------------------------------------------
 int32_t Cpu::timestamp() const noexcept { return static_cast<int32_t>(timestamp_); }
 
 uint64_t Cpu::timestamp_base() const noexcept {
-    // ::timestampbase is still owned by fceu.cpp; this accessor is provided
-    // for API symmetry with the legacy facade.
-    extern uint64_t timestampbase;
+    // ::timestampbase is declared in cpu.h (v1.4 Post-Release
+    // Optimization Plan §1.3 — hoisted out of this function body so
+    // the declaration is grouped with the other CPU-state externs).
+    // The actual definition lives in fceu.cpp.
     return timestampbase;
 }
 

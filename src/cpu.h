@@ -15,13 +15,20 @@
 
 #include <cstdint>
 #include <cstddef>
-#include <functional>
 
 #include "x6502struct.h"
 #include "fceu11_core_types.h"
 
-// Legacy global still read by Cpu::add_cycles.
-extern bool overclocking;
+// Legacy global still read by Cpu::timestamp_base(). v1.4
+// Post-Release Optimization Plan §1.3 — hoisted the function-local
+// `extern uint64_t timestampbase;` from cpu.cpp into this header so
+// the declaration lives next to the other CPU-state externs. The
+// actual definition stays in fceu.cpp.
+//
+// (Plan §2.1 moved `overclocking` into Cpu as a private member with
+//  public accessors — see Cpu::overclocking() / set_overclocking() —
+//  and the legacy `extern bool overclocking;` is gone.)
+extern uint64_t timestampbase;
 
 namespace fceu11 {
 
@@ -31,11 +38,37 @@ public:
     uint16_t pc() const noexcept;
     void set_pc(uint16_t v) noexcept;
     uint8_t a() const noexcept;
+    void set_a(uint8_t v) noexcept;
     uint8_t x() const noexcept;
+    void set_x(uint8_t v) noexcept;
     uint8_t y() const noexcept;
+    void set_y(uint8_t v) noexcept;
     uint8_t s() const noexcept;
+    void set_s(uint8_t v) noexcept;
     uint8_t p() const noexcept;
+    void set_p(uint8_t v) noexcept;
     bool jammed() const noexcept;
+
+    // v1.4 Post-Release Optimization Plan §2.2 — non-A/X/Y/S/P
+    // register accessors. `db()` covers the data-bus "cache" reads
+    // (used by ::ANull / open-bus readback); `pi()` covers the
+    // legacy "mooPI" register, kept under the friendlier accessor
+    // name. Other modules (Bus::ANullImpl, savestate, etc.) should
+    // use these instead of native_layout().DB / native_layout().mooPI.
+    uint8_t db() const noexcept;
+    void set_db(uint8_t v) noexcept;
+    uint8_t pi() const noexcept;
+    void set_pi(uint8_t v) noexcept;
+
+    // v1.4 Post-Release Optimization Plan §2.1 — `overclocking`
+    // moved from a free-floating `bool ::overclocking` global (set
+    // by ppu.cpp, read by Cpu::add_cycles and x6502.cpp) into Cpu as
+    // a private member with public accessors. Callers (ppu.cpp,
+    // x6502.cpp, future v1.5+ modules) now go through
+    // g_cpu.set_overclocking() / g_cpu.overclocking() instead of
+    // touching a global.
+    bool overclocking() const noexcept;
+    void set_overclocking(bool v) noexcept;
 
     // Lifecycle
     void init() noexcept;
@@ -48,10 +81,16 @@ public:
     void trigger_irq(uint32_t source) noexcept;
     void clear_irq(uint32_t source) noexcept;
 
-    // Debug hooks (stored now; wired to the legacy hook slots in Phase 3/4)
-    void set_cpu_hook(std::function<void()> fn);
-    void set_read_hook(std::function<void(uint32_t)> fn);
-    void set_write_hook(std::function<void(uint32_t, uint8_t)> fn);
+    // v1.4 Post-Release Optimization Plan §1.4 — the
+    // cpu_hook_ / read_hook_ / write_hook_ std::function members and
+    // their set_*_hook setters were placeholders for the v1.3 Roadmap
+    // §3.1 "Phase 3/4 接入 legacy hook 槽位" promise that never landed.
+    // Removing them is safer than wiring them up: a caller that sets
+    // a hook today would think it triggers, but no code path actually
+    // invokes the std::function. v1.5+ real hook needs should go
+    // through fceu11::State::debug() (Roadmap §2.2).
+    //
+    // (No replacement setters — the member fields below are gone too.)
 
     // Timestamps
     int32_t timestamp() const noexcept;
@@ -64,7 +103,7 @@ public:
         layout_.tcount += c;
         layout_.count -= c * 48;
         timestamp_ += c;
-        if (!overclocking) sound_timestamp_ += c;
+        if (!overclocking_) sound_timestamp_ += c;
     }
 
     // Savestate compatibility: only serialization code should use this.
@@ -84,10 +123,7 @@ private:
     uint32_t sound_timestamp_ = 0;   // ::soundtimestamp
     int scanline_ = 0;               // ::scanline
     MapIRQHook map_irq_hook_ = nullptr; // ::MapIRQHook
-
-    std::function<void()> cpu_hook_;
-    std::function<void(uint32_t)> read_hook_;
-    std::function<void(uint32_t, uint8_t)> write_hook_;
+    bool overclocking_ = false;      // ::overclocking (Plan §2.1)
 };
 
 // Global singleton. Meyers pattern keeps initialization lazy and thread-safe.

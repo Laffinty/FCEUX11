@@ -529,7 +529,7 @@ extern int test; test++;
    _tcount=0;
    if(g_cpu.map_irq_hook_ref()) [[unlikely]] g_cpu.map_irq_hook_ref()(temp);
 
-   if (!overclocking) [[likely]]
+   if (!g_cpu.overclocking()) [[likely]]
     FCEU_SoundCPUHook(temp);
    #ifdef _S9XLUA_H
    CallRegisteredLuaMemHook(_PC, 1, 0, LUAMEMHOOK_EXEC);

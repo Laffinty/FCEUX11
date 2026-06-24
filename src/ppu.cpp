@@ -1804,9 +1804,9 @@ int FCEUPPU_Loop(int skip) {
 		X6502_Run((scanlines_per_frame - 242) * (256 + 85) - 12);
 		if (overclock_enabled && vblankscanlines) {
 			if (!DMC_7bit || !skip_7bit_overclocking) {
-				overclocking = 1;
+				g_cpu.set_overclocking(true);
 				X6502_Run(vblankscanlines * (256 + 85) - 12);
-				overclocking = 0;
+				g_cpu.set_overclocking(false);
 			}
 		}
 		PPU_status &= 0x1f;
@@ -1882,11 +1882,11 @@ int FCEUPPU_Loop(int skip) {
 				DoLine();
 
 				if (g_cpu.scanline_ref() < normalscanlines || g_cpu.scanline_ref() == totalscanlines)
-					overclocking = 0;
+					g_cpu.set_overclocking(false);
 				else {
 					if (DMC_7bit && skip_7bit_overclocking) // 7bit sample started after 240th line
 						break;
-					overclocking = 1;
+					g_cpu.set_overclocking(true);
 				}
 			}
 			DMC_7bit = 0;

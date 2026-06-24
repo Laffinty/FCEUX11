@@ -282,12 +282,16 @@ inline void setprg32(uint32_t A, uint32_t V) noexcept { fceu11::g_bus.setprg32(A
 inline void setchr1 (uint32_t A, uint32_t V) noexcept { fceu11::g_bus.setchr1 (A, V); }
 inline void setchr4 (uint32_t A, uint32_t V) noexcept { fceu11::g_bus.setchr4 (A, V); }
 inline void setchr8 (uint32_t V)          noexcept { fceu11::g_bus.setchr8 (V); }
-inline void setmirror (int t)              noexcept { fceu11::g_bus.setmirror (static_cast<uint32_t>(t)); }
-inline void setmirrorw(int a, int b, int c, int d) noexcept {
-    fceu11::g_bus.setmirrorw(static_cast<uint32_t>(a),
-                             static_cast<uint32_t>(b),
-                             static_cast<uint32_t>(c),
-                             static_cast<uint32_t>(d));
+// v1.4 Post-Release Optimization Plan §2.4 — forwarder params
+// match Bus::setmirror(uint32_t) / Bus::setmirrorw(uint32_t, ...).
+// A grep of src/boards/ for setmirror( / setmirrorw( shows all
+// callers pass either MI_0..MI_3 macros (uint32 literals) or
+// uint8 / int local variables — uint8→uint32_t and int→uint32_t
+// implicit conversions are well-defined, so no cast is needed
+// at the call site.
+inline void setmirror (uint32_t t)              noexcept { fceu11::g_bus.setmirror (t); }
+inline void setmirrorw(uint32_t a, uint32_t b, uint32_t c, uint32_t d) noexcept {
+    fceu11::g_bus.setmirrorw(a, b, c, d);
 }
 inline void setntamem(uint8_t* p, int ram, uint32_t b) noexcept {
     fceu11::g_bus.setntamem(p, ram, b);

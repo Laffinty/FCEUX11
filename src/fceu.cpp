@@ -22,6 +22,7 @@
 #include "cpu.h"
 #include "x6502.h"
 #include "fceu.h"
+#include "bus.h"      // v1.4 Post-Release Optimization Plan §1.1: g_bus.init()
 #include "ppu.h"
 #include "sound.h"
 #include "netplay.h"
@@ -103,8 +104,11 @@ extern void RefreshThrottleFPS();
 // overclock the console by adding dummy scanlines to PPU loop or to vblank
 // disables DMC DMA, WaveHi filling and image rendering for these dummies
 // doesn't work with new PPU
+// v1.4 Post-Release Optimization Plan §2.1: `overclocking` is now
+// a private member of fceu11::Cpu (default false); ppu.cpp drives
+// it via g_cpu.set_overclocking() and Cpu::add_cycles / x6502.cpp
+// read it via g_cpu.overclocking().
 bool overclock_enabled = 0;
-bool overclocking = 0;
 bool skip_7bit_overclocking = 1; // 7-bit samples have priority over overclocking
 int normalscanlines;
 int totalscanlines;
@@ -1050,8 +1054,13 @@ void PowerNES(void) {
 
 	FCEU_MemoryRand(RAM, 0x800);
 
-	SetReadHandler(0x0000, 0xFFFF, ANull);
-	SetWriteHandler(0x0000, 0xFFFF, BNull);
+	// v1.4 Post-Release Optimization Plan §1.1: replace the legacy
+	// SetReadHandler/SetWriteHandler "fill the whole 64K with ANull/BNull"
+	// idiom with a single g_bus.init() call. The effect is identical
+	// (ANullImpl/BNullImpl installed across the dispatch tables) and
+	// the Bus API is now self-consistent: a future caller reading
+	// bus.h can trust that init() is what initializes the dispatch.
+	fceu11::g_bus.init();
 
 	SetReadHandler(0, 0x7FF, ARAML);
 	SetWriteHandler(0, 0x7FF, BRAML);

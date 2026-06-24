@@ -13,6 +13,13 @@
 // member at static init (C++ inline pointer variables must have
 // constant initializers, and `&g_bus.vpage_[0]` is not constexpr).
 
+// v1.5 Prism §5.x target: redirect PPU side-effects through a Ppu&
+// reference (Bus would hold a Ppu* member). The current direct
+// PPUCHRRAM / PPUNTARAM / vnapage[] writes in setchr1 / setchr4 /
+// setchr8 / setmirror / setmirrorw / setntamem are the natural
+// seam where v1.5 work will pull — see
+// docs/v1.x_Modernization_Roadmap.md §5.2 "渲染内部状态迁入".
+
 #include "bus.h"
 
 #include <cstring>  // memset
@@ -42,60 +49,49 @@ namespace {
 
     // Inline handler for reads on unmapped ranges: returns the CPU
     // data-bus (X6502::DB) — matches the v1.3.0 fceu.cpp::ANull.
+    // v1.4 Post-Release Optimization Plan §2.2: use the new typed
+    // accessor (Cpu::db()) instead of reaching through native_layout().
     uint8_t ANullImpl(uint32_t) {
-        return g_cpu.native_layout().DB;
+        return g_cpu.db();
     }
     void BNullImpl(uint32_t, uint8_t) {}
 } // namespace
 
 // ---------------------------------------------------------------------------
-// ctor: zero-init everything except the Genie shadow pointers (those
-// stay nullptr until AllocGenieRW mallocs them).
+// ctor: zero-init everything via a single whole-object memset
+// (v1.4 Post-Release Optimization Plan §2.3 — replaces 22 per-array
+// memsets, which were easy to forget when a new Bus member array is
+// added in v1.5+). The Genie shadow pointers / mirror_hard_ all
+// default-init to 0 / nullptr already, and the wholesale memset
+// keeps them at 0 / nullptr which is what AllocGenieRW / PowerNES
+// expect at first contact.
 // ---------------------------------------------------------------------------
 Bus::Bus() noexcept {
-    std::memset(aread_,  0, sizeof(aread_));
-    std::memset(bwrite_, 0, sizeof(bwrite_));
-    std::memset(page_,          0, sizeof(page_));
-    std::memset(vpage_,         0, sizeof(vpage_));
-    std::memset(vpage_g_,       0, sizeof(vpage_g_));
-    std::memset(mmc5_spr_vpage_, 0, sizeof(mmc5_spr_vpage_));
-    std::memset(mmc5_bg_vpage_,  0, sizeof(mmc5_bg_vpage_));
-    std::memset(prg_ptr_,       0, sizeof(prg_ptr_));
-    std::memset(chr_ptr_,       0, sizeof(chr_ptr_));
-    std::memset(prg_size_,      0, sizeof(prg_size_));
-    std::memset(chr_size_,      0, sizeof(chr_size_));
-    std::memset(prg_mask2_,     0, sizeof(prg_mask2_));
-    std::memset(prg_mask4_,     0, sizeof(prg_mask4_));
-    std::memset(prg_mask8_,     0, sizeof(prg_mask8_));
-    std::memset(prg_mask16_,    0, sizeof(prg_mask16_));
-    std::memset(prg_mask32_,    0, sizeof(prg_mask32_));
-    std::memset(chr_mask1_,     0, sizeof(chr_mask1_));
-    std::memset(chr_mask2_,     0, sizeof(chr_mask2_));
-    std::memset(chr_mask4_,     0, sizeof(chr_mask4_));
-    std::memset(chr_mask8_,     0, sizeof(chr_mask8_));
-    std::memset(prg_is_ram_,    0, sizeof(prg_is_ram_));
-    std::memset(prg_ram_,       0, sizeof(prg_ram_));
-    std::memset(chr_ram_,       0, sizeof(chr_ram_));
-    mirror_hard_ = 0;
+    std::memset(this, 0, sizeof(*this));
 }
 
 // ---------------------------------------------------------------------------
-// init: do the v1.3.0 cart.cpp::ResetCartMapping equivalent.
-// Called once at process start; also re-callable on game load.
+// init: install the open-bus handlers (ANullImpl / BNullImpl) on the
+// entire 64K CPU read/write dispatch.
+//
+// v1.4 Post-Release Optimization Plan §1.1: this replaces the legacy
+// `SetReadHandler(0, 0xFFFF, ANull); SetWriteHandler(0, 0xFFFF, BNull);`
+// pair in fceu.cpp::PowerNES. Intentionally does NOT call
+// reset_mapping() — SetupCartPRGMapping / SetupCartCHRMapping
+// (called by FCEUXLoad BEFORE PowerNES) populate prg_ptr_[] /
+// chr_ptr_[], and reset_mapping() would wipe those before the
+// mapper's Power handler can call setprg* / setchr*. Callers that
+// want the v1.3.0 cart.cpp::ResetCartMapping effect should call
+// reset_mapping() separately.
+//
+// Called once at process start (and again on each game load by
+// PowerNES) — idempotent.
 // ---------------------------------------------------------------------------
 void Bus::init() noexcept {
-    // Install default open-bus handler on the entire 64K CPU read
-    // and write dispatch. cart.cpp::ResetCartMapping only zeroed
-    // Page[] (no ARead/BWrite init), because the original Initialize
-    // path in fceu.cpp did ARead[x] = ANull manually. Both are
-    // idempotent and equivalent — installing ANull/BNull here keeps
-    // the bus in a known state even if a caller never runs the
-    // legacy Initialize path.
     for (uint32_t x = 0; x < 0x10000; x++) {
         aread_[x]  = ANullImpl;
         bwrite_[x] = BNullImpl;
     }
-    reset_mapping();
 }
 
 void Bus::shutdown() noexcept {
@@ -152,20 +148,30 @@ void Bus::direct_write(uint32_t addr, uint8_t val) noexcept {
 // Handler registration. Bus is the no-wrap path. The Genie-aware
 // path stays in fceu.cpp::SetReadHandler / SetWriteHandler (which
 // call these on the non-wrap branch).
+//
+// v1.4 Post-Release Optimization Plan §1.2 — ascending loop with
+// explicit end < start early-out. The previous descending loop
+// relied on a quirk: a caller passing end < start would cause `x` to
+// underflow to UINT32_MAX and the loop would run ~4G times. All
+// current callers (v1.4 grep) pass end >= start, but the API did
+// not enforce it; the new form is both safer and clearer.
 // ---------------------------------------------------------------------------
 void Bus::set_read_handler(uint32_t start, uint32_t end, readfunc fn) noexcept {
+    // Defensive guard (v1.4 Post-Release Optimization Plan §1.2):
+    // a caller passing end < start would underflow the previous
+    // descending loop. Silently no-op rather than spin ~4G times.
+    if (end < start) return;
     if (!fn) fn = ANullImpl;
-    for (uint32_t x = end; ; x--) {
+    for (uint32_t x = start; x <= end; x++) {
         aread_[x] = fn;
-        if (x == start) break;
     }
 }
 
 void Bus::set_write_handler(uint32_t start, uint32_t end, writefunc fn) noexcept {
+    if (end < start) return;
     if (!fn) fn = BNullImpl;
-    for (uint32_t x = end; ; x--) {
+    for (uint32_t x = start; x <= end; x++) {
         bwrite_[x] = fn;
-        if (x == start) break;
     }
 }
 

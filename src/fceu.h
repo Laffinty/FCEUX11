@@ -13,8 +13,12 @@ extern int newppu;
 void ResetGameLoaded(void);
 
 //overclocking-related
+// v1.4 Post-Release Optimization Plan §2.1: `overclocking` moved
+// into fceu11::Cpu as a private member with public accessors
+// (Cpu::overclocking() / Cpu::set_overclocking()). The global
+// `extern bool overclocking;` is gone — callers go through
+// g_cpu.set_overclocking() / g_cpu.overclocking() instead.
 extern bool overclock_enabled;
-extern bool overclocking;
 extern bool skip_7bit_overclocking;
 extern int normalscanlines;
 extern int totalscanlines;
