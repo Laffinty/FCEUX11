@@ -33,6 +33,13 @@
 struct CartInfo;
 
 namespace fceu11 {
+// Forward-declare so Bus::attach_ppu(fceu11::Ppu*) can be declared in
+// the public section without pulling in ppu_class.h (which would
+// create a circular include).
+class Ppu;
+} // namespace fceu11
+
+namespace fceu11 {
 
 class FCEUX11_CACHE_ALIGN Bus {
 public:
@@ -46,6 +53,16 @@ public:
     void init() noexcept;
     void shutdown() noexcept;
     void reset_mapping() noexcept;   // cart.cpp::ResetCartMapping equivalent
+
+    // -----------------------------------------------------------------
+    // v1.5 Prism §3.2 / §3.3: Ppu injection point. The Bus holds a
+    // pointer to fceu11::Ppu; before attach_ppu() is called (e.g.
+    // during early Phase F transition), ppu_ is null and setchr* /
+    // setmirror* / setntamem fall back to the v1.0 free-function
+    // path (FCEUPPU_LineUpdate + direct v1.0 alias writes). The
+    // canonical attach site is fceu.cpp::Initialize() after bus init.
+    // -----------------------------------------------------------------
+    void attach_ppu(fceu11::Ppu* p) noexcept { ppu_ = p; }
 
     // -----------------------------------------------------------------
     // Hot-path 64K CPU address-space read / write dispatch.
@@ -206,6 +223,13 @@ private:
     readfunc*  genie_a_read_  = nullptr;
     writefunc* genie_b_write_ = nullptr;
     int        genie_r_wrap_  = 0;
+
+    // v1.5 Prism §3.2: Ppu back-pointer injected by attach_ppu().
+    // Null until fceu.cpp::Initialize() calls g_bus.attach_ppu(&g_ppu).
+    // The null guard in setchr* / setmirror* / setntamem keeps the
+    // Bus buildable + runnable before injection (Phase F transition
+    // state) and after the Bus shutdown (defensive).
+    Ppu* ppu_ = nullptr;
 };
 
 // Direct global instance (v1.4 Phase 3 §5.1.1). Replaces the

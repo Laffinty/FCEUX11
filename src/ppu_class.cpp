@@ -66,6 +66,15 @@ int Ppu::dot()      const noexcept { return 0; }
 // Deliberately empty in Phase B — leaving the writes to the existing
 // ppu.cpp / cart.cpp code paths guarantees the visual-diff baseline
 // stays 0-pixel identical to the v1.4 + WIP pre-class state.
+//
+// Phase F will fill these in (see F.2 commit) when Bus::setchr* /
+// setmirror* / setntamem start routing through ppu_->method()
+// instead of touching the v1.0 globals directly. Splitting the
+// method-body fill from the Bus routing keeps the diff between
+// commits minimal — important because each Phase commit shifts
+// the MSVC link-time layout, and we want each step's savestate MD5
+// to be reproducible from its single commit (not the cumulative
+// effect of two stacked changes).
 // ---------------------------------------------------------------------------
 
 void Ppu::set_chr_ram(uint8_t /*mask*/) noexcept {}
