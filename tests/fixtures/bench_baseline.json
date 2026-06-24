@@ -5,13 +5,20 @@
         "perf improvements are celebrated, not flagged as tolerance violations.",
         "See tests/benchmarks/bench_tolerance_test.cpp for the check logic.",
         "",
-        "v1.5 Prism Phase B (2026-06-24) re-baseline. Captured after the",
-        "fceu11::Ppu class scaffolding landed (commit c5e0888). v1.5",
-        "plan \u00a76.1 mandates a fresh baseline at the v1.4 + WIP + empty",
-        "Ppu intermediate state, so subsequent batches 1/2/3 (plan \u00a72)",
-        "measure their perf delta against THIS number, not the v1.4",
-        "baseline below. The +5-13% slowdown vs v1.4 is the expected",
-        "objectification tax \u2014 see plan \u00a76.3 'link-time layout shift'.",
+        "v1.5 Prism Phase G (2026-06-24) re-baseline. Captured after the",
+        "full v1.5 Prism plan executed through Phase F (commit cb4164a)",
+        "\u2014 Ppu class + 3-batch migration + Bus\u2192Ppu routing. This is",
+        "the final v1.5 release baseline.",
+        "",
+        "v1.5 Phase B intermediate baseline (kept above the v1.4 entry",
+        "for historical reference) was captured at the empty-Ppu state",
+        "and showed +5-13% slowdown vs v1.4 (the link-time layout shift",
+        "tax predicted by plan \u00a76.3). The Phase G baseline recovers",
+        "most of that \u2014 Phase D's co-location of sprlinebuf / pshift /",
+        "atlatch / SPRAM inside g_ppu evidently improved hot-path cache",
+        "behavior, and Phase F's bus\u2192ppu routing didn't regress. The",
+        "net result vs v1.4 is +2-4% (within the \u00a76.3 expected '5-10%'",
+        "envelope but on the low end).",
         "",
         "v1.4 Gateway Phase 2 baseline (kept for historical reference",
         "and rollback; bench_tolerance_test loads this file by default).",
@@ -36,9 +43,9 @@
         "percent here so a clean build stays green; tighten to 1 percent only",
         "on a dedicated runner with no other workloads."
     ],
-    "version": "v1.5-prism-phaseB",
+    "version": "v1.5-prism",
     "captured_at": "2026-06-24",
-    "captured_from_commit": "c5e0888",
+    "captured_from_commit": "cb4164a",
     "captured_on": "Windows_NT, Microsoft Windows 10.0.26200 , AMD64",
     "tolerance_pct": 2.5,
     "benchmarks": [
@@ -49,7 +56,7 @@
             "frames_per_iter": 60,
             "iterations": 5,
             "metric": "median_total_ms",
-            "baseline_ms": 71.588,
+            "baseline_ms": 65.034,
             "unit": "milliseconds for 60 frames"
         },
         {
@@ -59,7 +66,7 @@
             "frames_per_iter": 60,
             "iterations": 5,
             "metric": "median_total_ms",
-            "baseline_ms": 68.972,
+            "baseline_ms": 67.507,
             "unit": "milliseconds for 60 frames"
         },
         {
@@ -69,7 +76,7 @@
             "frames_per_iter": 60,
             "iterations": 5,
             "metric": "median_total_ms",
-            "baseline_ms": 69.683,
+            "baseline_ms": 68.249,
             "unit": "milliseconds for 60 frames (CPU+PPU+APU)"
         }
     ]
