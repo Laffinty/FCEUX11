@@ -120,3 +120,6 @@ uint32_t (& TempAddr)       = fceu11::g_ppu.vaddr();
 uint32_t (& RefreshAddr)    = fceu11::g_ppu.vaddr_latch();
 uint32_t (& NTRefreshAddr)  = fceu11::g_ppu.nt_refresh_addr();
 uint32_t (& DummyRead)      = fceu11::g_ppu.dummy_read();
+
+// Batch 3 (plan §2.3) alias binding — OAM.
+uint8_t (& SPRAM)[0x100]    = fceu11::g_ppu.oam();

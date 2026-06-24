@@ -401,7 +401,15 @@ static uint32 scanlines_per_frame;
 // SFORMAT descriptor at g_ppu.regs_. SPRAM / SPRBUF stay here for now
 // (Phase E will migrate SPRAM as part of batch 3).
 uint8 PPUSPL;
-uint8 SPRAM[0x100], SPRBUF[0x100];
+// v1.5 Prism §2.3 (Batch 3): SPRAM[0x100] migrated into
+// fceu11::g_ppu.oam_; the `extern uint8_t (& SPRAM)[0x100]` reference
+// alias in ppu_class.h rebinds the v1.0 name to g_ppu's storage, so
+// every ppu.cpp / debug.cpp / drivers/Qt/HexEditor.cpp / ppuViewer.cpp
+// call site keeps compiling unchanged. SPRBUF stays here — the
+// sprite-evaluation buffer is per-scanline internal state (the v1.0
+// `static uint8 numsprites` driver reads from it during RefreshLine)
+// and not on plan §2.3's migration list.
+uint8 SPRBUF[0x100];
 alignas(64) std::array<uint8_t, 0x20> PALRAM;
 std::array<uint8_t, 3> UPALRAM;//for 0x4/0x8/0xC addresses in palette, the ones in
 					//0x20 are 0 to not break fceu rendering.

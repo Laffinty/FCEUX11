@@ -113,6 +113,15 @@ public:
     __forceinline uint32_t (& bg_latch() noexcept)[2]    { return bg_latch_; }
     __forceinline uint32_t & bg_latch_h() noexcept       { return bg_latch_h_; }
 
+    // ---- Batch 3 (plan §2.3): OAM (256 bytes) ----
+    // v1.0 used `extern uint8 SPRAM[0x100]` — file-scope BSS global
+    // referenced from ppu.cpp, debug.cpp, and Qt UI tools (HexEditor,
+    // PPU viewer). Migrates here as oam_[256] (alias name retained
+    // for the public-facing UI / debugger surface; v1.0 savestate
+    // chunk "SPRA" continues to memcpy these 256 bytes — see
+    // state.cpp SFORMAT descriptor which references `SPRAM`).
+    __forceinline uint8_t (& oam() noexcept)[256] { return oam_; }
+
     // ---- Name table RAM + pointer table ----
     // `ntaram()` returns a reference to the 0x800-byte internal array.
     // Return type is `uint8_t (&)[0x800]` (array reference), NOT a
@@ -215,6 +224,16 @@ private:
     uint8_t  line_buffer_[264] = {};             // was ppu.cpp:1064 sprlinebuf[256+8]
     uint32_t bg_latch_[2]      = {0, 0};         // was RefreshLine static pshift[2]
     uint32_t bg_latch_h_       = 0;              // was RefreshLine static atlatch
+
+    // ---- Batch 3 (plan §2.3) OAM. ----
+    // Plan §2.3 also lists Spr_Pri[8] / Spr_Index[8] / sprite_0_hit_
+    // / max_sprites_; none of these exist as separate globals in v1.0
+    // (sprite priority rides inside SPRBUF during eval, sprite 0 hit
+    // is encoded in PPU[2] bit 6, max sprites is the constant 8).
+    // We migrate only SPRAM (the on-chip OAM that the CPU reads at
+    // $2004 / writes at $2004 / DMAs via $4014) and leave the rest
+    // for a hypothetical v1.5+ sprite-pipeline rewrite.
+    uint8_t  oam_[256]         = {};             // was ppu.cpp SPRAM[0x100]
 };
 
 // Direct global instance (plan §1.2). Same pattern as Bus g_bus —
@@ -285,5 +304,19 @@ extern uint32_t (& TempAddr);
 extern uint32_t (& RefreshAddr);
 extern uint32_t (& NTRefreshAddr);
 extern uint32_t (& DummyRead);
+
+// ---------------------------------------------------------------------------
+// Batch 3 (plan §2.3) compat alias — OAM.
+//
+// SPRAM is the on-chip OAM accessed by the CPU at $2004 / DMAd via
+// $4014. Migrated into fceu11::g_ppu.oam_. External consumers (Qt
+// debugger HexEditor / PPU viewer / debugger.cpp) keep referencing
+// the v1.0 `SPRAM` name through this reference alias; the v1.0
+// savestate chunk 'SPRA' continues to memcpy the same 256 bytes via
+// the existing state.cpp SFORMAT descriptor (which points at &SPRAM
+// — now resolves to g_ppu.oam_'s address).
+// ---------------------------------------------------------------------------
+
+extern uint8_t (& SPRAM)[0x100];
 
 #endif // FCEU11_PPU_CLASS_H
