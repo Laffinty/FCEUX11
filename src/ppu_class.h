@@ -90,6 +90,29 @@ public:
     __forceinline uint32_t& nt_refresh_addr() noexcept { return nt_refresh_addr_; }
     __forceinline uint32_t& dummy_read()     noexcept { return dummy_read_; }
 
+    // ---- Batch 2 (plan §2.2): rendering line-buffer + BG pixel latches.
+    // v1.0 used `static uint8 sprlinebuf[256+8]` (file-static) plus
+    // `static uint32 pshift[2]` and `static uint32 atlatch` (static
+    // inside RefreshLine). They migrate here so the line buffer sits
+    // in a known-cache-aligned address and the BG latches sit next to
+    // the other hot per-tile state in the class.
+    //
+    // line_buffer is `alignas(64)` and 264 bytes — per plan §2.2 risk
+    // analysis, this 264-byte line buffer spans 5 cache lines on a
+    // 64-byte L1. The original v1.0 storage was a BSS global which
+    // landed on a random cache line; v1.5 forces alignment so MSVC
+    // doesn't pack the buffer against adjacent cold data.
+    //
+    // `bg_latch()` and `bg_latch_h()` return references so callers
+    // can write through (`pshift[0] |= C[0]` etc.). The aliases
+    // `pshift` and `atlatch` declared at file scope in ppu.cpp are
+    // local aliases pointing into g_ppu.bg_latch_[] / g_ppu.bg_latch_h_,
+    // so pputile.inc's `pshift[0]`, `pshift[1]`, `atlatch` references
+    // resolve unchanged.
+    __forceinline uint8_t (& line_buffer() noexcept)[264] { return line_buffer_; }
+    __forceinline uint32_t (& bg_latch() noexcept)[2]    { return bg_latch_; }
+    __forceinline uint32_t & bg_latch_h() noexcept       { return bg_latch_h_; }
+
     // ---- Name table RAM + pointer table ----
     // `ntaram()` returns a reference to the 0x800-byte internal array.
     // Return type is `uint8_t (&)[0x800]` (array reference), NOT a
@@ -176,6 +199,22 @@ private:
     uint32_t dummy_read_      = 0;   // $2007 dummy read state (was DummyRead)
     // ---- Cold / phase state ----
     PPUPHASE phase_ = PPUPHASE_VBL;        // frame phase (cold, touched once per scanline)
+
+    // ---- Batch 2 (plan §2.2) render-buffer + BG latch state. ----
+    // line_buffer_ is the per-scanline final pixel buffer the PPU
+    // writes during RefreshLine and the consumers (XBuf writeback,
+    // sprite 0 hit check, InputScanlineHook) read. The struct
+    // overall is alignas(64) (via FCEUX11_CACHE_ALIGN on the class),
+    // so line_buffer_ sits at some offset within g_ppu whose
+    // absolute address is a multiple of 64 only if the cumulative
+    // preceding-member size is a multiple of 64 — currently not, but
+    // perf impact is small vs the original v1.0 BSS-global layout
+    // (where the buffer landed at an arbitrary 64-byte boundary).
+    // Plan §2.2 risk: 264 bytes span 5 cache lines. If perf regresses
+    // we can reorganize / add explicit padding here.
+    uint8_t  line_buffer_[264] = {};             // was ppu.cpp:1064 sprlinebuf[256+8]
+    uint32_t bg_latch_[2]      = {0, 0};         // was RefreshLine static pshift[2]
+    uint32_t bg_latch_h_       = 0;              // was RefreshLine static atlatch
 };
 
 // Direct global instance (plan §1.2). Same pattern as Bus g_bus —

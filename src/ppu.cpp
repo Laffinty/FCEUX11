@@ -1061,7 +1061,14 @@ static void ResetRL(uint8 *target) {
 	tofix = 1;
 }
 
-static uint8 sprlinebuf[256 + 8];
+// v1.5 Prism §2.2 (Batch 2): sprlinebuf[256+8] migrated into
+// fceu11::g_ppu.line_buffer_. The `sprlinebuf` name below (inside
+// RefreshLine / CopySprites) is now a local pointer alias bound to
+// g_ppu.line_buffer() so call-site reads / writes / pointers stay
+// unchanged. The original file-static array `static uint8
+// sprlinebuf[256+8];` was removed; equivalent storage now lives in
+// the class (alignas(64) for cache alignment — see plan §2.2 risk
+// analysis).
 
 void FCEUPPU_LineUpdate(void) {
 	if (newppu)
@@ -1122,8 +1129,15 @@ static int spork = 0;
 
 // lasttile is really "second to last tile."
 static void RefreshLine(int lastpixel) {
-	static uint32 pshift[2];
-	static uint32 atlatch;
+	// v1.5 Prism §2.2 (Batch 2): pshift[2] / atlatch were static
+	// locals here (persistent across scanlines, lifetime = process).
+	// They migrate into fceu11::g_ppu.bg_latch_[] / bg_latch_h_; the
+	// local aliases below rebind the names without touching
+	// pputile.inc (which is included later in this function and uses
+	// `pshift[0]`, `pshift[1]`, `atlatch`).
+	uint32 (&pshift)[2] = fceu11::g_ppu.bg_latch();
+	uint32 &atlatch     = fceu11::g_ppu.bg_latch_h();
+	uint8 *sprlinebuf   = fceu11::g_ppu.line_buffer();  // alias for the line buffer (see also RefreshLine / CopySprites callsites)
 	uint32 smorkus = RefreshAddr;
 
 	#define RefreshAddr smorkus
@@ -1587,6 +1601,8 @@ static void FetchSpriteData(void) {
 }
 
 static void RefreshSprites(void) {
+	// v1.5 Prism §2.2 (Batch 2): sprlinebuf now aliases g_ppu.line_buffer().
+	uint8 *sprlinebuf = fceu11::g_ppu.line_buffer();
 	int n;
 	SPRB *spr;
 
@@ -1703,6 +1719,8 @@ static void RefreshSprites(void) {
 }
 
 static void CopySprites(uint8 *target) {
+	// v1.5 Prism §2.2 (Batch 2): sprlinebuf now aliases g_ppu.line_buffer().
+	uint8 *sprlinebuf = fceu11::g_ppu.line_buffer();
 	uint8 *P = target;
 
 	if (!spork) return;
