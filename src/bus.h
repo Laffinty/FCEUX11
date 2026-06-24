@@ -55,12 +55,12 @@ public:
     void reset_mapping() noexcept;   // cart.cpp::ResetCartMapping equivalent
 
     // -----------------------------------------------------------------
-    // v1.5 Prism §3.2 / §3.3: Ppu injection point. The Bus holds a
-    // pointer to fceu11::Ppu; before attach_ppu() is called (e.g.
-    // during early Phase F transition), ppu_ is null and setchr* /
-    // setmirror* / setntamem fall back to the v1.0 free-function
-    // path (FCEUPPU_LineUpdate + direct v1.0 alias writes). The
-    // canonical attach site is fceu.cpp::Initialize() after bus init.
+    // v1.5 Prism §3.2 / §3.3: Ppu injection point. The canonical
+    // attach site is fceu.cpp::Initialize() right after g_bus.init()
+    // (fceu.cpp:1063-1065). After attach_ppu runs, ppu_ is guaranteed
+    // non-null for the lifetime of the Bus; the v1.5.1 cleanup
+    // removed the pre-attachment fallback branches from setchr* /
+    // setmirror* / setntamem (plan §10.6 release-readiness).
     // -----------------------------------------------------------------
     void attach_ppu(fceu11::Ppu* p) noexcept { ppu_ = p; }
 
@@ -225,10 +225,11 @@ private:
     int        genie_r_wrap_  = 0;
 
     // v1.5 Prism §3.2: Ppu back-pointer injected by attach_ppu().
-    // Null until fceu.cpp::Initialize() calls g_bus.attach_ppu(&g_ppu).
-    // The null guard in setchr* / setmirror* / setntamem keeps the
-    // Bus buildable + runnable before injection (Phase F transition
-    // state) and after the Bus shutdown (defensive).
+    // Null until fceu.cpp::Initialize() calls g_bus.attach_ppu(&g_ppu),
+    // then guaranteed non-null for the rest of process lifetime.
+    // Bus methods (setchr* / setmirror* / setntamem) dereference
+    // ppu_ unconditionally — the v1.5.1 hotfix removed the
+    // pre-attachment fallback branches (plan §10.6).
     Ppu* ppu_ = nullptr;
 };
 

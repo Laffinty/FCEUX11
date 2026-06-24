@@ -665,6 +665,15 @@ bool fceu11::Initialize() {
 
 	g_cpu.init();
 
+	// v1.5 Prism §3.2: wire Bus → Ppu back-pointer so Bank-switching
+	// (setchr* / setmirror* / setntamem) can route through
+	// ppu_->method() instead of touching v1.0 globals directly.
+	// v1.5.1: moved here from PowerNES because iNESLoad
+	// (ines.cpp:794) calls SetupCartMirroring → g_bus.setmirror
+	// BEFORE PowerNES runs. The Bus needs ppu_ set up by the time
+	// any board/mapper setup code can call into it.
+	fceu11::g_bus.attach_ppu(&fceu11::g_ppu);
+
 	return true;
 }
 
@@ -1061,13 +1070,12 @@ void PowerNES(void) {
 	// the Bus API is now self-consistent: a future caller reading
 	// bus.h can trust that init() is what initializes the dispatch.
 	fceu11::g_bus.init();
-	// v1.5 Prism §3.2: wire Bus → Ppu back-pointer so Bank-switching
-	// (setchr* / setmirror* / setntamem) can route through
-	// ppu_->method() instead of touching v1.0 globals directly. Must
-	// happen after g_bus.init() and after g_ppu is constructed
-	// (it's a direct global, so it's already constructed at static-
-	// init time before main() runs).
-	fceu11::g_bus.attach_ppu(&fceu11::g_ppu);
+	// (v1.5.1) attach_ppu moved to fceu11::Initialize — see below.
+	// Must run BEFORE iNESLoad because ines.cpp:794 calls
+	// SetupCartMirroring during load, which routes through
+	// g_bus.setmirror → ppu_->set_mirror_mode, and ppu_ was null
+	// when attach_ppu only ran from PowerNES (iNESLoad runs
+	// before PowerNES).
 
 	SetReadHandler(0, 0x7FF, ARAML);
 	SetWriteHandler(0, 0x7FF, BRAML);
