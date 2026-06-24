@@ -74,6 +74,22 @@ public:
     uint8_t reg(uint32_t idx) const noexcept;
     void    set_reg(uint32_t idx, uint8_t v) noexcept;
 
+    // ---- Batch 1: PPU control register mirror state (plan §2.1) ----
+    // The v1.0 PPU loop maintains a handful of static / global scratch
+    // variables that mirror derived state of the PPU register file
+    // (the current VRAM address, the toggle bit, fine X scroll, etc.).
+    // These are now class members with reference-returning accessors
+    // (no `const` qualifier) so the v1.0 global names can bind as
+    // reference aliases. Callers that want read-only semantics should
+    // capture-by-value or use static_cast — typical call sites do
+    // `vtoggle ^= 1` or `XOffset = V & 7` which are write-through.
+    __forceinline uint8_t&  vtoggle()        noexcept { return vtoggle_; }
+    __forceinline uint8_t&  fine_x_scroll()  noexcept { return fine_x_scroll_; }
+    __forceinline uint32_t& vaddr()          noexcept { return vaddr_; }
+    __forceinline uint32_t& vaddr_latch()    noexcept { return vaddr_latch_; }
+    __forceinline uint32_t& nt_refresh_addr() noexcept { return nt_refresh_addr_; }
+    __forceinline uint32_t& dummy_read()     noexcept { return dummy_read_; }
+
     // ---- Name table RAM + pointer table ----
     // `ntaram()` returns a reference to the 0x800-byte internal array.
     // Return type is `uint8_t (&)[0x800]` (array reference), NOT a
@@ -127,13 +143,39 @@ public:
     __forceinline uint8_t (& nt_ram_mask() noexcept)    { return nt_ram_mask_; }
 
 private:
-    // Storage. See file-top comment for layout rationale.
+    // Storage layout (revised after Phase C bench regression — see
+    // git log). Hot per-cycle control state is grouped at the start of
+    // the struct (after the NTARAM block) so the PPU loop's frequent
+    // vtoggle_ / vaddr_ / vaddr_latch_ / XOffset_ accesses land in
+    // the same ~64-byte cache line as regs_ / vnapage_, instead of
+    // being scattered across 2 KB of NTARAM BSS. Phase B had these
+    // fields AFTER phase_; that layout forced a 2 KB cache-line walk
+    // before reaching them, which showed up as +15% on bench_ppu_frame
+    // vs the Phase B baseline.
     alignas(64) uint8_t ntaram_[0x800];    // name-table RAM (2 KB)
     uint8_t* vnapage_[4];                  // 4-entry pointer table (32 B)
     uint8_t  regs_[4] = {};                // PPU[0..3] register file (4 B)
     uint8_t  chr_ram_mask_ = 0;            // PPUCHRRAM flag (1 B)
     uint8_t  nt_ram_mask_  = 0;            // PPUNTARAM flag (1 B)
-    PPUPHASE phase_ = PPUPHASE_VBL;        // frame phase
+    // ---- Batch 1 hot control state (plan §2.1) ----
+    // v1.0 used file-scope `static` / global variables here (`vtoggle`,
+    // `XOffset`, `TempAddr`, `RefreshAddr`, `NTRefreshAddr`,
+    // `DummyRead`); they migrate into the class so the link-time
+    // layout can fold the accessor calls. v1.0 global names are
+    // reference aliases in the extern block below. Types preserved:
+    // vtoggle stays uint8_t (v1.0's `vtoggle ^= 1` toggle idiom works
+    // on both); TempAddr / RefreshAddr / NTRefreshAddr stay uint32_t
+    // (v1.0 stores flags in the upper bits alongside the 14-bit
+    // address; narrowing to 16 bits would break the bit extracts at
+    // ppu.cpp:584-587 / 770 / 790 / 810 / 830 / 856).
+    uint8_t  vtoggle_         = 0;   // PPU read-toggle (was ppu.cpp:368)
+    uint8_t  fine_x_scroll_   = 0;   // $2005 fine X (was ppu.cpp:369 XOffset)
+    uint32_t vaddr_           = 0;   // current VRAM address (was TempAddr)
+    uint32_t vaddr_latch_     = 0;   // reload value (was RefreshAddr)
+    uint32_t nt_refresh_addr_ = 0;   // MMC5 sync (was NTRefreshAddr)
+    uint32_t dummy_read_      = 0;   // $2007 dummy read state (was DummyRead)
+    // ---- Cold / phase state ----
+    PPUPHASE phase_ = PPUPHASE_VBL;        // frame phase (cold, touched once per scanline)
 };
 
 // Direct global instance (plan §1.2). Same pattern as Bus g_bus —
@@ -179,5 +221,30 @@ extern uint8_t* (& vnapage)[4];
 // / g_ppu.nt_ram_mask_.
 extern uint8_t (& PPUCHRRAM);
 extern uint8_t (& PPUNTARAM);
+
+// ---------------------------------------------------------------------------
+// Batch 1 (plan §2.1) compat aliases — control-register mirror state.
+//
+// These v1.0 global names (vtoggle, XOffset, TempAddr, RefreshAddr,
+// NTRefreshAddr, DummyRead) are migrated into fceu11::g_ppu. External
+// consumers (debug.cpp uses XOffset; mmc5.cpp uses NTRefreshAddr;
+// state.cpp savestate uses &vtoggle / &XOffset / &TempAddr / &
+// RefreshAddr / &NTRefreshAddr / &DummyRead via the SFORMAT descriptor)
+// still see the v1.0 names bound as references to g_ppu's storage —
+// so `&vtoggle` and `&NTRefreshAddr` resolve to the same address
+// before and after the migration, and savestate chunks stay
+// byte-exact identical.
+//
+// Pure-internal-to-ppu.cpp names (TempAddr, RefreshAddr, DummyRead)
+// are also aliased because pputile.inc (included into ppu.cpp) reads
+// RefreshAddr; the alias lets the include-file stay unchanged.
+// ---------------------------------------------------------------------------
+
+extern uint8_t  (& vtoggle);
+extern uint8_t  (& XOffset);
+extern uint32_t (& TempAddr);
+extern uint32_t (& RefreshAddr);
+extern uint32_t (& NTRefreshAddr);
+extern uint32_t (& DummyRead);
 
 #endif // FCEU11_PPU_CLASS_H

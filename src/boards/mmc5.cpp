@@ -173,7 +173,11 @@ static void mmc5_PPUWrite(uint32 A, uint8 V) {
 	}
 }
 
-extern uint32 NTRefreshAddr;
+// v1.5 Prism §2.1 (Batch 1): NTRefreshAddr is now an `extern
+// uint32_t (& NTRefreshAddr)` reference alias in ppu_class.h, bound
+// to fceu11::g_ppu.nt_refresh_addr_. The previous file-local
+// `extern uint32 NTRefreshAddr;` variable form is gone (and would
+// conflict with the alias in the same TU).
 uint8 FASTCALL mmc5_PPURead(uint32 A)
 {
 	bool split = false;

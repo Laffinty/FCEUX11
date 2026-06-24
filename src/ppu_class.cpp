@@ -109,3 +109,14 @@ uint8_t   (& NTARAM )[0x800] = fceu11::g_ppu.ntaram();
 uint8_t*  (& vnapage)[4]    = fceu11::g_ppu.vnapage();
 uint8_t   (& PPUCHRRAM)     = fceu11::g_ppu.chr_ram_mask();
 uint8_t   (& PPUNTARAM)     = fceu11::g_ppu.nt_ram_mask();
+
+// Batch 1 (plan §2.1) alias bindings — control-register mirror state.
+// Bind to g_ppu's batch-1 member fields so existing ppu.cpp / pputile.inc /
+// debug.cpp / mmc5.cpp / state.cpp call sites (which use the v1.0 names)
+// transparently read/write through the class.
+uint8_t  (& vtoggle)        = fceu11::g_ppu.vtoggle();
+uint8_t  (& XOffset)        = fceu11::g_ppu.fine_x_scroll();
+uint32_t (& TempAddr)       = fceu11::g_ppu.vaddr();
+uint32_t (& RefreshAddr)    = fceu11::g_ppu.vaddr_latch();
+uint32_t (& NTRefreshAddr)  = fceu11::g_ppu.nt_refresh_addr();
+uint32_t (& DummyRead)      = fceu11::g_ppu.dummy_read();

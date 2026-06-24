@@ -70,14 +70,19 @@ extern int g_rasterpos;
 // Including ppu_class.h (above) provides these declarations; no
 // separate `extern uint8 PPU[4];` etc. are needed here.
 
-// v1.5 Prism: SPRAM / SPRBUF / VRAMBuffer / PPUGenLatch / XOffset are
-// v1.0 PPU-internal globals still defined in ppu.cpp. They used to be
-// forward-declared in debug.h alongside PPU/vnapage; that header's
-// declarations were removed when ppu_class.h took ownership of
-// PPU/vnapage. Forward them here so debug.cpp (and any other PPU-
+// v1.5 Prism §2.1 (Batch 1): SPRAM / SPRBUF / VRAMBuffer / PPUGenLatch
+// are v1.0 PPU-internal globals still defined in ppu.cpp. They used
+// to be forward-declared in debug.h alongside PPU/vnapage; that
+// header's declarations were removed when ppu_class.h took ownership
+// of PPU/vnapage. Forward them here so debug.cpp (and any other PPU-
 // internal state reader) sees them via the ppu.h include chain.
+//
+// XOffset was previously listed here too; v1.5 Prism §2.1 migrates
+// it into fceu11::g_ppu as fine_x_scroll_. The `extern uint8_t
+// (& XOffset)` reference alias in ppu_class.h is the new public
+// declaration — old `extern uint8 XOffset;` variable form is gone.
 extern uint8 SPRAM[0x100], SPRBUF[0x100];
-extern uint8 VRAMBuffer, PPUGenLatch, XOffset;
+extern uint8 VRAMBuffer, PPUGenLatch;
 
 extern bool DMC_7bit;
 extern bool paldeemphswap;

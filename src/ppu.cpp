@@ -365,11 +365,23 @@ static int deempcnt[8];
 void (*GameHBIRQHook)(void), (*GameHBIRQHook2)(void);
 void (*PPU_hook)(uint32 A);
 
-uint8 vtoggle = 0;
-uint8 XOffset = 0;
+// v1.5 Prism §2.1 (Batch 1): vtoggle / XOffset / TempAddr /
+// RefreshAddr / DummyRead / NTRefreshAddr migrated into
+// fceu11::g_ppu. The `extern ... (& NAME)` reference aliases in
+// ppu_class.h rebind these names to g_ppu's member storage; every
+// existing call site (ppu.cpp, pputile.inc, debug.cpp, mmc5.cpp,
+// state.cpp SFORMAT descriptor) keeps compiling unchanged because
+// the alias target type preserves v1.0 call-site semantics:
+//   vtoggle        -> g_ppu.vtoggle_         (uint8_t)
+//   XOffset        -> g_ppu.fine_x_scroll_   (uint8_t)
+//   TempAddr       -> g_ppu.vaddr_           (uint32_t)
+//   RefreshAddr    -> g_ppu.vaddr_latch_     (uint32_t)
+//   NTRefreshAddr  -> g_ppu.nt_refresh_addr_ (uint32_t)
+//   DummyRead      -> g_ppu.dummy_read_      (uint32_t)
+// Byte-level semantics unchanged; the only delta is the storage
+// location (BSS addresses move into fceu11::g_ppu). SpriteDMA
+// stays here — Phase E (Batch 3) will migrate it alongside SPRAM.
 uint8 SpriteDMA = 0; // $4014 / Writing $xx copies 256 bytes by reading from $xx00-$xxFF and writing to $2004 (OAM data)
-
-uint32 TempAddr = 0, RefreshAddr = 0, DummyRead = 0, NTRefreshAddr = 0;
 
 static int maxsprites = 8;
 
