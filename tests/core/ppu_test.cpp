@@ -100,7 +100,13 @@ void test_ntaram_rw(TestContext& ctx) {
     // bytes and read them back. This is *not* a PPU-rendered test;
     // it confirms the storage backing is reachable from the test
     // process address space.
-    extern uint8 NTARAM[0x800];
+    //
+    // v1.5 Prism §1.1: NTARAM is now an `extern uint8_t (&)[0x800]`
+    // reference alias in ppu_class.h. The alias is visible via the
+    // ppu.h include chain (test_helpers.h includes ppu.h transitively
+    // via fceu.h), so no local redeclaration is needed — and the
+    // previous `extern uint8 NTARAM[0x800]` is no longer compatible
+    // with the new reference-alias type.
     uint8_t orig0 = NTARAM[0x100];
     uint8_t orig1 = NTARAM[0x700];
     NTARAM[0x100] = 0xAB;
@@ -114,7 +120,10 @@ void test_ntaram_rw(TestContext& ctx) {
 void test_vnapage_pointers(TestContext& ctx) {
     // vnapage[4] are the four name-table address-space pointers. After
     // mapper power, they should all be non-null and addressable.
-    extern uint8* vnapage[4];
+    //
+    // v1.5 Prism §1.1: vnapage is now an `extern uint8_t* (&)[4]`
+    // reference alias in ppu_class.h, visible via ppu.h. No local
+    // redeclaration needed.
     bool all_nn = true;
     for (int i = 0; i < 4; ++i) {
         if (vnapage[i] == nullptr) { all_nn = false; break; }

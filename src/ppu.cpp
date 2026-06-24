@@ -349,9 +349,14 @@ uint8 QTAINTRAM[2048];
 uint8 qtaintramreg;
 
 uint8 VRAMBuffer = 0, PPUGenLatch = 0;
-uint8 *vnapage[4];
-uint8 PPUNTARAM = 0;
-uint8 PPUCHRRAM = 0;
+// v1.5 Prism §1.1: vnapage[] / PPUCHRRAM / PPUNTARAM migrated into
+// fceu11::g_ppu; the compat aliases `extern uint8_t* (& vnapage)[4]`,
+// `extern uint8_t (& PPUCHRRAM)`, `extern uint8_t (& PPUNTARAM)` in
+// ppu_class.h bind the global names to g_ppu member storage. The
+// plan §1.3 wording "PPUCHRRAM / PPUNTARAM stay as v1.0 globals" was
+// aspirational — in C++ a reference-to-storage alias cannot coexist
+// in the same TU as a variable definition of the same name, so all
+// three migrate into the class. Byte-level semantics unchanged.
 
 //Color deemphasis emulation.  Joy...
 static uint8 deemp = 0;
@@ -374,9 +379,17 @@ static int maxsprites = 8;
 int g_rasterpos;
 static uint32 scanlines_per_frame;
 
-uint8 PPU[4];
+// v1.5 Prism §1.1: PPU[4] / NTARAM[0x800] migrated into fceu11::g_ppu;
+// the compat aliases `extern uint8_t (& PPU)[4]`, `extern uint8_t
+// (& NTARAM)[0x800]` in ppu_class.h bind the global names to g_ppu
+// member storage. Plan §1.3 said PPU[4] "stays in ppu.cpp"; in C++ a
+// reference alias cannot coexist with a variable definition of the
+// same name, so PPU[4] also migrates into the class. Savestate layout
+// impact will be addressed in Phase E (batch 3) by repointing the
+// SFORMAT descriptor at g_ppu.regs_. SPRAM / SPRBUF stay here for now
+// (Phase E will migrate SPRAM as part of batch 3).
 uint8 PPUSPL;
-uint8 NTARAM[0x800], SPRAM[0x100], SPRBUF[0x100];
+uint8 SPRAM[0x100], SPRBUF[0x100];
 alignas(64) std::array<uint8_t, 0x20> PALRAM;
 std::array<uint8_t, 3> UPALRAM;//for 0x4/0x8/0xC addresses in palette, the ones in
 					//0x20 are 0 to not break fceu rendering.

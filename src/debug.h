@@ -126,8 +126,14 @@ extern void IncrementInstructionsCounters();
 // bus.h that binds to g_bus.vpage(). Declarations in
 // debug.h (and anywhere else that included the old `extern
 // uint8* VPage[8]`) are removed.
-extern uint8 *vnapage[4];
-extern uint8 PPU[4],SPRAM[0x100],VRAMBuffer,PPUGenLatch,XOffset;
+// v1.5 Prism §1.1: vnapage / PPU[4] / SPRAM / VRAMBuffer /
+// PPUGenLatch / XOffset moved similarly. vnapage and PPU[4]
+// are now `extern` reference-to-array / reference-to-array
+// aliases in ppu_class.h (which ppu.h transitively includes);
+// SPRAM / VRAMBuffer / PPUGenLatch / XOffset stay as v1.0
+// globals in ppu.cpp and are forward-declared in ppu.h. The
+// duplicate declarations below were removed when the
+// fceu11::Ppu class landed.
 extern std::array<uint8_t, 0x20> PALRAM;
 extern std::array<uint8_t, 3> UPALRAM;
 extern uint32 FCEUPPU_PeekAddress();

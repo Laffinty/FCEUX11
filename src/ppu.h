@@ -1,3 +1,19 @@
+// FCEUX11 — PPU public interface.
+//
+// v1.5 Prism §1.1: PPU register file (`PPU[4]`), name-table RAM
+// (`NTARAM[0x800]`), pointer table (`vnapage[4]`), and bank-switching
+// masks (`PPUCHRRAM`, `PPUNTARAM`) are now `fceu11::g_ppu` internals
+// (NTARAM/vnapage) or thin `extern` reference aliases binding to the
+// v1.0 storage (PPU[4]/PPUCHRRAM/PPUNTARAM). The declarations live in
+// ppu_class.h — see that file for the class definition and the alias
+// binding rationale. This file keeps the FCEUPPU_* free-function
+// surface that fceu.cpp / bus.cpp / cart.cpp etc. call into.
+
+#ifndef FCEU11_PPU_H
+#define FCEU11_PPU_H
+
+#include "ppu_class.h"   // fceu11::Ppu, g_ppu, PPU/NTARAM/vnapage/PPUCHRRAM/PPUNTARAM aliases
+
 void FCEUPPU_Init(void);
 void FCEUPPU_Reset(void);
 void FCEUPPU_Power(void);
@@ -13,10 +29,18 @@ int newppu_get_scanline();
 int newppu_get_dot();
 void newppu_hacky_emergency_reset();
 
-/* For cart.c and banksw.h, mostly */
-extern uint8 NTARAM[0x800], *vnapage[4];
-extern uint8 PPUNTARAM;
-extern uint8 PPUCHRRAM;
+// NTARAM, vnapage, PPUCHRRAM, PPUNTARAM — declared as reference
+// aliases in ppu_class.h. The alias definitions there rebind these
+// names to the canonical storage: NTARAM / vnapage point into
+// fceu11::g_ppu; PPUCHRRAM / PPUNTARAM stay as v1.0 ppu.cpp globals
+// per plan §1.3. Including ppu_class.h (above) is what makes these
+// visible to ppu.h consumers.
+//
+// The old v1.0 declarations were:
+//   extern uint8 NTARAM[0x800], *vnapage[4];
+//   extern uint8 PPUNTARAM;
+//   extern uint8 PPUCHRRAM;
+// These are now superseded by ppu_class.h's reference aliases.
 
 void FCEUPPU_SaveState(void);
 void FCEUPPU_LoadState(int version);
@@ -39,16 +63,32 @@ extern uint8 FASTCALL FFCEUX_PPURead_Default(uint32 A);
 void FFCEUX_PPUWrite_Default(uint32 A, uint8 V);
 
 extern int g_rasterpos;
-extern uint8 PPU[4];
+// PPU[4] / PPUCHRRAM / PPUNTARAM — declared as reference-to-storage
+// aliases in ppu_class.h. The alias bindings there point to the v1.0
+// storage in ppu.cpp (the actual `uint8 PPU[4]`, `uint8 PPUCHRRAM`,
+// `uint8 PPUNTARAM` definitions remain in ppu.cpp per plan §1.3).
+// Including ppu_class.h (above) provides these declarations; no
+// separate `extern uint8 PPU[4];` etc. are needed here.
+
+// v1.5 Prism: SPRAM / SPRBUF / VRAMBuffer / PPUGenLatch / XOffset are
+// v1.0 PPU-internal globals still defined in ppu.cpp. They used to be
+// forward-declared in debug.h alongside PPU/vnapage; that header's
+// declarations were removed when ppu_class.h took ownership of
+// PPU/vnapage. Forward them here so debug.cpp (and any other PPU-
+// internal state reader) sees them via the ppu.h include chain.
+extern uint8 SPRAM[0x100], SPRBUF[0x100];
+extern uint8 VRAMBuffer, PPUGenLatch, XOffset;
+
 extern bool DMC_7bit;
 extern bool paldeemphswap;
 
-enum PPUPHASE {
-	PPUPHASE_VBL, PPUPHASE_BG, PPUPHASE_OBJ
-};
+// PPUPHASE — moved to ppu_class.h (which ppu.h includes). Keeping a
+// declaration here would re-introduce the circular include.
 
 extern PPUPHASE ppuphase;
 
 extern unsigned char *cdloggervdata;
 extern unsigned int cdloggerVideoDataSize;
 extern volatile int rendercount, vromreadcount, undefinedvromcount;
+
+#endif // FCEU11_PPU_H
