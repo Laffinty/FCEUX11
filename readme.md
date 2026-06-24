@@ -2,7 +2,7 @@
 
 # FCEUX11
 
-[![Version](https://img.shields.io/badge/version-v1.0.0-blue)](https://github.com/Laffinty/FCEUX11/releases)
+[![Version](https://img.shields.io/badge/version-v1.4-blue)](https://github.com/Laffinty/FCEUX11/releases)
 [![License](https://img.shields.io/badge/license-GPL--v2-green)](COPYING)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?logo=windows)](https://www.microsoft.com/windows/windows-11)
 [![Qt](https://img.shields.io/badge/Qt-6.8%20LTS-41CD52?logo=qt)](https://www.qt.io)
@@ -58,8 +58,8 @@
 | **Qt** | 6.8 LTS |
 | **C++ 标准 / Standard** | C++20 |
 
-> 如需从源码编译，请参阅 [`docs/tech/13_构建系统与CI矩阵.txt`](docs/tech/13_构建系统与CI矩阵.txt) 与 [`docs/tech/00_NES架构与FCEUX11项目导览.txt`](docs/tech/00_NES架构与FCEUX11项目导览.txt)。
-> For building from source, please refer to [`docs/tech/13_构建系统与CI矩阵.txt`](docs/tech/13_构建系统与CI矩阵.txt) and [`docs/tech/00_NES架构与FCEUX11项目导览.txt`](docs/tech/00_NES架构与FCEUX11项目导览.txt).
+> 如需从源码编译，请参阅 [`docs/BuildGuide.md`](docs/BuildGuide.md) 与 [`docs/v1.x_Modernization_Roadmap.md`](docs/v1.x_Modernization_Roadmap.md)。
+> For building from source, please refer to [`docs/BuildGuide.md`](docs/BuildGuide.md) and [`docs/v1.x_Modernization_Roadmap.md`](docs/v1.x_Modernization_Roadmap.md).
 
 ---
 
@@ -92,18 +92,27 @@ Precompiled binaries are available on the **[GitHub Releases](https://github.com
 
 详见 [CHANGELOG.md](CHANGELOG.md)。
 
-v1.0 是首个正式版（基于 v0.3.16 LTS 收官），整合 v0.3.0 ~ v0.3.16 全部
-17 个子版本 + 2 个整合检查点。完整 Release Notes 见
-[`docs/tech/22_v0_3_x发布说明.txt`](docs/tech/22_v0_3_x发布说明.txt)。
-编译指南见 [`docs/v1.0_BuildGuide.md`](docs/v1.0_BuildGuide.md)。
+v1.4（代号 **Gateway**）是当前稳定版，v1.x 现代化周期的第四个子
+版本（v1.1 Sentinel → v1.2 Census → v1.3 Legion → v1.4 Gateway）。
+本版本在保持 100% 存档格式向前兼容（v1.3 生成的 `.fc0` 可在 v1.4
+中正常加载与保存）、mapper 兼容性与游戏行为不变的前提下，重构了
+核心模拟器内部的全局状态与地址派发表。详细 Release Notes 见
+[CHANGELOG.md](CHANGELOG.md) 与
+[`docs/v1.x_Modernization_Roadmap.md`](docs/v1.x_Modernization_Roadmap.md)。
+编译指南见 [`docs/BuildGuide.md`](docs/BuildGuide.md)。
 
 See [CHANGELOG.md](CHANGELOG.md) for version history.
 
-v1.0 is the first official stable release (based on the v0.3.16 LTS
-closure), integrating all 17 sub-versions and 2 integration checkpoints
-from v0.3.0 to v0.3.16. Full release notes:
-[`docs/tech/22_v0_3_x发布说明.txt`](docs/tech/22_v0_3_x发布说明.txt).
-Build guide: [`docs/v1.0_BuildGuide.md`](docs/v1.0_BuildGuide.md).
+v1.4 (codename **Gateway**) is the current stable release — the fourth
+sub-version of the v1.x modernization cycle (v1.1 Sentinel → v1.2
+Census → v1.3 Legion → v1.4 Gateway). This release is a non-user-visible
+internal refactor of the core emulator's global state and address
+dispatch tables, with full forward-compatible savestate support (v1.3
+`.fc0` files continue to load and save normally under v1.4) and
+unchanged mapper compatibility and gameplay behaviour. Full release
+notes: [CHANGELOG.md](CHANGELOG.md) and
+[`docs/v1.x_Modernization_Roadmap.md`](docs/v1.x_Modernization_Roadmap.md).
+Build guide: [`docs/BuildGuide.md`](docs/BuildGuide.md).
 
 ---
 

@@ -1,16 +1,16 @@
-# FCEUX11 v1.2 正式版编译指南 / v1.2 Build Guide
+# FCEUX11 v1.4 正式版编译指南 / v1.4 Build Guide
 
-> **适用版本**：FCEUX11 v1.2（正式版）
+> **适用版本**：FCEUX11 v1.4（正式版，代号 Gateway）
 > **目标平台**：Windows 11 22H2+（64-bit）独占
 > **工具链**：MSVC 2022 19.36+ (VS 17.6+) + CMake 4.0+ + Ninja + vcpkg + Rust 1.78+
 > **Qt**：6.8 LTS
-> **最后更新**：2026-06-19
+> **最后更新**：2026-06-24
 
 ---
 
 ## 0. 文档导读
 
-本指南面向所有想从源码编译 FCEUX11 v1.2 的开发者 / 用户。每一步都
+本指南面向所有想从源码编译 FCEUX11 v1.4 的开发者 / 用户。每一步都
 经过实测，**任意一台符合系统要求 + 已按本章第 3 节装好工具链的 Windows
 11 电脑**都可以照搬命令完成编译。
 
@@ -38,7 +38,7 @@
 | 磁盘 | 20 GB 可用 | 50 GB 可用（含 vcpkg 构建缓存）|
 | 网络 | 首次 ~500 MB 下载 | 持续可达 github.com / vcpkg |
 
-> **注意**：Windows 7/8/8.1/10 不支持（Qt 6.8 LTS 运行时要求 + v0.3.x Win11 独占策略）。
+> **注意**：Windows 7/8/8.1/10 不支持（Qt 6.8 LTS 运行时要求 + v1.x Win11 独占策略）。
 > **不支持** MSYS2 / MinGW / clang-cl 工具链（CMakeLists.txt 强制 MSVC，详见 §10）。
 
 ---
@@ -57,7 +57,7 @@
 | Qt 翻译 | `build\src\drivers\Qt\lang\fceux11_*.qm` | 编译后的翻译（en/zh_CN/zh_TW）|
 | 部署脚本 | `build\cmake_install.cmake` | 给 `cmake --install` 用 |
 
-**程序版本号**：执行 `fceux11.exe --version` 应输出 `1.2`（或 `v1.2`）。
+**程序版本号**：执行 `fceux11.exe --version` 应输出 `1.4`（或 `v1.4`）。
 
 ---
 
@@ -193,7 +193,7 @@ winget install --id Rustlang.Rustup -e
 
 ## 4. vcpkg 依赖安装
 
-FCEUX11 v1.2 通过 vcpkg 管理 9 个 C++ 包 + Qt 6.8。
+FCEUX11 v1.4 通过 vcpkg 管理 9 个 C++ 包 + Qt 6.8。
 
 ### 4.1 方式 A：一键脚本（推荐）
 
@@ -355,55 +355,79 @@ cmake --build build-dev
 ctest --test-dir build --output-on-failure
 ```
 
-**期望结果**（v1.2）：8/9 通过。
+**期望结果**（v1.4）：18/18 通过。
 
-9 个 ctest 测试：
-| 测试 | 状态 | 说明 |
-|------|------|------|
-| `smoke_test` | ✅ 通过 | 启动-关闭 烟雾 |
-| `mapper_load_test` | ✅ 通过 | 175 个 mapper 加载 |
-| `mapper_reset_test` | ✅ 通过 | mapper 状态重置 |
-| `rom_regression_test` | ✅ 通过 | 5 ROM 字节级回归 |
-| `expected_api_test` | ✅ 通过 | tl::expected API 路径 |
-| `enum_class_bitflags_test` | ✅ 通过 | v0.3.8 enum class 化 |
-| `i18n_regression_test` | ✅ 通过 | i18n 静态分析（≥ 90% 覆盖）|
-| `config_store_test` | ✅ 通过 | TypedConfig<T> 包装类 |
-| `savestate_regression_test` | ⚠️ 已知 hash gap | 12 ROM × 60 帧 hash 与 v0.3.13 重生成的 golden 文件不一致；从 v0.3.16 继承的已知问题（CHANGELOG 闸 2 已记录）。v1.2.x hotfix 计划刷新 golden 文件。|
+18 个 ctest 测试（v0.3.x 9 个 + v1.x 9 个）：
+| 测试 | v1.x 引入 | 说明 |
+|------|-----------|------|
+| `smoke_test` | v0.3.0 | 启动-关闭 烟雾 |
+| `mapper_load_test` | v0.3.0 | 175 个 mapper 加载 |
+| `mapper_reset_test` | v0.3.0 | mapper 状态重置 |
+| `rom_regression_test` | v0.3.12.5 | 5 ROM 字节级回归 |
+| `savestate_regression_test` | v0.3.0 | 12 ROM × 60 帧 hash 回归 |
+| `expected_api_test` | v0.3.3 | tl::expected API 路径 |
+| `enum_class_bitflags_test` | v0.3.8 | enum class 化 |
+| `i18n_regression_test` | v0.3.15.x | i18n 静态分析（≥ 90% 覆盖）|
+| `config_store_test` | v0.3.15.x | TypedConfig<T> 包装类 |
+| `cpu_test` | v1.1 Sentinel | X6502 复位 / 寄存器 / 寻址 / 中断（13 用例 / 44 断言）|
+| `ppu_test` | v1.1 Sentinel | PPU 寄存器 / xbuf / 扫描线（12 / 35）|
+| `apu_test` | v1.1 Sentinel | APU 时戳 / Wave / GetSoundBuffer（11 / 26）|
+| `bus_test` | v1.1 Sentinel | ARead / BWrite / SetReadHandler / setprg8（10 / 29）|
+| `mapper_core_test` | v1.1 Sentinel | NROM / MMC1 / MMC3 / VRC6 寄存器行为（12 / 31）|
+| `savestate_core_test` | v1.1 Sentinel | SFORMAT 结构 / 存档 roundtrip（12 / 38）|
+| `golden_savestate_test` | v1.1 Sentinel | 9 golden `.fc0` 字节比对（FDS 2 个 SKIP 缺 BIOS）|
+| `bench_tolerance_test` | v1.1 Sentinel | 性能基线 asymmetric gate（speedup 无上限，slowdown ≤ +2.5%）|
+| `core_state_test` | v1.2 Census | `fceu11::State` facade 身份校验 |
 
-### 6.2 性能基线（v1.2 = v0.3.16 LTS 数据）
+### 6.2 性能基线
 
 ```powershell
-# 跑 3 个 Google Benchmark
+# 跑 3 个 Google Benchmark + 1 个 tolerance gate
 .\build\tests\fceux11_x6502_exec_bench.exe
 .\build\tests\fceux11_ppu_render_bench.exe
 .\build\tests\fceux11_apu_mix_bench.exe
+ctest --test-dir build -R bench_tolerance --output-on-failure
 ```
 
-**期望**（vs v0.3.0 baseline）：
-- x6502 CPU：≤ 0.95×（0.842 ms/frame → 0.760 ms/frame，v1.2 保持）
-- PPU 渲染：≤ 1.1×（0.735 ms/frame → 0.717 ms/frame）
-- APU 混音：informational（0.704 → 0.718 ms/frame）
+**参考数据**（v1.0 baseline，见 `tests/benchmarks/baseline_v1.0.json`）：
+- x6502 CPU：44.20 ms / 60 帧 / 5 iter
+- PPU 渲染：39.10 ms / 60 帧 / 5 iter
+- APU/full：48.50 ms / 60 帧 / 5 iter
 
-详见 `docs/tech/21_性能基准测试方法.txt`。
+**v1.4 实测**（vs v1.0 baseline asymmetric gate）：
+- `bench_cpu_frame`：+1.25%
+- `bench_ppu_frame`：+1.93%
+- `bench_full_frame`：+1.76%
+
+均在 `bench_tolerance_test` 的 +2.5% max-regression 阈值内（speedup 方向无
+上限）。详见 [CHANGELOG.md](../../CHANGELOG.md) v1.1 §性能基线与 v1.4
+§Performance。
 
 ### 6.3 字节级 savestate 一致性
 
 ```powershell
 # 跑 5 ROM × 60 帧 字节级回归
 ctest --test-dir build -R rom_regression --output-on-failure
+
+# v1.x golden 比对（v1.1 引入）
+ctest --test-dir build -R golden_savestate --output-on-failure
 ```
 
-**期望**：5 ROM（nrom / mmc1 / mmc3 / nrom-256 / fds）哈希与 v0.2.30 baseline
-完全一致（v0.3.0 起的基线，v0.3.x 17 个子版本逐版本累计验证，v1.2 继承）。
+**期望**：
+- 5 ROM（nrom / mmc1 / mmc3 / nrom-256 / fds）哈希与 v0.2.30 baseline
+  完全一致（v0.3.0 起的基线，逐版本累计验证，v1.4 继承）。
+- 9 个 golden `.fc0`（NROM/MMC1/MMC3/VRC6 × 2 场景，FDS × 2 场景
+  SKIP）字节比对 7/7 通过；v1.3 生成的 `.fc0` 在 v1.4 中加载→运行
+  →保存后字节一致。
 
 ### 6.4 版本号确认
 
 ```powershell
 .\build\src\fceux11.exe --version
 # 期望输出（任一形式）：
-#   1.2
-#   v1.2
-#   FCEUX11 v1.2
+#   1.4
+#   v1.4
+#   FCEUX11 v1.4
 ```
 
 ---
@@ -435,18 +459,18 @@ cmake --install build --prefix dist
 ### 7.3 压缩成 zip / 7z 分发
 
 ```powershell
-Compress-Archive -Path dist\* -DestinationPath FCEUX11-v1.2-win64.zip
+Compress-Archive -Path dist\* -DestinationPath FCEUX11-v1.4-win64.zip
 ```
 
 ### 7.4 端到端验证
 
 ```powershell
 # 1) 解压到临时目录
-Expand-Archive FCEUX11-v1.2-win64.zip -DestinationPath C:\TestFCEUX11
+Expand-Archive FCEUX11-v1.4-win64.zip -DestinationPath C:\TestFCEUX11
 
 # 2) 运行
 cd C:\TestFCEUX11
-.\fceux11.exe --version    # 期望：1.2
+.\fceux11.exe --version    # 期望：1.4
 .\fceux11.exe               # 启动 GUI，加载 .nes ROM 测试
 ```
 
@@ -454,7 +478,7 @@ cd C:\TestFCEUX11
 
 ## 8. 跨机兼容性验证清单
 
-v1.2 在任意符合 §1 系统要求 + §3 工具链装好的 Windows 11 电脑上必过
+v1.4 在任意符合 §1 系统要求 + §3 工具链装好的 Windows 11 电脑上必过
 **5 条硬指标**：
 
 | # | 指标 | 验证方法 | 期望 |
@@ -631,30 +655,36 @@ endif()
 
 ## 11. 版本与升级
 
-| 项 | v1.2 状态 |
+| 项 | v1.4 状态 |
 |----|-----------|
-| 主版本 | **1.2**（正式版）|
+| 主版本 | **1.4**（代号 Gateway，v1.x 现代化周期第四子版本）|
 | 工具链 | MSVC 19.36+ / Qt 6.8 LTS / vcpkg 2024+ baseline / Rust 1.78+ |
 | API 兼容 | 与 v0.3.x 完全兼容（兼容 shim 保留到 v2.0）|
-| savestate 兼容 | 与 v0.2.x / v0.3.x 完全兼容 |
+| savestate 兼容 | 与 v0.2.x / v0.3.x / v1.0 / v1.1 / v1.2 / v1.3 全部兼容 |
 | INI 兼容 | 与 v0.2.x / v0.3.x 完全兼容 |
 | Rust crate 版本 | 0.2.x 不变（与产品版本解耦）|
-| 下一里程碑 | v1.2.x hotfix 维护期 → v2.0 大版本（删除 compat shim）|
+| 下一里程碑 | v1.5 Prism → v1.6 Resonance → …（v1.x §4 Roadmap）→ v2.0 |
 
 ### 11.1 升级路径
 
-**从 v0.3.16 LTS 升级到 v1.2**：
+**从 v1.x（v1.0 / v1.1 Sentinel / v1.2 Census / v1.3 Legion）升级到 v1.4 Gateway**：
 - 替换 `fceux11.exe` 即可，savestate / INI / 配置完全兼容
 - 无需重新配置控制器 / 快捷键
+- v1.4 内部重构（`fceu11::Bus` 拥有 dispatch + bank-switching
+  表面对外不可见）对 mapper / 玩家行为零影响
 
-**从 v0.2.x 升级到 v1.2**：
-- 详见 `docs/tech/20_API迁移指南_v0_2到v0_3.txt`
-- savestate 兼容；可能需要重新配置控制器（API 变化）
+**从 v0.3.16 LTS 升级到 v1.4**：
+- 替换 `fceux11.exe` 即可，savestate / INI / 配置完全兼容
+- v0.3.16 → v1.0 → v1.4 期间的所有兼容 shim 仍保留（v2.0 删除）
 
-### 11.2 降级路径（v1.2 → v0.3.16）
+**从 v0.2.x 升级到 v1.4**：
+- savestate 兼容（v0.2.30+ 起）；API 变化，需重新配置控制器
+- 详见 [CHANGELOG.md](../../CHANGELOG.md) 兼容性段落
 
-v1.2 savestate 完全兼容 v0.3.16。直接用 v0.3.16 的 `fceux11.exe` 打开 v1.2
-保存的 savestate 即可。
+### 11.2 降级路径（v1.4 → 任意早期版本）
+
+v1.4 savestate 与 v0.2.x / v0.3.x / v1.0 / v1.1 / v1.2 / v1.3 完全兼容。
+直接用早期版本的 `fceux11.exe` 打开 v1.4 保存的 savestate 即可。
 
 ---
 
@@ -667,7 +697,7 @@ v1.2 savestate 完全兼容 v0.3.16。直接用 v0.3.16 的 `fceux11.exe` 打开
 3. **API 冻结与 RFC**：API 增减必须走 RFC
 4. **子版本独立性**：每个子版本可独立 cherry-pick / revert
 5. **审查门控**：每个 PR 必须有审查报告
-6. **文档同步**：`docs/tech/` 增量更新 + CHANGELOG Keep a Changelog
+6. **文档同步**：`docs/` + `docs/internal/` 增量更新 + [CHANGELOG.md](../../CHANGELOG.md) Keep a Changelog
 7. **不静默改 API**：include 顺序、宏定义、可见符号集合变化必须在 commit message 标注
 8. **工具链锁定**：MSVC 19.36+ / Qt 6.8 LTS 在 v2.0 之前不升级
 9. **MSVC-only**：`CMakeLists.txt:28-34` 强制 MSVC，cl 拒绝 clang / gcc / MinGW / MSYS2
@@ -679,14 +709,18 @@ v1.2 savestate 完全兼容 v0.3.16。直接用 v0.3.16 的 `fceux11.exe` 打开
 ## 13. 获取帮助
 
 - **Issue 反馈**：https://github.com/Laffinty/FCEUX11/issues
-- **构建系统细节**：`docs/tech/13_构建系统与CI矩阵.txt`
-- **5 道闸方法论**：`docs/tech/16_五道闸验证方法与铁律审计.txt`
-- **24h 烟雾测试**：`docs/tech/17_24小时烟雾测试方法与监控指标.txt`
-- **Win11 平台特性**：`docs/tech/19_Win11开发者集成指南.txt`
-- **性能基线**：`docs/tech/21_性能基准测试方法.txt`
-- **v0.3.x → v1.x 发布说明**：`docs/tech/22_v0_3_x发布说明.txt`
-- **i18n 翻译管线**：`docs/tech/18_国际化翻译管线与脚本陷阱.txt`
+- **变更日志**：[`CHANGELOG.md`](../../CHANGELOG.md)
+- **v1.x 现代化周期路线图**：[`docs/v1.x_Modernization_Roadmap.md`](../v1.x_Modernization_Roadmap.md)
+- **全局状态审计**（v1.2 Census 产物）：[`docs/internal/global_state_audit.md`](../internal/global_state_audit.md)
+- **存档布局审计**（v1.3 Legion 产物）：[`docs/internal/savestate_layout_audit.md`](../internal/savestate_layout_audit.md)
+- **v1.4 调用点审计**（v1.4 Gateway 产物）：[`docs/internal/v1.4_call_site_audit.md`](../internal/v1.4_call_site_audit.md)
+- **性能基准 baseline**：`tests/benchmarks/baseline_v1.0.json`
+
+> **说明**：v0.3.x 时期的 `docs/tech/*.txt` 7 篇（构建系统 / 5 道闸 /
+> 24h 烟雾 / Win11 集成 / 性能方法 / v0.3.x 发布说明 / i18n 管线）已
+> 随 v0.3.16 LTS 收官统一归档到 `CHANGELOG.md` 与本指南对应章节中，
+> 不再单独维护独立 `.txt`。
 
 ---
 
-**文档结束** — FCEUX11 v1.2 正式版编译指南。生效版本：v1.2（2026-06-19）。
+**文档结束** — FCEUX11 v1.4 正式版编译指南。生效版本：v1.4（2026-06-24）。
