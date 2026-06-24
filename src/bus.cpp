@@ -246,81 +246,126 @@ void Bus::setprg32(uint32_t A, uint32_t V) noexcept {
 
 // ---------------------------------------------------------------------------
 // Bank-switching — setchr1/4/8. Each writes through this->vpage_ via
-// set_vpage(). The PPUCHRRAM and PPUNTARAM flags live in ppu.cpp
-// and are accessed via the ppu.h declarations (extern).
+// set_vpage(). The PPU side (chr_ram_mask_, nt_ram_mask_, vnapage_[],
+// ntaram_) lives in fceu11::g_ppu; we route the writes through
+// ppu_->method() per plan §3 (Bus → Ppu decoupling). The compat
+// aliases PPUCHRRAM / PPUNTARAM / vnapage[] / NTARAM bind to those
+// same g_ppu members so ppu.cpp's read-side access (which still uses
+// the v1.0 names through the reference aliases) sees the same bytes.
 // ---------------------------------------------------------------------------
 void Bus::setchr1(uint32_t A, uint32_t V) noexcept {
     if (!chr_ptr_[0]) return;
-    FCEUPPU_LineUpdate();
+    if (ppu_) ppu_->notify_line_update();
+    else      FCEUPPU_LineUpdate();   // plan §3.3 fallback
     uint32_t bank = V & chr_mask1_[0];
-    if (chr_ram_[0]) PPUCHRRAM |= (1u << (A >> 10));
-    else             PPUCHRRAM &= ~(1u << (A >> 10));
+    if (ppu_) {
+        uint8_t mask = ppu_->chr_ram_mask();
+        if (chr_ram_[0]) mask |= (1u << (A >> 10));
+        else             mask &= ~(1u << (A >> 10));
+        ppu_->set_chr_ram(mask);
+    } else {
+        if (chr_ram_[0]) PPUCHRRAM |= (1u << (A >> 10));
+        else             PPUCHRRAM &= ~(1u << (A >> 10));
+    }
     set_vpage(A >> 10, &chr_ptr_[0][bank << 10] - A);
 }
 
 void Bus::setchr4(uint32_t A, uint32_t V) noexcept {
     if (!chr_ptr_[0]) return;
-    FCEUPPU_LineUpdate();
+    if (ppu_) ppu_->notify_line_update();
+    else      FCEUPPU_LineUpdate();
     uint32_t bank = V & chr_mask4_[0];
     set_vpage((A) >> 10,        &chr_ptr_[0][bank << 12] - A);
     set_vpage(((A) >> 10) + 1,  &chr_ptr_[0][bank << 12] - A);
     set_vpage(((A) >> 10) + 2,  &chr_ptr_[0][bank << 12] - A);
     set_vpage(((A) >> 10) + 3,  &chr_ptr_[0][bank << 12] - A);
-    if (chr_ram_[0]) PPUCHRRAM |= (15u << (A >> 10));
-    else             PPUCHRRAM &= ~(15u << (A >> 10));
+    if (ppu_) {
+        uint8_t mask = ppu_->chr_ram_mask();
+        if (chr_ram_[0]) mask |= (15u << (A >> 10));
+        else             mask &= ~(15u << (A >> 10));
+        ppu_->set_chr_ram(mask);
+    } else {
+        if (chr_ram_[0]) PPUCHRRAM |= (15u << (A >> 10));
+        else             PPUCHRRAM &= ~(15u << (A >> 10));
+    }
 }
 
 void Bus::setchr8(uint32_t V) noexcept {
     if (!chr_ptr_[0]) return;
-    FCEUPPU_LineUpdate();
+    if (ppu_) ppu_->notify_line_update();
+    else      FCEUPPU_LineUpdate();
     uint32_t bank = V & chr_mask8_[0];
     for (int x = 7; x >= 0; x--) {
         set_vpage(x, &chr_ptr_[0][bank << 13]);
     }
-    if (chr_ram_[0]) PPUCHRRAM = 0xFF;
-    else             PPUCHRRAM = 0;
+    if (ppu_) {
+        ppu_->set_chr_ram(chr_ram_[0] ? 0xFF : 0x00);
+    } else {
+        if (chr_ram_[0]) PPUCHRRAM = 0xFF;
+        else             PPUCHRRAM = 0;
+    }
 }
 
 // ---------------------------------------------------------------------------
-// Mirroring + NTAMEM. PPU side (PPUNTARAM, vnapage[], NTARAM) lives
-// in ppu.cpp and is accessed via ppu.h.
+// Mirroring + NTAMEM. vnapage[] / PPUNTARAM / NTARAM live in g_ppu;
+// we route through ppu_->set_mirror_mode / set_mirror_pages /
+// set_mirror_page per plan §3. The fallback (ppu_ == nullptr) writes
+// through the v1.0 reference aliases, which are bound to the same
+// g_ppu members — so the rendered output is identical either way.
 // ---------------------------------------------------------------------------
 void Bus::setmirror(uint32_t m) noexcept {
-    FCEUPPU_LineUpdate();
+    if (ppu_) ppu_->notify_line_update();
+    else      FCEUPPU_LineUpdate();
     if (!mirror_hard_) {
-        switch (m) {
-        case 0:  // MI_H
-            vnapage[0] = vnapage[1] = NTARAM;
-            vnapage[2] = vnapage[3] = NTARAM + 0x400;
-            break;
-        case 1:  // MI_V
-            vnapage[0] = vnapage[2] = NTARAM;
-            vnapage[1] = vnapage[3] = NTARAM + 0x400;
-            break;
-        case 2:  // MI_0
-            vnapage[0] = vnapage[1] = vnapage[2] = vnapage[3] = NTARAM;
-            break;
-        case 3:  // MI_1
-            vnapage[0] = vnapage[1] = vnapage[2] = vnapage[3] = NTARAM + 0x400;
-            break;
+        if (ppu_) ppu_->set_mirror_mode(m);
+        else {
+            // Fallback: same switch as Ppu::set_mirror_mode.
+            switch (m) {
+            case 0:  // MI_H
+                vnapage[0] = vnapage[1] = NTARAM;
+                vnapage[2] = vnapage[3] = NTARAM + 0x400;
+                break;
+            case 1:  // MI_V
+                vnapage[0] = vnapage[2] = NTARAM;
+                vnapage[1] = vnapage[3] = NTARAM + 0x400;
+                break;
+            case 2:  // MI_0
+                vnapage[0] = vnapage[1] = vnapage[2] = vnapage[3] = NTARAM;
+                break;
+            case 3:  // MI_1
+                vnapage[0] = vnapage[1] = vnapage[2] = vnapage[3] = NTARAM + 0x400;
+                break;
+            }
+            PPUNTARAM = 0xF;
         }
-        PPUNTARAM = 0xF;
     }
 }
 
 void Bus::setmirrorw(uint32_t a, uint32_t b, uint32_t c, uint32_t d) noexcept {
-    FCEUPPU_LineUpdate();
-    vnapage[0] = NTARAM + a * 0x400;
-    vnapage[1] = NTARAM + b * 0x400;
-    vnapage[2] = NTARAM + c * 0x400;
-    vnapage[3] = NTARAM + d * 0x400;
+    if (ppu_) ppu_->notify_line_update();
+    else      FCEUPPU_LineUpdate();
+    if (ppu_) ppu_->set_mirror_pages(a, b, c, d);
+    else {
+        vnapage[0] = NTARAM + a * 0x400;
+        vnapage[1] = NTARAM + b * 0x400;
+        vnapage[2] = NTARAM + c * 0x400;
+        vnapage[3] = NTARAM + d * 0x400;
+    }
 }
 
 void Bus::setntamem(uint8_t* p, int ram, uint32_t b) noexcept {
-    FCEUPPU_LineUpdate();
-    vnapage[b] = p;
-    PPUNTARAM &= ~(1u << b);
-    if (ram) PPUNTARAM |= (1u << b);
+    if (ppu_) ppu_->notify_line_update();
+    else      FCEUPPU_LineUpdate();
+    if (ppu_) {
+        ppu_->set_mirror_page(b, p);
+        uint8_t mask = ppu_->nt_ram_mask() & ~(1u << b);
+        if (ram) mask |= (1u << b);
+        ppu_->set_nt_ram(mask);
+    } else {
+        vnapage[b] = p;
+        PPUNTARAM &= ~(1u << b);
+        if (ram) PPUNTARAM |= (1u << b);
+    }
 }
 
 // ---------------------------------------------------------------------------

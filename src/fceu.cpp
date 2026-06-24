@@ -1061,6 +1061,13 @@ void PowerNES(void) {
 	// the Bus API is now self-consistent: a future caller reading
 	// bus.h can trust that init() is what initializes the dispatch.
 	fceu11::g_bus.init();
+	// v1.5 Prism §3.2: wire Bus → Ppu back-pointer so Bank-switching
+	// (setchr* / setmirror* / setntamem) can route through
+	// ppu_->method() instead of touching v1.0 globals directly. Must
+	// happen after g_bus.init() and after g_ppu is constructed
+	// (it's a direct global, so it's already constructed at static-
+	// init time before main() runs).
+	fceu11::g_bus.attach_ppu(&fceu11::g_ppu);
 
 	SetReadHandler(0, 0x7FF, ARAML);
 	SetWriteHandler(0, 0x7FF, BRAML);

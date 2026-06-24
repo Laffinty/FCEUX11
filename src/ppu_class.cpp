@@ -13,6 +13,11 @@
 
 #include "ppu_class.h"
 
+// Forward decl — ppu.h can't be included here (circular: ppu.h
+// already includes ppu_class.h). The actual definition is in ppu.cpp;
+// notify_line_update() below calls it.
+void FCEUPPU_LineUpdate();
+
 namespace fceu11 {
 
 // ---------------------------------------------------------------------------
@@ -67,23 +72,66 @@ int Ppu::dot()      const noexcept { return 0; }
 // ppu.cpp / cart.cpp code paths guarantees the visual-diff baseline
 // stays 0-pixel identical to the v1.4 + WIP pre-class state.
 //
-// Phase F will fill these in (see F.2 commit) when Bus::setchr* /
-// setmirror* / setntamem start routing through ppu_->method()
-// instead of touching the v1.0 globals directly. Splitting the
-// method-body fill from the Bus routing keeps the diff between
-// commits minimal — important because each Phase commit shifts
-// the MSVC link-time layout, and we want each step's savestate MD5
-// to be reproducible from its single commit (not the cumulative
-// effect of two stacked changes).
+// Phase F fills these in so Bus::setchr* / setmirror* / setntamem
+// can route through ppu_->method() instead of touching the v1.0
+// globals directly. Each method writes through g_ppu's own member
+// storage; the compat aliases (PPUCHRRAM / PPUNTARAM / vnapage[] /
+// NTARAM) bind to the same members so ppu.cpp's read-side access
+// (which still uses the v1.0 names through the reference aliases)
+// sees the same bytes.
 // ---------------------------------------------------------------------------
 
-void Ppu::set_chr_ram(uint8_t /*mask*/) noexcept {}
-void Ppu::set_nt_ram (uint8_t /*mask*/) noexcept {}
-void Ppu::set_mirror_page(uint32_t /*idx*/, uint8_t* /*ptr*/) noexcept {}
-void Ppu::set_mirror_mode(uint32_t /*mode*/) noexcept {}
-void Ppu::set_mirror_pages(uint8_t /*a*/, uint8_t /*b*/,
-                           uint8_t /*c*/, uint8_t /*d*/) noexcept {}
-void Ppu::notify_line_update() noexcept {}
+// Phase F: bus-switching entry points. Bus::setchr* / setmirror* /
+// setntamem call these to update PPU-side mirror / CHR-RAM state.
+// Per plan §3.5 these are warm-path (mapper register write), so the
+// ~3-cycle indirect-call cost is acceptable. They MUST NOT be called
+// from inside Ppu::loop() / RefreshLine — that would be hot-path and
+// blow up bench_ppu_frame. Bus::setchr1/4/8 already call them only
+// on mapper register writes (not per-cycle).
+void Ppu::set_chr_ram(uint8_t mask) noexcept {
+    chr_ram_mask_ = mask;
+}
+void Ppu::set_nt_ram(uint8_t mask) noexcept {
+    nt_ram_mask_ = mask;
+}
+void Ppu::set_mirror_page(uint32_t idx, uint8_t* ptr) noexcept {
+    vnapage_[idx & 3] = ptr;
+}
+void Ppu::set_mirror_mode(uint32_t mode) noexcept {
+    // Same switch as v1.0 Bus::setmirror (bus.cpp:288-309).
+    uint8_t* nt = ntaram_;
+    switch (mode) {
+    case 0:  // MI_H (horizontal)
+        vnapage_[0] = vnapage_[1] = nt;
+        vnapage_[2] = vnapage_[3] = nt + 0x400;
+        break;
+    case 1:  // MI_V (vertical)
+        vnapage_[0] = vnapage_[2] = nt;
+        vnapage_[1] = vnapage_[3] = nt + 0x400;
+        break;
+    case 2:  // MI_0
+        vnapage_[0] = vnapage_[1] = vnapage_[2] = vnapage_[3] = nt;
+        break;
+    case 3:  // MI_1
+        vnapage_[0] = vnapage_[1] = vnapage_[2] = vnapage_[3] = nt + 0x400;
+        break;
+    }
+    nt_ram_mask_ = 0xF;
+}
+void Ppu::set_mirror_pages(uint8_t a, uint8_t b, uint8_t c, uint8_t d) noexcept {
+    uint8_t* nt = ntaram_;
+    vnapage_[0] = nt + a * 0x400;
+    vnapage_[1] = nt + b * 0x400;
+    vnapage_[2] = nt + c * 0x400;
+    vnapage_[3] = nt + d * 0x400;
+}
+void Ppu::notify_line_update() noexcept {
+    // FCEUPPU_LineUpdate is defined in ppu.cpp. We can't include
+    // ppu.h here (circular: ppu.h includes ppu_class.h), so the
+    // declaration is provided as a forward decl at the top of this
+    // file.
+    FCEUPPU_LineUpdate();
+}
 
 // ---------------------------------------------------------------------------
 // Direct global instance (plan §1.2). Real global object — same pattern
