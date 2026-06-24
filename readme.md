@@ -2,7 +2,7 @@
 
 # FCEUX11
 
-[![Version](https://img.shields.io/badge/version-v1.4-blue)](https://github.com/Laffinty/FCEUX11/releases)
+[![Version](https://img.shields.io/badge/version-v1.5-blue)](https://github.com/Laffinty/FCEUX11/releases)
 [![License](https://img.shields.io/badge/license-GPL--v2-green)](COPYING)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?logo=windows)](https://www.microsoft.com/windows/windows-11)
 [![Qt](https://img.shields.io/badge/Qt-6.8%20LTS-41CD52?logo=qt)](https://www.qt.io)
@@ -92,25 +92,29 @@ Precompiled binaries are available on the **[GitHub Releases](https://github.com
 
 详见 [CHANGELOG.md](CHANGELOG.md)。
 
-v1.4（代号 **Gateway**）是当前稳定版，v1.x 现代化周期的第四个子
-版本（v1.1 Sentinel → v1.2 Census → v1.3 Legion → v1.4 Gateway）。
-本版本在保持 100% 存档格式向前兼容（v1.3 生成的 `.fc0` 可在 v1.4
-中正常加载与保存）、mapper 兼容性与游戏行为不变的前提下，重构了
-核心模拟器内部的全局状态与地址派发表。详细 Release Notes 见
+v1.5（代号 **Prism**）是当前稳定版，v1.x 现代化周期的第五个子版本
+（v1.1 Sentinel → v1.2 Census → v1.3 Legion → v1.4 Gateway → v1.5
+Prism）。本版本将 PPU 寄存器、名称表 RAM、渲染状态封装为
+`fceu11::Ppu` 类，解除 Bus → PPU 的硬耦合（Bank-switching 改走
+`ppu_->method()` 调用），并新增像素级视觉帧对比测试作为渲染行为
+不变性的硬指标（0 像素差异）。详细 Release Notes 见
 [CHANGELOG.md](CHANGELOG.md) 与
 [`docs/v1.x_Modernization_Roadmap.md`](docs/v1.x_Modernization_Roadmap.md)。
 编译指南见 [`docs/BuildGuide.md`](docs/BuildGuide.md)。
 
 See [CHANGELOG.md](CHANGELOG.md) for version history.
 
-v1.4 (codename **Gateway**) is the current stable release — the fourth
+v1.5 (codename **Prism**) is the current stable release — the fifth
 sub-version of the v1.x modernization cycle (v1.1 Sentinel → v1.2
-Census → v1.3 Legion → v1.4 Gateway). This release is a non-user-visible
-internal refactor of the core emulator's global state and address
-dispatch tables, with full forward-compatible savestate support (v1.3
-`.fc0` files continue to load and save normally under v1.4) and
-unchanged mapper compatibility and gameplay behaviour. Full release
-notes: [CHANGELOG.md](CHANGELOG.md) and
+Census → v1.3 Legion → v1.4 Gateway → v1.5 Prism). This release
+introduces `fceu11::Ppu` as the single owner of the PPU register file,
+name-table RAM, pointer table, and rendering scratch state, decouples
+Bus → PPU so bank-switching routes through `ppu_->method()` calls, and
+adds a byte-exact visual frame-diff regression test (0-pixel diff
+hard gate on 5 ROMs). The v1.0 PPU layout is preserved via
+`extern` reference-to-storage aliases, so the migration is
+source-compatible for all 50+ call sites. Full release notes:
+[CHANGELOG.md](CHANGELOG.md) and
 [`docs/v1.x_Modernization_Roadmap.md`](docs/v1.x_Modernization_Roadmap.md).
 Build guide: [`docs/BuildGuide.md`](docs/BuildGuide.md).
 

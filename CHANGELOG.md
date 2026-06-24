@@ -213,6 +213,29 @@ PPU refactor — every Phase B/C/D/E/F commit must keep
   `&g_ppu.regs_[0]` via the alias; SPRAM is now `&g_ppu.oam_[0]`
   via the alias).
 
+### Post-release init-order fix (2026-06-25)
+
+- **Init-order bugfix in Bus → Ppu injection**: the original v1.5
+  release called `g_bus.attach_ppu(&g_ppu)` from `fceu11::PowerNES()`
+  (`src/fceu.cpp:1070`). That meant `ppu_` was null during
+  `iNESLoad` — which calls `SetupCartMirroring → g_bus.setmirror`
+  *before* `PowerNES` runs. Symptom was a hard segfault on the
+  first ROM load (15 of 19 ctest cases crashed; only `config_store_test`
+  and `smoke_test` were unaffected because they don't load a ROM).
+  **Fix**: moved `g_bus.attach_ppu(&g_ppu)` from `PowerNES()` into
+  `fceu11::Initialize()` (right after `g_cpu.init()`). Now `ppu_` is
+  set up by the time *any* Bus method (including the early
+  `setup_mirroring` call inside `iNESLoad`) is reached.
+- **Defensive fallback branches removed from `Bus::setchr*` /
+  `setmirror*` / `setntamem`**: the `if (ppu_) ppu_->method(); else
+  v1.0_alias_path;` blocks that v1.5 added defensively were dead
+  code once `attach_ppu` runs in `Initialize()`. Per plan §10.6
+  release-readiness checklist, the fallbacks are removed — Bus
+  methods now call `ppu_->method()` unconditionally.
+- **Savestate goldens re-captured**: byte-identical to v1.5
+  baseline (no link-time layout shift from the dead-code removal);
+  the `golden_index.json` / `.fc0` file updates are content-only.
+
 ### Next steps
 
 v1.6 Resonance (Roadmap §6) is the next sub-version: APU / sound
