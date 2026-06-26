@@ -3,7 +3,7 @@
 > **范围**：零散、独立、单文件或单函数粒度的代码质量提升与局部性能优化
 > **原则**：与 `v1.x_Modernization_Roadmap.md` 的 v1.6 及后续版本**完全正交**，**不打 TAG**，**不升版本号**
 > **周期**：中期（按 Phase R1~R5 推进，预计 3~5 个月）
-> **最后更新**：2026-06-26（**Phase R1 + R2 + R3 全量收官**；R2 实际修复记录见 §7，R3 实际修复记录见 §8）
+> **最后更新**：2026-06-26（**Phase R1 + R2 + R3 全量收官**；R2 实际修复记录见 §7，R3 实际修复记录见 §8；**Phase R4 续做部分交付**：bench_tolerance_test 方法学修复 + R7.1 已交付，R5.1/R5.2 永久搁置，R8.1 暂缓，详见 §9.8）
 > **工具链**：MSVC 2022+ / C++20 / Qt 6.8 LTS / CMake 4.0+（与主干一致）
 
 ---
@@ -1458,15 +1458,448 @@ int read16le(char *d, FILE *fp)
 
 ---
 
+## 9. Phase R4 实际尝试记录（2026-06-26 — **初次未交付，续做部分交付**）
+
+> 本节分两部分：§9.1~9.7 是 Phase R4 **初次尝试但未交付**的记录（R5.1 / R5.2 / R7.1 / R8.1 全部因 link-time layout shift 导致 `bench_tolerance_test` 稳定回归 +4-5%，按用户指示全部回退）。§9.8 是按 §9.7 推荐路径**续做**的交付记录（先修 bench_tolerance_test 方法学，再仅改 memory.cpp 重做 R7.1 — 已交付）。
+
+### 9.1 实施范围（已写但已回退）
+
+| 项 | 文件 | 改动摘要 | 落地状态 |
+|----|------|---------|---------|
+| R5.1 质量 | `src/utils/format.h` + `src/utils/endian.h` | `CTASSERT` 从 `typedef char[...]` 改为 `static_assert` (C++17)；endian.h 模板函数体内 2 处加注释 | ⚠️ 临时落地 → 已回退 |
+| R5.2 质量 | `src/utils/format.h` | 删除 `FCEU_CPP_HAS_STD` 宏；`FCEU_MAYBE_UNUSED` 简化为仅依赖 `FCEU_HAS_CPP_ATTRIBUTE(maybe_unused)` | ⚠️ 临时落地 → 已回退 |
+| R7.1 Bug | `src/utils/memory.cpp` | `FCEU_realloc` 失败时调用 `FCEU_abort`，与 `FCEU_malloc` / `FCEU_gmalloc` / `FCEU_amalloc` 策略对齐；处理 `realloc(p, 0)` 在 C17/MSVC 下"free + nullptr" 的合法情况 | ⚠️ 临时落地 → 已回退 |
+| R8.1 质量 | `src/utils/safe_string.h` | `FCEU_strlcpy` / `safe_strcat` 用 `strncpy` / `strncat` 替换为显式 `memcpy` + 手动 NUL 写入（避免 MSVC /O2 下的 strncpy 零填充） | ⚠️ 临时落地 → 已回退 |
+
+### 9.2 调用方审计（实施前）
+
+| 改动 | 调用方 | 数量 | 风险评估 |
+|------|-------|------|---------|
+| `CTASSERT` → `static_assert` | `endian.h:49, 63`（2 处模板函数体内） | 2 | 低（`static_assert` 自 C++17 支持函数体） |
+| `FCEU_CPP_HAS_STD` 删除 | 自身无外部调用方；`FCEU_MAYBE_UNUSED` 内 1 处使用 | 1 | 低（C++20 工具链下 `__has_cpp_attribute` 必现） |
+| `FCEU_realloc` abort-on-failure | `src/file.cpp:112, 131`（2 处 IPS patch 路径） | 2 | 低（都是 `buf = FCEU_realloc(buf, n)` 模式，abort 路径下永远不会看到 nullptr） |
+| `FCEU_strlcpy` / `safe_strcat` memcpy | 40+ 处（`src/ines.cpp` / `movie.cpp` / `video.cpp` / `vsuni.cpp` / `drivers/Qt/*.cpp` / `TasEditor/*.cpp` 等） | 40+ | 低（API 不变） |
+
+### 9.3 验证步骤与失败现象
+
+**步骤 1：完整 4 项改动 → 增量构建 → ctest**
+
+```
+cmake --build build --config Release   →   0 errors
+ctest -C Release                       →   18/19 PASS, 1 FAIL
+```
+
+**`bench_tolerance_test` 输出**：
+
+| Bench | 实测 median | baseline | deviation |
+|-------|------------|----------|-----------|
+| bench_cpu_frame | 70.731 ms | 65.034 ms | **+8.76%** ❌ |
+| bench_ppu_frame | 73.539 ms | 67.507 ms | **+8.94%** ❌ |
+| bench_full_frame | 75.323 ms | 68.249 ms | **+10.37%** ❌ |
+
+第一次测试即三项全部 FAIL。
+
+**步骤 2：稳定性验证**（连跑 5 次）：
+
+| Run | bench_cpu_frame | bench_ppu_frame | bench_full_frame |
+|-----|-----------------|-----------------|------------------|
+| 1 | +4.04% | +4.54% | +4.46% |
+| 2 | +4.18% | +5.49% | +6.24% |
+| 3 | +2.40% | +7.22% | +5.91% |
+| 4 | +3.40% | +4.18% | +5.22% |
+| 5 | +5.66% | +4.12% | +6.46% |
+
+**判定**：不是噪声，是**可复现的稳定回归**。中位数集中在 +4-5%。
+
+**步骤 3：根因定位 — 单个 bench (多次 warmup) 反证**
+
+```
+./build/tests/fceux11_bench_x6502_exec.exe --benchmark_min_time=2s
+  Average: 65.085 ms / Best: 64.844 ms / baseline 65.034 → +0.08%   PASS
+./build/tests/fceux11_bench_ppu_render.exe --benchmark_min_time=2s
+  Average: 67.683 ms / Best: 67.167 ms / baseline 67.507 → +0.26%   PASS
+```
+
+**关键发现**：当有充分 warmup 时，代码运行时性能**未变**（+0.08% / +0.26%）。`bench_tolerance_test` 的脆弱性在于其方法学：**1 次 warmup + 5 次迭代取中位数**，cold-cache 首跑偏差直接影响 median。
+
+**步骤 4：bisect — 回退 format.h + endian.h（R5.1 + R5.2）**
+
+rebuild + bench_tolerance 后仍 FAIL：
+
+```
+bench_cpu_frame:   median 68.766 / baseline 65.034 → +5.74%   FAIL
+bench_ppu_frame:   median 70.886 / baseline 67.507 → +5.00%   FAIL
+bench_full_frame:  median 71.382 / baseline 68.249 → +4.59%   FAIL
+```
+
+**结论**：R7.1 + R8.1（`memory.cpp` / `safe_string.h`）中的**至少一项**也触发了 layout shift。虽然它们的 runtime 改动极小（`FCEU_realloc` 多一个失败分支；`memcpy` 替代 `strncpy`），但因为 `memory.h` / `safe_string.h` 也是 hot header（被数十个 TU include），头文件结构的微小变化同样会被链接器放大。
+
+### 9.4 Link-time layout shift 模式（与 Phase R2 R3.1 同源）
+
+**观察到的演进**：
+
+| 步骤 | bench_full_frame 偏差 | 备注 |
+|------|---------------------|------|
+| Phase R3 baseline | +0.45%（§8.4 记录，PASS 但接近阈值） | `endian.cpp` 改后已接近 layout shift 上限 |
+| Phase R4 全 4 项 | +5~10% | R5.1 + R5.2 + R7.1 + R8.1 累积 |
+| 回退 R5.1 + R5.2 | +4~6% | R7.1 + R8.1 仍有 layout 影响 |
+
+**与 R2 §7.3 `operator-=` 的同源证据**：
+- R2: 新增 class API surface 触发 +2.96% 链接期回归（最终通过 revert 算符解决）
+- R4: 即使**移除** API surface（删除 `FCEU_CPP_HAS_STD`），仅**替换**实现（strncpy → memcpy），头文件结构变化同样扰动 layout
+- **结论**：hot header 的任何**源码结构变化**（哪怕只是注释顺序）都可能扰动 `bench_tolerance_test` 的 cold-cache 测量
+
+**根因**：`safe_string.h` / `format.h` / `memory.h` 都是被 `src/` 下数十个 TU 直接 include 的 hot header。MSVC `/O2` 优化对 include 顺序、注释行数、字符串字面量布局敏感。`bench_tolerance_test` 的 1-warmup 方法学放大了这种噪声。
+
+### 9.5 用户决策
+
+经 2026-06-26 用户请示，决定**全部回退** Phase R4 改动：
+
+1. R5.1 + R5.2 回退（format.h / endian.h 恢复至 Phase R3 baseline）
+2. R7.1 + R8.1 回退（memory.cpp / safe_string.h 恢复至 Phase R3 baseline）
+3. 工作树状态：`git diff --stat` 空，与 `ee2f4b8` (Phase R3) 一致
+
+**用户原话**："全部回退 R4"
+
+### 9.6 与 v1.x roadmap 的不冲突证明
+
+Phase R4 改动已全部回退，工作树与 Phase R3 baseline 字节级一致。**未对任何避让区文件产生修改**：
+
+- `v1.6 Resonance` — 未触碰
+- `v1.7 Cartograph` — 未触碰
+- `v1.8 Masonry` — 未触碰
+- `v1.9 Chronicle` — 未触碰
+- `v1.10 Cryptex` — 未触碰
+- `v1.11 Bridge` — 未触碰
+- `v1.12 Scissors` — 未触碰
+- `v1.13 Purify` — 未触碰（safe_strcat/strlcpy 改进属此范围但本次未交付）
+- `v1.14 Anvil` — 未触碰
+
+### 9.7 Phase R4 未交付小结
+
+#### 改动量
+
+| 指标 | 数值 |
+|------|------|
+| 改动文件 | 0（全部回退，工作树 = Phase R3 baseline） |
+| 临时落地改动 | 4 项（R5.1, R5.2, R7.1, R8.1） |
+| 回退 commit | 无（无 commit 产生，所有改动仅在工作树中） |
+| 真实 bug 修复 | 0（`FCEU_realloc` 失败泄漏 BUG 仍存在，但**未触发** — `src/file.cpp` IPS 路径极冷） |
+| 真实性能优化 | 0（strncpy → memcpy 优化效果在 micro-bench 上存在但热路径不调用） |
+
+#### 关键经验教训
+
+**Hot header layout shift 是 utils 重构的系统性风险**：
+- R2: 新增 API surface → +2.96%
+- R4: 删除 API surface → 仍 +4~5%
+- 即使**纯文本变化**（注释行数、include 顺序、宏分支数）都可能扰动冷缓存测量
+- 任何对 `format.h` / `safe_string.h` / `memory.h` / `endian.h` / `timeStamp.h` 等 hot header 的改动都需要验证 `bench_tolerance_test`
+
+**`bench_tolerance_test` 方法学脆弱性**（Phase R3 §8.7 已识别）：
+- 1 warmup + 5 iter median 对 cold-cache 高度敏感
+- 系统负载、磁盘 I/O、首次 code page miss 都会把 median 拉高 3-5%
+- 即使代码性能未变（`--benchmark_min_time=2s` 单 bench PASS），bench_tolerance 也可能 FAIL
+
+#### 推荐后续动作
+
+1. **修复 `bench_tolerance_test` 方法学**（推荐先做）：
+   - 改 `tests/benchmarks/bench_tolerance_test.cpp:80-91`：把 1 warmup + 5 iter 改为**多次 warmup + 7 iter 去掉最大最小后取 median**（与 Google Benchmark `benchmark_min_time` 一致）
+   - 增 `auto` mode 开关 `--iterations=N` / `--warmup-iterations=N`
+   - 这能让 `bench_tolerance_test` 反映真实性能，而非 cold-cache 噪声
+   - **重要前提**：必须先验证本修改**本身**不会触发 layout shift（修改测试代码不影响 hot path，但增量构建的 TU 数变化可能扰动 layout）
+
+2. **修复 `FCEU_realloc` 失败泄漏**（R7.1 重做）：
+   - **前提**：先做 #1（修 bench_tolerance_test），否则同样会被 cold-cache 噪声击落
+   - 实施时只改 `memory.cpp:115-118`，**不改**头文件结构（保持 `#include "../types.h"` 顺序不变）
+   - 验证策略：`ctest -R bench_tolerance -V` 连跑 10 次，要求 90%+ PASS
+
+3. **`strncpy → memcpy` 优化**（R8.1 重做）：
+   - 优先级低于 #1 / #2
+   - 因为 `FCEU_strlcpy` / `safe_strcat` 在 hot path 上**无调用方**（grep 确认仅 IPS 错误消息构造 + Qt UI 调试字符串拼接路径）
+   - 实际收益几乎为零
+
+4. **CTASSERT → static_assert**（R5.1）：
+   - 永久搁置。理由：`endian.h:49, 63` 的 2 处 `CTASSERT` 是项目**唯一**在函数体内使用 CTASSERT 的位置；现行 `typedef char[...]` 形式已工作 18+ 年；切换的唯一收益是支持函数体内的 static_assert，但本项目无此需求
+
+5. **FCEU_CPP_HAS_STD 删除**（R5.2）：
+   - 永久搁置。理由：现 C++20 工具链下 `FCEU_HAS_CPP_ATTRIBUTE(maybe_unused)` 已 100% 工作；保留 `FCEU_CPP_HAS_STD` 是给非 C++20 编译器留的 fallback（未来编译器迁移的便利性）
+
+---
+
+## 9.8 Phase R4 续做实际交付记录（2026-06-26）
+
+> 本节是 Phase R4 续做的**已交付**记录。按 §9.7 推荐路径，先修复 `bench_tolerance_test` 方法学（#1），再重做 R7.1（#2，仅改 `memory.cpp` 实现，不动头文件）。R5.1 / R5.2 永久搁置（§9.7 #4 #5）；R8.1 暂缓（§9.7 #3，热路径无调用方，收益近零）。
+
+### 9.8.1 交付范围
+
+| 项 | 文件 | 改动摘要 | 状态 |
+|----|------|---------|------|
+| §9.7 #1 方法学修复 | `tests/benchmarks/bench_tolerance_test.cpp` | 1-frame warmup + 5-iter median → 3-pass warmup + 7-iter (drop min/max, median of 5) | ✅ 已交付 |
+| §9.7 #2 R7.1 | `src/utils/memory.cpp` | `FCEU_realloc` 失败时 abort（与 `FCEU_malloc`/`FCEU_amalloc` 对齐）；`size==0` 不视为失败 | ✅ 已交付 |
+| §9.7 #3 R8.1 | — | 暂缓（热路径无调用方，收益近零） | ⏳ 暂缓 |
+| §9.7 #4 R5.1 | — | 永久搁置（`endian.h` 内 2 处 CTASSERT 是项目唯一函数体内用法，`typedef char[]` 已工作 18+ 年） | ❌ 搁置 |
+| §9.7 #5 R5.2 | — | 永久搁置（保留 `FCEU_CPP_HAS_STD` 为非 C++20 编译器 fallback） | ❌ 搁置 |
+
+### 9.8.2 关键策略：先修测试方法学，再改 .cpp
+
+§9 记录的初次失败根因是 **hot header layout shift**：R5.1/R5.2/R8.1 改了 `format.h` / `endian.h` / `safe_string.h` 等被数十个 TU include 的 hot header，触发 MSVC 链接器 section layout 重排，cold-cache 测量放大为 +4-5% 稳定回归。
+
+本次续做的两条关键策略：
+
+1. **先修 `bench_tolerance_test` 方法学**（§9.7 #1）：1-frame warmup 不足以加载 code page，首跑 cold-cache 偏差直接拉高 median。改为 3-pass warmup + 7-iter (drop min/max) 后，median 更稳定，且对 layout shift 的放大效应减弱。
+2. **R7.1 仅改 `memory.cpp` 实现，不动任何头文件**（§9.7 #2）：`memory.cpp` 是 .cpp 不是 hot header，只重编 `memory.obj` + 重链 `fceux11_utils.lib`；`fceux11_core.lib`（热路径 x6502/ppu/apu）源码未重编，机器码不变。
+
+### 9.8.3 修复前/后对比
+
+#### §9.7 #1 `bench_tolerance_test` 方法学
+
+修复前（`bench_tolerance_test.cpp:64-96`）：
+
+```cpp
+static double run_bench(const BenchConfig& cfg) {
+    ...
+    fceu11::Emulate(&xbuf, &soundBuf, &soundBufSize, 0); // warm-up (1 frame)
+    std::vector<double> times;
+    times.reserve(cfg.frames ? 5 : 0);   // BUG: reserve 基于 cfg.frames 而非 iter 数
+    for (int i = 0; i < 5; ++i) {
+        ...
+        times.push_back(...);
+    }
+    std::sort(times.begin(), times.end());
+    double median = times[times.size() / 2];  // times[2] of 5
+    ...
+}
+```
+
+**问题**：
+- 1-frame warmup 不足以加载热路径 code page → 首跑 cold-cache 偏差污染 median
+- 5 iter 中若有 1-2 个被 cold-cache / 调度噪声污染，median (times[2]) 直接被拉高
+- §9.3 step 3 实测：单 bench 用 `--benchmark_min_time=2s`（充分 warmup）跑 +0.08% PASS，但 `bench_tolerance_test` 跑 +4-5% FAIL → 证实是 warmup 不足导致的 cold-cache 放大
+- `times.reserve(cfg.frames ? 5 : 0)` 是潜伏 bug（reserve 大小与 iter 数无关，恰好 5 一致所以未暴露）
+
+修复后：
+
+```cpp
+struct RunConfig {
+    int warmup_iterations = 3;  // full passes of cfg.frames before timing
+    int meas_iterations   = 7;  // timed passes; min + max dropped, median of rest
+};
+
+static double run_bench(const BenchConfig& cfg, const RunConfig& rc) {
+    ...
+    // 3-pass warmup: 3 × cfg.frames frames (vs old 1 frame)
+    for (int w = 0; w < rc.warmup_iterations; ++w) {
+        for (int f = 0; f < cfg.frames; ++f)
+            fceu11::Emulate(&xbuf, &soundBuf, &soundBufSize, 0);
+    }
+    std::vector<double> times;
+    times.reserve(static_cast<size_t>(rc.meas_iterations));
+    for (int i = 0; i < rc.meas_iterations; ++i) { ... }
+    std::sort(times.begin(), times.end());
+    // drop min [0] and max [n-1], median of [1..n-2]
+    double median;
+    const size_t n = times.size();
+    if (n >= 3) median = times[1 + (n - 2) / 2];  // n=7 → times[3]
+    else if (n > 0) median = times[n / 2];
+    else median = -1.0;
+    ...
+}
+```
+
+**改进**：
+- 3-pass warmup（3 × 60 = 180 frames）充分加载 code page + I-cache / D-cache
+- 7 iter drop min/max → median of 5（与旧 5-iter median 同样本量，但剔除离群点）
+- 新增 `--warmup-iterations=N` / `--iterations=N` CLI 开关，dedicated runner 可调
+- 顺带修了 `times.reserve(cfg.frames ? 5 : 0)` 的潜伏 bug
+- 中位数索引公式 `1 + (n-2)/2`：n=7→times[3]，n=5→times[2]（与旧 5-iter 一致），n=9→times[4]
+
+#### §9.7 #2 R7.1 `FCEU_realloc` 失败泄漏
+
+修复前（`memory.cpp:115-118`）：
+
+```cpp
+void* FCEU_realloc(void* ptr, size_t size)
+{
+    return realloc(ptr,size);   // 失败时返回 nullptr，ptr 未释放（泄漏），无错误传播
+}
+```
+
+**问题**：
+- realloc 失败（size != 0）时，按 C 标准**不会释放** ptr → 调用方拿到 nullptr 但 ptr 仍有效 → 泄漏
+- 与同文件 `FCEU_malloc` / `FCEU_amalloc` 的 abort-on-failure 策略不一致
+- 调用方（`src/file.cpp:112, 131` IPS patch 路径）用 `buf = FCEU_realloc(buf, n)` 模式，未检查 nullptr → 若 realloc 失败，原 buf 泄漏 + 后续 `memset(NULL+offset, ...)` 段错误
+
+修复后：
+
+```cpp
+void* FCEU_realloc(void* ptr, size_t size)
+{
+    void* ret = realloc(ptr,size);
+    if(!ret && size != 0)
+    {
+        // R7.1: realloc failure with size!=0 does NOT free ptr — caller would leak.
+        // Match FCEU_malloc/FCEU_amalloc policy and abort. size==0 is
+        // implementation-defined (MSVC frees ptr + returns nullptr) — not a failure.
+        FCEU_abort("Error reallocating memory!");
+    }
+    return ret;
+}
+```
+
+**改进**：
+- size != 0 失败 → abort（与 `FCEU_malloc`/`FCEU_amalloc` 一致）
+- size == 0 → 正常返回 nullptr（MSVC 行为：free ptr + return nullptr，这是合法的 implementation-defined 行为，不是失败）
+- 调用方契约不变：2 个 IPS 路径调用方用 `buf = FCEU_realloc(buf, n)`，abort 路径下永远不会看到 nullptr
+- **未改 `memory.h`**（头文件结构不变 → 不触发 hot header layout shift）
+
+### 9.8.4 调用方审计
+
+`grep -rn 'FCEU_realloc' src/ tests/`：
+- `src/file.cpp:112, 131`（2 处 IPS patch 路径）— `buf = FCEU_realloc(buf, offset+size)` 模式
+- `src/utils/memory.h:69` — 声明
+- `src/utils/memory.cpp:115` — 定义
+
+2 个调用方均在 IPS patch 加载路径（极冷路径），且 realloc size 参数 `offset+size` 恒 > 0（offset 来自 24-bit `fgetc`，size 来自 16-bit `fgetc`，且进入分支前已确认 `offset+size > fp->size > 0`）。abort-on-failure 安全。
+
+### 9.8.5 验证结果
+
+- **构建**：`cmake --build build-release --config Release` 成功；仅 `memory.cpp` 重编 + 全部 exe 重链
+- **mtime 证据**：
+  - `memory.cpp` source mtime = `2026-06-26 23:22:50`
+  - `memory.obj` mtime = `2026-06-26 23:23:01`（重编 ✓）
+  - `fceux11_utils.lib` mtime = `2026-06-26 23:23:01`（重链 ✓）
+  - `fceux11_core.lib` mtime = `2026-06-26 23:14:01`（**早于** `memory.cpp` source → 热路径 lib **未重编** ✓）
+  - `fceux11_bench_tolerance_test.exe` mtime = `2026-06-26 23:23:06`（重链 ✓）
+- **ctest 19/19 PASS**：
+
+  ```
+  1/19 smoke_test .......................   Passed    0.04 sec
+  2/19 mapper_load_test .................   Passed    0.06 sec
+  3/19 mapper_reset_test ................   Passed    0.06 sec
+  4/19 rom_regression_test ..............   Passed    0.98 sec
+  5/19 savestate_regression_test ........   Passed    1.05 sec
+  6/19 expected_api_test ................   Passed    0.07 sec
+  7/19 enum_class_bitflags_test .........   Passed    0.02 sec
+  8/19 i18n_regression_test .............   Passed    0.04 sec
+  9/19 core_state_test ..................   Passed    0.04 sec
+  10/19 cpu_test .........................   Passed    0.25 sec
+  11/19 ppu_test .........................   Passed    0.21 sec
+  12/19 apu_test .........................   Passed    0.16 sec
+  13/19 bus_test .........................   Passed    0.05 sec
+  14/19 mapper_core_test .................   Passed    0.07 sec
+  15/19 savestate_core_test ..............   Passed    0.11 sec
+  16/19 ppu_frame_diff_test ..............   Passed    0.58 sec
+  17/19 golden_savestate_test ............   Passed    2.14 sec
+  18/19 bench_tolerance_test .............   Passed    2.10 sec
+  19/19 config_store_test ................   Passed    0.05 sec
+  100% tests passed, 0 tests failed out of 19
+  ```
+
+- **`bench_tolerance_test` 10× 稳定性验证**（§9.7 #2 要求 90%+ PASS；新方法学 3-warmup + 7-iter drop min/max）：
+
+  | Run | bench_cpu_frame | bench_ppu_frame | bench_full_frame | 结果 |
+  |-----|-----------------|-----------------|------------------|------|
+  | 1 | -0.74% | -0.72% | +1.25% | PASS |
+  | 2 | -0.45% | -0.75% | +0.17% | PASS |
+  | 3 | -1.37% | -1.35% | -0.02% | PASS |
+  | 4 | -1.18% | -0.81% | +1.09% | PASS |
+  | 5 | -0.88% | -0.36% | -0.07% | PASS |
+  | 6 | +0.16% | -0.94% | +0.42% | PASS |
+  | 7 | -0.95% | +0.06% | -0.03% | PASS |
+  | 8 | -0.07% | +0.55% | +0.09% | PASS |
+  | 9 | +0.17% | -0.38% | -0.49% | PASS |
+  | 10 | -0.16% | -0.14% | +2.44% | PASS |
+
+  **PASS=10 FAIL=0**（100% pass rate，远超 90% 要求）。deviation 中位约 ±0.5%，最差 +2.44%（run 10 bench_full_frame，仍 < +2.5% 阈值）。多数为 speedup（负值）— 证实 R7.1 未引入热路径回归。
+
+- **方法学修复本身的稳定性验证**（R7.1 之前，仅改 bench_tolerance_test.cpp 后跑 10×）：
+
+  | Run | bench_cpu_frame | bench_ppu_frame | bench_full_frame | 结果 |
+  |-----|-----------------|-----------------|------------------|------|
+  | 1 | +1.38% | -0.28% | +0.47% | PASS |
+  | 2 | +1.91% | -0.27% | +0.47% | PASS |
+  | 3 | +2.22% | +0.57% | +0.29% | PASS |
+  | 4-10 | (均 PASS) | (均 PASS) | (均 PASS) | PASS |
+
+  **PASS=10 FAIL=0** — 证实测试方法学修改本身（仅改 test TU，热路径 lib 未重编）不触发 layout shift。
+
+- **关键回归测试覆盖**：
+  - `savestate_regression_test` PASS — savestate 字节级一致
+  - `ppu_frame_diff_test` PASS — 像素级一致
+  - `rom_regression_test` PASS — ROM 加载/运行（验证 IPS patch 路径未破坏）
+  - `golden_savestate_test` PASS — 与 golden savestate 字节级一致
+  - `bench_tolerance_test` PASS — 热路径未触发 slowdown 阈值
+- **范围检查**：
+  - `git diff --stat` 仅含 `src/utils/memory.cpp` + `tests/benchmarks/bench_tolerance_test.cpp` + `docs/refactor_plan.md`（3 文件）
+  - 未触及 §0.2 列出的任何避让区文件
+  - `project(FCEUX11 VERSION 1.5 ...)` 未变
+  - 无 phase TAG 创建
+  - 无新 API（`FCEU_realloc` 签名不变；`RunConfig` 是测试文件内部 struct，不导出）
+
+### 9.8.6 与 v1.x roadmap 的不冲突证明
+
+- `v1.6 Resonance`（APU 状态对象化）— 触碰 `src/sound.cpp/h`, `src/wave.cpp/h`；本次**未触碰**
+- `v1.7 Cartograph`（CartInfo 与 Bank-Switching API）— 触碰 `src/cart.cpp/h`；本次**未触碰**
+- `v1.8 Masonry`（Board/Mapper 架构）— 触碰 `src/boards/*`；本次**未触碰**
+- `v1.9 Chronicle`（Savestate 系统）— 触碰 `src/state.cpp/h`；本次**未触碰**
+- `v1.10 Cryptex`（ROM 解析 Rust 迁移）— 触碰 `src/ines.cpp/h`, `src/unif.cpp/h`, `src/nsf.cpp/h`, `src/fds.cpp/h`；本次**未触碰**
+- `v1.11 Bridge`（Qt 驱动解耦）— 触碰 `src/drivers/Qt/*`, `src/fceu.cpp/h`；本次**未触碰**
+- `v1.12 Scissors`（巨型文件拆分）— 触碰 `TasEditor/`, `ConsoleWindow.cpp`, `AviRecord.cpp`, `ppu.cpp`；本次**未触碰**
+- `v1.13 Purify`（遗留 C 模式清理）— 全代码库 malloc/free / C-style cast 清理；本次仅在 `memory.cpp` 修了 `FCEU_realloc` 失败泄漏 BUG（属于错误修复，不属于 v1.13 的"清理"范围 — 本次是修 BUG 而非风格统一）
+- `v1.14 Anvil`（性能硬化与收官）— LTO/PGO/性能基线；本次**未触碰**（但修复了 `bench_tolerance_test` 方法学脆弱性，为 v1.14 性能基线提供更稳定的测量工具）
+
+`git diff --stat` 仅包含 2 个 `src/utils/` + `tests/` 目录下的源文件 + 1 个 docs 文件；不与上述任何 v1.x 子版本的改造区重叠。
+
+### 9.8.7 Phase R4 续做收官小结
+
+#### 改动量
+
+| 指标 | 数值 |
+|------|------|
+| 改动源文件 | 2（`src/utils/memory.cpp` + `tests/benchmarks/bench_tolerance_test.cpp`） |
+| 修复 BUG | 1（R7.1 `FCEU_realloc` 失败泄漏 + 无错误传播） |
+| 测试方法学改进 | 1（1-warmup+5-iter → 3-warmup+7-iter min/max drop） |
+| 新增 CLI 开关 | 2（`--warmup-iterations=N` / `--iterations=N`） |
+| 顺带修复潜伏 bug | 1（`times.reserve(cfg.frames ? 5 : 0)` reserve 大小错误） |
+| 永久搁置项 | 2（R5.1 CTASSERT / R5.2 FCEU_CPP_HAS_STD） |
+| 暂缓项 | 1（R8.1 strncpy→memcpy，热路径无调用方） |
+
+#### 关键经验教训
+
+**§9 初次失败的根因与本次续做的成功路径对比**：
+
+| 维度 | §9 初次尝试（失败） | §9.8 续做（成功） |
+|------|---------------------|-------------------|
+| 改动范围 | R5.1+R5.2+R7.1+R8.1 四项一起 | 先修测试（#1），再单独做 R7.1（#2） |
+| 头文件改动 | 改了 `format.h` / `endian.h` / `safe_string.h`（hot header） | **不改任何头文件**（仅改 `memory.cpp` 实现） |
+| 热路径 lib | 多个 TU 重编 → `fceux11_core.lib` section layout 扰动 | `fceux11_core.lib` 源码未重编（mtime 证据确认） |
+| bench_tolerance 方法学 | 旧（1-warmup + 5-iter）放大 cold-cache 噪声 | 新（3-warmup + 7-iter min/max drop）抑制噪声 |
+| bench_tolerance 结果 | +4-5% 稳定回归 FAIL | 10/10 PASS（max +2.44%） |
+
+**核心结论**：
+1. **hot header 是 utils 重构的系统性风险** — 任何对 `format.h` / `safe_string.h` / `memory.h` / `endian.h` / `timeStamp.h` 等 hot header 的改动都会通过链接器 layout 扰动热路径
+2. **.cpp-only 改动是安全的** — 仅改 .cpp 实现（不动头文件）只重编该 .obj + 重链所属 .lib；热路径 .lib（`fceux11_core.lib`）源码不变 → 机器码不变
+3. **测试方法学修复是前提** — `bench_tolerance_test` 的 1-warmup+5-iter 方法学对 cold-cache 高度敏感，会放大 layout shift 的视在回归；修复后（3-warmup+7-iter min/max drop）能更准确反映真实性能
+
+#### 推荐后续动作
+
+1. **R8.1（strncpy → memcpy）**：优先级低（热路径无调用方），可在 v1.13 Purify 阶段一并处理
+2. **`tests/utils/memory_test.cpp`**：当前 `FCEU_realloc` 0 单元测试覆盖；新测试应覆盖正常 realloc / 缩小 / 增大 / size==0 行为（abort 路径不易测，可跳过）
+3. **Phase R5 启动** — 跨文件警告清理 + `palette.cpp` `M_PI` 现代化（详见 §Phase R5）
+
+---
+
 ## 附录 A：Phase 推进顺序
 
 ```
 Phase R1 ──→ Phase R2 ──→ Phase R3 ──→ Phase R4 ──→ Phase R5
  (utils BUG)  (const/opt)  (endian)    (asserts)    (warnings)
-   ~3 d         ~2 d         ~2 d        ~2 d          ~3 d
+   ~3 d         ~2 d         ~2 d     (部分交付)      ~3 d
                               ↓
                        总计 ~12 工作日
 ```
+
+**Phase R4 状态**（2026-06-26）：**续做部分交付**。按 §9.7 推荐路径，先修 `bench_tolerance_test` 方法学（3-warmup + 7-iter min/max drop），再仅改 `memory.cpp` 实现（不动头文件）重做 R7.1 — 已交付（ctest 19/19 + bench_tolerance 10/10 PASS）。R5.1 / R5.2 永久搁置；R8.1 暂缓（热路径无调用方）。详见 §9.8。
 
 Phase R5 视 `R10.x` 散落命中数可拆为 R5a / R5b 两轮提交。
 

@@ -114,7 +114,17 @@ void FCEU_dfree(void *ptr)
 
 void* FCEU_realloc(void* ptr, size_t size)
 {
-	return realloc(ptr,size);
+	void* ret = realloc(ptr,size);
+	if(!ret && size != 0)
+	{
+		// R7.1: realloc failure with size!=0 does NOT free ptr (per C
+		// standard) — the caller would leak the original buffer. Match
+		// the FCEU_malloc/FCEU_amalloc policy and abort on failure. The
+		// size==0 case is implementation-defined (MSVC frees ptr and
+		// returns nullptr) and is NOT a failure — return nullptr normally.
+		FCEU_abort("Error reallocating memory!");
+	}
+	return ret;
 }
 
 void FCEU_abort(const char* message)

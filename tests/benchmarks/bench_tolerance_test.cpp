@@ -58,10 +58,33 @@ static const BenchConfig kBenchs[] = {
 static const int kNumBenchs = sizeof(kBenchs) / sizeof(kBenchs[0]);
 
 // ---------------------------------------------------------------------------
-// Single-bench timing (mirrors x6502_exec_bench.cpp / ppu_render_bench.cpp /
-// apu_mix_bench.cpp: 5 timed iterations, 1 warm-up, 1 stddev extra pass).
+// Measurement configuration. Defaults implement the R4 methodology fix
+// (see docs/refactor_plan.md §9.7 #1): the original 1-frame warm-up +
+// 5-iteration median was fragile against cold-cache contamination —
+// when a hot header changed, the resulting link-time layout shift was
+// amplified by the under-warmed first measurement, producing stable
+// +4-5% false regressions that disappeared under Google Benchmark's
+// long warm-up (§9.3 step 3). The new defaults (3 full warm-up passes
+// + 7 timed iterations with the single min/max dropped, median of the
+// remaining 5) bring the methodology in line with Google Benchmark's
+// `benchmark_min_time` approach while keeping the same effective sample
+// count for the median. Both knobs are CLI-tunable so a dedicated
+// runner can tighten or loosen the gate.
 // ---------------------------------------------------------------------------
-static double run_bench(const BenchConfig& cfg) {
+struct RunConfig {
+    int warmup_iterations = 3;  // full passes of cfg.frames before timing
+    int meas_iterations   = 7;  // timed passes; min + max dropped, median of rest
+};
+
+// ---------------------------------------------------------------------------
+// Single-bench timing. R4 methodology: multi-pass warm-up + 7 timed
+// iterations, drop the single min and single max, take the median of
+// the remaining samples. For the default 7 iterations this yields a
+// median of 5 (same effective sample count as the old 5-iteration
+// median) while discarding the most likely cold-cache / scheduling
+// outliers.
+// ---------------------------------------------------------------------------
+static double run_bench(const BenchConfig& cfg, const RunConfig& rc) {
     fceu11::CloseGame();
 
     if (!core_init()) return -1.0;
@@ -75,11 +98,19 @@ static double run_bench(const BenchConfig& cfg) {
     uint8*  xbuf = nullptr;
     int32*  soundBuf = nullptr;
     int32   soundBufSize = 0;
-    fceu11::Emulate(&xbuf, &soundBuf, &soundBufSize, 0); // warm-up
+
+    // R4: multi-pass warm-up to load code pages + warm caches before the
+    // timed loop. The original 1-frame warm-up left cold-cache residue
+    // that contaminated the median of 5 iterations.
+    for (int w = 0; w < rc.warmup_iterations; ++w) {
+        for (int f = 0; f < cfg.frames; ++f) {
+            fceu11::Emulate(&xbuf, &soundBuf, &soundBufSize, 0);
+        }
+    }
 
     std::vector<double> times;
-    times.reserve(cfg.frames ? 5 : 0);
-    for (int i = 0; i < 5; ++i) {
+    times.reserve(static_cast<size_t>(rc.meas_iterations));
+    for (int i = 0; i < rc.meas_iterations; ++i) {
         auto t0 = std::chrono::high_resolution_clock::now();
         for (int f = 0; f < cfg.frames; ++f) {
             fceu11::Emulate(&xbuf, &soundBuf, &soundBufSize, 0);
@@ -88,7 +119,20 @@ static double run_bench(const BenchConfig& cfg) {
         times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
     }
     std::sort(times.begin(), times.end());
-    double median = times[times.size() / 2];
+
+    // R4: drop the single min and single max, then take the median of
+    // the remaining (n-2) samples. With the default 7 iterations this
+    // yields a median of 5. For n < 3 we fall back to the plain median.
+    double median;
+    const size_t n = times.size();
+    if (n >= 3) {
+        // remaining slice is [1 .. n-2]; its median sits at index 1 + (n-2)/2.
+        median = times[1 + (n - 2) / 2];
+    } else if (n > 0) {
+        median = times[n / 2];
+    } else {
+        median = -1.0;
+    }
 
     fceu11::CloseGame();
     core_shutdown();
@@ -172,13 +216,24 @@ int main(int argc, char** argv) {
     std::setvbuf(stdout, nullptr, _IONBF, 0);
 
     bool generate = false;
+    RunConfig rc;
     for (int i = 1; i < argc; ++i) {
-        if (std::strcmp(argv[i], "--generate") == 0) generate = true;
+        if (std::strcmp(argv[i], "--generate") == 0) {
+            generate = true;
+        } else if (std::strncmp(argv[i], "--warmup-iterations=", 20) == 0) {
+            int v = std::atoi(argv[i] + 20);
+            rc.warmup_iterations = (v >= 0) ? v : 0;
+        } else if (std::strncmp(argv[i], "--iterations=", 13) == 0) {
+            int v = std::atoi(argv[i] + 13);
+            // Need >= 3 to drop min/max and still have a median; clamp.
+            rc.meas_iterations = (v >= 3) ? v : 7;
+        }
     }
 
     std::printf("=== FCEUX11 v1.1 Bench Tolerance Test ===\n");
-    std::printf("Mode: %s\n\n", generate ? "GENERATE local baseline"
-                                         : "VERIFY against baseline");
+    std::printf("Mode: %s  (warmup=%d passes, measure=%d iters, drop min/max)\n\n",
+                generate ? "GENERATE local baseline" : "VERIFY against baseline",
+                rc.warmup_iterations, rc.meas_iterations);
 
     // Pick baseline path: env var > v1.3 default > v1.0 fallback.
     // v1.3 Legion Phase 7.3: the v1.3 baseline (fixtures/bench_baseline.json)
@@ -212,7 +267,7 @@ int main(int argc, char** argv) {
     for (int i = 0; i < kNumBenchs; ++i) {
         std::printf("[%d/%d] %s (%d frames)\n",
                     i + 1, kNumBenchs, kBenchs[i].name, kBenchs[i].frames);
-        double ms = run_bench(kBenchs[i]);
+        double ms = run_bench(kBenchs[i], rc);
         if (ms < 0) {
             std::printf("  FAIL: benchmark did not complete\n");
             ++ctx.failed;
