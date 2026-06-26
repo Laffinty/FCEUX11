@@ -3,7 +3,7 @@
 > **范围**：零散、独立、单文件或单函数粒度的代码质量提升与局部性能优化
 > **原则**：与 `v1.x_Modernization_Roadmap.md` 的 v1.6 及后续版本**完全正交**，**不打 TAG**，**不升版本号**
 > **周期**：中期（按 Phase R1~R5 推进，预计 3~5 个月）
-> **最后更新**：2026-06-26（**Phase R1 + R2 + R3 全量收官**；R2 实际修复记录见 §7，R3 实际修复记录见 §8；**Phase R4 续做部分交付**：bench_tolerance_test 方法学修复 + R7.1 已交付，R5.1/R5.2 永久搁置，R8.1 暂缓，详见 §9.8）
+> **最后更新**：2026-06-27（**Phase R1 + R2 + R3 全量收官**；R2 实际修复记录见 §7，R3 实际修复记录见 §8；**Phase R4 续做部分交付**：bench_tolerance_test 方法学修复 + R7.1 已交付，R5.1/R5.2 永久搁置，R8.1 暂缓，详见 §9.8；**Phase R5 部分交付**：R9.1 + R6.1 + R6.2 已交付，R10.1/R10.2/R10.3/R11.1 经审计为 no-op，详见 §Phase R5 "R5 no-op 审计" 子节）
 > **工具链**：MSVC 2022+ / C++20 / Qt 6.8 LTS / CMake 4.0+（与主干一致）
 
 ---
@@ -276,51 +276,92 @@ inline void FCEU_strlcpy(char* dst, size_t dstSize, const char* src) {
 
 **目标**：在被 `/wd*` 抑制的警告类别中，挑避让区外的清掉；同步做 `palette.cpp` 的 `M_PI` 现代化。
 
-**包含**：R9.1, R10.1, R10.2（推荐）+ R6.1, R6.2（mutex RAII，可选）+ R11.1（input 现代化，可选）
+**包含（R5a 已交付，2026-06-27）**：R9.1, R6.1, R6.2
 
-**改动文件**：
-- 散落（grep `strcpy|sprintf|vsprintf` 排除 boards/、drivers/、fceu.cpp、movie.cpp、state.cpp、ines.cpp、unif.cpp、nsf.cpp、fds.cpp、cart.cpp、cpu.cpp、x6502.cpp、ppu.cpp、sound.cpp、wave.cpp、bus.cpp、ppu_class.cpp、lua-engine.cpp）
-- `src/palette.cpp`
-- `src/utils/mutex.h/.cpp`（可选）
-- `src/input/*.cpp`（可选，注意：input 不在 roadmap 避让区，但 input 是单文件单功能，重构风险中等）
+**包含（审计后判定为 no-op）**：R10.1, R10.2, R10.3, R11.1 — 详见子节 "R5 no-op 审计"。
 
-**关键细节**：
+**改动文件（R5a）**：
+- `src/palette.cpp`（R9.1：删除 3 行 dead `#define M_PI` 块）
+- `src/utils/mutex.h/.cpp`（R6.1 + R6.2：`std::unique_ptr` RAII + `autoScopedLock` 模板化）
 
-R9.1 `palette.cpp`：
+**关键细节（R5a 已交付）**：
+
+R9.1 `palette.cpp` — 实际改动（与 plan 原描述不同）：
 ```cpp
-// 现状（palette.cpp:36）
+// 现状（palette.cpp:35-37）—— dead macro
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
-// 改后（palette.cpp:36）
-#include <numbers>
-// ...
-// 用 std::numbers::pi_v<float> 或 std::numbers::pi 替换所有 M_PI 引用
+// 改后：直接删除 3 行。palette.cpp body 从未使用 M_PI：
+//   line 227: float v = (spot - black) / (white-black) / 12.f;
+//   line 228: i += v * std::cos(3.141592653 * p / 6);   // 用字面量，非 M_PI
+//   line 229: q += v * std::sin(3.141592653 * p / 6);
+// 不需要 <numbers> 替换。nsf.cpp（避让区 v1.10 Cryptex）独立定义 M_PI，
+// 不影响。
 ```
 
-R10.1 散落 `strcpy/sprintf/vsprintf` 清理：
-- 排除避让区文件
-- 优先清单（按 `grep -nE '\b(strcpy|strcat|sprintf|vsprintf)\b' src/` 命中数排序）：
-  - `src/utils/xstring.cpp`（R1.3 已覆盖，但残留 `snprintf` 需统一化）
-  - `src/file.cpp`（820 行，主战场）
-  - `src/cheat.cpp`（694 行）
-  - `src/palette.cpp`（612 行，`#ifndef M_PI` 也是）
-  - `src/netplay.cpp`（273 行）
-  - `src/profiler.cpp`（298 行，已有 printf 噪声）
-- 替换为 `safe_format` (utils/safe_string.h) 或 `std::format` (C++20) 或 `std::string` 构造
+R6.1 `mutex.cpp/h`：
+- `mutex` 类的 `mtx` 字段从 `QRecursiveMutex*`/`QMutex*` 改为 `std::unique_ptr<QRecursiveMutex>`/`std::unique_ptr<QMutex>`
+- `mutex::mutex()` 用 `std::make_unique<...>()` 分配
+- `mutex::~mutex()` 改 `= default`，unique_ptr 处理 delete
+- mutex.h 仅被 `debugsymboltable.h` include（冷 header，§9.4 hot-header layout-shift 风险极低）
+- 13 个 `autoScopedLock` 调用方（`debugsymboltable.cpp:313/325/379/...`）无需改动
 
-R10.2 未引用参数：
-- 排除事件处理器、虚函数、回调签名（这些是结构性的）
-- 命中位置补 `[[maybe_unused]]` 即可
-
-R10.3 `size_t → int` 缩窄：
-- 仅在避让区外，且必须显式 `narrow_cast<int>(x)` 或 `static_cast<int>(x)`
-- 不强求覆盖
+R6.2 `mutex.h`：
+- 两个 `autoScopedLock` 构造函数（`mutex*` + `mutex&`）合并为单模板：
+  ```cpp
+  template <typename Mtx>
+  autoScopedLock(Mtx&& mtx) : m(getPtr(std::forward<Mtx>(mtx))) { if (m) m->lock(); }
+  ```
+- 私有静态 `getPtr(mutex*)` / `getPtr(mutex&)` 重载由模板体内通过重载决议选择
+- 模板体必须在 header 内（template definition 必须可见）
 
 **验收**：
 - `ctest` 19/19 PASS
-- 阶段性移除 1-2 个 `/wd*` 选项（验证 suppress 的需求已消失）
-- `bench_tolerance_test` PASS
+- `bench_tolerance_test` 单次 PASS；多次稳定性验证见下方 "bench_tolerance 噪声观察"
+- 阶段性移除 1-2 个 `/wd*` 选项 — **本次未达成**（见 "R5 no-op 审计"）
+
+**bench_tolerance 噪声观察（2026-06-27）**：
+R5a 实施过程中观察到 bench_tolerance_test 在 15 次连续运行中 ~13-20% 概率 FAIL。**关键发现**：在 R4-cont baseline（无任何 R5a 改动）下重测，得到 13/15 = 87% PASS — 即 ~13% 的失败率是环境噪声，与 R5a 改动**无关**。具体：
+
+| 构建状态 | 样本数 | PASS | 失败率 | 失败特征 |
+|---------|--------|------|--------|---------|
+| R4-cont baseline（无 R5a） | 15 | 13/15 | 13% | full +2.74%, full +6.11% |
+| R9.1 only（palette.cpp） | 15 | 12/15 | 20% | 全部 marginal（+2.57% ~ +3.07%） |
+| R5a combined（palette + mutex） | 45 | ~38/45 | ~16% | 同样 marginal |
+
+所有失败都在 `+2.5% ~ +3.1%` 的窄带内（与阈值的差 < 0.6%），是 §9.7 #1 已知的环境性 cold-cache 噪声放大。R5a 的 palette.cpp dead macro 删除和 mutex RAII 改造均不涉及 hot path，§9.3 step 3 已验证 `--benchmark_min_time=2s` 充分 warmup 时 +0.08% PASS。**R5a 通过单次 ctest 19/19 + 噪声率与 baseline 一致判定为可交付**。如有更严格的 90%+ PASS 要求，建议扩大样本（如 §9.7 #2 的 30 次连续运行）或降低 ±阈值。
+
+---
+
+#### R5 no-op 审计（2026-06-27）
+
+R5 计划范围中除 R9.1/R6.1/R6.2 外的子项经 grep + 人工审计后**判定为 no-op**，理由如下：
+
+**R10.1 — `strcpy`/`sprintf`/`vsprintf` 散落清理**
+- 在 `src/` 内排除避让区（`boards/`、`drivers/`、`lua/`、`lua-engine.cpp`、`fceu.cpp`、`movie.cpp`、`state.cpp`、`ines.cpp`、`unif.cpp/`、`nsf.cpp`、`fds.cpp`、`cart.cpp`、`cpu.cpp`、`x6502.cpp`、`ppu.cpp`、`sound.cpp`、`wave.cpp`、`bus.cpp`、`ppu_class.cpp`、`emufile.h`、`video.cpp`）后，唯一命中为：
+  - `src/file.cpp:499` `vsnprintf(*strp, 2048, fmt, ap)` — 在 `#ifndef HAVE_ASPRINTF` polyfill 块内（asprintf 的 C99-less 实现）。`vsnprintf` 本身就是该 primitive 的正确实现，不应替换。
+- 其他命中（`emufile.h:189/194` `vsnprintf` 用于测量大小）同样是正确的格式化 primitive。
+- 结论：**无 R10.1 工作可做**。/wd4996 抑制保留（避让区文件内的 `FCEU_strlcpy` / `safe_strcat` 调用由 v1.13 Purify 处理）。
+
+**R10.2 — `/wd4100` 未引用参数**
+- 排除避让区 + 事件处理器 / 虚函数 / 回调签名（`void Update(void *data, int arg)` 类 input 设备 ABI）后，剩余命中极少，且均位于 `src/archived/`（历史遗留目录）或 `src/drivers/Qt/`（避让区 v1.11 Bridge）。
+- 结论：**R10.2 在当前范围无新增工作**。
+
+**R10.3 — `/wd4267` `size_t → int` 缩窄**
+- CMakeLists.txt 注释指明源文件为 mappers（避让区 v1.8 Masonry）和 TasEditor/（避让区 v1.12 Scissors）。
+- `src/file.cpp:136` 已正确 `static_cast<size_t>(size)`。
+- 结论：**R10.3 无工作可做**。/wd4267 抑制保留。
+
+**R11.1 — `input/*.cpp` 局部现代化**
+- `src/input/*.cpp`（21 文件，1814 行）已审计：
+  - `void zero(void)` 命中：**0**
+  - 裸 `malloc/free` 命中：**0**
+  - 裸 `new[]` 命中：**0**
+- 剩余 8 处 `(void)` 风格清理（`static void StrobeARKFC(void)` 等），但这些是 input 设备回调 ABI 的一部分（与 `void Update(void *data, int arg)` 配套），属于"风格统一"而非"BUG/质量"修复。
+- 结论：**R11.1 的实质清理工作已前置完成**，残余为 5 分钟的风格清理，可作为 R5b 可选增量（建议推迟到 v1.13 Purify 阶段一并处理）。
+
+**总结**：R5 实际可交付范围是 R9.1 + R6.1 + R6.2，已在 R5a 完成。R10.x / R11.1 /wd* 抑制移除不在 R5 处理（属于 v1.13 Purify 或下一轮 refactor 的工作）。
 
 ---
 
@@ -1894,14 +1935,14 @@ void* FCEU_realloc(void* ptr, size_t size)
 ```
 Phase R1 ──→ Phase R2 ──→ Phase R3 ──→ Phase R4 ──→ Phase R5
  (utils BUG)  (const/opt)  (endian)    (asserts)    (warnings)
-   ~3 d         ~2 d         ~2 d     (部分交付)      ~3 d
-                              ↓
+   ~3 d         ~2 d         ~2 d     (部分交付)    (部分交付)
+                              ↓                  ↓
                        总计 ~12 工作日
 ```
 
 **Phase R4 状态**（2026-06-26）：**续做部分交付**。按 §9.7 推荐路径，先修 `bench_tolerance_test` 方法学（3-warmup + 7-iter min/max drop），再仅改 `memory.cpp` 实现（不动头文件）重做 R7.1 — 已交付（ctest 19/19 + bench_tolerance 10/10 PASS）。R5.1 / R5.2 永久搁置；R8.1 暂缓（热路径无调用方）。详见 §9.8。
 
-Phase R5 视 `R10.x` 散落命中数可拆为 R5a / R5b 两轮提交。
+**Phase R5 状态**（2026-06-27）：**R5a 部分交付**。R9.1（palette.cpp dead `M_PI` 删除）+ R6.1（mutex `std::unique_ptr` RAII）+ R6.2（`autoScopedLock` 模板化）三个子项已交付。R10.1 / R10.2 / R10.3 / R11.1 经审计判定为 no-op（详见 §Phase R5 "R5 no-op 审计"）。ctest 19/19 PASS；bench_tolerance 多次运行约 80-87% PASS（环境噪声，与 baseline 一致）。R5b（可选增量：R11.1 8 处 `(void)` 风格清理）推迟到 v1.13 Purify 阶段。
 
 ## 附录 B：与 v1.5 已交付项的衔接
 
