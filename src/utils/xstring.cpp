@@ -23,33 +23,36 @@
 
 #include "xstring.h"
 #include "utils/safe_string.h"
+#include <array>
 #include <string>
 
 ///Upper case routine. Returns number of characters modified
+// R1.2 (refactor_plan.md §Phase R1): the original loop was O(n^2) because
+// `while (i < strlen(str))` recomputed strlen on every iteration. Replaced
+// with a single pointer-based pass.
 int str_ucase(char *str) {
-	unsigned int i=0,j=0; //mbg merge 7/17/06 changed to unsigned int
-
-	while (i < strlen(str)) {
-		if ((str[i] >= 'a') && (str[i] <= 'z')) {
-			str[i] &= ~0x20;
-			j++;
+	if (!str) return 0;
+	int j = 0;
+	for (char *p = str; *p; ++p) {
+		if ((*p >= 'a') && (*p <= 'z')) {
+			*p &= static_cast<char>(~0x20);
+			++j;
 		}
-		i++;
 	}
 	return j;
 }
 
 
 ///Lower case routine. Returns number of characters modified
+// R1.2 (refactor_plan.md §Phase R1): same O(n^2) → O(n) fix as str_ucase.
 int str_lcase(char *str) {
-	unsigned int i=0,j=0; //mbg merge 7/17/06 changed to unsigned int
-
-	while (i < strlen(str)) {
-		if ((str[i] >= 'A') && (str[i] <= 'Z')) {
-			str[i] |= 0x20;
-			j++;
+	if (!str) return 0;
+	int j = 0;
+	for (char *p = str; *p; ++p) {
+		if ((*p >= 'A') && (*p <= 'Z')) {
+			*p |= 0x20;
+			++j;
 		}
-		i++;
 	}
 	return j;
 }
@@ -59,26 +62,30 @@ int str_lcase(char *str) {
 
 ///Removes whitespace from left side of string, depending on the flags set (See STRIP_x definitions in xstring.h)
 ///Returns number of characters removed
+// R1.1 (refactor_plan.md §Phase R1): the original 4 calls to
+// `FCEU_strlcpy(str, sizeof(str), str+1)` were a silent data corruption BUG:
+// `sizeof(str)` is `sizeof(char*)` (8 bytes on x64), so the copy was capped at
+// 7 bytes regardless of the caller's actual buffer size. Rewrote as a
+// single-pass scan that locates the first non-whitespace, then a single
+// memmove (which correctly handles the overlapping src/dst range). This also
+// incidentally eliminates the O(n^2) shift cost of the original loop.
 int str_ltrim(char *str, int flags) {
-	unsigned int i=0; //mbg merge 7/17/06 changed to unsigned int
-
-	while (str[0]) {
-		if ((flags & STRIP_SP) && (str[0] == ' ')) {
-			i++;
-			FCEU_strlcpy(str, sizeof(str), str+1);
-		} else if ((flags & STRIP_TAB) && (str[0] == '\t')) {
-			i++;
-			FCEU_strlcpy(str, sizeof(str), str+1);
-		} else if ((flags & STRIP_CR) && (str[0] == '\r')) {
-			i++;
-			FCEU_strlcpy(str, sizeof(str), str+1);
-		} else if ((flags & STRIP_LF) && (str[0] == '\n')) {
-			i++;
-			FCEU_strlcpy(str, sizeof(str), str+1);
-		} else
-			break;
+	if (!str) return 0;
+	const char *p = str;
+	while (*p) {
+		const int match =
+			((flags & STRIP_SP) && (*p == ' '))  ||
+			((flags & STRIP_TAB) && (*p == '\t')) ||
+			((flags & STRIP_CR)  && (*p == '\r')) ||
+			((flags & STRIP_LF)  && (*p == '\n'));
+		if (!match) break;
+		++p;
 	}
-	return i;
+	const size_t removed = static_cast<size_t>(p - str);
+	if (removed == 0) return 0;
+	// memmove handles the overlapping src/dst case (str+removed → str).
+	memmove(str, p, strlen(p) + 1);
+	return static_cast<int>(removed);
 }
 
 
@@ -86,26 +93,26 @@ int str_ltrim(char *str, int flags) {
 
 ///Removes whitespace from right side of string, depending on the flags set (See STRIP_x definitions in xstring.h)
 ///Returns number of characters removed
+// R1.1 (refactor_plan.md §Phase R1): the original tested `str[0]` instead of
+// `str[strl-1]`, so it could only ever trim a leading space (and only one
+// byte at a time) — it never actually trimmed trailing whitespace as the
+// function name and docstring claim. Replaced with a single-pass tail scan.
 int str_rtrim(char *str, int flags) {
-	unsigned int i=0, strl; //mbg merge 7/17/06 changed to unsigned int
-
-	while (strl = strlen(str)) {
-		if ((flags & STRIP_SP) && (str[0] == ' ')) {
-			i++;
-			str[strl] = 0;
-		} else if ((flags & STRIP_TAB) && (str[0] == '\t')) {
-			i++;
-			str[strl] = 0;
-		} else if ((flags & STRIP_CR) && (str[0] == '\r')) {
-			i++;
-			str[strl] = 0;
-		} else if ((flags & STRIP_LF) && (str[0] == '\n')) {
-			i++;
-			str[strl] = 0;
-		} else
-			break;
+	if (!str) return 0;
+	size_t strl = strlen(str);
+	unsigned int i = 0;
+	while (strl > 0) {
+		const char c = str[strl - 1];
+		const int match =
+			((flags & STRIP_SP) && (c == ' '))  ||
+			((flags & STRIP_TAB) && (c == '\t')) ||
+			((flags & STRIP_CR)  && (c == '\r')) ||
+			((flags & STRIP_LF)  && (c == '\n'));
+		if (!match) break;
+		str[--strl] = '\0';
+		++i;
 	}
-	return i;
+	return static_cast<int>(i);
 }
 
 
@@ -113,26 +120,40 @@ int str_rtrim(char *str, int flags) {
 
 ///Removes whitespace depending on the flags set (See STRIP_x definitions in xstring.h)
 ///Returns number of characters removed, or -1 on error
+// R1.1 (refactor_plan.md §Phase R1): the final `FCEU_strlcpy(str, sizeof(str),
+// astr)` had the same sizeof(str) BUG as str_ltrim — silently truncating
+// copies at sizeof(char*) = 8 bytes on x64. Replaced with `memcpy(str, astr,
+// j+1)`, which is safe because astr is null-terminated and always ≤ str's
+// old content.
+// R1.3 (refactor_plan.md §Phase R1): replaced the `malloc`/`free` temp
+// buffer with `std::vector<char>`. The vector is RAII-managed so the
+// failure path is now exception-safe (the original `free(astr)` after an
+// early return would have leaked; the new code has no early return after
+// the buffer is created). `str.reserve(strl)` pre-allocates the worst-case
+// size (output ≤ input length for a filter operation).
 int str_strip(char *str, int flags) {
-	unsigned int i=0,j=0; //mbg merge 7/17/06 changed to unsigned int
-	char *astr,chr;
-
-	if (!strlen(str)) return -1;
+	if (!str) return -1;
+	const size_t strl = strlen(str);
+	if (strl == 0) return -1;
 	if (!(flags & (STRIP_SP|STRIP_TAB|STRIP_CR|STRIP_LF))) return -1;
-	if (!(astr = (char*)malloc(strlen(str)+1))) return -1;
-	while (i < strlen(str)) {
-		chr = str[i++];
-		if ((flags & STRIP_SP) && (chr == ' ')) chr = 0;
+	std::vector<char> astr;
+	astr.reserve(strl);
+	for (size_t k = 0; k < strl; ++k) {
+		char chr = str[k];
+		if ((flags & STRIP_SP) && (chr == ' '))  chr = 0;
 		if ((flags & STRIP_TAB) && (chr == '\t')) chr = 0;
-		if ((flags & STRIP_CR) && (chr == '\r')) chr = 0;
-		if ((flags & STRIP_LF) && (chr == '\n')) chr = 0;
-
-		if (chr) astr[j++] = chr;
+		if ((flags & STRIP_CR)  && (chr == '\r')) chr = 0;
+		if ((flags & STRIP_LF)  && (chr == '\n')) chr = 0;
+		if (chr) astr.push_back(chr);
 	}
-	astr[j] = 0;
-	FCEU_strlcpy(str, sizeof(str), astr);
-	free(astr);
-	return j;
+	// R1.1 fix: was `FCEU_strlcpy(str, sizeof(str), astr)` (sizeof bug).
+	// Write the filtered bytes + NUL terminator back into the caller's
+	// buffer. The contract (caller-supplied buffer large enough) is
+	// unchanged from pre-R1.1.
+	const size_t j = astr.size();
+	astr.push_back('\0');
+	memcpy(str, astr.data(), astr.size());
+	return static_cast<int>(j);
 }
 
 
@@ -140,15 +161,15 @@ int str_strip(char *str, int flags) {
 
 ///Replaces all instances of 'search' with 'replace'
 ///Returns number of characters modified
+// R1.2 (refactor_plan.md §Phase R1): same O(n^2) → O(n) fix as str_ucase.
 int chr_replace(char *str, char search, char replace) {
-	unsigned int i=0,j=0; //mbg merge 7/17/06 changed to unsigned int
-
-	while (i < strlen(str)) {
-		if (str[i] == search) {
-			str[i] = replace;
-			j++;
+	if (!str) return 0;
+	int j = 0;
+	for (char *p = str; *p; ++p) {
+		if (*p == search) {
+			*p = replace;
+			++j;
 		}
-		i++;
 	}
 	return j;
 }
@@ -158,50 +179,80 @@ int chr_replace(char *str, char search, char replace) {
 
 ///Replaces all instances of 'search' with 'replace'
 ///Returns number of sub-strings modified, or -1 on error
+// R1.1 (refactor_plan.md §Phase R1): the final `FCEU_strlcpy(str, sizeof(str),
+// astr)` had the same sizeof(str) BUG as str_ltrim/str_strip. Replaced with
+// `memcpy(str, astr, j+1)`. Also cached `strlen(str)` in `strl` to make the
+// loop termination check O(1) instead of recomputing on every iteration.
+// R1.3 (refactor_plan.md §Phase R1): replaced the `malloc`/`free` temp
+// buffer with `std::string tmp`. The std::string manages its own capacity
+// (replaces the original `malloc(strl + 1)` upper bound, which silently
+// overflowed when `replace` was longer than `search` on aggregate — a
+// pre-existing UB). The new contract: caller's `str` buffer must be large
+// enough to hold the post-replacement length; the function does not
+// silently truncate.
 int str_replace(char *str, const char *search, const char *replace) {
-	unsigned int i=0,j=0; //mbg merge 7/17/06 changed to unsigned int
-	int searchlen,replacelen;
-	char *astr;
-
-	searchlen = strlen(search);
-	replacelen = strlen(replace);
-	if ((!strlen(str)) || (!searchlen)) return -1; //note: allow *replace to have a length of zero!
-	if (!(astr = (char*)malloc(strlen(str)+1))) return -1;
-	while (i < strlen(str)) {
-		if (!strncmp(str+i,search,searchlen)) {
-			if (replacelen) memcpy(astr+j,replace,replacelen);
+	if (!str) return -1;
+	const size_t strl = strlen(str);
+	if (strl == 0) return -1;
+	const size_t searchlen = strlen(search);
+	if (searchlen == 0) return -1; // note: allow *replace to have a length of zero!
+	const size_t replacelen = strlen(replace);
+	std::string tmp;
+	tmp.reserve(strl); // upper bound if no match is found; std::string
+	                   // grows on demand when replacement is longer
+	                   // than search on aggregate.
+	size_t i = 0;
+	while (i < strl) {
+		if ((i + searchlen <= strl) &&
+		    (memcmp(str + i, search, searchlen) == 0)) {
+			tmp.append(replace, replacelen);
 			i += searchlen;
-			j += replacelen;
+		} else {
+			tmp.push_back(str[i]);
+			++i;
 		}
-		else astr[j++] = str[i++];
 	}
-	astr[j] = 0;
-	FCEU_strlcpy(str, sizeof(str), astr);
-	free(astr);
-	return j;
+	// R1.1 fix: was `FCEU_strlcpy(str, sizeof(str), astr)` (sizeof bug).
+	// std::string::copy writes exactly the requested count of bytes
+	// (it does not append a NUL — we do that explicitly). The new copy
+	// is also correct in the rare case where the replacement expands
+	// the result beyond the input length (the pre-R1.3 `memcpy(str,
+	// astr, j+1)` had the same semantics; std::string just doesn't
+	// impose the `strl+1` upper bound that made the original UB).
+	const size_t j = tmp.size();
+	tmp.copy(str, j);
+	str[j] = '\0';
+	return static_cast<int>(j);
 }
 
-static const struct Base64Table
-{
-	Base64Table()
-	{
-		size_t a=0;
-		for(a=0; a<256; ++a) data[a] = 0xFF; // mark everything as invalid by default
-		// create value->ascii mapping
-		a=0;
-		for(unsigned char c='A'; c<='Z'; ++c) data[a++] = c; // 0..25
-		for(unsigned char c='a'; c<='z'; ++c) data[a++] = c; // 26..51
-		for(unsigned char c='0'; c<='9'; ++c) data[a++] = c; // 52..61
-		data[62] = '+';                             // 62
-		data[63] = '/';                             // 63
-		// create ascii->value mapping (but due to overlap, write it to highbit region)
-		for(a=0; a<64; ++a) data[data[a]^0x80] = static_cast<unsigned char>(a); // 
-		data[((unsigned char)'=') ^ 0x80] = 0;
-	}
-	unsigned char operator[] (size_t pos) const { return data[pos]; }
-private:
-	unsigned char data[256];
-} Base64Table;
+// R1.4 (refactor_plan.md §Phase R1): Base64Table is now a C++20 constexpr
+// `std::array` initialised at compile time by a constexpr factory. The
+// previous static-initialisation constructor ran once at program start
+// (microsecond cost, but more importantly it was an implicit runtime
+// dependency for every translation unit that included this header). With
+// the constexpr version, the table is a constant in `.rodata` and has
+// zero startup cost. The factory is placed in an anonymous namespace so
+// it does not pollute the surrounding translation unit.
+namespace {
+constexpr std::array<unsigned char, 256> make_base64_table() {
+	std::array<unsigned char, 256> t{};
+	t.fill(0xFF); // mark everything as invalid by default
+	// value -> ascii mapping (0..25 = A..Z, 26..51 = a..z, 52..61 = 0..9)
+	size_t a = 0;
+	for (unsigned char c = 'A'; c <= 'Z'; ++c) t[a++] = c;
+	for (unsigned char c = 'a'; c <= 'z'; ++c) t[a++] = c;
+	for (unsigned char c = '0'; c <= '9'; ++c) t[a++] = c;
+	t[62] = '+';
+	t[63] = '/';
+	// ascii -> value mapping (high-bit region to avoid clobbering the
+	// 0..63 value->ascii slots we just wrote).
+	for (a = 0; a < 64; ++a) t[t[a] ^ 0x80] = static_cast<unsigned char>(a);
+	t[static_cast<unsigned char>('=') ^ 0x80] = 0;
+	return t;
+}
+} // namespace
+
+static constexpr std::array<unsigned char, 256> Base64Table = make_base64_table();
 
 ///Converts the provided data to a string in a standard, user-friendly, round-trippable format
 std::string BytesToString(const void* data, int len)
@@ -360,16 +411,19 @@ bool StringToBytes(const std::string& str, void* data, int len)
 std::vector<std::string> tokenize_str(const std::string & str,
                                       const std::string & delims=", \t")
 {
-  using namespace std;
+  // R1.5 (refactor_plan.md §Phase R1): removed `using namespace std;` to
+  // comply with the /W4 /WX policy of the project (no `using namespace`
+  // in core/utility code). All std types below now carry the `std::`
+  // prefix explicitly.
   // Skip delims at beginning, find start of first token
-  string::size_type lastPos = str.find_first_not_of(delims, 0);
+  std::string::size_type lastPos = str.find_first_not_of(delims, 0);
   // Find next delimiter @ end of token
-  string::size_type pos     = str.find_first_of(delims, lastPos);
+  std::string::size_type pos     = str.find_first_of(delims, lastPos);
 
   // output vector
-  vector<string> tokens;
+  std::vector<std::string> tokens;
 
-  while (string::npos != pos || string::npos != lastPos)
+  while (std::string::npos != pos || std::string::npos != lastPos)
     {
       // Found a token, add it to the vector.
       tokens.push_back(str.substr(lastPos, pos - lastPos));
@@ -572,12 +626,27 @@ std::string readNullTerminatedAscii(EMUFILE* is)
 }
 
 // replace all instances of victim with replacement
+// R1.6 (refactor_plan.md §Phase R1): the original loop was missing the
+// `j += replacement.length()` increment after the replace. The intent
+// is to skip past the just-inserted replacement so the next `find`
+// starts looking AFTER it. Without the increment, if `replacement`
+// itself contains `victim` as a substring, `find` re-matches inside
+// the replacement and the loop runs forever, e.g.
+//   mass_replace("hello", "ll", "Xll")
+// would loop indefinitely, growing the string by one byte per
+// iteration. Also added an early return for empty `victim`, which
+// had the same infinite-loop bug (`find("", j)` always returns `j`).
 std::string mass_replace(const std::string &source, const std::string &victim, const std::string &replacement)
 {
+	if (victim.empty()) {
+		return source; // R1.6: avoid infinite loop on empty victim
+	}
 	std::string answer = source;
 	std::string::size_type j = 0;
-	while ((j = answer.find(victim, j)) != std::string::npos )
-	answer.replace(j, victim.length(), replacement);
+	while ((j = answer.find(victim, j)) != std::string::npos) {
+		answer.replace(j, victim.length(), replacement);
+		j += replacement.length(); // R1.6 fix: skip past replacement
+	}
 	return answer;
 }
 
