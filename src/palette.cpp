@@ -32,9 +32,9 @@
 #include "palettes/palettes.h"
 #include "rust/fceux11_rust.h"
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
+// R5a R9.1: M_PI was a dead macro here (palette.cpp body uses
+// 3.141592653 literals directly, not M_PI). Removed 2026-06-26;
+// nsf.cpp also defined M_PI but is in the v1.10 Cryptex avoidance zone.
 
 #include <cstdio>
 #include <cstdlib>
