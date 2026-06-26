@@ -28,46 +28,32 @@
 #include "endian.h"
 #include "../emufile.h"
 
-#ifdef FCEU_BIG_ENDIAN
-#define LOCAL_BE
-#else
-#define LOCAL_LE
+#ifndef FCEU_LITTLE_ENDIAN
+#include <cstdlib> // _byteswap_ushort / _byteswap_ulong / _byteswap_uint64
 #endif
 
-/* little endian to local endianess convert macros */
-#ifdef LOCAL_BE	/* local arch is big endian */
-# define LE_TO_LOCAL_16(x) ((((x)&0xff)<<8)|(((x)>>8)&0xff))
-# define LE_TO_LOCAL_32(x) ((((x)&0xff)<<24)|(((x)&0xff00)<<8)|(((x)>>8)&0xff00)|(((x)>>24)&0xff))
-# define LE_TO_LOCAL_64(x) ((((x)&0xff)<<56)|(((x)&0xff00)<<40)|(((x)&0xff0000)<<24)|(((x)&0xff000000)<<8)|(((x)>>8)&0xff000000)|(((x)>>24)&0xff00)|(((x)>>40)&0xff00)|(((x)>>56)&0xff))
-# define LOCAL_TO_LE_16(x) ((((x)&0xff)<<8)|(((x)>>8)&0xff))
-# define LOCAL_TO_LE_32(x) ((((x)&0xff)<<24)|(((x)&0xff00)<<8)|(((x)>>8)&0xff00)|(((x)>>24)&0xff))
-# define LOCAL_TO_LE_64(x) ((((x)&0xff)<<56)|(((x)&0xff00)<<40)|(((x)&0xff0000)<<24)|(((x)&0xff000000)<<8)|(((x)>>8)&0xff000000)|(((x)>>24)&0xff00)|(((x)>>40)&0xff00)|(((x)>>56)&0xff))
-#else		/* local arch is little endian */
-# define LE_TO_LOCAL_16(x) (x)
-# define LE_TO_LOCAL_32(x) (x)
-# define LE_TO_LOCAL_64(x) (x)
-# define LOCAL_TO_LE_16(x) (x)
-# define LOCAL_TO_LE_32(x) (x)
-# define LOCAL_TO_LE_64(x) (x)
+namespace {
+#ifdef FCEU_LITTLE_ENDIAN
+constexpr uint16 bswap16(uint16 x) noexcept { return x; }
+constexpr uint32 bswap32(uint32 x) noexcept { return x; }
+constexpr uint64 bswap64(uint64 x) noexcept { return x; }
+#else
+inline uint16 bswap16(uint16 x) noexcept { return _byteswap_ushort(x); }
+inline uint32 bswap32(uint32 x) noexcept { return _byteswap_ulong(x); }
+inline uint64 bswap64(uint64 x) noexcept { return _byteswap_uint64(x); }
 #endif
+} // namespace
 
 ///endian-flips count bytes.  count should be even and nonzero.
-void FlipByteOrder(uint8 *src, uint32 count)
+void FlipByteOrder(uint8 *src, uint32 count) noexcept
 {
-	uint8 *start=src;
-	uint8 *end=src+count-1;
+	if ((count & 1u) || count == 0) return;        /* This shouldn't happen. */
 
-	if((count&1) || !count)        return;         /* This shouldn't happen. */
-
-	while(count--)
+	for (uint32 i = 0, j = count - 1; i < j; ++i, --j)
 	{
-		uint8 tmp;
-
-		tmp=*end;
-		*end=*start;
-		*start=tmp;
-		end--;
-		start++;
+		const uint8 tmp = src[i];
+		src[i] = src[j];
+		src[j] = tmp;
 	}
 }
 
@@ -124,11 +110,7 @@ int read32le(uint32 *Bufo, FILE *fp)
 	uint32 buf;
 	if(fread(&buf,1,4,fp)<4)
 		return 0;
-#ifdef FCEU_LITTLE_ENDIAN
-	*(uint32*)Bufo=buf;
-#else
-	*(uint32*)Bufo=((buf&0xFF)<<24)|((buf&0xFF00)<<8)|((buf&0xFF0000)>>8)|((buf&0xFF000000)>>24);
-#endif
+	*Bufo = bswap32(buf);
 	return 1;
 }
 
@@ -137,11 +119,7 @@ int read16le(uint16 *Bufo, std::istream *is)
 	uint16 buf;
 	if(is->read((char*)&buf,2).gcount() != 2)
 		return 0;
-#ifdef FCEU_LITTLE_ENDIAN
-	*Bufo=buf;
-#else
-	*Bufo = FCEU_de16lsb((uint8*)&buf);
-#endif
+	*Bufo = bswap16(buf);
 	return 1;
 }
 
@@ -151,11 +129,7 @@ int read64le(uint64 *Bufo, std::istream *is)
 	uint64 buf;
 	if(is->read((char*)&buf,8).gcount() != 8)
 		return 0;
-#ifdef FCEU_LITTLE_ENDIAN
-	*Bufo=buf;
-#else
-	*Bufo = FCEU_de64lsb((uint8*)&buf);
-#endif
+	*Bufo = bswap64(buf);
 	return 1;
 }
 
@@ -165,25 +139,8 @@ int read32le(uint32 *Bufo, std::istream *is)
 	uint32 buf;
 	if(is->read((char*)&buf,4).gcount() != 4)
 		return 0;
-#ifdef FCEU_LITTLE_ENDIAN
-	*(uint32*)Bufo=buf;
-#else
-	*(uint32*)Bufo=((buf&0xFF)<<24)|((buf&0xFF00)<<8)|((buf&0xFF0000)>>8)|((buf&0xFF000000)>>24);
-#endif
+	*Bufo = bswap32(buf);
 	return 1;
-}
-
-///reads a little endian 16bit value from the specified file
-int read16le(char *d, FILE *fp)
-{
-#ifdef FCEU_LITTLE_ENDIAN
-	return((fread(d,1,2,fp)<2)?0:2);
-#else
-	int ret;
-	ret=fread(d+1,1,1,fp);
-	ret+=fread(d,1,1,fp);
-	return ret<2?0:2;
-#endif
 }
 
 ///stores a 32bit value into the provided byte array in guaranteed little endian form
@@ -293,11 +250,7 @@ int read32le(uint32 *Bufo, EMUFILE *fp)
 	if(fp->fread(std::span<std::byte>(
 		reinterpret_cast<std::byte*>(&buf), sizeof(buf))) < sizeof(buf))
 		return 0;
-#ifdef LOCAL_LE
-	*(u32*)Bufo=buf;
-#else
-	*(u32*)Bufo=((buf&0xFF)<<24)|((buf&0xFF00)<<8)|((buf&0xFF0000)>>8)|((buf&0xFF000000)>>24);
-#endif
+	*Bufo = bswap32(buf);
 	return 1;
 }
 
@@ -308,11 +261,7 @@ int read16le(u16 *Bufo, EMUFILE *is)
 	if(is->fread(std::span<std::byte>(
 		reinterpret_cast<std::byte*>(&buf), sizeof(buf))) != sizeof(buf))
 		return 0;
-#ifdef LOCAL_LE
-	*Bufo=buf;
-#else
-	*Bufo = LE_TO_LOCAL_16(buf);
-#endif
+	*Bufo = bswap16(buf);
 	return 1;
 }
 
@@ -323,10 +272,6 @@ int read64le(uint64 *Bufo, EMUFILE *is)
 	if(is->fread(std::span<std::byte>(
 		reinterpret_cast<std::byte*>(&buf), sizeof(buf))) != sizeof(buf))
 		return 0;
-#ifdef LOCAL_LE
-	*Bufo=buf;
-#else
-	*Bufo = LE_TO_LOCAL_64(buf);
-#endif
+	*Bufo = bswap64(buf);
 	return 1;
 }

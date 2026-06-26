@@ -18,7 +18,7 @@ int [[nodiscard]] read32le(uint32 *Bufo, std::istream *is);
 int [[nodiscard]] read32le(uint32 *Bufo, FILE *fp);
 int [[nodiscard]] read16le(uint16 *Bufo, std::istream *is);
 
-void FlipByteOrder(uint8 *src, uint32 count);
+void FlipByteOrder(uint8 *src, uint32 count) noexcept;
 
 void FCEU_en32lsb(uint8 *, uint32);
 void FCEU_en16lsb(uint8* buf, uint16 val);

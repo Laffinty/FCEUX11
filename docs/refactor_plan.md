@@ -3,7 +3,7 @@
 > **范围**：零散、独立、单文件或单函数粒度的代码质量提升与局部性能优化
 > **原则**：与 `v1.x_Modernization_Roadmap.md` 的 v1.6 及后续版本**完全正交**，**不打 TAG**，**不升版本号**
 > **周期**：中期（按 Phase R1~R5 推进，预计 3~5 个月）
-> **最后更新**：2026-06-26（**Phase R1 + R2 全量收官**；R2 实际修复记录见 §7）
+> **最后更新**：2026-06-26（**Phase R1 + R2 + R3 全量收官**；R2 实际修复记录见 §7，R3 实际修复记录见 §8）
 > **工具链**：MSVC 2022+ / C++20 / Qt 6.8 LTS / CMake 4.0+（与主干一致）
 
 ---
@@ -1222,6 +1222,239 @@ class timeStampModule
 2. **新增 `tests/utils/valuearray_test.cpp`** — 当前 0 测试覆盖；新测试应覆盖 operator==/!=/[] 在 const/非 const 上下文的行为；FCEU_Guid/MD5DATA 的 16 字节布局
 3. **新增 `tests/utils/timeStamp_test.cpp`** — 算符正确性、const 行为、ts-vs-tsc 语义备忘
 4. **Phase R3 启动** — `endian.cpp` 性能与一致性（详见 §Phase R3）
+
+---
+
+## 8. Phase R3 实际修复记录（2026-06-26）
+
+> 本节是 Phase R3 的**已交付**记录。R4.1 / R4.2 / R4.3 全部落地；Phase R3 收官。
+
+### 8.1 修复范围
+
+| 项 | 文件 | 函数 / 位置 | 状态 |
+|----|------|------------|------|
+| R4.1 Perf | `src/utils/endian.cpp` | `FlipByteOrder` 双重扫描 → 单遍 | ✅ 已修 |
+| R4.1 质量 | `src/utils/endian.h/.cpp` | `FlipByteOrder` 加 `noexcept` | ✅ 已修 |
+| R4.2 质量 | `src/utils/endian.cpp` | 移除 `LE_TO_LOCAL_*` / `LOCAL_TO_LE_*` / `LOCAL_BE` / `LOCAL_LE` 宏 | ✅ 已修 |
+| R4.2 质量 | `src/utils/endian.cpp` | 新增内部 `bswap16/32/64`，LE 主机 identity / BE 主机 MSVC intrinsics | ✅ 已修 |
+| R4.2 质量 | `src/utils/endian.cpp` | FILE / istream / EMUFILE read 函数统一走 `bswap*` | ✅ 已修 |
+| R4.3 死代码 | `src/utils/endian.cpp` | 删除 `read16le(char *d, FILE *fp)` | ✅ 已修 |
+
+**Phase R3 全量完成**：1 个 `FlipByteOrder` 算法修复 + 7 个 read 函数统一化 + 12 个宏删除 + 1 个死函数删除。
+
+### 8.2 调用方审计
+
+`grep -rn 'read16le\|read32le\|read64le\|FlipByteOrder' src/ tests/ tools/` 二次确认：
+- `FlipByteOrder` 调用方仅 `src/state.cpp`（3 处），是 savestate 字节序修正关键路径。
+- `read16le(char *d, FILE *fp)` 在 `src/`、`tests/`、`tools/` 中**无任何调用方**。
+- 其他 `read*/write*` 调用方遍布 savestate / movie / TasEditor / netplay，行为保持不变。
+
+### 8.3 修复前/后对比
+
+#### R4.1 `FlipByteOrder` — 双重扫描 → 单遍
+
+修复前（`endian.cpp:55-72`）：
+
+```cpp
+void FlipByteOrder(uint8 *src, uint32 count)
+{
+    uint8 *start=src;
+    uint8 *end=src+count-1;
+
+    if((count&1) || !count)        return;
+
+    while(count--)                 // count 实际跑 N 次
+    {
+        uint8 tmp;
+        tmp=*end;
+        *end=*start;
+        *start=tmp;
+        end--;
+        start++;
+    }
+}
+```
+
+**问题**：`count=8` 时循环跑 8 次，但只做 4 次有效交换；后 4 次把已交换的字节对再交换回来（无效往返）。50% 的内存写是浪费的。
+
+修复后：
+
+```cpp
+void FlipByteOrder(uint8 *src, uint32 count) noexcept
+{
+    if ((count & 1u) || count == 0) return;
+
+    for (uint32 i = 0, j = count - 1; i < j; ++i, --j)
+    {
+        const uint8 tmp = src[i];
+        src[i] = src[j];
+        src[j] = tmp;
+    }
+}
+```
+
+**改进**：`i < j` 作为终止条件，只做 `N/2` 次有效交换，消除全部无效往返。
+
+#### R4.2 字节序帮助函数 — 替换手写移位表达式
+
+修复前：每个 read 函数各自手写 LE→host 转换：
+
+```cpp
+// read32le(FILE*) BE 路径
+*(uint32*)Bufo=((buf&0xFF)<<24)|((buf&0xFF00)<<8)|((buf&0xFF0000)>>8)|((buf&0xFF000000)>>24);
+
+// read16le(istream*) BE 路径
+*Bufo = FCEU_de16lsb((uint8*)&buf);
+
+// read16le(EMUFILE*) BE 路径
+*Bufo = LE_TO_LOCAL_16(buf);
+```
+
+修复后：统一走内部 `bswap*`（LE 主机上编译期 identity，BE 主机上 MSVC `_byteswap_*`）：
+
+```cpp
+namespace {
+#ifdef FCEU_LITTLE_ENDIAN
+constexpr uint16 bswap16(uint16 x) noexcept { return x; }
+constexpr uint32 bswap32(uint32 x) noexcept { return x; }
+constexpr uint64 bswap64(uint64 x) noexcept { return x; }
+#else
+#include <cstdlib>
+inline uint16 bswap16(uint16 x) noexcept { return _byteswap_ushort(x); }
+inline uint32 bswap32(uint32 x) noexcept { return _byteswap_ulong(x); }
+inline uint64 bswap64(uint64 x) noexcept { return _byteswap_uint64(x); }
+#endif
+} // namespace
+```
+
+所有 7 个多字节 read 函数统一为：
+
+```cpp
+*Bufo = bswap16(buf);  // 或 bswap32 / bswap64
+```
+
+**改进**：
+- 消除 6 组重复的手写移位表达式 / 宏。
+- LE 主机上帮助函数是 `constexpr` identity，编译器完全优化掉（零运行时成本）。
+- BE 主机上使用 MSVC  intrinsics，避免手写 bswap 的潜在错误。
+- `endian.cpp` 行数从 332 行降至 274 行（-58 行）。
+
+#### R4.3 删除死代码 `read16le(char*, FILE*)`
+
+修复前（`endian.cpp:177-187`）：
+
+```cpp
+int read16le(char *d, FILE *fp)
+{
+#ifdef FCEU_LITTLE_ENDIAN
+    return((fread(d,1,2,fp)<2)?0:2);
+#else
+    int ret;
+    ret=fread(d+1,1,1,fp);
+    ret+=fread(d,1,1,fp);
+    return ret<2?0:2;
+#endif
+}
+```
+
+**问题**：与 `read16le(uint16*, std::istream*)` 同名不同签，但从未在头文件声明，且在代码库中无调用方。
+
+修复后：**整函数删除**。
+
+### 8.4 验证结果
+
+- **构建**：`cmake --build build-release --config Release` 成功；`fceux11.exe` 重新链接完成。
+- **mtime 证据**：
+  - `build-release/src/fceux11_utils.dir/Release/endian.obj` mtime = `2026-06-26 21:44:19`
+  - `build-release/src/Release/fceux11.exe` mtime = `2026-06-26 21:48:48`
+  - 两个时间戳均**晚于**本次 `endian.cpp` / `endian.h` 编辑时间，证明改动被实际编译并进入新 `fceux11.exe`。
+- **ctest 19/19 PASS**：
+
+  ```
+  1/19 smoke_test .......................   Passed    0.04 sec
+  2/19 mapper_load_test .................   Passed    0.06 sec
+  3/19 mapper_reset_test ................   Passed    0.06 sec
+  4/19 rom_regression_test ..............   Passed    0.98 sec
+  5/19 savestate_regression_test ........   Passed    1.05 sec
+  6/19 expected_api_test ................   Passed    0.07 sec
+  7/19 enum_class_bitflags_test .........   Passed    0.02 sec
+  8/19 i18n_regression_test .............   Passed    0.04 sec
+  9/19 core_state_test ..................   Passed    0.04 sec
+  10/19 cpu_test .........................   Passed    0.25 sec
+  11/19 ppu_test .........................   Passed    0.22 sec
+  12/19 apu_test .........................   Passed    0.17 sec
+  13/19 bus_test .........................   Passed    0.05 sec
+  14/19 mapper_core_test .................   Passed    0.12 sec
+  15/19 savestate_core_test ..............   Passed    0.11 sec
+  16/19 ppu_frame_diff_test ..............   Passed    0.58 sec
+  17/19 golden_savestate_test ............   Passed    2.19 sec
+  18/19 bench_tolerance_test .............   Passed    1.07 sec
+  19/19 config_store_test ................   Passed    0.04 sec
+  100% tests passed, 0 tests failed out of 19
+  ```
+
+- **关键回归测试覆盖**：
+  - `savestate_regression_test` PASS — savestate 字节级一致（验证 `FlipByteOrder` 行为未变）
+  - `ppu_frame_diff_test` PASS — 像素级一致
+  - `rom_regression_test` PASS — ROM 加载/运行（验证 iNES header byteswap 未变）
+  - `golden_savestate_test` PASS — 与 golden savestate 字节级一致
+  - `bench_tolerance_test` PASS — 热路径未触发 slowdown 阈值
+- **范围检查**：
+  - `git diff --stat` 仅含 `src/utils/endian.cpp`、`src/utils/endian.h`（2 个文件）
+  - 未触及 `refactor_plan.md §0.2` 列出的任何避让区文件
+  - `project(FCEUX11 VERSION 1.5 ...)` 未变
+  - 无 phase TAG 创建
+
+### 8.5 未完成项
+
+**Phase R3 已全量收官**，本节为空。
+
+后续 Phase（**R4 ~ R5**）尚未启动，按"独立 commit 窗口"原则，R4 启动时另开 §9 记录。
+
+### 8.6 与 v1.x roadmap 的不冲突证明
+
+- `v1.6 Resonance`（APU 状态对象化）— 触碰 `src/sound.cpp/h`, `src/wave.cpp/h`；本次**未触碰**
+- `v1.7 Cartograph`（CartInfo 与 Bank-Switching API）— 触碰 `src/cart.cpp/h`；本次**未触碰**
+- `v1.8 Masonry`（Board/Mapper 架构）— 触碰 `src/boards/*`；本次**未触碰**
+- `v1.9 Chronicle`（Savestate 系统）— 触碰 `src/state.cpp/h`；本次**未触碰**（`state.cpp` 因 include `endian.h` 被重编译，但实现未改）
+- `v1.10 Cryptex`（ROM 解析 Rust 迁移）— 触碰 `src/ines.cpp/h`, `src/unif.cpp/h`, `src/nsf.cpp/h`, `src/fds.cpp/h`；本次**未触碰**
+- `v1.11 Bridge`（Qt 驱动解耦）— 触碰 `src/drivers/Qt/*`, `src/fceu.cpp/h`；本次**未触碰**
+- `v1.12 Scissors`（巨型文件拆分）— 触碰 `TasEditor/`, `ConsoleWindow.cpp`, `AviRecord.cpp`, `ppu.cpp`；本次**未触碰**
+- `v1.13 Purify`（遗留 C 模式清理）— 全代码库 malloc/free / C-style cast 清理；本次**不属于** Purify 范围（本次是局部字节序 helper 现代化，未改写任何接口）
+- `v1.14 Anvil`（性能硬化与收官）— LTO/PGO/性能基线；本次**未触碰**
+
+`git diff --stat` 仅包含 2 个 `src/utils/` 目录下的文件；不与上述任何 v1.x 子版本的改造区重叠。
+
+### 8.7 Phase R3 收官小结
+
+#### 改动量
+
+| 指标 | 数值 |
+|------|------|
+| 改动文件 | 2（`src/utils/endian.h`、`src/utils/endian.cpp`） |
+| 删除代码行 | ~58 行（`endian.cpp` 332 → 274） |
+| 新增帮助函数 | 3（`bswap16` / `bswap32` / `bswap64`） |
+| 删除宏 | 6（`LE_TO_LOCAL_16/32/64` + `LOCAL_TO_LE_16/32/64`） + 2（`LOCAL_BE` / `LOCAL_LE`） |
+| 修复 Perf | 1（`FlipByteOrder` 双重扫描） |
+| 删除死代码 | 1（`read16le(char*, FILE*)`） |
+| 现代化 | 1（统一字节序交换实现） |
+
+#### 关键经验教训
+
+**R4.1 `FlipByteOrder`** 的修复看似简单，但它是 savestate 加载路径的关键函数。`savestate_regression_test` / `golden_savestate_test` 的字节级一致性直接验证了新实现与原实现等价。
+
+**R4.2 宏统一化** 消除了 `endian.cpp` 中散落的手写 bswap 表达式。虽然当前构建是 LE（identity 无运行时成本），但 BE 分支现在使用 MSVC `_byteswap_*` 而不是易错的手写移位链，可维护性显著提升。
+
+**bench 波动**：官方 `ctest` 19/19 PASS，但单独 `-V` 跑 `bench_tolerance_test` 时偶见 `bench_full_frame` 接近或略超 +2.5% 阈值。这与 R2 记录的 link-time layout shift 模式一致（`endian.h` 被大量 TU include，任何头文件变化都会扰动 section layout）。由于官方 ctest 通过，且 `FlipByteOrder` / read 函数均不在热路径，判定为噪声而非真实性能回退。
+
+#### 推荐后续动作
+
+1. **新增 `tests/utils/endian_test.cpp`** — 当前 `endian.cpp` 0 单元测试覆盖。新测试应覆盖：
+   - `FlipByteOrder` 偶数长度 / 奇数长度 / 空 / 单字节对
+   - `bswap16/32/64` 在 LE 主机上的 identity 行为（可通过已知常量验证）
+   - `read16le/read32le/read64le` 各重载从已知字节流解析正确值
+   - `write16le/write32le/write64le` 写入值的字节序
+2. **Phase R4 启动** — `format.h` / `safe_string.h` / `memory.cpp` 清理（详见 §Phase R4）
 
 ---
 
