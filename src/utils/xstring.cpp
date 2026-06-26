@@ -27,7 +27,7 @@
 #include <string>
 
 ///Upper case routine. Returns number of characters modified
-// R1.2 (refactor_plan.md §Phase R1): the original loop was O(n^2) because
+// R1.2 (docs/internal/refactor_plan_R1_R5_archive.md §Phase R1): the original loop was O(n^2) because
 // `while (i < strlen(str))` recomputed strlen on every iteration. Replaced
 // with a single pointer-based pass.
 int str_ucase(char *str) {
@@ -44,7 +44,7 @@ int str_ucase(char *str) {
 
 
 ///Lower case routine. Returns number of characters modified
-// R1.2 (refactor_plan.md §Phase R1): same O(n^2) → O(n) fix as str_ucase.
+// R1.2 (docs/internal/refactor_plan_R1_R5_archive.md §Phase R1): same O(n^2) → O(n) fix as str_ucase.
 int str_lcase(char *str) {
 	if (!str) return 0;
 	int j = 0;
@@ -62,7 +62,7 @@ int str_lcase(char *str) {
 
 ///Removes whitespace from left side of string, depending on the flags set (See STRIP_x definitions in xstring.h)
 ///Returns number of characters removed
-// R1.1 (refactor_plan.md §Phase R1): the original 4 calls to
+// R1.1 (docs/internal/refactor_plan_R1_R5_archive.md §Phase R1): the original 4 calls to
 // `FCEU_strlcpy(str, sizeof(str), str+1)` were a silent data corruption BUG:
 // `sizeof(str)` is `sizeof(char*)` (8 bytes on x64), so the copy was capped at
 // 7 bytes regardless of the caller's actual buffer size. Rewrote as a
@@ -93,7 +93,7 @@ int str_ltrim(char *str, int flags) {
 
 ///Removes whitespace from right side of string, depending on the flags set (See STRIP_x definitions in xstring.h)
 ///Returns number of characters removed
-// R1.1 (refactor_plan.md §Phase R1): the original tested `str[0]` instead of
+// R1.1 (docs/internal/refactor_plan_R1_R5_archive.md §Phase R1): the original tested `str[0]` instead of
 // `str[strl-1]`, so it could only ever trim a leading space (and only one
 // byte at a time) — it never actually trimmed trailing whitespace as the
 // function name and docstring claim. Replaced with a single-pass tail scan.
@@ -120,12 +120,12 @@ int str_rtrim(char *str, int flags) {
 
 ///Removes whitespace depending on the flags set (See STRIP_x definitions in xstring.h)
 ///Returns number of characters removed, or -1 on error
-// R1.1 (refactor_plan.md §Phase R1): the final `FCEU_strlcpy(str, sizeof(str),
+// R1.1 (docs/internal/refactor_plan_R1_R5_archive.md §Phase R1): the final `FCEU_strlcpy(str, sizeof(str),
 // astr)` had the same sizeof(str) BUG as str_ltrim — silently truncating
 // copies at sizeof(char*) = 8 bytes on x64. Replaced with `memcpy(str, astr,
 // j+1)`, which is safe because astr is null-terminated and always ≤ str's
 // old content.
-// R1.3 (refactor_plan.md §Phase R1): replaced the `malloc`/`free` temp
+// R1.3 (docs/internal/refactor_plan_R1_R5_archive.md §Phase R1): replaced the `malloc`/`free` temp
 // buffer with `std::vector<char>`. The vector is RAII-managed so the
 // failure path is now exception-safe (the original `free(astr)` after an
 // early return would have leaked; the new code has no early return after
@@ -161,7 +161,7 @@ int str_strip(char *str, int flags) {
 
 ///Replaces all instances of 'search' with 'replace'
 ///Returns number of characters modified
-// R1.2 (refactor_plan.md §Phase R1): same O(n^2) → O(n) fix as str_ucase.
+// R1.2 (docs/internal/refactor_plan_R1_R5_archive.md §Phase R1): same O(n^2) → O(n) fix as str_ucase.
 int chr_replace(char *str, char search, char replace) {
 	if (!str) return 0;
 	int j = 0;
@@ -179,11 +179,11 @@ int chr_replace(char *str, char search, char replace) {
 
 ///Replaces all instances of 'search' with 'replace'
 ///Returns number of sub-strings modified, or -1 on error
-// R1.1 (refactor_plan.md §Phase R1): the final `FCEU_strlcpy(str, sizeof(str),
+// R1.1 (docs/internal/refactor_plan_R1_R5_archive.md §Phase R1): the final `FCEU_strlcpy(str, sizeof(str),
 // astr)` had the same sizeof(str) BUG as str_ltrim/str_strip. Replaced with
 // `memcpy(str, astr, j+1)`. Also cached `strlen(str)` in `strl` to make the
 // loop termination check O(1) instead of recomputing on every iteration.
-// R1.3 (refactor_plan.md §Phase R1): replaced the `malloc`/`free` temp
+// R1.3 (docs/internal/refactor_plan_R1_R5_archive.md §Phase R1): replaced the `malloc`/`free` temp
 // buffer with `std::string tmp`. The std::string manages its own capacity
 // (replaces the original `malloc(strl + 1)` upper bound, which silently
 // overflowed when `replace` was longer than `search` on aggregate — a
@@ -225,7 +225,7 @@ int str_replace(char *str, const char *search, const char *replace) {
 	return static_cast<int>(j);
 }
 
-// R1.4 (refactor_plan.md §Phase R1): Base64Table is now a C++20 constexpr
+// R1.4 (docs/internal/refactor_plan_R1_R5_archive.md §Phase R1): Base64Table is now a C++20 constexpr
 // `std::array` initialised at compile time by a constexpr factory. The
 // previous static-initialisation constructor ran once at program start
 // (microsecond cost, but more importantly it was an implicit runtime
@@ -411,7 +411,7 @@ bool StringToBytes(const std::string& str, void* data, int len)
 std::vector<std::string> tokenize_str(const std::string & str,
                                       const std::string & delims=", \t")
 {
-  // R1.5 (refactor_plan.md §Phase R1): removed `using namespace std;` to
+  // R1.5 (docs/internal/refactor_plan_R1_R5_archive.md §Phase R1): removed `using namespace std;` to
   // comply with the /W4 /WX policy of the project (no `using namespace`
   // in core/utility code). All std types below now carry the `std::`
   // prefix explicitly.
@@ -626,7 +626,7 @@ std::string readNullTerminatedAscii(EMUFILE* is)
 }
 
 // replace all instances of victim with replacement
-// R1.6 (refactor_plan.md §Phase R1): the original loop was missing the
+// R1.6 (docs/internal/refactor_plan_R1_R5_archive.md §Phase R1): the original loop was missing the
 // `j += replacement.length()` increment after the replace. The intent
 // is to skip past the just-inserted replacement so the next `find`
 // starts looking AFTER it. Without the increment, if `replacement`

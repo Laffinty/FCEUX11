@@ -59,7 +59,7 @@ static const int kNumBenchs = sizeof(kBenchs) / sizeof(kBenchs[0]);
 
 // ---------------------------------------------------------------------------
 // Measurement configuration. Defaults implement the R4 methodology fix
-// (see docs/refactor_plan.md §9.7 #1): the original 1-frame warm-up +
+// (see docs/internal/refactor_plan_R1_R5_archive.md §9.7 #1): the original 1-frame warm-up +
 // 5-iteration median was fragile against cold-cache contamination —
 // when a hot header changed, the resulting link-time layout shift was
 // amplified by the under-warmed first measurement, producing stable

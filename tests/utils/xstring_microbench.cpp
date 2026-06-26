@@ -1,4 +1,4 @@
-// FCEUX11 Phase R1 micro-benchmark (refactor_plan.md §6.4)
+// FCEUX11 Phase R1 micro-benchmark (docs/internal/refactor_plan_R1_R5_archive.md §6.4)
 //
 // Compares OLD (pre-R1.1/R1.2) and NEW (post-R1.1/R1.2/R1.3) implementations
 // of selected xstring utilities. The OLD versions are inline in this file

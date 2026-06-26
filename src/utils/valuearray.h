@@ -1,7 +1,7 @@
 #ifndef _VALUEARRAY_H_
 #define _VALUEARRAY_H_
 
-// R2.1 (refactor_plan.md §Phase R2): const-correctness overhaul.
+// R2.1 (docs/internal/refactor_plan_R1_R5_archive.md §Phase R2): const-correctness overhaul.
 // The original had three issues:
 //   1. `operator==` was missing `const` — could not be called on
 //      `const ValueArray` (e.g., `if (guid1 == guid2)` in a const

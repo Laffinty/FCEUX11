@@ -7,7 +7,7 @@
 
 typedef ValueArray<uint8,16> MD5DATA;
 
-// R2.1 (refactor_plan.md §Phase R2): layout-assert for MD5DATA — same
+// R2.1 (docs/internal/refactor_plan_R1_R5_archive.md §Phase R2): layout-assert for MD5DATA — same
 // reason as FCEU_Guid in guid.h (16-byte SFORMAT blob in src/state.cpp).
 static_assert(sizeof(MD5DATA) == 16,
               "MD5DATA layout changed: 16-byte SFORMAT serialization will "

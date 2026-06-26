@@ -14,7 +14,7 @@ struct FCEU_Guid : public ValueArray<uint8,16>
 	void scan(std::string& str);
 };
 
-// R2.1 (refactor_plan.md §Phase R2): layout-assert that the const-correctness
+// R2.1 (docs/internal/refactor_plan_R1_R5_archive.md §Phase R2): layout-assert that the const-correctness
 // refactor of ValueArray did not change the byte layout. SFORMAT
 // savestate serialization in src/state.cpp writes FCEU_Guid as a raw
 // 16-byte blob, so any size change here is a savestate-compat break.

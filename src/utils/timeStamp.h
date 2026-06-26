@@ -23,7 +23,7 @@ namespace FCEU
 			return *this;
 		}
 
-		// R3.1 (refactor_plan.md §Phase R2): added operator-=, *=, /=.
+		// R3.1 (docs/internal/refactor_plan_R1_R5_archive.md §Phase R2): added operator-=, *=, /=.
 		// The previous API only had operator+=, forcing callers like
 		// `rec->sum = rec->sum + dt` to copy a 16-byte timeStampRecord
 		// (4 fields: ts, tsc, plus padding) per iteration. The -=/*=//=
@@ -97,7 +97,7 @@ namespace FCEU
 		// on the method, so they could not be called on `const
 		// timeStampRecord` (e.g. from a const profiler record). Added
 		// `const`. The semantic mismatch with +/- (which compare both
-		// `ts` and `tsc`) is left untouched per refactor_plan.md §0.3
+		// `ts` and `tsc`) is left untouched per docs/internal/refactor_plan_R1_R5_archive.md §0.3
 		// ("不引入新接口") — the existing `ts`-only comparison is
 		// preserved.
 		// TODO(refactor_R3.1): the comparison operators compare `ts`
@@ -113,7 +113,7 @@ namespace FCEU
 		[[nodiscard]] bool operator <  (const timeStampRecord& op) const { return ts <  op.ts; }
 		[[nodiscard]] bool operator <= (const timeStampRecord& op) const { return ts <= op.ts; }
 
-		// R3.3 (refactor_plan.md §Phase R2): removed C-style `(void)`
+		// R3.3 (docs/internal/refactor_plan_R1_R5_archive.md §Phase R2): removed C-style `(void)`
 		// empty-parameter-list decoration. C++ distinguishes
 		// `void f()` (no params) from `void f(void)` (also no params,
 		// but the `(void)` is a C-ism left over from the 2002-vintage

@@ -17,7 +17,7 @@
 
 #include "../rust/fceux11_rust.h"
 
-// R3.2 (refactor_plan.md §Phase R2): originally routed the calibration
+// R3.2 (docs/internal/refactor_plan_R1_R5_archive.md §Phase R2): originally routed the calibration
 // trace through FCEU_PrintError for unified logging. That required
 // `#include "../fceu.h"`, which transitively pulls in bus.h (the v1.4
 // Bus class header). bench_tolerance_test caught a +23% regression on
@@ -63,7 +63,7 @@ void timeStampRecord::qpcCalibrate(void)
 }
 #endif
 
-// R3.2 (refactor_plan.md §Phase R2): removed the
+// R3.2 (docs/internal/refactor_plan_R1_R5_archive.md §Phase R2): removed the
 // `printf("timeStampModuleInit\n")` that fired at static initialisation
 // time (before main(), polluting stdout of any program that links
 // fceux11_utils). The ctor's only real work is calling qpcCalibrate();

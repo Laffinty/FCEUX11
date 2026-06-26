@@ -5,6 +5,70 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — Mid-term refactor plan R1–R5 completion (2026-06-27)
+
+> **No version bump, no tag.** This batch of utils-layer quality fixes is
+> intentionally orthogonal to the v1.x modernization roadmap per
+> `docs/internal/refactor_plan.md` and does not change `project(FCEUX11 VERSION 1.5 ...)`.
+
+### Fixed
+
+- **`src/utils/xstring.cpp`** — R1.1: 4 `sizeof(char*)` buffer-size bugs in
+  `str_ltrim`/`str_strip`/`str_replace`; `str_rtrim` off-by-one. R1.2:
+  `str_ucase`/`str_lcase`/`chr_replace` O(n²)→O(n). R1.6: `mass_replace`
+  infinite loop when `replacement` contains `victim` and empty-victim guard.
+- **`src/utils/valuearray.h`** — R2.1: const-correctness for `operator==`/`!=`
+  and `operator[]`; layout assertions added in `guid.h` and `md5.h`.
+- **`src/utils/timeStamp.cpp/h`** — R3.2: removed static-init `printf` noise;
+  R3.3: 14 C-style `(void)` parameter cleanups.
+- **`src/utils/endian.cpp/h`** — R4.1: `FlipByteOrder` double-scan → single
+  pass; R4.2: unified byte-swap helpers; R4.3: removed dead
+  `read16le(char*, FILE*)`.
+- **`src/utils/memory.cpp`** — R7.1: `FCEU_realloc` now aborts on failure
+  (matches `FCEU_malloc`/`FCEU_amalloc`); `realloc(ptr, 0)` treated as the
+  implementation-defined free+nullptr case, not a failure.
+- **`tests/benchmarks/bench_tolerance_test.cpp`** — Methodology fix:
+  1-warmup + 5-iter median → 3-warmup + 7-iter drop-min/max median, plus
+  `--warmup-iterations` / `--iterations` CLI switches. Reduces cold-cache
+  noise that previously magnified link-time layout shifts.
+
+### Changed
+
+- **`src/utils/xstring.cpp`** — R1.3: `str_strip`/`str_replace` malloc/free
+  → `std::vector`/`std::string`. R1.4: `Base64Table` runtime construction
+  → C++20 `constexpr`. R1.5: removed `using namespace std;` in
+  `tokenize_str`.
+- **`src/utils/timeStamp.h`** — R3.1: binary/comparison operators const- and
+  `[[nodiscard]]`-qualified; `operator-=`/`*=`/`/=` deferred to a future
+  R3.1b wave because adding them triggered +2.96% link-time layout
+  regression on hot paths.
+- **`src/utils/mutex.cpp/h`** — R6.1: `QRecursiveMutex`/`QMutex` raw
+  new/delete → `std::unique_ptr`. R6.2: `autoScopedLock` two constructors
+  merged into one forwarding-template constructor.
+- **`src/palette.cpp`** — R9.1: removed dead `#define M_PI` block (body used
+  literal π, not the macro).
+
+### Not done / no-op / deferred
+
+- R5.1 (`CTASSERT` → `static_assert`) and R5.2 (`FCEU_CPP_HAS_STD`
+  removal) permanently shelved: existing implementations work and the
+  risk of hot-header link-time layout shift outweighs the benefit.
+- R8.1 (`strncpy`/`strncat` → explicit `memcpy`) deferred: no hot-path
+  callers, near-zero gain; left for v1.13 Purify.
+- R10.1–R10.3 (warning cleanup) and R11.1 (`input/*.cpp` modernization)
+  audited as no-op: no actionable items outside roadmap-evasion zones.
+
+### Verification
+
+- `ctest 19/19 PASS` throughout all phases, including the tightened
+  `bench_tolerance_test` methodology.
+- R5a stability: 10 consecutive runs of `bench_tolerance_test` with the
+  new methodology were 10/10 PASS (max +2.44%, within the asymmetric
+  ±2.5% gate).
+- Savestate / ROM / PPU pixel regressions remain byte-identical:
+  `savestate_regression_test`, `golden_savestate_test`,
+  `ppu_frame_diff_test`, `rom_regression_test` all PASS.
+
 ## [1.5] - 2026-06-24
 
 **Codename: Prism.** Fifth sub-version of the v1.x modernization cycle
