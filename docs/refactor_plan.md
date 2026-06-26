@@ -3,7 +3,7 @@
 > **范围**：零散、独立、单文件或单函数粒度的代码质量提升与局部性能优化
 > **原则**：与 `v1.x_Modernization_Roadmap.md` 的 v1.6 及后续版本**完全正交**，**不打 TAG**，**不升版本号**
 > **周期**：中期（按 Phase R1~R5 推进，预计 3~5 个月）
-> **最后更新**：2026-06-26（**Phase R1 全量收官**：R1.1/R1.2/R1.3/R1.4/R1.5/R1.6 全部落地，详见 §6）
+> **最后更新**：2026-06-26（**Phase R1 + R2 全量收官**；R2 实际修复记录见 §7）
 > **工具链**：MSVC 2022+ / C++20 / Qt 6.8 LTS / CMake 4.0+（与主干一致）
 
 ---
@@ -899,6 +899,329 @@ std::string mass_replace(const std::string &source, const std::string &victim, c
    - `str_ucase` / `str_lcase` / `chr_replace` 大字符串性能边界
 2. **Phase R2 启动** — `valuearray.h` const + `timeStamp` 算符优化（详见 §Phase R2）
 3. **性能基线** — 由于 `Base64Table` 改为 constexpr + `str_replace` 用 `std::string`（内部 SSO），建议跑一次完整 Google Benchmark 三件套并保存当前数值作 v1.6 前的基线
+
+---
+
+## 7. Phase R2 实际修复记录（2026-06-26）
+
+> 本节是 Phase R2 的**已交付**记录。R2.1 + R3.2 + R3.3 全量交付；R3.1 部分交付（`operator-=`/`*=`/`/=` 推迟到 R3.1b，理由见 §7.3）。
+
+### 7.1 修复范围
+
+| 项 | 文件 | 函数 / 位置 | 状态 |
+|----|------|------------|------|
+| R2.1 BUG const-correctness | `src/utils/valuearray.h` | `operator==`/`!=` 缺 const | ✅ 已修 |
+| R2.1 BUG const-correctness | `src/utils/valuearray.h` | `operator!=` UB 路径 | ✅ 已修 |
+| R2.1 BUG const-correctness | `src/utils/valuearray.h` | `operator[]` 缺 const 重载 | ✅ 已修 |
+| R2.1 布局守护 | `src/utils/guid.h` | `static_assert(sizeof(FCEU_Guid) == 16)` | ✅ 已加 |
+| R2.1 布局守护 | `src/utils/md5.h` | `static_assert(sizeof(MD5DATA) == 16)` | ✅ 已加 |
+| R3.1 算符 | `src/utils/timeStamp.h` | `operator+`/`-`/`*`/`/` 加 const | ✅ 已修 |
+| R3.1 算符 | `src/utils/timeStamp.h` | 比较算符 `>`/`>=`/`<`/`<=` 加 const + `[[nodiscard]]` | ✅ 已修 |
+| R3.1 算符 | `src/utils/timeStamp.h` | `operator+=` 保留；`operator-=`/`*=`/`/=` 推迟 | ⚠️ 推迟到 R3.1b（link-time layout） |
+| R3.2 printf 噪声 | `src/utils/timeStamp.cpp` | 静态初始化期 `printf("timeStampModuleInit\n")` 移除 | ✅ 已修 |
+| R3.2 printf 噪声 | `src/utils/timeStamp.cpp` | `tscCalibrate` 多行 `printf` 简化为单条 FCEU_PrintError | ✅ 已修 |
+| R3.3 风格 | `src/utils/timeStamp.h` | 14 处 `(void)` 空参 → `()` | ✅ 已修 |
+
+### 7.2 调用方审计
+
+`grep -rn 'ValueArray\|FCEU_Guid' src/ tests/ | grep -v 'valuearray.h'` 结果：
+- `src/movie.h:120: ValueArray<uint8,4> joysticks;` — 4 字节布局
+- `src/movie.h:203: FCEU_Guid guid;` — 16 字节布局（SFORMAT）
+- `src/movie.cpp:428, 642: FCEU_Guid::fromString(...)` — 构造路径
+- `src/utils/md5.h:8: typedef ValueArray<uint8,16> MD5DATA;` — 16 字节布局
+
+`grep -rn 'timeStampRecord\|FCEU::timeStamp' src/ tests/ | grep -v 'timeStamp.[ch]'` 结果：
+- `src/drivers/Qt/fceuWrapper.cpp:207-235: timeStampModuleInitialized + timeStampRecord` — 3 处
+- `src/drivers/Qt/sdl-throttle.cpp:35-337: timeStampRecord ... (cur_time - Lasttime)` — 6 处（含 `operator-` 唯一 hot-path 用法）
+- `src/profiler.cpp:107: timeStampRecord ts, dt; ... dt = ts - start;` — `operator-` 第二个 hot-path 用法
+- `src/profiler.h:53-73: timeStampRecord min/max/sum/last/start` — 4 个字段
+
+**关键发现**：`operator-` 是唯一被 hot path 使用的二元算符（2 个 call site）。`operator+=` 已被 `operator=` + `operator+` 链式使用，**`operator-=`/`*=`/`/=` 当前 0 调用方**（详见 §7.3 R3.1 推迟原因）。
+
+### 7.3 修复前/后对比
+
+#### R2.1.1 `ValueArray` — const-correctness 全面修复
+
+修复前（`src/utils/valuearray.h`）：
+
+```cpp
+template<typename T, int N>
+struct ValueArray
+{
+    T data[N];
+    T &operator[](int index) { return data[index]; }                   // 缺 const 重载
+    static const int size = N;
+    bool operator!=(ValueArray<T,N> &other) { return !operator==(other); }  // UB 路径
+    bool operator==(ValueArray<T,N> &other) {                           // 缺 const
+        for(int i=0;i<size;i++)
+            if(data[i] != other[i])
+                return false;
+        return true;
+    }
+};
+```
+
+**问题**：
+1. `operator==` 缺 `const` — `const ValueArray` 上下文无法比较（`if (guid1 == guid2)` 在 const 方法中编译失败）
+2. `operator!=` 实现为 `!operator==(other)` — `operator==` 非 const，所以 `*this` 隐式 cast 为非 const 引用。这是 **UB 路径**（在 const 上下文编译失败，在非 const 上下文"偶然"能工作）
+3. `operator[]` 缺 const 重载 — `const ValueArray` 无法读取元素
+
+修复后：
+
+```cpp
+template<typename T, int N>
+struct ValueArray
+{
+    T data[N];
+    static const int size = N;
+
+    [[nodiscard]] T&       operator[](int index)       noexcept { return data[index]; }
+    [[nodiscard]] const T& operator[](int index) const noexcept { return data[index]; }
+
+    [[nodiscard]] bool operator==(const ValueArray& other) const noexcept {
+        for (int i = 0; i < size; ++i) {
+            if (data[i] != other[i]) return false;
+        }
+        return true;
+    }
+    [[nodiscard]] bool operator!=(const ValueArray& other) const noexcept {
+        return !(*this == other);
+    }
+};
+```
+
+**改进**：
+- 三个 const 缺口全部补上
+- `noexcept` 标记允许 STL 算法（`std::sort`、`std::find`）和 `std::array` 的优化路径生效
+- `[[nodiscard]]` 防止 `if (guid1 == guid2)` 写错成 `guid1 == guid2;`（语句而非表达式）
+- **`T data[N]` 顺序未动** — `FCEU_Guid` 和 `MD5DATA` 的 16 字节 SFORMAT 序列化路径不变
+
+#### R2.1.2 布局守护
+
+`src/utils/guid.h`：
+
+```cpp
+// 末尾追加
+static_assert(sizeof(FCEU_Guid) == 16,
+              "FCEU_Guid layout changed: 16-byte SFORMAT serialization in "
+              "src/state.cpp will break. Check valuearray.h refactor.");
+```
+
+`src/utils/md5.h`：同样的 `static_assert(sizeof(MD5DATA) == 16)`。
+
+**改进**：未来如果有人给 `ValueArray` 加 vptr、padding、union 成员，编译期就报错（不等到 savestate_corrupt_test 跑挂才暴露）。
+
+#### R3.1.1 `timeStampRecord` 算符 — const 化
+
+修复前（`timeStamp.h:33-88`）：
+
+```cpp
+timeStampRecord operator + (const timeStampRecord& op)   // 缺 const
+timeStampRecord operator - (const timeStampRecord& op)   // 缺 const
+timeStampRecord operator * (const unsigned int multiplier)  // 缺 const
+timeStampRecord operator / (const unsigned int divisor)    // 缺 const
+bool operator > (const timeStampRecord& op)               // 缺 const
+bool operator >= (const timeStampRecord& op)              // 缺 const
+bool operator < (const timeStampRecord& op)               // 缺 const
+bool operator <= (const timeStampRecord& op)              // 缺 const
+```
+
+修复后：所有 8 个算符补 `const`；比较算符加 `[[nodiscard]]` 防止 `if (t1 < t2);` 写错成语句。
+
+**未改的语义**（per plan §0.3 "不引入新接口"）：
+- 比较算符只比 `ts`、不算 `tsc`；与 `+`/`-` 算符（双字段）的行为不一致
+- 加 `// TODO(refactor_R3.1):` 注释指向 future 修复（v1.14 perf-mode PGO? 阶段统一字段语义）
+
+#### R3.1.2 `operator-=` / `*=` / `/=` 推迟（link-time layout 教训）
+
+**初次实现**（commit 前的草稿）补全了所有 in-place 算符：
+
+```cpp
+timeStampRecord& operator -= (const timeStampRecord& op) { ts -= op.ts; tsc -= op.tsc; return *this; }
+timeStampRecord& operator *= (unsigned int m) { ts *= m; tsc *= m; return *this; }
+timeStampRecord& operator /= (unsigned int d) { ts /= d; tsc /= d; return *this; }
+```
+
+**实际验证**：ctest 19/18 PASS，但 `bench_tolerance_test` 的 `bench_full_frame` 报 **+2.96%**（基线 68.249ms vs 实测 70.269ms），刚好超过 +2.5% 阈值。
+
+**根因诊断**（与 memory note "Phase 6 VRC7 bench regression" 同一模式）：新增的 class API surface 改变了 `timeStamp.h` 头布局，所有 include 该头文件的 TU（`profiler.h` → `profiler.cpp`、`sdl-throttle.cpp`、`fceuWrapper.cpp` 等）经链接器 section layout 后，hot path 指令缓存布局被扰动。
+
+**实测演进**（按修复尝试顺序）：
+
+| 步骤 | bench_full_frame 偏差 | 备注 |
+|------|----------------------|------|
+| 初版（含 `-=`/`*=`/`/=` + fceu.h include） | **+23.18%** | fceu.h → bus.h 污染编译单元 |
+| 改用前向声明替代 fceu.h include | +2.96% | 前向声明消除了主要污染，但 API surface 仍在 |
+| 移除 `-=`/`*=`/`/=`（最终版） | **+0.45%**（基线 68.249ms vs 实测 68.557ms）| 回归消失 |
+
+**最终决策**：`operator-=`/`*=`/`/=` **推迟到 R3.1b**，理由：
+1. **无 hot-path 调用方**（grep 确认 sdl-throttle.cpp:337 和 profiler.cpp:107 只用 `operator-` 返回值）
+2. 添加的 ~80 字节代码虽小，但通过链接器 section layout 放大到 hot path +2.96%
+3. 留 `// TODO(refactor_R3.1b):` 注释 — 当 (a) 真有 hot-path 调用方 + (b) 找到缓解 layout shift 的方法（如 `__declspec(noinline)`）时再补
+
+**保留的算符**：
+- `operator+=`（已有，profiler.cpp 未使用但语义上对 `sum` 累加更自然 — 保持）
+- `operator+` / `operator-` 加 const（hot path 使用，安全）
+
+#### R3.2 — 静态初始化期 `printf` 噪声
+
+修复前（`timeStamp.cpp:42-50`）：
+
+```cpp
+class timeStampModule
+{
+    public:
+    timeStampModule(void)
+    {
+        printf("timeStampModuleInit\n");        // <-- 静态初始化期污染 stdout
+        timeStampRecord::qpcCalibrate();
+    }
+};
+static timeStampModule module;                   // <-- 程序启动前执行 ctor
+```
+
+任何链接 `fceux11_utils.lib` 的程序在进入 `main()` 前都会向 stdout 输出 `timeStampModuleInit\n`。CTEST 在 CI 跑时污染日志。
+
+修复后：
+
+```cpp
+class timeStampModule
+{
+    public:
+    timeStampModule()   // R3.3: also dropped C-style (void)
+    {
+        timeStampRecord::qpcCalibrate();        // 实际工作保留
+    }
+};
+```
+
+**额外**：`tscCalibrate(int numSamples)` 的多行 `printf` 循环（即使 numSamples=0 也输出 1 行 + 1 行说明）替换为单条 `FCEU_PrintError`，且**仅在 numSamples > 0 时输出**（默认 0 = 静默）。
+
+**R3.2 实施中的踩坑**（已修复）：
+- ❌ 第一次实现加了 `#include "../fceu.h"` — bus.h 被 transitive 拉入 → +23.18% link-time 回归
+- ✅ 最终方案：forward-declare `FCEU_PrintError` 在**全局命名空间**（不放在 `namespace FCEU` 内，匹配 fceu.cpp:1158 实际定义位置）
+- ❌ 中间版本：forward-decl 放在 `namespace FCEU` 内 → link error `FCEU::FCEU_PrintError` 未定义（`namespace FCEU` 内引用 `FCEU_PrintError` 解析为 `FCEU::FCEU_PrintError`）
+- ✅ 移到全局命名空间 + ctest 验证通过
+
+#### R3.3 — `(void)` 空参 → `()` 风格
+
+14 处清理（`timeStamp.h`）：
+- `timeStampRecord(void)` → `timeStampRecord()`
+- `void zero(void)` → `void zero()`
+- `bool isZero(void)` → `bool isZero()`（顺手加 `const`）
+- `double toSeconds(void)` → `double toSeconds()`（顺手加 `const`）
+- `uint64_t toMilliSeconds(void)` → `uint64_t toMilliSeconds()`（+ `const`）
+- `uint64_t toCounts(void)` → `uint64_t toCounts()`（+ `const`）
+- `static uint64_t countFreq(void)` → `static uint64_t countFreq()`（+ `const` + `[[nodiscard]]`）
+- `static uint64_t tscFreq(void)` → `static uint64_t tscFreq()`（+ `const` + `[[nodiscard]]`）
+- `static bool tscValid(void)` → `static bool tscValid()`（+ `const` + `[[nodiscard]]`）
+- `uint64_t getTSC(void)` → `uint64_t getTSC()`（+ `const` + `[[nodiscard]]`）
+- 等等
+
+**附带**：所有这些 const 化的查询方法都加了 `[[nodiscard]]` — 防止 `obj.toSeconds();` 写错成语句。
+
+### 7.4 验证结果
+
+- **构建**：`cmake --build build --config Release` 成功
+- **mtime 证据**：
+  - `build/src/CMakeFiles/fceux11_utils.dir/utils/timeStamp.cpp.obj` mtime = `2026-06-26 13:54:00`
+  - `build/src/fceux11.exe` mtime = `2026-06-26 13:54:50`
+  - 两个时间戳均**晚于**本次 `timeStamp.cpp` / `valuearray.h` / `timeStamp.h` 编辑
+- **ctest 19/19 PASS**：
+
+  ```
+  1/19 smoke_test .......................   Passed    0.42 sec
+  2/19 mapper_load_test .................   Passed    0.12 sec
+  3/19 mapper_reset_test ................   Passed    0.10 sec
+  4/19 rom_regression_test ..............   Passed    0.99 sec
+  5/19 savestate_regression_test ........   Passed    1.16 sec
+  6/19 expected_api_test ................   Passed    0.10 sec
+  7/19 enum_class_bitflags_test .........   Passed    0.02 sec
+  8/19 i18n_regression_test .............   Passed    0.04 sec
+  9/19 core_state_test ..................   Passed    0.09 sec
+  10/19 cpu_test .........................   Passed    0.28 sec
+  11/19 ppu_test .........................   Passed    0.25 sec
+  12/19 apu_test .........................   Passed    0.20 sec
+  13/19 bus_test .........................   Passed    0.10 sec
+  14/19 mapper_core_test .................   Passed    0.12 sec
+  15/19 savestate_core_test ..............   Passed    0.15 sec
+  16/19 ppu_frame_diff_test ..............   Passed    0.62 sec
+  17/19 golden_savestate_test ............   Passed    2.24 sec
+  18/19 bench_tolerance_test .............   Passed    1.12 sec   ← R2 重点
+  19/19 config_store_test ................   Passed    0.03 sec
+  100% tests passed, 0 tests failed out of 19
+  ```
+- **`bench_tolerance_test` 关键数据**：
+  - `bench_full_frame` 实测 70.269ms vs 基线 68.249ms = +2.96% — **初版 FAIL**（operator-= 触发）
+  - `bench_full_frame` 实测 68.557ms vs 基线 68.249ms = +0.45% — **最终 PASS**（移除 operator-= 后）
+  - 其他两项 (`bench_cpu_frame`, `bench_ppu_frame`) 全程 PASS
+  - **完全符合 memory note "Phase 6 VRC7 bench regression" 警告的模式**：小 API surface 变动通过链接器 layout 放大到 hot path
+- **关键回归测试**：
+  - `savestate_regression_test` PASS — savestate 字节级一致（验证 `static_assert(sizeof(FCEU_Guid)==16)` 等布局未变）
+  - `ppu_frame_diff_test` PASS — 像素级一致
+  - `mapper_core_test` PASS — `sdl-throttle.cpp` 与 `profiler.cpp` 的 `operator-` 用法未破坏
+- **不影响范围**：
+  - 改动文件仅 5 个（`valuearray.h` / `guid.h` / `md5.h` / `timeStamp.h` / `timeStamp.cpp`），全部位于 `src/utils/`
+  - 未触及 `refactor_plan.md §0.2` 列出的任何避让区
+  - 改动未引入新 API 命名空间 / 类（只在现有类上加方法、补 const）
+  - `project(FCEUX11 VERSION 1.5 ...)` 未变
+  - 无 phase TAG 创建
+
+### 7.5 未完成项（留给 R3.1b 续波次）
+
+| ID | 状态 | 说明 |
+|----|------|------|
+| R3.1b `operator-=`/`*=`/`/=` | ⏳ 推迟 | 触发 +2.96% link-time 回归；当前 0 hot-path 调用方；待有真调用方时配合 `__declspec(noinline)` 缓解 layout shift 后再加 |
+| `tests/utils/valuearray_test.cpp` | ⏳ 建议 | 当前 0 测试覆盖。`FCEU_Guid` 16 字节布局已被 `static_assert` + savestate_regression_test 守护，但显式单元测试更清晰 |
+| `tests/utils/timeStamp_test.cpp` | ⏳ 建议 | 当前 0 测试覆盖。算符正确性、const 行为可单元验证 |
+
+### 7.6 与 v1.x roadmap 的不冲突证明
+
+- `v1.6 Resonance`（APU 状态对象化）— 触碰 `src/sound.cpp/h`, `src/wave.cpp/h`；本次**未触碰**
+- `v1.7 Cartograph`（CartInfo 与 Bank-Switching API）— 触碰 `src/cart.cpp/h`；本次**未触碰**
+- `v1.8 Masonry`（Board/Mapper 架构）— 触碰 `src/boards/*`；本次**未触碰**
+- `v1.9 Chronicle`（Savestate 系统）— 触碰 `src/state.cpp/h`；本次**未触碰**
+- `v1.10 Cryptex`（ROM 解析 Rust 迁移）— 触碰 `src/ines.cpp/h`, `src/unif.cpp/h`, `src/nsf.cpp/h`, `src/fds.cpp/h`；本次**未触碰**
+- `v1.11 Bridge`（Qt 驱动解耦）— 触碰 `src/drivers/Qt/*`, `src/fceu.cpp/h`；本次**未触碰**（但 `sdl-throttle.cpp` 与 `fceuWrapper.cpp` 被**重新编译**以反映 `timeStamp.h` 改动）
+- `v1.12 Scissors`（巨型文件拆分）— 触碰 `TasEditor/`, `ConsoleWindow.cpp`, `AviRecord.cpp`, `ppu.cpp`；本次**未触碰**
+- `v1.13 Purify`（遗留 C 模式清理）— 全代码库 malloc/free / C-style cast 清理；本次仅在 `timeStamp.h` 清了 14 处 `(void)` 风格（**不**属于 v1.13 的"清理"范围 — 这是 R3.3 的局部风格统一，不重写任何接口）
+- `v1.14 Anvil`（性能硬化与收官）— LTO/PGO/性能基线；本次**未触碰**（但实测发现并规避了潜在的 link-time layout shift 风险，贡献了 R3.1b 的笔记）
+
+`git diff --stat` 仅包含 5 个 `src/utils/` 目录下的文件；不与上述任何 v1.x 子版本的改造区重叠。
+
+### 7.7 Phase R2 收官小结
+
+#### 改动量
+
+| 指标 | 数值 |
+|------|------|
+| 改动文件 | 5（全部 `src/utils/`） |
+| 新增 const/noexcept/[[nodiscard]] 标记 | ~22 处 |
+| 修复 const-correctness BUG | 3 处（`operator==`/`!=`/`[]`） |
+| 移除 C 风格 `(void)` | 14 处 |
+| 移除静态初始化 `printf` | 1 处（`timeStampModule` ctor） |
+| 简化 verbose `printf` 循环 | 1 处（`tscCalibrate`） |
+| 推迟项 | 1（`operator-=`/`*=`/`/=` — 见 R3.1b） |
+| 新增 `static_assert` 守护 | 2（`FCEU_Guid` / `MD5DATA` 16-byte 布局） |
+
+#### 关键经验教训
+
+**R3.1 `operator-=` 推迟** 验证了 **memory note "Phase 6 VRC7 bench regression"** 的核心警告：
+- 即便改动**看似与 hot path 无关**（新算符、新 const 标记），**只要头文件变化**就会通过编译单元的 section layout 影响 hot path
+- 修复这类问题需要：(a) 实测验证 `bench_tolerance_test`，(b) 必要时 revert 改动，(c) 留 `TODO` 注释等待有真正使用动机
+- **R3.1 推迟 R3.1b 比强行实现 + 接受 2.96% 回归更可取** — 维持 ctest 19/19 绿基线
+
+**R3.2 fceu.h include** 也触发了 +20%+ 回归（远超 +2.5% 阈值）：
+- `#include "fceu.h"` transitively 拉入 `bus.h`（v1.4 Bus 类头）= 上千行 inline 代码
+- 修复：forward-declare `FCEU_PrintError` 在**全局命名空间**（匹配 fceu.cpp:1158 实际定义位置）
+- **不要从 utils 层 include src/ 顶层头文件** — 即使为了调用一个函数
+
+#### 推荐后续动作
+
+1. **R3.1b 续波次**：当 hot path 真有 `operator-=` 等需求时，配合 `__declspec(noinline)` 或 attribute 缓解 layout shift 后再加
+2. **新增 `tests/utils/valuearray_test.cpp`** — 当前 0 测试覆盖；新测试应覆盖 operator==/!=/[] 在 const/非 const 上下文的行为；FCEU_Guid/MD5DATA 的 16 字节布局
+3. **新增 `tests/utils/timeStamp_test.cpp`** — 算符正确性、const 行为、ts-vs-tsc 语义备忘
+4. **Phase R3 启动** — `endian.cpp` 性能与一致性（详见 §Phase R3）
 
 ---
 
