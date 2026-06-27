@@ -403,3 +403,41 @@ void SNROM_Init(CartInfo *info) {
 void SOROM_Init(CartInfo *info) {
 	GenMMC1Init(info, 256, 0, 16, info->battery ? 8 : 0);
 }
+
+// ---------------------------------------------------------------------------
+// v1.7 Phase F: Mmc1Cart subclass (Strategy A).
+//
+// Definitions live in mmc1.cpp because they need access to the static
+// GenMMC1Power() and MMC1CMReset() helpers. The cart subclass only owns
+// the *call sequence* (Power -> cart_obj->on_power -> GenMMC1Power; Reset ->
+// cart_obj->on_reset -> MMC1CMReset), not the cart wiring logic itself.
+// ---------------------------------------------------------------------------
+
+#include "boards/mmc1_cart.h"
+
+namespace fceu11 {
+
+void Mmc1Cart::on_power() noexcept {
+	// Mapper1_Init (called during iNES_Init) invokes GenMMC1Init which sets
+	// info->Power = GenMMC1Power. The v1.7 factory block then redirects
+	// info->Power to CartInfo_PowerForward. To fire the actual MMC1 power
+	// routine, temporarily swap in the legacy GenMMC1Power pointer, invoke
+	// it, then restore the forwarding function pointer so subsequent
+	// PowerNES calls also route through cart_obj->on_power.
+	if (!currCartInfo) return;
+	void (*saved)(void) = currCartInfo->Power;
+	currCartInfo->Power = GenMMC1Power;
+	currCartInfo->Power();
+	currCartInfo->Power = saved;
+}
+
+void Mmc1Cart::on_reset() noexcept {
+	// GenMMC1Init does NOT set info->Reset (MMC1 historically relied on the
+	// full Power cycle to restore registers), so the v1.7 factory leaves
+	// info->Reset pointing at CartInfo_ResetForward. Our on_reset does the
+	// actual reset work: zero the shift register / buffer / four data regs,
+	// then re-sync mirroring, CHR, and PRG banking.
+	MMC1CMReset();
+}
+
+} // namespace fceu11

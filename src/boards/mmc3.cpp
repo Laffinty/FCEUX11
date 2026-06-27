@@ -1452,3 +1452,59 @@ void Mapper406_Init(CartInfo *info) {
 	GenMMC3_Init(info, 512, 256, 0, 0);
 	info->Power = M406_Power;
 }
+
+// ---------------------------------------------------------------------------
+// v1.7 Phase F: Mmc3Cart subclass (Strategy A).
+//
+// Definitions live in mmc3.cpp because they need access to the static
+// M4Power(), MMC3RegReset(), and the Mapper4_Init body. The cart subclass
+// only owns the *call sequence* (Power -> cart_obj->on_power -> M4Power ->
+// GenMMC3Power + Karnov mirror hack; Reset -> cart_obj->on_reset ->
+// MMC3RegReset), not the cart wiring logic itself.
+//
+// MMC3 has no expansion audio, so install_expansion_audio inherits the
+// default no-op. Other MMC3 variants (Mapper 12, 37, 44, ...) are not
+// covered here — v1.8 Masonry will register additional cart subclasses.
+// ---------------------------------------------------------------------------
+
+#include "boards/mmc3_cart.h"
+
+namespace fceu11 {
+
+void Mmc3Cart::on_power() noexcept {
+	// Mapper4_Init (called during iNES_Init) calls GenMMC3_Init which sets
+	// info->Power = GenMMC3Power, then Mapper4_Init overwrites it with
+	// M4Power (which adds the Karnov mirror hack on top of GenMMC3Power).
+	// The v1.7 factory block then redirects info->Power to
+	// CartInfo_PowerForward. To fire the actual MMC3 power routine,
+	// temporarily swap in the legacy M4Power pointer, invoke it, then
+	// restore the forwarding function pointer so subsequent PowerNES calls
+	// also route through cart_obj->on_power.
+	if (!currCartInfo) return;
+	void (*saved)(void) = currCartInfo->Power;
+	currCartInfo->Power = M4Power;
+	currCartInfo->Power();
+	currCartInfo->Power = saved;
+}
+
+void Mmc3Cart::on_reset() noexcept {
+	// GenMMC3_Init sets info->Reset = MMC3RegReset. The v1.7 factory block
+	// overwrites info->Reset with CartInfo_ResetForward so ResetNES routes
+	// through cart_obj->on_reset. We call MMC3RegReset() directly to
+	// restore the eight bank registers, IRQ counter/latch/cmd, and the
+	// PRG/CHR mirroring derived from MMC3_cmd.
+	MMC3RegReset();
+}
+
+void Mmc3Cart::on_close() noexcept {
+	// GenMMC3_Init registers GameHBIRQHook = MMC3_hb (or one of the
+	// *_KickMasterHack / *_PALStarWarsHack variants). Drop the hook here
+	// so a subsequent load of a non-MMC3 ROM does not receive stale IRQ
+	// callbacks pointing at the now-freed mapper state. fceu.cpp's
+	// ResetGameLoaded() also nulls this on next load, but doing it in the
+	// cart subclass matches the Vrc6Cart pattern and provides immediate
+	// cleanup.
+	GameHBIRQHook = nullptr;
+}
+
+} // namespace fceu11
