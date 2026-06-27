@@ -21,6 +21,8 @@
 #ifndef _SOUND_H_
 #define _SOUND_H_
 
+#include "apu.h"   // v1.6 Resonance §1.3: Apu class + v1.0 reference aliases
+
 typedef struct {
 	   void (*Fill)(int Count);	/* Low quality ext sound. */
 
@@ -40,16 +42,17 @@ typedef struct {
 
 extern EXPSOUND GameExpSound;
 
-extern int32 nesincsize;
+extern int32_t& nesincsize;
 
 void SetSoundVariables(void);
 
 int GetSoundBuffer(int32 **W);
 int FlushEmulateSound(void);
-extern int32 Wave[2048+512];
-extern int32 WaveFinal[2048+512];
-extern int32 WaveHi[];
-extern uint32 soundtsinc;
+extern int32_t (&Wave)[2048+512];
+extern int32_t (&WaveFinal)[2048+512];
+extern int32_t (&WaveHi)[40000];
+extern uint32_t& soundtsinc;
+extern uint32_t& soundtsi;
 
 #ifdef WIN32
 extern volatile int datacount, undefinedcount;
@@ -57,8 +60,8 @@ extern int debug_loggingCD;
 extern unsigned char *cdloggerdata;
 #endif
 
-extern uint32 soundtsoffs;
-extern bool swapDuty;
+extern uint32_t& soundtsoffs;
+extern bool& swapDuty;
 #define SOUNDTS (g_cpu.sound_timestamp_ref() + soundtsoffs)
 
 void SetNESSoundMap(void);

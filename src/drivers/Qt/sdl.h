@@ -22,7 +22,7 @@ extern int isloaded;
 
 extern int dendy;
 extern int pal_emulation;
-extern bool swapDuty;
+extern bool& swapDuty;
 
 int LoadGame(const char *path, bool silent);
 int CloseGame(void);

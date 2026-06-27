@@ -35,10 +35,6 @@
 static uint32 wlookup1[32];
 static uint32 wlookup2[203];
 
-int32 Wave[2048+512];
-int32 WaveHi[40000];
-int32 WaveFinal[2048+512];
-
 EXPSOUND GameExpSound={0,0,0};
 
 /*static*/ uint8 TriCount=0;
@@ -75,12 +71,7 @@ static uint8 fcnt=0;
 static int32 fhcnt=0;
 static int32 fhinc=0;
 
-uint32 soundtsoffs=0;
-
 /* Variables exclusively for low-quality sound. */
-int32 nesincsize=0;
-uint32 soundtsinc=0;
-uint32 soundtsi=0;
 static int32 sqacc[2];
 /* LQ variables segment ends. */
 
