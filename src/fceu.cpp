@@ -33,6 +33,7 @@
 #include "utils/crc32.h"
 
 #include "cart.h"
+#include "cart_class.h"   // v1.7 Cartograph: fceu11::g_cart
 #include "nsf.h"
 #include "fds.h"
 #include "ines.h"
@@ -677,6 +678,10 @@ bool fceu11::Initialize() {
 	// BEFORE PowerNES runs. The Bus needs ppu_ set up by the time
 	// any board/mapper setup code can call into it.
 	fceu11::g_bus.attach_ppu(&fceu11::g_ppu);
+
+	// v1.7 Cartograph §10.2: wire Cart → Bus back-pointer. Phase B uses
+	// a no-op placeholder cart so this is safe before any ROM is loaded.
+	fceu11::g_cart->attach_bus(fceu11::g_bus);
 
 	return true;
 }

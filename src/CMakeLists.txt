@@ -195,6 +195,7 @@ set(SRC_CORE
 	${CMAKE_CURRENT_SOURCE_DIR}/asm.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/bus.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/cart.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/cart_class.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/cheat.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/conddebug.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/config.cpp

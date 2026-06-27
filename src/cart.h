@@ -3,6 +3,16 @@
 
 #include <vector>
 
+#include "cart_class.h"   // v1.7 Cartograph: fceu11::Cart / Mapper / MirrorMode
+
+// v1.7 Cartograph §1.3: forward declarations for CartInfo lifecycle
+// forwarding functions. Defined in cart.cpp; declared here before struct
+// CartInfo so CartInfo::clear() can install them as defaults.
+extern CartInfo *currCartInfo;
+void CartInfo_PowerForward(void);
+void CartInfo_ResetForward(void);
+void CartInfo_CloseForward(void);
+
 // Pull in Bus — provides the inline global aliases (ARead, BWrite,
 // Page, VPage, PRGptr, CHRptr, PRGsize, CHRmask*, etc.) and inline
 // forwarders for setprg8/16/32, setchr1/4/8, setmirror/setmirrorw/
@@ -61,6 +71,12 @@ struct CartInfo
 					// code, used by mapper/board code, maybe
 					// other code in the future.
 
+	// v1.7 Cartograph: back-pointer to the objectized cart. Board init
+	// functions continue to use the Power/Reset/Close fields; iNES/UNIF
+	// loading overwrites those fields with CartInfo_*Forward and sets this
+	// pointer to the concrete mapper subclass.
+	fceu11::Cart* cart_obj = nullptr;
+
 	CartInfo(void)
 	{
 		clear();
@@ -68,11 +84,17 @@ struct CartInfo
 
 	void clear(void)
 	{
-		Power = nullptr;
-		Reset = nullptr;
-		Close = nullptr;
+		// v1.7: default to forwarding functions so cart_obj->on_*() is
+		// used whenever a concrete Cart subclass is installed. Board files
+		// that assign their own Power/Reset/Close function pointers still
+		// work because they overwrite these defaults during MapperNN_Init.
+		Power = CartInfo_PowerForward;
+		Reset = CartInfo_ResetForward;
+		Close = CartInfo_CloseForward;
 
 		SaveGame.clear();
+
+		cart_obj = nullptr;
 
 		mirror = 0;
 		mirrorAs2Bits = 0;
@@ -88,7 +110,13 @@ struct CartInfo
 	};
 };
 
-extern CartInfo *currCartInfo;
+// v1.7 Cartograph §2.3: legacy MI_* macros as MirrorMode enum aliases.
+// Existing board files use these as int constants, so the macros expand to
+// static_cast<int>(enum_value) and keep source compatibility.
+#define MI_H static_cast<int>(fceu11::MirrorMode::Horizontal)
+#define MI_V static_cast<int>(fceu11::MirrorMode::Vertical)
+#define MI_0 static_cast<int>(fceu11::MirrorMode::Mode0)
+#define MI_1 static_cast<int>(fceu11::MirrorMode::Mode1)
 
 void FCEU_SaveGameSave(CartInfo *LocalHWInfo);
 void FCEU_LoadGameSave(CartInfo *LocalHWInfo);
@@ -119,11 +147,6 @@ void setchr2  (uint32 A, uint32 V);
 void setchr2r (int r, unsigned int A, unsigned int V);
 void setchr4r (int r, unsigned int A, unsigned int V);
 void setchr8r (int r, uint32 V);
-
-#define MI_H 0
-#define MI_V 1
-#define MI_0 2
-#define MI_1 3
 
 extern int geniestage;
 

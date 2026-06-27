@@ -347,6 +347,7 @@ if(FCEUX11_BUILD_TESTS)
             cpu_test ppu_test apu_test bus_test mapper_core_test
             savestate_core_test golden_savestate_test bench_tolerance_test
             ppu_frame_diff_test apu_wav_diff_test
+            cart_class_test mapper_byte_diff_test
             PROPERTIES ENVIRONMENT_MODIFICATION
                 "${_FCEUX11_TEST_PATH_MODIFICATIONS}"
         )

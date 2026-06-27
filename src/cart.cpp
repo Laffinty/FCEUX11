@@ -57,6 +57,27 @@ uint32 genieaddr[3];
 
 CartInfo *currCartInfo;
 
+// v1.7 Cartograph §1.3: CartInfo lifecycle forwarding functions.
+// These are installed as the default Power/Reset/Close function pointers
+// in CartInfo::clear(). When a concrete fceu11::Cart subclass is installed
+// (cart_obj != nullptr), the call is routed to its virtual method; otherwise
+// the call is a no-op. Board files that set their own function pointers
+// during MapperNN_Init overwrite these defaults and continue to work.
+void CartInfo_PowerForward(void) {
+	if (currCartInfo && currCartInfo->cart_obj)
+		currCartInfo->cart_obj->on_power();
+}
+
+void CartInfo_ResetForward(void) {
+	if (currCartInfo && currCartInfo->cart_obj)
+		currCartInfo->cart_obj->on_reset();
+}
+
+void CartInfo_CloseForward(void) {
+	if (currCartInfo && currCartInfo->cart_obj)
+		currCartInfo->cart_obj->on_close();
+}
+
 static INLINE void setpageptr(int s, uint32 A, uint8 *p, int ram) {
 	uint32 AB = A >> 11;
 	int x;
