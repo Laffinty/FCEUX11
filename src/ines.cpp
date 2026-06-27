@@ -837,6 +837,25 @@ init_ok:
 
 	GameInterface = iNESGI;
 	currCartInfo = &iNESCart;
+
+	// v1.7 Phase C2: sync parsed iNES metadata into the objectized Cart.
+	// Cart setters dual-write back to currCartInfo, so CartInfo fields stay
+	// populated for the 168 un-migrated board files.
+	if (fceu11::g_cart) {
+		fceu11::g_cart->set_md5(iNESCart.MD5);
+		fceu11::g_cart->set_crc32(iNESCart.CRC32);
+		fceu11::g_cart->set_mirror(iNESCart.mirror);
+		fceu11::g_cart->set_mirror_as_2bits(iNESCart.mirrorAs2Bits);
+		fceu11::g_cart->set_battery(iNESCart.battery != 0);
+		fceu11::g_cart->set_ines2(iNESCart.ines2 != 0);
+		fceu11::g_cart->set_submapper(iNESCart.submapper);
+		fceu11::g_cart->set_wram_size(iNESCart.wram_size);
+		fceu11::g_cart->set_battery_wram_size(iNESCart.battery_wram_size);
+		fceu11::g_cart->set_vram_size(iNESCart.vram_size);
+		fceu11::g_cart->set_battery_vram_size(iNESCart.battery_vram_size);
+		fceu11::g_cart->set_mapper_number(MapperNo);
+	}
+
 	FCEU_printf("\n");
 
 	// since apparently the iNES format doesn't store this information,

@@ -41,6 +41,63 @@ Cart::Cart() noexcept = default;
 
 void Cart::set_md5(const uint8_t (&md5)[16]) noexcept {
     std::memcpy(md5_.data(), md5, md5_.size());
+    if (currCartInfo) {
+        std::memcpy(currCartInfo->MD5, md5, sizeof(currCartInfo->MD5));
+    }
+}
+
+void Cart::set_crc32(uint32_t v) noexcept {
+    crc32_ = v;
+    if (currCartInfo) currCartInfo->CRC32 = v;
+}
+
+void Cart::set_mirror(int m) noexcept {
+    mirror_ = m;
+    if (currCartInfo) currCartInfo->mirror = m;
+}
+
+void Cart::set_mirror_as_2bits(int m) noexcept {
+    mirror_as_2bits_ = m;
+    if (currCartInfo) currCartInfo->mirrorAs2Bits = m;
+}
+
+void Cart::set_battery(bool b) noexcept {
+    battery_ = b ? 1 : 0;
+    if (currCartInfo) currCartInfo->battery = b ? 1 : 0;
+}
+
+void Cart::set_ines2(bool b) noexcept {
+    ines2_ = b ? 1 : 0;
+    if (currCartInfo) currCartInfo->ines2 = b ? 1 : 0;
+}
+
+void Cart::set_submapper(int s) noexcept {
+    submapper_ = s;
+    if (currCartInfo) currCartInfo->submapper = s;
+}
+
+void Cart::set_wram_size(int s) noexcept {
+    wram_size_ = s;
+    if (currCartInfo) currCartInfo->wram_size = s;
+}
+
+void Cart::set_battery_wram_size(int s) noexcept {
+    battery_wram_size_ = s;
+    if (currCartInfo) currCartInfo->battery_wram_size = s;
+}
+
+void Cart::set_vram_size(int s) noexcept {
+    vram_size_ = s;
+    if (currCartInfo) currCartInfo->vram_size = s;
+}
+
+void Cart::set_battery_vram_size(int s) noexcept {
+    battery_vram_size_ = s;
+    if (currCartInfo) currCartInfo->battery_vram_size = s;
+}
+
+void Cart::set_mapper_number(uint32_t n) noexcept {
+    mapper_number_ = n;
 }
 
 // ---------------------------------------------------------------------------

@@ -83,18 +83,20 @@ public:
     int battery_vram_size() const noexcept { return battery_vram_size_; }
     uint32_t mapper_number() const noexcept { return mapper_number_; }
 
+    // Phase C2: setters are defined in cart_class.cpp so they can dual-write
+    // to the legacy CartInfo fields (currCartInfo) while populating Cart.
     void set_md5(const uint8_t (&md5)[16]) noexcept;
-    void set_crc32(uint32_t v) noexcept { crc32_ = v; }
-    void set_mirror(int m) noexcept { mirror_ = m; }
-    void set_mirror_as_2bits(int m) noexcept { mirror_as_2bits_ = m; }
-    void set_battery(bool b) noexcept { battery_ = b ? 1 : 0; }
-    void set_ines2(bool b) noexcept { ines2_ = b ? 1 : 0; }
-    void set_submapper(int s) noexcept { submapper_ = s; }
-    void set_wram_size(int s) noexcept { wram_size_ = s; }
-    void set_battery_wram_size(int s) noexcept { battery_wram_size_ = s; }
-    void set_vram_size(int s) noexcept { vram_size_ = s; }
-    void set_battery_vram_size(int s) noexcept { battery_vram_size_ = s; }
-    void set_mapper_number(uint32_t n) noexcept { mapper_number_ = n; }
+    void set_crc32(uint32_t v) noexcept;
+    void set_mirror(int m) noexcept;
+    void set_mirror_as_2bits(int m) noexcept;
+    void set_battery(bool b) noexcept;
+    void set_ines2(bool b) noexcept;
+    void set_submapper(int s) noexcept;
+    void set_wram_size(int s) noexcept;
+    void set_battery_wram_size(int s) noexcept;
+    void set_vram_size(int s) noexcept;
+    void set_battery_vram_size(int s) noexcept;
+    void set_mapper_number(uint32_t n) noexcept;
 
     // ---- v1.0 compatible SaveGame buffer registration ----
     struct SaveGame_t {

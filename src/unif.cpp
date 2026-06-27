@@ -629,5 +629,22 @@ init_ok:
 	FCEU_strlcpy(LoadedRomFName, sizeof(LoadedRomFName), name); //For the debugger list
 	GameInterface = UNIFGI;
 	currCartInfo = &UNIFCart;
+
+	// v1.7 Phase C2: sync parsed UNIF metadata into the objectized Cart.
+	if (fceu11::g_cart) {
+		fceu11::g_cart->set_md5(UNIFCart.MD5);
+		fceu11::g_cart->set_crc32(UNIFCart.CRC32);
+		fceu11::g_cart->set_mirror(UNIFCart.mirror);
+		fceu11::g_cart->set_mirror_as_2bits(UNIFCart.mirrorAs2Bits);
+		fceu11::g_cart->set_battery(UNIFCart.battery != 0);
+		fceu11::g_cart->set_ines2(UNIFCart.ines2 != 0);
+		fceu11::g_cart->set_submapper(UNIFCart.submapper);
+		fceu11::g_cart->set_wram_size(UNIFCart.wram_size);
+		fceu11::g_cart->set_battery_wram_size(UNIFCart.battery_wram_size);
+		fceu11::g_cart->set_vram_size(UNIFCart.vram_size);
+		fceu11::g_cart->set_battery_vram_size(UNIFCart.battery_vram_size);
+		fceu11::g_cart->set_mapper_number(0);
+	}
+
 	return LOADER_OK;
 }
