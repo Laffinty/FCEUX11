@@ -5,6 +5,111 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7] - 2026-06-28
+
+**Codename: Cartograph.** Seventh sub-version of the v1.x modernization
+cycle per `docs/v1.x_Modernization_Roadmap.md` §7. Objectifies the
+v1.0 `CartInfo` C structure into `fceu11::Cart` / `fceu11::Mapper` C++
+classes, migrates mapper lifecycle from function pointers to virtual
+methods (`on_power` / `on_reset` / `on_close`), introduces
+`fceu11::MirrorMode` enum class as the type-safe replacement for the
+`MI_H` / `MI_V` / `MI_0` / `MI_1` macros (legacy macros retained as
+`int` aliases), and fulfills the v1.6 §11.1 contract by adding
+`Cart::install_expansion_audio(Apu&) noexcept` so cart subclasses
+inject `ExpansionAudio*` backends during load.
+
+The 171 board files in `src/boards/` are unchanged except for the three
+PoC subclasses (NROM, MMC1, MMC3) plus the VRC6 PoC; the other 166
+mappers continue to use the legacy `CartInfo::Power` / `Reset` /
+`Close` function-pointer path through the v1.7 compat layer
+(`CartInfo_PowerForward` / `_ResetForward` / `_CloseForward` routing
+through `cart_obj->on_*`). v1.8 Masonry §8.2 will batch-migrate the
+remaining 166 board files.
+
+The v1.6 Ppu / Apu reference-alias pattern (`extern T (&NAME) = g_ppu.X`)
+is reused for the Bus pointer (`Mapper::bus_`), so existing board files
+that reach `g_bus` directly continue to compile.
+
+### Added
+
+- **`src/cart_class.h` / `src/cart_class.cpp`** — `fceu11::Cart` class
+  (`alignas(64)` cache-line alignment, `Bus*` reference injection via
+  `attach_bus(Bus&)`), `fceu11::Mapper : Cart` thin base, `MirrorMode`
+  enum class (`Horizontal` / `Vertical` / `Mode0` / `Mode1`),
+  `Cart::create_cart_for_mapper(uint32_t, Bus&)` factory, and
+  `Cart::assign_cart(std::unique_ptr<Cart>)` ownership helper.
+  `Cart::on_power()` / `on_reset()` / `on_close()` are pure virtual;
+  `on_save_pre()` / `on_load_post()` are defaulted no-ops
+  (v1.4 §Known issues vrc7_PreSave deferred to v1.14 Anvil LTO).
+- **`src/boards/nrom_cart.h`** — `NromCart` PoC subclass (mapper 0).
+- **`src/boards/vrc6_cart.h`** — `Vrc6Cart` PoC subclass (mapper
+  24 / 26). Overrides `install_expansion_audio` to inject
+  `g_vrc6_audio` into `g_apu` via `Apu::set_exp_sound()`, fulfilling
+  the v1.6 §11.1 cart-side contract.
+- **`src/boards/mmc1_cart.h`** — `Mmc1Cart` PoC subclass (mapper 1).
+- **`src/boards/mmc3_cart.h`** — `Mmc3Cart` PoC subclass (mapper 4).
+- **`tests/core/cart_class_test.cpp`** — Phase A skeleton promoted to
+  full coverage: Cart lifecycle call counts, MirrorMode enum value
+  parity, factory dispatch for NROM / MMC1 / MMC3 / VRC6,
+  `install_expansion_audio` APU wiring, save / load battery API,
+  metadata dual-write through `currCartInfo`, `attach_bus` injection,
+  `on_save_pre` / `on_load_post` default no-op + trigger sequence.
+- **`tests/core/mapper_byte_diff_test.cpp`** — Phase A skeleton
+  (header validation only; body byte-diff deferred to v1.8 Masonry
+  when `Cart::save_mapper_state()` API lands).
+
+### Changed
+
+- **`src/cart.h`** — `CartInfo` gains `fceu11::Cart* cart_obj` field
+  and `clear()` installs `CartInfo_PowerForward` /
+  `CartInfo_ResetForward` / `CartInfo_CloseForward` as defaults so the
+  166 un-migrated boards continue to function through the v1.7 compat
+  layer. The `MI_H` / `MI_V` / `MI_0` / `MI_1` macros are redefined as
+  `static_cast<int>(fceu11::MirrorMode::*)` aliases so existing board
+  files compile unchanged.
+- **`src/cart.cpp`** — `CartInfo_PowerForward` /
+  `CartInfo_ResetForward` / `CartInfo_CloseForward` defined; route to
+  `cart_obj->on_*` when the factory installs a concrete subclass.
+- **`src/ines.cpp` / `src/unif.cpp`** — iNES / UNIF loader calls
+  `fceu11::create_cart_for_mapper` after parsing; when the factory
+  returns a concrete cart, `currCartInfo->Power` / `Reset` / `Close`
+  are overwritten with the v1.7 forwarders so the cart virtual
+  lifecycle is the sole dispatch path. `assign_cart(nullptr)` is
+  called on the `init_error:` path to release the previous cart.
+- **`src/state.cpp`** — `FCEUSS_SaveMS()` triggers
+  `cart_obj->on_save_pre()` before the SFMDATA chunk;
+  `FCEUSS_LoadFP()` triggers `cart_obj->on_load_post()` after
+  `FCEUMOV_PostLoad()` succeeds.
+- **`src/boards/datalatch.cpp` / `src/boards/vrc6.cpp` /
+  `src/boards/mmc1.cpp` / `src/boards/mmc3.cpp`** — PoC cart subclass
+  definitions appended at end of file (Strategy A: `on_power` swaps
+  `info->Power` to the legacy Init-installed Power function pointer,
+  invokes it, then restores the v1.7 forwarder).
+
+### Performance
+
+- **`bench_tolerance_test`** — advisory FAIL carried from Phase B/C
+  link-time layout shift: `bench_cpu_frame` median +4.37% vs v1.5
+  baseline. `bench_ppu_frame` -1.26% (speedup) and `bench_full_frame`
+  (MMC3 ROM) -0.57% (speedup). Per v1.7 plan §7.1 the baseline is
+  **not** re-captured during v1.7; the regression is documented as
+  advisory and re-evaluated in v1.14 Anvil §14.1.
+
+### Known issues / Deferred to v1.8 Masonry §8.2
+
+- PoC cart `on_close()` does not release WRAM / CHRRAM (small
+  per-load leaks; the v1.7 factory block overwrites
+  `info->Close = CartInfo_CloseForward` so the legacy
+  `GenMMC1Close` / `GenMMC3Close` path is bypassed). 166 un-migrated
+  boards still free WRAM / CHRRAM correctly through their own
+  `info->Close` setter.
+- `mapper_byte_diff_test` body byte-diff is still skeleton (no
+  `Cart::save_mapper_state()` API yet). Goldens cannot be generated
+  until v1.8.
+- Other MMC3 variants (Mapper 12 / 37 / 44 / 45 / 47 / 49 / 52 / 74 /
+  114 / 115 / 116 / 118 / 119 / 165 / 205 / 245 / 249 / 250 / 254 /
+  406) continue to use the legacy function-pointer path.
+
 ## [Unreleased] — Mid-term refactor plan R1–R5 completion (2026-06-27)
 
 > **No version bump, no tag.** This batch of utils-layer quality fixes is
