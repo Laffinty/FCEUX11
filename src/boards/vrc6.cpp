@@ -450,3 +450,57 @@ void NSFVRC6_Init(void) {
 	VRC6_ESI();
 	SetWriteHandler(0x8000, 0xbfff, VRC6SW);
 }
+
+// ---------------------------------------------------------------------------
+// v1.7 Phase E: Vrc6Cart subclass (Strategy A).
+//
+// Definitions live in vrc6.cpp because they need access to the static
+// `g_vrc6_audio` instance, `is26` flag, and the Mapper24_Init / Mapper26_Init
+// bodies. The cart subclass only owns the *call sequence* (Power ->
+// cart_obj->on_power -> Mapper24_Init / Mapper26_Init -> info->Power =
+// VRC6Power + IRQ hook + VRC6_ESI), not the cart wiring logic itself.
+// ---------------------------------------------------------------------------
+
+#include "boards/vrc6_cart.h"
+
+namespace fceu11 {
+
+void Vrc6Cart::on_power() noexcept {
+	// Mapper24_Init / Mapper26_Init was already called once during
+	// iNES_Init (step 1). Calling it again would duplicate the SFORMAT
+	// entries (StateRegs, and for mapper 26 also WRAM). Instead, fire
+	// the VRC6Power function pointer that the Init set up. At this point
+	// info->Power has been redirected by the v1.7 factory block to
+	// CartInfo_PowerForward, so we temporarily swap in the legacy
+	// VRC6Power pointer, invoke it, then restore the forwarding function
+	// pointer so subsequent PowerNES calls also route through
+	// cart_obj->on_power.
+	if (!currCartInfo) return;
+	void (*saved)(void) = currCartInfo->Power;
+	currCartInfo->Power = VRC6Power;
+	currCartInfo->Power();
+	currCartInfo->Power = saved;
+}
+
+void Vrc6Cart::on_close() noexcept {
+	// Mapper24 / Mapper26_Init set g_cpu.map_irq_hook_ref() = VRC6IRQHook.
+	// On game close, drop the hook so a subsequent load of a non-VRC6 ROM
+	// does not receive stale IRQ callbacks.
+	g_cpu.map_irq_hook_ref() = nullptr;
+}
+
+void Vrc6Cart::install_expansion_audio(fceu11::Apu& apu) noexcept {
+	// v1.6 §11.1 contract: cart subclass installs the EXPSOUND adapter into
+	// the global APU. We reuse the same logic as VRC6_ESI() but route through
+	// the APU's set_exp_sound() entry point instead of touching the global
+	// GameExpSound directly. The Fill / NeoFill / HiFill / HiSync / RChange
+	// function pointers are still populated by VRC6_ESI; only the
+	// ExpansionAudio backend pointer is duplicated here so the APU's view is
+	// in sync with GameExpSound's view.
+	EXPSOUND es = apu.exp_sound();
+	es.expansion = &g_vrc6_audio;
+	apu.set_exp_sound(es);
+	g_vrc6_audio.region_changed();
+}
+
+} // namespace fceu11

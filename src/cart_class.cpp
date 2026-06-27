@@ -7,6 +7,8 @@
 #include "cart_class.h"
 
 #include "cart.h"             // currCartInfo, CartInfo::SaveGame_t
+#include "boards/nrom_cart.h" // v1.7 Phase E: NromCart PoC subclass
+#include "boards/vrc6_cart.h" // v1.7 Phase E: Vrc6Cart PoC subclass (24/26)
 #include "rust/fceux11_rust.h" // FceuSaveGameEntry, battery Rust functions
 
 #include <cstring>
@@ -39,11 +41,20 @@ std::unique_ptr<Cart> g_cart_owner;
 
 Cart* g_cart = &g_cart_placeholder;
 
-std::unique_ptr<Cart> create_cart_for_mapper(uint32_t /*mapper_no*/, Bus& /*bus*/) {
-    // Phase D: infrastructure only. All mappers keep using the legacy
-    // CartInfo function pointers. Phase E/F will add switch cases here
-    // for NROM/MMC1/MMC3.
-    return nullptr;
+std::unique_ptr<Cart> create_cart_for_mapper(uint32_t mapper_no, Bus& bus) {
+    // Phase E: NROM (0) + VRC6 (24, 26) are the PoC subclasses. Phase F will
+    // add cases 1 (MMC1) and 4 (MMC3). All other mappers return nullptr,
+    // which keeps them on the legacy CartInfo function-pointer path through
+    // the v1.7 compat layer.
+    switch (mapper_no) {
+    case 0:
+        return std::make_unique<NromCart>(bus);
+    case 24:
+    case 26:
+        return std::make_unique<Vrc6Cart>(bus, mapper_no);
+    default:
+        return nullptr;
+    }
 }
 
 void assign_cart(std::unique_ptr<Cart> cart) {

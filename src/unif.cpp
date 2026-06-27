@@ -26,6 +26,7 @@
 #include "utils/safe_string.h"
 #include "fceu.h"
 #include "cart.h"
+#include "apu.h"            // v1.7 Phase E: fceu11::g_apu for install_expansion_audio
 #include "unif.h"
 #include "ines.h"
 #include "utils/endian.h"
@@ -641,6 +642,12 @@ init_ok:
 		UNIFCart.Reset = CartInfo_ResetForward;
 		UNIFCart.Close = CartInfo_CloseForward;
 	}
+
+	// v1.7 Phase E: give the cart a chance to install expansion audio
+	// (v1.6 §11.1 contract). Must run before PowerNES() so the audio backend
+	// is ready for the first frame's mix.
+	if (currCartInfo && currCartInfo->cart_obj)
+		currCartInfo->cart_obj->install_expansion_audio(fceu11::g_apu);
 
 	// v1.7 Phase C2: sync parsed UNIF metadata into the objectized Cart.
 	if (fceu11::g_cart) {

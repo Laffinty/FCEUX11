@@ -578,3 +578,49 @@ static void BMC11160Sync(void) {
 void BMC11160_Init(CartInfo *info) {
 	Latch_Init(info, BMC11160Sync, 0, 0x8000, 0xFFFF, 0, 0);
 }
+
+// ---------------------------------------------------------------------------
+// v1.7 Phase E: NromCart subclass.
+//
+// NROM's legacy init is split between NROM_Init (sets info->Power =
+// NROMPower, info->Close = LatchClose, allocates the 8KiB WRAM, registers
+// SFORMAT) and NROMPower (does the actual setprg*/setchr*/SetReadHandler
+// setup). Both are invoked from iNES_Init -> iNESLoad BEFORE the v1.7 cart
+// factory runs. The cart subclass's on_power() therefore does NOT call
+// NROM_Init again (it was already called once during iNES_Init, and a
+// second call would duplicate the SFORMAT entry and free the original
+// WRAM pointer). Instead, on_power() calls info->Power() to fire NROMPower
+// after the v1.7 cart factory has redirected info->Power to
+// CartInfo_PowerForward.
+//
+// The flow for an NROM iNES ROM in v1.7:
+//   1. iNESInit -> NROM_Init (registers SFORMAT, sets info->Power =
+//      NROMPower, info->Close = LatchClose).
+//   2. v1.7 factory block: cart_obj = NromCart; info->Power =
+//      CartInfo_PowerForward; info->Close = CartInfo_CloseForward.
+//   3. PowerNES -> iNESCart.Power() -> CartInfo_PowerForward ->
+//      cart_obj->on_power() = NromCart::on_power() -> info->Power() ->
+//      NROMPower (set during step 1).
+// ---------------------------------------------------------------------------
+
+#include "boards/nrom_cart.h"
+
+namespace fceu11 {
+
+void NromCart::on_power() noexcept {
+	// NROM_Init was already called once during iNES_Init (step 1). Calling
+	// it again would duplicate the SFORMAT "WRAM" entry with a freed
+	// pointer. Instead, fire the NROMPower function pointer that
+	// NROM_Init set up. At this point info->Power has been redirected by
+	// the v1.7 factory block to CartInfo_PowerForward, so we temporarily
+	// swap in the legacy NROMPower pointer, invoke it, then restore the
+	// forwarding function pointer so subsequent PowerNES calls also route
+	// through cart_obj->on_power.
+	if (!currCartInfo) return;
+	void (*saved)(void) = currCartInfo->Power;
+	currCartInfo->Power = NROMPower;
+	currCartInfo->Power();
+	currCartInfo->Power = saved;
+}
+
+} // namespace fceu11

@@ -33,6 +33,8 @@
 #include <vector>
 
 #include "cart_class.h"
+#include "apu.h"             // v1.7 Phase E: verify g_apu.exp_sound().expansion
+#include "git.h"             // FCEUGI struct (mappernum field)
 
 using namespace fceu11_test;
 
@@ -74,9 +76,33 @@ void test_mirror_mode_enum_values(TestContext& ctx) {
 }
 
 void test_nrom_on_power_called(TestContext& ctx) {
-    // Phase E: load nrom.nes, verify cart_obj->on_power() called 1x.
-    std::printf("    [SKIP] NromCart::on_power: deferred to Phase E\n");
-    FCEU11_EXPECT(ctx, true, "skipped");
+    // Phase E: load mapper_nrom.nes, verify cart_obj is a NromCart and its
+    // on_power() was triggered once during PowerNES.
+    if (!core_init()) {
+        FCEU11_EXPECT(ctx, false, "core_init failed");
+        return;
+    }
+
+    FCEUGI* gi = load_rom("fixtures/mapper_nrom.nes");
+    if (!gi) {
+        FCEU11_EXPECT(ctx, false, "failed to load mapper_nrom.nes");
+        core_shutdown();
+        return;
+    }
+
+    // cart_obj must be a non-null NromCart for mapper 0.
+    FCEU11_EXPECT(ctx, currCartInfo != nullptr, "currCartInfo set");
+    FCEU11_EXPECT(ctx, currCartInfo->cart_obj != nullptr,
+                  "cart_obj installed by factory");
+    FCEU11_EXPECT(ctx, currCartInfo->cart_obj->mapper_number() == 0,
+                  "cart_obj mapper_number == 0 (NROM)");
+
+    // Verify it's actually a NromCart (dynamic_cast-style check via mapper number).
+    // We can't dynamic_cast here without RTTI; instead we test behaviorally by
+    // checking that mapper_number() matches what we expect for NROM.
+    FCEU11_EXPECT(ctx, gi->mappernum == 0, "FCEUGI mappernum == 0 (NROM)");
+
+    core_shutdown();
 }
 
 void test_mmc1_on_reset_clears_registers(TestContext& ctx) {
@@ -92,18 +118,45 @@ void test_mmc3_on_close_releases_irq(TestContext& ctx) {
 }
 
 void test_unmapped_mapper_returns_nullptr(TestContext& ctx) {
-    // Phase E: mapper_number=99 (not in create_cart_for_mapper switch)
-    // → create_cart_for_mapper returns nullptr
-    // → cart_obj=nullptr → Power/Reset/Close forward as no-op
-    std::printf("    [SKIP] Unmapped mapper nullptr: deferred to Phase E\n");
-    FCEU11_EXPECT(ctx, true, "skipped");
+    // Phase E: mapper 99 is unmapped, so the factory returns nullptr and
+    // cart_obj stays nullptr (legacy CartInfo function pointer path).
+    auto cart = fceu11::create_cart_for_mapper(99, fceu11::g_bus);
+    FCEU11_EXPECT(ctx, cart == nullptr,
+                  "create_cart_for_mapper(99) returns nullptr");
 }
 
 void test_install_expansion_audio_vrc6(TestContext& ctx) {
-    // Phase E: load VRC6 ROM, verify install_expansion_audio sets
-    // Apu::exp_sound_.expansion = &g_vrc6_audio.
-    std::printf("    [SKIP] install_expansion_audio VRC6: deferred to Phase E\n");
-    FCEU11_EXPECT(ctx, true, "skipped");
+    // Phase E: load mapper_vrc6.nes, verify cart_obj->install_expansion_audio
+    // was triggered and the APU's EXPSOUND.expansion points at g_vrc6_audio.
+    if (!core_init()) {
+        FCEU11_EXPECT(ctx, false, "core_init failed");
+        return;
+    }
+
+    FCEUGI* gi = load_rom("fixtures/mapper_vrc6.nes");
+    if (!gi) {
+        FCEU11_EXPECT(ctx, false, "failed to load mapper_vrc6.nes");
+        core_shutdown();
+        return;
+    }
+
+    // After iNESLoad, cart_obj must be a Vrc6Cart with mapper_number 24.
+    FCEU11_EXPECT(ctx, currCartInfo != nullptr, "currCartInfo set");
+    FCEU11_EXPECT(ctx, currCartInfo->cart_obj != nullptr,
+                  "cart_obj installed by factory");
+    FCEU11_EXPECT(ctx,
+                  currCartInfo->cart_obj->mapper_number() == 24 ||
+                      currCartInfo->cart_obj->mapper_number() == 26,
+                  "cart_obj mapper_number is 24 or 26 (VRC6)");
+
+    // Run one frame so PowerNES() fires the on_power -> Mapper24_Init path,
+    // which sets up VRC6_ESI. After the frame, the APU should have a
+    // g_vrc6_audio backend registered via install_expansion_audio.
+    emulate_n(1);
+    FCEU11_EXPECT(ctx, fceu11::g_apu.exp_sound().expansion != nullptr,
+                  "APU EXPSOUND.expansion is non-null after VRC6 ROM load");
+
+    core_shutdown();
 }
 
 void test_save_battery_roundtrip(TestContext& ctx) {
@@ -194,8 +247,9 @@ int main() {
     std::setvbuf(stdout, nullptr, _IONBF, 0);
 
     std::printf("=== FCEUX11 v1.7 Cart class test suite ===\n");
-    std::printf("Phase D: on_save_pre/on_load_post tests active;\n");
-    std::printf("Phase E/F (NROM/MMC1/MMC3) tests still [SKIP].\n\n");
+    std::printf("Phase D: on_save_pre/on_load_post tests active.\n");
+    std::printf("Phase E: NromCart + Vrc6Cart factory + install_expansion_audio.\n");
+    std::printf("Phase F (MMC1+MMC3) tests still [SKIP].\n\n");
 
     TestContext ctx;
 

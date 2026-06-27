@@ -24,6 +24,7 @@
 #include "x6502.h"
 #include "fceu.h"
 #include "cart.h"
+#include "apu.h"            // v1.7 Phase E: fceu11::g_apu for install_expansion_audio
 #include "ppu.h"
 
 #include "ines.h"
@@ -849,6 +850,14 @@ init_ok:
 		iNESCart.Reset = CartInfo_ResetForward;
 		iNESCart.Close = CartInfo_CloseForward;
 	}
+
+	// v1.7 Phase E: give the cart a chance to install expansion audio
+	// (v1.6 §11.1 contract). Default Cart::install_expansion_audio() is a
+	// no-op; Vrc6Cart overrides it to register g_vrc6_audio into g_apu. Must
+	// run before PowerNES() so the audio backend is ready for the first
+	// frame's mix.
+	if (currCartInfo && currCartInfo->cart_obj)
+		currCartInfo->cart_obj->install_expansion_audio(fceu11::g_apu);
 
 	// v1.7 Phase C2: sync parsed iNES metadata into the objectized Cart.
 	// Cart setters dual-write back to currCartInfo, so CartInfo fields stay
