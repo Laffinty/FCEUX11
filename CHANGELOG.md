@@ -313,6 +313,261 @@ template.
 
 ---
 
+## [1.6] - 2026-06-27
+
+**Codename: Resonance.** Sixth sub-version of the v1.x modernization
+cycle per `docs/v1.x_Modernization_Roadmap.md` §6. Introduces
+`fceu11::Apu` as the single owner of the APU register file, output
+buffers, envelope / square / triangle / noise / DMC channel state,
+and frame-counter state previously held by file-scope globals in
+`sound.cpp`. Introduces `fceu11::ExpansionAudio` virtual base class
+abstracting the `EXPSOUND` function-pointer dispatch, with a VRC6
+PoC subclass wired through the new `EXPSOUND::expansion` adapter
+field. Finalizes the Rust FIR audio backend by archiving the dead
+C++ coefficient arrays under `src/archived/fir/`.
+
+The v1.5 Ppu reference-alias pattern (`extern T (&NAME)[N]` bound to
+`g_ppu` member fields) is reused throughout, so the existing
+`sound.cpp` / `x6502.cpp` / board files / `wave.cpp` /
+`filter.cpp` call sites keep working without a break-all commit.
+The SFORMAT schema for `FCEUSND_STATEINFO` is byte-identical, so
+v1.5 ↔ v1.6 savestates round-trip without re-capture (golden
+hashes unchanged).
+
+### Added
+
+- **`src/apu.h` / `src/apu.cpp`** — `fceu11::Apu` class
+  (`alignas(64)` cache-line alignment) owning the APU register file
+  (`psg_[0x10]`, `enabled_channels_`, `irq_frame_mode_`, `nreg_`),
+  envelope state (`env_units_[3]`), triangle channel
+  (`tri_count_`, `tri_mode_`, `tristep_`, `wlcount_[4]`), square
+  channels (`rect_duty_count_[2]`, `sweepon_[2]`, `curfreq_[2]`,
+  `sweep_count_[2]`, `sweep_reload_[2]`, `sqacc_[2]`,
+  `lengthcount_[4]`), noise channel, frame counter
+  (`fcnt_`, `fhcnt_`, `fhinc_`), DMC state (`dmc_format_`,
+  `raw_da_latch_`, `initial_raw_da_latch_`, `dmc_7bit_`, `dmc_acc_`,
+  `dmc_period_`, `dmc_bit_count_`, `dmc_address_`, `dmc_size_`,
+  `dmc_shift_`, `dmc_have_dma_`, `dmc_have_sample_`, `dmc_dma_buf_`,
+  `sirq_stat_`), output buffers (`wave_[2048+512]`,
+  `wave_final_[2048+512]`, `wave_hi_[40000]`), timing
+  (`soundtsinc_`, `soundtsoffs_`, `soundtsi_`, `nesincsize_`,
+  `swap_duty_`), and `exp_sound_` adapter. Public API: lifecycle
+  (`init` / `shutdown` / `power` / `reset`), `sound_cpu_hook(int)`
+  `__forceinline`, `get_sound_buffer()` /
+  `flush_emulate_sound()`, configuration (`set_sound_variables` /
+  `set_rate` / `set_volume` / `set_lowpass`), `set_exp_sound()`,
+  savestate (`save_state` / `load_state`). `fceu11::g_apu` is a
+  direct global (same pattern as `fceu11::g_cpu` /
+  `fceu11::g_bus` / `fceu11::g_ppu`).
+- **Apu compat aliases** (`extern T (& NAME) ...` / `extern T& NAME`)
+  in `src/sound.h` that bind the v1.0 global names to `g_apu`
+  internal storage — `Wave[2048+512]` / `WaveFinal[2048+512]` /
+  `WaveHi[40000]` / `soundtsinc` / `soundtsoffs` / `soundtsi` /
+  `nesincsize` / `swapDuty` / `PSG[0x10]` / `EnabledChannels` /
+  `IRQFrameMode` / `EnvUnits[3]` / `lengthcount[4]` / `TriCount` /
+  `TriMode` / `tristep` / `wlcount[4]` / `RectDutyCount[2]` /
+  `sweepon[2]` / `curfreq[2]` / `SweepCount[2]` / `SweepReload[2]` /
+  `sqacc[2]` / `fcnt` / `fhcnt` / `fhinc` / `DMCFormat` /
+  `RawDALatch` / `InitialRawDALatch` / `DMC_7bit` / `DMCacc` /
+  `DMCPeriod` / `DMCBitCount` / `DMCAddress` / `DMCSize` / `DMCShift`
+  / `DMCHaveDMA` / `DMCHaveSample` / `DMCDMABuf` / `SIRQStat`.
+  All alias targets resolve to `g_apu` member fields, so existing
+  call sites (`Wave[i] = v`, `PSG[2] |= 0x80`,
+  `&Wave[0]` for SFORMAT, etc.) compile and run unchanged. The
+  `extern int32 WaveHi[]` (incomplete-array-type) was replaced
+  with `extern int32 (&WaveHi)[40000]` per build plan §1.3.
+- **`src/expansion_audio.h`** — `fceu11::ExpansionAudio` virtual
+  base class declaring the expansion-audio interface:
+  `fill(int32_t count)` (LQ) / `hi_fill()` (HQ) /
+  `hi_sync(int32_t ts)` / `region_changed()` / `kill()` plus a
+  default-empty `neo_fill(int32_t*, int32_t)` for VRC7-only sites.
+  Pure virtual on the 5 core methods; `neo_fill` defaults to `{}`
+  so subclasses that don't need VRC7-style LQ with wave-buffer
+  parameter are not forced to implement it.
+- **`EXPSOUND` adapter extension** — `EXPSOUND` gained an
+  `fceu11::ExpansionAudio* expansion` field (Phase D, commit
+  `ae81a9b`). The existing 6 function-pointer fields are retained
+  for ABI compatibility with board files that still assign them
+  directly; `FlushEmulateSound` checks `expansion != nullptr`
+  first and routes through the virtual methods, falling back to
+  the function pointers when no object is installed.
+- **VRC6 `ExpansionAudio` subclass PoC** (Phase E, commit
+  `7f032841`) — `fceu11::Vrc6Audio : public ExpansionAudio`
+  defined inline in `src/boards/vrc6.cpp`, forwarding `fill`
+  → `VRC6Sound`, `hi_fill` → `VRC6SoundHQ`, `hi_sync` →
+  `VRC6SyncHQ`, `region_changed` → `VRC6_ESI`, `kill` → `{}`.
+  `VRC6_ESI` installs a static `Vrc6Audio` instance via
+  `GameExpSound.expansion = &g_vrc6_audio;`.
+- **Lifecycle plumbing** — `fceu11::Initialize()` calls
+  `g_apu.init()` right after `g_cpu.init()` / `g_bus.init()` /
+  `g_ppu.init()`; `PowerNES()` / `ResetNES()` call
+  `g_apu.power()` / `g_apu.reset()` symmetrically. No
+  init-order bugfix was required (the v1.5 `Bus::attach_ppu`
+  lesson did not recur: `g_apu` is not referenced from any
+  board-load callback, only from `FlushEmulateSound` /
+  `FCEU_SoundCPUHook` post-`Initialize`).
+- **`FCEUSND_STATEINFO` migration** — the SFORMAT table moved
+  from `src/sound.cpp` to `src/apu.cpp`. Every entry's address
+  now points to a `g_apu.member_` field (e.g.
+  `{ &g_apu.fhcnt_, 4 | FCEUSTATE_RLSB, "FHCN" }`). Chunk names,
+  byte sizes, and order are byte-identical to v1.5; no SFORMAT
+  schema change → `golden_savestate_test` 9/9 PASS and
+  `savestate_regression_test` 12/12 PASS without re-capture.
+
+### Changed
+
+- **`src/sound.cpp`** — every file-scope variable from the §2.1
+  migration list was removed; their definition moved into
+  `Apu`'s constructor / member-initializer list, with the v1.0
+  global names now provided as reference aliases in `src/sound.h`.
+  Lookup tables (`wlookup1[32]`, `wlookup2[203]`, `RectDuties[4]`,
+  `lengthtable[0x20]`, `NoiseFreqTableNTSC/PAL`, `NTSCDMCTable`,
+  `PALDMCTable`) and dispatch function pointers (`DoNoise` /
+  `DoTriangle` / `DoPCM` / `DoSQ1` / `DoSQ2`) remained `static`
+  in `sound.cpp` (no state to own, per build plan §2.1).
+- **`src/x6502.cpp::FCEU_SoundCPUHook` hot path** — preserved
+  as a free function entry (ABI compatible); body now
+  `__forceinline`-forwards to `g_apu.sound_cpu_hook(cycles)`.
+  `x6502.cpp` still only `#include "sound.h"` — the Apu class
+  declaration does not leak into the CPU translation unit,
+  matching build plan §2.3's "no include-graph churn" rule.
+- **`src/filter.cpp`** — unchanged in this release (Rust FIR was
+  already the default path since v0.2.10 Phase 9). Phase F
+  verification confirmed `SexyFilter` / `SexyFilter2` /
+  `NeoFilterSound` / `MakeFilters` all delegate to
+  `fceux11_rust_filter_*`.
+- **`src/archived/fir/`** — the dead C++ coefficient arrays
+  (`fcoeffs.h` and the `src/fir/*.h` tables) moved here from
+  their original locations (Phase F, commit `d9879a9`). The
+  directory is no longer in any C++
+  `target_include_directories` path; `src/fcoeffs.h` is
+  deleted. The header comment in
+  `src/rust/crates/fceux11-media/src/fcoeffs.rs` notes
+  "Rust-only; C-side coefficients archived in
+  `src/archived/fir/` for historical reference".
+
+### Performance
+
+- **`ctest -C Release -LE perf` 19/19 PASS** —
+  smoke_test / mapper_load_test / mapper_reset_test /
+  rom_regression_test / savestate_regression_test /
+  expected_api_test / enum_class_bitflags_test /
+  i18n_regression_test / core_state_test / cpu_test / ppu_test /
+  apu_test / bus_test / mapper_core_test / savestate_core_test /
+  ppu_frame_diff_test / apu_wav_diff_test / golden_savestate_test /
+  config_store_test.
+- **`bench_tolerance_test` advisory FAIL** (single stable
+  measurement, not within ±2.5% on `bench_full_frame`):
+  - `bench_cpu_frame`:  ~baseline (within ±2.5%)
+  - `bench_ppu_frame`:  +2.00% (within ±2.5%, PASS)
+  - `bench_full_frame`: +3.63% (70.728 ms vs 68.249 ms
+    baseline; exceeds +2.5% gate; recorded as
+    `bench_tolerance_test FAIL`)
+
+  Per project convention (commit `ec3c2dc`)
+  `bench_tolerance_test` is excluded from CI gating
+  (`ctest -LE perf`), so this is advisory. The +3.63% on
+  `bench_full_frame` reproduces across runs and matches the
+  Phase 6 VRC7 bench-regression pattern
+  (`docs/internal/phase6_vrc7_bench_regression.md`):
+  link-time code-layout disturbance from Phase E's
+  `VRC6_ESI()` expansion-pointer assignment — the call is
+  unreachable at the bench's ROM-load (no VRC6 board is
+  loaded for `mapper_mmc3.nes`), but the linker reorders
+  hot-path instructions when the new pointer-assignment code
+  is added to `vrc6.cpp`. **v1.6 accepts this result and does
+  not re-baseline**; re-baselining would mask the same pattern
+  recurring in v1.7 Cart-class changes. The asymmetry is
+  deferred to v1.14 Anvil §14.3 LTO pass for proper
+  evaluation.
+- **`apu_wav_diff_test` sample-level parity preserved** —
+  NROM / MMC1 / VRC6 / MMC5 captures (60/90/60/90 frames @
+  44100 Hz mono 16-bit) all `memcmp` byte-identical to the
+  v1.5-era golden WAV files in
+  `tests/fixtures/golden_wav/`. 0 sample drift across all 4
+  ROMs.
+- **`savestate_regression_test` 12/12 PASS** — MD5 round-trip
+  on NROM / MMC1 / MMC3 / UXROM / CNROM / AxROM /
+  ColorDreams / GNROM / VRC2and4 / VRC6 / VRC7 / nestest
+  matches v1.5 baselines.
+- **`golden_savestate_test` 9/9 PASS** — every entry in
+  `golden_index.json` byte-loads and byte-saves correctly
+  (2 FDS entries remain SKIP per no-BIOS environment).
+
+### Compatibility
+
+- **API**: source-compatible at the global-name level. Every
+  existing call site in `src/sound.cpp` / `src/x6502.cpp` /
+  `src/wave.cpp` / `src/filter.cpp` / `src/boards/*.cpp` /
+  `src/fds.cpp` compiles unchanged thanks to the
+  reference-alias pattern. `src/apu.h` is only included by
+  `src/apu.cpp` and `src/fceu.cpp` (for `g_apu` lifecycle
+  calls); 175 board files do not see `fceu11::Apu` and keep
+  their existing `GameExpSound.Fill = VRC6Sound;` direct
+  assignments.
+- **Savestate (forward: v1.6 build loading v1.5 savestate)**:
+  ✅ byte-identical round-trip via
+  `savestate_regression_test` (12 ROMs) and
+  `golden_savestate_test` (9 entries). SFORMAT schema
+  unchanged; chunk names / sizes / order preserved.
+- **Savestate (backward: v1.6 build loading pre-v1.5
+  savestate)**: ✅ supported. v1.5's `ec3c2dc` baseline (and
+  earlier v1.4 / v1.3 baselines) load and save byte-identical
+  to the new build's output. The ~10-byte drift from v1.5
+  Phase F's link-time layout shift is NOT amplified by v1.6 —
+  Apu members are defined at compile time with the same
+  layout as the v1.5 free-storage globals they replaced.
+- **WAV output**: ✅ sample-level identical to v1.5 for all
+  4 ROMs covered by `apu_wav_diff_test`. Rust FIR is the
+  default path unchanged since v0.2.10.
+
+### Known issues / deferred
+
+- **`bench_full_frame` +3.63% regression** — see Performance
+  section. Recorded as advisory; CI gating unaffected.
+  Deferred to v1.14 Anvil.
+- **Other expansion chips (VRC7 / FDS / MMC5 / Namco163 /
+  Sunsoft5B) not subclassed** — v1.6 §6.2 only does the
+  `ExpansionAudio` interface + VRC6 PoC; bulk subclassing is
+  v1.8 Masonry scope (build plan §0.3 / §3.4). Their existing
+  function-pointer assignments continue to work via the
+  adapter fallback path.
+- **`Apu::flush_emulate_sound()` doesn't call Rust FIR via a
+  member method** — the Rust FIR pipeline is invoked from
+  `src/filter.cpp` free functions, not from
+  `g_apu.flush_emulate_sound`. v1.6 chose to keep the FFI
+  call site at the free-function layer to avoid a
+  `g_apu`-member-function indirect call in the per-frame
+  flush path (build plan §1.4). The `ExpansionAudio::fill`
+  virtual is only invoked when an expansion-audio subclass
+  is registered (VRC6 PoC + future v1.8 subclasses), so
+  standard APU ROMs (NROM / MMC1 / MMC3) take the same
+  code path as v1.5.
+
+### Verification
+
+- **ctest -LE perf 19/19 PASS** in Release.
+- **`apu_wav_diff_test` 4/4 ROMs sample-level byte-identical**
+  to the v1.5 golden WAVs (NROM 60f, MMC1 90f, VRC6 60f,
+  MMC5 90f).
+- **`ppu_frame_diff_test` 5/5 ROMs 0-pixel diff** (inherited
+  from v1.5; v1.6 has no PPU-side changes).
+- **Final v1.6 commit** `d9879a9` (Phase F: archive dead C++
+  FIR coefficient sources).
+- **Final v1.6 tag** `v1.6` (annotated; see Phase G wrap-up
+  notes).
+
+### Next steps
+
+v1.7 Cartograph (Roadmap §7) is the next sub-version: CartInfo /
+Bank-Switching API modernization. The `Apu::set_exp_sound` entry
+point is the v1.7 hook for Cart to install expansion audio on
+ROM load. The `ExpansionAudio` virtual base class is the v1.8
+Mapper-class interface contract — bulk subclassing of VRC7 /
+FDS / MMC5 / Namco163 / Sunsoft5B lands in v1.8 Masonry.
+
+---
+
 ## [1.4] - 2026-06-23
 
 **Codename: Gateway.** Fourth sub-version of the v1.x modernization cycle
