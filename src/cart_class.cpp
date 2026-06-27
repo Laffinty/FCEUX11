@@ -6,7 +6,11 @@
 
 #include "cart_class.h"
 
+#include "cart.h"             // currCartInfo, CartInfo::SaveGame_t
+#include "rust/fceux11_rust.h" // FceuSaveGameEntry, battery Rust functions
+
 #include <cstring>
+#include <vector>
 
 namespace fceu11 {
 
@@ -47,22 +51,68 @@ bool Cart::has_battery() const noexcept {
     return battery_present();
 }
 
-bool Cart::save_battery(const std::filesystem::path& /*path*/) const {
-    // Phase C1: serialize CartInfo::SaveGame buffers to disk.
-    return false;
+bool Cart::save_battery(const std::filesystem::path& path) const {
+    if (!has_battery() || save_games_.empty()) {
+        return false;
+    }
+
+    std::vector<FceuSaveGameEntry> entries;
+    entries.reserve(save_games_.size());
+    for (const auto& sg : save_games_) {
+        if (sg.bufptr) {
+            entries.push_back({sg.bufptr, sg.buflen});
+        }
+    }
+    const auto path_str = path.string();
+    return fceux11_rust_cart_battery_save(path_str.c_str(), entries.data(),
+                                          entries.size());
 }
 
-bool Cart::load_battery(const std::filesystem::path& /*path*/) const {
-    // Phase C1: deserialize CartInfo::SaveGame buffers from disk.
-    return false;
+bool Cart::load_battery(const std::filesystem::path& path) const {
+    if (!has_battery() || save_games_.empty()) {
+        return false;
+    }
+
+    std::vector<FceuSaveGameEntry> entries;
+    entries.reserve(save_games_.size());
+    for (auto& sg : save_games_) {
+        if (sg.bufptr) {
+            entries.push_back({sg.bufptr, sg.buflen});
+        }
+    }
+    const auto path_str = path.string();
+    return fceux11_rust_cart_battery_load(path_str.c_str(), entries.data(),
+                                          entries.size());
 }
 
 void Cart::clear_battery() noexcept {
-    // Phase C1: clear registered save-game buffers.
+    if (save_games_.empty()) {
+        return;
+    }
+
+    std::vector<FceuSaveGameEntry> entries;
+    entries.reserve(save_games_.size());
+    for (const auto& sg : save_games_) {
+        if (sg.bufptr) {
+            entries.push_back({sg.bufptr, sg.buflen});
+        }
+    }
+    fceux11_rust_cart_battery_clear(entries.data(), entries.size());
+
+    for (auto& sg : save_games_) {
+        if (sg.resetFunc) {
+            sg.resetFunc();
+        }
+    }
+
+    save_games_.clear();
+    if (currCartInfo) {
+        currCartInfo->SaveGame.clear();
+    }
 }
 
 // ---------------------------------------------------------------------------
-// SaveGame buffer registration (Phase C1 stub)
+// SaveGame buffer registration (Phase C1)
 // ---------------------------------------------------------------------------
 
 void Cart::addSaveGameBuf(uint8_t* bufptrIn, uint32_t buflenIn,
@@ -72,6 +122,17 @@ void Cart::addSaveGameBuf(uint8_t* bufptrIn, uint32_t buflenIn,
     tmp.buflen = buflenIn;
     tmp.resetFunc = resetFuncIn;
     save_games_.push_back(tmp);
+
+    // Dual-write to the legacy CartInfo::SaveGame vector so existing
+    // FCEU_SaveGameSave / FCEU_LoadGameSave / FCEU_ClearGameSave paths
+    // continue to work for both old board files and new Cart subclasses.
+    if (currCartInfo) {
+        CartInfo::SaveGame_t ci_tmp;
+        ci_tmp.bufptr = bufptrIn;
+        ci_tmp.buflen = buflenIn;
+        ci_tmp.resetFunc = resetFuncIn;
+        currCartInfo->SaveGame.push_back(ci_tmp);
+    }
 }
 
 // ---------------------------------------------------------------------------

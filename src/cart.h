@@ -43,6 +43,16 @@ struct CartInfo
 
 	void addSaveGameBuf( uint8* bufptrIn, uint32 buflenIn, void (*resetFuncIn)(void) = nullptr )
 	{
+		// v1.7 Phase C1: route through the objectized Cart when a concrete
+		// subclass is installed; otherwise keep the v1.0 direct-append path
+		// so un-migrated board files continue to work before Phase D sets
+		// cart_obj.
+		if (cart_obj)
+		{
+			cart_obj->addSaveGameBuf(bufptrIn, buflenIn, resetFuncIn);
+			return;
+		}
+
 		SaveGame_t tmp;
 
 		tmp.bufptr = bufptrIn;
