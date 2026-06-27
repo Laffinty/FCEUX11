@@ -90,7 +90,7 @@ extern int g_rasterpos;
 extern uint8 SPRBUF[0x100];
 extern uint8 VRAMBuffer, PPUGenLatch;
 
-extern bool DMC_7bit;
+extern bool& DMC_7bit;
 extern bool paldeemphswap;
 
 // PPUPHASE — moved to ppu_class.h (which ppu.h includes). Keeping a
