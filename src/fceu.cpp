@@ -24,6 +24,7 @@
 #include "fceu.h"
 #include "bus.h"      // v1.4 Post-Release Optimization Plan §1.1: g_bus.init()
 #include "ppu.h"
+#include "apu.h"
 #include "sound.h"
 #include "netplay.h"
 #include "file.h"
@@ -665,6 +666,10 @@ bool fceu11::Initialize() {
 
 	g_cpu.init();
 
+	// v1.6 Resonance §10.2: instantiate APU scaffolding.
+	// Phase B: no-op; Phase C will migrate APU state from sound.cpp.
+	fceu11::g_apu.init();
+
 	// v1.5 Prism §3.2: wire Bus → Ppu back-pointer so Bank-switching
 	// (setchr* / setmirror* / setntamem) can route through
 	// ppu_->method() instead of touching v1.0 globals directly.
@@ -949,6 +954,7 @@ void ResetNES(void) {
 	FCEUMOV_AddCommand(FCEUNPCMD_RESET);
 	if (!GameInfo) return;
 	GameInterface(GI_RESETM2);
+	fceu11::g_apu.reset();
 	FCEUSND_Reset();
 	FCEUPPU_Reset();
 	g_cpu.reset();
@@ -1062,6 +1068,9 @@ void PowerNES(void) {
 	FCEU_GeniePower();
 
 	FCEU_MemoryRand(RAM, 0x800);
+
+	// v1.6 Resonance §10.2: APU power scaffolding (no-op in Phase B).
+	fceu11::g_apu.power();
 
 	// v1.4 Post-Release Optimization Plan §1.1: replace the legacy
 	// SetReadHandler/SetWriteHandler "fill the whole 64K with ANull/BNull"
