@@ -35,8 +35,6 @@
 static uint32 wlookup1[32];
 static uint32 wlookup2[203];
 
-EXPSOUND GameExpSound={0,0,0};
-
 // v1.6 Resonance Phase C2: TriCount/TriMode/tristep/wlcount/PSG/DMCFormat/
 // RawDALatch/DMCAddressLatch/DMCSizeLatch/EnabledChannels/IRQFrameMode/
 // InitialRawDALatch/DMC_7bit/EnvUnits migrated to fceu11::g_apu; accessed
@@ -1005,7 +1003,7 @@ int FlushEmulateSound(void)
   {
    int32 *tmpo=&WaveHi[soundtsoffs];
 
-   if(GameExpSound.HiFill) GameExpSound.HiFill();
+   FCEU11_ExpHiFill(&GameExpSound);
 
    for(x=g_cpu.sound_timestamp_ref();x;x--)
    {
@@ -1018,15 +1016,14 @@ int FlushEmulateSound(void)
    memmove(WaveHi,WaveHi+SOUNDTS-left,left*sizeof(uint32));
    memset(WaveHi+left,0,sizeof(WaveHi)-left*sizeof(uint32));
 
-   if(GameExpSound.HiSync) GameExpSound.HiSync(left);
+   FCEU11_ExpHiSync(&GameExpSound, left);
    for(x=0;x<5;x++)
     ChannelBC[x]=left;
   }
   else
   {
    end=(SOUNDTS<<16)/soundtsinc;
-   if(GameExpSound.Fill)
-    GameExpSound.Fill(end&0xF);
+   FCEU11_ExpFill(&GameExpSound, end&0xF);
 
    SexyFilter(Wave,WaveFinal,end>>4);
 
@@ -1205,8 +1202,7 @@ void SetSoundVariables(void)
 
   MakeFilters(FSettings.SndRate);
 
-  if(GameExpSound.RChange)
-   GameExpSound.RChange();
+  FCEU11_ExpRegionChanged(&GameExpSound);
 
   nesincsize=(int64)(((int64)1<<17)*(double)(PAL?PAL_CPU:NTSC_CPU)/(FSettings.SndRate * 16));
   memset(sqacc,0,sizeof(sqacc));

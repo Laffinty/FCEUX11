@@ -15,6 +15,7 @@
 #include <cstddef>
 
 #include "types.h"
+#include "expansion_audio.h"   // EXPSOUND, ExpansionAudio
 #include "utils/cache.h"       // FCEUX11_CACHE_ALIGN
 
 // Envelope unit state (was in sound.h; moved here because it is now a
@@ -29,14 +30,22 @@ typedef struct {
 
 namespace fceu11 {
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4324)
+#endif
 class FCEUX11_CACHE_ALIGN Apu {
 public:
     // ---- Lifecycle (Phase B: no-op; Phase C/E: real impls) ----
-    Apu() noexcept = default;
+    Apu() noexcept : exp_sound_{} {}
     void init() noexcept {}
     void shutdown() noexcept {}
     void power() noexcept {}
     void reset() noexcept {}
+
+    // ---- Phase D: expansion audio adapter ----
+    EXPSOUND& exp_sound() noexcept { return exp_sound_; }
+    void set_exp_sound(const EXPSOUND& exp) noexcept { exp_sound_ = exp; }
 
     // ---- Phase C1 accessors: output buffers ----
     __forceinline int32_t (& wave() noexcept)[2048 + 512]       { return wave_; }
@@ -146,7 +155,13 @@ private:
     char    dmc_have_sample_;
     uint8_t dmc_dma_buf_;
     uint8_t sirq_stat_;
+
+    // Phase D: expansion audio adapter (v1.0 EXPSOUND ABI).
+    EXPSOUND exp_sound_;
 };
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 // Direct global instance (plan §1.2). Same pattern as g_bus / g_ppu.
 extern Apu g_apu;

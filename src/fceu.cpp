@@ -417,8 +417,7 @@ void ResetGameLoaded(void) {
 	GameHBIRQHook = NULL;
 	FFCEUX_PPURead = NULL;
 	FFCEUX_PPUWrite = NULL;
-	if (GameExpSound.Kill)
-		GameExpSound.Kill();
+	FCEU11_ExpKill(&GameExpSound);
 	memset(&GameExpSound, 0, sizeof(GameExpSound));
 	g_cpu.map_irq_hook_ref() = nullptr;
 	MMC5Hack = 0;

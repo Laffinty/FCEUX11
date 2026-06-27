@@ -73,3 +73,9 @@ char&       DMCHaveDMA              = fceu11::g_apu.dmc_have_dma();
 char&       DMCHaveSample           = fceu11::g_apu.dmc_have_sample();
 uint8_t&    DMCDMABuf               = fceu11::g_apu.dmc_dma_buf();
 uint8_t&    SIRQStat                = fceu11::g_apu.sirq_stat();
+
+// ---- Phase D: expansion audio adapter ----
+// GameExpSound is now a reference alias into g_apu.exp_sound_. Board files
+// that assign GameExpSound.Fill / .HiFill / etc. write through to the
+// canonical storage inside the Apu object.
+EXPSOUND& GameExpSound = fceu11::g_apu.exp_sound();
