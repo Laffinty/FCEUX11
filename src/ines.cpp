@@ -811,6 +811,7 @@ int iNESLoad(const char *name, FCEUFILE *fp, int OverwriteVidMode) {
 	}
 
 init_error:
+	fceu11::assign_cart(nullptr);
 	if (ROM) free(ROM);
 	if (VROM) free(VROM);
 	if (trainerpoo) free(trainerpoo);
@@ -837,6 +838,17 @@ init_ok:
 
 	GameInterface = iNESGI;
 	currCartInfo = &iNESCart;
+
+	// v1.7 Phase D: install a concrete Cart subclass when the factory returns
+	// one. Phase D factory returns nullptr, so board-set function pointers
+	// remain in effect. Phase E/F will override the factory for NROM/MMC1/MMC3.
+	if (auto cart = fceu11::create_cart_for_mapper(MapperNo, fceu11::g_bus)) {
+		fceu11::assign_cart(std::move(cart));
+		iNESCart.cart_obj = fceu11::g_cart;
+		iNESCart.Power = CartInfo_PowerForward;
+		iNESCart.Reset = CartInfo_ResetForward;
+		iNESCart.Close = CartInfo_CloseForward;
+	}
 
 	// v1.7 Phase C2: sync parsed iNES metadata into the objectized Cart.
 	// Cart setters dual-write back to currCartInfo, so CartInfo fields stay

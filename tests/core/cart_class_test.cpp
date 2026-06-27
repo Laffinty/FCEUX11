@@ -32,7 +32,30 @@
 #include <cstring>
 #include <vector>
 
+#include "cart_class.h"
+
 using namespace fceu11_test;
+
+// ---------------------------------------------------------------------------
+// Phase D helper: counting cart that records on_save_pre / on_load_post calls
+// ---------------------------------------------------------------------------
+
+namespace {
+
+class CountingTestCart : public fceu11::Cart {
+public:
+    int on_save_pre_count = 0;
+    int on_load_post_count = 0;
+
+    void on_power() noexcept override {}
+    void on_reset() noexcept override {}
+    void on_close() noexcept override {}
+
+    void on_save_pre() noexcept override { ++on_save_pre_count; }
+    void on_load_post() noexcept override { ++on_load_post_count; }
+};
+
+} // namespace
 
 // ---------------------------------------------------------------------------
 // Phase A stub tests — all [SKIP] until Cart class is implemented
@@ -105,14 +128,62 @@ void test_attach_bus_injection(TestContext& ctx) {
 void test_on_save_pre_default_noop(TestContext& ctx) {
     // Phase D: verify default Cart::on_save_pre() does nothing.
     // (Critical for v1.4 vrc7_PreSave layout-shift avoidance.)
-    std::printf("    [SKIP] on_save_pre default no-op: deferred to Phase D\n");
-    FCEU11_EXPECT(ctx, true, "skipped");
+    class DefaultCart : public fceu11::Cart {
+    public:
+        void on_power() noexcept override {}
+        void on_reset() noexcept override {}
+        void on_close() noexcept override {}
+    };
+
+    DefaultCart cart;
+    cart.on_save_pre(); // should compile and do nothing
+    FCEU11_EXPECT(ctx, true, "default on_save_pre is a no-op");
 }
 
 void test_on_load_post_trigger_sequence(TestContext& ctx) {
-    // Phase D: verify Cart::on_load_post() called AFTER FCEUMOV_PostLoad.
-    std::printf("    [SKIP] on_load_post sequence: deferred to Phase D\n");
-    FCEU11_EXPECT(ctx, true, "skipped");
+    if (!core_init()) {
+        FCEU11_EXPECT(ctx, false, "core_init failed");
+        return;
+    }
+
+    FCEUGI* gi = load_rom("fixtures/nestest.nes");
+    if (!gi) {
+        FCEU11_EXPECT(ctx, false, "failed to load nestest.nes");
+        core_shutdown();
+        return;
+    }
+
+    // Run a few frames so the savestate has something to serialize.
+    emulate_n(10);
+
+    // Install our counting cart into the legacy CartInfo.
+    CountingTestCart test_cart;
+    fceu11::Cart* old_cart_obj = currCartInfo->cart_obj;
+    currCartInfo->cart_obj = &test_cart;
+
+    // Save state to a temp file. FCEUSS_Save returns void, so we just call
+    // it and then check whether on_save_pre fired (it should have regardless
+    // of whether the write itself succeeded).
+    const char* tmp_state = "cart_class_test_tmp.fcs";
+    FCEUSS_Save(tmp_state, false);
+
+    // on_save_pre should have been triggered during save.
+    FCEU11_EXPECT(ctx, test_cart.on_save_pre_count == 1,
+                  "on_save_pre triggered exactly once during save");
+
+    // Load the state back.
+    bool loaded = FCEUSS_Load(tmp_state, false);
+    FCEU11_EXPECT(ctx, loaded, "FCEUSS_Load succeeded");
+    FCEU11_EXPECT(ctx, test_cart.on_load_post_count == 1,
+                  "on_load_post triggered exactly once after successful load");
+
+    // Restore the previous cart_obj so cleanup does not touch our stack cart.
+    currCartInfo->cart_obj = old_cart_obj;
+
+    // Clean up temp file.
+    std::remove(tmp_state);
+
+    core_shutdown();
 }
 
 // ---------------------------------------------------------------------------
@@ -123,8 +194,8 @@ int main() {
     std::setvbuf(stdout, nullptr, _IONBF, 0);
 
     std::printf("=== FCEUX11 v1.7 Cart class test suite ===\n");
-    std::printf("Phase A skeleton: 12 stub tests, all [SKIP] until v1.7 Cart\n");
-    std::printf("subclass PoCs land in Phase E (NROM) / Phase F (MMC1+MMC3).\n\n");
+    std::printf("Phase D: on_save_pre/on_load_post tests active;\n");
+    std::printf("Phase E/F (NROM/MMC1/MMC3) tests still [SKIP].\n\n");
 
     TestContext ctx;
 

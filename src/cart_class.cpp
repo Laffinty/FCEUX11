@@ -29,9 +29,27 @@ public:
 
 CartPlaceholder g_cart_placeholder;
 
+// Owning pointer for the concrete cart returned by create_cart_for_mapper().
+// When nullptr, g_cart points at g_cart_placeholder (above). When set, g_cart
+// aliases g_cart_owner.get() so the existing raw-pointer API surface
+// (fceu11::g_cart, currCartInfo->cart_obj) keeps working unchanged.
+std::unique_ptr<Cart> g_cart_owner;
+
 } // namespace
 
 Cart* g_cart = &g_cart_placeholder;
+
+std::unique_ptr<Cart> create_cart_for_mapper(uint32_t /*mapper_no*/, Bus& /*bus*/) {
+    // Phase D: infrastructure only. All mappers keep using the legacy
+    // CartInfo function pointers. Phase E/F will add switch cases here
+    // for NROM/MMC1/MMC3.
+    return nullptr;
+}
+
+void assign_cart(std::unique_ptr<Cart> cart) {
+    g_cart_owner = std::move(cart);
+    g_cart = g_cart_owner ? g_cart_owner.get() : &g_cart_placeholder;
+}
 
 Cart::Cart() noexcept = default;
 

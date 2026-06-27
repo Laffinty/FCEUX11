@@ -39,6 +39,7 @@
 #include "video.h"
 #include "input.h"
 #include "driver.h"
+#include "cart.h"
 
 #ifdef _WIN32
 // v0.3.15.x PHASE-3: DirectStorage probe scaffold. Only compiled in
@@ -344,6 +345,11 @@ bool FCEUSS_SaveMS(EMUFILE* outstream, int compressionLevel)
 		chunks.push_back({8, std::move(buf)});
 	}
 
+	// v1.7 Phase D: give the current cart a chance to prepare state before
+	// the SFMDATA chunk is serialized. Default implementation is a no-op.
+	if (currCartInfo && currCartInfo->cart_obj)
+		currCartInfo->cart_obj->on_save_pre();
+
 	if (SPreSave) SPreSave();
 	addSformatChunk(0x10, SFMDATA);
 	if (SPostSave) SPostSave();
@@ -599,6 +605,11 @@ bool FCEUSS_LoadFP(EMUFILE* is, ENUM_SSLOADPARAMS params)
 		FCEUPPU_LoadState(version);
 		FCEUSND_LoadState(version);
 		ret = FCEUMOV_PostLoad();
+		// v1.7 Phase D: notify the current cart after a successful load.
+		// Default implementation is a no-op, so savestate compatibility is
+		// unchanged.
+		if (ret && currCartInfo && currCartInfo->cart_obj)
+			currCartInfo->cart_obj->on_load_post();
 	} else if (backup)
 	{
 		msBackupSavestate.fseek(0, SEEK_SET);

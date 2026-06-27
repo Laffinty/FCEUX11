@@ -621,6 +621,7 @@ int UNIFLoad(const char *name, FCEUFILE *fp) {
 	}
 	FreeUNIF();
 	ResetUNIF();
+	fceu11::assign_cart(nullptr);
 	return LOADER_HANDLED_ERROR;
 
 init_ok:
@@ -629,6 +630,17 @@ init_ok:
 	FCEU_strlcpy(LoadedRomFName, sizeof(LoadedRomFName), name); //For the debugger list
 	GameInterface = UNIFGI;
 	currCartInfo = &UNIFCart;
+
+	// v1.7 Phase D: install a concrete Cart subclass when the factory returns
+	// one. UNIF uses board names rather than iNES mapper numbers, so pass 0
+	// for now; the Phase D factory ignores the number anyway.
+	if (auto cart = fceu11::create_cart_for_mapper(0, fceu11::g_bus)) {
+		fceu11::assign_cart(std::move(cart));
+		UNIFCart.cart_obj = fceu11::g_cart;
+		UNIFCart.Power = CartInfo_PowerForward;
+		UNIFCart.Reset = CartInfo_ResetForward;
+		UNIFCart.Close = CartInfo_CloseForward;
+	}
 
 	// v1.7 Phase C2: sync parsed UNIF metadata into the objectized Cart.
 	if (fceu11::g_cart) {

@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <filesystem>
+#include <memory>
 #include <vector>
 
 #include "types.h"
@@ -162,6 +163,15 @@ public:
 // loaded. A concrete mapper subclass replaces the pointer during iNES/UNIF
 // loading (Phase E/F).
 extern Cart* g_cart;
+
+// Phase D factory: create a concrete Cart subclass for a given iNES mapper
+// number. Phase D stub returns nullptr for all mappers; Phase E/F override
+// for NROM (0), MMC1 (1), and MMC3 (4).
+std::unique_ptr<Cart> create_cart_for_mapper(uint32_t mapper_no, Bus& bus);
+
+// Take ownership of a newly-created cart and update the global g_cart pointer.
+// Passing nullptr restores g_cart to the no-op placeholder.
+void assign_cart(std::unique_ptr<Cart> cart);
 
 } // namespace fceu11
 #endif
