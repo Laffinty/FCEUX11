@@ -607,6 +607,7 @@ void BMC11160_Init(CartInfo *info) {
 // ---------------------------------------------------------------------------
 
 #include "boards/nrom_cart.h"
+#include "boards/datalatch_carts.h"
 #include "boards/registry.h"
 
 namespace fceu11 {
@@ -640,6 +641,24 @@ static MapperEntryRegister kNromRegister{
         /*legacy_init=*/&NROM_Init,
         /*factory=*/[](Bus& bus) { return std::make_unique<NromCart>(bus); }
     }
+};
+
+// v1.8 Masonry Phase D.4: simple P0 latch mappers.
+static MapperEntryRegister kUnromRegister{
+    MapperEntry{2, "UNROM", &UNROM_Init,
+        [](Bus& bus) { return std::make_unique<UnromCart>(bus); }}
+};
+static MapperEntryRegister kCnromRegister{
+    MapperEntry{3, "CNROM", &CNROM_Init,
+        [](Bus& bus) { return std::make_unique<CnromCart>(bus); }}
+};
+static MapperEntryRegister kAnromRegister{
+    MapperEntry{7, "ANROM", &ANROM_Init,
+        [](Bus& bus) { return std::make_unique<AnromCart>(bus); }}
+};
+static MapperEntryRegister kCpromRegister{
+    MapperEntry{13, "CPROM", &CPROM_Init,
+        [](Bus& bus) { return std::make_unique<CpromCart>(bus); }}
 };
 
 }  // namespace
