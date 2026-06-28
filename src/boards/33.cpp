@@ -19,6 +19,8 @@
  */
 
 #include "mapinc_bus.h"
+#include "boards/irem_txc_bit_carts.h"
+#include "boards/registry.h"
 #include "../ppu.h"
 
 static uint8 is48;
@@ -116,3 +118,12 @@ void Mapper48_Init(CartInfo *info) {
 	AddExState(&StateRegs, ~0, 0, 0);
 }
 
+
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper33Register{
+    MapperEntry{33, "TENGEN RBI Baseball", &Mapper33_Init,
+        [](Bus& bus) { return std::make_unique<Mapper33Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

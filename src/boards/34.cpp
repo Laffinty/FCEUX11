@@ -28,6 +28,8 @@
  */
 
 #include "mapinc_bus.h"
+#include "boards/irem_txc_bit_carts.h"
+#include "boards/registry.h"
 
 static uint8 regs[3];
 static uint8 *WRAM = NULL;
@@ -92,3 +94,12 @@ void Mapper34_Init(CartInfo *info) {
 
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper34Register{
+    MapperEntry{34, "NINA-001", &Mapper34_Init,
+        [](Bus& bus) { return std::make_unique<Mapper34Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

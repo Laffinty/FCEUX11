@@ -19,6 +19,8 @@
  */
 
 #include "mapinc_bus.h"
+#include "boards/irem_txc_bit_carts.h"
+#include "boards/registry.h"
 
 static uint8 preg[2], creg[8], mirr;
 
@@ -102,3 +104,12 @@ void Mapper32_Init(CartInfo *info) {
 
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper32Register{
+    MapperEntry{32, "IREM G-101", &Mapper32_Init,
+        [](Bus& bus) { return std::make_unique<Mapper32Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

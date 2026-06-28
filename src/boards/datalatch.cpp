@@ -608,6 +608,7 @@ void BMC11160_Init(CartInfo *info) {
 
 #include "boards/nrom_cart.h"
 #include "boards/datalatch_carts.h"
+#include "boards/irem_txc_bit_carts.h"
 #include "boards/registry.h"
 
 namespace fceu11 {
@@ -664,3 +665,12 @@ static MapperEntryRegister kCpromRegister{
 }  // namespace
 
 } // namespace fceu11
+
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper38Register{
+    MapperEntry{38, "Bit Corp (Crime Busters)", &Mapper38_Init,
+        [](Bus& bus) { return std::make_unique<Mapper38Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11
