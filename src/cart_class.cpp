@@ -231,6 +231,55 @@ void Cart::install_expansion_audio(class Apu& /*apu*/) noexcept {
 }
 
 // ---------------------------------------------------------------------------
+// save_mapper_state / load_mapper_state (v1.8 Masonry §6.1)
+// ---------------------------------------------------------------------------
+// Default implementations return an empty body.  Per-mapper subclasses
+// (NromCart / Mmc1Cart / Mmc3Cart / Vrc6Cart and the Phase D+ P0 batch)
+// override these to capture their private register file, PRG/CHR bank
+// selections, IRQ counters, etc.  The mapper_byte_diff_test harness
+// prepends an 8-byte header [mapper_number | body_size] before writing
+// tests/fixtures/golden_mapper/<rom>.bin and compares body bytes byte-
+// exact on subsequent runs.
+
+std::vector<uint8_t> Cart::save_mapper_state() const noexcept {
+    return {};
+}
+
+bool Cart::load_mapper_state(const std::vector<uint8_t>& /*body*/) noexcept {
+    // Default: nothing to restore.  Subclasses override.
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// Unpack helpers (declared in cart_class.h; bodies here so the inline
+// declaration can stay above the class definition).
+// ---------------------------------------------------------------------------
+
+void unpack_u8(const std::vector<uint8_t>& body, size_t& pos, uint8_t& out) noexcept {
+    if (pos < body.size()) {
+        out = body[pos++];
+    }
+}
+
+void unpack_u16(const std::vector<uint8_t>& body, size_t& pos, uint16_t& out) noexcept {
+    if (pos + 1 < body.size()) {
+        out = static_cast<uint16_t>(body[pos]) |
+              (static_cast<uint16_t>(body[pos + 1]) << 8);
+        pos += 2;
+    }
+}
+
+void unpack_u32(const std::vector<uint8_t>& body, size_t& pos, uint32_t& out) noexcept {
+    if (pos + 3 < body.size()) {
+        out =  static_cast<uint32_t>(body[pos]) |
+              (static_cast<uint32_t>(body[pos + 1]) << 8) |
+              (static_cast<uint32_t>(body[pos + 2]) << 16) |
+              (static_cast<uint32_t>(body[pos + 3]) << 24);
+        pos += 4;
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Savestate chunk registration (Phase D stub)
 // ---------------------------------------------------------------------------
 

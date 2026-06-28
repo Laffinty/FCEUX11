@@ -31,6 +31,41 @@ namespace fceu11 {
 class Bus;
 class Mapper;
 
+// ---------------------------------------------------------------------------
+// Pack helpers for save_mapper_state() (v1.8 §6)
+// ---------------------------------------------------------------------------
+// Inline so every Mapper subclass can call them without per-TU codegen
+// overhead.  Endianness: little-endian (matches the savestate .fc0 header
+// and the Rust state_file crate's u32 LE encoding).
+
+inline void pack_u8(std::vector<uint8_t>& out, uint8_t v) noexcept {
+    out.push_back(v);
+}
+
+inline void pack_u8_array(std::vector<uint8_t>& out,
+                          const uint8_t* src, size_t n) noexcept {
+    out.insert(out.end(), src, src + n);
+}
+
+inline void pack_u16(std::vector<uint8_t>& out, uint16_t v) noexcept {
+    out.push_back(static_cast<uint8_t>(v & 0xff));
+    out.push_back(static_cast<uint8_t>((v >> 8) & 0xff));
+}
+
+inline void pack_u32(std::vector<uint8_t>& out, uint32_t v) noexcept {
+    out.push_back(static_cast<uint8_t>(v & 0xff));
+    out.push_back(static_cast<uint8_t>((v >> 8) & 0xff));
+    out.push_back(static_cast<uint8_t>((v >> 16) & 0xff));
+    out.push_back(static_cast<uint8_t>((v >> 24) & 0xff));
+}
+
+// Forward-declare unpack counterparts so subclasses can implement
+// load_mapper_state symmetrically without exposing the vector type to
+// board.cpp's C-style header.
+void unpack_u8(const std::vector<uint8_t>& body, size_t& pos, uint8_t& out) noexcept;
+void unpack_u16(const std::vector<uint8_t>& body, size_t& pos, uint16_t& out) noexcept;
+void unpack_u32(const std::vector<uint8_t>& body, size_t& pos, uint32_t& out) noexcept;
+
 // MirrorMode enum class (v1.7 §2.3) — replaces MI_H / MI_V / MI_0 / MI_1
 // macros. The legacy macros in cart.h are kept as int aliases so existing
 // board files continue to compile unchanged.
@@ -113,6 +148,14 @@ public:
     // Phase B: default no-op; Phase E Vrc6Cart overrides this to inject
     // g_vrc6_audio into g_apu via set_exp_sound().
     virtual void install_expansion_audio(class Apu& apu) noexcept;
+
+    // ---- v1.8 Masonry §6: mapper-internal state snapshot ----
+    // Default implementation returns an empty body (legacy carts work as-is).
+    // Subclasses override to expose private registers / PRGptr / CHRptr /
+    // IRQ counters via the pack helpers below.  The harness (mapper_byte_diff_test)
+    // prepends a header [mapper_number | body_size] before persisting to disk.
+    virtual std::vector<uint8_t> save_mapper_state() const noexcept;
+    virtual bool load_mapper_state(const std::vector<uint8_t>& body) noexcept;
 
     // ---- Savestate chunk registration helper (v1.9 Savestate V2 prep) ----
     // Phase B: scaffolding; Phase D wires the real SFORMAT registration.
