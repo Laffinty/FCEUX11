@@ -1,4 +1,5 @@
 extern uint8 MMC3_cmd;
+struct CartInfo;
 extern uint8 mmc3opts;
 extern uint8 A000B;
 extern uint8 A001B;

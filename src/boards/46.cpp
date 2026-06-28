@@ -19,6 +19,8 @@
  */
 
 #include "mapinc_bus.h"
+#include "boards/smb2j_carts.h"
+#include "boards/registry.h"
 
 static uint8 reg0, reg1;
 
@@ -67,3 +69,12 @@ void Mapper46_Init(CartInfo *info) {
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper46Register{
+    MapperEntry{46, "GameStar Smarty", &Mapper46_Init,
+        [](Bus& bus) { return std::make_unique<Mapper46Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

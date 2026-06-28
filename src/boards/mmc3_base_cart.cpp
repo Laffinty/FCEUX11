@@ -2,7 +2,7 @@
 
 #include "mmc3_base_cart.h"
 
-#include "../cart.h"           // currCartInfo
+#include "../cart.h"           // currCartInfo + CartInfo (mmc3.h uses it)
 #include "_cart_helpers.h"     // release_mapper_resources
 #include "mmc3.h"              // MMC3RegReset
 
