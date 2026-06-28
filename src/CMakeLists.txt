@@ -379,6 +379,7 @@ set(SRC_BOARDS
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/n106.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/n625092.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/registry.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/boards/_cart_helpers.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/novel.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/onebus.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/pec-586.cpp
