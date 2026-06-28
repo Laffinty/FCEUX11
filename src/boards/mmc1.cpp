@@ -414,6 +414,7 @@ void SOROM_Init(CartInfo *info) {
 // ---------------------------------------------------------------------------
 
 #include "boards/mmc1_cart.h"
+#include "boards/registry.h"
 
 namespace fceu11 {
 
@@ -439,5 +440,19 @@ void Mmc1Cart::on_reset() noexcept {
 	// then re-sync mirroring, CHR, and PRG banking.
 	MMC1CMReset();
 }
+
+namespace {
+
+// v1.8 Masonry §2: MapperEntryRegister for MMC1 (mapper 1).
+static MapperEntryRegister kMmc1Register{
+    MapperEntry{
+        /*mapper_number=*/1,
+        /*name=*/"MMC1",
+        /*legacy_init=*/&Mapper1_Init,
+        /*factory=*/[](Bus& bus) { return std::make_unique<Mmc1Cart>(bus); }
+    }
+};
+
+}  // namespace
 
 } // namespace fceu11

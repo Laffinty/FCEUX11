@@ -462,6 +462,7 @@ void NSFVRC6_Init(void) {
 // ---------------------------------------------------------------------------
 
 #include "boards/vrc6_cart.h"
+#include "boards/registry.h"
 
 namespace fceu11 {
 
@@ -502,5 +503,31 @@ void Vrc6Cart::install_expansion_audio(fceu11::Apu& apu) noexcept {
 	apu.set_exp_sound(es);
 	g_vrc6_audio.region_changed();
 }
+
+namespace {
+
+// v1.8 Masonry §2: MapperEntryRegister for VRC6 — separate entries for the
+// two iNES mapper numbers (24, 26) that share Vrc6Cart.  Each factory
+// captures its mapper number so Vrc6Cart's on_power() can dispatch to the
+// matching Mapper24_Init / Mapper26_Init body.
+static MapperEntryRegister kVrc6Register24{
+    MapperEntry{
+        /*mapper_number=*/24,
+        /*name=*/"VRC6",
+        /*legacy_init=*/&Mapper24_Init,
+        /*factory=*/[](Bus& bus) { return std::make_unique<Vrc6Cart>(bus, 24); }
+    }
+};
+
+static MapperEntryRegister kVrc6Register26{
+    MapperEntry{
+        /*mapper_number=*/26,
+        /*name=*/"VRC6",
+        /*legacy_init=*/&Mapper26_Init,
+        /*factory=*/[](Bus& bus) { return std::make_unique<Vrc6Cart>(bus, 26); }
+    }
+};
+
+}  // namespace
 
 } // namespace fceu11

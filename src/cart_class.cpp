@@ -12,6 +12,7 @@
 #include "boards/mmc1_cart.h" // v1.7 Phase F: Mmc1Cart PoC subclass
 #include "boards/mmc3_cart.h" // v1.7 Phase F: Mmc3Cart PoC subclass
 #include "rust/fceux11_rust.h" // FceuSaveGameEntry, battery Rust functions
+#include "boards/registry.h"   // v1.8 Masonry §2: MapperEntry static registry
 
 #include <cstring>
 #include <vector>
@@ -44,22 +45,17 @@ std::unique_ptr<Cart> g_cart_owner;
 Cart* g_cart = &g_cart_placeholder;
 
 std::unique_ptr<Cart> create_cart_for_mapper(uint32_t mapper_no, Bus& bus) {
-    // Phase E/F: NROM (0) + VRC6 (24, 26) + MMC1 (1) + MMC3 (4) are the PoC
-    // subclasses. All other mappers return nullptr, which keeps them on the
-    // legacy CartInfo function-pointer path through the v1.7 compat layer.
-    switch (mapper_no) {
-    case 0:
-        return std::make_unique<NromCart>(bus);
-    case 1:
-        return std::make_unique<Mmc1Cart>(bus);
-    case 4:
-        return std::make_unique<Mmc3Cart>(bus);
-    case 24:
-    case 26:
-        return std::make_unique<Vrc6Cart>(bus, mapper_no);
-    default:
-        return nullptr;
+    // v1.8 Masonry §2 Phase C: dispatch via the MapperEntry static registry.
+    // Each board file (nrom / mmc1 / mmc3 / vrc6 for now, all 171 by Phase H)
+    // registers a kXxxRegister instance whose factory builds the matching
+    // Cart subclass.  Legacy mappers without a registered factory return
+    // nullptr, keeping them on the v1.7 CartInfo function-pointer path.
+    if (const MapperEntry* entry = find_mapper(mapper_no)) {
+        if (entry->factory) {
+            return entry->factory(bus);
+        }
     }
+    return nullptr;
 }
 
 void assign_cart(std::unique_ptr<Cart> cart) {

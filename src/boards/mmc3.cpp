@@ -1470,6 +1470,7 @@ void Mapper406_Init(CartInfo *info) {
 // ---------------------------------------------------------------------------
 
 #include "boards/mmc3_cart.h"
+#include "boards/registry.h"
 
 namespace fceu11 {
 
@@ -1508,5 +1509,19 @@ void Mmc3Cart::on_close() noexcept {
 	// cleanup.
 	GameHBIRQHook = nullptr;
 }
+
+namespace {
+
+// v1.8 Masonry §2: MapperEntryRegister for MMC3 (mapper 4).
+static MapperEntryRegister kMmc3Register{
+    MapperEntry{
+        /*mapper_number=*/4,
+        /*name=*/"MMC3",
+        /*legacy_init=*/&Mapper4_Init,
+        /*factory=*/[](Bus& bus) { return std::make_unique<Mmc3Cart>(bus); }
+    }
+};
+
+}  // namespace
 
 } // namespace fceu11

@@ -607,6 +607,7 @@ void BMC11160_Init(CartInfo *info) {
 // ---------------------------------------------------------------------------
 
 #include "boards/nrom_cart.h"
+#include "boards/registry.h"
 
 namespace fceu11 {
 
@@ -625,5 +626,22 @@ void NromCart::on_power() noexcept {
 	currCartInfo->Power();
 	currCartInfo->Power = saved;
 }
+
+namespace {
+
+// v1.8 Masonry §2: MapperEntryRegister static instance for NROM (mapper 0).
+// Replaces the v1.7 `case 0:` branch in create_cart_for_mapper() with a
+// registry lookup.  v1.9 Chronicle will reuse the same pattern for the
+// remaining 166 board files.
+static MapperEntryRegister kNromRegister{
+    MapperEntry{
+        /*mapper_number=*/0,
+        /*name=*/"NROM",
+        /*legacy_init=*/&NROM_Init,
+        /*factory=*/[](Bus& bus) { return std::make_unique<NromCart>(bus); }
+    }
+};
+
+}  // namespace
 
 } // namespace fceu11
