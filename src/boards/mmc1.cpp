@@ -19,7 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static void GenMMC1Power(void);
 static void GenMMC1Init(CartInfo *info, int prg, int chr, int wram, int bram);

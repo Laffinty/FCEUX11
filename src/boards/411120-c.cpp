@@ -20,7 +20,7 @@
 
 // actually cart ID is 811120-C, sorry ;) K-3094 - another ID
 
-#include "mapinc.h"
+#include "mapinc_mmc3.h"
 #include "mmc3.h"
 
 static uint8 reset_flag = 0;

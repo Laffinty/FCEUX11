@@ -20,7 +20,7 @@
  * Super Bros. Pocker Mali (VRC4 mapper)
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static uint8 IRQCount; //, IRQPre;
 static uint8 IRQa;

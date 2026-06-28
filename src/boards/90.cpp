@@ -19,7 +19,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "../ppu.h"
 //#define DEBUG90
 
 // Mapper 090 is simpliest mapper hardware and have not extended nametable control and latched chr banks in 4k mode

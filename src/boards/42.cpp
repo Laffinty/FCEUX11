@@ -22,7 +22,7 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static uint8 preg, creg, mirr;
 static uint32 IRQCount, IRQa;

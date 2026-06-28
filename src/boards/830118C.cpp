@@ -20,7 +20,7 @@
 
 // M-022 MMC3 based 830118C T-106 4M + 4M
 
-#include "mapinc.h"
+#include "mapinc_mmc3.h"
 #include "mmc3.h"
 
 static void BMC830118CCW(uint32 A, uint8 V) {

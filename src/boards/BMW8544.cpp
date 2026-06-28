@@ -23,7 +23,7 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_mmc3.h"
 #include "mmc3.h"
 
 static void UNLBMW8544PW(uint32 A, uint8 V) {

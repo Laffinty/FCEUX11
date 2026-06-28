@@ -33,7 +33,8 @@
  * it otherwise functions identically.
 */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "../unif.h"
 #include "../ines.h"
 
 const int ROM_CHIP = 0x00;

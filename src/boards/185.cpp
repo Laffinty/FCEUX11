@@ -19,7 +19,7 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static uint8 *DummyCHR = NULL;
 static FceuMallocPtr DummyCHR_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction

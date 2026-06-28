@@ -26,7 +26,7 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static uint8 mode, bank, reg[11], low[4], dip, IRQa;
 static int32 IRQCount;

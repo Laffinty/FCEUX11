@@ -18,7 +18,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_mmc3.h"
+#include "../unif.h"
 #include "mmc3.h"
 
 static void SA9602BPW(uint32 A, uint8 V) {

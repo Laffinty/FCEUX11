@@ -15,7 +15,7 @@
 	along with the this software.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 // http://wiki.nesdev.com/w/index.php/INES_Mapper_028
 

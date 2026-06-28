@@ -22,7 +22,7 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 // v0.3.10 P4.1: DatachSet moved into fceu11:: namespace; pull in driver.h
 // for the declaration. mapinc.h doesn't transitively include the API
 // surface header.

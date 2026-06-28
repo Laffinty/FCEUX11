@@ -19,7 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static uint8 preg, creg[4], mirr, suntoggle = 0;
 static uint8 IRQa;

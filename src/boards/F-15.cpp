@@ -30,7 +30,7 @@
  * initial state of extra regs is undefined, A001 enables/disables the 6000 area
  */
 
-#include "mapinc.h"
+#include "mapinc_mmc3.h"
 #include "mmc3.h"
 
 static void BMCF15PW(uint32 A, uint8 V) {

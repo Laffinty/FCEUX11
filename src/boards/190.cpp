@@ -19,7 +19,7 @@
  * Magic Kid GooGoo
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static uint8 prgr, chrr[4];
 static uint8 *WRAM = NULL;

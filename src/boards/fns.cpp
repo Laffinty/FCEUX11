@@ -23,7 +23,7 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static uint8 DRegs[4];
 static uint8 Buffer, BufferShift;

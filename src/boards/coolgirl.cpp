@@ -96,7 +96,9 @@
 *
 */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "../unif.h"
+#include "../ppu.h"
 
 const uint32 SAVE_FLASH_SIZE = 1024 * 1024 * 8;
 const uint32 FLASH_SECTOR_SIZE = 128 * 1024;

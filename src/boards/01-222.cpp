@@ -35,7 +35,8 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "../unif.h"
 
 static uint8 reg[4], cmd, is172, is173;
 static SFORMAT StateRegs[] =

@@ -24,7 +24,7 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_mmc3.h"
 #include "mmc3.h"
 
 static void BMC8IN1CW(uint32 A, uint8 V) {

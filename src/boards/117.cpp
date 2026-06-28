@@ -18,7 +18,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "../ppu.h"
 
 static uint8 prgreg[4], chrreg[8], mirror;
 static uint8 IRQa, IRQCount, IRQLatch;

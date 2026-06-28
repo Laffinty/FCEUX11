@@ -18,8 +18,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
-#include "mmc3.h"
+#include "mapinc_mmc3.h"
 
 static uint8 lut[4] = { 0x00, 0x02, 0x02, 0x03 };
 

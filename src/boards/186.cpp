@@ -47,7 +47,7 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static uint8 SWRAM[3072];
 static uint8 *WRAM = NULL;

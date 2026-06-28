@@ -21,7 +21,7 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static uint8 preg[3], creg[2], mode;
 static SFORMAT StateRegs[] =

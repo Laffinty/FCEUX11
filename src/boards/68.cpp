@@ -18,7 +18,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "../ppu.h"
+#include "../unif.h"
 
 static uint8 chr_reg[4];
 static uint8 kogame, prg_reg, nt1, nt2, mirr;

@@ -21,7 +21,7 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static uint8 reg[8];
 static uint8 mirror, cmd, bank;

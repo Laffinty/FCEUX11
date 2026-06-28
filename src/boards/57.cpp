@@ -19,7 +19,7 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static uint8 prg_reg;
 static uint8 chr_reg;

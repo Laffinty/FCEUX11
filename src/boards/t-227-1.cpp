@@ -20,7 +20,7 @@
 
 // T-227-1, 820632, MMC3 based, multimenu, 60000in1 (0010) dip switches
 
-#include "mapinc.h"
+#include "mapinc_mmc3.h"
 #include "mmc3.h"
 
 static uint8 reset_flag = 0x07;

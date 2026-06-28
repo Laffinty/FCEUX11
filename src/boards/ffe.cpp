@@ -21,7 +21,7 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static uint8 preg[4], creg[8], latch, ffemode;
 static uint8 IRQa, mirr;

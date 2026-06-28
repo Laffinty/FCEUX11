@@ -38,7 +38,8 @@ Example Game:
 7 in 1 multicart (Amarello, TMNT2, Contra, Ninja Cat, Ninja Crusaders, Rainbow Islands 2)
 */
 
-#include "mapinc.h"
+#include "mapinc_mmc3.h"
+#include "../ppu.h"
 #include "mmc3.h"
 
 static uint8 *CHRRAM;

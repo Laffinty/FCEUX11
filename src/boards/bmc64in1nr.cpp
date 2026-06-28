@@ -20,7 +20,7 @@
  * BMC 42-in-1 "reset switch" type
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static uint8 regs[4];
 

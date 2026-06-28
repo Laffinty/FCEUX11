@@ -19,7 +19,7 @@
  * 63in1 ghostbusters
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static uint8 reg[2], bank;
 static uint8 banks[4] = { 0, 0, 1, 2 };

@@ -18,7 +18,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 FCEUX11_MAPPER_HOT static uint16 latche, latcheinit;
 FCEUX11_MAPPER_HOT static uint16 addrreg0, addrreg1;

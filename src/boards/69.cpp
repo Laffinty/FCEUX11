@@ -19,7 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_audio.h"
 
 static uint8 cmdreg, preg[4], creg[8], mirr;
 static uint8 IRQa;

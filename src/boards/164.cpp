@@ -22,7 +22,8 @@
  * carts
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "../ppu.h"
 
 static uint8 laststrobe, trigger;
 static uint8 reg[8];

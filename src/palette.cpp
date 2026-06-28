@@ -23,7 +23,7 @@
 #include "file.h"
 #include "fceu.h"
 #include "driver.h"
-#include "boards/mapinc.h"
+#include "boards/mapinc_bus.h"
 #ifdef _S9XLUA_H
 #include "fceulua.h"
 #endif

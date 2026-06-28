@@ -20,7 +20,9 @@
 
 /* None of this code should use any of the iNES bank switching wrappers. */
 
-#include "mapinc.h"
+#include "mapinc_audio.h"
+#include "../unif.h"
+#include "../ppu.h"
 
 #include <array>
 

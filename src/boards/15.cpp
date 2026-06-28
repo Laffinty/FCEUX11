@@ -19,7 +19,7 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static uint16 latchea;
 static uint8 latched;

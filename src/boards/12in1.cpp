@@ -22,7 +22,7 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static uint8 prgchr[2], ctrl;
 static SFORMAT StateRegs[] =

@@ -20,7 +20,8 @@
  * Wario Land II (Kirby hack)
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "../ppu.h"
 
 static uint8 reg[8], chr[8];
 static uint8 *WRAM = NULL;

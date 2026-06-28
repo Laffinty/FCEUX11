@@ -18,7 +18,8 @@
 * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "../unif.h"
 
 static uint16 latchAddr;
 static uint8  latchData;

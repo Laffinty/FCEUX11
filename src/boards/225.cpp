@@ -28,7 +28,7 @@
 
 /* 2020-2-20 - merge mapper 255, re-implement extra RAM */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static uint8 extraRAM[4], prg, mode, chr, mirr;
 

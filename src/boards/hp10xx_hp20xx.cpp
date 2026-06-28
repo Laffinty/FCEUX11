@@ -24,7 +24,7 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_mmc3.h"
 #include "mmc3.h"
 #include "../ines.h"
 

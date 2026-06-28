@@ -22,7 +22,7 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static uint8 latche, reset;
 static SFORMAT StateRegs[] =

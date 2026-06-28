@@ -18,7 +18,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static uint8 chrlo[8], chrhi[8], prg[2], mirr, vlock;
 static int32 IRQa, IRQCount, IRQLatch, IRQClock;

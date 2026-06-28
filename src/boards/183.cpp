@@ -20,7 +20,8 @@
  * Gimmick Bootleg (VRC4 mapper)
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "../ppu.h"
 
 static uint8 prg[4], chr[8], mirr;
 static uint8 IRQCount;

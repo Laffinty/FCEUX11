@@ -27,7 +27,7 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static uint8 regs[3];
 static uint8 *WRAM = NULL;

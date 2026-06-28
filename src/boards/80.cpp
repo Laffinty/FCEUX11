@@ -19,7 +19,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "../ppu.h"
 
 static uint8 preg[3], creg[6], isExMirr;
 static uint8 mirr, cmd, wram_enable, wram[256];

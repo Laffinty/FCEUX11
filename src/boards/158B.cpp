@@ -21,7 +21,7 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_mmc3.h"
 #include "mmc3.h"
 
 static uint8 lut[8] = { 0x00, 0x00, 0x00, 0x01, 0x02, 0x04, 0x0F, 0x00 };

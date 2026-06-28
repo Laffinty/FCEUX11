@@ -20,7 +20,8 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "../ppu.h"
 
 static uint8 is10;
 static uint8 creg[4], latch0, latch1, preg, mirr;

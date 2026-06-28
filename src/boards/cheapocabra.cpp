@@ -29,7 +29,7 @@
 // Notes:
 // - CHR-RAM for nametables maps to $3000-3FFF as well, but FCEUX internally mirrors to 4k?
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 #include "../ines.h"
 
 static uint8 reg;

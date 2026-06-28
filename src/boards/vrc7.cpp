@@ -18,7 +18,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_audio.h"
 
 static uint8 vrc7idx;
 FCEUX11_MAPPER_HOT static uint8 preg[3], creg[8];

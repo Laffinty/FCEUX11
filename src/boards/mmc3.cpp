@@ -24,7 +24,9 @@
  119,165,205,245,249,250,254
 */
 
-#include "mapinc.h"
+#include "mapinc_mmc3.h"
+#include "../ppu.h"
+#include "../unif.h"
 #include "mmc3.h"
 
 uint8 MMC3_cmd;

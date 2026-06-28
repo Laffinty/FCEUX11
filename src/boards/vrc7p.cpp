@@ -20,7 +20,7 @@
  * YOKO Mortal Kombat V Pro, VRC7 pirate clone
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static uint8 prg[3], chr[8], mirr;
 static uint8 IRQLatch, IRQa, IRQd;

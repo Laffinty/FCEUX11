@@ -21,7 +21,7 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_audio.h"
 
 static uint8 is26;
 FCEUX11_MAPPER_HOT static uint8 prg[2], chr[8], mirr;
