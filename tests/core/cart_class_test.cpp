@@ -316,6 +316,11 @@ void test_on_load_post_trigger_sequence(TestContext& ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// v1.8 Masonry Phase D tests (inserted via addendum header)
+// ---------------------------------------------------------------------------
+#include "_phase_d_tests.h"
+
+// ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
 
@@ -341,6 +346,18 @@ int main() {
     test_attach_bus_injection(ctx);
     test_on_save_pre_default_noop(ctx);
     test_on_load_post_trigger_sequence(ctx);
+
+    // v1.8 Masonry Phase D tests
+    test_release_mapper_resources_idempotent(ctx);
+    test_save_mapper_state_default_empty(ctx);
+    test_pack_helpers_roundtrip(ctx);
+    test_find_mapper_registered(ctx);
+    test_mapper28_factory_dispatch(ctx);
+    test_vrc2and4_21_factory_dispatch(ctx);
+    test_mapper36_factory_dispatch(ctx);
+    test_mapper40_factory_dispatch(ctx);
+    test_mapper50_factory_dispatch(ctx);
+    test_mmc3_variants_factory_dispatch(ctx);
 
     // Phase A: all tests [SKIP] → exit 0
     // Phase E+: real tests will report_and_exit with real pass/fail counts

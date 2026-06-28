@@ -29,8 +29,11 @@ extern bool AutoResumePlay;
 extern bool frameAdvanceLagSkip;
 extern char romNameWhenClosingEmulator[];
 
+#ifndef FCEU_DECLFW_GUARD
+#define FCEU_DECLFW_GUARD
 #define DECLFR(x) uint8 x (uint32 A)
 #define DECLFW(x) void x (uint32 A, uint8 V)
+#endif
 // v0.3.6: DECLFW-decorated mapper write functions are protected by Control
 // Flow Guard (CFG) — /guard:cf is set globally in CMakeLists.txt. The
 // compiler emits the guard check at the indirect call site (SetWriteHandler

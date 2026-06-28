@@ -2,9 +2,10 @@
 
 #include "mmc3_base_cart.h"
 
-#include "../cart.h"           // currCartInfo + CartInfo (mmc3.h uses it)
+#include "../fceu.h"            // DECLFR/DECLFW macros (must precede cart.h + mmc3.h)
+#include "../cart.h"           // currCartInfo + CartInfo (uses DECLFR/DECLFW)
 #include "_cart_helpers.h"     // release_mapper_resources
-#include "mmc3.h"              // MMC3RegReset
+#include "mmc3.h"              // MMC3RegReset (uses DECLFW)
 
 namespace fceu11 {
 
@@ -30,3 +31,7 @@ void Mmc3BaseCart::on_close() noexcept {
 }
 
 } // namespace fceu11
+// v1.8 Masonry Phase D.3: include cart.h AFTER mmc3.h to ensure CartInfo
+// is fully defined (mmc3.h only forward-declares CartInfo; the function
+// body in mmc3_base_cart.cpp doesn't dereference info so this is fine).
+#include "../cart.h"
