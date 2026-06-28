@@ -1470,6 +1470,7 @@ void Mapper406_Init(CartInfo *info) {
 // ---------------------------------------------------------------------------
 
 #include "boards/mmc3_cart.h"
+#include "boards/mmc3_variants_carts.h"
 #include "boards/registry.h"
 
 namespace fceu11 {
@@ -1520,6 +1521,105 @@ static MapperEntryRegister kMmc3Register{
         /*legacy_init=*/&Mapper4_Init,
         /*factory=*/[](Bus& bus) { return std::make_unique<Mmc3Cart>(bus); }
     }
+};
+
+// v1.8 Masonry Phase D.3 §1.4: 24 MMC3 variants dispatched via
+// Mmc3BaseCart.  Each Init name matches the existing ines.cpp entry.
+static MapperEntryRegister kMapper12Register{
+    MapperEntry{12, "REX DBZ 5",      &Mapper12_Init,
+        [](Bus& bus) { return std::make_unique<Mapper12Cart>(bus); }}
+};
+static MapperEntryRegister kMapper37Register{
+    MapperEntry{37, "PAL-ZZ SMB/TETRIS", &Mapper37_Init,
+        [](Bus& bus) { return std::make_unique<Mapper37Cart>(bus); }}
+};
+static MapperEntryRegister kMapper44Register{
+    MapperEntry{44, "MMC3 BMC Pirate",   &Mapper44_Init,
+        [](Bus& bus) { return std::make_unique<Mapper44Cart>(bus); }}
+};
+static MapperEntryRegister kMapper45Register{
+    MapperEntry{45, "MMC3 BMC Pirate 45", &Mapper45_Init,
+        [](Bus& bus) { return std::make_unique<Mapper45Cart>(bus); }}
+};
+static MapperEntryRegister kMapper47Register{
+    MapperEntry{47, "MMC3 BMC Pirate 47", &Mapper47_Init,
+        [](Bus& bus) { return std::make_unique<Mapper47Cart>(bus); }}
+};
+static MapperEntryRegister kMapper49Register{
+    MapperEntry{49, "MMC3 BMC Pirate 49", &Mapper49_Init,
+        [](Bus& bus) { return std::make_unique<Mapper49Cart>(bus); }}
+};
+static MapperEntryRegister kMapper52Register{
+    MapperEntry{52, "MMC3 BMC Pirate 52", &Mapper52_Init,
+        [](Bus& bus) { return std::make_unique<Mapper52Cart>(bus); }}
+};
+static MapperEntryRegister kMapper74Register{
+    MapperEntry{74, "MMC3 BMC Pirate 74", &Mapper74_Init,
+        [](Bus& bus) { return std::make_unique<Mapper74Cart>(bus); }}
+};
+static MapperEntryRegister kMapper114Register{
+    MapperEntry{114, "MMC3 BMC Pirate 114", &Mapper114_Init,
+        [](Bus& bus) { return std::make_unique<Mapper114Cart>(bus); }}
+};
+static MapperEntryRegister kMapper115Register{
+    MapperEntry{115, "MMC3 BMC Pirate 115", &Mapper115_Init,
+        [](Bus& bus) { return std::make_unique<Mapper115Cart>(bus); }}
+};
+static MapperEntryRegister kMapper116Register{
+    MapperEntry{116, "MMC1/MMC3/VRC PIRATE", &UNLSL12_Init,
+        [](Bus& bus) { return std::make_unique<Mapper116Cart>(bus); }}
+};
+static MapperEntryRegister kMapper118Register{
+    MapperEntry{118, "TSKROM", &TKSROM_Init,
+        [](Bus& bus) { return std::make_unique<Mapper118Cart>(bus); }}
+};
+static MapperEntryRegister kMapper119Register{
+    MapperEntry{119, "MMC3 BMC Pirate 119", &Mapper119_Init,
+        [](Bus& bus) { return std::make_unique<Mapper119Cart>(bus); }}
+};
+static MapperEntryRegister kMapper165Register{
+    MapperEntry{165, "MMC3 BMC Pirate 165", &Mapper165_Init,
+        [](Bus& bus) { return std::make_unique<Mapper165Cart>(bus); }}
+};
+static MapperEntryRegister kMapper192Register{
+    MapperEntry{192, "MMC3 BMC Pirate 192", &Mapper192_Init,
+        [](Bus& bus) { return std::make_unique<Mapper192Cart>(bus); }}
+};
+static MapperEntryRegister kMapper194Register{
+    MapperEntry{194, "MMC3 BMC Pirate 194", &Mapper194_Init,
+        [](Bus& bus) { return std::make_unique<Mapper194Cart>(bus); }}
+};
+static MapperEntryRegister kMapper195Register{
+    MapperEntry{195, "MMC3 BMC Pirate 195", &Mapper195_Init,
+        [](Bus& bus) { return std::make_unique<Mapper195Cart>(bus); }}
+};
+static MapperEntryRegister kMapper198Register{
+    MapperEntry{198, "MMC3 BMC Pirate 198", &Mapper198_Init,
+        [](Bus& bus) { return std::make_unique<Mapper198Cart>(bus); }}
+};
+static MapperEntryRegister kMapper205Register{
+    MapperEntry{205, "MMC3 BMC Pirate 205", &Mapper205_Init,
+        [](Bus& bus) { return std::make_unique<Mapper205Cart>(bus); }}
+};
+static MapperEntryRegister kMapper245Register{
+    MapperEntry{245, "MMC3 BMC Pirate 245", &Mapper245_Init,
+        [](Bus& bus) { return std::make_unique<Mapper245Cart>(bus); }}
+};
+static MapperEntryRegister kMapper249Register{
+    MapperEntry{249, "MMC3 BMC Pirate 249", &Mapper249_Init,
+        [](Bus& bus) { return std::make_unique<Mapper249Cart>(bus); }}
+};
+static MapperEntryRegister kMapper250Register{
+    MapperEntry{250, "MMC3 BMC Pirate 250", &Mapper250_Init,
+        [](Bus& bus) { return std::make_unique<Mapper250Cart>(bus); }}
+};
+static MapperEntryRegister kMapper254Register{
+    MapperEntry{254, "MMC3 BMC Pirate 254", &Mapper254_Init,
+        [](Bus& bus) { return std::make_unique<Mapper254Cart>(bus); }}
+};
+static MapperEntryRegister kMapper406Register{
+    MapperEntry{406, "MMC3 BMC Pirate 406", &Mapper406_Init,
+        [](Bus& bus) { return std::make_unique<Mapper406Cart>(bus); }}
 };
 
 }  // namespace

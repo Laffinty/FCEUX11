@@ -375,6 +375,7 @@ set(SRC_BOARDS
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/mmc1.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/mmc2and4.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/mmc3.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/boards/mmc3_base_cart.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/mmc5.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/n106.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/n625092.cpp
