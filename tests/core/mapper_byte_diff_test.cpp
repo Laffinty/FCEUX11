@@ -118,6 +118,10 @@ static const RomTestCase tests[] = {
     { "fixtures/mapper_mmc4.nes",         "mmc4",         60  },  // mapper 10
     { "fixtures/mapper_mapper15.nes",     "mapper15",     60  },  // mapper 15
     { "fixtures/mapper_mapper48.nes",     "mapper48",     60  },  // mapper 48
+    // Phase E.2 step 8 (round out P0 + add VRC6 variant 26).
+    { "fixtures/mapper_bandai.nes",       "bandai",       60  },  // mapper 16
+    { "fixtures/mapper_mapper18.nes",     "mapper18",     60  },  // mapper 18
+    { "fixtures/mapper_vrc6var26.nes",    "vrc6var26",    90  },  // mapper 26
 };
 
 static const int NUM_TESTS = sizeof(tests) / sizeof(tests[0]);

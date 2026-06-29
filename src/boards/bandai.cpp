@@ -610,3 +610,13 @@ void Mapper157_Init(CartInfo *info) {
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+#include "simple_carts.h"
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper16Register{
+    MapperEntry{16, "Bandai", &Mapper16_Init,
+        [](Bus& bus) { return std::make_unique<Mapper16Cart>(bus); }}
+};
+}  // namespace
+} // namespace fceu11

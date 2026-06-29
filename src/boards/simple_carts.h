@@ -19,6 +19,9 @@ class Mmc2Cart : public MapperStrategyA { public: explicit Mmc2Cart(Bus& bus) no
 class Mmc4Cart : public MapperStrategyA { public: explicit Mmc4Cart(Bus& bus) noexcept : MapperStrategyA(bus) {} };
 class Mapper15Cart : public MapperStrategyA { public: explicit Mapper15Cart(Bus& bus) noexcept : MapperStrategyA(bus) {} };
 class Mapper48Cart : public MapperStrategyA { public: explicit Mapper48Cart(Bus& bus) noexcept : MapperStrategyA(bus) {} };
+// Phase E.2 step 8: round out P0 mappers (mapper 16 Bandai, 18 Magic Floor).
+class Mapper16Cart : public MapperStrategyA { public: explicit Mapper16Cart(Bus& bus) noexcept : MapperStrategyA(bus) {} };
+class Mapper18Cart : public MapperStrategyA { public: explicit Mapper18Cart(Bus& bus) noexcept : MapperStrategyA(bus) {} };
 
 } // namespace fceu11
 

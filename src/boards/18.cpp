@@ -132,3 +132,13 @@ void Mapper18_Init(CartInfo *info) {
 	AddExState(&StateRegs, ~0, 0, 0);
 }
 
+
+#include "simple_carts.h"
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper18Register{
+    MapperEntry{18, "Magic Floor", &Mapper18_Init,
+        [](Bus& bus) { return std::make_unique<Mapper18Cart>(bus); }}
+};
+}  // namespace
+} // namespace fceu11

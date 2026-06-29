@@ -78,6 +78,10 @@ INES_MAPPERS = [
     ("mmc4",        10),  # MMC4 (Wario Land II, etc.)
     ("mapper15",    15),  # 100-in-1 (contra)
     ("mapper48",    48),  # Taito MMC3 variant
+    # Phase E.2 step 8: round out P0 mappers + VRC6 variant.
+    ("bandai",      16),   # Bandai (mapper 16)
+    ("mapper18",    18),   # Magic Floor (mapper 18)
+    ("vrc6var26",   26),   # Konami VRC6 variant 26 (shares Vrc6Cart)
 ]
 
 PRG_SIZE = 1   # 1 x 16 KB
