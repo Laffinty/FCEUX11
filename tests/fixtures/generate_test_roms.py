@@ -68,6 +68,11 @@ INES_MAPPERS = [
     ("mapper250",  250),   # MMC3 variant 250
     ("mapper254",  254),   # MMC3 variant 254
     ("mapper406",  406),   # MMC3 variant 406
+    # Phase E.2 step 6: 4 more MMC3 variants (192/194/195/198 -- BMC pirates).
+    ("mapper192",  192),   # MMC3 variant 192
+    ("mapper194",  194),   # MMC3 variant 194
+    ("mapper195",  195),   # MMC3 variant 195
+    ("mapper198",  198),   # MMC3 variant 198
 ]
 
 PRG_SIZE = 1   # 1 x 16 KB
