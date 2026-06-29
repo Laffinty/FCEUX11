@@ -61,11 +61,7 @@ static const RomTestCase tests[] = {
     { "fixtures/mapper_mmc1.nes",         "mmc1",         90  },
     { "fixtures/mapper_mmc3.nes",         "mmc3",         120 },
     { "fixtures/mapper_vrc6.nes",         "vrc6",         90  },
-    // Phase E.2: 8 P0 mappers inheriting MapperStrategyA (with the new
-    // default save_mapper_state override that captures mapper_number +
-    // ROM metadata).  Per-mapper state (bank registers, IRQs) is not yet
-    // captured — these bodies are 16 bytes each (vs. 8-28 for the 4 PoCs).
-    // Adding full per-mapper state lands in Phase E.2 followups.
+    // Phase E.2 step 1: 8 P0 mappers inheriting MapperStrategyA default.
     { "fixtures/mapper_uxrom.nes",        "uxrom",        60  },  // mapper 2
     { "fixtures/mapper_cnrom.nes",        "cnrom",        60  },  // mapper 3
     { "fixtures/mapper_axrom.nes",        "axrom",        60  },  // mapper 7
@@ -74,6 +70,25 @@ static const RomTestCase tests[] = {
     { "fixtures/mapper_vrc2and4.nes",     "vrc2and4",     90  },  // mapper 21
     { "fixtures/mapper_vrc7.nes",         "vrc7",         90  },  // mapper 85
     { "fixtures/mapper_mmc5.nes",         "mmc5",         90  },  // mapper 5
+    // Phase E.2 step 3a: 16 P0 mappers with existing Cart subclasses from
+    // Phase D.4/D.6/D.8.  All share the 16-byte MapperStrategyA default
+    // until per-mapper state capture lands in a followup commit.
+    { "fixtures/mapper_cprom.nes",        "cprom",        60  },  // mapper 13
+    { "fixtures/mapper_mapper28.nes",     "mapper28",     60  },  // mapper 28
+    { "fixtures/mapper_mapper32.nes",     "mapper32",     60  },  // mapper 32
+    { "fixtures/mapper_mapper33.nes",     "mapper33",     60  },  // mapper 33
+    { "fixtures/mapper_mapper34.nes",     "mapper34",     60  },  // mapper 34
+    { "fixtures/mapper_mapper36.nes",     "mapper36",     60  },  // mapper 36
+    { "fixtures/mapper_mapper38.nes",     "mapper38",     60  },  // mapper 38
+    { "fixtures/mapper_mapper40.nes",     "mapper40",     60  },  // mapper 40
+    { "fixtures/mapper_mapper41.nes",     "mapper41",     60  },  // mapper 41
+    { "fixtures/mapper_mapper42.nes",     "mapper42",     60  },  // mapper 42
+    { "fixtures/mapper_mapper43.nes",     "mapper43",     60  },  // mapper 43
+    { "fixtures/mapper_mapper46.nes",     "mapper46",     60  },  // mapper 46
+    { "fixtures/mapper_mapper50.nes",     "mapper50",     60  },  // mapper 50
+    { "fixtures/mapper_vrc22.nes",        "vrc22",        90  },  // mapper 22
+    { "fixtures/mapper_vrc23.nes",        "vrc23",        90  },  // mapper 23
+    { "fixtures/mapper_vrc25.nes",        "vrc25",        90  },  // mapper 25
 };
 
 static const int NUM_TESTS = sizeof(tests) / sizeof(tests[0]);

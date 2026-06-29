@@ -25,6 +25,27 @@ INES_MAPPERS = [
     ("vrc2and4",    21),   # VRC2/4 (21 used here; 25 also valid)
     ("vrc6",        24),
     ("vrc7",        85),
+    # Phase E.2 step 3a: P0 mappers with existing MapperStrategyA Cart
+    # subclasses from Phase D.4/D.6/D.8 (Action 53 28, IREM/TXC/Bit Corp
+    # 32-38, SMB2j/CALTRON 40-50, VRC2/4 variants 22/23/25).  Each shares
+    # the 16-byte MapperStrategyA::save_mapper_state default until
+    # per-mapper state capture lands in a followup commit.
+    ("cprom",       13),   # CPROM (mapper 13) -- distinct from anrom/axrom
+    ("mapper28",    28),   # Action 53
+    ("mapper32",    32),   # IREM G-101
+    ("mapper33",    33),   # TENGEN RBI Baseball
+    ("mapper34",    34),   # NINA-001
+    ("mapper36",    36),   # TXC Policeman
+    ("mapper38",    38),   # Bit Corp Crime Busters
+    ("mapper40",    40),   # SMB2j FDS
+    ("mapper41",    41),   # CALTRON 6-in-1
+    ("mapper42",    42),   # SMB2j FDS 42
+    ("mapper43",    43),   # SMB2j FDS 43
+    ("mapper46",    46),   # GameStar Smarty
+    ("mapper50",    50),   # SMB2j FDS 50
+    ("vrc22",       22),   # VRC2/4 variant 22
+    ("vrc23",       23),   # VRC2/4 variant 23
+    ("vrc25",       25),   # VRC2/4 variant 25
 ]
 
 PRG_SIZE = 1   # 1 x 16 KB
