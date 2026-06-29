@@ -55,13 +55,12 @@ struct RomTestCase {
 };
 
 static const RomTestCase tests[] = {
-    // Phase D.12: 4 v1.7 PoC mappers with both a Cart subclass override of
-    // save_mapper_state() AND a test ROM in tests/fixtures/.
+    // Phase D.12: 4 v1.7 PoC mappers.
     { "fixtures/mapper_nrom.nes",         "nrom",         60  },
     { "fixtures/mapper_mmc1.nes",         "mmc1",         90  },
     { "fixtures/mapper_mmc3.nes",         "mmc3",         120 },
     { "fixtures/mapper_vrc6.nes",         "vrc6",         90  },
-    // Phase E.2 step 1: 8 P0 mappers inheriting MapperStrategyA default.
+    // Phase E.2 step 1 (8 P0 mapper subclasses from MapperStrategyA default).
     { "fixtures/mapper_uxrom.nes",        "uxrom",        60  },  // mapper 2
     { "fixtures/mapper_cnrom.nes",        "cnrom",        60  },  // mapper 3
     { "fixtures/mapper_axrom.nes",        "axrom",        60  },  // mapper 7
@@ -70,24 +69,24 @@ static const RomTestCase tests[] = {
     { "fixtures/mapper_vrc2and4.nes",     "vrc2and4",     90  },  // mapper 21
     { "fixtures/mapper_vrc7.nes",         "vrc7",         90  },  // mapper 85
     { "fixtures/mapper_mmc5.nes",         "mmc5",         90  },  // mapper 5
-    // Phase E.2 step 3a: 16 P0 mappers with existing Cart subclasses.
-    { "fixtures/mapper_cprom.nes",        "cprom",        60  },  // mapper 13
-    { "fixtures/mapper_mapper28.nes",     "mapper28",     60  },  // mapper 28
-    { "fixtures/mapper_mapper32.nes",     "mapper32",     60  },  // mapper 32
-    { "fixtures/mapper_mapper33.nes",     "mapper33",     60  },  // mapper 33
-    { "fixtures/mapper_mapper34.nes",     "mapper34",     60  },  // mapper 34
-    { "fixtures/mapper_mapper36.nes",     "mapper36",     60  },  // mapper 36
-    { "fixtures/mapper_mapper38.nes",     "mapper38",     60  },  // mapper 38
-    { "fixtures/mapper_mapper40.nes",     "mapper40",     60  },  // mapper 40
-    { "fixtures/mapper_mapper41.nes",     "mapper41",     60  },  // mapper 41
-    { "fixtures/mapper_mapper42.nes",     "mapper42",     60  },  // mapper 42
-    { "fixtures/mapper_mapper43.nes",     "mapper43",     60  },  // mapper 43
-    { "fixtures/mapper_mapper46.nes",     "mapper46",     60  },  // mapper 46
-    { "fixtures/mapper_mapper50.nes",     "mapper50",     60  },  // mapper 50
-    { "fixtures/mapper_vrc22.nes",        "vrc22",        90  },  // mapper 22
-    { "fixtures/mapper_vrc23.nes",        "vrc23",        90  },  // mapper 23
-    { "fixtures/mapper_vrc25.nes",        "vrc25",        90  },  // mapper 25
-    // Phase E.2 step 5: 21 MMC3 variants (12/37/44/45/47/49/52/74/105/...).
+    // Phase E.2 step 3a (16 P0 mappers, MapperStrategyA default).
+    { "fixtures/mapper_cprom.nes",        "cprom",        60  },
+    { "fixtures/mapper_mapper28.nes",     "mapper28",     60  },
+    { "fixtures/mapper_mapper32.nes",     "mapper32",     60  },
+    { "fixtures/mapper_mapper33.nes",     "mapper33",     60  },
+    { "fixtures/mapper_mapper34.nes",     "mapper34",     60  },
+    { "fixtures/mapper_mapper36.nes",     "mapper36",     60  },
+    { "fixtures/mapper_mapper38.nes",     "mapper38",     60  },
+    { "fixtures/mapper_mapper40.nes",     "mapper40",     60  },
+    { "fixtures/mapper_mapper41.nes",     "mapper41",     60  },
+    { "fixtures/mapper_mapper42.nes",     "mapper42",     60  },
+    { "fixtures/mapper_mapper43.nes",     "mapper43",     60  },
+    { "fixtures/mapper_mapper46.nes",     "mapper46",     60  },
+    { "fixtures/mapper_mapper50.nes",     "mapper50",     60  },
+    { "fixtures/mapper_vrc22.nes",        "vrc22",        90  },
+    { "fixtures/mapper_vrc23.nes",        "vrc23",        90  },
+    { "fixtures/mapper_vrc25.nes",        "vrc25",        90  },
+    // Phase E.2 step 5 (21 MMC3 variants).
     { "fixtures/mapper_mapper12.nes",     "mapper12",     90  },
     { "fixtures/mapper_mapper37.nes",     "mapper37",     90  },
     { "fixtures/mapper_mapper44.nes",     "mapper44",     90  },
@@ -109,11 +108,16 @@ static const RomTestCase tests[] = {
     { "fixtures/mapper_mapper250.nes",    "mapper250",    90  },
     { "fixtures/mapper_mapper254.nes",    "mapper254",    90  },
     { "fixtures/mapper_mapper406.nes",    "mapper406",    90  },
-    // Phase E.2 step 6: 4 more MMC3 variants (BMC pirates 192/194/195/198).
+    // Phase E.2 step 6 (4 more MMC3 BMC pirates).
     { "fixtures/mapper_mapper192.nes",    "mapper192",    90  },
     { "fixtures/mapper_mapper194.nes",    "mapper194",    90  },
     { "fixtures/mapper_mapper195.nes",    "mapper195",    90  },
     { "fixtures/mapper_mapper198.nes",    "mapper198",    90  },
+    // Phase E.2 step 7 (4 simple P0 mappers with new Cart subclasses).
+    { "fixtures/mapper_mmc2.nes",         "mmc2",         60  },  // mapper 9
+    { "fixtures/mapper_mmc4.nes",         "mmc4",         60  },  // mapper 10
+    { "fixtures/mapper_mapper15.nes",     "mapper15",     60  },  // mapper 15
+    { "fixtures/mapper_mapper48.nes",     "mapper48",     60  },  // mapper 48
 };
 
 static const int NUM_TESTS = sizeof(tests) / sizeof(tests[0]);

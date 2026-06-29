@@ -127,3 +127,13 @@ static MapperEntryRegister kMapper33Register{
 };
 }  // namespace
 }  // namespace fceu11
+
+#include "simple_carts.h"
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper48Register{
+    MapperEntry{48, "Taito MMC3 variant", &Mapper48_Init,
+        [](Bus& bus) { return std::make_unique<Mapper48Cart>(bus); }}
+};
+}  // namespace
+} // namespace fceu11

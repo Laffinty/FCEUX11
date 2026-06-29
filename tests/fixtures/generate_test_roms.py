@@ -73,6 +73,11 @@ INES_MAPPERS = [
     ("mapper194",  194),   # MMC3 variant 194
     ("mapper195",  195),   # MMC3 variant 195
     ("mapper198",  198),   # MMC3 variant 198
+    # Phase E.2 step 7: 4 simple P0 mappers with new Cart subclasses.
+    ("mmc2",         9),  # MMC2 (Pine Bros, Castlevania II)
+    ("mmc4",        10),  # MMC4 (Wario Land II, etc.)
+    ("mapper15",    15),  # 100-in-1 (contra)
+    ("mapper48",    48),  # Taito MMC3 variant
 ]
 
 PRG_SIZE = 1   # 1 x 16 KB
