@@ -644,6 +644,70 @@ std::vector<uint8_t> NromCart::save_mapper_state() const noexcept {
 	return out;  // 16 bytes
 }
 
+// v1.8 Masonry Phase E.2 step 2a: UNROM/CNROM/ANROM/CPROM all read the
+// shared file-scope `latche` byte.  Capture: mapper_number + mirror +
+// WRAM (4 metadata bytes from CartStrategyA) + latche (1 byte) + padding
+// to keep body size aligned.  Total 21 bytes.  Replaces the
+// MapperStrategyA default for these four mappers.
+std::vector<uint8_t> UnromCart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out;
+	out.reserve(21);
+	out.push_back(0x02);                              // mapper 2
+	uint8 mirror = 0;
+	switch (mirror_raw()) {
+		uint8 raw = static_cast<uint8_t>(mirror_raw());
+		mirror = (raw == 0) ? 0x00 : (raw == 1) ? 0x01 : 0xFF;
+	}
+	out.push_back(mirror);
+	out.push_back(static_cast<uint8_t>(wram_size() & 0xFF));
+	out.push_back(static_cast<uint8_t>(battery_wram_size() & 0xFF));
+	// 4 bytes of header so far -- pad to 8 for 8-byte alignment of state.
+	for (int i = 0; i < 4; ++i) out.push_back(0x00);
+	// 12 bytes used.  bank + aux registers...
+	out.push_back(latche);                            // 12: bank
+	for (int i = 0; i < 8; ++i) out.push_back(0x00);   // 13..20: future IRQs/reserved
+	return out;  // 21 bytes
+}
+
+std::vector<uint8_t> CnromCart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out;
+	out.reserve(21);
+	out.push_back(0x03);                              // mapper 3
+	out.push_back(0x00);                              // mirror: NROM-style (CNROM is fixed)
+	out.push_back(0x00);                              // WRAM size
+	out.push_back(0x00);                              // battery WRAM size
+	for (int i = 0; i < 4; ++i) out.push_back(0x00);
+	out.push_back(latche);                            // CHR bank
+	for (int i = 0; i < 8; ++i) out.push_back(0x00);
+	return out;  // 21 bytes
+}
+
+std::vector<uint8_t> AnromCart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out;
+	out.reserve(21);
+	out.push_back(0x07);                              // mapper 7
+	out.push_back(0xFF);                              // mirror: ANROM does its own
+	out.push_back(0x00);
+	out.push_back(0x00);
+	for (int i = 0; i < 4; ++i) out.push_back(0x00);
+	out.push_back(latche);                            // PRG bank + mirror high bit
+	for (int i = 0; i < 8; ++i) out.push_back(0x00);
+	return out;  // 21 bytes
+}
+
+std::vector<uint8_t> CpromCart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out;
+	out.reserve(21);
+	out.push_back(0x0D);                              // mapper 13
+	out.push_back(0x00);
+	out.push_back(0x00);
+	out.push_back(0x00);
+	for (int i = 0; i < 4; ++i) out.push_back(0x00);
+	out.push_back(latche);                            // CHR bank register
+	for (int i = 0; i < 8; ++i) out.push_back(0x00);
+	return out;  // 21 bytes
+}
+
 namespace {
 
 // v1.8 Masonry §2: MapperEntryRegister static instance for NROM (mapper 0).

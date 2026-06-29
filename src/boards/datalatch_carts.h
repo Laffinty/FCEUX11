@@ -16,10 +16,13 @@
 
 namespace fceu11 {
 
-class UnromCart    : public MapperStrategyA { public: explicit UnromCart(Bus& bus) noexcept    : MapperStrategyA(bus) {} };
-class CnromCart    : public MapperStrategyA { public: explicit CnromCart(Bus& bus) noexcept    : MapperStrategyA(bus) {} };
-class AnromCart    : public MapperStrategyA { public: explicit AnromCart(Bus& bus) noexcept    : MapperStrategyA(bus) {} };
-class CpromCart    : public MapperStrategyA { public: explicit CpromCart(Bus& bus) noexcept    : MapperStrategyA(bus) {} };
+// v1.8 Masonry Phase E.2 step 2a: UNROM/CNROM/ANROM/CPROM each capture the
+// shared latche byte so mapper_byte_diff_test detects accidental latch
+// register regressions.  Override body lives in datalatch.cpp.
+class UnromCart    : public MapperStrategyA { public: explicit UnromCart(Bus& bus) noexcept    : MapperStrategyA(bus) {} std::vector<uint8_t> save_mapper_state() const noexcept override; };
+class CnromCart    : public MapperStrategyA { public: explicit CnromCart(Bus& bus) noexcept    : MapperStrategyA(bus) {} std::vector<uint8_t> save_mapper_state() const noexcept override; };
+class AnromCart    : public MapperStrategyA { public: explicit AnromCart(Bus& bus) noexcept    : MapperStrategyA(bus) {} std::vector<uint8_t> save_mapper_state() const noexcept override; };
+class CpromCart    : public MapperStrategyA { public: explicit CpromCart(Bus& bus) noexcept    : MapperStrategyA(bus) {} std::vector<uint8_t> save_mapper_state() const noexcept override; };
 class Mapper28Cart : public MapperStrategyA { public: explicit Mapper28Cart(Bus& bus) noexcept : MapperStrategyA(bus) {} };
 
 } // namespace fceu11
