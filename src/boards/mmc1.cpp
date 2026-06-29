@@ -441,6 +441,21 @@ void Mmc1Cart::on_reset() noexcept {
 	MMC1CMReset();
 }
 
+// v1.8 Masonry §6.1: Mmc1Cart::save_mapper_state() — capture MMC1 register
+// file for byte-diff regression.  The state lives in mmc1.cpp's file-scope
+// globals (DRegs[4] / Buffer / BufferShift / WRAMSIZE / is155 / is171) so
+// the override is placed in the same TU.  8 bytes total.
+std::vector<uint8_t> Mmc1Cart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out;
+	out.reserve(8);
+	pack_u8_array(out, DRegs, 4);    // 4 data registers (control, CHR0, CHR1, PRG)
+	pack_u8(out, Buffer);
+	pack_u8(out, BufferShift);
+	pack_u8(out, is155 ? 1 : 0);
+	pack_u8(out, is171 ? 1 : 0);
+	return out;  // 8 bytes
+}
+
 namespace {
 
 // v1.8 Masonry §2: MapperEntryRegister for MMC1 (mapper 1).

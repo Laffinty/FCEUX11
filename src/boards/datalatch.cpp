@@ -629,6 +629,21 @@ void NromCart::on_power() noexcept {
 	currCartInfo->Power = saved;
 }
 
+// v1.8 Masonry §6.1: NromCart::save_mapper_state() — NROM has no
+// mapper-internal registers (PRG is fixed, CHR is fixed, mirror is set
+// during Power).  Capture the mirror mode + WRAM size + battery flag from
+// the base Cart class so the byte-diff detects accidental mirroring/ROM-
+// metadata regressions.
+std::vector<uint8_t> NromCart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out;
+	out.reserve(16);
+	pack_u32(out, mapper_number());                  // 0
+	pack_u32(out, static_cast<uint32_t>(mirror_raw()));
+	pack_u32(out, static_cast<uint32_t>(wram_size()));
+	pack_u32(out, static_cast<uint32_t>(battery_wram_size()));
+	return out;  // 16 bytes
+}
+
 namespace {
 
 // v1.8 Masonry §2: MapperEntryRegister static instance for NROM (mapper 0).

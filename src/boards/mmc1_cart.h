@@ -25,6 +25,9 @@ public:
     void on_power() noexcept override;
     void on_reset() noexcept override;   // calls MMC1CMReset() directly
     void on_close() noexcept override {} // CartInfo clear path frees WRAM.
+
+    // v1.8 Masonry §6.1: byte-diff snapshot of mapper state.
+    std::vector<uint8_t> save_mapper_state() const noexcept override;
 };
 
 } // namespace fceu11

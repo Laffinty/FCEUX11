@@ -504,6 +504,28 @@ void Vrc6Cart::install_expansion_audio(fceu11::Apu& apu) noexcept {
 	g_vrc6_audio.region_changed();
 }
 
+// v1.8 Masonry §6.1: Vrc6Cart::save_mapper_state() — capture VRC6 bank
+// registers, mirror, IRQ state.  The state lives in vrc6.cpp's file-scope
+// globals (prg[2] / chr[8] / mirr / IRQLatch / IRQa / IRQd / IRQMode /
+// IRQCount / is26) so the override is placed in the same TU.  Layout
+// mirrors the StateRegs[] SFORMAT declaration (line 34).
+std::vector<uint8_t> Vrc6Cart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out;
+	out.reserve(32);
+	pack_u8_array(out, prg, 2);          // 2 PRG bank registers
+	pack_u8_array(out, chr, 8);          // 8 CHR bank registers
+	pack_u8(out, mirr);
+	pack_u8(out, IRQa);
+	pack_u8(out, IRQd);
+	pack_u8(out, IRQLatch);
+	pack_u8_array(out, reinterpret_cast<const uint8_t*>(&IRQCount), 4);
+	pack_u8_array(out, reinterpret_cast<const uint8_t*>(&CycleCount), 4);
+	pack_u8(out, IRQMode);
+	pack_u8(out, is26);
+	pack_u32(out, WRAMSIZE);
+	return out;  // 30 bytes
+}
+
 namespace {
 
 // v1.8 Masonry §2: MapperEntryRegister for VRC6 — separate entries for the

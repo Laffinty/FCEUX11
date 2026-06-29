@@ -31,6 +31,9 @@ public:
     // v1.6 §11.1 contract: route g_vrc6_audio into g_apu via set_exp_sound().
     // Triggered by iNESLoad / UNIFLoad after cart assignment, before PowerNES.
     void install_expansion_audio(class Apu& apu) noexcept override;
+
+    // v1.8 Masonry §6.1: byte-diff snapshot of mapper state.
+    std::vector<uint8_t> save_mapper_state() const noexcept override;
 };
 
 } // namespace fceu11

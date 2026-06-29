@@ -1,28 +1,30 @@
-// FCEUX11 v1.7 Cartograph — mapper state byte-diff regression test (Phase A).
+// FCEUX11 v1.8 Masonry §6.5: mapper state byte-diff regression test.
 //
 // Goal: pin down mapper internal state to a byte-exact golden, so any v1.7
-// refactor of the Cart class (CartInfo migration, mapper subclass PoCs) that
-// drifts a mapper register will fail the test suite.
+// refactor of the Cart class (CartInfo migration, mapper subclass PoCs)
+// or v1.8 subclass override of save_mapper_state() that drifts a mapper
+// register will fail the test suite.
 //
 // Per mapper:
-//   1. fceu11::Initialize / LoadGame
-//   2. Run N frames (per docs/internal/v1.7_mapper_byte_diff_test_design.md)
-//   3. After the last frame, capture the Cart::save_mapper_state() output
-//   4. Validate header magic + version + total_size
+//   1. core_init + fceu11::LoadGame
+//   2. Run N frames
+//   3. After the last frame, capture g_cart->save_mapper_state() body
+//   4. Validate header magic + version + body_size
 //   5. In GENERATE mode: write to fixtures/golden_mapper/<name>.bin
 //      In VERIFY mode:   read golden, memcmp body bytes
 //
-// Golden file format (16-byte header + 64-512 byte body):
-//   magic:    "FMAP\0\0\0" (8 bytes)
-//   version:  uint32 LE (= 1)
-//   total:    uint32 LE (= HEADER + body size)
-//   body:     mapper-specific binary snapshot
+// Golden file format (16-byte header + variable-size body):
+//   [0..8)   magic = "FMAP\0\0\0"
+//   [8..12)  version = uint32 LE (= 1)
+//   [12..16) body_size = uint32 LE (excluding 16-byte header)
+//   [16..)   body bytes (from Cart::save_mapper_state())
 //
-// Run with --generate to write fresh goldens (deferred to Phase E/F when
-// Cart subclasses are implemented).
+// Run with --generate to write fresh goldens.
 //
-// Phase A acceptance: compiles + links + runs; all tests [SKIP] until
-// Phase E (NROM PoC) generates the first golden.
+// Phase D.12 acceptance (real body byte-diff enabled):
+//   ctest -R mapper_byte_diff must pass for all 4 PoC mappers
+//   (nrom / mmc1 / mmc3 / vrc6).  The remaining 46 P0 mappers land in
+//   Phase E.2 when more test ROMs are added to tests/fixtures/.
 
 #include <cstdio>
 #include <cstdlib>
@@ -36,46 +38,39 @@
 #include "fceu.h"
 #include "driver.h"
 #include "state.h"
+#include "cart.h"             // currCartInfo
+#include "cart_class.h"       // fceu11::Cart, fceu11::g_cart
 #include "drivers/Qt/nes_shm.h"
+#include "test_helpers.h"     // core_init / load_rom / emulate_n
 
 static const size_t HEADER_SIZE = 16;
 static const uint8_t MAGIC[8] = {'F', 'M', 'A', 'P', 0, 0, 0, 0};
 static const uint32_t VERSION = 1;
-static const double WATCHDOG_SECONDS_PER_FRAME = 30.0;
 static const char*  GOLDEN_DIR = "fixtures/golden_mapper";
 
 struct RomTestCase {
     const char* filename;
     const char* name;
     int         frames;
-    uint32_t    total_size;  // body size (excluding 16-byte header)
 };
 
 static const RomTestCase tests[] = {
-    // docs/internal/v1.7_mapper_byte_diff_test_design.md §2.4
-    { "fixtures/mapper_nrom.nes", "nrom", 60,  64  },
-    { "fixtures/mapper_mmc1.nes", "mmc1", 90,  256 },
-    { "fixtures/mapper_mmc3.nes", "mmc3", 120, 512 },
+    // Phase D.12: 4 v1.7 PoC mappers with both a Cart subclass override of
+    // save_mapper_state() AND a test ROM in tests/fixtures/.  The remaining
+    // 46 P0 mappers land in Phase E.2 / F when additional test ROMs land.
+    { "fixtures/mapper_nrom.nes",   "nrom",  60  },
+    { "fixtures/mapper_mmc1.nes",   "mmc1",  90  },
+    { "fixtures/mapper_mmc3.nes",   "mmc3",  120 },
+    { "fixtures/mapper_vrc6.nes",   "vrc6",  90  },
 };
 
 static const int NUM_TESTS = sizeof(tests) / sizeof(tests[0]);
 
 // ---------------------------------------------------------------------------
-// Phase A stubs — all [SKIP] until Cart::save_mapper_state is implemented
+// Golden file I/O
 // ---------------------------------------------------------------------------
 
-// Build the golden file content (header + zero-filled body) for --generate mode.
-static std::vector<uint8_t> buildGoldenZeroFilled(uint32_t body_size) {
-    std::vector<uint8_t> out(HEADER_SIZE + body_size, 0);
-    std::memcpy(out.data(),         MAGIC, 8);
-    uint32_t version = VERSION;
-    uint32_t total = HEADER_SIZE + body_size;
-    std::memcpy(out.data() + 8,  &version, 4);
-    std::memcpy(out.data() + 12, &total, 4);
-    return out;
-}
-
-// Try to open the golden file. Returns empty vector if not found.
+// Read a golden file.  Returns empty vector on error / not found.
 static std::vector<uint8_t> readGoldenFile(const char* name) {
     char path[512];
     std::snprintf(path, sizeof(path), "%s/%s.bin", GOLDEN_DIR, name);
@@ -91,87 +86,158 @@ static std::vector<uint8_t> readGoldenFile(const char* name) {
     return data;
 }
 
-// Validate golden header. Returns true if magic+version+size match.
+// Validate a golden header.  Returns true if magic + version match and
+// total file size == HEADER + body_size.
 static bool validateGoldenHeader(const std::vector<uint8_t>& data,
-                                 uint32_t expected_body_size) {
+                                 uint32_t expected_body_size,
+                                 uint32_t& body_size_out) {
     if (data.size() < HEADER_SIZE) return false;
     if (std::memcmp(data.data(), MAGIC, 8) != 0) return false;
     uint32_t version;
     std::memcpy(&version, data.data() + 8, 4);
     if (version != VERSION) return false;
-    uint32_t total;
-    std::memcpy(&total, data.data() + 12, 4);
-    if (total != HEADER_SIZE + expected_body_size) return false;
+    uint32_t body_size;
+    std::memcpy(&body_size, data.data() + 12, 4);
+    if (data.size() != HEADER_SIZE + body_size) return false;
+    body_size_out = body_size;
     return true;
 }
 
-// Write the golden file (--generate mode).
-static bool writeGoldenFile(const char* name, const std::vector<uint8_t>& data) {
+// Write a golden file (--generate mode).
+static bool writeGoldenFile(const char* name, uint32_t body_size,
+                            const std::vector<uint8_t>& body) {
     char path[512];
     std::snprintf(path, sizeof(path), "%s/%s.bin", GOLDEN_DIR, name);
-    // v0.3.x mkdir-p fallback: rely on test runner to pre-create GOLDEN_DIR.
-    // (applies to --generate mode only; verify mode reads without writing.)
     FILE* fp = std::fopen(path, "wb");
     if (!fp) {
         std::fprintf(stderr, "Cannot write golden %s\n", path);
         return false;
     }
-    size_t n = std::fwrite(data.data(), 1, data.size(), fp);
+    std::fwrite(MAGIC, 1, 8, fp);
+    uint32_t version = VERSION;
+    std::fwrite(&version, 1, 4, fp);
+    std::fwrite(&body_size, 1, 4, fp);
+    size_t n = std::fwrite(body.data(), 1, body.size(), fp);
     std::fclose(fp);
-    return n == data.size();
+    return n == body.size();
+}
+
+// Capture save_mapper_state() for a given ROM.  Returns empty vector on
+// failure.  Caller must have called core_init() and load_rom() already.
+static std::vector<uint8_t> captureMapperState() {
+    if (!fceu11::g_cart) {
+        std::fprintf(stderr, "g_cart is null (no cart loaded?)\n");
+        return {};
+    }
+    return fceu11::g_cart->save_mapper_state();
 }
 
 // ---------------------------------------------------------------------------
-// main — GENERATE or VERIFY
+// main
 // ---------------------------------------------------------------------------
 
 int main(int argc, char** argv) {
     bool generate = (argc > 1 && std::strcmp(argv[1], "--generate") == 0);
 
     int total = NUM_TESTS;
+    int passed = 0;
     int failed = 0;
     int skipped = 0;
     int generated = 0;
 
-    std::printf("=== mapper_byte_diff_test (Phase A skeleton) ===\n");
+    std::printf("=== mapper_byte_diff_test (v1.8 Phase D.12 body byte-diff) ===\n");
     std::printf("Mode: %s\n", generate ? "GENERATE" : "VERIFY");
     std::printf("Total cases: %d\n\n", total);
 
     for (int i = 0; i < NUM_TESTS; ++i) {
         const RomTestCase& t = tests[i];
+
+        // Fresh init per case so currCartInfo is reloaded.
+        if (!fceu11_test::core_init()) {
+            std::printf("[FAIL] %s: core_init failed\n", t.name);
+            failed++;
+            continue;
+        }
+
+        FCEUGI* gi = fceu11_test::load_rom(t.filename);
+        if (!gi) {
+            std::printf("[FAIL] %s: load_rom(%s) failed\n", t.name, t.filename);
+            fceu11_test::core_shutdown();
+            failed++;
+            continue;
+        }
+
+        // Run the requested number of frames.
+        fceu11_test::emulate_n(t.frames);
+
+        // Capture the live mapper state.
+        std::vector<uint8_t> body = captureMapperState();
+        if (body.empty() && !generate) {
+            // Empty body in verify mode is a SKIP: the Cart subclass
+            // inherits the base default (returns empty) and the golden
+            // (if any) must also be empty.  Detect that below.
+        }
+
         if (generate) {
-            // Phase A: --generate writes a zero-filled golden with valid header.
-            // Phase E/F: replace with real Cart::save_mapper_state output.
-            std::vector<uint8_t> golden = buildGoldenZeroFilled(t.total_size);
-            if (!writeGoldenFile(t.name, golden)) {
-                std::printf("[GENERATE FAIL] %s\n", t.name);
+            // --generate writes a real golden.
+            uint32_t body_size = static_cast<uint32_t>(body.size());
+            if (!writeGoldenFile(t.name, body_size, body)) {
+                std::printf("[GENERATE FAIL] %s: cannot write\n", t.name);
                 failed++;
-                continue;
+            } else {
+                std::printf("[GENERATE] %s: %u bytes (header + %u body)\n",
+                            t.name, static_cast<uint32_t>(HEADER_SIZE + body_size), body_size);
+                generated++;
             }
-            std::printf("[GENERATE] %s: %zu bytes (header + %u body, zero-filled)\n",
-                        t.name, golden.size(), t.total_size);
-            generated++;
         } else {
-            // VERIFY mode
+            // VERIFY mode: read the golden, validate header, memcmp body.
             std::vector<uint8_t> golden = readGoldenFile(t.name);
             if (golden.empty()) {
                 std::printf("[SKIP] %s: golden not generated yet (run --generate first)\n",
                             t.name);
                 skipped++;
-                continue;
+            } else {
+                uint32_t expected_body_size = 0;
+                if (!validateGoldenHeader(golden, 0, expected_body_size)) {
+                    std::printf("[FAIL] %s: golden header validation failed\n",
+                                t.name);
+                    failed++;
+                } else if (body.size() != expected_body_size) {
+                    std::printf("[FAIL] %s: body size %zu (golden expects %u)\n",
+                                t.name, body.size(), expected_body_size);
+                    failed++;
+                } else if (expected_body_size == 0) {
+                    // Both sides are empty: pass-through.
+                    std::printf("[SKIP] %s: empty body (no save_mapper_state override)\n",
+                                t.name);
+                    skipped++;
+                } else {
+                    int diff_offset = -1;
+                    for (size_t j = 0; j < expected_body_size; ++j) {
+                        if (body[j] != golden[HEADER_SIZE + j]) {
+                            diff_offset = static_cast<int>(j);
+                            break;
+                        }
+                    }
+                    if (diff_offset >= 0) {
+                        std::printf("[FAIL] %s: byte-diff at offset %d "
+                                    "(live=0x%02X, golden=0x%02X)\n",
+                                    t.name, diff_offset,
+                                    body[diff_offset], golden[HEADER_SIZE + diff_offset]);
+                        failed++;
+                    } else {
+                        std::printf("[PASS] %s: %u bytes, byte-diff = 0\n",
+                                    t.name, expected_body_size);
+                        passed++;
+                    }
+                }
             }
-            if (!validateGoldenHeader(golden, t.total_size)) {
-                std::printf("[FAIL] %s: golden header validation failed\n", t.name);
-                failed++;
-                continue;
-            }
-            // Phase A: body byte-diff is trivially 0 (golden body is zero-filled;
-            // expected body is also 0 since Cart::save_mapper_state returns 0
-            // until Phase E/F subclasses are implemented).
-            std::printf("[SKIP] %s: body byte-diff deferred to Phase E/F (Cart subclass impl)\n",
-                        t.name);
-            skipped++;
         }
+
+        // Tear down the engine so the next iteration starts from a clean
+        // state.  CartInfo::GI_CLOSE is the legacy compat path that
+        // fceu11::Kill() routes through.
+        fceu11_test::core_shutdown();
     }
 
     std::printf("\n=== Summary ===\n");
@@ -179,11 +245,12 @@ int main(int argc, char** argv) {
     if (generate) {
         std::printf("Generated: %d\n", generated);
     } else {
+        std::printf("Passed:    %d\n", passed);
         std::printf("Skipped:   %d\n", skipped);
     }
     std::printf("Failed:    %d\n", failed);
     std::printf("RESULT:    %s\n", failed == 0 ? "PASS" : "FAIL");
 
-    // Phase A: exit 0 (skipped tests don't fail)
+    // Phase D.12: SKIP is allowed (no regression), but FAIL is not.
     return failed == 0 ? 0 : 1;
 }

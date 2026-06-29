@@ -1511,6 +1511,28 @@ void Mmc3Cart::on_close() noexcept {
 	GameHBIRQHook = nullptr;
 }
 
+// v1.8 Masonry §6.1: Mmc3Cart::save_mapper_state() — capture MMC3 register
+// file + IRQ state for byte-diff regression.  The state lives in mmc3.cpp's
+// file-scope globals (MMC3_cmd, DRegBuf, A000B/A001B, IRQCount/Latch/a/
+// Reload) so the override is placed in the same TU.  Layout mirrors the
+// MMC3_StateRegs[] SFORMAT declaration (line 51) so the order matches the
+// on-disk savestate encoding (v1.7 wire format + v1.8 mapper_byte_diff).
+std::vector<uint8_t> Mmc3Cart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out;
+	out.reserve(17);
+	pack_u8_array(out, DRegBuf, 8);  // bank registers 0-7
+	pack_u8(out, MMC3_cmd);
+	pack_u8(out, A000B);
+	pack_u8(out, A001B);
+	pack_u8(out, IRQReload);
+	pack_u8(out, IRQCount);
+	pack_u8(out, IRQLatch);
+	pack_u8(out, IRQa);
+	pack_u8(out, mmc3opts);
+	pack_u8(out, kt_extra);
+	return out;  // 17 bytes
+}
+
 namespace {
 
 // v1.8 Masonry §2: MapperEntryRegister for MMC3 (mapper 4).
