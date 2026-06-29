@@ -22,17 +22,48 @@ namespace fceu11 {
 
 class MapperStrategyA : public Mapper {
 public:
-    explicit MapperStrategyA(Bus& bus) noexcept { attach_bus(bus); }
+    explicit MapperStrategyA(Bus& bus) noexcept {
+        attach_bus(bus);
+        // v1.8 Masonry Phase E.1: capture the legacy Power/Reset function
+        // pointers set by the per-mapper Init (Mapper21_Init, Mapper2_Init,
+        // etc.) BEFORE the iNES loader (src/ines.cpp:849-851) overwrites
+        // them with CartInfo_PowerForward / ResetForward.  Without this
+        // capture, MapperStrategyA::on_power() and on_reset() would call
+        // currCartInfo->Power() / Reset() unconditionally, which after the
+        // overwrite routes back through CartInfo_*Forward -> cart_obj's
+        // virtual on_power / on_reset -> infinite recursion -> stack
+        // overflow -> SEGFAULT.  Confirmed by E.1 diagnostic commit
+        // 41d779a+1: the diagnostic showed info->Power and PowerForward
+        // printing identical addresses during the second mapper load.
+        if (currCartInfo) {
+            // Only capture if the function pointer is a real legacy
+            // function (not already a forwarder — that means a previous
+            // Cart subclass is somehow still wired up, which shouldn't
+            // happen in the iNES loader path but we guard defensively).
+            if (currCartInfo->Power &&
+                currCartInfo->Power != &CartInfo_PowerForward) {
+                legacy_power_ = currCartInfo->Power;
+            }
+            if (currCartInfo->Reset &&
+                currCartInfo->Reset != &CartInfo_ResetForward) {
+                legacy_reset_ = currCartInfo->Reset;
+            }
+        }
+    }
 
     void on_power() noexcept override {
-        if (currCartInfo && currCartInfo->Power) currCartInfo->Power();
+        if (legacy_power_) legacy_power_();
     }
     void on_reset() noexcept override {
-        if (currCartInfo && currCartInfo->Reset) currCartInfo->Reset();
+        if (legacy_reset_) legacy_reset_();
     }
     void on_close() noexcept override {
         release_mapper_resources();
     }
+
+private:
+    void (*legacy_power_)(void) = nullptr;
+    void (*legacy_reset_)(void) = nullptr;
 };
 
 } // namespace fceu11

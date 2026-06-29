@@ -24,7 +24,7 @@ namespace fceu11 {
 
 class Mmc3BaseCart : public Mapper {
 public:
-    explicit Mmc3BaseCart(Bus& bus) noexcept { attach_bus(bus); }
+    explicit Mmc3BaseCart(Bus& bus) noexcept;
 
     // Strategy A: defer to the legacy currCartInfo->Power function pointer
     // that the per-mapper Init() (Mapper12_Init, Mapper37_Init, ...) sets
@@ -43,6 +43,15 @@ public:
     // empty snapshot is correct for now.  Phase D.9 (this phase)
     // overrides on Mmc3Cart proper (the v1.7 PoC subclass); the
     // 24 derived classes inherit its implementation.
+
+private:
+    // v1.8 Masonry Phase E.1: legacy Power captured in constructor
+    // before iNES loader overwrites currCartInfo->Power with
+    // CartInfo_PowerForward (see mapper_strategy_a.h:25-52 for the
+    // same pattern).  The 24 MMC3 variants need the captured pointer
+    // because each per-mapper Init (Mapper12_Init, Mapper37_Init, ...)
+    // sets a different legacy Power function (M12Power, M37Power, ...).
+    void (*legacy_power_)(void) = nullptr;
 };
 
 } // namespace fceu11
