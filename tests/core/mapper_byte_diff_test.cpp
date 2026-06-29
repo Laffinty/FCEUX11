@@ -72,7 +72,7 @@ static const RomTestCase tests[] = {
     { "fixtures/mapper_mmc5.nes",         "mmc5",         90  },  // mapper 5
     // Phase E.2 step 3a: 16 P0 mappers with existing Cart subclasses from
     // Phase D.4/D.6/D.8.  All share the 16-byte MapperStrategyA default
-    // until per-mapper state capture lands in a followup commit.
+    // (or 17-byte latch override for UNROM/CNROM/ANROM/CPROM).
     { "fixtures/mapper_cprom.nes",        "cprom",        60  },  // mapper 13
     { "fixtures/mapper_mapper28.nes",     "mapper28",     60  },  // mapper 28
     { "fixtures/mapper_mapper32.nes",     "mapper32",     60  },  // mapper 32
@@ -89,6 +89,30 @@ static const RomTestCase tests[] = {
     { "fixtures/mapper_vrc22.nes",        "vrc22",        90  },  // mapper 22
     { "fixtures/mapper_vrc23.nes",        "vrc23",        90  },  // mapper 23
     { "fixtures/mapper_vrc25.nes",        "vrc25",        90  },  // mapper 25
+    // Phase E.2 step 5: 21 MMC3 variants share Mmc3BaseCart factory
+    // (mapper_number set in ctor, 16-byte Mmc3BaseCart::save_mapper_state
+    // default).  Mmc3BaseCart registration lives in mmc3_variants_carts.h.
+    { "fixtures/mapper_mapper12.nes",     "mapper12",     90  },  // mapper 12
+    { "fixtures/mapper_mapper37.nes",     "mapper37",     90  },  // mapper 37
+    { "fixtures/mapper_mapper44.nes",     "mapper44",     90  },  // mapper 44
+    { "fixtures/mapper_mapper45.nes",     "mapper45",     90  },  // mapper 45
+    { "fixtures/mapper_mapper47.nes",     "mapper47",     90  },  // mapper 47
+    { "fixtures/mapper_mapper49.nes",     "mapper49",     90  },  // mapper 49
+    { "fixtures/mapper_mapper52.nes",     "mapper52",     90  },  // mapper 52
+    { "fixtures/mapper_mapper74.nes",     "mapper74",     90  },  // mapper 74
+    { "fixtures/mapper_mapper105.nes",    "mapper105",    90  },  // mapper 105
+    { "fixtures/mapper_mapper114.nes",    "mapper114",    90  },  // mapper 114
+    { "fixtures/mapper_mapper115.nes",    "mapper115",    90  },  // mapper 115
+    { "fixtures/mapper_mapper116.nes",    "mapper116",    90  },  // mapper 116
+    { "fixtures/mapper_mapper118.nes",    "mapper118",    90  },  // mapper 118
+    { "fixtures/mapper_mapper119.nes",    "mapper119",    90  },  // mapper 119
+    { "fixtures/mapper_mapper165.nes",    "mapper165",    90  },  // mapper 165
+    { "fixtures/mapper_mapper205.nes",    "mapper205",    90  },  // mapper 205
+    { "fixtures/mapper_mapper245.nes",    "mapper245",    90  },  // mapper 245
+    { "fixtures/mapper_mapper249.nes",    "mapper249",    90  },  // mapper 249
+    { "fixtures/mapper_mapper250.nes",    "mapper250",    90  },  // mapper 250
+    { "fixtures/mapper_mapper254.nes",    "mapper254",    90  },  // mapper 254
+    { "fixtures/mapper_mapper406.nes",    "mapper406",    90  },  // mapper 406
 };
 
 static const int NUM_TESTS = sizeof(tests) / sizeof(tests[0]);

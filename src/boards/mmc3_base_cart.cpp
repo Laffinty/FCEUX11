@@ -43,6 +43,17 @@ void Mmc3BaseCart::on_close() noexcept {
     release_mapper_resources();
 }
 
+// v1.8 Masonry Phase E.2 step 5: see mmc3_base_cart.h:42-46 doc.
+std::vector<uint8_t> Mmc3BaseCart::save_mapper_state() const noexcept {
+    std::vector<uint8_t> out;
+    out.reserve(16);
+    pack_u32(out, mapper_number());
+    pack_u32(out, static_cast<uint32_t>(mirror_raw()));
+    pack_u32(out, static_cast<uint32_t>(wram_size()));
+    pack_u32(out, static_cast<uint32_t>(battery_wram_size()));
+    return out;  // 16 bytes
+}
+
 } // namespace fceu11
 // v1.8 Masonry Phase D.3: include cart.h AFTER mmc3.h to ensure CartInfo
 // is fully defined (mmc3.h only forward-declares CartInfo; the function

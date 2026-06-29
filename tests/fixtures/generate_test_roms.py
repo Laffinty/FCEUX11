@@ -46,6 +46,28 @@ INES_MAPPERS = [
     ("vrc22",       22),   # VRC2/4 variant 22
     ("vrc23",       23),   # VRC2/4 variant 23
     ("vrc25",       25),   # VRC2/4 variant 25
+    # Phase E.2 step 5: 21 MMC3 variants (share Mmc3BaseCart factory).
+    ("mapper12",    12),   # MMC3 variant 12
+    ("mapper37",    37),   # MMC3 variant 37
+    ("mapper44",    44),   # MMC3 variant 44
+    ("mapper45",    45),   # MMC3 variant 45
+    ("mapper47",    47),   # MMC3 variant 47
+    ("mapper49",    49),   # MMC3 variant 49
+    ("mapper52",    52),   # MMC3 variant 52
+    ("mapper74",    74),   # MMC3 variant 74
+    ("mapper105",  105),   # MMC3 variant 105
+    ("mapper114",  114),   # MMC3 variant 114
+    ("mapper115",  115),   # MMC3 variant 115
+    ("mapper116",  116),   # MMC3 variant 116
+    ("mapper118",  118),   # MMC3 variant 118
+    ("mapper119",  119),   # MMC3 variant 119
+    ("mapper165",  165),   # MMC3 variant 165
+    ("mapper205",  205),   # MMC3 variant 205
+    ("mapper245",  245),   # MMC3 variant 245
+    ("mapper249",  249),   # MMC3 variant 249
+    ("mapper250",  250),   # MMC3 variant 250
+    ("mapper254",  254),   # MMC3 variant 254
+    ("mapper406",  406),   # MMC3 variant 406
 ]
 
 PRG_SIZE = 1   # 1 x 16 KB

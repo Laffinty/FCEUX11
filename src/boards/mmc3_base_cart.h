@@ -34,6 +34,13 @@ public:
     // All 24 MMC3 variants share MMC3RegReset, so call it directly.
     void on_reset() noexcept override;
 
+    // v1.8 Masonry Phase E.2 step 5: default body byte-diff for all 24 MMC3
+    // variants.  Returns 16 bytes (mapper_number + mirror + WRAM + battery),
+    // matching MapperStrategyA.  The PoC Mmc3Cart subclass overrides with
+    // its 17-byte register file; the 21 derived variants get this default
+    // until per-variant state capture lands.
+    std::vector<uint8_t> save_mapper_state() const noexcept override;
+
     // GameHBIRQHook may have been wired by the per-mapper Init (Kick
     // Master / Shougi hacks).  Null it out on close.  WRAM/CHRRAM
     // release is handled by GenMMC3Close via iNESCart.Close().
