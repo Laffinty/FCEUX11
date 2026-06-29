@@ -644,7 +644,10 @@ static MapperEntryRegister kNromRegister{
     }
 };
 
-// v1.8 Masonry Phase D.4: simple P0 latch mappers.
+// v1.8 Masonry Phase D.4: simple P0 latch mappers (UNROM/CNROM/ANROM/CPROM).
+// Phase D.11 re-enables the registration (was previously guarded by #if 0
+// pending a build break fix; the cart.h forward decl added in Phase D.11
+// closes the gap so the registration compiles cleanly).
 static MapperEntryRegister kUnromRegister{
     MapperEntry{2, "UNROM", &UNROM_Init,
         [](Bus& bus) { return std::make_unique<UnromCart>(bus); }}

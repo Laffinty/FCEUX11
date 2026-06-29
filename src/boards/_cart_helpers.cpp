@@ -2,8 +2,9 @@
 
 #include "_cart_helpers.h"
 
+#include "../fceu.h"            // DECLFR/DECLFW, currCartInfo via cart.h
 #include "../cart.h"            // currCartInfo, CartInfo::Close
-#include "../x6502.h"           // GameHBIRQHook (declared in x6502.h via fceu.h)
+#include "../ppu.h"             // GameHBIRQHook (declared in ppu.h:26)
 
 namespace fceu11 {
 

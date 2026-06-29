@@ -5,6 +5,16 @@
 
 #include "cart_class.h"   // v1.7 Cartograph: fceu11::Cart / Mapper / MirrorMode
 
+// v1.8 Masonry Phase D.11 (WIP): forward-declare CartInfo before any use.
+// cart.h:11 (`extern CartInfo *currCartInfo;`) historically relied on
+// bus.h's forward decl reaching this header via fceu.h, but board TUs
+// (e.g. src/boards/32.cpp) include cart.h via mapinc_base.h before
+// registry.h, and the prior bus.h forward decl was not guaranteed to
+// be visible.  Adding the forward decl here closes the gap so the
+// 12 Phase D.4-D.8 board files can re-enable their MapperEntryRegister
+// blocks in Phase E.  See build plan §1.3.
+struct CartInfo;
+
 // v1.7 Cartograph §1.3: forward declarations for CartInfo lifecycle
 // forwarding functions. Defined in cart.cpp; declared here before struct
 // CartInfo so CartInfo::clear() can install them as defaults.
