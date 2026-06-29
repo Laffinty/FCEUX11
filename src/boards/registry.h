@@ -63,6 +63,16 @@ const MapperEntry* find_mapper_by_name(const char* name) noexcept;
 // Constructor helper: each board file declares a static instance of this
 // type.  The constructor appends the entry to the Meyers-singleton registry.
 // Defined in registry.cpp.
+//
+// v1.8 Masonry Phase E.1 followup: the constructor reads + writes a
+// volatile global counter (k_registration_count in registry.cpp) and
+// the find_mapper lookup reads it.  This forces the linker to retain
+// every MapperEntryRegister static instance that is constructed at
+// static-init time, even if no other TU explicitly references the
+// instance (e.g. kMapper406Register, whose Init function is referenced
+// via bmap[] but whose static instance was previously DCE-stripped by
+// MSVC's /OPT:REF).  Without the sentinel, find_mapper(406) returns
+// null because the static instance's constructor never runs.
 struct MapperEntryRegister {
     explicit MapperEntryRegister(const MapperEntry& entry) noexcept;
 };

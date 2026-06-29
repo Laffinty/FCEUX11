@@ -1639,6 +1639,19 @@ static MapperEntryRegister kMapper254Register{
     MapperEntry{254, "MMC3 BMC Pirate 254", &Mapper254_Init,
         [](Bus& bus) { return std::make_unique<Mapper254Cart>(bus); }}
 };
+// v1.8 Masonry Phase E.1 followup: kMapper406Register is the LAST static
+// instance in this anonymous namespace and is the only one that is
+// DCE-stripped by the MSVC linker.  E.1 diagnostic confirmed the
+// other 24 MMC3 variants (12, 37, 44, 45, 47, 49, 52, 74, 114, 115,
+// 116, 118, 119, 165, 192, 194, 195, 198, 205, 245, 249, 250, 254)
+// all register correctly, and the volatile keepalive in registry.cpp
+// retains them.  kMapper406Register remains missing despite multiple
+// keepalive strategies (volatile counter, keepalive array, non-static
+// instance, anchor wrapper).  Root cause: COMDAT folding with the
+// preceding kMapper254Register (sibling in the same anonymous
+// namespace).  Fix requires moving kMapper406Register to a separate
+// TU or applying a linker flag such as `/OPT:NOREF`.  Tracked as a
+// Phase E.1 followup in v1.8_phase_e1_handoff.md §4.
 static MapperEntryRegister kMapper406Register{
     MapperEntry{406, "MMC3 BMC Pirate 406", &Mapper406_Init,
         [](Bus& bus) { return std::make_unique<Mapper406Cart>(bus); }}
