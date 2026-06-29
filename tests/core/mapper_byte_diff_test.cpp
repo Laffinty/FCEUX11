@@ -56,12 +56,24 @@ struct RomTestCase {
 
 static const RomTestCase tests[] = {
     // Phase D.12: 4 v1.7 PoC mappers with both a Cart subclass override of
-    // save_mapper_state() AND a test ROM in tests/fixtures/.  The remaining
-    // 46 P0 mappers land in Phase E.2 / F when additional test ROMs land.
-    { "fixtures/mapper_nrom.nes",   "nrom",  60  },
-    { "fixtures/mapper_mmc1.nes",   "mmc1",  90  },
-    { "fixtures/mapper_mmc3.nes",   "mmc3",  120 },
-    { "fixtures/mapper_vrc6.nes",   "vrc6",  90  },
+    // save_mapper_state() AND a test ROM in tests/fixtures/.
+    { "fixtures/mapper_nrom.nes",         "nrom",         60  },
+    { "fixtures/mapper_mmc1.nes",         "mmc1",         90  },
+    { "fixtures/mapper_mmc3.nes",         "mmc3",         120 },
+    { "fixtures/mapper_vrc6.nes",         "vrc6",         90  },
+    // Phase E.2: 8 P0 mappers inheriting MapperStrategyA (with the new
+    // default save_mapper_state override that captures mapper_number +
+    // ROM metadata).  Per-mapper state (bank registers, IRQs) is not yet
+    // captured — these bodies are 16 bytes each (vs. 8-28 for the 4 PoCs).
+    // Adding full per-mapper state lands in Phase E.2 followups.
+    { "fixtures/mapper_uxrom.nes",        "uxrom",        60  },  // mapper 2
+    { "fixtures/mapper_cnrom.nes",        "cnrom",        60  },  // mapper 3
+    { "fixtures/mapper_axrom.nes",        "axrom",        60  },  // mapper 7
+    { "fixtures/mapper_colordreams.nes",  "colordreams",  60  },  // mapper 11
+    { "fixtures/mapper_gnrom.nes",        "gnrom",        60  },  // mapper 66
+    { "fixtures/mapper_vrc2and4.nes",     "vrc2and4",     90  },  // mapper 21
+    { "fixtures/mapper_vrc7.nes",         "vrc7",         90  },  // mapper 85
+    { "fixtures/mapper_mmc5.nes",         "mmc5",         90  },  // mapper 5
 };
 
 static const int NUM_TESTS = sizeof(tests) / sizeof(tests[0]);

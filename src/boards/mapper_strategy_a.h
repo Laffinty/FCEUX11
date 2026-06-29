@@ -61,6 +61,20 @@ public:
         release_mapper_resources();
     }
 
+    // v1.8 Masonry §6.1: default byte-diff snapshot of mapper state.
+    // Captures mapper_number + ROM metadata only (no bank registers
+    // or IRQs).  Subclasses with significant per-mapper state
+    // (e.g. VRC6, MMC3) override this to include the state they own.
+    std::vector<uint8_t> save_mapper_state() const noexcept override {
+        std::vector<uint8_t> out;
+        out.reserve(16);
+        pack_u32(out, mapper_number());
+        pack_u32(out, static_cast<uint32_t>(mirror_raw()));
+        pack_u32(out, static_cast<uint32_t>(wram_size()));
+        pack_u32(out, static_cast<uint32_t>(battery_wram_size()));
+        return out;  // 16 bytes
+    }
+
 private:
     void (*legacy_power_)(void) = nullptr;
     void (*legacy_reset_)(void) = nullptr;
