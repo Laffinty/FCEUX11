@@ -20,6 +20,7 @@
  */
 
 #include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase E.2 step 9.1: Mapper105Cart
 
 static void GenMMC1Power(void);
 static void GenMMC1Init(CartInfo *info, int prg, int chr, int wram, int bram);
@@ -466,6 +467,13 @@ static MapperEntryRegister kMmc1Register{
         /*legacy_init=*/&Mapper1_Init,
         /*factory=*/[](Bus& bus) { return std::make_unique<Mmc1Cart>(bus); }
     }
+};
+
+// v1.8 Masonry Phase E.2 step 9.2: NES-EVENT NWC1990 (mapper 105) is
+// MMC1-based; Cart subclass uses MapperStrategyA default (16-byte body).
+static MapperEntryRegister kMapper105Register{
+    MapperEntry{105, "NES-EVENT NWC1990", &Mapper105_Init,
+        [](Bus& bus) { return std::make_unique<Mapper105Cart>(bus); }}
 };
 
 }  // namespace

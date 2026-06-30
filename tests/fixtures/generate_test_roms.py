@@ -89,20 +89,38 @@ CHR_SIZE = 0   # 0 x 8 KB  => CHR-RAM
 
 
 def make_ines_header(mapper: int) -> bytes:
-    """Build a 16-byte iNES 1.0 header."""
-    # Mapper low nibble -> byte6 high bits
-    # Mapper high nibble -> byte7 high bits
-    byte6 = (mapper & 0x0F) << 4
-    byte7 = (mapper & 0xF0)
-    return struct.pack(
-        "<4sBBBBBBBBBBBB",
-        b"NES\x1A",
-        PRG_SIZE,
-        CHR_SIZE,
-        byte6,
-        byte7,
-        0, 0, 0, 0, 0, 0, 0, 0
-    )
+    """Build a 16-byte iNES header.  Uses iNES 2.0 format for mapper numbers
+    > 255 (e.g. mapper 406) since iNES 1.0 only encodes mappers 0-255."""
+    if mapper < 256:
+        # iNES 1.0: byte 6 = mapper low nibble, byte 7 = mapper high nibble
+        byte6 = (mapper & 0x0F) << 4
+        byte7 = (mapper & 0xF0)
+        return struct.pack(
+            "<4sBBBBBBBBBBBB",
+            b"NES\x1A",
+            PRG_SIZE,
+            CHR_SIZE,
+            byte6,
+            byte7,
+            0, 0, 0, 0, 0, 0, 0, 0
+        )
+    else:
+        # iNES 2.0: byte 6 = mapper low nibble, byte 7 = (mapper mid nibble << 4 | iNES 2.0
+        # marker in bits 2-3).  iNES parser reads (byte7 & 0xF0) for the mapper mid
+        # nibble and ((byte7 & 0x0C) == 0x08) to detect iNES 2.0.
+        byte6 = (mapper & 0x0F) << 4
+        byte7 = ((mapper >> 4) & 0x0F) << 4 | 0x08
+        byte8 = (mapper >> 8) & 0x0F
+        # 16-byte iNES header: indices 0-3 magic, 4 PRG, 5 CHR, 6 byte6, 7 byte7,
+        # 8 byte8 (mapper high nibble), 9-15 padding.
+        return struct.pack(
+            "<4sBBBBBBBBBBBB",
+            b"NES\x1A",
+            PRG_SIZE, CHR_SIZE,
+            byte6, byte7,
+            byte8,
+            0, 0, 0, 0, 0, 0, 0
+        )
 
 
 def generate_ines_roms():

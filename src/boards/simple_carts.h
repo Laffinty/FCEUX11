@@ -22,6 +22,24 @@ class Mapper48Cart : public MapperStrategyA { public: explicit Mapper48Cart(Bus&
 // Phase E.2 step 8: round out P0 mappers (mapper 16 Bandai, 18 Magic Floor).
 class Mapper16Cart : public MapperStrategyA { public: explicit Mapper16Cart(Bus& bus) noexcept : MapperStrategyA(bus) {} };
 class Mapper18Cart : public MapperStrategyA { public: explicit Mapper18Cart(Bus& bus) noexcept : MapperStrategyA(bus) {} };
+// Phase E.2 step 9.1: backfill Cart subclasses for the 4 P0 mappers that
+// step 1 added to mapper_byte_diff_test but never received a Cart subclass.
+// Color Dreams (11) and GNROM (66) live in src/boards/datalatch.cpp; their
+// save_mapper_state bodies mirror the UNROM/CNROM/ANROM/CPROM pattern
+// (MapperStrategyA 16-byte default + 1 byte latche).  VRC7 (85) and MMC5 (5)
+// are larger boards; they stay on the 16-byte MapperStrategyA default for
+// now and gain per-board state in Phase E.2 step 11/12 (ExpansionAudio
+// subclassing).  Cart subclass declarations are forward-only here; the
+// save_mapper_state() overrides live next to the MapperEntryRegister in
+// src/boards/datalatch.cpp / vrc7.cpp / mmc5.cpp.
+class ColorDreamsCart : public MapperStrategyA { public: explicit ColorDreamsCart(Bus& bus) noexcept : MapperStrategyA(bus) {} std::vector<uint8_t> save_mapper_state() const noexcept override; };
+class GnromCart : public MapperStrategyA { public: explicit GnromCart(Bus& bus) noexcept : MapperStrategyA(bus) {} std::vector<uint8_t> save_mapper_state() const noexcept override; };
+class Vrc7Cart : public MapperStrategyA { public: explicit Vrc7Cart(Bus& bus) noexcept : MapperStrategyA(bus) {} };
+class Mmc5Cart : public MapperStrategyA { public: explicit Mmc5Cart(Bus& bus) noexcept : MapperStrategyA(bus) {} };
+// v1.8 Masonry Phase E.2 step 9.2: NES-EVENT NWC1990 (mapper 105) is
+// MMC1-based but lives in mmc1.cpp.  Cart subclass + registration lands
+// in mmc1.cpp's MapperEntryRegister block.
+class Mapper105Cart : public MapperStrategyA { public: explicit Mapper105Cart(Bus& bus) noexcept : MapperStrategyA(bus) {} };
 
 } // namespace fceu11
 

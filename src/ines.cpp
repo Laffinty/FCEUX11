@@ -849,6 +849,19 @@ init_ok:
 		iNESCart.Power = CartInfo_PowerForward;
 		iNESCart.Reset = CartInfo_ResetForward;
 		iNESCart.Close = CartInfo_CloseForward;
+	} else {
+		// v1.8 Masonry Phase E.2 step 9.0: clear g_cart_owner so the previous
+		// mapper's Cart object doesn't leak into the new mapper's lifecycle.
+		// Without this, mapper_byte_diff_test would capture stale state from
+		// the previous test's Cart (e.g. colordreams/gnrom/vrc7/mmc5 currently
+		// appear to PASS but actually exercise the prior test's Cart by
+		// accident).  Set cart_obj to the placeholder so CartInfo_*Forward
+		// is a no-op.
+		fceu11::assign_cart(nullptr);
+		iNESCart.cart_obj = nullptr;
+		iNESCart.Power = CartInfo_PowerForward;
+		iNESCart.Reset = CartInfo_ResetForward;
+		iNESCart.Close = CartInfo_CloseForward;
 	}
 
 	// v1.7 Phase E: give the cart a chance to install expansion audio

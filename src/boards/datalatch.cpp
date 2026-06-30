@@ -23,6 +23,7 @@
 #include "../ppu.h"
 #include "../cheat.h"
 #include "../ines.h"
+#include "simple_carts.h"          // v1.8 Phase E.2 step 9.1: ColorDreamsCart, GnromCart
 
 FCEUX11_MAPPER_HOT static uint8 latche=0, latcheinit=0, bus_conflict=0;
 FCEUX11_MAPPER_HOT static uint16 addrreg0=0, addrreg1=0;
@@ -708,6 +709,37 @@ std::vector<uint8_t> CpromCart::save_mapper_state() const noexcept {
 	return out;  // 21 bytes
 }
 
+// v1.8 Masonry Phase E.2 step 9.1: ColorDreams (mapper 11) and GNROM
+// (mapper 66) share datalatch.cpp's Latch infrastructure.  Their
+// save_mapper_state bodies mirror the UNROM/CNROM/ANROM/CPROM pattern from
+// step 2a (MapperStrategyA 16-byte default + 1-byte latche = 17 bytes).
+// The Cart subclass declarations live in src/boards/simple_carts.h.
+std::vector<uint8_t> ColorDreamsCart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out;
+	out.reserve(17);
+	out.push_back(0x0B);                              // mapper 11
+	out.push_back(0x00);
+	out.push_back(0x00);
+	out.push_back(0x00);
+	for (int i = 0; i < 4; ++i) out.push_back(0x00);
+	out.push_back(latche);                            // CHR bank low / PRG bank high
+	for (int i = 0; i < 8; ++i) out.push_back(0x00);
+	return out;  // 17 bytes
+}
+
+std::vector<uint8_t> GnromCart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out;
+	out.reserve(17);
+	out.push_back(0x42);                              // mapper 66
+	out.push_back(0x00);
+	out.push_back(0x00);
+	out.push_back(0x00);
+	for (int i = 0; i < 4; ++i) out.push_back(0x00);
+	out.push_back(latche);                            // PRG bank + CHR bank nibbles
+	for (int i = 0; i < 8; ++i) out.push_back(0x00);
+	return out;  // 17 bytes
+}
+
 namespace {
 
 // v1.8 Masonry §2: MapperEntryRegister static instance for NROM (mapper 0).
@@ -742,6 +774,19 @@ static MapperEntryRegister kAnromRegister{
 static MapperEntryRegister kCpromRegister{
     MapperEntry{13, "CPROM", &CPROM_Init,
         [](Bus& bus) { return std::make_unique<CpromCart>(bus); }}
+};
+
+// v1.8 Masonry Phase E.2 step 9.1: ColorDreams (mapper 11) and GNROM
+// (mapper 66) complete the P0 batch step 1 missed.  Both live in
+// src/boards/datalatch.cpp's Latch_* family; their Cart subclasses share
+// the 16-byte MapperStrategyA default + 1-byte latche body layout.
+static MapperEntryRegister kColordreamsRegister{
+    MapperEntry{11, "Color Dreams", &Mapper11_Init,
+        [](Bus& bus) { return std::make_unique<ColorDreamsCart>(bus); }}
+};
+static MapperEntryRegister kGnromRegister{
+    MapperEntry{66, "MHROM (GNROM)", &MHROM_Init,
+        [](Bus& bus) { return std::make_unique<GnromCart>(bus); }}
 };
 
 }  // namespace
