@@ -20,6 +20,7 @@
 
 #include "mapinc_audio.h"
 #include "simple_carts.h"          // v1.8 Phase E.2 step 9.1: Vrc7Cart
+#include "legacy_expansion_audio.h"  // v1.8 Phase G
 
 static uint8 vrc7idx;
 FCEUX11_MAPPER_HOT static uint8 preg[3], creg[8];
@@ -232,4 +233,12 @@ static MapperEntryRegister kVrc7Register{
         [](Bus& bus) { return std::make_unique<Vrc7Cart>(bus); }}
 };
 }  // namespace
+
+// v1.8 Phase G: Vrc7Cart::install_expansion_audio.
+void Vrc7Cart::install_expansion_audio(Apu& apu) noexcept {
+    EXPSOUND es = apu.exp_sound();
+    es.expansion = &g_vrc7_expansion_audio;
+    apu.set_exp_sound(es);
+}
+
 }  // namespace fceu11

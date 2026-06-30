@@ -34,8 +34,9 @@ class Mapper18Cart : public MapperStrategyA { public: explicit Mapper18Cart(Bus&
 // src/boards/datalatch.cpp / vrc7.cpp / mmc5.cpp.
 class ColorDreamsCart : public MapperStrategyA { public: explicit ColorDreamsCart(Bus& bus) noexcept : MapperStrategyA(bus) {} std::vector<uint8_t> save_mapper_state() const noexcept override; };
 class GnromCart : public MapperStrategyA { public: explicit GnromCart(Bus& bus) noexcept : MapperStrategyA(bus) {} std::vector<uint8_t> save_mapper_state() const noexcept override; };
-class Vrc7Cart : public MapperStrategyA { public: explicit Vrc7Cart(Bus& bus) noexcept : MapperStrategyA(bus) {} };
-class Mmc5Cart : public MapperStrategyA { public: explicit Mmc5Cart(Bus& bus) noexcept : MapperStrategyA(bus) {} };
+// v1.8 Phase G: ExpansionAudio subclass overrides.
+class Vrc7Cart : public MapperStrategyA { public: explicit Vrc7Cart(Bus& bus) noexcept : MapperStrategyA(bus) {} void install_expansion_audio(Apu& apu) noexcept override; };
+class Mmc5Cart : public MapperStrategyA { public: explicit Mmc5Cart(Bus& bus) noexcept : MapperStrategyA(bus) {} void install_expansion_audio(Apu& apu) noexcept override; };
 // v1.8 Masonry Phase E.2 step 9.2: NES-EVENT NWC1990 (mapper 105) is
 // MMC1-based but lives in mmc1.cpp.  Cart subclass + registration lands
 // in mmc1.cpp's MapperEntryRegister block.
@@ -90,11 +91,10 @@ class Mapper95Cart  : public MapperStrategyA { public: explicit Mapper95Cart(Bus
 // v1.8 Phase E.2 step 9.5: FFE mappers 6/17 and Namco 163 mappers 19/210.
 class Mapper6Cart   : public MapperStrategyA { public: explicit Mapper6Cart(Bus& bus) noexcept   : MapperStrategyA(bus) {} };
 class Mapper17Cart  : public MapperStrategyA { public: explicit Mapper17Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
-class Mapper19Cart  : public MapperStrategyA { public: explicit Mapper19Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
-class Mapper210Cart : public MapperStrategyA { public: explicit Mapper210Cart(Bus& bus) noexcept : MapperStrategyA(bus) {} };
-// v1.8 Phase E.2 step 9.6: Sunsoft 5B (mapper 69) as simple cart.
-// ExpansionAudio subclass deferred to Phase G.
-class Mapper69Cart  : public MapperStrategyA { public: explicit Mapper69Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+// v1.8 Phase G: ExpansionAudio subclass overrides.
+class Mapper19Cart  : public MapperStrategyA { public: explicit Mapper19Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} void install_expansion_audio(Apu& apu) noexcept override; };
+class Mapper210Cart : public MapperStrategyA { public: explicit Mapper210Cart(Bus& bus) noexcept : MapperStrategyA(bus) {} void install_expansion_audio(Apu& apu) noexcept override; };
+class Mapper69Cart  : public MapperStrategyA { public: explicit Mapper69Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} void install_expansion_audio(Apu& apu) noexcept override; };
 class Mapper206Cart : public MapperStrategyA { public: explicit Mapper206Cart(Bus& bus) noexcept : MapperStrategyA(bus) {} };
 // v1.8 Phase E.2 audit: mapper 59 was active in bmap[] but missing from registry.
 class Mapper59Cart  : public MapperStrategyA { public: explicit Mapper59Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };

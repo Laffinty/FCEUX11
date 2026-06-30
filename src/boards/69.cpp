@@ -21,6 +21,7 @@
 
 #include "mapinc_audio.h"
 #include "simple_carts.h"          // v1.8 Phase E.2 step 9.6
+#include "legacy_expansion_audio.h"  // v1.8 Phase G
 
 static uint8 cmdreg, preg[4], creg[8], mirr;
 static uint8 IRQa;
@@ -291,4 +292,12 @@ static MapperEntryRegister kMapper69Register{
         [](Bus& bus) { return std::make_unique<Mapper69Cart>(bus); }}
 };
 }  // namespace
+
+// v1.8 Phase G: Mapper69Cart::install_expansion_audio.
+void Mapper69Cart::install_expansion_audio(Apu& apu) noexcept {
+    EXPSOUND es = apu.exp_sound();
+    es.expansion = &g_s5b_expansion_audio;
+    apu.set_exp_sound(es);
+}
+
 }  // namespace fceu11

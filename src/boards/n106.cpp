@@ -21,6 +21,7 @@
 #include "mapinc_audio.h"
 #include "../ppu.h"
 #include "simple_carts.h"          // v1.8 Phase E.2 step 9.5
+#include "legacy_expansion_audio.h"  // v1.8 Phase G
 
 static uint16 IRQCount;
 static uint8 IRQa;
@@ -463,4 +464,17 @@ static MapperEntryRegister kMapper210Register{
         [](Bus& bus) { return std::make_unique<Mapper210Cart>(bus); }}
 };
 }  // namespace
+
+// v1.8 Phase G: Mapper19Cart/210Cart::install_expansion_audio.
+void Mapper19Cart::install_expansion_audio(Apu& apu) noexcept {
+    EXPSOUND es = apu.exp_sound();
+    es.expansion = &g_n106_expansion_audio;
+    apu.set_exp_sound(es);
+}
+void Mapper210Cart::install_expansion_audio(Apu& apu) noexcept {
+    EXPSOUND es = apu.exp_sound();
+    es.expansion = &g_n106_expansion_audio;
+    apu.set_exp_sound(es);
+}
+
 }  // namespace fceu11

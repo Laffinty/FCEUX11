@@ -24,6 +24,7 @@
 #include "../unif.h"
 #include "../ppu.h"
 #include "simple_carts.h"          // v1.8 Phase E.2 step 9.1: Mmc5Cart
+#include "legacy_expansion_audio.h"  // v1.8 Phase G
 
 #include <array>
 
@@ -1105,4 +1106,12 @@ static MapperEntryRegister kMmc5Register{
         [](Bus& bus) { return std::make_unique<Mmc5Cart>(bus); }}
 };
 }  // namespace
+
+// v1.8 Phase G: Mmc5Cart::install_expansion_audio.
+void Mmc5Cart::install_expansion_audio(Apu& apu) noexcept {
+    EXPSOUND es = apu.exp_sound();
+    es.expansion = &g_mmc5_expansion_audio;
+    apu.set_exp_sound(es);
+}
+
 }  // namespace fceu11
