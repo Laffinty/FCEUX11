@@ -5,6 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8] - 2026-07-01
+
+**Codename: Masonry.** Eighth sub-version of the v1.x modernization
+cycle per `docs/v1.x_Modernization_Roadmap.md` §8. Batch-migrates
+174 board files to `fceu11::Mapper` subclasses with `MapperEntry`
+auto-registration (replacing `BMAPPINGLocal bmap[]`), introduces
+`Cart::save_mapper_state()` for byte-level mapper state regression
+testing, implements `Mmc3BaseCart` for 23 MMC3 variants, and adds
+`ExpansionAudio` subclassing for VRC7/MMC5/N106/Sunsoft5B.
+
+### Added
+
+- **`src/boards/registry.h` / `registry.cpp`** — `MapperEntry` static
+  registration table with Meyers-singleton storage. 174 mappers
+  registered via `MapperEntryRegister` static instances in board files.
+- **`src/boards/simple_carts.h`** — Cart subclass declarations for
+  174 mappers (MapperStrategyA default body + Mmc3BaseCart variants).
+- **`src/boards/legacy_expansion_audio.h`** — `LegacyExpansionAudio`
+  wrapper that delegates to existing `GameExpSound` function pointers.
+- **`src/boards/mmc3_base_cart.h` / `mmc3_base_cart.cpp`** —
+  `Mmc3BaseCart` shared base for 23 MMC3 variant mappers.
+- **`tests/core/mapper_byte_diff_test.cpp`** — 174 mapper byte-diff
+  regression test (body byte-exact golden comparison).
+- **`tests/core/cart_class_test.cpp`** — 211 assertions covering
+  factory dispatch, registration, and lifecycle tests.
+
+### Changed
+
+- **Version**: 1.7 → 1.8
+- **`src/boards/*.cpp`** — 174 board files now include `simple_carts.h`
+  and register `MapperEntryRegister` static instances.
+- **`src/boards/vrc7.cpp`** — Vrc7Cart overrides
+  `install_expansion_audio` via LegacyExpansionAudio.
+- **`src/boards/mmc5.cpp`** — Mmc5Cart overrides
+  `install_expansion_audio` via LegacyExpansionAudio.
+- **`src/boards/n106.cpp`** — Mapper19Cart/210Cart override
+  `install_expansion_audio` via LegacyExpansionAudio.
+- **`src/boards/69.cpp`** — Mapper69Cart overrides
+  `install_expansion_audio` via LegacyExpansionAudio.
+
+### Known Issues
+
+- **mapper 178** (178.cpp): ACCESS_VIOLATION when loaded in test
+  binary (calls `GetMouseData` from Qt driver, not linked in tests).
+  Deferred to v1.9.
+- **mapper 88** (88.cpp): heap corruption when run after mapper 83
+  (YOKO VRC) in ctest. Mitigated by test ordering. Deferred to v1.9.
+- **bench_tolerance_test**: +4.28%~+6.20% regression vs v1.5 baseline.
+  Pre-existing from v1.7 (+4.37% carryover). Deferred to v1.14 Anvil.
+
 ## [1.7] - 2026-06-28
 
 **Codename: Cartograph.** Seventh sub-version of the v1.x modernization
