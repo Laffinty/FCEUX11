@@ -156,6 +156,9 @@ static const RomTestCase tests[] = {
     { "fixtures/mapper_mapper93.nes",     "mapper93",     60  },
     { "fixtures/mapper_mapper96.nes",     "mapper96",     60  },
     { "fixtures/mapper_mapper99.nes",     "mapper99",     60  },
+    // Phase E.2 step 9.4: 5 remaining P1 mappers (added one-by-one to
+    // isolate potential heap-corruption regressions; see mapper 88 followup).
+    { "fixtures/mapper_mapper53.nes",     "mapper53",     60  },  // SUPERVISION 16-in-1
 };
 
 static const int NUM_TESTS = sizeof(tests) / sizeof(tests[0]);

@@ -81,6 +81,8 @@ class Mapper92Cart  : public MapperStrategyA { public: explicit Mapper92Cart(Bus
 class Mapper93Cart  : public MapperStrategyA { public: explicit Mapper93Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
 class Mapper96Cart  : public MapperStrategyA { public: explicit Mapper96Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
 class Mapper99Cart  : public MapperStrategyA { public: explicit Mapper99Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+// v1.8 Phase E.2 step 9.4: SUPERVISION 16-in-1 (mapper 53).
+class Mapper53Cart  : public MapperStrategyA { public: explicit Mapper53Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
 
 } // namespace fceu11
 
