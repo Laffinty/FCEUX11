@@ -196,11 +196,16 @@ void Mapper207_Init(CartInfo *info) {
 
 // v1.8 Masonry Phase E.2 step 9.3: MapperEntryRegister for mapper 80
 // (TAITO X1-005 Rev. A).  Cart subclass inherits MapperStrategyA (16-byte default body).
+// v1.8 Phase E.2 step 9.4: also mapper 95 (NAMCOT 108 Rev. B).
 namespace fceu11 {
 namespace {
 static MapperEntryRegister kMapper80Register{
     MapperEntry{80, "TAITO X1-005 Rev. A", &Mapper80_Init,
         [](Bus& bus) { return std::make_unique<Mapper80Cart>(bus); } }
+};
+static MapperEntryRegister kMapper95Register{
+    MapperEntry{95, "NAMCOT 108 Rev. B", &Mapper95_Init,
+        [](Bus& bus) { return std::make_unique<Mapper95Cart>(bus); } }
 };
 }  // namespace
 }  // namespace fceu11

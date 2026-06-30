@@ -117,9 +117,12 @@ INES_MAPPERS = [
     ("mapper93",    93),
     ("mapper96",    96),
     ("mapper99",    99),
-    # Phase E.2 step 9.4: 5 remaining P1 mappers (one at a time to
-    # isolate heap-corruption regressions).
-    ("mapper53",    53),
+    # Phase E.2 step 9.4: 5 remaining P1 mappers.
+    ("mapper53",    53),   # SUPERVISION 16-in-1
+    ("mapper58",    58),   # BMCGK192
+    ("mapper60",    60),   # BMCD1038
+    ("mapper76",    76),   # NAMCOT 108 Rev. A
+    ("mapper95",    95),   # NAMCOT 108 Rev. B
 ]
 
 PRG_SIZE = 1   # 1 x 16 KB

@@ -1472,6 +1472,7 @@ void Mapper406_Init(CartInfo *info) {
 #include "boards/mmc3_cart.h"
 #include "boards/mmc3_variants_carts.h"
 #include "boards/registry.h"
+#include "simple_carts.h"          // v1.8 Phase E.2 step 9.4
 
 namespace fceu11 {
 
@@ -1642,6 +1643,12 @@ static MapperEntryRegister kMapper254Register{
 static MapperEntryRegister kMapper406Register{
     MapperEntry{406, "MMC3 BMC Pirate 406", &Mapper406_Init,
         [](Bus& bus) { return std::make_unique<Mapper406Cart>(bus); }}
+};
+
+// v1.8 Phase E.2 step 9.4: MapperEntryRegister for mapper 76 (NAMCOT 108 Rev. A).
+static MapperEntryRegister kMapper76Register{
+    MapperEntry{76, "NAMCOT 108 Rev. A", &Mapper76_Init,
+        [](Bus& bus) { return std::make_unique<Mapper76Cart>(bus); }}
 };
 
 }  // namespace

@@ -536,6 +536,7 @@ void BMCG146_Init(CartInfo *info) {
 
 // v1.8 Masonry Phase E.2 step 9.3: MapperEntryRegister for mapper 61 (20-in-1
 // KAISER Rev. A) and 92 (JALECO JF-19).  Both use Latch_Init, live here.
+// v1.8 Phase E.2 step 9.4: also mapper 58 (BMCGK192) and 60 (BMCD1038).
 namespace fceu11 {
 namespace {
 static MapperEntryRegister kMapper61Register{
@@ -545,6 +546,14 @@ static MapperEntryRegister kMapper61Register{
 static MapperEntryRegister kMapper92Register{
     MapperEntry{92, "JALECO JF-19", &Mapper92_Init,
         [](Bus& bus) { return std::make_unique<Mapper92Cart>(bus); }}
+};
+static MapperEntryRegister kMapper58Register{
+    MapperEntry{58, "BMCGK192", &BMCGK192_Init,
+        [](Bus& bus) { return std::make_unique<Mapper58Cart>(bus); }}
+};
+static MapperEntryRegister kMapper60Register{
+    MapperEntry{60, "BMCD1038", &BMCD1038_Init,
+        [](Bus& bus) { return std::make_unique<Mapper60Cart>(bus); }}
 };
 }  // namespace
 }  // namespace fceu11
