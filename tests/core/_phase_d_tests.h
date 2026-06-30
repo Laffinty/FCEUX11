@@ -59,6 +59,21 @@ void test_find_mapper_registered(TestContext& ctx) {
     FCEU11_EXPECT(ctx, fceu11::find_mapper(12) != nullptr,  "MMC3 var 12 registered");
     FCEU11_EXPECT(ctx, fceu11::find_mapper(406) != nullptr, "MMC3 var 406 registered");
     FCEU11_EXPECT(ctx, fceu11::find_mapper(99) != nullptr,  "VS Uni 99 registered");
+    // v1.8 Phase E.2 step 9.6: verify newly registered mappers.
+    FCEU11_EXPECT(ctx, fceu11::find_mapper(6) != nullptr,   "FFE 6 registered");
+    FCEU11_EXPECT(ctx, fceu11::find_mapper(17) != nullptr,  "FFE 17 registered");
+    FCEU11_EXPECT(ctx, fceu11::find_mapper(19) != nullptr,  "Namco 163 registered");
+    FCEU11_EXPECT(ctx, fceu11::find_mapper(69) != nullptr,  "Sunsoft 5B registered");
+    FCEU11_EXPECT(ctx, fceu11::find_mapper(206) != nullptr, "Namco 108 var 206 registered");
+    FCEU11_EXPECT(ctx, fceu11::find_mapper(210) != nullptr, "Namco 163 var 210 registered");
+    FCEU11_EXPECT(ctx, fceu11::find_mapper(53) != nullptr,  "SUPERVISION 53 registered");
+    FCEU11_EXPECT(ctx, fceu11::find_mapper(58) != nullptr,  "BMCGK192 58 registered");
+    FCEU11_EXPECT(ctx, fceu11::find_mapper(60) != nullptr,  "BMCD1038 60 registered");
+    FCEU11_EXPECT(ctx, fceu11::find_mapper(76) != nullptr,  "NAMCOT 76 registered");
+    FCEU11_EXPECT(ctx, fceu11::find_mapper(95) != nullptr,  "NAMCOT 95 registered");
+    FCEU11_EXPECT(ctx, fceu11::find_mapper(105) != nullptr, "NES-EVENT 105 registered");
+    FCEU11_EXPECT(ctx, fceu11::find_mapper(118) != nullptr, "TSKROM 118 registered");
+    FCEU11_EXPECT(ctx, fceu11::find_mapper(254) != nullptr, "MMC3 254 registered");
     FCEU11_EXPECT(ctx, fceu11::find_mapper(300) == nullptr, "out-of-range mapper 300");
 }
 
@@ -129,6 +144,19 @@ void test_mapper50_factory_dispatch(TestContext& ctx) {
     if (reg_entry) {
         FCEU11_EXPECT(ctx, reg_entry->factory != nullptr,
                       "SMB2j 50 factory non-null");
+    }
+    core_shutdown();
+}
+
+// v1.8 Phase E.2 step 9.6: factory dispatch for newly registered mappers.
+void test_new_mapper_factory_dispatch(TestContext& ctx) {
+    if (!core_init()) { FCEU11_EXPECT(ctx, false, "core_init"); return; }
+    uint32_t new_mappers[] = {6, 17, 19, 53, 58, 60, 69, 76, 95, 206, 210};
+    for (uint32_t n : new_mappers) {
+        const fceu11::MapperEntry* reg_entry = fceu11::find_mapper(n);
+        FCEU11_EXPECT(ctx, reg_entry != nullptr, "new mapper registered");
+        FCEU11_EXPECT(ctx, reg_entry && reg_entry->factory != nullptr,
+                      "new mapper factory non-null");
     }
     core_shutdown();
 }

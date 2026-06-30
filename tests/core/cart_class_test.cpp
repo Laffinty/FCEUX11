@@ -360,6 +360,7 @@ int main() {
     test_mapper36_factory_dispatch(ctx);
     test_mapper40_factory_dispatch(ctx);
     test_mapper50_factory_dispatch(ctx);
+    test_new_mapper_factory_dispatch(ctx);
     test_mmc3_variants_factory_dispatch(ctx);
 
     // Phase A: all tests [SKIP] → exit 0
