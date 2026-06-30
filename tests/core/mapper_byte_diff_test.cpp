@@ -160,6 +160,9 @@ static const RomTestCase tests[] = {
     { "fixtures/mapper_mapper60.nes",     "mapper60",     60  },  // BMCD1038
     { "fixtures/mapper_mapper76.nes",     "mapper76",     60  },  // NAMCOT 108 Rev. A
     { "fixtures/mapper_mapper95.nes",     "mapper95",     60  },  // NAMCOT 108 Rev. B
+    // mapper 88 (NAMCO 3433) placed here (before mapper 83) to avoid
+    // heap corruption when ctest pipes stdout.  Phase E.2 followup.
+    { "fixtures/mapper_mapper88.nes",     "mapper88",     60  },  // NAMCO 3433
     // Phase E.2 step 9.5: FFE + Namco 163 + P2 mappers.
     { "fixtures/mapper_mapper6.nes",      "mapper6",      60  },  // FFE
     { "fixtures/mapper_mapper17.nes",     "mapper17",     60  },  // FFE variant
@@ -182,6 +185,8 @@ static const RomTestCase tests[] = {
     { "fixtures/mapper_mapper250.nes",    "mapper250",    60  },  // MMC3 BMC Pirate
     { "fixtures/mapper_mapper254.nes",    "mapper254",    60  },  // MMC3 BMC Pirate
     { "fixtures/mapper_mapper406.nes",    "mapper406",    60  },  // MMC3 BMC Pirate
+    { "fixtures/mapper_mapper69.nes",     "mapper69",     60  },  // Sunsoft 5B
+    { "fixtures/mapper_mapper206.nes",    "mapper206",    60  },  // Namco 108 variant
     // mapper 83 (YOKO VRC) placed last: its cleanup corrupts the heap for
     // subsequent mappers in ctest.  Passes standalone.  Phase E.2 followup.
     { "fixtures/mapper_mapper83.nes",     "mapper83",     60  },  // YOKO VRC

@@ -19,6 +19,7 @@
  */
 
 #include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase E.2 step 9.6
 
 static uint8 cmd;
 static uint8 DRegs[8];
@@ -76,3 +77,14 @@ void Mapper206_Init(CartInfo *info) {
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+// v1.8 Masonry Phase E.2 step 9.6: MapperEntryRegister for mapper 206
+// (Namco 108 variant / DxROM).
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper206Register{
+    MapperEntry{206, "Namco 108 variant", &Mapper206_Init,
+        [](Bus& bus) { return std::make_unique<Mapper206Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

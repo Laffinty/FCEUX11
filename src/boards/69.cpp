@@ -20,6 +20,7 @@
  */
 
 #include "mapinc_audio.h"
+#include "simple_carts.h"          // v1.8 Phase E.2 step 9.6
 
 static uint8 cmdreg, preg[4], creg[8], mirr;
 static uint8 IRQa;
@@ -280,3 +281,14 @@ void NSFAY_Init(void) {
 	SetWriteHandler(0xE000, 0xFFFF, M69SWrite1);
 	Mapper69_ESI();
 }
+
+// v1.8 Masonry Phase E.2 step 9.6: MapperEntryRegister for mapper 69
+// (Sunsoft 5B).  ExpansionAudio subclass deferred to Phase G.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper69Register{
+    MapperEntry{69, "Sunsoft 5B", &Mapper69_Init,
+        [](Bus& bus) { return std::make_unique<Mapper69Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

@@ -92,6 +92,10 @@ class Mapper6Cart   : public MapperStrategyA { public: explicit Mapper6Cart(Bus&
 class Mapper17Cart  : public MapperStrategyA { public: explicit Mapper17Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
 class Mapper19Cart  : public MapperStrategyA { public: explicit Mapper19Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
 class Mapper210Cart : public MapperStrategyA { public: explicit Mapper210Cart(Bus& bus) noexcept : MapperStrategyA(bus) {} };
+// v1.8 Phase E.2 step 9.6: Sunsoft 5B (mapper 69) as simple cart.
+// ExpansionAudio subclass deferred to Phase G.
+class Mapper69Cart  : public MapperStrategyA { public: explicit Mapper69Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper206Cart : public MapperStrategyA { public: explicit Mapper206Cart(Bus& bus) noexcept : MapperStrategyA(bus) {} };
 
 } // namespace fceu11
 

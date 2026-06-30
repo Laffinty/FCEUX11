@@ -145,6 +145,8 @@ INES_MAPPERS = [
     ("mapper250",  250),   # MMC3 BMC Pirate
     ("mapper254",  254),   # MMC3 BMC Pirate
     ("mapper406",  406),   # MMC3 BMC Pirate
+    ("mapper69",    69),   # Sunsoft 5B
+    ("mapper206",  206),   # Namco 108 variant
 ]
 
 PRG_SIZE = 1   # 1 x 16 KB
