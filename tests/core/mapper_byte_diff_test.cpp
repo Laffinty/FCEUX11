@@ -122,6 +122,14 @@ static const RomTestCase tests[] = {
     { "fixtures/mapper_bandai.nes",       "bandai",       60  },  // mapper 16
     { "fixtures/mapper_mapper18.nes",     "mapper18",     60  },  // mapper 18
     { "fixtures/mapper_vrc6var26.nes",    "vrc6var26",    90  },  // mapper 26
+    // Phase E.2 step 9.2: 7 P1 Latch-family mappers (datalatch.cpp).
+    { "fixtures/mapper_mapper70.nes",     "mapper70",     60  },  // BA KAMEN DISCRETE
+    { "fixtures/mapper_mapper78.nes",     "mapper78",     60  },  // Irem 74HC161/32
+    { "fixtures/mapper_mapper86.nes",     "mapper86",     60  },  // JALECO JF-13
+    { "fixtures/mapper_mapper87.nes",     "mapper87",     60  },  // 74*139/74 DISCRETE
+    { "fixtures/mapper_mapper89.nes",     "mapper89",     60  },  // SUNSOFT-3
+    { "fixtures/mapper_mapper94.nes",     "mapper94",     60  },  // HVC-UN1ROM
+    { "fixtures/mapper_mapper97.nes",     "mapper97",     60  },  // IREM TAM-S1
 };
 
 static const int NUM_TESTS = sizeof(tests) / sizeof(tests[0]);

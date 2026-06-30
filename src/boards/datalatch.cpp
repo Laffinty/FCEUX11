@@ -740,6 +740,74 @@ std::vector<uint8_t> GnromCart::save_mapper_state() const noexcept {
 	return out;  // 17 bytes
 }
 
+// v1.8 Masonry Phase E.2 step 9.2: 7 more Latch-family mappers (70, 78,
+// 86, 87, 89, 94, 97) in datalatch.cpp.  All share the same 17-byte body
+// layout: 4-byte mapper/mirror/wram/battery + 4 padding + 1-byte latche
+// + 8-byte reserved future state.  Same pattern as ColorDreams/Gnrom
+// above.
+std::vector<uint8_t> Mapper70Cart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out; out.reserve(17);
+	out.push_back(70); out.push_back(0); out.push_back(0); out.push_back(0);
+	for (int i = 0; i < 4; ++i) out.push_back(0);
+	out.push_back(latche);
+	for (int i = 0; i < 8; ++i) out.push_back(0);
+	return out;
+}
+
+std::vector<uint8_t> Mapper78Cart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out; out.reserve(17);
+	out.push_back(78); out.push_back(0); out.push_back(0); out.push_back(0);
+	for (int i = 0; i < 4; ++i) out.push_back(0);
+	out.push_back(latche);
+	for (int i = 0; i < 8; ++i) out.push_back(0);
+	return out;
+}
+
+std::vector<uint8_t> Mapper86Cart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out; out.reserve(17);
+	out.push_back(86); out.push_back(0); out.push_back(0); out.push_back(0);
+	for (int i = 0; i < 4; ++i) out.push_back(0);
+	out.push_back(latche);
+	for (int i = 0; i < 8; ++i) out.push_back(0);
+	return out;
+}
+
+std::vector<uint8_t> Mapper87Cart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out; out.reserve(17);
+	out.push_back(87); out.push_back(0); out.push_back(0); out.push_back(0);
+	for (int i = 0; i < 4; ++i) out.push_back(0);
+	out.push_back(latche);
+	for (int i = 0; i < 8; ++i) out.push_back(0);
+	return out;
+}
+
+std::vector<uint8_t> Mapper89Cart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out; out.reserve(17);
+	out.push_back(89); out.push_back(0); out.push_back(0); out.push_back(0);
+	for (int i = 0; i < 4; ++i) out.push_back(0);
+	out.push_back(latche);
+	for (int i = 0; i < 8; ++i) out.push_back(0);
+	return out;
+}
+
+std::vector<uint8_t> Mapper94Cart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out; out.reserve(17);
+	out.push_back(94); out.push_back(0); out.push_back(0); out.push_back(0);
+	for (int i = 0; i < 4; ++i) out.push_back(0);
+	out.push_back(latche);
+	for (int i = 0; i < 8; ++i) out.push_back(0);
+	return out;
+}
+
+std::vector<uint8_t> Mapper97Cart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out; out.reserve(17);
+	out.push_back(97); out.push_back(0); out.push_back(0); out.push_back(0);
+	for (int i = 0; i < 4; ++i) out.push_back(0);
+	out.push_back(latche);
+	for (int i = 0; i < 8; ++i) out.push_back(0);
+	return out;
+}
+
 namespace {
 
 // v1.8 Masonry §2: MapperEntryRegister static instance for NROM (mapper 0).
@@ -787,6 +855,38 @@ static MapperEntryRegister kColordreamsRegister{
 static MapperEntryRegister kGnromRegister{
     MapperEntry{66, "MHROM (GNROM)", &MHROM_Init,
         [](Bus& bus) { return std::make_unique<GnromCart>(bus); }}
+};
+
+// v1.8 Masonry Phase E.2 step 9.2: 7 more Latch-family P1 mappers (70, 78,
+// 86, 87, 89, 94, 97).  All in src/boards/datalatch.cpp's Latch_* family;
+// Cart subclasses inherit MapperStrategyA and capture the shared latche byte.
+static MapperEntryRegister kMapper70Register{
+    MapperEntry{70, "BA KAMEN DISCRETE", &Mapper70_Init,
+        [](Bus& bus) { return std::make_unique<Mapper70Cart>(bus); }}
+};
+static MapperEntryRegister kMapper78Register{
+    MapperEntry{78, "Irem 74HC161/32", &Mapper78_Init,
+        [](Bus& bus) { return std::make_unique<Mapper78Cart>(bus); }}
+};
+static MapperEntryRegister kMapper86Register{
+    MapperEntry{86, "JALECO JF-13", &Mapper86_Init,
+        [](Bus& bus) { return std::make_unique<Mapper86Cart>(bus); }}
+};
+static MapperEntryRegister kMapper87Register{
+    MapperEntry{87, "74*139/74 DISCRETE", &Mapper87_Init,
+        [](Bus& bus) { return std::make_unique<Mapper87Cart>(bus); }}
+};
+static MapperEntryRegister kMapper89Register{
+    MapperEntry{89, "SUNSOFT-3", &Mapper89_Init,
+        [](Bus& bus) { return std::make_unique<Mapper89Cart>(bus); }}
+};
+static MapperEntryRegister kMapper94Register{
+    MapperEntry{94, "HVC-UN1ROM", &Mapper94_Init,
+        [](Bus& bus) { return std::make_unique<Mapper94Cart>(bus); }}
+};
+static MapperEntryRegister kMapper97Register{
+    MapperEntry{97, "IREM TAM-S1", &Mapper97_Init,
+        [](Bus& bus) { return std::make_unique<Mapper97Cart>(bus); }}
 };
 
 }  // namespace

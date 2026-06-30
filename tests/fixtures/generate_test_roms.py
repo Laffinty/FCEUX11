@@ -82,6 +82,15 @@ INES_MAPPERS = [
     ("bandai",      16),   # Bandai (mapper 16)
     ("mapper18",    18),   # Magic Floor (mapper 18)
     ("vrc6var26",   26),   # Konami VRC6 variant 26 (shares Vrc6Cart)
+    # Phase E.2 step 9.2: 7 P1 Latch-family mappers from datalatch.cpp.
+    # Each emits a 17-byte body (MapperStrategyA 16-byte default + latche).
+    ("mapper70",    70),
+    ("mapper78",    78),
+    ("mapper86",    86),
+    ("mapper87",    87),
+    ("mapper89",    89),
+    ("mapper94",    94),
+    ("mapper97",    97),
 ]
 
 PRG_SIZE = 1   # 1 x 16 KB

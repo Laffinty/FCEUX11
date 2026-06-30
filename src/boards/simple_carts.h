@@ -40,6 +40,17 @@ class Mmc5Cart : public MapperStrategyA { public: explicit Mmc5Cart(Bus& bus) no
 // MMC1-based but lives in mmc1.cpp.  Cart subclass + registration lands
 // in mmc1.cpp's MapperEntryRegister block.
 class Mapper105Cart : public MapperStrategyA { public: explicit Mapper105Cart(Bus& bus) noexcept : MapperStrategyA(bus) {} };
+// v1.8 Masonry Phase E.2 step 9.2: P1 Latch-family mappers (70, 78, 86, 87,
+// 89, 94, 97) live in src/boards/datalatch.cpp and share the Latch_*
+// infrastructure with the P0 batch.  Each emits a 17-byte body
+// (MapperStrategyA 16-byte default + 1-byte latche).
+class Mapper70Cart  : public MapperStrategyA { public: explicit Mapper70Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} std::vector<uint8_t> save_mapper_state() const noexcept override; };
+class Mapper78Cart  : public MapperStrategyA { public: explicit Mapper78Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} std::vector<uint8_t> save_mapper_state() const noexcept override; };
+class Mapper86Cart  : public MapperStrategyA { public: explicit Mapper86Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} std::vector<uint8_t> save_mapper_state() const noexcept override; };
+class Mapper87Cart  : public MapperStrategyA { public: explicit Mapper87Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} std::vector<uint8_t> save_mapper_state() const noexcept override; };
+class Mapper89Cart  : public MapperStrategyA { public: explicit Mapper89Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} std::vector<uint8_t> save_mapper_state() const noexcept override; };
+class Mapper94Cart  : public MapperStrategyA { public: explicit Mapper94Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} std::vector<uint8_t> save_mapper_state() const noexcept override; };
+class Mapper97Cart  : public MapperStrategyA { public: explicit Mapper97Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} std::vector<uint8_t> save_mapper_state() const noexcept override; };
 
 } // namespace fceu11
 
