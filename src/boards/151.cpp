@@ -19,6 +19,7 @@
  */
 
 #include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 static uint8 regs[8];
 
@@ -57,3 +58,13 @@ void Mapper151_Init(CartInfo *info) {
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+// v1.8 Phase F: MapperEntryRegister.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper151Register{
+    MapperEntry{151, "", &Mapper151_Init,
+        [](Bus& bus) { return std::make_unique<Mapper151Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

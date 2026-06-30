@@ -188,6 +188,17 @@ static const RomTestCase tests[] = {
     { "fixtures/mapper_mapper69.nes",     "mapper69",     60  },  // Sunsoft 5B
     { "fixtures/mapper_mapper206.nes",    "mapper206",    60  },  // Namco 108 variant
     { "fixtures/mapper_mapper59.nes",     "mapper59",     60  },  // audit gap
+    // Phase F batch 1.
+    { "fixtures/mapper_mapper103.nes",    "mapper103",    60  },
+    { "fixtures/mapper_mapper106.nes",    "mapper106",    60  },
+    { "fixtures/mapper_mapper108.nes",    "mapper108",    60  },
+    { "fixtures/mapper_mapper112.nes",    "mapper112",    60  },
+    { "fixtures/mapper_mapper117.nes",    "mapper117",    60  },
+    { "fixtures/mapper_mapper120.nes",    "mapper120",    60  },
+    { "fixtures/mapper_mapper121.nes",    "mapper121",    60  },
+    { "fixtures/mapper_mapper151.nes",    "mapper151",    60  },
+    { "fixtures/mapper_mapper156.nes",    "mapper156",    60  },
+    { "fixtures/mapper_mapper177.nes",    "mapper177",    60  },
     // mapper 83 (YOKO VRC) placed last: its cleanup corrupts the heap for
     // subsequent mappers in ctest.  Passes standalone.  Phase E.2 followup.
     { "fixtures/mapper_mapper83.nes",     "mapper83",     60  },  // YOKO VRC

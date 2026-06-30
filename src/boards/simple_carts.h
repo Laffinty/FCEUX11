@@ -99,6 +99,18 @@ class Mapper206Cart : public MapperStrategyA { public: explicit Mapper206Cart(Bu
 // v1.8 Phase E.2 audit: mapper 59 was active in bmap[] but missing from registry.
 class Mapper59Cart  : public MapperStrategyA { public: explicit Mapper59Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
 
+// v1.8 Phase F batch 1.
+class Mapper103Cart  : public MapperStrategyA { public: explicit Mapper103Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper106Cart  : public MapperStrategyA { public: explicit Mapper106Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper108Cart  : public MapperStrategyA { public: explicit Mapper108Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper112Cart  : public MapperStrategyA { public: explicit Mapper112Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper117Cart  : public MapperStrategyA { public: explicit Mapper117Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper120Cart  : public MapperStrategyA { public: explicit Mapper120Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper121Cart  : public MapperStrategyA { public: explicit Mapper121Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper151Cart  : public MapperStrategyA { public: explicit Mapper151Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper156Cart  : public MapperStrategyA { public: explicit Mapper156Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper177Cart  : public MapperStrategyA { public: explicit Mapper177Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+
 } // namespace fceu11
 
 #endif // FCEU11_BOARDS_SIMPLE_CARTS_H

@@ -148,6 +148,17 @@ INES_MAPPERS = [
     ("mapper69",    69),   # Sunsoft 5B
     ("mapper206",  206),   # Namco 108 variant
     ("mapper59",    59),   # active in bmap[], audit gap
+    # Phase F batch 1.
+    ("mapper103",  103),
+    ("mapper106",  106),
+    ("mapper108",  108),
+    ("mapper112",  112),
+    ("mapper117",  117),
+    ("mapper120",  120),
+    ("mapper121",  121),
+    ("mapper151",  151),
+    ("mapper156",  156),
+    ("mapper177",  177),
 ]
 
 PRG_SIZE = 1   # 1 x 16 KB

@@ -19,6 +19,7 @@
  */
 
 #include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 static uint8 reg[16], IRQa;
 static uint32 IRQCount;
@@ -107,3 +108,13 @@ void Mapper106_Init(CartInfo *info) {
 
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+// v1.8 Phase F: MapperEntryRegister.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper106Register{
+    MapperEntry{106, "SMB3 PIRATE A", &Mapper106_Init,
+        [](Bus& bus) { return std::make_unique<Mapper106Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

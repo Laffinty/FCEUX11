@@ -19,6 +19,7 @@
  */
 
 #include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 static uint8 reg0, reg1, reg2;
 static uint8 *WRAM = NULL;
@@ -111,3 +112,13 @@ void Mapper103_Init(CartInfo *info) {
 
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+// v1.8 Phase F: MapperEntryRegister.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper103Register{
+    MapperEntry{103, "FDS DOKIDOKI FULL", &Mapper103_Init,
+        [](Bus& bus) { return std::make_unique<Mapper103Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11
