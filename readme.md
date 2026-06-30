@@ -92,28 +92,29 @@ Precompiled binaries are available on the **[GitHub Releases](https://github.com
 
 详见 [CHANGELOG.md](CHANGELOG.md)。
 
-v1.5（代号 **Prism**）是当前稳定版，v1.x 现代化周期的第五个子版本
+v1.8（代号 **Masonry**）是当前稳定版，v1.x 现代化周期的第八个子版本
 （v1.1 Sentinel → v1.2 Census → v1.3 Legion → v1.4 Gateway → v1.5
-Prism）。本版本将 PPU 寄存器、名称表 RAM、渲染状态封装为
-`fceu11::Ppu` 类，解除 Bus → PPU 的硬耦合（Bank-switching 改走
-`ppu_->method()` 调用），并新增像素级视觉帧对比测试作为渲染行为
-不变性的硬指标（0 像素差异）。详细 Release Notes 见
+Prism → v1.6 Resonance → v1.7 Cartograph → v1.8 Masonry）。本版本将
+174 个 Mapper 板文件批量迁移为 `fceu11::Mapper` 子类并采用
+`MapperEntry` 自动注册机制（替代 `BMAPPINGLocal bmap[]`），引入
+`Cart::save_mapper_state()` 支持字节级 Mapper 状态回归测试，新增
+`Mmc3BaseCart` 共享基类统一 23 种 MMC3 变体，并完成 VRC7/MMC5/N106/
+Sunsoft5B 的 `ExpansionAudio` 子类化。详细 Release Notes 见
 [CHANGELOG.md](CHANGELOG.md) 与
 [`docs/v1.x_Modernization_Roadmap.md`](docs/v1.x_Modernization_Roadmap.md)。
 编译指南见 [`docs/BuildGuide.md`](docs/BuildGuide.md)。
 
 See [CHANGELOG.md](CHANGELOG.md) for version history.
 
-v1.5 (codename **Prism**) is the current stable release — the fifth
+v1.8 (codename **Masonry**) is the current stable release — the eighth
 sub-version of the v1.x modernization cycle (v1.1 Sentinel → v1.2
-Census → v1.3 Legion → v1.4 Gateway → v1.5 Prism). This release
-introduces `fceu11::Ppu` as the single owner of the PPU register file,
-name-table RAM, pointer table, and rendering scratch state, decouples
-Bus → PPU so bank-switching routes through `ppu_->method()` calls, and
-adds a byte-exact visual frame-diff regression test (0-pixel diff
-hard gate on 5 ROMs). The v1.0 PPU layout is preserved via
-`extern` reference-to-storage aliases, so the migration is
-source-compatible for all 50+ call sites. Full release notes:
+Census → v1.3 Legion → v1.4 Gateway → v1.5 Prism → v1.6 Resonance →
+v1.7 Cartograph → v1.8 Masonry). This release batch-migrates 174 board
+files to `fceu11::Mapper` subclasses with `MapperEntry` auto-registration
+(replacing `BMAPPINGLocal bmap[]`), introduces `Cart::save_mapper_state()`
+for byte-level mapper state regression testing, adds `Mmc3BaseCart` as a
+shared base for 23 MMC3 variant mappers, and completes `ExpansionAudio`
+subclassing for VRC7/MMC5/N106/Sunsoft5B. Full release notes:
 [CHANGELOG.md](CHANGELOG.md) and
 [`docs/v1.x_Modernization_Roadmap.md`](docs/v1.x_Modernization_Roadmap.md).
 Build guide: [`docs/BuildGuide.md`](docs/BuildGuide.md).
