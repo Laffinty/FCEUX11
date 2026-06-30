@@ -18,7 +18,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "../ppu.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 static uint8 prgreg[4], chrreg[8], mirror;
 static uint8 IRQa, IRQCount, IRQLatch;
@@ -89,3 +91,12 @@ void Mapper117_Init(CartInfo *info) {
 	AddExState(&StateRegs, ~0, 0, 0);
 }
 
+// v1.8 Phase F: MapperEntryRegister.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper117Register{
+    MapperEntry{117, "FUTURE MEDIA BOARD", &Mapper117_Init,
+        [](Bus& bus) { return std::make_unique<Mapper117Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

@@ -39,7 +39,7 @@
  * 
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static uint8 latch_out, latch_in;
 

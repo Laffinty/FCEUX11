@@ -20,7 +20,8 @@
  * Lethal Weapon (VRC4 mapper)
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "../ppu.h"
 
 static uint8 prg0, prg1, mirr, swap;
 static uint8 chr[8];

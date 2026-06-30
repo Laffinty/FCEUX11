@@ -18,8 +18,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_mmc3.h"
 #include "mmc3.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 static void M187CW(uint32 A, uint8 V) {
 	if ((A & 0x1000) == static_cast<uint32>((MMC3_cmd & 0x80) << 5))
@@ -82,3 +83,13 @@ void Mapper187_Init(CartInfo *info) {
 	info->Power = M187Power;
 	AddExState(EXPREGS, 3, 0, "EXPR");
 }
+
+// v1.8 Phase F incremental.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper187Register{
+    MapperEntry{187, "", &Mapper187_Init,
+        [](Bus& bus) { return std::make_unique<Mapper187Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

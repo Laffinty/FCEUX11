@@ -195,6 +195,7 @@ set(SRC_CORE
 	${CMAKE_CURRENT_SOURCE_DIR}/asm.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/bus.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/cart.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/cart_class.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/cheat.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/conddebug.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/config.cpp
@@ -218,6 +219,8 @@ set(SRC_CORE
   	${CMAKE_CURRENT_SOURCE_DIR}/profiler.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/ppu.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/ppu_class.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/apu.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/expansion_audio.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/sound.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/state.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/unif.cpp
@@ -372,9 +375,12 @@ set(SRC_BOARDS
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/mmc1.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/mmc2and4.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/mmc3.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/boards/mmc3_base_cart.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/mmc5.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/n106.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/n625092.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/boards/registry.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/boards/_cart_helpers.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/novel.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/onebus.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/pec-586.cpp

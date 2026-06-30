@@ -42,8 +42,8 @@ void test_wave_buffer_writable(TestContext& ctx) {
     // exist in the address space and accept writes. We don't depend
     // on the value surviving emulation (the engine will overwrite),
     // only on the storage being addressable.
-    extern int32 Wave[2048 + 512];
-    extern int32 WaveFinal[2048 + 512];
+    extern int32 (&Wave)[2048 + 512];
+    extern int32 (&WaveFinal)[2048 + 512];
     int32 orig0 = Wave[0];
     int32 origF = WaveFinal[0];
     Wave[0]      = 0x11223344;

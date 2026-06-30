@@ -18,7 +18,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "../unif.h"
+#include "boards/vrc2and4_carts.h"
+#include "boards/registry.h"
 
 static bool isPirate;
 static uint8 is22, reg1mask, reg2mask;
@@ -237,3 +240,26 @@ void UNLT230_Init(CartInfo *info) {
 	reg2mask = 0x2a;
 	VRC24_Init(info);
 }
+
+namespace fceu11 {
+namespace {
+
+static MapperEntryRegister kVrc21Register{
+    MapperEntry{21, "Konami VRC2", &Mapper21_Init,
+        [](Bus& bus) { return std::make_unique<Vrc2and4_21Cart>(bus); }}
+};
+static MapperEntryRegister kVrc22Register{
+    MapperEntry{22, "Konami VRC2 type B", &Mapper22_Init,
+        [](Bus& bus) { return std::make_unique<Vrc2and4_22Cart>(bus); }}
+};
+static MapperEntryRegister kVrc23Register{
+    MapperEntry{23, "Konami VRC2 type C", &Mapper23_Init,
+        [](Bus& bus) { return std::make_unique<Vrc2and4_23Cart>(bus); }}
+};
+static MapperEntryRegister kVrc25Register{
+    MapperEntry{25, "Konami VRC4", &Mapper25_Init,
+        [](Bus& bus) { return std::make_unique<Vrc2and4_25Cart>(bus); }}
+};
+
+}  // namespace
+}  // namespace fceu11

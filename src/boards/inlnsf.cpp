@@ -18,7 +18,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 static uint8 regs[8];
 
@@ -60,3 +61,13 @@ void Mapper31_Init(CartInfo *info) {
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+// v1.8 Phase F incremental.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper31Register{
+    MapperEntry{31, "infiniteneslives-NSF", &Mapper31_Init,
+        [](Bus& bus) { return std::make_unique<Mapper31Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

@@ -12,7 +12,7 @@ extern int pal_emulation;
 extern int gametype;
 extern int closeFinishedMovie;
 extern bool turbo;
-extern bool swapDuty;
+extern bool& swapDuty;
 extern bool pauseAfterPlayback;
 extern bool suggestReadOnlyReplay;
 extern bool emulatorCycleToggle;

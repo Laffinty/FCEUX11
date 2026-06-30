@@ -24,6 +24,7 @@
 #include "x6502.h"
 #include "fceu.h"
 #include "cart.h"
+#include "apu.h"            // v1.7 Phase E: fceu11::g_apu for install_expansion_audio
 #include "ppu.h"
 
 #include "ines.h"
@@ -811,6 +812,7 @@ int iNESLoad(const char *name, FCEUFILE *fp, int OverwriteVidMode) {
 	}
 
 init_error:
+	fceu11::assign_cart(nullptr);
 	if (ROM) free(ROM);
 	if (VROM) free(VROM);
 	if (trainerpoo) free(trainerpoo);
@@ -837,6 +839,57 @@ init_ok:
 
 	GameInterface = iNESGI;
 	currCartInfo = &iNESCart;
+
+	// v1.7 Phase D: install a concrete Cart subclass when the factory returns
+	// one. Phase D factory returns nullptr, so board-set function pointers
+	// remain in effect. Phase E/F will override the factory for NROM/MMC1/MMC3.
+	if (auto cart = fceu11::create_cart_for_mapper(MapperNo, fceu11::g_bus)) {
+		fceu11::assign_cart(std::move(cart));
+		iNESCart.cart_obj = fceu11::g_cart;
+		iNESCart.Power = CartInfo_PowerForward;
+		iNESCart.Reset = CartInfo_ResetForward;
+		iNESCart.Close = CartInfo_CloseForward;
+	} else {
+		// v1.8 Masonry Phase E.2 step 9.0: clear g_cart_owner so the previous
+		// mapper's Cart object doesn't leak into the new mapper's lifecycle.
+		// Without this, mapper_byte_diff_test would capture stale state from
+		// the previous test's Cart (e.g. colordreams/gnrom/vrc7/mmc5 currently
+		// appear to PASS but actually exercise the prior test's Cart by
+		// accident).  Set cart_obj to the placeholder so CartInfo_*Forward
+		// is a no-op.
+		fceu11::assign_cart(nullptr);
+		iNESCart.cart_obj = nullptr;
+		iNESCart.Power = CartInfo_PowerForward;
+		iNESCart.Reset = CartInfo_ResetForward;
+		iNESCart.Close = CartInfo_CloseForward;
+	}
+
+	// v1.7 Phase E: give the cart a chance to install expansion audio
+	// (v1.6 §11.1 contract). Default Cart::install_expansion_audio() is a
+	// no-op; Vrc6Cart overrides it to register g_vrc6_audio into g_apu. Must
+	// run before PowerNES() so the audio backend is ready for the first
+	// frame's mix.
+	if (currCartInfo && currCartInfo->cart_obj)
+		currCartInfo->cart_obj->install_expansion_audio(fceu11::g_apu);
+
+	// v1.7 Phase C2: sync parsed iNES metadata into the objectized Cart.
+	// Cart setters dual-write back to currCartInfo, so CartInfo fields stay
+	// populated for the 168 un-migrated board files.
+	if (fceu11::g_cart) {
+		fceu11::g_cart->set_md5(iNESCart.MD5);
+		fceu11::g_cart->set_crc32(iNESCart.CRC32);
+		fceu11::g_cart->set_mirror(iNESCart.mirror);
+		fceu11::g_cart->set_mirror_as_2bits(iNESCart.mirrorAs2Bits);
+		fceu11::g_cart->set_battery(iNESCart.battery != 0);
+		fceu11::g_cart->set_ines2(iNESCart.ines2 != 0);
+		fceu11::g_cart->set_submapper(iNESCart.submapper);
+		fceu11::g_cart->set_wram_size(iNESCart.wram_size);
+		fceu11::g_cart->set_battery_wram_size(iNESCart.battery_wram_size);
+		fceu11::g_cart->set_vram_size(iNESCart.vram_size);
+		fceu11::g_cart->set_battery_vram_size(iNESCart.battery_vram_size);
+		fceu11::g_cart->set_mapper_number(MapperNo);
+	}
+
 	FCEU_printf("\n");
 
 	// since apparently the iNES format doesn't store this information,

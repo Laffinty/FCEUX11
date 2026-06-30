@@ -21,7 +21,8 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "../ppu.h"
 
 static uint8 IRQCount;
 static uint8 IRQa;

@@ -21,7 +21,7 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_audio.h"
 
 static uint8 is26;
 FCEUX11_MAPPER_HOT static uint8 prg[2], chr[8], mirr;
@@ -45,20 +45,6 @@ static SFORMAT StateRegs[] =
 	{ 0 }
 };
 
-static void(*sfun[3]) (void);
-static uint8 vpsg1[8];
-static uint8 vpsg2[4];
-static int32 cvbc[3];
-static int32 vcount[3];
-static int32 dcount[2];
-
-static SFORMAT SStateRegs[] =
-{
-	{ vpsg1, 8, "PSG1" },
-	{ vpsg2, 4, "PSG2" },
-	{ 0 }
-};
-
 static void Sync(void) {
 	uint8 i;
 	if (is26)
@@ -76,17 +62,317 @@ static void Sync(void) {
 	}
 }
 
+static DECLFW(VRC6Write);
+
+static void VRC6Power(void) {
+	Sync();
+	SetReadHandler(0x6000, 0xFFFF, CartBR);
+	SetWriteHandler(0x6000, 0x7FFF, CartBW);
+	SetWriteHandler(0x8000, 0xFFFF, VRC6Write);
+	FCEU_CheatAddRAM(WRAMSIZE >> 10, 0x6000, WRAM);
+}
+
+static void VRC6IRQHook(int a) {
+	if (IRQa) {
+		if (IRQMode) {
+			CycleCount += a;
+			while (CycleCount > 0) {
+				CycleCount--;
+				IRQCount++;
+				if (IRQCount & 0x100) {
+					X6502_IRQBegin(FCEU_IQEXT);
+					IRQCount = IRQLatch;
+				}
+			}
+		} else {
+			CycleCount += a * 3;
+			while(CycleCount >= 341) {
+				CycleCount -= 341;
+				IRQCount++;
+				if (IRQCount == 0x100) {
+					IRQCount = IRQLatch;
+					X6502_IRQBegin(FCEU_IQEXT);
+				}
+			}
+		}
+	}
+}
+
+static void VRC6Close(void)
+{
+	FCEU11_ExpKill(&GameExpSound);
+	WRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
+	WRAM = nullptr;
+}
+
+static void StateRestore(int version) {
+	Sync();
+}
+
+// ---------------------------------------------------------------------------
+// VRC6 Sound — v1.6 Resonance Phase E: migrated to fceu11::ExpansionAudio.
+// The class owns all VRC6 audio state. A single static instance lives for the
+// process lifetime so AddExState pointers remain valid across game loads.
+// ---------------------------------------------------------------------------
+
+class Vrc6Audio : public fceu11::ExpansionAudio {
+public:
+	Vrc6Audio();
+
+	void fill(int32_t count) override;
+	void hi_fill() override;
+	void hi_sync(int32_t ts) override;
+	void region_changed() override;
+	void kill() override;
+
+	void run_sfun(int index) {
+		if (sfun_[index]) sfun_[index]();
+	}
+
+	// Register arrays are reached directly by the static write handler.
+	uint8 vpsg1_[8];
+	uint8 vpsg2_[4];
+
+public:
+	// Called by the thin free-function wrappers bound to sfun_.
+	void do_sqv(int x);
+	void do_sqv_hq(int x);
+	void do_sawv();
+	void do_sawv_hq();
+
+private:
+
+	void full_reset();
+
+	int32 cvbc_[3];
+	int32 vcount_[3];
+	int32 dcount_[2];
+	void (*sfun_[3])(void);
+
+	// LQ saw-channel persistent state (was function-local static in DoSawV).
+	int32 lq_saw1phaseacc_;
+	uint8 lq_saw_b3_;
+	int32 lq_saw_phaseacc_;
+	uint32 lq_saw_duff_;
+
+	// HQ saw-channel persistent state (was function-local static in DoSawVHQ).
+	uint8 hq_saw_b3_;
+	int32 hq_saw_phaseacc_;
+
+	SFORMAT state_regs_[3];
+	bool state_registered_;
+};
+
+static Vrc6Audio g_vrc6_audio;
+
+static void DoSQV1(void);
+static void DoSQV2(void);
+static void DoSawV(void);
+static void DoSQV1HQ(void);
+static void DoSQV2HQ(void);
+static void DoSawVHQ(void);
+
+Vrc6Audio::Vrc6Audio() : state_registered_(false) {
+	state_regs_[0] = { vpsg1_, 8, "PSG1" };
+	state_regs_[1] = { vpsg2_, 4, "PSG2" };
+	state_regs_[2] = { nullptr, 0, nullptr };
+	full_reset();
+}
+
+void Vrc6Audio::full_reset() {
+	memset(vpsg1_, 0, sizeof(vpsg1_));
+	memset(vpsg2_, 0, sizeof(vpsg2_));
+	memset(cvbc_, 0, sizeof(cvbc_));
+	memset(vcount_, 0, sizeof(vcount_));
+	memset(dcount_, 0, sizeof(dcount_));
+	memset(sfun_, 0, sizeof(sfun_));
+	lq_saw1phaseacc_ = 0;
+	lq_saw_b3_ = 0;
+	lq_saw_phaseacc_ = 0;
+	lq_saw_duff_ = 0;
+	hq_saw_b3_ = 0;
+	hq_saw_phaseacc_ = 0;
+}
+
+void Vrc6Audio::do_sqv(int x) {
+	int32 V;
+	int32 amp = (((vpsg1_[x << 2] & 15) << 8) * 6 / 8) >> 4;
+	int32 start, end;
+
+	start = cvbc_[x];
+	end = (SOUNDTS << 16) / soundtsinc;
+	if (end <= start) return;
+	cvbc_[x] = end;
+
+	if (vpsg1_[(x << 2) | 0x2] & 0x80) {
+		if (vpsg1_[x << 2] & 0x80) {
+			for (V = start; V < end; V++)
+				Wave[V >> 4] += amp;
+		} else {
+			int32 thresh = (vpsg1_[x << 2] >> 4) & 7;
+			int32 freq = ((vpsg1_[(x << 2) | 0x1] | ((vpsg1_[(x << 2) | 0x2] & 15) << 8)) + 1) << 17;
+			for (V = start; V < end; V++) {
+				if (dcount_[x] > thresh)
+					Wave[V >> 4] += amp;
+				vcount_[x] -= nesincsize;
+				while (vcount_[x] <= 0) {
+					vcount_[x] += freq;
+					dcount_[x] = (dcount_[x] + 1) & 15;
+				}
+			}
+		}
+	}
+}
+
+void Vrc6Audio::do_sqv_hq(int x) {
+	int32 V;
+	int32 amp = ((vpsg1_[x << 2] & 15) << 8) * 6 / 8;
+
+	if (vpsg1_[(x << 2) | 0x2] & 0x80) {
+		if (vpsg1_[x << 2] & 0x80) {
+			for (V = cvbc_[x]; V < (int)SOUNDTS; V++)
+				WaveHi[V] += amp;
+		} else {
+			int32 thresh = (vpsg1_[x << 2] >> 4) & 7;
+			for (V = cvbc_[x]; V < (int)SOUNDTS; V++) {
+				if (dcount_[x] > thresh)
+					WaveHi[V] += amp;
+				vcount_[x]--;
+				if (vcount_[x] <= 0) {
+					vcount_[x] = (vpsg1_[(x << 2) | 0x1] | ((vpsg1_[(x << 2) | 0x2] & 15) << 8)) + 1;
+					dcount_[x] = (dcount_[x] + 1) & 15;
+				}
+			}
+		}
+	}
+	cvbc_[x] = SOUNDTS;
+}
+
+void Vrc6Audio::do_sawv() {
+	int V;
+	int32 start, end;
+
+	start = cvbc_[2];
+	end = (SOUNDTS << 16) / soundtsinc;
+	if (end <= start) return;
+	cvbc_[2] = end;
+
+	if (vpsg2_[2] & 0x80) {
+		uint32 freq3 = (vpsg2_[1] + ((vpsg2_[2] & 15) << 8) + 1);
+
+		for (V = start; V < end; V++) {
+			lq_saw1phaseacc_ -= nesincsize;
+			if (lq_saw1phaseacc_ <= 0) {
+				int32 t;
+			 rea:
+				t = freq3;
+				t <<= 18;
+				lq_saw1phaseacc_ += t;
+				lq_saw_phaseacc_ += vpsg2_[0] & 0x3f;
+				lq_saw_b3_++;
+				if (lq_saw_b3_ == 7) {
+					lq_saw_b3_ = 0;
+					lq_saw_phaseacc_ = 0;
+				}
+				if (lq_saw1phaseacc_ <= 0)
+					goto rea;
+				lq_saw_duff_ = (((lq_saw_phaseacc_ >> 3) & 0x1f) << 4) * 6 / 8;
+			}
+			Wave[V >> 4] += lq_saw_duff_;
+		}
+	}
+}
+
+void Vrc6Audio::do_sawv_hq() {
+	int32 V;
+
+	if (vpsg2_[2] & 0x80) {
+		for (V = cvbc_[2]; V < (int)SOUNDTS; V++) {
+			WaveHi[V] += (((hq_saw_phaseacc_ >> 3) & 0x1f) << 8) * 6 / 8;
+			vcount_[2]--;
+			if (vcount_[2] <= 0) {
+				vcount_[2] = (vpsg2_[1] + ((vpsg2_[2] & 15) << 8) + 1) << 1;
+				hq_saw_phaseacc_ += vpsg2_[0] & 0x3f;
+				hq_saw_b3_++;
+				if (hq_saw_b3_ == 7) {
+					hq_saw_b3_ = 0;
+					hq_saw_phaseacc_ = 0;
+				}
+			}
+		}
+	}
+	cvbc_[2] = SOUNDTS;
+}
+
+void Vrc6Audio::fill(int32_t count) {
+	do_sqv(0);
+	do_sqv(1);
+	do_sawv();
+	for (int x = 0; x < 3; x++)
+		cvbc_[x] = count;
+}
+
+void Vrc6Audio::hi_fill() {
+	do_sqv_hq(0);
+	do_sqv_hq(1);
+	do_sawv_hq();
+}
+
+void Vrc6Audio::hi_sync(int32_t ts) {
+	for (int x = 0; x < 3; x++)
+		cvbc_[x] = ts;
+}
+
+void Vrc6Audio::region_changed() {
+	// Preserve register state across region/rate changes, just like the
+	// original VRC6_ESI did; only reset the counters and rebind sfun.
+	memset(cvbc_, 0, sizeof(cvbc_));
+	memset(vcount_, 0, sizeof(vcount_));
+	memset(dcount_, 0, sizeof(dcount_));
+
+	if (FSettings.SndRate) {
+		if (FSettings.soundq >= 1) {
+			sfun_[0] = DoSQV1HQ;
+			sfun_[1] = DoSQV2HQ;
+			sfun_[2] = DoSawVHQ;
+		} else {
+			sfun_[0] = DoSQV1;
+			sfun_[1] = DoSQV2;
+			sfun_[2] = DoSawV;
+		}
+	} else {
+		memset(sfun_, 0, sizeof(sfun_));
+	}
+
+	if (!state_registered_) {
+		AddExState(state_regs_, ~0, 0, 0);
+		state_registered_ = true;
+	}
+}
+
+void Vrc6Audio::kill() {
+	full_reset();
+	GameExpSound.expansion = nullptr;
+}
+
+static void DoSQV1(void) { g_vrc6_audio.do_sqv(0); }
+static void DoSQV2(void) { g_vrc6_audio.do_sqv(1); }
+static void DoSawV(void) { g_vrc6_audio.do_sawv(); }
+static void DoSQV1HQ(void) { g_vrc6_audio.do_sqv_hq(0); }
+static void DoSQV2HQ(void) { g_vrc6_audio.do_sqv_hq(1); }
+static void DoSawVHQ(void) { g_vrc6_audio.do_sawv_hq(); }
+
 static DECLFW(VRC6SW) {
 	A &= 0xF003;
 	if (A >= 0x9000 && A <= 0x9002) {
-		vpsg1[A & 3] = V;
-		if (sfun[0]) sfun[0]();
+		g_vrc6_audio.vpsg1_[A & 3] = V;
+		g_vrc6_audio.run_sfun(0);
 	} else if (A >= 0xA000 && A <= 0xA002) {
-		vpsg1[4 | (A & 3)] = V;
-		if (sfun[1]) sfun[1]();
+		g_vrc6_audio.vpsg1_[4 | (A & 3)] = V;
+		g_vrc6_audio.run_sfun(1);
 	} else if (A >= 0xB000 && A <= 0xB002) {
-		vpsg2[A & 3] = V;
-		if (sfun[2]) sfun[2]();
+		g_vrc6_audio.vpsg2_[A & 3] = V;
+		g_vrc6_audio.run_sfun(2);
 	}
 }
 
@@ -125,237 +411,11 @@ static DECLFW(VRC6Write) {
 	}
 }
 
-static void VRC6Power(void) {
-	Sync();
-	SetReadHandler(0x6000, 0xFFFF, CartBR);
-	SetWriteHandler(0x6000, 0x7FFF, CartBW);
-	SetWriteHandler(0x8000, 0xFFFF, VRC6Write);
-	FCEU_CheatAddRAM(WRAMSIZE >> 10, 0x6000, WRAM);
-}
-
-static void VRC6IRQHook(int a) {
-	if (IRQa) {
-		if (IRQMode) {
-			CycleCount += a;
-			while (CycleCount > 0) {
-				CycleCount--;
-				IRQCount++;
-				if (IRQCount & 0x100) {
-					X6502_IRQBegin(FCEU_IQEXT);
-					IRQCount = IRQLatch;
-				}
-			}
-		} else {
-			CycleCount += a * 3;
-			while(CycleCount >= 341) {
-				CycleCount -= 341;
-				IRQCount++;
-				if (IRQCount == 0x100) {
-					IRQCount = IRQLatch;
-					X6502_IRQBegin(FCEU_IQEXT);
-				}
-			}
-		}
-	}
-}
-
-static void VRC6Close(void)
-{
-	WRAM_owner.reset();  // v0.3.6: RAII owner frees via FCEU_gfree
-	WRAM = nullptr;
-}
-
-static void StateRestore(int version) {
-	Sync();
-}
-
-// VRC6 Sound
-
-static void DoSQV1(void);
-static void DoSQV2(void);
-static void DoSawV(void);
-
-static INLINE void DoSQV(int x) {
-	int32 V;
-	int32 amp = (((vpsg1[x << 2] & 15) << 8) * 6 / 8) >> 4;
-	int32 start, end;
-
-	start = cvbc[x];
-	end = (SOUNDTS << 16) / soundtsinc;
-	if (end <= start) return;
-	cvbc[x] = end;
-
-	if (vpsg1[(x << 2) | 0x2] & 0x80) {
-		if (vpsg1[x << 2] & 0x80) {
-			for (V = start; V < end; V++)
-				Wave[V >> 4] += amp;
-		} else {
-			int32 thresh = (vpsg1[x << 2] >> 4) & 7;
-			int32 freq = ((vpsg1[(x << 2) | 0x1] | ((vpsg1[(x << 2) | 0x2] & 15) << 8)) + 1) << 17;
-			for (V = start; V < end; V++) {
-				if (dcount[x] > thresh)
-					Wave[V >> 4] += amp;
-				vcount[x] -= nesincsize;
-				while (vcount[x] <= 0) {
-					vcount[x] += freq;
-					dcount[x] = (dcount[x] + 1) & 15;
-				}
-			}
-		}
-	}
-}
-
-static void DoSQV1(void) {
-	DoSQV(0);
-}
-
-static void DoSQV2(void) {
-	DoSQV(1);
-}
-
-static void DoSawV(void) {
-	int V;
-	int32 start, end;
-
-	start = cvbc[2];
-	end = (SOUNDTS << 16) / soundtsinc;
-	if (end <= start) return;
-	cvbc[2] = end;
-
-	if (vpsg2[2] & 0x80) {
-		static int32 saw1phaseacc = 0;
-		uint32 freq3;
-		static uint8 b3 = 0;
-		static int32 phaseacc = 0;
-		static uint32 duff = 0;
-
-		freq3 = (vpsg2[1] + ((vpsg2[2] & 15) << 8) + 1);
-
-		for (V = start; V < end; V++) {
-			saw1phaseacc -= nesincsize;
-			if (saw1phaseacc <= 0) {
-				int32 t;
- rea:
-				t = freq3;
-				t <<= 18;
-				saw1phaseacc += t;
-				phaseacc += vpsg2[0] & 0x3f;
-				b3++;
-				if (b3 == 7) {
-					b3 = 0;
-					phaseacc = 0;
-				}
-				if (saw1phaseacc <= 0)
-					goto rea;
-				duff = (((phaseacc >> 3) & 0x1f) << 4) * 6 / 8;
-			}
-			Wave[V >> 4] += duff;
-		}
-	}
-}
-
-static INLINE void DoSQVHQ(int x) {
-	int32 V;
-	int32 amp = ((vpsg1[x << 2] & 15) << 8) * 6 / 8;
-
-	if (vpsg1[(x << 2) | 0x2] & 0x80) {
-		if (vpsg1[x << 2] & 0x80) {
-			for (V = cvbc[x]; V < (int)SOUNDTS; V++)
-				WaveHi[V] += amp;
-		} else {
-			int32 thresh = (vpsg1[x << 2] >> 4) & 7;
-			for (V = cvbc[x]; V < (int)SOUNDTS; V++) {
-				if (dcount[x] > thresh)
-					WaveHi[V] += amp;
-				vcount[x]--;
-				if (vcount[x] <= 0) {
-					vcount[x] = (vpsg1[(x << 2) | 0x1] | ((vpsg1[(x << 2) | 0x2] & 15) << 8)) + 1;
-					dcount[x] = (dcount[x] + 1) & 15;
-				}
-			}
-		}
-	}
-	cvbc[x] = SOUNDTS;
-}
-
-static void DoSQV1HQ(void) {
-	DoSQVHQ(0);
-}
-
-static void DoSQV2HQ(void) {
-	DoSQVHQ(1);
-}
-
-static void DoSawVHQ(void) {
-	static uint8 b3 = 0;
-	static int32 phaseacc = 0;
-	int32 V;
-
-	if (vpsg2[2] & 0x80) {
-		for (V = cvbc[2]; V < (int)SOUNDTS; V++) {
-			WaveHi[V] += (((phaseacc >> 3) & 0x1f) << 8) * 6 / 8;
-			vcount[2]--;
-			if (vcount[2] <= 0) {
-				vcount[2] = (vpsg2[1] + ((vpsg2[2] & 15) << 8) + 1) << 1;
-				phaseacc += vpsg2[0] & 0x3f;
-				b3++;
-				if (b3 == 7) {
-					b3 = 0;
-					phaseacc = 0;
-				}
-			}
-		}
-	}
-	cvbc[2] = SOUNDTS;
-}
-
-
-void VRC6Sound(int Count) {
-	int x;
-
-	DoSQV1();
-	DoSQV2();
-	DoSawV();
-	for (x = 0; x < 3; x++)
-		cvbc[x] = Count;
-}
-
-void VRC6SoundHQ(void) {
-	DoSQV1HQ();
-	DoSQV2HQ();
-	DoSawVHQ();
-}
-
-void VRC6SyncHQ(int32 ts) {
-	int x;
-	for (x = 0; x < 3; x++) cvbc[x] = ts;
-}
-
 static void VRC6_ESI(void) {
-	GameExpSound.RChange = VRC6_ESI;
-	GameExpSound.Fill = VRC6Sound;
-	GameExpSound.HiFill = VRC6SoundHQ;
-	GameExpSound.HiSync = VRC6SyncHQ;
-
-	memset(cvbc, 0, sizeof(cvbc));
-	memset(vcount, 0, sizeof(vcount));
-	memset(dcount, 0, sizeof(dcount));
-	if (FSettings.SndRate) {
-		if (FSettings.soundq >= 1) {
-			sfun[0] = DoSQV1HQ;
-			sfun[1] = DoSQV2HQ;
-			sfun[2] = DoSawVHQ;
-		} else {
-			sfun[0] = DoSQV1;
-			sfun[1] = DoSQV2;
-			sfun[2] = DoSawV;
-		}
-	} else
-		memset(sfun, 0, sizeof(sfun));
-	AddExState(&SStateRegs, ~0, 0, 0);
+	memset(&GameExpSound, 0, sizeof(GameExpSound));
+	GameExpSound.expansion = &g_vrc6_audio;
+	g_vrc6_audio.region_changed();
 }
-
-// VRC6 Sound
 
 void Mapper24_Init(CartInfo *info) {
 	is26 = 0;
@@ -390,3 +450,106 @@ void NSFVRC6_Init(void) {
 	VRC6_ESI();
 	SetWriteHandler(0x8000, 0xbfff, VRC6SW);
 }
+
+// ---------------------------------------------------------------------------
+// v1.7 Phase E: Vrc6Cart subclass (Strategy A).
+//
+// Definitions live in vrc6.cpp because they need access to the static
+// `g_vrc6_audio` instance, `is26` flag, and the Mapper24_Init / Mapper26_Init
+// bodies. The cart subclass only owns the *call sequence* (Power ->
+// cart_obj->on_power -> Mapper24_Init / Mapper26_Init -> info->Power =
+// VRC6Power + IRQ hook + VRC6_ESI), not the cart wiring logic itself.
+// ---------------------------------------------------------------------------
+
+#include "boards/vrc6_cart.h"
+#include "boards/registry.h"
+
+namespace fceu11 {
+
+void Vrc6Cart::on_power() noexcept {
+	// Mapper24_Init / Mapper26_Init was already called once during
+	// iNES_Init (step 1). Calling it again would duplicate the SFORMAT
+	// entries (StateRegs, and for mapper 26 also WRAM). Instead, fire
+	// the VRC6Power function pointer that the Init set up. At this point
+	// info->Power has been redirected by the v1.7 factory block to
+	// CartInfo_PowerForward, so we temporarily swap in the legacy
+	// VRC6Power pointer, invoke it, then restore the forwarding function
+	// pointer so subsequent PowerNES calls also route through
+	// cart_obj->on_power.
+	if (!currCartInfo) return;
+	void (*saved)(void) = currCartInfo->Power;
+	currCartInfo->Power = VRC6Power;
+	currCartInfo->Power();
+	currCartInfo->Power = saved;
+}
+
+void Vrc6Cart::on_close() noexcept {
+	// Mapper24 / Mapper26_Init set g_cpu.map_irq_hook_ref() = VRC6IRQHook.
+	// On game close, drop the hook so a subsequent load of a non-VRC6 ROM
+	// does not receive stale IRQ callbacks.
+	g_cpu.map_irq_hook_ref() = nullptr;
+}
+
+void Vrc6Cart::install_expansion_audio(fceu11::Apu& apu) noexcept {
+	// v1.6 §11.1 contract: cart subclass installs the EXPSOUND adapter into
+	// the global APU. We reuse the same logic as VRC6_ESI() but route through
+	// the APU's set_exp_sound() entry point instead of touching the global
+	// GameExpSound directly. The Fill / NeoFill / HiFill / HiSync / RChange
+	// function pointers are still populated by VRC6_ESI; only the
+	// ExpansionAudio backend pointer is duplicated here so the APU's view is
+	// in sync with GameExpSound's view.
+	EXPSOUND es = apu.exp_sound();
+	es.expansion = &g_vrc6_audio;
+	apu.set_exp_sound(es);
+	g_vrc6_audio.region_changed();
+}
+
+// v1.8 Masonry §6.1: Vrc6Cart::save_mapper_state() — capture VRC6 bank
+// registers, mirror, IRQ state.  The state lives in vrc6.cpp's file-scope
+// globals (prg[2] / chr[8] / mirr / IRQLatch / IRQa / IRQd / IRQMode /
+// IRQCount / is26) so the override is placed in the same TU.  Layout
+// mirrors the StateRegs[] SFORMAT declaration (line 34).
+std::vector<uint8_t> Vrc6Cart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out;
+	out.reserve(32);
+	pack_u8_array(out, prg, 2);          // 2 PRG bank registers
+	pack_u8_array(out, chr, 8);          // 8 CHR bank registers
+	pack_u8(out, mirr);
+	pack_u8(out, IRQa);
+	pack_u8(out, IRQd);
+	pack_u8(out, IRQLatch);
+	pack_u8_array(out, reinterpret_cast<const uint8_t*>(&IRQCount), 4);
+	pack_u8_array(out, reinterpret_cast<const uint8_t*>(&CycleCount), 4);
+	pack_u8(out, IRQMode);
+	pack_u8(out, is26);
+	pack_u32(out, WRAMSIZE);
+	return out;  // 30 bytes
+}
+
+namespace {
+
+// v1.8 Masonry §2: MapperEntryRegister for VRC6 — separate entries for the
+// two iNES mapper numbers (24, 26) that share Vrc6Cart.  Each factory
+// captures its mapper number so Vrc6Cart's on_power() can dispatch to the
+// matching Mapper24_Init / Mapper26_Init body.
+static MapperEntryRegister kVrc6Register24{
+    MapperEntry{
+        /*mapper_number=*/24,
+        /*name=*/"VRC6",
+        /*legacy_init=*/&Mapper24_Init,
+        /*factory=*/[](Bus& bus) { return std::make_unique<Vrc6Cart>(bus, 24); }
+    }
+};
+
+static MapperEntryRegister kVrc6Register26{
+    MapperEntry{
+        /*mapper_number=*/26,
+        /*name=*/"VRC6",
+        /*legacy_init=*/&Mapper26_Init,
+        /*factory=*/[](Bus& bus) { return std::make_unique<Vrc6Cart>(bus, 26); }
+    }
+};
+
+}  // namespace
+
+} // namespace fceu11

@@ -19,7 +19,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase E.2 step 9.1: Mapper105Cart
 
 static void GenMMC1Power(void);
 static void GenMMC1Init(CartInfo *info, int prg, int chr, int wram, int bram);
@@ -403,3 +404,78 @@ void SNROM_Init(CartInfo *info) {
 void SOROM_Init(CartInfo *info) {
 	GenMMC1Init(info, 256, 0, 16, info->battery ? 8 : 0);
 }
+
+// ---------------------------------------------------------------------------
+// v1.7 Phase F: Mmc1Cart subclass (Strategy A).
+//
+// Definitions live in mmc1.cpp because they need access to the static
+// GenMMC1Power() and MMC1CMReset() helpers. The cart subclass only owns
+// the *call sequence* (Power -> cart_obj->on_power -> GenMMC1Power; Reset ->
+// cart_obj->on_reset -> MMC1CMReset), not the cart wiring logic itself.
+// ---------------------------------------------------------------------------
+
+#include "boards/mmc1_cart.h"
+#include "boards/registry.h"
+
+namespace fceu11 {
+
+void Mmc1Cart::on_power() noexcept {
+	// Mapper1_Init (called during iNES_Init) invokes GenMMC1Init which sets
+	// info->Power = GenMMC1Power. The v1.7 factory block then redirects
+	// info->Power to CartInfo_PowerForward. To fire the actual MMC1 power
+	// routine, temporarily swap in the legacy GenMMC1Power pointer, invoke
+	// it, then restore the forwarding function pointer so subsequent
+	// PowerNES calls also route through cart_obj->on_power.
+	if (!currCartInfo) return;
+	void (*saved)(void) = currCartInfo->Power;
+	currCartInfo->Power = GenMMC1Power;
+	currCartInfo->Power();
+	currCartInfo->Power = saved;
+}
+
+void Mmc1Cart::on_reset() noexcept {
+	// GenMMC1Init does NOT set info->Reset (MMC1 historically relied on the
+	// full Power cycle to restore registers), so the v1.7 factory leaves
+	// info->Reset pointing at CartInfo_ResetForward. Our on_reset does the
+	// actual reset work: zero the shift register / buffer / four data regs,
+	// then re-sync mirroring, CHR, and PRG banking.
+	MMC1CMReset();
+}
+
+// v1.8 Masonry §6.1: Mmc1Cart::save_mapper_state() — capture MMC1 register
+// file for byte-diff regression.  The state lives in mmc1.cpp's file-scope
+// globals (DRegs[4] / Buffer / BufferShift / WRAMSIZE / is155 / is171) so
+// the override is placed in the same TU.  8 bytes total.
+std::vector<uint8_t> Mmc1Cart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out;
+	out.reserve(8);
+	pack_u8_array(out, DRegs, 4);    // 4 data registers (control, CHR0, CHR1, PRG)
+	pack_u8(out, Buffer);
+	pack_u8(out, BufferShift);
+	pack_u8(out, is155 ? 1 : 0);
+	pack_u8(out, is171 ? 1 : 0);
+	return out;  // 8 bytes
+}
+
+namespace {
+
+// v1.8 Masonry §2: MapperEntryRegister for MMC1 (mapper 1).
+static MapperEntryRegister kMmc1Register{
+    MapperEntry{
+        /*mapper_number=*/1,
+        /*name=*/"MMC1",
+        /*legacy_init=*/&Mapper1_Init,
+        /*factory=*/[](Bus& bus) { return std::make_unique<Mmc1Cart>(bus); }
+    }
+};
+
+// v1.8 Masonry Phase E.2 step 9.2: NES-EVENT NWC1990 (mapper 105) is
+// MMC1-based; Cart subclass uses MapperStrategyA default (16-byte body).
+static MapperEntryRegister kMapper105Register{
+    MapperEntry{105, "NES-EVENT NWC1990", &Mapper105_Init,
+        [](Bus& bus) { return std::make_unique<Mapper105Cart>(bus); }}
+};
+
+}  // namespace
+
+} // namespace fceu11

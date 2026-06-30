@@ -19,7 +19,8 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 static uint8 *DummyCHR = NULL;
 static FceuMallocPtr DummyCHR_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
@@ -107,3 +108,17 @@ void Mapper181_Init(CartInfo *info) {
 	SetupCartCHRMapping(0x10, DummyCHR, 8192, 0);
 	AddExState(StateRegs, ~0, 0, 0);
 }
+
+// v1.8 Phase F incremental.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper181Register{
+    MapperEntry{181, "", &Mapper181_Init,
+        [](Bus& bus) { return std::make_unique<Mapper181Cart>(bus); }}
+};
+static MapperEntryRegister kMapper185Register{
+    MapperEntry{185, "", &Mapper185_Init,
+        [](Bus& bus) { return std::make_unique<Mapper185Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

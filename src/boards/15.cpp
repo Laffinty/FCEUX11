@@ -19,7 +19,7 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static uint16 latchea;
 static uint8 latched;
@@ -115,3 +115,13 @@ void Mapper15_Init(CartInfo *info) {
 	AddExState(&StateRegs, ~0, 0, 0);
 }
 
+
+#include "simple_carts.h"
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper15Register{
+    MapperEntry{15, "100-in-1", &Mapper15_Init,
+        [](Bus& bus) { return std::make_unique<Mapper15Cart>(bus); }}
+};
+}  // namespace
+} // namespace fceu11

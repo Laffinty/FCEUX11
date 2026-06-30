@@ -18,7 +18,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase E.2 step 9.3
 
 static uint8 latche;
 
@@ -74,3 +75,13 @@ void Mapper77_Init(CartInfo *info) {
 
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+// v1.8 Masonry Phase E.2 step 9.3: MapperEntryRegister for mapper 77 (IREM LROG017).
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper77Register{
+    MapperEntry{77, "IREM LROG017", &Mapper77_Init,
+        [](Bus& bus) { return std::make_unique<Mapper77Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

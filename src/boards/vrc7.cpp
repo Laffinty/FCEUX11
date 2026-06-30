@@ -18,7 +18,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_audio.h"
+#include "simple_carts.h"          // v1.8 Phase E.2 step 9.1: Vrc7Cart
+#include "legacy_expansion_audio.h"  // v1.8 Phase G
 
 static uint8 vrc7idx;
 FCEUX11_MAPPER_HOT static uint8 preg[3], creg[8];
@@ -219,3 +221,24 @@ void NSFVRC7_Init(void) {
 	SetWriteHandler(0x9030, 0x903F, VRC7Write);
 	VRC7_ESI();
 }
+
+// v1.8 Masonry Phase E.2 step 9.1: VRC7 (mapper 85) Cart subclass
+// registration.  Vrc7Cart inherits MapperStrategyA (16-byte default body);
+// per-board state (preg/creg/IRQ registers, OPLL audio) lands in Phase E.2
+// step 11 alongside install_expansion_audio().
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kVrc7Register{
+    MapperEntry{85, "Konami VRC7", &Mapper85_Init,
+        [](Bus& bus) { return std::make_unique<Vrc7Cart>(bus); }}
+};
+}  // namespace
+
+// v1.8 Phase G: Vrc7Cart::install_expansion_audio.
+void Vrc7Cart::install_expansion_audio(Apu& apu) noexcept {
+    EXPSOUND es = apu.exp_sound();
+    es.expansion = &g_vrc7_expansion_audio;
+    apu.set_exp_sound(es);
+}
+
+}  // namespace fceu11

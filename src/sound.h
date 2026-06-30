@@ -21,35 +21,23 @@
 #ifndef _SOUND_H_
 #define _SOUND_H_
 
-typedef struct {
-	   void (*Fill)(int Count);	/* Low quality ext sound. */
+#include "apu.h"           // v1.6 Resonance: Apu class + v1.0 reference aliases
+#include "expansion_audio.h" // v1.6 Resonance: EXPSOUND + ExpansionAudio
 
-	   /* NeoFill is for sound devices that are emulated in a more
-	      high-level manner(VRC7) in HQ mode.  Interestingly,
-	      this device has slightly better sound quality(updated more
-	      often) in lq mode than in high-quality mode.  Maybe that
-     	      should be fixed. :)
-	   */
-           void (*NeoFill)(int32 *Wave, int Count);
-	   void (*HiFill)(void);
-	   void (*HiSync)(int32 ts);
+extern EXPSOUND& GameExpSound;
 
-	   void (*RChange)(void);
-	   void (*Kill)(void);
-} EXPSOUND;
-
-extern EXPSOUND GameExpSound;
-
-extern int32 nesincsize;
+// ---- Phase C1 aliases: resampling / timing ----
+extern int32_t& nesincsize;
 
 void SetSoundVariables(void);
 
 int GetSoundBuffer(int32 **W);
 int FlushEmulateSound(void);
-extern int32 Wave[2048+512];
-extern int32 WaveFinal[2048+512];
-extern int32 WaveHi[];
-extern uint32 soundtsinc;
+extern int32_t (&Wave)[2048+512];
+extern int32_t (&WaveFinal)[2048+512];
+extern int32_t (&WaveHi)[40000];
+extern uint32_t& soundtsinc;
+extern uint32_t& soundtsi;
 
 #ifdef WIN32
 extern volatile int datacount, undefinedcount;
@@ -57,9 +45,52 @@ extern int debug_loggingCD;
 extern unsigned char *cdloggerdata;
 #endif
 
-extern uint32 soundtsoffs;
-extern bool swapDuty;
+extern uint32_t& soundtsoffs;
+extern bool& swapDuty;
 #define SOUNDTS (g_cpu.sound_timestamp_ref() + soundtsoffs)
+
+// ---- Phase C2 aliases: channel registers / envelope / length ----
+extern uint8_t   (& PSG            )[0x10];
+extern ENVUNIT   (& EnvUnits       )[3];
+extern uint8_t&    EnabledChannels;
+extern uint8_t&    IRQFrameMode;
+extern uint16_t&   nreg;
+extern uint8_t&    TriCount;
+extern uint8_t&    TriMode;
+extern int32_t&    tristep;
+extern int32_t   (& wlcount        )[4];
+extern int32_t   (& lengthcount    )[4];
+
+// ---- Phase C2 aliases: square waves ----
+extern int32_t   (& RectDutyCount  )[2];
+extern uint8_t   (& sweepon         )[2];
+extern int32_t   (& curfreq         )[2];
+extern uint8_t   (& SweepCount      )[2];
+extern uint8_t   (& SweepReload     )[2];
+extern int32_t   (& sqacc           )[2];
+
+// ---- Phase C2 aliases: frame counter ----
+extern uint8_t&    fcnt;
+extern int32_t&    fhcnt;
+extern int32_t&    fhinc;
+
+// ---- Phase C2 aliases: DMC ----
+extern uint8_t&    DMCFormat;
+extern uint8_t&    RawDALatch;
+extern uint8_t&    InitialRawDALatch;
+extern bool&       DMC_7bit;
+extern int32_t&    DMCacc;
+extern int32_t&    DMCPeriod;
+extern uint8_t&    DMCBitCount;
+extern uint32_t&   DMCAddress;
+extern uint8_t&    DMCAddressLatch;
+extern int32_t&    DMCSize;
+extern uint8_t&    DMCSizeLatch;
+extern uint8_t&    DMCShift;
+extern char&       DMCHaveDMA;
+extern char&       DMCHaveSample;
+extern uint8_t&    DMCDMABuf;
+extern uint8_t&    SIRQStat;
 
 void SetNESSoundMap(void);
 void FrameSoundUpdate(void);
@@ -73,13 +104,5 @@ void FCEU_SoundCPUHook(int);
 void Write_IRQFM (uint32 A, uint8 V); //mbg merge 7/17/06 brought over from latest mmbuild
 
 void LogDPCM(int romaddress, int dpcmsize);
-
-typedef struct {
-	uint8 Speed;
-	uint8 Mode;	/* Fixed volume(1), and loop(2) */
-	uint8 DecCountTo1;
-	uint8 decvolume;
-	int reloaddec;
-} ENVUNIT;
 
 #endif

@@ -483,18 +483,7 @@ void TaseditorDisableManualFunctionIfNeeded() {
 
 // C++ forward declarations needed by FFI bridge functions
 // (must be outside extern "C" to get C++ name mangling)
-extern ENVUNIT EnvUnits[3];
 extern int CheckFreq(uint32 cf, uint8 sr);
-extern int32 curfreq[2];
-extern uint8 PSG[0x10];
-extern int32 lengthcount[4];
-extern uint8 TriCount;
-extern char DMCHaveSample;
-extern int32 DMCPeriod;
-extern uint8 DMCFormat;
-extern uint8 DMCAddressLatch;
-extern uint8 DMCSizeLatch;
-extern uint8 InitialRawDALatch;
 extern const uint32 NoiseFreqTableNTSC[0x10];
 extern const uint32 NoiseFreqTablePAL[0x10];
 extern uint64 timestampbase;

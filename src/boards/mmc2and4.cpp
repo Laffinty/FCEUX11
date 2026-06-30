@@ -20,7 +20,8 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "../ppu.h"
 
 static uint8 is10;
 static uint8 creg[4], latch0, latch1, preg, mirr;
@@ -136,3 +137,17 @@ void Mapper10_Init(CartInfo *info) {
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+#include "simple_carts.h"
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMmc2Register{
+    MapperEntry{9, "MMC2", &Mapper9_Init,
+        [](Bus& bus) { return std::make_unique<Mmc2Cart>(bus); }}
+};
+static MapperEntryRegister kMmc4Register{
+    MapperEntry{10, "MMC4", &Mapper10_Init,
+        [](Bus& bus) { return std::make_unique<Mmc4Cart>(bus); }}
+};
+}  // namespace
+} // namespace fceu11

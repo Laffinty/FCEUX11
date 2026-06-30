@@ -24,6 +24,7 @@
 #include "fceu.h"
 #include "bus.h"      // v1.4 Post-Release Optimization Plan §1.1: g_bus.init()
 #include "ppu.h"
+#include "apu.h"
 #include "sound.h"
 #include "netplay.h"
 #include "file.h"
@@ -32,6 +33,7 @@
 #include "utils/crc32.h"
 
 #include "cart.h"
+#include "cart_class.h"   // v1.7 Cartograph: fceu11::g_cart
 #include "nsf.h"
 #include "fds.h"
 #include "ines.h"
@@ -416,8 +418,7 @@ void ResetGameLoaded(void) {
 	GameHBIRQHook = NULL;
 	FFCEUX_PPURead = NULL;
 	FFCEUX_PPUWrite = NULL;
-	if (GameExpSound.Kill)
-		GameExpSound.Kill();
+	FCEU11_ExpKill(&GameExpSound);
 	memset(&GameExpSound, 0, sizeof(GameExpSound));
 	g_cpu.map_irq_hook_ref() = nullptr;
 	MMC5Hack = 0;
@@ -665,6 +666,10 @@ bool fceu11::Initialize() {
 
 	g_cpu.init();
 
+	// v1.6 Resonance §10.2: instantiate APU scaffolding.
+	// Phase B: no-op; Phase C will migrate APU state from sound.cpp.
+	fceu11::g_apu.init();
+
 	// v1.5 Prism §3.2: wire Bus → Ppu back-pointer so Bank-switching
 	// (setchr* / setmirror* / setntamem) can route through
 	// ppu_->method() instead of touching v1.0 globals directly.
@@ -673,6 +678,10 @@ bool fceu11::Initialize() {
 	// BEFORE PowerNES runs. The Bus needs ppu_ set up by the time
 	// any board/mapper setup code can call into it.
 	fceu11::g_bus.attach_ppu(&fceu11::g_ppu);
+
+	// v1.7 Cartograph §10.2: wire Cart → Bus back-pointer. Phase B uses
+	// a no-op placeholder cart so this is safe before any ROM is loaded.
+	fceu11::g_cart->attach_bus(fceu11::g_bus);
 
 	return true;
 }
@@ -949,6 +958,7 @@ void ResetNES(void) {
 	FCEUMOV_AddCommand(FCEUNPCMD_RESET);
 	if (!GameInfo) return;
 	GameInterface(GI_RESETM2);
+	fceu11::g_apu.reset();
 	FCEUSND_Reset();
 	FCEUPPU_Reset();
 	g_cpu.reset();
@@ -1062,6 +1072,9 @@ void PowerNES(void) {
 	FCEU_GeniePower();
 
 	FCEU_MemoryRand(RAM, 0x800);
+
+	// v1.6 Resonance §10.2: APU power scaffolding (no-op in Phase B).
+	fceu11::g_apu.power();
 
 	// v1.4 Post-Release Optimization Plan §1.1: replace the legacy
 	// SetReadHandler/SetWriteHandler "fill the whole 64K with ANull/BNull"

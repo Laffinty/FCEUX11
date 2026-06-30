@@ -21,7 +21,8 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 static uint8 reg[8];
 static uint8 mirror, cmd, bank;
@@ -89,3 +90,13 @@ void Mapper112_Init(CartInfo *info) {
 	AddExState(WRAM, 8192, 0, "WRAM");
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+// v1.8 Phase F: MapperEntryRegister.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper112Register{
+    MapperEntry{112, "ASDER/NTDEC BOARD", &Mapper112_Init,
+        [](Bus& bus) { return std::make_unique<Mapper112Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

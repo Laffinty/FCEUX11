@@ -22,7 +22,9 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "boards/smb2j_carts.h"
+#include "boards/registry.h"
 
 static uint8 reg;
 static uint32 IRQCount, IRQa;
@@ -83,3 +85,12 @@ void Mapper50_Init(CartInfo *info) {
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper50Register{
+    MapperEntry{50, "SMB2j FDS 50", &Mapper50_Init,
+        [](Bus& bus) { return std::make_unique<Mapper50Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

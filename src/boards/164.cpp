@@ -22,7 +22,9 @@
  * carts
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "../ppu.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 static uint8 laststrobe, trigger;
 static uint8 reg[8];
@@ -230,3 +232,21 @@ void UNLFS304_Init(CartInfo *info) {
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+// v1.8 Phase F incremental.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper162Register{
+    MapperEntry{162, "", &UNLFS304_Init,
+        [](Bus& bus) { return std::make_unique<Mapper162Cart>(bus); }}
+};
+static MapperEntryRegister kMapper163Register{
+    MapperEntry{163, "", &Mapper163_Init,
+        [](Bus& bus) { return std::make_unique<Mapper163Cart>(bus); }}
+};
+static MapperEntryRegister kMapper164Register{
+    MapperEntry{164, "", &Mapper164_Init,
+        [](Bus& bus) { return std::make_unique<Mapper164Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

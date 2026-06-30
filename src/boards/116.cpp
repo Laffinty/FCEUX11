@@ -33,7 +33,8 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "../ppu.h"
 
 static uint8 mode;
 static uint8 vrc2_chr[8], vrc2_prg[2], vrc2_mirr;

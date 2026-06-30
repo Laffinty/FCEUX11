@@ -26,6 +26,7 @@
 #include "utils/safe_string.h"
 #include "fceu.h"
 #include "cart.h"
+#include "apu.h"            // v1.7 Phase E: fceu11::g_apu for install_expansion_audio
 #include "unif.h"
 #include "ines.h"
 #include "utils/endian.h"
@@ -621,6 +622,7 @@ int UNIFLoad(const char *name, FCEUFILE *fp) {
 	}
 	FreeUNIF();
 	ResetUNIF();
+	fceu11::assign_cart(nullptr);
 	return LOADER_HANDLED_ERROR;
 
 init_ok:
@@ -629,5 +631,39 @@ init_ok:
 	FCEU_strlcpy(LoadedRomFName, sizeof(LoadedRomFName), name); //For the debugger list
 	GameInterface = UNIFGI;
 	currCartInfo = &UNIFCart;
+
+	// v1.7 Phase D: install a concrete Cart subclass when the factory returns
+	// one. UNIF uses board names rather than iNES mapper numbers, so pass 0
+	// for now; the Phase D factory ignores the number anyway.
+	if (auto cart = fceu11::create_cart_for_mapper(0, fceu11::g_bus)) {
+		fceu11::assign_cart(std::move(cart));
+		UNIFCart.cart_obj = fceu11::g_cart;
+		UNIFCart.Power = CartInfo_PowerForward;
+		UNIFCart.Reset = CartInfo_ResetForward;
+		UNIFCart.Close = CartInfo_CloseForward;
+	}
+
+	// v1.7 Phase E: give the cart a chance to install expansion audio
+	// (v1.6 §11.1 contract). Must run before PowerNES() so the audio backend
+	// is ready for the first frame's mix.
+	if (currCartInfo && currCartInfo->cart_obj)
+		currCartInfo->cart_obj->install_expansion_audio(fceu11::g_apu);
+
+	// v1.7 Phase C2: sync parsed UNIF metadata into the objectized Cart.
+	if (fceu11::g_cart) {
+		fceu11::g_cart->set_md5(UNIFCart.MD5);
+		fceu11::g_cart->set_crc32(UNIFCart.CRC32);
+		fceu11::g_cart->set_mirror(UNIFCart.mirror);
+		fceu11::g_cart->set_mirror_as_2bits(UNIFCart.mirrorAs2Bits);
+		fceu11::g_cart->set_battery(UNIFCart.battery != 0);
+		fceu11::g_cart->set_ines2(UNIFCart.ines2 != 0);
+		fceu11::g_cart->set_submapper(UNIFCart.submapper);
+		fceu11::g_cart->set_wram_size(UNIFCart.wram_size);
+		fceu11::g_cart->set_battery_wram_size(UNIFCart.battery_wram_size);
+		fceu11::g_cart->set_vram_size(UNIFCart.vram_size);
+		fceu11::g_cart->set_battery_vram_size(UNIFCart.battery_vram_size);
+		fceu11::g_cart->set_mapper_number(0);
+	}
+
 	return LOADER_OK;
 }

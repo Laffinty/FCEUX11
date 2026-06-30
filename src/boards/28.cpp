@@ -15,7 +15,9 @@
 	along with the this software.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "boards/datalatch_carts.h"
+#include "boards/registry.h"
 
 // http://wiki.nesdev.com/w/index.php/INES_Mapper_028
 
@@ -215,3 +217,19 @@ void Mapper28_Init(CartInfo* info)
 	GameStateRestore=StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+namespace fceu11 {
+namespace {
+
+// v1.8 Masonry Phase D.4: MapperEntry for Action 53 (mapper 28).
+static MapperEntryRegister kMapper28Register{
+    MapperEntry{
+        /*mapper_number=*/28,
+        /*name=*/"Action 53",
+        /*legacy_init=*/&Mapper28_Init,
+        /*factory=*/[](Bus& bus) { return std::make_unique<Mapper28Cart>(bus); }
+    }
+};
+
+}  // namespace
+}  // namespace fceu11

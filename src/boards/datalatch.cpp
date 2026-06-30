@@ -18,8 +18,12 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "../unif.h"
+#include "../ppu.h"
+#include "../cheat.h"
 #include "../ines.h"
+#include "simple_carts.h"          // v1.8 Phase E.2 step 9.1: ColorDreamsCart, GnromCart
 
 FCEUX11_MAPPER_HOT static uint8 latche=0, latcheinit=0, bus_conflict=0;
 FCEUX11_MAPPER_HOT static uint16 addrreg0=0, addrreg1=0;
@@ -578,3 +582,330 @@ static void BMC11160Sync(void) {
 void BMC11160_Init(CartInfo *info) {
 	Latch_Init(info, BMC11160Sync, 0, 0x8000, 0xFFFF, 0, 0);
 }
+
+// ---------------------------------------------------------------------------
+// v1.7 Phase E: NromCart subclass.
+//
+// NROM's legacy init is split between NROM_Init (sets info->Power =
+// NROMPower, info->Close = LatchClose, allocates the 8KiB WRAM, registers
+// SFORMAT) and NROMPower (does the actual setprg*/setchr*/SetReadHandler
+// setup). Both are invoked from iNES_Init -> iNESLoad BEFORE the v1.7 cart
+// factory runs. The cart subclass's on_power() therefore does NOT call
+// NROM_Init again (it was already called once during iNES_Init, and a
+// second call would duplicate the SFORMAT entry and free the original
+// WRAM pointer). Instead, on_power() calls info->Power() to fire NROMPower
+// after the v1.7 cart factory has redirected info->Power to
+// CartInfo_PowerForward.
+//
+// The flow for an NROM iNES ROM in v1.7:
+//   1. iNESInit -> NROM_Init (registers SFORMAT, sets info->Power =
+//      NROMPower, info->Close = LatchClose).
+//   2. v1.7 factory block: cart_obj = NromCart; info->Power =
+//      CartInfo_PowerForward; info->Close = CartInfo_CloseForward.
+//   3. PowerNES -> iNESCart.Power() -> CartInfo_PowerForward ->
+//      cart_obj->on_power() = NromCart::on_power() -> info->Power() ->
+//      NROMPower (set during step 1).
+// ---------------------------------------------------------------------------
+
+#include "boards/nrom_cart.h"
+#include "boards/datalatch_carts.h"
+#include "boards/irem_txc_bit_carts.h"
+#include "boards/registry.h"
+
+namespace fceu11 {
+
+void NromCart::on_power() noexcept {
+	// NROM_Init was already called once during iNES_Init (step 1). Calling
+	// it again would duplicate the SFORMAT "WRAM" entry with a freed
+	// pointer. Instead, fire the NROMPower function pointer that
+	// NROM_Init set up. At this point info->Power has been redirected by
+	// the v1.7 factory block to CartInfo_PowerForward, so we temporarily
+	// swap in the legacy NROMPower pointer, invoke it, then restore the
+	// forwarding function pointer so subsequent PowerNES calls also route
+	// through cart_obj->on_power.
+	if (!currCartInfo) return;
+	void (*saved)(void) = currCartInfo->Power;
+	currCartInfo->Power = NROMPower;
+	currCartInfo->Power();
+	currCartInfo->Power = saved;
+}
+
+// v1.8 Masonry §6.1: NromCart::save_mapper_state() — NROM has no
+// mapper-internal registers (PRG is fixed, CHR is fixed, mirror is set
+// during Power).  Capture the mirror mode + WRAM size + battery flag from
+// the base Cart class so the byte-diff detects accidental mirroring/ROM-
+// metadata regressions.
+std::vector<uint8_t> NromCart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out;
+	out.reserve(16);
+	pack_u32(out, mapper_number());                  // 0
+	pack_u32(out, static_cast<uint32_t>(mirror_raw()));
+	pack_u32(out, static_cast<uint32_t>(wram_size()));
+	pack_u32(out, static_cast<uint32_t>(battery_wram_size()));
+	return out;  // 16 bytes
+}
+
+// v1.8 Masonry Phase E.2 step 2a: UNROM/CNROM/ANROM/CPROM all read the
+// shared file-scope `latche` byte.  Capture: mapper_number + mirror +
+// WRAM (4 metadata bytes from CartStrategyA) + latche (1 byte) + padding
+// to keep body size aligned.  Total 21 bytes.  Replaces the
+// MapperStrategyA default for these four mappers.
+std::vector<uint8_t> UnromCart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out;
+	out.reserve(21);
+	out.push_back(0x02);                              // mapper 2
+	uint8 mirror = 0;
+	switch (mirror_raw()) {
+		uint8 raw = static_cast<uint8_t>(mirror_raw());
+		mirror = (raw == 0) ? 0x00 : (raw == 1) ? 0x01 : 0xFF;
+	}
+	out.push_back(mirror);
+	out.push_back(static_cast<uint8_t>(wram_size() & 0xFF));
+	out.push_back(static_cast<uint8_t>(battery_wram_size() & 0xFF));
+	// 4 bytes of header so far -- pad to 8 for 8-byte alignment of state.
+	for (int i = 0; i < 4; ++i) out.push_back(0x00);
+	// 12 bytes used.  bank + aux registers...
+	out.push_back(latche);                            // 12: bank
+	for (int i = 0; i < 8; ++i) out.push_back(0x00);   // 13..20: future IRQs/reserved
+	return out;  // 21 bytes
+}
+
+std::vector<uint8_t> CnromCart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out;
+	out.reserve(21);
+	out.push_back(0x03);                              // mapper 3
+	out.push_back(0x00);                              // mirror: NROM-style (CNROM is fixed)
+	out.push_back(0x00);                              // WRAM size
+	out.push_back(0x00);                              // battery WRAM size
+	for (int i = 0; i < 4; ++i) out.push_back(0x00);
+	out.push_back(latche);                            // CHR bank
+	for (int i = 0; i < 8; ++i) out.push_back(0x00);
+	return out;  // 21 bytes
+}
+
+std::vector<uint8_t> AnromCart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out;
+	out.reserve(21);
+	out.push_back(0x07);                              // mapper 7
+	out.push_back(0xFF);                              // mirror: ANROM does its own
+	out.push_back(0x00);
+	out.push_back(0x00);
+	for (int i = 0; i < 4; ++i) out.push_back(0x00);
+	out.push_back(latche);                            // PRG bank + mirror high bit
+	for (int i = 0; i < 8; ++i) out.push_back(0x00);
+	return out;  // 21 bytes
+}
+
+std::vector<uint8_t> CpromCart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out;
+	out.reserve(21);
+	out.push_back(0x0D);                              // mapper 13
+	out.push_back(0x00);
+	out.push_back(0x00);
+	out.push_back(0x00);
+	for (int i = 0; i < 4; ++i) out.push_back(0x00);
+	out.push_back(latche);                            // CHR bank register
+	for (int i = 0; i < 8; ++i) out.push_back(0x00);
+	return out;  // 21 bytes
+}
+
+// v1.8 Masonry Phase E.2 step 9.1: ColorDreams (mapper 11) and GNROM
+// (mapper 66) share datalatch.cpp's Latch infrastructure.  Their
+// save_mapper_state bodies mirror the UNROM/CNROM/ANROM/CPROM pattern from
+// step 2a (MapperStrategyA 16-byte default + 1-byte latche = 17 bytes).
+// The Cart subclass declarations live in src/boards/simple_carts.h.
+std::vector<uint8_t> ColorDreamsCart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out;
+	out.reserve(17);
+	out.push_back(0x0B);                              // mapper 11
+	out.push_back(0x00);
+	out.push_back(0x00);
+	out.push_back(0x00);
+	for (int i = 0; i < 4; ++i) out.push_back(0x00);
+	out.push_back(latche);                            // CHR bank low / PRG bank high
+	for (int i = 0; i < 8; ++i) out.push_back(0x00);
+	return out;  // 17 bytes
+}
+
+std::vector<uint8_t> GnromCart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out;
+	out.reserve(17);
+	out.push_back(0x42);                              // mapper 66
+	out.push_back(0x00);
+	out.push_back(0x00);
+	out.push_back(0x00);
+	for (int i = 0; i < 4; ++i) out.push_back(0x00);
+	out.push_back(latche);                            // PRG bank + CHR bank nibbles
+	for (int i = 0; i < 8; ++i) out.push_back(0x00);
+	return out;  // 17 bytes
+}
+
+// v1.8 Masonry Phase E.2 step 9.2: 7 more Latch-family mappers (70, 78,
+// 86, 87, 89, 94, 97) in datalatch.cpp.  All share the same 17-byte body
+// layout: 4-byte mapper/mirror/wram/battery + 4 padding + 1-byte latche
+// + 8-byte reserved future state.  Same pattern as ColorDreams/Gnrom
+// above.
+std::vector<uint8_t> Mapper70Cart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out; out.reserve(17);
+	out.push_back(70); out.push_back(0); out.push_back(0); out.push_back(0);
+	for (int i = 0; i < 4; ++i) out.push_back(0);
+	out.push_back(latche);
+	for (int i = 0; i < 8; ++i) out.push_back(0);
+	return out;
+}
+
+std::vector<uint8_t> Mapper78Cart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out; out.reserve(17);
+	out.push_back(78); out.push_back(0); out.push_back(0); out.push_back(0);
+	for (int i = 0; i < 4; ++i) out.push_back(0);
+	out.push_back(latche);
+	for (int i = 0; i < 8; ++i) out.push_back(0);
+	return out;
+}
+
+std::vector<uint8_t> Mapper86Cart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out; out.reserve(17);
+	out.push_back(86); out.push_back(0); out.push_back(0); out.push_back(0);
+	for (int i = 0; i < 4; ++i) out.push_back(0);
+	out.push_back(latche);
+	for (int i = 0; i < 8; ++i) out.push_back(0);
+	return out;
+}
+
+std::vector<uint8_t> Mapper87Cart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out; out.reserve(17);
+	out.push_back(87); out.push_back(0); out.push_back(0); out.push_back(0);
+	for (int i = 0; i < 4; ++i) out.push_back(0);
+	out.push_back(latche);
+	for (int i = 0; i < 8; ++i) out.push_back(0);
+	return out;
+}
+
+std::vector<uint8_t> Mapper89Cart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out; out.reserve(17);
+	out.push_back(89); out.push_back(0); out.push_back(0); out.push_back(0);
+	for (int i = 0; i < 4; ++i) out.push_back(0);
+	out.push_back(latche);
+	for (int i = 0; i < 8; ++i) out.push_back(0);
+	return out;
+}
+
+std::vector<uint8_t> Mapper94Cart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out; out.reserve(17);
+	out.push_back(94); out.push_back(0); out.push_back(0); out.push_back(0);
+	for (int i = 0; i < 4; ++i) out.push_back(0);
+	out.push_back(latche);
+	for (int i = 0; i < 8; ++i) out.push_back(0);
+	return out;
+}
+
+std::vector<uint8_t> Mapper97Cart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out; out.reserve(17);
+	out.push_back(97); out.push_back(0); out.push_back(0); out.push_back(0);
+	for (int i = 0; i < 4; ++i) out.push_back(0);
+	out.push_back(latche);
+	for (int i = 0; i < 8; ++i) out.push_back(0);
+	return out;
+}
+
+namespace {
+
+// v1.8 Masonry §2: MapperEntryRegister static instance for NROM (mapper 0).
+// Replaces the v1.7 `case 0:` branch in create_cart_for_mapper() with a
+// registry lookup.  v1.9 Chronicle will reuse the same pattern for the
+// remaining 166 board files.
+static MapperEntryRegister kNromRegister{
+    MapperEntry{
+        /*mapper_number=*/0,
+        /*name=*/"NROM",
+        /*legacy_init=*/&NROM_Init,
+        /*factory=*/[](Bus& bus) { return std::make_unique<NromCart>(bus); }
+    }
+};
+
+// v1.8 Masonry Phase D.4: simple P0 latch mappers (UNROM/CNROM/ANROM/CPROM).
+// Phase D.11 re-enables the registration (was previously guarded by #if 0
+// pending a build break fix; the cart.h forward decl added in Phase D.11
+// closes the gap so the registration compiles cleanly).
+static MapperEntryRegister kUnromRegister{
+    MapperEntry{2, "UNROM", &UNROM_Init,
+        [](Bus& bus) { return std::make_unique<UnromCart>(bus); }}
+};
+static MapperEntryRegister kCnromRegister{
+    MapperEntry{3, "CNROM", &CNROM_Init,
+        [](Bus& bus) { return std::make_unique<CnromCart>(bus); }}
+};
+static MapperEntryRegister kAnromRegister{
+    MapperEntry{7, "ANROM", &ANROM_Init,
+        [](Bus& bus) { return std::make_unique<AnromCart>(bus); }}
+};
+static MapperEntryRegister kCpromRegister{
+    MapperEntry{13, "CPROM", &CPROM_Init,
+        [](Bus& bus) { return std::make_unique<CpromCart>(bus); }}
+};
+
+// v1.8 Masonry Phase E.2 step 9.1: ColorDreams (mapper 11) and GNROM
+// (mapper 66) complete the P0 batch step 1 missed.  Both live in
+// src/boards/datalatch.cpp's Latch_* family; their Cart subclasses share
+// the 16-byte MapperStrategyA default + 1-byte latche body layout.
+static MapperEntryRegister kColordreamsRegister{
+    MapperEntry{11, "Color Dreams", &Mapper11_Init,
+        [](Bus& bus) { return std::make_unique<ColorDreamsCart>(bus); }}
+};
+static MapperEntryRegister kGnromRegister{
+    MapperEntry{66, "MHROM (GNROM)", &MHROM_Init,
+        [](Bus& bus) { return std::make_unique<GnromCart>(bus); }}
+};
+
+// v1.8 Masonry Phase E.2 step 9.2: 7 more Latch-family P1 mappers (70, 78,
+// 86, 87, 89, 94, 97).  All in src/boards/datalatch.cpp's Latch_* family;
+// Cart subclasses inherit MapperStrategyA and capture the shared latche byte.
+static MapperEntryRegister kMapper70Register{
+    MapperEntry{70, "BA KAMEN DISCRETE", &Mapper70_Init,
+        [](Bus& bus) { return std::make_unique<Mapper70Cart>(bus); }}
+};
+static MapperEntryRegister kMapper78Register{
+    MapperEntry{78, "Irem 74HC161/32", &Mapper78_Init,
+        [](Bus& bus) { return std::make_unique<Mapper78Cart>(bus); }}
+};
+static MapperEntryRegister kMapper86Register{
+    MapperEntry{86, "JALECO JF-13", &Mapper86_Init,
+        [](Bus& bus) { return std::make_unique<Mapper86Cart>(bus); }}
+};
+static MapperEntryRegister kMapper87Register{
+    MapperEntry{87, "74*139/74 DISCRETE", &Mapper87_Init,
+        [](Bus& bus) { return std::make_unique<Mapper87Cart>(bus); }}
+};
+static MapperEntryRegister kMapper89Register{
+    MapperEntry{89, "SUNSOFT-3", &Mapper89_Init,
+        [](Bus& bus) { return std::make_unique<Mapper89Cart>(bus); }}
+};
+static MapperEntryRegister kMapper94Register{
+    MapperEntry{94, "HVC-UN1ROM", &Mapper94_Init,
+        [](Bus& bus) { return std::make_unique<Mapper94Cart>(bus); }}
+};
+static MapperEntryRegister kMapper97Register{
+    MapperEntry{97, "IREM TAM-S1", &Mapper97_Init,
+        [](Bus& bus) { return std::make_unique<Mapper97Cart>(bus); }}
+};
+
+// v1.8 Masonry Phase E.2 step 9.3: mapper 93 (SUNSOFT-3R) shares
+// SUNSOFT_UNROM_Init with mapper 89.  Cart subclass uses MapperStrategyA
+// default body (16 bytes).
+static MapperEntryRegister kMapper93Register{
+    MapperEntry{93, "SUNSOFT-3R", &SUNSOFT_UNROM_Init,
+        [](Bus& bus) { return std::make_unique<Mapper93Cart>(bus); }}
+};
+
+}  // namespace
+
+} // namespace fceu11
+
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper38Register{
+    MapperEntry{38, "Bit Corp (Crime Busters)", &Mapper38_Init,
+        [](Bus& bus) { return std::make_unique<Mapper38Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

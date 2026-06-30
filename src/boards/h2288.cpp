@@ -18,8 +18,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_mmc3.h"
 #include "mmc3.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 extern uint8 m114_perm[8];
 
@@ -68,3 +69,13 @@ void UNLH2288_Init(CartInfo *info) {
 	info->Power = H2288Power;
 	AddExState(EXPREGS, 2, 0, "EXPR");
 }
+
+// v1.8 Phase F incremental.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper123Register{
+    MapperEntry{123, "MMC3 PIRATE H2288", &UNLH2288_Init,
+        [](Bus& bus) { return std::make_unique<Mapper123Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

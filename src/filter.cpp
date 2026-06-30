@@ -47,7 +47,7 @@ int32 NeoFilterSound(int32 *in, int32 *out, uint32 inlen, int32 *leftover)
         in, out, inlen, leftover,
         FSettings.soundq,
         FSettings.lowpass,
-        GameExpSound.NeoFill,
+        FCEU11_ExpNeoFillCallback,
         FSettings.SndRate,
         FSettings.SoundVolume
     );

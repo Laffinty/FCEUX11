@@ -29,8 +29,9 @@
 // Notes:
 // - CHR-RAM for nametables maps to $3000-3FFF as well, but FCEUX internally mirrors to 4k?
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 #include "../ines.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 static uint8 reg;
 static uint8 *CHRRAM = NULL;
@@ -269,3 +270,13 @@ void Mapper111_Init(CartInfo *info) {
 		SetupCartPRGMapping(0x10, FLASHROM, FLASHROMSIZE, 0);
 	}
 }
+
+// v1.8 Phase F incremental.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper111Register{
+    MapperEntry{111, "Cheapocabra", &Mapper111_Init,
+        [](Bus& bus) { return std::make_unique<Mapper111Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

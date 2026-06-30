@@ -18,7 +18,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "../ppu.h"
+#include "../unif.h"
+#include "simple_carts.h"          // v1.8 Phase E.2 step 9.3
 
 static uint8 chr_reg[4];
 static uint8 kogame, prg_reg, nt1, nt2, mirr;
@@ -162,3 +165,15 @@ void Mapper68_Init(CartInfo *info) {
 	AddExState(WRAM, WRAMSIZE, 0, "WRAM");
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+
+// v1.8 Masonry Phase E.2 step 9.3: MapperEntryRegister for mapper 68
+// (Sunsoft Mapper #4).  Cart subclass inherits MapperStrategyA (16-byte default body).
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper68Register{
+    MapperEntry{68, "Sunsoft Mapper #4", &Mapper68_Init,
+        [](Bus& bus) { return std::make_unique<Mapper68Cart>(bus); } }
+};
+}  // namespace
+}  // namespace fceu11

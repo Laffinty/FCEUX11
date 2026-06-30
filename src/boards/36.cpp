@@ -20,7 +20,9 @@
  * TXC/Micro Genius simplified mapper
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "boards/irem_txc_bit_carts.h"
+#include "boards/registry.h"
 
 static uint8 latche, mirr;
 
@@ -67,3 +69,12 @@ void Mapper36_Init(CartInfo *info) {
 	GameStateRestore = M36Restore;
 	AddExState(StateRegs, ~0, 0, 0);
 }
+
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper36Register{
+    MapperEntry{36, "TXC Policeman", &Mapper36_Init,
+        [](Bus& bus) { return std::make_unique<Mapper36Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

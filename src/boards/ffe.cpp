@@ -21,7 +21,8 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase E.2 step 9.5
 
 static uint8 preg[4], creg[8], latch, ffemode;
 static uint8 IRQa, mirr;
@@ -152,3 +153,18 @@ void Mapper17_Init(CartInfo *info) {
 	ffemode = 1;
 	Mapper6_Init(info);
 }
+
+// v1.8 Masonry Phase E.2 step 9.5: MapperEntryRegister for mappers 6 (FFE)
+// and 17 (FFE variant).  Both share Mapper6_Init.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper6Register{
+    MapperEntry{6, "FFE", &Mapper6_Init,
+        [](Bus& bus) { return std::make_unique<Mapper6Cart>(bus); }}
+};
+static MapperEntryRegister kMapper17Register{
+    MapperEntry{17, "FFE variant", &Mapper17_Init,
+        [](Bus& bus) { return std::make_unique<Mapper17Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

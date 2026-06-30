@@ -18,7 +18,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 static uint8 chrlo[8], chrhi[8], prg, mirr, mirrisused = 0;
 static uint8 *WRAM = NULL;
@@ -113,3 +114,13 @@ void Mapper156_Init(CartInfo *info) {
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+// v1.8 Phase F: MapperEntryRegister.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper156Register{
+    MapperEntry{156, "", &Mapper156_Init,
+        [](Bus& bus) { return std::make_unique<Mapper156Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

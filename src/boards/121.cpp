@@ -25,8 +25,9 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_mmc3.h"
 #include "mmc3.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 static void Sync() {
 	switch (EXPREGS[5] & 0x3F) {
@@ -127,3 +128,13 @@ void Mapper121_Init(CartInfo *info) {
 	info->Power = M121Power;
 	AddExState(EXPREGS, 8, 0, "EXPR");
 }
+
+// v1.8 Phase F: MapperEntryRegister.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper121Register{
+    MapperEntry{121, "MMC3 PIRATE PROT. A", &Mapper121_Init,
+        [](Bus& bus) { return std::make_unique<Mapper121Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

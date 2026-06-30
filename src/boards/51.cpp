@@ -18,7 +18,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase E.2 step 9.3
 
 static uint8 bank, mode;
 static SFORMAT StateRegs[] =
@@ -82,3 +83,15 @@ void Mapper51_Init(CartInfo *info) {
 	AddExState(&StateRegs, ~0, 0, 0);
 	GameStateRestore = StateRestore;
 }
+
+
+// v1.8 Masonry Phase E.2 step 9.3: MapperEntryRegister for mapper 51
+// (11-in-1 BALL SERIES).  Cart subclass inherits MapperStrategyA (16-byte default body).
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper51Register{
+    MapperEntry{51, "11-in-1 BALL SERIES", &Mapper51_Init,
+        [](Bus& bus) { return std::make_unique<Mapper51Cart>(bus); } }
+};
+}  // namespace
+}  // namespace fceu11

@@ -24,7 +24,9 @@
  119,165,205,245,249,250,254
 */
 
-#include "mapinc.h"
+#include "mapinc_mmc3.h"
+#include "../ppu.h"
+#include "../unif.h"
 #include "mmc3.h"
 
 uint8 MMC3_cmd;
@@ -1452,3 +1454,203 @@ void Mapper406_Init(CartInfo *info) {
 	GenMMC3_Init(info, 512, 256, 0, 0);
 	info->Power = M406_Power;
 }
+
+// ---------------------------------------------------------------------------
+// v1.7 Phase F: Mmc3Cart subclass (Strategy A).
+//
+// Definitions live in mmc3.cpp because they need access to the static
+// M4Power(), MMC3RegReset(), and the Mapper4_Init body. The cart subclass
+// only owns the *call sequence* (Power -> cart_obj->on_power -> M4Power ->
+// GenMMC3Power + Karnov mirror hack; Reset -> cart_obj->on_reset ->
+// MMC3RegReset), not the cart wiring logic itself.
+//
+// MMC3 has no expansion audio, so install_expansion_audio inherits the
+// default no-op. Other MMC3 variants (Mapper 12, 37, 44, ...) are not
+// covered here — v1.8 Masonry will register additional cart subclasses.
+// ---------------------------------------------------------------------------
+
+#include "boards/mmc3_cart.h"
+#include "boards/mmc3_variants_carts.h"
+#include "boards/registry.h"
+#include "simple_carts.h"          // v1.8 Phase E.2 step 9.4
+
+namespace fceu11 {
+
+void Mmc3Cart::on_power() noexcept {
+	// Mapper4_Init (called during iNES_Init) calls GenMMC3_Init which sets
+	// info->Power = GenMMC3Power, then Mapper4_Init overwrites it with
+	// M4Power (which adds the Karnov mirror hack on top of GenMMC3Power).
+	// The v1.7 factory block then redirects info->Power to
+	// CartInfo_PowerForward. To fire the actual MMC3 power routine,
+	// temporarily swap in the legacy M4Power pointer, invoke it, then
+	// restore the forwarding function pointer so subsequent PowerNES calls
+	// also route through cart_obj->on_power.
+	if (!currCartInfo) return;
+	void (*saved)(void) = currCartInfo->Power;
+	currCartInfo->Power = M4Power;
+	currCartInfo->Power();
+	currCartInfo->Power = saved;
+}
+
+void Mmc3Cart::on_reset() noexcept {
+	// GenMMC3_Init sets info->Reset = MMC3RegReset. The v1.7 factory block
+	// overwrites info->Reset with CartInfo_ResetForward so ResetNES routes
+	// through cart_obj->on_reset. We call MMC3RegReset() directly to
+	// restore the eight bank registers, IRQ counter/latch/cmd, and the
+	// PRG/CHR mirroring derived from MMC3_cmd.
+	MMC3RegReset();
+}
+
+void Mmc3Cart::on_close() noexcept {
+	// GenMMC3_Init registers GameHBIRQHook = MMC3_hb (or one of the
+	// *_KickMasterHack / *_PALStarWarsHack variants). Drop the hook here
+	// so a subsequent load of a non-MMC3 ROM does not receive stale IRQ
+	// callbacks pointing at the now-freed mapper state. fceu.cpp's
+	// ResetGameLoaded() also nulls this on next load, but doing it in the
+	// cart subclass matches the Vrc6Cart pattern and provides immediate
+	// cleanup.
+	GameHBIRQHook = nullptr;
+}
+
+// v1.8 Masonry §6.1: Mmc3Cart::save_mapper_state() — capture MMC3 register
+// file + IRQ state for byte-diff regression.  The state lives in mmc3.cpp's
+// file-scope globals (MMC3_cmd, DRegBuf, A000B/A001B, IRQCount/Latch/a/
+// Reload) so the override is placed in the same TU.  Layout mirrors the
+// MMC3_StateRegs[] SFORMAT declaration (line 51) so the order matches the
+// on-disk savestate encoding (v1.7 wire format + v1.8 mapper_byte_diff).
+std::vector<uint8_t> Mmc3Cart::save_mapper_state() const noexcept {
+	std::vector<uint8_t> out;
+	out.reserve(17);
+	pack_u8_array(out, DRegBuf, 8);  // bank registers 0-7
+	pack_u8(out, MMC3_cmd);
+	pack_u8(out, A000B);
+	pack_u8(out, A001B);
+	pack_u8(out, IRQReload);
+	pack_u8(out, IRQCount);
+	pack_u8(out, IRQLatch);
+	pack_u8(out, IRQa);
+	pack_u8(out, mmc3opts);
+	pack_u8(out, kt_extra);
+	return out;  // 17 bytes
+}
+
+namespace {
+
+// v1.8 Masonry §2: MapperEntryRegister for MMC3 (mapper 4).
+static MapperEntryRegister kMmc3Register{
+    MapperEntry{
+        /*mapper_number=*/4,
+        /*name=*/"MMC3",
+        /*legacy_init=*/&Mapper4_Init,
+        /*factory=*/[](Bus& bus) { return std::make_unique<Mmc3Cart>(bus); }
+    }
+};
+
+// v1.8 Masonry Phase D.3 §1.4: 24 MMC3 variants dispatched via
+// Mmc3BaseCart.  Each Init name matches the existing ines.cpp entry.
+static MapperEntryRegister kMapper12Register{
+    MapperEntry{12, "REX DBZ 5",      &Mapper12_Init,
+        [](Bus& bus) { return std::make_unique<Mapper12Cart>(bus); }}
+};
+static MapperEntryRegister kMapper37Register{
+    MapperEntry{37, "PAL-ZZ SMB/TETRIS", &Mapper37_Init,
+        [](Bus& bus) { return std::make_unique<Mapper37Cart>(bus); }}
+};
+static MapperEntryRegister kMapper44Register{
+    MapperEntry{44, "MMC3 BMC Pirate",   &Mapper44_Init,
+        [](Bus& bus) { return std::make_unique<Mapper44Cart>(bus); }}
+};
+static MapperEntryRegister kMapper45Register{
+    MapperEntry{45, "MMC3 BMC Pirate 45", &Mapper45_Init,
+        [](Bus& bus) { return std::make_unique<Mapper45Cart>(bus); }}
+};
+static MapperEntryRegister kMapper47Register{
+    MapperEntry{47, "MMC3 BMC Pirate 47", &Mapper47_Init,
+        [](Bus& bus) { return std::make_unique<Mapper47Cart>(bus); }}
+};
+static MapperEntryRegister kMapper49Register{
+    MapperEntry{49, "MMC3 BMC Pirate 49", &Mapper49_Init,
+        [](Bus& bus) { return std::make_unique<Mapper49Cart>(bus); }}
+};
+static MapperEntryRegister kMapper52Register{
+    MapperEntry{52, "MMC3 BMC Pirate 52", &Mapper52_Init,
+        [](Bus& bus) { return std::make_unique<Mapper52Cart>(bus); }}
+};
+static MapperEntryRegister kMapper74Register{
+    MapperEntry{74, "MMC3 BMC Pirate 74", &Mapper74_Init,
+        [](Bus& bus) { return std::make_unique<Mapper74Cart>(bus); }}
+};
+static MapperEntryRegister kMapper114Register{
+    MapperEntry{114, "MMC3 BMC Pirate 114", &Mapper114_Init,
+        [](Bus& bus) { return std::make_unique<Mapper114Cart>(bus); }}
+};
+static MapperEntryRegister kMapper115Register{
+    MapperEntry{115, "MMC3 BMC Pirate 115", &Mapper115_Init,
+        [](Bus& bus) { return std::make_unique<Mapper115Cart>(bus); }}
+};
+static MapperEntryRegister kMapper116Register{
+    MapperEntry{116, "MMC1/MMC3/VRC PIRATE", &UNLSL12_Init,
+        [](Bus& bus) { return std::make_unique<Mapper116Cart>(bus); }}
+};
+static MapperEntryRegister kMapper118Register{
+    MapperEntry{118, "TSKROM", &TKSROM_Init,
+        [](Bus& bus) { return std::make_unique<Mapper118Cart>(bus); }}
+};
+static MapperEntryRegister kMapper119Register{
+    MapperEntry{119, "MMC3 BMC Pirate 119", &Mapper119_Init,
+        [](Bus& bus) { return std::make_unique<Mapper119Cart>(bus); }}
+};
+static MapperEntryRegister kMapper165Register{
+    MapperEntry{165, "MMC3 BMC Pirate 165", &Mapper165_Init,
+        [](Bus& bus) { return std::make_unique<Mapper165Cart>(bus); }}
+};
+static MapperEntryRegister kMapper192Register{
+    MapperEntry{192, "MMC3 BMC Pirate 192", &Mapper192_Init,
+        [](Bus& bus) { return std::make_unique<Mapper192Cart>(bus); }}
+};
+static MapperEntryRegister kMapper194Register{
+    MapperEntry{194, "MMC3 BMC Pirate 194", &Mapper194_Init,
+        [](Bus& bus) { return std::make_unique<Mapper194Cart>(bus); }}
+};
+static MapperEntryRegister kMapper195Register{
+    MapperEntry{195, "MMC3 BMC Pirate 195", &Mapper195_Init,
+        [](Bus& bus) { return std::make_unique<Mapper195Cart>(bus); }}
+};
+static MapperEntryRegister kMapper198Register{
+    MapperEntry{198, "MMC3 BMC Pirate 198", &Mapper198_Init,
+        [](Bus& bus) { return std::make_unique<Mapper198Cart>(bus); }}
+};
+static MapperEntryRegister kMapper205Register{
+    MapperEntry{205, "MMC3 BMC Pirate 205", &Mapper205_Init,
+        [](Bus& bus) { return std::make_unique<Mapper205Cart>(bus); }}
+};
+static MapperEntryRegister kMapper245Register{
+    MapperEntry{245, "MMC3 BMC Pirate 245", &Mapper245_Init,
+        [](Bus& bus) { return std::make_unique<Mapper245Cart>(bus); }}
+};
+static MapperEntryRegister kMapper249Register{
+    MapperEntry{249, "MMC3 BMC Pirate 249", &Mapper249_Init,
+        [](Bus& bus) { return std::make_unique<Mapper249Cart>(bus); }}
+};
+static MapperEntryRegister kMapper250Register{
+    MapperEntry{250, "MMC3 BMC Pirate 250", &Mapper250_Init,
+        [](Bus& bus) { return std::make_unique<Mapper250Cart>(bus); }}
+};
+static MapperEntryRegister kMapper254Register{
+    MapperEntry{254, "MMC3 BMC Pirate 254", &Mapper254_Init,
+        [](Bus& bus) { return std::make_unique<Mapper254Cart>(bus); }}
+};
+static MapperEntryRegister kMapper406Register{
+    MapperEntry{406, "MMC3 BMC Pirate 406", &Mapper406_Init,
+        [](Bus& bus) { return std::make_unique<Mapper406Cart>(bus); }}
+};
+
+// v1.8 Phase E.2 step 9.4: MapperEntryRegister for mapper 76 (NAMCOT 108 Rev. A).
+static MapperEntryRegister kMapper76Register{
+    MapperEntry{76, "NAMCOT 108 Rev. A", &Mapper76_Init,
+        [](Bus& bus) { return std::make_unique<Mapper76Cart>(bus); }}
+};
+
+}  // namespace
+
+} // namespace fceu11

@@ -22,7 +22,7 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 // v0.3.10 P4.1: DatachSet moved into fceu11:: namespace; pull in driver.h
 // for the declaration. mapinc.h doesn't transitively include the API
 // surface header.
@@ -610,3 +610,13 @@ void Mapper157_Init(CartInfo *info) {
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+#include "simple_carts.h"
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper16Register{
+    MapperEntry{16, "Bandai", &Mapper16_Init,
+        [](Bus& bus) { return std::make_unique<Mapper16Cart>(bus); }}
+};
+}  // namespace
+} // namespace fceu11

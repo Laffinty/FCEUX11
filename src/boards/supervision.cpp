@@ -18,7 +18,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase E.2 step 9.4
 
 static uint8 cmd0, cmd1;
 static SFORMAT StateRegs[] =
@@ -85,3 +86,13 @@ void Supervision16_Init(CartInfo *info) {
 	GameStateRestore = SuperRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+// v1.8 Masonry Phase E.2 step 9.4: MapperEntryRegister for mapper 53.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper53Register{
+    MapperEntry{53, "SUPERVISION 16-in-1", &Supervision16_Init,
+        [](Bus& bus) { return std::make_unique<Mapper53Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

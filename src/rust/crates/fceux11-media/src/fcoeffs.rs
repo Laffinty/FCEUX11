@@ -1,5 +1,9 @@
-// Auto-generated from src/fcoeffs.h and src/fir/*.h
-// Do not edit manually.
+// Canonical FIR coefficient tables for the Rust audio filter backend.
+//
+// Historically auto-generated from src/fcoeffs.h + src/fir/*.h; those C++
+// sources have been archived in Phase F (see src/archived/fir). This file
+// is now the runtime source of truth. Do not edit manually unless you are
+// intentionally changing the filter response.
 
 pub const SQ2NCOEFFS: usize = 1024;
 pub const NCOEFFS: usize = 484;

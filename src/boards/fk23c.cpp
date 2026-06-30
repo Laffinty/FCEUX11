@@ -18,9 +18,11 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_mmc3.h"
+#include "../unif.h"
 #include "mmc3.h"
 #include "../ines.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 static bool is_BMCFK23CA;
 static uint8 unromchr;
@@ -288,3 +290,13 @@ void BMCFK23CA_Init(CartInfo *info)
 		prg_bonus = atoi(MasterRomInfoParams["bonus"].c_str());
 	prg_mask = 0x7F>>(prg_bonus);
 }
+
+// v1.8 Phase F incremental.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper176Register{
+    MapperEntry{176, "BMCFK23C", &BMCFK23C_Init,
+        [](Bus& bus) { return std::make_unique<Mapper176Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

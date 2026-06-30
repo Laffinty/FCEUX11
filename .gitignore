@@ -106,3 +106,9 @@ scripts/reconfig_*.ps1
 
 # CTest artifacts (cost data, last-test logs)
 Testing/
+
+# Local scratch / unused first-level junk (matches "first level only" usage below)
+/discard/
+
+# CMake Multi-Config target output shells (Debug/ MinSizeRel/ etc.) — empty placeholder dirs
+*.dir/

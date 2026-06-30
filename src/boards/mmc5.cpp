@@ -20,7 +20,11 @@
 
 /* None of this code should use any of the iNES bank switching wrappers. */
 
-#include "mapinc.h"
+#include "mapinc_audio.h"
+#include "../unif.h"
+#include "../ppu.h"
+#include "simple_carts.h"          // v1.8 Phase E.2 step 9.1: Mmc5Cart
+#include "legacy_expansion_audio.h"  // v1.8 Phase G
 
 #include <array>
 
@@ -1090,3 +1094,24 @@ void ETROM_Init(CartInfo *info) {
 void EWROM_Init(CartInfo *info) {
 	GenMMC5_Init(info, 32, info->battery);
 }
+
+// v1.8 Masonry Phase E.2 step 9.1: MMC5 (mapper 5) Cart subclass registration.
+// Mmc5Cart inherits MapperStrategyA (16-byte default body); per-board state
+// (PRG/CHR banks, MMC5 scanline counter, fill-mode tile data, etc.) lands in
+// Phase E.2 step 12 alongside install_expansion_audio().
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMmc5Register{
+    MapperEntry{5, "MMC5", &Mapper5_Init,
+        [](Bus& bus) { return std::make_unique<Mmc5Cart>(bus); }}
+};
+}  // namespace
+
+// v1.8 Phase G: Mmc5Cart::install_expansion_audio.
+void Mmc5Cart::install_expansion_audio(Apu& apu) noexcept {
+    EXPSOUND es = apu.exp_sound();
+    es.expansion = &g_mmc5_expansion_audio;
+    apu.set_exp_sound(es);
+}
+
+}  // namespace fceu11

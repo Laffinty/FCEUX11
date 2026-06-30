@@ -187,15 +187,15 @@ public:
 
 extern NSF_HEADER NSFHeader;
 
-extern uint8 PSG[0x10];
-extern uint8 DMCFormat;
-extern uint8 RawDALatch;
-extern uint8 DMCAddressLatch;
-extern uint8 DMCSizeLatch;
-extern uint8 EnabledChannels;
-extern uint8 SpriteDMA;
-extern uint8 RawReg4016;
-extern uint8 IRQFrameMode;
+extern uint8_t   (& PSG            )[0x10];
+extern uint8_t&    DMCFormat;
+extern uint8_t&    RawDALatch;
+extern uint8_t&    DMCAddressLatch;
+extern uint8_t&    DMCSizeLatch;
+extern uint8_t&    EnabledChannels;
+extern uint8_t     SpriteDMA;
+extern uint8_t     RawReg4016;
+extern uint8_t&    IRQFrameMode;
 
 ///retrieves the core's DebuggerState
 DebuggerState &FCEUI_Debugger();

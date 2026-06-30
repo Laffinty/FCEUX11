@@ -1,3 +1,9 @@
+// FCEUX11 — mmc3.h shared declarations.
+// v1.8 Masonry Phase D.3: CartInfo forward decl so callers that include
+// mmc3.h standalone (mmc3_base_cart.cpp) get a parseable declaration.
+// mmc3.cpp itself transitively pulls cart.h via mapinc_mmc3.h.
+struct CartInfo;
+
 extern uint8 MMC3_cmd;
 extern uint8 mmc3opts;
 extern uint8 A000B;

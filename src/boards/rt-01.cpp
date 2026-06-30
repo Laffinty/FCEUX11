@@ -24,7 +24,7 @@
  * 
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 extern u64 xoroshiro128plus_next(); // deterministic random
 

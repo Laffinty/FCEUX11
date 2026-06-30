@@ -30,7 +30,7 @@
  * PCB for this mapper is "09-034A"
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static uint8 prg;
 static uint32 IRQCount, IRQa;

@@ -25,7 +25,8 @@
  *
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "../ppu.h"
 
 // General Purpose Registers
 static uint8 cpu410x[16], ppu201x[16], apu40xx[64];

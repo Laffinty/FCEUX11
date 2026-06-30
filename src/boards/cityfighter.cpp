@@ -20,7 +20,7 @@
  * City Fighter IV sith Sound VRC4 hacked
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
 
 static int32 IRQCount;
 static uint8 IRQa;

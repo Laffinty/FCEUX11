@@ -18,7 +18,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_audio.h"
+#include "../ppu.h"
+#include "simple_carts.h"          // v1.8 Phase E.2 step 9.5
+#include "legacy_expansion_audio.h"  // v1.8 Phase G
 
 static uint16 IRQCount;
 static uint8 IRQa;
@@ -447,3 +450,31 @@ void Mapper210_Init(CartInfo *info) {
 	AddExState(WRAM, 8192, 0, "WRAM");
 	AddExState(N106_StateRegs, ~0, 0, 0);
 }
+
+// v1.8 Masonry Phase E.2 step 9.5: MapperEntryRegister for mappers 19
+// (Namco 163) and 210 (Namco 163 variant).
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper19Register{
+    MapperEntry{19, "Namco 163", &Mapper19_Init,
+        [](Bus& bus) { return std::make_unique<Mapper19Cart>(bus); }}
+};
+static MapperEntryRegister kMapper210Register{
+    MapperEntry{210, "Namco 163 variant", &Mapper210_Init,
+        [](Bus& bus) { return std::make_unique<Mapper210Cart>(bus); }}
+};
+}  // namespace
+
+// v1.8 Phase G: Mapper19Cart/210Cart::install_expansion_audio.
+void Mapper19Cart::install_expansion_audio(Apu& apu) noexcept {
+    EXPSOUND es = apu.exp_sound();
+    es.expansion = &g_n106_expansion_audio;
+    apu.set_exp_sound(es);
+}
+void Mapper210Cart::install_expansion_audio(Apu& apu) noexcept {
+    EXPSOUND es = apu.exp_sound();
+    es.expansion = &g_n106_expansion_audio;
+    apu.set_exp_sound(es);
+}
+
+}  // namespace fceu11

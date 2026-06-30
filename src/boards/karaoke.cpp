@@ -18,7 +18,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 extern uint32 ROM_size;
 static uint8 latche;
@@ -61,3 +62,13 @@ void Mapper188_Init(CartInfo *info) {
 	GameStateRestore = StateRestore;
 	AddExState(&latche, 1, 0, "LATC");
 }
+
+// v1.8 Phase F incremental.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper188Register{
+    MapperEntry{188, "", &Mapper188_Init,
+        [](Bus& bus) { return std::make_unique<Mapper188Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

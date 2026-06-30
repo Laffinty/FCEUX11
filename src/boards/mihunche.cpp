@@ -18,7 +18,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mapinc.h"
+#include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 static uint16 latche;
 
@@ -66,3 +67,13 @@ void UNLCC21_Init(CartInfo *info) {
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+// v1.8 Phase F incremental.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper27Register{
+    MapperEntry{27, "CC-21 MI HUN CHE", &UNLCC21_Init,
+        [](Bus& bus) { return std::make_unique<Mapper27Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11
