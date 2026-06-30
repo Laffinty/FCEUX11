@@ -111,6 +111,49 @@ class Mapper151Cart  : public MapperStrategyA { public: explicit Mapper151Cart(B
 class Mapper156Cart  : public MapperStrategyA { public: explicit Mapper156Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
 class Mapper177Cart  : public MapperStrategyA { public: explicit Mapper177Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
 
+// v1.8 Phase F incremental.
+class Mapper111Cart  : public MapperStrategyA { public: explicit Mapper111Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper123Cart  : public MapperStrategyA { public: explicit Mapper123Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper125Cart  : public MapperStrategyA { public: explicit Mapper125Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper132Cart  : public MapperStrategyA { public: explicit Mapper132Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper133Cart  : public MapperStrategyA { public: explicit Mapper133Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper136Cart  : public MapperStrategyA { public: explicit Mapper136Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper137Cart  : public MapperStrategyA { public: explicit Mapper137Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper138Cart  : public MapperStrategyA { public: explicit Mapper138Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper139Cart  : public MapperStrategyA { public: explicit Mapper139Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper141Cart  : public MapperStrategyA { public: explicit Mapper141Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper142Cart  : public MapperStrategyA { public: explicit Mapper142Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper143Cart  : public MapperStrategyA { public: explicit Mapper143Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper145Cart  : public MapperStrategyA { public: explicit Mapper145Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper146Cart  : public MapperStrategyA { public: explicit Mapper146Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper147Cart  : public MapperStrategyA { public: explicit Mapper147Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper148Cart  : public MapperStrategyA { public: explicit Mapper148Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper149Cart  : public MapperStrategyA { public: explicit Mapper149Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper150Cart  : public MapperStrategyA { public: explicit Mapper150Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper160Cart  : public MapperStrategyA { public: explicit Mapper160Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper162Cart  : public MapperStrategyA { public: explicit Mapper162Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper163Cart  : public MapperStrategyA { public: explicit Mapper163Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper164Cart  : public MapperStrategyA { public: explicit Mapper164Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper166Cart  : public MapperStrategyA { public: explicit Mapper166Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper167Cart  : public MapperStrategyA { public: explicit Mapper167Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper168Cart  : public MapperStrategyA { public: explicit Mapper168Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper170Cart  : public MapperStrategyA { public: explicit Mapper170Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper172Cart  : public MapperStrategyA { public: explicit Mapper172Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper173Cart  : public MapperStrategyA { public: explicit Mapper173Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper175Cart  : public MapperStrategyA { public: explicit Mapper175Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper176Cart  : public MapperStrategyA { public: explicit Mapper176Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper181Cart  : public MapperStrategyA { public: explicit Mapper181Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper183Cart  : public MapperStrategyA { public: explicit Mapper183Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper185Cart  : public MapperStrategyA { public: explicit Mapper185Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper186Cart  : public MapperStrategyA { public: explicit Mapper186Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+
+// v1.8 Phase F incremental.
+class Mapper187Cart  : public MapperStrategyA { public: explicit Mapper187Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper188Cart  : public MapperStrategyA { public: explicit Mapper188Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper189Cart  : public MapperStrategyA { public: explicit Mapper189Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper190Cart  : public MapperStrategyA { public: explicit Mapper190Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper193Cart  : public MapperStrategyA { public: explicit Mapper193Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+
 } // namespace fceu11
 
 #endif // FCEU11_BOARDS_SIMPLE_CARTS_H

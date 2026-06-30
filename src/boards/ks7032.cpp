@@ -19,6 +19,7 @@
  */
 
 #include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 static uint8 reg[8], cmd, IRQa = 0, isirqused = 0;
 static int32 IRQCount;
@@ -86,3 +87,13 @@ void UNLKS7032_Init(CartInfo *info) {
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+// v1.8 Phase F incremental.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper142Register{
+    MapperEntry{142, "UNLKS7032", &UNLKS7032_Init,
+        [](Bus& bus) { return std::make_unique<Mapper142Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

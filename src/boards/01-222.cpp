@@ -37,6 +37,7 @@
 
 #include "mapinc_bus.h"
 #include "../unif.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 static uint8 reg[4], cmd, is172, is173;
 static SFORMAT StateRegs[] =
@@ -110,3 +111,20 @@ void Mapper173_Init(CartInfo *info) {
 	AddExState(&StateRegs, ~0, 0, 0);
 }
 
+// v1.8 Phase F incremental.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper132Register{
+    MapperEntry{132, "TXC/MGENIUS 22111", &UNL22211_Init,
+        [](Bus& bus) { return std::make_unique<Mapper132Cart>(bus); }}
+};
+static MapperEntryRegister kMapper172Register{
+    MapperEntry{172, "", &Mapper172_Init,
+        [](Bus& bus) { return std::make_unique<Mapper172Cart>(bus); }}
+};
+static MapperEntryRegister kMapper173Register{
+    MapperEntry{173, "", &Mapper173_Init,
+        [](Bus& bus) { return std::make_unique<Mapper173Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

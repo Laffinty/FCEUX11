@@ -20,6 +20,7 @@
  */
 
 #include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 static uint8 prgr, chrr[4];
 static uint8 *WRAM = NULL;
@@ -85,3 +86,13 @@ void Mapper190_Init(CartInfo *info) {
 	AddExState(chrr, 4, 0, "CHRR");
 	AddExState(WRAM, 0x2000, 0, "WRAM");
 }
+
+// v1.8 Phase F incremental.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper190Register{
+    MapperEntry{190, "", &Mapper190_Init,
+        [](Bus& bus) { return std::make_unique<Mapper190Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

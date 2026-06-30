@@ -19,6 +19,7 @@
  */
 
 #include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 static uint8 reg, delay, mirr;
 
@@ -77,3 +78,13 @@ void Mapper175_Init(CartInfo *info) {
 
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+// v1.8 Phase F incremental.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper175Register{
+    MapperEntry{175, "", &Mapper175_Init,
+        [](Bus& bus) { return std::make_unique<Mapper175Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

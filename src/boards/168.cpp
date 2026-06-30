@@ -19,6 +19,7 @@
  */
 
 #include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 static uint8 reg;
 static uint8 *CHRRAM = NULL;
@@ -77,3 +78,13 @@ void Mapper168_Init(CartInfo *info) {
 	SetupCartCHRMapping(0x10, CHRRAM, CHRRAMSIZE, 1);
 	AddExState(CHRRAM, CHRRAMSIZE, 0, "CRAM");
 }
+
+// v1.8 Phase F incremental.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper168Register{
+    MapperEntry{168, "", &Mapper168_Init,
+        [](Bus& bus) { return std::make_unique<Mapper168Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

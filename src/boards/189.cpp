@@ -20,6 +20,7 @@
 
 #include "mapinc_mmc3.h"
 #include "mmc3.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 static void M189PW(uint32 A, uint8 V) {
 	setprg32(0x8000, EXPREGS[0] & 7);
@@ -42,3 +43,13 @@ void Mapper189_Init(CartInfo *info) {
 	info->Power = M189Power;
 	AddExState(EXPREGS, 2, 0, "EXPR");
 }
+
+// v1.8 Phase F incremental.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper189Register{
+    MapperEntry{189, "", &Mapper189_Init,
+        [](Bus& bus) { return std::make_unique<Mapper189Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

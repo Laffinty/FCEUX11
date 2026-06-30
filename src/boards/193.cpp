@@ -19,6 +19,7 @@
  */
 
 #include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 static uint8 reg[8];
 static uint8 mirror, cmd, bank;
@@ -69,3 +70,13 @@ void Mapper193_Init(CartInfo *info) {
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+// v1.8 Phase F incremental.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper193Register{
+    MapperEntry{193, "NTDEC TC-112", &Mapper193_Init,
+        [](Bus& bus) { return std::make_unique<Mapper193Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

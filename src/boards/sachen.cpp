@@ -20,6 +20,7 @@
 
 #include "mapinc_bus.h"
 #include "../unif.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 static uint8 cmd, dip;
 static uint8 latch[8];
@@ -408,3 +409,64 @@ void TCA01_Init(CartInfo *info) {
 	info->Power = TCA01Power;
 }
 
+// v1.8 Phase F incremental.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper133Register{
+    MapperEntry{133, "SA72008", &SA72008_Init,
+        [](Bus& bus) { return std::make_unique<Mapper133Cart>(bus); }}
+};
+static MapperEntryRegister kMapper136Register{
+    MapperEntry{136, "TCU02", &TCU02_Init,
+        [](Bus& bus) { return std::make_unique<Mapper136Cart>(bus); }}
+};
+static MapperEntryRegister kMapper137Register{
+    MapperEntry{137, "S8259D", &S8259D_Init,
+        [](Bus& bus) { return std::make_unique<Mapper137Cart>(bus); }}
+};
+static MapperEntryRegister kMapper138Register{
+    MapperEntry{138, "S8259B", &S8259B_Init,
+        [](Bus& bus) { return std::make_unique<Mapper138Cart>(bus); }}
+};
+static MapperEntryRegister kMapper139Register{
+    MapperEntry{139, "S8259C", &S8259C_Init,
+        [](Bus& bus) { return std::make_unique<Mapper139Cart>(bus); }}
+};
+static MapperEntryRegister kMapper141Register{
+    MapperEntry{141, "S8259A", &S8259A_Init,
+        [](Bus& bus) { return std::make_unique<Mapper141Cart>(bus); }}
+};
+static MapperEntryRegister kMapper143Register{
+    MapperEntry{143, "TCA01", &TCA01_Init,
+        [](Bus& bus) { return std::make_unique<Mapper143Cart>(bus); }}
+};
+static MapperEntryRegister kMapper145Register{
+    MapperEntry{145, "SA72007", &SA72007_Init,
+        [](Bus& bus) { return std::make_unique<Mapper145Cart>(bus); }}
+};
+static MapperEntryRegister kMapper146Register{
+    MapperEntry{146, "SA0161M", &SA0161M_Init,
+        [](Bus& bus) { return std::make_unique<Mapper146Cart>(bus); }}
+};
+static MapperEntryRegister kMapper147Register{
+    MapperEntry{147, "TCU01", &TCU01_Init,
+        [](Bus& bus) { return std::make_unique<Mapper147Cart>(bus); }}
+};
+static MapperEntryRegister kMapper148Register{
+    MapperEntry{148, "SA0037", &SA0037_Init,
+        [](Bus& bus) { return std::make_unique<Mapper148Cart>(bus); }}
+};
+static MapperEntryRegister kMapper149Register{
+    MapperEntry{149, "SA0036", &SA0036_Init,
+        [](Bus& bus) { return std::make_unique<Mapper149Cart>(bus); }}
+};
+static MapperEntryRegister kMapper150Register{
+    MapperEntry{150, "S74LS374N", &S74LS374N_Init,
+        [](Bus& bus) { return std::make_unique<Mapper150Cart>(bus); }}
+};
+static MapperEntryRegister kMapper160Register{
+    MapperEntry{160, "SA009", &SA009_Init,
+        [](Bus& bus) { return std::make_unique<Mapper160Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11
