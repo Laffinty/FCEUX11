@@ -555,5 +555,10 @@ static MapperEntryRegister kMapper60Register{
     MapperEntry{60, "BMCD1038", &BMCD1038_Init,
         [](Bus& bus) { return std::make_unique<Mapper60Cart>(bus); }}
 };
+// v1.8 Phase E.2 audit: mapper 59 active in bmap[] but was missing.
+static MapperEntryRegister kMapper59Register{
+    MapperEntry{59, "Mapper 59", &Mapper59_Init,
+        [](Bus& bus) { return std::make_unique<Mapper59Cart>(bus); }}
+};
 }  // namespace
 }  // namespace fceu11

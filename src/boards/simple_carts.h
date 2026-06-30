@@ -96,6 +96,8 @@ class Mapper210Cart : public MapperStrategyA { public: explicit Mapper210Cart(Bu
 // ExpansionAudio subclass deferred to Phase G.
 class Mapper69Cart  : public MapperStrategyA { public: explicit Mapper69Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
 class Mapper206Cart : public MapperStrategyA { public: explicit Mapper206Cart(Bus& bus) noexcept : MapperStrategyA(bus) {} };
+// v1.8 Phase E.2 audit: mapper 59 was active in bmap[] but missing from registry.
+class Mapper59Cart  : public MapperStrategyA { public: explicit Mapper59Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
 
 } // namespace fceu11
 

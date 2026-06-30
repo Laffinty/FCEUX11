@@ -147,6 +147,7 @@ INES_MAPPERS = [
     ("mapper406",  406),   # MMC3 BMC Pirate
     ("mapper69",    69),   # Sunsoft 5B
     ("mapper206",  206),   # Namco 108 variant
+    ("mapper59",    59),   # active in bmap[], audit gap
 ]
 
 PRG_SIZE = 1   # 1 x 16 KB
