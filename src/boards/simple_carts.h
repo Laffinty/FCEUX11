@@ -51,6 +51,36 @@ class Mapper87Cart  : public MapperStrategyA { public: explicit Mapper87Cart(Bus
 class Mapper89Cart  : public MapperStrategyA { public: explicit Mapper89Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} std::vector<uint8_t> save_mapper_state() const noexcept override; };
 class Mapper94Cart  : public MapperStrategyA { public: explicit Mapper94Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} std::vector<uint8_t> save_mapper_state() const noexcept override; };
 class Mapper97Cart  : public MapperStrategyA { public: explicit Mapper97Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} std::vector<uint8_t> save_mapper_state() const noexcept override; };
+// v1.8 Masonry Phase E.2 step 9.3: 24 P1 mappers outside the Latch family.
+// Each inherits MapperStrategyA (16-byte default body).  Registrations land
+// in their respective source files (51.cpp / 57.cpp / 62.cpp / 65.cpp / 67.cpp
+// / 68.cpp / 71.cpp / 72.cpp / 73.cpp / 75.cpp / 77.cpp / 79.cpp / 80.cpp /
+// 82.cpp / 83.cpp / 88.cpp / 90.cpp / 91.cpp / 96.cpp / 99.cpp / addrlatch.cpp
+// / tangen.cpp / vrc1.cpp / vrc3.cpp / yoko.cpp).
+class Mapper51Cart  : public MapperStrategyA { public: explicit Mapper51Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper57Cart  : public MapperStrategyA { public: explicit Mapper57Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper61Cart  : public MapperStrategyA { public: explicit Mapper61Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper62Cart  : public MapperStrategyA { public: explicit Mapper62Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper64Cart  : public MapperStrategyA { public: explicit Mapper64Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper65Cart  : public MapperStrategyA { public: explicit Mapper65Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper67Cart  : public MapperStrategyA { public: explicit Mapper67Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper68Cart  : public MapperStrategyA { public: explicit Mapper68Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper71Cart  : public MapperStrategyA { public: explicit Mapper71Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper72Cart  : public MapperStrategyA { public: explicit Mapper72Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper73Cart  : public MapperStrategyA { public: explicit Mapper73Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper75Cart  : public MapperStrategyA { public: explicit Mapper75Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper77Cart  : public MapperStrategyA { public: explicit Mapper77Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper79Cart  : public MapperStrategyA { public: explicit Mapper79Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper80Cart  : public MapperStrategyA { public: explicit Mapper80Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper82Cart  : public MapperStrategyA { public: explicit Mapper82Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper83Cart  : public MapperStrategyA { public: explicit Mapper83Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper88Cart  : public MapperStrategyA { public: explicit Mapper88Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper90Cart  : public MapperStrategyA { public: explicit Mapper90Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper91Cart  : public MapperStrategyA { public: explicit Mapper91Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper92Cart  : public MapperStrategyA { public: explicit Mapper92Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper93Cart  : public MapperStrategyA { public: explicit Mapper93Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper96Cart  : public MapperStrategyA { public: explicit Mapper96Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper99Cart  : public MapperStrategyA { public: explicit Mapper99Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
 
 } // namespace fceu11
 

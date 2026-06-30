@@ -22,6 +22,7 @@
  */
 
 #include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase E.2 step 9.3
 
 static uint8 preg;
 static uint8 IRQx;	//autoenable
@@ -134,3 +135,13 @@ void Mapper73_Init(CartInfo *info) {
 	AddExState(&StateRegs, ~0, 0, 0);
 	GameStateRestore = StateRestore;
 }
+
+// v1.8 Masonry Phase E.2 step 9.3: MapperEntryRegister for mapper 73 (KONAMI VRC3).
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper73Register{
+    MapperEntry{73, "KONAMI VRC3", &Mapper73_Init,
+        [](Bus& bus) { return std::make_unique<Mapper73Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

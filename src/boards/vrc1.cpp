@@ -22,6 +22,7 @@
  */
 
 #include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase E.2 step 9.3
 
 static uint8 preg[3], creg[2], mode;
 static SFORMAT StateRegs[] =
@@ -68,3 +69,13 @@ void Mapper75_Init(CartInfo *info) {
 	AddExState(&StateRegs, ~0, 0, 0);
 	GameStateRestore = StateRestore;
 }
+
+// v1.8 Masonry Phase E.2 step 9.3: MapperEntryRegister for mapper 75 (KONAMI VRC1).
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper75Register{
+    MapperEntry{75, "KONAMI VRC1", &Mapper75_Init,
+        [](Bus& bus) { return std::make_unique<Mapper75Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

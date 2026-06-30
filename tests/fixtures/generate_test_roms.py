@@ -91,6 +91,32 @@ INES_MAPPERS = [
     ("mapper89",    89),
     ("mapper94",    94),
     ("mapper97",    97),
+    # Phase E.2 step 9.3: 23 P1 mappers outside the Latch family.  All use
+    # MapperStrategyA default body (16 bytes).
+    ("mapper51",    51),
+    ("mapper57",    57),
+    ("mapper61",    61),
+    ("mapper62",    62),
+    ("mapper64",    64),
+    ("mapper65",    65),
+    ("mapper67",    67),
+    ("mapper68",    68),
+    ("mapper71",    71),
+    ("mapper72",    72),
+    ("mapper73",    73),
+    ("mapper75",    75),
+    ("mapper77",    77),
+    ("mapper79",    79),
+    ("mapper80",    80),
+    ("mapper82",    82),
+    ("mapper83",    83),
+    ("mapper88",    88),
+    ("mapper90",    90),
+    ("mapper91",    91),
+    ("mapper92",    92),
+    ("mapper93",    93),
+    ("mapper96",    96),
+    ("mapper99",    99),
 ]
 
 PRG_SIZE = 1   # 1 x 16 KB

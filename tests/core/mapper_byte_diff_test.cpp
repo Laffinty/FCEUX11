@@ -130,6 +130,32 @@ static const RomTestCase tests[] = {
     { "fixtures/mapper_mapper89.nes",     "mapper89",     60  },  // SUNSOFT-3
     { "fixtures/mapper_mapper94.nes",     "mapper94",     60  },  // HVC-UN1ROM
     { "fixtures/mapper_mapper97.nes",     "mapper97",     60  },  // IREM TAM-S1
+    // Phase E.2 step 9.3: 24 P1 mappers outside the Latch family.  All use
+    // MapperStrategyA default body (16 bytes).
+    { "fixtures/mapper_mapper51.nes",     "mapper51",     60  },
+    { "fixtures/mapper_mapper57.nes",     "mapper57",     60  },
+    { "fixtures/mapper_mapper61.nes",     "mapper61",     60  },
+    { "fixtures/mapper_mapper62.nes",     "mapper62",     60  },
+    { "fixtures/mapper_mapper64.nes",     "mapper64",     60  },
+    { "fixtures/mapper_mapper65.nes",     "mapper65",     60  },
+    { "fixtures/mapper_mapper67.nes",     "mapper67",     60  },
+    { "fixtures/mapper_mapper68.nes",     "mapper68",     60  },
+    { "fixtures/mapper_mapper71.nes",     "mapper71",     60  },
+    { "fixtures/mapper_mapper72.nes",     "mapper72",     60  },
+    { "fixtures/mapper_mapper73.nes",     "mapper73",     60  },
+    { "fixtures/mapper_mapper75.nes",     "mapper75",     60  },
+    { "fixtures/mapper_mapper77.nes",     "mapper77",     60  },
+    { "fixtures/mapper_mapper79.nes",     "mapper79",     60  },
+    { "fixtures/mapper_mapper80.nes",     "mapper80",     60  },
+    { "fixtures/mapper_mapper82.nes",     "mapper82",     60  },
+    { "fixtures/mapper_mapper83.nes",     "mapper83",     60  },
+    { "fixtures/mapper_mapper88.nes",     "mapper88",     60  },
+    { "fixtures/mapper_mapper90.nes",     "mapper90",     60  },
+    { "fixtures/mapper_mapper91.nes",     "mapper91",     60  },
+    { "fixtures/mapper_mapper92.nes",     "mapper92",     60  },
+    { "fixtures/mapper_mapper93.nes",     "mapper93",     60  },
+    { "fixtures/mapper_mapper96.nes",     "mapper96",     60  },
+    { "fixtures/mapper_mapper99.nes",     "mapper99",     60  },
 };
 
 static const int NUM_TESTS = sizeof(tests) / sizeof(tests[0]);

@@ -194,11 +194,14 @@ void test_mmc3_on_close_releases_irq(TestContext& ctx) {
 }
 
 void test_unmapped_mapper_returns_nullptr(TestContext& ctx) {
-    // Phase E: mapper 99 is unmapped, so the factory returns nullptr and
+    // Phase E: mapper 999 is unmapped, so the factory returns nullptr and
     // cart_obj stays nullptr (legacy CartInfo function pointer path).
-    auto cart = fceu11::create_cart_for_mapper(99, fceu11::g_bus);
+    // v1.8 Phase E.2 step 9.3: mapper 99 was previously the unmapped
+    // sentinel but now has its own Cart subclass (Mapper99Cart), so the
+    // test moved to mapper 999 (still unmapped).
+    auto cart = fceu11::create_cart_for_mapper(999, fceu11::g_bus);
     FCEU11_EXPECT(ctx, cart == nullptr,
-                  "create_cart_for_mapper(99) returns nullptr");
+                  "create_cart_for_mapper(999) returns nullptr");
 }
 
 void test_install_expansion_audio_vrc6(TestContext& ctx) {

@@ -20,6 +20,7 @@
  */
 
 #include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase E.2 step 9.3
 
 static uint8 creg, preg;
 static SFORMAT StateRegs[] =
@@ -59,3 +60,15 @@ void Mapper79_Init(CartInfo *info) {
 	AddExState(&StateRegs, ~0, 0, 0);
 	GameStateRestore = StateRestore;
 }
+
+
+// v1.8 Masonry Phase E.2 step 9.3: MapperEntryRegister for mapper 79
+// (AVE/C&E/TXC BOARD).  Cart subclass inherits MapperStrategyA (16-byte default body).
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper79Register{
+    MapperEntry{79, "AVE/C&E/TXC BOARD", &Mapper79_Init,
+        [](Bus& bus) { return std::make_unique<Mapper79Cart>(bus); } }
+};
+}  // namespace
+}  // namespace fceu11

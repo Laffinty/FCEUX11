@@ -21,6 +21,7 @@
 
 #include "mapinc_bus.h"
 #include "../ppu.h"
+#include "simple_carts.h"          // v1.8 Phase E.2 step 9.3
 //#define DEBUG90
 
 // Mapper 090 is simpliest mapper hardware and have not extended nametable control and latched chr banks in 4k mode
@@ -506,3 +507,15 @@ void Mapper211_Init(CartInfo *info)
   GameStateRestore=M90Restore;
   AddExState(Tek_StateRegs, ~0, 0, 0);
 }
+
+
+// v1.8 Masonry Phase E.2 step 9.3: MapperEntryRegister for mapper 90
+// (HUMMER/JY BOARD).  Cart subclass inherits MapperStrategyA (16-byte default body).
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper90Register{
+    MapperEntry{90, "HUMMER/JY BOARD", &Mapper90_Init,
+        [](Bus& bus) { return std::make_unique<Mapper90Cart>(bus); } }
+};
+}  // namespace
+}  // namespace fceu11

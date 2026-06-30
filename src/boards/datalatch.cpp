@@ -889,6 +889,14 @@ static MapperEntryRegister kMapper97Register{
         [](Bus& bus) { return std::make_unique<Mapper97Cart>(bus); }}
 };
 
+// v1.8 Masonry Phase E.2 step 9.3: mapper 93 (SUNSOFT-3R) shares
+// SUNSOFT_UNROM_Init with mapper 89.  Cart subclass uses MapperStrategyA
+// default body (16 bytes).
+static MapperEntryRegister kMapper93Register{
+    MapperEntry{93, "SUNSOFT-3R", &SUNSOFT_UNROM_Init,
+        [](Bus& bus) { return std::make_unique<Mapper93Cart>(bus); }}
+};
+
 }  // namespace
 
 } // namespace fceu11

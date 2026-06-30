@@ -19,6 +19,7 @@
  */
 
 #include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase E.2 step 9.3
 
 static uint8 bank;
 static uint16 mode;
@@ -67,3 +68,15 @@ void Mapper62_Init(CartInfo *info) {
 	AddExState(&StateRegs, ~0, 0, 0);
 	GameStateRestore = StateRestore;
 }
+
+
+// v1.8 Masonry Phase E.2 step 9.3: MapperEntryRegister for mapper 62
+// (700-in-1).  Cart subclass inherits MapperStrategyA (16-byte default body).
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper62Register{
+    MapperEntry{62, "700-in-1", &Mapper62_Init,
+        [](Bus& bus) { return std::make_unique<Mapper62Cart>(bus); } }
+};
+}  // namespace
+}  // namespace fceu11

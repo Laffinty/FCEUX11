@@ -19,6 +19,7 @@
  */
 
 #include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase E.2 step 9.3
 
 FCEUX11_MAPPER_HOT static uint16 latche, latcheinit;
 FCEUX11_MAPPER_HOT static uint16 addrreg0, addrreg1;
@@ -532,3 +533,18 @@ static void BMCG146Sync(void) {
 void BMCG146_Init(CartInfo *info) {
 	Latch_Init(info, BMCG146Sync, NULL, 0x0000, 0x8000, 0xFFFF, 0);
 }
+
+// v1.8 Masonry Phase E.2 step 9.3: MapperEntryRegister for mapper 61 (20-in-1
+// KAISER Rev. A) and 92 (JALECO JF-19).  Both use Latch_Init, live here.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper61Register{
+    MapperEntry{61, "20-in-1 KAISER Rev. A", &Mapper61_Init,
+        [](Bus& bus) { return std::make_unique<Mapper61Cart>(bus); }}
+};
+static MapperEntryRegister kMapper92Register{
+    MapperEntry{92, "JALECO JF-19", &Mapper92_Init,
+        [](Bus& bus) { return std::make_unique<Mapper92Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

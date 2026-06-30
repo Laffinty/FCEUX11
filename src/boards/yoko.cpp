@@ -27,6 +27,7 @@
  */
 
 #include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase E.2 step 9.3
 
 static uint8 mode, bank, reg[11], low[4], dip, IRQa;
 static int32 IRQCount;
@@ -236,3 +237,13 @@ void Mapper83_Init(CartInfo *info) {
 
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+// v1.8 Masonry Phase E.2 step 9.3: MapperEntryRegister for mapper 83 (YOKO VRC Rev. B).
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper83Register{
+    MapperEntry{83, "YOKO VRC Rev. B", &Mapper83_Init,
+        [](Bus& bus) { return std::make_unique<Mapper83Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

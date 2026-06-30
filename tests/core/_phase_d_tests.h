@@ -58,7 +58,7 @@ void test_find_mapper_registered(TestContext& ctx) {
     FCEU11_EXPECT(ctx, fceu11::find_mapper(36) != nullptr,  "TXC 36 registered");
     FCEU11_EXPECT(ctx, fceu11::find_mapper(12) != nullptr,  "MMC3 var 12 registered");
     FCEU11_EXPECT(ctx, fceu11::find_mapper(406) != nullptr, "MMC3 var 406 registered");
-    FCEU11_EXPECT(ctx, fceu11::find_mapper(99) == nullptr,  "unmapped mapper 99");
+    FCEU11_EXPECT(ctx, fceu11::find_mapper(99) != nullptr,  "VS Uni 99 registered");
     FCEU11_EXPECT(ctx, fceu11::find_mapper(300) == nullptr, "out-of-range mapper 300");
 }
 

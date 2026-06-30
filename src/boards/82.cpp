@@ -22,6 +22,7 @@
  */
 
 #include "mapinc_bus.h"
+#include "simple_carts.h"          // v1.8 Phase E.2 step 9.3
 
 static uint8 regs[9], ctrl;
 static uint8 *WRAM = NULL;
@@ -96,3 +97,15 @@ void Mapper82_Init(CartInfo *info) {
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+
+// v1.8 Masonry Phase E.2 step 9.3: MapperEntryRegister for mapper 82
+// (TAITO X1-017).  Cart subclass inherits MapperStrategyA (16-byte default body).
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper82Register{
+    MapperEntry{82, "TAITO X1-017", &Mapper82_Init,
+        [](Bus& bus) { return std::make_unique<Mapper82Cart>(bus); } }
+};
+}  // namespace
+}  // namespace fceu11
