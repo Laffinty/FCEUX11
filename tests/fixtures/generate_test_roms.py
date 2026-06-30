@@ -123,6 +123,28 @@ INES_MAPPERS = [
     ("mapper60",    60),   # BMCD1038
     ("mapper76",    76),   # NAMCOT 108 Rev. A
     ("mapper95",    95),   # NAMCOT 108 Rev. B
+    # Phase E.2 step 9.5: FFE + Namco 163 + P2 mappers.
+    ("mapper6",      6),   # FFE
+    ("mapper17",    17),   # FFE variant
+    ("mapper19",    19),   # Namco 163
+    ("mapper210",  210),   # Namco 163 variant
+    ("mapper105",  105),   # NES-EVENT NWC1990
+    ("mapper114",  114),   # MMC3 BMC Pirate
+    ("mapper115",  115),   # MMC3 BMC Pirate
+    ("mapper116",  116),   # MMC1/MMC3/VRC PIRATE
+    ("mapper118",  118),   # TSKROM
+    ("mapper119",  119),   # MMC3 BMC Pirate
+    ("mapper165",  165),   # MMC3 BMC Pirate
+    ("mapper192",  192),   # MMC3 BMC Pirate
+    ("mapper194",  194),   # MMC3 BMC Pirate
+    ("mapper195",  195),   # MMC3 BMC Pirate
+    ("mapper198",  198),   # MMC3 BMC Pirate
+    ("mapper205",  205),   # MMC3 BMC Pirate
+    ("mapper245",  245),   # MMC3 BMC Pirate
+    ("mapper249",  249),   # MMC3 BMC Pirate
+    ("mapper250",  250),   # MMC3 BMC Pirate
+    ("mapper254",  254),   # MMC3 BMC Pirate
+    ("mapper406",  406),   # MMC3 BMC Pirate
 ]
 
 PRG_SIZE = 1   # 1 x 16 KB

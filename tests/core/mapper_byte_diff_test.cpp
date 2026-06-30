@@ -160,6 +160,28 @@ static const RomTestCase tests[] = {
     { "fixtures/mapper_mapper60.nes",     "mapper60",     60  },  // BMCD1038
     { "fixtures/mapper_mapper76.nes",     "mapper76",     60  },  // NAMCOT 108 Rev. A
     { "fixtures/mapper_mapper95.nes",     "mapper95",     60  },  // NAMCOT 108 Rev. B
+    // Phase E.2 step 9.5: FFE + Namco 163 + P2 mappers.
+    { "fixtures/mapper_mapper6.nes",      "mapper6",      60  },  // FFE
+    { "fixtures/mapper_mapper17.nes",     "mapper17",     60  },  // FFE variant
+    { "fixtures/mapper_mapper19.nes",     "mapper19",     60  },  // Namco 163
+    { "fixtures/mapper_mapper210.nes",    "mapper210",    60  },  // Namco 163 variant
+    { "fixtures/mapper_mapper105.nes",    "mapper105",    60  },  // NES-EVENT NWC1990
+    { "fixtures/mapper_mapper114.nes",    "mapper114",    60  },  // MMC3 BMC Pirate
+    { "fixtures/mapper_mapper115.nes",    "mapper115",    60  },  // MMC3 BMC Pirate
+    { "fixtures/mapper_mapper116.nes",    "mapper116",    60  },  // MMC1/MMC3/VRC PIRATE
+    { "fixtures/mapper_mapper118.nes",    "mapper118",    60  },  // TSKROM
+    { "fixtures/mapper_mapper119.nes",    "mapper119",    60  },  // MMC3 BMC Pirate
+    { "fixtures/mapper_mapper165.nes",    "mapper165",    60  },  // MMC3 BMC Pirate
+    { "fixtures/mapper_mapper192.nes",    "mapper192",    60  },  // MMC3 BMC Pirate
+    { "fixtures/mapper_mapper194.nes",    "mapper194",    60  },  // MMC3 BMC Pirate
+    { "fixtures/mapper_mapper195.nes",    "mapper195",    60  },  // MMC3 BMC Pirate
+    { "fixtures/mapper_mapper198.nes",    "mapper198",    60  },  // MMC3 BMC Pirate
+    { "fixtures/mapper_mapper205.nes",    "mapper205",    60  },  // MMC3 BMC Pirate
+    { "fixtures/mapper_mapper245.nes",    "mapper245",    60  },  // MMC3 BMC Pirate
+    { "fixtures/mapper_mapper249.nes",    "mapper249",    60  },  // MMC3 BMC Pirate
+    { "fixtures/mapper_mapper250.nes",    "mapper250",    60  },  // MMC3 BMC Pirate
+    { "fixtures/mapper_mapper254.nes",    "mapper254",    60  },  // MMC3 BMC Pirate
+    { "fixtures/mapper_mapper406.nes",    "mapper406",    60  },  // MMC3 BMC Pirate
     // mapper 83 (YOKO VRC) placed last: its cleanup corrupts the heap for
     // subsequent mappers in ctest.  Passes standalone.  Phase E.2 followup.
     { "fixtures/mapper_mapper83.nes",     "mapper83",     60  },  // YOKO VRC

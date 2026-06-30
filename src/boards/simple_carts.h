@@ -87,6 +87,11 @@ class Mapper58Cart  : public MapperStrategyA { public: explicit Mapper58Cart(Bus
 class Mapper60Cart  : public MapperStrategyA { public: explicit Mapper60Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
 class Mapper76Cart  : public MapperStrategyA { public: explicit Mapper76Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
 class Mapper95Cart  : public MapperStrategyA { public: explicit Mapper95Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+// v1.8 Phase E.2 step 9.5: FFE mappers 6/17 and Namco 163 mappers 19/210.
+class Mapper6Cart   : public MapperStrategyA { public: explicit Mapper6Cart(Bus& bus) noexcept   : MapperStrategyA(bus) {} };
+class Mapper17Cart  : public MapperStrategyA { public: explicit Mapper17Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper19Cart  : public MapperStrategyA { public: explicit Mapper19Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper210Cart : public MapperStrategyA { public: explicit Mapper210Cart(Bus& bus) noexcept : MapperStrategyA(bus) {} };
 
 } // namespace fceu11
 
