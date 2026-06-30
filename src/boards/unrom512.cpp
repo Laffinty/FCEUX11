@@ -36,6 +36,7 @@
 #include "mapinc_bus.h"
 #include "../unif.h"
 #include "../ines.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 const int ROM_CHIP = 0x00;
 const int CFI_CHIP = 0x10;
@@ -235,3 +236,13 @@ void UNROM512_Init(CartInfo *info) {
 	AddExState(&latche, sizeof(latche), 0, "LATC");
 	AddExState(&bus_conflict, sizeof(bus_conflict), 0, "BUSC");
 }
+
+// v1.8 Phase F incremental.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper30Register{
+    MapperEntry{30, "UNROM 512", &UNROM512_Init,
+        [](Bus& bus) { return std::make_unique<Mapper30Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

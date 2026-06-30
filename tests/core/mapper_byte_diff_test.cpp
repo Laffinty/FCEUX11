@@ -238,6 +238,11 @@ static const RomTestCase tests[] = {
     { "fixtures/mapper_mapper189.nes",     "mapper189",     60  },
     { "fixtures/mapper_mapper190.nes",     "mapper190",     60  },
     { "fixtures/mapper_mapper193.nes",     "mapper193",     60  },
+    { "fixtures/mapper_mapper14.nes",     "mapper14",     60  },
+    { "fixtures/mapper_mapper27.nes",     "mapper27",     60  },
+    { "fixtures/mapper_mapper30.nes",     "mapper30",     60  },
+    { "fixtures/mapper_mapper31.nes",     "mapper31",     60  },
+    { "fixtures/mapper_mapper35.nes",     "mapper35",     60  },
     // mapper 83 (YOKO VRC) placed last: its cleanup corrupts the heap for
     // subsequent mappers in ctest.  Passes standalone.  Phase E.2 followup.
     { "fixtures/mapper_mapper83.nes",     "mapper83",     60  },  // YOKO VRC

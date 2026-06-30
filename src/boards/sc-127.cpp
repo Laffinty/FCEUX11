@@ -22,6 +22,7 @@
 
 #include "mapinc_bus.h"
 #include "../ppu.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 static uint8 reg[8], chr[8];
 static uint8 *WRAM = NULL;
@@ -123,3 +124,13 @@ void UNLSC127_Init(CartInfo *info) {
 	AddExState(WRAM, WRAMSIZE, 0, "WRAM");
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+// v1.8 Phase F incremental.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper35Register{
+    MapperEntry{35, "Wario Land 2", &UNLSC127_Init,
+        [](Bus& bus) { return std::make_unique<Mapper35Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

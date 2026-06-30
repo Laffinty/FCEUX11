@@ -198,6 +198,11 @@ INES_MAPPERS = [
     ("mapper189",  189),
     ("mapper190",  190),
     ("mapper193",  193),
+    ("mapper14",  14),
+    ("mapper27",  27),
+    ("mapper30",  30),
+    ("mapper31",  31),
+    ("mapper35",  35),
 ]
 
 PRG_SIZE = 1   # 1 x 16 KB

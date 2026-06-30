@@ -20,6 +20,7 @@
 
 #include "mapinc_mmc3.h"
 #include "mmc3.h"
+#include "simple_carts.h"          // v1.8 Phase F
 
 static uint8 chrcmd[8], prg0, prg1, bbrk, mirr, swap;
 static SFORMAT StateRegs[] =
@@ -105,3 +106,13 @@ void UNLSL1632_Init(CartInfo *info) {
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }
+
+// v1.8 Phase F incremental.
+namespace fceu11 {
+namespace {
+static MapperEntryRegister kMapper14Register{
+    MapperEntry{14, "REX SL-1632", &UNLSL1632_Init,
+        [](Bus& bus) { return std::make_unique<Mapper14Cart>(bus); }}
+};
+}  // namespace
+}  // namespace fceu11

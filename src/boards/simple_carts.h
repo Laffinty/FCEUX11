@@ -154,6 +154,16 @@ class Mapper189Cart  : public MapperStrategyA { public: explicit Mapper189Cart(B
 class Mapper190Cart  : public MapperStrategyA { public: explicit Mapper190Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
 class Mapper193Cart  : public MapperStrategyA { public: explicit Mapper193Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
 
+// v1.8 Phase F incremental.
+class Mapper178Cart  : public MapperStrategyA { public: explicit Mapper178Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+
+// v1.8 Phase F incremental.
+class Mapper14Cart  : public MapperStrategyA { public: explicit Mapper14Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper27Cart  : public MapperStrategyA { public: explicit Mapper27Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper30Cart  : public MapperStrategyA { public: explicit Mapper30Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper31Cart  : public MapperStrategyA { public: explicit Mapper31Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+class Mapper35Cart  : public MapperStrategyA { public: explicit Mapper35Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
+
 } // namespace fceu11
 
 #endif // FCEU11_BOARDS_SIMPLE_CARTS_H
