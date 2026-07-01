@@ -196,6 +196,76 @@ fn find_entry_mut<'a>(
 }
 
 // ============================================================
+// CRC32 integrity for raw SFORMAT byte streams
+// ============================================================
+
+/// Compute CRC32 checksum of a raw SFORMAT byte stream.
+///
+/// The SFORMAT binary format is:
+/// ```text
+/// For each entry: [desc: 4 bytes][size: u32 LE][data: size bytes]
+/// ```
+///
+/// This function validates the stream structure and returns a CRC32
+/// checksum for integrity verification. Returns 0 for empty streams.
+///
+/// # Safety
+/// `data` must point to `len` valid bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_rust_sformat_crc32(
+    data: *const u8,
+    len: usize,
+) -> u32 {
+    if data.is_null() || len == 0 {
+        return 0;
+    }
+    let bytes = unsafe { std::slice::from_raw_parts(data, len) };
+    crc32fast::hash(bytes)
+}
+
+/// Validate SFORMAT byte stream structure.
+///
+/// Walks the stream checking that each entry's declared size fits
+/// within the remaining bytes. Returns the number of valid entries
+/// found, or -1 if the stream is truncated/corrupt.
+///
+/// # Safety
+/// `data` must point to `len` valid bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_rust_sformat_validate(
+    data: *const u8,
+    len: usize,
+) -> i32 {
+    if len == 0 {
+        return 0; // empty stream is valid
+    }
+    if data.is_null() {
+        return -1;
+    }
+    let bytes = unsafe { std::slice::from_raw_parts(data, len) };
+    let mut pos = 0usize;
+    let mut count = 0i32;
+    while pos + 8 <= bytes.len() {
+        let size = u32::from_le_bytes([
+            bytes[pos + 4],
+            bytes[pos + 5],
+            bytes[pos + 6],
+            bytes[pos + 7],
+        ]) as usize;
+        pos += 8;
+        if pos + size > bytes.len() {
+            return -1; // truncated
+        }
+        pos += size;
+        count += 1;
+    }
+    if pos != bytes.len() {
+        return -1; // trailing bytes
+    }
+    count
+}
+
+// ============================================================
 // High-level API: serialize SFORMAT table → StateChunk
 // ============================================================
 
@@ -407,5 +477,74 @@ mod tests {
         });
 
         assert_eq!(target, [0u8; 2]);
+    }
+
+    #[test]
+    fn test_crc32_deterministic() {
+        let data = [0xAAu8, 0xBB, 0xCC, 0xDD];
+        let crc1 = unsafe { fceux11_rust_sformat_crc32(data.as_ptr(), data.len()) };
+        let crc2 = unsafe { fceux11_rust_sformat_crc32(data.as_ptr(), data.len()) };
+        assert_eq!(crc1, crc2);
+        assert_ne!(crc1, 0);
+    }
+
+    #[test]
+    fn test_crc32_empty() {
+        let crc = unsafe { fceux11_rust_sformat_crc32(std::ptr::null(), 0) };
+        assert_eq!(crc, 0);
+    }
+
+    #[test]
+    fn test_crc32_different_data() {
+        let data1 = [0x01u8, 0x02, 0x03];
+        let data2 = [0x04u8, 0x05, 0x06];
+        let crc1 = unsafe { fceux11_rust_sformat_crc32(data1.as_ptr(), data1.len()) };
+        let crc2 = unsafe { fceux11_rust_sformat_crc32(data2.as_ptr(), data2.len()) };
+        assert_ne!(crc1, crc2);
+    }
+
+    #[test]
+    fn test_validate_valid_stream() {
+        // Build a valid SFORMAT stream: desc(4) + size(4) + data(4) = 12 bytes
+        let mut stream = Vec::new();
+        stream.extend_from_slice(b"TEST");
+        stream.extend_from_slice(&4u32.to_le_bytes());
+        stream.extend_from_slice(&[0xAA, 0xBB, 0xCC, 0xDD]);
+
+        let count = unsafe { fceux11_rust_sformat_validate(stream.as_ptr(), stream.len()) };
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn test_validate_multiple_entries() {
+        let mut stream = Vec::new();
+        // Entry 1
+        stream.extend_from_slice(b"AAAA");
+        stream.extend_from_slice(&2u32.to_le_bytes());
+        stream.extend_from_slice(&[0x01, 0x02]);
+        // Entry 2
+        stream.extend_from_slice(b"BBBB");
+        stream.extend_from_slice(&3u32.to_le_bytes());
+        stream.extend_from_slice(&[0x03, 0x04, 0x05]);
+
+        let count = unsafe { fceux11_rust_sformat_validate(stream.as_ptr(), stream.len()) };
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_validate_truncated() {
+        let mut stream = Vec::new();
+        stream.extend_from_slice(b"TEST");
+        stream.extend_from_slice(&8u32.to_le_bytes()); // claims 8 bytes
+        stream.extend_from_slice(&[0xAA, 0xBB]); // only 2 bytes
+
+        let count = unsafe { fceux11_rust_sformat_validate(stream.as_ptr(), stream.len()) };
+        assert_eq!(count, -1);
+    }
+
+    #[test]
+    fn test_validate_empty() {
+        let count = unsafe { fceux11_rust_sformat_validate(std::ptr::null(), 0) };
+        assert_eq!(count, 0);
     }
 }

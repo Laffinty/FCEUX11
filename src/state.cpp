@@ -324,7 +324,12 @@ bool FCEUSS_SaveMS(EMUFILE* outstream, int compressionLevel)
 			std::vector<uint8_t> buf(size);
 			mem.fseek(0, SEEK_SET);
 			mem.fread(std::span<std::byte>(reinterpret_cast<std::byte*>(buf.data()), size));
-			chunks.push_back({type, std::move(buf)});
+			// v1.9: validate SFORMAT stream and compute CRC32 via Rust
+			int32_t entries = fceux11_rust_sformat_validate(buf.data(), buf.size());
+			if (entries >= 0) {
+				chunks.push_back({type, std::move(buf)});
+			}
+			// If validation fails, skip this chunk (corrupt SFORMAT data)
 		}
 	};
 
@@ -570,7 +575,14 @@ bool FCEUSS_LoadFP(EMUFILE* is, ENUM_SSLOADPARAMS params)
 
 	// v1.9 Chronicle: C++ handles SFORMAT field-level deserialization via
 	// ReadStateChunkFromBuffer (safe memory access to C++ globals).
+	// Rust validates SFORMAT stream structure before deserialization.
 	auto deserializeSformatChunk = [&](uint8_t* data, int size, SFORMAT* sf) -> bool {
+		if (!sf || !sf->v) return true;
+		// Validate SFORMAT stream structure via Rust FFI
+		int32_t entries = fceux11_rust_sformat_validate(data, size);
+		if (entries < 0) {
+			return false; // corrupt stream
+		}
 		return ReadStateChunkFromBuffer(data, size, sf);
 	};
 

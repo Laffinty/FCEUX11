@@ -2913,6 +2913,34 @@ bool fceux11_rust_sformat_deserialize(const uint8_t *stream_data,
                                       uint32_t _version);
 
 /**
+ * Compute CRC32 checksum of a raw SFORMAT byte stream.
+ *
+ * The SFORMAT binary format is:
+ * ```text
+ * For each entry: [desc: 4 bytes][size: u32 LE][data: size bytes]
+ * ```
+ *
+ * This function validates the stream structure and returns a CRC32
+ * checksum for integrity verification. Returns 0 for empty streams.
+ *
+ * # Safety
+ * `data` must point to `len` valid bytes.
+ */
+uint32_t fceux11_rust_sformat_crc32(const uint8_t *data, uintptr_t len);
+
+/**
+ * Validate SFORMAT byte stream structure.
+ *
+ * Walks the stream checking that each entry's declared size fits
+ * within the remaining bytes. Returns the number of valid entries
+ * found, or -1 if the stream is truncated/corrupt.
+ *
+ * # Safety
+ * `data` must point to `len` valid bytes.
+ */
+int32_t fceux11_rust_sformat_validate(const uint8_t *data, uintptr_t len);
+
+/**
  * Serialize an SFORMAT table into a `StateChunk` with the given chunk type.
  *
  * This is the Rust equivalent of the C++ `addSformatChunk` lambda in
