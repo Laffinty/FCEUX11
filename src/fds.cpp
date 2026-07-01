@@ -271,43 +271,29 @@ static DECLFR(FDSRead4030) {
 }
 
 static DECLFR(FDSRead4031) {
-	static uint8 ret = 0;
+	// v1.10 Cryptex: Use Rust FFI for disk read
+	FceuFdsDiskIoState state;
+	state.block = mapperFDS_block;
+	state.block_start = mapperFDS_blockstart;
+	state.block_len = mapperFDS_blocklen;
+	state.disk_addr = mapperFDS_diskaddr;
+	state.file_size = mapperFDS_filesize;
+	state.control = mapperFDS_control;
+	state.disk_inserted = mapperFDS_diskinsert ? 1 : 0;
+	state.disk_access = mapperFDS_diskaccess;
 
-	ret = 0xff;
-	if (mapperFDS_diskinsert && mapperFDS_control & 0x04) {
+	FceuFdsDiskReadResult result;
+	if (fceux11_rust_fds_disk_read(&state, diskdata[InDisk], &result)) {
+		mapperFDS_diskaddr = result.new_disk_addr;
+		mapperFDS_filesize = result.new_file_size;
 		mapperFDS_diskaccess = 1;
-
-		ret = 0;
-
-		switch (mapperFDS_block) {
-			case DSK_FILEHDR:
-				if (mapperFDS_diskaddr < mapperFDS_blocklen) {
-					ret = fds_disk();
-					switch (mapperFDS_diskaddr) {
-						case 13: mapperFDS_filesize = ret; break;
-						case 14:
-							mapperFDS_filesize |= ret << 8;
-							//char fdsfile[10];
-							//strncpy(fdsfile, (char*)&diskdata[InDisk][mapperFDS_blockstart + 3], 8);
-							//printf("Read file: %s (size: %d)\n"), fdsfile, mapperFDS_filesize);
-							break;
-					}
-					mapperFDS_diskaddr++;
-				}
-				break;
-			default:
-				if (mapperFDS_diskaddr < mapperFDS_blocklen) {
-					ret = fds_disk();
-					mapperFDS_diskaddr++;
-				}
-				break;
+		if (result.trigger_seek_irq) {
+			DiskSeekIRQ = 150;
+			X6502_IRQEnd(FCEU_IQEXT2);
 		}
-
-		DiskSeekIRQ = 150;
-		X6502_IRQEnd(FCEU_IQEXT2);
+		return result.value;
 	}
-
-	return ret;
+	return 0xff;
 }
 
 static DECLFR(FDSRead4032) {
@@ -600,39 +586,29 @@ static DECLFW(FDSWrite) {
 		}
 		break;
 	case 0x4024:
+		// v1.10 Cryptex: Use Rust FFI for disk write
 		if (mapperFDS_diskinsert && ~mapperFDS_control & 0x04) {
-
 			if (mapperFDS_diskaccess == 0) {
 				mapperFDS_diskaccess = 1;
 				break;
 			}
 
-			switch (mapperFDS_block) {
-				case DSK_FILEHDR:
-					if (mapperFDS_diskaddr < mapperFDS_blocklen) {
-						fds_disk() = V;
-						DiskWritten = 1;
-						switch (mapperFDS_diskaddr) {
-							case 13: mapperFDS_filesize = V; break;
-							case 14:
-								mapperFDS_filesize |= V << 8;
-								//char fdsfile[10];
-								//strncpy(fdsfile, (char*)&diskdata[InDisk][mapperFDS_blockstart + 3], 8);
-								//printf("Write file: %s (size: %d)\n"), fdsfile, mapperFDS_filesize);
-								break;
-						}
-						mapperFDS_diskaddr++;
-					}
-					break;
-				default:
-					if (mapperFDS_diskaddr < mapperFDS_blocklen) {
-						fds_disk() = V;
-					DiskWritten = 1;
-						mapperFDS_diskaddr++;
-					}
-					break;
-			}
+			FceuFdsDiskIoState state;
+			state.block = mapperFDS_block;
+			state.block_start = mapperFDS_blockstart;
+			state.block_len = mapperFDS_blocklen;
+			state.disk_addr = mapperFDS_diskaddr;
+			state.file_size = mapperFDS_filesize;
+			state.control = mapperFDS_control;
+			state.disk_inserted = mapperFDS_diskinsert ? 1 : 0;
+			state.disk_access = mapperFDS_diskaccess;
 
+			FceuFdsDiskWriteResult result;
+			if (fceux11_rust_fds_disk_write(&state, diskdata[InDisk], V, &result)) {
+				mapperFDS_diskaddr = result.new_disk_addr;
+				mapperFDS_filesize = result.new_file_size;
+				if (result.disk_written) DiskWritten = 1;
+			}
 		}
 		break;
 	case 0x4025:

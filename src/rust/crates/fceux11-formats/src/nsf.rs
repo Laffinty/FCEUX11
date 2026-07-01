@@ -351,6 +351,114 @@ unsafe fn copy_cstr(dst: *mut u8, src: &[u8], maxlen: usize) {
 }
 
 // ------------------------------------------------------------------
+// FFI: Complete NSF load
+// ------------------------------------------------------------------
+
+/// Result of a complete NSF file load.
+///
+/// Contains the NSF data pointer, parsed header info, and computed
+/// addresses.  The caller must keep the file buffer alive for as long
+/// as it uses the data pointer.
+#[repr(C)]
+pub struct FceuNsfCartResult {
+    /// Pointer to NSF data (after the 0x80 header), within file buffer.
+    pub nsf_data: *const u8,
+    /// NSF data size in bytes.
+    pub nsf_size: u32,
+    /// Load address.
+    pub load_addr: u16,
+    /// Init address.
+    pub init_addr: u16,
+    /// Play address.
+    pub play_addr: u16,
+    /// Maximum bank number.
+    pub max_bank: u32,
+    /// Bank-switching on flag.
+    pub bank_switch: bool,
+    /// Video system (0=NTSC, 1=PAL).
+    pub video_system: u8,
+    /// Sound chip flags.
+    pub sound_chip: u8,
+    /// Total songs.
+    pub total_songs: u8,
+    /// Starting song (1-based).
+    pub starting_song: u8,
+    /// Song name (null-terminated).
+    pub song_name: [u8; 32],
+    /// Artist (null-terminated).
+    pub artist: [u8; 32],
+    /// Copyright (null-terminated).
+    pub copyright: [u8; 32],
+}
+
+/// Load an NSF ROM file from a buffer.
+///
+/// Parses the 0x80 header, validates it, computes bank layout, and
+/// returns a pointer to the NSF data.  The data pointer points into
+/// the original `file_data` buffer, so the caller must keep it alive.
+///
+/// Returns `true` on success.
+///
+/// # Safety
+/// `file_data` must point to at least `file_len` readable bytes.
+/// `out_cart` must point to a writable `FceuNsfCartResult`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_rust_nsf_load(
+    file_data: *const u8,
+    file_len: usize,
+    out_cart: *mut FceuNsfCartResult,
+) -> bool {
+    if file_data.is_null() || out_cart.is_null() || file_len < 0x80 {
+        return false;
+    }
+
+    let result = unsafe { &mut *out_cart };
+
+    // Validate header
+    let header = file_data as *mut FceuNsfHeader;
+    let mut load_addr: u16 = 0;
+    let mut init_addr: u16 = 0;
+    let mut play_addr: u16 = 0;
+
+    if unsafe { !fceux11_rust_nsf_header_validate(header, &mut load_addr, &mut init_addr, &mut play_addr) } {
+        return false;
+    }
+
+    if load_addr < 0x6000 {
+        return false;
+    }
+
+    // Compute banks
+    let nsf_size = (file_len - 0x80) as u32;
+    let mut max_bank: u32 = 0;
+    let mut bson: u8 = 0;
+
+    // Read bank_switch from header
+    let hdr = unsafe { &*header };
+    if unsafe { !fceux11_rust_nsf_compute_banks(header, nsf_size, &mut max_bank, &mut bson, hdr.bank_switch.as_ptr() as *mut u8) } {
+        return false;
+    }
+
+    // Extract header fields
+    result.nsf_data = unsafe { file_data.add(0x80) };
+    result.nsf_size = nsf_size;
+    result.load_addr = load_addr;
+    result.init_addr = init_addr;
+    result.play_addr = play_addr;
+    result.max_bank = max_bank;
+    result.bank_switch = bson != 0;
+    result.video_system = hdr.video_system;
+    result.sound_chip = hdr.sound_chip;
+    result.total_songs = hdr.total_songs;
+    result.starting_song = hdr.starting_song;
+    result.song_name = hdr.song_name;
+    result.artist = hdr.artist;
+    result.copyright = hdr.copyright;
+
+    true
+}
+
+// ------------------------------------------------------------------
 // Tests
 // ------------------------------------------------------------------
 

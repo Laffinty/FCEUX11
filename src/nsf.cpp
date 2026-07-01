@@ -174,88 +174,24 @@ static INLINE void BANKSET(uint32 A, uint32 bank)
 		setprg4(A,bank);
 }
 
+// v1.10 Cryptex: NSFLoad is now a thin wrapper around NSFLoadCore (nsf_load.cpp)
+extern int NSFLoadCore(const char *name, FCEUFILE *fp);
+
 int NSFLoad(const char *name, FCEUFILE *fp)
 {
-	FCEU_fseek(fp,0,SEEK_SET);
-	FCEU_fread(&NSFHeader,1,0x80,fp);
+	FCEU_fseek(fp, 0, SEEK_SET);
 
-	if(!fceux11_rust_nsf_header_validate((FceuNsfHeader*)&NSFHeader, &LoadAddr, &InitAddr, &PlayAddr))
-		return LOADER_INVALID_FORMAT;
+	int result = NSFLoadCore(name, fp);
+	if (result != LOADER_OK) return result;
 
-	if(LoadAddr<0x6000)
-	{
-		FCEUD_PrintError("Invalid load address.");
-		return LOADER_HANDLED_ERROR;
-	}
-
-	NSFSize=FCEU_fgetsize(fp)-0x80;
-
-	{
-		uint32 nsf_max_bank = 0;
-		uint8 bson = 0;
-		if(!fceux11_rust_nsf_compute_banks((FceuNsfHeader*)&NSFHeader, NSFSize, &nsf_max_bank, &bson, NSFHeader.BankSwitch))
-			return LOADER_HANDLED_ERROR;
-		NSFMaxBank=PRGsize[0]=nsf_max_bank;
-		BSon=bson;
-	}
-
-	if (!(NSFDATA = (uint8 *)FCEU_malloc(NSFMaxBank * 4096)))
-	{
-		FCEU_PrintError("Unable to allocate memory.");
-		return LOADER_HANDLED_ERROR;
-	}
-
-	FCEU_fseek(fp,0x80,SEEK_SET);
-	memset(NSFDATA,0x00,NSFMaxBank*4096);
-	FCEU_fread(NSFDATA+(LoadAddr&0xfff),1,NSFSize,fp);
-
-	NSFMaxBank--;
-
-	GameInfo->type=GIT_NSF;
-	// v0.3.8: GameInfo->input[] is ESI; SI_GAMEPAD is int — cast.
-	GameInfo->input[0]=GameInfo->input[1]=static_cast<ESI>(SI_GAMEPAD);
-	GameInfo->cspecial=SIS_NSF;
-
-	if(!fceux11_rust_nsf_patch_nsfrom(NSFROM, sizeof(NSFROM), InitAddr, PlayAddr))
-		return LOADER_HANDLED_ERROR;
-
-	if(NSFHeader.VideoSystem==0)
-		GameInfo->vidsys=GIV_NTSC;
-	else if(NSFHeader.VideoSystem==1)
-		GameInfo->vidsys=GIV_PAL;
-
-	GameInterface=NSFGI;
-
+	// Post-load setup
+	GameInterface = NSFGI;
 	FCEU_strlcpy(LoadedRomFName, sizeof(LoadedRomFName), name);
 
-	FCEU_printf("\nNSF Loaded.\nFile information:\n");
-	FCEU_printf(" Name:       %s\n Artist:     %s\n Copyright:  %s\n\n",NSFHeader.SongName,NSFHeader.Artist,NSFHeader.Copyright);
-	if(NSFHeader.SoundChip)
-	{
-		uint8 chip_mask = 0;
-		const char* chip_name = fceux11_rust_nsf_chip_name(NSFHeader.SoundChip, &chip_mask);
-		if(chip_name)
-		{
-			FCEU_printf(" Expansion hardware:  %s\n", chip_name);
-			NSFHeader.SoundChip = chip_mask;  /* Prevent confusing weirdness if more than one bit is set. */
-		}
-	}
-	if(BSon)
-		FCEU_printf(" Bank-switched.\n");
-	FCEU_printf(" Load address:  $%04x\n Init address:  $%04x\n Play address:  $%04x\n",LoadAddr,InitAddr,PlayAddr);
-	FCEU_printf(" %s\n",(NSFHeader.VideoSystem&1)?"PAL":"NTSC");
-	FCEU_printf(" Starting song:  %d / %d\n\n",NSFHeader.StartingSong,NSFHeader.TotalSongs);
-
-	//choose exwram size and allocate
-	int exwram_size = 8192;
-	if(NSFHeader.SoundChip&4)
-		exwram_size = 32768+8192;
-	//lets just always use this size, for savestate simplicity
-	exwram_size = FIXED_EXWRAM_SIZE;
-	ExWRAM_owner = FCEU_gmalloc_unique(exwram_size);  // v0.3.6: RAII-wrapped
+	// Allocate extended WRAM
+	int exwram_size = FIXED_EXWRAM_SIZE;
+	ExWRAM_owner = FCEU_gmalloc_unique(exwram_size);
 	ExWRAM = ExWRAM_owner.get();
-
-	fceu11::SetVidSystem(NSFHeader.VideoSystem);
 
 	return LOADER_OK;
 }

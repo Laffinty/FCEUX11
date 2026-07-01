@@ -624,6 +624,81 @@ pub unsafe extern "C" fn fceux11_rust_ines_parse_header(
 }
 
 // ------------------------------------------------------------------
+// FFI: ROM/CHR layout computation
+// ------------------------------------------------------------------
+
+/// Computed ROM/CHR layout from an iNES header parse result.
+///
+/// Contains byte-level sizes and flags needed for memory allocation
+/// and data loading.  Produced by `fceux11_rust_ines_compute_layout`.
+#[repr(C)]
+pub struct FceuInesLayout {
+    /// PRG-ROM size in bytes (`rom_size_16kb << 14`).
+    pub prg_size_bytes: u32,
+    /// CHR-ROM size in bytes (`vrom_size_8kb << 13`).
+    pub chr_size_bytes: u32,
+    /// CHR-RAM size in bytes when no CHR-ROM is present.
+    /// -1 means CHR-ROM is present (no CHR-RAM needed).
+    /// 0 means size will be determined later by mapper init.
+    pub chrram_size: i32,
+    /// Whether the mapper number is a power of two (determines rounding).
+    pub round_prg: bool,
+    /// Number of 16 KiB PRG banks (after rounding if applicable).
+    pub prg_banks_16kb: u32,
+    /// Number of 8 KiB CHR banks.
+    pub chr_banks_8kb: u32,
+    /// Whether a 512-byte trainer is present.
+    pub trainer_present: bool,
+    /// PRG-ROM raw (not rounded) size in 16 KiB units.
+    pub prg_banks_raw: u32,
+}
+
+/// Compute ROM/CHR layout from a parsed iNES header.
+///
+/// Takes the `FceuInesParseResult` from `fceux11_rust_ines_parse_header`
+/// and computes byte-level sizes, CHR-RAM requirements, and rounding info.
+///
+/// Returns `true` on success.
+///
+/// # Safety
+/// `parse` must point to a valid `FceuInesParseResult`.
+/// `out` must point to a writable `FceuInesLayout`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_rust_ines_compute_layout(
+    parse: *const FceuInesParseResult,
+    out: *mut FceuInesLayout,
+) -> bool {
+    if parse.is_null() || out.is_null() {
+        return false;
+    }
+    let p = unsafe { &*parse };
+    let out = unsafe { &mut *out };
+
+    let round = crate::ines::fceux11_rust_ines_not_power2(p.mapper_no as i32) == 0;
+
+    out.prg_banks_16kb = p.rom_size_16kb;
+    out.prg_banks_raw = p.rom_size_raw;
+    out.chr_banks_8kb = p.vrom_size_8kb;
+    out.round_prg = round;
+    out.trainer_present = p.trainer;
+
+    // PRG size in bytes: use rounded banks if mapper requires it, else raw
+    let prg_units = if round { p.rom_size_16kb } else { p.rom_size_raw };
+    out.prg_size_bytes = prg_units << 14;
+
+    // CHR size in bytes
+    out.chr_size_bytes = p.vrom_size_8kb << 13;
+
+    // CHR-RAM: determined by mapper when no CHR-ROM present
+    // The actual CHRRAM size is computed during mapper init (iNES_Init),
+    // so we leave it at 0 here.  The caller should use
+    // `fceux11_rust_cart_compute_chrram_size` if it needs the value early.
+    out.chrram_size = if p.vrom_size_8kb > 0 { -1 } else { 0 };
+
+    true
+}
+
+// ------------------------------------------------------------------
 // FFI: ROM hash computation
 // ------------------------------------------------------------------
 
@@ -689,6 +764,220 @@ pub unsafe extern "C" fn fceux11_rust_ines_compute_hash(
             md5: md5_bytes,
             crc32: crc,
             partial_md5,
+        };
+    }
+
+    true
+}
+
+// ------------------------------------------------------------------
+// FFI: Complete iNES load
+// ------------------------------------------------------------------
+
+/// Result of a complete iNES file load.
+///
+/// Contains pointers into the original file buffer for PRG, CHR, and
+/// trainer data, along with all parsed metadata.  The caller must keep
+/// the file buffer alive for as long as it uses the data pointers.
+#[repr(C)]
+pub struct FceuInesCartResult {
+    /// Pointer to PRG-ROM data within the file buffer.
+    pub prg_data: *const u8,
+    /// PRG-ROM size in bytes.
+    pub prg_size: u32,
+    /// Pointer to CHR-ROM data within the file buffer (null if no CHR-ROM).
+    pub chr_data: *const u8,
+    /// CHR-ROM size in bytes.
+    pub chr_size: u32,
+    /// Pointer to trainer data within the file buffer (null if no trainer).
+    pub trainer_data: *const u8,
+    /// Trainer size in bytes (0 if no trainer).
+    pub trainer_size: u32,
+    /// Mapper number.
+    pub mapper_no: u32,
+    /// NES 2.0 submapper (0 if not NES 2.0).
+    pub submapper: u8,
+    /// Mirroring mode (0=H, 1=V, 2=four-screen).
+    pub mirror: i32,
+    /// Mirroring as 2-bit value.
+    pub mirror_as_2bits: i32,
+    /// Battery-backed RAM present.
+    pub battery: bool,
+    /// NES 2.0 flag.
+    pub is_nes2: bool,
+    /// MD5 hash of PRG+CHR.
+    pub md5: [u8; 16],
+    /// CRC32 of PRG+CHR.
+    pub crc32: u32,
+    /// Partial MD5 (first 8 bytes, big-endian).
+    pub partial_md5: u64,
+    /// VS UniSystem type (0=cart, 1=VS, -1=unsupported).
+    pub vs_system: i32,
+    /// VS PPU type.
+    pub vs_ppu: i32,
+    /// VS system type.
+    pub vs_type: i32,
+    /// TV system (0=NTSC, 1=PAL).
+    pub tv_system: i32,
+    /// NES 2.0 WRAM size in bytes.
+    pub wram_size: u32,
+    /// NES 2.0 battery-backed WRAM size in bytes.
+    pub battery_wram_size: u32,
+    /// NES 2.0 VRAM size in bytes.
+    pub vram_size: u32,
+    /// NES 2.0 battery-backed VRAM size in bytes.
+    pub battery_vram_size: u32,
+    /// Raw PRG-ROM size in 16 KiB units (before rounding).
+    pub rom_size_raw: u32,
+    /// PRG-ROM size in 16 KiB units (after rounding).
+    pub rom_size_16kb: u32,
+    /// CHR-ROM size in 8 KiB units.
+    pub vrom_size_8kb: u32,
+}
+
+/// Load an iNES ROM file from a buffer.
+///
+/// Parses the 16-byte header, extracts trainer/PRG/CHR data pointers,
+/// and computes MD5/CRC32 hashes.  Data pointers point into the original
+/// `file_data` buffer, so the caller must keep it alive.
+///
+/// Returns `true` on success.
+///
+/// # Safety
+/// `file_data` must point to at least `file_len` readable bytes.
+/// `out_cart` must point to a writable `FceuInesCartResult`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_rust_ines_load(
+    file_data: *const u8,
+    file_len: usize,
+    out_cart: *mut FceuInesCartResult,
+) -> bool {
+    if file_data.is_null() || out_cart.is_null() || file_len < 16 {
+        return false;
+    }
+
+    // Parse header
+    let mut parse_result = FceuInesParseResult {
+        is_nes2: false,
+        mapper_no: 0,
+        submapper: 0,
+        mirroring: 0,
+        mirroring_as_2bits: 0,
+        battery: false,
+        trainer: false,
+        rom_size_16kb: 0,
+        vrom_size_8kb: 0,
+        rom_size_raw: 0,
+        wram_size: 0,
+        battery_wram_size: 0,
+        vram_size: 0,
+        battery_vram_size: 0,
+        vs_system: 0,
+        vs_ppu: 0,
+        vs_type: 0,
+        tv_system: 0,
+    };
+
+    if unsafe { !fceux11_rust_ines_parse_header(file_data, &mut parse_result) } {
+        return false;
+    }
+
+    // Compute layout
+    let mut layout = FceuInesLayout {
+        prg_size_bytes: 0,
+        chr_size_bytes: 0,
+        chrram_size: 0,
+        round_prg: false,
+        prg_banks_16kb: 0,
+        chr_banks_8kb: 0,
+        trainer_present: false,
+        prg_banks_raw: 0,
+    };
+
+    if unsafe { !fceux11_rust_ines_compute_layout(&parse_result, &mut layout) } {
+        return false;
+    }
+
+    // Calculate offsets
+    let mut offset: usize = 16; // skip header
+
+    // Trainer
+    let trainer_data = if parse_result.trainer {
+        if offset + 512 > file_len {
+            return false;
+        }
+        let ptr = unsafe { file_data.add(offset) };
+        offset += 512;
+        ptr
+    } else {
+        std::ptr::null()
+    };
+    let trainer_size: u32 = if parse_result.trainer { 512 } else { 0 };
+
+    // PRG-ROM
+    let prg_size = layout.prg_size_bytes as usize;
+    if offset + prg_size > file_len {
+        return false;
+    }
+    let prg_data = unsafe { file_data.add(offset) };
+    offset += prg_size;
+
+    // CHR-ROM
+    let chr_size = layout.chr_size_bytes as usize;
+    let chr_data = if chr_size > 0 {
+        if offset + chr_size > file_len {
+            return false;
+        }
+        unsafe { file_data.add(offset) }
+    } else {
+        std::ptr::null()
+    };
+
+    // Compute hash
+    let mut hash_result = FceuInesHashResult {
+        md5: [0; 16],
+        crc32: 0,
+        partial_md5: 0,
+    };
+    unsafe {
+        fceux11_rust_ines_compute_hash(
+            prg_data,
+            layout.prg_size_bytes,
+            chr_data,
+            layout.chr_size_bytes,
+            &mut hash_result,
+        );
+    }
+
+    // Fill output
+    unsafe {
+        *out_cart = FceuInesCartResult {
+            prg_data,
+            prg_size: layout.prg_size_bytes,
+            chr_data,
+            chr_size: layout.chr_size_bytes,
+            trainer_data,
+            trainer_size,
+            mapper_no: parse_result.mapper_no,
+            submapper: parse_result.submapper,
+            mirror: parse_result.mirroring,
+            mirror_as_2bits: parse_result.mirroring_as_2bits,
+            battery: parse_result.battery,
+            is_nes2: parse_result.is_nes2,
+            md5: hash_result.md5,
+            crc32: hash_result.crc32,
+            partial_md5: hash_result.partial_md5,
+            vs_system: parse_result.vs_system,
+            vs_ppu: parse_result.vs_ppu,
+            vs_type: parse_result.vs_type,
+            tv_system: parse_result.tv_system,
+            wram_size: parse_result.wram_size,
+            battery_wram_size: parse_result.battery_wram_size,
+            vram_size: parse_result.vram_size,
+            battery_vram_size: parse_result.battery_vram_size,
+            rom_size_raw: parse_result.rom_size_raw,
+            rom_size_16kb: parse_result.rom_size_16kb,
+            vrom_size_8kb: parse_result.vrom_size_8kb,
         };
     }
 

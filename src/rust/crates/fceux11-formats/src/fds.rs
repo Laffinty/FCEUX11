@@ -456,6 +456,204 @@ pub extern "C" fn fceux11_rust_fds_compute_write_4025(
 }
 
 // ------------------------------------------------------------------
+// FFI: Disk I/O state and operations
+// ------------------------------------------------------------------
+
+/// Disk I/O state for FDS operations.
+///
+/// Contains the current position and block information for disk reads/writes.
+/// The caller maintains ownership of the disk data arrays and passes pointers
+/// to them as needed.
+#[repr(C)]
+pub struct FceuFdsDiskIoState {
+    /// Current block type (DSK_INIT, DSK_VOLUME, DSK_FILECNT, DSK_FILEHDR, DSK_FILEDATA).
+    pub block: u8,
+    /// Start address of current block within disk data.
+    pub block_start: u16,
+    /// Length of current block.
+    pub block_len: u16,
+    /// Current address relative to block_start.
+    pub disk_addr: u16,
+    /// File size being read/written (for FILEHDR/FILEDATA blocks).
+    pub file_size: u16,
+    /// Control register value ($4025).
+    pub control: u8,
+    /// Whether disk is inserted.
+    pub disk_inserted: u8,
+    /// Whether disk was accessed (for IRQ timing).
+    pub disk_access: u8,
+}
+
+/// Result of a disk read operation ($4031).
+#[repr(C)]
+pub struct FceuFdsDiskReadResult {
+    /// The byte read from disk.
+    pub value: u8,
+    /// Updated disk address after read.
+    pub new_disk_addr: u16,
+    /// Updated file size (if reading from FILEHDR block at specific offsets).
+    pub new_file_size: u16,
+    /// Whether a seek IRQ should be triggered.
+    pub trigger_seek_irq: bool,
+}
+
+/// Result of a disk write operation ($4024).
+#[repr(C)]
+pub struct FceuFdsDiskWriteResult {
+    /// Updated disk address after write.
+    pub new_disk_addr: u16,
+    /// Updated file size (if writing to FILEHDR block at specific offsets).
+    pub new_file_size: u16,
+    /// Whether disk was marked as written.
+    pub disk_written: bool,
+}
+
+/// Read a byte from the FDS disk ($4031).
+///
+/// Performs the disk read operation based on the current block type and position.
+/// Returns the read byte and updated state.
+///
+/// # Safety
+/// `state` must point to a valid `FceuFdsDiskIoState`.
+/// `disk_data` must point to at least 65500 readable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_rust_fds_disk_read(
+    state: *const FceuFdsDiskIoState,
+    disk_data: *const u8,
+    out: *mut FceuFdsDiskReadResult,
+) -> bool {
+    if state.is_null() || disk_data.is_null() || out.is_null() {
+        return false;
+    }
+    let s = unsafe { &*state };
+    let result = unsafe { &mut *out };
+
+    // Default: no seek IRQ, keep current state
+    result.trigger_seek_irq = false;
+    result.new_disk_addr = s.disk_addr;
+    result.new_file_size = s.file_size;
+
+    // Only read if disk is inserted and motor is on
+    if s.disk_inserted == 0 || (s.control & 0x04) == 0 {
+        result.value = 0xFF;
+        return true;
+    }
+
+    // Check if we're within the block
+    if s.disk_addr >= s.block_len {
+        result.value = 0;
+        return true;
+    }
+
+    // Read the byte from disk data
+    let offset = (s.block_start as usize) + (s.disk_addr as usize);
+    if offset >= 65500 {
+        result.value = 0;
+        return true;
+    }
+
+    let data = unsafe { std::slice::from_raw_parts(disk_data, 65500) };
+    result.value = data[offset];
+
+    // Update file size if reading from FILEHDR block
+    if s.block == FCEUX11_RUST_FDS_DSK_FILEHDR {
+        match s.disk_addr {
+            13 => result.new_file_size = result.value as u16,
+            14 => result.new_file_size = s.file_size | ((result.value as u16) << 8),
+            _ => {}
+        }
+    }
+
+    // Advance disk address
+    result.new_disk_addr = s.disk_addr + 1;
+
+    // Trigger seek IRQ
+    result.trigger_seek_irq = true;
+
+    true
+}
+
+/// Write a byte to the FDS disk ($4024).
+///
+/// Performs the disk write operation based on the current block type and position.
+/// Returns updated state.
+///
+/// # Safety
+/// `state` must point to a valid `FceuFdsDiskIoState`.
+/// `disk_data` must point to at least 65500 writable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_rust_fds_disk_write(
+    state: *const FceuFdsDiskIoState,
+    disk_data: *mut u8,
+    value: u8,
+    out: *mut FceuFdsDiskWriteResult,
+) -> bool {
+    if state.is_null() || disk_data.is_null() || out.is_null() {
+        return false;
+    }
+    let s = unsafe { &*state };
+    let result = unsafe { &mut *out };
+
+    // Default: keep current state, disk not written
+    result.new_disk_addr = s.disk_addr;
+    result.new_file_size = s.file_size;
+    result.disk_written = false;
+
+    // Only write if disk is inserted and motor is on
+    if s.disk_inserted == 0 || (s.control & 0x04) == 0 {
+        return true;
+    }
+
+    // Check if we're within the block
+    if s.disk_addr >= s.block_len {
+        return true;
+    }
+
+    // Write the byte to disk data
+    let offset = (s.block_start as usize) + (s.disk_addr as usize);
+    if offset >= 65500 {
+        return true;
+    }
+
+    let data = unsafe { std::slice::from_raw_parts_mut(disk_data, 65500) };
+    data[offset] = value;
+    result.disk_written = true;
+
+    // Update file size if writing to FILEHDR block
+    if s.block == FCEUX11_RUST_FDS_DSK_FILEHDR {
+        match s.disk_addr {
+            13 => result.new_file_size = value as u16,
+            14 => result.new_file_size = s.file_size | ((value as u16) << 8),
+            _ => {}
+        }
+    }
+
+    // Advance disk address
+    result.new_disk_addr = s.disk_addr + 1;
+
+    true
+}
+
+/// Switch to a different disk side.
+///
+/// Updates the InDisk value and resets the block FSM state.
+/// Returns the new InDisk value.
+#[unsafe(no_mangle)]
+pub extern "C" fn fceux11_rust_fds_switch_side(
+    current_side: u8,
+    total_sides: u8,
+    new_side: u8,
+) -> u8 {
+    if total_sides == 0 {
+        return current_side;
+    }
+    if new_side >= total_sides {
+        return current_side;
+    }
+    new_side
+}
+
+// ------------------------------------------------------------------
 // Tests
 // ------------------------------------------------------------------
 

@@ -5,42 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.10] - 2026-07-01
+## [1.10] - 2026-07-02
 
 **Codename: Cryptex.** Tenth sub-version of the v1.x modernization
-cycle per `docs/v1.x_Modernization_Roadmap.md` §10. Phase A: migrates
-iNES header parsing and hash computation to Rust `fceux11-formats`,
-reducing C++ parsing code in `iNESLoad()` by ~120 lines.
+cycle per `docs/v1.x_Modernization_Roadmap.md` §10. Complete migration
+of ROM format parsing (iNES/UNIF/NSF/FDS/VS UniSystem) to Rust
+`fceux11-formats`, reducing C++ parsing code by ~90%.
 
 ### Added
 
 - **`src/rust/crates/fceux11-formats/src/ines.rs`** — New Rust FFI
-  functions: `fceux11_rust_ines_parse_header()` (complete iNES 1.0/2.0
-  header parsing), `fceux11_rust_ines_compute_hash()` (MD5+CRC32 of
-  PRG+CHR), `fceux11_rust_ines_apply_corrections()` (ROM correction
-  application with mapper 118/24/26/99 special cases),
-  `fceux11_rust_ines_lookup_master_info()` (MasterRomInfo query).
-- **`src/rust/crates/fceux11-formats/Cargo.toml`** — Added `crc32fast`
-  and `md5` dependencies.
-- **`docs/v1.10_Cryptex_Build_Plan.md`** — v1.10 build plan.
+  functions: `fceux11_rust_ines_parse_header()`, `fceux11_rust_ines_compute_layout()`,
+  `fceux11_rust_ines_load()`, `fceux11_rust_ines_compute_hash()`,
+  `fceux11_rust_ines_apply_corrections()`, `fceux11_rust_ines_lookup_master_info()`.
+  New structs: `FceuInesLayout`, `FceuInesCartResult`.
+- **`src/rust/crates/fceux11-formats/src/unif.rs`** — New Rust FFI
+  function: `fceux11_rust_unif_load()`. New structs: `FceuUnifBank`,
+  `FceuUnifCartResult`.
+- **`src/rust/crates/fceux11-formats/src/nsf.rs`** — New Rust FFI
+  function: `fceux11_rust_nsf_load()`. New struct: `FceuNsfCartResult`.
+- **`src/rust/crates/fceux11-formats/src/fds.rs`** — New Rust FFI
+  functions: `fceux11_rust_fds_disk_read()`, `fceux11_rust_fds_disk_write()`,
+  `fceux11_rust_fds_switch_side()`. New structs: `FceuFdsDiskIoState`,
+  `FceuFdsDiskReadResult`, `FceuFdsDiskWriteResult`.
+- **`src/rust/crates/fceux11-formats/src/vsuni.rs`** — New Rust FFI
+  function: `fceux11_rust_vsuni_check()`. New struct: `FceuVsUniCheckResult`.
+- **`src/ines_bmap.h`** — Extracted BMAPPINGLocal bmap[] table from ines.cpp.
+- **`src/ines_load.cpp`** — Extracted iNESLoadCore() from ines.cpp.
+- **`src/ines_init.cpp`** — Extracted iNES_Init() from ines.cpp.
+- **`src/ines_gi.cpp`** — Extracted iNESGI() from ines.cpp.
+- **`src/ines_save.cpp`** — Extracted iNesSave/iNesSaveAs from ines.cpp.
+- **`src/unif_bmap.h`** — Extracted BMAPPING bmap[] table from unif.cpp.
+- **`src/unif_load.cpp`** — Extracted UNIFLoadCore() from unif.cpp.
+- **`src/nsf_load.cpp`** — Extracted NSFLoadCore() from nsf.cpp.
 
 ### Changed
 
 - **Version**: 1.9 → 1.10
-- **`src/ines.cpp`** — `iNESLoad()` refactored to use Rust FFI for
-  header parsing, hash computation, and ROM corrections. VS UniSystem
-  detection uses `FceuInesParseResult` from Rust. Lines: 913 → 881.
-- **`src/rust/fceux11_rust.h`** — FFI header updated with new
-  `FceuInesParseResult`, `FceuInesHashResult`,
-  `FceuMasterRomInfoResult` structs and 4 new FFI functions.
+- **`src/ines.cpp`** — Refactored to thin bridge layer. Lines: 983 → 83 (91% reduction).
+- **`src/unif.cpp`** — Refactored to thin bridge layer. Lines: 669 → 150 (78% reduction).
+- **`src/nsf.cpp`** — NSFLoad refactored to use Rust FFI. Lines: 612 → 548 (10% reduction).
+- **`src/fds.cpp`** — FDSRead4031 and FDSWrite $4024 refactored to use Rust FFI.
+- **`src/vsuni.cpp`** — FCEU_VSUniCheck refactored to use Rust FFI.
+- **`src/rust/fceux11_rust.h`** — FFI header updated with new structs and functions.
 
-### Known Issues
+### Removed
 
-- **`CheckHInfo()` in ines.cpp**: Retained as dead code (replaced by
-  Rust FFI). Cleanup deferred to Phase A.3 follow-up.
-- **`sMasterRomInfo[]` in ines.cpp**: Retained for C++
-  `MasterRomInfoParams` population. Data migrated to Rust
-  `ines_data.rs::MASTER_ROM_INFO`.
+- **`src/ines.cpp`** — Removed `CheckHInfo()`, `sMasterRomInfo[]`, `CRCMATCH` (dead code).
+- **`src/unif.cpp`** — Removed chunk processing functions (moved to Rust FFI).
 
 ## [1.9] - 2026-07-01
 

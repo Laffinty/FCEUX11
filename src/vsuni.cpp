@@ -141,29 +141,31 @@ void FCEU_VSUniPower(void) {
 }
 
 void FCEU_VSUniCheck(uint64 md5partial, int *MapperNo, uint8 *Mirroring) {
-    const VsUniEntry *vs = fceux11_rust_vsuni_lookup(md5partial);
-    if (!vs) return;
+    // v1.10 Cryptex: Use Rust FFI for VS UniSystem check
+    FceuVsUniCheckResult result;
+    if (!fceux11_rust_vsuni_check(md5partial, &result))
+        return;
 
     int32 tofix = 0;
-    if (*MapperNo != vs->mapper) {
+    if (*MapperNo != result.mapper) {
         tofix |= 1;
-        *MapperNo = vs->mapper;
+        *MapperNo = result.mapper;
     }
-    if (*Mirroring != vs->mirroring) {
+    if (*Mirroring != result.mirroring) {
         tofix |= 2;
-        *Mirroring = vs->mirroring;
+        *Mirroring = result.mirroring;
     }
     if (GameInfo->type != GIT_VSUNI) {
         tofix |= 4;
         GameInfo->type = GIT_VSUNI;
     }
-    if (GameInfo->vs_type != vs->game_type) {
+    if (GameInfo->vs_type != result.game_type) {
         tofix |= 8;
-        GameInfo->vs_type = (EGIVS)vs->game_type;
+        GameInfo->vs_type = (EGIVS)result.game_type;
     }
-    if (vs->ppu && (GameInfo->vs_ppu != vs->ppu)) {
+    if (result.ppu && (GameInfo->vs_ppu != result.ppu)) {
         tofix |= 16;
-        GameInfo->vs_ppu = (EGIPPU)vs->ppu;
+        GameInfo->vs_ppu = (EGIPPU)result.ppu;
     }
 
     secptr = 0;
@@ -174,13 +176,10 @@ void FCEU_VSUniCheck(uint64 md5partial, int *MapperNo, uint8 *Mirroring) {
     default: secptr = 0; break;
     }
 
-    vsdip = 0x0;
-    if (vs->ioption & VS_OPTION_PREDIP) {
-        vsdip = (uint8)vs->predip;
-    }
-    if ((vs->ioption & VS_OPTION_GUN) && !head.expansion) {
+    vsdip = result.dip_value;
+
+    if (result.use_gun && !head.expansion) {
         tofix |= 32;
-        // v0.3.8: GameInfo->input[] is ESI; SI_*/SIFC_* are int — cast.
         GameInfo->input[0] = static_cast<ESI>(SI_ZAPPER);
         GameInfo->input[1] = static_cast<ESI>(SI_NONE);
         GameInfo->inputfc = static_cast<ESIFC>(SIFC_NONE);
@@ -189,7 +188,7 @@ void FCEU_VSUniCheck(uint64 md5partial, int *MapperNo, uint8 *Mirroring) {
         GameInfo->input[0] = GameInfo->input[1] = static_cast<ESI>(SI_GAMEPAD);
         GameInfo->inputfc = static_cast<ESIFC>(SIFC_NONE);
     }
-    if ((vs->ioption & VS_OPTION_SWAPDIRAB) && !GameInfo->vs_cswitch) {
+    if (result.swap_ab && !GameInfo->vs_cswitch) {
         tofix |= 64;
         GameInfo->vs_cswitch = 1;
     }
@@ -197,29 +196,14 @@ void FCEU_VSUniCheck(uint64 md5partial, int *MapperNo, uint8 *Mirroring) {
     if (tofix) {
         char gigastr[768];
         FCEU_strlcpy(gigastr, sizeof(gigastr), "The iNES header contains incorrect information.  For now, the information will be corrected in RAM.  ");
-        if (tofix & 4) {
-            snprintf( gigastr + strlen(gigastr), sizeof(gigastr + strlen(gigastr)), "Game type should be set to Vs. System.  ");
-        }
-        if (tofix & 1)
-            snprintf( gigastr + strlen(gigastr), sizeof(gigastr + strlen(gigastr)), "The mapper number should be set to %d.  ", *MapperNo);
-        if (tofix & 2) {
-            const char* mstr[3] = { "Horizontal", "Vertical", "Four-screen" };
-            snprintf( gigastr + strlen(gigastr), sizeof(gigastr + strlen(gigastr)), "Mirroring should be set to \"%s\".  ", mstr[vs->mirroring & 3]);
-        }
-        if (tofix & 8) {
-            const char* mstr[4] = { "Normal", "RBI Baseball protection", "TKO Boxing protection", "Super Xevious protection"};
-            snprintf( gigastr + strlen(gigastr), sizeof(gigastr + strlen(gigastr)), "Vs. System type should be set to \"%s\".  ", mstr[vs->game_type]);
-        }
-        if (tofix & 16)
-        {
-            const char* mstr[10] = { "Default", "RP2C04-0001", "RP2C04-0002", "RP2C04-0003", "RP2C04-0004", "RC2C03B", "RC2C05-01", "RC2C05-02" , "RC2C05-03" , "RC2C05-04" };
-            snprintf( gigastr + strlen(gigastr), sizeof(gigastr + strlen(gigastr)), "Vs. System PPU should be set to \"%s\".  ", mstr[vs->ppu]);
-        }
-        if (tofix & 32)
-            snprintf( gigastr + strlen(gigastr), sizeof(gigastr + strlen(gigastr)), "The controller type should be set to zapper.  ");
-        if (tofix & 64)
-            snprintf( gigastr + strlen(gigastr), sizeof(gigastr + strlen(gigastr)), "The controllers should be swapped.  ");
-        safe_strcat(gigastr, sizeof(gigastr), "\n");
+        if (tofix & 4) FCEU_strlcat(gigastr, sizeof(gigastr), "Game type should be set to Vs. System.  ");
+        if (tofix & 1) { char tmp[80]; snprintf(tmp, sizeof(tmp), "The mapper number should be set to %d.  ", *MapperNo); FCEU_strlcat(gigastr, sizeof(gigastr), tmp); }
+        if (tofix & 2) { const char* mstr[3] = { "Horizontal", "Vertical", "Four-screen" }; char tmp[80]; snprintf(tmp, sizeof(tmp), "Mirroring should be set to \"%s\".  ", mstr[result.mirroring & 3]); FCEU_strlcat(gigastr, sizeof(gigastr), tmp); }
+        if (tofix & 8) { const char* mstr[4] = { "Normal", "RBI Baseball protection", "TKO Boxing protection", "Super Xevious protection"}; char tmp[80]; snprintf(tmp, sizeof(tmp), "Vs. System type should be set to \"%s\".  ", mstr[result.game_type]); FCEU_strlcat(gigastr, sizeof(gigastr), tmp); }
+        if (tofix & 16) { const char* mstr[10] = { "Default", "RP2C04-0001", "RP2C04-0002", "RP2C04-0003", "RP2C04-0004", "RC2C03B", "RC2C05-01", "RC2C05-02" , "RC2C05-03" , "RC2C05-04" }; char tmp[80]; snprintf(tmp, sizeof(tmp), "Vs. System PPU should be set to \"%s\".  ", mstr[result.ppu]); FCEU_strlcat(gigastr, sizeof(gigastr), tmp); }
+        if (tofix & 32) FCEU_strlcat(gigastr, sizeof(gigastr), "The controller type should be set to zapper.  ");
+        if (tofix & 64) FCEU_strlcat(gigastr, sizeof(gigastr), "The controllers should be swapped.  ");
+        FCEU_strlcat(gigastr, sizeof(gigastr), "\n");
         FCEU_printf("%s", gigastr);
     }
 }

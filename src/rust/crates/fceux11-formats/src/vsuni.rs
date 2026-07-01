@@ -545,6 +545,81 @@ pub unsafe extern "C" fn fceux11_rust_vsuni_draw(
 }
 
 // ------------------------------------------------------------------
+// FFI: VS UniSystem check result
+// ------------------------------------------------------------------
+
+/// Result of a VS UniSystem ROM check.
+///
+/// Contains all the information needed to set up a VS UniSystem game.
+#[repr(C)]
+pub struct FceuVsUniCheckResult {
+    /// Whether a VS UniSystem entry was found.
+    pub found: bool,
+    /// Mapper number to use.
+    pub mapper: i32,
+    /// Mirroring mode.
+    pub mirroring: u8,
+    /// PPU type.
+    pub ppu: u8,
+    /// Game type (Normal, RBI, TKO, Xevious).
+    pub game_type: u8,
+    /// DIP switch default value.
+    pub dip_value: u8,
+    /// Whether to use zapper input.
+    pub use_gun: bool,
+    /// Whether to swap A/B controllers.
+    pub swap_ab: bool,
+}
+
+/// Check if a ROM is a VS UniSystem game and return setup information.
+///
+/// Looks up the ROM by its partial MD5 hash and returns all the
+/// information needed to configure the emulator for VS UniSystem mode.
+///
+/// Returns `true` if a VS UniSystem entry was found.
+///
+/// # Safety
+/// `out` must point to a writable `FceuVsUniCheckResult`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_rust_vsuni_check(
+    md5partial: u64,
+    out: *mut FceuVsUniCheckResult,
+) -> bool {
+    if out.is_null() {
+        return false;
+    }
+    let result = unsafe { &mut *out };
+
+    let entry = fceux11_rust_vsuni_lookup(md5partial);
+    if entry.is_null() {
+        result.found = false;
+        return false;
+    }
+
+    let vs = unsafe { &*entry };
+    result.found = true;
+    result.mapper = vs.mapper;
+    result.mirroring = vs.mirroring;
+    result.ppu = vs.ppu;
+    result.game_type = vs.game_type;
+
+    // Set DIP switch default
+    result.dip_value = if (vs.ioption & VS_OPTION_PREDIP) != 0 {
+        vs.predip as u8
+    } else {
+        0
+    };
+
+    // Set gun input
+    result.use_gun = (vs.ioption & VS_OPTION_GUN) != 0;
+
+    // Set swap A/B
+    result.swap_ab = (vs.ioption & VS_OPTION_SWAPDIRAB) != 0;
+
+    true
+}
+
+// ------------------------------------------------------------------
 // Tests
 // ------------------------------------------------------------------
 

@@ -752,6 +752,159 @@ pub extern "C" fn fceux11_rust_unif_chrram_size(flags: i32) -> u32 {
 }
 
 // ------------------------------------------------------------------
+// FFI: Complete UNIF load
+// ------------------------------------------------------------------
+
+/// PRG/CHR bank data pointer and size.
+#[repr(C)]
+pub struct FceuUnifBank {
+    pub data: *const u8,
+    pub size: u32,
+}
+
+/// Result of a complete UNIF file load.
+///
+/// Contains pointers into the original file buffer for PRG/CHR banks,
+/// along with all parsed metadata.  The caller must keep the file buffer
+/// alive for as long as it uses the data pointers.
+#[repr(C)]
+pub struct FceuUnifCartResult {
+    /// PRG banks (PRG0-PRG31).  Unused entries have data=null, size=0.
+    pub prg: [FceuUnifBank; 32],
+    /// CHR banks (CHR0-CHR31).  Unused entries have data=null, size=0.
+    pub chr: [FceuUnifBank; 32],
+    /// Board name (null-terminated, points into file buffer).
+    pub board_name: *const c_char,
+    /// Board name string length (excluding null terminator).
+    pub board_name_len: u32,
+    /// Mirroring mode (0-4).
+    pub mirroring: i32,
+    /// Battery-backed RAM present.
+    pub battery: bool,
+    /// TV system (0=NTSC, 1=PAL, 2=Dendy).
+    pub tv_system: i32,
+    /// MD5 hash of all PRG+CHR data.
+    pub md5: [u8; 16],
+}
+
+/// Load a UNIF ROM file from a buffer.
+///
+/// Parses the UNIF header and chunks, extracts PRG/CHR data pointers,
+/// board name, and computes MD5 hash.  Data pointers point into the
+/// original `file_data` buffer, so the caller must keep it alive.
+///
+/// Returns `true` on success.
+///
+/// # Safety
+/// `file_data` must point to at least `file_len` readable bytes.
+/// `out_cart` must point to a writable `FceuUnifCartResult`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_rust_unif_load(
+    file_data: *const u8,
+    file_len: usize,
+    out_cart: *mut FceuUnifCartResult,
+) -> bool {
+    if file_data.is_null() || out_cart.is_null() || file_len < 32 {
+        return false;
+    }
+
+    let data = unsafe { std::slice::from_raw_parts(file_data, file_len) };
+
+    // Validate magic "UNIF"
+    if &data[0..4] != b"UNIF" {
+        return false;
+    }
+
+    // Read version (bytes 4-7, little-endian)
+    let _version = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
+
+    // Initialize result
+    let result = unsafe { &mut *out_cart };
+    result.board_name = std::ptr::null();
+    result.board_name_len = 0;
+    result.mirroring = 0;
+    result.battery = false;
+    result.tv_system = 0;
+    result.md5 = [0; 16];
+    for i in 0..32 {
+        result.prg[i] = FceuUnifBank { data: std::ptr::null(), size: 0 };
+        result.chr[i] = FceuUnifBank { data: std::ptr::null(), size: 0 };
+    }
+
+    // Parse chunks starting at offset 0x20
+    let mut offset: usize = 0x20;
+    let mut md5_ctx = md5::Context::new();
+
+    while offset + 8 <= file_len {
+        // Read chunk ID (4 bytes)
+        let chunk_id = &data[offset..offset + 4];
+        let chunk_len = u32::from_le_bytes([
+            data[offset + 4],
+            data[offset + 5],
+            data[offset + 6],
+            data[offset + 7],
+        ]) as usize;
+        offset += 8;
+
+        if offset + chunk_len > file_len {
+            return false;
+        }
+
+        let chunk_data = &data[offset..offset + chunk_len];
+
+        // Process chunk by ID
+        if chunk_id.starts_with(b"PRG") {
+            // PRG0-PRG31
+            let idx = chunk_id[3] as usize;
+            if idx < 32 {
+                result.prg[idx].data = unsafe { file_data.add(offset) };
+                result.prg[idx].size = chunk_len as u32;
+                md5_ctx.consume(chunk_data);
+            }
+        } else if chunk_id.starts_with(b"CHR") {
+            // CHR0-CHR31
+            let idx = chunk_id[3] as usize;
+            if idx < 32 {
+                result.chr[idx].data = unsafe { file_data.add(offset) };
+                result.chr[idx].size = chunk_len as u32;
+                md5_ctx.consume(chunk_data);
+            }
+        } else if chunk_id == b"MAPR" {
+            // Board name (null-terminated string)
+            if chunk_len > 0 {
+                result.board_name = unsafe { file_data.add(offset) } as *const c_char;
+                // Find null terminator
+                let null_pos = chunk_data.iter().position(|&b| b == 0).unwrap_or(chunk_len);
+                result.board_name_len = null_pos as u32;
+            }
+        } else if chunk_id == b"TVCI" {
+            // TV system
+            if chunk_len > 0 {
+                result.tv_system = chunk_data[0] as i32;
+            }
+        } else if chunk_id == b"BATR" {
+            // Battery flag
+            if chunk_len > 0 {
+                result.battery = chunk_data[0] != 0;
+            }
+        } else if chunk_id == b"MIRR" {
+            // Mirroring
+            if chunk_len > 0 {
+                result.mirroring = chunk_data[0] as i32;
+            }
+        }
+
+        offset += chunk_len;
+    }
+
+    // Compute MD5
+    let md5_digest = md5_ctx.compute();
+    result.md5 = md5_digest.into();
+
+    true
+}
+
+// ------------------------------------------------------------------
 // Tests
 // ------------------------------------------------------------------
 
