@@ -36,8 +36,8 @@
   "name":"FCEUX11",
   "applicationCategory":"GameApplication",
   "operatingSystem":"Windows",
-  "description":"A modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 with accurate emulation, debugging tools, TAS editor, and Lua scripting. v1.8 Masonry: PPU state consolidated into fceu11::Ppu, Bus→Ppu decoupled, byte-exact visual regression test, and a first-ROM-load init-order fix.",
-  "softwareVersion":"1.5",
+  "description":"A modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 with accurate emulation, debugging tools, TAS editor, and Lua scripting. v1.8 Masonry: all 174 mappers now subclass fceu11::Mapper with auto-registration; 23 MMC3 variants share a common Mmc3BaseCart; VRC7/MMC5/N106/Sunsoft5B expansion-audio chips unified under the ExpansionAudio virtual interface.",
+  "softwareVersion":"1.8",
   "license":"https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt",
   "url":"https://laffinty.github.io/FCEUX11/",
   "downloadUrl":"https://github.com/Laffinty/FCEUX11/releases",
@@ -193,7 +193,7 @@
 
 <header class="hero" id="top">
   <div class="wrap">
-    <div class="pill reveal"><span class="dot"></span><span data-i18n="pill">v1.5 · Prism</span></div>
+    <div class="pill reveal"><span class="dot"></span><span data-i18n="pill">v1.8 · Masonry</span></div>
     <h1 class="reveal"><span class="grad">FCEUX</span><span class="dim">11</span></h1>
     <p class="tagline reveal" data-i18n="tagline"><span class="tagline-title">A FCEUX-based NES/Famicom emulator optimized for Windows</span><br>core accuracy, modern native experience.</p>
     <div class="cta reveal">
@@ -250,41 +250,41 @@
   <div class="wrap">
     <div class="whatsnew-head reveal">
       <div class="kicker" data-i18n="wn.k">What's new</div>
-      <h2 data-i18n="wn.t">v1.5 · Prism</h2>
-      <div class="sub" data-i18n="wn.sub">Released 2026-06-24 · since v1.4 (Gateway)</div>
+      <h2 data-i18n="wn.t">v1.8 · Masonry</h2>
+      <div class="sub" data-i18n="wn.sub">Released 2026-07-01 · since v1.5 (Prism)</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3 data-i18n="wn1.t">PPU module consolidated</h3>
-          <p data-i18n="wn1.d">The PPU register file, name-table RAM, sprite RAM and render scratch buffers now live in a single <code>fceu11::Ppu</code> class. A byte-exact visual regression test guards every refactor step so rendered output never drifts.</p>
+          <h3 data-i18n="wn1.t">All 174 mappers unified under modern C++ classes</h3>
+          <p data-i18n="wn1.d">Every supported NES/Famicom cartridge board now runs through a unified <code>fceu11::Mapper</code> subclass with auto-registration, replacing the legacy C-style function-pointer dispatch. Together with the v1.7 Cart class and v1.6 APU objectification, the entire core is now modern C++ — games load more predictably and the codebase is dramatically easier to maintain.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">02</div>
         <div class="wn-text">
-          <h3 data-i18n="wn2.t">Cleaner Bus ↔ PPU boundary</h3>
-          <p data-i18n="wn2.d">Bus no longer reads or writes PPU globals directly — bank-switching routes through <code>ppu_-&gt;method()</code>. Future mappers and rendering features sit on a sturdier base.</p>
+          <h3 data-i18n="wn2.t">MMC3 family shares one base class</h3>
+          <p data-i18n="wn2.d">Twenty-three different MMC3-family mappers — the family behind Super Mario Bros 3, Kirby's Adventure, Mega Man 4–6, and hundreds more — now inherit from a single <code>Mmc3BaseCart</code> base class. Behavior stays consistent across the whole family and a single fix applies everywhere at once.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">03</div>
         <div class="wn-text">
-          <h3 data-i18n="wn3.t">Savestate forward &amp; backward compatible</h3>
-          <p data-i18n="wn3.d">Pre-v1.5 <code>.fc0</code> and <code>.fm2</code> files still load with no manual migration. The save format is unchanged; v1.5 round-trips are byte-identical.</p>
+          <h3 data-i18n="wn3.t">Expansion-audio chips unified</h3>
+          <p data-i18n="wn3.d">VRC7, MMC5, Namco 106 and Sunsoft 5B expansion-audio chips now use the same <code>ExpansionAudio</code> virtual interface introduced for VRC6 in v1.6. The audio path is cleaner, more predictable, and easier to extend when new chips are supported.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">04</div>
         <div class="wn-text">
-          <h3 data-i18n="wn4.t">First-ROM-load crash fixed</h3>
-          <p data-i18n="wn4.d">The PPU-injection init-order bug that crashed 15 of 19 ctest cases on the first ROM load is patched — <code>g_bus.attach_ppu(&amp;g_ppu)</code> now runs in <code>Initialize()</code> before any cart-load code, so games boot clean from cold start.</p>
+          <h3 data-i18n="wn4.t">174 mapper byte-exact regression tests</h3>
+          <p data-i18n="wn4.d">Every supported mapper now has an automated byte-exact regression test that snapshots its internal state against a known-good golden file. Any future change that would shift a mapper's behavior is caught before release — the safety net behind every subsequent update.</p>
         </div>
       </div>
     </div>
     <div class="wn-cta reveal">
-      <a href="https://github.com/Laffinty/FCEUX11/blob/main/CHANGELOG.md#15---2026-06-24" target="_blank" rel="noopener" data-i18n="wn.cta">Read the full v1.5 release notes →</a>
+      <a href="https://github.com/Laffinty/FCEUX11/blob/main/CHANGELOG.md#18---2026-07-01" target="_blank" rel="noopener" data-i18n="wn.cta">Read the full v1.8 release notes →</a>
     </div>
   </div>
 </section>
@@ -297,7 +297,7 @@
 
 <script>
 const I18N={
-  en:{pill:"v1.5 · Prism",
+  en:{pill:"v1.8 · Masonry",
       tagline:"<span class=\"tagline-title\">A FCEUX-based NES/Famicom emulator optimized for Windows</span><br>core accuracy, modern native experience.",
       download:"Download",changelog:"Changelog",
       "f1.t":"Accurate Emulation","f1.d":"Full NES, Famicom &amp; mapper support",
@@ -307,14 +307,14 @@ const I18N={
       "about.k":"About","about.t":"Introduction",
       "about.a1":"FCEUX11 is a derivative of the FCEUX NES/Famicom emulator, actively maintained and optimized for <em>Windows</em>.",
       "about.a2":"It preserves the core emulation accuracy of FCEUX while providing a modern, native Windows experience, including a <em>Qt6-based</em> user interface, multi-language support, and comprehensive debugging and TAS tooling.",
-      "wn.k":"What's new","wn.t":"v1.5 · Prism","wn.sub":"Released 2026-06-24 · since v1.4 (Gateway)",
-      "wn1.t":"PPU module consolidated","wn1.d":"The PPU register file, name-table RAM, sprite RAM and render scratch buffers now live in a single <code>fceu11::Ppu</code> class. A byte-exact visual regression test guards every refactor step so rendered output never drifts.",
-      "wn2.t":"Cleaner Bus ↔ PPU boundary","wn2.d":"Bus no longer reads or writes PPU globals directly — bank-switching routes through <code>ppu_-&gt;method()</code>. Future mappers and rendering features sit on a sturdier base.",
-      "wn3.t":"Savestate forward &amp; backward compatible","wn3.d":"Pre-v1.5 <code>.fc0</code> and <code>.fm2</code> files still load with no manual migration. The save format is unchanged; v1.5 round-trips are byte-identical.",
-      "wn4.t":"First-ROM-load crash fixed","wn4.d":"The PPU-injection init-order bug that crashed 15 of 19 ctest cases on the first ROM load is patched — <code>g_bus.attach_ppu(&amp;g_ppu)</code> now runs in <code>Initialize()</code> before any cart-load code, so games boot clean from cold start.",
-      "wn.cta":"Read the full v1.5 release notes →",
+      "wn.k":"What's new","wn.t":"v1.8 · Masonry","wn.sub":"Released 2026-07-01 · since v1.5 (Prism)",
+      "wn1.t":"All 174 mappers unified under modern C++ classes","wn1.d":"Every supported NES/Famicom cartridge board now runs through a unified <code>fceu11::Mapper</code> subclass with auto-registration, replacing the legacy C-style function-pointer dispatch. Together with the v1.7 Cart class and v1.6 APU objectification, the entire core is now modern C++ — games load more predictably and the codebase is dramatically easier to maintain.",
+      "wn2.t":"MMC3 family shares one base class","wn2.d":"Twenty-three different MMC3-family mappers — the family behind Super Mario Bros 3, Kirby's Adventure, Mega Man 4–6, and hundreds more — now inherit from a single <code>Mmc3BaseCart</code> base class. Behavior stays consistent across the whole family and a single fix applies everywhere at once.",
+      "wn3.t":"Expansion-audio chips unified","wn3.d":"VRC7, MMC5, Namco 106 and Sunsoft 5B expansion-audio chips now use the same <code>ExpansionAudio</code> virtual interface introduced for VRC6 in v1.6. The audio path is cleaner, more predictable, and easier to extend when new chips are supported.",
+      "wn4.t":"174 mapper byte-exact regression tests","wn4.d":"Every supported mapper now has an automated byte-exact regression test that snapshots its internal state against a known-good golden file. Any future change that would shift a mapper's behavior is caught before release — the safety net behind every subsequent update.",
+      "wn.cta":"Read the full v1.8 release notes →",
       foot:"based on FCEUX"},
-  zh:{pill:"v1.5 · Prism",
+  zh:{pill:"v1.8 · Masonry",
       tagline:"<span class=\"tagline-title\">基于 FCEUX 的 NES/Famicom 模拟器，为 Windows 平台优化</span><br>保留核心精度，提供现代原生体验。",
       download:"下载",changelog:"更新日志",
       "f1.t":"精确模拟","f1.d":"完整支持 NES、Famicom 及扩展芯片",
@@ -324,12 +324,12 @@ const I18N={
       "about.k":"关于","about.t":"简介",
       "about.a1":"FCEUX11 是基于 FCEUX 的 NES/Famicom 模拟器衍生项目，持续维护并为 <em>Windows</em> 平台优化。",
       "about.a2":"在保留 FCEUX 核心模拟精度的基础上，提供现代化的 Windows 原生体验，包括 <em>Qt6 图形界面</em>、多语言支持以及完善的调试与 TAS 工具集。",
-      "wn.k":"本次更新","wn.t":"v1.5 · Prism","wn.sub":"2026-06-24 发布 · 上一个版本 v1.4 (Gateway)",
-      "wn1.t":"PPU 模块整合","wn1.d":"PPU 寄存器、名称表 RAM、OAM 与渲染缓存统一收敛到 <code>fceu11::Ppu</code> 类。新增逐像素视觉回归测试守住每一次重构，渲染输出零偏差。",
-      "wn2.t":"Bus ↔ PPU 边界更清晰","wn2.d":"Bus 不再直接读写 PPU 全局变量——bank-switch 全部经由 <code>ppu_-&gt;method()</code> 走。后续 mapper 与渲染特性有了更稳的基础。",
-      "wn3.t":"存档前后版本兼容","wn3.d":"v1.5 之前的 <code>.fc0</code> 与 <code>.fm2</code> 文件继续可加载，无需手工迁移。存档格式保持不变，v1.5 自身存档回环字节完全一致。",
-      "wn4.t":"首次加载崩溃已修复","wn4.d":"已修补 PPU 注入的初始化顺序 bug——<code>g_bus.attach_ppu(&amp;g_ppu)</code> 现在在 <code>Initialize()</code> 中执行，早于任何 mapper 装载代码，冷启动即可干净运行游戏。",
-      "wn.cta":"查看完整 v1.5 发布说明 →",
+      "wn.k":"本次更新","wn.t":"v1.8 · Masonry","wn.sub":"2026-07-01 发布 · 上一个版本 v1.5 (Prism)",
+      "wn1.t":"174 款 mapper 统一为现代 C++ 类","wn1.d":"所有 174 款受支持的 NES/Famicom 卡带 mapper 现在统一通过 <code>fceu11::Mapper</code> 子类（含自动注册）运行，取代旧的 C 风格函数指针调度。结合 v1.7 的 Cart 类与 v1.6 的 APU 面向对象化，整个核心已全部现代化——游戏加载更可靠，代码库更易维护。",
+      "wn2.t":"MMC3 家族共享一个基类","wn2.d":"MMC3 系列 23 款不同 mapper（涵盖超级马里奥兄弟 3、星之卡比、洛克人 4–6 等数百款经典）现在统一继承自 <code>Mmc3BaseCart</code> 基类。整个家族行为一致性显著提升，一次修复全家族受益。",
+      "wn3.t":"扩展音频芯片接口统一","wn3.d":"VRC7、MMC5、Namco 106 与 Sunsoft 5B 等扩展音频芯片现在使用与 v1.6 VRC6 相同的 <code>ExpansionAudio</code> 虚拟接口。音频路径更清晰、更可预测、更易扩展，未来加入新芯片更省力。",
+      "wn4.t":"174 款 mapper 字节级状态回归测试","wn4.d":"每款受支持的 mapper 现已配备自动字节级回归测试，将内部状态与已知正确的 golden 文件比对。任何可能改变 mapper 行为的修改都会在发布前被捕获——这是后续每一次更新的安全网。",
+      "wn.cta":"查看完整 v1.8 发布说明 →",
       foot:"基于 FCEUX"}
 };
 let lang='en';
