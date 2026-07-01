@@ -4,7 +4,23 @@
 //! compression) from `src/state.cpp`.  C++ retains SFORMAT field-level
 //! serialization; Rust owns the file envelope.
 //!
-//! # File format
+//! # Supported formats
+//!
+//! ## V2 format (v1.9+, default for saving)
+//! ```text
+//! Header (24 bytes):
+//!   [0..8]   "FCEU11ST" magic
+//!   [8..12]  format_version (u32 LE) = 2
+//!   [12..16] chunk_count   (u32 LE)
+//!   [16..20] total_uncompressed_size (u32 LE)
+//!   [20..24] flags (u32 LE) — bit 0: compressed, bit 1: has_crc32
+//!
+//! Payload (compressed or raw):
+//!   For each chunk:
+//!     [type: u8][size: u32 LE][crc32: u32 LE][data: size bytes]
+//! ```
+//!
+//! ## V1 format (FCSX, v1.0~v1.8, supported for load and legacy save)
 //! ```text
 //! Header (16 bytes):
 //!   [0..4]   "FCSX" magic
@@ -16,7 +32,7 @@
 //!   [type: u8][size: u32 LE][data: size bytes]  (repeated)
 //! ```
 //!
-//! Old format (pre-FCSX) is supported for loading only:
+//! ## Legacy format (pre-FCSX, load only)
 //!   [0..3] "FCS" magic
 //!   [3]    version byte (or 0xFF + u32 at offset 8)
 //!   [4..8] totalsize (u32 LE)
@@ -29,8 +45,33 @@ use flate2::write::ZlibEncoder;
 /// Maximum uncompressed size we are willing to accept (safety limit).
 const MAX_UNCOMPRESSED_SIZE: usize = 64 * 1024 * 1024; // 64 MiB
 
-/// Size of the savestate file header.
-const HEADER_SIZE: usize = 16;
+/// V1 (FCSX) header size.
+const V1_HEADER_SIZE: usize = 16;
+
+/// V2 (FCEU11ST) header size.
+const V2_HEADER_SIZE: usize = 24;
+
+/// V2 chunk header: type(1) + size(4) + crc32(4) = 9 bytes.
+const V2_CHUNK_HEADER_SIZE: usize = 9;
+
+/// V1 chunk header: type(1) + size(4) = 5 bytes.
+const V1_CHUNK_HEADER_SIZE: usize = 5;
+
+/// V2 flag: payload is zlib-compressed.
+const V2_FLAG_COMPRESSED: u32 = 1 << 0;
+
+/// V2 flag: each chunk carries a CRC32 checksum.
+const V2_FLAG_HAS_CRC32: u32 = 1 << 1;
+
+/// Savestate format version.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+pub enum StateFormatVersion {
+    /// V1 (FCSX) — v1.0 through v1.8.
+    V1 = 1,
+    /// V2 (FCEU11ST) — v1.9+, with per-chunk CRC32.
+    V2 = 2,
+}
 
 // ============================================================
 // Internal Rust API
@@ -51,9 +92,10 @@ pub enum StateError {
     DecompressionFailed,
     CompressionFailed,
     InvalidChunk,
+    CrcMismatch,
 }
 
-/// Build a savestate file from chunks.
+/// Build a V1 (FCSX) savestate file from chunks.
 ///
 /// `compression_level`:
 /// * `0`   → no compression
@@ -64,7 +106,7 @@ pub fn save_state_file(
     version: u32,
     compression_level: i32,
 ) -> Result<Vec<u8>, StateError> {
-    // 1. Serialize uncompressed payload
+    // 1. Serialize uncompressed payload (V1 chunk format: type + size + data)
     let mut payload = Vec::new();
     for chunk in chunks {
         payload.push(chunk.chunk_type);
@@ -75,26 +117,10 @@ pub fn save_state_file(
     let totalsize = payload.len() as u32;
 
     // 2. Compress if requested
-    let (body, comprlen) = if compression_level == 0 {
-        (payload, u32::MAX)
-    } else {
-        let level = match compression_level {
-            -1 => Compression::default(),
-            n if (1..=9).contains(&n) => Compression::new(n as u32),
-            _ => Compression::default(),
-        };
-        let mut encoder = ZlibEncoder::new(Vec::new(), level);
-        std::io::Write::write_all(&mut encoder, &payload)
-            .map_err(|_| StateError::CompressionFailed)?;
-        let compressed = encoder
-            .finish()
-            .map_err(|_| StateError::CompressionFailed)?;
-        let comprlen_u32 = compressed.len() as u32;
-        (compressed, comprlen_u32)
-    };
+    let (body, comprlen) = compress_payload(&payload, compression_level)?;
 
-    // 3. Assemble header + body
-    let mut file = Vec::with_capacity(HEADER_SIZE + body.len());
+    // 3. Assemble V1 header + body
+    let mut file = Vec::with_capacity(V1_HEADER_SIZE + body.len());
     file.extend_from_slice(b"FCSX");
     file.extend_from_slice(&totalsize.to_le_bytes());
     file.extend_from_slice(&version.to_le_bytes());
@@ -104,72 +130,158 @@ pub fn save_state_file(
     Ok(file)
 }
 
+/// Build a V2 (FCEU11ST) savestate file from chunks.
+///
+/// Each chunk carries a CRC32 checksum for integrity verification.
+pub fn save_state_file_v2(
+    chunks: &[StateChunk],
+    compression_level: i32,
+) -> Result<Vec<u8>, StateError> {
+    // 1. Serialize uncompressed payload (V2 chunk format: type + size + crc32 + data)
+    let mut payload = Vec::new();
+    for chunk in chunks {
+        let crc = crc32fast::hash(&chunk.data);
+        payload.push(chunk.chunk_type);
+        payload.extend_from_slice(&(chunk.data.len() as u32).to_le_bytes());
+        payload.extend_from_slice(&crc.to_le_bytes());
+        payload.extend_from_slice(&chunk.data);
+    }
+
+    let totalsize = payload.len() as u32;
+    let chunk_count = chunks.len() as u32;
+
+    // 2. Compress if requested
+    let (body, comprlen) = compress_payload(&payload, compression_level)?;
+
+    // 3. Build flags
+    let mut flags: u32 = V2_FLAG_HAS_CRC32;
+    if comprlen != u32::MAX {
+        flags |= V2_FLAG_COMPRESSED;
+    }
+
+    // 4. Assemble V2 header + body
+    let mut file = Vec::with_capacity(V2_HEADER_SIZE + body.len());
+    file.extend_from_slice(b"FCEU11ST");
+    file.extend_from_slice(&2u32.to_le_bytes()); // format_version
+    file.extend_from_slice(&chunk_count.to_le_bytes());
+    file.extend_from_slice(&totalsize.to_le_bytes());
+    file.extend_from_slice(&flags.to_le_bytes());
+    file.extend_from_slice(&body);
+
+    Ok(file)
+}
+
 /// Parse a savestate file, returning `(version, chunks, totalsize)`.
 ///
-/// Supports both FCSX and legacy "FCS" headers.
+/// Auto-detects V2 (FCEU11ST), V1 (FCSX), and legacy (FCS) formats.
+/// For V2, `version` returned is the format version (2).
 pub fn load_state_file(data: &[u8]) -> Result<(u32, Vec<StateChunk>, u32), StateError> {
-    if data.len() < HEADER_SIZE {
+    if data.len() < V1_HEADER_SIZE {
         return Err(StateError::InvalidHeader);
     }
 
-    let magic = &data[0..4];
+    // Detect format by magic
+    if data.len() >= V2_HEADER_SIZE && &data[0..8] == b"FCEU11ST" {
+        load_v2(data)
+    } else if &data[0..4] == b"FCSX" {
+        load_v1(data)
+    } else if &data[0..3] == b"FCS" {
+        load_legacy(data)
+    } else {
+        Err(StateError::InvalidHeader)
+    }
+}
+
+// ============================================================
+// Format-specific loaders
+// ============================================================
+
+fn load_v1(data: &[u8]) -> Result<(u32, Vec<StateChunk>, u32), StateError> {
     let totalsize = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
+    let version = u32::from_le_bytes([data[8], data[9], data[10], data[11]]);
+    let comprlen = u32::from_le_bytes([data[12], data[13], data[14], data[15]]);
 
-    // Detect format and extract uncompressed payload
-    let version: u32;
-    let payload: Vec<u8>;
+    if (totalsize as usize) > MAX_UNCOMPRESSED_SIZE {
+        return Err(StateError::PayloadTooLarge);
+    }
 
-    if magic == b"FCSX" {
-        version = u32::from_le_bytes([data[8], data[9], data[10], data[11]]);
-        let comprlen = u32::from_le_bytes([data[12], data[13], data[14], data[15]]);
-
-        if (totalsize as usize) > MAX_UNCOMPRESSED_SIZE {
-            return Err(StateError::PayloadTooLarge);
-        }
-
-        if comprlen == u32::MAX {
-            // Uncompressed
-            if data.len() < HEADER_SIZE + totalsize as usize {
-                return Err(StateError::InvalidHeader);
-            }
-            payload = data[HEADER_SIZE..HEADER_SIZE + totalsize as usize].to_vec();
-        } else {
-            // Compressed
-            if data.len() < HEADER_SIZE + comprlen as usize {
-                return Err(StateError::InvalidHeader);
-            }
-            let compressed = &data[HEADER_SIZE..HEADER_SIZE + comprlen as usize];
-            let mut decoder = ZlibDecoder::new(compressed);
-            let mut uncompressed = Vec::with_capacity(totalsize as usize);
-            std::io::Read::read_to_end(&mut decoder, &mut uncompressed)
-                .map_err(|_| StateError::DecompressionFailed)?;
-            if uncompressed.len() != totalsize as usize {
-                return Err(StateError::DecompressionFailed);
-            }
-            payload = uncompressed;
-        }
-    } else if &magic[0..3] == b"FCS" {
-        // Legacy format
-        version = if data[3] == 0xFF {
-            u32::from_le_bytes([data[8], data[9], data[10], data[11]])
-        } else {
-            (data[3] as u32) * 100
-        };
-        if data.len() < HEADER_SIZE + totalsize as usize {
+    let payload = if comprlen == u32::MAX {
+        // Uncompressed
+        if data.len() < V1_HEADER_SIZE + totalsize as usize {
             return Err(StateError::InvalidHeader);
         }
-        payload = data[HEADER_SIZE..HEADER_SIZE + totalsize as usize].to_vec();
+        data[V1_HEADER_SIZE..V1_HEADER_SIZE + totalsize as usize].to_vec()
     } else {
-        return Err(StateError::InvalidHeader);
+        // Compressed
+        if data.len() < V1_HEADER_SIZE + comprlen as usize {
+            return Err(StateError::InvalidHeader);
+        }
+        let compressed = &data[V1_HEADER_SIZE..V1_HEADER_SIZE + comprlen as usize];
+        decompress_payload(compressed, totalsize as usize)?
     };
 
-    // Parse chunks from payload
+    let chunks = parse_v1_chunks(&payload)?;
+    Ok((version, chunks, totalsize))
+}
+
+fn load_v2(data: &[u8]) -> Result<(u32, Vec<StateChunk>, u32), StateError> {
+    let format_version = u32::from_le_bytes([data[8], data[9], data[10], data[11]]);
+    let chunk_count = u32::from_le_bytes([data[12], data[13], data[14], data[15]]) as usize;
+    let totalsize = u32::from_le_bytes([data[16], data[17], data[18], data[19]]);
+    let flags = u32::from_le_bytes([data[20], data[21], data[22], data[23]]);
+
+    if (totalsize as usize) > MAX_UNCOMPRESSED_SIZE {
+        return Err(StateError::PayloadTooLarge);
+    }
+
+    let is_compressed = (flags & V2_FLAG_COMPRESSED) != 0;
+    let has_crc32 = (flags & V2_FLAG_HAS_CRC32) != 0;
+
+    let payload = if is_compressed {
+        // Compressed: read remaining data and decompress
+        if data.len() < V2_HEADER_SIZE {
+            return Err(StateError::InvalidHeader);
+        }
+        let compressed = &data[V2_HEADER_SIZE..];
+        decompress_payload(compressed, totalsize as usize)?
+    } else {
+        // Uncompressed
+        if data.len() < V2_HEADER_SIZE + totalsize as usize {
+            return Err(StateError::InvalidHeader);
+        }
+        data[V2_HEADER_SIZE..V2_HEADER_SIZE + totalsize as usize].to_vec()
+    };
+
+    let chunks = parse_v2_chunks(&payload, chunk_count, has_crc32)?;
+    Ok((format_version, chunks, totalsize))
+}
+
+fn load_legacy(data: &[u8]) -> Result<(u32, Vec<StateChunk>, u32), StateError> {
+    let totalsize = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
+    let version = if data[3] == 0xFF {
+        u32::from_le_bytes([data[8], data[9], data[10], data[11]])
+    } else {
+        (data[3] as u32) * 100
+    };
+    if data.len() < V1_HEADER_SIZE + totalsize as usize {
+        return Err(StateError::InvalidHeader);
+    }
+    let payload = data[V1_HEADER_SIZE..V1_HEADER_SIZE + totalsize as usize].to_vec();
+    let chunks = parse_v1_chunks(&payload)?;
+    Ok((version, chunks, totalsize))
+}
+
+// ============================================================
+// Chunk parsers
+// ============================================================
+
+fn parse_v1_chunks(payload: &[u8]) -> Result<Vec<StateChunk>, StateError> {
     let mut chunks = Vec::new();
     let mut pos = 0usize;
     let payload_len = payload.len();
 
     while pos < payload_len {
-        if pos + 5 > payload_len {
+        if pos + V1_CHUNK_HEADER_SIZE > payload_len {
             return Err(StateError::InvalidChunk);
         }
         let chunk_type = payload[pos];
@@ -179,7 +291,7 @@ pub fn load_state_file(data: &[u8]) -> Result<(u32, Vec<StateChunk>, u32), State
             payload[pos + 3],
             payload[pos + 4],
         ]) as usize;
-        pos += 5;
+        pos += V1_CHUNK_HEADER_SIZE;
 
         if pos + chunk_size > payload_len {
             return Err(StateError::InvalidChunk);
@@ -191,7 +303,96 @@ pub fn load_state_file(data: &[u8]) -> Result<(u32, Vec<StateChunk>, u32), State
         pos += chunk_size;
     }
 
-    Ok((version, chunks, totalsize))
+    Ok(chunks)
+}
+
+fn parse_v2_chunks(
+    payload: &[u8],
+    expected_count: usize,
+    verify_crc: bool,
+) -> Result<Vec<StateChunk>, StateError> {
+    let mut chunks = Vec::with_capacity(expected_count);
+    let mut pos = 0usize;
+    let payload_len = payload.len();
+
+    while pos < payload_len {
+        if pos + V2_CHUNK_HEADER_SIZE > payload_len {
+            return Err(StateError::InvalidChunk);
+        }
+        let chunk_type = payload[pos];
+        let chunk_size = u32::from_le_bytes([
+            payload[pos + 1],
+            payload[pos + 2],
+            payload[pos + 3],
+            payload[pos + 4],
+        ]) as usize;
+        let stored_crc = u32::from_le_bytes([
+            payload[pos + 5],
+            payload[pos + 6],
+            payload[pos + 7],
+            payload[pos + 8],
+        ]);
+        pos += V2_CHUNK_HEADER_SIZE;
+
+        if pos + chunk_size > payload_len {
+            return Err(StateError::InvalidChunk);
+        }
+        let chunk_data = &payload[pos..pos + chunk_size];
+
+        if verify_crc {
+            let computed_crc = crc32fast::hash(chunk_data);
+            if computed_crc != stored_crc {
+                return Err(StateError::CrcMismatch);
+            }
+        }
+
+        chunks.push(StateChunk {
+            chunk_type,
+            data: chunk_data.to_vec(),
+        });
+        pos += chunk_size;
+    }
+
+    if chunks.len() != expected_count {
+        return Err(StateError::InvalidChunk);
+    }
+
+    Ok(chunks)
+}
+
+// ============================================================
+// Compression helpers
+// ============================================================
+
+fn compress_payload(payload: &[u8], compression_level: i32) -> Result<(Vec<u8>, u32), StateError> {
+    if compression_level == 0 {
+        return Ok((payload.to_vec(), u32::MAX));
+    }
+
+    let level = match compression_level {
+        -1 => Compression::default(),
+        n if (1..=9).contains(&n) => Compression::new(n as u32),
+        _ => Compression::default(),
+    };
+    let mut encoder = ZlibEncoder::new(Vec::new(), level);
+    std::io::Write::write_all(&mut encoder, payload)
+        .map_err(|_| StateError::CompressionFailed)?;
+    let compressed = encoder
+        .finish()
+        .map_err(|_| StateError::CompressionFailed)?;
+    let comprlen = compressed.len() as u32;
+    Ok((compressed, comprlen))
+}
+
+fn decompress_payload(compressed: &[u8], expected_size: usize) -> Result<Vec<u8>, StateError> {
+    let mut decoder = ZlibDecoder::new(compressed);
+    let mut uncompressed = Vec::with_capacity(expected_size);
+    std::io::Read::read_to_end(&mut decoder, &mut uncompressed)
+        .map_err(|_| StateError::DecompressionFailed)?;
+    if uncompressed.len() != expected_size {
+        return Err(StateError::DecompressionFailed);
+    }
+    Ok(uncompressed)
 }
 
 // ============================================================
@@ -223,10 +424,10 @@ pub struct FceuStateBuffer {
 }
 
 // ============================================================
-// FFI: Save
+// FFI: Save (V1)
 // ============================================================
 
-/// Serialize chunks into a savestate file buffer.
+/// Serialize chunks into a V1 (FCSX) savestate file buffer.
 ///
 /// On success, returns `true` and writes a `FceuStateBuffer` to `out_buf`.
 /// The caller must free `out_buf.ptr` via `fceux11_rust_state_file_buf_free`.
@@ -245,20 +446,51 @@ pub unsafe extern "C" fn fceux11_rust_state_file_save(
     }
 
     let inputs = unsafe { std::slice::from_raw_parts(chunks, chunk_count) };
-    let mut state_chunks = Vec::with_capacity(chunk_count);
-    for inp in inputs {
-        let data = if inp.data.is_null() || inp.len == 0 {
-            Vec::new()
-        } else {
-            unsafe { std::slice::from_raw_parts(inp.data, inp.len) }.to_vec()
-        };
-        state_chunks.push(StateChunk {
-            chunk_type: inp.chunk_type,
-            data,
-        });
-    }
+    let state_chunks = ffi_inputs_to_chunks(inputs);
 
     match save_state_file(&state_chunks, version, compression_level) {
+        Ok(mut vec) => {
+            vec.shrink_to_fit();
+            let buf = FceuStateBuffer {
+                ptr: vec.as_mut_ptr(),
+                len: vec.len(),
+                cap: vec.capacity(),
+            };
+            std::mem::forget(vec);
+            unsafe {
+                *out_buf = buf;
+            }
+            true
+        }
+        Err(_) => false,
+    }
+}
+
+// ============================================================
+// FFI: Save V2
+// ============================================================
+
+/// Serialize chunks into a V2 (FCEU11ST) savestate file buffer.
+///
+/// On success, returns `true` and writes a `FceuStateBuffer` to `out_buf`.
+/// The caller must free `out_buf.ptr` via `fceux11_rust_state_file_buf_free`.
+#[unsafe(no_mangle)]
+/// # Safety
+/// Callers must ensure all raw pointer arguments passed to this function are valid.
+pub unsafe extern "C" fn fceux11_rust_state_file_save_v2(
+    chunks: *const FceuStateChunkInput,
+    chunk_count: usize,
+    compression_level: i32,
+    out_buf: *mut FceuStateBuffer,
+) -> bool {
+    if chunks.is_null() || out_buf.is_null() {
+        return false;
+    }
+
+    let inputs = unsafe { std::slice::from_raw_parts(chunks, chunk_count) };
+    let state_chunks = ffi_inputs_to_chunks(inputs);
+
+    match save_state_file_v2(&state_chunks, compression_level) {
         Ok(mut vec) => {
             vec.shrink_to_fit();
             let buf = FceuStateBuffer {
@@ -282,10 +514,12 @@ pub unsafe extern "C" fn fceux11_rust_state_file_save(
 
 /// Deserialize a savestate file buffer into chunks.
 ///
+/// Auto-detects V1 (FCSX) and V2 (FCEU11ST) formats.
+///
 /// On success, returns `true` and writes:
 /// * `out_chunks` — pointer to an array of `FceuStateChunkOutput`
 /// * `out_chunk_count` — number of chunks
-/// * `out_version` — savestate version from header
+/// * `out_version` — savestate version from header (format version for V2)
 /// * `out_totalsize` — uncompressed payload size
 ///
 /// The caller must free `out_chunks` via `fceux11_rust_state_file_chunks_free`.
@@ -378,6 +612,26 @@ pub unsafe extern "C" fn fceux11_rust_state_file_chunks_free(
 }
 
 // ============================================================
+// Internal helpers
+// ============================================================
+
+fn ffi_inputs_to_chunks(inputs: &[FceuStateChunkInput]) -> Vec<StateChunk> {
+    let mut state_chunks = Vec::with_capacity(inputs.len());
+    for inp in inputs {
+        let data = if inp.data.is_null() || inp.len == 0 {
+            Vec::new()
+        } else {
+            unsafe { std::slice::from_raw_parts(inp.data, inp.len) }.to_vec()
+        };
+        state_chunks.push(StateChunk {
+            chunk_type: inp.chunk_type,
+            data,
+        });
+    }
+    state_chunks
+}
+
+// ============================================================
 // Tests
 // ============================================================
 
@@ -402,178 +656,318 @@ mod tests {
         ]
     }
 
+    // ---- V1 tests (unchanged from original) ----
+
     #[test]
-    fn test_roundtrip_uncompressed() {
-        unsafe {
-            let chunks = make_test_chunks();
-            let file = save_state_file(&chunks, 0x020400, 0).unwrap();
+    fn test_v1_roundtrip_uncompressed() {
+        let chunks = make_test_chunks();
+        let file = save_state_file(&chunks, 0x020400, 0).unwrap();
 
-            assert!(file.len() >= 16);
-            assert_eq!(&file[0..4], b"FCSX");
+        assert!(file.len() >= V1_HEADER_SIZE);
+        assert_eq!(&file[0..4], b"FCSX");
 
-            let (version, loaded_chunks, totalsize) = load_state_file(&file).unwrap();
-            assert_eq!(version, 0x020400);
-            assert_eq!(loaded_chunks, chunks);
-            assert_eq!(totalsize as usize, file.len() - 16);
-        }
+        let (version, loaded_chunks, totalsize) = load_state_file(&file).unwrap();
+        assert_eq!(version, 0x020400);
+        assert_eq!(loaded_chunks, chunks);
+        assert_eq!(totalsize as usize, file.len() - V1_HEADER_SIZE);
     }
 
     #[test]
-    fn test_roundtrip_compressed() {
-        unsafe {
-            let chunks = make_test_chunks();
-            let file_compressed = save_state_file(&chunks, 0x020400, 6).unwrap();
-            let file_uncompressed = save_state_file(&chunks, 0x020400, 0).unwrap();
+    fn test_v1_roundtrip_compressed() {
+        let chunks = make_test_chunks();
+        let file_compressed = save_state_file(&chunks, 0x020400, 6).unwrap();
+        let file_uncompressed = save_state_file(&chunks, 0x020400, 0).unwrap();
 
-            // Compressed should be smaller (or equal) for this tiny payload
-            // Actually tiny data may compress larger; just verify it parses.
-            let (version, loaded_chunks, _) = load_state_file(&file_compressed).unwrap();
-            assert_eq!(version, 0x020400);
-            assert_eq!(loaded_chunks, chunks);
+        let (version, loaded_chunks, _) = load_state_file(&file_compressed).unwrap();
+        assert_eq!(version, 0x020400);
+        assert_eq!(loaded_chunks, chunks);
 
-            let (_, loaded2, _) = load_state_file(&file_uncompressed).unwrap();
-            assert_eq!(loaded2, chunks);
-        }
+        let (_, loaded2, _) = load_state_file(&file_uncompressed).unwrap();
+        assert_eq!(loaded2, chunks);
     }
 
     #[test]
     fn test_old_format_load() {
-        unsafe {
-            // Legacy header: "FCS" + version byte + totalsize + padding
-            let mut header = vec![b'F', b'C', b'S', 0x63]; // version = 99 * 100 = 9900
-            // payload = chunk1(1+4+4) + chunk2(1+4+3) = 17 bytes
-            header.extend_from_slice(&17u32.to_le_bytes());
-            header.extend_from_slice(&[0u8; 8]); // padding
+        let mut header = vec![b'F', b'C', b'S', 0x63]; // version = 99 * 100 = 9900
+        header.extend_from_slice(&17u32.to_le_bytes());
+        header.extend_from_slice(&[0u8; 8]);
 
-            // chunk type=1, size=4, data=[AA BB CC DD]
-            header.push(1);
-            header.extend_from_slice(&4u32.to_le_bytes());
-            header.extend_from_slice(&[0xAA, 0xBB, 0xCC, 0xDD]);
-            // chunk type=2, size=3, data=[11 22 33]
-            header.push(2);
-            header.extend_from_slice(&3u32.to_le_bytes());
-            header.extend_from_slice(&[0x11, 0x22, 0x33]);
+        header.push(1);
+        header.extend_from_slice(&4u32.to_le_bytes());
+        header.extend_from_slice(&[0xAA, 0xBB, 0xCC, 0xDD]);
+        header.push(2);
+        header.extend_from_slice(&3u32.to_le_bytes());
+        header.extend_from_slice(&[0x11, 0x22, 0x33]);
 
-            let (version, chunks, totalsize) = load_state_file(&header).unwrap();
-            assert_eq!(version, 9900);
-            assert_eq!(totalsize, 17);
-            assert_eq!(chunks.len(), 2);
-            assert_eq!(chunks[0].chunk_type, 1);
-            assert_eq!(chunks[0].data, vec![0xAA, 0xBB, 0xCC, 0xDD]);
-            assert_eq!(chunks[1].chunk_type, 2);
-            assert_eq!(chunks[1].data, vec![0x11, 0x22, 0x33]);
-        }
+        let (version, chunks, totalsize) = load_state_file(&header).unwrap();
+        assert_eq!(version, 9900);
+        assert_eq!(totalsize, 17);
+        assert_eq!(chunks.len(), 2);
+        assert_eq!(chunks[0].chunk_type, 1);
+        assert_eq!(chunks[0].data, vec![0xAA, 0xBB, 0xCC, 0xDD]);
+        assert_eq!(chunks[1].chunk_type, 2);
+        assert_eq!(chunks[1].data, vec![0x11, 0x22, 0x33]);
     }
 
     #[test]
     fn test_old_format_0xff_version() {
-        unsafe {
-            let mut header = vec![b'F', b'C', b'S', 0xFF];
-            header.extend_from_slice(&5u32.to_le_bytes()); // totalsize
-            header.extend_from_slice(&12345u32.to_le_bytes()); // version
-            header.extend_from_slice(&[0u8; 4]);
+        let mut header = vec![b'F', b'C', b'S', 0xFF];
+        header.extend_from_slice(&5u32.to_le_bytes());
+        header.extend_from_slice(&12345u32.to_le_bytes());
+        header.extend_from_slice(&[0u8; 4]);
 
-            // 5 bytes payload
-            header.push(1);
-            header.extend_from_slice(&0u32.to_le_bytes());
+        header.push(1);
+        header.extend_from_slice(&0u32.to_le_bytes());
 
-            let (version, chunks, _) = load_state_file(&header).unwrap();
-            assert_eq!(version, 12345);
-            assert_eq!(chunks.len(), 1);
-            assert_eq!(chunks[0].chunk_type, 1);
-            assert_eq!(chunks[0].data.len(), 0);
-        }
+        let (version, chunks, _) = load_state_file(&header).unwrap();
+        assert_eq!(version, 12345);
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].chunk_type, 1);
+        assert_eq!(chunks[0].data.len(), 0);
     }
 
     #[test]
     fn test_invalid_header() {
-        unsafe {
-            assert!(load_state_file(b"BAD").is_err());
-            assert!(load_state_file(b"FCSX\x00\x00\x00\x00").is_err()); // too short
-        }
+        assert!(load_state_file(b"BAD").is_err());
+        assert!(load_state_file(b"FCSX\x00\x00\x00\x00").is_err());
     }
 
     #[test]
-    fn test_empty_chunks() {
-        unsafe {
-            let chunks: Vec<StateChunk> = vec![];
-            let file = save_state_file(&chunks, 1, 0).unwrap();
-            let (version, loaded, totalsize) = load_state_file(&file).unwrap();
-            assert_eq!(version, 1);
-            assert_eq!(totalsize, 0);
-            assert!(loaded.is_empty());
-        }
+    fn test_v1_empty_chunks() {
+        let chunks: Vec<StateChunk> = vec![];
+        let file = save_state_file(&chunks, 1, 0).unwrap();
+        let (version, loaded, totalsize) = load_state_file(&file).unwrap();
+        assert_eq!(version, 1);
+        assert_eq!(totalsize, 0);
+        assert!(loaded.is_empty());
     }
+
+    // ---- V2 tests ----
+
+    #[test]
+    fn test_v2_roundtrip_uncompressed() {
+        let chunks = make_test_chunks();
+        let file = save_state_file_v2(&chunks, 0).unwrap();
+
+        assert!(file.len() >= V2_HEADER_SIZE);
+        assert_eq!(&file[0..8], b"FCEU11ST");
+
+        let (version, loaded_chunks, totalsize) = load_state_file(&file).unwrap();
+        assert_eq!(version, 2);
+        assert_eq!(loaded_chunks, chunks);
+        assert!(totalsize > 0);
+    }
+
+    #[test]
+    fn test_v2_roundtrip_compressed() {
+        let chunks = make_test_chunks();
+        let file = save_state_file_v2(&chunks, 6).unwrap();
+
+        assert_eq!(&file[0..8], b"FCEU11ST");
+
+        let (version, loaded_chunks, _) = load_state_file(&file).unwrap();
+        assert_eq!(version, 2);
+        assert_eq!(loaded_chunks, chunks);
+    }
+
+    #[test]
+    fn test_v2_empty_chunks() {
+        let chunks: Vec<StateChunk> = vec![];
+        let file = save_state_file_v2(&chunks, 0).unwrap();
+        let (version, loaded, _) = load_state_file(&file).unwrap();
+        assert_eq!(version, 2);
+        assert!(loaded.is_empty());
+    }
+
+    #[test]
+    fn test_v2_crc32_verification() {
+        let chunks = make_test_chunks();
+        let mut file = save_state_file_v2(&chunks, 0).unwrap();
+
+        // Corrupt one byte in the payload (after V2 header)
+        let corrupt_pos = V2_HEADER_SIZE + V2_CHUNK_HEADER_SIZE; // first data byte of first chunk
+        file[corrupt_pos] ^= 0xFF;
+
+        // Loading should fail with CRC mismatch
+        let result = load_state_file(&file);
+        assert_eq!(result.err(), Some(StateError::CrcMismatch));
+    }
+
+    #[test]
+    fn test_v2_large_data() {
+        // Test with larger data to exercise compression
+        let chunks: Vec<StateChunk> = (0..10)
+            .map(|i| StateChunk {
+                chunk_type: i,
+                data: vec![i as u8; 1024],
+            })
+            .collect();
+
+        let file_uncompressed = save_state_file_v2(&chunks, 0).unwrap();
+        let file_compressed = save_state_file_v2(&chunks, 6).unwrap();
+
+        // Compressed should be smaller for repetitive data
+        assert!(file_compressed.len() < file_uncompressed.len());
+
+        // Both should roundtrip correctly
+        let (_, loaded1, _) = load_state_file(&file_uncompressed).unwrap();
+        assert_eq!(loaded1, chunks);
+
+        let (_, loaded2, _) = load_state_file(&file_compressed).unwrap();
+        assert_eq!(loaded2, chunks);
+    }
+
+    // ---- Cross-format tests ----
+
+    #[test]
+    fn test_v1_loads_v1_data() {
+        let chunks = make_test_chunks();
+        let file = save_state_file(&chunks, 100, 0).unwrap();
+        let (version, loaded, _) = load_state_file(&file).unwrap();
+        assert_eq!(version, 100);
+        assert_eq!(loaded, chunks);
+    }
+
+    #[test]
+    fn test_v2_loads_v2_data() {
+        let chunks = make_test_chunks();
+        let file = save_state_file_v2(&chunks, 0).unwrap();
+        let (version, loaded, _) = load_state_file(&file).unwrap();
+        assert_eq!(version, 2);
+        assert_eq!(loaded, chunks);
+    }
+
+    // ---- FFI tests ----
 
     #[test]
     fn test_ffi_save_load_roundtrip() {
-        unsafe {
-            let input_data1 = [0xAAu8, 0xBB, 0xCC];
-            let input_data2 = [0x11u8, 0x22];
-            let inputs = [
-                FceuStateChunkInput {
-                    chunk_type: 1,
-                    data: input_data1.as_ptr(),
-                    len: input_data1.len(),
-                },
-                FceuStateChunkInput {
-                    chunk_type: 2,
-                    data: input_data2.as_ptr(),
-                    len: input_data2.len(),
-                },
-            ];
+        let input_data1 = [0xAAu8, 0xBB, 0xCC];
+        let input_data2 = [0x11u8, 0x22];
+        let inputs = [
+            FceuStateChunkInput {
+                chunk_type: 1,
+                data: input_data1.as_ptr(),
+                len: input_data1.len(),
+            },
+            FceuStateChunkInput {
+                chunk_type: 2,
+                data: input_data2.as_ptr(),
+                len: input_data2.len(),
+            },
+        ];
 
-            let mut out_buf = FceuStateBuffer {
-                ptr: std::ptr::null_mut(),
-                len: 0,
-                cap: 0,
-            };
+        let mut out_buf = FceuStateBuffer {
+            ptr: std::ptr::null_mut(),
+            len: 0,
+            cap: 0,
+        };
 
-            assert!(fceux11_rust_state_file_save(
+        assert!(unsafe {
+            fceux11_rust_state_file_save(
                 inputs.as_ptr(),
                 inputs.len(),
                 42,
                 0,
                 &mut out_buf,
-            ));
+            )
+        });
 
-            assert!(!out_buf.ptr.is_null());
-            assert!(out_buf.len >= 16);
+        assert!(!out_buf.ptr.is_null());
+        assert!(out_buf.len >= V1_HEADER_SIZE);
 
-            let mut out_chunks: *mut FceuStateChunkOutput = std::ptr::null_mut();
-            let mut out_chunk_count: usize = 0;
-            let mut out_version: u32 = 0;
-            let mut out_totalsize: u32 = 0;
+        let mut out_chunks: *mut FceuStateChunkOutput = std::ptr::null_mut();
+        let mut out_chunk_count: usize = 0;
+        let mut out_version: u32 = 0;
+        let mut out_totalsize: u32 = 0;
 
-            assert!(fceux11_rust_state_file_load(
+        assert!(unsafe {
+            fceux11_rust_state_file_load(
                 out_buf.ptr,
                 out_buf.len,
                 &mut out_chunks,
                 &mut out_chunk_count,
                 &mut out_version,
                 &mut out_totalsize,
-            ));
+            )
+        });
 
-            assert_eq!(out_version, 42);
-            assert_eq!(out_chunk_count, 2);
-            assert!(!out_chunks.is_null());
+        assert_eq!(out_version, 42);
+        assert_eq!(out_chunk_count, 2);
+        assert!(!out_chunks.is_null());
 
-            unsafe {
-                let slice = std::slice::from_raw_parts(out_chunks, out_chunk_count);
-                assert_eq!(slice[0].chunk_type, 1);
-                assert_eq!(slice[0].len, 3);
-                assert_eq!(
-                    std::slice::from_raw_parts(slice[0].data, slice[0].len),
-                    &[0xAA, 0xBB, 0xCC]
-                );
-                assert_eq!(slice[1].chunk_type, 2);
-                assert_eq!(slice[1].len, 2);
-                assert_eq!(
-                    std::slice::from_raw_parts(slice[1].data, slice[1].len),
-                    &[0x11, 0x22]
-                );
-            }
+        unsafe {
+            let slice = std::slice::from_raw_parts(out_chunks, out_chunk_count);
+            assert_eq!(slice[0].chunk_type, 1);
+            assert_eq!(slice[0].len, 3);
+            assert_eq!(
+                std::slice::from_raw_parts(slice[0].data, slice[0].len),
+                &[0xAA, 0xBB, 0xCC]
+            );
+            assert_eq!(slice[1].chunk_type, 2);
+            assert_eq!(slice[1].len, 2);
+            assert_eq!(
+                std::slice::from_raw_parts(slice[1].data, slice[1].len),
+                &[0x11, 0x22]
+            );
+        }
 
+        unsafe {
+            fceux11_rust_state_file_chunks_free(out_chunks, out_chunk_count);
+            fceux11_rust_state_file_buf_free(out_buf);
+        }
+    }
+
+    #[test]
+    fn test_ffi_save_v2_roundtrip() {
+        let input_data = [0xAAu8, 0xBB, 0xCC, 0xDD];
+        let inputs = [FceuStateChunkInput {
+            chunk_type: 5,
+            data: input_data.as_ptr(),
+            len: input_data.len(),
+        }];
+
+        let mut out_buf = FceuStateBuffer {
+            ptr: std::ptr::null_mut(),
+            len: 0,
+            cap: 0,
+        };
+
+        assert!(unsafe {
+            fceux11_rust_state_file_save_v2(
+                inputs.as_ptr(),
+                inputs.len(),
+                0,
+                &mut out_buf,
+            )
+        });
+
+        assert!(!out_buf.ptr.is_null());
+
+        let mut out_chunks: *mut FceuStateChunkOutput = std::ptr::null_mut();
+        let mut out_chunk_count: usize = 0;
+        let mut out_version: u32 = 0;
+
+        assert!(unsafe {
+            fceux11_rust_state_file_load(
+                out_buf.ptr,
+                out_buf.len,
+                &mut out_chunks,
+                &mut out_chunk_count,
+                &mut out_version,
+                std::ptr::null_mut(),
+            )
+        });
+
+        assert_eq!(out_version, 2);
+        assert_eq!(out_chunk_count, 1);
+
+        unsafe {
+            let slice = std::slice::from_raw_parts(out_chunks, out_chunk_count);
+            assert_eq!(slice[0].chunk_type, 5);
+            assert_eq!(
+                std::slice::from_raw_parts(slice[0].data, slice[0].len),
+                &[0xAA, 0xBB, 0xCC, 0xDD]
+            );
             fceux11_rust_state_file_chunks_free(out_chunks, out_chunk_count);
             fceux11_rust_state_file_buf_free(out_buf);
         }

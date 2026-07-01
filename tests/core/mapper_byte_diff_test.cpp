@@ -160,8 +160,6 @@ static const RomTestCase tests[] = {
     { "fixtures/mapper_mapper60.nes",     "mapper60",     60  },  // BMCD1038
     { "fixtures/mapper_mapper76.nes",     "mapper76",     60  },  // NAMCOT 108 Rev. A
     { "fixtures/mapper_mapper95.nes",     "mapper95",     60  },  // NAMCOT 108 Rev. B
-    // mapper 88 (NAMCO 3433) placed here (before mapper 83) to avoid
-    // heap corruption when ctest pipes stdout.  Phase E.2 followup.
     { "fixtures/mapper_mapper88.nes",     "mapper88",     60  },  // NAMCO 3433
     // Phase E.2 step 9.5: FFE + Namco 163 + P2 mappers.
     { "fixtures/mapper_mapper6.nes",      "mapper6",      60  },  // FFE
@@ -199,6 +197,7 @@ static const RomTestCase tests[] = {
     { "fixtures/mapper_mapper151.nes",    "mapper151",    60  },
     { "fixtures/mapper_mapper156.nes",    "mapper156",    60  },
     { "fixtures/mapper_mapper177.nes",    "mapper177",    60  },
+    { "fixtures/mapper_mapper178.nes",    "mapper178",    60  },  // Education Cartridge VR Tennis
     { "fixtures/mapper_mapper111.nes",     "mapper111",     60  },
     { "fixtures/mapper_mapper123.nes",     "mapper123",     60  },
     { "fixtures/mapper_mapper125.nes",     "mapper125",     60  },
@@ -243,11 +242,7 @@ static const RomTestCase tests[] = {
     { "fixtures/mapper_mapper30.nes",     "mapper30",     60  },
     { "fixtures/mapper_mapper31.nes",     "mapper31",     60  },
     { "fixtures/mapper_mapper35.nes",     "mapper35",     60  },
-    // mapper 83 (YOKO VRC) placed last: its cleanup corrupts the heap for
-    // subsequent mappers in ctest.  Passes standalone.  Phase E.2 followup.
     { "fixtures/mapper_mapper83.nes",     "mapper83",     60  },  // YOKO VRC
-    // mapper 88 (NAMCO 3433) skipped: heap corruption after mapper 83.
-    //{ "fixtures/mapper_mapper88.nes",     "mapper88",     60  },
 };
 
 static const int NUM_TESTS = sizeof(tests) / sizeof(tests[0]);
@@ -439,8 +434,8 @@ int main(int argc, char** argv) {
 
     // Phase D.12: SKIP is allowed (no regression), but FAIL is not.
     //
-    // v1.8 Phase E.2: Use _exit(0) on success to avoid heap corruption in
-    // global/static destructors from legacy mapper code (exit code 0xC0000374).
+    // v1.8 Phase E.2 / v1.9: Use _exit(0) on success to avoid heap corruption
+    // in global/static destructors from legacy mapper code (exit code 0xC0000374).
     // The corruption is in mapper teardown, not in the test logic.
     if (failed == 0) {
         std::fflush(stdout);

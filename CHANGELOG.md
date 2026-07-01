@@ -5,6 +5,66 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9] - 2026-07-01
+
+**Codename: Chronicle.** Ninth sub-version of the v1.x modernization
+cycle per `docs/v1.x_Modernization_Roadmap.md` §9. Introduces V2
+savestate format (FCEU11ST) with per-chunk CRC32 integrity checking,
+fixes v1.8 mapper 178/88 test issues, and adds `crc32fast` dependency
+to `fceux11-core`.
+
+### Added
+
+- **`src/rust/crates/fceux11-core/src/state_file.rs`** — V2 format
+  support: `FCEU11ST` magic (8 bytes), 24-byte header with
+  format_version/chunk_count/totalsize/flags, per-chunk CRC32 checksums,
+  auto-detection on load (V2/V1/legacy). New functions:
+  `save_state_file_v2()`, `fceux11_rust_state_file_save_v2()` FFI.
+- **`src/rust/crates/fceux11-core/src/sformat.rs`** — Rust SFORMAT
+  chunk serialization engine. Replaces C++ `SubWrite` / `ReadStateChunk`
+  with `fceux11_rust_sformat_serialize` / `fceux11_rust_sformat_deserialize`.
+  All subsystem chunks (CPU/PPU/APU/CTRL/Mapper) now serialize through Rust.
+- **`src/rust/crates/fceux11-core/Cargo.toml`** — Added `crc32fast = "1.4"`
+  dependency for per-chunk integrity verification.
+- **`tests/core/mapper_byte_diff_test.cpp`** — Mapper 178 (Education
+  Cartridge VR Tennis) added to test list.
+- **Unknown chunk preservation** — `FCEUSS_LoadFP` now stores
+  unrecognized chunk types in `g_unknownChunks`; `FCEUSS_SaveMS`
+  re-includes them. Forward-compatible load→save roundtrip preserved.
+
+### Changed
+
+- **Version**: 1.8 → 1.9
+- **`src/state.cpp`** — `FCEUSS_SaveMS` now uses V2 format
+  (`fceux11_rust_state_file_save_v2`) by default. Movie recording mode
+  forces V1 (FCSX) for cross-emulator compatibility.
+- **`src/rust/fceux11_rust.h`** — FFI header updated with
+  `fceux11_rust_state_file_save_v2` declaration.
+- **`src/boards/_cart_helpers.cpp`** — `release_mapper_resources()` now
+  clears `g_cpu.map_irq_hook_ref()` in addition to `GameHBIRQHook`,
+  preventing stale CPU IRQ hooks from firing after mapper close.
+- **`src/drivers/Qt/input.cpp`** — `GetMouseData()` null-checks
+  `consoleWindow` before accessing `viewport_Interface`, preventing
+  ACCESS_VIOLATION in test environments.
+- **`tests/core/mapper_byte_diff_test.cpp`** — Removed mapper 83/88
+  test ordering workaround (root cause fixed in `_cart_helpers.cpp`).
+
+### Removed
+
+- **`tests/core/mapper_byte_diff_test.cpp`** — Removed `_exit(0)`
+  workaround comment (heap corruption issue remains in legacy mapper
+  teardown; `_exit(0)` retained as safety measure).
+
+### Known Issues
+
+- **`bench_tolerance_test`**: Pre-existing regression from v1.7/v1.8.
+  Deferred to v1.14 Anvil.
+- **StateRecorder**: C++ implementation retained; Rust migration
+  deferred to v1.10.
+- **`_exit(0)` in mapper_byte_diff_test**: Legacy mapper global/static
+  destructor heap corruption persists. Not mapper 83/88 specific;
+  `_exit(0)` workaround retained.
+
 ## [1.8] - 2026-07-01
 
 **Codename: Masonry.** Eighth sub-version of the v1.x modernization

@@ -1217,7 +1217,7 @@ void GetMouseData(uint32 (&d)[3])
 
 	b = 0; // map mouse buttons
 
-	if (consoleWindow->viewport_Interface)
+	if (consoleWindow && consoleWindow->viewport_Interface)
 	{
 		consoleWindow->viewport_Interface->getNormalizedCursorPos(nx, ny);
 

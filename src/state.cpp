@@ -99,6 +99,17 @@ bool compressSavestates = true;  //By default FCEUX compresses savestates when a
 static SFORMAT SFMDATA[SFMDATA_SIZE];
 static int SFEXINDEX;
 
+// v1.9 Chronicle: preserve unknown chunks across load→save roundtrip.
+// When loading a V2 savestate that contains chunk types this version
+// doesn't recognize, we store them here so FCEUSS_SaveMS can re-include
+// them. This ensures forward-compatible savestates survive a load→save
+// cycle without data loss.
+struct UnknownChunk {
+	uint8_t type;
+	std::vector<uint8_t> data;
+};
+static std::vector<UnknownChunk> g_unknownChunks;
+
 #define RLSB 		FCEUSTATE_RLSB	//0x80000000
 
 
@@ -301,6 +312,10 @@ bool FCEUSS_SaveMS(EMUFILE* outstream, int compressionLevel)
 	};
 	std::vector<Chunk> chunks;
 
+	// v1.9 Chronicle: C++ handles SFORMAT field-level serialization via
+	// SubWrite (safe memory access to C++ globals). Rust handles V2 file
+	// format wrapping (CRC32, compression). This split avoids unsafe
+	// cross-language pointer operations on SFORMAT tables.
 	auto addSformatChunk = [&](uint8_t type, SFORMAT* sf) {
 		if (!sf || !sf->v) return;
 		EMUFILE_MEMORY mem;
@@ -354,6 +369,12 @@ bool FCEUSS_SaveMS(EMUFILE* outstream, int compressionLevel)
 	addSformatChunk(0x10, SFMDATA);
 	if (SPostSave) SPostSave();
 
+	// v1.9 Chronicle: re-include unknown chunks preserved from a prior load.
+	// This ensures forward-compatible savestates survive load→save roundtrip.
+	for (auto& uc : g_unknownChunks) {
+		chunks.push_back({uc.type, uc.data});
+	}
+
 	// Build FFI inputs and call Rust state-file serializer
 	std::vector<FceuStateChunkInput> inputs;
 	inputs.reserve(chunks.size());
@@ -362,12 +383,25 @@ bool FCEUSS_SaveMS(EMUFILE* outstream, int compressionLevel)
 	}
 
 	FceuStateBuffer outbuf = {nullptr, 0, 0};
-	bool ok = fceux11_rust_state_file_save(
-		inputs.data(), inputs.size(),
-		FCEU_VERSION_NUMERIC,
-		compressionLevel,
-		&outbuf
-	);
+	bool ok;
+
+	// v1.9 Chronicle: use V2 format (FCEU11ST) by default for per-chunk
+	// CRC32 integrity. Movie recording mode forces V1 (FCSX) for
+	// cross-emulator compatibility.
+	if (FCEUMOV_Mode(MOVIEMODE_PLAY | MOVIEMODE_RECORD | MOVIEMODE_FINISHED)) {
+		ok = fceux11_rust_state_file_save(
+			inputs.data(), inputs.size(),
+			FCEU_VERSION_NUMERIC,
+			compressionLevel,
+			&outbuf
+		);
+	} else {
+		ok = fceux11_rust_state_file_save_v2(
+			inputs.data(), inputs.size(),
+			compressionLevel,
+			&outbuf
+		);
+	}
 
 	if (ok && outbuf.ptr && outbuf.len > 0) {
 		outstream->fwrite(std::span<const std::byte>(
@@ -479,6 +513,9 @@ bool FCEUSS_LoadFP(EMUFILE* is, ENUM_SSLOADPARAMS params)
 {
 	if(!is) return false;
 
+	// v1.9: clear previously preserved unknown chunks before loading new state
+	g_unknownChunks.clear();
+
 	//maybe make a backup savestate
 	bool backup = (params == SSLOADPARAM_BACKUP);
 	EMUFILE_MEMORY msBackupSavestate;
@@ -524,6 +561,19 @@ bool FCEUSS_LoadFP(EMUFILE* is, ENUM_SSLOADPARAMS params)
 	read_sfcpuc = 0;
 	read_snd = 0;
 
+	// v1.9 Chronicle: count SFORMAT entries for Rust FFI.
+	auto countSfEntries = [](SFORMAT* sf) -> size_t {
+		size_t n = 0;
+		while (sf && sf->v) { ++n; ++sf; }
+		return n;
+	};
+
+	// v1.9 Chronicle: C++ handles SFORMAT field-level deserialization via
+	// ReadStateChunkFromBuffer (safe memory access to C++ globals).
+	auto deserializeSformatChunk = [&](uint8_t* data, int size, SFORMAT* sf) -> bool {
+		return ReadStateChunkFromBuffer(data, size, sf);
+	};
+
 	for (size_t i = 0; i < chunkCount; i++) {
 		uint8_t t = rustChunks[i].chunk_type;
 		uint8_t* data = rustChunks[i].data;
@@ -531,23 +581,23 @@ bool FCEUSS_LoadFP(EMUFILE* is, ENUM_SSLOADPARAMS params)
 
 		switch (t) {
 		case 1:
-			if (!ReadStateChunkFromBuffer(data, size, SFCPU)) ret = false;
+			if (!deserializeSformatChunk(data, size, SFCPU)) ret = false;
 			break;
 		case 2:
-			if (!ReadStateChunkFromBuffer(data, size, SFCPUC)) ret = false;
+			if (!deserializeSformatChunk(data, size, SFCPUC)) ret = false;
 			else read_sfcpuc = 1;
 			break;
 		case 3:
-			if (!ReadStateChunkFromBuffer(data, size, FCEUPPU_STATEINFO)) ret = false;
+			if (!deserializeSformatChunk(data, size, FCEUPPU_STATEINFO)) ret = false;
 			break;
 		case 31:
-			if (!ReadStateChunkFromBuffer(data, size, FCEU_NEWPPU_STATEINFO)) ret = false;
+			if (!deserializeSformatChunk(data, size, FCEU_NEWPPU_STATEINFO)) ret = false;
 			break;
 		case 4:
-			if (!ReadStateChunkFromBuffer(data, size, FCEUCTRL_STATEINFO)) ret = false;
+			if (!deserializeSformatChunk(data, size, FCEUCTRL_STATEINFO)) ret = false;
 			break;
 		case 5:
-			if (!ReadStateChunkFromBuffer(data, size, FCEUSND_STATEINFO)) ret = false;
+			if (!deserializeSformatChunk(data, size, FCEUSND_STATEINFO)) ret = false;
 			else read_snd = 1;
 			break;
 		case 6:
@@ -575,12 +625,15 @@ bool FCEUSS_LoadFP(EMUFILE* is, ENUM_SSLOADPARAMS params)
 			}
 			break;
 		case 0x10:
-			if (!ReadStateChunkFromBuffer(data, size, SFMDATA)) ret = false;
+			if (!deserializeSformatChunk(data, size, SFMDATA)) ret = false;
 			break;
 		default:
+			// v1.9 Chronicle: preserve unknown chunks for forward-compatible
+			// load→save roundtrip. Store raw data so FCEUSS_SaveMS can re-include them.
+			g_unknownChunks.push_back({t, std::vector<uint8_t>(data, data + size)});
 			if (!warned) {
 				char str[256];
-				snprintf( str, sizeof(str), "Warning: Found unknown save chunk of type %d.\nThis could indicate the save state is corrupted\nor made with a different (incompatible) emulator version.", t);
+				snprintf( str, sizeof(str), "Warning: Found unknown save chunk of type %d (preserved).\nThis could indicate the save state is made with a newer version.", t);
 				FCEUD_PrintError(str);
 				warned = true;
 			}

@@ -2825,6 +2825,31 @@ void fceux11_lua_GetMouseState(int32_t *_x, int32_t *_y, int32_t *_click);
 
 void fceux11_lua_recalculate_mem_hook_regions(int _hook_type);
 /**
+ * A single chunk extracted from / to be written into a savestate.
+ */
+typedef struct StateChunk StateChunk;
+
+/**
+ * FFI descriptor for a single SFORMAT entry (mirrors C++ `struct SFORMAT`).
+ *
+ * Layout must match C++ exactly:
+ * ```c
+ * struct SFORMAT { void *v; uint32 s; const char *desc; };
+ * ```
+ * On x64: v(8) + s(4) + pad(4) + desc(8) = 24 bytes.
+ *
+ * `v` points to the data in C++ memory. `s` encodes size plus flags
+ * (RLSB = byte-swap, INDIRECT = pointer indirection). `desc` is a
+ * 4-byte ASCII tag (pointer to static string in C++).
+ */
+typedef struct FceuxSformatEntry {
+  const uint8_t *v;
+  uint32_t s;
+  uint32_t _pad;
+  const uint8_t *desc;
+} FceuxSformatEntry;
+
+/**
  * Input chunk descriptor for saving.
  */
 typedef struct FceuStateChunkInput {
@@ -2852,7 +2877,58 @@ typedef struct FceuStateChunkOutput {
 } FceuStateChunkOutput;
 
 /**
- * Serialize chunks into a savestate file buffer.
+ * Serialize SFORMAT entries into a byte stream (the SFORMAT chunk payload).
+ *
+ * # Safety
+ * `entries` must point to a valid array of `count` SFORMAT entries.
+ * Each entry's `v` pointer must be valid for reads of `entry.s & !FLAGS` bytes.
+ * The array must be terminated by an entry with `v == null`.
+ */
+bool fceux11_rust_sformat_serialize(const struct FceuxSformatEntry *entries,
+                                    uintptr_t count,
+                                    uint8_t **out_buf,
+                                    uintptr_t *out_len);
+
+/**
+ * Free a buffer returned by `fceux11_rust_sformat_serialize`.
+ */
+void fceux11_rust_sformat_buf_free(uint8_t *buf, uintptr_t len);
+
+/**
+ * Deserialize a SFORMAT byte stream into C++ memory regions.
+ *
+ * For each entry in the stream (desc + size + data), finds the matching
+ * entry in the SFORMAT table by `desc` and copies the data.
+ *
+ * # Safety
+ * `stream_data` must point to `stream_len` valid bytes of SFORMAT payload.
+ * `entries` must point to a valid array of `count` SFORMAT entries.
+ * Each entry's `v` pointer must be valid for writes of `entry.s & !FLAGS` bytes.
+ * The array must be terminated by an entry with `v == null`.
+ */
+bool fceux11_rust_sformat_deserialize(const uint8_t *stream_data,
+                                      uintptr_t stream_len,
+                                      struct FceuxSformatEntry *entries,
+                                      uintptr_t count,
+                                      uint32_t _version);
+
+/**
+ * Serialize an SFORMAT table into a `StateChunk` with the given chunk type.
+ *
+ * This is the Rust equivalent of the C++ `addSformatChunk` lambda in
+ * `FCEUSS_SaveMS`. It reads from C++ memory via the SFORMAT entries and
+ * produces a `StateChunk` ready for V2 file assembly.
+ *
+ * # Safety
+ * Same as `fceux11_rust_sformat_serialize`.
+ */
+bool fceux11_rust_sformat_to_chunk(const struct FceuxSformatEntry *entries,
+                                   uintptr_t count,
+                                   uint8_t chunk_type,
+                                   struct StateChunk *out_chunk);
+
+/**
+ * Serialize chunks into a V1 (FCSX) savestate file buffer.
  *
  * On success, returns `true` and writes a `FceuStateBuffer` to `out_buf`.
  * The caller must free `out_buf.ptr` via `fceux11_rust_state_file_buf_free`.
@@ -2866,12 +2942,27 @@ bool fceux11_rust_state_file_save(const struct FceuStateChunkInput *chunks,
                                   struct FceuStateBuffer *out_buf);
 
 /**
+ * Serialize chunks into a V2 (FCEU11ST) savestate file buffer.
+ *
+ * On success, returns `true` and writes a `FceuStateBuffer` to `out_buf`.
+ * The caller must free `out_buf.ptr` via `fceux11_rust_state_file_buf_free`.
+ * # Safety
+ * Callers must ensure all raw pointer arguments passed to this function are valid.
+ */
+bool fceux11_rust_state_file_save_v2(const struct FceuStateChunkInput *chunks,
+                                     uintptr_t chunk_count,
+                                     int32_t compression_level,
+                                     struct FceuStateBuffer *out_buf);
+
+/**
  * Deserialize a savestate file buffer into chunks.
+ *
+ * Auto-detects V1 (FCSX) and V2 (FCEU11ST) formats.
  *
  * On success, returns `true` and writes:
  * * `out_chunks` — pointer to an array of `FceuStateChunkOutput`
  * * `out_chunk_count` — number of chunks
- * * `out_version` — savestate version from header
+ * * `out_version` — savestate version from header (format version for V2)
  * * `out_totalsize` — uncompressed payload size
  *
  * The caller must free `out_chunks` via `fceux11_rust_state_file_chunks_free`.
