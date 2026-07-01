@@ -7,3 +7,5 @@ edition.workspace = true
 crate-type = ["rlib"]
 
 [dependencies]
+crc32fast = "1.4"
+md5 = "0.7"

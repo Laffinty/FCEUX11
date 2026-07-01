@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10] - 2026-07-01
+
+**Codename: Cryptex.** Tenth sub-version of the v1.x modernization
+cycle per `docs/v1.x_Modernization_Roadmap.md` §10. Phase A: migrates
+iNES header parsing and hash computation to Rust `fceux11-formats`,
+reducing C++ parsing code in `iNESLoad()` by ~120 lines.
+
+### Added
+
+- **`src/rust/crates/fceux11-formats/src/ines.rs`** — New Rust FFI
+  functions: `fceux11_rust_ines_parse_header()` (complete iNES 1.0/2.0
+  header parsing), `fceux11_rust_ines_compute_hash()` (MD5+CRC32 of
+  PRG+CHR), `fceux11_rust_ines_apply_corrections()` (ROM correction
+  application with mapper 118/24/26/99 special cases),
+  `fceux11_rust_ines_lookup_master_info()` (MasterRomInfo query).
+- **`src/rust/crates/fceux11-formats/Cargo.toml`** — Added `crc32fast`
+  and `md5` dependencies.
+- **`docs/v1.10_Cryptex_Build_Plan.md`** — v1.10 build plan.
+
+### Changed
+
+- **Version**: 1.9 → 1.10
+- **`src/ines.cpp`** — `iNESLoad()` refactored to use Rust FFI for
+  header parsing, hash computation, and ROM corrections. VS UniSystem
+  detection uses `FceuInesParseResult` from Rust. Lines: 913 → 881.
+- **`src/rust/fceux11_rust.h`** — FFI header updated with new
+  `FceuInesParseResult`, `FceuInesHashResult`,
+  `FceuMasterRomInfoResult` structs and 4 new FFI functions.
+
+### Known Issues
+
+- **`CheckHInfo()` in ines.cpp**: Retained as dead code (replaced by
+  Rust FFI). Cleanup deferred to Phase A.3 follow-up.
+- **`sMasterRomInfo[]` in ines.cpp**: Retained for C++
+  `MasterRomInfoParams` population. Data migrated to Rust
+  `ines_data.rs::MASTER_ROM_INFO`.
+
 ## [1.9] - 2026-07-01
 
 **Codename: Chronicle.** Ninth sub-version of the v1.x modernization

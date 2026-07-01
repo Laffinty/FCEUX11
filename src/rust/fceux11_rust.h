@@ -978,6 +978,50 @@ typedef struct FceuInesHInfoResult {
 } FceuInesHInfoResult;
 
 /**
+ * Master ROM info result for C++ compatibility.
+ */
+typedef struct FceuMasterRomInfoResult {
+  bool found;
+  int32_t bonus;
+  int32_t busc;
+} FceuMasterRomInfoResult;
+
+/**
+ * Complete iNES header parse result.
+ * Contains all fields extracted from the 16-byte header, ready for
+ * C++ to use without re-parsing.
+ */
+typedef struct FceuInesParseResult {
+  bool is_nes2;
+  uint32_t mapper_no;
+  uint8_t submapper;
+  int32_t mirroring;
+  int32_t mirroring_as_2bits;
+  bool battery;
+  bool trainer;
+  uint32_t rom_size_16kb;
+  uint32_t vrom_size_8kb;
+  uint32_t rom_size_raw;
+  uint32_t wram_size;
+  uint32_t battery_wram_size;
+  uint32_t vram_size;
+  uint32_t battery_vram_size;
+  int32_t vs_system;
+  int32_t vs_ppu;
+  int32_t vs_type;
+  int32_t tv_system;
+} FceuInesParseResult;
+
+/**
+ * Hash result for iNES ROM data.
+ */
+typedef struct FceuInesHashResult {
+  uint8_t md5[16];
+  uint32_t crc32;
+  uint64_t partial_md5;
+} FceuInesHashResult;
+
+/**
  * C-compatible movie record layout.
  */
 typedef struct FceuMovieRecord {
@@ -1496,6 +1540,54 @@ const char *fceux11_rust_ines_check_bad(uint64_t md5partial);
 int32_t fceux11_rust_ines_check_hinfo(uint32_t crc32,
                                       uint64_t partialmd5,
                                       struct FceuInesHInfoResult *out);
+
+/**
+ * Look up MasterRomInfo parameters by partial MD5.
+ * Returns bonus/busc values, or -1 if not set.
+ */
+bool fceux11_rust_ines_lookup_master_info(uint64_t partial_md5,
+                                          struct FceuMasterRomInfoResult *out);
+
+/**
+ * Apply ROM corrections (mapper 118/24/26/99 special cases) to parse result.
+ * Returns a tofix bitmask indicating what was changed.
+ *
+ * # Safety
+ * `parse` must point to a writable `FceuInesParseResult`.
+ * `hinfo` must point to a valid `FceuInesHInfoResult`.
+ */
+int32_t fceux11_rust_ines_apply_corrections(struct FceuInesParseResult *parse,
+                                            const struct FceuInesHInfoResult *hinfo,
+                                            uint64_t _partial_md5,
+                                            bool has_chr_rom);
+
+/**
+ * Parse a 16-byte iNES header into a structured result.
+ *
+ * Performs: magic validation, garbage cleanup, NES 2.0 detection,
+ * mapper number assembly, mirroring extraction, ROM/CHR size
+ * computation, VS UniSystem detection, battery/trainer flags.
+ *
+ * Returns `true` if the header is valid iNES, `false` otherwise.
+ *
+ * # Safety
+ * `header_bytes` must point to at least 16 readable bytes.
+ * `out` must point to a writable `FceuInesParseResult`.
+ */
+bool fceux11_rust_ines_parse_header(const uint8_t *header_bytes, struct FceuInesParseResult *out);
+
+/**
+ * Compute MD5 and CRC32 of PRG + CHR ROM data.
+ *
+ * # Safety
+ * `prg_data` must point to `prg_size` valid bytes.
+ * `chr_data` may be null if `chr_size == 0`.
+ */
+bool fceux11_rust_ines_compute_hash(const uint8_t *prg_data,
+                                    uint32_t prg_size,
+                                    const uint8_t *chr_data,
+                                    uint32_t chr_size,
+                                    struct FceuInesHashResult *out);
 
 /**
  * Parse an FM2 file from raw bytes.

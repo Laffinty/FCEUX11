@@ -606,45 +606,41 @@ BMAPPINGLocal bmap[] = {
 
 int iNESLoad(const char *name, FCEUFILE *fp, int OverwriteVidMode) {
 	int result;
-	struct md5_context md5;
 	uint64 partialmd5 = 0;
 	const char* mappername = "Not Listed";
+	int32 tofix = 0;
+	FceuInesHashResult hashResult;
+	FceuInesHInfoResult hinfo;
+	FceuMasterRomInfoResult masterInfo;
 
-	if (FCEU_fread(&head, 1, 16, fp) != 16 || memcmp(&head, "NES\x1A", 4))
+	// v1.10 Cryptex: Read raw header and parse via Rust FFI
+	if (FCEU_fread(&head, 1, 16, fp) != 16)
 		return LOADER_INVALID_FORMAT;
-	
-	fceux11_rust_ines_header_cleanup((uint8*)&head);
+
+	FceuInesParseResult parseResult;
+	if (!fceux11_rust_ines_parse_header((const uint8*)&head, &parseResult))
+		return LOADER_INVALID_FORMAT;
 
 	iNESCart.clear();
 
-	iNES2 = ((head.ROM_type2 & 0x0C) == 0x08);
-	if(iNES2)
-	{
+	// Apply parsed results to C++ globals
+	iNES2 = parseResult.is_nes2;
+	MapperNo = parseResult.mapper_no;
+	Mirroring = parseResult.mirroring;
+	MirroringAs2bits = parseResult.mirroring_as_2bits;
+	ROM_size = parseResult.rom_size_16kb;
+	VROM_size = parseResult.vrom_size_8kb;
+	uint32 not_round_size = parseResult.rom_size_raw;
+
+	// NES 2.0 fields
+	if (iNES2) {
 		iNESCart.ines2 = true;
-		iNESCart.wram_size = (head.RAM_size & 0x0F)?(64 << (head.RAM_size & 0x0F)):0;
-		iNESCart.battery_wram_size = (head.RAM_size & 0xF0)?(64 << ((head.RAM_size & 0xF0)>>4)):0;
-		iNESCart.vram_size = (head.VRAM_size & 0x0F)?(64 << (head.VRAM_size & 0x0F)):0;
-		iNESCart.battery_vram_size = (head.VRAM_size & 0xF0)?(64 << ((head.VRAM_size & 0xF0)>>4)):0;
-		iNESCart.submapper = head.ROM_type3 >> 4;
+		iNESCart.wram_size = parseResult.wram_size;
+		iNESCart.battery_wram_size = parseResult.battery_wram_size;
+		iNESCart.vram_size = parseResult.vram_size;
+		iNESCart.battery_vram_size = parseResult.battery_vram_size;
+		iNESCart.submapper = parseResult.submapper;
 	}
-
-	MapperNo = (head.ROM_type >> 4);
-	MapperNo |= (head.ROM_type2 & 0xF0);
-	if(iNES2) MapperNo |= ((head.ROM_type3 & 0x0F) << 8);
-	
-	if (head.ROM_type & 8) {
-		Mirroring = 2;
-	} else
-		Mirroring = (head.ROM_type & 1);
-
-	MirroringAs2bits = head.ROM_type & 1;
-	if (head.ROM_type & 8) MirroringAs2bits |= 2;
-
-	FceuRomSizes sizes;
-	fceux11_rust_cart_compute_rom_sizes((const FceuInesHeader*)&head, iNES2, &sizes);
-	ROM_size = sizes.rom_size_16kb;
-	VROM_size = sizes.vrom_size_8kb;
-	uint32 not_round_size = sizes.rom_size_raw;
 
 	int round = !fceux11_rust_ines_not_power2(MapperNo);
 
@@ -656,57 +652,33 @@ int iNESLoad(const char *name, FCEUFILE *fp, int OverwriteVidMode) {
 		memset(VROM, 0xFF, VROM_size << 13);
 	}
 
-	// Set Vs. System flag if need
-	if (!iNES2) {
-		GameInfo->type = !(head.ROM_type2 & 1) ? GIT_CART : GIT_VSUNI;
+	// VS UniSystem detection (from Rust parse result)
+	if (parseResult.vs_system < 0) {
+		FCEU_PrintError("Game type is not supported at all.");
+		goto init_error;
 	}
-	else {
-		switch (!(head.ROM_type2 & 2) ? (head.ROM_type2 & 3) : (head.VS_hardware & 0xF)) {
-		case 0: 
-			GameInfo->type = GIT_CART;
-			break;
-		case 1:
-			GameInfo->type = GIT_VSUNI;
-			break;
-		default:
-			FCEU_PrintError("Game type is not supported at all.");
-			goto init_error;
-		}
-	}
+	GameInfo->type = (parseResult.vs_system == 1) ? GIT_VSUNI : GIT_CART;
 
-	// Set Vs. System PPU type if need
-	if (GameInfo->type == GIT_VSUNI && !(head.ROM_type2 & 2)) {
-		switch (head.VS_hardware & 0xF) { 
-		case 0x0: GameInfo->vs_ppu = GIPPU_RC2C03B; break;
-		//case 0x1: GameInfo->vs_ppu = GIPPU_RPC2C03C; break;
-		case 0x2: GameInfo->vs_ppu = GIPPU_RP2C04_0001; break;
-		case 0x3: GameInfo->vs_ppu = GIPPU_RP2C04_0002; break;
-		case 0x4: GameInfo->vs_ppu = GIPPU_RP2C04_0003; break;
-		case 0x5: GameInfo->vs_ppu = GIPPU_RP2C04_0004; break;
-		case 0x6: GameInfo->vs_ppu = GIPPU_RC2C03B; break;
-		//case 0x7: GameInfo->ppu = GIPPU_RPC2C03C; break;
-		case 0x8: GameInfo->vs_ppu = GIPPU_RC2C05_01; break;
-		case 0x9: GameInfo->vs_ppu = GIPPU_RC2C05_02; break;
-		case 0xA: GameInfo->vs_ppu = GIPPU_RC2C05_03; break;
-		case 0xB: GameInfo->vs_ppu = GIPPU_RC2C05_04; break;
-		//case 0xC: GameInfo->ppu = GIPPU_RPC2C05_05; break;
-		default:
+	if (GameInfo->type == GIT_VSUNI) {
+		if (parseResult.vs_ppu < 0) {
 			FCEU_PrintError("Vs. System PPU type is not supported at all.");
 			goto init_error;
 		}
+		// Map Rust PPU enum to C++ enum
+		static const EGIPPU ppu_map[] = {
+			GIPPU_RC2C03B, (EGIPPU)0, GIPPU_RP2C04_0001, GIPPU_RP2C04_0002,
+			GIPPU_RP2C04_0003, GIPPU_RP2C04_0004, GIPPU_RC2C03B, (EGIPPU)0,
+			GIPPU_RC2C05_01, GIPPU_RC2C05_02, GIPPU_RC2C05_03, GIPPU_RC2C05_04,
+		};
+		if (parseResult.vs_ppu >= 0 && parseResult.vs_ppu < 12)
+			GameInfo->vs_ppu = ppu_map[parseResult.vs_ppu];
 
-		switch (head.VS_hardware >> 4) {
-		case 0x0: GameInfo->vs_type = EGIVS_NORMAL; break;
-		case 0x1: GameInfo->vs_type = EGIVS_RBI; break;
-		case 0x2: GameInfo->vs_type = EGIVS_TKO; break;
-		case 0x3: GameInfo->vs_type = EGIVS_XEVIOUS; break;
-		default:
-			FCEU_PrintError("Vs. System type is not supported at all.");
-			goto init_error;
-		}
+		static const EGIVS vs_type_map[] = { EGIVS_NORMAL, EGIVS_RBI, EGIVS_TKO, EGIVS_XEVIOUS };
+		if (parseResult.vs_type >= 0 && parseResult.vs_type < 4)
+			GameInfo->vs_type = vs_type_map[parseResult.vs_type];
 	}
 
-	if (head.ROM_type & 4) {	/* Trainer */
+	if (parseResult.trainer) {	/* Trainer */
 		trainerpoo_owner = FCEU_gmalloc_unique(512);  // v0.3.6: RAII-wrapped
 		trainerpoo = trainerpoo_owner.get();
 		FCEU_fread(trainerpoo, 512, 1, fp);
@@ -722,60 +694,54 @@ int iNESLoad(const char *name, FCEUFILE *fp, int OverwriteVidMode) {
 	if (VROM_size)
 		FCEU_fread(VROM, 0x2000, VROM_size, fp);
 
-	md5_starts(&md5); 
-	md5_update(&md5, ROM, ROM_size << 14);
+	// v1.10 Cryptex: Compute hash via Rust FFI
+	fceux11_rust_ines_compute_hash(ROM, ROM_size << 14, VROM, VROM_size << 13, &hashResult);
+	memcpy(iNESCart.MD5, hashResult.md5, 16);
+	memcpy(&GameInfo->MD5, hashResult.md5, 16);
+	iNESGameCRC32 = hashResult.crc32;
+	iNESCart.CRC32 = hashResult.crc32;
+	partialmd5 = hashResult.partial_md5;
 
-	iNESGameCRC32 = CalcCRC32(0, ROM, ROM_size << 14);
-
-	if (VROM_size) {
-		iNESGameCRC32 = CalcCRC32(iNESGameCRC32, VROM, VROM_size << 13);
-		md5_update(&md5, VROM, VROM_size << 13);
-	}
-	md5_finish(&md5, iNESCart.MD5);
-	memcpy(&GameInfo->MD5, &iNESCart.MD5, sizeof(iNESCart.MD5));
-	for (int x = 0; x < 8; x++)
-		partialmd5 |= (uint64)iNESCart.MD5[7 - x] << (x * 8);
-
-	iNESCart.CRC32 = iNESGameCRC32;
+	// Log ROM info
+	{ const char* rn = fceux11_rust_ines_mapper_name(MapperNo); if (rn) mappername = rn; }
 
 	FCEU_printf(" PRG ROM: %d x 16KiB = %d KiB\n", round ? ROM_size : not_round_size, (round ? ROM_size : not_round_size) * 16);
 	FCEU_printf(" CHR ROM: %d x  8KiB = %d KiB\n", VROM_size, VROM_size * 8);
 	FCEU_printf(" ROM CRC32: 0x%08x\n", iNESGameCRC32);
-	{
-		int x;
-		FCEU_printf(" ROM MD5:  0x");
-		for(x=0;x<16;x++)
-			FCEU_printf("%02x",iNESCart.MD5[x]);
-		FCEU_printf("\n");
-	}
-
-	{
-		const char* rust_name = fceux11_rust_ines_mapper_name(MapperNo);
-		if (rust_name) mappername = rust_name;
-	}
-
+	FCEU_printf(" ROM MD5:  0x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\n",
+		iNESCart.MD5[0], iNESCart.MD5[1], iNESCart.MD5[2], iNESCart.MD5[3],
+		iNESCart.MD5[4], iNESCart.MD5[5], iNESCart.MD5[6], iNESCart.MD5[7],
+		iNESCart.MD5[8], iNESCart.MD5[9], iNESCart.MD5[10], iNESCart.MD5[11],
+		iNESCart.MD5[12], iNESCart.MD5[13], iNESCart.MD5[14], iNESCart.MD5[15]);
 	FCEU_printf(" Mapper #: %d\n", MapperNo);
 	FCEU_printf(" Mapper name: %s\n", mappername);
 	FCEU_printf(" Mirroring: %s\n", Mirroring == 2 ? "None (Four-screen)" : Mirroring ? "Vertical" : "Horizontal");
-	FCEU_printf(" Battery-backed: %s\n", (head.ROM_type & 2) ? "Yes" : "No");
-	FCEU_printf(" Trained: %s\n", (head.ROM_type & 4) ? "Yes" : "No");
-	if(iNES2) 
-	{
+	FCEU_printf(" Battery-backed: %s\n", parseResult.battery ? "Yes" : "No");
+	FCEU_printf(" Trained: %s\n", parseResult.trainer ? "Yes" : "No");
+	if(iNES2) {
 		FCEU_printf(" NES2.0 Extensions\n");
 		FCEU_printf(" Sub Mapper #: %d\n", iNESCart.submapper);
 		FCEU_printf(" Total WRAM size: %d KiB\n", (iNESCart.wram_size + iNESCart.battery_wram_size) / 1024);
 		FCEU_printf(" Total VRAM size: %d KiB\n", (iNESCart.vram_size + iNESCart.battery_vram_size) / 1024);
-		if(head.ROM_type & 2)
-		{
+		if(parseResult.battery) {
 			FCEU_printf(" WRAM backed by battery: %d KiB\n", iNESCart.battery_wram_size / 1024);
 			FCEU_printf(" VRAM backed by battery: %d KiB\n", iNESCart.battery_vram_size / 1024);
 		}
 	}
 
+	// v1.10 Cryptex: Apply corrections via Rust FFI
 	SetInput();
-	// Input can be overriden by NES 2.0 header
 	if (iNES2) SetInputNes20(head.expansion);
-	CheckHInfo(partialmd5);
+
+	fceux11_rust_ines_check_hinfo(iNESGameCRC32, partialmd5, &hinfo);
+	tofix = fceux11_rust_ines_apply_corrections(&parseResult, &hinfo, partialmd5, VROM_size > 0);
+	if (tofix & 1) MapperNo = parseResult.mapper_no;
+	if (tofix & 2) Mirroring = parseResult.mirroring;
+	if (tofix & 4) { head.ROM_type |= 2; parseResult.battery = true; }
+	if (tofix & 8 && VROM_size) { VROM_size = 0; free(VROM); VROM = NULL; }
+
+	fceux11_rust_ines_lookup_master_info(partialmd5, &masterInfo);
+
 	FCEU_VSUniCheck(partialmd5, &MapperNo, &Mirroring);
 	CheckBad(partialmd5);
 

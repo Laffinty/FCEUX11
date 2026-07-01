@@ -297,6 +297,405 @@ pub unsafe extern "C" fn fceux11_rust_ines_check_hinfo(
 }
 
 // ------------------------------------------------------------------
+// FFI: Apply ROM corrections to parse result
+// ------------------------------------------------------------------
+
+/// Master ROM info result for C++ compatibility.
+#[repr(C)]
+pub struct FceuMasterRomInfoResult {
+    pub found: bool,
+    pub bonus: i32,
+    pub busc: i32,
+}
+
+/// Look up MasterRomInfo parameters by partial MD5.
+/// Returns bonus/busc values, or -1 if not set.
+#[unsafe(no_mangle)]
+pub extern "C" fn fceux11_rust_ines_lookup_master_info(
+    partial_md5: u64,
+    out: *mut FceuMasterRomInfoResult,
+) -> bool {
+    if out.is_null() {
+        return false;
+    }
+    unsafe {
+        (*out).found = false;
+        (*out).bonus = -1;
+        (*out).busc = -1;
+    }
+
+    if let Some(entry) = ines_data::MASTER_ROM_INFO
+        .iter()
+        .find(|e| e.md5lower == partial_md5)
+    {
+        unsafe {
+            (*out).found = true;
+        }
+        // Parse params string (e.g. "bonus=0" or "busc=1")
+        for part in entry.params.split(',') {
+            if let Some((key, val)) = part.split_once('=') {
+                if let Ok(v) = val.trim().parse::<i32>() {
+                    unsafe {
+                        match key.trim() {
+                            "bonus" => (*out).bonus = v,
+                            "busc" => (*out).busc = v,
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    false
+}
+
+/// Apply ROM corrections (mapper 118/24/26/99 special cases) to parse result.
+/// Returns a tofix bitmask indicating what was changed.
+///
+/// # Safety
+/// `parse` must point to a writable `FceuInesParseResult`.
+/// `hinfo` must point to a valid `FceuInesHInfoResult`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_rust_ines_apply_corrections(
+    parse: *mut FceuInesParseResult,
+    hinfo: *const FceuInesHInfoResult,
+    _partial_md5: u64,
+    has_chr_rom: bool,
+) -> i32 {
+    if parse.is_null() || hinfo.is_null() {
+        return 0;
+    }
+
+    let p = unsafe { &mut *parse };
+    let h = unsafe { &*hinfo };
+    let mut tofix: i32 = 0;
+
+    // Apply clear_vrom
+    if h.clear_vrom != 0 && has_chr_rom {
+        p.vrom_size_8kb = 0;
+        tofix |= 8;
+    }
+
+    // Apply mapper correction
+    if h.mapper >= 0 && p.mapper_no != h.mapper as u32 {
+        tofix |= 1;
+        p.mapper_no = h.mapper as u32;
+    }
+
+    // Apply mirror correction
+    if h.mirror >= 0 {
+        if h.mirror == 8 {
+            // Special: only change if currently four-screen
+            if p.mirroring == 2 {
+                tofix |= 2;
+                p.mirroring = 0;
+            }
+        } else if p.mirroring != h.mirror {
+            if p.mirroring != (h.mirror & !4) && (h.mirror & !4) <= 2 {
+                tofix |= 2;
+            }
+            p.mirroring = h.mirror;
+        }
+    }
+
+    // Apply force_battery
+    if h.force_battery != 0 && !p.battery {
+        tofix |= 4;
+        p.battery = true;
+    }
+
+    // Hard-coded mapper-specific corrections
+    // Mapper 118, 24, 26 with four-screen -> horizontal
+    if (p.mapper_no == 118 || p.mapper_no == 24 || p.mapper_no == 26)
+        && p.mirroring == 2
+    {
+        p.mirroring = 0;
+        tofix |= 2;
+    }
+
+    // Mapper 99: four-screen implicitly set
+    if p.mapper_no == 99 {
+        p.mirroring = 2;
+        tofix |= 2;
+    }
+
+    tofix
+}
+
+// ------------------------------------------------------------------
+// FFI: Complete iNES header parsing
+// ------------------------------------------------------------------
+
+/// Complete iNES header parse result.
+/// Contains all fields extracted from the 16-byte header, ready for
+/// C++ to use without re-parsing.
+#[repr(C)]
+pub struct FceuInesParseResult {
+    pub is_nes2: bool,
+    pub mapper_no: u32,
+    pub submapper: u8,
+    pub mirroring: i32,          // 0=H, 1=V, 2=four-screen
+    pub mirroring_as_2bits: i32,
+    pub battery: bool,
+    pub trainer: bool,
+    pub rom_size_16kb: u32,      // PRG-ROM in 16KB units (rounded)
+    pub vrom_size_8kb: u32,      // CHR-ROM in 8KB units
+    pub rom_size_raw: u32,       // PRG-ROM raw (not rounded)
+    pub wram_size: u32,          // NES 2.0 WRAM bytes
+    pub battery_wram_size: u32,  // NES 2.0 battery WRAM bytes
+    pub vram_size: u32,          // NES 2.0 VRAM bytes
+    pub battery_vram_size: u32,  // NES 2.0 battery VRAM bytes
+    pub vs_system: i32,          // 0=cart, 1=VS UniSystem, -1=unsupported
+    pub vs_ppu: i32,             // VS PPU type (0-11)
+    pub vs_type: i32,            // VS system type (0-3)
+    pub tv_system: i32,          // 0=NTSC, 1=PAL
+}
+
+/// Parse a 16-byte iNES header into a structured result.
+///
+/// Performs: magic validation, garbage cleanup, NES 2.0 detection,
+/// mapper number assembly, mirroring extraction, ROM/CHR size
+/// computation, VS UniSystem detection, battery/trainer flags.
+///
+/// Returns `true` if the header is valid iNES, `false` otherwise.
+///
+/// # Safety
+/// `header_bytes` must point to at least 16 readable bytes.
+/// `out` must point to a writable `FceuInesParseResult`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_rust_ines_parse_header(
+    header_bytes: *const u8,
+    out: *mut FceuInesParseResult,
+) -> bool {
+    if header_bytes.is_null() || out.is_null() {
+        return false;
+    }
+
+    // Copy header to local struct for safe access
+    let mut hdr = FceuInesHeader {
+        id: [0; 4],
+        rom_size: 0,
+        vrom_size: 0,
+        rom_type: 0,
+        rom_type2: 0,
+        rom_type3: 0,
+        upper_rom_vrom_size: 0,
+        ram_size: 0,
+        vram_size: 0,
+        tv_system: 0,
+        vs_hardware: 0,
+        misc_roms: 0,
+        expansion: 0,
+    };
+    unsafe {
+        std::ptr::copy_nonoverlapping(header_bytes, &mut hdr as *mut _ as *mut u8, 16);
+    }
+
+    // Validate magic
+    if &hdr.id != b"NES\x1A" {
+        return false;
+    }
+
+    // Clean garbage signatures
+    hdr.cleanup();
+
+    // NES 2.0 detection
+    let is_nes2 = (hdr.rom_type2 & 0x0C) == 0x08;
+
+    // Mapper number assembly
+    let mut mapper_no: u32 = (hdr.rom_type >> 4) as u32;
+    mapper_no |= (hdr.rom_type2 & 0xF0) as u32;
+    if is_nes2 {
+        mapper_no |= ((hdr.rom_type3 & 0x0F) as u32) << 8;
+    }
+
+    // Submapper
+    let submapper = if is_nes2 { hdr.rom_type3 >> 4 } else { 0 };
+
+    // NES 2.0 WRAM/VRAM sizes
+    let (wram_size, battery_wram_size, vram_size, battery_vram_size) = if is_nes2 {
+        let w = if hdr.ram_size & 0x0F != 0 { 64u32 << (hdr.ram_size & 0x0F) } else { 0 };
+        let bw = if hdr.ram_size & 0xF0 != 0 { 64u32 << ((hdr.ram_size & 0xF0) >> 4) } else { 0 };
+        let v = if hdr.vram_size & 0x0F != 0 { 64u32 << (hdr.vram_size & 0x0F) } else { 0 };
+        let bv = if hdr.vram_size & 0xF0 != 0 { 64u32 << ((hdr.vram_size & 0xF0) >> 4) } else { 0 };
+        (w, bw, v, bv)
+    } else {
+        (0, 0, 0, 0)
+    };
+
+    // Mirroring
+    let mirroring = if hdr.rom_type & 8 != 0 { 2 } else { (hdr.rom_type & 1) as i32 };
+    let mut mirroring_as_2bits = (hdr.rom_type & 1) as i32;
+    if hdr.rom_type & 8 != 0 {
+        mirroring_as_2bits |= 2;
+    }
+
+    // Battery and trainer
+    let battery = (hdr.rom_type & 2) != 0;
+    let trainer = (hdr.rom_type & 4) != 0;
+
+    // ROM/CHR sizes
+    let mut sizes = crate::cart::FceuRomSizes {
+        rom_size_16kb: 0,
+        vrom_size_8kb: 0,
+        chrram_size: 0,
+        rom_size_raw: 0,
+    };
+    unsafe {
+        crate::cart::fceux11_rust_cart_compute_rom_sizes(
+            &hdr as *const FceuInesHeader,
+            is_nes2,
+            &mut sizes as *mut crate::cart::FceuRomSizes,
+        );
+    }
+
+    // VS UniSystem detection
+    let (vs_system, vs_ppu, vs_type) = if !is_nes2 {
+        if hdr.rom_type2 & 1 != 0 { (1, 0, 0) } else { (0, 0, 0) }
+    } else {
+        let game_type = if hdr.rom_type2 & 2 == 0 {
+            hdr.rom_type2 & 3
+        } else {
+            hdr.vs_hardware & 0xF
+        };
+        match game_type {
+            0 => (0, 0, 0),  // cart
+            1 => {
+                // VS UniSystem — extract PPU and type
+                let ppu = if hdr.rom_type2 & 2 == 0 {
+                    match hdr.vs_hardware & 0xF {
+                        0x0 => 0,  // RC2C03B
+                        0x2 => 2,  // RP2C04_0001
+                        0x3 => 3,  // RP2C04_0002
+                        0x4 => 4,  // RP2C04_0003
+                        0x5 => 5,  // RP2C04_0004
+                        0x6 => 0,  // RC2C03B
+                        0x8 => 8,  // RC2C05_01
+                        0x9 => 9,  // RC2C05_02
+                        0xA => 10, // RC2C05_03
+                        0xB => 11, // RC2C05_04
+                        _ => -1,   // unsupported
+                    }
+                } else {
+                    0
+                };
+                let vtype = match hdr.vs_hardware >> 4 {
+                    0x0 => 0, // NORMAL
+                    0x1 => 1, // RBI
+                    0x2 => 2, // TKO
+                    0x3 => 3, // XEVIOUS
+                    _ => 0,
+                };
+                (1, ppu, vtype)
+            }
+            _ => (-1, 0, 0), // unsupported
+        }
+    };
+
+    // TV system
+    let tv_system = if is_nes2 && (hdr.tv_system & 3) == 1 { 1 } else { 0 };
+
+    unsafe {
+        *out = FceuInesParseResult {
+            is_nes2,
+            mapper_no,
+            submapper,
+            mirroring,
+            mirroring_as_2bits,
+            battery,
+            trainer,
+            rom_size_16kb: sizes.rom_size_16kb,
+            vrom_size_8kb: sizes.vrom_size_8kb,
+            rom_size_raw: sizes.rom_size_raw,
+            wram_size,
+            battery_wram_size,
+            vram_size,
+            battery_vram_size,
+            vs_system,
+            vs_ppu,
+            vs_type,
+            tv_system,
+        };
+    }
+
+    true
+}
+
+// ------------------------------------------------------------------
+// FFI: ROM hash computation
+// ------------------------------------------------------------------
+
+/// Hash result for iNES ROM data.
+#[repr(C)]
+pub struct FceuInesHashResult {
+    pub md5: [u8; 16],
+    pub crc32: u32,
+    pub partial_md5: u64,
+}
+
+/// Compute MD5 and CRC32 of PRG + CHR ROM data.
+///
+/// # Safety
+/// `prg_data` must point to `prg_size` valid bytes.
+/// `chr_data` may be null if `chr_size == 0`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_rust_ines_compute_hash(
+    prg_data: *const u8,
+    prg_size: u32,
+    chr_data: *const u8,
+    chr_size: u32,
+    out: *mut FceuInesHashResult,
+) -> bool {
+    if prg_data.is_null() || out.is_null() {
+        return false;
+    }
+    if prg_size == 0 {
+        return false;
+    }
+
+    let prg = unsafe { std::slice::from_raw_parts(prg_data, prg_size as usize) };
+
+    // Compute CRC32 of PRG+CHR (chained)
+    let crc = if chr_size > 0 && !chr_data.is_null() {
+        let chr = unsafe { std::slice::from_raw_parts(chr_data, chr_size as usize) };
+        let mut hasher = crc32fast::Hasher::new();
+        hasher.update(prg);
+        hasher.update(chr);
+        hasher.finalize()
+    } else {
+        crc32fast::hash(prg)
+    };
+
+    // Compute MD5 of PRG+CHR
+    let mut md5_ctx = md5::Context::new();
+    md5_ctx.consume(prg);
+    if chr_size > 0 && !chr_data.is_null() {
+        let chr = unsafe { std::slice::from_raw_parts(chr_data, chr_size as usize) };
+        md5_ctx.consume(chr);
+    }
+    let md5_digest = md5_ctx.compute();
+    let md5_bytes: [u8; 16] = md5_digest.into();
+
+    // Compute partial MD5 (first 8 bytes, big-endian reassembly)
+    let mut partial_md5: u64 = 0;
+    for x in 0..8 {
+        partial_md5 |= (md5_bytes[7 - x] as u64) << (x * 8);
+    }
+
+    unsafe {
+        *out = FceuInesHashResult {
+            md5: md5_bytes,
+            crc32: crc,
+            partial_md5,
+        };
+    }
+
+    true
+}
+
+// ------------------------------------------------------------------
 // Tests
 // ------------------------------------------------------------------
 
