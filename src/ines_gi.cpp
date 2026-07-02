@@ -5,8 +5,16 @@
 #include "fceu.h"
 #include "cart.h"
 #include "ines.h"
+#include "utils/memory.h"
 
 #include <cstdlib>
+
+extern uint8 *trainerpoo;
+extern FceuMallocPtr trainerpoo_owner;
+extern uint8 *ExtraNTARAM;
+extern FceuMallocPtr ExtraNTARAM_owner;
+extern int CHRRAMSize;
+extern CartInfo iNESCart;
 
 static DECLFR(TrainerRead) {
 	return(trainerpoo[A & 0x1FF]);
@@ -58,11 +66,11 @@ void iNESGI(GI h) {
 			VROM = NULL;
 		}
 		if (trainerpoo) {
-			free(trainerpoo);
+			trainerpoo_owner.reset();
 			trainerpoo = NULL;
 		}
 		if (ExtraNTARAM) {
-			free(ExtraNTARAM);
+			ExtraNTARAM_owner.reset();
 			ExtraNTARAM = NULL;
 		}
 	}

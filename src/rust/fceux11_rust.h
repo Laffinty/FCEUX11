@@ -969,6 +969,140 @@ typedef struct FceuFdsWrite4025Result {
   uint16_t new_blocklen;
 } FceuFdsWrite4025Result;
 
+/**
+ * Disk I/O state for FDS operations.
+ *
+ * Contains the current position and block information for disk reads/writes.
+ * The caller maintains ownership of the disk data arrays and passes pointers
+ * to them as needed.
+ */
+typedef struct FceuFdsDiskIoState {
+  /**
+   * Current block type (DSK_INIT, DSK_VOLUME, DSK_FILECNT, DSK_FILEHDR, DSK_FILEDATA).
+   */
+  uint8_t block;
+  /**
+   * Start address of current block within disk data.
+   */
+  uint16_t block_start;
+  /**
+   * Length of current block.
+   */
+  uint16_t block_len;
+  /**
+   * Current address relative to block_start.
+   */
+  uint16_t disk_addr;
+  /**
+   * File size being read/written (for FILEHDR/FILEDATA blocks).
+   */
+  uint16_t file_size;
+  /**
+   * Control register value ($4025).
+   */
+  uint8_t control;
+  /**
+   * Whether disk is inserted.
+   */
+  uint8_t disk_inserted;
+  /**
+   * Whether disk was accessed (for IRQ timing).
+   */
+  uint8_t disk_access;
+} FceuFdsDiskIoState;
+
+/**
+ * Result of a disk read operation ($4031).
+ */
+typedef struct FceuFdsDiskReadResult {
+  /**
+   * The byte read from disk.
+   */
+  uint8_t value;
+  /**
+   * Updated disk address after read.
+   */
+  uint16_t new_disk_addr;
+  /**
+   * Updated file size (if reading from FILEHDR block at specific offsets).
+   */
+  uint16_t new_file_size;
+  /**
+   * Whether a seek IRQ should be triggered.
+   */
+  bool trigger_seek_irq;
+} FceuFdsDiskReadResult;
+
+/**
+ * Result of a disk write operation ($4024).
+ */
+typedef struct FceuFdsDiskWriteResult {
+  /**
+   * Updated disk address after write.
+   */
+  uint16_t new_disk_addr;
+  /**
+   * Updated file size (if writing to FILEHDR block at specific offsets).
+   */
+  uint16_t new_file_size;
+  /**
+   * Whether disk was marked as written.
+   */
+  bool disk_written;
+} FceuFdsDiskWriteResult;
+
+/**
+ * Opaque FDS runtime state — C++ holds an `FdsRuntimeState*` handle.
+ */
+typedef struct FdsRuntimeState {
+  uint8_t control;
+  uint16_t filesize;
+  uint8_t block;
+  uint16_t blockstart;
+  uint16_t blocklen;
+  uint16_t diskaddr;
+  uint8_t diskaccess;
+  int32_t irq_count;
+  int32_t irq_latch;
+  uint8_t irq_a;
+  int32_t disk_seek_irq;
+  uint8_t select_disk;
+  uint8_t in_disk;
+  uint8_t disk_written;
+  uint8_t write_skip;
+  int32_t disk_ptr;
+  int32_t total_sides;
+  uint8_t fds_regs[6];
+} FdsRuntimeState;
+
+/**
+ * Flags returned by `fceux11_rust_fds_handle_write_4025` telling C++
+ * which side effects to apply.
+ */
+typedef struct FceuFdsWrite4025Action {
+  /**
+   * New mirror mode: 0=horizontal, 1=vertical (call `setmirror`).
+   */
+  uint8_t mirror_mode;
+  /**
+   * `true` when `mirror_mode` changed (bit 3 of the new control value
+   * differs from the old one), so C++ can skip the call when false.
+   */
+  bool mirror_changed;
+  /**
+   * `true` → C++ must call `X6502_IRQEnd(FCEU_IQEXT2)`.
+   */
+  bool irq_end_ext2;
+  /**
+   * `true` → C++ must call `X6502_IRQBegin(FCEU_IQEXT)`.
+   */
+  bool irq_begin_ext;
+  /**
+   * `true` → C++ must call `X6502_IRQEnd(FCEU_IQEXT)`.
+   */
+  bool irq_end_ext;
+} FceuFdsWrite4025Action;
+
 typedef struct FceuInesHInfoResult {
   int32_t mapper;
   int32_t mapper_mask;
@@ -1013,6 +1147,49 @@ typedef struct FceuInesParseResult {
 } FceuInesParseResult;
 
 /**
+ * Computed ROM/CHR layout from an iNES header parse result.
+ *
+ * Contains byte-level sizes and flags needed for memory allocation
+ * and data loading.  Produced by `fceux11_rust_ines_compute_layout`.
+ */
+typedef struct FceuInesLayout {
+  /**
+   * PRG-ROM size in bytes (`rom_size_16kb << 14`).
+   */
+  uint32_t prg_size_bytes;
+  /**
+   * CHR-ROM size in bytes (`vrom_size_8kb << 13`).
+   */
+  uint32_t chr_size_bytes;
+  /**
+   * CHR-RAM size in bytes when no CHR-ROM is present.
+   * -1 means CHR-ROM is present (no CHR-RAM needed).
+   * 0 means size will be determined later by mapper init.
+   */
+  int32_t chrram_size;
+  /**
+   * Whether the mapper number is a power of two (determines rounding).
+   */
+  bool round_prg;
+  /**
+   * Number of 16 KiB PRG banks (after rounding if applicable).
+   */
+  uint32_t prg_banks_16kb;
+  /**
+   * Number of 8 KiB CHR banks.
+   */
+  uint32_t chr_banks_8kb;
+  /**
+   * Whether a 512-byte trainer is present.
+   */
+  bool trainer_present;
+  /**
+   * PRG-ROM raw (not rounded) size in 16 KiB units.
+   */
+  uint32_t prg_banks_raw;
+} FceuInesLayout;
+
+/**
  * Hash result for iNES ROM data.
  */
 typedef struct FceuInesHashResult {
@@ -1020,6 +1197,120 @@ typedef struct FceuInesHashResult {
   uint32_t crc32;
   uint64_t partial_md5;
 } FceuInesHashResult;
+
+/**
+ * Result of a complete iNES file load.
+ *
+ * Contains pointers into the original file buffer for PRG, CHR, and
+ * trainer data, along with all parsed metadata.  The caller must keep
+ * the file buffer alive for as long as it uses the data pointers.
+ */
+typedef struct FceuInesCartResult {
+  /**
+   * Pointer to PRG-ROM data within the file buffer.
+   */
+  const uint8_t *prg_data;
+  /**
+   * PRG-ROM size in bytes.
+   */
+  uint32_t prg_size;
+  /**
+   * Pointer to CHR-ROM data within the file buffer (null if no CHR-ROM).
+   */
+  const uint8_t *chr_data;
+  /**
+   * CHR-ROM size in bytes.
+   */
+  uint32_t chr_size;
+  /**
+   * Pointer to trainer data within the file buffer (null if no trainer).
+   */
+  const uint8_t *trainer_data;
+  /**
+   * Trainer size in bytes (0 if no trainer).
+   */
+  uint32_t trainer_size;
+  /**
+   * Mapper number.
+   */
+  uint32_t mapper_no;
+  /**
+   * NES 2.0 submapper (0 if not NES 2.0).
+   */
+  uint8_t submapper;
+  /**
+   * Mirroring mode (0=H, 1=V, 2=four-screen).
+   */
+  int32_t mirror;
+  /**
+   * Mirroring as 2-bit value.
+   */
+  int32_t mirror_as_2bits;
+  /**
+   * Battery-backed RAM present.
+   */
+  bool battery;
+  /**
+   * NES 2.0 flag.
+   */
+  bool is_nes2;
+  /**
+   * MD5 hash of PRG+CHR.
+   */
+  uint8_t md5[16];
+  /**
+   * CRC32 of PRG+CHR.
+   */
+  uint32_t crc32;
+  /**
+   * Partial MD5 (first 8 bytes, big-endian).
+   */
+  uint64_t partial_md5;
+  /**
+   * VS UniSystem type (0=cart, 1=VS, -1=unsupported).
+   */
+  int32_t vs_system;
+  /**
+   * VS PPU type.
+   */
+  int32_t vs_ppu;
+  /**
+   * VS system type.
+   */
+  int32_t vs_type;
+  /**
+   * TV system (0=NTSC, 1=PAL).
+   */
+  int32_t tv_system;
+  /**
+   * NES 2.0 WRAM size in bytes.
+   */
+  uint32_t wram_size;
+  /**
+   * NES 2.0 battery-backed WRAM size in bytes.
+   */
+  uint32_t battery_wram_size;
+  /**
+   * NES 2.0 VRAM size in bytes.
+   */
+  uint32_t vram_size;
+  /**
+   * NES 2.0 battery-backed VRAM size in bytes.
+   */
+  uint32_t battery_vram_size;
+  /**
+   * Raw PRG-ROM size in 16 KiB units (before rounding).
+   */
+  uint32_t rom_size_raw;
+  /**
+   * PRG-ROM size in 16 KiB units (after rounding).
+   */
+  uint32_t rom_size_16kb;
+  /**
+   * CHR-ROM size in 8 KiB units.
+   */
+  uint32_t vrom_size_8kb;
+} FceuInesCartResult;
 
 /**
  * C-compatible movie record layout.
@@ -1090,10 +1381,196 @@ typedef struct FceuNsfHeader {
   uint8_t reserve[8];
 } FceuNsfHeader;
 
+/**
+ * Result of a complete NSF file load.
+ *
+ * Contains the NSF data pointer, parsed header info, and computed
+ * addresses.  The caller must keep the file buffer alive for as long
+ * as it uses the data pointer.
+ */
+typedef struct FceuNsfCartResult {
+  /**
+   * Pointer to NSF data (after the 0x80 header), within file buffer.
+   */
+  const uint8_t *nsf_data;
+  /**
+   * NSF data size in bytes.
+   */
+  uint32_t nsf_size;
+  /**
+   * Load address.
+   */
+  uint16_t load_addr;
+  /**
+   * Init address.
+   */
+  uint16_t init_addr;
+  /**
+   * Play address.
+   */
+  uint16_t play_addr;
+  /**
+   * Maximum bank number.
+   */
+  uint32_t max_bank;
+  /**
+   * Bank-switching on flag.
+   */
+  bool bank_switch;
+  /**
+   * Video system (0=NTSC, 1=PAL).
+   */
+  uint8_t video_system;
+  /**
+   * Sound chip flags.
+   */
+  uint8_t sound_chip;
+  /**
+   * Total songs.
+   */
+  uint8_t total_songs;
+  /**
+   * Starting song (1-based).
+   */
+  uint8_t starting_song;
+  /**
+   * Song name (null-terminated).
+   */
+  uint8_t song_name[32];
+  /**
+   * Artist (null-terminated).
+   */
+  uint8_t artist[32];
+  /**
+   * Copyright (null-terminated).
+   */
+  uint8_t copyright[32];
+} FceuNsfCartResult;
+
+/**
+ * Table of C++ function pointers that the Rust runtime calls back
+ * for mapper, bus, and CPU operations. All fields are optional;
+ * set to `NULL` (= `None`) if a callback is not needed.
+ */
+typedef struct NsfRuntimeCallbacks {
+  /**
+   * setprg4(A, bank) — map a 4 KiB PRG bank at address A.
+   */
+  void (*set_prg4)(uint32_t, uint32_t);
+  /**
+   * setprg8(A, bank) — map an 8 KiB PRG bank at address A.
+   */
+  void (*set_prg8)(uint32_t, uint32_t);
+  /**
+   * setprg8r(rom, A, bank) — map an 8 KiB PRG ROM bank at address A.
+   */
+  void (*set_prg8r)(int32_t, uint32_t, uint32_t);
+  /**
+   * setprg32(A, bank) — map a 32 KiB PRG bank at address A.
+   */
+  void (*set_prg32)(uint32_t, uint32_t);
+  /**
+   * SetupCartPRGMapping(chip, data, size, writable).
+   */
+  void (*setup_cart_prg_mapping)(int32_t, const uint8_t*, uint32_t, int32_t);
+  /**
+   * ResetCartMapping().
+   */
+  void (*reset_cart_mapping)(void);
+  /**
+   * fceu11::g_bus.write(addr, val).
+   */
+  void (*bus_write)(uint16_t, uint8_t);
+  /**
+   * TriggerNMI().
+   */
+  void (*trigger_nmi)(void);
+  /**
+   * CartBR(A) — fallback cart read.
+   */
+  uint8_t (*cart_br)(uint16_t);
+  /**
+   * Sound chip init dispatcher: takes sound_chip bitmask,
+   * calls the appropriate NSFVRC6/VRC7/FDS/MMC5/N106/AY init.
+   */
+  void (*sound_chip_init)(uint8_t);
+} NsfRuntimeCallbacks;
+
+/**
+ * Holds all NSF runtime state previously scattered across C++ globals
+ * (`doreset`, `NSFNMIFlags`, `SongReload`, `CurrentSong`, etc.) plus
+ * the configuration needed by the read/write/init/frame handlers.
+ */
+typedef struct NsfRuntimeState {
+  uint8_t doreset;
+  uint8_t nsf_nmi_flags;
+  uint8_t song_reload;
+  int32_t current_song;
+  const uint8_t *nsf_data;
+  int32_t nsf_max_bank;
+  uint8_t bs_on;
+  uint8_t sound_chip;
+  uint8_t *ex_wram;
+  uint8_t bank_switch[8];
+  uint16_t load_addr;
+  uint8_t nsfrom[54];
+  struct NsfRuntimeCallbacks cb;
+} NsfRuntimeState;
+
 typedef struct UnifBoardInfo {
   const char *name;
   int32_t flags;
 } UnifBoardInfo;
+
+/**
+ * PRG/CHR bank data pointer and size.
+ */
+typedef struct FceuUnifBank {
+  const uint8_t *data;
+  uint32_t size;
+} FceuUnifBank;
+
+/**
+ * Result of a complete UNIF file load.
+ *
+ * Contains pointers into the original file buffer for PRG/CHR banks,
+ * along with all parsed metadata.  The caller must keep the file buffer
+ * alive for as long as it uses the data pointers.
+ */
+typedef struct FceuUnifCartResult {
+  /**
+   * PRG banks (PRG0-PRG31).  Unused entries have data=null, size=0.
+   */
+  struct FceuUnifBank prg[32];
+  /**
+   * CHR banks (CHR0-CHR31).  Unused entries have data=null, size=0.
+   */
+  struct FceuUnifBank chr[32];
+  /**
+   * Board name (null-terminated, points into file buffer).
+   */
+  const char *board_name;
+  /**
+   * Board name string length (excluding null terminator).
+   */
+  uint32_t board_name_len;
+  /**
+   * Mirroring mode (0-4).
+   */
+  int32_t mirroring;
+  /**
+   * Battery-backed RAM present.
+   */
+  bool battery;
+  /**
+   * TV system (0=NTSC, 1=PAL, 2=Dendy).
+   */
+  int32_t tv_system;
+  /**
+   * MD5 hash of all PRG+CHR data.
+   */
+  uint8_t md5[16];
+} FceuUnifCartResult;
 
 typedef struct VsUniEntry {
   const char *name;
@@ -1105,6 +1582,46 @@ typedef struct VsUniEntry {
   int32_t predip;
   uint8_t game_type;
 } VsUniEntry;
+
+/**
+ * Result of a VS UniSystem ROM check.
+ *
+ * Contains all the information needed to set up a VS UniSystem game.
+ */
+typedef struct FceuVsUniCheckResult {
+  /**
+   * Whether a VS UniSystem entry was found.
+   */
+  bool found;
+  /**
+   * Mapper number to use.
+   */
+  int32_t mapper;
+  /**
+   * Mirroring mode.
+   */
+  uint8_t mirroring;
+  /**
+   * PPU type.
+   */
+  uint8_t ppu;
+  /**
+   * Game type (Normal, RBI, TKO, Xevious).
+   */
+  uint8_t game_type;
+  /**
+   * DIP switch default value.
+   */
+  uint8_t dip_value;
+  /**
+   * Whether to use zapper input.
+   */
+  bool use_gun;
+  /**
+   * Whether to swap A/B controllers.
+   */
+  bool swap_ab;
+} FceuVsUniCheckResult;
 
 /**
  * Compute `ROM_size` and `VROM_size` (in bank counts) from the iNES
@@ -1477,40 +1994,10 @@ struct FceuFdsWrite4025Result fceux11_rust_fds_compute_write_4025(uint8_t curren
                                                                   uint8_t disk_inserted);
 
 /**
- * Disk I/O state for FDS operations.
- */
-typedef struct FceuFdsDiskIoState {
-    uint8_t block;
-    uint16_t block_start;
-    uint16_t block_len;
-    uint16_t disk_addr;
-    uint16_t file_size;
-    uint8_t control;
-    uint8_t disk_inserted;
-    uint8_t disk_access;
-} FceuFdsDiskIoState;
-
-/**
- * Result of a disk read operation ($4031).
- */
-typedef struct FceuFdsDiskReadResult {
-    uint8_t value;
-    uint16_t new_disk_addr;
-    uint16_t new_file_size;
-    bool trigger_seek_irq;
-} FceuFdsDiskReadResult;
-
-/**
- * Result of a disk write operation ($4024).
- */
-typedef struct FceuFdsDiskWriteResult {
-    uint16_t new_disk_addr;
-    uint16_t new_file_size;
-    bool disk_written;
-} FceuFdsDiskWriteResult;
-
-/**
  * Read a byte from the FDS disk ($4031).
+ *
+ * Performs the disk read operation based on the current block type and position.
+ * Returns the read byte and updated state.
  *
  * # Safety
  * `state` must point to a valid `FceuFdsDiskIoState`.
@@ -1523,6 +2010,9 @@ bool fceux11_rust_fds_disk_read(const struct FceuFdsDiskIoState *state,
 /**
  * Write a byte to the FDS disk ($4024).
  *
+ * Performs the disk write operation based on the current block type and position.
+ * Returns updated state.
+ *
  * # Safety
  * `state` must point to a valid `FceuFdsDiskIoState`.
  * `disk_data` must point to at least 65500 writable bytes.
@@ -1534,10 +2024,56 @@ bool fceux11_rust_fds_disk_write(const struct FceuFdsDiskIoState *state,
 
 /**
  * Switch to a different disk side.
+ *
+ * Updates the InDisk value and resets the block FSM state.
+ * Returns the new InDisk value.
  */
-uint8_t fceux11_rust_fds_switch_side(uint8_t current_side,
-                                     uint8_t total_sides,
-                                     uint8_t new_side);
+uint8_t fceux11_rust_fds_switch_side(uint8_t current_side, uint8_t total_sides, uint8_t new_side);
+
+/**
+ * Allocate and zero-initialise an `FdsRuntimeState`.
+ */
+struct FdsRuntimeState *fceux11_rust_fds_runtime_create(void);
+
+/**
+ * Free an `FdsRuntimeState`.
+ */
+void fceux11_rust_fds_runtime_destroy(struct FdsRuntimeState *state);
+
+/**
+ * Reset the FDS runtime state for a fresh disk load.
+ */
+void fceux11_rust_fds_runtime_reset(struct FdsRuntimeState *state);
+
+/**
+ * Handle a write to FDS register $4025.
+ *
+ * This replaces the entire C++ FDSWrite `case 0x4025:` block.
+ * The caller (C++) must:
+ * 1. Store `value` in `FDSRegs[A & 7]` AFTER this call
+ * 2. If `action.irq_end_ext2`: call `X6502_IRQEnd(FCEU_IQEXT2)`
+ * 3. If `action.mirror_changed`: call `setmirror(action.mirror_mode)`
+ *
+ * # Safety
+ * `state` and `action` must be valid.
+ */
+void fceux11_rust_fds_handle_write_4025(struct FdsRuntimeState *state,
+                                        uint8_t value,
+                                        struct FceuFdsWrite4025Action *action);
+
+/**
+ * Handle writes to FDS registers $4020–$4024.
+ *
+ * Returns the new value for `FDSRegs[A & 7]` (usually `value`,
+ * except for $4023 which reads back 0xFF).
+ *
+ * # Safety
+ * `state` must be valid.
+ */
+uint8_t fceux11_rust_fds_handle_write_4020_4024(struct FdsRuntimeState *state,
+                                                uint16_t addr,
+                                                uint8_t value,
+                                                struct FceuFdsWrite4025Action *action);
 
 /**
  * Clean garbage signatures out of an iNES header.
@@ -1640,23 +2176,6 @@ int32_t fceux11_rust_ines_apply_corrections(struct FceuInesParseResult *parse,
 bool fceux11_rust_ines_parse_header(const uint8_t *header_bytes, struct FceuInesParseResult *out);
 
 /**
- * Computed ROM/CHR layout from an iNES header parse result.
- *
- * Contains byte-level sizes and flags needed for memory allocation
- * and data loading.  Produced by `fceux11_rust_ines_compute_layout`.
- */
-typedef struct FceuInesLayout {
-    uint32_t prg_size_bytes;
-    uint32_t chr_size_bytes;
-    int32_t chrram_size;
-    bool round_prg;
-    uint32_t prg_banks_16kb;
-    uint32_t chr_banks_8kb;
-    bool trainer_present;
-    uint32_t prg_banks_raw;
-} FceuInesLayout;
-
-/**
  * Compute ROM/CHR layout from a parsed iNES header.
  *
  * Takes the `FceuInesParseResult` from `fceux11_rust_ines_parse_header`
@@ -1668,7 +2187,8 @@ typedef struct FceuInesLayout {
  * `parse` must point to a valid `FceuInesParseResult`.
  * `out` must point to a writable `FceuInesLayout`.
  */
-bool fceux11_rust_ines_compute_layout(const struct FceuInesParseResult *parse, struct FceuInesLayout *out);
+bool fceux11_rust_ines_compute_layout(const struct FceuInesParseResult *parse,
+                                      struct FceuInesLayout *out);
 
 /**
  * Compute MD5 and CRC32 of PRG + CHR ROM data.
@@ -1682,42 +2202,6 @@ bool fceux11_rust_ines_compute_hash(const uint8_t *prg_data,
                                     const uint8_t *chr_data,
                                     uint32_t chr_size,
                                     struct FceuInesHashResult *out);
-
-/**
- * Result of a complete iNES file load.
- *
- * Contains pointers into the original file buffer for PRG, CHR, and
- * trainer data, along with all parsed metadata.  The caller must keep
- * the file buffer alive for as long as it uses the data pointers.
- */
-typedef struct FceuInesCartResult {
-    const uint8_t *prg_data;
-    uint32_t prg_size;
-    const uint8_t *chr_data;
-    uint32_t chr_size;
-    const uint8_t *trainer_data;
-    uint32_t trainer_size;
-    uint32_t mapper_no;
-    uint8_t submapper;
-    int32_t mirror;
-    int32_t mirror_as_2bits;
-    bool battery;
-    bool is_nes2;
-    uint8_t md5[16];
-    uint32_t crc32;
-    uint64_t partial_md5;
-    int32_t vs_system;
-    int32_t vs_ppu;
-    int32_t vs_type;
-    int32_t tv_system;
-    uint32_t wram_size;
-    uint32_t battery_wram_size;
-    uint32_t vram_size;
-    uint32_t battery_vram_size;
-    uint32_t rom_size_raw;
-    uint32_t rom_size_16kb;
-    uint32_t vrom_size_8kb;
-} FceuInesCartResult;
 
 /**
  * Load an iNES ROM file from a buffer.
@@ -2035,30 +2519,6 @@ int32_t fceux11_rust_nsf_get_info(const struct FceuNsfHeader *header,
                                   uintptr_t maxlen);
 
 /**
- * Result of a complete NSF file load.
- *
- * Contains the NSF data pointer, parsed header info, and computed
- * addresses.  The caller must keep the file buffer alive for as long
- * as it uses the data pointer.
- */
-typedef struct FceuNsfCartResult {
-    const uint8_t *nsf_data;
-    uint32_t nsf_size;
-    uint16_t load_addr;
-    uint16_t init_addr;
-    uint16_t play_addr;
-    uint32_t max_bank;
-    bool bank_switch;
-    uint8_t video_system;
-    uint8_t sound_chip;
-    uint8_t total_songs;
-    uint8_t starting_song;
-    uint8_t song_name[32];
-    uint8_t artist[32];
-    uint8_t copyright[32];
-} FceuNsfCartResult;
-
-/**
  * Load an NSF ROM file from a buffer.
  *
  * Parses the 0x80 header, validates it, computes bank layout, and
@@ -2074,6 +2534,98 @@ typedef struct FceuNsfCartResult {
 bool fceux11_rust_nsf_load(const uint8_t *file_data,
                            uintptr_t file_len,
                            struct FceuNsfCartResult *out_cart);
+
+/**
+ * Allocate and zero-initialise an `NsfRuntimeState`.
+ * The caller must eventually call `fceux11_rust_nsf_runtime_destroy` to free it.
+ * # Safety
+ * The returned pointer must be freed only via `_destroy`.
+ */
+struct NsfRuntimeState *fceux11_rust_nsf_runtime_create(void);
+
+/**
+ * Free an `NsfRuntimeState` allocated by `_create`.
+ * # Safety
+ * `state` must have been returned by `_create` and not previously freed.
+ */
+void fceux11_rust_nsf_runtime_destroy(struct NsfRuntimeState *state);
+
+/**
+ * Populate the configuration fields and callback table of the runtime state.
+ * Must be called once after `_create` and before `_init`.
+ * # Safety
+ * All pointers must be valid for the lifetime of the state.
+ */
+bool fceux11_rust_nsf_runtime_configure(struct NsfRuntimeState *state,
+                                        const uint8_t *nsf_data,
+                                        int32_t nsf_max_bank,
+                                        uint8_t bs_on,
+                                        uint8_t sound_chip,
+                                        uint8_t *ex_wram,
+                                        const uint8_t *bank_switch,
+                                        uint16_t load_addr,
+                                        const uint8_t *nsfrom,
+                                        uintptr_t nsfrom_len,
+                                        const struct NsfRuntimeCallbacks *callbacks);
+
+/**
+ * Execute NSF_init logic: reset cart mapping, set up PRG mapping,
+ * configure initial banks, and initialise sound chip.
+ *
+ * C++ must call this FIRST, then register handlers via
+ * `SetReadHandler` / `SetWriteHandler` / `AddExState`.
+ *
+ * Returns `true` on success.
+ * # Safety
+ * `state` must have been configured via `_configure`.
+ */
+bool fceux11_rust_nsf_runtime_init(struct NsfRuntimeState *state, uint8_t starting_song);
+
+/**
+ * Handle a write to the NSF control / bank-switch registers.
+ * C++ calls this from its thin `NSF_write` DECLFW handler.
+ * # Safety
+ * `state` must be valid.
+ */
+void fceux11_rust_nsf_write(struct NsfRuntimeState *state, uint16_t addr, uint8_t val);
+
+/**
+ * Handle a read from the NSF status registers ($3FF0-$3FFF).
+ * Returns the value to place on the data bus.
+ * # Safety
+ * `state` must be valid. `ram` must point to 0x800 bytes of NES WRAM.
+ */
+uint8_t fceux11_rust_nsf_read(struct NsfRuntimeState *state,
+                              uint16_t addr,
+                              uint8_t pal,
+                              int32_t fceuindbg,
+                              uint8_t *ram);
+
+/**
+ * Handle a read from the vector table ($FFFA-$FFFD).
+ * Returns `true` if the read was intercepted and `*out_value` is valid.
+ * Returns `false` if the caller should fall back to `CartBR(A)`.
+ * # Safety
+ * `state` and `out_value` must be valid.
+ */
+bool fceux11_rust_nsf_vector_read(struct NsfRuntimeState *state, uint16_t addr, uint8_t *out_value);
+
+/**
+ * Handle a read from $3800-$3835 (NSFROM bootstrap ROM).
+ * Returns the byte at the given address.
+ * This is stateless — the NSFROM ROM is stored in the state.
+ * # Safety
+ * `state` must be valid.
+ */
+uint8_t fceux11_rust_nsf_from_read(const struct NsfRuntimeState *state, uint16_t addr);
+
+/**
+ * Evaluate the NSF frame-trigger condition.
+ * Returns `true` if `TriggerNMI()` should be called.
+ * # Safety
+ * `state` must be valid.
+ */
+bool fceux11_rust_nsf_frame(struct NsfRuntimeState *state);
 
 /**
  * Look up a UNIF board by name.
@@ -2095,32 +2647,6 @@ int32_t fceux11_rust_unif_board_flags(const char *name);
  * Compute CHR-RAM size in bytes from board flags.
  */
 uint32_t fceux11_rust_unif_chrram_size(int32_t flags);
-
-/**
- * PRG/CHR bank data pointer and size.
- */
-typedef struct FceuUnifBank {
-    const uint8_t *data;
-    uint32_t size;
-} FceuUnifBank;
-
-/**
- * Result of a complete UNIF file load.
- *
- * Contains pointers into the original file buffer for PRG/CHR banks,
- * along with all parsed metadata.  The caller must keep the file buffer
- * alive for as long as it uses the data pointers.
- */
-typedef struct FceuUnifCartResult {
-    FceuUnifBank prg[32];
-    FceuUnifBank chr[32];
-    const char *board_name;
-    uint32_t board_name_len;
-    int32_t mirroring;
-    bool battery;
-    int32_t tv_system;
-    uint8_t md5[16];
-} FceuUnifCartResult;
 
 /**
  * Load a UNIF ROM file from a buffer.
@@ -2169,28 +2695,17 @@ uint8_t fceux11_rust_vsuni_service(uint8_t game_type);
 int32_t fceux11_rust_vsuni_draw(uint8_t *xbuf, uint8_t vsdip, int32_t dips_howlong);
 
 /**
- * Result of a VS UniSystem ROM check.
- */
-typedef struct FceuVsUniCheckResult {
-    bool found;
-    int32_t mapper;
-    uint8_t mirroring;
-    uint8_t ppu;
-    uint8_t game_type;
-    uint8_t dip_value;
-    bool use_gun;
-    bool swap_ab;
-} FceuVsUniCheckResult;
-
-/**
  * Check if a ROM is a VS UniSystem game and return setup information.
  *
+ * Looks up the ROM by its partial MD5 hash and returns all the
+ * information needed to configure the emulator for VS UniSystem mode.
+ *
  * Returns `true` if a VS UniSystem entry was found.
+ *
  * # Safety
  * `out` must point to a writable `FceuVsUniCheckResult`.
  */
 bool fceux11_rust_vsuni_check(uint64_t md5partial, struct FceuVsUniCheckResult *out);
-
 /**
  * `0x10000 / 8` bytes — one bit per NES address.
  */

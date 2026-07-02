@@ -73,6 +73,8 @@ struct CartInfo
 	}
 
 	// Set by iNES/UNIF loading code.
+	int mapper_number;	// Parsed mapper number (v1.10 Cryptex)
+	int tv_system;		// 0=NTSC, 1=PAL (v1.10 Cryptex)
 	int mirror;		// As set in the header or chunk.
 				// iNES/UNIF specific.  Intended
 				// to help support games like "Karnov"
@@ -116,6 +118,8 @@ struct CartInfo
 
 		cart_obj = nullptr;
 
+		mapper_number = 0;
+		tv_system = 0;
 		mirror = 0;
 		mirrorAs2Bits = 0;
 		battery = 0;

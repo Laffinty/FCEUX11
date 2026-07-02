@@ -1,7 +1,6 @@
-// v1.10 Cryptex: UNIF format bridge layer.
-// Global variables and thin UNIFLoad wrapper.  Core logic lives in:
-//   unif_load.cpp  — UNIFLoadCore (Rust FFI parsing + ROM setup)
-//   unif_bmap.h    — BMAPPING bmap[] table
+// v1.10 Cryptex: UNIF format bridge layer (< 100 lines).
+// Core logic lives in unif_load.cpp (Rust FFI parsing + ROM setup + board init)
+// and unif_bmap.h (BMAPPING bmap[] table).
 
 #include "types.h"
 #include "utils/safe_string.h"
@@ -10,86 +9,17 @@
 #include "apu.h"
 #include "unif.h"
 #include "ines.h"
-#include "utils/memory.h"
-#include "state.h"
 #include "file.h"
-#include "driver.h"
-#include "rust/fceux11_rust.h"
 
-#include <cstdio>
-#include <cstdlib>
 #include <cstring>
 
-// Type definitions
-typedef struct {
-	const char *name;
-	void (*init)(CartInfo *);
-} BMAPPING;
-
-typedef struct {
-	const char *name;
-	int (*init)(FCEUFILE *fp);
-} BFMAPPING;
-
 // Global variables
-static CartInfo UNIFCart;
-static int vramo;
-static int mirrortodo;
-static uint8 *boardname;
-static uint8 *sboardname;
-static uint32 CHRRAMSize;
+CartInfo UNIFCart;
 uint8 *UNIFchrrama = 0;
-static uint8 *malloced[32];
-static uint32 mallocedsizes[32];
 
-// Helper functions
-void FreeUNIF(void) {
-	if (UNIFchrrama) { free(UNIFchrrama); UNIFchrrama = 0; }
-	if (boardname) { free(boardname); boardname = 0; }
-	for (int x = 0; x < 32; x++)
-		if (malloced[x]) { free(malloced[x]); malloced[x] = 0; }
-}
-
-void ResetUNIF(void) {
-	for (int x = 0; x < 32; x++) malloced[x] = 0;
-	vramo = 0; boardname = 0; mirrortodo = 0;
-	UNIFCart.clear(); UNIFchrrama = 0;
-}
-
-static uint8 exntar[2048];
-
-void MooMirroring(void) {
-	if (mirrortodo < 0x4) SetupCartMirroring(mirrortodo, 1, 0);
-	else if (mirrortodo == 0x4) {
-		FCEU_MemoryRand(exntar, sizeof(exntar), true);
-		SetupCartMirroring(4, 1, exntar);
-		AddExState(exntar, 2048, 0, "EXNR");
-	} else SetupCartMirroring(0, 0, 0);
-}
-
-int InitializeBoard(void) {
-	if (!sboardname) return 0;
-	int x = 0;
-	while (bmap[x].name) {
-		if (!strcmp((char*)sboardname, (char*)bmap[x].name)) {
-			int flags = fceux11_rust_unif_board_flags((const char*)sboardname);
-			if (flags < 0) return 1;
-			if (!malloced[16]) {
-				CHRRAMSize = fceux11_rust_unif_chrram_size(flags);
-				if ((UNIFchrrama = (uint8*)FCEU_malloc(CHRRAMSize))) {
-					SetupCartCHRMapping(0, UNIFchrrama, CHRRAMSize, 1);
-					AddExState(UNIFchrrama, CHRRAMSize, 0, "CHRR");
-				} else return 2;
-			}
-			if (flags & BMCFLAG_FORCE4) mirrortodo = 4;
-			MooMirroring();
-			bmap[x].init(&UNIFCart);
-			return 0;
-		}
-		x++;
-	}
-	return 1;
-}
+// Forward declarations for functions in unif_load.cpp
+extern void FreeUNIF(void);
+extern int UNIFLoadCore(const char *name, FCEUFILE *fp, CartInfo& UNIFCart);
 
 static void UNIFGI(GI h) {
 	switch (h) {
@@ -107,20 +37,12 @@ static void UNIFGI(GI h) {
 	}
 }
 
-// Include the bmap table
-#include "unif_bmap.h"
-
-// Forward declaration for core load function
-extern int UNIFLoadCore(const char *name, FCEUFILE *fp, CartInfo& UNIFCart);
-
-// Thin wrapper: UNIFLoad
 int UNIFLoad(const char *name, FCEUFILE *fp) {
 	FCEU_fseek(fp, 0, SEEK_SET);
 
 	int result = UNIFLoadCore(name, fp, UNIFCart);
 	if (result != LOADER_OK) return result;
 
-	// Post-load setup
 	FCEU_LoadGameSave(&UNIFCart);
 	FCEU_strlcpy(LoadedRomFName, sizeof(LoadedRomFName), name);
 	GameInterface = UNIFGI;

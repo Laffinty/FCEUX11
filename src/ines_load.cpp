@@ -35,10 +35,32 @@ extern uint32 VROM_size;
 extern int iNES2;
 extern uint32 iNESGameCRC32;
 
-// Forward declarations for functions in other files
-extern void SetInput(void);
-extern void SetInputNes20(uint8 expansion);
-extern void CheckBad(uint64 md5partial);
+// SetInput — look up input controllers by CRC (Rust FFI thin wrapper)
+static void SetInput(void) {
+	int32_t i1 = 0, i2 = 0, ifc = 0;
+	if (fceux11_rust_ines_lookup_input_crc(iNESGameCRC32, &i1, &i2, &ifc)) {
+		GameInfo->input[0] = static_cast<ESI>(i1);
+		GameInfo->input[1] = static_cast<ESI>(i2);
+		GameInfo->inputfc = static_cast<ESIFC>(ifc);
+	}
+}
+extern int eoptions;
+static void SetInputNes20(uint8 expansion) {
+	int32_t i1 = 0, i2 = 0, ifc = 0, eopt = 0, vsc = 0;
+	if (fceux11_rust_ines_lookup_input_nes20(expansion, &i1, &i2, &ifc, &eopt, &vsc)) {
+		GameInfo->input[0] = static_cast<ESI>(i1);
+		GameInfo->input[1] = static_cast<ESI>(i2);
+		GameInfo->inputfc = static_cast<ESIFC>(ifc);
+	}
+	eoptions |= eopt;
+	GameInfo->vs_cswitch = vsc != 0;
+}
+static void CheckBad(uint64 md5partial) {
+	const char* name = fceux11_rust_ines_check_bad(md5partial);
+	if (name) {
+		FCEU_PrintError("The copy game you have loaded, \"%s\", is bad, and will not work properly in FCEUX.", name);
+	}
+}
 extern int iNES_Init(int num);
 
 // Helper: set up VS UniSystem fields from cart result
@@ -115,7 +137,7 @@ static int ines_apply_corrections(const FceuInesCartResult& cart, uint64 partial
 // Main iNES load logic — called from thin wrapper in ines.cpp
 int iNESLoadCore(const char *name, FCEUFILE *fp, CartInfo& iNESCart, FceuMallocPtr& trainerpoo_owner, FceuMallocPtr& ExtraNTARAM_owner) {
 	EMUFILE_MEMORY* ms = fp->EnsureMemorystream();
-	const uint8_t* file_data = ms->buf();
+	const uint8_t* file_data = reinterpret_cast<const uint8_t*>(ms->buf());
 	size_t file_size = ms->size();
 
 	FceuInesCartResult cart;
@@ -132,6 +154,7 @@ int iNESLoadCore(const char *name, FCEUFILE *fp, CartInfo& iNESCart, FceuMallocP
 	VROM_size = cart.vrom_size_8kb;
 	uint32 not_round_size = cart.rom_size_raw;
 	int MapperNo = cart.mapper_no;
+	GameInfo->mappernum = MapperNo;
 
 	// NES 2.0 fields
 	if (iNES2) {

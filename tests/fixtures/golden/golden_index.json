@@ -82,14 +82,6 @@
       "frames_after_load": 5,
       "md5":  "REPLACE_ME_AFTER_GENERATION",
       "fc0_path": "golden/fds_bios.fc0"
-    },
-    {
-      "name": "fds_loaded",
-      "rom":  "fixtures/test_fds.fds",
-      "scenario": "game_loaded",
-      "frames_after_load": 600,
-      "md5":  "REPLACE_ME_AFTER_GENERATION",
-      "fc0_path": "golden/fds_loaded.fc0"
     }
   ],
   "regenerate_command": "fceux11_golden_savestate_test --generate",

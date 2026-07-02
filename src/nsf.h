@@ -51,5 +51,7 @@ extern int NSFMaxBank;
 void NSFDealloc(void);
 void NSFDodo(void);
 void DoNSFFrame(void);
+void nsf_runtime_create(void);
+void nsf_runtime_destroy(void);
 
 #endif

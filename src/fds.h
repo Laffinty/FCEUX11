@@ -1,5 +1,6 @@
 extern bool isFDS;
 void FDSSoundReset(void);
+void FDSSoundStateAdd(void);
 
 void FCEU_FDSInsert(void);
 //void FCEU_FDSEject(void);

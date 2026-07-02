@@ -110,5 +110,9 @@ Testing/
 # Local scratch / unused first-level junk (matches "first level only" usage below)
 /discard/
 
+# Copyrighted FDS BIOS for local FDS testing (never commit)
+/.dr/
+tests/disksys.rom
+
 # CMake Multi-Config target output shells (Debug/ MinSizeRel/ etc.) — empty placeholder dirs
 *.dir/

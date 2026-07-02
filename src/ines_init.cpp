@@ -1,6 +1,7 @@
 // iNES mapper initialization — extracted from ines.cpp for v1.10 Cryptex Phase A.3.
 
 #include "types.h"
+#include "utils/memory.h"
 #include "fceu.h"
 #include "cart.h"
 #include "ines.h"
@@ -13,10 +14,19 @@
 #include <cstdlib>
 
 extern SFORMAT FCEUVSUNI_STATEINFO[];
+extern BMAPPINGLocal bmap[];
+extern int CHRRAMSize;
+extern uint8 *UNIFchrrama;
+extern CartInfo iNESCart;
+extern uint8 *VROM;
+extern uint32 VROM_size;
+extern uint8 *ExtraNTARAM;
+extern iNES_HEADER head;
 
 int iNES_Init(int num) {
 	BMAPPINGLocal *tmp = bmap;
 
+	iNESCart.mapper_number = num;
 	CHRRAMSize = -1;
 
 	if (GameInfo->type == GIT_VSUNI)
@@ -36,7 +46,7 @@ int iNES_Init(int num) {
 				if (CHRRAMSize > 0)
 				{
 					int mCHRRAMSize = (CHRRAMSize < 1024) ? 1024 : CHRRAMSize;
-					if ((UNIFchrrama = VROM = (uint8*)FCEU_dmalloc(mCHRRAMSize)) == NULL) return 2;
+					if ((UNIFchrrama = VROM = (uint8*)FCEU_malloc(mCHRRAMSize)) == NULL) return 2;
 					FCEU_MemoryRand(VROM, CHRRAMSize);
 					SetupCartCHRMapping(0, VROM, CHRRAMSize, 1);
 					AddExState(VROM, CHRRAMSize, 0, "CHRR");

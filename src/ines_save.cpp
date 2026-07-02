@@ -5,11 +5,17 @@
 #include "fceu.h"
 #include "cart.h"
 #include "ines.h"
-#include "driver.h"
 #include "file.h"
 
 #include <cstdio>
 #include <cstring>
+
+extern uint8 *trainerpoo;
+extern uint8 *ROM;
+extern uint8 *VROM;
+extern uint32 ROM_size;
+extern iNES_HEADER head;
+extern void iNESGI(GI h);
 
 // bbit edited: the whole function below was added
 int iNesSave(void) {

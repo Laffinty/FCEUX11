@@ -206,14 +206,22 @@ set(SRC_CORE
   	${CMAKE_CURRENT_SOURCE_DIR}/drawing.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/fceu.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/fds.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/fds_sound.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/file.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/emufile.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/filter.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/ines.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/ines_load.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/ines_init.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/ines_gi.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/ines_save.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/input.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/movie.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/netplay.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/nsf.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/nsf_load.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/nsf_runtime.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/nsf_ui.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/oldmovie.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/palette.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/profiler.cpp
@@ -224,6 +232,7 @@ set(SRC_CORE
   	${CMAKE_CURRENT_SOURCE_DIR}/sound.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/state.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/unif.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/unif_load.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/video.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/vsuni.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/wave.cpp

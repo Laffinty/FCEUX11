@@ -165,15 +165,3 @@ static BMAPPING bmap[] = {
 	{ 0, 0 }
 };
 
-static BFMAPPING bfunc[] = {
-	{ "CTRL", CTRL },
-	{ "TVCI", TVCI },
-	{ "BATR", EnableBattery },
-	{ "MIRR", DoMirroring },
-	{ "PRG", LoadPRG },
-	{ "CHR", LoadCHR },
-	{ "NAME", NAME },
-	{ "MAPR", SetBoardName },
-	{ "DINF", DINF },
-	{ NULL, NULL }
-};

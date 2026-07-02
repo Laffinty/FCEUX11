@@ -653,8 +653,264 @@ pub extern "C" fn fceux11_rust_fds_switch_side(
     new_side
 }
 
+// ==================================================================
+// FDS Runtime State — v1.10 Cryptex Task 3
+// ==================================================================
+// Consolidates the FDS disk-block state machine, IRQ state, and
+// disk-insertion state previously held by C++ static globals.
+//
+// C++ retains: FDSLoad / FDSClose file I/O, FDSSound DSP,
+// AddExState savestate registration, and handler registration.
+
+/// Flags returned by `fceux11_rust_fds_handle_write_4025` telling C++
+/// which side effects to apply.
+#[repr(C)]
+pub struct FceuFdsWrite4025Action {
+    /// New mirror mode: 0=horizontal, 1=vertical (call `setmirror`).
+    pub mirror_mode: u8,
+    /// `true` when `mirror_mode` changed (bit 3 of the new control value
+    /// differs from the old one), so C++ can skip the call when false.
+    pub mirror_changed: bool,
+    /// `true` → C++ must call `X6502_IRQEnd(FCEU_IQEXT2)`.
+    pub irq_end_ext2: bool,
+    /// `true` → C++ must call `X6502_IRQBegin(FCEU_IQEXT)`.
+    pub irq_begin_ext: bool,
+    /// `true` → C++ must call `X6502_IRQEnd(FCEU_IQEXT)`.
+    pub irq_end_ext: bool,
+}
+
+/// Opaque FDS runtime state — C++ holds an `FdsRuntimeState*` handle.
+#[repr(C)]
+pub struct FdsRuntimeState {
+    // ── Disk block FSM (was `mapperFDS_*` C++ globals) ──
+    pub control: u8,
+    pub filesize: u16,
+    pub block: u8,
+    pub blockstart: u16,
+    pub blocklen: u16,
+    pub diskaddr: u16,
+    pub diskaccess: u8,
+
+    // ── IRQ state ──
+    pub irq_count: i32,
+    pub irq_latch: i32,
+    pub irq_a: u8,
+    pub disk_seek_irq: i32,
+
+    // ── Disk side state ──
+    pub select_disk: u8,
+    pub in_disk: u8,
+    pub disk_written: u8,
+    pub write_skip: u8,
+    pub disk_ptr: i32,
+    pub total_sides: i32,
+
+    // ── FDS registers ──
+    pub fds_regs: [u8; 6],
+}
+
+// ── FFI: Create / destroy ─────────────────────────────────────────
+
+/// Allocate and zero-initialise an `FdsRuntimeState`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_rust_fds_runtime_create() -> *mut FdsRuntimeState {
+    let state = Box::new(FdsRuntimeState {
+        control: 0,
+        filesize: 0,
+        block: 0,
+        blockstart: 0,
+        blocklen: 0,
+        diskaddr: 0,
+        diskaccess: 0,
+        irq_count: 0,
+        irq_latch: 0,
+        irq_a: 0,
+        disk_seek_irq: 0,
+        select_disk: 0,
+        in_disk: 255,
+        disk_written: 0,
+        write_skip: 0,
+        disk_ptr: 0,
+        total_sides: 0,
+        fds_regs: [0u8; 6],
+    });
+    Box::into_raw(state)
+}
+
+/// Free an `FdsRuntimeState`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_rust_fds_runtime_destroy(state: *mut FdsRuntimeState) {
+    if !state.is_null() {
+        unsafe { drop(Box::from_raw(state)); }
+    }
+}
+
+/// Reset the FDS runtime state for a fresh disk load.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_rust_fds_runtime_reset(state: *mut FdsRuntimeState) {
+    if state.is_null() { return; }
+    let s = unsafe { &mut *state };
+    s.control = 0;
+    s.filesize = 0;
+    s.block = 0;
+    s.blockstart = 0;
+    s.blocklen = 0;
+    s.diskaddr = 0;
+    s.diskaccess = 0;
+    s.irq_count = 0;
+    s.irq_latch = 0;
+    s.irq_a = 0;
+    s.disk_seek_irq = 0;
+    s.select_disk = 0;
+    s.in_disk = 255;
+    s.disk_written = 0;
+    s.write_skip = 0;
+    s.disk_ptr = 0;
+    s.fds_regs = [0u8; 6];
+}
+
+// ── FFI: Handle complete $4025 write ──────────────────────────────
+
+/// Handle a write to FDS register $4025.
+///
+/// This replaces the entire C++ FDSWrite `case 0x4025:` block.
+/// The caller (C++) must:
+/// 1. Store `value` in `FDSRegs[A & 7]` AFTER this call
+/// 2. If `action.irq_end_ext2`: call `X6502_IRQEnd(FCEU_IQEXT2)`
+/// 3. If `action.mirror_changed`: call `setmirror(action.mirror_mode)`
+///
+/// # Safety
+/// `state` and `action` must be valid.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_rust_fds_handle_write_4025(
+    state: *mut FdsRuntimeState,
+    value: u8,
+    action: *mut FceuFdsWrite4025Action,
+) {
+    if state.is_null() || action.is_null() {
+        return;
+    }
+    let s = unsafe { &mut *state };
+    let a = unsafe { &mut *action };
+
+    a.irq_end_ext2 = true;
+    a.mirror_mode = ((value >> 3) & 1) ^ 1;
+    a.mirror_changed = (s.control & 0x08) != (value & 0x08);
+    a.irq_begin_ext = false;
+    a.irq_end_ext = false;
+
+    let disk_inserted = s.in_disk != 255;
+
+    let motor_on = (value & 0x40) != 0;
+    let motor_on_edge = motor_on && (s.control & 0x40) == 0;
+    let transfer_reset = (value & 0x02) != 0;
+
+    if disk_inserted {
+        if motor_on_edge {
+            s.diskaccess = 0;
+            s.disk_seek_irq = 150;
+
+            s.blockstart = s.blockstart.wrapping_add(s.diskaddr);
+            s.diskaddr = 0;
+
+            let advanced = fceux11_rust_fds_block_advance_on_motor(s.block);
+            s.block = advanced;
+            s.blocklen = fceux11_rust_fds_block_size(advanced, s.filesize).max(0) as u16;
+        }
+        if transfer_reset {
+            s.block = 0; // DSK_INIT
+            s.blockstart = 0;
+            s.blocklen = 0;
+            s.diskaddr = 0;
+            s.disk_seek_irq = 150;
+        }
+        if motor_on {
+            s.disk_seek_irq = 150;
+        }
+    }
+
+    s.control = value;
+}
+
+// ── FFI: Handle writes to $4020-$4024 ─────────────────────────────
+
+/// Handle writes to FDS registers $4020–$4024.
+///
+/// Returns the new value for `FDSRegs[A & 7]` (usually `value`,
+/// except for $4023 which reads back 0xFF).
+///
+/// # Safety
+/// `state` must be valid.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_rust_fds_handle_write_4020_4024(
+    state: *mut FdsRuntimeState,
+    addr: u16,
+    value: u8,
+    action: *mut FceuFdsWrite4025Action,
+) -> u8 {
+    if state.is_null() {
+        return value;
+    }
+    let s = unsafe { &mut *state };
+
+    // Default action: no side effects
+    if !action.is_null() {
+        let a = unsafe { &mut *action };
+        a.irq_end_ext2 = false;
+        a.mirror_changed = false;
+        a.mirror_mode = 0;
+        a.irq_begin_ext = false;
+        a.irq_end_ext = false;
+    }
+
+    match addr {
+        0x4020 => {
+            s.irq_latch &= 0xFF00;
+            s.irq_latch |= value as i32;
+        }
+        0x4021 => {
+            s.irq_latch &= 0xFF;
+            s.irq_latch |= (value as i32) << 8;
+        }
+        0x4022 => {
+            if s.fds_regs[3] & 1 != 0 {
+                s.irq_a = value & 0x03;
+                if s.irq_a & 0x02 != 0 {
+                    s.irq_count = s.irq_latch;
+                } else {
+                    if !action.is_null() {
+                        let a = unsafe { &mut *action };
+                        a.irq_end_ext = true;
+                    }
+                }
+            }
+        }
+        0x4023 => {
+            if value & 0x01 == 0 {
+                s.irq_a &= !0x02;
+                if !action.is_null() {
+                    let a = unsafe { &mut *action };
+                    a.irq_end_ext = true;
+                    a.irq_end_ext2 = true;
+                }
+            }
+        }
+        0x4024 => {
+            // Disk write: the C++ side handles the actual disk byte
+            // write via fceux11_rust_fds_disk_write. Here we just
+            // handle the seek IRQ side effect that the C++ side
+            // expects to apply after disk_write returns.
+            // (No Rust-side state changes needed — everything is in
+            // fceux11_rust_fds_disk_write.)
+        }
+        _ => {}
+    }
+
+    value
+}
+
 // ------------------------------------------------------------------
-// Tests
+// Tests (existing)
 // ------------------------------------------------------------------
 
 #[cfg(test)]

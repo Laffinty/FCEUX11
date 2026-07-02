@@ -19,530 +19,89 @@
 */
 
 /// \file
-/// \brief implements a built-in NSF player.  This is a perk--not a part of the emu core
+/// \brief NSF player bridge layer — v1.10 Cryptex.
+/// Runtime handlers live in nsf_runtime.cpp; UI in nsf_ui.cpp; loader in nsf_load.cpp.
 
 #include "types.h"
 #include "utils/safe_string.h"
-#include "x6502.h"
 #include "fceu.h"
-#include "video.h"
-#include "sound.h"
 #include "nsf.h"
-#include "utils/general.h"
+#include "ines.h"
 #include "utils/memory.h"
 #include "file.h"
-#include "fds.h"
-#include "cart.h"
-#include "ines.h"
-#include "input.h"
-#include "state.h"
 #include "driver.h"
 #include "rust/fceux11_rust.h"
-#ifdef _S9XLUA_H
-#include "fceulua.h"
-#endif
-
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
 
 #include <cstdio>
 #include <cstdlib>
-#include <cstring>
-#include <cmath>
 
-static const int FIXED_EXWRAM_SIZE = 32768+8192;
+// ── Global configuration ─────────────────────────────────────────────────
+uint8 *NSFDATA = 0;
+int NSFMaxBank;
+int32 NSFSize;
+uint8 BSon;
+uint16 PlayAddr;
+uint16 InitAddr;
+uint16 LoadAddr;
+NSF_HEADER NSFHeader;
 
-static uint8 SongReload;
-static int32 CurrentSong;
+// ── Forward declarations from nsf_runtime.cpp ────────────────────────────
+extern void NSF_init(void);
+extern void DoNSFFrame(void);
+extern void nsf_allocate_exwram(void);
+extern void nsf_free_exwram(void);
+extern void nsf_runtime_create(void);
+extern void nsf_runtime_destroy(void);
+extern uint8 SongReload;
+extern int32 CurrentSong;
 
-static DECLFW(NSF_write);
-static DECLFR(NSF_read);
+// ── Forward declarations from nsf_ui.cpp ─────────────────────────────────
+extern void DrawNSF(uint8 *XBuf);
 
-static int vismode=1; //we cant consider this state, because the UI may be controlling it and wouldnt know we loadstated it
-
-//mbg 7/31/06 todo - no reason this couldnt be assembled on the fly from actual asm source code. thatd be less obscure.
-//here it is disassembled, for reference
-/*
-00:8000:8D F4 3F  STA $3FF4 = #$00
-00:8003:A2 FF     LDX #$FF
-00:8005:9A        TXS
-00:8006:AD F0 3F  LDA $3FF0 = #$00
-00:8009:F0 09     BEQ $8014
-00:800B:AD F1 3F  LDA $3FF1 = #$00
-00:800E:AE F3 3F  LDX $3FF3 = #$00
-00:8011:20 00 00  JSR $0000
-00:8014:A9 00     LDA #$00
-00:8016:AA        TAX
-00:8017:A8        TAY
-00:8018:20 00 00  JSR $0000
-00:801B:8D F5 EF  STA $EFF5 = #$FF
-00:801E:90 FE     BCC $801E
-00:8020:8D F3 3F  STA $3FF3 = #$00
-00:8023:18        CLC
-00:8024:90 FE     BCC $8024
-*/
-static uint8 NSFROM[0x30+6]=
-{
-	/* 0x00 - NMI */
-	0x8D,0xF4,0x3F,       /* Stop play routine NMIs. */
-	0xA2,0xFF,0x9A,       /* Initialize the stack pointer. */
-	0xAD,0xF0,0x3F,       /* See if we need to init. */
-	0xF0,0x09,            /* If 0, go to play routine playing. */
-
-	0xAD,0xF1,0x3F,       /* Confirm and load A      */
-	0xAE,0xF3,0x3F,       /* Load X with PAL/NTSC byte */
-
-	0x20,0x00,0x00,       /* JSR to init routine     */
-
-	0xA9,0x00,
-	0xAA,
-	0xA8,
-	0x20,0x00,0x00,       /* JSR to play routine  */
-	0x8D,0xF5,0x3F,        /* Start play routine NMIs. */
-	0x90,0xFE,             /* Loopie time. */
-
-	/* 0x20 */
-	0x8D,0xF3,0x3F,        /* Init init NMIs */
-	0x18,
-	0x90,0xFE        /* Loopie time. */
-};
-
-static DECLFR(NSFROMRead)
-{
-	return (NSFROM-0x3800)[A];
-}
-
-static uint8 doreset=0; //state
-static uint8 NSFNMIFlags; //state
-uint8 *NSFDATA=0; //configration, loaded from rom?
-int NSFMaxBank; //configuration
-
-static int32 NSFSize; //configuration
-static uint8 BSon; //configuration
-static uint8 BankCounter; //configuration
-
-static uint16 PlayAddr; //configuration
-static uint16 InitAddr; //configuration
-static uint16 LoadAddr; //configuration
-
-NSF_HEADER NSFHeader; //mbg merge 6/29/06 - needs to be global
-
+// ── Forward declarations for sound chip cleanup ──────────────────────────
 void NSFMMC5_Close(void);
-static uint8 *ExWRAM=0;
-static FceuMallocPtr ExWRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 
-void NSFGI(GI h)
-{
-	switch(h)
-	{
-		case GI_CLOSE:
-			if(NSFDATA) {free(NSFDATA);NSFDATA=0;}
-			if(ExWRAM) {free(ExWRAM);ExWRAM=0;}
-			if(NSFHeader.SoundChip&1) {
-				//   NSFVRC6_Init();
-			} else if(NSFHeader.SoundChip&2) {
-				//   NSFVRC7_Init();
-			} else if(NSFHeader.SoundChip&4) {
-				//   FDSSoundReset();
-			} else if(NSFHeader.SoundChip&8) {
-				NSFMMC5_Close();
-			} else if(NSFHeader.SoundChip&0x10) {
-				//   NSFN106_Init();
-			} else if(NSFHeader.SoundChip&0x20) {
-				//   NSFAY_Init();
-			}
+// ── Game interface (lifecycle) ───────────────────────────────────────────
+void NSFGI(GI h) {
+	switch (h) {
+	case GI_CLOSE:
+		nsf_runtime_destroy();
+		if (NSFDATA) { free(NSFDATA); NSFDATA = 0; }
+		nsf_free_exwram();
+		if (NSFHeader.SoundChip & 1) { /* NSFVRC6_Init(); */ }
+		else if (NSFHeader.SoundChip & 2) { /* NSFVRC7_Init(); */ }
+		else if (NSFHeader.SoundChip & 4) { /* FDSSoundReset(); */ }
+		else if (NSFHeader.SoundChip & 8) { NSFMMC5_Close(); }
+		else if (NSFHeader.SoundChip & 0x10) { /* NSFN106_Init(); */ }
+		else if (NSFHeader.SoundChip & 0x20) { /* NSFAY_Init(); */ }
 		break;
-		case GI_RESETM2:
-		case GI_POWER:
-			NSF_init();
-		break;
-		default:
-			//Unhandled cases
+	case GI_RESETM2:
+	case GI_POWER:
+		NSF_init();
 		break;
 	}
 }
 
-// First 32KB is reserved for sound chip emulation in the iNES mapper code.
-
-static INLINE void BANKSET(uint32 A, uint32 bank)
-{
-	bank&=NSFMaxBank;
-	if(NSFHeader.SoundChip&4)
-		memcpy(ExWRAM+(A-0x6000),NSFDATA+(bank<<12),4096);
-	else
-		setprg4(A,bank);
-}
-
-// v1.10 Cryptex: NSFLoad is now a thin wrapper around NSFLoadCore (nsf_load.cpp)
+// ── NSFLoad (thin wrapper around NSFLoadCore in nsf_load.cpp) ────────────
 extern int NSFLoadCore(const char *name, FCEUFILE *fp);
 
-int NSFLoad(const char *name, FCEUFILE *fp)
-{
+int NSFLoad(const char *name, FCEUFILE *fp) {
 	FCEU_fseek(fp, 0, SEEK_SET);
-
 	int result = NSFLoadCore(name, fp);
 	if (result != LOADER_OK) return result;
 
-	// Post-load setup
 	GameInterface = NSFGI;
 	FCEU_strlcpy(LoadedRomFName, sizeof(LoadedRomFName), name);
-
-	// Allocate extended WRAM
-	int exwram_size = FIXED_EXWRAM_SIZE;
-	ExWRAM_owner = FCEU_gmalloc_unique(exwram_size);
-	ExWRAM = ExWRAM_owner.get();
-
+	nsf_allocate_exwram();
+	nsf_runtime_create();
 	return LOADER_OK;
 }
 
-static DECLFR(NSFVectorRead)
-{
-	if(((NSFNMIFlags&1) && SongReload) || (NSFNMIFlags&2) || doreset)
-	{
-		if(A==0xFFFA) return(0x00);
-		else if(A==0xFFFB) return(0x38);
-		else if(A==0xFFFC) return(0x20);
-		else if(A==0xFFFD) {doreset=0;return(0x38);}
-		return(g_cpu.native_layout().DB);
-	}
-	else
-		return(CartBR(A));
+// ── Thin wrappers (Rust FFI) ─────────────────────────────────────────────
+int fceu11::NSFChange(int amount) {
+	return fceux11_rust_nsf_change_song(::CurrentSong, amount, NSFHeader.TotalSongs, &::SongReload);
 }
 
-void NSFVRC6_Init(void);
-void NSFVRC7_Init(void);
-void NSFMMC5_Init(void);
-void NSFN106_Init(void);
-void NSFAY_Init(void);
-
-//zero 17-apr-2013 - added
-static SFORMAT StateRegs[] = {
-	{&SongReload, 1, "SREL"},
-	{&CurrentSong, 4 | FCEUSTATE_RLSB, "CURS"},
-	{&doreset, 1, "DORE"},
-	{&NSFNMIFlags, 1, "NMIF"},
-	{ 0 }
-};
-
-void NSF_init(void)
-{
-	doreset=1;
-
-	ResetCartMapping();
-	if(NSFHeader.SoundChip&4)
-	{
-		SetupCartPRGMapping(0,ExWRAM,32768+8192,1);
-		setprg32(0x6000,0);
-		setprg8(0xE000,4);
-		memset(ExWRAM,0x00,32768+8192);
-		SetWriteHandler(0x6000,0xDFFF,CartBW);
-		SetReadHandler(0x6000,0xFFFF,CartBR);
-	}
-	else
-	{
-		memset(ExWRAM,0x00,8192);
-		SetReadHandler(0x6000,0x7FFF,CartBR);
-		SetWriteHandler(0x6000,0x7FFF,CartBW);
-		SetupCartPRGMapping(0,NSFDATA,((NSFMaxBank+1)*4096),0);
-		SetupCartPRGMapping(1,ExWRAM,8192,1);
-		setprg8r(1,0x6000,0);
-		SetReadHandler(0x8000,0xFFFF,CartBR);
-	}
-
-	if(BSon)
-	{
-		int32 x;
-		for(x=0;x<8;x++)
-		{
-			if(NSFHeader.SoundChip&4 && x>=6)
-				BANKSET(0x6000+(x-6)*4096,NSFHeader.BankSwitch[x]);
-			BANKSET(0x8000+x*4096,NSFHeader.BankSwitch[x]);
-		}
-	}
-	else
-	{
-		int32 x;
-		for(x=(LoadAddr&0xF000);x<0x10000;x+=0x1000)
-			BANKSET(x,((x-(LoadAddr&0x7000))>>12));
-	}
-
-	SetReadHandler(0xFFFA,0xFFFD,NSFVectorRead);
-
-	SetWriteHandler(0x2000,0x3fff,0);
-	SetReadHandler(0x2000,0x37ff,0);
-	SetReadHandler(0x3836,0x3FFF,0);
-	SetReadHandler(0x3800,0x3835,NSFROMRead);
-
-	SetWriteHandler(0x5ff6,0x5fff,NSF_write);
-
-	SetWriteHandler(0x3ff0,0x3fff,NSF_write);
-	SetReadHandler(0x3ff0,0x3fff,NSF_read);
-
-
-	if(NSFHeader.SoundChip&1) {
-		NSFVRC6_Init();
-	} else if(NSFHeader.SoundChip&2) {
-		NSFVRC7_Init();
-	} else if(NSFHeader.SoundChip&4) {
-		FDSSoundReset();
-	} else if(NSFHeader.SoundChip&8) {
-		NSFMMC5_Init();
-	} else if(NSFHeader.SoundChip&0x10) {
-		NSFN106_Init();
-	} else if(NSFHeader.SoundChip&0x20) {
-		NSFAY_Init();
-	}
-	CurrentSong=NSFHeader.StartingSong;
-	SongReload=0xFF;
-	NSFNMIFlags=0;
-
-	//zero 17-apr-2013 - added
-	AddExState(StateRegs, ~0, 0, 0);
-	AddExState(ExWRAM, FIXED_EXWRAM_SIZE, 0, "ERAM");
-}
-
-static DECLFW(NSF_write)
-{
-	switch(A)
-	{
-	case 0x3FF3:NSFNMIFlags|=1;break;
-	case 0x3FF4:NSFNMIFlags&=~2;break;
-	case 0x3FF5:NSFNMIFlags|=2;break;
-
-	case 0x5FF6:
-	case 0x5FF7:if(!(NSFHeader.SoundChip&4)) return;
-	case 0x5FF8:
-	case 0x5FF9:
-	case 0x5FFA:
-	case 0x5FFB:
-	case 0x5FFC:
-	case 0x5FFD:
-	case 0x5FFE:
-	case 0x5FFF:if(!BSon) return;
-		A&=0xF;
-		BANKSET((A*4096),V);
-		break;
-	}
-}
-
-static DECLFR(NSF_read)
-{
-	int x;
-
-	switch(A)
-	{
-	case 0x3ff0:x=SongReload;
-		if(!fceuindbg)
-			SongReload=0;
-		return x;
-	case 0x3ff1:
-		if(!fceuindbg)
-		{
-			memset(RAM,0x00,0x800);
-
-			fceu11::g_bus.write(0x4015, 0x0);
-			for(x=0;x<0x14;x++)
-				fceu11::g_bus.write(static_cast<uint16_t>(0x4000+x), 0);
-			fceu11::g_bus.write(0x4015, 0xF);
-
-			if(NSFHeader.SoundChip&4)
-			{
-				fceu11::g_bus.write(0x4017, 0xC0);  /* FDS BIOS writes $C0 */
-				fceu11::g_bus.write(0x4089, 0x80);
-				fceu11::g_bus.write(0x408A, 0xE8);
-			}
-			else
-			{
-				memset(ExWRAM,0x00,8192);
-				fceu11::g_bus.write(0x4017, 0xC0);
-				fceu11::g_bus.write(0x4017, 0xC0);
-				fceu11::g_bus.write(0x4017, 0x40);
-			}
-
-			if(BSon)
-			{
-				for(x=0;x<8;x++)
-					BANKSET(0x8000+x*4096,NSFHeader.BankSwitch[x]);
-			}
-			#ifdef _S9XLUA_H
-			//CallRegisteredLuaMemHook(A, 1, V, LUAMEMHOOK_WRITE); FIXME
-			#endif
-			return (CurrentSong-1);
-		}
-	case 0x3FF3:return PAL;
-	}
-	return 0;
-}
-
-uint8 FCEU_GetJoyJoy(void);
-
-static int special=0;
-
-void DrawNSF(uint8 *XBuf)
-{
-	char snbuf[16];
-	int x;
-
-	if(vismode==0) return;
-
-	memset(XBuf,0,256*240);
-	memset(XDBuf,0,256*240);
-
-
-	{
-		int32 *Bufpl;
-		int32 mul=0;
-
-		int l;
-		l=GetSoundBuffer(&Bufpl);
-
-		if(special==0)
-		{
-			if(FSettings.SoundVolume)
-				mul=8192*240/(16384*FSettings.SoundVolume/50);
-			for(x=0;x<256;x++)
-			{
-				uint32 y;
-				y=142+((Bufpl[(x*l)>>8]*mul)>>14);
-				if(y<240)
-					XBuf[x+y*256]=3;
-			}
-		}
-		else if(special==1)
-		{
-			if(FSettings.SoundVolume)
-				mul=8192*240/(8192*FSettings.SoundVolume/50);
-			for(x=0;x<256;x++)
-			{
-				double r;
-				uint32 xp,yp;
-
-				r=(Bufpl[(x*l)>>8]*mul)>>14;
-				xp=128+r*cos(x*M_PI*2/256);
-				yp=120+r*sin(x*M_PI*2/256);
-				xp&=255;
-				yp%=240;
-				XBuf[xp+yp*256]=3;
-			}
-		}
-		else if(special==2)
-		{
-			static double theta=0;
-			if(FSettings.SoundVolume)
-				mul=8192*240/(16384*FSettings.SoundVolume/50);
-			for(x=0;x<128;x++)
-			{
-				double xc,yc;
-				double r,t;
-				uint32 m,n;
-
-				xc=(double)128-x;
-				yc=0-((double)( ((Bufpl[(x*l)>>8]) *mul)>>14));
-				t=M_PI+atan(yc/xc);
-				r=sqrt(xc*xc+yc*yc);
-
-				t+=theta;
-				m=128+r*cos(t);
-				n=120+r*sin(t);
-
-				if(m<256 && n<240)
-					XBuf[m+n*256]=3;
-
-			}
-			for(x=128;x<256;x++)
-			{
-				double xc,yc;
-				double r,t;
-				uint32 m,n;
-
-				xc=(double)x-128;
-				yc=(double)((Bufpl[(x*l)>>8]*mul)>>14);
-				t=atan(yc/xc);
-				r=sqrt(xc*xc+yc*yc);
-
-				t+=theta;
-				m=128+r*cos(t);
-				n=120+r*sin(t);
-
-				if(m<256 && n<240)
-					XBuf[m+n*256]=3;
-
-			}
-			theta+=(double)M_PI/256;
-		}
-	}
-
-	static const int kFgColor = 1;
-	DrawTextTrans(ClipSidesOffset+XBuf+10*256+4+(((31-strlen((char*)NSFHeader.SongName))<<2)), 256, NSFHeader.SongName, kFgColor);
-	DrawTextTrans(ClipSidesOffset+XBuf+26*256+4+(((31-strlen((char*)NSFHeader.Artist))<<2)), 256,NSFHeader.Artist, kFgColor);
-	DrawTextTrans(ClipSidesOffset+XBuf+42*256+4+(((31-strlen((char*)NSFHeader.Copyright))<<2)), 256,NSFHeader.Copyright, kFgColor);
-
-	DrawTextTrans(ClipSidesOffset+XBuf+70*256+4+(((31-strlen("Song:"))<<2)), 256, (uint8*)"Song:", kFgColor);
-	snprintf( snbuf, sizeof(snbuf),"<%d/%d>",CurrentSong,NSFHeader.TotalSongs);
-	DrawTextTrans(XBuf+82*256+4+(((31-strlen(snbuf))<<2)), 256, (uint8*)snbuf, kFgColor);
-
-	{
-		static uint8 last=0;
-		uint8 tmp;
-		tmp=FCEU_GetJoyJoy();
-		if((tmp&JOY_RIGHT) && !(last&JOY_RIGHT))
-		{
-			if(CurrentSong<NSFHeader.TotalSongs)
-			{
-				CurrentSong++;
-				SongReload=0xFF;
-			}
-		}
-		else if((tmp&JOY_LEFT) && !(last&JOY_LEFT))
-		{
-			if(CurrentSong>1)
-			{
-				CurrentSong--;
-				SongReload=0xFF;
-			}
-		}
-		else if((tmp&JOY_UP) && !(last&JOY_UP))
-		{
-			CurrentSong+=10;
-			if(CurrentSong>NSFHeader.TotalSongs) CurrentSong=NSFHeader.TotalSongs;
-			SongReload=0xFF;
-		}
-		else if((tmp&JOY_DOWN) && !(last&JOY_DOWN))
-		{
-			CurrentSong-=10;
-			if(CurrentSong<1) CurrentSong=1;
-			SongReload=0xFF;
-		}
-		else if((tmp&JOY_START) && !(last&JOY_START))
-			SongReload=0xFF;
-		else if((tmp&JOY_A) && !(last&JOY_A))
-		{
-			special=(special+1)%3;
-		}
-		last=tmp;
-	}
-}
-
-void DoNSFFrame(void)
-{
-	if(((NSFNMIFlags&1) && SongReload) || (NSFNMIFlags&2))
-		TriggerNMI();
-}
-
-void fceu11::NSFSetVis(int mode)
-{
-	vismode=mode;
-}
-
-int fceu11::NSFChange(int amount)
-{
-	CurrentSong = fceux11_rust_nsf_change_song(CurrentSong, amount, NSFHeader.TotalSongs, &SongReload);
-	return CurrentSong;
-}
-
-//Returns total songs
-int fceu11::NSFGetInfo(uint8 *name, uint8 *artist, uint8 *copyright, int maxlen)
-{
+int fceu11::NSFGetInfo(uint8 *name, uint8 *artist, uint8 *copyright, int maxlen) {
 	return fceux11_rust_nsf_get_info((FceuNsfHeader*)&NSFHeader, name, artist, copyright, maxlen);
 }

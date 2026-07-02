@@ -1,5 +1,6 @@
 // UNIF load helper — extracted from unif.cpp for v1.10 Cryptex Phase B.1.
-// Contains the core UNIFLoad logic using Rust FFI, called from the thin wrapper in unif.cpp.
+// Contains the core UNIFLoad logic using Rust FFI, board initialization,
+// and cleanup helpers — all moved from unif.cpp to keep the bridge < 100 lines.
 
 #include "types.h"
 #include "utils/safe_string.h"
@@ -17,25 +18,87 @@
 #include <cstdlib>
 #include <cstring>
 
-// Forward declarations for globals defined in unif.cpp
+// Type definitions (mirrored in unif.cpp for the bridge layer)
+typedef struct {
+	const char *name;
+	void (*init)(CartInfo *);
+} BMAPPING;
+
+// Board flags (mirrored from Rust unif.rs for C++ bridge use)
+#define BMCFLAG_FORCE4    0x01
+
+#include "unif_bmap.h"
+
+// ── Local globals ───────────────────────────────────────────────────────────
+static int mirrortodo;
+static uint8 *boardname;
+static uint8 *sboardname;
+static uint32 CHRRAMSize;
+static uint8 *malloced[32];
+static uint32 mallocedsizes[32];
+static uint8 exntar[2048];
+
+// ── Externs from unif.cpp ───────────────────────────────────────────────────
 extern uint8 *UNIFchrrama;
 extern uint8 *ROM;
 extern uint8 *VROM;
+extern CartInfo UNIFCart;
 
-// Forward declarations for functions in unif.cpp
-extern void FreeUNIF(void);
-extern void ResetUNIF(void);
-extern void MooMirroring(void);
-extern int InitializeBoard(void);
+// ── Cleanup & lifecycle ─────────────────────────────────────────────────────
 
-// Main UNIF load logic — called from thin wrapper in unif.cpp
+void FreeUNIF(void) {
+	if (UNIFchrrama) { free(UNIFchrrama); UNIFchrrama = 0; }
+	if (boardname) { free(boardname); boardname = 0; }
+	for (int x = 0; x < 32; x++)
+		if (malloced[x]) { free(malloced[x]); malloced[x] = 0; }
+}
+
+void ResetUNIF(void) {
+	for (int x = 0; x < 32; x++) malloced[x] = 0;
+	boardname = 0; mirrortodo = 0;
+	UNIFCart.clear(); UNIFchrrama = 0;
+}
+
+void MooMirroring(void) {
+	if (mirrortodo < 0x4) SetupCartMirroring(mirrortodo, 1, 0);
+	else if (mirrortodo == 0x4) {
+		FCEU_MemoryRand(exntar, sizeof(exntar), true);
+		SetupCartMirroring(4, 1, exntar);
+		AddExState(exntar, 2048, 0, "EXNR");
+	} else SetupCartMirroring(0, 0, 0);
+}
+
+int InitializeBoard(void) {
+	if (!sboardname) return 0;
+	int x = 0;
+	while (bmap[x].name) {
+		if (!strcmp((char*)sboardname, (char*)bmap[x].name)) {
+			int flags = fceux11_rust_unif_board_flags((const char*)sboardname);
+			if (flags < 0) return 1;
+			if (!malloced[16]) {
+				CHRRAMSize = fceux11_rust_unif_chrram_size(flags);
+				if ((UNIFchrrama = (uint8*)FCEU_malloc(CHRRAMSize))) {
+					SetupCartCHRMapping(0, UNIFchrrama, CHRRAMSize, 1);
+					AddExState(UNIFchrrama, CHRRAMSize, 0, "CHRR");
+				} else return 2;
+			}
+			if (flags & BMCFLAG_FORCE4) mirrortodo = 4;
+			MooMirroring();
+			bmap[x].init(&UNIFCart);
+			return 0;
+		}
+		x++;
+	}
+	return 1;
+}
+
+// ── Core UNIF load ──────────────────────────────────────────────────────────
+
 int UNIFLoadCore(const char *name, FCEUFILE *fp, CartInfo& UNIFCart) {
-	// Read entire file into memory
 	EMUFILE_MEMORY* ms = fp->EnsureMemorystream();
-	const uint8_t* file_data = ms->buf();
+	const uint8_t* file_data = reinterpret_cast<const uint8_t*>(ms->buf());
 	size_t file_size = ms->size();
 
-	// Parse via Rust FFI
 	FceuUnifCartResult cart;
 	if (!fceux11_rust_unif_load(file_data, file_size, &cart))
 		return LOADER_INVALID_FORMAT;
@@ -44,7 +107,6 @@ int UNIFLoadCore(const char *name, FCEUFILE *fp, CartInfo& UNIFCart) {
 	ResetExState(0, 0);
 	ResetUNIF();
 
-	// Copy PRG banks to emulator-owned memory
 	for (int i = 0; i < 32; i++) {
 		if (cart.prg[i].data && cart.prg[i].size > 0) {
 			uint32 t = fceux11_rust_uppow2(cart.prg[i].size);
@@ -57,7 +119,6 @@ int UNIFLoadCore(const char *name, FCEUFILE *fp, CartInfo& UNIFCart) {
 		}
 	}
 
-	// Copy CHR banks to emulator-owned memory
 	for (int i = 0; i < 32; i++) {
 		if (cart.chr[i].data && cart.chr[i].size > 0) {
 			uint32 t = fceux11_rust_uppow2(cart.chr[i].size);
@@ -70,11 +131,7 @@ int UNIFLoadCore(const char *name, FCEUFILE *fp, CartInfo& UNIFCart) {
 		}
 	}
 
-	// Set board name
 	if (cart.board_name && cart.board_name_len > 0) {
-		// Store board name for InitializeBoard
-		extern uint8 *boardname;
-		extern uint8 *sboardname;
 		boardname = (uint8*)FCEU_malloc(cart.board_name_len + 1);
 		if (boardname) {
 			memcpy(boardname, cart.board_name, cart.board_name_len);
@@ -87,15 +144,11 @@ int UNIFLoadCore(const char *name, FCEUFILE *fp, CartInfo& UNIFCart) {
 		}
 	}
 
-	// Set mirroring
-	extern int mirrortodo;
 	mirrortodo = cart.mirroring;
 	MooMirroring();
 
-	// Set battery
 	UNIFCart.battery = cart.battery ? 1 : 0;
 
-	// Set TV system
 	if (cart.tv_system == 0) {
 		GameInfo->vidsys = GIV_NTSC;
 		fceu11::SetVidSystem(0);
@@ -104,7 +157,6 @@ int UNIFLoadCore(const char *name, FCEUFILE *fp, CartInfo& UNIFCart) {
 		fceu11::SetVidSystem(1);
 	}
 
-	// Compute MD5
 	memcpy(UNIFCart.MD5, cart.md5, 16);
 	memcpy(&GameInfo->MD5, cart.md5, 16);
 
@@ -113,7 +165,6 @@ int UNIFLoadCore(const char *name, FCEUFILE *fp, CartInfo& UNIFCart) {
 		FCEU_printf("%02x", UNIFCart.MD5[x]);
 	FCEU_printf("\n");
 
-	// Initialize board (mapper)
 	int result = InitializeBoard();
 	if (result != 0) {
 		if (result == 1) FCEU_PrintError("UNIF mapper is not supported at all.");

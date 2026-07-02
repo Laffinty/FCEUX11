@@ -8,15 +8,34 @@
 
 #include "types.h"
 #include "utils/safe_string.h"
+#include "utils/memory.h"
 #include "fceu.h"
 #include "cart.h"
 #include "apu.h"
 #include "ines.h"
+#include "unif.h"
 #include "file.h"
 #include "driver.h"
 #include "vsuni.h"
 
 #include <cstring>
+
+#include "ines_bmap.h"
+
+// sMasterRomInfo — ROM-specific parameter overrides
+static const TMasterRomInfo sMasterRomInfo[] = {
+	{ 0x62b51b108a01d2beULL, "bonus=0" },
+	{ 0x8bb48490d8d22711ULL, "bonus=0" },
+	{ 0xc75888d7b48cd378ULL, "bonus=0" },
+	{ 0xf81a376fa54fdd69ULL, "bonus=0" },
+	{ 0xa37eb9163e001a46ULL, "bonus=0" },
+	{ 0xde5ce25860233f7eULL, "bonus=0" },
+	{ 0x5b3aa4cdc484a088ULL, "bonus=0" },
+	{ 0x9342bf9bae1c798aULL, "bonus=0" },
+	{ 0x164eea6097a1e313ULL, "busc=1" },
+};
+const TMasterRomInfo* MasterRomInfo;
+TMasterRomInfoParams MasterRomInfoParams;
 
 // Global variables (extern-declared in ines.h)
 uint8 *trainerpoo = NULL;
@@ -40,12 +59,13 @@ uint32 iNESGameCRC32 = 0;
 
 // v1.10 Cryptex: iNESLoad is now a thin wrapper around iNESLoadCore (ines_load.cpp)
 extern int iNESLoadCore(const char *name, FCEUFILE *fp, CartInfo& iNESCart, FceuMallocPtr& trainerpoo_owner, FceuMallocPtr& ExtraNTARAM_owner);
+extern void iNESGI(GI h);
 
 int iNESLoad(const char *name, FCEUFILE *fp, int OverwriteVidMode) {
 	int result = iNESLoadCore(name, fp, iNESCart, trainerpoo_owner, ExtraNTARAM_owner);
 	if (result != LOADER_OK) return result;
 
-	int MapperNo = iNESCart.mapper_number();
+	int MapperNo = iNESCart.mapper_number;
 	FCEU_strlcpy(LoadedRomFName, sizeof(LoadedRomFName), name);
 	const char* basename = strrchr(name, '/') ? strrchr(name, '/') + 1 : strrchr(name, '\\') ? strrchr(name, '\\') + 1 : name;
 

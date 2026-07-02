@@ -16,13 +16,13 @@
 
 // Forward declarations for globals defined in nsf.cpp
 extern uint8 *NSFDATA;
-extern uint32 NSFSize;
-extern uint32 NSFMaxBank;
+extern int32 NSFSize;
+extern int NSFMaxBank;
 extern uint8 BSon;
 extern uint16 LoadAddr;
 extern uint16 InitAddr;
 extern uint16 PlayAddr;
-extern uint8 NSFHeader[0x80];
+extern NSF_HEADER NSFHeader;
 
 // Forward declaration for NSFROM patch
 extern uint8 NSFROM[0x30+6];
@@ -31,7 +31,7 @@ extern uint8 NSFROM[0x30+6];
 int NSFLoadCore(const char *name, FCEUFILE *fp) {
 	// Read entire file into memory
 	EMUFILE_MEMORY* ms = fp->EnsureMemorystream();
-	const uint8_t* file_data = ms->buf();
+	const uint8_t* file_data = reinterpret_cast<const uint8_t*>(ms->buf());
 	size_t file_size = ms->size();
 
 	// Parse via Rust FFI
@@ -40,7 +40,7 @@ int NSFLoadCore(const char *name, FCEUFILE *fp) {
 		return LOADER_INVALID_FORMAT;
 
 	// Store header for later use
-	memcpy(NSFHeader, file_data, 0x80);
+	memcpy(&NSFHeader, file_data, 0x80);
 
 	// Set global variables
 	LoadAddr = cart.load_addr;
@@ -85,7 +85,7 @@ int NSFLoadCore(const char *name, FCEUFILE *fp) {
 		if (chip_name) {
 			FCEU_printf(" Expansion hardware:  %s\n", chip_name);
 			// Update sound_chip in header
-			NSFHeader[0x7B] = chip_mask;
+			NSFHeader.SoundChip = chip_mask;
 		}
 	}
 
