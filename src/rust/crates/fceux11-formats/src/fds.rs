@@ -909,6 +909,62 @@ pub unsafe extern "C" fn fceux11_rust_fds_handle_write_4020_4024(
     value
 }
 
+// ── FFI: Bulk disk-data operations ─────────────────────────────────
+
+/// XOR all disk sides: `diskdata[x] ^= diskdatao[x]` for `x` in `0..total_sides`.
+///
+/// Used by `PreSave`, `PostSave`, and `FDSStateRestore` to replace
+/// three separate C++ for-loops with a single FFI call.
+///
+/// Null-safe: skips null `diskdata[x]` or `diskdatao[x]` entries.
+///
+/// # Safety
+/// `diskdata` and `diskdatao` must each point to `total_sides`
+/// readable/writable pointers (or be null when `total_sides == 0`).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_rust_fds_xor_all_sides(
+    diskdata: *mut *mut u8,
+    diskdatao: *mut *mut u8,
+    total_sides: i32,
+) {
+    for x in 0..total_sides as usize {
+        unsafe {
+            let d = *diskdata.add(x);
+            let o = *diskdatao.add(x);
+            if !d.is_null() && !o.is_null() {
+                fceux11_rust_fds_xor_disk_data(d, o);
+            }
+        }
+    }
+}
+
+/// Free all disk side buffers: `free(diskdata[x])` + null out.
+///
+/// Uses the C-standard `free()` which matches the `FCEU_malloc`/`malloc`
+/// allocator used to allocate disk side buffers in C++.
+///
+/// # Safety
+/// `diskdata` must point to `total_sides` writable pointer slots.
+/// Each non-null pointer must have been allocated by the C allocator.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_rust_fds_free_disk_sides(
+    diskdata: *mut *mut u8,
+    total_sides: i32,
+) {
+    unsafe extern "C" {
+        fn free(ptr: *mut core::ffi::c_void);
+    }
+    for x in 0..total_sides as usize {
+        unsafe {
+            let slot = diskdata.add(x);
+            if !(*slot).is_null() {
+                free(*slot as *mut core::ffi::c_void);
+                *slot = std::ptr::null_mut();
+            }
+        }
+    }
+}
+
 // ------------------------------------------------------------------
 // Tests (existing)
 // ------------------------------------------------------------------

@@ -2076,6 +2076,32 @@ uint8_t fceux11_rust_fds_handle_write_4020_4024(struct FdsRuntimeState *state,
                                                 struct FceuFdsWrite4025Action *action);
 
 /**
+ * XOR all disk sides: `diskdata[x] ^= diskdatao[x]` for `x` in `0..total_sides`.
+ *
+ * Used by `PreSave`, `PostSave`, and `FDSStateRestore` to replace
+ * three separate C++ for-loops with a single FFI call.
+ *
+ * Null-safe: skips null `diskdata[x]` or `diskdatao[x]` entries.
+ *
+ * # Safety
+ * `diskdata` and `diskdatao` must each point to `total_sides`
+ * readable/writable pointers (or be null when `total_sides == 0`).
+ */
+void fceux11_rust_fds_xor_all_sides(uint8_t **diskdata, uint8_t **diskdatao, int32_t total_sides);
+
+/**
+ * Free all disk side buffers: `free(diskdata[x])` + null out.
+ *
+ * Uses the C-standard `free()` which matches the `FCEU_malloc`/`malloc`
+ * allocator used to allocate disk side buffers in C++.
+ *
+ * # Safety
+ * `diskdata` must point to `total_sides` writable pointer slots.
+ * Each non-null pointer must have been allocated by the C allocator.
+ */
+void fceux11_rust_fds_free_disk_sides(uint8_t **diskdata, int32_t total_sides);
+
+/**
  * Clean garbage signatures out of an iNES header.
  * `header_bytes` must point to at least 16 writable bytes.
  * # Safety

@@ -27,12 +27,6 @@
 
 #include "cart.h"
 
-struct TMasterRomInfo
-{
-	uint64 md5lower;
-	const char* params;
-};
-
 class TMasterRomInfoParams : public std::map<std::string,std::string>
 {
 public:
@@ -51,7 +45,6 @@ extern int iNesSaveAs(const char* name);
 extern char LoadedRomFName[4096]; //bbit Edited: line added
 extern char LoadedRomFNamePatchToUse[4096];
 extern char *iNesShortFName(void);
-extern const TMasterRomInfo* MasterRomInfo;
 extern TMasterRomInfoParams MasterRomInfoParams;
 
 //mbg merge 7/19/06 changed to c++ decl format

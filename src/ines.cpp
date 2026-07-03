@@ -22,19 +22,6 @@
 
 #include "ines_bmap.h"
 
-// sMasterRomInfo — ROM-specific parameter overrides
-static const TMasterRomInfo sMasterRomInfo[] = {
-	{ 0x62b51b108a01d2beULL, "bonus=0" },
-	{ 0x8bb48490d8d22711ULL, "bonus=0" },
-	{ 0xc75888d7b48cd378ULL, "bonus=0" },
-	{ 0xf81a376fa54fdd69ULL, "bonus=0" },
-	{ 0xa37eb9163e001a46ULL, "bonus=0" },
-	{ 0xde5ce25860233f7eULL, "bonus=0" },
-	{ 0x5b3aa4cdc484a088ULL, "bonus=0" },
-	{ 0x9342bf9bae1c798aULL, "bonus=0" },
-	{ 0x164eea6097a1e313ULL, "busc=1" },
-};
-const TMasterRomInfo* MasterRomInfo;
 TMasterRomInfoParams MasterRomInfoParams;
 
 // Global variables (extern-declared in ines.h)

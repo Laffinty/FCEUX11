@@ -42,17 +42,29 @@ of ROM format parsing (iNES/UNIF/NSF/FDS/VS UniSystem) to Rust
 ### Changed
 
 - **Version**: 1.9 → 1.10
-- **`src/ines.cpp`** — Refactored to thin bridge layer. Lines: 983 → 83 (91% reduction).
-- **`src/unif.cpp`** — Refactored to thin bridge layer. Lines: 669 → 150 (78% reduction).
-- **`src/nsf.cpp`** — NSFLoad refactored to use Rust FFI. Lines: 612 → 548 (10% reduction).
-- **`src/fds.cpp`** — FDSRead4031 and FDSWrite $4024 refactored to use Rust FFI.
-- **`src/vsuni.cpp`** — FCEU_VSUniCheck refactored to use Rust FFI.
+- **`src/ines.cpp`** — Refactored to thin bridge layer. Lines: 983 → 90 (91% reduction).
+- **`src/unif.cpp`** — Refactored to thin bridge layer. Lines: 669 → 72 (89% reduction).
+- **`src/nsf.cpp`** — NSF runtime migrated to Rust (NsfRuntimeState + 10 runtime FFI). Lines: 612 → 107 (83% reduction).
+- **`src/fds.cpp`** — FDS runtime migrated to Rust (FdsRuntimeState + handle_write_402x FFI). Lines: 905 → 315 (65% reduction).
+- **`src/vsuni.cpp`** — FCEU_VSUniCheck refactored to use Rust FFI. Lines: 278 → 119 (57% reduction).
 - **`src/rust/fceux11_rust.h`** — FFI header updated with new structs and functions.
+- **`src/fds_sound.cpp`** — Extracted FDSSound DSP from fds.cpp (225 lines).
 
 ### Removed
 
 - **`src/ines.cpp`** — Removed `CheckHInfo()`, `sMasterRomInfo[]`, `CRCMATCH` (dead code).
+- **`src/ines.h`** — Removed dead `TMasterRomInfo` struct and `MasterRomInfo` extern.
 - **`src/unif.cpp`** — Removed chunk processing functions (moved to Rust FFI).
+
+### Fixed
+
+- **`src/fds.cpp`** — Fixed `FDSClose()` null-pointer dereference: the `DiskWritten`
+  macro (`g_fds_state->disk_written`) was evaluated after
+  `fceux11_rust_fds_runtime_destroy(g_fds_state)` set `g_fds_state` to nullptr,
+  causing a SEGFAULT in `golden_savestate_test` FDS teardown. Now captures
+  `was_written` in a local variable before destroying the runtime state.
+- **`tests/core/fds_load_test.cpp`** — Added FDS runtime + Bad ROM detection test
+  (46 assertions: header/XOR/IRQ/side-switch/block-FSM/read-regs/write4025/Bad-ROM).
 
 ## [1.9] - 2026-07-01
 
