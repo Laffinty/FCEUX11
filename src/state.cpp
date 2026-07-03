@@ -295,7 +295,6 @@ static bool ReadStateChunkFromBuffer(const uint8_t* data, int size, SFORMAT *sf)
 
 static int read_sfcpuc=0, read_snd=0;
 
-void FCEUD_BlitScreen(uint8 *XBuf); //mbg merge 7/17/06 YUCKY had to add
 void UpdateFCEUWindow(void);  //mbg merge 7/17/06 YUCKY had to add
 int CurrentState=0;
 extern int geniestage;

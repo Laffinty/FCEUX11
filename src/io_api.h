@@ -262,6 +262,5 @@ void FCEUD_SaveStateAs(void);
 void FCEUD_LoadStateFrom(void);
 void FCEUD_MovieRecordTo(void);
 void FCEUD_MovieReplayFrom(void);
-void FCEUD_LuaRunFrom(void);
 
 #endif //__FCEU_IO_API_H_

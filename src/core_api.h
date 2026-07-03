@@ -191,9 +191,7 @@ inline void  FCEUI_FDSSelect() { fceu11::FDSSelect(); }
 inline int   FCEUI_DatachSet(uint8 *rcode) { return fceu11::DatachSet(rcode); }
 
 #ifdef FRAMESKIP
-/* Should be called from FCEUD_BlitScreen(). Specifies how many frames
-   to skip until FCEUD_BlitScreen() is called. FCEUD_BlitScreenDummy()
-   will be called instead of FCEUD_BlitScreen() when a frame is skipped. */
+/* Specifies how many frames to skip until the next frame is rendered. */
 void FCEUI_FrameSkip(int x);
 #endif
 
@@ -254,12 +252,6 @@ void FCEUD_TurboToggle(void);
 int  FCEUD_ShowStatusIcon(void);
 void FCEUD_ToggleStatusIcon(void);
 void FCEUD_HideMenuToggle(void);
-
-/// signals the driver to perform a file open GUI operation
-void FCEUD_CmdOpen(void);
-
-/// called when the emulator closes a game
-void FCEUD_OnCloseGame(void);
 
 // Debugger hook surface — the driver wires these to the UI's
 // breakpoint / trace / nametable viewers.
