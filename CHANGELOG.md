@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **Codename: Cryptex.** Tenth sub-version of the v1.x modernization
 cycle per `docs/v1.x_Modernization_Roadmap.md` §10. Complete migration
 of ROM format parsing (iNES/UNIF/NSF/FDS/VS UniSystem) to Rust
-`fceux11-formats`, reducing C++ parsing code by ~90%.
+  `fceux11-formats`, reducing C++ parsing code by ~90%.
 
 ### Added
 
@@ -45,7 +45,7 @@ of ROM format parsing (iNES/UNIF/NSF/FDS/VS UniSystem) to Rust
 - **`src/ines.cpp`** — Refactored to thin bridge layer. Lines: 983 → 90 (91% reduction).
 - **`src/unif.cpp`** — Refactored to thin bridge layer. Lines: 669 → 72 (89% reduction).
 - **`src/nsf.cpp`** — NSF runtime migrated to Rust (NsfRuntimeState + 10 runtime FFI). Lines: 612 → 107 (83% reduction).
-- **`src/fds.cpp`** — FDS runtime migrated to Rust (FdsRuntimeState + handle_write_402x FFI). Lines: 905 → 315 (65% reduction).
+- **`src/fds.cpp`** — FDS runtime migrated to Rust (FdsRuntimeState + handle_write_402x FFI). Lines: 905 → 316 (65% reduction). Fixed FDSClose null-deref segfault.
 - **`src/vsuni.cpp`** — FCEU_VSUniCheck refactored to use Rust FFI. Lines: 278 → 119 (57% reduction).
 - **`src/rust/fceux11_rust.h`** — FFI header updated with new structs and functions.
 - **`src/fds_sound.cpp`** — Extracted FDSSound DSP from fds.cpp (225 lines).
