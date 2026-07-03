@@ -2,7 +2,7 @@
 
 # FCEUX11
 
-[![Version](https://img.shields.io/badge/version-v1.8-blue)](https://github.com/Laffinty/FCEUX11/releases)
+[![Version](https://img.shields.io/badge/version-v1.10-blue)](https://github.com/Laffinty/FCEUX11/releases)
 [![License](https://img.shields.io/badge/license-GPL--v2-green)](COPYING)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?logo=windows)](https://www.microsoft.com/windows/windows-11)
 [![Qt](https://img.shields.io/badge/Qt-6.8%20LTS-41CD52?logo=qt)](https://www.qt.io)
@@ -92,29 +92,32 @@ Precompiled binaries are available on the **[GitHub Releases](https://github.com
 
 详见 [CHANGELOG.md](CHANGELOG.md)。
 
-v1.8（代号 **Masonry**）是当前稳定版，v1.x 现代化周期的第八个子版本
+v1.10（代号 **Cryptex**）是当前稳定版，v1.x 现代化周期的第十个子版本
 （v1.1 Sentinel → v1.2 Census → v1.3 Legion → v1.4 Gateway → v1.5
-Prism → v1.6 Resonance → v1.7 Cartograph → v1.8 Masonry）。本版本将
-174 个 Mapper 板文件批量迁移为 `fceu11::Mapper` 子类并采用
-`MapperEntry` 自动注册机制（替代 `BMAPPINGLocal bmap[]`），引入
-`Cart::save_mapper_state()` 支持字节级 Mapper 状态回归测试，新增
-`Mmc3BaseCart` 共享基类统一 23 种 MMC3 变体，并完成 VRC7/MMC5/N106/
-Sunsoft5B 的 `ExpansionAudio` 子类化。详细 Release Notes 见
+Prism → v1.6 Resonance → v1.7 Cartograph → v1.8 Masonry → v1.9
+Chronicle → v1.10 Cryptex）。v1.9（Chronicle）引入 V2 Savestate 格式
+（FCEU11ST，带逐 chunk CRC32 校验），将 SFORMAT 序列化系统全量迁移至
+Rust `fceux11-core`。v1.10（Cryptex）完成 ROM 格式解析全量 Rust 迁移
+——将 iNES/UNIF/NSF/FDS/VS UniSystem 解析器迁至 `fceux11-formats`，
+C++ 解析代码缩减约 90%（ines.cpp 983→90 行，unif.cpp 669→72 行，
+nsf.cpp 612→107 行，fds.cpp 905→316 行）。详细 Release Notes 见
 [CHANGELOG.md](CHANGELOG.md) 与
 [`docs/v1.x_Modernization_Roadmap.md`](docs/v1.x_Modernization_Roadmap.md)。
 编译指南见 [`docs/BuildGuide.md`](docs/BuildGuide.md)。
 
 See [CHANGELOG.md](CHANGELOG.md) for version history.
 
-v1.8 (codename **Masonry**) is the current stable release — the eighth
+v1.10 (codename **Cryptex**) is the current stable release — the tenth
 sub-version of the v1.x modernization cycle (v1.1 Sentinel → v1.2
 Census → v1.3 Legion → v1.4 Gateway → v1.5 Prism → v1.6 Resonance →
-v1.7 Cartograph → v1.8 Masonry). This release batch-migrates 174 board
-files to `fceu11::Mapper` subclasses with `MapperEntry` auto-registration
-(replacing `BMAPPINGLocal bmap[]`), introduces `Cart::save_mapper_state()`
-for byte-level mapper state regression testing, adds `Mmc3BaseCart` as a
-shared base for 23 MMC3 variant mappers, and completes `ExpansionAudio`
-subclassing for VRC7/MMC5/N106/Sunsoft5B. Full release notes:
+v1.7 Cartograph → v1.8 Masonry → v1.9 Chronicle → v1.10 Cryptex).
+v1.9 (Chronicle) introduces the V2 savestate format (FCEU11ST with
+per-chunk CRC32 integrity checking), migrating the SFORMAT serialization
+system entirely to Rust `fceux11-core`. v1.10 (Cryptex) completes the
+full Rust migration of ROM format parsing — iNES/UNIF/NSF/FDS/VS
+UniSystem parsers moved to `fceux11-formats`, reducing C++ parsing code
+by ~90% (ines.cpp 983→90 lines, unif.cpp 669→72 lines, nsf.cpp 612→107
+lines, fds.cpp 905→316 lines). Full release notes:
 [CHANGELOG.md](CHANGELOG.md) and
 [`docs/v1.x_Modernization_Roadmap.md`](docs/v1.x_Modernization_Roadmap.md).
 Build guide: [`docs/BuildGuide.md`](docs/BuildGuide.md).

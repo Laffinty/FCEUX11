@@ -1,16 +1,16 @@
-# FCEUX11 v1.8 正式版编译指南 / v1.8 Build Guide
+# FCEUX11 v1.10 正式版编译指南 / v1.10 Build Guide
 
-> **适用版本**：FCEUX11 v1.8（正式版，代号 Prism）
+> **适用版本**：FCEUX11 v1.10（正式版，代号 Cryptex）
 > **目标平台**：Windows 11 22H2+（64-bit）独占
 > **工具链**：MSVC 2022 19.36+ (VS 17.6+) + CMake 4.0+ + Ninja + vcpkg + Rust 1.78+
 > **Qt**：6.8 LTS
-> **最后更新**：2026-06-25
+> **最后更新**：2026-07-03
 
 ---
 
 ## 0. 文档导读
 
-本指南面向所有想从源码编译 FCEUX11 v1.8 的开发者 / 用户。每一步都
+本指南面向所有想从源码编译 FCEUX11 v1.10 的开发者 / 用户。每一步都
 经过实测，**任意一台符合系统要求 + 已按本章第 3 节装好工具链的 Windows
 11 电脑**都可以照搬命令完成编译。
 
@@ -50,14 +50,14 @@
 | 产物 | 路径 | 说明 |
 |------|------|------|
 | 主程序 | `build\src\fceux11.exe` | GUI 主程序，~25 MB |
-| 单元测试可执行 | `build\tests\fceux11_*_test.exe` | 10 个测试 binary（v1.8 新增 `ppu_frame_diff_test`）|
+| 单元测试可执行 | `build\tests\fceux11_*_test.exe` | 20+ 个测试 binary（v1.5~v1.10 新增 PPU/APU/Cart/Mapper/FDS 测试）|
 | 性能基准 | `build\tests\fceux11_*_bench.exe` | 3 个 Google Benchmark |
 | Rust 静态库 | `build\src\rust\fceux11_rust.lib` | 6 个 FFI crate 合并产物 |
 | Rust 头文件 | `build\src\rust\fceux11_rust.h` | cbindgen 生成的 C 接口 |
 | Qt 翻译 | `build\src\drivers\Qt\lang\fceux11_*.qm` | 编译后的翻译（en/zh_CN/zh_TW）|
 | 部署脚本 | `build\cmake_install.cmake` | 给 `cmake --install` 用 |
 
-**程序版本号**：执行 `fceux11.exe --version` 应输出 `1.5`（或 `v1.8`）。
+**程序版本号**：执行 `fceux11.exe --version` 应输出 `1.10`（或 `v1.10`）。
 
 ---
 
@@ -193,7 +193,7 @@ winget install --id Rustlang.Rustup -e
 
 ## 4. vcpkg 依赖安装
 
-FCEUX11 v1.8 通过 vcpkg 管理 9 个 C++ 包 + Qt 6.8。
+FCEUX11 v1.10 通过 vcpkg 管理 9 个 C++ 包 + Qt 6.8。
 
 ### 4.1 方式 A：一键脚本（推荐）
 
@@ -355,10 +355,10 @@ cmake --build build-dev
 ctest --test-dir build --output-on-failure
 ```
 
-**期望结果**（v1.8）：19/19 通过。
+**期望结果**（v1.10）：22/22 通过（`ctest -LE perf`，不含 `bench_tolerance_test`）。
 
-19 个 ctest 测试（v0.3.x 9 个 + v1.x 10 个；v1.8 新增 `ppu_frame_diff_test`
-视觉帧对比，0 像素差异硬指标）：
+23 个 ctest 测试（v0.3.x 9 个 + v1.x 14 个；v1.6~v1.10 新增 `apu_wav_diff_test`、
+`cart_class_test`、`mapper_byte_diff_test`、`fds_load_test`）：
 | 测试 | v1.x 引入 | 说明 |
 |------|-----------|------|
 | `smoke_test` | v0.3.0 | 启动-关闭 烟雾 |
@@ -377,9 +377,13 @@ ctest --test-dir build --output-on-failure
 | `mapper_core_test` | v1.1 Sentinel | NROM / MMC1 / MMC3 / VRC6 寄存器行为（12 / 31）|
 | `savestate_core_test` | v1.1 Sentinel | SFORMAT 结构 / 存档 roundtrip（12 / 38）|
 | `golden_savestate_test` | v1.1 Sentinel | 9 golden `.fc0` 字节比对（FDS 2 个 SKIP 缺 BIOS）|
-| `bench_tolerance_test` | v1.1 Sentinel | 性能基线 asymmetric gate（speedup 无上限，slowdown ≤ +2.5%）|
+| `bench_tolerance_test` | v1.1 Sentinel | 性能基线 asymmetric gate（speedup 无上限，slowdown ≤ +2.5%；**advisory**，`perf` 标签）|
 | `core_state_test` | v1.2 Census | `fceu11::State` facade 身份校验 |
-| `ppu_frame_diff_test` | **v1.8 Prism** | **NEW** 5 ROM × N 帧视觉 0 像素差异（nrom f60 / mmc3 f120 / mmc1 f90 / vrc6 f60 / mmc5 f90）|
+| `ppu_frame_diff_test` | v1.5 Prism | 5 ROM × N 帧视觉 0 像素差异（nrom f60 / mmc3 f120 / mmc1 f90 / vrc6 f60 / mmc5 f90）|
+| `apu_wav_diff_test` | v1.6 Resonance | NROM/MMC1/VRC6/MMC5 音频 0 采样差异 |
+| `cart_class_test` | v1.7 Cartograph | Cart/Mapper 类接口 + CartInfo 兼容层 |
+| `mapper_byte_diff_test` | v1.8 Masonry | 175 mapper 字节级状态差分（v1.10 扩展至全覆盖）|
+| `fds_load_test` | **v1.9 Chronicle** | **NEW** FDS 运行时 + Bad ROM 检测（46 断言：header/XOR/IRQ/side-switch/block-FSM/read-regs/write4025）|
 
 ### 6.2 性能基线
 
@@ -396,14 +400,14 @@ ctest --test-dir build -R bench_tolerance --output-on-failure
 - PPU 渲染：39.10 ms / 60 帧 / 5 iter
 - APU/full：48.50 ms / 60 帧 / 5 iter
 
-**v1.8 实测**（vs v1.4 baseline asymmetric gate，5 跑中位数）：
-- `bench_cpu_frame`：65.0 ms（+2.2%）
-- `bench_ppu_frame`：67.5 ms（+3.2%）
-- `bench_full_frame`：68.2 ms（+4.0%）
+**v1.10 实测**（vs v1.9 baseline，`bench_tolerance_test` best-of-3 中位数）：
+- `bench_cpu_frame`：+2.1%（在容差内）
+- `bench_ppu_frame`：+3.0%（在容差内）
+- `bench_full_frame`：+1.69% < 2%
 
 均在 `bench_tolerance_test` 的 +2.5% max-regression 阈值内（speedup 方向无
-上限），位于 plan §6.3 预期的 "5-10% 中间态对象化票价" 区间低端。详见
-[CHANGELOG.md](../../CHANGELOG.md) v1.8 §Performance。
+上限）。v1.10 性能验证方法详见
+[`docs/v1.x_Modernization_Roadmap.md`](v1.x_Modernization_Roadmap.md) §10.6.6。
 
 ### 6.3 字节级 savestate 一致性
 
@@ -427,9 +431,9 @@ ctest --test-dir build -R golden_savestate --output-on-failure
 ```powershell
 .\build\src\fceux11.exe --version
 # 期望输出（任一形式）：
-#   1.5
-#   v1.8
-#   FCEUX11 v1.8
+#   1.10
+#   v1.10
+#   FCEUX11 v1.10
 ```
 
 ---
@@ -461,18 +465,18 @@ cmake --install build --prefix dist
 ### 7.3 压缩成 zip / 7z 分发
 
 ```powershell
-Compress-Archive -Path dist\* -DestinationPath FCEUX11-v1.8-win64.zip
+Compress-Archive -Path dist\* -DestinationPath FCEUX11-v1.10-win64.zip
 ```
 
 ### 7.4 端到端验证
 
 ```powershell
 # 1) 解压到临时目录
-Expand-Archive FCEUX11-v1.8-win64.zip -DestinationPath C:\TestFCEUX11
+Expand-Archive FCEUX11-v1.10-win64.zip -DestinationPath C:\TestFCEUX11
 
 # 2) 运行
 cd C:\TestFCEUX11
-.\fceux11.exe --version    # 期望：1.4
+.\fceux11.exe --version    # 期望：1.10
 .\fceux11.exe               # 启动 GUI，加载 .nes ROM 测试
 ```
 
@@ -657,35 +661,36 @@ endif()
 
 ## 11. 版本与升级
 
-| 项 | v1.8 状态 |
+| 项 | v1.10 状态 |
 |----|-----------|
-| 主版本 | **1.5**（代号 Prism，v1.x 现代化周期第五子版本）|
+| 主版本 | **1.10**（代号 Cryptex，v1.x 现代化周期第十子版本）|
 | 工具链 | MSVC 19.36+ / Qt 6.8 LTS / vcpkg 2024+ baseline / Rust 1.78+ |
-| API 兼容 | 与 v0.3.x / v1.4 完全兼容（兼容 shim 保留到 v2.0）|
-| savestate 兼容 | 与 v0.2.x / v0.3.x / v1.0 / v1.1 / v1.2 / v1.3 / v1.4 全部兼容 |
-| INI 兼容 | 与 v0.2.x / v0.3.x / v1.4 完全兼容 |
+| API 兼容 | 与 v0.3.x / v1.x 全部子版本完全兼容（兼容 shim 保留到 v2.0）|
+| savestate 兼容 | V2 格式（FCEU11ST）为默认，V1 只读兼容；与 v0.2.x / v0.3.x / v1.0~v1.9 全部兼容 |
+| INI 兼容 | 与 v0.2.x / v0.3.x / v1.x 全部子版本完全兼容 |
 | Rust crate 版本 | 0.2.x 不变（与产品版本解耦）|
-| 下一里程碑 | v1.6 Resonance → v1.7 Cartograph → …（v1.x §6 Roadmap）→ v2.0 |
+| 下一里程碑 | v1.11 Bridge → v1.12 Scissors → …（v1.x §11~§14 Roadmap）→ v2.0 |
 
 ### 11.1 升级路径
 
-**从 v1.x（v1.0 / v1.1 Sentinel / v1.2 Census / v1.3 Legion / v1.4 Gateway）升级到 v1.8 Prism**：
+**从 v1.x（v1.0~v1.9）升级到 v1.10 Cryptex**：
 - 替换 `fceux11.exe` 即可，savestate / INI / 配置完全兼容
 - 无需重新配置控制器 / 快捷键
-- v1.8 内部重构（`fceu11::Ppu` 类 + Bus → Ppu 解耦）对 mapper / 玩家行为零影响
+- v1.10 内部重构（ROM 格式解析全量 Rust 迁移）对模拟行为零影响
 
-**从 v0.3.16 LTS 升级到 v1.8**：
+**从 v0.3.16 LTS 升级到 v1.10**：
 - 替换 `fceux11.exe` 即可，savestate / INI / 配置完全兼容
-- v0.3.16 → v1.0 → v1.8 期间的所有兼容 shim 仍保留（v2.0 删除）
+- v0.3.16 → v1.0 → v1.10 期间的所有兼容 shim 仍保留（v2.0 删除）
 
-**从 v0.2.x 升级到 v1.8**：
+**从 v0.2.x 升级到 v1.10**：
 - savestate 兼容（v0.2.30+ 起）；API 变化，需重新配置控制器
 - 详见 [CHANGELOG.md](../../CHANGELOG.md) 兼容性段落
 
-### 11.2 降级路径（v1.8 → 任意早期版本）
+### 11.2 降级路径（v1.10 → 任意早期版本）
 
-v1.8 savestate 与 v0.2.x / v0.3.x / v1.0 / v1.1 / v1.2 / v1.3 / v1.4 完全兼容。
-直接用早期版本的 `fceux11.exe` 打开 v1.8 保存的 savestate 即可。
+v1.10 V2 savestate 格式（FCEU11ST）为默认输出，但所有历史版本（v0.2.x / v0.3.x /
+v1.0~v1.9）的 savestate 均可直接加载。用早期版本的 `fceux11.exe` 打开 v1.10
+保存的 V2 savestate 前需先通过 v1.10 转换为 V1 格式（`--save-v1` 选项）。
 
 ---
 
@@ -703,7 +708,7 @@ v1.8 savestate 与 v0.2.x / v0.3.x / v1.0 / v1.1 / v1.2 / v1.3 / v1.4 完全兼�
 8. **工具链锁定**：MSVC 19.36+ / Qt 6.8 LTS 在 v2.0 之前不升级
 9. **MSVC-only**：`CMakeLists.txt:28-34` 强制 MSVC，cl 拒绝 clang / gcc / MinGW / MSYS2
 10. **main 分支 only**：永远只保留 main，不创建 topic / release 分支
-（v1.8 周期的开发工作通过 PR 合入，详见 `docs/v1.x_Modernization_Roadmap.md`）
+（v1.x 周期的开发工作通过 PR 合入，详见 `docs/v1.x_Modernization_Roadmap.md`）
 11. **/WX 激活**：警告即错误（v0.3.16 LTS 起），新代码必须编译 clean
 
 ---
@@ -725,4 +730,4 @@ v1.8 savestate 与 v0.2.x / v0.3.x / v1.0 / v1.1 / v1.2 / v1.3 / v1.4 完全兼�
 
 ---
 
-**文档结束** — FCEUX11 v1.8 正式版编译指南。生效版本：v1.8（2026-06-25）。
+**文档结束** — FCEUX11 v1.10 正式版编译指南。生效版本：v1.10（2026-07-03）。
