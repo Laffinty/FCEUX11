@@ -16,9 +16,9 @@
 
 ## 简介 / Introduction
 
-**FCEUX11** 是基于 [FCEUX](https://fceux.com) 的 NES/Famicom 模拟器衍生项目，面向 **Windows 11** 平台持续维护。在保留 FCEUX 核心模拟精度的基础上，提供现代化的 Windows 原生体验，包括 Qt6 图形界面、多语言支持以及完善的调试与 TAS 工具集。
+**FCEUX11** 是基于 [FCEUX](https://fceux.com) 的 NES/Famicom 模拟器衍生项目，针对 **Windows** 平台深度优化。在继承 FCEUX 卓越模拟精度的同时，带来焕然一新的现代 Windows 原生体验——Qt6 图形界面、中英文多语言支持，以及面向开发者和速通玩家的调试与 TAS 工具集。无论你是重温经典红白机游戏，还是深入 ROM 修改与研究，FCEUX11 都能以最顺畅的方式运行你的 NES 游戏。
 
-**FCEUX11** is a derivative of the [FCEUX](https://fceux.com) NES/Famicom emulator, actively maintained for **Windows 11**. It preserves the core emulation accuracy of FCEUX while providing a modern, native Windows experience, including a Qt6-based user interface, multi-language support, and comprehensive debugging and TAS tooling.
+**FCEUX11** is a derivative of the [FCEUX](https://fceux.com) NES/Famicom emulator, optimized for **Windows**. It inherits FCEUX's renowned emulation accuracy while delivering a polished, modern Windows-native experience — Qt6-powered interface, multi-language support (Chinese & English), and a full suite of debugging and TAS tools for developers and speedrunners alike. Whether you're revisiting childhood classics or diving into ROM hacking, FCEUX11 runs your NES games smoothly and looks great doing it.
 
 ---
 
@@ -26,15 +26,15 @@
 
 | 中文 | English |
 |------|---------|
-| **精确模拟** — 完整支持 NES、Famicom 及各类扩展芯片（Mapper）的游戏运行。 | **Accurate Emulation** — Full support for NES, Famicom, and various expansion chips (Mappers). |
-| **调试工具** — 内置 CPU/PPU 调试器、十六进制编辑器、内存搜索与监视、代码数据日志等。 | **Debugging Tools** — Built-in CPU/PPU debugger, hex editor, RAM search/watch, code/data logger, and more. |
-| **TAS 编辑器** — 支持逐帧录制与编辑输入，便于制作工具辅助速通。 | **TAS Editor** — Frame-by-frame recording and editing of inputs for Tool-Assisted Speedruns. |
-| **Lua 脚本** — 通过 Lua 接口扩展功能，支持自定义 HUD、自动化测试等。 | **Lua Scripting** — Extend functionality via Lua scripts, including custom HUDs and automated testing. |
-| **录像回放** — 录制与播放游戏过程，支持 AVI 导出。 | **Movie Recording** — Record and playback gameplay, with AVI export support. |
-| **金手指** — 支持 Game Genie 与原始金手指代码。 | **Cheats** — Support for Game Genie and raw cheat codes. |
-| **多语言界面** — 提供简体中文、繁体中文及英文界面。 | **Multi-language UI** — Interface available in Simplified Chinese, Traditional Chinese, and English. |
-| **自定义调色板** — 支持加载外部调色板文件，调整游戏色彩表现。 | **Custom Palettes** — Load external palette files to adjust in-game color rendering. |
-| **存档管理** — 支持即时存档/读档及自动存档记录。 | **Save States** — Instant save/load with automatic state history. |
+| **精确模拟** — 完整支持 NES、Famicom 及各类 Mapper 扩展芯片，画面与音效高度还原，带来原汁原味的 8 位体验。 | **Accurate Emulation** — Full NES, Famicom, and mapper support with faithful graphics and audio — the authentic 8-bit experience, just as you remember it. |
+| **调试工具** — 内置 CPU/PPU 调试器、十六进制编辑器、内存搜索与监视、代码/数据日志，满足 ROM 修改与深度研究需求。 | **Debugging Tools** — CPU/PPU debugger, hex editor, RAM search/watch, and code/data logger — everything you need for ROM hacking and in-depth analysis. |
+| **TAS 编辑器** — 逐帧录制并精确编辑按键输入，轻松制作工具辅助速通（TAS）录像，挑战操作极限。 | **TAS Editor** — Frame-by-frame recording and precise input editing — craft perfect Tool-Assisted Speedruns and push gameplay to its limits. |
+| **Lua 脚本** — 通过 Lua 接口编写脚本，实现自定义屏幕叠加显示、自动化操作、内存数据读取等高级玩法。 | **Lua Scripting** — Write Lua scripts to create custom on-screen displays, automate gameplay, or read memory — extend the emulator however you like. |
+| **录像回放** — 录制完整游戏过程并支持回放，可导出为 AVI 视频，方便分享你的精彩通关时刻。 | **Movie Recording** — Record full playthroughs, replay them anytime, and export to AVI to share your best runs with the community. |
+| **金手指** — 支持 Game Genie 与原始金手指代码，轻松修改游戏内容，重温童年「无敌版」的快乐。 | **Cheats** — Game Genie and raw cheat code support — tweak gameplay, unlock hidden content, or just have fun bending the rules. |
+| **多语言界面** — 提供简体中文、繁体中文及英文界面，随时自由切换，告别语言障碍。 | **Multi-language UI** — Switch seamlessly between Simplified Chinese, Traditional Chinese, and English — play in the language you're most comfortable with. |
+| **自定义调色板** — 加载外部调色板文件，自由调整画面色彩，还原你记忆中最对的那个画面色调。 | **Custom Palettes** — Load custom palette files to fine-tune color rendering — match the exact look you grew up with on your old CRT TV. |
+| **即时存档** — 随时随地保存/读取进度，支持自动存档历史记录，再难的关卡也能反复挑战、不留遗憾。 | **Save States** — Save and load anywhere, anytime, with automatic state history — never lose progress on a tough boss fight again. |
 
 ---
 
@@ -45,7 +45,7 @@
 | 项目 / Item | 要求 / Requirement |
 |-------------|-------------------|
 | **操作系统 / OS** | Windows 11 22H2+ (64-bit) |
-| **说明 / Note** | Windows 7/8/8.1/10 不支持，由 Qt 6.8 LTS 运行时依赖及 v0.3.x 的 Win11 独占优化策略决定。 Windows 7, 8, 8.1, and 10 are not supported, determined by Qt 6.8 LTS runtime requirements and the v0.3.x Win11-exclusive optimization strategy. |
+| **说明 / Note** | Windows 7/8/8.1/10 不支持，由 Qt 6.8 LTS 运行时依赖及 Windows 平台深度优化策略决定。 Windows 7, 8, 8.1, and 10 are not supported, determined by Qt 6.8 LTS runtime requirements and the Windows platform optimization strategy. |
 
 ### 构建环境 / Build Environment
 
