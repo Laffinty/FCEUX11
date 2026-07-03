@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark" />
 <meta name="theme-color" content="#080a09" />
 <title>FCEUX11 — NES/Famicom Emulator Optimized for Windows</title>
-<meta name="description" content="FCEUX11 v1.8 Masonry — a modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 — accurate emulation, 174 mapper subclasses, debugging tools, TAS editor, and Lua scripting." />
+<meta name="description" content="FCEUX11 v1.10 Cryptex — a modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 — faster ROM loading, reliable save states, FDS support, debugging tools, TAS editor, and Lua scripting." />
 <meta name="keywords" content="FCEUX11, FCEUX, NES emulator, Famicom emulator, Windows emulator, TAS editor, Qt6, C++20, game emulator, 8-bit" />
 <meta name="author" content="Laffinty" />
 <meta name="robots" content="index, follow, max-image-preview:large" />
@@ -15,16 +15,16 @@
 <link rel="icon" type="image/x-icon" href="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <meta property="og:site_name" content="FCEUX11" />
 <meta property="og:type" content="website" />
-<meta property="og:title" content="FCEUX11 v1.8 Masonry — NES/Famicom Emulator for Windows" />
-<meta property="og:description" content="FCEUX11 v1.8 Masonry — modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 — accurate emulation, debugging, TAS, Lua." />
+<meta property="og:title" content="FCEUX11 v1.10 Cryptex — NES/Famicom Emulator for Windows" />
+<meta property="og:description" content="FCEUX11 v1.10 Cryptex — modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 — faster ROM loading, reliable save states, debugging, TAS, Lua." />
 <meta property="og:url" content="https://laffinty.github.io/FCEUX11/" />
 <meta property="og:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <meta property="og:locale" content="en_US" />
 <meta property="og:locale:alternate" content="zh_CN" />
 <meta name="google-site-verification" content="2be70qD04OCrme3y8dDxUj_h1QwY4no9IWoFQpepryE" />
 <meta name="twitter:card" content="summary" />
-<meta name="twitter:title" content="FCEUX11 v1.8 Masonry — NES/Famicom Emulator for Windows" />
-<meta name="twitter:description" content="FCEUX11 v1.8 Masonry — modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20." />
+<meta name="twitter:title" content="FCEUX11 v1.10 Cryptex — NES/Famicom Emulator for Windows" />
+<meta name="twitter:description" content="FCEUX11 v1.10 Cryptex — modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20." />
 <meta name="twitter:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -36,8 +36,8 @@
   "name":"FCEUX11",
   "applicationCategory":"GameApplication",
   "operatingSystem":"Windows",
-  "description":"A modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 with accurate emulation, debugging tools, TAS editor, and Lua scripting. v1.8 Masonry: all 174 mappers now subclass fceu11::Mapper with auto-registration; 23 MMC3 variants share a common Mmc3BaseCart; VRC7/MMC5/N106/Sunsoft5B expansion-audio chips unified under the ExpansionAudio virtual interface.",
-  "softwareVersion":"1.8",
+  "description":"A modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 — v1.10 Cryptex: rebuilt ROM loading engine for faster load times and better game detection; V2 save state format with corruption protection; improved Famicom Disk System support. Includes debugging tools, TAS editor, and Lua scripting.",
+  "softwareVersion":"1.10",
   "license":"https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt",
   "url":"https://laffinty.github.io/FCEUX11/",
   "downloadUrl":"https://github.com/Laffinty/FCEUX11/releases",
@@ -193,7 +193,7 @@
 
 <header class="hero" id="top">
   <div class="wrap">
-    <div class="pill reveal"><span class="dot"></span><span data-i18n="pill">v1.8 · Masonry</span></div>
+    <div class="pill reveal"><span class="dot"></span><span data-i18n="pill">v1.10 · Cryptex</span></div>
     <h1 class="reveal"><span class="grad">FCEUX</span><span class="dim">11</span></h1>
     <p class="tagline reveal" data-i18n="tagline"><span class="tagline-title">A FCEUX-based NES/Famicom emulator optimized for Windows</span><br>core accuracy, modern native experience.</p>
     <div class="cta reveal">
@@ -250,41 +250,48 @@
   <div class="wrap">
     <div class="whatsnew-head reveal">
       <div class="kicker" data-i18n="wn.k">What's new</div>
-      <h2 data-i18n="wn.t">v1.8 · Masonry</h2>
-      <div class="sub" data-i18n="wn.sub">Released 2026-07-01 · since v1.7 (Cartograph)</div>
+      <h2 data-i18n="wn.t">v1.10 · Cryptex</h2>
+      <div class="sub" data-i18n="wn.sub">Released 2026-07-02 · since v1.8 (Masonry)</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3 data-i18n="wn1.t">All 174 mappers unified under modern C++ classes</h3>
-          <p data-i18n="wn1.d">Every supported NES/Famicom cartridge board now runs through a unified <code>fceu11::Mapper</code> subclass with auto-registration, replacing the legacy C-style function-pointer dispatch. Together with the v1.7 Cart class and v1.6 APU objectification, the entire core is now modern C++ — games load more predictably and the codebase is dramatically easier to maintain.</p>
+          <h3 data-i18n="wn1.t">Save states you can trust</h3>
+          <p data-i18n="wn1.d">Introducing a new V2 save state format with built-in integrity checks for every data chunk — your progress is now protected against file corruption. Old save states still load seamlessly, so nothing you've saved is ever lost. Think of it as a stronger lockbox for your game progress.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">02</div>
         <div class="wn-text">
-          <h3 data-i18n="wn2.t">MMC3 family shares one base class</h3>
-          <p data-i18n="wn2.d">Twenty-three different MMC3-family mappers — the family behind Super Mario Bros 3, Kirby's Adventure, Mega Man 4–6, and hundreds more — now inherit from a single <code>Mmc3BaseCart</code> base class. Behavior stays consistent across the whole family and a single fix applies everywhere at once.</p>
+          <h3 data-i18n="wn2.t">Games load faster, crash less</h3>
+          <p data-i18n="wn2.d">We rebuilt the ROM loading engine from the ground up. Every format — NES, FDS disk images, NSF music files, UNIF — now loads noticeably faster. Cartridge type detection is more accurate too, so fewer "this ROM won't open" moments. The code behind it all is 90% smaller, which means fewer places for bugs to hide.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">03</div>
         <div class="wn-text">
-          <h3 data-i18n="wn3.t">Expansion-audio chips unified</h3>
-          <p data-i18n="wn3.d">VRC7, MMC5, Namco 106 and Sunsoft 5B expansion-audio chips now use the same <code>ExpansionAudio</code> virtual interface introduced for VRC6 in v1.6. The audio path is cleaner, more predictable, and easier to extend when new chips are supported.</p>
+          <h3 data-i18n="wn3.t">Famicom Disk System just works better</h3>
+          <p data-i18n="wn3.d">Fixed a crash that could happen when closing FDS games — no more unexpected shutdowns after playing your favorite disk-based titles. Disk reading, writing, and side-switching are all smoother now. We also added comprehensive FDS testing to catch issues before they reach you.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">04</div>
         <div class="wn-text">
-          <h3 data-i18n="wn4.t">174 mapper byte-exact regression tests</h3>
-          <p data-i18n="wn4.d">Every supported mapper now has an automated byte-exact regression test that snapshots its internal state against a known-good golden file. Any future change that would shift a mapper's behavior is caught before release — the safety net behind every subsequent update.</p>
+          <h3 data-i18n="wn4.t">More games, fewer problems</h3>
+          <p data-i18n="wn4.d">Added support for educational cartridges (Mapper 178) and fixed stability bugs in several rare cartridge types. If you've had a game that wouldn't start or would randomly glitch out, there's a good chance this update fixes it. 174 cartridge types tested, byte for byte, before every release.</p>
+        </div>
+      </div>
+      <div class="wn-item">
+        <div class="wn-num">05</div>
+        <div class="wn-text">
+          <h3 data-i18n="wn5.t">Ready for whatever comes next</h3>
+          <p data-i18n="wn5.d">The new save state format is forward-compatible — it preserves extra data it doesn't yet understand, so future versions can add features without breaking your saves. We've also laid the groundwork for the next wave of emulation improvements: cleaner code, smarter testing, and a solid foundation.</p>
         </div>
       </div>
     </div>
     <div class="wn-cta reveal">
-      <a href="https://github.com/Laffinty/FCEUX11/blob/main/CHANGELOG.md#18---2026-07-01" target="_blank" rel="noopener" data-i18n="wn.cta">Read the full v1.8 release notes →</a>
+      <a href="https://github.com/Laffinty/FCEUX11/blob/main/CHANGELOG.md#110---2026-07-02" target="_blank" rel="noopener" data-i18n="wn.cta">Read the full v1.10 release notes →</a>
     </div>
   </div>
 </section>
@@ -297,7 +304,7 @@
 
 <script>
 const I18N={
-  en:{pill:"v1.8 · Masonry",
+  en:{pill:"v1.10 · Cryptex",
       tagline:"<span class=\"tagline-title\">A FCEUX-based NES/Famicom emulator optimized for Windows</span><br>core accuracy, modern native experience.",
       download:"Download",changelog:"Changelog",
       "f1.t":"Accurate Emulation","f1.d":"Full NES, Famicom &amp; mapper support",
@@ -307,14 +314,15 @@ const I18N={
       "about.k":"About","about.t":"Introduction",
       "about.a1":"FCEUX11 is a derivative of the FCEUX NES/Famicom emulator, actively maintained and optimized for <em>Windows</em>.",
       "about.a2":"It preserves the core emulation accuracy of FCEUX while providing a modern, native Windows experience, including a <em>Qt6-based</em> user interface, multi-language support, and comprehensive debugging and TAS tooling.",
-      "wn.k":"What's new","wn.t":"v1.8 · Masonry","wn.sub":"Released 2026-07-01 · since v1.7 (Cartograph)",
-      "wn1.t":"All 174 mappers unified under modern C++ classes","wn1.d":"Every supported NES/Famicom cartridge board now runs through a unified <code>fceu11::Mapper</code> subclass with auto-registration, replacing the legacy C-style function-pointer dispatch. Together with the v1.7 Cart class and v1.6 APU objectification, the entire core is now modern C++ — games load more predictably and the codebase is dramatically easier to maintain.",
-      "wn2.t":"MMC3 family shares one base class","wn2.d":"Twenty-three different MMC3-family mappers — the family behind Super Mario Bros 3, Kirby's Adventure, Mega Man 4–6, and hundreds more — now inherit from a single <code>Mmc3BaseCart</code> base class. Behavior stays consistent across the whole family and a single fix applies everywhere at once.",
-      "wn3.t":"Expansion-audio chips unified","wn3.d":"VRC7, MMC5, Namco 106 and Sunsoft 5B expansion-audio chips now use the same <code>ExpansionAudio</code> virtual interface introduced for VRC6 in v1.6. The audio path is cleaner, more predictable, and easier to extend when new chips are supported.",
-      "wn4.t":"174 mapper byte-exact regression tests","wn4.d":"Every supported mapper now has an automated byte-exact regression test that snapshots its internal state against a known-good golden file. Any future change that would shift a mapper's behavior is caught before release — the safety net behind every subsequent update.",
-      "wn.cta":"Read the full v1.8 release notes →",
+      "wn.k":"What's new","wn.t":"v1.10 · Cryptex","wn.sub":"Released 2026-07-02 · since v1.8 (Masonry)",
+      "wn1.t":"Save states you can trust","wn1.d":"Introducing a new V2 save state format with built-in integrity checks for every data chunk — your progress is now protected against file corruption. Old save states still load seamlessly, so nothing you've saved is ever lost. Think of it as a stronger lockbox for your game progress.",
+      "wn2.t":"Games load faster, crash less","wn2.d":"We rebuilt the ROM loading engine from the ground up. Every format — NES, FDS disk images, NSF music files, UNIF — now loads noticeably faster. Cartridge type detection is more accurate too, so fewer \"this ROM won\'t open\" moments. The code behind it all is 90% smaller, which means fewer places for bugs to hide.",
+      "wn3.t":"Famicom Disk System just works better","wn3.d":"Fixed a crash that could happen when closing FDS games — no more unexpected shutdowns after playing your favorite disk-based titles. Disk reading, writing, and side-switching are all smoother now. We also added comprehensive FDS testing to catch issues before they reach you.",
+      "wn4.t":"More games, fewer problems","wn4.d":"Added support for educational cartridges (Mapper 178) and fixed stability bugs in several rare cartridge types. If you've had a game that wouldn't start or would randomly glitch out, there's a good chance this update fixes it. 174 cartridge types tested, byte for byte, before every release.",
+      "wn5.t":"Ready for whatever comes next","wn5.d":"The new save state format is forward-compatible — it preserves extra data it doesn't yet understand, so future versions can add features without breaking your saves. We've also laid the groundwork for the next wave of emulation improvements: cleaner code, smarter testing, and a solid foundation.",
+      "wn.cta":"Read the full v1.10 release notes →",
       foot:"based on FCEUX"},
-  zh:{pill:"v1.8 · Masonry",
+  zh:{pill:"v1.10 · Cryptex",
       tagline:"<span class=\"tagline-title\">基于 FCEUX 的 NES/Famicom 模拟器，为 Windows 平台优化</span><br>保留核心精度，提供现代原生体验。",
       download:"下载",changelog:"更新日志",
       "f1.t":"精确模拟","f1.d":"完整支持 NES、Famicom 及扩展芯片",
@@ -324,12 +332,13 @@ const I18N={
       "about.k":"关于","about.t":"简介",
       "about.a1":"FCEUX11 是基于 FCEUX 的 NES/Famicom 模拟器衍生项目，持续维护并为 <em>Windows</em> 平台优化。",
       "about.a2":"在保留 FCEUX 核心模拟精度的基础上，提供现代化的 Windows 原生体验，包括 <em>Qt6 图形界面</em>、多语言支持以及完善的调试与 TAS 工具集。",
-      "wn.k":"本次更新","wn.t":"v1.8 · Masonry","wn.sub":"2026-07-01 发布 · 上一个版本 v1.7 (Cartograph)",
-      "wn1.t":"174 款 mapper 统一为现代 C++ 类","wn1.d":"所有 174 款受支持的 NES/Famicom 卡带 mapper 现在统一通过 <code>fceu11::Mapper</code> 子类（含自动注册）运行，取代旧的 C 风格函数指针调度。结合 v1.7 的 Cart 类与 v1.6 的 APU 面向对象化，整个核心已全部现代化——游戏加载更可靠，代码库更易维护。",
-      "wn2.t":"MMC3 家族共享一个基类","wn2.d":"MMC3 系列 23 款不同 mapper（涵盖超级马里奥兄弟 3、星之卡比、洛克人 4–6 等数百款经典）现在统一继承自 <code>Mmc3BaseCart</code> 基类。整个家族行为一致性显著提升，一次修复全家族受益。",
-      "wn3.t":"扩展音频芯片接口统一","wn3.d":"VRC7、MMC5、Namco 106 与 Sunsoft 5B 等扩展音频芯片现在使用与 v1.6 VRC6 相同的 <code>ExpansionAudio</code> 虚拟接口。音频路径更清晰、更可预测、更易扩展，未来加入新芯片更省力。",
-      "wn4.t":"174 款 mapper 字节级状态回归测试","wn4.d":"每款受支持的 mapper 现已配备自动字节级回归测试，将内部状态与已知正确的 golden 文件比对。任何可能改变 mapper 行为的修改都会在发布前被捕获——这是后续每一次更新的安全网。",
-      "wn.cta":"查看完整 v1.8 发布说明 →",
+      "wn.k":"本次更新","wn.t":"v1.10 · Cryptex","wn.sub":"2026-07-02 发布 · 上一个版本 v1.8 (Masonry)",
+      "wn1.t":"即时存档，值得信赖","wn1.d":"全新的 V2 存档格式，每个数据块都内置完整性校验，有效防止存档文件损坏导致进度丢失。旧版存档依然可以无缝读取，你保存的每一个游戏进度都不会白费。就像给你的存档加了一把更可靠的保险箱。",
+      "wn2.t":"游戏加载更快，崩溃更少","wn2.d":"我们从零开始重构了游戏文件加载引擎。所有格式（NES、FDS 磁碟镜像、NSF 音乐文件、UNIF）的加载速度都有明显提升。卡带类型识别也更准确了，\"ROM 打不开\"的情况大幅减少。背后的代码量缩减了 90%，出 bug 的地方也更少了。",
+      "wn3.t":"磁碟机游戏，体验全面升级","wn3.d":"修复了关闭 FDS 磁碟机游戏时可能崩溃的问题——不会再因为玩完一款磁盘游戏而意外退出了。磁盘读取、写入和换碟操作都更加流畅。我们还为 FDS 增加了全面的自动化测试，确保问题在到达你手中之前就被发现。",
+      "wn4.t":"更多游戏，更少问题","wn4.d":"新增了对教育卡带（Mapper 178）等特殊游戏的支持，修复了若干稀有卡带类型导致的不稳定 bug。如果你有游戏之前打不开或者会随机花屏出错，这次更新很有可能已经修复了。每次发布前，174 种卡带类型都会经过逐字节的严格测试。",
+      "wn5.t":"为未来做好准备","wn5.d":"新的存档格式支持向前兼容——它会保留当前尚不理解的数据，确保未来版本新增功能时不会破坏你的存档。我们还为下一波模拟器改进打好了基础：更清晰的代码、更智能的测试、更扎实的架构。",
+      "wn.cta":"查看完整 v1.10 发布说明 →",
       foot:"基于 FCEUX"}
 };
 let lang='en';
