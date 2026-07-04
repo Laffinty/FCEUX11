@@ -22,11 +22,7 @@ void FCEU_WriteWaveData(int32 *Buffer, int Count)
 	int16 *dest;
 	int x;
 
-#ifndef __WIN_DRIVER__
 	if(!fceux11_rust_wave_running()) return;
-#else
-	if(!fceux11_rust_wave_running() && !fceu11::AviIsRecording()) return;
-#endif
 
 	dest=temp;
 	x=Count;
@@ -43,13 +39,6 @@ void FCEU_WriteWaveData(int32 *Buffer, int Count)
 
 	if(fceux11_rust_wave_running())
 		fceux11_rust_wave_write(temp, Count);
-
-#ifdef __WIN_DRIVER__
-	if(fceu11::AviIsRecording())
-	{
-		FCEUI_AviSoundUpdate((void*)temp, Count);
-	}
-#endif
 }
 
 int fceu11::EndWaveRecord()

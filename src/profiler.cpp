@@ -28,11 +28,8 @@
 #include <stdio.h>
 #include "utils/safe_string.h"
 
-#ifdef __QT_DRIVER__
-#include <QThread>
-#endif
-
 #include "fceu.h"
+#include "driver_callbacks.h"
 #include "profiler.h"
 #include "rust/fceux11_rust.h"
 
@@ -132,15 +129,9 @@ profileExecVector::profileExecVector(void)
 
 	FCEU_strlcpy(threadName, sizeof(threadName), "MainThread");
 
-#ifdef __QT_DRIVER__
-	QThread *thread = QThread::currentThread();
-
-	if (thread)
-	{
-		//printf("Thread: %s\n", thread->objectName().toStdString().c_str());
-		FCEU_strlcpy(threadName, sizeof(threadName), thread->objectName().toStdString().c_str());
+	if (auto* fn = fceu11::g_driver().get_thread_name) {
+		FCEU_strlcpy(threadName, sizeof(threadName), fn());
 	}
-#endif
 	snprintf( fileName, sizeof(fileName), "fceux-profile-%s.log", threadName);
 
 	logFp = ::fopen(fileName, "w");

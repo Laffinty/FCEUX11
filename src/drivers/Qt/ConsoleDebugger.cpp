@@ -4628,7 +4628,7 @@ void bpDebugSetEnable(bool val)
 	bpDebugEnable = val;
 }
 //----------------------------------------------------------------------------
-void FCEUD_DebugBreakpoint( int bpNum )
+void fceWrapper_DebugBreakpoint( int bpNum )
 {
 
 	if ( !nes_shm->runEmulator || !bpDebugEnable )

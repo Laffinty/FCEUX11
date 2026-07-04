@@ -262,6 +262,8 @@ void FCEUD_UpdateNTView(int scanline, bool drawall);
 void FCEUD_UpdatePPUView(int scanline, int drawall);
 bool FCEUD_PauseAfterPlayback();
 void FCEUD_VideoChanged();
+uint64 FCEUD_GetTime(void);
+uint64 FCEUD_GetTimeFreq(void);
 
 // Lua TAS editor bridge. Only declared when the Lua engine has been
 // included in this translation unit (the s9xlua.h header is the

@@ -115,7 +115,7 @@ KillVideo(void)
 // this variable contains information about the special scaling filters
 static int s_sponge = 0;
 
-void FCEUD_VideoChanged(void)
+void fceWrapper_VideoChanged(void)
 {
 	int buf;
 	if (g_config)
@@ -351,7 +351,7 @@ static SDL_Color s_psdl[256];
  * Sets the color for a particular index in the palette.
  */
 void
-FCEUD_SetPalette(uint8 index,
+fceWrapper_SetPalette(uint8 index,
                  uint8 r,
                  uint8 g,
                  uint8 b)
@@ -367,7 +367,7 @@ FCEUD_SetPalette(uint8 index,
  * Gets the color for a particular index in the palette.
  */
 void
-FCEUD_GetPalette(uint8 index,
+fceWrapper_GetPalette(uint8 index,
 				uint8 *r,
 				uint8 *g,
 				uint8 *b)

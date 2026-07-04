@@ -1672,7 +1672,7 @@ static void drawSpriteTable(void)
 	}
 }
 //----------------------------------------------------
-void FCEUD_UpdatePPUView(int scanline, int refreshchr)
+void fceWrapper_UpdatePPUView(int scanline, int refreshchr)
 {
 	if ( (ppuViewWindow == NULL) && (spriteViewWindow == NULL) )
 	{

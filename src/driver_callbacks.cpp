@@ -122,3 +122,65 @@ void FCEUD_MovieRecordTo() {
 void FCEUD_MovieReplayFrom() {
     if (auto* fn = fceu11::g_driver().movie_replay_from) fn();
 }
+
+// ===========================================================================
+// Phase E: Batch 3 — Video / Palette 回调转发
+// ===========================================================================
+void FCEUD_SetPalette(uint8 index, uint8 r, uint8 g, uint8 b) {
+    if (auto* fn = fceu11::g_driver().set_palette) fn(index, r, g, b);
+}
+void FCEUD_GetPalette(uint8 i, uint8* r, uint8* g, uint8* b) {
+    if (auto* fn = fceu11::g_driver().get_palette) fn(i, r, g, b);
+}
+void FCEUD_VideoChanged(void) {
+    if (auto* fn = fceu11::g_driver().video_changed) fn();
+}
+bool FCEUD_ShouldDrawInputAids(void) {
+    if (auto* fn = fceu11::g_driver().should_draw_input_aids) return fn();
+    return true;
+}
+uint64 FCEUD_GetTime(void) {
+    if (auto* fn = fceu11::g_driver().get_time) return fn();
+    return 0;
+}
+uint64 FCEUD_GetTimeFreq(void) {
+    if (auto* fn = fceu11::g_driver().get_time_freq) return fn();
+    return 1000;
+}
+
+// ===========================================================================
+// Phase E: Batch 4 — Sound 回调转发
+// ===========================================================================
+void FCEUD_SoundToggle(void) {
+    if (auto* fn = fceu11::g_driver().sound_toggle) fn();
+}
+void FCEUD_SoundVolumeAdjust(int n) {
+    if (auto* fn = fceu11::g_driver().sound_volume_adjust) fn(n);
+}
+
+// ===========================================================================
+// Phase E: Batch 5 — Input 回调转发
+// ===========================================================================
+void FCEUD_SetInput(bool fourscore, bool microphone, ESI port0, ESI port1, ESIFC fcexp) {
+    if (auto* fn = fceu11::g_driver().set_input)
+        fn(fourscore, microphone, port0, port1, fcexp);
+}
+
+// ===========================================================================
+// Phase E: Batch 6 — Debug 回调转发
+// ===========================================================================
+void FCEUD_DebugBreakpoint(int bp_num) {
+    if (auto* fn = fceu11::g_driver().debug_breakpoint) fn(bp_num);
+}
+void FCEUD_TraceInstruction(uint8* opcode, int size) {
+    if (auto* fn = fceu11::g_driver().trace_instruction) fn(opcode, size);
+}
+void FCEUD_FlushTrace(void) {
+    if (auto* fn = fceu11::g_driver().flush_trace) fn();
+}
+void FCEUD_UpdateNTView(int scanline, bool drawall) {
+    if (auto* fn = fceu11::g_driver().update_nt_view) fn(scanline, drawall);
+}
+void FCEUD_UpdatePPUView(int scanline, int drawall) {
+    if (auto* fn = fceu11::g_driver().update_ppu_view) fn(scanline, drawall);
+}

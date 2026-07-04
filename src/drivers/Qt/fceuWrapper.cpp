@@ -199,8 +199,7 @@ const char *fceuWrapper_GetCompilerString(void)
 /**
  * Get the time in ticks.
  */
-uint64
-FCEUD_GetTime(void)
+uint64 fceWrapper_GetTime(void)
 {
 	uint64 t;
 
@@ -225,7 +224,7 @@ FCEUD_GetTime(void)
  * Get the tick frequency in Hz.
  */
 uint64
-FCEUD_GetTimeFreq(void)
+fceWrapper_GetTimeFreq(void)
 {
 	// SDL_GetTicks() is in milliseconds
 	uint64 f = 1000;
@@ -779,6 +778,28 @@ void fceWrapper_LoadStateFrom(void);
 void fceWrapper_MovieRecordTo(void);
 void fceWrapper_MovieReplayFrom(void);
 
+// Phase E: forward declarations for renamed FCEUD_* implementations
+void     fceWrapper_SetPalette(uint8 index, uint8 r, uint8 g, uint8 b);
+void     fceWrapper_GetPalette(uint8 i, uint8* r, uint8* g, uint8* b);
+void     fceWrapper_VideoChanged(void);
+bool     fceWrapper_ShouldDrawInputAids(void);
+uint64   fceWrapper_GetTime(void);
+uint64   fceWrapper_GetTimeFreq(void);
+void     fceWrapper_SoundToggle(void);
+void     fceWrapper_SoundVolumeAdjust(int n);
+void     fceWrapper_SetInput(bool fourscore, bool microphone,
+                              ESI port0, ESI port1, ESIFC fcexp);
+void     fceWrapper_DebugBreakpoint(int bpNum);
+void     fceWrapper_TraceInstruction(uint8 *opcode, int size);
+void     fceWrapper_FlushTrace(void);
+void     fceWrapper_UpdateNTView(int scanline, bool drawall);
+void     fceWrapper_UpdatePPUView(int scanline, int refreshchr);
+
+// Phase E: audit §5 supplemental callbacks
+void     fceWrapper_GetKeyboardState(void* out);
+void     fceWrapper_TaseditorDisableRunFunction(void);
+const char* fceWrapper_GetThreadName(void);
+
 int  fceuWrapperInit( int argc, char *argv[] )
 {
 	int opt, error;
@@ -816,6 +837,33 @@ int  fceuWrapperInit( int argc, char *argv[] )
 		cb.load_state_from  = fceWrapper_LoadStateFrom;
 		cb.movie_record_to  = fceWrapper_MovieRecordTo;
 		cb.movie_replay_from = fceWrapper_MovieReplayFrom;
+
+		// Phase E: Batch 3 — Video / Palette
+		cb.set_palette      = fceWrapper_SetPalette;
+		cb.get_palette      = fceWrapper_GetPalette;
+		cb.video_changed    = fceWrapper_VideoChanged;
+		cb.should_draw_input_aids = fceWrapper_ShouldDrawInputAids;
+		cb.get_time         = fceWrapper_GetTime;
+		cb.get_time_freq    = fceWrapper_GetTimeFreq;
+
+		// Phase E: Batch 4 — Sound
+		cb.sound_toggle      = fceWrapper_SoundToggle;
+		cb.sound_volume_adjust = fceWrapper_SoundVolumeAdjust;
+
+		// Phase E: Batch 5 — Input
+		cb.set_input         = fceWrapper_SetInput;
+
+		// Phase E: Batch 6 — Debug
+		cb.debug_breakpoint   = fceWrapper_DebugBreakpoint;
+		cb.trace_instruction  = fceWrapper_TraceInstruction;
+		cb.flush_trace        = fceWrapper_FlushTrace;
+		cb.update_nt_view     = fceWrapper_UpdateNTView;
+		cb.update_ppu_view    = fceWrapper_UpdatePPUView;
+
+		// Phase E: audit §5 supplemental callbacks
+		cb.get_keyboard_state = fceWrapper_GetKeyboardState;
+		cb.taseditor_disable_run_function = fceWrapper_TaseditorDisableRunFunction;
+		cb.get_thread_name = fceWrapper_GetThreadName;
 
 		fceu11::register_driver(cb);
 	}
@@ -1961,7 +2009,7 @@ void fceuWrapper_ToggleStatusIcon(void)
 	showStatusIconOpt = !showStatusIconOpt;
 }
 
-bool FCEUD_ShouldDrawInputAids(void)
+bool fceWrapper_ShouldDrawInputAids(void)
 {
 	return drawInputAidsEnable;
 }
@@ -1969,4 +2017,32 @@ bool FCEUD_ShouldDrawInputAids(void)
 void fceuWrapper_TurboOn (void) { turbo = true; };
 void fceuWrapper_TurboOff   (void) { turbo = false; };
 void fceuWrapper_TurboToggle(void) { turbo = !turbo; };
+
+// Phase E: audit §5 callbacks
+
+void fceWrapper_GetKeyboardState(void* out) {
+	uint8_t* keys = static_cast<uint8_t*>(out);
+	memset(keys, 0, 256);
+	const uint8_t* keyBuf = QtSDL_getKeyboardState(nullptr);
+	if (keyBuf) {
+		for (int i = 0; i < 256 && i < SDL_NUM_SCANCODES; i++) {
+			if (keyBuf[i]) keys[i] = 0x80;
+		}
+	}
+}
+
+void fceWrapper_TaseditorDisableRunFunction(void) {
+	extern TASEDITOR_LUA *taseditor_lua;
+	if (taseditor_lua) taseditor_lua->disableRunFunction();
+}
+
+const char* fceWrapper_GetThreadName(void) {
+	QThread* thread = QThread::currentThread();
+	if (thread) {
+		static thread_local std::string s;
+		s = thread->objectName().toStdString();
+		return s.c_str();
+	}
+	return "MainThread";
+}
 

@@ -1717,7 +1717,7 @@ void FCEUD_UpdateInput(void)
 	}
 }
 
-void FCEUD_SetInput(bool fourscore, bool microphone, ESI port0, ESI port1,
+void fceWrapper_SetInput(bool fourscore, bool microphone, ESI port0, ESI port1,
 					ESIFC fcexp)
 {
 	eoptions &= ~EO_FOURSCORE;

@@ -33,15 +33,11 @@
 #include "vsuni.h"
 #include "drawing.h"
 #include "driver.h"
+#include "io_api.h"
 #include "drivers/common/vidblit.h"
 #include "rust/fceux11_rust.h"
 #ifdef _S9XLUA_H
 #include "fceulua.h"
-#endif
-
-#ifdef __WIN_DRIVER__
-#include "drivers/win/common.h" //For DirectX constants
-#include "drivers/win/input.h"
 #endif
 
 #ifdef CREATE_AVI
@@ -306,18 +302,7 @@ void FCEU_PutImage(void)
 			uint32 ci = 0;
 			uint32 color;
 
-#ifdef __WIN_DRIVER__
-			extern uint32 JSAutoHeld;
-			// This doesn't work in anything except windows for now.
-			// It doesn't get set anywhere in other ports.
-			if (!oldInputDisplay)
-				ci = FCEUMOV_Mode(MOVIEMODE_PLAY) ? 0 : GetGamepadPressedImmediate() >> (controller * 8);
-
-			if (!oldInputDisplay && !FCEUMOV_Mode(MOVIEMODE_PLAY))
-				held = (JSAutoHeld >> (controller * 8));
-#else
 			// Put other port info here
-#endif
 
 			//adelikat: I apologize to anyone who ever sifts through this color assignment
 			//A
@@ -661,8 +646,6 @@ void ResetScreenshotsCounter()
 	lastu = 0;
 }
 
-uint64 FCEUD_GetTime(void);
-uint64 FCEUD_GetTimeFreq(void);
 bool Show_FPS = false;
 // Control whether the frames per second of the emulation is rendered.
 bool FCEUI_ShowFPS()
