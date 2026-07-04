@@ -20,6 +20,7 @@
 // fceuWrapper.cpp
 //
 #include <stdio.h>
+#include "driver_callbacks.h"
 #include "utils/safe_string.h"
 #include <stdlib.h>
 #include <stdint.h>
@@ -190,7 +191,7 @@ static const char *s_CompilerString = __COMPILER__STRING__;
 /**
  * Returns the compiler string.
  */
-const char *FCEUD_GetCompilerString(void)
+const char *fceuWrapper_GetCompilerString(void)
 {
 	return s_CompilerString;
 }
@@ -750,10 +751,42 @@ int  fceuWrapperPreInit( int argc, char *argv[] )
 	return 0;
 }
 
+// Phase C: forward declarations for renamed FCEUD_* implementations
+// (defined below in this file, referenced by register_driver() in fceuWrapperInit)
+const char* fceuWrapper_GetCompilerString(void);
+int   fceuWrapper_ShowStatusIcon(void);
+void  fceuWrapper_ToggleStatusIcon(void);
+void  fceuWrapper_HideMenuToggle(void);
+bool  fceuWrapper_PauseAfterPlayback(void);
+void  fceuWrapper_TurboOn(void);
+void  fceuWrapper_TurboOff(void);
+void  fceuWrapper_TurboToggle(void);
+
 int  fceuWrapperInit( int argc, char *argv[] )
 {
 	int opt, error;
 	std::string s;
+
+	{
+		extern void msgLog_Message(const char*);
+		extern void msgLog_PrintError(const char*);
+		extern void throttle_SetEmulationSpeed(int);
+
+		fceu11::DriverCallbacks cb{};
+		cb.message = msgLog_Message;
+		cb.print_error = msgLog_PrintError;
+		cb.get_compiler_string = fceuWrapper_GetCompilerString;
+		cb.show_status_icon = fceuWrapper_ShowStatusIcon;
+		cb.toggle_status_icon = fceuWrapper_ToggleStatusIcon;
+		cb.hide_menu_toggle = fceuWrapper_HideMenuToggle;
+		cb.pause_after_playback = fceuWrapper_PauseAfterPlayback;
+		cb.set_emulation_speed = throttle_SetEmulationSpeed;
+		cb.turbo_on = fceuWrapper_TurboOn;
+		cb.turbo_off = fceuWrapper_TurboOff;
+		cb.turbo_toggle = fceuWrapper_TurboToggle;
+
+		fceu11::register_driver(cb);
+	}
 
 	FCEUD_Message("Starting " FCEU_NAME_AND_VERSION "...\n");
 
@@ -1878,20 +1911,20 @@ FCEUFILE* FCEUD_OpenArchiveIndex(ArchiveScanRecord& asr, std::string &fname, int
         printf("%s\n", #__f);\
         FCEU_DispMessage("Not implemented.",0);\
     }
-DUMMY(FCEUD_HideMenuToggle)
+DUMMY(fceuWrapper_HideMenuToggle)
 DUMMY(FCEUD_MovieReplayFrom)
 //DUMMY(FCEUD_AviRecordTo)
 //DUMMY(FCEUD_AviStop)
 //void fceu11::AviVideoUpdate(const unsigned char* buffer) { }
 //bool fceu11::AviIsRecording(void) {return false;}
 void fceu11::UseInputPreset(int preset) { }
-bool FCEUD_PauseAfterPlayback() { return pauseAfterPlayback; }
+bool fceuWrapper_PauseAfterPlayback() { return pauseAfterPlayback; }
 
-int FCEUD_ShowStatusIcon(void)
+int fceuWrapper_ShowStatusIcon(void)
 {
 	return showStatusIconOpt;
 }
-void FCEUD_ToggleStatusIcon(void)
+void fceuWrapper_ToggleStatusIcon(void)
 {
 	showStatusIconOpt = !showStatusIconOpt;
 }
@@ -1901,7 +1934,7 @@ bool FCEUD_ShouldDrawInputAids(void)
 	return drawInputAidsEnable;
 }
 
-void FCEUD_TurboOn (void) { turbo = true; };
-void FCEUD_TurboOff   (void) { turbo = false; };
-void FCEUD_TurboToggle(void) { turbo = !turbo; };
+void fceuWrapper_TurboOn (void) { turbo = true; };
+void fceuWrapper_TurboOff   (void) { turbo = false; };
+void fceuWrapper_TurboToggle(void) { turbo = !turbo; };
 
