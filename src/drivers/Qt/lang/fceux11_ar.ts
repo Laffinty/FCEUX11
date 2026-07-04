@@ -13,13 +13,13 @@
 <location filename="../AboutWindow.cpp" line="64" />
 <location filename="../AboutWindow.cpp" line="115" />
 <source>Based on FCEUX | License: GPLv2</source>
-<translation type="unfinished">Based on FCEUX | License: GPLv2</translation>
+<translation>Based on FCEUX | License: GPLv2</translation>
 </message>
 <message>
 <location filename="../AboutWindow.cpp" line="70" />
 <location filename="../AboutWindow.cpp" line="116" />
 <source>© 2026 FCEUX11 Contributors</source>
-<translation type="unfinished">© 2026 FCEUX11 Contributors</translation>
+<translation>© 2026 FCEUX11 Contributors</translation>
 </message>
 <message>
 <location filename="../AboutWindow.cpp" line="85" />
@@ -39,7 +39,7 @@
 <message>
 <location filename="../AviRiffViewer.cpp" line="115" />
 <source>RIFF TREE</source>
-<translation type="unfinished">RIFF TREE</translation>
+<translation>شجرة RIFF</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="139" />
@@ -54,32 +54,32 @@
 <message>
 <location filename="../AviRiffViewer.cpp" line="196" />
 <source>&amp;Open AVI File</source>
-<translation type="unfinished">&amp;Open AVI File</translation>
+<translation>&amp;فتح ملف AVI</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="198" />
 <source>Open AVI File</source>
-<translation type="unfinished">Open AVI File</translation>
+<translation>فتح ملف AVI</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="205" />
 <source>&amp;Close AVI File</source>
-<translation type="unfinished">&amp;Close AVI File</translation>
+<translation>&amp;إغلاق ملف AVI</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="206" />
 <source>Ctrl+C</source>
-<translation type="unfinished">Ctrl+C</translation>
+<translation>Ctrl+C</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="207" />
 <source>Close AVI File</source>
-<translation type="unfinished">Close AVI File</translation>
+<translation>إغلاق ملف AVI</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="216" />
 <source>&amp;Quit Window</source>
-<translation type="unfinished">&amp;Quit Window</translation>
+<translation>إ&amp;غلاق النافذة</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="218" />
@@ -89,12 +89,12 @@
 <message>
 <location filename="../AviRiffViewer.cpp" line="235" />
 <source>Open AVI Movie for Inspection</source>
-<translation type="unfinished">Open AVI Movie for Inspection</translation>
+<translation>فتح فيلم AVI للمعاينة</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="241" />
 <source>AVI Movies (*.avi) ;; All files (*)</source>
-<translation type="unfinished">AVI Movies (*.avi) ;; All files (*)</translation>
+<translation>ملفات فيديو AVI (*.avi) ;; جميع الملفات (*)</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="245" />
@@ -104,12 +104,12 @@
 <message>
 <location filename="../AviRiffViewer.cpp" line="267" />
 <source>.avi</source>
-<translation type="unfinished">.avi</translation>
+<translation>.avi</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="328" />
 <source>Loading AVI File</source>
-<translation type="unfinished">Loading AVI File</translation>
+<translation>جاري تحميل ملف AVI</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="328" />
@@ -119,22 +119,22 @@
 <message>
 <location filename="../AviRiffViewer.cpp" line="343" />
 <source>AVI Load Canceled</source>
-<translation type="unfinished">AVI Load Canceled</translation>
+<translation>تم إلغاء تحميل AVI</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="343" />
 <source>AVI Load Canceled By User.</source>
-<translation type="unfinished">AVI Load Canceled By User.</translation>
+<translation>تم إلغاء تحميل AVI من قبل المستخدم.</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="348" />
 <source>AVI Load Error</source>
-<translation type="unfinished">AVI Load Error</translation>
+<translation>خطأ في تحميل ملف AVI</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="348" />
 <source>AVI format errors detected. Unable to load file.</source>
-<translation type="unfinished">AVI format errors detected. Unable to load file.</translation>
+<translation>تم اكتشاف أخطاء في صيغة AVI. يتعذر تحميل الملف.</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="482" />
@@ -143,7 +143,7 @@
 <location filename="../AviRiffViewer.cpp" line="861" />
 <location filename="../AviRiffViewer.cpp" line="936" />
 <source>fcc</source>
-<translation type="unfinished">fcc</translation>
+<translation>fcc</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="489" />
@@ -152,219 +152,219 @@
 <location filename="../AviRiffViewer.cpp" line="868" />
 <location filename="../AviRiffViewer.cpp" line="943" />
 <source>cb</source>
-<translation type="unfinished">cb</translation>
+<translation>cb</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="496" />
 <source>dwMicroSecPerFrame</source>
-<translation type="unfinished">dwMicroSecPerFrame</translation>
+<translation>dwMicroSecPerFrame</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="503" />
 <source>dwMaxBytesPerSec</source>
-<translation type="unfinished">dwMaxBytesPerSec</translation>
+<translation>dwMaxBytesPerSec</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="510" />
 <source>dwPaddingGranularity</source>
-<translation type="unfinished">dwPaddingGranularity</translation>
+<translation>dwPaddingGranularity</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="517" />
 <location filename="../AviRiffViewer.cpp" line="636" />
 <source>dwFlags</source>
-<translation type="unfinished">dwFlags</translation>
+<translation>dwFlags</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="524" />
 <source>dwTotalFrames</source>
-<translation type="unfinished">dwTotalFrames</translation>
+<translation>dwTotalFrames</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="531" />
 <location filename="../AviRiffViewer.cpp" line="657" />
 <source>dwInitialFrames</source>
-<translation type="unfinished">dwInitialFrames</translation>
+<translation>dwInitialFrames</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="538" />
 <source>dwStreams</source>
-<translation type="unfinished">dwStreams</translation>
+<translation>dwStreams</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="545" />
 <location filename="../AviRiffViewer.cpp" line="698" />
 <source>dwSuggestedBufferSize</source>
-<translation type="unfinished">dwSuggestedBufferSize</translation>
+<translation>dwSuggestedBufferSize</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="552" />
 <source>dwWidth</source>
-<translation type="unfinished">dwWidth</translation>
+<translation>dwWidth</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="559" />
 <source>dwHeight</source>
-<translation type="unfinished">dwHeight</translation>
+<translation>dwHeight</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="566" />
 <location filename="../AviRiffViewer.cpp" line="664" />
 <source>dwScale</source>
-<translation type="unfinished">dwScale</translation>
+<translation>dwScale</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="573" />
 <location filename="../AviRiffViewer.cpp" line="671" />
 <source>dwRate</source>
-<translation type="unfinished">dwRate</translation>
+<translation>dwRate</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="580" />
 <location filename="../AviRiffViewer.cpp" line="684" />
 <source>dwStart</source>
-<translation type="unfinished">dwStart</translation>
+<translation>dwStart</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="587" />
 <location filename="../AviRiffViewer.cpp" line="691" />
 <source>dwLength</source>
-<translation type="unfinished">dwLength</translation>
+<translation>dwLength</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="615" />
 <source>fccType</source>
-<translation type="unfinished">fccType</translation>
+<translation>fccType</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="629" />
 <source>fccHandler</source>
-<translation type="unfinished">fccHandler</translation>
+<translation>fccHandler</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="643" />
 <source>wPriority</source>
-<translation type="unfinished">wPriority</translation>
+<translation>wPriority</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="650" />
 <source>wLanguage</source>
-<translation type="unfinished">wLanguage</translation>
+<translation>wLanguage</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="705" />
 <source>dwQuality</source>
-<translation type="unfinished">dwQuality</translation>
+<translation>dwQuality</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="712" />
 <source>dwSampleSize</source>
-<translation type="unfinished">dwSampleSize</translation>
+<translation>dwSampleSize</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="719" />
 <source>rcFrame.left</source>
-<translation type="unfinished">rcFrame.left</translation>
+<translation>rcFrame.left</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="726" />
 <source>rcFrame.top</source>
-<translation type="unfinished">rcFrame.top</translation>
+<translation>rcFrame.top</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="733" />
 <source>rcFrame.right</source>
-<translation type="unfinished">rcFrame.right</translation>
+<translation>rcFrame.right</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="740" />
 <source>rcFrame.bottom</source>
-<translation type="unfinished">rcFrame.bottom</translation>
+<translation>rcFrame.bottom</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="769" />
 <source>biSize</source>
-<translation type="unfinished">biSize</translation>
+<translation>biSize</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="776" />
 <source>biWidth</source>
-<translation type="unfinished">biWidth</translation>
+<translation>biWidth</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="783" />
 <source>biHeight</source>
-<translation type="unfinished">biHeight</translation>
+<translation>biHeight</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="790" />
 <source>biPlanes</source>
-<translation type="unfinished">biPlanes</translation>
+<translation>biPlanes</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="797" />
 <source>biBitCount</source>
-<translation type="unfinished">biBitCount</translation>
+<translation>biBitCount</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="811" />
 <source>biCompression</source>
-<translation type="unfinished">biCompression</translation>
+<translation>biCompression</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="818" />
 <source>biSizeImage</source>
-<translation type="unfinished">biSizeImage</translation>
+<translation>biSizeImage</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="825" />
 <source>biXPelsPerMeter</source>
-<translation type="unfinished">biXPelsPerMeter</translation>
+<translation>biXPelsPerMeter</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="832" />
 <source>biYPelsPerMeter</source>
-<translation type="unfinished">biYPelsPerMeter</translation>
+<translation>biYPelsPerMeter</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="839" />
 <source>biClrUsed</source>
-<translation type="unfinished">biClrUsed</translation>
+<translation>biClrUsed</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="846" />
 <source>biClrImportant</source>
-<translation type="unfinished">biClrImportant</translation>
+<translation>biClrImportant</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="875" />
 <source>wFormatTag</source>
-<translation type="unfinished">wFormatTag</translation>
+<translation>wFormatTag</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="882" />
 <source>nChannels</source>
-<translation type="unfinished">nChannels</translation>
+<translation>nChannels</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="889" />
 <source>nSamplesPerSec</source>
-<translation type="unfinished">nSamplesPerSec</translation>
+<translation>nSamplesPerSec</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="896" />
 <source>nAvgBytesPerSec</source>
-<translation type="unfinished">nAvgBytesPerSec</translation>
+<translation>nAvgBytesPerSec</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="903" />
 <source>nBlockAlign</source>
-<translation type="unfinished">nBlockAlign</translation>
+<translation>nBlockAlign</translation>
 </message>
 <message>
 <location filename="../AviRiffViewer.cpp" line="910" />
 <source>nBitsPerSample</source>
-<translation type="unfinished">nBitsPerSample</translation>
+<translation>nBitsPerSample</translation>
 </message>
 </context>
 <context>
