@@ -509,6 +509,7 @@ set(SRC_DRIVERS_QT
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/fceuWrapper.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/fceu_archive.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/fceu_globals.cpp  
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/fceu_callbacks.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ppuViewer.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/NameTableViewer.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/RamWatch.cpp  

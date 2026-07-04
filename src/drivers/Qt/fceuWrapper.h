@@ -40,6 +40,7 @@ int LoadGameFromLua( const char *path );
 
 int  fceuWrapperPreInit( int argc, char *argv[] );
 int  fceuWrapperInit( int argc, char *argv[] );
+void fceuWrapper_registerCallbacks(void);
 int  fceuWrapperMemoryCleanup( void );
 int  fceuWrapperClose( void );
 int  fceuWrapperUpdate( void );
