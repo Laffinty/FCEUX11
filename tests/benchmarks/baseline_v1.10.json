@@ -1,0 +1,68 @@
+{
+  "_comment": [
+    "v1.11 Bridge Phase A — v1.10 Cryptex performance baseline anchor.",
+    "",
+    "Captured from the v1.10 baseline code (tag v1.10 = commit 07f0126).",
+    "The measurement was taken at repo HEAD 6153fa3, which is a doc-only",
+    "commit (adds docs/internal/v1.11_bridge_build_plan.md) on top of",
+    "07f0126 and is therefore byte-identical to v1.10 for all compiled",
+    "translation units — so these numbers are the v1.10 anchor.",
+    "",
+    "Methodology (plan v1.11 §6.3, inherited from v1.10 §10.6.6):",
+    "  - binary: build/tests/fceux11_bench_tolerance_test.exe",
+    "  - run from tests/ (fixtures/ + baseline json resolve relative to cwd)",
+    "  - per round: 3 warm-up passes + 7 timed iterations, drop min+max,",
+    "    median of remaining 5 (bench_tolerance_test R4 default)",
+    "  - best-of-3: 3 sequential rounds, take the minimum (best) round median",
+    "  - sequential execution (no parallel rounds; avoids CPU contention)",
+    "",
+    "Raw per-round medians (ms for 60 frames):",
+    "  bench_cpu_frame : 65.992 / 65.755 / 65.680  -> best 65.680",
+    "  bench_ppu_frame : 66.994 / 66.634 / 67.239  -> best 66.634",
+    "  bench_full_frame: 69.698 / 69.407 / 68.685  -> best 68.685",
+    "",
+    "Host class note: this runner sits within 2.5% of the v1.5 Prism",
+    "baseline (fixtures/bench_baseline.json: 65.034 / 67.507 / 68.249),",
+    "so it is a consistent same-class host. Absolute ms are host-relative;",
+    "the v1.11 gate is the RELATIVE regression vs these numbers, not the",
+    "absolute floor. tolerance_pct below is the plan §8.2 hard gate (<2%)."
+  ],
+  "version": "v1.10",
+  "captured_at": "2026-07-04",
+  "captured_from_commit": "07f0126",
+  "measured_at_head": "6153fa3",
+  "captured_on": "Windows x64, MSVC Release, vcpkg (x64-windows)",
+  "tolerance_pct": 2.0,
+  "benchmarks": [
+    {
+      "name": "bench_cpu_frame",
+      "binary": "fceux11_bench_x6502_exec",
+      "rom": "fixtures/nestest.nes",
+      "frames_per_iter": 60,
+      "iterations": 5,
+      "metric": "best_of_3_median_total_ms",
+      "baseline_ms": 65.680,
+      "unit": "milliseconds for 60 frames"
+    },
+    {
+      "name": "bench_ppu_frame",
+      "binary": "fceux11_bench_ppu_render",
+      "rom": "fixtures/mapper_nrom.nes",
+      "frames_per_iter": 60,
+      "iterations": 5,
+      "metric": "best_of_3_median_total_ms",
+      "baseline_ms": 66.634,
+      "unit": "milliseconds for 60 frames"
+    },
+    {
+      "name": "bench_full_frame",
+      "binary": "fceux11_bench_apu_mix",
+      "rom": "fixtures/mapper_mmc3.nes",
+      "frames_per_iter": 60,
+      "iterations": 5,
+      "metric": "best_of_3_median_total_ms",
+      "baseline_ms": 68.685,
+      "unit": "milliseconds for 60 frames (CPU+PPU+APU)"
+    }
+  ]
+}

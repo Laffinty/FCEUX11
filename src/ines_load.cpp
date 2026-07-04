@@ -1,4 +1,4 @@
-// iNES load helper â€” extracted from ines.cpp for v1.10 Cryptex Phase A.3.
+// iNES load helper â€?extracted from ines.cpp for v1.10 Cryptex Phase A.3.
 // Contains the bulk of iNESLoad logic, called from the thin wrapper in ines.cpp.
 
 #include "types.h"
@@ -14,7 +14,10 @@
 #include "utils/general.h"
 #include "utils/memory.h"
 #include "vsuni.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "input.h"
 #include "rust/fceux11_rust.h"
 
@@ -35,7 +38,7 @@ extern uint32 VROM_size;
 extern int iNES2;
 extern uint32 iNESGameCRC32;
 
-// SetInput â€” look up input controllers by CRC (Rust FFI thin wrapper)
+// SetInput â€?look up input controllers by CRC (Rust FFI thin wrapper)
 static void SetInput(void) {
 	int32_t i1 = 0, i2 = 0, ifc = 0;
 	if (fceux11_rust_ines_lookup_input_crc(iNESGameCRC32, &i1, &i2, &ifc)) {
@@ -134,7 +137,7 @@ static int ines_apply_corrections(const FceuInesCartResult& cart, uint64 partial
 	return tofix;
 }
 
-// Main iNES load logic â€” called from thin wrapper in ines.cpp
+// Main iNES load logic â€?called from thin wrapper in ines.cpp
 int iNESLoadCore(const char *name, FCEUFILE *fp, CartInfo& iNESCart, FceuMallocPtr& trainerpoo_owner, FceuMallocPtr& ExtraNTARAM_owner) {
 	EMUFILE_MEMORY* ms = fp->EnsureMemorystream();
 	const uint8_t* file_data = reinterpret_cast<const uint8_t*>(ms->buf());

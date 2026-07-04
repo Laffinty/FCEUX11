@@ -44,7 +44,7 @@ int str_ucase(char *str) {
 
 
 ///Lower case routine. Returns number of characters modified
-// R1.2 (docs/internal/refactor_plan_R1_R5_archive.md Â§Phase R1): same O(n^2) â†’ O(n) fix as str_ucase.
+// R1.2 (docs/internal/refactor_plan_R1_R5_archive.md Â§Phase R1): same O(n^2) â†?O(n) fix as str_ucase.
 int str_lcase(char *str) {
 	if (!str) return 0;
 	int j = 0;
@@ -83,7 +83,7 @@ int str_ltrim(char *str, int flags) {
 	}
 	const size_t removed = static_cast<size_t>(p - str);
 	if (removed == 0) return 0;
-	// memmove handles the overlapping src/dst case (str+removed â†’ str).
+	// memmove handles the overlapping src/dst case (str+removed â†?str).
 	memmove(str, p, strlen(p) + 1);
 	return static_cast<int>(removed);
 }
@@ -95,7 +95,7 @@ int str_ltrim(char *str, int flags) {
 ///Returns number of characters removed
 // R1.1 (docs/internal/refactor_plan_R1_R5_archive.md Â§Phase R1): the original tested `str[0]` instead of
 // `str[strl-1]`, so it could only ever trim a leading space (and only one
-// byte at a time) â€” it never actually trimmed trailing whitespace as the
+// byte at a time) â€?it never actually trimmed trailing whitespace as the
 // function name and docstring claim. Replaced with a single-pass tail scan.
 int str_rtrim(char *str, int flags) {
 	if (!str) return 0;
@@ -121,16 +121,16 @@ int str_rtrim(char *str, int flags) {
 ///Removes whitespace depending on the flags set (See STRIP_x definitions in xstring.h)
 ///Returns number of characters removed, or -1 on error
 // R1.1 (docs/internal/refactor_plan_R1_R5_archive.md Â§Phase R1): the final `FCEU_strlcpy(str, sizeof(str),
-// astr)` had the same sizeof(str) BUG as str_ltrim â€” silently truncating
+// astr)` had the same sizeof(str) BUG as str_ltrim â€?silently truncating
 // copies at sizeof(char*) = 8 bytes on x64. Replaced with `memcpy(str, astr,
-// j+1)`, which is safe because astr is null-terminated and always â‰¤ str's
+// j+1)`, which is safe because astr is null-terminated and always â‰?str's
 // old content.
 // R1.3 (docs/internal/refactor_plan_R1_R5_archive.md Â§Phase R1): replaced the `malloc`/`free` temp
 // buffer with `std::vector<char>`. The vector is RAII-managed so the
 // failure path is now exception-safe (the original `free(astr)` after an
 // early return would have leaked; the new code has no early return after
 // the buffer is created). `str.reserve(strl)` pre-allocates the worst-case
-// size (output â‰¤ input length for a filter operation).
+// size (output â‰?input length for a filter operation).
 int str_strip(char *str, int flags) {
 	if (!str) return -1;
 	const size_t strl = strlen(str);
@@ -161,7 +161,7 @@ int str_strip(char *str, int flags) {
 
 ///Replaces all instances of 'search' with 'replace'
 ///Returns number of characters modified
-// R1.2 (docs/internal/refactor_plan_R1_R5_archive.md Â§Phase R1): same O(n^2) â†’ O(n) fix as str_ucase.
+// R1.2 (docs/internal/refactor_plan_R1_R5_archive.md Â§Phase R1): same O(n^2) â†?O(n) fix as str_ucase.
 int chr_replace(char *str, char search, char replace) {
 	if (!str) return 0;
 	int j = 0;
@@ -186,7 +186,7 @@ int chr_replace(char *str, char search, char replace) {
 // R1.3 (docs/internal/refactor_plan_R1_R5_archive.md Â§Phase R1): replaced the `malloc`/`free` temp
 // buffer with `std::string tmp`. The std::string manages its own capacity
 // (replaces the original `malloc(strl + 1)` upper bound, which silently
-// overflowed when `replace` was longer than `search` on aggregate â€” a
+// overflowed when `replace` was longer than `search` on aggregate â€?a
 // pre-existing UB). The new contract: caller's `str` buffer must be large
 // enough to hold the post-replacement length; the function does not
 // silently truncate.
@@ -214,7 +214,7 @@ int str_replace(char *str, const char *search, const char *replace) {
 	}
 	// R1.1 fix: was `FCEU_strlcpy(str, sizeof(str), astr)` (sizeof bug).
 	// std::string::copy writes exactly the requested count of bytes
-	// (it does not append a NUL â€” we do that explicitly). The new copy
+	// (it does not append a NUL â€?we do that explicitly). The new copy
 	// is also correct in the rare case where the replacement expands
 	// the result beyond the input length (the pre-R1.3 `memcpy(str,
 	// astr, j+1)` had the same semantics; std::string just doesn't
@@ -650,107 +650,6 @@ std::string mass_replace(const std::string &source, const std::string &victim, c
 	return answer;
 }
 
-#ifdef __WIN_DRIVER__ // this code tends to crash on SDL.
-//http://www.codeproject.com/KB/string/UtfConverter.aspx
-#include "ConvertUTF.h"
-namespace UtfConverter
-{
-    std::wstring FromUtf8(const std::string& utf8string)
-    {
-        size_t widesize = utf8string.length();
-        if (sizeof(wchar_t) == 2)
-        {
-            wchar_t* widestringnative = new wchar_t[widesize+1];
-            const UTF8* sourcestart = reinterpret_cast<const UTF8*>(utf8string.c_str());
-            const UTF8* sourceend = sourcestart + widesize;
-            UTF16* targetstart = reinterpret_cast<UTF16*>(widestringnative);
-            UTF16* targetend = targetstart + widesize+1;
-            ConversionResult res = ConvertUTF8toUTF16(&sourcestart, sourceend, &targetstart, targetend, strictConversion);
-            if (res != conversionOK)
-            {
-                delete [] widestringnative;
-                throw std::exception();
-            }
-            *targetstart = 0;
-            std::wstring resultstring(widestringnative);
-            delete [] widestringnative;
-            return resultstring;
-        }
-        else if (sizeof(wchar_t) == 4) // somewhat pointless as it's always 2 on WIN32, but whatever.
-        {
-            wchar_t* widestringnative = new wchar_t[widesize];
-            const UTF8* sourcestart = reinterpret_cast<const UTF8*>(utf8string.c_str());
-            const UTF8* sourceend = sourcestart + widesize;
-            UTF32* targetstart = reinterpret_cast<UTF32*>(widestringnative);
-            UTF32* targetend = targetstart + widesize;
-            ConversionResult res = ConvertUTF8toUTF32(&sourcestart, sourceend, &targetstart, targetend, strictConversion);
-            if (res != conversionOK)
-            {
-                delete [] widestringnative;
-                throw std::exception();
-            }
-            *targetstart = 0;
-            std::wstring resultstring(widestringnative);
-            delete [] widestringnative;
-            return resultstring;
-        }
-        else
-        {
-            throw std::exception();
-        }
-        return L"";
-    }
-
-    std::string ToUtf8(const std::wstring& widestring)
-    {
-        size_t widesize = widestring.length();
-
-        if (sizeof(wchar_t) == 2)
-        {
-            size_t utf8size = 3 * widesize + 1;
-            char* utf8stringnative = new char[utf8size];
-            const UTF16* sourcestart = reinterpret_cast<const UTF16*>(widestring.c_str());
-            const UTF16* sourceend = sourcestart + widesize;
-            UTF8* targetstart = reinterpret_cast<UTF8*>(utf8stringnative);
-            UTF8* targetend = targetstart + utf8size;
-            ConversionResult res = ConvertUTF16toUTF8(&sourcestart, sourceend, &targetstart, targetend, strictConversion);
-            if (res != conversionOK)
-            {
-                delete [] utf8stringnative;
-                throw std::exception();
-            }
-            *targetstart = 0;
-            std::string resultstring(utf8stringnative);
-            delete [] utf8stringnative;
-            return resultstring;
-        }
-        else if (sizeof(wchar_t) == 4) // again, sizeof(wchar_t) == 2 in win32
-        {
-            size_t utf8size = 4 * widesize + 1;
-            char* utf8stringnative = new char[utf8size];
-            const UTF32* sourcestart = reinterpret_cast<const UTF32*>(widestring.c_str());
-            const UTF32* sourceend = sourcestart + widesize;
-            UTF8* targetstart = reinterpret_cast<UTF8*>(utf8stringnative);
-            UTF8* targetend = targetstart + utf8size;
-            ConversionResult res = ConvertUTF32toUTF8(&sourcestart, sourceend, &targetstart, targetend, strictConversion);
-            if (res != conversionOK)
-            {
-                delete [] utf8stringnative;
-                throw std::exception();
-            }
-            *targetstart = 0;
-            std::string resultstring(utf8stringnative);
-            delete [] utf8stringnative;
-            return resultstring;
-        }
-        else
-        {
-            throw std::exception();
-        }
-        return "";
-    }
-}
-#else
 namespace UtfConverter
 {
     void SeqValue(std::string& result, unsigned n)
@@ -814,7 +713,6 @@ namespace UtfConverter
         return result;
     }
 }
-#endif
 
   
 //convert a std::string to std::wstring

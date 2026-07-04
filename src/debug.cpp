@@ -8,7 +8,10 @@
 #include "ines.h"
 #include "debug.h"
 #include "debugsymboltable.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "ppu.h"
 #include "rust/fceux11_rust.h"
 

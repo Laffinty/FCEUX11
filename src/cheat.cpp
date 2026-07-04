@@ -22,12 +22,12 @@
 // is now owned by Rust (fceux11-debug::cheat). This C++ file retains only
 // the parts that must call into x6502 (SetReadHandler / GetReadHandler) or
 // the platform-native file I/O (FCEU_MakeFName + FCEUD_UTF8fopen):
-//   * RebuildSubCheats     â€” installs/removes read handlers per cheat
-//   * SubCheatsRead        â€” the read handler itself
-//   * FCEU_ApplyPeriodicCheats â€” pokes RAM via CheatRPtrs
-//   * FCEU_CheatGetByte/SetByte â€” go through ARead/BWrite
-//   * FCEU_LoadGameCheats / SaveGameCheats / FlushGameCheats â€” file I/O
-//   * FCEU_CheatResetRAM / FCEU_CheatAddRAM â€” the CheatRPtrs translation array
+//   * RebuildSubCheats     â€?installs/removes read handlers per cheat
+//   * SubCheatsRead        â€?the read handler itself
+//   * FCEU_ApplyPeriodicCheats â€?pokes RAM via CheatRPtrs
+//   * FCEU_CheatGetByte/SetByte â€?go through ARead/BWrite
+//   * FCEU_LoadGameCheats / SaveGameCheats / FlushGameCheats â€?file I/O
+//   * FCEU_CheatResetRAM / FCEU_CheatAddRAM â€?the CheatRPtrs translation array
 //
 // Everything else delegates to fceux11_rust_cheat_*.
 
@@ -38,7 +38,10 @@
 #include "fceu.h"
 #include "file.h"
 #include "cart.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "utils/memory.h"
 
 #include "rust/fceux11_rust.h"
@@ -81,7 +84,7 @@ int globalCheatDisabled = 0;
 int disableAutoLSCheats = 0;
 bool disableShowGG = 0;
 // v0.2.24: cheat-map storage moved to Rust (fceux11_rust_cheat_map_*).
-// This pointer is repurposed as a presence sentinel â€” non-null when the
+// This pointer is repurposed as a presence sentinel â€?non-null when the
 // Rust-side buffer is allocated, NULL otherwise. The cheat code never
 // dereferences it (all reads/writes go through the FFI).
 static _8BYTECHEATMAP* cheatMap = NULL;
@@ -480,12 +483,12 @@ int fceu11::GlobalToggleCheat(int global_enabled)
 }
 
 // ---------------------------------------------------------------------------
-// Cheat search â€” all storage in Rust; C++ builds the memory snapshots that
+// Cheat search â€?all storage in Rust; C++ builds the memory snapshots that
 // Rust needs to evaluate the comparators.
 // ---------------------------------------------------------------------------
 
 namespace {
-// Snapshot helpers â€” populate `mem` from CheatRPtrs (current memory) and
+// Snapshot helpers â€?populate `mem` from CheatRPtrs (current memory) and
 // `pres` from the presence of a CheatRPtrs entry (1 = real RAM, 0 = absent).
 void buildMemorySnapshot(uint8* mem, uint8* pres)
 {
@@ -659,7 +662,7 @@ int fceu11::FindCheatMapByte(uint16 address)
 void fceu11::SetCheatMapByte(uint16 address, bool cheat)
 {
 	// v0.2.24: bit storage migrated to Rust. The original C++ ternary is
-	// `cheat ? OR : XOR` â€” preserved exactly inside the Rust impl.
+	// `cheat ? OR : XOR` â€?preserved exactly inside the Rust impl.
 	fceux11_rust_cheat_map_set(address, cheat ? 1 : 0);
 }
 

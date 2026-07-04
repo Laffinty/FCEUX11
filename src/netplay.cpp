@@ -27,7 +27,10 @@
 #include "state.h"
 #include "cheat.h"
 #include "input.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "utils/memory.h"
 
 #include <cstdio>

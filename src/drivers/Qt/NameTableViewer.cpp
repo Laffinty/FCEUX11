@@ -1761,7 +1761,7 @@ static void DrawNameTable(int scanline, int ntnum, bool invalidateCache)
 	}
 }
 //----------------------------------------------------
-void FCEUD_UpdateNTView(int scanline, bool drawall) 
+void fceWrapper_UpdateNTView(int scanline, bool drawall) 
 {
 	if (nameTableViewWindow == 0)
 	{

@@ -530,7 +530,7 @@ KillSound(void)
  * Unmutes if mute was active before.
  */
 void
-FCEUD_SoundVolumeAdjust(int n)
+fceWrapper_SoundVolumeAdjust(int n)
 {
 	int soundvolume;
 	g_config->getOption("SDL.Sound.Volume", &soundvolume);
@@ -565,8 +565,7 @@ FCEUD_SoundVolumeAdjust(int n)
 /**
  * Toggles the sound on or off.
  */
-void
-FCEUD_SoundToggle(void)
+void fceWrapper_SoundToggle(void)
 {
 	FCEUD_MuteSoundOutput( !s_mute );
 }

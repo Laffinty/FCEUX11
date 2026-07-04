@@ -1,4 +1,4 @@
-ï»¿#ifdef WIN32
+#ifdef WIN32
 #include <Windows.h>
 #include <direct.h>
 #define SetCurrentDir _chdir
@@ -15,7 +15,10 @@
 #include "sound.h"
 #include "state.h"
 #include "movie.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "cheat.h"
 #include "x6502.h"
 #include "ppu.h"
@@ -27,21 +30,8 @@
 
 extern char FileBase[];
 
-#ifdef __WIN_DRIVER__
-#include "drivers/win/common.h"
-#include "drivers/win/main.h"
-#include "drivers/win/taseditor/selection.h"
-#include "drivers/win/taseditor/laglog.h"
-#include "drivers/win/taseditor/markers.h"
-#include "drivers/win/taseditor/snapshot.h"
-#include "drivers/win/taseditor/taseditor_lua.h"
-#include "drivers/win/cdlogger.h"
-extern TASEDITOR_LUA taseditor_lua;
-#endif
+#include "driver_callbacks.h"
 
-#ifdef __SDL__
-
-#ifdef __QT_DRIVER__
 #include "drivers/Qt/sdl.h"
 #include "drivers/Qt/main.h"
 #include "drivers/Qt/input.h"
@@ -51,14 +41,6 @@ extern TASEDITOR_LUA taseditor_lua;
 #include "drivers/Qt/TasEditor/markers.h"
 #include "drivers/Qt/TasEditor/snapshot.h"
 #include "drivers/Qt/TasEditor/taseditor_lua.h"
-extern TASEDITOR_LUA *taseditor_lua;
-#else
-int LoadGame(const char *path, bool silent = false);
-int reloadLastGame(void);
-void fceuWrapperRequestAppExit(void);
-#endif
-
-#endif
 
 #include <cstdio>
 #include <cstdlib>
@@ -131,7 +113,7 @@ static int transparencyModifier = 255;
 static std::map<int, LuaSaveState*> s_savestate_objects;
 static int s_next_savestate_id = 1;
 
-// Rust FFI declarations â€” implemented in fceux11-lua crate
+// Rust FFI declarations ¡ª implemented in fceux11-lua crate
 extern "C" {
     int fceux11_lua_init(void);
     int fceux11_lua_load_script(const char *path, const char *arg);
@@ -144,7 +126,7 @@ extern "C" {
     void fceux11_lua_call_mem_hook(unsigned int addr, int size, unsigned int value, int hook_type);
 }
 
-// Public C++ entry points â€” delegate to Rust FFI
+// Public C++ entry points ¡ª delegate to Rust FFI
 void FCEU_LuaFrameBoundary() {
     fceux11_lua_frame_boundary();
 }
@@ -466,15 +448,9 @@ void CallRegisteredLuaMemHook(unsigned int address, int size, unsigned int value
 // ---------------------------------------------------------------------------
 // Taseditor stubs (full implementations require C++ taseditor API)
 // ---------------------------------------------------------------------------
-#ifdef __WIN_DRIVER__
 void TaseditorDisableManualFunctionIfNeeded() {
-	taseditor_lua.disableRunFunction();
+	if (auto* fn = fceu11::g_driver().taseditor_disable_run_function) fn();
 }
-#elif defined(__QT_DRIVER__)
-void TaseditorDisableManualFunctionIfNeeded() {
-	if (taseditor_lua) taseditor_lua->disableRunFunction();
-}
-#endif
 
 // ---------------------------------------------------------------------------
 // v0.2.22.2: Rust Lua FFI bridge functions
@@ -522,7 +498,7 @@ uint8_t fceux11_lua_GetMem(uint32_t addr) {
 void fceux11_lua_BWrite(uint32_t addr, uint8_t val) {
 	uint16_t a = static_cast<uint16_t>(addr & 0xFFFF);
 	if (a < 0x8000) {
-		// RAM/writable memory â€” call through BWrite handler
+		// RAM/writable memory ¡ª call through BWrite handler
 		writefunc wf = fceu11::g_bus.bwrite_table()[a];
 		if (wf) wf(a, val);
 	}
@@ -573,35 +549,12 @@ int32_t fceux11_lua_GetRomMD5(uint8_t* buf) {
 
 int32_t fceux11_lua_GetKeyboardState(uint8_t* keys) {
 	if (!keys) return -1;
-#ifdef __WIN_DRIVER__
-	extern int EnableBackgroundInput;
-	if (!EnableBackgroundInput) {
-		if (!GetKeyboardState(keys)) return -1;
-	} else {
-		memset(keys, 0, 256);
-		for (int i = 1; i < 255; i++) {
-			int active;
-			if (i == VK_CAPITAL || i == VK_NUMLOCK || i == VK_SCROLL)
-				active = GetKeyState(i) & 0x01;
-			else
-				active = GetAsyncKeyState(i) & 0x8000;
-			if (active) keys[i] = 0x80;
-		}
+	if (auto* fn = fceu11::g_driver().get_keyboard_state) {
+		fn(keys);
+		return 0;
 	}
-	return 0;
-#elif defined(__QT_DRIVER__)
 	memset(keys, 0, 256);
-	const uint8_t *keyBuf = QtSDL_getKeyboardState(nullptr);
-	if (keyBuf) {
-		for (int i = 0; i < 256 && i < SDL_NUM_SCANCODES; i++) {
-			if (keyBuf[i]) keys[i] = 0x80;
-		}
-	}
 	return 0;
-#else
-	memset(keys, 0, 256);
-	return -1;
-#endif
 }
 
 void fceux11_lua_GetMouseState(int32_t* x, int32_t* y, int32_t* click) {
@@ -970,7 +923,7 @@ int fceux11_lua_sound_get_length_count() {
     return lengthcount[0];
 }
 
-// Zapper â€” uses luazapperx/y/fire from lua-engine.cpp globals
+// Zapper ¡ª uses luazapperx/y/fire from lua-engine.cpp globals
 int fceux11_lua_zapper_get_x() {
     if (luazapperx < 0) return 0;
     return luazapperx;

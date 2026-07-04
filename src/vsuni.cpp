@@ -1,4 +1,4 @@
-// FCEUX11 â€” VS UniSystem bridge (v1.10 Cryptex Task 5, â‰¤120 lines).
+// FCEUX11 â€?VS UniSystem bridge (v1.10 Cryptex Task 5, â‰?20 lines).
 #include "types.h"
 #include "utils/safe_string.h"
 #include "x6502.h"
@@ -6,7 +6,10 @@
 #include "input.h"
 #include "vsuni.h"
 #include "state.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "cart.h"
 #include "ines.h"
 #include "rust/fceux11_rust.h"
@@ -88,11 +91,11 @@ void FCEU_VSUniCheck(uint64 md5partial, int *MapperNo, uint8 *Mirroring) {
 		static const char* mp[10]={"Default","RP2C04-0001","RP2C04-0002","RP2C04-0003","RP2C04-0004","RC2C03B","RC2C05-01","RC2C05-02","RC2C05-03","RC2C05-04"};
 		static const char* mm[3]={"Horizontal","Vertical","Four-screen"};
 		FCEU_printf("iNES header corrected:\n");
-		if (f&1)  FCEU_printf("  Mapperâ†’%d\n",*MapperNo);
-		if (f&2)  FCEU_printf("  Mirroringâ†’%s\n",mm[r.mirroring&3]);
+		if (f&1)  FCEU_printf("  Mapperâ†?d\n",*MapperNo);
+		if (f&2)  FCEU_printf("  Mirroringâ†?s\n",mm[r.mirroring&3]);
 		if (f&4)  FCEU_printf("  Typeâ†’Vs. System\n");
-		if (f&8)  FCEU_printf("  VS typeâ†’%s\n",mt[r.game_type]);
-		if (f&16) FCEU_printf("  VS PPUâ†’%s\n",mp[r.ppu]);
+		if (f&8)  FCEU_printf("  VS typeâ†?s\n",mt[r.game_type]);
+		if (f&16) FCEU_printf("  VS PPUâ†?s\n",mp[r.ppu]);
 		if (f&32) FCEU_printf("  Controllerâ†’Zapper\n");
 		if (f&64) FCEU_printf("  Controllers swapped\n");
 	}

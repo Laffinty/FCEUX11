@@ -22,7 +22,10 @@
 #include "types.h"
 #include "file.h"
 #include "fceu.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "boards/mapinc_bus.h"
 #ifdef _S9XLUA_H
 #include "fceulua.h"

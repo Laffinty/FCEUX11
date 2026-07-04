@@ -29,7 +29,10 @@
 #include "state.h"
 #include "cart.h"
 #include "ines.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "movie.h"
 #include "netplay.h"
 #include "rust/fceux11_rust.h"
@@ -52,7 +55,7 @@ static uint32 FDSRAMSize, FDSBIOSsize, CHRRAMSize;
 static uint8 *diskdatao[8] = {}, *diskdata[8] = {};
 static int TotalSides, DiskPtr, writeskip;
 
-// C++ globals aliased into Rust FdsRuntimeState (macros â†’ g_fds_state->*)
+// C++ globals aliased into Rust FdsRuntimeState (macros â†?g_fds_state->*)
 #define mapperFDS_control    (g_fds_state->control)
 #define mapperFDS_filesize   (g_fds_state->filesize)
 #define mapperFDS_block      (g_fds_state->block)

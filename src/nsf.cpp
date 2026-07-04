@@ -19,7 +19,7 @@
 */
 
 /// \file
-/// \brief NSF player bridge layer â€” v1.10 Cryptex.
+/// \brief NSF player bridge layer â€?v1.10 Cryptex.
 /// Runtime handlers live in nsf_runtime.cpp; UI in nsf_ui.cpp; loader in nsf_load.cpp.
 
 #include "types.h"
@@ -29,7 +29,10 @@
 #include "ines.h"
 #include "utils/memory.h"
 #include "file.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "rust/fceux11_rust.h"
 
 #include <cstdio>

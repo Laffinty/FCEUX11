@@ -38,7 +38,11 @@
 #include "netplay.h"
 #include "video.h"
 #include "input.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
+#include "driver_callbacks.h"
 #include "cart.h"
 
 #ifdef _WIN32
@@ -52,12 +56,6 @@
 #endif
 
 //TODO - we really need some kind of global platform-specific options api
-#ifdef __WIN_DRIVER__
-#include "drivers/win/main.h"
-#include "drivers/win/cheat.h"
-#include "drivers/win/ram_search.h"
-#include "drivers/win/ramwatch.h"
-#endif
 
 #include <string>
 #include <cstdio>
@@ -295,7 +293,6 @@ static bool ReadStateChunkFromBuffer(const uint8_t* data, int size, SFORMAT *sf)
 
 static int read_sfcpuc=0, read_snd=0;
 
-void FCEUD_BlitScreen(uint8 *XBuf); //mbg merge 7/17/06 YUCKY had to add
 void UpdateFCEUWindow(void);  //mbg merge 7/17/06 YUCKY had to add
 int CurrentState=0;
 extern int geniestage;
@@ -773,9 +770,7 @@ bool FCEUSS_Load(const char *fname, bool display_message)
 		}
 		#endif
 
-#ifdef __WIN_DRIVER__
-		Update_RAM_Search(); // Update_RAM_Watch() is also called.
-#endif
+		if (auto* fn = fceu11::g_driver().update_ram_search) fn();
 
 		//Update input display if movie is loaded
 		extern uint32 cur_input_display;
@@ -862,11 +857,11 @@ void AddExState(void *v, uint32 s, int type, const char *desc)
 			std::string desc = tmp;
 			if(names.find(desc) != names.end())
 			{
-#ifdef __WIN_DRIVER__
-				MessageBox(NULL,"OH NO!!! YOU HAVE AN INVALID SFORMAT! POST A BUG TICKET ALONG WITH INFO ON THE ROM YOURE USING\n","OOPS",MB_OK);
-#else
-				printf("OH NO!!! YOU HAVE AN INVALID SFORMAT! POST A BUG TICKET ALONG WITH INFO ON THE ROM YOURE USING\n");
-#endif
+				if (auto* fn = fceu11::g_driver().message_box) {
+					fn("OOPS", "OH NO!!! YOU HAVE AN INVALID SFORMAT! POST A BUG TICKET ALONG WITH INFO ON THE ROM YOURE USING\n", 0);
+				} else {
+					printf("OH NO!!! YOU HAVE AN INVALID SFORMAT! POST A BUG TICKET ALONG WITH INFO ON THE ROM YOURE USING\n");
+				}
 				exit(0);
 			}
 			names[desc] = true;
@@ -877,7 +872,7 @@ void AddExState(void *v, uint32 s, int type, const char *desc)
 	if(desc)
 	{
 		// v0.3.6.5-followup: capture the actual buffer size; do NOT use
-		// sizeof((char*)SFMDATA[SFEXINDEX].desc) â€” that is the size of a
+		// sizeof((char*)SFMDATA[SFEXINDEX].desc) â€?that is the size of a
 		// pointer (8 on x64), not the malloc'd buffer, and triggers an
 		// ASan heap-buffer-overflow for any desc shorter than 7 chars
 		// (e.g. the 4-char "CHRR"/"EXNR" tags registered during iNES_Init).

@@ -20,6 +20,7 @@
 // fceuWrapper.cpp
 //
 #include <stdio.h>
+#include "driver_callbacks.h"
 #include "utils/safe_string.h"
 #include <stdlib.h>
 #include <stdint.h>
@@ -77,30 +78,32 @@
 #define strcasecmp _stricmp
 #endif
 //*****************************************************************
-// Define Global Variables to be shared with FCEU Core
+// Extern declarations — defined in fceu_globals.cpp
 //*****************************************************************
-int  dendy = 0;
-int eoptions=0;
-int isloaded=0;
-int pal_emulation=0;
-int gametype = 0;
-int closeFinishedMovie = 0;
-int KillFCEUXonFrame = 0;
+extern int  dendy;
+extern int  eoptions;
+extern int  isloaded;
+extern int  pal_emulation;
+extern int  gametype;
+extern int  closeFinishedMovie;
+extern int  KillFCEUXonFrame;
 
-bool turbo = false;
-bool pauseAfterPlayback = false;
-bool suggestReadOnlyReplay = true;
-bool showStatusIconOpt = true;
-bool drawInputAidsEnable = true;
-bool usePaletteForVideoBg = false;
-unsigned int gui_draw_area_width   = 256;
-unsigned int gui_draw_area_height  = 256;
+extern bool turbo;
+extern bool pauseAfterPlayback;
+extern bool suggestReadOnlyReplay;
+extern bool showStatusIconOpt;
+extern bool drawInputAidsEnable;
+extern bool usePaletteForVideoBg;
+extern unsigned int gui_draw_area_width;
+extern unsigned int gui_draw_area_height;
 
-// global configuration object
-Config *g_config = NULL;
+extern Config *g_config;
+extern bool g_noConsole;
+extern unsigned int emulatorCycleCount;
 
-// v0.3.15.x PHASE-3: --no-console flag, parsed in fceuWrapperPreInit.
-bool g_noConsole = false;
+#ifdef CREATE_AVI
+extern int mutecapture;
+#endif
 
 #ifdef _WIN32
 // v0.3.15.x PHASE-3: DirectStorage probe cache. Populated once at
@@ -117,124 +120,8 @@ static int periodic_saves = 0;
 static int   mutexLocks = 0;
 static int   mutexPending = 0;
 static bool  emulatorHasMutex = 0;
-unsigned int emulatorCycleCount = 0;
 
 extern double g_fpsScale;
-
-#ifdef CREATE_AVI
-int mutecapture = 0;
-#endif
-//*****************************************************************
-// Define Global Functions to be shared with FCEU Core
-//*****************************************************************
-//
-
-// Message functions defined in MsgLogViewer.cpp
-//void FCEUD_Message(const char *text)
-//void FCEUD_PrintError(const char *errormsg)
-
-/**
- * Opens a file, C++ style, to be read a byte at a time.
- */
-FILE *FCEUD_UTF8fopen(const char *fn, const char *mode)
-{
-   FILE *fp = ::fopen(fn,mode);
-	return(fp);
-}
-
-/**
- * Opens a file to be read a byte at a time.
- */
-EMUFILE_FILE* FCEUD_UTF8_fstream(const char *fn, const char *m)
-{
-	std::ios_base::openmode mode = std::ios_base::binary;
-	if(!strcmp(m,"r") || !strcmp(m,"rb"))
-		mode |= std::ios_base::in;
-	else if(!strcmp(m,"w") || !strcmp(m,"wb"))
-		mode |= std::ios_base::out | std::ios_base::trunc;
-	else if(!strcmp(m,"a") || !strcmp(m,"ab"))
-		mode |= std::ios_base::out | std::ios_base::app;
-	else if(!strcmp(m,"r+") || !strcmp(m,"r+b"))
-		mode |= std::ios_base::in | std::ios_base::out;
-	else if(!strcmp(m,"w+") || !strcmp(m,"w+b"))
-		mode |= std::ios_base::in | std::ios_base::out | std::ios_base::trunc;
-	else if(!strcmp(m,"a+") || !strcmp(m,"a+b"))
-		mode |= std::ios_base::in | std::ios_base::out | std::ios_base::app;
-    return new EMUFILE_FILE(fn, m);
-	//return new std::fstream(fn,mode);
-}
-
-#if defined(MSVC)
- #ifdef _M_X64
-   #define _MSVC_ARCH "x64"
- #else
-   #define _MSVC_ARCH "x86"
- #endif
- #ifdef _DEBUG
-  #define _MSVC_BUILD "debug"
- #else
-  #define _MSVC_BUILD "release"
- #endif
- #define __COMPILER__STRING__ "msvc " _Py_STRINGIZE(_MSC_VER) " " _MSVC_ARCH " " _MSVC_BUILD
- #define _Py_STRINGIZE(X) _Py_STRINGIZE1((X))
- #define _Py_STRINGIZE1(X) _Py_STRINGIZE2 ## X
- #define _Py_STRINGIZE2(X) #X
- //re: http://72.14.203.104/search?q=cache:HG-okth5NGkJ:mail.python.org/pipermail/python-checkins/2002-November/030704.html+_msc_ver+compiler+version+string&hl=en&gl=us&ct=clnk&cd=5
-#elif defined(__GNUC__)
- #define __COMPILER__STRING__ "gcc " __VERSION__
-#else
- #define __COMPILER__STRING__ "unknown"
-#endif
-
-static const char *s_CompilerString = __COMPILER__STRING__;
-/**
- * Returns the compiler string.
- */
-const char *FCEUD_GetCompilerString(void)
-{
-	return s_CompilerString;
-}
-
-/**
- * Get the time in ticks.
- */
-uint64
-FCEUD_GetTime(void)
-{
-	uint64 t;
-
-	if (FCEU::timeStampModuleInitialized())
-	{
-		FCEU::timeStampRecord ts;
-
-		ts.readNew();
-
-		t = ts.toCounts();
-	}
-	else
-	{
-		t = (double)SDL_GetTicks();
-
-		t = t * 1e-3;
-	}
-	return t;
-}
-
-/**
- * Get the tick frequency in Hz.
- */
-uint64
-FCEUD_GetTimeFreq(void)
-{
-	// SDL_GetTicks() is in milliseconds
-	uint64 f = 1000;
-
-	if (FCEU::timeStampModuleInitialized())
-	{
-		f = FCEU::timeStampRecord::countFreq();
-	}
-	return f;
-}
 
 /**
  * Initialize all of the subsystem drivers: video, audio, and joystick.
@@ -755,6 +642,8 @@ int  fceuWrapperInit( int argc, char *argv[] )
 	int opt, error;
 	std::string s;
 
+	fceuWrapper_registerCallbacks();
+
 	FCEUD_Message("Starting " FCEU_NAME_AND_VERSION "...\n");
 
 	extern void fceux11_lua_SetMouseDataCallback(void (*fn)(uint32_t *md));
@@ -1208,7 +1097,6 @@ FCEUD_Update(uint8 *XBuf,
 	 int Count)
 {
 	int blitDone = 0;
-	//extern int FCEUDnetplay;
 
 	aviRecordAddAudioFrame( Buffer, Count );
 	WriteSound(Buffer,Count);
@@ -1220,7 +1108,6 @@ FCEUD_Update(uint8 *XBuf,
 			BlitScreen(XBuf); blitDone = 1;
 		}
 	}
-	//FCEUD_UpdateInput();
 }
 
 static void DoFun(int frameskip, int periodic_saves)
@@ -1432,476 +1319,4 @@ int  fceuWrapperUpdate( void )
 	}
 	return 0;
 }
-
-static int minizip_ScanArchive( const char *filepath, ArchiveScanRecord &rec)
-{
-	int idx=0, ret;
-	unzFile zf;
-	unz_file_info fi;
-	char filename[512];
-
-	zf = unzOpen( filepath );
-
-	if ( zf == NULL )
-	{
-		//printf("Error: Failed to open Zip File: '%s'\n", fname.c_str() );
-		return -1;
-	}
-	rec.type = 0;
-
-	ret = unzGoToFirstFile( zf );
-
-	//printf("unzGoToFirstFile: %i \n", ret );
-
-	while ( ret == 0 )
-	{
-		FCEUARCHIVEFILEINFO_ITEM item;
-
-		unzGetCurrentFileInfo( zf, &fi, filename, sizeof(filename), NULL, 0, NULL, 0 );
-
-		//printf("Filename: %u '%s' \n", fi.uncompressed_size, filename );
-
-		item.name.assign( filename );
-		item.size  = fi.uncompressed_size;
-		item.index = idx; idx++;
-
-		rec.files.push_back( item );
-
-		ret = unzGoToNextFile( zf );
-
-		//printf("unzGoToNextFile: %i \n", ret );
-	}
-	rec.numFilesInArchive = idx;
-
-	unzClose( zf );
-
-	return 0;
-}
-
-#ifdef _USE_LIBARCHIVE
-#include <archive.h>
-#include <archive_entry.h>
-
-static int libarchive_ScanArchive( const char *filepath, ArchiveScanRecord &rec)
-{
-	int r, idx=0;
-	struct archive *a;
-	struct archive_entry *entry;
-
-	a = archive_read_new();
-
-	if (a == nullptr)
-	{
-		return -1;
-	}
-
-	// Initialize decoders
-	r = archive_read_support_filter_all(a);
-	if (r)
-	{
-		archive_read_free(a);
-		return -1;
-	}
-
-	// Initialize formats
-	r = archive_read_support_format_all(a);
-	if (r)
-	{
-		archive_read_free(a);
-		return -1;
-	}
-
-	r = archive_read_open_filename(a, filepath, 10240);
-
-	if (r)
-	{
-		archive_read_free(a);
-		return -1;
-	}
-	rec.type = 1;
-
-	while (1)
-	{
-		r = archive_read_next_header(a, &entry);
-		if (r == ARCHIVE_EOF)
-		{
-			break;
-		}
-		else if (r != ARCHIVE_OK)
-		{
-			printf("archive_read_next_header() %s\n", archive_error_string(a));
-			break;
-		}
-		const char *filename = archive_entry_pathname(entry);
-
-		FCEUARCHIVEFILEINFO_ITEM item;
-		item.name.assign( filename );
-		item.size  = archive_entry_size(entry);
-		item.index = idx; idx++;
-
-		rec.files.push_back( item );
-	}
-	rec.numFilesInArchive = idx;
-
-	archive_read_free(a);
-
-	return 0;
-}
-#endif
-
-ArchiveScanRecord FCEUD_ScanArchive(std::string fname)
-{
-	int ret = -1;
-	ArchiveScanRecord rec;
-		
-#ifdef _USE_LIBARCHIVE
-	ret = libarchive_ScanArchive( fname.c_str(), rec );
-#endif
-
-	if (ret == -1)
-	{
-		minizip_ScanArchive( fname.c_str(), rec );
-	}
-	return rec;
-}
-
-static FCEUFILE* minizip_OpenArchive(ArchiveScanRecord& asr, std::string &fname, std::string *searchFile, int innerIndex )
-{
-	int ret, idx=0;
-	FCEUFILE* fp = nullptr;
-	void *tmpMem = nullptr;
-	unzFile zf;
-	unz_file_info fi;
-	char filename[512];
-	bool foundFile = false;
-
-	zf = unzOpen( fname.c_str() );
-
-	if ( zf == NULL )
-	{
-		//printf("Error: Failed to open Zip File: '%s'\n", fname.c_str() );
-		return fp;
-	}
-
-	//printf("Searching for %s in %s \n", searchFile.c_str(), fname.c_str() );
-
-	ret = unzGoToFirstFile( zf );
-
-	//printf("unzGoToFirstFile: %i \n", ret );
-
-	while ( ret == 0 )
-	{
-		unzGetCurrentFileInfo( zf, &fi, filename, sizeof(filename), NULL, 0, NULL, 0 );
-
-		//printf("Filename: %u '%s' \n", fi.uncompressed_size, filename );
-
-		if (searchFile)
-		{
-			if ( strcmp( searchFile->c_str(), filename ) == 0 )
-			{
-			   //printf("Found Filename: %u '%s' \n", fi.uncompressed_size, filename );
-				foundFile = true; break;
-			}
-		}
-		else if ((innerIndex != -1) && (idx == innerIndex))
-		{
-			foundFile = true; break;
-		}
-
-		ret = unzGoToNextFile( zf );
-
-		//printf("unzGoToNextFile: %i \n", ret );
-		idx++;
-	}
-
-	if ( !foundFile )
-	{
-		unzClose( zf );
-		return fp;
-	}
-
-	tmpMem = ::malloc( fi.uncompressed_size );
-
-	if ( tmpMem == NULL )
-	{
-		unzClose( zf );
-		return fp;
-	}
-	//printf("Loading via minizip\n");
-
-	EMUFILE_MEMORY* ms = new EMUFILE_MEMORY(fi.uncompressed_size);
-
-	unzOpenCurrentFile( zf );
-	unzReadCurrentFile( zf, tmpMem, fi.uncompressed_size );
-	unzCloseCurrentFile( zf );
-
-	ms->fwrite(std::span<const std::byte>(static_cast<const std::byte*>(tmpMem), fi.uncompressed_size));
-
-	free( tmpMem );
-
-	//if we extracted the file correctly
-	fp = new FCEUFILE();
-	fp->archiveFilename = fname;
-	fp->filename = filename;
-	fp->fullFilename = fp->archiveFilename + "|" + fp->filename;
-	fp->archiveIndex = idx;
-	fp->mode = FCEUFILE::READ;
-	fp->size = fi.uncompressed_size;
-	fp->stream = ms;
-	fp->archiveCount = (int)asr.numFilesInArchive;
-	ms->fseek(0,SEEK_SET); //rewind so that the rom analyzer sees a freshly opened file
-
-	unzClose( zf );
-
-	return fp;
-}
-
-#ifdef _USE_LIBARCHIVE
-static FCEUFILE* libarchive_OpenArchive( ArchiveScanRecord& asr, std::string& fname, std::string *searchFile, int innerIndex)
-{
-	int r, idx=0;
-	struct archive *a;
-	struct archive_entry *entry;
-	const char *filename = nullptr;
-	bool foundFile = false;
-	int fileSize = 0;
-	FCEUFILE* fp = nullptr;
-
-	a = archive_read_new();
-
-	if (a == nullptr)
-	{
-		archive_read_free(a);
-		return nullptr;
-	}
-
-	// Initialize decoders
-	r = archive_read_support_filter_all(a);
-	if (r)
-	{
-		archive_read_free(a);
-		return nullptr;
-	}
-
-	// Initialize formats
-	r = archive_read_support_format_all(a);
-	if (r)
-	{
-		archive_read_free(a);
-		return nullptr;
-	}
-
-	r = archive_read_open_filename(a, fname.c_str(), 10240);
-
-	if (r)
-	{
-		archive_read_free(a);
-		return nullptr;
-	}
-
-	while (1)
-	{
-		r = archive_read_next_header(a, &entry);
-		if (r == ARCHIVE_EOF)
-		{
-			break;
-		}
-		else if (r != ARCHIVE_OK)
-		{
-			printf("archive_read_next_header() %s\n", archive_error_string(a));
-			break;
-		}
-		filename = archive_entry_pathname(entry);
-		fileSize = archive_entry_size(entry);
-
-		if (searchFile)
-		{
-			if (strcmp( filename, searchFile->c_str() ) == 0)
-			{
-				foundFile = true; break;
-			}
-		}
-		else if ((innerIndex != -1) && (idx == innerIndex))
-		{
-			foundFile = true; break;
-		}
-		idx++;
-	}
-
-	if (foundFile && (fileSize > 0))
-	{
-		const void *buff;
-		size_t size, totalSize = 0;
-		#if ARCHIVE_VERSION_NUMBER >= 3000000
-			int64_t offset;
-		#else
-			off_t offset;
-		#endif
-
-		//printf("Loading via libarchive\n");
-
-		EMUFILE_MEMORY* ms = new EMUFILE_MEMORY(fileSize);
-
-		while (1)
-		{
-			r = archive_read_data_block(a, &buff, &size, &offset);
-
-			if (r == ARCHIVE_EOF)
-			{
-				break;
-			}
-			if (r != ARCHIVE_OK)
-			{
-				break;
-			}
-			//printf("Read: %p   Size:%zu   Offset:%llu\n", buff, size, (long long int)offset);
-			ms->fwrite(std::span<const std::byte>(static_cast<const std::byte*>(buff), size));
-			totalSize += size;
-		}
-
-		//if we extracted the file correctly
-		fp = new FCEUFILE();
-		fp->archiveFilename = fname;
-		fp->filename = filename;
-		fp->fullFilename = fp->archiveFilename + "|" + fp->filename;
-		fp->archiveIndex = idx;
-		fp->mode = FCEUFILE::READ;
-		fp->size = totalSize;
-		fp->stream = ms;
-		fp->archiveCount = (int)asr.numFilesInArchive;
-		ms->fseek(0,SEEK_SET); //rewind so that the rom analyzer sees a freshly opened file
-	}
-
-	archive_read_free(a);
-
-	return fp;
-}
-
-#endif
-
-FCEUFILE* FCEUD_OpenArchive(ArchiveScanRecord& asr, std::string& fname, std::string* innerFilename, int* userCancel)
-{
-	FCEUFILE* fp = nullptr;
-	std::string searchFile;
-
-	if ( innerFilename != NULL )
-	{
-		searchFile = *innerFilename;
-	}
-	else
-	{
-		std::vector <std::string> fileList;
-
-		for (size_t i=0; i<asr.files.size(); i++)
-		{
-			char base[512], suffix[128];
-
-			getFileBaseName( asr.files[i].name.c_str(), base, suffix );
-
-			if ( (strcasecmp( suffix, ".nes" ) == 0) ||
-			     (strcasecmp( suffix, ".nsf" ) == 0) ||
-			     (strcasecmp( suffix, ".fds" ) == 0) ||
-			     (strcasecmp( suffix, ".unf" ) == 0) ||
-			     (strcasecmp( suffix, ".unif") == 0) )
-			{
-				fileList.push_back( asr.files[i].name );
-			}
-		}
-
-		if ( fileList.size() > 1 )
-		{
-			if ( consoleWindow != NULL )
-			{
-				int sel = consoleWindow->showListSelectDialog( "Select ROM From Archive", fileList );
-
-				if ( sel < 0 )
-				{
-					if ( userCancel )
-					{
-						*userCancel = 1;
-					}
-					return fp;
-				}
-				searchFile = fileList[sel];
-			}
-		}
-		else if ( fileList.size() > 0 )
-		{
-			searchFile = fileList[0];
-		}
-	}
-
-#ifdef _USE_LIBARCHIVE
-	fp = libarchive_OpenArchive(asr, fname, &searchFile, -1 );
-#endif
-
-	if (fp == nullptr)
-	{
-		fp = minizip_OpenArchive(asr, fname, &searchFile, -1 );
-	}
-	return fp;
-}
-
-FCEUFILE* FCEUD_OpenArchive(ArchiveScanRecord& asr, std::string& fname, std::string* innerFilename)
-{
-	int userCancel = 0;
-
-	return FCEUD_OpenArchive( asr, fname, innerFilename, &userCancel );
-}
-
-FCEUFILE* FCEUD_OpenArchiveIndex(ArchiveScanRecord& asr, std::string &fname, int innerIndex, int* userCancel)
-{
-	FCEUFILE* fp = nullptr;
-
-#ifdef _USE_LIBARCHIVE
-	fp = libarchive_OpenArchive( asr, fname, nullptr, innerIndex );
-#endif
-	if (fp == nullptr)
-	{
-		fp = minizip_OpenArchive(asr, fname, nullptr, innerIndex);
-	}
-
-	return fp;
-}
-
-FCEUFILE* FCEUD_OpenArchiveIndex(ArchiveScanRecord& asr, std::string &fname, int innerIndex)
-{
-	int userCancel = 0;
-
-	return FCEUD_OpenArchiveIndex( asr, fname, innerIndex, &userCancel );
-}
-
-// dummy functions
-
-#define DUMMY(__f) \
-    void __f(void) {\
-        printf("%s\n", #__f);\
-        FCEU_DispMessage("Not implemented.",0);\
-    }
-DUMMY(FCEUD_HideMenuToggle)
-DUMMY(FCEUD_MovieReplayFrom)
-//DUMMY(FCEUD_AviRecordTo)
-//DUMMY(FCEUD_AviStop)
-//void fceu11::AviVideoUpdate(const unsigned char* buffer) { }
-//bool fceu11::AviIsRecording(void) {return false;}
-void fceu11::UseInputPreset(int preset) { }
-bool FCEUD_PauseAfterPlayback() { return pauseAfterPlayback; }
-
-int FCEUD_ShowStatusIcon(void)
-{
-	return showStatusIconOpt;
-}
-void FCEUD_ToggleStatusIcon(void)
-{
-	showStatusIconOpt = !showStatusIconOpt;
-}
-
-bool FCEUD_ShouldDrawInputAids(void)
-{
-	return drawInputAidsEnable;
-}
-
-void FCEUD_TurboOn (void) { turbo = true; };
-void FCEUD_TurboOff   (void) { turbo = false; };
-void FCEUD_TurboToggle(void) { turbo = !turbo; };
 

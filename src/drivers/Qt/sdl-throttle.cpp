@@ -435,7 +435,7 @@ int CustomEmulationSpeed(int spdPercent)
  * Set the emulation speed throttling to a specific value.
  */
 void
-FCEUD_SetEmulationSpeed(int cmd)
+throttle_SetEmulationSpeed(int cmd)
 {
 	MaxSpeed = false;
     

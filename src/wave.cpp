@@ -1,5 +1,5 @@
 /// \file
-/// \brief Wave Audio Export wrapper â€” delegates to Rust.
+/// \brief Wave Audio Export wrapper â€?delegates to Rust.
 ///
 /// Phase 4 (v0.2.5): Rust module provides a memory-safe WAV file writer
 /// using `std::fs::File` and manual PCM header construction.
@@ -7,7 +7,10 @@
 #include "types.h"
 #include "fceu.h"
 
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "sound.h"
 #include "wave.h"
 
@@ -22,11 +25,7 @@ void FCEU_WriteWaveData(int32 *Buffer, int Count)
 	int16 *dest;
 	int x;
 
-#ifndef __WIN_DRIVER__
 	if(!fceux11_rust_wave_running()) return;
-#else
-	if(!fceux11_rust_wave_running() && !fceu11::AviIsRecording()) return;
-#endif
 
 	dest=temp;
 	x=Count;
@@ -43,13 +42,6 @@ void FCEU_WriteWaveData(int32 *Buffer, int Count)
 
 	if(fceux11_rust_wave_running())
 		fceux11_rust_wave_write(temp, Count);
-
-#ifdef __WIN_DRIVER__
-	if(fceu11::AviIsRecording())
-	{
-		FCEUI_AviSoundUpdate((void*)temp, Count);
-	}
-#endif
 }
 
 int fceu11::EndWaveRecord()

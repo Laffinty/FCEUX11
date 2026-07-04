@@ -301,7 +301,7 @@ void MsgLogViewDialog_t::updatePeriodic(void)
 *
 * TODO: This function should have a better name.
 **/
-void FCEUD_Message(const char *text)
+void msgLog_Message(const char *text)
 {
 	fputs(text, stdout);
 	//fprintf(stdout, "\n");
@@ -317,7 +317,7 @@ void FCEUD_Message(const char *text)
 *
 * @param errormsg Text of the error message.
 **/
-void FCEUD_PrintError(const char *errormsg)
+void msgLog_PrintError(const char *errormsg)
 {
 	fprintf(stderr, "%s\n", errormsg);
 

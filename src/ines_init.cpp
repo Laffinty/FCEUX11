@@ -1,4 +1,4 @@
-// iNES mapper initialization â€” extracted from ines.cpp for v1.10 Cryptex Phase A.3.
+// iNES mapper initialization â€?extracted from ines.cpp for v1.10 Cryptex Phase A.3.
 
 #include "types.h"
 #include "utils/memory.h"
@@ -7,7 +7,10 @@
 #include "ines.h"
 #include "state.h"
 #include "vsuni.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 
 #include "rust/fceux11_rust.h"
 

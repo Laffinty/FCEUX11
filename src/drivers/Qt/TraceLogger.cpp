@@ -1346,7 +1346,7 @@ int FCEUD_TraceLoggerRunning(void)
 	return logging;
 }
 
-void FCEUD_FlushTrace()
+void fceWrapper_FlushTrace()
 {
 	//not needed, since it's doing something in a thread, i guess.
 	//seems weird that there's no way to rendezvous with it
@@ -1354,7 +1354,7 @@ void FCEUD_FlushTrace()
 
 //----------------------------------------------------
 //todo: really speed this up
-void FCEUD_TraceInstruction(uint8 *opcode, int size)
+void fceWrapper_TraceInstruction(uint8 *opcode, int size)
 {
 	if (!logging)
 		return;

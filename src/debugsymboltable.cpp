@@ -16,12 +16,7 @@
 #include "cart.h"
 #include "rust/fceux11_rust.h"
 
-#ifdef __QT_DRIVER__
 #include "Qt/ConsoleUtilities.h"
-#else
-extern char LoadedRomFName[4096];
-static inline const char* getRomFile() { return LoadedRomFName; }
-#endif
 
 #include <cstdio>
 #include <cstring>

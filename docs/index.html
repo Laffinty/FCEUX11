@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="dark" />
 <meta name="theme-color" content="#080a09" />
-<title>FCEUX11 — NES/Famicom Emulator Optimized for Windows</title>
-<meta name="description" content="FCEUX11 v1.10 Cryptex — a modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 — faster ROM loading, reliable save states, FDS support, debugging tools, TAS editor, and Lua scripting." />
+<title>FCEUX11 �?NES/Famicom Emulator Optimized for Windows</title>
+<meta name="description" content="FCEUX11 v1.11 Cryptex �?a modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 �?faster ROM loading, reliable save states, FDS support, debugging tools, TAS editor, and Lua scripting." />
 <meta name="keywords" content="FCEUX11, FCEUX, NES emulator, Famicom emulator, Windows emulator, TAS editor, Qt6, C++20, game emulator, 8-bit" />
 <meta name="author" content="Laffinty" />
 <meta name="robots" content="index, follow, max-image-preview:large" />
@@ -15,16 +15,16 @@
 <link rel="icon" type="image/x-icon" href="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <meta property="og:site_name" content="FCEUX11" />
 <meta property="og:type" content="website" />
-<meta property="og:title" content="FCEUX11 v1.10 Cryptex — NES/Famicom Emulator for Windows" />
-<meta property="og:description" content="FCEUX11 v1.10 Cryptex — modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 — faster ROM loading, reliable save states, debugging, TAS, Lua." />
+<meta property="og:title" content="FCEUX11 v1.11 Cryptex �?NES/Famicom Emulator for Windows" />
+<meta property="og:description" content="FCEUX11 v1.11 Cryptex �?modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 �?faster ROM loading, reliable save states, debugging, TAS, Lua." />
 <meta property="og:url" content="https://laffinty.github.io/FCEUX11/" />
 <meta property="og:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <meta property="og:locale" content="en_US" />
 <meta property="og:locale:alternate" content="zh_CN" />
 <meta name="google-site-verification" content="2be70qD04OCrme3y8dDxUj_h1QwY4no9IWoFQpepryE" />
 <meta name="twitter:card" content="summary" />
-<meta name="twitter:title" content="FCEUX11 v1.10 Cryptex — NES/Famicom Emulator for Windows" />
-<meta name="twitter:description" content="FCEUX11 v1.10 Cryptex — modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20." />
+<meta name="twitter:title" content="FCEUX11 v1.11 Cryptex �?NES/Famicom Emulator for Windows" />
+<meta name="twitter:description" content="FCEUX11 v1.11 Cryptex �?modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20." />
 <meta name="twitter:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -36,7 +36,7 @@
   "name":"FCEUX11",
   "applicationCategory":"GameApplication",
   "operatingSystem":"Windows",
-  "description":"A modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 — v1.10 Cryptex: rebuilt ROM loading engine for faster load times and better game detection; V2 save state format with corruption protection; improved Famicom Disk System support. Includes debugging tools, TAS editor, and Lua scripting.",
+  "description":"A modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 �?v1.11 Cryptex: rebuilt ROM loading engine for faster load times and better game detection; V2 save state format with corruption protection; improved Famicom Disk System support. Includes debugging tools, TAS editor, and Lua scripting.",
   "softwareVersion":"1.10",
   "license":"https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt",
   "url":"https://laffinty.github.io/FCEUX11/",
@@ -76,7 +76,7 @@
     min-height:100vh;
     position:relative;
   }
-  /* background — single subtle orb + faint grid */
+  /* background �?single subtle orb + faint grid */
   .bg{position:fixed;inset:0;z-index:-2;pointer-events:none;overflow:hidden}
   .orb{position:absolute;width:560px;height:560px;border-radius:50%;background:radial-gradient(circle,rgba(52,211,153,.18),transparent 65%);top:-180px;left:50%;transform:translateX(-50%);filter:blur(70px)}
   .grid{position:absolute;inset:0;
@@ -89,7 +89,7 @@
 
   .wrap{max-width:780px;margin:0 auto;padding:0 24px}
 
-  /* nav — minimal */
+  /* nav �?minimal */
   nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);background:rgba(8,10,9,.6);border-bottom:1px solid transparent;transition:.3s}
   nav.scrolled{border-color:var(--border)}
   .nav-inner{display:flex;align-items:center;justify-content:space-between;height:60px}
@@ -102,7 +102,7 @@
   .gh:hover{color:var(--green);border-color:var(--green)}
   .gh svg{width:16px;height:16px}
 
-  /* hero — compact, centered */
+  /* hero �?compact, centered */
   .hero{padding:104px 0 60px;text-align:center}
   .pill{display:inline-flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:12px;color:var(--muted);padding:5px 13px;border:1px solid var(--border);border-radius:100px;background:var(--surface);margin-bottom:30px}
   .pill .dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);animation:pulse 2.4s ease-in-out infinite}
@@ -121,7 +121,7 @@
   .btn-ghost:hover{background:var(--surface-2);border-color:var(--border-strong);transform:translateY(-2px)}
   .btn svg{width:15px;height:15px}
 
-  /* features — one inline row, minimal */
+  /* features �?one inline row, minimal */
   .features{padding:54px 0}
   .feat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
   @media(max-width:680px){.feat-row{grid-template-columns:repeat(2,1fr)}}
@@ -134,7 +134,7 @@
   .feat h3{font-family:var(--font-display);font-size:14px;font-weight:600;margin-bottom:4px}
   .feat p{font-size:12px;color:var(--muted)}
 
-  /* about — short prose, refined */
+  /* about �?short prose, refined */
   .about{padding:60px 0 30px}
   .about-head{text-align:center;margin-bottom:36px}
   .about-head .kicker{font-family:var(--font-mono);font-size:11px;color:var(--green);text-transform:uppercase;letter-spacing:.16em;margin-bottom:9px}
@@ -144,7 +144,7 @@
   .about-body p:last-child{margin-bottom:0}
   .about-body em{color:var(--green);font-style:normal;font-weight:500}
 
-  /* whatsnew — single column, numbered list, changelog-style */
+  /* whatsnew �?single column, numbered list, changelog-style */
   .whatsnew{padding:60px 0 30px;border-top:1px solid var(--border);margin-top:30px}
   .whatsnew-head{text-align:center;margin-bottom:32px}
   .whatsnew-head .kicker{font-family:var(--font-mono);font-size:11px;color:var(--green);text-transform:uppercase;letter-spacing:.16em;margin-bottom:9px}
@@ -160,7 +160,7 @@
   .wn-cta a{font-family:var(--font-mono);font-size:12px;color:var(--muted);text-decoration:none;border-bottom:1px solid var(--border);padding-bottom:2px;transition:.2s}
   .wn-cta a:hover{color:var(--green);border-color:var(--green)}
 
-  /* footer — single line */
+  /* footer �?single line */
   footer{padding:40px 0 50px;text-align:center;border-top:1px solid var(--border);margin-top:30px}
   footer p{font-family:var(--font-mono);font-size:12px;color:var(--muted-2)}
   footer p a{color:var(--muted);text-decoration:none;transition:.2s}
@@ -193,7 +193,7 @@
 
 <header class="hero" id="top">
   <div class="wrap">
-    <div class="pill reveal"><span class="dot"></span><span data-i18n="pill">v1.10 · Cryptex</span></div>
+    <div class="pill reveal"><span class="dot"></span><span data-i18n="pill">v1.11 · Cryptex</span></div>
     <h1 class="reveal"><span class="grad">FCEUX</span><span class="dim">11</span></h1>
     <p class="tagline reveal" data-i18n="tagline"><span class="tagline-title">A FCEUX-based NES/Famicom emulator optimized for Windows</span><br>core accuracy, modern native experience.</p>
     <div class="cta reveal">
@@ -250,7 +250,7 @@
   <div class="wrap">
     <div class="whatsnew-head reveal">
       <div class="kicker" data-i18n="wn.k">What's new</div>
-      <h2 data-i18n="wn.t">v1.10 · Cryptex</h2>
+      <h2 data-i18n="wn.t">v1.11 · Cryptex</h2>
       <div class="sub" data-i18n="wn.sub">Released 2026-07-02 · since v1.8 (Masonry)</div>
     </div>
     <div class="whatsnew-list reveal">
@@ -258,21 +258,21 @@
         <div class="wn-num">01</div>
         <div class="wn-text">
           <h3 data-i18n="wn1.t">Save states you can trust</h3>
-          <p data-i18n="wn1.d">Introducing a new V2 save state format with built-in integrity checks for every data chunk — your progress is now protected against file corruption. Old save states still load seamlessly, so nothing you've saved is ever lost. Think of it as a stronger lockbox for your game progress.</p>
+          <p data-i18n="wn1.d">Introducing a new V2 save state format with built-in integrity checks for every data chunk �?your progress is now protected against file corruption. Old save states still load seamlessly, so nothing you've saved is ever lost. Think of it as a stronger lockbox for your game progress.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">02</div>
         <div class="wn-text">
           <h3 data-i18n="wn2.t">Games load faster, crash less</h3>
-          <p data-i18n="wn2.d">We rebuilt the ROM loading engine from the ground up. Every format — NES, FDS disk images, NSF music files, UNIF — now loads noticeably faster. Cartridge type detection is more accurate too, so fewer "this ROM won't open" moments. The code behind it all is 90% smaller, which means fewer places for bugs to hide.</p>
+          <p data-i18n="wn2.d">We rebuilt the ROM loading engine from the ground up. Every format �?NES, FDS disk images, NSF music files, UNIF �?now loads noticeably faster. Cartridge type detection is more accurate too, so fewer "this ROM won't open" moments. The code behind it all is 90% smaller, which means fewer places for bugs to hide.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">03</div>
         <div class="wn-text">
           <h3 data-i18n="wn3.t">Famicom Disk System just works better</h3>
-          <p data-i18n="wn3.d">Fixed a crash that could happen when closing FDS games — no more unexpected shutdowns after playing your favorite disk-based titles. Disk reading, writing, and side-switching are all smoother now. We also added comprehensive FDS testing to catch issues before they reach you.</p>
+          <p data-i18n="wn3.d">Fixed a crash that could happen when closing FDS games �?no more unexpected shutdowns after playing your favorite disk-based titles. Disk reading, writing, and side-switching are all smoother now. We also added comprehensive FDS testing to catch issues before they reach you.</p>
         </div>
       </div>
       <div class="wn-item">
@@ -286,12 +286,12 @@
         <div class="wn-num">05</div>
         <div class="wn-text">
           <h3 data-i18n="wn5.t">Ready for whatever comes next</h3>
-          <p data-i18n="wn5.d">The new save state format is forward-compatible — it preserves extra data it doesn't yet understand, so future versions can add features without breaking your saves. We've also laid the groundwork for the next wave of emulation improvements: cleaner code, smarter testing, and a solid foundation.</p>
+          <p data-i18n="wn5.d">The new save state format is forward-compatible �?it preserves extra data it doesn't yet understand, so future versions can add features without breaking your saves. We've also laid the groundwork for the next wave of emulation improvements: cleaner code, smarter testing, and a solid foundation.</p>
         </div>
       </div>
     </div>
     <div class="wn-cta reveal">
-      <a href="https://github.com/Laffinty/FCEUX11/blob/main/CHANGELOG.md#110---2026-07-02" target="_blank" rel="noopener" data-i18n="wn.cta">Read the full v1.10 release notes →</a>
+      <a href="https://github.com/Laffinty/FCEUX11/blob/main/CHANGELOG.md#110---2026-07-02" target="_blank" rel="noopener" data-i18n="wn.cta">Read the full v1.11 release notes �?/a>
     </div>
   </div>
 </section>
@@ -304,7 +304,7 @@
 
 <script>
 const I18N={
-  en:{pill:"v1.10 · Cryptex",
+  en:{pill:"v1.11 · Cryptex",
       tagline:"<span class=\"tagline-title\">A FCEUX-based NES/Famicom emulator optimized for Windows</span><br>core accuracy, modern native experience.",
       download:"Download",changelog:"Changelog",
       "f1.t":"Accurate Emulation","f1.d":"Full NES, Famicom &amp; mapper support",
@@ -314,31 +314,31 @@ const I18N={
       "about.k":"About","about.t":"Introduction",
       "about.a1":"FCEUX11 is a derivative of the FCEUX NES/Famicom emulator, actively maintained and optimized for <em>Windows</em>.",
       "about.a2":"It preserves the core emulation accuracy of FCEUX while providing a modern, native Windows experience, including a <em>Qt6-based</em> user interface, multi-language support, and comprehensive debugging and TAS tooling.",
-      "wn.k":"What's new","wn.t":"v1.10 · Cryptex","wn.sub":"Released 2026-07-02 · since v1.8 (Masonry)",
-      "wn1.t":"Save states you can trust","wn1.d":"Introducing a new V2 save state format with built-in integrity checks for every data chunk — your progress is now protected against file corruption. Old save states still load seamlessly, so nothing you've saved is ever lost. Think of it as a stronger lockbox for your game progress.",
-      "wn2.t":"Games load faster, crash less","wn2.d":"We rebuilt the ROM loading engine from the ground up. Every format — NES, FDS disk images, NSF music files, UNIF — now loads noticeably faster. Cartridge type detection is more accurate too, so fewer \"this ROM won\'t open\" moments. The code behind it all is 90% smaller, which means fewer places for bugs to hide.",
-      "wn3.t":"Famicom Disk System just works better","wn3.d":"Fixed a crash that could happen when closing FDS games — no more unexpected shutdowns after playing your favorite disk-based titles. Disk reading, writing, and side-switching are all smoother now. We also added comprehensive FDS testing to catch issues before they reach you.",
+      "wn.k":"What's new","wn.t":"v1.11 · Cryptex","wn.sub":"Released 2026-07-02 · since v1.8 (Masonry)",
+      "wn1.t":"Save states you can trust","wn1.d":"Introducing a new V2 save state format with built-in integrity checks for every data chunk �?your progress is now protected against file corruption. Old save states still load seamlessly, so nothing you've saved is ever lost. Think of it as a stronger lockbox for your game progress.",
+      "wn2.t":"Games load faster, crash less","wn2.d":"We rebuilt the ROM loading engine from the ground up. Every format �?NES, FDS disk images, NSF music files, UNIF �?now loads noticeably faster. Cartridge type detection is more accurate too, so fewer \"this ROM won\'t open\" moments. The code behind it all is 90% smaller, which means fewer places for bugs to hide.",
+      "wn3.t":"Famicom Disk System just works better","wn3.d":"Fixed a crash that could happen when closing FDS games �?no more unexpected shutdowns after playing your favorite disk-based titles. Disk reading, writing, and side-switching are all smoother now. We also added comprehensive FDS testing to catch issues before they reach you.",
       "wn4.t":"More games, fewer problems","wn4.d":"Added support for educational cartridges (Mapper 178) and fixed stability bugs in several rare cartridge types. If you've had a game that wouldn't start or would randomly glitch out, there's a good chance this update fixes it. 174 cartridge types tested, byte for byte, before every release.",
-      "wn5.t":"Ready for whatever comes next","wn5.d":"The new save state format is forward-compatible — it preserves extra data it doesn't yet understand, so future versions can add features without breaking your saves. We've also laid the groundwork for the next wave of emulation improvements: cleaner code, smarter testing, and a solid foundation.",
-      "wn.cta":"Read the full v1.10 release notes →",
+      "wn5.t":"Ready for whatever comes next","wn5.d":"The new save state format is forward-compatible �?it preserves extra data it doesn't yet understand, so future versions can add features without breaking your saves. We've also laid the groundwork for the next wave of emulation improvements: cleaner code, smarter testing, and a solid foundation.",
+      "wn.cta":"Read the full v1.11 release notes �?,
       foot:"based on FCEUX"},
-  zh:{pill:"v1.10 · Cryptex",
-      tagline:"<span class=\"tagline-title\">基于 FCEUX 的 NES/Famicom 模拟器，为 Windows 平台优化</span><br>保留核心精度，提供现代原生体验。",
+  zh:{pill:"v1.11 · Cryptex",
+      tagline:"<span class=\"tagline-title\">基于 FCEUX �?NES/Famicom 模拟器，�?Windows 平台优化</span><br>保留核心精度，提供现代原生体验�?,
       download:"下载",changelog:"更新日志",
-      "f1.t":"精确模拟","f1.d":"完整支持 NES、Famicom 及扩展芯片",
-      "f2.t":"调试工具","f2.d":"CPU/PPU 调试器、十六进制、内存监视",
-      "f3.t":"TAS 编辑器","f3.d":"逐帧录制与编辑输入",
-      "f4.t":"Lua 脚本","f4.d":"自定义 HUD 与自动化测试",
-      "about.k":"关于","about.t":"简介",
-      "about.a1":"FCEUX11 是基于 FCEUX 的 NES/Famicom 模拟器衍生项目，持续维护并为 <em>Windows</em> 平台优化。",
-      "about.a2":"在保留 FCEUX 核心模拟精度的基础上，提供现代化的 Windows 原生体验，包括 <em>Qt6 图形界面</em>、多语言支持以及完善的调试与 TAS 工具集。",
-      "wn.k":"本次更新","wn.t":"v1.10 · Cryptex","wn.sub":"2026-07-02 发布 · 上一个版本 v1.8 (Masonry)",
-      "wn1.t":"即时存档，值得信赖","wn1.d":"全新的 V2 存档格式，每个数据块都内置完整性校验，有效防止存档文件损坏导致进度丢失。旧版存档依然可以无缝读取，你保存的每一个游戏进度都不会白费。就像给你的存档加了一把更可靠的保险箱。",
-      "wn2.t":"游戏加载更快，崩溃更少","wn2.d":"我们从零开始重构了游戏文件加载引擎。所有格式（NES、FDS 磁碟镜像、NSF 音乐文件、UNIF）的加载速度都有明显提升。卡带类型识别也更准确了，\"ROM 打不开\"的情况大幅减少。背后的代码量缩减了 90%，出 bug 的地方也更少了。",
-      "wn3.t":"磁碟机游戏，体验全面升级","wn3.d":"修复了关闭 FDS 磁碟机游戏时可能崩溃的问题——不会再因为玩完一款磁盘游戏而意外退出了。磁盘读取、写入和换碟操作都更加流畅。我们还为 FDS 增加了全面的自动化测试，确保问题在到达你手中之前就被发现。",
-      "wn4.t":"更多游戏，更少问题","wn4.d":"新增了对教育卡带（Mapper 178）等特殊游戏的支持，修复了若干稀有卡带类型导致的不稳定 bug。如果你有游戏之前打不开或者会随机花屏出错，这次更新很有可能已经修复了。每次发布前，174 种卡带类型都会经过逐字节的严格测试。",
-      "wn5.t":"为未来做好准备","wn5.d":"新的存档格式支持向前兼容——它会保留当前尚不理解的数据，确保未来版本新增功能时不会破坏你的存档。我们还为下一波模拟器改进打好了基础：更清晰的代码、更智能的测试、更扎实的架构。",
-      "wn.cta":"查看完整 v1.10 发布说明 →",
+      "f1.t":"精确模拟","f1.d":"完整支持 NES、Famicom 及扩展芯�?,
+      "f2.t":"调试工具","f2.d":"CPU/PPU 调试器、十六进制、内存监�?,
+      "f3.t":"TAS 编辑�?,"f3.d":"逐帧录制与编辑输�?,
+      "f4.t":"Lua 脚本","f4.d":"自定�?HUD 与自动化测试",
+      "about.k":"关于","about.t":"简�?,
+      "about.a1":"FCEUX11 是基�?FCEUX �?NES/Famicom 模拟器衍生项目，持续维护并为 <em>Windows</em> 平台优化�?,
+      "about.a2":"在保�?FCEUX 核心模拟精度的基础上，提供现代化的 Windows 原生体验，包�?<em>Qt6 图形界面</em>、多语言支持以及完善的调试与 TAS 工具集�?,
+      "wn.k":"本次更新","wn.t":"v1.11 · Cryptex","wn.sub":"2026-07-02 发布 · 上一个版�?v1.8 (Masonry)",
+      "wn1.t":"即时存档，值得信赖","wn1.d":"全新�?V2 存档格式，每个数据块都内置完整性校验，有效防止存档文件损坏导致进度丢失。旧版存档依然可以无缝读取，你保存的每一个游戏进度都不会白费。就像给你的存档加了一把更可靠的保险箱�?,
+      "wn2.t":"游戏加载更快，崩溃更�?,"wn2.d":"我们从零开始重构了游戏文件加载引擎。所有格式（NES、FDS 磁碟镜像、NSF 音乐文件、UNIF）的加载速度都有明显提升。卡带类型识别也更准确了，\"ROM 打不开\"的情况大幅减少。背后的代码量缩减了 90%，出 bug 的地方也更少了�?,
+      "wn3.t":"磁碟机游戏，体验全面升级","wn3.d":"修复了关�?FDS 磁碟机游戏时可能崩溃的问题——不会再因为玩完一款磁盘游戏而意外退出了。磁盘读取、写入和换碟操作都更加流畅。我们还�?FDS 增加了全面的自动化测试，确保问题在到达你手中之前就被发现�?,
+      "wn4.t":"更多游戏，更少问�?,"wn4.d":"新增了对教育卡带（Mapper 178）等特殊游戏的支持，修复了若干稀有卡带类型导致的不稳�?bug。如果你有游戏之前打不开或者会随机花屏出错，这次更新很有可能已经修复了。每次发布前�?74 种卡带类型都会经过逐字节的严格测试�?,
+      "wn5.t":"为未来做好准�?,"wn5.d":"新的存档格式支持向前兼容——它会保留当前尚不理解的数据，确保未来版本新增功能时不会破坏你的存档。我们还为下一波模拟器改进打好了基础：更清晰的代码、更智能的测试、更扎实的架构�?,
+      "wn.cta":"查看完整 v1.11 发布说明 �?,
       foot:"基于 FCEUX"}
 };
 let lang='en';

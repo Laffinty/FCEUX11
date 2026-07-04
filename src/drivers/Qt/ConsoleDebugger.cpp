@@ -57,7 +57,10 @@
 #include "../../fceu.h"
 #include "../../cheat.h"
 #include "../../debug.h"
-#include "../../driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "../../version.h"
 #include "../../video.h"
 #include "../../movie.h"
@@ -4628,7 +4631,7 @@ void bpDebugSetEnable(bool val)
 	bpDebugEnable = val;
 }
 //----------------------------------------------------------------------------
-void FCEUD_DebugBreakpoint( int bpNum )
+void fceWrapper_DebugBreakpoint( int bpNum )
 {
 
 	if ( !nes_shm->runEmulator || !bpDebugEnable )

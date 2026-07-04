@@ -20,7 +20,10 @@
 
 #include <stdio.h>
 #include <ctype.h>
-#include "../../driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "../../fceu.h"
 
 static void GetString(char *s, int max)
