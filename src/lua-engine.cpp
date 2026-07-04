@@ -38,7 +38,6 @@ extern char FileBase[];
 #include "drivers/Qt/TasEditor/markers.h"
 #include "drivers/Qt/TasEditor/snapshot.h"
 #include "drivers/Qt/TasEditor/taseditor_lua.h"
-extern TASEDITOR_LUA *taseditor_lua;
 
 #include <cstdio>
 #include <cstdlib>

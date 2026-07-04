@@ -800,6 +800,18 @@ void     fceWrapper_GetKeyboardState(void* out);
 void     fceWrapper_TaseditorDisableRunFunction(void);
 const char* fceWrapper_GetThreadName(void);
 
+// Phase D residual: UI refresh / dialog callbacks (registered in Phase F)
+void     fceWrapper_SetMainWindowText(const char* s);
+void     fceWrapper_UpdateRamSearch(void);
+int      fceWrapper_MessageBox(const char* title, const char* msg, int type);
+void     fceWrapper_EmuCommand(int cmd);
+
+// Phase F: Batch 9 — Netplay callbacks (renamed from QtNetplay.cpp)
+extern int  qNetplay_SendData(void* data, uint32 len);
+extern int  qNetplay_RecvData(void* data, uint32 len);
+extern void qNetplay_NetplayText(uint8* text);
+extern void qNetplay_NetworkClose(void);
+
 int  fceuWrapperInit( int argc, char *argv[] )
 {
 	int opt, error;
@@ -864,6 +876,18 @@ int  fceuWrapperInit( int argc, char *argv[] )
 		cb.get_keyboard_state = fceWrapper_GetKeyboardState;
 		cb.taseditor_disable_run_function = fceWrapper_TaseditorDisableRunFunction;
 		cb.get_thread_name = fceWrapper_GetThreadName;
+
+		// Phase D residual: UI refresh / dialog callbacks
+		cb.set_main_window_text = fceWrapper_SetMainWindowText;
+		cb.update_ram_search    = fceWrapper_UpdateRamSearch;
+		cb.message_box          = fceWrapper_MessageBox;
+		cb.emu_command          = fceWrapper_EmuCommand;
+
+		// Phase F: Batch 9 — Netplay callbacks
+		cb.send_data     = qNetplay_SendData;
+		cb.recv_data     = qNetplay_RecvData;
+		cb.netplay_text  = qNetplay_NetplayText;
+		cb.network_close = qNetplay_NetworkClose;
 
 		fceu11::register_driver(cb);
 	}
@@ -2044,5 +2068,19 @@ const char* fceWrapper_GetThreadName(void) {
 		return s.c_str();
 	}
 	return "MainThread";
+}
+
+// Phase D residual: UI refresh / dialog callback stubs
+void fceWrapper_SetMainWindowText(const char* ) { }
+
+void fceWrapper_UpdateRamSearch(void) { }
+
+int fceWrapper_MessageBox(const char* /*title*/, const char* msg, int /*type*/) {
+	FCEUD_PrintError(msg);
+	return 0;
+}
+
+void fceWrapper_EmuCommand(int cmd) {
+	FCEU_DispMessage("EmuCommand %d not implemented.", 0, cmd);
 }
 

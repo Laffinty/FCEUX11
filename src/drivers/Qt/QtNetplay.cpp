@@ -244,7 +244,7 @@ FCEUD_NetworkConnect(void)
 
 
 int
-FCEUD_SendData(void *data,
+qNetplay_SendData(void *data,
                uint32 len)
 {
 	int check = 0, error = 0;
@@ -275,7 +275,7 @@ FCEUD_SendData(void *data,
 }
 
 int
-FCEUD_RecvData(void *data,
+qNetplay_RecvData(void *data,
 			uint32 len)
 {
 	int size;
@@ -328,7 +328,7 @@ FCEUD_RecvData(void *data,
 }
 
 void
-FCEUD_NetworkClose(void)
+qNetplay_NetworkClose(void)
 {
 	if(s_Socket > 0) {
 #ifdef BEOS
@@ -347,7 +347,7 @@ FCEUD_NetworkClose(void)
 
 
 void
-FCEUD_NetplayText(uint8 *text)
+qNetplay_NetplayText(uint8 *text)
 {
 	char *tot = (char *)FCEU_dmalloc(strlen((const char *)text) + 1);
 	char *tmp;

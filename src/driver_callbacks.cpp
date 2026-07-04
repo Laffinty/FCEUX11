@@ -8,6 +8,7 @@
 #include "core_api.h"    // FCEUD_PrintError / FCEUD_Message / FCEUD_SetEmulationSpeed / ...
 #include "diag_api.h"    // FCEUD_GetCompilerString
 #include "io_api.h"      // FCEUD_UTF8fopen / FCEUD_UTF8_fstream / FCEUD_ScanArchive / ...
+#include "net_api.h"     // FCEUD_SendData / FCEUD_RecvData / FCEUD_NetplayText / FCEUD_NetworkClose
 #include "file.h"        // ArchiveScanRecord / FCEUFILE (full type needed for return-by-value)
 
 namespace fceu11 {
@@ -183,4 +184,22 @@ void FCEUD_UpdateNTView(int scanline, bool drawall) {
 }
 void FCEUD_UpdatePPUView(int scanline, int drawall) {
     if (auto* fn = fceu11::g_driver().update_ppu_view) fn(scanline, drawall);
+}
+
+// ===========================================================================
+// Phase F: Batch 9 — Netplay 回调转发
+// ===========================================================================
+int FCEUD_SendData(void *data, uint32 len) {
+    if (auto* fn = fceu11::g_driver().send_data) return fn(data, len);
+    return 0;
+}
+int FCEUD_RecvData(void *data, uint32 len) {
+    if (auto* fn = fceu11::g_driver().recv_data) return fn(data, len);
+    return 0;
+}
+void FCEUD_NetplayText(uint8 *text) {
+    if (auto* fn = fceu11::g_driver().netplay_text) fn(text);
+}
+void FCEUD_NetworkClose(void) {
+    if (auto* fn = fceu11::g_driver().network_close) fn();
 }

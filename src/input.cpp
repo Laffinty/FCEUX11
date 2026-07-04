@@ -40,7 +40,7 @@
 #include <ostream>
 #include <cstring>
 
-extern bool mustRewindNow;
+bool mustRewindNow = false;
 
 //it is easier to declare these input drivers extern here than include a bunch of files
 //-------------
@@ -1039,9 +1039,6 @@ static void CommandSelectSaveSlot(void)
 {
 	if (FCEUMOV_Mode(MOVIEMODE_TASEDITOR))
 	{
-#ifdef __WIN_DRIVER__
-		handleEmuCmdByTaseditor(execcmd);
-#endif
 	} else
 	{
 		if(execcmd <= EMUCMD_SAVE_SLOT_9)
@@ -1057,12 +1054,8 @@ static void CommandStateSave(void)
 {
 	if (FCEUMOV_Mode(MOVIEMODE_TASEDITOR))
 	{
-#ifdef __WIN_DRIVER__
-		handleEmuCmdByTaseditor(execcmd);
-#endif
 	} else
 	{
-		//	FCEU_PrintError("execcmd=%d, EMUCMD_SAVE_STATE_SLOT_0=%d, EMUCMD_SAVE_STATE_SLOT_9=%d", execcmd,EMUCMD_SAVE_STATE_SLOT_0,EMUCMD_SAVE_STATE_SLOT_9);
 		if(execcmd >= EMUCMD_SAVE_STATE_SLOT_0 && execcmd <= EMUCMD_SAVE_STATE_SLOT_9)
 		{
 			int oldslot=fceu11::SelectStateSlot(execcmd-EMUCMD_SAVE_STATE_SLOT_0, 0);
@@ -1078,9 +1071,6 @@ static void CommandStateLoad(void)
 {
 	if (FCEUMOV_Mode(MOVIEMODE_TASEDITOR))
 	{
-#ifdef __WIN_DRIVER__
-		handleEmuCmdByTaseditor(execcmd);
-#endif
 	} else
 	{
 		if(execcmd >= EMUCMD_LOAD_STATE_SLOT_0 && execcmd <= EMUCMD_LOAD_STATE_SLOT_9)
@@ -1139,158 +1129,34 @@ void LagCounterToggle(void)
 	lagCounterDisplay ^= 1;
 }
 
-static void LaunchTasEditor(void)
-{
-#ifdef __WIN_DRIVER__
-	extern bool enterTASEditor();
-	enterTASEditor();
-#endif
-}
+static void LaunchTasEditor(void) { }
 
-static void LaunchMemoryWatch(void)
-{
-#ifdef __WIN_DRIVER__
-	CreateMemWatch();
-#endif
-}
+static void LaunchMemoryWatch(void) { }
 
-static void LaunchDebugger(void)
-{
-#ifdef __WIN_DRIVER__
-	DoDebug(0);
-#endif
-}
+static void LaunchDebugger(void) { }
 
-static void LaunchNTView(void)
-{
-#ifdef __WIN_DRIVER__
-	DoNTView();
-#endif
-}
+static void LaunchNTView(void) { }
 
-static void LaunchPPU(void)
-{
-#ifdef __WIN_DRIVER__
-	DoPPUView();
-#endif
-}
+static void LaunchPPU(void) { }
 
-static void LaunchHex(void)
-{
-#ifdef __WIN_DRIVER__
-	DoMemView();
-#endif
-}
+static void LaunchHex(void) { }
 
-static void LaunchTraceLogger(void)
-{
-#ifdef __WIN_DRIVER__
-	DoTracer();
-#endif
-}
+static void LaunchTraceLogger(void) { }
 
-static void LaunchCodeDataLogger(void)
-{
-#ifdef __WIN_DRIVER__
-	DoCDLogger();
-#endif
-}
+static void LaunchCodeDataLogger(void) { }
 
-static void LaunchCheats(void)
-{
-#ifdef __WIN_DRIVER__
-	extern HWND hCheat;
-	ConfigCheats(hCheat);
-#endif
-}
+static void LaunchCheats(void) { }
 
-static void LaunchRamWatch(void)
-{
-#ifdef __WIN_DRIVER__
-	extern void OpenRamWatch();	//adelikat: Blah blah hacky, I know
-	OpenRamWatch();
-#endif
-}
+static void LaunchRamWatch(void) { }
 
-static void LaunchRamSearch(void)
-{
-#ifdef __WIN_DRIVER__
-	extern void OpenRamSearch();
-	OpenRamSearch();
-#endif
-}
+static void LaunchRamSearch(void) { }
 
-static void RamSearchOpLT(void) {
-#ifdef __WIN_DRIVER__
-	if (GameInfo)
-	{
-		extern void SetSearchType(int SearchType);
-		extern void DoRamSearchOperation();
-		SetSearchType(0);
-		DoRamSearchOperation();
-	}
-#endif
-}
-
-static void RamSearchOpGT(void) {
-#ifdef __WIN_DRIVER__
-	if (GameInfo)
-	{
-		extern void SetSearchType(int SearchType);
-		extern void DoRamSearchOperation();
-		SetSearchType(1);
-		DoRamSearchOperation();
-	}
-#endif
-}
-
-static void RamSearchOpLTE(void) {
-#ifdef __WIN_DRIVER__
-	if (GameInfo)
-	{
-		extern void SetSearchType(int SearchType);
-		extern void DoRamSearchOperation();
-		SetSearchType(2);
-		DoRamSearchOperation();
-	}
-#endif
-}
-
-static void RamSearchOpGTE(void) {
-#ifdef __WIN_DRIVER__
-	if (GameInfo)
-	{
-		extern void SetSearchType(int SearchType);
-		extern void DoRamSearchOperation();
-		SetSearchType(3);
-		DoRamSearchOperation();
-	}
-#endif
-}
-
-static void RamSearchOpEQ(void) {
-#ifdef __WIN_DRIVER__
-	if (GameInfo)
-	{
-		extern void SetSearchType(int SearchType);
-		extern void DoRamSearchOperation();
-		SetSearchType(4);
-		DoRamSearchOperation();
-	}
-#endif
-}
-
-static void RamSearchOpNE(void) {
-#ifdef __WIN_DRIVER__
-	if (GameInfo)
-	{
-		extern void SetSearchType(int SearchType);
-		extern void DoRamSearchOperation();
-		SetSearchType(5);
-		DoRamSearchOperation();
-	}
-#endif
-}
+static void RamSearchOpLT(void) { }
+static void RamSearchOpGT(void) { }
+static void RamSearchOpLTE(void) { }
+static void RamSearchOpGTE(void) { }
+static void RamSearchOpEQ(void) { }
+static void RamSearchOpNE(void) { }
 
 extern int globalCheatDisabled;
 extern unsigned int FrozenAddressCount;
@@ -1298,58 +1164,20 @@ static void ToggleCheats()
 {
 	fceu11::GlobalToggleCheat(globalCheatDisabled);
 	FCEU_DispMessage("%d cheats active", 0, FrozenAddressCount);
-	#ifdef __WIN_DRIVER__
-	UpdateCheatRelatedWindow();
-	UpdateCheatListGroupBoxUI();
-	#endif
 }
 
-static void DebuggerStepInto()
-{
-#ifdef __WIN_DRIVER__
-	if (GameInfo)
-	{
-		extern void DoDebuggerStepInto();
-		DoDebuggerStepInto();
-	}
-#endif
-}
+static void DebuggerStepInto() { }
 
 static void FA_SkipLag(void)
 {
 	frameAdvanceLagSkip ^= 1;
 }
 
-static void OpenRom(void)
-{
-#ifdef __WIN_DRIVER__
-	extern HWND hAppWnd;
-	LoadNewGamey(hAppWnd, 0);
-#endif
-}
+static void OpenRom(void) { }
 
-static void CloseRom(void)
-{
-#ifdef __WIN_DRIVER__
-	CloseGame();
-#endif
-}
+static void CloseRom(void) { }
 
-void ReloadRom(void)
-{
-#ifdef __WIN_DRIVER__
-	if (FCEUMOV_Mode(MOVIEMODE_TASEDITOR))
-	{
-		// load most recent project
-		handleEmuCmdByTaseditor(execcmd);
-	} else
-	{
-		// load most recent ROM
-		extern void LoadRecentRom(int slot);
-		LoadRecentRom(0);
-	}
-#endif
-}
+void ReloadRom(void) { }
 
 static void MovieSubtitleToggle(void)
 {
@@ -1364,49 +1192,20 @@ static void UndoRedoSavestate(void)
 		SwapSaveState();
 }
 
-static void FCEUI_DoExit(void)
-{
-#ifdef __WIN_DRIVER__
-	DoFCEUExit();
-#endif
-}
+static void FCEUI_DoExit(void) { }
 
-void ToggleFullscreen()
-{
-#ifdef __WIN_DRIVER__
-	extern int SetVideoMode(int fs);		//adelikat: Yeah, I know, hacky
-	extern void UpdateCheckedMenuItems();
-
-	UpdateCheckedMenuItems();
-	changerecursive=1;
-
-	int oldmode = fullscreen;
-	if(!SetVideoMode(oldmode ^ 1))
-		SetVideoMode(oldmode);
-	changerecursive=0;
-#endif
-}
+void ToggleFullscreen() { }
 
 static void TaseditorRewindOn(void)
 {
-#ifdef __WIN_DRIVER__
 	mustRewindNow = true;
-#endif
 }
 static void TaseditorRewindOff(void)
 {
-#ifdef __WIN_DRIVER__
 	mustRewindNow = false;
-#endif
 }
 
-static void TaseditorCommand(void)
-{
-#ifdef __WIN_DRIVER__
-	if (FCEUMOV_Mode(MOVIEMODE_TASEDITOR))
-		handleEmuCmdByTaseditor(execcmd);
-#endif
-}
+static void TaseditorCommand(void) { }
 
 /**
 * Function to get command info entry by command number
