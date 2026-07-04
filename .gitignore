@@ -107,6 +107,9 @@ scripts/reconfig_*.ps1
 # CTest artifacts (cost data, last-test logs)
 Testing/
 
+# Generated i18n build artefacts (qm files generated from src/drivers/Qt/lang/*.ts)
+assets/i18n/
+
 # Local scratch / unused first-level junk (matches "first level only" usage below)
 /discard/
 
