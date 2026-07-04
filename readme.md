@@ -17,6 +17,7 @@
 ## 简介 / Introduction
 
 **FCEUX11** 是基于 [FCEUX](https://fceux.com) 的 NES/Famicom 模拟器衍生项目，针对 **Windows** 平台深度优化。在继承 FCEUX 卓越模拟精度的同时，采用 Qt6 图形界面重塑了现代 Windows 原生体验，并提供中英文多语言支持，以及面向开发者和速通玩家的调试与 TAS 工具集。无论你是重温经典红白机游戏，还是深入 ROM 修改与研究，FCEUX11 都能以最顺畅的方式运行你的 NES 游戏。
+
 **FCEUX11** is a derivative of the [FCEUX](https://fceux.com) NES/Famicom emulator, optimized for **Windows**. It inherits FCEUX's renowned emulation accuracy while delivering a polished, modern Windows-native experience powered by Qt6. Multi-language support (Chinese & English) and a full suite of debugging and TAS tools are built in for developers and speedrunners alike. Whether you're revisiting childhood classics or diving into ROM hacking, FCEUX11 runs your NES games smoothly and looks great doing it.
 
 ---
