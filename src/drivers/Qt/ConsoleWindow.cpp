@@ -1054,7 +1054,7 @@ void consoleWin_t::createMainMenu(void)
 	connect( Hotkeys[ HK_SAVE_STATE ].getShortcut(), SIGNAL(activated()), this, SLOT(quickSave(void)) );
 	
 	// File -> Change State Slot
-	subMenu = fileMenu->addMenu(tr("Change &State Slot"));
+	changeStateMenu = fileMenu->addMenu(tr("Change &State Slot"));
 	group   = new QActionGroup(this);
 
 	group->setExclusive(true);
@@ -1069,7 +1069,7 @@ void consoleWin_t::createMainMenu(void)
 	        state[i]->setCheckable(true);
 
 	        group->addAction(state[i]);
-		subMenu->addAction(state[i]);
+		changeStateMenu->addAction(state[i]);
 	}
 	state[0]->setChecked(true);
 
@@ -1278,7 +1278,7 @@ void consoleWin_t::createMainMenu(void)
 	optMenu->addSeparator();
 
 	// Options -> Window Resize
-	subMenu = optMenu->addMenu( tr("Window Resi&ze") );
+	windowResizeMenu = optMenu->addMenu( tr("Window Resi&ze") );
 
 	for (int i=0; i<4; i++)
 	{
@@ -1288,7 +1288,7 @@ void consoleWin_t::createMainMenu(void)
 
 	        winSizeAct[i] = new QAction(tr(stmp), this);
 
-		subMenu->addAction(winSizeAct[i]);
+		windowResizeMenu->addAction(winSizeAct[i]);
 
 		connect( winSizeAct[i], &QAction::triggered, [ this, i ]{ consoleWin_t::winResizeIx(i+1); } );
 	}
@@ -1306,29 +1306,29 @@ void consoleWin_t::createMainMenu(void)
 	connect( Hotkeys[ HK_FULLSCREEN ].getShortcut(), SIGNAL(activated()), this, SLOT(toggleFullscreen(void)) );
 
 	// Options -> Hide Menu Screen
-	act = new QAction(tr("&Hide Menu"), this);
-	//act->setShortcut( QKeySequence(tr("Alt+/")));
-	act->setStatusTip(tr("Hide Menu"));
-	act->setIcon( style()->standardIcon( QStyle::SP_TitleBarMaxButton ) );
-	connect(act, SIGNAL(triggered()), this, SLOT(toggleMenuVis(void)) );
+	hideMenuAct = new QAction(tr("&Hide Menu"), this);
+	//hideMenuAct->setShortcut( QKeySequence(tr("Alt+/")));
+	hideMenuAct->setStatusTip(tr("Hide Menu"));
+	hideMenuAct->setIcon( style()->standardIcon( QStyle::SP_TitleBarMaxButton ) );
+	connect(hideMenuAct, SIGNAL(triggered()), this, SLOT(toggleMenuVis(void)) );
 	
-	optMenu->addAction(act);
+	optMenu->addAction(hideMenuAct);
 
-	Hotkeys[ HK_MAIN_MENU_HIDE ].setAction( act );
+	Hotkeys[ HK_MAIN_MENU_HIDE ].setAction( hideMenuAct );
 	connect( Hotkeys[ HK_MAIN_MENU_HIDE ].getShortcut(), SIGNAL(activated()), this, SLOT(toggleMenuVis(void)) );
 
 	// Options -> Auto Hide Menu on Fullscreen
 	g_config->getOption( "SDL.AutoHideMenuFullsreen", &autoHideMenuFullscreen );
 
-	act = new QAction(tr("&Auto Hide Menu on Fullscreen"), this);
-	//act->setShortcut( QKeySequence(tr("Alt+/")));
-	act->setCheckable(true);
-	act->setChecked( autoHideMenuFullscreen );
-	act->setStatusTip(tr("Auto Hide Menu on Fullscreen"));
-	//act->setIcon( style()->standardIcon( QStyle::SP_TitleBarMaxButton ) );
-	connect(act, SIGNAL(triggered(bool)), this, SLOT(toggleMenuAutoHide(bool)) );
+	autoHideMenuAct = new QAction(tr("&Auto Hide Menu on Fullscreen"), this);
+	//autoHideMenuAct->setShortcut( QKeySequence(tr("Alt+/")));
+	autoHideMenuAct->setCheckable(true);
+	autoHideMenuAct->setChecked( autoHideMenuFullscreen );
+	autoHideMenuAct->setStatusTip(tr("Auto Hide Menu on Fullscreen"));
+	//autoHideMenuAct->setIcon( style()->standardIcon( QStyle::SP_TitleBarMaxButton ) );
+	connect(autoHideMenuAct, SIGNAL(triggered(bool)), this, SLOT(toggleMenuAutoHide(bool)) );
 
-	optMenu->addAction(act);
+	optMenu->addAction(autoHideMenuAct);
 
 	optMenu->addSeparator();
 
@@ -1350,6 +1350,7 @@ void consoleWin_t::createMainMenu(void)
 	act->setCheckable(true);
 	act->setChecked( usePaletteForVideoBg );
 	act->setStatusTip(tr("Use BG Palette for Video BG Color"));
+	useBgPaletteAct = act;
 	//act->setIcon( style()->standardIcon( QStyle::SP_TitleBarMaxButton ) );
 	connect(act, SIGNAL(triggered(bool)), this, SLOT(toggleUseBgPaletteForVideo(bool)) );
 
@@ -1405,7 +1406,7 @@ void consoleWin_t::createMainMenu(void)
 	emuMenu->addSeparator();
 
 	// Emulation -> Region
-	subMenu = emuMenu->addMenu(tr("&Region"));
+	regionMenu = emuMenu->addMenu(tr("&Region"));
 	group   = new QActionGroup(this);
 
 	group->setExclusive(true);
@@ -1431,7 +1432,7 @@ void consoleWin_t::createMainMenu(void)
 	        region[i]->setCheckable(true);
 
 	        group->addAction(region[i]);
-		subMenu->addAction(region[i]);
+		regionMenu->addAction(region[i]);
 	}
 	region[ fceu11::GetRegion() ]->setChecked(true);
 
@@ -1445,83 +1446,83 @@ void consoleWin_t::createMainMenu(void)
 	// Hard Reset / Pause / Region / Speed / AutoFire.
 
 	// Emulation -> Speed
-	subMenu = emuMenu->addMenu(tr("&Speed"));
+	speedMenu = emuMenu->addMenu(tr("&Speed"));
 
 	// Emulation -> Speed -> Speed Up
-	act = new QAction(tr("Speed &Up"), this);
-	//act->setShortcut( QKeySequence(tr("=")));
-	act->setStatusTip(tr("Speed Up"));
-	act->setIcon( style()->standardIcon( QStyle::SP_MediaSeekForward ) );
-	connect(act, SIGNAL(triggered()), this, SLOT(emuSpeedUp(void)) );
+	speedUpAct = new QAction(tr("Speed &Up"), this);
+	//speedUpAct->setShortcut( QKeySequence(tr("=")));
+	speedUpAct->setStatusTip(tr("Speed Up"));
+	speedUpAct->setIcon( style()->standardIcon( QStyle::SP_MediaSeekForward ) );
+	connect(speedUpAct, SIGNAL(triggered()), this, SLOT(emuSpeedUp(void)) );
 	
-	Hotkeys[ HK_INCREASE_SPEED ].setAction( act );
+	Hotkeys[ HK_INCREASE_SPEED ].setAction( speedUpAct );
 	connect( Hotkeys[ HK_INCREASE_SPEED ].getShortcut(), SIGNAL(activated()), this, SLOT(emuSpeedUp(void)) );
 
-	subMenu->addAction(act);
+	speedMenu->addAction(speedUpAct);
 
 	// Emulation -> Speed -> Slow Down
-	act = new QAction(tr("Slow &Down"), this);
-	//act->setShortcut( QKeySequence(tr("-")));
-	act->setStatusTip(tr("Slow Down"));
-	act->setIcon( style()->standardIcon( QStyle::SP_MediaSeekBackward ) );
-	connect(act, SIGNAL(triggered()), this, SLOT(emuSlowDown(void)) );
+	slowDownAct = new QAction(tr("Slow &Down"), this);
+	//slowDownAct->setShortcut( QKeySequence(tr("-")));
+	slowDownAct->setStatusTip(tr("Slow Down"));
+	slowDownAct->setIcon( style()->standardIcon( QStyle::SP_MediaSeekBackward ) );
+	connect(slowDownAct, SIGNAL(triggered()), this, SLOT(emuSlowDown(void)) );
 	
-	Hotkeys[ HK_DECREASE_SPEED ].setAction( act );
+	Hotkeys[ HK_DECREASE_SPEED ].setAction( slowDownAct );
 	connect( Hotkeys[ HK_DECREASE_SPEED ].getShortcut(), SIGNAL(activated()), this, SLOT(emuSlowDown(void)) );
 
-	subMenu->addAction(act);
+	speedMenu->addAction(slowDownAct);
 	
-	subMenu->addSeparator();
+	speedMenu->addSeparator();
 
 	// Emulation -> Speed -> Slowest Speed
-	act = new QAction(tr("&Slowest"), this);
-	//act->setShortcut( QKeySequence(tr("-")));
-	act->setStatusTip(tr("Slowest"));
-	act->setIcon( style()->standardIcon( QStyle::SP_MediaSkipBackward ) );
-	connect(act, SIGNAL(triggered()), this, SLOT(emuSlowestSpd(void)) );
+	slowestSpdAct = new QAction(tr("&Slowest"), this);
+	//slowestSpdAct->setShortcut( QKeySequence(tr("-")));
+	slowestSpdAct->setStatusTip(tr("Slowest"));
+	slowestSpdAct->setIcon( style()->standardIcon( QStyle::SP_MediaSkipBackward ) );
+	connect(slowestSpdAct, SIGNAL(triggered()), this, SLOT(emuSlowestSpd(void)) );
 	
-	subMenu->addAction(act);
+	speedMenu->addAction(slowestSpdAct);
 
 	// Emulation -> Speed -> Normal Speed
-	act = new QAction(tr("&Normal"), this);
-	//act->setShortcut( QKeySequence(tr("-")));
-	act->setStatusTip(tr("Normal"));
-	act->setIcon( style()->standardIcon( QStyle::SP_MediaPlay ) );
-	connect(act, SIGNAL(triggered()), this, SLOT(emuNormalSpd(void)) );
+	normalSpdAct = new QAction(tr("&Normal"), this);
+	//normalSpdAct->setShortcut( QKeySequence(tr("-")));
+	normalSpdAct->setStatusTip(tr("Normal"));
+	normalSpdAct->setIcon( style()->standardIcon( QStyle::SP_MediaPlay ) );
+	connect(normalSpdAct, SIGNAL(triggered()), this, SLOT(emuNormalSpd(void)) );
 	
-	subMenu->addAction(act);
+	speedMenu->addAction(normalSpdAct);
 	
 	// Emulation -> Speed -> Fastest Speed
-	act = new QAction(tr("&Turbo"), this);
-	//act->setShortcut( QKeySequence(tr("-")));
-	act->setStatusTip(tr("Turbo (Fastest)"));
-	act->setIcon( style()->standardIcon( QStyle::SP_MediaSkipForward ) );
-	connect(act, SIGNAL(triggered()), this, SLOT(emuFastestSpd(void)) );
+	turboSpdAct = new QAction(tr("&Turbo"), this);
+	//turboSpdAct->setShortcut( QKeySequence(tr("-")));
+	turboSpdAct->setStatusTip(tr("Turbo (Fastest)"));
+	turboSpdAct->setIcon( style()->standardIcon( QStyle::SP_MediaSkipForward ) );
+	connect(turboSpdAct, SIGNAL(triggered()), this, SLOT(emuFastestSpd(void)) );
 	
-	subMenu->addAction(act);
+	speedMenu->addAction(turboSpdAct);
 	
 	// Emulation -> Speed -> Custom Speed
-	act = new QAction(tr("&Custom"), this);
-	//act->setShortcut( QKeySequence(tr("-")));
-	act->setStatusTip(tr("Custom"));
-	connect(act, SIGNAL(triggered()), this, SLOT(emuCustomSpd(void)) );
+	customSpdAct = new QAction(tr("&Custom"), this);
+	//customSpdAct->setShortcut( QKeySequence(tr("-")));
+	customSpdAct->setStatusTip(tr("Custom"));
+	connect(customSpdAct, SIGNAL(triggered()), this, SLOT(emuCustomSpd(void)) );
 	
-	subMenu->addAction(act);
+	speedMenu->addAction(customSpdAct);
 	
-	subMenu->addSeparator();
+	speedMenu->addSeparator();
 	
 	// Emulation -> Speed -> Set Frame Advance Delay
-	act = new QAction(tr("Set Frame &Advance Delay"), this);
-	//act->setShortcut( QKeySequence(tr("-")));
-	act->setStatusTip(tr("Set Frame Advance Delay"));
-	connect(act, SIGNAL(triggered()), this, SLOT(emuSetFrameAdvDelay(void)) );
+	frameAdvDelayAct = new QAction(tr("Set Frame &Advance Delay"), this);
+	//frameAdvDelayAct->setShortcut( QKeySequence(tr("-")));
+	frameAdvDelayAct->setStatusTip(tr("Set Frame Advance Delay"));
+	connect(frameAdvDelayAct, SIGNAL(triggered()), this, SLOT(emuSetFrameAdvDelay(void)) );
 	
-	subMenu->addAction(act);
+	speedMenu->addAction(frameAdvDelayAct);
 
 	emuMenu->addSeparator();
 
 	// Emulation -> AutoFire Pattern
-	subMenu = emuMenu->addMenu(tr("&AutoFire Pattern"));
+	autoFireMenu = emuMenu->addMenu(tr("&AutoFire Pattern"));
 	
 	group   = new QActionGroup(this);
 	group->setExclusive(true);
@@ -1536,7 +1537,7 @@ void consoleWin_t::createMainMenu(void)
 			autoFireMenuAction *afAct = new autoFireMenuAction( i, j, tr(stmp), this);
 			afAct->setCheckable(true);
 			group->addAction(afAct);
-			subMenu->addAction(afAct);
+			autoFireMenu->addAction(afAct);
 			afActList.push_back(afAct);
 
 			connect( afAct, SIGNAL(triggered(void)), afAct, SLOT(activateCB(void)) );
@@ -1549,21 +1550,21 @@ void consoleWin_t::createMainMenu(void)
 	afActCustom = new autoFireMenuAction( customAutofireOnFrames, customAutofireOffFrames, tr("Custom"), this);
 	afActCustom->setCheckable(true);
 	group->addAction(afActCustom);
-	subMenu->addAction(afActCustom);
+	autoFireMenu->addAction(afActCustom);
 	//afActList.push_back(afAct);
 
 	connect( afActCustom, SIGNAL(triggered(void)), afActCustom, SLOT(activateCB(void)) );
 
-	subMenu->addSeparator();
+	autoFireMenu->addSeparator();
 
 	syncAutoFirePatternMenu();
 
 	// Emulation -> AutoFire Pattern -> Set Custom Pattern
-	act = new QAction(tr("Set Custom Pattern"), this);
-	act->setStatusTip(tr("Set Custom Pattern"));
-	connect(act, SIGNAL(triggered()), this, SLOT(setCustomAutoFire(void)) );
+	setCustomAutoFireAct = new QAction(tr("Set Custom Pattern"), this);
+	setCustomAutoFireAct->setStatusTip(tr("Set Custom Pattern"));
+	connect(setCustomAutoFireAct, SIGNAL(triggered()), this, SLOT(setCustomAutoFire(void)) );
 
-	subMenu->addAction(act);
+	autoFireMenu->addAction(setCustomAutoFireAct);
 
 	//-----------------------------------------------------------------------
 	// Advanced -> Emulation  (was: Emulation -> soft reset / GG / FKB /
@@ -1612,12 +1613,12 @@ void consoleWin_t::createMainMenu(void)
 	advEmuMenu->addSeparator();
 
 	// Advanced -> Emulation -> Virtual Family Keyboard
-	act = new QAction(tr("Virtual Family Keyboard"), this);
-	//act->setShortcut( QKeySequence(tr("Ctrl+G")));
-	act->setStatusTip(tr("Virtual Family Keyboard"));
-	connect(act, SIGNAL(triggered()), this, SLOT(openFamilyKeyboard(void)) );
+	virtualFkbAct = new QAction(tr("Virtual Family Keyboard"), this);
+	//virtualFkbAct->setShortcut( QKeySequence(tr("Ctrl+G")));
+	virtualFkbAct->setStatusTip(tr("Virtual Family Keyboard"));
+	connect(virtualFkbAct, SIGNAL(triggered()), this, SLOT(openFamilyKeyboard(void)) );
 
-	advEmuMenu->addAction(act);
+	advEmuMenu->addAction(virtualFkbAct);
 
 	advEmuMenu->addSeparator();
 
@@ -1635,7 +1636,7 @@ void consoleWin_t::createMainMenu(void)
 	advEmuMenu->addSeparator();
 
 	// Advanced -> Emulation -> FDS sub-menu
-	subMenu = advEmuMenu->addMenu(tr("&FDS"));
+	fdsMenu = advEmuMenu->addMenu(tr("&FDS"));
 
 	fdsSwitchAct = new QAction(tr("&Switch Disk"), this);
 	fdsSwitchAct->setStatusTip(tr("Switch Disk"));
@@ -1644,24 +1645,24 @@ void consoleWin_t::createMainMenu(void)
 	Hotkeys[ HK_FDS_SELECT ].setAction( fdsSwitchAct );
 	connect( Hotkeys[ HK_FDS_SELECT ].getShortcut(), SIGNAL(activated()), this, SLOT(fdsSwitchDisk(void)) );
 
-	subMenu->addAction(fdsSwitchAct);
+	fdsMenu->addAction(fdsSwitchAct);
 
 	fdsEjectAct = new QAction(tr("&Eject Disk"), this);
 	fdsEjectAct->setStatusTip(tr("Eject Disk"));
 	connect(fdsEjectAct, SIGNAL(triggered()), this, SLOT(fdsEjectDisk(void)) );
 
-	subMenu->addAction(fdsEjectAct);
+	fdsMenu->addAction(fdsEjectAct);
 
 	fdsLoadBiosAct = new QAction(tr("&Load BIOS"), this);
 	fdsLoadBiosAct->setStatusTip(tr("Load FDS BIOS"));
 	connect(fdsLoadBiosAct, SIGNAL(triggered()), this, SLOT(fdsLoadBIOS(void)) );
 
-	subMenu->addAction(fdsLoadBiosAct);
+	fdsMenu->addAction(fdsLoadBiosAct);
 
 	advEmuMenu->addSeparator();
 
 	// Advanced -> Emulation -> RAM Init
-	subMenu = advEmuMenu->addMenu(tr("&RAM Init"));
+	ramInitMenu = advEmuMenu->addMenu(tr("&RAM Init"));
 	group   = new QActionGroup(this);
 	group->setExclusive(true);
 
@@ -1679,7 +1680,7 @@ void consoleWin_t::createMainMenu(void)
 		ramInit[i] = new QAction(tr(txt), this);
 		ramInit[i]->setCheckable(true);
 		group->addAction(ramInit[i]);
-		subMenu->addAction(ramInit[i]);
+		ramInitMenu->addAction(ramInit[i]);
 	}
 	g_config->getOption ("SDL.RamInitMethod", &RAMInitOption);
 	ramInit[ RAMInitOption ]->setChecked(true);
@@ -1810,28 +1811,28 @@ void consoleWin_t::createMainMenu(void)
 	connect( advMiscMenu, SIGNAL(aboutToHide(void)), this, SLOT(mainMenuClose(void)) );
 
 	// Advanced -> Misc Tools -> Frame Timing
-	act = new QAction(tr("&Frame Timing ..."), this);
-	//act->setShortcut( QKeySequence(tr("Shift+F7")));
-	act->setStatusTip(tr("Open Frame Timing Window"));
-	connect(act, SIGNAL(triggered()), this, SLOT(openTimingStatWin(void)) );
+	frameTimingAct = new QAction(tr("&Frame Timing ..."), this);
+	//frameTimingAct->setShortcut( QKeySequence(tr("Shift+F7")));
+	frameTimingAct->setStatusTip(tr("Open Frame Timing Window"));
+	connect(frameTimingAct, SIGNAL(triggered()), this, SLOT(openTimingStatWin(void)) );
 
-	advMiscMenu->addAction(act);
+	advMiscMenu->addAction(frameTimingAct);
 
 	// Advanced -> Misc Tools -> Palette Editor
-	act = new QAction(tr("&Palette Editor ..."), this);
-	//act->setShortcut( QKeySequence(tr("Shift+F7")));
-	act->setStatusTip(tr("Open Palette Editor Window"));
-	connect(act, SIGNAL(triggered()), this, SLOT(openPaletteEditorWin(void)) );
+	paletteEditorAct = new QAction(tr("&Palette Editor ..."), this);
+	//paletteEditorAct->setShortcut( QKeySequence(tr("Shift+F7")));
+	paletteEditorAct->setStatusTip(tr("Open Palette Editor Window"));
+	connect(paletteEditorAct, SIGNAL(triggered()), this, SLOT(openPaletteEditorWin(void)) );
 
-	advMiscMenu->addAction(act);
+	advMiscMenu->addAction(paletteEditorAct);
 
 	// Advanced -> Misc Tools -> AVI RIFF Viewer
-	act = new QAction(tr("&AVI RIFF Viewer ..."), this);
-	//act->setShortcut( QKeySequence(tr("Shift+F7")));
-	act->setStatusTip(tr("Open AVI RIFF Viewer Window"));
-	connect(act, SIGNAL(triggered()), this, SLOT(openAviRiffViewer(void)) );
+	aviRiffViewerAct = new QAction(tr("&AVI RIFF Viewer ..."), this);
+	//aviRiffViewerAct->setShortcut( QKeySequence(tr("Shift+F7")));
+	aviRiffViewerAct->setStatusTip(tr("Open AVI RIFF Viewer Window"));
+	connect(aviRiffViewerAct, SIGNAL(triggered()), this, SLOT(openAviRiffViewer(void)) );
 
-	advMiscMenu->addAction(act);
+	advMiscMenu->addAction(aviRiffViewerAct);
 
 	// Advanced -> Misc Tools -> TAS Editor
 	tasEditorAct = act = new QAction(tr("&TAS Editor ..."), this);
@@ -4944,6 +4945,13 @@ void consoleWin_t::retranslateUi(void)
 	if (advSettingsMenu) advSettingsMenu->setTitle(tr("&Advanced Settings"));
 	if (helpMenu) helpMenu->setTitle(tr("&Help"));
 	if (languageMenu) languageMenu->setTitle(tr("&Language"));
+	if (changeStateMenu) changeStateMenu->setTitle(tr("Change &State Slot"));
+	if (windowResizeMenu) windowResizeMenu->setTitle(tr("Window Resi&ze"));
+	if (regionMenu) regionMenu->setTitle(tr("&Region"));
+	if (speedMenu) speedMenu->setTitle(tr("&Speed"));
+	if (autoFireMenu) autoFireMenu->setTitle(tr("&AutoFire Pattern"));
+	if (fdsMenu) fdsMenu->setTitle(tr("&FDS"));
+	if (ramInitMenu) ramInitMenu->setTitle(tr("&RAM Init"));
 
 	if (openROM) openROM->setText(tr("&Open ROM"));
 	if (closeROM) closeROM->setText(tr("&Close ROM"));
@@ -4969,6 +4977,10 @@ void consoleWin_t::retranslateUi(void)
 	if (movieConfig) movieConfig->setText(tr("&Movie Options"));
 	if (autoResume) autoResume->setText(tr("Auto-&Resume Play"));
 	if (fullscreen) fullscreen->setText(tr("&Fullscreen"));
+	if (hideMenuAct) hideMenuAct->setText(tr("&Hide Menu"));
+	if (autoHideMenuAct) autoHideMenuAct->setText(tr("&Auto Hide Menu on Fullscreen"));
+	if (useBgPaletteAct) useBgPaletteAct->setText(tr("Use BG Palette for Video BG Color"));
+	if (bgColorMenuItem) bgColorMenuItem->setText(tr("BG Side Panel Color"));
 
 	if (powerAct) powerAct->setText(tr("&Power"));
 	if (resetAct) resetAct->setText(tr("Hard &Reset"));
@@ -4980,6 +4992,7 @@ void consoleWin_t::retranslateUi(void)
 	if (fdsSwitchAct) fdsSwitchAct->setText(tr("&Switch Disk"));
 	if (fdsEjectAct) fdsEjectAct->setText(tr("&Eject Disk"));
 	if (fdsLoadBiosAct) fdsLoadBiosAct->setText(tr("&Load BIOS"));
+	if (virtualFkbAct) virtualFkbAct->setText(tr("Virtual Family Keyboard"));
 
 	if (cheatsAct) cheatsAct->setText(tr("&Cheats..."));
 	if (ramSearchAct) ramSearchAct->setText(tr("RAM &Search..."));
@@ -4995,6 +5008,9 @@ void consoleWin_t::retranslateUi(void)
 	if (codeDataLogAct) codeDataLogAct->setText(tr("&Code/Data Logger..."));
 	if (ggEncodeAct) ggEncodeAct->setText(tr("&Game Genie Encode/Decode"));
 	if (iNesEditAct) iNesEditAct->setText(tr("NES Header Edito&r..."));
+	if (frameTimingAct) frameTimingAct->setText(tr("&Frame Timing ..."));
+	if (paletteEditorAct) paletteEditorAct->setText(tr("&Palette Editor ..."));
+	if (aviRiffViewerAct) aviRiffViewerAct->setText(tr("&AVI RIFF Viewer ..."));
 
 	if (openMovAct) openMovAct->setText(tr("Movie &Play"));
 	if (playMovBeginAct) playMovBeginAct->setText(tr("Movie Play From &Beginning"));
@@ -5006,6 +5022,90 @@ void consoleWin_t::retranslateUi(void)
 	if (recWavAct) recWavAct->setText(tr("WAV &Record"));
 	if (recAsWavAct) recAsWavAct->setText(tr("WAV Record &As"));
 	if (stopWavAct) stopWavAct->setText(tr("WAV &Stop"));
+
+	for (int i = 0; i < 10; i++)
+	{
+		if (state[i])
+		{
+			char stmp[8];
+			snprintf(stmp, sizeof(stmp), "Slot &%i", i);
+			state[i]->setText(tr(stmp));
+		}
+	}
+
+	for (int i = 0; i < 4; i++)
+	{
+		if (winSizeAct[i])
+		{
+			char stmp[8];
+			snprintf(stmp, sizeof(stmp), "&%ix", i + 1);
+			winSizeAct[i]->setText(tr(stmp));
+		}
+	}
+
+	if (region[0]) region[0]->setText(tr("&NTSC"));
+	if (region[1]) region[1]->setText(tr("&PAL"));
+	if (region[2]) region[2]->setText(tr("&Dendy"));
+
+	if (ramInit[0]) ramInit[0]->setText(tr("&Default"));
+	if (ramInit[1]) ramInit[1]->setText(tr("Fill $&FF"));
+	if (ramInit[2]) ramInit[2]->setText(tr("Fill $&00"));
+	if (ramInit[3]) ramInit[3]->setText(tr("&Random"));
+
+	if (speedUpAct) speedUpAct->setText(tr("Speed &Up"));
+	if (slowDownAct) slowDownAct->setText(tr("Slow &Down"));
+	if (slowestSpdAct) slowestSpdAct->setText(tr("&Slowest"));
+	if (normalSpdAct) normalSpdAct->setText(tr("&Normal"));
+	if (turboSpdAct) turboSpdAct->setText(tr("&Turbo"));
+	if (customSpdAct) customSpdAct->setText(tr("&Custom"));
+	if (frameAdvDelayAct) frameAdvDelayAct->setText(tr("Set Frame &Advance Delay"));
+	if (setCustomAutoFireAct) setCustomAutoFireAct->setText(tr("Set Custom Pattern"));
+
+	if (languageActionGroup)
+	{
+		for (auto action : languageActionGroup->actions())
+		{
+			QString code = action->data().toString();
+			if (code == QStringLiteral("en"))
+				action->setText(tr("English"));
+			else if (code == QStringLiteral("zh_CN"))
+				action->setText(tr("Simplified Chinese"));
+			else if (code == QStringLiteral("zh_TW"))
+				action->setText(tr("Traditional Chinese"));
+			else if (code == QStringLiteral("ja"))
+				action->setText(tr("Japanese"));
+			else if (code == QStringLiteral("ko"))
+				action->setText(tr("Korean"));
+			else if (code == QStringLiteral("es"))
+				action->setText(tr("Spanish"));
+			else if (code == QStringLiteral("fr"))
+				action->setText(tr("French"));
+			else if (code == QStringLiteral("de"))
+				action->setText(tr("German"));
+			else if (code == QStringLiteral("vi"))
+				action->setText(tr("Vietnamese"));
+			else if (code == QStringLiteral("th"))
+				action->setText(tr("Thai"));
+			else if (code == QStringLiteral("hi"))
+				action->setText(tr("Hindi (beta)"));
+			else if (code == QStringLiteral("ar"))
+				action->setText(tr("Arabic (beta)"));
+		}
+	}
+
+	for (auto afAct : afActList)
+	{
+		if (afAct)
+		{
+			char stmp[64];
+			snprintf(stmp, sizeof(stmp), "%i On, %i Off", afAct->getOnValue(), afAct->getOffValue());
+			afAct->setText(tr(stmp));
+		}
+	}
+	if (afActCustom)
+	{
+		afActCustom->setText(tr("Custom"));
+	}
 
 	if (aboutAct) aboutAct->setText(tr("&About FCEUX11"));
 	if (aboutActQt) aboutActQt->setText(tr("About &Qt"));

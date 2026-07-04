@@ -196,7 +196,15 @@ class  consoleWin_t : public QMainWindow
 		QMenu *advSettingsMenu; // input / gamepad / hotkey / palette / timing / stateRec / movieOpt / autoResume
 
 		QActionGroup *languageActionGroup;
-		
+
+		QMenu *changeStateMenu = nullptr;
+		QMenu *windowResizeMenu = nullptr;
+		QMenu *regionMenu = nullptr;
+		QMenu *speedMenu = nullptr;
+		QMenu *autoFireMenu = nullptr;
+		QMenu *fdsMenu = nullptr;
+		QMenu *ramInitMenu = nullptr;
+
 		QAction *openROM = nullptr;
 		QAction *closeROM = nullptr;
 		QAction *playNSF = nullptr;
@@ -259,6 +267,23 @@ class  consoleWin_t : public QMainWindow
 		QAction *recAsWavAct = nullptr;
 		QAction *stopWavAct = nullptr;
 		QAction *tasEditorAct = nullptr;
+
+		QAction *hideMenuAct = nullptr;
+		QAction *autoHideMenuAct = nullptr;
+		QAction *useBgPaletteAct = nullptr;
+		QAction *virtualFkbAct = nullptr;
+		QAction *speedUpAct = nullptr;
+		QAction *slowDownAct = nullptr;
+		QAction *slowestSpdAct = nullptr;
+		QAction *normalSpdAct = nullptr;
+		QAction *turboSpdAct = nullptr;
+		QAction *customSpdAct = nullptr;
+		QAction *frameAdvDelayAct = nullptr;
+		QAction *setCustomAutoFireAct = nullptr;
+		QAction *frameTimingAct = nullptr;
+		QAction *paletteEditorAct = nullptr;
+		QAction *aviRiffViewerAct = nullptr;
+
 		//QAction *aviHudAct;
 		//QAction *aviMsgAct;
 
