@@ -54,7 +54,7 @@
 | 性能基准 | `build\tests\fceux11_*_bench.exe` | 3 个 Google Benchmark |
 | Rust 静态库 | `build\src\rust\fceux11_rust.lib` | 6 个 FFI crate 合并产物 |
 | Rust 头文件 | `build\src\rust\fceux11_rust.h` | cbindgen 生成的 C 接口 |
-| Qt 翻译 | `build\src\drivers\Qt\lang\fceux11_*.qm` | 编译后的翻译（en/zh_CN/zh_TW）|
+| Qt 翻译 | `build\src\drivers\Qt\lang\fceux11_*.qm` | 编译后的翻译（12 种语言：en/zh_CN/zh_TW/ja/ko/es/fr/de/vi/th/hi/ar）|
 | 部署脚本 | `build\cmake_install.cmake` | 给 `cmake --install` 用 |
 
 **程序版本号**：执行 `fceux11.exe --version` 应输出 `1.10`（或 `v1.10`）。

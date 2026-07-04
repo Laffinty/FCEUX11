@@ -1,7 +1,14 @@
-# FCEUX11 i18n Glossary (v0.3.15 PR-B)
+# FCEUX11 i18n Glossary (v0.3.15 PR-B / v1.11 §11.5 expanded)
 # Format: source_term [tab] zh_CN [tab] zh_TW
 # Used by DeepL / Google Translate custom glossary for terminology
 # consistency across machine translation.
+#
+# v1.11: Expanded to 12 languages. See lang/README.md for the
+# complete lupdate→lrelease workflow. Contributors: please submit
+# PRs to improve hi/ar beta translations based on this glossary.
+#
+# Supported language codes:
+#   en zh_CN zh_TW ja ko es fr de vi th hi ar
 #
 # Rules:
 #   - TAS / ROM / NES / mapper / CPU / PPU / APU / FPS / RAM / PRG / CHR

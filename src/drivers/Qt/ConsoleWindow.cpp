@@ -1225,6 +1225,51 @@ void consoleWin_t::createMainMenu(void)
 	langZhTW->setData("zh_TW");
 	languageMenu->addAction(langZhTW);
 
+	QAction *langJa = new QAction(tr("Japanese"), languageActionGroup);
+	langJa->setCheckable(true);
+	langJa->setData("ja");
+	languageMenu->addAction(langJa);
+
+	QAction *langKo = new QAction(tr("Korean"), languageActionGroup);
+	langKo->setCheckable(true);
+	langKo->setData("ko");
+	languageMenu->addAction(langKo);
+
+	QAction *langEs = new QAction(tr("Spanish"), languageActionGroup);
+	langEs->setCheckable(true);
+	langEs->setData("es");
+	languageMenu->addAction(langEs);
+
+	QAction *langFr = new QAction(tr("French"), languageActionGroup);
+	langFr->setCheckable(true);
+	langFr->setData("fr");
+	languageMenu->addAction(langFr);
+
+	QAction *langDe = new QAction(tr("German"), languageActionGroup);
+	langDe->setCheckable(true);
+	langDe->setData("de");
+	languageMenu->addAction(langDe);
+
+	QAction *langVi = new QAction(tr("Vietnamese"), languageActionGroup);
+	langVi->setCheckable(true);
+	langVi->setData("vi");
+	languageMenu->addAction(langVi);
+
+	QAction *langTh = new QAction(tr("Thai"), languageActionGroup);
+	langTh->setCheckable(true);
+	langTh->setData("th");
+	languageMenu->addAction(langTh);
+
+	QAction *langHi = new QAction(tr("Hindi (beta)"), languageActionGroup);
+	langHi->setCheckable(true);
+	langHi->setData("hi");
+	languageMenu->addAction(langHi);
+
+	QAction *langAr = new QAction(tr("Arabic (beta)"), languageActionGroup);
+	langAr->setCheckable(true);
+	langAr->setData("ar");
+	languageMenu->addAction(langAr);
+
 	connect(languageActionGroup, &QActionGroup::triggered, this, [this](QAction *action) {
 		loadTranslation(action->data().toString());
 	});
@@ -2049,6 +2094,32 @@ void consoleWin_t::createMainMenu(void)
 		static const fceu11::qt::TypedConfig<QString> kLanguage(
 			"General/Language", QStringLiteral("en"));
 		savedLang = kLanguage.get();
+	}
+	// v1.11 §11.5: auto-detect system language on first launch (no saved preference)
+	if (savedLang.isEmpty() || savedLang == QStringLiteral("en")) {
+		QString sysLocale = QLocale::system().name();
+		if (sysLocale.startsWith(QLatin1String("zh_CN")) || sysLocale.startsWith(QLatin1String("zh_Hans")))
+			savedLang = QStringLiteral("zh_CN");
+		else if (sysLocale.startsWith(QLatin1String("zh_TW")) || sysLocale.startsWith(QLatin1String("zh_Hant")))
+			savedLang = QStringLiteral("zh_TW");
+		else if (sysLocale.startsWith(QLatin1String("ja")))
+			savedLang = QStringLiteral("ja");
+		else if (sysLocale.startsWith(QLatin1String("ko")))
+			savedLang = QStringLiteral("ko");
+		else if (sysLocale.startsWith(QLatin1String("es")))
+			savedLang = QStringLiteral("es");
+		else if (sysLocale.startsWith(QLatin1String("fr")))
+			savedLang = QStringLiteral("fr");
+		else if (sysLocale.startsWith(QLatin1String("de")))
+			savedLang = QStringLiteral("de");
+		else if (sysLocale.startsWith(QLatin1String("vi")))
+			savedLang = QStringLiteral("vi");
+		else if (sysLocale.startsWith(QLatin1String("th")))
+			savedLang = QStringLiteral("th");
+		else if (sysLocale.startsWith(QLatin1String("hi")))
+			savedLang = QStringLiteral("hi");
+		else if (sysLocale.startsWith(QLatin1String("ar")))
+			savedLang = QStringLiteral("ar");
 	}
 	loadTranslation(savedLang);
 };
@@ -4814,6 +4885,13 @@ void consoleWin_t::loadTranslation(const QString &langCode)
 	if (loadQmWithFallback(appTranslator, langCode))
 	{
 		qApp->installTranslator(appTranslator);
+	}
+
+	// v1.11 §11.5.4: RTL layout for Arabic
+	if (langCode == QStringLiteral("ar")) {
+		qApp->setLayoutDirection(Qt::RightToLeft);
+	} else {
+		qApp->setLayoutDirection(Qt::LeftToRight);
 	}
 
 	// Save preference (skip the QSettings write for the implicit

@@ -80,5 +80,14 @@
     <file alias="fceux11_en.qm">assets/i18n/fceux11_en.qm</file>
     <file alias="fceux11_zh_CN.qm">assets/i18n/fceux11_zh_CN.qm</file>
     <file alias="fceux11_zh_TW.qm">assets/i18n/fceux11_zh_TW.qm</file>
+    <file alias="fceux11_ja.qm">assets/i18n/fceux11_ja.qm</file>
+    <file alias="fceux11_ko.qm">assets/i18n/fceux11_ko.qm</file>
+    <file alias="fceux11_es.qm">assets/i18n/fceux11_es.qm</file>
+    <file alias="fceux11_fr.qm">assets/i18n/fceux11_fr.qm</file>
+    <file alias="fceux11_de.qm">assets/i18n/fceux11_de.qm</file>
+    <file alias="fceux11_vi.qm">assets/i18n/fceux11_vi.qm</file>
+    <file alias="fceux11_th.qm">assets/i18n/fceux11_th.qm</file>
+    <file alias="fceux11_hi.qm">assets/i18n/fceux11_hi.qm</file>
+    <file alias="fceux11_ar.qm">assets/i18n/fceux11_ar.qm</file>
 </qresource>
 </RCC>

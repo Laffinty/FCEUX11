@@ -654,6 +654,15 @@ set(TS_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/lang/fceux11_en.ts
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/lang/fceux11_zh_CN.ts
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/lang/fceux11_zh_TW.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/lang/fceux11_ja.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/lang/fceux11_ko.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/lang/fceux11_es.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/lang/fceux11_fr.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/lang/fceux11_de.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/lang/fceux11_vi.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/lang/fceux11_th.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/lang/fceux11_hi.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/lang/fceux11_ar.ts
 )
 
 set(I18N_OUT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../assets/i18n)
