@@ -7,6 +7,8 @@
 #include "driver_callbacks.h"
 #include "core_api.h"    // FCEUD_PrintError / FCEUD_Message / FCEUD_SetEmulationSpeed / ...
 #include "diag_api.h"    // FCEUD_GetCompilerString
+#include "io_api.h"      // FCEUD_UTF8fopen / FCEUD_UTF8_fstream / FCEUD_ScanArchive / ...
+#include "file.h"        // ArchiveScanRecord / FCEUFILE (full type needed for return-by-value)
 
 namespace fceu11 {
 namespace detail {
@@ -65,4 +67,58 @@ void FCEUD_TurboOff() {
 }
 void FCEUD_TurboToggle() {
     if (auto* fn = fceu11::g_driver().turbo_toggle) fn();
+}
+
+// ===========================================================================
+// Phase D: Batch 2 — File I/O 回调转发 (Archive)
+// ===========================================================================
+ArchiveScanRecord FCEUD_ScanArchive(std::string fname) {
+    if (auto* fn = fceu11::g_driver().scan_archive) return fn(fname);
+    return ArchiveScanRecord{};
+}
+FCEUFILE* FCEUD_OpenArchive(ArchiveScanRecord& asr, std::string& fname,
+                             std::string* innerFilename, int* userCancel) {
+    if (auto* fn = fceu11::g_driver().open_archive)
+        return fn(asr, fname, innerFilename, userCancel);
+    return nullptr;
+}
+FCEUFILE* FCEUD_OpenArchiveIndex(ArchiveScanRecord& asr, std::string& fname,
+                                  int innerIndex, int* userCancel) {
+    if (auto* fn = fceu11::g_driver().open_archive_index)
+        return fn(asr, fname, innerIndex, userCancel);
+    return nullptr;
+}
+
+// ===========================================================================
+// Phase D: Batch 2 — File I/O 回调转发 (UTF8 fopen/fstream)
+// ===========================================================================
+FILE* FCEUD_UTF8fopen(const char *fn, const char *mode) {
+    if (auto* cb = fceu11::g_driver().utf8_fopen) return cb(fn, mode);
+    return nullptr;
+}
+EMUFILE_FILE* FCEUD_UTF8_fstream(const char *fn, const char *m) {
+    if (auto* cb = fceu11::g_driver().utf8_fstream) return cb(fn, m);
+    return nullptr;
+}
+
+// ===========================================================================
+// Phase D: Batch 8 — Driver-command file dialogs 回调转发
+// ===========================================================================
+void FCEUD_AviRecordTo() {
+    if (auto* fn = fceu11::g_driver().avi_record_to) fn();
+}
+void FCEUD_AviStop() {
+    if (auto* fn = fceu11::g_driver().avi_stop) fn();
+}
+void FCEUD_SaveStateAs() {
+    if (auto* fn = fceu11::g_driver().save_state_as) fn();
+}
+void FCEUD_LoadStateFrom() {
+    if (auto* fn = fceu11::g_driver().load_state_from) fn();
+}
+void FCEUD_MovieRecordTo() {
+    if (auto* fn = fceu11::g_driver().movie_record_to) fn();
+}
+void FCEUD_MovieReplayFrom() {
+    if (auto* fn = fceu11::g_driver().movie_replay_from) fn();
 }

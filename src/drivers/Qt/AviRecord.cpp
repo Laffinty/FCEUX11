@@ -2465,12 +2465,12 @@ bool fceu11::AviIsRecording()
 	return recordEnable;
 }
 //**************************************************************************************
-void FCEUD_AviRecordTo(void)
+void fceWrapper_AviRecordTo(void)
 {
 	return;
 }
 //**************************************************************************************
-void FCEUD_AviStop(void)
+void fceWrapper_AviStop(void)
 {
 	return;
 }

@@ -137,7 +137,7 @@ int mutecapture = 0;
 /**
  * Opens a file, C++ style, to be read a byte at a time.
  */
-FILE *FCEUD_UTF8fopen(const char *fn, const char *mode)
+FILE *fceWrapper_UTF8fopen(const char *fn, const char *mode)
 {
    FILE *fp = ::fopen(fn,mode);
 	return(fp);
@@ -146,7 +146,7 @@ FILE *FCEUD_UTF8fopen(const char *fn, const char *mode)
 /**
  * Opens a file to be read a byte at a time.
  */
-EMUFILE_FILE* FCEUD_UTF8_fstream(const char *fn, const char *m)
+EMUFILE_FILE* fceWrapper_UTF8_fstream(const char *fn, const char *m)
 {
 	std::ios_base::openmode mode = std::ios_base::binary;
 	if(!strcmp(m,"r") || !strcmp(m,"rb"))
@@ -762,6 +762,23 @@ void  fceuWrapper_TurboOn(void);
 void  fceuWrapper_TurboOff(void);
 void  fceuWrapper_TurboToggle(void);
 
+// Phase D: forward declarations for renamed FCEUD_* implementations (Batch 2)
+FILE*             fceWrapper_UTF8fopen(const char *fn, const char *mode);
+EMUFILE_FILE*     fceWrapper_UTF8_fstream(const char *fn, const char *m);
+ArchiveScanRecord fceWrapper_ScanArchive(std::string fname);
+FCEUFILE*         fceWrapper_OpenArchive(ArchiveScanRecord& asr, std::string& fname,
+                                          std::string* innerFilename, int* userCancel);
+FCEUFILE*         fceWrapper_OpenArchiveIndex(ArchiveScanRecord& asr, std::string& fname,
+                                               int innerIndex, int* userCancel);
+
+// Phase D: forward declarations for renamed FCEUD_* implementations (Batch 8)
+void fceWrapper_AviRecordTo(void);
+void fceWrapper_AviStop(void);
+void fceWrapper_SaveStateAs(void);
+void fceWrapper_LoadStateFrom(void);
+void fceWrapper_MovieRecordTo(void);
+void fceWrapper_MovieReplayFrom(void);
+
 int  fceuWrapperInit( int argc, char *argv[] )
 {
 	int opt, error;
@@ -784,6 +801,21 @@ int  fceuWrapperInit( int argc, char *argv[] )
 		cb.turbo_on = fceuWrapper_TurboOn;
 		cb.turbo_off = fceuWrapper_TurboOff;
 		cb.turbo_toggle = fceuWrapper_TurboToggle;
+
+		// Phase D: Batch 2 — File I/O
+		cb.utf8_fopen     = fceWrapper_UTF8fopen;
+		cb.utf8_fstream   = fceWrapper_UTF8_fstream;
+		cb.scan_archive   = fceWrapper_ScanArchive;
+		cb.open_archive   = fceWrapper_OpenArchive;
+		cb.open_archive_index = fceWrapper_OpenArchiveIndex;
+
+		// Phase D: Batch 8 — Driver-command file dialogs
+		cb.avi_record_to    = fceWrapper_AviRecordTo;
+		cb.avi_stop         = fceWrapper_AviStop;
+		cb.save_state_as    = fceWrapper_SaveStateAs;
+		cb.load_state_from  = fceWrapper_LoadStateFrom;
+		cb.movie_record_to  = fceWrapper_MovieRecordTo;
+		cb.movie_replay_from = fceWrapper_MovieReplayFrom;
 
 		fceu11::register_driver(cb);
 	}
@@ -1582,7 +1614,7 @@ static int libarchive_ScanArchive( const char *filepath, ArchiveScanRecord &rec)
 }
 #endif
 
-ArchiveScanRecord FCEUD_ScanArchive(std::string fname)
+ArchiveScanRecord fceWrapper_ScanArchive(std::string fname)
 {
 	int ret = -1;
 	ArchiveScanRecord rec;
@@ -1812,7 +1844,7 @@ static FCEUFILE* libarchive_OpenArchive( ArchiveScanRecord& asr, std::string& fn
 
 #endif
 
-FCEUFILE* FCEUD_OpenArchive(ArchiveScanRecord& asr, std::string& fname, std::string* innerFilename, int* userCancel)
+FCEUFILE* fceWrapper_OpenArchive(ArchiveScanRecord& asr, std::string& fname, std::string* innerFilename, int* userCancel)
 {
 	FCEUFILE* fp = nullptr;
 	std::string searchFile;
@@ -1882,7 +1914,7 @@ FCEUFILE* FCEUD_OpenArchive(ArchiveScanRecord& asr, std::string& fname, std::str
 	return FCEUD_OpenArchive( asr, fname, innerFilename, &userCancel );
 }
 
-FCEUFILE* FCEUD_OpenArchiveIndex(ArchiveScanRecord& asr, std::string &fname, int innerIndex, int* userCancel)
+FCEUFILE* fceWrapper_OpenArchiveIndex(ArchiveScanRecord& asr, std::string &fname, int innerIndex, int* userCancel)
 {
 	FCEUFILE* fp = nullptr;
 
@@ -1912,7 +1944,7 @@ FCEUFILE* FCEUD_OpenArchiveIndex(ArchiveScanRecord& asr, std::string &fname, int
         FCEU_DispMessage("Not implemented.",0);\
     }
 DUMMY(fceuWrapper_HideMenuToggle)
-DUMMY(FCEUD_MovieReplayFrom)
+DUMMY(fceWrapper_MovieReplayFrom)
 //DUMMY(FCEUD_AviRecordTo)
 //DUMMY(FCEUD_AviStop)
 //void fceu11::AviVideoUpdate(const unsigned char* buffer) { }

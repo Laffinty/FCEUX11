@@ -39,6 +39,7 @@
 #include "video.h"
 #include "input.h"
 #include "driver.h"
+#include "driver_callbacks.h"
 #include "cart.h"
 
 #ifdef _WIN32
@@ -52,12 +53,6 @@
 #endif
 
 //TODO - we really need some kind of global platform-specific options api
-#ifdef __WIN_DRIVER__
-#include "drivers/win/main.h"
-#include "drivers/win/cheat.h"
-#include "drivers/win/ram_search.h"
-#include "drivers/win/ramwatch.h"
-#endif
 
 #include <string>
 #include <cstdio>
@@ -772,9 +767,7 @@ bool FCEUSS_Load(const char *fname, bool display_message)
 		}
 		#endif
 
-#ifdef __WIN_DRIVER__
-		Update_RAM_Search(); // Update_RAM_Watch() is also called.
-#endif
+		if (auto* fn = fceu11::g_driver().update_ram_search) fn();
 
 		//Update input display if movie is loaded
 		extern uint32 cur_input_display;
@@ -861,11 +854,11 @@ void AddExState(void *v, uint32 s, int type, const char *desc)
 			std::string desc = tmp;
 			if(names.find(desc) != names.end())
 			{
-#ifdef __WIN_DRIVER__
-				MessageBox(NULL,"OH NO!!! YOU HAVE AN INVALID SFORMAT! POST A BUG TICKET ALONG WITH INFO ON THE ROM YOURE USING\n","OOPS",MB_OK);
-#else
-				printf("OH NO!!! YOU HAVE AN INVALID SFORMAT! POST A BUG TICKET ALONG WITH INFO ON THE ROM YOURE USING\n");
-#endif
+				if (auto* fn = fceu11::g_driver().message_box) {
+					fn("OOPS", "OH NO!!! YOU HAVE AN INVALID SFORMAT! POST A BUG TICKET ALONG WITH INFO ON THE ROM YOURE USING\n", 0);
+				} else {
+					printf("OH NO!!! YOU HAVE AN INVALID SFORMAT! POST A BUG TICKET ALONG WITH INFO ON THE ROM YOURE USING\n");
+				}
 				exit(0);
 			}
 			names[desc] = true;

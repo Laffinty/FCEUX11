@@ -688,7 +688,7 @@ static std::string GetFilename(const char *title, int mode, const char *filter)
 /**
 * Lets the user start a new .fm2 movie file
 **/
-void FCEUD_MovieRecordTo(void)
+void fceWrapper_MovieRecordTo(void)
 {
 	//bool ok = false;
 	//std::string fname = GetFilename("Save FM2 movie for recording", 2, "FM2 movies|*.fm2");
@@ -711,7 +711,7 @@ void FCEUD_MovieRecordTo(void)
 /**
 * Lets the user save a savestate to a specific file
 **/
-void FCEUD_SaveStateAs(void)
+void fceWrapper_SaveStateAs(void)
 {
 	std::string fname = GetFilename("Save State As...", 0, "Save States|*.fc0");
 	if (!fname.size())
@@ -723,7 +723,7 @@ void FCEUD_SaveStateAs(void)
 /**
 * Lets the user load a savestate from a specific file
 */
-void FCEUD_LoadStateFrom(void)
+void fceWrapper_LoadStateFrom(void)
 {
 	std::string fname = GetFilename("Load State From...", 1, "Save States|*.fc?");
 	if (!fname.size())
