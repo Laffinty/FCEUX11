@@ -78,30 +78,32 @@
 #define strcasecmp _stricmp
 #endif
 //*****************************************************************
-// Define Global Variables to be shared with FCEU Core
+// Extern declarations — defined in fceu_globals.cpp
 //*****************************************************************
-int  dendy = 0;
-int eoptions=0;
-int isloaded=0;
-int pal_emulation=0;
-int gametype = 0;
-int closeFinishedMovie = 0;
-int KillFCEUXonFrame = 0;
+extern int  dendy;
+extern int  eoptions;
+extern int  isloaded;
+extern int  pal_emulation;
+extern int  gametype;
+extern int  closeFinishedMovie;
+extern int  KillFCEUXonFrame;
 
-bool turbo = false;
-bool pauseAfterPlayback = false;
-bool suggestReadOnlyReplay = true;
-bool showStatusIconOpt = true;
-bool drawInputAidsEnable = true;
-bool usePaletteForVideoBg = false;
-unsigned int gui_draw_area_width   = 256;
-unsigned int gui_draw_area_height  = 256;
+extern bool turbo;
+extern bool pauseAfterPlayback;
+extern bool suggestReadOnlyReplay;
+extern bool showStatusIconOpt;
+extern bool drawInputAidsEnable;
+extern bool usePaletteForVideoBg;
+extern unsigned int gui_draw_area_width;
+extern unsigned int gui_draw_area_height;
 
-// global configuration object
-Config *g_config = NULL;
+extern Config *g_config;
+extern bool g_noConsole;
+extern unsigned int emulatorCycleCount;
 
-// v0.3.15.x PHASE-3: --no-console flag, parsed in fceuWrapperPreInit.
-bool g_noConsole = false;
+#ifdef CREATE_AVI
+extern int mutecapture;
+#endif
 
 #ifdef _WIN32
 // v0.3.15.x PHASE-3: DirectStorage probe cache. Populated once at
@@ -118,13 +120,8 @@ static int periodic_saves = 0;
 static int   mutexLocks = 0;
 static int   mutexPending = 0;
 static bool  emulatorHasMutex = 0;
-unsigned int emulatorCycleCount = 0;
 
 extern double g_fpsScale;
-
-#ifdef CREATE_AVI
-int mutecapture = 0;
-#endif
 //*****************************************************************
 // Define Global Functions to be shared with FCEU Core
 //*****************************************************************
