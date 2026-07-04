@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11] - 2026-07-04
+
+**Codename: Bridge.** Eleventh sub-version of the v1.x modernization.
+
+### Added
+- `fceu11::DriverCallbacks` — Core→Driver callback table (43 function pointer fields)
+- `g_driver()` `__forceinline` singleton accessor
+- `register_driver()` — Qt driver registration mechanism
+- `src/driver_callbacks.h` / `.cpp` — core-side FCEUD_* forwarders
+- `tests/core/driver_callbacks_test.cpp` — 12 callback infrastructure tests
+- `tests/core/core_driver_boundary_test.cpp` — Phase H boundary regression test
+
+### Changed
+- **86 driver `#ifdef` blocks removed** from 12 core source files
+- 40 live `FCEUD_*` functions migrated to `g_driver()->fn(...)` forwarding
+- 5 dead `FCEUD_*` declarations removed (CmdOpen/OnCloseGame/LuaRunFrom/BlitScreen/BlitScreenDummy)
+- `movie.cpp`, `state.cpp`, `fceu.cpp`, `input.cpp` all zero driver `#ifdef`
+- `taseditor_lua` type unification via `g_driver()->taseditor_disable_run_function()`
+- keyboard state abstraction via `g_driver()->get_keyboard_state()`
+- QThread name abstraction via `g_driver()->get_thread_name()`
+- Phase E supplemental: `profiler.cpp`, `debugsymboltable.cpp`, `video.cpp`, `wave.cpp`, `version.h` cleaned
+
+### Phase G — fceuWrapper.cpp split
+- `src/drivers/Qt/fceu_archive.cpp` — archive subsystem (minizip + libarchive, 460 lines)
+- `src/drivers/Qt/fceu_globals.cpp` — global variable definitions (65 lines)
+- `src/drivers/Qt/fceu_callbacks.cpp` — Qt-side callback implementations + `register_driver()` (358 lines)
+- `fceuWrapper.cpp` reduced from 2086 → 1316 lines
+
+### Phase H — Cleanup
+- `src/utils/mutex.h` / `.cpp` pImpl transformation — Qt type leakage eliminated
+- `src/driver.h` shim removed — 53 files updated to 4 direct peer headers
+- `__SDL__` dead macro removed from CMakeLists.txt + 6 .vcxproj files
+- PCH updated: driver.h → core_api/io_api/net_api/diag_api.h
+
 ## [1.10] - 2026-07-02
 
 **Codename: Cryptex.** Tenth sub-version of the v1.x modernization
