@@ -1,5 +1,5 @@
 /// \file
-/// \brief Wave Audio Export wrapper â€” delegates to Rust.
+/// \brief Wave Audio Export wrapper â€?delegates to Rust.
 ///
 /// Phase 4 (v0.2.5): Rust module provides a memory-safe WAV file writer
 /// using `std::fs::File` and manual PCM header construction.
@@ -7,7 +7,10 @@
 #include "types.h"
 #include "fceu.h"
 
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "sound.h"
 #include "wave.h"
 

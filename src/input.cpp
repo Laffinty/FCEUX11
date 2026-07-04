@@ -34,7 +34,10 @@
 #include "input.h"
 #include "vsuni.h"
 #include "fds.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 
 #include <string>
 #include <ostream>
@@ -534,7 +537,7 @@ static void SetInputStuff(int port)
 
 static void SetInputStuffFC()
 {
-	// v0.3.8: cast ESIFC to int â€” see SetInputStuff comment above.
+	// v0.3.8: cast ESIFC to int â€?see SetInputStuff comment above.
 	switch(static_cast<int>(portFC.type))
 	{
 	case SIFC_NONE:

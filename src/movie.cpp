@@ -6,7 +6,10 @@
 #include "input.h"
 #include "fceu.h"
 #include "netplay.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "driver_callbacks.h"
 #include "state.h"
 #include "file.h"
@@ -864,7 +867,7 @@ void FCEUMOV_CreateCleanMovie()
 	currMovieData.fourscore = fceu11::GetInputFourscore();
 	currMovieData.microphone = fceu11::GetInputMicrophone();
 	// v0.3.8: currMovieData.ports[] is `int[3]`; .type is the typed
-	// fceu11::InputDevice / InputDeviceFC form â€” cast to int.
+	// fceu11::InputDevice / InputDeviceFC form â€?cast to int.
 	currMovieData.ports[0] = static_cast<int>(joyports[0].type);
 	currMovieData.ports[1] = static_cast<int>(joyports[1].type);
 	currMovieData.ports[2] = static_cast<int>(portFC.type);

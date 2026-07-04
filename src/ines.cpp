@@ -1,10 +1,10 @@
 // v1.10 Cryptex: iNES format bridge layer.
 // Global variables and thin iNESLoad wrapper.  Core logic lives in:
-//   ines_load.cpp  â€” iNESLoadCore (Rust FFI parsing + ROM setup)
-//   ines_init.cpp  â€” iNES_Init (mapper initialization)
-//   ines_gi.cpp    â€” iNESGI (game interface hooks)
-//   ines_save.cpp  â€” iNesSave/iNesSaveAs
-//   ines_bmap.h    â€” BMAPPINGLocal bmap[] table
+//   ines_load.cpp  â€?iNESLoadCore (Rust FFI parsing + ROM setup)
+//   ines_init.cpp  â€?iNES_Init (mapper initialization)
+//   ines_gi.cpp    â€?iNESGI (game interface hooks)
+//   ines_save.cpp  â€?iNesSave/iNesSaveAs
+//   ines_bmap.h    â€?BMAPPINGLocal bmap[] table
 
 #include "types.h"
 #include "utils/safe_string.h"
@@ -15,7 +15,10 @@
 #include "ines.h"
 #include "unif.h"
 #include "file.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "vsuni.h"
 
 #include <cstring>

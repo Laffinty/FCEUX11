@@ -18,7 +18,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-// FCEUX11 v1.11 Bridge — fceu_archive.cpp
+// FCEUX11 v1.11 Bridge �?fceu_archive.cpp
 // Archive subsystem (minizip + libarchive backend).
 // Split from fceuWrapper.cpp per v1.11_bridge_build_plan.md §4.1.
 
@@ -30,7 +30,10 @@
 #include <string>
 #include <vector>
 
-#include "../../driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "../../emufile.h"
 #include "utils/unzip.h"
 #include "common/configSys.h"

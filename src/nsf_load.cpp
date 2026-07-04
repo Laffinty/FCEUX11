@@ -1,4 +1,4 @@
-// NSF load helper â€” extracted from nsf.cpp for v1.10 Cryptex Phase B.2.
+// NSF load helper â€?extracted from nsf.cpp for v1.10 Cryptex Phase B.2.
 // Contains the core NSFLoad logic using Rust FFI, called from the thin wrapper in nsf.cpp.
 
 #include "types.h"
@@ -7,7 +7,10 @@
 #include "nsf.h"
 #include "utils/memory.h"
 #include "file.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "rust/fceux11_rust.h"
 
 #include <cstdio>
@@ -27,7 +30,7 @@ extern NSF_HEADER NSFHeader;
 // Forward declaration for NSFROM patch
 extern uint8 NSFROM[0x30+6];
 
-// Main NSF load logic â€” called from thin wrapper in nsf.cpp
+// Main NSF load logic â€?called from thin wrapper in nsf.cpp
 int NSFLoadCore(const char *name, FCEUFILE *fp) {
 	// Read entire file into memory
 	EMUFILE_MEMORY* ms = fp->EnsureMemorystream();

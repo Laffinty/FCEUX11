@@ -1,4 +1,4 @@
-// NSF UI rendering â€” extracted from nsf.cpp for v1.10 Cryptex Task 2.
+// NSF UI rendering â€?extracted from nsf.cpp for v1.10 Cryptex Task 2.
 // Contains DrawNSF (audio visualization + song info overlay).
 
 #include "types.h"
@@ -7,7 +7,10 @@
 #include "sound.h"
 #include "nsf.h"
 #include "input.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "rust/fceux11_rust.h"
 
 #include <cstdio>

@@ -43,7 +43,10 @@
 #include "common/cheat.h"
 #include "../../movie.h"
 #include "../../fceu.h"
-#include "../../driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "../../state.h"
 #include "../../utils/xstring.h"
 #ifdef _S9XLUA_H
@@ -97,7 +100,7 @@ void ParseGIInput(FCEUGI *gi)
 
 	// v0.3.8: gi->input[0..1] is fceu11::InputDevice (enum class) and
 	// gi->inputfc is fceu11::InputDeviceFC. Storage is int per the
-	// pre-v0.3.8 contract â€” cast explicitly. Sentinel test is "any
+	// pre-v0.3.8 contract â€?cast explicitly. Sentinel test is "any
 	// non-negative value means valid"; ESI::Unset = -1.
 	if (static_cast<int>(gi->input[0]) >= 0)
 	{
@@ -1732,7 +1735,7 @@ void fceWrapper_SetInput(bool fourscore, bool microphone, ESI port0, ESI port1,
 	{
 		// no Four Core emulation, check the config/movie file for controller types
 		// v0.3.8: CurInputType[] is int; port0/port1/fcexp are typed
-		// fceu11::InputDevice / InputDeviceFC â€” cast at the boundary.
+		// fceu11::InputDevice / InputDeviceFC â€?cast at the boundary.
 		CurInputType[0] = static_cast<int>(port0);
 		CurInputType[1] = static_cast<int>(port1);
 		CurInputType[2] = static_cast<int>(fcexp);

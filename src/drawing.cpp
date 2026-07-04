@@ -1,4 +1,4 @@
-// drawing.cpp â€” Thin C++ wrappers around Rust FFI implementations (v0.2.23).
+// drawing.cpp â€?Thin C++ wrappers around Rust FFI implementations (v0.2.23).
 //
 // All pixel-buffer algorithms have been migrated to
 // `src/rust/crates/fceux11-media/src/drawing.rs`. This file retains the
@@ -12,14 +12,17 @@
 #include "drawing.h"
 #include "video.h"
 #include "movie.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 
 #include "rust/fceux11_rust.h"
 
 #include <string.h>
 
 // ---------------------------------------------------------------------------
-// DrawTextLineBG â€” dim the 14-row message-line background
+// DrawTextLineBG â€?dim the 14-row message-line background
 // ---------------------------------------------------------------------------
 void DrawTextLineBG(uint8 *dest)
 {
@@ -28,7 +31,7 @@ void DrawTextLineBG(uint8 *dest)
 }
 
 // ---------------------------------------------------------------------------
-// DrawMessage â€” top/bottom message banner, called from video.cpp
+// DrawMessage â€?top/bottom message banner, called from video.cpp
 // ---------------------------------------------------------------------------
 void DrawMessage(bool beforeMovie)
 {
@@ -92,7 +95,7 @@ void DrawMessage(bool beforeMovie)
 }
 
 // ---------------------------------------------------------------------------
-// FCEU_DrawRecordingStatus â€” play/record/pause indicator
+// FCEU_DrawRecordingStatus â€?play/record/pause indicator
 // ---------------------------------------------------------------------------
 static void drawstatus(uint8* XBuf, int n, int y, int xofs)
 {
@@ -130,7 +133,7 @@ void FCEU_DrawRecordingStatus(uint8* XBuf)
 }
 
 // ---------------------------------------------------------------------------
-// FCEU_DrawNumberRow â€” save-state status digit row
+// FCEU_DrawNumberRow â€?save-state status digit row
 // ---------------------------------------------------------------------------
 void FCEU_DrawNumberRow(uint8 *XBuf, int *nstatus, int cur)
 {
@@ -144,7 +147,7 @@ void FCEU_DrawNumberRow(uint8 *XBuf, int *nstatus, int cur)
 }
 
 // ---------------------------------------------------------------------------
-// DrawTextTrans / DrawTextTransWH â€” text rasterization
+// DrawTextTrans / DrawTextTransWH â€?text rasterization
 // ---------------------------------------------------------------------------
 void DrawTextTransWH(uint8 *dest, int width, uint8 *textmsg, uint8 fgcolor,
                      int max_w, int max_h, int border)

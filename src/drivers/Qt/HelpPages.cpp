@@ -1,4 +1,4 @@
-﻿/* FCE Ultra - NES/Famicom Emulator
+/* FCE Ultra - NES/Famicom Emulator
  *
  * Copyright notice for this file:
  *  Copyright (C) 2020 mjbudd77
@@ -35,7 +35,10 @@
 #include <QHelpContentWidget>
 #endif
 
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "Qt/HelpPages.h"
 #include "Qt/fceuWrapper.h"
 #include "Qt/ConsoleWindow.h"

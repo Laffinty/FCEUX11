@@ -7,7 +7,10 @@
 
 #include "types.h"
 #include "fceu.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "utils/crc32.h"
 #include "drivers/Qt/nes_shm.h"
 

@@ -24,7 +24,10 @@
 #include "types.h"
 #include "fceu.h"
 #include "ppu.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 
 #include "cart.h"
 #include "x6502.h"

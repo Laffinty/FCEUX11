@@ -47,7 +47,10 @@
 
 #include "fceu.h"
 #include "movie.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 
 #include "common/vidblit.h"
 #include "Qt/config.h"

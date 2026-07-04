@@ -38,7 +38,10 @@
 #include "netplay.h"
 #include "video.h"
 #include "input.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "driver_callbacks.h"
 #include "cart.h"
 
@@ -869,7 +872,7 @@ void AddExState(void *v, uint32 s, int type, const char *desc)
 	if(desc)
 	{
 		// v0.3.6.5-followup: capture the actual buffer size; do NOT use
-		// sizeof((char*)SFMDATA[SFEXINDEX].desc) â€” that is the size of a
+		// sizeof((char*)SFMDATA[SFEXINDEX].desc) â€?that is the size of a
 		// pointer (8 on x64), not the malloc'd buffer, and triggers an
 		// ASan heap-buffer-overflow for any desc shorter than 7 chars
 		// (e.g. the 4-char "CHRR"/"EXNR" tags registered during iNES_Init).

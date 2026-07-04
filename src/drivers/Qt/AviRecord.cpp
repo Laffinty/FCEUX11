@@ -43,7 +43,10 @@
 #include <QInputDialog>
 
 #include "fceu.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "version.h"
 #include "common/os_utils.h"
 

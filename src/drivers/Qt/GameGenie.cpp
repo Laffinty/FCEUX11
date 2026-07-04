@@ -33,7 +33,10 @@
 #include "../../cart.h"
 #include "../../cheat.h"
 #include "../../debug.h"
-#include "../../driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 
 #include "Qt/main.h"
 #include "Qt/dface.h"

@@ -34,7 +34,10 @@
 #include "state.h"
 #include "video.h"
 #include "input.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "debug.h"
 		 
 #include <array>
@@ -354,7 +357,7 @@ uint8 VRAMBuffer = 0, PPUGenLatch = 0;
 // `extern uint8_t (& PPUCHRRAM)`, `extern uint8_t (& PPUNTARAM)` in
 // ppu_class.h bind the global names to g_ppu member storage. The
 // plan §1.3 wording "PPUCHRRAM / PPUNTARAM stay as v1.0 globals" was
-// aspirational — in C++ a reference-to-storage alias cannot coexist
+// aspirational �?in C++ a reference-to-storage alias cannot coexist
 // in the same TU as a variable definition of the same name, so all
 // three migrate into the class. Byte-level semantics unchanged.
 
@@ -380,7 +383,7 @@ void (*PPU_hook)(uint32 A);
 //   DummyRead      -> g_ppu.dummy_read_      (uint32_t)
 // Byte-level semantics unchanged; the only delta is the storage
 // location (BSS addresses move into fceu11::g_ppu). SpriteDMA
-// stays here — Phase E (Batch 3) will migrate it alongside SPRAM.
+// stays here �?Phase E (Batch 3) will migrate it alongside SPRAM.
 uint8 SpriteDMA = 0; // $4014 / Writing $xx copies 256 bytes by reading from $xx00-$xxFF and writing to $2004 (OAM data)
 
 static int maxsprites = 8;
@@ -405,7 +408,7 @@ uint8 PPUSPL;
 // fceu11::g_ppu.oam_; the `extern uint8_t (& SPRAM)[0x100]` reference
 // alias in ppu_class.h rebinds the v1.0 name to g_ppu's storage, so
 // every ppu.cpp / debug.cpp / drivers/Qt/HexEditor.cpp / ppuViewer.cpp
-// call site keeps compiling unchanged. SPRBUF stays here — the
+// call site keeps compiling unchanged. SPRBUF stays here �?the
 // sprite-evaluation buffer is per-scanline internal state (the v1.0
 // `static uint8 numsprites` driver reads from it during RefreshLine)
 // and not on plan §2.3's migration list.
@@ -1075,7 +1078,7 @@ static void ResetRL(uint8 *target) {
 // g_ppu.line_buffer() so call-site reads / writes / pointers stay
 // unchanged. The original file-static array `static uint8
 // sprlinebuf[256+8];` was removed; equivalent storage now lives in
-// the class (alignas(64) for cache alignment — see plan §2.2 risk
+// the class (alignas(64) for cache alignment �?see plan §2.2 risk
 // analysis).
 
 void FCEUPPU_LineUpdate(void) {

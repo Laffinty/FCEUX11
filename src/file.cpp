@@ -42,12 +42,18 @@
 #else
 #include "utils/unzip.h"
 #endif
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "types.h"
 #include "fceu.h"
 #include "state.h"
 #include "movie.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "utils/xstring.h"
 
 

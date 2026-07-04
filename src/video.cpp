@@ -32,7 +32,10 @@
 #include "input.h"
 #include "vsuni.h"
 #include "drawing.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "io_api.h"
 #include "drivers/common/vidblit.h"
 #include "rust/fceux11_rust.h"
@@ -78,7 +81,7 @@ bool oldInputDisplay = false;
 unsigned int lastu = 0;
 
 // v0.2.27: AsSnapshotName is owned by Rust (fceux11_rust_video_*).
-// The C++ side is a thin pass-through â€” see FCEUI_SetSnapshotAsName /
+// The C++ side is a thin pass-through â€?see FCEUI_SetSnapshotAsName /
 // FCEUI_GetSnapshotAsName below. The std::string global is gone.
 
 void FCEUI_SetSnapshotAsName(std::string name)

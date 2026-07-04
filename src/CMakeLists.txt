@@ -79,7 +79,7 @@ endif()
 
 # Qt5 support removed in Phase 2 — Qt6 only
 # v0.3.1: Removed _CRT_SECURE_NO_WARNINGS; using standard secure APIs
-add_definitions( -D__SDL__  -D__QT_DRIVER__  -DQT_DEPRECATED_WARNINGS -DPSS_STYLE=2 )
+add_definitions( -D__QT_DRIVER__  -DQT_DEPRECATED_WARNINGS -DPSS_STYLE=2 )
 add_definitions( -D_UNICODE -DUNICODE )
 add_definitions( -DFCEUDEF_DEBUGGER )
 add_definitions( -D_USE_LIBARCHIVE )
@@ -580,10 +580,14 @@ target_include_directories(fceux11_boards PUBLIC ${CMAKE_SOURCE_DIR}/src)
 add_library(fceux11_core STATIC ${SRC_CORE})
 target_link_libraries(fceux11_core PUBLIC fceux11_boards fceux11_utils ${ZLIB_LIBRARIES} SDL2::SDL2)
 target_include_directories(fceux11_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
-# v0.3.1: PCH for core — types.h + driver.h + fceu.h (C++ only; C files skip PCH)
+# v0.3.1: PCH for core — types.h + API headers + fceu.h (C++ only; C files skip PCH)
+# v1.11: driver.h replaced with 4 peer headers (Phase H)
 target_precompile_headers(fceux11_core PRIVATE
     ${CMAKE_SOURCE_DIR}/src/types.h
-    ${CMAKE_SOURCE_DIR}/src/driver.h
+    ${CMAKE_SOURCE_DIR}/src/core_api.h
+    ${CMAKE_SOURCE_DIR}/src/io_api.h
+    ${CMAKE_SOURCE_DIR}/src/net_api.h
+    ${CMAKE_SOURCE_DIR}/src/diag_api.h
     ${CMAKE_SOURCE_DIR}/src/fceu.h
 )
 # Exclude C sources from C++ PCH to avoid STL1003 error

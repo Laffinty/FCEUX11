@@ -26,7 +26,10 @@
 // v0.3.10 P4.1: DatachSet moved into fceu11:: namespace; pull in driver.h
 // for the declaration. mapinc.h doesn't transitively include the API
 // surface header.
-#include "../driver.h"
+#include "../core_api.h"
+#include "../io_api.h"
+#include "../net_api.h"
+#include "../diag_api.h"
 
 static uint8 reg[16], is153, x24c02;
 static uint8 IRQa;

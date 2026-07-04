@@ -1,6 +1,6 @@
-// UNIF load helper â€” extracted from unif.cpp for v1.10 Cryptex Phase B.1.
+// UNIF load helper â€?extracted from unif.cpp for v1.10 Cryptex Phase B.1.
 // Contains the core UNIFLoad logic using Rust FFI, board initialization,
-// and cleanup helpers â€” all moved from unif.cpp to keep the bridge < 100 lines.
+// and cleanup helpers â€?all moved from unif.cpp to keep the bridge < 100 lines.
 
 #include "types.h"
 #include "utils/safe_string.h"
@@ -11,7 +11,10 @@
 #include "utils/memory.h"
 #include "state.h"
 #include "file.h"
-#include "driver.h"
+#include "core_api.h"
+#include "io_api.h"
+#include "net_api.h"
+#include "diag_api.h"
 #include "rust/fceux11_rust.h"
 
 #include <cstdio>
