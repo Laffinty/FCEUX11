@@ -530,6 +530,7 @@ set(SRC_DRIVERS_QT
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/sdl-throttle.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/QtNetplay.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/AviRecord.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/AviOptionsDialog.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/AviRiffViewer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/avi/avi-utils.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/avi/fileio.cpp
