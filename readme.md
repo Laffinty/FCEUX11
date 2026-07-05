@@ -32,7 +32,7 @@
 | **Lua 脚本**：通过 Lua 接口编写脚本，实现自定义屏幕叠加显示、自动化操作、内存数据读取等高级玩法。 | **Lua Scripting**: Write Lua scripts to create custom on-screen displays, automate gameplay, or read memory, extending the emulator however you like. |
 | **录像回放**：录制完整游戏过程并支持回放，可导出为 AVI 视频，方便分享你的精彩通关时刻。 | **Movie Recording**: Record full playthroughs, replay them anytime, and export to AVI to share your best runs with the community. |
 | **金手指**：支持 Game Genie 与原始金手指代码，轻松修改游戏内容，重温童年「无敌版」的快乐。 | **Cheats**: Game Genie and raw cheat code support to tweak gameplay, unlock hidden content, or just have fun bending the rules. |
-| **多语言界面**：提供简体中文、繁体中文、英文、日语、韩语、西班牙语、法语、德语、越南语、泰语、印地语及阿拉伯语界面，随时自由切换，告别语言障碍。 | **Multi-language UI**: Switch seamlessly between Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Spanish, French, German, Vietnamese, Thai, Hindi, and Arabic to play in the language you're most comfortable with. |
+| **多语言界面（v1.11 升级）**：v1.11（Bridge）将可用界面语言从 3 种扩展至 **12 种**——简体中文、繁体中文、英文、日语、韩语、西班牙语、法语、德语、越南语、泰语、印地语（beta）、阿拉伯语（beta）；首启自动按系统区域设置匹配语言（`zh-CN` / `ja-JP` / `ar-SA` 等），切换语言后菜单、对话框即时全部重译；阿拉伯语自动启用从右到左布局。 | **Multi-language UI (v1.11 upgrade)**: v1.11 (Bridge) expands the available UI languages from 3 to **12** — Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Spanish, French, German, Vietnamese, Thai, Hindi (beta), and Arabic (beta). On first launch the language is auto-detected from your system locale (`zh-CN` / `ja-JP` / `ar-SA`, etc.), and menus/dialogs are fully retranslated the moment you switch. Arabic automatically enables right-to-left layout. |
 | **自定义调色板**：加载外部调色板文件，自由调整画面色彩，还原你记忆中最对的那个画面色调。 | **Custom Palettes**: Load custom palette files to fine-tune color rendering and match the exact look you grew up with on your old CRT TV. |
 | **即时存档**：随时随地保存/读取进度，支持自动存档历史记录，再难的关卡也能反复挑战、不留遗憾。 | **Save States**: Save and load anywhere, anytime, with automatic state history so you never lose progress on a tough boss fight again. |
 
@@ -89,26 +89,47 @@ Precompiled binaries are available on the **[GitHub Releases](https://github.com
 ## 版本历史 / Changelog
 
 详见 [CHANGELOG.md](CHANGELOG.md)。
-v1.11（代号 **Cryptex**）是当前稳定版，v1.x 现代化周期的第十个子版本
+v1.11（代号 **Bridge**）是当前稳定版，v1.x 现代化周期的第十一个子版本
 （v1.1 Sentinel → v1.2 Census → v1.3 Legion → v1.4 Gateway → v1.5
 Prism → v1.6 Resonance → v1.7 Cartograph → v1.8 Masonry → v1.9
-Chronicle → v1.11 Cryptex）。v1.9（Chronicle）引入 V2 Savestate 格式
-（FCEU11ST，带每 chunk CRC32 校验），将 SFORMAT 序列化系统全量迁移至
-Rust `fceux11-core`。v1.10（Cryptex）完成 ROM 格式解析全量 Rust 迁移
-——将 iNES/UNIF/NSF/FDS/VS UniSystem 解析器迁移至 `fceux11-formats`，C++ 解析代码缩减约 90%（ines.cpp 983→0 行，unif.cpp 669→2 行，
-nsf.cpp 612→07 行，fds.cpp 905→16 行）。详见 Release Notes 与 [CHANGELOG.md](CHANGELOG.md) 和 [`docs/v1.x_Modernization_Roadmap.md`](docs/v1.x_Modernization_Roadmap.md)，编译指南见 [`docs/BuildGuide.md`](docs/BuildGuide.md)。
+Chronicle → v1.10 Cryptex → v1.11 Bridge）。v1.11（Bridge）完成两大
+里程碑：**（1）Qt 驱动层解耦** —— `fceu11::DriverCallbacks` 回调表
+上线，核心源码 `#ifdef __QT_DRIVER__` / `__WIN_DRIVER__` 块消除 86 处，
+40 个 `FCEUD_*` 函数迁移至接口转发，5 个死代码声明移除，`fceuWrapper.cpp`
+由 2086 行拆分为四个职责单一的子模块；
+**（2）多语言系统重大升级** —— UI 语言从 3 种扩展到 **12 种**（新增
+ja / ko / es / fr / de / vi / th / hi(beta) / ar(beta)），首启自动按
+`QLocale::system()` 匹配语言并加载翻译，阿拉伯语启用 Qt RTL 布局，
+`retranslateUi()` 全量覆盖 ~90 处先前遗漏的菜单/动作项。
+v1.10（Cryptex）完成 ROM 格式解析全量 Rust 迁移（iNES/UNIF/NSF/FDS/
+VS UniSystem → `fceux11-formats`，C++ 解析代码缩减约 90%）。
+v1.9（Chronicle）引入 V2 Savestate 格式（FCEU11ST，带每 chunk CRC32 校验），
+将 SFORMAT 序列化系统全量迁移至 Rust `fceux11-core`。
+详见 Release Notes 与 [CHANGELOG.md](CHANGELOG.md) 和 [`docs/v1.x_Modernization_Roadmap.md`](docs/v1.x_Modernization_Roadmap.md)，
+编译指南见 [`docs/BuildGuide.md`](docs/BuildGuide.md)。
 See [CHANGELOG.md](CHANGELOG.md) for version history.
 
-v1.11 (codename **Cryptex**) is the current stable release, the tenth
+v1.11 (codename **Bridge**) is the current stable release, the eleventh
 sub-version of the v1.x modernization cycle (v1.1 Sentinel → v1.2
-Census → v1.3 Legion → v1.4 Gateway → v1.5 Prism → v1.6 Resonance → v1.7 Cartograph → v1.8 Masonry → v1.9 Chronicle → v1.11 Cryptex).
-v1.9 (Chronicle) introduces the V2 savestate format (FCEU11ST with
-per-chunk CRC32 integrity checking), migrating the SFORMAT serialization
-system entirely to Rust `fceux11-core`. v1.11 (Cryptex) completes the
-full Rust migration of ROM format parsing: iNES/UNIF/NSF/FDS/VS
-UniSystem parsers moved to `fceux11-formats`, reducing C++ parsing code
-by ~90% (ines.cpp 983→0 lines, unif.cpp 669→2 lines, nsf.cpp 612→07
-lines, fds.cpp 905→16 lines). Full release notes:
+Census → v1.3 Legion → v1.4 Gateway → v1.5 Prism → v1.6 Resonance →
+v1.7 Cartograph → v1.8 Masonry → v1.9 Chronicle → v1.10 Cryptex →
+v1.11 Bridge). v1.11 (Bridge) ships two major milestones: **(1) Qt
+driver decoupling** — the `fceu11::DriverCallbacks` callback table is
+introduced, eliminating 86 `#ifdef __QT_DRIVER__` / `__WIN_DRIVER__`
+blocks from core sources, migrating 40 `FCEUD_*` functions to interface
+forwarding, removing 5 dead declarations, and splitting
+`fceuWrapper.cpp` from 2086 lines into four single-responsibility
+sub-modules; **(2) a major multi-language overhaul** — the UI ships in
+**12 languages** (new: ja / ko / es / fr / de / vi / th / hi(beta) /
+ar(beta)), auto-detects the system locale via `QLocale::system()` and
+loads the matching translation on first launch, enables Qt RTL layout
+for Arabic, and the `retranslateUi()` pass now covers ~90 previously
+untranslated menu/action items. v1.10 (Cryptex) completed the full Rust
+migration of ROM format parsing (iNES/UNIF/NSF/FDS/VS UniSystem →
+`fceux11-formats`, reducing C++ parsing code by ~90%). v1.9 (Chronicle)
+introduced the V2 savestate format (FCEU11ST with per-chunk CRC32
+integrity checking), migrating the SFORMAT serialization system entirely
+to Rust `fceux11-core`. Full release notes:
 [CHANGELOG.md](CHANGELOG.md) and
 [`docs/v1.x_Modernization_Roadmap.md`](docs/v1.x_Modernization_Roadmap.md).
 Build guide: [`docs/BuildGuide.md`](docs/BuildGuide.md).

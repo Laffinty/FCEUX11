@@ -1,18 +1,24 @@
-# FCEUX11 v1.10 正式版编译指南 / v1.10 Build Guide
+# FCEUX11 v1.11 正式版编译指南 / v1.11 Build Guide
 
-> **适用版本**：FCEUX11 v1.10（正式版，代号 Cryptex）
+> **适用版本**：FCEUX11 v1.11（正式版，代号 **Bridge**）
 > **目标平台**：Windows 11 22H2+（64-bit）独占
 > **工具链**：MSVC 2022 19.36+ (VS 17.6+) + CMake 4.0+ + Ninja + vcpkg + Rust 1.78+
 > **Qt**：6.8 LTS
-> **最后更新**：2026-07-03
+> **最后更新**：2026-07-05（v1.11 多语言系统升级：UI 现支持 12 种语言，含阿拉伯语 RTL 布局与系统语言自动侦测）
 
 ---
 
 ## 0. 文档导读
 
-本指南面向所有想从源码编译 FCEUX11 v1.10 的开发者 / 用户。每一步都
+本指南面向所有想从源码编译 FCEUX11 v1.11 的开发者 / 用户。每一步都
 经过实测，**任意一台符合系统要求 + 已按本章第 3 节装好工具链的 Windows
 11 电脑**都可以照搬命令完成编译。
+
+> **v1.11 新增内容**：
+> - UI 现支持 **12 种语言**（en / zh_CN / zh_TW / ja / ko / es / fr / de / vi / th / hi(beta) / ar(beta)）；
+>   详见 §11.5。
+> - 构建产物中包含 12 份 `.qm`（vs v1.10 的 3 份）；详见 §2。
+> - 翻译流水线（`lupdate` + `lrelease`）无外部翻译 API 依赖；详见 §4.5。
 
 阅读路径：
 1. **§1 系统要求** — 确认你的电脑符合
@@ -54,10 +60,10 @@
 | 性能基准 | `build\tests\fceux11_*_bench.exe` | 3 个 Google Benchmark |
 | Rust 静态库 | `build\src\rust\fceux11_rust.lib` | 6 个 FFI crate 合并产物 |
 | Rust 头文件 | `build\src\rust\fceux11_rust.h` | cbindgen 生成的 C 接口 |
-| Qt 翻译 | `build\src\drivers\Qt\lang\fceux11_*.qm` | 编译后的翻译（12 种语言：en/zh_CN/zh_TW/ja/ko/es/fr/de/vi/th/hi/ar）|
+| Qt 翻译 | `build\src\drivers\Qt\lang\fceux11_*.qm` | 编译后的翻译（v1.11 起 **12 种语言**：en/zh_CN/zh_TW/ja/ko/es/fr/de/vi/th/hi/ar）|
 | 部署脚本 | `build\cmake_install.cmake` | 给 `cmake --install` 用 |
 
-**程序版本号**：执行 `fceux11.exe --version` 应输出 `1.10`（或 `v1.10`）。
+**程序版本号**：执行 `fceux11.exe --version` 应输出 `1.11`（或 `v1.11`）。
 
 ---
 
@@ -252,6 +258,71 @@ C:\vcpkg\vcpkg list --triplet=x64-windows
 # 应该看到上面 9 个包
 ```
 
+### 4.5 多语言翻译流水线（v1.11 新增 §11.5）
+
+FCEUX11 v1.11 将 UI 语言从 3 种扩展到 **12 种**。翻译源文件位于
+`src/drivers/Qt/lang/`，经 `lupdate` → `lrelease` 流水线产出 `.qm`
+（运行时二进制翻译）。
+
+#### 4.5.1 已包含的语言
+
+| Locale | `.ts` 源文件 | `.qm` 产物 | 状态 |
+|--------|--------------|-----------|------|
+| `en` | `fceux11_en.ts` | `fceux11_en.qm` | 稳定 |
+| `zh_CN` | `fceux11_zh_CN.ts` | `fceux11_zh_CN.qm` | 稳定 |
+| `zh_TW` | `fceux11_zh_TW.ts` | `fceux11_zh_TW.qm` | 稳定 |
+| `ja` | `fceux11_ja.ts` | `fceux11_ja.qm` | 稳定 |
+| `ko` | `fceux11_ko.ts` | `fceux11_ko.qm` | 稳定 |
+| `es` | `fceux11_es.ts` | `fceux11_es.qm` | 稳定 |
+| `fr` | `fceux11_fr.ts` | `fceux11_fr.qm` | 稳定 |
+| `de` | `fceux11_de.ts` | `fceux11_de.qm` | 稳定 |
+| `vi` | `fceux11_vi.ts` | `fceux11_vi.qm` | 稳定 |
+| `th` | `fceux11_th.ts` | `fceux11_th.qm` | 稳定 |
+| `hi` | `fceux11_hi.ts` | `fceux11_hi.qm` | **beta**（欢迎 PR 母语审校） |
+| `ar` | `fceux11_ar.ts` | `fceux11_ar.qm` | **beta**（含 RTL 布局，欢迎 PR 母语审校） |
+
+#### 4.5.2 重新生成翻译（修改源码后）
+
+```powershell
+# 进入源码根目录
+cd C:\src\FCEUX11
+
+# 1) 从源码（*.cpp / *.h 的 tr() 标记）抽取字符串到 .ts
+lupdate src\ -ts src\drivers\Qt\lang\fceux11_en.ts
+
+# 2) 编译所有 .ts 为 .qm（Qt Linguist 工具链）
+lrelease src\drivers\Qt\lang\fceux11_*.ts
+
+# 3) 重新构建（CMake 会自动把新 .qm 编入 resources.qrc）
+cmake --build build
+```
+
+> **注**：`do_build.ps1` 默认会跑一次 `lupdate` + `lrelease`，
+> 所以日常增量构建不需要手动执行上面三步。仅当翻译文本需要大改、
+> 或新增 UI 字符串时，才需要手工跑流水线。
+
+#### 4.5.3 添加新语言
+
+如需在 v1.11 的 12 种之外追加新语言，遵循以下步骤：
+
+1. 在 `src/drivers/Qt/lang/` 下复制一份 `fceux11_en.ts` 作为模板，改名
+   为 `fceux11_<code>.ts`（`<code>` 是 Qt locale 标识，例如 `pt_BR`
+   表示巴西葡萄牙语）。
+2. 修改 `<TS ... language="<code>">` 元素的 `language` 属性。
+3. 翻译每条 `<message>` 中的 `<source>`，填入 `<translation>`。
+4. 在 `src/CMakeLists.txt` 的 `TS_FILES` 列表中追加新文件名。
+5. 在 `src/drivers/Qt/ConsoleWindow.cpp` 的语言菜单构造处追加
+   `QAction` 项；在 `loadTranslation()` 调用链中追加匹配分支。
+6. 在 `src/drivers/Qt/main.cpp::detectSystemLang()` 的候选表里追加新 locale。
+7. 重新 configure + build：`cmake --build build`。
+
+#### 4.5.4 翻译可信度与外部 API 声明
+
+v1.11 全部 9 个新增语言的翻译**直接由 Claude 翻译能力生成**，未调用
+任何外部翻译 API（DeepL / Google Translate / Azure Translator /
+任何在线 LLM API）。hîndî (hi) 与阿拉伯语 (ar) 因训练语料覆盖较低，
+显式标 `(beta)`，欢迎母语贡献者通过 PR 提交修订。
+
 ---
 
 ## 5. 编译流程
@@ -355,7 +426,7 @@ cmake --build build-dev
 ctest --test-dir build --output-on-failure
 ```
 
-**期望结果**（v1.10）：22/22 通过（`ctest -LE perf`，不含 `bench_tolerance_test`）。
+**期望结果**（v1.11）：23/23 通过（`ctest -LE perf`，不含 `bench_tolerance_test`）。
 
 23 个 ctest 测试（v0.3.x 9 个 + v1.x 14 个；v1.6~v1.10 新增 `apu_wav_diff_test`、
 `cart_class_test`、`mapper_byte_diff_test`、`fds_load_test`）：
@@ -408,6 +479,11 @@ ctest --test-dir build -R bench_tolerance --output-on-failure
 均在 `bench_tolerance_test` 的 +2.5% max-regression 阈值内（speedup 方向无
 上限）。v1.10 性能验证方法详见
 [`docs/v1.x_Modernization_Roadmap.md`](v1.x_Modernization_Roadmap.md) §10.6.6。
+
+**v1.11 实测**：v1.11（Bridge）的 §11.1–11.4 工作（驱动层解耦）与
+§11.5（多语言 i18n）均为非热路径改动，不影响 CPU/PPU/APU 帧基准；
+预期复用 v1.10 基线 ±2.5% 范围。如出现 >2.5% 偏差，请将 CI 日志附
+bug report 提交。
 
 ### 6.3 字节级 savestate 一致性
 
@@ -476,8 +552,26 @@ Expand-Archive FCEUX11-v1.10-win64.zip -DestinationPath C:\TestFCEUX11
 
 # 2) 运行
 cd C:\TestFCEUX11
-.\fceux11.exe --version    # 期望：1.10
+.\fceux11.exe --version    # 期望：1.11
 .\fceux11.exe               # 启动 GUI，加载 .nes ROM 测试
+```
+
+### 7.5 多语言冒烟测试（v1.11 新增）
+
+```powershell
+# 1) 验证 --lang 参数仍可用（沿用 v1.10 行为，未引入新参数）
+.\fceux11.exe --lang=en
+.\fceux11.exe --lang=zh_CN
+.\fceux11.exe --lang=ja
+.\fceux11.exe --lang=ar   # 期望：界面 RTL 翻转
+
+# 2) 验证系统区域自动侦测
+#    修改 Windows 设置 → 时间和语言 → 语言和区域 → Windows 显示语言
+#    - 中文（简体）→ zh_CN
+#    - 日本語 → ja
+#    - العربية → ar (RTL)
+#    - English (United States) → en
+#    首次启动按系统区域匹配；手动切换过一次后写入 savedLang 配置
 ```
 
 ---
@@ -661,36 +755,44 @@ endif()
 
 ## 11. 版本与升级
 
-| 项 | v1.10 状态 |
+| 项 | v1.11 状态 |
 |----|-----------|
-| 主版本 | **1.10**（代号 Cryptex，v1.x 现代化周期第十子版本）|
+| 主版本 | **1.11**（代号 **Bridge**，v1.x 现代化周期第十一子版本）|
 | 工具链 | MSVC 19.36+ / Qt 6.8 LTS / vcpkg 2024+ baseline / Rust 1.78+ |
 | API 兼容 | 与 v0.3.x / v1.x 全部子版本完全兼容（兼容 shim 保留到 v2.0）|
-| savestate 兼容 | V2 格式（FCEU11ST）为默认，V1 只读兼容；与 v0.2.x / v0.3.x / v1.0~v1.9 全部兼容 |
+| savestate 兼容 | V2 格式（FCEU11ST）为默认，V1 只读兼容；与 v0.2.x / v0.3.x / v1.0~v1.10 全部兼容 |
 | INI 兼容 | 与 v0.2.x / v0.3.x / v1.x 全部子版本完全兼容 |
 | Rust crate 版本 | 0.2.x 不变（与产品版本解耦）|
-| 下一里程碑 | v1.11 Bridge → v1.12 Scissors → …（v1.x §11~§14 Roadmap）→ v2.0 |
+| UI 语言 | **12 种**：en / zh_CN / zh_TW / ja / ko / es / fr / de / vi / th / hi(beta) / ar(beta, RTL)；首启按 `QLocale::system()` 自动匹配 |
+| 下一里程碑 | v1.12 Scissors → …（v1.x §12~§14 Roadmap）→ v2.0 |
 
 ### 11.1 升级路径
 
-**从 v1.x（v1.0~v1.9）升级到 v1.10 Cryptex**：
+**从 v1.x（v1.0~v1.10）升级到 v1.11 Bridge**：
 - 替换 `fceux11.exe` 即可，savestate / INI / 配置完全兼容
 - 无需重新配置控制器 / 快捷键
-- v1.10 内部重构（ROM 格式解析全量 Rust 迁移）对模拟行为零影响
+- v1.11 内部重构（驱动层解耦 + 多语言 i18n 扩展）对模拟行为零影响
+- 已保存的语言偏好 `savedLang` 配置键自动迁移；新用户首启会按 Windows
+  显示语言自动匹配
 
-**从 v0.3.16 LTS 升级到 v1.10**：
+**从 v0.3.16 LTS 升级到 v1.11**：
 - 替换 `fceux11.exe` 即可，savestate / INI / 配置完全兼容
-- v0.3.16 → v1.0 → v1.10 期间的所有兼容 shim 仍保留（v2.0 删除）
+- v0.3.16 → v1.0 → v1.11 期间的所有兼容 shim 仍保留（v2.0 删除）
 
-**从 v0.2.x 升级到 v1.10**：
+**从 v0.2.x 升级到 v1.11**：
 - savestate 兼容（v0.2.30+ 起）；API 变化，需重新配置控制器
 - 详见 [CHANGELOG.md](../../CHANGELOG.md) 兼容性段落
 
-### 11.2 降级路径（v1.10 → 任意早期版本）
+### 11.2 降级路径（v1.11 → 任意早期版本）
 
-v1.10 V2 savestate 格式（FCEU11ST）为默认输出，但所有历史版本（v0.2.x / v0.3.x /
-v1.0~v1.9）的 savestate 均可直接加载。用早期版本的 `fceux11.exe` 打开 v1.10
-保存的 V2 savestate 前需先通过 v1.10 转换为 V1 格式（`--save-v1` 选项）。
+v1.11 沿用 v1.10 的 V2 savestate 格式（FCEU11ST）为默认输出，但所有
+历史版本（v0.2.x / v0.3.x / v1.0~v1.10）的 savestate 均可直接加载。
+用早期版本的 `fceux11.exe` 打开 v1.11 保存的 V2 savestate 前需先
+通过 v1.11 转换为 V1 格式（`--save-v1` 选项）。
+
+> **多语言降级注意事项**：v1.11 写入 INI 的 `savedLang` 字段若为新增
+> 9 种之一（ja / ko / es / fr / de / vi / th / hi / ar），降级到 v1.10
+> 或更早版本后会被识别为未知 locale，自动回退到 `en`；其它配置不受影响。
 
 ---
 
@@ -730,4 +832,4 @@ v1.0~v1.9）的 savestate 均可直接加载。用早期版本的 `fceux11.exe` 
 
 ---
 
-**文档结束** — FCEUX11 v1.10 正式版编译指南。生效版本：v1.10（2026-07-03）。
+**文档结束** — FCEUX11 v1.11 正式版编译指南。生效版本：v1.11 Bridge（2026-07-05）。

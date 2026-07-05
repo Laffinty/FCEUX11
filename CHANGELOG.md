@@ -5,39 +5,117 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.11] - 2026-07-04
+## [1.11] - 2026-07-05
 
-**Codename: Bridge.** Eleventh sub-version of the v1.x modernization.
+**Codename: Bridge.** Eleventh sub-version of the v1.x modernization
+cycle per `docs/v1.x_Modernization_Roadmap.md` §11. Decouples the Qt
+driver layer from the emulation core via `fceu11::DriverCallbacks`, and
+ships a major multi-language overhaul expanding the UI from 3 languages
+to **12**.
 
 ### Added
-- `fceu11::DriverCallbacks` — Core→Driver callback table (43 function pointer fields)
-- `g_driver()` `__forceinline` singleton accessor
-- `register_driver()` — Qt driver registration mechanism
-- `src/driver_callbacks.h` / `.cpp` — core-side FCEUD_* forwarders
-- `tests/core/driver_callbacks_test.cpp` — 12 callback infrastructure tests
-- `tests/core/core_driver_boundary_test.cpp` — Phase H boundary regression test
+
+- **`fceu11::DriverCallbacks`** — Core→Driver callback table (43 function
+  pointer fields). `g_driver()` `__forceinline` singleton accessor;
+  `register_driver()` registration entry point.
+- **`src/driver_callbacks.h` / `.cpp`** — Core-side FCEUD_* forwarders.
+- **`tests/core/driver_callbacks_test.cpp`** — 12 callback infrastructure tests.
+- **`tests/core/core_driver_boundary_test.cpp`** — Phase H boundary regression test.
+- **§11.5 Multi-language expansion (Roadmap §11.5)** — UI languages
+  expanded from 3 (en / zh_CN / zh_TW) to **12**:
+  - **Stable**: English, 简体中文 (zh_CN), 繁體中文 (zh_TW), 日本語 (ja),
+    한국어 (ko), Español (es), Français (fr), Deutsch (de), Tiếng Việt (vi),
+    ไทย (th).
+  - **Beta**: हिन्दी (hi), العربية (ar).
+  - 9 new Qt Linguist `.ts` sources added under `src/drivers/Qt/lang/`
+    (`fceux11_{ja,ko,es,fr,de,vi,th,hi,ar}.ts`), each ~224 core UI strings
+    translated.
+- **Arabic RTL layout** — `QApplication::setLayoutDirection(Qt::RightToLeft)`
+    is now wired automatically when the active locale is Arabic; all
+    top-level widgets reflow correctly.
+- **System locale auto-detection** — `main.cpp::detectSystemLang()`
+  extended from `zh_CN` / `zh_TW` only to all 12 supported languages; on
+  first launch with no saved preference, the matching `.qm` is loaded
+  (English fallback otherwise). Once the user manually picks a language,
+  the choice is persisted in `savedLang` and reused on subsequent
+  launches.
+- **Language menu** — 9 new `QAction` entries added to the ConsoleWindow
+  language menu, with `हिन्दी (beta)` / `العربية (beta)` rendered in
+  italic as a visual cue.
 
 ### Changed
-- **86 driver `#ifdef` blocks removed** from 12 core source files
-- 40 live `FCEUD_*` functions migrated to `g_driver()->fn(...)` forwarding
-- 5 dead `FCEUD_*` declarations removed (CmdOpen/OnCloseGame/LuaRunFrom/BlitScreen/BlitScreenDummy)
-- `movie.cpp`, `state.cpp`, `fceu.cpp`, `input.cpp` all zero driver `#ifdef`
-- `taseditor_lua` type unification via `g_driver()->taseditor_disable_run_function()`
-- keyboard state abstraction via `g_driver()->get_keyboard_state()`
-- QThread name abstraction via `g_driver()->get_thread_name()`
-- Phase E supplemental: `profiler.cpp`, `debugsymboltable.cpp`, `video.cpp`, `wave.cpp`, `version.h` cleaned
+
+- **86 driver `#ifdef` blocks removed** from 12 core source files.
+- **40 live `FCEUD_*` functions** migrated to `g_driver()->fn(...)`
+  forwarding.
+- **5 dead `FCEUD_*` declarations** removed (CmdOpen / OnCloseGame /
+  LuaRunFrom / BlitScreen / BlitScreenDummy).
+- `movie.cpp`, `state.cpp`, `fceu.cpp`, `input.cpp` all reach zero driver
+  `#ifdef`.
+- `taseditor_lua` type unification via
+  `g_driver()->taseditor_disable_run_function()`.
+- Keyboard state abstraction via `g_driver()->get_keyboard_state()`.
+- QThread name abstraction via `g_driver()->get_thread_name()`.
+- Phase E supplemental: `profiler.cpp`, `debugsymboltable.cpp`,
+  `video.cpp`, `wave.cpp`, `version.h` cleaned.
+- **§11.5 retranslateUi() complete pass** — 7 previously stack-local
+  sub-menus and 15 locally-scoped `QAction`s (hide menu, auto-hide,
+  use-bg-palette, speed controls, auto-fire custom, virtual FKB,
+  frame-timing, palette-editor, AVI RIFF viewer) promoted to
+  ConsoleWindow member variables; `retranslateUi()` expanded to cover
+  ~90 previously-untranslated items including `state[]` / `winSizeAct[]`
+  / `region[]` / `ramInit[]` arrays, the language menu actions,
+  auto-fire pattern actions, and `bgColorMenuItem`.
+- `CMakeLists.txt` `TS_FILES`, `resources.qrc` `/i18n` aliases updated
+  to include the 9 new locales.
+- `src/drivers/Qt/lang/translations.pro` and `glossary.txt` updated.
 
 ### Phase G — fceuWrapper.cpp split
-- `src/drivers/Qt/fceu_archive.cpp` — archive subsystem (minizip + libarchive, 460 lines)
-- `src/drivers/Qt/fceu_globals.cpp` — global variable definitions (65 lines)
-- `src/drivers/Qt/fceu_callbacks.cpp` — Qt-side callback implementations + `register_driver()` (358 lines)
-- `fceuWrapper.cpp` reduced from 2086 → 1316 lines
+- `src/drivers/Qt/fceu_archive.cpp` — archive subsystem (minizip +
+  libarchive, 460 lines).
+- `src/drivers/Qt/fceu_globals.cpp` — global variable definitions (65 lines).
+- `src/drivers/Qt/fceu_callbacks.cpp` — Qt-side callback implementations
+  + `register_driver()` (358 lines).
+- `fceuWrapper.cpp` reduced from 2086 → 1316 lines.
 
 ### Phase H — Cleanup
-- `src/utils/mutex.h` / `.cpp` pImpl transformation — Qt type leakage eliminated
-- `src/driver.h` shim removed — 53 files updated to 4 direct peer headers
-- `__SDL__` dead macro removed from CMakeLists.txt + 6 .vcxproj files
-- PCH updated: driver.h → core_api/io_api/net_api/diag_api.h
+- `src/utils/mutex.h` / `.cpp` pImpl transformation — Qt type leakage
+  eliminated.
+- `src/driver.h` shim **restored as a backward-compat thin shim** after
+  Phase H removed it pre-maturely: 14 test-file `#include "driver.h"`
+  sites in `smoke_test`, `mapper_load_test`, `mapper_reset_test`,
+  `rom_regression_test` were not migrated in the same commit, breaking
+  CI with C1083 `driver.h: No such file`. The shim is now kept (1-line
+  forward to the 4 peer headers) until v1.12 migrates the remaining test
+  files.
+- `__SDL__` dead macro removed from CMakeLists.txt + 6 .vcxproj files.
+- PCH updated: `driver.h` → `core_api/io_api/net_api/diag_api.h`.
+
+### Fixed
+
+- **`src/drivers/Qt/main.cpp`** — Splash-screen translator now loads the
+  correct `.qm` for all 12 supported system locales (was hard-coded to
+  `zh_CN` / `zh_TW` only); previously a fresh install on a `ja-JP`
+  system displayed English UI for the first few seconds until the main
+  window finished loading.
+- **`src/drivers/Qt/lang/fceux11_hi.ts` / `fceux11_ar.ts`** — Per third-
+  party multilingual audit, removed `type="unfinished"` from
+  `AboutWindow` + `AviRiffViewerDialog` contexts and filled:
+  - `AboutWindow`: GPLv2 license + copyright strings (legal text kept in
+    English per audit non-translation spec).
+  - `AviRiffViewerDialog`: 16 UI strings with verified hi/ar
+    translations; 41 technical field names (`dwMicroSecPerFrame`, `fcc`,
+    `cb`, `bi*`, `rc*`, etc.) marked English-only.
+- Verified: 0 XML errors, 0 accelerator integrity violations, 0 file
+  filter integrity violations across all 9 new languages.
+
+### Localization Pipeline
+
+- All 12 `.ts` files compile via `lrelease` with **zero obsolete** entries
+  when re-running `lupdate -no-obsolete` against the current source.
+- Translation source: directly authored, no external translation API
+  used (no DeepL / Google Translate / Azure Translator / online LLM).
+  Community native-speaker review contributions welcome via PR.
 
 ## [1.10] - 2026-07-02
 

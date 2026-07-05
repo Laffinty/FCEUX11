@@ -6,8 +6,8 @@
 <meta name="color-scheme" content="dark" />
 <meta name="theme-color" content="#080a09" />
 <title>FCEUX11 — NES/Famicom Emulator Optimized for Windows</title>
-<meta name="description" content="FCEUX11 v1.11 Cryptex — a modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 — faster ROM loading, reliable save states, FDS support, debugging tools, TAS editor, and Lua scripting." />
-<meta name="keywords" content="FCEUX11, FCEUX, NES emulator, Famicom emulator, Windows emulator, TAS editor, Qt6, C++20, game emulator, 8-bit" />
+<meta name="description" content="FCEUX11 v1.11 Bridge — a modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 — now in 12 languages (including Arabic RTL), with system language auto-detect. Plus a cleaner, more maintainable emulation core." />
+<meta name="keywords" content="FCEUX11, FCEUX, NES emulator, Famicom emulator, Windows emulator, TAS editor, Qt6, C++20, game emulator, 8-bit, multi-language, 12 languages, Arabic, RTL, NES" />
 <meta name="author" content="Laffinty" />
 <meta name="robots" content="index, follow, max-image-preview:large" />
 <meta name="generator" content="FCEUX11" />
@@ -15,16 +15,26 @@
 <link rel="icon" type="image/x-icon" href="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <meta property="og:site_name" content="FCEUX11" />
 <meta property="og:type" content="website" />
-<meta property="og:title" content="FCEUX11 v1.11 Cryptex — NES/Famicom Emulator for Windows" />
-<meta property="og:description" content="FCEUX11 v1.11 Cryptex — modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 — faster ROM loading, reliable save states, debugging, TAS, Lua." />
+<meta property="og:title" content="FCEUX11 v1.11 Bridge — NES/Famicom Emulator for Windows" />
+<meta property="og:description" content="FCEUX11 v1.11 Bridge — modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 — now in 12 languages, with system language auto-detect." />
 <meta property="og:url" content="https://laffinty.github.io/FCEUX11/" />
 <meta property="og:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <meta property="og:locale" content="en_US" />
 <meta property="og:locale:alternate" content="zh_CN" />
+<meta property="og:locale:alternate" content="zh_TW" />
+<meta property="og:locale:alternate" content="ja_JP" />
+<meta property="og:locale:alternate" content="ko_KR" />
+<meta property="og:locale:alternate" content="es_ES" />
+<meta property="og:locale:alternate" content="fr_FR" />
+<meta property="og:locale:alternate" content="de_DE" />
+<meta property="og:locale:alternate" content="vi_VN" />
+<meta property="og:locale:alternate" content="th_TH" />
+<meta property="og:locale:alternate" content="hi_IN" />
+<meta property="og:locale:alternate" content="ar_SA" />
 <meta name="google-site-verification" content="2be70qD04OCrme3y8dDxUj_h1QwY4no9IWoFQpepryE" />
 <meta name="twitter:card" content="summary" />
-<meta name="twitter:title" content="FCEUX11 v1.11 Cryptex — NES/Famicom Emulator for Windows" />
-<meta name="twitter:description" content="FCEUX11 v1.11 Cryptex — modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20." />
+<meta name="twitter:title" content="FCEUX11 v1.11 Bridge — NES/Famicom Emulator for Windows" />
+<meta name="twitter:description" content="FCEUX11 v1.11 Bridge — modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 — 12 UI languages." />
 <meta name="twitter:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -36,7 +46,7 @@
   "name":"FCEUX11",
   "applicationCategory":"GameApplication",
   "operatingSystem":"Windows",
-  "description":"A modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 — v1.11 Cryptex: rebuilt ROM loading engine for faster load times and better game detection; V2 save state format with corruption protection; improved Famicom Disk System support. Includes debugging tools, TAS editor, and Lua scripting.",
+  "description":"A modern NES/Famicom emulator optimized for Windows. Built on Qt 6.8 and C++20 — v1.11 Bridge: the user interface now ships in 12 languages (Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Spanish, French, German, Vietnamese, Thai, Hindi beta, and Arabic beta with RTL layout), with automatic system locale detection. Includes debugging tools, TAS editor, and Lua scripting.",
   "softwareVersion":"1.11",
   "license":"https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt",
   "url":"https://laffinty.github.io/FCEUX11/",
@@ -123,11 +133,11 @@
 
   /* features — one inline row, minimal */
   .features{padding:54px 0}
-  .feat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
-  @media(max-width:680px){.feat-row{grid-template-columns:repeat(2,1fr)}}
-  .feat{padding:26px 18px;border-right:1px solid var(--border);text-align:center;transition:.25s}
+  .feat-row{display:grid;grid-template-columns:repeat(5,1fr);gap:0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+  @media(max-width:960px){.feat-row{grid-template-columns:repeat(3,1fr)}.feat:nth-child(3){border-right:none}.feat:nth-child(-n+3){border-bottom:1px solid var(--border)}}
+  @media(max-width:560px){.feat-row{grid-template-columns:repeat(2,1fr)}.feat:nth-child(3){border-right:1px solid var(--border)}.feat:nth-child(2){border-right:none}.feat:nth-child(-n+2){border-bottom:1px solid var(--border)}}
+  .feat{padding:26px 14px;border-right:1px solid var(--border);text-align:center;transition:.25s}
   .feat:last-child{border-right:none}
-  @media(max-width:680px){.feat:nth-child(2){border-right:none}.feat:nth-child(-n+2){border-bottom:1px solid var(--border)}}
   .feat:hover{background:var(--green-soft)}
   .feat .ico{width:34px;height:34px;margin:0 auto 12px;color:var(--green)}
   .feat .ico svg{width:100%;height:100%}
@@ -193,7 +203,7 @@
 
 <header class="hero" id="top">
   <div class="wrap">
-    <div class="pill reveal"><span class="dot"></span><span data-i18n="pill">v1.11 · Cryptex</span></div>
+    <div class="pill reveal"><span class="dot"></span><span data-i18n="pill">v1.11 · Bridge</span></div>
     <h1 class="reveal"><span class="grad">FCEUX</span><span class="dim">11</span></h1>
     <p class="tagline reveal" data-i18n="tagline"><span class="tagline-title">A FCEUX-based NES/Famicom emulator optimized for Windows</span><br>core accuracy, modern native experience.</p>
     <div class="cta reveal">
@@ -229,6 +239,11 @@
         <h3 data-i18n="f4.t">Lua Scripting</h3>
         <p data-i18n="f4.d">Custom HUDs &amp; automation</p>
       </div>
+      <div class="feat">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 5h12M9 3v2c0 4.4-3.6 8-8 8M5 8c0 3.3-2.7 6-6 6M12 20l5-11 5 11M14 17h6"/></svg></div>
+        <h3 data-i18n="f5.t">12 Languages</h3>
+        <p data-i18n="f5.d">UI in 12 languages, auto locale detect</p>
+      </div>
     </div>
   </div>
 </section>
@@ -250,48 +265,41 @@
   <div class="wrap">
     <div class="whatsnew-head reveal">
       <div class="kicker" data-i18n="wn.k">What's new</div>
-      <h2 data-i18n="wn.t">v1.11 · Cryptex</h2>
-      <div class="sub" data-i18n="wn.sub">Released 2026-07-02 · since v1.8 (Masonry)</div>
+      <h2 data-i18n="wn.t">v1.11 · Bridge</h2>
+      <div class="sub" data-i18n="wn.sub">Released 2026-07-05 · since v1.10 (Cryptex)</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3 data-i18n="wn1.t">Save states you can trust</h3>
-          <p data-i18n="wn1.d">Introducing a new V2 save state format with built-in integrity checks for every data chunk — your progress is now protected against file corruption. Old save states still load seamlessly, so nothing you've saved is ever lost. Think of it as a stronger lockbox for your game progress.</p>
+          <h3 data-i18n="wn1.t">12 languages out of the box</h3>
+          <p data-i18n="wn1.d">The UI now ships in 12 languages: Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Spanish, French, German, Vietnamese, Thai, Hindi (beta), and Arabic (beta). On first launch, FCEUX11 automatically picks the language that matches your Windows display language. No setup, no downloads — just open it and play in your language.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">02</div>
         <div class="wn-text">
-          <h3 data-i18n="wn2.t">Games load faster, crash less</h3>
-          <p data-i18n="wn2.d">We rebuilt the ROM loading engine from the ground up. Every format — NES, FDS disk images, NSF music files, UNIF — now loads noticeably faster. Cartridge type detection is more accurate too, so fewer "this ROM won't open" moments. The code behind it all is 90% smaller, which means fewer places for bugs to hide.</p>
+          <h3 data-i18n="wn2.t">Qt driver layer decoupled from the core</h3>
+          <p data-i18n="wn2.d">The emulation core and the Windows interface layer are now formally separated through a DriverCallbacks interface. 86 conditional compilation blocks were removed from the core sources, and 40 legacy FCEUD_* functions were migrated to interface forwarding. The boundary between the engine and the UI is now clean, which makes the codebase easier to maintain and extend.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">03</div>
         <div class="wn-text">
-          <h3 data-i18n="wn3.t">Famicom Disk System just works better</h3>
-          <p data-i18n="wn3.d">Fixed a crash that could happen when closing FDS games — no more unexpected shutdowns after playing your favorite disk-based titles. Disk reading, writing, and side-switching are all smoother now. We also added comprehensive FDS testing to catch issues before they reach you.</p>
+          <h3 data-i18n="wn3.t">fceuWrapper.cpp split into four focused modules</h3>
+          <p data-i18n="wn3.d">The 2086-line fceuWrapper.cpp has been divided into fceu_archive.cpp (460 lines, archive subsystem), fceu_globals.cpp (65 lines, global variable definitions), fceu_callbacks.cpp (358 lines, Qt-side callback implementations) and the remaining 1316-line fceuWrapper.cpp. Each module now has a single responsibility, which shortens incremental build times and lowers the cost of future changes.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">04</div>
         <div class="wn-text">
-          <h3 data-i18n="wn4.t">More games, fewer problems</h3>
-          <p data-i18n="wn4.d">Added support for educational cartridges (Mapper 178) and fixed stability bugs in several rare cartridge types. If you've had a game that wouldn't start or would randomly glitch out, there's a good chance this update fixes it. 174 cartridge types tested, byte for byte, before every release.</p>
-        </div>
-      </div>
-      <div class="wn-item">
-        <div class="wn-num">05</div>
-        <div class="wn-text">
-          <h3 data-i18n="wn5.t">Ready for whatever comes next</h3>
-          <p data-i18n="wn5.d">The new save state format is forward-compatible — it preserves extra data it doesn't yet understand, so future versions can add features without breaking your saves. We've also laid the groundwork for the next wave of emulation improvements: cleaner code, smarter testing, and a solid foundation.</p>
+          <h3 data-i18n="wn4.t">Qt type leakage from core mutex eliminated</h3>
+          <p data-i18n="wn4.d">src/utils/mutex.h and mutex.cpp were converted to a pImpl pattern, removing the QMutex and QWaitCondition references that previously leaked Qt types into the core. The emulation core no longer depends on Qt headers through the mutex path, which preserves the boundary established by the DriverCallbacks work.</p>
         </div>
       </div>
     </div>
     <div class="wn-cta reveal">
-      <a href="https://github.com/Laffinty/FCEUX11/blob/main/CHANGELOG.md#110---2026-07-02" target="_blank" rel="noopener" data-i18n="wn.cta">Read the full v1.11 release notes →</a>
+      <a href="https://github.com/Laffinty/FCEUX11/blob/main/CHANGELOG.md#111---2026-07-05" target="_blank" rel="noopener" data-i18n="wn.cta">Read the full v1.11 release notes →</a>
     </div>
   </div>
 </section>
@@ -304,40 +312,40 @@
 
 <script>
 const I18N={
-  en:{pill:"v1.11 · Cryptex",
-      tagline:"<span class=\"tagline-title\">A FCEUX-based NES/Famicom emulator optimized for Windows</span><br>core accuracy, modern native experience.",
+  en:{pill:"v1.11 · Bridge",
+      tagline:"<span class=\"tagline-title\">A FCEUX-based NES/Famicom emulator optimized for Windows</span><br>core accuracy, modern native experience, 12 UI languages.",
       download:"Download",changelog:"Changelog",
       "f1.t":"Accurate Emulation","f1.d":"Full NES, Famicom &amp; mapper support",
       "f2.t":"Debugging Tools","f2.d":"CPU/PPU debugger, hex, RAM watch",
       "f3.t":"TAS Editor","f3.d":"Frame-by-frame input recording",
       "f4.t":"Lua Scripting","f4.d":"Custom HUDs &amp; automation",
+      "f5.t":"12 Languages","f5.d":"UI in 12 languages, auto locale detect",
       "about.k":"About","about.t":"Introduction",
       "about.a1":"FCEUX11 is a derivative of the FCEUX NES/Famicom emulator, actively maintained and optimized for <em>Windows</em>.",
-      "about.a2":"It preserves the core emulation accuracy of FCEUX while providing a modern, native Windows experience, including a <em>Qt6-based</em> user interface, multi-language support, and comprehensive debugging and TAS tooling.",
-      "wn.k":"What's new","wn.t":"v1.11 · Cryptex","wn.sub":"Released 2026-07-02 · since v1.8 (Masonry)",
-      "wn1.t":"Save states you can trust","wn1.d":"Introducing a new V2 save state format with built-in integrity checks for every data chunk — your progress is now protected against file corruption. Old save states still load seamlessly, so nothing you've saved is ever lost. Think of it as a stronger lockbox for your game progress.",
-      "wn2.t":"Games load faster, crash less","wn2.d":"We rebuilt the ROM loading engine from the ground up. Every format — NES, FDS disk images, NSF music files, UNIF — now loads noticeably faster. Cartridge type detection is more accurate too, so fewer \"this ROM won\'t open\" moments. The code behind it all is 90% smaller, which means fewer places for bugs to hide.",
-      "wn3.t":"Famicom Disk System just works better","wn3.d":"Fixed a crash that could happen when closing FDS games — no more unexpected shutdowns after playing your favorite disk-based titles. Disk reading, writing, and side-switching are all smoother now. We also added comprehensive FDS testing to catch issues before they reach you.",
-      "wn4.t":"More games, fewer problems","wn4.d":"Added support for educational cartridges (Mapper 178) and fixed stability bugs in several rare cartridge types. If you've had a game that wouldn't start or would randomly glitch out, there's a good chance this update fixes it. 174 cartridge types tested, byte for byte, before every release.",
-      "wn5.t":"Ready for whatever comes next","wn5.d":"The new save state format is forward-compatible — it preserves extra data it doesn't yet understand, so future versions can add features without breaking your saves. We've also laid the groundwork for the next wave of emulation improvements: cleaner code, smarter testing, and a solid foundation.",
+      "about.a2":"It preserves the core emulation accuracy of FCEUX while providing a modern, native Windows experience, including a <em>Qt6-based</em> user interface, <em>12-language</em> UI (with automatic system locale detection and full Arabic RTL layout), and comprehensive debugging and TAS tooling.",
+      "wn.k":"What's new","wn.t":"v1.11 · Bridge","wn.sub":"Released 2026-07-05 · since v1.10 (Cryptex)",
+      "wn1.t":"12 languages out of the box","wn1.d":"The UI now ships in 12 languages: Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Spanish, French, German, Vietnamese, Thai, Hindi (beta), and Arabic (beta). On first launch, FCEUX11 automatically picks the language that matches your Windows display language. No setup, no downloads — just open it and play in your language.",
+      "wn2.t":"Qt driver layer decoupled from the core","wn2.d":"The emulation core and the Windows interface layer are now formally separated through a DriverCallbacks interface. 86 conditional compilation blocks were removed from the core sources, and 40 legacy FCEUD_* functions were migrated to interface forwarding. The boundary between the engine and the UI is now clean, which makes the codebase easier to maintain and extend.",
+      "wn3.t":"fceuWrapper.cpp split into four focused modules","wn3.d":"The 2086-line fceuWrapper.cpp has been divided into fceu_archive.cpp (460 lines, archive subsystem), fceu_globals.cpp (65 lines, global variable definitions), fceu_callbacks.cpp (358 lines, Qt-side callback implementations) and the remaining 1316-line fceuWrapper.cpp. Each module now has a single responsibility, which shortens incremental build times and lowers the cost of future changes.",
+      "wn4.t":"Qt type leakage from core mutex eliminated","wn4.d":"src/utils/mutex.h and mutex.cpp were converted to a pImpl pattern, removing the QMutex and QWaitCondition references that previously leaked Qt types into the core. The emulation core no longer depends on Qt headers through the mutex path, which preserves the boundary established by the DriverCallbacks work.",
       "wn.cta":"Read the full v1.11 release notes →",
       foot:"based on FCEUX"},
-  zh:{pill:"v1.11 · Cryptex",
-      tagline:"<span class=\"tagline-title\">基于 FCEUX 的 NES/Famicom 模拟器，为 Windows 平台优化</span><br>保留核心精度，提供现代原生体验。",
+  zh:{pill:"v1.11 · Bridge",
+      tagline:"<span class=\"tagline-title\">基于 FCEUX 的 NES/Famicom 模拟器，为 Windows 平台优化</span><br>保留核心精度，提供现代原生体验，支持 12 种界面语言。",
       download:"下载",changelog:"更新日志",
       "f1.t":"精确模拟","f1.d":"完整支持 NES、Famicom 及扩展芯片",
       "f2.t":"调试工具","f2.d":"CPU/PPU 调试器、十六进制、内存监视",
       "f3.t":"TAS 编辑器","f3.d":"逐帧录制与编辑输入",
       "f4.t":"Lua 脚本","f4.d":"自定义 HUD 与自动化测试",
+      "f5.t":"12 种语言","f5.d":"含阿拉伯语 RTL 布局，自动匹配系统区域",
       "about.k":"关于","about.t":"简介",
       "about.a1":"FCEUX11 是基于 FCEUX 的 NES/Famicom 模拟器衍生项目，持续维护并为 <em>Windows</em> 平台优化。",
-      "about.a2":"在保留 FCEUX 核心模拟精度的基础上，提供现代化的 Windows 原生体验，包括 <em>Qt6 图形界面</em>、多语言支持以及完善的调试与 TAS 工具集。",
-      "wn.k":"本次更新","wn.t":"v1.11 · Cryptex","wn.sub":"2026-07-02 发布 · 上一个版本 v1.8 (Masonry)",
-      "wn1.t":"即时存档，值得信赖","wn1.d":"全新的 V2 存档格式，每个数据块都内置完整性校验，有效防止存档文件损坏导致进度丢失。旧版存档依然可以无缝读取，你保存的每一个游戏进度都不会白费。就像给你的存档加了一把更可靠的保险箱。",
-      "wn2.t":"游戏加载更快，崩溃更少","wn2.d":"我们从零开始重构了游戏文件加载引擎。所有格式（NES、FDS 磁碟镜像、NSF 音乐文件、UNIF）的加载速度都有明显提升。卡带类型识别也更准确了，\"ROM 打不开\"的情况大幅减少。背后的代码量缩减了 90%，出 bug 的地方也更少了。",
-      "wn3.t":"磁碟机游戏，体验全面升级","wn3.d":"修复了关闭 FDS 磁碟机游戏时可能崩溃的问题——不会再因为玩完一款磁盘游戏而意外退出了。磁盘读取、写入和换碟操作都更加流畅。我们还为 FDS 增加了全面的自动化测试，确保问题在到达你手中之前就被发现。",
-      "wn4.t":"更多游戏，更少问题","wn4.d":"新增了对教育卡带（Mapper 178）等特殊游戏的支持，修复了若干稀有卡带类型导致的不稳定 bug。如果你有游戏之前打不开或者会随机花屏出错，这次更新很有可能已经修复了。每次发布前，174 种卡带类型都会经过逐字节的严格测试。",
-      "wn5.t":"为未来做好准备","wn5.d":"新的存档格式支持向前兼容——它会保留当前尚不理解的数据，确保未来版本新增功能时不会破坏你的存档。我们还为下一波模拟器改进打好了基础：更清晰的代码、更智能的测试、更扎实的架构。",
+      "about.a2":"在保留 FCEUX 核心模拟精度的基础上，提供现代化的 Windows 原生体验，包括 <em>Qt6 图形界面</em>、<em>12 种语言</em>的多语言支持（自动按系统区域匹配，阿拉伯语带完整 RTL 布局）以及完善的调试与 TAS 工具集。",
+      "wn.k":"本次更新","wn.t":"v1.11 · Bridge","wn.sub":"2026-07-05 发布 · 上一个版本 v1.10 (Cryptex)",
+      "wn1.t":"内置 12 种界面语言","wn1.d":"v1.11 起开箱即用 12 种界面语言：简体中文、繁體中文、English、日本語、한국어、Español、Français、Deutsch、Tiếng Việt、ไทย、हिन्दी（beta）、العربية（beta）。首次启动会自动按 Windows 显示语言匹配，无需任何设置或额外下载，开箱即用。",
+      "wn2.t":"Qt 驱动层与核心解耦","wn2.d":"模拟核心与 Windows 界面层通过全新的 DriverCallbacks 接口正式分离：核心源码中 86 处条件编译块被移除，40 个遗留 FCEUD_* 函数迁移至接口转发。引擎与 UI 之间的边界变得清晰，便于后续维护和扩展。",
+      "wn3.t":"fceuWrapper.cpp 拆分为四个职责单一的模块","wn3.d":"原 2086 行的 fceuWrapper.cpp 拆分为 fceu_archive.cpp（460 行，归档子系统）、fceu_globals.cpp（65 行，全局变量定义）、fceu_callbacks.cpp（358 行，Qt 侧回调实现）以及剩余 1316 行的 fceuWrapper.cpp。每个模块职责单一，增量编译更快，后续改动成本更低。",
+      "wn4.t":"核心互斥锁中 Qt 类型泄漏已消除","wn4.d":"src/utils/mutex.h 与 mutex.cpp 改造为 pImpl 模式，移除了原先泄漏到核心的 QMutex 与 QWaitCondition 引用。模拟核心不再通过互斥锁路径依赖 Qt 头文件，保留了 DriverCallbacks 工作建立的分层边界。",
       "wn.cta":"查看完整 v1.11 发布说明 →",
       foot:"基于 FCEUX"}
 };
