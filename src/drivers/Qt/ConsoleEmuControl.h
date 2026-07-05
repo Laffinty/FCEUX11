@@ -1,0 +1,4 @@
+// ConsoleEmuControl.h
+//
+
+#pragma once

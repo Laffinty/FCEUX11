@@ -471,7 +471,10 @@ set(SRC_DRIVERS_COMMON
 )
 
 set(SRC_DRIVERS_QT
-  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleWindow.cpp  
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleWindow.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleRecentRom.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleEmuControl.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleDebugWindows.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleViewerGL.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleViewerSDL.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleViewerQWidget.cpp  

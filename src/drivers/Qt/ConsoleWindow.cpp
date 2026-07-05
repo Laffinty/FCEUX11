@@ -1,4 +1,4 @@
-/* FCE Ultra - NES/Famicom Emulator
+﻿/* FCE Ultra - NES/Famicom Emulator
  *
  * Copyright notice for this file:
  *  Copyright (C) 2020 mjbudd77
@@ -2297,119 +2297,9 @@ int consoleWin_t::loadVideoDriver( int driverId, bool force )
 	return 0;
 }
 //---------------------------------------------------------------------------
-void consoleWin_t::clearRomList(void)
-{
-	std::list <std::string*>::iterator it;
-
-	for (it=romList.begin(); it != romList.end(); it++)
-	{
-		delete *it;
-	}
-	romList.clear();
-}
 //---------------------------------------------------------------------------
-void consoleWin_t::buildRecentRomMenu(void)
-{
-	QAction *act;
-	std::string s;
-	std::string *sptr;
-	char buf[128];
-
-	clearRomList();
-	recentRomMenu->clear();
-
-	for (int i=0; i<10; i++)
-	{
-		snprintf( buf, sizeof(buf), "SDL.RecentRom%02i", i);
-
-		g_config->getOption( buf, &s);
-
-		//printf("Recent Rom:%i  '%s'\n", i, s.c_str() );
-
-		if ( s.size() > 0 )
-		{
-			act = new consoleRecentRomAction( tr(s.c_str()), recentRomMenu);
-
-			recentRomMenu->addAction( act );
-
-			connect(act, SIGNAL(triggered()), act, SLOT(activateCB(void)) );
-
-			sptr = new std::string();
-
-			sptr->assign( s.c_str() );
-
-			romList.push_front( sptr );
-		}
-	}
-}
 //---------------------------------------------------------------------------
-void consoleWin_t::saveRecentRomMenu(void)
-{
-	int i;
-	std::string *s;
-	std::list <std::string*>::iterator it;
-	char buf[128];
-
-	i = romList.size() - 1;
-
-	for (it=romList.begin(); it != romList.end(); it++)
-	{
-		s = *it;
-		snprintf( buf, sizeof(buf), "SDL.RecentRom%02i", i);
-
-		g_config->setOption( buf, s->c_str() );
-
-		//printf("Recent Rom:%u  '%s'\n", i, s->c_str() );
-		i--;
-	}
-}
 //---------------------------------------------------------------------------
-void consoleWin_t::addRecentRom( const char *rom )
-{
-	std::string *s;
-	std::list <std::string*>::iterator match_it;
-
-	for (match_it=romList.begin(); match_it != romList.end(); match_it++)
-	{
-		s = *match_it;
-
-		if ( s->compare( rom ) == 0 )
-		{
-			//printf("Found Match: %s\n", rom );
-			break;
-		}
-	}
-
-	if ( match_it != romList.end() )
-	{
-		s = *match_it;
-
-		romList.erase(match_it);
-
-		romList.push_back(s);
-	}
-	else
-	{
-		s = new std::string();
-
-		s->assign( rom );
-		
-		romList.push_back(s);
-
-		if ( romList.size() > 10 )
-		{
-			s = romList.front();
-
-			romList.pop_front();
-
-			delete s;
-		}
-	}
-
-	saveRecentRomMenu();
-
-	recentRomMenuReset = true;
-}
 //---------------------------------------------------------------------------
 void consoleWin_t::toggleMenuVis(void)
 {
@@ -2756,178 +2646,7 @@ void consoleWin_t::loadNSF(void)
 	FCEU_WRAPPER_UNLOCK();
 }
 
-void consoleWin_t::loadStateFrom(void)
-{
-	int ret, useNativeFileDialogVal;
-	QString filename;
-	std::string last;
-	std::string dir;
-	const char *base;
-	QFileDialog  dialog(this, tr("Load State From File") );
-	QList<QUrl> urls;
-	QDir d;
 
-	base = fceu11::GetBaseDirectory();
-
-	urls << QUrl::fromLocalFile( QDir::rootPath() );
-	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
-	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::DesktopLocation).first());
-	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::DownloadLocation).first());
-
-	if ( base )
-	{
-		urls << QUrl::fromLocalFile( QDir( base ).absolutePath() );
-
-		d.setPath( QString(base) + "/fcs");
-
-		if ( d.exists() )
-		{
-			urls << QUrl::fromLocalFile( d.absolutePath() );
-		}
-
-		d.setPath( QString(base) + "/sav");
-
-		if ( d.exists() )
-		{
-			urls << QUrl::fromLocalFile( d.absolutePath() );
-		}
-	}
-
-
-	dialog.setFileMode(QFileDialog::ExistingFile);
-
-	dialog.setNameFilter(tr("FCS & SAV Files (*.sav *.SAV *.fc? *.FC?) ;; All files (*)"));
-
-	dialog.setViewMode(QFileDialog::List);
-	dialog.setFilter( QDir::AllEntries | QDir::AllDirs | QDir::Hidden );
-	dialog.setLabelText( QFileDialog::Accept, tr("Load") );
-
-	g_config->getOption ("SDL.LastLoadStateFrom", &last );
-
-	getDirFromFile( last.c_str(), dir );
-
-	dialog.setDirectory( tr(dir.c_str()) );
-
-	// Check config option to use native file dialog or not
-	g_config->getOption ("SDL.UseNativeFileDialog", &useNativeFileDialogVal);
-
-	dialog.setOption(QFileDialog::DontUseNativeDialog, !useNativeFileDialogVal);
-	dialog.setSidebarUrls(urls);
-
-	ret = dialog.exec();
-
-	if ( ret )
-	{
-		QStringList fileList;
-		fileList = dialog.selectedFiles();
-
-		if ( fileList.size() > 0 )
-		{
-			filename = fileList[0];
-		}
-	}
-
-	if ( filename.isNull() )
-   {
-      return;
-   }
-
-	g_config->setOption ("SDL.LastLoadStateFrom", filename.toStdString().c_str() );
-
-	FCEU_WRAPPER_LOCK();
-	fceu11::LoadStateFile( filename.toStdString().c_str() );
-	FCEU_WRAPPER_UNLOCK();
-}
-
-void consoleWin_t::saveStateAs(void)
-{
-	int ret, useNativeFileDialogVal;
-	QString filename;
-	std::string last;
-	std::string dir;
-	const char *base;
-	QFileDialog  dialog(this, tr("Save State To File") );
-	QList<QUrl> urls;
-	QDir d;
-
-	base = fceu11::GetBaseDirectory();
-
-	urls << QUrl::fromLocalFile( QDir::rootPath() );
-	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
-	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::DesktopLocation).first());
-	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::DownloadLocation).first());
-
-	if ( base )
-	{
-		urls << QUrl::fromLocalFile( QDir( base ).absolutePath() );
-
-		d.setPath( QString(base) + "/fcs");
-
-		if ( d.exists() )
-		{
-			urls << QUrl::fromLocalFile( d.absolutePath() );
-		}
-
-		d.setPath( QString(base) + "/sav");
-
-		if ( d.exists() )
-		{
-			urls << QUrl::fromLocalFile( d.absolutePath() );
-		}
-	}
-
-	dialog.setFileMode(QFileDialog::AnyFile);
-
-	dialog.setNameFilter(tr("SAV Files (*.sav *.SAV) ;; All files (*)"));
-
-	dialog.setViewMode(QFileDialog::List);
-	dialog.setFilter( QDir::AllEntries | QDir::AllDirs | QDir::Hidden );
-	dialog.setLabelText( QFileDialog::Accept, tr("Save") );
-	dialog.setDefaultSuffix( tr(".sav") );
-
-	g_config->getOption ("SDL.LastSaveStateAs", &last );
-
-	if ( last.size() == 0 )
-	{
-		if ( base )
-		{
-			last = std::string(base) + "/sav";
-		}
-	}
-	getDirFromFile( last.c_str(), dir );
-
-	dialog.setDirectory( tr(dir.c_str()) );
-
-	// Check config option to use native file dialog or not
-	g_config->getOption ("SDL.UseNativeFileDialog", &useNativeFileDialogVal);
-
-	dialog.setOption(QFileDialog::DontUseNativeDialog, !useNativeFileDialogVal);
-	dialog.setSidebarUrls(urls);
-
-	ret = dialog.exec();
-
-	if ( ret )
-	{
-		QStringList fileList;
-		fileList = dialog.selectedFiles();
-
-		if ( fileList.size() > 0 )
-		{
-			filename = fileList[0];
-		}
-	}
-
-	if ( filename.isNull() )
-	{
-	   return;
-	}
-
-	g_config->setOption ("SDL.LastSaveStateAs", filename.toStdString().c_str() );
-
-	FCEU_WRAPPER_LOCK();
-	fceu11::SaveStateFile( filename.toStdString().c_str() );
-	FCEU_WRAPPER_UNLOCK();
-}
 
 void consoleWin_t::quickLoad(void)
 {
@@ -2936,39 +2655,8 @@ void consoleWin_t::quickLoad(void)
 	FCEU_WRAPPER_UNLOCK();
 }
 
-void consoleWin_t::loadState(int slot)
-{
-	int prevState;
-	FCEU_WRAPPER_LOCK();
-	prevState = fceu11::SelectStateSlot( slot, false );
-	fceu11::LoadStateFile( NULL, true );
-	fceu11::SelectStateSlot( prevState, false );
-	FCEU_WRAPPER_UNLOCK();
-}
-void consoleWin_t::loadState0(void){ loadState(0); }
-void consoleWin_t::loadState1(void){ loadState(1); }
-void consoleWin_t::loadState2(void){ loadState(2); }
-void consoleWin_t::loadState3(void){ loadState(3); }
-void consoleWin_t::loadState4(void){ loadState(4); }
-void consoleWin_t::loadState5(void){ loadState(5); }
-void consoleWin_t::loadState6(void){ loadState(6); }
-void consoleWin_t::loadState7(void){ loadState(7); }
-void consoleWin_t::loadState8(void){ loadState(8); }
-void consoleWin_t::loadState9(void){ loadState(9); }
 
-void consoleWin_t::loadPrevState(void)
-{
-	FCEU_WRAPPER_LOCK();
-	FCEU_StateRecorderLoadPrevState();
-	FCEU_WRAPPER_UNLOCK();
-}
 
-void consoleWin_t::loadNextState(void)
-{
-	FCEU_WRAPPER_LOCK();
-	FCEU_StateRecorderLoadNextState();
-	FCEU_WRAPPER_UNLOCK();
-}
 
 void consoleWin_t::quickSave(void)
 {
@@ -2977,57 +2665,9 @@ void consoleWin_t::quickSave(void)
 	FCEU_WRAPPER_UNLOCK();
 }
 
-void consoleWin_t::saveState(int slot)
-{
-	int prevState;
-	FCEU_WRAPPER_LOCK();
-	prevState = fceu11::SelectStateSlot( slot, false );
-	fceu11::SaveStateFile( NULL, true );
-	fceu11::SelectStateSlot( prevState, false );
-	FCEU_WRAPPER_UNLOCK();
-}
-void consoleWin_t::saveState0(void){ saveState(0); }
-void consoleWin_t::saveState1(void){ saveState(1); }
-void consoleWin_t::saveState2(void){ saveState(2); }
-void consoleWin_t::saveState3(void){ saveState(3); }
-void consoleWin_t::saveState4(void){ saveState(4); }
-void consoleWin_t::saveState5(void){ saveState(5); }
-void consoleWin_t::saveState6(void){ saveState(6); }
-void consoleWin_t::saveState7(void){ saveState(7); }
-void consoleWin_t::saveState8(void){ saveState(8); }
-void consoleWin_t::saveState9(void){ saveState(9); }
 
-void consoleWin_t::changeState(int slot)
-{
-	FCEU_WRAPPER_LOCK();
-	fceu11::SelectStateSlot( slot, true );
-	FCEU_WRAPPER_UNLOCK();
-	state[slot]->setChecked(true);
-}
-void consoleWin_t::changeState0(void){ changeState(0); }
-void consoleWin_t::changeState1(void){ changeState(1); }
-void consoleWin_t::changeState2(void){ changeState(2); }
-void consoleWin_t::changeState3(void){ changeState(3); }
-void consoleWin_t::changeState4(void){ changeState(4); }
-void consoleWin_t::changeState5(void){ changeState(5); }
-void consoleWin_t::changeState6(void){ changeState(6); }
-void consoleWin_t::changeState7(void){ changeState(7); }
-void consoleWin_t::changeState8(void){ changeState(8); }
-void consoleWin_t::changeState9(void){ changeState(9); }
 
-void consoleWin_t::incrementState(void)
-{
-	FCEU_WRAPPER_LOCK();
-	fceu11::SelectStateNext(1);
-	FCEU_WRAPPER_UNLOCK();
-}
 
-void consoleWin_t::decrementState(void)
-{
-	FCEU_WRAPPER_LOCK();
-	fceu11::SelectStateNext(-1);
-	FCEU_WRAPPER_UNLOCK();
-}
 
 void consoleWin_t::mainMenuOpen(void)
 {
@@ -3215,38 +2855,8 @@ void consoleWin_t::openTimingConfWin(void)
    tmConfWin->show();
 }
 
-void consoleWin_t::openTimingStatWin(void)
-{
-	FrameTimingDialog_t *tmStatWin;
 
-	//printf("Open Timing Statistics Window\n");
-	
-   tmStatWin = new FrameTimingDialog_t(this);
-	
-   tmStatWin->show();
-}
 
-void consoleWin_t::openPaletteEditorWin(void)
-{
-	PaletteEditorDialog_t *win;
-
-	//printf("Open Palette Editor Window\n");
-	
-   win = new PaletteEditorDialog_t(this);
-	
-   win->show();
-}
-
-void consoleWin_t::openAviRiffViewer(void)
-{
-	AviRiffViewerDialog *win;
-
-	//printf("Open AVI RIFF Viewer Window\n");
-	
-	win = new AviRiffViewerDialog(this);
-	
-	win->show();
-}
 
 void consoleWin_t::openTasEditor(void)
 {
@@ -3280,118 +2890,17 @@ void consoleWin_t::openMovieOptWin(void)
    win->show();
 }
 
-void consoleWin_t::openCheats(void)
-{
-	//printf("Open GUI Cheat Window\n");
-	
-   openCheatDialog(this);
-}
 
-void consoleWin_t::openRamWatch(void)
-{
-	RamWatchDialog_t *ramWatchWin;
 
-	//printf("Open GUI RAM Watch Window\n");
-	
-   ramWatchWin = new RamWatchDialog_t(this);
-	
-   ramWatchWin->show();
-}
 
-void consoleWin_t::openRamSearch(void)
-{
-	//printf("Open GUI RAM Search Window\n");
-	openRamSearchWindow(this);
-}
 
-void consoleWin_t::openDebugWindow(void)
-{
-	//printf("Open GUI 6502 Debugger Window\n");
-	
-	if ( debuggerWindowIsOpen() )
-	{
-		debuggerWindowSetFocus();
-	}
-	else
-	{
-		ConsoleDebugger *debugWin;
 
-		debugWin = new ConsoleDebugger(this);
-	
-		debugWin->show();
-	}
-}
 
-void consoleWin_t::openHexEditor(void)
-{
-	HexEditorDialog_t *hexEditWin;
 
-	//printf("Open GUI Hex Editor Window\n");
-	
-   hexEditWin = new HexEditorDialog_t(this);
-	
-   hexEditWin->show();
-}
 
-void consoleWin_t::openPPUViewer(void)
-{
-	//printf("Open GUI PPU Viewer Window\n");
-	
-	openPPUViewWindow(this);
-}
 
-void consoleWin_t::openOAMViewer(void)
-{
-	//printf("Open GUI OAM Viewer Window\n");
-	
-	openOAMViewWindow(this);
-}
 
-void consoleWin_t::openNTViewer(void)
-{
-	//printf("Open GUI Name Table Viewer Window\n");
-	
-	openNameTableViewWindow(this);
-}
 
-void consoleWin_t::openCodeDataLogger(void)
-{
-	openCDLWindow(this);
-}
-
-void consoleWin_t::openGGEncoder(void)
-{
-	GameGenieDialog_t *win;
-
-	//printf("Open Game Genie Window\n");
-	
-	win = new GameGenieDialog_t(this);
-	
-	win->show();
-}
-
-void consoleWin_t::openNesHeaderEditor(void)
-{
-	iNesHeaderEditor_t *win;
-
-	//printf("Open NES Header Editor Window\n");
-	
-	win = new iNesHeaderEditor_t(this);
-	
-	if ( win->isInitialized() )
-	{
-		win->show();
-	}
-	else
-	{
-		delete win;
-	}
-}
-
-void consoleWin_t::openTraceLogger(void)
-{
-	openTraceLoggerWindow(this);
-}
 
 void consoleWin_t::toggleAutoResume(void)
 {
@@ -3535,58 +3044,9 @@ void consoleWin_t::warnAmbiguousShortcut( QShortcut *shortcut)
 	QueueErrorMsgWindow( msg.c_str() );
 }
 
-void consoleWin_t::powerConsoleCB(void)
-{
-	FCEU_WRAPPER_LOCK();
-	fceu11::PowerNES();
-	FCEU_WRAPPER_UNLOCK();
-   return;
-}
 
-void consoleWin_t::consoleHardReset(void)
-{
-	FCEU_WRAPPER_LOCK();
-	fceuWrapperHardReset();
-	FCEU_WRAPPER_UNLOCK();
-   return;
-}
 
-void consoleWin_t::consoleSoftReset(void)
-{
-	FCEU_WRAPPER_LOCK();
-	fceuWrapperSoftReset();
-	FCEU_WRAPPER_UNLOCK();
-   return;
-}
 
-void consoleWin_t::consolePause(void)
-{
-	FCEU_WRAPPER_LOCK();
-	fceuWrapperTogglePause();
-	FCEU_WRAPPER_UNLOCK();
-
-	mainMenuEmuPauseSet = false;
-
-#ifdef _WIN32
-	// v0.3.15.x PHASE-3: update the taskbar overlay icon and
-	// progress state to reflect the new pause state. We deliberately
-	// do NOT add a custom HICON resource here; the existing icon
-	// is cleared (nullptr) and the progress state is switched to
-	// TBPF_PAUSED so the bar shows the standard Windows paused
-	// (yellow) accent.
-	if (taskbarProgress) {
-		const bool nowPaused = FCEUI_EmulationPaused() != 0;
-		taskbarProgress->setOverlayIcon(nullptr,
-			nowPaused ? L"Paused" : L"");
-		if (nowPaused) {
-			taskbarProgress->setState(TBPF_PAUSED);
-		} else {
-			taskbarProgress->setState(TBPF_NOPROGRESS);
-		}
-	}
-#endif
-   return;
-}
 
 #ifdef _WIN32
 void consoleWin_t::setTaskbarProgress(double pct)
@@ -3622,132 +3082,14 @@ void consoleWin_t::setRegion(int region)
 	return;
 }
 
-void consoleWin_t::setRegionNTSC(void)
-{
-	setRegion(0);
-	return;
-}
 
-void consoleWin_t::setRegionPAL(void)
-{
-	setRegion(1);
-	return;
-}
 
-void consoleWin_t::setRegionDendy(void)
-{
-	setRegion(2);
-	return;
-}
 
-void consoleWin_t::setRamInit0(void)
-{
-	RAMInitOption = 0;
 
-	g_config->setOption ("SDL.RamInitMethod", RAMInitOption);
-	return;
-}
 
-void consoleWin_t::setRamInit1(void)
-{
-	RAMInitOption = 1;
 
-	g_config->setOption ("SDL.RamInitMethod", RAMInitOption);
-	return;
-}
 
-void consoleWin_t::setRamInit2(void)
-{
-	RAMInitOption = 2;
 
-	g_config->setOption ("SDL.RamInitMethod", RAMInitOption);
-	return;
-}
-
-void consoleWin_t::setRamInit3(void)
-{
-	RAMInitOption = 3;
-
-	g_config->setOption ("SDL.RamInitMethod", RAMInitOption);
-	return;
-}
-
-void consoleWin_t::toggleGameGenie(bool checked)
-{
-	int gg_enabled;
-
-	FCEU_WRAPPER_LOCK();
-	g_config->getOption ("SDL.GameGenie", &gg_enabled);
-	g_config->setOption ("SDL.GameGenie", !gg_enabled);
-	g_config->save ();
-	FCEUI_SetGameGenie (gg_enabled);
-	FCEU_WRAPPER_UNLOCK();
-   return;
-}
-
-void consoleWin_t::loadGameGenieROM(void)
-{
-	int ret, useNativeFileDialogVal;
-	QString filename;
-	std::string last;
-	std::string dir;
-	QFileDialog  dialog(this, tr("Open Game Genie ROM") );
-	QList<QUrl> urls;
-
-	urls << QUrl::fromLocalFile( QDir::rootPath() );
-	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
-	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::DesktopLocation).first());
-	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::DownloadLocation).first());
-
-	dialog.setFileMode(QFileDialog::ExistingFile);
-
-	dialog.setNameFilter(tr("GG ROM File (gg.rom  *Genie*.nes) ;; All files (*)"));
-
-	dialog.setViewMode(QFileDialog::List);
-	dialog.setFilter( QDir::AllEntries | QDir::AllDirs | QDir::Hidden );
-	dialog.setLabelText( QFileDialog::Accept, tr("Load") );
-
-	g_config->getOption ("SDL.LastOpenFile", &last );
-
-	getDirFromFile( last.c_str(), dir );
-
-	dialog.setDirectory( tr(dir.c_str()) );
-
-	// Check config option to use native file dialog or not
-	g_config->getOption ("SDL.UseNativeFileDialog", &useNativeFileDialogVal);
-
-	dialog.setOption(QFileDialog::DontUseNativeDialog, !useNativeFileDialogVal);
-	dialog.setSidebarUrls(urls);
-
-	ret = dialog.exec();
-
-	if ( ret )
-	{
-		QStringList fileList;
-		fileList = dialog.selectedFiles();
-
-		if ( fileList.size() > 0 )
-		{
-			filename = fileList[0];
-		}
-	}
-
-	if ( filename.isNull() )
-	{
-	   return;
-	}
-
-	g_config->setOption ("SDL.LastOpenFile", filename.toStdString().c_str() );
-
-	// copy file to proper place (~/.fceux/gg.rom)
-	std::ifstream f1 ( filename.toStdString().c_str(), std::fstream::binary);
-	std::string fn_out = FCEU_MakeFName (FCEUMKF_GGROM, 0, "");
-	std::ofstream f2 (fn_out.c_str (),
-	std::fstream::trunc | std::fstream::binary);
-	f2 << f1.rdbuf ();
-
-   return;
-}
 
 void consoleWin_t::openFamilyKeyboard(void)
 {
@@ -3755,269 +3097,17 @@ void consoleWin_t::openFamilyKeyboard(void)
 	return;
 }
 
-void consoleWin_t::insertCoin(void)
-{
-	FCEU_WRAPPER_LOCK();
-	fceu11::VSUniCoin();
-	FCEU_WRAPPER_UNLOCK();
-   return;
-}
 
-void consoleWin_t::fdsSwitchDisk(void)
-{
-	FCEU_WRAPPER_LOCK();
-	FCEU_FDSSelect();
-	FCEU_WRAPPER_UNLOCK();
-   return;
-}
 
-void consoleWin_t::fdsEjectDisk(void)
-{
-	FCEU_WRAPPER_LOCK();
-	FCEU_FDSInsert();
-	FCEU_WRAPPER_UNLOCK();
-   return;
-}
 
-void consoleWin_t::fdsLoadBiosFile(void)
-{
-	int ret, useNativeFileDialogVal;
-	QString filename;
-	std::string last;
-	std::string dir;
-	QFileDialog  dialog(this, tr("Load FDS BIOS (disksys.rom)") );
-	QList<QUrl> urls;
 
-	urls << QUrl::fromLocalFile( QDir::rootPath() );
-	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
-	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::DesktopLocation).first());
-	urls << QUrl::fromLocalFile(QStandardPaths::standardLocations(QStandardPaths::DownloadLocation).first());
 
-	dialog.setFileMode(QFileDialog::ExistingFile);
 
-	dialog.setNameFilter(tr("ROM files (*.rom *.ROM) ;; All files (*)"));
 
-	dialog.setViewMode(QFileDialog::List);
-	dialog.setFilter( QDir::AllEntries | QDir::AllDirs | QDir::Hidden );
-	dialog.setLabelText( QFileDialog::Accept, tr("Load") );
 
-	g_config->getOption ("SDL.LastOpenFile", &last );
 
-	getDirFromFile( last.c_str(), dir);
 
-	dialog.setDirectory( tr(dir.c_str()) );
 
-	// Check config option to use native file dialog or not
-	g_config->getOption ("SDL.UseNativeFileDialog", &useNativeFileDialogVal);
-
-	dialog.setOption(QFileDialog::DontUseNativeDialog, !useNativeFileDialogVal);
-	dialog.setSidebarUrls(urls);
-
-	ret = dialog.exec();
-
-	if ( ret )
-	{
-		QStringList fileList;
-		fileList = dialog.selectedFiles();
-
-		if ( fileList.size() > 0 )
-		{
-			filename = fileList[0];
-		}
-	}
-
-	if ( filename.isNull() )
-	{
-	   return;
-	}
-
-	// copy BIOS file to proper place (~/.fceux/disksys.rom)
-	std::ifstream fdsBios (filename.toStdString().c_str(), std::fstream::binary);
-	std::string output_filename =
-		FCEU_MakeFName (FCEUMKF_FDSROM, 0, "");
-	std::ofstream outFile (output_filename.c_str (),
-			       std::fstream::trunc | std::fstream::
-			       binary);
-	outFile << fdsBios.rdbuf ();
-	if (outFile.fail ())
-	{
-		FCEUD_PrintError ("Error copying the FDS BIOS file.");
-	}
-	else
-	{
-		printf("Famicom Disk System BIOS loaded.  If you are you having issues, make sure your BIOS file is 8KB in size.\n");
-	}
-
-   return;
-}
-
-void consoleWin_t::emuSpeedUp(void)
-{
-   IncreaseEmulationSpeed();
-}
-
-void consoleWin_t::emuSlowDown(void)
-{
-   DecreaseEmulationSpeed();
-}
-
-void consoleWin_t::emuSlowestSpd(void)
-{
-   FCEUD_SetEmulationSpeed( EMUSPEED_SLOWEST );
-}
-
-void consoleWin_t::emuNormalSpd(void)
-{
-   FCEUD_SetEmulationSpeed( EMUSPEED_NORMAL );
-}
-
-void consoleWin_t::emuFastestSpd(void)
-{
-   FCEUD_SetEmulationSpeed( EMUSPEED_FASTEST );
-}
-
-void consoleWin_t::emuCustomSpd(void)
-{
-	int ret;
-	QInputDialog dialog(this);
-
-	dialog.setWindowTitle( tr("Emulation Speed") );
-	dialog.setLabelText( tr("Enter a percentage from 1 to 1000.") );
-	dialog.setOkButtonText( tr("Ok") );
-	dialog.setInputMode( QInputDialog::IntInput );
-	dialog.setIntRange( 1, 1000 );
-	dialog.setIntValue( 100 );
-	
-	ret = dialog.exec();
-	
-	if ( QDialog::Accepted == ret )
-	{
-	   int spdPercent;
-	
-	   spdPercent = dialog.intValue();
-	
-	   CustomEmulationSpeed( spdPercent );
-	}
-}
-
-void consoleWin_t::emuSetFrameAdvDelay(void)
-{
-	int ret;
-	QInputDialog dialog(this);
-
-	dialog.setWindowTitle( tr("Frame Advance Delay") );
-	dialog.setLabelText( tr("How much time should elapse before holding the frame advance unpauses the simulation?") );
-	dialog.setOkButtonText( tr("Ok") );
-	dialog.setInputMode( QInputDialog::IntInput );
-	dialog.setIntRange( 0, 1000 );
-	dialog.setIntValue( frameAdvance_Delay );
-	
-	ret = dialog.exec();
-	
-	if ( QDialog::Accepted == ret )
-	{
-	   frameAdvance_Delay = dialog.intValue();
-
-	   g_config->setOption("SDL.FrameAdvanceDelay", frameAdvance_Delay );
-	   g_config->save();
-	}
-}
-
-void consoleWin_t::syncAutoFirePatternMenu(void)
-{
-	int on, off;
-
-	GetAutoFirePattern( &on, &off );
-
-	for (size_t i=0; i<afActList.size(); i++)
-	{
-		if ( afActList[i]->isMatch( on, off ) )
-		{
-			afActList[i]->setChecked(true);
-			return;
-		}
-	}
-
-	// If we get here, then the custom option is selected.
-	afActCustom->setChecked(true);
-
-}
-void consoleWin_t::setCustomAutoFire(void)
-{
-	int ret, autoFireOnFrames, autoFireOffFrames;
-	QDialog dialog(this);
-	QLabel *lbl;
-	QGridLayout *grid;
-	QVBoxLayout *vbox;
-	QSpinBox *onBox, *offBox;
-	QPushButton *okButton, *cancelButton;
-
-	autoFireOnFrames  = afActCustom->getOnValue();
-	autoFireOffFrames = afActCustom->getOffValue();
-
-	dialog.setWindowTitle( tr("Custom AutoFire Pattern") );
-
-	 onBox = new QSpinBox();
-	offBox = new QSpinBox();
-
-	 onBox->setMinimum( 1);
-	offBox->setMinimum( 1);
-	 onBox->setMaximum(30);
-	offBox->setMaximum(30);
-
-	 onBox->setValue( autoFireOnFrames  );
-	offBox->setValue( autoFireOffFrames );
-
-	vbox = new QVBoxLayout();
-	grid = new QGridLayout();
-
-	lbl = new QLabel( tr("# ON Frames") );
-
-	grid->addWidget( lbl, 0, 0 );
-
-	lbl = new QLabel( tr("# OFF Frames") );
-
-	grid->addWidget( lbl, 1, 0 );
-
-	grid->addWidget( onBox , 0, 1 );
-	grid->addWidget( offBox, 1, 1 );
-
-	    okButton = new QPushButton( tr("Ok") );
-	cancelButton = new QPushButton( tr("Cancel") );
-
-	    okButton->setIcon( style()->standardIcon( QStyle::SP_DialogApplyButton  ) );
-	cancelButton->setIcon( style()->standardIcon( QStyle::SP_DialogCancelButton ) );
-
-	grid->addWidget( cancelButton , 2, 0 );
-	grid->addWidget(     okButton , 2, 1 );
-
-	vbox->addLayout( grid );
-
-	dialog.setLayout( vbox );
-	
-	connect( cancelButton, SIGNAL(clicked(void)), &dialog, SLOT(reject(void)) );
-	connect(     okButton, SIGNAL(clicked(void)), &dialog, SLOT(accept(void)) );
-
-	okButton->setDefault(true);
-
-	ret = dialog.exec();
-	
-	if ( QDialog::Accepted == ret )
-	{
-		autoFireOnFrames  =  onBox->value();
-		autoFireOffFrames = offBox->value();
-
-		afActCustom->setPattern( autoFireOnFrames, autoFireOffFrames );
-
-		if ( afActCustom->isChecked() )
-		{
-			afActCustom->activateCB();
-		}
-		g_config->setOption("SDL.AutofireCustomOnFrames"  , autoFireOnFrames );
-		g_config->setOption("SDL.AutofireCustomOffFrames" , autoFireOffFrames);
-		g_config->save();
-	}
-}
 
 void consoleWin_t::muteSoundVolume(void)
 {
@@ -4540,17 +3630,6 @@ void consoleWin_t::syncActionConfig( QAction *act, const char *property )
 	}
 }
 
-void consoleWin_t::loadMostRecentROM(void)
-{
-	if ( romList.size() <= 0 )
-	{
-		return;
-	}
-	FCEU_WRAPPER_LOCK();
-	CloseGame ();
-	LoadGame ( (romList.back())->c_str() );
-	FCEU_WRAPPER_UNLOCK();
-}
 
 int consoleWin_t::getPeriodicInterval(void)
 {
@@ -4769,35 +3848,8 @@ void consoleMenuBar::keyReleaseEvent(QKeyEvent *event)
 }
 //-----------------------------------------------------------------------------
 //----------------------------------------------------------------------------
-consoleRecentRomAction::consoleRecentRomAction(QString desc, QWidget *parent)
-	: QAction( desc, parent )
-{
-	QString txt;
-	QFileInfo fi(desc);
-
-	path = desc.toStdString();
-
-	txt  = fi.fileName();
-	txt += QString("\t");
-	txt += desc;
-
-	setText( txt );
-}
 //----------------------------------------------------------------------------
-consoleRecentRomAction::~consoleRecentRomAction(void)
-{
-	//printf("Recent ROM Menu Action Deleted\n");
-}
 //----------------------------------------------------------------------------
-void consoleRecentRomAction::activateCB(void)
-{
-	printf("Activate Recent ROM: %s \n", path.c_str() );
-
-	FCEU_WRAPPER_LOCK();
-	CloseGame ();
-	LoadGame ( path.c_str() );
-	FCEU_WRAPPER_UNLOCK();
-}
 //-----------------------------------------------------------------------------
 autoFireMenuAction::autoFireMenuAction(int on, int off, QString name, QWidget *parent)
 	: QAction( name, parent)
@@ -5112,3 +4164,4 @@ void consoleWin_t::retranslateUi(void)
 	if (msgLogAct) msgLogAct->setText(tr("&Message Log"));
 }
 //-----------------------------------------------------------------------------
+
