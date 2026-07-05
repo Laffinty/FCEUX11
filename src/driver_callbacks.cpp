@@ -95,11 +95,11 @@ FCEUFILE* FCEUD_OpenArchiveIndex(ArchiveScanRecord& asr, std::string& fname,
 // ===========================================================================
 FILE* FCEUD_UTF8fopen(const char *fn, const char *mode) {
     if (auto* cb = fceu11::g_driver().utf8_fopen) return cb(fn, mode);
-    return nullptr;
+    return ::fopen(fn, mode);
 }
 EMUFILE_FILE* FCEUD_UTF8_fstream(const char *fn, const char *m) {
     if (auto* cb = fceu11::g_driver().utf8_fstream) return cb(fn, m);
-    return nullptr;
+    return new EMUFILE_FILE(fn, m);
 }
 
 // ===========================================================================
