@@ -293,14 +293,6 @@ struct PPUREGS {
 	}
 } ppur;
 
-int newppu_get_scanline() { return ppur.status.sl; }
-int newppu_get_dot() { return ppur.status.cycle; }
-void newppu_hacky_emergency_reset()
-{
-	if(ppur.status.end_cycle == 0)
-		ppur.reset();
-}
-
 static void makeppulut(void) {
 	int x;
 	int y;
@@ -366,9 +358,6 @@ uint8 VRAMBuffer = 0, PPUGenLatch = 0;
 static uint8 deemp = 0;
 static int deempcnt[8];
 
-void (*GameHBIRQHook)(void), (*GameHBIRQHook2)(void);
-void (*PPU_hook)(uint32 A);
-
 // v1.5 Prism §2.1 (Batch 1): vtoggle / XOffset / TempAddr /
 // RefreshAddr / DummyRead / NTRefreshAddr migrated into
 // fceu11::g_ppu. The `extern ... (& NAME)` reference aliases in
@@ -393,7 +382,10 @@ static int maxsprites = 8;
 // v1.3 Legion Phase 2: code below accesses it via g_cpu.scanline_ref();
 // the global inline alias in src/x6502.h is kept for files not yet migrated.
 int g_rasterpos;
-static uint32 scanlines_per_frame;
+// v1.12 Scissors Phase E-B: scanlines_per_frame promoted from static
+// (file-local) to extern so FCEUPPU_SetVideoSystem in ppu_core.cpp
+// can write it. Extern declaration is in ppu.h.
+uint32 scanlines_per_frame;
 
 // v1.5 Prism §1.1: PPU[4] / NTARAM[0x800] migrated into fceu11::g_ppu;
 // the compat aliases `extern uint8_t (& PPU)[4]`, `extern uint8_t
@@ -1755,42 +1747,6 @@ static void CopySprites(uint8 *target) {
 	}
 }
 
-void FCEUPPU_SetVideoSystem(int w) {
-	if (w) {
-		scanlines_per_frame = dendy ? 262: 312;
-		FSettings.FirstSLine = FSettings.UsrFirstSLine[1];
-		FSettings.LastSLine = FSettings.UsrLastSLine[1];
-		//paldeemphswap = 1; // dendy has pal ppu, and pal ppu has these swapped
-	} else {
-		scanlines_per_frame = 262;
-		FSettings.FirstSLine = FSettings.UsrFirstSLine[0];
-		FSettings.LastSLine = FSettings.UsrLastSLine[0];
-		//paldeemphswap = 0;
-	}
-}
-
-//Initializes the PPU
-void FCEUPPU_Init(void) {
-	makeppulut();
-}
-
-void PPU_ResetHooks() {
-	FFCEUX_PPURead = FFCEUX_PPURead_Default;
-}
-
-void FCEUPPU_Reset(void) {
-	VRAMBuffer = PPU[0] = PPU[1] = PPU_status = PPU[3] = 0;
-	PPUSPL = 0;
-	PPUGenLatch = 0;
-	RefreshAddr = TempAddr = 0;
-	vtoggle = 0;
-	ppudead = 2;
-	kook = 0;
-	idleSynch = 1;
-
-	new_ppu_reset = true; // delay reset of ppur/spr_read until it's ready to start a new frame
-}
-
 void FCEUPPU_Power(void) {
 	int x;
 
@@ -1826,6 +1782,10 @@ void FCEUPPU_Power(void) {
 		BWrite[x + 7] = B2007;
 	}
 	BWrite[0x4014] = B4014;
+}
+
+void FCEUPPU_Init(void) {
+	makeppulut();
 }
 
 int FCEUPPU_Loop(int skip) {
@@ -1973,16 +1933,6 @@ int FCEUPPU_Loop(int skip) {
 }
 
 int (*PPU_MASTER)(int skip) = FCEUPPU_Loop;
-
-uint32 FCEUPPU_PeekAddress()
-{
-	if (newppu)
-	{
-		return ppur.get_2007access() & 0x3FFF;
-	}
-
-	return RefreshAddr & 0x3FFF;
-}
 
 //---------------------
 int pputime = 0;

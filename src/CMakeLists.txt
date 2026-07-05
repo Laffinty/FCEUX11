@@ -228,6 +228,7 @@ set(SRC_CORE
   	${CMAKE_CURRENT_SOURCE_DIR}/profiler.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/ppu.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/ppu_state.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/ppu_core.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/ppu_class.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/apu.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/expansion_audio.cpp
