@@ -23,6 +23,7 @@
 #include "x6502.h"
 #include "fceu.h"
 #include "ppu.h"
+#include "ppu_state.h"
 #include "nsf.h"
 #include "sound.h"
 #include "file.h"
@@ -326,8 +327,8 @@ static void makeppulut(void) {
 	}
 }
 
-static int ppudead = 1;
-static int kook = 0;
+int ppudead = 1;
+int kook = 0;
 int fceuindbg = 0;
 
 //mbg 6/23/08
@@ -357,7 +358,7 @@ uint8 VRAMBuffer = 0, PPUGenLatch = 0;
 // `extern uint8_t (& PPUCHRRAM)`, `extern uint8_t (& PPUNTARAM)` in
 // ppu_class.h bind the global names to g_ppu member storage. The
 // plan Â§1.3 wording "PPUCHRRAM / PPUNTARAM stay as v1.0 globals" was
-// aspirational â€?in C++ a reference-to-storage alias cannot coexist
+// aspirational ï¿½?in C++ a reference-to-storage alias cannot coexist
 // in the same TU as a variable definition of the same name, so all
 // three migrate into the class. Byte-level semantics unchanged.
 
@@ -383,7 +384,7 @@ void (*PPU_hook)(uint32 A);
 //   DummyRead      -> g_ppu.dummy_read_      (uint32_t)
 // Byte-level semantics unchanged; the only delta is the storage
 // location (BSS addresses move into fceu11::g_ppu). SpriteDMA
-// stays here â€?Phase E (Batch 3) will migrate it alongside SPRAM.
+// stays here ï¿½?Phase E (Batch 3) will migrate it alongside SPRAM.
 uint8 SpriteDMA = 0; // $4014 / Writing $xx copies 256 bytes by reading from $xx00-$xxFF and writing to $2004 (OAM data)
 
 static int maxsprites = 8;
@@ -408,7 +409,7 @@ uint8 PPUSPL;
 // fceu11::g_ppu.oam_; the `extern uint8_t (& SPRAM)[0x100]` reference
 // alias in ppu_class.h rebinds the v1.0 name to g_ppu's storage, so
 // every ppu.cpp / debug.cpp / drivers/Qt/HexEditor.cpp / ppuViewer.cpp
-// call site keeps compiling unchanged. SPRBUF stays here â€?the
+// call site keeps compiling unchanged. SPRBUF stays here ï¿½?the
 // sprite-evaluation buffer is per-scanline internal state (the v1.0
 // `static uint8 numsprites` driver reads from it during RefreshLine)
 // and not on plan Â§2.3's migration list.
@@ -1078,7 +1079,7 @@ static void ResetRL(uint8 *target) {
 // g_ppu.line_buffer() so call-site reads / writes / pointers stay
 // unchanged. The original file-static array `static uint8
 // sprlinebuf[256+8];` was removed; equivalent storage now lives in
-// the class (alignas(64) for cache alignment â€?see plan Â§2.2 risk
+// the class (alignas(64) for cache alignment ï¿½?see plan Â§2.2 risk
 // analysis).
 
 void FCEUPPU_LineUpdate(void) {
@@ -1972,70 +1973,6 @@ int FCEUPPU_Loop(int skip) {
 }
 
 int (*PPU_MASTER)(int skip) = FCEUPPU_Loop;
-
-static uint16 TempAddrT, RefreshAddrT;
-
-void FCEUPPU_LoadState(int version) {
-	TempAddr = TempAddrT;
-	RefreshAddr = RefreshAddrT;
-}
-
-SFORMAT FCEUPPU_STATEINFO[] = {
-	{ NTARAM, 0x800, "NTAR" },
-	{ PALRAM.data(), 0x20, "PRAM" },
-	{ SPRAM, 0x100, "SPRA" },
-	{ PPU, 0x4, "PPUR" },
-	{ &kook, 1, "KOOK" },
-	{ &ppudead, 1, "DEAD" },
-	{ &PPUSPL, 1, "PSPL" },
-	{ &XOffset, 1, "XOFF" },
-	{ &vtoggle, 1, "VTGL" },
-	{ &RefreshAddrT, 2 | FCEUSTATE_RLSB, "RADD" },
-	{ &TempAddrT, 2 | FCEUSTATE_RLSB, "TADD" },
-	{ &VRAMBuffer, 1, "VBUF" },
-	{ &PPUGenLatch, 1, "PGEN" },
-	{ 0 }
-};
-
-SFORMAT FCEU_NEWPPU_STATEINFO[] = {
-	{ &idleSynch, 1, "IDLS" },
-	{ &spr_read.num, 4 | FCEUSTATE_RLSB, "SR_0" },
-	{ &spr_read.count, 4 | FCEUSTATE_RLSB, "SR_1" },
-	{ &spr_read.fetch, 4 | FCEUSTATE_RLSB, "SR_2" },
-	{ &spr_read.found, 4 | FCEUSTATE_RLSB, "SR_3" },
-	{ &spr_read.found_pos[0], 4 | FCEUSTATE_RLSB, "SRx0" },
-	{ &spr_read.found_pos[0], 4 | FCEUSTATE_RLSB, "SRx1" },
-	{ &spr_read.found_pos[0], 4 | FCEUSTATE_RLSB, "SRx2" },
-	{ &spr_read.found_pos[0], 4 | FCEUSTATE_RLSB, "SRx3" },
-	{ &spr_read.found_pos[0], 4 | FCEUSTATE_RLSB, "SRx4" },
-	{ &spr_read.found_pos[0], 4 | FCEUSTATE_RLSB, "SRx5" },
-	{ &spr_read.found_pos[0], 4 | FCEUSTATE_RLSB, "SRx6" },
-	{ &spr_read.found_pos[0], 4 | FCEUSTATE_RLSB, "SRx7" },
-	{ &spr_read.ret, 4 | FCEUSTATE_RLSB, "SR_4" },
-	{ &spr_read.last, 4 | FCEUSTATE_RLSB, "SR_5" },
-	{ &spr_read.mode, 4 | FCEUSTATE_RLSB, "SR_6" },
-	{ &ppur.fv, 4 | FCEUSTATE_RLSB, "PFVx" },
-	{ &ppur.v, 4 | FCEUSTATE_RLSB, "PVxx" },
-	{ &ppur.h, 4 | FCEUSTATE_RLSB, "PHxx" },
-	{ &ppur.vt, 4 | FCEUSTATE_RLSB, "PVTx" },
-	{ &ppur.ht, 4 | FCEUSTATE_RLSB, "PHTx" },
-	{ &ppur._fv, 4 | FCEUSTATE_RLSB, "P_FV" },
-	{ &ppur._v, 4 | FCEUSTATE_RLSB, "P_Vx" },
-	{ &ppur._h, 4 | FCEUSTATE_RLSB, "P_Hx" },
-	{ &ppur._vt, 4 | FCEUSTATE_RLSB, "P_VT" },
-	{ &ppur._ht, 4 | FCEUSTATE_RLSB, "P_HT" },
-	{ &ppur.fh, 4 | FCEUSTATE_RLSB, "PFHx" },
-	{ &ppur.s, 4 | FCEUSTATE_RLSB, "PSxx" },
-	{ &ppur.status.sl, 4 | FCEUSTATE_RLSB, "PST0" },
-	{ &ppur.status.cycle, 4 | FCEUSTATE_RLSB, "PST1" },
-	{ &ppur.status.end_cycle, 4 | FCEUSTATE_RLSB, "PST2" },
-	{ 0 }
-};
-
-void FCEUPPU_SaveState(void) {
-	TempAddrT = TempAddr;
-	RefreshAddrT = RefreshAddr;
-}
 
 uint32 FCEUPPU_PeekAddress()
 {
