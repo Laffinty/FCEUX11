@@ -139,7 +139,7 @@ static const WidgetGate kPhase2Widgets[] = {
     { "ppuViewer.cpp",                "ppuPatternView_t", 1, 1, 0 },
     { "AviRiffViewer.cpp",            "AviRiffViewerDialog", 1, 1, 0 },
     { "HexEditor.cpp",                "QHexEdit", 1, 1, 1 }, // keyPress :2602
-    { "AviRecord.cpp",                "AviRecordDiskThread_t", 1, 1, 0 },
+    { "AviOptionsDialog.cpp",         "LibavOptionsPage", 1, 1, 0 },
     { "GamePadConf.cpp",              "GamePadConfDialog_t", 1, 1, 0 },
     { "GuiConf.cpp",                  "GuiConfDialog_t", 1, 1, 0 },
     { "RamWatch.cpp",                 "RamWatchDialog_t", 1, 1, 0 },
