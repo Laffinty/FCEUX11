@@ -1,38 +1,38 @@
 {
   "nrom": {
-    "hash": "f98de674e67706bd91afd643ed411ac8"
+    "hash": "2ebb816875e61a223545f45e09080f91"
   },
   "mmc1": {
-    "hash": "a9274952c30fe0d5e043401a6b4c1833"
+    "hash": "e5169d870c26324ee699a0cdff7e8018"
   },
   "uxrom": {
-    "hash": "26efd56cd0aadbd6ff70d5e116ef3b0a"
+    "hash": "dc931dd8f8b2d1be4de0c5e0bfbf9de6"
   },
   "cnrom": {
-    "hash": "d1ac6cb997885ab3b935819a224a9109"
+    "hash": "6a24e5a264d8e740cace4ea7f929856f"
   },
   "mmc3": {
-    "hash": "27a166284c9ecfcc87c6bd30f0f4697a"
+    "hash": "71c5fa6c6c555e4f3d16985e82c41e1f"
   },
   "mmc5": {
-    "hash": "7c6db359ad5ed0d7926e36eb4a097ab1"
+    "hash": "2ddfa1495a70005b447f0bec9f5ee1e3"
   },
   "axrom": {
-    "hash": "26efd56cd0aadbd6ff70d5e116ef3b0a"
+    "hash": "dc931dd8f8b2d1be4de0c5e0bfbf9de6"
   },
   "colordreams": {
-    "hash": "26efd56cd0aadbd6ff70d5e116ef3b0a"
+    "hash": "dc931dd8f8b2d1be4de0c5e0bfbf9de6"
   },
   "gnrom": {
-    "hash": "26efd56cd0aadbd6ff70d5e116ef3b0a"
+    "hash": "dc931dd8f8b2d1be4de0c5e0bfbf9de6"
   },
   "vrc2and4": {
-    "hash": "d39ec42634173ebd93c8fe6129f10069"
+    "hash": "2b86a67342b55d126af79f596cfde4ef"
   },
   "vrc6": {
-    "hash": "83636294fb1d2c36f20ab455d3aa29c1"
+    "hash": "fe7b0183d4714d6ca40afe6c32866fb3"
   },
   "nestest": {
-    "hash": "ef261160d06f3f0642abf1d3cd08a677"
+    "hash": "e910448a075bbf529bfda08304dec283"
   }
 }
