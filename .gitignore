@@ -9,6 +9,7 @@ build-*/
 _build/
 *.build/
 out/
+dist/
 
 # CMake generated files
 CMakeCache.txt
