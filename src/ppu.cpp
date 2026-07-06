@@ -76,7 +76,17 @@ static alignas(64) std::array<uint32, 256> ppulut1;
 static alignas(64) std::array<uint32, 256> ppulut2;
 static alignas(64) std::array<uint32, 128> ppulut3;
 
-static bool new_ppu_reset = false;
+bool new_ppu_reset = false;
+
+// v1.12 Scissors Phase E-A: PPUPHASE / SPRITE_READ / idleSynch
+// globals were originally file-scope (lines 146-152 of pre-split
+// ppu.cpp). The struct definitions moved to ppu_class.h, but the
+// instances stay here. Phase E-A promote new_ppu_reset to extern
+// so FCEUPPU_Reset in ppu_core.cpp can write it (kept static
+// pending Phase E-C migration to ppu_rendering.cpp).
+PPUPHASE ppuphase;
+SPRITE_READ spr_read;
+uint8 idleSynch = 1;
 
 int test = 0;
 
@@ -109,189 +119,10 @@ struct BITREVLUT {
 };
 BITREVLUT<uint8, 8> bitrevlut;
 
-struct PPUSTATUS {
-	int32 sl;
-	int32 cycle, end_cycle;
-};
-
-struct SPRITE_READ {
-	int32 num;
-	int32 count;
-	int32 fetch;
-	int32 found;
-	int32 found_pos[8];
-	int32 ret;
-	int32 last;
-	int32 mode;
-
-	void reset() {
-		num = count = fetch = found = ret = last = mode = 0;
-		found_pos[0] = found_pos[1] = found_pos[2] = found_pos[3] = 0;
-		found_pos[4] = found_pos[5] = found_pos[6] = found_pos[7] = 0;
-	}
-
-	void start_scanline() {
-		num = 1;
-		found = 0;
-		fetch = 1;
-		count = 0;
-		last = 64;
-		mode = 0;
-		found_pos[0] = found_pos[1] = found_pos[2] = found_pos[3] = 0;
-		found_pos[4] = found_pos[5] = found_pos[6] = found_pos[7] = 0;
-	}
-};
-
-//doesn't need to be savestated as it is just a reflection of the current position in the ppu loop
-PPUPHASE ppuphase;
-
-//this needs to be savestated since a game may be trying to read from this across vblanks
-SPRITE_READ spr_read;
-
-//definitely needs to be savestated
-uint8 idleSynch = 1;
-
-//uses the internal counters concept at http://nesdev.icequake.net/PPU%20addressing.txt
-struct PPUREGS {
-	//normal clocked regs. as the game can interfere with these at any time, they need to be savestated
-	uint32 fv;	//3
-	uint32 v;	//1
-	uint32 h;	//1
-	uint32 vt;	//5
-	uint32 ht;	//5
-
-	//temp unlatched regs (need savestating, can be written to at any time)
-	uint32 _fv, _v, _h, _vt, _ht;
-
-	//other regs that need savestating
-	uint32 fh;	//3 (horz scroll)
-	uint32 s;	//1 ($2000 bit 4: "Background pattern table address (0: $0000; 1: $1000)")
-
-	//other regs that don't need saving
-	uint32 par;	//8 (sort of a hack, just stored in here, but not managed by this system)
-
-	//cached state data. these are always reset at the beginning of a frame and don't need saving
-	//but just to be safe, we're gonna save it
-	PPUSTATUS status;
-
-	void reset() {
-		fv = v = h = vt = ht = 0;
-		fh = par = s = 0;
-		_fv = _v = _h = _vt = _ht = 0;
-		status.cycle = 0;
-		status.end_cycle = 341;
-		status.sl = 241;
-	}
-
-	void install_latches() {
-		fv = _fv;
-		v = _v;
-		h = _h;
-		vt = _vt;
-		ht = _ht;
-	}
-
-	void install_h_latches() {
-		ht = _ht;
-		h = _h;
-	}
-
-	void clear_latches() {
-		_fv = _v = _h = _vt = _ht = 0;
-		fh = 0;
-	}
-
-	void increment_hsc() {
-		//The first one, the horizontal scroll counter, consists of 6 bits, and is
-		//made up by daisy-chaining the HT counter to the H counter. The HT counter is
-		//then clocked every 8 pixel dot clocks (or every 8/3 CPU clock cycles).
-		ht++;
-		h += (ht >> 5);
-		ht &= 31;
-		h &= 1;
-	}
-
-	void increment_vs() {
-		fv++;
-		int fv_overflow = (fv >> 3);
-		vt += fv_overflow;
-		vt &= 31;	//fixed tecmo super bowl
-		if (vt == 30 && fv_overflow == 1) {	//caution here (only do it at the exact instant of overflow) fixes p'radikus conflict
-			v++;
-			vt = 0;
-		}
-		fv &= 7;
-		v &= 1;
-	}
-
-	uint32 get_ntread() {
-		return 0x2000 | (v << 0xB) | (h << 0xA) | (vt << 5) | ht;
-	}
-
-	uint32 get_2007access() {
-		return ((fv & 3) << 0xC) | (v << 0xB) | (h << 0xA) | (vt << 5) | ht;
-	}
-
-	//The PPU has an internal 4-position, 2-bit shifter, which it uses for
-	//obtaining the 2-bit palette select data during an attribute table byte
-	//fetch. To represent how this data is shifted in the diagram, letters a..c
-	//are used in the diagram to represent the right-shift position amount to
-	//apply to the data read from the attribute data (a is always 0). This is why
-	//you only see bits 0 and 1 used off the read attribute data in the diagram.
-	uint32 get_atread() {
-		return 0x2000 | (v << 0xB) | (h << 0xA) | 0x3C0 | ((vt & 0x1C) << 1) | ((ht & 0x1C) >> 2);
-	}
-
-	//address line 3 relates to the pattern table fetch occuring (the PPU always makes them in pairs).
-	uint32 get_ptread() {
-		return (s << 0xC) | (par << 0x4) | fv;
-	}
-
-	void increment2007(bool rendering, bool by32) {
-
-		if (rendering)
-		{
-			//don't do this:
-			//if (by32) increment_vs();
-			//else increment_hsc();
-			//do this instead:
-			increment_vs();  //yes, even if we're moving by 32
-			return;
-		}
-
-		//If the VRAM address increment bit (2000.2) is clear (inc. amt. = 1), all the
-		//scroll counters are daisy-chained (in the order of HT, VT, H, V, FV) so that
-		//the carry out of each counter controls the next counter's clock rate. The
-		//result is that all 5 counters function as a single 15-bit one. Any access to
-		//2007 clocks the HT counter here.
-		//
-		//If the VRAM address increment bit is set (inc. amt. = 32), the only
-		//difference is that the HT counter is no longer being clocked, and the VT
-		//counter is now being clocked by access to 2007.
-		if (by32) {
-			vt++;
-		} else {
-			ht++;
-			vt += (ht >> 5) & 1;
-		}
-		h += (vt >> 5);
-		v += (h >> 1);
-		fv += (v >> 1);
-		ht &= 31;
-		vt &= 31;
-		h &= 1;
-		v &= 1;
-		fv &= 7;
-	}
-
-	void debug_log()
-	{
-		FCEU_printf("ppur: fv(%d), v(%d), h(%d), vt(%d), ht(%d)\n",fv,v,h,vt,ht);
-		FCEU_printf("      _fv(%d), _v(%d), _h(%d), _vt(%d), _ht(%d)\n",_fv,_v,_h,_vt,_ht);
-		FCEU_printf("      fh(%d), s(%d), par(%d)\n",fh,s,par);
-		FCEU_printf("      .status cycle(%d), end_cycle(%d), sl(%d)\n",status.cycle,status.end_cycle,status.sl);
-	}
-} ppur;
+// v1.12 Scissors Phase E-A: PPUREGS struct definition moved to
+// ppu_class.h so the SFORMAT tables in ppu_state.cpp can take
+// addresses of its fields (e.g. `&ppur.fv`). The instance stays here.
+PPUREGS ppur;
 
 static void makeppulut(void) {
 	int x;

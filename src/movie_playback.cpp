@@ -34,8 +34,19 @@
 
 #include "fceu.h"
 #include "driver.h"
+#include "driver_callbacks.h"
+#include "state.h"
 
 #include <cstdint>
+
+// These helpers are defined in movie.cpp but called from FCEUMOV_ReadState
+// below. Drop-static promotions: declarations here resolve cross-TU
+// through the existing movie.cpp definitions (their `static` keyword
+// was removed as part of Phase F-B). They remain part of the movie
+// module's internal surface (no public header exposure).
+void closeRecordingMovie();
+void RedumpWholeMovieFile(bool justToggledRecording = false);
+void FinishPlayback();
 
 // ----------------------------------------------------------------------------
 // Savestate plugin: write side

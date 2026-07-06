@@ -220,8 +220,6 @@ MovieData::MovieData()
 }
 
 
-}
-
 int FCEUMOV_GetFrame(void)
 {
 	return currFrameCounter;
@@ -272,7 +270,7 @@ bool FCEUMOV_Mode(int modemask)
 	return FCEUMOV_Mode((EMOVIEMODE)modemask);
 }
 
-static const char *GetMovieModeStr()
+const char *GetMovieModeStr()
 {
 	if (movieMode == MOVIEMODE_INACTIVE)
 		return " (no movie)";
@@ -327,7 +325,7 @@ static EMUFILE *openRecordingMovie(const char* fname)
 	return osRecordingMovie;
 }
 
-static void closeRecordingMovie()
+void closeRecordingMovie()
 {
 	if (osRecordingMovie)
 	{
@@ -337,7 +335,7 @@ static void closeRecordingMovie()
 }
 
 // Callers shall set the approriate movieMode before calling this
-static void RedumpWholeMovieFile(bool justToggledRecording = false)
+void RedumpWholeMovieFile(bool justToggledRecording = false)
 {
 	bool recording = (movieMode == MOVIEMODE_RECORD);
 	assert((NULL != osRecordingMovie) == (recording != justToggledRecording) && "osRecordingMovie should be consistent with movie mode!");
@@ -362,7 +360,7 @@ static void StopPlayback()
 }
 
 // Stop movie playback without closing the movie.
-static void FinishPlayback()
+void FinishPlayback()
 {
 	assert(movieMode != MOVIEMODE_RECORD);
 
@@ -386,7 +384,7 @@ static void StopRecording()
 	FCEU_DispMessage("Movie recording stopped.",0);
 }
 
-static void OnMovieClosed()
+void OnMovieClosed()
 {
 	assert(movieMode == MOVIEMODE_INACTIVE);
 

@@ -46,7 +46,7 @@
 #include <string>
 
 extern "C" {
-#include "rust.h"
+#include "rust/fceux11_rust.h"
 }
 
 // ----------------------------------------------------------------------------

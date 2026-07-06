@@ -31,9 +31,18 @@
 #include "movie_record.h"
 
 #include "fceu.h"
+#include "utils/safe_string.h"
 
 #include <cstring>
 #include <vector>
+
+// Helpers defined in movie.cpp (Phase F-B removed `static` from the
+// related playback helpers; the same treatment is applied here for
+// record-flow helpers called from this TU). They remain part of the
+// movie module's internal surface — no public header exposure.
+void RedumpWholeMovieFile(bool justToggledRecording = false);
+void OnMovieClosed();
+const char* GetMovieModeStr();
 
 // ----------------------------------------------------------------------------
 // Recording-side manipulators.

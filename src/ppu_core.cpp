@@ -85,7 +85,7 @@ void PPU_ResetHooks() {
 }
 
 void FCEUPPU_Reset(void) {
-	VRAMBuffer = PPU[0] = PPU[1] = PPU_status = PPU[3] = 0;
+	VRAMBuffer = PPU[0] = PPU[1] = PPU[2] = PPU[3] = 0;
 	PPUSPL = 0;
 	PPUGenLatch = 0;
 	RefreshAddr = TempAddr = 0;

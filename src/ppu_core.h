@@ -35,7 +35,7 @@
 
 #pragma once
 
-#include "ppu_class.h"   // fceu11::Ppu, PPU/NTARAM/vnapage/PPUCHRRAM/PPUNTARAM aliases
+#include "ppu_class.h"   // fceu11::Ppu, PPUREGS / PPUSTATUS / SPRITE_READ structs
 
 // ----------------------------------------------------------------------------
 // Cross-TU promotion (file-static → extern).
@@ -45,3 +45,17 @@
 // FCEUPPU_SetVideoSystem (ppu_core), read by FCEUPPU_Loop /
 // FCEUX_PPU_Loop (ppu.cpp; moves to ppu_rendering.cpp in E-C).
 extern unsigned int scanlines_per_frame;
+
+// Phase E-A: PPU globals now referenced from this TU (via
+// newppu_get_* / FCEUPPU_Reset).
+extern PPUREGS ppur;
+extern uint8 PPUSPL;
+extern uint8 idleSynch;
+extern int ppudead;
+extern int kook;
+extern bool new_ppu_reset;
+
+// Phase E-A: PPU_status is a #define macro in ppu.cpp pointing at
+// PPU[2]; the macro doesn't expand across TU. Drop-static promotion
+// of the underlying register file already lives in ppu_class.h.
+#include "ppu.h"   // PPU[4] reference alias + PPU_status macro
