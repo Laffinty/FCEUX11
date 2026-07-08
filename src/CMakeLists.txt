@@ -230,6 +230,7 @@ set(SRC_CORE
   	${CMAKE_CURRENT_SOURCE_DIR}/palette.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/profiler.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/ppu.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/ppu_rendering.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/ppu_state.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/ppu_core.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/ppu_class.cpp
