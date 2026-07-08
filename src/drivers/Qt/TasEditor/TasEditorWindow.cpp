@@ -213,6 +213,16 @@ TasEditorWindow::TasEditorWindow(QWidget *parent)
 
 	// Restore Horizontal Panel State
 	mainHBox->restoreState( settings.value("tasEditor/hPanelState").toByteArray() );
+
+	// v1.13 Phase B / Batch B: register the TAS Editor bridge with the
+	// movie core. Movie.cpp no longer includes TasEditorWindow.h; it
+	// dispatches to these function pointers instead. ctx is nullptr
+	// because the legacy free functions take no user data.
+	fceu11::RegisterTasBridge({
+		[](void*) -> bool { return isTaseditorRecording(); },
+		[](void*) -> void { recordInputByTaseditor(); },
+		nullptr
+	});
 }
 //----------------------------------------------------------------------------
 TasEditorWindow::~TasEditorWindow(void)
@@ -220,6 +230,9 @@ TasEditorWindow::~TasEditorWindow(void)
 	QSettings  settings;
 
 	printf("Destroy Tas Editor Window\n");
+
+	// v1.13 Phase B / Batch B: tear down the TAS Editor bridge.
+	fceu11::UnregisterTasBridge();
 
 	FCEU_WRAPPER_LOCK();
 	//if (!askToSaveProject()) return false;

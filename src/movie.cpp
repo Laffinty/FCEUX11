@@ -36,7 +36,11 @@
 #include <windows.h>
 #endif
 
-#include "./drivers/Qt/TasEditor/TasEditorWindow.h"
+// v1.13 Phase B / Batch B: Removed the `#include "./drivers/Qt/TasEditor/
+// TasEditorWindow.h"` drag. The TAS Editor bridge is now wired through
+// function-pointer registration (see `fceu11::RegisterTasBridge` in
+// movie.h). The TasEditor GUI registers itself in its constructor and
+// unregisters in its destructor / closeEvent.
 
 extern int RAMInitOption;
 extern int RAMInitSeed;
@@ -66,6 +70,26 @@ bool subtitlesOnAVI = false;
 bool autoMovieBackup = false; //Toggle that determines if movies should be backed up automatically before altering them
 bool freshMovie = false;	  //True when a movie loads, false when movie is altered.  Used to determine if a movie has been altered since opening
 bool movieFromPoweron = true;
+
+// v1.13 Phase B / Batch B: TAS Editor bridge (function-pointer based,
+// set via fceu11::RegisterTasBridge from the TasEditorWindow GUI on
+// construction). When `is_recording` is null the movie core treats the
+// frame as a normal joystick log; when set, the per-frame dispatcher
+// in FCEUMOV_AddInputState routes into TAS via `record_input` instead
+// of writing the joy log itself.
+namespace {
+fceu11::TasBridge g_tas_bridge{nullptr, nullptr, nullptr};
+} // anonymous namespace
+
+void fceu11::RegisterTasBridge(const fceu11::TasBridge& b)
+{
+	g_tas_bridge = b;
+}
+
+void fceu11::UnregisterTasBridge()
+{
+	g_tas_bridge = fceu11::TasBridge{nullptr, nullptr, nullptr};
+}
 
 static int _currCommand = 0;
 
@@ -708,13 +732,14 @@ void FCEUMOV_AddInputState()
 			currMovieData.insertEmpty(-1, (currFrameCounter + 1) - ((int)currMovieData.records.size() - 1));
 
 		MovieRecord* mr = &currMovieData.records[currFrameCounter];
-		if (isTaseditorRecording())
+		if (g_tas_bridge.is_recording && g_tas_bridge.is_recording(g_tas_bridge.ctx))
 		{
 			// record commands and buttons
 			mr->commands |= _currCommand;
 			joyports[0].log(mr);
 			joyports[1].log(mr);
-			recordInputByTaseditor();
+			if (g_tas_bridge.record_input)
+				g_tas_bridge.record_input(g_tas_bridge.ctx);
 		}
 		// replay buttons
 		joyports[0].load(mr);
