@@ -30,16 +30,31 @@
 #include "movie.h"
 #include "movie_record.h"
 
+#include "emufile.h"
 #include "fceu.h"
+#include "driver.h"
+#include "driver_callbacks.h"
+#include "file.h"   // `extern bool bindSavestate;`
 #include "utils/safe_string.h"
 
 #include <cstring>
 #include <vector>
 
-// Helpers defined in movie.cpp (Phase F-B removed `static` from the
-// related playback helpers; the same treatment is applied here for
-// record-flow helpers called from this TU). They remain part of the
-// movie module's internal surface — no public header exposure.
+// v1.13 Phase B / Batch D-D.2: definitions of `osRecordingMovie` (declared
+// extern in movie.h:284) and `bindSavestate` (driver/settings) live in
+// movie.cpp / drivers layer; `AutoSS` lives in fceu.cpp. Re-declare here
+// to resolve the cross-TU symbol references inside the session helpers
+// moved into this file. (bindSavestate's true type is `bool` per file.h:12.)
+extern EMUFILE* osRecordingMovie;
+extern bool AutoSS;
+
+// ----------------------------------------------------------------------------
+// v1.13 Phase B / Batch D-D.2: helper forward-declarations for the
+// pre-existing v1.12 manipulator block (which still references these
+// by name — the v1.13 §0.2.1 pure-move principle keeps the manipulator
+// call sites unchanged). Definitions are also in this TU (see end of
+// file) but C++ requires a forward decl before first use.
+// ----------------------------------------------------------------------------
 void RedumpWholeMovieFile(bool justToggledRecording = false);
 void OnMovieClosed();
 const char* GetMovieModeStr();
@@ -51,9 +66,8 @@ const char* GetMovieModeStr();
 // they toggle playback↔record mode, insert/delete/truncate frames, and
 // select the active record-mode (TRUNCATE / OVERWRITE / INSERT). Most
 // dispatch through `movieMode` checks against the file-static state
-// defined in movie.cpp; the static helpers (RedumpWholeMovieFile /
-// OnMovieClosed / GetMovieModeStr) stay in movie.cpp and resolve via
-// the existing extern declarations.
+// defined in movie.cpp; the helpers listed above (now in this TU) are
+// no longer cross-TU references.
 // ----------------------------------------------------------------------------
 
 void FCEUI_MovieToggleRecording()
@@ -226,4 +240,121 @@ void FCEUI_MovieRecordModeOverwrite()
 void FCEUI_MovieRecordModeInsert()
 {
 	movieRecordMode = MOVIE_RECORD_MODE_INSERT;
+}
+
+// ----------------------------------------------------------------------------
+// v1.13 Phase B / Batch D-D.2: Recording-session IO helpers +
+// playback/recording lifecycle helpers relocated here from src/movie.cpp.
+// All of these touch osRecordingMovie / movieMode / curMovieFilename /
+// etc. — i.e. exclusively recording-side state. Moving them co-locates
+// the "save a movie file to disk" and "open a movie recording" flows
+// with the existing recording manipulators above.
+//
+// `bindSavestate` / `AutoSS` / `g_driver()` continue to resolve via
+// the extern declarations in fceu.h / driver.h / driver_callbacks.h
+// pulled in at the top of this file.
+// ----------------------------------------------------------------------------
+
+EMUFILE *openRecordingMovie(const char* fname)
+{
+	if (osRecordingMovie)
+		delete osRecordingMovie;
+
+	osRecordingMovie = FCEUD_UTF8_fstream(fname, "wb");
+	if (!osRecordingMovie || osRecordingMovie->fail()) {
+		FCEU_PrintError("Error opening movie output file: %s", fname);
+		return NULL;
+	}
+	if ( fname != curMovieFilename.c_str() )
+	{
+		curMovieFilename.assign(fname);
+	}
+
+	return osRecordingMovie;
+}
+
+void closeRecordingMovie()
+{
+	if (osRecordingMovie)
+	{
+		delete osRecordingMovie;
+		osRecordingMovie = 0;
+	}
+}
+
+// Callers shall set the approriate movieMode before calling this
+void RedumpWholeMovieFile(bool justToggledRecording)
+{
+	bool recording = (movieMode == MOVIEMODE_RECORD);
+	assert((NULL != osRecordingMovie) == (recording != justToggledRecording) && "osRecordingMovie should be consistent with movie mode!");
+
+	if (NULL == openRecordingMovie(curMovieFilename.c_str()))
+		return;
+
+	currMovieData.dump(osRecordingMovie, false/*currMovieData.binaryFlag*/, recording);
+	if (recording)
+		osRecordingMovie->fflush();
+	else
+		closeRecordingMovie();
+}
+
+/// Stop movie playback.
+void StopPlayback()
+{
+	assert(movieMode != MOVIEMODE_RECORD && NULL == osRecordingMovie);
+
+	movieMode = MOVIEMODE_INACTIVE;
+	FCEU_DispMessageOnMovie("Movie playback stopped.");
+}
+
+// Stop movie playback without closing the movie.
+void FinishPlayback()
+{
+	assert(movieMode != MOVIEMODE_RECORD);
+
+	extern int closeFinishedMovie;
+	if (closeFinishedMovie)
+		StopPlayback();
+	else
+	{
+		movieMode = MOVIEMODE_FINISHED;
+		FCEU_DispMessage("Movie finished playing.",0);
+	}
+}
+
+/// Stop movie recording
+void StopRecording()
+{
+	assert(movieMode == MOVIEMODE_RECORD);
+
+	movieMode = MOVIEMODE_INACTIVE;
+	RedumpWholeMovieFile(true);
+	FCEU_DispMessage("Movie recording stopped.",0);
+}
+
+void OnMovieClosed()
+{
+	assert(movieMode == MOVIEMODE_INACTIVE);
+
+	curMovieFilename.clear();			//No longer a current movie filename
+	freshMovie = false;					//No longer a fresh movie loaded
+	if (bindSavestate) AutoSS = false;	//If bind movies to savestates is true, then there is no longer a valid auto-save to load
+
+	if (auto* fn = fceu11::g_driver().set_main_window_text) fn(nullptr);
+}
+
+const char* GetMovieModeStr()
+{
+	if (movieMode == MOVIEMODE_INACTIVE)
+		return " (no movie)";
+	else if (movieMode == MOVIEMODE_PLAY)
+		return " (playing)";
+	else if (movieMode == MOVIEMODE_RECORD)
+		return " (recording)";
+	else if (movieMode == MOVIEMODE_FINISHED)
+		return " (finished)";
+	else if (movieMode == MOVIEMODE_TASEDITOR)
+		return " (taseditor)";
+	else
+		return ".";
 }

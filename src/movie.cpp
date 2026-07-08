@@ -45,6 +45,18 @@
 extern int RAMInitOption;
 extern int RAMInitSeed;
 
+// v1.13 Phase B / Batch D-D.2: cross-TU forward decls for session-lifecycle
+// helpers now defined in movie_record.cpp. fceu11::StopMovie (below),
+// fceu11::SaveMovie (around line 600), fceu11::OnMovieClosed, and
+// fceu11::MoviePlayFromBeginning (around line 970) call into these.
+void StopPlayback();
+void StopRecording();
+void FinishPlayback();
+void OnMovieClosed();
+void RedumpWholeMovieFile(bool justToggledRecording = false);
+EMUFILE *openRecordingMovie(const char* fname);
+const char* GetMovieModeStr();
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -295,21 +307,9 @@ bool FCEUMOV_Mode(int modemask)
 	return FCEUMOV_Mode((EMOVIEMODE)modemask);
 }
 
-const char *GetMovieModeStr()
-{
-	if (movieMode == MOVIEMODE_INACTIVE)
-		return " (no movie)";
-	else if (movieMode == MOVIEMODE_PLAY)
-		return " (playing)";
-	else if (movieMode == MOVIEMODE_RECORD)
-		return " (recording)";
-	else if (movieMode == MOVIEMODE_FINISHED)
-		return " (finished)";
-	else if (movieMode == MOVIEMODE_TASEDITOR)
-		return " (taseditor)";
-	else
-		return ".";
-}
+// v1.13 Phase B / Batch D-D.2: GetMovieModeStr relocated to
+// src/movie_record.cpp. Call site at line ~960 (MovieToggleReadOnly)
+// resolves through the cross-TU forward decl at the top of this file.
 
 static const char *GetMovieReadOnlyStr()
 {
@@ -332,93 +332,21 @@ static const char *GetMovieRecordModeStr()
 	}
 }
 
-static EMUFILE *openRecordingMovie(const char* fname)
-{
-	if (osRecordingMovie)
-		delete osRecordingMovie;
-
-	osRecordingMovie = FCEUD_UTF8_fstream(fname, "wb");
-	if (!osRecordingMovie || osRecordingMovie->fail()) {
-		FCEU_PrintError("Error opening movie output file: %s", fname);
-		return NULL;
-	}
-	if ( fname != curMovieFilename.c_str() )
-	{
-		curMovieFilename.assign(fname);
-	}
-
-	return osRecordingMovie;
-}
-
-void closeRecordingMovie()
-{
-	if (osRecordingMovie)
-	{
-		delete osRecordingMovie;
-		osRecordingMovie = 0;
-	}
-}
-
-// Callers shall set the approriate movieMode before calling this
-void RedumpWholeMovieFile(bool justToggledRecording = false)
-{
-	bool recording = (movieMode == MOVIEMODE_RECORD);
-	assert((NULL != osRecordingMovie) == (recording != justToggledRecording) && "osRecordingMovie should be consistent with movie mode!");
-
-	if (NULL == openRecordingMovie(curMovieFilename.c_str()))
-		return;
-
-	currMovieData.dump(osRecordingMovie, false/*currMovieData.binaryFlag*/, recording);
-	if (recording)
-		osRecordingMovie->fflush();
-	else
-		closeRecordingMovie();
-}
-
-/// Stop movie playback.
-static void StopPlayback()
-{
-	assert(movieMode != MOVIEMODE_RECORD && NULL == osRecordingMovie);
-
-	movieMode = MOVIEMODE_INACTIVE;
-	FCEU_DispMessageOnMovie("Movie playback stopped.");
-}
-
-// Stop movie playback without closing the movie.
-void FinishPlayback()
-{
-	assert(movieMode != MOVIEMODE_RECORD);
-
-	extern int closeFinishedMovie;
-	if (closeFinishedMovie)
-		StopPlayback();
-	else
-	{
-		movieMode = MOVIEMODE_FINISHED;
-		FCEU_DispMessage("Movie finished playing.",0);
-	}
-}
-
-/// Stop movie recording
-static void StopRecording()
-{
-	assert(movieMode == MOVIEMODE_RECORD);
-
-	movieMode = MOVIEMODE_INACTIVE;
-	RedumpWholeMovieFile(true);
-	FCEU_DispMessage("Movie recording stopped.",0);
-}
-
-void OnMovieClosed()
-{
-	assert(movieMode == MOVIEMODE_INACTIVE);
-
-	curMovieFilename.clear();			//No longer a current movie filename
-	freshMovie = false;					//No longer a fresh movie loaded
-	if (bindSavestate) AutoSS = false;	//If bind movies to savestates is true, then there is no longer a valid auto-save to load
-
-	if (auto* fn = fceu11::g_driver().set_main_window_text) fn(nullptr);
-}
+// v1.13 Phase B / Batch D-D.2: openRecordingMovie / closeRecordingMovie /
+// RedumpWholeMovieFile / StopPlayback / FinishPlayback / StopRecording /
+// OnMovieClosed relocated to src/movie_record.cpp (recording-session
+// IO + playback-lifecycle). The cross-TU decls already in
+// movie_record.cpp:43-45 (RedumpWholeMovieFile / OnMovieClosed /
+// GetMovieModeStr) become redundant since the definitions now live in
+// the same TU; they are pruned there as part of this commit.
+// movie_playback.cpp and movie.cpp add equivalent forward decls.
+//
+// GetMovieReadOnlyStr / GetMovieRecordModeStr stay here because they
+// are referenced by FCEU_DrawMovies / FCEUMOV_AddInputState in the
+// remaining playback/record dispatcher that lives in movie.cpp (HUD
+// drawing moves to movie_record.cpp in D.3; the per-frame dispatcher
+// uses the strings only inside the RECORD branch which is further
+// moved in D.4).
 
 bool bogorf;
 
