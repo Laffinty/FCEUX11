@@ -35,7 +35,13 @@
 #include "driver.h"
 #include "driver_callbacks.h"
 #include "file.h"   // `extern bool bindSavestate;`
+#include "input.h"  // lagCounter / lagCounterDisplay / lagFlag (move globals)
 #include "utils/safe_string.h"
+#include "video.h"  // DrawTextTrans / ClipSidesOffset / FCEU_TextScanlineOffsetFromBottom
+#include "drawing.h"
+
+// v1.13 Phase B / Batch D-D.3: extra includes for the HUD overlay
+// helpers. drawing.h is also pulled in transitively by video.h.
 
 #include <cstring>
 #include <vector>
@@ -47,6 +53,13 @@
 // moved into this file. (bindSavestate's true type is `bool` per file.h:12.)
 extern EMUFILE* osRecordingMovie;
 extern bool AutoSS;
+
+// v1.13 Phase B / Batch D-D.3: HUD overlay helpers reference int
+// frame_display / rerecord_display file-scope globals from fceu.cpp
+// (not in any header). lagCounter / lagCounterDisplay / lagFlag come
+// in via input.h:309-311.
+extern int frame_display;
+extern int rerecord_display;
 
 // ----------------------------------------------------------------------------
 // v1.13 Phase B / Batch D-D.2: helper forward-declarations for the
@@ -357,4 +370,100 @@ const char* GetMovieModeStr()
 		return " (taseditor)";
 	else
 		return ".";
+}
+
+// ----------------------------------------------------------------------------
+// v1.13 Phase B / Batch D-D.3: HUD overlays relocated here from
+// src/movie.cpp. All four helpers are called from src/video.cpp
+// (the per-frame video renderer); pulling them together with the
+// recording-session IO block they format makes for a coherent
+// "movie output" TU.
+//
+// GetMovieReadOnlyStr / GetMovieRecordModeStr lose their v1.12
+// `static` qualifier and gain external linkage — the remaining
+// FCEUMOV_AddInputState RECORD branch in movie.cpp calls them via
+// forward decls at the top of movie.cpp until D-D.4 moves that branch.
+// ----------------------------------------------------------------------------
+
+const char *GetMovieReadOnlyStr()
+{
+	if (movieMode == MOVIEMODE_RECORD)
+		return movie_readonly ? " R-O" : "";
+	else
+		return movie_readonly ? "" : " R+W";
+}
+
+const char *GetMovieRecordModeStr()
+{
+	switch (movieRecordMode)
+	{
+	case MOVIE_RECORD_MODE_OVERWRITE:
+		return " [W]";
+	case MOVIE_RECORD_MODE_INSERT:
+		return " [I]";
+	default:
+		return "";
+	}
+}
+
+// v1.13 Phase B / Batch D-D.3: lagcounterbuf file-scope storage,
+// formerly at the top of movie.cpp. Demoted to anonymous namespace
+// here — its only writer/reader is FCEU_DrawLagCounter below, both
+// in this TU.
+namespace {
+char lagcounterbuf[32] = {0};
+} // anonymous namespace
+
+void FCEU_DrawMovies(uint8 *XBuf)
+{
+	// not the best place, but just working
+	assert((NULL != osRecordingMovie) == (movieMode == MOVIEMODE_RECORD));
+
+	if (frame_display)
+	{
+		char counterbuf[32] = {0};
+		int color = 0x20;
+
+		if (movieMode == MOVIEMODE_PLAY)
+		{
+			snprintf(counterbuf, sizeof(counterbuf), "%d/%d%s%s", currFrameCounter, (int)currMovieData.records.size(), GetMovieRecordModeStr(), GetMovieReadOnlyStr());
+		} else if (movieMode == MOVIEMODE_RECORD)
+		{
+			if (movieRecordMode == MOVIE_RECORD_MODE_TRUNCATE)
+				snprintf(counterbuf, sizeof(counterbuf), "%d%s%s (record)", currFrameCounter, GetMovieRecordModeStr(), GetMovieReadOnlyStr()); // nearly classic
+			else
+				snprintf(counterbuf, sizeof(counterbuf), "%d/%d%s%s (record)", currFrameCounter, (int)currMovieData.records.size(), GetMovieRecordModeStr(), GetMovieReadOnlyStr());
+		} else if (movieMode == MOVIEMODE_FINISHED)
+		{
+			snprintf(counterbuf, sizeof(counterbuf),"%d/%d%s%s (finished)",currFrameCounter,(int)currMovieData.records.size(), GetMovieRecordModeStr(), GetMovieReadOnlyStr());
+			color = 0x17; //Show red to get attention
+		} else if (movieMode == MOVIEMODE_TASEDITOR)
+		{
+			snprintf(counterbuf, sizeof(counterbuf),"%d",currFrameCounter);
+		} else
+			snprintf(counterbuf, sizeof(counterbuf),"%d (no movie)",currFrameCounter);
+
+		if (counterbuf[0])
+			DrawTextTrans(ClipSidesOffset+XBuf+FCEU_TextScanlineOffsetFromBottom(30)+1, 256, (uint8*)counterbuf, color+0x80);
+	}
+	if (rerecord_display && movieMode != MOVIEMODE_INACTIVE)
+	{
+		char counterbuf[32] = {0};
+		snprintf(counterbuf, sizeof(counterbuf), "%d", currMovieData.rerecordCount);
+
+		if (counterbuf[0])
+			DrawTextTrans(ClipSidesOffset+XBuf+FCEU_TextScanlineOffsetFromBottom(50)+1, 256, (uint8*)counterbuf, 0x28+0x80);
+	}
+}
+
+void FCEU_DrawLagCounter(uint8 *XBuf)
+{
+	if (lagCounterDisplay)
+	{
+		// If currently lagging - display red, else display green
+		uint8 color = (lagFlag) ? (0x16+0x80) : (0x2A+0x80);
+		snprintf(lagcounterbuf, sizeof(lagcounterbuf), "%d", lagCounter);
+		if(lagcounterbuf[0])
+			DrawTextTrans(ClipSidesOffset + XBuf + FCEU_TextScanlineOffsetFromBottom(40) + 1, 256, (uint8*)lagcounterbuf, color);
+	}
 }

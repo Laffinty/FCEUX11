@@ -56,6 +56,8 @@ void OnMovieClosed();
 void RedumpWholeMovieFile(bool justToggledRecording = false);
 EMUFILE *openRecordingMovie(const char* fname);
 const char* GetMovieModeStr();
+const char* GetMovieReadOnlyStr();        // moved to movie_record.cpp in D-D.3
+const char* GetMovieRecordModeStr();      // moved to movie_record.cpp in D-D.3
 
 #include <cstdio>
 #include <cstdlib>
@@ -151,7 +153,11 @@ MovieData currMovieData;
 MovieData defaultMovieData;
 int currRerecordCount; // Keep the global value
 
-char lagcounterbuf[32] = {0};
+// v1.13 Phase B / Batch D-D.3: lagcounterbuf relocated to
+// src/movie_record.cpp alongside FCEU_DrawLagCounter (its only writer
+// and reader). The buffer is purely private to FCEU_DrawLagCounter,
+// so promoting it from file-scope in movie.cpp to anonymous namespace
+// in movie_record.cpp is a no-op.
 
 void MovieData::clearRecordRange(int start, int len)
 {
@@ -310,27 +316,24 @@ bool FCEUMOV_Mode(int modemask)
 // v1.13 Phase B / Batch D-D.2: GetMovieModeStr relocated to
 // src/movie_record.cpp. Call site at line ~960 (MovieToggleReadOnly)
 // resolves through the cross-TU forward decl at the top of this file.
+//
+// v1.13 Phase B / Batch D-D.3: GetMovieReadOnlyStr / GetMovieRecordModeStr
+// also relocated to src/movie_record.cpp (HUD + recording helpers
+// co-located). Forward decls at top of movie.cpp keep the remaining
+// (RECORD branch in FCEUMOV_AddInputState until D-D.4) call sites
+// resolving.
 
-static const char *GetMovieReadOnlyStr()
-{
-	if (movieMode == MOVIEMODE_RECORD)
-		return movie_readonly ? " R-O" : "";
-	else
-		return movie_readonly ? "" : " R+W";
-}
-
-static const char *GetMovieRecordModeStr()
-{
-	switch (movieRecordMode)
-	{
-	case MOVIE_RECORD_MODE_OVERWRITE:
-		return " [W]";
-	case MOVIE_RECORD_MODE_INSERT:
-		return " [I]";
-	default:
-		return "";
-	}
-}
+// v1.13 Phase B / Batch D-D.3: FCEU_DrawMovies / FCEU_DrawLagCounter /
+// GetMovieRecordModeStr / GetMovieReadOnlyStr relocated to
+// src/movie_record.cpp. All four are video-side rendering state that
+// co-locates cleanly with the rest of the recording-session output.
+//
+// The two str() helpers were `static` in this TU; they lose the
+// `static` qualifier (internal linkage) and gain external linkage so
+// the FCEUMOV_AddInputState RECORD branch — which still lives in
+// movie.cpp until D-D.4 — can keep calling them via forward decls at
+// the top of movie_record.cpp (added in this commit). After D-D.4 the
+// RECORD branch moves too and the forward decls drop.
 
 // v1.13 Phase B / Batch D-D.2: openRecordingMovie / closeRecordingMovie /
 // RedumpWholeMovieFile / StopPlayback / FinishPlayback / StopRecording /
@@ -340,13 +343,6 @@ static const char *GetMovieRecordModeStr()
 // GetMovieModeStr) become redundant since the definitions now live in
 // the same TU; they are pruned there as part of this commit.
 // movie_playback.cpp and movie.cpp add equivalent forward decls.
-//
-// GetMovieReadOnlyStr / GetMovieRecordModeStr stay here because they
-// are referenced by FCEU_DrawMovies / FCEUMOV_AddInputState in the
-// remaining playback/record dispatcher that lives in movie.cpp (HUD
-// drawing moves to movie_record.cpp in D.3; the per-frame dispatcher
-// uses the strings only inside the RECORD branch which is further
-// moved in D.4).
 
 bool bogorf;
 
@@ -790,59 +786,9 @@ void FCEUMOV_AddCommand(int cmd)
 	_currCommand |= cmd;
 }
 
-void FCEU_DrawMovies(uint8 *XBuf)
-{
-	// not the best place, but just working
-	assert((NULL != osRecordingMovie) == (movieMode == MOVIEMODE_RECORD));
-
-	if (frame_display)
-	{
-		char counterbuf[32] = {0};
-		int color = 0x20;
-		
-		if (movieMode == MOVIEMODE_PLAY)
-		{
-			snprintf(counterbuf, sizeof(counterbuf), "%d/%d%s%s", currFrameCounter, (int)currMovieData.records.size(), GetMovieRecordModeStr(), GetMovieReadOnlyStr());
-		} else if (movieMode == MOVIEMODE_RECORD)
-		{
-			if (movieRecordMode == MOVIE_RECORD_MODE_TRUNCATE)
-				snprintf(counterbuf, sizeof(counterbuf), "%d%s%s (record)", currFrameCounter, GetMovieRecordModeStr(), GetMovieReadOnlyStr()); // nearly classic
-			else
-				snprintf(counterbuf, sizeof(counterbuf), "%d/%d%s%s (record)", currFrameCounter, (int)currMovieData.records.size(), GetMovieRecordModeStr(), GetMovieReadOnlyStr());
-		} else if (movieMode == MOVIEMODE_FINISHED)
-		{
-			snprintf(counterbuf, sizeof(counterbuf),"%d/%d%s%s (finished)",currFrameCounter,(int)currMovieData.records.size(), GetMovieRecordModeStr(), GetMovieReadOnlyStr());
-			color = 0x17; //Show red to get attention
-		} else if (movieMode == MOVIEMODE_TASEDITOR)
-		{
-			snprintf(counterbuf, sizeof(counterbuf),"%d",currFrameCounter);
-		} else
-			snprintf(counterbuf, sizeof(counterbuf),"%d (no movie)",currFrameCounter);
-
-		if (counterbuf[0])
-			DrawTextTrans(ClipSidesOffset+XBuf+FCEU_TextScanlineOffsetFromBottom(30)+1, 256, (uint8*)counterbuf, color+0x80);
-	}
-	if (rerecord_display && movieMode != MOVIEMODE_INACTIVE)
-	{
-		char counterbuf[32] = {0};
-		snprintf(counterbuf, sizeof(counterbuf), "%d", currMovieData.rerecordCount);
-
-		if (counterbuf[0])
-			DrawTextTrans(ClipSidesOffset+XBuf+FCEU_TextScanlineOffsetFromBottom(50)+1, 256, (uint8*)counterbuf, 0x28+0x80);
-	}
-}
-
-void FCEU_DrawLagCounter(uint8 *XBuf)
-{
-	if (lagCounterDisplay)
-	{
-		// If currently lagging - display red, else display green
-		uint8 color = (lagFlag) ? (0x16+0x80) : (0x2A+0x80);
-		snprintf(lagcounterbuf, sizeof(lagcounterbuf), "%d", lagCounter);
-		if(lagcounterbuf[0])
-			DrawTextTrans(ClipSidesOffset + XBuf + FCEU_TextScanlineOffsetFromBottom(40) + 1, 256, (uint8*)lagcounterbuf, color);
-	}
-}
+// v1.13 Phase B / Batch D-D.3: FCEU_DrawMovies / FCEU_DrawLagCounter
+// bodies relocated to src/movie_record.cpp. See comment block above
+// the GetMovieRecordModeStr helper for the migration rationale.
 
 // FCEUMOV_WriteState + CheckTimelines + FCEUMOV_ReadState +
 // FCEUMOV_PreLoad + FCEUMOV_PostLoad moved to src/movie_playback.cpp
