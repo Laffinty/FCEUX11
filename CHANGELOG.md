@@ -117,6 +117,104 @@ to **12**.
   used (no DeepL / Google Translate / Azure Translator / online LLM).
   Community native-speaker review contributions welcome via PR.
 
+## [1.13] - 2026-07-08
+
+**Codename: Purify.** Thirteenth sub-version of the v1.x modernization
+cycle per `docs/v1.x_Modernization_Roadmap.md` §13. Completes the
+v1.12 Scissors carryover splits (ppu.cpp / movie.cpp) and addresses
+Roadmap §13 Purify items (malloc/free root-out, C-style cast
+cleanup, #define→constexpr/inline migration, scoped_ptr.h removal,
+Lua 5.1 in-tree source removal, /wd suppression cleanup).
+
+Phase B specifically (this release) finishes the `movie.cpp` split
+from 1203 lines to ≤300 (per build plan §2 / §12.1 hard gate),
+breaking the v1.12 actual (also documented as Phase F carryover in
+build plan §6.3 / §7.1). Phase A (ppu.cpp 2304 → 800) shipped in
+the previous commit (`5db1888`).
+
+### Changed
+
+#### `src/movie.cpp` split (Phase B §2 / §12.1)
+
+- `src/movie.cpp` — 1203 → **269 lines** (≤300 hard gate met per
+  build plan §12.1).
+- New TU `src/movie_subtitles.cpp` (88 lines): LoadSubtitles /
+  ProcessSubtitles / FCEU_DisplaySubtitles + `subtitleFrames` /
+  `subtitleMessages` (file-static) + `subtitlesOnAVI` (extern via
+  movie.h). Replaces D-D.1 carve-out.
+- New TU `src/movie_taseditor_bridge.cpp` (90 lines): the
+  MOVIEMODE_TASEDITOR branch of `FCEUMOV_AddInputState` + the
+  function-pointer dispatch over `fceu11::TasBridge`. Replaces
+  D-D.4 carve-out.
+- New TU `src/movie_io.cpp` (404 lines): fceu11::LoadMovie /
+  SaveMovie / MoviePlayFromBeginning + poweron +
+  FCEUMOV_CreateCleanMovie / ClearCommands / FromPoweron +
+  MovieData::loadSaveramFrom / dumpSaveramTo. Replaces D-D.5
+  carve-out.
+- New TU `src/movie_settings.cpp` (404 lines): FCEUMOV_AddCommand /
+  IncrementRerecordCount / MovieToggle* family +
+  Get/Set Movie Toggle Read-Only / MovieGetInfo / MovieAddInputState
+  per-frame PLAY-branch helper + GetMovieName / lag / ShouldPause /
+  Mode queries + FCEUI_CreateMovieFile / FCEUI_MakeBackupMovie.
+  Replaces D-D.5-extension + D-D.4-extension.
+- `src/movie_record.cpp` — 228 → 641 lines: extended with the
+  session-lifecycle helpers (StopPlayback / StopRecording /
+  RedumpWholeMovieFile / OnMovieClosed / FinishPlayback /
+  openRecordingMovie / closeRecordingMovie), the HUD overlays
+  (FCEU_DrawMovies / FCEU_DrawLagCounter), the lag-counter buffer
+  (`lagcounterbuf`, file-local), the two str() helpers
+  (GetMovieReadOnlyStr / GetMovieRecordModeStr — promoted from
+  static for cross-TU access from movie.cpp until D-D.5-extension
+  absorbed the remaining call sites), the per-frame
+  MovieAddInputState_Record (RECORD branch), the MovieRecord ctor
+  / clear / Compare / Clone, the MovieData ctor, and the
+  record-array helpers (clearRecordRange / eraseRecords /
+  insertEmpty / cloneRegion). GetMovieModeStr also migrated here
+  from movie.cpp.
+- `src/movie_playback.cpp` — 257 → 302 lines: now also owns
+  `SFORMAT FCEUMOV_STATEINFO[]` (chunk-6 frame counter block)
+  + `MovieData::loadSavestateFrom` + `dumpSavestateTo` bodies
+  (moved from movie.cpp). The state.cpp:118 `extern` resolves to
+  the new TU at link time without source change. The chunk-6
+  before chunk-7 timing invariant in state.cpp:340-355 is
+  preserved — both helpers live in the savestate-plugin TU and
+  the dispatcher in state.cpp does not change.
+
+#### Cross-module architectural change: core ↔ drivers_qt
+
+- Removed the `movie.cpp` → `drivers/Qt/TasEditor/TasEditorWindow.h`
+  include drag (which transitively pulled ~30 Qt headers + 17
+  TasEditor sub-module headers into `fceux11_core`, violating the
+  `core ← drivers_qt` layering).
+- Replaced with a function-pointer registry in `fceu11::TasBridge`
+  (movie.h lines 304-318). The TasEditorWindow constructor calls
+  `fceu11::RegisterTasBridge(...)` with lambdas wrapping the legacy
+  `isTaseditorRecording()` / `recordInputByTaseditor()` free
+  functions; the destructor / closeEvent calls `UnregisterTasBridge`.
+- Hot-path check `g_tas_bridge.is_recording(...)` keeps the per-frame
+  dispatch unconditional (no null-check on the main call site) since
+  the bridge is always registered in the GUI lifetime.
+- The `movie.h` public surface is otherwise unchanged: `MovieData`,
+  `MovieRecord`, `currFrameCounter`, `movieMode` exports, etc.
+  TasEditor-side code in `src/drivers/Qt/TasEditor/` continues to
+  read/write these via the same `extern` declarations.
+
+### Verification
+
+```
+cmake --build build --config Release   # zero errors, zero warnings
+ctest -C Release -LE perf              # 24/24 pass
+grep 'drivers/Qt' src/movie.cpp src/movie.h  # empty
+wc -l src/movie.cpp                    # 269 (≤300 §12.1 hard gate ✓)
+```
+
+### Out of scope (Phase C..I carryover)
+
+Phase B finishes the v1.13 carryover splits for the movie TU. Roadmap
+§13 Purify items (C-style cast cleanup / #define→constexpr /
+scoped_ptr.h removal / Lua 5.1 in-tree source / /wd suppression
+cleanup) ship in subsequent phases (C..I in the §14 timeline).
+
 ## [1.12] - 2026-07-06
 
 **Codename: Scissors.** Twelfth sub-version of the v1.x modernization
