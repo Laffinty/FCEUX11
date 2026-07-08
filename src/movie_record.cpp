@@ -37,8 +37,17 @@
 #include "file.h"   // `extern bool bindSavestate;`
 #include "input.h"  // lagCounter / lagCounterDisplay / lagFlag (move globals)
 #include "utils/safe_string.h"
+#include "utils/memory.h"   // memset
 #include "video.h"  // DrawTextTrans / ClipSidesOffset / FCEU_TextScanlineOffsetFromBottom
 #include "drawing.h"
+
+// v1.13 Phase B / Batch D-D.6: MovieData / MovieRecord constructors need
+// MOVIE_VERSION (defined in movie.cpp via #define, but we keep the macro
+// here too — historically it lived at the top of movie.cpp; carrying
+// it over here too avoids pulling in version.h gratuitously when the
+// macro is already in scope through the next TU). FCEU_VERSION_NUMERIC
+// comes from version.h transitively.
+#define MOVIE_VERSION           3
 
 // v1.13 Phase B / Batch D-D.3: extra includes for the HUD overlay
 // helpers. drawing.h is also pulled in transitively by video.h.
@@ -466,4 +475,122 @@ void FCEU_DrawLagCounter(uint8 *XBuf)
 		if(lagcounterbuf[0])
 			DrawTextTrans(ClipSidesOffset + XBuf + FCEU_TextScanlineOffsetFromBottom(40) + 1, 256, (uint8*)lagcounterbuf, color);
 	}
+}
+
+// ----------------------------------------------------------------------------
+// v1.13 Phase B / Batch D-D.6: MovieData record-array helpers +
+// MovieRecord per-frame utilities + MovieData / MovieRecord ctors
+// relocated here from src/movie.cpp.
+//
+// The 5 MovieData static methods loadSavestateFrom / dumpSavestateTo /
+// loadSaveramFrom / dumpSaveramTo stay in movie_playback.cpp /
+// movie.cpp respectively (already moved by earlier batches and
+// covered by separate audit). The methods moved in this batch are
+// all NON-static and touch only `this->records` / `this->joysticks` /
+// `this->zappers` / `this->commands` / the MovieData member POD —
+// no cross-module externs needed other than what movie.h already
+// provides (MD5DATA, FCEU_VERSION_NUMERIC, MOVIE_VERSION).
+// ----------------------------------------------------------------------------
+
+void MovieData::clearRecordRange(int start, int len)
+{
+	for(int i=0;i<len;i++)
+	{
+		records[i+start].clear();
+	}
+}
+
+void MovieData::eraseRecords(int at, int frames)
+{
+	if (at < (int)records.size())
+	{
+		if (frames == 1)
+		{
+			// erase 1 frame
+			records.erase(records.begin() + at);
+		} else
+		{
+			// erase many frames
+			if (at + frames > (int)records.size())
+				frames = (int)records.size() - at;
+			records.erase(records.begin() + at, records.begin() + (at + frames));
+		}
+	}
+}
+
+void MovieData::insertEmpty(int at, int frames)
+{
+	if (at == -1)
+	{
+		records.resize(records.size() + frames);
+	} else
+	{
+		records.insert(records.begin() + at, frames, MovieRecord());
+	}
+}
+
+void MovieData::cloneRegion(int at, int frames)
+{
+	if (at < 0) return;
+
+	records.insert(records.begin() + at, frames, MovieRecord());
+
+	for(int i = 0; i < frames; i++)
+		records[i + at].Clone(records[i + at + frames]);
+}
+// ----------------------------------------------------------------------------
+MovieRecord::MovieRecord()
+{
+	commands = 0;
+	*(uint32*)&joysticks = 0;
+	memset(zappers, 0, sizeof(zappers));
+}
+
+void MovieRecord::clear()
+{
+	commands = 0;
+	*(uint32*)&joysticks = 0;
+	memset(zappers, 0, sizeof(zappers));
+}
+
+bool MovieRecord::Compare(MovieRecord& compareRec)
+{
+	//Joysticks, Zappers, and commands
+
+	if (this->commands != compareRec.commands)
+		return false;
+	if ((*(uint32*)&(this->joysticks)) != (*(uint32*)&(compareRec.joysticks)))
+		return false;
+	if (memcmp(this->zappers, compareRec.zappers, sizeof(zappers)))
+		return false;
+
+	return true;
+}
+void MovieRecord::Clone(MovieRecord& sourceRec)
+{
+	*(uint32*)&joysticks = *(uint32*)(&(sourceRec.joysticks));
+	memcpy(this->zappers, sourceRec.zappers, sizeof(zappers));
+	this->commands = sourceRec.commands;
+}
+
+// MovieRecord::mnemonics + dumpJoy/parseJoy/parse/parseBinary/dumpBinary/dump,
+// MovieData::truncateAt, installValue, dump, and LoadFM2 moved to
+// src/movie_fm2.cpp (Phase F-A, v1.12 Scissors).
+
+
+MovieData::MovieData()
+	: version(MOVIE_VERSION)
+	, emuVersion(FCEU_VERSION_NUMERIC)
+	, fds(false)
+	, palFlag(false)
+	, PPUflag(false)
+	, rerecordCount(0)
+	, binaryFlag(false)
+	, loadFrameCount(-1)
+	, fourscore(false)
+	, microphone(false)
+	, RAMInitOption(0)
+	, RAMInitSeed(0)
+{
+	memset(&romChecksum,0,sizeof(MD5DATA));
 }

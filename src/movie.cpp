@@ -159,109 +159,18 @@ int currRerecordCount; // Keep the global value
 // so promoting it from file-scope in movie.cpp to anonymous namespace
 // in movie_record.cpp is a no-op.
 
-void MovieData::clearRecordRange(int start, int len)
-{
-	for(int i=0;i<len;i++)
-	{
-		records[i+start].clear();
-	}
-}
-
-void MovieData::eraseRecords(int at, int frames)
-{
-	if (at < (int)records.size())
-	{
-		if (frames == 1)
-		{
-			// erase 1 frame
-			records.erase(records.begin() + at);
-		} else
-		{
-			// erase many frames
-			if (at + frames > (int)records.size())
-				frames = (int)records.size() - at;
-			records.erase(records.begin() + at, records.begin() + (at + frames));
-		}
-	}
-}
-
-void MovieData::insertEmpty(int at, int frames)
-{
-	if (at == -1)
-	{
-		records.resize(records.size() + frames);
-	} else
-	{
-		records.insert(records.begin() + at, frames, MovieRecord());
-	}
-}
-
-void MovieData::cloneRegion(int at, int frames)
-{
-	if (at < 0) return;
-
-	records.insert(records.begin() + at, frames, MovieRecord());
-
-	for(int i = 0; i < frames; i++)
-		records[i + at].Clone(records[i + at + frames]);
-}
-// ----------------------------------------------------------------------------
-MovieRecord::MovieRecord()
-{
-	commands = 0;
-	*(uint32*)&joysticks = 0;
-	memset(zappers, 0, sizeof(zappers));
-}
-
-void MovieRecord::clear()
-{
-	commands = 0;
-	*(uint32*)&joysticks = 0;
-	memset(zappers, 0, sizeof(zappers));
-}
-
-bool MovieRecord::Compare(MovieRecord& compareRec)
-{
-	//Joysticks, Zappers, and commands
-
-	if (this->commands != compareRec.commands)
-		return false;
-	if ((*(uint32*)&(this->joysticks)) != (*(uint32*)&(compareRec.joysticks)))
-		return false;
-	if (memcmp(this->zappers, compareRec.zappers, sizeof(zappers)))
-		return false;
-
-	return true;
-}
-void MovieRecord::Clone(MovieRecord& sourceRec)
-{
-	*(uint32*)&joysticks = *(uint32*)(&(sourceRec.joysticks));
-	memcpy(this->zappers, sourceRec.zappers, sizeof(zappers));
-	this->commands = sourceRec.commands;
-}
-
-// MovieRecord::mnemonics + dumpJoy/parseJoy/parse/parseBinary/dumpBinary/dump,
-// MovieData::truncateAt, installValue, dump, and LoadFM2 moved to
-// src/movie_fm2.cpp (Phase F-A, v1.12 Scissors).
-
-
-MovieData::MovieData()
-	: version(MOVIE_VERSION)
-	, emuVersion(FCEU_VERSION_NUMERIC)
-	, fds(false)
-	, palFlag(false)
-	, PPUflag(false)
-	, rerecordCount(0)
-	, binaryFlag(false)
-	, loadFrameCount(-1)
-	, fourscore(false)
-	, microphone(false)
-	, RAMInitOption(0)
-	, RAMInitSeed(0)
-{
-	memset(&romChecksum,0,sizeof(MD5DATA));
-}
-
+// v1.13 Phase B / Batch D-D.6: MovieData record-array helpers
+// (clearRecordRange / eraseRecords / insertEmpty / cloneRegion) and
+// MovieRecord ctor / clear / Compare / Clone bodies, plus the
+// MovieData ctor, relocated to src/movie_record.cpp. These are all
+// pure record-array / per-frame utilities that co-locate cleanly with
+// the recording-side manipulators and session IO already moved there.
+//
+// The MovieData static members loadSavestateFrom / dumpSavestateTo
+// were already moved in Batch C; this batch covers the remaining
+// non-static helpers and the constructors. Declared in movie.h
+// (lines 114-274); only the bodies move, and call sites are
+// unchanged (the v1.13 §0.2.1 pure-move principle).
 
 int FCEUMOV_GetFrame(void)
 {
