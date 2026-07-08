@@ -128,10 +128,11 @@ int rerecord_display = 0;
 bool fullSaveStateLoads = false;	//Option for loading a savestates full contents in read+write mode instead of up to the frame count in the savestate (useful as a recovery option)
 int movieRecordMode = 0;			//Option for various movie recording modes such as TRUNCATE (normal), OVERWRITE etc.
 
-SFORMAT FCEUMOV_STATEINFO[]={
-	{ &currFrameCounter, 4|FCEUSTATE_RLSB, "FCNT"},
-	{ 0 }
-};
+// v1.13 Phase B / Batch C: SFORMAT FCEUMOV_STATEINFO[] moved to
+// movie_playback.cpp where the rest of the savestate plugin lives
+// (chunk 6 / 7 dispatcher, FCEUMOV_WriteState / ReadState / PreLoad /
+// PostLoad, CheckTimelines). The state.cpp:118 `extern` resolves to the
+// new TU at link time with no source change required.
 
 std::string curMovieFilename;
 MovieData currMovieData;
@@ -494,27 +495,12 @@ bool FCEUMOV_FromPoweron()
 {
 	return movieFromPoweron;
 }
-bool MovieData::loadSavestateFrom(std::vector<uint8>* buf)
-{
-	// v0.3.10: EMUFILE_MEMORY now wraps std::vector<std::byte>. Convert at
-	// the boundary so the std::vector<uint8> movie signature stays intact.
-	std::vector<std::byte> tmp(reinterpret_cast<const std::byte*>(buf->data()),
-	                            reinterpret_cast<const std::byte*>(buf->data()) + buf->size());
-	EMUFILE_MEMORY ms(&tmp);
-	return FCEUSS_LoadFP(&ms,SSLOADPARAM_BACKUP);
-}
 
-void MovieData::dumpSavestateTo(std::vector<uint8>* buf, int compressionLevel)
-{
-	// v0.3.10: write into a temporary std::vector<std::byte> then copy back
-	// to the caller's std::vector<uint8>.
-	std::vector<std::byte> tmp;
-	EMUFILE_MEMORY ms(&tmp);
-	FCEUSS_SaveMS(&ms,compressionLevel);
-	ms.trim();
-	buf->assign(reinterpret_cast<const uint8_t*>(tmp.data()),
-	            reinterpret_cast<const uint8_t*>(tmp.data()) + tmp.size());
-}
+// v1.13 Phase B / Batch C: MovieData::loadSavestateFrom + dumpSavestateTo
+// bodies moved to movie_playback.cpp alongside the rest of the savestate
+// plugin. Declared as static members in movie.h; the body-only relocation
+// is C++-legal and matches the v1.12 cross-TU static-style pattern
+// documented at movie_record.cpp:39-46.
 
 bool MovieData::loadSaveramFrom(std::vector<uint8>* buf)
 {

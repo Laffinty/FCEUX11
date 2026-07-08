@@ -48,6 +48,51 @@ void closeRecordingMovie();
 void RedumpWholeMovieFile(bool justToggledRecording = false);
 void FinishPlayback();
 
+// v1.13 Phase B / Batch C: SFORMAT FCEUMOV_STATEINFO[] relocated from
+// movie.cpp. The chunk-6 dispatcher in state.cpp captures this address
+// via `extern SFORMAT FCEUMOV_STATEINFO[];` at state.cpp:118; that
+// declaration is TU-blind, so moving the definition into this file is a
+// link-time-only relocation with zero source change required elsewhere.
+//
+// chunk 6 is emitted before chunk 7 by state.cpp:340-355; chunk 6 walks
+// over `&currFrameCounter` via SFORMAT, then chunk 7's FCEUMOV_ReadState
+// (below) reads it for CheckTimelines. Both `currFrameCounter` and
+// `MovieData::loadSavestateFrom/dumpSavestateTo` (below) resolve to
+// `extern` declarations in movie.h and to the same global emitted by
+// movie.cpp.
+SFORMAT FCEUMOV_STATEINFO[]={
+	{ &currFrameCounter, 4|FCEUSTATE_RLSB, "FCNT"},
+	{ 0 }
+};
+
+// v1.13 Phase B / Batch C: MovieData::loadSavestateFrom +
+// MovieData::dumpSavestateTo bodies relocated from movie.cpp. These are
+// declared as static members in movie.h; body-only migration is C++-legal
+// and matches v1.12's documented cross-TU static-style pattern (see
+// movie_record.cpp:39-46). Call sites keep the original
+// `MovieData::loadSavestateFrom(...)` member syntax unchanged.
+bool MovieData::loadSavestateFrom(std::vector<uint8>* buf)
+{
+	// v0.3.10: EMUFILE_MEMORY now wraps std::vector<std::byte>. Convert at
+	// the boundary so the std::vector<uint8> movie signature stays intact.
+	std::vector<std::byte> tmp(reinterpret_cast<const std::byte*>(buf->data()),
+	                            reinterpret_cast<const std::byte*>(buf->data()) + buf->size());
+	EMUFILE_MEMORY ms(&tmp);
+	return FCEUSS_LoadFP(&ms,SSLOADPARAM_BACKUP);
+}
+
+void MovieData::dumpSavestateTo(std::vector<uint8>* buf, int compressionLevel)
+{
+	// v0.3.10: write into a temporary std::vector<std::byte> then copy back
+	// to the caller's std::vector<uint8>.
+	std::vector<std::byte> tmp;
+	EMUFILE_MEMORY ms(&tmp);
+	FCEUSS_SaveMS(&ms,compressionLevel);
+	ms.trim();
+	buf->assign(reinterpret_cast<const uint8_t*>(tmp.data()),
+	            reinterpret_cast<const uint8_t*>(tmp.data()) + tmp.size());
+}
+
 // ----------------------------------------------------------------------------
 // Savestate plugin: write side
 // ----------------------------------------------------------------------------
