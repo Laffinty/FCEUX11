@@ -63,10 +63,10 @@ extern int RAMInitSeed;
 extern char FileBase[];
 extern bool AutoSS;		//Declared in fceu.cpp, keeps track if a auto-savestate has been made
 
-std::vector<int> subtitleFrames;		//Frame numbers for subtitle messages
-std::vector<std::string> subtitleMessages;	//Messages of subtitles
-
-bool subtitlesOnAVI = false;
+// v1.13 Phase B / Batch D-D.1: subtitlesOnAVI + subtitleFrames / subtitleMessages /
+// LoadSubtitles / ProcessSubtitles / FCEU_DisplaySubtitles relocated to
+// src/movie_subtitles.cpp. The `extern bool subtitlesOnAVI` in movie.h:280
+// resolves to the new TU at link time.
 bool autoMovieBackup = false; //Toggle that determines if movies should be backed up automatically before altering them
 bool freshMovie = false;	  //True when a movie loads, false when movie is altered.  Used to determine if a movie has been altered since opening
 bool movieFromPoweron = true;
@@ -1094,58 +1094,9 @@ bool fceu11::MovieGetInfo(FCEUFILE* fp, MOVIE_INFO& info, bool skipFrameCount)
 	return true;
 }
 
-//This function creates an array of frame numbers and corresponding strings for displaying subtitles
-void LoadSubtitles(MovieData &moviedata)
-{
-	subtitleFrames.resize(0);
-	subtitleMessages.resize(0);
-	extern std::vector<std::string> subtitles;
-	for(uint32 i=0; i < moviedata.subtitles.size() ; i++)
-	{
-		std::string& subtitle = moviedata.subtitles[i];
-		size_t splitat = subtitle.find_first_of(' ');
-		std::string key, value;
-
-		//If we can't split them, then don't process this one
-		if(splitat == std::string::npos)
-		{
-		}
-		//Else split the subtitle into the int and string arrays
-		else
-		{
-			key = subtitle.substr(0,splitat);
-			value = subtitle.substr(splitat+1);
-			subtitleFrames.push_back(atoi(key.c_str()));
-			subtitleMessages.push_back(value);
-		}
-	}
-
-}
-
-//Every frame, this will be called to determine if a subtitle should be displayed, which one, and then to display it
-void ProcessSubtitles(void)
-{
-	if (movieMode == MOVIEMODE_INACTIVE) return;
-
-	for(uint32 i=0;i<currMovieData.subtitles.size();i++)
-	{
-		if (currFrameCounter == subtitleFrames[i])
-			FCEU_DisplaySubtitles("%s",subtitleMessages[i].c_str());
-	}
-}
-
-void FCEU_DisplaySubtitles(const char *format, ...)
-{
-	va_list ap;
-
-	va_start(ap,format);
-	vsnprintf(subtitleMessage.errmsg,sizeof(subtitleMessage.errmsg),format,ap);
-	va_end(ap);
-
-	subtitleMessage.howlong = 400;
-	subtitleMessage.isMovieMessage = subtitlesOnAVI;
-	subtitleMessage.linesFromBottom = 0;
-}
+// v1.13 Phase B / Batch D-D.1: LoadSubtitles / ProcessSubtitles /
+// FCEU_DisplaySubtitles relocated to src/movie_subtitles.cpp. The 3
+// fns' declarations in movie.h are unchanged.
 
 void FCEUI_CreateMovieFile(std::string fn)
 {

@@ -221,6 +221,7 @@ set(SRC_CORE
   	${CMAKE_CURRENT_SOURCE_DIR}/movie_fm2.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/movie_playback.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/movie_record.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/movie_subtitles.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/netplay.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/nsf.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/nsf_load.cpp
