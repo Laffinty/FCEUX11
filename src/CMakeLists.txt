@@ -482,6 +482,12 @@ set(SRC_DRIVERS_COMMON
 
 set(SRC_DRIVERS_QT
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleWindow.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleMenu.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleRecording.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleFile.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleActions.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleVideo.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleTranslation.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleRecentRom.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleEmuControl.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleDebugWindows.cpp  
