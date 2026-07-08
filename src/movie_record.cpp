@@ -63,6 +63,13 @@
 extern EMUFILE* osRecordingMovie;
 extern bool AutoSS;
 
+// v1.13 Phase B / Batch D-D.5: the per-command staging int was promoted
+// from TU-static (movie.cpp) to TU-external so the moved
+// FCEUMOV_ClearCommands (movie_io.cpp) and the still-resident
+// FCEUMOV_AddCommand (movie.cpp) plus MovieAddInputState_Record (this
+// TU, D-D.4) share it without going through a function call.
+extern int _currCommand;
+
 // v1.13 Phase B / Batch D-D.3: HUD overlay helpers reference int
 // frame_display / rerecord_display file-scope globals from fceu.cpp
 // (not in any header). lagCounter / lagCounterDisplay / lagFlag come
@@ -593,4 +600,43 @@ MovieData::MovieData()
 	, RAMInitSeed(0)
 {
 	memset(&romChecksum,0,sizeof(MD5DATA));
+}
+
+// ----------------------------------------------------------------------------
+// v1.13 Phase B / Batch D-D.4: per-frame RECORD branch helper. The main
+// FCEUMOV_AddInputState() in movie.cpp dispatches here on
+// movieMode == MOVIEMODE_RECORD.
+// ----------------------------------------------------------------------------
+void MovieAddInputState_Record()
+{
+	MovieRecord mr;
+
+	joyports[0].log(&mr);
+	joyports[1].log(&mr);
+	mr.commands = _currCommand;
+	_currCommand = 0;
+
+	//aquanull: now it supports other recording modes that don't necessarily truncate further frame data
+	//If the user chooses it can be delayed to here
+	if (currFrameCounter < (int)currMovieData.records.size())
+		switch (movieRecordMode)
+		{
+		case MOVIE_RECORD_MODE_OVERWRITE:
+			currMovieData.records[currFrameCounter].Clone(mr);
+			break;
+		case MOVIE_RECORD_MODE_INSERT:
+			//FIXME: this could be very insufficient
+			currMovieData.records.insert(currMovieData.records.begin() + currFrameCounter, mr);
+			break;
+		//case MOVIE_RECORD_MODE_TRUNCATE:
+		default:
+			//Adelikat: in normal mode, this is done at the time of loading a savestate in read+write mode
+			currMovieData.truncateAt(currFrameCounter);
+			currMovieData.records.push_back(mr);
+			break;
+		}
+	else
+		currMovieData.records.push_back(mr);
+
+	mr.dump(&currMovieData, osRecordingMovie, currFrameCounter);	// to disk
 }

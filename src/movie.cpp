@@ -59,6 +59,12 @@ const char* GetMovieModeStr();
 const char* GetMovieReadOnlyStr();        // moved to movie_record.cpp in D-D.3
 const char* GetMovieRecordModeStr();      // moved to movie_record.cpp in D-D.3
 
+// v1.13 Phase B / Batch D-D.4: per-frame dispatcher helpers — the
+// PLAY branch stays in movie.cpp; the TASEDITOR branch lives in
+// movie_taseditor_bridge.cpp; the RECORD branch in movie_record.cpp.
+void MovieAddInputState_TasEditor();       // movie_taseditor_bridge.cpp
+void MovieAddInputState_Record();          // movie_record.cpp
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -85,15 +91,13 @@ bool autoMovieBackup = false; //Toggle that determines if movies should be backe
 bool freshMovie = false;	  //True when a movie loads, false when movie is altered.  Used to determine if a movie has been altered since opening
 bool movieFromPoweron = true;
 
-// v1.13 Phase B / Batch B: TAS Editor bridge (function-pointer based,
-// set via fceu11::RegisterTasBridge from the TasEditorWindow GUI on
-// construction). When `is_recording` is null the movie core treats the
-// frame as a normal joystick log; when set, the per-frame dispatcher
-// in FCEUMOV_AddInputState routes into TAS via `record_input` instead
-// of writing the joy log itself.
-namespace {
+// v1.13 Phase B / Batch B + D-D.4: TAS Editor bridge (function-pointer
+// based, set via fceu11::RegisterTasBridge from the TasEditorWindow GUI
+// on construction). g_tas_bridge moved out of anonymous namespace
+// (Batch D-D.4) so the TASEDITTOR branch helper MovieAddInputState_TasEditor
+// (now in movie_taseditor_bridge.cpp) can read it without re-defining
+// the structure / losing the bridge registration.
 fceu11::TasBridge g_tas_bridge{nullptr, nullptr, nullptr};
-} // anonymous namespace
 
 void fceu11::RegisterTasBridge(const fceu11::TasBridge& b)
 {
@@ -290,35 +294,60 @@ void fceu11::StopMovie()
 
 //the main interaction point between the emulator and the movie system.
 //either dumps the current joystick state or loads one state from the movie
+// v1.13 Phase B / Batch D-D.4: the TASEDITOR branch (uses
+// g_tas_bridge function-pointer dispatch from Batch B) is now in
+// movie_taseditor_bridge.cpp; the RECORD branch is in movie_record.cpp;
+// the PLAY branch stays here as a thin inline dispatch. FCEUMOV_AddInputState
+// itself becomes a thin per-frame router.
+
+void MovieAddInputState_Playback();
+
+// fceu11::SetVidSystem (loader-side) is not needed here; the bridge /
+// playback / record helpers each contain their own MovieReplayEmulatedCommands
+// or hot-path equivalent. The current dispatcher is intentionally tiny —
+// keeping FCEUMOV_AddInputState() in TU-local switch keeps the per-frame
+// call site readable for the regression suite.
 void FCEUMOV_AddInputState()
 {
 	if (movieMode == MOVIEMODE_TASEDITOR)
-	{
-		// if movie length is less or equal to currFrame, pad it with empty frames
-		if (((int)currMovieData.records.size() - 1) < (currFrameCounter + 1))
-			currMovieData.insertEmpty(-1, (currFrameCounter + 1) - ((int)currMovieData.records.size() - 1));
+		MovieAddInputState_TasEditor();
+	else if (movieMode == MOVIEMODE_PLAY)
+		MovieAddInputState_Playback();
+	else if (movieMode == MOVIEMODE_RECORD)
+		MovieAddInputState_Record();
 
+	currFrameCounter++;
+
+	extern uint8 joy[4];
+	memcpy(&cur_input_display,joy,4);
+}
+
+// v1.13 Phase B / Batch D-D.4: PLAY branch kept here. The TASEDITOR
+// branch (with g_tas_bridge) is in movie_taseditor_bridge.cpp; the
+// RECORD branch (which writes to osRecordingMovie + truncates /
+// overwrites / inserts based on movieRecordMode) is in movie_record.cpp.
+void MovieAddInputState_Playback()
+{
+	//stop when we run out of frames
+	if (currFrameCounter >= (int)currMovieData.records.size())
+	{
+		FinishPlayback();
+		//tell all drivers to poll input and set up their logical states
+		for(int port=0;port<2;port++)
+			joyports[port].driver->Update(port,joyports[port].ptr,joyports[port].attrib);
+		portFC.driver->Update(portFC.ptr,portFC.attrib);
+	} else
+	{
 		MovieRecord* mr = &currMovieData.records[currFrameCounter];
-		if (g_tas_bridge.is_recording && g_tas_bridge.is_recording(g_tas_bridge.ctx))
-		{
-			// record commands and buttons
-			mr->commands |= _currCommand;
-			joyports[0].log(mr);
-			joyports[1].log(mr);
-			if (g_tas_bridge.record_input)
-				g_tas_bridge.record_input(g_tas_bridge.ctx);
-		}
-		// replay buttons
-		joyports[0].load(mr);
-		joyports[1].load(mr);
-		// replay commands
-		if (mr->command_power())
+
+		//reset and power cycle if necessary
+		if(mr->command_power())
 			PowerNES();
-		if (mr->command_reset())
+		if(mr->command_reset())
 			ResetNES();
-		if (mr->command_fds_insert())
+		if(mr->command_fds_insert())
 			FCEU_FDSInsert();
-		if (mr->command_fds_select())
+		if(mr->command_fds_select())
 			FCEU_FDSSelect();
 		if (mr->command_vs_insertcoin())
 			FCEU_VSUniCoin(0);
@@ -326,96 +355,26 @@ void FCEUMOV_AddInputState()
 			FCEU_VSUniCoin(1);
 		if (mr->command_vs_service())
 			FCEU_VSUniService();
-		_currCommand = 0;
-	} else
-	if (movieMode == MOVIEMODE_PLAY)
-	{
-		//stop when we run out of frames
-		if (currFrameCounter >= (int)currMovieData.records.size())
-		{
-			FinishPlayback();
-			//tell all drivers to poll input and set up their logical states
-			for(int port=0;port<2;port++)
-				joyports[port].driver->Update(port,joyports[port].ptr,joyports[port].attrib);
-			portFC.driver->Update(portFC.ptr,portFC.attrib);
-		} else
-		{
-			MovieRecord* mr = &currMovieData.records[currFrameCounter];
 
-			//reset and power cycle if necessary
-			if(mr->command_power())
-				PowerNES();
-			if(mr->command_reset())
-				ResetNES();
-			if(mr->command_fds_insert())
-				FCEU_FDSInsert();
-			if(mr->command_fds_select())
-				FCEU_FDSSelect();
-			if (mr->command_vs_insertcoin())
-				FCEU_VSUniCoin(0);
-			if (mr->command_vs_insertcoin2())
-				FCEU_VSUniCoin(1);
-			if (mr->command_vs_service())
-				FCEU_VSUniService();
-
-			joyports[0].load(mr);
-			joyports[1].load(mr);
-		}
-
-		//if we are on the last frame, then pause the emulator if the player requested it
-		if ( static_cast<size_t>(currFrameCounter) == currMovieData.records.size()-1)
-		{
-			if(FCEUD_PauseAfterPlayback())
-			{
-				fceu11::ToggleEmulationPause();
-			}
-		}
-
-		//pause the movie at a specified frame
-		if (FCEUMOV_ShouldPause() && fceu11::IsEmulationPaused()==0)
-		{
-			fceu11::ToggleEmulationPause();
-			FCEU_DispMessage("Paused at specified movie frame",0);
-		}
-
-	} else if (movieMode == MOVIEMODE_RECORD)
-	{
-		MovieRecord mr;
-
-		joyports[0].log(&mr);
-		joyports[1].log(&mr);
-		mr.commands = _currCommand;
-		_currCommand = 0;
-
-		//aquanull: now it supports other recording modes that don't necessarily truncate further frame data
-		//If the user chooses it can be delayed to here
-		if (currFrameCounter < (int)currMovieData.records.size())
-			switch (movieRecordMode)
-			{
-			case MOVIE_RECORD_MODE_OVERWRITE:
-				currMovieData.records[currFrameCounter].Clone(mr);
-				break;
-			case MOVIE_RECORD_MODE_INSERT:
-				//FIXME: this could be very insufficient
-				currMovieData.records.insert(currMovieData.records.begin() + currFrameCounter, mr);
-				break;
-			//case MOVIE_RECORD_MODE_TRUNCATE:
-			default:
-				//Adelikat: in normal mode, this is done at the time of loading a savestate in read+write mode
-				currMovieData.truncateAt(currFrameCounter);
-				currMovieData.records.push_back(mr);
-				break;
-			}
-		else
-			currMovieData.records.push_back(mr);
-
-		mr.dump(&currMovieData, osRecordingMovie, currFrameCounter);	// to disk
+		joyports[0].load(mr);
+		joyports[1].load(mr);
 	}
 
-	currFrameCounter++;
+	//if we are on the last frame, then pause the emulator if the player requested it
+	if ( static_cast<size_t>(currFrameCounter) == currMovieData.records.size()-1)
+	{
+		if(FCEUD_PauseAfterPlayback())
+		{
+			fceu11::ToggleEmulationPause();
+		}
+	}
 
-	extern uint8 joy[4];
-	memcpy(&cur_input_display,joy,4);
+	//pause the movie at a specified frame
+	if (FCEUMOV_ShouldPause() && fceu11::IsEmulationPaused()==0)
+	{
+		fceu11::ToggleEmulationPause();
+		FCEU_DispMessage("Paused at specified movie frame",0);
+	}
 }
 
 
