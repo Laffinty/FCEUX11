@@ -224,6 +224,7 @@ set(SRC_CORE
   	${CMAKE_CURRENT_SOURCE_DIR}/movie_subtitles.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/movie_io.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/movie_taseditor_bridge.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/movie_settings.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/netplay.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/nsf.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/nsf_load.cpp
