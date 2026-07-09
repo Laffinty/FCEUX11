@@ -46,6 +46,7 @@
 
 #include <assert.h>
 #include <stdlib.h>
+#include <vector>
 
 /**
  * Apply the Scale2x effect on a group of rows. Used internally.
@@ -293,17 +294,12 @@ static void scale4x(void* void_dst, unsigned dst_slice, const void* void_src, un
 
 	assert(mid != 0); /* alloca should never fails */
 #else
-	mid = malloc(6 * mid_slice); /* allocate space for 6 row buffers */
-
-	if (!mid)
-		return;
+	// v1.13 Purify F3d: std::vector replaces malloc/free
+	std::vector<uint8_t> mid_vec(6 * mid_slice);
+	mid = mid_vec.data();
 #endif
 
 	scale4x_buf(void_dst, dst_slice, mid, mid_slice, void_src, src_slice, pixel, width, height);
-
-#if !HAVE_ALLOCA
-	free(mid);
-#endif
 }
 
 /**

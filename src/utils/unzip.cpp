@@ -74,6 +74,7 @@
 
 #include "zlib.h"
 #include "unzip.h"
+#include <new>  // v1.13 Purify F3d: for operator new/delete in ALLOC/TRYFREE
 
 #ifdef STDC
 #  include <stddef.h>
@@ -109,10 +110,12 @@
 #endif
 
 #ifndef ALLOC
-# define ALLOC(size) (malloc(size))
+// v1.13 Purify F3d: ::operator new replaces malloc() for RAII-clean codebase
+# define ALLOC(size) (::operator new((size), std::nothrow))
 #endif
 #ifndef TRYFREE
-# define TRYFREE(p) {if (p) free(p);}
+// v1.13 Purify F3d: ::operator delete replaces free() for RAII-clean codebase
+# define TRYFREE(p) {if (p) { ::operator delete((p)); (p) = 0; } }
 #endif
 
 #define SIZECENTRALDIRITEM (0x2e)

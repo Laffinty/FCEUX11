@@ -232,8 +232,8 @@ int InitBlitToHigh(int b, uint32 rmask, uint32 gmask, uint32 bmask, int efx, int
 	//allocate adequate room for 32bpp palette
 	if ( palettetranslate )
 	{
-		free(palettetranslate);
-		palettetranslate=NULL;
+		palettetranslate_owner.reset();  // v1.13 Purify F3d: was free(palettetranslate)
+		palettetranslate = NULL;
 	}
 	palettetranslate_owner = FCEU_gmalloc_unique(256*4 + 512*4);  // v0.3.6: RAII-wrapped
 	palettetranslate = (uint32*)palettetranslate_owner.get();
@@ -281,19 +281,19 @@ void KillBlitToHigh(void)
 		nes_ntsc = nullptr;
 	}
 	if (ntscblit) {
-		free(ntscblit);
+		ntscblit_owner.reset();  // v1.13 Purify F3d: was free(ntscblit)
 		ntscblit = NULL;
 	}
 	if (prescalebuf) {
-		free(prescalebuf);
+		prescalebuf_owner.reset();  // v1.13 Purify F3d: was free(prescalebuf)
 		prescalebuf = NULL;
 	}
 	if (palrgb) {
-		free(palrgb);
+		palrgb_owner.reset();  // v1.13 Purify F3d: was free(palrgb)
 		palrgb = NULL;
-		free(palrgb2);
+		palrgb2_owner.reset();  // v1.13 Purify F3d: was free(palrgb2)
 		palrgb2 = NULL;
-		free(moire);
+		moire_owner.reset();  // v1.13 Purify F3d: was free(moire)
 		moire = NULL;
 	}
 }
