@@ -235,7 +235,8 @@ void setchr2(uint32 A, uint32 V) {
  * to bus.cpp's anonymous namespace where Bus::reset_mapping() and
  * the hot-path ANull handler reference it. */
 
-static uint8 *GENIEROM = 0;
+// v1.13 Purify F2b: FceuMallocPtr RAII (was uint8* via FCEU_malloc/free)
+static FceuMallocPtr GENIEROM;
 
 void FixGenieMap(void);
 
@@ -247,41 +248,40 @@ bool FCEU_OpenGenie(void)
 
 	if (!GENIEROM)
 	{
-		char *fn;
+		std::string fn;
 
-		if (!(GENIEROM = (uint8*)FCEU_malloc(4096 + 1024)))
+		GENIEROM = FCEU_gmalloc_unique(4096 + 1024);
+		if (!GENIEROM)
 			return true;
 
-		fn = strdup(FCEU_MakeFName(FCEUMKF_GGROM, 0, 0).c_str());
-		fp = FCEUD_UTF8fopen(fn, "rb");
+		fn = FCEU_MakeFName(FCEUMKF_GGROM, 0, 0);
+		fp = FCEUD_UTF8fopen(fn.c_str(), "rb");
 		if (!fp)
 		{
 			FCEU_PrintError("Error opening Game Genie ROM image!\nIt should be named \"gg.rom\"!");
-			free(GENIEROM);
-			GENIEROM = 0;
+			GENIEROM.reset();
 			return true;
 		}
-		if (fread(GENIEROM, 1, 16, fp) != 16)
+		if (fread(GENIEROM.get(), 1, 16, fp) != 16)
 		{
  grerr:
 			FCEU_PrintError("Error reading from Game Genie ROM image!");
-			free(GENIEROM);
-			GENIEROM = 0;
+			GENIEROM.reset();
 			fclose(fp);
 			return true;
 		}
 		if (GENIEROM[0] == 0x4E)
 		{
 			/* iNES ROM image */
-			if (fread(GENIEROM, 1, 4096, fp) != 4096)
+			if (fread(GENIEROM.get(), 1, 4096, fp) != 4096)
 				goto grerr;
 			if (fseek(fp, 16384 - 4096, SEEK_CUR))
 				goto grerr;
-			if (fread(GENIEROM + 4096, 1, 256, fp) != 256)
+			if (fread(GENIEROM.get() + 4096, 1, 256, fp) != 256)
 				goto grerr;
 		} else
 		{
-			if (fread(GENIEROM + 16, 1, 4352 - 16, fp) != (4352 - 16))
+			if (fread(GENIEROM.get() + 16, 1, 4352 - 16, fp) != (4352 - 16))
 				goto grerr;
 		}
 		fclose(fp);
@@ -289,7 +289,7 @@ bool FCEU_OpenGenie(void)
 		/* Workaround for the FCE Ultra CHR page size only being 1KB */
 		for (x = 0; x < 4; x++)
 		{
-			memcpy(GENIEROM + 4096 + (x << 8), GENIEROM + 4096, 256);
+			memcpy(GENIEROM.get() + 4096 + (x << 8), GENIEROM.get() + 4096, 256);
 		}
 	}
 
@@ -307,8 +307,7 @@ void FCEU_CloseGenie(void) {
 
 void FCEU_KillGenie(void) {
 	if (GENIEROM) {
-		free(GENIEROM);
-		GENIEROM = 0;
+		GENIEROM.reset();
 	}
 }
 
@@ -419,7 +418,7 @@ void FCEU_GeniePower(void) {
 	SetReadHandler(0x8000, 0xFFFF, GenieRead);
 
 	for (x = 0; x < 8; x++)
-		fceu11::g_bus.vpage()[x] = GENIEROM + 4096 - 0x400 * x;
+		fceu11::g_bus.vpage()[x] = GENIEROM.get() + 4096 - 0x400 * x;
 
 	if (AllocGenieRW())
 		VPageR = VPageG;
