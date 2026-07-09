@@ -74,6 +74,7 @@ extern "C"
 #endif
 
 #include "Qt/AviRecord.h"
+#include "Qt/AviVideoCodec.h"
 #include "Qt/avi/gwavi.h"
 #include "Qt/nes_shm.h"
 #include "Qt/throttle.h"
@@ -81,10 +82,7 @@ extern "C"
 #include "Qt/ConsoleUtilities.h"
 #include "Qt/fceuWrapper.h"
 
-#define  AV_LOG_FILE_NAME  "fceuxAV.log"
-
 #include "Qt/AviOptionsDialog.h"
-
 extern bool recordAudio;
 extern int  videoFormat;
 extern int  audioSampleRate;

@@ -482,6 +482,11 @@ set(SRC_DRIVERS_COMMON
 
 set(SRC_DRIVERS_QT
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleWindow.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleEmulatorThread.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleMenuBar.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleVideoSetup.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleCursor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleHotKeys.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleMenu.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleRecording.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleFile.cpp
@@ -530,6 +535,11 @@ set(SRC_DRIVERS_QT
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/fceu_globals.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/fceu_callbacks.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ppuViewer.cpp  
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ppuViewerContext.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ppuViewerPalette.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ppuViewerTileEditor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ppuViewerSpriteViewer.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ppuViewerPatternTables.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/NameTableViewer.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/RamWatch.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/RamSearch.cpp  
@@ -546,6 +556,9 @@ set(SRC_DRIVERS_QT
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/sdl-throttle.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/QtNetplay.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/AviRecord.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/AviRecordDiskThread.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/AviVideoCodec.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/AviAudioCodec.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/AviOptionsDialog.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/AviRiffViewer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/avi/avi-utils.cpp
