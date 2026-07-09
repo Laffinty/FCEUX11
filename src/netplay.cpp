@@ -124,17 +124,17 @@ int FCEUNET_SendFile(uint8 cmd, char *fn)
 
 	FCEUX_fstat(fileno(fp),&sb);
 	len = sb.st_size;
-	buf = (char*)FCEU_dmalloc(len); //mbg merge 7/17/06 added cast
+	buf = (char*)FCEU_malloc(len); //mbg merge 7/17/06 added cast
 	if ( fread(buf, 1, len, fp) != static_cast<size_t>(len) )
 	{
 		FCEU_printf("Warning: FCEUNET_SendFile failed to load complete file.\n");
 	}
 	fclose(fp);
 
-	cbuf = (char*)FCEU_dmalloc(4 + len + len / 1000 + 12); //mbg merge 7/17/06 added cast
+	cbuf = (char*)FCEU_malloc(4 + len + len / 1000 + 12); //mbg merge 7/17/06 added cast
 	FCEU_en32lsb((uint8*)cbuf, len); //mbg merge 7/17/06 added cast
 	compress2((uint8*)cbuf + 4, &clen, (uint8*)buf, len, 7); //mbg merge 7/17/06 added casts
-	free(buf);
+	FCEU_free(buf);
 
 	//printf("Sending file: %s, %d, %d\n",fn,len,clen);
 
@@ -142,16 +142,16 @@ int FCEUNET_SendFile(uint8 cmd, char *fn)
 
 	if(!FCEUNET_SendCommand(cmd,len))
 	{
-		free(cbuf);
+		FCEU_free(cbuf);
 		return(0);
 	}
 	if(!FCEUD_SendData(cbuf, len))
 	{
 		NetError();
-		free(cbuf);
+		FCEU_free(cbuf);
 		return(0);
 	}
-	free(cbuf);
+	FCEU_free(cbuf);
 
 	return(1);
 }
@@ -173,12 +173,12 @@ static FILE *FetchFile(uint32 remlen)
 	//printf("Receiving file: %d...\n",clen);
 	if((fp = tmpfile()))
 	{
-		cbuf = (char *)FCEU_dmalloc(clen); //mbg merge 7/17/06 added cast
+		cbuf = (char *)FCEU_malloc(clen); //mbg merge 7/17/06 added cast
 		if(!FCEUD_RecvData(cbuf, clen))
 		{
 			NetError();
 			fclose(fp);
-			free(cbuf);
+			FCEU_free(cbuf);
 			return(0);
 		}
 
@@ -187,14 +187,14 @@ static FILE *FetchFile(uint32 remlen)
 		{
 			NetError();
 			fclose(fp);
-			free(cbuf);
+			FCEU_free(cbuf);
 			return(0);
 		}
-		buf = (char *)FCEU_dmalloc(len); //mbg merge 7/17/06 added cast
+		buf = (char *)FCEU_malloc(len); //mbg merge 7/17/06 added cast
 		uncompress((uint8*)buf, &len, (uint8*)cbuf + 4, clen - 4); //mbg merge 7/17/06 added casts
 
 		fwrite(buf, 1, len, fp);
-		free(buf);
+		FCEU_free(buf);
 		fseek(fp, 0, SEEK_SET);
 		return(fp);
 	}
@@ -241,16 +241,17 @@ void NetplayUpdate(uint8 *joyp)
 						NetError();
 						return;
 					}
-					tbuf = (uint8*)malloc(len + 1); //mbg merge 7/17/06 added cast
+					// v1.13 Purify F2d: FCEU_malloc replaces raw malloc; matching FCEU_free
+					tbuf = (uint8*)FCEU_malloc(len + 1);
 					tbuf[len] = 0;
 					if(!FCEUD_RecvData(tbuf, len))
 					{
 						NetError();
-						free(tbuf);
+						FCEU_free(tbuf);
 						return;
 					}
 					FCEUD_NetplayText(tbuf);
-					free(tbuf);
+					FCEU_free(tbuf);
 				}
 				break;
 			case FCEUNPCMD_SAVESTATE:
