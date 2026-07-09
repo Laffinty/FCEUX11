@@ -249,10 +249,10 @@ static void ModifyCheat(int num)
  else
   pName=nullptr;	// Don't change name when fceu11::SetCheat() is called.
 
- printf("Address [$%04x]: ",(unsigned int)A);
+ printf("Address [$%04x]: ",static_cast<unsigned int>(A));
  A=GetH16(A);
 
- printf("Value [%03u]: ",(unsigned int)V);
+ printf("Value [%03u]: ",static_cast<unsigned int>(V));
  V=Get8(V);
 
  printf("Compare [%3d]: ",compare);
@@ -326,11 +326,11 @@ static void AddCheatParam(uint32 A, uint8 V)
 
  printf("Name: ");
  GetString(name,256);
- printf("Address [$%04x]: ",(unsigned int)A);
+ printf("Address [$%04x]: ",static_cast<unsigned int>(A));
  A=GetH16(A);
- printf("Value [%03u]: ",(unsigned int)V);
+ printf("Value [%03u]: ",static_cast<unsigned int>(V));
  V=Get8(V);
- printf("Add cheat \"%s\" for address $%04x with value %03u?",name,(unsigned int)A,(unsigned int)V);
+ printf("Add cheat \"%s\" for address $%04x with value %03u?",name,static_cast<unsigned int>(A),static_cast<unsigned int>(V));
  if(GetYN(0))
  {
   if(fceu11::AddCheat(name,A,V,-1,0))
@@ -352,9 +352,9 @@ static int clistcallb(const char *name, uint32 a, uint8 v, int compare, int s, i
  int ret;
 
  if(compare>=0)
-  snprintf( tmp, sizeof(tmp),"%s   $%04x:%03u:%03d - %s",s?"*":" ",(unsigned int)a,(unsigned int)v,compare,name);
+  snprintf( tmp, sizeof(tmp),"%s   $%04x:%03u:%03d - %s",s?"*":" ",static_cast<unsigned int>(a),static_cast<unsigned int>(v),compare,name);
  else
-  snprintf( tmp, sizeof(tmp),"%s   $%04x:%03u     - %s",s?"*":" ",(unsigned int)a,(unsigned int)v,name);
+  snprintf( tmp, sizeof(tmp),"%s   $%04x:%03u     - %s",s?"*":" ",static_cast<unsigned int>(a),static_cast<unsigned int>(v),name);
  if(type==1)
   tmp[2]='S';
  ret=AddToList(tmp,lid);
@@ -402,7 +402,7 @@ static void ResetSearch(void)
 static int srescallb(uint32 a, uint8 last, uint8 current, void *data)
 {
  char tmp[14];
- snprintf( tmp, sizeof(tmp), "$%04x:%03u:%03u",(unsigned int)a,(unsigned int)last,(unsigned int)current);
+ snprintf( tmp, sizeof(tmp), "$%04x:%03u:%03u",static_cast<unsigned int>(a),static_cast<unsigned int>(last),static_cast<unsigned int>(current));
  return(AddToList(tmp,a));
 }
 
@@ -500,20 +500,20 @@ static void DoSearch(void)
 
 
 static MENU NewCheatsMenu[]={
- {"Add Cheat",(void *)AddCheat,1},
- {"Reset Search",(void *)ResetSearch,1},
- {"Do Search",(void *)DoSearch,1},
- {"Set Original to Current",(void *)SetOC,1},
- {"Unhide Excluded",(void *)UnhideEx,1},
- {"Show Results",(void *)ShowRes,1},
- {"Add Game Genie Cheat",(void *)AddCheatGG,1},
- {"Add PAR Cheat",(void *)AddCheatPAR,1},
+ {"Add Cheat",reinterpret_cast<void*>(AddCheat),1},
+ {"Reset Search",reinterpret_cast<void*>(ResetSearch),1},
+ {"Do Search",reinterpret_cast<void*>(DoSearch),1},
+ {"Set Original to Current",reinterpret_cast<void*>(SetOC),1},
+ {"Unhide Excluded",reinterpret_cast<void*>(UnhideEx),1},
+ {"Show Results",reinterpret_cast<void*>(ShowRes),1},
+ {"Add Game Genie Cheat",reinterpret_cast<void*>(AddCheatGG),1},
+ {"Add PAR Cheat",reinterpret_cast<void*>(AddCheatPAR),1},
  {0}
 };
 
 static MENU MainMenu[]={
- {"List Cheats",(void *)ListCheats,1},
- {"New Cheats...",(void *)NewCheatsMenu,0},
+ {"List Cheats",reinterpret_cast<void*>(ListCheats),1},
+ {"New Cheats...",reinterpret_cast<void*>(NewCheatsMenu),0},
  {0}
 };
 
@@ -554,11 +554,11 @@ static void DoMenu(MENU *men)
    if(c>x) goto invalid;
    if(men[c-1].type)
    {
-    void (*func)(void)=(void(*)())men[c-1].action;
+    void (*func)(void)=reinterpret_cast<void(*)()>(men[c-1].action);
     func();
    }
    else
-    DoMenu((MENU*)men[c-1].action);	/* Mmm...recursivey goodness. */
+    DoMenu(reinterpret_cast<MENU*>(men[c-1].action));	/* Mmm...recursivey goodness. */
    goto redisplay;
   }
   else

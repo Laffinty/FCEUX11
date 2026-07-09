@@ -4299,8 +4299,8 @@ void  ConsoleDebugger::updateRegisterView(void)
 	stackText->updateText();
 
 	// update counters
-	int64 counter_value1 = timestampbase + (uint64)g_cpu.timestamp_ref() - total_cycles_base;
-	int64 counter_value2 = timestampbase + (uint64)g_cpu.timestamp_ref() - delta_cycles_base;
+	int64 counter_value1 = timestampbase + static_cast<uint64>(g_cpu.timestamp_ref()) - total_cycles_base;
+	int64 counter_value2 = timestampbase + static_cast<uint64>(g_cpu.timestamp_ref()) - delta_cycles_base;
 
 	if (counter_value1 < 0)	// sanity check
 	{
@@ -4328,7 +4328,7 @@ void  ConsoleDebugger::updateRegisterView(void)
 	snprintf( stmp, sizeof(stmp), "$%02X", PPU[2] );
 	ppuStatReg->setText( tr(stmp) );
 
-	snprintf( stmp, sizeof(stmp), "$%04X", (int)FCEUPPU_PeekAddress());
+	snprintf( stmp, sizeof(stmp), "$%04X", static_cast<int>(FCEUPPU_PeekAddress()));
 	ppuAddrDsp->setText( tr(stmp) );
 
 	snprintf( stmp, sizeof(stmp), "$%02X", PPU[3] );
@@ -4638,7 +4638,7 @@ void fceWrapper_DebugBreakpoint( int bpNum )
 		{
 			if ( breakOnCycleMode )
 			{
-				long long int totalCount = timestampbase + (uint64)g_cpu.timestamp_ref() - total_cycles_base;
+				long long int totalCount = timestampbase + static_cast<uint64>(g_cpu.timestamp_ref()) - total_cycles_base;
 
 				if (totalCount < 0)	// sanity check
 				{
@@ -5842,9 +5842,9 @@ QPoint QAsmView::convPixToCursor( QPoint p )
 	}
 	else
 	{
-		float x = (float)(p.x() + pxLineXScroll) / pxCharWidth;
+		float x = static_cast<float>(p.x() + pxLineXScroll) / pxCharWidth;
 
-		c.setX( (int)x );
+		c.setX( static_cast<int>(x) );
 	}
 
 	if ( p.y() < 0 )
@@ -5853,17 +5853,17 @@ QPoint QAsmView::convPixToCursor( QPoint p )
 	}
 	else 
 	{
-		float ly = ( (float)pxLineLead / (float)pxLineSpacing );
-		float py = ( (float)p.y() ) /  (float)pxLineSpacing;
+		float ly = ( static_cast<float>(pxLineLead) / static_cast<float>(pxLineSpacing) );
+		float py = ( static_cast<float>(p.y()) ) /  static_cast<float>(pxLineSpacing);
 		float ry = fmod( py, 1.0 );
 
 		if ( ry < ly )
 		{
-			c.setY( ((int)py) - 1 );
+			c.setY( (static_cast<int>(py)) - 1 );
 		}
 		else
 		{
-			c.setY( (int)py );
+			c.setY( static_cast<int>(py) );
 		}
 	}
 	return c;
@@ -6168,7 +6168,7 @@ void QAsmView::mousePressEvent(QMouseEvent * event)
 					selAddrValue = addr = asmEntry[line]->sym.offset();
 					selAddrType  = 0;
 
-					if ( selAddrWidth >= (int)sizeof(selAddrText) )
+					if ( selAddrWidth >= static_cast<int>(sizeof(selAddrText)) )
 					{
 						selAddrWidth = sizeof(selAddrText)-1;
 					}
@@ -6230,7 +6230,7 @@ void QAsmView::mousePressEvent(QMouseEvent * event)
 			i=selAddrChar; j=0;
 			while ( asmEntry[line]->text[i] != 0 )
 			{
-				if ( j >= (int)sizeof(selAddrText) )
+				if ( j >= static_cast<int>(sizeof(selAddrText)) )
 				{
 					j=sizeof(selAddrText)-1;
 					break;
@@ -6713,7 +6713,7 @@ void QAsmView::paintEvent(QPaintEvent *event)
 	}
 
 	pxCharWidth2 = (pxCharWidth/2);
-	cd_boundary = (int)(2.5*pxCharWidth) - pxLineXScroll;
+	cd_boundary = static_cast<int>(2.5*pxCharWidth) - pxLineXScroll;
 	asm_start_boundary = cd_boundary + (10*pxCharWidth);
 	//asm_stop_boundary  = asm_start_boundary + (9*pxCharWidth);
 	
@@ -7917,8 +7917,8 @@ DebugBreakOnDialog::DebugBreakOnDialog(int type, QWidget *parent )
 	}
 	else
 	{
-		totalCount = timestampbase + (uint64)g_cpu.timestamp_ref() - total_cycles_base;
-		deltaCount = timestampbase + (uint64)g_cpu.timestamp_ref() - delta_cycles_base;
+		totalCount = timestampbase + static_cast<uint64>(g_cpu.timestamp_ref()) - total_cycles_base;
+		deltaCount = timestampbase + static_cast<uint64>(g_cpu.timestamp_ref()) - delta_cycles_base;
 
 		if (totalCount < 0)	// sanity check
 		{
@@ -8170,8 +8170,8 @@ void DebugBreakOnDialog::updateCurrent(void)
 	}
 	else
 	{
-		totalCount = timestampbase + (uint64)g_cpu.timestamp_ref() - total_cycles_base;
-		deltaCount = timestampbase + (uint64)g_cpu.timestamp_ref() - delta_cycles_base;
+		totalCount = timestampbase + static_cast<uint64>(g_cpu.timestamp_ref()) - total_cycles_base;
+		deltaCount = timestampbase + static_cast<uint64>(g_cpu.timestamp_ref()) - delta_cycles_base;
 
 		if (totalCount < 0)	// sanity check
 		{

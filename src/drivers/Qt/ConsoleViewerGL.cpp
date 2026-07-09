@@ -162,8 +162,8 @@ void ConsoleViewGL_t::screenChanged( QScreen *screen )
 
 	devPixRatio = screen->devicePixelRatio();
 
-	w = (int)(devPixRatio * width()  );
-	h = (int)(devPixRatio * height() );
+	w = static_cast<int>(devPixRatio * width()  );
+	h = static_cast<int>(devPixRatio * height() );
 
 	view_width  = w;
 	view_height = h;
@@ -366,8 +366,8 @@ void ConsoleViewGL_t::cleanupGL(void)
 
 void ConsoleViewGL_t::resizeGL(int w, int h)
 {
-	w = (int)( devPixRatio * w );
-	h = (int)( devPixRatio * h );
+	w = static_cast<int>( devPixRatio * w );
+	h = static_cast<int>( devPixRatio * h );
 	//printf("GL Resize: %i x %i \n", w, h );
 	glViewport(0, 0, w, h);
 
@@ -466,8 +466,8 @@ void ConsoleViewGL_t::transfer2LocalBuffer(void)
 	{
 		cpSize = localBufSize;
 	}
-	src  = (uint8_t*)nes_shm->pixbuf[bufIdx];
-	dest = (uint8_t*)localBuf.get();
+	src  = reinterpret_cast<uint8_t*>(nes_shm->pixbuf[bufIdx]);
+	dest = reinterpret_cast<uint8_t*>(localBuf.get());
 
 	hq = (nes_shm->video.preScaler == 1) || (nes_shm->video.preScaler == 4); // hq2x and hq3x
 
@@ -540,8 +540,8 @@ void  ConsoleViewGL_t::getNormalizedCursorPos( double &x, double &y )
 
 	//printf("Window Cursor (%i,%i) \n", cursor.x(), cursor.y() );
 
-	x = (double)(cursor.x() - sx) / (double)rw;
-	y = (double)(cursor.y() - sy) / (double)rh;
+	x = static_cast<double>(cursor.x() - sx) / static_cast<double>(rw);
+	y = static_cast<double>(cursor.y() - sy) / static_cast<double>(rh);
 
 	if ( x < 0.0 )
 	{
@@ -582,14 +582,14 @@ void ConsoleViewGL_t::renderBg(void)
 	glViewport(0, 0, view_width, view_height);
 
 	projectionMatrix.setToIdentity();
-	projectionMatrix.ortho(0.0f, (float)view_width, 0.0f, (float)view_height, -1.0f, 1.0f);
+	projectionMatrix.ortho(0.0f, static_cast<float>(view_width), 0.0f, static_cast<float>(view_height), -1.0f, 1.0f);
 
 	float vertices[] = {
 		// pos                  // tex
-		(float)x,         (float)y,          0.0f, 1.0f,
-		(float)(x + bgW), (float)y,          1.0f, 1.0f,
-		(float)(x + bgW), (float)(y + bgH), 1.0f, 0.0f,
-		(float)x,         (float)(y + bgH), 0.0f, 0.0f
+		static_cast<float>(x),         static_cast<float>(y),          0.0f, 1.0f,
+		static_cast<float>(x + bgW), static_cast<float>(y),          1.0f, 1.0f,
+		static_cast<float>(x + bgW), static_cast<float>(y + bgH), 1.0f, 0.0f,
+		static_cast<float>(x),         static_cast<float>(y + bgH), 0.0f, 0.0f
 	};
 
 	shaderProgram->bind();
@@ -617,10 +617,10 @@ void ConsoleViewGL_t::renderFrame(void)
 	int l=0, r=texture_width;
 	int t=0, b=texture_height;
 
-	float ixScale   = (float)nes_shm->video.xscale;
-	float iyScale   = (float)nes_shm->video.yscale;
-	float xscaleTmp = (float)(view_width)  / (float)(texture_width);
-	float yscaleTmp = (float)(view_height) / (float)(texture_height);
+	float ixScale   = static_cast<float>(nes_shm->video.xscale);
+	float iyScale   = static_cast<float>(nes_shm->video.yscale);
+	float xscaleTmp = static_cast<float>(view_width)  / static_cast<float>(texture_width);
+	float yscaleTmp = static_cast<float>(view_height) / static_cast<float>(texture_height);
 
 	xscaleTmp *= ixScale;
 	yscaleTmp *= iyScale;
@@ -654,15 +654,15 @@ void ConsoleViewGL_t::renderFrame(void)
 		}
 	}
 
-	rw=(int)((r-l)*xscaleTmp/ixScale);
-	rh=(int)((b-t)*yscaleTmp/iyScale);
+	rw=static_cast<int>((r-l)*xscaleTmp/ixScale);
+	rh=static_cast<int>((b-t)*yscaleTmp/iyScale);
 
 	if ( forceAspect )
 	{
 		int iw, ih, ax, ay;
 
-		ax = (int)(aspectX+0.50);
-		ay = (int)(aspectY+0.50);
+		ax = static_cast<int>(aspectX+0.50);
+		ay = static_cast<int>(aspectY+0.50);
 
 		iw = rw * ay;
 		ih = rh * ax;
@@ -706,15 +706,15 @@ void ConsoleViewGL_t::renderFrame(void)
 	projectionMatrix.setToIdentity();
 	projectionMatrix.ortho( 0.0,  rw,  0.0,  rh,  -1.0,  1.0);
 
-	float u = (float)texture_width  / (float)txtWidth;
-	float v = (float)texture_height / (float)txtHeight;
+	float u = static_cast<float>(texture_width)  / static_cast<float>(txtWidth);
+	float v = static_cast<float>(texture_height) / static_cast<float>(txtHeight);
 
 	float vertices[] = {
 		// pos       // tex
 		0.0f, 0.0f,  0.0f, v,
-		(float)rw, 0.0f,  u, v,
-		(float)rw, (float)rh, u, 0.0f,
-		0.0f, (float)rh, 0.0f, 0.0f
+		static_cast<float>(rw), 0.0f,  u, v,
+		static_cast<float>(rw), static_cast<float>(rh), u, 0.0f,
+		0.0f, static_cast<float>(rh), 0.0f, 0.0f
 	};
 
 	shaderProgram->bind();

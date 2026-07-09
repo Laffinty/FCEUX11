@@ -279,7 +279,7 @@ static int getROM( unsigned int offset)
 	}
 	if (offset < 16)
 	{
-		return *((unsigned char *)&head+offset);
+		return *(reinterpret_cast<unsigned char*>(&head)+offset);
 	}
 	else if (offset < (16+PRGsize[0]) )
 	{
@@ -333,8 +333,8 @@ static int writeMem( int mode, unsigned int addr, int value )
             
 				if (wfunc)
 				{
-					wfunc ((uint32) addr,
-					       (uint8) (value & 0x000000ff));
+				wfunc (static_cast<uint32>(addr),
+				       static_cast<uint8>(value & 0x000000ff));
 
 					updateDebugger = true;
 				}
@@ -376,11 +376,11 @@ static int writeMem( int mode, unsigned int addr, int value )
 			}
 			else if ( (addr >= 16) && (addr < PRGsize[0]+16) )
 			{
-			  	*(uint8 *)(GetNesPRGPointer(addr-16)) = value;
+			  	*(reinterpret_cast<uint8*>(GetNesPRGPointer(addr-16))) = value;
 			}
 			else if ( (addr >= PRGsize[0]+16) && (addr < CHRsize[0]+PRGsize[0]+16) )
 			{
-				*(uint8 *)(GetNesCHRPointer(addr-16-PRGsize[0])) = value;
+				*(reinterpret_cast<uint8*>(GetNesCHRPointer(addr-16-PRGsize[0]))) = value;
 			}
 			updateDebugger = true;
 		}
@@ -588,7 +588,7 @@ HexBookMark *HexBookMarkManager_t::getBookMark( int index )
 	{
 		return NULL;
 	}
-	else if ( index >= (int)v.size() )
+	else if ( index >= static_cast<int>(v.size()) )
 	{
 		return NULL;
 	}
@@ -959,7 +959,7 @@ HexEditorFindDialog_t::HexEditorFindDialog_t(QWidget *parent)
 
 	QDialog::setWindowTitle( tr("Find") );
 
-	this->parent = (HexEditorDialog_t*)parent;
+	this->parent = static_cast<HexEditorDialog_t*>(parent);
 
 	mainLayout = new QVBoxLayout();
 	hbox       = new QHBoxLayout();
@@ -1995,7 +1995,7 @@ QHexEdit::QHexEdit(QWidget *parent)
 	QPalette pal;
 	std::string fontString, colorString;
 
-	this->parent = (HexEditorDialog_t*)parent;
+	this->parent = static_cast<HexEditorDialog_t*>(parent);
 	this->setFocusPolicy(Qt::StrongFocus);
 
 	g_config->getOption("SDL.HexEditFont", &fontString);
@@ -2244,10 +2244,10 @@ void QHexEdit::setHorzScroll( int value )
 	}
 	else
 	{
-		f = 0.010f * (float)value * (float)(pxLineWidth - viewWidth);
+		f = 0.010f * static_cast<float>(value) * static_cast<float>(pxLineWidth - viewWidth);
 	}
 
-	pxLineXScroll = (int)f;
+	pxLineXScroll = static_cast<int>(f);
 }
 //----------------------------------------------------------------------------
 void QHexEdit::setScrollBars( QScrollBar *h, QScrollBar *v )
@@ -2555,23 +2555,23 @@ QPoint QHexEdit::convPixToCursor( QPoint p )
 	}
 	else if ( (p.x() >= pxHexOffset) && (p.x() < pxHexAscii) )
 	{
-		float px = ( (float)p.x() - (float)pxHexOffset) / (float)(pxCharWidth);
+		float px = ( static_cast<float>(p.x()) - static_cast<float>(pxHexOffset)) / static_cast<float>(pxCharWidth);
 		float ox = (px/3.0);
 		float rx = fmodf(px,3.0);
 
 		if ( rx >= 2.50 )
 		{
-			c.setX( 2*( (int)ox + 1 ) );
+			c.setX( 2*( static_cast<int>(ox) + 1 ) );
 		}
 		else
 		{
 			//if ( rx >= 1.0 )
 			//{
-			//	c.setX( 2*( (int)ox ) + 1 );
+			//	c.setX( 2*( static_cast<int>(ox) ) + 1 );
 			//}
 			//else
 			//{
-				c.setX( 2*( (int)ox ) );
+				c.setX( 2*( static_cast<int>(ox) ) );
 			//}
 		}
 	}
@@ -2590,17 +2590,17 @@ QPoint QHexEdit::convPixToCursor( QPoint p )
 	}
 	else
 	{
-		float ly = ( (float)pxLineLead / (float)pxLineSpacing );
-		float py = ( (float)p.y() -  (float)pxLineSpacing) /  (float)pxLineSpacing;
+		float ly = ( static_cast<float>(pxLineLead) / static_cast<float>(pxLineSpacing) );
+		float py = ( static_cast<float>(p.y()) -  static_cast<float>(pxLineSpacing)) /  static_cast<float>(pxLineSpacing);
 		float ry = fmod( py, 1.0 );
 
 		if ( ry < ly )
 		{
-			c.setY( ((int)py) - 1 );
+			c.setY( (static_cast<int>(py)) - 1 );
 		}
 		else
 		{
-			c.setY( (int)py );
+			c.setY( static_cast<int>(py) );
 		}
 	}
 	if ( c.y() < 0 )
@@ -2837,7 +2837,7 @@ void QHexEdit::keyPressEvent(QKeyEvent *event)
 			// v0.3.15 PR-D: use unicode() & 0xFF to avoid implicit encoding
 			// conversion through QChar::toLatin1(). This keeps ASCII input
 			// working identically on locales where Latin-1 != the system code page.
-			key = (int)(event->text()[0].unicode() & 0xFF);
+			key = static_cast<int>(event->text()[0].unicode() & 0xFF);
 
 			if ( (key >= 0) && (key < 256) )
 			{
@@ -3316,7 +3316,7 @@ void QHexEdit::addBookMarkCB(void)
 //----------------------------------------------------------------------------
 static int RamFreezeCB(const char *name, uint32 a, uint8 v, int compare,int s,int type, void *data)
 {
-	return ((QHexEdit*)data)->FreezeRam( name, a, v, compare, s, type );
+	return (reinterpret_cast<QHexEdit*>(data))->FreezeRam( name, a, v, compare, s, type );
 }	
 //----------------------------------------------------------------------------
 int QHexEdit::FreezeRam( const char *name, uint32_t a, uint8_t v, int c, int s, int type )
@@ -3715,7 +3715,7 @@ int QHexEdit::getRomAddrColor( int addr, QColor &fg, QColor &bg )
 
 	if (temp_offset >= 0)
 	{
-		if ((unsigned int)temp_offset < cdloggerdataSize)
+		if (static_cast<unsigned int>(temp_offset) < cdloggerdataSize)
 		{
 			// PRG
 			if ((cdloggerdata[temp_offset] & 3) == 3)
@@ -3747,7 +3747,7 @@ int QHexEdit::getRomAddrColor( int addr, QColor &fg, QColor &bg )
 		else
 		{
 			temp_offset -= cdloggerdataSize;
-			if (((unsigned int)temp_offset < cdloggerVideoDataSize))
+			if ((static_cast<unsigned int>(temp_offset) < cdloggerVideoDataSize))
 			{
 				// CHR
 				if ((cdloggervdata[temp_offset] & 3) == 3)

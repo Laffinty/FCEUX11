@@ -196,12 +196,12 @@ InputConfDialog_t::InputConfDialog_t(QWidget *parent)
 		// Cast to int so QComboBox::addItem(text, userData) takes the
 		// numeric tag as before. itemData(j).toInt() consumers below
 		// stay unchanged.
-		nesPortComboxBox[i]->addItem(tr("<None>"), (int)SI_NONE);
-		nesPortComboxBox[i]->addItem(tr("Gamepad"), (int)SI_GAMEPAD);
-		nesPortComboxBox[i]->addItem(tr("Zapper"), (int)SI_ZAPPER);
-		nesPortComboxBox[i]->addItem(tr("Power Pad A"), (int)SI_POWERPADA);
-		nesPortComboxBox[i]->addItem(tr("Power Pad B"), (int)SI_POWERPADB);
-		nesPortComboxBox[i]->addItem(tr("Arkanoid Paddle"), (int)SI_ARKANOID);
+		nesPortComboxBox[i]->addItem(tr("<None>"), static_cast<int>(SI_NONE));
+		nesPortComboxBox[i]->addItem(tr("Gamepad"), static_cast<int>(SI_GAMEPAD));
+		nesPortComboxBox[i]->addItem(tr("Zapper"), static_cast<int>(SI_ZAPPER));
+		nesPortComboxBox[i]->addItem(tr("Power Pad A"), static_cast<int>(SI_POWERPADA));
+		nesPortComboxBox[i]->addItem(tr("Power Pad B"), static_cast<int>(SI_POWERPADB));
+		nesPortComboxBox[i]->addItem(tr("Arkanoid Paddle"), static_cast<int>(SI_ARKANOID));
 
 		for (int j = 0; j < nesPortComboxBox[i]->count(); j++)
 		{
@@ -219,17 +219,17 @@ InputConfDialog_t::InputConfDialog_t(QWidget *parent)
 	getInputSelection(2, &curNesInput[2], &usrNesInput[2]);
 	// v0.3.8: SIFC_* are now `inline constexpr ESIFC` (enum class) —
 	// cast to int for QVariant. See nesPortComboxBox block above.
-	expPortComboxBox->addItem(tr("<None>"), (int)SIFC_NONE);
-	expPortComboxBox->addItem(tr("Arkanoid Paddle"), (int)SIFC_ARKANOID);
-	expPortComboxBox->addItem(tr("Shadow"), (int)SIFC_SHADOW);
-	expPortComboxBox->addItem(tr("Hyper Shot Gun"), (int)SIFC_HYPERSHOT);
-	expPortComboxBox->addItem(tr("Family Keyboard"), (int)SIFC_FKB);
-	expPortComboxBox->addItem(tr("Mahjong"), (int)SIFC_MAHJONG);
-	expPortComboxBox->addItem(tr("Quiz King Buzzers"), (int)SIFC_QUIZKING);
-	expPortComboxBox->addItem(tr("Family Trainer A"), (int)SIFC_FTRAINERA);
-	expPortComboxBox->addItem(tr("Family Trainer B"), (int)SIFC_FTRAINERB);
-	expPortComboxBox->addItem(tr("Oeka Kids Tablet"), (int)SIFC_OEKAKIDS);
-	expPortComboxBox->addItem(tr("Top Rider"), (int)SIFC_TOPRIDER);
+	expPortComboxBox->addItem(tr("<None>"), static_cast<int>(SIFC_NONE));
+	expPortComboxBox->addItem(tr("Arkanoid Paddle"), static_cast<int>(SIFC_ARKANOID));
+	expPortComboxBox->addItem(tr("Shadow"), static_cast<int>(SIFC_SHADOW));
+	expPortComboxBox->addItem(tr("Hyper Shot Gun"), static_cast<int>(SIFC_HYPERSHOT));
+	expPortComboxBox->addItem(tr("Family Keyboard"), static_cast<int>(SIFC_FKB));
+	expPortComboxBox->addItem(tr("Mahjong"), static_cast<int>(SIFC_MAHJONG));
+	expPortComboxBox->addItem(tr("Quiz King Buzzers"), static_cast<int>(SIFC_QUIZKING));
+	expPortComboxBox->addItem(tr("Family Trainer A"), static_cast<int>(SIFC_FTRAINERA));
+	expPortComboxBox->addItem(tr("Family Trainer B"), static_cast<int>(SIFC_FTRAINERB));
+	expPortComboxBox->addItem(tr("Oeka Kids Tablet"), static_cast<int>(SIFC_OEKAKIDS));
+	expPortComboxBox->addItem(tr("Top Rider"), static_cast<int>(SIFC_TOPRIDER));
 
 	for (int j = 0; j < expPortComboxBox->count(); j++)
 	{
@@ -331,9 +331,9 @@ void InputConfDialog_t::setInputs(void)
 	idx[1] = nesPortComboxBox[1]->currentIndex();
 	idx[2] = expPortComboxBox->currentIndex();
 
-	port[0] = (ESI)nesPortComboxBox[0]->itemData(idx[0]).toInt();
-	port[1] = (ESI)nesPortComboxBox[1]->itemData(idx[1]).toInt();
-	fcexp = (ESIFC)expPortComboxBox->itemData(idx[2]).toInt();
+	port[0] = static_cast<ESI>(nesPortComboxBox[0]->itemData(idx[0]).toInt());
+	port[1] = static_cast<ESI>(nesPortComboxBox[1]->itemData(idx[1]).toInt());
+	fcexp = static_cast<ESIFC>(expPortComboxBox->itemData(idx[2]).toInt());
 
 	FCEUD_SetInput(fourscore, microphone, port[0], port[1], fcexp);
 }
