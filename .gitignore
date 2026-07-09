@@ -5,6 +5,7 @@ build_no_rust/
 build_rust_*/
 build_v027/
 build_vs/
+build_msvc/
 build-*/
 _build/
 *.build/
