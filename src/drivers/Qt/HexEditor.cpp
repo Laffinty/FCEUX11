@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <string>
+#include <memory>
 
 #include <SDL.h>
 #include <QHeaderView>
@@ -81,25 +82,17 @@ struct  romEditEntry_t
 {
 	int       addr;
 	int       size;
-	uint8_t  *data;
+	std::unique_ptr<uint8_t[]> data;
 
 	romEditEntry_t(void)
 	{
-		addr = -1; size = 0; data = NULL;
-	}
-
-	~romEditEntry_t(void)
-	{
-		if ( data != NULL )
-		{
-			free(data); data = NULL;
-		}
+		addr = -1; size = 0;
 	}
 };
 
 struct  romEditList_t
 {
-	uint8_t  *modMem;
+	std::unique_ptr<uint8_t[]> modMem;
 	int       modMemSize;
 
 	std::list <romEditEntry_t*> undoList;
@@ -107,7 +100,6 @@ struct  romEditList_t
 
 	romEditList_t(void)
 	{
-		modMem = NULL;
 		modMemSize = 0;
 	}
 
@@ -124,9 +116,9 @@ struct  romEditList_t
 
 			undoList.pop_back();
 		}
-		if ( modMem != NULL )
+		if ( modMem )
 		{
-			free(modMem); modMem = NULL; modMemSize = 0;
+			modMem.reset(); modMemSize = 0;
 		}
 	}	
 
@@ -148,18 +140,17 @@ struct  romEditList_t
 		{
 			return;
 		}
-		if ( modMem == NULL )
+		if ( !modMem )
 		{
 			modMemSize = 16 + CHRsize[0] + PRGsize[0];
 
-			modMem = (uint8_t*)malloc( modMemSize );
-
-			if ( modMem == NULL )
-			{
+			try {
+				modMem = std::make_unique<uint8_t[]>(modMemSize);
+			} catch (const std::bad_alloc&) {
 				printf("Error: Failed to allocate ROM modification memory buffer\n");
 				return;
 			}
-			memset( modMem, 0, modMemSize );
+			memset( modMem.get(), 0, modMemSize );
 		}
 		if ( (addr + size) >= modMemSize )
 		{
@@ -172,7 +163,7 @@ struct  romEditList_t
 		entry = new romEditEntry_t();
 		entry->addr = addr;
 		entry->size = size;
-		entry->data = (uint8_t*)malloc(sizeof(uint8_t)*size);
+		entry->data = std::make_unique<uint8_t[]>(size);
 
 		for (int i = 0; i < size; i++)
 		{
@@ -446,7 +437,6 @@ static int convFromXchar( int i )
 //----------------------------------------------------------------------------
 memBlock_t::memBlock_t( void )
 {
-	buf = NULL;
 	_size = 0;
 	_maxLines = 0;
 	memAccessFunc = NULL;
@@ -455,10 +445,6 @@ memBlock_t::memBlock_t( void )
 
 memBlock_t::~memBlock_t(void)
 {
-	if ( buf != NULL )
-	{
-		::free( buf ); buf = NULL;
-	}
 	_size = 0;
 	_maxLines = 0;
 }
@@ -475,32 +461,31 @@ int memBlock_t::reAlloc( int newSize )
 		return 0;
 	}
 
-	if ( buf != NULL )
-	{
-		::free( buf ); buf = NULL;
-	}
+	buf.reset();
 	_size = 0;
 	_maxLines = 0;
 
-	buf = (struct memByte_t *)malloc( newSize * sizeof(struct memByte_t) );
-
-	if ( buf != NULL )
-	{
-		memset( buf, 0, newSize * sizeof(struct memByte_t) );
-
-		_size = newSize;
-		init();
-
-		if ( (_size % 16) )
-		{
-			_maxLines = (_size / 16) + 1;
-		}
-		else
-		{
-			_maxLines = (_size / 16);
-		}
+	try {
+		buf = std::make_unique<struct memByte_t[]>(newSize);
+	} catch (const std::bad_alloc&) {
+		return 1;
 	}
-	return (buf == NULL);
+
+	memset( buf.get(), 0, newSize * sizeof(struct memByte_t) );
+
+	_size = newSize;
+	init();
+
+	if ( (_size % 16) )
+	{
+		_maxLines = (_size / 16) + 1;
+	}
+	else
+	{
+		_maxLines = (_size / 16);
+	}
+
+	return 0;
 }
 //----------------------------------------------------------------------------
 void memBlock_t::setAccessFunc( int (*newMemAccessFunc)( unsigned int offset) )
@@ -2396,7 +2381,7 @@ void QHexEdit::pasteFromClipboard(void)
 	int i, nbytes=0, val, addr;
 	std::string s = clipboard->text().toStdString();
 	const char *c;
-	unsigned char *buf;
+	std::unique_ptr<unsigned char[]> buf;
 
 	FCEU_WRAPPER_LOCK();
 
@@ -2410,13 +2395,12 @@ void QHexEdit::pasteFromClipboard(void)
 	{
 		return;
 	}
-	buf = (unsigned char*)malloc( s.size() );
-
-	if ( buf == NULL )
-	{
+	try {
+		buf = std::make_unique<unsigned char[]>(s.size());
+	} catch (const std::bad_alloc&) {
 		return;
 	}
-	memset( buf, 0, s.size() );
+	memset( buf.get(), 0, s.size() );
 
 	i=0; nbytes = 0;
 	while ( c[i] != 0 )
@@ -2450,14 +2434,13 @@ void QHexEdit::pasteFromClipboard(void)
 	{
 		if ( viewMode == QHexEdit::MODE_NES_ROM )
 		{
-			romEditList.applyPatch( addr, buf, nbytes );
+			romEditList.applyPatch( addr, buf.get(), nbytes );
 		}
 		for (i=0; i<nbytes; i++)
 		{
 			writeMem( viewMode, addr+i, buf[i] );
 		}
 	}
-	free(buf);
 
 	FCEU_WRAPPER_UNLOCK();
 }

@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <memory>
 #include <QWidget>
 #include <QDialog>
 #include <QVBoxLayout>
@@ -83,7 +84,7 @@ class iNesHeaderEditor_t : public QDialog
 		QLabel       *chrNvRamLbl;
 		QLabel       *inputDevLbl;
 		QLabel       *miscRomsLbl;
-		iNES_HEADER  *iNesHdr;
+		std::unique_ptr<iNES_HEADER> iNesHdr;
 
 		bool          initOK;
 	private:

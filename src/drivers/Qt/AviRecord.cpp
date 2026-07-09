@@ -27,6 +27,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <string>
+#include <memory>
 
 #include <QFile>
 #include <QDate>
@@ -65,8 +66,9 @@ int       vbufSize = 0;
 int       abufHead = 0;
 int       abufTail = 0;
 int       abufSize = 0;
-uint32_t *rawVideoBuf = NULL;
-int16_t  *rawAudioBuf = NULL;
+// v1.13 Purify F3a: std::unique_ptr<T[]> RAII (was raw malloc/free)
+std::unique_ptr<uint32_t[]> rawVideoBuf;
+std::unique_ptr<int16_t[]>   rawAudioBuf;
 int       aviDriver = 0;
 int       videoFormat = AVI_RGB24;
 int       audioSampleRate = 48000;
@@ -498,10 +500,10 @@ int aviRecordOpenFile( const char *filepath )
 	}
 
 	vbufSize    = 1024 * 1024 * 60;
-	rawVideoBuf = (uint32_t*)malloc( vbufSize * sizeof(uint32_t) );
+	rawVideoBuf = std::make_unique<uint32_t[]>(vbufSize);
 
 	abufSize    = 96000;
-	rawAudioBuf = (int16_t*)malloc( abufSize * sizeof(uint16_t) );
+	rawAudioBuf = std::make_unique<int16_t[]>(abufSize);
 
 	vbufHead = 0;
 	vbufTail = 0;
@@ -591,14 +593,9 @@ int aviRecordClose(void)
 		delete gwavi; gwavi = NULL;
 	}
 
-	if ( rawVideoBuf != NULL )
-	{
-		free(rawVideoBuf); rawVideoBuf = NULL;
-	}
-	if ( rawAudioBuf != NULL )
-	{
-		free(rawAudioBuf); rawAudioBuf = NULL;
-	}
+	// v1.13 Purify F3a: std::unique_ptr<T[]> RAII; .reset() replaces free+NULL
+	rawVideoBuf.reset();
+	rawAudioBuf.reset();
 	vbufTail = abufTail = 0;
 	vbufSize = abufSize = 0;
 

@@ -30,7 +30,7 @@ nes_shm_t *open_nes_shm(void)
 {
 	nes_shm_t *vaddr;
 
-	vaddr = (nes_shm_t*)malloc( sizeof(struct nes_shm_t) );
+	vaddr = new nes_shm_t;
 
 	memset( vaddr, 0, sizeof(struct nes_shm_t));
 
@@ -49,7 +49,7 @@ void close_nes_shm(void)
 {
 	if ( nes_shm )
 	{
-		free(nes_shm); nes_shm = NULL;
+		delete nes_shm; nes_shm = NULL;
 	}
 
 }

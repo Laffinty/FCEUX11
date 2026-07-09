@@ -229,7 +229,7 @@ struct FCEUGI
 	FCEUGI();
 	~FCEUGI();
 
-	uint8 *name;	//Game name, UTF8 encoding
+	std::string name;	//Game name, UTF8 encoding
 	int mappernum;
 
 	EGIT type;

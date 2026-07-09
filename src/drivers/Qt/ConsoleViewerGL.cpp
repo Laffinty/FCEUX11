@@ -106,11 +106,11 @@ ConsoleViewGL_t::ConsoleViewGL_t(QWindow *parent)
 
 	localBufSize = (4 * GL_NES_WIDTH) * (4 * GL_NES_HEIGHT) * sizeof(uint32_t);
 
-	localBuf = (uint32_t*)malloc( localBufSize );
+	localBuf = std::make_unique<uint32_t[]>(localBufSize / sizeof(uint32_t));
 
 	if ( localBuf )
 	{
-		memset32( localBuf, alphaMask, localBufSize );
+		memset32( localBuf.get(), alphaMask, localBufSize );
 	}
 
 	vsyncEnabled = true;
@@ -154,12 +154,6 @@ ConsoleViewGL_t::ConsoleViewGL_t(QWindow *parent)
 
 ConsoleViewGL_t::~ConsoleViewGL_t(void)
 {
-	//printf("Destroying GL Viewport\n");
-
-	if ( localBuf )
-	{
-		free( localBuf ); localBuf = NULL;
-	}
 }
 
 void ConsoleViewGL_t::screenChanged( QScreen *screen )
@@ -473,7 +467,7 @@ void ConsoleViewGL_t::transfer2LocalBuffer(void)
 		cpSize = localBufSize;
 	}
 	src  = (uint8_t*)nes_shm->pixbuf[bufIdx];
-	dest = (uint8_t*)localBuf;
+	dest = (uint8_t*)localBuf.get();
 
 	hq = (nes_shm->video.preScaler == 1) || (nes_shm->video.preScaler == 4); // hq2x and hq3x
 
@@ -707,7 +701,7 @@ void ConsoleViewGL_t::renderFrame(void)
 	glBindTexture(GL_TEXTURE_2D, gltexture);
 	glTexSubImage2D(GL_TEXTURE_2D, 0,
 		  	0, 0, texture_width, texture_height,
-				GL_BGRA, GL_UNSIGNED_BYTE, localBuf );
+				GL_BGRA, GL_UNSIGNED_BYTE, localBuf.get() );
 
 	projectionMatrix.setToIdentity();
 	projectionMatrix.ortho( 0.0,  rw,  0.0,  rh,  -1.0,  1.0);

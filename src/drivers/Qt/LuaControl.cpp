@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <list>
+#include <memory>
 
 #ifdef WIN32
 #include <Windows.h>
@@ -58,23 +59,19 @@ struct luaConsoleOutputBuffer
 	int head;
 	int tail;
 	int size;
-	char *buf;
+	std::unique_ptr<char[]> buf;
 
 	luaConsoleOutputBuffer(void)
 	{
 		tail = head = 0;
 		size = 4096;
 
-		buf = (char *)malloc(size);
+		buf = std::make_unique<char[]>(size);
 	}
 
 	~luaConsoleOutputBuffer(void)
 	{
-		if (buf)
-		{
-			free(buf);
-			buf = NULL;
-		}
+		buf.reset();
 	}
 
 	void addLine(const char *l)

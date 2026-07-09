@@ -31,11 +31,12 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
+#include <memory>
 
 extern Config *g_config;
 extern bool turbo;
 
-static int *s_Buffer = 0;
+static std::unique_ptr<int[]> s_Buffer;
 static unsigned int s_BufferSize;
 static unsigned int s_BufferSize25;
 static unsigned int s_BufferSize50;
@@ -277,7 +278,7 @@ InitSound()
 	noiseGateActive = true;
 	fillInit = 1;
 
-	s_Buffer = (int *)FCEU_dmalloc(sizeof(int) * s_BufferSize);
+	s_Buffer = std::make_unique<int[]>(s_BufferSize);
 
 	if (!s_Buffer)
 	{
@@ -516,10 +517,7 @@ KillSound(void)
 	fceu11::Sound(0);
 	SDL_CloseAudio();
 	SDL_QuitSubSystem(SDL_INIT_AUDIO);
-	if(s_Buffer) {
-		free((void *)s_Buffer);
-		s_Buffer = 0;
-	}
+	s_Buffer.reset();
 	s_BufferIn = 0;
 	return 0;
 }

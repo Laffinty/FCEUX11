@@ -86,11 +86,11 @@ ConsoleViewSDL_t::ConsoleViewSDL_t(QWidget *parent)
 
 	localBufSize = (4 * GL_NES_WIDTH) * (4 * GL_NES_HEIGHT) * sizeof(uint32_t);
 
-	localBuf = (uint32_t*)malloc( localBufSize );
+	localBuf = std::make_unique<uint32_t[]>(localBufSize / sizeof(uint32_t));
 
 	if ( localBuf )
 	{
-		memset32( localBuf, alphaMask, localBufSize );
+		memset32( localBuf.get(), alphaMask, localBufSize );
 	}
 
 	forceAspect  = true;
@@ -125,10 +125,6 @@ ConsoleViewSDL_t::~ConsoleViewSDL_t(void)
 {
 	//printf("Destroying SDL Viewport\n");
 
-	if ( localBuf )
-	{
-		free( localBuf ); localBuf = NULL;
-	}
 	if ( sdlCursor )
 	{
 		SDL_FreeCursor(sdlCursor); sdlCursor = NULL;
@@ -225,7 +221,7 @@ void ConsoleViewSDL_t::transfer2LocalBuffer(void)
 		cpSize = localBufSize;
 	}
 	src  = (uint8_t*)nes_shm->pixbuf[bufIdx];
-	dest = (uint8_t*)localBuf;
+	dest = (uint8_t*)localBuf.get();
 
 	hq = (nes_shm->video.preScaler == 1) || (nes_shm->video.preScaler == 4); // hq2x and hq3x
 
@@ -726,7 +722,7 @@ void ConsoleViewSDL_t::render(void)
 	int rowPitch;
 	SDL_LockTexture( sdlTexture, nullptr, (void**)&textureBuffer, &rowPitch);
 	{
-		memcpy( textureBuffer, localBuf, nesWidth*nesHeight*sizeof(uint32_t) );
+		memcpy( textureBuffer, localBuf.get(), nesWidth*nesHeight*sizeof(uint32_t) );
 	}
 	SDL_UnlockTexture(sdlTexture);
 

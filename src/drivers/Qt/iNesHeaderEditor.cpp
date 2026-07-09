@@ -514,9 +514,9 @@ iNesHeaderEditor_t::iNesHeaderEditor_t(QWidget *parent)
 		inputDevBox->addItem( inputDevList[i], i ); i++;
 	}
 
-	iNesHdr = (iNES_HEADER*)::malloc( sizeof(iNES_HEADER) );
+	iNesHdr = std::make_unique<iNES_HEADER>();
 
-	::memset( iNesHdr, 0, sizeof(iNES_HEADER) );
+	::memset( iNesHdr.get(), 0, sizeof(iNES_HEADER) );
 
 	if (GameInfo == NULL)
 	{
@@ -525,12 +525,12 @@ iNesHeaderEditor_t::iNesHeaderEditor_t(QWidget *parent)
 			return;
 		}
 	}
-	if ( loadHeader( iNesHdr ) == false )
+	if ( loadHeader( iNesHdr.get() ) == false )
 	{
 		return;
 	}
 
-	setHeaderData( iNesHdr );
+	setHeaderData( iNesHdr.get() );
 
 	initOK = true;
 
@@ -540,12 +540,6 @@ iNesHeaderEditor_t::iNesHeaderEditor_t(QWidget *parent)
 iNesHeaderEditor_t::~iNesHeaderEditor_t(void)
 {
 	QSettings settings;
-	//printf("Destroy Header Editor Config Window\n");
-
-	if ( iNesHdr )
-	{
-		free( iNesHdr ); iNesHdr = NULL;
-	}
 	settings.setValue("iNesHeaderWindow/geometry", saveGeometry());
 }
 //----------------------------------------------------------------------------
@@ -580,9 +574,9 @@ void iNesHeaderEditor_t::closeWindow(void)
 //----------------------------------------------------------------------------
 void iNesHeaderEditor_t::restoreHeader(void)
 {
-	if ( iNesHdr != NULL )
+	if ( iNesHdr )
 	{
-		setHeaderData( iNesHdr );
+		setHeaderData( iNesHdr.get() );
 	}
 }
 //----------------------------------------------------------------------------
@@ -892,9 +886,9 @@ void iNesHeaderEditor_t::saveFileAs(void)
       return;
    }
 
-	WriteHeaderData( iNesHdr );
+	WriteHeaderData( iNesHdr.get() );
 
-	if ( SaveINESFile( filename.toStdString().c_str(), iNesHdr ) )
+	if ( SaveINESFile( filename.toStdString().c_str(), iNesHdr.get() ) )
 	{
 		// Error
 	}

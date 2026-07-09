@@ -5,6 +5,7 @@
 
 #include <list>
 #include <vector>
+#include <memory>
 
 #include <QWidget>
 #include <QDialog>
@@ -43,7 +44,7 @@ struct memBlock_t
 	int  reAlloc( int newSize );
 	void setAccessFunc( int (*newMemAccessFunc)( unsigned int offset) );
 
-	struct memByte_t *buf;
+	std::unique_ptr<struct memByte_t[]> buf;
 	int  _size;
 	int  _maxLines;
 	int (*memAccessFunc)( unsigned int offset);

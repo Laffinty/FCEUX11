@@ -14,6 +14,7 @@
 #endif
 
 #include <string>
+#include <memory>
 
 #ifdef _USE_X264
 #include "x264.h"
@@ -51,8 +52,8 @@ extern int       vbufSize;
 extern int       abufHead;
 extern int       abufTail;
 extern int       abufSize;
-extern uint32_t *rawVideoBuf;
-extern int16_t  *rawAudioBuf;
+extern std::unique_ptr<uint32_t[]> rawVideoBuf;
+extern std::unique_ptr<int16_t[]>   rawAudioBuf;
 extern int       aviDriver;
 extern int       videoFormat;
 

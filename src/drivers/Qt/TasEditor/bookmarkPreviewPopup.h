@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <memory>
 #include <QDialog>
 #include <QLabel>
 #include <QTimer>
@@ -32,7 +33,7 @@ class bookmarkPreviewPopup : public QDialog
 		int alpha;
 		int imageIndex;
 		bool actv;
-		unsigned char *screenShotRaster;
+		std::unique_ptr<unsigned char[]> screenShotRaster;
 		QTimer *timer;
 		QLabel *imgLbl, *descLbl;
 

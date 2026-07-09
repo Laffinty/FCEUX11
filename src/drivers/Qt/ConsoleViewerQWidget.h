@@ -3,6 +3,7 @@
 
 #pragma  once
 
+#include <memory>
 #include <QWidget>
 #include <QColor>
 #include <QCursor>
@@ -85,7 +86,7 @@ class ConsoleViewQWidget_t : public QWidget, public ConsoleViewerBase
 	QColor *bgColor;
 	QPixmap bgPix;
 
-	uint32_t  *localBuf;
+	std::unique_ptr<uint32_t[]> localBuf;
 	uint32_t   localBufSize;
 	unsigned int mouseButtonMask;
 

@@ -7,6 +7,7 @@
 #include <string.h>
 #include <math.h>
 #include <string>
+#include <memory>
 #include <zlib.h>
 
 #include <QSettings>
@@ -32,7 +33,7 @@ bookmarkPreviewPopup::bookmarkPreviewPopup( int index, QWidget *parent )
 	int p;
 	QPoint pos;
 	QVBoxLayout *vbox;
-	uint32_t *pixBuf;
+	std::unique_ptr<uint32_t[]> pixBuf;
 	uint32_t  pixel;
 	QPixmap pixmap;
 
@@ -55,7 +56,7 @@ bookmarkPreviewPopup::bookmarkPreviewPopup( int index, QWidget *parent )
 	int frame = bookmarks->bookmarksArray[index].snapshot.keyFrame;
 	int markerID = markersManager->getMarkerAboveFrame(bookmarks->bookmarksArray[index].snapshot.markers, frame);
 
-	screenShotRaster = (unsigned char *)malloc( SCREENSHOT_SIZE );
+	screenShotRaster = std::make_unique<unsigned char[]>(SCREENSHOT_SIZE);
 
 	if ( screenShotRaster == NULL )
 	{
@@ -63,7 +64,7 @@ bookmarkPreviewPopup::bookmarkPreviewPopup( int index, QWidget *parent )
 	}
 	// bookmarks.itemUnderMouse
 
-	pixBuf = (uint32_t *)malloc( SCREENSHOT_SIZE * sizeof(uint32_t) );
+	pixBuf = std::make_unique<uint32_t[]>(SCREENSHOT_SIZE);
 
 	loadImage(index);
 
@@ -72,7 +73,7 @@ bookmarkPreviewPopup::bookmarkPreviewPopup( int index, QWidget *parent )
 	{
 		for (int w=0; w<SCREENSHOT_WIDTH; w++)
 		{
-			pixel = ModernDeemphColorMap( &screenShotRaster[p], screenShotRaster, 1 );
+			pixel = ModernDeemphColorMap( &screenShotRaster[p], screenShotRaster.get(), 1 );
 			pixBuf[p]  = 0xFF000000;
 			pixBuf[p] |= (pixel & 0x000000FF) << 16;
 			pixBuf[p] |= (pixel & 0x00FF0000) >> 16;
@@ -80,7 +81,7 @@ bookmarkPreviewPopup::bookmarkPreviewPopup( int index, QWidget *parent )
 			p++;
 		}
 	}
-	QImage img( (unsigned char*)pixBuf, SCREENSHOT_WIDTH, SCREENSHOT_HEIGHT, SCREENSHOT_WIDTH*4, QImage::Format_RGBA8888 );
+	QImage img( (unsigned char*)pixBuf.get(), SCREENSHOT_WIDTH, SCREENSHOT_HEIGHT, SCREENSHOT_WIDTH*4, QImage::Format_RGBA8888 );
 	pixmap.convertFromImage( img );
 
 	vbox = new QVBoxLayout();
@@ -98,11 +99,6 @@ bookmarkPreviewPopup::bookmarkPreviewPopup( int index, QWidget *parent )
 	descLbl->setText( tr(markersManager->getNoteCopy(bookmarks->bookmarksArray[index].snapshot.markers, markerID).c_str()) );
 
 	resize( 256, 256 );
-
-	if ( pixBuf )
-	{
-		free( pixBuf ); pixBuf = NULL;
-	}
 
 	pos = tasWin->getPreviewPopupCoordinates();
 
@@ -147,12 +143,6 @@ void bookmarkPreviewPopup::changeEvent(QEvent *event)
 bookmarkPreviewPopup::~bookmarkPreviewPopup( void )
 {
 	timer->stop();
-
-	if ( screenShotRaster != NULL )
-	{
-		free( screenShotRaster ); screenShotRaster = NULL;
-	}
-	//printf("Popup Deleted\n");
 }
 //----------------------------------------------------------------------------
 void bookmarkPreviewPopup::periodicUpdate(void)
@@ -238,13 +228,13 @@ int bookmarkPreviewPopup::loadImage(int index)
 	// uncompress
 	int ret = 0;
 	uLongf destlen = SCREENSHOT_SIZE;
-	int e = uncompress(screenShotRaster, &destlen, &bookmarks->bookmarksArray[index].savedScreenshot[0], bookmarks->bookmarksArray[index].savedScreenshot.size());
+	int e = uncompress(screenShotRaster.get(), &destlen, &bookmarks->bookmarksArray[index].savedScreenshot[0], bookmarks->bookmarksArray[index].savedScreenshot.size());
 	if (e != Z_OK && e != Z_BUF_ERROR)
 	{
 		// error decompressing
 		FCEU_printf("Error decompressing screenshot %d\n", index);
 		// at least fill bitmap with zeros
-		memset(screenShotRaster, 0, SCREENSHOT_SIZE);
+		memset(screenShotRaster.get(), 0, SCREENSHOT_SIZE);
 		ret = -1;
 	}
 	return ret;
@@ -253,7 +243,7 @@ int bookmarkPreviewPopup::loadImage(int index)
 int bookmarkPreviewPopup::reloadImage(int index)
 {
 	int p, ret = 0;
-	uint32_t *pixBuf;
+	std::unique_ptr<uint32_t[]> pixBuf;
 	uint32_t  pixel;
 	QPixmap pixmap;
 
@@ -268,7 +258,7 @@ int bookmarkPreviewPopup::reloadImage(int index)
 	int frame = bookmarks->bookmarksArray[index].snapshot.keyFrame;
 	int markerID = markersManager->getMarkerAboveFrame(bookmarks->bookmarksArray[index].snapshot.markers, frame);
 
-	pixBuf = (uint32_t *)malloc( SCREENSHOT_SIZE * sizeof(uint32_t) );
+	pixBuf = std::make_unique<uint32_t[]>(SCREENSHOT_SIZE);
 
 	loadImage(index);
 
@@ -277,7 +267,7 @@ int bookmarkPreviewPopup::reloadImage(int index)
 	{
 		for (int w=0; w<SCREENSHOT_WIDTH; w++)
 		{
-			pixel = ModernDeemphColorMap( &screenShotRaster[p], screenShotRaster, 1 );
+			pixel = ModernDeemphColorMap( &screenShotRaster[p], screenShotRaster.get(), 1 );
 			pixBuf[p]  = 0xFF000000;
 			pixBuf[p] |= (pixel & 0x000000FF) << 16;
 			pixBuf[p] |= (pixel & 0x00FF0000) >> 16;
@@ -285,13 +275,8 @@ int bookmarkPreviewPopup::reloadImage(int index)
 			p++;
 		}
 	}
-	QImage img( (unsigned char*)pixBuf, SCREENSHOT_WIDTH, SCREENSHOT_HEIGHT, SCREENSHOT_WIDTH*4, QImage::Format_RGBA8888 );
+	QImage img( (unsigned char*)pixBuf.get(), SCREENSHOT_WIDTH, SCREENSHOT_HEIGHT, SCREENSHOT_WIDTH*4, QImage::Format_RGBA8888 );
 	pixmap.convertFromImage( img );
-
-	if ( pixBuf )
-	{
-		free( pixBuf ); pixBuf = NULL;
-	}
 
 	imgLbl->setPixmap( pixmap );
 

@@ -154,9 +154,8 @@ static void FCEU_CloseGame(void)
 			FCEUD_NetworkClose();
 		}
 
-		if (GameInfo->name) {
-			free(GameInfo->name);
-			GameInfo->name = NULL;
+		if (!GameInfo->name.empty()) {
+			GameInfo->name.clear();
 		}
 
 		if (GameInfo->type != GIT_NSF) {
@@ -444,7 +443,7 @@ FCEUGI *fceu11::LoadGameVirtual(const char *name, int OverwriteVidMode, bool sil
 
 	GameInfo->soundchan = 0;
 	GameInfo->soundrate = 0;
-	GameInfo->name = 0;
+	GameInfo->name.clear();
 	GameInfo->type = GIT_CART;
 	GameInfo->vidsys = GIV_USER;
 	// v0.3.8: GameInfo->input[] is ESI (enum class); SI_*/SIFC_* are

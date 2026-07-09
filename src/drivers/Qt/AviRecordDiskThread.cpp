@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <memory>
 
 #include <QThread>
 
@@ -30,9 +31,10 @@ void AviRecordDiskThread_t::run(void)
 	int numPixels, width, height, numPixelsReady = 0;
 	int numSamples = 0;
 	double fps = 60.0;
-	unsigned char *rgb24;
-	int16_t *audioOut;
-	uint32_t *videoOut;
+	// v1.13 Purify F3a: std::unique_ptr<T[]> RAII (was raw malloc/free)
+	std::unique_ptr<unsigned char[]> rgb24;
+	std::unique_ptr<int16_t[]>         audioOut;
+	std::unique_ptr<uint32_t[]>        videoOut;
 	char writeAudio = 1;
 	char localRecordAudio = 0;
 	int  avgAudioPerFrame, audioChunkSize, audioSamplesAvail=0;
@@ -53,11 +55,11 @@ void AviRecordDiskThread_t::run(void)
 	height    = nes_shm->video.nrow;
 	numPixels = width * height;
 
-	rgb24 = (unsigned char *)malloc( numPixels * sizeof(uint32_t) );
+	rgb24 = std::make_unique<unsigned char[]>( numPixels * sizeof(uint32_t) );
 
 	if ( rgb24 )
 	{
-		memset( rgb24, 0, numPixels * sizeof(uint32_t) );
+		memset( rgb24.get(), 0, numPixels * sizeof(uint32_t) );
 	}
 	else
 	{
@@ -102,8 +104,8 @@ void AviRecordDiskThread_t::run(void)
 	}
 #endif
 
-	audioOut = (int16_t *)malloc(96000);
-	videoOut = (uint32_t*)malloc(1048576);
+	audioOut = std::make_unique<int16_t[]>(96000);
+	videoOut = std::make_unique<uint32_t[]>(1048576);
 
 	while ( !isInterruptionRequested() )
 	{
@@ -122,42 +124,42 @@ void AviRecordDiskThread_t::run(void)
 
 			if ( localVideoFormat == AVI_I420)
 			{
-				Convert_4byte_To_I420Frame<4>(videoOut,rgb24,numPixels,width);
-				gwavi->add_frame( rgb24, (numPixels*3)/2 );
+				Convert_4byte_To_I420Frame<4>(videoOut.get(), rgb24.get(), numPixels, width);
+				gwavi->add_frame( rgb24.get(), (numPixels*3)/2 );
 			}
 			#ifdef _USE_X264
 			else if ( localVideoFormat == AVI_X264)
 			{
-				Convert_4byte_To_I420Frame<4>(videoOut,rgb24,numPixels,width);
-				X264::encode_frame( rgb24, width, height );
+				Convert_4byte_To_I420Frame<4>(videoOut.get(), rgb24.get(), numPixels, width);
+				X264::encode_frame( rgb24.get(), width, height );
 			}
 			#endif
 			#ifdef _USE_X265
 			else if ( localVideoFormat == AVI_X265)
 			{
-				Convert_4byte_To_I420Frame<4>(videoOut,rgb24,numPixels,width);
-				X265::encode_frame( rgb24, width, height );
+				Convert_4byte_To_I420Frame<4>(videoOut.get(), rgb24.get(), numPixels, width);
+				X265::encode_frame( rgb24.get(), width, height );
 			}
 			#endif
 			#ifdef WIN32
 			else if ( localVideoFormat == AVI_VFW)
 			{
-				convertRgb_32_to_24( (const unsigned char*)videoOut, rgb24,
+				convertRgb_32_to_24( (const unsigned char*)videoOut.get(), rgb24.get(),
 						width, height, numPixels, true );
-				VFW::encode_frame( rgb24, width, height );
+				VFW::encode_frame( rgb24.get(), width, height );
 			}
 			#endif
 			#ifdef _USE_LIBAV
 			else if ( localVideoFormat == AVI_LIBAV)
 			{
-				LIBAV::encode_video_frame( (unsigned char*)videoOut );
+				LIBAV::encode_video_frame( (unsigned char*)videoOut.get() );
 			}
 			#endif
 			else
 			{
-				convertRgb_32_to_24( (const unsigned char*)videoOut, rgb24,
+				convertRgb_32_to_24( (const unsigned char*)videoOut.get(), rgb24.get(),
 						width, height, numPixels, true );
-				gwavi->add_frame( rgb24, numPixels*3 );
+				gwavi->add_frame( rgb24.get(), numPixels*3 );
 			}
 
 			numPixelsReady = 0;
@@ -191,12 +193,12 @@ void AviRecordDiskThread_t::run(void)
 					#ifdef _USE_LIBAV
 					if ( localVideoFormat == AVI_LIBAV)
 					{
-						LIBAV::encode_audio_frame( audioOut, numSamples );
+						LIBAV::encode_audio_frame( audioOut.get(), numSamples );
 					}
 					else
 					#endif
 					{
-						gwavi->add_audio( (unsigned char *)audioOut, numSamples*2);
+						gwavi->add_audio( (unsigned char *)audioOut.get(), numSamples*2);
 					}
 
 					numSamples = 0;
@@ -233,19 +235,19 @@ void AviRecordDiskThread_t::run(void)
 			#ifdef _USE_LIBAV
 			if ( localVideoFormat == AVI_LIBAV)
 			{
-				LIBAV::encode_audio_frame( audioOut, numSamples );
-			}
-			else
-			#endif
-			{
-				gwavi->add_audio( (unsigned char *)audioOut, numSamples*2);
-			}
+					LIBAV::encode_audio_frame( audioOut.get(), numSamples );
+				}
+				else
+				#endif
+				{
+					gwavi->add_audio( (unsigned char *)audioOut.get(), numSamples*2);
+				}
 
 			numSamples = 0;
 		}
 	}
 
-	free(rgb24);
+	rgb24.reset();
 
 #ifdef _USE_X264
 	if ( localVideoFormat == AVI_X264)
@@ -273,8 +275,8 @@ void AviRecordDiskThread_t::run(void)
 #endif
 	aviRecordClose();
 
-	free(audioOut);
-	free(videoOut);
+	audioOut.reset();
+	videoOut.reset();
 
 	fprintf( avLogFp, "AVI Record Disk Thread Exit\n");
 	emit finished();
