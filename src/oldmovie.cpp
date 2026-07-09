@@ -21,6 +21,7 @@
 #include "utils/xstring.h"
 
 #include <fstream>
+#include <vector>
 
 // v1.2 Census §2.3: `using namespace std` removed; std types in this
 // file are already explicitly qualified with std::.
@@ -35,7 +36,8 @@ static uint8 joop[4];
 static uint8 joopcmd;
 static uint32 framets = 0;
 static uint32 frameptr = 0;
-static uint8* moviedata = nullptr;
+// v1.13 Purify F2b: std::vector<uint8_t> replaces uint8* (realloc/free)
+static std::vector<uint8_t> moviedata;
 static uint32 moviedatasize = 0;
 static uint32 firstframeoffset = 0;
 static uint32 savestate_offset = 0;
@@ -209,20 +211,14 @@ EFCM_CONVERTRESULT convert_fcm(MovieData& md, std::string fname)
 	}
 
 	fp->fseek(firstframeoffset,SEEK_SET);
-	uint8 *newMovieData = (uint8*)realloc(moviedata, moviedatasize);
-	if (newMovieData)
-	{
-		moviedata = newMovieData;
-	}
-	else
-	{
-		if (moviedata)
-		{
-			free(moviedata); moviedata = nullptr;
-		}
+	try {
+		moviedata.resize(moviedatasize);
+	} catch (const std::bad_alloc&) {
+		moviedata.clear();
+		moviedata.shrink_to_fit();
 		return FCM_CONVERTRESULT_REALLOC_FAIL;
 	}
-	fp->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(moviedata), moviedatasize));
+	fp->fread(std::span<std::byte>(reinterpret_cast<std::byte*>(moviedata.data()), moviedatasize));
 
 	frameptr = 0;
 	memset(joop,0,sizeof(joop));
@@ -262,10 +258,10 @@ EFCM_CONVERTRESULT convert_fcm(MovieData& md, std::string fname)
 		md.ports[0] = md.ports[1] = SI_GAMEPAD;
 	}
 
-	if (moviedata)
+	if (!moviedata.empty())
 	{
-		free(moviedata);
-		moviedata = nullptr;
+		moviedata.clear();
+		moviedata.shrink_to_fit();
 	}
 
 	delete fp;

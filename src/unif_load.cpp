@@ -1,6 +1,6 @@
-// UNIF load helper �?extracted from unif.cpp for v1.10 Cryptex Phase B.1.
+// UNIF load helper �?extracted from unif.cpp for v1.10 Cryptex Phase B.1.
 // Contains the core UNIFLoad logic using Rust FFI, board initialization,
-// and cleanup helpers �?all moved from unif.cpp to keep the bridge < 100 lines.
+// and cleanup helpers �?all moved from unif.cpp to keep the bridge < 100 lines.
 
 #include "types.h"
 #include "utils/safe_string.h"
@@ -49,11 +49,13 @@ extern CartInfo UNIFCart;
 
 // ── Cleanup & lifecycle ─────────────────────────────────────────────────────
 
+// v1.13 Purify F2b: FCEU_malloc was used to allocate UNIFchrrama/boardname/malloced[]
+// (lines 83, 138, see boards/); use matching FCEU_free() deallocator.
 void FreeUNIF(void) {
-	if (UNIFchrrama) { free(UNIFchrrama); UNIFchrrama = 0; }
-	if (boardname) { free(boardname); boardname = 0; }
+	if (UNIFchrrama) { FCEU_free(UNIFchrrama); UNIFchrrama = 0; }
+	if (boardname) { FCEU_free(boardname); boardname = 0; }
 	for (int x = 0; x < 32; x++)
-		if (malloced[x]) { free(malloced[x]); malloced[x] = 0; }
+		if (malloced[x]) { FCEU_free(malloced[x]); malloced[x] = 0; }
 }
 
 void ResetUNIF(void) {
