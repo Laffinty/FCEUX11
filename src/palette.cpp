@@ -42,10 +42,12 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
+#include <memory>
 #include <cstring>
 
 bool force_grayscale = false;
-pal *grayscaled_palo = NULL;
+// v1.13 Purify F2c: grayscaled_palo was pal* (malloc/free); now std::unique_ptr<pal[]> RAII.
+static std::unique_ptr<pal[]> grayscaled_palo;
 
 pal palette_game[64*8]; //custom palette for an individual game. (formerly palettei)
 pal palette_user[64*8]; //user's overridden palette (formerly palettec)
@@ -490,17 +492,18 @@ static void ChoosePalette(void)
 	{
 		// need to apply grayscale filter
 		// allocate memory for grayscale palette
-		if (grayscaled_palo == NULL)
-			grayscaled_palo = (pal*)malloc(sizeof(pal) * 64 * 8);
-		fceux11_rust_palette_make_grayscale(reinterpret_cast<const Pal*>(palo), reinterpret_cast<Pal*>(grayscaled_palo));
+		if (!grayscaled_palo)
+		{
+			grayscaled_palo = std::make_unique<pal[]>(64 * 8);
+		}
+		fceux11_rust_palette_make_grayscale(reinterpret_cast<const Pal*>(palo), reinterpret_cast<Pal*>(grayscaled_palo.get()));
 		// apply new palette
-		palo = grayscaled_palo;
+		palo = grayscaled_palo.get();
 	}
-	else if (grayscaled_palo != NULL)
+	else if (grayscaled_palo)
 	{
-		// free allocated memory if the grayscale filter is not used anymore
-		free(grayscaled_palo);
-		grayscaled_palo = NULL;
+		// RAII unique_ptr frees on reset()
+		grayscaled_palo.reset();
 	}
 }
 
