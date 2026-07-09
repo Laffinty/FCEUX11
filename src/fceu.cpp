@@ -427,14 +427,14 @@ FCEUGI *fceu11::LoadGameVirtual(const char *name, int OverwriteVidMode, bool sil
 
 	if (!AutosaveStatus) {
 		AutosaveStatus_owner = FCEU_gmalloc_unique(sizeof(int) * AutosaveQty);  // v0.3.6: RAII-wrapped
-		AutosaveStatus = (int*)AutosaveStatus_owner.get();
+		AutosaveStatus = reinterpret_cast<int*>(AutosaveStatus_owner.get());
 	}
 	for (AutosaveIndex = 0; AutosaveIndex < AutosaveQty; ++AutosaveIndex)
 		AutosaveStatus[AutosaveIndex] = 0;
 
 	FCEU_CloseGame();
 	GameInfo = new FCEUGI();
-	memset( (void*)GameInfo, 0, sizeof(FCEUGI));
+	memset( static_cast<void*>(GameInfo), 0, sizeof(FCEUGI));
 
 	GameInfo->filename = fp->filename;
 	if (fp->archiveFilename != "")
@@ -903,7 +903,7 @@ void FCEU_MemoryRand(uint8 *ptr, uint32 size, bool default_zero) {
 				break;
 			case 1: v = 0xFF; break;
 			case 2: v = 0x00; break;
-			case 3: v = (u8)(xoroshiro128plus_next()); break;
+			case 3: v = static_cast<u8>(xoroshiro128plus_next()); break;
 
 			// the default is this 8 byte pattern: 00 00 00 00 FF FF FF FF
 			// it has been used in FCEUX since time immemorial
@@ -934,7 +934,7 @@ void PowerNES(void) {
 	extern int disableBatteryLoading;
 	if(FCEUMOV_Mode(MOVIEMODE_INACTIVE) && !disableBatteryLoading)
 	{
-		RAMInitSeed = rand() ^ (u32)xoroshiro128plus_next();
+		RAMInitSeed = rand() ^ static_cast<u32>(xoroshiro128plus_next());
 	}
 
 	//always reseed the PRNG with the current seed, for deterministic results (for that seed)
@@ -1410,7 +1410,7 @@ bool FCEUXLoad(const char *name, FCEUFILE *fp) {
 	mapper |= (head.ROM_type2 & 0xF0);
 
 	//choose what kind of cart to use.
-	cart = (FCEUXCart*)new NROM();
+	cart = reinterpret_cast<FCEUXCart*>(new NROM());
 
 	//fceu ines loading code uses 256 here when the romsize is 0.
 	cart->prgPages = head.ROM_size;
@@ -1441,8 +1441,8 @@ bool FCEUXLoad(const char *name, FCEUFILE *fp) {
 	//setup the emulator
 	GameInterface = FCEUXGameInterface;
 	ResetCartMapping();
-	SetupCartPRGMapping(0, (uint8*)cart->PRG, cart->prgSize, 0);
-	SetupCartCHRMapping(0, (uint8*)cart->CHR, cart->chrSize, 0);
+	SetupCartPRGMapping(0, reinterpret_cast<uint8*>(cart->PRG), cart->prgSize, 0);
+	SetupCartCHRMapping(0, reinterpret_cast<uint8*>(cart->CHR), cart->chrSize, 0);
 
 	return true;
 }
@@ -1450,7 +1450,7 @@ bool FCEUXLoad(const char *name, FCEUFILE *fp) {
 uint8 FCEU_ReadRomByte(uint32 i) {
 	extern iNES_HEADER head;
 	if (i < 16)
-		return *((unsigned char*)&head + i);
+		return *reinterpret_cast<unsigned char*>(&head + i);
 	if (i < 16 + PRGsize[0])
 		return PRGptr[0][i - 16];
 	if (i < 16 + PRGsize[0] + CHRsize[0])

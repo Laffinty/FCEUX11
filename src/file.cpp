@@ -74,7 +74,7 @@ void ApplyIPS(FILE *ips, FCEUFILE* fp)
 
 	if(!ips) return;
 
-	char* buf = (char*)FCEU_malloc(fp->size);
+	char* buf = static_cast<char*>(FCEU_malloc(fp->size));
 	// v0.3.10: buf() now returns std::byte*. Reinterpret for memcpy into
 	// the char* scratch buffer (both are 1-byte trivial types).
 	memcpy(buf, reinterpret_cast<const void*>(fp->EnsureMemorystream()->buf()), fp->size);
@@ -112,10 +112,10 @@ void ApplyIPS(FILE *ips, FCEUFILE* fp)
 
 			//FCEU_printf("  Offset: %8d  Size: %5d RLE\n",offset,size);
 
-			if((offset+size)>(uint32)fp->size)
+			if((offset+size)>static_cast<uint32>(fp->size))
 			{
 				// Probably a little slow.
-				char *newbuf=(char *)FCEU_realloc(buf,offset+size);
+				char *newbuf = static_cast<char*>(FCEU_realloc(buf,offset+size));
 				buf=newbuf;
 				memset(buf+fp->size,0,offset+size-fp->size);
 				fp->size=offset+size;
@@ -131,10 +131,10 @@ void ApplyIPS(FILE *ips, FCEUFILE* fp)
 		else		/* Normal patch */
 		{
 			//FCEU_printf("  Offset: %8d  Size: %5d\n",offset,size);
-			if((offset+size)>(uint32)fp->size)
+			if((offset+size)>static_cast<uint32>(fp->size))
 			{
 				// Probably a little slow.
-				char *newbuf=(char *)FCEU_realloc(buf,offset+size);
+				char *newbuf = static_cast<char*>(FCEU_realloc(buf,offset+size));
 				buf=newbuf;
 				memset(buf+fp->size,0,offset+size-fp->size);
 				fp->size=offset+size;
@@ -187,7 +187,7 @@ FileBaseInfo DetermineFileBase(const char *f) {
 
         if(dir[0] == 0) FCEU_strlcpy(dir, sizeof(dir), ".");
 
-	return FileBaseInfo((std::string)drv + dir,name,ext);
+	return FileBaseInfo(std::string(drv) + dir,name,ext);
 
 }
 
@@ -499,7 +499,7 @@ void FCEUI_SetDirOverride(int which, char *n)
 		va_list ap;
 		int ret;
 
-		if(!(*strp=(char*)FCEU_malloc(2048))) //mbg merge 7/17/06 cast to char*
+		if(!(*strp=static_cast<char*>(FCEU_malloc(2048))))
 			return(0);
 		va_start(ap,fmt);
 		ret=vsnprintf(*strp,2048,fmt,ap);
@@ -604,13 +604,13 @@ std::string FCEU_MakePath(int type, const char* filebase)
 	{
 		case FCEUMKF_MOVIE:
 			if(odirs[FCEUIOD_MOVIES])
-				return (std::string)odirs[FCEUIOD_MOVIES] + PSS + filebase;
+				return std::string(odirs[FCEUIOD_MOVIES]) + PSS + filebase;
 			else
 				return BaseDirectory + PSS + "movies" + PSS + filebase;
 			break;
 		case FCEUMKF_STATE:
 			if(odirs[FCEUIOD_STATES])
-				return (std::string)odirs[FCEUIOD_STATES] + PSS + filebase;
+				return std::string(odirs[FCEUIOD_STATES]) + PSS + filebase;
 			else
 				return BaseDirectory + PSS + "fcs" + PSS + filebase;
 			break;

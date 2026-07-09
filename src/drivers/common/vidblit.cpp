@@ -69,8 +69,8 @@ static uint32 *palrgb2 = NULL;	// buffer for lookup values of blended moir phase
 static FceuMallocPtr palrgb2_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static float  *moire   = NULL;	// modulated signal
 static FceuMallocPtr moire_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
-const  float   phasex  = (float) 5/18*2;
-const  float   phasey  = (float) 1/ 6*2;
+const  float   phasex  = static_cast<float>(5)/18*2;
+const  float   phasey  = static_cast<float>(1)/6*2;
 const  float   pi      = 3.14f;
 int    palnotch        = 100;
 int    palsaturation   = 100;
@@ -82,7 +82,7 @@ bool   paldeemphswap   = 0;
 
 static int Round(float value)
 {
-   return (int) floor(value + 0.5);
+   return static_cast<int>(floor(value + 0.5));
 }
 
 static int PAL_LUT(uint32 *buffer, int index, int x, int y)
@@ -137,7 +137,7 @@ int InitBlitToHigh(int b, uint32 rmask, uint32 gmask, uint32 bmask, int efx, int
 		}
 		
 		nes_ntsc_owner = FCEU_gmalloc_unique(sizeof (nes_ntsc_t));  // v0.3.6: RAII-wrapped
-		nes_ntsc = (nes_ntsc_t*)nes_ntsc_owner.get();
+		nes_ntsc = reinterpret_cast<nes_ntsc_t*>(nes_ntsc_owner.get());
 		
 		if ( nes_ntsc )
 		{
@@ -150,7 +150,7 @@ int InitBlitToHigh(int b, uint32 rmask, uint32 gmask, uint32 bmask, int efx, int
 	else if(specfilt == 2 || specfilt == 5) // scale2x and scale3x
 	{
 		int multi = ((specfilt == 2) ? 2 * 2 : 3 * 3);		
-		specbuf8bpp = (uint8*)FCEU_dmalloc(256*240*multi); //mbg merge 7/17/06 added cast		
+		specbuf8bpp = static_cast<uint8*>(FCEU_dmalloc(256*240*multi));		
 	} // -Video Modes Tag-
 	else if(specfilt == 1 || specfilt == 4) // hq2x and hq3x
 	{ 
@@ -186,9 +186,9 @@ int InitBlitToHigh(int b, uint32 rmask, uint32 gmask, uint32 bmask, int efx, int
 			}
 			// -Video Modes Tag-
 			if(specfilt == 1)
-				specbuf32bpp = (uint32*)FCEU_dmalloc(256*240*4*sizeof(uint32)); //mbg merge 7/17/06 added cast
+				specbuf32bpp = static_cast<uint32*>(FCEU_dmalloc(256*240*4*sizeof(uint32)));
 			else if(specfilt == 4)
-				specbuf32bpp = (uint32*)FCEU_dmalloc(256*240*9*sizeof(uint32)); //mbg merge 7/17/06 added cast
+				specbuf32bpp = static_cast<uint32*>(FCEU_dmalloc(256*240*9*sizeof(uint32)));
 		}
 		
 		efx=0;
@@ -203,22 +203,22 @@ int InitBlitToHigh(int b, uint32 rmask, uint32 gmask, uint32 bmask, int efx, int
 		else
 			hq2x_InitLUTs();
 		
-		specbuf=(uint16*)FCEU_dmalloc(256*240*sizeof(uint16)); //mbg merge 7/17/06 added cast
+		specbuf = static_cast<uint16*>(FCEU_dmalloc(256*240*sizeof(uint16)));
 	}
 	else if (specfilt >= 6 && specfilt <= 8)
 	{
 		int multi = specfilt - 4; // magic assuming prescales are specfilt >= 6
 		prescalebuf_owner = FCEU_gmalloc_unique(256*240*multi*sizeof(uint32));  // v0.3.6: RAII-wrapped
-		prescalebuf = (uint32*)prescalebuf_owner.get();
+		prescalebuf = reinterpret_cast<uint32*>(prescalebuf_owner.get());
 	}
 	else if (specfilt == 9)
 	{
 		palrgb_owner = FCEU_gmalloc_unique((256+512)*PAL_PHASES*sizeof(uint32));  // v0.3.6: RAII-wrapped
-		palrgb = (uint32*)palrgb_owner.get();
+		palrgb = reinterpret_cast<uint32*>(palrgb_owner.get());
 		palrgb2_owner = FCEU_gmalloc_unique((256+512)*PAL_PHASES*sizeof(uint32));  // v0.3.6: RAII-wrapped
-		palrgb2 = (uint32*)palrgb2_owner.get();
+		palrgb2 = reinterpret_cast<uint32*>(palrgb2_owner.get());
 		moire_owner = FCEU_gmalloc_unique(PAL_PHASES*sizeof(float));  // v0.3.6: RAII-wrapped
-		moire = (float*)moire_owner.get();
+		moire = reinterpret_cast<float*>(moire_owner.get());
 		palupdate  = 1;
 	}
 
@@ -236,7 +236,7 @@ int InitBlitToHigh(int b, uint32 rmask, uint32 gmask, uint32 bmask, int efx, int
 		palettetranslate = NULL;
 	}
 	palettetranslate_owner = FCEU_gmalloc_unique(256*4 + 512*4);  // v0.3.6: RAII-wrapped
-	palettetranslate = (uint32*)palettetranslate_owner.get();
+	palettetranslate = reinterpret_cast<uint32*>(palettetranslate_owner.get());
 	
 	if(!palettetranslate)
 		return(0);
@@ -679,8 +679,8 @@ void Blit8ToHigh(uint8 *src, uint8 *dest, int xr, int yr, int pitch, int xscale,
 			int16 R,G,B;
 			float Y,U,V;
 			float alpha;
-			float sat = (float) palsaturation/100;
-			float contrast = (float) palcontrast/100;
+			float sat = static_cast<float>(palsaturation)/100;
+			float contrast = static_cast<float>(palcontrast)/100;
 			int bright = palbrightness - 50;
 			int notch = palnotch;
 			int unnotch = 100 - palnotch;
@@ -877,7 +877,7 @@ void Blit8ToHigh(uint8 *src, uint8 *dest, int xr, int yr, int pitch, int xscale,
 					burst_phase ^= 1;
 
 					u8* srcD = XDBuf + (src-XBuf); // get deemphasis buffer
-					nes_ntsc_blit( nes_ntsc, (unsigned char*)src, (unsigned char*)srcD, xr, burst_phase, xr, yr, ntscblit, (2*outxr) * Bpp );
+					nes_ntsc_blit( nes_ntsc, src, srcD, xr, burst_phase, xr, yr, ntscblit, (2*outxr) * Bpp );
 
 					const uint8 *in = ntscblit + (Bpp * xscale);
 					uint8 *out = dest;
@@ -925,7 +925,7 @@ void Blit8ToHigh(uint8 *src, uint8 *dest, int xr, int yr, int pitch, int xscale,
 							int too=xscale;
 							do
 							{
-								uint32 tmp=palettetranslate[(uint32)*src];
+								uint32 tmp=palettetranslate[static_cast<uint32>(*src)];
 								*(uint8 *)dest=tmp;
 								*((uint8 *)dest+1)=tmp>>8;
 								*((uint8 *)dest+2)=tmp>>16;
@@ -1025,22 +1025,22 @@ void Blit8ToHigh(uint8 *src, uint8 *dest, int xr, int yr, int pitch, int xscale,
 			int mult = (silt == 4)?3:2;
 			
 			if(silt == 4)
-				hq3x_32((uint8 *)specbuf,(uint8*)specbuf32bpp,xr,yr,xr*3*sizeof(uint32));
+				hq3x_32(reinterpret_cast<uint8*>(specbuf), reinterpret_cast<uint8*>(specbuf32bpp), xr, yr, xr*3*sizeof(uint32));
 			else
-				hq2x_32((uint8 *)specbuf,(uint8*)specbuf32bpp,xr,yr,xr*2*sizeof(uint32));
+				hq2x_32(reinterpret_cast<uint8*>(specbuf), reinterpret_cast<uint8*>(specbuf32bpp), xr, yr, xr*2*sizeof(uint32));
 			
 			if(backBpp == 2)
-				Blit32to16(specbuf32bpp, (uint16*)destbackup, xr*mult, yr*mult, pitchbackup, backshiftr,backshiftl);
+				Blit32to16(specbuf32bpp, reinterpret_cast<uint16*>(destbackup), xr*mult, yr*mult, pitchbackup, backshiftr,backshiftl);
 			else // == 3
-				Blit32to24(specbuf32bpp, (uint8*)destbackup, xr*mult, yr*mult, pitchbackup);
+				Blit32to24(specbuf32bpp, reinterpret_cast<uint8*>(destbackup), xr*mult, yr*mult, pitchbackup);
 		}
 		else
 		{
 			// -Video Modes Tag-
 			if(silt == 4)
-				hq3x_32((uint8 *)specbuf,destbackup,xr,yr,pitchbackup);
+				hq3x_32(reinterpret_cast<uint8*>(specbuf), destbackup, xr, yr, pitchbackup);
 			else
-				hq2x_32((uint8 *)specbuf,destbackup,xr,yr,pitchbackup);
+				hq2x_32(reinterpret_cast<uint8*>(specbuf), destbackup, xr, yr, pitchbackup);
 		}
 	}
 }

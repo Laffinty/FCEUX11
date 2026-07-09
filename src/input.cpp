@@ -228,25 +228,25 @@ static void UpdateGP(int w, void *data, int arg)
 	if(w==0)	//adelikat, 3/14/09: Changing the joypads to inclusive OR the user's joypad + the Lua joypad, this way lua only takes over the buttons it explicity says to
 	{			//FatRatKnight: Assume lua is always good. If it's doing nothing in particular using my logic, it'll pass-through the values anyway.
 		#ifdef _S9XLUA_H
-		joy[0]= *(uint32 *)joyports[0].ptr;
+		joy[0]= *static_cast<uint32*>(joyports[0].ptr);
 		joy[0]= FCEU_LuaReadJoypad(0,joy[0]);
-		joy[2]= *(uint32 *)joyports[0].ptr >> 16;
+		joy[2]= *static_cast<uint32*>(joyports[0].ptr) >> 16;
 		joy[2]= FCEU_LuaReadJoypad(2,joy[2]);
 		#else // without this, there seems to be no input at all without Lua
-		joy[0] = *(uint32 *)joyports[0].ptr;;
-		joy[2] = *(uint32 *)joyports[0].ptr >> 16;
+		joy[0] = *static_cast<uint32*>(joyports[0].ptr);;
+		joy[2] = *static_cast<uint32*>(joyports[0].ptr) >> 16;
 		#endif
 	}
 	else
 	{
 		#ifdef _S9XLUA_H
-		joy[1]= *(uint32 *)joyports[1].ptr >> 8;
+		joy[1]= *static_cast<uint32*>(joyports[1].ptr) >> 8;
 		joy[1]= FCEU_LuaReadJoypad(1,joy[1]);
-		joy[3]= *(uint32 *)joyports[1].ptr >> 24;
+		joy[3]= *static_cast<uint32*>(joyports[1].ptr) >> 24;
 		joy[3]= FCEU_LuaReadJoypad(3,joy[3]);
 		#else // same goes for the other two pads
-		joy[1] = *(uint32 *)joyports[1].ptr >> 8;
-		joy[3] = *(uint32 *)joyports[1].ptr >> 24;
+		joy[1] = *static_cast<uint32*>(joyports[1].ptr) >> 8;
+		joy[3] = *static_cast<uint32*>(joyports[1].ptr) >> 24;
 		#endif
 	}
 
@@ -318,13 +318,13 @@ static void UpdateSNES(int w, void *data, int arg)
 	//LUA NOT SUPPORTED YET
 	if(w==0)
 	{
-		snesjoy[0]= ((uint32 *)joyports[0].ptr)[0];
-		snesjoy[2]= ((uint32 *)joyports[0].ptr)[2];
+		snesjoy[0]= static_cast<uint32*>(joyports[0].ptr)[0];
+		snesjoy[2]= static_cast<uint32*>(joyports[0].ptr)[2];
 	}
 	else
 	{
-		snesjoy[1] = ((uint32 *)joyports[0].ptr)[1];
-		snesjoy[3] = ((uint32 *)joyports[0].ptr)[3];
+		snesjoy[1] = static_cast<uint32*>(joyports[0].ptr)[1];
+		snesjoy[3] = static_cast<uint32*>(joyports[0].ptr)[3];
 	}
 
 }
@@ -537,7 +537,7 @@ static void SetInputStuff(int port)
 
 static void SetInputStuffFC()
 {
-	// v0.3.8: cast ESIFC to int â€?see SetInputStuff comment above.
+	// v0.3.8: cast ESIFC to int ï¿½?see SetInputStuff comment above.
 	switch(static_cast<int>(portFC.type))
 	{
 	case SIFC_NONE:

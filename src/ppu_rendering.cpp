@@ -426,7 +426,7 @@ static void RefreshLine(int lastpixel) {
 		uint32 tem;
 		tem = READPAL(0) | (READPAL(0) << 8) | (READPAL(0) << 16) | (READPAL(0) << 24);
 		tem |= 0x40404040;
-		*(uint32*)Plinef = *(uint32*)(Plinef + 4) = tem;
+		*reinterpret_cast<uint32*>(Plinef) = *reinterpret_cast<uint32*>(Plinef + 4) = tem;
 	}
 
 	if (!ScreenON) {
@@ -524,22 +524,22 @@ void DoLine(void) {
 	{
 		if (PPU[1] & 0x01) {
 			for (x = 63; x >= 0; x--)
-				*(uint32*)&target[x << 2] = (*(uint32*)&target[x << 2]) & 0x30303030;
+				*reinterpret_cast<uint32*>(&target[x << 2]) = (*reinterpret_cast<uint32*>(&target[x << 2])) & 0x30303030;
 		}
 	}
 
 	if ((PPU[1] >> 5) == 0x7) {
 		for (x = 63; x >= 0; x--)
-			*(uint32*)&target[x << 2] = ((*(uint32*)&target[x << 2]) & 0x3f3f3f3f) | 0xc0c0c0c0;
+			*reinterpret_cast<uint32*>(&target[x << 2]) = ((*reinterpret_cast<uint32*>(&target[x << 2])) & 0x3f3f3f3f) | 0xc0c0c0c0;
 	} else if (PPU[1] & 0xE0)
 		for (x = 63; x >= 0; x--)
-			*(uint32*)&target[x << 2] = (*(uint32*)&target[x << 2]) | 0x40404040;
+			*reinterpret_cast<uint32*>(&target[x << 2]) = (*reinterpret_cast<uint32*>(&target[x << 2])) | 0x40404040;
 	else
 		for (x = 63; x >= 0; x--)
-			*(uint32*)&target[x << 2] = ((*(uint32*)&target[x << 2]) & 0x3f3f3f3f) | 0x80808080;
+			*reinterpret_cast<uint32*>(&target[x << 2]) = ((*reinterpret_cast<uint32*>(&target[x << 2])) & 0x3f3f3f3f) | 0x80808080;
 
 	for (x = 63; x >= 0; x--)
-		*(uint32*)&dtarget[x << 2] = ((PPU[1]>>5)<<0)|((PPU[1]>>5)<<8)|((PPU[1]>>5)<<16)|((PPU[1]>>5)<<24);
+		*reinterpret_cast<uint32*>(&dtarget[x << 2]) = ((PPU[1]>>5)<<0)|((PPU[1]>>5)<<8)|((PPU[1]>>5)<<16)|((PPU[1]>>5)<<24);
 
 	sphitx = 0x100;
 
@@ -661,17 +661,17 @@ void FetchSpriteData(void) {
 	int vofs;
 	uint8 P0 = PPU[0];
 
-	spr = (SPR*)SPRAM;
+	spr = reinterpret_cast<SPR*>(SPRAM);
 	H = 8;
 
 	ns = sb = 0;
 
-	vofs = (uint32)(P0 & 0x8 & (((P0 & 0x20) ^ 0x20) >> 2)) << 9;
+	vofs = static_cast<uint32>(P0 & 0x8 & (((P0 & 0x20) ^ 0x20) >> 2)) << 9;
 	H += (P0 & 0x20) >> 2;
 
 	if (!PPU_hook)
 		for (n = 63; n >= 0; n--, spr++) {
-			if ((uint32)(g_cpu.scanline_ref() - spr->y) >= H) continue;
+			if (static_cast<uint32>(g_cpu.scanline_ref() - spr->y) >= H) continue;
 			if (ns < maxsprites) {
 				if (n == 63) sb = 1;
 
@@ -681,7 +681,7 @@ void FetchSpriteData(void) {
 					int t;
 					uint32 vadr;
 
-					t = (int)g_cpu.scanline_ref() - (spr->y);
+					t = static_cast<int>(g_cpu.scanline_ref()) - (spr->y);
 
 					if (Sprite16)
 						vadr = ((spr->no & 1) << 12) + ((spr->no & 0xFE) << 4);
@@ -713,7 +713,7 @@ void FetchSpriteData(void) {
 					dst.x = spr->x;
 					dst.atr = spr->atr;
 
-					*(uint32*)&SPRBUF[ns << 2] = *(uint32*)&dst;
+					*reinterpret_cast<uint32*>(&SPRBUF[ns << 2]) = *reinterpret_cast<uint32*>(&dst);
 				}
 
 				ns++;
@@ -724,7 +724,7 @@ void FetchSpriteData(void) {
 		}
 	else
 		for (n = 63; n >= 0; n--, spr++) {
-			if ((uint32)(g_cpu.scanline_ref() - spr->y) >= H) continue;
+			if (static_cast<uint32>(g_cpu.scanline_ref() - spr->y) >= H) continue;
 
 			if (ns < maxsprites) {
 				if (n == 63) sb = 1;
@@ -735,7 +735,7 @@ void FetchSpriteData(void) {
 					int t;
 					uint32 vadr;
 
-					t = (int)g_cpu.scanline_ref() - (spr->y);
+					t = static_cast<int>(g_cpu.scanline_ref()) - (spr->y);
 
 					if (Sprite16)
 						vadr = ((spr->no & 1) << 12) + ((spr->no & 0xFE) << 4);
@@ -770,7 +770,7 @@ void FetchSpriteData(void) {
 					dst.atr = spr->atr;
 
 
-					*(uint32*)&SPRBUF[ns << 2] = *(uint32*)&dst;
+					*reinterpret_cast<uint32*>(&SPRBUF[ns << 2]) = *reinterpret_cast<uint32*>(&dst);
 				}
 
 				ns++;
@@ -803,7 +803,7 @@ void RefreshSprites(void) {
 
 	FCEU_dwmemset(sprlinebuf, 0x80808080, 256);
 	numsprites--;
-	spr = (SPRB*)SPRBUF + numsprites;
+	spr = reinterpret_cast<SPRB*>(SPRBUF) + numsprites;
 
 	for (n = numsprites; n >= 0; n--, spr--) {
 		uint32 pixdata;
@@ -1454,7 +1454,7 @@ int FCEUX_PPU_Loop(int skip) {
 
 					//note that we stuff the oam index into [6].
 					//i need to turn this into a struct so we can have fewer magic numbers
-					oams[scanslot][oamcount][6] = (uint8)i;
+					oams[scanslot][oamcount][6] = static_cast<uint8>(i);
 					oamcount++;
 				}
 			}

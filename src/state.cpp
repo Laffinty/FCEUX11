@@ -141,7 +141,7 @@ SFORMAT SFCPUC[]={
 	{ 0 }
 };
 
-void foo(uint8* test) { (void)test; }
+void foo(uint8* test) { static_cast<void>(test); }
 
 static int SubWrite(EMUFILE* os, SFORMAT *sf)
 {
@@ -153,7 +153,7 @@ static int SubWrite(EMUFILE* os, SFORMAT *sf)
 		{
 			uint32 tmp;
 
-			if(!(tmp=SubWrite(os,(SFORMAT *)sf->v)))
+			if(!(tmp=SubWrite(os,static_cast<SFORMAT*>(sf->v))))
 				return(0);
 			acc+=tmp;
 			sf++;
@@ -171,23 +171,23 @@ static int SubWrite(EMUFILE* os, SFORMAT *sf)
 
 #ifdef FCEU_BIG_ENDIAN
 			if(sf->s&RLSB)
-				FlipByteOrder((uint8*)sf->v,sf->s&(~FCEUSTATE_FLAGS));
+		FlipByteOrder(static_cast<uint8*>(sf->v),sf->s&(~FCEUSTATE_FLAGS));
 #endif
 
-			if(sf->s&FCEUSTATE_INDIRECT)
+		if(sf->s&FCEUSTATE_INDIRECT)
 				os->fwrite(std::span<const std::byte>(
-					reinterpret_cast<const std::byte*>(*(char **)sf->v), sf->s&(~FCEUSTATE_FLAGS)));
+					reinterpret_cast<const std::byte*>(*static_cast<char**>(sf->v)), sf->s&(~FCEUSTATE_FLAGS)));
 			else
 				os->fwrite(std::span<const std::byte>(
-					reinterpret_cast<const std::byte*>((char*)sf->v), sf->s&(~FCEUSTATE_FLAGS)));
+					reinterpret_cast<const std::byte*>(static_cast<char*>(sf->v)), sf->s&(~FCEUSTATE_FLAGS)));
 
 			//Now restore the original byte order.
 #ifdef FCEU_BIG_ENDIAN
 			if(sf->s&RLSB)
-				FlipByteOrder((uint8*)sf->v,sf->s&(~FCEUSTATE_FLAGS));
+		FlipByteOrder(static_cast<uint8*>(sf->v),sf->s&(~FCEUSTATE_FLAGS));
 #endif
-		}
-		sf++;
+	}
+	sf++;
 	}
 
 	return(acc);
@@ -200,7 +200,7 @@ static SFORMAT *CheckS(SFORMAT *sf, uint32 tsize, char *desc)
 		if(sf->s==~0u)		// Link to another SFORMAT structure.
 		{
 			SFORMAT *tmp;
-			if((tmp= CheckS((SFORMAT *)sf->v, tsize, desc) ))
+			if((tmp= CheckS(static_cast<SFORMAT*>(sf->v), tsize, desc) ))
 				return(tmp);
 			sf++;
 			continue;
@@ -235,18 +235,18 @@ static bool ReadStateChunk(EMUFILE* is, SFORMAT *sf, int size)
 		{
 			if(tmp->s&FCEUSTATE_INDIRECT)
 				is->fread(std::span<std::byte>(
-					reinterpret_cast<std::byte*>(*(char **)tmp->v), tmp->s&(~FCEUSTATE_FLAGS)));
+					reinterpret_cast<std::byte*>(*static_cast<char**>(tmp->v)), tmp->s&(~FCEUSTATE_FLAGS)));
 			else
 				is->fread(std::span<std::byte>(
-					reinterpret_cast<std::byte*>((char *)tmp->v), tmp->s&(~FCEUSTATE_FLAGS)));
+					reinterpret_cast<std::byte*>(static_cast<char*>(tmp->v)), tmp->s&(~FCEUSTATE_FLAGS)));
 
 #ifdef FCEU_BIG_ENDIAN
 			if(tmp->s&RLSB)
-				FlipByteOrder((uint8*)tmp->v,tmp->s&(~FCEUSTATE_FLAGS));
+		FlipByteOrder(static_cast<uint8*>(tmp->v),tmp->s&(~FCEUSTATE_FLAGS));
 #endif
-		}
-		else
-			is->fseek(tsize,SEEK_CUR);
+	}
+	else
+		is->fseek(tsize,SEEK_CUR);
 	} // while(...)
 	return true;
 }
@@ -274,19 +274,19 @@ static bool ReadStateChunkFromBuffer(const uint8_t* data, int size, SFORMAT *sf)
 
 		if((tmp=CheckS(sf,tsize,toa)))
 		{
-			if(pos + (int)tsize > end)
+			if(pos + static_cast<int>(tsize) > end)
 				return false;
 			if(tmp->s&FCEUSTATE_INDIRECT)
-				memcpy(*(char **)tmp->v, data + pos, tmp->s&(~FCEUSTATE_FLAGS));
+				memcpy(*static_cast<char**>(tmp->v), data + pos, tmp->s&(~FCEUSTATE_FLAGS));
 			else
-				memcpy((char *)tmp->v, data + pos, tmp->s&(~FCEUSTATE_FLAGS));
+				memcpy(static_cast<char*>(tmp->v), data + pos, tmp->s&(~FCEUSTATE_FLAGS));
 
 #ifdef FCEU_BIG_ENDIAN
 			if(tmp->s&RLSB)
-				FlipByteOrder((uint8*)tmp->v,tmp->s&(~FCEUSTATE_FLAGS));
+		FlipByteOrder(static_cast<uint8*>(tmp->v),tmp->s&(~FCEUSTATE_FLAGS));
 #endif
-		}
-		pos += tsize;
+}
+pos += tsize;
 	}
 	return true;
 }
@@ -431,7 +431,7 @@ void FCEUSS_Save(const char *fname, bool display_message)
 	// (requires vcpkg `directstorage` dep and a 1-2 person-day
 	// refactor of EMUFILE_FILE).
 	extern fceu11::platform::win11::DirectStorageCaps g_directStorageCaps;
-	(void)g_directStorageCaps; // referenced for future v0.4.x takeover
+	static_cast<void>(g_directStorageCaps); // referenced for future v0.4.x takeover
 
 	if (geniestage==1)
 	{
@@ -586,7 +586,7 @@ bool FCEUSS_LoadFP(EMUFILE* is, ENUM_SSLOADPARAMS params)
 	for (size_t i = 0; i < chunkCount; i++) {
 		uint8_t t = rustChunks[i].chunk_type;
 		uint8_t* data = rustChunks[i].data;
-		int size = (int)rustChunks[i].len;
+		int size = static_cast<int>(rustChunks[i].len);
 
 		switch (t) {
 		case 1:
@@ -821,7 +821,7 @@ void ResetExState(void (*PreSave)(void), void (*PostSave)(void))
 	for(x=0;x<SFEXINDEX;x++)
 	{
 		if(SFMDATA[x].desc)
-			FCEU_free( (void*)SFMDATA[x].desc);
+			FCEU_free(const_cast<void*>(static_cast<const void*>(SFMDATA[x].desc)));
 	}
 	// adelikat, 3/14/09:  had to add this to clear out the size parameter.  NROM(mapper 0) games were having savestate crashes if loaded after a non NROM game	because the size variable was carrying over and causing savestates to save too much data
 	SFMDATA[0].s = 0;
@@ -848,7 +848,7 @@ void AddExState(void *v, uint32 s, int type, const char *desc)
 	
 	if(s==~0u)
 	{
-		SFORMAT* sf = (SFORMAT*)v;
+		SFORMAT* sf = static_cast<SFORMAT*>(v);
 		std::map<std::string,bool> names;
 		while(sf->v)
 		{
@@ -872,13 +872,13 @@ void AddExState(void *v, uint32 s, int type, const char *desc)
 	if(desc)
 	{
 		// v0.3.6.5-followup: capture the actual buffer size; do NOT use
-		// sizeof((char*)SFMDATA[SFEXINDEX].desc) â€?that is the size of a
+		// sizeof((char*)SFMDATA[SFEXINDEX].desc) ï¿½?that is the size of a
 		// pointer (8 on x64), not the malloc'd buffer, and triggers an
 		// ASan heap-buffer-overflow for any desc shorter than 7 chars
 		// (e.g. the 4-char "CHRR"/"EXNR" tags registered during iNES_Init).
 		const size_t desc_len = strlen(desc) + 1;
-		SFMDATA[SFEXINDEX].desc = (const char *)FCEU_malloc(desc_len);
-		FCEU_strlcpy((char*)SFMDATA[SFEXINDEX].desc, desc_len, desc);
+		SFMDATA[SFEXINDEX].desc = static_cast<const char*>(FCEU_malloc(desc_len));
+		FCEU_strlcpy(const_cast<char*>(SFMDATA[SFEXINDEX].desc), desc_len, desc);
 	}
 	else
 		SFMDATA[SFEXINDEX].desc=0;

@@ -81,7 +81,7 @@ bool oldInputDisplay = false;
 unsigned int lastu = 0;
 
 // v0.2.27: AsSnapshotName is owned by Rust (fceux11_rust_video_*).
-// The C++ side is a thin pass-through â€?see FCEUI_SetSnapshotAsName /
+// The C++ side is a thin pass-through ï¿½?see FCEUI_SetSnapshotAsName /
 // FCEUI_GetSnapshotAsName below. The std::string global is gone.
 
 void FCEUI_SetSnapshotAsName(std::string name)
@@ -144,10 +144,10 @@ int FCEU_InitVirtualVideo(void)
 	if(XBuf)
 		return 1;
 	
-	XBuf = (u8*)FCEU_amalloc(256 * 256);
-	XBackBuf = (u8*)FCEU_amalloc(256 * 256);
-	XDBuf = (u8*)FCEU_amalloc(256 * 256);
-	XDBackBuf = (u8*)FCEU_amalloc(256 * 256);
+	XBuf = static_cast<u8*>(FCEU_amalloc(256 * 256));
+	XBackBuf = static_cast<u8*>(FCEU_amalloc(256 * 256));
+	XDBuf = static_cast<u8*>(FCEU_amalloc(256 * 256));
+	XDBackBuf = static_cast<u8*>(FCEU_amalloc(256 * 256));
 
 
 	xbsave = XBuf;
@@ -491,7 +491,7 @@ uint32 GetScreenPixel(int x, int y, bool usebackup) {
 
 	uint8 palette_64[64 * 3];
 	for (int i = 0; i < 64; ++i)
-		FCEUD_GetPalette((uint8)i, &palette_64[i*3], &palette_64[i*3+1], &palette_64[i*3+2]);
+		FCEUD_GetPalette(static_cast<uint8>(i), &palette_64[i*3], &palette_64[i*3+1], &palette_64[i*3+2]);
 
 	FceuSlice xbuf_slice     = { XBuf,     XBuf     ? 256*256 : 0 };
 	FceuSlice xbackbuf_slice = { XBackBuf, XBackBuf ? 256*256 : 0 };
@@ -500,11 +500,11 @@ uint32 GetScreenPixel(int x, int y, bool usebackup) {
 	FceuSliceMut rgb_mut     = { rgb, sizeof(rgb) };
 
 	int32_t rc = fceux11_rust_video_get_screen_pixel(
-		(int32_t)x, (int32_t)y, usebackup,
+		static_cast<int32_t>(x), static_cast<int32_t>(y), usebackup,
 		xbuf_slice, xbackbuf_slice, pal_slice, rgb_mut);
 	if (rc != 0)
-		return (uint32_t)-1;
-	return ((uint32_t)rgb[0] << 16) | ((uint32_t)rgb[1] << 8) | (uint32_t)rgb[2];
+		return static_cast<uint32_t>(-1);
+	return (static_cast<uint32_t>(rgb[0]) << 16) | (static_cast<uint32_t>(rgb[1]) << 8) | static_cast<uint32_t>(rgb[2]);
 }
 
 int GetScreenPixelPalette(int x, int y, bool usebackup) {
@@ -515,7 +515,7 @@ int GetScreenPixelPalette(int x, int y, bool usebackup) {
 	FceuSlice xbackbuf_slice = { XBackBuf, XBackBuf ? 256*256 : 0 };
 
 	return fceux11_rust_video_get_screen_pixel_palette(
-		(int32_t)x, (int32_t)y, usebackup,
+		static_cast<int32_t>(x), static_cast<int32_t>(y), usebackup,
 		xbuf_slice, xbackbuf_slice);
 }
 
@@ -571,7 +571,7 @@ int SaveSnapshot(void)
 	if (pp == NULL) return 0;
 
 	// Build the RGB scanlines (256 * 3 * totallines bytes).
-	const size_t rgb_bytes = (size_t)256 * 3 * (size_t)totallines;
+	const size_t rgb_bytes = static_cast<size_t>(256) * 3 * static_cast<size_t>(totallines);
 	std::vector<uint8> rgb(rgb_bytes, 0);
 	if (!video_build_rgb_scanlines(FSettings.FirstSLine, totallines, rgb.data()))
 	{
@@ -603,7 +603,7 @@ int SaveSnapshot(void)
 		return 0;
 	}
 	fclose(pp);
-	return (int)(u + 1);
+	return static_cast<int>(u + 1);
 }
 
 //overloaded SaveSnapshot for "Savesnapshot As" function
@@ -616,7 +616,7 @@ int SaveSnapshot(char fileName[512])
 	// Build the 256-entry NES palette (768 bytes).
 	uint8 pdata[256 * 3];
 	for (int x = 0; x < 256; ++x)
-		FCEUD_GetPalette((uint8)x, pdata + x*3, pdata + x*3 + 1, pdata + x*3 + 2);
+		FCEUD_GetPalette(static_cast<uint8>(x), pdata + x*3, pdata + x*3 + 1, pdata + x*3 + 2);
 
 	// Encode the indexed PNG into a stack buffer.
 	uint8 png_buf[256 * 1024];
@@ -697,14 +697,14 @@ void ShowFPS(void)
 
 	if ( da > FCEUD_GetTimeFreq() )
 	{
-		snprintf( fpsmsg, sizeof(fpsmsg), "%.1f", (double)boopcount / ((double)da / FCEUD_GetTimeFreq()));
+		snprintf( fpsmsg, sizeof(fpsmsg), "%.1f", static_cast<double>(boopcount) / (static_cast<double>(da) / FCEUD_GetTimeFreq()));
 
 		boopcount = 0;
 		boop_ts = ts;
 	}
 	boopcount++;
 
-	DrawTextTrans(XBuf + ((256 - ClipSidesOffset) - 40) + (FSettings.FirstSLine + 4) * 256, 256, (uint8*)fpsmsg, 0xA0);
+	DrawTextTrans(XBuf + ((256 - ClipSidesOffset) - 40) + (FSettings.FirstSLine + 4) * 256, 256, reinterpret_cast<uint8*>(fpsmsg), 0xA0);
 }
 
 bool showPauseCountDown = true;
@@ -733,7 +733,7 @@ static void FCEU_DrawPauseCountDown(uint8 *XBuf)
 
 			if (text[0])
 			{
-				DrawTextTrans(XBuf + ClipSidesOffset + (FSettings.FirstSLine) * 256, 256, (uint8*)text, 0xA0);
+				DrawTextTrans(XBuf + ClipSidesOffset + (FSettings.FirstSLine) * 256, 256, reinterpret_cast<uint8*>(text), 0xA0);
 			}
 		}
 	}
