@@ -2109,9 +2109,9 @@ void QTraceLogView::openBpEditWindow(int editIdx, watchpointinfo *wp, traceRecor
 			ebp->setChecked(true);
 		}
 
-		if (wp->condText)
+		if (!wp->condText.empty())
 		{
-			cond->setText(tr(wp->condText));
+			cond->setText(tr(wp->condText.c_str()));
 		}
 		else
 		{
@@ -2134,9 +2134,9 @@ void QTraceLogView::openBpEditWindow(int editIdx, watchpointinfo *wp, traceRecor
 			}
 		}
 
-		if (wp->desc)
+		if (wp->desc.size() > 0)
 		{
-			name->setText(tr(wp->desc));
+			name->setText(tr(wp->desc.c_str()));
 		}
 	}
 
@@ -2233,8 +2233,8 @@ void QTraceLogView::ctxMenuAddBP(void)
 	wp.address = selAddrValue;
 	wp.endaddress = 0;
 	wp.flags = WP_X | WP_E;
-	wp.condText = 0;
-	wp.desc = NULL;
+	wp.condText.clear();
+	wp.desc.clear();
 
 	if (selAddrLine >= 0)
 	{

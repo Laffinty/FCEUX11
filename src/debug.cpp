@@ -161,9 +161,8 @@ int checkCondition(const char* condition, int num)
 		if (watchpoint[num].cond)
 		{
 			delete watchpoint[num].cond;
-			free(watchpoint[num].condText);
+			watchpoint[num].condText.clear();
 			watchpoint[num].cond = 0;
-			watchpoint[num].condText = 0;
 		}
 
 		// If the creation of the BP condition object was succesful
@@ -173,10 +172,9 @@ int checkCondition(const char* condition, int num)
 		if (c)
 		{
 			watchpoint[num].cond = c;
-			watchpoint[num].condText = (char*)malloc(strlen(condition) + 1);
-			if (!watchpoint[num].condText)
-				return 0;
-			FCEU_strlcpy(watchpoint[num].condText, sizeof(watchpoint[num].condText), condition);
+			// v1.13 Purify F2c: was malloc/free + FCEU_strlcpy with broken sizeof() bug;
+			// std::string assignment is RAII and handles arbitrary lengths.
+			watchpoint[num].condText = condition;
 		}
 		else
 		{
@@ -191,9 +189,8 @@ int checkCondition(const char* condition, int num)
 		if (watchpoint[num].cond)
 		{
 			delete watchpoint[num].cond;
-			free(watchpoint[num].condText);
+			watchpoint[num].condText.clear();
 			watchpoint[num].cond = 0;
-			watchpoint[num].condText = 0;
 		}
 		return 0;
 	}
@@ -237,11 +234,9 @@ unsigned int NewBreak(const char* name, int start, int end, unsigned int type, c
 		watchpoint[num].flags|=BT_R;
 	}
 
-	if (watchpoint[num].desc)
-		free(watchpoint[num].desc);
-
-	watchpoint[num].desc = (char*)malloc(strlen(name) + 1);
-	FCEU_strlcpy(watchpoint[num].desc, sizeof(watchpoint[num].desc), name);
+	// v1.13 Purify F2c: was malloc/free + FCEU_strlcpy with broken sizeof() bug;
+	// std::string assignment is RAII and handles arbitrary lengths.
+	watchpoint[num].desc = name;
 
 	return checkCondition(condition, num);
 }

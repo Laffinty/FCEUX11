@@ -2040,9 +2040,9 @@ DebuggerBreakpointEditor::DebuggerBreakpointEditor(int editIndex, watchpointinfo
 		   ebp->setChecked(true);
 		}
 
-		if ( wp->condText )
+		if ( wp->condText.size() > 0 )
 		{
-			cond->setText( tr(wp->condText) );
+			cond->setText( tr(wp->condText.c_str()) );
 		}
 		else
 		{
@@ -2073,9 +2073,9 @@ DebuggerBreakpointEditor::DebuggerBreakpointEditor(int editIndex, watchpointinfo
 			}
 		}
 
-		if ( wp->desc )
+		if ( wp->desc.size() > 0 )
 		{
-			name->setText( tr(wp->desc) );
+			name->setText( tr(wp->desc.c_str()) );
 		}
 	}
 	else
@@ -2485,15 +2485,15 @@ void ConsoleDebugger::bpListUpdate( bool reset )
 		cond[0] = 0;
 		desc[0] = 0;
 
-		if (watchpoint[i].desc )
+		if (!watchpoint[i].desc.empty() )
 		{
-			safe_strcat( desc, sizeof(desc), watchpoint[i].desc);
+			safe_strcat( desc, sizeof(desc), watchpoint[i].desc.c_str());
 		}
 
-		if (watchpoint[i].condText )
+		if (!watchpoint[i].condText.empty() )
 		{
 			safe_strcat( cond, sizeof(cond), " (");
-			safe_strcat( cond, sizeof(cond), watchpoint[i].condText);
+			safe_strcat( cond, sizeof(cond), watchpoint[i].condText.c_str());
 			safe_strcat( cond, sizeof(cond), ") ");
 		}
 
@@ -2693,16 +2693,9 @@ static void DeleteBreak(int sel)
 	{
 		delete watchpoint[sel].cond;
 	}
-	if (watchpoint[sel].condText)
-	{
-		free(watchpoint[sel].condText);
-	}
-	if (watchpoint[sel].desc)
-	{
-		free(watchpoint[sel].desc);
-	}
+	// v1.13 Purify F2c/F3b: std::string is RAII-managed, no manual free needed
 	// move all BP items up in the list
-	for (int i = sel; i < numWPs; i++) 
+	for (int i = sel; i < numWPs; i++)
 	{
 		watchpoint[i].address = watchpoint[i+1].address;
 		watchpoint[i].endaddress = watchpoint[i+1].endaddress;
@@ -2718,8 +2711,8 @@ static void DeleteBreak(int sel)
 	watchpoint[numWPs].endaddress = 0;
 	watchpoint[numWPs].flags = 0;
 	watchpoint[numWPs].cond = 0;
-	watchpoint[numWPs].condText = 0;
-	watchpoint[numWPs].desc = 0;
+	watchpoint[numWPs].condText.clear();
+	watchpoint[numWPs].desc.clear();
 	numWPs--;
 
 	FCEU_WRAPPER_UNLOCK();
@@ -2742,21 +2735,14 @@ void debuggerClearAllBreakpoints(void)
 	   {
 	   	delete watchpoint[i].cond;
 	   }
-	   if (watchpoint[i].condText)
-	   {
-	   	free(watchpoint[i].condText);
-	   }
-	   if (watchpoint[i].desc)
-	   {
-	   	free(watchpoint[i].desc);
-	   }
+	   // v1.13 Purify F2c/F3b: std::string RAII; no manual free needed
 
 	   watchpoint[i].address = 0;
 	   watchpoint[i].endaddress = 0;
 	   watchpoint[i].flags = 0;
 	   watchpoint[i].cond = 0;
-	   watchpoint[i].condText = 0;
-	   watchpoint[i].desc = 0;
+	   watchpoint[i].condText.clear();
+	   watchpoint[i].desc.clear();
 	}
 	numWPs = 0;
 
@@ -3497,8 +3483,8 @@ void ConsoleDebugger::asmViewCtxMenuAddBP(void)
 	wp.address = asmView->getCtxMenuAddr();
 	wp.endaddress = 0;
 	wp.flags   = WP_X | WP_E;
-	wp.condText = 0;
-	wp.desc = NULL;
+	wp.condText.clear();
+	wp.desc.clear();
 
 	if ( asmView->getCtxMenuAddrType() )
 	{
@@ -3606,8 +3592,8 @@ void QAsmView::toggleBreakpoint(int line)
 			wp.address = asmEntry[line]->addr;
 			wp.endaddress = 0;
 			wp.flags   = WP_X | WP_E;
-			wp.condText = 0;
-			wp.desc = NULL;
+			wp.condText.clear();
+			wp.desc.clear();
 
 			dbgWin->openBpEditWindow( -1, &wp, true );
 		}
@@ -4840,8 +4826,8 @@ void saveGameDebugBreakpoints( bool force )
 
 		fprintf( fp, "BreakPoint: startAddr=%08X  endAddr=%08X  flags=%s  condition=\"%s\"  desc=\"%s\" \n",
 			  	watchpoint[i].address, watchpoint[i].endaddress, flags,
-			  		(watchpoint[i].condText != NULL) ? watchpoint[i].condText : "",
-			  		(watchpoint[i].desc != NULL) ? watchpoint[i].desc : "");
+			  		watchpoint[i].condText.c_str(),
+			  		watchpoint[i].desc.c_str());
 	}
 
 	bm = dbgBmMgr.begin();

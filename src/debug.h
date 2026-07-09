@@ -2,6 +2,7 @@
 #define _DEBUG_H_
 
 #include <array>
+#include <string>
 
 #include "conddebug.h"
 #include "git.h"
@@ -56,8 +57,8 @@ typedef struct {
 	uint16 flags;
 
 	Condition* cond;
-	char* condText;
-	char* desc;
+	std::string condText;  // v1.13 Purify F2c: was char* (malloc/free); now RAII-managed std::string
+	std::string desc;      // v1.13 Purify F2c: was char* (malloc/free); now RAII-managed std::string
 
 } watchpointinfo;
 
