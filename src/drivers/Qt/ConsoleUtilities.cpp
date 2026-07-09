@@ -74,14 +74,14 @@ const char *getRomFile( void )
 
 	if ( GameInfo )
 	{
-		//printf("filename: '%s' \n", GameInfo->filename );
-		//printf("archiveFilename: '%s' \n", GameInfo->archiveFilename );
+		//printf("filename: '%s' \n", GameInfo->filename.c_str() );
+		//printf("archiveFilename: '%s' \n", GameInfo->archiveFilename.c_str() );
 
-		if ( GameInfo->archiveFilename != NULL )
+		if ( !GameInfo->archiveFilename.empty() )
 		{
 			std::string dir, base, suffix;
 
-			parseFilepath( GameInfo->archiveFilename, &dir, &base, &suffix );
+			parseFilepath( GameInfo->archiveFilename.c_str(), &dir, &base, &suffix );
 
 			filePath.clear();
 
@@ -90,7 +90,7 @@ const char *getRomFile( void )
 				filePath.append( dir );
 			}
 
-			parseFilepath( GameInfo->filename, &dir, &base, &suffix );
+			parseFilepath( GameInfo->filename.c_str(), &dir, &base, &suffix );
 
 			filePath.append( base   );
 			filePath.append( suffix );
@@ -101,7 +101,7 @@ const char *getRomFile( void )
 		}
 		else
 		{
-			return GameInfo->filename;
+			return GameInfo->filename.c_str();
 		}
 	}
 	return nullptr;

@@ -61,6 +61,7 @@ extern void RefreshThrottleFPS();
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include <cstring>
 #include <cstdio>
@@ -100,24 +101,15 @@ static unsigned int pauseTimer = 0;
 
 
 FCEUGI::FCEUGI()
-	: filename(0),
-	  archiveFilename(0) 
+	: filename(),
+	  archiveFilename()
 {
 	//printf("%08x",opsize); // WTF?!
 }
 
-FCEUGI::~FCEUGI() 
+FCEUGI::~FCEUGI()
 {
-	if (filename) 
-	{
-		free(filename);
-		filename = NULL;
-	}
-	if (archiveFilename) 
-	{
-		free(archiveFilename);
-		archiveFilename = NULL;
-	}
+	// v1.13 Purify F2b: std::string is RAII-managed; destructor implicit.
 }
 
 bool CheckFileExists(const char* filename) {
@@ -217,8 +209,9 @@ void (*GameStateRestore)(int version);
 // because AllocGenieRW / FlushGenieRW own the heap-allocated
 // 32K shadow buffers and the SetReadHandler/SetWriteHandler
 // Genie-aware code path lives in this translation unit.
-static readfunc *AReadG;
-static writefunc *BWriteG;
+// v1.13 Purify F2b: std::vector replaces readfunc*/writefunc* (FCEU_malloc/free)
+static std::vector<readfunc> AReadG(0x8000);
+static std::vector<writefunc> BWriteG(0x8000);
 static int RWWrap = 0;
 
 //mbg merge 7/18/06 docs
@@ -254,10 +247,8 @@ static DECLFR(ANull) {
 }
 
 int AllocGenieRW(void) {
-	if (!(AReadG = (readfunc*)FCEU_malloc(0x8000 * sizeof(readfunc))))
-		return 0;
-	if (!(BWriteG = (writefunc*)FCEU_malloc(0x8000 * sizeof(writefunc))))
-		return 0;
+	AReadG.assign(0x8000, nullptr);
+	BWriteG.assign(0x8000, nullptr);
 	RWWrap = 1;
 	return 1;
 }
@@ -270,10 +261,10 @@ void FlushGenieRW(void) {
 			ARead[x + 0x8000] = AReadG[x];
 			BWrite[x + 0x8000] = BWriteG[x];
 		}
-		free(AReadG);
-		free(BWriteG);
-		AReadG = NULL;
-		BWriteG = NULL;
+		AReadG.clear();
+		BWriteG.clear();
+		AReadG.shrink_to_fit();
+		BWriteG.shrink_to_fit();
 		RWWrap = 0;
 	}
 }
@@ -446,9 +437,9 @@ FCEUGI *fceu11::LoadGameVirtual(const char *name, int OverwriteVidMode, bool sil
 	GameInfo = new FCEUGI();
 	memset( (void*)GameInfo, 0, sizeof(FCEUGI));
 
-	GameInfo->filename = strdup(fp->filename.c_str());
+	GameInfo->filename = fp->filename;
 	if (fp->archiveFilename != "")
-		GameInfo->archiveFilename = strdup(fp->archiveFilename.c_str());
+		GameInfo->archiveFilename = fp->archiveFilename;
 	GameInfo->archiveCount = fp->archiveCount;
 
 	GameInfo->soundchan = 0;
@@ -1242,15 +1233,12 @@ void UpdateAutosave(void) {
 	if (!EnableAutosave || turbo)
 		return;
 
-	char * f;
 	if (++AutosaveCounter >= AutosaveFrequency) {
 		AutosaveCounter = 0;
 		AutosaveIndex = (AutosaveIndex + 1) % AutosaveQty;
-		f = strdup(FCEU_MakeFName(FCEUMKF_AUTOSTATE, AutosaveIndex, 0).c_str());
-		FCEUSS_Save(f, false);
+		std::string f = FCEU_MakeFName(FCEUMKF_AUTOSTATE, AutosaveIndex, 0);
+		FCEUSS_Save(f.c_str(), false);
 		AutoSS = true;  //Flag that an auto-savestate was made
-		free(f);
-		f = NULL;
 		AutosaveStatus[AutosaveIndex] = 1;
 	}
 }
@@ -1260,11 +1248,8 @@ void FCEUI_RewindToLastAutosave(void) {
 		return;
 
 	if (AutosaveStatus[AutosaveIndex] == 1) {
-		char * f;
-		f = strdup(FCEU_MakeFName(FCEUMKF_AUTOSTATE, AutosaveIndex, 0).c_str());
-		FCEUSS_Load(f);
-		free(f);
-        f = NULL;
+		std::string f = FCEU_MakeFName(FCEUMKF_AUTOSTATE, AutosaveIndex, 0);
+		FCEUSS_Load(f.c_str());
 
 		//Set pointer to previous available slot
 		if (AutosaveStatus[(AutosaveIndex + AutosaveQty - 1) % AutosaveQty] == 1) {

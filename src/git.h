@@ -2,6 +2,7 @@
 #define __FCEU_GIT
 
 #include <cstdint>
+#include <string>
 
 enum EGIT
 {
@@ -246,8 +247,9 @@ struct FCEUGI
 	int soundrate;  //For Ogg Vorbis expansion sound wacky support.  0 for default.
 	int soundchan;  //Number of sound channels.
 
-	char* filename;
-	char* archiveFilename;
+	// v1.13 Purify F2b: std::string RAII (was char* with malloc/free)
+	std::string filename;
+	std::string archiveFilename;
 	int archiveCount;
 };
 
