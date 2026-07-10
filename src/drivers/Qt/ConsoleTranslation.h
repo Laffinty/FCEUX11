@@ -1,0 +1,4 @@
+// ConsoleTranslation.h
+//
+
+#pragma once

@@ -13,7 +13,8 @@ int FCEU_CalcCheatAffectedBytes(uint32 address, uint32 size);
 // Trying to find a more efficient way for determining if an address has a cheat
 // each bit of 1 byte represents to 8 bytes in NES
 typedef unsigned char _8BYTECHEATMAP;
-#define CHEATMAP_SIZE 0x10000 / 8
+// v1.13 Purify H: #define → constexpr
+inline constexpr unsigned int CHEATMAP_SIZE = 0x10000 / 8;
 
 namespace fceu11 {
     int FindCheatMapByte(uint16 address);
@@ -70,15 +71,16 @@ struct SEARCHPOSSIBLE {
 	bool update;
 };
 
-#define FCEU_SEARCH_SPECIFIC_CHANGE         0
-#define FCEU_SEARCH_RELATIVE_CHANGE         1
-#define FCEU_SEARCH_PUERLY_RELATIVE_CHANGE  2
-#define FCEU_SEARCH_ANY_CHANGE              3
-#define FCEU_SEARCH_NEWVAL_KNOWN            4
-#define FCEU_SEARCH_NEWVAL_GT               5
-#define FCEU_SEARCH_NEWVAL_LT               6
-#define FCEU_SEARCH_NEWVAL_GT_KNOWN         7
-#define FCEU_SEARCH_NEWVAL_LT_KNOWN         8
+// v1.13 Purify H: #define → constexpr
+inline constexpr int FCEU_SEARCH_SPECIFIC_CHANGE        = 0;
+inline constexpr int FCEU_SEARCH_RELATIVE_CHANGE        = 1;
+inline constexpr int FCEU_SEARCH_PUERLY_RELATIVE_CHANGE = 2;
+inline constexpr int FCEU_SEARCH_ANY_CHANGE             = 3;
+inline constexpr int FCEU_SEARCH_NEWVAL_KNOWN           = 4;
+inline constexpr int FCEU_SEARCH_NEWVAL_GT              = 5;
+inline constexpr int FCEU_SEARCH_NEWVAL_LT              = 6;
+inline constexpr int FCEU_SEARCH_NEWVAL_GT_KNOWN        = 7;
+inline constexpr int FCEU_SEARCH_NEWVAL_LT_KNOWN        = 8;
 
 #endif
 

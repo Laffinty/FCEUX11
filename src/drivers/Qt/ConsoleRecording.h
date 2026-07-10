@@ -1,0 +1,4 @@
+// ConsoleRecording.h
+//
+
+#pragma once

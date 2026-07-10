@@ -153,7 +153,7 @@ static void GetValueR(FILE *fp, char *str, void *v, int c)
 				if (s > 32768)
 					goto gogl;
 
-				if(!(*(char **)v=(char*)malloc(s)))
+				if(!(*(char **)v = new char[s]))  // v1.13 Purify F3d: was malloc()
 					goto gogl;
 				
 				fread(*(char **)v,1,s,fp);
@@ -310,12 +310,16 @@ void cfg_NewToOld(CFGSTRUCT *cfgst)
 		{
 			//string data
 			if(*(char*)cfgst[x].ptr)
-				free(cfgst[x].ptr);
+				delete[] static_cast<char*>(cfgst[x].ptr);  // v1.13 Purify F3d: was free()
 			std::string& str = cfgmap[cfgst[x].name];
 			if(str == "")
 				*(char**)cfgst[x].ptr = 0;
-			else
-				*(char**)cfgst[x].ptr = strdup(cfgmap[cfgst[x].name].c_str());
+			else {
+				// v1.13 Purify F3d: new[]/strcpy replaces strdup()
+				char* newstr = new char[str.size() + 1];
+				strcpy(newstr, str.c_str());
+				*(char**)cfgst[x].ptr = newstr;
+			}
 		}
 
 		x++;

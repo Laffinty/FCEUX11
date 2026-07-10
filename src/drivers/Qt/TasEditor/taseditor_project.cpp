@@ -109,7 +109,7 @@ bool TASEDITOR_PROJECT::save(const char* differentName, bool inputInBinary, bool
 			message.append("\nMD5: ");
 			message.append(md5OfMovie);
 			message.append("\n\nCurrent ROM:\n");
-			message.append(GameInfo->filename);
+			message.append(GameInfo->filename.c_str());
 			message.append("\nMD5: ");
 			message.append(md5OfRom);
 			message.append("\n\nFix the movie header before saving? ");
@@ -258,7 +258,7 @@ bool TASEDITOR_PROJECT::load(const char* fullName)
 				message.append("\nMD5: ");
 				message.append(md5OfOriginal);
 				message.append("\n\nCurrent ROM:\n");
-				message.append(GameInfo->filename);
+				message.append(GameInfo->filename.c_str());
 				message.append("\nMD5: ");
 				message.append(md5OfCurrent);
 				message.append("\n\nLoad the project anyway?");

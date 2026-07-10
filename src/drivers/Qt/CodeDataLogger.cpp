@@ -784,13 +784,13 @@ void FreeCDLog(void)
 	FCEU_WRAPPER_LOCK();
 	if (cdloggerdata)
 	{
-		free(cdloggerdata);
+		delete[] cdloggerdata;
 		cdloggerdata = NULL;
 		cdloggerdataSize = 0;
 	}
 	if (cdloggervdata)
 	{
-		free(cdloggervdata);
+		delete[] cdloggervdata;
 		cdloggervdata = NULL;
 		cdloggerVideoDataSize = 0;
 	}
@@ -807,13 +807,13 @@ void InitCDLog(void)
 		rom_sel = 1;
 	}
 	cdloggerdataSize = PRGsize[rom_sel];
-	cdloggerdata = (unsigned char *)malloc(cdloggerdataSize);
+	cdloggerdata = new unsigned char[cdloggerdataSize]();
 	if (!CHRram[0] || (CHRptr[0] == PRGptr[0]))
 	{ // Some kind of workaround for my OneBus VRAM hack, will remove it if I find another solution for that
 		cdloggerVideoDataSize = CHRsize[0];
 		if (cdloggerVideoDataSize > 0)
 		{
-			cdloggervdata = (unsigned char *)malloc(cdloggerVideoDataSize);
+			cdloggervdata = new unsigned char[cdloggerVideoDataSize]();
 		}
 		else
 		{
@@ -825,7 +825,7 @@ void InitCDLog(void)
 		if (GameInfo->type != GIT_NSF)
 		{
 			cdloggerVideoDataSize = 0;
-			cdloggervdata = (unsigned char *)malloc(8192);
+			cdloggervdata = new unsigned char[8192]();
 		}
 	}
 	FCEU_WRAPPER_UNLOCK();

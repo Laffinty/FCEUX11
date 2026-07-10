@@ -21,29 +21,30 @@
 #ifndef CONDDEBUG_H
 #define CONDDEBUG_H
 
-#define TYPE_NO 0
-#define TYPE_REG 1
-#define TYPE_FLAG 2
-#define TYPE_NUM 3
-#define TYPE_ADDR 4
-#define TYPE_PC_BANK 5
-#define TYPE_DATA_BANK 6
-#define TYPE_VALUE_READ 7
-#define TYPE_VALUE_WRITE 8
+// v1.13 Purify H: #define → constexpr
+inline constexpr int TYPE_NO         = 0;
+inline constexpr int TYPE_REG        = 1;
+inline constexpr int TYPE_FLAG       = 2;
+inline constexpr int TYPE_NUM        = 3;
+inline constexpr int TYPE_ADDR       = 4;
+inline constexpr int TYPE_PC_BANK    = 5;
+inline constexpr int TYPE_DATA_BANK  = 6;
+inline constexpr int TYPE_VALUE_READ = 7;
+inline constexpr int TYPE_VALUE_WRITE = 8;
 
-#define OP_NO 0
-#define OP_EQ 1
-#define OP_NE 2
-#define OP_GE 3
-#define OP_LE 4
-#define OP_G 5
-#define OP_L 6
-#define OP_PLUS 7
-#define OP_MINUS 8
-#define OP_MULT 9
-#define OP_DIV 10
-#define OP_OR 11
-#define OP_AND 12
+inline constexpr int OP_NO    = 0;
+inline constexpr int OP_EQ    = 1;
+inline constexpr int OP_NE    = 2;
+inline constexpr int OP_GE    = 3;
+inline constexpr int OP_LE    = 4;
+inline constexpr int OP_G     = 5;
+inline constexpr int OP_L     = 6;
+inline constexpr int OP_PLUS  = 7;
+inline constexpr int OP_MINUS = 8;
+inline constexpr int OP_MULT  = 9;
+inline constexpr int OP_DIV   = 10;
+inline constexpr int OP_OR    = 11;
+inline constexpr int OP_AND   = 12;
 
 extern uint16 debugLastAddress;
 extern uint8 debugLastOpcode;

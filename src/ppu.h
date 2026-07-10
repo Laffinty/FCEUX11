@@ -93,6 +93,13 @@ extern uint8 VRAMBuffer, PPUGenLatch;
 extern bool& DMC_7bit;
 extern bool paldeemphswap;
 
+// v1.12 Scissors Phase E-B: scanlines_per_frame promoted from file-
+// static in ppu.cpp to extern. Written by FCEUPPU_SetVideoSystem
+// (now in ppu_core.cpp); read by the main scanline loops in
+// ppu_rendering.cpp (post-E-C). Definition stays in ppu.cpp until
+// E-C moves it.
+extern unsigned int scanlines_per_frame;
+
 // PPUPHASE — moved to ppu_class.h (which ppu.h includes). Keeping a
 // declaration here would re-introduce the circular include.
 

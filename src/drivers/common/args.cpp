@@ -77,8 +77,8 @@ int ParseEA(int x, int argc, char *argv[], ARGPSTRUCT *argsps)
 						if(argsps[y].substype&0x4000)
 						{
 							if(*(char **)argsps[y].subs)
-								free(*(char **)argsps[y].subs);
-							if(!( *(char **)argsps[y].subs=(char*)malloc(strlen(argv[x+1])+1) ))
+								delete[] *(char **)argsps[y].subs;  // v1.13 Purify F3d: was free()
+							if(!( *(char **)argsps[y].subs = new char[strlen(argv[x+1])+1] ))  // v1.13 Purify F3d: was malloc()
 								break;
 						}	
 						FCEU_strlcpy(*(char **)argsps[y].subs, sizeof(*(char **)argsps[y].subs), argv[x+1]);

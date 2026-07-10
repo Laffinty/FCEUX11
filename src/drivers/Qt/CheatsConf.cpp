@@ -864,7 +864,7 @@ void GuiCheatsDialog_t::saveCheatFile(void)
 
 	if (GameInfo)
 	{
-		getFileBaseName(GameInfo->filename, dir);
+		getFileBaseName(GameInfo->filename.c_str(), dir);
 
 		safe_strcat( dir, sizeof(dir), ".cht");
 

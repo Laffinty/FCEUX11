@@ -42,10 +42,12 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
+#include <memory>
 #include <cstring>
 
 bool force_grayscale = false;
-pal *grayscaled_palo = NULL;
+// v1.13 Purify F2c: grayscaled_palo was pal* (malloc/free); now std::unique_ptr<pal[]> RAII.
+static std::unique_ptr<pal[]> grayscaled_palo;
 
 pal palette_game[64*8]; //custom palette for an individual game. (formerly palettei)
 pal palette_user[64*8]; //user's overridden palette (formerly palettec)
@@ -86,9 +88,9 @@ pal *palo = NULL;
 )
 
 #define YIQ_TO_RGB( y, i, q, to_rgb, type, r, g ) (\
-	r = (type) (y + to_rgb [0] * i + to_rgb [1] * q),\
-	g = (type) (y + to_rgb [2] * i + to_rgb [3] * q),\
-	(type) (y + to_rgb [4] * i + to_rgb [5] * q)\
+	r = static_cast<type>(y + to_rgb [0] * i + to_rgb [1] * q),\
+	g = static_cast<type>(y + to_rgb [2] * i + to_rgb [3] * q),\
+	static_cast<type>(y + to_rgb [4] * i + to_rgb [5] * q)\
 )
 
 FCEU_MAYBE_UNUSED
@@ -160,9 +162,9 @@ static void ApplyDeemphasisNTSC(int entry, u8& r, u8& g, u8& b)
 	fb = YIQ_TO_RGB( y, i, q, default_decoder, float, fr, fg );
 
 	#define CLAMP(x) ((x)<0?0:((x)>1.0f?1.0f:(x)))
-	r = (u8)(CLAMP(fr)*255);
-	g = (u8)(CLAMP(fg)*255);
-	b = (u8)(CLAMP(fb)*255);
+	r = static_cast<u8>(CLAMP(fr)*255);
+	g = static_cast<u8>(CLAMP(fg)*255);
+	b = static_cast<u8>(CLAMP(fb)*255);
 
 	//doesnt help
 	//float gamma=1.8f;
@@ -242,13 +244,13 @@ static void ApplyDeemphasisBisqwit(int entry, u8& r, u8& g, u8& b)
 		if(pass==0) myr = rt, myg = gt, myb = bt;
 		else
 		{
-			float rscale = (float)rt / myr;
-			float gscale = (float)gt / myg;
-			float bscale = (float)bt / myb;
+			float rscale = static_cast<float>(rt) / myr;
+			float gscale = static_cast<float>(gt) / myg;
+			float bscale = static_cast<float>(bt) / myb;
 			#define BCLAMP(x) ((x)<0?0:((x)>255?255:(x)))
-			if(myr!=0) r = (u8)(BCLAMP(r*rscale));
-			if(myg!=0) g = (u8)(BCLAMP(g*gscale));
-			if(myb!=0) b = (u8)(BCLAMP(b*bscale));
+			if(myr!=0) r = static_cast<u8>(BCLAMP(r*rscale));
+			if(myg!=0) g = static_cast<u8>(BCLAMP(g*gscale));
+			if(myb!=0) b = static_cast<u8>(BCLAMP(b*bscale));
 		}
 	}
 
@@ -271,15 +273,15 @@ static void ApplyDeemphasisClassic(int entry, u8& r, u8& g, u8& b)
 	if (deemph_bits == 0) return;
 
 	int d = deemph_bits - 1;
-	int nr = (int)(r * rtmul[d]);
-	int ng = (int)(g * gtmul[d]);
-	int nb = (int)(b * btmul[d]);
+	int nr = static_cast<int>(r * rtmul[d]);
+	int ng = static_cast<int>(g * gtmul[d]);
+	int nb = static_cast<int>(b * btmul[d]);
 	if (nr > 0xFF) nr = 0xFF;
 	if (ng > 0xFF) ng = 0xFF;
 	if (nb > 0xFF) nb = 0xFF;
-	r = (u8)nr;
-	g = (u8)ng;
-	b = (u8)nb;
+	r = static_cast<u8>(nr);
+	g = static_cast<u8>(ng);
+	b = static_cast<u8>(nb);
 }
 
 static void ApplyDeemphasisComplete(pal* pal512)
@@ -490,17 +492,18 @@ static void ChoosePalette(void)
 	{
 		// need to apply grayscale filter
 		// allocate memory for grayscale palette
-		if (grayscaled_palo == NULL)
-			grayscaled_palo = (pal*)malloc(sizeof(pal) * 64 * 8);
-		fceux11_rust_palette_make_grayscale(reinterpret_cast<const Pal*>(palo), reinterpret_cast<Pal*>(grayscaled_palo));
+		if (!grayscaled_palo)
+		{
+			grayscaled_palo = std::make_unique<pal[]>(64 * 8);
+		}
+		fceux11_rust_palette_make_grayscale(reinterpret_cast<const Pal*>(palo), reinterpret_cast<Pal*>(grayscaled_palo.get()));
 		// apply new palette
-		palo = grayscaled_palo;
+		palo = grayscaled_palo.get();
 	}
-	else if (grayscaled_palo != NULL)
+	else if (grayscaled_palo)
 	{
-		// free allocated memory if the grayscale filter is not used anymore
-		free(grayscaled_palo);
-		grayscaled_palo = NULL;
+		// RAII unique_ptr frees on reset()
+		grayscaled_palo.reset();
 	}
 }
 
@@ -602,12 +605,12 @@ void FCEU_DrawNTSCControlBars(uint8 *XBuf)
 
 	if(controlselect==1)
 	{
-		DrawTextTrans(XBuf+128-12+180*256, 256, (uint8 *)"Hue", 0x85);
+		DrawTextTrans(XBuf+128-12+180*256, 256, reinterpret_cast<uint8*>(const_cast<char*>("Hue")), 0x85);
 		which=ntschue<<1;
 	}
 	else if(controlselect==2)
 	{
-		DrawTextTrans(XBuf+128-16+180*256, 256, (uint8 *)"Tint", 0x85);
+		DrawTextTrans(XBuf+128-16+180*256, 256, reinterpret_cast<uint8*>(const_cast<char*>("Tint")), 0x85);
 		which=ntsctint<<1;
 	}
 

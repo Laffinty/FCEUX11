@@ -108,11 +108,11 @@ static int logging = 0;
 static int logging_options = LOG_REGISTERS | LOG_PROCESSOR_STATUS | LOG_TO_THE_LEFT | LOG_MESSAGES | LOG_BREAKPOINTS | LOG_CODE_TABBING;
 static int oldcodecount = 0, olddatacount = 0;
 
-static traceRecord_t *recBuf = NULL;
+static std::unique_ptr<traceRecord_t[]> recBuf;
 static int recBufMax = 0;
-static int recBufHead = 0;
 static int recBufNum = 0;
-static traceRecord_t *logBuf = NULL;
+static int recBufHead = 0;
+static std::unique_ptr<traceRecord_t[]> logBuf;
 static int logBufMax = 3000000;
 // logBufHead and logBufTail are volatile because they are shared use by both the emulation and disk logger threads.
 // Ensure that the compiler doesn't do any thread caching optimizations on them so that changes to these
@@ -1215,16 +1215,16 @@ int initTraceLogBuffer(int maxRecs)
 
 		size = maxRecs * sizeof(traceRecord_t);
 
-		if ( recBuf != NULL )
+		if ( recBuf )
 		{
-			free(recBuf); recBuf = NULL;
+			recBuf.reset();
 		}
 
-		recBuf = (traceRecord_t *)malloc(size);
+		recBuf = std::make_unique<traceRecord_t[]>(maxRecs);
 
 		if (recBuf)
 		{
-			memset((void *)recBuf, 0, size);
+			memset(recBuf.get(), 0, size);
 			recBufMax = maxRecs;
 		}
 		else
@@ -2109,9 +2109,9 @@ void QTraceLogView::openBpEditWindow(int editIdx, watchpointinfo *wp, traceRecor
 			ebp->setChecked(true);
 		}
 
-		if (wp->condText)
+		if (!wp->condText.empty())
 		{
-			cond->setText(tr(wp->condText));
+			cond->setText(tr(wp->condText.c_str()));
 		}
 		else
 		{
@@ -2134,9 +2134,9 @@ void QTraceLogView::openBpEditWindow(int editIdx, watchpointinfo *wp, traceRecor
 			}
 		}
 
-		if (wp->desc)
+		if (wp->desc.size() > 0)
 		{
-			name->setText(tr(wp->desc));
+			name->setText(tr(wp->desc.c_str()));
 		}
 	}
 
@@ -2233,8 +2233,8 @@ void QTraceLogView::ctxMenuAddBP(void)
 	wp.address = selAddrValue;
 	wp.endaddress = 0;
 	wp.flags = WP_X | WP_E;
-	wp.condText = 0;
-	wp.desc = NULL;
+	wp.condText.clear();
+	wp.desc.clear();
 
 	if (selAddrLine >= 0)
 	{
@@ -2559,8 +2559,7 @@ TraceLogDiskThread_t::~TraceLogDiskThread_t(void)
 
 	if ( logBuf )
 	{
-		free(logBuf);
-		logBuf = NULL;
+		logBuf.reset();
 	}
 }
 //----------------------------------------------------
@@ -2608,7 +2607,7 @@ void TraceLogDiskThread_t::run(void)
 
 		logBufHead = logBufTail = 0;
 
-		logBuf = (traceRecord_t *)malloc(size);
+		logBuf = std::make_unique<traceRecord_t[]>(logBufMax);
 	}
 	idx = 0;
 

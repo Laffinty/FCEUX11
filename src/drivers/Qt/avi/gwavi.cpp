@@ -103,7 +103,7 @@ gwavi_t::~gwavi_t(void)
 	}
 	if ( readBuf )
 	{
-		free(readBuf); readBuf = NULL;
+		delete[] readBuf; readBuf = NULL;  // v1.13 Purify F3d: was free()
 		readBufSize = 0;
 	}
 }
@@ -612,7 +612,7 @@ gwavi_t::close(void)
 		goto fseek_failed;
 
 	if (stream_format_v.palette != 0)
-		free(stream_format_v.palette);
+		delete[] stream_format_v.palette;  // v1.13 Purify F3d: was free()
 
 	if (fclose(out) == EOF) {
 		perror("gwavi_close (fclose)");
@@ -731,7 +731,7 @@ int gwavi_t::riffwalk(void)
 	if ( readBuf == NULL )
 	{
 		readBufSize = 64 * 1024;
-		readBuf = (unsigned char*)malloc( readBufSize );
+		readBuf = new unsigned char[readBufSize];  // v1.13 Purify F3d: was malloc()
 	}
 	fpos = ftell(in);
 
@@ -1345,13 +1345,13 @@ gwavi_dataBuffer::~gwavi_dataBuffer(void)
 {
 	if ( buf )
 	{
-		free(buf); buf = NULL;
+		delete[] buf; buf = NULL;  // v1.13 Purify F3d: was free()
 	}
 }
 
 int gwavi_dataBuffer::malloc( size_t s )
 {
-	buf = (unsigned char*)::malloc(s); size = s;
+	buf = new unsigned char[s]; size = s;  // v1.13 Purify F3d: was ::malloc()
 
 	return 0;
 }

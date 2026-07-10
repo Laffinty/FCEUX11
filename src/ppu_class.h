@@ -57,6 +57,104 @@ enum PPUPHASE {
     PPUPHASE_VBL, PPUPHASE_BG, PPUPHASE_OBJ
 };
 
+// ----------------------------------------------------------------------------
+// v1.12 Scissors Phase E-A: PPU state-register / sprite-eval structs.
+//
+// Originally file-scope in src/ppu.cpp (lines 112-292). Moved here so the
+// Phase E-A SFORMAT tables (which take `&ppur.field`, `&spr_read.num`,
+// etc.) can be compiled in ppu_state.cpp's TU. The struct bodies are
+// kept byte-identical to the v1.11 originals to preserve the savestate
+// chunk layout (the SFORMAT array in ppu_state.cpp byte-for-byte mirrors
+// what state.cpp:614 deserializes).
+// ----------------------------------------------------------------------------
+
+struct PPUSTATUS {
+    int32_t sl;
+    int32_t cycle, end_cycle;
+};
+
+struct SPRITE_READ {
+    int32_t num;
+    int32_t count;
+    int32_t fetch;
+    int32_t found;
+    int32_t found_pos[8];
+    int32_t ret;
+    int32_t last;
+    int32_t mode;
+
+    void reset() {
+        num = count = fetch = found = ret = last = mode = 0;
+        found_pos[0] = found_pos[1] = found_pos[2] = found_pos[3] = 0;
+        found_pos[4] = found_pos[5] = found_pos[6] = found_pos[7] = 0;
+    }
+
+    void start_scanline() {
+        num = 1;
+        found = 0;
+        fetch = 1;
+        count = 0;
+        last = 64;
+        mode = 0;
+        found_pos[0] = found_pos[1] = found_pos[2] = found_pos[3] = 0;
+        found_pos[4] = found_pos[5] = found_pos[6] = found_pos[7] = 0;
+    }
+};
+
+// PPUREGS — the new-PPU's per-frame state-register file (mirrors the
+// 5-scroll-counter daisy chain + latched copies + derived fields).
+// Reference docs: http://nesdev.icequake.net/PPU%20addressing.txt
+struct PPUREGS {
+    uint32_t fv;        //3
+    uint32_t v;         //1
+    uint32_t h;         //1
+    uint32_t vt;        //5
+    uint32_t ht;        //5
+
+    uint32_t _fv, _v, _h, _vt, _ht;
+
+    uint32_t fh;        //3 (horz scroll)
+    uint32_t s;         //1 ($2000 bit 4)
+    uint32_t par;       //8
+
+    PPUSTATUS status;
+
+    void reset() {
+        fv = v = h = vt = ht = 0;
+        fh = par = s = 0;
+        _fv = _v = _h = _vt = _ht = 0;
+        status.cycle = 0;
+        status.end_cycle = 341;
+        status.sl = 241;
+    }
+    void install_latches() { fv = _fv; v = _v; h = _h; vt = _vt; ht = _ht; }
+    void install_h_latches() { ht = _ht; h = _h; }
+    void clear_latches() { _fv = _v = _h = _vt = _ht = 0; fh = 0; }
+    void increment_hsc() { ht++; h += (ht >> 5); ht &= 31; h &= 1; }
+    void increment_vs() {
+        fv++;
+        int fv_overflow = (fv >> 3);
+        vt += fv_overflow;
+        vt &= 31;
+        if (vt == 30 && fv_overflow == 1) { v++; vt = 0; }
+        fv &= 7;
+        v &= 1;
+    }
+    uint32_t get_ntread() { return 0x2000 | (v << 0xB) | (h << 0xA) | (vt << 5) | ht; }
+    uint32_t get_2007access() { return ((fv & 3) << 0xC) | (v << 0xB) | (h << 0xA) | (vt << 5) | ht; }
+    uint32_t get_atread() { return 0x2000 | (v << 0xB) | (h << 0xA) | 0x3C0 | ((vt & 0x1C) << 1) | ((ht & 0x1C) >> 2); }
+    uint32_t get_ptread() { return (s << 0xC) | (par << 0x4) | fv; }
+    void increment2007(bool rendering, bool by32) {
+        if (rendering) { increment_vs(); return; }
+        if (by32) { vt++; }
+        else { ht++; vt += (ht >> 5) & 1; }
+        h += (vt >> 5);
+        v += (h >> 1);
+        fv += (v >> 1);
+        ht &= 31; vt &= 31; h &= 1; v &= 1; fv &= 7;
+    }
+};
+
 namespace fceu11 {
 
 class FCEUX11_CACHE_ALIGN Ppu {

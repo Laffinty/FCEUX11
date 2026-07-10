@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <string>
+#include <memory>
 
 #include <SDL.h>
 #include <QHeaderView>
@@ -81,25 +82,17 @@ struct  romEditEntry_t
 {
 	int       addr;
 	int       size;
-	uint8_t  *data;
+	std::unique_ptr<uint8_t[]> data;
 
 	romEditEntry_t(void)
 	{
-		addr = -1; size = 0; data = NULL;
-	}
-
-	~romEditEntry_t(void)
-	{
-		if ( data != NULL )
-		{
-			free(data); data = NULL;
-		}
+		addr = -1; size = 0;
 	}
 };
 
 struct  romEditList_t
 {
-	uint8_t  *modMem;
+	std::unique_ptr<uint8_t[]> modMem;
 	int       modMemSize;
 
 	std::list <romEditEntry_t*> undoList;
@@ -107,7 +100,6 @@ struct  romEditList_t
 
 	romEditList_t(void)
 	{
-		modMem = NULL;
 		modMemSize = 0;
 	}
 
@@ -124,9 +116,9 @@ struct  romEditList_t
 
 			undoList.pop_back();
 		}
-		if ( modMem != NULL )
+		if ( modMem )
 		{
-			free(modMem); modMem = NULL; modMemSize = 0;
+			modMem.reset(); modMemSize = 0;
 		}
 	}	
 
@@ -148,18 +140,17 @@ struct  romEditList_t
 		{
 			return;
 		}
-		if ( modMem == NULL )
+		if ( !modMem )
 		{
 			modMemSize = 16 + CHRsize[0] + PRGsize[0];
 
-			modMem = (uint8_t*)malloc( modMemSize );
-
-			if ( modMem == NULL )
-			{
+			try {
+				modMem = std::make_unique<uint8_t[]>(modMemSize);
+			} catch (const std::bad_alloc&) {
 				printf("Error: Failed to allocate ROM modification memory buffer\n");
 				return;
 			}
-			memset( modMem, 0, modMemSize );
+			memset( modMem.get(), 0, modMemSize );
 		}
 		if ( (addr + size) >= modMemSize )
 		{
@@ -172,7 +163,7 @@ struct  romEditList_t
 		entry = new romEditEntry_t();
 		entry->addr = addr;
 		entry->size = size;
-		entry->data = (uint8_t*)malloc(sizeof(uint8_t)*size);
+		entry->data = std::make_unique<uint8_t[]>(size);
 
 		for (int i = 0; i < size; i++)
 		{
@@ -288,7 +279,7 @@ static int getROM( unsigned int offset)
 	}
 	if (offset < 16)
 	{
-		return *((unsigned char *)&head+offset);
+		return *(reinterpret_cast<unsigned char*>(&head)+offset);
 	}
 	else if (offset < (16+PRGsize[0]) )
 	{
@@ -342,8 +333,8 @@ static int writeMem( int mode, unsigned int addr, int value )
             
 				if (wfunc)
 				{
-					wfunc ((uint32) addr,
-					       (uint8) (value & 0x000000ff));
+				wfunc (static_cast<uint32>(addr),
+				       static_cast<uint8>(value & 0x000000ff));
 
 					updateDebugger = true;
 				}
@@ -385,11 +376,11 @@ static int writeMem( int mode, unsigned int addr, int value )
 			}
 			else if ( (addr >= 16) && (addr < PRGsize[0]+16) )
 			{
-			  	*(uint8 *)(GetNesPRGPointer(addr-16)) = value;
+			  	*(reinterpret_cast<uint8*>(GetNesPRGPointer(addr-16))) = value;
 			}
 			else if ( (addr >= PRGsize[0]+16) && (addr < CHRsize[0]+PRGsize[0]+16) )
 			{
-				*(uint8 *)(GetNesCHRPointer(addr-16-PRGsize[0])) = value;
+				*(reinterpret_cast<uint8*>(GetNesCHRPointer(addr-16-PRGsize[0]))) = value;
 			}
 			updateDebugger = true;
 		}
@@ -446,7 +437,6 @@ static int convFromXchar( int i )
 //----------------------------------------------------------------------------
 memBlock_t::memBlock_t( void )
 {
-	buf = NULL;
 	_size = 0;
 	_maxLines = 0;
 	memAccessFunc = NULL;
@@ -455,10 +445,6 @@ memBlock_t::memBlock_t( void )
 
 memBlock_t::~memBlock_t(void)
 {
-	if ( buf != NULL )
-	{
-		::free( buf ); buf = NULL;
-	}
 	_size = 0;
 	_maxLines = 0;
 }
@@ -475,32 +461,31 @@ int memBlock_t::reAlloc( int newSize )
 		return 0;
 	}
 
-	if ( buf != NULL )
-	{
-		::free( buf ); buf = NULL;
-	}
+	buf.reset();
 	_size = 0;
 	_maxLines = 0;
 
-	buf = (struct memByte_t *)malloc( newSize * sizeof(struct memByte_t) );
-
-	if ( buf != NULL )
-	{
-		memset( buf, 0, newSize * sizeof(struct memByte_t) );
-
-		_size = newSize;
-		init();
-
-		if ( (_size % 16) )
-		{
-			_maxLines = (_size / 16) + 1;
-		}
-		else
-		{
-			_maxLines = (_size / 16);
-		}
+	try {
+		buf = std::make_unique<struct memByte_t[]>(newSize);
+	} catch (const std::bad_alloc&) {
+		return 1;
 	}
-	return (buf == NULL);
+
+	memset( buf.get(), 0, newSize * sizeof(struct memByte_t) );
+
+	_size = newSize;
+	init();
+
+	if ( (_size % 16) )
+	{
+		_maxLines = (_size / 16) + 1;
+	}
+	else
+	{
+		_maxLines = (_size / 16);
+	}
+
+	return 0;
 }
 //----------------------------------------------------------------------------
 void memBlock_t::setAccessFunc( int (*newMemAccessFunc)( unsigned int offset) )
@@ -603,7 +588,7 @@ HexBookMark *HexBookMarkManager_t::getBookMark( int index )
 	{
 		return NULL;
 	}
-	else if ( index >= (int)v.size() )
+	else if ( index >= static_cast<int>(v.size()) )
 	{
 		return NULL;
 	}
@@ -974,7 +959,7 @@ HexEditorFindDialog_t::HexEditorFindDialog_t(QWidget *parent)
 
 	QDialog::setWindowTitle( tr("Find") );
 
-	this->parent = (HexEditorDialog_t*)parent;
+	this->parent = static_cast<HexEditorDialog_t*>(parent);
 
 	mainLayout = new QVBoxLayout();
 	hbox       = new QHBoxLayout();
@@ -2010,7 +1995,7 @@ QHexEdit::QHexEdit(QWidget *parent)
 	QPalette pal;
 	std::string fontString, colorString;
 
-	this->parent = (HexEditorDialog_t*)parent;
+	this->parent = static_cast<HexEditorDialog_t*>(parent);
 	this->setFocusPolicy(Qt::StrongFocus);
 
 	g_config->getOption("SDL.HexEditFont", &fontString);
@@ -2259,10 +2244,10 @@ void QHexEdit::setHorzScroll( int value )
 	}
 	else
 	{
-		f = 0.010f * (float)value * (float)(pxLineWidth - viewWidth);
+		f = 0.010f * static_cast<float>(value) * static_cast<float>(pxLineWidth - viewWidth);
 	}
 
-	pxLineXScroll = (int)f;
+	pxLineXScroll = static_cast<int>(f);
 }
 //----------------------------------------------------------------------------
 void QHexEdit::setScrollBars( QScrollBar *h, QScrollBar *v )
@@ -2396,7 +2381,7 @@ void QHexEdit::pasteFromClipboard(void)
 	int i, nbytes=0, val, addr;
 	std::string s = clipboard->text().toStdString();
 	const char *c;
-	unsigned char *buf;
+	std::unique_ptr<unsigned char[]> buf;
 
 	FCEU_WRAPPER_LOCK();
 
@@ -2410,13 +2395,12 @@ void QHexEdit::pasteFromClipboard(void)
 	{
 		return;
 	}
-	buf = (unsigned char*)malloc( s.size() );
-
-	if ( buf == NULL )
-	{
+	try {
+		buf = std::make_unique<unsigned char[]>(s.size());
+	} catch (const std::bad_alloc&) {
 		return;
 	}
-	memset( buf, 0, s.size() );
+	memset( buf.get(), 0, s.size() );
 
 	i=0; nbytes = 0;
 	while ( c[i] != 0 )
@@ -2450,14 +2434,13 @@ void QHexEdit::pasteFromClipboard(void)
 	{
 		if ( viewMode == QHexEdit::MODE_NES_ROM )
 		{
-			romEditList.applyPatch( addr, buf, nbytes );
+			romEditList.applyPatch( addr, buf.get(), nbytes );
 		}
 		for (i=0; i<nbytes; i++)
 		{
 			writeMem( viewMode, addr+i, buf[i] );
 		}
 	}
-	free(buf);
 
 	FCEU_WRAPPER_UNLOCK();
 }
@@ -2572,23 +2555,23 @@ QPoint QHexEdit::convPixToCursor( QPoint p )
 	}
 	else if ( (p.x() >= pxHexOffset) && (p.x() < pxHexAscii) )
 	{
-		float px = ( (float)p.x() - (float)pxHexOffset) / (float)(pxCharWidth);
+		float px = ( static_cast<float>(p.x()) - static_cast<float>(pxHexOffset)) / static_cast<float>(pxCharWidth);
 		float ox = (px/3.0);
 		float rx = fmodf(px,3.0);
 
 		if ( rx >= 2.50 )
 		{
-			c.setX( 2*( (int)ox + 1 ) );
+			c.setX( 2*( static_cast<int>(ox) + 1 ) );
 		}
 		else
 		{
 			//if ( rx >= 1.0 )
 			//{
-			//	c.setX( 2*( (int)ox ) + 1 );
+			//	c.setX( 2*( static_cast<int>(ox) ) + 1 );
 			//}
 			//else
 			//{
-				c.setX( 2*( (int)ox ) );
+				c.setX( 2*( static_cast<int>(ox) ) );
 			//}
 		}
 	}
@@ -2607,17 +2590,17 @@ QPoint QHexEdit::convPixToCursor( QPoint p )
 	}
 	else
 	{
-		float ly = ( (float)pxLineLead / (float)pxLineSpacing );
-		float py = ( (float)p.y() -  (float)pxLineSpacing) /  (float)pxLineSpacing;
+		float ly = ( static_cast<float>(pxLineLead) / static_cast<float>(pxLineSpacing) );
+		float py = ( static_cast<float>(p.y()) -  static_cast<float>(pxLineSpacing)) /  static_cast<float>(pxLineSpacing);
 		float ry = fmod( py, 1.0 );
 
 		if ( ry < ly )
 		{
-			c.setY( ((int)py) - 1 );
+			c.setY( (static_cast<int>(py)) - 1 );
 		}
 		else
 		{
-			c.setY( (int)py );
+			c.setY( static_cast<int>(py) );
 		}
 	}
 	if ( c.y() < 0 )
@@ -2854,7 +2837,7 @@ void QHexEdit::keyPressEvent(QKeyEvent *event)
 			// v0.3.15 PR-D: use unicode() & 0xFF to avoid implicit encoding
 			// conversion through QChar::toLatin1(). This keeps ASCII input
 			// working identically on locales where Latin-1 != the system code page.
-			key = (int)(event->text()[0].unicode() & 0xFF);
+			key = static_cast<int>(event->text()[0].unicode() & 0xFF);
 
 			if ( (key >= 0) && (key < 256) )
 			{
@@ -3333,7 +3316,7 @@ void QHexEdit::addBookMarkCB(void)
 //----------------------------------------------------------------------------
 static int RamFreezeCB(const char *name, uint32 a, uint8 v, int compare,int s,int type, void *data)
 {
-	return ((QHexEdit*)data)->FreezeRam( name, a, v, compare, s, type );
+	return (reinterpret_cast<QHexEdit*>(data))->FreezeRam( name, a, v, compare, s, type );
 }	
 //----------------------------------------------------------------------------
 int QHexEdit::FreezeRam( const char *name, uint32_t a, uint8_t v, int c, int s, int type )
@@ -3732,7 +3715,7 @@ int QHexEdit::getRomAddrColor( int addr, QColor &fg, QColor &bg )
 
 	if (temp_offset >= 0)
 	{
-		if ((unsigned int)temp_offset < cdloggerdataSize)
+		if (static_cast<unsigned int>(temp_offset) < cdloggerdataSize)
 		{
 			// PRG
 			if ((cdloggerdata[temp_offset] & 3) == 3)
@@ -3764,7 +3747,7 @@ int QHexEdit::getRomAddrColor( int addr, QColor &fg, QColor &bg )
 		else
 		{
 			temp_offset -= cdloggerdataSize;
-			if (((unsigned int)temp_offset < cdloggerVideoDataSize))
+			if ((static_cast<unsigned int>(temp_offset) < cdloggerVideoDataSize))
 			{
 				// CHR
 				if ((cdloggervdata[temp_offset] & 3) == 3)

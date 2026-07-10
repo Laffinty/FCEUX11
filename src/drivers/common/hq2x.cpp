@@ -20,11 +20,12 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <memory>
 
 #include "hq2x.h"
 
-static int *LUT16to32=NULL;
-static int *RGBtoYUV=NULL;
+static std::unique_ptr<int[]> LUT16to32;
+static std::unique_ptr<int[]> RGBtoYUV;
 static const int   Ymask = 0x00FF0000;
 static const int   Umask = 0x0000FF00;
 static const int   Vmask = 0x000000FF;
@@ -2896,8 +2897,11 @@ int hq2x_InitLUTs(void)
 {
   int i, j, k, r, g, b, Y, u, v;
 
-  if(!(LUT16to32 = (int*)malloc(65536*sizeof(int)))) return(0); //mbg merge 7/17/06 added cast
-  if(!(RGBtoYUV = (int*)malloc(65536*sizeof(int)))) { free(LUT16to32); return(0); } //mbg merge 7/17/06 added cast
+  // v1.13 Purify F3d: std::unique_ptr<int[]> RAII (was raw malloc/free)
+  LUT16to32.reset(new(std::nothrow) int[65536]);
+  if (!LUT16to32) return 0;
+  RGBtoYUV.reset(new(std::nothrow) int[65536]);
+  if (!RGBtoYUV) { LUT16to32.reset(); return 0; }
 
   for (i=0; i<65536; i++)
     LUT16to32[i] = ((i & 0xF800) << 8) + ((i & 0x07E0) << 5) + ((i & 0x001F) << 3);
@@ -2919,10 +2923,8 @@ int hq2x_InitLUTs(void)
 
 void hq2x_Kill(void)
 {
- free(LUT16to32);
- free(RGBtoYUV);
-
-// LUT16to32=RGBtoYUV=NULL;
+ LUT16to32.reset();
+ RGBtoYUV.reset();
 }
 
 #ifdef FIFINONO

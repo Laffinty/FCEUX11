@@ -22,12 +22,12 @@
 // is now owned by Rust (fceux11-debug::cheat). This C++ file retains only
 // the parts that must call into x6502 (SetReadHandler / GetReadHandler) or
 // the platform-native file I/O (FCEU_MakeFName + FCEUD_UTF8fopen):
-//   * RebuildSubCheats     â€?installs/removes read handlers per cheat
-//   * SubCheatsRead        â€?the read handler itself
-//   * FCEU_ApplyPeriodicCheats â€?pokes RAM via CheatRPtrs
-//   * FCEU_CheatGetByte/SetByte â€?go through ARead/BWrite
-//   * FCEU_LoadGameCheats / SaveGameCheats / FlushGameCheats â€?file I/O
-//   * FCEU_CheatResetRAM / FCEU_CheatAddRAM â€?the CheatRPtrs translation array
+//   * RebuildSubCheats     ï¿½?installs/removes read handlers per cheat
+//   * SubCheatsRead        ï¿½?the read handler itself
+//   * FCEU_ApplyPeriodicCheats ï¿½?pokes RAM via CheatRPtrs
+//   * FCEU_CheatGetByte/SetByte ï¿½?go through ARead/BWrite
+//   * FCEU_LoadGameCheats / SaveGameCheats / FlushGameCheats ï¿½?file I/O
+//   * FCEU_CheatResetRAM / FCEU_CheatAddRAM ï¿½?the CheatRPtrs translation array
 //
 // Everything else delegates to fceux11_rust_cheat_*.
 
@@ -84,7 +84,7 @@ int globalCheatDisabled = 0;
 int disableAutoLSCheats = 0;
 bool disableShowGG = 0;
 // v0.2.24: cheat-map storage moved to Rust (fceux11_rust_cheat_map_*).
-// This pointer is repurposed as a presence sentinel â€?non-null when the
+// This pointer is repurposed as a presence sentinel ï¿½?non-null when the
 // Rust-side buffer is allocated, NULL otherwise. The cheat code never
 // dereferences it (all reads/writes go through the FFI).
 static _8BYTECHEATMAP* cheatMap = NULL;
@@ -197,7 +197,7 @@ void FCEU_LoadGameCheats(FILE *override, int override_existing)
 	char linebuf[2048] = { 0 };
 	char namebuf[128] = { 0 };
 	int tc = 0;
-	char *fn;
+	std::string fn;
 
 	if (override_existing)
 	{
@@ -210,9 +210,8 @@ void FCEU_LoadGameCheats(FILE *override, int override_existing)
 		fp = override;
 	else
 	{
-		fn = strdup(FCEU_MakeFName(FCEUMKF_CHEAT, 0, 0).c_str());
-		fp = FCEUD_UTF8fopen(fn, "rb");
-		free(fn);
+		fn = FCEU_MakeFName(FCEUMKF_CHEAT, 0, 0);
+		fp = FCEUD_UTF8fopen(fn.c_str(), "rb");
 		if (!fp) {
 			return;
 		}
@@ -324,10 +323,10 @@ void FCEU_FlushGameCheats(FILE *override, int nosave)
 	}
 	else
 	{
-		char *fn = 0;
+		std::string fn;
 
 		if(!override)
-			fn = strdup(FCEU_MakeFName(FCEUMKF_CHEAT,0,0).c_str());
+			fn = FCEU_MakeFName(FCEUMKF_CHEAT,0,0);
 
 		if(fceux11_rust_cheat_count() > 0)
 		{
@@ -336,7 +335,7 @@ void FCEU_FlushGameCheats(FILE *override, int nosave)
 			if(override)
 				fp = override;
 			else
-				fp=FCEUD_UTF8fopen(fn,"wb");
+				fp=FCEUD_UTF8fopen(fn.c_str(),"wb");
 
 			if(fp)
 			{
@@ -349,9 +348,7 @@ void FCEU_FlushGameCheats(FILE *override, int nosave)
 			fceux11_rust_cheat_delete_all();
 		}
 		else if(!override)
-			remove(fn);
-		if(!override)
-			free(fn);
+			remove(fn.c_str());
 	}
 
 	RebuildSubCheats();  /* Remove memory handlers. */
@@ -483,12 +480,12 @@ int fceu11::GlobalToggleCheat(int global_enabled)
 }
 
 // ---------------------------------------------------------------------------
-// Cheat search â€?all storage in Rust; C++ builds the memory snapshots that
+// Cheat search ï¿½?all storage in Rust; C++ builds the memory snapshots that
 // Rust needs to evaluate the comparators.
 // ---------------------------------------------------------------------------
 
 namespace {
-// Snapshot helpers â€?populate `mem` from CheatRPtrs (current memory) and
+// Snapshot helpers ï¿½?populate `mem` from CheatRPtrs (current memory) and
 // `pres` from the presence of a CheatRPtrs entry (1 = real RAM, 0 = absent).
 void buildMemorySnapshot(uint8* mem, uint8* pres)
 {
@@ -662,7 +659,7 @@ int fceu11::FindCheatMapByte(uint16 address)
 void fceu11::SetCheatMapByte(uint16 address, bool cheat)
 {
 	// v0.2.24: bit storage migrated to Rust. The original C++ ternary is
-	// `cheat ? OR : XOR` â€?preserved exactly inside the Rust impl.
+	// `cheat ? OR : XOR` ï¿½?preserved exactly inside the Rust impl.
 	fceux11_rust_cheat_map_set(address, cheat ? 1 : 0);
 }
 

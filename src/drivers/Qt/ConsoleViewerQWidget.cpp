@@ -83,11 +83,11 @@ ConsoleViewQWidget_t::ConsoleViewQWidget_t(QWidget *parent)
 
 	localBufSize = (4 * GL_NES_WIDTH) * (4 * GL_NES_HEIGHT) * sizeof(uint32_t);
 
-	localBuf = (uint32_t*)malloc( localBufSize );
+	localBuf = std::make_unique<uint32_t[]>(localBufSize / sizeof(uint32_t));
 
 	if ( localBuf )
 	{
-		memset32( localBuf, alphaMask, localBufSize );
+		memset32( localBuf.get(), alphaMask, localBufSize );
 	}
 
 	forceAspect  = true;
@@ -120,12 +120,6 @@ ConsoleViewQWidget_t::ConsoleViewQWidget_t(QWidget *parent)
 
 ConsoleViewQWidget_t::~ConsoleViewQWidget_t(void)
 {
-	//printf("Destroying QPainter Viewport\n");
-
-	if ( localBuf )
-	{
-		free( localBuf ); localBuf = nullptr;
-	}
 	cleanup();
 }
 
@@ -212,7 +206,7 @@ void ConsoleViewQWidget_t::transfer2LocalBuffer(void)
 		cpSize = localBufSize;
 	}
 	src  = (uint8_t*)nes_shm->pixbuf[bufIdx];
-	dest = (uint8_t*)localBuf;
+	dest = (uint8_t*)localBuf.get();
 
 	hq = (nes_shm->video.preScaler == 1) || (nes_shm->video.preScaler == 4); // hq2x and hq3x
 
@@ -512,7 +506,7 @@ void ConsoleViewQWidget_t::paintEvent(QPaintEvent *event)
 
 	int rowPitch = nesWidth * sizeof(uint32_t);
 
-	QImage tmpImage( (const uchar*)localBuf, nesWidth, nesHeight, rowPitch, QImage::Format_ARGB32);
+	QImage tmpImage( (const uchar*)localBuf.get(), nesWidth, nesHeight, rowPitch, QImage::Format_ARGB32);
 
 	//SDL_Rect source = {0, 0, nesWidth, nesHeight };
 	QRect dest( sx, sy, rw, rh );

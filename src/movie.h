@@ -299,6 +299,26 @@ namespace fceu11 {
     void SetMovieToggleReadOnly(bool which);
     std::string GetMovieName();
     void MovieToggleFrameDisplay();
+
+    // v1.13 Phase B / Batch B: TAS Editor bridge via function-pointer
+    // registration. Replaces the previous movie.cpp -> TasEditorWindow.h
+    // include drag (and the direct calls to isTaseditorRecording() /
+    // recordInputByTaseditor()) with an opaque registration interface.
+    //
+    // The GUI side (TasEditorWindow) calls RegisterTasBridge once during
+    // construction; the destructor (or closeEvent) calls
+    // UnregisterTasBridge. Hot-path lookups are unconditional; when no
+    // bridge is registered the movie core falls back to standard
+    // joystick record/replay.
+    using TasIsRecordingFn = bool (*)(void*);
+    using TasRecordInputFn  = void (*)(void*);
+    struct TasBridge {
+        TasIsRecordingFn is_recording;   // optional (nullable)
+        TasRecordInputFn  record_input;   // optional (nullable)
+        void*            ctx;            // opaque, passed back to fns
+    };
+    void RegisterTasBridge(const TasBridge& b);
+    void UnregisterTasBridge();
 } // namespace fceu11
 
 inline void FCEUI_SaveMovie(const char *fname, EMOVIE_FLAG flags, std::wstring author) { fceu11::SaveMovie(fname, flags, author); }

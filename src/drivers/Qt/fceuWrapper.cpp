@@ -461,13 +461,13 @@ int  fceuWrapperHardReset(void)
 
 		romPath[0] = 0;
 
-		if ( GameInfo->archiveFilename )
+		if ( !GameInfo->archiveFilename.empty() )
 		{
-			FCEU_strlcpy(romPath, sizeof(romPath), GameInfo->archiveFilename);
+			FCEU_strlcpy(romPath, sizeof(romPath), GameInfo->archiveFilename.c_str());
 		}
-		else if ( GameInfo->filename )
+		else if ( !GameInfo->filename.empty() )
 		{
-			FCEU_strlcpy(romPath, sizeof(romPath), GameInfo->filename);
+			FCEU_strlcpy(romPath, sizeof(romPath), GameInfo->filename.c_str());
 		}
 
 		if ( romPath[0] != 0 )

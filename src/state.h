@@ -59,14 +59,15 @@ void AddExState(void *v, uint32 s, int type, const char *desc);
 // Chains with whatever PreSave ResetExState set earlier.
 void FCEU_SetStatePreSave(void (*PreSave)(void));
 
-//indicates that the value is a multibyte integer that needs to be put in the correct byte order
-#define FCEUSTATE_RLSB            0x80000000
+// v1.13 Purify H: #define → constexpr (savestate flags)
+// indicates that the value is a multibyte integer that needs to be put in the correct byte order
+inline constexpr uint32_t FCEUSTATE_RLSB = 0x80000000;
 
-//void*v is actually a void** which will be indirected before reading
-#define FCEUSTATE_INDIRECT            0x40000000
+// void*v is actually a void** which will be indirected before reading
+inline constexpr uint32_t FCEUSTATE_INDIRECT = 0x40000000;
 
-//all FCEUSTATE flags together so that we can mask them out and get the size
-#define FCEUSTATE_FLAGS (FCEUSTATE_RLSB|FCEUSTATE_INDIRECT)
+// all FCEUSTATE flags together so that we can mask them out and get the size
+inline constexpr uint32_t FCEUSTATE_FLAGS = FCEUSTATE_RLSB | FCEUSTATE_INDIRECT;
 
 void FCEU_DrawSaveStates(uint8 *XBuf);
 

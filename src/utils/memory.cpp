@@ -30,6 +30,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <new>
 #include "../types.h"
 #include "../fceu.h"
 #include "memory.h"
@@ -77,8 +78,11 @@ static void _FCEU_free(void* ptr)
 
 void *FCEU_gmalloc(size_t size)
 {
-	void *ret = _FCEU_malloc(size);
- 
+	void *ret = ::operator new(size, std::nothrow);
+
+	if(!ret)
+		FCEU_abort("Error allocating memory!");
+
 	// initialize according to RAMInitOption, default zero
 	FCEU_MemoryRand((uint8*)ret,size,true);
 
@@ -94,7 +98,7 @@ void *FCEU_malloc(size_t size)
 
 void FCEU_gfree(void *ptr)
 {
-	_FCEU_free(ptr);
+	::operator delete(ptr);
 }
 
 void FCEU_free(void *ptr)

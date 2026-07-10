@@ -5,10 +5,12 @@ build_no_rust/
 build_rust_*/
 build_v027/
 build_vs/
+build_msvc/
 build-*/
 _build/
 *.build/
 out/
+dist/
 
 # CMake generated files
 CMakeCache.txt
@@ -81,6 +83,9 @@ docs/history/unpacked/
 
 # Claude Code
 .claude/
+
+# MiMoCode
+.mimocode/
 
 # Local configuration
 config.ini

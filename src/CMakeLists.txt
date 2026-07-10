@@ -122,59 +122,16 @@ option(FCEUX11_WGI_BACKEND "Enable Windows.Gaming.Input backend (requires WinRT/
 # after v1.0).
 option(FCEUX11_DIRECT_STORAGE_PROBE "Enable DirectStorage 1.2 NVMe probe (Windows only)" ON)
 
-if(FCEUX11_LUA_RUST_ENABLED AND FCEUX11_RUST_ENABLED)
-    message(STATUS "Using Rust Lua engine (mlua vendored Lua 5.1)")
-    add_definitions(-D_S9XLUA_H -DFCEUX11_LUA_RUST_ENABLED)
-    set(LUA_ENGINE_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/lua-engine.cpp)
-elseif ( ${LUA_FOUND} )
-   # Use System LUA (legacy fallback, requires old lua-engine.cpp)
-        message( STATUS "Using System Lua ${LUA_VERSION} (legacy, not recommended)" )
-
-        add_definitions( -D_S9XLUA_H  ${LUA_CFLAGS} )
-
-        set( LUA_ENGINE_SOURCE  ${CMAKE_CURRENT_SOURCE_DIR}/lua-engine.cpp )
-
-else ()
-
-   # Use Internal Lua (legacy fallback, requires old lua-engine.cpp)
-        message( STATUS "Using Internal Lua (legacy, not recommended)" )
-
-   add_definitions( -D_S9XLUA_H  -I${CMAKE_CURRENT_SOURCE_DIR}/lua/src )
-
-        set( LUA_ENGINE_SOURCE  
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lapi.c 
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lauxlib.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lbaselib.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lcode.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/ldblib.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/ldebug.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/ldo.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/ldump.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lfunc.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lgc.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/linit.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/liolib.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/llex.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lmathlib.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lmem.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/loadlib.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lobject.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lopcodes.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/loslib.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lparser.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lstate.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lstring.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lstrlib.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/ltable.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/ltablib.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/ltm.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lundump.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lvm.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lzio.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/print.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua-engine.cpp 
-   )
+# v1.13 Purify I §10: Lua 5.1 C source removed. Rust Lua (mlua) is the only path.
+if(NOT FCEUX11_LUA_RUST_ENABLED)
+    message(FATAL_ERROR
+        "v1.13 Purify: Lua 5.1 C source has been removed. "
+        "FCEUX11_LUA_RUST_ENABLED=ON is required.")
 endif()
+
+message(STATUS "Using Rust Lua engine (mlua vendored Lua 5.1)")
+add_definitions(-D_S9XLUA_H -DFCEUX11_LUA_RUST_ENABLED)
+set(LUA_ENGINE_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/lua-engine.cpp)
 
 if ( ${ZLIB_FOUND} )
 
@@ -218,6 +175,13 @@ set(SRC_CORE
   	${CMAKE_CURRENT_SOURCE_DIR}/ines_save.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/input.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/movie.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/movie_fm2.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/movie_playback.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/movie_record.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/movie_subtitles.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/movie_io.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/movie_taseditor_bridge.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/movie_settings.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/netplay.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/nsf.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/nsf_load.cpp
@@ -227,6 +191,9 @@ set(SRC_CORE
   	${CMAKE_CURRENT_SOURCE_DIR}/palette.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/profiler.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/ppu.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/ppu_rendering.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/ppu_state.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/ppu_core.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/ppu_class.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/apu.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/expansion_audio.cpp
@@ -471,7 +438,21 @@ set(SRC_DRIVERS_COMMON
 )
 
 set(SRC_DRIVERS_QT
-  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleWindow.cpp  
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleWindow.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleEmulatorThread.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleMenuBar.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleVideoSetup.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleCursor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleHotKeys.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleMenu.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleRecording.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleFile.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleActions.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleVideo.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleTranslation.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleRecentRom.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleEmuControl.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleDebugWindows.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleViewerGL.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleViewerSDL.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ConsoleViewerQWidget.cpp  
@@ -511,6 +492,11 @@ set(SRC_DRIVERS_QT
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/fceu_globals.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/fceu_callbacks.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ppuViewer.cpp  
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ppuViewerContext.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ppuViewerPalette.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ppuViewerTileEditor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ppuViewerSpriteViewer.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/ppuViewerPatternTables.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/NameTableViewer.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/RamWatch.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/RamSearch.cpp  
@@ -527,11 +513,19 @@ set(SRC_DRIVERS_QT
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/sdl-throttle.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/QtNetplay.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/AviRecord.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/AviRecordDiskThread.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/AviVideoCodec.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/AviAudioCodec.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/AviOptionsDialog.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/AviRiffViewer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/avi/avi-utils.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/avi/fileio.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/avi/gwavi.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/TasEditor/TasEditorWindow.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/TasEditor/TasEditorTimeline.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/TasEditor/bookmarkPreviewPopup.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/TasEditor/markerDragPopup.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/TasEditor/TasFindNoteWindow.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/TasEditor/taseditor_project.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/TasEditor/taseditor_config.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/TasEditor/taseditor_lua.cpp

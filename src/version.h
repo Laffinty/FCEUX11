@@ -56,18 +56,19 @@
 #define FCEU_COMPILER_DETAIL ""
 #endif
 
-#define FCEU_VERSION_MAJOR  1
-#define FCEU_VERSION_MINOR  11
-#define FCEU_VERSION_PATCH  0
-#define FCEU_VERSION_TWEAK  0
+// v1.13 Purify H: #define → constexpr (version numbers)
+inline constexpr int FCEU_VERSION_MAJOR = 1;
+inline constexpr int FCEU_VERSION_MINOR = 13;
+inline constexpr int FCEU_VERSION_PATCH = 0;
+inline constexpr int FCEU_VERSION_TWEAK = 0;
 
-#define FCEU_VERSION_NUMERIC  ( (FCEU_VERSION_MAJOR*10000) + (FCEU_VERSION_MINOR*100) + (FCEU_VERSION_PATCH) )
-#define FCEU_VERSION_MAJOR_DECODE(x)  ( (x / 10000) )
-#define FCEU_VERSION_MINOR_DECODE(x)  ( (x / 100) % 100 )
-#define FCEU_VERSION_PATCH_DECODE(x)    (x % 100)
+inline constexpr int FCEU_VERSION_NUMERIC = (FCEU_VERSION_MAJOR * 10000) + (FCEU_VERSION_MINOR * 100) + FCEU_VERSION_PATCH;
+inline constexpr int FCEU_VERSION_MAJOR_DECODE(int x) { return x / 10000; }
+inline constexpr int FCEU_VERSION_MINOR_DECODE(int x) { return (x / 100) % 100; }
+inline constexpr int FCEU_VERSION_PATCH_DECODE(int x) { return x % 100; }
 
-#define FCEU_VERSION_STRING "1.11"  FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
-#define FCEU_DISPLAY_VERSION "v1.11"
+#define FCEU_VERSION_STRING "1.13"  FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
+#define FCEU_DISPLAY_VERSION "v1.13"
 #define FCEU_NAME_AND_VERSION FCEU_NAME " " FCEU_DISPLAY_VERSION
 
 // FCEUX11 Contributors — Derivative work based on FCEUX

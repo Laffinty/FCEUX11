@@ -100,7 +100,7 @@ void ParseGIInput(FCEUGI *gi)
 
 	// v0.3.8: gi->input[0..1] is fceu11::InputDevice (enum class) and
 	// gi->inputfc is fceu11::InputDeviceFC. Storage is int per the
-	// pre-v0.3.8 contract â€?cast explicitly. Sentinel test is "any
+	// pre-v0.3.8 contract ï¿½?cast explicitly. Sentinel test is "any
 	// non-negative value means valid"; ESI::Unset = -1.
 	if (static_cast<int>(gi->input[0]) >= 0)
 	{
@@ -292,11 +292,11 @@ void hotkey_t::conv2SDL(void)
 	SDL_Keycode k = convQtKey2SDLKeyCode(shortcut->key()[0].key());
 	SDL_Keymod m = convQtKey2SDLModifier(shortcut->key()[0].keyboardModifiers());
 #else
-	qkey.value    = (Qt::Key)(shortcut->key()[0] & 0x01FFFFFF);
-	qkey.modifier = (Qt::KeyboardModifier)(shortcut->key()[0] & 0xFE000000);
+	qkey.value    = static_cast<Qt::Key>(shortcut->key()[0] & 0x01FFFFFF);
+	qkey.modifier = static_cast<Qt::KeyboardModifier>(shortcut->key()[0] & 0xFE000000);
 
-	SDL_Keycode k = convQtKey2SDLKeyCode((Qt::Key)(shortcut->key()[0] & 0x01FFFFFF));
-	SDL_Keymod m = convQtKey2SDLModifier((Qt::KeyboardModifier)(shortcut->key()[0] & 0xFE000000));
+	SDL_Keycode k = convQtKey2SDLKeyCode(static_cast<Qt::Key>(shortcut->key()[0] & 0x01FFFFFF));
+	SDL_Keymod m = convQtKey2SDLModifier(static_cast<Qt::KeyboardModifier>(shortcut->key()[0] & 0xFE000000));
 #endif
 
 	//printf("Key: '%s'  0x%08x\n", shortcut->key().toString().toStdString().c_str(), shortcut->key()[0] );
@@ -536,9 +536,9 @@ void gamepad_function_key_t::sendKeyPressEvent(int idx)
 
 	if ( !hasShortcut && (keySeq[idx].key > 0) )
 	{
-		QKeyEvent *k = new QKeyEvent(QEvent::KeyPress, keySeq[idx].key, (Qt::KeyboardModifiers)keySeq[idx].modifier);
+		QKeyEvent *k = new QKeyEvent(QEvent::KeyPress, keySeq[idx].key, static_cast<Qt::KeyboardModifiers>(keySeq[idx].modifier));
 
-		qApp->postEvent((QObject *)consoleWindow, (QEvent *)k);
+		qApp->postEvent(static_cast<QObject*>(consoleWindow), static_cast<QEvent*>(k));
 
 		keyRelReq[idx] = 1;
 	}
@@ -548,9 +548,9 @@ void gamepad_function_key_t::sendKeyReleaseEvent(int idx)
 {
 	if ( keyRelReq[idx] )
 	{
-		QKeyEvent *k = new QKeyEvent(QEvent::KeyRelease, keySeq[idx].key, (Qt::KeyboardModifiers)keySeq[idx].modifier);
+		QKeyEvent *k = new QKeyEvent(QEvent::KeyRelease, keySeq[idx].key, static_cast<Qt::KeyboardModifiers>(keySeq[idx].modifier));
 
-		qApp->postEvent((QObject *)consoleWindow, (QEvent *)k);
+		qApp->postEvent(static_cast<QObject*>(consoleWindow), static_cast<QEvent*>(k));
 
 		keyRelReq[idx] = 0;
 	}
@@ -742,9 +742,9 @@ unsigned int *GetKeyboard(void)
 {
 	int size = 256;
 
-	Uint8 *keystate = (Uint8 *)SDL_GetKeyboardState(&size);
+	Uint8 *keystate = const_cast<Uint8*>(SDL_GetKeyboardState(&size));
 
-	return (unsigned int *)(keystate);
+	return reinterpret_cast<unsigned int*>(keystate);
 }
 
 static void FKB_CheckShortcutConflicts(void)
@@ -1735,7 +1735,7 @@ void fceWrapper_SetInput(bool fourscore, bool microphone, ESI port0, ESI port1,
 	{
 		// no Four Core emulation, check the config/movie file for controller types
 		// v0.3.8: CurInputType[] is int; port0/port1/fcexp are typed
-		// fceu11::InputDevice / InputDeviceFC â€?cast at the boundary.
+		// fceu11::InputDevice / InputDeviceFC ï¿½?cast at the boundary.
 		CurInputType[0] = static_cast<int>(port0);
 		CurInputType[1] = static_cast<int>(port1);
 		CurInputType[2] = static_cast<int>(fcexp);
@@ -1793,7 +1793,7 @@ void InitInputInterface()
 			t |= 1;
 			break;
 		}
-		fceu11::SetInput(x, (ESI)CurInputType[x], InputDPtr, attrib);
+		fceu11::SetInput(x, static_cast<ESI>(CurInputType[x]), InputDPtr, attrib);
 	}
 
 	attrib = 0;
@@ -1838,7 +1838,7 @@ void InitInputInterface()
 		break;
 	}
 
-	fceu11::SetInputFC((ESIFC)CurInputType[2], InputDPtr, attrib);
+	fceu11::SetInputFC(static_cast<ESIFC>(CurInputType[2]), InputDPtr, attrib);
 	fceu11::SetInputFourscore((eoptions & EO_FOURSCORE) != 0);
 }
 
@@ -2109,10 +2109,10 @@ int DWaitButton(const uint8_t *text, ButtConfig *bc, int *buttonConfigStatus)
 	if (text)
 	{
 		std::string title = "Press a key for ";
-		title += (const char *)text;
+		title += reinterpret_cast<const char*>(text);
 		// TODO - SDL2
 		//SDL_WM_SetCaption (title.c_str (), 0);
-		puts((const char *)text);
+		puts(reinterpret_cast<const char*>(text));
 	}
 
 	for (x = 0; x < 64; x++)
@@ -2607,63 +2607,63 @@ void UpdateInput(Config *config)
 		}
 		else if (device.find("GamePad") != std::string::npos)
 		{
-			UsrInputType[i] = (i < 2) ? (int)SI_GAMEPAD : (int)SIFC_NONE;
+			UsrInputType[i] = (i < 2) ? static_cast<int>(SI_GAMEPAD) : static_cast<int>(SIFC_NONE);
 		}
 		else if (device.find("PowerPad.0") != std::string::npos)
 		{
-			UsrInputType[i] = (i < 2) ? (int)SI_POWERPADA : (int)SIFC_NONE;
+			UsrInputType[i] = (i < 2) ? static_cast<int>(SI_POWERPADA) : static_cast<int>(SIFC_NONE);
 		}
 		else if (device.find("PowerPad.1") != std::string::npos)
 		{
-			UsrInputType[i] = (i < 2) ? (int)SI_POWERPADB : (int)SIFC_NONE;
+			UsrInputType[i] = (i < 2) ? static_cast<int>(SI_POWERPADB) : static_cast<int>(SIFC_NONE);
 		}
 		else if (device.find("QuizKing") != std::string::npos)
 		{
-			UsrInputType[i] = (i < 2) ? (int)SI_NONE : (int)SIFC_QUIZKING;
+			UsrInputType[i] = (i < 2) ? static_cast<int>(SI_NONE) : static_cast<int>(SIFC_QUIZKING);
 		}
 		else if (device.find("HyperShot") != std::string::npos)
 		{
-			UsrInputType[i] = (i < 2) ? (int)SI_NONE : (int)SIFC_HYPERSHOT;
+			UsrInputType[i] = (i < 2) ? static_cast<int>(SI_NONE) : static_cast<int>(SIFC_HYPERSHOT);
 		}
 		else if (device.find("Mahjong") != std::string::npos)
 		{
-			UsrInputType[i] = (i < 2) ? (int)SI_NONE : (int)SIFC_MAHJONG;
+			UsrInputType[i] = (i < 2) ? static_cast<int>(SI_NONE) : static_cast<int>(SIFC_MAHJONG);
 		}
 		else if (device.find("TopRider") != std::string::npos)
 		{
-			UsrInputType[i] = (i < 2) ? (int)SI_NONE : (int)SIFC_TOPRIDER;
+			UsrInputType[i] = (i < 2) ? static_cast<int>(SI_NONE) : static_cast<int>(SIFC_TOPRIDER);
 		}
 		else if (device.find("FTrainer") != std::string::npos)
 		{
-			UsrInputType[i] = (i < 2) ? (int)SI_NONE : (int)SIFC_FTRAINERA;
+			UsrInputType[i] = (i < 2) ? static_cast<int>(SI_NONE) : static_cast<int>(SIFC_FTRAINERA);
 		}
 		else if (device.find("FamilyKeyBoard") != std::string::npos)
 		{
-			UsrInputType[i] = (i < 2) ? (int)SI_NONE : (int)SIFC_FKB;
+			UsrInputType[i] = (i < 2) ? static_cast<int>(SI_NONE) : static_cast<int>(SIFC_FKB);
 		}
 		else if (device.find("OekaKids") != std::string::npos)
 		{
-			UsrInputType[i] = (i < 2) ? (int)SI_NONE : (int)SIFC_OEKAKIDS;
+			UsrInputType[i] = (i < 2) ? static_cast<int>(SI_NONE) : static_cast<int>(SIFC_OEKAKIDS);
 		}
 		else if (device.find("Arkanoid") != std::string::npos)
 		{
-			UsrInputType[i] = (i < 2) ? (int)SI_ARKANOID : (int)SIFC_ARKANOID;
+			UsrInputType[i] = (i < 2) ? static_cast<int>(SI_ARKANOID) : static_cast<int>(SIFC_ARKANOID);
 		}
 		else if (device.find("Shadow") != std::string::npos)
 		{
-			UsrInputType[i] = (i < 2) ? (int)SI_NONE : (int)SIFC_SHADOW;
+			UsrInputType[i] = (i < 2) ? static_cast<int>(SI_NONE) : static_cast<int>(SIFC_SHADOW);
 		}
 		else if (device.find("Zapper") != std::string::npos)
 		{
-			UsrInputType[i] = (i < 2) ? (int)SI_ZAPPER : (int)SIFC_NONE;
+			UsrInputType[i] = (i < 2) ? static_cast<int>(SI_ZAPPER) : static_cast<int>(SIFC_NONE);
 		}
 		else if (device.find("BWorld") != std::string::npos)
 		{
-			UsrInputType[i] = (i < 2) ? (int)SI_NONE : (int)SIFC_BWORLD;
+			UsrInputType[i] = (i < 2) ? static_cast<int>(SI_NONE) : static_cast<int>(SIFC_BWORLD);
 		}
 		else if (device.find("4Player") != std::string::npos)
 		{
-			UsrInputType[i] = (i < 2) ? (int)SI_NONE : (int)SIFC_4PLAYER;
+			UsrInputType[i] = (i < 2) ? static_cast<int>(SI_NONE) : static_cast<int>(SIFC_4PLAYER);
 		}
 		else
 		{

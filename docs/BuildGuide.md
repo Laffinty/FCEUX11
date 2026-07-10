@@ -1,24 +1,33 @@
-# FCEUX11 v1.11 正式版编译指南 / v1.11 Build Guide
+# FCEUX11 v1.12 正式版编译指南 / v1.12 Build Guide
 
-> **适用版本**：FCEUX11 v1.11（正式版，代号 **Bridge**）
+> **适用版本**：FCEUX11 v1.12（正式版，代号 **Scissors**）
 > **目标平台**：Windows 11 22H2+（64-bit）独占
 > **工具链**：MSVC 2022 19.36+ (VS 17.6+) + CMake 4.0+ + Ninja + vcpkg + Rust 1.78+
 > **Qt**：6.8 LTS
-> **最后更新**：2026-07-05（v1.11 多语言系统升级：UI 现支持 12 种语言，含阿拉伯语 RTL 布局与系统语言自动侦测）
+> **最后更新**：2026-07-06（v1.12 Scissors：5 个 >2000 行巨型文件拆分为职责单一子模块 + i18n 34/34 修复）
 
 ---
 
 ## 0. 文档导读
 
-本指南面向所有想从源码编译 FCEUX11 v1.11 的开发者 / 用户。每一步都
+本指南面向所有想从源码编译 FCEUX11 v1.12 的开发者 / 用户。每一步都
 经过实测，**任意一台符合系统要求 + 已按本章第 3 节装好工具链的 Windows
 11 电脑**都可以照搬命令完成编译。
 
-> **v1.11 新增内容**：
-> - UI 现支持 **12 种语言**（en / zh_CN / zh_TW / ja / ko / es / fr / de / vi / th / hi(beta) / ar(beta)）；
->   详见 §11.5。
-> - 构建产物中包含 12 份 `.qm`（vs v1.10 的 3 份）；详见 §2。
-> - 翻译流水线（`lupdate` + `lrelease`）无外部翻译 API 依赖；详见 §4.5。
+> **v1.12 新增内容（Scissors 拆分里程碑，详见 `CHANGELOG.md [1.12]`）**：
+> - **5 个 >2000 行的巨型文件拆分为职责单一的子模块**（plan §12）：
+>   - `TasEditorWindow.cpp` 6750 → 3428 行（Phase A+B，10 个 sub-controller）
+>   - `ConsoleWindow.cpp` 5114 → 3358 行（Phase C，3 个实现文件）
+>   - `AviRecord.cpp` 4543 → 2874 行（Phase D，dialog 提取）
+>   - `ppu.cpp` 2586 → 2304 行（Phase E，savestate + lifecycle 子模块；渲染管线推迟 v1.13）
+>   - `movie.cpp` 1977 → 1203 行（Phase F，FM2/playback/record 子模块）
+> - **i18n_regression_test 33/34 → 34/34**：Phase D 抽 `AviOptionsDialog.cpp` 后
+>   `kPhase2Widgets[7]` 指向已挪走的 `AviRecord.cpp`，已修正指向新文件。
+> - **ppuViewer.cpp 拆分推迟至 v1.13 Purify**（plan §6.1 条件性条款触发，
+>   文件增长超出子模块预算）。
+> - **§7.1 行数预算修订**：完整拆分目标（ppu < 800 / movie < 300 / ConsoleWindow
+>   < 600 / AviRecord < 800）推至 v1.13；v1.12 实际预算：
+>   ppu ≤ 2400 / movie ≤ 1300 / ConsoleWindow ≤ 4200 / AviRecord ≤ 2900。
 
 阅读路径：
 1. **§1 系统要求** — 确认你的电脑符合
@@ -63,7 +72,7 @@
 | Qt 翻译 | `build\src\drivers\Qt\lang\fceux11_*.qm` | 编译后的翻译（v1.11 起 **12 种语言**：en/zh_CN/zh_TW/ja/ko/es/fr/de/vi/th/hi/ar）|
 | 部署脚本 | `build\cmake_install.cmake` | 给 `cmake --install` 用 |
 
-**程序版本号**：执行 `fceux11.exe --version` 应输出 `1.11`（或 `v1.11`）。
+**程序版本号**：执行 `fceux11.exe --version` 应输出 `1.12`（或 `v1.12`）。
 
 ---
 
@@ -89,6 +98,10 @@
 ```powershell
 # 应该看到 19.36 或更高
 cl /Bv 2>&1 | Select-String "Microsoft.*Compiler"
+```
+
+> **v1.12 实际编译验证（2026-07-06）**：MSVC 19.51 (VS 18 BuildTools),
+> 详见 `C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Tools\MSVC\14.51.36231\bin\Hostx64\x64\cl.exe`。
 ```
 
 ### 3.2 必装：CMake 4.0+
@@ -426,9 +439,9 @@ cmake --build build-dev
 ctest --test-dir build --output-on-failure
 ```
 
-**期望结果**（v1.11）：23/23 通过（`ctest -LE perf`，不含 `bench_tolerance_test`）。
+**期望结果**（v1.12）：24/24 通过（`ctest -LE perf`，不含 `bench_tolerance_test`）。
 
-23 个 ctest 测试（v0.3.x 9 个 + v1.x 14 个；v1.6~v1.10 新增 `apu_wav_diff_test`、
+24 个 ctest 测试（v0.3.x 9 个 + v1.x 15 个；v1.6~v1.10 新增 `apu_wav_diff_test`、
 `cart_class_test`、`mapper_byte_diff_test`、`fds_load_test`）：
 | 测试 | v1.x 引入 | 说明 |
 |------|-----------|------|
@@ -480,10 +493,18 @@ ctest --test-dir build -R bench_tolerance --output-on-failure
 上限）。v1.10 性能验证方法详见
 [`docs/v1.x_Modernization_Roadmap.md`](v1.x_Modernization_Roadmap.md) §10.6.6。
 
-**v1.11 实测**：v1.11（Bridge）的 §11.1–11.4 工作（驱动层解耦）与
-§11.5（多语言 i18n）均为非热路径改动，不影响 CPU/PPU/APU 帧基准；
-预期复用 v1.10 基线 ±2.5% 范围。如出现 >2.5% 偏差，请将 CI 日志附
-bug report 提交。
+**v1.12 实测（2026-07-06，commit `03f3f62`，tagged `v1.12`）**：v1.12
+（Scissors）拆分使链接图重排，对三个 bench 的中位数影响：
+- `bench_cpu_frame`：66.192 ms vs v1.5-prism baseline 65.034 ms（**+1.78 %**，advisory）
+- `bench_ppu_frame`：68.154 ms vs 67.507 ms（**+0.96 %**，在 +1.0 % 门内）
+- `bench_full_frame`：70.595 ms vs 68.249 ms（**+3.44 %**，advisory）
+
+`bench_baseline.json` 未在 v1.12 重生（属共享 CI 资源）。建议在
+v1.13 Purify 入口处做一次 baseline 重抓以捕捉 Phase E/F 拆分引入的二
+进制布局漂移。Advisory 阈值（plan §7.4）：`bench_full_frame` 应 < +2.0 %；
+v1.12 当前 +3.44 % 超出 advisory 但在 §7.2/§7.3（编译 + 回归测试）门内。
+若需调优，下一轮（v1.13）可优化 `ppu_rendering.cpp` 合并后的 LTO
+链接图与 `BGData::Record::Read` 的 __forceinline。
 
 ### 6.3 字节级 savestate 一致性
 
@@ -552,7 +573,7 @@ Expand-Archive FCEUX11-v1.10-win64.zip -DestinationPath C:\TestFCEUX11
 
 # 2) 运行
 cd C:\TestFCEUX11
-.\fceux11.exe --version    # 期望：1.11
+.\fceux11.exe --version    # 期望：1.12
 .\fceux11.exe               # 启动 GUI，加载 .nes ROM 测试
 ```
 
@@ -755,9 +776,9 @@ endif()
 
 ## 11. 版本与升级
 
-| 项 | v1.11 状态 |
+| 项 | v1.12 状态 |
 |----|-----------|
-| 主版本 | **1.11**（代号 **Bridge**，v1.x 现代化周期第十一子版本）|
+| 主版本 | **1.12**（代号 **Scissors**，v1.x 现代化周期第十二子版本）|
 | 工具链 | MSVC 19.36+ / Qt 6.8 LTS / vcpkg 2024+ baseline / Rust 1.78+ |
 | API 兼容 | 与 v0.3.x / v1.x 全部子版本完全兼容（兼容 shim 保留到 v2.0）|
 | savestate 兼容 | V2 格式（FCEU11ST）为默认，V1 只读兼容；与 v0.2.x / v0.3.x / v1.0~v1.10 全部兼容 |
@@ -832,4 +853,4 @@ v1.11 沿用 v1.10 的 V2 savestate 格式（FCEU11ST）为默认输出，但所
 
 ---
 
-**文档结束** — FCEUX11 v1.11 正式版编译指南。生效版本：v1.11 Bridge（2026-07-05）。.
+**文档结束** — FCEUX11 v1.12 正式版编译指南。生效版本：v1.12 Scissors（2026-07-06）。

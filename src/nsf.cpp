@@ -19,7 +19,7 @@
 */
 
 /// \file
-/// \brief NSF player bridge layer â€?v1.10 Cryptex.
+/// \brief NSF player bridge layer ï¿½?v1.10 Cryptex.
 /// Runtime handlers live in nsf_runtime.cpp; UI in nsf_ui.cpp; loader in nsf_load.cpp.
 
 #include "types.h"
@@ -69,7 +69,8 @@ void NSFGI(GI h) {
 	switch (h) {
 	case GI_CLOSE:
 		nsf_runtime_destroy();
-		if (NSFDATA) { free(NSFDATA); NSFDATA = 0; }
+		// v1.13 Purify F2a: NSFDATA allocated with FCEU_malloc() in nsf_load.cpp:57; use matching FCEU_free()
+		if (NSFDATA) { FCEU_free(NSFDATA); NSFDATA = 0; }
 		nsf_free_exwram();
 		if (NSFHeader.SoundChip & 1) { /* NSFVRC6_Init(); */ }
 		else if (NSFHeader.SoundChip & 2) { /* NSFVRC7_Init(); */ }

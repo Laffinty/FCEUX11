@@ -18,7 +18,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-// FCEUX11 v1.11 Bridge â€?fceu_archive.cpp
+// FCEUX11 v1.11 Bridge ï¿½?fceu_archive.cpp
 // Archive subsystem (minizip + libarchive backend).
 // Split from fceuWrapper.cpp per v1.11_bridge_build_plan.md Â§4.1.
 
@@ -27,6 +27,7 @@
 #include <cstring>
 
 #include <QFileInfo>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -177,7 +178,7 @@ static FCEUFILE* minizip_OpenArchive(ArchiveScanRecord& asr, std::string &fname,
 {
 	int ret, idx=0;
 	FCEUFILE* fp = nullptr;
-	void *tmpMem = nullptr;
+	std::unique_ptr<uint8_t[]> tmpMem;
 	unzFile zf;
 	unz_file_info fi;
 	char filename[512];
@@ -219,7 +220,7 @@ static FCEUFILE* minizip_OpenArchive(ArchiveScanRecord& asr, std::string &fname,
 		return fp;
 	}
 
-	tmpMem = ::malloc( fi.uncompressed_size );
+	tmpMem = std::make_unique<uint8_t[]>(fi.uncompressed_size);
 
 	if ( tmpMem == NULL )
 	{
@@ -230,12 +231,10 @@ static FCEUFILE* minizip_OpenArchive(ArchiveScanRecord& asr, std::string &fname,
 	EMUFILE_MEMORY* ms = new EMUFILE_MEMORY(fi.uncompressed_size);
 
 	unzOpenCurrentFile( zf );
-	unzReadCurrentFile( zf, tmpMem, fi.uncompressed_size );
+	unzReadCurrentFile( zf, tmpMem.get(), fi.uncompressed_size );
 	unzCloseCurrentFile( zf );
 
-	ms->fwrite(std::span<const std::byte>(static_cast<const std::byte*>(tmpMem), fi.uncompressed_size));
-
-	free( tmpMem );
+	ms->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(tmpMem.get()), fi.uncompressed_size));
 
 	fp = new FCEUFILE();
 	fp->archiveFilename = fname;

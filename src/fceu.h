@@ -84,7 +84,7 @@ extern int QTAIHack;
 extern uint8 QTAINTRAM[2048];
 extern uint8 qtaintramreg;
 
-#define GAME_MEM_BLOCK_SIZE 131072
+inline constexpr uint32_t GAME_MEM_BLOCK_SIZE = 131072;
 
 extern  uint8  *RAM;            //shared memory modifications
 extern int EmulationPaused;
@@ -181,28 +181,31 @@ extern uint8 vsdip;
 
 //#define FCEUDEF_DEBUGGER //mbg merge 7/17/06 - cleaning out conditional compiles
 
-#define JOY_A           0x01
-#define JOY_B           0x02
-#define JOY_SELECT      0x04
-#define JOY_START       0x08
-#define JOY_UP          0x10
-#define JOY_DOWN        0x20
-#define JOY_LEFT        0x40
-#define JOY_RIGHT       0x80
+// v1.13 Purify H: #define → constexpr
+inline constexpr uint8_t JOY_A      = 0x01;
+inline constexpr uint8_t JOY_B      = 0x02;
+inline constexpr uint8_t JOY_SELECT = 0x04;
+inline constexpr uint8_t JOY_START  = 0x08;
+inline constexpr uint8_t JOY_UP     = 0x10;
+inline constexpr uint8_t JOY_DOWN   = 0x20;
+inline constexpr uint8_t JOY_LEFT   = 0x40;
+inline constexpr uint8_t JOY_RIGHT  = 0x80;
 
-#define LOADER_INVALID_FORMAT   0
-#define LOADER_OK               1
-#define LOADER_HANDLED_ERROR    2
-#define LOADER_UNHANDLED_ERROR  3
+// v1.13 Purify H: #define → constexpr
+inline constexpr int LOADER_INVALID_FORMAT  = 0;
+inline constexpr int LOADER_OK              = 1;
+inline constexpr int LOADER_HANDLED_ERROR   = 2;
+inline constexpr int LOADER_UNHANDLED_ERROR = 3;
+
+// v1.13 Purify H: #define → constexpr
+inline constexpr int EMULATIONPAUSED_PAUSED = 0x01;
+inline constexpr int EMULATIONPAUSED_TIMER  = 0x02;
+inline constexpr int EMULATIONPAUSED_FA     = 0x04;
+
+inline constexpr int FRAMEADVANCE_DELAY_DEFAULT = 10;
+inline constexpr int NES_HEADER_SIZE = 16;
 
 #endif
 
-#define ARRAY_SIZE(a) (sizeof(a)/sizeof(a[0]))
-
-#define EMULATIONPAUSED_PAUSED  0x01
-#define EMULATIONPAUSED_TIMER   0x02
-#define EMULATIONPAUSED_FA      0x04
-
-#define FRAMEADVANCE_DELAY_DEFAULT 10
-#define NES_HEADER_SIZE  16
+#define ARRAY_SIZE(a) (sizeof(a)/sizeof(a[0]))  // needs type deduction — keep as macro
 

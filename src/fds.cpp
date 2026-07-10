@@ -55,7 +55,7 @@ static uint32 FDSRAMSize, FDSBIOSsize, CHRRAMSize;
 static uint8 *diskdatao[8] = {}, *diskdata[8] = {};
 static int TotalSides, DiskPtr, writeskip;
 
-// C++ globals aliased into Rust FdsRuntimeState (macros �?g_fds_state->*)
+// C++ globals aliased into Rust FdsRuntimeState (macros �?g_fds_state->*)
 #define mapperFDS_control    (g_fds_state->control)
 #define mapperFDS_filesize   (g_fds_state->filesize)
 #define mapperFDS_block      (g_fds_state->block)
@@ -127,8 +127,9 @@ void FCEU_FDSSelect(void) {
 }
 
 // ── IRQ / Register reads / Write dispatch ────────────────────────────
-#define IRQ_Repeat  0x01
-#define IRQ_Enabled 0x02
+// v1.13 Purify H: #define → constexpr
+inline constexpr uint8_t IRQ_Repeat  = 0x01;
+inline constexpr uint8_t IRQ_Enabled = 0x02;
 
 static void FDSFix(int a) {
 	FceuFdsIrqState st = { IRQCount, IRQLatch, IRQa, DiskSeekIRQ, FDSRegs[5] };
@@ -201,7 +202,8 @@ static void PreSave(void) {
 }
 static void PostSave(void) { PreSave(); }
 static void FreeFDSMemory(void) {
-	for (int x = 0; x < TotalSides; x++) { free(diskdata[x]); diskdata[x] = 0; }
+	// v1.13 Purify F2a: diskdata[] was allocated with FCEU_malloc(); use matching FCEU_free()
+	for (int x = 0; x < TotalSides; x++) { FCEU_free(diskdata[x]); diskdata[x] = 0; }
 }
 
 static int SubLoad(FCEUFILE *fp) {
@@ -230,8 +232,8 @@ int FDSLoad(const char *name, FCEUFILE *fp) {
 	if (r == 2) { FreeFDSMemory(); FCEU_PrintError("Unable to allocate memory."); return LOADER_HANDLED_ERROR; }
 
 	// BIOS
-	char *fn = strdup(FCEU_MakeFName(FCEUMKF_FDSROM, 0, 0).c_str());
-	FILE *zp = FCEUD_UTF8fopen(fn, "rb"); free(fn);
+	std::string fn = FCEU_MakeFName(FCEUMKF_FDSROM, 0, 0);
+	FILE *zp = FCEUD_UTF8fopen(fn.c_str(), "rb");
 	if (!zp) { FCEU_PrintError("FDS BIOS ROM image missing: %s", FCEU_MakeFName(FCEUMKF_FDSROM, 0, 0).c_str());
 		FreeFDSMemory(); return LOADER_HANDLED_ERROR; }
 	fseek(zp, 0L, SEEK_END);
@@ -239,12 +241,14 @@ int FDSLoad(const char *name, FCEUFILE *fp) {
 		FCEU_PrintError("FDS BIOS ROM image incompatible: %s", FCEU_MakeFName(FCEUMKF_FDSROM, 0, 0).c_str());
 		return LOADER_HANDLED_ERROR; }
 	fseek(zp, 0L, SEEK_SET); ResetCartMapping();
-	free(FDSBIOS); free(FDSRAM); free(CHRRAM); FDSBIOS = FDSRAM = CHRRAM = NULL;
+	// v1.13 Purify F2a: use FceuMallocPtr owners; FDSBIOS/RAM/CHRRAM RAII via .reset()
+	FDSBIOS_owner.reset(); FDSRAM_owner.reset(); CHRRAM_owner.reset();
+	FDSBIOS = FDSRAM = CHRRAM = NULL;
 	FDSBIOSsize = 8192;
 	FDSBIOS_owner = FCEU_gmalloc_unique(FDSBIOSsize); FDSBIOS = FDSBIOS_owner.get();
 	SetupCartPRGMapping(0, FDSBIOS, FDSBIOSsize, 0);
 	if (fread(FDSBIOS, 1, FDSBIOSsize, zp) != FDSBIOSsize) {
-		free(FDSBIOS); FDSBIOS = NULL; fclose(zp); FreeFDSMemory();
+		FDSBIOS_owner.reset(); FDSBIOS = NULL; fclose(zp); FreeFDSMemory();
 		FCEU_PrintError("Error reading FDS BIOS ROM image."); return LOADER_HANDLED_ERROR; }
 	fclose(zp);
 
@@ -254,16 +258,15 @@ int FDSLoad(const char *name, FCEUFILE *fp) {
 			diskdatao[x] = (uint8*)FCEU_malloc(65500);
 			memcpy(diskdatao[x], diskdata[x], 65500);
 		}
-		char *fn2 = strdup(FCEU_MakeFName(FCEUMKF_FDS, 0, 0).c_str());
-		FCEUFILE *tp = FCEU_fopen(fn2, 0, "rb", 0);
+		std::string fn2 = FCEU_MakeFName(FCEUMKF_FDS, 0, 0);
+		FCEUFILE *tp = FCEU_fopen(fn2.c_str(), 0, "rb", 0);
 		if (tp) {
-			FCEU_printf("Disk was written. Auxiliary FDS file open \"%s\".\n", fn2);
+			FCEU_printf("Disk was written. Auxiliary FDS file open \"%s\".\n", fn2.c_str());
 			FreeFDSMemory();
-			if (SubLoad(tp)) { free(FDSBIOS); FDSBIOS = NULL; free(fn2); FreeFDSMemory();
+			if (SubLoad(tp)) { FDSBIOS_owner.reset(); FDSBIOS = NULL; FreeFDSMemory();
 				FCEU_PrintError("Error reading auxiliary FDS file."); return LOADER_HANDLED_ERROR; }
 			FCEU_fclose(tp); DiskWritten = 1;
 		}
-		free(fn2);
 	}
 
 	FCEU_strlcpy(LoadedRomFName, sizeof(LoadedRomFName), name);
@@ -312,8 +315,11 @@ void FDSClose(void) {
 	for (int x = 0; x < TotalSides; x++)
 		if (fwrite(diskdata[x], 1, 65500, fp) != 65500)
 			{ FCEU_PrintError("Error saving FDS image!"); fclose(fp); return; }
-	for (int x = 0; x < TotalSides; x++) { free(diskdatao[x]); diskdatao[x] = 0; }
+	// v1.13 Purify F2a: diskdatao[] was FCEU_malloc(); use matching FCEU_free()
+	for (int x = 0; x < TotalSides; x++) { FCEU_free(diskdatao[x]); diskdatao[x] = 0; }
 	FreeFDSMemory();
-	free(FDSBIOS); free(FDSRAM); free(CHRRAM); FDSBIOS = FDSRAM = CHRRAM = NULL;
+	// FDSBIOS/FDSRAM/CHRRAM use the FceuMallocPtr owners (FDSBIOS_owner etc.); RAII frees them.
+	FDSBIOS_owner.reset(); FDSRAM_owner.reset(); CHRRAM_owner.reset();
+	FDSBIOS = FDSRAM = CHRRAM = NULL;
 	fclose(fp);
 }

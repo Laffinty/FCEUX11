@@ -1,7 +1,8 @@
 #ifndef _FCEU_FILE_H_
 #define _FCEU_FILE_H_
 
-#define MAX_MOVIEFILENAME_LEN 80
+// v1.13 Purify H: #define → constexpr
+inline constexpr int MAX_MOVIEFILENAME_LEN = 80;
 
 #include "types.h"
 #include "emufile.h"
@@ -145,27 +146,27 @@ std::string FCEU_MakeFName(int type, int id1, const char *cd1);
 std::string GetMfn();
 void FCEU_SplitArchiveFilename(std::string src, std::string& archive, std::string& file, std::string& fileToOpen);
 
-#define FCEUMKF_STATE        1
-#define FCEUMKF_SNAP         2
-#define FCEUMKF_SAV          3
-#define FCEUMKF_CHEAT        4
-#define FCEUMKF_FDSROM       5
-#define FCEUMKF_PALETTE      6
-#define FCEUMKF_GGROM        7
-#define FCEUMKF_IPS          8
-#define FCEUMKF_FDS          9
-#define FCEUMKF_MOVIE        10
-//#define FCEUMKF_NPTEMP       11 //mbg 6/21/08 - who needs this..?
-#define FCEUMKF_MOVIEGLOB    12
-#define FCEUMKF_STATEGLOB    13
-#define FCEUMKF_MOVIEGLOB2   14
-#define FCEUMKF_AUTOSTATE	 15
-#define FCEUMKF_MEMW         16
-#define FCEUMKF_BBOT         17
-#define FCEUMKF_ROMS         18
-#define FCEUMKF_INPUT        19
-#define FCEUMKF_LUA          20
-#define FCEUMKF_AVI			 21
-#define FCEUMKF_TASEDITOR    22
-#define FCEUMKF_RESUMESTATE  23
+// v1.13 Purify H: #define → constexpr (movie kind flags)
+inline constexpr int FCEUMKF_STATE       = 1;
+inline constexpr int FCEUMKF_SNAP        = 2;
+inline constexpr int FCEUMKF_SAV         = 3;
+inline constexpr int FCEUMKF_CHEAT       = 4;
+inline constexpr int FCEUMKF_FDSROM      = 5;
+inline constexpr int FCEUMKF_PALETTE     = 6;
+inline constexpr int FCEUMKF_GGROM       = 7;
+inline constexpr int FCEUMKF_IPS         = 8;
+inline constexpr int FCEUMKF_FDS         = 9;
+inline constexpr int FCEUMKF_MOVIE       = 10;
+inline constexpr int FCEUMKF_MOVIEGLOB   = 12;
+inline constexpr int FCEUMKF_STATEGLOB   = 13;
+inline constexpr int FCEUMKF_MOVIEGLOB2  = 14;
+inline constexpr int FCEUMKF_AUTOSTATE   = 15;
+inline constexpr int FCEUMKF_MEMW        = 16;
+inline constexpr int FCEUMKF_BBOT        = 17;
+inline constexpr int FCEUMKF_ROMS        = 18;
+inline constexpr int FCEUMKF_INPUT       = 19;
+inline constexpr int FCEUMKF_LUA         = 20;
+inline constexpr int FCEUMKF_AVI         = 21;
+inline constexpr int FCEUMKF_TASEDITOR   = 22;
+inline constexpr int FCEUMKF_RESUMESTATE = 23;
 #endif

@@ -61,6 +61,7 @@ extern void RefreshThrottleFPS();
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include <cstring>
 #include <cstdio>
@@ -100,24 +101,15 @@ static unsigned int pauseTimer = 0;
 
 
 FCEUGI::FCEUGI()
-	: filename(0),
-	  archiveFilename(0) 
+	: filename(),
+	  archiveFilename()
 {
 	//printf("%08x",opsize); // WTF?!
 }
 
-FCEUGI::~FCEUGI() 
+FCEUGI::~FCEUGI()
 {
-	if (filename) 
-	{
-		free(filename);
-		filename = NULL;
-	}
-	if (archiveFilename) 
-	{
-		free(archiveFilename);
-		archiveFilename = NULL;
-	}
+	// v1.13 Purify F2b: std::string is RAII-managed; destructor implicit.
 }
 
 bool CheckFileExists(const char* filename) {
@@ -162,9 +154,8 @@ static void FCEU_CloseGame(void)
 			FCEUD_NetworkClose();
 		}
 
-		if (GameInfo->name) {
-			free(GameInfo->name);
-			GameInfo->name = NULL;
+		if (!GameInfo->name.empty()) {
+			GameInfo->name.clear();
 		}
 
 		if (GameInfo->type != GIT_NSF) {
@@ -217,8 +208,9 @@ void (*GameStateRestore)(int version);
 // because AllocGenieRW / FlushGenieRW own the heap-allocated
 // 32K shadow buffers and the SetReadHandler/SetWriteHandler
 // Genie-aware code path lives in this translation unit.
-static readfunc *AReadG;
-static writefunc *BWriteG;
+// v1.13 Purify F2b: std::vector replaces readfunc*/writefunc* (FCEU_malloc/free)
+static std::vector<readfunc> AReadG(0x8000);
+static std::vector<writefunc> BWriteG(0x8000);
 static int RWWrap = 0;
 
 //mbg merge 7/18/06 docs
@@ -254,10 +246,8 @@ static DECLFR(ANull) {
 }
 
 int AllocGenieRW(void) {
-	if (!(AReadG = (readfunc*)FCEU_malloc(0x8000 * sizeof(readfunc))))
-		return 0;
-	if (!(BWriteG = (writefunc*)FCEU_malloc(0x8000 * sizeof(writefunc))))
-		return 0;
+	AReadG.assign(0x8000, nullptr);
+	BWriteG.assign(0x8000, nullptr);
 	RWWrap = 1;
 	return 1;
 }
@@ -270,10 +260,10 @@ void FlushGenieRW(void) {
 			ARead[x + 0x8000] = AReadG[x];
 			BWrite[x + 0x8000] = BWriteG[x];
 		}
-		free(AReadG);
-		free(BWriteG);
-		AReadG = NULL;
-		BWriteG = NULL;
+		AReadG.clear();
+		BWriteG.clear();
+		AReadG.shrink_to_fit();
+		BWriteG.shrink_to_fit();
 		RWWrap = 0;
 	}
 }
@@ -437,23 +427,23 @@ FCEUGI *fceu11::LoadGameVirtual(const char *name, int OverwriteVidMode, bool sil
 
 	if (!AutosaveStatus) {
 		AutosaveStatus_owner = FCEU_gmalloc_unique(sizeof(int) * AutosaveQty);  // v0.3.6: RAII-wrapped
-		AutosaveStatus = (int*)AutosaveStatus_owner.get();
+		AutosaveStatus = reinterpret_cast<int*>(AutosaveStatus_owner.get());
 	}
 	for (AutosaveIndex = 0; AutosaveIndex < AutosaveQty; ++AutosaveIndex)
 		AutosaveStatus[AutosaveIndex] = 0;
 
 	FCEU_CloseGame();
 	GameInfo = new FCEUGI();
-	memset( (void*)GameInfo, 0, sizeof(FCEUGI));
+	memset( static_cast<void*>(GameInfo), 0, sizeof(FCEUGI));
 
-	GameInfo->filename = strdup(fp->filename.c_str());
+	GameInfo->filename = fp->filename;
 	if (fp->archiveFilename != "")
-		GameInfo->archiveFilename = strdup(fp->archiveFilename.c_str());
+		GameInfo->archiveFilename = fp->archiveFilename;
 	GameInfo->archiveCount = fp->archiveCount;
 
 	GameInfo->soundchan = 0;
 	GameInfo->soundrate = 0;
-	GameInfo->name = 0;
+	GameInfo->name.clear();
 	GameInfo->type = GIT_CART;
 	GameInfo->vidsys = GIV_USER;
 	// v0.3.8: GameInfo->input[] is ESI (enum class); SI_*/SIFC_* are
@@ -913,7 +903,7 @@ void FCEU_MemoryRand(uint8 *ptr, uint32 size, bool default_zero) {
 				break;
 			case 1: v = 0xFF; break;
 			case 2: v = 0x00; break;
-			case 3: v = (u8)(xoroshiro128plus_next()); break;
+			case 3: v = static_cast<u8>(xoroshiro128plus_next()); break;
 
 			// the default is this 8 byte pattern: 00 00 00 00 FF FF FF FF
 			// it has been used in FCEUX since time immemorial
@@ -944,7 +934,7 @@ void PowerNES(void) {
 	extern int disableBatteryLoading;
 	if(FCEUMOV_Mode(MOVIEMODE_INACTIVE) && !disableBatteryLoading)
 	{
-		RAMInitSeed = rand() ^ (u32)xoroshiro128plus_next();
+		RAMInitSeed = rand() ^ static_cast<u32>(xoroshiro128plus_next());
 	}
 
 	//always reseed the PRNG with the current seed, for deterministic results (for that seed)
@@ -1242,15 +1232,12 @@ void UpdateAutosave(void) {
 	if (!EnableAutosave || turbo)
 		return;
 
-	char * f;
 	if (++AutosaveCounter >= AutosaveFrequency) {
 		AutosaveCounter = 0;
 		AutosaveIndex = (AutosaveIndex + 1) % AutosaveQty;
-		f = strdup(FCEU_MakeFName(FCEUMKF_AUTOSTATE, AutosaveIndex, 0).c_str());
-		FCEUSS_Save(f, false);
+		std::string f = FCEU_MakeFName(FCEUMKF_AUTOSTATE, AutosaveIndex, 0);
+		FCEUSS_Save(f.c_str(), false);
 		AutoSS = true;  //Flag that an auto-savestate was made
-		free(f);
-		f = NULL;
 		AutosaveStatus[AutosaveIndex] = 1;
 	}
 }
@@ -1260,11 +1247,8 @@ void FCEUI_RewindToLastAutosave(void) {
 		return;
 
 	if (AutosaveStatus[AutosaveIndex] == 1) {
-		char * f;
-		f = strdup(FCEU_MakeFName(FCEUMKF_AUTOSTATE, AutosaveIndex, 0).c_str());
-		FCEUSS_Load(f);
-		free(f);
-        f = NULL;
+		std::string f = FCEU_MakeFName(FCEUMKF_AUTOSTATE, AutosaveIndex, 0);
+		FCEUSS_Load(f.c_str());
 
 		//Set pointer to previous available slot
 		if (AutosaveStatus[(AutosaveIndex + AutosaveQty - 1) % AutosaveQty] == 1) {
@@ -1426,7 +1410,7 @@ bool FCEUXLoad(const char *name, FCEUFILE *fp) {
 	mapper |= (head.ROM_type2 & 0xF0);
 
 	//choose what kind of cart to use.
-	cart = (FCEUXCart*)new NROM();
+	cart = reinterpret_cast<FCEUXCart*>(new NROM());
 
 	//fceu ines loading code uses 256 here when the romsize is 0.
 	cart->prgPages = head.ROM_size;
@@ -1457,8 +1441,8 @@ bool FCEUXLoad(const char *name, FCEUFILE *fp) {
 	//setup the emulator
 	GameInterface = FCEUXGameInterface;
 	ResetCartMapping();
-	SetupCartPRGMapping(0, (uint8*)cart->PRG, cart->prgSize, 0);
-	SetupCartCHRMapping(0, (uint8*)cart->CHR, cart->chrSize, 0);
+	SetupCartPRGMapping(0, reinterpret_cast<uint8*>(cart->PRG), cart->prgSize, 0);
+	SetupCartCHRMapping(0, reinterpret_cast<uint8*>(cart->CHR), cart->chrSize, 0);
 
 	return true;
 }
@@ -1466,7 +1450,7 @@ bool FCEUXLoad(const char *name, FCEUFILE *fp) {
 uint8 FCEU_ReadRomByte(uint32 i) {
 	extern iNES_HEADER head;
 	if (i < 16)
-		return *((unsigned char*)&head + i);
+		return *reinterpret_cast<unsigned char*>(&head + i);
 	if (i < 16 + PRGsize[0])
 		return PRGptr[0][i - 16];
 	if (i < 16 + PRGsize[0] + CHRsize[0])

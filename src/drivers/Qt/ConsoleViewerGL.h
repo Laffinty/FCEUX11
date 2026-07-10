@@ -5,6 +5,7 @@
 
 #include <stdint.h>
 
+#include <memory>
 #include <QColor>
 #include <QCursor>
 #include <QMatrix4x4>
@@ -104,7 +105,7 @@ class ConsoleViewGL_t : public QOpenGLWindow,
 	QColor *bgColor;
 	QPixmap bgPix;
 
-	uint32_t  *localBuf;
+	std::unique_ptr<uint32_t[]> localBuf;
 	uint32_t   localBufSize;
 
 	QOpenGLShaderProgram *shaderProgram;

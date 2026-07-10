@@ -86,11 +86,11 @@ ConsoleViewSDL_t::ConsoleViewSDL_t(QWidget *parent)
 
 	localBufSize = (4 * GL_NES_WIDTH) * (4 * GL_NES_HEIGHT) * sizeof(uint32_t);
 
-	localBuf = (uint32_t*)malloc( localBufSize );
+	localBuf = std::make_unique<uint32_t[]>(localBufSize / sizeof(uint32_t));
 
 	if ( localBuf )
 	{
-		memset32( localBuf, alphaMask, localBufSize );
+		memset32( localBuf.get(), alphaMask, localBufSize );
 	}
 
 	forceAspect  = true;
@@ -125,10 +125,6 @@ ConsoleViewSDL_t::~ConsoleViewSDL_t(void)
 {
 	//printf("Destroying SDL Viewport\n");
 
-	if ( localBuf )
-	{
-		free( localBuf ); localBuf = NULL;
-	}
 	if ( sdlCursor )
 	{
 		SDL_FreeCursor(sdlCursor); sdlCursor = NULL;
@@ -224,8 +220,8 @@ void ConsoleViewSDL_t::transfer2LocalBuffer(void)
 	{
 		cpSize = localBufSize;
 	}
-	src  = (uint8_t*)nes_shm->pixbuf[bufIdx];
-	dest = (uint8_t*)localBuf;
+	src  = reinterpret_cast<uint8_t*>(nes_shm->pixbuf[bufIdx]);
+	dest = reinterpret_cast<uint8_t*>(localBuf.get());
 
 	hq = (nes_shm->video.preScaler == 1) || (nes_shm->video.preScaler == 4); // hq2x and hq3x
 
@@ -287,7 +283,7 @@ int ConsoleViewSDL_t::init(void)
 
 	if (sdlWindow == NULL) 
 	{
-		sdlWindow = SDL_CreateWindowFrom( (void*)windowHandle);
+		sdlWindow = SDL_CreateWindowFrom( reinterpret_cast<void*>(windowHandle));
 	}
 
 	if (sdlWindow == NULL) 
@@ -395,7 +391,7 @@ void ConsoleViewSDL_t::setCursor(const QCursor &c)
 	    Uint32 bmask = 0x000000ff;
 	#endif
 
-	s = SDL_CreateRGBSurfaceFrom((void*)pm.constBits(),
+	s = SDL_CreateRGBSurfaceFrom(reinterpret_cast<void*>(const_cast<uchar*>(pm.constBits())),
 		pm.width(), pm.height(), pm.depth(), pm.bytesPerLine(),
 			rmask, gmask, bmask, amask);
 
@@ -564,8 +560,8 @@ void  ConsoleViewSDL_t::getNormalizedCursorPos( double &x, double &y )
 
 	//printf("Window Cursor (%i,%i) \n", cursor.x(), cursor.y() );
 
-	x = (double)(cursor.x() - sx) / (double)rw;
-	y = (double)(cursor.y() - sy) / (double)rh;
+	x = static_cast<double>(cursor.x() - sx) / static_cast<double>(rw);
+	y = static_cast<double>(cursor.y() - sy) / static_cast<double>(rh);
 
 	if ( x < 0.0 )
 	{
@@ -597,12 +593,12 @@ void ConsoleViewSDL_t::render(void)
 	{
 		nesWidth  = nes_shm->video.ncol;
 		nesHeight = nes_shm->video.nrow;
-		ixScale   = (float)nes_shm->video.xscale;
-		iyScale   = (float)nes_shm->video.yscale;
+		ixScale   = static_cast<float>(nes_shm->video.xscale);
+		iyScale   = static_cast<float>(nes_shm->video.yscale);
 	}
 	//printf(" %i x %i \n", nesWidth, nesHeight );
-	float xscaleTmp = (float)view_width  / (float)nesWidth;
-	float yscaleTmp = (float)view_height / (float)nesHeight;
+	float xscaleTmp = static_cast<float>(view_width)  / static_cast<float>(nesWidth);
+	float yscaleTmp = static_cast<float>(view_height) / static_cast<float>(nesHeight);
 
 	xscaleTmp *= ixScale;
 	yscaleTmp *= iyScale;
@@ -636,15 +632,15 @@ void ConsoleViewSDL_t::render(void)
 		}
 	}
 
-	rw=(int)(nesWidth*xscaleTmp/ixScale);
-	rh=(int)(nesHeight*yscaleTmp/iyScale);
+	rw=static_cast<int>(nesWidth*xscaleTmp/ixScale);
+	rh=static_cast<int>(nesHeight*yscaleTmp/iyScale);
 
 	if ( forceAspect )
 	{
 		int iw, ih, ax, ay;
 
-		ax = (int)(aspectX+0.50);
-		ay = (int)(aspectY+0.50);
+		ax = static_cast<int>(aspectX+0.50);
+		ay = static_cast<int>(aspectY+0.50);
 
 		iw = rw * ay;
 		ih = rh * ax;
@@ -724,9 +720,9 @@ void ConsoleViewSDL_t::render(void)
 
 	uint8_t *textureBuffer;
 	int rowPitch;
-	SDL_LockTexture( sdlTexture, nullptr, (void**)&textureBuffer, &rowPitch);
+	SDL_LockTexture( sdlTexture, nullptr, reinterpret_cast<void**>(&textureBuffer), &rowPitch);
 	{
-		memcpy( textureBuffer, localBuf, nesWidth*nesHeight*sizeof(uint32_t) );
+		memcpy( textureBuffer, localBuf.get(), nesWidth*nesHeight*sizeof(uint32_t) );
 	}
 	SDL_UnlockTexture(sdlTexture);
 
