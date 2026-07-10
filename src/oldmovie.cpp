@@ -27,10 +27,11 @@
 // file are already explicitly qualified with std::.
 
 // FCM\x1a
-#define MOVIE_MAGIC             0x1a4d4346
+// v1.13 Purify H: #define → constexpr
+inline constexpr uint32_t MOVIE_MAGIC = 0x1a4d4346;
 
 // still at 2 since the format itself is still compatible
-#define MOVIE_VERSION           2
+inline constexpr int MOVIE_VERSION = 2;
 
 static uint8 joop[4];
 static uint8 joopcmd;

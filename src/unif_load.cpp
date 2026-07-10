@@ -28,7 +28,8 @@ typedef struct {
 } BMAPPING;
 
 // Board flags (mirrored from Rust unif.rs for C++ bridge use)
-#define BMCFLAG_FORCE4    0x01
+// v1.13 Purify H: #define → constexpr
+inline constexpr uint8_t BMCFLAG_FORCE4 = 0x01;
 
 #include "unif_bmap.h"
 

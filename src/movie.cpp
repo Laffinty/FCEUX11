@@ -119,7 +119,8 @@ void MovieAddInputState_Record();             // movie_record.cpp
 // v1.2 Census §2.3: `using namespace std` removed; std types below are
 // explicitly qualified with std::.
 
-#define MOVIE_VERSION           3
+// v1.13 Purify H: #define → constexpr
+inline constexpr int MOVIE_VERSION = 3;
 
 extern char FileBase[];
 extern bool AutoSS;		//Declared in fceu.cpp, keeps track if a auto-savestate has been made

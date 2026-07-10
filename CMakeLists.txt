@@ -52,20 +52,20 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # v0.3.1: /wd4996 is transitional — will be removed after strcpy/sprintf/vsprintf cleanup in v0.3.5
 add_compile_options(/W4 /WX /permissive- /guard:cf /GS /sdl
     /utf-8  # v1.0: tell cl.exe to interpret source as UTF-8 (not system code page 936)
-    /wd4996  # transitional: deprecated POSIX/CRT functions
+    /wd4996  # transitional: deprecated POSIX/CRT functions (strncpy/strncat in safe_string.h)
     /wd4100  # pre-existing: unreferenced parameter (event handlers, virtuals)
     /wd4267  # pre-existing: size_t→int in mappers / TasEditor / file.cpp (pre-v0.3.10)
-    /wd4456  # pre-existing: variable shadowing in TasEditor auto-generated code
+    # /wd4456 removed in v1.13 Purify I §11
     /wd4200  # pre-existing: zero-length array in cbindgen-generated fceux11_rust.h
-    /wd4244  # pre-existing: narrowing conversion in legacy Lua 5.1 binding code
-    /wd4514  # pre-existing: unreferenced inline function (third-party tl/expected.hpp)
-    /wd4710  # pre-existing: function not inlined (Qt moc generated code)
+    /wd4244  # pre-existing: narrowing conversion in ops_table.inc / x6502.cpp / vsuni.cpp
+    # /wd4514 removed in v1.13 Purify I §11
+    # /wd4710 removed in v1.13 Purify I §11
     /wd4820  # pre-existing: padding added (Q_OBJECT vtables, Rust #[repr(C)] structs)
-    /wd4866  # pre-existing: left-to-right evaluation order (MSVC 19.30+ warns on unspecified order)
-    /wd4868  # pre-existing: left operand of comma operator has no effect
-    /wd5039  # pre-existing: exception throws inside extern "C" (Qt moc + Lua C bridge)
+    # /wd4866 removed in v1.13 Purify I §11
+    # /wd4868 removed in v1.13 Purify I §11
+    # /wd5039 removed in v1.13 Purify I §11
 )
-add_link_options(/GUARD:CF /CETCOMPAT /IGNORE:4098)  # LNK4098 LIBCMT vs LIBCMTD conflict (Lua static)
+add_link_options(/GUARD:CF /CETCOMPAT /IGNORE:4098)  # LNK4098 LIBCMT conflict in test linking
 
 # v0.3.1: ccache probe. v1.0: scan PATH first (CMake default) so ccache
 # in any user-writable location (scoop, winget, custom) is picked up.

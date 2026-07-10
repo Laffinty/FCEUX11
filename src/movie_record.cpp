@@ -47,7 +47,8 @@
 // it over here too avoids pulling in version.h gratuitously when the
 // macro is already in scope through the next TU). FCEU_VERSION_NUMERIC
 // comes from version.h transitively.
-#define MOVIE_VERSION           3
+// v1.13 Purify H: #define → constexpr
+inline constexpr int MOVIE_VERSION = 3;
 
 // v1.13 Phase B / Batch D-D.3: extra includes for the HUD overlay
 // helpers. drawing.h is also pulled in transitively by video.h.

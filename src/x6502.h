@@ -61,14 +61,15 @@ inline auto& timestamp = fceu11::cpu_instance().timestamp_ref();
 inline auto& soundtimestamp = fceu11::cpu_instance().sound_timestamp_ref();
 inline auto& scanline = fceu11::cpu_instance().scanline_ref();
 
-#define N_FLAG  0x80
-#define V_FLAG  0x40
-#define U_FLAG  0x20
-#define B_FLAG  0x10
-#define D_FLAG  0x08
-#define I_FLAG  0x04
-#define Z_FLAG  0x02
-#define C_FLAG  0x01
+// v1.13 Purify H: #define → constexpr (6502 P-register flag masks)
+inline constexpr uint8_t N_FLAG = 0x80;
+inline constexpr uint8_t V_FLAG = 0x40;
+inline constexpr uint8_t U_FLAG = 0x20;
+inline constexpr uint8_t B_FLAG = 0x10;
+inline constexpr uint8_t D_FLAG = 0x08;
+inline constexpr uint8_t I_FLAG = 0x04;
+inline constexpr uint8_t Z_FLAG = 0x02;
+inline constexpr uint8_t C_FLAG = 0x01;
 
 // v0.3.8/v1.3: declared via fceu11::MapIRQHook typedef for compile-time type
 // identity. The symbol stays at global namespace as an inline alias so the
@@ -78,15 +79,15 @@ inline auto& MapIRQHook = fceu11::cpu_instance().map_irq_hook_ref();
 #define NTSC_CPU (dendy ? 1773447.467 : 1789772.7272727272727272)  // v1.13: depends on runtime ::dendy; defer to v1.14
 inline constexpr double PAL_CPU = 1662607.125;  // v1.13 Purify H: #define → constexpr
 
-#define FCEU_IQEXT      0x001
-#define FCEU_IQEXT2     0x002
-/* ... */
-#define FCEU_IQRESET    0x020
-#define FCEU_IQNMI2  0x040  // Delayed NMI, gets converted to *_IQNMI
-#define FCEU_IQNMI  0x080
-#define FCEU_IQDPCM     0x100
-#define FCEU_IQFCOUNT   0x200
-#define FCEU_IQTEMP     0x800
+// v1.13 Purify H: #define → constexpr (IRQ source bitmasks)
+inline constexpr uint32_t FCEU_IQEXT    = 0x001;
+inline constexpr uint32_t FCEU_IQEXT2   = 0x002;
+inline constexpr uint32_t FCEU_IQRESET  = 0x020;
+inline constexpr uint32_t FCEU_IQNMI2   = 0x040;  // Delayed NMI, gets converted to FCEU_IQNMI
+inline constexpr uint32_t FCEU_IQNMI    = 0x080;
+inline constexpr uint32_t FCEU_IQDPCM   = 0x100;
+inline constexpr uint32_t FCEU_IQFCOUNT = 0x200;
+inline constexpr uint32_t FCEU_IQTEMP   = 0x800;
 
 void X6502_Init(void);
 void X6502_Reset(void);

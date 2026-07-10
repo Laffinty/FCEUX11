@@ -8,25 +8,27 @@
 #include "git.h"
 #include "nsf.h"
 
-//watchpoint stuffs
-#define WP_E       0x01  //watchpoint, enable
-#define WP_W       0x02  //watchpoint, write
-#define WP_R       0x04  //watchpoint, read
-#define WP_X       0x08  //watchpoint, execute
-#define WP_F       0x10  //watchpoint, forbid
+// v1.13 Purify H: #define → constexpr (watchpoint flags)
+inline constexpr uint8_t WP_E = 0x01;  // watchpoint, enable
+inline constexpr uint8_t WP_W = 0x02;  // watchpoint, write
+inline constexpr uint8_t WP_R = 0x04;  // watchpoint, read
+inline constexpr uint8_t WP_X = 0x08;  // watchpoint, execute
+inline constexpr uint8_t WP_F = 0x10;  // watchpoint, forbid
 
-#define BT_C       0x00  //break type, cpu mem
-#define BT_P       0x20  //break type, ppu mem
-#define BT_S       0x40  //break type, sprite mem
-#define BT_R       0x80  //break type, rom mem
+// v1.13 Purify H: #define → constexpr (break type flags)
+inline constexpr uint8_t BT_C = 0x00;  // break type, cpu mem
+inline constexpr uint8_t BT_P = 0x20;  // break type, ppu mem
+inline constexpr uint8_t BT_S = 0x40;  // break type, sprite mem
+inline constexpr uint8_t BT_R = 0x80;  // break type, rom mem
 
-#define BREAK_TYPE_STEP -1
-#define BREAK_TYPE_BADOP -2
-#define BREAK_TYPE_CYCLES_EXCEED -3
-#define BREAK_TYPE_INSTRUCTIONS_EXCEED -4
-#define BREAK_TYPE_LUA -5
-#define BREAK_TYPE_UNLOGGED_CODE -6
-#define BREAK_TYPE_UNLOGGED_DATA -7
+// v1.13 Purify H: #define → constexpr (break type special values)
+inline constexpr int BREAK_TYPE_STEP                    = -1;
+inline constexpr int BREAK_TYPE_BADOP                   = -2;
+inline constexpr int BREAK_TYPE_CYCLES_EXCEED           = -3;
+inline constexpr int BREAK_TYPE_INSTRUCTIONS_EXCEED     = -4;
+inline constexpr int BREAK_TYPE_LUA                     = -5;
+inline constexpr int BREAK_TYPE_UNLOGGED_CODE           = -6;
+inline constexpr int BREAK_TYPE_UNLOGGED_DATA           = -7;
 
 //opbrktype is used to grab the breakpoint type that each instruction will cause.
 //WP_X is not used because ALL opcodes will have the execute bit set.

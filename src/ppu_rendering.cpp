@@ -621,11 +621,12 @@ struct BITREVLUT {
 };
 BITREVLUT<uint8, 8> bitrevlut;
 
-// V_FLIP / H_FLIP / SP_BACK macros + SPR / SPRB structs (used by
+// V_FLIP / H_FLIP / SP_BACK + SPR / SPRB structs (used by
 // FetchSpriteData / RefreshSprites / CopySprites).
-#define V_FLIP  0x80
-#define H_FLIP  0x40
-#define SP_BACK 0x20
+// v1.13 Purify H: #define → constexpr
+inline constexpr uint8_t V_FLIP  = 0x80;
+inline constexpr uint8_t H_FLIP  = 0x40;
+inline constexpr uint8_t SP_BACK = 0x20;
 
 typedef struct {
 	uint8 y, no, atr, x;

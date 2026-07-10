@@ -122,59 +122,16 @@ option(FCEUX11_WGI_BACKEND "Enable Windows.Gaming.Input backend (requires WinRT/
 # after v1.0).
 option(FCEUX11_DIRECT_STORAGE_PROBE "Enable DirectStorage 1.2 NVMe probe (Windows only)" ON)
 
-if(FCEUX11_LUA_RUST_ENABLED AND FCEUX11_RUST_ENABLED)
-    message(STATUS "Using Rust Lua engine (mlua vendored Lua 5.1)")
-    add_definitions(-D_S9XLUA_H -DFCEUX11_LUA_RUST_ENABLED)
-    set(LUA_ENGINE_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/lua-engine.cpp)
-elseif ( ${LUA_FOUND} )
-   # Use System LUA (legacy fallback, requires old lua-engine.cpp)
-        message( STATUS "Using System Lua ${LUA_VERSION} (legacy, not recommended)" )
-
-        add_definitions( -D_S9XLUA_H  ${LUA_CFLAGS} )
-
-        set( LUA_ENGINE_SOURCE  ${CMAKE_CURRENT_SOURCE_DIR}/lua-engine.cpp )
-
-else ()
-
-   # Use Internal Lua (legacy fallback, requires old lua-engine.cpp)
-        message( STATUS "Using Internal Lua (legacy, not recommended)" )
-
-   add_definitions( -D_S9XLUA_H  -I${CMAKE_CURRENT_SOURCE_DIR}/lua/src )
-
-        set( LUA_ENGINE_SOURCE  
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lapi.c 
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lauxlib.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lbaselib.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lcode.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/ldblib.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/ldebug.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/ldo.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/ldump.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lfunc.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lgc.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/linit.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/liolib.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/llex.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lmathlib.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lmem.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/loadlib.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lobject.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lopcodes.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/loslib.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lparser.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lstate.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lstring.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lstrlib.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/ltable.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/ltablib.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/ltm.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lundump.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lvm.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/lzio.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua/src/print.c
-      ${CMAKE_CURRENT_SOURCE_DIR}/lua-engine.cpp 
-   )
+# v1.13 Purify I §10: Lua 5.1 C source removed. Rust Lua (mlua) is the only path.
+if(NOT FCEUX11_LUA_RUST_ENABLED)
+    message(FATAL_ERROR
+        "v1.13 Purify: Lua 5.1 C source has been removed. "
+        "FCEUX11_LUA_RUST_ENABLED=ON is required.")
 endif()
+
+message(STATUS "Using Rust Lua engine (mlua vendored Lua 5.1)")
+add_definitions(-D_S9XLUA_H -DFCEUX11_LUA_RUST_ENABLED)
+set(LUA_ENGINE_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/lua-engine.cpp)
 
 if ( ${ZLIB_FOUND} )
 

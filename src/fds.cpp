@@ -127,8 +127,9 @@ void FCEU_FDSSelect(void) {
 }
 
 // ── IRQ / Register reads / Write dispatch ────────────────────────────
-#define IRQ_Repeat  0x01
-#define IRQ_Enabled 0x02
+// v1.13 Purify H: #define → constexpr
+inline constexpr uint8_t IRQ_Repeat  = 0x01;
+inline constexpr uint8_t IRQ_Enabled = 0x02;
 
 static void FDSFix(int a) {
 	FceuFdsIrqState st = { IRQCount, IRQLatch, IRQa, DiskSeekIRQ, FDSRegs[5] };
