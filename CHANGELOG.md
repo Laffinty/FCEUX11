@@ -5,6 +5,66 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13] - 2026-07-10
+
+**Codename: Purify.** Thirteenth sub-version of the v1.x modernization
+cycle per `docs/v1.x_Modernization_Roadmap.md` §13. Completes the
+v1.12 carryover file splits (ppu/movie/ConsoleWindow/AviRecord/ppuViewer)
+and eliminates remaining C-style patterns: raw malloc/free, C-style
+casts, #define constants, scoped_ptr.h, embedded Lua 5.1 C source,
+and /wd warning suppressions.
+
+### Added (v1.12 carryover file splits)
+
+- **`src/ppu_rendering.cpp/.h`** — Activated from placeholder; rendering
+  pipeline (BG fetch, sprite eval, pixel composite, DoLine, Ppu::loop)
+  migrated from ppu.cpp (1629 lines).
+- **`src/movie_io.cpp`**, **`src/movie_settings.cpp`**,
+  **`src/movie_taseditor_bridge.cpp`**, **`src/movie_subtitles.cpp`** —
+  movie.cpp split (269 lines remaining, target ≤300).
+- **`src/drivers/Qt/ConsoleEmuControl.cpp`**,
+  **`ConsoleVideoConf.cpp`**, **`ConsoleSoundConf.cpp`**,
+  **`ConsoleMenuBar.cpp`**, **`ConsoleHotKeys.cpp`**,
+  **`ConsoleRecording.cpp`**, **`ConsoleFile.cpp`**,
+  **`ConsoleUtilities.cpp`**, **`ConsoleTranslation.cpp`**,
+  **`ConsoleVideo.cpp`**, **`ConsoleVideoSetup.cpp`**,
+  **`ConsoleCursor.cpp`**, **`ConsoleEmulatorThread.cpp`** —
+  ConsoleWindow.cpp split (915 lines remaining, accepted deviation).
+- **`src/drivers/Qt/AviVideoCodec.cpp`** (1066 lines),
+  **`AviAudioCodec.cpp`** (470 lines),
+  **`AviRecordDiskThread.cpp`** (292 lines),
+  **`AviRiffViewer.cpp`** (1068 lines) — AviRecord.cpp split
+  (731 lines remaining, target ≤800).
+- **`src/drivers/Qt/ppuViewerContext.cpp`**,
+  **`ppuViewerPalette.cpp`**, **`ppuViewerPatternTables.cpp`**,
+  **`ppuViewerSpriteViewer.cpp`**, **`ppuViewerTileEditor.cpp`** —
+  ppuViewer.cpp split (553 lines remaining, target ≤860).
+
+### Changed
+
+- **~120 #define constants → `inline constexpr`** across 14 files:
+  JOY_*, FCEU_IQ*, N/V/U/B/D/I/Z/C_FLAG, LOADER_*, EMULATIONPAUSED_*,
+  FCEUMKF_*, FCEUNPCMD_*, FCEUSTATE_*, WP_*, BT_*, TYPE_*, OP_*,
+  FCEU_SEARCH_*, BREAK_TYPE_*, MOVIE_VERSION/MAGIC, IRQ_*,
+  V_FLIP/H_FLIP/SP_BACK, BMCFLAG_FORCE4, version numbers, etc.
+  Only 4 justified macros remain (feature detection + platform).
+- **/wd suppressions reduced 50%** (12 → 6): removed /wd5039, /wd4866,
+  /wd4868, /wd4514, /wd4710, /wd4456.
+- **CMake**: legacy Lua fallback paths removed; `FATAL_ERROR` enforces
+  Rust Lua (mlua) as sole engine.
+
+### Removed
+
+- **`src/lua/` directory** — Lua 5.1 embedded C source (56 files,
+  ~17,600 lines). Rust Lua (`fceux11-lua` crate) is the only path.
+- **`scoped_ptr.h`** — fully migrated to `std::unique_ptr` (verified
+  zero code references).
+
+### Fixed
+
+- Zero raw `malloc()`/`free()`/`calloc()`/`realloc()` calls in core
+  and Qt driver code (verified by grep).
+
 ## [1.11] - 2026-07-05
 
 **Codename: Bridge.** Eleventh sub-version of the v1.x modernization
