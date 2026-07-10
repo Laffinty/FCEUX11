@@ -75,8 +75,8 @@ inline auto& scanline = fceu11::cpu_instance().scanline_ref();
 // 35 mapper .cpp files in src/boards/ that assign to it keep linking.
 inline auto& MapIRQHook = fceu11::cpu_instance().map_irq_hook_ref();
 
-#define NTSC_CPU (dendy ? 1773447.467 : 1789772.7272727272727272)
-#define PAL_CPU  1662607.125
+#define NTSC_CPU (dendy ? 1773447.467 : 1789772.7272727272727272)  // v1.13: depends on runtime ::dendy; defer to v1.14
+inline constexpr double PAL_CPU = 1662607.125;  // v1.13 Purify H: #define → constexpr
 
 #define FCEU_IQEXT      0x001
 #define FCEU_IQEXT2     0x002

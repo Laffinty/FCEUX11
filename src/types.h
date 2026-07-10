@@ -89,10 +89,10 @@ typedef uint32_t uint32;
 typedef void (*writefunc)(uint32 A, uint8 V);
 typedef uint8 (*readfunc)(uint32 A);
 
-// v0.3.7: pull in the three split-out headers so the 41 existing
+// v0.3.7: pull in the split-out headers so existing
 // #include "types.h" consumers keep working without source changes.
+// v1.13 Purify H: scoped_ptr.h removed — fceuScopedPtr fully migrated to std::unique_ptr
 #include "utils/platform_compat.h"
-#include "utils/scoped_ptr.h"
 #include "utils/format.h"
 
 #include "utils/endian.h"
