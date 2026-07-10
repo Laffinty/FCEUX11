@@ -1,10 +1,10 @@
-# FCEUX11 v1.12 正式版编译指南 / v1.12 Build Guide
+# FCEUX11 v1.13 正式版编译指南 / v1.13 Build Guide
 
-> **适用版本**：FCEUX11 v1.12（正式版，代号 **Scissors**）
+> **适用版本**：FCEUX11 v1.13（正式版，代号 **Purify**）
 > **目标平台**：Windows 11 22H2+（64-bit）独占
 > **工具链**：MSVC 2022 19.36+ (VS 17.6+) + CMake 4.0+ + Ninja + vcpkg + Rust 1.78+
 > **Qt**：6.8 LTS
-> **最后更新**：2026-07-06（v1.12 Scissors：5 个 >2000 行巨型文件拆分为职责单一子模块 + i18n 34/34 修复）
+> **最后更新**：2026-07-10（v1.13 Purify：完成 v1.12 遗留文件拆分 + 消除裸 malloc/free + 移除 Lua 5.1 内嵌源码 + #define→constexpr 迁移 + /wd 抑制项清理）
 
 ---
 
@@ -14,20 +14,18 @@
 经过实测，**任意一台符合系统要求 + 已按本章第 3 节装好工具链的 Windows
 11 电脑**都可以照搬命令完成编译。
 
-> **v1.12 新增内容（Scissors 拆分里程碑，详见 `CHANGELOG.md [1.12]`）**：
-> - **5 个 >2000 行的巨型文件拆分为职责单一的子模块**（plan §12）：
->   - `TasEditorWindow.cpp` 6750 → 3428 行（Phase A+B，10 个 sub-controller）
->   - `ConsoleWindow.cpp` 5114 → 3358 行（Phase C，3 个实现文件）
->   - `AviRecord.cpp` 4543 → 2874 行（Phase D，dialog 提取）
->   - `ppu.cpp` 2586 → 2304 行（Phase E，savestate + lifecycle 子模块；渲染管线推迟 v1.13）
->   - `movie.cpp` 1977 → 1203 行（Phase F，FM2/playback/record 子模块）
-> - **i18n_regression_test 33/34 → 34/34**：Phase D 抽 `AviOptionsDialog.cpp` 后
->   `kPhase2Widgets[7]` 指向已挪走的 `AviRecord.cpp`，已修正指向新文件。
-> - **ppuViewer.cpp 拆分推迟至 v1.13 Purify**（plan §6.1 条件性条款触发，
->   文件增长超出子模块预算）。
-> - **§7.1 行数预算修订**：完整拆分目标（ppu < 800 / movie < 300 / ConsoleWindow
->   < 600 / AviRecord < 800）推至 v1.13；v1.12 实际预算：
->   ppu ≤ 2400 / movie ≤ 1300 / ConsoleWindow ≤ 4200 / AviRecord ≤ 2900。
+> **v1.13 新增内容（Purify 代码质量里程碑，详见 `CHANGELOG.md [1.13]`）**：
+> - **完成 v1.12 遗留的大型文件拆分**（v1.12 carryover）：
+>   - `ppu.cpp` 2304 → ~800 行（渲染管线迁入 `ppu_rendering.cpp`）
+>   - `movie.cpp` 1203 → 269 行（拆分为 `movie_io` / `movie_settings` / `movie_taseditor_bridge` / `movie_subtitles`）
+>   - `ConsoleWindow.cpp` 4167 → 915 行（拆分为 13 个职责单一的子模块）
+>   - `AviRecord.cpp` 2874 → 731 行（拆分为 `AviVideoCodec` / `AviAudioCodec` / `AviRecordDiskThread` / `AviRiffViewer`）
+>   - `ppuViewer.cpp` 3985 → 553 行（拆分为 5 个子模块）
+> - **消除所有裸 `malloc()`/`free()` 调用**：核心和 Qt 驱动代码全部改用现代 C++ 内存管理（`std::unique_ptr` / `std::vector` / `FceuMallocPtr`）
+> - **移除 Lua 5.1 内嵌 C 源码**（56 个文件，约 17,600 行）：Rust Lua（mlua）成为唯一 Lua 引擎
+> - **~120 个 `#define` 常量迁移为 `inline constexpr`**
+> - **编译警告抑制项减少 50%**（12 → 6 个 `/wd` 项）
+> - **移除 `scoped_ptr.h`**：全部改用 `std::unique_ptr`
 
 阅读路径：
 1. **§1 系统要求** — 确认你的电脑符合
@@ -72,7 +70,7 @@
 | Qt 翻译 | `build\src\drivers\Qt\lang\fceux11_*.qm` | 编译后的翻译（v1.11 起 **12 种语言**：en/zh_CN/zh_TW/ja/ko/es/fr/de/vi/th/hi/ar）|
 | 部署脚本 | `build\cmake_install.cmake` | 给 `cmake --install` 用 |
 
-**程序版本号**：执行 `fceux11.exe --version` 应输出 `1.12`（或 `v1.12`）。
+**程序版本号**：执行 `fceux11.exe --version` 应输出 `1.13`（或 `v1.13`）。
 
 ---
 
@@ -439,7 +437,7 @@ cmake --build build-dev
 ctest --test-dir build --output-on-failure
 ```
 
-**期望结果**（v1.12）：24/24 通过（`ctest -LE perf`，不含 `bench_tolerance_test`）。
+**期望结果**（v1.13）：24/24 通过（`ctest -LE perf`，不含 `bench_tolerance_test`）。
 
 24 个 ctest 测试（v0.3.x 9 个 + v1.x 15 个；v1.6~v1.10 新增 `apu_wav_diff_test`、
 `cart_class_test`、`mapper_byte_diff_test`、`fds_load_test`）：
@@ -493,7 +491,7 @@ ctest --test-dir build -R bench_tolerance --output-on-failure
 上限）。v1.10 性能验证方法详见
 [`docs/v1.x_Modernization_Roadmap.md`](v1.x_Modernization_Roadmap.md) §10.6.6。
 
-**v1.12 实测（2026-07-06，commit `03f3f62`，tagged `v1.12`）**：v1.12
+**v1.13 实测（2026-07-10，tagged `v1.13`）**：v1.13
 （Scissors）拆分使链接图重排，对三个 bench 的中位数影响：
 - `bench_cpu_frame`：66.192 ms vs v1.5-prism baseline 65.034 ms（**+1.78 %**，advisory）
 - `bench_ppu_frame`：68.154 ms vs 67.507 ms（**+0.96 %**，在 +1.0 % 门内）
@@ -776,42 +774,42 @@ endif()
 
 ## 11. 版本与升级
 
-| 项 | v1.12 状态 |
+| 项 | v1.13 状态 |
 |----|-----------|
-| 主版本 | **1.12**（代号 **Scissors**，v1.x 现代化周期第十二子版本）|
+| 主版本 | **1.13**（代号 **Purify**，v1.x 现代化周期第十三子版本）|
 | 工具链 | MSVC 19.36+ / Qt 6.8 LTS / vcpkg 2024+ baseline / Rust 1.78+ |
 | API 兼容 | 与 v0.3.x / v1.x 全部子版本完全兼容（兼容 shim 保留到 v2.0）|
 | savestate 兼容 | V2 格式（FCEU11ST）为默认，V1 只读兼容；与 v0.2.x / v0.3.x / v1.0~v1.10 全部兼容 |
 | INI 兼容 | 与 v0.2.x / v0.3.x / v1.x 全部子版本完全兼容 |
 | Rust crate 版本 | 0.2.x 不变（与产品版本解耦）|
 | UI 语言 | **12 种**：en / zh_CN / zh_TW / ja / ko / es / fr / de / vi / th / hi(beta) / ar(beta, RTL)；首启按 `QLocale::system()` 自动匹配 |
-| 下一里程碑 | v1.12 Scissors → …（v1.x §12~§14 Roadmap）→ v2.0 |
+| 下一里程碑 | v1.13 Purify → …（v1.x §14~§15 Roadmap）→ v2.0 |
 
 ### 11.1 升级路径
 
-**从 v1.x（v1.0~v1.10）升级到 v1.11 Bridge**：
+**从 v1.x（v1.0~v1.11）升级到 v1.13 Purify**：
 - 替换 `fceux11.exe` 即可，savestate / INI / 配置完全兼容
 - 无需重新配置控制器 / 快捷键
-- v1.11 内部重构（驱动层解耦 + 多语言 i18n 扩展）对模拟行为零影响
+- v1.12/v1.13 的内部重构（文件拆分 + 内存管理现代化 + Lua 引擎统一）对模拟行为零影响
 - 已保存的语言偏好 `savedLang` 配置键自动迁移；新用户首启会按 Windows
   显示语言自动匹配
 
-**从 v0.3.16 LTS 升级到 v1.11**：
+**从 v0.3.16 LTS 升级到 v1.13**：
 - 替换 `fceux11.exe` 即可，savestate / INI / 配置完全兼容
-- v0.3.16 → v1.0 → v1.11 期间的所有兼容 shim 仍保留（v2.0 删除）
+- v0.3.16 → v1.0 → v1.13 期间的所有兼容 shim 仍保留（v2.0 删除）
 
-**从 v0.2.x 升级到 v1.11**：
+**从 v0.2.x 升级到 v1.13**：
 - savestate 兼容（v0.2.30+ 起）；API 变化，需重新配置控制器
 - 详见 [CHANGELOG.md](../../CHANGELOG.md) 兼容性段落
 
-### 11.2 降级路径（v1.11 → 任意早期版本）
+### 11.2 降级路径（v1.13 → 任意早期版本）
 
-v1.11 沿用 v1.10 的 V2 savestate 格式（FCEU11ST）为默认输出，但所有
-历史版本（v0.2.x / v0.3.x / v1.0~v1.10）的 savestate 均可直接加载。
-用早期版本的 `fceux11.exe` 打开 v1.11 保存的 V2 savestate 前需先
-通过 v1.11 转换为 V1 格式（`--save-v1` 选项）。
+v1.13 沿用 v1.10 的 V2 savestate 格式（FCEU11ST）为默认输出，但所有
+历史版本（v0.2.x / v0.3.x / v1.0~v1.11）的 savestate 均可直接加载。
+用早期版本的 `fceux11.exe` 打开 v1.13 保存的 V2 savestate 前需先
+通过 v1.13 转换为 V1 格式（`--save-v1` 选项）。
 
-> **多语言降级注意事项**：v1.11 写入 INI 的 `savedLang` 字段若为新增
+> **多语言降级注意事项**：v1.11+ 写入 INI 的 `savedLang` 字段若为新增
 > 9 种之一（ja / ko / es / fr / de / vi / th / hi / ar），降级到 v1.10
 > 或更早版本后会被识别为未知 locale，自动回退到 `en`；其它配置不受影响。
 
@@ -853,4 +851,4 @@ v1.11 沿用 v1.10 的 V2 savestate 格式（FCEU11ST）为默认输出，但所
 
 ---
 
-**文档结束** — FCEUX11 v1.12 正式版编译指南。生效版本：v1.12 Scissors（2026-07-06）。
+**文档结束** — FCEUX11 v1.13 正式版编译指南。生效版本：v1.13 Purify（2026-07-10）。

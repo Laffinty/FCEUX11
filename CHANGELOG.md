@@ -392,7 +392,7 @@ in new plan §6.3. Full ppuViewer split re-planned in v1.13.
   `CMakeLists.txt:16`, `vcpkg.json`).
 - CHANGELOG v1.12 section (this file).
 - Roadmap §12 checkboxes ticked.
-- `docs/internal/v1.12_scissors_build_plan.md` §7.1 line gates
+- `docs/internal/history.md` v1.12 Scissors Build Plan §Line Count Gates
   revised (see "Known deviations" below).
 - `tests/fixtures/golden_savestate_hashes.json` + 8 .fc0 files
   regenerated to match Phase E/F struct relocation
@@ -445,8 +445,8 @@ Rationale: Phase E / F adopted a "scope v1" minimal-split approach
 (conservative body-move surface) due to cross-TU verification
 constraints during the Phase E/F run. The full-split targets
 (ppu < 800 / movie < 300 / ConsoleWindow < 600 / AviRecord < 800)
-are deferred to v1.13 Purify. `docs/internal/v1.12_scissors_build_plan.md`
-§7.1 has been revised to record v1.12 actuals as the new budgets.
+are deferred to v1.13 Purify. `docs/internal/history.md` v1.12 Scissors Build Plan
+has been revised to record v1.12 actuals as the new budgets.
 The "no single file > 1500 lines" generic gate (§7.1 last bullet)
 remains in force; ppu.cpp/movie.cpp at 2304/1203 exceed the generic
 >1500 limit and are explicitly called out as known deviations with

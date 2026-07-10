@@ -1,12 +1,9 @@
 # FCEUX11 Internal Build History
 
-> This file consolidates completed build plans and handoff documents from
-> v1.4 through v1.11. The original individual files have been extracted,
-> merged into this document, and removed to avoid confusion for AI agents
-> working on current phases.
->
-> **Active documents** (kept in `docs/internal/`):
-> - `v1.12_scissors_build_plan.md` — v1.12 Scissors build plan (active)
+> This file consolidates completed build plans, handoff documents, and
+> technical audit data from v1.4 through v1.13. The original individual
+> files have been extracted, merged into this document, and removed to
+> avoid confusion for AI agents working on current phases.
 
 ---
 
@@ -477,3 +474,206 @@ pcre2-8.dll ──→ [system DLLs only]   ← ZERO importers in entire director
 - Documented SFORMAT chunk structure
 - Identified endianness and alignment issues
 - Mapped mapper-specific state formats
+
+---
+
+## v1.12 Scissors Build Plan (2026-07-04 ~ 2026-07-06, archived)
+
+**Scope**: Split 5 large source files (>1500 lines each) into single-responsibility sub-modules.
+
+### Key Technical Decisions
+
+**Pure Code Movement Principle**: Split operations must not change any runtime behavior. Each phase runs regression tests to confirm zero diff. This avoids introducing bugs during large-scale refactoring.
+
+**Layout-Shift Mitigation** (lessons from v1.6/v1.7/v1.11):
+- New .cpp files rearrange the linker graph, disturbing hot-path instruction layout even when code logic is unchanged
+- Mitigation: run `bench_full_frame` 3 rounds per phase, take median; any batch >+1.5% marks that phase as advisory
+- Hot-path split units should use `__forceinline` in headers or stay in original .cpp
+- Qt sub-controller signals/slots use `Qt::DirectConnection` to avoid malloc overhead
+
+**Anti-Pessimistic Build Checks** (inherited from v1.10/v1.11):
+- File splits must not be empty shells; original .cpp must be deleted or reduced to ≤50 lines
+- New file line counts must sum to ±5% of original file
+- "Pure code movement" claims verified by running corresponding regression tests
+
+### Line Count Gates (v1.12 Revised)
+
+| File | v1.12 Actual | Original Target | Reason for Deviation |
+|------|-------------|-----------------|---------------------|
+| ppu.cpp | 2304 | <800 | Rendering pipeline not yet migrated (placeholder only) |
+| movie.cpp | 1203 | <300 | fm2/playback/record split out, residual ~1200 lines |
+| ConsoleWindow.cpp | 4167 | <600 | 3 sub-files split, remaining Toolbar/EmuControl/Video/Sound/Input not split |
+| AviRecord.cpp | 2874 | <800 | Dialog extracted, VideoCodec/AudioCodec tight coupling deferred |
+| TasEditorWindow.cpp | 3428 | <800 | 10 sub-controllers extracted, main window at 3428 |
+
+### Phase G Decision: ppuViewer.cpp Deferral to v1.13
+
+**Decision Date**: 2026-07-06 (commit `58ea093`)
+
+**Conditions evaluated** (per plan §6.1):
+- §1 TasEditorWindow split: ✅ complete
+- §2 ConsoleWindow split: ✅ complete
+- §3 AviRecord split: ✅ complete
+- §4 ppu.cpp split: ⏳ pending (3 batches + bench gate)
+- §5 movie.cpp split: ⏳ pending (3 batches + bench gate)
+- `bench_full_frame` regression <2%: ⏳ unknown
+
+**Decision**: §6.1 conditions not met → defer ppuViewer.cpp split to v1.13 Purify.
+
+**Additional reasons**:
+1. ppuViewer.cpp grew from 3394 to 3985 lines since plan authored; original sub-file budgets (<600 each) no longer feasible
+2. Time budget: remaining ~12-15 work sessions for Phase E+F+H; adding Phase G would extend to 15-20 sessions
+3. Risk asymmetry: ppuViewer split is maintenance-only benefit, zero performance impact
+
+### Performance Verification Protocol
+
+1. `git worktree add` for v1.11 baseline independent worktree
+2. Link `vcpkg_installed` (`mklink /J`) to share dependencies
+3. Build v1.11 baseline, run `fceux11_bench_tolerance_test.exe` from `tests/`
+4. Current version similarly from `tests/`
+5. **Sequential execution** (not parallel, avoid CPU contention), 3 rounds each take best-of-3
+6. Compare best-of-3 `bench_full_frame`/`bench_ppu_frame`/`bench_cpu_frame` medians, calculate regression percentage
+7. Only **ppu and movie split batches** (§4, §5) require forced bench verification; GUI split batches (§1, §2, §3) only do comprehensive bench at Phase H
+
+### Key Commits
+
+```
+08efd24  Phase A+B — TasEditorWindow split (6750 → 3428 lines)
+11713d5  Phase C — ConsoleWindow method extraction (5114 → 3358 lines)
+58ea093  Phase D — AviRecord dialog extraction (4543 → 2874 lines)
+bf0f273  Phase E-A — ppu_state.cpp split (savestate bookkeeping)
+d181047  Phase E-B — ppu_core.cpp split (lifecycle + accessor)
+98798e2  Phase E-C — ppu_rendering.cpp placeholder (NOT in build)
+d9e855d  Phase E/F fixup — cross-TU visibility + struct relocation
+5ea8bea  Phase F-A — movie_fm2.cpp split (FM2 I/O)
+41aac92  Phase F-B — movie_playback.cpp split (savestate plugin)
+c972632  Phase F-C — movie_record.cpp split (recording manipulators)
+b75aa42  Phase H — bookend (CHANGELOG + version bump + golden regeneration)
+```
+
+---
+
+## v1.13 Purify Build Plan (2026-07-08 ~ 2026-07-10, archived)
+
+**Scope**: Complete v1.12 carryover file splits + eliminate remaining C-style patterns.
+
+### malloc/free Elimination (§6)
+
+**Audit Methodology** (F1 phase):
+- `grep -rnE '\b(malloc|free|calloc|realloc)\b' --include='*.cpp' --include='*.h' src/`
+- Filter license headers: 587+ raw matches → 292 after filtering → ~197 actual code-level
+- Exclude Lua 5.1 embedded (36) and rust target generated (8)
+
+**Classification System**:
+
+| Category | Description | Replacement |
+|----------|-------------|-------------|
+| T_A | Simple bare `malloc(T)`/`free(p)` pairs, no complex ownership | `std::unique_ptr<T[]>` / `std::vector<T>` |
+| T_B | Already wrapped via `FCEU_malloc`/`FCEU_gmalloc` | `FceuMallocPtr` RAII or `FCEU_gmalloc_unique()` |
+| T_C | Cross-file/cross-module ownership, need pair audit | Pair-by-pair replacement + unit tests |
+| T_D | `FCEU_gmalloc`/`FCEU_gcalloc` wrapper internal implementation | Internal `new (std::nothrow)` conversion |
+| T_E | Comments/strings/lua 5.1 embedded/rust target generated | No action (delete directory or auto-generated) |
+
+**Actual counts**: T_A/T_B ~106 business code calls, T_D 5 wrapper internals, T_E ~50 (comments/strings/external code)
+
+**FceuMallocPtr RAII Pattern** (key tool):
+```cpp
+struct FceuMallocDeleter {
+    void operator()(uint8_t* p) const noexcept { if (p) FCEU_gfree(p); }
+};
+using FceuMallocPtr = std::unique_ptr<uint8_t[], FceuMallocDeleter>;
+inline FceuMallocPtr FCEU_gmalloc_unique(size_t size) {
+    return FceuMallocPtr(static_cast<uint8_t*>(FCEU_gmalloc(size)));
+}
+```
+
+**Standard replacement patterns**:
+- Simple byte buffer: `std::unique_ptr<T[]> ptr = std::make_unique<T[]>(n);`
+- FCEU_malloc/FCEU_gmalloc buffer: `FceuMallocPtr ptr = FCEU_gmalloc_unique(n);`
+- String: `std::string s = FCEU_MakeFName(...);`
+
+### C-Style Cast Cleanup (§7)
+
+**Classification**:
+- A class (trivial): numeric type conversions → `static_cast<T>(x)`
+- B class (pointer): pointer conversions → `reinterpret_cast<T*>(p)`
+- C class (polymorphic): `dynamic_cast<T*>(p)`
+- D class (C legacy retain): DECLFR/DECLFW/thunk necessary C-cast, add `// NOLINT(cstyle-cast)` comment
+
+**Result**: ~264 C-style casts converted to static_cast/reinterpret_cast across core and Qt driver files.
+
+### #define → constexpr Migration (§8)
+
+- ~120 `#define` constants converted to `inline constexpr` across 14 files
+- Includes: JOY_*, FCEU_IQ*, N/V/U/B/D/I/Z/C_FLAG, LOADER_*, EMULATIONPAUSED_*, FCEUMKF_*, FCEUNPCMD_*, FCEUSTATE_*, WP_*, BT_*, TYPE_*, OP_*, FCEU_SEARCH_*, BREAK_TYPE_*, MOVIE_VERSION/MAGIC, IRQ_*, V_FLIP/H_FLIP/SP_BACK, BMCFLAG_FORCE4, version numbers
+- Only 4 justified macros remain (feature detection + platform)
+
+### Other Cleanup
+
+- **scoped_ptr.h removal**: Fully migrated to `std::unique_ptr`, verified zero code references
+- **Lua 5.1 removal**: Deleted `src/lua/` directory (56 files, ~17,600 lines). Rust Lua (mlua) is the only path.
+- **/wd suppression cleanup**: Reduced 50% (12 → 6): removed /wd5039, /wd4866, /wd4868, /wd4514, /wd4710, /wd4456
+
+### Verification Gates (§12)
+
+- Zero raw `malloc()`/`free()`/`calloc()`/`realloc()` calls in business code
+- Zero C-style casts (`/W4` no C-style cast warnings, D class exempt)
+- Core file `#define` constants ≤10 (excluding DECLFR/DECLFW)
+- `scoped_ptr.h` removed
+- `src/lua/src/` removed, Rust Lua is sole path
+- `/wd` suppressions reduced ≥50%
+- `cmake --build build --config Release` zero errors zero warnings (`/W4 /WX`)
+- `ctest -C Release -LE perf` all green
+
+### Key Commits
+
+```
+5db1888  Phase A — ppu.cpp (2304→800) split into ppu_rendering.cpp
+850d348  F1 audit + F2c/F3b watchpoint condText/desc to std::string
+753d8f7  F2c palette.cpp grayscaled_palo -> std::unique_ptr<pal[]>
+979fea5  F2b fceu.cpp + FCEUGI fields -> std::string/std::vector
+f05b4ac  F2b cart.cpp GENIEROM -> FceuMallocPtr RAII
+32bb6a2  F2b ines_load/unif_load/oldmovie.cpp free() modernization
+9d54045  F2a nsf.cpp + fds.cpp free() modernization (FFI boundary)
+0865210  F2d netplay.cpp free() -> FCEU_free() (FCEU_malloc allocations)
+d317f7f  F3/F4/F5 — malloc/free eradication in Qt drivers + FCEU_gmalloc modernization
+c7c6df1  Phase G3/G4 — C-style cast cleanup in drivers/Qt/ + drivers/common/ (151 casts)
+88dd595  Phase G2 — C-style cast cleanup in core src/ files (113 casts)
+296d85d  Phase H+I — #define→constexpr migration + Lua 5.1 removal + /wd cleanup
+c01c897  v1.13: version bump 1.12 → 1.13
+```
+
+### Build System Notes (accumulated experience)
+
+- **NMake vs Ninja**: NMake Makefiles generator works but is slower; Ninja is preferred for parallel builds
+- **MSVC PCH quirks**: Deleting PCH requires `cmake . -G "NMake Makefiles"` to regenerate `cmake_pch.cxx`
+- **MSYS bash + cmd**: Use `cmd //c` (double slash) in MSYS bash; `cmd /c` gets output swallowed
+- **MSVC /W4 /WX**: Default overridden by PCH to `/WX-` (historical reason, not a bug)
+- **CI race condition**: Ninja parallel build can cause `ERROR_SHARING_VIOLATION` (code 32) when Rust build script writes `fceux11_rust.h` while C++ compiler reads it. Fix: write to temp file first, then atomic rename.
+
+---
+
+## DLL Decoupling Analysis (v1.11, 2026-07-05)
+
+**Context**: Post-v1.11 release packaging audit. Independent of source code changes.
+
+### Key Findings
+
+**Orphaned DLLs** (safe to delete, ~3.5 MB):
+- Qt6Network.dll (1,587 KB) — not imported by fceux11.exe or any Qt module
+- plugins/tls/qschannelbackend.dll (228 KB) — TLS plugin, no HTTPS usage
+- plugins/tls/qopensslbackend.dll (230 KB) — TLS plugin + libssl
+- plugins/tls/qcertonlybackend.dll (84 KB) — TLS plugin
+- libssl-3-x64.dll (858 KB) — only imported by qopensslbackend
+- pcre2-8.dll (599 KB) — absolute orphan, zero importers
+
+**Verification method**: `dumpbin /DEPENDENTS` import-table tracing on all .dll/.exe in package directory + source-code audit of `LoadLibrary`/`QLibrary`/`QPluginLoader` + CMakeLists.txt linkage.
+
+**Source-code confirmation**: Zero references to `Qt6Network`, `QNetwork`, `QNetworkAccessManager`, `QSslSocket`, `pcre2-8`, `libssl`, `openssl`, or `Qt6::Network` in CMakeLists.txt anywhere in the codebase.
+
+### Execution Protocol
+1. Backup all 6 files to `_dll_backup/` directory
+2. Move (not delete) to `_removed_test/` for testing
+3. Smoke test: start → open .nes → open .zip → menu → sound → input → OpenGL
+4. Confirm with Process Explorer: Qt6Network.dll not loaded
+5. After verification: delete backup and temp directories

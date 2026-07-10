@@ -2,7 +2,7 @@
 
 # FCEUX11
 
-[![Version](https://img.shields.io/badge/version-v1.11-blue)](https://github.com/Laffinty/FCEUX11/releases)
+[![Version](https://img.shields.io/badge/version-v1.13-blue)](https://github.com/Laffinty/FCEUX11/releases)
 [![License](https://img.shields.io/badge/license-GPL--v2-green)](COPYING)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?logo=windows)](https://www.microsoft.com/windows/windows-11)
 [![Qt](https://img.shields.io/badge/Qt-6.8%20LTS-41CD52?logo=qt)](https://www.qt.io)
@@ -89,48 +89,46 @@ Precompiled binaries are available on the **[GitHub Releases](https://github.com
 ## 版本历史 / Changelog
 
 详见 [CHANGELOG.md](CHANGELOG.md)。
-v1.11（代号 **Bridge**）是当前稳定版，v1.x 现代化周期的第十一个子版本
-（v1.1 Sentinel → v1.2 Census → v1.3 Legion → v1.4 Gateway → v1.5
-Prism → v1.6 Resonance → v1.7 Cartograph → v1.8 Masonry → v1.9
-Chronicle → v1.10 Cryptex → v1.11 Bridge）。v1.11（Bridge）完成两大
-里程碑：**（1）Qt 驱动层解耦** —— `fceu11::DriverCallbacks` 回调表
-上线，核心源码 `#ifdef __QT_DRIVER__` / `__WIN_DRIVER__` 块消除 86 处，
-40 个 `FCEUD_*` 函数迁移至接口转发，5 个死代码声明移除，`fceuWrapper.cpp`
-由 2086 行拆分为四个职责单一的子模块；
-**（2）多语言系统重大升级** —— UI 语言从 3 种扩展到 **12 种**（新增
-ja / ko / es / fr / de / vi / th / hi(beta) / ar(beta)），首启自动按
-`QLocale::system()` 匹配语言并加载翻译，阿拉伯语启用 Qt RTL 布局，
-`retranslateUi()` 全量覆盖 ~90 处先前遗漏的菜单/动作项。
-v1.10（Cryptex）完成 ROM 格式解析全量 Rust 迁移（iNES/UNIF/NSF/FDS/
-VS UniSystem → `fceux11-formats`，C++ 解析代码缩减约 90%）。
-v1.9（Chronicle）引入 V2 Savestate 格式（FCEU11ST，带每 chunk CRC32 校验），
-将 SFORMAT 序列化系统全量迁移至 Rust `fceux11-core`。
-详见 Release Notes 与 [CHANGELOG.md](CHANGELOG.md) 和 [`docs/v1.x_Modernization_Roadmap.md`](docs/v1.x_Modernization_Roadmap.md)，
-编译指南见 [`docs/BuildGuide.md`](docs/BuildGuide.md)。
-See [CHANGELOG.md](CHANGELOG.md) for version history.
+v1.13（代号 **Purify**）是当前稳定版，v1.x 现代化周期的第十三个子版本
+（v1.1 Sentinel → … → v1.11 Bridge → v1.12 Scissors → v1.13 Purify）。
 
-v1.11 (codename **Bridge**) is the current stable release, the eleventh
-sub-version of the v1.x modernization cycle (v1.1 Sentinel → v1.2
-Census → v1.3 Legion → v1.4 Gateway → v1.5 Prism → v1.6 Resonance →
-v1.7 Cartograph → v1.8 Masonry → v1.9 Chronicle → v1.10 Cryptex →
-v1.11 Bridge). v1.11 (Bridge) ships two major milestones: **(1) Qt
-driver decoupling** — the `fceu11::DriverCallbacks` callback table is
-introduced, eliminating 86 `#ifdef __QT_DRIVER__` / `__WIN_DRIVER__`
-blocks from core sources, migrating 40 `FCEUD_*` functions to interface
-forwarding, removing 5 dead declarations, and splitting
-`fceuWrapper.cpp` from 2086 lines into four single-responsibility
-sub-modules; **(2) a major multi-language overhaul** — the UI ships in
-**12 languages** (new: ja / ko / es / fr / de / vi / th / hi(beta) /
-ar(beta)), auto-detects the system locale via `QLocale::system()` and
-loads the matching translation on first launch, enables Qt RTL layout
-for Arabic, and the `retranslateUi()` pass now covers ~90 previously
-untranslated menu/action items. v1.10 (Cryptex) completed the full Rust
-migration of ROM format parsing (iNES/UNIF/NSF/FDS/VS UniSystem →
-`fceux11-formats`, reducing C++ parsing code by ~90%). v1.9 (Chronicle)
-introduced the V2 savestate format (FCEU11ST with per-chunk CRC32
-integrity checking), migrating the SFORMAT serialization system entirely
-to Rust `fceux11-core`. Full release notes:
-[CHANGELOG.md](CHANGELOG.md) and
+**v1.13 Purify** 对代码进行了深度清理，消除了所有不安全的内存操作，
+将底层 Lua 引擎完全切换到 Rust 实现，并清理了过时的编译警告——
+这些改进让模拟器运行更加稳定可靠，减少意外崩溃的可能。
+同时完成了 v1.12 遗留的大型文件拆分工作，将原本超过 2000 行的核心文件
+拆分为职责单一的小模块，方便后续维护和快速修复问题。
+
+**v1.12 Scissors** 将 5 个超大源代码文件（最大的超过 6700 行）
+拆分为多个职责清晰的小模块——这意味着未来的 bug 修复和功能更新会更快更稳。
+
+v1.11（Bridge）完成两大里程碑：**（1）Qt 驱动层解耦** —— 核心引擎与
+界面层正式分离，消除了 86 处条件编译块；**（2）多语言系统重大升级** ——
+UI 语言从 3 种扩展到 **12 种**，首启自动匹配系统语言，阿拉伯语支持从右到左布局。
+
+详见 Release Notes 与 [CHANGELOG.md](CHANGELOG.md) 和
+[`docs/v1.x_Modernization_Roadmap.md`](docs/v1.x_Modernization_Roadmap.md)，
+编译指南见 [`docs/BuildGuide.md`](docs/BuildGuide.md)。
+
+See [CHANGELOG.md](CHANGELOG.md) for version history.
+v1.13 (codename **Purify**) is the current stable release, the thirteenth
+sub-version of the v1.x modernization cycle. It deep-cleans the codebase,
+eliminating all unsafe memory operations, switching the Lua engine entirely
+to Rust, and removing outdated compiler warnings — making the emulator
+more stable and reliable. It also completes the large-file splits carried
+over from v1.12, breaking core files over 2000 lines into focused modules
+for easier maintenance and faster bug fixes.
+
+v1.12 (Scissors) split 5 oversized source files (the largest over 6700 lines)
+into smaller, single-responsibility modules — meaning future bug fixes and
+feature updates will be faster and more stable.
+
+v1.11 (Bridge) shipped two major milestones: **(1) Qt driver decoupling** —
+the emulation core and UI layer are formally separated, eliminating 86
+conditional compilation blocks; **(2) a major multi-language overhaul** —
+the UI ships in **12 languages** with automatic system locale detection
+and full Arabic RTL layout.
+
+Full release notes: [CHANGELOG.md](CHANGELOG.md) and
 [`docs/v1.x_Modernization_Roadmap.md`](docs/v1.x_Modernization_Roadmap.md).
 Build guide: [`docs/BuildGuide.md`](docs/BuildGuide.md).
 
