@@ -58,7 +58,7 @@
 
 // v1.13 Purify H: #define → constexpr (version numbers)
 inline constexpr int FCEU_VERSION_MAJOR = 1;
-inline constexpr int FCEU_VERSION_MINOR = 12;
+inline constexpr int FCEU_VERSION_MINOR = 13;
 inline constexpr int FCEU_VERSION_PATCH = 0;
 inline constexpr int FCEU_VERSION_TWEAK = 0;
 
@@ -67,8 +67,8 @@ inline constexpr int FCEU_VERSION_MAJOR_DECODE(int x) { return x / 10000; }
 inline constexpr int FCEU_VERSION_MINOR_DECODE(int x) { return (x / 100) % 100; }
 inline constexpr int FCEU_VERSION_PATCH_DECODE(int x) { return x % 100; }
 
-#define FCEU_VERSION_STRING "1.12"  FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
-#define FCEU_DISPLAY_VERSION "v1.12"
+#define FCEU_VERSION_STRING "1.13"  FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
+#define FCEU_DISPLAY_VERSION "v1.13"
 #define FCEU_NAME_AND_VERSION FCEU_NAME " " FCEU_DISPLAY_VERSION
 
 // FCEUX11 Contributors — Derivative work based on FCEUX
