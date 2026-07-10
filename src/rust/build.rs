@@ -206,8 +206,10 @@ fn merge_headers(
     output.push_str("\n#ifdef __cplusplus\n}\n#endif\n\n");
     output.push_str("#endif /* FCEUX11_RUST_H */\n");
 
-    fs::write(format!("{}/fceux11_rust.h", crate_dir), output)
-        .expect("Failed to write merged header");
+    let final_path = format!("{}/fceux11_rust.h", crate_dir);
+    let tmp_path = format!("{}/fceux11_rust.h.tmp", crate_dir);
+    fs::write(&tmp_path, &output).expect("Failed to write merged header");
+    fs::rename(&tmp_path, &final_path).expect("Failed to rename merged header");
 }
 
 fn extract_body(content: &str) -> String {
