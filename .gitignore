@@ -84,6 +84,9 @@ docs/history/unpacked/
 # Claude Code
 .claude/
 
+# MiMoCode
+.mimocode/
+
 # Local configuration
 config.ini
 settings.ini
