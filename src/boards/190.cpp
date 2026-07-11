@@ -62,7 +62,7 @@ static void Mapper190_Power(void) {
 }
 
 static void Mapper190_Close(void) {
-	FCEU_gfree(WRAM);
+	WRAM_owner.reset();  // v1.15 F.1: use RAII owner instead of raw FCEU_gfree to avoid double-free
 	WRAM = NULL;
 }
 

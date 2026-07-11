@@ -615,19 +615,11 @@ void BMC11160_Init(CartInfo *info) {
 namespace fceu11 {
 
 void NromCart::on_power() noexcept {
-	// NROM_Init was already called once during iNES_Init (step 1). Calling
-	// it again would duplicate the SFORMAT "WRAM" entry with a freed
-	// pointer. Instead, fire the NROMPower function pointer that
-	// NROM_Init set up. At this point info->Power has been redirected by
-	// the v1.7 factory block to CartInfo_PowerForward, so we temporarily
-	// swap in the legacy NROMPower pointer, invoke it, then restore the
-	// forwarding function pointer so subsequent PowerNES calls also route
-	// through cart_obj->on_power.
-	if (!currCartInfo) return;
-	void (*saved)(void) = currCartInfo->Power;
-	currCartInfo->Power = NROMPower;
-	currCartInfo->Power();
-	currCartInfo->Power = saved;
+	// v1.15 B.1: Direct call to NROMPower — no legacy function pointer
+	// indirection. NROM_Init was already called during iNES_Init (registers
+	// SFORMAT, allocates WRAM, sets up PRG/CHR mapping). on_power() only
+	// needs to fire the bank-switching + read/write handler setup.
+	NROMPower();
 }
 
 // v1.8 Masonry §6.1: NromCart::save_mapper_state() — NROM has no

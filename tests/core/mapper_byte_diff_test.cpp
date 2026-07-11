@@ -434,13 +434,9 @@ int main(int argc, char** argv) {
 
     // Phase D.12: SKIP is allowed (no regression), but FAIL is not.
     //
-    // v1.8 Phase E.2 / v1.9: Use _exit(0) on success to avoid heap corruption
-    // in global/static destructors from legacy mapper code (exit code 0xC0000374).
-    // The corruption is in mapper teardown, not in the test logic.
-    if (failed == 0) {
-        std::fflush(stdout);
-        std::fflush(stderr);
-        _exit(0);
-    }
-    return 1;
+    // v1.15 F.1: Removed _exit(0) workaround. The heap corruption (0xC0000374)
+    // was caused by double-free in mapper Close handlers: 190.cpp and mmc5.cpp
+    // freed RAII-owned memory via raw FCEU_gfree() instead of owner.reset().
+    // Fixed in v1.15. Normal return now safe.
+    return failed == 0 ? 0 : 1;
 }

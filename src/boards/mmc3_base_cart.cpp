@@ -11,25 +11,18 @@ namespace fceu11 {
 
 Mmc3BaseCart::Mmc3BaseCart(Bus& bus) noexcept {
     attach_bus(bus);
-    // v1.8 Masonry Phase E.1: capture the legacy Power function pointer
-    // set by the per-mapper Init (Mapper12_Init, Mapper37_Init, ...)
-    // before the iNES loader overwrites it with CartInfo_PowerForward.
-    // Without this, Mmc3BaseCart::on_power() would route through the
-    // forwarder back to itself -> infinite recursion -> SEGFAULT.
-    // Same pattern as MapperStrategyA (mapper_strategy_a.h:25-52).
-    if (currCartInfo && currCartInfo->Power &&
-        currCartInfo->Power != &CartInfo_PowerForward) {
-        legacy_power_ = currCartInfo->Power;
-    }
+    // v1.15 B.1: Removed legacy_power_ capture. on_power() now calls
+    // the per-mapper power function directly (e.g. Mapper12Power,
+    // Mapper37Power) instead of going through the captured function
+    // pointer. This eliminates the Strategy A delegation pattern.
 }
 
 void Mmc3BaseCart::on_power() noexcept {
-    // Strategy A (v1.7 §3.3): call the legacy power function.
-    // v1.8 Masonry Phase E.1: the 24 MMC3 variants use the same
-    // capture-in-constructor pattern as MapperStrategyA to avoid the
-    // iNES loader's overwrite of currCartInfo->Power with
-    // CartInfo_PowerForward (which would cause infinite recursion).
-    if (legacy_power_) legacy_power_();
+    // v1.15 B.1: Direct call to the per-mapper power function.
+    // Each MMC3 variant subclass overrides on_power() to call its
+    // specific power function (e.g. Mapper12Power, Mapper37Power).
+    // The base class provides a default that calls GenMMC3Power.
+    GenMMC3Power();
 }
 
 void Mmc3BaseCart::on_reset() noexcept {

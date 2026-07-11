@@ -420,17 +420,11 @@ void SOROM_Init(CartInfo *info) {
 namespace fceu11 {
 
 void Mmc1Cart::on_power() noexcept {
-	// Mapper1_Init (called during iNES_Init) invokes GenMMC1Init which sets
-	// info->Power = GenMMC1Power. The v1.7 factory block then redirects
-	// info->Power to CartInfo_PowerForward. To fire the actual MMC1 power
-	// routine, temporarily swap in the legacy GenMMC1Power pointer, invoke
-	// it, then restore the forwarding function pointer so subsequent
-	// PowerNES calls also route through cart_obj->on_power.
-	if (!currCartInfo) return;
-	void (*saved)(void) = currCartInfo->Power;
-	currCartInfo->Power = GenMMC1Power;
-	currCartInfo->Power();
-	currCartInfo->Power = saved;
+	// v1.15 B.1: Direct call to GenMMC1Power — no legacy function pointer
+	// indirection. Mapper1_Init was already called during iNES_Init
+	// (registers SFORMAT, allocates WRAM/CHRRAM, sets up DRegs).
+	// on_power() only needs to fire the bank-sync + read/write handlers.
+	GenMMC1Power();
 }
 
 void Mmc1Cart::on_reset() noexcept {

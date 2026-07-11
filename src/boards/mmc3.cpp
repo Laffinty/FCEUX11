@@ -1477,19 +1477,11 @@ void Mapper406_Init(CartInfo *info) {
 namespace fceu11 {
 
 void Mmc3Cart::on_power() noexcept {
-	// Mapper4_Init (called during iNES_Init) calls GenMMC3_Init which sets
-	// info->Power = GenMMC3Power, then Mapper4_Init overwrites it with
-	// M4Power (which adds the Karnov mirror hack on top of GenMMC3Power).
-	// The v1.7 factory block then redirects info->Power to
-	// CartInfo_PowerForward. To fire the actual MMC3 power routine,
-	// temporarily swap in the legacy M4Power pointer, invoke it, then
-	// restore the forwarding function pointer so subsequent PowerNES calls
-	// also route through cart_obj->on_power.
-	if (!currCartInfo) return;
-	void (*saved)(void) = currCartInfo->Power;
-	currCartInfo->Power = M4Power;
-	currCartInfo->Power();
-	currCartInfo->Power = saved;
+	// v1.15 B.1: Direct call to M4Power — no legacy function pointer
+	// indirection. Mapper4_Init was already called during iNES_Init
+	// (registers SFORMAT, allocates WRAM/CHRRAM, sets up bank masks).
+	// on_power() only needs to fire the bank-sync + read/write handlers.
+	M4Power();
 }
 
 void Mmc3Cart::on_reset() noexcept {

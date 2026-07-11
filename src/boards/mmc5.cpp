@@ -905,7 +905,7 @@ void NSFMMC5_Close(void) {
 		FCEU_gfree(WRAM);
 	WRAM = NULL;
 	MMC5WRAMsize = 0;
-	FCEU_gfree(ExRAM);
+	ExRAM_owner.reset();  // v1.15 F.1: use RAII owner instead of raw FCEU_gfree to avoid double-free
 	ExRAM = NULL;
 }
 

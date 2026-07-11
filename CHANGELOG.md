@@ -5,6 +5,66 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15] - 2026-07-11
+
+**Codename: Finale.** Fifteenth and final sub-version of the v1.x
+modernization cycle. Deepens Cart subclass migration for P0 mappers,
+fixes a long-standing teardown heap corruption, and synchronizes all
+roadmap documentation. v1.x modernization is now complete.
+
+### Added
+
+- **`docs/internal/v2.0_removal_checklist.md`** — Comprehensive audit
+  of deprecated FCEUI_* shims (105 total), 6 global variable aliases,
+  and bmap[] status for v2.0 removal planning.
+
+### Changed
+
+- **NromCart / Mmc1Cart / Mmc3Cart / Vrc6Cart `on_power()`** (B.1) —
+  Eliminated legacy function pointer swap-restore pattern. Each P0
+  cart subclass now calls its power function directly (NROMPower,
+  GenMMC1Power, M4Power, VRC6Power) instead of temporarily swapping
+  `currCartInfo->Power` and invoking through the function pointer.
+- **Mmc3BaseCart** (B.1) — Removed `legacy_power_` member and
+  constructor capture. `on_power()` calls `GenMMC3Power()` directly.
+  All 24 MMC3 variant subclasses inherit this behavior.
+- **`roadmap §3/§4/§8/§14`** (F.3) — All checkboxes synchronized
+  with actual delivery status. §8.2/§8.5 annotated as shell-coverage
+  (空壳覆盖). §14.6 misleading annotation corrected.
+- **`roadmap §6.3`** (C.2) — Rust filter path marked as intentional
+  design choice `[⚠️]`, not unfinished work.
+- **`roadmap §0.3`** — v1.8 Masonry status updated to ✅.
+- **`version.h`** — Version bump to 1.15.
+- **`CMakeLists.txt`** — `project(FCEUX11 VERSION 1.15)`.
+- **`remaining_work.md`** — Repositioned as v1.x closure audit report.
+
+### Fixed
+
+- **`src/boards/190.cpp`** (F.1) — `Mapper190_Close()` freed WRAM via
+  raw `FCEU_gfree(WRAM)` instead of `WRAM_owner.reset()`, causing
+  double-free when the static `FceuMallocPtr` destructor ran at program
+  exit (heap corruption 0xC0000374).
+- **`src/boards/mmc5.cpp`** (F.1) — `NSFMMC5_Close()` freed ExRAM via
+  raw `FCEU_gfree(ExRAM)` instead of `ExRAM_owner.reset()`, same
+  double-free root cause.
+- **`tests/core/mapper_byte_diff_test.cpp`** (F.1) — Removed
+  `_exit(0)` workaround that was bypassing the heap corruption. Normal
+  `return` now safe after fixing the two double-free bugs above.
+
+### Deferred to v2.0
+
+- **C.1** — Expansion audio true subclassing (VRC7/MMC5/Namco163/
+  Sunsoft5B/FDS). LegacyExpansionAudio shim satisfies functional
+  correctness; true OO refactoring is pure architectural cleanup.
+- **C.2** — Rust filter path unification through Apu member method.
+  Current free-function path is a deliberate performance choice.
+- **F.2** — LegacyExpansionAudio static instance declaration location.
+- **D.1** — v1.0 baseline comparison on matched hardware. v1.15
+  benchmarks all outperform v1.0 baseline by 18-29% on local machine;
+  precise v1.0-hardware comparison deferred to v2.0 closure.
+
+---
+
 ## [1.14] - 2026-07-11
 
 **Codename: Anvil.** Fourteenth and final sub-version of the v1.x

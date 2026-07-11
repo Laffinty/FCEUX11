@@ -467,20 +467,11 @@ void NSFVRC6_Init(void) {
 namespace fceu11 {
 
 void Vrc6Cart::on_power() noexcept {
-	// Mapper24_Init / Mapper26_Init was already called once during
-	// iNES_Init (step 1). Calling it again would duplicate the SFORMAT
-	// entries (StateRegs, and for mapper 26 also WRAM). Instead, fire
-	// the VRC6Power function pointer that the Init set up. At this point
-	// info->Power has been redirected by the v1.7 factory block to
-	// CartInfo_PowerForward, so we temporarily swap in the legacy
-	// VRC6Power pointer, invoke it, then restore the forwarding function
-	// pointer so subsequent PowerNES calls also route through
-	// cart_obj->on_power.
-	if (!currCartInfo) return;
-	void (*saved)(void) = currCartInfo->Power;
-	currCartInfo->Power = VRC6Power;
-	currCartInfo->Power();
-	currCartInfo->Power = saved;
+	// v1.15 B.1: Direct call to VRC6Power — no legacy function pointer
+	// indirection. Mapper24/26_Init was already called during iNES_Init
+	// (registers SFORMAT, allocates WRAM, sets up IRQ hook).
+	// on_power() only needs to fire the bank-sync + read/write handlers.
+	VRC6Power();
 }
 
 void Vrc6Cart::on_close() noexcept {
