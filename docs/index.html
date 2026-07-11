@@ -357,6 +357,7 @@ function apply(l){
   document.getElementById('langBtn').textContent=l==='zh'?'EN':'中文';
 }
 document.getElementById('langBtn').addEventListener('click',()=>apply(lang==='zh'?'en':'zh'));
+apply('en');
 
 const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}}),{threshold:.12,rootMargin:'0px 0px -30px 0px'});
 document.querySelectorAll('.reveal').forEach(e=>io.observe(e));
