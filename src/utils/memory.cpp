@@ -24,8 +24,11 @@
 // v0.3.6: Suppress deprecation warnings inside the implementation file —
 // memory.cpp implements the deprecated FCEU_malloc/FCEU_free/FCEU_dmalloc/FCEU_dfree
 // shims. External callers (and the v0.3.6 mapper migrations) should still see
-// the warnings.
+// the warnings. CMakeLists.txt also injects -DFCEUX11_NO_DEPRECATION_WARNINGS
+// via add_definitions; guard against redefinition (C4005).
+#ifndef FCEUX11_NO_DEPRECATION_WARNINGS
 #define FCEUX11_NO_DEPRECATION_WARNINGS
+#endif
 
 #include <stdlib.h>
 #include <stdio.h>

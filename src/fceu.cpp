@@ -608,9 +608,23 @@ void fceu11::Kill() {
 	#ifdef _S9XLUA_H
 	FCEU_LuaStop();
 	#endif
+
+	// v1.15 Finale: close the game (including Cart lifecycle cleanup
+	// and GameInfo deletion) *before* tearing down video/GENIE/RAM
+	// so the Cart destructor sees valid ROM/VROM backing pointers.
+	// This also prevents STATUS_HEAP_CORRUPTION (0xc0000374) during
+	// CRT teardown caused by g_cart_owner deleting the Cart while
+	// CartInfo::cart_obj still holds a raw pointer to it.
+	FCEU_CloseGame();
+
 	FCEU_KillVirtualVideo();
 	FCEU_KillGenie();
 	FreeBuffers();
+
+	if (currCartInfo) {
+		currCartInfo->cart_obj = nullptr;
+	}
+	fceu11::assign_cart(nullptr);
 }
 
 int rapidAlternator = 0;

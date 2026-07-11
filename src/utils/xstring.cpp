@@ -44,7 +44,7 @@ int str_ucase(char *str) {
 
 
 ///Lower case routine. Returns number of characters modified
-// R1.2 (docs/internal/refactor_plan_R1_R5_archive.md Â§Phase R1): same O(n^2) â†?O(n) fix as str_ucase.
+// R1.2 (docs/internal/refactor_plan_R1_R5_archive.md Â§Phase R1): same O(n^2) ->O(n) fix as str_ucase.
 int str_lcase(char *str) {
 	if (!str) return 0;
 	int j = 0;
@@ -83,7 +83,7 @@ int str_ltrim(char *str, int flags) {
 	}
 	const size_t removed = static_cast<size_t>(p - str);
 	if (removed == 0) return 0;
-	// memmove handles the overlapping src/dst case (str+removed â†?str).
+	// memmove handles the overlapping src/dst case (str+removed ->str).
 	memmove(str, p, strlen(p) + 1);
 	return static_cast<int>(removed);
 }
@@ -95,7 +95,7 @@ int str_ltrim(char *str, int flags) {
 ///Returns number of characters removed
 // R1.1 (docs/internal/refactor_plan_R1_R5_archive.md Â§Phase R1): the original tested `str[0]` instead of
 // `str[strl-1]`, so it could only ever trim a leading space (and only one
-// byte at a time) â€?it never actually trimmed trailing whitespace as the
+// byte at a time) --it never actually trimmed trailing whitespace as the
 // function name and docstring claim. Replaced with a single-pass tail scan.
 int str_rtrim(char *str, int flags) {
 	if (!str) return 0;
@@ -121,16 +121,16 @@ int str_rtrim(char *str, int flags) {
 ///Removes whitespace depending on the flags set (See STRIP_x definitions in xstring.h)
 ///Returns number of characters removed, or -1 on error
 // R1.1 (docs/internal/refactor_plan_R1_R5_archive.md Â§Phase R1): the final `FCEU_strlcpy(str, sizeof(str),
-// astr)` had the same sizeof(str) BUG as str_ltrim â€?silently truncating
+// astr)` had the same sizeof(str) BUG as str_ltrim --silently truncating
 // copies at sizeof(char*) = 8 bytes on x64. Replaced with `memcpy(str, astr,
-// j+1)`, which is safe because astr is null-terminated and always â‰?str's
+// j+1)`, which is safe because astr is null-terminated and always <=str's
 // old content.
 // R1.3 (docs/internal/refactor_plan_R1_R5_archive.md Â§Phase R1): replaced the `malloc`/`free` temp
 // buffer with `std::vector<char>`. The vector is RAII-managed so the
 // failure path is now exception-safe (the original `free(astr)` after an
 // early return would have leaked; the new code has no early return after
 // the buffer is created). `str.reserve(strl)` pre-allocates the worst-case
-// size (output â‰?input length for a filter operation).
+// size (output <=input length for a filter operation).
 int str_strip(char *str, int flags) {
 	if (!str) return -1;
 	const size_t strl = strlen(str);
@@ -161,7 +161,7 @@ int str_strip(char *str, int flags) {
 
 ///Replaces all instances of 'search' with 'replace'
 ///Returns number of characters modified
-// R1.2 (docs/internal/refactor_plan_R1_R5_archive.md Â§Phase R1): same O(n^2) â†?O(n) fix as str_ucase.
+// R1.2 (docs/internal/refactor_plan_R1_R5_archive.md Â§Phase R1): same O(n^2) ->O(n) fix as str_ucase.
 int chr_replace(char *str, char search, char replace) {
 	if (!str) return 0;
 	int j = 0;
@@ -186,7 +186,7 @@ int chr_replace(char *str, char search, char replace) {
 // R1.3 (docs/internal/refactor_plan_R1_R5_archive.md Â§Phase R1): replaced the `malloc`/`free` temp
 // buffer with `std::string tmp`. The std::string manages its own capacity
 // (replaces the original `malloc(strl + 1)` upper bound, which silently
-// overflowed when `replace` was longer than `search` on aggregate â€?a
+// overflowed when `replace` was longer than `search` on aggregate --a
 // pre-existing UB). The new contract: caller's `str` buffer must be large
 // enough to hold the post-replacement length; the function does not
 // silently truncate.
@@ -214,7 +214,7 @@ int str_replace(char *str, const char *search, const char *replace) {
 	}
 	// R1.1 fix: was `FCEU_strlcpy(str, sizeof(str), astr)` (sizeof bug).
 	// std::string::copy writes exactly the requested count of bytes
-	// (it does not append a NUL â€?we do that explicitly). The new copy
+	// (it does not append a NUL --we do that explicitly). The new copy
 	// is also correct in the rare case where the replacement expands
 	// the result beyond the input length (the pre-R1.3 `memcpy(str,
 	// astr, j+1)` had the same semantics; std::string just doesn't
@@ -720,7 +720,7 @@ std::wstring mbstowcs(std::string str) // UTF8->UTF32
 {
 	try {
 		return UtfConverter::FromUtf8(str);
-	} catch(std::exception &e) {
+	} catch(std::exception&) {
 		return L"(failed UTF-8 conversion)";
 	}
 }

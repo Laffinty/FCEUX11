@@ -2,7 +2,7 @@
 
 # FCEUX11
 
-[![Version](https://img.shields.io/badge/version-v1.13-blue)](https://github.com/Laffinty/FCEUX11/releases)
+[![Version](https://img.shields.io/badge/version-v1.15-blue)](https://github.com/Laffinty/FCEUX11/releases)
 [![License](https://img.shields.io/badge/license-GPL--v2-green)](COPYING)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?logo=windows)](https://www.microsoft.com/windows/windows-11)
 [![Qt](https://img.shields.io/badge/Qt-6.8%20LTS-41CD52?logo=qt)](https://www.qt.io)
@@ -32,7 +32,7 @@
 | **Lua 脚本**：通过 Lua 接口编写脚本，实现自定义屏幕叠加显示、自动化操作、内存数据读取等高级玩法。 | **Lua Scripting**: Write Lua scripts to create custom on-screen displays, automate gameplay, or read memory, extending the emulator however you like. |
 | **录像回放**：录制完整游戏过程并支持回放，可导出为 AVI 视频，方便分享你的精彩通关时刻。 | **Movie Recording**: Record full playthroughs, replay them anytime, and export to AVI to share your best runs with the community. |
 | **金手指**：支持 Game Genie 与原始金手指代码，轻松修改游戏内容，重温童年「无敌版」的快乐。 | **Cheats**: Game Genie and raw cheat code support to tweak gameplay, unlock hidden content, or just have fun bending the rules. |
-| **多语言界面（v1.11 升级）**：v1.11（Bridge）将可用界面语言从 3 种扩展至 **12 种**——简体中文、繁体中文、英文、日语、韩语、西班牙语、法语、德语、越南语、泰语、印地语（beta）、阿拉伯语（beta）；首启自动按系统区域设置匹配语言（`zh-CN` / `ja-JP` / `ar-SA` 等），切换语言后菜单、对话框即时全部重译；阿拉伯语自动启用从右到左布局。 | **Multi-language UI (v1.11 upgrade)**: v1.11 (Bridge) expands the available UI languages from 3 to **12** — Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Spanish, French, German, Vietnamese, Thai, Hindi (beta), and Arabic (beta). On first launch the language is auto-detected from your system locale (`zh-CN` / `ja-JP` / `ar-SA`, etc.), and menus/dialogs are fully retranslated the moment you switch. Arabic automatically enables right-to-left layout. |
+| **多语言界面**：支持 **12 种语言** —— 简体中文、繁体中文、英文、日语、韩语、西班牙语、法语、德语、越南语、泰语、印地语（beta）、阿拉伯语（beta）；首启自动按系统区域设置匹配语言（`zh-CN` / `ja-JP` / `ar-SA` 等），切换语言后菜单、对话框即时全部重译；阿拉伯语自动启用从右到左布局。 | **Multi-language UI**: Supports **12 languages** — Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Spanish, French, German, Vietnamese, Thai, Hindi (beta), and Arabic (beta). On first launch the language is auto-detected from your system locale (`zh-CN` / `ja-JP` / `ar-SA`, etc.), and menus/dialogs are fully retranslated the moment you switch. Arabic automatically enables right-to-left layout. |
 | **自定义调色板**：加载外部调色板文件，自由调整画面色彩，还原你记忆中最对的那个画面色调。 | **Custom Palettes**: Load custom palette files to fine-tune color rendering and match the exact look you grew up with on your old CRT TV. |
 | **即时存档**：随时随地保存/读取进度，支持自动存档历史记录，再难的关卡也能反复挑战、不留遗憾。 | **Save States**: Save and load anywhere, anytime, with automatic state history so you never lose progress on a tough boss fight again. |
 
@@ -89,44 +89,27 @@ Precompiled binaries are available on the **[GitHub Releases](https://github.com
 ## 版本历史 / Changelog
 
 详见 [CHANGELOG.md](CHANGELOG.md)。
-v1.13（代号 **Purify**）是当前稳定版，v1.x 现代化周期的第十三个子版本
-（v1.1 Sentinel → … → v1.11 Bridge → v1.12 Scissors → v1.13 Purify）。
+v1.15（代号 **Finale**）是当前稳定版，v1.x 现代化周期的第十五个子版本
+（v1.1 Sentinel → … → v1.13 Purify → v1.14 Anvil → v1.15 Finale）。
 
-**v1.13 Purify** 对代码进行了深度清理，消除了所有不安全的内存操作，
-将底层 Lua 引擎完全切换到 Rust 实现，并清理了过时的编译警告——
-这些改进让模拟器运行更加稳定可靠，减少意外崩溃的可能。
-同时完成了 v1.12 遗留的大型文件拆分工作，将原本超过 2000 行的核心文件
-拆分为职责单一的小模块，方便后续维护和快速修复问题。
+**v1.15 Finale** 深化了 Cart 子类体系，修复了程序退出时的堆损坏问题，
+并同步了所有项目文档，确保模拟器运行更加稳定可靠。
 
-**v1.12 Scissors** 将 5 个超大源代码文件（最大的超过 6700 行）
-拆分为多个职责清晰的小模块——这意味着未来的 bug 修复和功能更新会更快更稳。
-
-v1.11（Bridge）完成两大里程碑：**（1）Qt 驱动层解耦** —— 核心引擎与
-界面层正式分离，消除了 86 处条件编译块；**（2）多语言系统重大升级** ——
-UI 语言从 3 种扩展到 **12 种**，首启自动匹配系统语言，阿拉伯语支持从右到左布局。
+**v1.14 Anvil** 完成了性能加固，启用 LTO/PGO 优化，添加了废弃接口注解，
+并修复了链接器兼容性问题。
 
 详见 Release Notes 与 [CHANGELOG.md](CHANGELOG.md) 和
 [`docs/v1.x_Modernization_Roadmap.md`](docs/v1.x_Modernization_Roadmap.md)，
 编译指南见 [`docs/BuildGuide.md`](docs/BuildGuide.md)。
 
 See [CHANGELOG.md](CHANGELOG.md) for version history.
-v1.13 (codename **Purify**) is the current stable release, the thirteenth
-sub-version of the v1.x modernization cycle. It deep-cleans the codebase,
-eliminating all unsafe memory operations, switching the Lua engine entirely
-to Rust, and removing outdated compiler warnings — making the emulator
-more stable and reliable. It also completes the large-file splits carried
-over from v1.12, breaking core files over 2000 lines into focused modules
-for easier maintenance and faster bug fixes.
+v1.15 (codename **Finale**) is the current stable release, the fifteenth
+sub-version of the v1.x modernization cycle. It deepens the Cart subclass
+hierarchy, fixes a teardown heap corruption issue, and syncs all project
+documentation — making the emulator more stable and reliable.
 
-v1.12 (Scissors) split 5 oversized source files (the largest over 6700 lines)
-into smaller, single-responsibility modules — meaning future bug fixes and
-feature updates will be faster and more stable.
-
-v1.11 (Bridge) shipped two major milestones: **(1) Qt driver decoupling** —
-the emulation core and UI layer are formally separated, eliminating 86
-conditional compilation blocks; **(2) a major multi-language overhaul** —
-the UI ships in **12 languages** with automatic system locale detection
-and full Arabic RTL layout.
+v1.14 (Anvil) completed performance hardening with LTO/PGO optimizations,
+added deprecation annotations, and fixed linker compatibility issues.
 
 Full release notes: [CHANGELOG.md](CHANGELOG.md) and
 [`docs/v1.x_Modernization_Roadmap.md`](docs/v1.x_Modernization_Roadmap.md).
