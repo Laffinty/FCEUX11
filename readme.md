@@ -47,19 +47,30 @@
 | **操作系统 / OS** | Windows 11 22H2+ (64-bit) |
 | **说明 / Note** | Windows 7/8/8.1/10 不支持，由 Qt 6.8 LTS 运行时依赖及 Windows 平台深度优化策略决定。Windows 7, 8, 8.1, and 10 are not supported, determined by Qt 6.8 LTS runtime requirements and the Windows platform optimization strategy. |
 
-### 构建环境 / Build Environment
+### 自行编译 / Build from Source
 
-| 项目 / Item | 要求 / Requirement |
-|-------------|-------------------|
-| **编译器 / Compiler** | MSVC 2022 19.36 (VS 17.6) 或更高 |
-| **CMake** | 4.0 或更高 / 4.0+ |
-| **生成器 / Generator** | Ninja（推荐）或 Visual Studio 2022 / Ninja (recommended) or Visual Studio 2022 |
-| **包管理器 / Package Manager** | vcpkg（manifest 模式） / vcpkg (manifest mode) |
-| **Qt** | 6.8 LTS |
-| **C++ 标准 / Standard** | C++20 |
+只需安装 **Visual Studio 2022 Community**（免费）和 **Rust**（免费），然后运行两条脚本即可。详见 [`docs/BuildGuide.md`](docs/BuildGuide.md)。
 
-> 如需从源码编译，请参考 [`docs/BuildGuide.md`](docs/BuildGuide.md) 与 [`docs/v1.x_Modernization_Roadmap.md`](docs/v1.x_Modernization_Roadmap.md)。
-> For building from source, please refer to [`docs/BuildGuide.md`](docs/BuildGuide.md) and [`docs/v1.x_Modernization_Roadmap.md`](docs/v1.x_Modernization_Roadmap.md).
+**三步概览：**
+
+```powershell
+# 1. 安装前置工具（一次性）
+#    ① Visual Studio 2022 Community → 勾选 "使用 C++ 的桌面开发"
+#    ② Rust → https://rustup.rs/ → 默认安装
+
+# 2. 下载源码
+git clone https://github.com/Laffinty/FCEUX11.git
+cd FCEUX11
+
+# 3. 一键安装依赖 + 编译
+.\scripts\setup_vcpkg.ps1
+.\scripts\do_build.ps1 -Config Release
+# → 产物：build\src\fceux11.exe
+```
+
+仅需两条命令即可完成编译。首次编译约 30-60 分钟（主要耗时在 Qt6 下载和编译），后续增量编译 1-3 分钟。
+
+> 详细说明（含常见错误修复、高级选项），请查阅 [`docs/BuildGuide.md`](docs/BuildGuide.md)。
 
 ---
 
@@ -88,32 +99,9 @@ Precompiled binaries are available on the **[GitHub Releases](https://github.com
 
 ## 版本历史 / Changelog
 
-详见 [CHANGELOG.md](CHANGELOG.md)。
-v1.15（代号 **Finale**）是当前稳定版，v1.x 现代化周期的第十五个子版本
-（v1.1 Sentinel → … → v1.13 Purify → v1.14 Anvil → v1.15 Finale）。
+详见 [CHANGELOG.md](CHANGELOG.md)。当前稳定版为 v1.15（代号 **Finale**）。
 
-**v1.15 Finale** 深化了 Cart 子类体系，修复了程序退出时的堆损坏问题，
-并同步了所有项目文档，确保模拟器运行更加稳定可靠。
-
-**v1.14 Anvil** 完成了性能加固，启用 LTO/PGO 优化，添加了废弃接口注解，
-并修复了链接器兼容性问题。
-
-详见 Release Notes 与 [CHANGELOG.md](CHANGELOG.md) 和
-[`docs/v1.x_Modernization_Roadmap.md`](docs/v1.x_Modernization_Roadmap.md)，
-编译指南见 [`docs/BuildGuide.md`](docs/BuildGuide.md)。
-
-See [CHANGELOG.md](CHANGELOG.md) for version history.
-v1.15 (codename **Finale**) is the current stable release, the fifteenth
-sub-version of the v1.x modernization cycle. It deepens the Cart subclass
-hierarchy, fixes a teardown heap corruption issue, and syncs all project
-documentation — making the emulator more stable and reliable.
-
-v1.14 (Anvil) completed performance hardening with LTO/PGO optimizations,
-added deprecation annotations, and fixed linker compatibility issues.
-
-Full release notes: [CHANGELOG.md](CHANGELOG.md) and
-[`docs/v1.x_Modernization_Roadmap.md`](docs/v1.x_Modernization_Roadmap.md).
-Build guide: [`docs/BuildGuide.md`](docs/BuildGuide.md).
+See [CHANGELOG.md](CHANGELOG.md). Current stable release is v1.15 (codename **Finale**).
 
 ---
 
