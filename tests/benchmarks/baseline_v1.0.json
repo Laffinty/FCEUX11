@@ -53,6 +53,26 @@
       "metric":           "median_total_ms",
       "baseline_ms":      48.50,
       "unit":             "milliseconds for 60 frames (CPU+PPU+APU)"
+    },
+    {
+      "name":             "bench_apu_frame",
+      "binary":           "fceux11_bench_apu_frame",
+      "rom":              "fixtures/mapper_mmc3.nes",
+      "frames_per_iter":  60,
+      "iterations":       5,
+      "metric":           "median_total_ms",
+      "baseline_ms":      48.50,
+      "unit":             "milliseconds for 60 frames (APU)"
+    },
+    {
+      "name":             "bench_bus_dispatch",
+      "binary":           "fceux11_bench_bus_dispatch",
+      "rom":              "fixtures/nestest.nes",
+      "frames_per_iter":  60,
+      "iterations":       5,
+      "metric":           "median_total_ms",
+      "baseline_ms":      44.20,
+      "unit":             "milliseconds for 60 frames (Bus dispatch)"
     }
   ]
 }

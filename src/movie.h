@@ -4,6 +4,7 @@
 #include "input/zapper.h"
 #include "utils/guid.h"
 #include "utils/md5.h"
+#include "utils/memory.h"  // v1.14 Anvil: FCEUX11_DEPRECATED macro
 
 #include <vector>
 #include <map>
@@ -321,15 +322,25 @@ namespace fceu11 {
     void UnregisterTasBridge();
 } // namespace fceu11
 
+FCEUX11_DEPRECATED("use fceu11::SaveMovie() instead")
 inline void FCEUI_SaveMovie(const char *fname, EMOVIE_FLAG flags, std::wstring author) { fceu11::SaveMovie(fname, flags, author); }
+FCEUX11_DEPRECATED("use fceu11::LoadMovie() instead")
 inline bool FCEUI_LoadMovie(const char *fname, bool read_only, int _stopframe) { return fceu11::LoadMovie(fname, read_only, _stopframe); }
+FCEUX11_DEPRECATED("use fceu11::MoviePlayFromBeginning() instead")
 inline void FCEUI_MoviePlayFromBeginning(void) { fceu11::MoviePlayFromBeginning(); }
+FCEUX11_DEPRECATED("use fceu11::StopMovie() instead")
 inline void FCEUI_StopMovie(void) { fceu11::StopMovie(); }
+FCEUX11_DEPRECATED("use fceu11::MovieGetInfo() instead")
 inline bool FCEUI_MovieGetInfo(FCEUFILE* fp, MOVIE_INFO& info, bool skipFrameCount = false) { return fceu11::MovieGetInfo(fp, info, skipFrameCount); }
+FCEUX11_DEPRECATED("use fceu11::MovieToggleReadOnly() instead")
 inline void FCEUI_MovieToggleReadOnly(void) { fceu11::MovieToggleReadOnly(); }
+FCEUX11_DEPRECATED("use fceu11::GetMovieToggleReadOnly() instead")
 inline bool FCEUI_GetMovieToggleReadOnly() { return fceu11::GetMovieToggleReadOnly(); }
+FCEUX11_DEPRECATED("use fceu11::SetMovieToggleReadOnly() instead")
 inline void FCEUI_SetMovieToggleReadOnly(bool which) { fceu11::SetMovieToggleReadOnly(which); }
+FCEUX11_DEPRECATED("use fceu11::GetMovieName() instead")
 inline std::string FCEUI_GetMovieName(void) { return fceu11::GetMovieName(); }
+FCEUX11_DEPRECATED("use fceu11::MovieToggleFrameDisplay() instead")
 inline void FCEUI_MovieToggleFrameDisplay() { fceu11::MovieToggleFrameDisplay(); }
 
 void FCEUI_MakeBackupMovie(bool dispMessage);

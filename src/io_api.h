@@ -40,6 +40,7 @@
 #include "types.h"
 #include "git.h"
 #include "file.h"
+#include "utils/memory.h"  // v1.14 Anvil: FCEUX11_DEPRECATED macro
 
 #include <cstdio>
 #include <string>
@@ -82,11 +83,17 @@ namespace fceu11 {
     void UseInputPreset(int preset);
 } // namespace fceu11
 
+FCEUX11_DEPRECATED("use fceu11::SetInput() instead")
 inline void FCEUI_SetInput(int port, ESI type, void *ptr, int attrib) { fceu11::SetInput(port, type, ptr, attrib); }
+FCEUX11_DEPRECATED("use fceu11::SetInputFC() instead")
 inline void FCEUI_SetInputFC(ESIFC type, void *ptr, int attrib) { fceu11::SetInputFC(type, ptr, attrib); }
+FCEUX11_DEPRECATED("use fceu11::SetInputFourscore() instead")
 inline void FCEUI_SetInputFourscore(bool attachFourscore) { fceu11::SetInputFourscore(attachFourscore); }
+FCEUX11_DEPRECATED("use fceu11::GetInputFourscore() instead")
 inline bool FCEUI_GetInputFourscore() { return fceu11::GetInputFourscore(); }
+FCEUX11_DEPRECATED("use fceu11::GetInputMicrophone() instead")
 inline bool FCEUI_GetInputMicrophone() { return fceu11::GetInputMicrophone(); }
+FCEUX11_DEPRECATED("use fceu11::UseInputPreset() instead")
 inline void FCEUI_UseInputPreset(int preset) { fceu11::UseInputPreset(preset); }
 
 // Driver-side batched input update — called once per frame from the
@@ -104,7 +111,9 @@ namespace fceu11 {
     void SetNTSCTH(bool en, int tint, int hue);
 } // namespace fceu11
 
+FCEUX11_DEPRECATED("use fceu11::GetNTSCTH() instead")
 inline void FCEUI_GetNTSCTH(int *tint, int *hue) { fceu11::GetNTSCTH(tint, hue); }
+FCEUX11_DEPRECATED("use fceu11::SetNTSCTH() instead")
 inline void FCEUI_SetNTSCTH(bool en, int tint, int hue) { fceu11::SetNTSCTH(en, tint, hue); }
 
 // ---- Palette ------------------------------------------------------------
@@ -116,7 +125,9 @@ namespace fceu11 {
     void SetUserPalette(uint8 *pal, int nEntries);
 } // namespace fceu11
 
+FCEUX11_DEPRECATED("use fceu11::GetUserPaletteAvail() instead")
 inline bool FCEUI_GetUserPaletteAvail() { return fceu11::GetUserPaletteAvail(); }
+FCEUX11_DEPRECATED("use fceu11::SetUserPalette() instead")
 inline void FCEUI_SetUserPalette(uint8 *pal, int nEntries) { fceu11::SetUserPalette(pal, nEntries); }
 
 // ---- Base directory ----------------------------------------------------
@@ -127,7 +138,9 @@ namespace fceu11 {
     const char *GetBaseDirectory();
 } // namespace fceu11
 
+FCEUX11_DEPRECATED("use fceu11::SetBaseDirectory() instead")
 inline void FCEUI_SetBaseDirectory(std::string const & dir) { fceu11::SetBaseDirectory(dir); }
+FCEUX11_DEPRECATED("use fceu11::GetBaseDirectory() instead")
 inline const char *FCEUI_GetBaseDirectory() { return fceu11::GetBaseDirectory(); }
 
 // Directory override slot for the per-category path table indexed by
@@ -194,13 +207,21 @@ namespace fceu11 {
     void SetPCMVolume(uint32 volume);
 } // namespace fceu11
 
+FCEUX11_DEPRECATED("use fceu11::Sound() instead")
 inline void FCEUI_Sound(int Rate) { fceu11::Sound(Rate); }
+FCEUX11_DEPRECATED("use fceu11::SetSoundQuality() instead")
 inline void FCEUI_SetSoundQuality(int quality) { fceu11::SetSoundQuality(quality); }
+FCEUX11_DEPRECATED("use fceu11::SetSoundVolume() instead")
 inline void FCEUI_SetSoundVolume(uint32 volume) { fceu11::SetSoundVolume(volume); }
+FCEUX11_DEPRECATED("use fceu11::SetTriangleVolume() instead")
 inline void FCEUI_SetTriangleVolume(uint32 volume) { fceu11::SetTriangleVolume(volume); }
+FCEUX11_DEPRECATED("use fceu11::SetSquare1Volume() instead")
 inline void FCEUI_SetSquare1Volume(uint32 volume) { fceu11::SetSquare1Volume(volume); }
+FCEUX11_DEPRECATED("use fceu11::SetSquare2Volume() instead")
 inline void FCEUI_SetSquare2Volume(uint32 volume) { fceu11::SetSquare2Volume(volume); }
+FCEUX11_DEPRECATED("use fceu11::SetNoiseVolume() instead")
 inline void FCEUI_SetNoiseVolume(uint32 volume) { fceu11::SetNoiseVolume(volume); }
+FCEUX11_DEPRECATED("use fceu11::SetPCMVolume() instead")
 inline void FCEUI_SetPCMVolume(uint32 volume) { fceu11::SetPCMVolume(volume); }
 void FCEUD_SoundToggle(void);
 void FCEUD_SoundVolumeAdjust(int);
@@ -213,7 +234,9 @@ namespace fceu11 {
     void GetRenderPlanes(bool& sprites, bool& bg);
 } // namespace fceu11
 
+FCEUX11_DEPRECATED("use fceu11::SetRenderPlanes() instead")
 inline void FCEUI_SetRenderPlanes(bool sprites, bool bg) { fceu11::SetRenderPlanes(sprites, bg); }
+FCEUX11_DEPRECATED("use fceu11::GetRenderPlanes() instead")
 inline void FCEUI_GetRenderPlanes(bool& sprites, bool& bg) { fceu11::GetRenderPlanes(sprites, bg); }
 
 // Should input aids (crosshairs, lightgun reticles, etc.) be drawn?
@@ -227,8 +250,11 @@ namespace fceu11 {
     bool WaveRecordRunning();
 } // namespace fceu11
 
+FCEUX11_DEPRECATED("use fceu11::BeginWaveRecord() instead")
 inline bool FCEUI_BeginWaveRecord(const char *fn) { return fceu11::BeginWaveRecord(fn); }
+FCEUX11_DEPRECATED("use fceu11::EndWaveRecord() instead")
 inline int  FCEUI_EndWaveRecord() { return fceu11::EndWaveRecord(); }
+FCEUX11_DEPRECATED("use fceu11::WaveRecordRunning() instead")
 inline bool FCEUI_WaveRecordRunning() { return fceu11::WaveRecordRunning(); }
 
 // ---- AVI recording -----------------------------------------------------
@@ -246,11 +272,17 @@ namespace fceu11 {
     void SetAviDisableMovieMessages(bool disable);
 } // namespace fceu11
 
+FCEUX11_DEPRECATED("use fceu11::AviVideoUpdate() instead")
 inline void FCEUI_AviVideoUpdate(const unsigned char* buffer) { fceu11::AviVideoUpdate(buffer); }
+FCEUX11_DEPRECATED("use fceu11::AviIsRecording() instead")
 inline bool FCEUI_AviIsRecording() { return fceu11::AviIsRecording(); }
+FCEUX11_DEPRECATED("use fceu11::AviEnableHUDrecording() instead")
 inline bool FCEUI_AviEnableHUDrecording() { return fceu11::AviEnableHUDrecording(); }
+FCEUX11_DEPRECATED("use fceu11::SetAviEnableHUDrecording() instead")
 inline void FCEUI_SetAviEnableHUDrecording(bool enable) { fceu11::SetAviEnableHUDrecording(enable); }
+FCEUX11_DEPRECATED("use fceu11::AviDisableMovieMessages() instead")
 inline bool FCEUI_AviDisableMovieMessages() { return fceu11::AviDisableMovieMessages(); }
+FCEUX11_DEPRECATED("use fceu11::SetAviDisableMovieMessages() instead")
 inline void FCEUI_SetAviDisableMovieMessages(bool disable) { fceu11::SetAviDisableMovieMessages(disable); }
 
 void FCEUD_AviRecordTo(void);

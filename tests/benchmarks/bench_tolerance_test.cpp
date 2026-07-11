@@ -51,9 +51,11 @@ struct BenchConfig {
 
 // Match the v0.3.0 baseline binaries.
 static const BenchConfig kBenchs[] = {
-    { "bench_cpu_frame",  "fixtures/nestest.nes",     60 },
-    { "bench_ppu_frame",  "fixtures/mapper_nrom.nes", 60 },
-    { "bench_full_frame", "fixtures/mapper_mmc3.nes", 60 },
+    { "bench_cpu_frame",    "fixtures/nestest.nes",     60 },
+    { "bench_ppu_frame",    "fixtures/mapper_nrom.nes", 60 },
+    { "bench_full_frame",   "fixtures/mapper_mmc3.nes", 60 },
+    { "bench_apu_frame",    "fixtures/mapper_mmc3.nes", 60 },
+    { "bench_bus_dispatch", "fixtures/nestest.nes",     60 },
 };
 static const int kNumBenchs = sizeof(kBenchs) / sizeof(kBenchs[0]);
 
@@ -91,7 +93,8 @@ static double run_bench(const BenchConfig& cfg, const RunConfig& rc) {
     FCEUGI* gi = load_rom(cfg.rom);
     if (!gi) { core_shutdown(); return -1.0; }
 
-    if (std::strcmp(cfg.name, "bench_full_frame") == 0) {
+    if (std::strcmp(cfg.name, "bench_full_frame") == 0 ||
+        std::strcmp(cfg.name, "bench_apu_frame") == 0) {
         FCEUI_Sound(48000);
     }
 

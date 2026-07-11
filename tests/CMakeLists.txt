@@ -426,11 +426,37 @@ if(FCEUX11_BUILD_TESTS)
         if(WIN32)
             target_link_libraries(fceux11_bench_apu_mix PRIVATE ntdll)
         endif()
+
+        # v1.14 Anvil §14.1 — APU frame benchmark
+        add_executable(fceux11_bench_apu_frame benchmark/apu_frame_bench.cpp git_info_stub.cpp)
+        target_link_libraries(fceux11_bench_apu_frame PRIVATE
+            fceux11_drivers_qt fceux11_drivers_common fceux11_core fceux11_boards fceux11_utils
+            benchmark::benchmark
+        )
+        target_include_directories(fceux11_bench_apu_frame PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/drivers)
+        target_compile_definitions(fceux11_bench_apu_frame PRIVATE __QT_DRIVER__)
+        if(WIN32)
+            target_link_libraries(fceux11_bench_apu_frame PRIVATE ntdll)
+        endif()
+
+        # v1.14 Anvil §14.1 — Bus dispatch benchmark
+        add_executable(fceux11_bench_bus_dispatch benchmark/bus_dispatch_bench.cpp git_info_stub.cpp)
+        target_link_libraries(fceux11_bench_bus_dispatch PRIVATE
+            fceux11_drivers_qt fceux11_drivers_common fceux11_core fceux11_boards fceux11_utils
+            benchmark::benchmark
+        )
+        target_include_directories(fceux11_bench_bus_dispatch PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/drivers)
+        target_compile_definitions(fceux11_bench_bus_dispatch PRIVATE __QT_DRIVER__)
+        if(WIN32)
+            target_link_libraries(fceux11_bench_bus_dispatch PRIVATE ntdll)
+        endif()
     else()
         message(STATUS "Google Benchmark not found — building standalone benchmark executables")
-        fceux11_add_test_executable(fceux11_bench_ppu_render   benchmark/ppu_render_bench.cpp   git_info_stub.cpp)
-        fceux11_add_test_executable(fceux11_bench_x6502_exec   benchmark/x6502_exec_bench.cpp   git_info_stub.cpp)
-        fceux11_add_test_executable(fceux11_bench_apu_mix      benchmark/apu_mix_bench.cpp      git_info_stub.cpp)
+        fceux11_add_test_executable(fceux11_bench_ppu_render    benchmark/ppu_render_bench.cpp    git_info_stub.cpp)
+        fceux11_add_test_executable(fceux11_bench_x6502_exec    benchmark/x6502_exec_bench.cpp    git_info_stub.cpp)
+        fceux11_add_test_executable(fceux11_bench_apu_mix       benchmark/apu_mix_bench.cpp       git_info_stub.cpp)
+        fceux11_add_test_executable(fceux11_bench_apu_frame     benchmark/apu_frame_bench.cpp     git_info_stub.cpp)
+        fceux11_add_test_executable(fceux11_bench_bus_dispatch  benchmark/bus_dispatch_bench.cpp  git_info_stub.cpp)
     endif()
 
     # v0.3.11 Phase-2 SIMD probe — standalone, build-only, not registered as CTest.

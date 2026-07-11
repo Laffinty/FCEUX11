@@ -13,7 +13,7 @@ if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
     endif()
 endif()
 
-project(FCEUX11 VERSION 1.13 LANGUAGES CXX C)
+project(FCEUX11 VERSION 1.14 LANGUAGES CXX C)
 
 # v0.2.1: Enforce MSVC toolchain; MinGW-w64 / MSYS2 support removed.
 # v0.3.1: Locked to MSVC 19.36+ (Visual Studio 17.6+) to avoid C++23
@@ -66,6 +66,40 @@ add_compile_options(/W4 /WX /permissive- /guard:cf /GS /sdl
     # /wd5039 removed in v1.13 Purify I §11
 )
 add_link_options(/GUARD:CF /CETCOMPAT /IGNORE:4098)  # LNK4098 LIBCMT conflict in test linking
+
+# v1.14 Anvil §14.3 — Link-Time Code Generation for Release builds.
+# /LTCG enables cross-TU inlining and whole-program optimization.
+# Disabled when ASan/UBSan is active (instrumentation conflicts with LTCG).
+if(NOT FCEUX11_ASAN AND NOT FCEUX11_UBSAN)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+endif()
+
+# v1.14 Anvil §14.3 — Profile-Guided Optimization (optional).
+# PGO is a manual two-step process on MSVC:
+#   1. cmake -DFCEUX11_PGO=ON → build → run training scenarios
+#   2. cmake -DFCEUX11_PGO_USE=ON → rebuild with /USEPROFILE
+option(FCEUX11_PGO "Enable PGO instrumented build (Phase 1: /GENPROFILE)" OFF)
+option(FCEUX11_PGO_USE "Enable PGO profile-use build (Phase 2: /USEPROFILE)" OFF)
+
+if(FCEUX11_PGO AND FCEUX11_PGO_USE)
+    message(FATAL_ERROR "FCEUX11_PGO and FCEUX11_PGO_USE are mutually exclusive")
+endif()
+if(FCEUX11_PGO)
+    if(NOT MSVC)
+        message(FATAL_ERROR "FCEUX11_PGO requires MSVC toolchain")
+    endif()
+    add_compile_options(/GL)
+    add_link_options(/LTCG /GENPROFILE)
+    message(STATUS "FCEUX11: PGO instrumented build enabled (/GENPROFILE)")
+endif()
+if(FCEUX11_PGO_USE)
+    if(NOT MSVC)
+        message(FATAL_ERROR "FCEUX11_PGO_USE requires MSVC toolchain")
+    endif()
+    add_compile_options(/GL)
+    add_link_options(/LTCG /USEPROFILE)
+    message(STATUS "FCEUX11: PGO profile-use build enabled (/USEPROFILE)")
+endif()
 
 # v0.3.1: ccache probe. v1.0: scan PATH first (CMake default) so ccache
 # in any user-writable location (scoop, winget, custom) is picked up.
@@ -202,6 +236,14 @@ if(FCEUX11_UBSAN)
     # No linker-side flags for MSVC native UB checks.
     set(UBSAN_LDFLAGS "" CACHE INTERNAL "UBSan link flags (MSVC native: none)")
     add_definitions(-DFCEUX11_UBSAN_ENABLED=1)
+endif()
+
+# v1.14 Anvil §14.4 — Dead code / identical COMDAT folding for Release.
+# MSVC defaults to /OPT:REF /OPT:ICF when /DEBUG is absent, but we make
+# them explicit to ensure they survive any future /DEBUG injection.
+if(NOT FCEUX11_ASAN)
+    add_link_options($<$<CONFIG:Release>:/OPT:REF>)
+    add_link_options($<$<CONFIG:Release>:/OPT:ICF>)
 endif()
 
 # Export compile_commands.json for IDE integration (Visual Studio Code,

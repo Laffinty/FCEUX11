@@ -18,6 +18,7 @@
 
 #include "x6502struct.h"
 #include "fceu11_core_types.h"
+#include "utils/memory.h"  // v1.14 Anvil: FCEUX11_DEPRECATED macro
 
 // Legacy global still read by Cpu::timestamp_base(). v1.4
 // Post-Release Optimization Plan §1.3 — hoisted the function-local
@@ -131,7 +132,8 @@ Cpu& cpu_instance() noexcept;
 
 } // namespace fceu11
 
-// Compatibility alias used by new call sites.
+// v1.14 Anvil §14.5: compatibility alias, deprecated for v2.0 removal.
+FCEUX11_DEPRECATED("use fceu11::cpu_instance() instead")
 inline auto& g_cpu = fceu11::cpu_instance();
 
 #endif // FCEU11_CPU_H

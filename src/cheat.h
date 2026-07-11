@@ -1,5 +1,6 @@
 #ifndef CHEAT_H
 #define CHEAT_H
+#include "utils/memory.h"  // v1.14 Anvil: FCEUX11_DEPRECATED macro
 void FCEU_CheatResetRAM(void);
 void FCEU_CheatAddRAM(int s, uint32 A, uint8 *p);
 
@@ -24,10 +25,15 @@ namespace fceu11 {
     void ReleaseCheatMap();
 } // namespace fceu11
 
+FCEUX11_DEPRECATED("use fceu11::FindCheatMapByte() instead")
 inline int FCEUI_FindCheatMapByte(uint16 address) { return fceu11::FindCheatMapByte(address); }
+FCEUX11_DEPRECATED("use fceu11::SetCheatMapByte() instead")
 inline void FCEUI_SetCheatMapByte(uint16 address, bool cheat) { fceu11::SetCheatMapByte(address, cheat); }
+FCEUX11_DEPRECATED("use fceu11::CreateCheatMap() instead")
 inline void FCEUI_CreateCheatMap() { fceu11::CreateCheatMap(); }
+FCEUX11_DEPRECATED("use fceu11::RefreshCheatMap() instead")
 inline void FCEUI_RefreshCheatMap() { fceu11::RefreshCheatMap(); }
+FCEUX11_DEPRECATED("use fceu11::ReleaseCheatMap() instead")
 inline void FCEUI_ReleaseCheatMap() { fceu11::ReleaseCheatMap(); }
 extern unsigned int FrozenAddressCount;
 

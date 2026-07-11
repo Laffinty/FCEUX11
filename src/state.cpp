@@ -420,18 +420,12 @@ void FCEUSS_Save(const char *fname, bool display_message)
 	EMUFILE* st = 0;
 	std::string fn;
 
-	// v0.3.15.x PHASE-3: DirectStorage probe scaffold added.
-	// probeDirectStorage() in src/platform/win11/DirectStorageProbe.cpp
-	// is invoked once during fceuWrapperInit() and the result is
-	// cached in fceu11::platform::win11::g_directStorageCaps. When
-	// caps.isSupported is true, the v0.4.x takeover will route the
-	// .fc0/.fcs write through IDStorageFactory -> IDStorageQueue for
-	// zero-copy async I/O. The current path uses std::fstream, which
-	// is bound by the OS page cache. Implementation deferred to v0.4.x
-	// (requires vcpkg `directstorage` dep and a 1-2 person-day
-	// refactor of EMUFILE_FILE).
-	extern fceu11::platform::win11::DirectStorageCaps g_directStorageCaps;
-	static_cast<void>(g_directStorageCaps); // referenced for future v0.4.x takeover
+	// v0.3.15.x PHASE-3: DirectStorage probe scaffold.
+	// probeDirectStorage() results are cached in
+	// fceu11::platform::win11::g_directStorageCaps (populated by
+	// fceuWrapperInit at startup). The v0.4.x takeover will route
+	// .fc0/.fcs writes through IDStorageFactory -> IDStorageQueue.
+	// Implementation deferred to v0.4.x.
 
 	if (geniestage==1)
 	{

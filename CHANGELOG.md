@@ -5,6 +5,71 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14] - 2026-07-11
+
+**Codename: Anvil.** Fourteenth and final sub-version of the v1.x
+modernization cycle per `docs/v1.x_Modernization_Roadmap.md` §14.
+Performance hardening, LTO/PGO build configuration, and v2.0 readiness.
+
+### Added
+
+- **`tests/benchmark/apu_frame_bench.cpp`** — Isolated APU frame
+  benchmark (MMC3 ROM with sound enabled, 60 frames × 5 iterations).
+- **`tests/benchmark/bus_dispatch_bench.cpp`** — Bus dispatch overhead
+  benchmark (nestest.nes CPU-intensive, sound disabled).
+- **LTO build configuration** — `CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE`
+  enabled for non-ASan/UBSan Release builds (maps to `/GL` + `/LTCG`).
+- **PGO build options** — `FCEUX11_PGO` (Phase 1: `/GENPROFILE`) and
+  `FCEUX11_PGO_USE` (Phase 2: `/USEPROFILE`) CMake options for
+  Profile-Guided Optimization.
+- **`/OPT:REF` + `/OPT:ICF`** — Explicit linker flags for Release builds
+  (non-ASan) to ensure dead-code folding survives future `/DEBUG` injection.
+
+### Changed
+
+- **`NTSC_CPU` macro** (x6502.h) — Migrated from `#define` to inline
+  function `NTSC_CPU_freq()` with compatibility `#define` alias. Depends
+  on runtime `::dendy` variable, so `constexpr` was not possible.
+- **`bench_tolerance_test.cpp`** — Extended with 2 new benchmarks
+  (`bench_apu_frame`, `bench_bus_dispatch`); `kBenchs[]` now has 5 entries.
+- **`baseline_v1.0.json`** — Added entries for `bench_apu_frame` and
+  `bench_bus_dispatch`.
+- **`tests/CMakeLists.txt`** — Registered `fceux11_bench_apu_frame` and
+  `fceux11_bench_bus_dispatch` targets (both Google Benchmark and fallback
+  paths).
+- **Version bump** — `project(FCEUX11 VERSION 1.14)`.
+
+### Fixed
+
+- **`state.cpp` linker error** — Removed unused `extern
+  fceu11::platform::win11::DirectStorageCaps g_directStorageCaps`
+  reference that caused LNK2001 when linking `fceux11_core` (symbol
+  defined in `fceu11_direct_storage_probe`, not linked to core).
+  Comment preserved for v0.4.x future reference.
+- **`utils/memory.h` include guard** — Added `#ifndef FCEU11_MEMORY_H`
+  guard to prevent duplicate struct/function definitions when the
+  header is included through multiple paths (e.g. board files via
+  `cheat.h` + `mapinc_base.h`).
+
+### Deprecated (v2.0 preparation)
+
+- **107 `FCEUI_*` inline shims** — All shims in `core_api.h` (61),
+  `io_api.h` (31), `movie.h` (10), `cheat.h` (5) annotated with
+  `FCEUX11_DEPRECATED("use fceu11::Xxx() instead")`.
+- **6 global variable aliases** — `X`, `timestamp`, `soundtimestamp`,
+  `scanline`, `MapIRQHook` in `x6502.h`; `g_cpu` in `cpu.h` annotated
+  with `FCEUX11_DEPRECATED`.
+- Annotations are **inert by default** (`FCEUX11_NO_DEPRECATION_WARNINGS`
+  defined); enable with `-DFCEUX11_SHOW_DEPRECATION_WARNINGS=ON`.
+
+### Verified
+
+- `Bus::read()/write()` confirmed `__forceinline` (bus.h:74-79).
+- `Ppu::loop()` / `FCEUPPU_Loop()` confirmed no virtual calls.
+- `Cpu::run()` → `X6502_RunDebug` delegation confirmed correct.
+
+---
+
 ## [1.13] - 2026-07-10
 
 **Codename: Purify.** Thirteenth sub-version of the v1.x modernization

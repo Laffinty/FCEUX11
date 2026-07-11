@@ -22,6 +22,9 @@
 		(at least that's the idea)
 */
 
+#ifndef FCEU11_MEMORY_H
+#define FCEU11_MEMORY_H
+
 #include <memory>
 
 #define FCEU_dwmemset(d,c,n) {int _x; for(_x=n-4;_x>=0;_x-=4) *(uint32 *)&(d)[_x]=c;}
@@ -95,3 +98,5 @@ using FceuMallocPtr = std::unique_ptr<uint8_t[], FceuMallocDeleter>;
 inline FceuMallocPtr FCEU_gmalloc_unique(size_t size) {
 	return FceuMallocPtr(static_cast<uint8_t*>(FCEU_gmalloc(size)));
 }
+
+#endif // FCEU11_MEMORY_H

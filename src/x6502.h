@@ -23,11 +23,13 @@
 #include "x6502struct.h"
 #include "fceu11_core_types.h"
 #include "cpu.h"
+#include "utils/memory.h"  // v1.14 Anvil: FCEUX11_DEPRECATED macro
 
 // v1.3 Legion Phase 1: legacy CPU-state globals are now inline reference
 // aliases into the single fceu11::Cpu instance. Existing source files that
 // read/write X, timestamp, soundtimestamp, scanline or MapIRQHook continue
 // to compile and link without changes.
+FCEUX11_DEPRECATED("use fceu11::cpu_instance().native_layout() instead")
 inline auto& X = fceu11::cpu_instance().native_layout();
 
 
@@ -57,8 +59,11 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles);
 #define X6502_Run(cycles) X6502_RunDebug(g_cpu, cycles)
 //------------
 
+FCEUX11_DEPRECATED("use fceu11::cpu_instance().timestamp_ref() instead")
 inline auto& timestamp = fceu11::cpu_instance().timestamp_ref();
+FCEUX11_DEPRECATED("use fceu11::cpu_instance().sound_timestamp_ref() instead")
 inline auto& soundtimestamp = fceu11::cpu_instance().sound_timestamp_ref();
+FCEUX11_DEPRECATED("use fceu11::cpu_instance().scanline_ref() instead")
 inline auto& scanline = fceu11::cpu_instance().scanline_ref();
 
 // v1.13 Purify H: #define → constexpr (6502 P-register flag masks)
@@ -74,9 +79,13 @@ inline constexpr uint8_t C_FLAG = 0x01;
 // v0.3.8/v1.3: declared via fceu11::MapIRQHook typedef for compile-time type
 // identity. The symbol stays at global namespace as an inline alias so the
 // 35 mapper .cpp files in src/boards/ that assign to it keep linking.
+FCEUX11_DEPRECATED("use fceu11::cpu_instance().map_irq_hook_ref() instead")
 inline auto& MapIRQHook = fceu11::cpu_instance().map_irq_hook_ref();
 
-#define NTSC_CPU (dendy ? 1773447.467 : 1789772.7272727272727272)  // v1.13: depends on runtime ::dendy; defer to v1.14
+// v1.14 Anvil: #define → inline function (depends on runtime ::dendy)
+extern int dendy;
+inline double NTSC_CPU_freq() { return dendy ? 1773447.467 : 1789772.7272727272727272; }
+#define NTSC_CPU NTSC_CPU_freq()
 inline constexpr double PAL_CPU = 1662607.125;  // v1.13 Purify H: #define → constexpr
 
 // v1.13 Purify H: #define → constexpr (IRQ source bitmasks)

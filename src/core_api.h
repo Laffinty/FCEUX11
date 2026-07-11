@@ -34,6 +34,7 @@
 
 #include "types.h"
 #include "git.h"
+#include "utils/memory.h"  // v1.14 Anvil: FCEUX11_DEPRECATED macro
 
 #include <cstdio>
 
@@ -72,15 +73,28 @@ namespace fceu11 {
     void IRQ();
 } // namespace fceu11
 
+// v1.14 Anvil §14.5: FCEUI_* → fceu11::* migration shims.
+// Suppressed by default (FCEUX11_NO_DEPRECATION_WARNINGS); enable with
+// -DFCEUX11_SHOW_DEPRECATION_WARNINGS=ON.
+FCEUX11_DEPRECATED("use fceu11::LoadGame() instead")
 inline FCEUGI *FCEUI_LoadGame(const char *name, int OverwriteVidMode, bool silent = false) { return fceu11::LoadGame(name, OverwriteVidMode, silent); }
+FCEUX11_DEPRECATED("use fceu11::LoadGameVirtual() instead")
 inline FCEUGI *FCEUI_LoadGameVirtual(const char *name, int OverwriteVidMode, bool silent = false) { return fceu11::LoadGameVirtual(name, OverwriteVidMode, silent); }
+FCEUX11_DEPRECATED("use fceu11::Initialize() instead")
 inline bool FCEUI_Initialize() { return fceu11::Initialize(); }
+FCEUX11_DEPRECATED("use fceu11::Emulate() instead")
 inline void FCEUI_Emulate(uint8 **xbuf, int32 **sbuf, int32 *ssize, int skip) { fceu11::Emulate(xbuf, sbuf, ssize, skip); }
+FCEUX11_DEPRECATED("use fceu11::CloseGame() instead")
 inline void FCEUI_CloseGame() { fceu11::CloseGame(); }
+FCEUX11_DEPRECATED("use fceu11::Kill() instead")
 inline void FCEUI_Kill() { fceu11::Kill(); }
+FCEUX11_DEPRECATED("use fceu11::ResetNES() instead")
 inline void FCEUI_ResetNES() { fceu11::ResetNES(); }
+FCEUX11_DEPRECATED("use fceu11::PowerNES() instead")
 inline void FCEUI_PowerNES() { fceu11::PowerNES(); }
+FCEUX11_DEPRECATED("use fceu11::NMI() instead")
 inline void FCEUI_NMI() { fceu11::NMI(); }
+FCEUX11_DEPRECATED("use fceu11::IRQ() instead")
 inline void FCEUI_IRQ() { fceu11::IRQ(); }
 
 // CPU/PPU debug-time memory ops.
@@ -154,40 +168,75 @@ namespace fceu11 {
     int DatachSet(uint8 *rcode);
 } // namespace fceu11
 
+FCEUX11_DEPRECATED("use fceu11::SetVidSystem() instead")
 inline void  FCEUI_SetVidSystem(int a) { fceu11::SetVidSystem(a); }
+FCEUX11_DEPRECATED("use fceu11::SetRegion() instead")
 inline void  FCEUI_SetRegion(int region, int notify = 1) { fceu11::SetRegion(region, notify); }
+FCEUX11_DEPRECATED("use fceu11::GetRegion() instead")
 inline int   FCEUI_GetRegion() { return fceu11::GetRegion(); }
+FCEUX11_DEPRECATED("use fceu11::GetCurrentVidSystem() instead")
 inline int   FCEUI_GetCurrentVidSystem(int *slstart, int *slend) { return fceu11::GetCurrentVidSystem(slstart, slend); }
+FCEUX11_DEPRECATED("use fceu11::SetRenderedLines() instead")
 inline void  FCEUI_SetRenderedLines(int ntscf, int ntscl, int palf, int pall) { fceu11::SetRenderedLines(ntscf, ntscl, palf, pall); }
+FCEUX11_DEPRECATED("use fceu11::SaveStateFile() instead")
 inline void  FCEUI_SaveState(const char *fname, bool display_message = true) { fceu11::SaveStateFile(fname, display_message); }
+FCEUX11_DEPRECATED("use fceu11::LoadStateFile() instead")
 inline void  FCEUI_LoadState(const char *fname, bool display_message = true) { fceu11::LoadStateFile(fname, display_message); }
+FCEUX11_DEPRECATED("use fceu11::SelectStateSlot() instead")
 inline int   FCEUI_SelectState(int w, int show) { return fceu11::SelectStateSlot(w, show); }
+FCEUX11_DEPRECATED("use fceu11::SelectStateNext() instead")
 inline void  FCEUI_SelectStateNext(int n) { fceu11::SelectStateNext(n); }
+FCEUX11_DEPRECATED("use fceu11::GetDesiredFPS() instead")
 inline int32 FCEUI_GetDesiredFPS() { return fceu11::GetDesiredFPS(); }
+FCEUX11_DEPRECATED("use fceu11::SaveSnapshot() instead")
 inline void  FCEUI_SaveSnapshot() { fceu11::SaveSnapshot(); }
+FCEUX11_DEPRECATED("use fceu11::SaveSnapshotAs() instead")
 inline void  FCEUI_SaveSnapshotAs() { fceu11::SaveSnapshotAs(); }
+FCEUX11_DEPRECATED("use fceu11::FrameAdvance() instead")
 inline void  FCEUI_FrameAdvance() { fceu11::FrameAdvance(); }
+FCEUX11_DEPRECATED("use fceu11::FrameAdvanceEnd() instead")
 inline void  FCEUI_FrameAdvanceEnd() { fceu11::FrameAdvanceEnd(); }
+FCEUX11_DEPRECATED("use fceu11::IsEmulationPaused() instead")
 inline int   FCEUI_EmulationPaused() { return fceu11::IsEmulationPaused(); }
+FCEUX11_DEPRECATED("use fceu11::EmulationFrameStepped() instead")
 inline int   FCEUI_EmulationFrameStepped() { return fceu11::EmulationFrameStepped(); }
+FCEUX11_DEPRECATED("use fceu11::ClearEmulationFrameStepped() instead")
 inline void  FCEUI_ClearEmulationFrameStepped() { fceu11::ClearEmulationFrameStepped(); }
+FCEUX11_DEPRECATED("use fceu11::SetEmulationPaused() instead")
 inline void  FCEUI_SetEmulationPaused(int val) { fceu11::SetEmulationPaused(val); }
+FCEUX11_DEPRECATED("use fceu11::ToggleEmulationPause() instead")
 inline void  FCEUI_ToggleEmulationPause() { fceu11::ToggleEmulationPause(); }
+FCEUX11_DEPRECATED("use fceu11::PauseForDuration() instead")
 inline void  FCEUI_PauseForDuration(int secs) { fceu11::PauseForDuration(secs); }
+FCEUX11_DEPRECATED("use fceu11::PauseFramesRemaining() instead")
 inline int   FCEUI_PauseFramesRemaining() { return fceu11::PauseFramesRemaining(); }
+FCEUX11_DEPRECATED("use fceu11::SetGameGenie() instead")
 inline void  FCEUI_SetGameGenie(bool a) { fceu11::SetGameGenie(a); }
+FCEUX11_DEPRECATED("use fceu11::SetLowPass() instead")
 inline void  FCEUI_SetLowPass(int q) { fceu11::SetLowPass(q); }
+FCEUX11_DEPRECATED("use fceu11::NSFSetVis() instead")
 inline void  FCEUI_NSFSetVis(int mode) { fceu11::NSFSetVis(mode); }
+FCEUX11_DEPRECATED("use fceu11::NSFChange() instead")
 inline int   FCEUI_NSFChange(int amount) { return fceu11::NSFChange(amount); }
+FCEUX11_DEPRECATED("use fceu11::NSFGetInfo() instead")
 inline int   FCEUI_NSFGetInfo(uint8 *name, uint8 *artist, uint8 *copyright, int maxlen) { return fceu11::NSFGetInfo(name, artist, copyright, maxlen); }
+FCEUX11_DEPRECATED("use fceu11::VSUniToggleDIP() instead")
 inline void  FCEUI_VSUniToggleDIP(int w) { fceu11::VSUniToggleDIP(w); }
+FCEUX11_DEPRECATED("use fceu11::VSUniGetDIPs() instead")
 inline uint8 FCEUI_VSUniGetDIPs() { return fceu11::VSUniGetDIPs(); }
+FCEUX11_DEPRECATED("use fceu11::VSUniSetDIP() instead")
 inline void  FCEUI_VSUniSetDIP(int w, int state) { fceu11::VSUniSetDIP(w, state); }
+FCEUX11_DEPRECATED("use fceu11::VSUniCoin() instead")
 inline void  FCEUI_VSUniCoin() { fceu11::VSUniCoin(); }
+FCEUX11_DEPRECATED("use fceu11::VSUniCoin2() instead")
 inline void  FCEUI_VSUniCoin2() { fceu11::VSUniCoin2(); }
+FCEUX11_DEPRECATED("use fceu11::VSUniService() instead")
 inline void  FCEUI_VSUniService() { fceu11::VSUniService(); }
+FCEUX11_DEPRECATED("use fceu11::FDSInsert() instead")
 inline void  FCEUI_FDSInsert() { fceu11::FDSInsert(); }
+FCEUX11_DEPRECATED("use fceu11::FDSSelect() instead")
 inline void  FCEUI_FDSSelect() { fceu11::FDSSelect(); }
+FCEUX11_DEPRECATED("use fceu11::DatachSet() instead")
 inline int   FCEUI_DatachSet(uint8 *rcode) { return fceu11::DatachSet(rcode); }
 
 #ifdef FRAMESKIP
@@ -292,21 +341,37 @@ namespace fceu11 {
     void CheatSearchSetCurrentAsOriginal(void);
 } // namespace fceu11
 
+FCEUX11_DEPRECATED("use fceu11::DecodePAR() instead")
 inline int FCEUI_DecodePAR(const char *code, int *a, int *v, int *c, int *type) { return fceu11::DecodePAR(code, a, v, c, type); }
+FCEUX11_DEPRECATED("use fceu11::DecodeGG() instead")
 inline int FCEUI_DecodeGG(const char *str, int *a, int *v, int *c) { return fceu11::DecodeGG(str, a, v, c); }
+FCEUX11_DEPRECATED("use fceu11::AddCheat() instead")
 inline int FCEUI_AddCheat(const char *name, uint32 addr, uint8 val, int compare, int type) { return fceu11::AddCheat(name, addr, val, compare, type); }
+FCEUX11_DEPRECATED("use fceu11::DelCheat() instead")
 inline int FCEUI_DelCheat(uint32 which) { return fceu11::DelCheat(which); }
+FCEUX11_DEPRECATED("use fceu11::ToggleCheat() instead")
 inline int FCEUI_ToggleCheat(uint32 which) { return fceu11::ToggleCheat(which); }
+FCEUX11_DEPRECATED("use fceu11::GlobalToggleCheat() instead")
 inline int FCEUI_GlobalToggleCheat(int global_enable) { return fceu11::GlobalToggleCheat(global_enable); }
+FCEUX11_DEPRECATED("use fceu11::CheatSearchGetCount() instead")
 inline int32 FCEUI_CheatSearchGetCount(void) { return fceu11::CheatSearchGetCount(); }
+FCEUX11_DEPRECATED("use fceu11::CheatSearchGetRange() instead")
 inline void FCEUI_CheatSearchGetRange(uint32 first, uint32 last, int (*callb)(uint32 a, uint8 last, uint8 current)) { fceu11::CheatSearchGetRange(first, last, callb); }
+FCEUX11_DEPRECATED("use fceu11::CheatSearchGet() instead")
 inline void FCEUI_CheatSearchGet(int (*callb)(uint32 a, uint8 last, uint8 current, void *data), void *data) { fceu11::CheatSearchGet(callb, data); }
+FCEUX11_DEPRECATED("use fceu11::CheatSearchBegin() instead")
 inline void FCEUI_CheatSearchBegin(void) { fceu11::CheatSearchBegin(); }
+FCEUX11_DEPRECATED("use fceu11::CheatSearchEnd() instead")
 inline void FCEUI_CheatSearchEnd(int type, uint8 v1, uint8 v2) { fceu11::CheatSearchEnd(type, v1, v2); }
+FCEUX11_DEPRECATED("use fceu11::ListCheats() instead")
 inline void FCEUI_ListCheats(int (*callb)(const char *name, uint32 a, uint8 v, int compare, int s, int type, void *data), void *data) { fceu11::ListCheats(callb, data); }
+FCEUX11_DEPRECATED("use fceu11::GetCheat() instead")
 inline int FCEUI_GetCheat(uint32 which, std::string *name, uint32 *a, uint8 *v, int *compare, int *s, int *type) { return fceu11::GetCheat(which, name, a, v, compare, s, type); }
+FCEUX11_DEPRECATED("use fceu11::SetCheat() instead")
 inline int FCEUI_SetCheat(uint32 which, const std::string *name, int32 a, int32 v, int compare, int s, int type) { return fceu11::SetCheat(which, name, a, v, compare, s, type); }
+FCEUX11_DEPRECATED("use fceu11::CheatSearchShowExcluded() instead")
 inline void FCEUI_CheatSearchShowExcluded(void) { fceu11::CheatSearchShowExcluded(); }
+FCEUX11_DEPRECATED("use fceu11::CheatSearchSetCurrentAsOriginal() instead")
 inline void FCEUI_CheatSearchSetCurrentAsOriginal(void) { fceu11::CheatSearchSetCurrentAsOriginal(); }
 
 #endif //__FCEU_CORE_API_H_
