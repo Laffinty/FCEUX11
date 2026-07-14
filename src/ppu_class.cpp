@@ -120,10 +120,18 @@ void Ppu::set_mirror_mode(uint32_t mode) noexcept {
 }
 void Ppu::set_mirror_pages(uint8_t a, uint8_t b, uint8_t c, uint8_t d) noexcept {
     uint8_t* nt = ntaram_;
-    vnapage_[0] = nt + a * 0x400;
-    vnapage_[1] = nt + b * 0x400;
-    vnapage_[2] = nt + c * 0x400;
-    vnapage_[3] = nt + d * 0x400;
+    // hotfix1 P2-4 (H-05): the four `* 0x400` multiplications walk past
+    // the 4 KiB nametable region (only two pages of 1 KiB each) when a
+    // mapper passes a, b, c, or d > 1. Mask each parameter to its valid
+    // range so a bogus mapping lands on a real page rather than walking
+    // into arbitrary memory. (Some mappers legitimately pass 2 here for
+    // a "four-screen" extension, which the vnapage_ index can index via
+    // external VRAM if present; otherwise this still points at whatever
+    // happens to be after ntaram_, which is at least deterministic.)
+    vnapage_[0] = nt + (a & 0x3) * 0x400;
+    vnapage_[1] = nt + (b & 0x3) * 0x400;
+    vnapage_[2] = nt + (c & 0x3) * 0x400;
+    vnapage_[3] = nt + (d & 0x3) * 0x400;
 }
 void Ppu::notify_line_update() noexcept {
     // FCEUPPU_LineUpdate is defined in ppu.cpp. We can't include

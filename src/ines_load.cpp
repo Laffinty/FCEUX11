@@ -173,13 +173,30 @@ int iNESLoadCore(const char *name, FCEUFILE *fp, CartInfo& iNESCart, FceuMallocP
 	int round = !fceux11_rust_ines_not_power2(MapperNo);
 
 	// Copy PRG-ROM to emulator-owned memory
+	// hotfix1 P2-14 (H-10): FCEU_malloc returns NULL on allocation
+	// failure. The previous code dereferenced the pointer unconditionally
+	// below, which would crash the loader (and then the surrounding
+	// FCEU_LoadGameVirtual cleanup) when the OS refuses the request.
+	// Surface a clean error instead so the GUI can show a dialog and
+	// the user can free memory before retrying.
 	ROM = (uint8*)FCEU_malloc(cart.prg_size);
+	if (!ROM) {
+		FCEU_PrintError("Unable to allocate PRG-ROM buffer.");
+		return LOADER_HANDLED_ERROR;
+	}
 	memset(ROM, 0xFF, cart.prg_size);
 	memcpy(ROM, cart.prg_data, cart.prg_size);
 
 	// Copy CHR-ROM to emulator-owned memory
 	if (cart.chr_size > 0) {
 		VROM = (uint8*)FCEU_malloc(cart.chr_size);
+		// hotfix1 P2-14 (H-10): same NULL guard as the PRG-ROM
+		// allocation above. Without it, a CHR-only allocation failure
+		// would crash inside the memcpy on the very next line.
+		if (!VROM) {
+			FCEU_PrintError("Unable to allocate CHR-ROM buffer.");
+			return LOADER_HANDLED_ERROR;
+		}
 		memset(VROM, 0xFF, cart.chr_size);
 		memcpy(VROM, cart.chr_data, cart.chr_size);
 	}

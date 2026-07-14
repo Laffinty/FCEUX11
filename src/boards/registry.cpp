@@ -43,8 +43,8 @@ constexpr size_t kRegistrySize = 512;
 // find_mapper (forcing this TU to be retained).  Each MapperEntryRegister
 // constructor writes its `this` to a slot in this array, ensuring the
 // static instance is constructed at static-init time.  The array is
-// sized to hold all 256 possible mapper numbers, so any number can
-// register without bounds issues.
+// sized to match kRegistrySize (512) so any mapper number that the
+// registry accepts (0..511) can register without bounds issues.
 //
 // Why this works when the previous `volatile g_registration_count`
 // did not: the compiler treats a write to a `volatile` global as
@@ -54,7 +54,16 @@ constexpr size_t kRegistrySize = 512;
 // Storing `this` into a volatile array forces the writer (i.e. the
 // static instance) to be retained, since the array's address is
 // referenced by find_mapper.
-volatile const MapperEntryRegister* g_keepalive[256] = {};
+//
+// hotfix1 P2-6 (H-19): the array used to be hard-coded to 256 entries
+// while kRegistrySize was 512. The constructor and find_mapper both
+// guard with `mapper_number < kRegistrySize`, so the actual code
+// path was safe from a buffer overflow — but a mapper numbered 256..511
+// would silently fail to be kept-alive (its static instance could be
+// DCE-stripped by the linker) and disappear at runtime. Grow the
+// keepalive to kRegistrySize so the guard's promise and the array
+// size agree.
+volatile const MapperEntryRegister* g_keepalive[kRegistrySize] = {};
 
 // Meyers singleton: returns a pointer to the 256-entry MapperEntry array.
 // First-call initialization is guaranteed thread-safe by C++11 magic statics.

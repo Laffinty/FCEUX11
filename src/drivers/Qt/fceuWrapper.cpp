@@ -371,7 +371,7 @@ CloseGame(void)
 	if ( nes_shm )
 	{	// Clear Screen on Game Close
 		nes_shm->clear_pixbuf();
-		nes_shm->blitUpdated = 1;
+		nes_shm->blitUpdated.store(1, std::memory_order_release);
 	}
 
 	if (!isloaded) {
@@ -1255,8 +1255,19 @@ int  fceuWrapperUpdate( void )
 {
 	bool lock_acq;
 	static bool mutexLockFail = false;
+	// hotfix1 P2-10 (H-24): progressive backoff for the GUI-owns-lock
+	// path. When the GUI thread holds the lock for a sustained period
+	// (e.g. a heavy file dialog or a long debugger pause) the emulator
+	// thread otherwise wakes every 16 ms, fails fceuWrapperTryLock,
+	// sleeps 16 ms, and immediately retries — a busy-wait that wastes
+	// CPU and starves other processes. Track consecutive misses and
+	// double the sleep (capped at 256 ms) until the GUI eventually
+	// releases the lock, at which point the counter resets.
+	static int  consecutiveLockMisses = 0;
+	constexpr int kMinSleepMs = 16;
+	constexpr int kMaxSleepMs = 256;
 
-	// If a request is pending, 
+	// If a request is pending,
 	// sleep to allow request to be serviced.
 	if ( mutexPending > 0 )
 	{
@@ -1275,10 +1286,20 @@ int  fceuWrapperUpdate( void )
 			}
 			mutexLockFail = true;
 		}
-		msleep( 16 );
+
+		// Progressive backoff: 16, 32, 64, 128, 256, 256, 256, ...
+		int sleepMs = kMinSleepMs;
+		if (consecutiveLockMisses > 0) {
+			sleepMs = kMinSleepMs << consecutiveLockMisses;
+			if (sleepMs > kMaxSleepMs) sleepMs = kMaxSleepMs;
+			if (sleepMs <= 0) sleepMs = kMaxSleepMs; // shift overflow guard
+		}
+		consecutiveLockMisses++;
+		msleep( sleepMs );
 
 		return -1;
 	}
+	consecutiveLockMisses = 0;
 	mutexLockFail = false;
 	emulatorHasMutex = 1;
  

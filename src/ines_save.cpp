@@ -40,6 +40,13 @@ int iNesSaveAs(const char* name)
 	if (!fp)
 		return 0;
 
+	// hotfix1 P2-12 (H-12, H-30): every fwrite below used to discard its
+	// return value, so a short write, a full disk, or an early EOF would
+	// still report "save succeeded" via the final `return 1`. That left
+	// the caller with a partially written .nes and no error indication.
+	// Treat any fwrite that returns less than requested as a failure so
+	// the GUI can surface the problem instead of silently producing a
+	// corrupt ROM on disk.
 	if (fwrite(&head, 1, 16, fp) != 16)
 	{
 		fclose(fp);
@@ -49,13 +56,24 @@ int iNesSaveAs(const char* name)
 	if (head.ROM_type & 4)
 	{
 		/* Trainer */
-		fwrite(trainerpoo, 512, 1, fp);
+		if (fwrite(trainerpoo, 512, 1, fp) != 1) {
+			fclose(fp);
+			return 0;
+		}
 	}
 
-	fwrite(ROM, 0x4000, ROM_size, fp);
+	if (fwrite(ROM, 0x4000, ROM_size, fp) != ROM_size)
+	{
+		fclose(fp);
+		return 0;
+	}
 
-	if (head.VROM_size)
-		fwrite(VROM, 0x2000, head.VROM_size, fp);
+	if (head.VROM_size) {
+		if (fwrite(VROM, 0x2000, head.VROM_size, fp) != head.VROM_size) {
+			fclose(fp);
+			return 0;
+		}
+	}
 
 	fclose(fp);
 	return 1;

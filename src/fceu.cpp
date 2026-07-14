@@ -164,6 +164,20 @@ static void FCEU_CloseGame(void)
 
 		GameInterface(GI_CLOSE);
 
+		// hotfix1 P2-2 (H-03): FCEUXCart::cart is heap-allocated once
+		// per game load (see FCEUXLoad at line 1444). Without an explicit
+		// delete the previous game's PRG/CHR buffers leaked for every
+		// ROM swap, and the non-virtual destructor would have silently
+		// sliced any future subclass. Now that the destructor is virtual
+		// (see FCEUXCart declaration above) this delete dispatches
+		// correctly. Reset to nullptr so any stale `cart->...` access
+		// after close dereferences deterministically instead of reading
+		// freed memory.
+		if (cart) {
+			delete cart;
+			cart = nullptr;
+		}
+
 		FCEU_StateRecorderStop();
 
 		fceu11::StopMovie();
@@ -281,6 +295,13 @@ void SetReadHandler(int32 start, int32 end, readfunc func) {
 	if (!func)
 		func = ANull;
 
+	// hotfix1 P2-1 (H-02): if a caller passes an inverted range (end < start)
+	// the `for (x = end; x >= start; x--)` loop silently walks a huge number
+	// of iterations before wrapping or until it scribbles past ARead[] /
+	// AReadG[]. Guard at the entry so the loop is only ever reached with a
+	// non-empty ascending range.
+	if (end < start) return;
+
 	if (RWWrap)
 		for (x = end; x >= start; x--) {
 			if (x >= 0x8000)
@@ -305,6 +326,12 @@ void SetWriteHandler(int32 start, int32 end, writefunc func) {
 
 	if (!func)
 		func = BNull;
+
+	// hotfix1 P2-1 (H-02): same end<start guard as SetReadHandler above.
+	// The original loop iterates `end` down to `start`; an inverted range
+	// would happily spin past the array boundaries and corrupt unrelated
+	// memory. Bail out before touching anything.
+	if (end < start) return;
 
 	if (RWWrap)
 		for (x = end; x >= start; x--) {
@@ -433,8 +460,12 @@ FCEUGI *fceu11::LoadGameVirtual(const char *name, int OverwriteVidMode, bool sil
 		AutosaveStatus[AutosaveIndex] = 0;
 
 	FCEU_CloseGame();
+	// hotfix1 P0-1 (C-01): FCEUGI contains std::string members (name,
+	// filename, archiveFilename); calling memset over its storage corrupts
+	// the SSO representation and causes UB at destruction. The default
+	// constructor (git.h) zero-initialises all POD fields and leaves
+	// std::string fields value-initialised to empty — no manual zeroing needed.
 	GameInfo = new FCEUGI();
-	memset( static_cast<void*>(GameInfo), 0, sizeof(FCEUGI));
 
 	GameInfo->filename = fp->filename;
 	if (fp->archiveFilename != "")
@@ -647,7 +678,15 @@ void SetAutoFirePattern(int onframes, int offframes)
 	//} else {
 	//	AutoFirePatternLength = onframes + offframes;
 	//}
-	AutoFirePatternLength = onframes + offframes;
+	// hotfix1 P2-8 (H-21): a buggy caller that passes onframes==0 and
+	// offframes==1 (or vice versa) would set AutoFirePatternLength to 1,
+	// which then trips division-by-zero / modulo-by-zero downstream in
+	// the autofire scheduler. Clamp the pattern length to a minimum of 2
+	// so the always-on / always-off edge cases still produce a sensible
+	// period (1 on + 1 off is the shortest legal pattern).
+	int len = onframes + offframes;
+	if (len < 2) len = 2;
+	AutoFirePatternLength = len;
 	AFon = onframes; AFoff = offframes;
 }
 
@@ -1356,7 +1395,13 @@ FCEUXCart()
 	, PRG(0) {
 }
 
-~FCEUXCart() {
+// hotfix1 P2-2 (H-03): FCEUXCart* cart (line 1444) is deleted through the
+// base pointer in FCEU_CloseGame below. Without a virtual destructor the
+// derived NROM (and any future cart subclasses) would be sliced — only the
+// base portion freed, derived members leaked. Make the destructor virtual
+// up front so the existing `delete cart` is well-defined and any future
+// subclass automatically participates in polymorphic destruction.
+virtual ~FCEUXCart() {
 	if (CHR) delete[] CHR;
 	if (PRG) delete[] PRG;
 }
@@ -1381,7 +1426,14 @@ FCEUXCart* cart = 0;
 
 
 
-class NROM : FCEUXCart {
+// hotfix1 P2-2 (H-03) and P3-4 (N-L03): NROM was inheriting FCEUXCart
+// privately (the default for `class`). That silently downcasts every
+// implicit upcast from `NROM*` to `FCEUXCart*` and would prevent any
+// future code from naming NROM as a public base of an even more derived
+// type. Make the inheritance explicit-public so polymorphic destruction
+// (now that the base has a virtual dtor) and any future subclassing work
+// as expected.
+class NROM : public FCEUXCart {
 public:
 virtual void Power() {
 	SetReadHandler(0x8000, 0xFFFF, CartBR);
@@ -1463,8 +1515,13 @@ bool FCEUXLoad(const char *name, FCEUFILE *fp) {
 
 uint8 FCEU_ReadRomByte(uint32 i) {
 	extern iNES_HEADER head;
-	if (i < 16)
-		return *reinterpret_cast<unsigned char*>(&head + i);
+	if (i < 16) {
+		// hotfix1 P0-3 (C-03): &head + i advances by sizeof(iNES_HEADER)
+		// per increment, not by bytes, so reading byte i of the header
+		// either returns garbage or walks off the struct. Use byte stride.
+		const unsigned char* headBytes = reinterpret_cast<const unsigned char*>(&head);
+		return headBytes[i];
+	}
 	if (i < 16 + PRGsize[0])
 		return PRGptr[0][i - 16];
 	if (i < 16 + PRGsize[0] + CHRsize[0])
@@ -1473,8 +1530,15 @@ uint8 FCEU_ReadRomByte(uint32 i) {
 }
 
 void FCEU_WriteRomByte(uint32 i, uint8 value) {
-	if (i < 16)
+	if (i < 16) {
+		// hotfix1 P0-5 (H-01): previously the second branch `i < 16 + PRGsize[0]`
+		// was an independent `if`, not `else if`. When i < 16 the second
+		// condition was true (assuming any PRG is mapped), and `i - 16`
+		// as a uint32 wraps to ~4 GiB -> catastrophically out-of-bounds
+		// write into PRGptr[0]. Early-return after the diagnostic.
 		printf("Sorry, you can't edit the ROM header.\n");
+		return;
+	}
 	if (i < 16 + PRGsize[0])
 		PRGptr[0][i - 16] = value;
 	else if (i < 16 + PRGsize[0] + CHRsize[0])

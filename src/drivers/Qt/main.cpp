@@ -349,24 +349,47 @@ int main( int argc, char *argv[] )
 		                            NULL, OPEN_EXISTING, 0, NULL);
 		if (hConOut != INVALID_HANDLE_VALUE)
 		{
-			int conFd = _open_osfhandle((intptr_t)hConOut, _O_TEXT);
-			if (conFd != -1)
-			{
-				FILE *conFile = _fdopen(conFd, "w");
-				if (conFile != NULL)
+			// hotfix1 P1-9 (C-10): the previous version reused the same
+			// `hConOut` handle for both stdout and stderr via two
+			// `_open_osfhandle` calls. When stdout's FILE* was later
+			// fclose()d, the CRT pulled the OS handle out from under
+			// stderr — subsequent writes to stderr would then write to
+			// an already-freed handle (use-after-free). Duplicate into
+			// two independent kernel objects so each FILE* owns its own
+			// handle and can be closed without affecting the other.
+			HANDLE hStdout = INVALID_HANDLE_VALUE;
+			HANDLE hStderr = INVALID_HANDLE_VALUE;
+			if (!DuplicateHandle(GetCurrentProcess(), hConOut,
+			                     GetCurrentProcess(), &hStdout,
+			                     0, TRUE, DUPLICATE_SAME_ACCESS) ||
+			    !DuplicateHandle(GetCurrentProcess(), hConOut,
+			                     GetCurrentProcess(), &hStderr,
+			                     0, TRUE, DUPLICATE_SAME_ACCESS)) {
+				CloseHandle(hConOut);
+				if (hStdout != INVALID_HANDLE_VALUE) CloseHandle(hStdout);
+				if (hStderr != INVALID_HANDLE_VALUE) CloseHandle(hStderr);
+			} else {
+				CloseHandle(hConOut);
+
+				int conFd = _open_osfhandle((intptr_t)hStdout, _O_TEXT);
+				if (conFd != -1)
 				{
-					*stdout = *conFile;
-					setvbuf(stdout, NULL, _IONBF, 0);
+					FILE *conFile = _fdopen(conFd, "w");
+					if (conFile != NULL)
+					{
+						*stdout = *conFile;
+						setvbuf(stdout, NULL, _IONBF, 0);
+					}
 				}
-			}
-			int conFd2 = _open_osfhandle((intptr_t)hConOut, _O_TEXT);
-			if (conFd2 != -1)
-			{
-				FILE *conFile2 = _fdopen(conFd2, "w");
-				if (conFile2 != NULL)
+				int conFd2 = _open_osfhandle((intptr_t)hStderr, _O_TEXT);
+				if (conFd2 != -1)
 				{
-					*stderr = *conFile2;
-					setvbuf(stderr, NULL, _IONBF, 0);
+					FILE *conFile2 = _fdopen(conFd2, "w");
+					if (conFile2 != NULL)
+					{
+						*stderr = *conFile2;
+						setvbuf(stderr, NULL, _IONBF, 0);
+					}
 				}
 			}
 		}
@@ -424,7 +447,20 @@ int main( int argc, char *argv[] )
 	QObject::connect(sdlPumpTimer, &QTimer::timeout, []() {
 		SDL_PumpEvents();
 	});
-	sdlPumpTimer->start(0);
+	// hotfix1 P2-15 (N-L01): SDL_PumpEvents() must not be called before
+	// SDL_Init() succeeds — calling it on an uninitialised subsystem is
+	// undefined per SDL2 docs (some platforms deref a null internal
+	// subsystem pointer). fceuWrapperInit above runs SDL_Init(SDL_INIT_VIDEO);
+	// confirm that subsystem came up before arming the timer. If it
+	// didn't, skip starting the timer so we don't crash; the fceuWrapper
+	// path will already have exit()ed in that case but the runtime
+	// check is cheap insurance against any future refactor that moves
+	// the init call.
+	if (SDL_WasInit(SDL_INIT_VIDEO) != 0) {
+		sdlPumpTimer->start(0);
+	} else {
+		printf("Warning: SDL_INIT_VIDEO not active; skipping SDL pump timer.\n");
+	}
 
 	consoleWindow = new consoleWin_t();
 

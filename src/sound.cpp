@@ -651,7 +651,13 @@ static void RDoSQLQ(void)
 
 	//Modify Square wave volume based on channel volume modifiers
 	//adelikat: Note: the formulat x = x * y /100 does not yield exact results, but is "close enough" and avoids the need for using double vales or implicit cohersion which are slower (we need speed here)
-    ampx = x ? FSettings.Square1Volume : FSettings.Square2Volume;  // TODO OPTIMIZE ME!
+    // hotfix1 P2-7 (H-20): the LQ path used to read the volume in the
+    // wrong order — `x ? Square1 : Square2` swapped the two channels
+    // compared with the HQ path (line 572, which reads `x ? Square2 :
+    // Square1`). Adjusting Square1's slider in the GUI therefore
+    // affected Square2's LQ output and vice versa. Align with HQ so the
+    // two paths finally agree on which knob scales which channel.
+    ampx = x ? FSettings.Square2Volume : FSettings.Square1Volume;
     if (ampx != 256) amp[x] = (amp[x] * ampx) / 256; // CaH4e3: fixed - setting up maximum volume for square2 caused complete mute square2 channel
 
     if(!inie[x]) amp[x]=0;    /* Correct? Buzzing in MM2, others otherwise... */

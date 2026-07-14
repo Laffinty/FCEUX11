@@ -426,7 +426,14 @@ static void RefreshLine(int lastpixel) {
 		uint32 tem;
 		tem = READPAL(0) | (READPAL(0) << 8) | (READPAL(0) << 16) | (READPAL(0) << 24);
 		tem |= 0x40404040;
-		*reinterpret_cast<uint32*>(Plinef) = *reinterpret_cast<uint32*>(Plinef + 4) = tem;
+		// hotfix1 P2-5 (H-06): Plinef points at uint8[] (XBuf row).
+		// Aliasing it as uint32* to write 4 bytes at a time is undefined
+		// under the strict-aliasing rules (the underlying dynamic type is
+		// uint8). memcpy is the only well-defined way to perform a
+		// multi-byte store into a byte buffer. Cost is negligible — this
+		// fires at most once per scanline.
+		std::memcpy(Plinef + 4, &tem, 4);
+		std::memcpy(Plinef, &tem, 4);
 	}
 
 	if (!ScreenON) {
@@ -523,23 +530,49 @@ void DoLine(void) {
 	if (ScreenON || SpriteON)
 	{
 		if (PPU[1] & 0x01) {
-			for (x = 63; x >= 0; x--)
-				*reinterpret_cast<uint32*>(&target[x << 2]) = (*reinterpret_cast<uint32*>(&target[x << 2])) & 0x30303030;
+			// hotfix1 P2-5 (H-06): target is uint8* (XBuf row); reading
+			// and writing it through a uint32* lvalue is strict-aliasing
+			// UB. Stage the 4-byte value through a local uint32_t using
+			// memcpy so every byte round-trip is well-defined. The four
+			// nested `for` loops below follow the same pattern.
+			for (x = 63; x >= 0; x--) {
+				uint32_t tmp;
+				std::memcpy(&tmp, &target[x << 2], 4);
+				tmp &= 0x30303030;
+				std::memcpy(&target[x << 2], &tmp, 4);
+			}
 		}
 	}
 
 	if ((PPU[1] >> 5) == 0x7) {
-		for (x = 63; x >= 0; x--)
-			*reinterpret_cast<uint32*>(&target[x << 2]) = ((*reinterpret_cast<uint32*>(&target[x << 2])) & 0x3f3f3f3f) | 0xc0c0c0c0;
+		for (x = 63; x >= 0; x--) {
+			uint32_t tmp;
+			std::memcpy(&tmp, &target[x << 2], 4);
+			tmp = (tmp & 0x3f3f3f3f) | 0xc0c0c0c0;
+			std::memcpy(&target[x << 2], &tmp, 4);
+		}
 	} else if (PPU[1] & 0xE0)
-		for (x = 63; x >= 0; x--)
-			*reinterpret_cast<uint32*>(&target[x << 2]) = (*reinterpret_cast<uint32*>(&target[x << 2])) | 0x40404040;
+		for (x = 63; x >= 0; x--) {
+			uint32_t tmp;
+			std::memcpy(&tmp, &target[x << 2], 4);
+			tmp |= 0x40404040;
+			std::memcpy(&target[x << 2], &tmp, 4);
+		}
 	else
-		for (x = 63; x >= 0; x--)
-			*reinterpret_cast<uint32*>(&target[x << 2]) = ((*reinterpret_cast<uint32*>(&target[x << 2])) & 0x3f3f3f3f) | 0x80808080;
+		for (x = 63; x >= 0; x--) {
+			uint32_t tmp;
+			std::memcpy(&tmp, &target[x << 2], 4);
+			tmp = (tmp & 0x3f3f3f3f) | 0x80808080;
+			std::memcpy(&target[x << 2], &tmp, 4);
+		}
 
-	for (x = 63; x >= 0; x--)
-		*reinterpret_cast<uint32*>(&dtarget[x << 2]) = ((PPU[1]>>5)<<0)|((PPU[1]>>5)<<8)|((PPU[1]>>5)<<16)|((PPU[1]>>5)<<24);
+	// hotfix1 P2-5 (H-06): dtarget is uint8*; uint32* store is
+	// strict-aliasing UB. Compute into a local and memcpy the 4 bytes.
+	for (x = 63; x >= 0; x--) {
+		uint32_t tmp = ((PPU[1]>>5)<<0) | ((PPU[1]>>5)<<8)
+		             | ((PPU[1]>>5)<<16) | ((PPU[1]>>5)<<24);
+		std::memcpy(&dtarget[x << 2], &tmp, 4);
+	}
 
 	sphitx = 0x100;
 
@@ -714,7 +747,15 @@ void FetchSpriteData(void) {
 					dst.x = spr->x;
 					dst.atr = spr->atr;
 
-					*reinterpret_cast<uint32*>(&SPRBUF[ns << 2]) = *reinterpret_cast<uint32*>(&dst);
+					// hotfix1 P2-5 (H-06): SPRBUF is uint8[0x100] (ppu.h:90).
+						// Writing four bytes into a byte array via a uint32*
+						// lvalue is strict-aliasing UB; reading the local
+						// `dst` struct via uint32* is also UB. memcpy is the
+						// only portable way to perform byte-buffer <-> struct
+						// transfers of arbitrary width.
+						uint32_t tmp;
+						std::memcpy(&tmp, &dst, 4);
+						std::memcpy(&SPRBUF[ns << 2], &tmp, 4);
 				}
 
 				ns++;
@@ -771,7 +812,15 @@ void FetchSpriteData(void) {
 					dst.atr = spr->atr;
 
 
-					*reinterpret_cast<uint32*>(&SPRBUF[ns << 2]) = *reinterpret_cast<uint32*>(&dst);
+					// hotfix1 P2-5 (H-06): SPRBUF is uint8[0x100] (ppu.h:90).
+						// Writing four bytes into a byte array via a uint32*
+						// lvalue is strict-aliasing UB; reading the local
+						// `dst` struct via uint32* is also UB. memcpy is the
+						// only portable way to perform byte-buffer <-> struct
+						// transfers of arbitrary width.
+						uint32_t tmp;
+						std::memcpy(&tmp, &dst, 4);
+						std::memcpy(&SPRBUF[ns << 2], &tmp, 4);
 				}
 
 				ns++;

@@ -41,6 +41,7 @@
 //#include <unistd.h> //mbg merge 7/17/06 removed
 
 #include <zlib.h>
+#include <vector>
 
 int FCEUnetplay=0;
 
@@ -84,15 +85,19 @@ int FCEUI_NetplayStart(int nlocal, int divisor)
 
 int FCEUNET_SendCommand(uint8 cmd, uint32 len)
 {
-	//mbg merge 7/17/06 changed to alloca
-	//uint8 buf[numlocal + 1 + 4];
-	uint8 *buf = (uint8*)alloca(numlocal+1+4);
-
+	// hotfix1 P2-13 (H-09): the original alloca() request grew with
+	// `numlocal + 1 + 4`, which is unbounded and would overflow the
+	// stack for an absurdly large numlocal (theoretical OOM-via-stack
+	// instead of OOM-via-heap). Move the buffer to the heap via a
+	// std::vector so the size is bounded by available memory rather than
+	// the (much smaller) stack reserve, and the storage is freed
+	// deterministically when buf goes out of scope.
+	std::vector<uint8_t> buf(numlocal + 1 + 4);
 
 	buf[0] = 0xFF;
 	FCEU_en32lsb(&buf[numlocal], len);
 	buf[numlocal + 4] = cmd;
-	if(!FCEUD_SendData(buf,numlocal + 1 + 4))
+	if(!FCEUD_SendData(buf.data(), static_cast<int>(buf.size())))
 	{
 		NetError();
 		return(0);

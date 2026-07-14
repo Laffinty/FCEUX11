@@ -331,6 +331,25 @@ void Bus::setntamem(uint8_t* p, int ram, uint32_t b) noexcept {
 // hard-mirroring case (was SetupCartMirroring in v1.3.0).
 // ---------------------------------------------------------------------------
 void Bus::setup_prg_mapping(uint32_t chip, uint8_t* p, uint32_t size, int ram) noexcept {
+    // hotfix1 P2-3 (H-04): when size==0 every mask below this line
+    //   `(size >> N) - 1`
+    // evaluates on a uint32_t and underflows to UINT32_MAX. Subsequent
+    // `addr & prg_mask*` reads would then return UINT32_MAX from a 0-byte
+    // ROM region (or, worse, alias into unrelated memory on the following
+    // lookup). Clear all per-chip state up front so a size==0 mapping is a
+    // clean no-op rather than a bomb.
+    if (size == 0) {
+        prg_ptr_[chip]   = p;
+        prg_size_[chip]  = 0;
+        prg_mask2_[chip]  = 0;
+        prg_mask4_[chip]  = 0;
+        prg_mask8_[chip]  = 0;
+        prg_mask16_[chip] = 0;
+        prg_mask32_[chip] = 0;
+        prg_ram_[chip]    = ram ? 1 : 0;
+        return;
+    }
+
     prg_ptr_[chip]  = p;
     prg_size_[chip] = size;
     prg_mask2_[chip]  = (size >> 11) - 1;
@@ -342,16 +361,30 @@ void Bus::setup_prg_mapping(uint32_t chip, uint8_t* p, uint32_t size, int ram) n
 }
 
 void Bus::setup_chr_mapping(uint32_t chip, uint8_t* p, uint32_t size, int ram) noexcept {
+    // hotfix1 P2-3 (H-04, CHR companion): same size==0 underflow as
+    // setup_prg_mapping above. The four belt-and-braces `if (chr_mask* >=
+    // UINT32_MAX) chr_mask* = 0` guards only fire when size is exactly a
+    // single bit set (so the shifted result is 1, then 0 after subtraction);
+    // a true size==0 still underflowed mask values, and callers relying on
+    // size==0 semantics ("no CHR") would see garbage mask reads. Treat
+    // size==0 as a clean unmapped chip.
+    if (size == 0) {
+        chr_ptr_[chip]   = p;
+        chr_size_[chip]  = 0;
+        chr_mask1_[chip] = 0;
+        chr_mask2_[chip] = 0;
+        chr_mask4_[chip] = 0;
+        chr_mask8_[chip] = 0;
+        chr_ram_[chip]   = static_cast<uint8_t>(ram);
+        return;
+    }
+
     chr_ptr_[chip]  = p;
     chr_size_[chip] = size;
     chr_mask1_[chip] = (size >> 10) - 1;
     chr_mask2_[chip] = (size >> 11) - 1;
     chr_mask4_[chip] = (size >> 12) - 1;
     chr_mask8_[chip] = (size >> 13) - 1;
-    if (chr_mask1_[chip] >= static_cast<uint32_t>(-1)) chr_mask1_[chip] = 0;
-    if (chr_mask2_[chip] >= static_cast<uint32_t>(-1)) chr_mask2_[chip] = 0;
-    if (chr_mask4_[chip] >= static_cast<uint32_t>(-1)) chr_mask4_[chip] = 0;
-    if (chr_mask8_[chip] >= static_cast<uint32_t>(-1)) chr_mask8_[chip] = 0;
     chr_ram_[chip] = static_cast<uint8_t>(ram);
 }
 

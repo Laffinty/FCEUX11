@@ -104,7 +104,13 @@ FCEUX11_MAPPER_HOT static std::array<uint8,2> mul;
 
 static uint32 WRAMSIZE = 0;
 static uint8 *WRAM = NULL;
+static FceuMallocPtr WRAM_owner;    // hotfix1 P2-9 (H-17/18): RAII owner so the
+                                    // WRAM buffer (and the nametable fill
+                                    // buffer below) is freed exactly once,
+                                    // either at game close or at process exit
+                                    // — whichever happens first.
 static uint8 *MMC5fill = NULL;
+static FceuMallocPtr MMC5fill_owner; // see comment above
 static uint8 *ExRAM = NULL;
 static FceuMallocPtr ExRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static uint8 MMC5battery = 0;
@@ -1003,16 +1009,35 @@ static SFORMAT MMC5_StateRegs[] = {
 	{ 0 }
 };
 
+// hotfix1 P2-9 (H-17/18): the original GenMMC5_Init never wired
+// info->Close, so on every Game Close / ROM swap the WRAM, MMC5fill,
+// and ExRAM buffers leaked. The owners below let the RAII wrappers do
+// the freeing automatically the moment the cart is unloaded (and again
+// at process exit, idempotently).
+static void GenMMC5_Close(void) {
+	WRAM_owner.reset();
+	WRAM = nullptr;
+	MMC5fill_owner.reset();
+	MMC5fill = nullptr;
+	// ExRAM is owned by ExRAM_owner (set below) and is freed by it.
+	ExRAM_owner.reset();
+	ExRAM = nullptr;
+	MMC5Hack = 0;
+}
+
 static void GenMMC5_Init(CartInfo *info, int wsize, int battery) {
 	if (wsize) {
-		WRAM = (uint8*)FCEU_malloc(wsize * 1024);
+		WRAM_owner = FCEU_gmalloc_unique(wsize * 1024);
+		WRAM = WRAM_owner.get();
 		FCEU_MemoryRand(WRAM, wsize * 1024);
 		SetupCartPRGMapping(0x10, WRAM, wsize * 1024, 1);
 		AddExState(WRAM, wsize * 1024, 0, "WRAM");
 	}
 
-	MMC5fill = (uint8*)FCEU_malloc(1024);
-	ExRAM = (uint8*)FCEU_malloc(1024);
+	MMC5fill_owner = FCEU_gmalloc_unique(1024);
+	MMC5fill = MMC5fill_owner.get();
+	ExRAM_owner = FCEU_gmalloc_unique(1024);
+	ExRAM = ExRAM_owner.get();
 
 	FCEU_MemoryRand(MMC5fill,1024);
 	FCEU_MemoryRand(ExRAM,1024);
@@ -1028,6 +1053,10 @@ static void GenMMC5_Init(CartInfo *info, int wsize, int battery) {
 	BuildWRAMSizeTable();
 	GameStateRestore = MMC5_StateRestore;
 	info->Power = GenMMC5Power;
+	// hotfix1 P2-9 (H-17/18): wire the close handler so FCEU_CloseGame
+	// (which calls GameInterface(GI_CLOSE) -> info->Close) actually frees
+	// the WRAM / MMC5fill / ExRAM buffers instead of leaking them.
+	info->Close = GenMMC5_Close;
 
 	MMC5battery = battery;
 	if (battery) {
