@@ -63,10 +63,10 @@ int main() {
     printf("\n--- CpuView ---\n");
     {
         auto& v = s.cpu();
-        // v.reg() returns __X6502&, which is the same type as X6502
-        // (typedef X6502 = __X6502). Take address through a typedef-friendly
-        // indirection so we don't depend on x6502struct.h being included.
-        struct __X6502& ref = v.reg();
+        // v.reg() returns X6502& (typedef defined in x6502struct.h, which
+        // x6502.h pulls in). Bind through the typedef name directly; no
+        // local struct-tag indirection needed.
+        X6502& ref = v.reg();
         uint32_t& ts     = v.timestamp();
         uint32_t& sts    = v.sound_timestamp();
         int& sl          = v.scanline();
