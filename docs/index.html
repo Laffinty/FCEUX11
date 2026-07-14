@@ -203,7 +203,7 @@
 
 <header class="hero" id="top">
   <div class="wrap">
-    <div class="pill reveal"><span class="dot"></span><span data-i18n="pill">v1.15 · Finale</span></div>
+    <div class="pill reveal"><span class="dot"></span><span data-i18n="pill">v1.15 · hotfix1</span></div>
     <h1 class="reveal"><span class="grad">FCEUX</span><span class="dim">11</span></h1>
     <p class="tagline reveal" data-i18n="tagline"><span class="tagline-title">基于 FCEUX 的 NES/Famicom 模拟器，为 Windows 优化</span><br>保留核心精度，现代原生体验，12 种界面语言。</p>
     <div class="cta reveal">
@@ -265,7 +265,7 @@
   <div class="wrap">
     <div class="whatsnew-head reveal">
       <div class="kicker" data-i18n="wn.k">What's new</div>
-      <h2 data-i18n="wn.t">v1.15 · Finale</h2>
+      <h2 data-i18n="wn.t">v1.15 · hotfix1</h2>
       <div class="sub" data-i18n="wn.sub">2026-07-11 发布 · 回顾 v1.0 ~ v1.15</div>
     </div>
     <div class="whatsnew-list reveal">
@@ -312,7 +312,7 @@
 
 <script>
 const I18N={
-  en:{pill:"v1.15 · Finale",
+  en:{pill:"v1.15 · hotfix1",
       tagline:"<span class=\"tagline-title\">A FCEUX-based NES/Famicom emulator optimized for Windows</span><br>core accuracy, modern native experience, 12 UI languages.",
       download:"Download",changelog:"Changelog",
       "f1.t":"Accurate Emulation","f1.d":"Full NES, Famicom &amp; mapper support",
@@ -323,14 +323,14 @@ const I18N={
       "about.k":"About","about.t":"Introduction",
       "about.a1":"FCEUX11 is a derivative of the FCEUX NES/Famicom emulator, actively maintained and optimized for <em>Windows</em>.",
       "about.a2":"It preserves the core emulation accuracy of FCEUX while providing a modern, native Windows experience, including a <em>Qt6-based</em> user interface, <em>12-language</em> UI (with automatic system locale detection and full Arabic RTL layout), and comprehensive debugging and TAS tooling.",
-      "wn.k":"What's new","wn.t":"v1.15 · Finale","wn.sub":"Released 2026-07-11 · v1.0 ~ v1.15 recap",
+      "wn.k":"What's new","wn.t":"v1.15 · hotfix1","wn.sub":"Released 2026-07-11 · v1.0 ~ v1.15 recap",
       "wn1.t":"12 Languages, Auto-Detected","wn1.d":"The UI supports 12 languages — Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Spanish, French, German, Vietnamese, Thai, Hindi, and Arabic (with a full RTL layout engine). On first launch, it automatically matches your Windows display language — zero configuration.",
       "wn2.t":"Goodbye Crashes","wn2.d":"Manual memory management (malloc/free) has been eliminated in favor of automatic memory management. Core crash bugs — including heap double-free corruption — have been fixed. Long play sessions stay rock-solid.",
       "wn3.t":"Faster, Smoother Gameplay","wn3.d":"LTO/PGO compilation and linker optimization (/OPT:REF, /OPT:ICF) deliver noticeably faster startup and game loading. Steadier frame pacing means no stuttering and no audio glitches, even on modest hardware.",
       "wn4.t":"Rock-Solid Save States","wn4.d":"The new V2 save state format (FCEU11ST) embeds per-chunk CRC32 integrity checks. Even if your drive develops a bad sector or a file gets truncated, the emulator can detect corruption — your progress is always safe.",
       "wn.cta":"View full changelog →",
       foot:"based on FCEUX"},
-  zh:{pill:"v1.15 · Finale",
+  zh:{pill:"v1.15 · hotfix1",
       tagline:"<span class=\"tagline-title\">基于 FCEUX 的 NES/Famicom 模拟器，为 Windows 优化</span><br>保留核心精度，现代原生体验，12 种界面语言。",
       download:"下载",changelog:"更新日志",
       "f1.t":"精确模拟","f1.d":"完整支持 NES、Famicom 及扩展芯片",
@@ -341,7 +341,7 @@ const I18N={
       "about.k":"关于","about.t":"简介",
       "about.a1":"FCEUX11 是基于 FCEUX 的 NES/Famicom 模拟器衍生项目，持续维护并为 <em>Windows</em> 平台优化。",
       "about.a2":"在保留 FCEUX 核心模拟精度的基础上，提供现代化的 Windows 原生体验，包括 <em>Qt6 图形界面</em>、<em>12 种语言</em>的多语言支持（自动按系统区域匹配，阿拉伯语带完整 RTL 布局）以及完善的调试与 TAS 工具集。",
-      "wn.k":"本次更新","wn.t":"v1.15 · Finale","wn.sub":"2026-07-11 发布 · 回顾 v1.0 ~ v1.15",
+      "wn.k":"本次更新","wn.t":"v1.15 · hotfix1","wn.sub":"2026-07-11 发布 · 回顾 v1.0 ~ v1.15",
       "wn1.t":"12 种语言，开箱即用","wn1.d":"模拟器界面已支持 12 种语言——简体中文、繁體中文、English、日本語、한국어、Español、Français、Deutsch、Tiếng Việt、ไทย、हिन्दी、العربية（含完整 RTL 布局）。首次启动自动匹配 Windows 显示语言，无需任何设置。",
       "wn2.t":"告别闪退，畅玩无忧","wn2.d":"底层已全面淘汰手动内存管理（malloc/free），改用自动内存管理，修复了堆损坏（double-free）等核心崩溃问题。长时间游玩不再突然退出，游戏进度稳如磐石。",
       "wn3.t":"启动更快，运行更流畅","wn3.d":"启用 LTO/PGO 编译优化与链接器精简（/OPT:REF, /OPT:ICF），模拟器冷启动和游戏加载速度显著提升。帧率更稳定，画面不卡顿、声音不断续，老电脑也能流畅运行。",

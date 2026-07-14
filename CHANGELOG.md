@@ -5,6 +5,304 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.1] - 2026-07-14
+
+**Codename: hotfix1.** First hotfix release for v1.15 LTS. Forty-two
+bug fixes covering data integrity, thread and FFI boundary safety,
+and code quality, all derived from the audit in
+`docs/FCEUX11-1.15_LTS-隐患审计报告.md` and tracked in
+`docs/FCEUX11-1.15_LTS-hotfix1-PLAN.md`. Every fix is tagged in-source
+with a `hotfix1 PN-N` marker; cross-reference the PLAN for severity
+ratings and review notes. The build was verified end-to-end on
+`fceux11.exe` with manual play-testing of *Kira Kira Star Night DX*.
+
+Build verified with MSVC 14.51 / VS Build Tools 18, `/std:c++20`,
+NMake generator, Release configuration, `/LTCG` link-time code
+generation. The exe (5.7 MB) is binary-compatible with v1.15
+save states and ROM image metadata.
+
+### Fixed
+
+#### Phase 1 — Data integrity (8 PRs)
+
+- **`src/fceu.cpp`** (C-01, P0-1) — Removed `memset(0, sizeof(FCEUGI))`
+  that walked over the `std::string` members (`name`, `filename`,
+  `archiveFilename`) of `FCEUGI`. The default constructor already
+  zero-initialises every POD field, so the memset was pure
+  undefined behaviour at destruction time.
+- **`src/ppu_state.cpp`** (C-02, P0-2) — Corrected the eight
+  `SFORMAT` entries for `spr_read.found_pos[0..7]`. They all
+  pointed at slot 0, so save/load only ever persisted one sprite
+  position and the remaining seven desynchronised. Labels
+  preserved for savestate compatibility with v1.15 LTS.
+- **`src/fceu.cpp`** (C-03, P0-3) — `FCEU_ReadRomByte` used
+  `&head + i`, which advanced by `sizeof(iNES_HEADER)` per
+  increment rather than by bytes. Replaced with
+  `reinterpret_cast<const unsigned char*>(&head)[i]`.
+- **`src/drivers/Qt/ConsoleVideo.cpp`** (C-12, P0-4) — Repaired a
+  literal backtick-`n` that had been sitting between two
+  `#include` lines ever since a Windows-1252 conversion
+  corrupted the file. The build was broken.
+- **`src/fceu.cpp`** (H-01, P0-5) — `FCEU_WriteRomByte` had two
+  independent `if` statements; when `i < 16` the second branch
+  was still evaluated and `i - 16` (uint32) wrapped to ~4 GiB
+  for a catastrophically out-of-bounds write. Added an early
+  `return` after the diagnostic.
+- **`src/state.cpp`** (H-29, P0-6) — `FCEUSS_LoadFP` chunk-8
+  branch did `memcpy(XBackBuf, data, size)` with no upper
+  bound. A corrupt savestate could declare any size and the
+  memcpy would happily write up to GIGA bytes past the
+  framebuffer. Reject any size other than the two valid
+  256×256 options.
+- **`src/cheat.cpp`** (H-07, P0-7) — `FCEU_CheatAddRAM` walked
+  `CheatRPtrs[AB .. AB + s - 1]` with no range check, so
+  `AB + s > 64` corrupted globals past the fixed 64-entry
+  array. Reject out-of-range ranges up front.
+- **`src/cheat.cpp`** (H-08, P0-8) — `RebuildSubCheats`
+  incremented `numsubcheats` past the 256-entry `SubCheats[]`
+  cap on a malformed cheat list. Skip further entries once
+  full.
+
+#### Phase 2 — Thread safety (5 PRs, touching 13 files)
+
+- **`src/drivers/Qt/input/sdl_backend.cpp`** (N-C01, P1-1,
+  upgraded CRITICAL) — Removed the emulator thread's
+  `SDL_PumpEvents()` call. SDL2 explicitly documents
+  `SDL_PumpEvents` as not thread-safe even though the entry
+  point itself is, and the main thread's 0-ms QTimer already
+  pumps per event-loop iteration. Without the fix, real-world
+  tests showed intermittent input loss and process crashes.
+- **`src/drivers/Qt/ConsoleVideo.cpp`** (N-C02, P1-2,
+  upgraded CRITICAL) — `closeApp` used `quit()` (a no-op for
+  a `QThread` that overrides `run()` instead of `exec()`) plus
+  `wait(1000)`. The 1-second timeout therefore offered no
+  guarantee the thread had actually stopped, and the path
+  continued to call `fceuWrapperClose()` while the emulator
+  was still inside `fceuWrapperUpdate()` — textbook
+  use-after-free. Switched to `requestInterruption()` +
+  `wait(5000)` + `terminate()` fallback.
+- **`src/drivers/Qt/sdl-video.cpp`** (C-08, P1-7) —
+  `CalcVideoDimensions` and the PPU surface handoff now report
+  an out-of-range `pixbuf` write through a transient
+  `std::cerr` instead of silently writing past
+  `pixbuf[5][1048576]`.
+- **`src/drivers/Qt/nes_shm.{cpp,h}`** + ripple sites
+  (N-H03, P1-12) — The cross-thread fields (`runEmulator`,
+  `blitUpdated`, `pixBufIdx`, `sndBuf.head/tail/starveCounter`)
+  are now `std::atomic<T>`. Every call site in
+  `ConsoleDebugger`, `ConsoleEmulatorThread`,
+  `ConsoleSoundConf`, `ConsoleViewerGL`,
+  `ConsoleViewerQWidget`, `ConsoleWindow`, and `sdl-sound`
+  uses `.load(acquire)` / `.store(release)` /
+  `.fetch_add(relaxed)` as appropriate.
+- **`src/drivers/Qt/ConsoleViewerSDL.{cpp,h}`** (H-22, P1-17)
+  — SDL resource recreation is now debounced (100 ms after
+  the last resize event) rather than rebuilding the surface /
+  texture / renderer on every frame of a live drag. The
+  `QTimer` is parented to the viewer for automatic cleanup.
+
+#### Phase 3 — FFI boundary safety (12 PRs)
+
+- **`src/rust/crates/fceux11-lua/src/lib.rs`** (C-05, P1-3) —
+  Replaced `static mut LUA_ENGINE_PTR` with `AtomicPtr<c_void>`
+  using Acquire/Release load/store. The previous code was a
+  data race on every `LuaEngine` access.
+- **`src/rust/crates/fceux11-core/src/state_file.rs`** (C-06,
+  P1-4) — `FceuStateChunkOutput` now carries the actual `Vec`
+  capacity. The receiving `Vec::from_raw_parts` previously
+  assumed the same capacity as the producer, which the FFI
+  contract could not guarantee. The `cap` field is mirrored
+  in `fceux11_rust.h`.
+- **`src/rust/crates/fceux11-core/src/sformat.rs`** (C-07,
+  P1-5) — Cap individual SFORMAT entries at 1 MiB during
+  deserialization. A corrupt chunk that declared a 4-byte
+  header followed by a 1 GiB payload used to `memcpy` the
+  whole 1 GiB into the destination buffer.
+- **`src/rust/fceux11_rust.h`** + **`src/rust/crates/
+  fceux11-media/src/filter.rs`** (C-04, P1-6) —
+  `FceuFilterState`'s zero-length-array tail member was
+  undefined behaviour per the C standard. The FFI surface is
+  now an opaque struct tag; the Rust side owns the actual
+  buffer behind `Box<...>`.
+- **`src/drivers/Qt/AviRecord.cpp`** (C-09, P1-8, upgraded
+  CRITICAL) — `aviRecordAddAudioFrame` now drops samples (with
+  a one-shot warn) instead of writing past the `rawAudioBuf`
+  ring when the AVI thread is slower than the emulator. The
+  old behaviour silently corrupted recorded audio and made
+  the resulting AVI unplayable.
+- **`src/drivers/Qt/main.cpp`** (C-10, P1-9) — `CONOUT$` is
+  handed to `stdout` and `stderr` via `DuplicateHandle`
+  rather than reusing the same OS handle through two
+  `_open_osfhandle` calls. The old code closed the underlying
+  handle when the first `FILE*` was `fclose()`d, leaving the
+  second `FILE*` with a dangling OS handle.
+- **`src/rust/crates/fceux11-formats/src/nsf.rs`** (N-H01,
+  P1-10) — The NSF memory write path now refuses to compute
+  `a - 0x6000` when `a < 0x6000`. The underflow wrapped to a
+  huge offset and corrupted the expansion WRAM.
+- **`src/rust/crates/fceux11-formats/src/emufile.rs`** (N-H02,
+  P1-11) — `EMUFILE::seek_set` rejects negative offsets up
+  front instead of casting them to a huge `usize` and
+  resizing the buffer to match.
+- **`src/rust/crates/fceux11-utils/src/{md5,guid}.rs`** (H-13,
+  P1-13) — Every FFI entry point bails on a NULL context
+  argument. The `guid` check was missing entirely; `md5` had
+  one unguarded path.
+- **`src/rust/crates/fceux11-media/src/{video,wave}.rs`**
+  (H-14, P1-14) — `MUTEX.lock().unwrap()` is replaced with
+  `match { Ok(g) => g, Err(poisoned) => poisoned.into_inner() }`
+  so a poisoned mutex on the FFI boundary no longer panics.
+- **`src/rust/crates/fceux11-formats/src/ines.rs`** (H-15,
+  P1-15) — The thread-local PRG/CHR scratch buffers used
+  during iNES load are replaced with `Box::leak` + a free
+  FFI; the C++ side becomes the sole owner and the lifetime
+  is no longer a TOCTOU between threads.
+- **`src/rust/crates/fceux11-utils/src/profiler.rs`** (H-16,
+  P1-16) — The profiler's per-record pointer storage used to
+  be raw `*mut c_void` retained on the C side, which would
+  dangle if the owning Rust struct was dropped first. The
+  registry is now the sole owner behind a `HashMap<u64, ...>`
+  with weak-style ownership semantics for the C-visible
+  handle.
+
+#### Phase 4 — Code robustness (14 PRs)
+
+- **`src/fceu.cpp`** (H-02, P2-1) — `SetReadHandler` /
+  `SetWriteHandler` now reject inverted ranges (`end < start`)
+  up front. A bogus range would walk a huge number of
+  iterations before wrapping or scribbling past
+  `ARead[]` / `AReadG[]`.
+- **`src/fceu.cpp`** (H-03, P2-2 + P3-4 / N-L03) —
+  `FCEUXCart`'s destructor is now `virtual`, `NROM` explicitly
+  inherits `public`, and `FCEU_CloseGame` `delete cart; cart =
+  nullptr;`. Previously the cart leaked on every ROM swap and
+  a future subclass would have been silently sliced.
+- **`src/bus.cpp`** (H-04, P2-3) — `setup_prg_mapping` and
+  `setup_chr_mapping` now short-circuit when `size == 0`. The
+  `(size >> N) - 1` mask computations underflowed on
+  `uint32_t`, leaving mask fields at `UINT32_MAX` and
+  aliasing unrelated memory on every read.
+- **`src/ppu_class.cpp`** (H-05, P2-4) — `set_mirror_pages`
+  masks each of `a`/`b`/`c`/`d` with `0x3` before multiplying
+  by `0x400`, so a bogus mapper cannot index past the 4 KiB
+  nametable region.
+- **`src/ppu_rendering.cpp`** (H-06, P2-5) — Every
+  `*reinterpret_cast<uint32*>` on a `uint8` array is replaced
+  with a `memcpy` round-trip through a local `uint32_t`.
+  Strict-aliasing UB eliminated at 8 sites (`Plinef`,
+  `target[]`, `dtarget[]`, `SPRBUF[]`).
+- **`src/boards/registry.cpp`** (H-19, P2-6) — `g_keepalive[]`
+  grew from a hard-coded `[256]` to `[kRegistrySize]` (512).
+  The constructor and `find_mapper` already guard with
+  `< kRegistrySize`, so the original code did not overflow —
+  but mapper numbers 256..511 silently failed to be
+  kept-alive and could be DCE-stripped by the linker.
+- **`src/sound.cpp`** (H-20, P2-7) — `RDoSQLQ` now reads
+  `x ? Square2 : Square1` matching the HQ path, instead of
+  the inverted pair. Adjusting the Square1 slider used to
+  scale Square2's LQ output and vice versa.
+- **`src/fceu.cpp`** (H-21, P2-8) — `SetAutoFirePattern`
+  clamps the pattern length to a minimum of 2 so an
+  `(0, 1)` or `(1, 0)` input cannot trigger
+  division-by-zero downstream in the autofire scheduler.
+- **`src/boards/mmc5.cpp`** (H-17, H-18, P2-9) —
+  `GenMMC5_Init` now wraps the WRAM and MMC5fill allocations
+  in `FceuMallocPtr` (RAII), wires `info->Close =
+  GenMMC5_Close`, and the close handler resets every owner
+  plus the raw pointers. The MMC5 buffers used to leak on
+  every ROM swap.
+- **`src/drivers/Qt/fceuWrapper.cpp`** (H-24, P2-10) —
+  `fceuWrapperUpdate` now applies progressive backoff
+  (16, 32, 64, 128, 256 ms cap) when the GUI holds the lock
+  for a sustained period. The previous fixed 16 ms wake-up
+  was a busy-wait that starved other processes during long
+  GUI operations.
+- **`src/ines_save.cpp`** (H-12, H-30, P2-12) — `iNesSaveAs`
+  checks every `fwrite` return value (trainer, ROM, VROM)
+  and returns 0 on short writes instead of silently
+  producing a truncated `.nes`.
+- **`src/netplay.cpp`** (H-09, P2-13) — `FCEUNET_SendCommand`
+  switched from `alloca()` to `std::vector<uint8_t>`. The
+  original unbounded `alloca` could overflow the stack for
+  a degenerate `numlocal`.
+- **`src/ines_load.cpp`** (H-10, P2-14) — `FCEU_malloc(PRG-size)`
+  and `FCEU_malloc(CHR-size)` return `LOADER_HANDLED_ERROR`
+  on NULL instead of dereferencing a null pointer on the
+  next line.
+- **`src/drivers/Qt/main.cpp`** (N-L01, P2-15) — The 0-ms
+  `sdlPumpTimer` is armed only after `SDL_WasInit(SDL_INIT_VIDEO)`
+  confirms the subsystem is up. Calling `SDL_PumpEvents`
+  before `SDL_Init` is undefined on some platforms.
+
+#### Phase 5 — Code quality (4 PRs; P3-4 folded into P2-2)
+
+- **`src/x6502struct.h` + `src/core_state.{h,cpp}`** (P3-1) —
+  Renamed the reserved identifier `__X6502` to `X6502` (the
+  same name as the public `typedef`). The double-underscore
+  form was reserved for the implementation per the C and C++
+  standards. The public typedef and every caller now use the
+  same compliant name. ABI is unaffected.
+- **`src/x6502.cpp` + `src/boards/fk23c.cpp`** (P3-2) —
+  Removed `extern int test; test++;` from the main CPU
+  execution loop and the per-reset `printf` of the
+  `BMCFK23C` dip-switch value. The underlying round-robin
+  dipswitch advancement itself is preserved.
+- **`src/state.cpp`** (P3-3) — Rewrote the SFORMAT `desc`
+  allocator and matching free in `ResetExState` to drop the
+  `const_cast<void>(static_cast<const void*>(...))`
+  round-trip. The producer side now copies into a `char*`
+  local first and then assigns to the `const char*` field.
+- **`src/rust/crates/fceux11-core/src/state_file.rs`** (P3-5)
+  — Dropped the dead `let _cap = c_chunks.capacity();` line.
+  The FFI surface only needs the pointer; the per-chunk
+  capacity is already carried in each
+  `FceuStateChunkOutput`.
+
+### Housekeeping
+
+- **`src/fceu.cpp`** — Forward declaration for the file-scope
+  `cart` (FCEUXCart*) near the top of the TU. P2-2 introduced
+  a `delete cart` inside `FCEU_CloseGame`, but `cart` is
+  defined later in the same file (line 1388). Without the
+  forward declaration the compiler reported C2065 on the
+  delete site.
+- **`scripts/check_patches.ps1`** — Relocated from the project
+  root to `scripts/` where the rest of the build/test scripts
+  already live. v1.15 LTS root discipline keeps new top-level
+  entries to a strict allow-list.
+- **`_build_step0.bat`** — Removed. The file was a one-off
+  wrapper from the Phase 0 build attempts and is no longer
+  needed.
+- **`.gitignore`** — `scripts/logs/` is now ignored. The
+  directory holds build verification artifacts (cmake
+  `--build` log, `dumpbin` symbol dumps, manual `cl.exe`
+  probe objects) produced while debugging the Phase 4 + 5
+  builds; they have no long-term value.
+
+### Build verification
+
+`fceux11.exe` 5.7 MB built cleanly with MSVC 14.51 / VS
+BuildTools 18, NMake generator, Release configuration, `/LTCG`.
+The new `scripts/check_patches.ps1` was used to syntax-check
+the patched core files; manual play-testing was performed on
+*Kira Kira Star Night DX* (Kira☆Kira Star Night DX).
+
+### Notes
+
+- All 42 fixes were committed across 7 git commits
+  (`b1a4639`, `48ae750`, `430b4f9`, `ad2914d`, `190412a`,
+  `040de6c`, `a580073`). The Phase 4 (`ad2914d`) and Phase 5
+  (`190412a`) commits are slightly broader than their message
+  suggests because they picked up P0 entries that modified the
+  same files; the per-PR fix rationale is duplicated in the
+  Phase 1 (`b1a4639`) message above.
+- Savestate compatibility: v1.15 save states load correctly.
+  Old v1.10-era savestates with the legacy `SRx0..SRx7` labels
+  continue to load thanks to the P0-2 label-preservation fix.
+- ROM image metadata: no change.
+
+---
+
 ## [1.15] - 2026-07-11
 
 **Codename: Finale.** Fifteenth and final sub-version of the v1.x
