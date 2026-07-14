@@ -165,7 +165,7 @@ fillaudio(void *udata,
         	 		// noise when sound system is starved of audio data.
 				//sample = 0; 
 				bufStarveDetected = 1;
-				nes_shm->sndBuf.starveCounter++;
+				nes_shm->sndBuf.starveCounter.fetch_add(1, std::memory_order_relaxed);
 			}
 
 			nes_shm->push_sound_sample( sample );

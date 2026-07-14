@@ -32,11 +32,11 @@ void emulatorThread_t::setPriority( QThread::Priority priority_req )
 void emulatorThread_t::run(void)
 {
 	printf("Emulator Start\n");
-	nes_shm->runEmulator = 1;
+	nes_shm->runEmulator.store(1, std::memory_order_relaxed);
 
 	init();
 
-	while ( nes_shm->runEmulator )
+	while ( nes_shm->runEmulator.load(std::memory_order_acquire) )
 	{
 		fceuWrapperUpdate();
 	}

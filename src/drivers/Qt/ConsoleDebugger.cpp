@@ -4620,7 +4620,7 @@ void bpDebugSetEnable(bool val)
 void fceWrapper_DebugBreakpoint( int bpNum )
 {
 
-	if ( !nes_shm->runEmulator || !bpDebugEnable )
+	if ( !nes_shm->runEmulator.load(std::memory_order_acquire) || !bpDebugEnable )
 	{
 		return;
 	}
@@ -4671,7 +4671,7 @@ void fceWrapper_DebugBreakpoint( int bpNum )
 
 	FCEU_WRAPPER_UNLOCK();
 
-	while ( nes_shm->runEmulator && bpDebugEnable &&
+	while ( nes_shm->runEmulator.load(std::memory_order_acquire) && bpDebugEnable &&
 			fceu11::IsEmulationPaused() && !fceu11::EmulationFrameStepped())
 	{
 		// HACK: break when Frame Advance is pressed

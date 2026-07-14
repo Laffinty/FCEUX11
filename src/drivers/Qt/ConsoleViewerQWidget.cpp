@@ -195,7 +195,7 @@ void ConsoleViewQWidget_t::transfer2LocalBuffer(void)
 	unsigned int cpSize = numPixels * 4;
  	uint8_t *src, *dest;
 
-	bufIdx = nes_shm->pixBufIdx-1;
+	bufIdx = nes_shm->pixBufIdx.load(std::memory_order_acquire) - 1;
 
 	if ( bufIdx < 0 )
 	{

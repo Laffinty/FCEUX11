@@ -154,10 +154,20 @@ InputDevice* SDLBackend::device(std::size_t index) {
 }
 
 void SDLBackend::pollAll() {
-    // Pump SDL events so joystick state stays current.  The actual event
-    // dispatch loop lives in input.cpp; this just keeps SDL's internal
-    // joystick state fresh for queries.
-    SDL_PumpEvents();
+    // hotfix1 P1-1 (N-C01, upgraded to CRITICAL): SDL_PumpEvents() is NOT
+    // thread-safe per SDL2 docs ("This function is thread-safe, but the
+    // event queue itself is not" — i.e. internal data structures touched
+    // here race with concurrent pumps). The main thread already pumps via
+    // a 0-ms QTimer installed in main.cpp around line 423, which fires
+    // every iteration of the Qt event loop. Calling it here from the
+    // emulator thread concurrently is racy and (per main.cpp:405-425) was
+    // the cause of intermittent input loss / process crashes.
+    //
+    // Joystick state is kept current automatically by the main-thread
+    // pump, so this backend can be a no-op. If a future platform needs
+    // per-frame backend wake-up, gate it with a thread-affinity guard
+    // rather than re-introducing a second pump.
+    (void)0; // intentionally empty
 }
 
 jsDev_t* SDLBackend::rawDevice(int index) {

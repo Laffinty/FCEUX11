@@ -312,7 +312,7 @@ consoleWin_t::~consoleWin_t(void)
 	g_config->save();
 
 	// Signal Emulator Thread to Stop
-	nes_shm->runEmulator = 0;
+	nes_shm->runEmulator.store(0, std::memory_order_release);
 
 #ifdef _WIN32
 	// v0.3.15.x PHASE-3: release the ITaskbarList3 wrapper before
@@ -597,9 +597,9 @@ void consoleWin_t::contextMenuEvent(QContextMenuEvent *event)
 void consoleWin_t::transferVideoBuffer(void)
 {
 	FCEU_PROFILE_FUNC(prof, "VideoXfer");
-	if ( nes_shm->blitUpdated )
+	if ( nes_shm->blitUpdated.load(std::memory_order_acquire) )
 	{
-		nes_shm->blitUpdated = 0;
+		nes_shm->blitUpdated.store(0, std::memory_order_relaxed);
 
 		if (viewport_Interface)
 		{

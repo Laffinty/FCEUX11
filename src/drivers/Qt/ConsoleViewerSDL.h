@@ -9,6 +9,7 @@
 #include <QCursor>
 #include <QPaintEvent>
 #include <QResizeEvent>
+#include <QTimer>
 #include <QPixmap>
 #include <SDL.h>
 
@@ -97,6 +98,14 @@ class ConsoleViewSDL_t : public QWidget, public ConsoleViewerBase
 	SDL_Cursor   *sdlCursor;
 	//SDL_Rect      sdlViewport;
 
+	// hotfix1 P1-17 (H-22): debounce SDL resource recreation so a live
+	// drag-resize doesn't tear down and rebuild the SDL renderer /
+	// texture on every intermediate size. The timer is owned by Qt as
+	// `this`'s child, restarted on each resizeEvent, fires reset() 100
+	// ms after the last event.
+	QTimer resizeDebounceTimer;
+
 	private slots:
+	void onResizeDebounceTimeout(void);
 };
 

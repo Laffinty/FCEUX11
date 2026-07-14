@@ -38,6 +38,11 @@ extern unsigned int gui_draw_area_height;
 
 ConsoleViewSDL_t::ConsoleViewSDL_t(QWidget *parent)
 	: QWidget( parent )
+	// hotfix1 P1-17 (H-22): construct as a child of `this` so it is
+	// destroyed automatically with the widget. `this` is allowed inside
+	// the ctor's init list because QTimer only stores the parent; no
+	// call into the timer happens until the connection below.
+	, resizeDebounceTimer(this)
 {
 	consoleWin_t *win = qobject_cast <consoleWin_t*>(parent);
 
@@ -119,6 +124,23 @@ ConsoleViewSDL_t::ConsoleViewSDL_t(QWidget *parent)
 		}
 		g_config->getOption ("SDL.VideoVsync", &vsyncEnabled);
 	}
+
+	// hotfix1 P1-17 (H-22): wire up the debounce timer that batches a
+	// burst of resize events into a single reset(). 100 ms is short
+	// enough to feel responsive but long enough that a user dragging the
+	// window border doesn't trigger a full SDL window / renderer teardown
+	// + recreation on every event-loop tick.
+	resizeDebounceTimer.setSingleShot(true);
+	resizeDebounceTimer.setInterval(100);
+	connect(&resizeDebounceTimer, &QTimer::timeout,
+	        this, &ConsoleViewSDL_t::onResizeDebounceTimeout);
+}
+
+void ConsoleViewSDL_t::onResizeDebounceTimeout(void)
+{
+	// timer is single-shot — just rebuild now that the user stopped
+	// resizing for at least one tick interval.
+	reset();
 }
 
 ConsoleViewSDL_t::~ConsoleViewSDL_t(void)
@@ -210,7 +232,7 @@ void ConsoleViewSDL_t::transfer2LocalBuffer(void)
 	unsigned int cpSize = numPixels * 4;
  	uint8_t *src, *dest;
 
-	bufIdx = nes_shm->pixBufIdx-1;
+	bufIdx = nes_shm->pixBufIdx.load(std::memory_order_acquire) - 1;
 
 	if ( bufIdx < 0 )
 	{
@@ -487,7 +509,14 @@ void ConsoleViewSDL_t::resizeEvent(QResizeEvent *event)
 	gui_draw_area_width = view_width;
 	gui_draw_area_height = view_height;
 
-	reset();
+	// hotfix1 P1-17 (H-22): instead of recreating SDL resources on every
+	// event (see PLAN §3 P1-17), restart the single-shot timer. If a new
+	// resize fires within 100 ms the timer is restarted and only the
+	// last one in the burst actually runs reset(). The very first event
+	// in a burst sets the desired final size into the member variables
+	// above immediately so paintEvent can keep drawing at the latest
+	// dimensions without waiting for the timer.
+	resizeDebounceTimer.start();
 }
 
 void ConsoleViewSDL_t::mousePressEvent(QMouseEvent * event)

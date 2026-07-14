@@ -47,6 +47,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
+#include <iostream>
 
 // GLOBALS
 extern Config *g_config;
@@ -189,6 +190,29 @@ void CalcVideoDimensions(void)
 		nes_shm->video.xyRatio = 1;
 	}
 	nes_shm->video.pitch = nes_shm->video.ncol * 4;
+
+	// hotfix1 P1-7 (C-08): the destination buffer is `pixbuf[5][1048576]`
+	// (1024×1024 uint32), so any ncol×nrow product beyond 1048576 is a
+	// guaranteed scribble past the end. With the largest configured
+	// scale (4×) and the largest visible line range (PAL ≈ 312 lines),
+	// peak ncol × nrow should fit in 1024×1024, but a corrupt
+	// configuration (scale "5", manual override, or future custom
+	// filter) could blow past it. Clamp to 1024 and refuse the
+	// calc — every consumer checks the bounds first.
+	if ((long long)nes_shm->video.ncol * nes_shm->video.nrow > 1048576LL) {
+		// hotfix1 P1-7 (C-08): report the mismatch via a transient std::cerr
+		// rather than FCEUD_PrintError, which only takes a single message
+		// argument; using a 3-arg printf-like form here would fail to
+		// compile. The diagnostic is fire-and-forget on the first
+		// overrun; after the clamp below, the rest of the program sees
+		// a sane 1024×1024 surface.
+		std::cerr << "video dimensions " << nes_shm->video.ncol
+		          << "x" << nes_shm->video.nrow
+		          << " exceed 1024x1024 framebuffer; clamping" << std::endl;
+		nes_shm->video.ncol = 1024;
+		nes_shm->video.nrow = 1024;
+		nes_shm->video.pitch = 4096;
+	}
 }
 
 int InitVideo(FCEUGI *gi)
@@ -403,7 +427,7 @@ static void vsync_test(void)
 	static int ofs = 0;
 	uint32_t *pixbuf;
 
-	pixbuf = nes_shm->pixbuf[nes_shm->pixBufIdx];
+	pixbuf = nes_shm->pixbuf[ nes_shm->pixBufIdx.load(std::memory_order_acquire) ];
 
 	cycleLen = nes_shm->video.ncol / 4;
 
@@ -498,7 +522,7 @@ doBlitScreen(uint8_t *XBuf, uint8_t *dest)
 void
 BlitScreen(uint8 *XBuf)
 {
-	int i = nes_shm->pixBufIdx;
+	int i = nes_shm->pixBufIdx.load(std::memory_order_acquire);
 
 	if (usePaletteForVideoBg)
 	{
@@ -515,9 +539,9 @@ BlitScreen(uint8 *XBuf)
 
 	doBlitScreen(XBuf, (uint8_t*)nes_shm->pixbuf[i]);
 
-	nes_shm->pixBufIdx = (i+1) % NES_VIDEO_BUFLEN;
+	nes_shm->pixBufIdx.store( (i+1) % NES_VIDEO_BUFLEN, std::memory_order_release );
 	nes_shm->blit_count++;
-	nes_shm->blitUpdated = 1;
+	nes_shm->blitUpdated.store(1, std::memory_order_release);
 }
 
 void fceu11::AviVideoUpdate(const unsigned char* buffer)

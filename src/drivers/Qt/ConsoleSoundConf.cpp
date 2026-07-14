@@ -365,7 +365,7 @@ void ConsoleSndConfDialog_t::closeWindow(void)
 //----------------------------------------------------
 void ConsoleSndConfDialog_t::resetCounters(void)
 {
-	nes_shm->sndBuf.starveCounter = 0;
+	nes_shm->sndBuf.starveCounter.store(0, std::memory_order_relaxed);
 
 	periodicUpdate();
 }
@@ -383,7 +383,7 @@ void ConsoleSndConfDialog_t::periodicUpdate(void)
 
 	bufUsage->setValue( (int)(percBufUse) );
 
-	snprintf( stmp, sizeof(stmp), "Sink Starve Count: %u", nes_shm->sndBuf.starveCounter );
+	snprintf( stmp, sizeof(stmp), "Sink Starve Count: %u", nes_shm->sndBuf.starveCounter.load(std::memory_order_relaxed) );
 
 	starveLbl->setText( tr(stmp) );
 
