@@ -24,7 +24,7 @@ namespace fceu11 {
 // ---------------------------------------------------------------------------
 // CpuView
 // ---------------------------------------------------------------------------
-__X6502& CpuView::reg() noexcept { return fceu11::cpu_instance().native_layout(); }
+X6502& CpuView::reg() noexcept { return fceu11::cpu_instance().native_layout(); }
 uint32_t& CpuView::timestamp() noexcept { return fceu11::cpu_instance().timestamp_ref(); }
 uint32_t& CpuView::sound_timestamp() noexcept { return fceu11::cpu_instance().sound_timestamp_ref(); }
 int& CpuView::scanline() noexcept { return fceu11::cpu_instance().scanline_ref(); }

@@ -620,10 +620,22 @@ bool FCEUSS_LoadFP(EMUFILE* is, ENUM_SSLOADPARAMS params)
 		case 8:
 			{
 				extern uint8 *XBackBuf;
-				if (size == 256 * 256 + 8) {
-					memcpy(XBackBuf, data, 256 * 256);
+				constexpr size_t kXBackBufSize = 256 * 256;
+				// hotfix1 P0-6 (H-29): the old `else memcpy(XBackBuf, data, size)`
+				// would happily copy up to GIGA bytes when the chunk's size field
+				// is corrupted, writing past XBackBuf. Accept only the two valid
+				// sizes (with and without the 8-byte trailer present on legacy
+				// savestates); reject anything else so a malformed chunk
+				// can't corrupt the framebuffer or stack.
+				if (size == kXBackBufSize + 8 || size == kXBackBufSize) {
+					memcpy(XBackBuf, data, kXBackBufSize);
 				} else {
-					memcpy(XBackBuf, data, size);
+					char msg[96];
+					snprintf(msg, sizeof(msg),
+						"chunk-8 size %u outside XBackBuf; ignoring",
+						static_cast<unsigned>(size));
+					FCEUD_PrintError(msg);
+					ret = false;
 				}
 			}
 			break;
@@ -815,7 +827,13 @@ void ResetExState(void (*PreSave)(void), void (*PostSave)(void))
 	for(x=0;x<SFEXINDEX;x++)
 	{
 		if(SFMDATA[x].desc)
-			FCEU_free(const_cast<void*>(static_cast<const void*>(SFMDATA[x].desc)));
+			// hotfix1 P3-3: drop the awkward
+			//   const_cast<void>(static_cast<const void*>())
+			// round-trip. desc is `const char*` but the underlying memory
+			// was allocated via FCEU_malloc in AddExState (mutable heap),
+			// so a single const_cast<char*> is enough to hand the pointer
+			// back to FCEU_free, which expects `void*`.
+			FCEU_free(const_cast<char*>(SFMDATA[x].desc));
 	}
 	// adelikat, 3/14/09:  had to add this to clear out the size parameter.  NROM(mapper 0) games were having savestate crashes if loaded after a non NROM game	because the size variable was carrying over and causing savestates to save too much data
 	SFMDATA[0].s = 0;
@@ -871,8 +889,15 @@ void AddExState(void *v, uint32 s, int type, const char *desc)
 		// ASan heap-buffer-overflow for any desc shorter than 7 chars
 		// (e.g. the 4-char "CHRR"/"EXNR" tags registered during iNES_Init).
 		const size_t desc_len = strlen(desc) + 1;
-		SFMDATA[SFEXINDEX].desc = static_cast<const char*>(FCEU_malloc(desc_len));
-		FCEU_strlcpy(const_cast<char*>(SFMDATA[SFEXINDEX].desc), desc_len, desc);
+		// hotfix1 P3-3: drop the const_cast on strlcpy by performing the
+		// copy into a mutable local while the memory is still typed as
+		// char*, then assigning the result to the const char* desc field.
+		// desc is meant to be a read-only identifier, but the underlying
+		// allocation is mutable heap, so this cast happens exactly once
+		// and only on the producer side.
+		char* mutable_desc = static_cast<char*>(FCEU_malloc(desc_len));
+		FCEU_strlcpy(mutable_desc, desc_len, desc);
+		SFMDATA[SFEXINDEX].desc = mutable_desc;
 	}
 	else
 		SFMDATA[SFEXINDEX].desc=0;

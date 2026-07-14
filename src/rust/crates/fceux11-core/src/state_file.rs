@@ -408,11 +408,20 @@ pub struct FceuStateChunkInput {
 }
 
 /// Output chunk descriptor for loading.
+///
+/// hotfix1 P1-4 (C-06): added an explicit `cap` so the matching
+/// `Vec::from_raw_parts` in `state_file_chunks_free` reconstructs the
+/// exact same capacity `Vec::with_capacity` produced originally. Without
+/// `cap`, the previous code passed `cap = chunk.len` which silently
+/// truncated deallocations and could cause a mismatched-deallocation UB
+/// at shutdown if a single chunk had been reallocated away from its
+/// initial capacity.
 #[repr(C)]
 pub struct FceuStateChunkOutput {
     pub chunk_type: u8,
     pub data: *mut u8,
     pub len: usize,
+    pub cap: usize,
 }
 
 /// Buffer descriptor returned by save / used by free.
@@ -545,18 +554,29 @@ pub unsafe extern "C" fn fceux11_rust_state_file_load(
             let mut c_chunks: Vec<FceuStateChunkOutput> = Vec::with_capacity(count);
             for chunk in chunks {
                 let mut data = chunk.data;
-                data.shrink_to_fit();
+                let cap = data.capacity();
+                let ptr = data.as_mut_ptr();
+                let len = data.len();
+                // transfer ownership: forget the original Vec and hand the
+                // C side the raw allocation plus its true capacity.
+                std::mem::forget(data);
                 c_chunks.push(FceuStateChunkOutput {
                     chunk_type: chunk.chunk_type,
-                    data: data.as_mut_ptr(),
-                    len: data.len(),
+                    data: ptr,
+                    len,
+                    cap,
                 });
-                std::mem::forget(data);
             }
 
             c_chunks.shrink_to_fit();
             let ptr = c_chunks.as_mut_ptr();
-            let _cap = c_chunks.capacity();
+            // hotfix1 P3-5 (N-L02): the previous code computed
+            //   let _cap = c_chunks.capacity();
+            // but never used the value (the FFI surface only needs the
+            // pointer, len, and the per-chunk capacity which is already
+            // carried inside each FceuStateChunkOutput). The leading
+            // underscore silenced the unused-variable warning, but the
+            // call itself was pure dead work. Drop it entirely.
             std::mem::forget(c_chunks);
 
             unsafe {
@@ -604,7 +624,9 @@ pub unsafe extern "C" fn fceux11_rust_state_file_chunks_free(
         let slice = std::slice::from_raw_parts_mut(chunks, chunk_count);
         for chunk in slice {
             if !chunk.data.is_null() && chunk.len > 0 {
-                drop(Vec::from_raw_parts(chunk.data, chunk.len, chunk.len));
+                // hotfix1 P1-4 (C-06): use the propagated `cap` so the
+                // freed allocation matches what `with_capacity` set.
+                drop(Vec::from_raw_parts(chunk.data, chunk.len, chunk.cap));
             }
         }
         drop(Vec::from_raw_parts(chunks, chunk_count, chunk_count));

@@ -202,7 +202,11 @@ static void BMCFK23CReset(void)
 	//this little hack makes sure that we try all the dip switch settings eventually, if we reset enough
 	 dipswitch++;
 	 dipswitch&=7;
-	printf("BMCFK23C dipswitch set to %u\n",dipswitch);
+	// hotfix1 P3-2: the per-reset stdout print of the current dip-switch
+	// value used to fire every time a BMCFK23C cart reset itself —
+	// useful when first reverse-engineering the board, spammy in any
+	// long play session. Drop the print but keep the underlying
+	// round-robin dipswitch advancement intact.
 
 	EXPREGS[0]=EXPREGS[1]=EXPREGS[2]=EXPREGS[3]=0;
 	EXPREGS[4]=EXPREGS[5]=EXPREGS[6]=EXPREGS[7]=0xFF;

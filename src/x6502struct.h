@@ -5,7 +5,15 @@
 #pragma warning(push)
 #pragma warning(disable: 4324)
 #endif
-typedef struct alignas(64) __X6502 {
+// hotfix1 P3-1: identifiers beginning with two underscores (or with an
+// underscore followed by an upper-case letter) are reserved for the
+// implementation per the C and C++ standards. `__X6502` was therefore
+// technically a strict-aliasing / name-collision hazard on conforming
+// toolchains. Rename the struct tag to `X6502` (the same name as the
+// public typedef at the bottom of this file) and update the few
+// internal references — the public typedef is unchanged so all existing
+// `X6502 foo;` and `X6502 *bar;` callers keep working.
+typedef struct alignas(64) X6502 {
   int32 tcount;     /* Temporary cycle counter */
   uint16 PC;        /* I'll change this to uint32 later... */
                                 /* I'll need to AND PC after increments to 0xFFFF */
@@ -21,9 +29,9 @@ typedef struct alignas(64) __X6502 {
   int preexec;      /* Pre-exec'ing for debug breakpoints. */
 
 	#ifdef FCEUDEF_DEBUGGER
-        void (*CPUHook)(struct __X6502 *);
-        uint8 (*ReadHook)(struct __X6502 *, unsigned int);
-        void (*WriteHook)(struct __X6502 *, unsigned int, uint8);
+        void (*CPUHook)(struct X6502 *);
+        uint8 (*ReadHook)(struct X6502 *, unsigned int);
+        void (*WriteHook)(struct X6502 *, unsigned int, uint8);
 	#endif
 
 } X6502;

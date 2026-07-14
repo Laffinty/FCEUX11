@@ -30,11 +30,14 @@
 // them inside namespace fceu11 would create distinct types — the global
 // X6502 used by `::X` is not the same C++ type as fceu11::X6502.
 //
-// Note: for typedef'd types (FCEUS → fceu_settings_struct, X6502 → __X6502)
-// we forward-declare the underlying struct tag, not the typedef alias.
-// The .cpp uses the typedef names; C++ treats both spellings as the same
-// type.
-struct __X6502;
+// Note: for typedef'd types (FCEUS → fceu_settings_struct, X6502 → X6502
+// struct tag) we forward-declare the underlying struct tag, not the
+// typedef alias. The .cpp uses the typedef names; C++ treats both
+// spellings as the same type.
+// hotfix1 P3-1: the previous forward decl was `struct __X6502`, an
+// identifier reserved for the implementation. Renamed to `struct X6502`
+// in x6502struct.h; this forward declaration follows.
+struct X6502;
 struct fceu_settings_struct;
 struct CartInfo;
 struct iNES_HEADER;
@@ -45,7 +48,7 @@ namespace fceu11 {
 // CPU view (分类 A — owned by x6502.cpp; v1.3 will fold into Cpu class)
 // ---------------------------------------------------------------------------
 struct CpuView {
-    __X6502&     reg()      noexcept;   // X (typedef X6502 = __X6502)
+    X6502&     reg()      noexcept;   // X (typedef X6502 = X6502 struct tag)
     uint32_t&    timestamp()   noexcept; // CPU master clock
     uint32_t&    sound_timestamp() noexcept; // APU sub-clock
     int&         scanline() noexcept;
