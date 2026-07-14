@@ -121,7 +121,14 @@ pub unsafe extern "C" fn fceux11_rust_sformat_buf_free(buf: *mut u8, len: usize)
 /// `entries` must point to a valid array of `count` SFORMAT entries.
 /// Each entry's `v` pointer must be valid for writes of `entry.s & !FLAGS` bytes.
 /// The array must be terminated by an entry with `v == null`.
-#[unsafe(no_mangle)]
+// hotfix1 P1-5 (C-07): refuse any individual SFORMAT entry larger than
+// 1 MiB. The savestate stream header declares the size, and the old
+// code trusted it without bound — a 32-bit `size` field of 0xFFFFFFFF
+// plus any pointer-deref target would copy ~4 GiB into the destination
+// even though legitimate entries never exceed a few KB. We bail out
+// before doing any memcpy.
+const MAX_SFORMAT_ENTRY_SIZE: usize = 1 << 20;
+
 pub unsafe extern "C" fn fceux11_rust_sformat_deserialize(
     stream_data: *const u8,
     stream_len: usize,
@@ -147,6 +154,12 @@ pub unsafe extern "C" fn fceux11_rust_sformat_deserialize(
         ]) as usize;
         pos += 8;
 
+        // hotfix1 P1-5 (C-07): cap individual entries. A 4-byte length
+        // field with no upper bound check was enough for a malicious
+        // savestate to scribble past the destination buffer.
+        if size > MAX_SFORMAT_ENTRY_SIZE {
+            return false;
+        }
         if pos + size > stream.len() {
             return false; // truncated
         }

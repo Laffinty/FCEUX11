@@ -544,10 +544,21 @@ fn bankset(
     if sound_chip & 4 != 0 {
         // FDS: copy bank data into ExWRAM
         if !ex_wram.is_null() && !nsf_data.is_null() {
-            let dst = unsafe { ex_wram.add((a - 0x6000) as usize) };
-            let src = unsafe { nsf_data.add((bank as usize) << 12) };
-            unsafe {
-                std::ptr::copy_nonoverlapping(src, dst, 4096);
+            // hotfix1 P1-10 (N-H01): a corrupt or future-format NSF
+            // can pass `a` smaller than 0x6000 here, in which case
+            // `(a - 0x6000) as usize` would wrap to a near-`usize::MAX`
+            // offset and the subsequent copy would scribble wildly
+            // outside `ex_wram`. Guard and skip silently for that path
+            // — the FDS handler is the only branch that actually
+            // depends on the offset into ExWRAM, so dropping the
+            // invalid bank load is preferable to writing past the
+            // heap.
+            if a >= 0x6000 {
+                let dst = unsafe { ex_wram.add((a - 0x6000) as usize) };
+                let src = unsafe { nsf_data.add((bank as usize) << 12) };
+                unsafe {
+                    std::ptr::copy_nonoverlapping(src, dst, 4096);
+                }
             }
         }
     } else if let Some(set_prg4) = cb.set_prg4 {

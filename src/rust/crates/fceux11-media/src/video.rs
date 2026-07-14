@@ -485,9 +485,11 @@ static SNAPSHOT_AS_NAME: Mutex<Option<String>> = Mutex::new(None);
 /// UTF-8 bytes. The bytes need not be NUL-terminated.
 #[unsafe(no_mangle)]
 pub extern "C" fn fceux11_rust_video_set_snapshot_as_name(name: *const c_char, name_len: usize) {
-    let mut guard = SNAPSHOT_AS_NAME
-        .lock()
-        .expect("snapshot name mutex poisoned");
+    // hotfix1 P1-14 (H-14): recover from poisoning instead of aborting.
+    let mut guard = match SNAPSHOT_AS_NAME.lock() {
+        Ok(g) => g,
+        Err(poisoned) => poisoned.into_inner(),
+    };
     if name.is_null() || name_len == 0 {
         *guard = None;
         return;
@@ -524,9 +526,11 @@ pub extern "C" fn fceux11_rust_video_get_snapshot_as_name(
     buf: *mut c_char,
     buf_len: usize,
 ) -> usize {
-    let guard = SNAPSHOT_AS_NAME
-        .lock()
-        .expect("snapshot name mutex poisoned");
+    // hotfix1 P1-14 (H-14): same recovery pattern as set_snapshot_as_name.
+    let guard = match SNAPSHOT_AS_NAME.lock() {
+        Ok(g) => g,
+        Err(poisoned) => poisoned.into_inner(),
+    };
     let name = match guard.as_ref() {
         Some(s) => s.clone(),
         None => return 0,

@@ -24,9 +24,14 @@ fn write_hex_u16(val: u16, out: &mut [c_char]) {
 /// C ABI: Generate a new random GUID (UUID v4) into the provided buffer.
 ///
 /// # Safety
-/// `guid` must point to a valid, writable `FceuGuid`.
+/// `guid` must point to a valid, writable `FceuGuid`, or be NULL.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_guid_new(guid: *mut FceuGuid) {
+    // hotfix1 P1-13 (H-13): tolerate NULL rather than dereferencing into
+    // address 0.
+    if guid.is_null() {
+        return;
+    }
     let guid = unsafe { &mut *guid };
     let id = uuid::Uuid::new_v4();
     guid.data.copy_from_slice(id.as_bytes());

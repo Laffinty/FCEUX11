@@ -15,19 +15,26 @@ mod ffi_stubs;
 use std::collections::HashMap;
 use std::ffi::{c_char, c_int, c_void};
 use std::os::raw::c_uint;
+use std::sync::atomic::{AtomicPtr, Ordering};
 
 use mlua::{Lua, RegistryKey, Thread};
 
-static mut LUA_ENGINE_PTR: *mut c_void = std::ptr::null_mut();
+// hotfix1 P1-3 (C-05): replaced `static mut LUA_ENGINE_PTR` with AtomicPtr
+// so C++ can read the pointer from any FFI callback without going through
+// `unsafe { ... }` to mutate the static. We also lift the `unsafe` from
+// each `get_engine()` accessor — the only remaining `unsafe` is the
+// dereference of the `*mut LuaEngine` itself, which is unavoidable.
+static LUA_ENGINE_PTR: AtomicPtr<c_void> = AtomicPtr::new(std::ptr::null_mut());
 
 #[inline(always)]
 fn get_engine<'a>() -> Option<&'a mut LuaEngine> {
-    unsafe { (LUA_ENGINE_PTR as *mut LuaEngine).as_mut() }
+    let raw = LUA_ENGINE_PTR.load(Ordering::Acquire) as *mut LuaEngine;
+    unsafe { raw.as_mut() }
 }
 
 #[unsafe(no_mangle)]
 pub(crate) fn get_engine_mut<'a>() -> Option<&'a mut LuaEngine> {
-    unsafe { (LUA_ENGINE_PTR as *mut LuaEngine).as_mut() }
+    get_engine()
 }
 
 // ---------------------------------------------------------------------------
@@ -510,7 +517,11 @@ unsafe extern "C" fn fceux11_lua_init() -> c_int {
     match LuaEngine::new() {
         Ok(engine) => {
             let boxed = Box::new(engine);
-            LUA_ENGINE_PTR = Box::into_raw(boxed) as *mut c_void;
+            // hotfix1 P1-3 (C-05): use atomic store; the matching
+            // `Ordering::Acquire` reader in `get_engine()` ensures the
+            // publishing thread's writes to the freshly-created engine
+            // are visible before any subsequent reader observes it.
+            LUA_ENGINE_PTR.store(Box::into_raw(boxed) as *mut c_void, Ordering::Release);
             0
         }
         Err(e) => {
@@ -800,7 +811,7 @@ mod tests {
         unsafe {
             let lua = Lua::new();
             let engine = LuaEngine::new().unwrap();
-            unsafe { LUA_ENGINE_PTR = Box::into_raw(Box::new(engine)) as *mut c_void };
+            unsafe { LUA_ENGINE_PTR.store(Box::into_raw(Box::new(engine)) as *mut c_void, Ordering::Release) };
 
             let memory_table = bindings::memory::register(&lua).unwrap();
             lua.globals().set("memory", memory_table).unwrap();
@@ -816,11 +827,12 @@ mod tests {
             assert_eq!(count, 1, "Should have 1 write hook registered");
 
             unsafe {
-                if let Some(eng) = (LUA_ENGINE_PTR as *mut LuaEngine).as_mut() {
+                let raw = LUA_ENGINE_PTR.load(Ordering::Acquire) as *mut LuaEngine;
+                if let Some(eng) = raw.as_mut() {
                     eng.stop();
                 }
-                let _ = Box::from_raw(LUA_ENGINE_PTR as *mut LuaEngine);
-                LUA_ENGINE_PTR = std::ptr::null_mut();
+                let _ = Box::from_raw(raw);
+                LUA_ENGINE_PTR.store(std::ptr::null_mut(), Ordering::Release);
             }
         }
     }
@@ -831,7 +843,7 @@ mod tests {
         unsafe {
             let lua = Lua::new();
             let engine = LuaEngine::new().unwrap();
-            unsafe { LUA_ENGINE_PTR = Box::into_raw(Box::new(engine)) as *mut c_void };
+            unsafe { LUA_ENGINE_PTR.store(Box::into_raw(Box::new(engine)) as *mut c_void, Ordering::Release) };
 
             let func1 = lua.create_function(|_, ()| Ok(())).unwrap();
             let func2 = lua.create_function(|_, ()| Ok(())).unwrap();
@@ -847,11 +859,12 @@ mod tests {
             assert_eq!(unsafe { fceux11_lua_get_mem_hook_count(2) }, 0);
 
             unsafe {
-                if let Some(eng) = (LUA_ENGINE_PTR as *mut LuaEngine).as_mut() {
+                let raw = LUA_ENGINE_PTR.load(Ordering::Acquire) as *mut LuaEngine;
+                if let Some(eng) = raw.as_mut() {
                     eng.stop();
                 }
-                let _ = Box::from_raw(LUA_ENGINE_PTR as *mut LuaEngine);
-                LUA_ENGINE_PTR = std::ptr::null_mut();
+                let _ = Box::from_raw(raw);
+                LUA_ENGINE_PTR.store(std::ptr::null_mut(), Ordering::Release);
             }
         }
     }

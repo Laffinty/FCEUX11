@@ -74,28 +74,54 @@ pub unsafe extern "C" fn fceux11_rust_ines_header_cleanup(header_bytes: *mut u8)
 // ------------------------------------------------------------------
 
 /// Return the human-readable name for a mapper number.
-/// Returns a pointer to a static string, or null if not found.
+/// Returns a pointer to a `&'static CStr`, or null if not found.
+///
+/// hotfix1 P1-15 (H-15): the previous implementation kept the result in a
+/// `thread_local!` cell, so thread A's returned pointer would silently
+/// get overwritten the next time thread B called mapper_name(). Even on
+/// a single thread, the buffer's lifetime was tied to the calling
+/// thread's existence (panics inside the borrow_mut() guard would
+/// poison the cell for the rest of the program).
+///
+/// We replace it with a once-initialized `Vec<(i32, &'static CStr)>`
+/// keyed by mapper number. The CStr pointers have `'static` lifetime
+/// and a single backing allocation built on first call, so they can be
+/// read concurrently from any thread.
+fn mapper_name_cache() -> &'static std::sync::RwLock<
+    std::collections::HashMap<i32, &'static std::ffi::CStr>,
+> {
+    use std::collections::HashMap;
+    use std::ffi::CStr;
+    use std::sync::{OnceLock, RwLock};
+    static CACHE: OnceLock<RwLock<HashMap<i32, &'static CStr>>> = OnceLock::new();
+    CACHE.get_or_init(|| {
+        // hotfix1 P1-15 follow-up: the prior version called
+        // CStr::from_bytes_with_nul(s.as_bytes()) on a plain &str,
+        // which does NOT include the trailing NUL byte and panicked
+        // at first FFI entry with NotNulTerminated. Walk MAPPER_NAMES,
+        // convert each entry to CString (which adds the NUL), then
+        // leak the boxed CStr so the cache holds &'static CStr.
+        // Bounded leak (finite mapper table, ~hundred entries).
+        let mut m: HashMap<i32, &'static CStr> =
+            HashMap::with_capacity(ines_data::MAPPER_NAMES.len());
+        for (n, s) in ines_data::MAPPER_NAMES {
+            let owned = std::ffi::CString::new(*s)
+                .expect("static mapper name contained interior NUL");
+            m.insert(*n, Box::leak(owned.into_boxed_c_str()));
+        }
+        RwLock::new(m)
+    })
+}
 #[unsafe(no_mangle)]
 pub extern "C" fn fceux11_rust_ines_mapper_name(mapper_no: i32) -> *const c_char {
-    match ines_data::MAPPER_NAMES
-        .iter()
-        .find(|(n, _)| *n == mapper_no)
-    {
-        Some(entry) => {
-            let name: &str = entry.1;
-            // For simplicity we use a thread-local buffer.
-            thread_local! {
-                static BUF: std::cell::RefCell<[u8; 256]> = const { std::cell::RefCell::new([0u8; 256]) };
-            }
-            BUF.with(|buf| {
-                let mut b = buf.borrow_mut();
-                let bytes = name.as_bytes();
-                let len = bytes.len().min(255);
-                b[..len].copy_from_slice(&bytes[..len]);
-                b[len] = 0;
-                b.as_ptr() as *const c_char
-            })
-        }
+    let guard = match mapper_name_cache().read() {
+        Ok(g) => g,
+        // POISON: another thread panicked while holding the write lock;
+        // fall through with the still-readable contents rather than abort.
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    match guard.get(&mapper_no) {
+        Some(s) => s.as_ptr(),
         None => std::ptr::null(),
     }
 }

@@ -156,9 +156,16 @@ const MD5_PADDING: [u8; 64] = [
 ];
 
 /// # Safety
-/// `ctx` must point to a valid, writable `Md5Context`.
+/// `ctx` must point to a valid, writable `Md5Context`, or be NULL.
+///
+/// hotfix1 P1-13 (H-13): tolerated NULL — the C-side driver can pass a
+/// zero-initialised `Md5Context*` during FCEU_MemoryInitialize-style
+/// probing. Returning silently leaves the caller's intent (no-op) intact.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_md5_starts(ctx: *mut Md5Context) {
+    if ctx.is_null() {
+        return;
+    }
     let ctx = unsafe { &mut *ctx };
     ctx.total = [0, 0];
     ctx.state = [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476];
@@ -174,7 +181,9 @@ pub unsafe extern "C" fn fceux11_rust_md5_update(
     input: *const u8,
     length: u32,
 ) {
-    if input.is_null() || length == 0 {
+    // hotfix1 P1-13 (H-13): guard ctx as well — the old code only bailed
+    // on null/empty inputs and dereferenced ctx unconditionally.
+    if ctx.is_null() || input.is_null() || length == 0 {
         return;
     }
     let ctx = unsafe { &mut *ctx };
@@ -219,6 +228,10 @@ pub unsafe extern "C" fn fceux11_rust_md5_update(
 /// `digest` must point to at least 16 writable bytes.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_md5_finish(ctx: *mut Md5Context, digest: *mut u8) {
+    // hotfix1 P1-13 (H-13): both pointers must be non-null.
+    if ctx.is_null() || digest.is_null() {
+        return;
+    }
     let ctx = unsafe { &mut *ctx };
     let digest = unsafe { slice::from_raw_parts_mut(digest, 16) };
 

@@ -145,7 +145,7 @@ uint32_t fceux11_rust_uppow2(uint32_t n);
  * C ABI: Generate a new random GUID (UUID v4) into the provided buffer.
  *
  * # Safety
- * `guid` must point to a valid, writable `FceuGuid`.
+ * `guid` must point to a valid, writable `FceuGuid`, or be NULL.
  */
 void fceux11_rust_guid_new(struct FceuGuid *guid);
 
@@ -170,7 +170,11 @@ void fceux11_rust_guid_scan(struct FceuGuid *guid,
 
 /**
  * # Safety
- * `ctx` must point to a valid, writable `Md5Context`.
+ * `ctx` must point to a valid, writable `Md5Context`, or be NULL.
+ *
+ * hotfix1 P1-13 (H-13): tolerated NULL — the C-side driver can pass a
+ * zero-initialised `Md5Context*` during FCEU_MemoryInitialize-style
+ * probing. Returning silently leaves the caller's intent (no-op) intact.
  */
 void fceux11_rust_md5_starts(struct md5_context *ctx);
 
@@ -233,6 +237,24 @@ int32_t fceux11_rust_file_exists(const char *filepath);
 int32_t fceux11_rust_msleep(int32_t ms);
 
 /**
+ * Take ownership of a raw C++ record pointer and return a stable `u64`
+ * ID. Subsequent FFI calls use this ID; the ID remains valid until
+ * `fceux11_rust_profiler_record_drop` is called or the process exits.
+ *
+ * # Safety
+ * The pointer may be anything non-null that the C++ side wants Rust to
+ * hand back later. Rust never dereferences it.
+ */
+uint64_t fceux11_rust_profiler_record_take(void *rec);
+
+/**
+ * Drop the strong reference previously taken with `record_take`. Map
+ * lookups that still hold a `Weak` for this record will start returning
+ * `null` afterwards.
+ */
+void fceux11_rust_profiler_record_drop(uint64_t id);
+
+/**
  * C ABI: Create a new `ProfilerFuncMap` and return an opaque handle.
  */
 void *fceux11_rust_profiler_map_create(void);
@@ -243,39 +265,45 @@ void *fceux11_rust_profiler_map_create(void);
 void fceux11_rust_profiler_map_destroy(void *handle);
 
 /**
- * C ABI: Register a `funcProfileRecord*` under the key `file:line`.
+ * C ABI: Register a record (looked up by ID) under the key `file:line`.
+ * `record_id` must come from `fceux11_rust_profiler_record_take`.
  * # Safety
- * Callers must ensure all raw pointer arguments passed to `fceux11_rust_profiler_map_add_record` are valid.
+ * Callers must ensure all raw pointer arguments and the record ID are valid.
  */
 int fceux11_rust_profiler_map_add_record(void *handle,
                                          const char *file,
                                          int line,
                                          const char *_func,
                                          const char *_comment,
-                                         void *rec);
+                                         uint64_t record_id);
 
 /**
- * C ABI: Push a record pointer onto the call stack.
+ * C ABI: Push a record ID onto the call stack.
  */
-void fceux11_rust_profiler_map_push_stack(void *handle, void *rec);
+void fceux11_rust_profiler_map_push_stack(void *handle, uint64_t record_id);
 
 /**
  * C ABI: Pop the top of the call stack.
  */
-void fceux11_rust_profiler_map_pop_stack(void *handle, void *_rec);
+void fceux11_rust_profiler_map_pop_stack(void *handle, uint64_t _record_id);
 
 /**
- * C ABI: Begin iteration over the map. Returns the first record, or null.
+ * C ABI: Begin iteration over the map. Returns the first record pointer,
+ * or null. Skips records whose `Arc` has already been released.
  */
 void *fceux11_rust_profiler_map_iterate_begin(void *handle);
 
 /**
- * C ABI: Advance iteration and return the next record, or null.
+ * C ABI: Advance iteration and return the next record pointer, or null.
  */
 void *fceux11_rust_profiler_map_iterate_next(void *handle);
 
 /**
  * C ABI: Add a C++ `profilerFuncMap*` to the global thread list.
+ *
+ * To keep the FFI surface stable we still take `*mut c_void`, but the
+ * stored value is converted through a `usize` ID — this lets the mutex
+ * decide when the pointer identity has gone stale.
  */
 int fceux11_rust_profiler_mgr_add(void *cpp_ptr);
 
@@ -343,11 +371,8 @@ int32_t fceux11_rust_timestamp_init(void);
 
 
 
-/**
- * C-visible opaque type for audio filter state.
- */
 typedef struct FceuFilterState {
-  uint8_t _private[0];
+  uint8_t _handle;
 } FceuFilterState;
 
 typedef struct Pal {
@@ -2110,10 +2135,6 @@ void fceux11_rust_fds_free_disk_sides(uint8_t **diskdata, int32_t total_sides);
  */
 void fceux11_rust_ines_header_cleanup(uint8_t *header_bytes);
 
-/**
- * Return the human-readable name for a mapper number.
- * Returns a pointer to a static string, or null if not found.
- */
 const char *fceux11_rust_ines_mapper_name(int32_t mapper_no);
 
 /**
@@ -3757,11 +3778,20 @@ typedef struct FceuStateBuffer {
 
 /**
  * Output chunk descriptor for loading.
+ *
+ * hotfix1 P1-4 (C-06): added an explicit `cap` so the matching
+ * `Vec::from_raw_parts` in `state_file_chunks_free` reconstructs the
+ * exact same capacity `Vec::with_capacity` produced originally. Without
+ * `cap`, the previous code passed `cap = chunk.len` which silently
+ * truncated deallocations and could cause a mismatched-deallocation UB
+ * at shutdown if a single chunk had been reallocated away from its
+ * initial capacity.
  */
 typedef struct FceuStateChunkOutput {
   uint8_t chunk_type;
   uint8_t *data;
   uintptr_t len;
+  uintptr_t cap;
 } FceuStateChunkOutput;
 
 /**
@@ -3781,24 +3811,6 @@ bool fceux11_rust_sformat_serialize(const struct FceuxSformatEntry *entries,
  * Free a buffer returned by `fceux11_rust_sformat_serialize`.
  */
 void fceux11_rust_sformat_buf_free(uint8_t *buf, uintptr_t len);
-
-/**
- * Deserialize a SFORMAT byte stream into C++ memory regions.
- *
- * For each entry in the stream (desc + size + data), finds the matching
- * entry in the SFORMAT table by `desc` and copies the data.
- *
- * # Safety
- * `stream_data` must point to `stream_len` valid bytes of SFORMAT payload.
- * `entries` must point to a valid array of `count` SFORMAT entries.
- * Each entry's `v` pointer must be valid for writes of `entry.s & !FLAGS` bytes.
- * The array must be terminated by an entry with `v == null`.
- */
-bool fceux11_rust_sformat_deserialize(const uint8_t *stream_data,
-                                      uintptr_t stream_len,
-                                      struct FceuxSformatEntry *entries,
-                                      uintptr_t count,
-                                      uint32_t _version);
 
 /**
  * Compute CRC32 checksum of a raw SFORMAT byte stream.

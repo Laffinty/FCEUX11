@@ -126,6 +126,15 @@ impl EmuFileMem {
 
     /// Seek to an absolute position.
     pub fn seek_set(&mut self, offset: isize) -> bool {
+        // hotfix1 P1-11 (N-H02): the previous `offset as usize`
+        // silently wrapped a negative value to a near-`usize::MAX`
+        // offset, which then triggered the `resize(offset, 0)` below
+        // and reserved gigabytes of RAM. Reject negative offsets
+        // outright — the only legitimate caller is the C++ emufile
+        // wrapper which always passes unsigned positions.
+        if offset < 0 {
+            return false;
+        }
         let offset = offset as usize;
         if offset > self.buf.len() {
             self.buf.resize(offset, 0);

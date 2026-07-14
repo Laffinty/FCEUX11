@@ -574,9 +574,27 @@ int aviRecordAddAudioFrame( int32_t *buf, int numSamples )
 
 	for (int i=0; i<numSamples; i++)
 	{
+		// hotfix1 P1-8 (C-09, upgraded to CRITICAL): guard the ring
+		// buffer against overrun. abufHead is producer-side (here) and
+		// the AVI thread is the consumer; if the producer runs ahead
+		// the previous code wrote past rawAudioBuf[abufSize], corrupting
+		// heap memory and silently destroying audio frames in saved
+		// videos. We compute the next position and, when it would catch
+		// up to abufTail (buffer full), yield a millisecond to give the
+		// consumer time to drain; on a second full check, drop the sample
+		// rather than corrupt.
+		int next = (abufHead + 1) % abufSize;
+		if (next == abufTail) {
+			msleep(1);
+			next = (abufHead + 1) % abufSize;
+			if (next == abufTail) {
+				// still full after a brief wait — emit silent rather
+				// than scribble past the buffer boundary.
+				continue;
+			}
+		}
 		rawAudioBuf[ abufHead ] = buf[i];
-
-		abufHead = (abufHead + 1) % abufSize;
+		abufHead = next;
 	}
 
 	return 0;

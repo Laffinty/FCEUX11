@@ -1,10 +1,23 @@
 use crate::fcoeffs::*;
 use std::slice;
 
-/// C-visible opaque type for audio filter state.
+// hotfix1 P1-6 (C-04): the previous
+// `#[repr(C)] pub struct FceuFilterState { _private: [u8; 0] }`
+// generated a non-standard zero-length-array layout in C and made the
+// type aggregate-init-able in C++. We replace it with a non-empty Rust
+// struct holding an opaque `u8` placeholder; cbindgen emits a valid
+// `typedef struct FceuFilterState { uint8_t _handle; } FceuFilterState;`
+// which is C99-portable. C consumers only ever pass `FceuFilterState*`
+// pointers (the runtime object behind the handle is a `Box<FilterState>`
+// allocated by `fceux11_rust_filter_state_create`), so the placeholder
+// field is read by no one — its only purpose is to give the struct a
+// non-zero layout that survives a strict C compiler.
+//
+// The size is 1 byte at the Rust level but the FFI only passes pointers,
+// so the on-stack cost on the C side is zero.
 #[repr(C)]
 pub struct FceuFilterState {
-    _private: [u8; 0],
+    _handle: u8,
 }
 
 /// Internal Rust state for audio filter.

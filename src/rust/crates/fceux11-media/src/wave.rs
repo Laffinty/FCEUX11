@@ -61,7 +61,14 @@ pub unsafe extern "C" fn fceux11_rust_wave_begin(path: *const c_char, sample_rat
         Err(_) => return false,
     };
 
-    let mut state = WAVE_STATE.lock().unwrap();
+    // hotfix1 P1-14 (H-14): swallow lock poisoning on FFI entry — the
+    // mutex can only be poisoned if a prior C++ caller panics inside a
+    // Rust call, in which case we still want subsequent FFI requests to
+    // make progress rather than abort the process.
+    let mut state = match WAVE_STATE.lock() {
+        Ok(g) => g,
+        Err(poisoned) => poisoned.into_inner(),
+    };
     state.file = Some(file);
     state.data_size = 0;
 
@@ -79,7 +86,10 @@ pub unsafe extern "C" fn fceux11_rust_wave_begin(path: *const c_char, sample_rat
 /// C ABI: Returns whether a wave recording is currently active.
 #[unsafe(no_mangle)]
 pub extern "C" fn fceux11_rust_wave_running() -> bool {
-    WAVE_STATE.lock().unwrap().file.is_some()
+    match WAVE_STATE.lock() {
+        Ok(g) => g.file.is_some(),
+        Err(poisoned) => poisoned.into_inner().file.is_some(),
+    }
 }
 
 /// C ABI: Write audio samples to the active wave file.
@@ -95,7 +105,10 @@ pub unsafe extern "C" fn fceux11_rust_wave_write(buffer: *const i16, count: i32)
         return 0;
     }
 
-    let mut state = WAVE_STATE.lock().unwrap();
+    let mut state = match WAVE_STATE.lock() {
+        Ok(g) => g,
+        Err(poisoned) => poisoned.into_inner(),
+    };
     let file = match state.file.as_mut() {
         Some(f) => f,
         None => return 0,
@@ -125,7 +138,10 @@ pub unsafe extern "C" fn fceux11_rust_wave_write(buffer: *const i16, count: i32)
 /// Returns 1 on success, 0 if no file was open.
 #[unsafe(no_mangle)]
 pub extern "C" fn fceux11_rust_wave_end() -> i32 {
-    let mut state = WAVE_STATE.lock().unwrap();
+    let mut state = match WAVE_STATE.lock() {
+        Ok(g) => g,
+        Err(poisoned) => poisoned.into_inner(),
+    };
     let mut file = match state.file.take() {
         Some(f) => f,
         None => return 0,
