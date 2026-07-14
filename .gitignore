@@ -109,6 +109,11 @@ src/rust/Cargo.lock
 scripts/build_*.ps1
 scripts/reconfig_*.ps1
 
+# Build verification logs and investigation artifacts (kept out of git;
+# reproduce locally with `cmake --build build --target fceux11` and any
+# dumpbin / PowerShell helper you like).
+scripts/logs/
+
 # CTest artifacts (cost data, last-test logs)
 Testing/
 
