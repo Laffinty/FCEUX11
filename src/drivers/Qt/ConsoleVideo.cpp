@@ -108,7 +108,11 @@
 #include "Qt/TasEditor/TasEditorWindow.h"
 
 
-#include "Qt/ConsoleVideo.h"`n#include "Qt/ConsoleWindow.h"
+// hotfix1 P0-4 (C-12): a prior encoding/format conversion corrupted the
+// newline between these two includes to a literal backtick-n, breaking the
+// build. Restored the real line break.
+#include "Qt/ConsoleVideo.h"
+#include "Qt/ConsoleWindow.h"
 
 int consoleWin_t::unloadVideoDriver(void)
 {
@@ -321,14 +325,34 @@ void consoleWin_t::toggleUseBgPaletteForVideo(bool checked)
 //---------------------------------------------------------------------------
 void consoleWin_t::closeApp(void)
 {
-	nes_shm->runEmulator = 0;
+	nes_shm->runEmulator.store(0, std::memory_order_release);
 
 	gameTimer->stop();
 
 	closeGamePadConfWindow();
 
-	emulatorThread->quit();
-	emulatorThread->wait( 1000 );
+	// hotfix1 P1-2 (N-C02, upgraded to CRITICAL):
+	//   emulatorThread_t inherits QThread but overrides run() directly
+	//   instead of calling exec(). For a QThread with no event loop,
+	//   `quit()` is a documented no-op — `quit` posts a quit event to a
+	//   loop that never starts. The old wait(1000) therefore offered no
+	//   guarantee that the thread had actually stopped, and once it timed
+	//   out we still called fceuWrapperClose() concurrently with a thread
+	//   that was still inside fceuWrapperUpdate() / fceuWrapper -> close
+	//   path: textbook use-after-free.
+	//
+	//   Order matters and must be:
+	//     1. Tell the thread to stop (runEmulator=0 + requestInterruption)
+	//     2. Wait up to 5 s for it to finish its current frame and exit
+	//     3. As a last resort terminate() it (UNSAFE: leaves mutexes held,
+	//        transitively cleaned up by process exit) and wait() again
+	//     4. Only THEN tear down fceuWrapper state.
+	emulatorThread->requestInterruption();
+	if (!emulatorThread->wait(5000)) {
+		qWarning("Emulator thread did not exit cleanly within 5s; terminating");
+		emulatorThread->terminate();
+		emulatorThread->wait();
+	}
 
 	aviDiskThread->requestInterruption();
 	aviDiskThread->quit();

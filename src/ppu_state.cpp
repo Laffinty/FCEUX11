@@ -71,14 +71,19 @@ SFORMAT FCEU_NEWPPU_STATEINFO[] = {
 	{ &spr_read.count, 4 | FCEUSTATE_RLSB, "SR_1" },
 	{ &spr_read.fetch, 4 | FCEUSTATE_RLSB, "SR_2" },
 	{ &spr_read.found, 4 | FCEUSTATE_RLSB, "SR_3" },
+	// hotfix1 P0-2 (C-02): the eight SFORMAT entries for sprite positions
+	// all pointed at found_pos[0], so save/load only ever persisted slot 0
+	// and the remaining 7 sprites desynchronised after load. Each label
+	// now maps to its own array element (labels preserved for savestate
+	// compatibility with v1.15 LTS).
 	{ &spr_read.found_pos[0], 4 | FCEUSTATE_RLSB, "SRx0" },
-	{ &spr_read.found_pos[0], 4 | FCEUSTATE_RLSB, "SRx1" },
-	{ &spr_read.found_pos[0], 4 | FCEUSTATE_RLSB, "SRx2" },
-	{ &spr_read.found_pos[0], 4 | FCEUSTATE_RLSB, "SRx3" },
-	{ &spr_read.found_pos[0], 4 | FCEUSTATE_RLSB, "SRx4" },
-	{ &spr_read.found_pos[0], 4 | FCEUSTATE_RLSB, "SRx5" },
-	{ &spr_read.found_pos[0], 4 | FCEUSTATE_RLSB, "SRx6" },
-	{ &spr_read.found_pos[0], 4 | FCEUSTATE_RLSB, "SRx7" },
+	{ &spr_read.found_pos[1], 4 | FCEUSTATE_RLSB, "SRx1" },
+	{ &spr_read.found_pos[2], 4 | FCEUSTATE_RLSB, "SRx2" },
+	{ &spr_read.found_pos[3], 4 | FCEUSTATE_RLSB, "SRx3" },
+	{ &spr_read.found_pos[4], 4 | FCEUSTATE_RLSB, "SRx4" },
+	{ &spr_read.found_pos[5], 4 | FCEUSTATE_RLSB, "SRx5" },
+	{ &spr_read.found_pos[6], 4 | FCEUSTATE_RLSB, "SRx6" },
+	{ &spr_read.found_pos[7], 4 | FCEUSTATE_RLSB, "SRx7" },
 	{ &spr_read.ret, 4 | FCEUSTATE_RLSB, "SR_4" },
 	{ &spr_read.last, 4 | FCEUSTATE_RLSB, "SR_5" },
 	{ &spr_read.mode, 4 | FCEUSTATE_RLSB, "SR_6" },

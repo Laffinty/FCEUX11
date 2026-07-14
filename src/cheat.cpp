@@ -71,10 +71,17 @@ void FCEU_CheatResetRAM(void)
 void FCEU_CheatAddRAM(int s, uint32 A, uint8 *p)
 {
 	uint32 AB=A>>10;
-	int x;
+	// hotfix1 P0-7 (H-07): CheatRPtrs is a fixed 64-entry array (see reset
+	// above at src/cheat.cpp:67-68). When A>>10 + (s-1) exceeds 63, the
+	// unguarded loop walked past the end and corrupted unrelated globals.
+	// AB is the start index; s is the byte count to register. Reject
+	// out-of-range ranges rather than silently spilling into other memory.
+	if (s <= 0 || AB >= 64 || AB + (uint32)s > 64) {
+		return;
+	}
 
-	for(x=s-1;x>=0;x--)
-		CheatRPtrs[AB+x]=p-A;
+	for (int32 x = (int32)(s - 1); x >= 0; x--)
+		CheatRPtrs[AB + x] = p - A;
 }
 
 
@@ -144,6 +151,13 @@ void RebuildSubCheats(void)
 				continue;
 			if (view.type_ == 1 && view.status && GetReadHandler((uint16)view.addr) != SubCheatsRead)
 			{
+				// hotfix1 P0-8 (H-08): SubCheats has a hard cap of 256 (see
+				// declaration at cheat.cpp:81). Without this guard a malformed
+				// or unusually large cheat list would silently clobber memory
+				// past the array. Drop further entries when the table is full.
+				if (numsubcheats >= 256) {
+					continue;
+				}
 				SubCheats[numsubcheats].PrevRead = GetReadHandler((uint16)view.addr);
 				SubCheats[numsubcheats].addr = (uint16)view.addr;
 				SubCheats[numsubcheats].val = view.val;
