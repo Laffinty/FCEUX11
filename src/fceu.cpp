@@ -34,6 +34,15 @@
 
 #include "cart.h"
 #include "cart_class.h"   // v1.7 Cartograph: fceu11::g_cart
+
+// hotfix1 P2-2: the file-scope `cart` (FCEUXCart*) is defined later in
+// this TU (around line 1388) but FCEU_CloseGame above (~line 143) needs
+// to `delete cart` to free the heap-allocated PRG/CHR buffers. Forward
+// declare the symbol so the delete site can see it before the
+// definition. Without this the compiler reports C2065 "cart" on the
+// delete statement.
+class FCEUXCart;
+extern FCEUXCart* cart;
 #include "nsf.h"
 #include "fds.h"
 #include "ines.h"
