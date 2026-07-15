@@ -69,7 +69,10 @@ at `docs/history/v1.15_hotfix2_phase_b.md`.
 - Windows MSVC 19.51 (`fceux11_core.lib` including
   `ppu_rendering.cpp`, `pputile_template.cpp`, `cpu.cpp`) compiles
   clean. Final `fceux11.exe` link pending at write-time; see
-  Phase B report §七 for tri-platform follow-up.
+  Phase B report §七 for follow-up.
+- **Platform scope**: fceux11 is Windows-only (readme.md:
+  Windows 11 22H2+, 64-bit). The tri-platform reference inherited
+  from the upstream FCEUX PLAN does not apply to this project.
 
 ## [1.15.1] - 2026-07-14
 
