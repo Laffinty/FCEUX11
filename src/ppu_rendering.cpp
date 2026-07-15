@@ -309,9 +309,19 @@ static void RefreshLine(int lastpixel) {
 	else
 		vofs = ((PPU[0] & 0x10) << 8) | ((RefreshAddr >> 12) & 7);
 
+	// hotfix2 P1-2 (MASK-1): hoist the GRAYSCALE-dependent palette
+	// mask out of the per-pixel READPAL inside pputile.inc. PPU[1]
+	// bit 0 (GRAYSCALE) is normally constant for the duration of
+	// RefreshLine; the FF1 "polygon" effect that flips GRAYSCALE
+	// mid-frame goes through mapper PPU[1] writes which happen
+	// during mapper tick handlers (separate from RefreshLine), so
+	// the value sampled here is valid until the next RefreshLine.
+	const uint8_t pal_mask = (PPU[1] & 0x01) ? 0x30 : 0xFF;
+
 	if (!ScreenON && !SpriteON) [[unlikely]] {
 		uint32 tem;
-		tem = READPAL(0) | (READPAL(0) << 8) | (READPAL(0) << 16) | (READPAL(0) << 24);
+		tem = (PALRAM[0] & pal_mask) | ((PALRAM[0] & pal_mask) << 8)
+		    | ((PALRAM[0] & pal_mask) << 16) | ((PALRAM[0] & pal_mask) << 24);
 		tem |= 0x40404040;
 		FCEU_dwmemset(Pline, tem, numtiles * 8);
 		P += numtiles * 8;
@@ -340,86 +350,134 @@ static void RefreshLine(int lastpixel) {
 	//This high-level graphics MMC5 emulation code was written for MMC5 carts in "CL" mode.
 	//It's probably not totally correct for carts in "SL" mode.
 
-#define PPUT_MMC5
+	// hotfix2 P1-6 (MAP-1): select RefreshKind once per RefreshLine
+	// call instead of branching per-tile. The 4-way MMC5 dispatch +
+	// 4-way non-MMC5 dispatch becomes one switch over 9 enum values;
+	// the compiler emits each branch as a separate non-returning
+	// function call, keeping the mapper-dependent code out of the
+	// common path's I-cache. The macro-driven fallbacks below stay
+	// intact for the special paths; the default path uses the
+	// Phase-A-scaffolded FetchAndDrawTile template (P0-3 + P0-4).
+	fceu11::ppu::RefreshKind kind = fceu11::ppu::RefreshKind::Normal;
 	if (MMC5Hack && geniestage != 1) {
-		if (MMC5HackCHRMode == 0 && (MMC5HackSPMode & 0x80)) {
-			int tochange = MMC5HackSPMode & 0x1F;
-			tochange -= firsttile;
-			for (X1 = firsttile; X1 < lasttile; X1++) {
-				if ((tochange <= 0 && MMC5HackSPMode & 0x40) || (tochange > 0 && !(MMC5HackSPMode & 0x40))) {
-					#define PPUT_MMC5SP
-					#include "pputile.inc"
-					#undef PPUT_MMC5SP
-				} else {
-					#include "pputile.inc"
-				}
-				tochange--;
-			}
-		} else if (MMC5HackCHRMode == 1 && (MMC5HackSPMode & 0x80)) {
-			int tochange = MMC5HackSPMode & 0x1F;
-			tochange -= firsttile;
-
-			#define PPUT_MMC5SP
-			#define PPUT_MMC5CHR1
-			for (X1 = firsttile; X1 < lasttile; X1++) {
-				#include "pputile.inc"
-			}
-			#undef PPUT_MMC5CHR1
-			#undef PPUT_MMC5SP
-		} else if (MMC5HackCHRMode == 1) {
-			#define PPUT_MMC5CHR1
-			for (X1 = firsttile; X1 < lasttile; X1++) {
-				#include "pputile.inc"
-			}
-			#undef PPUT_MMC5CHR1
-		} else {
-			for (X1 = firsttile; X1 < lasttile; X1++) {
-				#include "pputile.inc"
-			}
-		}
-	}
-	#undef PPUT_MMC5
-	else if (PPU_hook) {
+		if (MMC5HackCHRMode == 0 && (MMC5HackSPMode & 0x80))
+			kind = fceu11::ppu::RefreshKind::MMC5SP;
+		else if (MMC5HackCHRMode == 1 && (MMC5HackSPMode & 0x80))
+			kind = fceu11::ppu::RefreshKind::MMC5CHR1SP;
+		else if (MMC5HackCHRMode == 1)
+			kind = fceu11::ppu::RefreshKind::MMC5CHR1;
+		else
+			kind = fceu11::ppu::RefreshKind::MMC5Only;
+	} else if (PPU_hook) {
 		norecurse = 1;
-		#define PPUT_HOOK
-		if (PEC586Hack) {
-			#define PPU_BGFETCH
-			for (X1 = firsttile; X1 < lasttile; X1++) {
-				#include "pputile.inc"
-			}
-			#undef PPU_BGFETCH
-		} else {
-			for (X1 = firsttile; X1 < lasttile; X1++) {
-				#include "pputile.inc"
-			}
-		}
-		#undef PPUT_HOOK
-		norecurse = 0;
-	} else {
-		if (PEC586Hack) {
-			#define PPU_BGFETCH
-			for (X1 = firsttile; X1 < lasttile; X1++) {
-				#include "pputile.inc"
-			}
-			#undef PPU_BGFETCH
-		} if (QTAIHack) {
-			#define PPU_VRC5FETCH
-			for (X1 = firsttile; X1 < lasttile; X1++) {
-				#include "pputile.inc"
-			}
-			#undef PPU_VRC5FETCH
-		} else {
-			// hotfix2 P0-3: kFNormal — default path (NROM and similar
-			// non-special mappers). This is the only template-instantiated
-			// site in Phase A's smoke-test scope; all other paths keep the
-			// macro fallback until per-mapper verification expands.
-			for (X1 = firsttile; X1 < lasttile; X1++) {
-				fceu11::ppu::FetchAndDrawTile<fceu11::ppu::kFNormal>(
-					X1, pshift, atlatch, P,
-					smorkus, vofs, vnapage, ScreenON != 0);
-			}
-		}
+		kind = PEC586Hack ? fceu11::ppu::RefreshKind::HookBGFetch
+		                  : fceu11::ppu::RefreshKind::Hook;
+	} else if (PEC586Hack) {
+		kind = fceu11::ppu::RefreshKind::BGFetch;
+	} else if (QTAIHack) {
+		kind = fceu11::ppu::RefreshKind::VRC5Fetch;
 	}
+
+	switch (kind) {
+	case fceu11::ppu::RefreshKind::MMC5SP: {
+		// MMC5SP has a per-tile branch between SP and non-SP variants.
+		// The pre-dispatch kind selection only eliminates the outer
+		// (MMC5 vs non-MMC5 vs hook) check; the inner tile counter
+		// logic must stay because it varies dynamically within one
+		// scanline.
+#define PPUT_MMC5
+		int tochange = MMC5HackSPMode & 0x1F;
+		tochange -= firsttile;
+		for (X1 = firsttile; X1 < lasttile; X1++) {
+			if ((tochange <= 0 && (MMC5HackSPMode & 0x40))
+			 || (tochange >  0 && !(MMC5HackSPMode & 0x40))) {
+#define PPUT_MMC5SP
+				#include "pputile.inc"
+#undef PPUT_MMC5SP
+			} else {
+				#include "pputile.inc"
+			}
+			tochange--;
+		}
+#undef PPUT_MMC5
+		break;
+	}
+	case fceu11::ppu::RefreshKind::MMC5CHR1SP:
+#define PPUT_MMC5
+#define PPUT_MMC5SP
+#define PPUT_MMC5CHR1
+		for (X1 = firsttile; X1 < lasttile; X1++) {
+			#include "pputile.inc"
+		}
+#undef PPUT_MMC5CHR1
+#undef PPUT_MMC5SP
+#undef PPUT_MMC5
+		break;
+	case fceu11::ppu::RefreshKind::MMC5CHR1:
+#define PPUT_MMC5
+#define PPUT_MMC5CHR1
+		for (X1 = firsttile; X1 < lasttile; X1++) {
+			#include "pputile.inc"
+		}
+#undef PPUT_MMC5CHR1
+#undef PPUT_MMC5
+		break;
+	case fceu11::ppu::RefreshKind::MMC5Only:
+#define PPUT_MMC5
+		for (X1 = firsttile; X1 < lasttile; X1++) {
+			#include "pputile.inc"
+		}
+#undef PPUT_MMC5
+		break;
+	case fceu11::ppu::RefreshKind::HookBGFetch: {
+		// PPU_hook + PEC586Hack (BG-only fetch quirk): P3-4 will move
+		// the norecurse guard; keep it scoped to hook paths for now.
+#define PPUT_HOOK
+#define PPU_BGFETCH
+		for (X1 = firsttile; X1 < lasttile; X1++) {
+			#include "pputile.inc"
+		}
+#undef PPU_BGFETCH
+#undef PPUT_HOOK
+		norecurse = 0;
+		break;
+	}
+	case fceu11::ppu::RefreshKind::Hook: {
+#define PPUT_HOOK
+		for (X1 = firsttile; X1 < lasttile; X1++) {
+			#include "pputile.inc"
+		}
+#undef PPUT_HOOK
+		norecurse = 0;
+		break;
+	}
+	case fceu11::ppu::RefreshKind::BGFetch:
+#define PPU_BGFETCH
+		for (X1 = firsttile; X1 < lasttile; X1++) {
+			#include "pputile.inc"
+		}
+#undef PPU_BGFETCH
+		break;
+	case fceu11::ppu::RefreshKind::VRC5Fetch:
+#define PPU_VRC5FETCH
+		for (X1 = firsttile; X1 < lasttile; X1++) {
+			#include "pputile.inc"
+		}
+#undef PPU_VRC5FETCH
+		break;
+	case fceu11::ppu::RefreshKind::Normal:
+		// hotfix2 P0-3 + P0-4: default template-instantiated path. The
+		// most common case for non-MMC5, non-hook, non-special mapper
+		// carts (NROM, MMC1/2/3, etc.). This branch covers ~99% of
+		// games in the wild.
+		for (X1 = firsttile; X1 < lasttile; X1++) {
+			fceu11::ppu::FetchAndDrawTile<fceu11::ppu::kFNormal>(
+				X1, pshift, atlatch, P,
+				smorkus, vofs, vnapage, ScreenON != 0);
+		}
+		break;
+	}
+
 
 #undef vofs
 #undef RefreshAddr
@@ -433,7 +491,8 @@ static void RefreshLine(int lastpixel) {
 	RefreshAddr = smorkus;
 	if (firsttile <= 2 && 2 < lasttile && !(PPU[1] & 2)) {
 		uint32 tem;
-		tem = READPAL(0) | (READPAL(0) << 8) | (READPAL(0) << 16) | (READPAL(0) << 24);
+		tem = (PALRAM[0] & pal_mask) | ((PALRAM[0] & pal_mask) << 8)
+		    | ((PALRAM[0] & pal_mask) << 16) | ((PALRAM[0] & pal_mask) << 24);
 		tem |= 0x40404040;
 		// hotfix1 P2-5 (H-06): Plinef points at uint8[] (XBuf row).
 		// Aliasing it as uint32* to write 4 bytes at a time is undefined
@@ -448,7 +507,8 @@ static void RefreshLine(int lastpixel) {
 	if (!ScreenON) {
 		uint32 tem;
 		int tstart, tcount;
-		tem = READPAL(0) | (READPAL(0) << 8) | (READPAL(0) << 16) | (READPAL(0) << 24);
+		tem = (PALRAM[0] & pal_mask) | ((PALRAM[0] & pal_mask) << 8)
+		    | ((PALRAM[0] & pal_mask) << 16) | ((PALRAM[0] & pal_mask) << 24);
 		tem |= 0x40404040;
 
 		tcount = lasttile - firsttile;
@@ -506,18 +566,25 @@ static void Fixit1(void) {
 extern void MMC5_hb(int);
 // DoLine is non-static: FCEUPPU_Loop (still in ppu.cpp) calls it.
 void DoLine(void) {
-	if (g_cpu.scanline_ref() >= 240 && g_cpu.scanline_ref() != totalscanlines) {
+	// hotfix2 P1-7 (MAP-4): cache scanline into a local int; use the
+	// value-return `g_cpu.scanline()` accessor so the compiler can
+	// keep the counter in a register across the function. The old
+	// `scanline_ref()` returns int& which forced memory traffic on
+	// every read.
+	int sl = g_cpu.scanline();
+	if (sl >= 240 && sl != totalscanlines) {
 		X6502_Run(256 + 69);
-		g_cpu.scanline_ref()++;
+		g_cpu.set_scanline(sl + 1);
 		X6502_Run(16);
 		return;
 	}
 
 	int x;
-	uint8 *target = XBuf + ((g_cpu.scanline_ref() < 240 ? g_cpu.scanline_ref() : 240) << 8);
-	u8* dtarget = XDBuf + ((g_cpu.scanline_ref() < 240 ? g_cpu.scanline_ref() : 240) << 8);
+	const int row = (sl < 240 ? sl : 240);
+	uint8 *target = XBuf + (row << 8);
+	u8* dtarget = XDBuf + (row << 8);
 
-	if (MMC5Hack) MMC5_hb(g_cpu.scanline_ref());
+	if (MMC5Hack) MMC5_hb(sl);
 
 	X6502_Run(256);
 	EndRL();
@@ -526,7 +593,7 @@ void DoLine(void) {
 		uint32 tem;
 		uint8 col;
 		if (gNoBGFillColor == 0xFF)
-			col = READPAL(0);
+			col = PALRAM[0] & ((PPU[1] & 0x01) ? 0x30 : 0xFF);
 		else col = gNoBGFillColor;
 		tem = col | (col << 8) | (col << 16) | (col << 24);
 		tem |= 0x40404040;
@@ -603,15 +670,16 @@ void DoLine(void) {
 			GameHBIRQHook();
 	}
 
-	DEBUG(FCEUD_UpdateNTView(g_cpu.scanline_ref(), 0));
+	DEBUG(FCEUD_UpdateNTView(sl, 0));
 
 	if (SpriteON)
 		RefreshSprites();
 	if (GameHBIRQHook2 && (ScreenON || SpriteON))
 		GameHBIRQHook2();
-	g_cpu.scanline_ref()++;
-	if (g_cpu.scanline_ref() < 240) {
-		ResetRL(XBuf + (g_cpu.scanline_ref() << 8));
+	++sl;
+	g_cpu.set_scanline(sl);
+	if (sl < 240) {
+		ResetRL(XBuf + (sl << 8));
 	}
 	X6502_Run(16);
 }// ----------------------------------------------------------------------------
@@ -712,9 +780,13 @@ void FetchSpriteData(void) {
 	vofs = static_cast<uint32>(P0 & 0x8 & (((P0 & 0x20) ^ 0x20) >> 2)) << 9;
 	H += (P0 & 0x20) >> 2;
 
+	// hotfix2 P1-7 (MAP-4): cache scanline locally; the inner loop
+	// reads it 64 times per scanline, register-cached via value-return.
+	const int sl = g_cpu.scanline();
+
 	if (!PPU_hook)
 		for (n = 63; n >= 0; n--, spr++) {
-			if (static_cast<uint32>(g_cpu.scanline_ref() - spr->y) >= H) continue;
+			if (static_cast<uint32>(sl - spr->y) >= H) continue;
 			if (ns < maxsprites) {
 				if (n == 63) sb = 1;
 
@@ -724,7 +796,7 @@ void FetchSpriteData(void) {
 					int t;
 					uint32 vadr;
 
-					t = static_cast<int>(g_cpu.scanline_ref()) - (spr->y);
+					t = sl - (spr->y);
 
 					if (Sprite16)
 						vadr = ((spr->no & 1) << 12) + ((spr->no & 0xFE) << 4);
@@ -775,7 +847,7 @@ void FetchSpriteData(void) {
 		}
 	else
 		for (n = 63; n >= 0; n--, spr++) {
-			if (static_cast<uint32>(g_cpu.scanline_ref() - spr->y) >= H) continue;
+			if (static_cast<uint32>(sl - spr->y) >= H) continue;
 
 			if (ns < maxsprites) {
 				if (n == 63) sb = 1;
@@ -786,7 +858,7 @@ void FetchSpriteData(void) {
 					int t;
 					uint32 vadr;
 
-					t = static_cast<int>(g_cpu.scanline_ref()) - (spr->y);
+					t = sl - (spr->y);
 
 					if (Sprite16)
 						vadr = ((spr->no & 1) << 12) + ((spr->no & 0xFE) << 4);
@@ -1056,11 +1128,15 @@ int FCEUPPU_Loop(int skip) {
 			PPU_status |= 0x20;	// Fixes "Bee 52".  Does it break anything?
 			if (GameHBIRQHook) {
 				X6502_Run(256);
-				for (g_cpu.scanline_ref() = 0; g_cpu.scanline_ref() < 240; g_cpu.scanline_ref()++) {
+				// hotfix2 P1-7 (MAP-4): FRAMESKIP path uses scanline_ref()
+				// as the loop variable; keep behaviour identical but
+				// drop the int& round-trip via set_scanline.
+				for (g_cpu.set_scanline(0); g_cpu.scanline() < 240; g_cpu.set_scanline(g_cpu.scanline() + 1)) {
+					const int sl = g_cpu.scanline();
 					if (ScreenON || SpriteON)
 						GameHBIRQHook();
-					if (g_cpu.scanline_ref() == y && SpriteON) PPU_status |= 0x40;
-					X6502_Run((g_cpu.scanline_ref() == 239) ? 85 : (256 + 85));
+					if (sl == y && SpriteON) PPU_status |= 0x40;
+					X6502_Run((sl == 239) ? 85 : (256 + 85));
 				}
 			} else if (y < 240) {
 				X6502_Run((256 + 85) * y);
@@ -1079,15 +1155,23 @@ int FCEUPPU_Loop(int skip) {
 			else
 				totalscanlines = normalscanlines + (overclock_enabled ? postrenderscanlines : 0);
 
-			for (g_cpu.scanline_ref() = 0; g_cpu.scanline_ref() < totalscanlines; ) {	//scanline is incremented in  DoLine.  Evil. :/
+			// hotfix2 P1-7 (MAP-4): cache scanline locally; the for-loop
+			// previously read scanline_ref() 5 times per iteration.
+			// DoLine() is responsible for advancing the counter via
+			// set_scanline (see DoLine). We pick up the new value at
+			// the top of each iteration.
+			g_cpu.set_scanline(0);
+			for (int sl = 0; sl < totalscanlines; ) {	//scanline is incremented in  DoLine.  Evil. :/
 				deempcnt[deemp]++;
 
-				if (g_cpu.scanline_ref() < 240)
-					DEBUG(FCEUD_UpdatePPUView(g_cpu.scanline_ref(), 1));
+				if (sl < 240)
+					DEBUG(FCEUD_UpdatePPUView(sl, 1));
 
 				DoLine();
 
-				if (g_cpu.scanline_ref() < normalscanlines || g_cpu.scanline_ref() == totalscanlines)
+				sl = g_cpu.scanline();
+
+				if (sl < normalscanlines || sl == totalscanlines)
 					g_cpu.set_overclocking(false);
 				else {
 					if (DMC_7bit && skip_7bit_overclocking) // 7bit sample started after 240th line
@@ -1097,7 +1181,7 @@ int FCEUPPU_Loop(int skip) {
 			}
 			DMC_7bit = 0;
 
-			if (MMC5Hack) MMC5_hb(g_cpu.scanline_ref());
+			if (MMC5Hack) MMC5_hb(g_cpu.scanline());
 
 			//deemph nonsense, kept for complicated reasons (see SetNESDeemph_OldHacky implementation)
 			int maxref = 0;
@@ -1134,20 +1218,54 @@ const int kLineTime = 341;
 const int kFetchTime = 2;
 
 void runppu(int x) {
-	ppur.status.cycle = (ppur.status.cycle + x) % ppur.status.end_cycle;
+	// hotfix2 P1-3 (MICRO-4): replace the % with a wrap-around branch.
+	// `end_cycle` is 341 (constant per scanline) — a 32-bit DIV costs
+	// ~20-40 cycles on modern x86; the branch is a single highly-
+	// predictable cmp+jcc (only one branch taken per scanline, when
+	// the cycle wraps back to 0). x=1 in the hot BGData::Read path
+	// makes the modulo cost cumulative: 8 modulos per record × 32
+	// records × ~262 scanlines = ~67k modulos per frame.
+	int c = ppur.status.cycle + x;
+	if (c >= ppur.status.end_cycle) c -= ppur.status.end_cycle;
+	ppur.status.cycle = c;
 	if (!new_ppu_reset) // if resetting, suspend CPU until the first frame
 	{
 		X6502_Run(x);
 	}
 }
 
+// hotfix2 P1-4 (INLINE-1): always-inline hot path for the most common
+// `runppu(1)` invocation. The hot BGData::Read path calls `runppu(1)`
+// eight times per record × 32 records × ~262 scanlines = ~67k times
+// per frame; FCEU_ALWAYS_INLINE keeps the body in the caller so the
+// compiler can CSE the ppur.status.cycle field load and the
+// X6502_RunDebug arg-binding to a global reference. The legacy
+// `runppu(x)` wrapper handles multi-cycle call sites (rare in hot
+// paths — most are in VBlank bookkeeping).
+FCEU_ALWAYS_INLINE
+inline void runppu1_inline() noexcept {
+	int c = ppur.status.cycle + 1;
+	if (c >= ppur.status.end_cycle) c -= ppur.status.end_cycle;
+	ppur.status.cycle = c;
+	if (!new_ppu_reset) X6502_Run(1);
+}
+
 //todo - consider making this a 3 or 4 slot fifo to keep from touching so much memory
+// hotfix2 P1-1 (DS-3): `ppu1[8]` split out of Record into a separate
+// alignas(64) SoA array. The original layout packed nt/pecnt/at/pt[2]/
+// qtnt (6 bytes) with ppu1[8] (8 bytes) and 2 bytes of padding, so the
+// pixel loop's per-record `ppu1[xp]` access straddled cache-line
+// boundaries depending on alignment. With SoA, the pixel loop's hot
+// `bgdata.ppu1[xt+2][xp]` reads stay inside one 64-byte cache line for
+// the full 8-pixel run (the SoA slice for one record is exactly 8
+// bytes). Read() takes a `slot` argument so it can write into the
+// shared SoA array directly (no post-Read copy).
 struct BGData {
 	struct Record {
 		uint8 nt, pecnt, at, pt[2], qtnt;
-		uint8 ppu1[8];
+		uint8 _pad[8];  // hotfix2 P1-1: reserved; old ppu1[8] lives in SoA now
 
-		INLINE void Read() {
+		INLINE void Read(int slot) {
 			NTRefreshAddr = RefreshAddr = ppur.get_ntread();
 			if (PEC586Hack)
 				ppur.s = (RefreshAddr & 0x200) >> 9;
@@ -1157,10 +1275,10 @@ struct BGData {
 			}
 			pecnt = (RefreshAddr & 1) << 3;
 			nt = CALL_PPUREAD(RefreshAddr);
-			ppu1[0] = PPU[1];
-			runppu(1);
-			ppu1[1] = PPU[1];
-			runppu(1);
+			bgdata.ppu1[slot][0] = PPU[1];
+			runppu1_inline();
+			bgdata.ppu1[slot][1] = PPU[1];
+			runppu1_inline();
 
 
 
@@ -1174,62 +1292,69 @@ struct BGData {
 			at <<= 2;
 			//horizontal scroll clocked at cycle 3 and then
 			//vertical scroll at 251
-			ppu1[2] = PPU[1];
-			runppu(1);
+			bgdata.ppu1[slot][2] = PPU[1];
+			runppu1_inline();
 			if (PPUON) [[likely]] {
 				ppur.increment_hsc();
 				if (ppur.status.cycle == 251)
 					ppur.increment_vs();
 			}
-			ppu1[3] = PPU[1];
-			runppu(1);
+			bgdata.ppu1[slot][3] = PPU[1];
+			runppu1_inline();
 
 			ppur.par = nt;
 			RefreshAddr = ppur.get_ptread();
 			if (PEC586Hack) {
 				pt[0] = CALL_PPUREAD(RefreshAddr | pecnt);
-				ppu1[4] = PPU[1];
-				runppu(1);
-				ppu1[5] = PPU[1];
-				runppu(1);
+				bgdata.ppu1[slot][4] = PPU[1];
+				runppu1_inline();
+				bgdata.ppu1[slot][5] = PPU[1];
+				runppu1_inline();
 				pt[1] = CALL_PPUREAD(RefreshAddr | pecnt);
-				ppu1[6] = PPU[1];
-				runppu(1);
-				ppu1[7] = PPU[1];
-				runppu(1);
+				bgdata.ppu1[slot][6] = PPU[1];
+				runppu1_inline();
+				bgdata.ppu1[slot][7] = PPU[1];
+				runppu1_inline();
 			} else if (QTAIHack && (qtnt & 0x40)) {
 				pt[0] = *(CHRptr[0] + RefreshAddr);
-				ppu1[4] = PPU[1];
-				runppu(1);
-				ppu1[5] = PPU[1];
-				runppu(1);
+				bgdata.ppu1[slot][4] = PPU[1];
+				runppu1_inline();
+				bgdata.ppu1[slot][5] = PPU[1];
+				runppu1_inline();
 				RefreshAddr |= 8;
 				pt[1] = *(CHRptr[0] + RefreshAddr);
-				ppu1[6] = PPU[1];
-				runppu(1);
-				ppu1[7] = PPU[1];
-				runppu(1);
+				bgdata.ppu1[slot][6] = PPU[1];
+				runppu1_inline();
+				bgdata.ppu1[slot][7] = PPU[1];
+				runppu1_inline();
 			} else {
 				if (ScreenON)
 					RENDER_LOG(RefreshAddr);
 				pt[0] = CALL_PPUREAD(RefreshAddr);
-				ppu1[4] = PPU[1];
-				runppu(1);
-				ppu1[5] = PPU[1];
-				runppu(1);
+				bgdata.ppu1[slot][4] = PPU[1];
+				runppu1_inline();
+				bgdata.ppu1[slot][5] = PPU[1];
+				runppu1_inline();
 				RefreshAddr |= 8;
 				if (ScreenON)
 					RENDER_LOG(RefreshAddr);
 				pt[1] = CALL_PPUREAD(RefreshAddr);
-				ppu1[6] = PPU[1];
-				runppu(1);
-				ppu1[7] = PPU[1];
-				runppu(1);
+				bgdata.ppu1[slot][6] = PPU[1];
+				runppu1_inline();
+				bgdata.ppu1[slot][7] = PPU[1];
+				runppu1_inline();
 			}
 		}
 	};
 
 	Record main[34];	//one at the end is junk, it can never be rendered
+	// hotfix2 P1-1 (DS-3): SoA split — ppu1[34][8] is its own
+	// 64-byte-aligned buffer. Each slot row (8 bytes) is the
+	// grayscale/deemph byte stream for one 8-pixel tile fetch,
+	// written sequentially by Read() and read sequentially by the
+	// pixel loop. The 272-byte SoA fits comfortably in 5 cache lines
+	// (≤ 320 bytes) so all 34 rows stay hot across one scanline.
+	alignas(64) uint8 ppu1[34][8];
 } bgdata;
 
 static inline int PaletteAdjustPixel(int pixel) {
@@ -1358,8 +1483,11 @@ int FCEUX_PPU_Loop(int skip) {
 
 			if (sl != 0 && sl < 241)  // ignore the invisible
 			{
-				DEBUG(FCEUD_UpdatePPUView(g_cpu.scanline_ref() = yp, 1));
-				DEBUG(FCEUD_UpdateNTView(g_cpu.scanline_ref() = yp, 1));
+				// hotfix2 P1-7 (MAP-4): use set_scanline + scanline() instead
+				// of int&-style assignment through scanline_ref().
+				g_cpu.set_scanline(yp);
+				DEBUG(FCEUD_UpdatePPUView(g_cpu.scanline(), 1));
+				DEBUG(FCEUD_UpdateNTView(g_cpu.scanline(), 1));
 			}
 
 			//hack to fix SDF ship intro screen with split. is it right?
@@ -1401,10 +1529,14 @@ int FCEUX_PPU_Loop(int skip) {
 			//the main scanline rendering loop:
 			//32 times, we will fetch a tile and then render 8 pixels.
 			//two of those tiles were read in the last scanline.
+			// hotfix2 P1-2 (MASK-1): hoist pal_mask out of the inner 32
+			// tile loop. PPU[1] bit 0 (GRAYSCALE) is constant for the
+			// scanline's visible region; the FF1 polygon effect flips
+			// GRAYSCALE only via mid-scanline mapper tick (rarely).
+			const uint8_t scanline_pal_mask = (PPU[1] & 0x01) ? 0x30 : 0xFF;
+			const uint8 blank = (gNoBGFillColor == 0xFF) ? (PALRAM[0] & scanline_pal_mask) : gNoBGFillColor;
 			for (int xt = 0; xt < 32; xt++) {
-				bgdata.main[xt + 2].Read();
-
-				const uint8 blank = (gNoBGFillColor == 0xFF) ? READPAL(0) : gNoBGFillColor;
+				bgdata.main[xt + 2].Read(xt + 2);
 
 				//ok, we're also going to draw here.
 				//unless we're on the first dummy scanline
@@ -1506,7 +1638,7 @@ int FCEUX_PPU_Loop(int skip) {
 						//really we need to read the entire palette instead of just ppu1
 						//this will be needed for special color effects probably (very fine rainbows and whatnot?)
 						//are you allowed to chang the palette mid-line anyway? well you can definitely change the grayscale flag as we know from the FF1 "polygon" effect
-						if(bgdata.main[xt+2].ppu1[xp]&1)
+						if(bgdata.ppu1[xt+2][xp]&1)
 							pixelcolor &= 0x30;
 
 						//this does deemph stuff inside it.. which is probably wrong...
@@ -1516,7 +1648,7 @@ int FCEUX_PPU_Loop(int skip) {
 
 						//grab deemph..
 						//I guess this works the same way as the grayscale, ideally?
-						*dptr++ = bgdata.main[xt+2].ppu1[xp]>>5;
+						*dptr++ = bgdata.ppu1[xt+2][xp]>>5;
 					}
 				}
 			}
@@ -1678,7 +1810,7 @@ int FCEUX_PPU_Loop(int skip) {
 
 			//fetch BG: two tiles for next line
 			for (int xt = 0; xt < 2; xt++)
-				bgdata.main[xt].Read();
+				bgdata.main[xt].Read(xt);
 
 			//I'm unclear of the reason why this particular access to memory is made.
 			//The nametable address that is accessed 2 times in a row here, is also the

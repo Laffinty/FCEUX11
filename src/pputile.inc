@@ -53,7 +53,13 @@ if (X1 >= 2) {
 #endif
 
 #ifdef PPUT_HOOK
-	PPU_hook(0x2000 | (RefreshAddr & 0xfff));
+	// hotfix2 P1-5 (INLINE-2): guard the indirect call so the compiler
+	// can hoist the null-check and skip it on non-hooked paths. The
+	// dispatcher in ppu_rendering.cpp:382 already only reaches here
+	// when PPU_hook != nullptr, but the in-loop guard turns the
+	// indirect call into a predictable conditional branch instead of
+	// an unconditional call-then-bail.
+	if (PPU_hook) [[unlikely]] PPU_hook(0x2000 | (RefreshAddr & 0xfff));
 #endif
 
 #ifdef PPUT_MMC5SP
@@ -99,7 +105,7 @@ pshift[1] <<= 8;
 #endif
 
 #ifdef PPUT_HOOK
-	PPU_hook(vadr);
+	if (PPU_hook) [[unlikely]] PPU_hook(vadr);
 #endif
 
 #ifdef PPU_BGFETCH
@@ -137,6 +143,12 @@ else
 	RefreshAddr++;
 
 #ifdef PPUT_HOOK
-	PPU_hook(0x2000 | (RefreshAddr & 0xfff));
+	// hotfix2 P1-5 (INLINE-2): guard the indirect call so the compiler
+	// can hoist the null-check and skip it on non-hooked paths. The
+	// dispatcher in ppu_rendering.cpp:382 already only reaches here
+	// when PPU_hook != nullptr, but the in-loop guard turns the
+	// indirect call into a predictable conditional branch instead of
+	// an unconditional call-then-bail.
+	if (PPU_hook) [[unlikely]] PPU_hook(0x2000 | (RefreshAddr & 0xfff));
 #endif
 

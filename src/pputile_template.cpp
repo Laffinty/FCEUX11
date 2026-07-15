@@ -115,7 +115,8 @@ void FetchAndDrawTile(int X1, uint32_t pshift[2], uint32_t& atlatch,
 
     // pputile.inc:55-57 — first hook opportunity (post-NT fetch).
     if constexpr ((Flags & kFlagHook) != 0) {
-        PPU_hook(0x2000 | (RefreshAddr & 0xfff));
+        // hotfix2 P1-5 (INLINE-2): guard the indirect call.
+        if (PPU_hook) [[unlikely]] PPU_hook(0x2000 | (RefreshAddr & 0xfff));
     }
 
     // pputile.inc:59-69 — attribute-table fetch.
@@ -171,7 +172,8 @@ void FetchAndDrawTile(int X1, uint32_t pshift[2], uint32_t& atlatch,
 
     // pputile.inc:101-103 — second hook opportunity (post-pattern fetch).
     if constexpr ((Flags & kFlagHook) != 0) {
-        PPU_hook(vadr);
+        // hotfix2 P1-5 (INLINE-2): guard the indirect call.
+        if (PPU_hook) [[unlikely]] PPU_hook(vadr);
     }
 
     // pputile.inc:105-132 — shift-register update: BG-only fetch vs
@@ -220,7 +222,8 @@ void FetchAndDrawTile(int X1, uint32_t pshift[2], uint32_t& atlatch,
 
     // pputile.inc:139-141 — final hook opportunity.
     if constexpr ((Flags & kFlagHook) != 0) {
-        PPU_hook(0x2000 | (RefreshAddr & 0xfff));
+        // hotfix2 P1-5 (INLINE-2): guard the indirect call.
+        if (PPU_hook) [[unlikely]] PPU_hook(0x2000 | (RefreshAddr & 0xfff));
     }
 }
 

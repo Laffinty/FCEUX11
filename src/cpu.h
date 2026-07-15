@@ -117,6 +117,17 @@ public:
     int& scanline_ref() noexcept;
     MapIRQHook& map_irq_hook_ref() noexcept;
 
+    // hotfix2 P1-7 (MAP-4): value-return / setter pair for the
+    // scanline counter. `scanline_ref()` returns `int&` which forces
+    // the value into memory and inhibits register caching in the
+    // hot DoLine / RefreshLine paths. The new `scanline()` (value)
+    // + `set_scanline(v)` (write) pair let the compiler keep the
+    // counter in a register across the call. The legacy
+    // `scanline_ref()` is kept for back-compat with all the
+    // mapper / debug call sites that aren't in the hot path.
+    int scanline() const noexcept { return scanline_; }
+    void set_scanline(int v) noexcept { scanline_ = v; }
+
     X6502 layout_{};                 // must remain at offset 0
 
 private:
