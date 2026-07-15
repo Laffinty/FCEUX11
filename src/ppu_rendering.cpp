@@ -52,6 +52,9 @@
 #include "ppu_state.h"
 #include "ppu_core.h"
 #include "ppu_class.h"
+#include "ppu_sprite_lut.h"   // hotfix2 P0-1: kSpriteIdxLUT
+#include "pputile_template.h" // hotfix2 P0-3: template<uint8 Flags> FetchAndDrawTile
+#include "compiler_attrs.h"   // hotfix2 §16.6: FCEU_BSWAP64, FCEU_UNLIKELY, ...
 #include "nsf.h"
 #include "sound.h"
 #include "file.h"
@@ -406,8 +409,14 @@ static void RefreshLine(int lastpixel) {
 			}
 			#undef PPU_VRC5FETCH
 		} else {
+			// hotfix2 P0-3: kFNormal — default path (NROM and similar
+			// non-special mappers). This is the only template-instantiated
+			// site in Phase A's smoke-test scope; all other paths keep the
+			// macro fallback until per-mapper verification expands.
 			for (X1 = firsttile; X1 < lasttile; X1++) {
-				#include "pputile.inc"
+				fceu11::ppu::FetchAndDrawTile<fceu11::ppu::kFNormal>(
+					X1, pshift, atlatch, P,
+					smorkus, vofs, vnapage, ScreenON != 0);
 			}
 		}
 	}
@@ -855,19 +864,33 @@ void RefreshSprites(void) {
 	numsprites--;
 	spr = reinterpret_cast<SPRB*>(SPRBUF) + numsprites;
 
+	// hotfix2 P1-2 (MASK-1, hoisted in lockstep with P0-1): GRAYSCALE
+	// (PPU[1] bit 0) is constant for the duration of one RefreshSprites
+	// call. Lifting the mask out of the per-pixel READPAL into a single
+	// multiply on the small palette table (built per sprite below)
+	// eliminates a branch + load per pixel × 8 pixels × ≤8 sprites.
+	const uint8_t pal_mask = (PPU[1] & 0x01) ? 0x30 : 0xFF;
+
 	for (n = numsprites; n >= 0; n--, spr--) {
-		uint32 pixdata;
 		uint8 J, atr;
 
 		int x = spr->x;
 		uint8 *C;
 		int VB;
 
-		pixdata = ppulut1[spr->ca[0]] | ppulut2[spr->ca[1]];
+		// hotfix2 P0-1 (ARCH-2): two-stage sprite decode. The
+		// 65536-entry kSpriteIdxLUT maps (ca0 | (ca1 << 8)) to 8 packed
+		// bytes — one per pixel position — where each byte is the
+		// 2-bit palette index (0 = transparent). This replaces the
+		// 8 data-dependent `if (J & mask) ... pixdata >>= 4;` chains
+		// plus the four (SP_BACK × H_FLIP) path duplications.
+		const uint64_t packed = fceu11::ppu::kSpriteIdxLUT[
+			(uint32_t)spr->ca[0] | ((uint32_t)spr->ca[1] << 8)];
+
 		J = spr->ca[0] | spr->ca[1];
 		atr = spr->atr;
 
-		if (J) {
+		if (J) [[likely]] {
 			if (n == 0 && SpriteBlurp && !(PPU_status & 0x40)) {
 				sphitx = x;
 				sphitdata = J;
@@ -885,74 +908,42 @@ void RefreshSprites(void) {
 			C = sprlinebuf + x;
 			VB = (0x10) + ((atr & 3) << 2);
 
-			if (atr & SP_BACK) {
-				if (atr & H_FLIP) {
-					if (J & 0x80) C[7] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x40) C[6] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x20) C[5] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x10) C[4] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x08) C[3] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x04) C[2] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x02) C[1] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x01) C[0] = READPAL(VB | pixdata) | 0x40;
-				} else {
-					if (J & 0x80) C[0] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x40) C[1] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x20) C[2] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x10) C[3] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x08) C[4] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x04) C[5] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x02) C[6] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x01) C[7] = READPAL(VB | pixdata) | 0x40;
-				}
-			} else {
-				if (atr & H_FLIP) {
-					if (J & 0x80) C[7] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x40) C[6] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x20) C[5] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x10) C[4] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x08) C[3] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x04) C[2] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x02) C[1] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x01) C[0] = READPAL(VB | pixdata);
-				} else {
-					if (J & 0x80) C[0] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x40) C[1] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x20) C[2] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x10) C[3] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x08) C[4] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x04) C[5] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x02) C[6] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x01) C[7] = READPAL(VB | pixdata);
-				}
+			// Stage 2 (per-sprite runtime): build the 4-entry colour
+			// table once for this sprite's `VB`. pal_mask is the
+			// hoisted GRAYSCALE mask from above; SP_BACK path ORs 0x40
+			// (the "behind background" marker) up-front so the hot
+			// 8-pixel loop only ever does one load + one store per
+			// pixel.
+			uint8_t pal_tab_op[4], pal_tab_bk[4];
+			for (int i = 0; i < 4; ++i) {
+				const uint8_t c = PALRAM[VB | i] & pal_mask;
+				pal_tab_op[i] = c;
+				pal_tab_bk[i] = c | 0x40;
+			}
+			const uint8_t *pal_tab = (atr & SP_BACK) ? pal_tab_bk : pal_tab_op;
+
+			// H_FLIP: byte-reverse the 64-bit packed indices via a
+			// single bswap instruction instead of indexing [7-i] in a
+			// loop body (which would force un-indexed loads through
+			// the loop counter). After bswap, idx[k] gives the
+			// natural-order pixel that should land at C[k].
+			uint64_t flipped = packed;
+			if (atr & H_FLIP) [[unlikely]] {
+				flipped = FCEU_BSWAP64(packed);
+			}
+			const uint8_t *idx = reinterpret_cast<const uint8_t *>(&flipped);
+
+			// Single 8-pixel loop covering all four (SP_BACK × H_FLIP)
+			// combinations. Each iteration is an L1-resident load
+			// (idx[i]) gated on visibility (idx[i] & 0x80). The
+			// colour-low-2-bits (idx[i] & 0x03) feeds the 4-entry
+			// `pal_tab` indexed load. No serial dependency chain on a
+			// shift register. The 4-way branch tree in the original
+			// code collapses to two branch-free selects (pal_tab and
+			// bswap gate at compile time).
+			for (int i = 0; i < 8; ++i) {
+				const uint8_t v = idx[i];
+				if (v & 0x80) [[likely]] C[i] = pal_tab[v & 0x03];
 			}
 		}
 	}
@@ -1328,6 +1319,27 @@ int FCEUX_PPU_Loop(int skip) {
 		static int oamslot = 0;
 		static int oamcount;
 
+		// hotfix2 P0-2 (ARCH-3): sprite X-bucket + per-pixel shift
+		// pre-computation. Built once per scanline from the `oams`
+		// snapshot that FetchSpriteData populated, then consumed by
+		// the inner pixel loop without further per-pixel state
+		// mutation. Layout:
+		//   - `oam_pat_lo[s][k]` / `oam_pat_hi[s][k]` =
+		//     oams[..][s][4] (or [5]) shifted right k times.
+		//   - `oam_bucket_idx[bi][k]` = k-th sprite index whose start
+		//     x satisfies x>>3 == bi; count is in `oam_bucket_count`.
+		alignas(64) static uint8 oam_pat_lo[64][8];
+		alignas(64) static uint8 oam_pat_hi[64][8];
+		// hotfix2 P0-2 (post-Phase-A review): widen each X-bucket
+		// from 8 to 64 sprite slots. The PPU supports
+		// FCEUI_DisableSpriteLimitation(1) which raises maxsprites
+		// to 64; in that mode multiple sprites can share the same
+		// `x >> 3` and overflow the bucket (silent OOB write). The
+		// extra ~1.75 KiB BSS is negligible — `alignas(64)` keeps
+		// it on cache-line boundaries either way.
+		alignas(64) static uint8 oam_bucket_idx[32][64];
+		static int   oam_bucket_count[32] = {0};
+
 		//capture the initial xscroll
 		//int xscroll = ppur.fh;
 		//render 241/291 scanlines (1 dummy at beginning, dendy's 50 at the end)
@@ -1363,6 +1375,29 @@ int FCEUX_PPU_Loop(int skip) {
 
 			oamcount = oamcounts[renderslot];
 
+			// hotfix2 P0-2: precompute per-sprite shift tables and
+			// X-bucket classification once per scanline. This moves
+			// the per-pixel `oam[4] >>= 1; oam[5] >>= 1;` work out of
+			// the hot 256×8 inner loop, and replaces the O(sprites)
+			// sprite-search with O(bucket-size) where the average
+			// bucket size is 0..1 sprite.
+			for (int bi = 0; bi < 32; ++bi) oam_bucket_count[bi] = 0;
+			if (sl != 0 && sl < 241) {
+				for (int s = 0; s < oamcount; ++s) {
+					uint8 p0 = oams[renderslot][s][4];
+					uint8 p1 = oams[renderslot][s][5];
+					for (int k = 0; k < 8; ++k) {
+						oam_pat_lo[s][k] = p0;
+						oam_pat_hi[s][k] = p1;
+						p0 >>= 1;
+						p1 >>= 1;
+					}
+					const int bi = (oams[renderslot][s][3] >> 3) & 31;
+					oam_bucket_idx[bi][oam_bucket_count[bi]++] =
+						static_cast<uint8_t>(s);
+				}
+			}
+
 			//the main scanline rendering loop:
 			//32 times, we will fetch a tile and then render 8 pixels.
 			//two of those tiles were read in the last scanline.
@@ -1385,6 +1420,12 @@ int FCEUX_PPU_Loop(int skip) {
 					//check all the conditions that can cause things to render in these 8px
 					const bool renderspritenow = SpriteON && (xt > 0 || SpriteLeft8);
 					const bool renderbgnow = ScreenON && (xt > 0 || BGLeft8);
+					// hotfix2 P0-2: per-tile bucket index (constant for the
+					// whole 8-pixel xp loop body). Bucket 0..31 covers all
+					// possible sprite start-x tile positions.
+					const uint8 *bucket_idx =
+						oam_bucket_idx[rasterpos >> 3];
+					const int bucket_n = oam_bucket_count[rasterpos >> 3];
 					for (int xp = 0; xp < 8; xp++, rasterpos++, g_rasterpos++) {
 						//bg pos is different from raster pos due to its offsetability.
 						//so adjust for that here
@@ -1417,49 +1458,48 @@ int FCEUX_PPU_Loop(int skip) {
 
 						//look for a sprite to be drawn
 						bool havepixel = false;
-						for (int s = 0; s < oamcount; s++) {
+						// hotfix2 P0-2: pre-bucketed sprite scan.
+						//
+						// Average bucket size is ~0-1 sprite (not all 8),
+						// because most sprite x positions in a 32-tile
+						// scanline are unique. The original `for s =
+						// 0..oamcount` would scan all 8 sprites at every
+						// pixel; this iterates `bucket_n` sprites (often
+						// 0-2). The per-sprite pattern shift is read from
+						// `oam_pat_lo/_hi[s][k]` rather than mutating
+						// `oams[..][s][4/5]` inside the pixel loop.
+						for (int sb = 0; sb < bucket_n; ++sb) {
+							const int s = bucket_idx[sb];
 							uint8* oam = oams[renderslot][s];
-							int x = oam[3];
-							if (rasterpos >= x && rasterpos < x + 8) {
-								//build the pixel.
-								//fetch the LSB of the patterns
-								uint8 spixel = oam[4] & 1;
-								spixel |= (oam[5] & 1) << 1;
+							const int x = oam[3];
+							if (rasterpos < x || rasterpos >= x + 8) continue;
 
-								//shift down the patterns so the next pixel is in the LSB
-								oam[4] >>= 1;
-								oam[5] >>= 1;
+							const int k = rasterpos - x;
+							uint8 spixel = (oam_pat_lo[s][k] & 1)
+								| ((oam_pat_hi[s][k] & 1) << 1);
 
-								if (!renderspritenow) continue;
+							if (!renderspritenow) continue;
+							if (havepixel) continue;
+							if (spixel == 0) continue;
 
-								//bail out if we already have a pixel from a higher priority sprite
-								if (havepixel) continue;
-
-								//transparent pixel bailout
-								if (spixel == 0) continue;
-
-								//spritehit:
-								//1. is it sprite#0?
-								//2. is the bg pixel nonzero?
-								//then, it is spritehit.
-								if (oam[6] == 0 && (pixel & 3) != 0 &&
-									rasterpos < 255) {
-									PPU_status |= 0x40;
-								}
-								havepixel = true;
-
-								//priority handling
-								if (oam[2] & 0x20) {
-									//behind background:
-									if ((pixel & 3) != 0) continue;
-								}
-
-								//bring in the palette bits and palettize
-								spixel |= (oam[2] & 3) << 2;
-
-								if (rendersprites)
-									pixelcolor = READPALNOGS(0x10 + spixel);
+							//spritehit:
+							//1. is it sprite#0?
+							//2. is the bg pixel nonzero?
+							if (oam[6] == 0 && (pixel & 3) != 0 &&
+								rasterpos < 255) {
+								PPU_status |= 0x40;
 							}
+							havepixel = true;
+
+							//priority handling
+							if (oam[2] & 0x20) {
+								if ((pixel & 3) != 0) continue;
+							}
+
+							spixel |= (oam[2] & 3) << 2;
+
+							if (rendersprites)
+								pixelcolor = READPALNOGS(0x10 + spixel);
 						}
 
 						//apply grayscale.. kind of clunky
