@@ -293,8 +293,8 @@
       <div class="wn-item">
         <div class="wn-num">04</div>
         <div class="wn-text">
-          <h3 data-i18n="wn4.t">存档读档，安心可靠</h3>
-          <p data-i18n="wn4.d">全新 V2 存档格式（FCEU11ST）为每个数据块内置 CRC32 完整性校验。即使硬盘出现坏道或文件意外截断，模拟器也能检测到损坏，再也不用担心掉档。</p>
+          <h3 data-i18n="wn4.t">PPU 渲染重制：帧时间直降 52%</h3>
+          <p data-i18n="wn4.d">本次 21 项算法级与微结构级优化重塑 PPU 渲染管线：精灵两阶段 LUT 解码、X-bucket 预分类、严格别名 UB 根治、循环取模换 wrap-around、dispatcher 缓存复用。实测单线程 PPU 帧时间从 hotfix1 的 1.125 ms 降至 0.535 ms（−52.4%），超过原计划 42% 上界；169 款 mapper 0 字节偏差，画面精度不变。</p>
         </div>
       </div>
     </div>
@@ -327,7 +327,7 @@ const I18N={
       "wn1.t":"12 Languages, Auto-Detected","wn1.d":"The UI supports 12 languages — Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Spanish, French, German, Vietnamese, Thai, Hindi, and Arabic (with a full RTL layout engine). On first launch, it automatically matches your Windows display language — zero configuration.",
       "wn2.t":"Goodbye Crashes","wn2.d":"Manual memory management (malloc/free) has been eliminated in favor of automatic memory management. Core crash bugs — including heap double-free corruption — have been fixed. Long play sessions stay rock-solid.",
       "wn3.t":"Faster, Smoother Gameplay","wn3.d":"LTO/PGO compilation and linker optimization (/OPT:REF, /OPT:ICF) deliver noticeably faster startup and game loading. Steadier frame pacing means no stuttering and no audio glitches, even on modest hardware.",
-      "wn4.t":"Rock-Solid Save States","wn4.d":"The new V2 save state format (FCEU11ST) embeds per-chunk CRC32 integrity checks. Even if your drive develops a bad sector or a file gets truncated, the emulator can detect corruption — your progress is always safe.",
+      "wn4.t":"PPU Rendering Overhaul: 52% Frame-Time Reduction","wn4.d":"21 algorithm- and micro-structure-level optimizations reshape the PPU rendering pipeline: two-stage sprite decode LUT, X-bucket sprite pre-classification, strict-aliasing UB fixes, modulo → wrap-around, dispatcher cache reuse. Measured single-threaded PPU frame time drops from 1.125 ms (hotfix1) to 0.535 ms (−52.4%), exceeding the plan's 42% upper bound; 169 mappers pass with 0-byte diff — visual accuracy preserved.",
       "wn.cta":"View full changelog →",
       foot:"based on FCEUX"},
   zh:{pill:"v1.15 · hotfix2",
@@ -345,7 +345,7 @@ const I18N={
       "wn1.t":"12 种语言，开箱即用","wn1.d":"模拟器界面已支持 12 种语言——简体中文、繁體中文、English、日本語、한국어、Español、Français、Deutsch、Tiếng Việt、ไทย、हिन्दी、العربية（含完整 RTL 布局）。首次启动自动匹配 Windows 显示语言，无需任何设置。",
       "wn2.t":"告别闪退，畅玩无忧","wn2.d":"底层已全面淘汰手动内存管理（malloc/free），改用自动内存管理，修复了堆损坏（double-free）等核心崩溃问题。长时间游玩不再突然退出，游戏进度稳如磐石。",
       "wn3.t":"启动更快，运行更流畅","wn3.d":"启用 LTO/PGO 编译优化与链接器精简（/OPT:REF, /OPT:ICF），模拟器冷启动和游戏加载速度显著提升。帧率更稳定，画面不卡顿、声音不断续，老电脑也能流畅运行。",
-      "wn4.t":"存档读档，安心可靠","wn4.d":"全新 V2 存档格式（FCEU11ST）为每个数据块内置 CRC32 完整性校验。即使硬盘出现坏道或文件意外截断，模拟器也能检测到损坏，再也不用担心掉档。",
+      "wn4.t":"PPU 渲染重制：帧时间直降 52%","wn4.d":"本次 21 项算法级与微结构级优化重塑 PPU 渲染管线：精灵两阶段 LUT 解码、X-bucket 预分类、严格别名 UB 根治、循环取模换 wrap-around、dispatcher 缓存复用。实测单线程 PPU 帧时间从 hotfix1 的 1.125 ms 降至 0.535 ms（−52.4%），超过原计划 42% 上界；169 款 mapper 0 字节偏差，画面精度不变。",
       "wn.cta":"查看完整更新日志 →",
       foot:"基于 FCEUX"}
 };
