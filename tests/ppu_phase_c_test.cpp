@@ -11,17 +11,63 @@
 // Each test exercises one Phase C PR's invariants at the byte level
 // (no PPU / mapper exercise required) so they can run in <1 second
 // during every CTest cycle.
+//
+// Implementation note: this file deliberately avoids <gtest/gtest.h>
+// (Phase B / D and the LUT test follow the same convention) so the
+// test builds in environments without vcpkg-installed GoogleTest.
+// EXPECT_* keeps running after a failure; ASSERT_* records the first
+// failure in the current test function and returns early (mirroring
+// gtest semantics). All checks / failures are aggregated in main().
 
-#include <gtest/gtest.h>
+// Disable C4127 ("conditional expression is constant") for this test
+// file. The PPU_C_* macros compare scalar values that may fold to
+// constants under MSVC's /WX flag; the comparisons are intentional
+// and the test still gates production behaviour.
+#pragma warning(push)
+#pragma warning(disable: 4127)
 
+#include <array>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
+#include <type_traits>
 #include <vector>
 
 #include "utils/simd_fill.h"
 #include "ppu.h"
 
 namespace {
+
+int g_phase_c_failures = 0;
+int g_phase_c_checks   = 0;
+
+// EXPECT-style: log and continue.
+#define PPU_C_EXPECT_EQ(a, b)                                                   \
+    do {                                                                        \
+        ++g_phase_c_checks;                                                     \
+        const auto _a = (a);                                                    \
+        const auto _b = (b);                                                    \
+        if (!(_a == _b)) {                                                      \
+            ++g_phase_c_failures;                                               \
+            std::printf("[FAIL] %s:%d  %s == %s\n",                             \
+                        __FILE__, __LINE__, #a, #b);                            \
+        }                                                                       \
+    } while (0)
+
+// ASSERT-style: log and return from the enclosing test function on
+// first failure (mirrors gtest ASSERT_* semantics).
+#define PPU_C_ASSERT_EQ(a, b)                                                  \
+    do {                                                                        \
+        ++g_phase_c_checks;                                                     \
+        const auto _a = (a);                                                    \
+        const auto _b = (b);                                                    \
+        if (!(_a == _b)) {                                                      \
+            ++g_phase_c_failures;                                               \
+            std::printf("[FAIL] %s:%d  %s == %s  (assert; aborting test)\n",   \
+                        __FILE__, __LINE__, #a, #b);                            \
+            return;                                                             \
+        }                                                                       \
+    } while (0)
 
 // ---------------------------------------------------------------------------
 // P2-1 (ALIAS-1): fceu_dwmemset byte equivalence vs the original macro
@@ -41,7 +87,7 @@ namespace {
 //   - 0x40 (MMC5 attribute fill — boards/mmc5.cpp:547,662,942)
 //   - numtiles*8 for sweep of {8, 16, 24, 32, 64, 128, 192, 256}
 // plus a few "weird" patterns (pal_color | 0x40, 0xc0c0c0c0, etc.).
-TEST(P2_1FceuDwmemset, MatchesLegacyBytePattern) {
+void test_p2_1_matches_legacy_byte_pattern() noexcept {
     // Legacy implementation, copy-pasted verbatim from utils/memory.h
     // pre-hotfix2 line 30 for the duration of the test. Stays local so
     // the hotfix is the only production path.
@@ -91,29 +137,35 @@ TEST(P2_1FceuDwmemset, MatchesLegacyBytePattern) {
             legacy_dwmemset(a.data(), pat, static_cast<int>(n));
             fceu11::fceu_dwmemset(b.data(), pat, n);
 
-            ASSERT_EQ(a, b)
-                << "mismatch for pattern=0x" << std::hex << pat
-                << " n=" << std::dec << n;
+            // ASSERT semantics: stop at the first (pat, n) mismatch
+            // and report it (no continuation across iterations).
+            ++g_phase_c_checks;
+            if (!(a == b)) {
+                ++g_phase_c_failures;
+                std::printf("[FAIL] P2-1: mismatch for pattern=0x%x n=%zu\n",
+                            pat, n);
+                return;
+            }
         }
     }
 }
 
 // Edge cases: n=0 (no-op), n=4 (single chunk), n=12 (3 chunks).
-TEST(P2_1FceuDwmemset, EdgeCases) {
+void test_p2_1_edge_cases() noexcept {
     alignas(64) uint8_t buf[64] = {};
 
     // n=0 must be a no-op (preserve anything that was there).
     for (int i = 0; i < 64; ++i) buf[i] = static_cast<uint8_t>(i);
     fceu11::fceu_dwmemset(buf, 0xDEADBEEFu, 0);
-    for (int i = 0; i < 64; ++i) ASSERT_EQ(buf[i], i) << "i=" << i;
+    for (int i = 0; i < 64; ++i) PPU_C_ASSERT_EQ(buf[i], i);
 
     // n=4 single chunk.
     memset(buf, 0xCC, sizeof(buf));
     fceu11::fceu_dwmemset(buf, 0x12345678u, 4);
-    EXPECT_EQ(buf[0], 0x78u);
-    EXPECT_EQ(buf[1], 0x56u);
-    EXPECT_EQ(buf[2], 0x34u);
-    EXPECT_EQ(buf[3], 0x12u);
+    PPU_C_EXPECT_EQ(buf[0], 0x78u);
+    PPU_C_EXPECT_EQ(buf[1], 0x56u);
+    PPU_C_EXPECT_EQ(buf[2], 0x34u);
+    PPU_C_EXPECT_EQ(buf[3], 0x12u);
 
     // n=12: 3 chunks of 4 bytes each.
     memset(buf, 0xCC, sizeof(buf));
@@ -126,7 +178,7 @@ TEST(P2_1FceuDwmemset, EdgeCases) {
             case 2: want = 0xBBu; break;
             case 3: want = 0xAAu; break;
         }
-        EXPECT_EQ(buf[i], want) << "i=" << i;
+        PPU_C_EXPECT_EQ(buf[i], want);
     }
 }
 
@@ -138,9 +190,9 @@ TEST(P2_1FceuDwmemset, EdgeCases) {
 // the v1.0 SPRBUF[0x100]. If a future maintainer adds fields or padding
 // the static_asserts in ppu.h will catch it; this test is for a runtime
 // smoke check of the defined struct (also documents intent).
-TEST(P2_3SPRB, LayoutMatchesV1ByteBuffer) {
-    EXPECT_EQ(sizeof(SPRB), 4u);
-    EXPECT_EQ(alignof(SPRB), 1u);
+void test_p2_3_sprb_layout() noexcept {
+    PPU_C_EXPECT_EQ(sizeof(SPRB), 4u);
+    PPU_C_EXPECT_EQ(alignof(SPRB), 1u);
 
     // Byte-order check: ca[0..1] -> atr -> x. Build by field so a
     // reordering of the struct body fails this test loudly (rather
@@ -152,18 +204,18 @@ TEST(P2_3SPRB, LayoutMatchesV1ByteBuffer) {
     s.x     = 0x44u;
 
     const uint8_t* raw = reinterpret_cast<const uint8_t*>(&s);
-    EXPECT_EQ(raw[0], 0x11u);
-    EXPECT_EQ(raw[1], 0x22u);
-    EXPECT_EQ(raw[2], 0x33u);
-    EXPECT_EQ(raw[3], 0x44u);
+    PPU_C_EXPECT_EQ(raw[0], 0x11u);
+    PPU_C_EXPECT_EQ(raw[1], 0x22u);
+    PPU_C_EXPECT_EQ(raw[2], 0x33u);
+    PPU_C_EXPECT_EQ(raw[3], 0x44u);
 }
 
-TEST(P2_3SPRBUF, StorageMatchesLayout) {
+void test_p2_3_sprbuf_storage() noexcept {
     // SPRBUF[64] must be 256 bytes contiguous (1 × cache line fits
     // twice in a 64-byte cache line + boundary; not strictly required
     // to be cache-aligned but the production definition says so).
-    EXPECT_EQ(sizeof(SPRBUF), sizeof(SPRB) * 64u);
-    EXPECT_EQ(sizeof(SPRBUF), 256u);
+    PPU_C_EXPECT_EQ(sizeof(SPRBUF), sizeof(SPRB) * 64u);
+    PPU_C_EXPECT_EQ(sizeof(SPRBUF), 256u);
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +227,7 @@ TEST(P2_3SPRBUF, StorageMatchesLayout) {
 // system handles this for us (we can't write uint32_t into a
 // differently-sized slot from a single TU), but the regression test
 // makes the dependency between pputile.inc and RefreshLine explicit.
-TEST(P2_6Pshift, StorageElementWidth) {
+void test_p2_6_pshift_storage_width() noexcept {
     // bg_latch() returns a uint32 (&)[2]; the array's element type is
     // pinned to uint32 at the API boundary.
     static_assert(std::is_same_v<
@@ -194,3 +246,18 @@ TEST(P2_6Pshift, StorageElementWidth) {
 }
 
 }  // namespace
+
+#pragma warning(pop)
+
+int main() noexcept {
+    std::printf("hotfix2 Phase C regression tests\n");
+    test_p2_1_matches_legacy_byte_pattern();
+    test_p2_1_edge_cases();
+    test_p2_3_sprb_layout();
+    test_p2_3_sprbuf_storage();
+    test_p2_6_pshift_storage_width();
+
+    std::printf("ppu_phase_c_test: %d checks, %d failures\n",
+                g_phase_c_checks, g_phase_c_failures);
+    return g_phase_c_failures == 0 ? 0 : 1;
+}

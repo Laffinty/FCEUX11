@@ -18,6 +18,16 @@
 // check uses a simple PPU_D_EXPECT_EQ macro that records the first
 // failure but keeps running so a single run reports the full set.
 
+// Disable C4127 ("conditional expression is constant") for this test
+// file. The PPU_D_EXPECT_EQ macro compares constexpr values from a
+// 256-entry bit-reversal table; MSVC's /WX flag would otherwise
+// promote the constexpr-folded `if (!(a == b))` to a build-breaking
+// error. The comparison is intentional and the test still gates
+// production behaviour — silencing the diagnostic is the correct
+// trade-off here.
+#pragma warning(push)
+#pragma warning(disable: 4127)
+
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -179,6 +189,8 @@ void test_p3_5_vnapage_shape() noexcept {
 }
 
 }  // namespace
+
+#pragma warning(pop)
 
 int main() noexcept {
     test_p3_1_matches_byte_swap();
