@@ -40,7 +40,7 @@ namespace fceu11 {
 // definition so the compiler can constant-fold / loop-unroll /
 // vectorise as it sees fit.
 FCEU_ALWAYS_INLINE
-inline void fceu_dwmemset(uint8_t* dst, uint32_t pattern, size_t n_bytes) noexcept {
+void fceu_dwmemset(uint8_t* dst, uint32_t pattern, size_t n_bytes) noexcept {
     // n_bytes is always a positive multiple of 4 in all callers
     // (boards/mmc5.cpp uses 0x3c0 / 0x40 / 0x3C0 / 0x040; ppu_rendering.cpp
     // uses numtiles*8 / 256 / tcount*8). Branch on this once.

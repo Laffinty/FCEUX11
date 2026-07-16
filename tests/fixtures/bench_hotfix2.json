@@ -1,0 +1,1 @@
+﻿{"name":"bench_ppu_frame","binary":"fceux11_bench_ppu_render","rom":"fixtures/mapper_nrom.nes","frames_per_iter":60,"iterations":5,"metric":"median_total_ms","median_total_ms":37.673,"best_ms":36.462,"worst_ms":38.634,"stddev_ms":3.868,"stddev_pct":10.3,"unit":"milliseconds for 60 frames"}

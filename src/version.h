@@ -67,13 +67,16 @@ inline constexpr int FCEU_VERSION_MAJOR_DECODE(int x) { return x / 10000; }
 inline constexpr int FCEU_VERSION_MINOR_DECODE(int x) { return (x / 100) % 100; }
 inline constexpr int FCEU_VERSION_PATCH_DECODE(int x) { return x % 100; }
 
-// v1.15 hotfix1 marker — single source of truth for downstream surfaces
+// v1.15 hotfix2 marker — single source of truth for downstream surfaces
 // (About, main-window title, startup banner, config.cpp about-template,
 // diag API, AVI ISFT metadata). Clear to "" when no hotfix is active.
-#define FCEU_HOTFIX_TAG "(hotfix1)"
+// Both FCEU_VERSION_STRING ("1.15 (hotfix2)") and FCEU_DISPLAY_VERSION
+// ("v1.15 (hotfix2)") keep a single space between "1.15" and the hotfix
+// parenthetical — convention introduced with hotfix2.
+#define FCEU_HOTFIX_TAG "(hotfix2)"
 
-#define FCEU_VERSION_STRING "1.15" FCEU_HOTFIX_TAG " " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
-#define FCEU_DISPLAY_VERSION "v1.15" FCEU_HOTFIX_TAG
+#define FCEU_VERSION_STRING "1.15 " FCEU_HOTFIX_TAG " " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
+#define FCEU_DISPLAY_VERSION "v1.15 " FCEU_HOTFIX_TAG
 #define FCEU_NAME_AND_VERSION FCEU_NAME " " FCEU_DISPLAY_VERSION
 
 // FCEUX11 Contributors — Derivative work based on FCEUX
