@@ -212,7 +212,14 @@ static void Fixit1(void);
 // ResetRL is non-static: FCEUPPU_Loop (still in ppu.cpp) calls it.
 void ResetRL(uint8 *target) {
 	memset(target, 0xFF, 256);
-	InputScanlineHook(0, 0, 0, 0);
+	// hotfix2 P3-3 (MICRO-3): same [[unlikely]] guard as the per-tile
+	// hook sites below. ResetRL fires once per visible scanline so it
+	// is ~32x colder than the RefreshLine inner-loop site, but the
+	// branch-predictor benefit still applies and the surrounding code
+	// is the same shape.
+	if (InputScanlineHook) [[unlikely]] {
+		InputScanlineHook(0, 0, 0, 0);
+	}
 	Plinef = target;
 	Pline = target;
 	firsttile = 0;
@@ -268,6 +275,23 @@ static void CheckSpriteHit(int p) {
 	}
 }
 
+// hotfix2 P3-2 (MICRO-1): leading-edge detector for the ppudead
+// XBuf memset. Set on entry to ppudead so the 60 KiB memset runs
+// exactly once per power-on stretch; cleared on the trailing edge
+// (next non-ppudead frame) so the next power-on cycle also gets a
+// clean fill. File-scope because the reset site lives in the `else`
+// branch of FCEUPPU_Loop below, which is outside the static block.
+static bool s_ppudead_cleared = false;
+
+// hotfix2 P3-4 (MAP-2): recursion guard for the PPU_hook callback
+// path. Set to 1 when the dispatcher routes RefreshLine into the
+// Hook / HookBGFetch case (PPU_hook fires from inside the inner
+// loop). Cleared at the end of those case bodies. The corresponding
+// re-entry check moved from the top of RefreshLine (where every call
+// paid the load cost) into a `PPU_hook && norecurse` test guarded
+// with [[unlikely]] (see RefreshLine body for the rationale).
+static int norecurse = 0;
+
 // lasttile is really "second to last tile."
 static void RefreshLine(int lastpixel) {
 	// v1.5 Prism §2.2 (Batch 2): pshift[2] / atlatch were static
@@ -301,8 +325,13 @@ static void RefreshLine(int lastpixel) {
 	uint8 *P = Pline;
 	int lasttile = lastpixel >> 3;
 	int numtiles;
-	static int norecurse = 0;
-	if (norecurse) return;
+	// hotfix2 P3-4 (MAP-2): the unconditional `if (norecurse) return;`
+	// guard at the top of RefreshLine has been moved further down
+	// (see comment near the PPU_hook-driven dispatch) so the >99%
+	// non-hooked path no longer pays the load+cmp cost. The static
+	// `norecurse` storage itself is hoisted to file scope below so the
+	// set/clear sites in the dispatcher and the Hook / HookBGFetch
+	// case bodies can share state across the recursion guard.
 
 	if (sphitx != 0x100 && !(PPU_status & 0x40)) {
 		if ((sphitx < (lastpixel - 16)) && !(sphitx < ((lasttile - 2) * 8)))
@@ -315,6 +344,29 @@ static void RefreshLine(int lastpixel) {
 	if (numtiles <= 0) return;
 
 	P = Pline;
+
+	// hotfix2 P3-4 (MAP-2): `norecurse` is a recursion guard for the
+	// PPU_hook callback path. The hook fires from inside the
+	// pputile.inc include under PPUT_HOOK; if the hook ever calls
+	// back into RefreshLine (e.g. debugger memory-search re-entrancy)
+	// we must bail out before the second call reaches the inner loop
+	// again. Previously the guard was checked unconditionally at the
+	// top of RefreshLine so every call (including the >99%
+	// non-hooked path) paid the read-and-compare cost. Now the
+	// guard only fires when PPU_hook is set — the common non-hook
+	// path takes the [[likely]] branch and skips the read entirely.
+	// (The static variable itself is declared at file scope below
+	// so the set/clear sites in the dispatcher and case bodies can
+	// see it without an inner-static lifetime problem.)
+	if (PPU_hook && norecurse) [[unlikely]] {
+		// Re-entry from inside a PPU_hook callback while we are
+		// still inside the first invocation's hook-driven inner
+		// loop. Bail before the inner loop runs again to prevent
+		// unbounded recursion. PPU_hook is non-null here so the
+		// dispatcher below would otherwise route us back into the
+		// Hook / HookBGFetch case and re-invoke the hook.
+		return;
+	}
 
 	vofs = 0;
 
@@ -350,7 +402,15 @@ static void RefreshLine(int lastpixel) {
 		}
 
 		if ((lastpixel - 16) >= 0) {
-			InputScanlineHook(Plinef, spork ? sprlinebuf : 0, linestartts, lasttile * 8 - 16);
+			// hotfix2 P3-3 (MICRO-3): InputScanlineHook is a TAS /
+			// input-recording callback; for the >99% non-TAS users it
+			// is the nullptr branch (input.cpp:473 is a no-op when no
+			// input recorder is active). Marking the call [[unlikely]]
+			// tells the compiler to lay out the call site cold and
+			// keep the fast path's branch predictor history clean.
+			if (InputScanlineHook) [[unlikely]] {
+				InputScanlineHook(Plinef, spork ? sprlinebuf : 0, linestartts, lasttile * 8 - 16);
+			}
 		}
 		return;
 	}
@@ -578,7 +638,12 @@ static void RefreshLine(int lastpixel) {
 	CheckSpriteHit(lastpixel);
 
 	if ((lastpixel - 16) >= 0) {
-		InputScanlineHook(Plinef, spork ? sprlinebuf : 0, linestartts, lasttile * 8 - 16);
+		// hotfix2 P3-3 (MICRO-3): see the matching comment in
+		// RefreshLine above. The hook is nullptr for non-TAS runs;
+		// [[unlikely]] keeps the inline branch out of the hot path.
+		if (InputScanlineHook) [[unlikely]] {
+			InputScanlineHook(Plinef, spork ? sprlinebuf : 0, linestartts, lasttile * 8 - 16);
+		}
 	}
 	Pline = P;
 	firsttile = lasttile;
@@ -745,39 +810,37 @@ void DoLine(void) {
 //   - PaletteAdjustPixel
 //   - FCEUX_PPU_Loop (line 1466-end) + framectr + int test
 
-// BITREVLUT template + bitrevlut instance (used by FCEUX_PPU_Loop).
-// Also dead `int test` (was at ppu.cpp line 96; kept as byte-compatible
-// placeholder per v1.13 §1.4 future-scope list).
-int test = 0;
-
-template<typename T, int BITS>
-struct BITREVLUT {
-	T* lut;
-	BITREVLUT() {
-		int bits = BITS;
-		int n = 1 << BITS;
-		lut = new T[n];
-
-		int m = 1;
-		int a = n >> 1;
-		int j = 2;
-
-		lut[0] = 0;
-		lut[1] = a;
-
-		while (--bits) {
-			m <<= 1;
-			a >>= 1;
-			for (int i = 0; i < m; i++)
-				lut[j++] = lut[i] + a;
+// hotfix2 P3-1 (DS-5): constexpr 256-entry bit-reversal LUT. The
+// original BITREVLUT<T,BITS> template allocated with `new[]` and
+// relied on atexit-time cleanup (OS reclaims the heap). Replacing
+// it with `alignas(64) constexpr std::array<uint8_t, 256>` removes
+// the heap allocation entirely (the table now lives in .rodata),
+// keeps the same 8-bit reversal mapping, and makes the per-call
+// `bitrevlut[i]` access a plain array subscript. The mapping is
+// identical to the recursive-doubling algorithm the old template
+// produced: bit `b` of the input maps to bit `(7-b)` of the output.
+//
+// `bitrevlut` is kept as an `inline constexpr` reference into the
+// table so existing `bitrevlut[oam[4]]` call sites in FCEUX_PPU_Loop
+// compile unchanged (std::array::operator[](size_t) returns the
+// same uint8_t the BITREVLUT::operator[] used to return). The
+// constexpr value lives in .rodata, so the only address loaded
+// per call is the table base — no heap indirection, no atexit
+// teardown ordering concerns.
+alignas(64) inline constexpr std::array<uint8_t, 256> kBitRevLUT = []{
+	std::array<uint8_t, 256> t{};
+	for (int i = 0; i < 256; i++) {
+		uint8_t r = 0;
+		for (int b = 0; b < 8; b++) {
+			if (i & (1 << b)) r |= static_cast<uint8_t>(1 << (7 - b));
 		}
+		t[i] = r;
 	}
-
-	T operator[](int index) {
-		return lut[index];
-	}
-};
-BITREVLUT<uint8, 8> bitrevlut;
+	return t;
+}();
+// Backwards-compatible alias. std::array subscript matches the
+// old BITREVLUT::operator[] semantics 1:1.
+static constexpr const std::array<uint8_t, 256>& bitrevlut = kBitRevLUT;
 
 // V_FLIP / H_FLIP / SP_BACK + SPR / SPRB structs (used by
 // FetchSpriteData / RefreshSprites / CopySprites).
@@ -1103,10 +1166,30 @@ int FCEUPPU_Loop(int skip) {
 
 	//Needed for Knight Rider, possibly others.
 	if (ppudead) {
-		memset(XBuf, 0x80, 256 * 240);
+		// hotfix2 P3-2 (MICRO-1): ppudead fires for the first ~2-3
+		// frames after power-on while the NES PPU stabilises. The
+		// frame buffer is rendered to 0x80 (mid-grey, "screen off")
+		// during this period — the 60 KiB memset is unnecessary
+		// after the first ppudead frame because nothing in the
+		// emulation writes to XBuf while ppudead is set (no BG/sprite
+		// fetches run; the runppu() call below only advances CPU
+		// and mapper clocks). We clear once on the leading edge of
+		// ppudead and skip the memset on subsequent frames; the
+		// guard resets on the trailing edge so the next power-on
+		// cycle still gets a clean fill.
+		if (!s_ppudead_cleared) {
+			memset(XBuf, 0x80, 256 * 240);
+			s_ppudead_cleared = true;
+		}
 		X6502_Run(scanlines_per_frame * (256 + 85));
 		ppudead--;
 	} else {
+		// Trailing edge of ppudead: re-arm the leading-edge guard so
+		// the next power-on cycle still gets the memset exactly once.
+		// ResetRL writes XBuf as soon as ppudead returns to zero, so
+		// the stale 0x80 fill from the previous ppudead stretch is
+		// overwritten before any visible frame is drawn.
+		s_ppudead_cleared = false;
 		X6502_Run(256 + 85);
 		PPU_status |= 0x80;
 
