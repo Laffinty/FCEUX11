@@ -24,6 +24,25 @@ if (-not [System.IO.Path]::IsPathRooted($BuildDir)) {
     $BuildDir = Join-Path $ProjectRoot $BuildDir
 }
 
+# Load MSVC environment so CMake can locate cl / nmake / link.
+# (PowerShell script invocation does NOT inherit the calling shell's
+# vcvars64 environment; doing this here matches what the manual
+# build calls do.) Tries the same canonical path as scripts\build_full.bat.
+$vcvars = "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+if (Test-Path $vcvars) {
+    Write-Host "[VCVARS] Loading $vcvars" -ForegroundColor Gray
+    # Use `cmd /c` to source vcvars64 then dump env vars back to PowerShell.
+    $vcvarsDump = cmd /c "`"$vcvars`" && set"
+    foreach ($line in $vcvarsDump) {
+        if ($line -match "^(PATH|INCLUDE|LIB|LIBPATH|VCINSTALLDIR|VSINSTALLDIR|WindowSdkDir|UCRTVersionDir|WindowsSdkDir|WindowsSDKLibVersion|WindowsSDKVersion)=") {
+            $name, $value = $line -split "=", 2
+            Set-Item -Path "Env:\$name" -Value $value
+        }
+    }
+} else {
+    Write-Host "[VCVARS WARN] $vcvars not found; assuming cl/nmake are already on PATH" -ForegroundColor Yellow
+}
+
 # Default behavior: wipe the cache, since a prior v0.3.6.5 cache may
 # contain the buggy `/fsanitize:address` (colon) flag baked into the
 # cached ASAN_LDFLAGS / compile rules. Use -KeepCache to opt in to
@@ -33,15 +52,18 @@ if ((-not $KeepCache) -and (Test-Path $BuildDir)) {
     Remove-Item -Recurse -Force $BuildDir
 }
 
-$localVcpkg = Join-Path $ProjectRoot "vcpkg_installed\x64-windows"
+$localVcpkg = Join-Path $ProjectRoot "build\vcpkg_installed\x64-windows"
 if (-not (Test-Path $localVcpkg)) {
-    throw "vcpkg_installed\x64-windows not found at $localVcpkg. Run scripts\setup_vcpkg.ps1 first."
+    $localVcpkg = Join-Path $ProjectRoot "vcpkg_installed\x64-windows"
+}
+if (-not (Test-Path $localVcpkg)) {
+    throw "vcpkg_installed\x64-windows not found at project root or build/. Run scripts\setup_vcpkg.ps1 first."
 }
 
 $cmakeArgs = @(
     "-S", $ProjectRoot
     "-B", $BuildDir
-    "-G", "Ninja"
+    "-G", "NMake Makefiles"
     "-DCMAKE_BUILD_TYPE=$Config"
     "-DCMAKE_C_COMPILER=cl"
     "-DCMAKE_CXX_COMPILER=cl"

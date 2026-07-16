@@ -106,7 +106,12 @@ int QTAIHack = 0;
 uint8 QTAINTRAM[2048];
 uint8 qtaintramreg;
 
-uint8 SPRBUF[0x100];
+// hotfix2 P2-3 (DS-4): SPRBUF is now SPRB[64] (4-byte packed sprite
+// descriptors) instead of a raw byte buffer. Same 256-byte footprint
+// (64 × 4) but type-safe — callers in ppu_rendering.cpp can write
+// `SPRBUF[ns] = dst;` directly and the compiler emits a single 4-byte
+// store instead of going through memcpy.
+alignas(64) SPRB SPRBUF[64];
 alignas(64) std::array<uint8_t, 0x20> PALRAM;
 std::array<uint8_t, 3> UPALRAM;
 

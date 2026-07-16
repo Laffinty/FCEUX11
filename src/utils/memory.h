@@ -27,7 +27,15 @@
 
 #include <memory>
 
-#define FCEU_dwmemset(d,c,n) {int _x; for(_x=n-4;_x>=0;_x-=4) *(uint32 *)&(d)[_x]=c;}
+#include "utils/simd_fill.h"   // hotfix2 P2-1 (ALIAS-1): see simd_fill.h
+
+// hotfix2 P2-1 (ALIAS-1): the legacy macro body declared a
+// strict-aliasing UB (`*(uint32*)&(uint8_t[])` write on a buffer whose
+// dynamic type is `uint8_t`). The macro is now a thin redirect to the
+// type-safe `fceu11::fceu_dwmemset` (defined in utils/simd_fill.h) which
+// uses memcpy semantics internally and dispatches to AVX2
+// `_mm256_storeu_si256` on capable hosts.
+#define FCEU_dwmemset(d,c,n) fceu11::fceu_dwmemset((d),(c),(n))
 
 // v0.3.6: deprecation annotation. Suppress with -DFCEUX11_NO_DEPRECATION_WARNINGS
 // (provided until v0.4.0, per the v0.3.x plan §6.3).

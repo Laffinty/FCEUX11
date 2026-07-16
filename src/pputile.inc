@@ -44,16 +44,44 @@ if (X1 >= 2) {
 	vadr = (MMC5HackExNTARAMPtr[xs | (ys << 5)] << 4) + (vofs & 7);
 #else
 	zz = RefreshAddr & 0x1F;
+	// hotfix2 P3-5 (MAP-3) review conclusion (no code change):
+	// `vnapage[(RefreshAddr >> 10) & 3]` is a 2-level indirection
+	// (table-of-pointers lookup, then byte-fetch). Both modern
+	// MSVC /O2 and Clang -O2 already CSE the index within the
+	// inner loop (it only depends on `RefreshAddr`, which the
+	// compiler sees as loop-invariant across the per-tile body),
+	// and the four pointers typically map to four distinct 1 KiB
+	// NTARAM slices that sit in the same few cache lines (NTARAM
+	// is 2 KiB contiguous, MMC5fill is 1 KiB contiguous, etc.).
+	// Plan §十 P3-5 option A (keep current code, rely on
+	// compiler optimisation) is the right call here:
+	//   * Option B (separate tight nt_ptrs[4]) would duplicate the
+	//     bookkeeping that boards/*.cpp / ppu_class.cpp already do
+	//     to keep vnapage_[] in sync, with no measurable win.
+	//   * Option C (_mm_prefetch at RefreshLine entry) trades 4
+	//     prefetch instructions for ~40 cycles of L1 fill each,
+	//     which only helps when the nametables have been evicted
+	//     since the last scanline — for the common case (warm
+	//     NTARAM in L1 across adjacent scanlines) it is pure
+	//     overhead.
+	// Conclusion: leave as-is, document the rationale so a future
+	// reviewer does not re-flag this site.
 	C = vnapage[(RefreshAddr >> 10) & 3];
 #ifdef PPU_VRC5FETCH
 	tmpd = QTAINTRAM[((((RefreshAddr >> 10) & 3) >> ((qtaintramreg >> 1)) & 1) << 10) | (RefreshAddr & 0x3FF)];
-	vofs = ((tmpd & 0x3F) << 12) | ((RefreshAddr >> 12) & 7);	// recalculate VROM offset 
+	vofs = ((tmpd & 0x3F) << 12) | ((RefreshAddr >> 12) & 7);	// recalculate VROM offset
 #endif
 	vadr = (C[RefreshAddr & 0x3ff] << 4) + vofs;				// Fetch name table byte.
 #endif
 
 #ifdef PPUT_HOOK
-	PPU_hook(0x2000 | (RefreshAddr & 0xfff));
+	// hotfix2 P1-5 (INLINE-2): guard the indirect call so the compiler
+	// can hoist the null-check and skip it on non-hooked paths. The
+	// dispatcher in ppu_rendering.cpp:382 already only reaches here
+	// when PPU_hook != nullptr, but the in-loop guard turns the
+	// indirect call into a predictable conditional branch instead of
+	// an unconditional call-then-bail.
+	if (PPU_hook) [[unlikely]] PPU_hook(0x2000 | (RefreshAddr & 0xfff));
 #endif
 
 #ifdef PPUT_MMC5SP
@@ -99,7 +127,7 @@ pshift[1] <<= 8;
 #endif
 
 #ifdef PPUT_HOOK
-	PPU_hook(vadr);
+	if (PPU_hook) [[unlikely]] PPU_hook(vadr);
 #endif
 
 #ifdef PPU_BGFETCH
@@ -137,6 +165,12 @@ else
 	RefreshAddr++;
 
 #ifdef PPUT_HOOK
-	PPU_hook(0x2000 | (RefreshAddr & 0xfff));
+	// hotfix2 P1-5 (INLINE-2): guard the indirect call so the compiler
+	// can hoist the null-check and skip it on non-hooked paths. The
+	// dispatcher in ppu_rendering.cpp:382 already only reaches here
+	// when PPU_hook != nullptr, but the in-loop guard turns the
+	// indirect call into a predictable conditional branch instead of
+	// an unconditional call-then-bail.
+	if (PPU_hook) [[unlikely]] PPU_hook(0x2000 | (RefreshAddr & 0xfff));
 #endif
 

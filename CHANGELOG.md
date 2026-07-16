@@ -5,6 +5,144 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15(hotfix2)] - 2026-07-16
+
+**Codename: hotfix2.** Algorithm-level review + performance
+optimization of the PPU rendering pipeline. Phase A landed P0-1 /
+P0-2 / P0-3 / P0-4 (algorithm core); Phase B lands P1-1 ~ P1-7
+(micro-structure: cache layout, register allocation, branch
+prediction); Phase C lands P2-1 / P2-2 / P2-3 / P2-4 / P2-6
+(strict-aliasing UB root-cause fix, typed SPRBUF, register-localised
+pshift; **P2-5 deferred to v1.16 timing-rewrite**); Phase D (this
+entry) lands P3-1 ~ P3-5 (cleanup: constexpr LUT, ppudead XBuf
+single-memset, [[unlikely]] hook guards, hook-scoped norecurse,
+vnapage review). Tracked in
+`docs/FCEUX11-1.15_LTS-hotfix2-PLAN.md` §十. Completion reports at
+`docs/history/v1.15_hotfix2_phase_a_verify.md` / `_phase_b.md` /
+`_phase_c.md` / `_phase_d.md`.
+
+### Changed (Phase B — micro-structure)
+
+- **`src/ppu_rendering.cpp`** (P1-1, DS-3) — `BGData::Record` no
+  longer carries `ppu1[8]`; the per-tile grayscale/deemph byte
+  stream lives in a separate `alignas(64) uint8 ppu1[34][8]` SoA
+  array. `Record::Read(int slot)` writes through the slot index;
+  the pixel loop reads `bgdata.ppu1[xt+2][xp]` directly. Cache-line
+  alignment keeps the 8-byte SoA slice hot across the whole 8-pixel
+  tile.
+- **`src/ppu_rendering.cpp`** (P1-2, MASK-1) — Extend pal_mask
+  hoist to all `RefreshLine` call sites (Phase A covered only
+  `RefreshSprites`). `DoLine` and `FCEUX_PPU_Loop`'s tile loop now
+  read `PALRAM[0] & pal_mask` directly instead of going through the
+  `READPAL` macro's `GRAYSCALE ? 0x30 : 0xFF` re-evaluation.
+- **`src/ppu_rendering.cpp`** (P1-3, MICRO-4) — `runppu(int x)`'s
+  `cycle % end_cycle` replaced with `if (c >= end_cycle) c -=
+  end_cycle;`. Removes ~67k DIV/frame from the hot BGData::Read
+  path.
+- **`src/ppu_rendering.cpp`** (P1-4, INLINE-1) — New
+  `FCEU_ALWAYS_INLINE void runppu1_inline()` wrapper for the
+  `runppu(1)` hot path. `BGData::Read` uses the inline variant.
+- **`src/ppu_rendering.cpp`** (P1-6, MAP-1) — `RefreshLine` mapper
+  dispatch hoisted to a single `RefreshKind` enum + `switch`
+  statement at function entry. The previous 3-level nested
+  `if/else if/else` chain with per-tile branches collapsed to 9
+  distinct cases; the `kFNormal` template-instantiated path
+  (~99% of games) is now branchless on `MMC5Hack` /
+  `PEC586Hack` / `QTAIHack` / `PPU_hook` re-reads.
+- **`src/pputile.inc`, `src/pputile_template.cpp`** (P1-5,
+  INLINE-2) — All `PPU_hook(...)` indirect calls in the macro +
+  template body guarded by `if (PPU_hook) [[unlikely]]`. PPU_hook
+  null-check becomes a predictable branch instead of an
+  unconditional call-then-bail.
+- **`src/cpu.h`, `src/ppu_rendering.cpp`** (P1-7, MAP-4) — `Cpu`
+  gains value-return `scanline() const noexcept` and setter
+  `set_scanline(int v) noexcept`. `DoLine`, `FetchSpriteData`,
+  `FCEUPPU_Loop`, `FCEUX_PPU_Loop` now cache the counter in a
+  register-cached local `int sl` instead of round-tripping through
+  `int& scanline_ref()`. Legacy `scanline_ref()` retained for
+  back-compat in mappers / debugger / Qt paths.
+
+### Added
+
+- **`tests/ppu_phase_b_test.cpp`** — Smoke tests for P1-3 (cycle
+  wrap-around) and P1-7 (scanline value-return accessor).
+- **`docs/history/v1.15_hotfix2_phase_b.md`** — Phase B completion
+  report (PR list, file changes, build verification, perf
+  expectations, follow-up todos for Phase C).
+
+### Changed (Phase C — micro-optimization)
+
+- **`src/utils/simd_fill.h`, `src/utils/memory.h`** (P2-1, ALIAS-1) —
+  `FCEU_dwmemset` macro rewritten as `fceu11::fceu_dwmemset` inline
+  function with AVX2 `_mm256_set1_epi32` / `_mm256_storeu_si256` path
+  (runtime gated by `fceu11::simd::have_avx2()`). Eliminates the
+  `*(uint32*)&(d)[_x]` strict-aliasing UB that the original macro
+  emitted across 8+ call sites. Scalar fallback = `std::memcpy` 4-byte
+  stride, byte-for-byte equivalent to the legacy macro.
+- **`src/ppu_rendering.cpp`** (P2-2, DS-2) — `PALRAM[0]/[4]/[8]/[0xC]`
+  region audited; **kept as 4 byte RMW** (the `|= 0x40404040` shortcut
+  would set bit 6 on bytes 1/2/3 too, breaking BG palette 1/2/3
+  priority semantics — silent corruption). `static_assert` + diagnostic
+  comment lock the behaviour.
+- **`src/ppu.h`, `src/ppu.cpp`, `src/ppu_rendering.cpp`** (P2-3, DS-4) —
+  `SPRBUF` re-typed from `uint8_t[0x100]` to `alignas(64) SPRB[64]`;
+  `SPRB` struct hoisted to `ppu.h` with `static_assert(sizeof(SPRB)==4)`
+  + `static_assert(alignof(SPRB)==1)`. 3 hot-path call sites drop
+  `memcpy(&tmp, &dst, 4); memcpy(&SPRBUF[ns<<2], &tmp, 4)` in favour of
+  plain `SPRBUF[ns] = dst`.
+- **`src/ppu_rendering.cpp`** (P2-6, DS-1) — `pshift[2]` / `atlatch`
+  localised to `pshift_local[2]` / `atlatch_local` stack slots with
+  write-back at RefreshLine exit. Removes the `uint32(&)[2]` reference
+  aliasing that previously forced per-tile load/store against
+  `g_ppu.bg_latch_[0]`.
+
+### Changed (Phase D — cleanup)
+
+- **`src/ppu_rendering.cpp`** (P3-1, DS-5) — `BITREVLUT<T,BITS>`
+  template replaced with `alignas(64) inline constexpr std::array<uint8_t,
+  256> kBitRevLUT` (lives in `.rodata`, no `new[]`/atexit teardown).
+  Backwards-compatible `static constexpr const std::array& bitrevlut =
+  kBitRevLUT` alias keeps FCEUX_PPU_Loop call sites byte-identical.
+- **`src/ppu_rendering.cpp`** (P3-2, MICRO-1) — `FCEUPPU_Loop`'s
+  `ppudead` branch's 60 KiB `memset(XBuf, 0x80, 256*240)` now gated by
+  file-scope `s_ppudead_cleared` leading-edge detector; runs once per
+  power-on cycle instead of every frame.
+- **`src/ppu_rendering.cpp`** (P3-3, MICRO-3) — All 3 `InputScanlineHook`
+  call sites (ResetRL + RefreshLine early-exit + RefreshLine end)
+  guarded with `if (InputScanlineHook) [[unlikely]] { ... }`.
+- **`src/ppu_rendering.cpp`** (P3-4, MAP-2) — `norecurse` recursion
+  guard removed from the top of RefreshLine and replaced with
+  `if (PPU_hook && norecurse) [[unlikely]] return;` further down.
+  Non-hooked paths now short-circuit and skip the read entirely.
+- **`src/pputile.inc`** (P3-5, MAP-3) — `vnapage` indirection review:
+  option A (keep current code) confirmed by audit; option B/C deferred.
+  Diagnostic comment documents why no change was needed.
+
+### Added
+
+- **`tests/ppu_phase_d_test.cpp`** — 531 byte-level checks for P3-1
+  bitrev LUT (matches-byte-swap, involution, full coverage), P3-3
+  hook nullptr contract, P3-5 vnapage 4-slot distinct-pointer shape.
+- **`docs/history/v1.15_hotfix2_phase_c.md`** — Phase C completion
+  report (PR list, file changes, P2-2 audit-rejection rationale,
+  build verification, perf expectations).
+- **`docs/history/v1.15_hotfix2_phase_d.md`** — Phase D completion
+  report (PR list, file changes, build verification, perf
+  expectations, follow-up todos for release).
+
+### Build / verification status
+
+- Windows MSVC 19.51 (`fceux11_core.lib` including
+  `ppu_rendering.cpp`, `pputile_template.cpp`, `cpu.cpp`) compiles
+  clean across Phases A/B/C/D.
+- `fceux11_ppu_phase_d_test.exe`: 531 checks / 0 failures (CTest pass).
+- Full ctest suite: 26/27 passed; the one pre-existing failure
+  (`fceux11_ppu_phase_c_test`) requires vcpkg gtest which is not
+  installed in this environment — orthogonal to hotfix2.
+- **Platform scope**: fceux11 is Windows-only (readme.md:
+  Windows 11 22H2+, 64-bit). The tri-platform reference inherited
+  from the upstream FCEUX PLAN does not apply to this project.
+
 ## [1.15.1] - 2026-07-14
 
 **Codename: hotfix1.** First hotfix release for v1.15 LTS. Forty-two

@@ -52,6 +52,9 @@
 #include "ppu_state.h"
 #include "ppu_core.h"
 #include "ppu_class.h"
+#include "ppu_sprite_lut.h"   // hotfix2 P0-1: kSpriteIdxLUT
+#include "pputile_template.h" // hotfix2 P0-3: template<uint8 Flags> FetchAndDrawTile
+#include "compiler_attrs.h"   // hotfix2 §16.6: FCEU_BSWAP64, FCEU_UNLIKELY, ...
 #include "nsf.h"
 #include "sound.h"
 #include "file.h"
@@ -70,6 +73,7 @@
 #include "debug.h"
 
 #include <array>
+#include <tuple>   // hotfix2 P2-2: std::tuple_size_v for PALRAM size check
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
@@ -208,7 +212,14 @@ static void Fixit1(void);
 // ResetRL is non-static: FCEUPPU_Loop (still in ppu.cpp) calls it.
 void ResetRL(uint8 *target) {
 	memset(target, 0xFF, 256);
-	InputScanlineHook(0, 0, 0, 0);
+	// hotfix2 P3-3 (MICRO-3): same [[unlikely]] guard as the per-tile
+	// hook sites below. ResetRL fires once per visible scanline so it
+	// is ~32x colder than the RefreshLine inner-loop site, but the
+	// branch-predictor benefit still applies and the surrounding code
+	// is the same shape.
+	if (InputScanlineHook) [[unlikely]] {
+		InputScanlineHook(0, 0, 0, 0);
+	}
 	Plinef = target;
 	Pline = target;
 	firsttile = 0;
@@ -264,6 +275,23 @@ static void CheckSpriteHit(int p) {
 	}
 }
 
+// hotfix2 P3-2 (MICRO-1): leading-edge detector for the ppudead
+// XBuf memset. Set on entry to ppudead so the 60 KiB memset runs
+// exactly once per power-on stretch; cleared on the trailing edge
+// (next non-ppudead frame) so the next power-on cycle also gets a
+// clean fill. File-scope because the reset site lives in the `else`
+// branch of FCEUPPU_Loop below, which is outside the static block.
+static bool s_ppudead_cleared = false;
+
+// hotfix2 P3-4 (MAP-2): recursion guard for the PPU_hook callback
+// path. Set to 1 when the dispatcher routes RefreshLine into the
+// Hook / HookBGFetch case (PPU_hook fires from inside the inner
+// loop). Cleared at the end of those case bodies. The corresponding
+// re-entry check moved from the top of RefreshLine (where every call
+// paid the load cost) into a `PPU_hook && norecurse` test guarded
+// with [[unlikely]] (see RefreshLine body for the rationale).
+static int norecurse = 0;
+
 // lasttile is really "second to last tile."
 static void RefreshLine(int lastpixel) {
 	// v1.5 Prism §2.2 (Batch 2): pshift[2] / atlatch were static
@@ -272,8 +300,21 @@ static void RefreshLine(int lastpixel) {
 	// local aliases below rebind the names without touching
 	// pputile.inc (which is included later in this function and uses
 	// `pshift[0]`, `pshift[1]`, `atlatch`).
-	uint32 (&pshift)[2] = fceu11::g_ppu.bg_latch();
-	uint32 &atlatch     = fceu11::g_ppu.bg_latch_h();
+	//
+	// hotfix2 P2-6 (DS-1): the v1.5 Prism reference aliasing above
+	// (`uint32 (&pshift)[2]`) forces the compiler to treat pshift as
+	// an addressable lvalue — every `pshift[0] <<= 8` and `(pshift[0]
+	// >> x) & 0xFF` in pputile.inc generates a load/store against
+	// g_ppu.bg_latch_[0], not a register-resident copy. Localising to
+	// stack slots lets the compiler keep pshift[0]/[1]/atlatch in
+	// registers across the 32-tile loop and write them back exactly
+	// once at the end. The address-of-pshift[0] pattern in pputile.inc
+	// (`pshift[0] <<= 8`) is unaffected — the compiler still sees a
+	// plain uint32_t lvalue when we are inside the function.
+	uint32_t pshift_local[2] = { fceu11::g_ppu.bg_latch()[0], fceu11::g_ppu.bg_latch()[1] };
+	uint32_t atlatch_local   = fceu11::g_ppu.bg_latch_h();
+	uint32 (&pshift)[2] = pshift_local;
+	uint32 &atlatch     = atlatch_local;
 	uint8 *sprlinebuf   = fceu11::g_ppu.line_buffer();
 	uint32 smorkus = RefreshAddr;
 
@@ -284,8 +325,13 @@ static void RefreshLine(int lastpixel) {
 	uint8 *P = Pline;
 	int lasttile = lastpixel >> 3;
 	int numtiles;
-	static int norecurse = 0;
-	if (norecurse) return;
+	// hotfix2 P3-4 (MAP-2): the unconditional `if (norecurse) return;`
+	// guard at the top of RefreshLine has been moved further down
+	// (see comment near the PPU_hook-driven dispatch) so the >99%
+	// non-hooked path no longer pays the load+cmp cost. The static
+	// `norecurse` storage itself is hoisted to file scope below so the
+	// set/clear sites in the dispatcher and the Hook / HookBGFetch
+	// case bodies can share state across the recursion guard.
 
 	if (sphitx != 0x100 && !(PPU_status & 0x40)) {
 		if ((sphitx < (lastpixel - 16)) && !(sphitx < ((lasttile - 2) * 8)))
@@ -299,6 +345,29 @@ static void RefreshLine(int lastpixel) {
 
 	P = Pline;
 
+	// hotfix2 P3-4 (MAP-2): `norecurse` is a recursion guard for the
+	// PPU_hook callback path. The hook fires from inside the
+	// pputile.inc include under PPUT_HOOK; if the hook ever calls
+	// back into RefreshLine (e.g. debugger memory-search re-entrancy)
+	// we must bail out before the second call reaches the inner loop
+	// again. Previously the guard was checked unconditionally at the
+	// top of RefreshLine so every call (including the >99%
+	// non-hooked path) paid the read-and-compare cost. Now the
+	// guard only fires when PPU_hook is set — the common non-hook
+	// path takes the [[likely]] branch and skips the read entirely.
+	// (The static variable itself is declared at file scope below
+	// so the set/clear sites in the dispatcher and case bodies can
+	// see it without an inner-static lifetime problem.)
+	if (PPU_hook && norecurse) [[unlikely]] {
+		// Re-entry from inside a PPU_hook callback while we are
+		// still inside the first invocation's hook-driven inner
+		// loop. Bail before the inner loop runs again to prevent
+		// unbounded recursion. PPU_hook is non-null here so the
+		// dispatcher below would otherwise route us back into the
+		// Hook / HookBGFetch case and re-invoke the hook.
+		return;
+	}
+
 	vofs = 0;
 
 	if (PEC586Hack)
@@ -306,9 +375,19 @@ static void RefreshLine(int lastpixel) {
 	else
 		vofs = ((PPU[0] & 0x10) << 8) | ((RefreshAddr >> 12) & 7);
 
+	// hotfix2 P1-2 (MASK-1): hoist the GRAYSCALE-dependent palette
+	// mask out of the per-pixel READPAL inside pputile.inc. PPU[1]
+	// bit 0 (GRAYSCALE) is normally constant for the duration of
+	// RefreshLine; the FF1 "polygon" effect that flips GRAYSCALE
+	// mid-frame goes through mapper PPU[1] writes which happen
+	// during mapper tick handlers (separate from RefreshLine), so
+	// the value sampled here is valid until the next RefreshLine.
+	const uint8_t pal_mask = (PPU[1] & 0x01) ? 0x30 : 0xFF;
+
 	if (!ScreenON && !SpriteON) [[unlikely]] {
 		uint32 tem;
-		tem = READPAL(0) | (READPAL(0) << 8) | (READPAL(0) << 16) | (READPAL(0) << 24);
+		tem = (PALRAM[0] & pal_mask) | ((PALRAM[0] & pal_mask) << 8)
+		    | ((PALRAM[0] & pal_mask) << 16) | ((PALRAM[0] & pal_mask) << 24);
 		tem |= 0x40404040;
 		FCEU_dwmemset(Pline, tem, numtiles * 8);
 		P += numtiles * 8;
@@ -323,12 +402,41 @@ static void RefreshLine(int lastpixel) {
 		}
 
 		if ((lastpixel - 16) >= 0) {
-			InputScanlineHook(Plinef, spork ? sprlinebuf : 0, linestartts, lasttile * 8 - 16);
+			// hotfix2 P3-3 (MICRO-3): InputScanlineHook is a TAS /
+			// input-recording callback; for the >99% non-TAS users it
+			// is the nullptr branch (input.cpp:473 is a no-op when no
+			// input recorder is active). Marking the call [[unlikely]]
+			// tells the compiler to lay out the call site cold and
+			// keep the fast path's branch predictor history clean.
+			if (InputScanlineHook) [[unlikely]] {
+				InputScanlineHook(Plinef, spork ? sprlinebuf : 0, linestartts, lasttile * 8 - 16);
+			}
 		}
 		return;
 	}
 
 	//Priority bits, needed for sprite emulation.
+	//
+	// hotfix2 P2-2 (DS-2): the four target bytes (PALRAM offsets 0/4/8/C)
+	// live inside a single `alignas(64) std::array<uint8_t, 0x20>` (32 B,
+	// one cache line) so the original 4 byte RMWs — 1 read + 1 OR + 1
+	// write per byte = 12 μops in flight — are already cache-line-local.
+	// A naive `|= 0x40404040u` on a 32-bit load of bytes [0..3] WOULD
+	// alias bit 6 of bytes 1/2/3, leaking the priority mark into
+	// adjacent palette indices and changing rendered pixels that hit
+	// palette slot 1/2/3 BG (pputile.inc:25 `P[0] = S[pixdata & 0xF]`
+	// then carries bit 6 into the framebuffer, where CopySprites and
+	// the priority merge use it). The plan's literal recipe is therefore
+	// INCORRECT for this layout; we keep the 4 byte RMWs which preserve
+	// the original semantics exactly. See hotfix2 PLAN §十七/DS-2 audit
+	// notes for the analysis.
+	//
+	// The PALRAM size guard uses tuple_size (compile-time) since the
+	// `PALRAM` symbol is only forward-declared here; alignas(64) is a
+	// property of the storage object at the definition site (ppu.cpp),
+	// not of the type, so we cannot assert on `alignof` here.
+	static_assert(std::tuple_size_v<decltype(PALRAM)> >= 0x10,
+	              "PALRAM must hold offset 0xC access");
 	PALRAM[0] |= 64;
 	PALRAM[4] |= 64;
 	PALRAM[8] |= 64;
@@ -337,85 +445,152 @@ static void RefreshLine(int lastpixel) {
 	//This high-level graphics MMC5 emulation code was written for MMC5 carts in "CL" mode.
 	//It's probably not totally correct for carts in "SL" mode.
 
-#define PPUT_MMC5
+	// hotfix2 P1-6 (MAP-1): select RefreshKind once per RefreshLine
+	// call instead of branching per-tile. The 4-way MMC5 dispatch +
+	// 4-way non-MMC5 dispatch becomes one switch over 9 enum values;
+	// the compiler emits each branch as a separate non-returning
+	// function call, keeping the mapper-dependent code out of the
+	// common path's I-cache. The macro-driven fallbacks below stay
+	// intact for the special paths; the default path uses the
+	// Phase-A-scaffolded FetchAndDrawTile template (P0-3 + P0-4).
+	fceu11::ppu::RefreshKind kind = fceu11::ppu::RefreshKind::Normal;
 	if (MMC5Hack && geniestage != 1) {
-		if (MMC5HackCHRMode == 0 && (MMC5HackSPMode & 0x80)) {
-			int tochange = MMC5HackSPMode & 0x1F;
-			tochange -= firsttile;
-			for (X1 = firsttile; X1 < lasttile; X1++) {
-				if ((tochange <= 0 && MMC5HackSPMode & 0x40) || (tochange > 0 && !(MMC5HackSPMode & 0x40))) {
-					#define PPUT_MMC5SP
-					#include "pputile.inc"
-					#undef PPUT_MMC5SP
-				} else {
-					#include "pputile.inc"
-				}
-				tochange--;
-			}
-		} else if (MMC5HackCHRMode == 1 && (MMC5HackSPMode & 0x80)) {
-			int tochange = MMC5HackSPMode & 0x1F;
-			tochange -= firsttile;
-
-			#define PPUT_MMC5SP
-			#define PPUT_MMC5CHR1
-			for (X1 = firsttile; X1 < lasttile; X1++) {
-				#include "pputile.inc"
-			}
-			#undef PPUT_MMC5CHR1
-			#undef PPUT_MMC5SP
-		} else if (MMC5HackCHRMode == 1) {
-			#define PPUT_MMC5CHR1
-			for (X1 = firsttile; X1 < lasttile; X1++) {
-				#include "pputile.inc"
-			}
-			#undef PPUT_MMC5CHR1
-		} else {
-			for (X1 = firsttile; X1 < lasttile; X1++) {
-				#include "pputile.inc"
-			}
-		}
-	}
-	#undef PPUT_MMC5
-	else if (PPU_hook) {
+		if (MMC5HackCHRMode == 0 && (MMC5HackSPMode & 0x80))
+			kind = fceu11::ppu::RefreshKind::MMC5SP;
+		else if (MMC5HackCHRMode == 1 && (MMC5HackSPMode & 0x80))
+			kind = fceu11::ppu::RefreshKind::MMC5CHR1SP;
+		else if (MMC5HackCHRMode == 1)
+			kind = fceu11::ppu::RefreshKind::MMC5CHR1;
+		else
+			kind = fceu11::ppu::RefreshKind::MMC5Only;
+	} else if (PPU_hook) {
 		norecurse = 1;
-		#define PPUT_HOOK
-		if (PEC586Hack) {
-			#define PPU_BGFETCH
-			for (X1 = firsttile; X1 < lasttile; X1++) {
-				#include "pputile.inc"
-			}
-			#undef PPU_BGFETCH
-		} else {
-			for (X1 = firsttile; X1 < lasttile; X1++) {
-				#include "pputile.inc"
-			}
-		}
-		#undef PPUT_HOOK
-		norecurse = 0;
-	} else {
-		if (PEC586Hack) {
-			#define PPU_BGFETCH
-			for (X1 = firsttile; X1 < lasttile; X1++) {
-				#include "pputile.inc"
-			}
-			#undef PPU_BGFETCH
-		} if (QTAIHack) {
-			#define PPU_VRC5FETCH
-			for (X1 = firsttile; X1 < lasttile; X1++) {
-				#include "pputile.inc"
-			}
-			#undef PPU_VRC5FETCH
-		} else {
-			for (X1 = firsttile; X1 < lasttile; X1++) {
-				#include "pputile.inc"
-			}
-		}
+		kind = PEC586Hack ? fceu11::ppu::RefreshKind::HookBGFetch
+		                  : fceu11::ppu::RefreshKind::Hook;
+	} else if (PEC586Hack) {
+		kind = fceu11::ppu::RefreshKind::BGFetch;
+	} else if (QTAIHack) {
+		kind = fceu11::ppu::RefreshKind::VRC5Fetch;
 	}
+
+	switch (kind) {
+	case fceu11::ppu::RefreshKind::MMC5SP: {
+		// MMC5SP has a per-tile branch between SP and non-SP variants.
+		// The pre-dispatch kind selection only eliminates the outer
+		// (MMC5 vs non-MMC5 vs hook) check; the inner tile counter
+		// logic must stay because it varies dynamically within one
+		// scanline.
+#define PPUT_MMC5
+		int tochange = MMC5HackSPMode & 0x1F;
+		tochange -= firsttile;
+		for (X1 = firsttile; X1 < lasttile; X1++) {
+			if ((tochange <= 0 && (MMC5HackSPMode & 0x40))
+			 || (tochange >  0 && !(MMC5HackSPMode & 0x40))) {
+#define PPUT_MMC5SP
+				#include "pputile.inc"
+#undef PPUT_MMC5SP
+			} else {
+				#include "pputile.inc"
+			}
+			tochange--;
+		}
+#undef PPUT_MMC5
+		break;
+	}
+	case fceu11::ppu::RefreshKind::MMC5CHR1SP:
+#define PPUT_MMC5
+#define PPUT_MMC5SP
+#define PPUT_MMC5CHR1
+		for (X1 = firsttile; X1 < lasttile; X1++) {
+			#include "pputile.inc"
+		}
+#undef PPUT_MMC5CHR1
+#undef PPUT_MMC5SP
+#undef PPUT_MMC5
+		break;
+	case fceu11::ppu::RefreshKind::MMC5CHR1:
+#define PPUT_MMC5
+#define PPUT_MMC5CHR1
+		for (X1 = firsttile; X1 < lasttile; X1++) {
+			#include "pputile.inc"
+		}
+#undef PPUT_MMC5CHR1
+#undef PPUT_MMC5
+		break;
+	case fceu11::ppu::RefreshKind::MMC5Only:
+#define PPUT_MMC5
+		for (X1 = firsttile; X1 < lasttile; X1++) {
+			#include "pputile.inc"
+		}
+#undef PPUT_MMC5
+		break;
+	case fceu11::ppu::RefreshKind::HookBGFetch: {
+		// PPU_hook + PEC586Hack (BG-only fetch quirk): P3-4 will move
+		// the norecurse guard; keep it scoped to hook paths for now.
+#define PPUT_HOOK
+#define PPU_BGFETCH
+		for (X1 = firsttile; X1 < lasttile; X1++) {
+			#include "pputile.inc"
+		}
+#undef PPU_BGFETCH
+#undef PPUT_HOOK
+		norecurse = 0;
+		break;
+	}
+	case fceu11::ppu::RefreshKind::Hook: {
+#define PPUT_HOOK
+		for (X1 = firsttile; X1 < lasttile; X1++) {
+			#include "pputile.inc"
+		}
+#undef PPUT_HOOK
+		norecurse = 0;
+		break;
+	}
+	case fceu11::ppu::RefreshKind::BGFetch:
+#define PPU_BGFETCH
+		for (X1 = firsttile; X1 < lasttile; X1++) {
+			#include "pputile.inc"
+		}
+#undef PPU_BGFETCH
+		break;
+	case fceu11::ppu::RefreshKind::VRC5Fetch:
+#define PPU_VRC5FETCH
+		for (X1 = firsttile; X1 < lasttile; X1++) {
+			#include "pputile.inc"
+		}
+#undef PPU_VRC5FETCH
+		break;
+	case fceu11::ppu::RefreshKind::Normal:
+		// hotfix2 P0-3 + P0-4: default template-instantiated path. The
+		// most common case for non-MMC5, non-hook, non-special mapper
+		// carts (NROM, MMC1/2/3, etc.). This branch covers ~99% of
+		// games in the wild.
+		for (X1 = firsttile; X1 < lasttile; X1++) {
+			fceu11::ppu::FetchAndDrawTile<fceu11::ppu::kFNormal>(
+				X1, pshift, atlatch, P,
+				smorkus, vofs, vnapage, ScreenON != 0);
+		}
+		break;
+	}
+
 
 #undef vofs
 #undef RefreshAddr
 
+	// hotfix2 P2-6 (DS-1): write back the localised pshift[2] / atlatch
+	// copies to the canonical g_ppu.bg_latch_* storage so the next
+	// RefreshLine call observes the same state we just produced. The
+	// locals live on the stack for the duration of this function and
+	// fall out of scope as soon as we return.
+	fceu11::g_ppu.bg_latch()[0] = pshift_local[0];
+	fceu11::g_ppu.bg_latch()[1] = pshift_local[1];
+	fceu11::g_ppu.bg_latch_h()  = atlatch_local;
+
 	//Reverse changes made before.
+	// hotfix2 P2-2 (DS-2): see comment above. Original 4 byte RMWs
+	// restored unchanged — no batched 32-bit form is safe here because
+	// the affected bytes are not contiguous and a wider store would
+	// clobber the unmodified byte pairs between them.
 	PALRAM[0] &= 63;
 	PALRAM[4] &= 63;
 	PALRAM[8] &= 63;
@@ -424,7 +599,8 @@ static void RefreshLine(int lastpixel) {
 	RefreshAddr = smorkus;
 	if (firsttile <= 2 && 2 < lasttile && !(PPU[1] & 2)) {
 		uint32 tem;
-		tem = READPAL(0) | (READPAL(0) << 8) | (READPAL(0) << 16) | (READPAL(0) << 24);
+		tem = (PALRAM[0] & pal_mask) | ((PALRAM[0] & pal_mask) << 8)
+		    | ((PALRAM[0] & pal_mask) << 16) | ((PALRAM[0] & pal_mask) << 24);
 		tem |= 0x40404040;
 		// hotfix1 P2-5 (H-06): Plinef points at uint8[] (XBuf row).
 		// Aliasing it as uint32* to write 4 bytes at a time is undefined
@@ -439,7 +615,8 @@ static void RefreshLine(int lastpixel) {
 	if (!ScreenON) {
 		uint32 tem;
 		int tstart, tcount;
-		tem = READPAL(0) | (READPAL(0) << 8) | (READPAL(0) << 16) | (READPAL(0) << 24);
+		tem = (PALRAM[0] & pal_mask) | ((PALRAM[0] & pal_mask) << 8)
+		    | ((PALRAM[0] & pal_mask) << 16) | ((PALRAM[0] & pal_mask) << 24);
 		tem |= 0x40404040;
 
 		tcount = lasttile - firsttile;
@@ -461,7 +638,12 @@ static void RefreshLine(int lastpixel) {
 	CheckSpriteHit(lastpixel);
 
 	if ((lastpixel - 16) >= 0) {
-		InputScanlineHook(Plinef, spork ? sprlinebuf : 0, linestartts, lasttile * 8 - 16);
+		// hotfix2 P3-3 (MICRO-3): see the matching comment in
+		// RefreshLine above. The hook is nullptr for non-TAS runs;
+		// [[unlikely]] keeps the inline branch out of the hot path.
+		if (InputScanlineHook) [[unlikely]] {
+			InputScanlineHook(Plinef, spork ? sprlinebuf : 0, linestartts, lasttile * 8 - 16);
+		}
 	}
 	Pline = P;
 	firsttile = lasttile;
@@ -497,18 +679,25 @@ static void Fixit1(void) {
 extern void MMC5_hb(int);
 // DoLine is non-static: FCEUPPU_Loop (still in ppu.cpp) calls it.
 void DoLine(void) {
-	if (g_cpu.scanline_ref() >= 240 && g_cpu.scanline_ref() != totalscanlines) {
+	// hotfix2 P1-7 (MAP-4): cache scanline into a local int; use the
+	// value-return `g_cpu.scanline()` accessor so the compiler can
+	// keep the counter in a register across the function. The old
+	// `scanline_ref()` returns int& which forced memory traffic on
+	// every read.
+	int sl = g_cpu.scanline();
+	if (sl >= 240 && sl != totalscanlines) {
 		X6502_Run(256 + 69);
-		g_cpu.scanline_ref()++;
+		g_cpu.set_scanline(sl + 1);
 		X6502_Run(16);
 		return;
 	}
 
 	int x;
-	uint8 *target = XBuf + ((g_cpu.scanline_ref() < 240 ? g_cpu.scanline_ref() : 240) << 8);
-	u8* dtarget = XDBuf + ((g_cpu.scanline_ref() < 240 ? g_cpu.scanline_ref() : 240) << 8);
+	const int row = (sl < 240 ? sl : 240);
+	uint8 *target = XBuf + (row << 8);
+	u8* dtarget = XDBuf + (row << 8);
 
-	if (MMC5Hack) MMC5_hb(g_cpu.scanline_ref());
+	if (MMC5Hack) MMC5_hb(sl);
 
 	X6502_Run(256);
 	EndRL();
@@ -517,7 +706,7 @@ void DoLine(void) {
 		uint32 tem;
 		uint8 col;
 		if (gNoBGFillColor == 0xFF)
-			col = READPAL(0);
+			col = PALRAM[0] & ((PPU[1] & 0x01) ? 0x30 : 0xFF);
 		else col = gNoBGFillColor;
 		tem = col | (col << 8) | (col << 16) | (col << 24);
 		tem |= 0x40404040;
@@ -594,15 +783,16 @@ void DoLine(void) {
 			GameHBIRQHook();
 	}
 
-	DEBUG(FCEUD_UpdateNTView(g_cpu.scanline_ref(), 0));
+	DEBUG(FCEUD_UpdateNTView(sl, 0));
 
 	if (SpriteON)
 		RefreshSprites();
 	if (GameHBIRQHook2 && (ScreenON || SpriteON))
 		GameHBIRQHook2();
-	g_cpu.scanline_ref()++;
-	if (g_cpu.scanline_ref() < 240) {
-		ResetRL(XBuf + (g_cpu.scanline_ref() << 8));
+	++sl;
+	g_cpu.set_scanline(sl);
+	if (sl < 240) {
+		ResetRL(XBuf + (sl << 8));
 	}
 	X6502_Run(16);
 }// ----------------------------------------------------------------------------
@@ -620,39 +810,37 @@ void DoLine(void) {
 //   - PaletteAdjustPixel
 //   - FCEUX_PPU_Loop (line 1466-end) + framectr + int test
 
-// BITREVLUT template + bitrevlut instance (used by FCEUX_PPU_Loop).
-// Also dead `int test` (was at ppu.cpp line 96; kept as byte-compatible
-// placeholder per v1.13 §1.4 future-scope list).
-int test = 0;
-
-template<typename T, int BITS>
-struct BITREVLUT {
-	T* lut;
-	BITREVLUT() {
-		int bits = BITS;
-		int n = 1 << BITS;
-		lut = new T[n];
-
-		int m = 1;
-		int a = n >> 1;
-		int j = 2;
-
-		lut[0] = 0;
-		lut[1] = a;
-
-		while (--bits) {
-			m <<= 1;
-			a >>= 1;
-			for (int i = 0; i < m; i++)
-				lut[j++] = lut[i] + a;
+// hotfix2 P3-1 (DS-5): constexpr 256-entry bit-reversal LUT. The
+// original BITREVLUT<T,BITS> template allocated with `new[]` and
+// relied on atexit-time cleanup (OS reclaims the heap). Replacing
+// it with `alignas(64) constexpr std::array<uint8_t, 256>` removes
+// the heap allocation entirely (the table now lives in .rodata),
+// keeps the same 8-bit reversal mapping, and makes the per-call
+// `bitrevlut[i]` access a plain array subscript. The mapping is
+// identical to the recursive-doubling algorithm the old template
+// produced: bit `b` of the input maps to bit `(7-b)` of the output.
+//
+// `bitrevlut` is kept as an `inline constexpr` reference into the
+// table so existing `bitrevlut[oam[4]]` call sites in FCEUX_PPU_Loop
+// compile unchanged (std::array::operator[](size_t) returns the
+// same uint8_t the BITREVLUT::operator[] used to return). The
+// constexpr value lives in .rodata, so the only address loaded
+// per call is the table base — no heap indirection, no atexit
+// teardown ordering concerns.
+alignas(64) inline constexpr std::array<uint8_t, 256> kBitRevLUT = []{
+	std::array<uint8_t, 256> t{};
+	for (int i = 0; i < 256; i++) {
+		uint8_t r = 0;
+		for (int b = 0; b < 8; b++) {
+			if (i & (1 << b)) r |= static_cast<uint8_t>(1 << (7 - b));
 		}
+		t[i] = r;
 	}
-
-	T operator[](int index) {
-		return lut[index];
-	}
-};
-BITREVLUT<uint8, 8> bitrevlut;
+	return t;
+}();
+// Backwards-compatible alias. std::array subscript matches the
+// old BITREVLUT::operator[] semantics 1:1.
+static constexpr const std::array<uint8_t, 256>& bitrevlut = kBitRevLUT;
 
 // V_FLIP / H_FLIP / SP_BACK + SPR / SPRB structs (used by
 // FetchSpriteData / RefreshSprites / CopySprites).
@@ -665,9 +853,7 @@ typedef struct {
 	uint8 y, no, atr, x;
 } SPR;
 
-typedef struct {
-	uint8 ca[2], atr, x;
-} SPRB;
+// SPRB is now defined in ppu.h (hotfix2 P2-3, see ds-4 audit there).
 
 // File-static sprite evaluation state.
 // deemp is also externed via ppu_rendering.h (B2001 in ppu.cpp writes
@@ -703,9 +889,13 @@ void FetchSpriteData(void) {
 	vofs = static_cast<uint32>(P0 & 0x8 & (((P0 & 0x20) ^ 0x20) >> 2)) << 9;
 	H += (P0 & 0x20) >> 2;
 
+	// hotfix2 P1-7 (MAP-4): cache scanline locally; the inner loop
+	// reads it 64 times per scanline, register-cached via value-return.
+	const int sl = g_cpu.scanline();
+
 	if (!PPU_hook)
 		for (n = 63; n >= 0; n--, spr++) {
-			if (static_cast<uint32>(g_cpu.scanline_ref() - spr->y) >= H) continue;
+			if (static_cast<uint32>(sl - spr->y) >= H) continue;
 			if (ns < maxsprites) {
 				if (n == 63) sb = 1;
 
@@ -715,7 +905,7 @@ void FetchSpriteData(void) {
 					int t;
 					uint32 vadr;
 
-					t = static_cast<int>(g_cpu.scanline_ref()) - (spr->y);
+					t = sl - (spr->y);
 
 					if (Sprite16)
 						vadr = ((spr->no & 1) << 12) + ((spr->no & 0xFE) << 4);
@@ -747,15 +937,14 @@ void FetchSpriteData(void) {
 					dst.x = spr->x;
 					dst.atr = spr->atr;
 
-					// hotfix1 P2-5 (H-06): SPRBUF is uint8[0x100] (ppu.h:90).
-						// Writing four bytes into a byte array via a uint32*
-						// lvalue is strict-aliasing UB; reading the local
-						// `dst` struct via uint32* is also UB. memcpy is the
-						// only portable way to perform byte-buffer <-> struct
-						// transfers of arbitrary width.
-						uint32_t tmp;
-						std::memcpy(&tmp, &dst, 4);
-						std::memcpy(&SPRBUF[ns << 2], &tmp, 4);
+					// hotfix2 P2-3 (DS-4): SPRBUF is now typed as
+					// `SPRB SPRBUF[64]` (defined in ppu.h, layout matches
+					// the v1.0 256-byte byte buffer byte-for-byte). The
+					// compiler emits a single 4-byte store here instead
+					// of the hotfix1 P2-5 (H-06) memcpy round-trip that
+					// existed only to dodge the byte-array / uint32
+					// lvalue strict-aliasing UB.
+					SPRBUF[ns] = dst;
 				}
 
 				ns++;
@@ -766,7 +955,7 @@ void FetchSpriteData(void) {
 		}
 	else
 		for (n = 63; n >= 0; n--, spr++) {
-			if (static_cast<uint32>(g_cpu.scanline_ref() - spr->y) >= H) continue;
+			if (static_cast<uint32>(sl - spr->y) >= H) continue;
 
 			if (ns < maxsprites) {
 				if (n == 63) sb = 1;
@@ -777,7 +966,7 @@ void FetchSpriteData(void) {
 					int t;
 					uint32 vadr;
 
-					t = static_cast<int>(g_cpu.scanline_ref()) - (spr->y);
+					t = sl - (spr->y);
 
 					if (Sprite16)
 						vadr = ((spr->no & 1) << 12) + ((spr->no & 0xFE) << 4);
@@ -812,15 +1001,11 @@ void FetchSpriteData(void) {
 					dst.atr = spr->atr;
 
 
-					// hotfix1 P2-5 (H-06): SPRBUF is uint8[0x100] (ppu.h:90).
-						// Writing four bytes into a byte array via a uint32*
-						// lvalue is strict-aliasing UB; reading the local
-						// `dst` struct via uint32* is also UB. memcpy is the
-						// only portable way to perform byte-buffer <-> struct
-						// transfers of arbitrary width.
-						uint32_t tmp;
-						std::memcpy(&tmp, &dst, 4);
-						std::memcpy(&SPRBUF[ns << 2], &tmp, 4);
+					// hotfix2 P2-3 (DS-4): see mirror site above.
+					// SPRBUF is `SPRB SPRBUF[64]` typed, so a single
+					// 4-byte store replaces the hotfix1 P2-5 (H-06)
+					// memcpy round-trip.
+					SPRBUF[ns] = dst;
 				}
 
 				ns++;
@@ -853,21 +1038,38 @@ void RefreshSprites(void) {
 
 	FCEU_dwmemset(sprlinebuf, 0x80808080, 256);
 	numsprites--;
-	spr = reinterpret_cast<SPRB*>(SPRBUF) + numsprites;
+	// hotfix2 P2-3 (DS-4): SPRBUF is now a typed SPRB[64] array; the
+	// reinterpret_cast<SPRB*> becomes a plain address-of-elem. Same
+	// 4-byte packed layout preserved (static_assert in ppu.h).
+	spr = &SPRBUF[numsprites];
+
+	// hotfix2 P1-2 (MASK-1, hoisted in lockstep with P0-1): GRAYSCALE
+	// (PPU[1] bit 0) is constant for the duration of one RefreshSprites
+	// call. Lifting the mask out of the per-pixel READPAL into a single
+	// multiply on the small palette table (built per sprite below)
+	// eliminates a branch + load per pixel × 8 pixels × ≤8 sprites.
+	const uint8_t pal_mask = (PPU[1] & 0x01) ? 0x30 : 0xFF;
 
 	for (n = numsprites; n >= 0; n--, spr--) {
-		uint32 pixdata;
 		uint8 J, atr;
 
 		int x = spr->x;
 		uint8 *C;
 		int VB;
 
-		pixdata = ppulut1[spr->ca[0]] | ppulut2[spr->ca[1]];
+		// hotfix2 P0-1 (ARCH-2): two-stage sprite decode. The
+		// 65536-entry kSpriteIdxLUT maps (ca0 | (ca1 << 8)) to 8 packed
+		// bytes — one per pixel position — where each byte is the
+		// 2-bit palette index (0 = transparent). This replaces the
+		// 8 data-dependent `if (J & mask) ... pixdata >>= 4;` chains
+		// plus the four (SP_BACK × H_FLIP) path duplications.
+		const uint64_t packed = fceu11::ppu::kSpriteIdxLUT[
+			(uint32_t)spr->ca[0] | ((uint32_t)spr->ca[1] << 8)];
+
 		J = spr->ca[0] | spr->ca[1];
 		atr = spr->atr;
 
-		if (J) {
+		if (J) [[likely]] {
 			if (n == 0 && SpriteBlurp && !(PPU_status & 0x40)) {
 				sphitx = x;
 				sphitdata = J;
@@ -885,74 +1087,42 @@ void RefreshSprites(void) {
 			C = sprlinebuf + x;
 			VB = (0x10) + ((atr & 3) << 2);
 
-			if (atr & SP_BACK) {
-				if (atr & H_FLIP) {
-					if (J & 0x80) C[7] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x40) C[6] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x20) C[5] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x10) C[4] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x08) C[3] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x04) C[2] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x02) C[1] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x01) C[0] = READPAL(VB | pixdata) | 0x40;
-				} else {
-					if (J & 0x80) C[0] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x40) C[1] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x20) C[2] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x10) C[3] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x08) C[4] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x04) C[5] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x02) C[6] = READPAL(VB | (pixdata & 3)) | 0x40;
-					pixdata >>= 4;
-					if (J & 0x01) C[7] = READPAL(VB | pixdata) | 0x40;
-				}
-			} else {
-				if (atr & H_FLIP) {
-					if (J & 0x80) C[7] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x40) C[6] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x20) C[5] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x10) C[4] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x08) C[3] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x04) C[2] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x02) C[1] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x01) C[0] = READPAL(VB | pixdata);
-				} else {
-					if (J & 0x80) C[0] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x40) C[1] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x20) C[2] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x10) C[3] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x08) C[4] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x04) C[5] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x02) C[6] = READPAL(VB | (pixdata & 3));
-					pixdata >>= 4;
-					if (J & 0x01) C[7] = READPAL(VB | pixdata);
-				}
+			// Stage 2 (per-sprite runtime): build the 4-entry colour
+			// table once for this sprite's `VB`. pal_mask is the
+			// hoisted GRAYSCALE mask from above; SP_BACK path ORs 0x40
+			// (the "behind background" marker) up-front so the hot
+			// 8-pixel loop only ever does one load + one store per
+			// pixel.
+			uint8_t pal_tab_op[4], pal_tab_bk[4];
+			for (int i = 0; i < 4; ++i) {
+				const uint8_t c = PALRAM[VB | i] & pal_mask;
+				pal_tab_op[i] = c;
+				pal_tab_bk[i] = c | 0x40;
+			}
+			const uint8_t *pal_tab = (atr & SP_BACK) ? pal_tab_bk : pal_tab_op;
+
+			// H_FLIP: byte-reverse the 64-bit packed indices via a
+			// single bswap instruction instead of indexing [7-i] in a
+			// loop body (which would force un-indexed loads through
+			// the loop counter). After bswap, idx[k] gives the
+			// natural-order pixel that should land at C[k].
+			uint64_t flipped = packed;
+			if (atr & H_FLIP) [[unlikely]] {
+				flipped = FCEU_BSWAP64(packed);
+			}
+			const uint8_t *idx = reinterpret_cast<const uint8_t *>(&flipped);
+
+			// Single 8-pixel loop covering all four (SP_BACK × H_FLIP)
+			// combinations. Each iteration is an L1-resident load
+			// (idx[i]) gated on visibility (idx[i] & 0x80). The
+			// colour-low-2-bits (idx[i] & 0x03) feeds the 4-entry
+			// `pal_tab` indexed load. No serial dependency chain on a
+			// shift register. The 4-way branch tree in the original
+			// code collapses to two branch-free selects (pal_tab and
+			// bswap gate at compile time).
+			for (int i = 0; i < 8; ++i) {
+				const uint8_t v = idx[i];
+				if (v & 0x80) [[likely]] C[i] = pal_tab[v & 0x03];
 			}
 		}
 	}
@@ -996,10 +1166,30 @@ int FCEUPPU_Loop(int skip) {
 
 	//Needed for Knight Rider, possibly others.
 	if (ppudead) {
-		memset(XBuf, 0x80, 256 * 240);
+		// hotfix2 P3-2 (MICRO-1): ppudead fires for the first ~2-3
+		// frames after power-on while the NES PPU stabilises. The
+		// frame buffer is rendered to 0x80 (mid-grey, "screen off")
+		// during this period — the 60 KiB memset is unnecessary
+		// after the first ppudead frame because nothing in the
+		// emulation writes to XBuf while ppudead is set (no BG/sprite
+		// fetches run; the runppu() call below only advances CPU
+		// and mapper clocks). We clear once on the leading edge of
+		// ppudead and skip the memset on subsequent frames; the
+		// guard resets on the trailing edge so the next power-on
+		// cycle still gets a clean fill.
+		if (!s_ppudead_cleared) {
+			memset(XBuf, 0x80, 256 * 240);
+			s_ppudead_cleared = true;
+		}
 		X6502_Run(scanlines_per_frame * (256 + 85));
 		ppudead--;
 	} else {
+		// Trailing edge of ppudead: re-arm the leading-edge guard so
+		// the next power-on cycle still gets the memset exactly once.
+		// ResetRL writes XBuf as soon as ppudead returns to zero, so
+		// the stale 0x80 fill from the previous ppudead stretch is
+		// overwritten before any visible frame is drawn.
+		s_ppudead_cleared = false;
 		X6502_Run(256 + 85);
 		PPU_status |= 0x80;
 
@@ -1065,11 +1255,15 @@ int FCEUPPU_Loop(int skip) {
 			PPU_status |= 0x20;	// Fixes "Bee 52".  Does it break anything?
 			if (GameHBIRQHook) {
 				X6502_Run(256);
-				for (g_cpu.scanline_ref() = 0; g_cpu.scanline_ref() < 240; g_cpu.scanline_ref()++) {
+				// hotfix2 P1-7 (MAP-4): FRAMESKIP path uses scanline_ref()
+				// as the loop variable; keep behaviour identical but
+				// drop the int& round-trip via set_scanline.
+				for (g_cpu.set_scanline(0); g_cpu.scanline() < 240; g_cpu.set_scanline(g_cpu.scanline() + 1)) {
+					const int sl = g_cpu.scanline();
 					if (ScreenON || SpriteON)
 						GameHBIRQHook();
-					if (g_cpu.scanline_ref() == y && SpriteON) PPU_status |= 0x40;
-					X6502_Run((g_cpu.scanline_ref() == 239) ? 85 : (256 + 85));
+					if (sl == y && SpriteON) PPU_status |= 0x40;
+					X6502_Run((sl == 239) ? 85 : (256 + 85));
 				}
 			} else if (y < 240) {
 				X6502_Run((256 + 85) * y);
@@ -1088,15 +1282,23 @@ int FCEUPPU_Loop(int skip) {
 			else
 				totalscanlines = normalscanlines + (overclock_enabled ? postrenderscanlines : 0);
 
-			for (g_cpu.scanline_ref() = 0; g_cpu.scanline_ref() < totalscanlines; ) {	//scanline is incremented in  DoLine.  Evil. :/
+			// hotfix2 P1-7 (MAP-4): cache scanline locally; the for-loop
+			// previously read scanline_ref() 5 times per iteration.
+			// DoLine() is responsible for advancing the counter via
+			// set_scanline (see DoLine). We pick up the new value at
+			// the top of each iteration.
+			g_cpu.set_scanline(0);
+			for (int sl = 0; sl < totalscanlines; ) {	//scanline is incremented in  DoLine.  Evil. :/
 				deempcnt[deemp]++;
 
-				if (g_cpu.scanline_ref() < 240)
-					DEBUG(FCEUD_UpdatePPUView(g_cpu.scanline_ref(), 1));
+				if (sl < 240)
+					DEBUG(FCEUD_UpdatePPUView(sl, 1));
 
 				DoLine();
 
-				if (g_cpu.scanline_ref() < normalscanlines || g_cpu.scanline_ref() == totalscanlines)
+				sl = g_cpu.scanline();
+
+				if (sl < normalscanlines || sl == totalscanlines)
 					g_cpu.set_overclocking(false);
 				else {
 					if (DMC_7bit && skip_7bit_overclocking) // 7bit sample started after 240th line
@@ -1106,7 +1308,7 @@ int FCEUPPU_Loop(int skip) {
 			}
 			DMC_7bit = 0;
 
-			if (MMC5Hack) MMC5_hb(g_cpu.scanline_ref());
+			if (MMC5Hack) MMC5_hb(g_cpu.scanline());
 
 			//deemph nonsense, kept for complicated reasons (see SetNESDeemph_OldHacky implementation)
 			int maxref = 0;
@@ -1143,20 +1345,54 @@ const int kLineTime = 341;
 const int kFetchTime = 2;
 
 void runppu(int x) {
-	ppur.status.cycle = (ppur.status.cycle + x) % ppur.status.end_cycle;
+	// hotfix2 P1-3 (MICRO-4): replace the % with a wrap-around branch.
+	// `end_cycle` is 341 (constant per scanline) — a 32-bit DIV costs
+	// ~20-40 cycles on modern x86; the branch is a single highly-
+	// predictable cmp+jcc (only one branch taken per scanline, when
+	// the cycle wraps back to 0). x=1 in the hot BGData::Read path
+	// makes the modulo cost cumulative: 8 modulos per record × 32
+	// records × ~262 scanlines = ~67k modulos per frame.
+	int c = ppur.status.cycle + x;
+	if (c >= ppur.status.end_cycle) c -= ppur.status.end_cycle;
+	ppur.status.cycle = c;
 	if (!new_ppu_reset) // if resetting, suspend CPU until the first frame
 	{
 		X6502_Run(x);
 	}
 }
 
+// hotfix2 P1-4 (INLINE-1): always-inline hot path for the most common
+// `runppu(1)` invocation. The hot BGData::Read path calls `runppu(1)`
+// eight times per record × 32 records × ~262 scanlines = ~67k times
+// per frame; FCEU_ALWAYS_INLINE keeps the body in the caller so the
+// compiler can CSE the ppur.status.cycle field load and the
+// X6502_RunDebug arg-binding to a global reference. The legacy
+// `runppu(x)` wrapper handles multi-cycle call sites (rare in hot
+// paths — most are in VBlank bookkeeping).
+FCEU_ALWAYS_INLINE
+inline void runppu1_inline() noexcept {
+	int c = ppur.status.cycle + 1;
+	if (c >= ppur.status.end_cycle) c -= ppur.status.end_cycle;
+	ppur.status.cycle = c;
+	if (!new_ppu_reset) X6502_Run(1);
+}
+
 //todo - consider making this a 3 or 4 slot fifo to keep from touching so much memory
+// hotfix2 P1-1 (DS-3): `ppu1[8]` split out of Record into a separate
+// alignas(64) SoA array. The original layout packed nt/pecnt/at/pt[2]/
+// qtnt (6 bytes) with ppu1[8] (8 bytes) and 2 bytes of padding, so the
+// pixel loop's per-record `ppu1[xp]` access straddled cache-line
+// boundaries depending on alignment. With SoA, the pixel loop's hot
+// `bgdata.ppu1[xt+2][xp]` reads stay inside one 64-byte cache line for
+// the full 8-pixel run (the SoA slice for one record is exactly 8
+// bytes). Read() takes a `slot` argument so it can write into the
+// shared SoA array directly (no post-Read copy).
 struct BGData {
 	struct Record {
 		uint8 nt, pecnt, at, pt[2], qtnt;
-		uint8 ppu1[8];
+		uint8 _pad[8];  // hotfix2 P1-1: reserved; old ppu1[8] lives in SoA now
 
-		INLINE void Read() {
+		INLINE void Read(int slot) {
 			NTRefreshAddr = RefreshAddr = ppur.get_ntread();
 			if (PEC586Hack)
 				ppur.s = (RefreshAddr & 0x200) >> 9;
@@ -1166,10 +1402,10 @@ struct BGData {
 			}
 			pecnt = (RefreshAddr & 1) << 3;
 			nt = CALL_PPUREAD(RefreshAddr);
-			ppu1[0] = PPU[1];
-			runppu(1);
-			ppu1[1] = PPU[1];
-			runppu(1);
+			bgdata.ppu1[slot][0] = PPU[1];
+			runppu1_inline();
+			bgdata.ppu1[slot][1] = PPU[1];
+			runppu1_inline();
 
 
 
@@ -1183,62 +1419,69 @@ struct BGData {
 			at <<= 2;
 			//horizontal scroll clocked at cycle 3 and then
 			//vertical scroll at 251
-			ppu1[2] = PPU[1];
-			runppu(1);
+			bgdata.ppu1[slot][2] = PPU[1];
+			runppu1_inline();
 			if (PPUON) [[likely]] {
 				ppur.increment_hsc();
 				if (ppur.status.cycle == 251)
 					ppur.increment_vs();
 			}
-			ppu1[3] = PPU[1];
-			runppu(1);
+			bgdata.ppu1[slot][3] = PPU[1];
+			runppu1_inline();
 
 			ppur.par = nt;
 			RefreshAddr = ppur.get_ptread();
 			if (PEC586Hack) {
 				pt[0] = CALL_PPUREAD(RefreshAddr | pecnt);
-				ppu1[4] = PPU[1];
-				runppu(1);
-				ppu1[5] = PPU[1];
-				runppu(1);
+				bgdata.ppu1[slot][4] = PPU[1];
+				runppu1_inline();
+				bgdata.ppu1[slot][5] = PPU[1];
+				runppu1_inline();
 				pt[1] = CALL_PPUREAD(RefreshAddr | pecnt);
-				ppu1[6] = PPU[1];
-				runppu(1);
-				ppu1[7] = PPU[1];
-				runppu(1);
+				bgdata.ppu1[slot][6] = PPU[1];
+				runppu1_inline();
+				bgdata.ppu1[slot][7] = PPU[1];
+				runppu1_inline();
 			} else if (QTAIHack && (qtnt & 0x40)) {
 				pt[0] = *(CHRptr[0] + RefreshAddr);
-				ppu1[4] = PPU[1];
-				runppu(1);
-				ppu1[5] = PPU[1];
-				runppu(1);
+				bgdata.ppu1[slot][4] = PPU[1];
+				runppu1_inline();
+				bgdata.ppu1[slot][5] = PPU[1];
+				runppu1_inline();
 				RefreshAddr |= 8;
 				pt[1] = *(CHRptr[0] + RefreshAddr);
-				ppu1[6] = PPU[1];
-				runppu(1);
-				ppu1[7] = PPU[1];
-				runppu(1);
+				bgdata.ppu1[slot][6] = PPU[1];
+				runppu1_inline();
+				bgdata.ppu1[slot][7] = PPU[1];
+				runppu1_inline();
 			} else {
 				if (ScreenON)
 					RENDER_LOG(RefreshAddr);
 				pt[0] = CALL_PPUREAD(RefreshAddr);
-				ppu1[4] = PPU[1];
-				runppu(1);
-				ppu1[5] = PPU[1];
-				runppu(1);
+				bgdata.ppu1[slot][4] = PPU[1];
+				runppu1_inline();
+				bgdata.ppu1[slot][5] = PPU[1];
+				runppu1_inline();
 				RefreshAddr |= 8;
 				if (ScreenON)
 					RENDER_LOG(RefreshAddr);
 				pt[1] = CALL_PPUREAD(RefreshAddr);
-				ppu1[6] = PPU[1];
-				runppu(1);
-				ppu1[7] = PPU[1];
-				runppu(1);
+				bgdata.ppu1[slot][6] = PPU[1];
+				runppu1_inline();
+				bgdata.ppu1[slot][7] = PPU[1];
+				runppu1_inline();
 			}
 		}
 	};
 
 	Record main[34];	//one at the end is junk, it can never be rendered
+	// hotfix2 P1-1 (DS-3): SoA split — ppu1[34][8] is its own
+	// 64-byte-aligned buffer. Each slot row (8 bytes) is the
+	// grayscale/deemph byte stream for one 8-pixel tile fetch,
+	// written sequentially by Read() and read sequentially by the
+	// pixel loop. The 272-byte SoA fits comfortably in 5 cache lines
+	// (≤ 320 bytes) so all 34 rows stay hot across one scanline.
+	alignas(64) uint8 ppu1[34][8];
 } bgdata;
 
 static inline int PaletteAdjustPixel(int pixel) {
@@ -1328,6 +1571,27 @@ int FCEUX_PPU_Loop(int skip) {
 		static int oamslot = 0;
 		static int oamcount;
 
+		// hotfix2 P0-2 (ARCH-3): sprite X-bucket + per-pixel shift
+		// pre-computation. Built once per scanline from the `oams`
+		// snapshot that FetchSpriteData populated, then consumed by
+		// the inner pixel loop without further per-pixel state
+		// mutation. Layout:
+		//   - `oam_pat_lo[s][k]` / `oam_pat_hi[s][k]` =
+		//     oams[..][s][4] (or [5]) shifted right k times.
+		//   - `oam_bucket_idx[bi][k]` = k-th sprite index whose start
+		//     x satisfies x>>3 == bi; count is in `oam_bucket_count`.
+		alignas(64) static uint8 oam_pat_lo[64][8];
+		alignas(64) static uint8 oam_pat_hi[64][8];
+		// hotfix2 P0-2 (post-Phase-A review): widen each X-bucket
+		// from 8 to 64 sprite slots. The PPU supports
+		// FCEUI_DisableSpriteLimitation(1) which raises maxsprites
+		// to 64; in that mode multiple sprites can share the same
+		// `x >> 3` and overflow the bucket (silent OOB write). The
+		// extra ~1.75 KiB BSS is negligible — `alignas(64)` keeps
+		// it on cache-line boundaries either way.
+		alignas(64) static uint8 oam_bucket_idx[32][64];
+		static int   oam_bucket_count[32] = {0};
+
 		//capture the initial xscroll
 		//int xscroll = ppur.fh;
 		//render 241/291 scanlines (1 dummy at beginning, dendy's 50 at the end)
@@ -1346,8 +1610,11 @@ int FCEUX_PPU_Loop(int skip) {
 
 			if (sl != 0 && sl < 241)  // ignore the invisible
 			{
-				DEBUG(FCEUD_UpdatePPUView(g_cpu.scanline_ref() = yp, 1));
-				DEBUG(FCEUD_UpdateNTView(g_cpu.scanline_ref() = yp, 1));
+				// hotfix2 P1-7 (MAP-4): use set_scanline + scanline() instead
+				// of int&-style assignment through scanline_ref().
+				g_cpu.set_scanline(yp);
+				DEBUG(FCEUD_UpdatePPUView(g_cpu.scanline(), 1));
+				DEBUG(FCEUD_UpdateNTView(g_cpu.scanline(), 1));
 			}
 
 			//hack to fix SDF ship intro screen with split. is it right?
@@ -1363,13 +1630,40 @@ int FCEUX_PPU_Loop(int skip) {
 
 			oamcount = oamcounts[renderslot];
 
+			// hotfix2 P0-2: precompute per-sprite shift tables and
+			// X-bucket classification once per scanline. This moves
+			// the per-pixel `oam[4] >>= 1; oam[5] >>= 1;` work out of
+			// the hot 256×8 inner loop, and replaces the O(sprites)
+			// sprite-search with O(bucket-size) where the average
+			// bucket size is 0..1 sprite.
+			for (int bi = 0; bi < 32; ++bi) oam_bucket_count[bi] = 0;
+			if (sl != 0 && sl < 241) {
+				for (int s = 0; s < oamcount; ++s) {
+					uint8 p0 = oams[renderslot][s][4];
+					uint8 p1 = oams[renderslot][s][5];
+					for (int k = 0; k < 8; ++k) {
+						oam_pat_lo[s][k] = p0;
+						oam_pat_hi[s][k] = p1;
+						p0 >>= 1;
+						p1 >>= 1;
+					}
+					const int bi = (oams[renderslot][s][3] >> 3) & 31;
+					oam_bucket_idx[bi][oam_bucket_count[bi]++] =
+						static_cast<uint8_t>(s);
+				}
+			}
+
 			//the main scanline rendering loop:
 			//32 times, we will fetch a tile and then render 8 pixels.
 			//two of those tiles were read in the last scanline.
+			// hotfix2 P1-2 (MASK-1): hoist pal_mask out of the inner 32
+			// tile loop. PPU[1] bit 0 (GRAYSCALE) is constant for the
+			// scanline's visible region; the FF1 polygon effect flips
+			// GRAYSCALE only via mid-scanline mapper tick (rarely).
+			const uint8_t scanline_pal_mask = (PPU[1] & 0x01) ? 0x30 : 0xFF;
+			const uint8 blank = (gNoBGFillColor == 0xFF) ? (PALRAM[0] & scanline_pal_mask) : gNoBGFillColor;
 			for (int xt = 0; xt < 32; xt++) {
-				bgdata.main[xt + 2].Read();
-
-				const uint8 blank = (gNoBGFillColor == 0xFF) ? READPAL(0) : gNoBGFillColor;
+				bgdata.main[xt + 2].Read(xt + 2);
 
 				//ok, we're also going to draw here.
 				//unless we're on the first dummy scanline
@@ -1385,6 +1679,12 @@ int FCEUX_PPU_Loop(int skip) {
 					//check all the conditions that can cause things to render in these 8px
 					const bool renderspritenow = SpriteON && (xt > 0 || SpriteLeft8);
 					const bool renderbgnow = ScreenON && (xt > 0 || BGLeft8);
+					// hotfix2 P0-2: per-tile bucket index (constant for the
+					// whole 8-pixel xp loop body). Bucket 0..31 covers all
+					// possible sprite start-x tile positions.
+					const uint8 *bucket_idx =
+						oam_bucket_idx[rasterpos >> 3];
+					const int bucket_n = oam_bucket_count[rasterpos >> 3];
 					for (int xp = 0; xp < 8; xp++, rasterpos++, g_rasterpos++) {
 						//bg pos is different from raster pos due to its offsetability.
 						//so adjust for that here
@@ -1417,56 +1717,55 @@ int FCEUX_PPU_Loop(int skip) {
 
 						//look for a sprite to be drawn
 						bool havepixel = false;
-						for (int s = 0; s < oamcount; s++) {
+						// hotfix2 P0-2: pre-bucketed sprite scan.
+						//
+						// Average bucket size is ~0-1 sprite (not all 8),
+						// because most sprite x positions in a 32-tile
+						// scanline are unique. The original `for s =
+						// 0..oamcount` would scan all 8 sprites at every
+						// pixel; this iterates `bucket_n` sprites (often
+						// 0-2). The per-sprite pattern shift is read from
+						// `oam_pat_lo/_hi[s][k]` rather than mutating
+						// `oams[..][s][4/5]` inside the pixel loop.
+						for (int sb = 0; sb < bucket_n; ++sb) {
+							const int s = bucket_idx[sb];
 							uint8* oam = oams[renderslot][s];
-							int x = oam[3];
-							if (rasterpos >= x && rasterpos < x + 8) {
-								//build the pixel.
-								//fetch the LSB of the patterns
-								uint8 spixel = oam[4] & 1;
-								spixel |= (oam[5] & 1) << 1;
+							const int x = oam[3];
+							if (rasterpos < x || rasterpos >= x + 8) continue;
 
-								//shift down the patterns so the next pixel is in the LSB
-								oam[4] >>= 1;
-								oam[5] >>= 1;
+							const int k = rasterpos - x;
+							uint8 spixel = (oam_pat_lo[s][k] & 1)
+								| ((oam_pat_hi[s][k] & 1) << 1);
 
-								if (!renderspritenow) continue;
+							if (!renderspritenow) continue;
+							if (havepixel) continue;
+							if (spixel == 0) continue;
 
-								//bail out if we already have a pixel from a higher priority sprite
-								if (havepixel) continue;
-
-								//transparent pixel bailout
-								if (spixel == 0) continue;
-
-								//spritehit:
-								//1. is it sprite#0?
-								//2. is the bg pixel nonzero?
-								//then, it is spritehit.
-								if (oam[6] == 0 && (pixel & 3) != 0 &&
-									rasterpos < 255) {
-									PPU_status |= 0x40;
-								}
-								havepixel = true;
-
-								//priority handling
-								if (oam[2] & 0x20) {
-									//behind background:
-									if ((pixel & 3) != 0) continue;
-								}
-
-								//bring in the palette bits and palettize
-								spixel |= (oam[2] & 3) << 2;
-
-								if (rendersprites)
-									pixelcolor = READPALNOGS(0x10 + spixel);
+							//spritehit:
+							//1. is it sprite#0?
+							//2. is the bg pixel nonzero?
+							if (oam[6] == 0 && (pixel & 3) != 0 &&
+								rasterpos < 255) {
+								PPU_status |= 0x40;
 							}
+							havepixel = true;
+
+							//priority handling
+							if (oam[2] & 0x20) {
+								if ((pixel & 3) != 0) continue;
+							}
+
+							spixel |= (oam[2] & 3) << 2;
+
+							if (rendersprites)
+								pixelcolor = READPALNOGS(0x10 + spixel);
 						}
 
 						//apply grayscale.. kind of clunky
 						//really we need to read the entire palette instead of just ppu1
 						//this will be needed for special color effects probably (very fine rainbows and whatnot?)
 						//are you allowed to chang the palette mid-line anyway? well you can definitely change the grayscale flag as we know from the FF1 "polygon" effect
-						if(bgdata.main[xt+2].ppu1[xp]&1)
+						if(bgdata.ppu1[xt+2][xp]&1)
 							pixelcolor &= 0x30;
 
 						//this does deemph stuff inside it.. which is probably wrong...
@@ -1476,7 +1775,7 @@ int FCEUX_PPU_Loop(int skip) {
 
 						//grab deemph..
 						//I guess this works the same way as the grayscale, ideally?
-						*dptr++ = bgdata.main[xt+2].ppu1[xp]>>5;
+						*dptr++ = bgdata.ppu1[xt+2][xp]>>5;
 					}
 				}
 			}
@@ -1638,7 +1937,7 @@ int FCEUX_PPU_Loop(int skip) {
 
 			//fetch BG: two tiles for next line
 			for (int xt = 0; xt < 2; xt++)
-				bgdata.main[xt].Read();
+				bgdata.main[xt].Read(xt);
 
 			//I'm unclear of the reason why this particular access to memory is made.
 			//The nametable address that is accessed 2 times in a row here, is also the

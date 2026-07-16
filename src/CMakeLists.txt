@@ -193,6 +193,8 @@ set(SRC_CORE
   	${CMAKE_CURRENT_SOURCE_DIR}/ppu.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/ppu_rendering.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/ppu_state.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/ppu_sprite_lut.cpp   # hotfix2 P0-1: 65536-entry sprite LUT
+  	${CMAKE_CURRENT_SOURCE_DIR}/pputile_template.cpp # hotfix2 P0-3: template<uint8_t Flags> FetchAndDrawTile
   	${CMAKE_CURRENT_SOURCE_DIR}/ppu_core.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/ppu_class.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/apu.cpp
