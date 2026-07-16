@@ -87,7 +87,34 @@ extern int g_rasterpos;
 // it into fceu11::g_ppu as fine_x_scroll_. The `extern uint8_t
 // (& XOffset)` reference alias in ppu_class.h is the new public
 // declaration — old `extern uint8 XOffset;` variable form is gone.
-extern uint8 SPRBUF[0x100];
+
+// hotfix2 P2-3 (DS-4): SPRB moved up from src/ppu_rendering.cpp so
+// the typed `SPRBUF[ns] = SPRB{...}` writes don't need a memcpy.
+// SPRB is a 4-byte packed sprite descriptor fetched from pattern
+// memory during sprite evaluation. Its byte-level layout must match
+// the v1.0 definition exactly (offset 0/1 = ca[0]/ca[1], offset 2 =
+// atr, offset 3 = x); the static_asserts below guard against future
+// reordering / padding drift.
+//
+// All members are uint8_t — the struct has natural alignment 1 with
+// no padding, so the v1.0 buffer layout is preserved bit-for-bit.
+struct SPRB {
+    uint8_t ca[2];    // offset 0..1 (plane 0 / plane 1 of sprite tile)
+    uint8_t atr;      // offset 2 (attribute byte: palette / flip / pri)
+    uint8_t x;        // offset 3 (horizontal position)
+};
+static_assert(sizeof(SPRB) == 4,
+              "SPRB must remain 4 bytes so SPRBUF[64] matches v1.0 SPRBUF[0x100] byte layout");
+static_assert(alignof(SPRB) == 1,
+              "SPRB must remain 1-byte aligned so we can memcpy from/to a uint32_t");
+
+// hotfix2 P2-3 (DS-4): SPRBUF is now an array of SPRB (typed sprite
+// descriptors) instead of a raw byte buffer. 64 entries × 4 bytes each
+// = 256 bytes total — same byte footprint, type-safe access. Defined
+// in src/ppu.cpp:109; consumed by src/ppu_rendering.cpp
+// (FetchSpriteData / RefreshSprites) without the hotfix1 P2-5
+// (H-06) memcpy round-trip.
+extern SPRB SPRBUF[64];
 extern uint8 VRAMBuffer, PPUGenLatch;
 
 extern bool& DMC_7bit;

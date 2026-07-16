@@ -73,6 +73,7 @@
 #include "debug.h"
 
 #include <array>
+#include <tuple>   // hotfix2 P2-2: std::tuple_size_v for PALRAM size check
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
@@ -275,8 +276,21 @@ static void RefreshLine(int lastpixel) {
 	// local aliases below rebind the names without touching
 	// pputile.inc (which is included later in this function and uses
 	// `pshift[0]`, `pshift[1]`, `atlatch`).
-	uint32 (&pshift)[2] = fceu11::g_ppu.bg_latch();
-	uint32 &atlatch     = fceu11::g_ppu.bg_latch_h();
+	//
+	// hotfix2 P2-6 (DS-1): the v1.5 Prism reference aliasing above
+	// (`uint32 (&pshift)[2]`) forces the compiler to treat pshift as
+	// an addressable lvalue — every `pshift[0] <<= 8` and `(pshift[0]
+	// >> x) & 0xFF` in pputile.inc generates a load/store against
+	// g_ppu.bg_latch_[0], not a register-resident copy. Localising to
+	// stack slots lets the compiler keep pshift[0]/[1]/atlatch in
+	// registers across the 32-tile loop and write them back exactly
+	// once at the end. The address-of-pshift[0] pattern in pputile.inc
+	// (`pshift[0] <<= 8`) is unaffected — the compiler still sees a
+	// plain uint32_t lvalue when we are inside the function.
+	uint32_t pshift_local[2] = { fceu11::g_ppu.bg_latch()[0], fceu11::g_ppu.bg_latch()[1] };
+	uint32_t atlatch_local   = fceu11::g_ppu.bg_latch_h();
+	uint32 (&pshift)[2] = pshift_local;
+	uint32 &atlatch     = atlatch_local;
 	uint8 *sprlinebuf   = fceu11::g_ppu.line_buffer();
 	uint32 smorkus = RefreshAddr;
 
@@ -342,6 +356,27 @@ static void RefreshLine(int lastpixel) {
 	}
 
 	//Priority bits, needed for sprite emulation.
+	//
+	// hotfix2 P2-2 (DS-2): the four target bytes (PALRAM offsets 0/4/8/C)
+	// live inside a single `alignas(64) std::array<uint8_t, 0x20>` (32 B,
+	// one cache line) so the original 4 byte RMWs — 1 read + 1 OR + 1
+	// write per byte = 12 μops in flight — are already cache-line-local.
+	// A naive `|= 0x40404040u` on a 32-bit load of bytes [0..3] WOULD
+	// alias bit 6 of bytes 1/2/3, leaking the priority mark into
+	// adjacent palette indices and changing rendered pixels that hit
+	// palette slot 1/2/3 BG (pputile.inc:25 `P[0] = S[pixdata & 0xF]`
+	// then carries bit 6 into the framebuffer, where CopySprites and
+	// the priority merge use it). The plan's literal recipe is therefore
+	// INCORRECT for this layout; we keep the 4 byte RMWs which preserve
+	// the original semantics exactly. See hotfix2 PLAN §十七/DS-2 audit
+	// notes for the analysis.
+	//
+	// The PALRAM size guard uses tuple_size (compile-time) since the
+	// `PALRAM` symbol is only forward-declared here; alignas(64) is a
+	// property of the storage object at the definition site (ppu.cpp),
+	// not of the type, so we cannot assert on `alignof` here.
+	static_assert(std::tuple_size_v<decltype(PALRAM)> >= 0x10,
+	              "PALRAM must hold offset 0xC access");
 	PALRAM[0] |= 64;
 	PALRAM[4] |= 64;
 	PALRAM[8] |= 64;
@@ -482,7 +517,20 @@ static void RefreshLine(int lastpixel) {
 #undef vofs
 #undef RefreshAddr
 
+	// hotfix2 P2-6 (DS-1): write back the localised pshift[2] / atlatch
+	// copies to the canonical g_ppu.bg_latch_* storage so the next
+	// RefreshLine call observes the same state we just produced. The
+	// locals live on the stack for the duration of this function and
+	// fall out of scope as soon as we return.
+	fceu11::g_ppu.bg_latch()[0] = pshift_local[0];
+	fceu11::g_ppu.bg_latch()[1] = pshift_local[1];
+	fceu11::g_ppu.bg_latch_h()  = atlatch_local;
+
 	//Reverse changes made before.
+	// hotfix2 P2-2 (DS-2): see comment above. Original 4 byte RMWs
+	// restored unchanged — no batched 32-bit form is safe here because
+	// the affected bytes are not contiguous and a wider store would
+	// clobber the unmodified byte pairs between them.
 	PALRAM[0] &= 63;
 	PALRAM[4] &= 63;
 	PALRAM[8] &= 63;
@@ -742,9 +790,7 @@ typedef struct {
 	uint8 y, no, atr, x;
 } SPR;
 
-typedef struct {
-	uint8 ca[2], atr, x;
-} SPRB;
+// SPRB is now defined in ppu.h (hotfix2 P2-3, see ds-4 audit there).
 
 // File-static sprite evaluation state.
 // deemp is also externed via ppu_rendering.h (B2001 in ppu.cpp writes
@@ -828,15 +874,14 @@ void FetchSpriteData(void) {
 					dst.x = spr->x;
 					dst.atr = spr->atr;
 
-					// hotfix1 P2-5 (H-06): SPRBUF is uint8[0x100] (ppu.h:90).
-						// Writing four bytes into a byte array via a uint32*
-						// lvalue is strict-aliasing UB; reading the local
-						// `dst` struct via uint32* is also UB. memcpy is the
-						// only portable way to perform byte-buffer <-> struct
-						// transfers of arbitrary width.
-						uint32_t tmp;
-						std::memcpy(&tmp, &dst, 4);
-						std::memcpy(&SPRBUF[ns << 2], &tmp, 4);
+					// hotfix2 P2-3 (DS-4): SPRBUF is now typed as
+					// `SPRB SPRBUF[64]` (defined in ppu.h, layout matches
+					// the v1.0 256-byte byte buffer byte-for-byte). The
+					// compiler emits a single 4-byte store here instead
+					// of the hotfix1 P2-5 (H-06) memcpy round-trip that
+					// existed only to dodge the byte-array / uint32
+					// lvalue strict-aliasing UB.
+					SPRBUF[ns] = dst;
 				}
 
 				ns++;
@@ -893,15 +938,11 @@ void FetchSpriteData(void) {
 					dst.atr = spr->atr;
 
 
-					// hotfix1 P2-5 (H-06): SPRBUF is uint8[0x100] (ppu.h:90).
-						// Writing four bytes into a byte array via a uint32*
-						// lvalue is strict-aliasing UB; reading the local
-						// `dst` struct via uint32* is also UB. memcpy is the
-						// only portable way to perform byte-buffer <-> struct
-						// transfers of arbitrary width.
-						uint32_t tmp;
-						std::memcpy(&tmp, &dst, 4);
-						std::memcpy(&SPRBUF[ns << 2], &tmp, 4);
+					// hotfix2 P2-3 (DS-4): see mirror site above.
+					// SPRBUF is `SPRB SPRBUF[64]` typed, so a single
+					// 4-byte store replaces the hotfix1 P2-5 (H-06)
+					// memcpy round-trip.
+					SPRBUF[ns] = dst;
 				}
 
 				ns++;
@@ -934,7 +975,10 @@ void RefreshSprites(void) {
 
 	FCEU_dwmemset(sprlinebuf, 0x80808080, 256);
 	numsprites--;
-	spr = reinterpret_cast<SPRB*>(SPRBUF) + numsprites;
+	// hotfix2 P2-3 (DS-4): SPRBUF is now a typed SPRB[64] array; the
+	// reinterpret_cast<SPRB*> becomes a plain address-of-elem. Same
+	// 4-byte packed layout preserved (static_assert in ppu.h).
+	spr = &SPRBUF[numsprites];
 
 	// hotfix2 P1-2 (MASK-1, hoisted in lockstep with P0-1): GRAYSCALE
 	// (PPU[1] bit 0) is constant for the duration of one RefreshSprites
