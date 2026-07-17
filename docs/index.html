@@ -221,10 +221,14 @@
   .whatsnew-list{max-width:640px;margin:0 auto;display:grid;gap:18px}
   .wn-item{display:grid;grid-template-columns:36px 1fr;gap:14px;align-items:start;padding:14px 16px;border:1px solid var(--border);border-radius:12px;background:var(--surface);transition:.2s}
   .wn-item:hover{border-color:var(--border-strong);background:var(--surface-2)}
-  html[dir="rtl"] .wn-item{grid-template-columns:1fr 36px}
+  /* RTL: grid auto-placement already places .wn-num at inline-start (right) and .wn-text next to it (left)
+     because the source order is number-first → text-second. No column-template override needed.
+     We only force the number itself to render LTR (so "01" reads left-to-right) and align to its
+     cell's inline-start edge. */
+  html[dir="rtl"] .wn-num{direction:ltr;unicode-bidi:isolate;text-align:start}
   .wn-num{font-family:var(--font-mono);font-size:12px;color:var(--green);font-weight:600;padding-top:2px;letter-spacing:.04em}
-  .wn-text h3{font-family:var(--font-display);font-size:14px;font-weight:600;margin-bottom:4px;letter-spacing:-.01em}
-  .wn-text p{font-size:13px;color:var(--muted);line-height:1.55}
+  .wn-text h3{font-family:var(--font-display);font-size:14px;font-weight:600;margin-bottom:4px;letter-spacing:-.01em;text-align:start}
+  .wn-text p{font-size:13px;color:var(--muted);line-height:1.55;text-align:start}
   .wn-cta{text-align:center;margin-top:24px}
   .wn-cta a{font-family:var(--font-mono);font-size:12px;color:var(--muted);text-decoration:none;border-bottom:1px solid var(--border);padding-bottom:2px;transition:.2s}
   .wn-cta a:hover{color:var(--green);border-color:var(--green)}
