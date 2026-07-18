@@ -444,9 +444,17 @@ int main( int argc, char *argv[] )
 	// which are then readable via SDL_PollEvent() from the emulator thread
 	// (where UpdatePhysicalInput runs).
 	QTimer *sdlPumpTimer = new QTimer(&app);
-	QObject::connect(sdlPumpTimer, &QTimer::timeout, []() {
+	// hotfix3 B-6: explicit Qt::QueuedConnection. The timer and the receiver
+	// lambda both live on the main thread today, so AutoConnection would pick
+	// DirectConnection. Pinning QueuedConnection is defensive: if the SDL pump
+	// is ever relocated off the main thread (the hotfix1 P2-15 comment in this
+	// file already contemplates this risk), the call still marshals correctly.
+	// The 4-arg `connect(sender, signal, context, slot, type)` form is required:
+	// Qt's overload set does not accept a bare lambda + ConnectionType without
+	// a context object to anchor the receiver's thread affinity.
+	QObject::connect(sdlPumpTimer, &QTimer::timeout, &app, []() {
 		SDL_PumpEvents();
-	});
+	}, Qt::QueuedConnection);
 	// hotfix1 P2-15 (N-L01): SDL_PumpEvents() must not be called before
 	// SDL_Init() succeeds — calling it on an uninitialised subsystem is
 	// undefined per SDL2 docs (some platforms deref a null internal

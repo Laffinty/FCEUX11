@@ -192,11 +192,23 @@ consoleWin_t::consoleWin_t(QWidget *parent)
 mutex      = new QRecursiveMutex();
 	emulatorThread = new emulatorThread_t(this);
 
-	connect(emulatorThread, &QThread::finished, emulatorThread, &QObject::deleteLater);
-	connect(emulatorThread, SIGNAL(frameFinished(void)), this, SLOT(emuFrameFinish(void)) );
-	connect(emulatorThread, SIGNAL(loadRomRequest(QString)), this, SLOT(loadRomRequestCB(QString)) );
+	// hotfix3 B-6: explicit Qt::QueuedConnection for cross-thread connect().
+	// AutoConnection on signal/slot macros currently picks QueuedConnection here
+	// because emulatorThread runs in the worker thread and `this` lives on the
+	// GUI thread — but if `this` were ever moved to a worker thread by a future
+	// refactor, AutoConnection would silently flip to DirectConnection and call
+	// the slot from the emitter's thread, racing against the GUI thread that
+	// owns the receiver's state. Pinning the type prevents that footgun.
+	connect(emulatorThread, &QThread::finished, emulatorThread, &QObject::deleteLater, Qt::QueuedConnection);
+	connect(emulatorThread, SIGNAL(frameFinished(void)), this, SLOT(emuFrameFinish(void)), Qt::QueuedConnection );
+	connect(emulatorThread, SIGNAL(loadRomRequest(QString)), this, SLOT(loadRomRequestCB(QString)), Qt::QueuedConnection );
 
-	connect( gameTimer, &QTimer::timeout, this, &consoleWin_t::updatePeriodic );
+	// hotfix3 B-6: gameTimer and `this` both live on the GUI thread today, so
+	// AutoConnection = DirectConnection. Pinning to QueuedConnection is a
+	// defensive annotation: if `this` is later moved off the main thread, the
+	// timer-driven slot will still marshal correctly instead of being invoked
+	// on whichever thread QTimer::timeout happens to fire on.
+	connect( gameTimer, &QTimer::timeout, this, &consoleWin_t::updatePeriodic, Qt::QueuedConnection );
 
 	gameTimer->setTimerType( Qt::PreciseTimer );
 	gameTimer->start( 8 ); // 120hz
