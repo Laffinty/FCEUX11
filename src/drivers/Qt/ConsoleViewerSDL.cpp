@@ -228,7 +228,7 @@ double ConsoleViewSDL_t::getAspectRatio(void)
 void ConsoleViewSDL_t::transfer2LocalBuffer(void)
 {
 	int i=0, hq = 0, bufIdx;
-	int numPixels = nes_shm->video.ncol * nes_shm->video.nrow;
+	int numPixels = nes_shm->video.ncol.load(std::memory_order_acquire) * nes_shm->video.nrow.load(std::memory_order_acquire);
 	unsigned int cpSize = numPixels * 4;
  	uint8_t *src, *dest;
 
@@ -245,7 +245,7 @@ void ConsoleViewSDL_t::transfer2LocalBuffer(void)
 	src  = reinterpret_cast<uint8_t*>(nes_shm->pixbuf[bufIdx]);
 	dest = reinterpret_cast<uint8_t*>(localBuf.get());
 
-	hq = (nes_shm->video.preScaler == 1) || (nes_shm->video.preScaler == 4); // hq2x and hq3x
+	hq = (nes_shm->video.preScaler.store(= 1) || (nes_shm->video.preScaler.load(std::memory_order_acquire) == 4), std::memory_order_release); // hq2x and hq3x
 
 	if ( hq )
 	{
@@ -343,11 +343,11 @@ int ConsoleViewSDL_t::init(void)
 
 	printf("[SDL] Renderer Output Size: %i x %i \n", sdlRendW, sdlRendH );
 
-	sdlTexture = SDL_CreateTexture(sdlRenderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, nes_shm->video.ncol, nes_shm->video.nrow);
+	sdlTexture = SDL_CreateTexture(sdlRenderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, nes_shm->video.ncol.load(std::memory_order_acquire), nes_shm->video.nrow.load(std::memory_order_acquire));
 
 	if (sdlTexture == NULL) 
 	{
-		printf("[SDL] Failed to create texture: %i x %i", nes_shm->video.ncol, nes_shm->video.nrow );
+		printf("[SDL] Failed to create texture: %i x %i", nes_shm->video.ncol.load(std::memory_order_acquire), nes_shm->video.nrow.load(std::memory_order_acquire) );
 		return -1;
 	}
 
@@ -620,10 +620,10 @@ void ConsoleViewSDL_t::render(void)
 
 	if ( nes_shm != NULL )
 	{
-		nesWidth  = nes_shm->video.ncol;
-		nesHeight = nes_shm->video.nrow;
-		ixScale   = static_cast<float>(nes_shm->video.xscale);
-		iyScale   = static_cast<float>(nes_shm->video.yscale);
+		nesWidth  = nes_shm->video.ncol.load(std::memory_order_acquire);
+		nesHeight = nes_shm->video.nrow.load(std::memory_order_acquire);
+		ixScale   = static_cast<float>(nes_shm->video.xscale.load(std::memory_order_acquire));
+		iyScale   = static_cast<float>(nes_shm->video.yscale.load(std::memory_order_acquire));
 	}
 	//printf(" %i x %i \n", nesWidth, nesHeight );
 	float xscaleTmp = static_cast<float>(view_width)  / static_cast<float>(nesWidth);
@@ -743,7 +743,7 @@ void ConsoleViewSDL_t::render(void)
 		}
 		SDL_RenderPresent(sdlRenderer);
 		videoBufferSwapMark();
-		nes_shm->render_count++;
+		nes_shm->render_count.fetch_add(1, std::memory_order_relaxed);
 		return;
 	}
 
@@ -763,5 +763,5 @@ void ConsoleViewSDL_t::render(void)
 
 	videoBufferSwapMark();
 
-	nes_shm->render_count++;
+	nes_shm->render_count.fetch_add(1, std::memory_order_relaxed);
 }

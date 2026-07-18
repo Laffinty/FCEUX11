@@ -32,32 +32,33 @@ nes_shm_t *open_nes_shm(void)
 
 	vaddr = new nes_shm_t;
 
-	// hotfix1 P1-12 (N-H03): zero-init the cross-thread atomic fields
-	// explicitly via .store() (relaxed, no observers yet). The previous
-	// memset() over the whole struct was unsafe because std::atomic<T>
-	// members do not have to be trivially constructible and the spec
-	// doesn't bless bulk-binary zeroing as a valid stand-in for value
-	// initialisation.
+	// hotfix1 P1-12 (N-H03) + hotfix3 A-3 (QT-CRASH-01): zero-init every
+	// cross-thread atomic field explicitly via .store() (relaxed, no
+	// observers yet). The previous memset() over the whole struct was
+	// unsafe because std::atomic<T> members do not have to be trivially
+	// constructible and the spec doesn't bless bulk-binary zeroing as a
+	// valid stand-in for value initialisation. After A-3 the entire
+	// `video` sub-struct + the bookkeeping counters are atomic, so the
+	// seed writes are per-field .store() calls below.
 	vaddr->runEmulator.store(0);
 	vaddr->blitUpdated.store(0);
 	vaddr->pixBufIdx.store(0);
+	vaddr->render_count.store(0);
+	vaddr->blit_count.store(0);
+	vaddr->pid.store(0);
+	vaddr->run.store(0);
 	vaddr->sndBuf.head.store(0);
 	vaddr->sndBuf.tail.store(0);
 	vaddr->sndBuf.starveCounter.store(0);
 
-	// POD fields left over from the old memset() bulk zero. These are
-	// either unused outside the main thread or only ever observed as
-	// gauges after a brief one-way crossing with no happens-before
-	// requirement, so a plain memset is fine for them.
-	memset( &vaddr->video, 0, sizeof(vaddr->video) );
-
-	vaddr->video.ncol      = GL_NES_WIDTH;
-	vaddr->video.nrow      = GL_NES_HEIGHT;
-	vaddr->video.pitch     = GL_NES_WIDTH * 4;
-	vaddr->video.xscale    = 1;
-	vaddr->video.yscale    = 1;
-	vaddr->video.xyRatio   = 1;
-	vaddr->video.preScaler = 0;
+	vaddr->video.ncol.store(      GL_NES_WIDTH,     std::memory_order_relaxed);
+	vaddr->video.nrow.store(      GL_NES_HEIGHT,    std::memory_order_relaxed);
+	vaddr->video.pitch.store(     GL_NES_WIDTH * 4, std::memory_order_relaxed);
+	vaddr->video.xscale.store(    1, std::memory_order_relaxed);
+	vaddr->video.yscale.store(    1, std::memory_order_relaxed);
+	vaddr->video.xyRatio.store(   1, std::memory_order_relaxed);
+	vaddr->video.preScaler.store( 0, std::memory_order_relaxed);
+	vaddr->video.test.store(      0, std::memory_order_relaxed);
 
 	return vaddr;
 }

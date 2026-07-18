@@ -116,8 +116,8 @@ QSize consoleWin_t::calcRequiredSize(void)
 
 	CalcVideoDimensions();
 
-	texture_width  = nes_shm->video.ncol;
-	texture_height = nes_shm->video.nrow;
+	texture_width  = nes_shm->video.ncol.load(std::memory_order_acquire);
+	texture_height = nes_shm->video.nrow.load(std::memory_order_acquire);
 
 	l=0, r=texture_width;
 	t=0, b=texture_height;
@@ -138,7 +138,7 @@ QSize consoleWin_t::calcRequiredSize(void)
 
 	if ( forceAspect )
 	{
-		yscale = xscale * (double)nes_shm->video.xyRatio;
+		yscale = xscale * (double)nes_shm->video.xyRatio.load(std::memory_order_acquire);
 	}
 	rw=(int)((r-l)*xscale);
 	rh=(int)((b-t)*yscale);

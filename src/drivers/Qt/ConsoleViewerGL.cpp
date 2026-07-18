@@ -241,8 +241,8 @@ void ConsoleViewGL_t::buildTextures(void)
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
 
-	txtWidth  = w = nes_shm->video.ncol;
-	txtHeight = h = nes_shm->video.nrow;
+	txtWidth  = w = nes_shm->video.ncol.load(std::memory_order_acquire);
+	txtHeight = h = nes_shm->video.nrow.load(std::memory_order_acquire);
 
 	glTexImage2D( GL_TEXTURE_2D, 0, 
 			GL_RGBA8, w, h, 0,
@@ -452,7 +452,7 @@ double ConsoleViewGL_t::getAspectRatio(void)
 void ConsoleViewGL_t::transfer2LocalBuffer(void)
 {
 	int i=0, hq = 0, bufIdx;
-	int numPixels = nes_shm->video.ncol * nes_shm->video.nrow;
+	int numPixels = nes_shm->video.ncol.load(std::memory_order_acquire) * nes_shm->video.nrow.load(std::memory_order_acquire);
 	unsigned int cpSize = numPixels * 4;
  	uint8_t *src, *dest;
 
@@ -469,7 +469,7 @@ void ConsoleViewGL_t::transfer2LocalBuffer(void)
 	src  = reinterpret_cast<uint8_t*>(nes_shm->pixbuf[bufIdx]);
 	dest = reinterpret_cast<uint8_t*>(localBuf.get());
 
-	hq = (nes_shm->video.preScaler == 1) || (nes_shm->video.preScaler == 4); // hq2x and hq3x
+	hq = (nes_shm->video.preScaler.store(= 1) || (nes_shm->video.preScaler.load(std::memory_order_acquire) == 4), std::memory_order_release); // hq2x and hq3x
 
 	if ( hq )
 	{
@@ -612,13 +612,13 @@ void ConsoleViewGL_t::renderBg(void)
 
 void ConsoleViewGL_t::renderFrame(void)
 {
-	int texture_width  = nes_shm->video.ncol;
-	int texture_height = nes_shm->video.nrow;
+	int texture_width  = nes_shm->video.ncol.load(std::memory_order_acquire);
+	int texture_height = nes_shm->video.nrow.load(std::memory_order_acquire);
 	int l=0, r=texture_width;
 	int t=0, b=texture_height;
 
-	float ixScale   = static_cast<float>(nes_shm->video.xscale);
-	float iyScale   = static_cast<float>(nes_shm->video.yscale);
+	float ixScale   = static_cast<float>(nes_shm->video.xscale.load(std::memory_order_acquire));
+	float iyScale   = static_cast<float>(nes_shm->video.yscale.load(std::memory_order_acquire));
 	float xscaleTmp = static_cast<float>(view_width)  / static_cast<float>(texture_width);
 	float yscaleTmp = static_cast<float>(view_height) / static_cast<float>(texture_height);
 
@@ -754,13 +754,13 @@ void ConsoleViewGL_t::paintGL(void)
 	if ( GameInfo == nullptr )
 	{
 		renderBg();
-		nes_shm->render_count++;
+		nes_shm->render_count.fetch_add(1, std::memory_order_relaxed);
 		return;
 	}
 
 	renderFrame();
 
-	nes_shm->render_count++;
+	nes_shm->render_count.fetch_add(1, std::memory_order_relaxed);
 	 //printf("Paint GL!\n");
 }
 

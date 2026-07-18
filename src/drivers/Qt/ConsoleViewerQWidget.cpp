@@ -191,7 +191,7 @@ double ConsoleViewQWidget_t::getAspectRatio(void)
 void ConsoleViewQWidget_t::transfer2LocalBuffer(void)
 {
 	int i=0, hq = 0, bufIdx;
-	int numPixels = nes_shm->video.ncol * nes_shm->video.nrow;
+	int numPixels = nes_shm->video.ncol.load(std::memory_order_acquire) * nes_shm->video.nrow.load(std::memory_order_acquire);
 	unsigned int cpSize = numPixels * 4;
  	uint8_t *src, *dest;
 
@@ -208,7 +208,7 @@ void ConsoleViewQWidget_t::transfer2LocalBuffer(void)
 	src  = (uint8_t*)nes_shm->pixbuf[bufIdx];
 	dest = (uint8_t*)localBuf.get();
 
-	hq = (nes_shm->video.preScaler == 1) || (nes_shm->video.preScaler == 4); // hq2x and hq3x
+	hq = (nes_shm->video.preScaler.store(= 1) || (nes_shm->video.preScaler.load(std::memory_order_acquire) == 4), std::memory_order_release); // hq2x and hq3x
 
 	if ( hq )
 	{
@@ -392,10 +392,10 @@ void ConsoleViewQWidget_t::paintEvent(QPaintEvent *event)
 
 	if ( nes_shm != nullptr )
 	{
-		nesWidth  = nes_shm->video.ncol;
-		nesHeight = nes_shm->video.nrow;
-		ixScale   = (float)nes_shm->video.xscale;
-		iyScale   = (float)nes_shm->video.yscale;
+		nesWidth  = nes_shm->video.ncol.load(std::memory_order_acquire);
+		nesHeight = nes_shm->video.nrow.load(std::memory_order_acquire);
+		ixScale   = (float)nes_shm->video.xscale.load(std::memory_order_acquire);
+		iyScale   = (float)nes_shm->video.yscale.load(std::memory_order_acquire);
 	}
 	//printf(" %i x %i \n", nesWidth, nesHeight );
 	float xscaleTmp = (float)view_width  / (float)nesWidth;
@@ -498,7 +498,7 @@ void ConsoleViewQWidget_t::paintEvent(QPaintEvent *event)
 		}
 		painter.end();
 		videoBufferSwapMark();
-		nes_shm->render_count++;
+		nes_shm->render_count.fetch_add(1, std::memory_order_relaxed);
 		return;
 	}
 
@@ -515,5 +515,5 @@ void ConsoleViewQWidget_t::paintEvent(QPaintEvent *event)
 
 	videoBufferSwapMark();
 
-	nes_shm->render_count++;
+	nes_shm->render_count.fetch_add(1, std::memory_order_relaxed);
 }

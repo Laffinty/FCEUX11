@@ -251,8 +251,8 @@ void consoleWin_t::winResizeIx(int iscale)
 {
 	QSize w, v;
 	double xscale = 1.0, yscale = 1.0, aspectRatio = 1.0;
-	int texture_width  = nes_shm->video.ncol;
-	int texture_height = nes_shm->video.nrow;
+	int texture_width  = nes_shm->video.ncol.load(std::memory_order_acquire);
+	int texture_height = nes_shm->video.nrow.load(std::memory_order_acquire);
 	int l=0, r=texture_width;
 	int t=0, b=texture_height;
 	int dw=0, dh=0, rw, rh;
@@ -275,13 +275,13 @@ void consoleWin_t::winResizeIx(int iscale)
 
 	if ( forceAspect )
 	{
-		xscale = xscale / nes_shm->video.xscale;
-		yscale = xscale * (double)nes_shm->video.xyRatio;
+		xscale = xscale / nes_shm->video.xscale.load(std::memory_order_acquire);
+		yscale = xscale * (double)nes_shm->video.xyRatio.load(std::memory_order_acquire);
 	}
 	else
 	{
-		xscale = xscale / nes_shm->video.xscale;
-		yscale = yscale / nes_shm->video.yscale;
+		xscale = xscale / nes_shm->video.xscale.load(std::memory_order_acquire);
+		yscale = yscale / nes_shm->video.yscale.load(std::memory_order_acquire);
 	}
 	rw=(int)((r-l)*xscale);
 	rh=(int)((b-t)*yscale);

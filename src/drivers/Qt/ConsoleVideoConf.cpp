@@ -220,7 +220,7 @@ ConsoleVideoConfDialog_t::ConsoleVideoConfDialog_t(QWidget *parent)
 	videoTest->addItem( tr("None")         , 0 );
 	videoTest->addItem( tr("Vertical Sync"), 1 );
 
-	videoTest->setCurrentIndex( nes_shm->video.test );
+	videoTest->setCurrentIndex( nes_shm->video.test.load(std::memory_order_acquire) );
 
 	connect(videoTest, SIGNAL(currentIndexChanged(int)), this, SLOT(testPatternChanged(int)) );
 
@@ -1087,7 +1087,7 @@ void ConsoleVideoConfDialog_t::inputDisplayChanged(int index)
 //----------------------------------------------------
 void ConsoleVideoConfDialog_t::testPatternChanged(int index)
 {
-	nes_shm->video.test = videoTest->itemData(index).toInt();
+	nes_shm->video.test.store(videoTest->itemData(index).toInt(), std::memory_order_release);
 }
 //----------------------------------------------------
 void ConsoleVideoConfDialog_t::aspectChanged(int index)
@@ -1188,8 +1188,8 @@ QSize ConsoleVideoConfDialog_t::calcNewScreenSize(void)
 	{
 		QSize w, v;
 		double xscale = 1.0, yscale = 1.0, aspectRatio = 1.0;
-		int texture_width  = nes_shm->video.ncol;
-		int texture_height = nes_shm->video.nrow;
+		int texture_width  = nes_shm->video.ncol.load(std::memory_order_acquire);
+		int texture_height = nes_shm->video.nrow.load(std::memory_order_acquire);
 		int l=0, r=texture_width;
 		int t=0, b=texture_height;
 		int dw=0, dh=0, rw, rh;
@@ -1207,13 +1207,13 @@ QSize ConsoleVideoConfDialog_t::calcNewScreenSize(void)
 
 		if ( aspectCbx->isChecked() )
 		{
-			xscale = xScaleBox->value() / nes_shm->video.xscale;
-			yscale = xscale * (double)nes_shm->video.xyRatio;
+			xscale = xScaleBox->value() / nes_shm->video.xscale.load(std::memory_order_acquire);
+			yscale = xscale * (double)nes_shm->video.xyRatio.load(std::memory_order_acquire);
 		}
 		else
 		{
-			xscale = xScaleBox->value() / nes_shm->video.xscale;
-			yscale = yScaleBox->value() / nes_shm->video.yscale;
+			xscale = xScaleBox->value() / nes_shm->video.xscale.load(std::memory_order_acquire);
+			yscale = yScaleBox->value() / nes_shm->video.yscale.load(std::memory_order_acquire);
 		}
 		rw=(int)((r-l)*xscale);
 		rh=(int)((b-t)*yscale);
