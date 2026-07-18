@@ -619,19 +619,25 @@ int32_t fceux11_lua_movie_is_from_savestate() {
 
 const char* fceux11_lua_movie_get_name() {
 	// Returns internal movie name (from header or filename)
-	static std::string name;
+	// hotfix3 A-6 (LUA-CRASH-02): `thread_local` so each thread gets
+	// its own buffer. Returning the c_str() pointer is safe as long
+	// as the caller copies the bytes before invoking another FFI
+	// call on the same thread (Rust bindings/movie.rs:61,76 already
+	// do this immediately).
+	thread_local std::string name;
 	name = fceu11::GetMovieName();
 	return name.c_str();
 }
 
 const char* fceux11_lua_movie_get_filename() {
 	// Returns filename stripped of path
-	static std::string name;
-	name = fceu11::GetMovieName();
-	int x = name.find_last_of("/\\") + 1;
+	// hotfix3 A-6 (LUA-CRASH-02): see get_name() above.
+	thread_local std::string filename;
+	filename = fceu11::GetMovieName();
+	int x = filename.find_last_of("/\\") + 1;
 	if (x)
-		name = name.substr(x, name.length() - x);
-	return name.c_str();
+		filename = filename.substr(x, filename.length() - x);
+	return filename.c_str();
 }
 
 // v0.2.22.4: savestate FFI
