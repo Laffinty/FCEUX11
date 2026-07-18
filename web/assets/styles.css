@@ -91,34 +91,20 @@
   .btn-ghost:hover{background:var(--surface-2);border-color:var(--border-strong);transform:translateY(-2px)}
   .btn svg{width:15px;height:15px}
 
-  /* features — one inline row, minimal */
+  /* features — one inline row, minimal.  Gap-based borders: grid background shows as 1px lines between items; each item paints its own bg over the gap so only inter-item lines remain.  Last incomplete row spans full width to avoid grid-bg bleed in empty cells.  Works symmetrically for LTR and RTL. */
   .features{padding:54px 0}
-  .feat-row{display:grid;grid-template-columns:repeat(5,1fr);gap:0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
-  .feat{padding:26px 14px;border-right:1px solid var(--border);text-align:center;transition:.25s}
-  .feat:last-child{border-right:none}
-  /* 3 cols: rows of 3+2, internal vertical borders on col-ends (1,2), horizontal border below top row */
+  .feat-row{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+  .feat{padding:26px 14px;background:var(--bg);text-align:center;transition:.25s}
+  /* 3 cols: rows of 3+2 — items 4,5 span full width to close the incomplete row */
   @media(max-width:960px){
     .feat-row{grid-template-columns:repeat(3,1fr)}
-    .feat{border-right:none}
-    .feat:nth-child(3n+1),.feat:nth-child(3n+2){border-right:1px solid var(--border)}
-    .feat:nth-child(-n+3){border-bottom:1px solid var(--border)}
+    .feat:nth-child(n+4){grid-column:span 2}
   }
-  /* 2 cols: rows of 2+2+1, internal vertical border on odd items, horizontal border on full rows (1-4) */
+  /* 2 cols: rows of 2+2+1 — item 5 alone, spans full width */
   @media(max-width:560px){
     .feat-row{grid-template-columns:repeat(2,1fr)}
-    .feat{border-right:none}
-    .feat:nth-child(2n+1){border-right:1px solid var(--border)}
-    .feat:nth-child(-n+4){border-bottom:1px solid var(--border)}
-  }
-  html[dir="rtl"] .feat{border-right:none;border-left:1px solid var(--border)}
-  html[dir="rtl"] .feat:last-child{border-left:none}
-  @media(max-width:960px){
-    html[dir="rtl"] .feat{border-left:none}
-    html[dir="rtl"] .feat:nth-child(3n+1),html[dir="rtl"] .feat:nth-child(3n+2){border-left:1px solid var(--border)}
-  }
-  @media(max-width:560px){
-    html[dir="rtl"] .feat{border-left:none}
-    html[dir="rtl"] .feat:nth-child(2n+1){border-left:1px solid var(--border)}
+    .feat:nth-child(n+4){grid-column:span 1}
+    .feat:nth-child(n+5){grid-column:span 2}
   }
   .feat:hover{background:var(--green-soft)}
   .feat .ico{width:34px;height:34px;margin:0 auto 12px;color:var(--green)}
