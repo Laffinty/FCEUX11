@@ -113,9 +113,10 @@ static int transparencyModifier = 255;
 static std::map<int, LuaSaveState*> s_savestate_objects;
 static int s_next_savestate_id = 1;
 
-// Rust FFI declarations ¡ª implemented in fceux11-lua crate
+// Rust FFI declarations ï¿½ï¿½ implemented in fceux11-lua crate
 extern "C" {
     int fceux11_lua_init(void);
+    int fceux11_lua_shutdown(void);  // hotfix3 A-2 (RUST-CRASH-02)
     int fceux11_lua_load_script(const char *path, const char *arg);
     void fceux11_lua_frame_boundary(void);
     void fceux11_lua_stop(void);
@@ -126,7 +127,7 @@ extern "C" {
     void fceux11_lua_call_mem_hook(unsigned int addr, int size, unsigned int value, int hook_type);
 }
 
-// Public C++ entry points ¡ª delegate to Rust FFI
+// Public C++ entry points ï¿½ï¿½ delegate to Rust FFI
 void FCEU_LuaFrameBoundary() {
     fceux11_lua_frame_boundary();
 }
@@ -144,6 +145,13 @@ void FCEU_ReloadLuaCode() {
 
 void FCEU_LuaStop() {
     fceux11_lua_stop();
+}
+
+// hotfix3 A-2 (RUST-CRASH-02): drop the active LuaEngine (if any)
+// and release its inner mlua::Lua state + Registry keys. Returns 1
+// if a live engine was torn down, 0 if there was nothing to do.
+int FCEU_LuaShutdown() {
+    return fceux11_lua_shutdown();
 }
 
 int FCEU_LuaRunning() {
@@ -498,7 +506,7 @@ uint8_t fceux11_lua_GetMem(uint32_t addr) {
 void fceux11_lua_BWrite(uint32_t addr, uint8_t val) {
 	uint16_t a = static_cast<uint16_t>(addr & 0xFFFF);
 	if (a < 0x8000) {
-		// RAM/writable memory ¡ª call through BWrite handler
+		// RAM/writable memory ï¿½ï¿½ call through BWrite handler
 		writefunc wf = fceu11::g_bus.bwrite_table()[a];
 		if (wf) wf(a, val);
 	}
@@ -923,7 +931,7 @@ int fceux11_lua_sound_get_length_count() {
     return lengthcount[0];
 }
 
-// Zapper ¡ª uses luazapperx/y/fire from lua-engine.cpp globals
+// Zapper ï¿½ï¿½ uses luazapperx/y/fire from lua-engine.cpp globals
 int fceux11_lua_zapper_get_x() {
     if (luazapperx < 0) return 0;
     return luazapperx;

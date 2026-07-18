@@ -521,13 +521,41 @@ unsafe extern "C" fn fceux11_lua_init() -> c_int {
             // `Ordering::Acquire` reader in `get_engine()` ensures the
             // publishing thread's writes to the freshly-created engine
             // are visible before any subsequent reader observes it.
-            LUA_ENGINE_PTR.store(Box::into_raw(boxed) as *mut c_void, Ordering::Release);
+            //
+            // hotfix3 A-1 (RUST-CRASH-01): also reclaim any previous
+            // engine before installing the new one. Without this the
+            // repeated `Box::into_raw` overwrote the previous pointer
+            // without dropping it, leaking one LuaEngine per reload.
+            let prev = LUA_ENGINE_PTR.swap(Box::into_raw(boxed) as *mut c_void, Ordering::AcqRel);
+            if !prev.is_null() {
+                drop(Box::from_raw(prev as *mut LuaEngine));
+            }
             0
         }
         Err(e) => {
             eprintln!("fceux11_lua_init failed: {:?}", e);
             -1
         }
+    }
+}
+
+/// hotfix3 A-2 (RUST-CRASH-02): reclaim the active `LuaEngine` Box
+/// (if any) and drop it, closing the inner `mlua::Lua` state and
+/// releasing all Registry keys. Pairs with `fceux11_lua_init`.
+///
+/// Returns 1 if an engine was actually torn down, 0 if there was
+/// nothing to do. `AcqRel` ordering on the swap synchronises with
+/// the matching `init` so any in-flight FFI either observes the new
+/// pointer (and is rejected with null) or the old pointer (and runs
+/// to completion before we reclaim it).
+#[unsafe(no_mangle)]
+unsafe extern "C" fn fceux11_lua_shutdown() -> c_int {
+    let prev = LUA_ENGINE_PTR.swap(std::ptr::null_mut(), Ordering::AcqRel);
+    if prev.is_null() {
+        0
+    } else {
+        drop(Box::from_raw(prev as *mut LuaEngine));
+        1
     }
 }
 
