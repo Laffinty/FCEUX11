@@ -54,6 +54,7 @@ extern char FileBase[];
 #include <vector>
 #include <map>
 #include <string>
+#include <atomic>
 #include <algorithm>
 #include <bitset>
 
@@ -104,9 +105,15 @@ struct LuaSaveState {
 
 static uint8 luajoypads1[4]= { 0xFF, 0xFF, 0xFF, 0xFF };
 static uint8 luajoypads2[4]= { 0x00, 0x00, 0x00, 0x00 };
-static int luazapperx = -1;
-static int luazappery = -1;
-static int luazapperfire = -1;
+// hotfix3 B-4 (LUA-CRASH-03): zapper globals are written by the Lua thread
+// (via fceux11_lua_zapper_set) and read by the emulator thread (via the get_*
+// accessors below, called from input polling). They must be std::atomic<int>
+// to avoid torn reads of 32-bit values on 32-bit targets and to give a
+// happens-before guarantee across the writer/reader boundary. Acquire/relaxed
+// is sufficient: a one-frame stale read on x/y is preferable to tearing.
+static std::atomic<int> luazapperx{-1};
+static std::atomic<int> luazappery{-1};
+static std::atomic<int> luazapperfire{-1};
 static enum {SPEED_NORMAL, SPEED_NOTHROTTLE, SPEED_TURBO, SPEED_MAXIMUM} speedmode = SPEED_NORMAL;
 static int transparencyModifier = 255;
 
@@ -937,26 +944,35 @@ int fceux11_lua_sound_get_length_count() {
     return lengthcount[0];
 }
 
-// Zapper �� uses luazapperx/y/fire from lua-engine.cpp globals
+// Zapper: uses luazapperx/y/fire from lua-engine.cpp globals (atomic<int>).
+// Read paths use acquire; the x/y/fire write path uses relaxed because the
+// caller (Lua) doesn't synchronize on the post-write value (a single stale
+// frame is acceptable for a light-pen input).
 int fceux11_lua_zapper_get_x() {
-    if (luazapperx < 0) return 0;
-    return luazapperx;
+    const int x = luazapperx.load(std::memory_order_acquire);
+    if (x < 0) return 0;
+    return x;
 }
 
 int fceux11_lua_zapper_get_y() {
-    if (luazapperx < 0) return 0;
-    return luazappery;
+    const int x = luazapperx.load(std::memory_order_acquire);
+    if (x < 0) return 0;
+    return luazappery.load(std::memory_order_relaxed);
 }
 
 int fceux11_lua_zapper_get_click() {
-    if (luazapperx < 0) return 0;
-    return luazapperfire;
+    const int x = luazapperx.load(std::memory_order_acquire);
+    if (x < 0) return 0;
+    return luazapperfire.load(std::memory_order_relaxed);
 }
 
 void fceux11_lua_zapper_set(int x, int y, int fire) {
-    luazapperx = x;
-    luazappery = y;
-    luazapperfire = fire;
+    // Ordering between x/y/fire stores: relaxed is fine because the readers
+    // snapshot x first as the "valid" gate (returning 0 if x<0), then read
+    // y/fire. Worst case is one frame of stale y/fire after a fresh x.
+    luazapperx.store(x, std::memory_order_relaxed);
+    luazappery.store(y, std::memory_order_relaxed);
+    luazapperfire.store(fire, std::memory_order_relaxed);
 }
 
 // Debugger
