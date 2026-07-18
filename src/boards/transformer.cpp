@@ -74,7 +74,7 @@ static void TransformerPower(void) {
 	SetReadHandler(0x8000, 0xFFFF, CartBR);
 	FCEU_CheatAddRAM(WRAMSIZE >> 10, 0x6000, WRAM);
 
-	g_cpu.map_irq_hook_ref() = TransformerIRQHook;
+	g_cpu.set_map_irq_hook(TransformerIRQHook);
 }
 
 static void TransformerClose(void) {

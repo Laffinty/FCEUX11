@@ -217,7 +217,7 @@ static void M83StateRestore(int version) {
 void UNLYOKO_Init(CartInfo *info) {
 	info->Power = UNLYOKOPower;
 	info->Reset = UNLYOKOReset;
-	g_cpu.map_irq_hook_ref() = UNLYOKOIRQHook;
+	g_cpu.set_map_irq_hook(UNLYOKOIRQHook);
 	GameStateRestore = UNLYOKOStateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }
@@ -226,7 +226,7 @@ void Mapper83_Init(CartInfo *info) {
 	info->Power = M83Power;
 	info->Reset = M83Reset;
 	info->Close = M83Close;
-	g_cpu.map_irq_hook_ref() = UNLYOKOIRQHook;
+	g_cpu.set_map_irq_hook(UNLYOKOIRQHook);
 	GameStateRestore = M83StateRestore;
 
 	WRAMSIZE = 8192;

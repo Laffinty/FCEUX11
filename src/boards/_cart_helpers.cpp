@@ -5,14 +5,14 @@
 #include "../fceu.h"            // DECLFR/DECLFW, currCartInfo via cart.h
 #include "../cart.h"            // currCartInfo, CartInfo::Close
 #include "../ppu.h"             // GameHBIRQHook (declared in ppu.h:26)
-#include "../cpu.h"             // g_cpu, map_irq_hook_ref
+#include "../cpu.h"             // g_cpu, set_map_irq_hook (hotfix3 B-5b)
 
 namespace fceu11 {
 
 void release_mapper_resources() noexcept {
     // Module-level IRQ hooks persist across cart swaps; always reset.
     GameHBIRQHook = nullptr;
-    g_cpu.map_irq_hook_ref() = nullptr;
+    g_cpu.set_map_irq_hook(nullptr);
 
     // The legacy iNES loader path (src/ines.cpp:113 GI_CLOSE) already
     // invokes iNESCart.Close() when a ROM is unloaded.  Cart subclass

@@ -77,16 +77,9 @@ inline constexpr uint8_t Z_FLAG = 0x02;
 inline constexpr uint8_t C_FLAG = 0x01;
 
 // v0.3.8/v1.3: declared via fceu11::MapIRQHook typedef for compile-time type
-// identity. The symbol stays at global namespace as an inline alias so the
-// 35 mapper .cpp files in src/boards/ that assign to it keep linking.
-//
-// hotfix3 B-5a: the alias now stores a Cpu::RefProxy by value (not a true
-// reference). Legacy `MapIRQHook = SomeFunc;` and `MapIRQHook(...)` syntax
-// keep working through the proxy's operator= and conversion-to-MapIRQHook.
-// The proxy cannot be stored across statements; B-5b removes this alias
-// once all mappers migrate to fceu11::cpu_instance().set_map_irq_hook().
-FCEUX11_DEPRECATED("use fceu11::cpu_instance().set_map_irq_hook() instead")
-inline auto MapIRQHook = fceu11::cpu_instance().map_irq_hook_ref();
+// identity. hotfix3 B-5b: the deprecated global `MapIRQHook` alias is
+// removed -- all ~50 mapper .cpp files in src/boards/ now write directly
+// via `fceu11::cpu_instance().set_map_irq_hook(X)`.
 
 // v1.14 Anvil: #define → inline function (depends on runtime ::dendy)
 extern int dendy;

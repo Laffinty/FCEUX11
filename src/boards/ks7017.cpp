@@ -103,7 +103,7 @@ static void StateRestore(int version) {
 void UNLKS7017_Init(CartInfo *info) {
 	info->Power = UNLKS7017Power;
 	info->Close = UNLKS7017Close;
-	g_cpu.map_irq_hook_ref() = UNL7017IRQ;
+	g_cpu.set_map_irq_hook(UNL7017IRQ);
 
 	WRAMSIZE = 8192;
 	WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped

@@ -420,7 +420,7 @@ static void VRC6_ESI(void) {
 void Mapper24_Init(CartInfo *info) {
 	is26 = 0;
 	info->Power = VRC6Power;
-	g_cpu.map_irq_hook_ref() = VRC6IRQHook;
+	g_cpu.set_map_irq_hook(VRC6IRQHook);
 	VRC6_ESI();
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
@@ -430,7 +430,7 @@ void Mapper26_Init(CartInfo *info) {
 	is26 = 1;
 	info->Power = VRC6Power;
 	info->Close = VRC6Close;
-	g_cpu.map_irq_hook_ref() = VRC6IRQHook;
+	g_cpu.set_map_irq_hook(VRC6IRQHook);
 	VRC6_ESI();
 	GameStateRestore = StateRestore;
 
@@ -478,7 +478,7 @@ void Vrc6Cart::on_close() noexcept {
 	// Mapper24 / Mapper26_Init set g_cpu.map_irq_hook_ref() = VRC6IRQHook.
 	// On game close, drop the hook so a subsequent load of a non-VRC6 ROM
 	// does not receive stale IRQ callbacks.
-	g_cpu.map_irq_hook_ref() = nullptr;
+	g_cpu.set_map_irq_hook(nullptr);
 }
 
 void Vrc6Cart::install_expansion_audio(fceu11::Apu& apu) noexcept {

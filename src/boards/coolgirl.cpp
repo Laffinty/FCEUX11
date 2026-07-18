@@ -2216,7 +2216,7 @@ static void COOLGIRL_Power(void) {
 	SetReadHandler(0x8000, 0xFFFF, CartBR);
 	SetWriteHandler(0x4020, 0xFFFF, COOLGIRL_WRITE);
 	GameHBIRQHook = COOLGIRL_ScanlineCounter;
-	g_cpu.map_irq_hook_ref() = COOLGIRL_CpuCounter;
+	g_cpu.set_map_irq_hook(COOLGIRL_CpuCounter);
 	PPU_hook = COOLGIRL_PPUHook;
 	COOLGIRL_Reset();
 }

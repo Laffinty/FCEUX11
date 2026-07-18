@@ -184,7 +184,7 @@ void Mapper178_Init(CartInfo *info) {
 	info->Power = M178Power;
 	info->Close = M178Close;
 	GameStateRestore = StateRestore;
-	g_cpu.map_irq_hook_ref() = M178SndClk;
+	g_cpu.set_map_irq_hook(M178SndClk);
 
 //	jedi_table_init();
 

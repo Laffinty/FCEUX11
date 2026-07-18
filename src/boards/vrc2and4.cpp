@@ -179,7 +179,7 @@ static void VRC24Close(void) {
 static void VRC24_Init(CartInfo *info) {
 	info->Power = VRC24Power;
 	info->Close = VRC24Close;
-	g_cpu.map_irq_hook_ref() = VRC24IRQHook;
+	g_cpu.set_map_irq_hook(VRC24IRQHook);
 	GameStateRestore = StateRestore;
 
 	WRAMSIZE = 8192;

@@ -261,7 +261,7 @@ void Mapper105_Init(CartInfo *info) {
 	GenMMC1Init(info, 256, 256, 8, 0);
 	MMC1CHRHook4 = NWCCHRHook;
 	MMC1PRGHook16 = NWCPRGHook;
-	g_cpu.map_irq_hook_ref() = NWCIRQHook;
+	g_cpu.set_map_irq_hook(NWCIRQHook);
 	info->Power = NWCPower;
 }
 

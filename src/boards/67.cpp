@@ -100,7 +100,7 @@ static void StateRestore(int version) {
 
 void Mapper67_Init(CartInfo *info) {
 	info->Power = M67Power;
-	g_cpu.map_irq_hook_ref() = M67IRQ;
+	g_cpu.set_map_irq_hook(M67IRQ);
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }

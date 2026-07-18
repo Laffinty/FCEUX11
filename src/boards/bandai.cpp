@@ -322,7 +322,7 @@ void Mapper16_Init(CartInfo *info) {
 	x24c02 = 1;
 	is153 = 0;
 	info->Power = BandaiPower;
-	g_cpu.map_irq_hook_ref() = BandaiIRQHook;
+	g_cpu.set_map_irq_hook(BandaiIRQHook);
 
 	info->battery = 1;
 	info->addSaveGameBuf( x24c0x_data + 256, 256 );
@@ -337,7 +337,7 @@ void Mapper159_Init(CartInfo *info) {
 	x24c02 = 0;
 	is153 = 0;
 	info->Power = BandaiPower;
-	g_cpu.map_irq_hook_ref() = BandaiIRQHook;
+	g_cpu.set_map_irq_hook(BandaiIRQHook);
 
 	info->battery = 1;
 	info->addSaveGameBuf( x24c0x_data, 128 );
@@ -375,7 +375,7 @@ void Mapper153_Init(CartInfo *info) {
 	is153 = 1;
 	info->Power = M153Power;
 	info->Close = M153Close;
-	g_cpu.map_irq_hook_ref() = BandaiIRQHook;
+	g_cpu.set_map_irq_hook(BandaiIRQHook);
 
 	WRAMSIZE = 8192;
 	WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped
@@ -600,7 +600,7 @@ static void M157Power(void) {
 void Mapper157_Init(CartInfo *info) {
 	x24c02 = 1;
 	info->Power = M157Power;
-	g_cpu.map_irq_hook_ref() = BarcodeIRQHook;
+	g_cpu.set_map_irq_hook(BarcodeIRQHook);
 
 	GameInfo->cspecial = SIS_DATACH;
 	info->battery = 1;

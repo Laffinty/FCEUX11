@@ -87,7 +87,7 @@ static void StateRestore(int version) {
 void Mapper43_Init(CartInfo *info) {
 	info->Reset = M43Reset;
 	info->Power = M43Power;
-	g_cpu.map_irq_hook_ref() = M43IRQHook;
+	g_cpu.set_map_irq_hook(M43IRQHook);
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }

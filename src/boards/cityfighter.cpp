@@ -118,7 +118,7 @@ static void StateRestore(int version) {
 
 void UNLCITYFIGHT_Init(CartInfo *info) {
 	info->Power = UNLCITYFIGHTPower;
-	g_cpu.map_irq_hook_ref() = UNLCITYFIGHTIRQ;
+	g_cpu.set_map_irq_hook(UNLCITYFIGHTIRQ);
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }

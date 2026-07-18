@@ -38,17 +38,11 @@
 // inline reference aliases into fceu11::cpu_instance() (see src/cpu.h and
 // src/x6502.h). Their storage lives in cpu.cpp as members of fceu11::Cpu.
 
-// v0.3.8 / hotfix3 B-5a: compile-time guard that the global MapIRQHook's
-// type is still compatible with the fceu11::MapIRQHook typedef used at the
-// extern declaration site (src/x6502.h:67). Since B-5a, MapIRQHook is no
-// longer a true reference to the underlying function pointer slot but a
-// Cpu::RefProxy value whose conversion operator yields MapIRQHook. We check
-// that the proxy's conversion is wired up correctly so a future refactor
-// cannot silently break the implicit MapIRQHook() conversion.
-static_assert(
-    std::is_convertible_v<fceu11::Cpu::RefProxy, fceu11::MapIRQHook>,
-    "MapIRQHook type drift: src/x6502.h MapIRQHook alias must remain "
-    "implicitly convertible to fceu11::MapIRQHook (hotfix3 B-5a).");
+// hotfix3 B-5b: the v0.3.8 static_assert on the deprecated global
+// `MapIRQHook` alias is removed along with the alias itself in x6502.h.
+// All ~50 mapper writers now use fceu11::cpu_instance().set_map_irq_hook(X)
+// directly, so there is no longer a symbol for the static_assert to
+// guard against drift.
 
 // v1.3 Legion Phase 3: cycle accounting is now a method on fceu11::Cpu.
 // The macro is kept so that the opcode handlers in ops_table.inc do not
@@ -528,8 +522,9 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
 
    temp=_tcount;
    _tcount=0;
-   // hotfix3 B-5a: single atomic load (acquire) instead of two RefProxy
-   // conversions, which would each round-trip through the atomic.
+   // hotfix3 B-5a + B-5b: single atomic acquire load (cached in a local)
+   // instead of the two ref-grabs per instruction that the legacy
+   // map_irq_hook_ref() returning-by-reference pattern required.
    if (const auto hook = g_cpu.map_irq_hook()) [[unlikely]] hook(temp);
 
    if (!g_cpu.overclocking()) [[likely]]

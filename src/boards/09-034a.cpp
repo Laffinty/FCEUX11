@@ -91,7 +91,7 @@ static void StateRestore(int version) {
 
 void UNLSMB2J_Init(CartInfo *info) {
 	info->Power = UNLSMB2JPower;
-	g_cpu.map_irq_hook_ref() = UNLSMB2JIRQHook;
+	g_cpu.set_map_irq_hook(UNLSMB2JIRQHook);
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }

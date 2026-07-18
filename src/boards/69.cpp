@@ -259,7 +259,7 @@ static void StateRestore(int version) {
 void Mapper69_Init(CartInfo *info) {
 	info->Power = M69Power;
 	info->Close = M69Close;
-	g_cpu.map_irq_hook_ref() = M69IRQHook;
+	g_cpu.set_map_irq_hook(M69IRQHook);
 	if(info->ines2)
 		WRAMSIZE = info->wram_size + info->battery_wram_size;
 	else
