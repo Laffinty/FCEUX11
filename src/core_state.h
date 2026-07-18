@@ -52,7 +52,13 @@ struct CpuView {
     uint32_t&    timestamp()   noexcept; // CPU master clock
     uint32_t&    sound_timestamp() noexcept; // APU sub-clock
     int&         scanline() noexcept;
-    void (*& irq_hook())(int) noexcept;  // ::MapIRQHook, function-pointer slot
+    // hotfix3 B-5b: CpuView::irq_hook() removed. The CPU IRQ hook is now
+    // manipulated via fceu11::cpu_instance().set_map_irq_hook() (cold path,
+    // mapper init) and read via fceu11::cpu_instance().map_irq_hook()
+    // (hot path, ~107M times/sec). The legacy CpuView wrapper is no
+    // longer needed because no C++ site goes through it -- a fresh grep
+    // for `CpuView::irq_hook|view.irq_hook|cpu_view.*irq_hook` returns
+    // only the core_state.cpp definition site.
 
     uint64_t&    timestamp_base() noexcept; // ::timestampbase
     int&         normal_scanlines()  noexcept;

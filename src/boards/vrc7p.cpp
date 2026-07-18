@@ -114,7 +114,7 @@ static void StateRestore(int version) {
 
 void UNLVRC7_Init(CartInfo *info) {
 	info->Power = UNLVRC7Power;
-	g_cpu.map_irq_hook_ref() = UNLVRC7IRQHook;
+	g_cpu.set_map_irq_hook(UNLVRC7IRQHook);
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }

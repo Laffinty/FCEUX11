@@ -94,7 +94,7 @@ static void FDSInit(void) {
 	memset(FDSRegs, 0, sizeof(FDSRegs));
 	writeskip = DiskPtr = DiskSeekIRQ = 0;
 	setmirror(1); setprg8(0xE000, 0); setprg32r(1, 0x6000, 0); setchr8(0);
-	g_cpu.map_irq_hook_ref() = FDSFix; GameStateRestore = FDSStateRestore;
+	g_cpu.set_map_irq_hook(FDSFix); GameStateRestore = FDSStateRestore;
 	SetReadHandler(0x4030, 0x4033, FDSRead4030);
 	SetReadHandler(0x4031, 0x4031, FDSRead4031);
 	SetReadHandler(0x4032, 0x4032, FDSRead4032);

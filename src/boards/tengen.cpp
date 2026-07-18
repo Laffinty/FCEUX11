@@ -135,7 +135,7 @@ static void StateRestore(int version) {
 void Mapper64_Init(CartInfo *info) {
 	info->Power = M64Power;
 	GameHBIRQHook = M64HBHook;
-	g_cpu.map_irq_hook_ref() = M64IRQHook;
+	g_cpu.set_map_irq_hook(M64IRQHook);
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 }

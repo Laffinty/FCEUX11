@@ -418,7 +418,7 @@ void Mapper19_Init(CartInfo *info) {
 	battery = info->battery;
 	info->Power = N106_Power;
 
-	g_cpu.map_irq_hook_ref() = NamcoIRQHook;
+	g_cpu.set_map_irq_hook(NamcoIRQHook);
 	GameStateRestore = Mapper19_StateRestore;
 	GameExpSound.RChange = M19SC;
 

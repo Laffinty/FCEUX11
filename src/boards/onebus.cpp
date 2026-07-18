@@ -309,7 +309,7 @@ void UNLOneBus_Init(CartInfo *info) {
 		inv_hack = 0xf;
 
 	GameHBIRQHook = UNLOneBusIRQHook;
-	g_cpu.map_irq_hook_ref() = UNLOneBusCpuHook;
+	g_cpu.set_map_irq_hook(UNLOneBusCpuHook);
 	GameStateRestore = StateRestore;
 	AddExState(&StateRegs, ~0, 0, 0);
 

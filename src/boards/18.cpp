@@ -117,7 +117,7 @@ static void StateRestore(int version) {
 void Mapper18_Init(CartInfo *info) {
 	info->Power = M18Power;
 	info->Close = M18Close;
-	g_cpu.map_irq_hook_ref() = M18IRQHook;
+	g_cpu.set_map_irq_hook(M18IRQHook);
 	GameStateRestore = StateRestore;
 
 	WRAMSIZE = 8192;

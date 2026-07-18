@@ -400,7 +400,7 @@ void ResetGameLoaded(void) {
 	FFCEUX_PPUWrite = NULL;
 	FCEU11_ExpKill(&GameExpSound);
 	memset(&GameExpSound, 0, sizeof(GameExpSound));
-	g_cpu.map_irq_hook_ref() = nullptr;
+	g_cpu.set_map_irq_hook(nullptr);
 	MMC5Hack = 0;
 	PEC586Hack = 0;
 	QTAIHack = 0;

@@ -38,15 +38,11 @@
 // inline reference aliases into fceu11::cpu_instance() (see src/cpu.h and
 // src/x6502.h). Their storage lives in cpu.cpp as members of fceu11::Cpu.
 
-// v0.3.8: compile-time guard that the global MapIRQHook's type still
-// matches the fceu11::MapIRQHook typedef used at the extern declaration
-// site (src/x6502.h:67). If a future refactor changes one without the
-// other, the link would succeed silently (C ABI symbols are typeless)
-// but the call sites would invoke UB. This static_assert turns that
-// into a compile error.
-static_assert(std::is_same_v<decltype(&MapIRQHook), fceu11::MapIRQHook*>,
-    "MapIRQHook type drift: definition in x6502.cpp and extern declaration "
-    "in x6502.h via fceu11::MapIRQHook must agree (v0.3.8 invariant).");
+// hotfix3 B-5b: the v0.3.8 static_assert on the deprecated global
+// `MapIRQHook` alias is removed along with the alias itself in x6502.h.
+// All ~50 mapper writers now use fceu11::cpu_instance().set_map_irq_hook(X)
+// directly, so there is no longer a symbol for the static_assert to
+// guard against drift.
 
 // v1.3 Legion Phase 3: cycle accounting is now a method on fceu11::Cpu.
 // The macro is kept so that the opcode handlers in ops_table.inc do not
@@ -526,7 +522,10 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
 
    temp=_tcount;
    _tcount=0;
-   if(g_cpu.map_irq_hook_ref()) [[unlikely]] g_cpu.map_irq_hook_ref()(temp);
+   // hotfix3 B-5a + B-5b: single atomic acquire load (cached in a local)
+   // instead of the two ref-grabs per instruction that the legacy
+   // map_irq_hook_ref() returning-by-reference pattern required.
+   if (const auto hook = g_cpu.map_irq_hook()) [[unlikely]] hook(temp);
 
    if (!g_cpu.overclocking()) [[likely]]
     FCEU_SoundCPUHook(temp);

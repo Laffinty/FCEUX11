@@ -249,7 +249,7 @@ void FNS_Init(CartInfo *info) {
 	info->Power = FNS_Power;
 
 	GameStateRestore = MMC1_Restore;
-	g_cpu.map_irq_hook_ref() = NFC_IRQ;
+	g_cpu.set_map_irq_hook(NFC_IRQ);
 
 	WRAMSIZE = (8 + 32) * 1024;
 	WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped

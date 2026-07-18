@@ -477,7 +477,7 @@ void Mapper90_Init(CartInfo *info)
   info->Reset=togglie;
   info->Power=M90Power;
   PPU_hook=M90PPU;
-  g_cpu.map_irq_hook_ref()=CPUWrap;
+  g_cpu.set_map_irq_hook(CPUWrap);
   GameHBIRQHook2=SLWrap;
   GameStateRestore=M90Restore;
   AddExState(Tek_StateRegs, ~0, 0, 0);
@@ -490,7 +490,7 @@ void Mapper209_Init(CartInfo *info)
   info->Reset=togglie;
   info->Power=M90Power;
   PPU_hook=M90PPU;
-  g_cpu.map_irq_hook_ref()=CPUWrap;
+  g_cpu.set_map_irq_hook(CPUWrap);
   GameHBIRQHook2=SLWrap;
   GameStateRestore=M90Restore;
   AddExState(Tek_StateRegs, ~0, 0, 0);
@@ -502,7 +502,7 @@ void Mapper211_Init(CartInfo *info)
   info->Reset=togglie;
   info->Power=M90Power;
   PPU_hook=M90PPU;
-  g_cpu.map_irq_hook_ref()=CPUWrap;
+  g_cpu.set_map_irq_hook(CPUWrap);
   GameHBIRQHook2=SLWrap;
   GameStateRestore=M90Restore;
   AddExState(Tek_StateRegs, ~0, 0, 0);

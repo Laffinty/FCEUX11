@@ -15,6 +15,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <atomic>
 
 #include "x6502struct.h"
 #include "fceu11_core_types.h"
@@ -115,7 +116,24 @@ public:
     uint32_t& timestamp_ref() noexcept;
     uint32_t& sound_timestamp_ref() noexcept;
     int& scanline_ref() noexcept;
-    MapIRQHook& map_irq_hook_ref() noexcept;
+
+    // hotfix3 B-5a (A-CRASH-06): the map_irq_hook function pointer is set
+    // by mapper init (cold path) and read by the CPU every instruction
+    // (hot path). std::atomic<MapIRQHook> gives a happens-before guarantee
+    // between the mapper-init completion and the first CPU read of the
+    // hook pointer.
+    //
+    // hotfix3 B-5b: the legacy map_irq_hook_ref() accessor (returning
+    // MapIRQHook&) is removed. All ~50 mapper files now go through
+    // set_map_irq_hook() (which stores atomically with release
+    // ordering), and the hot path reads via map_irq_hook() (atomic
+    // acquire load).
+    MapIRQHook map_irq_hook() const noexcept {
+        return map_irq_hook_.load(std::memory_order_acquire);
+    }
+    void set_map_irq_hook(MapIRQHook h) noexcept {
+        map_irq_hook_.store(h, std::memory_order_release);
+    }
 
     // hotfix2 P1-7 (MAP-4): value-return / setter pair for the
     // scanline counter. `scanline_ref()` returns `int&` which forces
@@ -134,7 +152,11 @@ private:
     uint32_t timestamp_ = 0;         // ::timestamp
     uint32_t sound_timestamp_ = 0;   // ::soundtimestamp
     int scanline_ = 0;               // ::scanline
-    MapIRQHook map_irq_hook_ = nullptr; // ::MapIRQHook
+    // hotfix3 B-5a: std::atomic<MapIRQHook> (function pointer). Same
+    // sizeof as the old plain MapIRQHook (8 bytes on 64-bit), so the
+    // surrounding Cpu class layout is unchanged and savestate assertions
+    // on layout_ still hold.
+    std::atomic<MapIRQHook> map_irq_hook_{nullptr}; // ::MapIRQHook
     bool overclocking_ = false;      // ::overclocking (Plan §2.1)
 };
 

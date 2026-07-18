@@ -88,7 +88,9 @@ const X6502& Cpu::native_layout() const noexcept { return layout_; }
 uint32_t& Cpu::timestamp_ref() noexcept { return timestamp_; }
 uint32_t& Cpu::sound_timestamp_ref() noexcept { return sound_timestamp_; }
 int& Cpu::scanline_ref() noexcept { return scanline_; }
-MapIRQHook& Cpu::map_irq_hook_ref() noexcept { return map_irq_hook_; }
+// hotfix3 B-5b: Cpu::map_irq_hook_ref() removed. map_irq_hook() and
+// set_map_irq_hook() are inline in cpu.h and operate on the
+// std::atomic<MapIRQHook> field directly.
 
 // ---------------------------------------------------------------------------
 // Singleton
