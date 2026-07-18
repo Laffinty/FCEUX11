@@ -41,9 +41,16 @@ static unsigned int s_BufferSize;
 static unsigned int s_BufferSize25;
 static unsigned int s_BufferSize50;
 static unsigned int s_BufferSize75;
-static unsigned int s_BufferRead;
-static unsigned int s_BufferWrite;
-static unsigned int s_BufferIn = 0;
+// hotfix3 B-1 (QT-CRASH-05): s_BufferRead/Write/In are touched by the SDL
+// audio-callback thread (fillaudio) and the emulator thread (WriteSound).
+// SDL_LockAudio already provides mutual exclusion between the two within a
+// single audio session, but InitSound/KillSound mutate the cursors from the
+// emulator thread without holding SDL_LockAudio, and the SDL audio callback
+// can fire after SDL_CloseAudio drains. std::atomic<unsigned int> gives us
+// a happens-before guarantee between init/destroy and the callback.
+static std::atomic<unsigned int> s_BufferRead{0};
+static std::atomic<unsigned int> s_BufferWrite{0};
+static std::atomic<unsigned int> s_BufferIn{0};
 static unsigned int s_SampleRate = 44100;
 static double noiseGate = 0.0;
 static double noiseGateRate = 0.010;
@@ -284,7 +291,12 @@ InitSound()
 	{
 		return 0;
 	}
-	s_BufferRead = s_BufferWrite = s_BufferIn = 0;
+	// hotfix3 B-1: store-release so the audio-callback thread, which loads
+	// these with acquire before touching the ring, sees the s_BufferStorage
+	// allocation above as well as the freshly-zeroed cursors.
+	s_BufferRead.store(0, std::memory_order_release);
+	s_BufferWrite.store(0, std::memory_order_release);
+	s_BufferIn.store(0, std::memory_order_release);
 
 	if (SDL_OpenAudio(&spec, 0) < 0)
 	{
@@ -518,7 +530,7 @@ KillSound(void)
 	SDL_CloseAudio();
 	SDL_QuitSubSystem(SDL_INIT_AUDIO);
 	s_Buffer.reset();
-	s_BufferIn = 0;
+	s_BufferIn.store(0, std::memory_order_release);
 	return 0;
 }
 
