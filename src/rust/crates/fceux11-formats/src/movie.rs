@@ -12,7 +12,7 @@
 //!   an `EmuFileMem` handle.
 
 use crate::emufile::EmuFileMem;
-use std::ffi::{CStr, c_char};
+use std::ffi::{CStr, CString, c_char};
 
 // ============================================================
 // Internal Rust types
@@ -962,23 +962,36 @@ pub unsafe extern "C" fn fceux11_rust_movie_data_rom_checksum(
     }
 }
 
-// --- String getters (thread_local buffer) ---
+// --- String getters (leaked CString) ---
+//
+// hotfix3 B-2 (RUST-CRASH-05): the previous `with_thread_local_buf` helper
+// returned a pointer to a thread_local RefCell<[u8; 512]>. Two bugs:
+//   1. RefCell is !Sync, so concurrent FFI calls from multiple threads
+//      panic / UB.
+//   2. The 512-byte buffer silently truncated long strings and a second
+//      call from the same thread would overwrite the prior caller's
+//      pointer (stale data).
+//
+// Replacement: each FFI call allocates a fresh CString and intentionally
+// leaks it via Box::leak. The pointer stays valid for the lifetime of
+// the process, so the C++ caller (movie_fm2.cpp uses the result in a
+// single conversion / push_back / std::string assignment) is safe as
+// long as it does not cache the pointer across FFI calls. All four
+// affected getters are cold paths (movie metadata read once per
+// fceux11_rust_movie_data_* call), so per-call allocation is acceptable.
 
-fn with_thread_local_buf<F: FnOnce(&mut [u8; 512]) -> *const c_char>(
-    s: &str,
-    f: F,
-) -> *const c_char {
-    thread_local! {
-        static BUF: std::cell::RefCell<[u8; 512]> = const { std::cell::RefCell::new([0u8; 512]) };
-    }
-    BUF.with(|buf| {
-        let mut b = buf.borrow_mut();
-        let bytes = s.as_bytes();
-        let len = bytes.len().min(511);
-        b[..len].copy_from_slice(&bytes[..len]);
-        b[len] = 0;
-        f(&mut b)
-    })
+/// Allocate a fresh null-terminated C string for the FFI return and leak
+/// it so the pointer remains valid for the lifetime of the process.
+///
+/// # Safety
+/// The returned pointer (if non-null) is valid for the lifetime of the
+/// process. The C++ caller MUST NOT cache the pointer across FFI calls.
+fn leak_cstr(s: &str) -> *const c_char {
+    // CString::new cannot fail on a &str that contains no interior NUL
+    // bytes; the caller-provided &str slices here are all sourced from
+    // parsed .fm2 fields, which contain at most terminating NULs.
+    let leaked: &'static CStr = Box::leak(Box::new(CString::new(s).unwrap()));
+    leaked.as_ptr()
 }
 
 /// # Safety
@@ -991,7 +1004,7 @@ pub unsafe extern "C" fn fceux11_rust_movie_data_rom_filename(
     let s = unsafe { md.as_ref() }
         .map(|m| m.rom_filename.as_str())
         .unwrap_or("");
-    with_thread_local_buf(s, |b| b.as_ptr() as *const c_char)
+    leak_cstr(s)
 }
 
 /// # Safety
@@ -1002,7 +1015,7 @@ pub unsafe extern "C" fn fceux11_rust_movie_data_guid(md: *const FceuMovieData) 
     let s = unsafe { md.as_ref() }
         .map(|m| m.guid.as_str())
         .unwrap_or("");
-    with_thread_local_buf(s, |b| b.as_ptr() as *const c_char)
+    leak_cstr(s)
 }
 
 // --- Vector getters ---
@@ -1109,7 +1122,7 @@ pub unsafe extern "C" fn fceux11_rust_movie_data_comment_get(
         .and_then(|m| m.comments.get(index))
         .map(|s| s.as_str())
         .unwrap_or("");
-    with_thread_local_buf(s, |b| b.as_ptr() as *const c_char)
+    leak_cstr(s)
 }
 
 /// # Safety
@@ -1136,7 +1149,7 @@ pub unsafe extern "C" fn fceux11_rust_movie_data_subtitle_get(
         .and_then(|m| m.subtitles.get(index))
         .map(|s| s.as_str())
         .unwrap_or("");
-    with_thread_local_buf(s, |b| b.as_ptr() as *const c_char)
+    leak_cstr(s)
 }
 
 // ============================================================
