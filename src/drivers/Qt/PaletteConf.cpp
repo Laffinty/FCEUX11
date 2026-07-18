@@ -182,7 +182,7 @@ PaletteConfDialog_t::PaletteConfDialog_t(QWidget *parent)
 
 	palFrame = new QGroupBox(tr("PAL Emulation:"));
 	palFrame->setCheckable(false);
-	palFrame->setEnabled( nes_shm->video.preScaler.store(= 9 ), std::memory_order_release);
+	palFrame->setEnabled( nes_shm->video.preScaler.load(std::memory_order_acquire) == 9 );
 
 	grid  = new QGridLayout();
 	grid->setColumnStretch( 0, 40 );
@@ -369,7 +369,7 @@ void PaletteConfDialog_t::changeEvent(QEvent *event)
 //----------------------------------------------------
 void PaletteConfDialog_t::updatePeriodic(void)
 {
-	palFrame->setEnabled( nes_shm->video.preScaler.store(= 9 ), std::memory_order_release);
+	palFrame->setEnabled( nes_shm->video.preScaler.load(std::memory_order_acquire) == 9 );
 }
 //----------------------------------------------------
 void PaletteConfDialog_t::ntscResetClicked(void)

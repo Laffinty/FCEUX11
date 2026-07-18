@@ -3550,6 +3550,19 @@ extern void fceux11_lua_recalculate_mem_hook_regions(int hook_type);
 
 int fceux11_lua_init(void);
 
+/**
+ * hotfix3 A-2 (RUST-CRASH-02): reclaim the active `LuaEngine` Box
+ * (if any) and drop it, closing the inner `mlua::Lua` state and
+ * releasing all Registry keys. Pairs with `fceux11_lua_init`.
+ *
+ * Returns 1 if an engine was actually torn down, 0 if there was
+ * nothing to do. `AcqRel` ordering on the swap synchronises with
+ * the matching `init` so any in-flight FFI either observes the new
+ * pointer (and is rejected with null) or the old pointer (and runs
+ * to completion before we reclaim it).
+ */
+int fceux11_lua_shutdown(void);
+
 int fceux11_lua_load_script(const char *path, const char *arg);
 
 void fceux11_lua_frame_boundary(void);

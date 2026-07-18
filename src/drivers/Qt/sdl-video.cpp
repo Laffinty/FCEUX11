@@ -565,9 +565,9 @@ uint32 PtoV(double nx, double ny)
 
 	y = (int)( ny * (double)nes_shm->video.nrow.load(std::memory_order_acquire) );
 
-	if ( nes_shm->video.preScaler.store(= 3 )
+	if ( nes_shm->video.preScaler.load(std::memory_order_acquire) == 3 )
 	{
-		x = (int)( nx * (double)nes_shm->video.ncol.load(std::memory_order_acquire) * (256.0/301.0) ), std::memory_order_release);
+		x = (int)( nx * (double)nes_shm->video.ncol.load(std::memory_order_acquire) * (256.0/301.0) );
 	}
 	else
 	{
@@ -579,9 +579,9 @@ uint32 PtoV(double nx, double ny)
 	x = x / nes_shm->video.xscale.load(std::memory_order_acquire);
 	y = y / nes_shm->video.yscale.load(std::memory_order_acquire);
 
-	//if ( nes_shm->video.xyRatio.store(= 1 )
+	//if ( nes_shm->video.xyRatio.load(std::memory_order_acquire) == 1 )
 	//{
-	//	y = y / nes_shm->video.scale, std::memory_order_release);
+	//	y = y / nes_shm->video.scale;
 	//}
 	//printf("UnScaled (%i,%i) \n", x, y);
 

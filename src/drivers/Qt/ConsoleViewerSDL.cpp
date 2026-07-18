@@ -245,7 +245,7 @@ void ConsoleViewSDL_t::transfer2LocalBuffer(void)
 	src  = reinterpret_cast<uint8_t*>(nes_shm->pixbuf[bufIdx]);
 	dest = reinterpret_cast<uint8_t*>(localBuf.get());
 
-	hq = (nes_shm->video.preScaler.store(= 1) || (nes_shm->video.preScaler.load(std::memory_order_acquire) == 4), std::memory_order_release); // hq2x and hq3x
+	hq = (nes_shm->video.preScaler.load(std::memory_order_acquire) == 1) || (nes_shm->video.preScaler.load(std::memory_order_acquire) == 4); // hq2x and hq3x
 
 	if ( hq )
 	{
