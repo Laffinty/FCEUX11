@@ -4,7 +4,7 @@
 //! `src/ines.cpp`. C++ retains `iNESLoad`, `iNES_Init`, and the `bmap[]`
 //! function-pointer table; Rust owns all pure-data lookup and parsing logic.
 
-use std::ffi::c_char;
+use std::ffi::{c_char, CStr, CString};
 
 mod ines_data;
 
@@ -225,7 +225,31 @@ pub unsafe extern "C" fn fceux11_rust_ines_lookup_input_nes20(
 // ------------------------------------------------------------------
 
 /// Check whether a ROM is known to be bad/corrupt/hacked.
-/// Returns a pointer to a static description string, or null if OK.
+/// Returns a pointer to a leaked C string, or null if OK.
+///
+/// # hotfix3 B-3 (RUST-CRASH-09)
+///
+/// The previous implementation stored the result in a `thread_local!`
+/// `RefCell<[u8; 256]>` and returned `&buf` as `*const c_char`. Two
+/// bugs:
+///   1. `RefCell` is `!Sync`, so concurrent calls from multiple threads
+///      would panic / UB.
+///   2. The 256-byte buffer silently truncated long names, and a second
+///      call from the same thread would overwrite the prior caller's
+///      pointer (stale data).
+///
+/// Replacement: `Box::leak(CString)` allocates a fresh null-terminated
+/// string per call and intentionally leaks it. The pointer stays valid
+/// for the remainder of the process, so the C++ caller (ines_load.cpp
+/// uses the result in a single `FCEU_PrintError` call) is safe as long
+/// as it does not cache the pointer for later use. Bad-ROM lookup is a
+/// cold path (called once per ROM load), so the per-call allocation is
+/// acceptable.
+///
+/// # Safety
+///
+/// The returned pointer (if non-null) is valid for the lifetime of the
+/// process. The C++ caller MUST NOT cache the pointer across FFI calls.
 #[unsafe(no_mangle)]
 pub extern "C" fn fceux11_rust_ines_check_bad(md5partial: u64) -> *const c_char {
     match ines_data::BAD_ROMS
@@ -233,17 +257,11 @@ pub extern "C" fn fceux11_rust_ines_check_bad(md5partial: u64) -> *const c_char 
         .find(|e| e.md5partial == md5partial)
     {
         Some(e) => {
-            thread_local! {
-                static BUF: std::cell::RefCell<[u8; 256]> = const { std::cell::RefCell::new([0u8; 256]) };
-            }
-            BUF.with(|buf| {
-                let mut b = buf.borrow_mut();
-                let bytes = e.name.as_bytes();
-                let len = bytes.len().min(255);
-                b[..len].copy_from_slice(&bytes[..len]);
-                b[len] = 0;
-                b.as_ptr() as *const c_char
-            })
+            // CString::new cannot fail on a &str that contains no NUL
+            // bytes; BAD_ROMS entries are static literal strings, so
+            // unwrap() is safe.
+            let leaked: &'static CStr = Box::leak(Box::new(CString::new(e.name).unwrap()));
+            leaked.as_ptr()
         }
         None => std::ptr::null(),
     }
