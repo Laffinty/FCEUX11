@@ -29,7 +29,7 @@ hotfix1（42 PR）以**数据完整性 / 线程 / FFI 安全**为主线；hotfix
 | 边界 / 别名 / 杂项 | 0 | 0 | 4 | 8 | 0 | **12** |
 | **合计** | **5** | **17** | **37** | **28** | **4** | **91** |
 
-> **重要声明**：本 PLAN 修复的目标是**实际可触发的 BUG**，每条都附"触发场景"。**纯理论（如 64-bit 端微优化）不纳入本轮范围**，留待 v1.16 timing-rewrite。
+> **重要声明**：本 PLAN 修复的目标是**实际可触发的 BUG**，每条都附"触发场景"。**纯理论（如 64-bit 端微优化）不纳入本轮范围**。
 
 ### 0.3 phase 切分原则（关键）
 
@@ -103,8 +103,8 @@ fn get_engine<'a>() -> Option<&'a mut LuaEngine> {
 >
 > **已实施的替代措施**：
 > - 在 `lib.rs` 的 `LUA_ENGINE_PTR` 声明处添加了 46 行安全论证文档（见 commit `802931b`），
->   明确说明当前架构下的安全保证、已知的理论 unsoundness、以及 v1.16 lua-rewrite 的改进方向。
-> - **后续 agent 不得重新尝试实施 Mutex 替换**。如需真正的线程安全，等 v1.16 lua-rewrite 统一重构。
+>   明确说明当前架构下的安全保证、已知的理论 unsoundness。
+> - **后续 agent 不得重新尝试实施 Mutex 替换**。当前方案已是最终决策。
 >
 > **对应 commit**：`802931b` — `docs(lua): add thread-safety rationale for AtomicPtr approach`
 
@@ -795,13 +795,13 @@ static_assert(sizeof(Cpu::layout_) == expected_size, "Cpu::layout_ size drift");
 
 | 项 | 原因 | 后续 |
 |----|------|------|
-| v1.16 timing-rewrite（hotfix2 P2-5 延期项） | MMC3 A12/IRQ 精度风险 | v1.16 timing-rewrite |
+| timing-rewrite（hotfix2 P2-5 延期项） | MMC3 A12/IRQ 精度风险 | 不在 hotfix3 范围 |
 | AVX2 gather (hotfix2 P0-5 可选项) | ROI 不明 | 视 Phase D 后实测 |
-| `map_irq_hook` 改为 atomic 后保留 `map_irq_hook_ref()` 冷路径优化 | 单测覆盖不足 | v1.16 |
-| Lua 引擎全套 race audit | 工作量大 | v1.16 lua-rewrite |
-| mapper 矩阵全套性能回归 | Phase A 优先 | v1.16 |
+| `map_irq_hook` 改为 atomic 后保留 `map_irq_hook_ref()` 冷路径优化 | 单测覆盖不足 | 不在 hotfix3 范围 |
+| Lua 引擎全套 race audit | 工作量大 | 不在 hotfix3 范围 |
+| mapper 矩阵全套性能回归 | Phase A 优先 | 不在 hotfix3 范围 |
 | `bgdata.main[34]` → `main[32]`（dead row 去除） | 影响 hotfix2 P1-1 SoA，需重测 | 单独 issue 跟踪 |
-| `oams[2][64][8]` 加 `alignas(64)` | 单线程优化，影响小 | v1.16 micro-opt |
+| `oams[2][64][8]` 加 `alignas(64)` | 单线程优化，影响小 | 不在 hotfix3 范围 |
 
 ---
 

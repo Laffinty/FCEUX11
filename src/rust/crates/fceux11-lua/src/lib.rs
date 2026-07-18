@@ -55,7 +55,7 @@ use mlua::{Lua, RegistryKey, Thread};
 // `get_engine()` concurrently and both dereference, Rust's aliasing
 // rules are violated (Stacked Borrows UB).  This cannot happen in
 // the current architecture but is not enforced by the type system.
-// A future v1.16 lua-rewrite should address this with a proper
+// A future lua-rewrite should address this with a proper
 // Mutex or by restructuring the FFI to avoid &mut aliasing.
 //
 // **Safety invariant**: callers of `get_engine()` must ensure that
