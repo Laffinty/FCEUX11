@@ -38,15 +38,17 @@
 // inline reference aliases into fceu11::cpu_instance() (see src/cpu.h and
 // src/x6502.h). Their storage lives in cpu.cpp as members of fceu11::Cpu.
 
-// v0.3.8: compile-time guard that the global MapIRQHook's type still
-// matches the fceu11::MapIRQHook typedef used at the extern declaration
-// site (src/x6502.h:67). If a future refactor changes one without the
-// other, the link would succeed silently (C ABI symbols are typeless)
-// but the call sites would invoke UB. This static_assert turns that
-// into a compile error.
-static_assert(std::is_same_v<decltype(&MapIRQHook), fceu11::MapIRQHook*>,
-    "MapIRQHook type drift: definition in x6502.cpp and extern declaration "
-    "in x6502.h via fceu11::MapIRQHook must agree (v0.3.8 invariant).");
+// v0.3.8 / hotfix3 B-5a: compile-time guard that the global MapIRQHook's
+// type is still compatible with the fceu11::MapIRQHook typedef used at the
+// extern declaration site (src/x6502.h:67). Since B-5a, MapIRQHook is no
+// longer a true reference to the underlying function pointer slot but a
+// Cpu::RefProxy value whose conversion operator yields MapIRQHook. We check
+// that the proxy's conversion is wired up correctly so a future refactor
+// cannot silently break the implicit MapIRQHook() conversion.
+static_assert(
+    std::is_convertible_v<fceu11::Cpu::RefProxy, fceu11::MapIRQHook>,
+    "MapIRQHook type drift: src/x6502.h MapIRQHook alias must remain "
+    "implicitly convertible to fceu11::MapIRQHook (hotfix3 B-5a).");
 
 // v1.3 Legion Phase 3: cycle accounting is now a method on fceu11::Cpu.
 // The macro is kept so that the opcode handlers in ops_table.inc do not
@@ -526,7 +528,9 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
 
    temp=_tcount;
    _tcount=0;
-   if(g_cpu.map_irq_hook_ref()) [[unlikely]] g_cpu.map_irq_hook_ref()(temp);
+   // hotfix3 B-5a: single atomic load (acquire) instead of two RefProxy
+   // conversions, which would each round-trip through the atomic.
+   if (const auto hook = g_cpu.map_irq_hook()) [[unlikely]] hook(temp);
 
    if (!g_cpu.overclocking()) [[likely]]
     FCEU_SoundCPUHook(temp);

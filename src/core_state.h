@@ -24,6 +24,7 @@
 #include <cstdint>
 
 #include "types.h"
+#include "cpu.h"  // hotfix3 B-5a: Cpu::RefProxy return type for irq_hook()
 
 // Forward declarations at GLOBAL scope so the accessors can reference the
 // real type (defined in x6502struct.h, cart.h, sound.h, etc.). Putting
@@ -52,7 +53,11 @@ struct CpuView {
     uint32_t&    timestamp()   noexcept; // CPU master clock
     uint32_t&    sound_timestamp() noexcept; // APU sub-clock
     int&         scanline() noexcept;
-    void (*& irq_hook())(int) noexcept;  // ::MapIRQHook, function-pointer slot
+    // hotfix3 B-5a: was `void (*&)(int)` returning a true reference to the
+    // Cpu::map_irq_hook_ field. The atomic-backed map_irq_hook_ref() now
+    // returns a Cpu::RefProxy by value; the view accessor matches that
+    // signature so callers can keep using `view.irq_hook() = SomeFunc;`.
+    Cpu::RefProxy irq_hook() noexcept;  // ::MapIRQHook, function-pointer slot
 
     uint64_t&    timestamp_base() noexcept; // ::timestampbase
     int&         normal_scanlines()  noexcept;
