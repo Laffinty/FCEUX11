@@ -15,6 +15,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <atomic>
 
 #include "x6502struct.h"
 #include "fceu11_core_types.h"
@@ -115,7 +116,29 @@ public:
     uint32_t& timestamp_ref() noexcept;
     uint32_t& sound_timestamp_ref() noexcept;
     int& scanline_ref() noexcept;
-    MapIRQHook& map_irq_hook_ref() noexcept;
+
+    // hotfix3 B-5a (A-CRASH-06): the map_irq_hook pointer is set by mapper
+    // init (cold path) and read by the CPU every instruction (hot path).
+    // std::atomic<MapIRQHook> gives a happens-before guarantee between the
+    // mapper-init completion and the first CPU read of the hook pointer.
+    //
+    // map_irq_hook_ref() is kept for back-compat with the ~50 mapper files
+    // that still write `g_cpu.map_irq_hook_ref() = SomeFunc;` plus the
+    // CpuView::irq_hook() debugger accessor. Because std::atomic<MapIRQHook>
+    // does not expose a true C++ reference, map_irq_hook_ref() returns a
+    // RefProxy value whose assignment operator= and conversion-to-MapIRQHook
+    // forward to set_map_irq_hook() / map_irq_hook() respectively. The proxy
+    // is a value, not a reference: it cannot be stored across statements.
+    // B-5b will migrate all ~50 mapper files to set_map_irq_hook() and then
+    // remove the proxy.
+    class RefProxy;
+    MapIRQHook map_irq_hook() const noexcept {
+        return map_irq_hook_.load(std::memory_order_acquire);
+    }
+    void set_map_irq_hook(MapIRQHook h) noexcept {
+        map_irq_hook_.store(h, std::memory_order_release);
+    }
+    RefProxy map_irq_hook_ref() noexcept { return RefProxy{this}; }
 
     // hotfix2 P1-7 (MAP-4): value-return / setter pair for the
     // scanline counter. `scanline_ref()` returns `int&` which forces
@@ -134,8 +157,31 @@ private:
     uint32_t timestamp_ = 0;         // ::timestamp
     uint32_t sound_timestamp_ = 0;   // ::soundtimestamp
     int scanline_ = 0;               // ::scanline
-    MapIRQHook map_irq_hook_ = nullptr; // ::MapIRQHook
+    // hotfix3 B-5a: std::atomic<MapIRQHook> (function pointer). Same
+    // sizeof as the old plain MapIRQHook (8 bytes on 64-bit), so the
+    // surrounding Cpu class layout is unchanged and savestate assertions
+    // on layout_ still hold.
+    std::atomic<MapIRQHook> map_irq_hook_{nullptr}; // ::MapIRQHook
     bool overclocking_ = false;      // ::overclocking (Plan §2.1)
+
+public:
+    // hotfix3 B-5a: RefProxy — value-type proxy returned by
+    // map_irq_hook_ref(). Lets the existing
+    //   `g_cpu.map_irq_hook_ref() = SomeFunc;`
+    // pattern (used in ~50 mapper files) compile unchanged while routing
+    // both reads and writes through the std::atomic<MapIRQHook> field.
+    class RefProxy {
+        Cpu* cpu_;
+    public:
+        explicit RefProxy(Cpu* cpu) noexcept : cpu_(cpu) {}
+        // Read conversion: load from atomic.
+        operator MapIRQHook() const noexcept { return cpu_->map_irq_hook(); }
+        // Write: atomic store via set_map_irq_hook().
+        RefProxy& operator=(MapIRQHook h) noexcept {
+            cpu_->set_map_irq_hook(h);
+            return *this;
+        }
+    };
 };
 
 // Global singleton. Meyers pattern keeps initialization lazy and thread-safe.

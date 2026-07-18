@@ -88,7 +88,11 @@ const X6502& Cpu::native_layout() const noexcept { return layout_; }
 uint32_t& Cpu::timestamp_ref() noexcept { return timestamp_; }
 uint32_t& Cpu::sound_timestamp_ref() noexcept { return sound_timestamp_; }
 int& Cpu::scanline_ref() noexcept { return scanline_; }
-MapIRQHook& Cpu::map_irq_hook_ref() noexcept { return map_irq_hook_; }
+// hotfix3 B-5a: map_irq_hook_ref() is now an inline header method that
+// returns a Cpu::RefProxy value. The proxy forwards both reads and writes
+// to the std::atomic<MapIRQHook> field via map_irq_hook() /
+// set_map_irq_hook() — see cpu.h for the rationale and B-5b for the
+// eventual removal once all ~50 mapper files migrate to set_map_irq_hook().
 
 // ---------------------------------------------------------------------------
 // Singleton
