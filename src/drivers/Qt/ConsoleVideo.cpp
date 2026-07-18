@@ -239,7 +239,7 @@ int consoleWin_t::loadVideoDriver( int driverId, bool force )
 
 			viewport_SDL->init();
 
-			connect( viewport_SDL, SIGNAL(destroyed(QObject*)), this, SLOT(videoDriverDestroyed(QObject*)) );
+			connect( viewport_SDL, SIGNAL(destroyed(QObject*)), this, SLOT(videoDriverDestroyed(QObject*)), Qt::QueuedConnection );
 		}
 		break;
 		case ConsoleViewerBase::VIDEO_DRIVER_OPENGL:
@@ -258,7 +258,7 @@ int consoleWin_t::loadVideoDriver( int driverId, bool force )
 
 			viewport_GL->init();
 
-			connect( viewport_GL, SIGNAL(destroyed(QObject*)), this, SLOT(videoDriverDestroyed(QObject*)) );
+			connect( viewport_GL, SIGNAL(destroyed(QObject*)), this, SLOT(videoDriverDestroyed(QObject*)), Qt::QueuedConnection );
 		}
 		break;
 		default:
@@ -274,7 +274,7 @@ int consoleWin_t::loadVideoDriver( int driverId, bool force )
 
 			viewport_QWidget->init();
 
-			connect( viewport_QWidget, SIGNAL(destroyed(QObject*)), this, SLOT(videoDriverDestroyed(QObject*)) );
+			connect( viewport_QWidget, SIGNAL(destroyed(QObject*)), this, SLOT(videoDriverDestroyed(QObject*)), Qt::QueuedConnection );
 		}
 		break;
 	}
