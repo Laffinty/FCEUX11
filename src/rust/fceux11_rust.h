@@ -2172,7 +2172,31 @@ int32_t fceux11_rust_ines_lookup_input_nes20(uint8_t expansion,
 
 /**
  * Check whether a ROM is known to be bad/corrupt/hacked.
- * Returns a pointer to a static description string, or null if OK.
+ * Returns a pointer to a leaked C string, or null if OK.
+ *
+ * # hotfix3 B-3 (RUST-CRASH-09)
+ *
+ * The previous implementation stored the result in a `thread_local!`
+ * `RefCell<[u8; 256]>` and returned `&buf` as `*const c_char`. Two
+ * bugs:
+ *   1. `RefCell` is `!Sync`, so concurrent calls from multiple threads
+ *      would panic / UB.
+ *   2. The 256-byte buffer silently truncated long names, and a second
+ *      call from the same thread would overwrite the prior caller's
+ *      pointer (stale data).
+ *
+ * Replacement: `Box::leak(CString)` allocates a fresh null-terminated
+ * string per call and intentionally leaks it. The pointer stays valid
+ * for the remainder of the process, so the C++ caller (ines_load.cpp
+ * uses the result in a single `FCEU_PrintError` call) is safe as long
+ * as it does not cache the pointer for later use. Bad-ROM lookup is a
+ * cold path (called once per ROM load), so the per-call allocation is
+ * acceptable.
+ *
+ * # Safety
+ *
+ * The returned pointer (if non-null) is valid for the lifetime of the
+ * process. The C++ caller MUST NOT cache the pointer across FFI calls.
  */
 const char *fceux11_rust_ines_check_bad(uint64_t md5partial);
 
