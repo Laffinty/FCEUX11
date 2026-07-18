@@ -886,6 +886,22 @@ A-4, A-5, A-6, B-2, B-3, B-4, B-5, B-6, C-2, C-4, D-4, D-5, E-1 ~ E-5。
 - 合并前必须 `git rebase hotfix3` 避免 merge commit
 - 冲突解决须由 PR 作者本人执行
 
+> **【hotfix3 后续 phase 政策更新 — 2026-07-18】hotfix3 不再新建 feature 分支。**
+>
+> **决策背景**：Phase A + Phase B 完成后，hotfix3 分支头 `0df36bd` 的所有改动已 fast-forward 到 `main`（见 commit `a3faeac` 和 Phase B 的 7 个 merge commits）。从 Phase C 起（含未来任何延续工作），工作直接基于 `main` 分支进行：
+>
+> - **不在 `hotfix3` 下创建任何 `hotfix3/c-*` / `hotfix3/d-*` / `hotfix3/e-*` 之类的 feature 分支**。
+> - 每个 Phase 的 PR 仍按"一个 PR 一个 feature 分支"原则工作，但分支前缀改为 `phase-c/c-1-vnapage` / `phase-d/d-1-pixbuf` 等（直接基于 `main` 切出）。
+> - 合并目标从 `hotfix3` 改为 `main`；`git tag` 命名沿用 `hotfix3-phase-c-done` / `hotfix3-phase-d-done` 以保留 hotfix3 时间线语义，但 tag 指向 `main` 上的 commit。
+> - 历史分支（`hotfix3-b1` ~ `hotfix3-b6`、`hotfix3-b5a`、`hotfix3-b5b`）已在 Phase B 合并到 `main` 后 `git branch -D` 删除（2026-07-18）。
+>
+> **理由**：
+> 1. `hotfix3` 与 `main` 已完全同步（无 unique commits），保留 `hotfix3` 作为单独 branch 已无实际意义。
+> 2. 后续 phase 不再需要"先 hotfix3 后 main"的两段式发布，所有改动直接面向 `main`。
+> 3. 简化 reviewer mental model：所有 PR 都基于 `main`，不需追问"hotfix3 与 main 的差是什么"。
+>
+> **例外**：若未来发现 hotfix3 与 main 必须分叉（例如 main 上引入破坏性重构），则重启"hotfix3 作为独立 branch"的策略。本节在重新启用时会被改回原方案。
+
 ### 12.3 Review 节奏
 
 - 高风险 PR（A-1+A-2, A-3, B-1, D-1）：双 reviewer（一位并发 / 一位核心算法），review ≥ 24h
