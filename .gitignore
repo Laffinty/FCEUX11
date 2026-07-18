@@ -129,3 +129,7 @@ tests/disksys.rom
 
 # CMake Multi-Config target output shells (Debug/ MinSizeRel/ etc.) — empty placeholder dirs
 *.dir/
+# Python build artifacts
+__pycache__/
+*.pyc
+scripts/_build_extract.js

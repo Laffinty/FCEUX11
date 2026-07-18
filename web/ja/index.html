@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="dark" />
+<meta name="theme-color" content="#080a09" />
+<title>FCEUX11 — Windows 向け NES/Famicom エミュレーター · v1.15 Finale</title>
+<meta name="description" content="FCEUX11 v1.15 Finale — FCEUX をベースにした Windows 向け NES/Famicom エミュレーター。Qt 6.8 + C++20、12 言語自動検出、デバッグツール・TAS エディター・Lua スクリプト、安定したセーブステートを備えています。" />
+<meta name="keywords" content="FCEUX11, FCEUX, NES emulator, FC emulator, Famicom emulator, Windows emulator, TAS editor, Qt6, C++20, game emulator, 8-bit, multi-language, 12 languages, Arabic, RTL, ROM hacking, debugger, Lua scripting" />
+<meta name="author" content="Laffinty" />
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+<meta name="generator" content="FCEUX11" />
+<meta name="application-name" content="FCEUX11" />
+<link rel="canonical" href="https://laffinty.github.io/FCEUX11/ja/" />
+<link rel="icon" type="image/x-icon" href="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
+
+  <!-- hreflang cluster: one URL per language, x-default for unspecified -->
+  <link rel="alternate" hreflang="x-default" href="https://laffinty.github.io/FCEUX11/" />
+  <link rel="alternate" hreflang="en" href="https://laffinty.github.io/FCEUX11/" />
+  <link rel="alternate" hreflang="zh-CN" href="https://laffinty.github.io/FCEUX11/zh-CN/" />
+  <link rel="alternate" hreflang="zh-TW" href="https://laffinty.github.io/FCEUX11/zh-TW/" />
+  <link rel="alternate" hreflang="ja" href="https://laffinty.github.io/FCEUX11/ja/" />
+  <link rel="alternate" hreflang="ko" href="https://laffinty.github.io/FCEUX11/ko/" />
+  <link rel="alternate" hreflang="es" href="https://laffinty.github.io/FCEUX11/es/" />
+  <link rel="alternate" hreflang="fr" href="https://laffinty.github.io/FCEUX11/fr/" />
+  <link rel="alternate" hreflang="de" href="https://laffinty.github.io/FCEUX11/de/" />
+  <link rel="alternate" hreflang="vi" href="https://laffinty.github.io/FCEUX11/vi/" />
+  <link rel="alternate" hreflang="th" href="https://laffinty.github.io/FCEUX11/th/" />
+  <link rel="alternate" hreflang="hi" href="https://laffinty.github.io/FCEUX11/hi/" />
+  <link rel="alternate" hreflang="ar" href="https://laffinty.github.io/FCEUX11/ar/" />
+
+<meta property="og:site_name" content="FCEUX11" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="FCEUX11 — Windows 向け NES/Famicom エミュレーター · v1.15 Finale" />
+<meta property="og:description" content="FCEUX11 v1.15 Finale — FCEUX をベースにした Windows 向け NES/Famicom エミュレーター。Qt 6.8 + C++20、12 言語自動検出、デバッグツール・TAS エディター・Lua スクリプト、安定したセーブステートを備えています。" />
+<meta property="og:url" content="https://laffinty.github.io/FCEUX11/ja/" />
+<meta property="og:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
+<meta property="og:locale" content="ja_JP" />
+  <meta property="og:locale:alternate" content="en_US" />
+  <meta property="og:locale:alternate" content="zh_CN" />
+  <meta property="og:locale:alternate" content="zh_TW" />
+  <meta property="og:locale:alternate" content="ja_JP" />
+  <meta property="og:locale:alternate" content="ko_KR" />
+  <meta property="og:locale:alternate" content="es_ES" />
+  <meta property="og:locale:alternate" content="fr_FR" />
+  <meta property="og:locale:alternate" content="de_DE" />
+  <meta property="og:locale:alternate" content="vi_VN" />
+  <meta property="og:locale:alternate" content="th_TH" />
+  <meta property="og:locale:alternate" content="hi_IN" />
+  <meta property="og:locale:alternate" content="ar_SA" />
+
+<meta name="google-site-verification" content="2be70qD04OCrme3y8dDxUj_h1QwY4no9IWoFQpepryE" />
+<meta name="yandex-verification" content="" />
+<meta name="baidu-site-verification" content="" />
+<meta name="msvalidate.01" content="" />
+
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="FCEUX11 — Windows 向け NES/Famicom エミュレーター · v1.15 Finale" />
+<meta name="twitter:description" content="FCEUX11 v1.15 Finale — FCEUX をベースにした Windows 向け NES/Famicom エミュレーター。Qt 6.8 + C++20、12 言語自動検出、デバッグツール・TAS エディター・Lua スクリプト、安定したセーブステートを備えています。" />
+<meta name="twitter:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<!-- Noto family covers CJK, Korean, Thai, Devanagari, Arabic, Vietnamese diacritics — no FOUT on any of the 12 locales -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Sans+Arabic:wght@400;500;600&family=Noto+Sans+Thai:wght@400;500;600&family=Noto+Sans+Devanagari:wght@400;500;600&display=swap" rel="stylesheet" />
+
+<script type="application/ld+json">
+{
+  "@context":"https://schema.org",
+  "@type":"SoftwareApplication",
+  "name":"FCEUX11",
+  "applicationCategory":"GameApplication",
+  "operatingSystem":"Windows 11",
+  "description":"FCEUX11 v1.15 Finale — FCEUX をベースにした Windows 向け NES/Famicom エミュレーター。Qt 6.8 + C++20、12 言語自動検出、デバッグツール・TAS エディター・Lua スクリプト、安定したセーブステートを備えています。",
+  "softwareVersion":"1.15",
+  "license":"https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt",
+  "url":"https://laffinty.github.io/FCEUX11/ja/",
+  "downloadUrl":"https://github.com/Laffinty/FCEUX11/releases",
+  "codeRepository":"https://github.com/Laffinty/FCEUX11",
+  "image":"https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico",
+  "author":{"@type":"Person","name":"Laffinty"},
+  "inLanguage":"ja",
+  "offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context":"https://schema.org",
+  "@type":"WebSite",
+  "name":"FCEUX11",
+  "url":"https://laffinty.github.io/FCEUX11/ja/",
+  "inLanguage":"ja",
+  "publisher":{"@type":"Person","name":"Laffinty"}
+}
+</script>
+
+<link rel="stylesheet" href="/ja/assets/styles.css" />
+<script src="/ja/assets/app.js" defer></script>
+</head>
+<body>
+
+<div class="bg"><div class="orb"></div><div class="grid"></div></div>
+
+<nav id="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top">
+      <img class="mark" src="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" alt="" width="26" height="26" />
+      FCEUX11
+    </a>
+    <div class="nav-right">
+      <div class="lang-dd" id="langDd">
+        <button class="lang" id="langBtn" aria-label="Switch language" aria-haspopup="menu" aria-expanded="false" aria-controls="langMenu">
+          <span id="langBtnLabel">日本語</span>
+          <svg class="caret" viewBox="0 0 12 12" aria-hidden="true"><polyline points="2,4 6,8 10,4"/></svg>
+        </button>
+        <div class="lang-menu" id="langMenu" role="menu" aria-label="Language">
+        <a class="lang-item" href="/" hreflang="en" role="menuitem" data-lang="en"><span>English</span><span class="code">en</span></a>
+        <a class="lang-item" href="/zh-CN/" hreflang="zh-CN" role="menuitem" data-lang="zh-CN"><span>简体中文</span><span class="code">zh-CN</span></a>
+        <a class="lang-item" href="/zh-TW/" hreflang="zh-TW" role="menuitem" data-lang="zh-TW"><span>繁體中文</span><span class="code">zh-TW</span></a>
+        <a class="lang-item active" href="/ja/" hreflang="ja" role="menuitem" data-lang="ja"><span>日本語</span><span class="code">ja</span></a>
+        <a class="lang-item" href="/ko/" hreflang="ko" role="menuitem" data-lang="ko"><span>한국어</span><span class="code">ko</span></a>
+        <a class="lang-item" href="/es/" hreflang="es" role="menuitem" data-lang="es"><span>Español</span><span class="code">es</span></a>
+        <a class="lang-item" href="/fr/" hreflang="fr" role="menuitem" data-lang="fr"><span>Français</span><span class="code">fr</span></a>
+        <a class="lang-item" href="/de/" hreflang="de" role="menuitem" data-lang="de"><span>Deutsch</span><span class="code">de</span></a>
+        <a class="lang-item" href="/vi/" hreflang="vi" role="menuitem" data-lang="vi"><span>Tiếng Việt</span><span class="code">vi</span></a>
+        <a class="lang-item" href="/th/" hreflang="th" role="menuitem" data-lang="th"><span>ไทย</span><span class="code">th</span></a>
+        <a class="lang-item" href="/hi/" hreflang="hi" role="menuitem" data-lang="hi"><span>हिन्दी</span><span class="code">hi <span class="beta">beta</span></span></a>
+        <a class="lang-item" href="/ar/" hreflang="ar" role="menuitem" data-lang="ar"><span>العربية</span><span class="code">ar <span class="beta">beta</span></span></a>
+      </div>
+      </div>
+      <a class="gh" href="https://github.com/Laffinty/FCEUX11" target="_blank" rel="noopener" aria-label="GitHub">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.76.41-1.27.74-1.56-2.56-.29-5.26-1.28-5.26-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.43-2.7 5.41-5.27 5.69.42.36.8 1.08.8 2.18v3.23c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/></svg>
+      </a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="pill reveal"><span class="dot"></span><span>v1.15 · hotfix2</span></div>
+    <h1 class="reveal"><span class="grad">FCEUX</span><span class="dim">11</span></h1>
+    <p class="tagline reveal"><span class="tagline-title">FCEUX ベースの NES/Famicom エミュレーター、Windows に最適化</span><br>コア精度をそのままに、モダンなネイティブ体験を 12 言語で。</p>
+    <div class="cta reveal">
+      <a class="btn btn-primary" href="https://github.com/Laffinty/FCEUX11/releases" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>ダウンロード</span>
+      </a>
+      <a class="btn btn-ghost" href="https://github.com/Laffinty/FCEUX11/blob/main/CHANGELOG.md" target="_blank" rel="noopener">更新履歴</a>
+    </div>
+  </div>
+</header>
+
+<section class="features">
+  <div class="wrap">
+    <div class="feat-row reveal">
+      <div class="feat">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 2v6h6V2M7 8h10l2 12H5z"/></svg></div>
+        <h3>高精度エミュレーション</h3>
+        <p>NES・Famicom と拡張チップを完全対応</p>
+      </div>
+      <div class="feat">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m8 2-4 6 4 6M16 2l4 6-4 6M14 4l-4 16"/></svg></div>
+        <h3>デバッグツール</h3>
+        <p>CPU/PPU デバッガ・16 進・RAM 監視</p>
+      </div>
+      <div class="feat">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+        <h3>TAS エディター</h3>
+        <p>フレーム単位の入力記録と編集</p>
+      </div>
+      <div class="feat">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3 4 7v5c0 4.5 3.2 7.5 8 9 4.8-1.5 8-4.5 8-9V7z"/></svg></div>
+        <h3>Lua スクリプト</h3>
+        <p>HUD の自作と自動化</p>
+      </div>
+      <div class="feat">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 5h12M9 3v2c0 4.4-3.6 8-8 8M5 8c0 3.3-2.7 6-6 6M12 20l5-11 5 11M14 17h6"/></svg></div>
+        <h3>12 言語対応</h3>
+        <p>アラビア語 RTL 対応、システム言語を自動検出</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="about">
+  <div class="wrap">
+    <div class="about-head reveal">
+      <div class="kicker">概要</div>
+      <h2>はじめに</h2>
+    </div>
+    <div class="about-body reveal">
+      <p>FCEUX11 は、FCEUX の NES/Famicom エミュレーターから派生したプロジェクトで、<em>Windows</em> 向けに最適化されています。</p>
+      <p>FCEUX の卓越したエミュレーション精度を継承しながら、<em>Qt 6</em> ベースの UI によってモダンな Windows ネイティブ体験を提供します。<em>12 言語</em>の多言語対応と、デバッグ・TAS ツール群を開発者や TAS 愛好家の双方に向けて搭載しています。</p>
+      <p>現在も内部リファクタリングとパフォーマンス最適化を継続しており、高負荷な状況でも効率的・滑らか・安定動作を実現。往年の名作をもう一度楽しみたい方も、ROM ハックに踏み込みたい方も、FCEUX11 が NES ゲームをスムーズに美しく動かします。</p>
+    </div>
+  </div>
+</section>
+
+<section class="whatsnew">
+  <div class="wrap">
+    <div class="whatsnew-head reveal">
+      <div class="kicker">新機能</div>
+      <h2>v1.15 · hotfix2</h2>
+      <div class="sub">2026-07-16 リリース · v1.0 ～ v1.15 の振り返り</div>
+    </div>
+    <div class="whatsnew-list reveal">
+      <div class="wn-item">
+        <div class="wn-num">01</div>
+        <div class="wn-text">
+          <h3>12 言語対応、すぐ使える</h3>
+          <p>UI は 12 言語——简体中文・繁體中文・English・日本語・한국어・Español・Français・Deutsch・Tiếng Việt・ไทย・हिन्दी・العربية（完全な RTL レイアウト含む）に対応。初回起動時に Windows の表示言語を自動検出するため、事前設定は不要です。</p>
+        </div>
+      </div>
+      <div class="wn-item">
+        <div class="wn-num">02</div>
+        <div class="wn-text">
+          <h3>クラッシュにさようなら</h3>
+          <p>手動メモリ管理（malloc/free）を全廃し、自動メモリ管理へ移行。ヒープ二重解放などの致命的クラッシュを修正し、長時間のプレイも安定して動作します。</p>
+        </div>
+      </div>
+      <div class="wn-item">
+        <div class="wn-num">03</div>
+        <div class="wn-text">
+          <h3>起動もプレイもより速く、より滑らかに</h3>
+          <p>LTO/PGO コンパイル最適化とリンカー縮小（/OPT:REF, /OPT:ICF）により、コールドスタートとゲーム読み込みが体感できるほど高速化。フレームレートもより安定し、旧型 PC でも映像のカクつきや音途切れなく動作します。</p>
+        </div>
+      </div>
+      <div class="wn-item">
+        <div class="wn-num">04</div>
+        <div class="wn-text">
+          <h3>PPU レンダリング刷新：フレームタイム 52% 削減</h3>
+          <p>21 件のアルゴリズム／マイクロ構造最適化で PPU 描画パイプラインを再構築：スプライト二段 LUT デコード、X-bucket 事前分類、strict aliasing UB 根治、ループ剰余 → wrap-around、dispatcher キャッシュ再利用。シングルスレッド PPU フレームタイムは hotfix1 の 1.125 ms から 0.535 ms（−52.4%）へ短縮し、計画上限 42% を上回る成果。169 個の mapper で 0 バイト差異、画質の精度は維持。</p>
+        </div>
+      </div>
+    </div>
+    <div class="wn-cta reveal">
+      <a href="https://github.com/Laffinty/FCEUX11/blob/main/CHANGELOG.md" target="_blank" rel="noopener">完全な更新履歴を見る →</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>© 2026 FCEUX11 · GPLv2 · <a href="https://github.com/Laffinty/FCEUX11" target="_blank" rel="noopener">GitHub</a> · <span>FCEUX ベース</span></p>
+  </div>
+</footer>
+
+<!-- app.js loaded externally -->
+</body>

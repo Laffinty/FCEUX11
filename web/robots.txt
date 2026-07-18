@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://laffinty.github.io/FCEUX11/sitemap.xml
