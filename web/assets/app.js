@@ -5,6 +5,24 @@
     nav.classList.toggle('scrolled', window.scrollY > 8);
   }, { passive: true });
 
+  // Language dropdown toggle
+  var langDd = document.getElementById('langDd');
+  var langBtn = document.getElementById('langBtn');
+  if (langDd && langBtn) {
+    langBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      langDd.classList.toggle('open');
+      langBtn.setAttribute('aria-expanded', langDd.classList.contains('open'));
+    });
+    document.addEventListener('click', function () {
+      langDd.classList.remove('open');
+      langBtn.setAttribute('aria-expanded', 'false');
+    });
+    langDd.addEventListener('click', function (e) {
+      e.stopPropagation();
+    });
+  }
+
   if (!('IntersectionObserver' in window)) {
     document.querySelectorAll('.reveal').forEach(function (e) { e.classList.add('in'); });
     return;
