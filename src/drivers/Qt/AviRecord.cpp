@@ -422,7 +422,7 @@ int aviRecordOpenFile( const char *filepath )
 #ifdef WIN32
 	if ( (aviDriver == AVI_DRIVER_LIBGWAVI) && (videoFormat == AVI_VFW) )
 	{
-		if ( VFW::chooseConfig( nes_shm->video.ncol, nes_shm->video.nrow ) )
+		if ( VFW::chooseConfig( nes_shm->video.ncol.load(std::memory_order_acquire), nes_shm->video.nrow.load(std::memory_order_acquire) ) )
 		{
 			return -1;
 		}
@@ -488,7 +488,7 @@ int aviRecordOpenFile( const char *filepath )
 	{
 		gwavi = new gwavi_t();
 
-		if ( gwavi->open( fileName.c_str(), nes_shm->video.ncol, nes_shm->video.nrow, fourcc, fps, recordAudio ? &audioConfig : NULL ) )
+		if ( gwavi->open( fileName.c_str(), nes_shm->video.ncol.load(std::memory_order_acquire), nes_shm->video.nrow.load(std::memory_order_acquire), fourcc, fps, recordAudio ? &audioConfig : NULL ) )
 		{
 			char msg[512];
 			fprintf( avLogFp, "Error: Failed to open AVI file.\n");
@@ -528,7 +528,7 @@ int aviRecordAddFrame( void )
 
 	int i, head, numPixels, availSize;
 
-	numPixels  = nes_shm->video.ncol * nes_shm->video.nrow;
+	numPixels  = nes_shm->video.ncol.load(std::memory_order_acquire) * nes_shm->video.nrow.load(std::memory_order_acquire);
 
 	availSize = (vbufTail - vbufHead);
 	if ( availSize <= 0 )

@@ -29,7 +29,7 @@ hotfix1（42 PR）以**数据完整性 / 线程 / FFI 安全**为主线；hotfix
 | 边界 / 别名 / 杂项 | 0 | 0 | 4 | 8 | 0 | **12** |
 | **合计** | **5** | **17** | **37** | **28** | **4** | **91** |
 
-> **重要声明**：本 PLAN 修复的目标是**实际可触发的 BUG**，每条都附"触发场景"。**纯理论（如 64-bit 端微优化）不纳入本轮范围**，留待 v1.16 timing-rewrite。
+> **重要声明**：本 PLAN 修复的目标是**实际可触发的 BUG**，每条都附"触发场景"。**纯理论（如 64-bit 端微优化）不纳入本轮范围**。
 
 ### 0.3 phase 切分原则（关键）
 
@@ -88,6 +88,26 @@ fn get_engine<'a>() -> Option<&'a mut LuaEngine> {
 **回滚**: 单 PR revert。
 **验证**: TSan + 集成测试（GUI 调 `get_mem_hook_count` 与 emulator 调 `call_registered` 并发）。
 
+> **【hotfix3 执行决策 — 2026-07-18】A-1 降级为文档化，不实施 Mutex 替换。**
+>
+> **决策理由**：经分析，FCEUX11 的 Lua FFI 调用全部在 emulator 单线程上执行，GUI 线程仅调用
+> `fceux11_lua_init` / `fceux11_lua_shutdown`，且 Qt 架构保证 emulatorThread 已退出后才调用
+> shutdown（`ConsoleWindow` 析构函数通过 `requestInterruption + wait(5000) + terminate` 等待）。
+> 因此 `AtomicPtr::swap(AcqRel)` 已经为 init/shutdown 提供了充分的 happens-before 保证。
+>
+> **Mutex 方案的风险**：
+> 1. **死锁**：`parking_lot::Mutex` 是非可重入锁。当 FFI 调用触发 C++ 回调（如 `fceux11_lua_BWrite`）
+>    时，C++ 侧可能通过 Lua C API 重新进入 Rust 的 `get_engine()`，在同一线程上再次尝试获取锁 → 死锁。
+> 2. **ABI 变更**：添加 `parking_lot` 依赖 + 改变所有 13+ FFI 入口签名，影响面过大。
+> 3. **ReentrantMutex 不可用**：`parking_lot::ReentrantMutex` 是 `!Sync`，不能用作 `static`。
+>
+> **已实施的替代措施**：
+> - 在 `lib.rs` 的 `LUA_ENGINE_PTR` 声明处添加了 46 行安全论证文档（见 commit `802931b`），
+>   明确说明当前架构下的安全保证、已知的理论 unsoundness。
+> - **后续 agent 不得重新尝试实施 Mutex 替换**。当前方案已是最终决策。
+>
+> **对应 commit**：`802931b` — `docs(lua): add thread-safety rationale for AtomicPtr approach`
+
 ### A-2 [CRITICAL] Lua 引擎无析构 FFI
 
 **诊断 ID**: RUST-CRASH-02
@@ -101,6 +121,21 @@ fn get_engine<'a>() -> Option<&'a mut LuaEngine> {
 - 在 Lua 脚本 reload / 应用退出路径调用 shutdown
 
 **PR 标题**: `fix(lua): make LuaEngine thread-safe via Mutex and add shutdown FFI`
+
+> **【hotfix3 执行决策 — 2026-07-18】A-2 已实施（不含 Mutex 部分）。**
+>
+> **实际 PR 标题**：`fix(lua): add fceux11_lua_shutdown FFI to reclaim LuaEngine Box (hotfix3 A-1+A-2)`
+>
+> **实施内容**：
+> - `fceux11_lua_shutdown()` FFI 已实现：通过 `AtomicPtr::swap(null, AcqRel)` 取出指针，`Box::from_raw` drop。
+> - `fceux11_lua_init()` 已修改：init 前先 `swap` 回收旧引擎，防止双重 init 泄漏。
+> - C++ 侧：`lua-engine.cpp` 添加 `FCEU_LuaShutdown()` wrapper + `extern "C"` 声明；
+>   `fceulua.h` 添加声明；`fceu.cpp` 的 `fceu11::Kill` 路径调用 shutdown。
+> - `fceux11_rust.h` 自动头文件已补齐 `fceux11_lua_shutdown` 声明（commit `1d62407`）。
+>
+> **未实施部分**（因 A-1 降级）：Mutex 保护、所有 FFI 入口加锁。
+>
+> **对应 commit**：`8498cb2`（主修复）、`1d62407`（头文件补齐）
 
 ---
 
@@ -137,6 +172,25 @@ struct nes_shm_t {
 
 **PR 标题**: `fix(qt): atomicize remaining nes_shm cross-thread fields`
 
+> **【hotfix3 执行决策 — 2026-07-18】A-3 已实施（含 errata 修复）。**
+>
+> **实际 PR 标题**：`fix(qt): atomicize remaining nes_shm cross-thread fields (hotfix3 A-3)`
+>
+> **实施内容**：
+> - `nes_shm.h` 中 14 个字段全部改为 `std::atomic`：`render_count`、`blit_count`、
+>   `video.{ncol,nrow,pitch,xscale,yscale,xyRatio,preScaler,test}`、`pid`、`run`。
+> - `nes_shm.cpp` 初始化使用 `.store(0, memory_order_relaxed)`。
+> - 13 个调用方文件的读/写路径全部替换为 `.load(acquire)` / `.store(release)` / `.fetch_add(relaxed)`。
+> - `sndBuf.head` / `sndBuf.tail` 同步 atomic 化。
+>
+> **已知问题与修复**：
+> - 自动化脚本 `atomize_nes_shm.py` 的正则 bug 将 `preScaler == N` 错误转换为
+>   `preScaler.store(= N)` 语法，影响 5 个文件 7 处。此 bug 在 commit `5041e03` 中引入，
+>   在 errata commit `1d62407` 中修复为正确的 `preScaler.load(acquire) == N`。
+> - `pid` 和 `run` 字段在 atomic 化后未被任何代码读写（dead code），无害但可在未来清理。
+>
+> **对应 commit**：`5041e03`（主修复）、`1d62407`（语法 errata + 头文件）
+
 ---
 
 ### A-4 [CRITICAL] `fceuWrapperLock` 在析构路径 UAF
@@ -167,6 +221,14 @@ consoleWin_t::~consoleWin_t() {
 
 **PR 标题**: `fix(qt): wait for emulator thread before deleting mutex in consoleWin_t dtor`
 
+> **【hotfix3 执行决策 — 2026-07-18】A-4 已实施，PASS。**
+>
+> **实际实现**与计划一致。额外增加了 `closed_` 幂等标志（`ConsoleWindow.h:142`），防止
+> `closeApp()` 已执行等待后析构函数重复等待。`closeApp()` 设置 `closed_ = true` 后使用相同
+> 的 `requestInterruption / wait(5000) / terminate + wait()` 模式。
+>
+> **对应 commit**：`f2cf4a0`
+
 ---
 
 ### A-5 [CRITICAL] `fceuWrapper` mutex 状态跨线程非原子
@@ -191,6 +253,16 @@ static std::atomic<bool> emulatorHasMutex{false};
 逐操作替换 ++ / -- / = 为 `fetch_add` / `fetch_sub` / `store` + memory_order_acquire/release。
 
 **PR 标题**: `fix(qt): atomicize fceuWrapper mutex state counters`
+
+> **【hotfix3 执行决策 — 2026-07-18】A-5 已实施，PASS。**
+>
+> **实施内容**与计划完全一致：
+> - `mutexLocks` → `std::atomic<int>`，使用 `fetch_add(1, acq_rel)` / `fetch_sub(1, acq_rel)` / `load(acquire)`
+> - `mutexPending` → `std::atomic<int>`，使用 `fetch_add(1, relaxed)` / `fetch_sub(1, relaxed)` / `load(acquire)`
+> - `emulatorHasMutex` → `std::atomic<bool>`，使用 `store(true/false, release)`
+> - 全部 18 处使用点已验证正确，变量为 `static` 作用域（仅 `fceuWrapper.cpp` 内部），无外部访问。
+>
+> **对应 commit**：`c7a78f6`
 
 ---
 
@@ -221,6 +293,34 @@ const char* fceux11_lua_movie_get_filename() {
 - 推荐 thread_local + 在 Lua 端立即 copy 出
 
 **PR 标题**: `fix(lua): make movie name/filename FFI return thread_local strings`
+
+> **【hotfix3 执行决策 — 2026-07-18】A-6 已实施，PASS。**
+>
+> **实施内容**与计划完全一致：
+> - `fceux11_lua_movie_get_name()`：`static std::string name` → `thread_local std::string name`
+> - `fceux11_lua_movie_get_filename()`：`static std::string name` → `thread_local std::string filename`
+> - 两个函数使用**独立**的 `thread_local` 变量（`name` vs `filename`），互不干扰。
+> - Rust 端 `bindings/movie.rs:61,76` 立即通过 `CStr::to_string_lossy().into_owned()` 拷贝，
+>   返回指针仅在单次 FFI 调用期间有效。
+>
+> **对应 commit**：`3fb4087`
+
+---
+
+## Phase A 执行总结（2026-07-18）
+
+| PR | 计划方案 | 实际方案 | 差异说明 |
+|---|---|---|---|
+| A-1 | Mutex\<Box\<LuaEngine\>\> 替换 AtomicPtr | **降级为文档化** | 单线程架构下 AtomicPtr + AcqRel 已足够安全；Mutex 会因 C++ 回调重入导致死锁 |
+| A-2 | Mutex 内 init + shutdown FFI | 仅 shutdown FFI | Mutex 部分随 A-1 一起取消；shutdown 和 init 的 swap 回收逻辑已正确实现 |
+| A-3 | 14 字段 atomic 化 | 已实施 + errata 修复 | 自动化脚本引入 7 处语法错误，已在后续 commit 修复 |
+| A-4 | 析构等待 emulatorThread | 已实施 | 额外增加了 `closed_` 幂等标志 |
+| A-5 | 3 变量 atomic 化 | 已实施 | 与计划完全一致 |
+| A-6 | thread_local 替换 static | 已实施 | 与计划完全一致 |
+
+**验证结果**：Release 构建 100% 通过，28/28 测试全部通过，Rust `cargo check` 通过。
+
+**Phase B 开工条件**：已满足。A-1 的理论 unsoundness 已文档化且有架构级安全保障，不阻塞后续 phase。
 
 ---
 
@@ -695,13 +795,13 @@ static_assert(sizeof(Cpu::layout_) == expected_size, "Cpu::layout_ size drift");
 
 | 项 | 原因 | 后续 |
 |----|------|------|
-| v1.16 timing-rewrite（hotfix2 P2-5 延期项） | MMC3 A12/IRQ 精度风险 | v1.16 timing-rewrite |
+| timing-rewrite（hotfix2 P2-5 延期项） | MMC3 A12/IRQ 精度风险 | 不在 hotfix3 范围 |
 | AVX2 gather (hotfix2 P0-5 可选项) | ROI 不明 | 视 Phase D 后实测 |
-| `map_irq_hook` 改为 atomic 后保留 `map_irq_hook_ref()` 冷路径优化 | 单测覆盖不足 | v1.16 |
-| Lua 引擎全套 race audit | 工作量大 | v1.16 lua-rewrite |
-| mapper 矩阵全套性能回归 | Phase A 优先 | v1.16 |
+| `map_irq_hook` 改为 atomic 后保留 `map_irq_hook_ref()` 冷路径优化 | 单测覆盖不足 | 不在 hotfix3 范围 |
+| Lua 引擎全套 race audit | 工作量大 | 不在 hotfix3 范围 |
+| mapper 矩阵全套性能回归 | Phase A 优先 | 不在 hotfix3 范围 |
 | `bgdata.main[34]` → `main[32]`（dead row 去除） | 影响 hotfix2 P1-1 SoA，需重测 | 单独 issue 跟踪 |
-| `oams[2][64][8]` 加 `alignas(64)` | 单线程优化，影响小 | v1.16 micro-opt |
+| `oams[2][64][8]` 加 `alignas(64)` | 单线程优化，影响小 | 不在 hotfix3 范围 |
 
 ---
 

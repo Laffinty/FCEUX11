@@ -117,9 +117,15 @@ static int inited = 0;
 static int noconfig=0;
 static int frameskip=0;
 static int periodic_saves = 0;
-static int   mutexLocks = 0;
-static int   mutexPending = 0;
-static bool  emulatorHasMutex = 0;
+// hotfix3 A-5 (QT-CRASH-08): the lock-state counters were plain
+// int/bool. On x86 (TSO) aligned 32-bit ++/-- happened to be
+// atomic in practice, but the C++ memory model makes no such
+// guarantee and ARM/AArch64 readers could observe a torn value or
+// re-ordered load.  Promote to std::atomic with acquire/release
+// ordering so lock acquisition/release is properly synchronised.
+static std::atomic<int>  mutexLocks{0};
+static std::atomic<int>  mutexPending{0};
+static std::atomic<bool> emulatorHasMutex{false};
 
 extern double g_fpsScale;
 
@@ -1170,9 +1176,9 @@ void fceuWrapperLock(const char *filename, int line, const char *func)
 	{
 		char txt[32];
 
-		if ( mutexLocks > 1 )
+		if ( mutexLocks.load(std::memory_order_acquire) > 1 )
 		{
-			printf("Recursive Lock:%i\n", mutexLocks );
+			printf("Recursive Lock:%i\n", mutexLocks.load(std::memory_order_acquire) );
 			printf("Already Locked By: %s\n", lockFile.c_str() );
 			printf("Requested By: %s:%i - %s\n", filename, line, func );
 		}
@@ -1185,13 +1191,13 @@ void fceuWrapperLock(const char *filename, int line, const char *func)
 
 void fceuWrapperLock(void)
 {
-	mutexPending++;
+	mutexPending.fetch_add(1, std::memory_order_relaxed);
 	if ( consoleWindow != NULL )
 	{
 		consoleWindow->mutex->lock();
 	}
-	mutexPending--;
-	mutexLocks++;
+	mutexPending.fetch_sub(1, std::memory_order_relaxed);
+	mutexLocks.fetch_add(1, std::memory_order_acq_rel);
 }
 
 bool fceuWrapperTryLock(const char *filename, int line, const char *func, int timeout)
@@ -1215,25 +1221,25 @@ bool fceuWrapperTryLock(int timeout)
 {
 	bool lockAcq = false;
 
-	mutexPending++;
+	mutexPending.fetch_add(1, std::memory_order_relaxed);
 	if ( consoleWindow != NULL )
 	{
 		lockAcq = consoleWindow->mutex->tryLock( timeout );
 	}
-	mutexPending--;
+	mutexPending.fetch_sub(1, std::memory_order_relaxed);
 
 	if ( lockAcq )
 	{
-		mutexLocks++;
+		mutexLocks.fetch_add(1, std::memory_order_acq_rel);
 	}
 	return lockAcq;
 }
 
 void fceuWrapperUnLock(void)
 {
-	if ( mutexLocks > 0 )
+	if ( mutexLocks.load(std::memory_order_acquire) > 0 )
 	{
-		mutexLocks--;
+		mutexLocks.fetch_sub(1, std::memory_order_acq_rel);
 		if ( consoleWindow != NULL )
 		{
 			consoleWindow->mutex->unlock();
@@ -1248,7 +1254,7 @@ void fceuWrapperUnLock(void)
 
 bool fceuWrapperIsLocked(void)
 {
-	return mutexLocks > 0;
+	return mutexLocks.load(std::memory_order_acquire) > 0;
 }
 
 int  fceuWrapperUpdate( void )
@@ -1269,7 +1275,7 @@ int  fceuWrapperUpdate( void )
 
 	// If a request is pending,
 	// sleep to allow request to be serviced.
-	if ( mutexPending > 0 )
+	if ( mutexPending.load(std::memory_order_acquire) > 0 )
 	{
 		msleep( 16 );
 	}
@@ -1301,12 +1307,12 @@ int  fceuWrapperUpdate( void )
 	}
 	consecutiveLockMisses = 0;
 	mutexLockFail = false;
-	emulatorHasMutex = 1;
- 
+	emulatorHasMutex.store(true, std::memory_order_release);
+
 	if ( GameInfo )
 	{
 		DoFun(frameskip, periodic_saves);
-	
+
 		hexEditorUpdateMemoryValues();
 
 		if ( consoleWindow )
@@ -1315,7 +1321,7 @@ int  fceuWrapperUpdate( void )
 		}
 		fceuWrapperUnLock();
 
-		emulatorHasMutex = 0;
+		emulatorHasMutex.store(false, std::memory_order_release);
 
 #ifdef __FCEU_PROFILER_ENABLE__
 		FCEU_profiler_log_thread_activity();
@@ -1324,14 +1330,14 @@ int  fceuWrapperUpdate( void )
 		{
 			// Input device processing is in main thread
 			// because to MAC OS X SDL2 requires it.
-			//FCEUD_UpdateInput(); 
+			//FCEUD_UpdateInput();
 		}
 	}
 	else
 	{
 		fceuWrapperUnLock();
 
-		emulatorHasMutex = 0;
+		emulatorHasMutex.store(false, std::memory_order_release);
 
 #ifdef __FCEU_PROFILER_ENABLE__
 		FCEU_profiler_log_thread_activity();

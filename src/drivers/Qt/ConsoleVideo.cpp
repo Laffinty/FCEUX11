@@ -347,6 +347,11 @@ void consoleWin_t::closeApp(void)
 	//     3. As a last resort terminate() it (UNSAFE: leaves mutexes held,
 	//        transitively cleaned up by process exit) and wait() again
 	//     4. Only THEN tear down fceuWrapper state.
+	//
+	// hotfix3 A-4 (QT-CRASH-03): mark `closed_` so the dtor knows the
+	// wait has already been performed (avoids a redundant wait block
+	// on the graceful-quit path that goes closeApp -> delete).
+	closed_ = true;
 	emulatorThread->requestInterruption();
 	if (!emulatorThread->wait(5000)) {
 		qWarning("Emulator thread did not exit cleanly within 5s; terminating");

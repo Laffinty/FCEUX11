@@ -67,6 +67,7 @@ void FCEU_LuaFrameBoundary();
 int FCEU_LoadLuaCode(const char *filename, const char *arg=NULL);
 void FCEU_ReloadLuaCode();
 void FCEU_LuaStop();
+int FCEU_LuaShutdown(); // hotfix3 A-2 (RUST-CRASH-02)
 int FCEU_LuaRunning();
 
 void FCEU_LuaReadZapper(const uint32* mouse_in, uint32* mouse_out);

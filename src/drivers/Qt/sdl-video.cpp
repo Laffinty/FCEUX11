@@ -138,58 +138,58 @@ void CalcVideoDimensions(void)
 
 	//printf("Calc Video: %i -> %i \n", s_srendline, s_erendline );
 
-	nes_shm->video.preScaler = s_sponge;
+	nes_shm->video.preScaler.store(s_sponge, std::memory_order_release);
 
 	switch ( s_sponge )
 	{
 		default:
 		case 0: // None
-			nes_shm->video.xscale = 1;
-			nes_shm->video.yscale = 1;
+			nes_shm->video.xscale.store(1, std::memory_order_release);
+			nes_shm->video.yscale.store(1, std::memory_order_release);
 		break;
 		case 1: // hq2x
 		case 2: // Scale2x
 		case 3: // NTSC 2x
 		case 6: // Prescale2x
-			nes_shm->video.xscale = 2;
-			nes_shm->video.yscale = 2;
+			nes_shm->video.xscale.store(2, std::memory_order_release);
+			nes_shm->video.yscale.store(2, std::memory_order_release);
 		break;
 		case 4: // hq3x
 		case 5: // Scale3x
 		case 7: // Prescale3x
-			nes_shm->video.xscale = 3;
-			nes_shm->video.yscale = 3;
+			nes_shm->video.xscale.store(3, std::memory_order_release);
+			nes_shm->video.yscale.store(3, std::memory_order_release);
 		break;
 		case 8: // Prescale4x
-			nes_shm->video.xscale = 4;
-			nes_shm->video.yscale = 4;
+			nes_shm->video.xscale.store(4, std::memory_order_release);
+			nes_shm->video.yscale.store(4, std::memory_order_release);
 		break;
 		case 9: // PAL
-			nes_shm->video.xscale = 3;
-			nes_shm->video.yscale = 1;
+			nes_shm->video.xscale.store(3, std::memory_order_release);
+			nes_shm->video.yscale.store(1, std::memory_order_release);
 		break;
 	}
 
-	int iScale = nes_shm->video.xscale;
+	int iScale = nes_shm->video.xscale.load(std::memory_order_acquire);
 	if ( s_sponge == 3 )
 	{
-		nes_shm->video.ncol = iScale*301;
+		nes_shm->video.ncol.store(iScale*301, std::memory_order_release);
 	}
 	else
 	{
-		nes_shm->video.ncol = iScale*NWIDTH;
+		nes_shm->video.ncol.store(iScale*NWIDTH, std::memory_order_release);
 	}
 	if ( s_sponge == 9 )
 	{
-		nes_shm->video.nrow  = 1*s_tlines;
-		nes_shm->video.xyRatio = 3;
+		nes_shm->video.nrow.store(1*s_tlines, std::memory_order_release);
+		nes_shm->video.xyRatio.store(3, std::memory_order_release);
 	}
 	else
 	{
-		nes_shm->video.nrow  = iScale*s_tlines;
-		nes_shm->video.xyRatio = 1;
+		nes_shm->video.nrow.store(iScale*s_tlines, std::memory_order_release);
+		nes_shm->video.xyRatio.store(1, std::memory_order_release);
 	}
-	nes_shm->video.pitch = nes_shm->video.ncol * 4;
+	nes_shm->video.pitch.store(nes_shm->video.ncol.load(std::memory_order_acquire) * 4, std::memory_order_release);
 
 	// hotfix1 P1-7 (C-08): the destination buffer is `pixbuf[5][1048576]`
 	// (1024×1024 uint32), so any ncol×nrow product beyond 1048576 is a
@@ -199,19 +199,19 @@ void CalcVideoDimensions(void)
 	// configuration (scale "5", manual override, or future custom
 	// filter) could blow past it. Clamp to 1024 and refuse the
 	// calc — every consumer checks the bounds first.
-	if ((long long)nes_shm->video.ncol * nes_shm->video.nrow > 1048576LL) {
+	if ((long long)nes_shm->video.ncol.load(std::memory_order_acquire) * nes_shm->video.nrow.load(std::memory_order_acquire) > 1048576LL) {
 		// hotfix1 P1-7 (C-08): report the mismatch via a transient std::cerr
 		// rather than FCEUD_PrintError, which only takes a single message
 		// argument; using a 3-arg printf-like form here would fail to
 		// compile. The diagnostic is fire-and-forget on the first
 		// overrun; after the clamp below, the rest of the program sees
 		// a sane 1024×1024 surface.
-		std::cerr << "video dimensions " << nes_shm->video.ncol
-		          << "x" << nes_shm->video.nrow
+		std::cerr << "video dimensions " << nes_shm->video.ncol.load(std::memory_order_acquire)
+		          << "x" << nes_shm->video.nrow.load(std::memory_order_acquire)
 		          << " exceed 1024x1024 framebuffer; clamping" << std::endl;
-		nes_shm->video.ncol = 1024;
-		nes_shm->video.nrow = 1024;
-		nes_shm->video.pitch = 4096;
+		nes_shm->video.ncol.store(1024, std::memory_order_release);
+		nes_shm->video.nrow.store(1024, std::memory_order_release);
+		nes_shm->video.pitch.store(4096, std::memory_order_release);
 	}
 }
 
@@ -251,64 +251,64 @@ int InitVideo(FCEUGI *gi)
 	fceu11::GetCurrentVidSystem(&s_srendline, &s_erendline);
 	s_tlines = s_erendline - s_srendline + 1;
 
-	nes_shm->video.preScaler = s_sponge;
+	nes_shm->video.preScaler.store(s_sponge, std::memory_order_release);
 
 	switch ( s_sponge )
 	{
 		default:
 		case 0: // None
-			nes_shm->video.xscale = 1;
-			nes_shm->video.yscale = 1;
+			nes_shm->video.xscale.store(1, std::memory_order_release);
+			nes_shm->video.yscale.store(1, std::memory_order_release);
 		break;
 		case 1: // hq2x
 		case 2: // Scale2x
 		case 3: // NTSC 2x
 		case 6: // Prescale2x
-			nes_shm->video.xscale = 2;
-			nes_shm->video.yscale = 2;
+			nes_shm->video.xscale.store(2, std::memory_order_release);
+			nes_shm->video.yscale.store(2, std::memory_order_release);
 		break;
 		case 4: // hq3x
 		case 5: // Scale3x
 		case 7: // Prescale3x
-			nes_shm->video.xscale = 3;
-			nes_shm->video.yscale = 3;
+			nes_shm->video.xscale.store(3, std::memory_order_release);
+			nes_shm->video.yscale.store(3, std::memory_order_release);
 		break;
 		case 8: // Prescale4x
-			nes_shm->video.xscale = 4;
-			nes_shm->video.yscale = 4;
+			nes_shm->video.xscale.store(4, std::memory_order_release);
+			nes_shm->video.yscale.store(4, std::memory_order_release);
 		break;
 		case 9: // PAL
-			nes_shm->video.xscale = 3;
-			nes_shm->video.yscale = 1;
+			nes_shm->video.xscale.store(3, std::memory_order_release);
+			nes_shm->video.yscale.store(1, std::memory_order_release);
 		break;
 	}
-	nes_shm->render_count = nes_shm->blit_count = 0;
+	nes_shm->render_count.store(0, std::memory_order_relaxed); nes_shm->blit_count.store(0, std::memory_order_relaxed);
 
 	s_inited = 1;
 
 	// check to see if we are showing FPS
 	FCEUI_SetShowFPS(show_fps);
 
-	int iScale = nes_shm->video.xscale;
+	int iScale = nes_shm->video.xscale.load(std::memory_order_acquire);
 	if ( s_sponge == 3 )
 	{
-		nes_shm->video.ncol = iScale*301;
+		nes_shm->video.ncol.store(iScale*301, std::memory_order_release);
 	}
 	else
 	{
-		nes_shm->video.ncol = iScale*NWIDTH;
+		nes_shm->video.ncol.store(iScale*NWIDTH, std::memory_order_release);
 	}
 	if ( s_sponge == 9 )
 	{
-		nes_shm->video.nrow  = 1*s_tlines;
-		nes_shm->video.xyRatio = 3;
+		nes_shm->video.nrow.store(1*s_tlines, std::memory_order_release);
+		nes_shm->video.xyRatio.store(3, std::memory_order_release);
 	}
 	else
 	{
-		nes_shm->video.nrow  = iScale*s_tlines;
-		nes_shm->video.xyRatio = 1;
+		nes_shm->video.nrow.store(iScale*s_tlines, std::memory_order_release);
+		nes_shm->video.xyRatio.store(1, std::memory_order_release);
 	}
-	nes_shm->video.pitch = nes_shm->video.ncol * 4;
+	nes_shm->video.pitch.store(nes_shm->video.ncol.load(std::memory_order_acquire) * 4, std::memory_order_release);
 
 #ifdef FCEU_BIG_ENDIAN
 	rmask = 0x00FF0000;
@@ -323,7 +323,7 @@ int InitVideo(FCEUGI *gi)
 	s_curbpp = 32; // Bits per pixel is always 32
 
 	FCEU_printf(" Video Mode: %d x %d x %d bpp %s\n",
-				nes_shm->video.ncol, nes_shm->video.nrow, s_curbpp,
+				nes_shm->video.ncol.load(std::memory_order_acquire), nes_shm->video.nrow.load(std::memory_order_acquire), s_curbpp,
 				s_fullscreen ? "full screen" : "");
 
 	if (s_curbpp != 8 && s_curbpp != 16 && s_curbpp != 24 && s_curbpp != 32) 
@@ -429,14 +429,14 @@ static void vsync_test(void)
 
 	pixbuf = nes_shm->pixbuf[ nes_shm->pixBufIdx.load(std::memory_order_acquire) ];
 
-	cycleLen = nes_shm->video.ncol / 4;
+	cycleLen = nes_shm->video.ncol.load(std::memory_order_acquire) / 4;
 
 	halfCycleLen = cycleLen / 2;
 
 	k=0;
-	for (j=0; j<nes_shm->video.nrow; j++)
+	for (j=0; j<nes_shm->video.nrow.load(std::memory_order_acquire); j++)
 	{
-		for (i=0; i<nes_shm->video.ncol; i++)
+		for (i=0; i<nes_shm->video.ncol.load(std::memory_order_acquire); i++)
 		{
 			l = ((i+ofs) % cycleLen);
 
@@ -450,7 +450,7 @@ static void vsync_test(void)
 			}
 		}
 	}
-	ofs = (ofs + 1) % nes_shm->video.ncol;
+	ofs = (ofs + 1) % nes_shm->video.ncol.load(std::memory_order_acquire);
 }
 
 static void
@@ -469,8 +469,8 @@ doBlitScreen(uint8_t *XBuf, uint8_t *dest)
 	XBuf += s_srendline * 256;
 
 	//dest    = (uint8*)nes_shm->pixbuf;
-	ixScale = nes_shm->video.xscale;
-	iyScale = nes_shm->video.yscale;
+	ixScale = nes_shm->video.xscale.load(std::memory_order_acquire);
+	iyScale = nes_shm->video.yscale.load(std::memory_order_acquire);
 
 	if ( s_sponge == 3 )
 	{
@@ -492,16 +492,16 @@ doBlitScreen(uint8_t *XBuf, uint8_t *dest)
 	}
 	pitch  = w*4;
 
-	nes_shm->video.ncol    = w;
-	nes_shm->video.nrow    = h;
-	nes_shm->video.pitch   = pitch;
-	nes_shm->video.preScaler = s_sponge;
+	nes_shm->video.ncol.store(w, std::memory_order_release);
+	nes_shm->video.nrow.store(h, std::memory_order_release);
+	nes_shm->video.pitch.store(pitch, std::memory_order_release);
+	nes_shm->video.preScaler.store(s_sponge, std::memory_order_release);
 
 	if ( dest == NULL ) return;
 
-	if ( nes_shm->video.test )
+	if ( nes_shm->video.test.load(std::memory_order_acquire) )
 	{
-		switch ( nes_shm->video.test )
+		switch ( nes_shm->video.test.load(std::memory_order_acquire) )
 		{
 			case 1:
 				vsync_test();
@@ -540,7 +540,7 @@ BlitScreen(uint8 *XBuf)
 	doBlitScreen(XBuf, (uint8_t*)nes_shm->pixbuf[i]);
 
 	nes_shm->pixBufIdx.store( (i+1) % NES_VIDEO_BUFLEN, std::memory_order_release );
-	nes_shm->blit_count++;
+	nes_shm->blit_count.fetch_add(1, std::memory_order_relaxed);
 	nes_shm->blitUpdated.store(1, std::memory_order_release);
 }
 
@@ -563,23 +563,23 @@ uint32 PtoV(double nx, double ny)
 {
 	int x, y;
 
-	y = (int)( ny * (double)nes_shm->video.nrow );
+	y = (int)( ny * (double)nes_shm->video.nrow.load(std::memory_order_acquire) );
 
-	if ( nes_shm->video.preScaler == 3 )
+	if ( nes_shm->video.preScaler.load(std::memory_order_acquire) == 3 )
 	{
-		x = (int)( nx * (double)nes_shm->video.ncol * (256.0/301.0) );
+		x = (int)( nx * (double)nes_shm->video.ncol.load(std::memory_order_acquire) * (256.0/301.0) );
 	}
 	else
 	{
-		x = (int)( nx * (double)nes_shm->video.ncol );
+		x = (int)( nx * (double)nes_shm->video.ncol.load(std::memory_order_acquire) );
 	}
 
 	//printf("Scaled (%i,%i) \n", x, y);
 
-	x = x / nes_shm->video.xscale;
-	y = y / nes_shm->video.yscale;
+	x = x / nes_shm->video.xscale.load(std::memory_order_acquire);
+	y = y / nes_shm->video.yscale.load(std::memory_order_acquire);
 
-	//if ( nes_shm->video.xyRatio == 1 )
+	//if ( nes_shm->video.xyRatio.load(std::memory_order_acquire) == 1 )
 	//{
 	//	y = y / nes_shm->video.scale;
 	//}

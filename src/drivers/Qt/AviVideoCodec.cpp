@@ -866,8 +866,8 @@ int initVideoStream(const char *codec_name, OutputStream *ost)
 
 	ost->enc = c;
 
-	c->width = nes_shm->video.ncol;
-	c->height = nes_shm->video.nrow;
+	c->width = nes_shm->video.ncol.load(std::memory_order_acquire);
+	c->height = nes_shm->video.nrow.load(std::memory_order_acquire);
 
 	if (codec->id == AV_CODEC_ID_MPEG4)
 	{

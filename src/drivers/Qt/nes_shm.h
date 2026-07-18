@@ -18,21 +18,31 @@
 
 struct  nes_shm_t
 {
-	int   pid;
-	int   run;
-	uint32_t  render_count;
-	uint32_t  blit_count;
+	// hotfix3 A-3 (QT-CRASH-01): promote remaining plain-int fields to
+	// std::atomic. hotfix1 P1-12 only atomised runEmulator /
+	// blitUpdated / pixBufIdx / sound ring indices; the GUI thread
+	// (e.g. viewers reading video.ncol inside paintGL) was subject to
+	// torn reads + reordering whenever the emulator thread wrote them
+	// in the same frame. Layout preserved (no nested VideoAtomic, no
+	// pid/run removal) so call sites stay byte-identical apart from
+	// the .load() / .store() calls. Ordering policy: release on the
+	// producer (emulator) write side, acquire on the GUI read side;
+	// relaxed for the bookkeeping counters.
+	std::atomic<int>      pid{0};
+	std::atomic<int>      run{0};
+	std::atomic<uint32_t> render_count{0};
+	std::atomic<uint32_t> blit_count{0};
 
 	struct
 	{
-		int   ncol;
-		int   nrow;
-		int   pitch;
-		int   xscale;
-		int   yscale;
-		int   xyRatio;
-		int   preScaler;
-		int   test;
+		std::atomic<int>  ncol{0};
+		std::atomic<int>  nrow{0};
+		std::atomic<int>  pitch{0};
+		std::atomic<int>  xscale{0};
+		std::atomic<int>  yscale{0};
+		std::atomic<int>  xyRatio{0};
+		std::atomic<int>  preScaler{0};
+		std::atomic<int>  test{0};
 	} video;
 
 	// hotfix1 P1-12 (N-H03): cross-thread fields promoted to std::atomic

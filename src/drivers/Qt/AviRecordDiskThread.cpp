@@ -51,8 +51,8 @@ void AviRecordDiskThread_t::run(void)
 
 	fprintf( avLogFp, "Avg Audio Sample Rate per Frame: %i \n", avgAudioPerFrame );
 
-	width     = nes_shm->video.ncol;
-	height    = nes_shm->video.nrow;
+	width     = nes_shm->video.ncol.load(std::memory_order_acquire);
+	height    = nes_shm->video.nrow.load(std::memory_order_acquire);
 	numPixels = width * height;
 
 	rgb24 = std::make_unique<unsigned char[]>( numPixels * sizeof(uint32_t) );

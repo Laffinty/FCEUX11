@@ -647,6 +647,11 @@ bool fceu11::Initialize() {
 void fceu11::Kill() {
 	#ifdef _S9XLUA_H
 	FCEU_LuaStop();
+	// hotfix3 A-2 (RUST-CRASH-02): reclaim the Rust LuaEngine Box
+	// after stopping the script. Without this the Box stays leaked
+	// (Lua state + Registry keys never freed) for the lifetime of
+	// the process. Pairs with fceux11_lua_init.
+	FCEU_LuaShutdown();
 	#endif
 
 	// v1.15 Finale: close the game (including Cart lifecycle cleanup

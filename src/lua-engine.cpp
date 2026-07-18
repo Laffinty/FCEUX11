@@ -113,9 +113,10 @@ static int transparencyModifier = 255;
 static std::map<int, LuaSaveState*> s_savestate_objects;
 static int s_next_savestate_id = 1;
 
-// Rust FFI declarations ¡ª implemented in fceux11-lua crate
+// Rust FFI declarations ï¿½ï¿½ implemented in fceux11-lua crate
 extern "C" {
     int fceux11_lua_init(void);
+    int fceux11_lua_shutdown(void);  // hotfix3 A-2 (RUST-CRASH-02)
     int fceux11_lua_load_script(const char *path, const char *arg);
     void fceux11_lua_frame_boundary(void);
     void fceux11_lua_stop(void);
@@ -126,7 +127,7 @@ extern "C" {
     void fceux11_lua_call_mem_hook(unsigned int addr, int size, unsigned int value, int hook_type);
 }
 
-// Public C++ entry points ¡ª delegate to Rust FFI
+// Public C++ entry points ï¿½ï¿½ delegate to Rust FFI
 void FCEU_LuaFrameBoundary() {
     fceux11_lua_frame_boundary();
 }
@@ -144,6 +145,13 @@ void FCEU_ReloadLuaCode() {
 
 void FCEU_LuaStop() {
     fceux11_lua_stop();
+}
+
+// hotfix3 A-2 (RUST-CRASH-02): drop the active LuaEngine (if any)
+// and release its inner mlua::Lua state + Registry keys. Returns 1
+// if a live engine was torn down, 0 if there was nothing to do.
+int FCEU_LuaShutdown() {
+    return fceux11_lua_shutdown();
 }
 
 int FCEU_LuaRunning() {
@@ -498,7 +506,7 @@ uint8_t fceux11_lua_GetMem(uint32_t addr) {
 void fceux11_lua_BWrite(uint32_t addr, uint8_t val) {
 	uint16_t a = static_cast<uint16_t>(addr & 0xFFFF);
 	if (a < 0x8000) {
-		// RAM/writable memory ¡ª call through BWrite handler
+		// RAM/writable memory ï¿½ï¿½ call through BWrite handler
 		writefunc wf = fceu11::g_bus.bwrite_table()[a];
 		if (wf) wf(a, val);
 	}
@@ -611,19 +619,25 @@ int32_t fceux11_lua_movie_is_from_savestate() {
 
 const char* fceux11_lua_movie_get_name() {
 	// Returns internal movie name (from header or filename)
-	static std::string name;
+	// hotfix3 A-6 (LUA-CRASH-02): `thread_local` so each thread gets
+	// its own buffer. Returning the c_str() pointer is safe as long
+	// as the caller copies the bytes before invoking another FFI
+	// call on the same thread (Rust bindings/movie.rs:61,76 already
+	// do this immediately).
+	thread_local std::string name;
 	name = fceu11::GetMovieName();
 	return name.c_str();
 }
 
 const char* fceux11_lua_movie_get_filename() {
 	// Returns filename stripped of path
-	static std::string name;
-	name = fceu11::GetMovieName();
-	int x = name.find_last_of("/\\") + 1;
+	// hotfix3 A-6 (LUA-CRASH-02): see get_name() above.
+	thread_local std::string filename;
+	filename = fceu11::GetMovieName();
+	int x = filename.find_last_of("/\\") + 1;
 	if (x)
-		name = name.substr(x, name.length() - x);
-	return name.c_str();
+		filename = filename.substr(x, filename.length() - x);
+	return filename.c_str();
 }
 
 // v0.2.22.4: savestate FFI
@@ -923,7 +937,7 @@ int fceux11_lua_sound_get_length_count() {
     return lengthcount[0];
 }
 
-// Zapper ¡ª uses luazapperx/y/fire from lua-engine.cpp globals
+// Zapper ï¿½ï¿½ uses luazapperx/y/fire from lua-engine.cpp globals
 int fceux11_lua_zapper_get_x() {
     if (luazapperx < 0) return 0;
     return luazapperx;
