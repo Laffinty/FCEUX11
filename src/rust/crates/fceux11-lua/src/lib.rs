@@ -24,8 +24,54 @@ use mlua::{Lua, RegistryKey, Thread};
 // `unsafe { ... }` to mutate the static. We also lift the `unsafe` from
 // each `get_engine()` accessor — the only remaining `unsafe` is the
 // dereference of the `*mut LuaEngine` itself, which is unavoidable.
+//
+// # Thread-safety rationale (hotfix3 A-1, RUST-CRASH-01)
+//
+// The plan called for replacing AtomicPtr with Mutex<Box<LuaEngine>> to
+// eliminate Stacked-Borrow UB from concurrent &mut aliasing.  After
+// analysis we decided to keep AtomicPtr because:
+//
+// 1. **Single-threaded Lua execution**: all `fceux11_lua_*` FFI calls
+//    originate from the emulator thread.  The GUI thread only calls
+//    `fceux11_lua_init` / `fceux11_lua_shutdown`, and the emulator
+//    thread is guaranteed to be idle during those calls (the Qt
+//    close-path waits for emulatorThread->wait() before shutdown).
+//
+// 2. **init/shutdown serialisation**: `init` and `shutdown` both use
+//    `AtomicPtr::swap(AcqRel)` which establishes a happens-before
+//    edge between them.  `init` reclaims the previous engine before
+//    publishing the new one, so no two engines coexist.
+//
+// 3. **Mutex deadlock risk**: a Mutex/RwLock around the engine pointer
+//    would deadlock when an FFI call triggers a C++ callback that
+//    re-enters `get_engine()` on the same thread (the Lua C API is
+//    re-entrant).  Avoiding this requires either a re-entrant lock
+//    (parking_lot::ReentrantMutex, which is !Sync) or careful
+//    lock-free design, both adding complexity disproportionate to
+//    the actual risk.
+//
+// **Known theoretical unsoundness**: `get_engine()` returns `&'a mut
+// LuaEngine` from a shared `AtomicPtr`.  If two threads ever call
+// `get_engine()` concurrently and both dereference, Rust's aliasing
+// rules are violated (Stacked Borrows UB).  This cannot happen in
+// the current architecture but is not enforced by the type system.
+// A future v1.16 lua-rewrite should address this with a proper
+// Mutex or by restructuring the FFI to avoid &mut aliasing.
+//
+// **Safety invariant**: callers of `get_engine()` must ensure that
+// no other thread is concurrently calling `init`/`shutdown` or any
+// other `fceux11_lua_*` function.  The Qt driver architecture
+// guarantees this today.
 static LUA_ENGINE_PTR: AtomicPtr<c_void> = AtomicPtr::new(std::ptr::null_mut());
 
+/// Returns a mutable reference to the active LuaEngine, or None if
+/// no engine has been initialised.
+///
+/// # Safety
+///
+/// The caller must ensure no other thread is concurrently calling
+/// `fceux11_lua_init`, `fceux11_lua_shutdown`, or any other
+/// `fceux11_lua_*` FFI function.  See `LUA_ENGINE_PTR` docs.
 #[inline(always)]
 fn get_engine<'a>() -> Option<&'a mut LuaEngine> {
     let raw = LUA_ENGINE_PTR.load(Ordering::Acquire) as *mut LuaEngine;
