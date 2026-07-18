@@ -331,8 +331,25 @@ consoleWin_t::~consoleWin_t(void)
 
 	closeGamePadConfWindow();
 
+	// hotfix3 A-4 (QT-CRASH-03): wait for emulatorThread to exit
+	// BEFORE deleting mutex. Without this, the dtor races with a
+	// still-running emulator thread mid-fceuWrapperTryLock that
+	// references consoleWindow->mutex, producing a UAF on the heap.
+	// Pattern is identical to ConsoleVideo.cpp:340-346 (hotfix1
+	// P1-2). The closed_ flag short-circuits when closeApp() has
+	// already performed the wait on the graceful-quit path.
+	if (emulatorThread && !closed_) {
+		closed_ = true;
+		emulatorThread->requestInterruption();
+		if (!emulatorThread->wait(5000)) {
+			qWarning("Emulator thread did not exit cleanly within 5s; terminating");
+			emulatorThread->terminate();
+			emulatorThread->wait();
+		}
+	}
+
 	// The closeApp function call stops all threads.
-	// Calling quit on threads should not happen here. 
+	// Calling quit on threads should not happen here.
 	//printf("Thread Finished: %i \n", emulatorThread->isFinished() );
 	//emulatorThread->quit();
 	//emulatorThread->wait( 1000 );

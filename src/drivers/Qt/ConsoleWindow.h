@@ -136,6 +136,11 @@ class  consoleWin_t : public QMainWindow
 		QMutex *mutex;
 #endif
 
+		// hotfix3 A-4 (QT-CRASH-03): idempotency guard so the dtor
+		// doesn't re-wait for emulatorThread when closeApp() has
+		// already done so. Avoids double-wait on the graceful path.
+		bool  closed_ = false;
+
 		int  videoInit(void);
 		void videoReset(void);
 		void requestClose(void);
