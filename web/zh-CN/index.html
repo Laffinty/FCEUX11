@@ -140,7 +140,7 @@
   <div class="wrap">
     <div class="pill reveal"><span class="dot"></span><span>v1.15 · hotfix2</span></div>
     <h1 class="reveal"><span class="grad">FCEUX</span><span class="dim">11</span></h1>
-    <p class="tagline reveal"><span class="tagline-title">基于 FCEUX 的 NES/Famicom 模拟器，为 Windows 深度优化</span><br>保留核心精度，现代原生体验，12 种界面语言。</p>
+    <p class="tagline reveal"><span class="tagline-title">基于 FCEUX 的 NES/Famicom 模拟器，为 Windows 深度优化</span><br>继承核心精度，重塑原生体验，界面支持 12 种语言。</p>
     <div class="cta reveal">
       <a class="btn btn-primary" href="https://github.com/Laffinty/FCEUX11/releases" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -162,7 +162,7 @@
       <div class="feat">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 14a9 9 0 0 1 18 0"/><path d="M12 14l5-5"/><circle cx="12" cy="14" r="1.2" fill="currentColor" stroke="none"/></svg></div>
         <h3>性能重构</h3>
-        <p>热路径重构，运行更流畅、更快速</p>
+        <p>深度优化关键代码路径，运行更流畅、响应更迅捷</p>
       </div>
       <div class="feat">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m8 2-4 6 4 6M16 2l4 6-4 6M14 4l-4 16"/></svg></div>
@@ -177,7 +177,7 @@
       <div class="feat">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3 4 7v5c0 4.5 3.2 7.5 8 9 4.8-1.5 8-4.5 8-9V7z"/></svg></div>
         <h3>Lua 脚本</h3>
-        <p>自定义 HUD 与自动化测试</p>
+        <p>自定义 HUD 与自动化操作</p>
       </div>
       <div class="feat">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 5h12M9 3v2c0 4.4-3.6 8-8 8M5 8c0 3.3-2.7 6-6 6M12 20l5-11 5 11M14 17h6"/></svg></div>
@@ -196,8 +196,8 @@
     </div>
     <div class="about-body reveal">
       <p>FCEUX11 是基于 <em>FCEUX</em> 的 NES/Famicom 模拟器衍生项目，针对 <em>Windows</em> 平台深度优化。</p>
-      <p>在继承 FCEUX 卓越模拟精度的同时，采用 <em>Qt 6</em> 图形界面重塑现代 Windows 原生体验，并提供 <em>12 种语言</em>的多语言支持，以及面向开发者和速通玩家的调试与 TAS 工具集。</p>
-      <p>项目持续推进内部核心重构与性能优化工作，致力于让模拟器在高负载场景下依旧保持高效、流畅与稳定。无论你是重温经典红白机游戏，还是深入 ROM 修改与研究，FCEUX11 都能以最顺畅的方式运行你的 NES 游戏。</p>
+      <p>在继承 FCEUX 卓越模拟精度的同时，基于 <em>Qt 6</em> 打造现代化 Windows 原生界面，并支持 <em>12 种界面语言</em>，同时为开发者和速通玩家准备了完整的调试与 TAS 工具集。</p>
+      <p>我们持续重构核心代码、优化运行性能，让模拟器在高负载下依然保持流畅稳定。无论你是想重温童年经典，还是深耕 ROM Hack 与逆向研究，FCEUX11 都能流畅驾驭各类 NES 游戏。</p>
     </div>
   </div>
 </section>
@@ -234,8 +234,8 @@
       <div class="wn-item">
         <div class="wn-num">04</div>
         <div class="wn-text">
-          <h3>PPU 渲染重制：帧时间直降 52%</h3>
-          <p>本次 21 项算法级与微结构级优化重塑 PPU 渲染管线：精灵两阶段 LUT 解码、X-bucket 预分类、严格别名 UB 根治、循环取模换 wrap-around、dispatcher 缓存复用。实测单线程 PPU 帧时间从 hotfix1 的 1.125 ms 降至 0.535 ms（−52.4%），超过原计划 42% 上界；169 款 mapper 0 字节偏差，画面精度不变。</p>
+          <h3>PPU 渲染重构：帧时间直降 52%</h3>
+          <p>本次带来 21 项算法级与微结构级优化，重塑 PPU 渲染管线：精灵两阶段 LUT 解码、X-bucket 预分类、严格别名 UB 根治、循环取模换 wrap-around、dispatcher 缓存复用。实测单线程 PPU 帧时间从 hotfix1 的 1.125 ms 降至 0.535 ms（−52.4%），超过原计划 42% 上界；169 款 mapper 0 字节偏差，画面精度丝毫不变。</p>
         </div>
       </div>
     </div>
