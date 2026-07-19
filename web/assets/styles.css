@@ -91,20 +91,21 @@
   .btn-ghost:hover{background:var(--surface-2);border-color:var(--border-strong);transform:translateY(-2px)}
   .btn svg{width:15px;height:15px}
 
-  /* features — one inline row, minimal.  Gap-based borders: grid background shows as 1px lines between items; each item paints its own bg over the gap so only inter-item lines remain.  Last incomplete row spans full width to avoid grid-bg bleed in empty cells.  Works symmetrically for LTR and RTL. */
+  /* features — 6 items, 3 cols × 2 rows on desktop/tablet, 2 cols × 3 rows on mobile.
+     Gap-based borders: grid background shows as 1px lines between items; each item paints
+     its own bg over the gap so only inter-item lines remain.  6 items tile cleanly into
+     3×2 and 2×3, so no span hacks needed.  Works symmetrically for LTR and RTL. */
   .features{padding:54px 0}
-  .feat-row{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+  .feat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
   .feat{padding:26px 14px;background:var(--bg);text-align:center;transition:.25s}
-  /* 3 cols: rows of 3+2 — items 4,5 span full width to close the incomplete row */
-  @media(max-width:960px){
-    .feat-row{grid-template-columns:repeat(3,1fr)}
-    .feat:nth-child(n+4){grid-column:span 2}
-  }
-  /* 2 cols: rows of 2+2+1 — item 5 alone, spans full width */
+  /* 2 cols × 3 rows on mobile — tighter padding/icons/typography so 6 tiles stay readable
+     on phones in any of the 12 locales (CJK / RTL / Thai / Devanagari / Vietnamese). */
   @media(max-width:560px){
     .feat-row{grid-template-columns:repeat(2,1fr)}
-    .feat:nth-child(n+4){grid-column:span 1}
-    .feat:nth-child(n+5){grid-column:span 2}
+    .feat{padding:22px 10px}
+    .feat .ico{width:28px;height:28px;margin-bottom:10px}
+    .feat h3{font-size:13px;line-height:1.35}
+    .feat p{font-size:11px;line-height:1.5}
   }
   .feat:hover{background:var(--green-soft)}
   .feat .ico{width:34px;height:34px;margin:0 auto 12px;color:var(--green)}
