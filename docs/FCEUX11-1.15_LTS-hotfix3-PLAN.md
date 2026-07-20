@@ -550,6 +550,30 @@ MMC5fill = MMC5fill_owner.get();
 
 ---
 
+> **【hotfix3 执行决策 — 2026-07-20】Phase C 整体落地状态。**
+>
+> 完成 Phase C 实地勘查后，5 个 PR 中实际出代码 3 个（C-1 / C-2 / C-3）+ 诊断-only 2 个（C-4 / C-5）。决策概要：
+>
+> | ID | 状态 | 对应 commit |
+> |----|------|-------------|
+> | **C-1** | ✅ 出代码（扩为"default + call site wiring"） | `2685293` |
+> | **C-2** | ✅ 出代码（与 PLAN 等价） | `dcb221e` |
+> | **C-3** | ✅ 出代码（注：PLAN §四 C-3 cycle 缩放位点原标 `sound.cpp:453-455`；**实际在 `x6502.cpp:449-453`**，PLAN 正文错位，已就位修复）。新增 2 个边界单测（`test_dmc_acc_negation_overflow`、`test_cycles_scaling_overflow`）。 | `68d5ad8` |
+> | **C-4** | ⏭ Skip。`src/sound.cpp:1203-1206` 已有 `else { Do*=Dummyfunc; return; }` 在 L1213/L1219 除法前拦截；PLAN "顶部早退" 是**防御性重构**（会跳过 `fhinc` 重算与 `Do*=Dummyfunc` 初值化），不做。 | — |
+> | **C-5** | ⏭ Skip。**PLAN §四 C-5 的两条诊断假设与现状不符**：<br>① `mmc3.cpp:316-318` 用 `&=` 不是 `=`、`PRGmask8[]` 是 `uint32_t[32]` 不是 `uint8`、调用方 42 处全传 KiB 值，结果三行实际是 **no-op**（不是"全 1 → 越界"）。<br>② `mmc5.cpp:1037-1038` null 守卫在当前 `FCEU_gmalloc → FCEU_abort → abort()` 契约下**不可达**。<br>见 `docs/history/v1.15_hotfix3_phase_c_diagnostics.md` §五。 | — |
+>
+> Phase C 3 PR 总变更：5 src 文件 + 1 test 文件，+83/-5 行；远低于 §0.3 上限。
+> Phase 收口 tag：`hotfix3-phase-c-done`（指向 `2685293`）。
+>
+> **真实存在的衍生问题（§十六 follow-up 候选）**：
+>
+> 1. **MMC3 KiB/byte unit mismatch**（C-5 勘查发现）：公式按 byte 移位，调用方按 KiB 传，目前 no-op 但**真实修复**需 `(prg>>3)-1 / chr-1 / (chr>>1)-1` 同时保留 `&=`。需独立策略 PR + 全 mapper_state regression。
+> 2. **C-3 周边 3 处同模式溢出**（C-3 勘查发现）：`ppu_rendering.cpp:226`、`cpu.h:106`、`sound.cpp:501` 都有 `int * 48` 隐患。统一留作未来 hotfix。
+>
+> §六 E-2 假设 "pputile_template.h ↔ ppu_rendering.h 循环 include" —— **经勘查为误诊**，实施时已确认零循环，新增 `#include "ppu_state.h"` 是单向的。E-2 PR 暂不需要（待未来 §六 整体 PR 时复核）。
+
+---
+
 ## 五、Phase D — 性能回退（热路径）
 
 > **主题**: 5 PRs 修复 hotfix2 未触及 / 新引入的性能回退。重点是 hot path 上的重复工作、大缓冲 memset、跨线程 volatile 缺 atomic。

@@ -5,6 +5,85 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 1.15(hotfix3)
+
+**Codename: hotfix3 - Phase C.** Detailed review of the PPU/audio/mapper
+codebase after hotfix2 landed; targeted memory-safety and signed-overflow
+fixes. Phase A (already shipped 2026-07-18) and Phase B (already shipped
+2026-07-18) are documented in `docs/history/v1.15_hotfix3_overview.md`
+and `docs/history/v1.15_hotfix3_phase_a_diagnostics.md`. This entry
+covers **Phase C only** (3 PR landed + 2 skip-only diagnostic). Phase
+D / E are tracked in `docs/FCEUX11-1.15_LTS-hotfix3-PLAN.md` §五 §六.
+Phase completion report at
+`docs/history/v1.15_hotfix3_phase_c_diagnostics.md`. Phase tag
+`hotfix3-phase-c-done`.
+
+### Fixed (Phase C — code PR)
+
+- **`src/ppu_class.cpp`, `src/ppu_core.cpp`** (hotfix3 C-1) —
+  `Ppu::reset()` was a no-op stub since v1.5 Prism, leaving
+  `g_ppu.vnapage_[]` as nullptr until the mapper Power() callback
+  fired. hotfix2 P0-3/P0-4 made `FetchAndDrawTile<Flags>` reachable
+  from the dispatcher; if it triggered before mapper Power(), the
+  `vnapage[(RefreshAddr >> 10) & 3]` deref at
+  `pputile_template.cpp:106/134` was UB. `Ppu::reset()` now
+  chain-assigns `vnapage_[0..3] = ntaram_` (a real 2 KiB backing
+  array, never null), and `FCEUPPU_Reset()` routes through it as
+  the new entry point. Commit `2685293`.
+
+- **`src/pputile_template.h`** (hotfix3 C-2) — Add
+  `static_assert(std::tuple_size_v<decltype(PALRAM)>> = 0x20, ...)`
+  at the template's primary include site. The existing guard at
+  `ppu_rendering.cpp:438` (>= 0x10) only covers TU-scope PALRAM
+  use; this stricter guard covers all 9 `FetchAndDrawTile<Flags>`
+  instantiations in the dispatcher. Stricter bound (0x20 vs 0x10)
+  matches the actual `std::array<uint8_t, 0x20>` type in
+  `ppu_state.h:37`. No include cycle (audited). Commit `dcb221e`.
+
+- **`src/sound.cpp`, `src/x6502.cpp`, `tests/core/apu_test.cpp`**
+  (hotfix3 C-3) — Two signed-integer overflow fixes reachable via
+  Lua/cheat supplying extreme cycle counts:
+  - `sound.cpp:521`: `-DMCacc` was UB when `DMCacc == INT32_MIN`.
+    Lifted to `(uint32)(-(int64_t)DMCacc)`.
+  - `x6502.cpp:453`: `cycles *= 16` (NTSC) was UB at `cycles ==
+    2^27`. Lifted to `int64 scaled = (int64)cycles * 16; clamp to
+    INT32_MAX; assign back`. Cost: one extra imul + cmp + cmov per
+    `X6502_RunDebug` call; well under the §十.2 1% soft target.
+  - Two new boundary tests (`test_dmc_acc_negation_overflow`,
+    `test_cycles_scaling_overflow`) exercise INT32_MIN / INT32_MAX/8
+    inputs without crashing.
+  - **Note**: PLAN §四 C-3 originally listed the cycle-scaling
+    site as `sound.cpp:453-455`. The actual file is `x6502.cpp`;
+    diagnosed during exploration, fix applied to the correct file.
+    Commit `68d5ad8`.
+
+### Documented (Phase C — skip-only diagnostic)
+
+- **C-4** (`SetSoundVariables` early-return on `SndRate==0`): The
+  currently existing `else { Do*=Dummyfunc; return; }` block at
+  `sound.cpp:1203-1206` already short-circuits before the
+  divide-by-zero sites at L1213/L1219 — no executable bug path. The
+  PLAN's "顶部早退" proposal is a defensive refactor that would skip
+  `fhinc` recomputation and `Do*` initialisation. Decided to skip;
+  revisit only if a separate control-flow unification PR arises.
+
+- **C-5** (MMC3 mask underflow + MMC5fill null guard): Both PLAN
+  diagnoses do not match the current code.
+  - `mmc3.cpp:316-318` uses `&=` (compound AND, not assignment),
+    masks are `uint32_t[32]` (not uint8), all 42 callers pass KiB
+    values — the three lines are effectively no-ops for every
+    real input. The PLAN's "use `=` with 0x2000 threshold" rewrite
+    would zero every MMC3-family mask and break every MMC3 game.
+  - `mmc5.cpp:1037-1038` null guard is unreachable because
+    `FCEU_gmalloc` calls `FCEU_abort → abort()` on allocation
+    failure (`utils/memory.cpp:82-92, 137-141`). Same contract
+    applies to WRAM, ExRAM, NSF ExRAM — none reachable.
+  - **Real latent issue identified**: MMC3 unit mismatch (KiB
+    input vs byte-shift formula). A "real" fix would change shifts
+    to `(prg>>3)-1 / chr-1 / (chr>>1)-1` keeping `&=`. Requires a
+    dedicated strategy PR with full mapper matrix regression;
+    tracked for a future hotfix, not Phase C scope.
+
 ## [1.15(hotfix2)] - 2026-07-16
 
 **Codename: hotfix2.** Algorithm-level review + performance
