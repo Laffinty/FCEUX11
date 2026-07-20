@@ -65,6 +65,37 @@ void test_sound_cpu_hook(TestContext& ctx) {
     FCEU11_EXPECT(ctx, true, "FCEU_SoundCPUHook survives 0/1/1000 cycles");
 }
 
+void test_dmc_acc_negation_overflow(TestContext& ctx) {
+    // hotfix3 C-3: the prior `-DMCacc` inside FCEU_SoundCPUHook was
+    // signed-overflow UB when DMCacc == INT32_MIN. With the int64
+    // cast this is a defined magnitude (2^31). Set DMCacc to the
+    // boundary, run a single hook call, and verify:
+    //   1. returns without crashing (UBSan would abort otherwise)
+    //   2. DMCacc advanced past the boundary (i.e. the inner while
+    //      terminated, not stuck because of a poisoned negation)
+    extern int32_t& DMCacc;
+    const int32_t sentinel = INT32_MIN;
+    DMCacc = sentinel;
+    FCEU_SoundCPUHook(1);
+    FCEU11_EXPECT(ctx, DMCacc != sentinel, "DMCacc advances past INT32_MIN boundary");
+}
+
+void test_cycles_scaling_overflow(TestContext& ctx) {
+    // hotfix3 C-3: pre-fix, X6502_RunDebug did `cycles *= 16` (NTSC) on a
+    // signed int32 — UB at cycles == 2^27 and poisoning _count for any
+    // larger caller (Lua/cheat can produce such inputs). Post-fix,
+    // int64 promotion + INT32_MAX clamp keeps the operation well-defined.
+    // Feeding cycles = INT32_MAX/8 (well above the NTSC UB threshold of
+    // 2^27 = 134,217,728) must not crash and the engine must continue
+    // executing on the next emulate call. We use the X6502_Run macro
+    // (x6502.h:59) which expands to X6502_RunDebug(g_cpu, cycles).
+    X6502_Run(INT32_MAX / 8);
+    FCEU11_EXPECT(ctx, true, "X6502_RunDebug survives INT32_MAX/8 cycles input");
+    // Smoke that the engine is still alive after the extreme input.
+    emulate_n(1);
+    FCEU11_EXPECT(ctx, true, "engine survives 1 frame after INT32_MAX/8 RunDebug");
+}
+
 void test_get_sound_buffer(TestContext& ctx) {
     // Run 30 frames and then ask GetSoundBuffer for the buffer size.
     // It should be > 0 (samples are accumulating).
@@ -168,6 +199,8 @@ int main() {
     test_sound_after_init(ctx);
     test_wave_buffer_writable(ctx);
     test_sound_cpu_hook(ctx);
+    test_dmc_acc_negation_overflow(ctx);
+    test_cycles_scaling_overflow(ctx);
     test_get_sound_buffer(ctx);
     test_flush_emulate_sound(ctx);
     test_sound_state_roundtrip(ctx);

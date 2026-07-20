@@ -518,7 +518,11 @@ void FCEU_SoundCPUHook(int cycles)
    /* Unbelievably ugly hack */
    if(FSettings.SndRate)
    {
-		const uint32 fudge = std::min<uint32>(-DMCacc, soundtsoffs + g_cpu.timestamp_ref());
+		// hotfix3 C-3: lift negation through int64 — direct `-DMCacc` is signed
+		// overflow UB when DMCacc == INT32_MIN. Cast back to uint32 once safe.
+		const uint32 fudge = std::min<uint32>(
+				static_cast<uint32>(-(int64_t)DMCacc),
+				soundtsoffs + g_cpu.timestamp_ref());
 		soundtsoffs -= fudge;
 		DoPCM();
 		soundtsoffs += fudge;

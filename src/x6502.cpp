@@ -445,12 +445,16 @@ void X6502_Power(void)
 
 void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
 {
-  if(PAL)
-   cycles*=15;    // 15*4=60
-  else
-   cycles*=16;    // 16*4=64
+  // hotfix3 C-3: lift multiply to int64 to avoid signed-overflow UB
+  // when `cycles` is near INT32_MAX (Lua/cheat can call X6502_Run with such
+  // arguments). The pre-fix `cycles *= 16` was UB at `cycles == 2^27`, and
+  // the subsequent `_count += cycles` could then propagate a poisoned value.
+  {
+   int64 scaled = static_cast<int64>(cycles) * (PAL ? 15 : 16);
+   if (scaled > INT32_MAX) scaled = INT32_MAX;
+   _count += static_cast<int32>(scaled);
+  }
 
-  _count+=cycles;
   while(_count>0)
   {
    int32 temp;
