@@ -99,9 +99,9 @@ Precompiled binaries are available on the **[GitHub Releases](https://github.com
 
 ## 版本历史 / Changelog
 
-详见 [CHANGELOG.md](CHANGELOG.md)。当前稳定版为 v1.15 (hotfix2)。
+详见 [CHANGELOG.md](CHANGELOG.md)。当前稳定版为 v1.15 (hotfix3)。
 
-See [CHANGELOG.md](CHANGELOG.md). Current stable release is v1.15 (hotfix2).
+See [CHANGELOG.md](CHANGELOG.md). Current stable release is v1.15 (hotfix3).
 
 ---
 
