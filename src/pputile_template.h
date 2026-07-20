@@ -47,9 +47,22 @@
 #define FCEU11_PPUTILE_TEMPLATE_H
 
 #include <cstdint>
+#include <tuple>
 
 #include "compiler_attrs.h"
 #include "ppu_rendering.h"
+#include "ppu_state.h"   // hotfix3 C-2: PALRAM type guard for FetchAndDrawTile template
+
+// hotfix3 C-2: PALRAM size guard. Mirror of ppu_rendering.cpp:438 (>= 0x10);
+// stricter here (>= 0x20) because the FetchAndDrawTile template body in
+// pputile_template.cpp:69 uses PALRAM.data() and the dispatcher instantiates
+// 9 specialisations — any shrink of PALRAM below 32 bytes must break compile,
+// not silently produce out-of-range reads.
+static_assert(std::tuple_size_v<decltype(PALRAM)>> = 0x20,
+              "PALRAM must hold offsets 0..0x1F (32 bytes); "
+              "pputile_template accesses PALRAM via PALRAM.data() in "
+              "FetchAndDrawTile. Shrinking below 32 B will silently corrupt "
+              "palette-indexed pixel output.");
 
 namespace fceu11::ppu {
 
