@@ -35,7 +35,11 @@
 //   RefreshAddr   PPU internal video address (in/out)
 //   vofs          VROM bank offset (in/out)
 //   vnapage       4-entry pointer array for nametables
-//   ScreenON      runtime bit (PPU[1] & 0x08)
+//   ScreenON      runtime bit (PPU[1] & 0x08). hotfix3 D-5:
+//                  parameter retained on signature for ABI stability
+//                  even though all inner-body uses have been removed
+//                  (the guarded stubs were a no-op). E-phase PR
+//                  will drop the parameter.
 //   PEC586Hack    bool: PEC586 BG-only fetch quirk
 //
 // Globals referenced (read by template body, looked up by caller):

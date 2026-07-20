@@ -168,7 +168,15 @@ void FetchAndDrawTile(int X1, uint32_t pshift[2], uint32_t& atlatch,
     } else {
         C = VRAMADR(vadr);
     }
-    (void)ScreenON;
+
+    // hotfix3 D-5: removed 5 dead `if (ScreenON) { (void)C; }` stub
+    // sites (originally guarded RENDER_LOGP logging, which itself has
+    // been neutered to a no-op since v1.5 Prism §1 template extract).
+    // The ScreenON parameter is retained on the signature for ABI
+    // stability; an E-phase PR will drop the parameter entirely.
+    // Each removed site saved 1 branch prediction event per tile
+    // invocation (32 tiles/RefreshLine × 4 active branches = 128
+    // events per RefreshLine).
 
     // pputile.inc:101-103 — second hook opportunity (post-pattern fetch).
     if constexpr ((Flags & kFlagHook) != 0) {
@@ -180,15 +188,9 @@ void FetchAndDrawTile(int X1, uint32_t pshift[2], uint32_t& atlatch,
     // VRC5 vs default.
     if constexpr ((Flags & kFlagBGFetch) != 0) {
         if (RefreshAddr & 1) {
-            if (ScreenON) {
-                (void)C;  // RENDER_LOGP(C + 8) stub
-            }
             pshift[0] |= C[8];
             pshift[1] |= C[8];
         } else {
-            if (ScreenON) {
-                (void)C;
-            }
             pshift[0] |= C[0];
             pshift[1] |= C[0];
         }
@@ -203,13 +205,7 @@ void FetchAndDrawTile(int X1, uint32_t pshift[2], uint32_t& atlatch,
             pshift[1] |= C[8];
         }
     } else {
-        if (ScreenON) {
-            (void)C;
-        }
         pshift[0] |= C[0];
-        if (ScreenON) {
-            (void)(C + 8);
-        }
         pshift[1] |= C[8];
     }
 
