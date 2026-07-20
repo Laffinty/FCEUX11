@@ -1023,8 +1023,18 @@ int FlushEmulateSound(void)
    }
    end=NeoFilterSound(WaveHi,WaveFinal,SOUNDTS,&left);
 
-   memmove(WaveHi,WaveHi+SOUNDTS-left,left*sizeof(uint32));
-   memset(WaveHi+left,0,sizeof(WaveHi)-left*sizeof(uint32));
+   // hotfix3 D-4: keep the memmove (FIR carryover must propagate to
+   // the next FlushEmulateSound call) but drop the trailing memset.
+   // WaveHi is 160 KiB (apu.h:109 `int32 wave_hi_[40000]`), the
+   // memset was zeroing ~159.88 KiB per call into the [left, 40000)
+   // tail that no reader ever touches. Every reader is bounded by
+   // SOUNDTS (~1500 ints): NeoFilterSound here, the tmpo loop above
+   // (sound.cpp:1014-1023), FCEU11_ExpHiFill/Sync. The tail bytes
+   // were purely defensive housekeeping -- and incorrect to assume
+   // anything cares about them. The Do*() writers and mapper WaveHi
+   // writers (boards/vrc6, n106, 69) only fill [ChannelBC[x], SOUNDTS),
+   // so the [left, SOUNDTS) region is freshly written each call.
+   memmove(WaveHi, WaveHi+SOUNDTS-left, left*sizeof(uint32));
 
    FCEU11_ExpHiSync(&GameExpSound, left);
    for(x=0;x<5;x++)
