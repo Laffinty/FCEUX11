@@ -164,6 +164,73 @@ unchanged until hotfix3 release tag. Phase completion report at
 - All 12 web pages' hero pill `v1.15 · hotfix2` → `v1.15 · hotfix3`
   (HTML, zh-CN, zh-TW, ja, ko, es, fr, de, vi, th, hi, ar).
 
+### Changed (Phase E — code quality cleanup)
+
+**Codename: hotfix3 - Phase E.** Last phase of hotfix3; bounds-checked
+cleanup with two PLAN-misdiagnoses folded into diagnostic-only
+documentation. Phase E does NOT touch hot-path code; it's a final
+sweep over compile-time guards, dead globals, and macro hygiene.
+Phase completion report at
+`docs/history/v1.15_hotfix3_phase_e_diagnostics.md`.
+
+- **`src/cpu.cpp`** (hotfix3 E-4, LOW) — pin
+  `sizeof(Cpu::layout_) == 64` as a third static_assert alongside
+  the pre-existing `offsetof == 0` and `alignof == 64`. Catches any
+  drift that adds fields to `X6502` (x6502struct.h:16 alignas(64))
+  without breaking compile.
+  Both Release (32 B payload, padded to 64) and Debugger
+  (56 B payload, padded to 64) configurations yield the same size.
+  Commit `a5b0da0`.
+
+- **`src/compiler_attrs.h`** (hotfix3 E-4, LOW) — removed the dead
+  `FCEU_LIKELY` / `FCEU_UNLIKELY` macros. The macros had zero
+  call sites in `src/` (verified via `git grep`); the codebase
+  already uses 20+ direct `if (cond) [[likely]] stmt` call sites.
+  Macro form `(x) [[msvc::likely]]` was planned but wouldn't
+  compile under `/std:c++20 /permissive-` because the attribute
+  belongs at the end of the if-condition, not inside it. The
+  surviving macros (`FCEU_ALWAYS_INLINE`, `FCEU_HOT`, `FCEU_COLD`,
+  `FCEU_BSWAP64`) remain unchanged. Commit `b0d9637`.
+
+- **`src/debug.cpp`, `src/ppu_rendering.cpp`,
+  `src/pputile_template.h`, `src/pputile_template.cpp`**
+  (hotfix3 E-5, LOW) — three bounded cleanup items in one commit:
+    - `debug.cpp:522-523` remove `int u;` (`//deleteme`) and
+      `int skipdebug;` (`//deleteme`) — both have zero readers
+      anywhere in the tree.
+    - `ppu_rendering.cpp:577` remove the no-op `#undef vofs`
+      (no corresponding `#define` exists; `vofs` is a plain
+      local at L322).
+    - `pputile_template.{h,cpp}` correct stale comments
+      (`tests/golden/pputile.inc` → `src/pputile.inc`; "10 dispatcher
+      sites" → "9 dispatcher sites" — actual `kNumRefreshKinds =
+      9`).
+  PLAN §六 E-5's RefreshAddr/Fixit macro reordering was based on
+  a misreading: `smorkus` is RefreshLine's local copy of
+  `RefreshAddr`, not a debugger alias; the current `RefreshAddr =
+  smorkus;` (after `#undef`) → `Fixit1()` order is the correct
+  global-sync read order. Skip. Commit `4742b42`.
+
+### Documented (Phase E — skip-only diagnostic)
+
+- **E-2** (`pputile_template.h` ↔ `ppu_rendering.h` include cycle):
+  Phase C §二 + Phase D 收口文档 already established that the
+  cycle does not exist (`ppu_rendering.h` does not include
+  `pputile_template.h` in reverse). PLAN's "break include cycle"
+  PR was a misdiagnosis. No code change.
+- **E-3** (`StackAddrBackup` non-debugger fallback):
+  `src/debug.cpp:644` provides an unconditional definition for
+  `StackAddrBackup`; `src/CMakeLists.txt:84` always defines
+  `FCEUDEF_DEBUGGER` for `fceux11_core`. There is no current
+  link failure. Both proposed fallbacks (`static int` /
+  non-static) introduce new problems (`static` gives two objects
+  with state-divergence between writer in `x6502.cpp` and reader
+  in `debug.cpp`; non-static duplicates the existing definition).
+  If a future "CPU-only lib without debug.cpp" target is desired,
+  the right fix is ownership relocation (`debug.cpp:644` becomes
+  `extern`; `x6502.cpp` owns the single definition), not a local
+  patch.
+
 ## [1.15(hotfix2)] - 2026-07-16
 
 **Codename: hotfix2.** Algorithm-level review + performance

@@ -841,6 +841,25 @@ static_assert(sizeof(Cpu::layout_) == expected_size, "Cpu::layout_ size drift");
 
 ---
 
+> **【hotfix3 执行决策 — 2026-07-21】Phase E 整体落地状态。**
+>
+> Phase E 原计划 5 PR，实际出代码 **3 PR**，文档化 skip 2 PR（E-2 / E-3 是 PLAN §六诊断误诊）：
+>
+> | ID | PLAN §六原描述 | 实际落地 | 对应 commit |
+> |----|-------------|--------|-------------|
+> | **E-1** | MSVC 分支加 `[[msvc::likely]]` 到 `FCEU_LIKELY/FCEU_UNLIKELY` macro | **形态简化**：macro `(x) [[msvc::likely]]` 在 C++20 下属性位于表达式内是非标位置；codebase 已有 20+ 处直接 `[[likely]]` site + 宏零调用 site = dead code。直接删两个宏，替换 6 行 breadcrumb 注释 | `b0d9637` |
+> | **E-2** | break "include cycle" between `pputile_template.h` 和 `ppu_rendering.h` | **Skip**——Phase C §二 + Phase D 收口文档已确认 `ppu_rendering.h` 不 include `pputile_template.h`（反向无引用）；零循环，PLN 误诊 | — |
+> | **E-3** | 为 `StackAddrBackup` 加 non-debugger fallback（`static int` 或 `extern int`） | **Skip**——`debug.cpp:644` 是无条件定义（无 `#ifdef FCEUDEF_DEBUGGER` 守卫）；`FCEUDEF_DEBUGGER` 全程 define（`src/CMakeLists.txt:84`）；两种 fallback 各自有问题（`static` 状态分裂；非 `static` 重复定义）。当前 build 不存在链接失败 | — |
+> | **E-4** | `static_assert(sizeof(Cpu::layout_) == 64, ...)` | PLAN 等价实施（+9 行含注释）| `a5b0da0` |
+> | **E-5** | 删 dead global + RefreshAddr/Fixit macro 重排 | **限定 scope**：删 `int u;`/`int skipdebug;`（dead）+ 删无效 `#undef vofs` + 修正 `tests/golden/pputile.inc` 注释；**不动 Fixit**——PLAN 这部分基于误诊（`smorkus` 不是 debugger alias，而是 RefreshLine 的 local copy；当前 #undef → `RefreshAddr=smorkus` → Fixit1 顺序正是正确的全局同步读顺序）| `4742b42` |
+>
+> Phase E 3 PR 总变更：6 个 src 文件，+25 / -22 行。
+> Phase 收口 tag：`hotfix3-phase-e-done`。
+>
+> **hotfix3 全 5 phase 收口**：Phase A (5 PR) + Phase B (6 PR, B-5 拆 5a/5b) + Phase C (3 PR + 2 skip) + Phase D (5 PR) + Phase E (3 PR + 2 skip) = **21 PR**；25 PR 计划 → 4 PR 因误诊 skip。**发布 tag: `v1.15_hotfix3`**（与 hotfix2 `v1.15_hotfix2` 形式对齐）。
+
+---
+
 ## 八、不在本 PLAN 范围
 
 | 项 | 原因 | 后续 |
