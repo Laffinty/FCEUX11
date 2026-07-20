@@ -96,6 +96,12 @@ static void (*DoPCM)(void)=Dummyfunc;
 static void (*DoSQ1)(void)=Dummyfunc;
 static void (*DoSQ2)(void)=Dummyfunc;
 
+// hotfix3 D-3: lifted from local statics in RDoTriangleNoisePCMLQ to file
+// scope so the split helper functions (do_tnp_*) can access them.
+static uint32 tcout = 0;
+static int32  triacc = 0;
+static int32  noiseacc = 0;
+
 static uint32 ChannelBC[5];
 
 //savestate sync hack stuff
@@ -861,10 +867,6 @@ static FCEU_ALWAYS_INLINE void do_tnp_lq_both(int32 start, int32 end, int32* tot
 
 static void RDoTriangleNoisePCMLQ(void)
 {
-   static uint32 tcout=0;
-   static int32 triacc=0;
-   static int32 noiseacc=0;
-
    int32 start,end;
    int32 freq[2];
    int32 inie[2];

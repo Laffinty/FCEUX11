@@ -434,6 +434,29 @@ public:
 
 ---
 
+> **【hotfix3 执行决策 — 2026-07-18】Phase B 整体落地状态。**
+>
+> Phase B 6 个 PR 全数出代码（B-5 拆为 5a atomic field + 5b writer migration 两段），无 skip。
+>
+> | ID | 计划方案 | 实际落地 | 对应 commit |
+> |----|---------|--------|-------------|
+> | **B-1** | SDL audio ring buffer indices atomic | 已实施：`s_BufferRead/Write/In` → `std::atomic<unsigned int>`，init/kill 路径 `store(0, release)`，热路径用 implicit conversion + `operator++/--`（seq_cst 在 44kHz 下开销可忽略） | `d740bae` |
+> | **B-2** | movie FFI thread_local → Box::leak CString | 已实施：覆盖范围超出 PLAN — 除 `rom_filename`/`guid` 外，同根因的 `comment_get`/`subtitle_get` 也一并从 `with_thread_local_buf` 迁移为 `Box::leak(CString)` | `18aeb81` |
+> | **B-3** | ines_check_bad thread_local → Box::leak CString | 已实施：与 PLAN 一致；cbindgen 自动头文件已随 crate 重编译刷新 | `8aae861` |
+> | **B-4** | Lua zapper file-static atomic | 已实施：`luazapperx/y/fire` → `std::atomic<int>`；读路径 x 用 acquire 作 validity 哨兵，y/fire 用 relaxed | `aaa0299` |
+> | **B-5** | map_irq_hook atomic | **拆为 5a+5b**：5a 引入 `std::atomic<MapIRQHook>` 字段 + `map_irq_hook()` (acquire) / `set_map_irq_hook()` (release) 接口 + `RefProxy` back-compat；5b 将全仓库 50 个 mapper + fceu.cpp/fds.cpp 迁移到 `set_map_irq_hook` 并删除 RefProxy 和废弃全局别名 `::MapIRQHook` | `9bb8eb4` + `94df0ce` |
+> | **B-6** | Qt QueuedConnection 显式标注 | 已实施：7 处 `connect` 跨 3 文件加 `Qt::QueuedConnection` 第五参数；`main.cpp` 的 lambda 用 4-arg `connect(&app, ...)` 变体 | `b0c8301` |
+>
+> Phase B 总变更：44+ 个源文件（含 36 个 board 文件 B-5b 批量迁移），均为原子化/同步/内存安全修正，无算法改动。全量 ctest 通过（B-5b 后 bench 1.70s，较 hotfix2 基线 1.87s 有 ~9% 改善）。
+>
+> Phase B 7 个 merge commit 已在 2026-07-18 fast-forward 到 main，对应 feature 分支（`hotfix3-b1`~`hotfix3-b6`、`hotfix3-b5a`、`hotfix3-b5b`）已删除。
+>
+> > **注**：`docs/history/v1.15_hotfix3_phase_b_diagnostics.md` 未单独生成——Phase B 诊断已在上游 overview（`v1.15_hotfix3_overview.md`）中覆盖，且本 PLAN §三自身即为可执行诊断文档。Phase B 的 6 个 commit message 中均含完整变更说明和验证结果，可替代独立诊断报告。
+>
+> Phase B 收口 tag：`hotfix3-phase-b-done`（指向 main 上 merge commit 合入后的 HEAD）。
+
+---
+
 ## 四、Phase C — PPU / Audio / Mapper 内存安全
 
 > **主题**: 5 PRs 修复 PPU 模板、sound.cpp 整数溢出、mapper mask 移位下溢、文件 I/O NULL 守卫。覆盖 hotfix2 落地后引入 / 遗留的内存安全问题。

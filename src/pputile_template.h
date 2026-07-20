@@ -64,7 +64,7 @@
 // pputile_template.cpp:69 uses PALRAM.data() and the dispatcher instantiates
 // 9 specialisations — any shrink of PALRAM below 32 bytes must break compile,
 // not silently produce out-of-range reads.
-static_assert(std::tuple_size_v<decltype(PALRAM)>> = 0x20,
+static_assert(std::tuple_size_v<decltype(PALRAM)> >= 0x20,
               "PALRAM must hold offsets 0..0x1F (32 bytes); "
               "pputile_template accesses PALRAM via PALRAM.data() in "
               "FetchAndDrawTile. Shrinking below 32 B will silently corrupt "

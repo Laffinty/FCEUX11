@@ -7,18 +7,100 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.15(hotfix3)] - 2026-07-21
 
-**Codename: hotfix3 - Phase C.** Detailed review of the PPU/audio/mapper
-codebase after hotfix2 landed; targeted memory-safety and signed-overflow
-fixes. Phase A (already shipped 2026-07-18) and Phase B (already shipped
-2026-07-18) are documented in `docs/history/v1.15_hotfix3_overview.md`
-and `docs/history/v1.15_hotfix3_phase_a_diagnostics.md`. This entry
-covers **Phase C only** (3 PR landed + 2 skip-only diagnostic). Phase
-D / E are tracked in `docs/FCEUX11-1.15_LTS-hotfix3-PLAN.md` §五 §六.
-Phase completion report at
-`docs/history/v1.15_hotfix3_phase_c_diagnostics.md`. Phase tag
-`hotfix3-phase-c-done`.
+**Codename: hotfix3.** Comprehensive cross-subsystem safety and performance
+review following hotfix2. 91 diagnostics across 3 review agents → 26 PRs
+planned → 21 PRs landed (4 skip-only diagnostics). Five phases across
+4.5 weeks: Phase A (5 CRITICAL data-race fixes), Phase B (6 HIGH
+cross-thread buffer/stale-pointer fixes), Phase C (3 PPU/Audio/Mapper
+memory-safety fixes + 2 skip), Phase D (5 performance hot-path
+optimizations), Phase E (3 code-quality cleanups + 2 skip).
 
-### Fixed (Phase C — code PR)
+### Fixed (Phase A — CRITICAL cross-thread data races)
+All landed 2026-07-18. See
+`docs/history/v1.15_hotfix3_phase_a_diagnostics.md` and PLAN §二 for
+full diagnostic detail.
+
+- **`src/rust/crates/fceux11-lua/src/lib.rs`** (hotfix3 A-1+A-2) — Added
+  `fceux11_lua_shutdown()` FFI to reclaim the `Box<LuaEngine>` via
+  `AtomicPtr::swap(null, AcqRel) → Box::from_raw`. `fceux11_lua_init()`
+  now swap-reclaims a previous engine before allocating. C++ side:
+  `FCEU_LuaShutdown()` wrapper in `lua-engine.cpp` with declaration in
+  `fceulua.h`; called from `fceu11::Kill`. Mutex replacement was
+  deferred (single-thread architecture with documented safety rationale
+  at `LUA_ENGINE_PTR` declaration site). Commits `8498cb2` + `802931b`.
+
+- **`src/drivers/Qt/nes_shm.h`** (hotfix3 A-3, 14 fields) — Remaining
+  non-atomic POD fields (`render_count`, `blit_count`, `video.{ncol,
+  nrow, pitch, xscale, yscale, xyRatio, preScaler, test}`, `pid`,
+  `run`, `sndBuf.{head, tail}`) converted to `std::atomic`. 13 call-site
+  files updated with `.load(acquire)` / `.store(release)` /
+  `.fetch_add(relaxed)`. Commits `5041e03` + `1d62407` (errata).
+
+- **`src/drivers/Qt/ConsoleWindow.cpp`** (hotfix3 A-4) — `consoleWin_t`
+  destructor now waits for `emulatorThread` (`requestInterruption` +
+  `wait(5000)` + `terminate` + `wait()`) before `delete mutex`.
+  `closed_` idempotency flag prevents double-wait when `closeApp()` and
+  dtor both fire. Commit `f2cf4a0`.
+
+- **`src/drivers/Qt/fceuWrapper.cpp`** (hotfix3 A-5) — `mutexLocks`,
+  `mutexPending`, `emulatorHasMutex` → `std::atomic<int/bool>`. All 18
+  access sites use `fetch_add(1, acq_rel)` / `fetch_sub(1, acq_rel)` /
+  `load(acquire)` / `store(release)`. Commit `c7a78f6`.
+
+- **`src/lua-engine.cpp`** (hotfix3 A-6) — `fceux11_lua_movie_get_name`
+  and `fceux11_lua_movie_get_filename` previously shared a single
+  `static std::string name` variable; split into independent
+  `thread_local` variables. Rust FFI bindings (`movie.rs`) immediately
+  copy via `CStr::to_string_lossy().into_owned()`. Commit `3fb4087`.
+
+### Fixed (Phase B — HIGH cross-thread buffer / stale pointer)
+All landed 2026-07-18. See PLAN §三 for full diagnostic detail (no
+separate diagnostics file; commit messages contain complete change logs
+and verification results).
+
+- **`src/drivers/Qt/sdl-sound.cpp`** (hotfix3 B-1) —
+  `s_BufferRead/Write/In` → `std::atomic<unsigned int>`. Init/destroy
+  paths use `store(0, release)`; hot-path reads/writes use implicit
+  conversion + `operator++/--`. Prevents stale cursor deref after
+  `SDL_CloseAudio`. Commit `d740bae`.
+
+- **`src/rust/crates/fceux11-formats/src/movie.rs`** (hotfix3 B-2) —
+  `movie_data_rom_filename`, `movie_data_guid`, `movie_data_comment_get`,
+  `movie_data_subtitle_get` migrated from `thread_local RefCell<[u8;
+  512]>` to `Box::leak(CString)`. Fixes `!Sync` panic risk + stale
+  pointer on second call. Commit `18aeb81`.
+
+- **`src/rust/crates/fceux11-formats/src/ines.rs`** (hotfix3 B-3) —
+  `fceux11_rust_ines_check_bad` migrated from `thread_local
+  RefCell<[u8; 256]>` to `Box::leak(CString)`. Same root cause as B-2.
+  Commit `8aae861`.
+
+- **`src/lua-engine.cpp`** (hotfix3 B-4) — `luazapperx/y/fire`
+  file-statics → `std::atomic<int>`. Reader uses acquire on x (validity
+  sentinel), relaxed on y/fire. Commit `aaa0299`.
+
+- **`src/cpu.h`, `src/x6502.cpp`, `src/x6502.h`** (hotfix3 B-5a) —
+  `map_irq_hook` field → `std::atomic<MapIRQHook>`. New `map_irq_hook()`
+  (acquire load) and `set_map_irq_hook()` (release store) API.
+  Hot-path reader at `x6502.cpp:531` uses single atomic load cached in
+  a local (`if (const auto hook = g_cpu.map_irq_hook()) [[unlikely]]
+  hook(temp)`). `RefProxy` value type provides back-compat for legacy
+  `g_cpu.map_irq_hook_ref() = X` syntax in ~50 mappers. Commit
+  `9bb8eb4`.
+
+- **44 files across `src/boards/`, `src/cpu.*`, `src/x6502.*`,
+  `src/fceu.cpp`, `src/fds.cpp`** (hotfix3 B-5b) — All 50 mapper
+  writers migrated from `map_irq_hook_ref() = X` to
+  `set_map_irq_hook(X)`. `RefProxy`, `CpuView::irq_hook()`, and
+  deprecated global `::MapIRQHook` alias removed. Commit `94df0ce`.
+
+- **`src/drivers/Qt/ConsoleWindow.cpp`, `ConsoleVideo.cpp`, `main.cpp`**
+  (hotfix3 B-6) — 7 cross-thread `connect()` calls annotated with
+  explicit `Qt::QueuedConnection` to prevent silent flip to
+  `DirectConnection` if receiver is later moved off its thread. Commit
+  `b0c8301`.
+
+### Fixed (Phase C — PPU/Audio/Mapper memory safety)
 
 - **`src/ppu_class.cpp`, `src/ppu_core.cpp`** (hotfix3 C-1) —
   `Ppu::reset()` was a no-op stub since v1.5 Prism, leaving
