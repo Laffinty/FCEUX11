@@ -40,20 +40,12 @@
   #define FCEU_COLD
 #endif
 
-// Branch-prediction hints. C++20 [[likely]]/[[unlikely]] is supported
-// on MSVC 19.30+; for older compilers fall back to builtin_expect.
-#if defined(__GNUC__) || defined(__clang__)
-  #define FCEU_LIKELY(x)   (__builtin_expect(!!(x), 1))
-  #define FCEU_UNLIKELY(x) (__builtin_expect(!!(x), 0))
-#elif defined(_MSC_VER)
-  // MSVC 19.30+ supports [[likely]]/[[unlikely]] natively. For older
-  // versions of MSVC the hint is dropped silently.
-  #define FCEU_LIKELY(x)   (x)
-  #define FCEU_UNLIKELY(x) (x)
-#else
-  #define FCEU_LIKELY(x)   (x)
-  #define FCEU_UNLIKELY(x) (x)
-#endif
+// Branch-prediction hints are written directly as C++20
+// [[likely]] / [[unlikely]] attributes at the call sites (see
+// ppu.cpp:322,347,496,633, x6502.cpp:463,532,534,
+// ppu_rendering.cpp:215-220,361,387, etc.). The legacy wrapping
+// macros FCEU_LIKELY / FCEU_UNLIKELY were zero-call-sites in `src/`
+// at hotfix3 E-1 audit and have been removed.
 
 // AVX2 intrinsic header — centralising it here keeps MSVC and Clang
 // happy (they include via the same <immintrin.h>; GCC prefers
