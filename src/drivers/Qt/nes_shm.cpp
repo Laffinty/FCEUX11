@@ -60,6 +60,17 @@ nes_shm_t *open_nes_shm(void)
 	vaddr->video.preScaler.store( 0, std::memory_order_relaxed);
 	vaddr->video.test.store(      0, std::memory_order_relaxed);
 
+	// hotfix3 D-1: replace the 24 MiB static pixbuf[5][1048576] +
+	// avibuf[1048576] with heap-allocated pools sized to the actual
+	// video dimensions (256x240 at NES res = 1.2 MiB, down from 24 MiB).
+	// No GUI consumer is alive at open_nes_shm time, so this initial
+	// resize is the safest resize point (no race on the underlying
+	// buffer during this call). Subsequent resizes during video mode
+	// changes must coordinate with the existing blitUpdated release /
+	// acquire contract (see PixBufPool class doc in nes_shm.h).
+	vaddr->pixBufPool.resize(GL_NES_WIDTH, GL_NES_HEIGHT);
+	vaddr->aviBuf.resize(GL_NES_WIDTH, GL_NES_HEIGHT);
+
 	return vaddr;
 }
 //************************************************************************

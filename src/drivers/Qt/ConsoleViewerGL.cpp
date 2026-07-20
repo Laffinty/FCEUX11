@@ -466,7 +466,7 @@ void ConsoleViewGL_t::transfer2LocalBuffer(void)
 	{
 		cpSize = localBufSize;
 	}
-	src  = reinterpret_cast<uint8_t*>(nes_shm->pixbuf[bufIdx]);
+	src  = reinterpret_cast<uint8_t*>(nes_shm->pixBufPool.slot(bufIdx));
 	dest = reinterpret_cast<uint8_t*>(localBuf.get());
 
 	hq = (nes_shm->video.preScaler.load(std::memory_order_acquire) == 1) || (nes_shm->video.preScaler.load(std::memory_order_acquire) == 4); // hq2x and hq3x

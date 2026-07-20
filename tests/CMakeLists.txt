@@ -420,6 +420,22 @@ if(FCEUX11_BUILD_TESTS)
         )
     endif()
 
+    # hotfix3 D-1 — PixBufPool unit test. Pure byte-level tests (<1s)
+    # that gate the dynamic-allocation refactor without needing a full
+    # Qt viewer exercise. Tests cover:
+    #   - resize() strides (slot(i+1) - slot(i) == ncol*nrow)
+    #   - clear() only zeros the active area, not the full capacity
+    #   - bytes() reports ncol*nrow*NES_VIDEO_BUFLEN*sizeof(uint32_t)
+    # No __QT_DRIVER__ needed: the test directly instantiates PixBufPool
+    # without involving nes_shm_t or the Qt driver.
+    fceux11_add_test_executable(fceux11_pixbuf_pool_test
+        pixbuf_pool_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME pixbuf_pool_test
+             COMMAND fceux11_pixbuf_pool_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
     # -------------------------------------------------------------------------
     # v0.3.0 — Performance baseline benchmarks (Google Benchmark preferred)
     # -------------------------------------------------------------------------

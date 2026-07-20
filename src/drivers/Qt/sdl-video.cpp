@@ -427,7 +427,7 @@ static void vsync_test(void)
 	static int ofs = 0;
 	uint32_t *pixbuf;
 
-	pixbuf = nes_shm->pixbuf[ nes_shm->pixBufIdx.load(std::memory_order_acquire) ];
+	pixbuf = nes_shm->pixBufPool.slot( nes_shm->pixBufIdx.load(std::memory_order_acquire) );
 
 	cycleLen = nes_shm->video.ncol.load(std::memory_order_acquire) / 4;
 
@@ -537,7 +537,7 @@ BlitScreen(uint8 *XBuf)
 		}
 	}
 
-	doBlitScreen(XBuf, (uint8_t*)nes_shm->pixbuf[i]);
+	doBlitScreen(XBuf, (uint8_t*)nes_shm->pixBufPool.slot(i));
 
 	nes_shm->pixBufIdx.store( (i+1) % NES_VIDEO_BUFLEN, std::memory_order_release );
 	nes_shm->blit_count.fetch_add(1, std::memory_order_relaxed);
@@ -548,7 +548,7 @@ void fceu11::AviVideoUpdate(const unsigned char* buffer)
 {	// This is not used by Qt Emulator, avi recording pulls from the post processed video buffer
 	// instead of emulation core video buffer. This allows for the video scaler effects
 	// and higher resolution to be seen in recording.
-	doBlitScreen( (uint8_t*)buffer, (uint8_t*)nes_shm->avibuf);
+	doBlitScreen( (uint8_t*)buffer, (uint8_t*)nes_shm->aviBuf.slot(0));
 
 	aviRecordAddFrame();
 

@@ -551,7 +551,7 @@ int aviRecordAddFrame( void )
 
 	while ( i < numPixels )
 	{
-		rawVideoBuf[ head ] = nes_shm->avibuf[i]; i++;
+		rawVideoBuf[ head ] = nes_shm->aviBuf.slot(0)[i]; i++;
 
 		head = (head + 1) % vbufSize;
 	}
