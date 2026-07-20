@@ -618,10 +618,50 @@ static void RDoSQ2(void)
  RDoSQ(1);
 }
 
+// hotfix3 D-3: 2-way split of RDoSQLQ. Helper functions keep the
+// existing channel-state semantics exactly. A more aggressive 4-way
+// split (skipping the ch0 catchup when `inie[0]==0` or vice-versa)
+// would alter RectDutyCount carry-over state and potentially
+// audible at the call-N -> call-(N+1) boundary where a previously-
+// gated channel re-enables. That change is deferred to a future
+// hotfix after per-game audio regressions can be characterised.
+static FCEU_ALWAYS_INLINE void do_sq_lq_silent(int32 start, int32 end, int32 totalout)
+{
+   for (int32 V = start; V < end; V++)
+       Wave[V>>4] += totalout;
+}
+
+static FCEU_ALWAYS_INLINE void do_sq_lq_active(int32 start, int32 end, int32* totalout_ptr,
+                                              const int32 inie[2], const int32 freq[2],
+                                              const int32 ttable[2][8])
+{
+   for (int32 V = start; V < end; V++) {
+       Wave[V>>4] += *totalout_ptr;
+
+       sqacc[0] -= inie[0];
+       sqacc[1] -= inie[1];
+
+       if (sqacc[0] <= 0) {
+       rea:
+           sqacc[0] += freq[0];
+           RectDutyCount[0] = (RectDutyCount[0]+1) & 7;
+           if (sqacc[0] <= 0) goto rea;
+           *totalout_ptr = wlookup1[ ttable[0][RectDutyCount[0]] + ttable[1][RectDutyCount[1]] ];
+       }
+
+       if (sqacc[1] <= 0) {
+       rea2:
+           sqacc[1] += freq[1];
+           RectDutyCount[1] = (RectDutyCount[1]+1) & 7;
+           if (sqacc[1] <= 0) goto rea2;
+           *totalout_ptr = wlookup1[ ttable[0][RectDutyCount[0]] + ttable[1][RectDutyCount[1]] ];
+       }
+   }
+}
+
 static void RDoSQLQ(void)
 {
    int32 start,end;
-   int32 V;
    int32 amp[2], ampx;
    int32 rthresh[2];
    int32 freq[2];
@@ -681,37 +721,13 @@ static void RDoSQLQ(void)
 
    totalout = wlookup1[ ttable[0][RectDutyCount[0]] + ttable[1][RectDutyCount[1]] ];
 
-   if(!inie[0] && !inie[1])
-   {
-    for(V=start;V<end;V++)
-     Wave[V>>4]+=totalout;
-   }
+   // hotfix3 D-3: 2-way dispatch. Silent path skips all accumulator
+   // work. Active path does the existing body verbatim (no state-
+   // mutation change vs pre-fix; see note on aggressive 4-way above).
+   if (!inie[0] && !inie[1])
+       do_sq_lq_silent(start, end, totalout);
    else
-   for(V=start;V<end;V++)
-   {
-    Wave[V>>4]+=totalout;
-
-    sqacc[0]-=inie[0];
-    sqacc[1]-=inie[1];
-
-    if(sqacc[0]<=0)
-    {
-     rea:
-     sqacc[0]+=freq[0];
-     RectDutyCount[0]=(RectDutyCount[0]+1)&7;
-     if(sqacc[0]<=0) goto rea;
-     totalout = wlookup1[ ttable[0][RectDutyCount[0]] + ttable[1][RectDutyCount[1]] ];
-    }
-
-    if(sqacc[1]<=0)
-    {
-     rea2:
-     sqacc[1]+=freq[1];
-     RectDutyCount[1]=(RectDutyCount[1]+1)&7;
-     if(sqacc[1]<=0) goto rea2;
-     totalout = wlookup1[ ttable[0][RectDutyCount[0]] + ttable[1][RectDutyCount[1]] ];
-    }
-   }
+       do_sq_lq_active(start, end, &totalout, inie, freq, ttable);
 }
 
 static void RDoTriangle(void)
@@ -756,13 +772,99 @@ static void RDoTriangle(void)
  ChannelBC[2]=SOUNDTS;
 }
 
+// hotfix3 D-3: 4-way split of RDoTriangleNoisePCMLQ. Each helper is the
+// exact body of the corresponding branch in the pre-fix code; the
+// split makes the call site dispatch per-channel instead of walking
+// the per-frame inner loop with two accumulator-update conditionals
+// for whichever channels happen to be active. Both statics
+// (triacc/noiseacc/tcout) stay shared and are mutated across calls.
+static FCEU_ALWAYS_INLINE void do_tnp_lq_silent(int32 start, int32 end, int32 totalout)
+{
+   for (int32 V = start; V < end; V++)
+       Wave[V>>4] += totalout;
+}
+
+static FCEU_ALWAYS_INLINE void do_tnp_lq_triangle_only(int32 start, int32 end, int32* totalout_ptr,
+                                                     int32 freq0, int32 inie0, uint32 noiseout)
+{
+   for (int32 V = start; V < end; V++) {
+       Wave[V>>4] += *totalout_ptr;
+       triacc -= inie0;
+       if (triacc <= 0) {
+       area:
+           triacc += freq0;
+           tristep = (tristep + 1) & 0x1F;
+           if (triacc <= 0) goto area;
+           tcout = (tristep & 0xF);
+           if (!(tristep & 0x10)) tcout ^= 0xF;
+           tcout = tcout * 3;
+           *totalout_ptr = wlookup2[tcout + noiseout + RawDALatch];
+       }
+   }
+}
+
+static FCEU_ALWAYS_INLINE void do_tnp_lq_noise_only(int32 start, int32 end, int32* totalout_ptr,
+                                                   int32 inie1, uint32* noiseout_ptr,
+                                                   int nshift, uint32 amptab[2])
+{
+   for (int32 V = start; V < end; V++) {
+       Wave[V>>4] += *totalout_ptr;
+       noiseacc -= inie1;
+       if (noiseacc <= 0) {
+       area2:
+           if (PAL)
+               noiseacc += NoiseFreqTablePAL[PSG[0xE]&0xF] << (16 + 1);
+           else
+               noiseacc += NoiseFreqTableNTSC[PSG[0xE]&0xF] << (16 + 1);
+           nreg = (nreg << 1) + (((nreg >> nshift) ^ (nreg >> 14)) & 1);
+           nreg &= 0x7fff;
+           *noiseout_ptr = amptab[(nreg >> 0xe) & 1];
+           if (noiseacc <= 0) goto area2;
+           *totalout_ptr = wlookup2[tcout + *noiseout_ptr + RawDALatch];
+       }
+   }
+}
+
+static FCEU_ALWAYS_INLINE void do_tnp_lq_both(int32 start, int32 end, int32* totalout_ptr,
+                                              int32 freq0, int32 inie0, int32 inie1,
+                                              uint32* noiseout_ptr, int nshift,
+                                              uint32 amptab[2])
+{
+   for (int32 V = start; V < end; V++) {
+       Wave[V>>4] += *totalout_ptr;
+       triacc -= inie0;
+       noiseacc -= inie1;
+       if (triacc <= 0) {
+       rea:
+           triacc += freq0;
+           tristep = (tristep + 1) & 0x1F;
+           if (triacc <= 0) goto rea;
+           tcout = (tristep & 0xF);
+           if (!(tristep & 0x10)) tcout ^= 0xF;
+           tcout = tcout * 3;
+           *totalout_ptr = wlookup2[tcout + *noiseout_ptr + RawDALatch];
+       }
+       if (noiseacc <= 0) {
+       rea2:
+           if (PAL)
+               noiseacc += NoiseFreqTablePAL[PSG[0xE]&0xF] << (16 + 1);
+           else
+               noiseacc += NoiseFreqTableNTSC[PSG[0xE]&0xF] << (16 + 1);
+           nreg = (nreg << 1) + (((nreg >> nshift) ^ (nreg >> 14)) & 1);
+           nreg &= 0x7fff;
+           *noiseout_ptr = amptab[(nreg >> 0xe) & 1];
+           if (noiseacc <= 0) goto rea2;
+           *totalout_ptr = wlookup2[tcout + *noiseout_ptr + RawDALatch];
+       }
+   }
+}
+
 static void RDoTriangleNoisePCMLQ(void)
 {
    static uint32 tcout=0;
    static int32 triacc=0;
    static int32 noiseacc=0;
 
-   int32 V;
    int32 start,end;
    int32 freq[2];
    int32 inie[2];
@@ -810,93 +912,17 @@ static void RDoTriangleNoisePCMLQ(void)
 
    totalout = wlookup2[tcout+noiseout+RawDALatch];
 
-   if(inie[0] && inie[1])
-   {
-    for(V=start;V<end;V++)
-    {
-     Wave[V>>4]+=totalout;
-
-    triacc-=inie[0];
-    noiseacc-=inie[1];
-
-    if(triacc<=0)
-    {
-     rea:
-     triacc+=freq[0]; //t;
-     tristep=(tristep+1)&0x1F;
-     if(triacc<=0) goto rea;
-     tcout=(tristep&0xF);
-     if(!(tristep&0x10)) tcout^=0xF;
-     tcout=tcout*3;
-      totalout = wlookup2[tcout+noiseout+RawDALatch];
-    }
-
-    if(noiseacc<=0)
-    {
-     rea2:
-        //used to added <<(16+2) when the noise table
-        //values were half.
-     if(PAL)
-       noiseacc+=NoiseFreqTablePAL[PSG[0xE]&0xF]<<(16+1);
- 	 else
-       noiseacc+=NoiseFreqTableNTSC[PSG[0xE]&0xF]<<(16+1);
-     nreg=(nreg<<1)+(((nreg>>nshift)^(nreg>>14))&1);
-     nreg&=0x7fff;
-     noiseout=amptab[(nreg>>0xe)&1];
-     if(noiseacc<=0) goto rea2;
-      totalout = wlookup2[tcout+noiseout+RawDALatch];
-    } /* noiseacc<=0 */
-  } /* for(V=... */
-}
-  else if(inie[0])
-  {
-    for(V=start;V<end;V++)
-    {
-     Wave[V>>4]+=totalout;
-
-     triacc-=inie[0];
-
-     if(triacc<=0)
-     {
-      area:
-      triacc+=freq[0]; //t;
-      tristep=(tristep+1)&0x1F;
-      if(triacc<=0) goto area;
-      tcout=(tristep&0xF);
-      if(!(tristep&0x10)) tcout^=0xF;
-      tcout=tcout*3;
-      totalout = wlookup2[tcout+noiseout+RawDALatch];
-     }
-    }
-  }
-  else if(inie[1])
-  {
-    for(V=start;V<end;V++)
-    {
-     Wave[V>>4]+=totalout;
-     noiseacc-=inie[1];
-     if(noiseacc<=0)
-     {
-      area2:
-         //used to be added <<(16+2) when the noise table
-         //values were half.
-      if(PAL)
-        noiseacc+=NoiseFreqTablePAL[PSG[0xE]&0xF]<<(16+1);
-	  else
-        noiseacc+=NoiseFreqTableNTSC[PSG[0xE]&0xF]<<(16+1);
-      nreg=(nreg<<1)+(((nreg>>nshift)^(nreg>>14))&1);
-      nreg&=0x7fff;
-      noiseout=amptab[(nreg>>0xe)&1];
-      if(noiseacc<=0) goto area2;
-      totalout = wlookup2[tcout+noiseout+RawDALatch];
-     } /* noiseacc<=0 */
-    }
-  }
-  else
-  {
-    for(V=start;V<end;V++)
-     Wave[V>>4]+=totalout;
-  }
+   // hotfix3 D-3: 4-way dispatch. Each helper is the exact body of
+   // its pre-fix branch; semantics preserved. The shared statics
+   // (tcout, triacc, noiseacc) cross call boundaries regardless.
+   if (inie[0] && inie[1])
+       do_tnp_lq_both(start, end, &totalout, freq[0], inie[0], inie[1], &noiseout, nshift, amptab);
+   else if (inie[0])
+       do_tnp_lq_triangle_only(start, end, &totalout, freq[0], inie[0], noiseout);
+   else if (inie[1])
+       do_tnp_lq_noise_only(start, end, &totalout, inie[1], &noiseout, nshift, amptab);
+   else
+       do_tnp_lq_silent(start, end, totalout);
 }
 
 
@@ -926,42 +952,29 @@ static void RDoNoise(void)
   outo=amptab[0]=0;
  }
 
- if(PSG[0xE]&0x80)  // "short" noise
-  for(V=ChannelBC[3];V<SOUNDTS;V++)
-  {
-   WaveHi[V]+=outo;
+ // hotfix3 D-3: collapse the two for-bodies by hoisting the only
+ // difference - which feedback bit picks up the LFSR tap. Pre-fix
+ // the entire body was duplicated for `PSG[0xE] & 0x80` short vs long
+ // noise modes, with the only difference being feedback_shift = 8 or
+ // 13. Single loop now reads the shift count once.
+ const uint8_t feedback_shift = (PSG[0xE] & 0x80) ? 8 : 13;
+ for (V=ChannelBC[3]; V<SOUNDTS; V++)
+ {
+   WaveHi[V] += outo;
    wlcount[3]--;
-   if(!wlcount[3])
+   if (!wlcount[3])
    {
-    uint8 feedback;
-    if(PAL)
-      wlcount[3]=NoiseFreqTablePAL[PSG[0xE]&0xF];
-	else
-      wlcount[3]=NoiseFreqTableNTSC[PSG[0xE]&0xF];
-    feedback=((nreg>>8)&1)^((nreg>>14)&1);
-    nreg=(nreg<<1)+feedback;
-    nreg&=0x7fff;
-    outo=amptab[(nreg>>0xe)&1];
+     uint8 feedback;
+     if (PAL)
+       wlcount[3]=NoiseFreqTablePAL[PSG[0xE]&0xF];
+     else
+       wlcount[3]=NoiseFreqTableNTSC[PSG[0xE]&0xF];
+     feedback=((nreg>>feedback_shift)&1)^((nreg>>14)&1);
+     nreg=(nreg<<1)+feedback;
+     nreg&=0x7fff;
+     outo=amptab[(nreg>>0xe)&1];
    }
-  }
- else
-  for(V=ChannelBC[3];V<SOUNDTS;V++)
-  {
-   WaveHi[V]+=outo;
-   wlcount[3]--;
-   if(!wlcount[3])
-   {
-    uint8 feedback;
-    if(PAL)
-      wlcount[3]=NoiseFreqTablePAL[PSG[0xE]&0xF];
-	else
-      wlcount[3]=NoiseFreqTableNTSC[PSG[0xE]&0xF];
-    feedback=((nreg>>13)&1)^((nreg>>14)&1);
-    nreg=(nreg<<1)+feedback;
-    nreg&=0x7fff;
-    outo=amptab[(nreg>>0xe)&1];
-   }
-  }
+ }
  ChannelBC[3]=SOUNDTS;
 }
 
