@@ -1050,6 +1050,25 @@ void RefreshSprites(void) {
 	// eliminates a branch + load per pixel × 8 pixels × ≤8 sprites.
 	const uint8_t pal_mask = (PPU[1] & 0x01) ? 0x30 : 0xFF;
 
+	// hotfix3 D-2: hoist PALRAM[0x10..0x1F] (the 4 sprite-palette windows)
+	// to a 16-byte op/bk mirror table, computed once per scanline.
+	// PALRAM[0x10..0x1F] is invariant for one scanline: writes via
+	// $2001 propagate to the next scanline only. Note that the prior
+	// PLAN §五 wording "VB 跨 sprite 不变" was incorrect - VB =
+	// (atr&3)<<2 | 0x10 depends on each sprite's atr bits 0-1, so
+	// per-sprite tables cannot be hoisted. The full 16-byte window
+	// is, in contrast, scanline-invariant (max 8 entries read per
+	// sprite, never touched mid-scanline). Each sprite then takes its
+	// 4 entries by palette index rather than re-reading PALRAM.
+	uint8_t palram_op_bk[4][2][4];        // [palette_idx][op=0|bk=1][i]
+	for (int p = 0; p < 4; ++p) {
+		for (int i = 0; i < 4; ++i) {
+			const uint8_t c = PALRAM[0x10 + p*4 + i] & pal_mask;
+			palram_op_bk[p][0][i] = c;
+			palram_op_bk[p][1][i] = c | 0x40;
+		}
+	}
+
 	for (n = numsprites; n >= 0; n--, spr--) {
 		uint8 J, atr;
 
@@ -1087,29 +1106,23 @@ void RefreshSprites(void) {
 			C = sprlinebuf + x;
 			VB = (0x10) + ((atr & 3) << 2);
 
-			// Stage 2 (per-sprite runtime): build the 4-entry colour
-			// table once for this sprite's `VB`. pal_mask is the
-			// hoisted GRAYSCALE mask from above; SP_BACK path ORs 0x40
-			// (the "behind background" marker) up-front so the hot
-			// 8-pixel loop only ever does one load + one store per
-			// pixel.
-			uint8_t pal_tab_op[4], pal_tab_bk[4];
-			for (int i = 0; i < 4; ++i) {
-				const uint8_t c = PALRAM[VB | i] & pal_mask;
-				pal_tab_op[i] = c;
-				pal_tab_bk[i] = c | 0x40;
-			}
-			const uint8_t *pal_tab = (atr & SP_BACK) ? pal_tab_bk : pal_tab_op;
+			// Stage 2 (per-sprite runtime): pull the precomputed
+			// 4-entry op/bk table from palram_op_bk (D-2 hoist). The
+			// pointer-select picks op vs bk directly; SP_BACK OR 0x40
+			// is already in palram_op_bk[p][1][i]. With the hoist,
+			// this path does zero PALRAM reads - they all happened in
+			// the scanline-entry loop above.
+			const uint8_t *pal_tab = palram_op_bk[atr & 3][(atr & SP_BACK) ? 1 : 0];
 
 			// H_FLIP: byte-reverse the 64-bit packed indices via a
 			// single bswap instruction instead of indexing [7-i] in a
 			// loop body (which would force un-indexed loads through
 			// the loop counter). After bswap, idx[k] gives the
-			// natural-order pixel that should land at C[k].
-			uint64_t flipped = packed;
-			if (atr & H_FLIP) [[unlikely]] {
-				flipped = FCEU_BSWAP64(packed);
-			}
+			// natural-order pixel that should land at C[k]. D-2 reads
+			// the form as one ternary instead of init-then-cond-store
+			// (semantically equivalent machine code on x86-64 with
+			// cmov; readability win, no perf delta).
+			const uint64_t flipped = (atr & H_FLIP) ? FCEU_BSWAP64(packed) : packed;
 			const uint8_t *idx = reinterpret_cast<const uint8_t *>(&flipped);
 
 			// Single 8-pixel loop covering all four (SP_BACK × H_FLIP)
