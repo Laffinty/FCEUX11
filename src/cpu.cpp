@@ -15,6 +15,15 @@ static_assert(offsetof(Cpu, layout_) == 0,
               "Cpu::layout_ must remain at offset 0 for savestate compatibility");
 static_assert(alignof(Cpu) == 64,
               "Cpu must remain 64-byte aligned");
+// hotfix3 E-4: pin the total size too. alignas(64) on the underlying
+// X6502 (x6502struct.h:16) forces sizeof to a 64-byte multiple.
+// Release payload is 32 B; adding the three debugger-only function
+// pointers in FCEUDEF_DEBUGGER builds brings payload to 56 B - both
+// pad up to 64. A future field addition that shifts either count
+// must break this assert, not silently corrupt the X6502 memory blob.
+static_assert(sizeof(Cpu::layout_) == 64,
+              "Cpu::layout_ must remain 64 bytes total (X6502 + padding); "
+              "see alignas(64) on X6502 in x6502struct.h");
 
 // ---------------------------------------------------------------------------
 // Register access
