@@ -92,17 +92,20 @@
   .btn svg{width:15px;height:15px}
 
   /* features — 6 items, 3 cols × 2 rows on desktop/tablet, 2 cols × 3 rows on mobile.
-     Gap-based borders: grid background shows as 1px lines between items; each item paints
-     its own bg over the gap so only inter-item lines remain.  6 items tile cleanly into
-     3×2 and 2×3, so no span hacks needed.  Works symmetrically for LTR and RTL. */
+     Symmetric 1px frame on all 4 edges of the grid plus the internal gap-lines: each cell
+     is painted with a slightly translucent fill so the page bg subtly bleeds through,
+     refining depth without compromising contrast in any of the 12 locales.  6 items tile
+     cleanly into 3×2 and 2×3, so no span hacks needed. Works symmetrically for LTR and RTL. */
   .features{padding:54px 0}
-  .feat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
-  .feat{padding:26px 14px;background:var(--bg);text-align:center;transition:.25s}
-  /* 2 cols × 3 rows on mobile — tighter padding/icons/typography so 6 tiles stay readable
-     on phones in any of the 12 locales (CJK / RTL / Thai / Devanagari / Vietnamese). */
+  .feat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border)}
+  .feat{padding:26px 14px;background:rgba(8,10,9,.78);text-align:center;transition:.25s}
+  /* 2 cols × 3 rows on mobile — same symmetric 1px frame as desktop, so the left/right
+     edges read the same way as the internal dividers; tighter padding/icons/typography so
+     6 tiles stay readable on phones in any of the 12 locales (CJK / RTL / Thai /
+     Devanagari / Vietnamese). */
   @media(max-width:560px){
     .feat-row{grid-template-columns:repeat(2,1fr)}
-    .feat{padding:22px 10px}
+    .feat{padding:22px 10px;background:rgba(8,10,9,.82)}
     .feat .ico{width:28px;height:28px;margin-bottom:10px}
     .feat h3{font-size:13px;line-height:1.35}
     .feat p{font-size:11px;line-height:1.5}
