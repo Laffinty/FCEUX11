@@ -36,7 +36,20 @@ Ppu::Ppu() noexcept {
 void Ppu::init() noexcept    { /* Phase C/E: real impl */ }
 void Ppu::shutdown() noexcept { /* Phase C/E: real impl */ }
 void Ppu::power() noexcept    { /* Phase C/E: real impl */ }
-void Ppu::reset() noexcept    { /* Phase C/E: real impl */ }
+void Ppu::reset() noexcept {
+    // hotfix3 C-1: default vnapage_ to point at the class-owned name-table
+    // RAM. Without this, g_ppu.vnapage_[] is nullptr at process startup and
+    // stays nullptr until the mapper's Power() callback installs its own
+    // mapping. hotfix2 P0-3/P0-4 introduced the FetchAndDrawTile<Flags>
+    // template (pputile_template.cpp:106 / :134) which dereferences
+    // vnapage[(RefreshAddr >> 10) & 3]; if the dispatcher fires before a
+    // mapper has populated vnapage_, that deref is UB. Setting all 4
+    // entries to ntaram_ mirrors set_mirror_mode(MI_0) (ppu_class.cpp:113)
+    // and matches v1.0's BSS-time behavior where vnapage defaulted to
+    // NTARAM. ntaram_ is a real 2 KiB backing array, never nullptr.
+    uint8_t* nt = ntaram_;
+    vnapage_[0] = vnapage_[1] = vnapage_[2] = vnapage_[3] = nt;
+}
 int  Ppu::loop(int /*skip*/) noexcept { return 0; /* Phase D: real impl */ }
 
 // ---------------------------------------------------------------------------

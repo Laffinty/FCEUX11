@@ -85,6 +85,13 @@ void PPU_ResetHooks() {
 }
 
 void FCEUPPU_Reset(void) {
+	// hotfix3 C-1: route the v1.5 Ppu class's reset() through the existing
+	// FCEUPPU_Reset entry point so mapper Power() (which runs *after* this
+	// in src/fceu.cpp:1045) can override vnapage_ with the board-specific
+	// mapping. Pre-fix, Ppu::reset() was a no-op stub and g_ppu.vnapage_[]
+	// stayed nullptr between process startup and the first mapper Power().
+	fceu11::g_ppu.reset();
+
 	VRAMBuffer = PPU[0] = PPU[1] = PPU[2] = PPU[3] = 0;
 	PPUSPL = 0;
 	PPUGenLatch = 0;
