@@ -574,7 +574,6 @@ static void RefreshLine(int lastpixel) {
 	}
 
 
-#undef vofs
 #undef RefreshAddr
 
 	// hotfix2 P2-6 (DS-1): write back the localised pshift[2] / atlatch

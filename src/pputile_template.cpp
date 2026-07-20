@@ -5,9 +5,10 @@
 // replacing pputile.inc's `#include` sites in ppu_rendering.cpp.
 //
 // Body is a byte-for-byte port of the original pputile.inc
-// (142 lines, kept on disk as `tests/golden/pputile.inc` for
-// cross-check); the only structural change is `#ifdef X` /
-// `#define X ... #endif` → `if constexpr ((Flags & XFlag) != 0)`.
+// (kept on disk as `src/pputile.inc` for cross-checking if
+// the legacy single-include form is ever regressed); the only
+// structural change is `#ifdef X` / `#define X ... #endif` →
+// `if constexpr ((Flags & XFlag) != 0)`.
 
 #include "pputile_template.h"
 

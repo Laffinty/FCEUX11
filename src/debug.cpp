@@ -519,8 +519,8 @@ void LogCDData(uint8 *opcode, uint16 A, int size)
 watchpointinfo watchpoint[65]; //64 watchpoints, + 1 reserved for step over
 int iaPC;
 uint32 iapoffset; //mbg merge 7/18/06 changed from int
-int u; //deleteme
-int skipdebug; //deleteme
+// hotfix3 E-5: removed `int u;` / `int skipdebug;` dead globals
+// (had `//deleteme` markers and zero readers in the entire tree).
 int numWPs;
 
 bool break_asap = false;

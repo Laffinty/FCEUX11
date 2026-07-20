@@ -2,8 +2,10 @@
 //
 // hotfix2 P0-3 (ARCH-1a): `pputile.inc` rewritten as a single
 // template <uint8_t Flags> function with `if constexpr` isolating
-// cold paths. Replaces the 10 dispatcher `#include "pputile.inc"`
-// sites in ppu_rendering.cpp:340-413 with template specializations.
+// cold paths. Replaces the 9 dispatcher `#include "pputile.inc"`
+// sites in ppu_rendering.cpp:340-413 with template specializations
+// (kFNormal, kFMMC5, kFMMC5SP, kFMMC5CHR1, kFMMC5CHR1SP,
+//  kFHook, kFHookBGFetch, kFBGFetch, kFVRC5Fetch).
 //
 // Flag bits:
 //   0x01  PPUT_MMC5       (MMC5 BG path: name/attribute via MMC5 BG fetcher)
