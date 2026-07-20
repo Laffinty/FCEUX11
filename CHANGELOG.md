@@ -84,6 +84,86 @@ Phase completion report at
     dedicated strategy PR with full mapper matrix regression;
     tracked for a future hotfix, not Phase C scope.
 
+### Changed (Phase D — performance)
+
+**Codename: hotfix3 - Phase D.** Targeted performance cleanups after
+Phase A/B/C landed. BSS-resident video buffers shrunk from 24 MiB to
+~2.4 MiB per emulator; 5 hot-path functions refactored for clearer
+branching and one dead memset removed. Phase D does NOT introduce
+benchmarks regression or breakage: HQ audio path untouched; sprite
+output bit-identical; bench baseline (`fixtures/bench_baseline.json`)
+unchanged until hotfix3 release tag. Phase completion report at
+`docs/history/v1.15_hotfix3_phase_d_diagnostics.md`. Phase tag
+`hotfix3-phase-d-done`.
+
+- **`src/drivers/Qt/nes_shm.h`, `src/drivers/Qt/nes_shm.cpp`** (hotfix3
+  D-1, HIGH risk) — 24 MiB static `pixbuf[5][1048576] + avibuf[1048576]`
+  replaced with a heap-allocated `PixBufPool` (std::vector-backed,
+  resize/slot/clear/bytes/generation API) sized to actual video
+  dimensions. ~22 MiB BSS freed at NES res; `clear_pixbuf()` memset goes
+  from 24 MiB to 1.2 MiB. 24 MiB → 2.4 MiB heap footprint at NES res.
+  Cross-thread safety preserved via the existing `blitUpdated`
+  release/`pixBufIdx` acquire contract. Generation counter exposed
+  for future consumer-side validation but not enforced in this PR.
+  New `tests/pixbuf_pool_test.cpp` pins the API contract (resize
+  strides, clear-only-active area, generation increments, invalid-
+  input rejection). Commit `fb930e7`.
+
+- **`src/ppu_rendering.cpp`** (hotfix3 D-2, MEDIUM) — Per-sprite
+  `pal_tab_op[4]/pal_tab_bk[4]` build replaced with a scanline-entry
+  `palram_op_bk[4][2][4]` lift over `PALRAM[0x10..0x1F]`. Each sprite
+  now pulls its 4 entries by palette index without re-reading PALRAM.
+  **`flipped = packed; if (H_FLIP)`** collapsed to a single ternary.
+  **Note**: PLAN §五 D-2's `pal_tab_op[8]` merge proposal was rejected
+  — it would force a per-pixel offset-add, semantically lossy. Also
+  PLAN's "VB 跨 sprite 不变" claim was incorrect: `VB =
+  (atr&3)<<2 | 0x10` depends on each sprite's palette bits, so
+  per-sprite tables cannot be hoisted; the 16-byte whole-window lift
+  is the correct invariant. Commit `753a8bd`.
+
+- **`src/sound.cpp`** (hotfix3 D-3, MEDIUM) — three LQ refinements:
+  - **RDoNoise**: two duplicate for-loops for short/long noise modes
+    collapsed by hoisting `feedback_shift = (PSG[0xE] & 0x80) ? 8 : 13`.
+  - **RDoSQLQ**: split into `do_sq_lq_silent` and `do_sq_lq_active`
+    helpers. A more aggressive 4-way split (skipping ch0/ch1 catchup
+    when `inie[ch]==0`) would change RectDutyCount carry-over state
+    and is audible at the call-N→N+1 boundary when a previously-gated
+    channel re-enables; deferred.
+  - **RDoTriangleNoisePCMLQ**: existing 4-way else-if extracted into
+    4 static `FCEU_ALWAYS_INLINE` helpers (`do_tnp_lq_silent` /
+    `_triangle_only` / `_noise_only` / `_both`).
+  - **Note**: PLAN §五 D-3's "use `if constexpr` in LQ" was off-target
+    — LQ/HQ is a runtime function-pointer dispatch in
+    `SetSoundVariables`, not a compile-time template parameter.
+    HQ paths (`RDoTriangle`/`RDoNoise`/`RDoPCM`/`RDoSQ`) untouched.
+  Commit `8711c62`.
+
+- **`src/sound.cpp`** (hotfix3 D-4, LOW) — `clear_pixbuf()`'s 159.88 KiB
+  memset in `FlushEmulateSound`'s HQ path removed. Analysis confirmed
+  no reader of `WaveHi` ever touches `[SOUNDTS, 40000)` — that
+  region is purely defensive housekeeping. memmove retained (FIR
+  carryover must propagate). **Note**: PLAN §五 D-4's
+  `wavehi_valid_` cursor was unnecessary; the simpler direct-deletion
+  form is equivalent. Commit `93a011a`.
+
+- **`src/pputile_template.cpp`, `src/pputile_template.h`** (hotfix3 D-5,
+  LOW) — five dead `if (ScreenON) { (void)C; }` stub sites in
+  `FetchAndDrawTile` removed (originally guarded `RENDER_LOGP` logging
+  already neutered to a no-op since v1.5 Prism template extract). 64
+  branch prediction events eliminated per `RefreshLine`. `ScreenON`
+  parameter retained on the signature and on all 9 wrapper helpers
+  + 1 dispatcher call site for ABI stability; an E-phase PR will
+  drop the parameter. **Note**: PLAN §五 D-5's `if constexpr` form
+  matched no existing 11+-site convention in this codebase; the
+  simpler direct-deletion form matches `hotfix2 P3-3 InputScanlineHook
+  null guard` and `P3-2 ppudead edge detector` cleanup patterns.
+  Commit `1667d77`.
+
+### Changed (Web)
+
+- All 12 web pages' hero pill `v1.15 · hotfix2` → `v1.15 · hotfix3`
+  (HTML, zh-CN, zh-TW, ja, ko, es, fr, de, vi, th, hi, ar).
+
 ## [1.15(hotfix2)] - 2026-07-16
 
 **Codename: hotfix2.** Algorithm-level review + performance

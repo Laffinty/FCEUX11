@@ -693,6 +693,32 @@ if constexpr (kRenderLog) {
 
 ---
 
+> **【hotfix3 执行决策 — 2026-07-21】Phase D 整体落地状态。**
+>
+> Phase D 5 PR 全数出代码，无 skip。决策概要（其中 4 处 PLAN §五原描述与现状或代码库约定有偏差，做了语义修正或形态简化）：
+>
+> | ID | PLAN §五原描述 | 实际落地 | 对应 commit |
+> |----|-------------|--------|-------------|
+> | **D-1** | `PixBufPool` 类：swap-then-dealloc resize + gen_ + clear + slot + bytes | 计划等价实施；+1 new `tests/pixbuf_pool_test.cpp` 钉死 strides / clear-active-only / generation / invalid-input 拒绝 4 类合约 | `fb930e7` |
+> | **D-2** | `pal_tab` 提升 + `pal_tab_op[8]` 合并 | **语义修正**：PLAN "VB 跨 sprite 不变" 与现状不符 —— `VB = (atr&3)<<2|0x10` 每 sprite 调色板位不同。**正确提升对象是 `PALRAM[0x10..0x1F]`** 完整 16 字节 `palram_op_bk[4][2][4]`（4 palette × op/bk × 4 entry）；`pal_tab_op[8]` 合并方案有损语义、已弃用。`flipped = packed; if (H_FLIP)` 折叠为 ternary。 | `753a8bd` |
+> | **D-3** | RDoSQLQ/RDoTriangleNoisePCMLQ 4 路拆分 + RDoNoise 反馈位提升 | **语义修正**：PLAN "use `if constexpr` in LQ" 误用 —— LQ/HQ 是运行时分派（函数指针），`if constexpr` 不能 fold。RDoNoise 合并 2 for-loop（`feedback_shift` hoist）；**RDoSQLQ 改 2 路语义安全拆分**（silent / active）—— 更激进的 4 路会改变 RectDutyCount 状态（在 `inie[ch]==0` 时跳过 catchup 会让下一帧的 totalout 不同，是 audible 行为变化），留给后续 hotfix；RDoTriangleNoisePCMLQ 已是 4-way else-if，直接抽 4 个 static FCEU_ALWAYS_INLINE helpers | `8711c62` |
+> | **D-4** | `wavehi_valid_` cursor | **形态简化**：实地分析确认 WaveHi `[SOUNDTS, 40000)` 没有 reader（~159.88 KiB memset 完全浪费）。**直接删除 memset** 而非加 cursor —— 实地分析表明 cursor 不必要，memset 是死写 | `93a011a` |
+> | **D-5** | `#ifndef FCEUDEF_DEBUGGER` 包 stub + `if constexpr` | **形态简化**：codebase 11+ 处现有约定是 `#ifdef`/`#ifndef`，不是 `if constexpr`；RENDER_LOGP macro 已 neutered 为 `(void)C` 5 处 stub 是真死代码。**直接删除 5 个 stub 站点**（未来 debugger 钩子若有需要，可在 RENDER_LOGP macro 定义点重引入），ScreenON 参数保留（E-phase 才删）| `1667d77` |
+>
+> Phase D 5 PR 总变更：12 src/test 文件 + 12 web index = 24 文件，+478 / -36 行。
+> Phase 收口 tag：`hotfix3-phase-d-done`。
+>
+> **真实存在的衍生问题（§十六 follow-up 候选）**：
+>
+> 1. **MMC3 KiB/byte unit mismatch**（C-5 勘查发现；Phase C 文档已记录）—— `prg>>3` / `chr-1` / `(chr>>1)-1` 修正需独立 mapper_state regression，列入 v1.16
+> 2. **C-3 周边 3 处同模式溢出** —— `ppu_rendering.cpp:226`、`cpu.h:106`、`sound.cpp:501` 同样 `int*48` 隐患，列入 v1.16
+> 3. **D-3 RDoSQLQ 激进 4 路方案** —— 跳过 ch0/ch1 catchup 的更激进优化需要 per-game audio regression 收齐后做，记入 §十六
+> 4. **D-5 后续**（E-phase 候选）：drop `bool ScreenON` 参数从 `FetchAndDrawTile` 模板签名；删除 9 个 wrapper helper 的 ScreenON 参数；更新 dispatcher call site
+> 5. **D-1 §七.2 解锁** —— pixbuf 24→2.4 MiB 省 ~22 MiB BSS + clear_pixbuf memset 24→1.2 MiB。GUI 烟测 5 次 + bench_tolerance 的 `bench_ppu_frame`/`bench_full_frame` 在 2.5% baseline 门控下应能看到 ≤5% 提升（实际可能更大）
+> 6. **§十六 bench baseline 重抓** —— `fixtures/bench_baseline.json` 仍为 v1.5 Phase G（commit `c47fa4e`，2026-06-24）；hotfix3 总改动（C+D）后应在 release tag 时一并重抓
+
+---
+
 ## 六、Phase E — 代码质量与一致性
 
 > **主题**: 5 个清理 PR（无新功能、无性能影响）。每 PR ≤ 50 行。
