@@ -1,0 +1,50 @@
+=== FCEUX11 i18n regression test (PHASE-2) ===
+
+[PASS] src/drivers/Qt/lang/fceux11_zh_CN.ts: 1906/1911 translated (99.74%) -- gate 90%
+[PASS] src/drivers/Qt/lang/fceux11_zh_TW.ts: 1906/1911 translated (99.74%) -- gate 90%
+[INFO] simp/trad gate: delegated to scripts/check_simp_trad.ps1
+
+--- Widget retranslateUi / changeEvent presence ---
+  [RTCEKP] ConsoleWindow.cpp
+  [RTCEKP] AboutWindow.cpp
+  [RTCEKP] ConsoleDebugger.cpp
+  [RTCEKP] TasEditor/TasEditorWindow.cpp
+  [RTCEKP] ppuViewer.cpp
+  [RTCEKP] AviRiffViewer.cpp
+  [RTCEKP] HexEditor.cpp
+  [RTCEKP] AviOptionsDialog.cpp
+  [RTCEKP] GamePadConf.cpp
+  [RTCEKP] GuiConf.cpp
+  [RTCEKP] RamWatch.cpp
+  [RTCEKP] TraceLogger.cpp
+  [RTCEKP] ConsoleVideoConf.cpp
+  [RTCEKP] CodeDataLogger.cpp
+  [RTCEKP] iNesHeaderEditor.cpp
+  [RTCEKP] CheatsConf.cpp
+  [RTCEKP] NameTableViewer.cpp
+  [RTCEKP] MoviePlay.cpp
+  [RTCEKP] PaletteEditor.cpp
+  [RTCEKP] StateRecorderConf.cpp
+  [RTCEKP] FamilyKeyboard.cpp
+  [RTCEKP] FrameTimingStats.cpp
+  [RTCEKP] RamSearch.cpp
+  [RTCEKP] InputConf.cpp
+  [RTCEKP] MovieRecord.cpp
+  [RTCEKP] PaletteConf.cpp
+  [RTCEKP] SymbolicDebug.cpp
+  [RTCEKP] GameGenie.cpp
+  [RTCEKP] ConsoleSoundConf.cpp
+  [RTCEKP] TimingConf.cpp
+  [RTCEKP] HelpPages.cpp
+  [RTCEKP] LuaControl.cpp
+  [RTCEKP] MovieOptions.cpp
+  [RTCEKP] HotKeyConf.cpp
+
+--- Summary ---
+retranslateUi declared: 34/34
+changeEvent override:   34/34
+keyPress forwarding:    34/34
+
+=== Test Complete ===
+
+RESULT: PASSED - all i18n gates green

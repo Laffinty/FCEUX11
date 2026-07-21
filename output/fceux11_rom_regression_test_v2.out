@@ -1,0 +1,35 @@
+=== FCEUX11 ROM Regression Test ===
+Mode: VERIFY against golden hashes
+
+[1/13] Testing nrom (fixtures/mapper_nrom.nes)
+  Collected 60 frame hashes
+[2/13] Testing mmc1 (fixtures/mapper_mmc1.nes)
+  Collected 60 frame hashes
+[3/13] Testing uxrom (fixtures/mapper_uxrom.nes)
+  Collected 60 frame hashes
+[4/13] Testing cnrom (fixtures/mapper_cnrom.nes)
+  Collected 60 frame hashes
+[5/13] Testing mmc3 (fixtures/mapper_mmc3.nes)
+  Collected 60 frame hashes
+[6/13] Testing mmc5 (fixtures/mapper_mmc5.nes)
+  Collected 60 frame hashes
+[7/13] Testing axrom (fixtures/mapper_axrom.nes)
+  Collected 60 frame hashes
+[8/13] Testing colordreams (fixtures/mapper_colordreams.nes)
+  Collected 60 frame hashes
+[9/13] Testing gnrom (fixtures/mapper_gnrom.nes)
+  Collected 60 frame hashes
+[10/13] Testing vrc2and4 (fixtures/mapper_vrc2and4.nes)
+  Collected 60 frame hashes
+[11/13] Testing vrc6 (fixtures/mapper_vrc6.nes)
+  Collected 60 frame hashes
+[12/13] Testing vrc7 (fixtures/mapper_vrc7.nes)
+  Collected 60 frame hashes
+[13/13] Testing nestest (fixtures/nestest.nes)
+  Collected 60 frame hashes
+  WARNING: no baseline for nrom
+
+=== Results ===
+Compared: 720 frames
+Mismatches: 0
+RESULT: PASSED

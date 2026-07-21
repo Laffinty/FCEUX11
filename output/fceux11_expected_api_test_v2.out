@@ -1,0 +1,14 @@
+=== FCEUX11 v0.3.3 tl::expected API Tests ===
+
+[test] load_file_bytes ... OK
+[test] load_file_bytes missing ... OK
+[test] initialize_core ... OK
+[test] make_ips_filename ... OK (C:\games\mario.nes.ips)
+[test] save_state ... OK (size=87536)
+[test] load_state ... OK
+[test] get_movie_info ... OK (correctly rejected missing file)
+[test] fceu11::fmt ... OK
+[test] EMUFILE::fread(std::span) compiles ... OK
+
+=== Results ===
+RESULT: PASSED

@@ -1,0 +1,5 @@
+=== FCEUX11 Savestate Regression Test ===
+Mode: VERIFY against golden hashes
+
+[ 1/12] nrom (fixtures/mapper_nrom.nes)
+RESULT: FAILED (could not compute hash)

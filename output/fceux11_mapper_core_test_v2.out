@@ -1,0 +1,32 @@
+=== FCEUX11 v1.1 Mapper test suite ===
+
+[1/4] NROM (fixtures/mapper_nrom.nes)
+  ok    NROM $8000 dispatches without crash
+  ok    NROM $C000 dispatches without crash
+[2/4] MMC1 (fixtures/mapper_mmc1.nes)
+  ok    MMC1 $8000 shift-register writes do not crash
+[3/4] MMC3 (fixtures/mapper_mmc3.nes)
+  ok    MMC3 $8000/$8001 bank register writes do not crash
+[4/4] VRC6 (fixtures/mapper_vrc6.nes)
+  ok    VRC6 PRG bank writes do not crash
+  ok    currCartInfo is non-null after load
+  ok    currCartInfo->Power populated
+  ok    currCartInfo->Close populated
+  ok    currCartInfo->Reset optional for NROM (mapper 0)
+  ok    setmirror H/V/0/1 survives across mappers
+  ok    currCartInfo is non-null
+  ok    addSaveGameBuf adds one entry
+  ok    pop_back restores SaveGame size
+  ok    PC is in a valid range after double Reset
+  ok    currCartInfo is non-null
+  ok    currCartInfo->MD5 has at least one non-zero byte
+  ok    currCartInfo is non-null
+  ok    currCartInfo->CRC32 != 0
+  ok    currCartInfo is non-null
+  ok    wram_size/vram_size fields are addressable
+
+=== Mapper test suite ===
+Passed:    20
+Failed:    0
+Total:     20
+RESULT:    PASSED

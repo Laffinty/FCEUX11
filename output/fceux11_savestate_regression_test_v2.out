@@ -1,0 +1,32 @@
+=== FCEUX11 Savestate Regression Test ===
+Mode: VERIFY against golden hashes
+
+[ 1/12] nrom (fixtures/mapper_nrom.nes)
+  hash: 2ebb816875e61a223545f45e09080f91
+[ 2/12] mmc1 (fixtures/mapper_mmc1.nes)
+  hash: e5169d870c26324ee699a0cdff7e8018
+[ 3/12] uxrom (fixtures/mapper_uxrom.nes)
+  hash: dc931dd8f8b2d1be4de0c5e0bfbf9de6
+[ 4/12] cnrom (fixtures/mapper_cnrom.nes)
+  hash: 6a24e5a264d8e740cace4ea7f929856f
+[ 5/12] mmc3 (fixtures/mapper_mmc3.nes)
+  hash: 71c5fa6c6c555e4f3d16985e82c41e1f
+[ 6/12] mmc5 (fixtures/mapper_mmc5.nes)
+  hash: 2ddfa1495a70005b447f0bec9f5ee1e3
+[ 7/12] axrom (fixtures/mapper_axrom.nes)
+  hash: dc931dd8f8b2d1be4de0c5e0bfbf9de6
+[ 8/12] colordreams (fixtures/mapper_colordreams.nes)
+  hash: dc931dd8f8b2d1be4de0c5e0bfbf9de6
+[ 9/12] gnrom (fixtures/mapper_gnrom.nes)
+  hash: dc931dd8f8b2d1be4de0c5e0bfbf9de6
+[10/12] vrc2and4 (fixtures/mapper_vrc2and4.nes)
+  hash: 2b86a67342b55d126af79f596cfde4ef
+[11/12] vrc6 (fixtures/mapper_vrc6.nes)
+  hash: fe7b0183d4714d6ca40afe6c32866fb3
+[12/12] nestest (fixtures/nestest.nes)
+  hash: e910448a075bbf529bfda08304dec283
+
+=== Results ===
+Compared: 12 ROMs
+Mismatches: 0
+RESULT: PASSED

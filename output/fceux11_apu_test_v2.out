@@ -1,0 +1,28 @@
+=== FCEUX11 v1.1 APU test suite ===
+ROM: fixtures/nestest.nes
+
+  ok    soundtsinc > 0 after SetSoundVariables
+  ok    soundtsoffs is a defined value
+  ok    Wave[0] writable
+  ok    WaveFinal[0] writable
+  ok    FCEU_SoundCPUHook survives 0/1/1000 cycles
+  ok    DMCacc advances past INT32_MIN boundary
+  ok    X6502_RunDebug survives INT32_MAX/8 cycles input
+  ok    engine survives 1 frame after INT32_MAX/8 RunDebug
+  ok    GetSoundBuffer returns non-negative count
+  ok    GetSoundBuffer pointer is non-null when count > 0
+  ok    FlushEmulateSound returns cleanly
+  ok    FCEUSND_SaveState/LoadState callable
+  ok    engine survives 1 frame with GameExpSound.Kill=nullptr
+  ok    FrameSoundUpdate callable
+  ok    timestampbase advances over 60 frames
+  ok    at least 1000 CPU cycles accumulated
+  ok    sound buffer non-empty after 60 frames
+  ok    FCEUI_Sound survives rate changes 48k->44.1k->48k
+  ok    swapDuty is mutable
+
+=== APU test suite ===
+Passed:    19
+Failed:    0
+Total:     19
+RESULT:    PASSED

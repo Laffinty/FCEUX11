@@ -1,0 +1,17 @@
+=== FCEUX11 v1.1 Mapper test suite ===
+
+[1/4] NROM (fixtures/mapper_nrom.nes)
+  FAIL: could not load fixtures/mapper_nrom.nes
+[2/4] MMC1 (fixtures/mapper_mmc1.nes)
+  FAIL: could not load fixtures/mapper_mmc1.nes
+[3/4] MMC3 (fixtures/mapper_mmc3.nes)
+  FAIL: could not load fixtures/mapper_mmc3.nes
+[4/4] VRC6 (fixtures/mapper_vrc6.nes)
+  FAIL: could not load fixtures/mapper_vrc6.nes
+WARNING: secondary mapper ROM load failed; skipping 7 tests
+
+=== Mapper test suite ===
+Passed:    0
+Failed:    11
+Total:     11
+RESULT:    FAILED

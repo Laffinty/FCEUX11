@@ -1,0 +1,11 @@
+[test] operator| ... OK
+[test] operator| chain ... OK
+[test] operator& ... OK
+[test] operator~ ... OK
+[test] operator^ ... OK
+[test] has ... OK
+[test] set/clear ... OK
+[test] |= &= ^= ... OK
+[test] underlying_type / size ... OK (uint8_t, 1 byte)
+
+All FCEU_ENUM_CLASS_BITFLAGS tests passed.

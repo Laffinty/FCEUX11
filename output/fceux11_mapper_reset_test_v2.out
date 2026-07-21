@@ -1,0 +1,14 @@
+=== Mapper Reset Test ===
+
+[1/8] Load + Reset fixtures/mapper_nrom.nes       ... OK
+[2/8] Load + Reset fixtures/mapper_mmc1.nes       ... OK
+[3/8] Load + Reset fixtures/mapper_uxrom.nes      ... OK
+[4/8] Load + Reset fixtures/mapper_mmc3.nes       ... OK
+[5/8] Load + Reset fixtures/mapper_mmc5.nes       ... OK
+[6/8] Load + Reset fixtures/mapper_axrom.nes      ... OK
+[7/8] Load + Reset fixtures/mapper_vrc6.nes       ... OK
+[8/8] Load + Reset fixtures/mapper_vrc7.nes       ... OK
+
+=== Results ===
+Passed: 8 / 8
+RESULT: PASSED
