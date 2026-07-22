@@ -187,3 +187,87 @@ D-8 按 §一 决策执行裁剪 + 文档；D-16 只做试验与记录，不强�
 - 保持现有菜单重组结构（Tools/Debug/Movie 并入 Advanced 五个子菜单是本项目设计，不回退）；
 - 每阶段独立 commit，消息遵循 `cliff.toml` 约定（`fix(ui): ...` / `fix(i18n): ...` 等）；
 - 凡与上游有意的行为差异（D-12 等），在 CHANGELOG 中注明。
+
+---
+
+## 六、二次审计意见（执行人：Claude / 2026-07-22）
+
+> 本节为执行前最后一轮独立核验。结论：**16 个缺陷全部经源码/日志核对为真实**（详见末尾核验表），计划整体质量高、按 Phase A → E 顺序推进即可。下文为本执行人后续开工必须遵守的补充约定。
+
+### 6.1 核验结论摘要
+
+- **D-1 ~ D-16 全部真实**。每条都能用 `Grep` / `Read` 直接复现文件:行号级证据；D-1 还有 `output/fceux11_run2.err:5` 的运行时警告作为独立佐证。
+- **基础设施存在性已确认**：`scripts/do_build.ps1`、`scripts/i18n_update.ps1` 在位；`tools/transform_v036.py` 在位（T-1 风格参照）；`tests/CMakeLists.txt` `add_test(` 计数 = 29（与计划一致）。`scripts/check_menu_slots.py` 按计划应于 T-1 新增，**开工前不存在是预期**。
+- **Git 卫生**：仓库当前在 `main`、干净。每次 Phase 必须独立 commit；不得 squash/fixup 多个 Phase。
+
+### 6.2 开工前必做的 3 件事
+
+1. **重新读一遍本文档**（每次新会话开头），避免凭印象施工。
+2. **`git checkout -b hotfix4/<phase>-<id>` 起步**（如 `hotfix4/phase-a-d1-d2-d7-d13-d14`），不要直接在 `main` 上堆 commit，方便 review 与回退。Phase E 验收通过后再合 `main`。
+3. **每 Phase 开工前先 `cmake --build build` 跑一次基线**，确认当前未提交改动下基线仍为绿。出现意外基线问题先停下汇报，不要带病施工。
+
+### 6.3 风险点与必须事先确认的细节
+
+> 这些点计划本身已写明，但执行中容易"读完就忘"。**开工对应 Phase 前必须回看本小节相关条目**。
+
+- **D-3 上游截屏**：`HK_LOAD_LUA` / `HK_VS_TOGGLE_DIPSWITCH` / `HK_TOGGLE_SUBTITLE` 这 3 个执行"从 config.cpp 移除"前，必须先拉一次 `TASEmulators/fceux@master` `initHotKeys` 段截屏附在 PR 描述里。若上游其实有实现、只是本地没接，要立刻停下来回报，不要静默删除。`HK_FDS_EJECT` 走"参照 HK_FDS_SELECT 接线"路线无此风险。
+- **D-4/D-5 refreshText 副作用**：`hotkey_t::setText` 会触发 `QAction::textChanged`。Phase B 落地前必须 `Grep "textChanged"` 全 Qt 树，确认没有监听者（典型嫌疑：Recent ROM 动态菜单、状态栏文本拼接）。若有，预先在 PR 描述里列出"已 grep 无监听"。
+- **D-6 第二落点**：`ConsoleWindow.cpp:855-873, 925-933` 三处同模式 `tr(运行时变量)` 在 `retranslateUi` 内。Phase B 改构建侧（ConsoleMenu.cpp:256/477/725）时必须**同步 diff 这三处**，否则语言切换时菜单中文化、对话框不中文化的双轨 bug 会出现。改完先跑一次 zh_CN/en 切换冒烟，再交 CTest。
+- **D-13 手动验收**：Phase A 修 `advMenu` aboutToShow/aboutToHide 后，必须**手动验证一次**"打开 Advanced 顶层菜单时 SDL.PauseOnMainMenuAccess 是否正确触发 mainMenuOpen/mainMenuClose"——仅靠 T-2 抓不到（不会进入 paused 态）。记录在 PR 描述里。
+- **D-14 超时 5000ms 仍偏长**：参照 hotfix3 A-4 的析构既有模式，但 5000ms 仍可能在被杀毒软件卡住的磁盘 I/O 上不够。先落地 5000ms；若后续 hotfix5 有用户反馈再降到 1000ms。本次不要拍脑袋降到 1s。
+- **D-16 试验性构建**：先 `cmake --build build --clean-first` 走一遍全量构建，记录 warning 总数与归类（Qt 头文件 / 自家代码）。**禁止**为消 warning 改任何非目标代码——计划明文要求"禁止大规模代码改动"。结果无论成败都在 `output/d16_wx_trial.log` 留档并附结论。
+
+### 6.4 T-1 (check_menu_slots.py) 必须满足的硬条件
+
+1. **红→绿验证**：脚本落地后**先在未修的 D-1 代码上跑一次，必须 FAIL 且明确报告 `ConsoleMenu.cpp:846: slot 'fdsLoadBIOS' not declared`**；再修 D-1，确认 PASS。两次结果都贴在 Phase E 的 PR 描述里。
+2. **已知边界**：脚本只防"SLOT 名拼错 / receiver 不是 `this`"，不防"SIGNAL 端错"。在脚本头部 docstring 与 PR 描述里都写明。
+3. **零第三方依赖**：只允许 Python3 标准库。CI 上若 Python3 缺位，`find_package(Python3 COMPONENTS Interpreter)` 应静默跳过该测试（参照现有 i18n_regression_test 的注册风格）。
+4. **不要反向过拟合**：脚本不应该要求 SLOT 都被某个特定 action 显式 addAction 进菜单——`aboutToShow` 类连接用 `this` 而不挂菜单，强制要求会导致误报。
+
+### 6.5 T-2 (smoke) 操作规范
+
+- `smoke.err` 输出到 `output/smoke_<phase>.err`，**不要覆盖既有 `output/fceux11_run*.err`**。
+- 跑完后立刻 `grep -E "No such slot|No such signal" output/smoke_<phase>.err`，**期望零匹配**。
+- 跑完把 exe 进程关掉（GUI 窗口关或 taskkill /IM fceux11.exe /F），避免后续 phase 启动时端口/单例冲突。
+
+### 6.6 报告义务（每 Phase 收尾）
+
+向用户回报时**必须**包含以下 5 项，缺一项视为 Phase 未完成：
+
+1. 本 Phase 涉及哪些 D-id，commit hash 列表；
+2. `cmake --build build` 与 `ctest --test-dir build --output-on-failure` 的尾部输出（红/绿结论 + 用时）；
+3. T-2 smoke.err grep 结果；
+4. 是否有"计划未列、但顺手发现的旁支问题"——有就列出来，**不要当场修**，留给 hotfix5 / 单独 PR；
+5. 下一 Phase 的开工计划（一句话即可）。
+
+### 6.7 禁止事项（再强调一次）
+
+- ❌ 不要在 hotfix4 内重构菜单层级（即便觉得 Advanced 五子菜单怪）；
+- ❌ 不要顺手"清理"D-2 之外的 ` `n` 残留 warning（D-2 是命中范围，其他发现归 hotfix5）；
+- ❌ 不要为 D-16 试验改任何 Qt 头文件引用或 `#pragma warning`；
+- ❌ 不要把多个 Phase 合并成一个 commit；
+- ❌ 不要跳过 Phase E 的 T-1 红→绿验证直接交 PASS；
+- ❌ 不要在 `main` 上直接 commit（先开分支）。
+
+### 6.8 附录：缺陷真实性核验抽样记录
+
+| 编号 | 核验方式 | 关键证据 |
+|---|---|---|
+| D-1 | Read + 运行时日志 | `ConsoleMenu.cpp:846` 实为 `SLOT(fdsLoadBIOS(void))`；`ConsoleWindow.h:444` 槽实为 `fdsLoadBiosFile`；`output/fceux11_run2.err:5` 含 `QObject::connect: No such slot consoleWin_t::fdsLoadBIOS(void)` |
+| D-2 | Grep | `ConsoleActions.cpp:111` 与 `ConsoleTranslation.cpp:111` 两行均含字面 `` `n `` |
+| D-3 | Grep | `config.cpp:93,173,179,185` 注册；`input.cpp:908,1072,1118,1145` 均为 `// Hotkeys[HK_...].getRisingEdge()` 注释 |
+| D-4 | Read | `input.cpp:319` `actText = act->text();`；`input.cpp:275` 复用 `actText` 重写 text |
+| D-5 | Grep | `ConsoleWindow.cpp` 全树零 `setStatusTip`；retranslateUi 段无 refresh 调用 |
+| D-6 | Read | `ConsoleMenu.cpp:256/477/725` 均为 `tr(snprintf 后字符串)` |
+| D-7 | Read | `input.cpp:340` `FCEU_strlcpy(s, sizeof(s), ...)`，`s` 为 `char*` 形参 |
+| D-8 | Grep | `fceuWrapper.cpp:365` 注释调用；`ConsoleMenu.cpp` 全树零 `NetPlay`；`config.cpp:588` 自注 broken |
+| D-9 | Grep | `config.h` 枚举无 `HK_SPEED_QUARTER/HALF/NORMAL/2X/4X/8X/16X`；Qt 目录 `HK_SPEED` 零匹配 |
+| D-10 | Grep + Read | `ConsoleMenu.cpp:1255-1277` 只 About/About Qt/Message Log；`openOfflineDocs` 全 Qt 树零调用方 |
+| D-11 | Read | `ConsoleRecentRom.cpp:124-155` 无 Clear 项 |
+| D-12 | Read | `ConsoleDebugWindows.cpp:265-267` config 写新值、`FCEUI_SetGameGenie` 用旧值 |
+| D-13 | Read | `ConsoleMenu.cpp:136` 创建 advMenu 后无 connect；`fileMenu:158-159` 反有 connect |
+| D-14 | Read | `TraceLogger.cpp:411` `diskThread->wait( 1000000 );` |
+| D-15 | Grep + Read | `ConsoleWindow.cpp` 零 `setStatusTip`；`MsgLogViewer.cpp:210-211` 仅构建时 tr() |
+| D-16 | Read | `src/CMakeLists.txt:96` `add_compile_options(/W4 /WX- ...)` |
+
+
