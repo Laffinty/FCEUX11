@@ -211,6 +211,28 @@ int getHotKeyConfig( int i, const char **nameOut, const char **keySeqOut, const 
 		case HK_TURBO:
 			name = "Turbo"; keySeq = "Tab"; group = "Speed";
 		break;
+		// hotfix4 D-9: preset speed hotkeys (restored from upstream master)
+		case HK_SPEED_QUARTER:
+			name = "QuarterSpeed"; keySeq = ""; group = "Speed";
+		break;
+		case HK_SPEED_HALF:
+			name = "HalfSpeed"; keySeq = ""; group = "Speed";
+		break;
+		case HK_SPEED_NORMAL:
+			name = "NormalSpeed"; keySeq = ""; group = "Speed";
+		break;
+		case HK_SPEED_2X:
+			name = "Speed2x"; keySeq = ""; group = "Speed";
+		break;
+		case HK_SPEED_4X:
+			name = "Speed4x"; keySeq = ""; group = "Speed";
+		break;
+		case HK_SPEED_8X:
+			name = "Speed8x"; keySeq = ""; group = "Speed";
+		break;
+		case HK_SPEED_16X:
+			name = "Speed16x"; keySeq = ""; group = "Speed";
+		break;
 		case HK_TOGGLE_INPUT_DISPLAY:
 			name = "ToggleInputDisplay"; keySeq = ","; group = "Misc";
 		break;

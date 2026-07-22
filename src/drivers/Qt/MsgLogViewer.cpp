@@ -195,7 +195,7 @@ MsgLogViewDialog_t::MsgLogViewDialog_t(QWidget *parent)
 	QPushButton *clearBtn, *closeBtn;
 	QSettings settings;
 
-	setWindowTitle("Message Log Viewer");
+	setWindowTitle(tr("Message Log Viewer"));
 
 	resize(512, 512);
 
@@ -250,6 +250,20 @@ MsgLogViewDialog_t::~MsgLogViewDialog_t(void)
 	//printf("Destroy Msg Log Config Window\n");
 	updateTimer->stop();
 	settings.setValue("MsgLogWindow/geometry", saveGeometry());
+}
+//----------------------------------------------------------------------------
+// hotfix4 D-15: handle LanguageChange so the 3 tr() strings in the
+// constructor (window title + Clear / Close button labels) refresh when
+// the user switches language. Pattern copied from AboutWindow.cpp:139-147.
+void MsgLogViewDialog_t::changeEvent(QEvent *event)
+{
+	if (event->type() == QEvent::LanguageChange)
+	{
+		setWindowTitle(tr("Message Log Viewer"));
+		if (clearBtn) clearBtn->setText(tr("Clear"));
+		if (closeBtn) closeBtn->setText(tr("Close"));
+	}
+	QDialog::changeEvent(event);
 }
 //----------------------------------------------------------------------------
 void MsgLogViewDialog_t::closeEvent(QCloseEvent *event)

@@ -188,6 +188,8 @@ class  consoleWin_t : public QMainWindow
 		QMenu *emuMenu;
 		QMenu *helpMenu;
 		QMenu *recentRomMenu;
+		// hotfix4 D-11: Recent ROMs -> Clear Recent ROM List action
+		QAction *clearRecentRomAct = nullptr;
 		QMenu *languageMenu;
 		// v0.3.15 PR-A: 5+1 audience-tiered menu model.
 		// Tools / Debug / Movie are collected under one "Advanced" top-level
@@ -236,6 +238,9 @@ class  consoleWin_t : public QMainWindow
 		QAction *aboutAct = nullptr;
 		QAction *aboutActQt = nullptr;
 		QAction *msgLogAct = nullptr;
+		// hotfix4 D-10: Help -> Documentation submenu actions
+		QAction *openOnlineDocsAct = nullptr;
+		QAction *openOfflineDocsAct = nullptr;
 		QAction *state[10] = {};
 		QAction *powerAct = nullptr;
 		QAction *resetAct = nullptr;
@@ -367,6 +372,11 @@ class  consoleWin_t : public QMainWindow
 		void winResizeIx(int iScale);
 		void loadTranslation(const QString &langCode);
 		void retranslateUi(void);
+		// hotfix4 D-11: slot for Recent ROMs -> Clear Recent ROM List.
+		// Must live under public slots: so Qt MOC registers it; otherwise
+		// connect(..., SIGNAL(triggered()), this, SLOT(clearRecentRomMenu()))
+		// silently fails at runtime (no compile error).
+		void clearRecentRomMenu(void);
 	private slots:
 		void closeApp(void);
 		void openROMFile(void);
