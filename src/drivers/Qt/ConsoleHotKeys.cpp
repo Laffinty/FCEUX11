@@ -44,6 +44,17 @@ void consoleWin_t::initHotKeys(void)
 	connect( Hotkeys[ HK_FKB_ENABLE           ].getShortcut(), SIGNAL(activated()), this, SLOT(toggleFamKeyBrdEnable(void))   );
 	connect( Hotkeys[ HK_TOGGLE_ALL_CHEATS    ].getShortcut(), SIGNAL(activated()), this, SLOT(toggleGlobalCheatEnable(void)) );
 
+	// hotfix4 D-9: preset speed hotkeys (restored from upstream master)
+	// Qt5+ functor connect with lambda, matching upstream style (file line 26
+	// already uses &QShortcut::activatedAmbiguously + lambda).
+	connect( Hotkeys[ HK_SPEED_QUARTER ].getShortcut(), &QShortcut::activated, [] { CustomEmulationSpeed(  25); } );
+	connect( Hotkeys[ HK_SPEED_HALF    ].getShortcut(), &QShortcut::activated, [] { CustomEmulationSpeed(  50); } );
+	connect( Hotkeys[ HK_SPEED_NORMAL  ].getShortcut(), &QShortcut::activated, [] { CustomEmulationSpeed( 100); } );
+	connect( Hotkeys[ HK_SPEED_2X      ].getShortcut(), &QShortcut::activated, [] { CustomEmulationSpeed( 200); } );
+	connect( Hotkeys[ HK_SPEED_4X      ].getShortcut(), &QShortcut::activated, [] { CustomEmulationSpeed( 400); } );
+	connect( Hotkeys[ HK_SPEED_8X      ].getShortcut(), &QShortcut::activated, [] { CustomEmulationSpeed( 800); } );
+	connect( Hotkeys[ HK_SPEED_16X     ].getShortcut(), &QShortcut::activated, [] { CustomEmulationSpeed(1600); } );
+
 	connect( Hotkeys[ HK_SAVE_STATE_0         ].getShortcut(), SIGNAL(activated()), this, SLOT(saveState0(void))        );
 	connect( Hotkeys[ HK_SAVE_STATE_1         ].getShortcut(), SIGNAL(activated()), this, SLOT(saveState1(void))        );
 	connect( Hotkeys[ HK_SAVE_STATE_2         ].getShortcut(), SIGNAL(activated()), this, SLOT(saveState2(void))        );

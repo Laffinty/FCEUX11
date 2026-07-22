@@ -154,6 +154,31 @@ void consoleWin_t::buildRecentRomMenu(void)
 			romList.push_front( sptr );
 		}
 	}
+
+	// hotfix4 D-11: separator + Clear entry at the end of the menu
+	// (matches upstream master ConsoleWindow.cpp:2344-2346 layout).
+	if (recentRomMenu->actions().size() > 0)
+	{
+		recentRomMenu->addSeparator();
+	}
+	clearRecentRomAct = new QAction(tr("&Clear Recent ROM List"), recentRomMenu);
+	connect(clearRecentRomAct, SIGNAL(triggered()), this, SLOT(clearRecentRomMenu(void)) );
+	recentRomMenu->addAction(clearRecentRomAct);
+}
+
+// hotfix4 D-11: implementation of the slot wired above. Drops the in-memory
+// romList, persists empty values for the 10 RecentRomNN config slots, and
+// rebuilds the menu so the change shows immediately without a restart.
+void consoleWin_t::clearRecentRomMenu(void)
+{
+	for (int i=0; i<10; i++)
+	{
+		char buf[128];
+		snprintf( buf, sizeof(buf), "SDL.RecentRom%02i", i);
+		g_config->setOption( buf, "");
+	}
+	g_config->save();
+	buildRecentRomMenu();
 }
 
 void consoleWin_t::saveRecentRomMenu(void)

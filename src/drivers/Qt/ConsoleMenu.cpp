@@ -1249,6 +1249,22 @@ void consoleWin_t::createMainMenu(void)
 	connect( helpMenu, SIGNAL(aboutToShow(void)), this, SLOT(mainMenuOpen(void)) );
 	connect( helpMenu, SIGNAL(aboutToHide(void)), this, SLOT(mainMenuClose(void)) );
 
+	// Help -> Documentation (submenu, hotfix4 D-10)
+	// Upstream master has this submenu; local project lost it during a
+	// refactor. Online link points to upstream fceux.com docs (CHANGELOG
+	// note: v1.16 should swap to local project docs URL).
+	QMenu *docsMenu = helpMenu->addMenu(tr("&Documentation"));
+
+	openOnlineDocsAct = new QAction(tr("&Online"), this);
+	openOnlineDocsAct->setStatusTip(tr("Open online documentation in browser"));
+	connect(openOnlineDocsAct, SIGNAL(triggered()), this, SLOT(openOnlineDocs(void)) );
+	docsMenu->addAction(openOnlineDocsAct);
+
+	openOfflineDocsAct = new QAction(tr("&Local"), this);
+	openOfflineDocsAct->setStatusTip(tr("Open bundled offline documentation"));
+	connect(openOfflineDocsAct, SIGNAL(triggered()), this, SLOT(openOfflineDocs(void)) );
+	docsMenu->addAction(openOfflineDocsAct);
+
 	// Help -> About FCEUX11
 	aboutAct = new QAction(tr("&About FCEUX11"), this);
 	aboutAct->setStatusTip(tr("About FCEUX11"));

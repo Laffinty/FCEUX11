@@ -258,13 +258,15 @@ void consoleWin_t::openTraceLogger(void)
 
 void consoleWin_t::toggleGameGenie(bool checked)
 {
-	int gg_enabled;
-
+	// hotfix4 D-12: drive both config and core from the slot's `checked`
+	// parameter so the in-session state matches the menu checkbox. The
+	// old implementation toggled gg_enabled for the config write but
+	// passed the pre-toggle value to FCEUI_SetGameGenie, leaving the
+	// core state opposite to the menu. Upstream has the same defect.
 	FCEU_WRAPPER_LOCK();
-	g_config->getOption ("SDL.GameGenie", &gg_enabled);
-	g_config->setOption ("SDL.GameGenie", !gg_enabled);
+	g_config->setOption ("SDL.GameGenie", checked);
 	g_config->save ();
-	FCEUI_SetGameGenie (gg_enabled);
+	FCEUI_SetGameGenie (checked);
 	FCEU_WRAPPER_UNLOCK();
    return;
 }

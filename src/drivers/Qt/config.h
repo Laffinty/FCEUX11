@@ -18,6 +18,10 @@ enum HOTKEY {
 
 	// Emulation Execution Control
 	HK_FRAME_ADVANCE, HK_DECREASE_SPEED, HK_INCREASE_SPEED, HK_TURBO,
+
+	// hotfix4 D-9: preset speed hotkeys (restored from upstream fceux@master)
+	HK_SPEED_QUARTER, HK_SPEED_HALF, HK_SPEED_NORMAL,
+	HK_SPEED_2X, HK_SPEED_4X, HK_SPEED_8X, HK_SPEED_16X,
 	
 	// Save States
 	HK_SAVE_STATE,

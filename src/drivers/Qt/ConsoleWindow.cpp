@@ -933,6 +933,22 @@ void consoleWin_t::retranslateUi(void)
 	if (aboutAct) aboutAct->setText(tr("&About FCEUX11"));
 	if (aboutActQt) aboutActQt->setText(tr("About &Qt"));
 	if (msgLogAct) msgLogAct->setText(tr("&Message Log"));
+	// hotfix4 D-10: Documentation submenu entries (see ConsoleMenu.cpp)
+	if (openOnlineDocsAct) openOnlineDocsAct->setText(tr("&Online"));
+	if (openOfflineDocsAct) openOfflineDocsAct->setText(tr("&Local"));
+	// hotfix4 D-15: statusTip for Help-menu actions (constructed with
+	// English-only tips at createMainMenu time; not retranslated on
+	// language switch without these re-applies). Comprehensive coverage
+	// of all statusTips is hotfix5 scope; this is a representative fix.
+	if (aboutAct) aboutAct->setStatusTip(tr("About FCEUX11"));
+	if (aboutActQt) aboutActQt->setStatusTip(tr("About Qt"));
+	if (msgLogAct) msgLogAct->setStatusTip(tr("Message Log"));
+	if (openOnlineDocsAct) openOnlineDocsAct->setStatusTip(tr("Open online documentation in browser"));
+	if (openOfflineDocsAct) openOfflineDocsAct->setStatusTip(tr("Open bundled offline documentation"));
+	// hotfix4 D-11: Clear Recent ROM List (recentRomMenu is rebuilt by
+	// buildRecentRomMenu, so clearRecentRomAct may be a stale pointer —
+	// guarded by nullptr check; safe no-op otherwise).
+	if (clearRecentRomAct) clearRecentRomAct->setText(tr("&Clear Recent ROM List"));
 
 	// hotfix4 D-5: tr()-above wiped the "\t<shortcut>" suffix from any
 	// action that had it applied via hotkey_t::setAction(). Re-apply it
