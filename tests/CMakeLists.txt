@@ -369,6 +369,20 @@ if(FCEUX11_BUILD_TESTS)
              COMMAND fceux11_config_store_test
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
+    # hotfix4 T-1: menu wiring static gate. Catches D-1 / D-11-v1 class
+    # bugs where a SLOT() name is wrong or the corresponding method is
+    # declared outside a `slots:` section (MOC silently ignores it).
+    # Headless, zero-third-party-deps Python3 script. Skipped if Python3
+    # interpreter is unavailable on this machine (CI parity).
+    find_package(Python3 COMPONENTS Interpreter)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME menu_slot_check
+            COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_SOURCE_DIR}/scripts/check_menu_slots.py
+                ${CMAKE_SOURCE_DIR}
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    endif()
+
     # -------------------------------------------------------------------------
     # v0.3.6.5 / v0.3.14 — Windows test runtime PATH injection
     # MSVC ASan-instrumented binaries dynamically import
