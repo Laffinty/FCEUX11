@@ -108,7 +108,8 @@
 #include "Qt/TasEditor/TasEditorWindow.h"
 
 
-#include "Qt/ConsoleTranslation.h"`n#include "Qt/ConsoleWindow.h"
+#include "Qt/ConsoleTranslation.h"
+#include "Qt/ConsoleWindow.h"
 
 static QTranslator *appTranslator = nullptr;
 QTranslator *g_earlyTranslator = nullptr;

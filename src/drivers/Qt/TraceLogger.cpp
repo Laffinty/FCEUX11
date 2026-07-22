@@ -408,7 +408,14 @@ TraceLoggerDialog_t::~TraceLoggerDialog_t(void)
 	msleep(1);
 	diskThread->requestInterruption();
 	diskThread->quit();
-	diskThread->wait( 1000000 );
+	// hotfix4 D-14: 1000000ms (16.7 min) was long enough for Windows
+	// unbuffered disk I/O to wedge the GUI on close. Mirrors hotfix3
+	// A-4 pattern in ConsoleWindow.cpp — bounded wait + terminate fallback.
+	if (!diskThread->wait(5000)) {
+		qWarning("TraceLogger disk thread did not exit cleanly within 5s; terminating");
+		diskThread->terminate();
+		diskThread->wait(1000);
+	}
 
 	traceLogWindow = NULL;
 

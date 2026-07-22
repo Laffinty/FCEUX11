@@ -331,13 +331,13 @@ const char *hotkey_t::getConfigName(void)
 	return configName;
 }
 
-int hotkey_t::getString(char *s)
+int hotkey_t::getString(char *s, size_t size)
 {
 	s[0] = 0;
 
 	if (shortcut)
 	{
-		FCEU_strlcpy(s, sizeof(s), shortcut->key().toString().toStdString().c_str());
+		FCEU_strlcpy(s, size, shortcut->key().toString().toStdString().c_str());
 	}
 	//if ( sdl.modifier != 0 )
 	//{

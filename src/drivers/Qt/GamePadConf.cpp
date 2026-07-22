@@ -2338,7 +2338,7 @@ void GamePadFuncConfigDialog::changeKeySeq0(void)
 
 		hkp = &Hotkeys[ k->hk[0] ];
 
-		hkp->getString(keyName);
+		hkp->getString(keyName, sizeof(keyName));
 
 		k->keySeq[0].key      = hkp->qkey.value;
 		k->keySeq[0].modifier = hkp->qkey.modifier;
@@ -2375,7 +2375,7 @@ void GamePadFuncConfigDialog::changeKeySeq1(void)
 
 		hkp = &Hotkeys[ k->hk[1] ];
 
-		hkp->getString(keyName);
+		hkp->getString(keyName, sizeof(keyName));
 
 		k->keySeq[1].key      = hkp->qkey.value;
 		k->keySeq[1].modifier = hkp->qkey.modifier;
@@ -2526,7 +2526,7 @@ HotKeySelectDialog_t::HotKeySelectDialog_t( QWidget *parent )
 		std::string optionName = prefix + Hotkeys[i].getConfigName();
 
 		//g_config->getOption (optionName.c_str (), &keycode);
-		Hotkeys[i].getString(keyName);
+		Hotkeys[i].getString(keyName, sizeof(keyName));
 
 		item = new QTreeWidgetItem();
 
