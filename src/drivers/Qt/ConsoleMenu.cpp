@@ -252,11 +252,7 @@ void consoleWin_t::createMainMenu(void)
 
 	for (int i=0; i<10; i++)
 	{
-	        char stmp[8];
-
-	        snprintf( stmp, sizeof(stmp), "Slot &%i", i );
-
-	        state[i] = new QAction(tr(stmp), this);
+	        state[i] = new QAction(tr("Slot &%1").arg(i), this);
 	        state[i]->setCheckable(true);
 
 	        group->addAction(state[i]);
@@ -473,11 +469,7 @@ void consoleWin_t::createMainMenu(void)
 
 	for (int i=0; i<4; i++)
 	{
-	        char stmp[8];
-
-	        snprintf( stmp, sizeof(stmp), "&%ix", i+1 );
-
-	        winSizeAct[i] = new QAction(tr(stmp), this);
+	        winSizeAct[i] = new QAction(tr("&%1x").arg(i + 1), this);
 
 		windowResizeMenu->addAction(winSizeAct[i]);
 
@@ -724,8 +716,7 @@ void consoleWin_t::createMainMenu(void)
 
 		for (int j=1; j<=(6-i); j++)
 		{
-			snprintf( stmp, sizeof(stmp), "%i On, %i Off", i, j );
-			autoFireMenuAction *afAct = new autoFireMenuAction( i, j, tr(stmp), this);
+			autoFireMenuAction *afAct = new autoFireMenuAction( i, j, tr("%1 On, %2 Off").arg(i).arg(j), this);
 			afAct->setCheckable(true);
 			group->addAction(afAct);
 			autoFireMenu->addAction(afAct);
@@ -841,6 +832,9 @@ void consoleWin_t::createMainMenu(void)
 	fdsEjectAct = new QAction(tr("&Eject Disk"), this);
 	fdsEjectAct->setStatusTip(tr("Eject Disk"));
 	connect(fdsEjectAct, SIGNAL(triggered()), this, SLOT(fdsEjectDisk(void)) );
+
+	Hotkeys[ HK_FDS_EJECT ].setAction( fdsEjectAct );
+	connect( Hotkeys[ HK_FDS_EJECT ].getShortcut(), SIGNAL(activated()), this, SLOT(fdsEjectDisk(void)) );
 
 	fdsMenu->addAction(fdsEjectAct);
 

@@ -90,9 +90,9 @@ int getHotKeyConfig( int i, const char **nameOut, const char **keySeqOut, const 
 		case HK_BIND_STATE:
 			name = "BindState"; keySeq = ""; title = "Bind Save State to Movie"; group = "Movie";
 		break;
-		case HK_LOAD_LUA:
-			name = "LoadLua"; keySeq = "Ctrl+L"; group = "Tools";
-		break;
+		// hotfix4 D-3: HK_LOAD_LUA removed — upstream master has no
+		// initHotKeys handler (visible-but-dead). Hidden in Hotkey
+		// Config to avoid users binding a key that does nothing.
 		case HK_TOGGLE_BG:
 			name = "ToggleBG"; keySeq = "";	title = "Toggle Background Display"; group = "Misc";
 		break;
@@ -176,15 +176,11 @@ int getHotKeyConfig( int i, const char **nameOut, const char **keySeqOut, const 
 		case HK_VS_INSERT_COIN:
 			name = "VSInsertCoin"; keySeq = ""; title = "VS Insert Coin"; group = "VS";
 		break;
-		case HK_VS_TOGGLE_DIPSWITCH:
-			name = "VSToggleDip"; keySeq = ""; title = "VS Toggle Dipswitch"; group = "VS";
-		break;
+		// hotfix4 D-3: HK_VS_TOGGLE_DIPSWITCH removed (see HK_LOAD_LUA).
 		case HK_TOGGLE_FRAME_DISPLAY:
 			name = "MovieToggleFrameDisplay"; keySeq = ".";	title = "Toggle Frame Display"; group = "Movie";
 		break;
-		case HK_TOGGLE_SUBTITLE:
-			name = "SubtitleDisplay"; keySeq = ""; title = "Toggle Movie Subtitles"; group = "Movie";
-		break;
+		// hotfix4 D-3: HK_TOGGLE_SUBTITLE removed (see HK_LOAD_LUA).
 		case HK_POWER:
 			name = "Power"; keySeq = ""; title = "Power"; group = "Emulation";
 		break;

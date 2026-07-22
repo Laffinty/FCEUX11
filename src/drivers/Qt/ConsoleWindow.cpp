@@ -856,9 +856,7 @@ void consoleWin_t::retranslateUi(void)
 	{
 		if (state[i])
 		{
-			char stmp[8];
-			snprintf(stmp, sizeof(stmp), "Slot &%i", i);
-			state[i]->setText(tr(stmp));
+			state[i]->setText(tr("Slot &%1").arg(i));
 		}
 	}
 
@@ -866,9 +864,7 @@ void consoleWin_t::retranslateUi(void)
 	{
 		if (winSizeAct[i])
 		{
-			char stmp[8];
-			snprintf(stmp, sizeof(stmp), "&%ix", i + 1);
-			winSizeAct[i]->setText(tr(stmp));
+			winSizeAct[i]->setText(tr("&%1x").arg(i + 1));
 		}
 	}
 
@@ -926,9 +922,7 @@ void consoleWin_t::retranslateUi(void)
 	{
 		if (afAct)
 		{
-			char stmp[64];
-			snprintf(stmp, sizeof(stmp), "%i On, %i Off", afAct->getOnValue(), afAct->getOffValue());
-			afAct->setText(tr(stmp));
+			afAct->setText(tr("%1 On, %2 Off").arg(afAct->getOnValue()).arg(afAct->getOffValue()));
 		}
 	}
 	if (afActCustom)
@@ -939,6 +933,15 @@ void consoleWin_t::retranslateUi(void)
 	if (aboutAct) aboutAct->setText(tr("&About FCEUX11"));
 	if (aboutActQt) aboutActQt->setText(tr("About &Qt"));
 	if (msgLogAct) msgLogAct->setText(tr("&Message Log"));
+
+	// hotfix4 D-5: tr()-above wiped the "\t<shortcut>" suffix from any
+	// action that had it applied via hotkey_t::setAction(). Re-apply it
+	// against the now-translated labels. Must come last so all
+	// setText(tr(...)) above have taken effect.
+	for (int i = 0; i < HK_MAX; i++)
+	{
+		Hotkeys[i].refreshText();
+	}
 }
 //-----------------------------------------------------------------------------
 

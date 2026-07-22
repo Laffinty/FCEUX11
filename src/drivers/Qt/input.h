@@ -58,6 +58,11 @@ class hotkey_t
 		void setConfigName(const char *cName);
 		void setAction( QAction *act );
 
+		// hotfix4 D-4/D-5: re-apply the "\t<shortcut>" suffix using the
+		// current action text (i.e. the latest tr()-translated label).
+		// Called from readConfig() and from retranslateUi().
+		void refreshText(void);
+
 		const char *getConfigName(void);
 		QShortcut *getShortcut(void);
 
@@ -85,7 +90,7 @@ class hotkey_t
 		QKeySequence keySeq;
 		QShortcut *shortcut;
 		QAction   *act;
-		QString    actText;
+		// hotfix4 D-4: removed actText snapshot. Use refreshText() instead.
 };
 extern class hotkey_t Hotkeys[];
 

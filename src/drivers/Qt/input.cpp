@@ -272,7 +272,7 @@ int hotkey_t::readConfig(void)
 
 		if (act)
 		{
-			act->setText(actText + "\t" + shortcut->key().toString());
+			refreshText();
 		}
 	}
 
@@ -316,9 +316,26 @@ void hotkey_t::setAction(QAction *actIn)
 {
 	act = actIn;
 
-	actText = act->text();
+	refreshText();
+}
 
-	act->setText(actText + "\t" + shortcut->key().toString());
+void hotkey_t::refreshText(void)
+{
+	if (act && shortcut)
+	{
+		// Strip any prior "\t<shortcut>" suffix from the current text
+		// (which may already be a translated label), then re-append the
+		// current shortcut. This avoids re-applying a stale suffix when
+		// the language has changed (D-4) or when retranslateUi() reset
+		// the text via setText(tr(...)) (D-5).
+		QString cur = act->text();
+		int tabPos = cur.lastIndexOf('\t');
+		if (tabPos >= 0)
+		{
+			cur = cur.left(tabPos);
+		}
+		act->setText(cur + "\t" + shortcut->key().toString());
+	}
 }
 
 QShortcut *hotkey_t::getShortcut(void)
