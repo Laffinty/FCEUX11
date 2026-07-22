@@ -39,7 +39,6 @@
 #include "Qt/sdl.h"
 #include "Qt/sdl-video.h"
 #include "Qt/nes_shm.h"
-#include "Qt/QtNetplay.h"
 #include "Qt/AviRecord.h"
 #include "Qt/HexEditor.h"
 #include "Qt/CheatsConf.h"
@@ -362,7 +361,7 @@ int LoadGame(const char *path, bool silent)
 	//}
 	isloaded = 1;
 
-	//FCEUD_NetworkConnect();
+	// hotfix4 D-8: NetPlay removed; FCEUD_NetworkConnect no longer reachable.
 	return 1;
 }
 

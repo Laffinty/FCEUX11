@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15(hotfix4)] - 2026-07-22
+
+**Codename: hotfix4.** Main-menu and menu-reachable functionality audit.
+16 defects identified and confirmed (D-1 ~ D-16). Five phases across
+1 day: Phase A (5 one-line P0/P2 fixes), Phase B (4 i18n + hotkey
+fixes), Phase C (5 feature completeness fixes), Phase D (1 NetPlay
+formal removal + 1 build-policy evaluation), Phase E (T-1 static
+test + total verification). See
+`docs/FCEUX11-1.15_LTS-hotfix4-PLAN.md` for full scope.
+
+### Removed (Phase D — NetPlay formal retirement)
+- **NetPlay (联机对战) formally removed.** The CLI options `--net`,
+  `--user`, `--pass`, `--netkey`, `--port`, `--players`, `--server`
+  were registered but unreachable: ROM loader never called
+  `FCEUD_NetworkConnect` (commented out since pre-hotfix4), and no
+  NetPlay menu existed. Upstream master has the same broken state
+  with the comment "network play options - netplay is broken".
+  - `src/drivers/Qt/config.cpp` — NetPlay CLI option block removed.
+  - `src/drivers/Qt/QtNetplay.cpp` — Implementation replaced with
+    no-op stubs (`qNetplay_*`); symbols preserved for callback-table
+    ABI compatibility.
+  - `src/drivers/Qt/QtNetplay.h` — Deleted (stale externs for
+    `netplaynick`/`netplayhost`/etc. that were never defined).
+  - `src/drivers/Qt/fceuWrapper.cpp` — Commented-out
+    `FCEUD_NetworkConnect()` call replaced with hotfix4 D-8 note.
+  - **NOT removed**: `src/netplay.cpp` (core receiver side) and
+    `src/driver_callbacks.cpp` — these preserve ABI/savestate
+    compatibility. Anyone needing NetPlay should fork from before
+    this release or wait for v2.0 (where the project plans to revisit
+    the topic).
+- The `NetPlay` config keys (`SDL.NetworkIsServer`, `SDL.NetworkIP`,
+  `SDL.NetworkUsername`, `SDL.NetworkPassword`, `SDL.NetworkGameKey`,
+  `SDL.NetworkPort`, `SDL.NetworkPlayers`) are silently dropped from
+  the options table; existing saved values are ignored.
+
+### Notes
+- 16/16 defects verified real via code grep + runtime log evidence
+  (e.g., D-1 verified by `output/fceux11_run2.err:5`).
+- A new `scripts/check_menu_slots.py` static test (T-1) is added in
+  Phase E to prevent D-1 / D-11-class "no such slot" regressions.
+
 ## [1.15(hotfix3)] - 2026-07-21
 
 **Codename: hotfix3.** Comprehensive cross-subsystem safety and performance
