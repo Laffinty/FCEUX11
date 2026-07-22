@@ -93,6 +93,15 @@ endif()
 # We only add the driver-specific /wd set here (additional categories
 # surfaced by Qt + SDL bindings).
 if(MSVC)
+    # hotfix4 D-16 TRIAL OUTCOME: /WX- kept.
+    # Trial log: output/d16_wx_trial.log (initial) + output/d16_wx_final.log
+    # (clean rebuild after each /wd add). Result: removing /WX- surfaces
+    # 11 warnings (10 in vendored mappers/utils/sound, 1 in our own
+    # debug.cpp). Plan §一 D-16 forbids "大规模代码改动" to silence our own
+    # warnings, so we keep /WX- and accept the policy contradiction with
+    # top-level CMakeLists.txt:53 (/WX active there but disabled here).
+    # Carried forward as v2.0 debt: re-evaluate when vendored files are
+    # upgraded or replaced.
     add_compile_options(/W4 /WX-
         /wd4127  # pre-existing: conditional expression is constant (Q_OBJECT generated code)
         /wd4189  # pre-existing: local variable initialized but not referenced (Qt headers)

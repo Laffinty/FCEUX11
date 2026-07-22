@@ -35,7 +35,6 @@
 #include "Qt/sdl.h"
 #include "Qt/sdl-video.h"
 #include "Qt/AviRecord.h"
-#include "Qt/QtNetplay.h"
 #include "Qt/TasEditor/taseditor_config.h"
 
 #ifdef WIN32
@@ -603,15 +602,13 @@ InitConfig()
 	config->addOption("SDL.SpecialFX", 0);
 	config->addOption("SDL.Vsync", 1);
 
-	// network play options - netplay is broken
-	config->addOption("server", "SDL.NetworkIsServer", 0);
-	config->addOption('n', "net", "SDL.NetworkIP", "");
-	config->addOption('u', "user", "SDL.NetworkUsername", "");
-	config->addOption('w', "pass", "SDL.NetworkPassword", "");
-	config->addOption('k', "netkey", "SDL.NetworkGameKey", "");
-	config->addOption("port", "SDL.NetworkPort", 4046);
-	config->addOption("players", "SDL.NetworkPlayers", 1);
-     
+	// hotfix4 D-8: NetPlay formally removed (CLI options + UI).
+	// The CLI flags below were registered but unreachable: ROM loader
+	// never called FCEUD_NetworkConnect (commented out at
+	// fceuWrapper.cpp:365), and no NetPlay menu existed. Config keys
+	// themselves are kept harmless — netplay.cpp on the receiver side
+	// is untouched (ABI/savestate preservation per plan §一 D-8).
+
 	// input configuration options
 	config->addOption("input1", "SDL.Input.0", "GamePad.0");
 	config->addOption("input2", "SDL.Input.1", "GamePad.1");
