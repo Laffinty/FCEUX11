@@ -51,7 +51,7 @@ class hotkey_t
 
 		int getRisingEdge(void);
 
-		int getString( char *s );
+		int getString( char *s, size_t size );
 
 		void setModifierFromString( const char *s );
 

@@ -152,6 +152,9 @@ void consoleWin_t::createMainMenu(void)
 		advMenu->menuAction()->setVisible(false);
 	}
 
+	connect( advMenu, SIGNAL(aboutToShow(void)), this, SLOT(mainMenuOpen(void)) );
+	connect( advMenu, SIGNAL(aboutToHide(void)), this, SLOT(mainMenuClose(void)) );
+
 	//-----------------------------------------------------------------------
 	// File
 	
@@ -843,7 +846,7 @@ void consoleWin_t::createMainMenu(void)
 
 	fdsLoadBiosAct = new QAction(tr("&Load BIOS"), this);
 	fdsLoadBiosAct->setStatusTip(tr("Load FDS BIOS"));
-	connect(fdsLoadBiosAct, SIGNAL(triggered()), this, SLOT(fdsLoadBIOS(void)) );
+	connect(fdsLoadBiosAct, SIGNAL(triggered()), this, SLOT(fdsLoadBiosFile(void)) );
 
 	fdsMenu->addAction(fdsLoadBiosAct);
 

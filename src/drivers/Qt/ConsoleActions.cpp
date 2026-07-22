@@ -108,7 +108,8 @@
 #include "Qt/TasEditor/TasEditorWindow.h"
 
 
-#include "Qt/ConsoleActions.h"`n#include "Qt/ConsoleWindow.h"
+#include "Qt/ConsoleActions.h"
+#include "Qt/ConsoleWindow.h"
 
 
 void consoleWin_t::openInputConfWin(void)
