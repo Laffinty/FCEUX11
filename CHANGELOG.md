@@ -15,6 +15,45 @@ formal removal + 1 build-policy evaluation), Phase E (T-1 static
 test + total verification). See
 `docs/FCEUX11-1.15_LTS-hotfix4-PLAN.md` for full scope.
 
+### Added (Phase E — regression test)
+- **`scripts/check_menu_slots.py`** (T-1) — Static gate that scans
+  `src/drivers/Qt/*.cpp` for every `connect(..., this, SLOT(name(...)))`
+  and verifies each `name` is declared under a `public slots:` /
+  `protected slots:` / `private slots:` section in the relevant Qt
+  header. Catches the same class of bug that shipped D-1 (fdsLoadBIOS
+  typo) and D-11 v1 (clearRecentRomMenu declared outside slots:
+  section). Headless, zero-third-party-deps Python 3 stdlib only.
+  Registered as CTest `menu_slot_check`; skipped if Python3
+  interpreter not found on PATH (CI parity).
+- **Known boundary** (documented in plan §六 6.4): the script checks
+  the SLOT side only. SIGNAL-side typos (e.g., typo in the SIGNAL()
+  macro argument) are still runtime-only failures.
+
+### Fixed (Phase A — P0/P2 point fixes, hotfix4 D-1 / D-2 / D-7 / D-13 / D-14)
+- **`src/drivers/Qt/ConsoleMenu.cpp:846`** (D-1) — `SLOT(fdsLoadBIOS)`
+  → `SLOT(fdsLoadBiosFile)`. Restored FDS→Load BIOS menu action;
+  runtime warning `QObject::connect: No such slot consoleWin_t::
+  fdsLoadBIOS(void)` (previously at `output/fceux11_run2.err:5`)
+  eliminated.
+- **`src/drivers/Qt/ConsoleActions.cpp:111`** + **`src/drivers/Qt/
+  ConsoleTranslation.cpp:111`** (D-2) — Replaced literal `` `n ``
+  artifacts with real newlines; source-tree grep for `` `n `` in
+  `#include` lines is now zero.
+- **`src/drivers/Qt/input.h:54`** + **`input.cpp:334`** + **3 callers
+  in `GamePadConf.cpp:2341/2378/2529`** (D-7) — `hotkey_t::getString`
+  now takes a `size_t size` parameter so GamePad Config dialog
+  displays full hotkey names (was truncated to 7 chars). Plan listed
+  only 2 callers; 2378 was found during execution as a same-class
+  bug and fixed in the same commit.
+- **`src/drivers/Qt/ConsoleMenu.cpp:advMenu`** (D-13) — Connected
+  `aboutToShow`/`aboutToHide` to `mainMenuOpen`/`mainMenuClose`,
+  matching the other top-level menus. Affects `SDL.PauseOnMainMenuAccess`
+  behavior.
+- **`src/drivers/Qt/TraceLogger.cpp:411`** (D-14) — Destructor
+  `diskThread->wait(1000000)` (16.7 min potential hang) → 5000ms
+  timeout + `terminate()` fallback, matching the hotfix3 A-4
+  `ConsoleWindow.cpp` pattern.
+
 ### Removed (Phase D — NetPlay formal retirement)
 - **NetPlay (联机对战) formally removed.** The CLI options `--net`,
   `--user`, `--pass`, `--netkey`, `--port`, `--players`, `--server`
