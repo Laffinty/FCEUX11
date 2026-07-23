@@ -9562,67 +9562,38 @@ Do you wish to save/apply the new settings?</translation>
         <translation>WAV Record Stop</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1256"/>
-        <source>&amp;Documentation</source>
-        <translation>&amp;Documentación</translation>
-    </message>
-    <message>
-        <location filename="../ConsoleMenu.cpp" line="1258"/>
-        <location filename="../ConsoleWindow.cpp" line="937"/>
-        <source>&amp;Online</source>
-        <translation>En &amp;línea</translation>
-    </message>
-    <message>
-        <location filename="../ConsoleMenu.cpp" line="1259"/>
-        <location filename="../ConsoleWindow.cpp" line="946"/>
-        <source>Open online documentation in browser</source>
-        <translation>Abrir documentación en línea en el navegador</translation>
-    </message>
-    <message>
-        <location filename="../ConsoleMenu.cpp" line="1263"/>
-        <location filename="../ConsoleWindow.cpp" line="938"/>
-        <source>&amp;Local</source>
-        <translation>&amp;Local</translation>
-    </message>
-    <message>
-        <location filename="../ConsoleMenu.cpp" line="1264"/>
-        <location filename="../ConsoleWindow.cpp" line="947"/>
-        <source>Open bundled offline documentation</source>
-        <translation>Abrir documentación sin conexión incluida</translation>
-    </message>
-    <message>
-        <location filename="../ConsoleMenu.cpp" line="1269"/>
+        <location filename="../ConsoleMenu.cpp" line="1253"/>
         <location filename="../ConsoleWindow.cpp" line="933"/>
         <source>&amp;About FCEUX11</source>
         <translation>&amp;About FCEUX11</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1270"/>
-        <location filename="../ConsoleWindow.cpp" line="943"/>
+        <location filename="../ConsoleMenu.cpp" line="1254"/>
+        <location filename="../ConsoleWindow.cpp" line="940"/>
         <source>About FCEUX11</source>
         <translation>Acerca de FCEUX11</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1277"/>
+        <location filename="../ConsoleMenu.cpp" line="1261"/>
         <location filename="../ConsoleWindow.cpp" line="934"/>
         <source>About &amp;Qt</source>
         <translation>About &amp;Qt</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1278"/>
-        <location filename="../ConsoleWindow.cpp" line="944"/>
+        <location filename="../ConsoleMenu.cpp" line="1262"/>
+        <location filename="../ConsoleWindow.cpp" line="941"/>
         <source>About Qt</source>
         <translation>About Qt</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1285"/>
+        <location filename="../ConsoleMenu.cpp" line="1269"/>
         <location filename="../ConsoleWindow.cpp" line="935"/>
         <source>&amp;Message Log</source>
         <translation>&amp;Message Log</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1286"/>
-        <location filename="../ConsoleWindow.cpp" line="945"/>
+        <location filename="../ConsoleMenu.cpp" line="1270"/>
+        <location filename="../ConsoleWindow.cpp" line="942"/>
         <source>Message Log</source>
         <translation>Message Log</translation>
     </message>
@@ -9802,7 +9773,7 @@ Do you wish to save/apply the new settings?</translation>
     </message>
     <message>
         <location filename="../ConsoleRecentRom.cpp" line="164"/>
-        <location filename="../ConsoleWindow.cpp" line="951"/>
+        <location filename="../ConsoleWindow.cpp" line="946"/>
         <source>&amp;Clear Recent ROM List</source>
         <translation>&amp;Borrar lista de ROM recientes</translation>
     </message>

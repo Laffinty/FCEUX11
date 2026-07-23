@@ -1,4 +1,4 @@
-﻿/* FCE Ultra - NES/Famicom Emulator
+/* FCE Ultra - NES/Famicom Emulator
  *
  * Copyright notice for this file:
  *  Copyright (C) 2020 mjbudd77
@@ -933,9 +933,6 @@ void consoleWin_t::retranslateUi(void)
 	if (aboutAct) aboutAct->setText(tr("&About FCEUX11"));
 	if (aboutActQt) aboutActQt->setText(tr("About &Qt"));
 	if (msgLogAct) msgLogAct->setText(tr("&Message Log"));
-	// hotfix4 D-10: Documentation submenu entries (see ConsoleMenu.cpp)
-	if (openOnlineDocsAct) openOnlineDocsAct->setText(tr("&Online"));
-	if (openOfflineDocsAct) openOfflineDocsAct->setText(tr("&Local"));
 	// hotfix4 D-15: statusTip for Help-menu actions (constructed with
 	// English-only tips at createMainMenu time; not retranslated on
 	// language switch without these re-applies). Comprehensive coverage
@@ -943,8 +940,6 @@ void consoleWin_t::retranslateUi(void)
 	if (aboutAct) aboutAct->setStatusTip(tr("About FCEUX11"));
 	if (aboutActQt) aboutActQt->setStatusTip(tr("About Qt"));
 	if (msgLogAct) msgLogAct->setStatusTip(tr("Message Log"));
-	if (openOnlineDocsAct) openOnlineDocsAct->setStatusTip(tr("Open online documentation in browser"));
-	if (openOfflineDocsAct) openOfflineDocsAct->setStatusTip(tr("Open bundled offline documentation"));
 	// hotfix4 D-11: Clear Recent ROM List (recentRomMenu is rebuilt by
 	// buildRecentRomMenu, so clearRecentRomAct may be a stale pointer —
 	// guarded by nullptr check; safe no-op otherwise).

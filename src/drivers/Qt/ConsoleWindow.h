@@ -238,7 +238,14 @@ class  consoleWin_t : public QMainWindow
 		QAction *aboutAct = nullptr;
 		QAction *aboutActQt = nullptr;
 		QAction *msgLogAct = nullptr;
-		// hotfix4 D-10: Help -> Documentation submenu actions
+		// hotfix4 D-10 added these for a Help -> Documentation submenu;
+		// the submenu was later removed per maintainer decision, but the
+		// members are kept (unused, always nullptr) so the class layout
+		// stays unchanged — removing them would force a full rebuild of
+		// every ConsoleWindow.h includer (header dependency tracking in
+		// the NMake build tree is unreliable; see CHANGELOG hotfix4
+		// post-release notes). openOnlineDocs() itself remains reachable
+		// via the right-click context menu.
 		QAction *openOnlineDocsAct = nullptr;
 		QAction *openOfflineDocsAct = nullptr;
 		QAction *state[10] = {};

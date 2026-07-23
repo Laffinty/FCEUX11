@@ -9561,67 +9561,38 @@ Do you wish to save/apply the new settings?</source>
         <translation>WAV 錄製停止</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1256"/>
-        <source>&amp;Documentation</source>
-        <translation>文件(&amp;D)</translation>
-    </message>
-    <message>
-        <location filename="../ConsoleMenu.cpp" line="1258"/>
-        <location filename="../ConsoleWindow.cpp" line="937"/>
-        <source>&amp;Online</source>
-        <translation>線上(&amp;O)</translation>
-    </message>
-    <message>
-        <location filename="../ConsoleMenu.cpp" line="1259"/>
-        <location filename="../ConsoleWindow.cpp" line="946"/>
-        <source>Open online documentation in browser</source>
-        <translation>在瀏覽器中開啟線上文件</translation>
-    </message>
-    <message>
-        <location filename="../ConsoleMenu.cpp" line="1263"/>
-        <location filename="../ConsoleWindow.cpp" line="938"/>
-        <source>&amp;Local</source>
-        <translation>本機(&amp;L)</translation>
-    </message>
-    <message>
-        <location filename="../ConsoleMenu.cpp" line="1264"/>
-        <location filename="../ConsoleWindow.cpp" line="947"/>
-        <source>Open bundled offline documentation</source>
-        <translation>開啟內建離線文件</translation>
-    </message>
-    <message>
-        <location filename="../ConsoleMenu.cpp" line="1269"/>
+        <location filename="../ConsoleMenu.cpp" line="1253"/>
         <location filename="../ConsoleWindow.cpp" line="933"/>
         <source>&amp;About FCEUX11</source>
         <translation>關於 FCEUX11(&amp;A)</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1270"/>
-        <location filename="../ConsoleWindow.cpp" line="943"/>
+        <location filename="../ConsoleMenu.cpp" line="1254"/>
+        <location filename="../ConsoleWindow.cpp" line="940"/>
         <source>About FCEUX11</source>
         <translation>關於 FCEUX11</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1277"/>
+        <location filename="../ConsoleMenu.cpp" line="1261"/>
         <location filename="../ConsoleWindow.cpp" line="934"/>
         <source>About &amp;Qt</source>
         <translation>關於 Qt(&amp;Q)</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1278"/>
-        <location filename="../ConsoleWindow.cpp" line="944"/>
+        <location filename="../ConsoleMenu.cpp" line="1262"/>
+        <location filename="../ConsoleWindow.cpp" line="941"/>
         <source>About Qt</source>
         <translation>關於 Qt</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1285"/>
+        <location filename="../ConsoleMenu.cpp" line="1269"/>
         <location filename="../ConsoleWindow.cpp" line="935"/>
         <source>&amp;Message Log</source>
         <translation>訊息記錄(&amp;M)</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1286"/>
-        <location filename="../ConsoleWindow.cpp" line="945"/>
+        <location filename="../ConsoleMenu.cpp" line="1270"/>
+        <location filename="../ConsoleWindow.cpp" line="942"/>
         <source>Message Log</source>
         <translation>訊息記錄</translation>
     </message>
@@ -9801,7 +9772,7 @@ Do you wish to save/apply the new settings?</source>
     </message>
     <message>
         <location filename="../ConsoleRecentRom.cpp" line="164"/>
-        <location filename="../ConsoleWindow.cpp" line="951"/>
+        <location filename="../ConsoleWindow.cpp" line="946"/>
         <source>&amp;Clear Recent ROM List</source>
         <translation>清除最近 ROM 清單(&amp;C)</translation>
     </message>

@@ -2830,7 +2830,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../FrameTimingStats.cpp" line="52"/>
         <location filename="../FrameTimingStats.cpp" line="196"/>
         <source>Frame Timing Statistics</source>
-        <translation>Statistiques de timing d'image</translation>
+        <translation>Statistiques de timing d&apos;image</translation>
     </message>
     <message>
         <location filename="../FrameTimingStats.cpp" line="59"/>
@@ -6583,7 +6583,7 @@ Replace file?</translation>
         <location filename="../StateRecorderConf.cpp" line="55"/>
         <location filename="../StateRecorderConf.cpp" line="364"/>
         <source>State Recorder Config</source>
-        <translation>Config. de l'enregistreur d'états</translation>
+        <translation>Config. de l&apos;enregistreur d&apos;états</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="60"/>
@@ -8446,17 +8446,17 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../TraceLogger.cpp" line="441"/>
         <source>Log Frame Counter</source>
-        <translation>Journaliser le compteur d'images</translation>
+        <translation>Journaliser le compteur d&apos;images</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="442"/>
         <source>Log Emu Messages</source>
-        <translation>Journaliser les messages de l'émulateur</translation>
+        <translation>Journaliser les messages de l&apos;émulateur</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="443"/>
         <source>Log Status Flags</source>
-        <translation>Journaliser les flags d'état</translation>
+        <translation>Journaliser les flags d&apos;état</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="444"/>
@@ -8476,7 +8476,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../TraceLogger.cpp" line="448"/>
         <source>Log Instruction Count</source>
-        <translation>Journaliser le nombre d'instructions</translation>
+        <translation>Journaliser le nombre d&apos;instructions</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="451"/>
@@ -9562,67 +9562,38 @@ Do you wish to save/apply the new settings?</translation>
         <translation>WAV Record Stop</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1256"/>
-        <source>&amp;Documentation</source>
-        <translation>&amp;Documentation</translation>
-    </message>
-    <message>
-        <location filename="../ConsoleMenu.cpp" line="1258"/>
-        <location filename="../ConsoleWindow.cpp" line="937"/>
-        <source>&amp;Online</source>
-        <translation>En &amp;ligne</translation>
-    </message>
-    <message>
-        <location filename="../ConsoleMenu.cpp" line="1259"/>
-        <location filename="../ConsoleWindow.cpp" line="946"/>
-        <source>Open online documentation in browser</source>
-        <translation>Ouvrir la documentation en ligne dans le navigateur</translation>
-    </message>
-    <message>
-        <location filename="../ConsoleMenu.cpp" line="1263"/>
-        <location filename="../ConsoleWindow.cpp" line="938"/>
-        <source>&amp;Local</source>
-        <translation>&amp;Local</translation>
-    </message>
-    <message>
-        <location filename="../ConsoleMenu.cpp" line="1264"/>
-        <location filename="../ConsoleWindow.cpp" line="947"/>
-        <source>Open bundled offline documentation</source>
-        <translation>Ouvrir la documentation hors ligne fournie</translation>
-    </message>
-    <message>
-        <location filename="../ConsoleMenu.cpp" line="1269"/>
+        <location filename="../ConsoleMenu.cpp" line="1253"/>
         <location filename="../ConsoleWindow.cpp" line="933"/>
         <source>&amp;About FCEUX11</source>
         <translation>&amp;About FCEUX11</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1270"/>
-        <location filename="../ConsoleWindow.cpp" line="943"/>
+        <location filename="../ConsoleMenu.cpp" line="1254"/>
+        <location filename="../ConsoleWindow.cpp" line="940"/>
         <source>About FCEUX11</source>
         <translation>À propos de FCEUX11</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1277"/>
+        <location filename="../ConsoleMenu.cpp" line="1261"/>
         <location filename="../ConsoleWindow.cpp" line="934"/>
         <source>About &amp;Qt</source>
         <translation>About &amp;Qt</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1278"/>
-        <location filename="../ConsoleWindow.cpp" line="944"/>
+        <location filename="../ConsoleMenu.cpp" line="1262"/>
+        <location filename="../ConsoleWindow.cpp" line="941"/>
         <source>About Qt</source>
         <translation>About Qt</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1285"/>
+        <location filename="../ConsoleMenu.cpp" line="1269"/>
         <location filename="../ConsoleWindow.cpp" line="935"/>
         <source>&amp;Message Log</source>
         <translation>&amp;Message Log</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1286"/>
-        <location filename="../ConsoleWindow.cpp" line="945"/>
+        <location filename="../ConsoleMenu.cpp" line="1270"/>
+        <location filename="../ConsoleWindow.cpp" line="942"/>
         <source>Message Log</source>
         <translation>Message Log</translation>
     </message>
@@ -9802,7 +9773,7 @@ Do you wish to save/apply the new settings?</translation>
     </message>
     <message>
         <location filename="../ConsoleRecentRom.cpp" line="164"/>
-        <location filename="../ConsoleWindow.cpp" line="951"/>
+        <location filename="../ConsoleWindow.cpp" line="946"/>
         <source>&amp;Clear Recent ROM List</source>
         <translation>Effa&amp;cer la liste des ROM récentes</translation>
     </message>
@@ -9978,7 +9949,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../iNesHeaderEditor.cpp" line="193"/>
         <location filename="../iNesHeaderEditor.cpp" line="556"/>
         <source>NES Header Editor</source>
-        <translation>Éditeur d'en-tête NES</translation>
+        <translation>Éditeur d&apos;en-tête NES</translation>
     </message>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="201"/>

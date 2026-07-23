@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 fixes), Phase C (5 feature completeness fixes), Phase D (1 NetPlay
 formal removal + 1 build-policy evaluation), Phase E (T-1 static
 test + total verification). See
-`docs/FCEUX11-1.15_LTS-hotfix4-PLAN.md` for full scope.
+`docs/history/FCEUX11-1.15_LTS-hotfix4-PLAN.md` for full scope.
 
 ### Added (Phase E — regression test)
 - **`scripts/check_menu_slots.py`** (T-1) — Static gate that scans
@@ -100,6 +100,16 @@ test + total verification). See
   regenerated (`scripts/_hotfix4_fill_translations.py` kept as the
   record of the applied translation table).
 - **readme.md** — NetPlay removal now documented (D-8 follow-up).
+
+### Help menu adjustment (2026-07-23, maintainer decision)
+- **Help → Documentation submenu removed** — the D-10 submenu
+  (Online / Local entries) was taken out of the Help menu per
+  maintainer decision; the menu now contains only About FCEUX11 /
+  About Qt / Message Log. `openOnlineDocs()` remains reachable via
+  the right-click context menu; the two action members in
+  `ConsoleWindow.h` are kept unused (nullptr) to preserve class
+  layout. The 5 now-unused strings were purged from all `.ts` files
+  via lupdate and all 12 `.qm` regenerated.
 
 ## [1.15(hotfix3)] - 2026-07-21
 
