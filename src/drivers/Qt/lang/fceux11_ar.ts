@@ -40,7 +40,7 @@
         <location filename="../AviRiffViewer.cpp" line="102"/>
         <location filename="../AviRiffViewer.cpp" line="152"/>
         <source>AVI RIFF Viewer</source>
-        <translation type="unfinished"></translation>
+        <translation>عارض AVI RIFF</translation>
     </message>
     <message>
         <location filename="../AviRiffViewer.cpp" line="114"/>
@@ -57,22 +57,22 @@
     <message>
         <location filename="../AviRiffViewer.cpp" line="163"/>
         <source>Block</source>
-        <translation type="unfinished"></translation>
+        <translation>كتلة</translation>
     </message>
     <message>
         <location filename="../AviRiffViewer.cpp" line="164"/>
         <source>FCC</source>
-        <translation type="unfinished"></translation>
+        <translation>FCC</translation>
     </message>
     <message>
         <location filename="../AviRiffViewer.cpp" line="165"/>
         <source>Size</source>
-        <translation type="unfinished"></translation>
+        <translation>الحجم</translation>
     </message>
     <message>
         <location filename="../AviRiffViewer.cpp" line="166"/>
         <source>FilePos</source>
-        <translation type="unfinished"></translation>
+        <translation>FilePos</translation>
     </message>
     <message>
         <location filename="../AviRiffViewer.cpp" line="227"/>
@@ -589,47 +589,47 @@
     <message>
         <location filename="../CodeDataLogger.cpp" line="313"/>
         <source>PRG Logged Code:</source>
-        <translation type="unfinished"></translation>
+        <translation>الشيفرة المسجلة PRG:</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="314"/>
         <source>PRG Logged Data:</source>
-        <translation type="unfinished"></translation>
+        <translation>البيانات المسجلة PRG:</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="315"/>
         <source>PRG Unmapped:</source>
-        <translation type="unfinished"></translation>
+        <translation>PRG غير معيّن:</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="316"/>
         <source>CHR Logged Code:</source>
-        <translation type="unfinished"></translation>
+        <translation>الشيفرة المسجلة CHR:</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="317"/>
         <source>CHR Logged Data:</source>
-        <translation type="unfinished"></translation>
+        <translation>البيانات المسجلة CHR:</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="318"/>
         <source>CHR Unmapped:</source>
-        <translation type="unfinished"></translation>
+        <translation>CHR غير معيّن:</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="320"/>
         <source>Auto Save CDL</source>
-        <translation type="unfinished"></translation>
+        <translation>حفظ CDL تلقائيًا</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="321"/>
         <source>Auto Load CDL</source>
-        <translation type="unfinished"></translation>
+        <translation>تحميل CDL تلقائيًا</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="322"/>
         <source>Auto Resume Logging</source>
-        <translation type="unfinished"></translation>
+        <translation>استئناف التسجيل تلقائيًا</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="379"/>
@@ -726,7 +726,7 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="297"/>
         <source>6502 Debugger</source>
-        <translation type="unfinished"></translation>
+        <translation>مصحح أخطاء 6502</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="315"/>
@@ -2647,7 +2647,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../FamilyKeyboard.cpp" line="587"/>
         <location filename="../FamilyKeyboard.cpp" line="1008"/>
         <source>Family Keyboard</source>
-        <translation type="unfinished">Family Keyboard</translation>
+        <translation>لوحة مفاتيح فاميلي</translation>
     </message>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="646"/>
@@ -2808,7 +2808,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../FamilyKeyboard.cpp" line="1559"/>
         <source>Press a key to map...</source>
-        <translation type="unfinished"></translation>
+        <translation>اضغط مفتاحًا لتعيينه...</translation>
     </message>
 </context>
 <context>
@@ -2830,7 +2830,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../FrameTimingStats.cpp" line="52"/>
         <location filename="../FrameTimingStats.cpp" line="196"/>
         <source>Frame Timing Statistics</source>
-        <translation type="unfinished"></translation>
+        <translation>إحصاءات توقيت الإطار</translation>
     </message>
     <message>
         <location filename="../FrameTimingStats.cpp" line="59"/>
@@ -2946,7 +2946,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../GameGenie.cpp" line="126"/>
         <location filename="../GameGenie.cpp" line="258"/>
         <source>Game Genie Encoder/Decoder Tool</source>
-        <translation type="unfinished"></translation>
+        <translation>أداة ترميز/فك ترميز Game Genie</translation>
     </message>
     <message>
         <location filename="../GameGenie.cpp" line="133"/>
@@ -2986,7 +2986,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../GameGenie.cpp" line="259"/>
         <source>Add Cheat</source>
-        <translation type="unfinished">Add Cheat</translation>
+        <translation>إضافة كود غش</translation>
     </message>
 </context>
 <context>
@@ -3549,42 +3549,42 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../CheatsConf.cpp" line="513"/>
         <source>Search Results</source>
-        <translation type="unfinished"></translation>
+        <translation>نتائج البحث</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="514"/>
         <source>Add Cheat</source>
-        <translation type="unfinished">Add Cheat</translation>
+        <translation>إضافة كود غش</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="520"/>
         <source>Known Value</source>
-        <translation type="unfinished"></translation>
+        <translation>القيمة المعروفة</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="525"/>
         <source>Not Equal Search</source>
-        <translation type="unfinished"></translation>
+        <translation>بحث عن غير مساوٍ</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="526"/>
         <source>Greater Than Search</source>
-        <translation type="unfinished"></translation>
+        <translation>بحث عن أكبر من</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="527"/>
         <source>Less Than Search</source>
-        <translation type="unfinished"></translation>
+        <translation>بحث عن أصغر من</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="529"/>
         <source>Auto Load/Save Cheats</source>
-        <translation type="unfinished"></translation>
+        <translation>تحميل/حفظ أكواد الغش تلقائيًا</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="530"/>
         <source>Pause While Active</source>
-        <translation type="unfinished"></translation>
+        <translation>إيقاف مؤقت أثناء النشاط</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="792"/>
@@ -4334,7 +4334,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../HotKeyConf.cpp" line="51"/>
         <location filename="../HotKeyConf.cpp" line="120"/>
         <source>Hotkey Configuration</source>
-        <translation type="unfinished"></translation>
+        <translation>إعدادات مفاتيح الاختصار</translation>
     </message>
     <message>
         <location filename="../HotKeyConf.cpp" line="88"/>
@@ -4353,7 +4353,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../HotKeyConf.cpp" line="338"/>
         <location filename="../HotKeyConf.cpp" line="381"/>
         <source>Set Hot Key</source>
-        <translation type="unfinished"></translation>
+        <translation>تعيين مفتاح الاختصار</translation>
     </message>
     <message>
         <location filename="../HotKeyConf.cpp" line="345"/>
@@ -4387,7 +4387,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../GamePadConf.cpp" line="2502"/>
         <location filename="../GamePadConf.cpp" line="2579"/>
         <source>Hotkey Select</source>
-        <translation type="unfinished"></translation>
+        <translation>اختيار مفتاح الاختصار</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="2551"/>
@@ -4408,7 +4408,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../InputConf.cpp" line="76"/>
         <location filename="../InputConf.cpp" line="313"/>
         <source>Input Configuration</source>
-        <translation type="unfinished"></translation>
+        <translation>إعدادات الإدخال</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="80"/>
@@ -4534,7 +4534,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../InputConf.cpp" line="226"/>
         <source>Family Keyboard</source>
-        <translation type="unfinished">Family Keyboard</translation>
+        <translation>لوحة مفاتيح فاميلي</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="227"/>
@@ -4662,12 +4662,12 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1314"/>
         <source>OK</source>
-        <translation type="unfinished">موافق</translation>
+        <translation>موافق</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1316"/>
         <source>Reset Defaults</source>
-        <translation type="unfinished"></translation>
+        <translation>استعادة الإعدادات الافتراضية</translation>
     </message>
 </context>
 <context>
@@ -4730,12 +4730,12 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../AviOptionsDialog.cpp" line="188"/>
         <source>Video</source>
-        <translation type="unfinished"></translation>
+        <translation>الفيديو</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="189"/>
         <source>Audio</source>
-        <translation type="unfinished"></translation>
+        <translation>الصوت</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="215"/>
@@ -4793,12 +4793,12 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1612"/>
         <source>Video</source>
-        <translation type="unfinished"></translation>
+        <translation>الفيديو</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1613"/>
         <source>Audio</source>
-        <translation type="unfinished"></translation>
+        <translation>الصوت</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1634"/>
@@ -4919,8 +4919,8 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <source>The Lua script running has been running a long time.
 It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
 </source>
-        <translation type="unfinished">The Lua script running has been running a long time.
-It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
+        <translation>يعمل برنامج Lua النصي منذ وقت طويل.
+ربما خرج عن السيطرة. هل تريد إيقافه؟ (إذا اخترت لا فلن يُسأل مجددًا)
 </translation>
     </message>
     <message>
@@ -4945,7 +4945,7 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MovieOptions.cpp" line="54"/>
         <location filename="../MovieOptions.cpp" line="205"/>
         <source>Movie Options</source>
-        <translation type="unfinished">Movie Options</translation>
+        <translation>خيارات التسجيل</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="63"/>
@@ -5044,7 +5044,7 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MoviePlay.cpp" line="60"/>
         <location filename="../MoviePlay.cpp" line="225"/>
         <source>Movie Play</source>
-        <translation type="unfinished"></translation>
+        <translation>تشغيل التسجيل</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="66"/>
@@ -5286,12 +5286,20 @@ Replace file?</translation>
 <context>
     <name>MsgLogViewDialog_t</name>
     <message>
+        <location filename="../MsgLogViewer.cpp" line="198"/>
+        <location filename="../MsgLogViewer.cpp" line="262"/>
+        <source>Message Log Viewer</source>
+        <translation>عارض سجل الرسائل</translation>
+    </message>
+    <message>
         <location filename="../MsgLogViewer.cpp" line="210"/>
+        <location filename="../MsgLogViewer.cpp" line="263"/>
         <source>Clear</source>
         <translation>مسح</translation>
     </message>
     <message>
         <location filename="../MsgLogViewer.cpp" line="211"/>
+        <location filename="../MsgLogViewer.cpp" line="264"/>
         <source>Close</source>
         <translation>إغلاق</translation>
     </message>
@@ -5381,7 +5389,7 @@ Replace file?</translation>
         <location filename="../PaletteEditor.cpp" line="74"/>
         <location filename="../PaletteEditor.cpp" line="211"/>
         <source>Palette Editor</source>
-        <translation type="unfinished"></translation>
+        <translation>محرر لوحة الألوان</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="88"/>
@@ -5992,7 +6000,7 @@ Replace file?</translation>
         <location filename="../RamSearch.cpp" line="219"/>
         <location filename="../RamSearch.cpp" line="563"/>
         <source>RAM Search</source>
-        <translation type="unfinished"></translation>
+        <translation>بحث RAM</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="232"/>
@@ -6084,7 +6092,7 @@ Replace file?</translation>
         <location filename="../RamSearch.cpp" line="326"/>
         <location filename="../RamSearch.cpp" line="555"/>
         <source>Add Cheat</source>
-        <translation type="unfinished">Add Cheat</translation>
+        <translation>إضافة كود غش</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="331"/>
@@ -6219,7 +6227,7 @@ Replace file?</translation>
         <location filename="../RamWatch.cpp" line="95"/>
         <location filename="../RamWatch.cpp" line="365"/>
         <source>RAM Watch</source>
-        <translation type="unfinished"></translation>
+        <translation>مراقبة RAM</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="110"/>
@@ -6469,7 +6477,7 @@ Replace file?</translation>
         <location filename="../RamWatch.cpp" line="296"/>
         <location filename="../RamWatch.cpp" line="358"/>
         <source>Add Cheat</source>
-        <translation type="unfinished">Add Cheat</translation>
+        <translation>إضافة كود غش</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="560"/>
@@ -6575,7 +6583,7 @@ Replace file?</translation>
         <location filename="../StateRecorderConf.cpp" line="55"/>
         <location filename="../StateRecorderConf.cpp" line="364"/>
         <source>State Recorder Config</source>
-        <translation type="unfinished"></translation>
+        <translation>إعدادات مسجل الحالة</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="60"/>
@@ -6920,22 +6928,22 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../SymbolicDebug.cpp" line="684"/>
         <source>Is Array</source>
-        <translation type="unfinished"></translation>
+        <translation>هو مصفوفة</translation>
     </message>
     <message>
         <location filename="../SymbolicDebug.cpp" line="685"/>
         <source>Overwrite Name</source>
-        <translation type="unfinished"></translation>
+        <translation>استبدال الاسم</translation>
     </message>
     <message>
         <location filename="../SymbolicDebug.cpp" line="686"/>
         <source>Overwrite Comment</source>
-        <translation type="unfinished"></translation>
+        <translation>استبدال التعليق</translation>
     </message>
     <message>
         <location filename="../SymbolicDebug.cpp" line="687"/>
         <source>Comment Head Only</source>
-        <translation type="unfinished"></translation>
+        <translation>رأس التعليق فقط</translation>
     </message>
 </context>
 <context>
@@ -8137,7 +8145,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TimingConf.cpp" line="59"/>
         <location filename="../TimingConf.cpp" line="402"/>
         <source>Timing Configuration</source>
-        <translation type="unfinished"></translation>
+        <translation>إعدادات التوقيت</translation>
     </message>
     <message>
         <location filename="../TimingConf.cpp" line="64"/>
@@ -8428,57 +8436,57 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../TraceLogger.cpp" line="439"/>
         <source>Auto Update</source>
-        <translation type="unfinished"></translation>
+        <translation>تحديث تلقائي</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="440"/>
         <source>Log Registers</source>
-        <translation type="unfinished"></translation>
+        <translation>تسجيل السجلات</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="441"/>
         <source>Log Frame Counter</source>
-        <translation type="unfinished"></translation>
+        <translation>تسجيل عداد الإطارات</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="442"/>
         <source>Log Emu Messages</source>
-        <translation type="unfinished"></translation>
+        <translation>تسجيل رسائل المحاكي</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="443"/>
         <source>Log Status Flags</source>
-        <translation type="unfinished"></translation>
+        <translation>تسجيل أعلام الحالة</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="444"/>
         <source>Log Cycle Count</source>
-        <translation type="unfinished"></translation>
+        <translation>تسجيل عدد الدورات</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="446"/>
         <source>Use Stack Pointer</source>
-        <translation type="unfinished"></translation>
+        <translation>استخدام مؤشر المكدس</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="447"/>
         <source>Disasm Left</source>
-        <translation type="unfinished"></translation>
+        <translation>تفكيك يسار</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="448"/>
         <source>Log Instruction Count</source>
-        <translation type="unfinished"></translation>
+        <translation>تسجيل عدد التعليمات</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="451"/>
         <source>Log New Mapped Code</source>
-        <translation type="unfinished"></translation>
+        <translation>تسجيل الشيفرة المعيّنة الجديدة</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="452"/>
         <source>Log New Mapped Data</source>
-        <translation type="unfinished"></translation>
+        <translation>تسجيل البيانات المعيّنة الجديدة</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="453"/>
@@ -8489,7 +8497,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../TraceLogger.cpp" line="454"/>
         <source>Clear</source>
-        <translation type="unfinished">مسح</translation>
+        <translation>مسح</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="609"/>
@@ -8519,7 +8527,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../ConsoleDebugger.cpp" line="7373"/>
         <location filename="../ConsoleDebugger.cpp" line="7402"/>
         <source> = </source>
-        <translation type="unfinished"> = </translation>
+        <translation> = </translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7381"/>
@@ -8596,37 +8604,37 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleWindow.cpp" line="871"/>
         <source>&amp;NTSC</source>
-        <translation type="unfinished"></translation>
+        <translation>&amp;NTSC</translation>
     </message>
     <message>
         <location filename="../ConsoleWindow.cpp" line="872"/>
         <source>&amp;PAL</source>
-        <translation type="unfinished"></translation>
+        <translation>&amp;PAL</translation>
     </message>
     <message>
         <location filename="../ConsoleWindow.cpp" line="873"/>
         <source>&amp;Dendy</source>
-        <translation type="unfinished"></translation>
+        <translation>&amp;Dendy</translation>
     </message>
     <message>
         <location filename="../ConsoleWindow.cpp" line="875"/>
         <source>&amp;Default</source>
-        <translation type="unfinished"></translation>
+        <translation>الافتراضي (&amp;D)</translation>
     </message>
     <message>
         <location filename="../ConsoleWindow.cpp" line="876"/>
         <source>Fill $&amp;FF</source>
-        <translation type="unfinished"></translation>
+        <translation>تعبئة $FF (&amp;F)</translation>
     </message>
     <message>
         <location filename="../ConsoleWindow.cpp" line="877"/>
         <source>Fill $&amp;00</source>
-        <translation type="unfinished"></translation>
+        <translation>تعبئة $00 (&amp;0)</translation>
     </message>
     <message>
         <location filename="../ConsoleWindow.cpp" line="878"/>
         <source>&amp;Random</source>
-        <translation type="unfinished"></translation>
+        <translation>عشوائي (&amp;R)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="141"/>
@@ -8746,7 +8754,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../ConsoleMenu.cpp" line="255"/>
         <location filename="../ConsoleWindow.cpp" line="859"/>
         <source>Slot &amp;%1</source>
-        <translation type="unfinished"></translation>
+        <translation>خانة %1 (&amp;%1)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="303"/>
@@ -8836,55 +8844,55 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../ConsoleMenu.cpp" line="415"/>
         <location filename="../ConsoleWindow.cpp" line="901"/>
         <source>Japanese</source>
-        <translation type="unfinished"></translation>
+        <translation>اليابانية</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="420"/>
         <location filename="../ConsoleWindow.cpp" line="903"/>
         <source>Korean</source>
-        <translation type="unfinished"></translation>
+        <translation>الكورية</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="425"/>
         <location filename="../ConsoleWindow.cpp" line="905"/>
         <source>Spanish</source>
-        <translation type="unfinished"></translation>
+        <translation>الإسبانية</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="430"/>
         <location filename="../ConsoleWindow.cpp" line="907"/>
         <source>French</source>
-        <translation type="unfinished"></translation>
+        <translation>الفرنسية</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="435"/>
         <location filename="../ConsoleWindow.cpp" line="909"/>
         <source>German</source>
-        <translation type="unfinished"></translation>
+        <translation>الألمانية</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="440"/>
         <location filename="../ConsoleWindow.cpp" line="911"/>
         <source>Vietnamese</source>
-        <translation type="unfinished"></translation>
+        <translation>الفيتنامية</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="445"/>
         <location filename="../ConsoleWindow.cpp" line="913"/>
         <source>Thai</source>
-        <translation type="unfinished"></translation>
+        <translation>التايلاندية</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="450"/>
         <location filename="../ConsoleWindow.cpp" line="915"/>
         <source>Hindi (beta)</source>
-        <translation type="unfinished"></translation>
+        <translation>الهندية (بيتا)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="455"/>
         <location filename="../ConsoleWindow.cpp" line="917"/>
         <source>Arabic (beta)</source>
-        <translation type="unfinished"></translation>
+        <translation>العربية (بيتا)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="468"/>
@@ -8896,7 +8904,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../ConsoleMenu.cpp" line="472"/>
         <location filename="../ConsoleWindow.cpp" line="867"/>
         <source>&amp;%1x</source>
-        <translation type="unfinished"></translation>
+        <translation>&amp;%1x</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="480"/>
@@ -9078,7 +9086,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../ConsoleMenu.cpp" line="719"/>
         <location filename="../ConsoleWindow.cpp" line="925"/>
         <source>%1 On, %2 Off</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 تشغيل، %2 إيقاف</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="745"/>
@@ -9254,7 +9262,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="939"/>
         <source>Movie Options</source>
-        <translation type="unfinished">Movie Options</translation>
+        <translation>خيارات التسجيل</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="948"/>
@@ -9554,35 +9562,67 @@ Do you wish to save/apply the new settings?</translation>
         <translation type="unfinished">WAV Record Stop</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1253"/>
+        <location filename="../ConsoleMenu.cpp" line="1256"/>
+        <source>&amp;Documentation</source>
+        <translation>الوثائق (&amp;D)</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1258"/>
+        <location filename="../ConsoleWindow.cpp" line="937"/>
+        <source>&amp;Online</source>
+        <translation>عبر الإنترنت (&amp;O)</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1259"/>
+        <location filename="../ConsoleWindow.cpp" line="946"/>
+        <source>Open online documentation in browser</source>
+        <translation>فتح الوثائق عبر الإنترنت في المتصفح</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1263"/>
+        <location filename="../ConsoleWindow.cpp" line="938"/>
+        <source>&amp;Local</source>
+        <translation>محلي (&amp;L)</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1264"/>
+        <location filename="../ConsoleWindow.cpp" line="947"/>
+        <source>Open bundled offline documentation</source>
+        <translation>فتح الوثائق المضمّنة دون اتصال</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1269"/>
         <location filename="../ConsoleWindow.cpp" line="933"/>
         <source>&amp;About FCEUX11</source>
         <translation type="unfinished">&amp;About FCEUX11</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1254"/>
+        <location filename="../ConsoleMenu.cpp" line="1270"/>
+        <location filename="../ConsoleWindow.cpp" line="943"/>
         <source>About FCEUX11</source>
         <translation>حول FCEUX11</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1261"/>
+        <location filename="../ConsoleMenu.cpp" line="1277"/>
         <location filename="../ConsoleWindow.cpp" line="934"/>
         <source>About &amp;Qt</source>
         <translation type="unfinished">About &amp;Qt</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1262"/>
+        <location filename="../ConsoleMenu.cpp" line="1278"/>
+        <location filename="../ConsoleWindow.cpp" line="944"/>
         <source>About Qt</source>
         <translation type="unfinished">About Qt</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1269"/>
+        <location filename="../ConsoleMenu.cpp" line="1285"/>
         <location filename="../ConsoleWindow.cpp" line="935"/>
         <source>&amp;Message Log</source>
         <translation type="unfinished">&amp;Message Log</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1270"/>
+        <location filename="../ConsoleMenu.cpp" line="1286"/>
+        <location filename="../ConsoleWindow.cpp" line="945"/>
         <source>Message Log</source>
         <translation type="unfinished">Message Log</translation>
     </message>
@@ -9614,7 +9654,7 @@ Do you wish to save/apply the new settings?</translation>
         <translation type="unfinished">NSF Sound Files (*.nsf *.NSF) ;; Zip Files (*.zip *.ZIP) ;; All files (*)</translation>
     </message>
     <message>
-        <location filename="../ConsoleDebugWindows.cpp" line="292"/>
+        <location filename="../ConsoleDebugWindows.cpp" line="294"/>
         <location filename="../ConsoleEmuControl.cpp" line="157"/>
         <location filename="../ConsoleEmuControl.cpp" line="549"/>
         <location filename="../ConsoleFile.cpp" line="341"/>
@@ -9654,12 +9694,12 @@ Do you wish to save/apply the new settings?</translation>
         <translation type="unfinished">.sav</translation>
     </message>
     <message>
-        <location filename="../ConsoleDebugWindows.cpp" line="278"/>
+        <location filename="../ConsoleDebugWindows.cpp" line="280"/>
         <source>Open Game Genie ROM</source>
         <translation type="unfinished">Open Game Genie ROM</translation>
     </message>
     <message>
-        <location filename="../ConsoleDebugWindows.cpp" line="288"/>
+        <location filename="../ConsoleDebugWindows.cpp" line="290"/>
         <source>GG ROM File (gg.rom  *Genie*.nes) ;; All files (*)</source>
         <translation type="unfinished">GG ROM File (gg.rom  *Genie*.nes) ;; All files (*)</translation>
     </message>
@@ -9760,6 +9800,12 @@ Do you wish to save/apply the new settings?</translation>
         <source>QHelp Files (*.qhc *.QHC) ;; All files (*)</source>
         <translation type="unfinished">QHelp Files (*.qhc *.QHC) ;; All files (*)</translation>
     </message>
+    <message>
+        <location filename="../ConsoleRecentRom.cpp" line="164"/>
+        <location filename="../ConsoleWindow.cpp" line="951"/>
+        <source>&amp;Clear Recent ROM List</source>
+        <translation>مسح قائمة ROM الأخيرة (&amp;C)</translation>
+    </message>
 </context>
 <context>
     <name>guiColorPickerDialog_t</name>
@@ -9767,7 +9813,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../GuiConf.cpp" line="1431"/>
         <location filename="../GuiConf.cpp" line="1510"/>
         <source>Pick Palette Color</source>
-        <translation type="unfinished"></translation>
+        <translation>اختيار لون اللوحة</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1459"/>
@@ -9932,7 +9978,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../iNesHeaderEditor.cpp" line="193"/>
         <location filename="../iNesHeaderEditor.cpp" line="556"/>
         <source>NES Header Editor</source>
-        <translation type="unfinished"></translation>
+        <translation>محرر ترويسة NES</translation>
     </message>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="201"/>
@@ -11023,18 +11069,18 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../input.cpp" line="661"/>
         <source>Save</source>
-        <translation type="unfinished">حفظ</translation>
+        <translation>حفظ</translation>
     </message>
     <message>
         <location filename="../input.cpp" line="667"/>
         <location filename="../input.cpp" line="677"/>
         <source>Load</source>
-        <translation type="unfinished">تحميل</translation>
+        <translation>تحميل</translation>
     </message>
     <message>
         <location filename="../input.cpp" line="672"/>
         <source>Record</source>
-        <translation type="unfinished"></translation>
+        <translation>تسجيل</translation>
     </message>
 </context>
 <context>

@@ -38,6 +38,9 @@
 
 ---
 
+> **已知移除 / Known Removal**：自 v1.15 (hotfix4) 起，**NetPlay（联机对战）** 正式移除——上游 FCEUX 的该功能本已不可用（`config.cpp` 原注 "netplay is broken"），本版本清理了其 CLI 选项与不可达代码，核心 `netplay.cpp` 保留以维持存档兼容。详见 [CHANGELOG.md](CHANGELOG.md)。
+> Since v1.15 (hotfix4), **NetPlay** has been formally removed — it was already broken upstream. Related CLI options and unreachable code were cleaned up; core `netplay.cpp` is kept for savestate compatibility. See [CHANGELOG.md](CHANGELOG.md).
+
 ## 系统要求 / System Requirements
 
 ### 运行环境 / Runtime

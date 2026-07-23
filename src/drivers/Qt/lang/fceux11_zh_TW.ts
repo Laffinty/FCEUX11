@@ -40,7 +40,7 @@
         <location filename="../AviRiffViewer.cpp" line="102"/>
         <location filename="../AviRiffViewer.cpp" line="152"/>
         <source>AVI RIFF Viewer</source>
-        <translation type="unfinished"></translation>
+        <translation>AVI RIFF 檢視器</translation>
     </message>
     <message>
         <location filename="../AviRiffViewer.cpp" line="114"/>
@@ -57,22 +57,22 @@
     <message>
         <location filename="../AviRiffViewer.cpp" line="163"/>
         <source>Block</source>
-        <translation type="unfinished"></translation>
+        <translation>區塊</translation>
     </message>
     <message>
         <location filename="../AviRiffViewer.cpp" line="164"/>
         <source>FCC</source>
-        <translation type="unfinished"></translation>
+        <translation>FCC</translation>
     </message>
     <message>
         <location filename="../AviRiffViewer.cpp" line="165"/>
         <source>Size</source>
-        <translation type="unfinished"></translation>
+        <translation>大小</translation>
     </message>
     <message>
         <location filename="../AviRiffViewer.cpp" line="166"/>
         <source>FilePos</source>
-        <translation type="unfinished"></translation>
+        <translation>FilePos</translation>
     </message>
     <message>
         <location filename="../AviRiffViewer.cpp" line="227"/>
@@ -589,47 +589,47 @@
     <message>
         <location filename="../CodeDataLogger.cpp" line="313"/>
         <source>PRG Logged Code:</source>
-        <translation type="unfinished"></translation>
+        <translation>PRG 已記錄程式碼:</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="314"/>
         <source>PRG Logged Data:</source>
-        <translation type="unfinished"></translation>
+        <translation>PRG 已記錄資料:</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="315"/>
         <source>PRG Unmapped:</source>
-        <translation type="unfinished"></translation>
+        <translation>PRG 未映射:</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="316"/>
         <source>CHR Logged Code:</source>
-        <translation type="unfinished"></translation>
+        <translation>CHR 已記錄程式碼:</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="317"/>
         <source>CHR Logged Data:</source>
-        <translation type="unfinished"></translation>
+        <translation>CHR 已記錄資料:</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="318"/>
         <source>CHR Unmapped:</source>
-        <translation type="unfinished"></translation>
+        <translation>CHR 未映射:</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="320"/>
         <source>Auto Save CDL</source>
-        <translation type="unfinished"></translation>
+        <translation>自動儲存 CDL</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="321"/>
         <source>Auto Load CDL</source>
-        <translation type="unfinished"></translation>
+        <translation>自動載入 CDL</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="322"/>
         <source>Auto Resume Logging</source>
-        <translation type="unfinished"></translation>
+        <translation>自動恢復記錄</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="379"/>
@@ -726,7 +726,7 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="297"/>
         <source>6502 Debugger</source>
-        <translation type="unfinished"></translation>
+        <translation>6502 偵錯器</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="315"/>
@@ -2647,7 +2647,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../FamilyKeyboard.cpp" line="587"/>
         <location filename="../FamilyKeyboard.cpp" line="1008"/>
         <source>Family Keyboard</source>
-        <translation type="unfinished">家用機鍵盤</translation>
+        <translation>家庭鍵盤</translation>
     </message>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="646"/>
@@ -2808,7 +2808,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="1559"/>
         <source>Press a key to map...</source>
-        <translation type="unfinished"></translation>
+        <translation>請按要映射的按鍵...</translation>
     </message>
 </context>
 <context>
@@ -2830,7 +2830,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../FrameTimingStats.cpp" line="52"/>
         <location filename="../FrameTimingStats.cpp" line="196"/>
         <source>Frame Timing Statistics</source>
-        <translation type="unfinished"></translation>
+        <translation>幀時序統計</translation>
     </message>
     <message>
         <location filename="../FrameTimingStats.cpp" line="59"/>
@@ -2946,7 +2946,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../GameGenie.cpp" line="126"/>
         <location filename="../GameGenie.cpp" line="258"/>
         <source>Game Genie Encoder/Decoder Tool</source>
-        <translation type="unfinished"></translation>
+        <translation>Game Genie 編碼/解碼工具</translation>
     </message>
     <message>
         <location filename="../GameGenie.cpp" line="133"/>
@@ -2986,7 +2986,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../GameGenie.cpp" line="259"/>
         <source>Add Cheat</source>
-        <translation type="unfinished">新增作弊碼</translation>
+        <translation>新增金手指</translation>
     </message>
 </context>
 <context>
@@ -3549,42 +3549,42 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../CheatsConf.cpp" line="513"/>
         <source>Search Results</source>
-        <translation type="unfinished"></translation>
+        <translation>搜尋結果</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="514"/>
         <source>Add Cheat</source>
-        <translation type="unfinished">新增作弊碼</translation>
+        <translation>新增金手指</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="520"/>
         <source>Known Value</source>
-        <translation type="unfinished"></translation>
+        <translation>已知值</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="525"/>
         <source>Not Equal Search</source>
-        <translation type="unfinished"></translation>
+        <translation>不相等搜尋</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="526"/>
         <source>Greater Than Search</source>
-        <translation type="unfinished"></translation>
+        <translation>大於搜尋</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="527"/>
         <source>Less Than Search</source>
-        <translation type="unfinished"></translation>
+        <translation>小於搜尋</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="529"/>
         <source>Auto Load/Save Cheats</source>
-        <translation type="unfinished"></translation>
+        <translation>自動載入/儲存金手指</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="530"/>
         <source>Pause While Active</source>
-        <translation type="unfinished"></translation>
+        <translation>啟用時暫停</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="792"/>
@@ -4334,7 +4334,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../HotKeyConf.cpp" line="51"/>
         <location filename="../HotKeyConf.cpp" line="120"/>
         <source>Hotkey Configuration</source>
-        <translation type="unfinished"></translation>
+        <translation>熱鍵設定</translation>
     </message>
     <message>
         <location filename="../HotKeyConf.cpp" line="88"/>
@@ -4353,7 +4353,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../HotKeyConf.cpp" line="338"/>
         <location filename="../HotKeyConf.cpp" line="381"/>
         <source>Set Hot Key</source>
-        <translation type="unfinished"></translation>
+        <translation>設定熱鍵</translation>
     </message>
     <message>
         <location filename="../HotKeyConf.cpp" line="345"/>
@@ -4387,7 +4387,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../GamePadConf.cpp" line="2502"/>
         <location filename="../GamePadConf.cpp" line="2579"/>
         <source>Hotkey Select</source>
-        <translation type="unfinished"></translation>
+        <translation>熱鍵選擇</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="2551"/>
@@ -4408,7 +4408,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../InputConf.cpp" line="76"/>
         <location filename="../InputConf.cpp" line="313"/>
         <source>Input Configuration</source>
-        <translation type="unfinished"></translation>
+        <translation>輸入設定</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="80"/>
@@ -4662,12 +4662,12 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1314"/>
         <source>OK</source>
-        <translation type="unfinished">確定</translation>
+        <translation>確定</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1316"/>
         <source>Reset Defaults</source>
-        <translation type="unfinished"></translation>
+        <translation>還原預設值</translation>
     </message>
 </context>
 <context>
@@ -4730,12 +4730,12 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="188"/>
         <source>Video</source>
-        <translation type="unfinished"></translation>
+        <translation>視訊</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="189"/>
         <source>Audio</source>
-        <translation type="unfinished"></translation>
+        <translation>音訊</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="215"/>
@@ -4793,12 +4793,12 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1612"/>
         <source>Video</source>
-        <translation type="unfinished"></translation>
+        <translation>視訊</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1613"/>
         <source>Audio</source>
-        <translation type="unfinished"></translation>
+        <translation>音訊</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1634"/>
@@ -4919,7 +4919,9 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <source>The Lua script running has been running a long time.
 It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
 </source>
-        <translation type="unfinished"></translation>
+        <translation>Lua 腳本已執行很長時間，
+可能已失去控制。要終止它嗎？（若選擇「否」，以後將不再詢問）
+</translation>
     </message>
     <message>
         <location filename="../LuaControl.cpp" line="299"/>
@@ -4943,7 +4945,7 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MovieOptions.cpp" line="54"/>
         <location filename="../MovieOptions.cpp" line="205"/>
         <source>Movie Options</source>
-        <translation type="unfinished">錄影選項</translation>
+        <translation>錄影選項</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="63"/>
@@ -5042,7 +5044,7 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MoviePlay.cpp" line="60"/>
         <location filename="../MoviePlay.cpp" line="225"/>
         <source>Movie Play</source>
-        <translation type="unfinished"></translation>
+        <translation>播放錄影</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="66"/>
@@ -5284,12 +5286,20 @@ Replace file?</source>
 <context>
     <name>MsgLogViewDialog_t</name>
     <message>
+        <location filename="../MsgLogViewer.cpp" line="198"/>
+        <location filename="../MsgLogViewer.cpp" line="262"/>
+        <source>Message Log Viewer</source>
+        <translation>訊息記錄檢視器</translation>
+    </message>
+    <message>
         <location filename="../MsgLogViewer.cpp" line="210"/>
+        <location filename="../MsgLogViewer.cpp" line="263"/>
         <source>Clear</source>
         <translation>清除</translation>
     </message>
     <message>
         <location filename="../MsgLogViewer.cpp" line="211"/>
+        <location filename="../MsgLogViewer.cpp" line="264"/>
         <source>Close</source>
         <translation>關閉</translation>
     </message>
@@ -5379,7 +5389,7 @@ Replace file?</source>
         <location filename="../PaletteEditor.cpp" line="74"/>
         <location filename="../PaletteEditor.cpp" line="211"/>
         <source>Palette Editor</source>
-        <translation type="unfinished"></translation>
+        <translation>調色盤編輯器</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="88"/>
@@ -5990,7 +6000,7 @@ Replace file?</source>
         <location filename="../RamSearch.cpp" line="219"/>
         <location filename="../RamSearch.cpp" line="563"/>
         <source>RAM Search</source>
-        <translation type="unfinished"></translation>
+        <translation>RAM 搜尋</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="232"/>
@@ -6217,7 +6227,7 @@ Replace file?</source>
         <location filename="../RamWatch.cpp" line="95"/>
         <location filename="../RamWatch.cpp" line="365"/>
         <source>RAM Watch</source>
-        <translation type="unfinished"></translation>
+        <translation>RAM 監視</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="110"/>
@@ -6573,7 +6583,7 @@ Replace file?</source>
         <location filename="../StateRecorderConf.cpp" line="55"/>
         <location filename="../StateRecorderConf.cpp" line="364"/>
         <source>State Recorder Config</source>
-        <translation type="unfinished"></translation>
+        <translation>狀態錄製設定</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="60"/>
@@ -6917,22 +6927,22 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../SymbolicDebug.cpp" line="684"/>
         <source>Is Array</source>
-        <translation type="unfinished"></translation>
+        <translation>是陣列</translation>
     </message>
     <message>
         <location filename="../SymbolicDebug.cpp" line="685"/>
         <source>Overwrite Name</source>
-        <translation type="unfinished"></translation>
+        <translation>覆蓋名稱</translation>
     </message>
     <message>
         <location filename="../SymbolicDebug.cpp" line="686"/>
         <source>Overwrite Comment</source>
-        <translation type="unfinished"></translation>
+        <translation>覆蓋註解</translation>
     </message>
     <message>
         <location filename="../SymbolicDebug.cpp" line="687"/>
         <source>Comment Head Only</source>
-        <translation type="unfinished"></translation>
+        <translation>僅註解開頭</translation>
     </message>
 </context>
 <context>
@@ -8134,7 +8144,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../TimingConf.cpp" line="59"/>
         <location filename="../TimingConf.cpp" line="402"/>
         <source>Timing Configuration</source>
-        <translation type="unfinished"></translation>
+        <translation>時序設定</translation>
     </message>
     <message>
         <location filename="../TimingConf.cpp" line="64"/>
@@ -8425,57 +8435,57 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../TraceLogger.cpp" line="439"/>
         <source>Auto Update</source>
-        <translation type="unfinished"></translation>
+        <translation>自動更新</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="440"/>
         <source>Log Registers</source>
-        <translation type="unfinished"></translation>
+        <translation>記錄暫存器</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="441"/>
         <source>Log Frame Counter</source>
-        <translation type="unfinished"></translation>
+        <translation>記錄幀計數器</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="442"/>
         <source>Log Emu Messages</source>
-        <translation type="unfinished"></translation>
+        <translation>記錄模擬器訊息</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="443"/>
         <source>Log Status Flags</source>
-        <translation type="unfinished"></translation>
+        <translation>記錄狀態旗標</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="444"/>
         <source>Log Cycle Count</source>
-        <translation type="unfinished"></translation>
+        <translation>記錄週期計數</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="446"/>
         <source>Use Stack Pointer</source>
-        <translation type="unfinished"></translation>
+        <translation>使用堆疊指標</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="447"/>
         <source>Disasm Left</source>
-        <translation type="unfinished"></translation>
+        <translation>左側反組譯</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="448"/>
         <source>Log Instruction Count</source>
-        <translation type="unfinished"></translation>
+        <translation>記錄指令計數</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="451"/>
         <source>Log New Mapped Code</source>
-        <translation type="unfinished"></translation>
+        <translation>記錄新映射的程式碼</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="452"/>
         <source>Log New Mapped Data</source>
-        <translation type="unfinished"></translation>
+        <translation>記錄新映射的資料</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="453"/>
@@ -8486,7 +8496,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../TraceLogger.cpp" line="454"/>
         <source>Clear</source>
-        <translation type="unfinished">清除</translation>
+        <translation>清除</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="609"/>
@@ -8516,7 +8526,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleDebugger.cpp" line="7373"/>
         <location filename="../ConsoleDebugger.cpp" line="7402"/>
         <source> = </source>
-        <translation type="unfinished"></translation>
+        <translation> = </translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7381"/>
@@ -8593,37 +8603,37 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../ConsoleWindow.cpp" line="871"/>
         <source>&amp;NTSC</source>
-        <translation type="unfinished"></translation>
+        <translation>&amp;NTSC</translation>
     </message>
     <message>
         <location filename="../ConsoleWindow.cpp" line="872"/>
         <source>&amp;PAL</source>
-        <translation type="unfinished"></translation>
+        <translation>&amp;PAL</translation>
     </message>
     <message>
         <location filename="../ConsoleWindow.cpp" line="873"/>
         <source>&amp;Dendy</source>
-        <translation type="unfinished"></translation>
+        <translation>&amp;Dendy</translation>
     </message>
     <message>
         <location filename="../ConsoleWindow.cpp" line="875"/>
         <source>&amp;Default</source>
-        <translation type="unfinished"></translation>
+        <translation>預設(&amp;D)</translation>
     </message>
     <message>
         <location filename="../ConsoleWindow.cpp" line="876"/>
         <source>Fill $&amp;FF</source>
-        <translation type="unfinished"></translation>
+        <translation>填充 $FF(&amp;F)</translation>
     </message>
     <message>
         <location filename="../ConsoleWindow.cpp" line="877"/>
         <source>Fill $&amp;00</source>
-        <translation type="unfinished"></translation>
+        <translation>填充 $00(&amp;0)</translation>
     </message>
     <message>
         <location filename="../ConsoleWindow.cpp" line="878"/>
         <source>&amp;Random</source>
-        <translation type="unfinished"></translation>
+        <translation>隨機(&amp;R)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="141"/>
@@ -8743,7 +8753,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="255"/>
         <location filename="../ConsoleWindow.cpp" line="859"/>
         <source>Slot &amp;%1</source>
-        <translation type="unfinished"></translation>
+        <translation>存檔槽 %1(&amp;%1)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="303"/>
@@ -8833,55 +8843,55 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="415"/>
         <location filename="../ConsoleWindow.cpp" line="901"/>
         <source>Japanese</source>
-        <translation type="unfinished"></translation>
+        <translation>日語</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="420"/>
         <location filename="../ConsoleWindow.cpp" line="903"/>
         <source>Korean</source>
-        <translation type="unfinished"></translation>
+        <translation>韓語</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="425"/>
         <location filename="../ConsoleWindow.cpp" line="905"/>
         <source>Spanish</source>
-        <translation type="unfinished"></translation>
+        <translation>西班牙語</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="430"/>
         <location filename="../ConsoleWindow.cpp" line="907"/>
         <source>French</source>
-        <translation type="unfinished"></translation>
+        <translation>法語</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="435"/>
         <location filename="../ConsoleWindow.cpp" line="909"/>
         <source>German</source>
-        <translation type="unfinished"></translation>
+        <translation>德語</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="440"/>
         <location filename="../ConsoleWindow.cpp" line="911"/>
         <source>Vietnamese</source>
-        <translation type="unfinished"></translation>
+        <translation>越南語</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="445"/>
         <location filename="../ConsoleWindow.cpp" line="913"/>
         <source>Thai</source>
-        <translation type="unfinished"></translation>
+        <translation>泰語</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="450"/>
         <location filename="../ConsoleWindow.cpp" line="915"/>
         <source>Hindi (beta)</source>
-        <translation type="unfinished"></translation>
+        <translation>印地語（beta）</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="455"/>
         <location filename="../ConsoleWindow.cpp" line="917"/>
         <source>Arabic (beta)</source>
-        <translation type="unfinished"></translation>
+        <translation>阿拉伯語（beta）</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="468"/>
@@ -8893,7 +8903,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="472"/>
         <location filename="../ConsoleWindow.cpp" line="867"/>
         <source>&amp;%1x</source>
-        <translation type="unfinished"></translation>
+        <translation>&amp;%1x</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="480"/>
@@ -9075,7 +9085,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="719"/>
         <location filename="../ConsoleWindow.cpp" line="925"/>
         <source>%1 On, %2 Off</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 開，%2 關</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="745"/>
@@ -9551,35 +9561,67 @@ Do you wish to save/apply the new settings?</source>
         <translation>WAV 錄製停止</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1253"/>
+        <location filename="../ConsoleMenu.cpp" line="1256"/>
+        <source>&amp;Documentation</source>
+        <translation>文件(&amp;D)</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1258"/>
+        <location filename="../ConsoleWindow.cpp" line="937"/>
+        <source>&amp;Online</source>
+        <translation>線上(&amp;O)</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1259"/>
+        <location filename="../ConsoleWindow.cpp" line="946"/>
+        <source>Open online documentation in browser</source>
+        <translation>在瀏覽器中開啟線上文件</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1263"/>
+        <location filename="../ConsoleWindow.cpp" line="938"/>
+        <source>&amp;Local</source>
+        <translation>本機(&amp;L)</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1264"/>
+        <location filename="../ConsoleWindow.cpp" line="947"/>
+        <source>Open bundled offline documentation</source>
+        <translation>開啟內建離線文件</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1269"/>
         <location filename="../ConsoleWindow.cpp" line="933"/>
         <source>&amp;About FCEUX11</source>
         <translation>關於 FCEUX11(&amp;A)</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1254"/>
+        <location filename="../ConsoleMenu.cpp" line="1270"/>
+        <location filename="../ConsoleWindow.cpp" line="943"/>
         <source>About FCEUX11</source>
         <translation>關於 FCEUX11</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1261"/>
+        <location filename="../ConsoleMenu.cpp" line="1277"/>
         <location filename="../ConsoleWindow.cpp" line="934"/>
         <source>About &amp;Qt</source>
         <translation>關於 Qt(&amp;Q)</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1262"/>
+        <location filename="../ConsoleMenu.cpp" line="1278"/>
+        <location filename="../ConsoleWindow.cpp" line="944"/>
         <source>About Qt</source>
         <translation>關於 Qt</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1269"/>
+        <location filename="../ConsoleMenu.cpp" line="1285"/>
         <location filename="../ConsoleWindow.cpp" line="935"/>
         <source>&amp;Message Log</source>
         <translation>訊息記錄(&amp;M)</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1270"/>
+        <location filename="../ConsoleMenu.cpp" line="1286"/>
+        <location filename="../ConsoleWindow.cpp" line="945"/>
         <source>Message Log</source>
         <translation>訊息記錄</translation>
     </message>
@@ -9611,7 +9653,7 @@ Do you wish to save/apply the new settings?</source>
         <translation>NSF 音效檔案 (*.nsf *.NSF) ;; Zip 檔案 (*.zip *.ZIP) ;; 所有檔案 (*)</translation>
     </message>
     <message>
-        <location filename="../ConsoleDebugWindows.cpp" line="292"/>
+        <location filename="../ConsoleDebugWindows.cpp" line="294"/>
         <location filename="../ConsoleEmuControl.cpp" line="157"/>
         <location filename="../ConsoleEmuControl.cpp" line="549"/>
         <location filename="../ConsoleFile.cpp" line="341"/>
@@ -9651,12 +9693,12 @@ Do you wish to save/apply the new settings?</source>
         <translation>.sav</translation>
     </message>
     <message>
-        <location filename="../ConsoleDebugWindows.cpp" line="278"/>
+        <location filename="../ConsoleDebugWindows.cpp" line="280"/>
         <source>Open Game Genie ROM</source>
         <translation>開啟金手指 ROM</translation>
     </message>
     <message>
-        <location filename="../ConsoleDebugWindows.cpp" line="288"/>
+        <location filename="../ConsoleDebugWindows.cpp" line="290"/>
         <source>GG ROM File (gg.rom  *Genie*.nes) ;; All files (*)</source>
         <translation>GG ROM 檔案 (gg.rom  *Genie*.nes) ;; 所有檔案 (*)</translation>
     </message>
@@ -9757,6 +9799,12 @@ Do you wish to save/apply the new settings?</source>
         <source>QHelp Files (*.qhc *.QHC) ;; All files (*)</source>
         <translation>QHelp 檔案 (*.qhc *.QHC) ;; 所有檔案 (*)</translation>
     </message>
+    <message>
+        <location filename="../ConsoleRecentRom.cpp" line="164"/>
+        <location filename="../ConsoleWindow.cpp" line="951"/>
+        <source>&amp;Clear Recent ROM List</source>
+        <translation>清除最近 ROM 清單(&amp;C)</translation>
+    </message>
 </context>
 <context>
     <name>guiColorPickerDialog_t</name>
@@ -9764,7 +9812,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../GuiConf.cpp" line="1431"/>
         <location filename="../GuiConf.cpp" line="1510"/>
         <source>Pick Palette Color</source>
-        <translation type="unfinished"></translation>
+        <translation>選擇調色盤顏色</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1459"/>
@@ -9929,7 +9977,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../iNesHeaderEditor.cpp" line="193"/>
         <location filename="../iNesHeaderEditor.cpp" line="556"/>
         <source>NES Header Editor</source>
-        <translation type="unfinished"></translation>
+        <translation>NES 標頭編輯器</translation>
     </message>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="201"/>
@@ -11020,18 +11068,18 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../input.cpp" line="661"/>
         <source>Save</source>
-        <translation type="unfinished">儲存</translation>
+        <translation>儲存</translation>
     </message>
     <message>
         <location filename="../input.cpp" line="667"/>
         <location filename="../input.cpp" line="677"/>
         <source>Load</source>
-        <translation type="unfinished">載入</translation>
+        <translation>載入</translation>
     </message>
     <message>
         <location filename="../input.cpp" line="672"/>
         <source>Record</source>
-        <translation type="unfinished"></translation>
+        <translation>錄製</translation>
     </message>
 </context>
 <context>

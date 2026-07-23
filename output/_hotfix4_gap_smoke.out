@@ -1,0 +1,11 @@
+Starting FCEUX11 v1.15 (hotfix3)...
+DirectStorage 1.2 NVMe probe: unsupported (nvme.dll not present (requires Windows 10 1903 or later))NTSC mode set
+NTSC mode set
+Running on Platform: windows
+Qt Debug: i18n: loaded :/i18n/fceux11_zh_CN.qm (:0, )
+GL Ratio: 1.000000 
+Emulator Start
+initializeGL start
+GL Version: 3.3.0 NVIDIA 582.28 
+Qt Warning: QObject::killTimer: Timers cannot be stopped from another thread (:0, )
+Qt Warning: QObject::~QObject: Timers cannot be stopped from another thread (:0, )

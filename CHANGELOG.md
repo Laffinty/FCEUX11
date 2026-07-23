@@ -85,6 +85,22 @@ test + total verification). See
 - A new `scripts/check_menu_slots.py` static test (T-1) is added in
   Phase E to prevent D-1 / D-11-class "no such slot" regressions.
 
+### Post-release gap closure (2026-07-23)
+- **`src/version.h`** — `FCEU_HOTFIX_TAG` bumped to `(hotfix4)`; the
+  executable now self-reports `v1.15 (hotfix4)` (was `(hotfix3)`).
+- **i18n completion** — lupdate re-run after Phase C/D so the new
+  strings (`Documentation` submenu, `Clear Recent ROM List`, new
+  statusTips) are extracted into all 12 `.ts` files; all `unfinished`
+  entries in zh_CN / zh_TW / ja / ko / es / fr / de / vi / th filled
+  (0 remaining). hi / ar (beta) received translations for the same
+  92 reviewed strings; their ~1500 pre-existing beta entries keep the
+  `unfinished` flag pending native review (wording screened for
+  religious / cultural sensitivities; untranslatable technical terms
+  intentionally left in English per project policy). All 12 `.qm`
+  regenerated (`scripts/_hotfix4_fill_translations.py` kept as the
+  record of the applied translation table).
+- **readme.md** — NetPlay removal now documented (D-8 follow-up).
+
 ## [1.15(hotfix3)] - 2026-07-21
 
 **Codename: hotfix3.** Comprehensive cross-subsystem safety and performance

@@ -5279,12 +5279,20 @@ Replace file?</source>
 <context>
     <name>MsgLogViewDialog_t</name>
     <message>
+        <location filename="../MsgLogViewer.cpp" line="198"/>
+        <location filename="../MsgLogViewer.cpp" line="262"/>
+        <source>Message Log Viewer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../MsgLogViewer.cpp" line="210"/>
+        <location filename="../MsgLogViewer.cpp" line="263"/>
         <source>Clear</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../MsgLogViewer.cpp" line="211"/>
+        <location filename="../MsgLogViewer.cpp" line="264"/>
         <source>Close</source>
         <translation type="unfinished"></translation>
     </message>
@@ -9543,35 +9551,67 @@ Do you wish to save/apply the new settings?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1253"/>
+        <location filename="../ConsoleMenu.cpp" line="1256"/>
+        <source>&amp;Documentation</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1258"/>
+        <location filename="../ConsoleWindow.cpp" line="937"/>
+        <source>&amp;Online</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1259"/>
+        <location filename="../ConsoleWindow.cpp" line="946"/>
+        <source>Open online documentation in browser</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1263"/>
+        <location filename="../ConsoleWindow.cpp" line="938"/>
+        <source>&amp;Local</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1264"/>
+        <location filename="../ConsoleWindow.cpp" line="947"/>
+        <source>Open bundled offline documentation</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1269"/>
         <location filename="../ConsoleWindow.cpp" line="933"/>
         <source>&amp;About FCEUX11</source>
         <translation>&amp;About FCEUX11</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1254"/>
+        <location filename="../ConsoleMenu.cpp" line="1270"/>
+        <location filename="../ConsoleWindow.cpp" line="943"/>
         <source>About FCEUX11</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1261"/>
+        <location filename="../ConsoleMenu.cpp" line="1277"/>
         <location filename="../ConsoleWindow.cpp" line="934"/>
         <source>About &amp;Qt</source>
         <translation>About &amp;Qt</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1262"/>
+        <location filename="../ConsoleMenu.cpp" line="1278"/>
+        <location filename="../ConsoleWindow.cpp" line="944"/>
         <source>About Qt</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1269"/>
+        <location filename="../ConsoleMenu.cpp" line="1285"/>
         <location filename="../ConsoleWindow.cpp" line="935"/>
         <source>&amp;Message Log</source>
         <translation>&amp;Message Log</translation>
     </message>
     <message>
-        <location filename="../ConsoleMenu.cpp" line="1270"/>
+        <location filename="../ConsoleMenu.cpp" line="1286"/>
+        <location filename="../ConsoleWindow.cpp" line="945"/>
         <source>Message Log</source>
         <translation type="unfinished"></translation>
     </message>
@@ -9603,7 +9643,7 @@ Do you wish to save/apply the new settings?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ConsoleDebugWindows.cpp" line="292"/>
+        <location filename="../ConsoleDebugWindows.cpp" line="294"/>
         <location filename="../ConsoleEmuControl.cpp" line="157"/>
         <location filename="../ConsoleEmuControl.cpp" line="549"/>
         <location filename="../ConsoleFile.cpp" line="341"/>
@@ -9643,12 +9683,12 @@ Do you wish to save/apply the new settings?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ConsoleDebugWindows.cpp" line="278"/>
+        <location filename="../ConsoleDebugWindows.cpp" line="280"/>
         <source>Open Game Genie ROM</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ConsoleDebugWindows.cpp" line="288"/>
+        <location filename="../ConsoleDebugWindows.cpp" line="290"/>
         <source>GG ROM File (gg.rom  *Genie*.nes) ;; All files (*)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -9747,6 +9787,12 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../HelpPages.cpp" line="160"/>
         <source>QHelp Files (*.qhc *.QHC) ;; All files (*)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ConsoleRecentRom.cpp" line="164"/>
+        <location filename="../ConsoleWindow.cpp" line="951"/>
+        <source>&amp;Clear Recent ROM List</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
