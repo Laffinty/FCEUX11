@@ -120,6 +120,9 @@ Testing/
 # Generated i18n build artefacts (qm files generated from src/drivers/Qt/lang/*.ts)
 assets/i18n/
 
+# hotfix5 translation working files (temporary scripts, TSV batches, analysis output)
+output/
+
 # Local scratch / unused first-level junk (matches "first level only" usage below)
 /discard/
 
