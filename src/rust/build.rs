@@ -209,7 +209,26 @@ fn merge_headers(
     let final_path = format!("{}/fceux11_rust.h", crate_dir);
     let tmp_path = format!("{}/fceux11_rust.h.tmp", crate_dir);
     fs::write(&tmp_path, &output).expect("Failed to write merged header");
-    fs::rename(&tmp_path, &final_path).expect("Failed to rename merged header");
+
+    // Windows: fs::rename cannot overwrite a file locked by another process
+    // (parallel C++ compilation may hold a handle on fceux11_rust.h).
+    // Retry with remove-then-rename, fall back to copy if all retries fail.
+    let mut last_err = None;
+    for attempt in 0..10 {
+        match fs::rename(&tmp_path, &final_path) {
+            Ok(()) => { last_err = None; break; }
+            Err(e) => {
+                last_err = Some(e);
+                let _ = fs::remove_file(&final_path);
+                std::thread::sleep(std::time::Duration::from_millis(50 * (attempt + 1)));
+            }
+        }
+    }
+    if let Some(_e) = last_err {
+        fs::copy(&tmp_path, &final_path)
+            .expect("Failed to copy merged header (rename and copy both failed)");
+    }
+    let _ = fs::remove_file(&tmp_path);
 }
 
 fn extract_body(content: &str) -> String {
