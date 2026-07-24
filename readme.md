@@ -89,14 +89,12 @@ Precompiled binaries are available on the **[GitHub Releases](https://github.com
 
 ## 快速开始 / Quick Start
 
-1. 启动 `fceux11.exe`。
-2. 通过 **File → Open ROM** 加载游戏文件（支持 `.nes`、`.fds`、`.nsf`、`.unf` 等格式）。
-3. 使用键盘或手柄进行游戏；输入映射可在 **Options → Input Config** 中调整。
-4. 按 **I** 快速存档，**P** 快速读档。
-1. Launch `fceux11.exe`.
-2. Load a game via **File → Open ROM** (supports `.nes`, `.fds`, `.nsf`, `.unf`, etc.).
-3. Play with keyboard or gamepad; remap inputs in **Options → Input Config**.
-4. Press **I** for quick save and **P** for quick load.
+**1.** 启动 `fceux11.exe`。
+**2.** 通过 **File → Open ROM** 加载游戏（支持 `.nes` / `.fds` / `.nsf` / `.unf`）。
+**3.** 键盘或手柄游戏；输入映射在 **Options → Input Config** 调整。
+**4.** **I** 快速存档，**P** 快速读档。
+
+Launch `fceux11.exe`, load a game via **File → Open ROM**, play with keyboard or gamepad (remap in **Options → Input Config**). Press **I** to quick-save, **P** to quick-load.
 
 ---
 
@@ -104,7 +102,11 @@ Precompiled binaries are available on the **[GitHub Releases](https://github.com
 
 详见 [CHANGELOG.md](CHANGELOG.md)。当前稳定版为 v1.15 (hotfix5)。
 
+**hotfix5 主要变更**：完成全部 11 种语言的 i18n 翻译补齐（母语覆盖率从 ~22% 提升至 94-99%），语言菜单改为固定母语名显示（简体中文/繁體中文/English/日本語/한국어/Español/Français/Deutsch/Tiếng Việt/ไทย/हिन्दी/العربية），新增 i18n 门禁覆盖全部 11 种语言，修复 CI Rust 构建竞态问题。
+
 See [CHANGELOG.md](CHANGELOG.md). Current stable release is v1.15 (hotfix5).
+
+**hotfix5 highlights**: Complete i18n overhaul for all 11 languages (native coverage from ~22% to 94-99%), language menu now shows fixed native names regardless of UI language, new i18n gate covering all 11 languages, and a CI Rust build race-condition fix.
 
 ---
 
