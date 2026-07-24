@@ -2,7 +2,7 @@
 
 # FCEUX11
 
-[![Version](https://img.shields.io/badge/version-v1.15%20(hotfix4)-blue)](https://github.com/Laffinty/FCEUX11/releases)
+[![Version](https://img.shields.io/badge/version-v1.15%20(hotfix5)-blue)](https://github.com/Laffinty/FCEUX11/releases)
 [![License](https://img.shields.io/badge/license-GPL--v2-green)](COPYING)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?logo=windows)](https://www.microsoft.com/windows/windows-11)
 [![Qt](https://img.shields.io/badge/Qt-6.8%20LTS-41CD52?logo=qt)](https://www.qt.io)
@@ -102,9 +102,9 @@ Precompiled binaries are available on the **[GitHub Releases](https://github.com
 
 ## 版本历史 / Changelog
 
-详见 [CHANGELOG.md](CHANGELOG.md)。当前稳定版为 v1.15 (hotfix4)。
+详见 [CHANGELOG.md](CHANGELOG.md)。当前稳定版为 v1.15 (hotfix5)。
 
-See [CHANGELOG.md](CHANGELOG.md). Current stable release is v1.15 (hotfix4).
+See [CHANGELOG.md](CHANGELOG.md). Current stable release is v1.15 (hotfix5).
 
 ---
 

@@ -5,6 +5,64 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15(hotfix5)] - 2026-07-24
+
+**Codename: hotfix5.** Complete i18n overhaul for all 11 target languages
++ language menu native names + CI Rust build fix. hotfix4 quality
+verified (all 16 defects confirmed landed, zero performance regression
+on hotfix2 PPU optimizations). See
+`docs/FCEUX11-1.15_LTS-hotfix5-PLAN.md` for full scope.
+
+### Added
+- **`scripts/i18n_audit.py`** — Coverage matrix measurement tool
+  (native/identical/unfinished/empty per language).
+- **`scripts/_hotfix5_translations.py`** — Translation fill script
+  with ~1400+ entries covering all context groups.
+- **`src/drivers/Qt/lang/en_keep_allowlist.txt`** — Whitelist of 341
+  legitimate English-keep entries (technical identifiers, file formats,
+  keyboard shortcuts, RIFF struct fields, etc.).
+
+### Changed
+- **All 11 `.ts` translation files** — Massive translation overhaul:
+  - zh_CN/zh_TW: 90.4% → 99.1% native coverage
+  - ja/ko: 23% → 98.7%
+  - es: 23.5% → 95.4%
+  - fr: 22.1% → 94.4%
+  - de: 21.8% → 94.0%
+  - vi: 23.0% → 96.9%
+  - th: 23.8% → 98.1%
+  - hi: 21.8% → 98.8% (sensitivity-aware: power→पावर, Game Genie kept English)
+  - ar: 21.8% → 98.4% (sensitivity-aware: cheat→كود غش, power→طاقة)
+- **`src/drivers/Qt/ConsoleMenu.cpp`** — Language menu title changed
+  from `&Language` to `&Language (Language)`; 12 language options
+  changed from `tr()` to `QStringLiteral` with fixed native names
+  (简体中文/繁體中文/English/日本語/한국어/Español/Français/Deutsch/
+  Tiếng Việt/ไทย/हिन्दी (beta)/العربية (beta)).
+- **`src/drivers/Qt/ConsoleWindow.cpp`** — retranslateUi updated to
+  match ConsoleMenu.cpp language menu changes.
+- **`scripts/i18n_coverage.ps1`** — Expanded from zh_CN/zh_TW only to
+  all 11 target languages; added identical-to-EN detection (catches
+  hotfix4's "English-in-translation" loophole).
+- **`src/drivers/Qt/lang/glossary.txt`** — Expanded to 12-language
+  terminology table.
+- **`src/rust/build.rs`** — Fixed Windows CI file rename race condition
+  in `merge_headers()`: `fs::rename` now retries with exponential
+  backoff and falls back to `fs::copy` when the destination file is
+  locked by parallel compilation.
+
+### Fixed
+- **D-17** (`src/rust/build.rs:212`) — CI `build-windows` job panicked
+  with "Failed to rename merged header: Access is denied" due to
+  Windows file locking during parallel ninja builds. Replaced single
+  `fs::rename` with retry loop + `fs::copy` fallback.
+
+### Verified
+- `i18n_regression_test`: PASSED (all gates green)
+- `config_store_test`: PASSED
+- `check_menu_slots.py`: PASSED (685 slots, 809 connects)
+- `i18n_coverage.ps1`: ALL 11 LANGUAGES PASS
+- `check_simp_trad.ps1`: PASSED
+
 ## [1.15(hotfix4)] - 2026-07-22
 
 **Codename: hotfix4.** Main-menu and menu-reachable functionality audit.
