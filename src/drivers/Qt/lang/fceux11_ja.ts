@@ -13,7 +13,7 @@
         <location filename="../AboutWindow.cpp" line="64"/>
         <location filename="../AboutWindow.cpp" line="115"/>
         <source>Based on FCEUX | License: GPLv2</source>
-        <translation>Based on FCEUX | License: GPLv2</translation>
+        <translation>FCEUX ベース | ライセンス: GPLv2</translation>
     </message>
     <message>
         <location filename="../AboutWindow.cpp" line="70"/>
@@ -46,7 +46,7 @@
         <location filename="../AviRiffViewer.cpp" line="114"/>
         <location filename="../AviRiffViewer.cpp" line="156"/>
         <source>RIFF TREE</source>
-        <translation>RIFF TREE</translation>
+        <translation>RIFF ツリー</translation>
     </message>
     <message>
         <location filename="../AviRiffViewer.cpp" line="139"/>
@@ -82,17 +82,17 @@
     <message>
         <location filename="../AviRiffViewer.cpp" line="230"/>
         <source>&amp;Open AVI File</source>
-        <translation>&amp;Open AVI File</translation>
+        <translation>AVI ファイルを開く(&amp;O)</translation>
     </message>
     <message>
         <location filename="../AviRiffViewer.cpp" line="232"/>
         <source>Open AVI File</source>
-        <translation>Open AVI File</translation>
+        <translation>AVI ファイルを開く</translation>
     </message>
     <message>
         <location filename="../AviRiffViewer.cpp" line="239"/>
         <source>&amp;Close AVI File</source>
-        <translation>&amp;Close AVI File</translation>
+        <translation>AVI ファイルを閉じる(&amp;C)</translation>
     </message>
     <message>
         <location filename="../AviRiffViewer.cpp" line="240"/>
@@ -102,12 +102,12 @@
     <message>
         <location filename="../AviRiffViewer.cpp" line="241"/>
         <source>Close AVI File</source>
-        <translation>Close AVI File</translation>
+        <translation>AVI ファイルを閉じる</translation>
     </message>
     <message>
         <location filename="../AviRiffViewer.cpp" line="250"/>
         <source>&amp;Quit Window</source>
-        <translation>&amp;Quit Window</translation>
+        <translation>ウィンドウを終了(&amp;Q)</translation>
     </message>
     <message>
         <location filename="../AviRiffViewer.cpp" line="252"/>
@@ -117,12 +117,12 @@
     <message>
         <location filename="../AviRiffViewer.cpp" line="269"/>
         <source>Open AVI Movie for Inspection</source>
-        <translation>Open AVI Movie for Inspection</translation>
+        <translation>検査用に AVI ムービーを開く</translation>
     </message>
     <message>
         <location filename="../AviRiffViewer.cpp" line="275"/>
         <source>AVI Movies (*.avi) ;; All files (*)</source>
-        <translation>AVI Movies (*.avi) ;; All files (*)</translation>
+        <translation>AVI 動画 (*.avi) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../AviRiffViewer.cpp" line="279"/>
@@ -137,7 +137,7 @@
     <message>
         <location filename="../AviRiffViewer.cpp" line="361"/>
         <source>Loading AVI File</source>
-        <translation>Loading AVI File</translation>
+        <translation>AVI ファイルを読み込み中</translation>
     </message>
     <message>
         <location filename="../AviRiffViewer.cpp" line="361"/>
@@ -147,22 +147,22 @@
     <message>
         <location filename="../AviRiffViewer.cpp" line="376"/>
         <source>AVI Load Canceled</source>
-        <translation>AVI Load Canceled</translation>
+        <translation>AVI 読み込みキャンセル</translation>
     </message>
     <message>
         <location filename="../AviRiffViewer.cpp" line="376"/>
         <source>AVI Load Canceled By User.</source>
-        <translation>AVI Load Canceled By User.</translation>
+        <translation>AVI の読み込みをユーザーがキャンセルしました。</translation>
     </message>
     <message>
         <location filename="../AviRiffViewer.cpp" line="381"/>
         <source>AVI Load Error</source>
-        <translation>AVI Load Error</translation>
+        <translation>AVI 読み込みエラー</translation>
     </message>
     <message>
         <location filename="../AviRiffViewer.cpp" line="381"/>
         <source>AVI format errors detected. Unable to load file.</source>
-        <translation>AVI format errors detected. Unable to load file.</translation>
+        <translation>AVI 形式エラーが検出されました。ファイルを読み込めません。</translation>
     </message>
     <message>
         <location filename="../AviRiffViewer.cpp" line="515"/>
@@ -400,7 +400,7 @@
     <message>
         <location filename="../TasEditor/bookmarks.cpp" line="922"/>
         <source>Right click = set Bookmark, Left click = jump to Bookmark or load Branch</source>
-        <translation>Right click = set Bookmark, Left click = jump to Bookmark or load Branch</translation>
+        <translation>右クリック=ブックマーク設定、左クリック=ブックマークへジャンプまたはブランチ読込</translation>
     </message>
 </context>
 <context>
@@ -408,7 +408,7 @@
     <message>
         <location filename="../TasEditor/branches.cpp" line="763"/>
         <source>Right click = set Bookmark, single Left click = jump to Bookmark, double Left click = load Branch</source>
-        <translation>Right click = set Bookmark, single Left click = jump to Bookmark, double Left click = load Branch</translation>
+        <translation>右クリック=ブックマーク設定、左クリック=ブックマークへジャンプ、ダブルクリック=ブランチ読込</translation>
     </message>
 </context>
 <context>
@@ -427,37 +427,37 @@
     <message>
         <location filename="../CodeDataLogger.cpp" line="111"/>
         <source>&amp;Load</source>
-        <translation>&amp;Load</translation>
+        <translation>読込(&amp;L)</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="113"/>
         <source>Load From File</source>
-        <translation>Load From File</translation>
+        <translation>ファイルから読込</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="119"/>
         <source>&amp;Save</source>
-        <translation>&amp;Save</translation>
+        <translation>保存(&amp;S)</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="121"/>
         <source>Save To File</source>
-        <translation>Save To File</translation>
+        <translation>ファイルに保存</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="127"/>
         <source>Save &amp;As</source>
-        <translation>Save &amp;As</translation>
+        <translation>名前を付けて保存(&amp;A)</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="129"/>
         <source>Save To File As</source>
-        <translation>Save To File As</translation>
+        <translation>ファイルに名前を付けて保存</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="137"/>
         <source>&amp;Close</source>
-        <translation>&amp;Close</translation>
+        <translation>閉じる(&amp;C)</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="139"/>
@@ -468,18 +468,18 @@
         <location filename="../CodeDataLogger.cpp" line="152"/>
         <location filename="../CodeDataLogger.cpp" line="386"/>
         <source> Logger is Paused: Press Start to Run </source>
-        <translation> Logger is Paused: Press Start to Run </translation>
+        <translation>ロガー一時停止中：開始を押して実行</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="153"/>
         <location filename="../CodeDataLogger.cpp" line="319"/>
         <source>CDL File:</source>
-        <translation>CDL File:</translation>
+        <translation>CDL ファイル:</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="163"/>
         <source>Code/Data Log Status</source>
-        <translation>Code/Data Log Status</translation>
+        <translation>コード/データログ状態</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="166"/>
@@ -494,52 +494,52 @@
     <message>
         <location filename="../CodeDataLogger.cpp" line="172"/>
         <source>Auto-save .CDL when closing ROMs</source>
-        <translation>Auto-save .CDL when closing ROMs</translation>
+        <translation>ROM 終了時に CDL を自動保存</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="173"/>
         <source>Auto-load .CDL when opening this window</source>
-        <translation>Auto-load .CDL when opening this window</translation>
+        <translation>このウィンドウを開く時に CDL を自動読込</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="174"/>
         <source>Auto-resume logging when loading ROMs</source>
-        <translation>Auto-resume logging when loading ROMs</translation>
+        <translation>ROM 読み込み時にログ記録を自動再開</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="188"/>
         <source>PRG Logged as Code</source>
-        <translation>PRG Logged as Code</translation>
+        <translation>PRG がコードとして記録済み</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="195"/>
         <source>PRG Logged as Data</source>
-        <translation>PRG Logged as Data</translation>
+        <translation>PRG がデータとして記録済み</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="202"/>
         <source>PRG not Logged</source>
-        <translation>PRG not Logged</translation>
+        <translation>PRG 未記録</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="209"/>
         <source>CHR Logged as Code</source>
-        <translation>CHR Logged as Code</translation>
+        <translation>CHR がコードとして記録済み</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="216"/>
         <source>CHR Logged as Data</source>
-        <translation>CHR Logged as Data</translation>
+        <translation>CHR がデータとして記録済み</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="223"/>
         <source>CHR not Logged</source>
-        <translation>CHR not Logged</translation>
+        <translation>CHR 未記録</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="232"/>
         <source>Reset Log</source>
-        <translation>Reset Log</translation>
+        <translation>ログをリセット</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="236"/>
@@ -569,22 +569,22 @@
     <message>
         <location filename="../CodeDataLogger.cpp" line="255"/>
         <source>Logging Workflow Options</source>
-        <translation>Logging Workflow Options</translation>
+        <translation>ログワークフロー設定</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="263"/>
         <source>Generate ROM</source>
-        <translation>Generate ROM</translation>
+        <translation>ROM 生成</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="266"/>
         <source>Save Stripped Data</source>
-        <translation>Save Stripped Data</translation>
+        <translation>ストリップデータを保存</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="269"/>
         <source>Save Unused Data</source>
-        <translation>Save Unused Data</translation>
+        <translation>未使用データを保存</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="313"/>
@@ -640,7 +640,7 @@
     <message>
         <location filename="../CodeDataLogger.cpp" line="380"/>
         <source> Logger is Running: Press Pause to Stop </source>
-        <translation> Logger is Running: Press Pause to Stop </translation>
+        <translation>ロガー実行中：一時停止を押して停止</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="412"/>
@@ -655,12 +655,12 @@
     <message>
         <location filename="../CodeDataLogger.cpp" line="456"/>
         <source>Save CDL File As</source>
-        <translation>Save CDL File As</translation>
+        <translation>CDL ファイルに名前を付けて保存</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="460"/>
         <source>CDL Files (*.cdl *.CDL) ;; All files (*)</source>
-        <translation>CDL Files (*.cdl *.CDL) ;; All files (*)</translation>
+        <translation>CDLファイル (*.cdl *.CDL) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="465"/>
@@ -670,7 +670,7 @@
     <message>
         <location filename="../CodeDataLogger.cpp" line="517"/>
         <source>Load CDL File</source>
-        <translation>Load CDL File</translation>
+        <translation>CDL ファイルを読込</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="521"/>
@@ -680,12 +680,12 @@
     <message>
         <location filename="../CodeDataLogger.cpp" line="590"/>
         <source>Save Stripped File As...</source>
-        <translation>Save Stripped File As...</translation>
+        <translation>ストリップファイルに名前を付けて保存...</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="596"/>
         <source>NSF Files (*.nsf *.NSF) ;; All files (*)</source>
-        <translation>NSF Files (*.nsf *.NSF) ;; All files (*)</translation>
+        <translation>NSFファイル (*.nsf *.NSF) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="597"/>
@@ -695,7 +695,7 @@
     <message>
         <location filename="../CodeDataLogger.cpp" line="601"/>
         <source>NES Files (*.nes *.NES) ;; All files (*)</source>
-        <translation>NES Files (*.nes *.NES) ;; All files (*)</translation>
+        <translation>NESファイル (*.nes *.NES) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="602"/>
@@ -731,7 +731,7 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="315"/>
         <source>Open ld65 Debug File</source>
-        <translation>Open ld65 Debug File</translation>
+        <translation>ld65 デバッグファイルを開く</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="354"/>
@@ -743,14 +743,12 @@
         <source>Do you wish to clear the existing symbol table and replace with the data contained in the selected file?
 
 </source>
-        <translation>Do you wish to clear the existing symbol table and replace with the data contained in the selected file?
-
-</translation>
+        <translation>既存のシンボルテーブルを消去し、選択ファイルのデータに置き換えますか？</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="384"/>
         <source>Symbol Table Clear Warning</source>
-        <translation>Symbol Table Clear Warning</translation>
+        <translation>シンボルテーブル消去警告</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="423"/>
@@ -760,17 +758,17 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="426"/>
         <source>&amp;Import ld65 dbg file</source>
-        <translation>&amp;Import ld65 dbg file</translation>
+        <translation>ld65 dbg ファイルをインポート(&amp;I)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="428"/>
         <source>Import ld65 Debug File</source>
-        <translation>Import ld65 Debug File</translation>
+        <translation>ld65 デバッグファイルをインポート</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="434"/>
         <source>&amp;Close</source>
-        <translation>&amp;Close</translation>
+        <translation>閉じる(&amp;C)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="436"/>
@@ -788,7 +786,7 @@
         <location filename="../ConsoleDebugger.cpp" line="963"/>
         <location filename="../ConsoleDebugger.cpp" line="965"/>
         <source>&amp;Go to Address</source>
-        <translation>&amp;Go to Address</translation>
+        <translation>アドレスへジャンプ(&amp;G)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="446"/>
@@ -799,7 +797,7 @@
         <location filename="../ConsoleDebugger.cpp" line="455"/>
         <location filename="../ConsoleDebugger.cpp" line="457"/>
         <source>Go to &amp;PC</source>
-        <translation>Go to &amp;PC</translation>
+        <translation>PC にジャンプ(&amp;G)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="456"/>
@@ -810,7 +808,7 @@
         <location filename="../ConsoleDebugger.cpp" line="464"/>
         <location filename="../ConsoleDebugger.cpp" line="466"/>
         <source>&amp;Change PC</source>
-        <translation>&amp;Change PC</translation>
+        <translation>PC 変更(&amp;C)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="465"/>
@@ -820,7 +818,7 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="475"/>
         <source>Navigate &amp;Back</source>
-        <translation>Navigate &amp;Back</translation>
+        <translation>戻る(&amp;B)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="476"/>
@@ -830,12 +828,12 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="477"/>
         <source>Navigate Back</source>
-        <translation>Navigate Back</translation>
+        <translation>戻る</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="484"/>
         <source>Navigate &amp;Forward</source>
-        <translation>Navigate &amp;Forward</translation>
+        <translation>進む(&amp;F)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="485"/>
@@ -845,185 +843,185 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="486"/>
         <source>Navigate Forward</source>
-        <translation>Navigate Forward</translation>
+        <translation>進む</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="495"/>
         <source>&amp;Layout Presets</source>
-        <translation>&amp;Layout Presets</translation>
+        <translation>レイアウトプリセット(&amp;L)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="503"/>
         <source>&amp;Compact</source>
-        <translation>&amp;Compact</translation>
+        <translation>コンパクト(&amp;C)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="510"/>
         <source>Compact &amp;Split</source>
-        <translation>Compact &amp;Split</translation>
+        <translation>コンパクト分割(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="517"/>
         <source>&amp;Wide</source>
-        <translation>&amp;Wide</translation>
+        <translation>ワイド(&amp;W)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="524"/>
         <source>Wide &amp;Quad</source>
-        <translation>Wide &amp;Quad</translation>
+        <translation>ワイドクワッド(&amp;Q)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="531"/>
         <source>&amp;Font Selection</source>
-        <translation>&amp;Font Selection</translation>
+        <translation>フォント選択(&amp;F)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="534"/>
         <source>&amp;Assembly View</source>
-        <translation>&amp;Assembly View</translation>
+        <translation>アセンブリビュー(&amp;A)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="536"/>
         <source>Set Assembly View Font</source>
-        <translation>Set Assembly View Font</translation>
+        <translation>アセンブリビューフォントを設定</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="542"/>
         <source>&amp;Stack View</source>
-        <translation>&amp;Stack View</translation>
+        <translation>スタックビュー(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="544"/>
         <source>Set Stack View Font</source>
-        <translation>Set Stack View Font</translation>
+        <translation>スタックビューフォントを設定</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="550"/>
         <source>&amp;CPU Data View</source>
-        <translation>&amp;CPU Data View</translation>
+        <translation>CPU データビュー(&amp;C)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="552"/>
         <source>Set CPU View Font</source>
-        <translation>Set CPU View Font</translation>
+        <translation>CPU ビューフォントを設定</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="558"/>
         <source>&amp;Color Selection</source>
-        <translation>&amp;Color Selection</translation>
+        <translation>カラー選択(&amp;C)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="561"/>
         <source>&amp;Opcodes</source>
-        <translation>&amp;Opcodes</translation>
+        <translation>オペコード(&amp;O)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="566"/>
         <source>&amp;Address Values</source>
-        <translation>&amp;Address Values</translation>
+        <translation>アドレス値(&amp;A)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="571"/>
         <source>&amp;Immediate Values</source>
-        <translation>&amp;Immediate Values</translation>
+        <translation>即値(&amp;I)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="576"/>
         <source>&amp;Labels</source>
-        <translation>&amp;Labels</translation>
+        <translation>ラベル(&amp;L)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="581"/>
         <source>&amp;Comments</source>
-        <translation>&amp;Comments</translation>
+        <translation>コメント(&amp;C)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="588"/>
         <source>(&amp;PC) Active Statement BG</source>
-        <translation>(&amp;PC) Active Statement BG</translation>
+        <translation>(&amp;PC) アクティブ文背景</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="595"/>
         <source>&amp;PC Line Positioning</source>
-        <translation>&amp;PC Line Positioning</translation>
+        <translation>PC 行位置指定(&amp;P)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="603"/>
         <source>&amp;Top Line</source>
-        <translation>&amp;Top Line</translation>
+        <translation>上線(&amp;T)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="604"/>
         <source>Top Line</source>
-        <translation>Top Line</translation>
+        <translation>上線</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="612"/>
         <source>&amp;Upper Mid-Line</source>
-        <translation>&amp;Upper Mid-Line</translation>
+        <translation>上部中央線(&amp;U)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="613"/>
         <source>Upper Mid-Line</source>
-        <translation>Upper Mid-Line</translation>
+        <translation>上部中央線</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="621"/>
         <source>&amp;Center Line</source>
-        <translation>&amp;Center Line</translation>
+        <translation>中央線(&amp;C)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="622"/>
         <source>Center Line</source>
-        <translation>Center Line</translation>
+        <translation>中央線</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="630"/>
         <source>&amp;Lower Mid-Line</source>
-        <translation>&amp;Lower Mid-Line</translation>
+        <translation>下部中央線(&amp;L)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="631"/>
         <source>Lower Mid-Line</source>
-        <translation>Lower Mid-Line</translation>
+        <translation>下部中央線</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="639"/>
         <source>&amp;Bottom Line</source>
-        <translation>&amp;Bottom Line</translation>
+        <translation>下線(&amp;B)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="640"/>
         <source>Bottom Line</source>
-        <translation>Bottom Line</translation>
+        <translation>下線</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="648"/>
         <source>Custom Line &amp;Offset</source>
-        <translation>Custom Line &amp;Offset</translation>
+        <translation>カスタム行オフセット(&amp;C)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="649"/>
         <source>Custom Line Offset</source>
-        <translation>Custom Line Offset</translation>
+        <translation>カスタム行オフセット</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="659"/>
         <location filename="../ConsoleDebugger.cpp" line="661"/>
         <source>Show &amp;Byte Codes</source>
-        <translation>Show &amp;Byte Codes</translation>
+        <translation>バイトコードを表示(&amp;B)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="671"/>
         <location filename="../ConsoleDebugger.cpp" line="673"/>
         <source>Show &amp;Trace Data</source>
-        <translation>Show &amp;Trace Data</translation>
+        <translation>トレースデータを表示(&amp;T)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="683"/>
         <location filename="../ConsoleDebugger.cpp" line="685"/>
         <source>Show ROM &amp;Offsets</source>
-        <translation>Show ROM &amp;Offsets</translation>
+        <translation>ROM オフセットを表示(&amp;O)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="693"/>
@@ -1033,7 +1031,7 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="696"/>
         <source>&amp;Run</source>
-        <translation>&amp;Run</translation>
+        <translation>実行(&amp;R)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="697"/>
@@ -1065,7 +1063,7 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="716"/>
         <source>Step &amp;Into</source>
-        <translation>Step &amp;Into</translation>
+        <translation>ステップイン(&amp;I)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="717"/>
@@ -1081,7 +1079,7 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="725"/>
         <source>&amp;Step Out</source>
-        <translation>&amp;Step Out</translation>
+        <translation>ステップアウト(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="726"/>
@@ -1097,7 +1095,7 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="734"/>
         <source>Step &amp;Over</source>
-        <translation>Step &amp;Over</translation>
+        <translation>ステップオーバー(&amp;O)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="735"/>
@@ -1113,7 +1111,7 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="743"/>
         <source>Step &amp;Back</source>
-        <translation>Step &amp;Back</translation>
+        <translation>ステップバック(&amp;B)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="744"/>
@@ -1129,7 +1127,7 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="753"/>
         <source>Run to S&amp;elected Line</source>
-        <translation>Run to S&amp;elected Line</translation>
+        <translation>選択行まで実行(&amp;E)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="754"/>
@@ -1139,12 +1137,12 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="755"/>
         <source>Run to Selected Line</source>
-        <translation>Run to Selected Line</translation>
+        <translation>選択行まで実行</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="762"/>
         <source>Run &amp;Line</source>
-        <translation>Run &amp;Line</translation>
+        <translation>1 行実行(&amp;L)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="763"/>
@@ -1155,12 +1153,12 @@
         <location filename="../ConsoleDebugger.cpp" line="764"/>
         <location filename="../ConsoleDebugger.cpp" line="1036"/>
         <source>Run Line</source>
-        <translation>Run Line</translation>
+        <translation>1 行実行</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="771"/>
         <source>Run &amp;128 Lines</source>
-        <translation>Run &amp;128 Lines</translation>
+        <translation>128 行実行(&amp;1)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="772"/>
@@ -1171,74 +1169,74 @@
         <location filename="../ConsoleDebugger.cpp" line="773"/>
         <location filename="../ConsoleDebugger.cpp" line="1045"/>
         <source>Run 128 Lines</source>
-        <translation>Run 128 Lines</translation>
+        <translation>128 行実行</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="781"/>
         <source>&amp;Break On...</source>
-        <translation>&amp;Break On...</translation>
+        <translation>ブレーク条件(&amp;B)...</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="790"/>
         <source>Bad &amp;Opcodes</source>
-        <translation>Bad &amp;Opcodes</translation>
+        <translation>不正オペコード(&amp;B)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="792"/>
         <source>Bad Opcodes</source>
-        <translation>Bad Opcodes</translation>
+        <translation>不正オペコード</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="802"/>
         <source>Unlogged &amp;Code</source>
-        <translation>Unlogged &amp;Code</translation>
+        <translation>未記録コード(&amp;C)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="804"/>
         <source>Unlogged Code</source>
-        <translation>Unlogged Code</translation>
+        <translation>未記録コード</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="814"/>
         <source>Unlogged &amp;Data</source>
-        <translation>Unlogged &amp;Data</translation>
+        <translation>未記録データ(&amp;D)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="816"/>
         <source>Unlogged Data</source>
-        <translation>Unlogged Data</translation>
+        <translation>未記録データ</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="824"/>
         <source>C&amp;ycle Count Exceeded</source>
-        <translation>C&amp;ycle Count Exceeded</translation>
+        <translation>サイクルカウント超過(&amp;Y)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="826"/>
         <source>CPU Cycle Count Exceeded</source>
-        <translation>CPU Cycle Count Exceeded</translation>
+        <translation>CPU サイクルカウント超過</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="834"/>
         <source>&amp;Instruction Count Exceeded</source>
-        <translation>&amp;Instruction Count Exceeded</translation>
+        <translation>命令カウント超過(&amp;I)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="836"/>
         <source>CPU Instruction Count Exceeded</source>
-        <translation>CPU Instruction Count Exceeded</translation>
+        <translation>CPU 命令カウント超過</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="846"/>
         <location filename="../ConsoleDebugger.cpp" line="1054"/>
         <source>Reset &amp;Counters</source>
-        <translation>Reset &amp;Counters</translation>
+        <translation>カウンタをリセット(&amp;C)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="848"/>
         <location filename="../ConsoleDebugger.cpp" line="1056"/>
         <source>Reset Counters</source>
-        <translation>Reset Counters</translation>
+        <translation>カウンタをリセット</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="856"/>
@@ -1248,94 +1246,94 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="861"/>
         <source>&amp;Open Debugger on ROM Load</source>
-        <translation>&amp;Open Debugger on ROM Load</translation>
+        <translation>ROM 読込時にデバッガを開く(&amp;O)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="863"/>
         <location filename="../ConsoleDebugger.cpp" line="900"/>
         <location filename="../ConsoleDebugger.cpp" line="902"/>
         <source>&amp;Reload</source>
-        <translation>&amp;Reload</translation>
+        <translation>再読込(&amp;R)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="873"/>
         <location filename="../ConsoleDebugger.cpp" line="875"/>
         <source>&amp;Load .FDB on ROM Load</source>
-        <translation>&amp;Load .FDB on ROM Load</translation>
+        <translation>ROM 読込時に FDB を読込(&amp;L)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="885"/>
         <location filename="../ConsoleDebugger.cpp" line="887"/>
         <source>Auto Start &amp;Trace Logger on Debugger Open</source>
-        <translation>Auto Start &amp;Trace Logger on Debugger Open</translation>
+        <translation>デバッガ起動時にトレースロガーを自動開始(&amp;T)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="897"/>
         <source>&amp;Symbols</source>
-        <translation>&amp;Symbols</translation>
+        <translation>シンボル(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="910"/>
         <location filename="../ConsoleDebugger.cpp" line="912"/>
         <source>&amp;Save</source>
-        <translation>&amp;Save</translation>
+        <translation>保存(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="924"/>
         <location filename="../ConsoleDebugger.cpp" line="926"/>
         <source>&amp;Symbolic Debug</source>
-        <translation>&amp;Symbolic Debug</translation>
+        <translation>シンボリックデバッグ(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="936"/>
         <location filename="../ConsoleDebugger.cpp" line="938"/>
         <source>&amp;Register Names</source>
-        <translation>&amp;Register Names</translation>
+        <translation>レジスタ名(&amp;R)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="975"/>
         <source>&amp;Run (F5)</source>
-        <translation>&amp;Run (F5)</translation>
+        <translation>実行(&amp;R) (F5)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="985"/>
         <source>&amp;Pause (F6)</source>
-        <translation>&amp;Pause (F6)</translation>
+        <translation>一時停止(&amp;P) (F6)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="995"/>
         <source>Step &amp;Back (F9)</source>
-        <translation>Step &amp;Back (F9)</translation>
+        <translation>ステップバック(&amp;B) (F9)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1005"/>
         <source>Step &amp;Into (F11)</source>
-        <translation>Step &amp;Into (F11)</translation>
+        <translation>ステップイン(&amp;I) (F11)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1014"/>
         <source>&amp;Step Out (Shift+F11)</source>
-        <translation>&amp;Step Out (Shift+F11)</translation>
+        <translation>ステップアウト(&amp;S) (Shift+F11)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1023"/>
         <source>Step &amp;Over (F10)</source>
-        <translation>Step &amp;Over (F10)</translation>
+        <translation>ステップオーバー(&amp;O) (F10)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1034"/>
         <source>Run &amp;Line (F7)</source>
-        <translation>Run &amp;Line (F7)</translation>
+        <translation>1 行実行(&amp;L) (F7)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1043"/>
         <source>Run &amp;128 Lines (F8)</source>
-        <translation>Run &amp;128 Lines (F8)</translation>
+        <translation>128 行実行(&amp;1) (F8)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1079"/>
         <source>Line Select</source>
-        <translation>Line Select</translation>
+        <translation>行選択</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1080"/>
@@ -1355,12 +1353,12 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1151"/>
         <source>Program Counter Register</source>
-        <translation>Program Counter Register</translation>
+        <translation>プログラムカウンタレジスタ</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1159"/>
         <source>Program Counter Register Hex Value</source>
-        <translation>Program Counter Register Hex Value</translation>
+        <translation>プログラムカウンタレジスタ16進値</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1169"/>
@@ -1370,12 +1368,12 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1170"/>
         <source>Accumulator Register</source>
-        <translation>Accumulator Register</translation>
+        <translation>アキュムレータレジスタ</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1178"/>
         <source>Accumulator Register Hex Value</source>
-        <translation>Accumulator Register Hex Value</translation>
+        <translation>アキュムレータレジスタ16進値</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1184"/>
@@ -1385,12 +1383,12 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1185"/>
         <source>X Index Register</source>
-        <translation>X Index Register</translation>
+        <translation>X インデックスレジスタ</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1193"/>
         <source>X Index Register Hex Value</source>
-        <translation>X Index Register Hex Value</translation>
+        <translation>X インデックスレジスタ16進値</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1199"/>
@@ -1400,12 +1398,12 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1200"/>
         <source>Y Index Register</source>
-        <translation>Y Index Register</translation>
+        <translation>Y インデックスレジスタ</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1208"/>
         <source>Y Index Register Hex Value</source>
-        <translation>Y Index Register Hex Value</translation>
+        <translation>Y インデックスレジスタ16進値</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1214"/>
@@ -1415,17 +1413,17 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1215"/>
         <source>Status Register</source>
-        <translation>Status Register</translation>
+        <translation>ステータスレジスタ</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1223"/>
         <source>Status Register Hex Value</source>
-        <translation>Status Register Hex Value</translation>
+        <translation>ステータスレジスタ16進値</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1228"/>
         <source>CPU Cycles:</source>
-        <translation>CPU Cycles:</translation>
+        <translation>CPU サイクル:</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1230"/>
@@ -1436,17 +1434,17 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1231"/>
         <source>Instructions:</source>
-        <translation>Instructions:</translation>
+        <translation>命令数:</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1260"/>
         <source>Stack $0100</source>
-        <translation>Stack $0100</translation>
+        <translation>スタック $0100</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1274"/>
         <source>Status Flags</source>
-        <translation>Status Flags</translation>
+        <translation>ステータスフラグ</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1279"/>
@@ -1491,42 +1489,42 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1288"/>
         <source>Negative</source>
-        <translation>Negative</translation>
+        <translation>ネガティブ</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1289"/>
         <source>Overflow</source>
-        <translation>Overflow</translation>
+        <translation>オーバーフロー</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1290"/>
         <source>Unused</source>
-        <translation>Unused</translation>
+        <translation>未使用</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1291"/>
         <source>Break</source>
-        <translation>Break</translation>
+        <translation>ブレーク</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1292"/>
         <source>Decimal</source>
-        <translation>Decimal</translation>
+        <translation>10進数</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1293"/>
         <source>Interrupt</source>
-        <translation>Interrupt</translation>
+        <translation>割り込み</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1294"/>
         <source>Zero</source>
-        <translation>Zero</translation>
+        <translation>ゼロ</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1295"/>
         <source>Carry</source>
-        <translation>Carry</translation>
+        <translation>キャリー</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1329"/>
@@ -1561,57 +1559,57 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1336"/>
         <source>Scanline:</source>
-        <translation>Scanline:</translation>
+        <translation>スキャンライン:</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1337"/>
         <source>Pixel:</source>
-        <translation>Pixel:</translation>
+        <translation>ピクセル:</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1339"/>
         <source>PPU Control Register, Address $2000</source>
-        <translation>PPU Control Register, Address $2000</translation>
+        <translation>PPU コントロールレジスタ, アドレス $2000</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1340"/>
         <source>PPU Mask Register, Address $2001</source>
-        <translation>PPU Mask Register, Address $2001</translation>
+        <translation>PPU マスクレジスタ, アドレス $2001</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1341"/>
         <source>PPU Status Register, Address $2002</source>
-        <translation>PPU Status Register, Address $2002</translation>
+        <translation>PPU ステータスレジスタ, アドレス $2002</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1342"/>
         <source>OAM Address Register, Address $2003</source>
-        <translation>OAM Address Register, Address $2003</translation>
+        <translation>OAM アドレスレジスタ, アドレス $2003</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1343"/>
         <source>PPU Address Register, Address $2006</source>
-        <translation>PPU Address Register, Address $2006</translation>
+        <translation>PPU アドレスレジスタ, アドレス $2006</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1344"/>
         <source>PPU Current Scanline being processed</source>
-        <translation>PPU Current Scanline being processed</translation>
+        <translation>PPU 処理中のスキャンライン</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1345"/>
         <source>PPU Current Pixel being processed</source>
-        <translation>PPU Current Pixel being processed</translation>
+        <translation>PPU 処理中のピクセル</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1418"/>
         <source>X Scroll:</source>
-        <translation>X Scroll:</translation>
+        <translation>X スクロール:</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1421"/>
         <source>Y Scroll:</source>
-        <translation>Y Scroll:</translation>
+        <translation>Y スクロール:</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1445"/>
@@ -1685,39 +1683,39 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="2584"/>
         <source>Edit Bookmark</source>
-        <translation>Edit Bookmark</translation>
+        <translation>ブックマークを編集</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="2938"/>
         <location filename="../ConsoleDebugger.cpp" line="2955"/>
         <location filename="../ConsoleDebugger.cpp" line="2971"/>
         <source>Select Font</source>
-        <translation>Select Font</translation>
+        <translation>フォント選択</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="3033"/>
         <source>PC Line Offset</source>
-        <translation>PC Line Offset</translation>
+        <translation>PC 行オフセット</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="3034"/>
         <source>Enter a line offset from 0 to 100.</source>
-        <translation>Enter a line offset from 0 to 100.</translation>
+        <translation>0 から 100 の行オフセットを入力してください。</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="3035"/>
         <source>Ok</source>
-        <translation>Ok</translation>
+        <translation>OK</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="3080"/>
         <source>Step Out Already Active</source>
-        <translation>Step Out Already Active</translation>
+        <translation>ステップアウトは既に実行中です</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="3081"/>
         <source>Step Out is currently in process. Cancel it and setup a new Step Out watch?</source>
-        <translation>Step Out is currently in process. Cancel it and setup a new Step Out watch?</translation>
+        <translation>ステップアウト実行中です。キャンセルして新しいステップアウトウォッチを設定しますか？</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="3245"/>
@@ -1731,13 +1729,13 @@
         <location filename="../ConsoleDebugger.cpp" line="3356"/>
         <location filename="../ConsoleDebugger.cpp" line="3411"/>
         <source>Specify Address [ 0x0000 -&gt; 0xFFFF ]</source>
-        <translation>Specify Address [ 0x0000 -&gt; 0xFFFF ]</translation>
+        <translation>アドレス指定 [ 0x0000 -&gt; 0xFFFF ]</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="3358"/>
         <location filename="../ConsoleDebugger.cpp" line="3413"/>
         <source>Go</source>
-        <translation>Go</translation>
+        <translation>ジャンプ</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="3359"/>
@@ -1748,12 +1746,12 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="3385"/>
         <source>Change Program Counter</source>
-        <translation>Change Program Counter</translation>
+        <translation>プログラムカウンタ変更</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="3440"/>
         <source>Goto Address</source>
-        <translation>Goto Address</translation>
+        <translation>アドレスへジャンプ</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="4440"/>
@@ -1773,22 +1771,22 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="4449"/>
         <source> Emulator Paused on Instruction Count Exceedance</source>
-        <translation> Emulator Paused on Instruction Count Exceedance</translation>
+        <translation>命令カウント超過でエミュレータ一時停止</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="4452"/>
         <source> Emulator Paused on Lua Breakpoint</source>
-        <translation> Emulator Paused on Lua Breakpoint</translation>
+        <translation>Lua ブレークポイントでエミュレータ一時停止</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="4455"/>
         <source> Emulator Paused on Unlogged Code</source>
-        <translation> Emulator Paused on Unlogged Code</translation>
+        <translation>未記録コードでエミュレータ一時停止</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="4458"/>
         <source> Emulator Paused on Unlogged Data</source>
-        <translation> Emulator Paused on Unlogged Data</translation>
+        <translation>未記録データでエミュレータ一時停止</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="4469"/>
@@ -1888,27 +1886,25 @@
     <message>
         <location filename="../ConsoleSoundConf.cpp" line="133"/>
         <source>Buffer Size (in ms):</source>
-        <translation>Buffer Size (in ms):</translation>
+        <translation>バッファサイズ (ms):</translation>
     </message>
     <message>
         <location filename="../ConsoleSoundConf.cpp" line="152"/>
         <source>% use of audio samples FIFO buffer.
 
 The emulation thread fills the buffer and the audio thread drains it.</source>
-        <translation>% use of audio samples FIFO buffer.
-
-The emulation thread fills the buffer and the audio thread drains it.</translation>
+        <translation>オーディオサンプル FIFO バッファの使用率。エミュレーションスレッドがバッファを埋め、オーディオスレッドが消費します。</translation>
     </message>
     <message>
         <location filename="../ConsoleSoundConf.cpp" line="160"/>
         <location filename="../ConsoleSoundConf.cpp" line="316"/>
         <source>Use Global Focus</source>
-        <translation>Use Global Focus</translation>
+        <translation>グローバルフォーカスを使用</translation>
     </message>
     <message>
         <location filename="../ConsoleSoundConf.cpp" line="161"/>
         <source>Mute sound when window is not in focus</source>
-        <translation>Mute sound when window is not in focus</translation>
+        <translation>ウィンドウ非フォーカス時にサウンドをミュート</translation>
     </message>
     <message>
         <location filename="../ConsoleSoundConf.cpp" line="169"/>
@@ -1929,22 +1925,22 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../ConsoleSoundConf.cpp" line="200"/>
         <source>Triangle</source>
-        <translation>Triangle</translation>
+        <translation>三角波</translation>
     </message>
     <message>
         <location filename="../ConsoleSoundConf.cpp" line="215"/>
         <source>Square1</source>
-        <translation>Square1</translation>
+        <translation>矩形波1</translation>
     </message>
     <message>
         <location filename="../ConsoleSoundConf.cpp" line="230"/>
         <source>Square2</source>
-        <translation>Square2</translation>
+        <translation>矩形波2</translation>
     </message>
     <message>
         <location filename="../ConsoleSoundConf.cpp" line="245"/>
         <source>Noise</source>
-        <translation>Noise</translation>
+        <translation>ノイズ</translation>
     </message>
     <message>
         <location filename="../ConsoleSoundConf.cpp" line="260"/>
@@ -1960,19 +1956,19 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../ConsoleSoundConf.cpp" line="279"/>
         <source>Sink Starve Count:</source>
-        <translation>Sink Starve Count:</translation>
+        <translation>シンク不足カウント:</translation>
     </message>
     <message>
         <location filename="../ConsoleSoundConf.cpp" line="280"/>
         <location filename="../ConsoleSoundConf.cpp" line="337"/>
         <source>Running count of the number of samples that the audio sink is starved of.</source>
-        <translation>Running count of the number of samples that the audio sink is starved of.</translation>
+        <translation>オーディオシンクが不足しているサンプル数の累計カウント。</translation>
     </message>
     <message>
         <location filename="../ConsoleSoundConf.cpp" line="281"/>
         <location filename="../ConsoleSoundConf.cpp" line="318"/>
         <source>Reset Counter</source>
-        <translation>Reset Counter</translation>
+        <translation>カウンターをリセット</translation>
     </message>
 </context>
 <context>
@@ -2057,19 +2053,19 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../ConsoleVideoConf.cpp" line="112"/>
         <location filename="../ConsoleVideoConf.cpp" line="597"/>
         <source>Prescale 2x</source>
-        <translation>Prescale 2x</translation>
+        <translation>プリスケール 2x</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="113"/>
         <location filename="../ConsoleVideoConf.cpp" line="598"/>
         <source>Prescale 3x</source>
-        <translation>Prescale 3x</translation>
+        <translation>プリスケール 3x</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="114"/>
         <location filename="../ConsoleVideoConf.cpp" line="599"/>
         <source>Prescale 4x</source>
-        <translation>Prescale 4x</translation>
+        <translation>プリスケール 4x</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="115"/>
@@ -2081,7 +2077,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../ConsoleVideoConf.cpp" line="125"/>
         <location filename="../ConsoleVideoConf.cpp" line="554"/>
         <source>Enable OpenGL Linear Filter</source>
-        <translation>Enable OpenGL Linear Filter</translation>
+        <translation>OpenGL リニアフィルタを有効化</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="134"/>
@@ -2112,49 +2108,49 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../ConsoleVideoConf.cpp" line="159"/>
         <location filename="../ConsoleVideoConf.cpp" line="555"/>
         <source>Region Auto Detect</source>
-        <translation>Region Auto Detect</translation>
+        <translation>リージョン自動検出</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="162"/>
         <location filename="../ConsoleVideoConf.cpp" line="556"/>
         <source>Enable New PPU</source>
-        <translation>Enable New PPU</translation>
+        <translation>新しい PPU を有効化</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="165"/>
         <location filename="../ConsoleVideoConf.cpp" line="557"/>
         <source>Enable Frameskip</source>
-        <translation>Enable Frameskip</translation>
+        <translation>フレームスキップを有効化</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="168"/>
         <location filename="../ConsoleVideoConf.cpp" line="558"/>
         <source>Enable Vertical Sync</source>
-        <translation>Enable Vertical Sync</translation>
+        <translation>垂直同期を有効化</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="171"/>
         <location filename="../ConsoleVideoConf.cpp" line="559"/>
         <source>Use Integer Frame Rate</source>
-        <translation>Use Integer Frame Rate</translation>
+        <translation>整数フレームレートを使用</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="174"/>
         <location filename="../ConsoleVideoConf.cpp" line="560"/>
         <source>Disable Sprite Limit</source>
-        <translation>Disable Sprite Limit</translation>
+        <translation>スプライト制限を無効化</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="177"/>
         <location filename="../ConsoleVideoConf.cpp" line="561"/>
         <source>Clip Left/Right Sides (8 px on each)</source>
-        <translation>Clip Left/Right Sides (8 px on each)</translation>
+        <translation>左右をクリップ（各8ピクセル）</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="180"/>
         <location filename="../ConsoleVideoConf.cpp" line="562"/>
         <source>GUI Messages</source>
-        <translation>GUI Messages</translation>
+        <translation>GUI メッセージ</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="184"/>
@@ -2166,37 +2162,37 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../ConsoleVideoConf.cpp" line="187"/>
         <location filename="../ConsoleVideoConf.cpp" line="564"/>
         <source>Frame Count</source>
-        <translation>Frame Count</translation>
+        <translation>フレームカウント</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="191"/>
         <location filename="../ConsoleVideoConf.cpp" line="565"/>
         <source>Lag Count</source>
-        <translation>Lag Count</translation>
+        <translation>ラグカウント</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="195"/>
         <location filename="../ConsoleVideoConf.cpp" line="566"/>
         <source>Re-Record Count</source>
-        <translation>Re-Record Count</translation>
+        <translation>リレコードカウント</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="199"/>
         <location filename="../ConsoleVideoConf.cpp" line="567"/>
         <source>Auto Scale on Resize</source>
-        <translation>Auto Scale on Resize</translation>
+        <translation>リサイズ時に自動スケール</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="202"/>
         <location filename="../ConsoleVideoConf.cpp" line="568"/>
         <source>Force Aspect Ratio</source>
-        <translation>Force Aspect Ratio</translation>
+        <translation>アスペクト比を強制</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="205"/>
         <location filename="../ConsoleVideoConf.cpp" line="569"/>
         <source>Draw Input Aids</source>
-        <translation>Draw Input Aids</translation>
+        <translation>入力補助を描画</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="211"/>
@@ -2220,13 +2216,13 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../ConsoleVideoConf.cpp" line="221"/>
         <location filename="../ConsoleVideoConf.cpp" line="626"/>
         <source>Vertical Sync</source>
-        <translation>Vertical Sync</translation>
+        <translation>垂直同期</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="278"/>
         <location filename="../ConsoleVideoConf.cpp" line="610"/>
         <source>Square Pixels (1:1)</source>
-        <translation>Square Pixels (1:1)</translation>
+        <translation>正方形ピクセル (1:1)</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="279"/>
@@ -2244,13 +2240,13 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../ConsoleVideoConf.cpp" line="281"/>
         <location filename="../ConsoleVideoConf.cpp" line="613"/>
         <source>Standard (4:3)</source>
-        <translation>Standard (4:3)</translation>
+        <translation>スタンダード (4:3)</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="282"/>
         <location filename="../ConsoleVideoConf.cpp" line="614"/>
         <source>Widescreen (16:9)</source>
-        <translation>Widescreen (16:9)</translation>
+        <translation>ワイドスクリーン (16:9)</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="289"/>
@@ -2271,13 +2267,13 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../ConsoleVideoConf.cpp" line="638"/>
         <location filename="../ConsoleVideoConf.cpp" line="1015"/>
         <source>X Scale:</source>
-        <translation>X Scale:</translation>
+        <translation>X スケール:</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="323"/>
         <location filename="../ConsoleVideoConf.cpp" line="642"/>
         <source>Y Scale:</source>
-        <translation>Y Scale:</translation>
+        <translation>Y スケール:</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="348"/>
@@ -2295,25 +2291,25 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../ConsoleVideoConf.cpp" line="362"/>
         <location filename="../ConsoleVideoConf.cpp" line="575"/>
         <source>Overlay Options</source>
-        <translation>Overlay Options</translation>
+        <translation>オーバーレイ設定</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="380"/>
         <location filename="../ConsoleVideoConf.cpp" line="576"/>
         <source>Show Controllers:</source>
-        <translation>Show Controllers:</translation>
+        <translation>コントローラーを表示:</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="386"/>
         <location filename="../ConsoleVideoConf.cpp" line="577"/>
         <source>Test Pattern:</source>
-        <translation>Test Pattern:</translation>
+        <translation>テストパターン:</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="392"/>
         <location filename="../ConsoleVideoConf.cpp" line="578"/>
         <source>Drawing Area</source>
-        <translation>Drawing Area</translation>
+        <translation>描画領域</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="450"/>
@@ -2323,86 +2319,86 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="451"/>
         <source>First Line:</source>
-        <translation>First Line:</translation>
+        <translation>最初の行:</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="452"/>
         <source>Last Line:</source>
-        <translation>Last Line:</translation>
+        <translation>最後の行:</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="459"/>
         <location filename="../ConsoleVideoConf.cpp" line="579"/>
         <source>Current Dimensions</source>
-        <translation>Current Dimensions</translation>
+        <translation>現在の寸法</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="476"/>
         <source>Window:</source>
-        <translation>Window:</translation>
+        <translation>ウィンドウ:</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="477"/>
         <source>Viewport:</source>
-        <translation>Viewport:</translation>
+        <translation>ビューポート:</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="481"/>
         <location filename="../ConsoleVideoConf.cpp" line="580"/>
         <source>Viewport Cursor</source>
-        <translation>Viewport Cursor</translation>
+        <translation>ビューポートカーソル</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="486"/>
         <location filename="../ConsoleVideoConf.cpp" line="630"/>
         <source>Arrow</source>
-        <translation>Arrow</translation>
+        <translation>矢印</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="487"/>
         <location filename="../ConsoleVideoConf.cpp" line="631"/>
         <source>Cross</source>
-        <translation>Cross</translation>
+        <translation>クロス</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="488"/>
         <location filename="../ConsoleVideoConf.cpp" line="632"/>
         <source>Blank</source>
-        <translation>Blank</translation>
+        <translation>ブランク</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="489"/>
         <location filename="../ConsoleVideoConf.cpp" line="633"/>
         <source>Reticle 1x</source>
-        <translation>Reticle 1x</translation>
+        <translation>レチクル 1x</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="490"/>
         <location filename="../ConsoleVideoConf.cpp" line="634"/>
         <source>Reticle 2x</source>
-        <translation>Reticle 2x</translation>
+        <translation>レチクル 2x</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="499"/>
         <source>Shape:</source>
-        <translation>Shape:</translation>
+        <translation>形状:</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="502"/>
         <location filename="../ConsoleVideoConf.cpp" line="570"/>
         <source>Visible</source>
-        <translation>Visible</translation>
+        <translation>表示</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="510"/>
         <location filename="../ConsoleVideoConf.cpp" line="581"/>
         <source>Screen</source>
-        <translation>Screen</translation>
+        <translation>スクリーン</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="521"/>
         <source>Refresh Rate (Hz):</source>
-        <translation>Refresh Rate (Hz):</translation>
+        <translation>リフレッシュレート (Hz):</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="882"/>
@@ -2416,13 +2412,13 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../ConsoleDebugger.cpp" line="7909"/>
         <location filename="../ConsoleDebugger.cpp" line="8336"/>
         <source>Break on CPU Instruction Exceedance</source>
-        <translation>Break on CPU Instruction Exceedance</translation>
+        <translation>CPU 命令超過でブレーク</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7933"/>
         <location filename="../ConsoleDebugger.cpp" line="8340"/>
         <source>Break on CPU Cycle Exceedance</source>
-        <translation>Break on CPU Cycle Exceedance</translation>
+        <translation>CPU サイクル超過でブレーク</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7947"/>
@@ -2433,40 +2429,40 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../ConsoleDebugger.cpp" line="7949"/>
         <location filename="../ConsoleDebugger.cpp" line="8343"/>
         <source>One-Shot</source>
-        <translation>One-Shot</translation>
+        <translation>ワンショット</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7950"/>
         <location filename="../ConsoleDebugger.cpp" line="8344"/>
         <source>Continuous</source>
-        <translation>Continuous</translation>
+        <translation>連続</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7960"/>
         <source>Reference</source>
-        <translation>Reference</translation>
+        <translation>参照</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7962"/>
         <location filename="../ConsoleDebugger.cpp" line="8345"/>
         <source>Absolute</source>
-        <translation>Absolute</translation>
+        <translation>絶対</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7963"/>
         <location filename="../ConsoleDebugger.cpp" line="8346"/>
         <source>Relative</source>
-        <translation>Relative</translation>
+        <translation>相対</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7984"/>
         <source>Threshold:</source>
-        <translation>Threshold:</translation>
+        <translation>しきい値:</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="8039"/>
         <source>Sync to Current</source>
-        <translation>Sync to Current</translation>
+        <translation>現在に同期</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="8043"/>
@@ -2481,12 +2477,12 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../ConsoleDebugger.cpp" line="8058"/>
         <source>Reset All</source>
-        <translation>Reset All</translation>
+        <translation>すべてリセット</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="8063"/>
         <source>Reset Deltas</source>
-        <translation>Reset Deltas</translation>
+        <translation>デルタをリセット</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="8070"/>
@@ -2496,7 +2492,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../ConsoleDebugger.cpp" line="8075"/>
         <source>Ok</source>
-        <translation>Ok</translation>
+        <translation>OK</translation>
     </message>
 </context>
 <context>
@@ -2505,13 +2501,13 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../ConsoleDebugger.cpp" line="1889"/>
         <location filename="../ConsoleDebugger.cpp" line="2119"/>
         <source>Edit Breakpoint</source>
-        <translation>Edit Breakpoint</translation>
+        <translation>ブレークポイントを編集</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1893"/>
         <location filename="../ConsoleDebugger.cpp" line="2123"/>
         <source>Add Breakpoint</source>
-        <translation>Add Breakpoint</translation>
+        <translation>ブレークポイントを追加</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1901"/>
@@ -2527,25 +2523,25 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../ConsoleDebugger.cpp" line="1915"/>
         <location filename="../ConsoleDebugger.cpp" line="2126"/>
         <source>Forbid</source>
-        <translation>Forbid</translation>
+        <translation>禁止</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1923"/>
         <location filename="../ConsoleDebugger.cpp" line="2127"/>
         <source>Read</source>
-        <translation>Read</translation>
+        <translation>読込</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1924"/>
         <location filename="../ConsoleDebugger.cpp" line="2128"/>
         <source>Write</source>
-        <translation>Write</translation>
+        <translation>書込</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1925"/>
         <location filename="../ConsoleDebugger.cpp" line="2129"/>
         <source>Execute</source>
-        <translation>Execute</translation>
+        <translation>実行</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1926"/>
@@ -2556,7 +2552,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1928"/>
         <source>Memory</source>
-        <translation>Memory</translation>
+        <translation>メモリ</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1941"/>
@@ -2585,7 +2581,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1961"/>
         <source>Condition</source>
-        <translation>Condition</translation>
+        <translation>条件</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1970"/>
@@ -2607,17 +2603,17 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../ConsoleDebugger.cpp" line="2226"/>
         <source>Start Address Invalid</source>
-        <translation>Start Address Invalid</translation>
+        <translation>開始アドレスが無効です</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="2230"/>
         <source>End Address Invalid</source>
-        <translation>End Address Invalid</translation>
+        <translation>終了アドレスが無効です</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="2234"/>
         <source>Condition Invalid</source>
-        <translation>Condition Invalid</translation>
+        <translation>条件が無効です</translation>
     </message>
 </context>
 <context>
@@ -2625,12 +2621,12 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7138"/>
         <source>Show Addresses</source>
-        <translation>Show Addresses</translation>
+        <translation>アドレスを表示</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7145"/>
         <source>Display Bytes Per Line</source>
-        <translation>Display Bytes Per Line</translation>
+        <translation>1行あたりの表示バイト数</translation>
     </message>
 </context>
 <context>
@@ -2638,7 +2634,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7738"/>
         <source>Move Tab To...</source>
-        <translation>Move Tab To...</translation>
+        <translation>タブを移動...</translation>
     </message>
 </context>
 <context>
@@ -2676,7 +2672,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../FamilyKeyboard.cpp" line="774"/>
         <source>Load Mapping</source>
-        <translation>Load Mapping</translation>
+        <translation>マッピングを読込</translation>
     </message>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="780"/>
@@ -2687,7 +2683,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../FamilyKeyboard.cpp" line="782"/>
         <source>Save Mapping</source>
-        <translation>Save Mapping</translation>
+        <translation>マッピングを保存</translation>
     </message>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="788"/>
@@ -2697,7 +2693,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../FamilyKeyboard.cpp" line="790"/>
         <source>Save Mapping As</source>
-        <translation>Save Mapping As</translation>
+        <translation>マッピングに名前を付けて保存</translation>
     </message>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="800"/>
@@ -2717,17 +2713,17 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../FamilyKeyboard.cpp" line="811"/>
         <source>Choose Font</source>
-        <translation>Choose Font</translation>
+        <translation>フォントを選択</translation>
     </message>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="819"/>
         <source>Reset to Defaults</source>
-        <translation>Reset to Defaults</translation>
+        <translation>デフォルトに戻す</translation>
     </message>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="821"/>
         <source>Reset to Defaults Mappings</source>
-        <translation>Reset to Defaults Mappings</translation>
+        <translation>デフォルトのマッピングに戻す</translation>
     </message>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="827"/>
@@ -2738,23 +2734,23 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../FamilyKeyboard.cpp" line="830"/>
         <location filename="../FamilyKeyboard.cpp" line="834"/>
         <source>Show Key Binding Tree</source>
-        <translation>Show Key Binding Tree</translation>
+        <translation>キーバインドツリーを表示</translation>
     </message>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="840"/>
         <location filename="../FamilyKeyboard.cpp" line="842"/>
         <source>Shrink Window to Minimum Size</source>
-        <translation>Shrink Window to Minimum Size</translation>
+        <translation>ウィンドウを最小サイズに縮小</translation>
     </message>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="854"/>
         <source>Select Font</source>
-        <translation>Select Font</translation>
+        <translation>フォント選択</translation>
     </message>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="950"/>
         <source>Family Keyboard is Enabled</source>
-        <translation>Family Keyboard is Enabled</translation>
+        <translation>ファミリーキーボードは有効です</translation>
     </message>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="951"/>
@@ -2764,22 +2760,22 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../FamilyKeyboard.cpp" line="955"/>
         <source>Family Keyboard is Disabled</source>
-        <translation>Family Keyboard is Disabled</translation>
+        <translation>ファミリーキーボードは無効です</translation>
     </message>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="1160"/>
         <source>Load Family Keyboard Mapping File</source>
-        <translation>Load Family Keyboard Mapping File</translation>
+        <translation>ファミリーキーボード マッピングファイルを読込</translation>
     </message>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="1387"/>
         <source>Save Mapping To File</source>
-        <translation>Save Mapping To File</translation>
+        <translation>マッピングをファイルに保存</translation>
     </message>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="1413"/>
         <source>FKB Config Files (*.txt *.TXT) ;; All files (*)</source>
-        <translation>FKB Config Files (*.txt *.TXT) ;; All files (*)</translation>
+        <translation>FKB 設定ファイル (*.txt *.TXT) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="1418"/>
@@ -2793,12 +2789,12 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../FamilyKeyboard.cpp" line="1471"/>
         <location filename="../FamilyKeyboard.cpp" line="1558"/>
         <source>Family Keyboard Key Mapping</source>
-        <translation>Family Keyboard Key Mapping</translation>
+        <translation>ファミリーキーボード キーマッピング</translation>
     </message>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="1497"/>
         <source>Current Mapping is:</source>
-        <translation>Current Mapping is:</translation>
+        <translation>現在のマッピング:</translation>
     </message>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="1503"/>
@@ -2816,12 +2812,12 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../FamilyKeyboard.cpp" line="321"/>
         <source>Map Key Binding...</source>
-        <translation>Map Key Binding...</translation>
+        <translation>キーバインドをマップ...</translation>
     </message>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="326"/>
         <source>Toggle State on Press</source>
-        <translation>Toggle State on Press</translation>
+        <translation>押下時に状態切換</translation>
     </message>
 </context>
 <context>
@@ -2842,7 +2838,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../FrameTimingStats.cpp" line="68"/>
         <location filename="../FrameTimingStats.cpp" line="201"/>
         <source>Parameter</source>
-        <translation>Parameter</translation>
+        <translation>パラメータ</translation>
     </message>
     <message>
         <location filename="../FrameTimingStats.cpp" line="69"/>
@@ -2872,55 +2868,55 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../FrameTimingStats.cpp" line="104"/>
         <location filename="../FrameTimingStats.cpp" line="207"/>
         <source>Frame Period ms</source>
-        <translation>Frame Period ms</translation>
+        <translation>フレーム周期 ms</translation>
     </message>
     <message>
         <location filename="../FrameTimingStats.cpp" line="105"/>
         <location filename="../FrameTimingStats.cpp" line="208"/>
         <source>Frame Delta ms</source>
-        <translation>Frame Delta ms</translation>
+        <translation>フレームデルタ ms</translation>
     </message>
     <message>
         <location filename="../FrameTimingStats.cpp" line="106"/>
         <location filename="../FrameTimingStats.cpp" line="209"/>
         <source>Frame Work ms</source>
-        <translation>Frame Work ms</translation>
+        <translation>フレームワーク ms</translation>
     </message>
     <message>
         <location filename="../FrameTimingStats.cpp" line="107"/>
         <location filename="../FrameTimingStats.cpp" line="210"/>
         <source>Frame Idle ms</source>
-        <translation>Frame Idle ms</translation>
+        <translation>フレームアイドル ms</translation>
     </message>
     <message>
         <location filename="../FrameTimingStats.cpp" line="108"/>
         <location filename="../FrameTimingStats.cpp" line="211"/>
         <source>Frame Work %</source>
-        <translation>Frame Work %</translation>
+        <translation>フレームワーク %</translation>
     </message>
     <message>
         <location filename="../FrameTimingStats.cpp" line="109"/>
         <location filename="../FrameTimingStats.cpp" line="212"/>
         <source>Frame Idle %</source>
-        <translation>Frame Idle %</translation>
+        <translation>フレームアイドル %</translation>
     </message>
     <message>
         <location filename="../FrameTimingStats.cpp" line="110"/>
         <location filename="../FrameTimingStats.cpp" line="213"/>
         <source>Frame Late Count</source>
-        <translation>Frame Late Count</translation>
+        <translation>フレーム遅延カウント</translation>
     </message>
     <message>
         <location filename="../FrameTimingStats.cpp" line="111"/>
         <location filename="../FrameTimingStats.cpp" line="214"/>
         <source>Video Period ms</source>
-        <translation>Video Period ms</translation>
+        <translation>ビデオ周期 ms</translation>
     </message>
     <message>
         <location filename="../FrameTimingStats.cpp" line="136"/>
         <location filename="../FrameTimingStats.cpp" line="215"/>
         <source>Enable Timing Statistics Calculations</source>
-        <translation>Enable Timing Statistics Calculations</translation>
+        <translation>タイミング統計計算を有効化</translation>
     </message>
     <message>
         <location filename="../FrameTimingStats.cpp" line="138"/>
@@ -2951,32 +2947,32 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../GameGenie.cpp" line="133"/>
         <source>Address/Compare/Value</source>
-        <translation>Address/Compare/Value</translation>
+        <translation>アドレス/比較/値</translation>
     </message>
     <message>
         <location filename="../GameGenie.cpp" line="145"/>
         <source>Address:</source>
-        <translation>Address:</translation>
+        <translation>アドレス:</translation>
     </message>
     <message>
         <location filename="../GameGenie.cpp" line="150"/>
         <source>Compare:</source>
-        <translation>Compare:</translation>
+        <translation>比較:</translation>
     </message>
     <message>
         <location filename="../GameGenie.cpp" line="155"/>
         <source>Value:</source>
-        <translation>Value:</translation>
+        <translation>値:</translation>
     </message>
     <message>
         <location filename="../GameGenie.cpp" line="158"/>
         <source>Game Genie Code</source>
-        <translation>Game Genie Code</translation>
+        <translation>ゲームジニーコード</translation>
     </message>
     <message>
         <location filename="../GameGenie.cpp" line="166"/>
         <source>Add To Cheat List</source>
-        <translation>Add To Cheat List</translation>
+        <translation>チートリストに追加</translation>
     </message>
     <message>
         <location filename="../GameGenie.cpp" line="183"/>
@@ -2995,7 +2991,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../GamePadConf.cpp" line="195"/>
         <location filename="../GamePadConf.cpp" line="703"/>
         <source>GamePad Config</source>
-        <translation>GamePad Config</translation>
+        <translation>ゲームパッド設定</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="208"/>
@@ -3007,7 +3003,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../GamePadConf.cpp" line="211"/>
         <location filename="../GamePadConf.cpp" line="684"/>
         <source>&amp;Close</source>
-        <translation>&amp;Close</translation>
+        <translation>閉じる(&amp;C)</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="213"/>
@@ -3019,25 +3015,25 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../GamePadConf.cpp" line="219"/>
         <location filename="../GamePadConf.cpp" line="681"/>
         <source>&amp;Extensions</source>
-        <translation>&amp;Extensions</translation>
+        <translation>拡張(&amp;E)</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="222"/>
         <location filename="../GamePadConf.cpp" line="689"/>
         <source>&amp;Show Adv Bindings</source>
-        <translation>&amp;Show Adv Bindings</translation>
+        <translation>詳細バインドを表示(&amp;S)</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="224"/>
         <location filename="../GamePadConf.cpp" line="690"/>
         <source>Show Adv Bindings</source>
-        <translation>Show Adv Bindings</translation>
+        <translation>詳細バインドを表示</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="241"/>
         <location filename="../GamePadConf.cpp" line="617"/>
         <source>Console Port:</source>
-        <translation>Console Port:</translation>
+        <translation>コンソールポート:</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="247"/>
@@ -3063,7 +3059,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../GamePadConf.cpp" line="252"/>
         <location filename="../GamePadConf.cpp" line="618"/>
         <source>Device:</source>
-        <translation>Device:</translation>
+        <translation>デバイス:</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="258"/>
@@ -3080,25 +3076,25 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../GamePadConf.cpp" line="315"/>
         <location filename="../GamePadConf.cpp" line="620"/>
         <source>Mapping Profile:</source>
-        <translation>Mapping Profile:</translation>
+        <translation>マッププロファイル:</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="329"/>
         <location filename="../GamePadConf.cpp" line="654"/>
         <source>Selected button mapping profile for use with Load/Save/Delete operations</source>
-        <translation>Selected button mapping profile for use with Load/Save/Delete operations</translation>
+        <translation>選択したボタンマッププロファイル（読込/保存/削除操作用）</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="330"/>
         <location filename="../GamePadConf.cpp" line="655"/>
         <source>Combo box for selection of a saved button mapping profile for the selected device</source>
-        <translation>Combo box for selection of a saved button mapping profile for the selected device</translation>
+        <translation>選択デバイスの保存済みボタンマッププロファイル選択コンボボックス</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="331"/>
         <location filename="../GamePadConf.cpp" line="775"/>
         <source>default</source>
-        <translation>default</translation>
+        <translation>デフォルト</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="336"/>
@@ -3110,13 +3106,13 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../GamePadConf.cpp" line="337"/>
         <location filename="../GamePadConf.cpp" line="633"/>
         <source>Sets Current Active Map to the Selected Profile</source>
-        <translation>Sets Current Active Map to the Selected Profile</translation>
+        <translation>現在のアクティブマップを選択したプロファイルに設定</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="338"/>
         <location filename="../GamePadConf.cpp" line="634"/>
         <source>Load selected configuration profile into current active mapping</source>
-        <translation>Load selected configuration profile into current active mapping</translation>
+        <translation>選択した設定プロファイルを現在のアクティブマッピングに読み込む</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="342"/>
@@ -3128,13 +3124,13 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../GamePadConf.cpp" line="343"/>
         <location filename="../GamePadConf.cpp" line="638"/>
         <source>Stores Current Active Map to the Selected Profile</source>
-        <translation>Stores Current Active Map to the Selected Profile</translation>
+        <translation>現在のアクティブマップを選択したプロファイルに保存</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="344"/>
         <location filename="../GamePadConf.cpp" line="639"/>
         <source>Save current active mapping to selected configuration profile</source>
-        <translation>Save current active mapping to selected configuration profile</translation>
+        <translation>現在のアクティブマッピングを選択したプロファイルに保存</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="351"/>
@@ -3148,13 +3144,13 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../GamePadConf.cpp" line="352"/>
         <location filename="../GamePadConf.cpp" line="643"/>
         <source>Create a New Map Profile</source>
-        <translation>Create a New Map Profile</translation>
+        <translation>新しいマッププロファイルを作成</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="353"/>
         <location filename="../GamePadConf.cpp" line="644"/>
         <source>Create a new named configuration profile</source>
-        <translation>Create a new named configuration profile</translation>
+        <translation>新しい名前付き設定プロファイルを作成</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="357"/>
@@ -3168,79 +3164,79 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../GamePadConf.cpp" line="358"/>
         <location filename="../GamePadConf.cpp" line="648"/>
         <source>Deletes the Selected Map Profile</source>
-        <translation>Deletes the Selected Map Profile</translation>
+        <translation>選択したマッププロファイルを削除</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="359"/>
         <location filename="../GamePadConf.cpp" line="649"/>
         <source>Delete selected configuration profile</source>
-        <translation>Delete selected configuration profile</translation>
+        <translation>選択した設定プロファイルを削除</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="366"/>
         <location filename="../GamePadConf.cpp" line="623"/>
         <source>Enable Four Score</source>
-        <translation>Enable Four Score</translation>
+        <translation>フォアスコアを有効化</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="367"/>
         <location filename="../GamePadConf.cpp" line="624"/>
         <source>Allow Up+Down/Left+Right</source>
-        <translation>Allow Up+Down/Left+Right</translation>
+        <translation>上下/左右同時入力を許可</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="378"/>
         <location filename="../GamePadConf.cpp" line="621"/>
         <source>Current Active Button Mappings:</source>
-        <translation>Current Active Button Mappings:</translation>
+        <translation>現在のアクティブボタンマッピング:</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="382"/>
         <location filename="../GamePadConf.cpp" line="660"/>
         <source>Pri</source>
-        <translation>Pri</translation>
+        <translation>プライマリ</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="383"/>
         <location filename="../GamePadConf.cpp" line="661"/>
         <source>Alt 1</source>
-        <translation>Alt 1</translation>
+        <translation>代替 1</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="384"/>
         <location filename="../GamePadConf.cpp" line="662"/>
         <source>Alt 2</source>
-        <translation>Alt 2</translation>
+        <translation>代替 2</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="385"/>
         <location filename="../GamePadConf.cpp" line="663"/>
         <source>Alt 3</source>
-        <translation>Alt 3</translation>
+        <translation>代替 3</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="387"/>
         <location filename="../GamePadConf.cpp" line="664"/>
         <source>Primary Button Map</source>
-        <translation>Primary Button Map</translation>
+        <translation>プライマリボタンマップ</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="388"/>
         <location filename="../GamePadConf.cpp" line="665"/>
         <source>Alternate Button Map #1</source>
-        <translation>Alternate Button Map #1</translation>
+        <translation>代替ボタンマップ #1</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="389"/>
         <location filename="../GamePadConf.cpp" line="666"/>
         <source>Alternate Button Map #2</source>
-        <translation>Alternate Button Map #2</translation>
+        <translation>代替ボタンマップ #2</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="390"/>
         <location filename="../GamePadConf.cpp" line="667"/>
         <source>Alternate Button Map #3</source>
-        <translation>Alternate Button Map #3</translation>
+        <translation>代替ボタンマップ #3</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="416"/>
@@ -3252,7 +3248,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../GamePadConf.cpp" line="427"/>
         <location filename="../GamePadConf.cpp" line="670"/>
         <source>Clear All</source>
-        <translation>Clear All</translation>
+        <translation>すべてクリア</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="428"/>
@@ -3264,13 +3260,13 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../GamePadConf.cpp" line="429"/>
         <location filename="../GamePadConf.cpp" line="672"/>
         <source>Change Sequentially</source>
-        <translation>Change Sequentially</translation>
+        <translation>順番に変更</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="495"/>
         <location filename="../GamePadConf.cpp" line="674"/>
         <source>Advanced Key Bindings</source>
-        <translation>Advanced Key Bindings</translation>
+        <translation>詳細キーバインド</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="526"/>
@@ -3282,27 +3278,27 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../GamePadConf.cpp" line="1039"/>
         <location filename="../GamePadConf.cpp" line="1073"/>
         <source>Mapping Error</source>
-        <translation>Mapping Error</translation>
+        <translation>マッピングエラー</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="1040"/>
         <source>Keyboard devices cannot accept joystick button mappings.</source>
-        <translation>Keyboard devices cannot accept joystick button mappings.</translation>
+        <translation>キーボードデバイスはジョイスティックボタンマッピングを受け付けません。</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="1335"/>
         <source>New Profile</source>
-        <translation>New Profile</translation>
+        <translation>新しいプロファイル</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="1336"/>
         <source>Specify New Profile Name</source>
-        <translation>Specify New Profile Name</translation>
+        <translation>新しいプロファイル名を指定</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="1337"/>
         <source>Create</source>
-        <translation>Create</translation>
+        <translation>作成</translation>
     </message>
 </context>
 <context>
@@ -3311,13 +3307,13 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../GamePadConf.cpp" line="2076"/>
         <location filename="../GamePadConf.cpp" line="2222"/>
         <source>Edit Gamepad Key Mapping</source>
-        <translation>Edit Gamepad Key Mapping</translation>
+        <translation>ゲームパッドキーマッピングを編集</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="2080"/>
         <location filename="../GamePadConf.cpp" line="2222"/>
         <source>Add Gamepad Key Mapping</source>
-        <translation>Add Gamepad Key Mapping</translation>
+        <translation>ゲームパッドキーマッピングを追加</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="2103"/>
@@ -3335,37 +3331,37 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../GamePadConf.cpp" line="2117"/>
         <location filename="../GamePadConf.cpp" line="2204"/>
         <source>Game Pad Button Sequence:</source>
-        <translation>Game Pad Button Sequence:</translation>
+        <translation>ゲームパッドボタンシーケンス:</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="2126"/>
         <location filename="../GamePadConf.cpp" line="2206"/>
         <source>Modifier Button:</source>
-        <translation>Modifier Button:</translation>
+        <translation>修飾ボタン:</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="2132"/>
         <location filename="../GamePadConf.cpp" line="2207"/>
         <source>Primary Button:</source>
-        <translation>Primary Button:</translation>
+        <translation>プライマリボタン:</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="2138"/>
         <location filename="../GamePadConf.cpp" line="2205"/>
         <source>Maps to Key Sequence:</source>
-        <translation>Maps to Key Sequence:</translation>
+        <translation>キーシーケンスにマップ:</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="2145"/>
         <location filename="../GamePadConf.cpp" line="2208"/>
         <source>On Press:</source>
-        <translation>On Press:</translation>
+        <translation>押下時:</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="2151"/>
         <location filename="../GamePadConf.cpp" line="2209"/>
         <source>On Release:</source>
-        <translation>On Release:</translation>
+        <translation>離す時:</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="2158"/>
@@ -3385,7 +3381,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../GamePadConf.cpp" line="1972"/>
         <source>Turbo</source>
-        <translation>Turbo</translation>
+        <translation>ターボ</translation>
     </message>
 </context>
 <context>
@@ -3394,53 +3390,53 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../CheatsConf.cpp" line="115"/>
         <location filename="../CheatsConf.cpp" line="511"/>
         <source>Active Cheats</source>
-        <translation>Active Cheats</translation>
+        <translation>アクティブチート</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="142"/>
         <location filename="../CheatsConf.cpp" line="528"/>
         <source>Enable Cheats</source>
-        <translation>Enable Cheats</translation>
+        <translation>チートを有効化</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="143"/>
         <source>Auto Load / Save with Game</source>
-        <translation>Auto Load / Save with Game</translation>
+        <translation>ゲーム時に自動読込/保存</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="157"/>
         <source>Name:</source>
-        <translation>Name:</translation>
+        <translation>名前:</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="169"/>
         <source>Address:</source>
-        <translation>Address:</translation>
+        <translation>アドレス:</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="181"/>
         <source>Value:</source>
-        <translation>Value:</translation>
+        <translation>値:</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="193"/>
         <source>Compare:</source>
-        <translation>Compare:</translation>
+        <translation>比較:</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="208"/>
         <source>Type:</source>
-        <translation>Type:</translation>
+        <translation>タイプ:</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="210"/>
         <source>0: Periodic Set (Every Frame)</source>
-        <translation>0: Periodic Set (Every Frame)</translation>
+        <translation>0: 定期セット（毎フレーム）</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="211"/>
         <source>1: Substitute/Freeze</source>
-        <translation>1: Substitute/Freeze</translation>
+        <translation>1: 置換/フリーズ</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="221"/>
@@ -3457,19 +3453,19 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../CheatsConf.cpp" line="223"/>
         <location filename="../CheatsConf.cpp" line="516"/>
         <source>Update</source>
-        <translation>Update</translation>
+        <translation>更新</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="233"/>
         <location filename="../CheatsConf.cpp" line="517"/>
         <source>Import</source>
-        <translation>Import</translation>
+        <translation>インポート</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="234"/>
         <location filename="../CheatsConf.cpp" line="518"/>
         <source>Export</source>
-        <translation>Export</translation>
+        <translation>エクスポート</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="101"/>
@@ -3477,12 +3473,12 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../CheatsConf.cpp" line="510"/>
         <location filename="../CheatsConf.cpp" line="512"/>
         <source>Cheat Search</source>
-        <translation>Cheat Search</translation>
+        <translation>チート検索</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="246"/>
         <source>Possibilities</source>
-        <translation>Possibilities</translation>
+        <translation>可能性</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="288"/>
@@ -3493,7 +3489,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../CheatsConf.cpp" line="301"/>
         <source>Known Value:</source>
-        <translation>Known Value:</translation>
+        <translation>既知の値:</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="310"/>
@@ -3503,43 +3499,43 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../CheatsConf.cpp" line="324"/>
         <source>Previous Compare</source>
-        <translation>Previous Compare</translation>
+        <translation>前回比較</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="336"/>
         <location filename="../CheatsConf.cpp" line="521"/>
         <source>Equal</source>
-        <translation>Equal</translation>
+        <translation>等しい</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="349"/>
         <location filename="../CheatsConf.cpp" line="522"/>
         <source>Not Equal</source>
-        <translation>Not Equal</translation>
+        <translation>等しくない</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="354"/>
         <location filename="../CheatsConf.cpp" line="385"/>
         <location filename="../CheatsConf.cpp" line="416"/>
         <source>By:</source>
-        <translation>By:</translation>
+        <translation>条件:</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="380"/>
         <location filename="../CheatsConf.cpp" line="523"/>
         <source>Greater Than</source>
-        <translation>Greater Than</translation>
+        <translation>より大きい</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="411"/>
         <location filename="../CheatsConf.cpp" line="524"/>
         <source>Less Than</source>
-        <translation>Less Than</translation>
+        <translation>より小さい</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="441"/>
         <source>Pause emulation when this window is active</source>
-        <translation>Pause emulation when this window is active</translation>
+        <translation>このウィンドウアクティブ時にエミュレーションを一時停止</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="443"/>
@@ -3589,13 +3585,13 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../CheatsConf.cpp" line="792"/>
         <source>Open Cheat File</source>
-        <translation>Open Cheat File</translation>
+        <translation>チートファイルを開く</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="796"/>
         <location filename="../CheatsConf.cpp" line="859"/>
         <source>Cheat files (*.cht *.CHT) ;; All files (*)</source>
-        <translation>Cheat files (*.cht *.CHT) ;; All files (*)</translation>
+        <translation>チートファイル (*.cht *.CHT) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="800"/>
@@ -3605,7 +3601,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../CheatsConf.cpp" line="855"/>
         <source>Save Cheat File</source>
-        <translation>Save Cheat File</translation>
+        <translation>チートファイルを保存</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="863"/>
@@ -3628,7 +3624,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../GuiConf.cpp" line="86"/>
         <location filename="../GuiConf.cpp" line="311"/>
         <source>GUI Config</source>
-        <translation>GUI Config</translation>
+        <translation>GUI 設定</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="96"/>
@@ -3638,17 +3634,17 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../GuiConf.cpp" line="99"/>
         <source>&amp;Test</source>
-        <translation>&amp;Test</translation>
+        <translation>テスト(&amp;T)</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="101"/>
         <source>Test</source>
-        <translation>Test</translation>
+        <translation>テスト</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="107"/>
         <source>&amp;Close</source>
-        <translation>&amp;Close</translation>
+        <translation>閉じる(&amp;C)</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="109"/>
@@ -3658,59 +3654,59 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../GuiConf.cpp" line="115"/>
         <source>&amp;Color</source>
-        <translation>&amp;Color</translation>
+        <translation>色(&amp;C)</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="118"/>
         <location filename="../GuiConf.cpp" line="120"/>
         <source>&amp;View QPalette</source>
-        <translation>&amp;View QPalette</translation>
+        <translation>QPalette を表示(&amp;V)</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="133"/>
         <location filename="../GuiConf.cpp" line="296"/>
         <source>Use Native OS File Dialog</source>
-        <translation>Use Native OS File Dialog</translation>
+        <translation>OS ネイティブファイルダイアログを使用</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="134"/>
         <location filename="../GuiConf.cpp" line="297"/>
         <source>Use Native OS Menu Bar</source>
-        <translation>Use Native OS Menu Bar</translation>
+        <translation>OS ネイティブメニューバーを使用</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="135"/>
         <location filename="../GuiConf.cpp" line="298"/>
         <source>Pause On Main Menu Access</source>
-        <translation>Pause On Main Menu Access</translation>
+        <translation>メインメニューアクセス時に一時停止</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="136"/>
         <location filename="../GuiConf.cpp" line="299"/>
         <source>Context Menu Enable</source>
-        <translation>Context Menu Enable</translation>
+        <translation>コンテキストメニューを有効化</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="137"/>
         <location filename="../GuiConf.cpp" line="300"/>
         <source>Show Splash Screen at Startup</source>
-        <translation>Show Splash Screen at Startup</translation>
+        <translation>起動時にスプラッシュスクリーンを表示</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="138"/>
         <location filename="../GuiConf.cpp" line="301"/>
         <source>Hide Advanced Menu</source>
-        <translation>Hide Advanced Menu</translation>
+        <translation>詳細メニューを非表示</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="170"/>
         <source>Style:</source>
-        <translation>Style:</translation>
+        <translation>スタイル:</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="178"/>
         <source>Base:</source>
-        <translation>Base:</translation>
+        <translation>ベース:</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="183"/>
@@ -3721,7 +3717,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../GuiConf.cpp" line="187"/>
         <location filename="../GuiConf.cpp" line="303"/>
         <source>Use Custom QPalette</source>
-        <translation>Use Custom QPalette</translation>
+        <translation>カスタム QPalette を使用</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="194"/>
@@ -3739,7 +3735,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../GuiConf.cpp" line="218"/>
         <location filename="../GuiConf.cpp" line="302"/>
         <source>Use Custom Stylesheet</source>
-        <translation>Use Custom Stylesheet</translation>
+        <translation>カスタムスタイルシートを使用</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="259"/>
@@ -3750,12 +3746,12 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../GuiConf.cpp" line="420"/>
         <source>Open Qt Stylesheet (QSS)</source>
-        <translation>Open Qt Stylesheet (QSS)</translation>
+        <translation>Qt スタイルシートを開く (QSS)</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="455"/>
         <source>Qt Stylesheets (*.qss *.QSS) ;; All files (*)</source>
-        <translation>Qt Stylesheets (*.qss *.QSS) ;; All files (*)</translation>
+        <translation>Qt スタイルシート (*.qss *.QSS) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="459"/>
@@ -3766,12 +3762,12 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../GuiConf.cpp" line="523"/>
         <source>Open Qt QPalette File (QPAL)</source>
-        <translation>Open Qt QPalette File (QPAL)</translation>
+        <translation>Qt QPalette ファイルを開く (QPAL)</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="558"/>
         <source>Qt Stylesheets (*.qpal *.QPAL) ;; All files (*)</source>
-        <translation>Qt Stylesheets (*.qpal *.QPAL) ;; All files (*)</translation>
+        <translation>Qt スタイルシート (*.qpal *.QPAL) ;; すべてのファイル (*)</translation>
     </message>
 </context>
 <context>
@@ -3788,7 +3784,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../GuiConf.cpp" line="1068"/>
         <location filename="../GuiConf.cpp" line="1201"/>
         <source>GUI Color Palette Edit</source>
-        <translation>GUI Color Palette Edit</translation>
+        <translation>GUI カラーパレット編集</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1080"/>
@@ -3798,7 +3794,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../GuiConf.cpp" line="1083"/>
         <source>Save &amp;As</source>
-        <translation>Save &amp;As</translation>
+        <translation>名前を付けて保存(&amp;A)</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1085"/>
@@ -3808,7 +3804,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../GuiConf.cpp" line="1091"/>
         <source>&amp;Close</source>
-        <translation>&amp;Close</translation>
+        <translation>閉じる(&amp;C)</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1093"/>
@@ -3818,27 +3814,27 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../GuiConf.cpp" line="1128"/>
         <source>Disabled</source>
-        <translation>Disabled</translation>
+        <translation>無効</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1133"/>
         <source>Inactive</source>
-        <translation>Inactive</translation>
+        <translation>非アクティブ</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1138"/>
         <source>Active</source>
-        <translation>Active</translation>
+        <translation>アクティブ</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1214"/>
         <source>Save QPalette (qpal)</source>
-        <translation>Save QPalette (qpal)</translation>
+        <translation>QPalette を保存 (qpal)</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1250"/>
         <source>Qt QPalette Files (*.qpal *.QPAL) ;; All files (*)</source>
-        <translation>Qt QPalette Files (*.qpal *.QPAL) ;; All files (*)</translation>
+        <translation>Qt QPalette ファイル (*.qpal *.QPAL) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1254"/>
@@ -3862,7 +3858,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../HelpPages.cpp" line="255"/>
         <location filename="../HelpPages.cpp" line="354"/>
         <source>&amp;Close</source>
-        <translation>&amp;Close</translation>
+        <translation>閉じる(&amp;C)</translation>
     </message>
     <message>
         <location filename="../HelpPages.cpp" line="257"/>
@@ -3874,7 +3870,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../HelpPages.cpp" line="270"/>
         <location filename="../HelpPages.cpp" line="344"/>
         <source>&amp;Backward</source>
-        <translation>&amp;Backward</translation>
+        <translation>戻る(&amp;B)</translation>
     </message>
     <message>
         <location filename="../HelpPages.cpp" line="271"/>
@@ -3885,13 +3881,13 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../HelpPages.cpp" line="272"/>
         <location filename="../HelpPages.cpp" line="345"/>
         <source>Navigate Backward</source>
-        <translation>Navigate Backward</translation>
+        <translation>戻る</translation>
     </message>
     <message>
         <location filename="../HelpPages.cpp" line="278"/>
         <location filename="../HelpPages.cpp" line="349"/>
         <source>&amp;Forward</source>
-        <translation>&amp;Forward</translation>
+        <translation>進む(&amp;F)</translation>
     </message>
     <message>
         <location filename="../HelpPages.cpp" line="279"/>
@@ -3902,19 +3898,19 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../HelpPages.cpp" line="280"/>
         <location filename="../HelpPages.cpp" line="350"/>
         <source>Navigate Forward</source>
-        <translation>Navigate Forward</translation>
+        <translation>進む</translation>
     </message>
     <message>
         <location filename="../HelpPages.cpp" line="293"/>
         <location filename="../HelpPages.cpp" line="359"/>
         <source>Contents</source>
-        <translation>Contents</translation>
+        <translation>目次</translation>
     </message>
     <message>
         <location filename="../HelpPages.cpp" line="294"/>
         <location filename="../HelpPages.cpp" line="360"/>
         <source>Index</source>
-        <translation>Index</translation>
+        <translation>索引</translation>
     </message>
 </context>
 <context>
@@ -3922,7 +3918,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../HexEditor.cpp" line="1140"/>
         <source>Hex Editor</source>
-        <translation>Hex Editor</translation>
+        <translation>16進エディタ</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1159"/>
@@ -3932,47 +3928,47 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../HexEditor.cpp" line="1162"/>
         <source>&amp;Save ROM</source>
-        <translation>&amp;Save ROM</translation>
+        <translation>ROM を保存(&amp;S)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1164"/>
         <source>Save ROM File</source>
-        <translation>Save ROM File</translation>
+        <translation>ROM ファイルを保存</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1170"/>
         <source>Save ROM &amp;As</source>
-        <translation>Save ROM &amp;As</translation>
+        <translation>ROM に名前を付けて保存(&amp;A)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1172"/>
         <source>Save ROM File As</source>
-        <translation>Save ROM File As</translation>
+        <translation>ROM ファイルに名前を付けて保存</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1178"/>
         <source>&amp;Load TBL File</source>
-        <translation>&amp;Load TBL File</translation>
+        <translation>TBL ファイルを読込(&amp;L)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1180"/>
         <source>Load Table from File</source>
-        <translation>Load Table from File</translation>
+        <translation>ファイルからテーブルを読込</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1186"/>
         <source>&amp;Unload TBL File</source>
-        <translation>&amp;Unload TBL File</translation>
+        <translation>TBL ファイルをアンロード(&amp;U)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1188"/>
         <source>Unload Table</source>
-        <translation>Unload Table</translation>
+        <translation>テーブルをアンロード</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1194"/>
         <source>&amp;Goto Address</source>
-        <translation>&amp;Goto Address</translation>
+        <translation>アドレスへジャンプ(&amp;G)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1195"/>
@@ -3982,12 +3978,12 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../HexEditor.cpp" line="1196"/>
         <source>Goto Address</source>
-        <translation>Goto Address</translation>
+        <translation>アドレスへジャンプ</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1204"/>
         <source>&amp;Close</source>
-        <translation>&amp;Close</translation>
+        <translation>閉じる(&amp;C)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1206"/>
@@ -3997,22 +3993,22 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../HexEditor.cpp" line="1212"/>
         <source>&amp;Edit</source>
-        <translation>&amp;Edit</translation>
+        <translation>編集(&amp;E)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1215"/>
         <source>&amp;Undo</source>
-        <translation>&amp;Undo</translation>
+        <translation>元に戻す(&amp;U)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1217"/>
         <source>Undo Edit</source>
-        <translation>Undo Edit</translation>
+        <translation>編集を元に戻す</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1225"/>
         <source>&amp;Copy</source>
-        <translation>&amp;Copy</translation>
+        <translation>コピー(&amp;C)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1226"/>
@@ -4027,7 +4023,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../HexEditor.cpp" line="1233"/>
         <source>&amp;Paste</source>
-        <translation>&amp;Paste</translation>
+        <translation>貼り付け(&amp;P)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1234"/>
@@ -4042,7 +4038,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../HexEditor.cpp" line="1242"/>
         <source>&amp;Find</source>
-        <translation>&amp;Find</translation>
+        <translation>検索(&amp;F)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1243"/>
@@ -4062,57 +4058,57 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../HexEditor.cpp" line="1257"/>
         <source>&amp;CPU</source>
-        <translation>&amp;CPU</translation>
+        <translation>CPU(&amp;C)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1259"/>
         <source>View CPU</source>
-        <translation>View CPU</translation>
+        <translation>CPU を表示</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1267"/>
         <source>&amp;PPU</source>
-        <translation>&amp;PPU</translation>
+        <translation>PPU(&amp;P)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1269"/>
         <source>View PPU</source>
-        <translation>View PPU</translation>
+        <translation>PPU を表示</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1277"/>
         <source>&amp;OAM</source>
-        <translation>&amp;OAM</translation>
+        <translation>OAM(&amp;O)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1279"/>
         <source>View OAM</source>
-        <translation>View OAM</translation>
+        <translation>OAM を表示</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1287"/>
         <source>&amp;ROM</source>
-        <translation>&amp;ROM</translation>
+        <translation>ROM(&amp;R)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1289"/>
         <source>View ROM</source>
-        <translation>View ROM</translation>
+        <translation>ROM を表示</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1301"/>
         <source>Set &amp;Font...</source>
-        <translation>Set &amp;Font...</translation>
+        <translation>フォントを設定(&amp;F)...</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1303"/>
         <source>Change Font</source>
-        <translation>Change Font</translation>
+        <translation>フォント変更</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1312"/>
         <source>Re&amp;fresh Rate</source>
-        <translation>Re&amp;fresh Rate</translation>
+        <translation>リフレッシュレート(&amp;F)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1321"/>
@@ -4147,68 +4143,68 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../HexEditor.cpp" line="1375"/>
         <source>&amp;Color</source>
-        <translation>&amp;Color</translation>
+        <translation>色(&amp;C)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1381"/>
         <source>Highlight &amp;Activity</source>
-        <translation>Highlight &amp;Activity</translation>
+        <translation>アクティビティをハイライト(&amp;A)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1383"/>
         <source>Highlight Activity</source>
-        <translation>Highlight Activity</translation>
+        <translation>アクティビティをハイライト</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1394"/>
         <source>Highlight &amp;Reverse Video</source>
-        <translation>Highlight &amp;Reverse Video</translation>
+        <translation>リバースビデオをハイライト(&amp;R)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1396"/>
         <source>Highlight Reverse Video</source>
-        <translation>Highlight Reverse Video</translation>
+        <translation>リバースビデオをハイライト</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1407"/>
         <source>Highlight &amp;Cursor Row/Column</source>
-        <translation>Highlight &amp;Cursor Row/Column</translation>
+        <translation>カーソル行/列をハイライト(&amp;C)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1409"/>
         <source>Highlight Cursor Row/Column</source>
-        <translation>Highlight Cursor Row/Column</translation>
+        <translation>カーソル行/列をハイライト</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1420"/>
         <location filename="../HexEditor.cpp" line="1422"/>
         <source>&amp;Alternating Column Colors</source>
-        <translation>&amp;Alternating Column Colors</translation>
+        <translation>交互列カラー(&amp;A)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1432"/>
         <source>&amp;ForeGround Color</source>
-        <translation>&amp;ForeGround Color</translation>
+        <translation>前景色(&amp;F)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1437"/>
         <source>&amp;BackGround Color</source>
-        <translation>&amp;BackGround Color</translation>
+        <translation>背景色(&amp;B)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1442"/>
         <source>&amp;Cursor Row/Column Color</source>
-        <translation>&amp;Cursor Row/Column Color</translation>
+        <translation>カーソル行/列カラー(&amp;C)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1447"/>
         <source>&amp;Alternate Column Color</source>
-        <translation>&amp;Alternate Column Color</translation>
+        <translation>交互列カラー(&amp;A)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1452"/>
         <source>&amp;Bookmarks</source>
-        <translation>&amp;Bookmarks</translation>
+        <translation>ブックマーク(&amp;B)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1577"/>
@@ -4218,27 +4214,27 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../HexEditor.cpp" line="1578"/>
         <source>Remove All Bookmarks?</source>
-        <translation>Remove All Bookmarks?</translation>
+        <translation>すべてのブックマークを削除しますか？</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1601"/>
         <source>&amp;Remove All Bookmarks</source>
-        <translation>&amp;Remove All Bookmarks</translation>
+        <translation>すべてのブックマークを削除(&amp;R)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1603"/>
         <source>Remove All Bookmarks</source>
-        <translation>Remove All Bookmarks</translation>
+        <translation>すべてのブックマークを削除</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1681"/>
         <source>Save ROM To File</source>
-        <translation>Save ROM To File</translation>
+        <translation>ROM をファイルに保存</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1685"/>
         <source>NES Files (*.nes *.NES) ;; All files (*)</source>
-        <translation>NES Files (*.nes *.NES) ;; All files (*)</translation>
+        <translation>NESファイル (*.nes *.NES) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1689"/>
@@ -4253,12 +4249,12 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../HexEditor.cpp" line="1722"/>
         <source>Load Table From File</source>
-        <translation>Load Table From File</translation>
+        <translation>ファイルからテーブルを読込</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1726"/>
         <source>TBL Files (*.tbl *.TBL) ;; All files (*)</source>
-        <translation>TBL Files (*.tbl *.TBL) ;; All files (*)</translation>
+        <translation>TBL ファイル (*.tbl *.TBL) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1730"/>
@@ -4283,13 +4279,13 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../HexEditor.cpp" line="973"/>
         <location filename="../HexEditor.cpp" line="1029"/>
         <source>Find Next</source>
-        <translation>Find Next</translation>
+        <translation>次を検索</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="974"/>
         <location filename="../HexEditor.cpp" line="1030"/>
         <source>Direction</source>
-        <translation>Direction</translation>
+        <translation>方向</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="975"/>
@@ -4301,31 +4297,31 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../HexEditor.cpp" line="976"/>
         <location filename="../HexEditor.cpp" line="1032"/>
         <source>Find What:</source>
-        <translation>Find What:</translation>
+        <translation>検索する文字列:</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="996"/>
         <location filename="../HexEditor.cpp" line="1033"/>
         <source>Up</source>
-        <translation>Up</translation>
+        <translation>上</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="997"/>
         <location filename="../HexEditor.cpp" line="1034"/>
         <source>Down</source>
-        <translation>Down</translation>
+        <translation>下</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1010"/>
         <location filename="../HexEditor.cpp" line="1035"/>
         <source>Hex</source>
-        <translation>Hex</translation>
+        <translation>16進数</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1011"/>
         <location filename="../HexEditor.cpp" line="1036"/>
         <source>Text</source>
-        <translation>Text</translation>
+        <translation>テキスト</translation>
     </message>
 </context>
 <context>
@@ -4339,7 +4335,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../HotKeyConf.cpp" line="88"/>
         <source>Restore Defaults</source>
-        <translation>Restore Defaults</translation>
+        <translation>デフォルトに戻す</translation>
     </message>
     <message>
         <location filename="../HotKeyConf.cpp" line="92"/>
@@ -4358,7 +4354,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../HotKeyConf.cpp" line="345"/>
         <source>Press a Key</source>
-        <translation>Press a Key</translation>
+        <translation>キーを押してください</translation>
     </message>
     <message>
         <location filename="../HotKeyConf.cpp" line="351"/>
@@ -4368,12 +4364,12 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../HotKeyConf.cpp" line="352"/>
         <source>Ok</source>
-        <translation>Ok</translation>
+        <translation>OK</translation>
     </message>
     <message>
         <location filename="../HotKeyConf.cpp" line="459"/>
         <source>Hotkey Conflict Warning</source>
-        <translation>Hotkey Conflict Warning</translation>
+        <translation>ホットキー競合警告</translation>
     </message>
     <message>
         <location filename="../HotKeyConf.cpp" line="486"/>
@@ -4393,7 +4389,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../GamePadConf.cpp" line="2551"/>
         <location filename="../GamePadConf.cpp" line="2571"/>
         <source>Ok</source>
-        <translation>Ok</translation>
+        <translation>OK</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="2556"/>
@@ -4413,35 +4409,35 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../InputConf.cpp" line="80"/>
         <source>NES-Style Input Ports</source>
-        <translation>NES-Style Input Ports</translation>
+        <translation>NES スタイル入力ポート</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="83"/>
         <location filename="../InputConf.cpp" line="295"/>
         <source>Attach 4-Score (Implies four gamepads)</source>
-        <translation>Attach 4-Score (Implies four gamepads)</translation>
+        <translation>フォアスコア接続（4つのゲームパッドを意味）</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="84"/>
         <location filename="../InputConf.cpp" line="296"/>
         <source>Replace Port 2 Start with Microphone</source>
-        <translation>Replace Port 2 Start with Microphone</translation>
+        <translation>ポート2のStartをマイクに置換</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="85"/>
         <location filename="../InputConf.cpp" line="297"/>
         <source>Auto Load/Save Presets at ROM Open/Close</source>
-        <translation>Auto Load/Save Presets at ROM Open/Close</translation>
+        <translation>ROM 開閉時にプリセットを自動読込/保存</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="99"/>
         <source>Port 1:</source>
-        <translation>Port 1:</translation>
+        <translation>ポート 1:</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="100"/>
         <source>Port 2:</source>
-        <translation>Port 2:</translation>
+        <translation>ポート 2:</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="114"/>
@@ -4453,7 +4449,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../InputConf.cpp" line="299"/>
         <location filename="../InputConf.cpp" line="300"/>
         <source>&lt;None&gt;</source>
-        <translation>&lt;None&gt;</translation>
+        <translation>&lt;なし&gt;</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="115"/>
@@ -4463,17 +4459,17 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../InputConf.cpp" line="302"/>
         <location filename="../InputConf.cpp" line="303"/>
         <source>Configure</source>
-        <translation>Configure</translation>
+        <translation>設定</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="137"/>
         <source>Input Presets:</source>
-        <translation>Input Presets:</translation>
+        <translation>入力プリセット:</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="138"/>
         <source>Famicom Expansion Port:</source>
-        <translation>Famicom Expansion Port:</translation>
+        <translation>ファミコン拡張ポート:</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="152"/>
@@ -4498,12 +4494,12 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../InputConf.cpp" line="200"/>
         <source>Gamepad</source>
-        <translation>Gamepad</translation>
+        <translation>ゲームパッド</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="201"/>
         <source>Zapper</source>
-        <translation>Zapper</translation>
+        <translation>ザッパー</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="202"/>
@@ -4519,32 +4515,32 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../InputConf.cpp" line="204"/>
         <location filename="../InputConf.cpp" line="223"/>
         <source>Arkanoid Paddle</source>
-        <translation>Arkanoid Paddle</translation>
+        <translation>アルカノイドパドル</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="224"/>
         <source>Shadow</source>
-        <translation>Shadow</translation>
+        <translation>シャドウ</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="225"/>
         <source>Hyper Shot Gun</source>
-        <translation>Hyper Shot Gun</translation>
+        <translation>ハイパーショットガン</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="226"/>
         <source>Family Keyboard</source>
-        <translation>Family Keyboard</translation>
+        <translation>ファミリーキーボード</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="227"/>
         <source>Mahjong</source>
-        <translation>Mahjong</translation>
+        <translation>麻雀</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="228"/>
         <source>Quiz King Buzzers</source>
-        <translation>Quiz King Buzzers</translation>
+        <translation>クイズキングブザーキット</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="229"/>
@@ -4559,7 +4555,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../InputConf.cpp" line="231"/>
         <source>Oeka Kids Tablet</source>
-        <translation>Oeka Kids Tablet</translation>
+        <translation>おえかきキッズタブレット</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="232"/>
@@ -4569,22 +4565,22 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../InputConf.cpp" line="484"/>
         <source>Load Preset From File</source>
-        <translation>Load Preset From File</translation>
+        <translation>ファイルからプリセットを読込</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="495"/>
         <source>Preset File (*.pre *.PRE) ;; All files (*)</source>
-        <translation>Preset File (*.pre *.PRE) ;; All files (*)</translation>
+        <translation>プリセットファイル (*.pre *.PRE) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="541"/>
         <source>Save Preset to File</source>
-        <translation>Save Preset to File</translation>
+        <translation>プリセットをファイルに保存</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="552"/>
         <source>Preset Files (*.pre *.PRE) ;; All files (*)</source>
-        <translation>Preset Files (*.pre *.PRE) ;; All files (*)</translation>
+        <translation>プリセットファイル (*.pre *.PRE) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="557"/>
@@ -4597,18 +4593,18 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1036"/>
         <source>Name:</source>
-        <translation>Name:</translation>
+        <translation>名前:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1044"/>
         <source>Desc:</source>
-        <translation>Desc:</translation>
+        <translation>説明:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1066"/>
         <location filename="../AviOptionsDialog.cpp" line="1124"/>
         <source>Range:</source>
-        <translation>Range:</translation>
+        <translation>範囲:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1072"/>
@@ -4618,7 +4614,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../AviOptionsDialog.cpp" line="1209"/>
         <location filename="../AviOptionsDialog.cpp" line="1233"/>
         <source>Default:</source>
-        <translation>Default:</translation>
+        <translation>デフォルト:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1078"/>
@@ -4626,22 +4622,22 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../AviOptionsDialog.cpp" line="1161"/>
         <location filename="../AviOptionsDialog.cpp" line="1215"/>
         <source>Value:</source>
-        <translation>Value:</translation>
+        <translation>値:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1185"/>
         <source>Numerator:</source>
-        <translation>Numerator:</translation>
+        <translation>分子:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1193"/>
         <source>Denominator:</source>
-        <translation>Denominator:</translation>
+        <translation>分母:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1217"/>
         <source>Checked=true</source>
-        <translation>Checked=true</translation>
+        <translation>チェック済=true</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1279"/>
@@ -4675,7 +4671,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../AviOptionsDialog.cpp" line="882"/>
         <source>Restore Defaults</source>
-        <translation>Restore Defaults</translation>
+        <translation>デフォルトに戻す</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="886"/>
@@ -4688,44 +4684,44 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../AviOptionsDialog.cpp" line="107"/>
         <source>Video:</source>
-        <translation>Video:</translation>
+        <translation>映像:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="108"/>
         <source>Audio:</source>
-        <translation>Audio:</translation>
+        <translation>音声:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="128"/>
         <location filename="../AviOptionsDialog.cpp" line="142"/>
         <source>Encoder:</source>
-        <translation>Encoder:</translation>
+        <translation>エンコーダ:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="131"/>
         <source>Pixel Format:</source>
-        <translation>Pixel Format:</translation>
+        <translation>ピクセルフォーマット:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="134"/>
         <location filename="../AviOptionsDialog.cpp" line="154"/>
         <source>Options...</source>
-        <translation>Options...</translation>
+        <translation>オプション...</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="145"/>
         <source>Sample Format:</source>
-        <translation>Sample Format:</translation>
+        <translation>サンプルフォーマット:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="148"/>
         <source>Sample Rate:</source>
-        <translation>Sample Rate:</translation>
+        <translation>サンプルレート:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="151"/>
         <source>Channel Layout:</source>
-        <translation>Channel Layout:</translation>
+        <translation>チャンネルレイアウト:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="188"/>
@@ -4751,44 +4747,44 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1531"/>
         <source>Video:</source>
-        <translation>Video:</translation>
+        <translation>映像:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1532"/>
         <source>Audio:</source>
-        <translation>Audio:</translation>
+        <translation>音声:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1552"/>
         <location filename="../AviOptionsDialog.cpp" line="1567"/>
         <source>Encoder:</source>
-        <translation>Encoder:</translation>
+        <translation>エンコーダ:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1555"/>
         <source>Pixel Format:</source>
-        <translation>Pixel Format:</translation>
+        <translation>ピクセルフォーマット:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1558"/>
         <location filename="../AviOptionsDialog.cpp" line="1579"/>
         <source>Options...</source>
-        <translation>Options...</translation>
+        <translation>オプション...</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1570"/>
         <source>Sample Format:</source>
-        <translation>Sample Format:</translation>
+        <translation>サンプルフォーマット:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1573"/>
         <source>Sample Rate:</source>
-        <translation>Sample Rate:</translation>
+        <translation>サンプルレート:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1576"/>
         <source>Channel Layout:</source>
-        <translation>Channel Layout:</translation>
+        <translation>チャンネルレイアウト:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1612"/>
@@ -4867,18 +4863,18 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../LuaControl.cpp" line="119"/>
         <location filename="../LuaControl.cpp" line="231"/>
         <source>Lua Script Control</source>
-        <translation>Lua Script Control</translation>
+        <translation>Luaスクリプト制御</translation>
     </message>
     <message>
         <location filename="../LuaControl.cpp" line="123"/>
         <source>Script File:</source>
-        <translation>Script File:</translation>
+        <translation>スクリプトファイル:</translation>
     </message>
     <message>
         <location filename="../LuaControl.cpp" line="139"/>
         <location filename="../LuaControl.cpp" line="232"/>
         <source>Browse</source>
-        <translation>Browse</translation>
+        <translation>参照</translation>
     </message>
     <message>
         <location filename="../LuaControl.cpp" line="140"/>
@@ -4890,7 +4886,7 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <location filename="../LuaControl.cpp" line="144"/>
         <location filename="../LuaControl.cpp" line="456"/>
         <source>Restart</source>
-        <translation>Restart</translation>
+        <translation>再起動</translation>
     </message>
     <message>
         <location filename="../LuaControl.cpp" line="148"/>
@@ -4902,12 +4898,12 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
     <message>
         <location filename="../LuaControl.cpp" line="166"/>
         <source>Arguments:</source>
-        <translation>Arguments:</translation>
+        <translation>引數:</translation>
     </message>
     <message>
         <location filename="../LuaControl.cpp" line="173"/>
         <source>Output Console:</source>
-        <translation>Output Console:</translation>
+        <translation>出力コンソール:</translation>
     </message>
     <message>
         <location filename="../LuaControl.cpp" line="177"/>
@@ -4919,19 +4915,17 @@ The emulation thread fills the buffer and the audio thread drains it.</translati
         <source>The Lua script running has been running a long time.
 It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
 </source>
-        <translation>The Lua script running has been running a long time.
-It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
-</translation>
+        <translation>実行中のLuaスクリプトが長時間動作しています。異常動作の可能性があります。終了しますか？（いいえを選択した場合、再確認しません）</translation>
     </message>
     <message>
         <location filename="../LuaControl.cpp" line="299"/>
         <source>Open LUA Script</source>
-        <translation>Open LUA Script</translation>
+        <translation>LUAスクリプトを開く</translation>
     </message>
     <message>
         <location filename="../LuaControl.cpp" line="372"/>
         <source>LUA Scripts (*.lua *.LUA) ;; All files (*)</source>
-        <translation>LUA Scripts (*.lua *.LUA) ;; All files (*)</translation>
+        <translation>LUAスクリプト (*.lua *.LUA) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../LuaControl.cpp" line="376"/>
@@ -4951,73 +4945,73 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MovieOptions.cpp" line="63"/>
         <location filename="../MovieOptions.cpp" line="207"/>
         <source>Always Suggest Read-Only Replay</source>
-        <translation>Always Suggest Read-Only Replay</translation>
+        <translation>常に読み取り専用再生を提案</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="65"/>
         <location filename="../MovieOptions.cpp" line="208"/>
         <source>Pause After Playback</source>
-        <translation>Pause After Playback</translation>
+        <translation>再生後に一時停止</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="67"/>
         <location filename="../MovieOptions.cpp" line="209"/>
         <source>Close After Playback</source>
-        <translation>Close After Playback</translation>
+        <translation>再生後に閉じる</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="69"/>
         <location filename="../MovieOptions.cpp" line="210"/>
         <source>Bind Save-States to Movies</source>
-        <translation>Bind Save-States to Movies</translation>
+        <translation>セーブステートを動画にバインド</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="71"/>
         <location filename="../MovieOptions.cpp" line="211"/>
         <source>Display Movie Subtitles</source>
-        <translation>Display Movie Subtitles</translation>
+        <translation>動画字幕を表示</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="73"/>
         <location filename="../MovieOptions.cpp" line="212"/>
         <source>Put Movie Subtitles in AVI</source>
-        <translation>Put Movie Subtitles in AVI</translation>
+        <translation>動画字幕をAVIに含める</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="75"/>
         <location filename="../MovieOptions.cpp" line="213"/>
         <source>Automatically Backup Movies</source>
-        <translation>Automatically Backup Movies</translation>
+        <translation>動画を自動バックアップ</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="77"/>
         <location filename="../MovieOptions.cpp" line="214"/>
         <source>Load Full Save-State Movies:</source>
-        <translation>Load Full Save-State Movies:</translation>
+        <translation>フルセーブステート動画を読込:</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="79"/>
         <location filename="../MovieOptions.cpp" line="215"/>
         <source>AVI Enable HUD Recording</source>
-        <translation>AVI Enable HUD Recording</translation>
+        <translation>AVIでHUD記録を有効化</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="81"/>
         <location filename="../MovieOptions.cpp" line="216"/>
         <source>AVI Enable Msg Recording</source>
-        <translation>AVI Enable Msg Recording</translation>
+        <translation>AVIでメッセージ記録を有効化</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="83"/>
         <location filename="../MovieOptions.cpp" line="217"/>
         <source>AVI Enable Audio Recording</source>
-        <translation>AVI Enable Audio Recording</translation>
+        <translation>AVIで音声記録を有効化</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="86"/>
         <location filename="../MovieOptions.cpp" line="218"/>
         <source>Loading states in record mode will not immediately truncate movie, next frame input will. (VBA-rr and SNES9x style)</source>
-        <translation>Loading states in record mode will not immediately truncate movie, next frame input will. (VBA-rr and SNES9x style)</translation>
+        <translation>記録モードでステートを読込しても動画はすぐに切り詰められず、次のフレーム入力で切り詰められます。（VBA-rr/SNES9xスタイル）</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="116"/>
@@ -5029,13 +5023,13 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MovieOptions.cpp" line="128"/>
         <location filename="../MovieOptions.cpp" line="219"/>
         <source>AVI Recording Options</source>
-        <translation>AVI Recording Options</translation>
+        <translation>AVI記録オプション</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="136"/>
         <location filename="../MovieOptions.cpp" line="220"/>
         <source>AVI Backend Driver:</source>
-        <translation>AVI Backend Driver:</translation>
+        <translation>AVIバックエンドドライバ:</translation>
     </message>
 </context>
 <context>
@@ -5050,79 +5044,79 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MoviePlay.cpp" line="66"/>
         <location filename="../MoviePlay.cpp" line="227"/>
         <source>File:</source>
-        <translation>File:</translation>
+        <translation>ファイル:</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="69"/>
         <location filename="../MoviePlay.cpp" line="228"/>
         <source>Browse</source>
-        <translation>Browse</translation>
+        <translation>参照</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="80"/>
         <location filename="../MoviePlay.cpp" line="229"/>
         <source>Parameters:</source>
-        <translation>Parameters:</translation>
+        <translation>パラメータ:</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="87"/>
         <location filename="../MoviePlay.cpp" line="230"/>
         <source>Open Read-Only</source>
-        <translation>Open Read-Only</translation>
+        <translation>読み取り専用で開く</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="89"/>
         <location filename="../MoviePlay.cpp" line="231"/>
         <source>Pause Movie At Frame</source>
-        <translation>Pause Movie At Frame</translation>
+        <translation>フレームで動画を一時停止</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="122"/>
         <location filename="../MoviePlay.cpp" line="232"/>
         <source>Length:</source>
-        <translation>Length:</translation>
+        <translation>長さ:</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="124"/>
         <location filename="../MoviePlay.cpp" line="233"/>
         <source>Frames:</source>
-        <translation>Frames:</translation>
+        <translation>フレーム数:</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="126"/>
         <location filename="../MoviePlay.cpp" line="234"/>
         <source>Record Count:</source>
-        <translation>Record Count:</translation>
+        <translation>記録回数:</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="128"/>
         <location filename="../MoviePlay.cpp" line="235"/>
         <source>Recorded From:</source>
-        <translation>Recorded From:</translation>
+        <translation>記録元:</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="130"/>
         <location filename="../MoviePlay.cpp" line="236"/>
         <source>ROM Used:</source>
-        <translation>ROM Used:</translation>
+        <translation>使用ROM:</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="132"/>
         <location filename="../MoviePlay.cpp" line="237"/>
         <source>ROM Checksum:</source>
-        <translation>ROM Checksum:</translation>
+        <translation>ROMチェックサム:</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="134"/>
         <location filename="../MoviePlay.cpp" line="238"/>
         <source>Current ROM Sum:</source>
-        <translation>Current ROM Sum:</translation>
+        <translation>現在のROM合計:</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="136"/>
         <location filename="../MoviePlay.cpp" line="239"/>
         <source>Emulator Used:</source>
-        <translation>Emulator Used:</translation>
+        <translation>使用エミュレーター:</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="138"/>
@@ -5134,13 +5128,13 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MoviePlay.cpp" line="140"/>
         <location filename="../MoviePlay.cpp" line="241"/>
         <source>New PPU:</source>
-        <translation>New PPU:</translation>
+        <translation>新PPU:</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="166"/>
         <location filename="../MoviePlay.cpp" line="242"/>
         <source>Play</source>
-        <translation>Play</translation>
+        <translation>再生</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="168"/>
@@ -5151,12 +5145,12 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
     <message>
         <location filename="../MoviePlay.cpp" line="569"/>
         <source>Open FM2 Movie</source>
-        <translation>Open FM2 Movie</translation>
+        <translation>FM2動画を開く</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="573"/>
         <source>FM2 Movies (*.fm2) ;; All files (*)</source>
-        <translation>FM2 Movies (*.fm2) ;; All files (*)</translation>
+        <translation>FM2動画 (*.fm2) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="577"/>
@@ -5171,7 +5165,7 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MovieRecord.cpp" line="385"/>
         <location filename="../MovieRecord.cpp" line="399"/>
         <source>Record Input Movie</source>
-        <translation>Record Input Movie</translation>
+        <translation>入力動画を記録</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="75"/>
@@ -5204,46 +5198,46 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
     <message>
         <location filename="../MovieRecord.cpp" line="86"/>
         <source>Save RAM</source>
-        <translation>Save RAM</translation>
+        <translation>RAMを保存</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="87"/>
         <source>Browse...</source>
-        <translation>Browse...</translation>
+        <translation>参照...</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="89"/>
         <location filename="../MovieRecord.cpp" line="389"/>
         <source>Path:</source>
-        <translation>Path:</translation>
+        <translation>パス:</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="92"/>
         <location filename="../MovieRecord.cpp" line="390"/>
         <source>File:</source>
-        <translation>File:</translation>
+        <translation>ファイル:</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="96"/>
         <location filename="../MovieRecord.cpp" line="391"/>
         <source>Record:</source>
-        <translation>Record:</translation>
+        <translation>記録:</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="99"/>
         <location filename="../MovieRecord.cpp" line="392"/>
         <source>Author:</source>
-        <translation>Author:</translation>
+        <translation>作者:</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="197"/>
         <source>Load State From File</source>
-        <translation>Load State From File</translation>
+        <translation>ファイルからステートを読込</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="230"/>
         <source>FCS &amp; SAV Files (*.sav *.SAV *.fc? *.FC?) ;; All files (*)</source>
-        <translation>FCS &amp; SAV Files (*.sav *.SAV *.fc? *.FC?) ;; All files (*)</translation>
+        <translation>FCS &amp; SAV ファイル (*.sav *.SAV *.fc? *.FC?) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="234"/>
@@ -5253,29 +5247,28 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
     <message>
         <location filename="../MovieRecord.cpp" line="303"/>
         <source>Overwrite Warning</source>
-        <translation>Overwrite Warning</translation>
+        <translation>上書き警告</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="304"/>
         <source>Pre-existing movie file Will be overwritten.
 Replace file?</source>
-        <translation>Pre-existing movie file Will be overwritten.
-Replace file?</translation>
+        <translation>既存の動画ファイルが上書きされます。ファイルを置き換えますか？</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="332"/>
         <source>Save FM2 Movie for Recording</source>
-        <translation>Save FM2 Movie for Recording</translation>
+        <translation>記録用にFM2動画を保存</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="336"/>
         <source>FM2 Movies (*.fm2) ;; All files (*)</source>
-        <translation>FM2 Movies (*.fm2) ;; All files (*)</translation>
+        <translation>FM2動画 (*.fm2) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="340"/>
         <source>Save To</source>
-        <translation>Save To</translation>
+        <translation>保存先</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="341"/>
@@ -5310,30 +5303,30 @@ Replace file?</translation>
         <location filename="../PaletteConf.cpp" line="75"/>
         <location filename="../PaletteConf.cpp" line="364"/>
         <source>Palette Config</source>
-        <translation>Palette Config</translation>
+        <translation>パレット設定</translation>
     </message>
     <message>
         <location filename="../PaletteConf.cpp" line="79"/>
         <source>Custom Palette:</source>
-        <translation>Custom Palette:</translation>
+        <translation>カスタムパレット:</translation>
     </message>
     <message>
         <location filename="../PaletteConf.cpp" line="84"/>
         <location filename="../PaletteConf.cpp" line="350"/>
         <source>Use Custom Palette</source>
-        <translation>Use Custom Palette</translation>
+        <translation>カスタムパレットを使用</translation>
     </message>
     <message>
         <location filename="../PaletteConf.cpp" line="85"/>
         <location filename="../PaletteConf.cpp" line="351"/>
         <source>Force Grayscale</source>
-        <translation>Force Grayscale</translation>
+        <translation>グレースケール強制</translation>
     </message>
     <message>
         <location filename="../PaletteConf.cpp" line="86"/>
         <location filename="../PaletteConf.cpp" line="352"/>
         <source>De-emphasis Bit Swap</source>
-        <translation>De-emphasis Bit Swap</translation>
+        <translation>デエンファシスビットスワップ</translation>
     </message>
     <message>
         <location filename="../PaletteConf.cpp" line="98"/>
@@ -5350,7 +5343,7 @@ Replace file?</translation>
         <location filename="../PaletteConf.cpp" line="133"/>
         <location filename="../PaletteConf.cpp" line="353"/>
         <source>NTSC Palette Control:</source>
-        <translation>NTSC Palette Control:</translation>
+        <translation>NTSCパレット制御:</translation>
     </message>
     <message>
         <location filename="../PaletteConf.cpp" line="173"/>
@@ -5364,7 +5357,7 @@ Replace file?</translation>
         <location filename="../PaletteConf.cpp" line="183"/>
         <location filename="../PaletteConf.cpp" line="354"/>
         <source>PAL Emulation:</source>
-        <translation>PAL Emulation:</translation>
+        <translation>PALエミュレーション:</translation>
     </message>
     <message>
         <location filename="../PaletteConf.cpp" line="308"/>
@@ -5375,12 +5368,12 @@ Replace file?</translation>
     <message>
         <location filename="../PaletteConf.cpp" line="523"/>
         <source>Open NES Palette</source>
-        <translation>Open NES Palette</translation>
+        <translation>NESパレットを開く</translation>
     </message>
     <message>
         <location filename="../PaletteConf.cpp" line="577"/>
         <source>NES Palettes (*.pal *.PAL) ;; All files (*)</source>
-        <translation>NES Palettes (*.pal *.PAL) ;; All files (*)</translation>
+        <translation>NESパレット (*.pal *.PAL) ;; すべてのファイル (*)</translation>
     </message>
 </context>
 <context>
@@ -5399,44 +5392,44 @@ Replace file?</translation>
     <message>
         <location filename="../PaletteEditor.cpp" line="91"/>
         <source>&amp;Open</source>
-        <translation>&amp;Open</translation>
+        <translation>開く(&amp;O)</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="93"/>
         <location filename="../PaletteEditor.cpp" line="335"/>
         <source>Open Palette From File</source>
-        <translation>Open Palette From File</translation>
+        <translation>ファイルからパレットを開く</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="99"/>
         <source>&amp;Save</source>
-        <translation>&amp;Save</translation>
+        <translation>保存(&amp;S)</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="101"/>
         <location filename="../PaletteEditor.cpp" line="445"/>
         <source>Save Palette To File</source>
-        <translation>Save Palette To File</translation>
+        <translation>パレットをファイルに保存</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="109"/>
         <source>E&amp;xport As</source>
-        <translation>E&amp;xport As</translation>
+        <translation>エクスポート(&amp;X)</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="111"/>
         <source>&amp;Adobe Color Table</source>
-        <translation>&amp;Adobe Color Table</translation>
+        <translation>Adobeカラーテーブル(&amp;A)</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="113"/>
         <source>Export Palette in ACT Format</source>
-        <translation>Export Palette in ACT Format</translation>
+        <translation>ACT形式でパレットをエクスポート</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="121"/>
         <source>&amp;Close</source>
-        <translation>&amp;Close</translation>
+        <translation>閉じる(&amp;C)</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="123"/>
@@ -5446,39 +5439,39 @@ Replace file?</translation>
     <message>
         <location filename="../PaletteEditor.cpp" line="129"/>
         <source>&amp;Edit</source>
-        <translation>&amp;Edit</translation>
+        <translation>編集(&amp;E)</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="132"/>
         <location filename="../PaletteEditor.cpp" line="257"/>
         <source>&amp;Undo</source>
-        <translation>&amp;Undo</translation>
+        <translation>元に戻す(&amp;U)</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="134"/>
         <source>Undo Last Operation</source>
-        <translation>Undo Last Operation</translation>
+        <translation>前回の操作を元に戻す</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="140"/>
         <location filename="../PaletteEditor.cpp" line="274"/>
         <source>&amp;Redo</source>
-        <translation>&amp;Redo</translation>
+        <translation>やり直し(&amp;R)</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="142"/>
         <source>Redo Last Operation</source>
-        <translation>Redo Last Operation</translation>
+        <translation>前回の操作をやり直し</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="148"/>
         <source>&amp;Memory</source>
-        <translation>&amp;Memory</translation>
+        <translation>メモリ(&amp;M)</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="151"/>
         <source>&amp;Write To</source>
-        <translation>&amp;Write To</translation>
+        <translation>書き込み先(&amp;W)</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="152"/>
@@ -5488,7 +5481,7 @@ Replace file?</translation>
     <message>
         <location filename="../PaletteEditor.cpp" line="153"/>
         <source>Write to Active Color Palette</source>
-        <translation>Write to Active Color Palette</translation>
+        <translation>アクティブカラーパレットに書き込み</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="399"/>
@@ -5498,7 +5491,7 @@ Replace file?</translation>
     <message>
         <location filename="../PaletteEditor.cpp" line="450"/>
         <source>Pal Files (*.pal *.PAL) ;; All files (*)</source>
-        <translation>Pal Files (*.pal *.PAL) ;; All files (*)</translation>
+        <translation>Palファイル (*.pal *.PAL) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="454"/>
@@ -5513,17 +5506,17 @@ Replace file?</translation>
     <message>
         <location filename="../PaletteEditor.cpp" line="494"/>
         <source>Export Palette To File</source>
-        <translation>Export Palette To File</translation>
+        <translation>パレットをファイルにエクスポート</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="499"/>
         <source>Adobe Color Table Files (*.act *.ACT) ;; All files (*)</source>
-        <translation>Adobe Color Table Files (*.act *.ACT) ;; All files (*)</translation>
+        <translation>Adobeカラーテーブルファイル (*.act *.ACT) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="503"/>
         <source>Export</source>
-        <translation>Export</translation>
+        <translation>エクスポート</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="504"/>
@@ -5536,17 +5529,17 @@ Replace file?</translation>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="6398"/>
         <source>Run To &amp;Cursor</source>
-        <translation>Run To &amp;Cursor</translation>
+        <translation>カーソルまで実行(&amp;C)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="6415"/>
         <source>Edit &amp;Breakpoint</source>
-        <translation>Edit &amp;Breakpoint</translation>
+        <translation>ブレークポイントを編集(&amp;B)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="6419"/>
         <source>Add &amp;Breakpoint</source>
-        <translation>Add &amp;Breakpoint</translation>
+        <translation>ブレークポイントを追加(&amp;B)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="6422"/>
@@ -5556,12 +5549,12 @@ Replace file?</translation>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="6432"/>
         <source>Edit &amp;Symbolic Debug Marker</source>
-        <translation>Edit &amp;Symbolic Debug Marker</translation>
+        <translation>シンボリックデバッグマーカーを編集(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="6436"/>
         <source>Add &amp;Symbolic Debug Marker</source>
-        <translation>Add &amp;Symbolic Debug Marker</translation>
+        <translation>シンボリックデバッグマーカーを追加(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="6439"/>
@@ -5571,12 +5564,12 @@ Replace file?</translation>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="6444"/>
         <source>Edit Book&amp;mark</source>
-        <translation>Edit Book&amp;mark</translation>
+        <translation>ブックマークを編集(&amp;M)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="6448"/>
         <source>Add Book&amp;mark</source>
-        <translation>Add Book&amp;mark</translation>
+        <translation>ブックマークを追加(&amp;M)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="6451"/>
@@ -5586,7 +5579,7 @@ Replace file?</translation>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="6454"/>
         <source>Open &amp;Hex Editor</source>
-        <translation>Open &amp;Hex Editor</translation>
+        <translation>16進エディタを開く(&amp;H)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="6456"/>
@@ -5599,12 +5592,12 @@ Replace file?</translation>
     <message>
         <location filename="../HexEditor.cpp" line="2155"/>
         <source>Select Font</source>
-        <translation>Select Font</translation>
+        <translation>フォント選択</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="2304"/>
         <source>Go</source>
-        <translation>Go</translation>
+        <translation>ジャンプ</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="2305"/>
@@ -5614,22 +5607,22 @@ Replace file?</translation>
     <message>
         <location filename="../HexEditor.cpp" line="2331"/>
         <source>Goto Address</source>
-        <translation>Goto Address</translation>
+        <translation>アドレスへジャンプ</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="3171"/>
         <source>Add &amp;Symbolic Debug Name</source>
-        <translation>Add &amp;Symbolic Debug Name</translation>
+        <translation>シンボリックデバッグ名を追加(&amp;S)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="3175"/>
         <source>&amp;Freeze/Unfreeze Address</source>
-        <translation>&amp;Freeze/Unfreeze Address</translation>
+        <translation>アドレスのフリーズ/アンフリーズ(&amp;F)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="3179"/>
         <source>&amp;Toggle State</source>
-        <translation>&amp;Toggle State</translation>
+        <translation>ステート切替(&amp;T)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="3180"/>
@@ -5639,17 +5632,17 @@ Replace file?</translation>
     <message>
         <location filename="../HexEditor.cpp" line="3184"/>
         <source>&amp;Freeze</source>
-        <translation>&amp;Freeze</translation>
+        <translation>フリーズ(&amp;F)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="3188"/>
         <source>&amp;Unfreeze</source>
-        <translation>&amp;Unfreeze</translation>
+        <translation>アンフリーズ(&amp;U)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="3195"/>
         <source>Unfreeze &amp;All</source>
-        <translation>Unfreeze &amp;All</translation>
+        <translation>すべてアンフリーズ(&amp;A)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="3228"/>
@@ -5657,17 +5650,17 @@ Replace file?</translation>
         <location filename="../HexEditor.cpp" line="3252"/>
         <location filename="../HexEditor.cpp" line="3259"/>
         <source>Add Book&amp;mark</source>
-        <translation>Add Book&amp;mark</translation>
+        <translation>ブックマークを追加(&amp;M)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="3303"/>
         <source>Add Bookmark</source>
-        <translation>Add Bookmark</translation>
+        <translation>ブックマークを追加</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="3304"/>
         <source>Specify New Bookmark Description</source>
-        <translation>Specify New Bookmark Description</translation>
+        <translation>新しいブックマークの説明を指定</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="3305"/>
@@ -5682,12 +5675,12 @@ Replace file?</translation>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1816"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2649"/>
         <source>Overwrite Warning</source>
-        <translation>Overwrite Warning</translation>
+        <translation>上書き警告</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="1104"/>
         <source>Cheat Manual Save Warning</source>
-        <translation>Cheat Manual Save Warning</translation>
+        <translation>チート手動保存警告</translation>
     </message>
     <message>
         <location filename="../MenuCatalog.h" line="52"/>
@@ -5744,24 +5737,24 @@ Replace file?</translation>
         <location filename="../TasEditor/splicer.cpp" line="230"/>
         <location filename="../TasEditor/splicer.cpp" line="231"/>
         <source>Insert number of Frames</source>
-        <translation>Insert number of Frames</translation>
+        <translation>フレーム数を挿入</translation>
     </message>
     <message>
         <location filename="../TasEditor/splicer.cpp" line="232"/>
         <source>Ok</source>
-        <translation>Ok</translation>
+        <translation>OK</translation>
     </message>
     <message>
         <location filename="../TasEditor/taseditor_project.cpp" line="117"/>
         <location filename="../TasEditor/taseditor_project.cpp" line="266"/>
         <source>ROM Checksum Mismatch</source>
-        <translation>ROM Checksum Mismatch</translation>
+        <translation>ROMチェックサム不一致</translation>
     </message>
     <message>
         <location filename="../TasEditor/taseditor_project.cpp" line="143"/>
         <location filename="../TasEditor/taseditor_project.cpp" line="145"/>
         <source>Saving TAS Project</source>
-        <translation>Saving TAS Project</translation>
+        <translation>TASプロジェクトを保存</translation>
     </message>
     <message>
         <location filename="../TasEditor/taseditor_project.cpp" line="143"/>
@@ -5772,18 +5765,18 @@ Replace file?</translation>
     <message>
         <location filename="../TasEditor/taseditor_project.cpp" line="295"/>
         <source>FM3 Version Mismatch</source>
-        <translation>FM3 Version Mismatch</translation>
+        <translation>FM3バージョン不一致</translation>
     </message>
     <message>
         <location filename="../TasEditor/taseditor_project.cpp" line="315"/>
         <source>Opening FM2 file</source>
-        <translation>Opening FM2 file</translation>
+        <translation>FM2ファイルを開く</translation>
     </message>
     <message>
         <location filename="../TasEditor/taseditor_project.cpp" line="336"/>
         <location filename="../TasEditor/taseditor_project.cpp" line="338"/>
         <source>Loading TAS Project</source>
-        <translation>Loading TAS Project</translation>
+        <translation>TASプロジェクトを読込</translation>
     </message>
 </context>
 <context>
@@ -5796,22 +5789,22 @@ Replace file?</translation>
     <message>
         <location filename="../TasEditor/TasEditorTimeline.cpp" line="940"/>
         <source>Set Markers	Dbl-Clk</source>
-        <translation>Set Markers	Dbl-Clk</translation>
+        <translation>ダブルクリックでマーカーを設定</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorTimeline.cpp" line="946"/>
         <source>Remove Markers</source>
-        <translation>Remove Markers</translation>
+        <translation>マーカーを削除</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorTimeline.cpp" line="954"/>
         <source>Deselect</source>
-        <translation>Deselect</translation>
+        <translation>選択解除</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorTimeline.cpp" line="959"/>
         <source>Select between markers</source>
-        <translation>Select between markers</translation>
+        <translation>マーカー間を選択</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorTimeline.cpp" line="961"/>
@@ -5821,7 +5814,7 @@ Replace file?</translation>
     <message>
         <location filename="../TasEditor/TasEditorTimeline.cpp" line="966"/>
         <source>Ungreenzone</source>
-        <translation>Ungreenzone</translation>
+        <translation>アングリーンゾーン</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorTimeline.cpp" line="973"/>
@@ -5846,7 +5839,7 @@ Replace file?</translation>
     <message>
         <location filename="../TasEditor/TasEditorTimeline.cpp" line="983"/>
         <source>Clone</source>
-        <translation>Clone</translation>
+        <translation>複製</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorTimeline.cpp" line="985"/>
@@ -5856,7 +5849,7 @@ Replace file?</translation>
     <message>
         <location filename="../TasEditor/TasEditorTimeline.cpp" line="988"/>
         <source>Insert</source>
-        <translation>Insert</translation>
+        <translation>挿入</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorTimeline.cpp" line="990"/>
@@ -5866,7 +5859,7 @@ Replace file?</translation>
     <message>
         <location filename="../TasEditor/TasEditorTimeline.cpp" line="993"/>
         <source>Insert # of Frames</source>
-        <translation>Insert # of Frames</translation>
+        <translation>フレーム数を挿入</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorTimeline.cpp" line="995"/>
@@ -5876,7 +5869,7 @@ Replace file?</translation>
     <message>
         <location filename="../TasEditor/TasEditorTimeline.cpp" line="1000"/>
         <source>Truncate Movie</source>
-        <translation>Truncate Movie</translation>
+        <translation>動画を切り詰め</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorTimeline.cpp" line="2540"/>
@@ -5895,13 +5888,13 @@ Replace file?</translation>
     <message>
         <location filename="../TraceLogger.cpp" line="1987"/>
         <source>Edit Breakpoint</source>
-        <translation>Edit Breakpoint</translation>
+        <translation>ブレークポイントを編集</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="1991"/>
         <location filename="../TraceLogger.cpp" line="2333"/>
         <source>Add Breakpoint</source>
-        <translation>Add Breakpoint</translation>
+        <translation>ブレークポイントを追加</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="1999"/>
@@ -5916,22 +5909,22 @@ Replace file?</translation>
     <message>
         <location filename="../TraceLogger.cpp" line="2010"/>
         <source>Forbid</source>
-        <translation>Forbid</translation>
+        <translation>禁止</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="2018"/>
         <source>Read</source>
-        <translation>Read</translation>
+        <translation>読込</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="2019"/>
         <source>Write</source>
-        <translation>Write</translation>
+        <translation>書込</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="2020"/>
         <source>Execute</source>
-        <translation>Execute</translation>
+        <translation>実行</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="2021"/>
@@ -5941,27 +5934,27 @@ Replace file?</translation>
     <message>
         <location filename="../TraceLogger.cpp" line="2023"/>
         <source>Memory</source>
-        <translation>Memory</translation>
+        <translation>メモリ</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="2036"/>
         <source>CPU Mem</source>
-        <translation>CPU Mem</translation>
+        <translation>CPUメモリ</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="2037"/>
         <source>PPU Mem</source>
-        <translation>PPU Mem</translation>
+        <translation>PPUメモリ</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="2038"/>
         <source>Sprite Mem</source>
-        <translation>Sprite Mem</translation>
+        <translation>スプライトメモリ</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="2049"/>
         <source>Condition</source>
-        <translation>Condition</translation>
+        <translation>条件</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="2055"/>
@@ -5981,7 +5974,7 @@ Replace file?</translation>
     <message>
         <location filename="../TraceLogger.cpp" line="2328"/>
         <source>Add Symbolic Debug Marker</source>
-        <translation>Add Symbolic Debug Marker</translation>
+        <translation>シンボリックデバッグマーカーを追加</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="2330"/>
@@ -6010,7 +6003,7 @@ Replace file?</translation>
     <message>
         <location filename="../RamSearch.cpp" line="235"/>
         <source>&amp;Close</source>
-        <translation>&amp;Close</translation>
+        <translation>閉じる(&amp;C)</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="237"/>
@@ -6033,7 +6026,7 @@ Replace file?</translation>
         <location filename="../RamSearch.cpp" line="284"/>
         <location filename="../RamSearch.cpp" line="551"/>
         <source>Clear Change</source>
-        <translation>Clear Change</translation>
+        <translation>変更をクリア</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="288"/>
@@ -6044,7 +6037,7 @@ Replace file?</translation>
     <message>
         <location filename="../RamSearch.cpp" line="293"/>
         <source>Search Regions</source>
-        <translation>Search Regions</translation>
+        <translation>検索範囲</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="298"/>
@@ -6080,145 +6073,145 @@ Replace file?</translation>
         <location filename="../RamSearch.cpp" line="316"/>
         <location filename="../RamSearch.cpp" line="553"/>
         <source>Eliminate</source>
-        <translation>Eliminate</translation>
+        <translation>除外</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="321"/>
         <location filename="../RamSearch.cpp" line="554"/>
         <source>Watch</source>
-        <translation>Watch</translation>
+        <translation>監視</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="326"/>
         <location filename="../RamSearch.cpp" line="555"/>
         <source>Add Cheat</source>
-        <translation>Add Cheat</translation>
+        <translation>チートを追加</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="331"/>
         <location filename="../RamSearch.cpp" line="556"/>
         <source>Hex Editor</source>
-        <translation>Hex Editor</translation>
+        <translation>16進エディタ</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="338"/>
         <source>Comparison Operator</source>
-        <translation>Comparison Operator</translation>
+        <translation>比較演算子</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="344"/>
         <source>Less Than</source>
-        <translation>Less Than</translation>
+        <translation>より小さい</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="345"/>
         <source>Greater Than</source>
-        <translation>Greater Than</translation>
+        <translation>より大きい</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="346"/>
         <source>Less Than or Equal To</source>
-        <translation>Less Than or Equal To</translation>
+        <translation>以下</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="347"/>
         <source>Greater Than or Equal To</source>
-        <translation>Greater Than or Equal To</translation>
+        <translation>以上</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="348"/>
         <source>Equal To</source>
-        <translation>Equal To</translation>
+        <translation>等しい</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="349"/>
         <source>Not Equal To</source>
-        <translation>Not Equal To</translation>
+        <translation>等しくない</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="350"/>
         <source>Different By:</source>
-        <translation>Different By:</translation>
+        <translation>差分:</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="351"/>
         <source>Modulo</source>
-        <translation>Modulo</translation>
+        <translation>剰餘</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="406"/>
         <source>Compare To/By</source>
-        <translation>Compare To/By</translation>
+        <translation>比較対象/方法</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="410"/>
         <source>Previous Value</source>
-        <translation>Previous Value</translation>
+        <translation>前回の値</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="411"/>
         <source>Specific Value:</source>
-        <translation>Specific Value:</translation>
+        <translation>特定の値:</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="412"/>
         <source>Specific Address:</source>
-        <translation>Specific Address:</translation>
+        <translation>特定アドレス:</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="413"/>
         <source>Number of Changes:</source>
-        <translation>Number of Changes:</translation>
+        <translation>変更回数:</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="444"/>
         <source>Data Size</source>
-        <translation>Data Size</translation>
+        <translation>データサイズ</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="449"/>
         <source>1 Byte</source>
-        <translation>1 Byte</translation>
+        <translation>1 バイト</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="450"/>
         <source>2 Byte</source>
-        <translation>2 Byte</translation>
+        <translation>2 バイト</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="451"/>
         <source>4 Byte</source>
-        <translation>4 Byte</translation>
+        <translation>4 バイト</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="452"/>
         <source>Check Misaligned</source>
-        <translation>Check Misaligned</translation>
+        <translation>アライメントチェック</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="472"/>
         <source>Data Type / Display</source>
-        <translation>Data Type / Display</translation>
+        <translation>データ型/表示</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="477"/>
         <source>Signed</source>
-        <translation>Signed</translation>
+        <translation>符号付き</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="478"/>
         <source>Unsigned</source>
-        <translation>Unsigned</translation>
+        <translation>符号なし</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="479"/>
         <source>Hexadecimal</source>
-        <translation>Hexadecimal</translation>
+        <translation>16進数</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="493"/>
         <source>Auto-Search</source>
-        <translation>Auto-Search</translation>
+        <translation>自動検索</translation>
     </message>
 </context>
 <context>
@@ -6237,7 +6230,7 @@ Replace file?</translation>
     <message>
         <location filename="../RamWatch.cpp" line="113"/>
         <source>&amp;New List</source>
-        <translation>&amp;New List</translation>
+        <translation>新規リスト(&amp;N)</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="114"/>
@@ -6247,12 +6240,12 @@ Replace file?</translation>
     <message>
         <location filename="../RamWatch.cpp" line="115"/>
         <source>New List</source>
-        <translation>New List</translation>
+        <translation>新規リスト</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="121"/>
         <source>&amp;Open</source>
-        <translation>&amp;Open</translation>
+        <translation>開く(&amp;O)</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="122"/>
@@ -6263,12 +6256,12 @@ Replace file?</translation>
         <location filename="../RamWatch.cpp" line="123"/>
         <location filename="../RamWatch.cpp" line="556"/>
         <source>Open Watch File</source>
-        <translation>Open Watch File</translation>
+        <translation>監視ファイルを開く</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="129"/>
         <source>&amp;Save</source>
-        <translation>&amp;Save</translation>
+        <translation>保存(&amp;S)</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="130"/>
@@ -6278,12 +6271,12 @@ Replace file?</translation>
     <message>
         <location filename="../RamWatch.cpp" line="131"/>
         <source>Save Watch File</source>
-        <translation>Save Watch File</translation>
+        <translation>監視ファイルを保存</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="137"/>
         <source>Save &amp;As</source>
-        <translation>Save &amp;As</translation>
+        <translation>名前を付けて保存(&amp;A)</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="138"/>
@@ -6293,22 +6286,22 @@ Replace file?</translation>
     <message>
         <location filename="../RamWatch.cpp" line="139"/>
         <source>Save As Watch File</source>
-        <translation>Save As Watch File</translation>
+        <translation>監視ファイルを名前を付けて保存</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="145"/>
         <source>&amp;Append from File</source>
-        <translation>&amp;Append from File</translation>
+        <translation>ファイルから追加(&amp;A)</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="147"/>
         <source>Append from File</source>
-        <translation>Append from File</translation>
+        <translation>ファイルから追加</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="155"/>
         <source>&amp;Close</source>
-        <translation>&amp;Close</translation>
+        <translation>閉じる(&amp;C)</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="157"/>
@@ -6318,12 +6311,12 @@ Replace file?</translation>
     <message>
         <location filename="../RamWatch.cpp" line="163"/>
         <source>&amp;Watch</source>
-        <translation>&amp;Watch</translation>
+        <translation>監視(&amp;W)</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="166"/>
         <source>&amp;New Watch</source>
-        <translation>&amp;New Watch</translation>
+        <translation>新規監視(&amp;N)</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="167"/>
@@ -6333,12 +6326,12 @@ Replace file?</translation>
     <message>
         <location filename="../RamWatch.cpp" line="168"/>
         <source>New Watch</source>
-        <translation>New Watch</translation>
+        <translation>新規監視</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="174"/>
         <source>&amp;Edit Watch</source>
-        <translation>&amp;Edit Watch</translation>
+        <translation>監視を編集(&amp;E)</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="175"/>
@@ -6348,12 +6341,12 @@ Replace file?</translation>
     <message>
         <location filename="../RamWatch.cpp" line="176"/>
         <source>Edit Watch</source>
-        <translation>Edit Watch</translation>
+        <translation>監視を編集</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="182"/>
         <source>&amp;Remove Watch</source>
-        <translation>&amp;Remove Watch</translation>
+        <translation>監視を削除(&amp;R)</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="183"/>
@@ -6363,12 +6356,12 @@ Replace file?</translation>
     <message>
         <location filename="../RamWatch.cpp" line="184"/>
         <source>Remove Watch</source>
-        <translation>Remove Watch</translation>
+        <translation>監視を削除</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="190"/>
         <source>Duplic&amp;ate Watch</source>
-        <translation>Duplic&amp;ate Watch</translation>
+        <translation>監視を複製(&amp;A)</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="191"/>
@@ -6378,12 +6371,12 @@ Replace file?</translation>
     <message>
         <location filename="../RamWatch.cpp" line="192"/>
         <source>Duplicate Watch</source>
-        <translation>Duplicate Watch</translation>
+        <translation>監視を複製</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="198"/>
         <source>Add &amp;Separator</source>
-        <translation>Add &amp;Separator</translation>
+        <translation>区切りを追加(&amp;S)</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="199"/>
@@ -6393,12 +6386,12 @@ Replace file?</translation>
     <message>
         <location filename="../RamWatch.cpp" line="200"/>
         <source>Add Separator</source>
-        <translation>Add Separator</translation>
+        <translation>区切りを追加</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="208"/>
         <source>Move &amp;Up</source>
-        <translation>Move &amp;Up</translation>
+        <translation>上へ移動(&amp;U)</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="209"/>
@@ -6408,12 +6401,12 @@ Replace file?</translation>
     <message>
         <location filename="../RamWatch.cpp" line="210"/>
         <source>Move Up</source>
-        <translation>Move Up</translation>
+        <translation>上へ移動</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="216"/>
         <source>Move &amp;Down</source>
-        <translation>Move &amp;Down</translation>
+        <translation>下へ移動(&amp;D)</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="217"/>
@@ -6423,25 +6416,25 @@ Replace file?</translation>
     <message>
         <location filename="../RamWatch.cpp" line="218"/>
         <source>Move Down</source>
-        <translation>Move Down</translation>
+        <translation>下へ移動</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="253"/>
         <location filename="../RamWatch.cpp" line="350"/>
         <source>Watches</source>
-        <translation>Watches</translation>
+        <translation>監視一覧</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="257"/>
         <location filename="../RamWatch.cpp" line="351"/>
         <source>Up</source>
-        <translation>Up</translation>
+        <translation>上</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="262"/>
         <location filename="../RamWatch.cpp" line="352"/>
         <source>Down</source>
-        <translation>Down</translation>
+        <translation>下</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="267"/>
@@ -6453,7 +6446,7 @@ Replace file?</translation>
         <location filename="../RamWatch.cpp" line="272"/>
         <location filename="../RamWatch.cpp" line="354"/>
         <source>Remove</source>
-        <translation>Remove</translation>
+        <translation>削除</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="277"/>
@@ -6465,24 +6458,24 @@ Replace file?</translation>
         <location filename="../RamWatch.cpp" line="282"/>
         <location filename="../RamWatch.cpp" line="356"/>
         <source>Duplicate</source>
-        <translation>Duplicate</translation>
+        <translation>複製</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="287"/>
         <location filename="../RamWatch.cpp" line="357"/>
         <source>Separator</source>
-        <translation>Separator</translation>
+        <translation>区切り</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="296"/>
         <location filename="../RamWatch.cpp" line="358"/>
         <source>Add Cheat</source>
-        <translation>Add Cheat</translation>
+        <translation>チートを追加</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="560"/>
         <source>Watch files (*.wch *.WCH) ;; All files (*)</source>
-        <translation>Watch files (*.wch *.WCH) ;; All files (*)</translation>
+        <translation>監視ファイル (*.wch *.WCH) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="564"/>
@@ -6492,13 +6485,13 @@ Replace file?</translation>
     <message>
         <location filename="../RamWatch.cpp" line="616"/>
         <source>Append from Watch File</source>
-        <translation>Append from Watch File</translation>
+        <translation>監視ファイルから追加</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="620"/>
         <location filename="../RamWatch.cpp" line="698"/>
         <source>Watch Files (*.wch *.WCH) ;; All files (*)</source>
-        <translation>Watch Files (*.wch *.WCH) ;; All files (*)</translation>
+        <translation>監視ファイル (*.wch *.WCH) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="624"/>
@@ -6514,7 +6507,7 @@ Replace file?</translation>
     <message>
         <location filename="../RamWatch.cpp" line="690"/>
         <source>Save Watch List To File</source>
-        <translation>Save Watch List To File</translation>
+        <translation>監視リストをファイルに保存</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="702"/>
@@ -6529,42 +6522,42 @@ Replace file?</translation>
     <message>
         <location filename="../RamWatch.cpp" line="822"/>
         <source>Notes</source>
-        <translation>Notes</translation>
+        <translation>メモ</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="833"/>
         <source>Data Type</source>
-        <translation>Data Type</translation>
+        <translation>データ型</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="837"/>
         <source>Signed</source>
-        <translation>Signed</translation>
+        <translation>符号付き</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="838"/>
         <source>Unsigned</source>
-        <translation>Unsigned</translation>
+        <translation>符号なし</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="844"/>
         <source>Data Size</source>
-        <translation>Data Size</translation>
+        <translation>データサイズ</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="848"/>
         <source>1 Byte</source>
-        <translation>1 Byte</translation>
+        <translation>1 バイト</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="849"/>
         <source>2 Bytes</source>
-        <translation>2 Bytes</translation>
+        <translation>2 バイト</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="850"/>
         <source>4 Bytes</source>
-        <translation>4 Bytes</translation>
+        <translation>4 バイト</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="859"/>
@@ -6589,35 +6582,35 @@ Replace file?</translation>
         <location filename="../StateRecorderConf.cpp" line="60"/>
         <location filename="../StateRecorderConf.cpp" line="365"/>
         <source>Auto Start Recorder at ROM Load</source>
-        <translation>Auto Start Recorder at ROM Load</translation>
+        <translation>ROM読込時にレコーダーを自動起動</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="65"/>
         <location filename="../StateRecorderConf.cpp" line="366"/>
         <source>By Frames</source>
-        <translation>By Frames</translation>
+        <translation>フレーム単位</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="66"/>
         <location filename="../StateRecorderConf.cpp" line="367"/>
         <source>By Time</source>
-        <translation>By Time</translation>
+        <translation>時間単位</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="109"/>
         <source>Retain History For:</source>
-        <translation>Retain History For:</translation>
+        <translation>履歴を保持:</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="113"/>
         <location filename="../StateRecorderConf.cpp" line="176"/>
         <source>Minutes</source>
-        <translation>Minutes</translation>
+        <translation>分</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="120"/>
         <source>Compression Level:</source>
-        <translation>Compression Level:</translation>
+        <translation>圧縮レベル:</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="124"/>
@@ -6672,13 +6665,13 @@ Replace file?</translation>
     <message>
         <location filename="../StateRecorderConf.cpp" line="146"/>
         <source>Snapshot Timing Setting:</source>
-        <translation>Snapshot Timing Setting:</translation>
+        <translation>スナップショットタイミング設定:</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="156"/>
         <location filename="../StateRecorderConf.cpp" line="368"/>
         <source>Frames Between Snapshots:</source>
-        <translation>Frames Between Snapshots:</translation>
+        <translation>スナップショット間フレーム数:</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="163"/>
@@ -6689,18 +6682,18 @@ Replace file?</translation>
         <location filename="../StateRecorderConf.cpp" line="165"/>
         <location filename="../StateRecorderConf.cpp" line="369"/>
         <source>Time Between Snapshots:</source>
-        <translation>Time Between Snapshots:</translation>
+        <translation>スナップショット間時間:</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="185"/>
         <location filename="../StateRecorderConf.cpp" line="218"/>
         <source>Seconds</source>
-        <translation>Seconds</translation>
+        <translation>秒</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="189"/>
         <source>Pause on State Load:</source>
-        <translation>Pause on State Load:</translation>
+        <translation>ステート読込時に一時停止:</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="196"/>
@@ -6710,56 +6703,54 @@ Replace file?</translation>
     <message>
         <location filename="../StateRecorderConf.cpp" line="197"/>
         <source>Temporary</source>
-        <translation>Temporary</translation>
+        <translation>一時的</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="198"/>
         <source>Full</source>
-        <translation>Full</translation>
+        <translation>フル</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="213"/>
         <source>Duration:</source>
-        <translation>Duration:</translation>
+        <translation>期間:</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="224"/>
         <source>Memory Usage:</source>
-        <translation>Memory Usage:</translation>
+        <translation>メモリ使用量:</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="239"/>
         <source>Number of
 Snapshots:</source>
-        <translation>Number of
-Snapshots:</translation>
+        <translation>スナップショット数:</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="242"/>
         <source>Snapshot Size:</source>
-        <translation>Snapshot Size:</translation>
+        <translation>スナップショットサイズ:</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="245"/>
         <source>Total Size:</source>
-        <translation>Total Size:</translation>
+        <translation>合計サイズ:</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="248"/>
         <source>CPU Usage:</source>
-        <translation>CPU Usage:</translation>
+        <translation>CPU使用率:</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="252"/>
         <source>Snapshot
 Save Time:</source>
-        <translation>Snapshot
-Save Time:</translation>
+        <translation>スナップショット保存時間:</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="259"/>
         <source>Recorder Status</source>
-        <translation>Recorder Status</translation>
+        <translation>レコーダー状態</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="271"/>
@@ -6770,22 +6761,22 @@ Save Time:</translation>
     <message>
         <location filename="../StateRecorderConf.cpp" line="272"/>
         <source>State:</source>
-        <translation>State:</translation>
+        <translation>状態:</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="291"/>
         <source>Buffer Size:</source>
-        <translation>Buffer Size:</translation>
+        <translation>バッファサイズ:</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="294"/>
         <source>Buffer Use:</source>
-        <translation>Buffer Use:</translation>
+        <translation>バッファ使用量:</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="301"/>
         <source>% use of history record buffer.</source>
-        <translation>% use of history record buffer.</translation>
+        <translation>% 履歴レコードバッファの使用。</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="316"/>
@@ -6803,19 +6794,18 @@ Save Time:</translation>
         <location filename="../StateRecorderConf.cpp" line="420"/>
         <location filename="../StateRecorderConf.cpp" line="447"/>
         <source>State Recorder</source>
-        <translation>State Recorder</translation>
+        <translation>ステートレコーダー</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="421"/>
         <source>Setting selections have not yet been saved.
 Do you wish to save/apply the new settings?</source>
-        <translation>Setting selections have not yet been saved.
-Do you wish to save/apply the new settings?</translation>
+        <translation>設定選択はまだ保存されていません。新しい設定を保存/適用しますか？</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="448"/>
         <source>New settings will not take effect until state recorder is restarted. Do you wish to restart?</source>
-        <translation>New settings will not take effect until state recorder is restarted. Do you wish to restart?</translation>
+        <translation>新しい設定はステートレコーダーの再起動まで有効になりません。再起動しますか？</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="518"/>
@@ -6825,12 +6815,12 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../StateRecorderConf.cpp" line="552"/>
         <source>Recording</source>
-        <translation>Recording</translation>
+        <translation>録画</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="556"/>
         <source>Off</source>
-        <translation>Off</translation>
+        <translation>オフ</translation>
     </message>
 </context>
 <context>
@@ -6839,7 +6829,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../SymbolicDebug.cpp" line="547"/>
         <location filename="../SymbolicDebug.cpp" line="683"/>
         <source>Symbolic Debug Naming</source>
-        <translation>Symbolic Debug Naming</translation>
+        <translation>シンボリックデバッグ命名</translation>
     </message>
     <message>
         <location filename="../SymbolicDebug.cpp" line="552"/>
@@ -6854,7 +6844,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../SymbolicDebug.cpp" line="574"/>
         <source>Array</source>
-        <translation>Array</translation>
+        <translation>配列</translation>
     </message>
     <message>
         <location filename="../SymbolicDebug.cpp" line="578"/>
@@ -6869,7 +6859,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../SymbolicDebug.cpp" line="589"/>
         <source>Bytes</source>
-        <translation>Bytes</translation>
+        <translation>バイト</translation>
     </message>
     <message>
         <location filename="../SymbolicDebug.cpp" line="593"/>
@@ -6890,22 +6880,22 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../SymbolicDebug.cpp" line="612"/>
         <source>Overwrite Names in Array Body</source>
-        <translation>Overwrite Names in Array Body</translation>
+        <translation>配列本文の名前を上書き</translation>
     </message>
     <message>
         <location filename="../SymbolicDebug.cpp" line="620"/>
         <source>Comment</source>
-        <translation>Comment</translation>
+        <translation>コメント</translation>
     </message>
     <message>
         <location filename="../SymbolicDebug.cpp" line="626"/>
         <source>Comment Head Address Only</source>
-        <translation>Comment Head Address Only</translation>
+        <translation>ヘッドアドレスのみコメント</translation>
     </message>
     <message>
         <location filename="../SymbolicDebug.cpp" line="627"/>
         <source>Overwrite Comments in Array Body</source>
-        <translation>Overwrite Comments in Array Body</translation>
+        <translation>配列本文のコメントを上書き</translation>
     </message>
     <message>
         <location filename="../SymbolicDebug.cpp" line="635"/>
@@ -6956,7 +6946,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="432"/>
         <source>&amp;New</source>
-        <translation>&amp;New</translation>
+        <translation>新規(&amp;N)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="433"/>
@@ -6966,12 +6956,12 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="434"/>
         <source>Open New Project</source>
-        <translation>Open New Project</translation>
+        <translation>新しいプロジェクトを開く</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="441"/>
         <source>&amp;Open</source>
-        <translation>&amp;Open</translation>
+        <translation>開く(&amp;O)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="442"/>
@@ -6981,12 +6971,12 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="443"/>
         <source>Open Project</source>
-        <translation>Open Project</translation>
+        <translation>プロジェクトを開く</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="450"/>
         <source>&amp;Save</source>
-        <translation>&amp;Save</translation>
+        <translation>保存(&amp;S)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="451"/>
@@ -6996,12 +6986,12 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="452"/>
         <source>Save Project</source>
-        <translation>Save Project</translation>
+        <translation>プロジェクトを保存</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="459"/>
         <source>Save &amp;As</source>
-        <translation>Save &amp;As</translation>
+        <translation>名前を付けて保存(&amp;A)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="460"/>
@@ -7011,48 +7001,48 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="461"/>
         <source>Save Project As</source>
-        <translation>Save Project As</translation>
+        <translation>プロジェクトを名前を付けて保存</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="468"/>
         <source>Save &amp;Compact</source>
-        <translation>Save &amp;Compact</translation>
+        <translation>保存して圧縮(&amp;C)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="470"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2676"/>
         <source>Save Compact</source>
-        <translation>Save Compact</translation>
+        <translation>保存して圧縮</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="477"/>
         <source>&amp;Recent</source>
-        <translation>&amp;Recent</translation>
+        <translation>最近使用(&amp;R)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="485"/>
         <source>&amp;Import Input</source>
-        <translation>&amp;Import Input</translation>
+        <translation>入力をインポート(&amp;I)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="487"/>
         <source>Import Input</source>
-        <translation>Import Input</translation>
+        <translation>入力をインポート</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="494"/>
         <source>&amp;Export to fm2</source>
-        <translation>&amp;Export to fm2</translation>
+        <translation>fm2にエクスポート(&amp;E)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="496"/>
         <source>Export to fm2</source>
-        <translation>Export to fm2</translation>
+        <translation>fm2にエクスポート</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="505"/>
         <source>&amp;Quit Window</source>
-        <translation>&amp;Quit Window</translation>
+        <translation>ウィンドウを終了(&amp;Q)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="506"/>
@@ -7067,12 +7057,12 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="514"/>
         <source>&amp;Edit</source>
-        <translation>&amp;Edit</translation>
+        <translation>編集(&amp;E)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="517"/>
         <source>&amp;Undo</source>
-        <translation>&amp;Undo</translation>
+        <translation>元に戻す(&amp;U)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="518"/>
@@ -7082,12 +7072,12 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="519"/>
         <source>Undo Changes</source>
-        <translation>Undo Changes</translation>
+        <translation>変更を元に戻す</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="526"/>
         <source>&amp;Redo</source>
-        <translation>&amp;Redo</translation>
+        <translation>やり直し(&amp;R)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="527"/>
@@ -7097,12 +7087,12 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="528"/>
         <source>Redo Changes</source>
-        <translation>Redo Changes</translation>
+        <translation>変更をやり直し</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="535"/>
         <source>Selection &amp;Undo</source>
-        <translation>Selection &amp;Undo</translation>
+        <translation>選択を元に戻す(&amp;U)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="536"/>
@@ -7112,12 +7102,12 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="537"/>
         <source>Undo Selection</source>
-        <translation>Undo Selection</translation>
+        <translation>選択を元に戻す</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="544"/>
         <source>Selection &amp;Redo</source>
-        <translation>Selection &amp;Redo</translation>
+        <translation>選択をやり直し(&amp;R)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="545"/>
@@ -7127,13 +7117,13 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="546"/>
         <source>Redo Selection</source>
-        <translation>Redo Selection</translation>
+        <translation>選択をやり直し</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="555"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="557"/>
         <source>Deselect</source>
-        <translation>Deselect</translation>
+        <translation>選択解除</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="564"/>
@@ -7145,7 +7135,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="573"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="575"/>
         <source>Select Between Markers</source>
-        <translation>Select Between Markers</translation>
+        <translation>マーカー間を選択</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="574"/>
@@ -7156,7 +7146,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="582"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="584"/>
         <source>Reselect Clipboard</source>
-        <translation>Reselect Clipboard</translation>
+        <translation>クリップボードを再選択</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="583"/>
@@ -7189,7 +7179,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="611"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="613"/>
         <source>Paste Insert</source>
-        <translation>Paste Insert</translation>
+        <translation>貼り付け挿入</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="612"/>
@@ -7233,7 +7223,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="649"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="651"/>
         <source>Clone</source>
-        <translation>Clone</translation>
+        <translation>複製</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="650"/>
@@ -7244,7 +7234,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="658"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="660"/>
         <source>Insert</source>
-        <translation>Insert</translation>
+        <translation>挿入</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="659"/>
@@ -7255,7 +7245,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="667"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="669"/>
         <source>Insert # of Frames</source>
-        <translation>Insert # of Frames</translation>
+        <translation>フレーム数を挿入</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="668"/>
@@ -7266,7 +7256,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="678"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="680"/>
         <source>Truncate Movie</source>
-        <translation>Truncate Movie</translation>
+        <translation>動画を切り詰め</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="687"/>
@@ -7277,7 +7267,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="690"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="692"/>
         <source>Find Note Window</source>
-        <translation>Find Note Window</translation>
+        <translation>メモウィンドウを検索</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="691"/>
@@ -7288,199 +7278,199 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="701"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="704"/>
         <source>Display Branch Screenshots</source>
-        <translation>Display Branch Screenshots</translation>
+        <translation>ブランチのスクリーンショットを表示</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="711"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="714"/>
         <source>Display Branch Descriptions</source>
-        <translation>Display Branch Descriptions</translation>
+        <translation>ブランチの説明を表示</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="721"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="724"/>
         <source>Enable Hot Changes</source>
-        <translation>Enable Hot Changes</translation>
+        <translation>ホットチェンジを有効化</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="733"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="736"/>
         <source>Follow Undo Content</source>
-        <translation>Follow Undo Content</translation>
+        <translation>元に戻す内容を追跡</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="743"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="746"/>
         <source>Follow Marker Note Content</source>
-        <translation>Follow Marker Note Content</translation>
+        <translation>マーカーメモの内容を追跡</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="755"/>
         <source>Piano Roll Font...</source>
-        <translation>Piano Roll Font...</translation>
+        <translation>Piano Rollフォント...</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="757"/>
         <source>Select Piano Roll Font</source>
-        <translation>Select Piano Roll Font</translation>
+        <translation>Piano Rollフォントを選択</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="764"/>
         <source>Bookmarks View Font...</source>
-        <translation>Bookmarks View Font...</translation>
+        <translation>ブックマーク表示フォント...</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="766"/>
         <source>Select Bookmarks View Font</source>
-        <translation>Select Bookmarks View Font</translation>
+        <translation>ブックマーク表示フォントを選択</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="773"/>
         <source>Branches View Font...</source>
-        <translation>Branches View Font...</translation>
+        <translation>ブランチ表示フォント...</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="775"/>
         <source>Select Branches View Font</source>
-        <translation>Select Branches View Font</translation>
+        <translation>ブランチ表示フォントを選択</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="784"/>
         <source>Piano Roll Grid Color...</source>
-        <translation>Piano Roll Grid Color...</translation>
+        <translation>Piano Rollグリッド色...</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="785"/>
         <source>Select Piano Roll Grid Color</source>
-        <translation>Select Piano Roll Grid Color</translation>
+        <translation>Piano Rollグリッド色を選択</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="792"/>
         <source>&amp;Config</source>
-        <translation>&amp;Config</translation>
+        <translation>設定(&amp;C)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="795"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="797"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3381"/>
         <source>Project File Saving Options</source>
-        <translation>Project File Saving Options</translation>
+        <translation>プロジェクトファイル保存オプション</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="804"/>
         <source>Set Max Undo Levels</source>
-        <translation>Set Max Undo Levels</translation>
+        <translation>最大元に戻すレベルを設定</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="806"/>
         <source>Set Max Undo History</source>
-        <translation>Set Max Undo History</translation>
+        <translation>最大元に戻す履歴を設定</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="813"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="815"/>
         <source>Set Greenzone Capacity</source>
-        <translation>Set Greenzone Capacity</translation>
+        <translation>Greenzone容量を設定</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="824"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="827"/>
         <source>Enable Greenzoning</source>
-        <translation>Enable Greenzoning</translation>
+        <translation>Greenzoneを有効化</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="834"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="837"/>
         <source>Autofire Pattern skips Lag</source>
-        <translation>Autofire Pattern skips Lag</translation>
+        <translation>オートファイアパターンがラグをスキップ</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="844"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="847"/>
         <source>Auto Adjust Input According to Lag</source>
-        <translation>Auto Adjust Input According to Lag</translation>
+        <translation>ラグに応じて入力を自動調整</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="856"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="859"/>
         <source>Draw Input by Dragging</source>
-        <translation>Draw Input by Dragging</translation>
+        <translation>ドラッグで入力を描画</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="866"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="869"/>
         <source>Combine Consecutive Recordings/Draws</source>
-        <translation>Combine Consecutive Recordings/Draws</translation>
+        <translation>連続録画/描画を結合</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="876"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="879"/>
         <source>Use 1P Keys for all Single Recordings</source>
-        <translation>Use 1P Keys for all Single Recordings</translation>
+        <translation>全シングル録画に1Pキーを使用</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="886"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="889"/>
         <source>Use Input Keys for Column Set</source>
-        <translation>Use Input Keys for Column Set</translation>
+        <translation>入力キーを列セットに使用</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="898"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="901"/>
         <source>Bind Markers to Input</source>
-        <translation>Bind Markers to Input</translation>
+        <translation>マーカーを入力にバインド</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="908"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="911"/>
         <source>Empty New Marker Notes</source>
-        <translation>Empty New Marker Notes</translation>
+        <translation>空の新規マーカーメ모</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="920"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="923"/>
         <source>Old Control Scheme for Branching</source>
-        <translation>Old Control Scheme for Branching</translation>
+        <translation>ブランチ用旧制御方式</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="930"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="933"/>
         <source>Branches Restore Entire Movie</source>
-        <translation>Branches Restore Entire Movie</translation>
+        <translation>ブランチが動画全体を復元</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="940"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="943"/>
         <source>HUD in Branch Screenshots</source>
-        <translation>HUD in Branch Screenshots</translation>
+        <translation>ブランチスクリーンショットのHUD</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="952"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="955"/>
         <source>Autopause at End of Movie</source>
-        <translation>Autopause at End of Movie</translation>
+        <translation>動画終了時に自動一時停止</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="962"/>
         <source>&amp;Lua</source>
-        <translation>&amp;Lua</translation>
+        <translation>Lua(&amp;L)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="965"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="967"/>
         <source>Run Function</source>
-        <translation>Run Function</translation>
+        <translation>関数を実行</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="976"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="979"/>
         <source>Auto Function</source>
-        <translation>Auto Function</translation>
+        <translation>自動関數</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="986"/>
         <source>&amp;Pattern</source>
-        <translation>&amp;Pattern</translation>
+        <translation>パターン(&amp;P)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1007"/>
@@ -7491,20 +7481,20 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1010"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1012"/>
         <source>Open TAS Editor Manual</source>
-        <translation>Open TAS Editor Manual</translation>
+        <translation>TAS Editorマニュアルを開く</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1019"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1022"/>
         <source>Enable Tool Tips</source>
-        <translation>Enable Tool Tips</translation>
+        <translation>ツールチップを有効化</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1031"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1033"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3980"/>
         <source>About</source>
-        <translation>About</translation>
+        <translation>バージョン情報</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="324"/>
@@ -7512,61 +7502,61 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1054"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1056"/>
         <source>Marker 0</source>
-        <translation>Marker 0</translation>
+        <translation>マーカー 0</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="328"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1158"/>
         <source>Playback</source>
-        <translation>Playback</translation>
+        <translation>再生</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="329"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1160"/>
         <source>Recorder</source>
-        <translation>Recorder</translation>
+        <translation>レコーダー</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="330"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1162"/>
         <source>Splicer</source>
-        <translation>Splicer</translation>
+        <translation>スプライサー</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="332"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1185"/>
         <source>Follow Cursor</source>
-        <translation>Follow Cursor</translation>
+        <translation>カーソルを追跡</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="333"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1187"/>
         <source>Turbo Seek</source>
-        <translation>Turbo Seek</translation>
+        <translation>ターボシーク</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="334"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1189"/>
         <source>Auto-Restore Last Position</source>
-        <translation>Auto-Restore Last Position</translation>
+        <translation>前回位置を自動復元</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="336"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1192"/>
         <source>Recording</source>
-        <translation>Recording</translation>
+        <translation>録画</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="337"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1194"/>
         <source>Superimpose</source>
-        <translation>Superimpose</translation>
+        <translation>重ね合わせ</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="338"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1196"/>
         <source>Use Pattern</source>
-        <translation>Use Pattern</translation>
+        <translation>パターンを使用</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="339"/>
@@ -7604,29 +7594,29 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1209"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1211"/>
         <source>Empty</source>
-        <translation>Empty</translation>
+        <translation>空</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="348"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1232"/>
         <source>Similar</source>
-        <translation>Similar</translation>
+        <translation>類似</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="349"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1234"/>
         <source>More</source>
-        <translation>More</translation>
+        <translation>もっと</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1271"/>
         <source>Selection:</source>
-        <translation>Selection:</translation>
+        <translation>選択：</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1273"/>
         <source>Clipboard:</source>
-        <translation>Clipboard:</translation>
+        <translation>クリップボード：</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="354"/>
@@ -7640,7 +7630,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="355"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1305"/>
         <source>Branches</source>
-        <translation>Branches</translation>
+        <translation>ブランチ</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="356"/>
@@ -7648,19 +7638,19 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2685"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3396"/>
         <source>History</source>
-        <translation>History</translation>
+        <translation>履歴</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1728"/>
         <source>Save TAS Editor Project As</source>
-        <translation>Save TAS Editor Project As</translation>
+        <translation>TAS Editorプロジェクトを名前を付けて保存</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1734"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1880"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2549"/>
         <source>TAS Project Files (*.fm3) ;; All files (*)</source>
-        <translation>TAS Project Files (*.fm3) ;; All files (*)</translation>
+        <translation>TASプロジェクトファイル (*.fm3) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1738"/>
@@ -7687,12 +7677,12 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1853"/>
         <source>Save project changes?</source>
-        <translation>Save project changes?</translation>
+        <translation>プロジェクトの変更を保存しますか？</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1874"/>
         <source>Open TAS Editor Project</source>
-        <translation>Open TAS Editor Project</translation>
+        <translation>TAS Editorプロジェクトを開く</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1884"/>
@@ -7702,44 +7692,44 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1997"/>
         <source>Input Type</source>
-        <translation>Input Type</translation>
+        <translation>入力タイプ</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2003"/>
         <source>1 Player</source>
-        <translation>1 Player</translation>
+        <translation>1プレイヤー</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2004"/>
         <source>2 Players</source>
-        <translation>2 Players</translation>
+        <translation>2プレイヤー</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2005"/>
         <source>4 Score</source>
-        <translation>4 Score</translation>
+        <translation>4スコア</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2018"/>
         <source>Copy Input</source>
-        <translation>Copy Input</translation>
+        <translation>入力をコピー</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2019"/>
         <source>Copy Markers</source>
-        <translation>Copy Markers</translation>
+        <translation>マーカーをコピー</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2028"/>
         <source>Author</source>
-        <translation>Author</translation>
+        <translation>作者</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2034"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2694"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3405"/>
         <source>Ok</source>
-        <translation>Ok</translation>
+        <translation>OK</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2035"/>
@@ -7751,22 +7741,22 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2049"/>
         <source>Create New Project</source>
-        <translation>Create New Project</translation>
+        <translation>新しいプロジェクトを作成</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2156"/>
         <source>Import Movie File</source>
-        <translation>Import Movie File</translation>
+        <translation>動画ファイルをインポート</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2162"/>
         <source>FCEUX Movie Files (*.fm2) ;; TAS Project Files (*.fm3) ;; All files (*)</source>
-        <translation>FCEUX Movie Files (*.fm2) ;; TAS Project Files (*.fm3) ;; All files (*)</translation>
+        <translation>FCEUX動画ファイル (*.fm2) ;; TASプロジェクトファイル (*.fm3) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2166"/>
         <source>Import</source>
-        <translation>Import</translation>
+        <translation>インポート</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2188"/>
@@ -7777,46 +7767,46 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2275"/>
         <source>Export to FM2 File</source>
-        <translation>Export to FM2 File</translation>
+        <translation>FM2ファイルにエクスポート</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2281"/>
         <source>FCEUX Movie File (*.fm2) ;; All files (*)</source>
-        <translation>FCEUX Movie File (*.fm2) ;; All files (*)</translation>
+        <translation>FCEUX動画ファイル (*.fm2) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2285"/>
         <source>Export</source>
-        <translation>Export</translation>
+        <translation>エクスポート</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2543"/>
         <source>Save Compact TAS Editor Project As</source>
-        <translation>Save Compact TAS Editor Project As</translation>
+        <translation>TAS Editorプロジェクトを圧縮して名前を付けて保存</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2679"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3385"/>
         <source>File Contents</source>
-        <translation>File Contents</translation>
+        <translation>ファイルの内容</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2680"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3386"/>
         <source>Greenzone Saving Options</source>
-        <translation>Greenzone Saving Options</translation>
+        <translation>Greenzone保存オプション</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2682"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3393"/>
         <source>Binary Input</source>
-        <translation>Binary Input</translation>
+        <translation>バイナリ入力</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2683"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3394"/>
         <source>Markers</source>
-        <translation>Markers</translation>
+        <translation>マーカー</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2686"/>
@@ -7828,31 +7818,31 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2687"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3398"/>
         <source>Selection</source>
-        <translation>Selection</translation>
+        <translation>選択</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2689"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3400"/>
         <source>All Frames</source>
-        <translation>All Frames</translation>
+        <translation>全フレーム</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2690"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3401"/>
         <source>Every 16th Frame</source>
-        <translation>Every 16th Frame</translation>
+        <translation>16フレームごと</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2691"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3402"/>
         <source>Marked Frame</source>
-        <translation>Marked Frame</translation>
+        <translation>マークされたフレーム</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2692"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3403"/>
         <source>Don&apos;t Save</source>
-        <translation>Don&apos;t Save</translation>
+        <translation>保存しない</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2787"/>
@@ -7867,128 +7857,128 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3130"/>
         <source>Click here to scroll Piano Roll to Playback cursor</source>
-        <translation>Click here to scroll Piano Roll to Playback cursor</translation>
+        <translation>ここをクリックしてPiano Rollを再生カーソルにスクロール</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3131"/>
         <source>Click here to scroll Piano Roll to Selection</source>
-        <translation>Click here to scroll Piano Roll to Selection</translation>
+        <translation>ここをクリックしてPiano Rollを選択範囲にスクロール</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3132"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3133"/>
         <source>Click to edit text</source>
-        <translation>Click to edit text</translation>
+        <translation>クリックしてテキストを編集</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3135"/>
         <source>Switch Input Recording on/off</source>
-        <translation>Switch Input Recording on/off</translation>
+        <translation>入力録画のオン/オフ切り替え</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3136"/>
         <source>Allows to superimpose old Input with new buttons, instead of overwriting</source>
-        <translation>Allows to superimpose old Input with new buttons, instead of overwriting</translation>
+        <translation>上書きではなく新しいボタンで古い入力を重ね合わせ可能</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3137"/>
         <source>Applies current Autofire Pattern to Input recording</source>
-        <translation>Applies current Autofire Pattern to Input recording</translation>
+        <translation>現在のオートファイアパターンを入力録画に適用</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3138"/>
         <source>Switch off Multitracking</source>
-        <translation>Switch off Multitracking</translation>
+        <translation>マルチトラッキングをオフ</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3139"/>
         <source>Select Joypad 1 as Current</source>
-        <translation>Select Joypad 1 as Current</translation>
+        <translation>ジョイパッド1を現在として選択</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3140"/>
         <source>Select Joypad 2 as Current</source>
-        <translation>Select Joypad 2 as Current</translation>
+        <translation>ジョイパッド2を現在として選択</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3141"/>
         <source>Select Joypad 3 as Current</source>
-        <translation>Select Joypad 3 as Current</translation>
+        <translation>ジョイパッド3を現在として選択</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3142"/>
         <source>Select Joypad 4 as Current</source>
-        <translation>Select Joypad 4 as Current</translation>
+        <translation>ジョイパッド4を現在として選択</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3144"/>
         <source>Send Playback to previous Marker (mouse: Shift+Wheel up) (hotkey: Shift+PageUp)</source>
-        <translation>Send Playback to previous Marker (mouse: Shift+Wheel up) (hotkey: Shift+PageUp)</translation>
+        <translation>再生を前のマーカーに送る (マウス: Shift+ホイール上) (ホットキー: Shift+PageUp)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3145"/>
         <source>Rewind 1 frame (mouse: Right button+Wheel up) (hotkey: Shift+Up)</source>
-        <translation>Rewind 1 frame (mouse: Right button+Wheel up) (hotkey: Shift+Up)</translation>
+        <translation>1フレーム戻る (マウス: 右ボタン+ホイール上) (ホットキー: Shift+Up)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3146"/>
         <source>Pause/Unpause Emulation (mouse: Middle button)</source>
-        <translation>Pause/Unpause Emulation (mouse: Middle button)</translation>
+        <translation>エミュレーションの一時停止/再開 (マウス: 中ボタン)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3147"/>
         <source>Advance 1 frame (mouse: Right button+Wheel down) (hotkey: Shift+Down)</source>
-        <translation>Advance 1 frame (mouse: Right button+Wheel down) (hotkey: Shift+Down)</translation>
+        <translation>1フレーム進む (マウス: 右ボタン+ホイール下) (ホットキー: Shift+Down)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3148"/>
         <source>Send Playback to next Marker (mouse: Shift+Wheel down) (hotkey: Shift+PageDown)</source>
-        <translation>Send Playback to next Marker (mouse: Shift+Wheel down) (hotkey: Shift+PageDown)</translation>
+        <translation>再生を次のマーカーに送る (マウス: Shift+ホイール下) (ホットキー: Shift+PageDown)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3150"/>
         <source>The Piano Roll will follow Playback cursor movements</source>
-        <translation>The Piano Roll will follow Playback cursor movements</translation>
+        <translation>Piano Rollは再生カーソルの動きを追跡します</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3151"/>
         <source>Uncheck when you need to watch seeking in slow motion</source>
-        <translation>Uncheck when you need to watch seeking in slow motion</translation>
+        <translation>スローモーションでシークを確認したい場合はチェックを外す</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3152"/>
         <source>Whenever you change Input above Playback cursor, the cursor returns to where it was before the change</source>
-        <translation>Whenever you change Input above Playback cursor, the cursor returns to where it was before the change</translation>
+        <translation>再生カーソルより上の入力を変更すると、カーソルは変更前の位置に戻ります</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3154"/>
         <source>Current size of Selection</source>
-        <translation>Current size of Selection</translation>
+        <translation>現在の選択サイズ</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3155"/>
         <source>Current size of Input in the Clipboard</source>
-        <translation>Current size of Input in the Clipboard</translation>
+        <translation>クリップボード内の入力の現在のサイズ</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3157"/>
         <source>Send Selection to previous Marker (mouse: Ctrl+Wheel up) (hotkey: Ctrl+PageUp)</source>
-        <translation>Send Selection to previous Marker (mouse: Ctrl+Wheel up) (hotkey: Ctrl+PageUp)</translation>
+        <translation>選択を前のマーカーに送る (マウス: Ctrl+ホイール上) (ホットキー: Ctrl+PageUp)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3158"/>
         <source>Send Selection to next Marker (mouse: Ctrl+Wheel up) (hotkey: Ctrl+PageDown)</source>
-        <translation>Send Selection to next Marker (mouse: Ctrl+Wheel up) (hotkey: Ctrl+PageDown)</translation>
+        <translation>選択を次のマーカーに送る (マウス: Ctrl+ホイール上) (ホットキー: Ctrl+PageDown)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3159"/>
         <source>Auto-search for Marker Note</source>
-        <translation>Auto-search for Marker Note</translation>
+        <translation>マーカーメモを自動検索</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3160"/>
         <source>Continue Auto-search</source>
-        <translation>Continue Auto-search</translation>
+        <translation>自動検索を続行</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3073"/>
@@ -8025,7 +8015,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3218"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3234"/>
         <source>Select Font</source>
-        <translation>Select Font</translation>
+        <translation>フォント選択</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3384"/>
@@ -8035,44 +8025,43 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3389"/>
         <source>Autosave project</source>
-        <translation>Autosave project</translation>
+        <translation>プロジェクトを自動保存</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3390"/>
         <source>silently</source>
-        <translation>silently</translation>
+        <translation>サイレント</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3424"/>
         <source>every</source>
-        <translation>every</translation>
+        <translation>毎</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3426"/>
         <source>minutes</source>
-        <translation>minutes</translation>
+        <translation>分</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3525"/>
         <source>Greenzone Capacity</source>
-        <translation>Greenzone Capacity</translation>
+        <translation>Greenzone容量</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3528"/>
         <source>Keep savestates for how many frames?
 (actual limit of savestates can be 5 times more than the number provided)</source>
-        <translation>Keep savestates for how many frames?
-(actual limit of savestates can be 5 times more than the number provided)</translation>
+        <translation>何フレーム分のセーブステートを保持しますか？（実際の上限は指定数の5倍になる場合があります）</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3564"/>
         <source>Max undo levels</source>
-        <translation>Max undo levels</translation>
+        <translation>最大元に戻すレベル</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3567"/>
         <source>Keep history of how many changes?</source>
-        <translation>Keep history of how many changes?</translation>
+        <translation>何件の変更履歴を保持しますか？</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3978"/>
@@ -8094,31 +8083,31 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TasEditor/TasFindNoteWindow.cpp" line="179"/>
         <location filename="../TasEditor/TasFindNoteWindow.cpp" line="190"/>
         <source>Find Note</source>
-        <translation>Find Note</translation>
+        <translation>メモを検索</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasFindNoteWindow.cpp" line="34"/>
         <location filename="../TasEditor/TasFindNoteWindow.cpp" line="88"/>
         <source>Match Case</source>
-        <translation>Match Case</translation>
+        <translation>大文字小文字を区別</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasFindNoteWindow.cpp" line="36"/>
         <location filename="../TasEditor/TasFindNoteWindow.cpp" line="89"/>
         <source>Up</source>
-        <translation>Up</translation>
+        <translation>上</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasFindNoteWindow.cpp" line="38"/>
         <location filename="../TasEditor/TasFindNoteWindow.cpp" line="90"/>
         <source>Down</source>
-        <translation>Down</translation>
+        <translation>下</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasFindNoteWindow.cpp" line="40"/>
         <location filename="../TasEditor/TasFindNoteWindow.cpp" line="91"/>
         <source>Next</source>
-        <translation>Next</translation>
+        <translation>次へ</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasFindNoteWindow.cpp" line="42"/>
@@ -8130,13 +8119,13 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TasEditor/TasFindNoteWindow.cpp" line="44"/>
         <location filename="../TasEditor/TasFindNoteWindow.cpp" line="93"/>
         <source>Direction</source>
-        <translation>Direction</translation>
+        <translation>方向</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasFindNoteWindow.cpp" line="179"/>
         <location filename="../TasEditor/TasFindNoteWindow.cpp" line="190"/>
         <source>Nothing was found!</source>
-        <translation>Nothing was found!</translation>
+        <translation>何も見つかりませんでした！</translation>
     </message>
 </context>
 <context>
@@ -8151,29 +8140,29 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TimingConf.cpp" line="64"/>
         <location filename="../TimingConf.cpp" line="393"/>
         <source>Set Scheduling Parameters at Startup</source>
-        <translation>Set Scheduling Parameters at Startup</translation>
+        <translation>起動時にスケジューリングパラメータを設定</translation>
     </message>
     <message>
         <location filename="../TimingConf.cpp" line="67"/>
         <source>EMU Thread Scheduling Parameters</source>
-        <translation>EMU Thread Scheduling Parameters</translation>
+        <translation>EMUスレッドスケジューリングパラメータ</translation>
     </message>
     <message>
         <location filename="../TimingConf.cpp" line="69"/>
         <source>GUI Thread Scheduling Parameters</source>
-        <translation>GUI Thread Scheduling Parameters</translation>
+        <translation>GUIスレッドスケジューリングパラメータ</translation>
     </message>
     <message>
         <location filename="../TimingConf.cpp" line="88"/>
         <location filename="../TimingConf.cpp" line="97"/>
         <source>Idle</source>
-        <translation>Idle</translation>
+        <translation>アイドル</translation>
     </message>
     <message>
         <location filename="../TimingConf.cpp" line="89"/>
         <location filename="../TimingConf.cpp" line="98"/>
         <source>Lowest</source>
-        <translation>Lowest</translation>
+        <translation>最低</translation>
     </message>
     <message>
         <location filename="../TimingConf.cpp" line="90"/>
@@ -8185,7 +8174,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TimingConf.cpp" line="91"/>
         <location filename="../TimingConf.cpp" line="100"/>
         <source>Normal</source>
-        <translation>Normal</translation>
+        <translation>通常</translation>
     </message>
     <message>
         <location filename="../TimingConf.cpp" line="92"/>
@@ -8197,19 +8186,19 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TimingConf.cpp" line="93"/>
         <location filename="../TimingConf.cpp" line="102"/>
         <source>Highest</source>
-        <translation>Highest</translation>
+        <translation>最高</translation>
     </message>
     <message>
         <location filename="../TimingConf.cpp" line="94"/>
         <location filename="../TimingConf.cpp" line="103"/>
         <source>Time Critical</source>
-        <translation>Time Critical</translation>
+        <translation>タイムクリティカル</translation>
     </message>
     <message>
         <location filename="../TimingConf.cpp" line="95"/>
         <location filename="../TimingConf.cpp" line="104"/>
         <source>Inherit</source>
-        <translation>Inherit</translation>
+        <translation>継承</translation>
     </message>
     <message>
         <location filename="../TimingConf.cpp" line="108"/>
@@ -8219,29 +8208,29 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../TimingConf.cpp" line="109"/>
         <source>Timing Mechanism:</source>
-        <translation>Timing Mechanism:</translation>
+        <translation>タイミングメカニズム:</translation>
     </message>
     <message>
         <location filename="../TimingConf.cpp" line="116"/>
         <location filename="../TimingConf.cpp" line="394"/>
         <source>Overclocking (Old PPU Only)</source>
-        <translation>Overclocking (Old PPU Only)</translation>
+        <translation>オーバークロック（旧PPUのみ）</translation>
     </message>
     <message>
         <location filename="../TimingConf.cpp" line="126"/>
         <location filename="../TimingConf.cpp" line="395"/>
         <source>Don&apos;t Overclock 7-bit Samples</source>
-        <translation>Don&apos;t Overclock 7-bit Samples</translation>
+        <translation>7ビットサンプルをオーバークロックしない</translation>
     </message>
     <message>
         <location filename="../TimingConf.cpp" line="137"/>
         <source>Post-render</source>
-        <translation>Post-render</translation>
+        <translation>ポストレンダー</translation>
     </message>
     <message>
         <location filename="../TimingConf.cpp" line="139"/>
         <source>Vblank Scanlines</source>
-        <translation>Vblank Scanlines</translation>
+        <translation>Vblankスキャンライン</translation>
     </message>
     <message>
         <location filename="../TimingConf.cpp" line="147"/>
@@ -8255,7 +8244,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TraceLogger.cpp" line="169"/>
         <location filename="../TraceLogger.cpp" line="437"/>
         <source>Trace Logger</source>
-        <translation>Trace Logger</translation>
+        <translation>トレースロガー</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="182"/>
@@ -8265,7 +8254,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../TraceLogger.cpp" line="185"/>
         <source>&amp;Close</source>
-        <translation>&amp;Close</translation>
+        <translation>閉じる(&amp;C)</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="187"/>
@@ -8275,12 +8264,12 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../TraceLogger.cpp" line="232"/>
         <source>Lines</source>
-        <translation>Lines</translation>
+        <translation>行数</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="233"/>
         <source>Log Last</source>
-        <translation>Log Last</translation>
+        <translation>最後を記録</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="236"/>
@@ -8326,112 +8315,112 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TraceLogger.cpp" line="254"/>
         <location filename="../TraceLogger.cpp" line="438"/>
         <source>Log to File</source>
-        <translation>Log to File</translation>
+        <translation>ファイルに記録</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="255"/>
         <source>Browse...</source>
-        <translation>Browse...</translation>
+        <translation>参照...</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="256"/>
         <location filename="../TraceLogger.cpp" line="556"/>
         <source>Start Logging</source>
-        <translation>Start Logging</translation>
+        <translation>記録開始</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="257"/>
         <source>Automatically update this window while logging</source>
-        <translation>Automatically update this window while logging</translation>
+        <translation>記録中にこのウィンドウを自動更新</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="258"/>
         <source>Clear Log</source>
-        <translation>Clear Log</translation>
+        <translation>記録をクリア</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="272"/>
         <location filename="../TraceLogger.cpp" line="577"/>
         <source>Stop Logging</source>
-        <translation>Stop Logging</translation>
+        <translation>記録停止</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="302"/>
         <source>Log Options</source>
-        <translation>Log Options</translation>
+        <translation>記録オプション</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="305"/>
         <source>Log State of Registers</source>
-        <translation>Log State of Registers</translation>
+        <translation>レジスタの状態を記録</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="306"/>
         <source>Log Frames Count</source>
-        <translation>Log Frames Count</translation>
+        <translation>フレーム数を記録</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="307"/>
         <source>Log Emulator Messages</source>
-        <translation>Log Emulator Messages</translation>
+        <translation>エミュレーターメッセージを記録</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="308"/>
         <location filename="../TraceLogger.cpp" line="450"/>
         <source>Symbolic Trace</source>
-        <translation>Symbolic Trace</translation>
+        <translation>シンボリックトレース</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="309"/>
         <source>Log Processor Status Flags</source>
-        <translation>Log Processor Status Flags</translation>
+        <translation>プロセッサステータスフラグを記録</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="310"/>
         <source>Log Cycles Count</source>
-        <translation>Log Cycles Count</translation>
+        <translation>サイクル数を記録</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="311"/>
         <location filename="../TraceLogger.cpp" line="445"/>
         <source>Log Breakpoint Hits</source>
-        <translation>Log Breakpoint Hits</translation>
+        <translation>ブレークポイントヒットを記録</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="312"/>
         <source>Use Stack Pointer for Code Tabbing (Nesting Visualization)</source>
-        <translation>Use Stack Pointer for Code Tabbing (Nesting Visualization)</translation>
+        <translation>スタックポインタでコードをタブ表示（ネスト可視化）</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="313"/>
         <source>To the Left from Disassembly</source>
-        <translation>To the Left from Disassembly</translation>
+        <translation>逆アセンブリの左側</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="314"/>
         <source>Log Instructions Count</source>
-        <translation>Log Instructions Count</translation>
+        <translation>命令数を記録</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="315"/>
         <location filename="../TraceLogger.cpp" line="449"/>
         <source>Log Bank Number</source>
-        <translation>Log Bank Number</translation>
+        <translation>バンク番号を記録</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="370"/>
         <source>Extra Log Options that work with the Code/Data Logger</source>
-        <translation>Extra Log Options that work with the Code/Data Logger</translation>
+        <translation>コード/データロガーで動作する追加記録オプション</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="373"/>
         <source>Only Log Newly Mapped Code</source>
-        <translation>Only Log Newly Mapped Code</translation>
+        <translation>新しくマッピングされたコードのみ記録</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="374"/>
         <source>Only Log that Accesses Newly Mapped Data</source>
-        <translation>Only Log that Accesses Newly Mapped Data</translation>
+        <translation>新しくマッピングされたデータにアクセスするもののみ記録</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="439"/>
@@ -8492,7 +8481,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../TraceLogger.cpp" line="453"/>
         <location filename="../TraceLogger.cpp" line="603"/>
         <source>Select Log File</source>
-        <translation>Select Log File</translation>
+        <translation>ログファイルを選択</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="454"/>
@@ -8502,7 +8491,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../TraceLogger.cpp" line="609"/>
         <source>LOG files (*.log *.LOG) ;; All files (*)</source>
-        <translation>LOG files (*.log *.LOG) ;; All files (*)</translation>
+        <translation>ログファイル (*.log *.LOG) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="613"/>
@@ -8521,7 +8510,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../ConsoleDebugger.cpp" line="7368"/>
         <location filename="../ConsoleDebugger.cpp" line="7397"/>
         <source>CPU ADDR:</source>
-        <translation>CPU ADDR:</translation>
+        <translation>CPUアドレス:</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7373"/>
@@ -8532,7 +8521,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7381"/>
         <source>ROM ADDR:</source>
-        <translation>ROM ADDR:</translation>
+        <translation>ROMアドレス:</translation>
     </message>
 </context>
 <context>
@@ -8584,22 +8573,22 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleWindow.cpp" line="593"/>
         <source>Open ROM</source>
-        <translation>Open ROM</translation>
+        <translation>ROM を開く</translation>
     </message>
     <message>
         <location filename="../ConsoleWindow.cpp" line="598"/>
         <source>Last ROM Used</source>
-        <translation>Last ROM Used</translation>
+        <translation>最後に使用した ROM</translation>
     </message>
     <message>
         <location filename="../ConsoleWindow.cpp" line="606"/>
         <source>Online Help</source>
-        <translation>Online Help</translation>
+        <translation>オンラインヘルプ</translation>
     </message>
     <message>
         <location filename="../ConsoleWindow.cpp" line="613"/>
         <source>Disable Context Menu via Options -&gt; GUI Config</source>
-        <translation>Disable Context Menu via Options -&gt; GUI Config</translation>
+        <translation>オプション -&gt; GUI 設定 でコンテキストメニューを無効にする</translation>
     </message>
     <message>
         <location filename="../ConsoleWindow.cpp" line="871"/>
@@ -8670,7 +8659,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../ConsoleFile.cpp" line="212"/>
         <location filename="../ConsoleMenu.cpp" line="167"/>
         <source>Open ROM File</source>
-        <translation>Open ROM File</translation>
+        <translation>ROM ファイルを開く</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="179"/>
@@ -8681,7 +8670,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="181"/>
         <source>Close Loaded ROM</source>
-        <translation>Close Loaded ROM</translation>
+        <translation>読み込み済み ROM を閉じる</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="191"/>
@@ -8698,7 +8687,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="200"/>
         <source>Play NSF</source>
-        <translation>Play NSF</translation>
+        <translation>NSF を再生</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="208"/>
@@ -8709,7 +8698,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="210"/>
         <source>Load State From</source>
-        <translation>Load State From</translation>
+        <translation>ステートを読み込み</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="217"/>
@@ -8720,7 +8709,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="219"/>
         <source>Save State As</source>
-        <translation>Save State As</translation>
+        <translation>ステートを名前を付けて保存</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="226"/>
@@ -8731,7 +8720,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="228"/>
         <source>Quick Load</source>
-        <translation>Quick Load</translation>
+        <translation>クイックロード</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="237"/>
@@ -8742,13 +8731,13 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="239"/>
         <source>Quick Save</source>
-        <translation>Quick Save</translation>
+        <translation>クイックセーブ</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="248"/>
         <location filename="../ConsoleWindow.cpp" line="777"/>
         <source>Change &amp;State Slot</source>
-        <translation>Change &amp;State Slot</translation>
+        <translation>ステートスロットの変更(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="255"/>
@@ -8765,7 +8754,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="305"/>
         <source>Load Lua Script</source>
-        <translation>Load Lua Script</translation>
+        <translation>Lua スクリプトを読み込む</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="317"/>
@@ -8776,7 +8765,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="319"/>
         <source>Screenshot</source>
-        <translation>Screenshot</translation>
+        <translation>スクリーンショット</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="329"/>
@@ -8787,7 +8776,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="331"/>
         <source>Quit the Application</source>
-        <translation>Quit the Application</translation>
+        <translation>アプリケーションを終了</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="370"/>
@@ -8798,7 +8787,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="372"/>
         <source>Sound Configure</source>
-        <translation>Sound Configure</translation>
+        <translation>サウンド設定</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="379"/>
@@ -8809,7 +8798,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="381"/>
         <source>Video Preferences</source>
-        <translation>Video Preferences</translation>
+        <translation>ビデオ設定</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="388"/>
@@ -8820,7 +8809,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="390"/>
         <source>GUI Configure</source>
-        <translation>GUI Configure</translation>
+        <translation>GUI 設定</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="400"/>
@@ -8915,7 +8904,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="482"/>
         <source>Fullscreen</source>
-        <translation>Fullscreen</translation>
+        <translation>フルスクリーン</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="492"/>
@@ -8926,7 +8915,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="494"/>
         <source>Hide Menu</source>
-        <translation>Hide Menu</translation>
+        <translation>メニューを非表示</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="506"/>
@@ -8937,20 +8926,20 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="510"/>
         <source>Auto Hide Menu on Fullscreen</source>
-        <translation>Auto Hide Menu on Fullscreen</translation>
+        <translation>フルスクリーン時にメニューを自動非表示</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="521"/>
         <location filename="../ConsoleWindow.cpp" line="812"/>
         <source>BG Side Panel Color</source>
-        <translation>BG Side Panel Color</translation>
+        <translation>BG サイドパネル色</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="531"/>
         <location filename="../ConsoleMenu.cpp" line="535"/>
         <location filename="../ConsoleWindow.cpp" line="811"/>
         <source>Use BG Palette for Video BG Color</source>
-        <translation>Use BG Palette for Video BG Color</translation>
+        <translation>BG パレットをビデオ背景色に使用</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="550"/>
@@ -8961,7 +8950,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="552"/>
         <source>Power On Console</source>
-        <translation>Power On Console</translation>
+        <translation>コンソールの電源オン</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="562"/>
@@ -8972,7 +8961,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="564"/>
         <source>Hard Reset of Console</source>
-        <translation>Hard Reset of Console</translation>
+        <translation>ハードリセット</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="578"/>
@@ -8983,80 +8972,80 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="580"/>
         <source>Pause Console</source>
-        <translation>Pause Console</translation>
+        <translation>一時停止</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="592"/>
         <location filename="../ConsoleWindow.cpp" line="779"/>
         <source>&amp;Region</source>
-        <translation>&amp;Region</translation>
+        <translation>地域(&amp;R)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="632"/>
         <location filename="../ConsoleWindow.cpp" line="780"/>
         <source>&amp;Speed</source>
-        <translation>&amp;Speed</translation>
+        <translation>速度(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="635"/>
         <location filename="../ConsoleWindow.cpp" line="880"/>
         <source>Speed &amp;Up</source>
-        <translation>Speed &amp;Up</translation>
+        <translation>スピードアップ(&amp;U)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="637"/>
         <source>Speed Up</source>
-        <translation>Speed Up</translation>
+        <translation>スピードアップ</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="647"/>
         <location filename="../ConsoleWindow.cpp" line="881"/>
         <source>Slow &amp;Down</source>
-        <translation>Slow &amp;Down</translation>
+        <translation>スローダウン(&amp;D)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="649"/>
         <source>Slow Down</source>
-        <translation>Slow Down</translation>
+        <translation>スローダウン</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="661"/>
         <location filename="../ConsoleWindow.cpp" line="882"/>
         <source>&amp;Slowest</source>
-        <translation>&amp;Slowest</translation>
+        <translation>最遅(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="663"/>
         <source>Slowest</source>
-        <translation>Slowest</translation>
+        <translation>最遅</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="670"/>
         <location filename="../ConsoleWindow.cpp" line="883"/>
         <source>&amp;Normal</source>
-        <translation>&amp;Normal</translation>
+        <translation>通常(&amp;N)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="672"/>
         <source>Normal</source>
-        <translation>Normal</translation>
+        <translation>通常</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="679"/>
         <location filename="../ConsoleWindow.cpp" line="884"/>
         <source>&amp;Turbo</source>
-        <translation>&amp;Turbo</translation>
+        <translation>ターボ(&amp;T)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="681"/>
         <source>Turbo (Fastest)</source>
-        <translation>Turbo (Fastest)</translation>
+        <translation>ターボ（最速）</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="688"/>
         <location filename="../ConsoleWindow.cpp" line="885"/>
         <source>&amp;Custom</source>
-        <translation>&amp;Custom</translation>
+        <translation>カスタム(&amp;C)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="690"/>
@@ -9069,18 +9058,18 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../ConsoleMenu.cpp" line="698"/>
         <location filename="../ConsoleWindow.cpp" line="886"/>
         <source>Set Frame &amp;Advance Delay</source>
-        <translation>Set Frame &amp;Advance Delay</translation>
+        <translation>フレームアドバンス遅延の設定(&amp;A)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="700"/>
         <source>Set Frame Advance Delay</source>
-        <translation>Set Frame Advance Delay</translation>
+        <translation>フレームアドバンス遅延の設定</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="708"/>
         <location filename="../ConsoleWindow.cpp" line="781"/>
         <source>&amp;AutoFire Pattern</source>
-        <translation>&amp;AutoFire Pattern</translation>
+        <translation>オートファイアパターン(&amp;A)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="719"/>
@@ -9093,7 +9082,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../ConsoleMenu.cpp" line="746"/>
         <location filename="../ConsoleWindow.cpp" line="887"/>
         <source>Set Custom Pattern</source>
-        <translation>Set Custom Pattern</translation>
+        <translation>カスタムパターンを設定</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="763"/>
@@ -9104,32 +9093,32 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="765"/>
         <source>Soft Reset of Console</source>
-        <translation>Soft Reset of Console</translation>
+        <translation>ソフトリセット</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="777"/>
         <location filename="../ConsoleWindow.cpp" line="818"/>
         <source>Enable Game &amp;Genie</source>
-        <translation>Enable Game &amp;Genie</translation>
+        <translation>Game &amp;Genie を有効にする</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="780"/>
         <source>Enable Game Genie</source>
-        <translation>Enable Game Genie</translation>
+        <translation>Game Genie を有効にする</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="788"/>
         <location filename="../ConsoleMenu.cpp" line="790"/>
         <location filename="../ConsoleWindow.cpp" line="819"/>
         <source>Load Game Genie ROM</source>
-        <translation>Load Game Genie ROM</translation>
+        <translation>Game Genie ROM を読み込む</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="798"/>
         <location filename="../ConsoleMenu.cpp" line="800"/>
         <location filename="../ConsoleWindow.cpp" line="824"/>
         <source>Virtual Family Keyboard</source>
-        <translation>Virtual Family Keyboard</translation>
+        <translation>バーチャル ファミリーキーボード</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="808"/>
@@ -9140,7 +9129,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="810"/>
         <source>Insert Coin</source>
-        <translation>Insert Coin</translation>
+        <translation>コインを入れる</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="821"/>
@@ -9157,7 +9146,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="824"/>
         <source>Switch Disk</source>
-        <translation>Switch Disk</translation>
+        <translation>ディスク切換</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="832"/>
@@ -9168,7 +9157,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="833"/>
         <source>Eject Disk</source>
-        <translation>Eject Disk</translation>
+        <translation>ディスク取出し</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="841"/>
@@ -9179,13 +9168,13 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="842"/>
         <source>Load FDS BIOS</source>
-        <translation>Load FDS BIOS</translation>
+        <translation>FDS BIOS を読み込む</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="850"/>
         <location filename="../ConsoleWindow.cpp" line="783"/>
         <source>&amp;RAM Init</source>
-        <translation>&amp;RAM Init</translation>
+        <translation>RAM 初期化(&amp;R)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="362"/>
@@ -9196,7 +9185,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="363"/>
         <source>Input Configure</source>
-        <translation>Input Configure</translation>
+        <translation>入力設定</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="898"/>
@@ -9207,7 +9196,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="899"/>
         <source>GamePad Configure</source>
-        <translation>GamePad Configure</translation>
+        <translation>ゲームパッド設定</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="906"/>
@@ -9218,7 +9207,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="907"/>
         <source>Hotkey Configure</source>
-        <translation>Hotkey Configure</translation>
+        <translation>ホットキー設定</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="914"/>
@@ -9229,7 +9218,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="915"/>
         <source>Palette Configure</source>
-        <translation>Palette Configure</translation>
+        <translation>パレット設定</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="922"/>
@@ -9240,7 +9229,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="923"/>
         <source>Timing Configure</source>
-        <translation>Timing Configure</translation>
+        <translation>タイミング設定</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="930"/>
@@ -9251,7 +9240,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="931"/>
         <source>State Recorder Configure</source>
-        <translation>State Recorder Configure</translation>
+        <translation>ステートレコーダー設定</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="938"/>
@@ -9262,7 +9251,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="939"/>
         <source>Movie Options</source>
-        <translation>Movie Options</translation>
+        <translation>動画オプション</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="948"/>
@@ -9273,299 +9262,299 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleMenu.cpp" line="950"/>
         <source>Auto-Resume Play</source>
-        <translation>Auto-Resume Play</translation>
+        <translation>自動再生再開</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="964"/>
         <location filename="../ConsoleWindow.cpp" line="826"/>
         <source>&amp;Cheats...</source>
-        <translation>&amp;Cheats...</translation>
+        <translation>チート(&amp;C)...</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="966"/>
         <source>Open Cheat Window</source>
-        <translation>Open Cheat Window</translation>
+        <translation>チートウィンドウを開く</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="975"/>
         <location filename="../ConsoleWindow.cpp" line="827"/>
         <source>RAM &amp;Search...</source>
-        <translation>RAM &amp;Search...</translation>
+        <translation>RAM 検索(&amp;S)...</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="977"/>
         <source>Open RAM Search Window</source>
-        <translation>Open RAM Search Window</translation>
+        <translation>RAM 検索ウィンドウを開く</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="983"/>
         <location filename="../ConsoleWindow.cpp" line="828"/>
         <source>RAM &amp;Watch...</source>
-        <translation>RAM &amp;Watch...</translation>
+        <translation>RAM ウォッチ(&amp;W)...</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="985"/>
         <source>Open RAM Watch Window</source>
-        <translation>Open RAM Watch Window</translation>
+        <translation>RAM ウォッチウィンドウを開く</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="999"/>
         <location filename="../ConsoleWindow.cpp" line="840"/>
         <source>&amp;Frame Timing ...</source>
-        <translation>&amp;Frame Timing ...</translation>
+        <translation>フレームタイミング(&amp;F)...</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1001"/>
         <source>Open Frame Timing Window</source>
-        <translation>Open Frame Timing Window</translation>
+        <translation>フレームタイミングウィンドウを開く</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1007"/>
         <location filename="../ConsoleWindow.cpp" line="841"/>
         <source>&amp;Palette Editor ...</source>
-        <translation>&amp;Palette Editor ...</translation>
+        <translation>パレットエディター(&amp;P)...</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1009"/>
         <source>Open Palette Editor Window</source>
-        <translation>Open Palette Editor Window</translation>
+        <translation>パレットエディターウィンドウを開く</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1015"/>
         <location filename="../ConsoleWindow.cpp" line="842"/>
         <source>&amp;AVI RIFF Viewer ...</source>
-        <translation>&amp;AVI RIFF Viewer ...</translation>
+        <translation>AVI RIFF ビューア(&amp;A)...</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1017"/>
         <source>Open AVI RIFF Viewer Window</source>
-        <translation>Open AVI RIFF Viewer Window</translation>
+        <translation>AVI RIFF ビューアウィンドウを開く</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1023"/>
         <location filename="../ConsoleWindow.cpp" line="829"/>
         <source>&amp;TAS Editor ...</source>
-        <translation>&amp;TAS Editor ...</translation>
+        <translation>TAS エディター(&amp;T)...</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1025"/>
         <source>Open TAS Editor Window</source>
-        <translation>Open TAS Editor Window</translation>
+        <translation>TAS エディターウィンドウを開く</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1038"/>
         <location filename="../ConsoleWindow.cpp" line="831"/>
         <source>&amp;Debugger...</source>
-        <translation>&amp;Debugger...</translation>
+        <translation>デバッガー(&amp;D)...</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1040"/>
         <source>Open 6502 Debugger</source>
-        <translation>Open 6502 Debugger</translation>
+        <translation>6502 デバッガーを開く</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1046"/>
         <location filename="../ConsoleWindow.cpp" line="832"/>
         <source>&amp;Hex Editor...</source>
-        <translation>&amp;Hex Editor...</translation>
+        <translation>16進エディター(&amp;H)...</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1048"/>
         <source>Open Memory Hex Editor</source>
-        <translation>Open Memory Hex Editor</translation>
+        <translation>メモリ16進エディターを開く</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1054"/>
         <location filename="../ConsoleWindow.cpp" line="833"/>
         <source>&amp;PPU Viewer...</source>
-        <translation>&amp;PPU Viewer...</translation>
+        <translation>PPU ビューア(&amp;P)...</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1056"/>
         <source>Open PPU Viewer</source>
-        <translation>Open PPU Viewer</translation>
+        <translation>PPU ビューアを開く</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1062"/>
         <location filename="../ConsoleWindow.cpp" line="834"/>
         <source>&amp;Sprite Viewer...</source>
-        <translation>&amp;Sprite Viewer...</translation>
+        <translation>スプライトビューア(&amp;S)...</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1064"/>
         <source>Open Sprite Viewer</source>
-        <translation>Open Sprite Viewer</translation>
+        <translation>スプライトビューアを開く</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1070"/>
         <location filename="../ConsoleWindow.cpp" line="835"/>
         <source>&amp;Name Table Viewer...</source>
-        <translation>&amp;Name Table Viewer...</translation>
+        <translation>ネームテーブルビューア(&amp;N)...</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1072"/>
         <source>Open Name Table Viewer</source>
-        <translation>Open Name Table Viewer</translation>
+        <translation>ネームテーブルビューアを開く</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1078"/>
         <location filename="../ConsoleWindow.cpp" line="836"/>
         <source>&amp;Trace Logger...</source>
-        <translation>&amp;Trace Logger...</translation>
+        <translation>トレースロガー(&amp;T)...</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1080"/>
         <source>Open Trace Logger</source>
-        <translation>Open Trace Logger</translation>
+        <translation>トレースロガーを開く</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1086"/>
         <location filename="../ConsoleWindow.cpp" line="837"/>
         <source>&amp;Code/Data Logger...</source>
-        <translation>&amp;Code/Data Logger...</translation>
+        <translation>コード/データロガー(&amp;C)...</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1088"/>
         <source>Open Code Data Logger</source>
-        <translation>Open Code Data Logger</translation>
+        <translation>コード/データロガーを開く</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1094"/>
         <location filename="../ConsoleWindow.cpp" line="838"/>
         <source>&amp;Game Genie Encode/Decode</source>
-        <translation>&amp;Game Genie Encode/Decode</translation>
+        <translation>Game Genie エンコード/デコード(&amp;G)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1096"/>
         <source>Open Game Genie Encode/Decode</source>
-        <translation>Open Game Genie Encode/Decode</translation>
+        <translation>Game Genie エンコード/デコードを開く</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1102"/>
         <location filename="../ConsoleWindow.cpp" line="839"/>
         <source>NES Header Edito&amp;r...</source>
-        <translation>NES Header Edito&amp;r...</translation>
+        <translation>NES ヘッダーエディター(&amp;R)...</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1104"/>
         <source>Open NES Header Editor</source>
-        <translation>Open NES Header Editor</translation>
+        <translation>NES ヘッダーエディターを開く</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1117"/>
         <location filename="../ConsoleWindow.cpp" line="844"/>
         <source>Movie &amp;Play</source>
-        <translation>Movie &amp;Play</translation>
+        <translation>動画再生(&amp;P)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1119"/>
         <source>Play Movie File</source>
-        <translation>Play Movie File</translation>
+        <translation>動画ファイルを再生</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1129"/>
         <location filename="../ConsoleWindow.cpp" line="845"/>
         <source>Movie Play From &amp;Beginning</source>
-        <translation>Movie Play From &amp;Beginning</translation>
+        <translation>動画を最初から再生(&amp;B)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1131"/>
         <source>Play Movie From Beginning</source>
-        <translation>Play Movie From Beginning</translation>
+        <translation>動画を最初から再生</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1141"/>
         <location filename="../ConsoleWindow.cpp" line="846"/>
         <source>Movie &amp;Stop</source>
-        <translation>Movie &amp;Stop</translation>
+        <translation>動画停止(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1143"/>
         <source>Stop Movie Recording</source>
-        <translation>Stop Movie Recording</translation>
+        <translation>動画録画を停止</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1155"/>
         <location filename="../ConsoleWindow.cpp" line="847"/>
         <source>Movie &amp;Record</source>
-        <translation>Movie &amp;Record</translation>
+        <translation>動画録画(&amp;R)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1157"/>
         <source>Record Movie</source>
-        <translation>Record Movie</translation>
+        <translation>動画を録画</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1171"/>
         <location filename="../ConsoleWindow.cpp" line="848"/>
         <source>AVI &amp;Record</source>
-        <translation>AVI &amp;Record</translation>
+        <translation>AVI 録画(&amp;R)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1173"/>
         <source>AVI Record Start</source>
-        <translation>AVI Record Start</translation>
+        <translation>AVI 録画開始</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1183"/>
         <location filename="../ConsoleWindow.cpp" line="849"/>
         <source>AVI Record &amp;As</source>
-        <translation>AVI Record &amp;As</translation>
+        <translation>AVI 録画の名前を付けて保存(&amp;A)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1185"/>
         <source>AVI Record As Start</source>
-        <translation>AVI Record As Start</translation>
+        <translation>AVI 録画名前保存開始</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1195"/>
         <location filename="../ConsoleWindow.cpp" line="850"/>
         <source>AVI &amp;Stop</source>
-        <translation>AVI &amp;Stop</translation>
+        <translation>AVI 停止(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1197"/>
         <source>AVI Record Stop</source>
-        <translation>AVI Record Stop</translation>
+        <translation>AVI 録画停止</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1211"/>
         <location filename="../ConsoleWindow.cpp" line="851"/>
         <source>WAV &amp;Record</source>
-        <translation>WAV &amp;Record</translation>
+        <translation>WAV 録音(&amp;R)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1213"/>
         <source>WAV Record Start</source>
-        <translation>WAV Record Start</translation>
+        <translation>WAV 録音開始</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1223"/>
         <location filename="../ConsoleWindow.cpp" line="852"/>
         <source>WAV Record &amp;As</source>
-        <translation>WAV Record &amp;As</translation>
+        <translation>WAV 録音の名前を付けて保存(&amp;A)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1225"/>
         <source>WAV Record As Start</source>
-        <translation>WAV Record As Start</translation>
+        <translation>WAV 録音名前保存開始</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1235"/>
         <location filename="../ConsoleWindow.cpp" line="853"/>
         <source>WAV &amp;Stop</source>
-        <translation>WAV &amp;Stop</translation>
+        <translation>WAV 停止(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1237"/>
         <source>WAV Record Stop</source>
-        <translation>WAV Record Stop</translation>
+        <translation>WAV 録音停止</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1253"/>
         <location filename="../ConsoleWindow.cpp" line="933"/>
         <source>&amp;About FCEUX11</source>
-        <translation>&amp;About FCEUX11</translation>
+        <translation>FCEUX11 について(&amp;A)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1254"/>
@@ -9577,25 +9566,25 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../ConsoleMenu.cpp" line="1261"/>
         <location filename="../ConsoleWindow.cpp" line="934"/>
         <source>About &amp;Qt</source>
-        <translation>About &amp;Qt</translation>
+        <translation>&amp;Qt について</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1262"/>
         <location filename="../ConsoleWindow.cpp" line="941"/>
         <source>About Qt</source>
-        <translation>About Qt</translation>
+        <translation>Qt について</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1269"/>
         <location filename="../ConsoleWindow.cpp" line="935"/>
         <source>&amp;Message Log</source>
-        <translation>&amp;Message Log</translation>
+        <translation>メッセージログ(&amp;M)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1270"/>
         <location filename="../ConsoleWindow.cpp" line="942"/>
         <source>Message Log</source>
-        <translation>Message Log</translation>
+        <translation>メッセージログ</translation>
     </message>
     <message>
         <location filename="../ConsoleFile.cpp" line="159"/>
@@ -9617,12 +9606,12 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleFile.cpp" line="314"/>
         <source>Load NSF File</source>
-        <translation>Load NSF File</translation>
+        <translation>NSF ファイルを読み込む</translation>
     </message>
     <message>
         <location filename="../ConsoleFile.cpp" line="337"/>
         <source>NSF Sound Files (*.nsf *.NSF) ;; Zip Files (*.zip *.ZIP) ;; All files (*)</source>
-        <translation>NSF Sound Files (*.nsf *.NSF) ;; Zip Files (*.zip *.ZIP) ;; All files (*)</translation>
+        <translation>NSF サウンドファイル (*.nsf *.NSF) ;; Zip ファイル (*.zip *.ZIP) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugWindows.cpp" line="294"/>
@@ -9635,22 +9624,22 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleEmuControl.cpp" line="120"/>
         <source>Load State From File</source>
-        <translation>Load State From File</translation>
+        <translation>ファイルからステートを読込</translation>
     </message>
     <message>
         <location filename="../ConsoleEmuControl.cpp" line="153"/>
         <source>FCS &amp; SAV Files (*.sav *.SAV *.fc? *.FC?) ;; All files (*)</source>
-        <translation>FCS &amp; SAV Files (*.sav *.SAV *.fc? *.FC?) ;; All files (*)</translation>
+        <translation>FCS &amp; SAV ファイル (*.sav *.SAV *.fc? *.FC?) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../ConsoleEmuControl.cpp" line="203"/>
         <source>Save State To File</source>
-        <translation>Save State To File</translation>
+        <translation>ステートをファイルに保存</translation>
     </message>
     <message>
         <location filename="../ConsoleEmuControl.cpp" line="235"/>
         <source>SAV Files (*.sav *.SAV) ;; All files (*)</source>
-        <translation>SAV Files (*.sav *.SAV) ;; All files (*)</translation>
+        <translation>SAV ファイル (*.sav *.SAV) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../ConsoleEmuControl.cpp" line="239"/>
@@ -9667,74 +9656,74 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleDebugWindows.cpp" line="280"/>
         <source>Open Game Genie ROM</source>
-        <translation>Open Game Genie ROM</translation>
+        <translation>Game Genie ROM を開く</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugWindows.cpp" line="290"/>
         <source>GG ROM File (gg.rom  *Genie*.nes) ;; All files (*)</source>
-        <translation>GG ROM File (gg.rom  *Genie*.nes) ;; All files (*)</translation>
+        <translation>GG ROM ファイル (gg.rom *Genie*.nes) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../ConsoleEmuControl.cpp" line="535"/>
         <source>Load FDS BIOS (disksys.rom)</source>
-        <translation>Load FDS BIOS (disksys.rom)</translation>
+        <translation>FDS BIOS を読み込む (disksys.rom)</translation>
     </message>
     <message>
         <location filename="../ConsoleEmuControl.cpp" line="545"/>
         <source>ROM files (*.rom *.ROM) ;; All files (*)</source>
-        <translation>ROM files (*.rom *.ROM) ;; All files (*)</translation>
+        <translation>ROM ファイル (*.rom *.ROM) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../ConsoleEmuControl.cpp" line="631"/>
         <source>Emulation Speed</source>
-        <translation>Emulation Speed</translation>
+        <translation>エミュレーション速度</translation>
     </message>
     <message>
         <location filename="../ConsoleEmuControl.cpp" line="632"/>
         <source>Enter a percentage from 1 to 1000.</source>
-        <translation>Enter a percentage from 1 to 1000.</translation>
+        <translation>1 から 1000 のパーセンテージを入力してください。</translation>
     </message>
     <message>
         <location filename="../ConsoleEmuControl.cpp" line="633"/>
         <location filename="../ConsoleEmuControl.cpp" line="657"/>
         <location filename="../ConsoleEmuControl.cpp" line="733"/>
         <source>Ok</source>
-        <translation>Ok</translation>
+        <translation>OK</translation>
     </message>
     <message>
         <location filename="../ConsoleEmuControl.cpp" line="655"/>
         <source>Frame Advance Delay</source>
-        <translation>Frame Advance Delay</translation>
+        <translation>フレームアドバンス遅延</translation>
     </message>
     <message>
         <location filename="../ConsoleEmuControl.cpp" line="656"/>
         <source>How much time should elapse before holding the frame advance unpauses the simulation?</source>
-        <translation>How much time should elapse before holding the frame advance unpauses the simulation?</translation>
+        <translation>フレームアドバンスを長押しするとシミュレーションのポーズが解除されますが、どのくらいの時間が必要ですか？</translation>
     </message>
     <message>
         <location filename="../ConsoleEmuControl.cpp" line="706"/>
         <source>Custom AutoFire Pattern</source>
-        <translation>Custom AutoFire Pattern</translation>
+        <translation>カスタムオートファイアパターン</translation>
     </message>
     <message>
         <location filename="../ConsoleEmuControl.cpp" line="722"/>
         <source># ON Frames</source>
-        <translation># ON Frames</translation>
+        <translation>ON フレーム数</translation>
     </message>
     <message>
         <location filename="../ConsoleEmuControl.cpp" line="726"/>
         <source># OFF Frames</source>
-        <translation># OFF Frames</translation>
+        <translation>OFF フレーム数</translation>
     </message>
     <message>
         <location filename="../ConsoleRecording.cpp" line="140"/>
         <source>Save AVI Movie for Recording</source>
-        <translation>Save AVI Movie for Recording</translation>
+        <translation>録画用 AVI 動画を保存</translation>
     </message>
     <message>
         <location filename="../ConsoleRecording.cpp" line="146"/>
         <source>AVI Movies (*.avi) ;; All files (*)</source>
-        <translation>AVI Movies (*.avi) ;; All files (*)</translation>
+        <translation>AVI 動画 (*.avi) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../ConsoleRecording.cpp" line="172"/>
@@ -9744,12 +9733,12 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleRecording.cpp" line="331"/>
         <source>Save WAV Movie for Recording</source>
-        <translation>Save WAV Movie for Recording</translation>
+        <translation>録音用 WAV を保存</translation>
     </message>
     <message>
         <location filename="../ConsoleRecording.cpp" line="337"/>
         <source>WAV Movies (*.wav) ;; All files (*)</source>
-        <translation>WAV Movies (*.wav) ;; All files (*)</translation>
+        <translation>WAV (*.wav) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../ConsoleRecording.cpp" line="363"/>
@@ -9759,17 +9748,17 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../HelpPages.cpp" line="146"/>
         <source>Open Help File</source>
-        <translation>Open Help File</translation>
+        <translation>ヘルプファイルを開く</translation>
     </message>
     <message>
         <location filename="../HelpPages.cpp" line="158"/>
         <source>Compiled HTML Files (*.chm *.CHM) ;; All files (*)</source>
-        <translation>Compiled HTML Files (*.chm *.CHM) ;; All files (*)</translation>
+        <translation>コンパイル済み HTML ファイル (*.chm *.CHM) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../HelpPages.cpp" line="160"/>
         <source>QHelp Files (*.qhc *.QHC) ;; All files (*)</source>
-        <translation>QHelp Files (*.qhc *.QHC) ;; All files (*)</translation>
+        <translation>QHelp ファイル (*.qhc *.QHC) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../ConsoleRecentRom.cpp" line="164"/>
@@ -9810,7 +9799,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../GuiConf.cpp" line="1586"/>
         <source>GUI Style Test Window</source>
-        <translation>GUI Style Test Window</translation>
+        <translation>GUIスタイルテストウィンドウ</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1598"/>
@@ -9820,7 +9809,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../GuiConf.cpp" line="1601"/>
         <source>&amp;Close</source>
-        <translation>&amp;Close</translation>
+        <translation>閉じる(&amp;C)</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1603"/>
@@ -9830,59 +9819,59 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../GuiConf.cpp" line="1635"/>
         <source>Text</source>
-        <translation>Text</translation>
+        <translation>テキスト</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1640"/>
         <source>Label Enabled</source>
-        <translation>Label Enabled</translation>
+        <translation>ラベル有効</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1645"/>
         <source>Line Edit Enabled</source>
-        <translation>Line Edit Enabled</translation>
+        <translation>ラインエディット有効</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1649"/>
         <source>Label Disabled</source>
-        <translation>Label Disabled</translation>
+        <translation>ラベル無効</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1654"/>
         <source>Line Edit Disabled</source>
-        <translation>Line Edit Disabled</translation>
+        <translation>ラインエディット無効</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1658"/>
         <source>Label Link</source>
-        <translation>Label Link</translation>
+        <translation>ラベルリンク</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1668"/>
         <source>Label Sunken</source>
-        <translation>Label Sunken</translation>
+        <translation>沈んだラベル</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1673"/>
         <source>Label Raised</source>
-        <translation>Label Raised</translation>
+        <translation>浮き上がったラベル</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1678"/>
         <source>Button</source>
-        <translation>Button</translation>
+        <translation>ボタン</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1684"/>
         <source>Normal</source>
-        <translation>Normal</translation>
+        <translation>通常</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1688"/>
         <location filename="../GuiConf.cpp" line="1714"/>
         <location filename="../GuiConf.cpp" line="1730"/>
         <source>Disabled</source>
-        <translation>Disabled</translation>
+        <translation>無効</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1692"/>
@@ -9892,37 +9881,37 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../GuiConf.cpp" line="1697"/>
         <source>Checkable</source>
-        <translation>Checkable</translation>
+        <translation>チェック可能</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1704"/>
         <source>Radio1</source>
-        <translation>Radio1</translation>
+        <translation>ラジオ1</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1709"/>
         <source>Radio2</source>
-        <translation>Radio2</translation>
+        <translation>ラジオ2</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1719"/>
         <source>Checkbox</source>
-        <translation>Checkbox</translation>
+        <translation>チェックボックス</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1724"/>
         <source>TriState</source>
-        <translation>TriState</translation>
+        <translation>三状態</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1767"/>
         <source>This is a text edit</source>
-        <translation>This is a text edit</translation>
+        <translation>これはテキストエディットです</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1770"/>
         <source>Selectable</source>
-        <translation>Selectable</translation>
+        <translation>選択可能</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1776"/>
@@ -9954,12 +9943,12 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="201"/>
         <source>NES Header</source>
-        <translation>NES Header</translation>
+        <translation>NESヘッダ</translation>
     </message>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="202"/>
         <source>Version:</source>
-        <translation>Version:</translation>
+        <translation>バージョン:</translation>
     </message>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="209"/>
@@ -10044,7 +10033,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="360"/>
         <source>Mirroring:</source>
-        <translation>Mirroring:</translation>
+        <translation>ミラーリング:</translation>
     </message>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="365"/>
@@ -10109,12 +10098,12 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="407"/>
         <source>System</source>
-        <translation>System</translation>
+        <translation>システム</translation>
     </message>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="412"/>
         <source>Normal</source>
-        <translation>Normal</translation>
+        <translation>通常</translation>
     </message>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="413"/>
@@ -10139,7 +10128,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="437"/>
         <source>Hardware:</source>
-        <translation>Hardware:</translation>
+        <translation>ハードウェア:</translation>
     </message>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="443"/>
@@ -10154,7 +10143,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="451"/>
         <source>Console:</source>
-        <translation>Console:</translation>
+        <translation>コンソール:</translation>
     </message>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="459"/>
@@ -10164,12 +10153,12 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="460"/>
         <source>Input Device:</source>
-        <translation>Input Device:</translation>
+        <translation>入力デバイス:</translation>
     </message>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="473"/>
         <source>Restore</source>
-        <translation>Restore</translation>
+        <translation>復元</translation>
     </message>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="474"/>
@@ -10184,7 +10173,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="791"/>
         <source>Open NES File</source>
-        <translation>Open NES File</translation>
+        <translation>NESファイルを開く</translation>
     </message>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="805"/>
@@ -10194,12 +10183,12 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="851"/>
         <source>Save iNES File</source>
-        <translation>Save iNES File</translation>
+        <translation>iNESファイルを保存</translation>
     </message>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="855"/>
         <source>NES Files (*.nes *.NES) ;; All files (*)</source>
-        <translation>NES Files (*.nes *.NES) ;; All files (*)</translation>
+        <translation>NESファイル (*.nes *.NES) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="859"/>
@@ -10235,7 +10224,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../PaletteEditor.cpp" line="1354"/>
         <source>Ok</source>
-        <translation>Ok</translation>
+        <translation>OK</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="1355"/>
@@ -10261,7 +10250,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="588"/>
         <source>Open PPU CHR &amp;Viewer</source>
-        <translation>Open PPU CHR &amp;Viewer</translation>
+        <translation>PPU CHRビューアを開く(&amp;V)</translation>
     </message>
 </context>
 <context>
@@ -10274,7 +10263,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../NameTableViewer.cpp" line="190"/>
         <source>&amp;Close</source>
-        <translation>&amp;Close</translation>
+        <translation>閉じる(&amp;C)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="192"/>
@@ -10289,107 +10278,107 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../NameTableViewer.cpp" line="201"/>
         <source>Show &amp;Scroll Lines</source>
-        <translation>Show &amp;Scroll Lines</translation>
+        <translation>スクロールラインを表示(&amp;S)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="205"/>
         <location filename="../NameTableViewer.cpp" line="517"/>
         <location filename="../NameTableViewer.cpp" line="631"/>
         <source>Show Scroll Lines</source>
-        <translation>Show Scroll Lines</translation>
+        <translation>スクロールラインを表示</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="212"/>
         <source>Show &amp;Tile Grid</source>
-        <translation>Show &amp;Tile Grid</translation>
+        <translation>タイルグリッドを表示(&amp;T)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="216"/>
         <location filename="../NameTableViewer.cpp" line="519"/>
         <location filename="../NameTableViewer.cpp" line="632"/>
         <source>Show Tile Grid</source>
-        <translation>Show Tile Grid</translation>
+        <translation>タイルグリッドを表示</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="223"/>
         <source>Show &amp;Attr Grid</source>
-        <translation>Show &amp;Attr Grid</translation>
+        <translation>属性グリッドを表示(&amp;A)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="227"/>
         <location filename="../NameTableViewer.cpp" line="521"/>
         <location filename="../NameTableViewer.cpp" line="633"/>
         <source>Show Attr Grid</source>
-        <translation>Show Attr Grid</translation>
+        <translation>属性グリッドを表示</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="234"/>
         <source>Show &amp;Attributes</source>
-        <translation>Show &amp;Attributes</translation>
+        <translation>属性を表示(&amp;A)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="238"/>
         <location filename="../NameTableViewer.cpp" line="523"/>
         <location filename="../NameTableViewer.cpp" line="634"/>
         <source>Show Attributes</source>
-        <translation>Show Attributes</translation>
+        <translation>属性を表示</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="245"/>
         <source>&amp;Ignore Palette</source>
-        <translation>&amp;Ignore Palette</translation>
+        <translation>パレットを無視(&amp;I)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="249"/>
         <location filename="../NameTableViewer.cpp" line="525"/>
         <location filename="../NameTableViewer.cpp" line="635"/>
         <source>Ignore Palette</source>
-        <translation>Ignore Palette</translation>
+        <translation>パレットを無視</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="258"/>
         <source>Zoom &amp;In</source>
-        <translation>Zoom &amp;In</translation>
+        <translation>ズームイン(&amp;I)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="261"/>
         <source>Zoom In</source>
-        <translation>Zoom In</translation>
+        <translation>ズームイン</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="269"/>
         <source>Zoom &amp;Out</source>
-        <translation>Zoom &amp;Out</translation>
+        <translation>ズームアウト(&amp;O)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="272"/>
         <source>Zoom Out</source>
-        <translation>Zoom Out</translation>
+        <translation>ズームアウト</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="279"/>
         <source>Image &amp;Zoom</source>
-        <translation>Image &amp;Zoom</translation>
+        <translation>画像ズーム(&amp;Z)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="306"/>
         <source>Tile &amp;Focus</source>
-        <translation>Tile &amp;Focus</translation>
+        <translation>タイルフォーカス(&amp;F)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="311"/>
         <source>&amp;Click</source>
-        <translation>&amp;Click</translation>
+        <translation>クリック(&amp;C)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="317"/>
         <source>&amp;Hover</source>
-        <translation>&amp;Hover</translation>
+        <translation>ホバー(&amp;H)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="327"/>
         <source>&amp;Refresh</source>
-        <translation>&amp;Refresh</translation>
+        <translation>更新(&amp;R)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="328"/>
@@ -10404,93 +10393,93 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../NameTableViewer.cpp" line="335"/>
         <source>Auto &amp;Refresh Rate</source>
-        <translation>Auto &amp;Refresh Rate</translation>
+        <translation>自動更新レート(&amp;R)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="375"/>
         <source>&amp;Colors</source>
-        <translation>&amp;Colors</translation>
+        <translation>色(&amp;C)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="378"/>
         <source>Tile &amp;Selector</source>
-        <translation>Tile &amp;Selector</translation>
+        <translation>タイルセレクター(&amp;S)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="383"/>
         <source>Tile &amp;Grid</source>
-        <translation>Tile &amp;Grid</translation>
+        <translation>タイルグリッド(&amp;G)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="389"/>
         <source>&amp;Attr Grid</source>
-        <translation>&amp;Attr Grid</translation>
+        <translation>属性グリッド(&amp;A)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="400"/>
         <location filename="../NameTableViewer.cpp" line="620"/>
         <source>Name Table Viewer</source>
-        <translation>Name Table Viewer</translation>
+        <translation>ネームテーブルビューア</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="412"/>
         <location filename="../NameTableViewer.cpp" line="622"/>
         <source>Tile Info</source>
-        <translation>Tile Info</translation>
+        <translation>タイル情報</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="437"/>
         <location filename="../NameTableViewer.cpp" line="623"/>
         <source>PPU Addr:</source>
-        <translation>PPU Addr:</translation>
+        <translation>PPUアドレス:</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="442"/>
         <location filename="../NameTableViewer.cpp" line="624"/>
         <source>Name Table:</source>
-        <translation>Name Table:</translation>
+        <translation>ネームテーブル:</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="447"/>
         <location filename="../NameTableViewer.cpp" line="625"/>
         <source>Location:</source>
-        <translation>Location:</translation>
+        <translation>位置:</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="452"/>
         <location filename="../NameTableViewer.cpp" line="626"/>
         <source>Tile Index:</source>
-        <translation>Tile Index:</translation>
+        <translation>タイルインデックス:</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="457"/>
         <location filename="../NameTableViewer.cpp" line="627"/>
         <source>Tile Addr:</source>
-        <translation>Tile Addr:</translation>
+        <translation>タイルアドレス:</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="462"/>
         <location filename="../NameTableViewer.cpp" line="628"/>
         <source>Attribute Data:</source>
-        <translation>Attribute Data:</translation>
+        <translation>属性データ:</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="467"/>
         <location filename="../NameTableViewer.cpp" line="629"/>
         <source>Attribute Addr:</source>
-        <translation>Attribute Addr:</translation>
+        <translation>属性アドレス:</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="472"/>
         <location filename="../NameTableViewer.cpp" line="630"/>
         <source>Palette Addr:</source>
-        <translation>Palette Addr:</translation>
+        <translation>パレットアドレス:</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="552"/>
         <location filename="../NameTableViewer.cpp" line="636"/>
         <source>Mirroring Type:</source>
-        <translation>Mirroring Type:</translation>
+        <translation>ミラーリングタイプ:</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="554"/>
@@ -10501,7 +10490,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../NameTableViewer.cpp" line="568"/>
         <location filename="../NameTableViewer.cpp" line="637"/>
         <source>Display on Scanline:</source>
-        <translation>Display on Scanline:</translation>
+        <translation>スキャンラインに表示:</translation>
     </message>
 </context>
 <context>
@@ -10509,7 +10498,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ppuViewerPatternTables.cpp" line="400"/>
         <source>Open Tile &amp;Editor</source>
-        <translation>Open Tile &amp;Editor</translation>
+        <translation>タイルエディタを開く(&amp;E)</translation>
     </message>
     <message>
         <location filename="../ppuViewerPatternTables.cpp" line="401"/>
@@ -10525,7 +10514,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ppuViewerPatternTables.cpp" line="424"/>
         <source>Draw Tile &amp;Grid Lines</source>
-        <translation>Draw Tile &amp;Grid Lines</translation>
+        <translation>タイルグリッド線を描画(&amp;G)</translation>
     </message>
     <message>
         <location filename="../ppuViewerPatternTables.cpp" line="427"/>
@@ -10535,7 +10524,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ppuViewerPatternTables.cpp" line="431"/>
         <source>Next &amp;Palette</source>
-        <translation>Next &amp;Palette</translation>
+        <translation>次のパレット(&amp;P)</translation>
     </message>
     <message>
         <location filename="../ppuViewerPatternTables.cpp" line="432"/>
@@ -10545,7 +10534,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ppuViewerPatternTables.cpp" line="436"/>
         <source>Palette &amp;Select</source>
-        <translation>Palette &amp;Select</translation>
+        <translation>パレット選択(&amp;S)</translation>
     </message>
 </context>
 <context>
@@ -10553,72 +10542,72 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7512"/>
         <source>PPU Control / Mask / Status</source>
-        <translation>PPU Control / Mask / Status</translation>
+        <translation>PPU 制御/マスク/ステータス</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7523"/>
         <source>BG Addr</source>
-        <translation>BG Addr</translation>
+        <translation>BGアドレス</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7524"/>
         <source>Spr Addr</source>
-        <translation>Spr Addr</translation>
+        <translation>スプライトアドレス</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7536"/>
         <source>BG Enabled</source>
-        <translation>BG Enabled</translation>
+        <translation>BG有効</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7537"/>
         <source>Sprites Enabled</source>
-        <translation>Sprites Enabled</translation>
+        <translation>スプライト有効</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7538"/>
         <source>Draw Left BG (8px)</source>
-        <translation>Draw Left BG (8px)</translation>
+        <translation>左BG描画 (8px)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7539"/>
         <source>Draw Left Sprites (8px)</source>
-        <translation>Draw Left Sprites (8px)</translation>
+        <translation>左スプライト描画 (8px)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7540"/>
         <source>Vertical Write</source>
-        <translation>Vertical Write</translation>
+        <translation>垂直書き込み</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7541"/>
         <source>NMI on vBlank</source>
-        <translation>NMI on vBlank</translation>
+        <translation>vBlank時にNMI</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7542"/>
         <source>8x16 Sprites</source>
-        <translation>8x16 Sprites</translation>
+        <translation>8x16スプライト</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7543"/>
         <source>Grayscale</source>
-        <translation>Grayscale</translation>
+        <translation>グレースケール</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7544"/>
         <source>Intensify Red</source>
-        <translation>Intensify Red</translation>
+        <translation>赤を強調</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7545"/>
         <source>Intensify Green</source>
-        <translation>Intensify Green</translation>
+        <translation>緑を強調</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7546"/>
         <source>Intensify Blue</source>
-        <translation>Intensify Blue</translation>
+        <translation>青を強調</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7547"/>
@@ -10628,12 +10617,12 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7548"/>
         <source>Sprite 0 Hit</source>
-        <translation>Sprite 0 Hit</translation>
+        <translation>スプライト0ヒット</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7549"/>
         <source>Sprite Overflow</source>
-        <translation>Sprite Overflow</translation>
+        <translation>スプライトオーバーフロー</translation>
     </message>
 </context>
 <context>
@@ -10646,7 +10635,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ppuViewerTileEditor.cpp" line="48"/>
         <source>&amp;Close</source>
-        <translation>&amp;Close</translation>
+        <translation>閉じる(&amp;C)</translation>
     </message>
     <message>
         <location filename="../ppuViewerTileEditor.cpp" line="50"/>
@@ -10661,67 +10650,67 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ppuViewerTileEditor.cpp" line="57"/>
         <source>Keys</source>
-        <translation>Keys</translation>
+        <translation>キー</translation>
     </message>
     <message>
         <location filename="../ppuViewerTileEditor.cpp" line="58"/>
         <source>View Key Descriptions</source>
-        <translation>View Key Descriptions</translation>
+        <translation>キーの説明を表示</translation>
     </message>
     <message>
         <location filename="../ppuViewerTileEditor.cpp" line="66"/>
         <source>PPU Tile Editor</source>
-        <translation>PPU Tile Editor</translation>
+        <translation>PPUタイルエディタ</translation>
     </message>
     <message>
         <location filename="../ppuViewerTileEditor.cpp" line="93"/>
         <source>Tile 0</source>
-        <translation>Tile 0</translation>
+        <translation>タイル 0</translation>
     </message>
     <message>
         <location filename="../ppuViewerTileEditor.cpp" line="94"/>
         <source>Tile 1</source>
-        <translation>Tile 1</translation>
+        <translation>タイル 1</translation>
     </message>
     <message>
         <location filename="../ppuViewerTileEditor.cpp" line="95"/>
         <source>Tile 2</source>
-        <translation>Tile 2</translation>
+        <translation>タイル 2</translation>
     </message>
     <message>
         <location filename="../ppuViewerTileEditor.cpp" line="96"/>
         <source>Tile 3</source>
-        <translation>Tile 3</translation>
+        <translation>タイル 3</translation>
     </message>
     <message>
         <location filename="../ppuViewerTileEditor.cpp" line="97"/>
         <source>Sprite 0</source>
-        <translation>Sprite 0</translation>
+        <translation>スプライト 0</translation>
     </message>
     <message>
         <location filename="../ppuViewerTileEditor.cpp" line="98"/>
         <source>Sprite 1</source>
-        <translation>Sprite 1</translation>
+        <translation>スプライト 1</translation>
     </message>
     <message>
         <location filename="../ppuViewerTileEditor.cpp" line="99"/>
         <source>Sprite 2</source>
-        <translation>Sprite 2</translation>
+        <translation>スプライト 2</translation>
     </message>
     <message>
         <location filename="../ppuViewerTileEditor.cpp" line="100"/>
         <source>Sprite 3</source>
-        <translation>Sprite 3</translation>
+        <translation>スプライト 3</translation>
     </message>
     <message>
         <location filename="../ppuViewerTileEditor.cpp" line="101"/>
         <source>GrayScale</source>
-        <translation>GrayScale</translation>
+        <translation>グレースケール</translation>
     </message>
     <message>
         <location filename="../ppuViewerTileEditor.cpp" line="112"/>
         <source>Palette:</source>
-        <translation>Palette:</translation>
+        <translation>パレット:</translation>
     </message>
 </context>
 <context>
@@ -10730,19 +10719,19 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../ppuViewer.cpp" line="131"/>
         <location filename="../ppuViewer.cpp" line="377"/>
         <source>PPU Viewer</source>
-        <translation>PPU Viewer</translation>
+        <translation>PPUビューア</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="144"/>
         <location filename="../ppuViewer.cpp" line="379"/>
         <source>Pattern Table 0</source>
-        <translation>Pattern Table 0</translation>
+        <translation>パターンテーブル 0</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="146"/>
         <location filename="../ppuViewer.cpp" line="380"/>
         <source>Pattern Table 1</source>
-        <translation>Pattern Table 1</translation>
+        <translation>パターンテーブル 1</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="150"/>
@@ -10750,7 +10739,7 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../ppuViewer.cpp" line="381"/>
         <location filename="../ppuViewer.cpp" line="382"/>
         <source>Sprites 8x16 Mode</source>
-        <translation>Sprites 8x16 Mode</translation>
+        <translation>スプライト 8x16 モード</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="154"/>
@@ -10758,43 +10747,43 @@ Do you wish to save/apply the new settings?</translation>
         <location filename="../ppuViewer.cpp" line="383"/>
         <location filename="../ppuViewer.cpp" line="384"/>
         <source>Tile:</source>
-        <translation>Tile:</translation>
+        <translation>タイル:</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="181"/>
         <location filename="../ppuViewer.cpp" line="385"/>
         <source>Mask unused Graphics (Code/Data Logger)</source>
-        <translation>Mask unused Graphics (Code/Data Logger)</translation>
+        <translation>未使用グラフィックをマスク（コード/データロガー）</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="183"/>
         <location filename="../ppuViewer.cpp" line="386"/>
         <source>Invert the Mask (Code/Data Logger)</source>
-        <translation>Invert the Mask (Code/Data Logger)</translation>
+        <translation>マスクを反転（コード/データロガー）</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="199"/>
         <location filename="../ppuViewer.cpp" line="387"/>
         <source>Refresh: More</source>
-        <translation>Refresh: More</translation>
+        <translation>更新: 多い</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="201"/>
         <location filename="../ppuViewer.cpp" line="388"/>
         <source>Less</source>
-        <translation>Less</translation>
+        <translation>少ない</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="213"/>
         <location filename="../ppuViewer.cpp" line="389"/>
         <source>Display on Scanline:</source>
-        <translation>Display on Scanline:</translation>
+        <translation>スキャンラインに表示:</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="220"/>
         <location filename="../ppuViewer.cpp" line="390"/>
         <source>Palettes:</source>
-        <translation>Palettes:</translation>
+        <translation>パレット:</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="271"/>
@@ -10804,7 +10793,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ppuViewer.cpp" line="273"/>
         <source>&amp;Close</source>
-        <translation>&amp;Close</translation>
+        <translation>閉じる(&amp;C)</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="275"/>
@@ -10814,42 +10803,42 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ppuViewer.cpp" line="280"/>
         <source>View&amp;1</source>
-        <translation>View&amp;1</translation>
+        <translation>ビュー1(&amp;1)</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="282"/>
         <location filename="../ppuViewer.cpp" line="302"/>
         <source>Toggle &amp;Grid</source>
-        <translation>Toggle &amp;Grid</translation>
+        <translation>グリッド切替(&amp;G)</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="283"/>
         <location filename="../ppuViewer.cpp" line="303"/>
         <source>Toggle Grid</source>
-        <translation>Toggle Grid</translation>
+        <translation>グリッド切替</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="288"/>
         <location filename="../ppuViewer.cpp" line="308"/>
         <source>&amp;Colors</source>
-        <translation>&amp;Colors</translation>
+        <translation>色(&amp;C)</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="290"/>
         <location filename="../ppuViewer.cpp" line="310"/>
         <source>Tile &amp;Selector</source>
-        <translation>Tile &amp;Selector</translation>
+        <translation>タイルセレクター(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="295"/>
         <location filename="../ppuViewer.cpp" line="315"/>
         <source>Tile &amp;Grid</source>
-        <translation>Tile &amp;Grid</translation>
+        <translation>タイルグリッド(&amp;G)</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="300"/>
         <source>View&amp;2</source>
-        <translation>View&amp;2</translation>
+        <translation>ビュー2(&amp;2)</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="320"/>
@@ -10859,17 +10848,17 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ppuViewer.cpp" line="322"/>
         <source>&amp;Focus Policy</source>
-        <translation>&amp;Focus Policy</translation>
+        <translation>フォーカスポリシー(&amp;F)</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="326"/>
         <source>&amp;Click</source>
-        <translation>&amp;Click</translation>
+        <translation>クリック(&amp;C)</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="333"/>
         <source>&amp;Hover</source>
-        <translation>&amp;Hover</translation>
+        <translation>ホバー(&amp;H)</translation>
     </message>
 </context>
 <context>
@@ -10882,7 +10871,7 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="64"/>
         <source>&amp;Close</source>
-        <translation>&amp;Close</translation>
+        <translation>閉じる(&amp;C)</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="66"/>
@@ -10897,32 +10886,32 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="73"/>
         <source>Toggle &amp;Grid</source>
-        <translation>Toggle &amp;Grid</translation>
+        <translation>グリッド切替(&amp;G)</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="74"/>
         <source>Toggle Grid</source>
-        <translation>Toggle Grid</translation>
+        <translation>グリッド切替</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="79"/>
         <source>&amp;Color</source>
-        <translation>&amp;Color</translation>
+        <translation>色(&amp;C)</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="81"/>
         <source>&amp;Selector</source>
-        <translation>&amp;Selector</translation>
+        <translation>セレクター(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="86"/>
         <source>&amp;Grid</source>
-        <translation>&amp;Grid</translation>
+        <translation>グリッド(&amp;G)</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="91"/>
         <source>&amp;Locator Box</source>
-        <translation>&amp;Locator Box</translation>
+        <translation>ロケーターボックス(&amp;L)</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="96"/>
@@ -10932,107 +10921,107 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="98"/>
         <source>&amp;Focus Policy</source>
-        <translation>&amp;Focus Policy</translation>
+        <translation>フォーカスポリシー(&amp;F)</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="102"/>
         <source>&amp;Click</source>
-        <translation>&amp;Click</translation>
+        <translation>クリック(&amp;C)</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="109"/>
         <source>&amp;Hover</source>
-        <translation>&amp;Hover</translation>
+        <translation>ホバー(&amp;H)</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="127"/>
         <source>Sprite Viewer</source>
-        <translation>Sprite Viewer</translation>
+        <translation>スプライトビューア</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="135"/>
         <source>Sprite RAM</source>
-        <translation>Sprite RAM</translation>
+        <translation>スプライトRAM</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="136"/>
         <source>CPU Page #</source>
-        <translation>CPU Page #</translation>
+        <translation>CPUページ #</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="150"/>
         <source>Horizontal Flip</source>
-        <translation>Horizontal Flip</translation>
+        <translation>水平反転</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="153"/>
         <source>Vertical Flip</source>
-        <translation>Vertical Flip</translation>
+        <translation>垂直反転</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="156"/>
         <source>Background Priority</source>
-        <translation>Background Priority</translation>
+        <translation>BG優先順位</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="184"/>
         <source>Show Position in Hex</source>
-        <translation>Show Position in Hex</translation>
+        <translation>位置を16進数で表示</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="192"/>
         <source>Display on Scanline:</source>
-        <translation>Display on Scanline:</translation>
+        <translation>スキャンラインに表示:</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="206"/>
         <source>Data Source:</source>
-        <translation>Data Source:</translation>
+        <translation>データソース:</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="211"/>
         <source>Sprite Info</source>
-        <translation>Sprite Info</translation>
+        <translation>スプライト情報</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="217"/>
         <source>Tile:</source>
-        <translation>Tile:</translation>
+        <translation>タイル:</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="234"/>
         <source>Palette:</source>
-        <translation>Palette:</translation>
+        <translation>パレット:</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="240"/>
         <source>Preview:</source>
-        <translation>Preview:</translation>
+        <translation>プレビュー:</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="247"/>
         <source>Sprite Index:</source>
-        <translation>Sprite Index:</translation>
+        <translation>スプライトインデックス:</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="251"/>
         <source>Tile Address:</source>
-        <translation>Tile Address:</translation>
+        <translation>タイルアドレス:</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="255"/>
         <source>Tile Index:</source>
-        <translation>Tile Index:</translation>
+        <translation>タイルインデックス:</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="259"/>
         <source>Palette Address:</source>
-        <translation>Palette Address:</translation>
+        <translation>パレットアドレス:</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="263"/>
         <source>Position (X,Y):</source>
-        <translation>Position (X,Y):</translation>
+        <translation>位置 (X,Y):</translation>
     </message>
 </context>
 <context>
@@ -11059,32 +11048,32 @@ Do you wish to save/apply the new settings?</translation>
     <message>
         <location filename="../ppuViewerPalette.cpp" line="98"/>
         <source>Change Color</source>
-        <translation>Change Color</translation>
+        <translation>色を変更</translation>
     </message>
     <message>
         <location filename="../ppuViewerPalette.cpp" line="102"/>
         <source>Export ACT</source>
-        <translation>Export ACT</translation>
+        <translation>ACTをエクスポート</translation>
     </message>
     <message>
         <location filename="../ppuViewerPalette.cpp" line="112"/>
         <source>Copy Color to Clipboard</source>
-        <translation>Copy Color to Clipboard</translation>
+        <translation>色をクリップボードにコピー</translation>
     </message>
     <message>
         <location filename="../ppuViewerPalette.cpp" line="176"/>
         <source>Export Palette To File</source>
-        <translation>Export Palette To File</translation>
+        <translation>パレットをファイルにエクスポート</translation>
     </message>
     <message>
         <location filename="../ppuViewerPalette.cpp" line="181"/>
         <source>Adobe Color Table Files (*.act *.ACT) ;; All files (*)</source>
-        <translation>Adobe Color Table Files (*.act *.ACT) ;; All files (*)</translation>
+        <translation>Adobeカラーテーブルファイル (*.act *.ACT) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../ppuViewerPalette.cpp" line="185"/>
         <source>Export</source>
-        <translation>Export</translation>
+        <translation>エクスポート</translation>
     </message>
     <message>
         <location filename="../ppuViewerPalette.cpp" line="186"/>

@@ -3204,19 +3204,19 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../GamePadConf.cpp" line="383"/>
         <location filename="../GamePadConf.cpp" line="661"/>
         <source>Alt 1</source>
-        <translation>Alt 1</translation>
+        <translation>備用 1</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="384"/>
         <location filename="../GamePadConf.cpp" line="662"/>
         <source>Alt 2</source>
-        <translation>Alt 2</translation>
+        <translation>備用 2</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="385"/>
         <location filename="../GamePadConf.cpp" line="663"/>
         <source>Alt 3</source>
-        <translation>Alt 3</translation>
+        <translation>備用 3</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="387"/>
@@ -4503,7 +4503,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../InputConf.cpp" line="201"/>
         <source>Zapper</source>
-        <translation>Zapper</translation>
+        <translation>光線槍</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="202"/>
@@ -4529,7 +4529,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../InputConf.cpp" line="225"/>
         <source>Hyper Shot Gun</source>
-        <translation>Hyper Shot Gun</translation>
+        <translation>Hyper Shot 槍</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="226"/>

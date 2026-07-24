@@ -1,0 +1,430 @@
+# en_keep_allowlist.txt — Legitimate English-keep whitelist for i18n_coverage.ps1
+# Lines starting with # are comments. Format: one normalized source string per line.
+# A translation that is identical-to-EN AND whose source is in this list is NOT flagged as a failure.
+# This whitelist is consumed by i18n_coverage.ps1 and _hotfix5_translations.py.
+#
+# Categories:
+#   1. Technical identifiers / acronyms (emulator community convention)
+#   2. File extensions / format names
+#   3. Keyboard shortcut literals
+#   4. Copyright / attribution lines
+#   5. Hex / struct field names
+#   6. Format strings / placeholders
+#   7. Proper nouns (product names, hardware names)
+#   8. Mixed technical strings that must stay verbatim
+#   9. RIFF / AVI struct field names
+#  10. Additional keyboard shortcut literals
+#  11. Additional file extensions
+#  12. Encoder / codec / technical format names
+#  13. PPU / CPU register names
+#  14. NES header / hardware labels
+#  15. Sample rate numbers
+#  16. Frequency labels
+#  17. Log line count option strings
+#  18. Compression level labels
+#  19. Short UI labels / technical identifiers
+#  20. Debug single-letter labels / register flags
+#  21. TAS Editor technical labels
+
+# ── 1. Technical identifiers / acronyms ──────────────────────────
+TAS
+ROM
+NES
+mapper
+CPU
+PPU
+APU
+FPS
+RAM
+PRG
+CHR
+FDS
+NTSC
+PAL
+Dendy
+Game Boy
+Game Genie
+VS System
+AVI
+RIFF
+FCC
+FilePos
+Lua
+SDL
+Qt
+QThread
+QWidget
+QAction
+QMenu
+QDialog
+Cheat
+CDL
+NSF
+FCEUX
+FCEUX11
+
+# ── 2. File extensions / format names ────────────────────────────
+.nes
+.fm2
+.fcm
+.fcs
+.fds
+.avi
+.lua
+.cfg
+.qml
+.txt
+.xml
+.zip
+.gz
+.qm
+.ts
+
+# ── 3. Keyboard shortcut literals ────────────────────────────────
+Ctrl+C
+Ctrl+V
+Ctrl+X
+Ctrl+Z
+Ctrl+Y
+Ctrl+A
+Ctrl+S
+Ctrl+O
+Ctrl+N
+Ctrl+F
+Ctrl+G
+Ctrl+R
+Ctrl+P
+Ctrl+Q
+Ctrl+W
+Ctrl+Shift+Z
+Ctrl+Shift+S
+Ctrl+Shift+R
+F1
+F2
+F3
+F4
+F5
+F6
+F7
+F8
+F9
+F10
+F11
+F12
+Alt+F4
+
+# ── 4. Copyright / attribution ───────────────────────────────────
+© 2026 FCEUX11 Contributors
+© FCEUX11 Contributors
+
+# ── 5. Hex / struct field names ──────────────────────────────────
+dwMicroSecPerFrame
+dwMaxSamplesPerFrame
+dwTotalFrames
+dwRecFrames
+dwTotalEmulationFrames
+dwNumVideoFrames
+dwNumAudioSamples
+VideoFormat
+AudioFormat
+FPS NTSC
+FPS PAL
+FPS Dendy
+
+# ── 6. Format strings / placeholders (non-translatable) ──────────
+%1
+%2
+%3
+$FF
+$00
+0x
+$&
+ = 
+
+# ── 7. Proper nouns (product / hardware names) ───────────────────
+Nintendo
+Famicom
+Family Computer
+Disk System
+VS Unisystem
+VS Dualsystem
+PowerPad
+Arkanoid
+Family BASIC
+
+# ── 8. Mixed technical strings that must stay verbatim ───────────
+fceux11
+fceux11.exe
+fceux11_*.ts
+fceux11_*.qm
+loadTranslation
+retranslateUi
+setLayoutDirection
+RightToLeft
+
+# ── 9. RIFF / AVI struct field names ─────────────────────────────
+dwFlags
+dwInitialFrames
+dwStreams
+dwSuggestedBufferSize
+dwWidth
+dwHeight
+dwScale
+dwRate
+dwStart
+dwLength
+fccType
+fccHandler
+wPriority
+wLanguage
+dwQuality
+dwSampleSize
+rcFrame.left
+rcFrame.top
+rcFrame.right
+rcFrame.bottom
+biSize
+biWidth
+biHeight
+biPlanes
+biBitCount
+biCompression
+biSizeImage
+biXPelsPerMeter
+biYPelsPerMeter
+biClrUsed
+biClrImportant
+wFormatTag
+nChannels
+nSamplesPerSec
+nAvgBytesPerSec
+nBlockAlign
+nBitsPerSample
+dwMaxBytesPerSec
+dwPaddingGranularity
+RIFF TREE
+
+# ── 10. Additional keyboard shortcut literals ────────────────────
+Ctrl+B
+Ctrl+Del
+Ctrl+Ins
+Ctrl+Shift+V
+Ctrl+Shift+Ins
+Ctrl+Shift+G
+Ctrl+Left
+Ctrl+Right
+Shift+F11
+Ctrl+L
+Ctrl-A
+Alt+Left
+Alt+Right
+
+# ── 11. Additional file extensions ───────────────────────────────
+.fm3
+.wav
+.wch
+.cdl
+.log
+.pal
+.act
+.pre
+.tbl
+.qpal
+.sav
+.chm
+.qhc
+
+# ── 12. Encoder / codec / technical format names ─────────────────
+hq2x
+scale2x
+NTSC 2x
+hq3x
+scale3x
+PAL 3x
+OpenGL
+QPainter
+I420
+X264
+X265
+VfW
+Raw PCM
+YUV 420
+RGB24
+S16 - Signed 16 Bit
+RGB24 (Uncompressed)
+I420 (YUV 4:2:0)
+X264 (H.264)
+X265 (H.265)
+VfW (Video for Windows)
+Raw PCM (Uncompressed)
+PCM
+Mono
+
+# ── 13. PPU / CPU register names ─────────────────────────────────
+PPUCTRL:
+PPUMASK:
+PPUSTAT:
+PPUADDR:
+OAMADDR:
+SRAM
+iNES
+NES 2.0
+QSS
+GUID
+
+# ── 14. NES header / hardware labels ─────────────────────────────
+Version 1.01
+SDL_Delay
+Extend
+Dual
+Dual Region
+Bus Conflict
+PRG RAM Exists
+Trainer
+Battery-backed NVRAM
+PRG RAM:
+PRG NVRAM:
+PRG ROM:
+CHR ROM:
+CHR RAM:
+CHR NVRAM:
+VS. Sys
+PlayChoice-10
+Mapper:
+Mapper #:
+Sub #:
+
+# ── 15. Sample rate numbers ──────────────────────────────────────
+11025
+22050
+44100
+48000
+96000
+
+# ── 16. Frequency labels ─────────────────────────────────────────
+5 Hz
+10 Hz
+20 Hz
+30 Hz
+50 Hz
+60 Hz
+
+# ── 17. Log line count option strings ────────────────────────────
+3,000,000
+1,000,000
+300,000
+100,000
+30,000
+10,000
+3,000
+1,000
+
+# ── 18. Compression level labels ─────────────────────────────────
+0 - None
+9 - Max
+
+# ── 19. Short UI labels / technical identifiers ──────────────────
+0x000000 0.00%
+------
+OK
+1P
+2P
+3P
+4P
+AAA
+BBB
+CCC
+
+# ── 20. Debug single-letter labels / register flags ──────────────
+N
+V
+U
+B
+D
+I
+Z
+C
+
+# ── 21. TAS Editor technical labels ──────────────────────────────
+000000000
+TAS Editor
+Piano Roll
+Del
+Ins
+
+# ── 22. Debugger technical labels ────────────────────────────────
+debuggerStatusCPU
+debuggerStatusPPU
+debuggerBreakpointList
+debuggerBookmarkList
+
+# ── 23. Single-letter shortcut labels ────────────────────────────
+E
+R
+A
+S
+M
+H
+P
+G
+
+# ── 24. Hardware device names ────────────────────────────────────
+Power Pad A
+Power Pad B
+Family Trainer A
+Family Trainer B
+Top Rider
+GUID:
+
+# ── 25. Hex/numeric labels ──────────────────────────────────────
+Size: 0x
+Init: 0x
+01
+00
+Range (1 - 10000)
+Search RAM Address Range: 0x0000 - 0x07FF
+Search SRAM Address Range: 0x6000 - 0x7FFF
+Search ROM Address Range: 0x8000 - 0xFFFF
+
+# ── 26. RIFF/technical field labels ─────────────────────────────
+fcc
+cb
+V-Blank
+
+# ── 27. Debug breakpoint labels ─────────────────────────────────
+-1g
++1g
+
+# ── 28. File format strings (duplicate patterns) ────────────────
+CDL files (*.cdl *.CDL) ;; All files (*)
+.nsf
+
+# ── 29. UI labels that stay English ─────────────────────────────
+...
+Now
+PAL:
+Error: Failed to open link to: https://fceux.com/web/help/taseditor/Title.html
+
+# ── 30. Menu labels with special formatting ─────────────────────
+&NTSC
+&PAL
+&Dendy
+English
+&%1x
+&FDS
+NTSC (8:7)
+PAL (11:8)
+PAL/Dendy
+1 & 2
+1, 2, 3 & 4
+
+# ── 31. NES header technical terms ──────────────────────────────
+iNES 1.0 Unofficial Properties
+Horizontal
+Vertical
+Four Screen
+VS. System
+PPU:
+Extend System
+Misc. ROM(s)
+Frame#

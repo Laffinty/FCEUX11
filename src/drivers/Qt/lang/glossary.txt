@@ -1,11 +1,6 @@
-# FCEUX11 i18n Glossary (v0.3.15 PR-B / v1.11 §11.5 expanded)
-# Format: source_term [tab] zh_CN [tab] zh_TW
-# Used by DeepL / Google Translate custom glossary for terminology
-# consistency across machine translation.
-#
-# v1.11: Expanded to 12 languages. See lang/README.md for the
-# complete lupdate→lrelease workflow. Contributors: please submit
-# PRs to improve hi/ar beta translations based on this glossary.
+# FCEUX11 i18n Glossary (v1.15 hotfix5 expanded)
+# Format: source_term [tab] zh_CN [tab] zh_TW [tab] ja [tab] ko [tab] es [tab] fr [tab] de [tab] vi [tab] th [tab] hi [tab] ar
+# Used by i18n_coverage.ps1 / i18n_audit.py for terminology consistency.
 #
 # Supported language codes:
 #   en zh_CN zh_TW ja ko es fr de vi th hi ar
@@ -15,105 +10,111 @@
 #     must NOT be translated (emulator community convention).
 #   - File extensions (.nes, .fm2, .fcm, .fcs) are kept verbatim.
 #   - Shortcut mnemonics (&) are kept in source.
+#   - See also en_keep_allowlist.txt for the full "legitimate English" whitelist.
 #
 # When a translator overrides a term here, they should also update
 # scripts/check_simp_trad.ps1 to ensure the override doesn't violate
 # the simplified/traditional glyph separation rule.
 
-gamepad        	游戏手柄	遊戲手把
-save state     	存档	存檔
-load state     	读档	讀檔
-quick load     	快速读档	快速讀檔
-quick save     	快速存档	快速存檔
-frame advance  	逐帧推进	逐格推進
-movie          	录像	錄影
-TAS editor     	TAS 编辑器	TAS 編輯器
-debugger       	调试器	除錯器
-breakpoint     	断点	中斷點
-cheat          	作弊码	作弊碼
-Game Genie     	金手指	金手指
-sprite         	精灵	精靈
-nametable      	名称表	名稱表
-palette        	调色板	調色盤
-ROM            	ROM	ROM
-NES            	NES	NES
-mapper         	映射器	映射器
-CPU            	CPU	CPU
-PPU            	PPU	PPU
-APU            	APU	APU
-RAM            	RAM	RAM
-PRG            	PRG	PRG
-CHR            	CHR	CHR
-hex editor     	十六进制编辑器	十六進位編輯器
-hex address    	十六进制地址	十六進位地址
-frame          	帧	幀
-input          	输入	輸入
-video          	视频	視訊
-audio / sound  	音频	音訊
-region         	区域	區域
-NTSC           	NTSC	NTSC
-PAL            	PAL	PAL
-Dendy          	Dendy	Dendy
-FDS            	FDS	FDS
-Game Boy       	Game Boy	Game Boy
-VS System      	VS System	VS System
-load state from	从文件载入存档	從檔案載入存檔
-save state as  	另存为	另存新檔
-screenshot     	截图	截圖
-recent ROMs    	最近的 ROM	最近的 ROM
-speed up       	加速	加速
-slow down      	减速	減速
-turbo          	极速	極速
-normal speed   	正常速度	正常速度
-slowest        	最慢	最慢
-auto resume    	自动续玩	自動續玩
-pause          	暂停	暫停
-reset          	重置	重置
-power          	电源	電源
-settings       	设置	設定
-preferences    	首选项	偏好設定
-hotkey         	快捷键	快捷鍵
-keyboard       	键盘	鍵盤
-language       	语言	語言
-simplified     	简体	簡體
-traditional    	繁体	繁體
-window         	窗口	視窗
-background     	背景	背景
-color          	颜色	顏色
-theme          	主题	主題
-light theme    	浅色主题	淺色主題
-dark theme     	深色主题	深色主題
-virtual keyboard	虚拟键盘	虛擬鍵盤
-family keyboard	家用机键盘	家用機鍵盤
-coin           	投币	投幣
-disk           	磁盘	磁碟
-eject          	弹出	退出
-insert         	插入	插入
-search         	搜索	搜尋
-watch          	监视	監視
-trace          	跟踪	追蹤
-logger         	记录器	記錄器
-enable         	启用	啟用
-disable        	禁用	停用
-about          	关于	關於
-quit           	退出	退出
-close          	关闭	關閉
-open           	打开	開啟
-new            	新建	新增
-delete         	删除	刪除
-edit           	编辑	編輯
-find           	查找	尋找
-replace        	替换	取代
-undo           	撤销	復原
-redo           	重做	重做
-copy           	复制	複製
-paste          	粘贴	貼上
-cut            	剪切	剪下
-select all     	全选	全選
-help           	帮助	說明
-information    	信息	資訊
-warning        	警告	警告
-error          	错误	錯誤
-question       	问题	問題
-message log    	消息日志	訊息記錄
-about Qt       	关于 Qt	關於 Qt
+gamepad	游戏手柄	遊戲手把	ゲームパッド	게임패드	Mando	Joystick	Gamepad	Tay cầm	จอยเกม	गेमपैड	يد التحكم
+save state	存档	存檔	セーブ状態	세이브 스테이트	Estado guardado	État sauvegardé	Spielstand	Trạng thái lưu	บันทึกสถานะ	सेव स्टेट	حالة محفوظة
+load state	读档	讀檔	ロード状態	로드 스테이트	Estado cargado	État chargé	Spielstand laden	Trạng thái tải	โหลดสถานะ	लोड स्टेट	تحميل حالة
+quick load	快速读档	快速讀檔	クイックロード	빠른 불러오기	Carga rápida	Chargement rapide	Schnellladen	Tải nhanh	โหลดเร็ว	क्विक लोड	تحميل سريع
+quick save	快速存档	快速存放	クイックセーブ	빠른 저장	Guardado rápido	Sauvegarde rapide	Schnellspeichern	Lưu nhanh	บันทึกเร็ว	क्विक सेव	حفظ سريع
+frame advance	逐帧推进	逐格推進	フレーム送り	프레임 어드밴스	Avance de fotograma	Avancement d'image	Einzelbildvorschub	Tiến khung hình	เลื่อนเฟรม	फ्रेम एडवांस	تقدُّم الإطار
+movie	录像	錄影	ムービー	무비	Película	Film	Film	Phim	มูฟวี่	मूवी	تسجيل
+TAS editor	TAS 编辑器	TAS 編輯器	TAS エディタ	TAS 에디터	Editor TAS	Éditeur TAS	TAS-Editor	Trình chỉnh sửa TAS	ตัวแก้ไข TAS	TAS एडिटर	محرر TAS
+debugger	调试器	除錯器	デバッガ	디버거	Depurador	Débogueur	Debugger	Trình gỡ lỗi	ดีบักเกอร์	डीबगर	مصحح أخطاء
+breakpoint	断点	中斷點	ブレークポイント	브레이크포인트	Punto de ruptura	Point d'arrêt	Haltepunkt	Điểm dừng	จุดหยุด	ब्रेकपॉइं트	نقطة توقف
+cheat	作弊码	作弊碼	チート	치트	Truco	Code de triche	Cheat	Mã gian lận	โกง	चीट	كود غش
+Game Genie	金手指	金手指	ゲームジニー	게지	Herramienta Game Genie	Game Genie	Game-Genie	Game Genie	Game Genie	Game Genie	Game Genie
+sprite	精灵	精靈	スプライト	스프라이트	Sprite	Sprite	Sprite	Sprite	สไปรท์	स्प्राइट	سبرايت
+nametable	名称表	名稱表	ネームテーブル	네임테이블	Tabla de nombres	Nametable	Nametabelle	Bảng tên	ตารางชื่อ	नेमटेबल	جدول الأسماء
+palette	调色板	調色盤	パレット	팔레트	Paleta	Palette	Palette	Bảng màu	พาเลต	पैलेट	لوحة الألوان
+ROM	ROM	ROM	ROM	ROM	ROM	ROM	ROM	ROM	ROM	ROM	ROM
+NES	NES	NES	NES	NES	NES	NES	NES	NES	NES	NES	NES
+mapper	映射器	映射器	マッパー	매퍼	Mapper	Mapper	Mapper	Ánh xạ	แมปเปอร์	मैपर	مخطط
+CPU	CPU	CPU	CPU	CPU	CPU	CPU	CPU	CPU	CPU	CPU	CPU
+PPU	PPU	PPU	PPU	PPU	PPU	PPU	PPU	PPU	PPU	PPU	PPU
+APU	APU	APU	APU	APU	APU	APU	APU	APU	APU	APU	APU
+RAM	RAM	RAM	RAM	RAM	RAM	RAM	RAM	RAM	RAM	RAM	RAM
+PRG	PRG	PRG	PRG	PRG	PRG	PRG	PRG	PRG	PRG	PRG	PRG
+CHR	CHR	CHR	CHR	CHR	CHR	CHR	CHR	CHR	CHR	CHR	CHR
+FPS	FPS	FPS	FPS	FPS	FPS	FPS	FPS	FPS	FPS	FPS	FPS
+FDS	FDS	FDS	FDS	FDS	FDS	FDS	FDS	FDS	FDS	FDS	FDS
+Game Boy	Game Boy	Game Boy	ゲームボーイ	게임보이	Game Boy	Game Boy	Game Boy	Game Boy	Game Boy	Game Boy	Game Boy
+VS System	VS System	VS System	VSシステム	VS 시스템	Sistema VS	Système VS	VS-System	Hệ thống VS	VS System	VS System	VS System
+NTSC	NTSC	NTSC	NTSC	NTSC	NTSC	NTSC	NTSC	NTSC	NTSC	NTSC	NTSC
+PAL	PAL	PAL	PAL	PAL	PAL	PAL	PAL	PAL	PAL	PAL	PAL
+Dendy	Dendy	Dendy	Dendy	Dendy	Dendy	Dendy	Dendy	Dendy	Dendy	Dendy	Dendy
+hex editor	十六进制编辑器	十六進位編輯器	16進エディタ	헥스 에디터	Editor hexadecimal	Éditeur hexadécimal	Hex-Editor	Trình chỉnh sửa thập lục phân	ตัวแก้ไขเฮกซ์	हेक्स एडिटर	محرر سداسي عشري
+hex address	十六进制地址	十六進位地址	16進アドレス	헥스 주소	Dirección hexadécimal	Adresse hexadécimale	Hex-Adresse	Địa chỉ thập lục phân	ที่อยู่เฮกซ์	हेक्स एड्रेस	عنوان سداسي عشري
+AVI	AVI	AVI	AVI	AVI	AVI	AVI	AVI	AVI	AVI	AVI	AVI
+RIFF	RIFF	RIFF	RIFF	RIFF	RIFF	RIFF	RIFF	RIFF	RIFF	RIFF	RIFF
+FCC	FCC	FCC	FCC	FCC	FCC	FCC	FCC	FCC	FCC	FCC	FCC
+FilePos	FilePos	FilePos	FilePos	FilePos	FilePos	FilePos	FilePos	FilePos	FilePos	FilePos	FilePos
+frame	帧	幀	フレーム	프레임	Fotograma	Image	Bild	Khung hình	เฟรม	फ्रेम	إطار
+input	输入	輸入	入力	입력	Entrée	Entrée	Eingabe	Đầu vào	อินพุต	इनपुट	إدخال
+video	视频	視訊	ビデオ	비디오	Vídeo	Vidéo	Video	Video	วิดีโอ	वीडियो	فيديو
+audio / sound	音频	音訊	オーディオ	오디오	Audio	Audio	Audio	Âm thanh	เสียง	ऑडियो	صوت
+region	区域	區域	地域	지역	Región	Région	Region	Vùng	ภูมิภาค	क्षेत्र	منطقة
+load state from	从文件载入存档	從檔案載入存檔	ファイルからロード	파일에서 불러오기	Cargar desde archivo	Charger depuis un fichier	Spielstand laden von	Tải trạng thái từ	โหลดสถานะจาก	फ़ाइल से लोड करें	تحميل حالة من
+save state as	另存为	另存新檔	名前を付けてセーブ	다른 이름으로 저장	Guardar como	Enregistrer sous	Speichern unter	Lưu dưới dạng	บันทึกสถานะเป็น	इस रूप में सहेजें	حفظ حالة باسم
+screenshot	截图	截圖	スクリーンショット	스크린샷	Captura de pantalla	Capture d'écran	Screenshot	Chụp ảnh màn hình	จับภาพหน้าจอ	स्क्रीनशॉट	لقطة شاشة
+recent ROMs	最近的 ROM	最近的 ROM	最近の ROM	최근 ROM	ROM recientes	ROM récentes	Letzte ROMs	ROM gần đây	ROM ล่าสุด	हालिया ROM	ROM الأخيرة
+speed up	加速	加速	スピードアップ	가속	Acelerar	Accélérer	Beschleunigen	Tăng tốc	เพิ่มความเร็ว	गति बढ़ाएँ	تسريع
+slow down	减速	減速	スローダウン	감속	Desacelerar	Ralentir	Verlangsamen	Giảm tốc	ลดความเร็ว	�ति धीमी करें	إبطاء
+turbo	极速	極速	ターボ	터보	Turbo	Turbo	Turbo	Turbo	เทอร์โบ	टर्बो	توربو
+normal speed	正常速度	正常速度	通常速度	보통 속도	Velocidad normal	Vitesse normale	Normalgeschwindigkeit	Tốc độ bình thường	ความเร็วปกติ	सामान्य गति	سرعة عادية
+slowest	最慢	最慢	最遅	가장 느림	El más lento	Le plus lent	Langsamste	Chậm nhất	ช้าที่สุด	सबसे धीमा	أبطأ
+auto resume	自动续玩	自動續玩	自動再開	자동 재개	Reanudar auto.	Reprise auto.	Automatisch fortsetzen	Tự động tiếp tục	เล่นต่ออัตโนมัติ	स्वतः जारी रखें	استئناف تلقائي
+pause	暂停	暫停	一時停止	일시 중지	Pausar	Pause	Pausieren	Tạm dừng	หยุดชั่วคราว	रोकें	إيقاف مؤقت
+reset	重置	重置	リセット	리셋	Reiniciar	Réinitialiser	Zurücksetzen	Đặt lại	รีเซ็�	रीसेट	إعادة تعيين
+power	电源	電源	電源	전원	Energía	Énergie	Strom	Nguồn	แหล่งจ่ายไฟ	पावर	طاقة
+settings	设置	設定	設定	設定	Configuración	Paramètres	Einstellungen	Cài đặt	การตั้งค่า	सेटिंग्स	إعدادات
+preferences	首选项	偏好設定	環境設定	환경설정	Preferencias	Préférences	Einstellungen	Tùy chọn	ค่าที่ต้องการ	प्राथमिकताएं	التفضيلات
+hotkey	快捷键	快捷鍵	ホットキー	단축키	Tecla rápida	Raccourci	Hotkey	Phím tắt	ฮอตคีย์	हॉटकी	مفتاح اختصار
+keyboard	键盘	鍵盤	キーボード	키보드	Teclado	Clavier	Tastatur	Bàn phím	คีย์บอร์ด	कीबोर्ड	لوحة مفاتيح
+language	语言	語言	言語	언어	Idioma	Langue	Sprache	Ngôn ngữ	ภาษา	भाषा	اللغة
+simplified	简体	簡體	簡体字	간체자	Simplificado	Simplifié	Vereinfacht	Giản thể	ตัวย่อ	सरलीकृत	مبسّط
+traditional	繁体	繁體	繁体字	번체자	Tradicional	Traditionnel	Traditionell	Phồn thể	ตัวเต็ม	पारंपरिक	تقليدي
+window	窗口	視窗	ウィンドウ	윈도우	Ventana	Fenêtre	Fenster	Cửa sổ	หน้าต่าง	विंडो	نافذة
+background	背景	背景	背景	배경	Fondo	Arrière-plan	Hintergrund	Nền	พื้นหลัง	पृष्ठभूमि	خلفية
+color	颜色	顏色	色	색상	Color	Couleur	Farbe	Màu sắc	สี	रंग	لون
+theme	主题	主題	テーマ	테마	Tema	Thème	Theme	Chủ đề	ธีม	थीम	سمة
+light theme	浅色主题	淺色主題	ライトテーマ	라이트 테마	Tema claro	Thème clair	Helles Theme	Chủ đề sáng	ธีมสว่าง	हल्की थीम	سمة فاتحة
+dark theme	深色主题	深色主題	ダークテーマ	다크 테마	Tema oscuro	Thème sombre	Dunkles Theme	Chủ đề tối	ธีมมืด	गहरी थीم	سمة داكنة
+virtual keyboard	虚拟键盘	虛擬鍵盤	仮想キーボード	가상 키보드	Teclado virtual	Clavier virtuel	Virtuelle Tastatur	Bàn phím ảo	คีย์บอร์ดเสมือน	वर्चुअल कीबोर्ड	لوحة مفاتيح افتراضية
+family keyboard	家用机键盘	家用機鍵盤	ファミリーキーボード	패밀리 키보드	Teclado Family	Clavier Family	Family-Tastatur	Bàn phím Family	คีย์บอร์ดแฟมิลี	फैमिली कीबोर्ड	لوحة مفاتيح فاميلي
+coin	投币	投幣	コイン	코인	Moneda	Pièce	Münze	Xu	เหรียญ	सिक्का	عملة
+disk	磁盘	磁碟	ディスク	디스크	Disco	Disque	Diskette	Đĩa	ดิสก์	डिस्क	قرص
+eject	弹出	退出	取り出し	꺼내기	Expulsar	Éjecter	Auswerfen	Đẩy ra	ดีดออก	निकालें	إخراج
+insert	插入	插入	挿入	삽입	Insertar	Insérer	Einfügen	Chèn vào	แทรก	डालें	إدراج
+search	搜索	搜尋	検索	검색	Buscar	Recherche	Suchen	Tìm kiếm	ค้นหา	खोजें	بحث
+watch	监视	監視	ウォッチ	감시	Vigilancia	Surveillance	Überwachung	Theo dõi	เฝ้าดู	निगरानी	مراقبة
+trace	跟踪	追蹤	トレース	추적	Trazar	Tracer	Verfolgen	Theo dõi	ติดตาม	ट्रेस	تتبُّع
+logger	记录器	記錄器	ロガー	로거	Registrador	Journal	Protokollierer	Bộ ghi nhật ký	บันทึก	लॉगर	مسجِّل
+enable	启用	啟用	有効	활성화	Habilitar	Activer	Aktivieren	Bật	เปิดใช้	सक्षम करें	تفعيل
+disable	禁用	停用	無効	비활성화	Deshabilitar	Désactiver	Deaktivieren	Tắt	ปิดใช้	अक्षम करें	تعطيل
+about	关于	關於	バージョン情報	정보	Acerca de	À propos	Über	Giới thiệu	เกี่ยวกับ	के बारे में	حول
+quit	退出	退出	終了	종료	Salir	Quitter	Beenden	Thoát	退出	बाहर निकलें	إنهاء
+close	关闭	關閉	閉じる	닫기	Cerrar	Fermer	Schließen	Đóng	ปิด	बंद करें	إغلاق
+open	打开	開啟	開く	열기	Abrir	Ouvrir	Öffnen	Mở	เปิด	खोलें	فتح
+new	新建	新增	新規	새로 만들기	Nuevo	Nouveau	Neu	Mới	ใหม่	नया	جديد
+delete	删除	刪除	削除	삭제	Eliminar	Supprimer	Löschen	Xóa	ลบ	हटाएं	حذف
+edit	编辑	編輯	編集	편집	Editar	Modifier	Bearbeiten	Chỉnh sửa	แก้ไข	संपादित करें	تحرير
+find	查找	尋找	検索	찾기	Buscar	Chercher	Finden	Tìm	ค้นหา	�ूंढें	بحث
+replace	替换	取代	置換	바꾸기	Reemplazar	Remplacer	Ersetzen	Thay thế	แทนที่	बदलें	استبدال
+undo	撤销	復原	元に戻す	실행 취소	Deshacer	Annuler	Rückgängig	Hoàn tác	เลิกทำ	पूर्ववत करें	تراجع
+redo	重做	重做	やり直し	다시 실행	Reacer	Rétablir	Wiederholen	Làm lại	ทำซ้ำ	फिर से करें	إعادة
+copy	复制	複製	コピー	복사	Copiar	Copier	Kopieren	Sao chép	คัดลอก	कॉपी करें	نسخ
+paste	粘贴	貼上	貼り付け	붙여넣기	Pegar	Coller	Einfügen	Dán	วาง	पेस्ट करें	لصق
+cut	剪切	剪下	切り取り	잘라내기	Cortar	Couper	Ausschneiden	Cắt	ตัด	काटें	قص
+select all	全选	全選	すべて選択	전체 선택	Seleccionar todo	Tout sélectionner	Alles auswählen	Chọn tất cả	เลือกทั้งหมด	सभी चुनें	تحديد الكل
+help	帮助	說明	ヘルプ	도움말	Ayuda	Aide	Hilfe	Trợ giúp	ช่วยเหลือ	मदद	مساعدة
+information	信息	資訊	情報	정보	Información	Information	Information	Thông tin	ข้อมูล	जानकारी	معلومات
+warning	警告	警告	警告	경고	Advertencia	Avertissement	Warnung	Cảnh báo	คำเตือน	चेतावनी	تحذير
+error	错误	錯誤	エラー	오류	Error	Erreur	Fehler	Lỗi	ข้อผิดพลาด	त्रुटि	خطأ
+question	问题	問題	質問	질문	Pregunta	Question	Frage	Câu hỏi	คำถาม	प्रश्न	سؤال
+message log	消息日志	訊息記錄	メッセージログ	메시지 로그	Registro de mensajes	Journal des messages	Meldungsprotokoll	Nhật ký thông báo	บันทึกข้อความ	संदेश लॉग	سجل الرسائل
+about Qt	关于 Qt	關於 Qt	Qt について	Qt 정보	Acerca de Qt	À propos de Qt	Über Qt	Giới thiệu Qt	เกี่ยวกับ Qt	Qt के बारे में	حول Qt

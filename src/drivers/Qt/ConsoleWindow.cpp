@@ -773,7 +773,7 @@ void consoleWin_t::retranslateUi(void)
 	if (advMiscMenu) advMiscMenu->setTitle(tr("&Misc Tools"));
 	if (advSettingsMenu) advSettingsMenu->setTitle(tr("&Advanced Settings"));
 	if (helpMenu) helpMenu->setTitle(tr("&Help"));
-	if (languageMenu) languageMenu->setTitle(tr("&Language"));
+	if (languageMenu) languageMenu->setTitle(tr("&Language (Language)"));
 	if (changeStateMenu) changeStateMenu->setTitle(tr("Change &State Slot"));
 	if (windowResizeMenu) windowResizeMenu->setTitle(tr("Window Resi&ze"));
 	if (regionMenu) regionMenu->setTitle(tr("&Region"));
@@ -892,29 +892,29 @@ void consoleWin_t::retranslateUi(void)
 		{
 			QString code = action->data().toString();
 			if (code == QStringLiteral("en"))
-				action->setText(tr("English"));
+				action->setText(QStringLiteral("English"));
 			else if (code == QStringLiteral("zh_CN"))
-				action->setText(tr("Simplified Chinese"));
+				action->setText(QStringLiteral("简体中文"));
 			else if (code == QStringLiteral("zh_TW"))
-				action->setText(tr("Traditional Chinese"));
+				action->setText(QStringLiteral("繁體中文"));
 			else if (code == QStringLiteral("ja"))
-				action->setText(tr("Japanese"));
+				action->setText(QStringLiteral("日本語"));
 			else if (code == QStringLiteral("ko"))
-				action->setText(tr("Korean"));
+				action->setText(QStringLiteral("한국어"));
 			else if (code == QStringLiteral("es"))
-				action->setText(tr("Spanish"));
+				action->setText(QStringLiteral("Español"));
 			else if (code == QStringLiteral("fr"))
-				action->setText(tr("French"));
+				action->setText(QStringLiteral("Français"));
 			else if (code == QStringLiteral("de"))
-				action->setText(tr("German"));
+				action->setText(QStringLiteral("Deutsch"));
 			else if (code == QStringLiteral("vi"))
-				action->setText(tr("Vietnamese"));
+				action->setText(QStringLiteral("Tiếng Việt"));
 			else if (code == QStringLiteral("th"))
-				action->setText(tr("Thai"));
+				action->setText(QStringLiteral("ไทย"));
 			else if (code == QStringLiteral("hi"))
-				action->setText(tr("Hindi (beta)"));
+				action->setText(QStringLiteral("हिन्दी (beta)"));
 			else if (code == QStringLiteral("ar"))
-				action->setText(tr("Arabic (beta)"));
+				action->setText(QStringLiteral("العربية (beta)"));
 		}
 	}
 

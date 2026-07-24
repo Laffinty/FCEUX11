@@ -394,65 +394,65 @@ void consoleWin_t::createMainMenu(void)
 	optMenu->addAction(guiConfig);
 
 	// Options -> Language
-	languageMenu = new QMenu(tr("&Language"), this);
+	languageMenu = new QMenu(tr("&Language (Language)"), this);
 	languageActionGroup = new QActionGroup(this);
 
-	QAction *langEn = new QAction(tr("English"), languageActionGroup);
+	QAction *langEn = new QAction(QStringLiteral("English"), languageActionGroup);
 	langEn->setCheckable(true);
 	langEn->setData("en");
 	languageMenu->addAction(langEn);
 
-	QAction *langZhCN = new QAction(tr("Simplified Chinese"), languageActionGroup);
+	QAction *langZhCN = new QAction(QStringLiteral("简体中文"), languageActionGroup);
 	langZhCN->setCheckable(true);
 	langZhCN->setData("zh_CN");
 	languageMenu->addAction(langZhCN);
 
-	QAction *langZhTW = new QAction(tr("Traditional Chinese"), languageActionGroup);
+	QAction *langZhTW = new QAction(QStringLiteral("繁體中文"), languageActionGroup);
 	langZhTW->setCheckable(true);
 	langZhTW->setData("zh_TW");
 	languageMenu->addAction(langZhTW);
 
-	QAction *langJa = new QAction(tr("Japanese"), languageActionGroup);
+	QAction *langJa = new QAction(QStringLiteral("日本語"), languageActionGroup);
 	langJa->setCheckable(true);
 	langJa->setData("ja");
 	languageMenu->addAction(langJa);
 
-	QAction *langKo = new QAction(tr("Korean"), languageActionGroup);
+	QAction *langKo = new QAction(QStringLiteral("한국어"), languageActionGroup);
 	langKo->setCheckable(true);
 	langKo->setData("ko");
 	languageMenu->addAction(langKo);
 
-	QAction *langEs = new QAction(tr("Spanish"), languageActionGroup);
+	QAction *langEs = new QAction(QStringLiteral("Español"), languageActionGroup);
 	langEs->setCheckable(true);
 	langEs->setData("es");
 	languageMenu->addAction(langEs);
 
-	QAction *langFr = new QAction(tr("French"), languageActionGroup);
+	QAction *langFr = new QAction(QStringLiteral("Français"), languageActionGroup);
 	langFr->setCheckable(true);
 	langFr->setData("fr");
 	languageMenu->addAction(langFr);
 
-	QAction *langDe = new QAction(tr("German"), languageActionGroup);
+	QAction *langDe = new QAction(QStringLiteral("Deutsch"), languageActionGroup);
 	langDe->setCheckable(true);
 	langDe->setData("de");
 	languageMenu->addAction(langDe);
 
-	QAction *langVi = new QAction(tr("Vietnamese"), languageActionGroup);
+	QAction *langVi = new QAction(QStringLiteral("Tiếng Việt"), languageActionGroup);
 	langVi->setCheckable(true);
 	langVi->setData("vi");
 	languageMenu->addAction(langVi);
 
-	QAction *langTh = new QAction(tr("Thai"), languageActionGroup);
+	QAction *langTh = new QAction(QStringLiteral("ไทย"), languageActionGroup);
 	langTh->setCheckable(true);
 	langTh->setData("th");
 	languageMenu->addAction(langTh);
 
-	QAction *langHi = new QAction(tr("Hindi (beta)"), languageActionGroup);
+	QAction *langHi = new QAction(QStringLiteral("हिन्दी (beta)"), languageActionGroup);
 	langHi->setCheckable(true);
 	langHi->setData("hi");
 	languageMenu->addAction(langHi);
 
-	QAction *langAr = new QAction(tr("Arabic (beta)"), languageActionGroup);
+	QAction *langAr = new QAction(QStringLiteral("العربية (beta)"), languageActionGroup);
 	langAr->setCheckable(true);
 	langAr->setData("ar");
 	languageMenu->addAction(langAr);
