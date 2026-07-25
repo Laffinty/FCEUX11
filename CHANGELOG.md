@@ -5,6 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15(hotfix5+)] - 2026-07-25
+
+**Translation quality audit-driven fixes.** ~227 P0+P1 issues fixed
+across all 11 languages based on per-term audit of 1,995 strings.
+
+### Fixed — P0 (semantic errors & text corruption)
+- **Shadow device name** — 8 languages mistranslated "Shadow" (Space
+  Shadow light gun) literally as shadow/影子/Schatten/Ombre/Sombra etc.
+  Fixed to "Space Shadow" in zh_CN/zh_TW/de/fr/es/ko/th/vi/ar.
+- **4-Score device name** — zh_CN/zh_TW translated "4 Score" as "4 计分"
+  (literal "4 points"). Fixed to "Four Score".
+- **Korean hanja mixing** — 6 instances of hanja "化" in Hangul text
+  (활성化→활성화), 1 Japanese 分→분, 1 U+FFFD corruption fixed.
+- **Korean 묵비 typo** — 2 instances of "묵비" (silence) → "무비" (movie).
+- **Thai movie term** — 24 instances of ภาพยนตร์ (systematic misspelling)
+  → มูฟวี่ (per glossary). 2 U+FFFD corruptions fixed.
+- **Spanish truncation** — 3 instances of "truc" → "truco/trucos".
+- **French double escape** — 8 instances of `&apos;` → `'` in
+  translations.
+- **zh_CN semantic fixes** — 测试模式→测试图案, 修改键→修饰键,
+  NSF 音效→音乐, 训练器→Trainer 数据, 自动读档/存档→自动载入/保存（作弊码）.
+- **zh_TW semantic fixes** — 測試樣式→測試圖案, NSF 音效→音樂.
+
+### Fixed — P1 (terminology unification)
+- **movie term** — ko 동영상→무비 (29), ja 動画→ムービー (29).
+  Arabic glossary corrected: تسجيل→فيلم (تسجيل means "recording").
+- **ja 読込→読み込み** — 30 places, unified to glossary standard.
+- **Vietnamese double &** — 23 places where inline `&` conflicted with
+  parenthesized `(&X)` shortcut.
+- **de save state** — Zustand/Savestate→Spielstand (7 places).
+- **hi save state** — स्थिति→स्टेट for save-state context (5 places).
+- **ko breakpoint** — 브레이크포인트→중단점 (5 places), aligned with
+  Microsoft Visual Studio Korean standard.
+- **ko save state** — 상태 불러오기→세이브 스테이트 (2 places).
+- **Add Cheat** — Unified across th/vi/fr/es (8 places).
+- **zh_CN** — 热键→快捷键 (3), 状态槽→存档槽 (1).
+
+### Changed
+- **`src/drivers/Qt/lang/glossary.txt`** — Fixed 10 entries:
+  - Unicode corruption: hi slow-down/find, th reset (garbled bytes)
+  - Wrong language: th quit had Chinese 退出→ออก, ko settings had
+    Japanese 設定→설정
+  - Misspelling: es redo Reacer→Rehacer, ko Game Genie 게지→게임 지니,
+    zh_TW quick save 快速存放→快速存檔
+  - Community alignment: ja save state→ステートセーブ, load
+    state→ステートロード, frame advance→フレームアドバンス
+  - New entries: Shadow (12 languages), Four Score (12 languages)
+- **All 11 `.qm` binaries** recompiled (1998 translations each, 0
+  unfinished).
+
 ## [1.15(hotfix5)] - 2026-07-24
 
 **Codename: hotfix5.** Complete i18n overhaul for all 11 target languages
