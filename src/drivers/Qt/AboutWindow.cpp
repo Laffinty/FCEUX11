@@ -61,7 +61,7 @@ AboutWindow::AboutWindow(QWidget *parent)
 	mainLayout->addLayout( hbox );
 
 	hbox = new QHBoxLayout();
-	licenseLabel = new QLabel( tr("Based on FCEUX | License: GPLv2") );
+	licenseLabel = new QLabel( tr("Based on FCEUX | License: GPLv2") + " | Build " + FCEUX_BUILD_TIMESTAMP_COMPACT );
 	hbox->addWidget( licenseLabel );
 	hbox->setAlignment( Qt::AlignCenter );
 	mainLayout->addLayout( hbox );
@@ -112,7 +112,7 @@ AboutWindow::~AboutWindow(void)
 void AboutWindow::retranslateUi(void)
 {
 	if (versionLabel) versionLabel->setText(tr(FCEU_NAME_AND_VERSION));
-	if (licenseLabel) licenseLabel->setText(tr("Based on FCEUX | License: GPLv2"));
+	if (licenseLabel) licenseLabel->setText(tr("Based on FCEUX | License: GPLv2") + " | Build " + FCEUX_BUILD_TIMESTAMP_COMPACT);
 	if (copyrightLabel) copyrightLabel->setText(tr("\u00A9 2026 FCEUX11 Contributors"));
 	if (viewLicenseButton) viewLicenseButton->setText(tr("View License"));
 	if (closeButton) closeButton->setText(tr("OK"));

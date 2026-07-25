@@ -37,6 +37,7 @@
 #include <QInputDialog>
 #include <QTranslator>
 #include <QActionGroup>
+#include <QLocale>
 #include <QSignalBlocker>
 #include <QDesktopServices>
 #include <QStyleFactory>
@@ -773,7 +774,13 @@ void consoleWin_t::retranslateUi(void)
 	if (advMiscMenu) advMiscMenu->setTitle(tr("&Misc Tools"));
 	if (advSettingsMenu) advSettingsMenu->setTitle(tr("&Advanced Settings"));
 	if (helpMenu) helpMenu->setTitle(tr("&Help"));
-	if (languageMenu) languageMenu->setTitle(tr("&Language (Language)"));
+	if (languageMenu) {
+		QString langLabel = tr("&Language");
+		if (QLocale().language() != QLocale::English) {
+			langLabel += " (Language)";
+		}
+		languageMenu->setTitle(langLabel);
+	}
 	if (changeStateMenu) changeStateMenu->setTitle(tr("Change &State Slot"));
 	if (windowResizeMenu) windowResizeMenu->setTitle(tr("Window Resi&ze"));
 	if (regionMenu) regionMenu->setTitle(tr("&Region"));

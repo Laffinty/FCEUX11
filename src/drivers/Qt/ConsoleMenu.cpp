@@ -37,6 +37,7 @@
 #include <QInputDialog>
 #include <QTranslator>
 #include <QActionGroup>
+#include <QLocale>
 #include <QSignalBlocker>
 #include <QDesktopServices>
 #include <QStyleFactory>
@@ -394,7 +395,11 @@ void consoleWin_t::createMainMenu(void)
 	optMenu->addAction(guiConfig);
 
 	// Options -> Language
-	languageMenu = new QMenu(tr("&Language (Language)"), this);
+	QString langLabel = tr("&Language");
+	if (QLocale().language() != QLocale::English) {
+		langLabel += " (Language)";
+	}
+	languageMenu = new QMenu(langLabel, this);
 	languageActionGroup = new QActionGroup(this);
 
 	QAction *langEn = new QAction(QStringLiteral("English"), languageActionGroup);

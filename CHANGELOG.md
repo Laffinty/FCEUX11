@@ -57,9 +57,17 @@ on hotfix2 PPU optimizations). See
   `fs::rename` with retry loop + `fs::copy` fallback.
 
 ### Verified
-- `i18n_regression_test`: PASSED (all gates green)
-- `config_store_test`: PASSED
-- `check_menu_slots.py`: PASSED (685 slots, 809 connects)
+- Full CTest suite: 30/30 PASSED (0 failures) — 2026-07-25 Release build
+  - smoke_test, mapper_load_test, mapper_reset_test,
+    rom_regression_test, savestate_regression_test, expected_api_test,
+    enum_class_bitflags_test, i18n_regression_test, core_state_test,
+    cpu_test, ppu_test, apu_test, bus_test, mapper_core_test,
+    savestate_core_test, ppu_frame_diff_test, apu_wav_diff_test,
+    cart_class_test, mapper_byte_diff_test, fds_load_test,
+    driver_callbacks_test, core_driver_boundary_test,
+    ppu_rendering_lut_test, ppu_phase_c_test, ppu_phase_d_test,
+    golden_savestate_test, bench_tolerance_test, config_store_test,
+    menu_slot_check, pixbuf_pool_test
 - `i18n_coverage.ps1`: ALL 11 LANGUAGES PASS
 - `check_simp_trad.ps1`: PASSED
 

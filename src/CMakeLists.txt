@@ -698,6 +698,10 @@ endif()
 string(TIMESTAMP BUILD_TS "%H:%M:%S  %b %d %Y" UTC)
 add_definitions( -DFCEUX_BUILD_TIMESTAMP=\"${BUILD_TS}\" )
 
+# Compact build timestamp for About dialog (YYMMDDHHmmss)
+string(TIMESTAMP BUILD_TS_COMPACT "%y%m%d%H%M%S" UTC)
+add_definitions( -DFCEUX_BUILD_TIMESTAMP_COMPACT=\"${BUILD_TS_COMPACT}\" )
+
 add_custom_command( 
 	OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/fceux_git_info.cpp  
 	COMMAND  ${CMAKE_SOURCE_DIR}/scripts/genGitHdr.bat  ${CMAKE_CURRENT_BINARY_DIR} 
