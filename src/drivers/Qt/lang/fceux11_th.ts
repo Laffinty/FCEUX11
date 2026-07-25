@@ -117,7 +117,7 @@
     <message>
         <location filename="../AviRiffViewer.cpp" line="269"/>
         <source>Open AVI Movie for Inspection</source>
-        <translation>เปิดภาพยนตร์ AVI เพื่อตรวจสอบ</translation>
+        <translation>เปิดมูฟวี่ AVI เพื่อตรวจสอบ</translation>
     </message>
     <message>
         <location filename="../AviRiffViewer.cpp" line="275"/>
@@ -4520,7 +4520,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../InputConf.cpp" line="224"/>
         <source>Shadow</source>
-        <translation>เงา</translation>
+        <translation>Space Shadow</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="225"/>
@@ -4963,31 +4963,31 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MovieOptions.cpp" line="69"/>
         <location filename="../MovieOptions.cpp" line="210"/>
         <source>Bind Save-States to Movies</source>
-        <translation>ผูกเซฟสเตทกับภาพยนตร์</translation>
+        <translation>ผูกเซฟสเตทกับมูฟวี่</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="71"/>
         <location filename="../MovieOptions.cpp" line="211"/>
         <source>Display Movie Subtitles</source>
-        <translation>แสดงคำบรรยายภาพยนตร์</translation>
+        <translation>แสดงคำบรรยายมูฟวี่</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="73"/>
         <location filename="../MovieOptions.cpp" line="212"/>
         <source>Put Movie Subtitles in AVI</source>
-        <translation>ใส่คำบรรยายภาพยนตร์ใน AVI</translation>
+        <translation>ใส่คำบรรยายมูฟวี่ใน AVI</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="75"/>
         <location filename="../MovieOptions.cpp" line="213"/>
         <source>Automatically Backup Movies</source>
-        <translation>สำรองภาพยนตร์อัตโนมัตी</translation>
+        <translation>สำรองมูฟวี่อัตโนมัตी</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="77"/>
         <location filename="../MovieOptions.cpp" line="214"/>
         <source>Load Full Save-State Movies:</source>
-        <translation>โหลดภาพยนตร์เซฟสเตทแบบเต็ม:</translation>
+        <translation>โหลดมูฟวี่เซฟสเตทแบบเต็ม:</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="79"/>
@@ -5011,7 +5011,7 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MovieOptions.cpp" line="86"/>
         <location filename="../MovieOptions.cpp" line="218"/>
         <source>Loading states in record mode will not immediately truncate movie, next frame input will. (VBA-rr and SNES9x style)</source>
-        <translation>การโหลดสถานะในโหมดบันทึกจะไม่ตัดภาพยนตร์ทันที แต่อินพุตเฟรมถัดไปจะทำ (รูปแบบ VBA-rr และ SNES9x)</translation>
+        <translation>การโหลดสถานะในโหมดบันทึกจะไม่ตัดมูฟวี่ทันที แต่อินพุตเฟรมถัดไปจะทำ (รูปแบบ VBA-rr และ SNES9x)</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="116"/>
@@ -5068,7 +5068,7 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MoviePlay.cpp" line="89"/>
         <location filename="../MoviePlay.cpp" line="231"/>
         <source>Pause Movie At Frame</source>
-        <translation>หยุดภาพยนตร์ชั่วคราวที่เฟรม</translation>
+        <translation>หยุดมูฟวี่ชั่วคราวที่เฟรม</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="122"/>
@@ -5145,12 +5145,12 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
     <message>
         <location filename="../MoviePlay.cpp" line="569"/>
         <source>Open FM2 Movie</source>
-        <translation>เปิดภาพยนตร์ FM2</translation>
+        <translation>เปิดมูฟวี่ FM2</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="573"/>
         <source>FM2 Movies (*.fm2) ;; All files (*)</source>
-        <translation>ภาพยนตร์ FM2 (*.fm2) ;; ไฟล์ทั้งหมด (*)</translation>
+        <translation>มูฟวี่ FM2 (*.fm2) ;; ไฟล์ทั้งหมด (*)</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="577"/>
@@ -5165,7 +5165,7 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MovieRecord.cpp" line="385"/>
         <location filename="../MovieRecord.cpp" line="399"/>
         <source>Record Input Movie</source>
-        <translation>บันทึกภาพยนตร์อินพุ�</translation>
+        <translation>บันทึกมูฟวี่อินพุต</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="75"/>
@@ -5253,17 +5253,17 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MovieRecord.cpp" line="304"/>
         <source>Pre-existing movie file Will be overwritten.
 Replace file?</source>
-        <translation>ไฟล์ภาพยนตร์ที่มีอยู่จะถูกเขียนทับ แทนที่ไฟล์?</translation>
+        <translation>ไฟล์มูฟวี่ที่มีอยู่จะถูกเขียนทับ แทนที่ไฟล์?</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="332"/>
         <source>Save FM2 Movie for Recording</source>
-        <translation>บันทึกภาพยนตร์ FM2 สำหรับบันทึก</translation>
+        <translation>บันทึกมูฟวี่ FM2 สำหรับบันทึก</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="336"/>
         <source>FM2 Movies (*.fm2) ;; All files (*)</source>
-        <translation>ภาพยนตร์ FM2 (*.fm2) ;; ไฟล์ทั้งหมด (*)</translation>
+        <translation>มูฟวี่ FM2 (*.fm2) ;; ไฟล์ทั้งหมด (*)</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="340"/>
@@ -5711,7 +5711,7 @@ Replace file?</source>
     <message>
         <location filename="../MenuCatalog.h" line="65"/>
         <source>&amp;Movie</source>
-        <translation>&amp;ภาพยนตร์</translation>
+        <translation>&amp;มูฟวี่</translation>
     </message>
     <message>
         <location filename="../MenuCatalog.h" line="66"/>
@@ -5869,7 +5869,7 @@ Replace file?</source>
     <message>
         <location filename="../TasEditor/TasEditorTimeline.cpp" line="1000"/>
         <source>Truncate Movie</source>
-        <translation>ตัดภาพยนตร์</translation>
+        <translation>ตัดมูฟวี่</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorTimeline.cpp" line="2540"/>
@@ -6085,7 +6085,7 @@ Replace file?</source>
         <location filename="../RamSearch.cpp" line="326"/>
         <location filename="../RamSearch.cpp" line="555"/>
         <source>Add Cheat</source>
-        <translation>เพิ่มสูตรโกง</translation>
+        <translation>เพิ่มโกง</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="331"/>
@@ -6470,7 +6470,7 @@ Replace file?</source>
         <location filename="../RamWatch.cpp" line="296"/>
         <location filename="../RamWatch.cpp" line="358"/>
         <source>Add Cheat</source>
-        <translation>เพิ่มสูตรโกง</translation>
+        <translation>เพิ่มโกง</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="560"/>
@@ -7146,7 +7146,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="582"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="584"/>
         <source>Reselect Clipboard</source>
-        <translation>เลือกคลิปบอร์ดอีกครั�ย</translation>
+        <translation>เลือกคลิปบอร์ดอีกครั้ง</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="583"/>
@@ -7256,7 +7256,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="678"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="680"/>
         <source>Truncate Movie</source>
-        <translation>ตัดภาพยนตร์</translation>
+        <translation>ตัดมูฟวี่</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="687"/>
@@ -7436,7 +7436,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="930"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="933"/>
         <source>Branches Restore Entire Movie</source>
-        <translation>สาขาเรียกคืนภาพยนตร์ทั้งหมด</translation>
+        <translation>สาขาเรียกคืนมูฟวี่ทั้งหมด</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="940"/>
@@ -7448,7 +7448,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="952"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="955"/>
         <source>Autopause at End of Movie</source>
-        <translation>หยุดชั่วคราวอัตโนมัติเมื่อจบภาพยนตร์</translation>
+        <translation>หยุดชั่วคราวอัตโนมัติเมื่อจบมูฟวี่</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="962"/>
@@ -7746,12 +7746,12 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2156"/>
         <source>Import Movie File</source>
-        <translation>นำเข้าไฟล์ภาพยนตร์</translation>
+        <translation>นำเข้าไฟล์มูฟวี่</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2162"/>
         <source>FCEUX Movie Files (*.fm2) ;; TAS Project Files (*.fm3) ;; All files (*)</source>
-        <translation>ไฟล์ภาพยนตร์ FCEUX (*.fm2) ;; ไฟล์โปรเจกต์ TAS (*.fm3) ;; ไฟล์ทั้งหมด (*)</translation>
+        <translation>ไฟล์มูฟวี่ FCEUX (*.fm2) ;; ไฟล์โปรเจกต์ TAS (*.fm3) ;; ไฟล์ทั้งหมด (*)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2166"/>
@@ -7772,7 +7772,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2281"/>
         <source>FCEUX Movie File (*.fm2) ;; All files (*)</source>
-        <translation>ไฟล์ภาพยนตร์ FCEUX (*.fm2) ;; ไฟล์ทั้งหมด (*)</translation>
+        <translation>ไฟล์มูฟวี่ FCEUX (*.fm2) ;; ไฟล์ทั้งหมด (*)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2285"/>
@@ -8629,7 +8629,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="141"/>
         <location filename="../ConsoleWindow.cpp" line="770"/>
         <source>&amp;Movie</source>
-        <translation>&amp;ภาพยนตร์</translation>
+        <translation>&amp;มูฟวี่</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="142"/>
@@ -9246,7 +9246,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="938"/>
         <location filename="../ConsoleWindow.cpp" line="806"/>
         <source>&amp;Movie Options</source>
-        <translation>ตัวเลือก&amp;ภาพยนตร์</translation>
+        <translation>ตัวเลือก&amp;มูฟวี่</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="939"/>

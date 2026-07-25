@@ -2826,7 +2826,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../FrameTimingStats.cpp" line="52"/>
         <location filename="../FrameTimingStats.cpp" line="196"/>
         <source>Frame Timing Statistics</source>
-        <translation>Statistiques de timing d&apos;image</translation>
+        <translation>Statistiques de timing d'image</translation>
     </message>
     <message>
         <location filename="../FrameTimingStats.cpp" line="59"/>
@@ -4520,7 +4520,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../InputConf.cpp" line="224"/>
         <source>Shadow</source>
-        <translation>Ombre</translation>
+        <translation>Space Shadow</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="225"/>
@@ -6085,7 +6085,7 @@ Replace file?</source>
         <location filename="../RamSearch.cpp" line="326"/>
         <location filename="../RamSearch.cpp" line="555"/>
         <source>Add Cheat</source>
-        <translation>Ajouter un truc</translation>
+        <translation>Ajouter un code de triche</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="331"/>
@@ -6470,7 +6470,7 @@ Replace file?</source>
         <location filename="../RamWatch.cpp" line="296"/>
         <location filename="../RamWatch.cpp" line="358"/>
         <source>Add Cheat</source>
-        <translation>Ajouter un truc</translation>
+        <translation>Ajouter un code de triche</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="560"/>
@@ -6576,7 +6576,7 @@ Replace file?</source>
         <location filename="../StateRecorderConf.cpp" line="55"/>
         <location filename="../StateRecorderConf.cpp" line="364"/>
         <source>State Recorder Config</source>
-        <translation>Config. de l&apos;enregistreur d&apos;états</translation>
+        <translation>Config. de l'enregistreur d'états</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="60"/>
@@ -8435,17 +8435,17 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../TraceLogger.cpp" line="441"/>
         <source>Log Frame Counter</source>
-        <translation>Journaliser le compteur d&apos;images</translation>
+        <translation>Journaliser le compteur d'images</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="442"/>
         <source>Log Emu Messages</source>
-        <translation>Journaliser les messages de l&apos;émulateur</translation>
+        <translation>Journaliser les messages de l'émulateur</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="443"/>
         <source>Log Status Flags</source>
-        <translation>Journaliser les flags d&apos;état</translation>
+        <translation>Journaliser les flags d'état</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="444"/>
@@ -8465,7 +8465,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../TraceLogger.cpp" line="448"/>
         <source>Log Instruction Count</source>
-        <translation>Journaliser le nombre d&apos;instructions</translation>
+        <translation>Journaliser le nombre d'instructions</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="451"/>
@@ -8760,7 +8760,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="317"/>
         <location filename="../ConsoleWindow.cpp" line="794"/>
         <source>Screens&amp;hot</source>
-        <translation>Capture d&apos;&amp;écran</translation>
+        <translation>Capture d'&amp;écran</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="319"/>
@@ -9938,7 +9938,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../iNesHeaderEditor.cpp" line="193"/>
         <location filename="../iNesHeaderEditor.cpp" line="556"/>
         <source>NES Header Editor</source>
-        <translation>Éditeur d&apos;en-tête NES</translation>
+        <translation>Éditeur d'en-tête NES</translation>
     </message>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="201"/>

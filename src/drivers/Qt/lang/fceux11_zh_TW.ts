@@ -2307,7 +2307,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../ConsoleVideoConf.cpp" line="386"/>
         <location filename="../ConsoleVideoConf.cpp" line="577"/>
         <source>Test Pattern:</source>
-        <translation>測試樣式：</translation>
+        <translation>測試圖案：</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="392"/>
@@ -4419,7 +4419,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../InputConf.cpp" line="83"/>
         <location filename="../InputConf.cpp" line="295"/>
         <source>Attach 4-Score (Implies four gamepads)</source>
-        <translation>附加 4 計分（隱含四手把）</translation>
+        <translation>連接 Four Score（四人適配器）</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="84"/>
@@ -4524,7 +4524,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../InputConf.cpp" line="224"/>
         <source>Shadow</source>
-        <translation>陰影</translation>
+        <translation>Space Shadow（光線槍）</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="225"/>
@@ -7716,7 +7716,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2005"/>
         <source>4 Score</source>
-        <translation>4 計分</translation>
+        <translation>Four Score</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2018"/>
@@ -9621,7 +9621,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../ConsoleFile.cpp" line="337"/>
         <source>NSF Sound Files (*.nsf *.NSF) ;; Zip Files (*.zip *.ZIP) ;; All files (*)</source>
-        <translation>NSF 音效檔案 (*.nsf *.NSF) ;; Zip 檔案 (*.zip *.ZIP) ;; 所有檔案 (*)</translation>
+        <translation>NSF 音樂檔案 (*.nsf *.NSF) ;; Zip 檔案 (*.zip *.ZIP) ;; 所有檔案 (*)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugWindows.cpp" line="294"/>

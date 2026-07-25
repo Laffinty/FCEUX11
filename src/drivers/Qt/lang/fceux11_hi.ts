@@ -2817,7 +2817,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="326"/>
         <source>Toggle State on Press</source>
-        <translation>दबाने पर स्थिति टॉगल करें</translation>
+        <translation>दबाने पर स्टेट टॉगल करें</translation>
     </message>
 </context>
 <context>
@@ -7540,7 +7540,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="334"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1189"/>
         <source>Auto-Restore Last Position</source>
-        <translation>अंतिम स्थिति ऑटो-बहाल करें</translation>
+        <translation>अंतिम स्टेट ऑटो-बहाल करें</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="336"/>
@@ -8695,7 +8695,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="208"/>
         <location filename="../ConsoleWindow.cpp" line="789"/>
         <source>Load State &amp;From</source>
-        <translation>स्थिति &amp;से लोड करें</translation>
+        <translation>स्टेट &amp;से लोड करें</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="210"/>
@@ -8706,7 +8706,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="217"/>
         <location filename="../ConsoleWindow.cpp" line="790"/>
         <source>Save State &amp;As</source>
-        <translation>स्थिति &amp;के रूप में सहेजें</translation>
+        <translation>स्टेट &amp;के रूप में सहेजें</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="219"/>
@@ -9237,7 +9237,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="930"/>
         <location filename="../ConsoleWindow.cpp" line="805"/>
         <source>&amp;State Recorder Config</source>
-        <translation>&amp;स्थिति रिकॉर्डर कॉन्फ़िग</translation>
+        <translation>&amp;स्टेट रिकॉर्डर कॉन्फ़िग</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="931"/>

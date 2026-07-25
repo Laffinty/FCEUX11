@@ -2982,7 +2982,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../GameGenie.cpp" line="259"/>
         <source>Add Cheat</source>
-        <translation>Thêm cheat</translation>
+        <translation>Thêm mã gian lận</translation>
     </message>
 </context>
 <context>
@@ -3550,7 +3550,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../CheatsConf.cpp" line="514"/>
         <source>Add Cheat</source>
-        <translation>Thêm cheat</translation>
+        <translation>Thêm mã gian lận</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="520"/>
@@ -4520,7 +4520,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../InputConf.cpp" line="224"/>
         <source>Shadow</source>
-        <translation>Bóng</translation>
+        <translation>Space Shadow</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="225"/>
@@ -5414,12 +5414,12 @@ Replace file?</source>
     <message>
         <location filename="../PaletteEditor.cpp" line="109"/>
         <source>E&amp;xport As</source>
-        <translation>Xuất &amp;ra(&amp;X)</translation>
+        <translation>Xuất ra(&amp;X)</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="111"/>
         <source>&amp;Adobe Color Table</source>
-        <translation>Bảng màu &amp;Adobe(&amp;A)</translation>
+        <translation>Bảng màu Adobe(&amp;A)</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="113"/>
@@ -5466,12 +5466,12 @@ Replace file?</source>
     <message>
         <location filename="../PaletteEditor.cpp" line="148"/>
         <source>&amp;Memory</source>
-        <translation>Bộ &amp;nhớ(&amp;M)</translation>
+        <translation>Bộ nhớ(&amp;M)</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="151"/>
         <source>&amp;Write To</source>
-        <translation>Ghi &amp;vào(&amp;W)</translation>
+        <translation>Ghi vào(&amp;W)</translation>
     </message>
     <message>
         <location filename="../PaletteEditor.cpp" line="152"/>
@@ -5529,17 +5529,17 @@ Replace file?</source>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="6398"/>
         <source>Run To &amp;Cursor</source>
-        <translation>Chạy đến con &amp;trỏ(&amp;C)</translation>
+        <translation>Chạy đến con trỏ(&amp;C)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="6415"/>
         <source>Edit &amp;Breakpoint</source>
-        <translation>Sửa &amp;breakpoint(&amp;B)</translation>
+        <translation>Sửa breakpoint(&amp;B)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="6419"/>
         <source>Add &amp;Breakpoint</source>
-        <translation>Thêm &amp;breakpoint(&amp;B)</translation>
+        <translation>Thêm breakpoint(&amp;B)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="6422"/>
@@ -5637,7 +5637,7 @@ Replace file?</source>
     <message>
         <location filename="../HexEditor.cpp" line="3188"/>
         <source>&amp;Unfreeze</source>
-        <translation>Giải &amp;băng(&amp;U)</translation>
+        <translation>Giải băng(&amp;U)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="3195"/>
@@ -6316,7 +6316,7 @@ Replace file?</source>
     <message>
         <location filename="../RamWatch.cpp" line="166"/>
         <source>&amp;New Watch</source>
-        <translation>Theo dõi &amp;mới(&amp;N)</translation>
+        <translation>Theo dõi mới(&amp;N)</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="167"/>
@@ -10290,7 +10290,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../NameTableViewer.cpp" line="212"/>
         <source>Show &amp;Tile Grid</source>
-        <translation>Hiển thị lưới &amp;Tile(&amp;T)</translation>
+        <translation>Hiển thị lưới Tile(&amp;T)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="216"/>
@@ -10338,7 +10338,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../NameTableViewer.cpp" line="258"/>
         <source>Zoom &amp;In</source>
-        <translation>Phóng &amp;to(&amp;I)</translation>
+        <translation>Phóng to(&amp;I)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="261"/>
@@ -10348,7 +10348,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../NameTableViewer.cpp" line="269"/>
         <source>Zoom &amp;Out</source>
-        <translation>Thu &amp;nhỏ(&amp;O)</translation>
+        <translation>Thu nhỏ(&amp;O)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="272"/>
@@ -10358,7 +10358,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../NameTableViewer.cpp" line="279"/>
         <source>Image &amp;Zoom</source>
-        <translation>Phóng &amp;ảnh(&amp;Z)</translation>
+        <translation>Phóng ảnh(&amp;Z)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="306"/>
@@ -10378,7 +10378,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../NameTableViewer.cpp" line="327"/>
         <source>&amp;Refresh</source>
-        <translation>Làm &amp;mới(&amp;R)</translation>
+        <translation>Làm mới(&amp;R)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="328"/>
@@ -10393,12 +10393,12 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../NameTableViewer.cpp" line="335"/>
         <source>Auto &amp;Refresh Rate</source>
-        <translation>Tự động tốc độ làm &amp;mới(&amp;R)</translation>
+        <translation>Tự động tốc độ làm mới(&amp;R)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="375"/>
         <source>&amp;Colors</source>
-        <translation>Màu &amp;sắc(&amp;C)</translation>
+        <translation>Màu sắc(&amp;C)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="378"/>
@@ -10408,7 +10408,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../NameTableViewer.cpp" line="383"/>
         <source>Tile &amp;Grid</source>
-        <translation>Lưới &amp;Tile(&amp;G)</translation>
+        <translation>Lưới Tile(&amp;G)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="389"/>
@@ -10524,7 +10524,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../ppuViewerPatternTables.cpp" line="431"/>
         <source>Next &amp;Palette</source>
-        <translation>Bảng màu &amp;tiếp(&amp;P)</translation>
+        <translation>Bảng màu tiếp(&amp;P)</translation>
     </message>
     <message>
         <location filename="../ppuViewerPatternTables.cpp" line="432"/>
@@ -10809,7 +10809,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ppuViewer.cpp" line="282"/>
         <location filename="../ppuViewer.cpp" line="302"/>
         <source>Toggle &amp;Grid</source>
-        <translation>Chuyển &amp;lưới(&amp;G)</translation>
+        <translation>Chuyển lưới(&amp;G)</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="283"/>
@@ -10821,7 +10821,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ppuViewer.cpp" line="288"/>
         <location filename="../ppuViewer.cpp" line="308"/>
         <source>&amp;Colors</source>
-        <translation>Màu &amp;sắc(&amp;C)</translation>
+        <translation>Màu sắc(&amp;C)</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="290"/>
@@ -10833,7 +10833,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ppuViewer.cpp" line="295"/>
         <location filename="../ppuViewer.cpp" line="315"/>
         <source>Tile &amp;Grid</source>
-        <translation>Lưới &amp;Tile(&amp;G)</translation>
+        <translation>Lưới Tile(&amp;G)</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="300"/>
@@ -10886,7 +10886,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="73"/>
         <source>Toggle &amp;Grid</source>
-        <translation>Chuyển &amp;lưới(&amp;G)</translation>
+        <translation>Chuyển lưới(&amp;G)</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="74"/>
@@ -10901,7 +10901,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="81"/>
         <source>&amp;Selector</source>
-        <translation>Bộ &amp;chọn(&amp;S)</translation>
+        <translation>Bộ chọn(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="86"/>

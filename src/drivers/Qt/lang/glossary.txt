@@ -17,17 +17,17 @@
 # the simplified/traditional glyph separation rule.
 
 gamepad	游戏手柄	遊戲手把	ゲームパッド	게임패드	Mando	Joystick	Gamepad	Tay cầm	จอยเกม	गेमपैड	يد التحكم
-save state	存档	存檔	セーブ状態	세이브 스테이트	Estado guardado	État sauvegardé	Spielstand	Trạng thái lưu	บันทึกสถานะ	सेव स्टेट	حالة محفوظة
-load state	读档	讀檔	ロード状態	로드 스테이트	Estado cargado	État chargé	Spielstand laden	Trạng thái tải	โหลดสถานะ	लोड स्टेट	تحميل حالة
+save state	存档	存檔	ステートセーブ	세이브 스테이트	Estado guardado	État sauvegardé	Spielstand	Trạng thái lưu	บันทึกสถานะ	सेव स्टेट	حالة محفوظة
+load state	读档	讀檔	ステートロード	로드 스테이트	Estado cargado	État chargé	Spielstand laden	Trạng thái tải	โหลดสถานะ	लोड स्टेट	تحميل حالة
 quick load	快速读档	快速讀檔	クイックロード	빠른 불러오기	Carga rápida	Chargement rapide	Schnellladen	Tải nhanh	โหลดเร็ว	क्विक लोड	تحميل سريع
-quick save	快速存档	快速存放	クイックセーブ	빠른 저장	Guardado rápido	Sauvegarde rapide	Schnellspeichern	Lưu nhanh	บันทึกเร็ว	क्विक सेव	حفظ سريع
-frame advance	逐帧推进	逐格推進	フレーム送り	프레임 어드밴스	Avance de fotograma	Avancement d'image	Einzelbildvorschub	Tiến khung hình	เลื่อนเฟรม	फ्रेम एडवांस	تقدُّم الإطار
-movie	录像	錄影	ムービー	무비	Película	Film	Film	Phim	มูฟวี่	मूवी	تسجيل
+quick save	快速存档	快速存檔	クイックセーブ	빠른 저장	Guardado rápido	Sauvegarde rapide	Schnellspeichern	Lưu nhanh	บันทึกเร็ว	क्विक सेव	حفظ سريع
+frame advance	逐帧推进	逐格推進	フレームアドバンス	프레임 어드밴스	Avance de fotograma	Avancement d'image	Einzelbildvorschub	Tiến khung hình	เลื่อนเฟรม	फ्रेम एडवांस	تقدُّم الإطار
+movie	录像	錄影	ムービー	무비	Película	Film	Film	Phim	มูฟวี่	मूवी	فيلم
 TAS editor	TAS 编辑器	TAS 編輯器	TAS エディタ	TAS 에디터	Editor TAS	Éditeur TAS	TAS-Editor	Trình chỉnh sửa TAS	ตัวแก้ไข TAS	TAS एडिटर	محرر TAS
 debugger	调试器	除錯器	デバッガ	디버거	Depurador	Débogueur	Debugger	Trình gỡ lỗi	ดีบักเกอร์	डीबगर	مصحح أخطاء
 breakpoint	断点	中斷點	ブレークポイント	브레이크포인트	Punto de ruptura	Point d'arrêt	Haltepunkt	Điểm dừng	จุดหยุด	ब्रेकपॉइं트	نقطة توقف
 cheat	作弊码	作弊碼	チート	치트	Truco	Code de triche	Cheat	Mã gian lận	โกง	चीट	كود غش
-Game Genie	金手指	金手指	ゲームジニー	게지	Herramienta Game Genie	Game Genie	Game-Genie	Game Genie	Game Genie	Game Genie	Game Genie
+Game Genie	金手指	金手指	ゲームジニー	게임 지니	Herramienta Game Genie	Game Genie	Game-Genie	Game Genie	Game Genie	Game Genie	Game Genie
 sprite	精灵	精靈	スプライト	스프라이트	Sprite	Sprite	Sprite	Sprite	สไปรท์	स्प्राइट	سبرايت
 nametable	名称表	名稱表	ネームテーブル	네임테이블	Tabla de nombres	Nametable	Nametabelle	Bảng tên	ตารางชื่อ	नेमटेबल	جدول الأسماء
 palette	调色板	調色盤	パレット	팔레트	Paleta	Palette	Palette	Bảng màu	พาเลต	पैलेट	لوحة الألوان
@@ -63,13 +63,13 @@ save state as	另存为	另存新檔	名前を付けてセーブ	다른 이름�
 screenshot	截图	截圖	スクリーンショット	스크린샷	Captura de pantalla	Capture d'écran	Screenshot	Chụp ảnh màn hình	จับภาพหน้าจอ	स्क्रीनशॉट	لقطة شاشة
 recent ROMs	最近的 ROM	最近的 ROM	最近の ROM	최근 ROM	ROM recientes	ROM récentes	Letzte ROMs	ROM gần đây	ROM ล่าสุด	हालिया ROM	ROM الأخيرة
 speed up	加速	加速	スピードアップ	가속	Acelerar	Accélérer	Beschleunigen	Tăng tốc	เพิ่มความเร็ว	गति बढ़ाएँ	تسريع
-slow down	减速	減速	スローダウン	감속	Desacelerar	Ralentir	Verlangsamen	Giảm tốc	ลดความเร็ว	�ति धीमी करें	إبطاء
+slow down	减速	減速	スローダウン	감속	Desacelerar	Ralentir	Verlangsamen	Giảm tốc	ลดความเร็ว	गति धीमी करें	إبطاء
 turbo	极速	極速	ターボ	터보	Turbo	Turbo	Turbo	Turbo	เทอร์โบ	टर्बो	توربو
 normal speed	正常速度	正常速度	通常速度	보통 속도	Velocidad normal	Vitesse normale	Normalgeschwindigkeit	Tốc độ bình thường	ความเร็วปกติ	सामान्य गति	سرعة عادية
 slowest	最慢	最慢	最遅	가장 느림	El más lento	Le plus lent	Langsamste	Chậm nhất	ช้าที่สุด	सबसे धीमा	أبطأ
 auto resume	自动续玩	自動續玩	自動再開	자동 재개	Reanudar auto.	Reprise auto.	Automatisch fortsetzen	Tự động tiếp tục	เล่นต่ออัตโนมัติ	स्वतः जारी रखें	استئناف تلقائي
 pause	暂停	暫停	一時停止	일시 중지	Pausar	Pause	Pausieren	Tạm dừng	หยุดชั่วคราว	रोकें	إيقاف مؤقت
-reset	重置	重置	リセット	리셋	Reiniciar	Réinitialiser	Zurücksetzen	Đặt lại	รีเซ็�	रीसेट	إعادة تعيين
+reset	重置	重置	リセット	리셋	Reiniciar	Réinitialiser	Zurücksetzen	Đặt lại	รีเซ็ต	रीसेट	إعادة تعيين
 power	电源	電源	電源	전원	Energía	Énergie	Strom	Nguồn	แหล่งจ่ายไฟ	पावर	طاقة
 settings	设置	設定	設定	設定	Configuración	Paramètres	Einstellungen	Cài đặt	การตั้งค่า	सेटिंग्स	إعدادات
 preferences	首选项	偏好設定	環境設定	환경설정	Preferencias	Préférences	Einstellungen	Tùy chọn	ค่าที่ต้องการ	प्राथमिकताएं	التفضيلات
@@ -97,16 +97,16 @@ logger	记录器	記錄器	ロガー	로거	Registrador	Journal	Protokollierer	B
 enable	启用	啟用	有効	활성화	Habilitar	Activer	Aktivieren	Bật	เปิดใช้	सक्षम करें	تفعيل
 disable	禁用	停用	無効	비활성화	Deshabilitar	Désactiver	Deaktivieren	Tắt	ปิดใช้	अक्षम करें	تعطيل
 about	关于	關於	バージョン情報	정보	Acerca de	À propos	Über	Giới thiệu	เกี่ยวกับ	के बारे में	حول
-quit	退出	退出	終了	종료	Salir	Quitter	Beenden	Thoát	退出	बाहर निकलें	إنهاء
+quit	退出	退出	終了	종료	Salir	Quitter	Beenden	Thoát	ออก	बाहर निकलें	إنهاء
 close	关闭	關閉	閉じる	닫기	Cerrar	Fermer	Schließen	Đóng	ปิด	बंद करें	إغلاق
 open	打开	開啟	開く	열기	Abrir	Ouvrir	Öffnen	Mở	เปิด	खोलें	فتح
 new	新建	新增	新規	새로 만들기	Nuevo	Nouveau	Neu	Mới	ใหม่	नया	جديد
 delete	删除	刪除	削除	삭제	Eliminar	Supprimer	Löschen	Xóa	ลบ	हटाएं	حذف
 edit	编辑	編輯	編集	편집	Editar	Modifier	Bearbeiten	Chỉnh sửa	แก้ไข	संपादित करें	تحرير
-find	查找	尋找	検索	찾기	Buscar	Chercher	Finden	Tìm	ค้นหา	�ूंढें	بحث
+find	查找	尋找	検索	찾기	Buscar	Chercher	Finden	Tìm	ค้นหา	ढूंढें	بحث
 replace	替换	取代	置換	바꾸기	Reemplazar	Remplacer	Ersetzen	Thay thế	แทนที่	बदलें	استبدال
 undo	撤销	復原	元に戻す	실행 취소	Deshacer	Annuler	Rückgängig	Hoàn tác	เลิกทำ	पूर्ववत करें	تراجع
-redo	重做	重做	やり直し	다시 실행	Reacer	Rétablir	Wiederholen	Làm lại	ทำซ้ำ	फिर से करें	إعادة
+redo	重做	重做	やり直し	다시 실행	Rehacer	Rétablir	Wiederholen	Làm lại	ทำซ้ำ	फिर से करें	إعادة
 copy	复制	複製	コピー	복사	Copiar	Copier	Kopieren	Sao chép	คัดลอก	कॉपी करें	نسخ
 paste	粘贴	貼上	貼り付け	붙여넣기	Pegar	Coller	Einfügen	Dán	วาง	पेस्ट करें	لصق
 cut	剪切	剪下	切り取り	잘라내기	Cortar	Couper	Ausschneiden	Cắt	ตัด	काटें	قص
@@ -118,3 +118,5 @@ error	错误	錯誤	エラー	오류	Error	Erreur	Fehler	Lỗi	ข้อผิ�
 question	问题	問題	質問	질문	Pregunta	Question	Frage	Câu hỏi	คำถาม	प्रश्न	سؤال
 message log	消息日志	訊息記錄	メッセージログ	메시지 로그	Registro de mensajes	Journal des messages	Meldungsprotokoll	Nhật ký thông báo	บันทึกข้อความ	संदेश लॉग	سجل الرسائل
 about Qt	关于 Qt	關於 Qt	Qt について	Qt 정보	Acerca de Qt	À propos de Qt	Über Qt	Giới thiệu Qt	เกี่ยวกับ Qt	Qt के बारे में	حول Qt
+Shadow	Space Shadow（光线枪）	Space Shadow（光線槍）	シャドウ	스페이스 섀도우	Space Shadow	Space Shadow	Space Shadow	Space Shadow	Space Shadow	शैडो	Space Shadow
+Four Score	Four Score（四人适配器）	Four Score（四人適配器）	フォアスコア	포어스코어	Four Score	Four Score	Four Score	Four Score	Four Score	फोर स्कोर	Four Score

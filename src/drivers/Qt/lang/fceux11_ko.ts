@@ -1776,7 +1776,7 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="4452"/>
         <source> Emulator Paused on Lua Breakpoint</source>
-        <translation>Lua 브레이크포인트로 에뮬레이터 일시 중지</translation>
+        <translation>Lua 중단점로 에뮬레이터 일시 중지</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="4455"/>
@@ -2501,13 +2501,13 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../ConsoleDebugger.cpp" line="1889"/>
         <location filename="../ConsoleDebugger.cpp" line="2119"/>
         <source>Edit Breakpoint</source>
-        <translation>브레이크포인트 편집</translation>
+        <translation>중단점 편집</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1893"/>
         <location filename="../ConsoleDebugger.cpp" line="2123"/>
         <source>Add Breakpoint</source>
-        <translation>브레이크포인트 추가</translation>
+        <translation>중단점 추가</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1901"/>
@@ -3176,7 +3176,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../GamePadConf.cpp" line="366"/>
         <location filename="../GamePadConf.cpp" line="623"/>
         <source>Enable Four Score</source>
-        <translation>포어스코어 활성化</translation>
+        <translation>포어스코어 활성화</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="367"/>
@@ -3396,7 +3396,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../CheatsConf.cpp" line="142"/>
         <location filename="../CheatsConf.cpp" line="528"/>
         <source>Enable Cheats</source>
-        <translation>치트 활성化</translation>
+        <translation>치트 활성화</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="143"/>
@@ -3684,7 +3684,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../GuiConf.cpp" line="136"/>
         <location filename="../GuiConf.cpp" line="299"/>
         <source>Context Menu Enable</source>
-        <translation>컨텍스트 메뉴 활성化</translation>
+        <translation>컨텍스트 메뉴 활성화</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="137"/>
@@ -4520,7 +4520,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../InputConf.cpp" line="224"/>
         <source>Shadow</source>
-        <translation>그림자</translation>
+        <translation>스페이스 섀도우</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="225"/>
@@ -4939,7 +4939,7 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MovieOptions.cpp" line="54"/>
         <location filename="../MovieOptions.cpp" line="205"/>
         <source>Movie Options</source>
-        <translation>묵비 옵션</translation>
+        <translation>무비 옵션</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="63"/>
@@ -4963,43 +4963,43 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MovieOptions.cpp" line="69"/>
         <location filename="../MovieOptions.cpp" line="210"/>
         <source>Bind Save-States to Movies</source>
-        <translation>세이브스테이트를 동영상에 바인딩</translation>
+        <translation>세이브스테이트를 무비에 바인딩</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="71"/>
         <location filename="../MovieOptions.cpp" line="211"/>
         <source>Display Movie Subtitles</source>
-        <translation>동영상 자막 표시</translation>
+        <translation>무비 자막 표시</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="73"/>
         <location filename="../MovieOptions.cpp" line="212"/>
         <source>Put Movie Subtitles in AVI</source>
-        <translation>동영상 자막을 AVI에 포함</translation>
+        <translation>무비 자막을 AVI에 포함</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="75"/>
         <location filename="../MovieOptions.cpp" line="213"/>
         <source>Automatically Backup Movies</source>
-        <translation>동영상 자동 백업</translation>
+        <translation>무비 자동 백업</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="77"/>
         <location filename="../MovieOptions.cpp" line="214"/>
         <source>Load Full Save-State Movies:</source>
-        <translation>전체 세이브스테이트 동영상 로드:</translation>
+        <translation>전체 세이브스테이트 무비 로드:</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="79"/>
         <location filename="../MovieOptions.cpp" line="215"/>
         <source>AVI Enable HUD Recording</source>
-        <translation>AVI HUD 녹화 활성化</translation>
+        <translation>AVI HUD 녹화 활성화</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="81"/>
         <location filename="../MovieOptions.cpp" line="216"/>
         <source>AVI Enable Msg Recording</source>
-        <translation>AVI 메시지 녹화 활성化</translation>
+        <translation>AVI 메시지 녹화 활성화</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="83"/>
@@ -5011,7 +5011,7 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MovieOptions.cpp" line="86"/>
         <location filename="../MovieOptions.cpp" line="218"/>
         <source>Loading states in record mode will not immediately truncate movie, next frame input will. (VBA-rr and SNES9x style)</source>
-        <translation>녹화 모드에서 상태 로드가 동영상을 즉시 자르지 않으며, 다음 프레임 입력에서 잘립니다. (VBA-rr/SNES9x 스타일)</translation>
+        <translation>녹화 모드에서 상태 로드가 무비을 즉시 자르지 않으며, 다음 프레임 입력에서 잘립니다. (VBA-rr/SNES9x 스타일)</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="116"/>
@@ -5038,7 +5038,7 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MoviePlay.cpp" line="60"/>
         <location filename="../MoviePlay.cpp" line="225"/>
         <source>Movie Play</source>
-        <translation>묵비 재생</translation>
+        <translation>무비 재생</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="66"/>
@@ -5068,7 +5068,7 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MoviePlay.cpp" line="89"/>
         <location filename="../MoviePlay.cpp" line="231"/>
         <source>Pause Movie At Frame</source>
-        <translation>프레임에서 동영상 일시정지</translation>
+        <translation>프레임에서 무비 일시정지</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="122"/>
@@ -5145,12 +5145,12 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
     <message>
         <location filename="../MoviePlay.cpp" line="569"/>
         <source>Open FM2 Movie</source>
-        <translation>FM2 동영상 열기</translation>
+        <translation>FM2 무비 열기</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="573"/>
         <source>FM2 Movies (*.fm2) ;; All files (*)</source>
-        <translation>FM2 동영상 (*.fm2) ;; 모든 파일 (*)</translation>
+        <translation>FM2 무비 (*.fm2) ;; 모든 파일 (*)</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="577"/>
@@ -5165,7 +5165,7 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MovieRecord.cpp" line="385"/>
         <location filename="../MovieRecord.cpp" line="399"/>
         <source>Record Input Movie</source>
-        <translation>입력 동영상 녹화</translation>
+        <translation>입력 무비 녹화</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="75"/>
@@ -5253,17 +5253,17 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MovieRecord.cpp" line="304"/>
         <source>Pre-existing movie file Will be overwritten.
 Replace file?</source>
-        <translation>기존 동영상 파일이 덮어쓰기 됩니다. 파일을 교체하시겠습니까?</translation>
+        <translation>기존 무비 파일이 덮어쓰기 됩니다. 파일을 교체하시겠습니까?</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="332"/>
         <source>Save FM2 Movie for Recording</source>
-        <translation>녹화용 FM2 동영상 저장</translation>
+        <translation>녹화용 FM2 무비 저장</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="336"/>
         <source>FM2 Movies (*.fm2) ;; All files (*)</source>
-        <translation>FM2 동영상 (*.fm2) ;; 모든 파일 (*)</translation>
+        <translation>FM2 무비 (*.fm2) ;; 모든 파일 (*)</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="340"/>
@@ -5869,7 +5869,7 @@ Replace file?</source>
     <message>
         <location filename="../TasEditor/TasEditorTimeline.cpp" line="1000"/>
         <source>Truncate Movie</source>
-        <translation>동영상 잘라내기</translation>
+        <translation>무비 잘라내기</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorTimeline.cpp" line="2540"/>
@@ -5888,13 +5888,13 @@ Replace file?</source>
     <message>
         <location filename="../TraceLogger.cpp" line="1987"/>
         <source>Edit Breakpoint</source>
-        <translation>브레이크포인트 편집</translation>
+        <translation>중단점 편집</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="1991"/>
         <location filename="../TraceLogger.cpp" line="2333"/>
         <source>Add Breakpoint</source>
-        <translation>브레이크포인트 추가</translation>
+        <translation>중단점 추가</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="1999"/>
@@ -6605,7 +6605,7 @@ Replace file?</source>
         <location filename="../StateRecorderConf.cpp" line="113"/>
         <location filename="../StateRecorderConf.cpp" line="176"/>
         <source>Minutes</source>
-        <translation>分</translation>
+        <translation>분</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="120"/>
@@ -7256,7 +7256,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="678"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="680"/>
         <source>Truncate Movie</source>
-        <translation>동영상 잘라내기</translation>
+        <translation>무비 잘라내기</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="687"/>
@@ -7436,7 +7436,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="930"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="933"/>
         <source>Branches Restore Entire Movie</source>
-        <translation>분기가 전체 동영상 복원</translation>
+        <translation>분기가 전체 무비 복원</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="940"/>
@@ -7448,7 +7448,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="952"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="955"/>
         <source>Autopause at End of Movie</source>
-        <translation>동영상 끝에서 자동 일시정지</translation>
+        <translation>무비 끝에서 자동 일시정지</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="962"/>
@@ -7746,12 +7746,12 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2156"/>
         <source>Import Movie File</source>
-        <translation>동영상 파일 가져오기</translation>
+        <translation>무비 파일 가져오기</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2162"/>
         <source>FCEUX Movie Files (*.fm2) ;; TAS Project Files (*.fm3) ;; All files (*)</source>
-        <translation>FCEUX 동영상 파일 (*.fm2) ;; TAS 프로젝트 파일 (*.fm3) ;; 모든 파일 (*)</translation>
+        <translation>FCEUX 무비 파일 (*.fm2) ;; TAS 프로젝트 파일 (*.fm3) ;; 모든 파일 (*)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2166"/>
@@ -7772,7 +7772,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2281"/>
         <source>FCEUX Movie File (*.fm2) ;; All files (*)</source>
-        <translation>FCEUX 동영상 파일 (*.fm2) ;; 모든 파일 (*)</translation>
+        <translation>FCEUX 무비 파일 (*.fm2) ;; 모든 파일 (*)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2285"/>
@@ -8693,12 +8693,12 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="208"/>
         <location filename="../ConsoleWindow.cpp" line="789"/>
         <source>Load State &amp;From</source>
-        <translation>상태 불러오기(&amp;F)</translation>
+        <translation>세이브 스테이트 불러오기(&amp;F)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="210"/>
         <source>Load State From</source>
-        <translation>상태 불러오기</translation>
+        <translation>세이브 스테이트 불러오기</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="217"/>
@@ -9251,7 +9251,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../ConsoleMenu.cpp" line="939"/>
         <source>Movie Options</source>
-        <translation>동영상 옵션</translation>
+        <translation>무비 옵션</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="948"/>
@@ -9444,45 +9444,45 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="1117"/>
         <location filename="../ConsoleWindow.cpp" line="844"/>
         <source>Movie &amp;Play</source>
-        <translation>동영상 재생(&amp;P)</translation>
+        <translation>무비 재생(&amp;P)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1119"/>
         <source>Play Movie File</source>
-        <translation>동영상 파일 재생</translation>
+        <translation>무비 파일 재생</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1129"/>
         <location filename="../ConsoleWindow.cpp" line="845"/>
         <source>Movie Play From &amp;Beginning</source>
-        <translation>동영상 처음부터 재생(&amp;B)</translation>
+        <translation>무비 처음부터 재생(&amp;B)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1131"/>
         <source>Play Movie From Beginning</source>
-        <translation>동영상 처음부터 재생</translation>
+        <translation>무비 처음부터 재생</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1141"/>
         <location filename="../ConsoleWindow.cpp" line="846"/>
         <source>Movie &amp;Stop</source>
-        <translation>동영상 정지(&amp;S)</translation>
+        <translation>무비 정지(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1143"/>
         <source>Stop Movie Recording</source>
-        <translation>동영상 녹화 중지</translation>
+        <translation>무비 녹화 중지</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1155"/>
         <location filename="../ConsoleWindow.cpp" line="847"/>
         <source>Movie &amp;Record</source>
-        <translation>동영상 녹화(&amp;R)</translation>
+        <translation>무비 녹화(&amp;R)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1157"/>
         <source>Record Movie</source>
-        <translation>동영상 녹화</translation>
+        <translation>무비 녹화</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1171"/>
@@ -9829,17 +9829,17 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../GuiConf.cpp" line="1645"/>
         <source>Line Edit Enabled</source>
-        <translation>줄 편집 활성化</translation>
+        <translation>줄 편집 활성화</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1649"/>
         <source>Label Disabled</source>
-        <translation>레이블 비활성化</translation>
+        <translation>레이블 비활성화</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1654"/>
         <source>Line Edit Disabled</source>
-        <translation>줄 편집 비활성化</translation>
+        <translation>줄 편집 비활성화</translation>
     </message>
     <message>
         <location filename="../GuiConf.cpp" line="1658"/>
@@ -10622,7 +10622,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="7549"/>
         <source>Sprite Overflow</source>
-        <translation>스�프라이트 오버플로</translation>
+        <translation>스프라이트 오버플로</translation>
     </message>
 </context>
 <context>

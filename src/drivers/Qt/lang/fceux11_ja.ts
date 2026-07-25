@@ -400,7 +400,7 @@
     <message>
         <location filename="../TasEditor/bookmarks.cpp" line="922"/>
         <source>Right click = set Bookmark, Left click = jump to Bookmark or load Branch</source>
-        <translation>右クリック=ブックマーク設定、左クリック=ブックマークへジャンプまたはブランチ読込</translation>
+        <translation>右クリック=ブックマーク設定、左クリック=ブックマークへジャンプまたはブランチ読み込み</translation>
     </message>
 </context>
 <context>
@@ -408,7 +408,7 @@
     <message>
         <location filename="../TasEditor/branches.cpp" line="763"/>
         <source>Right click = set Bookmark, single Left click = jump to Bookmark, double Left click = load Branch</source>
-        <translation>右クリック=ブックマーク設定、左クリック=ブックマークへジャンプ、ダブルクリック=ブランチ読込</translation>
+        <translation>右クリック=ブックマーク設定、左クリック=ブックマークへジャンプ、ダブルクリック=ブランチ読み込み</translation>
     </message>
 </context>
 <context>
@@ -427,12 +427,12 @@
     <message>
         <location filename="../CodeDataLogger.cpp" line="111"/>
         <source>&amp;Load</source>
-        <translation>読込(&amp;L)</translation>
+        <translation>読み込み(&amp;L)</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="113"/>
         <source>Load From File</source>
-        <translation>ファイルから読込</translation>
+        <translation>ファイルから読み込み</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="119"/>
@@ -499,7 +499,7 @@
     <message>
         <location filename="../CodeDataLogger.cpp" line="173"/>
         <source>Auto-load .CDL when opening this window</source>
-        <translation>このウィンドウを開く時に CDL を自動読込</translation>
+        <translation>このウィンドウを開く時に CDL を自動読み込み</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="174"/>
@@ -624,7 +624,7 @@
     <message>
         <location filename="../CodeDataLogger.cpp" line="321"/>
         <source>Auto Load CDL</source>
-        <translation>CDL を自動読込</translation>
+        <translation>CDL を自動読み込み</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="322"/>
@@ -670,7 +670,7 @@
     <message>
         <location filename="../CodeDataLogger.cpp" line="517"/>
         <source>Load CDL File</source>
-        <translation>CDL ファイルを読込</translation>
+        <translation>CDL ファイルを読み込み</translation>
     </message>
     <message>
         <location filename="../CodeDataLogger.cpp" line="521"/>
@@ -1246,20 +1246,20 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="861"/>
         <source>&amp;Open Debugger on ROM Load</source>
-        <translation>ROM 読込時にデバッガを開く(&amp;O)</translation>
+        <translation>ROM 読み込み時にデバッガを開く(&amp;O)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="863"/>
         <location filename="../ConsoleDebugger.cpp" line="900"/>
         <location filename="../ConsoleDebugger.cpp" line="902"/>
         <source>&amp;Reload</source>
-        <translation>再読込(&amp;R)</translation>
+        <translation>再読み込み(&amp;R)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="873"/>
         <location filename="../ConsoleDebugger.cpp" line="875"/>
         <source>&amp;Load .FDB on ROM Load</source>
-        <translation>ROM 読込時に FDB を読込(&amp;L)</translation>
+        <translation>ROM 読み込み時に FDB を読み込み(&amp;L)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="885"/>
@@ -2529,7 +2529,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../ConsoleDebugger.cpp" line="1923"/>
         <location filename="../ConsoleDebugger.cpp" line="2127"/>
         <source>Read</source>
-        <translation>読込</translation>
+        <translation>読み込み</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1924"/>
@@ -2672,7 +2672,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="774"/>
         <source>Load Mapping</source>
-        <translation>マッピングを読込</translation>
+        <translation>マッピングを読み込み</translation>
     </message>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="780"/>
@@ -2765,7 +2765,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="1160"/>
         <source>Load Family Keyboard Mapping File</source>
-        <translation>ファミリーキーボード マッピングファイルを読込</translation>
+        <translation>ファミリーキーボード マッピングファイルを読み込み</translation>
     </message>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="1387"/>
@@ -3082,7 +3082,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../GamePadConf.cpp" line="329"/>
         <location filename="../GamePadConf.cpp" line="654"/>
         <source>Selected button mapping profile for use with Load/Save/Delete operations</source>
-        <translation>選択したボタンマッププロファイル（読込/保存/削除操作用）</translation>
+        <translation>選択したボタンマッププロファイル（読み込み/保存/削除操作用）</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="330"/>
@@ -3401,7 +3401,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../CheatsConf.cpp" line="143"/>
         <source>Auto Load / Save with Game</source>
-        <translation>ゲーム時に自動読込/保存</translation>
+        <translation>ゲーム時に自動読み込み/保存</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="157"/>
@@ -3575,7 +3575,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../CheatsConf.cpp" line="529"/>
         <source>Auto Load/Save Cheats</source>
-        <translation>チートを自動読込/保存</translation>
+        <translation>チートを自動読み込み/保存</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="530"/>
@@ -3948,12 +3948,12 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../HexEditor.cpp" line="1178"/>
         <source>&amp;Load TBL File</source>
-        <translation>TBL ファイルを読込(&amp;L)</translation>
+        <translation>TBL ファイルを読み込み(&amp;L)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1180"/>
         <source>Load Table from File</source>
-        <translation>ファイルからテーブルを読込</translation>
+        <translation>ファイルからテーブルを読み込み</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1186"/>
@@ -4249,7 +4249,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../HexEditor.cpp" line="1722"/>
         <source>Load Table From File</source>
-        <translation>ファイルからテーブルを読込</translation>
+        <translation>ファイルからテーブルを読み込み</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1726"/>
@@ -4427,7 +4427,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../InputConf.cpp" line="85"/>
         <location filename="../InputConf.cpp" line="297"/>
         <source>Auto Load/Save Presets at ROM Open/Close</source>
-        <translation>ROM 開閉時にプリセットを自動読込/保存</translation>
+        <translation>ROM 開閉時にプリセットを自動読み込み/保存</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="99"/>
@@ -4565,7 +4565,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../InputConf.cpp" line="484"/>
         <source>Load Preset From File</source>
-        <translation>ファイルからプリセットを読込</translation>
+        <translation>ファイルからプリセットを読み込み</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="495"/>
@@ -4963,31 +4963,31 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MovieOptions.cpp" line="69"/>
         <location filename="../MovieOptions.cpp" line="210"/>
         <source>Bind Save-States to Movies</source>
-        <translation>セーブステートを動画にバインド</translation>
+        <translation>セーブステートをムービーにバインド</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="71"/>
         <location filename="../MovieOptions.cpp" line="211"/>
         <source>Display Movie Subtitles</source>
-        <translation>動画字幕を表示</translation>
+        <translation>ムービー字幕を表示</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="73"/>
         <location filename="../MovieOptions.cpp" line="212"/>
         <source>Put Movie Subtitles in AVI</source>
-        <translation>動画字幕をAVIに含める</translation>
+        <translation>ムービー字幕をAVIに含める</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="75"/>
         <location filename="../MovieOptions.cpp" line="213"/>
         <source>Automatically Backup Movies</source>
-        <translation>動画を自動バックアップ</translation>
+        <translation>ムービーを自動バックアップ</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="77"/>
         <location filename="../MovieOptions.cpp" line="214"/>
         <source>Load Full Save-State Movies:</source>
-        <translation>フルセーブステート動画を読込:</translation>
+        <translation>フルセーブステートムービーを読み込み:</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="79"/>
@@ -5011,7 +5011,7 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MovieOptions.cpp" line="86"/>
         <location filename="../MovieOptions.cpp" line="218"/>
         <source>Loading states in record mode will not immediately truncate movie, next frame input will. (VBA-rr and SNES9x style)</source>
-        <translation>記録モードでステートを読込しても動画はすぐに切り詰められず、次のフレーム入力で切り詰められます。（VBA-rr/SNES9xスタイル）</translation>
+        <translation>記録モードでステートを読み込みしてもムービーはすぐに切り詰められず、次のフレーム入力で切り詰められます。（VBA-rr/SNES9xスタイル）</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="116"/>
@@ -5068,7 +5068,7 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MoviePlay.cpp" line="89"/>
         <location filename="../MoviePlay.cpp" line="231"/>
         <source>Pause Movie At Frame</source>
-        <translation>フレームで動画を一時停止</translation>
+        <translation>フレームでムービーを一時停止</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="122"/>
@@ -5145,12 +5145,12 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
     <message>
         <location filename="../MoviePlay.cpp" line="569"/>
         <source>Open FM2 Movie</source>
-        <translation>FM2動画を開く</translation>
+        <translation>FM2ムービーを開く</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="573"/>
         <source>FM2 Movies (*.fm2) ;; All files (*)</source>
-        <translation>FM2動画 (*.fm2) ;; すべてのファイル (*)</translation>
+        <translation>FM2ムービー (*.fm2) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="577"/>
@@ -5165,7 +5165,7 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MovieRecord.cpp" line="385"/>
         <location filename="../MovieRecord.cpp" line="399"/>
         <source>Record Input Movie</source>
-        <translation>入力動画を記録</translation>
+        <translation>入力ムービーを記録</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="75"/>
@@ -5232,7 +5232,7 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
     <message>
         <location filename="../MovieRecord.cpp" line="197"/>
         <source>Load State From File</source>
-        <translation>ファイルからステートを読込</translation>
+        <translation>ファイルからステートを読み込み</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="230"/>
@@ -5253,17 +5253,17 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MovieRecord.cpp" line="304"/>
         <source>Pre-existing movie file Will be overwritten.
 Replace file?</source>
-        <translation>既存の動画ファイルが上書きされます。ファイルを置き換えますか？</translation>
+        <translation>既存のムービーファイルが上書きされます。ファイルを置き換えますか？</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="332"/>
         <source>Save FM2 Movie for Recording</source>
-        <translation>記録用にFM2動画を保存</translation>
+        <translation>記録用にFM2ムービーを保存</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="336"/>
         <source>FM2 Movies (*.fm2) ;; All files (*)</source>
-        <translation>FM2動画 (*.fm2) ;; すべてのファイル (*)</translation>
+        <translation>FM2ムービー (*.fm2) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../MovieRecord.cpp" line="340"/>
@@ -5776,7 +5776,7 @@ Replace file?</source>
         <location filename="../TasEditor/taseditor_project.cpp" line="336"/>
         <location filename="../TasEditor/taseditor_project.cpp" line="338"/>
         <source>Loading TAS Project</source>
-        <translation>TASプロジェクトを読込</translation>
+        <translation>TASプロジェクトを読み込み</translation>
     </message>
 </context>
 <context>
@@ -5869,7 +5869,7 @@ Replace file?</source>
     <message>
         <location filename="../TasEditor/TasEditorTimeline.cpp" line="1000"/>
         <source>Truncate Movie</source>
-        <translation>動画を切り詰め</translation>
+        <translation>ムービーを切り詰め</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorTimeline.cpp" line="2540"/>
@@ -5914,7 +5914,7 @@ Replace file?</source>
     <message>
         <location filename="../TraceLogger.cpp" line="2018"/>
         <source>Read</source>
-        <translation>読込</translation>
+        <translation>読み込み</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="2019"/>
@@ -6582,7 +6582,7 @@ Replace file?</source>
         <location filename="../StateRecorderConf.cpp" line="60"/>
         <location filename="../StateRecorderConf.cpp" line="365"/>
         <source>Auto Start Recorder at ROM Load</source>
-        <translation>ROM読込時にレコーダーを自動起動</translation>
+        <translation>ROM読み込み時にレコーダーを自動起動</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="65"/>
@@ -6693,7 +6693,7 @@ Replace file?</source>
     <message>
         <location filename="../StateRecorderConf.cpp" line="189"/>
         <source>Pause on State Load:</source>
-        <translation>ステート読込時に一時停止:</translation>
+        <translation>ステート読み込み時に一時停止:</translation>
     </message>
     <message>
         <location filename="../StateRecorderConf.cpp" line="196"/>
@@ -7256,7 +7256,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="678"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="680"/>
         <source>Truncate Movie</source>
-        <translation>動画を切り詰め</translation>
+        <translation>ムービーを切り詰め</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="687"/>
@@ -7436,7 +7436,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="930"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="933"/>
         <source>Branches Restore Entire Movie</source>
-        <translation>ブランチが動画全体を復元</translation>
+        <translation>ブランチがムービー全体を復元</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="940"/>
@@ -7448,7 +7448,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="952"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="955"/>
         <source>Autopause at End of Movie</source>
-        <translation>動画終了時に自動一時停止</translation>
+        <translation>ムービー終了時に自動一時停止</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="962"/>
@@ -7746,12 +7746,12 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2156"/>
         <source>Import Movie File</source>
-        <translation>動画ファイルをインポート</translation>
+        <translation>ムービーファイルをインポート</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2162"/>
         <source>FCEUX Movie Files (*.fm2) ;; TAS Project Files (*.fm3) ;; All files (*)</source>
-        <translation>FCEUX動画ファイル (*.fm2) ;; TASプロジェクトファイル (*.fm3) ;; すべてのファイル (*)</translation>
+        <translation>FCEUXムービーファイル (*.fm2) ;; TASプロジェクトファイル (*.fm3) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2166"/>
@@ -7772,7 +7772,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2281"/>
         <source>FCEUX Movie File (*.fm2) ;; All files (*)</source>
-        <translation>FCEUX動画ファイル (*.fm2) ;; すべてのファイル (*)</translation>
+        <translation>FCEUXムービーファイル (*.fm2) ;; すべてのファイル (*)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2285"/>
@@ -9251,7 +9251,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../ConsoleMenu.cpp" line="939"/>
         <source>Movie Options</source>
-        <translation>動画オプション</translation>
+        <translation>ムービーオプション</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="948"/>
@@ -9444,45 +9444,45 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="1117"/>
         <location filename="../ConsoleWindow.cpp" line="844"/>
         <source>Movie &amp;Play</source>
-        <translation>動画再生(&amp;P)</translation>
+        <translation>ムービー再生(&amp;P)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1119"/>
         <source>Play Movie File</source>
-        <translation>動画ファイルを再生</translation>
+        <translation>ムービーファイルを再生</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1129"/>
         <location filename="../ConsoleWindow.cpp" line="845"/>
         <source>Movie Play From &amp;Beginning</source>
-        <translation>動画を最初から再生(&amp;B)</translation>
+        <translation>ムービーを最初から再生(&amp;B)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1131"/>
         <source>Play Movie From Beginning</source>
-        <translation>動画を最初から再生</translation>
+        <translation>ムービーを最初から再生</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1141"/>
         <location filename="../ConsoleWindow.cpp" line="846"/>
         <source>Movie &amp;Stop</source>
-        <translation>動画停止(&amp;S)</translation>
+        <translation>ムービー停止(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1143"/>
         <source>Stop Movie Recording</source>
-        <translation>動画録画を停止</translation>
+        <translation>ムービー録画を停止</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1155"/>
         <location filename="../ConsoleWindow.cpp" line="847"/>
         <source>Movie &amp;Record</source>
-        <translation>動画録画(&amp;R)</translation>
+        <translation>ムービー録画(&amp;R)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1157"/>
         <source>Record Movie</source>
-        <translation>動画を録画</translation>
+        <translation>ムービーを録画</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1171"/>
@@ -9624,7 +9624,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../ConsoleEmuControl.cpp" line="120"/>
         <source>Load State From File</source>
-        <translation>ファイルからステートを読込</translation>
+        <translation>ファイルからステートを読み込み</translation>
     </message>
     <message>
         <location filename="../ConsoleEmuControl.cpp" line="153"/>
@@ -11035,7 +11035,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../input.cpp" line="667"/>
         <location filename="../input.cpp" line="677"/>
         <source>Load</source>
-        <translation>読込</translation>
+        <translation>読み込み</translation>
     </message>
     <message>
         <location filename="../input.cpp" line="672"/>

@@ -4520,7 +4520,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../InputConf.cpp" line="224"/>
         <source>Shadow</source>
-        <translation>ظل</translation>
+        <translation>Space Shadow</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="225"/>

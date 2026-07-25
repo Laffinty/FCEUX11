@@ -2817,7 +2817,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="326"/>
         <source>Toggle State on Press</source>
-        <translation>Zustand beim Drücken umschalten</translation>
+        <translation>Spielstand beim Drücken umschalten</translation>
     </message>
 </context>
 <context>
@@ -4520,7 +4520,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../InputConf.cpp" line="224"/>
         <source>Shadow</source>
-        <translation>Schatten</translation>
+        <translation>Space Shadow</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="225"/>
@@ -4963,7 +4963,7 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MovieOptions.cpp" line="69"/>
         <location filename="../MovieOptions.cpp" line="210"/>
         <source>Bind Save-States to Movies</source>
-        <translation>Savestates an Filme binden</translation>
+        <translation>Spielstände an Filme binden</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="71"/>
@@ -4987,7 +4987,7 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MovieOptions.cpp" line="77"/>
         <location filename="../MovieOptions.cpp" line="214"/>
         <source>Load Full Save-State Movies:</source>
-        <translation>Vollständige Savestate-Filme laden:</translation>
+        <translation>Vollständige Spielstand-Filme laden:</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="79"/>
@@ -8051,7 +8051,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3528"/>
         <source>Keep savestates for how many frames?
 (actual limit of savestates can be 5 times more than the number provided)</source>
-        <translation>Savestates für wie viele Frames aufbewahren? (tatsächliches Limit kann 5-mal höher sein als angegeben)</translation>
+        <translation>Spielstände für wie viele Frames aufbewahren? (tatsächliches Limit kann 5-mal höher sein als angegeben)</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3564"/>
@@ -8693,7 +8693,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="208"/>
         <location filename="../ConsoleWindow.cpp" line="789"/>
         <source>Load State &amp;From</source>
-        <translation>Zustand &amp;laden von</translation>
+        <translation>Spielstand &amp;laden von</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="210"/>
@@ -8704,7 +8704,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="217"/>
         <location filename="../ConsoleWindow.cpp" line="790"/>
         <source>Save State &amp;As</source>
-        <translation>Zustand speichern &amp;unter</translation>
+        <translation>Spielstand speichern &amp;unter</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="219"/>
@@ -9235,7 +9235,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="930"/>
         <location filename="../ConsoleWindow.cpp" line="805"/>
         <source>&amp;State Recorder Config</source>
-        <translation>&amp;Zustandsaufzeichner-Konfiguration</translation>
+        <translation>&amp;Spielstandaufzeichner-Konfiguration</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="931"/>

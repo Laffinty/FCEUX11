@@ -4520,7 +4520,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../InputConf.cpp" line="224"/>
         <source>Shadow</source>
-        <translation>Sombra</translation>
+        <translation>Space Shadow</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="225"/>
@@ -5680,7 +5680,7 @@ Replace file?</source>
     <message>
         <location filename="../CheatsConf.cpp" line="1104"/>
         <source>Cheat Manual Save Warning</source>
-        <translation>Advertencia de guardado manual de truc</translation>
+        <translation>Advertencia de guardado manual de trucos</translation>
     </message>
     <message>
         <location filename="../MenuCatalog.h" line="52"/>
@@ -6085,7 +6085,7 @@ Replace file?</source>
         <location filename="../RamSearch.cpp" line="326"/>
         <location filename="../RamSearch.cpp" line="555"/>
         <source>Add Cheat</source>
-        <translation>Agregar truc</translation>
+        <translation>Añadir truco</translation>
     </message>
     <message>
         <location filename="../RamSearch.cpp" line="331"/>
@@ -6470,7 +6470,7 @@ Replace file?</source>
         <location filename="../RamWatch.cpp" line="296"/>
         <location filename="../RamWatch.cpp" line="358"/>
         <source>Add Cheat</source>
-        <translation>Agregar truc</translation>
+        <translation>Añadir truco</translation>
     </message>
     <message>
         <location filename="../RamWatch.cpp" line="560"/>

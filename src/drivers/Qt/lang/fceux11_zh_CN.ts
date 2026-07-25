@@ -2307,7 +2307,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../ConsoleVideoConf.cpp" line="386"/>
         <location filename="../ConsoleVideoConf.cpp" line="577"/>
         <source>Test Pattern:</source>
-        <translation>测试模式：</translation>
+        <translation>测试图案：</translation>
     </message>
     <message>
         <location filename="../ConsoleVideoConf.cpp" line="392"/>
@@ -3341,7 +3341,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../GamePadConf.cpp" line="2126"/>
         <location filename="../GamePadConf.cpp" line="2206"/>
         <source>Modifier Button:</source>
-        <translation>修改键：</translation>
+        <translation>修饰键：</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="2132"/>
@@ -3405,7 +3405,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../CheatsConf.cpp" line="143"/>
         <source>Auto Load / Save with Game</source>
-        <translation>随游戏自动读档/存档</translation>
+        <translation>随游戏自动载入/保存（作弊码）</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="157"/>
@@ -4334,7 +4334,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../HotKeyConf.cpp" line="51"/>
         <location filename="../HotKeyConf.cpp" line="120"/>
         <source>Hotkey Configuration</source>
-        <translation>热键配置</translation>
+        <translation>快捷键配置</translation>
     </message>
     <message>
         <location filename="../HotKeyConf.cpp" line="88"/>
@@ -4353,7 +4353,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../HotKeyConf.cpp" line="338"/>
         <location filename="../HotKeyConf.cpp" line="381"/>
         <source>Set Hot Key</source>
-        <translation>设置热键</translation>
+        <translation>设置快捷键</translation>
     </message>
     <message>
         <location filename="../HotKeyConf.cpp" line="345"/>
@@ -4387,7 +4387,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../GamePadConf.cpp" line="2502"/>
         <location filename="../GamePadConf.cpp" line="2579"/>
         <source>Hotkey Select</source>
-        <translation>热键选择</translation>
+        <translation>快捷键选择</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="2551"/>
@@ -4419,7 +4419,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../InputConf.cpp" line="83"/>
         <location filename="../InputConf.cpp" line="295"/>
         <source>Attach 4-Score (Implies four gamepads)</source>
-        <translation>附加 4 计分（隐含四手柄）</translation>
+        <translation>连接 Four Score（四人适配器）</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="84"/>
@@ -4524,7 +4524,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../InputConf.cpp" line="224"/>
         <source>Shadow</source>
-        <translation>阴影</translation>
+        <translation>Space Shadow（光线枪）</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="225"/>
@@ -7716,7 +7716,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2005"/>
         <source>4 Score</source>
-        <translation>4 计分</translation>
+        <translation>Four Score</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="2018"/>
@@ -8747,7 +8747,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="248"/>
         <location filename="../ConsoleWindow.cpp" line="777"/>
         <source>Change &amp;State Slot</source>
-        <translation>更改状态槽(&amp;S)</translation>
+        <translation>更改存档槽(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="255"/>
@@ -9621,7 +9621,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../ConsoleFile.cpp" line="337"/>
         <source>NSF Sound Files (*.nsf *.NSF) ;; Zip Files (*.zip *.ZIP) ;; All files (*)</source>
-        <translation>NSF 音效文件 (*.nsf *.NSF) ;; Zip 文件 (*.zip *.ZIP) ;; 所有文件 (*)</translation>
+        <translation>NSF 音乐文件 (*.nsf *.NSF) ;; Zip 文件 (*.zip *.ZIP) ;; 所有文件 (*)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugWindows.cpp" line="294"/>
@@ -10033,7 +10033,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="355"/>
         <source>Trainer</source>
-        <translation>训练器</translation>
+        <translation>Trainer 数据</translation>
     </message>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="356"/>
