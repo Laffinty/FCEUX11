@@ -17,7 +17,7 @@
 #include "state.h"
 #include "emufile.h"
 #include "utils/md5.h"
-#include "drivers/Qt/nes_shm.h"
+#include "drivers/common/nes_shm.h"
 #include "x6502.h"
 #include "ppu.h"
 

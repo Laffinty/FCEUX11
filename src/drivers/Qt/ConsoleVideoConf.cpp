@@ -33,7 +33,7 @@
 #include "Qt/ConsoleWindow.h"
 #include "Qt/ConsoleUtilities.h"
 #include "Qt/ConsoleVideoConf.h"
-#include "Qt/nes_shm.h"
+#include "common/nes_shm.h"
 
 extern int input_display;
 extern int frame_display;

@@ -26,6 +26,7 @@ fceux11-formats = { path = "crates/fceux11-formats" }
 fceux11-debug = { path = "crates/fceux11-debug" }
 fceux11-lua = { path = "crates/fceux11-lua" }
 fceux11-core = { path = "crates/fceux11-core" }
+kagami-qa = { path = "crates/kagami-qa" }
 
 [dev-dependencies]
 # Enable FFI stubs only during Rust workspace tests so cargo test can link

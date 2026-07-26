@@ -7,7 +7,7 @@
 #include "../../fceu.h"
 #include "Qt/ConsoleWindow.h"
 #include "Qt/dface.h"
-#include "Qt/nes_shm.h"
+#include "common/nes_shm.h"
 #include "Qt/fceuWrapper.h"
 #include "Qt/ConsoleViewerInterface.h"
 #include "Qt/sdl-video.h"

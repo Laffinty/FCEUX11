@@ -26,7 +26,7 @@
 //#include <unistd.h>
 
 #include "../../profiler.h"
-#include "Qt/nes_shm.h"
+#include "common/nes_shm.h"
 #include "Qt/throttle.h"
 #include "Qt/fceuWrapper.h"
 #include "Qt/ConsoleViewerQWidget.h"

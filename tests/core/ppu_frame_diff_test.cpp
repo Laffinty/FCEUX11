@@ -34,7 +34,7 @@
 #include "fceu.h"
 #include "driver.h"
 #include "state.h"
-#include "drivers/Qt/nes_shm.h"
+#include "drivers/common/nes_shm.h"
 
 static const int FRAME_WIDTH  = 256;
 static const int FRAME_HEIGHT = 240;

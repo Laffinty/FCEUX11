@@ -296,6 +296,7 @@ dependencies = [
  "fceux11-lua",
  "fceux11-media",
  "fceux11-utils",
+ "kagami-qa",
 ]
 
 [[package]]
@@ -447,6 +448,15 @@ dependencies = [
  "futures-util",
  "once_cell",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "kagami-qa"
+version = "0.3.5"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

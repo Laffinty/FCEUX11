@@ -34,7 +34,7 @@
 #include "driver.h"
 #include "sound.h"
 #include "state.h"
-#include "drivers/Qt/nes_shm.h"
+#include "drivers/common/nes_shm.h"
 
 static const int SAMPLE_RATE = 44100;
 static const int CHANNELS = 1;

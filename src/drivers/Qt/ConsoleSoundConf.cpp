@@ -31,7 +31,7 @@
 #include "Qt/main.h"
 #include "Qt/dface.h"
 #include "Qt/config.h"
-#include "Qt/nes_shm.h"
+#include "common/nes_shm.h"
 #include "Qt/fceuWrapper.h"
 
 //----------------------------------------------------

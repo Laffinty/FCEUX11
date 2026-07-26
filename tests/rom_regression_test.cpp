@@ -9,7 +9,7 @@
 #include "fceu.h"
 #include "driver.h"
 #include "utils/crc32.h"
-#include "drivers/Qt/nes_shm.h"
+#include "drivers/common/nes_shm.h"
 
 // Frame hash dimensions: XBuf is 256x256 bytes, but visible area is 256x240.
 static const int FRAME_BUF_SIZE = 256 * 240;

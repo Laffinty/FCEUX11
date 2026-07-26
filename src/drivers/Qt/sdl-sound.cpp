@@ -25,7 +25,7 @@
 
 #include "common/configSys.h"
 #include "utils/memory.h"
-#include "Qt/nes_shm.h"
+#include "common/nes_shm.h"
 #include "Qt/throttle.h"
 
 #include <cstdio>

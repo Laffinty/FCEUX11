@@ -65,7 +65,6 @@ extern void RefreshThrottleFPS();
 #endif
 
 #include "drivers/Qt/sdl.h"
-#include "drivers/Qt/nes_shm.h"
 
 #include <fstream>
 #include <sstream>

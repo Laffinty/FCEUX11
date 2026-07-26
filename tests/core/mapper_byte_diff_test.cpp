@@ -40,7 +40,7 @@
 #include "state.h"
 #include "cart.h"             // currCartInfo
 #include "cart_class.h"       // fceu11::Cart, fceu11::g_cart
-#include "drivers/Qt/nes_shm.h"
+#include "drivers/common/nes_shm.h"
 #include "test_helpers.h"     // core_init / load_rom / emulate_n
 
 static const size_t HEADER_SIZE = 16;

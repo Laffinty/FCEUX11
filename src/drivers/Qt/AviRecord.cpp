@@ -48,7 +48,7 @@
 
 #include "Qt/AviRecord.h"
 #include "Qt/avi/gwavi.h"
-#include "Qt/nes_shm.h"
+#include "common/nes_shm.h"
 #include "Qt/throttle.h"
 #include "Qt/ConsoleWindow.h"
 #include "Qt/ConsoleUtilities.h"

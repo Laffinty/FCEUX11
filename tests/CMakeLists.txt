@@ -43,6 +43,39 @@ function(fceux11_add_test_executable target_name)
     target_compile_definitions(${target_name} PRIVATE __QT_DRIVER__)
 endfunction()
 
+# KagamiQA P1 — Headless test executable: links null driver instead of Qt.
+function(fceux11_add_headless_test_executable target_name)
+    add_executable(${target_name} ${ARGN})
+
+    target_link_libraries(${target_name} PRIVATE
+        fceux11_drivers_null
+        fceux11_drivers_common
+        fceux11_core
+        fceux11_boards
+        fceux11_utils
+    )
+
+    if(FCEUX11_RUST_ENABLED AND FCEUX11_RUST_STATIC_LIB)
+        add_dependencies(${target_name} fceux11_rust_build)
+        target_link_libraries(${target_name} PRIVATE
+            ${FCEUX11_RUST_STATIC_LIB}
+        )
+    endif()
+
+    if(WIN32)
+        target_link_libraries(${target_name} PRIVATE ntdll)
+    endif()
+
+    target_include_directories(${target_name} PRIVATE
+        ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_SOURCE_DIR}/src/drivers
+        ${CMAKE_SOURCE_DIR}/src/drivers/null
+    )
+
+    # Headless binaries don't need the Qt scmrev.h escape hatch.
+    # But they inherit fceu.cpp → sdl.h → SDL2 via fceux11_core (P2 cleanup).
+endfunction()
+
 if(FCEUX11_BUILD_TESTS)
     # Smoke test (Task 1.0)
     fceux11_add_test_executable(fceux11_smoke_test
@@ -429,6 +462,7 @@ if(FCEUX11_BUILD_TESTS)
         ppu_frame_diff_test apu_wav_diff_test
         cart_class_test mapper_byte_diff_test fds_load_test
         driver_callbacks_test core_driver_boundary_test
+        ppu_rendering_lut_test ppu_phase_c_test ppu_phase_d_test
         PROPERTIES ENVIRONMENT_MODIFICATION
                 "${_FCEUX11_TEST_PATH_MODIFICATIONS}"
         )
@@ -449,6 +483,10 @@ if(FCEUX11_BUILD_TESTS)
     add_test(NAME pixbuf_pool_test
              COMMAND fceux11_pixbuf_pool_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    if(WIN32)
+        set_tests_properties(pixbuf_pool_test PROPERTIES ENVIRONMENT_MODIFICATION
+                "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+    endif()
 
     # -------------------------------------------------------------------------
     # v0.3.0 — Performance baseline benchmarks (Google Benchmark preferred)
@@ -533,4 +571,17 @@ if(FCEUX11_BUILD_TESTS)
 
     add_executable(fceux11_ppu_simd_probe_avx2 benchmark/ppu_simd_probe.cpp)
     target_compile_options(fceux11_ppu_simd_probe_avx2 PRIVATE /arch:AVX2)
+
+    # KagamiQA P1 — Headless smoke test (null driver, no Qt linkage).
+    fceux11_add_headless_test_executable(fceux11_headless_smoke_test
+        headless_smoke_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME headless_smoke_test
+             COMMAND fceux11_headless_smoke_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    if(WIN32)
+        set_tests_properties(headless_smoke_test PROPERTIES ENVIRONMENT_MODIFICATION
+                "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+    endif()
 endif()

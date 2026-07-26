@@ -20,7 +20,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "../src/drivers/Qt/nes_shm.h"
+#include "drivers/common/nes_shm.h"
 
 static int failures = 0;
 

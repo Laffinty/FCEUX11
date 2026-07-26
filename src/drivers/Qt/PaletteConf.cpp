@@ -27,7 +27,7 @@
 #include "Qt/main.h"
 #include "Qt/input.h"
 #include "Qt/config.h"
-#include "Qt/nes_shm.h"
+#include "common/nes_shm.h"
 #include "Qt/keyscan.h"
 #include "Qt/fceuWrapper.h"
 #include "Qt/ConsoleUtilities.h"

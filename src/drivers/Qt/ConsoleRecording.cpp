@@ -104,7 +104,7 @@
 #include "Qt/RamWatch.h"
 #include "Qt/RamSearch.h"
 #include "Qt/keyscan.h"
-#include "Qt/nes_shm.h"
+#include "common/nes_shm.h"
 #include "Qt/TasEditor/TasEditorWindow.h"
 
 

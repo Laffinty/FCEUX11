@@ -25,7 +25,7 @@
 #include <math.h>
 //#include <unistd.h>
 
-#include "Qt/nes_shm.h"
+#include "common/nes_shm.h"
 #include "Qt/throttle.h"
 #include "Qt/fceuWrapper.h"
 #include "Qt/ConsoleViewerSDL.h"

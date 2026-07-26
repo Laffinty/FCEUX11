@@ -446,6 +446,7 @@ set(SRC_DRIVERS_COMMON
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/common/vidblit.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/common/os_utils.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/common/nes_ntsc.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/common/nes_shm.cpp
 )
 
 set(SRC_DRIVERS_QT
@@ -512,9 +513,8 @@ set(SRC_DRIVERS_QT
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/RamWatch.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/RamSearch.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/config.cpp  
-  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/input.cpp  
-  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/nes_shm.cpp  
-  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/keyscan.cpp  
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/input.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/keyscan.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/sdl-sound.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/sdl-video.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/sdl-joystick.cpp  
@@ -636,6 +636,21 @@ target_include_directories(fceux11_drivers_qt PUBLIC
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/drivers
 )
+
+# KagamiQA P1 — Null driver (headless, no Qt / SDL / OpenGL).
+set(SRC_DRIVERS_NULL
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/null/null_driver.cpp
+)
+add_library(fceux11_drivers_null STATIC ${SRC_DRIVERS_NULL})
+target_link_libraries(fceux11_drivers_null PUBLIC
+    fceux11_core
+    fceux11_drivers_common
+)
+target_include_directories(fceux11_drivers_null PUBLIC
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/drivers
+)
+
 # v0.3.1: PCH for Qt drivers — QtWidgets + QtOpenGL
 target_precompile_headers(fceux11_drivers_qt PRIVATE
     <QtWidgets>

@@ -38,7 +38,7 @@
 #include "input/input_manager.h"
 #include "Qt/sdl.h"
 #include "Qt/sdl-video.h"
-#include "Qt/nes_shm.h"
+#include "common/nes_shm.h"
 #include "Qt/AviRecord.h"
 #include "Qt/HexEditor.h"
 #include "Qt/CheatsConf.h"

@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "Qt/nes_shm.h"
+#include "common/nes_shm.h"
 
 nes_shm_t *nes_shm = NULL;
 

@@ -7,7 +7,7 @@
 #include "utils/fceu11_format.h"
 #include "fceu.h"
 #include "driver.h"
-#include "drivers/Qt/nes_shm.h"
+#include "drivers/common/nes_shm.h"
 
 static bool g_core_initialized = false;
 

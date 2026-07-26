@@ -7,7 +7,7 @@
 
 #include "fceu.h"
 #include "common/os_utils.h"
-#include "Qt/nes_shm.h"
+#include "common/nes_shm.h"
 #include "Qt/throttle.h"
 #include "Qt/ConsoleWindow.h"
 #include "Qt/fceuWrapper.h"

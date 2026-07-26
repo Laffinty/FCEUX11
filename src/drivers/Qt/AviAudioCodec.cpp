@@ -6,7 +6,7 @@
 #include <string.h>
 
 #include "fceu.h"
-#include "Qt/nes_shm.h"
+#include "common/nes_shm.h"
 #include "Qt/fceuWrapper.h"
 
 #include "Qt/AviAudioCodec.h"

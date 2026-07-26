@@ -12,7 +12,7 @@
 #include "Qt/AviRecord.h"
 #include "Qt/AviVideoCodec.h"
 #include "Qt/AviAudioCodec.h"
-#include "Qt/nes_shm.h"
+#include "common/nes_shm.h"
 #include "Qt/throttle.h"
 
 AviRecordDiskThread_t::AviRecordDiskThread_t( QObject *parent )

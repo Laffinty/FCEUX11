@@ -24,7 +24,7 @@
 #include <array>
 
 #include "Qt/sdl.h"
-#include "Qt/nes_shm.h"
+#include "common/nes_shm.h"
 #include "common/vidblit.h"
 #include "../../fceu.h"
 #include "../../version.h"

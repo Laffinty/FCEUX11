@@ -38,7 +38,7 @@
 #include <QScreen>
 #include <QWindow>
 
-#include "Qt/nes_shm.h"
+#include "common/nes_shm.h"
 #include "Qt/throttle.h"
 #include "Qt/fceuWrapper.h"
 #include "Qt/ConsoleViewerGL.h"

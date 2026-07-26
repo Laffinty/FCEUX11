@@ -5,7 +5,7 @@
 
 #include "Qt/ConsoleWindow.h"
 #include "Qt/fceuWrapper.h"
-#include "Qt/nes_shm.h"
+#include "common/nes_shm.h"
 
 emulatorThread_t::emulatorThread_t( QObject *parent )
 	: QThread(parent)

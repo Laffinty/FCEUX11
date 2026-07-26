@@ -12,7 +12,7 @@
 #include "types.h"
 #include "fceu.h"
 #include "driver.h"
-#include "drivers/Qt/nes_shm.h"
+#include "drivers/common/nes_shm.h"
 
 static const char* ROM_PATH = "fixtures/mapper_nrom.nes";
 static const int FRAMES = 60;
