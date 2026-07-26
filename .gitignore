@@ -87,6 +87,9 @@ docs/history/unpacked/
 # MiMoCode
 .mimocode/
 
+# ZCode
+.zcode/
+
 # Local configuration
 config.ini
 settings.ini
