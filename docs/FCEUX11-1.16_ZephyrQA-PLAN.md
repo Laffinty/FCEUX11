@@ -4,7 +4,7 @@
 > **分支**：`wip_1.16`（全流程在此分支进行）
 > **框架命名**：ZephyrQA
 > **核心命题**：把 FCEUX11 现有但散落的测试资产收编为一个独立存在的、清单驱动的、双 oracle 的、机器可判定的测试框架——既是 FCEUX11 的质量防线，也是 AI 代理的"阅卷机"，且框架核心可迁移到其他多种项目。
-> **本阶段（P0）范围**：仅产出本计划文档 + ZephyrQA 占位目录。零代码改动。
+> **本阶段（P0）范围**：仅产出本计划文档。零代码改动。
 
 ---
 
@@ -432,7 +432,7 @@ ZephyrQA runner                  FCEUX11 adapter
       "oracle_type": "B",                    // A=回归等价 B=硬件一致性（一等字段，必填）
       "layer": "core",                       // core / ui / i18n / perf
       "input": {
-        "rom": "ZephyrQA/roms/blargg/cpu_dummy_reads.nes",
+        "rom": "tests/fixtures/blargg/cpu_dummy_reads.nes",
         "frames": 300
       },
       "expected": {
@@ -457,7 +457,7 @@ ZephyrQA runner                  FCEUX11 adapter
         "frames": 60
       },
       "expected": {
-        "golden": "ZephyrQA/baselines/frames/nrom.xbuf",
+        "golden": "tests/fixtures/golden_frames/nrom.xbuf",
         "tolerance": 0
       },
       "timeout_seconds": 60,
@@ -541,7 +541,7 @@ ZephyrQA runner                  FCEUX11 adapter
 - ✅ 方向性报告审阅 + 代码级交叉验证
 - ✅ 技术选型（Rust + Lua + JSON）
 - ✅ AI 友好性 + 跨项目可迁移性评估
-- ✅ 本计划文档 + ZephyrQA 占位目录
+- ✅ 本计划文档
 - **退出条件**：本文档入库 `wip_1.16`
 
 ### P1：收编 + headless 全款
@@ -625,7 +625,7 @@ hotfix5/6 的三轮翻译审计（209→122→47）证明多层验证价值，�
 
 | 阶段 | 退出条件（可判定、可复现） |
 |---|---|
-| P0 | 本文档 + ZephyrQA 占位目录入库 `wip_1.16` |
+| P0 | 本文档入库 `wip_1.16` |
 | P1 | 现有 30 CTest 全部经 ZephyrQA runner 跑通；迁移矩阵 JSON 产出；headless 无 Qt 运行；golden_hashes 审计完成；nes_shm 下沉完成 |
 | P2 | blargg 全套件跑批 <3 分钟；精度对照表入库；已知失败清单版本化；零模拟器代码修改 |
 | P3 | Lua 测试脚本可经 ZephyrQA headless 运行并产出判定；双通道统一调度 |
