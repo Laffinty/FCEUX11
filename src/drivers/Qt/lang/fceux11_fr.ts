@@ -9180,7 +9180,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="362"/>
         <location filename="../ConsoleWindow.cpp" line="797"/>
         <source>&amp;Input Config</source>
-        <translation>Configuration de l'entrée</translation>
+        <translation>Configuration de l'&amp;entrée</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="363"/>
@@ -9235,7 +9235,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="930"/>
         <location filename="../ConsoleWindow.cpp" line="805"/>
         <source>&amp;State Recorder Config</source>
-        <translation>Configuration de l'enregistreur d'état</translation>
+        <translation>Configuration de l'en&amp;registreur d'état</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="931"/>

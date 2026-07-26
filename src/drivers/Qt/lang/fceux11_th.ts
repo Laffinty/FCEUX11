@@ -7532,7 +7532,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="333"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1187"/>
         <source>Turbo Seek</source>
-        <translation>ค้นหาเทอร์โบ</translation>
+        <translation>เลื่อนหาเร็ว</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="334"/>
@@ -9251,7 +9251,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../ConsoleMenu.cpp" line="939"/>
         <source>Movie Options</source>
-        <translation>ตัวเลือกวิดีโอ</translation>
+        <translation>ตัวเลือกมูฟวี่</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="948"/>
@@ -9449,40 +9449,40 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1119"/>
         <source>Play Movie File</source>
-        <translation>เล่นไฟล์วิดีโอ</translation>
+        <translation>เล่นไฟล์มูฟวี่</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1129"/>
         <location filename="../ConsoleWindow.cpp" line="845"/>
         <source>Movie Play From &amp;Beginning</source>
-        <translation>เล่นวิดีโอจากต้น(&amp;B)</translation>
+        <translation>เล่นมูฟวี่จากต้น(&amp;B)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1131"/>
         <source>Play Movie From Beginning</source>
-        <translation>เล่นวิดีโอจากต้น</translation>
+        <translation>เล่นมูฟวี่จากต้น</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1141"/>
         <location filename="../ConsoleWindow.cpp" line="846"/>
         <source>Movie &amp;Stop</source>
-        <translation>หยุดวิดีโอ(&amp;S)</translation>
+        <translation>หยุดมูฟวี่(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1143"/>
         <source>Stop Movie Recording</source>
-        <translation>หยุดบันทึกวิดีโอ</translation>
+        <translation>หยุดบันทึกมูฟวี่</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1155"/>
         <location filename="../ConsoleWindow.cpp" line="847"/>
         <source>Movie &amp;Record</source>
-        <translation>บันทึกวิดีโอ(&amp;R)</translation>
+        <translation>บันทึกมูฟวี่(&amp;R)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1157"/>
         <source>Record Movie</source>
-        <translation>บันทึกวิดีโอ</translation>
+        <translation>บันทึกมูฟวี่</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1171"/>

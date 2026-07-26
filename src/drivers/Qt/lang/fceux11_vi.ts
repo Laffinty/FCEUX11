@@ -7532,7 +7532,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="333"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="1187"/>
         <source>Turbo Seek</source>
-        <translation>Tìm kiếm turbo</translation>
+        <translation>Dò nhanh</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="334"/>

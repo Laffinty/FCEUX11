@@ -8747,7 +8747,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="248"/>
         <location filename="../ConsoleWindow.cpp" line="777"/>
         <source>Change &amp;State Slot</source>
-        <translation>變更狀態槽(&amp;S)</translation>
+        <translation>變更存檔槽(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="255"/>
