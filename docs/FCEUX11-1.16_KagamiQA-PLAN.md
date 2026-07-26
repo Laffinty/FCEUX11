@@ -1,8 +1,8 @@
-# FCEUX11 v1.16「ZephyrQA 独立测试系统」构建计划
+# FCEUX11 v1.16「KagamiQA 独立测试系统」构建计划
 
 > **报告性质**：工程化构建计划（P0 转译）。基于桌面《FCEUX11 v1.16 独立测试系统可行性与方向性评估》方向性报告，经代码级交叉验证后转译为可执行方案。
 > **分支**：`wip_1.16`（全流程在此分支进行）
-> **框架命名**：ZephyrQA
+> **框架命名**：KagamiQA
 > **核心命题**：把 FCEUX11 现有但散落的测试资产收编为一个独立存在的、清单驱动的、双 oracle 的、机器可判定的测试框架——既是 FCEUX11 的质量防线，也是 AI 代理的"阅卷机"，且框架核心可迁移到其他多种项目。
 > **本阶段（P0）范围**：仅产出本计划文档。零代码改动。
 
@@ -13,7 +13,7 @@
 **可行。** 方向性报告的三个核心判断经代码级验证全部成立，并补充两个工程化校正：
 
 1. **测试系统独立化是"收编"而非"新建"**——FCEUX11 已有 30 项 CTest、golden master、bench 协议、i18n 门禁构成的"影子测试系统"，资产齐全，缺的是统一清单、统一 runner、统一报告、统一生命周期。
-2. **双 oracle 分离是系统灵魂**——现有 oracle 全是"回归等价"（回答"与昨天是否一致"），无一个"硬件一致性"（回答"与真实硬件是否一致"）。ZephyrQA 的核心动作是补上 Oracle B。
+2. **双 oracle 分离是系统灵魂**——现有 oracle 全是"回归等价"（回答"与昨天是否一致"），无一个"硬件一致性"（回答"与真实硬件是否一致"）。KagamiQA 的核心动作是补上 Oracle B。
 3. **独立测试系统是精度对齐与 runppu 重批的前置条件**——依赖序为：测试系统 → 精度基线 → 精度攻关 → runppu 重批，而非三线并进。
 
 **两个工程化校正**（不构成否决项，决定分阶段策略）：
@@ -53,7 +53,7 @@ P0 报告转译（本次）
 ### 1.3 三条明确非目标（写进系统文档首页，防止典范野心吃掉主线）
 
 1. **不做跨平台二进制可移植**：MSVC-only 是 ABI 与字节级 savestate 兼容的正当约束。"可移植性"定义为数据与协议层可移植（清单、基线、报告格式、框架核心 Rust 代码），而非二进制可移植。
-2. **不做多被测物框架**（一期）：ZephyrQA 一期只服务 FCEUX11。跨项目迁移能力通过 `SutAdapter` 抽象层**预留**，但不在 v1.16 实际接入第二个被测物。
+2. **不做多被测物框架**（一期）：KagamiQA 一期只服务 FCEUX11。跨项目迁移能力通过 `SutAdapter` 抽象层**预留**，但不在 v1.16 实际接入第二个被测物。
 3. **不强行纳入 UI 层**：headless 天然绕开 GUI。Qt UI 层走独立 offscreen smoke 通道（hotfix4 D-1 教训），不纳入核心 harness。
 
 ---
@@ -80,8 +80,8 @@ P0 报告转译（本次）
 - **CMake 集成**：`src/rust/CMakeLists.txt` 用 `add_custom_command` 跑 `cargo build --release --target x86_64-pc-windows-msvc`，产出 `fceux11_rust.lib` 静态库；`FCEUX11_RUST_ENABLED` 链接进 `fceux11_utils`
 - **cbindgen**：`build.rs` + `cbindgen 0.29.3` 自动生成 C 头文件，`cpp_compat = false`
 - **release profile**：`panic = "abort"` + `lto = true`
-- **ffi_stubs 机制**：`fceux11-lua` crate 的 `ffi_stubs.rs`（`#[cfg(any(test, feature = "ffi-stubs"))]`）让 Rust 测试脱离 C++ 独立链接——这正是 ZephyrQA 框架核心可独立测试的范式
-- **结论**：ZephyrQA 作为新 crate 加入此 workspace，复用 staticlib + cbindgen + CMake 模式，**零新工具链**。
+- **ffi_stubs 机制**：`fceux11-lua` crate 的 `ffi_stubs.rs`（`#[cfg(any(test, feature = "ffi-stubs"))]`）让 Rust 测试脱离 C++ 独立链接——这正是 KagamiQA 框架核心可独立测试的范式
+- **结论**：KagamiQA 作为新 crate 加入此 workspace，复用 staticlib + cbindgen + CMake 模式，**零新工具链**。
 
 ### 2.3 Lua 引擎（关键支撑，决定软件侧对接语言）
 
@@ -144,7 +144,7 @@ Oracle B 的判定核心即 `ARead[0x6000](0x6000)` ——读取 blargg 写入�
 
 ### 2.7 core 可被独立 link
 
-`fceux11_core` 静态库（`src/CMakeLists.txt:585`）链接 `fceux11_boards + fceux11_utils + zlib + SDL2`，**不链接 Qt**。ZephyrQA 的 FCEUX11 adapter 经 C ABI link core（与现有 CTest 链接路径一致，`fceux11_add_test_executable` 也是 link core + drivers_common）。SDL2 依赖源于音频子系统，headless 场景可 dummy 化。
+`fceux11_core` 静态库（`src/CMakeLists.txt:585`）链接 `fceux11_boards + fceux11_utils + zlib + SDL2`，**不链接 Qt**。KagamiQA 的 FCEUX11 adapter 经 C ABI link core（与现有 CTest 链接路径一致，`fceux11_add_test_executable` 也是 link core + drivers_common）。SDL2 依赖源于音频子系统，headless 场景可 dummy 化。
 
 ---
 
@@ -154,11 +154,11 @@ Oracle B 的判定核心即 `ARead[0x6000](0x6000)` ——读取 blargg 写入�
 
 | 候选 | 评估 | 结论 |
 |---|---|---|
-| **Rust** | 项目已有成熟 workspace（7 crate + cbindgen + CMake + ffi_stubs）。ZephyrQA 作为新 crate 加入，复用全部既有基建。Rust 的 serde（JSON）、错误处理（Result）、trait 抽象（SutAdapter）、无 UB 保证，恰好匹配测试框架"序列化 + 判定 + 抽象"的核心需求。 | ✅ 选定 |
+| **Rust** | 项目已有成熟 workspace（7 crate + cbindgen + CMake + ffi_stubs）。KagamiQA 作为新 crate 加入，复用全部既有基建。Rust 的 serde（JSON）、错误处理（Result）、trait 抽象（SutAdapter）、无 UB 保证，恰好匹配测试框架"序列化 + 判定 + 抽象"的核心需求。 | ✅ 选定 |
 | C++ | 与现有 30 CTest 同语言，link core 直接。但 C++ 缺乏 Rust 的序列化/错误处理/并发安全网，且与项目正在推进的 Rust 化方向相背。 | ✗ |
 | Python | 开发快、生态丰富。但需 ctypes/cffi 调 C ABI，性能与类型安全弱，引入新运行时依赖，与 MSVC-only 工具链锁定不一致。 | ✗ |
 
-**顺势论据**：项目已在 `src/rust/` 建立完整 Rust 基建，`ffi_stubs` 机制已证明"Rust 测试可脱离 C++ 独立链接"。ZephyrQA 不是引入新范式，而是复用既有范式。
+**顺势论据**：项目已在 `src/rust/` 建立完整 Rust 基建，`ffi_stubs` 机制已证明"Rust 测试可脱离 C++ 独立链接"。KagamiQA 不是引入新范式，而是复用既有范式。
 
 ### 3.2 软件侧对接语言：Lua + 声明式 tests.json（双通道）
 
@@ -178,7 +178,7 @@ Oracle B 的判定核心即 `ARead[0x6000](0x6000)` ——读取 blargg 写入�
 
 ### 3.3 被测物对接：C ABI link core + SutAdapter trait
 
-ZephyrQA 框架核心通过 `SutAdapter` trait 与被测物解耦（详见 §五）。FCEUX11 adapter 经 C ABI 链接 `fceux11_core` 静态库，调用 `fceu11::Initialize` / `fceu11::LoadGame` / `fceu11::Emulate` / `ARead[addr](addr)`。
+KagamiQA 框架核心通过 `SutAdapter` trait 与被测物解耦（详见 §五）。FCEUX11 adapter 经 C ABI 链接 `fceux11_core` 静态库，调用 `fceu11::Initialize` / `fceu11::LoadGame` / `fceu11::Emulate` / `ARead[addr](addr)`。
 
 ---
 
@@ -226,11 +226,11 @@ AI 生成 Lua 脚本比生成 Rust 测试代码迭代快得多（无需重编译
 
 ### 5.1 核心思想：框架核心与被测物解耦
 
-ZephyrQA crate 内部分两层：
+KagamiQA crate 内部分两层：
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  ZephyrQA 框架核心层（被测物无关 · 可迁移）              │
+│  KagamiQA 框架核心层（被测物无关 · 可迁移）              │
 │  manifest 解析 · runner 调度 · 双 oracle 判定           │
 │  迁移矩阵报告 · 基线治理                                 │
 │  仅依赖 SutAdapter trait，不依赖任何具体被测物           │
@@ -291,10 +291,10 @@ pub trait SutAdapter {
 
 ## 六、架构设计
 
-### 6.1 ZephyrQA crate 结构
+### 6.1 KagamiQA crate 结构
 
 ```
-src/rust/crates/zephyr-qa/
+src/rust/crates/kagami-qa/
 ├── Cargo.toml
 └── src/
     ├── lib.rs                  ← 公共入口
@@ -361,13 +361,13 @@ src/rust/crates/zephyr-qa/
 
 - 注册一个全 nullptr 的 `DriverCallbacks`（所有 `FCEUD_*` 安全 no-op）
 - 不启动 QGuiApplication
-- 由 ZephyrQA runner 经 C ABI 驱动 `fceu11::Initialize` / `LoadGame` / `Emulate`
+- 由 KagamiQA runner 经 C ABI 驱动 `fceu11::Initialize` / `LoadGame` / `Emulate`
 - **P1 补齐全款**：下沉 `nes_shm_t` 解除 `fceu.cpp` 对 Qt 的残留依赖
 
 ### 6.4 `$6000` 协议（Oracle B 落地）
 
 ```
-ZephyrQA runner                  FCEUX11 adapter
+KagamiQA runner                  FCEUX11 adapter
      │                                  │
      │  load(blargg.nes)                │
      ├─────────────────────────────────►│ fceu11::LoadGame
@@ -406,7 +406,7 @@ ZephyrQA runner                  FCEUX11 adapter
           └──────────┬───────────────────┘
                      │
           ┌──────────▼──────────┐
-          │  ZephyrQA runner    │
+          │  KagamiQA runner    │
           │  (统一调度)         │
           └─────────────────────┘
 ```
@@ -420,7 +420,7 @@ ZephyrQA runner                  FCEUX11 adapter
   "schema_version": 1,
   "suite": "fceux11_v1.16",
   "provenance": {
-    "generated_by": "zephyr-qa",
+    "generated_by": "kagami-qa",
     "engine_version": "1.16.0",
     "toolchain": "msvc-19.x",
     "generated_at": "2026-07-26T00:00:00Z"
@@ -546,13 +546,13 @@ ZephyrQA runner                  FCEUX11 adapter
 
 ### P1：收编 + headless 全款
 - 迁移现有 30 CTest + 脚本门禁进 tests.json 清单体系
-- 建 `zephyr-qa` crate 骨架（六模块）+ runner 骨架 + JSON 报告最小内核
+- 建 `kagami-qa` crate 骨架（六模块）+ runner 骨架 + JSON 报告最小内核
 - **审计 `golden_hashes.json`**：确认错误固化样本，重建或标注"已知错误基线"
 - **下沉 `nes_shm_t`**：解除 `fceu.cpp` 对 Qt 的残留依赖，补齐 headless 全款
 - 实现 `SutAdapter` trait + FCEUX11 adapter（C ABI link core）
 - 实现 Null Driver（全 nullptr DriverCallbacks）
 - **不接入 blargg、不改模拟器源码**
-- **退出条件**：现有 30 CTest 全部能经 ZephyrQA runner 跑通并产出迁移矩阵 JSON；headless 可在无 Qt 环境运行
+- **退出条件**：现有 30 CTest 全部能经 KagamiQA runner 跑通并产出迁移矩阵 JSON；headless 可在无 Qt 环境运行
 
 ### P2：Oracle B 接入（零代码修改）
 - 建 blargg ROM 套件清单 + 已知失败清单基线
@@ -564,9 +564,9 @@ ZephyrQA runner                  FCEUX11 adapter
 
 ### P3：软件侧输入通道
 - 解耦 `lua-engine.cpp` 对 Qt 的依赖（下沉 Qt 特定 includes）
-- 确立 Lua 脚本通道：ZephyrQA runner 可加载并执行 Lua 测试脚本
+- 确立 Lua 脚本通道：KagamiQA runner 可加载并执行 Lua 测试脚本
 - 确立 tests.json + Lua 双通道统一调度
-- **退出条件**：Lua 测试脚本可经 ZephyrQA headless 运行并产出判定
+- **退出条件**：Lua 测试脚本可经 KagamiQA headless 运行并产出判定
 
 ### P4：精度攻关（双 oracle 护栏下）
 - 在 Oracle A 全绿 + Oracle B 清单稳定前提下，修模拟器
@@ -600,7 +600,7 @@ ZephyrQA runner                  FCEUX11 adapter
 
 ### 11.1 阅卷机定位
 
-ZephyrQA 在功能上与 SWE-bench harness 同构：每个 PLAN 里的 PR 就是一个"任务实例"，测试系统就是它的阅卷机。建成后的工作流：
+KagamiQA 在功能上与 SWE-bench harness 同构：每个 PLAN 里的 PR 就是一个"任务实例"，测试系统就是它的阅卷机。建成后的工作流：
 
 ```
 当前：  AI 声明 → 人工抽查 → 发布评估文档
@@ -617,7 +617,7 @@ hotfix5/6 的三轮翻译审计（209→122→47）证明多层验证价值，�
 
 ### 11.3 建设期的 AI 甜蜜点
 
-建设 ZephyrQA 恰好是 AI Coding 的甜蜜点任务：大量机械性工作（清单条目编写、报告解析器、历史测试元数据补录）、判据客观（runner 能跑、报告字段齐全）、反馈即时（每条清单改动立即可验证）。多代理编排也已被 v1.15 验证（hotfix3 三代理 REVIEW），可复用。
+建设 KagamiQA 恰好是 AI Coding 的甜蜜点任务：大量机械性工作（清单条目编写、报告解析器、历史测试元数据补录）、判据客观（runner 能跑、报告字段齐全）、反馈即时（每条清单改动立即可验证）。多代理编排也已被 v1.15 验证（hotfix3 三代理 REVIEW），可复用。
 
 ---
 
@@ -626,9 +626,9 @@ hotfix5/6 的三轮翻译审计（209→122→47）证明多层验证价值，�
 | 阶段 | 退出条件（可判定、可复现） |
 |---|---|
 | P0 | 本文档入库 `wip_1.16` |
-| P1 | 现有 30 CTest 全部经 ZephyrQA runner 跑通；迁移矩阵 JSON 产出；headless 无 Qt 运行；golden_hashes 审计完成；nes_shm 下沉完成 |
+| P1 | 现有 30 CTest 全部经 KagamiQA runner 跑通；迁移矩阵 JSON 产出；headless 无 Qt 运行；golden_hashes 审计完成；nes_shm 下沉完成 |
 | P2 | blargg 全套件跑批 <3 分钟；精度对照表入库；已知失败清单版本化；零模拟器代码修改 |
-| P3 | Lua 测试脚本可经 ZephyrQA headless 运行并产出判定；双通道统一调度 |
+| P3 | Lua 测试脚本可经 KagamiQA headless 运行并产出判定；双通道统一调度 |
 | P4 | 至少一项 Oracle B FAIL→PASS；Oracle A 全集 PASS→PASS |
 | P5 | runppu 重批完成且双 oracle 给出可信信号；或收益重估未过则继续冻结（附理由） |
 
@@ -655,4 +655,4 @@ hotfix5/6 的三轮翻译审计（209→122→47）证明多层验证价值，�
 
 ## 十四、一句话收束
 
-**v1.16 这个命题的可行性不是"能不能建一个测试系统"，而是"敢不敢承认现有散件已经是系统的零件"。** ZephyrQA 的工作是收编它们、补上硬件 oracle、把判定权交给机器——精度对齐和 runppu 重批会从"高风险愿望"变成"护栏内的普通工作"，而这套系统本身，会成为 FCEUX11 在 AI Coding 时代留下的最有复用价值的工程资产：它的框架核心可迁移，它的方法论可陈述，它的人机接口无需信任。
+**v1.16 这个命题的可行性不是"能不能建一个测试系统"，而是"敢不敢承认现有散件已经是系统的零件"。** KagamiQA 的工作是收编它们、补上硬件 oracle、把判定权交给机器——精度对齐和 runppu 重批会从"高风险愿望"变成"护栏内的普通工作"，而这套系统本身，会成为 FCEUX11 在 AI Coding 时代留下的最有复用价值的工程资产：它的框架核心可迁移，它的方法论可陈述，它的人机接口无需信任。
