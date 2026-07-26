@@ -5,10 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.15(hotfix5+)] - 2026-07-25
+## [1.15(hotfix6)] - 2026-07-26
 
-**Translation quality audit-driven fixes.** ~227 P0+P1 issues fixed
-across all 11 languages based on per-term audit of 1,995 strings.
+**Codename: hotfix6.** Translation quality audit-driven fixes. 102 issues
+fixed across all 11 languages based on 3-round audit (initial review →
+retest → final review). Zero blocking issues; release approved.
+
+### Summary
+- **3-round audit**: 209 → 122 → 47 issues (−78%). Blocking issues: 60 → 9 → 0.
+- **102 fixes total**: R0 blocking (10), R1 terminology (15), R2 style (64),
+  final retest residuals (13).
+- **11 `.ts` files + glossary.txt** modified; 12 GitHub Pages HTML files updated.
+
+### Fixed — P0 (semantic errors & text corruption)
 
 ### Fixed — P0 (semantic errors & text corruption)
 - **Shadow device name** — 8 languages mistranslated "Shadow" (Space

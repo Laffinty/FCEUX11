@@ -1,4 +1,4 @@
-# FCEUX11 i18n Glossary (v1.15 hotfix5 expanded)
+# FCEUX11 i18n Glossary (v1.15 hotfix6)
 # Format: source_term [tab] zh_CN [tab] zh_TW [tab] ja [tab] ko [tab] es [tab] fr [tab] de [tab] vi [tab] th [tab] hi [tab] ar
 # Used by i18n_coverage.ps1 / i18n_audit.py for terminology consistency.
 #
