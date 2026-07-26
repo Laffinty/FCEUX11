@@ -104,13 +104,9 @@ Launch `fceux11.exe`, load a game via **File → Open ROM**, play with keyboard 
 
 **hotfix6 主要变更**：修复 11 种语言共 102 处翻译质量问题（法语双重转义乱码、韩语助词语法、泰语/越南语助记符位置、术语一致性），经三轮审计（首审→复测→终测）阻断项归零，批准发布。
 
-**hotfix5 主要变更**：完成全部 11 种语言的 i18n 翻译补齐（母语覆盖率从 ~22% 提升至 94-99%），语言菜单改为固定母语名显示（简体中文/繁體中文/English/日本語/한국어/Español/Français/Deutsch/Tiếng Việt/ไทย/हिन्दी/العربية），新增 i18n 门禁覆盖全部 11 种语言，修复 CI Rust 构建竞态问题。
-
 See [CHANGELOG.md](CHANGELOG.md). Current stable release is v1.15 (hotfix6).
 
 **hotfix6 highlights**: Fixed 102 translation quality issues across 11 languages (French double-escape bugs, Korean particle grammar, Thai/Vietnamese mnemonic placement, terminology consistency). Zero blocking issues after 3-round audit (initial review → retest → final review). Release approved.
-
-**hotfix5 highlights**: Complete i18n overhaul for all 11 languages (native coverage from ~22% to 94-99%), language menu now shows fixed native names regardless of UI language, new i18n gate covering all 11 languages, and a CI Rust build race-condition fix.
 
 ---
 
