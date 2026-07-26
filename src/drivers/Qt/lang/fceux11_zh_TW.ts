@@ -3405,7 +3405,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../CheatsConf.cpp" line="143"/>
         <source>Auto Load / Save with Game</source>
-        <translation>隨遊戲自動讀檔/存檔</translation>
+        <translation>隨遊戲自動載入/儲存（作弊碼）</translation>
     </message>
     <message>
         <location filename="../CheatsConf.cpp" line="157"/>
@@ -4334,7 +4334,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../HotKeyConf.cpp" line="51"/>
         <location filename="../HotKeyConf.cpp" line="120"/>
         <source>Hotkey Configuration</source>
-        <translation>熱鍵設定</translation>
+        <translation>快捷鍵設定</translation>
     </message>
     <message>
         <location filename="../HotKeyConf.cpp" line="88"/>
@@ -4353,7 +4353,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../HotKeyConf.cpp" line="338"/>
         <location filename="../HotKeyConf.cpp" line="381"/>
         <source>Set Hot Key</source>
-        <translation>設定熱鍵</translation>
+        <translation>設定快捷鍵</translation>
     </message>
     <message>
         <location filename="../HotKeyConf.cpp" line="345"/>
@@ -4387,7 +4387,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../GamePadConf.cpp" line="2502"/>
         <location filename="../GamePadConf.cpp" line="2579"/>
         <source>Hotkey Select</source>
-        <translation>熱鍵選擇</translation>
+        <translation>快捷鍵選擇</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="2551"/>
@@ -10033,7 +10033,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="355"/>
         <source>Trainer</source>
-        <translation>訓練器</translation>
+        <translation>Trainer 資料</translation>
     </message>
     <message>
         <location filename="../iNesHeaderEditor.cpp" line="356"/>

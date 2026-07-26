@@ -71,7 +71,7 @@ auto resume	自动续玩	自動續玩	自動再開	자동 재개	Reanudar auto.	
 pause	暂停	暫停	一時停止	일시 중지	Pausar	Pause	Pausieren	Tạm dừng	หยุดชั่วคราว	रोकें	إيقاف مؤقت
 reset	重置	重置	リセット	리셋	Reiniciar	Réinitialiser	Zurücksetzen	Đặt lại	รีเซ็ต	रीसेट	إعادة تعيين
 power	电源	電源	電源	전원	Energía	Énergie	Strom	Nguồn	แหล่งจ่ายไฟ	पावर	طاقة
-settings	设置	設定	設定	設定	Configuración	Paramètres	Einstellungen	Cài đặt	การตั้งค่า	सेटिंग्स	إعدادات
+settings	设置	設定	設定	설정	Configuración	Paramètres	Einstellungen	Cài đặt	การตั้งค่า	सेटिंग्स	إعدادات
 preferences	首选项	偏好設定	環境設定	환경설정	Preferencias	Préférences	Einstellungen	Tùy chọn	ค่าที่ต้องการ	प्राथमिकताएं	التفضيلات
 hotkey	快捷键	快捷鍵	ホットキー	단축키	Tecla rápida	Raccourci	Hotkey	Phím tắt	ฮอตคีย์	हॉटकी	مفتاح اختصار
 keyboard	键盘	鍵盤	キーボード	키보드	Teclado	Clavier	Tastatur	Bàn phím	คีย์บอร์ด	कीबोर्ड	لوحة مفاتيح

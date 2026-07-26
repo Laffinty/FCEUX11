@@ -5549,12 +5549,12 @@ Replace file?</source>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="6432"/>
         <source>Edit &amp;Symbolic Debug Marker</source>
-        <translation>Sửa &amp;dấu gỡ lỗi ký hiệu(&amp;S)</translation>
+        <translation>Sửa dấu gỡ lỗi ký hiệu(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="6436"/>
         <source>Add &amp;Symbolic Debug Marker</source>
-        <translation>Thêm &amp;dấu gỡ lỗi ký hiệu(&amp;S)</translation>
+        <translation>Thêm dấu gỡ lỗi ký hiệu(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="6439"/>
@@ -5564,12 +5564,12 @@ Replace file?</source>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="6444"/>
         <source>Edit Book&amp;mark</source>
-        <translation>Sửa &amp;dấu trang(&amp;M)</translation>
+        <translation>Sửa dấu trang(&amp;M)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="6448"/>
         <source>Add Book&amp;mark</source>
-        <translation>Thêm &amp;dấu trang(&amp;M)</translation>
+        <translation>Thêm dấu trang(&amp;M)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="6451"/>
@@ -5579,7 +5579,7 @@ Replace file?</source>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="6454"/>
         <source>Open &amp;Hex Editor</source>
-        <translation>Mở trình &amp;sửa thập lục(&amp;H)</translation>
+        <translation>Mở trình sửa thập lục(&amp;H)</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="6456"/>
@@ -5612,7 +5612,7 @@ Replace file?</source>
     <message>
         <location filename="../HexEditor.cpp" line="3171"/>
         <source>Add &amp;Symbolic Debug Name</source>
-        <translation>Thêm &amp;tên gỡ lỗi ký hiệu(&amp;S)</translation>
+        <translation>Thêm tên gỡ lỗi ký hiệu(&amp;S)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="3175"/>
@@ -5622,7 +5622,7 @@ Replace file?</source>
     <message>
         <location filename="../HexEditor.cpp" line="3179"/>
         <source>&amp;Toggle State</source>
-        <translation>Chuyển &amp;trạng thái(&amp;T)</translation>
+        <translation>Chuyển trạng thái(&amp;T)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="3180"/>
@@ -5642,7 +5642,7 @@ Replace file?</source>
     <message>
         <location filename="../HexEditor.cpp" line="3195"/>
         <source>Unfreeze &amp;All</source>
-        <translation>Giải băng &amp;tất cả(&amp;A)</translation>
+        <translation>Giải băng tất cả(&amp;A)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="3228"/>
@@ -5650,7 +5650,7 @@ Replace file?</source>
         <location filename="../HexEditor.cpp" line="3252"/>
         <location filename="../HexEditor.cpp" line="3259"/>
         <source>Add Book&amp;mark</source>
-        <translation>Thêm &amp;dấu trang(&amp;M)</translation>
+        <translation>Thêm dấu trang(&amp;M)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="3303"/>
@@ -10302,7 +10302,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../NameTableViewer.cpp" line="223"/>
         <source>Show &amp;Attr Grid</source>
-        <translation>Hiển thị lưới &amp;thuộc tính(&amp;A)</translation>
+        <translation>Hiển thị lưới thuộc tính(&amp;A)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="227"/>
@@ -10314,7 +10314,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../NameTableViewer.cpp" line="234"/>
         <source>Show &amp;Attributes</source>
-        <translation>Hiển thị &amp;thuộc tính(&amp;A)</translation>
+        <translation>Hiển thị thuộc tính(&amp;A)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="238"/>
@@ -10363,7 +10363,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../NameTableViewer.cpp" line="306"/>
         <source>Tile &amp;Focus</source>
-        <translation>&amp;Lấy nét Tile(&amp;F)</translation>
+        <translation>Lấy nét Tile(&amp;F)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="311"/>
@@ -10403,7 +10403,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../NameTableViewer.cpp" line="378"/>
         <source>Tile &amp;Selector</source>
-        <translation>&amp;Bộ chọn Tile(&amp;S)</translation>
+        <translation>Bộ chọn Tile(&amp;S)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="383"/>
@@ -10413,7 +10413,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../NameTableViewer.cpp" line="389"/>
         <source>&amp;Attr Grid</source>
-        <translation>Lưới &amp;thuộc tính(&amp;A)</translation>
+        <translation>Lưới thuộc tính(&amp;A)</translation>
     </message>
     <message>
         <location filename="../NameTableViewer.cpp" line="400"/>
@@ -10498,7 +10498,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../ppuViewerPatternTables.cpp" line="400"/>
         <source>Open Tile &amp;Editor</source>
-        <translation>Mở trình &amp;sửa Tile(&amp;E)</translation>
+        <translation>Mở trình sửa Tile(&amp;E)</translation>
     </message>
     <message>
         <location filename="../ppuViewerPatternTables.cpp" line="401"/>
@@ -10514,7 +10514,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../ppuViewerPatternTables.cpp" line="424"/>
         <source>Draw Tile &amp;Grid Lines</source>
-        <translation>Vẽ đường &amp;lưới Tile(&amp;G)</translation>
+        <translation>Vẽ đường lưới Tile(&amp;G)</translation>
     </message>
     <message>
         <location filename="../ppuViewerPatternTables.cpp" line="427"/>
@@ -10534,7 +10534,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../ppuViewerPatternTables.cpp" line="436"/>
         <source>Palette &amp;Select</source>
-        <translation>Chọn &amp;bảng màu(&amp;S)</translation>
+        <translation>Chọn bảng màu(&amp;S)</translation>
     </message>
 </context>
 <context>
@@ -10827,7 +10827,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ppuViewer.cpp" line="290"/>
         <location filename="../ppuViewer.cpp" line="310"/>
         <source>Tile &amp;Selector</source>
-        <translation>&amp;Bộ chọn Tile(&amp;S)</translation>
+        <translation>Bộ chọn Tile(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="295"/>
@@ -10848,7 +10848,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../ppuViewer.cpp" line="322"/>
         <source>&amp;Focus Policy</source>
-        <translation>Chính sách &amp;lấy nét(&amp;F)</translation>
+        <translation>Chính sách lấy nét(&amp;F)</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="326"/>
@@ -10911,7 +10911,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="91"/>
         <source>&amp;Locator Box</source>
-        <translation>Hộp &amp;định vị(&amp;L)</translation>
+        <translation>Hộp định vị(&amp;L)</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="96"/>
@@ -10921,7 +10921,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="98"/>
         <source>&amp;Focus Policy</source>
-        <translation>Chính sách &amp;lấy nét(&amp;F)</translation>
+        <translation>Chính sách lấy nét(&amp;F)</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="102"/>

@@ -825,7 +825,7 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="476"/>
         <source>Ctrl+Left</source>
-        <translation>Ctrl+左</translation>
+        <translation>Ctrl+Left</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="477"/>
@@ -840,7 +840,7 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="485"/>
         <source>Ctrl+Right</source>
-        <translation>Ctrl+右</translation>
+        <translation>Ctrl+Right</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="486"/>
@@ -3879,7 +3879,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../HelpPages.cpp" line="271"/>
         <source>Alt+Left</source>
-        <translation>Alt+左</translation>
+        <translation>Alt+Left</translation>
     </message>
     <message>
         <location filename="../HelpPages.cpp" line="272"/>
@@ -3896,7 +3896,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../HelpPages.cpp" line="279"/>
         <source>Alt+Right</source>
-        <translation>Alt+右</translation>
+        <translation>Alt+Right</translation>
     </message>
     <message>
         <location filename="../HelpPages.cpp" line="280"/>

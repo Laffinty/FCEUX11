@@ -10492,7 +10492,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../NameTableViewer.cpp" line="568"/>
         <location filename="../NameTableViewer.cpp" line="637"/>
         <source>Display on Scanline:</source>
-        <translation>Scanline पर प्रदर्शित करें</translation>
+        <translation>Scanline पर प्रदर्शित करें:</translation>
     </message>
 </context>
 <context>
@@ -10779,7 +10779,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ppuViewer.cpp" line="213"/>
         <location filename="../ppuViewer.cpp" line="389"/>
         <source>Display on Scanline:</source>
-        <translation>Scanline पर प्रदर्शित करें</translation>
+        <translation>Scanline पर प्रदर्शित करें:</translation>
     </message>
     <message>
         <location filename="../ppuViewer.cpp" line="220"/>
@@ -10973,7 +10973,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="192"/>
         <source>Display on Scanline:</source>
-        <translation>Scanline पर प्रदर्शित करें</translation>
+        <translation>Scanline पर प्रदर्शित करें:</translation>
     </message>
     <message>
         <location filename="../ppuViewerSpriteViewer.cpp" line="206"/>

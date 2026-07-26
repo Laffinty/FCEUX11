@@ -1672,7 +1672,7 @@
         <location filename="../ConsoleDebugger.cpp" line="3273"/>
         <location filename="../ConsoleDebugger.cpp" line="3302"/>
         <source>Breakpoints</source>
-        <translation>Points d&amp;apos;Arrêt</translation>
+        <translation>Points d'arrêt</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="1607"/>
@@ -1791,7 +1791,7 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="4469"/>
         <source> Emulator Stopped / Paused at Breakpoint</source>
-        <translation> Émulateur Arrêté au Point d&amp;apos;Arrêt</translation>
+        <translation> Émulateur arrêté / en pause au point d'arrêt</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="4476"/>
@@ -8573,12 +8573,12 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../ConsoleWindow.cpp" line="593"/>
         <source>Open ROM</source>
-        <translation>Ouvrir un ROM</translation>
+        <translation>Ouvrir une ROM</translation>
     </message>
     <message>
         <location filename="../ConsoleWindow.cpp" line="598"/>
         <source>Last ROM Used</source>
-        <translation>Dernier ROM utilisé</translation>
+        <translation>Dernière ROM utilisée</translation>
     </message>
     <message>
         <location filename="../ConsoleWindow.cpp" line="606"/>
@@ -8670,7 +8670,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../ConsoleMenu.cpp" line="181"/>
         <source>Close Loaded ROM</source>
-        <translation>Fermer le ROM chargé</translation>
+        <translation>Fermer la ROM chargée</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="191"/>
@@ -9180,7 +9180,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="362"/>
         <location filename="../ConsoleWindow.cpp" line="797"/>
         <source>&amp;Input Config</source>
-        <translation>Configuration d&amp;apos;Entrée</translation>
+        <translation>Configuration de l'entrée</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="363"/>
@@ -9235,7 +9235,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="930"/>
         <location filename="../ConsoleWindow.cpp" line="805"/>
         <source>&amp;State Recorder Config</source>
-        <translation>Configuration de l&amp;apos;Enregistreur d&amp;apos;État</translation>
+        <translation>Configuration de l'enregistreur d'état</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="931"/>

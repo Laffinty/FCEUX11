@@ -4108,7 +4108,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../HexEditor.cpp" line="1312"/>
         <source>Re&amp;fresh Rate</source>
-        <translation>Bild&amp;wiederholrate</translation>
+        <translation>Aktualisierungsrate(&amp;F)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1321"/>

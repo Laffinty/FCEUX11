@@ -7,7 +7,7 @@
         <location filename="../AboutWindow.cpp" line="44"/>
         <location filename="../AboutWindow.cpp" line="143"/>
         <source>About FCEUX11</source>
-        <translation>FCEUX11について</translation>
+        <translation>FCEUX11 について</translation>
     </message>
     <message>
         <location filename="../AboutWindow.cpp" line="64"/>
@@ -2817,7 +2817,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../FamilyKeyboard.cpp" line="326"/>
         <source>Toggle State on Press</source>
-        <translation>押下時に状態切換</translation>
+        <translation>押下時に状態切替</translation>
     </message>
 </context>
 <context>
@@ -4684,12 +4684,12 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="107"/>
         <source>Video:</source>
-        <translation>映像:</translation>
+        <translation>ビデオ:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="108"/>
         <source>Audio:</source>
-        <translation>音声:</translation>
+        <translation>オーディオ:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="128"/>
@@ -4747,12 +4747,12 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1531"/>
         <source>Video:</source>
-        <translation>映像:</translation>
+        <translation>ビデオ:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1532"/>
         <source>Audio:</source>
-        <translation>音声:</translation>
+        <translation>オーディオ:</translation>
     </message>
     <message>
         <location filename="../AviOptionsDialog.cpp" line="1552"/>
@@ -8715,7 +8715,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="226"/>
         <location filename="../ConsoleWindow.cpp" line="791"/>
         <source>Quick &amp;Load</source>
-        <translation>クイック読み込み(&amp;L)</translation>
+        <translation>クイックロード(&amp;L)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="228"/>
@@ -8726,7 +8726,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="237"/>
         <location filename="../ConsoleWindow.cpp" line="792"/>
         <source>Quick &amp;Save</source>
-        <translation>クイック保存(&amp;S)</translation>
+        <translation>クイックセーブ(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="239"/>
@@ -9146,7 +9146,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../ConsoleMenu.cpp" line="824"/>
         <source>Switch Disk</source>
-        <translation>ディスク切換</translation>
+        <translation>ディスク切替</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="832"/>
@@ -9157,7 +9157,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../ConsoleMenu.cpp" line="833"/>
         <source>Eject Disk</source>
-        <translation>ディスク取出し</translation>
+        <translation>ディスク排出</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="841"/>
@@ -9560,7 +9560,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="1254"/>
         <location filename="../ConsoleWindow.cpp" line="940"/>
         <source>About FCEUX11</source>
-        <translation>FCEUX11について</translation>
+        <translation>FCEUX11 について</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1261"/>

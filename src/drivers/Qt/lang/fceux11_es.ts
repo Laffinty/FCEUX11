@@ -7382,7 +7382,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="834"/>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="837"/>
         <source>Autofire Pattern skips Lag</source>
-        <translation>Patrón de autofuego omite retraso</translation>
+        <translation>Patrón de autodisparo omite retraso</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="844"/>
@@ -7883,7 +7883,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3137"/>
         <source>Applies current Autofire Pattern to Input recording</source>
-        <translation>Aplica el patrón de autofuego actual a la grabación de entrada</translation>
+        <translation>Aplica el patrón de autodisparo actual a la grabación de entrada</translation>
     </message>
     <message>
         <location filename="../TasEditor/TasEditorWindow.cpp" line="3138"/>

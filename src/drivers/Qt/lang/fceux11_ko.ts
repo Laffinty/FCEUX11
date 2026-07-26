@@ -1776,7 +1776,7 @@
     <message>
         <location filename="../ConsoleDebugger.cpp" line="4452"/>
         <source> Emulator Paused on Lua Breakpoint</source>
-        <translation>Lua 중단점로 에뮬레이터 일시 중지</translation>
+        <translation>Lua 중단점으로 에뮬레이터 일시 중지</translation>
     </message>
     <message>
         <location filename="../ConsoleDebugger.cpp" line="4455"/>
@@ -2967,7 +2967,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../GameGenie.cpp" line="158"/>
         <source>Game Genie Code</source>
-        <translation>게지 코드</translation>
+        <translation>게임 지니 코드</translation>
     </message>
     <message>
         <location filename="../GameGenie.cpp" line="166"/>
@@ -3337,7 +3337,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
         <location filename="../GamePadConf.cpp" line="2126"/>
         <location filename="../GamePadConf.cpp" line="2206"/>
         <source>Modifier Button:</source>
-        <translation>수정 버튼:</translation>
+        <translation>보조 버튼:</translation>
     </message>
     <message>
         <location filename="../GamePadConf.cpp" line="2132"/>
@@ -4108,7 +4108,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../HexEditor.cpp" line="1312"/>
         <source>Re&amp;fresh Rate</source>
-        <translation>주사율(&amp;F)</translation>
+        <translation>갱신 주기(&amp;F)</translation>
     </message>
     <message>
         <location filename="../HexEditor.cpp" line="1321"/>
@@ -4499,7 +4499,7 @@ The emulation thread fills the buffer and the audio thread drains it.</source>
     <message>
         <location filename="../InputConf.cpp" line="201"/>
         <source>Zapper</source>
-        <translation>자퍼</translation>
+        <translation>Zapper</translation>
     </message>
     <message>
         <location filename="../InputConf.cpp" line="202"/>
@@ -5011,7 +5011,7 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MovieOptions.cpp" line="86"/>
         <location filename="../MovieOptions.cpp" line="218"/>
         <source>Loading states in record mode will not immediately truncate movie, next frame input will. (VBA-rr and SNES9x style)</source>
-        <translation>녹화 모드에서 상태 로드가 무비을 즉시 자르지 않으며, 다음 프레임 입력에서 잘립니다. (VBA-rr/SNES9x 스타일)</translation>
+        <translation>녹화 모드에서 상태 로드가 무비를 즉시 자르지 않으며, 다음 프레임 입력에서 잘립니다. (VBA-rr/SNES9x 스타일)</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="116"/>
@@ -8704,12 +8704,12 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="217"/>
         <location filename="../ConsoleWindow.cpp" line="790"/>
         <source>Save State &amp;As</source>
-        <translation>상태 다른 이름으로 저장(&amp;A)</translation>
+        <translation>세이브 스테이트 다른 이름으로 저장(&amp;A)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="219"/>
         <source>Save State As</source>
-        <translation>상태 다른 이름으로 저장</translation>
+        <translation>세이브 스테이트 다른 이름으로 저장</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="226"/>

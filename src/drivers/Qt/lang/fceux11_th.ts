@@ -5721,17 +5721,17 @@ Replace file?</source>
     <message>
         <location filename="../MenuCatalog.h" line="67"/>
         <source>&amp;Memory Tools</source>
-        <translation>เครื่องมือ&amp;หน่วยความจำ</translation>
+        <translation>เครื่องมือหน่วยความจำ(&amp;M)</translation>
     </message>
     <message>
         <location filename="../MenuCatalog.h" line="68"/>
         <source>&amp;Misc Tools</source>
-        <translation>เครื่องมือ&amp;อื่นๆ</translation>
+        <translation>เครื่องมืออื่นๆ(&amp;M)</translation>
     </message>
     <message>
         <location filename="../MenuCatalog.h" line="69"/>
         <source>&amp;Advanced Settings</source>
-        <translation>การตั้งค่า&amp;ขั้นสูง</translation>
+        <translation>การตั้งค่าขั้นสูง(&amp;A)</translation>
     </message>
     <message>
         <location filename="../TasEditor/splicer.cpp" line="230"/>
@@ -8641,19 +8641,19 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="143"/>
         <location filename="../ConsoleWindow.cpp" line="772"/>
         <source>&amp;Memory Tools</source>
-        <translation>เครื่องมือ&amp;หน่วยความจำ</translation>
+        <translation>เครื่องมือหน่วยความจำ(&amp;M)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="144"/>
         <location filename="../ConsoleWindow.cpp" line="773"/>
         <source>&amp;Misc Tools</source>
-        <translation>เครื่องมือ&amp;อื่นๆ</translation>
+        <translation>เครื่องมืออื่นๆ(&amp;M)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="145"/>
         <location filename="../ConsoleWindow.cpp" line="774"/>
         <source>&amp;Advanced Settings</source>
-        <translation>การตั้งค่า&amp;ขั้นสูง</translation>
+        <translation>การตั้งค่าขั้นสูง(&amp;A)</translation>
     </message>
     <message>
         <location filename="../ConsoleFile.cpp" line="212"/>
@@ -8693,7 +8693,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="208"/>
         <location filename="../ConsoleWindow.cpp" line="789"/>
         <source>Load State &amp;From</source>
-        <translation>โหลดสถานะ&amp;จาก</translation>
+        <translation>โหลดสถานะจาก(&amp;F)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="210"/>
@@ -8704,7 +8704,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="217"/>
         <location filename="../ConsoleWindow.cpp" line="790"/>
         <source>Save State &amp;As</source>
-        <translation>บันทึกสถานะ&amp;เป็น</translation>
+        <translation>บันทึกสถานะเป็น(&amp;A)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="219"/>
@@ -8715,7 +8715,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="226"/>
         <location filename="../ConsoleWindow.cpp" line="791"/>
         <source>Quick &amp;Load</source>
-        <translation>โหลด&amp;เร็ว</translation>
+        <translation>โหลดเร็ว(&amp;L)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="228"/>
@@ -8726,7 +8726,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="237"/>
         <location filename="../ConsoleWindow.cpp" line="792"/>
         <source>Quick &amp;Save</source>
-        <translation>บันทึก&amp;เร็ว</translation>
+        <translation>บันทึกเร็ว(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="239"/>
@@ -8737,7 +8737,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="248"/>
         <location filename="../ConsoleWindow.cpp" line="777"/>
         <source>Change &amp;State Slot</source>
-        <translation>เปลี่ยนช่อง&amp;สถานะ</translation>
+        <translation>เปลี่ยนช่องสถานะ(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="255"/>
@@ -8782,7 +8782,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="370"/>
         <location filename="../ConsoleWindow.cpp" line="799"/>
         <source>&amp;Sound Config</source>
-        <translation>การตั้งค่า&amp;เสียง</translation>
+        <translation>การตั้งค่าเสียง(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="372"/>
@@ -8793,7 +8793,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="379"/>
         <location filename="../ConsoleWindow.cpp" line="800"/>
         <source>&amp;Video Config</source>
-        <translation>การตั้งค่า&amp;วิดีโอ</translation>
+        <translation>การตั้งค่าวิดีโอ(&amp;V)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="381"/>
@@ -8887,7 +8887,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="468"/>
         <location filename="../ConsoleWindow.cpp" line="778"/>
         <source>Window Resi&amp;ze</source>
-        <translation>ปรับขนาด&amp;หน้าต่าง</translation>
+        <translation>ปรับขนาดหน้าต่าง(&amp;Z)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="472"/>
@@ -9180,7 +9180,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="362"/>
         <location filename="../ConsoleWindow.cpp" line="797"/>
         <source>&amp;Input Config</source>
-        <translation>การตั้งค่า&amp;อินพุต</translation>
+        <translation>การตั้งค่าอินพุต(&amp;I)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="363"/>
@@ -9191,7 +9191,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="898"/>
         <location filename="../ConsoleWindow.cpp" line="798"/>
         <source>&amp;GamePad Config</source>
-        <translation>การตั้งค่า&amp;เกมแพด</translation>
+        <translation>การตั้งค่าเกมแพด(&amp;G)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="899"/>
@@ -9202,7 +9202,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="906"/>
         <location filename="../ConsoleWindow.cpp" line="801"/>
         <source>Hot&amp;Key Config</source>
-        <translation>การตั้งค่า&amp;ปุ่มลัด</translation>
+        <translation>การตั้งค่าปุ่มลัด(&amp;K)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="907"/>
@@ -9213,7 +9213,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="914"/>
         <location filename="../ConsoleWindow.cpp" line="802"/>
         <source>&amp;Palette Config</source>
-        <translation>การตั้งค่า&amp;พาเลต</translation>
+        <translation>การตั้งค่าพาเลต(&amp;P)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="915"/>
@@ -9224,7 +9224,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="922"/>
         <location filename="../ConsoleWindow.cpp" line="804"/>
         <source>&amp;Timing Config</source>
-        <translation>การตั้งค่า&amp;เวลา</translation>
+        <translation>การตั้งค่าเวลา(&amp;T)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="923"/>
@@ -9235,7 +9235,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="930"/>
         <location filename="../ConsoleWindow.cpp" line="805"/>
         <source>&amp;State Recorder Config</source>
-        <translation>การตั้งค่าบันทึก&amp;สถานะ</translation>
+        <translation>การตั้งค่าบันทึกสถานะ(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="931"/>
@@ -9246,7 +9246,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="938"/>
         <location filename="../ConsoleWindow.cpp" line="806"/>
         <source>&amp;Movie Options</source>
-        <translation>ตัวเลือก&amp;มูฟวี่</translation>
+        <translation>ตัวเลือกมูฟวี่(&amp;M)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="939"/>
@@ -9257,7 +9257,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="948"/>
         <location filename="../ConsoleWindow.cpp" line="807"/>
         <source>Auto-&amp;Resume Play</source>
-        <translation>เล่น&amp;ต่ออัตโนมัติ</translation>
+        <translation>เล่นต่ออัตโนมัติ(&amp;R)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="950"/>
@@ -9455,7 +9455,7 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ConsoleMenu.cpp" line="1129"/>
         <location filename="../ConsoleWindow.cpp" line="845"/>
         <source>Movie Play From &amp;Beginning</source>
-        <translation>เล่นวิดีโอจาก&amp;ต้น</translation>
+        <translation>เล่นวิดีโอจากต้น(&amp;B)</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="1131"/>

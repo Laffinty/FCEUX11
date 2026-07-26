@@ -4941,7 +4941,7 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MovieOptions.cpp" line="54"/>
         <location filename="../MovieOptions.cpp" line="205"/>
         <source>Movie Options</source>
-        <translation>خيارات التسجيل</translation>
+        <translation>خيارات الفيلم</translation>
     </message>
     <message>
         <location filename="../MovieOptions.cpp" line="63"/>
@@ -5040,7 +5040,7 @@ It may have gone crazy. Kill it? (I won&apos;t ask again if you say No)
         <location filename="../MoviePlay.cpp" line="60"/>
         <location filename="../MoviePlay.cpp" line="225"/>
         <source>Movie Play</source>
-        <translation>تشغيل التسجيل</translation>
+        <translation>تشغيل الفيلم</translation>
     </message>
     <message>
         <location filename="../MoviePlay.cpp" line="66"/>
@@ -8349,7 +8349,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../TraceLogger.cpp" line="302"/>
         <source>Log Options</source>
-        <translation>خيارات التسجيل</translation>
+        <translation>خيارات السجل</translation>
     </message>
     <message>
         <location filename="../TraceLogger.cpp" line="305"/>
@@ -9253,7 +9253,7 @@ Do you wish to save/apply the new settings?</source>
     <message>
         <location filename="../ConsoleMenu.cpp" line="939"/>
         <source>Movie Options</source>
-        <translation>خيارات التسجيل</translation>
+        <translation>خيارات الفيلم</translation>
     </message>
     <message>
         <location filename="../ConsoleMenu.cpp" line="948"/>
