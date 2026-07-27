@@ -777,6 +777,16 @@ void FCEUPPU_Power(void) {
 	UPALRAM[2] = PALRAM[0x0C];
 	PALRAM[0x0C] = PALRAM[0x08] = PALRAM[0x04] = PALRAM[0x00];
 	PALRAM[0x1C] = PALRAM[0x18] = PALRAM[0x14] = PALRAM[0x10];
+	// Restore the default PPU read/write hooks before resetting. This is
+	// essential for the new-PPU rendering path: CALL_PPUREAD dereferences
+	// FFCEUX_PPURead without a NULL guard, and the only other writer of
+	// this pointer besides PPU_ResetHooks is ResetGameLoaded() (which
+	// NULLs it on every LoadGame). Without this call, the first
+	// bgdata::Record::Read() of the first rendered frame calls a NULL
+	// function pointer and crashes. Board Power() handlers (e.g. MMC5)
+	// run after FCEUPPU_Power via GameInterface(GI_POWER) and may
+	// override the hook themselves.
+	PPU_ResetHooks();
 	FCEUPPU_Reset();
 
 	for (x = 0x2000; x < 0x4000; x += 8) {

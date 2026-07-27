@@ -61,6 +61,11 @@ static bool core_init() {
         FCEUI_SetInput(1,    static_cast<ESI>(SI_NONE),    nullptr, 0);
         FCEUI_SetInputFC(static_cast<ESIFC>(SIFC_NONE),    nullptr, 0);
         FCEUI_SetInputFourscore(false);
+
+        // P4-bridge: Enable new PPU before any LoadGame.
+        // Setting newppu=1 early lets FCEU_ResetVidSys() compute
+        // normalscanlines=241 and disable overclocking correctly.
+        newppu = 1;
     }
     return true;
 }
@@ -165,10 +170,6 @@ static SingleResult run_one_rom(const char* rom_path, int frames) {
     // Run frames. Blargg ROMs are self-checking — they write PASS/FAIL to
     // $6000-$6003 and then loop. The frame count is tuned so the ROM has
     // time to complete its test sequence and write the result.
-	// P4-bridge: cycle-accurate new PPU for Oracle B testing.
-	newppu = 1;
-	normalscanlines = 241;	// 240 + newppu
-
     emulate_n(frames);
 
     // Read $6000-$6003. We read AFTER the full frame run because blargg

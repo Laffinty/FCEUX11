@@ -82,6 +82,7 @@ void FCEUPPU_SetVideoSystem(int w) {
 
 void PPU_ResetHooks() {
 	FFCEUX_PPURead = FFCEUX_PPURead_Default;
+	FFCEUX_PPUWrite = FFCEUX_PPUWrite_Default;
 }
 
 void FCEUPPU_Reset(void) {

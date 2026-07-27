@@ -1573,7 +1573,9 @@ int FCEUX_PPU_Loop(int skip) {
 		//formerly: runppu(20 * (kLineTime) - delay);
 		for(int S=0;S<sltodo;S++)
 		{
-			for(int dot=(S==0?delay:0);dot<kLineTime;dot++)
+			// P4-1: S==0 starts at delay+1 to compensate for runppu(1)
+		// above, keeping sl 241 total at 341 cycles (not 342).
+		for(int dot=(S==0?delay+1:0);dot<kLineTime;dot++)
 				runppu(1);
 			ppur.status.sl++;
 		}
