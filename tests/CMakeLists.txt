@@ -584,4 +584,38 @@ if(FCEUX11_BUILD_TESTS)
         set_tests_properties(headless_smoke_test PROPERTIES ENVIRONMENT_MODIFICATION
                 "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
     endif()
+
+    # KagamiQA P2 — blargg $6000 test ROM runner (Oracle B executor).
+    fceux11_add_test_executable(fceux11_blargg_runner
+        blargg_runner.cpp
+        git_info_stub.cpp
+    )
+    target_include_directories(fceux11_blargg_runner PRIVATE
+        ${CMAKE_SOURCE_DIR}/tests/core
+    )
+    add_test(NAME blargg_smoke
+             COMMAND fceux11_blargg_runner
+             --rom fixtures/nestest.nes --frames 60
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    if(WIN32)
+        set_tests_properties(blargg_smoke PROPERTIES ENVIRONMENT_MODIFICATION
+                "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+    endif()
+
+    # KagamiQA P3 — Headless Lua script runner (null driver, no Qt).
+    fceux11_add_headless_test_executable(fceux11_lua_runner
+        lua_runner.cpp
+        git_info_stub.cpp
+    )
+    target_include_directories(fceux11_lua_runner PRIVATE
+        ${CMAKE_SOURCE_DIR}/tests/core
+    )
+    add_test(NAME lua_bit_test_headless
+             COMMAND fceux11_lua_runner
+             tests/lua_scripts/test_bit.lua
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    if(WIN32)
+        set_tests_properties(lua_bit_test_headless PROPERTIES ENVIRONMENT_MODIFICATION
+                "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+    endif()
 endif()

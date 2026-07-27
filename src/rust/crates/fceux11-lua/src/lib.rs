@@ -290,19 +290,19 @@ impl LuaEngine {
 
         let main_thread = lua.create_thread(lua.create_function(|_, ()| Ok(()))?)?;
 
-        bindings::bit::register(&lua)?;
-        bindings::emu::register(&lua)?;
-        bindings::memory::register(&lua)?;
-        bindings::joypad::register(&lua)?;
-        bindings::rom::register(&lua)?;
-        bindings::ppu::register(&lua)?;
-        bindings::input::register(&lua)?;
-        bindings::sound::register(&lua)?;
-        bindings::movie::register(&lua)?;
-        bindings::savestate::register(&lua)?;
-        bindings::gui::register(&lua)?;
-        bindings::zapper::register(&lua)?;
-        bindings::debugger::register(&lua)?;
+        lua.globals().set("bit",       bindings::bit::register(&lua)?)?;
+        lua.globals().set("emu",       bindings::emu::register(&lua)?)?;
+        lua.globals().set("memory",    bindings::memory::register(&lua)?)?;
+        lua.globals().set("joypad",    bindings::joypad::register(&lua)?)?;
+        lua.globals().set("rom",       bindings::rom::register(&lua)?)?;
+        lua.globals().set("ppu",       bindings::ppu::register(&lua)?)?;
+        lua.globals().set("input",     bindings::input::register(&lua)?)?;
+        lua.globals().set("sound",     bindings::sound::register(&lua)?)?;
+        lua.globals().set("movie",     bindings::movie::register(&lua)?)?;
+        lua.globals().set("savestate", bindings::savestate::register(&lua)?)?;
+        lua.globals().set("gui",       bindings::gui::register(&lua)?)?;
+        lua.globals().set("zapper",    bindings::zapper::register(&lua)?)?;
+        lua.globals().set("debugger",  bindings::debugger::register(&lua)?)?;
 
         Ok(Self {
             lua,

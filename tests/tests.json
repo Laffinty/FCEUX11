@@ -362,5 +362,161 @@
     "tags": ["unit", "video"],
     "failure_means": "blocking",
     "provenance": "hotfix3 D-1"
+  },
+  "blargg_smoke": {
+    "id": "blargg_smoke",
+    "description": "blargg runner smoke test using nestest.nes — verifies $6000 probe infrastructure",
+    "oracle_type": "B",
+    "layer": "core",
+    "input": {
+      "binary": "fceux11_blargg_runner",
+      "args": ["--rom", "fixtures/nestest.nes", "--frames", "60"],
+      "working_dir": "tests",
+      "rom": "fixtures/nestest.nes",
+      "probe_addr": 24576
+    },
+    "expected": { "exit_code": 0 },
+    "timeout_seconds": 30,
+    "tags": ["blargg", "oracle-b", "smoke"],
+    "failure_means": "advisory",
+    "provenance": "blargg test ROM suite v1 / P2"
+  },
+  "blargg_cpu_instrs": {
+    "id": "blargg_cpu_instrs",
+    "description": "blargg CPU all instructions (all_instrs) — $6000 protocol",
+    "oracle_type": "B",
+    "layer": "core",
+    "input": {
+      "binary": "fceux11_blargg_runner",
+      "args": ["--rom", "fixtures/blargg/cpu/all_instrs.nes", "--frames", "300"],
+      "working_dir": "tests",
+      "rom": "fixtures/blargg/cpu/all_instrs.nes",
+      "probe_addr": 24576
+    },
+    "expected": { "exit_code": 0 },
+    "timeout_seconds": 30,
+    "tags": ["blargg", "cpu", "oracle-b"],
+    "failure_means": "blocking",
+    "provenance": "blargg instr_test-v5"
+  },
+  "blargg_cpu_timing": {
+    "id": "blargg_cpu_timing",
+    "description": "blargg CPU instruction timing test — $6000 protocol",
+    "oracle_type": "B",
+    "layer": "core",
+    "input": {
+      "binary": "fceux11_blargg_runner",
+      "args": ["--rom", "fixtures/blargg/cpu/cpu_timing_test.nes", "--frames", "500"],
+      "working_dir": "tests",
+      "rom": "fixtures/blargg/cpu/cpu_timing_test.nes",
+      "probe_addr": 24576
+    },
+    "expected": { "exit_code": 0 },
+    "timeout_seconds": 30,
+    "tags": ["blargg", "cpu", "timing", "oracle-b"],
+    "failure_means": "blocking",
+    "provenance": "blargg cpu_timing_test6"
+  },
+  "blargg_ppu_vbl_nmi": {
+    "id": "blargg_ppu_vbl_nmi",
+    "description": "blargg PPU VBL NMI timing test — $6000 protocol",
+    "oracle_type": "B",
+    "layer": "core",
+    "input": {
+      "binary": "fceux11_blargg_runner",
+      "args": ["--rom", "fixtures/blargg/ppu/ppu_vbl_nmi.nes", "--frames", "300"],
+      "working_dir": "tests",
+      "rom": "fixtures/blargg/ppu/ppu_vbl_nmi.nes",
+      "probe_addr": 24576
+    },
+    "expected": { "exit_code": 0 },
+    "timeout_seconds": 30,
+    "tags": ["blargg", "ppu", "oracle-b"],
+    "failure_means": "blocking",
+    "provenance": "blargg ppu_tests-v1.1"
+  },
+  "blargg_suite": {
+    "id": "blargg_suite",
+    "description": "blargg full test ROM suite ($6000 protocol) — Oracle B hardware consistency batch run",
+    "oracle_type": "B",
+    "layer": "core",
+    "input": {
+      "binary": "fceux11_blargg_runner",
+      "args": ["--manifest", "tests/fixtures/blargg_manifest.json"],
+      "working_dir": "."
+    },
+    "expected": { "exit_code": 0 },
+    "timeout_seconds": 300,
+    "tags": ["blargg", "oracle-b", "accuracy", "suite", "batch"],
+    "failure_means": "advisory",
+    "provenance": "blargg public-domain test ROM suite"
+  },
+  "lua_bit_test": {
+    "id": "lua_bit_test",
+    "description": "Lua bit library: bor/band/bxor/bnot/lshift/rshift/arshift/rol/ror/bswap/tohex/tobit",
+    "oracle_type": "A",
+    "layer": "lua",
+    "input": {
+      "binary": "fceux11_lua_runner",
+      "args": ["tests/lua_scripts/test_bit.lua"],
+      "working_dir": ".",
+      "script_path": "tests/lua_scripts/test_bit.lua"
+    },
+    "expected": { "exit_code": 0 },
+    "timeout_seconds": 30,
+    "tags": ["lua", "unit", "bit"],
+    "failure_means": "blocking",
+    "provenance": "fceux11-lua"
+  },
+  "lua_emu_test": {
+    "id": "lua_emu_test",
+    "description": "Lua emu library: framecount/lagcount/frameadvance/speedmode/registerbefore/after/exit/poweron/softreset",
+    "oracle_type": "A",
+    "layer": "lua",
+    "input": {
+      "binary": "fceux11_lua_runner",
+      "args": ["tests/lua_scripts/test_emu.lua", "--frames", "120"],
+      "working_dir": ".",
+      "script_path": "tests/lua_scripts/test_emu.lua"
+    },
+    "expected": { "exit_code": 0 },
+    "timeout_seconds": 60,
+    "tags": ["lua", "integration", "emu"],
+    "failure_means": "blocking",
+    "provenance": "fceux11-lua"
+  },
+  "lua_memory_test": {
+    "id": "lua_memory_test",
+    "description": "Lua memory library: readbyte/readbytesigned/readword/readwordsigned/writebyte/getregister/registerwrite/registerread/registerexec",
+    "oracle_type": "A",
+    "layer": "lua",
+    "input": {
+      "binary": "fceux11_lua_runner",
+      "args": ["tests/lua_scripts/test_memory.lua", "--frames", "60"],
+      "working_dir": ".",
+      "script_path": "tests/lua_scripts/test_memory.lua"
+    },
+    "expected": { "exit_code": 0 },
+    "timeout_seconds": 30,
+    "tags": ["lua", "integration", "memory"],
+    "failure_means": "blocking",
+    "provenance": "fceux11-lua"
+  },
+  "lua_joypad_test": {
+    "id": "lua_joypad_test",
+    "description": "Lua joypad library: get/set with mask1/mask2 override logic",
+    "oracle_type": "A",
+    "layer": "lua",
+    "input": {
+      "binary": "fceux11_lua_runner",
+      "args": ["tests/lua_scripts/test_joypad.lua", "--frames", "60"],
+      "working_dir": ".",
+      "script_path": "tests/lua_scripts/test_joypad.lua"
+    },
+    "expected": { "exit_code": 0 },
+    "timeout_seconds": 30,
+    "tags": ["lua", "integration", "joypad"],
+    "failure_means": "blocking",
+    "provenance": "fceux11-lua"
   }
 }

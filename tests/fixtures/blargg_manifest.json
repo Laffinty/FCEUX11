@@ -1,0 +1,184 @@
+{
+  "_comment": "KagamiQA P2 — blargg test ROM catalog. Each ROM uses $6000-$6003 protocol.",
+  "_source": "https://github.com/christopherpow/nes-test-roms",
+  "_protocol": "$6000 = 0x00 PASS, 0x01+ FAIL with diagnostic code",
+  "_downloader": "scripts/download_blargg_roms.ps1",
+  "roms": [
+    {
+      "name": "all_instrs",
+      "path": "fixtures/blargg/cpu/all_instrs.nes",
+      "category": "cpu",
+      "frames": 300,
+      "probe_addr": 24576,
+      "description": "CPU: all instructions including unofficial opcodes"
+    },
+    {
+      "name": "official_only",
+      "path": "fixtures/blargg/cpu/official_only.nes",
+      "category": "cpu",
+      "frames": 300,
+      "probe_addr": 24576,
+      "description": "CPU: official (documented) instructions only"
+    },
+    {
+      "name": "cpu_timing_test",
+      "path": "fixtures/blargg/cpu/cpu_timing_test.nes",
+      "category": "cpu",
+      "frames": 500,
+      "probe_addr": 24576,
+      "description": "CPU: instruction cycle timing accuracy (all official+unofficial)"
+    },
+    {
+      "name": "cpu_interrupts",
+      "path": "fixtures/blargg/cpu/cpu_interrupts.nes",
+      "category": "cpu",
+      "frames": 500,
+      "probe_addr": 24576,
+      "description": "CPU: interrupt handling (NMI/IRQ timing and behavior)"
+    },
+    {
+      "name": "ppu_vbl_nmi",
+      "path": "fixtures/blargg/ppu/ppu_vbl_nmi.nes",
+      "category": "ppu",
+      "frames": 300,
+      "probe_addr": 24576,
+      "description": "PPU: VBL flag and NMI timing (1 PPU clock accuracy)"
+    },
+    {
+      "name": "sprite_overflow_1_basics",
+      "path": "fixtures/blargg/ppu/sprite_overflow_1_basics.nes",
+      "category": "ppu",
+      "frames": 300,
+      "probe_addr": 24576,
+      "description": "PPU: sprite overflow — basic behavior"
+    },
+    {
+      "name": "sprite_overflow_2_details",
+      "path": "fixtures/blargg/ppu/sprite_overflow_2_details.nes",
+      "category": "ppu",
+      "frames": 300,
+      "probe_addr": 24576,
+      "description": "PPU: sprite overflow — detailed behavior"
+    },
+    {
+      "name": "sprite_overflow_3_timing",
+      "path": "fixtures/blargg/ppu/sprite_overflow_3_timing.nes",
+      "category": "ppu",
+      "frames": 300,
+      "probe_addr": 24576,
+      "description": "PPU: sprite overflow — timing edges"
+    },
+    {
+      "name": "sprite_overflow_4_obscure",
+      "path": "fixtures/blargg/ppu/sprite_overflow_4_obscure.nes",
+      "category": "ppu",
+      "frames": 300,
+      "probe_addr": 24576,
+      "description": "PPU: sprite overflow — obscure edge cases"
+    },
+    {
+      "name": "sprite_overflow_5_emu",
+      "path": "fixtures/blargg/ppu/sprite_overflow_5_emu.nes",
+      "category": "ppu",
+      "frames": 300,
+      "probe_addr": 24576,
+      "description": "PPU: sprite overflow — emulator-specific issues"
+    },
+    {
+      "name": "sprite_hit_01_basics",
+      "path": "fixtures/blargg/ppu/sprite_hit_01_basics.nes",
+      "category": "ppu",
+      "frames": 300,
+      "probe_addr": 24576,
+      "description": "PPU: sprite 0 hit — basic behavior"
+    },
+    {
+      "name": "sprite_hit_02_alignment",
+      "path": "fixtures/blargg/ppu/sprite_hit_02_alignment.nes",
+      "category": "ppu",
+      "frames": 300,
+      "probe_addr": 24576,
+      "description": "PPU: sprite 0 hit — alignment tests"
+    },
+    {
+      "name": "sprite_hit_03_corners",
+      "path": "fixtures/blargg/ppu/sprite_hit_03_corners.nes",
+      "category": "ppu",
+      "frames": 300,
+      "probe_addr": 24576,
+      "description": "PPU: sprite 0 hit — corner cases"
+    },
+    {
+      "name": "sprite_hit_04_flip",
+      "path": "fixtures/blargg/ppu/sprite_hit_04_flip.nes",
+      "category": "ppu",
+      "frames": 300,
+      "probe_addr": 24576,
+      "description": "PPU: sprite 0 hit — flip behavior"
+    },
+    {
+      "name": "sprite_hit_05_left_clip",
+      "path": "fixtures/blargg/ppu/sprite_hit_05_left_clip.nes",
+      "category": "ppu",
+      "frames": 300,
+      "probe_addr": 24576,
+      "description": "PPU: sprite 0 hit — left clip"
+    },
+    {
+      "name": "sprite_hit_06_right_edge",
+      "path": "fixtures/blargg/ppu/sprite_hit_06_right_edge.nes",
+      "category": "ppu",
+      "frames": 300,
+      "probe_addr": 24576,
+      "description": "PPU: sprite 0 hit — right edge"
+    },
+    {
+      "name": "sprite_hit_07_screen_bottom",
+      "path": "fixtures/blargg/ppu/sprite_hit_07_screen_bottom.nes",
+      "category": "ppu",
+      "frames": 300,
+      "probe_addr": 24576,
+      "description": "PPU: sprite 0 hit — screen bottom"
+    },
+    {
+      "name": "sprite_hit_08_double_height",
+      "path": "fixtures/blargg/ppu/sprite_hit_08_double_height.nes",
+      "category": "ppu",
+      "frames": 300,
+      "probe_addr": 24576,
+      "description": "PPU: sprite 0 hit — double height sprites"
+    },
+    {
+      "name": "sprite_hit_09_timing",
+      "path": "fixtures/blargg/ppu/sprite_hit_09_timing.nes",
+      "category": "ppu",
+      "frames": 300,
+      "probe_addr": 24576,
+      "description": "PPU: sprite 0 hit — timing basics"
+    },
+    {
+      "name": "sprite_hit_10_timing_order",
+      "path": "fixtures/blargg/ppu/sprite_hit_10_timing_order.nes",
+      "category": "ppu",
+      "frames": 300,
+      "probe_addr": 24576,
+      "description": "PPU: sprite 0 hit — timing order"
+    },
+    {
+      "name": "sprite_hit_11_edge_timing",
+      "path": "fixtures/blargg/ppu/sprite_hit_11_edge_timing.nes",
+      "category": "ppu",
+      "frames": 300,
+      "probe_addr": 24576,
+      "description": "PPU: sprite 0 hit — edge timing"
+    },
+    {
+      "name": "apu_test",
+      "path": "fixtures/blargg/apu/apu_test.nes",
+      "category": "apu",
+      "frames": 600,
+      "probe_addr": 24576,
+      "description": "APU: length counters, envelope, sweep, DMC (CPU-visible)"
+    }
+  ]
+}

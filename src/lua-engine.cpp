@@ -32,16 +32,6 @@ extern char FileBase[];
 
 #include "driver_callbacks.h"
 
-#include "drivers/Qt/sdl.h"
-#include "drivers/Qt/main.h"
-#include "drivers/Qt/input.h"
-#include "drivers/Qt/fceuWrapper.h"
-#include "drivers/Qt/TasEditor/selection.h"
-#include "drivers/Qt/TasEditor/laglog.h"
-#include "drivers/Qt/TasEditor/markers.h"
-#include "drivers/Qt/TasEditor/snapshot.h"
-#include "drivers/Qt/TasEditor/taseditor_lua.h"
-
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>

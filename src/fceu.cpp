@@ -64,8 +64,6 @@ extern void RefreshThrottleFPS();
 #include "fceulua.h"
 #endif
 
-#include "drivers/Qt/sdl.h"
-
 #include <fstream>
 #include <sstream>
 #include <string>

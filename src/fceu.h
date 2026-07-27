@@ -117,6 +117,7 @@ extern int GameAttributes;
 
 extern uint8 PAL;
 extern int dendy;
+extern int pal_emulation;
 extern bool movieSubtitles;
 
 

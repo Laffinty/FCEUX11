@@ -57,7 +57,17 @@ pub struct TestInput {
     #[serde(default)]
     pub args: Vec<String>,
     /// Optional working directory override.
+    #[serde(default)]
     pub working_dir: Option<String>,
+    /// P2: ROM path for Oracle B / ROM-based tests.
+    #[serde(default)]
+    pub rom: Option<String>,
+    /// P2: Probe address for Oracle B $6000 protocol (default 0x6000).
+    #[serde(default)]
+    pub probe_addr: Option<u32>,
+    /// P3: Lua script path for Lua script channel (run via fceux11_lua_runner).
+    #[serde(default)]
+    pub script_path: Option<String>,
 }
 
 /// Expected outcome for the test.

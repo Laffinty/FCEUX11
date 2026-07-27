@@ -1,0 +1,55 @@
+{
+  "_comment": "KagamiQA P2 — Known-failure baseline for blargg test ROM suite.",
+  "_policy": "This file is version-controlled. Each entry documents a ROM known to FAIL. Entries with expected_to_eventually_pass=true are accuracy bugs to fix in P4. Entries with expected_to_eventually_pass=false are permanent skips (e.g. unsupported features or ROM format issues).",
+  "_governance": "AI shall not modify this file. Baseline updates require the same review as code changes (per Plan §1.2 constraints 6-7).",
+  "baseline_version": "v1.16.0-P2",
+  "generated_at": "2026-07-27T06:45:00Z",
+  "engine": "FCEUX11 v1.16 wip_1.16 HEAD",
+  "summary": {
+    "total": 22,
+    "pass": 17,
+    "fail": 5
+  },
+  "failures": [
+    {
+      "rom": "all_instrs.nes",
+      "category": "cpu",
+      "result_code": "0x80",
+      "diag": "0xDE,0xB0,0x61",
+      "expected_to_eventually_pass": true,
+      "notes": "CPU instruction test (all opcodes including unofficial). 0x80 indicates at least one failed instruction. Upstream FCEUX also fails some blargg instr_test ROMs."
+    },
+    {
+      "rom": "official_only.nes",
+      "category": "cpu",
+      "result_code": "0x80",
+      "diag": "0xDE,0xB0,0x61",
+      "expected_to_eventually_pass": true,
+      "notes": "CPU instruction test (official opcodes only). Same failure pattern as all_instrs — official opcode subset also triggers failures."
+    },
+    {
+      "rom": "cpu_interrupts.nes",
+      "category": "cpu",
+      "result_code": "0xFE",
+      "diag": "ROM_LOAD_FAILURE",
+      "expected_to_eventually_pass": false,
+      "notes": "ROM load failure — 5x16k PRG NROM format is rejected by FCEUX11's ROM loader. Not an accuracy issue; ROM format compatibility issue."
+    },
+    {
+      "rom": "ppu_vbl_nmi.nes",
+      "category": "ppu",
+      "result_code": "0x01",
+      "diag": "0xDE,0xB0,0x61",
+      "expected_to_eventually_pass": true,
+      "notes": "PPU VBL NMI timing test. 0x01 indicates VBL/NMI timing does not match real hardware at 1-PPU-clock accuracy."
+    },
+    {
+      "rom": "apu_test.nes",
+      "category": "apu",
+      "result_code": "0x01",
+      "diag": "0xDE,0xB0,0x61",
+      "expected_to_eventually_pass": true,
+      "notes": "APU test (length counters, envelope, sweep, DMC). 0x01 indicates at least one APU behavior diverges from real hardware."
+    }
+  ]
+}
