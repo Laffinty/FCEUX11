@@ -1538,6 +1538,12 @@ int FCEUX_PPU_Loop(int skip) {
 	}
 
 	{
+		// KagamiQA P4-1: Advance 1 PPU cycle before setting VBL flag.
+		// Real NES hardware asserts VBL flag and NMI at dot 1 of
+		// scanline 241, not dot 0. This fixes blargg ppu_vbl_nmi
+		// off-by-1 (code 0x01).
+		runppu(1);
+
 		PPU_status |= 0x80;
 		ppuphase = PPUPHASE_VBL;
 
@@ -1545,15 +1551,16 @@ int FCEUX_PPU_Loop(int skip) {
 		//Timing is probably off, though.
 		//NOTE:  Not having this here breaks a Super Donkey Kong game.
 		PPU[3] = PPUSPL = 0;
-		const int delay = 20;	//fceu used 12 here but I couldnt get it to work in marble madness and pirates.
+		const int delay = 19;	// was 20; 1 cycle consumed above for VBL alignment
 
 		ppur.status.sl = 241;	//for sprite reads
+
+		// NMI fires at cycle 1, same dot as VBL flag (real hardware behavior).
+		if (VBlankON) TriggerNMI();
 
 		//formerly: runppu(delay);
 		for(int dot=0;dot<delay;dot++)
 			runppu(1);
-
-		if (VBlankON) TriggerNMI();
 		int sltodo = PAL?70:20;
 		
 		//formerly: runppu(20 * (kLineTime) - delay);

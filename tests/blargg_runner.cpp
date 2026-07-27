@@ -107,6 +107,21 @@ static ProbeResult read_probe() {
     return r;
 }
 
+/// Read a NUL-terminated ASCII diagnostic string starting at `addr`.
+/// Blargg instr_test ROMs write error detail strings at $6004+.
+/// Returns empty string if the first byte is 0x00 or non-printable.
+static std::string read_probe_string(uint16_t addr, size_t max_len = 512) {
+    std::string s;
+    s.reserve(max_len);
+    for (size_t i = 0; i < max_len; ++i) {
+        uint8_t b = ARead[addr + static_cast<uint16_t>(i)](addr + static_cast<uint16_t>(i));
+        if (b == 0x00 || b == 0xFF) break;
+        if (b < 0x20 && b != 0x0A && b != 0x0D) break;  // non-printable (allow LF/CR)
+        s.push_back(static_cast<char>(b));
+    }
+    return s;
+}
+
 // ---------------------------------------------------------------------------
 // Single ROM runner
 // ---------------------------------------------------------------------------
@@ -117,6 +132,7 @@ struct SingleResult {
     uint8_t     diag[3];
     bool        passed;
     int64_t     duration_ms;
+    std::string diag_string;   // $6004+ ASCII diagnostic (blargg error detail)
 };
 
 static SingleResult run_one_rom(const char* rom_path, int frames) {
@@ -161,6 +177,12 @@ static SingleResult run_one_rom(const char* rom_path, int frames) {
     res.diag[1]  = probe.diag[1];
     res.diag[2]  = probe.diag[2];
     res.passed   = (probe.code == 0x00);
+
+    // Read diagnostic string from $6004+ if the test failed.
+    // Blargg instr_test ROMs write error detail (opcode + expected/actual) here.
+    if (!res.passed) {
+        res.diag_string = read_probe_string(0x6004);
+    }
 
     fceu11::CloseGame();
     core_shutdown();
@@ -287,13 +309,17 @@ static std::vector<ManifestEntry> load_manifest(const char* manifest_path) {
 
 // Single-ROM output line (machine-parseable).
 static void print_single_result(const SingleResult& r) {
-    std::printf("BLARGG_RESULT: rom=%s addr=0x%04X value=0x%02X diag=[0x%02X,0x%02X,0x%02X] status=%s duration_ms=%lld\n",
+    std::printf("BLARGG_RESULT: rom=%s addr=0x%04X value=0x%02X diag=[0x%02X,0x%02X,0x%02X] status=%s duration_ms=%lld",
         r.rom_name.c_str(),
         r.probe_addr,
         r.value,
         r.diag[0], r.diag[1], r.diag[2],
         r.passed ? "PASS" : "FAIL",
         static_cast<long long>(r.duration_ms));
+    if (!r.diag_string.empty()) {
+        std::printf(" diag_string=\"%s\"", r.diag_string.c_str());
+    }
+    std::printf("\n");
 }
 
 // Batch JSON output.
@@ -306,14 +332,27 @@ static void print_batch_json(const std::vector<SingleResult>& results) {
         const char* comma = (i + 1 < results.size()) ? "," : "";
         std::printf(
             "    {\"rom\":\"%s\",\"addr\":\"0x%04X\",\"value\":\"0x%02X\","
-            "\"diag\":[%d,%d,%d],\"status\":\"%s\",\"duration_ms\":%lld}%s\n",
+            "\"diag\":[%d,%d,%d],\"status\":\"%s\",\"duration_ms\":%lld",
             r.rom_name.c_str(),
             r.probe_addr,
             r.value,
             r.diag[0], r.diag[1], r.diag[2],
             r.passed ? "PASS" : "FAIL",
-            static_cast<long long>(r.duration_ms),
-            comma);
+            static_cast<long long>(r.duration_ms));
+        if (!r.diag_string.empty()) {
+            // Escape JSON special characters in diag_string.
+            std::printf(",\"diag_string\":\"");
+            for (char c : r.diag_string) {
+                if (c == '"') std::printf("\\\"");
+                else if (c == '\\') std::printf("\\\\");
+                else if (c == '\n') std::printf("\\n");
+                else if (c == '\r') std::printf("\\r");
+                else if (c == '\t') std::printf("\\t");
+                else std::putchar(c);
+            }
+            std::printf("\"");
+        }
+        std::printf("}%s\n", comma);
     }
     std::printf("  ]\n}\n");
 }
