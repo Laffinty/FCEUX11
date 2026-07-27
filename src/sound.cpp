@@ -167,11 +167,8 @@ void LogDPCM(int romaddress, int dpcmsize){
 
 static void SQReload(int x, uint8 V)
 {
-	// KagamiQA P4-2: Always reload length counter on $4003/$4007 write.
-	// Real NES hardware loads regardless of channel enable state in $4015.
-	// The EnabledChannels gate was incorrect — $4015 only clears counters
-	// on disable, it does not block reloads.
-	lengthcount[x]=lengthtable[(V>>3)&0x1f];
+	if(EnabledChannels&(1<<x))
+		lengthcount[x]=lengthtable[(V>>3)&0x1f];
 
 	/* use the low 8 bits data from pulse period
 	 * instead of from the sweep period */
@@ -233,8 +230,8 @@ static DECLFW(Write_PSG)
 		break;
 	case 0xb:
 		DoTriangle();
-		// KagamiQA P4-2: Unconditional length counter reload (see SQReload).
-		lengthcount[2]=lengthtable[(V>>3)&0x1f];
+		if(EnabledChannels&0x4)
+			lengthcount[2]=lengthtable[(V>>3)&0x1f];
 		TriMode=1;	// Load mode
 		break;
 	case 0xC:
@@ -247,8 +244,8 @@ static DECLFW(Write_PSG)
 		break;
 	case 0xF:
 		DoNoise();
-		// KagamiQA P4-2: Unconditional length counter reload (see SQReload).
-		lengthcount[3]=lengthtable[(V>>3)&0x1f];
+		if(EnabledChannels&0x8)
+			lengthcount[3]=lengthtable[(V>>3)&0x1f];
 		EnvUnits[2].reloaddec=1;
 		break;
 	case 0x10:
