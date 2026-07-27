@@ -1365,7 +1365,8 @@ void runppu(int x) {
 	// makes the modulo cost cumulative: 8 modulos per record × 32
 	// records × ~262 scanlines = ~67k modulos per frame.
 	int c = ppur.status.cycle + x;
-	if (c >= ppur.status.end_cycle) c -= ppur.status.end_cycle;
+	// P4-bridge: while for ppudead multi-wrap safety.
+	while (c >= ppur.status.end_cycle) c -= ppur.status.end_cycle;
 	ppur.status.cycle = c;
 	if (!new_ppu_reset) // if resetting, suspend CPU until the first frame
 	{
@@ -1533,6 +1534,12 @@ int FCEUX_PPU_Loop(int skip) {
 			runppu(20 * kLineTime);
 		ppur.status.sl = 0;
 		runppu(242 * kLineTime);
+
+		// P4-bridge: VBL+NMI during ppudead, matching old PPU behavior.
+		PPU_status |= 0x80;
+		ppuphase = PPUPHASE_VBL;
+		if (VBlankON) TriggerNMI();
+
 		--ppudead;
 		goto finish;
 	}
