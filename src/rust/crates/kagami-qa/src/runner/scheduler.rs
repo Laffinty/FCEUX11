@@ -47,4 +47,9 @@ impl TestScheduler {
     pub fn is_empty(&self) -> bool {
         self.manifest.is_empty()
     }
+
+    /// Return a snapshot of the manifest for drift detection.
+    pub fn manifest_snapshot(&self) -> BTreeMap<String, crate::manifest::schema::TestManifest> {
+        self.manifest.clone()
+    }
 }
