@@ -139,3 +139,20 @@ tests/disksys.rom
 __pycache__/
 *.pyc
 scripts/_build_extract.js
+
+# ---------------------------------------------------------------------------
+# KagamiQA artifacts (migration matrix, accuracy table, batch results)
+# These are CI-produced reports — not source code.
+# ---------------------------------------------------------------------------
+kagamiqa_migration_matrix.json
+kagamiqa_accuracy_table.md
+kagamiqa_baseline_next.json
+kagamiqa_direct_matrix.json
+blargg_full_results.json
+blargg_full_output.txt
+blargg_full_stderr.txt
+build/*_matrix.json
+build/*_baseline*.json
+build/*_accuracy*.md
+build/*_results*.json
+build/*_output*.txt

@@ -14,5 +14,11 @@ path = "src/main.rs"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+[features]
+# P5: Enable the in-process (direct) adapter via C ABI FFI.
+# Requires linking against fceux11_core + fceux11_drivers_null.
+# Only available when built through CMake (kagami_qa_direct_runner target).
+direct-adapter = []
+
 [dev-dependencies]
 tempfile = "3"

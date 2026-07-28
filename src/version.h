@@ -56,9 +56,9 @@
 #define FCEU_COMPILER_DETAIL ""
 #endif
 
-// v1.13 Purify H: #define → constexpr (version numbers)
+// v1.16 KagamiQA P5 — final release build
 inline constexpr int FCEU_VERSION_MAJOR = 1;
-inline constexpr int FCEU_VERSION_MINOR = 15;
+inline constexpr int FCEU_VERSION_MINOR = 16;
 inline constexpr int FCEU_VERSION_PATCH = 0;
 inline constexpr int FCEU_VERSION_TWEAK = 0;
 
@@ -67,16 +67,12 @@ inline constexpr int FCEU_VERSION_MAJOR_DECODE(int x) { return x / 10000; }
 inline constexpr int FCEU_VERSION_MINOR_DECODE(int x) { return (x / 100) % 100; }
 inline constexpr int FCEU_VERSION_PATCH_DECODE(int x) { return x % 100; }
 
-// v1.15 hotfix6 marker — single source of truth for downstream surfaces
-// (About, main-window title, startup banner, config.cpp about-template,
-// diag API, AVI ISFT metadata). Clear to "" when no hotfix is active.
-// Both FCEU_VERSION_STRING ("1.15 (hotfix6)") and FCEU_DISPLAY_VERSION
-// ("v1.15 (hotfix6)") keep a single space between "1.15" and the hotfix
-// parenthetical — convention introduced with hotfix2.
-#define FCEU_HOTFIX_TAG "(hotfix6)"
+// v1.16 final release — no hotfix tag (this is not a hotfix).
+// Clear FCEU_HOTFIX_TAG to "" for final release builds.
+#define FCEU_HOTFIX_TAG ""
 
-#define FCEU_VERSION_STRING "1.15 " FCEU_HOTFIX_TAG " " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
-#define FCEU_DISPLAY_VERSION "v1.15 " FCEU_HOTFIX_TAG
+#define FCEU_VERSION_STRING "1.16 " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
+#define FCEU_DISPLAY_VERSION "v1.16"
 #define FCEU_NAME_AND_VERSION FCEU_NAME " " FCEU_DISPLAY_VERSION
 
 // FCEUX11 Contributors — Derivative work based on FCEUX

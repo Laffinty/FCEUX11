@@ -2,7 +2,7 @@
 
 # FCEUX11
 
-[![Version](https://img.shields.io/badge/version-v1.15%20(hotfix6)-blue)](https://github.com/Laffinty/FCEUX11/releases)
+[![Version](https://img.shields.io/badge/version-v1.16-blue)](https://github.com/Laffinty/FCEUX11/releases)
 [![License](https://img.shields.io/badge/license-GPL--v2-green)](COPYING)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?logo=windows)](https://www.microsoft.com/windows/windows-11)
 [![Qt](https://img.shields.io/badge/Qt-6.8%20LTS-41CD52?logo=qt)](https://www.qt.io)
@@ -98,15 +98,41 @@ Launch `fceux11.exe`, load a game via **File → Open ROM**, play with keyboard 
 
 ---
 
+## 质量保障 / Quality Assurance — KagamiQA
+
+FCEUX11 内置一套名为 **KagamiQA** 的双 Oracle 自动化质量保障系统，在 CI 上常驻运行：
+
+| 组件 | 说明 |
+|------|------|
+| **Oracle A（回归测试）** | 39 个 CTest 单元/回归/边界测试，每次 push 全量运行，零差异门禁 |
+| **Oracle B（硬件精度测试）** | 180 个 [blargg](https://github.com/christopherpow/nes-test-roms) $6000 协议 ROM，覆盖 CPU/PPU/APU/MMC3 全子类，headless 全量批处理 |
+| **迁移矩阵** | 每次 CI run 产出 `kagamiqa_migration_matrix.json`，追踪 PASS→FAIL 回归与 FAIL→PASS 进展 |
+| **基线漂移检测** | PASS→FAIL 自动在 PR 下评论红色警报，防止精度退化 |
+
+**KagamiQA 的实现细节、原理、独立化运行、跨项目迁移指南，请参阅 [`docs/tech/KagamiQA.md`](docs/tech/KagamiQA.md)。**
+
+FCEUX11 ships **KagamiQA**, a dual-oracle automated quality assurance system that runs continuously in CI:
+
+| Component | Description |
+|-----------|-------------|
+| **Oracle A (regression)** | 39 CTest unit/regression/boundary tests, full run on every push, zero-diff gating |
+| **Oracle B (hardware accuracy)** | 180 [blargg](https://github.com/christopherpow/nes-test-roms) $6000-protocol ROMs covering all CPU/PPU/APU/MMC3 sub-categories, headless batch |
+| **Migration Matrix** | Every CI run produces `kagamiqa_migration_matrix.json`, tracking PASS→FAIL regressions and FAIL→PASS progress |
+| **Baseline Drift Detection** | PASS→FAIL automatically posts a red alert PR comment, preventing accuracy decay |
+
+**For implementation details, principles, standalone operation, and cross-project migration, see [`docs/tech/KagamiQA.md`](docs/tech/KagamiQA.md).**
+
+---
+
 ## 版本历史 / Changelog
 
-详见 [CHANGELOG.md](CHANGELOG.md)。当前稳定版为 v1.15 (hotfix6)。
+详见 [CHANGELOG.md](CHANGELOG.md)。当前稳定版为 **v1.16**。
 
-**hotfix6 主要变更**：修复 11 种语言共 102 处翻译质量问题（法语双重转义乱码、韩语助词语法、泰语/越南语助记符位置、术语一致性），经三轮审计（首审→复测→终测）阻断项归零，批准发布。
+**v1.16 主要亮点**：KagamiQA 双 Oracle 质量防线正式上线 — 180 个 blargg 测试 ROM 覆盖 CPU/PPU/APU 全子类，每次 push 自动运行 CI 产出迁移矩阵；vbl_01_basics 修复（VBL 周期对齐）；Lua 断言级测试判定；in-process runner 通道打通（C ABI 直驱 core）。
 
-See [CHANGELOG.md](CHANGELOG.md). Current stable release is v1.15 (hotfix6).
+See [CHANGELOG.md](CHANGELOG.md). Current stable release is **v1.16**.
 
-**hotfix6 highlights**: Fixed 102 translation quality issues across 11 languages (French double-escape bugs, Korean particle grammar, Thai/Vietnamese mnemonic placement, terminology consistency). Zero blocking issues after 3-round audit (initial review → retest → final review). Release approved.
+**v1.16 highlights**: KagamiQA dual-oracle quality defense line deployed — 180 blargg test ROMs covering all CPU/PPU/APU sub-categories, CI auto-runs on every push with migration matrix output; vbl_01_basics fix (VBL cycle alignment); Lua assertion-level test signal; in-process runner pipeline (C ABI direct core drive).
 
 ---
 

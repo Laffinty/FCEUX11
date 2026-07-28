@@ -1,0 +1,208 @@
+# FCEUX11 v1.16 KagamiQA P5 — CI Workflow
+#
+# Runs the dual-oracle QA system on every push to wip_1.16 / main.
+# Produces a migration matrix artifact, accuracy table, and baseline drift report.
+#
+# Oracle A: CTest regression suite (unit tests, ROM regressions, golden files)
+# Oracle B: Blargg $6000 test ROM suite (180 ROMs, headless batch run)
+#
+# Triggers on push to wip_1.16 and main; also on PRs targeting these branches.
+
+name: KagamiQA
+
+on:
+  push:
+    branches: [main, wip_1.16]
+  pull_request:
+    branches: [main, wip_1.16]
+  workflow_dispatch:  # allow manual trigger
+
+jobs:
+  kagami-qa:
+    runs-on: windows-2022
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      # -----------------------------------------------------------------------
+      # Environment setup
+      # -----------------------------------------------------------------------
+      - name: Setup MSVC dev cmd
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Setup CMake 4.0
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: '4.0.x'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: x86_64-pc-windows-msvc
+
+      # -----------------------------------------------------------------------
+      # Cache
+      # -----------------------------------------------------------------------
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: |
+            vcpkg_installed
+            ${{ env.LOCALAPPDATA }}\vcpkg\archives
+          key: vcpkg-${{ hashFiles('vcpkg.json') }}
+          restore-keys: vcpkg-
+
+      - name: Cache Rust
+        uses: actions/cache@v4
+        with:
+          path: |
+            src/rust/target
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: rust-kagami-${{ hashFiles('src/rust/Cargo.lock') }}
+          restore-keys: rust-kagami-
+
+      # -----------------------------------------------------------------------
+      # Build C++ project (with tests)
+      # -----------------------------------------------------------------------
+      - name: Configure CMake
+        run: >
+          cmake -S . -B build
+          -G "Ninja"
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER=cl
+          -DCMAKE_CXX_COMPILER=cl
+          -DFCEUX11_BUILD_TESTS=ON
+          -DFCEUX11_ENABLE_RUST=ON
+          -DENABLE_LINT_CPPCHECK=OFF
+
+      - name: Build C++
+        run: cmake --build build --config Release --parallel
+
+      # -----------------------------------------------------------------------
+      # Build KagamiQA Rust runner
+      # -----------------------------------------------------------------------
+      - name: Build kagami-qa-runner
+        working-directory: src/rust
+        run: cargo build --release -p kagami-qa
+
+      # -----------------------------------------------------------------------
+      # Oracle A — CTest regression suite
+      # -----------------------------------------------------------------------
+      - name: Oracle A — CTest
+        run: ctest --test-dir build --build-config Release --output-on-failure -LE perf
+        continue-on-error: true  # capture results even if some tests fail
+
+      # -----------------------------------------------------------------------
+      # Oracle B — Blargg $6000 test ROM suite (180 ROM batch)
+      # -----------------------------------------------------------------------
+      - name: Oracle B — Blargg Suite
+        working-directory: tests
+        run: |
+          $runner = "../build/tests/fceux11_blargg_runner.exe"
+          if (Test-Path $runner) {
+            & $runner --manifest fixtures/blargg_manifest.json 2>&1 | Tee-Object -FilePath ../build/blargg_full_output.txt
+            $exitCode = $LASTEXITCODE
+            Write-Host "Blargg suite exit code: $exitCode"
+          } else {
+            Write-Host "::warning::blargg_runner not built; skipping Oracle B."
+            exit 0
+          }
+        shell: pwsh
+        continue-on-error: true
+
+      # -----------------------------------------------------------------------
+      # KagamiQA — Migration matrix generation
+      # -----------------------------------------------------------------------
+      - name: KagamiQA — Migration Matrix
+        run: |
+          $runner = "src/rust/target/release/kagami-qa-runner.exe"
+          if (Test-Path $runner) {
+            & $runner `
+              --manifest tests/tests.json `
+              --bin-dir build/tests `
+              --output build/kagamiqa_migration_matrix.json `
+              --accuracy-table build/kagamiqa_accuracy_table.md `
+              --known-fail tests/fixtures/blargg_known_fail.json `
+              --baseline build/kagamiqa_migration_matrix.json `
+              --save-baseline build/kagamiqa_baseline_next.json
+            $exitCode = $LASTEXITCODE
+            Write-Host "KagamiQA runner exit code: $exitCode"
+          } else {
+            Write-Host "::warning::kagami-qa-runner not built; skipping migration matrix."
+          }
+        shell: pwsh
+        continue-on-error: true
+
+      # -----------------------------------------------------------------------
+      # Upload artifacts
+      # -----------------------------------------------------------------------
+      - name: Upload KagamiQA Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kagamiqa-results
+          path: |
+            build/kagamiqa_migration_matrix.json
+            build/kagamiqa_accuracy_table.md
+            build/kagamiqa_baseline_next.json
+            build/blargg_full_output.txt
+          retention-days: 30
+
+      # -----------------------------------------------------------------------
+      # Baseline drift detection (PASS→FAIL alerts)
+      # -----------------------------------------------------------------------
+      - name: Baseline Drift Detection
+        if: github.event_name == 'pull_request'
+        shell: pwsh
+        run: |
+          $matrixPath = "build/kagamiqa_migration_matrix.json"
+          if (-not (Test-Path $matrixPath)) {
+            Write-Host "::warning::No migration matrix found; skipping drift detection."
+            exit 0
+          }
+          $matrix = Get-Content $matrixPath | ConvertFrom-Json
+          $passToFail = $matrix.transition_matrix.pass_to_fail
+          if ($passToFail -and $passToFail.Count -gt 0) {
+            $msg = "## ⚠️ KagamiQA Baseline Drift Alert`n`n"
+            $msg += "**PASS→FAIL regressions detected:** $($passToFail.Count)`n`n"
+            foreach ($entry in $passToFail) {
+              $msg += "- ❌ **$($entry.id)**`n"
+            }
+            $msg += "`n🤖 Generated with [Claude Code](https://claude.com/claude-code)"
+            # Post as PR comment using GitHub CLI
+            gh pr comment ${{ github.event.pull_request.number }} --body "$msg" 2>$null
+            Write-Host "Drift alert posted to PR."
+          } else {
+            Write-Host "No PASS→FAIL regressions detected. ✓"
+          }
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      # -----------------------------------------------------------------------
+      # Summary
+      # -----------------------------------------------------------------------
+      - name: Print Summary
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Host "========================================"
+          Write-Host "KagamiQA P5 CI Run Complete"
+          Write-Host "========================================"
+          $matrixPath = "build/kagamiqa_migration_matrix.json"
+          if (Test-Path $matrixPath) {
+            $m = Get-Content $matrixPath | ConvertFrom-Json
+            Write-Host "Total:   $($m.summary.total)"
+            Write-Host "Passed:  $($m.summary.passed)"
+            Write-Host "Failed:  $($m.summary.failed)"
+            Write-Host "Oracle A: $($m.oracle_breakdown.a_regression.pass)P / $($m.oracle_breakdown.a_regression.fail)F"
+            Write-Host "Oracle B: $($m.oracle_breakdown.b_hardware.pass)P / $($m.oracle_breakdown.b_hardware.fail)F"
+          }

@@ -1,0 +1,20 @@
+{
+  "baseline_version": "v1.16.0-P5",
+  "engine": "FCEUX11 v1.16 wip_1.16 HEAD (newppu=1, KagamiQA P5 full batch)",
+  "timestamp": "2026-07-28",
+  "summary": {
+    "total": 180,
+    "passed": 120,
+    "failed": 60,
+    "error": 0,
+    "coverage_pct": 66.7
+  },
+  "category_breakdown": {
+    "CPU": { "total": 56, "passed": 37, "failed": 19 },
+    "PPU": { "total": 49, "passed": 39, "failed": 10 },
+    "APU": { "total": 52, "passed": 35, "failed": 17 },
+    "MMC3": { "total": 18, "passed": 6, "failed": 12 },
+    "OTHER": { "total": 5, "passed": 3, "failed": 2 }
+  },
+  "reclassify_note": "P5 initial full baseline. 60 failures classified below. See blargg_known_fail.json for per-ROM disposition and runppu relevance."
+}

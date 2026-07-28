@@ -3953,6 +3953,27 @@ void fceux11_rust_state_file_buf_free(struct FceuStateBuffer buf);
  */
 void fceux11_rust_state_file_chunks_free(struct FceuStateChunkOutput *chunks,
                                          uintptr_t chunk_count);
+extern int32_t kagami_bridge_init(void);
+
+extern int32_t kagami_bridge_load_rom(const char *path);
+
+extern int32_t kagami_bridge_emulate_frame(void);
+
+extern uint8_t kagami_bridge_read_byte(uint16_t addr);
+
+extern uint8_t kagami_bridge_read_ppu(uint16_t addr);
+
+extern int32_t kagami_bridge_reset(void);
+
+extern void kagami_bridge_kill(void);
+
+extern void kagami_bridge_set_newppu(int32_t on);
+
+/**
+ * Main entry point called from C++ (kagami_direct_main.cpp).
+ * Parses CLI args and runs Oracle B tests in-process.
+ */
+int32_t kagami_qa_direct_main(int32_t argc, const char *const *argv);
 #ifdef __cplusplus
 }
 #endif

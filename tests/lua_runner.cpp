@@ -16,6 +16,11 @@
 //   LUA_RESULT: script=<name> status=PASS|FAIL details=<output>
 //
 // Exit code: 0 = PASS, 1 = FAIL.
+//
+// P5: Assertion capture. Redirects stderr to a temporary file during
+// script execution, then scans the captured output for Lua error/assert
+// patterns to determine PASS/FAIL. This replaces the previous "didn't
+// crash = PASS" heuristic with actual assertion-level signal extraction.
 
 #include <cstdio>
 #include <cstdlib>
@@ -23,6 +28,8 @@
 #include <cstring>
 #include <string>
 #include <ctime>
+#include <sstream>
+#include <fstream>
 
 #include "types.h"
 #include "fceu.h"
@@ -35,6 +42,10 @@
 #include "drivers/common/nes_shm.h"
 #include "driver_callbacks.h"
 #include "null_driver.h"
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 // ---------------------------------------------------------------------------
 // Rust FFI — fceux11-lua extern "C" bridge (symbols exported from fceux11_rust.lib)
@@ -109,6 +120,33 @@ struct LuaResult {
 // through Rust's print!() → line buffered stdout.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// P5: stderr capture for Lua assertion detection.
+// ---------------------------------------------------------------------------
+/// Captures stderr during Lua script execution by redirecting to a temp file.
+/// After execution, the file is read and scanned for error/assert patterns.
+/// This allows the runner to distinguish "script completed with assertions"
+/// (FAIL) from "script completed cleanly" (PASS).
+
+#include <cstdlib> // for std::tmpnam, std::tmpfile (alternative: mkstemp)
+
+// Simple temp file path generator (avoids tmpnam deprecation warning).
+static std::string make_temp_path() {
+#ifdef _WIN32
+    char tmp_path[MAX_PATH];
+    char tmp_file[MAX_PATH];
+    if (GetTempPathA(MAX_PATH, tmp_path) == 0) {
+        return "lua_runner_stderr_temp.txt";
+    }
+    if (GetTempFileNameA(tmp_path, "lua", 0, tmp_file) == 0) {
+        return std::string(tmp_path) + "lua_runner_stderr_temp.txt";
+    }
+    return std::string(tmp_file);
+#else
+    return "/tmp/lua_runner_stderr_" + std::to_string(std::time(nullptr)) + ".txt";
+#endif
+}
+
 static LuaResult run_lua_script(const char* script_path, const char* rom_path,
                                  int max_frames) {
     LuaResult res;
@@ -119,6 +157,12 @@ static LuaResult run_lua_script(const char* script_path, const char* rom_path,
     const char* base = std::strrchr(script_path, '/');
     if (!base) base = std::strrchr(script_path, '\\');
     res.script_name = base ? (base + 1) : script_path;
+
+    // P5: Setup stderr capture via temporary file.
+    std::string temp_stderr_path = make_temp_path();
+    FILE* captured_stderr = std::freopen(temp_stderr_path.c_str(), "w", stderr);
+    // Note: original stderr handle is lost after freopen. We restore by
+    // reopening CON (Windows) or /dev/stderr (Unix) after capture.
 
     auto t0 = std::clock();
 
@@ -190,6 +234,28 @@ static LuaResult run_lua_script(const char* script_path, const char* rom_path,
     // --- Shutdown Lua ---
     fceux11_lua_shutdown();
 
+    // --- Restore stderr (best-effort) ---
+    if (captured_stderr) {
+        std::fclose(captured_stderr);
+    }
+    // On Windows, reopen stderr to console. On failure (e.g. no console),
+    // stderr writes will be silently discarded — the test result is already
+    // determined from the captured file.
+    std::freopen("CONOUT$", "w", stderr);
+
+    // --- Read captured stderr ---
+    std::string captured_output;
+    {
+        std::ifstream cap_file(temp_stderr_path);
+        if (cap_file.is_open()) {
+            std::stringstream ss;
+            ss << cap_file.rdbuf();
+            captured_output = ss.str();
+            cap_file.close();
+        }
+        std::remove(temp_stderr_path.c_str());
+    }
+
     // --- Close game and shutdown core ---
     if (rom_path && rom_path[0] != '\0') {
         fceu11::CloseGame();
@@ -197,8 +263,53 @@ static LuaResult run_lua_script(const char* script_path, const char* rom_path,
     core_shutdown();
 
     res.duration_ms = (std::clock() - t0) * 1000 / CLOCKS_PER_SEC;
-    res.passed      = true;  // Script completed without crashing → success signal
-    res.details     = "script completed";
+
+    // --- P5: Parse stderr for Lua error/assert patterns ---
+    // Look for common Lua error markers:
+    //   "runtime error:" / "assertion failed!" / "ERROR:" / "FAIL:"
+    //   Lua stack traceback lines
+    //   "stack traceback:" — Lua error with traceback
+    bool has_lua_error = false;
+    std::string error_detail;
+
+    // Check for Lua runtime errors.
+    if (captured_output.find("runtime error") != std::string::npos ||
+        captured_output.find("stack traceback") != std::string::npos ||
+        captured_output.find("assertion failed") != std::string::npos ||
+        captured_output.find("ERROR:") != std::string::npos ||
+        captured_output.find("FAIL:") != std::string::npos ||
+        captured_output.find("PANIC:") != std::string::npos) {
+        has_lua_error = true;
+        // Extract first meaningful error line.
+        std::istringstream iss(captured_output);
+        std::string line;
+        while (std::getline(iss, line)) {
+            if (!line.empty() && line[0] != '\t' && line.find("stack traceback") == std::string::npos) {
+                error_detail = line;
+                break;
+            }
+        }
+    }
+
+    // Check for Lua load errors (from fceux11_lua_load_script).
+    if (captured_output.find("failed to load") != std::string::npos ||
+        captured_output.find("syntax error") != std::string::npos ||
+        captured_output.find("module ") != std::string::npos) {
+        has_lua_error = true;
+    }
+
+    if (has_lua_error) {
+        res.passed  = false;
+        res.details = error_detail.empty()
+            ? "Lua assertion/error detected (see captured output)"
+            : error_detail;
+        if (res.details.size() > 200) {
+            res.details = res.details.substr(0, 197) + "...";
+        }
+    } else {
+        res.passed  = true;
+        res.details = "script completed (no Lua errors detected)";
+    }
 
     return res;
 }

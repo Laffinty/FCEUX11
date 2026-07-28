@@ -1,6 +1,6 @@
 # FCEUX11 编译指南 / Build Guide
 
-> **适用版本**：FCEUX11 v1.15+
+> **适用版本**：FCEUX11 v1.16+
 > **目标平台**：Windows 11 22H2+（64-bit）
 > **预计首次编译时间**：30-60 分钟（取决于网络和 CPU）
 
@@ -140,7 +140,7 @@ $env:VCPKG_ROOT = "$PWD\vcpkg"
 .\scripts\copy_dependencies.ps1 -ExecutablePath .\build\src\fceux11.exe -OutputDir .\dist
 
 # 打包
-Compress-Archive -Path dist\* -DestinationPath FCEUX11-v1.15-win64.zip
+Compress-Archive -Path dist\* -DestinationPath FCEUX11-v1.16-win64.zip
 ```
 
 `dist` 目录可直接运行，复制到任意 Windows 11 电脑都能启动。
@@ -264,6 +264,87 @@ ctest --test-dir build --output-on-failure
 ## 9. 工具链约束
 
 FCEUX11 强制使用 **MSVC 2022+** 工具链，不支持 MinGW / clang / MSYS2。这是为了保证 ABI 一致性和 ROM savestate 字节级兼容。
+
+---
+
+---
+
+## 10. KagamiQA — 编译与运行
+
+KagamiQA 是 FCEUX11 的双 Oracle 质量保障系统。详见 [`docs/tech/KagamiQA.md`](tech/KagamiQA.md)。
+
+### 10.1 编译 KagamiQA 组件
+
+标准编译（`do_build.ps1`）会自动编译 KagamiQA 相关测试目标：
+
+```powershell
+# 完整构建（包含 blargg_runner、lua_runner 等）
+.\scripts\do_build.ps1 -Config Release
+```
+
+单独（重新）编译 KagamiQA 组件：
+
+```powershell
+# blargg $6000 ROM runner (Oracle B 执行器)
+cmake --build build --config Release --target fceux11_blargg_runner
+
+# Lua 脚本 runner
+cmake --build build --config Release --target fceux11_lua_runner
+
+# In-process direct runner (C ABI 直驱，需 Rust)
+cmake --build build --config Release --target kagami_qa_direct_runner
+```
+
+### 10.2 编译 Rust kagami-qa-runner
+
+```powershell
+cd src/rust
+cargo build --release -p kagami-qa
+# → target/release/kagami-qa-runner.exe
+```
+
+> `--features direct-adapter` 启用 in-process 模式（需链接 fceux11_core）。
+
+### 10.3 下载 blargg 测试 ROM
+
+```powershell
+.\scripts\download_blargg_roms.ps1
+```
+
+> 从 christopherpow/nes-test-roms GitHub 镜像下载 **180 个** blargg $6000 协议测试 ROM 到 `tests/fixtures/blargg/`。
+
+### 10.4 运行 Oracle A（CTest 回归）
+
+```powershell
+ctest --test-dir build --build-config Release --output-on-failure -LE perf
+```
+
+### 10.5 运行 Oracle B（blargg 全量批处理）
+
+```powershell
+cd tests
+..\build\tests\fceux11_blargg_runner.exe --manifest fixtures/blargg_manifest.json
+```
+
+### 10.6 生成迁移矩阵
+
+```powershell
+cargo run --release -p kagami-qa -- `
+  --manifest tests/tests.json `
+  --bin-dir build/tests `
+  --output build/kagamiqa_migration_matrix.json `
+  --accuracy-table build/kagamiqa_accuracy_table.md `
+  --known-fail tests/fixtures/blargg_known_fail.json `
+  --save-baseline build/kagamiqa_baseline_next.json
+```
+
+### 10.7 CI 自动运行
+
+KagamiQA 在 CI 上自动运行（`.github/workflows/kagami-qa.yml`）：
+- 每次 push 到 `main` / `wip_1.16` 触发
+- Oracle A + Oracle B 全量运行
+- 迁移矩阵 + 精度对照表作为 artifact 上传
+- PASS→FAIL 基线漂移自动 PR 评论警报
 
 ---
 
