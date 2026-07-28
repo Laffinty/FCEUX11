@@ -14,15 +14,80 @@ pub struct TestResult {
     pub migration_note: Option<String>,
 }
 
+/// Input specification for the direct (in-process) adapter.
+/// Mirrors the ROM/script fields from TestInput but is adapter-agnostic.
+#[derive(Debug, Clone)]
+pub struct InputSpec {
+    /// Path to a ROM file (for Oracle B / hardware tests).
+    pub rom_path: Option<String>,
+    /// Path to a Lua script (for software-side dynamic tests).
+    pub script_path: Option<String>,
+    /// Number of frames to run (for Oracle B tests).
+    pub frames: u32,
+    /// Probe address for $6000 protocol.
+    pub probe_addr: u32,
+}
+
+impl InputSpec {
+    pub fn from_manifest(test: &TestManifest) -> Self {
+        Self {
+            rom_path: test.input.rom.clone(),
+            script_path: test.input.script_path.clone(),
+            frames: 300, // default; can be overridden in manifest
+            probe_addr: test.input.probe_addr.unwrap_or(0x6000),
+        }
+    }
+}
+
 /// System-Under-Test adapter trait.
 ///
 /// Abstracts how the QA runner invokes tests against the FCEUX11 emulator.
-/// P1: Subprocess adapter (wraps CTest binaries).
-/// P2+: In-process adapter (calls core via FFI).
+///
+/// # Implementations
+///
+/// | Adapter              | Mode        | Use case                            |
+/// |----------------------|-------------|-------------------------------------|
+/// | `SubprocessAdapter`  | subprocess  | P1–P3: wraps existing CTest binaries |
+/// | `Fceux11DirectAdapter` | in-process | P5: frame-by-frame via C ABI FFI     |
+///
+/// The in-process adapter provides `step()` granularity needed for
+/// runppu 重批 — the runner can interleave emulation steps with
+/// oracle probes and state snapshots.
 pub trait SutAdapter {
     /// Initialize the adapter.
     fn init(&self, config: &QaConfig) -> Result<(), QaError>;
 
-    /// Run a single test and return its result.
+    /// Run a single test (subprocess mode — for existing CTest binaries).
     fn run_test(&self, test: &TestManifest) -> Result<TestResult, QaError>;
+
+    // ------------------------------------------------------------------
+    // In-process (direct) interface — used by Fceux11DirectAdapter.
+    // Default implementations return Unsupported so SubprocessAdapter
+    // doesn't need to implement them.
+    // ------------------------------------------------------------------
+
+    /// Load the input (ROM or script) into the emulator.
+    fn load(&mut self, _input: &InputSpec) -> Result<(), QaError> {
+        Err(QaError::unsupported("load (in-process) not available for this adapter"))
+    }
+
+    /// Advance the emulator by one frame.
+    fn step(&mut self) -> Result<(), QaError> {
+        Err(QaError::unsupported("step (in-process) not available for this adapter"))
+    }
+
+    /// Read an oracle probe value from CPU address space.
+    fn read_oracle_probe(&self, _addr: u32) -> Result<u8, QaError> {
+        Err(QaError::unsupported("read_oracle_probe (in-process) not available for this adapter"))
+    }
+
+    /// Take a snapshot of current emulator state (for golden-master comparison).
+    fn snapshot(&self) -> Result<Vec<u8>, QaError> {
+        Err(QaError::unsupported("snapshot (in-process) not available for this adapter"))
+    }
+
+    /// Reset the emulator to post-power-on state.
+    fn reset(&mut self) -> Result<(), QaError> {
+        Err(QaError::unsupported("reset (in-process) not available for this adapter"))
+    }
 }

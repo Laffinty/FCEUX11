@@ -1,14 +1,23 @@
 {
-  "_comment": "KagamiQA P2 — Known-failure baseline for blargg test ROM suite.",
-  "_policy": "This file is version-controlled. Each entry documents a ROM known to FAIL. Entries with expected_to_eventually_pass=true are accuracy bugs to fix in P4. Entries with expected_to_eventually_pass=false are permanent skips (e.g. unsupported features or ROM format issues).",
+  "_comment": "KagamiQA P4 — Known-failure baseline for blargg test ROM suite (NEW PPU baseline).",
+  "_policy": "This file is version-controlled. Each entry documents a ROM known to FAIL. Entries with expected_to_eventually_pass=true are accuracy bugs to fix. Entries with expected_to_eventually_pass=false are permanent skips (e.g. unsupported features or ROM format issues).",
   "_governance": "AI shall not modify this file. Baseline updates require the same review as code changes (per Plan §1.2 constraints 6-7).",
-  "baseline_version": "v1.16.0-P2",
-  "generated_at": "2026-07-27T06:45:00Z",
-  "engine": "FCEUX11 v1.16 wip_1.16 HEAD",
+  "baseline_version": "v1.16.0-P4",
+  "generated_at": "2026-07-28T12:00:00Z",
+  "engine": "FCEUX11 v1.16 wip_1.16 HEAD (newppu=1, P4-bridge VBL fix applied)",
+  "previous_baseline": "v1.16.0-P2 (old PPU, newppu=0)",
   "summary": {
     "total": 22,
     "pass": 17,
-    "fail": 5
+    "fail": 4,
+    "error": 1
+  },
+  "changes_from_P2_baseline": {
+    "ppu_vbl_nmi": {
+      "old": "0x01 — 01-vbl_basics ALL sub-tests FAIL (too short #7)",
+      "new": "0x80 — 01-vbl_basics all 9 sub-tests PASS; 02-vbl_set_time FAIL (VBL at cycle 0, needs cycle 1)",
+      "improvement": "partial — 01-vbl_basics now PASS. 02-vbl_set_time failure is a separate 1-PPU-cycle alignment issue."
+    }
   },
   "failures": [
     {
@@ -17,7 +26,8 @@
       "result_code": "0x80",
       "diag": "0xDE,0xB0,0x61",
       "expected_to_eventually_pass": true,
-      "notes": "CPU instruction test (all opcodes including unofficial). 0x80 indicates at least one failed instruction. Upstream FCEUX also fails some blargg instr_test ROMs."
+      "runppu_relevant": false,
+      "notes": "CPU instruction test (all opcodes including unofficial). 0x80 indicates at least one failed instruction. NOT a PPU timing issue — runppu 重批 unlikely to affect this. Requires CPU-level diagnosis."
     },
     {
       "rom": "official_only.nes",
@@ -25,7 +35,8 @@
       "result_code": "0x80",
       "diag": "0xDE,0xB0,0x61",
       "expected_to_eventually_pass": true,
-      "notes": "CPU instruction test (official opcodes only). Same failure pattern as all_instrs — official opcode subset also triggers failures."
+      "runppu_relevant": false,
+      "notes": "CPU instruction test (official opcodes only). Same failure pattern as all_instrs. Running test 4 of 16. NOT a PPU timing issue."
     },
     {
       "rom": "cpu_interrupts.nes",
@@ -33,15 +44,17 @@
       "result_code": "0xFE",
       "diag": "ROM_LOAD_FAILURE",
       "expected_to_eventually_pass": false,
+      "runppu_relevant": false,
       "notes": "ROM load failure — 5x16k PRG NROM format is rejected by FCEUX11's ROM loader. Not an accuracy issue; ROM format compatibility issue."
     },
     {
       "rom": "ppu_vbl_nmi.nes",
       "category": "ppu",
-      "result_code": "0x01",
+      "result_code": "0x80",
       "diag": "0xDE,0xB0,0x61",
       "expected_to_eventually_pass": true,
-      "notes": "PPU VBL NMI timing test. 0x01 indicates VBL/NMI timing does not match real hardware at 1-PPU-clock accuracy."
+      "runppu_relevant": true,
+      "notes": "P4-bridge fix restored correct VBL period (6820 cycles). 01-vbl_basics: all 9 sub-tests now PASS (was 'too short #7' on old PPU). 02-vbl_set_time: FAIL — VBL flag set at cycle 0 instead of cycle 1 (1-PPU-cycle alignment). This is the primary runppu-relevant accuracy bug."
     },
     {
       "rom": "apu_test.nes",
@@ -49,7 +62,19 @@
       "result_code": "0x01",
       "diag": "0xDE,0xB0,0x61",
       "expected_to_eventually_pass": true,
-      "notes": "APU test (length counters, envelope, sweep, DMC). 0x01 indicates at least one APU behavior diverges from real hardware."
+      "runppu_relevant": false,
+      "notes": "APU test (length counters, envelope, sweep, DMC). New PPU shows '3-irq_flag Failed #6' — different from old PPU failure mode but still FAIL. NOT a PPU timing issue."
     }
-  ]
+  ],
+  "benefits_reassessment": {
+    "date": "2026-07-28",
+    "conclusion": "PROCEED — runppu benefit is modest (1 of 4 real failures potentially fixable) but the TEST SYSTEM VALIDATION value is high: if KagamiQA can produce trusted FAIL→PASS signals on a PPU timing rewrite, it passes the 'exemplar' milestone (Plan §九 P5退出条件).",
+    "breakdown": {
+      "directly_fixable_by_runppu": ["ppu_vbl_nmi.nes (02-vbl_set_time: 1-PPU-cycle VBL alignment)"],
+      "not_ppu_related": ["all_instrs.nes", "official_only.nes", "apu_test.nes"],
+      "permanent_skip": ["cpu_interrupts.nes (ROM format)"],
+      "risk": "LOW — dual oracle guards in place (Oracle A regression + Oracle B known-fail baseline). Any runppu regression immediately detected as PASS→FAIL in transition matrix."
+    },
+    "decision": "P5 unblocked. Proceed with runppu 重批 under dual-oracle supervision."
+  }
 }

@@ -183,6 +183,7 @@ set(SRC_CORE
   	${CMAKE_CURRENT_SOURCE_DIR}/ines_gi.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/ines_save.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/input.cpp
+ 	${CMAKE_CURRENT_SOURCE_DIR}/kagami_bridge.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/movie.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/movie_fm2.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/movie_playback.cpp

@@ -25,4 +25,24 @@ pub enum ErrorKind {
     OracleMismatch,
     /// I/O error.
     IoError,
+    /// Operation not supported by this adapter.
+    Unsupported,
+}
+
+impl QaError {
+    pub fn unsupported(msg: impl Into<String>) -> Self {
+        Self {
+            kind: ErrorKind::Unsupported,
+            message: msg.into(),
+        }
+    }
+}
+
+impl From<std::io::Error> for QaError {
+    fn from(e: std::io::Error) -> Self {
+        Self {
+            kind: ErrorKind::IoError,
+            message: e.to_string(),
+        }
+    }
 }

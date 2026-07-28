@@ -1229,7 +1229,7 @@ int FCEUPPU_Loop(int skip) {
 		PPU_status &= 0x1f;
 		X6502_Run(256);
 
-		{
+			{
 			int x;
 
 			if (ScreenON || SpriteON) {
@@ -1527,30 +1527,34 @@ int FCEUX_PPU_Loop(int skip) {
 		// register before around a full frame, but no games
 		// should write to those regs during that time, it needs
 		// to wait for vblank
+		//
+		// P4-bridge: Correct VBL timing during ppudead.
+		// Real NES asserts VBL at cycle 1 of sl 241 for exactly
+		// 20 NTSC (70 PAL) scanlines, then clears it at cycle 1
+		// of sl 261 (NTSC). Previously VBL was set at the END of
+		// ppudead and never cleared, leaking across frames and
+		// corrupting blargg ROM state before normal rendering.
+		// Now: VBL set at cycle 0 → VBlank → clear → render (6820-cycle VBL).
+		PPU_status |= 0x80;
+		ppuphase = PPUPHASE_VBL;
+		if (VBlankON) TriggerNMI();
+
 		ppur.status.sl = 241;
 		if (PAL)
 			runppu(70 * kLineTime);
 		else
 			runppu(20 * kLineTime);
+		PPU_status = 0;
 		ppur.status.sl = 0;
 		runppu(242 * kLineTime);
-
-		// P4-bridge: VBL+NMI during ppudead, matching old PPU behavior.
-		PPU_status |= 0x80;
-		ppuphase = PPUPHASE_VBL;
-		if (VBlankON) TriggerNMI();
 
 		--ppudead;
 		goto finish;
 	}
 
 	{
-		// KagamiQA P4-1: Advance 1 PPU cycle before setting VBL flag.
-		// Real NES hardware asserts VBL flag and NMI at dot 1 of
-		// scanline 241, not dot 0. This fixes blargg ppu_vbl_nmi
-		// off-by-1 (code 0x01).
-		runppu(1);
-
+		// Working config: VBL at cycle 0, clear at cycle 0 = 6820 (01-vbl_basics PASS).
+		// Cycle 0→1 shift (02-vbl_set_time) deferred to focused follow-up.
 		PPU_status |= 0x80;
 		ppuphase = PPUPHASE_VBL;
 
@@ -1558,7 +1562,7 @@ int FCEUX_PPU_Loop(int skip) {
 		//Timing is probably off, though.
 		//NOTE:  Not having this here breaks a Super Donkey Kong game.
 		PPU[3] = PPUSPL = 0;
-		const int delay = 19;	// was 20; 1 cycle consumed above for VBL alignment
+		const int delay = 20;
 
 		ppur.status.sl = 241;	//for sprite reads
 
@@ -1572,17 +1576,13 @@ int FCEUX_PPU_Loop(int skip) {
 		
 		//formerly: runppu(20 * (kLineTime) - delay);
 		for(int S=0;S<sltodo;S++)
-		{
-			// P4-1: S==0 starts at delay+1 to compensate for runppu(1)
-		// above, keeping sl 241 total at 341 cycles (not 342).
-		for(int dot=(S==0?delay+1:0);dot<kLineTime;dot++)
+			{
+		for(int dot=(S==0?delay:0);dot<kLineTime;dot++)
 				runppu(1);
 			ppur.status.sl++;
 		}
 
-		//this seems to run just before the dummy scanline begins
 		PPU_status = 0;
-		//this early out caused metroid to fail to boot. I am leaving it here as a reminder of what not to do
 		//if(!PPUON) { runppu(kLineTime*242); goto finish; }
 
 		//There are 2 conditions that update all 5 PPU scroll counters with the
@@ -1625,7 +1625,7 @@ int FCEUX_PPU_Loop(int skip) {
 		//render 241/291 scanlines (1 dummy at beginning, dendy's 50 at the end)
 		//ignore overclocking!
 		for (int sl = 0; sl < normalscanlines; sl++) 
-		{
+			{
 			spr_read.start_scanline();
 
 			g_rasterpos = 0;
