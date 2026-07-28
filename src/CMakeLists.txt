@@ -586,6 +586,12 @@ target_include_directories(fceux11_boards PUBLIC ${CMAKE_SOURCE_DIR}/src)
 add_library(fceux11_core STATIC ${SRC_CORE})
 target_link_libraries(fceux11_core PUBLIC fceux11_boards fceux11_utils ${ZLIB_LIBRARIES} SDL2::SDL2)
 target_include_directories(fceux11_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
+# M3-fix: MSVC LTCG linker (c2.dll) crashes when materialising the 512 KiB
+# kSpriteIdxLUT from IL during link-time code gen — produces a 2 MB zero file
+# for fceux11_ppu_rendering_lut_test (the only consumer). Compile this source
+# without /GL so the LUT is emitted as real COFF data, skipping the LTCG path.
+set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/ppu_sprite_lut.cpp PROPERTIES
+    COMPILE_FLAGS "/GL-")
 # v0.3.1: PCH for core — types.h + API headers + fceu.h (C++ only; C files skip PCH)
 # v1.11: driver.h replaced with 4 peer headers (Phase H)
 target_precompile_headers(fceux11_core PRIVATE
