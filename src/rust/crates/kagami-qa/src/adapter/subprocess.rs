@@ -48,7 +48,7 @@ impl SutAdapter for SubprocessAdapter {
             if candidate.exists() {
                 candidate
             } else {
-                let candidate_exe = self.bin_dir.join(format!("{}{}", name, std::env::consts::EXE_EXTENSION));
+                let candidate_exe = self.bin_dir.join(format!("{}.{}", name, std::env::consts::EXE_EXTENSION));
                 if candidate_exe.exists() {
                     candidate_exe
                 } else {

@@ -115,7 +115,7 @@ FCEUX11 ships **KagamiQA**, a dual-oracle automated quality assurance system tha
 
 | Component | Description |
 |-----------|-------------|
-| **Oracle A (regression)** | 39 CTest unit/regression/boundary tests, full run on every push, zero-diff gating |
+| **Oracle A (regression)** | 34 CTest registered tests (from 39 manifest entries), full run on every push |
 | **Oracle B (hardware accuracy)** | 180 [blargg](https://github.com/christopherpow/nes-test-roms) $6000-protocol ROMs covering all CPU/PPU/APU/MMC3 sub-categories, headless batch |
 | **Migration Matrix** | Every CI run produces `kagamiqa_migration_matrix.json`, tracking PASS→FAIL regressions and FAIL→PASS progress |
 | **Baseline Drift Detection** | PASS→FAIL automatically posts a red alert PR comment, preventing accuracy decay |

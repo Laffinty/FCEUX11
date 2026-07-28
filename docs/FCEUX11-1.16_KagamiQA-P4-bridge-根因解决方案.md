@@ -226,9 +226,9 @@ EXIT=1    ← 300 帧正常完成（493ms），输出完整诊断字符串
 | `mapper_*_test`（load/reset/core/byte_diff） | PASSED | mapper 兼容性无影响 |
 | `cpu_test` / `apu_test` / `bus_test` / `cart_class_test` | PASSED | |
 | `ppu_test`（ctest 内 BAD_COMMAND） | ⚠ 既有配置问题 | ctest 从 `build/` 运行时 WORKING_DIRECTORY 解析错误；手动从 `tests/` 运行 24/24 PASS。**与本次修改无关** |
-| `lua_bit_test_headless` | ⚠ 既有配置问题 | CMake 配置中 `WORKING_DIRECTORY=tests` 与参数 `tests/lua_scripts/test_bit.lua` 路径前缀重复，解析为 `tests/tests/lua_scripts/...` 找不到。**与本次修改无关**（修改仅触及 ppu.cpp + ppu_core.cpp） |
+| `lua_bit_test_headless` | ⚠ 既有配置问题 + 真实 Lua 库 bug | CMake 配置中 `WORKING_DIRECTORY=tests` 与参数 `tests/lua_scripts/test_bit.lua` 路径前缀重复，解析为 `tests/tests/lua_scripts/...` 找不到。**与本次修改无关**（修改仅触及 ppu.cpp + ppu_core.cpp） |
 
-**结论**：修复对 Oracle A 零回归。ctest 报告的 2 个「失败」均为既有的测试基础设施工作目录配置问题，非代码回归（手动从正确目录运行均通过）。
+**结论**：修复对 Oracle A 零回归。ctest 报告的 2 个「失败」中 ppu_test 为既有工作目录配置问题，lua_bit_test_headless 为路径前缀 + Lua bit 库 bug 双重问题（P5 M2 修复后 5 个 FAIL 将被正确检测）。均非 P4-bridge 代码回归（手动从正确目录运行均通过）。
 
 ---
 

@@ -1,7 +1,8 @@
 ﻿# FCEUX11 Source Code Copyright Audit
 
-> **Audit Date**: 2026-05-17
+> **Audit Date**: 2026-05-17 (fixtures note added 2026-07-28)
 > **Scope**: src/ directory (all .cpp, .h, .c files)
+> **Excluded from scope**: tests/fixtures/ (third-party test ROMs — see DERIVATIVE_WORK_NOTICE.txt §"Third-Party Test ROM Attribution")
 > **Total Files Scanned**: 
 816
 
