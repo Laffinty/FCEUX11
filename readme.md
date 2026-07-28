@@ -104,7 +104,7 @@ FCEUX11 内置一套名为 **KagamiQA** 的双 Oracle 自动化质量保障系�
 
 | 组件 | 说明 |
 |------|------|
-| **Oracle A（回归测试）** | 39 个 CTest 单元/回归/边界测试，每次 push 全量运行，零差异门禁 |
+| **Oracle A（回归测试）** | 34 个 CTest 单元/回归/边界测试（来自 39 条清单条目），每次 push 全量运行 |
 | **Oracle B（硬件精度测试）** | 180 个 [blargg](https://github.com/christopherpow/nes-test-roms) $6000 协议 ROM，覆盖 CPU/PPU/APU/MMC3 全子类，headless 全量批处理 |
 | **迁移矩阵** | 每次 CI run 产出 `kagamiqa_migration_matrix.json`，追踪 PASS→FAIL 回归与 FAIL→PASS 进展 |
 | **基线漂移检测** | PASS→FAIL 自动在 PR 下评论红色警报，防止精度退化 |
@@ -128,7 +128,7 @@ FCEUX11 ships **KagamiQA**, a dual-oracle automated quality assurance system tha
 
 详见 [CHANGELOG.md](CHANGELOG.md)。当前稳定版为 **v1.16**。
 
-**v1.16 主要亮点**：KagamiQA 双 Oracle 质量防线正式上线 — 180 个 blargg 测试 ROM 覆盖 CPU/PPU/APU 全子类，每次 push 自动运行 CI 产出迁移矩阵；vbl_01_basics 修复（VBL 周期对齐）；Lua 断言级测试判定；in-process runner 通道打通（C ABI 直驱 core）。
+**v1.16 主要亮点**：KagamiQA 双 Oracle 质量防线正式上线 — 180 个 blargg 测试 ROM 覆盖 CPU/PPU/APU 全子类，每次 push 自动运行 CI 产出迁移矩阵；vbl_01_basics 修复（VBL 周期对齐）；Lua 断言级测试判定；in-process runner 框架就绪（C ABI 直驱 core，target `kagami_qa_direct_runner`）。
 
 See [CHANGELOG.md](CHANGELOG.md). Current stable release is **v1.16**.
 

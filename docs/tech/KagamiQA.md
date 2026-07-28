@@ -2,7 +2,7 @@
 
 > **版本**：v1.16  
 > **性质**：双 Oracle（Oracle A 回归 + Oracle B 硬件一致性）自动化测试系统  
-> **覆盖率**：39 CTest 回归 + 180 blargg $6000 协议 ROM（CPU/PPU/APU/MMC3）  
+> **覆盖率**：34 CTest 注册测试（39 条清单条目）+ 180 blargg $6000 协议 ROM（CPU/PPU/APU/MMC3）  
 > **CI 状态**：每次 push 到 `main` / `wip_1.16` 自动触发，产出迁移矩阵 artifact  
 
 ---
@@ -32,7 +32,7 @@ KagamiQA（「鏡」QA）是一个**双通道、零耦合的模拟器精度验�
 │  │  Oracle A     │       │  Oracle B             │ │
 │  │  (软件回归)    │       │  (硬件一致性)          │ │
 │  ├──────────────┤       ├──────────────────────┤ │
-│  │ • 39 CTest   │       │ • 180 blargg ROM     │ │
+│  │ • 34 CTest   │       │ • 180 blargg ROM     │ │
 │  │ • 单元测试    │       │ • $6000 协议         │ │
 │  │ • 回归测试    │       │ • CPU/PPU/APU/MMC3   │ │
 │  │ • 边界测试    │       │ • headless 批处理     │ │
@@ -73,7 +73,7 @@ ROM 的典型运行模式：
 ```
 权威性 = ROM覆盖率 × Oracle独立性 × CI常驻因子
 
-v1.16:  1.00  × 1.00  × 1.00  = 1.00  (防线)
+v1.16:  1.00  × 0.50  × 0.50  ≈ 0.25  (transitioning: baseline solid, CI form correct, migration matrix & in-process in progress)
 v1.15:  0.13  × 1.00  × 0.00  = 0.00  (原型)
 ```
 
@@ -212,7 +212,7 @@ KagamiQA 的核心组件可以**独立于 FCEUX11 项目**运行，用于测试�
 
 | 组件 | 路径 | 说明 |
 |------|------|------|
-| blargg 测试 ROM | `tests/fixtures/blargg/` | 180 个公共领域 ROM，$6000 协议 |
+| blargg 测试 ROM | `tests/fixtures/blargg/` | 180 个 ROM（作者 Shay Green，社区惯例可自由用于模拟器测试），$6000 协议 |
 | ROM 下载脚本 | `scripts/download_blargg_roms.ps1` | 从 GitHub 镜像下载，可独立运行 |
 | ROM 清单 | `tests/fixtures/blargg_manifest.json` | JSON 格式，记录每个 ROM 的 path/frames/probe_addr |
 | 已知失败基线 | `tests/fixtures/blargg_known_fail.json` | 版本化的已知失败清单 |
@@ -404,7 +404,7 @@ C ABI 桥接模式参考 `src/kagami_bridge.h` + `src/rust/crates/kagami-qa/src/
 
 | 可移植组件 | 路径 | 依赖 | 说明 |
 |-----------|------|------|------|
-| blargg ROM 套件 | `tests/fixtures/blargg/` | 无 | 公共领域，直接复制 |
+| blargg ROM 套件 | `tests/fixtures/blargg/` | 无 | 社区惯例可自由用于模拟器测试（上游无 LICENSE 声明），直接复制 |
 | ROM 清单格式 | `tests/fixtures/blargg_manifest.json` | 无 | JSON 格式，手工或脚本生成 |
 | 已知失败格式 | `tests/fixtures/blargg_known_fail.json` | 无 | JSON 格式，手动维护 |
 | kagami-qa crate | `src/rust/crates/kagami-qa/` | Rust + serde | 纯 Rust 库，可发布到 crates.io |
@@ -430,7 +430,7 @@ KagamiQA 的 Oracle 架构可以扩展以支持**非 blargg 测试 ROM**：
 ```
 FCEUX11/
 ├── tests/
-│   ├── tests.json                          ← 39 CTest + 9 blargg + 5 Lua 测试清单
+│   ├── tests.json                          ← 39 条测试清单（34 CTest 注册 + 5 纯清单条目）
 │   ├── fixtures/
 │   │   ├── blargg/                         ← 180 blargg ROM (cpu/ppu/apu/mmc3/)
 │   │   ├── blargg_manifest.json            ← ROM 清单（name/path/frames/probe_addr）

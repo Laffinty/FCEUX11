@@ -40,11 +40,20 @@ impl SutAdapter for SubprocessAdapter {
             PathBuf::from(&test.input.binary)
         } else {
             // Bare binary name — try bin_dir first, fall back to PATH.
-            let candidate = self.bin_dir.join(&test.input.binary);
+            // P5 S1-fix: On Windows, tests.json uses bare names like
+            // "fceux11_cpu_test" but the actual file is "fceux11_cpu_test.exe".
+            // Try both name and name+EXE_EXTENSION before falling back to PATH.
+            let name = &test.input.binary;
+            let candidate = self.bin_dir.join(name);
             if candidate.exists() {
                 candidate
             } else {
-                PathBuf::from(&test.input.binary)
+                let candidate_exe = self.bin_dir.join(format!("{}{}", name, std::env::consts::EXE_EXTENSION));
+                if candidate_exe.exists() {
+                    candidate_exe
+                } else {
+                    PathBuf::from(name)
+                }
             }
         };
 

@@ -3,9 +3,10 @@
 # Expanded from P2 (22 ROMs) to full coverage: CPU ~73, PPU ~45, APU ~52, Mapper ~20
 # Target: >=140 ROMs covering all blargg sub-categories for authoritative QA defense line.
 #
-# Blargg's test ROMs are public-domain NES diagnostic ROMs that use the
-# $6000 memory-mapped result protocol. This script fetches them from the
-# christopherpow/nes-test-roms GitHub mirror.
+# Blargg's test ROMs (by Shay Green) are NES diagnostic ROMs that use the
+# $6000 memory-mapped result protocol. They are community-treated as freely
+# redistributable for emulator testing. This script fetches them from the
+# christopherpow/nes-test-roms GitHub mirror (no LICENSE declared upstream).
 #
 # Usage:
 #   .\scripts\download_blargg_roms.ps1

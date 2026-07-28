@@ -109,41 +109,29 @@ struct LuaResult {
 };
 
 // ---------------------------------------------------------------------------
-// Capture Lua print() output.
+// P5 M2-fix: stdout + stderr capture for Lua assertion detection.
 //
-// The fceux11-lua engine uses Rust's print!() / eprintln!() which write to
-// the process's stdout/stderr via the Rust runtime. We redirect stdout to
-// a pipe to capture Lua print() output.
-//
-// For simplicity in P3, we read stderr (which the scripts use for print()).
-// In a full implementation, we'd redirect stdout. The Lua print() goes
-// through Rust's print!() → line buffered stdout.
+// Lua scripts write their test results to stdout (via print()), not stderr.
+// Runtime Lua errors (assert/error) go to stderr. We must capture BOTH to
+// correctly detect all failure modes:
+//   - stdout: script-printed "FAIL: ..." lines (test logic failures)
+//   - stderr: Lua runtime errors ("runtime error:", "stack traceback:")
 // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// P5: stderr capture for Lua assertion detection.
-// ---------------------------------------------------------------------------
-/// Captures stderr during Lua script execution by redirecting to a temp file.
-/// After execution, the file is read and scanned for error/assert patterns.
-/// This allows the runner to distinguish "script completed with assertions"
-/// (FAIL) from "script completed cleanly" (PASS).
+#include <cstdlib>
+#include <cstdio>
 
-#include <cstdlib> // for std::tmpnam, std::tmpfile (alternative: mkstemp)
-
-// Simple temp file path generator (avoids tmpnam deprecation warning).
-static std::string make_temp_path() {
+static std::string make_temp_path(const char* prefix) {
 #ifdef _WIN32
     char tmp_path[MAX_PATH];
     char tmp_file[MAX_PATH];
-    if (GetTempPathA(MAX_PATH, tmp_path) == 0) {
-        return "lua_runner_stderr_temp.txt";
-    }
-    if (GetTempFileNameA(tmp_path, "lua", 0, tmp_file) == 0) {
-        return std::string(tmp_path) + "lua_runner_stderr_temp.txt";
+    if (GetTempPathA(MAX_PATH, tmp_path) == 0) { tmp_path[0] = '.'; tmp_path[1] = '\\'; tmp_path[2] = 0; }
+    if (GetTempFileNameA(tmp_path, prefix, 0, tmp_file) == 0) {
+        return std::string(tmp_path) + prefix + "_temp.txt";
     }
     return std::string(tmp_file);
 #else
-    return "/tmp/lua_runner_stderr_" + std::to_string(std::time(nullptr)) + ".txt";
+    return std::string("/tmp/lua_runner_") + prefix + "_" + std::to_string(std::time(nullptr)) + ".txt";
 #endif
 }
 
@@ -158,11 +146,11 @@ static LuaResult run_lua_script(const char* script_path, const char* rom_path,
     if (!base) base = std::strrchr(script_path, '\\');
     res.script_name = base ? (base + 1) : script_path;
 
-    // P5: Setup stderr capture via temporary file.
-    std::string temp_stderr_path = make_temp_path();
+    // P5: Capture BOTH stdout and stderr to temp files.
+    std::string temp_stdout_path = make_temp_path("luaout");
+    std::string temp_stderr_path = make_temp_path("luaerr");
+    FILE* captured_stdout = std::freopen(temp_stdout_path.c_str(), "w", stdout);
     FILE* captured_stderr = std::freopen(temp_stderr_path.c_str(), "w", stderr);
-    // Note: original stderr handle is lost after freopen. We restore by
-    // reopening CON (Windows) or /dev/stderr (Unix) after capture.
 
     auto t0 = std::clock();
 
@@ -234,24 +222,32 @@ static LuaResult run_lua_script(const char* script_path, const char* rom_path,
     // --- Shutdown Lua ---
     fceux11_lua_shutdown();
 
-    // --- Restore stderr (best-effort) ---
-    if (captured_stderr) {
-        std::fclose(captured_stderr);
-    }
-    // On Windows, reopen stderr to console. On failure (e.g. no console),
-    // stderr writes will be silently discarded — the test result is already
-    // determined from the captured file.
+    // --- Restore stdout/stderr (best-effort) ---
+    if (captured_stdout) { std::fclose(captured_stdout); }
+    if (captured_stderr) { std::fclose(captured_stderr); }
+    std::freopen("CONOUT$", "w", stdout);
     std::freopen("CONOUT$", "w", stderr);
 
-    // --- Read captured stderr ---
-    std::string captured_output;
+    // --- M2-fix: Read BOTH captured stdout and stderr ---
+    std::string captured_stdout_str;
+    std::string captured_stderr_str;
     {
-        std::ifstream cap_file(temp_stderr_path);
-        if (cap_file.is_open()) {
+        std::ifstream out_file(temp_stdout_path);
+        if (out_file.is_open()) {
             std::stringstream ss;
-            ss << cap_file.rdbuf();
-            captured_output = ss.str();
-            cap_file.close();
+            ss << out_file.rdbuf();
+            captured_stdout_str = ss.str();
+            out_file.close();
+        }
+        std::remove(temp_stdout_path.c_str());
+    }
+    {
+        std::ifstream err_file(temp_stderr_path);
+        if (err_file.is_open()) {
+            std::stringstream ss;
+            ss << err_file.rdbuf();
+            captured_stderr_str = ss.str();
+            err_file.close();
         }
         std::remove(temp_stderr_path.c_str());
     }
@@ -264,51 +260,64 @@ static LuaResult run_lua_script(const char* script_path, const char* rom_path,
 
     res.duration_ms = (std::clock() - t0) * 1000 / CLOCKS_PER_SEC;
 
-    // --- P5: Parse stderr for Lua error/assert patterns ---
-    // Look for common Lua error markers:
-    //   "runtime error:" / "assertion failed!" / "ERROR:" / "FAIL:"
-    //   Lua stack traceback lines
-    //   "stack traceback:" — Lua error with traceback
-    bool has_lua_error = false;
+    // --- M2-fix: Parse BOTH stdout and stderr for failure signals ---
+    // Script-printed FAIL: / ERROR: lines go to stdout (Lua print()).
+    // Lua runtime errors go to stderr.
+    // Combine both streams for comprehensive detection.
+    std::string combined = captured_stdout_str + "\n" + captured_stderr_str;
+
+    bool has_error = false;
     std::string error_detail;
 
-    // Check for Lua runtime errors.
-    if (captured_output.find("runtime error") != std::string::npos ||
-        captured_output.find("stack traceback") != std::string::npos ||
-        captured_output.find("assertion failed") != std::string::npos ||
-        captured_output.find("ERROR:") != std::string::npos ||
-        captured_output.find("FAIL:") != std::string::npos ||
-        captured_output.find("PANIC:") != std::string::npos) {
-        has_lua_error = true;
-        // Extract first meaningful error line.
-        std::istringstream iss(captured_output);
+    // Check stdout for script-printed failure markers.
+    if (captured_stdout_str.find("FAIL:") != std::string::npos ||
+        captured_stdout_str.find("FAIL ") != std::string::npos ||
+        captured_stdout_str.find("ERROR:") != std::string::npos ||
+        captured_stdout_str.find("failed") != std::string::npos) {
+        has_error = true;
+    }
+
+    // Check stderr for Lua runtime errors.
+    if (captured_stderr_str.find("runtime error") != std::string::npos ||
+        captured_stderr_str.find("stack traceback") != std::string::npos ||
+        captured_stderr_str.find("assertion failed") != std::string::npos ||
+        captured_stderr_str.find("ERROR:") != std::string::npos ||
+        captured_stderr_str.find("PANIC:") != std::string::npos ||
+        captured_stderr_str.find("syntax error") != std::string::npos) {
+        has_error = true;
+    }
+
+    // Count FAIL lines to produce a meaningful detail string.
+    int fail_count = 0;
+    {
+        std::istringstream iss(combined);
         std::string line;
         while (std::getline(iss, line)) {
-            if (!line.empty() && line[0] != '\t' && line.find("stack traceback") == std::string::npos) {
-                error_detail = line;
-                break;
+            if (line.find("FAIL:") != std::string::npos ||
+                line.find("FAIL ") != std::string::npos) {
+                fail_count++;
+                if (error_detail.empty() && line.size() > 6) {
+                    error_detail = line;
+                }
             }
         }
     }
 
-    // Check for Lua load errors (from fceux11_lua_load_script).
-    if (captured_output.find("failed to load") != std::string::npos ||
-        captured_output.find("syntax error") != std::string::npos ||
-        captured_output.find("module ") != std::string::npos) {
-        has_lua_error = true;
-    }
-
-    if (has_lua_error) {
+    if (has_error || fail_count > 0) {
         res.passed  = false;
-        res.details = error_detail.empty()
-            ? "Lua assertion/error detected (see captured output)"
-            : error_detail;
-        if (res.details.size() > 200) {
-            res.details = res.details.substr(0, 197) + "...";
+        if (!error_detail.empty()) {
+            res.details = error_detail;
+            if (res.details.size() > 200) {
+                res.details = res.details.substr(0, 197) + "...";
+            }
+        } else if (fail_count > 0) {
+            res.details = std::to_string(fail_count) + " test failure(s) detected";
+        } else {
+            res.details = "Lua error/assert detected";
         }
     } else {
         res.passed  = true;
-        res.details = "script completed (no Lua errors detected)";
+        res.details = "script completed (all assertions passed)";
     }
 
     return res;

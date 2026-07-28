@@ -44,21 +44,80 @@ pub fn snapshot_from_results(
     }
 }
 
-/// Detect baseline drift by comparing expected values from the manifest
-/// against actual values from this run.
+/// Detect baseline drift by comparing the current run's results against
+/// the previous run's results.
 ///
-/// Currently detects:
-///   - A test whose expected exit_code differs from a stored golden value.
+/// Drift categories produced:
+///   - PASS→FAIL (regression): previously passed, now fails → `approved: false`
+///   - FAIL→PASS (progress): previously failed, now passes → `approved: false`
+///     (needs review to confirm it's a genuine fix, not a fluke)
+///   - NEW_TEST: test exists in current but not in previous baseline
+///   - REMOVED_TEST: test was in previous baseline but no longer in current
 ///
-/// This is a placeholder for a more sophisticated drift detector in P4+.
+/// If no previous baseline is provided, returns an empty vector (first run).
 pub fn detect_drift(
     _manifest: &BTreeMap<String, crate::manifest::schema::TestManifest>,
-    _previous: Option<&PreviousRun>,
+    previous: Option<&PreviousRun>,
+    current_results: &BTreeMap<String, bool>,
 ) -> Vec<BaselineDrift> {
-    // P1-P3: drift detection is deferred until the full baseline
-    // governance story is in place. The field and types exist in the
-    // report so that AI agents and human reviewers know where to look.
-    Vec::new()
+    let prev = match previous {
+        Some(p) => p,
+        None => return Vec::new(),
+    };
+
+    let mut drifts = Vec::new();
+
+    // Compare current results against previous results.
+    for (test_id, &current_passed) in current_results {
+        match prev.results.get(test_id) {
+            Some(&prev_passed) => {
+                if prev_passed && !current_passed {
+                    // Regression: PASS → FAIL
+                    drifts.push(BaselineDrift {
+                        id: test_id.clone(),
+                        field: "passed".into(),
+                        old: "PASS".into(),
+                        new: "FAIL".into(),
+                        approved: false,
+                    });
+                } else if !prev_passed && current_passed {
+                    // Progress: FAIL → PASS (needs review)
+                    drifts.push(BaselineDrift {
+                        id: test_id.clone(),
+                        field: "passed".into(),
+                        old: "FAIL".into(),
+                        new: "PASS".into(),
+                        approved: false,
+                    });
+                }
+            }
+            None => {
+                // New test not in previous baseline.
+                drifts.push(BaselineDrift {
+                    id: test_id.clone(),
+                    field: "existence".into(),
+                    old: "absent".into(),
+                    new: "present".into(),
+                    approved: false,
+                });
+            }
+        }
+    }
+
+    // Detect tests removed from current run.
+    for test_id in prev.results.keys() {
+        if !current_results.contains_key(test_id) {
+            drifts.push(BaselineDrift {
+                id: test_id.clone(),
+                field: "existence".into(),
+                old: "present".into(),
+                new: "absent".into(),
+                approved: false,
+            });
+        }
+    }
+
+    drifts
 }
 
 /// Produce an ISO 8601 timestamp (same algorithm as matrix::generate_run_id).
@@ -127,8 +186,69 @@ mod tests {
     }
 
     #[test]
-    fn drift_detection_returns_empty_for_now() {
-        let drifts = detect_drift(&BTreeMap::new(), None);
+    fn drift_detection_returns_empty_when_no_previous() {
+        let current = BTreeMap::new();
+        let drifts = detect_drift(&BTreeMap::new(), None, &current);
         assert!(drifts.is_empty());
+    }
+
+    #[test]
+    fn drift_detection_finds_regression() {
+        let mut prev_results = BTreeMap::new();
+        prev_results.insert("test_a".into(), true);
+        prev_results.insert("test_b".into(), true);
+        let prev = PreviousRun {
+            run_id: "run-1".into(),
+            generated_at: "2026-07-27T00:00:00Z".into(),
+            results: prev_results,
+        };
+
+        let mut current_results = BTreeMap::new();
+        current_results.insert("test_a".into(), true);   // still PASS
+        current_results.insert("test_b".into(), false);  // regressed: PASS→FAIL
+
+        let drifts = detect_drift(&BTreeMap::new(), Some(&prev), &current_results);
+        assert_eq!(drifts.len(), 1);
+        assert_eq!(drifts[0].id, "test_b");
+        assert_eq!(drifts[0].old, "PASS");
+        assert_eq!(drifts[0].new, "FAIL");
+        assert!(!drifts[0].approved);
+    }
+
+    #[test]
+    fn drift_detection_finds_progress() {
+        let mut prev_results = BTreeMap::new();
+        prev_results.insert("test_a".into(), false);
+        let prev = PreviousRun {
+            run_id: "run-1".into(),
+            generated_at: "2026-07-27T00:00:00Z".into(),
+            results: prev_results,
+        };
+
+        let mut current_results = BTreeMap::new();
+        current_results.insert("test_a".into(), true);  // FAIL→PASS
+
+        let drifts = detect_drift(&BTreeMap::new(), Some(&prev), &current_results);
+        assert_eq!(drifts.len(), 1);
+        assert_eq!(drifts[0].id, "test_a");
+        assert_eq!(drifts[0].old, "FAIL");
+        assert_eq!(drifts[0].new, "PASS");
+    }
+
+    #[test]
+    fn drift_detection_finds_new_test() {
+        let prev_results = BTreeMap::new();
+        let prev = PreviousRun {
+            run_id: "run-1".into(),
+            generated_at: "2026-07-27T00:00:00Z".into(),
+            results: prev_results,
+        };
+
+        let mut current_results = BTreeMap::new();
+        current_results.insert("test_new".into(), true);
+
+        let drifts = detect_drift(&BTreeMap::new(), Some(&prev), &current_results);
+        assert_eq!(drifts.len(), 1);
+        assert_eq!(drifts[0].field, "existence");
     }
 }

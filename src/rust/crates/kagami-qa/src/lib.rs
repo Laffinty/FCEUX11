@@ -28,19 +28,22 @@ mod direct_entry {
 
     /// Main entry point called from C++ (kagami_direct_main.cpp).
     /// Parses CLI args and runs Oracle B tests in-process.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub unsafe extern "C" fn kagami_qa_direct_main(
         argc: i32,
         argv: *const *const c_char,
     ) -> i32 {
         // Convert C args to Rust strings.
+        // S2-fix: wrap raw-pointer deref + CStr::from_ptr in explicit unsafe
+        // blocks (Rust 2024 unsafe_op_in_unsafe_fn lint requires explicit
+        // unsafe blocks even inside unsafe fn bodies).
         let mut args = Vec::new();
         for i in 0..argc {
-            let ptr = *argv.offset(i as isize);
+            let ptr = unsafe { *argv.offset(i as isize) };
             if ptr.is_null() {
                 break;
             }
-            match CStr::from_ptr(ptr).to_str() {
+            match unsafe { CStr::from_ptr(ptr) }.to_str() {
                 Ok(s) => args.push(s.to_string()),
                 Err(_) => args.push(String::from("<invalid-utf8>")),
             }

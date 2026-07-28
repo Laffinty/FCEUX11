@@ -200,11 +200,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
 
     // -------------------------------------------------------------------
-    // P4-report: Detect baseline drift (stub — full implementation in P4+).
+    // P5 M1-fix: Detect baseline drift by comparing current against previous.
     // -------------------------------------------------------------------
+    let mut current_pass_map = BTreeMap::new();
+    for r in &results {
+        current_pass_map.insert(r.test_id.clone(), r.passed);
+    }
     let drifts = detect_drift(
         &scheduler.manifest_snapshot(),
         previous.as_ref(),
+        &current_pass_map,
     );
 
     // -------------------------------------------------------------------
