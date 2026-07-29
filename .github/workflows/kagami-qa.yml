@@ -122,6 +122,15 @@ jobs:
       # -----------------------------------------------------------------------
       # KagamiQA — Migration matrix generation
       # -----------------------------------------------------------------------
+      # Stage-2 §八 D-4: The previous revision passed `--baseline` pointing
+      # to the SAME path as `--output` (`build/kagamiqa_migration_matrix.json`).
+      # The runner then compared the matrix against itself and reported an
+      # empty `transition_matrix` on every run, masking real regressions.
+      # Fix: omit `--baseline` for this run (no prior artifact available
+      # without an explicit download step) and only emit `--save-baseline`
+      # so subsequent runs can consume the artifact via download-artifact.
+      # Future PR: add a download-artifact step before this one and pass
+      # the downloaded baseline as `--baseline`.
       - name: KagamiQA — Migration Matrix
         run: |
           $runner = "src/rust/target/release/kagami-qa-runner.exe"
@@ -132,7 +141,6 @@ jobs:
               --output build/kagamiqa_migration_matrix.json `
               --accuracy-table build/kagamiqa_accuracy_table.md `
               --known-fail tests/fixtures/blargg_known_fail.json `
-              --baseline build/kagamiqa_migration_matrix.json `
               --save-baseline build/kagamiqa_baseline_next.json
             $exitCode = $LASTEXITCODE
             Write-Host "KagamiQA runner exit code: $exitCode"
