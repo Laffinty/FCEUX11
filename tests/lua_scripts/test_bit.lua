@@ -65,14 +65,17 @@ check("bswap(0x12345678)", bit.bswap(0x12345678), 0x78563412)
 
 -- tohex
 -- Stage-2 §六 B-2 F3~F5: LuaBitOp 1.0.2 §tohex says the default width is 8
--- and n >= 0 produces lowercase hex. n < 0 produces uppercase (covered by
--- B-3 separately). Width n is a *digit count*, not a byte count; the value
--- is masked to the low (n*4) bits and zero-padded on the LEFT.
+-- and n >= 0 produces lowercase hex. n < 0 produces uppercase (B-3).
+-- Width n is a *digit count*, not a byte count; the value is masked to
+-- the low (n*4) bits and zero-padded on the LEFT.
 --   tohex(255)     → "000000ff"   (8 lowercase hex digits, pad left)
 --   tohex(255, 2)  → "ff"         (2 lowercase hex digits, low 8 bits)
 --   tohex(-1, 4)   → "ffff"       (-1 = 0xFFFFFFFF, low 16 bits, 4 lower)
 check("tohex(255)", bit.tohex(255), "000000ff")
 check("tohex(255, 2)", bit.tohex(255, 2), "ff")
 check("tohex(-1, 4)", bit.tohex(-1, 4), "ffff")
+-- B-3: negative n → UPPERCASE (spec §tohex).
+check("tohex(255, -2)", bit.tohex(255, -2), "FF")
+check("tohex(-1, -8)", bit.tohex(-1, -8), "FFFFFFFF")
 
 print(string.format("bit library: %d passed, %d failed", passed, failed))
