@@ -35,7 +35,15 @@ pub fn register(lua: &Lua) -> Result<Table> {
     )?;
     bit.set(
         "rshift",
-        lua.create_function(|_, (x, n): (i32, i32)| Ok(x.wrapping_shr(n as u32)))?,
+        // Stage-2 §六 B-1: LuaBitOp 1.0.2 spec requires `rshift` to be a
+        // LOGICAL right shift (zero-fill). i32::wrapping_shr is arithmetic
+        // (sign-extending), so for negative x it produced -1 where the
+        // spec demands the high bits to be cleared. Reinterpret x as u32
+        // for the shift, then return as i32 to preserve Lua's signed
+        // return convention.
+        lua.create_function(|_, (x, n): (i32, i32)| {
+            Ok((x as u32).wrapping_shr(n as u32) as i32)
+        })?,
     )?;
     bit.set(
         "arshift",
@@ -138,6 +146,11 @@ mod tests {
             let lua = setup_lua();
             assert_eq!(1, lua.load("bit.rshift(256, 8)").eval::<i32>().unwrap());
             assert_eq!(0, lua.load("bit.rshift(1, 1)").eval::<i32>().unwrap());
+            // Stage-2 §六 B-1: negative x must logical-shift (zero-fill),
+            // not arithmetic-shift (sign-extend). Spec: rshift(-1, 31) == 1.
+            assert_eq!(1, lua.load("bit.rshift(-1, 31)").eval::<i32>().unwrap());
+            // -256 as i32 is 0xFFFFFF00; logical shift by 8 → 0x00FFFFFF = 16777215.
+            assert_eq!(16777215, lua.load("bit.rshift(-256, 8)").eval::<i32>().unwrap());
         }
     }
 
