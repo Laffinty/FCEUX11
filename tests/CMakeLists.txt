@@ -612,7 +612,7 @@ if(FCEUX11_BUILD_TESTS)
     )
     add_test(NAME lua_bit_test_headless
              COMMAND fceux11_lua_runner
-             tests/lua_scripts/test_bit.lua
+             lua_scripts/test_bit.lua
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     if(WIN32)
         set_tests_properties(lua_bit_test_headless PROPERTIES ENVIRONMENT_MODIFICATION
@@ -656,11 +656,18 @@ if(FCEUX11_BUILD_TESTS)
 
         # P5: CTest entry for direct runner Oracle B validation.
         # Compares direct mode output vs subprocess mode to verify parity.
+        #
+        # Stage-2 fix (kagami_qa_direct_smoke WORKING_DIRECTORY): the
+        # manifest ROM paths are authored as 'fixtures/...' relative to
+        # the tests/ directory, not to the project root. Setting
+        # WORKING_DIRECTORY to tests/ makes those paths resolve correctly
+        # without rewriting the manifest or having the runner prepend
+        # 'tests/'.
         add_test(NAME kagami_qa_direct_smoke
                  COMMAND kagami_qa_direct_runner
-                 --manifest ${CMAKE_CURRENT_SOURCE_DIR}/tests.json
+                 --manifest tests.json
                  --output ${CMAKE_BINARY_DIR}/kagamiqa_direct_matrix.json
-                 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+                 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
         if(WIN32)
             set_tests_properties(kagami_qa_direct_smoke PROPERTIES ENVIRONMENT_MODIFICATION
                     "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
