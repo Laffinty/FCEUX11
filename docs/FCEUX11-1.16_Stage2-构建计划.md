@@ -245,14 +245,23 @@ if ($ninjaOk) { $generator = "Ninja" }
 elseif (Get-Command nmake ...) { $generator = "NMake Makefiles" }
 ```
 
-但本机 `ninja.exe` 只存在于 VS 安装目录下（`Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/`），**不在裸 PATH 上**，探测失败 → 回落 NMake → 触发全部四个难题。**这就是全部真相。**
+但本机 `ninja.exe` 只存在于 VS 安装目录下（`Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/`），**不在裸 PATH 上**，旧探测因此失败 → 回落 NMake → 触发全部四个难题。这里的准确表述是「裸 PATH 不可见」，不是「电脑未安装 Ninja」。
+
+**2026-07-29 A-1 落地后复核**：`vswhere.exe` 确认本机有两套完整、可启动的 Visual Studio 18 C++ 工具链，两套都自带 Ninja 1.13.2 和 CMake 4.2.3-msvc3：
+
+```text
+C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe
+D:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe
+```
+
+因此后续排查不得再以 `Get-Command ninja` / `where ninja` 在裸 shell 无输出为依据声称「Ninja 缺失」。应先运行 `vswhere.exe -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`，再检查每个安装根下的上述相对路径。`do_build.ps1` 现已自动完成这一步，并在实跑中选中 BuildTools 内置 Ninja。
 
 同时确认：CMake 侧**零处**依赖 NMake（无 `if(CMAKE_GENERATOR MATCHES "NMake")`、无 `CMAKE_MAKE_PROGRAM` 覆盖、无 makefile 专用变量）。切换 Ninja 无需改任何 CMake 代码。
 
 | PR | 内容 | 文件 | 验收 |
 |---|---|---|---|
-| **A-1** | `do_build.ps1` 的 Ninja 探测增加 VS 安装目录回退（vswhere 或 glob `.../CommonExtensions/Microsoft/CMake/Ninja/ninja.exe`） | `scripts/do_build.ps1:33-35` | 在裸 Git Bash / 普通 PowerShell 下 `do_build.ps1` 选中 Ninja |
-| **A-2** | 将 Ninja 确立为唯一受支持的本地生成器；NMake 降级为「legacy，仅在 Ninja 缺失时」并打印醒目告警 | `scripts/do_build.ps1`、`docs/BuildGuide.md` §8 | 文档与脚本口径一致 |
+| **A-1 ✅ `24e6512`** | `do_build.ps1` 已用 `vswhere.exe` + VS 安装根回退定位内置 `ninja.exe`，并将其目录加入本次构建的 `PATH` | `scripts/do_build.ps1` | 已在裸 Git Bash → 普通 PowerShell 调用链实测选中 Ninja 1.13.2 |
+| **A-2 ✅ `2575f33`** | Ninja 已确立为唯一受支持的本地生成器；NMake 仅在穷尽 VS 内置 Ninja 后作 legacy 回退并打印醒目告警 | `scripts/do_build.ps1`、`docs/BuildGuide.md` §4/§7/§8 | 文档与脚本统一为「PATH 不可见 ≠ 未安装」口径 |
 | **A-3** | 设 `CMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embed`（`/Z7`）作为 C1041 的第二道防线 | `CMakeLists.txt` | 即使回落 NMake 也不再 PDB 争用；CMake ≥3.25 要求已满足（项目要求 4.0） |
 | **A-4** | `fceu11_direct_storage_probe` 由 `STATIC` 改为 `OBJECT` 库，消除该 `.lib` 落盘 | `src/CMakeLists.txt:570-576` | 不再产出 `fceu11_direct_storage_probe.lib`；消费端 `:639-641` 无需改动 |
 | **A-5** | `do_build.ps1` 增加 LNK1104 重试循环（检测 → kill 残留 `cl/nmake/link` → 删锁定 `.lib` → 重试 ≤3 次） | `scripts/do_build.ps1` | 覆盖全部 6 个静态库，不止 probe 库 |

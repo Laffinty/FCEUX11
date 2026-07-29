@@ -68,6 +68,8 @@ cd FCEUX11
 # 3. 一键安装依赖 + 编译
 .\scripts\setup_vcpkg.ps1
 .\scripts\do_build.ps1 -Config Release
+# do_build.ps1 会用 vswhere 自动发现 Visual Studio 自带的 Ninja；
+# 裸 PATH 查不到 ninja.exe 不代表未安装，也不需要另装一份。
 # → 产物：build\src\fceux11.exe
 ```
 

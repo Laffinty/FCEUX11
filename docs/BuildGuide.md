@@ -105,12 +105,20 @@ $env:VCPKG_ROOT = "$PWD\vcpkg"
 ```
 
 这个脚本自动完成：
-1. 探测 MSVC 编译器和 Ninja 构建工具（Ninja 缺失时才回落到 legacy NMake）
+1. 探测 MSVC 编译器，并定位与 CI 一致的 Ninja 构建工具
 2. CMake 配置（configure）
 3. 编译全部源码（build）
 4. 运行单元测试（test）
 
-**生成器口径**：本地构建只支持与 CI 一致的 **Ninja + MSVC**。`do_build.ps1` 会从 Visual Studio 安装目录自动找到其内置 Ninja；仅当 Ninja 确实缺失时才回落到 legacy NMake 并打印醒目告警。NMake 路径不保证具备与 CI 相同的构建结果，遇到回落告警时应通过 Visual Studio Installer 补装 **C++ CMake tools for Windows**。
+**Ninja 探测口径**：`ninja` 不在裸 PowerShell / Git Bash 的 `PATH` 上，**不等于电脑没有安装 Ninja**。Visual Studio 的 **C++ CMake tools for Windows** 组件自带 Ninja，默认位于：
+
+```text
+<Visual Studio 安装目录>\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe
+```
+
+`do_build.ps1` 的探测顺序是：① `PATH` 上的 `ninja.exe`；② 用 Visual Studio Installer 自带的 `vswhere.exe -latest` 定位首选 VS 安装目录，再检查上述路径；③ 检查备用 VS 安装根目录；④ 全部不存在时才回落到 legacy NMake 并打印醒目告警。因此，**不要仅凭 `Get-Command ninja` / `where ninja` 无输出就判断工具链缺失，也不需要重复安装独立版 Ninja**。
+
+**生成器口径**：本地构建只支持与 CI 一致的 **Ninja + MSVC**。NMake 路径不保证具备与 CI 相同的构建结果；只有脚本按上述顺序仍找不到 Ninja 并明确打印 legacy NMake 回退告警时，才应通过 Visual Studio Installer 确认已勾选 **C++ CMake tools for Windows**。
 
 **编译耗时**：首次约 10-20 分钟（Qt6 编译过的前提下），后续增量编译 1-3 分钟。
 
@@ -155,9 +163,32 @@ Compress-Archive -Path dist\* -DestinationPath FCEUX11-v1.16-win64.zip
 
 **原因**：PowerShell 未加载 VS 环境变量。
 
-**解决**：用开始菜单搜索打开 **"Developer PowerShell for VS 2022"**，然后重新执行编译命令。或者直接跑 `.\scripts\do_build.ps1`（它会自动探测并加载 VS 环境）。
+**解决**：用开始菜单搜索打开 **"Developer PowerShell for Visual Studio"**，然后重新执行编译命令。或者直接跑 `.\scripts\do_build.ps1`（它会自动探测并加载 VS 环境）。
 
-### 7.2 cmake 找不到 Qt6 / SDL2
+### 7.2 `ninja` / `where ninja` 找不到命令
+
+**原因**：Visual Studio 自带的 Ninja 默认不加入普通 shell 的 `PATH`。这是 PATH 可见性问题，不代表 Ninja 或工具链没有安装。
+
+**首选解决**：直接运行 `.\scripts\do_build.ps1`；脚本会通过 `vswhere.exe -latest` 定位首选 VS 安装，并自动使用其中的 Ninja。
+
+如需手工确认本机所有 VS 内置 Ninja，可在 PowerShell 执行：
+
+```powershell
+$vswhere = Join-Path ${env:ProgramFiles(x86)} `
+    "Microsoft Visual Studio\Installer\vswhere.exe"
+$vsRoots = & $vswhere -products * `
+    -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+    -property installationPath
+$ninjaPaths = $vsRoots | ForEach-Object {
+    Join-Path $_ "Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"
+} | Where-Object { Test-Path $_ }
+$ninjaPaths
+$ninjaPaths | ForEach-Object { & $_ --version }
+```
+
+只有 `vswhere` 已找到完整 VS C++ 安装、但上述列表仍为空时，才应打开 Visual Studio Installer 补装 **C++ CMake tools for Windows**。不要因为裸 `PATH` 查不到就重复安装 Ninja。
+
+### 7.3 cmake 找不到 Qt6 / SDL2
 
 **原因**：vcpkg 依赖未正确安装或 VCPKG_ROOT 未设置。
 
@@ -173,7 +204,7 @@ $env:VCPKG_ROOT = "$PWD\vcpkg"
 .\scripts\do_build.ps1 -Config Release
 ```
 
-### 7.3 编译中途崩溃（编译器内存不足）
+### 7.4 编译中途崩溃（编译器内存不足）
 
 **原因**：编译 Qt6 等大型库时内存不足（8 GB 内存容易遇到）。
 
@@ -181,7 +212,7 @@ $env:VCPKG_ROOT = "$PWD\vcpkg"
 1. 关闭 Chrome、VS Code 等吃内存的应用
 2. 系统设置 → 高级系统设置 → 高级 → 性能 → 虚拟内存 → 增加虚拟内存（建议 8-16 GB）
 
-### 7.4 vcpkg 下载很慢
+### 7.5 vcpkg 下载很慢
 
 **原因**：vcpkg 从 GitHub / 各项目官网下载源码，国内网络可能较慢。
 
@@ -189,7 +220,7 @@ $env:VCPKG_ROOT = "$PWD\vcpkg"
 - 开启代理后再运行 `.\scripts\setup_vcpkg.ps1`
 - 或耐心等待，vcpkg 支持断点续传
 
-### 7.5 Rust crate 编译报错 `linker link.exe not found`
+### 7.6 Rust crate 编译报错 `linker link.exe not found`
 
 **原因**：Rust 未找到 MSVC 链接器。
 
@@ -231,17 +262,28 @@ cmake --build build
 > 若确有分步需求（例如调试 CMake configure 阶段），按下方手动加载 MSVC 环境后，直接用对应 cmake 命令：
 
 ```powershell
-# 1. 加载 MSVC 环境（Developer PowerShell for VS 2022 已加载则跳过）
-#    旧版 .\scripts\_find_vcvars.bat 已归档到 scripts/archive/，不再维护
-#    推荐的探测路径：先尝试裸 $env:VCPKG_ROOT，否则启动 Developer PowerShell for VS 2022。
+# 1. 打开 Developer PowerShell for Visual Studio，确保 cl.exe 环境已加载。
+#    旧版 .\scripts\_find_vcvars.bat 已归档，不再维护。
 
-# 2. 配置
+# 2. 若 ninja.exe 不在 PATH，用 vswhere 定位 VS 自带版本并临时加入 PATH。
+$vswhere = Join-Path ${env:ProgramFiles(x86)} `
+    "Microsoft Visual Studio\Installer\vswhere.exe"
+$vsRoot = & $vswhere -latest -products * `
+    -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+    -property installationPath
+$ninja = Join-Path $vsRoot `
+    "Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"
+if (-not (Test-Path $ninja)) { throw "Visual Studio bundled Ninja not found" }
+$env:PATH = "$(Split-Path -Parent $ninja);$env:PATH"
+& $ninja --version
+
+# 3. 配置
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 
-# 3. 编译
+# 4. 编译
 cmake --build build
 
-# 4. 测试
+# 5. 测试
 ctest --test-dir build --output-on-failure
 ```
 
