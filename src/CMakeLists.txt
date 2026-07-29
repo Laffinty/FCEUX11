@@ -562,13 +562,13 @@ if(FCEUX11_WGI_BACKEND)
 endif()
 
 # v0.3.15.x PHASE-3: DirectStorage 1.2 NVMe probe scaffold. Compiled
-# into a separate library so the probe code can be disabled via
+# into a separate object library so the probe code can be disabled via
 # -DFCEUX11_DIRECT_STORAGE_PROBE=OFF without touching the rest of
 # the build. The library is linked in below; note that we do NOT
 # link nvme.lib because the probe resolves NvmeSdsSupported() at
 # runtime via GetProcAddress to keep the toolchain dependency-free.
 if(FCEUX11_DIRECT_STORAGE_PROBE AND WIN32)
-  add_library(fceu11_direct_storage_probe STATIC
+  add_library(fceu11_direct_storage_probe OBJECT
     ${CMAKE_CURRENT_SOURCE_DIR}/platform/win11/DirectStorageProbe.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/platform/win11/TaskbarProgress.cpp)
   target_include_directories(fceu11_direct_storage_probe PUBLIC
