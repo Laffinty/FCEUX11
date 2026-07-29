@@ -61,6 +61,11 @@ pub struct TransitionMatrix {
     pub pass_to_fail: Vec<TransitionEntry>,
     /// Tests that stayed FAIL → FAIL: known failures, not yet fixed.
     pub fail_to_fail: Vec<TransitionEntry>,
+    /// Tests whose `test_id` does NOT appear in the baseline at all.
+    /// Separated from the 4 transition buckets because it is semantically
+    /// incomparable: there is no "previous" to compare against.
+    /// Stage-2 §四·五 PR 0.5-3 / 0.5-d.
+    pub new_test: Vec<TransitionEntry>,
 }
 
 impl Default for TransitionMatrix {
@@ -70,6 +75,7 @@ impl Default for TransitionMatrix {
             pass_to_pass: Vec::new(),
             pass_to_fail: Vec::new(),
             fail_to_fail: Vec::new(),
+            new_test: Vec::new(),
         }
     }
 }
@@ -182,6 +188,12 @@ pub fn build_matrix(
     let mut transition = TransitionMatrix::default();
     if let Some(prev) = previous {
         for r in &results {
+            // Stage-2 §四·五 PR 0.5-3: tests not in baseline must NOT fall
+            // into fail_to_pass (or any other 4-bucket).
+            // Previously `unwrap_or(false)` made a brand-new passing test
+            // count as fail_to_pass — a direct gaming vector.
+            // New behaviour: route them to a 5th bucket `new_test`.
+            let in_baseline = prev.results.contains_key(&r.test_id);
             let prev_passed = prev.results.get(&r.test_id).copied().unwrap_or(false);
             let curr_passed = r.passed;
             let entry = TransitionEntry {
@@ -189,11 +201,15 @@ pub fn build_matrix(
                 prev: if prev_passed { "PASS" } else { "FAIL" }.into(),
                 curr: if curr_passed { "PASS" } else { "FAIL" }.into(),
             };
-            match (prev_passed, curr_passed) {
-                (false, true) => transition.fail_to_pass.push(entry),
-                (true, true) => transition.pass_to_pass.push(entry),
-                (true, false) => transition.pass_to_fail.push(entry),
-                (false, false) => transition.fail_to_fail.push(entry),
+            if !in_baseline {
+                transition.new_test.push(entry);
+            } else {
+                match (prev_passed, curr_passed) {
+                    (false, true) => transition.fail_to_pass.push(entry),
+                    (true, true) => transition.pass_to_pass.push(entry),
+                    (true, false) => transition.pass_to_fail.push(entry),
+                    (false, false) => transition.fail_to_fail.push(entry),
+                }
             }
         }
     }
@@ -410,22 +426,100 @@ mod tests {
     }
 
     // ---- Transition: new test not in baseline ----
+    //
+    // Stage-2 §四·五 PR 0.5-3 (0.5-d): tests not in baseline must NOT be
+    // bucketed into fail_to_pass or pass_to_fail. They are semantically
+    // incomparable (no "previous" exists) and must land in the new `new_test`
+    // bucket. Both PASS and FAIL outcomes are tested below.
 
     #[test]
-    fn new_test_not_in_baseline() {
+    fn new_test_passing_goes_to_new_test_bucket() {
         let empty_prev = BTreeMap::new();
         let prev = PreviousRun {
             run_id: "prev".into(),
             generated_at: "2026-01-01T00:00:00Z".into(),
             results: empty_prev,
         };
-        let results = vec![make_result("new_test", true, 0)];
+        // Brand-new test that PASSES in current run.
+        let results = vec![make_result("brand_new_pass", true, 0)];
         let mut ot = BTreeMap::new();
-        ot.insert("new_test".into(), "A".into());
+        ot.insert("brand_new_pass".into(), "A".into());
 
         let m = build_matrix(results, &ot, &Default::default(), Some(&prev), vec![]);
-        // Not in baseline → treated as previously-FAIL → if PASS, FAIL_TO_PASS
-        assert_eq!(m.transition_matrix.fail_to_pass.len(), 1);
+
+        // CRITICAL: must NOT count toward fail_to_pass (anti-gaming guard).
+        assert!(
+            m.transition_matrix.fail_to_pass.is_empty(),
+            "new passing test leaked into fail_to_pass"
+        );
+        assert!(
+            m.transition_matrix.pass_to_fail.is_empty(),
+            "new passing test must not be in pass_to_fail"
+        );
+        assert_eq!(m.transition_matrix.new_test.len(), 1);
+        assert_eq!(m.transition_matrix.new_test[0].id, "brand_new_pass");
+        assert_eq!(m.transition_matrix.new_test[0].curr, "PASS");
+    }
+
+    #[test]
+    fn new_test_failing_also_goes_to_new_test_bucket() {
+        let empty_prev = BTreeMap::new();
+        let prev = PreviousRun {
+            run_id: "prev".into(),
+            generated_at: "2026-01-01T00:00:00Z".into(),
+            results: empty_prev,
+        };
+        // Brand-new test that FAILS in current run.
+        let results = vec![make_result("brand_new_fail", false, 1)];
+        let mut ot = BTreeMap::new();
+        ot.insert("brand_new_fail".into(), "A".into());
+
+        let m = build_matrix(results, &ot, &Default::default(), Some(&prev), vec![]);
+
+        // A naive `unwrap_or(true)` swap would land this in pass_to_fail
+        // (false regression alarm). Verify it does NOT.
+        assert!(
+            m.transition_matrix.pass_to_fail.is_empty(),
+            "new failing test leaked into pass_to_fail"
+        );
+        assert!(
+            m.transition_matrix.fail_to_fail.is_empty(),
+            "new failing test must not be in fail_to_fail (no prior existed)"
+        );
+        assert_eq!(m.transition_matrix.new_test.len(), 1);
+        assert_eq!(m.transition_matrix.new_test[0].id, "brand_new_fail");
+        assert_eq!(m.transition_matrix.new_test[0].curr, "FAIL");
+    }
+
+    #[test]
+    fn new_test_bucket_keeps_baseline_buckets_clean() {
+        // Mixed scenario: baseline has 'a' (was PASS, still PASS); current
+        // run also has a brand-new 'b' that PASSES.
+        let mut prev_results = BTreeMap::new();
+        prev_results.insert("a".into(), true);
+        let prev = PreviousRun {
+            run_id: "prev".into(),
+            generated_at: "2026-01-01T00:00:00Z".into(),
+            results: prev_results,
+        };
+        let results = vec![
+            make_result("a", true, 0),  // PASS → PASS  (in baseline)
+            make_result("b", true, 0),  // new PASS    (not in baseline)
+        ];
+        let mut ot = BTreeMap::new();
+        ot.insert("a".into(), "A".into());
+        ot.insert("b".into(), "A".into());
+
+        let m = build_matrix(results, &ot, &Default::default(), Some(&prev), vec![]);
+
+        assert_eq!(m.transition_matrix.pass_to_pass.len(), 1);
+        assert_eq!(m.transition_matrix.pass_to_pass[0].id, "a");
+        assert_eq!(m.transition_matrix.new_test.len(), 1);
+        assert_eq!(m.transition_matrix.new_test[0].id, "b");
+        // All other buckets stay clean.
+        assert!(m.transition_matrix.fail_to_pass.is_empty());
+        assert!(m.transition_matrix.pass_to_fail.is_empty());
+        assert!(m.transition_matrix.fail_to_fail.is_empty());
     }
 
     // ---- Baseline drift ----
