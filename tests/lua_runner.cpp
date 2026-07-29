@@ -270,10 +270,17 @@ static LuaResult run_lua_script(const char* script_path, const char* rom_path,
     std::string error_detail;
 
     // Check stdout for script-printed failure markers.
+    //
+    // Stage-2 fix: previously this also matched the bare substring "failed",
+    // which produced false positives whenever a script's summary line
+    // contained that word — e.g. test_bit.lua's "bit library: X passed, Y
+    // failed" was treated as an error even when all assertions passed.
+    // Removed the bare "failed" check; rely on the more specific FAIL: /
+    // FAIL / ERROR: line-level patterns instead. The "failed" summary
+    // count is not a useful failure signal at this layer.
     if (captured_stdout_str.find("FAIL:") != std::string::npos ||
         captured_stdout_str.find("FAIL ") != std::string::npos ||
-        captured_stdout_str.find("ERROR:") != std::string::npos ||
-        captured_stdout_str.find("failed") != std::string::npos) {
+        captured_stdout_str.find("ERROR:") != std::string::npos) {
         has_error = true;
     }
 

@@ -620,54 +620,39 @@ if(FCEUX11_BUILD_TESTS)
     endif()
 
     # =========================================================================
-    # KagamiQA P5 — In-process direct runner (links Rust kagami-qa as static
-    # library against fceux11_core via C ABI bridge kagami_bridge_*).
+    # KagamiQA P5 — In-process direct runner (Stage-2 §七 C-3 + C-5).
+    #
+    # Stage-2 collapses the original P5 implementation into the headless test
+    # helper. The Rust side exports kagami_qa_direct_main via fceux11_rust.lib
+    # (see C-1 in src/rust/src/lib.rs); no separate kagami_qa.lib is produced
+    # and no second cargo invocation is needed.
     #
     # Produces: kagami_qa_direct_runner.exe
-    # Links: fceux11_core + fceux11_drivers_null + kagami-qa (Rust rlib)
-    #
-    # The Rust crate kagami-qa must expose a C-callable entry point:
-    #   extern "C" fn kagami_qa_direct_main(argc: i32, argv: *const *const c_char) -> i32
-    # This is provided in src/rust/crates/kagami-qa/src/lib.rs.
+    # Links:    fceux11_drivers_null + fceux11_core + fceux11_utils
+    #           + fceux11_rust.lib (carrying kagami_qa_direct_main)
+    #           + userenv / ws2_32 / dbghelp (per `cargo rustc --print
+    #           native-static-libs`; kernel32 + ntdll are auto-linked).
     # =========================================================================
     if(FCEUX11_ENABLE_RUST)
-        # Build the kagami-qa Rust static library with direct-adapter feature.
-        # This compiles the direct.rs adapter (C ABI FFI) and links against
-        # kagami_bridge_* symbols from fceux11_core at final link time.
-        add_custom_target(kagami_qa_direct_rust_lib
-            COMMAND ${CMAKE_COMMAND} -E env
-                CARGO_TARGET_DIR=${CMAKE_BINARY_DIR}/src/target
-                cargo build --release -p kagami-qa --features direct-adapter --lib
-            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/src/rust
-            COMMENT "Building kagami-qa Rust static library (direct-adapter feature)"
-        )
-
-        # Thin C++ entry point that calls kagami_qa_direct_main() from Rust.
-        add_executable(kagami_qa_direct_runner
+        fceux11_add_headless_test_executable(kagami_qa_direct_runner
             kagami_direct_main.cpp
             git_info_stub.cpp
         )
         target_include_directories(kagami_qa_direct_runner PRIVATE
             ${CMAKE_SOURCE_DIR}/tests/core
         )
-
-        # Link against the Rust static library and all C++ core libraries.
-        target_link_libraries(kagami_qa_direct_runner
-            fceux11_drivers_null
-            fceux11_core
-            fceux11_boards
-            fceux11_utils
-            # Rust static library (kagami-qa rlib)
-            ${CMAKE_BINARY_DIR}/src/target/release/kagami_qa.lib
-            # System libraries (matching fceux11_add_headless_test_executable)
-            ${_FCEUX11_CORE_LIBS}
-            ${_FCEUX11_OPENGL_LIBS}
+        # Stage-2 §七 C-3: native-static-libs reported by cargo (kernel32
+        # and ntdll auto-linked; userenv / ws2_32 / dbghelp must be
+        # explicit because MSVC's link.exe does not auto-resolve them
+        # from rlib object imports).
+        target_link_libraries(kagami_qa_direct_runner PRIVATE
+            userenv
+            ws2_32
+            dbghelp
         )
         target_compile_definitions(kagami_qa_direct_runner PRIVATE
             __HEADLESS_DRIVER__
         )
-        # Ensure Rust library is built before linking.
-        add_dependencies(kagami_qa_direct_runner kagami_qa_direct_rust_lib)
 
         # P5: CTest entry for direct runner Oracle B validation.
         # Compares direct mode output vs subprocess mode to verify parity.
