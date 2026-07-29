@@ -3,6 +3,13 @@
 > **日期**：2026-07-29
 > **分支**：`wip_1.16`
 > **关联**：`docs/FCEUX11-1.16_KagamiQA-审计报告.md`、`docs/FCEUX11-1.16_KagamiQA-修复验证报告.md`
+>
+> **2026-07-29 勘误说明（Stage-2 PR 0-3）**：
+> 本文档三处记载与 `301c742` 之后的 HEAD 实际状态不符，已就地更正：
+> 1. §2.4 第 197 行 `2 MiB 全零文件` 表述 — 实测当前 `ppu_rendering_lut_test.exe` 为 10.6 MiB 有效 PE 文件，详见 `docs/FCEUX11-1.16_Stage2-构建计划.md` §一勘误 1
+> 2. §1.3 第 84 行 `rlib ABI 交互` 表述 — 真因是 `tests/CMakeLists.txt:637-665` 的 4 个具体缺陷，不是 `工程复杂性`，详见 Stage-2 计划 §一勘误 3
+> 3. 关联审计链（`修复验证报告.md`）曾称「`fceux11_cpu_testexe` 后缀 bug 未修」 — 实测 `src/rust/crates/kagami-qa/src/adapter/subprocess.rs:51` 用 `format!("{}.{}", name, EXE_EXTENSION)` 已正确拼出 `fceux11_cpu_test.exe`，详见 Stage-2 计划 §一勘误 2
+> **结论稳定性声明**：除上述 3 处更正外，本文其余「不修复」与「构建难题绕过方案」维持原结论（即 L1.1/L1.2 维持、L2.3 维持、L2.4 维持 — `/GL-` 修复确实生效，现象描述变更不影响结论）
 
 ---
 
@@ -59,32 +66,34 @@ P4-bridge（commit `02db484`）在 `FCEUPPU_Power()` 开头插入了 `PPU_ResetH
 
 ---
 
-### 1.3 kagami_qa_direct_smoke — Direct runner 无法端到端构建（不修复）
+### 1.3 kagami_qa_direct_smoke — Direct runner 无法端到端构建（待 Stage-2 Phase C 重判）
+
+> **2026-07-29 勘误**：原文档将根因归为"跨语言工程复杂性"。Stage-2 §一勘误 3 已证伪该归因 — Rust 侧实测 `cargo build --release -p kagami-qa --features direct-adapter --lib` **退出码 0**，8 个 FFI 符号与 C++ 侧完全对应。真正的 4 个硬阻塞全部位于 `tests/CMakeLists.txt:637-665` 这 30 行（详见 Stage-2 计划 §七 Phase C）。本节先做诊断更正，**最终"是否修复"交由 Stage-2 Phase C 完成后再行修订**。
 
 **CTest 状态**：`Not Run`——`kagami_qa_direct_runner.exe` 从未生成。
 
-**原因链**：
+**原因链**（Stage-2 §一勘误 3 后）：
 
 ```
-CMake target kagami_qa_direct_runner
-  → 依赖 cargo build --features direct-adapter --lib
-    → 产出 kagami_qa.rlib (Rust 静态库)
-  → 链接 C++ 薄入口 kagami_direct_main.cpp
-    → 链接 fceux11_core + fceux11_drivers_null + Rust rlib
-      → 需要同时存在: MSVC 完整工具链 + Rust cargo + CMake NMake 生成器
-        → 当前构建仅在 Developer PowerShell 中可行
-        → 且需要 fceux11_core 以兼容格式编译（/GL 与 LTCG 交互复杂）
+CMake target kagami_qa_direct_runner              (tests/CMakeLists.txt:637-665)
+  → 调 cargo build --crate-type rlib                 (C-a: rlib 不是 link.exe 可消费的产物)
+  → 链接路径缺 target triple 段 x86_64-pc-windows-msvc  (C-b: 路径根本命中不了产物)
+  → 系统库 _FCEUX11_CORE_LIBS / _FCEUX11_OPENGL_LIBS  (C-c: 全仓库未定义变量, 展开为空)
+      → ntdll/userenv/ws2_32/dbghelp 全未链入, Rust std 必 LNK2019
+  → CRT 不匹配 /MT vs /MD                              (C-d: 已被现有 /IGNORE:4098 容忍)
 ```
 
-**为何不修复**：
+> 上述 4 个缺陷在 `tests/CMakeLists.txt` 这 30 行内集中体现。**Rust 侧代码本身完全无问题**。
 
-这不是代码缺陷，而是 **跨语言联合构建（C++ CMake + Rust Cargo）的工程复杂性问题**。具体阻塞点：
+**原 §1.3 中 3 个错误诊断**（Stage-2 §一勘误 3 列出）：
 
-1. CMake NMake 生成器的 `add_dependencies` 不传递 Rust 构建的失败信号
-2. Rust rlib 与 MSVC COFF/LTCG 对象的 ABI 交互需要精确的链接标志协调
-3. 当前 MSVC 工具链版本（14.51.36231）存在 LTCG 相关的已知不稳定性（见 M3 分析）
+| 原说法 | 实际情况 |
+|--------|----------|
+| 「NMake `add_dependencies` 不传递 Rust 构建失败信号」 | ❌ 失败的 `add_custom_target` 命令**会**中断构建；真正缺陷是缺 `add_custom_command(OUTPUT ... DEPENDS ...)` 增量建模（见 Phase C-5） |
+| 「rlib 与 MSVC COFF/LTCG 对象的 ABI 交互需精确协调」 | ❌ **rlib 不是 link.exe 可消费的产物**——`Cargo.toml:7` 声明 `crate-type = ["rlib"]`，应当产出 `kagami_qa.lib`（staticlib）才能链入 C++ |
+| 「MSVC 14.51 LTCG 已知不稳定性」 | ❌ 与本项无关；`link.exe` 原生支持 `/GL` 与普通 COFF 混合输入 |
 
-**S2 修复已完成 Rust 侧的编译阻塞**（`#[unsafe(no_mangle)]` + `unsafe {}` 块），但端到端链接仍需专门的构建环境配置工作。`kagami-qa-runner` 的 subprocess 模式已覆盖全部 Oracle A + Oracle B 测试需求，direct 模式是可选增强而非阻塞项。
+**为何本文档仍未直接给出修复**：本次勘误仅更新诊断准确性，`kagami_qa_direct_runner` 的实际修复路径已迁移至 Stage-2 §七 Phase C（C-1~C-5 共 5 个 PR）。在那之前，不应在本文档承诺"已修复"。
 
 ---
 
@@ -194,9 +203,11 @@ LINK : fatal error LNK1104: 无法打开文件"fceu11_direct_storage_probe.lib"
 
 ### 2.4 M3 — MSVC LTCG 链接器崩溃（c2.dll）
 
-**现象**：`fceux11_ppu_rendering_lut_test.exe` 为恰好 2,097,152 字节（2 MiB）的全零文件，无 PE 头。
+> **2026-07-29 勘误**：原文档描述的「2 MiB 全零文件、无 PE 头」是修复**前**的现象；当前 HEAD（`wip_1.16` 分支，`301c742` 之后）的 `build/tests/fceux11_ppu_rendering_lut_test.exe` 实测为 **10.6 MiB 的有效 PE 文件**（`MZ` 头正常，链接完整）。`/GL-` 修复确实生效，本节的根因分析与修复方案不变，只是现象描述需要刷新。
 
-**深入分析**：
+**历史现象**（修复前）：`fceux11_ppu_rendering_lut_test.exe` 在旧 NMake 本地构建路径下产出 2,097,152 字节（2 MiB）的全零占位文件，无 PE 头。
+
+**根因分析**（保留）：
 
 1. 该测试是 `fceux11_core.lib` 中 512 KiB `kSpriteIdxLUT`（`alignas(64) const std::array<uint64_t, 65536>`）的**唯一消费者**
 2. `ppu_sprite_lut.cpp.obj` 仅 12,649 字节，文件头为 `0000ffff`（MSVC LTCG "bigobj" magic），说明它是**IL（Intermediate Language）对象**，非标准 COFF
