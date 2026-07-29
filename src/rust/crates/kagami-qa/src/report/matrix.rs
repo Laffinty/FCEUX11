@@ -137,6 +137,24 @@ pub struct TestDetail {
 }
 
 // ---------------------------------------------------------------------------
+// Test-set diff — visibility of added / removed test_ids vs baseline.
+//
+// Stage-2 §四·五 PR 0.5-4 (anti-gaming reinforcement): the report must
+// surface the test_set_diff so reviewers cannot silently widen the test
+// suite to inflate `fail_to_pass`. `added` and `removed` are computed
+// unconditionally when a baseline is supplied; the field is omitted when
+// no baseline exists (no comparison possible).
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Serialize)]
+pub struct TestSetDiff {
+    /// test_ids present in current run but absent from baseline.
+    pub added: Vec<String>,
+    /// test_ids present in baseline but absent from current run.
+    pub removed: Vec<String>,
+}
+
+// ---------------------------------------------------------------------------
 // Top-level report
 // ---------------------------------------------------------------------------
 
@@ -150,6 +168,10 @@ pub struct MigrationMatrix {
     pub oracle_breakdown: OracleBreakdown,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub baseline_drift: Vec<BaselineDrift>,
+    /// Only emitted when a baseline is supplied. Omitted otherwise so
+    /// first-ever runs (no comparison possible) stay clean.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub test_set_diff: Option<TestSetDiff>,
     pub details: Vec<TestDetail>,
 }
 
@@ -239,7 +261,7 @@ pub fn build_matrix(
 
     // ---------- details ----------
     let details: Vec<TestDetail> = results
-        .into_iter()
+        .iter()
         .map(|r| {
             let oracle_type = oracle_types
                 .get(&r.test_id)
@@ -250,16 +272,36 @@ pub fn build_matrix(
                 .cloned()
                 .unwrap_or_else(|| "?".into());
             TestDetail {
-                test_id: r.test_id,
+                test_id: r.test_id.clone(),
                 passed: r.passed,
                 exit_code: r.exit_code,
                 duration_ms: r.duration_ms,
                 oracle_type,
                 layer,
-                migration_note: r.migration_note,
+                migration_note: r.migration_note.clone(),
             }
         })
         .collect();
+
+    // ---------- test_set_diff (Stage-2 §四·五 PR 0.5-4) ----------
+    // Compute AFTER details (so we can keep `results` borrowed via .iter()),
+    // using a fresh borrow to compute the added/removed sets.
+    let test_set_diff: Option<TestSetDiff> = previous.map(|prev| {
+        let current_ids: std::collections::BTreeSet<&str> =
+            results.iter().map(|r| r.test_id.as_str()).collect();
+        let baseline_ids: std::collections::BTreeSet<&str> =
+            prev.results.keys().map(String::as_str).collect();
+        TestSetDiff {
+            added: current_ids
+                .difference(&baseline_ids)
+                .map(|s| s.to_string())
+                .collect(),
+            removed: baseline_ids
+                .difference(&current_ids)
+                .map(|s| s.to_string())
+                .collect(),
+        }
+    });
 
     MigrationMatrix {
         report_version: 1,
@@ -277,6 +319,7 @@ pub fn build_matrix(
             b_hardware: b_stats,
         },
         baseline_drift: drifts,
+        test_set_diff,
         details,
     }
 }
@@ -547,5 +590,85 @@ mod tests {
         // Format: YYYYMMDD-HHMMSS-xxxxxx = 8+1+6+1+6 = 22 chars
         assert!(m.run_id.contains('-'));
         assert_eq!(m.run_id.len(), 22);
+    }
+
+    // ---- test_set_diff (Stage-2 §四·五 PR 0.5-4) ----
+
+    #[test]
+    fn test_set_diff_present_when_baseline_supplied() {
+        let mut prev_results = BTreeMap::new();
+        prev_results.insert("a".into(), true);
+        prev_results.insert("b".into(), false);
+        let prev = PreviousRun {
+            run_id: "prev".into(),
+            generated_at: "2026-01-01T00:00:00Z".into(),
+            results: prev_results,
+        };
+        // Current run: keeps 'a', drops 'b', adds 'c'.
+        let results = vec![
+            make_result("a", true, 0),
+            make_result("c", true, 0),
+        ];
+        let m = build_matrix(results, &Default::default(), &Default::default(), Some(&prev), vec![]);
+
+        let diff = m
+            .test_set_diff
+            .as_ref()
+            .expect("test_set_diff must be present when baseline supplied");
+        assert_eq!(diff.added, vec!["c".to_string()]);
+        assert_eq!(diff.removed, vec!["b".to_string()]);
+    }
+
+    #[test]
+    fn test_set_diff_absent_when_no_baseline() {
+        // First-ever run with no baseline — diff is meaningless, so the
+        // field must be None (skipped in serialisation).
+        let results = vec![make_result("a", true, 0)];
+        let m = build_matrix(results, &Default::default(), &Default::default(), None, vec![]);
+        assert!(m.test_set_diff.is_none());
+    }
+
+    #[test]
+    fn test_set_diff_surfaces_baseline_widening() {
+        // The anti-gaming guard scenario: a baseline with 1 test_id, and a
+        // current run that added 3 more. Those 3 MUST show up in `added`,
+        // not silently inflate `fail_to_pass`.
+        let mut prev_results = BTreeMap::new();
+        prev_results.insert("original".into(), true);
+        let prev = PreviousRun {
+            run_id: "prev".into(),
+            generated_at: "2026-01-01T00:00:00Z".into(),
+            results: prev_results,
+        };
+        let results = vec![
+            make_result("original", true, 0),
+            make_result("new_1", true, 0),
+            make_result("new_2", true, 0),
+            make_result("new_3", true, 0),
+        ];
+        let m = build_matrix(
+            results,
+            &Default::default(),
+            &Default::default(),
+            Some(&prev),
+            vec![],
+        );
+
+        let diff = m.test_set_diff.as_ref().unwrap();
+        let added: std::collections::BTreeSet<&str> =
+            diff.added.iter().map(String::as_str).collect();
+        assert_eq!(added.len(), 3);
+        assert!(added.contains("new_1"));
+        assert!(added.contains("new_2"));
+        assert!(added.contains("new_3"));
+        assert!(diff.removed.is_empty());
+
+        // And the canonical anti-gaming invariant: 4 new passing tests
+        // did NOT inflate fail_to_pass.
+        assert!(
+            m.transition_matrix.fail_to_pass.is_empty(),
+            "added passing tests leaked into fail_to_pass (gaming)"
+        );
+        assert_eq!(m.transition_matrix.new_test.len(), 3);
     }
 }

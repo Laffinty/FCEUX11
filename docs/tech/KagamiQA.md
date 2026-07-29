@@ -141,7 +141,7 @@ cargo run --release -p kagami-qa -- `
 
 | 文件 | 内容 |
 |------|------|
-| `kagamiqa_migration_matrix.json` | SWE-bench 同构迁移矩阵：`fail_to_pass` / `pass_to_pass` / `pass_to_fail` / `fail_to_fail` |
+| `kagamiqa_migration_matrix.json` | SWE-bench 同构迁移矩阵：`fail_to_pass` / `pass_to_pass` / `pass_to_fail` / `fail_to_fail` / `new_test` |
 | `kagamiqa_accuracy_table.md` | Oracle B 精度对照表（Markdown），每个 ROM 的 PASS/FAIL + 错误码 |
 | `kagamiqa_baseline_next.json` | 当前运行快照，保存为下次对比的基线 |
 
@@ -165,6 +165,20 @@ cargo run --release -p kagami-qa -- `
 - `FAIL → PASS`：✅ 进步！迁移矩阵 `fail_to_pass` 记录
 - `PASS → FAIL`：❌ **回归！** 迁移矩阵 `pass_to_fail` 记录，CI 自动 PR 评论警报
 - `FAIL → FAIL`：已知失败未变，计入 `fail_to_fail`
+- **`new_test`：基线中不存在的 `test_id`，无论当前 PASS / FAIL 均单列此桶**（Stage-2 §四·五 PR 0.5-3）—— 见下方「§反 gaming」
+
+### 2.4.1 反 gaming 与用例集合变更（Stage-2 §四·五 0.5-4）
+
+**问题**：迁移矩阵的 `fail_to_pass` 桶存在被刷分的可能 —— 若 baseline 中无某 test_id，过去会被静默当作"此前 FAIL"，新增通过的测试便计入 `fail_to_pass`。SWE-bench 的 `FAIL_TO_PASS` 是任务实例预固定的清单，不存在此问题；KagamiQA 必须自行锚定。
+
+**对策（4 层叠加）**：
+
+1. **第 5 桶 `new_test`**（PR 0.5-3）：基线中不含的 test_id 全部进入此桶，不分 PASS/FAIL
+2. **`test_set_diff` 字段可见性**（PR 0.5-4）：报告顶部字段，列出本次运行的 added/removed test_ids，PR Review 必须能 diff
+3. **用例集合变更需与基线更新同级评审**：扩大 manifest 新增 test_id 与 `--save-baseline` 升级必须**同一 PR**，不允许先加测试再改基线（让 diff 双向可见）
+4. **manifest 上的 `provenance` 字段必填**：每条 case 必须能追溯来源（hotfix4 T-1、blargg v1 等），禁止无 provenance 的"新增测试"
+
+**新增测试 ≠ 自动通过**：任何含 `test_set_diff.added` 非空的 PR，必须在描述里显式列出新增条目及其预期分类（已知失败 / 新覆盖 / 误报暴露），CI 仍报 `new_test` 桶大小供审计。
 
 ### 2.5 In-Process Direct 模式（帧级驱动）
 
