@@ -592,6 +592,11 @@ target_include_directories(fceux11_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 # without /GL so the LUT is emitted as real COFF data, skipping the LTCG path.
 set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/ppu_sprite_lut.cpp PROPERTIES
     COMPILE_FLAGS "/GL-")
+# Stage-2 A-6: bus.cpp owns two 0x10000-entry function-pointer tables
+# (1 MiB total). Keep that large object out of LTCG as a preventive guard
+# against the same c2.dll materialisation failure.
+set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/bus.cpp PROPERTIES
+    COMPILE_FLAGS "/GL-")
 # v0.3.1: PCH for core — types.h + API headers + fceu.h (C++ only; C files skip PCH)
 # v1.11: driver.h replaced with 4 peer headers (Phase H)
 target_precompile_headers(fceux11_core PRIVATE
