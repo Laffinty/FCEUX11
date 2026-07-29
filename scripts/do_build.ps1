@@ -1,4 +1,4 @@
-# FCEUX11 Build Script (v0.2.4)
+# FCEUX11 Build Script (v0.2.5)
 # Pure PowerShell — no MSYS2 / MinGW / POSIX dependencies
 # Lives under scripts/; resolves ProjectRoot via the parent of $PSScriptRoot
 # so it works regardless of the current working directory.
@@ -141,9 +141,102 @@ Write-Host "[CONFIGURE] cmake $cmakeArgs" -ForegroundColor Cyan
 & cmake @cmakeArgs
 if ($LASTEXITCODE -ne 0) { throw "CMake configure failed" }
 
-Write-Host "[BUILD] cmake --build $BuildDir --config $Config" -ForegroundColor Cyan
-& cmake --build $BuildDir --config $Config
-if ($LASTEXITCODE -ne 0) { throw "CMake build failed" }
+$maxBuildAttempts = 3
+$preexistingBuildProcessIds = @(Get-Process -Name cl, nmake, link -ErrorAction SilentlyContinue |
+    ForEach-Object { $_.Id })
+for ($attempt = 1; $attempt -le $maxBuildAttempts; $attempt++) {
+    Write-Host "[BUILD] cmake --build $BuildDir --config $Config (attempt $attempt/$maxBuildAttempts)" -ForegroundColor Cyan
+    $buildOutput = @()
+    $savedErrorActionPreference = $ErrorActionPreference
+    try {
+        # Windows PowerShell promotes redirected native stderr to ErrorRecord;
+        # keep it capturable without letting the global Stop policy abort here.
+        $ErrorActionPreference = "Continue"
+        & cmake --build $BuildDir --config $Config 2>&1 |
+            ForEach-Object { $_.ToString() } |
+            Tee-Object -Variable buildOutput
+        $buildExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $savedErrorActionPreference
+    }
+    if ($buildExitCode -eq 0) { break }
+
+    $buildText = ($buildOutput | Out-String)
+    if ($attempt -eq $maxBuildAttempts -or $buildText -notmatch "LNK1104") {
+        throw "CMake build failed"
+    }
+
+    # LNK1104 is locale-independent, but the surrounding diagnostic text is
+    # not. Extract quoted .lib paths instead of matching "cannot open file".
+    $lockedLibNames = @([regex]::Matches(
+        $buildText,
+        '(?im)LNK1104:[^\r\n]*[''"]([^''"\r\n]+\.lib)[''"]') |
+        ForEach-Object { $_.Groups[1].Value.Trim() } |
+        Select-Object -Unique)
+    $lockedLibPaths = @()
+    foreach ($lockedLibName in $lockedLibNames) {
+        $exactCandidates = @()
+        if ([System.IO.Path]::IsPathRooted($lockedLibName)) {
+            $exactCandidates += $lockedLibName
+        } else {
+            # Linker diagnostics may be relative to either the build tree or
+            # the cmake caller's working directory (the project root).
+            $exactCandidates += Join-Path $BuildDir $lockedLibName
+            $exactCandidates += Join-Path $ProjectRoot $lockedLibName
+        }
+        $matchesForName = @($exactCandidates |
+            Where-Object { Test-Path $_ -PathType Leaf } |
+            ForEach-Object { Get-Item $_ } |
+            Sort-Object FullName -Unique)
+
+        if ($matchesForName.Count -eq 0) {
+            $leafName = Split-Path $lockedLibName -Leaf
+            $matchesForName = @(Get-ChildItem -Path $BuildDir -Filter $leafName -File -Recurse -ErrorAction SilentlyContinue)
+            if ($matchesForName.Count -gt 1) {
+                throw "CMake build failed (LNK1104 library path is ambiguous: $lockedLibName)"
+            }
+        }
+        $lockedLibPaths += $matchesForName
+    }
+    $lockedLibPaths = @($lockedLibPaths | Sort-Object FullName -Unique)
+    if ($lockedLibPaths.Count -eq 0) {
+        throw "CMake build failed (LNK1104 referenced a missing library, not a locked build output)"
+    }
+
+    Write-Host "[RETRY] LNK1104 detected; clearing residual compiler/linker processes." -ForegroundColor Yellow
+    $residualProcesses = @(Get-Process -Name cl, nmake, link -ErrorAction SilentlyContinue |
+        Where-Object { $preexistingBuildProcessIds -notcontains $_.Id })
+    if ($residualProcesses.Count -gt 0) {
+        Write-Host "[RETRY] Stopping $($residualProcesses.Count) process(es) started during this build attempt." -ForegroundColor Yellow
+        $residualProcesses | Stop-Process -Force -ErrorAction SilentlyContinue
+    }
+    Start-Sleep -Milliseconds 500
+
+    $buildRoot = [System.IO.Path]::GetFullPath($BuildDir).TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
+    foreach ($lockedLib in $lockedLibPaths) {
+        $lockedLibPath = [System.IO.Path]::GetFullPath($lockedLib.FullName)
+        if (-not $lockedLibPath.StartsWith($buildRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+            Write-Host "[WARN] Refusing to delete library outside build directory: $lockedLibPath" -ForegroundColor Yellow
+            continue
+        }
+        $removed = $false
+        for ($deleteAttempt = 1; $deleteAttempt -le 3; $deleteAttempt++) {
+            try {
+                Remove-Item -Force $lockedLibPath
+                Write-Host "[RETRY] Removed locked output: $lockedLibPath" -ForegroundColor Yellow
+                $removed = $true
+                break
+            } catch {
+                if ($deleteAttempt -lt 3) {
+                    Start-Sleep -Milliseconds (250 * $deleteAttempt)
+                }
+            }
+        }
+        if (-not $removed) {
+            Write-Host "[WARN] Could not remove locked output before retry: $lockedLibPath" -ForegroundColor Yellow
+        }
+    }
+}
 
 Write-Host "[TEST] ctest --test-dir $BuildDir --output-on-failure" -ForegroundColor Cyan
 # Ensure vcpkg DLLs are on PATH for test execution
