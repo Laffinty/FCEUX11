@@ -93,6 +93,7 @@ pub mod direct_entry {
         let mut direct_adapter = Fceux11DirectAdapter::new();
         let mut passed = 0;
         let mut failed = 0;
+        let mut blocking_failed = 0;
         let mut results = Vec::new();
 
         for (id, test) in &manifest {
@@ -118,6 +119,12 @@ pub mod direct_entry {
                                         eprintln!(" PASS (0x00)");
                                     } else {
                                         failed += 1;
+                                        if matches!(
+                                            test.failure_means,
+                                            crate::manifest::schema::FailureSeverity::Blocking
+                                        ) {
+                                            blocking_failed += 1;
+                                        }
                                         eprintln!(" FAIL (0x{:02X})", val);
                                     }
                                     results.push(crate::adapter::trait_def::TestResult {
@@ -137,17 +144,35 @@ pub mod direct_entry {
                                 }
                                 Err(e) => {
                                     failed += 1;
+                                    if matches!(
+                                        test.failure_means,
+                                        crate::manifest::schema::FailureSeverity::Blocking
+                                    ) {
+                                        blocking_failed += 1;
+                                    }
                                     eprintln!(" PROBE_ERROR: {:?}", e);
                                 }
                             }
                         } else {
                             failed += 1;
+                            if matches!(
+                                test.failure_means,
+                                crate::manifest::schema::FailureSeverity::Blocking
+                            ) {
+                                blocking_failed += 1;
+                            }
                             eprintln!(" STEP_ERROR");
                         }
                         let _ = direct_adapter.reset();
                     }
                     Err(e) => {
                         failed += 1;
+                        if matches!(
+                            test.failure_means,
+                            crate::manifest::schema::FailureSeverity::Blocking
+                        ) {
+                            blocking_failed += 1;
+                        }
                         eprintln!(" LOAD_ERROR: {:?}", e);
                     }
                 }
@@ -155,10 +180,11 @@ pub mod direct_entry {
         }
 
         eprintln!(
-            "Direct run complete: {} total, {} PASS, {} FAIL",
+            "Direct run complete: {} total, {} PASS, {} FAIL ({} blocking)",
             passed + failed,
             passed,
-            failed
+            failed,
+            blocking_failed
         );
 
         // Write minimal JSON report.
@@ -180,7 +206,11 @@ pub mod direct_entry {
             }
         }
 
-        if failed > 0 { 1 } else { 0 }
+        // Stage-2: respect failure_means. Advisory failures (D-2
+        // missing-ROM, E-1 pending accuracy rebalance) are reported in
+        // the matrix but do not propagate to the process exit code —
+        // the same convention as kagami-qa-runner (subprocess mode).
+        if blocking_failed > 0 { 1 } else { 0 }
     }
 }
 
