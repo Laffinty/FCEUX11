@@ -1,4 +1,4 @@
-# FCEUX11 Build Script (v0.2.3)
+# FCEUX11 Build Script (v0.2.4)
 # Pure PowerShell — no MSYS2 / MinGW / POSIX dependencies
 # Lives under scripts/; resolves ProjectRoot via the parent of $PSScriptRoot
 # so it works regardless of the current working directory.
@@ -100,6 +100,8 @@ if (-not (Get-Command cl -ErrorAction SilentlyContinue)) {
 
 if (-not $generator) {
     if (Get-Command nmake -ErrorAction SilentlyContinue) {
+        Write-Host "[WARN] Ninja was not found; falling back to legacy NMake." -ForegroundColor Yellow
+        Write-Host "[WARN] Ninja is the only supported local generator and matches CI. Install the Visual Studio CMake component." -ForegroundColor Yellow
         $generator = "NMake Makefiles"
     } else {
         throw "No supported build generator found (Ninja or NMake). Install Ninja (recommended) or ensure nmake is on PATH."

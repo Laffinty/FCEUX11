@@ -105,10 +105,12 @@ $env:VCPKG_ROOT = "$PWD\vcpkg"
 ```
 
 这个脚本自动完成：
-1. 探测 MSVC 编译器和 Ninja/NMake 构建工具
+1. 探测 MSVC 编译器和 Ninja 构建工具（Ninja 缺失时才回落到 legacy NMake）
 2. CMake 配置（configure）
 3. 编译全部源码（build）
 4. 运行单元测试（test）
+
+**生成器口径**：本地构建只支持与 CI 一致的 **Ninja + MSVC**。`do_build.ps1` 会从 Visual Studio 安装目录自动找到其内置 Ninja；仅当 Ninja 确实缺失时才回落到 legacy NMake 并打印醒目告警。NMake 路径不保证具备与 CI 相同的构建结果，遇到回落告警时应通过 Visual Studio Installer 补装 **C++ CMake tools for Windows**。
 
 **编译耗时**：首次约 10-20 分钟（Qt6 编译过的前提下），后续增量编译 1-3 分钟。
 
@@ -224,7 +226,7 @@ cmake --build build
 
 ### 8.4 手动分步编译（不用一键脚本）
 
-> **推荐**：直接使用 [`.\scripts\do_build.ps1 -Config Release`](#4-编译) —— 它已经按顺序完成环境探测、配置、编译、测试四步，并自动选择 Ninja / Ninja+MSVC 工具链。
+> **推荐**：直接使用 [`.\scripts\do_build.ps1 -Config Release`](#4-编译) —— 它已经按顺序完成环境探测、配置、编译、测试四步，并自动选择受支持的 Ninja + MSVC 工具链。
 >
 > 若确有分步需求（例如调试 CMake configure 阶段），按下方手动加载 MSVC 环境后，直接用对应 cmake 命令：
 
