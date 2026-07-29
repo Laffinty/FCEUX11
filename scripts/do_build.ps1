@@ -1,4 +1,4 @@
-# FCEUX11 Build Script (v0.2.2)
+# FCEUX11 Build Script (v0.2.3)
 # Pure PowerShell — no MSYS2 / MinGW / POSIX dependencies
 # Lives under scripts/; resolves ProjectRoot via the parent of $PSScriptRoot
 # so it works regardless of the current working directory.
@@ -27,43 +27,61 @@ if ($env:VCPKG_ROOT) {
     $vcpkgToolchain = Join-Path $env:VCPKG_ROOT "scripts\buildsystems\vcpkg.cmake"
 }
 
-# Auto-detect available generator
+# Discover Visual Studio installations once for both Ninja and MSVC.
+# Prefer vswhere.exe (works across drive letters and editions), then fall back
+# to known install roots for edge cases where vswhere is unavailable.
+$vsInstallPaths = @()
+$vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+if (Test-Path $vswhere) {
+    try {
+        $vsInstallPaths += @(& $vswhere -latest -products * `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -property installationPath 2>$null)
+    } catch {}
+}
+$vsInstallPaths += @(
+    "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools"
+    "C:\Program Files\Microsoft Visual Studio\2022\BuildTools"
+    "C:\Program Files\Microsoft Visual Studio\2022\Enterprise"
+    "C:\Program Files\Microsoft Visual Studio\2022\Professional"
+    "C:\Program Files\Microsoft Visual Studio\2022\Community"
+)
+$vsInstallPaths = @($vsInstallPaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -Unique)
+
+# Auto-detect available generator. Visual Studio bundles Ninja outside PATH in
+# ordinary PowerShell/Git Bash sessions, so probe those installations as well.
 $generator = $null
+$ninjaPath = $null
+$ninjaCommand = Get-Command ninja -ErrorAction SilentlyContinue
+if ($ninjaCommand) {
+    $ninjaPath = $ninjaCommand.Source
+} else {
+    $ninjaPath = $vsInstallPaths |
+        ForEach-Object { Join-Path $_ "Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe" } |
+        Where-Object { Test-Path $_ } |
+        Select-Object -First 1
+}
+
 $ninjaOk = $false
-try { & ninja --version | Out-Null; $ninjaOk = ($LASTEXITCODE -eq 0) } catch {}
+if ($ninjaPath) {
+    try {
+        & $ninjaPath --version | Out-Null
+        $ninjaOk = ($LASTEXITCODE -eq 0)
+    } catch {}
+}
 if ($ninjaOk) {
     $generator = "Ninja"
-} elseif (Get-Command nmake -ErrorAction SilentlyContinue) {
-    $generator = "NMake Makefiles"
-} else {
-    # Attempt to auto-load VS 2017+ BuildTools environment.
-    # v1.0: prefer vswhere.exe (Microsoft-recommended discovery — works on
-    # any drive letter and any VS edition). Fall back to 5 hard paths for
-    # edge cases where vswhere is missing. This makes the script portable
-    # to users who install Visual Studio on D:\ / E:\ or use a custom path.
-    $vcvars = $null
-    $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
-    if (Test-Path $vswhere) {
-        try {
-            $installPath = & $vswhere -latest -products * `
-                -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
-                -property installationPath 2>$null
-            if ($installPath) {
-                $candidate = Join-Path $installPath "VC\Auxiliary\Build\vcvars64.bat"
-                if (Test-Path $candidate) { $vcvars = $candidate }
-            }
-        } catch {}
-    }
-    if (-not $vcvars) {
-        $vcvarsPaths = @(
-            "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
-            "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
-            "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-            "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars64.bat"
-            "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
-        )
-        $vcvars = $vcvarsPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
-    }
+    $ninjaDir = Split-Path -Parent $ninjaPath
+    $env:PATH = "$ninjaDir;$env:PATH"
+    Write-Host "[ENV] Using Ninja from $ninjaPath" -ForegroundColor Gray
+}
+
+# Load the MSVC environment when invoked from a non-Developer shell.
+if (-not (Get-Command cl -ErrorAction SilentlyContinue)) {
+    $vcvars = $vsInstallPaths |
+        ForEach-Object { Join-Path $_ "VC\Auxiliary\Build\vcvars64.bat" } |
+        Where-Object { Test-Path $_ } |
+        Select-Object -First 1
     if ($vcvars) {
         Write-Host "[ENV] Loading VS environment from $vcvars" -ForegroundColor Yellow
         $envVars = (& cmd /c "`"$vcvars`" >nul 2>&1 && set") -split "`r?`n"
@@ -74,11 +92,15 @@ if ($ninjaOk) {
                 Set-Item -Path "Env:$name" -Value $value -ErrorAction SilentlyContinue
             }
         }
-        if (Get-Command nmake -ErrorAction SilentlyContinue) {
-            $generator = "NMake Makefiles"
-        } else {
-            throw "Failed to load nmake after running vcvars64.bat"
-        }
+    }
+    if (-not (Get-Command cl -ErrorAction SilentlyContinue)) {
+        throw "Failed to locate MSVC. Install Visual Studio Build Tools with the C++ workload."
+    }
+}
+
+if (-not $generator) {
+    if (Get-Command nmake -ErrorAction SilentlyContinue) {
+        $generator = "NMake Makefiles"
     } else {
         throw "No supported build generator found (Ninja or NMake). Install Ninja (recommended) or ensure nmake is on PATH."
     }
