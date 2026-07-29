@@ -38,6 +38,11 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Stage-2 A-3: embed CodeView debug information in each object (/Z7).
+# Unlike /Zi, this does not create a compiler PDB shared by parallel cl.exe
+# processes, preventing C1041 contention even on the legacy NMake fallback.
+set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT Embedded)
+
 # v0.2.1: MSVC security and conformance options
 # v0.3.1: /W4 soft-start with /WX- (warnings are not errors yet; /WX pushed to v0.3.16)
 # v0.3.16 (LTS closure): /WX activated (warnings as errors). Residual
