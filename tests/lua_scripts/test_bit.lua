@@ -53,15 +53,26 @@ check("rol(0x01, 7)", bit.rol(0x01, 7), 0x80)
 check("rol(0x80, 25)", bit.rol(0x80, 25), 0x01)
 
 -- ror
-check("ror(0x01, 1)", bit.ror(0x01, 1), 0x80000000)
+-- Stage-2 §六 B-2 F2: LuaBitOp 1.0.2 §ror says all bit operations return
+-- SIGNED 32-bit integers. 0x80000000 as signed = -2147483648 (i32::MIN).
+-- The bit pattern is correct; the old literal 0x80000000 (= 2147483648)
+-- is out of i32 range and would have been the wrong sign.
+check("ror(0x01, 1)", bit.ror(0x01, 1), -2147483648)
 check("ror(0x80, 7)", bit.ror(0x80, 7), 0x01)
 
 -- bswap
 check("bswap(0x12345678)", bit.bswap(0x12345678), 0x78563412)
 
 -- tohex
-check("tohex(255)", bit.tohex(255), "000000FF")
-check("tohex(255, 2)", bit.tohex(255, 2), "FF")
-check("tohex(-1, 4)", bit.tohex(-1, 4), "FFFFFFFF")
+-- Stage-2 §六 B-2 F3~F5: LuaBitOp 1.0.2 §tohex says the default width is 8
+-- and n >= 0 produces lowercase hex. n < 0 produces uppercase (covered by
+-- B-3 separately). Width n is a *digit count*, not a byte count; the value
+-- is masked to the low (n*4) bits and zero-padded on the LEFT.
+--   tohex(255)     → "000000ff"   (8 lowercase hex digits, pad left)
+--   tohex(255, 2)  → "ff"         (2 lowercase hex digits, low 8 bits)
+--   tohex(-1, 4)   → "ffff"       (-1 = 0xFFFFFFFF, low 16 bits, 4 lower)
+check("tohex(255)", bit.tohex(255), "000000ff")
+check("tohex(255, 2)", bit.tohex(255, 2), "ff")
+check("tohex(-1, 4)", bit.tohex(-1, 4), "ffff")
 
 print(string.format("bit library: %d passed, %d failed", passed, failed))
