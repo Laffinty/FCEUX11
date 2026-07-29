@@ -63,15 +63,27 @@ pub fn register(lua: &Lua) -> Result<Table> {
     )?;
     bit.set(
         "tohex",
+        // Stage-2 §六 B-3: LuaBitOp 1.0.2 §tohex says n < 0 produces
+        // UPPERCASE hex, n >= 0 produces lowercase. abs(n) is the digit
+        // count; the value mask is identical for both signs.
         lua.create_function(|_, (x, n): (i32, Option<i32>)| {
             let digits = n.unwrap_or(8);
-            let width = digits as usize;
-            let mask = if width >= 8 {
+            let abs_digits = if digits < 0 {
+                (-digits) as usize
+            } else {
+                digits as usize
+            };
+            let mask = if abs_digits >= 8 {
                 u32::MAX
             } else {
-                (1u32 << (width * 4)).wrapping_sub(1)
+                (1u32 << (abs_digits * 4)).wrapping_sub(1)
             };
-            Ok(format!("{:0>width$x}", (x as u32) & mask, width = width))
+            let masked = (x as u32) & mask;
+            if digits < 0 {
+                Ok(format!("{:0>abs_digits$X}", masked, abs_digits = abs_digits))
+            } else {
+                Ok(format!("{:0>abs_digits$x}", masked, abs_digits = abs_digits))
+            }
         })?,
     )?;
 
@@ -203,6 +215,15 @@ mod tests {
             assert_eq!(
                 "ffff",
                 lua.load(r#"bit.tohex(-1, 4)"#).eval::<String>().unwrap()
+            );
+            // Stage-2 §六 B-3: negative n → UPPERCASE (spec §tohex).
+            assert_eq!(
+                "FF",
+                lua.load(r#"bit.tohex(255, -2)"#).eval::<String>().unwrap()
+            );
+            assert_eq!(
+                "FFFFFFFF",
+                lua.load(r#"bit.tohex(-1, -8)"#).eval::<String>().unwrap()
             );
         }
     }
