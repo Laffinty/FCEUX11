@@ -16,7 +16,7 @@ pub mod adapter;
 // =========================================================================
 
 #[cfg(feature = "direct-adapter")]
-mod direct_entry {
+pub mod direct_entry {
     use std::collections::BTreeMap;
     use std::ffi::CStr;
     use std::os::raw::c_char;
@@ -28,7 +28,12 @@ mod direct_entry {
 
     /// Main entry point called from C++ (kagami_direct_main.cpp).
     /// Parses CLI args and runs Oracle B tests in-process.
-    #[unsafe(no_mangle)]
+    ///
+    /// Stage-2 §七 (C-1): this function deliberately does NOT carry
+    /// `#[unsafe(no_mangle)]`. The exported C-ABI symbol `kagami_qa_direct_main`
+    /// is owned by the root crate `fceux11-rust` (see its wrapper), which calls
+    /// this function via the rlib. Keeping `no_mangle` here would create a
+    /// duplicate-symbol collision when both libs are linked together.
     pub unsafe extern "C" fn kagami_qa_direct_main(
         argc: i32,
         argv: *const *const c_char,

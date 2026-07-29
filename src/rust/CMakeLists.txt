@@ -44,9 +44,10 @@ add_custom_command(
         cargo build --manifest-path ${CARGO_MANIFEST}
                     --target ${RUST_TARGET}
                     --release
+                    --features direct-adapter
     DEPENDS ${RUST_SOURCE_FILES} ${CARGO_MANIFEST}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    COMMENT "Building Rust crate (target: ${RUST_TARGET})..."
+    COMMENT "Building Rust crate (target: ${RUST_TARGET}, features=direct-adapter)..."
     VERBATIM
 )
 

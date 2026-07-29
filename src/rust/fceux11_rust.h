@@ -3968,12 +3968,13 @@ extern int32_t kagami_bridge_reset(void);
 extern void kagami_bridge_kill(void);
 
 extern void kagami_bridge_set_newppu(int32_t on);
-
+/* === Stage-2 C-1: in-process direct runner entry === */
 /**
  * Main entry point called from C++ (kagami_direct_main.cpp).
  * Parses CLI args and runs Oracle B tests in-process.
  */
 int32_t kagami_qa_direct_main(int32_t argc, const char *const *argv);
+
 #ifdef __cplusplus
 }
 #endif

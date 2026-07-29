@@ -28,6 +28,18 @@ fceux11-lua = { path = "crates/fceux11-lua" }
 fceux11-core = { path = "crates/fceux11-core" }
 kagami-qa = { path = "crates/kagami-qa" }
 
+[features]
+# Stage-2 §七 (C-1): Pass-through to kagami-qa's `direct-adapter` feature.
+# When enabled, kagami-qa compiles the `direct.rs` FFI adapter and the
+# `kagami_qa_direct_main` symbol. Reusing the root crate's existing
+# staticlib (fceux11_rust.lib) avoids producing a separate `kagami_qa.lib`
+# and the LNK2005 std-symbol duplication that would result from linking
+# two Rust staticlibs in the same executable.
+#
+# Always on in CMake builds (see src/rust/CMakeLists.txt) — dead-code
+# elimination keeps the unused FFI paths free at runtime.
+direct-adapter = ["kagami-qa/direct-adapter"]
+
 [dev-dependencies]
 # Enable FFI stubs only during Rust workspace tests so cargo test can link
 # without the full C++ executable. This feature is never active in the CMake
