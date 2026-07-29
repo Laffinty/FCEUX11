@@ -28,6 +28,12 @@
 
 **一句话**：遗留文档把「我没能在 Git Bash 里把它构建出来」记录成了「这个问题不可解」。实际阻塞点绝大多数是**本地构建环境配置**与**测试期望值错误**，而非工程复杂性。CI（Ninja + Release）从未出现这四个构建难题中的任何一个——这本身就是最强的反证。
 
+### 补充：判定链路自身的可信性缺陷（本计划新增发现）
+
+在复核过程中另发现 **4 项此前未被任何审计或计划文档记录的缺陷**，全部位于 KagamiQA 的判定链路本身：生产判定只看退出码而忽略 `stdout_contains`、实现了正确判定的 `oracle/regression.rs` 是死代码、`timeout_seconds` 从不生效、`fail_to_pass` 可被新增测试灌水。
+
+其中最后一条直接击穿框架的反 gaming 设计。**这些缺陷的严重性高于原「遗留问题」清单中的任何一项**——构建失败是显性的（跑不出来），判定失真是隐性的（跑出来了，但结论是错的）。已单列为 **Phase 0.5**，与 Phase A 并列为硬阻塞。
+
 ---
 
 ## 一、对遗留文档的勘误（必读）
@@ -122,22 +128,29 @@ $ grep -rn "_FCEUX11_CORE_LIBS\|_FCEUX11_OPENGL_LIBS" --include=*.txt --include=
 
 ## 三、Phase 划分总览
 
-6 个 Phase，共 26 个 PR。Phase 之间**严格串行**（后者依赖前者的构建能力），Phase 内部 PR 可并行。
+7 个 Phase，共 30 个 PR。Phase 之间**串行为主**（后者依赖前者的构建与判定能力），Phase 内部 PR 可并行。每 Phase ≤6 PR。
 
 ```
-Phase 0  事实校准与基线重建        4 PR   ← 先证伪废数据，否则后续全在猜
+Phase 0    事实校准与基线重建        4 PR   ← 先证伪废数据，否则后续全在猜
    │
-Phase A  构建环境根治              6 PR   ← 解决 §2.1~§2.4，这是一切的前提
+Phase 0.5  判定链路可信性修复        4 PR   ← 判定逻辑本身不可信，则一切测量无意义
    │
-   ├─ Phase B  Lua bit 库归零      4 PR   ← 独立，可与 C 并行
-   ├─ Phase C  direct runner 端到端 5 PR   ← 独立，可与 B 并行
+Phase A    构建环境根治              6 PR   ← 解决 §2.1~§2.4，这是一切的前提
    │
-Phase D  Oracle B 覆盖率与 CI 权威性 4 PR   ← 依赖 A（构建）+ C（可选）
+   ├─ Phase B  Lua bit 库归零        4 PR   ← 独立，可与 C 并行
+   ├─ Phase C  direct runner 端到端   5 PR   ← 独立，可与 B 并行
    │
-Phase E  精度遗留与收尾            3 PR   ← 依赖 A + D 的可复现构建
+Phase D    Oracle B 覆盖率与 CI 权威性 4 PR   ← 依赖 A（构建）+ C（可选）
+   │
+Phase E    精度遗留与收尾            3 PR   ← 依赖 A + D 的可复现构建
 ```
 
-**关键路径**：Phase A 是唯一的硬阻塞。在 A 完成前，B/C/D/E 的任何验证都不可信——因为当前本地构建（NMake + Debug）本身就是四个构建难题的产地，而 CI（Ninja + Release）是绿的。
+**两条关键路径**：
+
+- **Phase A 是构建侧的硬阻塞**。在 A 完成前，B/C/D/E 的任何验证都不可信——当前本地构建（NMake + Debug）本身就是四个构建难题的产地，而 CI（Ninja + Release）是绿的。
+- **Phase 0.5 是判定侧的硬阻塞**。在 0.5 完成前，即使构建成功、测试全跑，**产出的 PASS/FAIL 与迁移矩阵也不能作为决策依据**——因为判定逻辑与 manifest 声明不一致（详见下节）。
+
+两者互不依赖，可并行推进；但 D（权威性指标）必须同时等两者。
 
 ---
 
@@ -158,7 +171,67 @@ Phase E  精度遗留与收尾            3 PR   ← 依赖 A + D 的可复现�
 
 ---
 
-## 五、Phase A — 构建环境根治
+## 四·五、Phase 0.5 — 判定链路可信性修复
+
+**目标**：让 KagamiQA 的判定逻辑与它自己的 manifest schema 声明相符。
+
+**为什么必须独立成 Phase**：Phase 0 校准的是「数据」，本 Phase 校准的是「判定数据的规则」。规则若与声明不符，重跑再多次也只是把错误结论刷新得更快。以下 4 项均为实测确认，此前**不在任何审计与计划文档中**。
+
+### 0.5-a 🔴 生产判定只看退出码，`stdout_contains` 是装饰性字段
+
+`src/rust/crates/kagami-qa/src/adapter/subprocess.rs:84` —— 生产路径唯一判据：
+
+```rust
+let passed = exit_code == test.expected.exit_code;
+```
+
+而 `manifest/schema.rs:78` 声明了 `expected.stdout_contains: Option<String>`。该字段**从未被生产代码读取**。任何按 schema 编写、依赖 stdout 断言的用例，都会拿到**静默的假 PASS**。
+
+### 0.5-b 🔴 `oracle/regression.rs` 是死代码
+
+```
+$ grep -rn "evaluate\|regression::" src/rust/crates/kagami-qa/src/ | grep -v regression.rs
+（无输出）
+```
+
+`oracle/regression.rs:7-19` 实现了正确的两因子判定（退出码 + stdout 包含），**全仓库无任何调用点**。它自带 4 个单元测试且全部通过——即**测试覆盖了一个永不执行的函数**，这类绿灯是纯粹的噪声。
+
+架构意图（oracle 层负责判定）与实现现状（adapter 层自行判定）已经背离。
+
+### 0.5-c 🟡 `timeout_seconds` 全链路解析但从不生效
+
+`manifest/schema.rs:14` 与 `core/config.rs:15` 都有该字段，`tests.json` 每条都填了值，但执行走 `Command::output()`——**无超时机制**。挂死的测试将永久阻塞 runner，而不是判 FAIL。这在 CI 上表现为 job 超时（无诊断信息），而非一条明确的失败用例。
+
+### 0.5-d 🔴 `fail_to_pass` 可被「新增测试」灌水 —— 反 gaming 设计的正门
+
+`report/matrix.rs:184`：
+
+```rust
+let prev_passed = prev.results.get(&r.test_id).copied().unwrap_or(false);
+```
+
+基线中不存在的 test_id **默认视为「此前 FAIL」**。于是：**新增一条通过的测试 → 直接记入 `fail_to_pass`**。
+
+这一条直接击穿框架的核心防御。PLAN §十一.1 明确：「AI 读 FAIL_TO_PASS 即判补丁对错」；§4.3 的反 gaming 规则是「**AI 不得修改已入库的 `expected` 值，只能新增条目**」。而「只能新增」恰恰就是刷分路径——规则堵死了改期望值这扇门，却把灌水留了个正门。
+
+对照 SWE-bench：其 `FAIL_TO_PASS` 是**任务实例预先固定的清单**，不由补丁运行时动态生成。KagamiQA 缺了这层锚定。
+
+### 现状澄清（避免过度恐慌）
+
+`tests/blargg_runner.cpp:425,441` 把判定编码进了退出码（`fail_count > 0 ? 1 : 0` / `r.passed ? 0 : 1`），因此 **Oracle B 当前没有产生误报**。0.5-a/b/c 是**潜伏缺陷**而非正在犯的错误。但 0.5-d 是**当前就在生效**的指标失真。
+
+| PR | 内容 | 文件 | 验收 |
+|---|---|---|---|
+| **0.5-1** | `SubprocessAdapter::run_test` 改为调用 `oracle::regression::evaluate`，消除判定逻辑二地并存 | `adapter/subprocess.rs:84`、`oracle/regression.rs` | `stdout_contains` 生效；新增一条「退出码 0 但 stdout 不含期望串」的用例，必须判 FAIL |
+| **0.5-2** | 实装 `timeout_seconds`：改用带超时的等待（`wait_timeout` 或 spawn + 轮询），超时判 FAIL 并写入 `migration_note` | `adapter/subprocess.rs` | 新增故意挂死 30s 的用例，在 5s 超时下判 FAIL 而非阻塞 |
+| **0.5-3** | 迁移矩阵引入第五桶 `new_test`：基线中不存在的 test_id 不得计入 `fail_to_pass` | `report/matrix.rs:184` | 新增通过的测试出现在 `new_test`，`fail_to_pass` 保持为空 |
+| **0.5-4** | 反 gaming 加固：`tests.json` 的用例集合变更需与基线更新同级评审；矩阵报告显式标注本次运行的「新增/删除用例数」 | `report/matrix.rs`、`docs/tech/KagamiQA.md` §反 gaming | 报告中用例集合变更可见、可 diff、不可静默 |
+
+**0.5-3 的设计要点**：不要简单把 `unwrap_or(false)` 改成 `unwrap_or(true)`——那会把新增的失败测试记成 `pass_to_fail`（假回归警报），只是把偏差换了个方向。**新测试在语义上不属于任何迁移桶**，必须单列。
+
+---
+
+
 
 **目标**：让「从任意 shell 一条命令构建成功」成为常态，永久消除 §2.1~§2.4。
 
@@ -337,12 +410,64 @@ kernel32.lib ntdll.lib userenv.lib ws2_32.lib dbghelp.lib /defaultlib:libcmt
 | 6 | Oracle B ROM 覆盖 ≥80%，失败项显式标注 | Phase D |
 | 7 | README / KagamiQA.md 的数字由 CI 产物回填，中英一致 | Phase D |
 | 8 | 遗留文档的 3 处过期记载已更正 | Phase 0 |
+| 9 | **判定链路与 schema 声明一致**：`stdout_contains` 生效、超时生效、`regression.rs` 在调用链上 | Phase 0.5；负向用例（退出码 0 但 stdout 不符）必须判 FAIL |
+| 10 | **`fail_to_pass` 不含新增测试** | Phase 0.5；新增通过用例落入 `new_test` 桶 |
+| 11 | **权威性按修订口径分离陈述**，不再输出单一乘积分数 | 见 §十·五 |
 
 **Oracle A 目标**：33 项中 33 PASS（当前 31 PASS / 1 FAIL / 1 Not Run）。Phase B 解决 FAIL，Phase C 解决 Not Run。
 
 ---
 
-## 十一、总体风险与不确定性
+## 十·五、权威性口径修订
+
+现行公式（`docs/tech/KagamiQA.md` §1.4、P5 计划 §1.1）：
+
+```
+权威性 = ROM覆盖率 × Oracle独立性 × CI常驻因子
+```
+
+**建议在 Stage-2 内废止这个单一乘积分数**，理由有二：
+
+### 理由一：它已被证明可被自评膨胀 4 倍
+
+同一份代码、同一天，文档自评 `1.00 × 1.00 × 1.00 = 1.00`，审计复评 `1.00 × 0.50 × 0.50 = 0.25`。三个因子里只有 ROM 覆盖率是测量量（`tested_roms / 174`），另两个是二元自评。**一个作者能自己写成 1.00 的分数，不是权威性度量，是自检清单。**
+
+### 理由二：它把卫生条件当成了权威来源
+
+真正承载权威性的**只有 Oracle B**——因为只有它对照外部真理（真实 NES 硬件，经 blargg ROM 的 `$6000` 协议中介）。Oracle A 全套（`mapper_byte_diff` / `apu_wav_diff` / `ppu_frame_diff` / `golden_savestate`）本质是 characterization testing，只能回答「和上一版一样吗」，**永远无法回答「对吗」**。PLAN §2.4 自己写得很清楚：「无一个 oracle 回答『与真实硬件是否一致』」。
+
+而「Oracle 独立性」和「CI 常驻」是**卫生条件**：不满足则结论无效，满足了也不增加真理含量。把 CI 常驻算作权威性的三分之一，等价于主张「跑得勤 = 更接近真理」——这不成立。乘积形式还有个副作用：任一因子为 0 则总分为 0，这掩盖了「其余部分其实已经做好」的事实，无法反映渐进改善。
+
+### 修订口径：门槛 + 度量分离陈述
+
+```
+【卫生门槛】（二元，不满足则以下度量无效）
+  □ Oracle A/B 判定通道物理隔离
+  □ 判定逻辑与 manifest schema 声明一致      ← Phase 0.5 新增
+  □ 迁移矩阵不含结构性失真                    ← Phase 0.5 新增
+  □ CI 常驻，指标由 CI 产物回填而非手写
+
+【权威性度量】（仅在全部门槛满足时有意义）
+  外部真理覆盖率 = 已接入的 blargg ROM / 177
+  已知失败清单   = 每条含错误码、诊断串、分类标记
+  oracle 来源数  = 当前 1（blargg）
+```
+
+### 保留原设计中正确的部分
+
+KagamiQA.md §1.4 的这句判断应当保留并前置：
+
+> **「权威性不要求 Oracle B 全部 PASS。精确知道什么失败，比『全绿但不测』更权威。已知失败清单本身就是防线的一部分。」**
+
+这是成熟的工程认识论——把已知失败清单当作防线的组成部分，而非污点。修订口径把它落成了可检查的字段要求（每条已知失败必须带错误码、诊断串、分类标记），而不只是一句态度。
+
+### 关于「oracle 来源数」这一新增项
+
+当前 `oracle 来源数 = 1`。这意味着 **KagamiQA 的权威性上限 = blargg ROM 套件对真实硅片的保真度**——ROM 覆盖率从 13% 提到 100%，也只是把这一个来源用尽，不会突破它。若未来要继续提升权威性，路径是**增加相互独立、可以彼此证伪的 oracle 来源**（NESdev 其他测试套件、TASVideos 精度表、第二个模拟器的差分比对、真机采集），而非继续增加同一来源的测试数量。此项列入度量是为了让这个天花板**在指标上可见**，避免用覆盖率的增长掩盖来源的单一。
+
+---
+
+
 
 诚实标注本计划中**尚未实测验证**的部分：
 
@@ -354,6 +479,7 @@ kernel32.lib ntdll.lib userenv.lib ws2_32.lib dbghelp.lib /defaultlib:libcmt
 | A-3 `/Z7` 的产物膨胀 | 🟢 低 | 嵌入式调试信息会增大 .obj；对 `fceux11_core.lib` 中 512 KiB LUT 的影响需实测确认可接受 |
 | c2.dll bug 的真实触发条件 | 🟢 低 | A-6 是基于「可能泛化」的保险，成本近零。若上游 MSVC 修复，`/GL-` 变成无害的历史包袱 |
 | Phase D 的覆盖率目标 | 🟡 中 | 「≥80%」继承自 P5 计划，但在真实分母（D-1）产出前，该目标是否现实未知。D-1 后可能需要下调 |
+| **历史结论的追溯污染** | 🟡 中 | 0.5-d（`fail_to_pass` 灌水）自 matrix 实现之日起就存在。此前所有基于迁移矩阵得出的「本次修复了 N 项」结论都可能虚高。Phase 0.5 完成后应重算一次历史基线，但**已发布文档中的历史声明无法追溯更正**——只能在 KagamiQA.md 加注说明该口径变更 |
 
 **上游动作（异步，不阻塞任何 Phase）**：向 Microsoft Developer Community 提交 c2.dll 的 LTCG 崩溃报告。最小复现已具备（512 KiB constexpr array + lambda init + `/GL` + `/LTCG`，MSVC 14.51.36231），见遗留文档 §2.4。这是未来能移除 `/GL-` 的唯一路径。
 
@@ -364,4 +490,5 @@ kernel32.lib ntdll.lib userenv.lib ws2_32.lib dbghelp.lib /defaultlib:libcmt
 - 本文档**取代**遗留文档中 §1.3、§1.4、§2.1、§2.2 四节的结论部分（其现象记录仍然有效且有价值）。
 - 遗留文档 §1.1、§1.2、§2.3、§2.4 的结论**予以维持**，本文档仅补充加固措施。
 - Phase 0-3 完成后，遗留文档应加一段前言，指向本文档作为后续处置方案。
+- **后续路线**见 `docs/FCEUX11-Stage3-权威性迭代与通用化路线.md`——回答「能否迭代趋于权威、再追求通用化」。其中 §3.2 的「冻结泄漏纪律」**在 Stage-2 期间即生效**：不再向共享 schema 添加领域专用字段、不再向 `SutAdapter` 添加方法。该纪律零成本，但决定了未来抽象重构的可行性。
 - 未纳入本计划的开放项（v2.0 清理项 E 系列、i18n 债务 H 系列、GUI/movie 层 TODO F 系列、5 项空指针缺陷 D 系列）已在调研中完整清点，建议单独立项，不塞进 Stage-2 以免超出注意力窗口。
