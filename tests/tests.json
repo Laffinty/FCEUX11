@@ -341,7 +341,7 @@
     "oracle_type": "A",
     "layer": "script",
     "input": {
-      "binary": "C:/Users/ikrx2/AppData/Local/Programs/Python/Python313/python.exe",
+      "binary": "python",
       "args": ["scripts/check_menu_slots.py", "."],
       "working_dir": "."
     },
