@@ -224,14 +224,14 @@ cmake --build build
 
 ### 8.4 手动分步编译（不用一键脚本）
 
+> **推荐**：直接使用 [`.\scripts\do_build.ps1 -Config Release`](#4-编译) —— 它已经按顺序完成环境探测、配置、编译、测试四步，并自动选择 Ninja / Ninja+MSVC 工具链。
+>
+> 若确有分步需求（例如调试 CMake configure 阶段），按下方手动加载 MSVC 环境后，直接用对应 cmake 命令：
+
 ```powershell
 # 1. 加载 MSVC 环境（Developer PowerShell for VS 2022 已加载则跳过）
-$vcvars = & .\scripts\_find_vcvars.bat
-cmd /c "`"$vcvars`" && set" | ForEach-Object {
-    if ($_ -match "^([^=]+)=(.*)$") {
-        Set-Item "Env:$($matches[1])" $matches[2]
-    }
-}
+#    旧版 .\scripts\_find_vcvars.bat 已归档到 scripts/archive/，不再维护
+#    推荐的探测路径：先尝试裸 $env:VCPKG_ROOT，否则启动 Developer PowerShell for VS 2022。
 
 # 2. 配置
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
