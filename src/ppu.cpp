@@ -43,6 +43,7 @@
 #include "debug.h"
 		 
 #include <array>
+#include <cassert>   // Stage-2 §九 L4: debug-only guard inside CALL_PPUREAD
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
@@ -298,7 +299,12 @@ uint8 FASTCALL FFCEUX_PPURead_Default(uint32 A) {
 uint8 (FASTCALL *FFCEUX_PPURead)(uint32 A) = 0;
 void (*FFCEUX_PPUWrite)(uint32 A, uint8 V) = 0;
 
-#define CALL_PPUREAD(A) (FFCEUX_PPURead(A))
+// Stage-2 §九 L4: the missing NULL check here is deliberate (fail-fast — a NULL
+// FFCEUX_PPURead means PPU_ResetHooks() was skipped, which is a lifecycle bug,
+// not a recoverable condition). The assert turns "crash on a NULL call" into
+// "crash with a diagnostic". Under NDEBUG assert() expands to ((void)0), so the
+// comma expression collapses to the original call — zero Release cost.
+#define CALL_PPUREAD(A) (assert(FFCEUX_PPURead != nullptr), FFCEUX_PPURead(A))
 
 #define CALL_PPUWRITE(A, V) (FFCEUX_PPUWrite ? FFCEUX_PPUWrite(A, V) : FFCEUX_PPUWrite_Default(A, V))
 

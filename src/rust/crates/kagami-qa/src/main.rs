@@ -182,8 +182,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // Stage-2 §九 L3: init with the real config, not a synthetic placeholder.
+    // SubprocessAdapter::init is a no-op today, so the old empty-path config was
+    // harmless — but it was a trap for any future adapter that actually reads
+    // config during init. Order matters: init before `config` moves into the
+    // scheduler.
+    adapter.init(&config)?;
+
     let scheduler = TestScheduler::new(config, manifest);
-    adapter.init(&scheduler_config_default())?;
 
     eprintln!("Running {} tests via subprocess adapter...", scheduler.len());
     let results = scheduler.run_all(&adapter);
@@ -342,13 +348,3 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Minimal config for adapter init (not used by SubprocessAdapter).
-fn scheduler_config_default() -> kagami_qa::core::QaConfig {
-    kagami_qa::core::QaConfig {
-        manifest_path: PathBuf::new(),
-        bin_dir: PathBuf::new(),
-        working_dir: PathBuf::new(),
-        output_path: PathBuf::new(),
-        timeout_seconds: 300,
-    }
-}

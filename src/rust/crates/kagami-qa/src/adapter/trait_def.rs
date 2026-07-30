@@ -28,14 +28,79 @@ pub struct InputSpec {
     pub probe_addr: u32,
 }
 
+// Default frame budget when the manifest entry does not state one.
+// Deliberately private: exposing it makes cbindgen emit a stray comment into
+// the generated fceux11_rust.h.
+const DEFAULT_FRAMES: u32 = 300;
+
 impl InputSpec {
     pub fn from_manifest(test: &TestManifest) -> Self {
         Self {
             rom_path: test.input.rom.clone(),
             script_path: test.input.script_path.clone(),
-            frames: 300, // default; can be overridden in manifest
+            frames: frames_from_args(&test.input.args).unwrap_or(DEFAULT_FRAMES),
             probe_addr: test.input.probe_addr.unwrap_or(0x6000),
         }
+    }
+}
+
+/// Extract the `--frames N` budget from a manifest entry's argv.
+///
+/// Stage-2 S-2: this used to be hardcoded to 300 with the comment "can be
+/// overridden in manifest" — but nothing ever overrode it, so direct mode ran
+/// every Oracle B ROM for exactly 300 frames while subprocess mode honored the
+/// per-test budget. Any ROM needing a longer run reported `$6000 == 0x80`
+/// ("still running") and was scored as a failure. That is a direct/subprocess
+/// parity break, not a ROM defect.
+///
+/// Accepts both `--frames 3000` and `--frames=3000`.
+fn frames_from_args(args: &[String]) -> Option<u32> {
+    let mut it = args.iter();
+    while let Some(arg) = it.next() {
+        if let Some(rest) = arg.strip_prefix("--frames=") {
+            return rest.parse().ok();
+        }
+        if arg == "--frames" {
+            return it.next()?.parse().ok();
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod input_spec_tests {
+    use super::frames_from_args;
+
+    fn v(items: &[&str]) -> Vec<String> {
+        items.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn reads_separate_value_form() {
+        assert_eq!(
+            frames_from_args(&v(&["--rom", "a.nes", "--frames", "3000"])),
+            Some(3000)
+        );
+    }
+
+    #[test]
+    fn reads_equals_form() {
+        assert_eq!(frames_from_args(&v(&["--frames=500"])), Some(500));
+    }
+
+    #[test]
+    fn absent_yields_none() {
+        assert_eq!(frames_from_args(&v(&["--rom", "a.nes"])), None);
+    }
+
+    #[test]
+    fn trailing_flag_without_value_yields_none() {
+        assert_eq!(frames_from_args(&v(&["--frames"])), None);
+    }
+
+    #[test]
+    fn non_numeric_value_yields_none() {
+        assert_eq!(frames_from_args(&v(&["--frames", "many"])), None);
     }
 }
 

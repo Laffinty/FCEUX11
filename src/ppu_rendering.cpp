@@ -73,6 +73,7 @@
 #include "debug.h"
 
 #include <array>
+#include <cassert>   // Stage-2 §九 L4: debug-only guard inside CALL_PPUREAD
 #include <tuple>   // hotfix2 P2-2: std::tuple_size_v for PALRAM size check
 #include <cstring>
 #include <cstdio>
@@ -154,8 +155,9 @@ void makeppulut(void) {
 #define READUPAL(ofs)      (UPALRAM[(ofs)] & (GRAYSCALE ? 0x30 : 0xFF))
 #define PAL(c)             ((c) + cc)
 #define GETLASTPIXEL       (PAL ? ((g_cpu.timestamp_ref() * 48 - linestartts) / 15) : ((g_cpu.timestamp_ref() * 48 - linestartts) >> 4))
-// CALL_PPUREAD — ppu.cpp line 401. Same expansion.
-#define CALL_PPUREAD(A)    (FFCEUX_PPURead(A))
+// CALL_PPUREAD — ppu.cpp line 401. Same expansion, including the Stage-2 §九 L4
+// debug-only assert (NDEBUG → ((void)0), so Release is byte-identical).
+#define CALL_PPUREAD(A)    (assert(FFCEUX_PPURead != nullptr), FFCEUX_PPURead(A))
 // CHRptr / VPage / MMC5SPRVPage — declared as reference aliases in
 // bus.h (already transitively included via cart.h / memory.h chain).
 // VRAMADR / MMC5SPRVRAMADR macros mirror ppu.cpp lines 222-223.
