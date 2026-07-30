@@ -631,7 +631,8 @@ if(FCEUX11_BUILD_TESTS)
     # Links:    fceux11_drivers_null + fceux11_core + fceux11_utils
     #           + fceux11_rust.lib (carrying kagami_qa_direct_main)
     #           + userenv / ws2_32 / dbghelp (per `cargo rustc --print
-    #           native-static-libs`; kernel32 + ntdll are auto-linked).
+    #           native-static-libs`; kernel32 auto-linked, ntdll via
+    #           fceux11_add_headless_test_executable helper at line 65-67).
     # =========================================================================
     if(FCEUX11_ENABLE_RUST)
         fceux11_add_headless_test_executable(kagami_qa_direct_runner
@@ -642,9 +643,9 @@ if(FCEUX11_BUILD_TESTS)
             ${CMAKE_SOURCE_DIR}/tests/core
         )
         # Stage-2 §七 C-3: native-static-libs reported by cargo (kernel32
-        # and ntdll auto-linked; userenv / ws2_32 / dbghelp must be
-        # explicit because MSVC's link.exe does not auto-resolve them
-        # from rlib object imports).
+        # auto-linked, ntdll via fceux11_add_headless_test_executable helper;
+        # userenv / ws2_32 / dbghelp must be explicit because MSVC's
+        # link.exe does not auto-resolve them from rlib object imports).
         target_link_libraries(kagami_qa_direct_runner PRIVATE
             userenv
             ws2_32

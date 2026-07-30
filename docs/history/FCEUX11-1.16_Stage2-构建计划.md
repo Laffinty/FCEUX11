@@ -220,7 +220,7 @@ let passed = exit_code == test.expected.exit_code;
 ### 0.5-b 🔴 `oracle/regression.rs` 是死代码
 
 ```
-$ grep -rn "evaluate\|regression::" src/rust/crates/kagami-qa/src/ | grep -v regression.rs
+$ grep -rn "check_expected\|regression::" src/rust/crates/kagami-qa/src/ | grep -v regression.rs
 （无输出）
 ```
 
@@ -252,7 +252,7 @@ let prev_passed = prev.results.get(&r.test_id).copied().unwrap_or(false);
 
 | PR | 内容 | 文件 | 验收 |
 |---|---|---|---|
-| **0.5-1 ✅ `36bd311`** | `SubprocessAdapter::run_test` 改为调用 `oracle::regression::evaluate`，消除判定逻辑二地并存 | `adapter/subprocess.rs:84`、`oracle/regression.rs` | `stdout_contains` 生效；新增一条「退出码 0 但 stdout 不含期望串」的用例，必须判 FAIL |
+| **0.5-1 ✅ `36bd311`** | `SubprocessAdapter::run_test` 改为调用 `oracle::regression::check_expected`，消除判定逻辑二地并存 | `adapter/subprocess.rs:235`、`oracle/regression.rs:10` | `stdout_contains` 生效；新增一条「退出码 0 但 stdout 不含期望串」的用例，必须判 FAIL |
 | **0.5-2 ✅ `7bf7771`** | 实装 `timeout_seconds`：改用带超时的等待（`wait_timeout` 或 spawn + 轮询），超时判 FAIL 并写入 `migration_note` | `adapter/subprocess.rs` | 新增故意挂死 30s 的用例，在 5s 超时下判 FAIL 而非阻塞 |
 | **0.5-3 ✅ `dfe0710`** | 迁移矩阵引入第五桶 `new_test`：基线中不存在的 test_id 不得计入 `fail_to_pass` | `report/matrix.rs:184` | 新增通过的测试出现在 `new_test`，`fail_to_pass` 保持为空 |
 | **0.5-4 ✅ `39c758b`** | 反 gaming 加固：`tests.json` 的用例集合变更需与基线更新同级评审；矩阵报告显式标注本次运行的「新增/删除用例数」 | `report/matrix.rs`、`docs/tech/KagamiQA.md` §反 gaming | 报告中用例集合变更可见、可 diff、不可静默 |

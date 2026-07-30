@@ -114,8 +114,8 @@ FCEUX11 内置一套名为 **KagamiQA** 的双 Oracle 自动化质量保障系�
 > **数字来源 / Where these numbers come from**：`34` CTest 数 + `39` 清单条目 + `177` 落盘 ROM 数均为 **CI 产物**——
 > 详见 `docs/tech/KagamiQA.md` §0 「CI 数字回填」与最近一次
 > `kagamiqa_migration_matrix.json` 的 `engine.git_rev` 字段。本表数值是
-> 文档快照（commit `5e55129` 时点），**禁止手改；改 README 之前先跑一次
-> `kagami-qa-runner --output` 并把数字随 commit 一并刷新**。
+> 本地构建快照（commit `623dd39` 时点，`engine.git_rev=623dd39`），**禁止手改；改 README 之前先跑一次
+> `kagami-qa-runner --output` 并把数字随 commit 一并刷新**。待 P1-R4 CI 实跑一轮后按路径 A 统一刷新。
 
 **KagamiQA 的实现细节、原理、独立化运行、跨项目迁移指南，请参阅 [`docs/tech/KagamiQA.md`](docs/tech/KagamiQA.md)。**
 
@@ -128,7 +128,7 @@ FCEUX11 ships **KagamiQA**, a dual-oracle automated quality assurance system tha
 | **Migration Matrix** | Every CI run produces `kagamiqa_migration_matrix.json` (uploaded as artifact), tracking PASS→FAIL regressions and FAIL→PASS progress |
 | **Baseline Drift Detection** | PASS→FAIL automatically posts a red alert PR comment, preventing accuracy decay |
 
-> **Source of truth / 数字来源**: 34 CTest + 39 manifest entries + 177 on-disk ROMs are **CI-sourced** — see `docs/tech/KagamiQA.md` §0 "CI number back-fill" and the `engine.git_rev` field of the most recent `kagamiqa_migration_matrix.json`. This table is a snapshot at commit `5e55129`; **do not hand-edit; re-run `kagami-qa-runner --output` first, then refresh the numbers in the same commit**.
+> **Source of truth / 数字来源**: 34 CTest + 39 manifest entries + 177 on-disk ROMs are **CI-sourced** — see `docs/tech/KagamiQA.md` §0 "CI number back-fill" and the `engine.git_rev` field of the most recent `kagamiqa_migration_matrix.json`. This table is a local-build snapshot at commit `623dd39` (`engine.git_rev=623dd39`); **do not hand-edit; re-run `kagami-qa-runner --output` first, then refresh the numbers in the same commit**. Pending P1-R4 CI run will trigger Path A unified refresh.
 
 **For implementation details, principles, standalone operation, and cross-project migration, see [`docs/tech/KagamiQA.md`](docs/tech/KagamiQA.md).**
 
