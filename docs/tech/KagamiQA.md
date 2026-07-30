@@ -2,8 +2,36 @@
 
 > **版本**：v1.16  
 > **性质**：双 Oracle（Oracle A 回归 + Oracle B 硬件一致性）自动化测试系统  
-> **覆盖率**：34 CTest 注册测试（39 条清单条目）+ 180 blargg $6000 协议 ROM（CPU/PPU/APU/MMC3）  
-> **CI 状态**：每次 push 到 `main` / `wip_1.16` 自动触发，产出迁移矩阵 artifact  
+> **覆盖率（CI 数字回填快照 — commit `5e55129`）**：
+>
+> | 维度 | 数值 | 来源 |
+> |---|---|---|
+> | CTest 注册测试 | 34 | `ctest -N` 输出（`build-c1/CTestTestfile.cmake`） |
+> | `tests/tests.json` 清单条目 | 39 | `python -c "import json; print(len(json.load(open('tests/tests.json'))))"` |
+> | blargg 落盘 ROM | 177 | `find tests/fixtures/blargg -name '*.nes' \| wc -l` |
+> | 当前矩阵 PASS / FAIL | 33 / 6 | 最近一次 `kagamiqa_migration_matrix.json`（`engine.git_rev` 锚定） |
+>
+> **CI 状态**：每次 push 到 `main` / `wip_1.16` 自动触发，产出迁移矩阵 artifact。
+
+> **§0. CI 数字回填纪律（Stage-2 P2-5）**
+>
+> 上面 4 行数字的**唯一可信来源**是 CI 产物：
+> - CTest / manifest 数字 = `ci.yml` 的 ctest 步骤输出
+> - blargg 落盘数字 = `D-1` 清单（`docs/FCEUX11-1.16_blargg_接入清单.md`）
+> - 矩阵 PASS/FAIL = `kagami-qa.yml` 的 `kagamiqa_migration_matrix.json` artifact
+>
+> **禁止手改本文档的数字**。改之前先跑：
+> ```powershell
+> # 1. 重生 matrix
+> & src\rust\target\x86_64-pc-windows-msvc\release\kagami-qa-runner.exe `
+>   --manifest tests\tests.json --bin-dir build-c1\tests --working-dir . `
+>   --output build-c1\kagamiqa_migration_matrix.json
+> # 2. 跑 ctest 列注册测试
+> ctest --test-dir build-c1 -N | Select-String 'Test #' | Measure-Object
+> # 3. 数落盘 ROM
+> (Get-ChildItem -Recurse tests\fixtures\blargg\*.nes).Count
+> # 4. 在同一 commit 里刷新本表 + 更新表头 commit 锚
+> ```
 
 ---
 
@@ -32,7 +60,7 @@ KagamiQA（「鏡」QA）是一个**双通道、零耦合的模拟器精度验�
 │  │  Oracle A     │       │  Oracle B             │ │
 │  │  (软件回归)    │       │  (硬件一致性)          │ │
 │  ├──────────────┤       ├──────────────────────┤ │
-│  │ • 34 CTest   │       │ • 180 blargg ROM     │ │
+│  │ • 34 CTest   │       │ • 177 blargg ROM     │ │
 │  │ • 单元测试    │       │ • $6000 协议         │ │
 │  │ • 回归测试    │       │ • CPU/PPU/APU/MMC3   │ │
 │  │ • 边界测试    │       │ • headless 批处理     │ │
