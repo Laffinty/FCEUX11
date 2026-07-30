@@ -2,14 +2,15 @@
 
 > **版本**：v1.16  
 > **性质**：双 Oracle（Oracle A 回归 + Oracle B 硬件一致性）自动化测试系统  
-> **覆盖率（CI 数字回填快照 — commit `5e55129`）**：
+> **覆盖率（CI 数字回填快照 — commit `ceed00e`）**：
 >
 > | 维度 | 数值 | 来源 |
 > |---|---|---|
-> | CTest 注册测试 | 34 | `ctest -N` 输出（`build-c1/CTestTestfile.cmake`） |
+> | CTest 注册测试 | 34（全 PASS） | `ctest -N` 输出（`build-c1/CTestTestfile.cmake`） |
 > | `tests/tests.json` 清单条目 | 39 | `python -c "import json; print(len(json.load(open('tests/tests.json'))))"` |
 > | blargg 落盘 ROM | 177 | `find tests/fixtures/blargg -name '*.nes' \| wc -l` |
-> | 当前矩阵 PASS / FAIL | 33 / 6 | 最近一次 `kagamiqa_migration_matrix.json`（`engine.git_rev` 锚定） |
+> | `blargg_manifest.json` 条目 | 177（与落盘 1:1，死条目 0） | Stage-2 S-1 清掉 3 个重复死条目后 180 → 177 |
+> | 当前矩阵 PASS / FAIL | 35 / 4 | 最近一次 `kagamiqa_migration_matrix.json`（`engine.git_rev = 623dd39`） |
 >
 > **CI 状态**：每次 push 到 `main` / `wip_1.16` 自动触发，产出迁移矩阵 artifact。
 
@@ -96,14 +97,42 @@ ROM 的典型运行模式：
 2. **写结果**：完成后将结果写入 $6000-$6003，然后进入死循环
 3. **Runner 读取**：emulate N 帧后，通过 `ARead[0x6000]` 读取结果
 
-### 1.4 权威性公式
+### 1.4 权威性口径（Stage-2 §十·五 修订：已废止单一乘积分数）
+
+> ⚠️ **旧公式已作废**，保留于此仅供追溯：
+>
+> ```
+> 权威性 = ROM覆盖率 × Oracle独立性 × CI常驻因子
+> v1.16:  1.00 × 0.50 × 0.50 ≈ 0.25
+> v1.15:  0.13 × 1.00 × 0.00 = 0.00
+> ```
+>
+> **废止理由**（Stage-2 §十·五）：三个因子里只有 ROM 覆盖率是测量量，另两个是二元自评 ——
+> 同一份代码、同一天，作者自评得 `1.00`、审计复评得 `0.25`，**一个能被自己写成满分的数不是度量**。
+> 且「Oracle 独立性」「CI 常驻」本质是**卫生条件**（不满足则结论无效，满足了也不增加真理含量），
+> 把它们乘进权威性等于主张「跑得勤 = 更接近真理」。乘积形式还会让任一因子为 0 时总分归零，
+> 掩盖其余部分的真实进展。
+
+**现行口径：门槛 + 度量分离陈述**
 
 ```
-权威性 = ROM覆盖率 × Oracle独立性 × CI常驻因子
+【卫生门槛】（二元；不满足则以下度量无效）
+  ☑ Oracle A/B 判定通道物理隔离
+  ☑ 判定逻辑与 manifest schema 声明一致
+  ☑ 迁移矩阵不含结构性失真（new_test 桶 + test_set_diff）
+  ☑ 产物可追溯：matrix 带真实 engine.git_rev
+  ☐ CI 常驻，指标由 CI 产物回填而非手写
 
-v1.16:  1.00  × 0.50  × 0.50  ≈ 0.25  (transitioning: baseline solid, CI form correct, migration matrix & in-process in progress)
-v1.15:  0.13  × 1.00  × 0.00  = 0.00  (原型)
+【权威性度量】（仅在全部门槛满足时有意义）
+  外部真理覆盖率 = 177 / 177 blargg ROM（manifest 与落盘 1:1）
+  已知失败清单   = 39 项中 4 项 FAIL，每条含 $6000 码 / 诊断串 / 分类 tag
+  oracle 来源数  = 1（blargg）
 ```
+
+**「oracle 来源数」为什么单列**：当前唯一的外部真理来源是 blargg ROM 套件，因此
+**权威性上限 = 该套件对真实硅片的保真度**。ROM 覆盖率从 13% 提到 100%，只是把这一个来源用尽，
+不会突破它。继续提升权威性的路径是**引入相互独立、可彼此证伪的新来源**（NESdev 其他套件、
+TASVideos 精度表、第二个模拟器差分、真机采集），而非在同一来源里继续堆测试数量。
 
 **权威性不要求 Oracle B 全部 PASS**。精确知道什么失败，比「全绿但不测」更权威。已知失败清单本身就是防线的一部分。
 
@@ -114,7 +143,7 @@ v1.15:  0.13  × 1.00  × 0.00  = 0.00  (原型)
 ### 2.1 快速开始
 
 ```powershell
-# 1. 下载 blargg 测试 ROM（一次性，约 180 个 ROM，~8 MB）
+# 1. 下载 blargg 测试 ROM（一次性，177 个 ROM，~8 MB）
 .\scripts\download_blargg_roms.ps1
 
 # 2. 生成 ROM 清单
@@ -136,10 +165,29 @@ cd tests
   [vbl_02_set_time] 300 frames... FAIL (0x01) 463ms
   ...
 === Blargg Suite Summary ===
-Total:  180
-Passed: 120
-Failed: 60
+Total:  177
+Passed: 121
+Failed: 56
 ```
+
+**56 项失败的分类（2026-07-30 实测，`git_rev=623dd39`）** —— 按 §十·五「已知失败清单每条须含
+错误码 + 诊断串 + 分类标记」的要求：
+
+| `$6000` | 数量 | 含义 | 性质 |
+|---|---|---|---|
+| `0x80` | 12 | **测试仍在运行** —— 该 ROM 的帧预算不够 | 🔧 **harness 问题，非精度缺陷** |
+| `0x81` | 6 | **"Press RESET"** —— ROM 要求在中途复位 | 🔧 **harness 能力缺口**（E-2 已给 runner 加 `--reset-after`，但 `--manifest` 批处理路径尚未逐 ROM 传递） |
+| `0x01`–`0xFE` | 38 | 具体子测试失败（`0x01`×14、`0x02`×11、`0x03`×5、`0x09`×3、其余零星） | ⚠️ **真实精度问题** |
+
+> **重要区分**：56 项里有 **18 项（32%）根本不是模拟精度缺陷**，而是 runner 的帧预算与 reset
+> 能力没喂对 —— 与 S-1 修掉的 `instr_v5_all` 属于同一类错误。把它们和真正的精度失败混在一个
+> "56 failed" 里报出去，会**高估**缺陷面并淹没真问题。真实精度待修面是 **38 项**。
+>
+> 按类目：cpu 17 / apu 15 / mmc3 12 / ppu 10 / 其他 2。
+>
+> **后续（不在 Stage-2 收官范围）**：给 `blargg_manifest.json` 增加逐 ROM 的 `reset_after` 字段并
+> 让 `--manifest` 路径消费它，可一次性收掉 `0x81` 的 6 项；`0x80` 的 12 项则需逐 ROM 校准 `frames`。
+
 
 ### 2.2 运行 Oracle A（CTest 回归）
 
@@ -254,7 +302,7 @@ KagamiQA 的核心组件可以**独立于 FCEUX11 项目**运行，用于测试�
 
 | 组件 | 路径 | 说明 |
 |------|------|------|
-| blargg 测试 ROM | `tests/fixtures/blargg/` | 180 个 ROM（作者 Shay Green，社区惯例可自由用于模拟器测试），$6000 协议 |
+| blargg 测试 ROM | `tests/fixtures/blargg/` | 177 个 ROM（作者 Shay Green，社区惯例可自由用于模拟器测试），$6000 协议 |
 | ROM 下载脚本 | `scripts/download_blargg_roms.ps1` | 从 GitHub 镜像下载，可独立运行 |
 | ROM 清单 | `tests/fixtures/blargg_manifest.json` | JSON 格式，记录每个 ROM 的 path/frames/probe_addr |
 | 已知失败基线 | `tests/fixtures/blargg_known_fail.json` | 版本化的已知失败清单 |
@@ -474,7 +522,7 @@ FCEUX11/
 ├── tests/
 │   ├── tests.json                          ← 39 条测试清单（34 CTest 注册 + 5 纯清单条目）
 │   ├── fixtures/
-│   │   ├── blargg/                         ← 180 blargg ROM (cpu/ppu/apu/mmc3/)
+│   │   ├── blargg/                         ← 177 blargg ROM (cpu/ppu/apu/mmc3/)
 │   │   ├── blargg_manifest.json            ← ROM 清单（name/path/frames/probe_addr）
 │   │   ├── blargg_known_fail.json          ← 已知失败分类（60 条，含 runppu 标记）
 │   │   ├── blargg_full_baseline.json       ← P5 全量基线（120 PASS / 60 FAIL）
@@ -531,5 +579,5 @@ FCEUX11/
 
 ### Q: Direct 模式和 Subprocess 模式什么时候用哪个？
 
-**A:** CI 日常用 **Subprocess**（已足够快，180 ROM 约 2 分钟）。精度调试（如 runppu 重批）用 **Direct**——可以在帧间插入 oracle probe、调整 PPU 参数、捕获中间状态，这是 subprocess 做不到的。
+**A:** CI 日常用 **Subprocess**（已足够快，177 ROM 约 2 分钟）。精度调试（如 runppu 重批）用 **Direct**——可以在帧间插入 oracle probe、调整 PPU 参数、捕获中间状态，这是 subprocess 做不到的。
 

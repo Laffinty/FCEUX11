@@ -138,11 +138,11 @@ FCEUX11 ships **KagamiQA**, a dual-oracle automated quality assurance system tha
 
 详见 [CHANGELOG.md](CHANGELOG.md)。当前稳定版为 **v1.16**。
 
-**v1.16 主要亮点**：KagamiQA 双 Oracle 质量防线正式上线 — 180 个 blargg 测试 ROM 覆盖 CPU/PPU/APU 全子类，每次 push 自动运行 CI 产出迁移矩阵；vbl_01_basics 修复（VBL 周期对齐）；Lua 断言级测试判定；in-process runner 框架就绪（C ABI 直驱 core，target `kagami_qa_direct_runner`）。
+**v1.16 主要亮点**：KagamiQA 双 Oracle 质量防线正式上线 — 177 个 blargg 测试 ROM 覆盖 CPU/PPU/APU 全子类，每次 push 自动运行 CI 产出迁移矩阵；vbl_01_basics 修复（VBL 周期对齐）；Lua 断言级测试判定；in-process runner 框架就绪（C ABI 直驱 core，target `kagami_qa_direct_runner`）。
 
 See [CHANGELOG.md](CHANGELOG.md). Current stable release is **v1.16**.
 
-**v1.16 highlights**: KagamiQA dual-oracle quality defense line deployed — 180 blargg test ROMs covering all CPU/PPU/APU sub-categories, CI auto-runs on every push with migration matrix output; vbl_01_basics fix (VBL cycle alignment); Lua assertion-level test signal; in-process runner pipeline (C ABI direct core drive).
+**v1.16 highlights**: KagamiQA dual-oracle quality defense line deployed — 177 blargg test ROMs covering all CPU/PPU/APU sub-categories, CI auto-runs on every push with migration matrix output; vbl_01_basics fix (VBL cycle alignment); Lua assertion-level test signal; in-process runner pipeline (C ABI direct core drive).
 
 ---
 
