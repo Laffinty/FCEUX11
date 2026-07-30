@@ -1,5 +1,5 @@
 use std::io::Read;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -8,6 +8,45 @@ use crate::core::{ErrorKind, QaConfig, QaError};
 use crate::manifest::schema::TestManifest;
 use crate::oracle::regression::check_expected;
 use super::trait_def::{SutAdapter, TestResult};
+
+/// Build the PATH value to pass to a child process.
+///
+/// Stage-2 P2-3: test binaries depend on Qt DLLs that live in
+/// `bin_dir`. The parent process normally has `bin_dir` in its
+/// PATH, but inheritance is unreliable on Windows (msys/git-bash
+/// path mangling, case-sensitivity, loader step-1 misses). This
+/// helper explicitly prepends `bin_dir` to the parent PATH so the
+/// child can find its sibling DLLs.
+///
+/// `parent_path_override` is an internal seam for tests; production
+/// callers pass `None` to use the current process's PATH.
+fn build_child_path(
+    bin_dir: &Path,
+    parent_path_override: Option<&std::ffi::OsStr>,
+) -> std::ffi::OsString {
+    let mut p = std::ffi::OsString::from(bin_dir);
+    let parent: Option<std::ffi::OsString> = match parent_path_override {
+        Some(s) => {
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_os_string())
+            }
+        }
+        None => std::env::vars_os().find_map(|(k, v)| {
+            if k.to_ascii_uppercase() == "PATH" {
+                Some(v)
+            } else {
+                None
+            }
+        }),
+    };
+    if let Some(parent) = parent {
+        p.push(";");
+        p.push(parent);
+    }
+    p
+}
 
 /// Adapter that runs tests as subprocesses (wrapping existing CTest binaries).
 pub struct SubprocessAdapter {
@@ -67,9 +106,36 @@ impl SutAdapter for SubprocessAdapter {
             .map(PathBuf::from)
             .unwrap_or_else(|| self.default_working_dir.clone());
 
+        // Stage-2 P2-3: matrix subprocess DLL injection fix.
+        //
+        // Test binaries (e.g. fceux11_lua_runner.exe) depend on Qt DLLs
+        // that live in `bin_dir`. The parent process normally has
+        // `bin_dir` in its PATH (set by do_build.ps1 before invoking
+        // kagami-qa-runner), but inheritance to subprocesses is
+        // unreliable on Windows:
+        //   - msys/git-bash pre-pends unix-style path entries that
+        //     Windows loader silently drops;
+        //   - env var case ("Path" vs "PATH") makes inheritance
+        //     inconsistent across shell launches;
+        //   - the loader's step-1 (exe directory) sometimes misses
+        //     when bin_path was resolved as a relative path.
+        //
+        // Symptom before this fix: matrix reports
+        //   lua_joypad_test / lua_memory_test → STATUS_DLL_NOT_FOUND
+        //   (0xC0000135), even though direct cmd.exe execution from
+        //   the project root succeeds.
+        //
+        // Fix: read the parent PATH case-insensitively, prepend
+        // `bin_dir` with the Windows `;` separator, and pass the
+        // joined value to the child explicitly via .env("PATH", …).
+        // This is additive — existing PATH entries are preserved,
+        // so non-Qt tests (cmd, powershell) are unaffected.
+        let child_path = build_child_path(&self.bin_dir, None);
+
         let mut child = Command::new(&bin_path)
             .args(&test.input.args)
             .current_dir(&cwd)
+            .env("PATH", &child_path)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
@@ -183,9 +249,48 @@ impl SutAdapter for SubprocessAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::ffi::OsStr;
     use crate::manifest::schema::{
         ExpectedResult, FailureSeverity, OracleType, TestInput, TestLayer,
     };
+
+    // Stage-2 P2-3: PATH construction helper unit tests.
+    // The build_child_path helper is the single source of truth for
+    // child-process PATH composition. These tests pin its contract:
+    //  - bin_dir is always present as the first path entry
+    //  - the parent PATH (if any) follows after a `;` separator
+    //  - when no parent PATH exists, only bin_dir is returned
+    #[test]
+    fn build_child_path_with_parent() {
+        let bin = Path::new(r"D:\Project\FCEUX11\build-c1\tests");
+        let parent = OsStr::new(r"C:\Windows\System32;C:\Windows");
+        let out = build_child_path(bin, Some(parent));
+        let s = out.to_string_lossy().into_owned();
+        assert!(
+            s.starts_with(r"D:\Project\FCEUX11\build-c1\tests;"),
+            "bin_dir must be first; got: {s}"
+        );
+        assert!(s.contains("C:\\Windows\\System32"));
+        assert!(s.contains("C:\\Windows"));
+    }
+
+    #[test]
+    fn build_child_path_no_parent() {
+        let bin = Path::new("/tmp/bin");
+        let out = build_child_path(bin, Some(OsStr::new("")));
+        let s = out.to_string_lossy().into_owned();
+        assert_eq!(s, "/tmp/bin");
+    }
+
+    #[test]
+    fn build_child_path_empty_parent_uses_env() {
+        // parent_path_override = Some("") means "use empty parent" — i.e.
+        // empty parent is an explicit choice, distinct from None which
+        // means "read from env". This pins that distinction.
+        let bin = Path::new("/x");
+        let out = build_child_path(bin, Some(OsStr::new("")));
+        assert_eq!(out.to_string_lossy(), "/x");
+    }
 
     #[test]
     fn test_binary_not_found() {
