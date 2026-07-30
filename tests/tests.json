@@ -383,39 +383,39 @@
   },
   "blargg_cpu_instrs": {
     "id": "blargg_cpu_instrs",
-    "description": "blargg CPU all instructions (all_instrs) — $6000 protocol [D-2 advisory: source ROM not in tree]",
+    "description": "blargg CPU all instructions (instr_test-v5 all_instrs) — $6000 protocol",
     "oracle_type": "B",
     "layer": "core",
     "input": {
       "binary": "fceux11_blargg_runner",
-      "args": ["--rom", "fixtures/blargg/cpu/all_instrs.nes", "--frames", "300"],
+      "args": ["--rom", "fixtures/blargg/cpu/instr_v5_all.nes", "--frames", "3000"],
       "working_dir": "tests",
-      "rom": "fixtures/blargg/cpu/all_instrs.nes",
+      "rom": "fixtures/blargg/cpu/instr_v5_all.nes",
       "probe_addr": 24576
     },
     "expected": { "exit_code": 0 },
-    "timeout_seconds": 30,
-    "tags": ["blargg", "cpu", "oracle-b", "rom-missing-in-tree"],
-    "failure_means": "advisory",
-    "provenance": "blargg instr_test-v5 | D-2: source ROM absent from tests/fixtures/blargg/cpu/all_instrs.nes (see docs/FCEUX11-1.16_blargg_接入清单.md); demoted to advisory until re-fetched."
+    "timeout_seconds": 60,
+    "tags": ["blargg", "cpu", "oracle-b"],
+    "failure_means": "blocking",
+    "provenance": "blargg instr_test-v5 all_instrs.nes | S-1 2026-07-30: the ROM was never missing — it is on disk as instr_v5_all.nes (download_blargg_roms.ps1 naming). Old 300-frame budget returned 0x80 (still running); measured PASS (0x00) at 3000 frames in ~4.8s. Promoted back to blocking."
   },
   "blargg_cpu_timing": {
     "id": "blargg_cpu_timing",
-    "description": "blargg CPU instruction timing test — $6000 protocol [D-2 advisory: source ROM not in tree]",
+    "description": "blargg CPU instruction timing test (cpu_timing_test6) — $6000 protocol",
     "oracle_type": "B",
     "layer": "core",
     "input": {
       "binary": "fceux11_blargg_runner",
-      "args": ["--rom", "fixtures/blargg/cpu/cpu_timing_test.nes", "--frames", "500"],
+      "args": ["--rom", "fixtures/blargg/cpu/cpu_timing_test6.nes", "--frames", "500"],
       "working_dir": "tests",
-      "rom": "fixtures/blargg/cpu/cpu_timing_test.nes",
+      "rom": "fixtures/blargg/cpu/cpu_timing_test6.nes",
       "probe_addr": 24576
     },
     "expected": { "exit_code": 0 },
     "timeout_seconds": 30,
-    "tags": ["blargg", "cpu", "timing", "oracle-b", "rom-missing-in-tree"],
-    "failure_means": "advisory",
-    "provenance": "blargg cpu_timing_test6 | D-2: source ROM absent from tests/fixtures/blargg/cpu/cpu_timing_test.nes (see docs/FCEUX11-1.16_blargg_接入清单.md); demoted to advisory until re-fetched."
+    "tags": ["blargg", "cpu", "timing", "oracle-b"],
+    "failure_means": "blocking",
+    "provenance": "blargg cpu_timing_test6 | S-1 2026-07-30: ROM on disk as cpu_timing_test6.nes; measured PASS (0x00) at 300 frames. Promoted back to blocking."
   },
   "blargg_ppu_vbl_nmi": {
     "id": "blargg_ppu_vbl_nmi",

@@ -422,14 +422,6 @@
       "description": "blargg test ROM: volume_test [apu]"
     },
     {
-      "name": "all_instrs",
-      "path": "fixtures/blargg/cpu/all_instrs.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: all_instrs [cpu]"
-    },
-    {
       "name": "branch_backward",
       "path": "fixtures/blargg/cpu/branch_backward.nes",
       "category": "cpu",
@@ -572,14 +564,6 @@
       "frames": 300,
       "probe_addr": 24576,
       "description": "blargg test ROM: cpu_test5_official [cpu]"
-    },
-    {
-      "name": "cpu_timing_test",
-      "path": "fixtures/blargg/cpu/cpu_timing_test.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: cpu_timing_test [cpu]"
     },
     {
       "name": "cpu_timing_test6",
@@ -801,17 +785,17 @@
       "name": "instr_v5_all",
       "path": "fixtures/blargg/cpu/instr_v5_all.nes",
       "category": "cpu",
-      "frames": 300,
+      "frames": 3000,
       "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v5_all [cpu]"
+      "description": "blargg test ROM: instr_v5_all [cpu] (S-1: needs 3000 frames; 300 returns 0x80 still-running)"
     },
     {
       "name": "instr_v5_official",
       "path": "fixtures/blargg/cpu/instr_v5_official.nes",
       "category": "cpu",
-      "frames": 300,
+      "frames": 3000,
       "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v5_official [cpu]"
+      "description": "blargg test ROM: instr_v5_official [cpu] (S-1: needs 3000 frames; 300 stops at 'Running test 4 of 16')"
     },
     {
       "name": "nes_instr_01_implied",
@@ -900,14 +884,6 @@
       "frames": 300,
       "probe_addr": 24576,
       "description": "blargg test ROM: nes_instr_11_special [cpu]"
-    },
-    {
-      "name": "official_only",
-      "path": "fixtures/blargg/cpu/official_only.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: official_only [cpu]"
     },
     {
       "name": "mmc3_1_clocking",
