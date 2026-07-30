@@ -2,7 +2,39 @@
 
 状态：**调查阶段第 2 轮（fresh 构建）**。本文记录两次会话的实测与结论，
 先前 §1/§3 多项已**被推翻**，接手前先读 §0 与 §6 的「不要照抄」清单。
-代码未做任何行为改动 —— `src/ppu_rendering.cpp` 的 VBL 段仍是 `9998b2b` 的配置。
+
+## §-1. 修复尝试记录
+
+### 2026-07-30 session：1-cycle NMI delay（已回退，未提交）
+
+**假设**：blargg 05_nmi_timing 期望 NMI 在 VBL set 后**第 2 CPU cycle**
+触发；当前实现是立即触发（cycle 0），导致所有行数值偏 1。
+
+**实测**：在 `src/ppu_rendering.cpp` 的「Working config」（普通）VBL
+路径给 `if (VBlankON) TriggerNMI()` 加 1 cycle delay。
+
+| 测试 | 修复前 | 修复后 |
+|---|---|---|
+| 01_basics | PASS | PASS |
+| 04_nmi_control | PASS | PASS |
+| rom_regression_test | PASS | PASS |
+| golden_savestate_test | PASS | PASS |
+| **05_nmi_timing** | FAIL 行 00-06 = "1"、07-09 = "0" | FAIL 行 00-01 = "2"、02-07 = "1"、08-09 = "0" |
+
+**结论**：**简单 linear shift 不能修 05**。该 ROM 每行测试不同 timing
+组合，相同 1-cycle 偏移在不同行产生**不同**结果（行 00-01 满足、02-07
+仍错）。"deliver at cycle X" 不是单一参数问题。
+
+**修正后的修复策略**：
+1. 先读 blargg 05 内部每行的具体 timing 序列
+2. 把 NMI 触发时机作为显式 cycle+dot 参数（非「立即 / +1」二分）
+3. 同时考虑 `$2002` 读点相位（blargg sync_vbl 用）
+4. 每次改一处，独立回归 01 / 04 / Oracle A / 05 单条
+
+完整记录见 `memory/e1-step2-attempt-2026-07-30.md`。
+代码 HEAD = 当前 release branch tip，PPU 段无变化。
+
+
 
 ## 0. 最重要的一条：增量构建的 exe 可能比源码旧好几个 commit
 
