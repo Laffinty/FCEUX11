@@ -229,6 +229,22 @@ $env:VCPKG_ROOT = "$PWD\vcpkg"
 rustup default stable-x86_64-pc-windows-msvc
 ```
 
+### 7.7 裸 `cmake --build` 报 `C1083 <cstdio>: No such file` 或 `fatal error C1034: stdafx.h`
+
+**原因**：直接 `cmake --build build-c1`（没有走 `do_build.ps1`）时，vcvars 没有被加载，
+`cl.exe` / `Windows SDK` 不在 `PATH` / `INCLUDE` / `LIB` 上，编译器找不到标准头文件。
+常见于：① 从裸 Git Bash 跑 `cmake --build`；② 在 PowerShell 里手动 `cmake --build` 但没先
+跑过 vcvars。
+
+**解决**：**始终用 `do_build.ps1` 触发构建**——它会探测 `vcvarsall.bat`、把 `cl.exe`、
+MSVC include/lib 目录、vcpkg toolchain 一次性注入当前进程的环境，再调 `cmake`。如果
+一定要手工分步（仅用于调试），按 §8.4 的步骤 1~2 先把 vcvars 加载完，且后续全部命令
+**在同一个 PowerShell 会话里**执行（`vcvarsall.bat` 只修改当前 shell 状态，不会持久化）。
+
+> 这一条是 Stage-2 P2-4 的清扫记录：早期 `do_build.ps1` 没有明确写出"为什么要用它"，导致
+> 接手者从 git-bash 复制 `cmake --build` 命令行，触发 C1083。正确做法是任何本地构建都
+> 走 `do_build.ps1`，CI 的 `ci.yml` 已经走同一条路径并始终通过。
+
 ---
 
 ## 8. 高级选项
@@ -257,7 +273,7 @@ cmake --build build
 
 ### 8.4 手动分步编译（不用一键脚本）
 
-> **推荐**：直接使用 [`.\scripts\do_build.ps1 -Config Release`](#4-编译) —— 它已经按顺序完成环境探测、配置、编译、测试四步，并自动选择受支持的 Ninja + MSVC 工具链。
+> **⚠️ 推荐**：直接使用 [`.\scripts\do_build.ps1 -Config Release`](#4-编译) —— 它已经按顺序完成 vcvars 加载、vcpkg toolchain 注入、Ninja 探测、CMake 配置、编译、测试六步，并自动选择受支持的 Ninja + MSVC 工具链。**不要**在裸 Git Bash 或未加载 vcvars 的 PowerShell 里直接 `cmake --build`——会触发 C1083 `<cstdio>` 等标准头文件找不到的错（见 §7.7）。
 >
 > 若确有分步需求（例如调试 CMake configure 阶段），按下方手动加载 MSVC 环境后，直接用对应 cmake 命令：
 
