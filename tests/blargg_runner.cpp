@@ -45,6 +45,11 @@
 // ---------------------------------------------------------------------------
 
 static int g_init_count = 0;
+/// Stage-2 PR E-2: --reset-after N sets g_reset_after_frames = N.
+/// After running N frames, the runner calls fceu11::ResetNES() so ROMs
+/// that gate their actual test behind a manual reset (apu_reset_*,
+/// mmc3_irq*) can complete. Default -1 = disabled (legacy behaviour).
+static int g_reset_after_frames = -1;
 
 static bool core_init() {
     if (g_init_count++ == 0) {
@@ -167,10 +172,24 @@ static SingleResult run_one_rom(const char* rom_path, int frames) {
         return res;
     }
 
-    // Run frames. Blargg ROMs are self-checking — they write PASS/FAIL to
-    // $6000-$6003 and then loop. The frame count is tuned so the ROM has
-    // time to complete its test sequence and write the result.
-    emulate_n(frames);
+    // Stage-2 Phase E / PR E-2 + E-3 root cause: many blargg ROMs (notably
+    // apu_reset_* / mmc3_irq*) require a manual soft-reset AFTER power-on
+    // to enter their actual test. Without it, the ROM displays "Press
+    // RESET" and writes $6000=0x81 forever, which the runner previously
+    // mis-reported as FAIL. If --reset-after N is set, run N frames, then
+    // ResetNES(), then run the remaining frames.
+    if (frames > 0 && g_reset_after_frames >= 0
+        && g_reset_after_frames < frames)
+    {
+        emulate_n(g_reset_after_frames);
+        fceu11::ResetNES();
+        emulate_n(frames - g_reset_after_frames);
+    } else {
+        // Run frames. Blargg ROMs are self-checking — they write PASS/FAIL to
+        // $6000-$6003 and then loop. The frame count is tuned so the ROM has
+        // time to complete its test sequence and write the result.
+        emulate_n(frames);
+    }
 
     // Read $6000-$6003. We read AFTER the full frame run because blargg
     // ROMs run their tests during NMI / game loop and the result is
@@ -185,8 +204,15 @@ static SingleResult run_one_rom(const char* rom_path, int frames) {
 
     // Read diagnostic string from $6004+ if the test failed.
     // Blargg instr_test ROMs write error detail (opcode + expected/actual) here.
+    // We sample twice (now, and again 1 frame later) because some ROMs
+    // overwrite the text AFTER writing $6000 — without the second sample
+    // we'd see only a partial / empty detail. PR E-2.
     if (!res.passed) {
         res.diag_string = read_probe_string(0x6004);
+        if (res.diag_string.empty()) {
+            emulate_n(1);
+            res.diag_string = read_probe_string(0x6004);
+        }
     }
 
     fceu11::CloseGame();
@@ -380,6 +406,9 @@ int main(int argc, char** argv) {
             frames = std::atoi(argv[++i]);
         } else if (std::strcmp(argv[i], "--manifest") == 0 && i + 1 < argc) {
             manifest_path = argv[++i];
+        } else if (std::strcmp(argv[i], "--reset-after") == 0 && i + 1 < argc) {
+            // Stage-2 PR E-2: press RESET after N frames, then continue.
+            g_reset_after_frames = std::atoi(argv[++i]);
         } else if (argv[i][0] != '-') {
             // Positional: first arg = rom_path, second = frames (for backward compat).
             if (!rom_path) {
@@ -430,9 +459,13 @@ int main(int argc, char** argv) {
     // -----------------------------------------------------------------------
     if (!rom_path) {
         std::fprintf(stderr,
-            "Usage: fceux11_blargg_runner --rom <path> [--frames N]\n"
+            "Usage: fceux11_blargg_runner --rom <path> [--frames N] [--reset-after N]\n"
             "       fceux11_blargg_runner --manifest <path.json>\n"
-            "       fceux11_blargg_runner <rom_path> [frames]\n");
+            "       fceux11_blargg_runner <rom_path> [frames]\n"
+            "\n"
+            "--reset-after N: press RESET after N frames, then continue.\n"
+            "                 Required for apu_reset_* / mmc3_irq_* ROMs that\n"
+            "                 wait for a manual soft-reset before their test runs.\n");
         return 1;
     }
 
