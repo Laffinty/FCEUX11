@@ -419,12 +419,12 @@
   },
   "blargg_ppu_vbl_nmi": {
     "id": "blargg_ppu_vbl_nmi",
-    "description": "blargg PPU VBL NMI timing test — $6000 protocol [E-1 advisory: 02-vbl_set_time returns 0x80; rebalance pending]",
+    "description": "blargg PPU VBL NMI timing test — $6000 protocol [E-1 advisory, fresh survey 2026-07-30: 03/09 PASS, 02/05/06/07/08 FAIL 0x01 with diagnostic, 10 FAIL 0x03 'clock skipped too late'; per-ROM VBL/NMI edge-timing fix pending; see docs/FCEUX11-1.16_E-1-VBL调查记录.md]",
     "oracle_type": "B",
     "layer": "core",
     "input": {
       "binary": "fceux11_blargg_runner",
-      "args": ["--rom", "fixtures/blargg/ppu/ppu_vbl_nmi.nes", "--frames", "300"],
+      "args": ["--rom", "fixtures/blargg/ppu/ppu_vbl_nmi.nes", "--frames", "600"],
       "working_dir": "tests",
       "rom": "fixtures/blargg/ppu/ppu_vbl_nmi.nes",
       "probe_addr": 24576
@@ -433,7 +433,7 @@
     "timeout_seconds": 30,
     "tags": ["blargg", "ppu", "oracle-b", "e1-pending"],
     "failure_means": "advisory",
-    "provenance": "blargg ppu_tests-v1.1 | E-1: 02-vbl_set_time returns 0x80 (VBL period too long); demoted to advisory until ppu_rendering.cpp VBL cycle count is rebalanced."
+    "provenance": "blargg ppu_tests-v1.1 | E-1 (closed at survey 2026-07-30, plan-only): fresh build shows VBL period correct (period=6820 398/398 frames); failures are per-ROM edge-timing — 02 VBL set +1 row, 05 NMI delivery +1 cycle, 06 suppression/VBL-clear, 07/08 NMI gating, 10 even-odd flag; demoted to advisory until ppu_rendering.cpp edge timing is tuned. Recommended fix order per doc §4: 05 → 02 → 06/07/08 → 10, each step regression-gated by 01/04 + Oracle A (rom_regression_test, golden_savestate_test)."
   },
   "blargg_suite": {
     "id": "blargg_suite",

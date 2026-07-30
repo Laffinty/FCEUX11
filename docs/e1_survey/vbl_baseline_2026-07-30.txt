@@ -1,0 +1,110 @@
+=== vbl_01_basics ===
+  exit=0
+  | BLARGG_RESULT: rom=vbl_01_basics.nes addr=0x6000 value=0x00 diag=[0xDE,0xB0,0x61] status=PASS duration_ms=920
+=== vbl_02_set_time ===
+  exit=1
+  | BLARGG_RESULT: rom=vbl_02_set_time.nes addr=0x6000 value=0x01 diag=[0xDE,0xB0,0x61] status=FAIL duration_ms=925 diag_string="T+ 1 2
+  | 00 - V
+  | 01 - V
+  | 02 - V
+  | 03 - V
+  | 04 - V
+  | 05 V -
+  | 06 V -
+  | 07 V -
+  | 08 V -
+  | 
+  | 4103C340
+  | 02-vbl_set_time
+  | 
+  | Failed
+  | "
+=== vbl_03_clear_time ===
+  exit=0
+  | BLARGG_RESULT: rom=vbl_03_clear_time.nes addr=0x6000 value=0x00 diag=[0xDE,0xB0,0x61] status=PASS duration_ms=914
+=== vbl_04_nmi_control ===
+  exit=0
+  | BLARGG_RESULT: rom=vbl_04_nmi_control.nes addr=0x6000 value=0x00 diag=[0xDE,0xB0,0x61] status=PASS duration_ms=911
+=== vbl_05_nmi_timing ===
+  exit=1
+  | BLARGG_RESULT: rom=vbl_05_nmi_timing.nes addr=0x6000 value=0x01 diag=[0xDE,0xB0,0x61] status=FAIL duration_ms=922 diag_string="00 2
+  | 01 1
+  | 02 1
+  | 03 1
+  | 04 1
+  | 05 1
+  | 06 1
+  | 07 0
+  | 08 0
+  | 09 0
+  | 
+  | D688789E
+  | 05-nmi_timing
+  | 
+  | Failed
+  | "
+=== vbl_06_suppression ===
+  exit=1
+  | BLARGG_RESULT: rom=vbl_06_suppression.nes addr=0x6000 value=0x01 diag=[0xDE,0xB0,0x61] status=FAIL duration_ms=921 diag_string="00 - N
+  | 01 - N
+  | 02 - N
+  | 03 - N
+  | 04 - N
+  | 05 V N
+  | 06 V N
+  | 07 V N
+  | 08 V N
+  | 09 V N
+  | 
+  | 3FE15516
+  | 06-suppression
+  | 
+  | Failed
+  | "
+=== vbl_07_nmi_on_timing ===
+  exit=1
+  | BLARGG_RESULT: rom=vbl_07_nmi_on_timing.nes addr=0x6000 value=0x01 diag=[0xDE,0xB0,0x61] status=FAIL duration_ms=915 diag_string="00 N
+  | 01 N
+  | 02 N
+  | 03 N
+  | 04 N
+  | 05 N
+  | 06 -
+  | 07 -
+  | 08 -
+  | 
+  | 2B1F5269
+  | 07-nmi_on_timing
+  | 
+  | Failed
+  | "
+=== vbl_08_nmi_off_timing ===
+  exit=1
+  | BLARGG_RESULT: rom=vbl_08_nmi_off_timing.nes addr=0x6000 value=0x01 diag=[0xDE,0xB0,0x61] status=FAIL duration_ms=929 diag_string="03 -
+  | 04 -
+  | 05 N
+  | 06 N
+  | 07 N
+  | 08 N
+  | 09 N
+  | 0A N
+  | 0B N
+  | 0C N
+  | 
+  | 4CC88927
+  | 08-nmi_off_timing
+  | 
+  | Failed
+  | "
+=== vbl_09_even_odd_frames ===
+  exit=0
+  | BLARGG_RESULT: rom=vbl_09_even_odd_frames.nes addr=0x6000 value=0x00 diag=[0xDE,0xB0,0x61] status=PASS duration_ms=912
+=== vbl_10_even_odd_timing ===
+  exit=1
+  | BLARGG_RESULT: rom=vbl_10_even_odd_timing.nes addr=0x6000 value=0x03 diag=[0xDE,0xB0,0x61] status=FAIL duration_ms=928 diag_string="08 07 
+  | Clock is skipped too late, relative to enabling BG
+  | 
+  | 10-even_odd_timing
+  | 
+  | Failed #3
+  | "
