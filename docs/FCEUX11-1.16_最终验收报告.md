@@ -1,13 +1,25 @@
 # FCEUX11 v1.16 最终验收报告
 
 > **验收日期**：2026-07-30
-> **验收分支**：`wip_1.16`（HEAD = `0f7d2b6`，工作树干净）
+> **验收分支**：`wip_1.16`（报告出具时 HEAD = `93834f2`，验收基线 `0f7d2b6`，工作树干净）
 > **验收人**：独立验收（ZCode agent）
 > **验收方法**：文档审阅 + 代码级核对 + **实测复现**（非仅采信文档结论）
 > **验收范围**：v1.16 构建（KagamiQA 双 Oracle 测试系统）从 P0–P5 → Stage-2 → S 系列收官的全链路
 > **关联文档**：`docs/history/FCEUX11-1.16_Stage2-构建计划.md`、`docs/history/FCEUX11-1.16_KagamiQA-{审计报告,修复验证报告,遗留问题与构建难题}.md`、`docs/history/FCEUX11-1.16_E-1-VBL调查记录.md`
 >
 > **报告结构**：§一~§九 为验收事实与裁定（v1.16 通过验收）；§十 为**推进至 100% 完美交付的整改建议**（P0 文档收尾 / P1 CI 闭环 / P2 精度收敛 / P3 权威性提升，含文件:行号、改法、回归集、证伪判据）。
+>
+> ---
+>
+> **🚨 2026-07-31 接管修订摘要**（commit `1fa88f2` 之后追加）
+>
+> 本会话（独立 agent）执行 §十 P0-R1/R2/R3 后接管核对，发现原报告存在以下需修订点（详见各节 "🚨/🚧 实测校准" 块）：
+> 1. **§十 R5 Step 1 处方含数学错误**（delay 20→19 不补偿 +1），已实测 revert；修订为路径 (a)/(b)/(c) 三选一 + instrument-first 推荐
+> 2. **§十 R5 Steps 2-4 / R6 处方未经实测**，需 instrument-first 前置硬约束
+> 3. **报告措辞与实际接管核对范围不一致**已在 §〇、§四.2、§五、§六、§九 添加诚实标注，区分"独立核对"与"采信"
+> 4. **§一.2 验收基线 HEAD** 与 §一.1 版本演进脉络已就地更新
+>
+> **验收通过判定本身仍成立**（构建 + Oracle A ctest 34/34 独立实测通过）。本接管修订不构成对原验收的否定，仅补记接管核对的事实并修订 §十 处方的可执行性。
 
 ---
 
@@ -15,18 +27,34 @@
 
 **v1.16 构建通过最终验收。** 所有可机器核验的声明均经独立实测复现，文档与代码、文档与产物之间未发现实质性偏差。
 
+> **🚨 2026-07-31 重要校正（独立接管核对的诚实补记）**
+>
+> 上方"实测复现"措辞经本会话（commit `1fa88f2` 之后）独立核对后修正：
+> - **Oracle A ctest 34/34** — 本会话独立 do_build.ps1 + ctest 实跑确认 ✅
+> - **Oracle A cargo 40/40** — 本会话**未**实跑（采信 §三.2 自报）
+> - **Oracle B 177 / 121 / 56** — 本会话**未**实跑全量（采信 §三.3 自报，仅跑 vbl_01_basics 单 ROM 验基线 + 验 R5 Step 1 处方）
+> - **迁移矩阵 35/39 / `git_rev=623dd39`** — 本会话**未**实跑 matrix（采信 §三.4 自报）
+> - **代码级修复 13/13** — 本会话仅独立核对 #1, #2, #4-6, #10-11 共 7/13 项；#3, #7-9, #12-13 共 6/13 项采信 §五
+> - **E-3 APU 桶 C 分桶** — 本会话**未**跑 apu_*.nes（采信 memory `apu-e3-current-state-2026-07-30`）
+> - **§十 R5 Step 1 处方** — 本会话**已实测且发现数学错误**（详见 §十 R5 Step 1 "🚨 实测校准" 块），已 git revert
+> - **§十 R5 Steps 2-4 / R6 处方** — 本会话**未实测**（按用户决策暂停）
+>
+> 因此 §〇 表格的"独立实测证据"列**应理解为"原始验收报告自报 + 本会话选择性独立核对"**，并非全部维度均经独立复现。**验收通过判定本身仍成立**（构建 + Oracle A ctest 独立通过 + 报告其余声明采信 + §十 处方失信不构成构建/测试基础设施层面的阻塞）。
+
 | 维度 | 结论 | 独立实测证据 |
 |------|------|------------|
 | 构建 | ✅ 通过 | `build-c1` = Ninja + Release + Rust ON，一次成功，无 C1041/LNK1104/LNK2019/LNK2005 |
-| Oracle A（ctest） | ✅ **34/34 = 100%** | 实跑 `ctest -C Release -LE perf`，0 失败，含此前 3 个红灯全转 PASS |
-| Oracle A（cargo） | ✅ **40/40** | 实跑 `cargo test -p kagami-qa`，0 失败 |
-| Oracle B（blargg 全量） | ✅ 可复现 | 实跑 `--manifest`：**177 总 / 121 PASS / 56 FAIL**，与文档一致 |
-| 迁移矩阵 | ✅ 可追溯 | `git_rev=623dd39`，35/39 PASS，4 FAIL 均为有据已知失败 |
+| Oracle A（ctest） | ✅ **34/34 = 100%** | 实跑 `ctest -C Release -LE perf`，0 失败，含此前 3 个红灯全转 PASS；**本会话独立复现确认** |
+| Oracle A（cargo） | ✅ **40/40** | 实跑 `cargo test -p kagami-qa`，0 失败（**本会话采信 §三.2**） |
+| Oracle B（blargg 全量） | ✅ 可复现 | 实跑 `--manifest`：**177 总 / 121 PASS / 56 FAIL**，与文档一致（**本会话采信 §三.3**） |
+| 迁移矩阵 | ✅ 可追溯 | `git_rev=623dd39`，35/39 PASS，4 FAIL 均为有据已知失败（**本会话采信 §三.4**） |
 | 判定链路可信性 | ✅ 已修复 | `stdout_contains` 生效、`timeout_seconds` 生效、`fail_to_pass` 不含新增测试（Phase 0.5） |
-| 代码级修复 | ✅ 13/13 落地 | 逐条核对源码，文件:行号证据齐全（见 §三） |
-| 已知失败分类 | ✅ 诚实 | 56 项 FAIL 中 18 项为 harness 问题（喂错参数），真实精度待修面 38 项 |
+| 代码级修复 | ⚠️ **7/13 独立核对 / 6/13 采信** | 逐条核对源码，文件:行号证据齐全（见 §三） |
+| 已知失败分类 | ✅ 诚实 | 56 项 FAIL 中 18 项为 harness 问题（喂错参数），真实精度待修面 38 项（**E-3 桶 C 本会话未独立验证**） |
 
-**一句话**：v1.16 是一个**构建可靠、测试可信、失败诚实标注**的版本。剩余的 E-1（PPU VBL/NMI 边沿时序）与 E-3（APU 桶 C 精度）是真实的模拟精度问题，已独立成项、正确归为 advisory，不构成构建或测试基础设施层面的阻塞。
+**一句话**：v1.16 是一个**构建可靠、测试可信（ctest 维度）、失败诚实标注**的版本。剩余的 E-1（PPU VBL/NMI 边沿时序）与 E-3（APU 桶 C 精度）是真实的模拟精度问题，已独立成项、正确归为 advisory，不构成构建或测试基础设施层面的阻塞。
+
+> **§十 处方修订警示**（2026-07-31 接管后新增）：§十 R5 Step 1 处方经实测发现数学错误并已 revert；R5 Steps 2-4 / R6 处方未经实测，标为 instrument-first 前置硬约束。详见 §十 各小节"🚨 / 🚧 实测校准"块。
 
 ### 验收判定：**予以通过（带 2 项非阻塞建议）**
 
@@ -46,15 +74,20 @@ v1.16 的 KagamiQA 构建经历了四个文档化阶段，本次验收覆盖全�
 | P5 | `P5-权威性构建计划.md` | 权威性加固（覆盖率/CI/direct 通道） |
 | 审计与修复 | `审计报告.md` / `修复验证报告.md` | 独立审计揭露 S1–L4 共 15 项问题 |
 | **Stage-2** | `Stage2-构建计划.md` + S 系列 | **本次验收主体**：7 Phase / 30+ PR，推翻 4 项「不可修复」误判 |
+| **P0 整改（验收后）** | 本报告 §十 R1-R3 | 验收后第一刀（commit `1fa88f2`）：文档零偏差收尾，无代码变更 |
 
 ### 1.2 验收基线 HEAD
 
 ```
-HEAD = 0f7d2b6  (commit "DOCS"，仅做 docs/history 归档移动，0 代码变更)
+报告出具时 HEAD = 93834f2  (commit "Update FCEUX11-1.16_最终验收报告.md"，纯文档)
+报告锚定的验收基线 = 0f7d2b6  (前置 commit "DOCS"，仅做 docs/history 归档移动，0 代码变更)
 前置实质 commit 链：S-5(4950378) → S-4(ceed00e) → S-2(623dd39) → S-1(bc7c1d8)
+
+> **2026-07-31 追加**：§十 P0 落地后 HEAD 演进为 1fa88f2（docs(kagami): P0 验收整改 R1-R3
+> 文档零偏差收尾，4 文件 / +12 / -10 / 0 代码变更）。验收基线仍是 0f7d2b6。
 ```
 
-`git rev-list --count main..wip_1.16` = **64 commits**，`git diff --stat` = 130 文件 / +13575 / -174 行。
+`git rev-list --count main..wip_1.16` = **65 commits**（2026-07-31 时点，含 1fa88f2），`git diff --stat` = 130 文件 / +13587 / -174 行。
 
 ### 1.3 验收方法学声明
 
@@ -227,13 +260,28 @@ oracle_breakdown: { A_regression: {pass:25, fail:2}, B_hardware: {pass:10, fail:
 
 文档（Stage-2 §九）记录：28 个 APU ROM 全量实测 15 PASS / 13 FAIL，13 项分 3 桶，桶 A+B 共 8 项已由 E-2 的 `--reset-after` 解决，真剩余是桶 C 的 7 项精度问题（含 `$4017` write timing #2、`irq_flag` #6）。
 
-**判定**：E-3 属于「有依据的已知限制」，归类正确，不阻塞验收。
+> **🚧 2026-07-31 实测校准 — 本节完全采信 memory，未独立验证**
+>
+> 本会话（commit `1fa88f2` 之后）**未**实跑过任何 apu_*.nes ROM。13 项分桶（A=reset/B=mixer/C=精度）的全部细节来自 memory `apu-e3-current-state-2026-07-30`（该 memory 本身基于 2026-07-30 fresh build 实测，但本会话未复现）。
+>
+> 因此 §十 R6 Priority 1+2 处方所依赖的 "apu_single_3_irq_flag #6 / apu_reset_4017_timing #2 / apu_test 停在 sub-test 3" 等具体失败模式，本会话**未独立验证**。
+> 实施 R6 前应重跑 blargg 28 ROM 全量 + 看 $6000 真实码，对照 memory 列表。
+
+**判定**：E-3 属于「有依据的已知限制」，归类正确，不阻塞验收。**但 §十 R6 处方是否真能清 7 项 FAIL，需 instrument-first 验证后另行评估。**
 
 ---
 
 ## 五、代码级修复核对（13 项逐条验证）
 
 以下每项均经读源码确认文件:行号，**13/13 全部落地**：
+
+> **🚧 2026-07-31 接管核对 — 13 项中 7 项独立核对，6 项采信报告**
+>
+> 本会话（commit `1fa88f2` 之后）独立核对结果：
+> - **独立核对（7 项）**：#1 (`check_expected` at `oracle/regression.rs:10` ✓)、#2 (subprocess.rs:175-201 ✓)、#4 (`bit.rs:54` ✓)、#5 (`bit.rs:92-93` ✓)、#6 (Cargo.toml:19,41 + fceux11_rust.h:3976 ✓)、#10 (main.rs:190 ✓)、#11 (ppu.cpp:307 + ppu_rendering.cpp:160 ✓)
+> - **采信 §五（6 项）**：#3 (matrix.rs:68, :218-227)、#7 (CMakeLists.txt:648-652, :65-67)、#8 (CMakeLists.txt:593, :598)、#9 (CMakeLists.txt:571)、#12 (build.rs:24, matrix.rs:33)、#13 (tests/tests.json 39 unique)
+>
+> 因此 §五 "13/13 全部落地" 措辞**应理解为"原始验收核对 + 本会话 7/13 独立核对确认"**，6 项未经本会话独立验证。
 
 | # | 修复 | 文件:行号 | 实测证据 | 判定 |
 |---|------|---------|---------|------|
@@ -286,6 +334,12 @@ oracle_breakdown: { A_regression: {pass:25, fail:2}, B_hardware: {pass:10, fail:
   已知失败清单   = 迁移矩阵 4 项 + blargg 全量 56 项，全部带错误码/分类
   oracle 来源数  = 1（blargg）—— 覆盖率已到顶，提升须引入新来源
 ```
+
+> **🚧 2026-07-31 接管后状态**
+> - CI 卫生门槛 #5 仍 ☐ 未闭合（workflow 已就绪但未实跑，本会话亦未触发）
+> - 验收标准 #5（§九.1 表） 仍 🟡
+> - §十 R4 是唯一闭合路径，需用户手动推送 wip_1.16 或开 PR 触发 `kagami-qa.yml`
+> - D-7 行号现在已过时：经 P0 整改后 README 中英文锚 commit 由 `5e55129` → `623dd39`（详见 §十 R2）
 
 ---
 
@@ -356,21 +410,37 @@ v2.0 清理项 E 系列、i18n 债务 H 系列、GUI/movie 层 TODO F 系列、5
 
 **11 项中 10 项完全闭合，1 项（#5 CI 实跑）为 workflow 就绪但未触发——属环境性待办，非缺陷。**
 
+> **🚧 2026-07-31 接管后口径修订**：
+> - 标准 #2 "ctest -LE perf 与 CI 一致"：本会话独立实跑确认 ✅
+> - 标准 #9 "cargo test 40/40"：本会话**未**独立实跑，采信 §三.2
+> - "11 项中 10 项完全闭合"措辞保留 — §十 R4 (#5) 闭合仍待用户推送触发
+
 ### 9.2 总体裁定
 
 > **v1.16 构建通过最终验收。**
 
 **裁定依据**：
 
-1. **构建可靠**：Ninja + Release 一次成功，四个历史构建难题全部闭环，关键产物（direct runner、LUT 测试）均为有效 PE。
-2. **测试可信**：ctest 34/34、cargo 40/40 均经独立实跑确认；三个历史红灯全转 PASS，且每个都有可追溯的 commit 与代码级证据。
+1. **构建可靠**：Ninja + Release 一次成功，四个历史构建难题全部闭环，关键产物（direct runner、LUT 测试）均为有效 PE。**（本会话独立 do_build.ps1 复现确认 ✅）**
+2. **测试可信（ctest 维度）**：ctest 34/34 经独立实跑确认 ✅；cargo 40/40 采信 §三.2 未独立验证；Oracle B 177/121/56 采信 §三.3 未独立验证。三个历史红灯全转 PASS，每个都有可追溯的 commit 与代码级证据。
 3. **判定链路可信**：Phase 0.5 修复了「判定逻辑与 schema 声明不符」「超时不生效」「fail_to_pass 可灌水」三类隐性失真——这些是比构建失败更危险的「跑出来了但结论是错的」型缺陷，现已根治并有单元测试钉死。
-4. **失败诚实**：E-1/E-3 及 38 项真实精度 FAIL 均显式标注为 advisory，带错误码与分类，未静默跳过；56 项中 18 项 harness 问题的区分被保留，避免高估缺陷面。
-5. **文档与实测一致**：本次对每条关键声明做实测复现，未发现实质性偏差；仅 3 处文档措辞/行号需后续修正（§五）。
+4. **失败诚实**：E-1/E-3 及 38 项真实精度 FAIL 均显式标注为 advisory，带错误码与分类，未静默跳过；56 项中 18 项 harness 问题的区分被保留，避免高估缺陷面。**（E-3 桶 C 分桶本会话未独立验证）**
+5. **文档与实测一致**：本次对每条关键声明做实测复现，**对 ctest / 7/13 代码修复 / check_expected line numbers / vbl_01 baseline / 4 处文档勘误 等 7 类关键声明独立核对**，未发现实质性偏差；仅 3 处文档措辞/行号需后续修正（§五）。**§十 R5 Step 1 处方含数学错误已记录并修订（不影响验收通过判定，仅影响 §十 处方完整性）；R6 处方标为 instrument-first 前置硬约束。**
 
 **前置条件**：合并到 `main` 前，建议在 CI 上实跑一轮 `kagami-qa.yml`（验收标准 #5 的最后一公里），确认 CI 环境下 matrix artifact 与 `git_rev` 同样正确。
 
 **后续路线**：E-1 / E-3 精度遗留按独立 PR 推进；v2.0 清理项等单独立项。后续权威性提升路径是**增加相互独立的 oracle 来源**（NESdev 其他套件、TASVideos 精度表、第二模拟器差分、真机采集），而非继续增加同一来源（blargg）的测试数量——当前 `oracle 来源数 = 1` 已是该来源的覆盖率天花板。
+
+> **🚧 2026-07-31 接管后补充**
+>
+> §十 处方修订导致"100% 完美交付"路径部分重审：
+> - P0（文档收尾 R1-R3） — ✅ 已 commit `1fa88f2`
+> - P1（CI 实跑 R4） — ⏸️ 待用户推送触发
+> - P2 R5（E-1 PPU） — ⚠️ Step 1 处方已修订并 revert；Steps 2-4 需先 instrument-first 验证
+> - P2 R6（E-3 APU） — ⚠️ 处方未经实测，需 instrument-first 验证
+> - P3 R7（第二 oracle 来源） — 未启动
+>
+> 验收通过判定本身**仍然成立**（构建 + Oracle A ctest 实测通过），但 §十 "100% 完美交付" 路径需在 P2 R5/R6 instrument 落地后再评估时效性。
 
 ---
 
@@ -476,28 +546,76 @@ v2.0 清理项 E 系列、i18n 债务 H 系列、GUI/movie 层 TODO F 系列、5
 
 > **关键认识**（推翻 E-1 调查记录 §-1 的结论）：02/05/06/07/08 **共享同一根缺陷**（cycle-0→cycle-1 边沿对齐），并非「每个 ROM 独立参数」。先前「1-cycle shift」失败是因为它**只移动了 NMI、没移动标志**，破坏了两者相对相位。正确做法是**标志与 NMI 一起前移 1 cycle**。`vbl_10` 是独立机制（even/odd 跳点位置）。
 
-**分步修复方案**（每步独立 PR，强制回归）：
+> **🚨 2026-07-31 实测校准 — Step 1 处方含数学错误，已 revert**
+>
+> 本会话（commit `1fa88f2` 之后）按下方 Step 1 字面处方实测：
+> - 改动：`PPU_status |= 0x80` → `runppu(1)` → `if (VBlankON) TriggerNMI()`，`delay: 20→19`
+> - 构建成功，ctest 34/34 PASS（Oracle A 无回归）
+> - **但 vbl_01_basics 翻红**：$6000=0x08 "VBL period is too long with BG off"（sub-test #8）
+>
+> 根因（数学推导）：Working config 时序结构
+> ```cpp
+> const int delay = N;
+> for(int dot=0;dot<delay;dot++) runppu(1);   // pre-loop
+> for(int S=0;S<sltodo;S++) {                 // main loop
+>     for(int dot=(S==0?delay:0);dot<kLineTime;dot++) runppu(1);
+>     ppur.status.sl++;
+> }
+> ```
+> 其中 `kLineTime = 341`（`ppu_rendering.cpp:1358`），`sltodo = 20`（NTSC）。
+> **关键不变量**：`pre-loop + S=0 = delay + (kLineTime - delay) = kLineTime = 341`
+> 无论 delay 取何值，sl 241 总是占 341 个 PPU dot。
+>
+> 加 `runppu(1)` 永远让总周期 +1。Step 1 处方说"delay 20→19 补偿"**无效**——pre-loop 减 1 但 S=0 起点同步减 1 → S=0 多跑 1，正好抵消。实测：
+>
+> | 改动 | 总周期 | 计算 |
+> |------|--------|------|
+> | 原始（delay=20） | **6820** | 20 + 321 + 19·341 |
+> | Step 1 字面（delay=19, +runppu(1)） | **6821** | 1 + 19 + 322 + 19·341 |
+>
+> 已 git checkout revert。完整记录见 memory `r5-step1-attempt-2026-07-31`。
+>
+> **修订后的正确补偿路径**（任选一，独立 PR 验证）：
+> - **路径 (a)** 改主循环范围 S=0 → `dot<(kLineTime-1)`，跑 321 cycles；pre-loop 保持 delay=20；runppu(1) 独立保留
+> - **路径 (b)** 把 `runppu(1)` 合并到 pre-loop 末：`for(int dot=0;dot<=delay;dot++)`，多跑 1 cycle，dispatch NMI 于 cycle 21（语义略变）
+> - **路径 (c)** instrument-first：env-gated 桩记录 VBL set 真实 dot 与 NMI dispatch 真实 dot，按实测数据决策
+>
+> **建议**：路径 (c) instrument-first 优先（与 memory `e1-vbl05-disasm-2026-07-30` "How to apply" 第 1-3 步一致），拿到 dot 数实测数据后再选 (a)/(b) 之一。
+>
+> **Step 2-4 的连带影响**：共享"线性相位偏移"假设，Step 1 字面处方证伪后 Step 2-4 也需重审，不可直接执行。详见 §十 R5 末段"约束修订"。
 
-**Step 1 — `vbl_05_nmi_timing`（最干净，先做）**
+**分步修复方案**（每步独立 PR，强制回归；Step 1 处方已修订，见上🚨 校准块）：
 
-假设（可证伪）：在 `:1560` 置标志后、`:1572` latch NMI 前，插入一个 `runppu(1)` 把 PPU 推进到 cycle 1，同时把 `:1567` 的 `delay` 从 20 减为 19（补偿 +1，保持 VBL 周期 6820 不变——这是 P4-1 失败的教训）：
+**Step 1 — `vbl_05_nmi_timing`（最干净，先做；处方已修订）**
+
+**修订后的假设（可证伪）**：
+
+- **路径 (c) instrument-first**（推荐先做）：加 env-gated 桩记录 `runppu()` 调用点的 PPU dot 计数，跑 `vbl_01_basics` 400 帧确认 VBL 置位 dot 与 VBL 清除 dot 的精确数值，对照分析假设。代码模板见 `e1-vbl05-disasm-2026-07-30.md` How-to-apply。
+- **路径 (a)** 实改处方：在 `:1560` 置标志后、`:1572` latch NMI 前插入 `runppu(1)` 把 PPU 推进到 cycle 1；**同时**把 `:1582` 主循环 S=0 的内层上限改为 `<(kLineTime-1)`（不是改 `:1567` delay），让 S=0 跑 321 cycles 抵消 +1：
 
 ```cpp
-PPU_status |= 0x80;         // :1560 标志置位（cycle 0）
-runppu(1);                  // 新增：推进到 cycle 1 = dot 1 of sl 241（HW VBL 置位点）
-if (VBlankON) TriggerNMI(); // :1572 现 NMI 在 cycle 1 latch（HW: 标志可见后 1 cyc）
-const int delay = 19;       // :1567 原 20，补偿上面的 +1 → 周期仍 6820
+PPU_status |= 0x80;                              // :1560 标志置位（cycle 0）
+// (a) 路径新增：
+runppu(1);                                       // 推进到 cycle 1（HW VBL 置位点）
+if (VBlankON) TriggerNMI();                      // :1572 现 NMI 在 cycle 1 latch
+const int delay = 20;                            // :1567 保持 20（不要改）
+// 主循环 S=0 内层上限改 (kLineTime-1)：
+for(int dot=(S==0?delay:0);dot<(kLineTime-1);dot++) runppu(1);  // S=0 跑 321 cycles，补偿 +runppu(1)
 ```
 
-同时修正 `:1571` 的过期注释（现写「NMI fires at cycle 1」但代码实为 cycle 0；修复后注释才为真）。
+- **路径 (b)**：不独立 `runppu(1)`，而是改 pre-loop 上限为 `<=delay`（多跑 1 cycle 包含 VBL 后第一 dot），NMI dispatch 于 cycle 21 后。最贴合 §十 「flag+NMI 一起前移 1 cycle」语义，但 dispatch 时机变化较大。
 
-证伪判据：`vbl_05` 行 00-06 应由 `1` 翻为 `2`，07-09 保持 `0`。若不翻，假设错——尝试 `runppu(3)`（1 CPU cycle = 3 PPU dot，见 `e1_survey/vbl05_disasm_2026-07-30.md:121-127`）。
+**关键**：**绝不要**像最初 Step 1 处方那样改 `delay` 来"补偿"——数学证明 pre-loop + S=0 = kLineTime 是不变量，调 delay 无法抵消 runppu(1) 的 +1。
 
-**Step 2 — `vbl_02_set_time`**：Step 1 后重测。标志现 effectively 在 cycle 1 可见，`02` 的读点应落到正确侧。PASS 则 Step 1 已闭合；仍 FAIL（反向行）则把 `PPU_status |= 0x80` 移到首个 `runppu(1)` 之后。
+同时修正 `:1571` 的过期注释（现写「NMI fires at cycle 1」但代码实为 cycle 0；路径 (a) 修复后注释才为真）。
 
-**Step 3 — `vbl_06/07/08`（NMI gating 组，逐个攻）**：共享 Step 1-2 的修复，残余看双 latch 时序（VBL-set 路径用立即 `IQNMI`（`x6502.cpp:397`），NMI-enable 边沿用延迟 `IQNMI2`（`:402`，`:474-478` 转换））。`06` 的 suppression 依赖 `$2002` clear-on-read（`ppu.cpp:345`）与 NMI latch 的竞速——NMI 现延后到 cycle 1，给 clear 留了窗口。逐个验证，**不要一次调三个**。
+证伪判据（路径 (a)）：`vbl_05` 行 00-06 应由 `1` 翻为 `2`，07-09 保持 `0`；同时 `vbl_01_basics` $6000 应保持 `0x00`（VBL 周期 6820 不变）。若 `vbl_01` 翻红 → 主循环范围补偿失效，回到路径 (c) instrument-first。若 `vbl_05` 不翻 → +1 PPU dot 不够，按 P2-1 disasm 结论改 `runppu(3)`（1 CPU cycle = 3 PPU dot，见 `e1_survey/vbl05_disasm_2026-07-30.md:121-127`），同样走路径 (a) 的主循环范围补偿（改为 `<(kLineTime-3)`）。
 
-**Step 4 — `vbl_10_even_odd_timing`（独立机制，最后做，风险最高）**：`ppu_rendering.cpp:1979-1994` 的 even/odd 跳点在 pre-render 行末。消息「skipped too late」相对 BG-enable 事件。**先插桩**（env-gated，仿已 revert 的 `FCEUX11_E1_TRACE`）记录跳点 dot 与 BG-enable dot，**确认跳点确实偏晚再动**——`vbl_09` 当前 PASS 且依赖此跳点位置，盲目移动会回归。注意 `idleSynch` 存于 savestate（`ppu_state.cpp:69` tag "IDLS"），改其 toggle 时机会 invalidate `golden_savestate_test` 哈希，须重生 golden 索引。
+**Step 2 — `vbl_02_set_time`（待 Step 1 修订处方落地后）**：Step 1 后重测。标志现 effectively 在 cycle 1 可见，`02` 的读点应落到正确侧。PASS 则 Step 1 已闭合；仍 FAIL（反向行）则把 `PPU_status |= 0x80` 移到首个 `runppu(1)` 之后。**注意**：Step 1 修订后此段"移到首个 runppu(1) 之后"应理解为移到修订路径 (a) 的 runppu(1) 之后，**不是**原始字面处方。
+
+**Step 3 — `vbl_06/07/08`（NMI gating 组，逐个攻；待 Step 1-2 修订处方落地后）**：共享 Step 1-2 的修复，残余看双 latch 时序（VBL-set 路径用立即 `IQNMI`（`x6502.cpp:397`），NMI-enable 边沿用延迟 `IQNMI2`（`:402`，`:474-478` 转换））。`06` 的 suppression 依赖 `$2002` clear-on-read（`ppu.cpp:345`）与 NMI latch 的竞速——NMI 现延后到 cycle 1，给 clear 留了窗口。逐个验证，**不要一次调三个**。
+
+**Step 4 — `vbl_10_even_odd_timing`（独立机制，最后做，风险最高；与 Step 1-3 失信无直接耦合）**：`ppu_rendering.cpp:1979-1994` 的 even/odd 跳点在 pre-render 行末。消息「skipped too late」相对 BG-enable 事件。**先插桩**（env-gated，仿已 revert 的 `FCEUX11_E1_TRACE`）记录跳点 dot 与 BG-enable dot，**确认跳点确实偏晚再动**——`vbl_09` 当前 PASS 且依赖此跳点位置，盲目移动会回归。注意 `idleSynch` 存于 savestate（`ppu_state.cpp:69` tag "IDLS"），改其 toggle 时机会 invalidate `golden_savestate_test` 哈希，须重生 golden 索引。
 
 **强制回归集（每步后必跑，任一红即 revert）**：
 - `vbl_01_basics`、`vbl_04_nmi_control`、`vbl_09_even_odd_frames`（PASS 基线）
@@ -523,6 +641,20 @@ const int delay = 19;       // :1567 原 20，补偿上面的 +1 → 周期仍 6
 | `apu_single_6_irq_timing.nes` | 0x02 | first frame IRQ 相位 | 缺陷 1 |
 | `apu_single_3_irq_flag.nes` | 0x06 | `irq_flag #6` | 缺陷 2 |
 | `apu_test.nes` | 0x01 | 组合套件，停在 sub-test 3(=#6) | 缺陷 2 |
+
+> **🚧 2026-07-31 实测校准 — R6 处方未经实测验证**
+>
+> 本会话（commit `1fa88f2` 之后）**未实测** R6 Priority 1+2 改动：
+> - 未实跑过任何 apu_*.nes ROM（仅在 memory `apu-e3-current-state-2026-07-30` 采信分桶结论）
+> - 未在 sound.cpp 写过任何代码（按用户 2026-07-31 决策"暂停 R6，重新评估风险"）
+> - 未读过完整 `FrameSoundStuff` 与 5-step / 4-step 序列运行时序
+>
+> 因此 Priority 1 "方案 A / 方案 B" 二选一的处方**仅基于文档推导**，未经 instrument 验证。实施前**必须**先：
+> 1. env-gated instrument：记录 fcnt / IRQFrameMode / FHCNT / SIRQStat 状态机序列
+> 2. 跑 `apu_reset_4017_timing` + `apu_single_3/4/5/6` 取真实时序数据
+> 3. 对照 §十 R6 处方分析（"上电后第一个 quarter-frame 就置 IRQ"）是否真有 7457 cyc 偏早
+>
+> §十 R6 本身已自标"方案 A 脆弱时回落方案 B"——此警告经本会话审视后升级为**实施前置硬约束**：instrument-first。
 
 **两个根因（均在 `src/sound.cpp`）**：
 
