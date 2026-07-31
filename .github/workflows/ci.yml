@@ -26,6 +26,13 @@ jobs:
     strategy:
       fail-fast: false
 
+    env:
+      # v1.16 R4-0 (2026-07-31): see the "Cache vcpkg" comment below. The
+      # previous value `${{ env.LOCALAPPDATA }}\vcpkg\archives` expanded to an
+      # empty string in the workflow-level `env` context, so vcpkg's binary
+      # cache was never preserved between runs.
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg_bincache
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,12 +40,29 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
+      # v1.16 R4-0 (2026-07-31) — this cache never produced a usable entry, so
+      # every run rebuilt all 33 manifest ports (Qt 6.8.0 debug + release) from
+      # source. Two independent defects, both observed in KagamiQA run
+      # 82956632293 whose log shows `Cache not found for input keys: vcpkg-...`:
+      #   * `path: vcpkg_installed` pointed at the repo root while manifest mode
+      #     installs under the CMake binary dir (`build/vcpkg_installed/...`),
+      #     so an empty directory was cached.
+      #   * the second entry expanded to the literal `\vcpkg\archives`.
+      # The configure step below now pins VCPKG_INSTALLED_DIR to the repo root,
+      # which both makes this path real and lets CMakeLists.txt:7 skip
+      # vcpkg/manifest mode entirely on warm runs.
+      # Buildtrees (`vcpkg_installed/vcpkg/blds`, multi-GB) are deliberately
+      # excluded; `status`/`info` (~500 KB) are kept as insurance for the case
+      # where manifest mode runs anyway.
       - name: Cache vcpkg
+        id: cache-vcpkg
         uses: actions/cache@v4
         with:
           path: |
-            vcpkg_installed
-            ${{ env.LOCALAPPDATA }}\vcpkg\archives
+            vcpkg_installed/x64-windows
+            vcpkg_installed/vcpkg/status
+            vcpkg_installed/vcpkg/info
+            vcpkg_bincache
           key: vcpkg-${{ hashFiles('vcpkg.json') }}
           restore-keys: |
             vcpkg-
@@ -74,6 +98,23 @@ jobs:
           toolchain: stable
           targets: x86_64-pc-windows-msvc
 
+      # v1.16 R4-0: defensive — vcpkg creates the binary-cache dir on demand on
+      # most versions, but a cold run must not fail on a missing directory.
+      - name: Prepare vcpkg binary cache dir
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path "${{ github.workspace }}\vcpkg_bincache" | Out-Null
+
+      - name: Announce cold vcpkg build
+        if: steps.cache-vcpkg.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          Write-Host "::warning::vcpkg cache miss - this run must build all manifest ports from source (Qt 6.8.0 included). Expect the configure step to take 60+ minutes."
+
+      # v1.16 R4-0: -DVCPKG_INSTALLED_DIR moves the install tree to the repo
+      # root so the cache above is real, CMakeLists.txt:7 can skip vcpkg on warm
+      # runs, and tests/CMakeLists.txt:431's PATH injection resolves to an
+      # existing directory. -DVCPKG_OVERLAY_TRIPLETS activates the release-only
+      # cmake/triplets/x64-windows.cmake (see that file's header).
       - name: Configure CMake (Ninja)
         run: >
           cmake -S . -B build
@@ -83,6 +124,8 @@ jobs:
           -DCMAKE_CXX_COMPILER=cl
           -DFCEUX11_BUILD_TESTS=ON
           -DENABLE_LINT_CPPCHECK=OFF
+          -DVCPKG_INSTALLED_DIR=${{ github.workspace }}/vcpkg_installed
+          -DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}/cmake/triplets
 
       - name: Build
         run: cmake --build build --config Release --parallel

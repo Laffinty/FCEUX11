@@ -405,6 +405,34 @@ KagamiQA 在 CI 上自动运行（`.github/workflows/kagami-qa.yml`）：
 - Oracle A + Oracle B 全量运行
 - 迁移矩阵 + 精度对照表作为 artifact 上传
 - PASS→FAIL 基线漂移自动 PR 评论警报
+- **`R4 Gate` 步**：矩阵缺失 / `engine.git_rev` 为 `unknown` / `summary.total < 39` /
+  `transition_matrix.fail_to_pass != 0` 任一成立即让作业失败。此前所有实质步骤都带
+  `continue-on-error: true`，矩阵静默缺失时无人察觉；该 gate 把验收报告 §十 R4 的证伪判据变成门禁
+
+### 10.8 CI 的 vcpkg 缓存机制（v1.16 R4-0）
+
+> **本节只影响 CI，本地开发流程完全不受影响**，但了解它有助于看懂 CI 日志。
+
+GitHub runner 每次都是干净机器。整改前两个 workflow 的缓存路径写错（缓存了空目录、且
+`${{ env.LOCALAPPDATA }}` 在 workflow 级上下文展开为空串），导致缓存从未生效、**每一轮 CI 都在从源码
+冷编 Qt 6.8.0**——`kagami-qa.yml` 因此在配置阶段撞 45 分钟超时被取消（run `82956632293`）。
+
+现在的机制：
+
+| 机制 | 说明 |
+|------|------|
+| `-DVCPKG_INSTALLED_DIR=<workspace>/vcpkg_installed` | 让 vcpkg 装到**仓库根**而非 `build/` 下。这样 (a) 缓存步能真的缓存到它，(b) 下一轮 `CMakeLists.txt:7` 的 prefer-local 分支命中后**完全跳过 vcpkg**，(c) `tests/CMakeLists.txt:431` 的测试 DLL PATH 注入指向真实目录 |
+| `cmake/triplets/x64-windows.cmake` | overlay triplet，`VCPKG_BUILD_TYPE release` —— CI 只构 Release，不编 debug 半边。安装树体积从 2.4 GB 降到约 1.2 GB，冷编时间对半砍。**故意与内置 triplet 同名**，因为安装目录名必须保持 `x64-windows` 才能被上面三条命中 |
+| 缓存 `path` 收窄 | 只存 `vcpkg_installed/x64-windows` + `vcpkg/{status,info}` + `vcpkg_bincache`；数 GB 的 `vcpkg/blds` buildtrees 刻意排除 |
+| `timeout-minutes: 180` | 只为容纳**一轮**冷预热跑（预计 60-90 分钟）。预热后稳态每轮约 15 分钟 |
+
+**看 CI 日志时**：若顶部出现 `::warning::vcpkg cache miss`，说明本轮是冷跑，配置步会慢很多，属正常。
+
+**本地为什么不受影响**：overlay triplet 只在传 `-DVCPKG_OVERLAY_TRIPLETS` 时才被读取，
+而 `scripts/do_build.ps1` 不传该参数——它走的是自己的 `-DVCPKG_MANIFEST_MODE=OFF` +
+复用现成 `vcpkg_installed/x64-windows` 的路径（`do_build.ps1:120-135`），与 CI 互不干扰。
+
+完整背景见 `docs/history/FCEUX11-1.16_CI-R4-实跑诊断.md`。
 
 ---
 

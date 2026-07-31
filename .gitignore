@@ -19,6 +19,11 @@ CMakeLists.txt.user
 cmake_install.cmake
 Makefile
 *.cmake
+# v1.16 R4-0: `*.cmake` above targets CMake-GENERATED files. cmake/triplets/
+# holds hand-written vcpkg overlay triplets that the CI workflows pass via
+# -DVCPKG_OVERLAY_TRIPLETS; they MUST be committed or CI configures against a
+# non-existent overlay directory.
+!cmake/triplets/*.cmake
 DartConfiguration.tcl
 
 # Qt generated files

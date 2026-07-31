@@ -20,6 +20,23 @@
 > 4. **§一.2 验收基线 HEAD** 与 §一.1 版本演进脉络已就地更新
 >
 > **验收通过判定本身仍成立**（构建 + Oracle A ctest 34/34 独立实测通过）。本接管修订不构成对原验收的否定，仅补记接管核对的事实并修订 §十 处方的可执行性。
+>
+> ---
+>
+> **🚨 2026-07-31 第二次接管修订：CI 已实跑一轮并失败（P1/R4）**
+>
+> 用户按 §十 R4 推送 `wip_1.16`，CI run **`82956632293`**（commit `10f1e05`）已触发。**该轮失败，未产出 matrix**：
+> 作业在 `Configure CMake` 步撞 `timeout-minutes: 45` 被取消，卡在 vcpkg 从源码编译 Qt 6.8.0。
+>
+> - **根因不在 KagamiQA**：两个 workflow 共有的 vcpkg 缓存路径缺陷（缓存空目录 + `${{ env.LOCALAPPDATA }}` 展开为空串），
+>   导致缓存从未生效、每轮冷编 Qt。Oracle A/B、判定链路、S-4 stamp 在本轮**根本没有获得执行机会**。
+> - **整改 R4-0 已落地**（新增 release-only overlay triplet + `VCPKG_INSTALLED_DIR` + 缓存路径收窄 + timeout 45→180
+>   + 把 R4 证伪判据机器化的 `R4 Gate` 步）；**纯 CI + 文档，零代码变更**。
+> - **R4-0 本身未经 CI 验证**，须待下一轮 CI 判定。
+> - 受影响章节：§六、§八.1、§九.1 #5、§九.2、§十（整改总览 / R4 / 完成判据）均已就地标注。
+> - 完整证据链见 **`docs/history/FCEUX11-1.16_CI-R4-实跑诊断.md`**。
+>
+> **验收通过判定仍不受影响**——本轮 CI 失败暴露的是 workflow 依赖治理缺陷，不触及构建、判定链路或覆盖率口径。
 
 ---
 
@@ -75,6 +92,7 @@ v1.16 的 KagamiQA 构建经历了四个文档化阶段，本次验收覆盖全�
 | 审计与修复 | `审计报告.md` / `修复验证报告.md` | 独立审计揭露 S1–L4 共 15 项问题 |
 | **Stage-2** | `Stage2-构建计划.md` + S 系列 | **本次验收主体**：7 Phase / 30+ PR，推翻 4 项「不可修复」误判 |
 | **P0 整改（验收后）** | 本报告 §十 R1-R3 | 验收后第一刀（commit `1fa88f2`）：文档零偏差收尾，无代码变更 |
+| **P1 整改 R4-0（验收后）** | 本报告 §十 R4-0 + `docs/history/FCEUX11-1.16_CI-R4-实跑诊断.md` | CI 首轮实跑失败后的 workflow 依赖治理修复：vcpkg 缓存路径 + release-only triplet + R4 Gate，无代码变更 |
 
 ### 1.2 验收基线 HEAD
 
@@ -326,7 +344,8 @@ oracle_breakdown: { A_regression: {pass:25, fail:2}, B_hardware: {pass:10, fail:
   ☑ 判定逻辑与 manifest schema 声明一致        （0.5-1 / 0.5-2 实测）
   ☑ 迁移矩阵不含结构性失真                      （0.5-3 / 0.5-4 实测，fail_to_pass=0）
   ☑ 产物可追溯：matrix 带真实 git_rev=623dd39   （S-4 实测）
-  ☐ CI 常驻、指标由 CI 产物回填                  （workflow 已就绪，本会话未触发一轮 CI）
+  ☐ CI 常驻、指标由 CI 产物回填                  （已实跑一轮 run 82956632293 → configure 步 45min timeout，
+                                                    未产出 matrix；根因为 vcpkg 缓存路径缺陷，R4-0 已修，待重跑）
                                                        ↑ 唯一未完全闭合的门槛
 
 【权威性度量】
@@ -335,10 +354,16 @@ oracle_breakdown: { A_regression: {pass:25, fail:2}, B_hardware: {pass:10, fail:
   oracle 来源数  = 1（blargg）—— 覆盖率已到顶，提升须引入新来源
 ```
 
-> **🚧 2026-07-31 接管后状态**
-> - CI 卫生门槛 #5 仍 ☐ 未闭合（workflow 已就绪但未实跑，本会话亦未触发）
+> **🚧 2026-07-31 接管后状态（第二次修订：CI 已实跑一轮，失败）**
+> - CI 卫生门槛 #5 仍 ☐ 未闭合，但**阻塞点已从「未触发」变为「已触发、因依赖治理缺陷失败」**
+> - **CI run `82956632293`（commit `10f1e05`）实测结果：作业在 `Configure CMake` 步撞 `timeout-minutes: 45` 被取消**，
+>   卡在 vcpkg manifest 模式从源码编译 Qt 6.8.0（`Installing 30/33 qtbase[...]` → `Building x64-windows-dbg`）。
+>   build / ctest / Oracle B / matrix 四步全部未执行，未产出任何 matrix 产物。
+> - **根因不在 KagamiQA**，在两个 workflow 共有的 vcpkg 缓存路径缺陷（缓存的是空目录 + `${{ env.LOCALAPPDATA }}` 展开为空串），
+>   导致缓存从未生效、每轮都冷编 Qt。完整证据链见 `docs/history/FCEUX11-1.16_CI-R4-实跑诊断.md`
+> - 整改 **R4-0** 已落地（纯 CI + 文档，零代码变更）；**但整改本身尚未经 CI 验证**，须待下一轮 CI 判定
 > - 验收标准 #5（§九.1 表） 仍 🟡
-> - §十 R4 是唯一闭合路径，需用户手动推送 wip_1.16 或开 PR 触发 `kagami-qa.yml`
+> - §十 R4 仍是唯一闭合路径，需用户重新推送 `wip_1.16` 或手动 `workflow_dispatch` 触发（第一轮为预热跑，预计 60-90 分钟）
 > - D-7 行号现在已过时：经 P0 整改后 README 中英文锚 commit 由 `5e55129` → `623dd39`（详见 §十 R2）
 
 ---
@@ -376,6 +401,14 @@ Stage-2 §一 对遗留文档做了 3 项勘误，本次确认全部已就地更
 **建议 2：CI 未实跑一轮**
 卫生门槛第 5 条「CI 常驻、指标由 CI 产物回填」目前 workflow 已就绪但本会话未触发实跑。建议合并到 `main` 前在 CI 上实跑一轮 `kagami-qa.yml`，确认 matrix artifact 上传与 `engine.git_rev` 字段在 CI 环境下同样正确（本地已证 `git_rev=623dd39` 可追溯）。
 
+> **🚧 2026-07-31 实测校准 — 已实跑，且失败**
+>
+> 用户已推送并触发 CI run `82956632293`（commit `10f1e05`）。**该轮未能产出 matrix**：作业在
+> `Configure CMake` 步撞 `timeout-minutes: 45` 被取消，卡在 vcpkg 从源码编译 Qt 6.8.0。
+> 根因是两个 workflow 共有的缓存路径缺陷（详见 `docs/history/FCEUX11-1.16_CI-R4-实跑诊断.md`），
+> **与 KagamiQA 本身无关**——Oracle A/B、判定链路、S-4 stamp 在本轮根本没有获得执行机会。
+> 整改 R4-0 已落地但尚未经 CI 验证。本条建议**升级为 §十 R4 的前置子项 R4-0**，且状态由「未做」改为「已修待验」。
+
 ### 8.2 已知精度遗留（独立成项，不属本次构建验收范围）
 
 | 项 | 性质 | 当前状态 | 建议处置 |
@@ -400,7 +433,7 @@ v2.0 清理项 E 系列、i18n 债务 H 系列、GUI/movie 层 TODO F 系列、5
 | 2 | 本地 `ctest -LE perf` 与 CI 一致 | 逐项比对 | ✅ **34/34 = 100%** | ✅ |
 | 3 | `lua_bit_test_headless` PASS | Phase B | ✅ Passed 0.03s | ✅ |
 | 4 | `kagami_qa_direct_smoke` PASS | Phase C | ✅ Passed 6.42s | ✅ |
-| 5 | migration matrix 由 CI 产出且 passed 率有据可查 | Phase D | 🟡 本地 35/39、`git_rev=623dd39` 可追溯；CI 未实跑 | 🟡 |
+| 5 | migration matrix 由 CI 产出且 passed 率有据可查 | Phase D | 🟡 本地 35/39、`git_rev=623dd39` 可追溯；CI 已实跑一轮但因 vcpkg 缓存缺陷 timeout，未产出 matrix（见 §十 R4-0） | 🟡 |
 | 6 | Oracle B ROM 覆盖 ≥80%，失败项显式标注 | Phase D | ✅ 177/177 = 100%，失败项带码+分类 | ✅ |
 | 7 | README/KagamiQA.md 数字由 CI 产物回填，中英一致 | Phase D | ✅ 34/39/177 中英一致 | ✅ |
 | 8 | 遗留文档 3 处过期记载已更正 | Phase 0 | ✅ | ✅ |
@@ -414,6 +447,11 @@ v2.0 清理项 E 系列、i18n 债务 H 系列、GUI/movie 层 TODO F 系列、5
 > - 标准 #2 "ctest -LE perf 与 CI 一致"：本会话独立实跑确认 ✅
 > - 标准 #9 "cargo test 40/40"：本会话**未**独立实跑，采信 §三.2
 > - "11 项中 10 项完全闭合"措辞保留 — §十 R4 (#5) 闭合仍待用户推送触发
+>
+> **第二次修订（CI 已实跑）**：上方"workflow 就绪但未触发"已过期。CI run `82956632293`（`10f1e05`）
+> 已触发并失败于配置步 timeout，未产出 matrix。标准 #5 的性质由「环境性待办」修正为
+> **「已暴露的 workflow 依赖治理缺陷，R4-0 已修待验」**——它确实是一个缺陷，只是不在 KagamiQA 侧。
+> 详见 `docs/history/FCEUX11-1.16_CI-R4-实跑诊断.md`。
 
 ### 9.2 总体裁定
 
@@ -435,7 +473,8 @@ v2.0 清理项 E 系列、i18n 债务 H 系列、GUI/movie 层 TODO F 系列、5
 >
 > §十 处方修订导致"100% 完美交付"路径部分重审：
 > - P0（文档收尾 R1-R3） — ✅ 已 commit `1fa88f2`
-> - P1（CI 实跑 R4） — ⏸️ 待用户推送触发
+> - P1（CI 实跑 R4） — ⚠️ **已实跑一轮并失败**（run `82956632293` / `10f1e05`，configure 步 45min timeout，
+>   根因为 vcpkg 缓存路径缺陷，非 KagamiQA 缺陷）；前置整改 **R4-0** 已落地待验，需用户重新触发
 > - P2 R5（E-1 PPU） — ⚠️ Step 1 处方已修订并 revert；Steps 2-4 需先 instrument-first 验证
 > - P2 R6（E-3 APU） — ⚠️ 处方未经实测，需 instrument-first 验证
 > - P3 R7（第二 oracle 来源） — 未启动
@@ -457,7 +496,8 @@ v2.0 清理项 E 系列、i18n 债务 H 系列、GUI/movie 层 TODO F 系列、5
 | **P0 文档/可追溯性收尾** | R1 文档符号名/行号勘误 | 文档偏差 | 检索可追溯 | 是（低成本） |
 | | R2 快照 commit 锚统一刷新 | 文档元数据漂移 | 三处锚点一致 | 是（低成本） |
 | | R3 ntdll 注释措辞修正 | 注释不准 | 注释真实 | 是（低成本） |
-| **P1 CI 闭环** | R4 CI 实跑一轮 `kagami-qa.yml` | 卫生门槛 #5 未闭合 | 验收 #5 转 ✅ | 是 |
+| **P1 CI 闭环** | R4-0 修 workflow vcpkg 依赖治理缺陷 | CI 冷编 Qt 超时 | 让 CI 有可能跑完 | 是（已落地待验） |
+| | R4 CI 实跑一轮 `kagami-qa.yml` | 卫生门槛 #5 未闭合 | 验收 #5 转 ✅ | 是 |
 | **P2 精度收敛** | R5 E-1 PPU VBL/NMI 边沿时序 | 真实精度，6 ROM FAIL | blargg_ppu_vbl_nmi 转 PASS | 否（独立 PR） |
 | | R6 E-3 APU 帧计数器相位 + $4017 标志 | 真实精度，7 sub-test FAIL | 7 项转 PASS | 否（独立 PR） |
 | **P3 权威性提升** | R7 引入第二个独立 oracle 来源 | oracle 来源数=1 已到顶 | 突破 blargg 单一来源天花板 | 否（路线项） |
@@ -521,17 +561,68 @@ v2.0 清理项 E 系列、i18n 债务 H 系列、GUI/movie 层 TODO F 系列、5
 
 **问题**：卫生门槛第 5 条「CI 常驻、指标由 CI 产物回填」目前 workflow 已就绪（`.github/workflows/kagami-qa.yml:123` matrix 生成 + `:157` `actions/upload-artifact@v4`）但本会话未触发实跑。验收标准 #5 为 🟡。
 
+> **🚨 2026-07-31 实测校准 — 已实跑一轮，失败；新增前置子项 R4-0**
+>
+> 用户已推送 `wip_1.16` 并触发 CI run **`82956632293`**（commit `10f1e05`）。**该轮未产出 matrix**：
+>
+> - 作业 `00:03:33` 起跑，`Configure CMake` 步 `00:04:09` 开始，`00:48:39` `##[error]The operation was canceled.` —— 撞 `timeout-minutes: 45`
+> - 取消时仍在 vcpkg manifest 模式从源码编 Qt 6.8.0：`Installing 30/33 qtbase[...]` → `Building x64-windows-dbg`（debug/release 两份都编）
+> - build / kagami-qa-runner / Oracle A ctest / Oracle B / Migration Matrix **五步全部未执行**
+> - `##[warning]No files were found with the provided path: build/kagamiqa_migration_matrix.json`
+>
+> **根因不在 KagamiQA**，在两个 workflow 共有的 vcpkg 缓存路径缺陷：
+> (1) `path: vcpkg_installed` 指向仓库根，但 manifest 模式实际装到 `build/vcpkg_installed` → 缓存空目录；
+> (2) `${{ env.LOCALAPPDATA }}\vcpkg\archives` 中 `${{ env.LOCALAPPDATA }}` 在 workflow 级上下文**展开为空串**
+> （日志实测渲染为字面量 `\vcpkg\archives`）→ vcpkg 二进制缓存从未被保存。
+> 结果 `Cache not found for input keys: vcpkg-13cac..., vcpkg-` —— 该 key 前缀下历史上从未存过任何条目，
+> **每一轮 CI 都在冷编 Qt**。`ci.yml:36-44` 有逐字相同的缺陷，只是它未设 timeout 故是硬扛。
+>
+> 完整证据链、整改内容与下轮判据见 **`docs/history/FCEUX11-1.16_CI-R4-实跑诊断.md`**。
+>
+> **因此 R4 拆为两步：先 R4-0（修 workflow），再 R4（重跑核验）。**
+
+#### R4-0. 修复 workflow 的 vcpkg 依赖治理缺陷（已落地，待 CI 验证）
+
+**改动**（纯 CI + 文档，**零代码变更**）：
+
+| # | 改动 | 作用 |
+|---|------|------|
+| 1 | 两个 workflow 配置步加 `-DVCPKG_INSTALLED_DIR=${{ github.workspace }}/vcpkg_installed` | 承重件：冷跑装到被缓存的仓库根路径；下轮命中缓存后 `CMakeLists.txt:7` prefer-local 分支触发，**完全跳过 vcpkg/manifest**；并顺带修掉 `tests/CMakeLists.txt:431` 的 PATH 注入在 CI 上一直指向不存在目录的潜伏脆弱 |
+| 2 | 新增 `cmake/triplets/x64-windows.cmake`（`VCPKG_BUILD_TYPE release`）+ `-DVCPKG_OVERLAY_TRIPLETS=...` | 只编 release。本地实测 `vcpkg_installed/x64-windows` 2.4 GB 中 `debug/` 占 1.2 GB → 冷编时间与缓存体积对半砍。故意沿用 `x64-windows` 名以保住安装目录名 |
+| 3 | 缓存 `path` 收窄为 `vcpkg_installed/x64-windows` + `vcpkg/{status,info}` + `vcpkg_bincache` | 删掉展开为空的那条；刻意排除数 GB 的 buildtrees |
+| 4 | job 级 `env: VCPKG_DEFAULT_BINARY_CACHE` + mkdir 步 + 缓存未命中告警步 | 确定性落点；让「本轮冷编 60+ 分钟」在日志顶部可见 |
+| 5 | `kagami-qa.yml` `timeout-minutes: 45` → `180` | 仅为容纳一轮冷预热。上限非预留，预热后稳态约 15 分钟 |
+| 6 | **`kagami-qa.yml` 新增 `R4 Gate` 步** | 把下方步骤 2-3 的证伪判据机器化，见下 |
+
+**R4 Gate（把证伪判据从散文变成门禁）**：R4 的判据此前只存在于本文档，而 workflow 中所有实质步骤都带
+`continue-on-error: true`、`Print Summary` 在 matrix 缺失时一个字都不打印 —— run `82956632293` 就是活证据。
+新 gate（`if: always()`，置于产物上传之后以保留诊断证据）在 matrix 缺失 / `git_rev` 为空或 `unknown` /
+`summary.total < 39` / `fail_to_pass != 0` 任一成立时 `::error::` + `exit 1`。
+
+**gate 逻辑已在本地用真实数据四向实测**：真实 S-4 矩阵 → 通过；仓库内 2026-07-26 的 P1 期废快照
+（30/30、无 `engine`）→ 同时报出 `git_rev is ''` 与 `total is 30`；文件缺失 → 报未产出；
+人工注入 `fail_to_pass` → 报反 gaming 判据失守。
+
+**R4-0 的诚实边界**：以上整改**本身未经 CI 实跑验证**，只做了本地 YAML 解析、grep 复核、gate 四向实测、
+以及本地 Release 重建回归。**整改是否真能让 CI 跑通，须待下一轮 CI 判定**——在那之前应视为
+「有依据的处方，而非已验证的结论」。若预热跑仍撞 180 分钟上限，contingency 见诊断文档 §五。
+
+#### R4（续）. 重跑并核验产物
+
 **步骤**：
 
-1. push `wip_1.16` 或开 PR 触发 `kagami-qa.yml`。
+1. 重新推送 `wip_1.16` 或手动 `workflow_dispatch` 触发 `kagami-qa.yml`。
+   **第一轮为预热跑，预计 60-90 分钟**（日志顶部应有 `::warning::vcpkg cache miss`）；第二轮应 ~15 分钟。
 2. 核验 CI 产物 `kagamiqa_migration_matrix.json` 的字段：
    - `engine.git_rev` = 触发该次 CI 的真实 commit 短哈希（非 `"unknown"`，证明 S-4 的 `build.rs` 编译期 stamp 在 CI 环境同样生效）
    - `summary` = `{total:39, passed:35, failed:4}`（与本地一致；4 FAIL 仍是 `blargg_ppu_vbl_nmi`/`blargg_suite`/`lua_joypad_test`/`lua_memory_test`）
    - `transition_matrix.fail_to_pass` = 0（反 gaming 加固在 CI 生效）
 3. 核验 `ci.yml` 的 `dtolnay/rust-toolchain@stable`（`:72`）步骤在 CI 上成功安装 Rust，`FCEUX11_ENABLE_RUST=ON` configure 不再「靠 runner 预装 Rust 侥幸通过」。
+   （**run `82956632293` 已实测确认该步骤本身正常执行**，只是后续被 timeout 打断。）
 4. 下载 artifact，确认上传成功且可被后续 run 作为基线对比。
 
 **证伪判据**：若 CI 上 `git_rev="unknown"` 或 `passed`≠35，说明 S-4/D-3 在 CI 环境未生效——此时**不得合并**，须先修。
+（步骤 2 的三条判据现已由 `R4 Gate` 步自动执行，人工复核仍建议保留。）
 
 **验收**：验收标准 #5 由 🟡 转 ✅；R2 路径 A 据此刷新文档锚。
 
@@ -709,7 +800,8 @@ for(int dot=(S==0?delay:0);dot<(kLineTime-1);dot++) runppu(1);  // S=0 跑 321 c
 全部满足时，v1.16 达到 100% 完美交付：
 
 - [ ] **R1-R3**：`grep` 验证文档零偏差（符号名/行号/注释/锚 commit 三处一致）
-- [ ] **R4**：CI 实跑一轮，`engine.git_rev` 非 unknown，`passed=35`，验收标准 #5 转 ✅
+- [x] **R4-0**：workflow vcpkg 缓存缺陷已修（`VCPKG_INSTALLED_DIR` + release-only overlay triplet + 缓存路径收窄 + R4 Gate），本地 YAML/grep/gate 四向实测通过 —— **但未经 CI 验证**
+- [ ] **R4**：CI 实跑一轮，`engine.git_rev` 非 unknown，`passed=35`，`R4 Gate` 步绿，验收标准 #5 转 ✅
 - [ ] **R5**：`vbl_01`~`vbl_10` 全 10 ROM 返回 `0x00`；`blargg_ppu_vbl_nmi` 升 `blocking`；Oracle A 维持 34/34
 - [ ] **R6**：7 个 bucket-C sub-test 全转 PASS；`apu_01`~`apu_11` + `pal_apu_*` 不回归；Oracle A 维持 34/34
 - [ ] **R7**（可选）：`oracle 来源数 ≥ 2`

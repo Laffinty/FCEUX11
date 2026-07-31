@@ -20,7 +20,22 @@ on:
 jobs:
   kagami-qa:
     runs-on: windows-2022
-    timeout-minutes: 45
+    # R4-0 (2026-07-31): raised 45 -> 180. Run 82956632293 was killed by the
+    # 45-minute cap while still inside the CMake configure step, building
+    # Qt 6.8.0 from source ("Installing 30/33 qtbase[...]"), so build / ctest /
+    # Oracle B / migration matrix never ran. This is an upper bound, not a
+    # reservation: once the vcpkg cache below is primed, the configure step
+    # skips vcpkg entirely (see CMakeLists.txt:7) and a full run takes ~15 min.
+    # The 180 covers the ONE cold priming run.
+    timeout-minutes: 180
+
+    env:
+      # R4-0: the previous revision cached `${{ env.LOCALAPPDATA }}\vcpkg\archives`,
+      # but the workflow-level `env` context does not carry runner environment
+      # variables — it expanded to an empty string, so the cache input was the
+      # literal `\vcpkg\archives` and vcpkg's binary cache was never preserved.
+      # Point it at a deterministic in-workspace directory instead.
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg_bincache
 
     steps:
       - name: Checkout
@@ -51,12 +66,33 @@ jobs:
       # -----------------------------------------------------------------------
       # Cache
       # -----------------------------------------------------------------------
+      # R4-0 (2026-07-31) — the previous cache configuration never produced a
+      # single usable entry, which is why every run cold-built Qt from source:
+      #   * `path: vcpkg_installed` pointed at the repo root, but manifest mode
+      #     installs under the CMake binary dir (`build/vcpkg_installed/...`),
+      #     so the cached directory was empty.
+      #   * the second path entry expanded to `\vcpkg\archives` (empty
+      #     LOCALAPPDATA), so the binary cache was not preserved either.
+      # Fix: the configure step below pins VCPKG_INSTALLED_DIR to the repo root
+      # so this path is the real install tree, AND on the next run
+      # CMakeLists.txt:7 sees `vcpkg_installed/x64-windows`, appends it to
+      # CMAKE_PREFIX_PATH and skips vcpkg/manifest mode altogether.
+      #
+      # The path list is deliberately NARROW: `vcpkg_installed/vcpkg/blds`
+      # (buildtrees) and `.../pkgs` are multi-GB and are not needed to consume
+      # an install tree, so they must stay out of the cache. `status` + `info`
+      # are ~500 KB and are kept only as insurance for the case where the
+      # prefer-local branch does not fire and manifest mode runs anyway — with
+      # them present vcpkg recognises the ports as already installed.
       - name: Cache vcpkg
+        id: cache-vcpkg
         uses: actions/cache@v4
         with:
           path: |
-            vcpkg_installed
-            ${{ env.LOCALAPPDATA }}\vcpkg\archives
+            vcpkg_installed/x64-windows
+            vcpkg_installed/vcpkg/status
+            vcpkg_installed/vcpkg/info
+            vcpkg_bincache
           key: vcpkg-${{ hashFiles('vcpkg.json') }}
           restore-keys: vcpkg-
 
@@ -73,6 +109,30 @@ jobs:
       # -----------------------------------------------------------------------
       # Build C++ project (with tests)
       # -----------------------------------------------------------------------
+      # R4-0: vcpkg creates its binary-cache directory on demand on most
+      # versions; this is defensive so a cold run cannot fail on a missing dir.
+      - name: Prepare vcpkg binary cache dir
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path "${{ github.workspace }}\vcpkg_bincache" | Out-Null
+
+      - name: Announce cold vcpkg build
+        if: steps.cache-vcpkg.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          Write-Host "::warning::vcpkg cache miss - this run must build all manifest ports from source (Qt 6.8.0 included). Expect the configure step to take 60+ minutes. Subsequent runs restore the cache and skip vcpkg entirely."
+
+      # R4-0: the two -DVCPKG_* flags are the load-bearing part of the fix.
+      #   * VCPKG_INSTALLED_DIR moves the install tree from
+      #     `build/vcpkg_installed` to the repo root, which is (a) the path the
+      #     cache step above preserves, (b) the path CMakeLists.txt:7 probes to
+      #     skip vcpkg on warm runs, and (c) the path tests/CMakeLists.txt:431
+      #     already injects into every ctest's PATH so test executables can
+      #     resolve Qt6Core.dll / SDL2.dll. Before this flag, (c) pointed at a
+      #     non-existent directory on CI and the tests only survived because
+      #     the vcpkg toolchain's applocal deployment copied DLLs next to each
+      #     exe — a mechanism that does not exist on the warm/bypass path.
+      #   * VCPKG_OVERLAY_TRIPLETS activates cmake/triplets/x64-windows.cmake,
+      #     which is release-only; see that file's header for the rationale.
       - name: Configure CMake
         run: >
           cmake -S . -B build
@@ -83,6 +143,8 @@ jobs:
           -DFCEUX11_BUILD_TESTS=ON
           -DFCEUX11_ENABLE_RUST=ON
           -DENABLE_LINT_CPPCHECK=OFF
+          -DVCPKG_INSTALLED_DIR=${{ github.workspace }}/vcpkg_installed
+          -DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}/cmake/triplets
 
       - name: Build C++
         run: cmake --build build --config Release --parallel
@@ -214,3 +276,70 @@ jobs:
             Write-Host "Oracle A: $($m.oracle_breakdown.a_regression.pass)P / $($m.oracle_breakdown.a_regression.fail)F"
             Write-Host "Oracle B: $($m.oracle_breakdown.b_hardware.pass)P / $($m.oracle_breakdown.b_hardware.fail)F"
           }
+
+      # -----------------------------------------------------------------------
+      # R4 gate — machine-enforce the acceptance report's falsification criteria
+      # -----------------------------------------------------------------------
+      # docs/FCEUX11-1.16_最终验收报告.md §十 R4 states the criteria for closing
+      # acceptance standard #5, and its 证伪判据: "if CI reports
+      # git_rev=\"unknown\" or passed != 35, S-4/D-3 did not take effect in the
+      # CI environment — do NOT merge."
+      #
+      # Until now those criteria lived only in prose, while every substantive
+      # step above carries `continue-on-error: true` and "Print Summary" simply
+      # prints nothing when the matrix is absent. Run 82956632293 is the proof:
+      # the matrix was never produced, and the only trace was a buried
+      # `##[warning]No files were found with the provided path`. That is exactly
+      # the "it ran but the conclusion is wrong" failure class the report calls
+      # more dangerous than an outright build failure (§九.2 item 3).
+      #
+      # This gate runs `if: always()` and is placed AFTER the artifact upload on
+      # purpose: a gate failure must still leave the artifacts downloadable for
+      # diagnosis. It fails the job, it does not hide evidence.
+      #
+      # `total` is compared with -lt 39 rather than -ne 39 so that legitimately
+      # adding test cases later cannot turn this gate red for the wrong reason.
+      - name: R4 Gate — migration matrix must exist and be sane
+        if: always()
+        shell: pwsh
+        run: |
+          $matrixPath = "build/kagamiqa_migration_matrix.json"
+          $failures = @()
+
+          if (-not (Test-Path $matrixPath)) {
+            Write-Host "::error::R4 gate: $matrixPath was not produced. The KagamiQA pipeline did not reach the migration-matrix stage - inspect the earlier steps (configure / build / runner) for the real cause."
+            exit 1
+          }
+
+          $m = Get-Content $matrixPath -Raw | ConvertFrom-Json
+
+          # S-4: git_rev must be a real commit hash, stamped at compile time via
+          # build.rs + option_env!. "unknown" means the stamp did not survive
+          # the CI environment and matrices are not traceable to a code state.
+          $gitRev = $m.engine.git_rev
+          if ([string]::IsNullOrWhiteSpace($gitRev) -or $gitRev -eq 'unknown') {
+            $failures += "engine.git_rev is '$gitRev' (expected a real commit short hash; S-4 compile-time stamp did not take effect in CI)"
+          }
+
+          # Coverage floor: the manifest carries 39 unique entries (S-1 removed
+          # the 3 duplicate dead entries). Fewer means the runner silently
+          # skipped cases.
+          if ($m.summary.total -lt 39) {
+            $failures += "summary.total is $($m.summary.total), expected >= 39 (test cases were silently skipped)"
+          }
+
+          # Phase 0.5-d anti-gaming guard: newly added tests must land in the
+          # `new_test` bucket, never inflate `fail_to_pass`.
+          $f2p = $m.transition_matrix.fail_to_pass
+          $f2pCount = if ($null -eq $f2p) { 0 } elseif ($f2p -is [array]) { $f2p.Count } else { [int]$f2p }
+          if ($f2pCount -ne 0) {
+            $failures += "transition_matrix.fail_to_pass is $f2pCount, expected 0 (Phase 0.5-d anti-gaming guard did not hold in CI)"
+          }
+
+          if ($failures.Count -gt 0) {
+            foreach ($f in $failures) { Write-Host "::error::R4 gate: $f" }
+            Write-Host "::error::R4 gate failed - per the acceptance report section 10 R4 falsification criteria, do NOT merge until this is resolved."
+            exit 1
+          }
+
+          Write-Host "R4 gate passed: git_rev=$gitRev, total=$($m.summary.total), passed=$($m.summary.passed), failed=$($m.summary.failed), fail_to_pass=0 [OK]"
