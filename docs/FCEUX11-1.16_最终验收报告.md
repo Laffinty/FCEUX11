@@ -37,6 +37,33 @@
 > - 完整证据链见 **`docs/history/FCEUX11-1.16_CI-R4-实跑诊断.md`**。
 >
 > **验收通过判定仍不受影响**——本轮 CI 失败暴露的是 workflow 依赖治理缺陷，不触及构建、判定链路或覆盖率口径。
+>
+> ---
+>
+> **🚨 2026-07-31 第三次接管修订：第二轮 CI 实跑（R4-0 生效，暴露两个新缺口 → R4-1）**
+>
+> CI run **`83046118885`**（commit `efaa363`）已跑完，约 75 分钟，最终由 `R4 Gate` 主动判红。
+>
+> **R4-0 的每一项都实测生效**：配置步**成功**（`Configuring done (2905.4s)` = 48.4 分钟，旧的 45 分钟上限差约 3.4 分钟）；
+> vcpkg 装到仓库根（`Found LibArchive: .../FCEUX11/vcpkg_installed/x64-windows/lib/archive.lib`）；
+> 测试 PATH 注入指向真实目录；**Build C++ `[1151/1151]` 全部链接**；`R4 Gate` 把静默失败变成指名道姓的红灯。
+>
+> **暴露两个此前被本地环境掩盖的 CI 缺口**（均**非** R4-0 引入，是 CI 第一次真正跑到这些步骤才显形）：
+> - **缺口 A**：`.gitignore:108` 的 `*.nes` 使 177 个 blargg ROM 全部不在仓库（本地 177 / 仓库 0），
+>   而 workflow 从未调用已有的 `scripts/download_blargg_roms.ps1` → Oracle B **177/0 PASS/177 FAIL**
+>   （全为 `0xFE` + `duration_ms:0` 的**加载失败**签名，非精度失败）；`kagami_qa_direct_smoke` 同因失败，
+>   CI 上 ctest 为 32/33 而本地同 commit 为 34/34
+> - **缺口 B**：`src/rust/.cargo/config.toml` 设 `build.target`，产物在 `target/x86_64-pc-windows-msvc/release/`，
+>   而 workflow 查的是 `target/release/` → 矩阵步被跳过。本地因存在一份 2026-07-28 的**陈旧副本**而看不见此 bug
+>
+> **R4-1 已落地**：补 ROM 缓存 + 拉取 + **对 manifest 逐条校验**（下载脚本从不设非零退出码，部分下载会被
+> 静默当成完整 177 ROM）；runner 路径按三元组优先解析，且「找不到」由 warning 升级为 error。
+> 5 个用例本地实测通过。**R4-1 尚未经 CI 验证。**
+>
+> 顺带更正 `docs/BuildGuide.md:363` 的同款错误路径（`docs/tech/KagamiQA.md:28` 一直是对的）——
+> 按旧文档跑 runner 的人可能一直在用过期二进制。
+>
+> 完整证据链见 `docs/history/FCEUX11-1.16_CI-R4-实跑诊断.md` §六。
 
 ---
 
@@ -344,8 +371,10 @@ oracle_breakdown: { A_regression: {pass:25, fail:2}, B_hardware: {pass:10, fail:
   ☑ 判定逻辑与 manifest schema 声明一致        （0.5-1 / 0.5-2 实测）
   ☑ 迁移矩阵不含结构性失真                      （0.5-3 / 0.5-4 实测，fail_to_pass=0）
   ☑ 产物可追溯：matrix 带真实 git_rev=623dd39   （S-4 实测）
-  ☐ CI 常驻、指标由 CI 产物回填                  （已实跑一轮 run 82956632293 → configure 步 45min timeout，
-                                                    未产出 matrix；根因为 vcpkg 缓存路径缺陷，R4-0 已修，待重跑）
+  ☐ CI 常驻、指标由 CI 产物回填                  （已实跑两轮：run 82956632293 配置步 45min timeout；
+                                                    run 83046118885 R4-0 生效、配置步 48.4min 成功、
+                                                    1151/1151 链接完成，但因 blargg ROM 缺失 + runner
+                                                    三元组路径两个缺口仍未产出 matrix。R4-1 已修，待重跑）
                                                        ↑ 唯一未完全闭合的门槛
 
 【权威性度量】
@@ -433,7 +462,7 @@ v2.0 清理项 E 系列、i18n 债务 H 系列、GUI/movie 层 TODO F 系列、5
 | 2 | 本地 `ctest -LE perf` 与 CI 一致 | 逐项比对 | ✅ **34/34 = 100%** | ✅ |
 | 3 | `lua_bit_test_headless` PASS | Phase B | ✅ Passed 0.03s | ✅ |
 | 4 | `kagami_qa_direct_smoke` PASS | Phase C | ✅ Passed 6.42s | ✅ |
-| 5 | migration matrix 由 CI 产出且 passed 率有据可查 | Phase D | 🟡 本地 35/39、`git_rev=623dd39` 可追溯；CI 已实跑一轮但因 vcpkg 缓存缺陷 timeout，未产出 matrix（见 §十 R4-0） | 🟡 |
+| 5 | migration matrix 由 CI 产出且 passed 率有据可查 | Phase D | 🟡 本地 35/39、`git_rev=623dd39` 可追溯；CI 已实跑两轮，R4-0 已实测生效但矩阵仍未产出（ROM 缺失 + runner 路径，R4-1 已修待验，见 §十 R4-0/R4-1） | 🟡 |
 | 6 | Oracle B ROM 覆盖 ≥80%，失败项显式标注 | Phase D | ✅ 177/177 = 100%，失败项带码+分类 | ✅ |
 | 7 | README/KagamiQA.md 数字由 CI 产物回填，中英一致 | Phase D | ✅ 34/39/177 中英一致 | ✅ |
 | 8 | 遗留文档 3 处过期记载已更正 | Phase 0 | ✅ | ✅ |
@@ -473,8 +502,10 @@ v2.0 清理项 E 系列、i18n 债务 H 系列、GUI/movie 层 TODO F 系列、5
 >
 > §十 处方修订导致"100% 完美交付"路径部分重审：
 > - P0（文档收尾 R1-R3） — ✅ 已 commit `1fa88f2`
-> - P1（CI 实跑 R4） — ⚠️ **已实跑一轮并失败**（run `82956632293` / `10f1e05`，configure 步 45min timeout，
->   根因为 vcpkg 缓存路径缺陷，非 KagamiQA 缺陷）；前置整改 **R4-0** 已落地待验，需用户重新触发
+> - P1（CI 实跑 R4） — ⚠️ **已实跑两轮**：run `82956632293`（`10f1e05`）配置步 45min timeout；
+>   run `83046118885`（`efaa363`）**R4-0 全项实测生效**（配置步 48.4min 成功、1151/1151 链接完成、
+>   gate 正确判红），但暴露 blargg ROM 缺失 + runner 三元组路径两个缺口，矩阵仍未产出。
+>   **R4-1** 已落地待验，需用户重新触发
 > - P2 R5（E-1 PPU） — ⚠️ Step 1 处方已修订并 revert；Steps 2-4 需先 instrument-first 验证
 > - P2 R6（E-3 APU） — ⚠️ 处方未经实测，需 instrument-first 验证
 > - P3 R7（第二 oracle 来源） — 未启动
@@ -496,7 +527,8 @@ v2.0 清理项 E 系列、i18n 债务 H 系列、GUI/movie 层 TODO F 系列、5
 | **P0 文档/可追溯性收尾** | R1 文档符号名/行号勘误 | 文档偏差 | 检索可追溯 | 是（低成本） |
 | | R2 快照 commit 锚统一刷新 | 文档元数据漂移 | 三处锚点一致 | 是（低成本） |
 | | R3 ntdll 注释措辞修正 | 注释不准 | 注释真实 | 是（低成本） |
-| **P1 CI 闭环** | R4-0 修 workflow vcpkg 依赖治理缺陷 | CI 冷编 Qt 超时 | 让 CI 有可能跑完 | 是（已落地待验） |
+| **P1 CI 闭环** | R4-0 修 workflow vcpkg 依赖治理缺陷 | CI 冷编 Qt 超时 | 让 CI 有可能跑完 | 是（**已由第二轮 CI 实测生效**） |
+| | R4-1 补 blargg ROM fixtures + 修 runner 三元组路径 | CI 无 ROM、矩阵步被跳过 | 让矩阵有可能产出 | 是（已落地待验） |
 | | R4 CI 实跑一轮 `kagami-qa.yml` | 卫生门槛 #5 未闭合 | 验收 #5 转 ✅ | 是 |
 | **P2 精度收敛** | R5 E-1 PPU VBL/NMI 边沿时序 | 真实精度，6 ROM FAIL | blargg_ppu_vbl_nmi 转 PASS | 否（独立 PR） |
 | | R6 E-3 APU 帧计数器相位 + $4017 标志 | 真实精度，7 sub-test FAIL | 7 项转 PASS | 否（独立 PR） |
@@ -606,6 +638,72 @@ v2.0 清理项 E 系列、i18n 债务 H 系列、GUI/movie 层 TODO F 系列、5
 **R4-0 的诚实边界**：以上整改**本身未经 CI 实跑验证**，只做了本地 YAML 解析、grep 复核、gate 四向实测、
 以及本地 Release 重建回归。**整改是否真能让 CI 跑通，须待下一轮 CI 判定**——在那之前应视为
 「有依据的处方，而非已验证的结论」。若预热跑仍撞 180 分钟上限，contingency 见诊断文档 §五。
+
+> **✅ 2026-07-31 第二轮 CI 实测：R4-0 全项生效，边界解除**
+>
+> run **`83046118885`**（commit `efaa363`，约 75 分钟）实测确认上表每一项：
+>
+> | R4-0 改动 | 实测证据 |
+> |---|---|
+> | `VCPKG_INSTALLED_DIR` | `Found LibArchive: D:/a/FCEUX11/FCEUX11/vcpkg_installed/x64-windows/lib/archive.lib`（仓库根）；`FCEUX11 tests: PATH prepended for vcpkg runtime — D:\a\FCEUX11\FCEUX11\vcpkg_installed\x64-windows\bin`（潜伏脆弱同时修复） |
+> | release-only triplet + timeout 180 | `-- Configuring done (2905.4s)` = **48.4 分钟，成功** —— 旧的 45 分钟上限差约 3.4 分钟，抬升既必要又充分 |
+> | 冷跑告警 | `::warning::vcpkg cache miss - ...` 如期出现 |
+> | 缓存/构建链路 | Build C++ **`[1151/1151]`** 全部链接；`cargo ... Finished release profile in 17.01s` |
+> | `.gitignore` 例外 | overlay triplet 成功进入 CI 检出（否则配置步会以全新理由失败） |
+> | **R4 Gate** | 正确判红并指名道姓：`R4 gate: build/kagamiqa_migration_matrix.json was not produced. ... inspect the earlier steps` |
+>
+> **R4-0 至此由「处方」升格为「已验证结论」。** 但矩阵仍未产出，原因是两个新暴露的缺口 → R4-1。
+
+#### R4-1. 补齐 blargg ROM fixtures 与 runner 三元组路径（已落地，待 CI 验证）
+
+第二轮 CI 让流水线第一次真正跑到 Oracle A/B 与矩阵生成，随即暴露两个**此前被本地环境掩盖**的缺口。
+两者均**非 R4-0 引入**。
+
+**缺口 A —— blargg ROM 在 CI 上根本不存在**
+
+- Oracle B 实测 `Total: 177 / Passed: 0 / Failed: 177`，逐条 `{"value":"0xFE","diag":[229,246,127],"duration_ms":0}`
+  —— 这是**加载不到 ROM** 的签名，**不是**精度失败
+- Oracle A 的 `kagami_qa_direct_smoke` 同因失败（`kagami_bridge_load_rom(...) failed: rc=-2`），
+  致 CI 上 ctest 为 **32/33**，而同一 commit 本地为 34/34
+- 根因：`.gitignore:108` 的 `*.nes` 把全部 ROM 排除出仓库（实测本地磁盘 **177** 个、`git ls-files` **0** 个）。
+  这本身是有意设计——ROM 从镜像拉取而非入库，项目已备有 `scripts/download_blargg_roms.ps1`——
+  **但两个 workflow 从未调用过它**。CI 历史上一直在对着空 fixture 树跑 Oracle B
+
+**改法**：新增 `Cache blargg ROMs`（key 跟随下载脚本哈希，因 ROM 清单声明在脚本内）+ `Fetch blargg test ROMs`
++ **`Verify blargg ROM fixtures against manifest`**。第三步不可省：下载脚本汇总失败数但**从不设非零退出码**，
+部分下载会被静默当作完整的 177 ROM 跑完并写进矩阵——正是本报告反复警惕的「跑出来了但结论是错的」型缺陷。
+校验步对着 `blargg_manifest.json` 的 177 条逐一核对磁盘存在性，缺一即 `::error::` + `exit 1`。
+
+**缺口 B —— runner 路径缺少 target 三元组**
+
+- 矩阵步输出 `::warning::kagami-qa-runner not built; skipping migration matrix.`，
+  而紧邻上一步 cargo 明确 `Finished release profile ... in 17.01s`
+- 根因：`src/rust/.cargo/config.toml` 设 `build.target = "x86_64-pc-windows-msvc"`，产物落在
+  `target/x86_64-pc-windows-msvc/release/`，而 workflow 查的是 `target/release/`
+- **为何本地看不见**：本仓库 `target/release/` 下存有一份 **2026-07-28、424,960 字节的陈旧副本**，
+  与三元组路径下 **2026-07-30、562,688 字节的真产物**并存。旧路径在开发机上恰好「能用」，
+  干净检出的 CI 上必然不存在
+
+**改法**：按 `[三元组路径, 平路径]` 顺序解析取第一个存在者；**两者皆无由 `::warning::` 升级为 `::error::` + `exit 1`**
+——静默跳过矩阵生成，正是让本轮看起来像「基础设施抽风」而非真实缺口的原因。
+同时更正 `docs/BuildGuide.md:363` 的同款错误路径（`docs/tech/KagamiQA.md:28` 一直是对的）：
+按旧文档跑 runner 的人可能一直在用过期二进制产出矩阵，这是 S-4 编译期 stamp 立项要防的问题的另一个入口。
+
+**R4-1 的本地实测（5 用例，非纸面推导）**：
+
+| # | 用例 | 结果 |
+|---|------|------|
+| A | ROM 校验：本地完整 177 个 | `blargg fixtures: 177 / 177 present`，exit 0 |
+| B | ROM 校验：临时移走 3 个 | `174 / 177` + 逐条 `::error::missing ROM:`，exit 1 |
+| C | runner 解析：两份都在 | 选中**三元组**路径（即避开陈旧副本） |
+| D | runner 解析：模拟干净 CI | 正确选中，exit 0 |
+| E | runner 解析：两者皆无 | `::error::` 列出查找路径，exit 1 |
+
+**R4-1 的诚实边界**：**尚未经 CI 验证**。ROM 补齐后 CI 的 ctest 预期回到 33/33（`-LE perf`）、
+Oracle B 回到 121/56 口径，但这些均需下一轮实测确认，本处不预判。
+另：本轮缓存是否已保存**未获证实**（日志包不含 Post 步骤输出）；理论上 `actions/cache@v4` 在
+**failed**（而非 cancelled）时会保存，本轮是 gate 主动 `exit 1` 的 failed，故大概率已存——
+下一轮 `Cache vcpkg` 步会给出确定答案。
 
 #### R4（续）. 重跑并核验产物
 
@@ -800,7 +898,8 @@ for(int dot=(S==0?delay:0);dot<(kLineTime-1);dot++) runppu(1);  // S=0 跑 321 c
 全部满足时，v1.16 达到 100% 完美交付：
 
 - [ ] **R1-R3**：`grep` 验证文档零偏差（符号名/行号/注释/锚 commit 三处一致）
-- [x] **R4-0**：workflow vcpkg 缓存缺陷已修（`VCPKG_INSTALLED_DIR` + release-only overlay triplet + 缓存路径收窄 + R4 Gate），本地 YAML/grep/gate 四向实测通过 —— **但未经 CI 验证**
+- [x] **R4-0**：workflow vcpkg 缓存缺陷已修（`VCPKG_INSTALLED_DIR` + release-only overlay triplet + 缓存路径收窄 + R4 Gate）—— **已由第二轮 CI（run 83046118885）实测生效**：配置步 48.4 min 成功、1151/1151 链接完成、gate 正确判红
+- [x] **R4-1**：补 blargg ROM 拉取+manifest 逐条校验、runner 三元组路径解析、BuildGuide 路径更正；5 用例本地实测通过 —— **未经 CI 验证**
 - [ ] **R4**：CI 实跑一轮，`engine.git_rev` 非 unknown，`passed=35`，`R4 Gate` 步绿，验收标准 #5 转 ✅
 - [ ] **R5**：`vbl_01`~`vbl_10` 全 10 ROM 返回 `0x00`；`blargg_ppu_vbl_nmi` 升 `blocking`；Oracle A 维持 34/34
 - [ ] **R6**：7 个 bucket-C sub-test 全转 PASS；`apu_01`~`apu_11` + `pal_apu_*` 不回归；Oracle A 维持 34/34

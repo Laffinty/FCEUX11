@@ -1,14 +1,20 @@
-# FCEUX11 v1.16 — §十 R4「CI 实跑」第一轮诊断与整改（R4-0）
+# FCEUX11 v1.16 — §十 R4「CI 实跑」诊断与整改（R4-0 / R4-1）
 
 > **日期**：2026-07-31
 > **触发**：用户按 `docs/FCEUX11-1.16_最终验收报告.md` §十 R4 步骤 1 推送 `wip_1.16`，`kagami-qa.yml` 自动触发
-> **CI run**：`82956632293`（日志包 `logs_82956632293.zip`，含 `0_kagami-qa.txt` 2354 行 + `kagami-qa/system.txt`）
-> **结论**：**该轮 CI 失败，R4 未闭合**。失败原因**不在 KagamiQA**，而在两个 workflow 共有的 vcpkg 依赖治理缺陷。
-> **本文档性质**：全部结论均来自对 CI 日志原文的逐行核对，非采信。凡推断处显式标注。
+> **本文档性质**：全部结论均来自对 CI 日志原文的逐条核对，非采信。凡推断处显式标注。
+>
+> | 轮次 | CI run | commit | 结果 | 章节 |
+> |---|---|---|---|---|
+> | 第一轮 | `82956632293` | `10f1e05` | 配置步 45 min timeout 被取消，五步全 skip | §一~§五（整改 = **R4-0**） |
+> | 第二轮 | `83046118885` | `efaa363` | **R4-0 全项生效**（配置步 48.4 min 成功、1151/1151 链接完成）；暴露 blargg ROM 缺失 + runner 路径两个新缺口 | §六（整改 = **R4-1**） |
+>
+> **R4 截至本文档仍未闭合**，但阻塞点已两次收敛：从「workflow 不可能跑完」→「跑完了但 fixture 与产物路径不对」。
+> 两轮失败的根因**均不在 KagamiQA 判定逻辑本身**。
 
 ---
 
-## 一、实测事实（全部有日志行号可查）
+## 一、第一轮实测事实（全部有日志行号可查）
 
 | # | 事实 | 证据 |
 |---|------|------|
@@ -110,6 +116,10 @@ R4 的三项证伪判据（git_rev / passed=35 / fail_to_pass=0）无从核验
 
 ## 四、下一轮 CI 的预期与验收判据
 
+> **⚠️ 本节写于第一轮之后，其中「第一轮/第二轮」的编号预期已被 §六 的实测取代。**
+> 第 1 条（预热跑 60-90 分钟）已由 run `83046118885` 实测证实（48.4 分钟配置步）；
+> 第 2 条（缓存命中后 ~15 分钟）**仍待验证**。第 3-4 条的闭合判据保持有效。
+
 1. **第一轮（预热跑）**：缓存未命中，配置步冷编 Qt release 半边，预计 **60-90 分钟**；日志顶部应出现
    `::warning::vcpkg cache miss`。此轮跑完后缓存条目 `vcpkg-<hash(vcpkg.json)>` 应被保存（约 1.2 GB + 二进制缓存）。
 2. **第二轮**：缓存命中 → `CMakeLists.txt:7` prefer-local 分支触发 → 配置步秒级完成 → 全流程预计 **~15 分钟**，
@@ -143,12 +153,98 @@ R4 的三项证伪判据（git_rev / passed=35 / fail_to_pass=0）无从核验
 
 ---
 
-## 六、本次未做（边界声明）
+## 六、第二轮实测（run `83046118885`，commit `efaa363`）—— R4-0 生效，暴露两个新缺口
+
+> 本节全部结论来自对 `logs_83046118885.zip` 分步日志的逐条核对。
+> 作业 `10:48:41` → `12:03:32`，约 **75 分钟**，最终**红灯**（`R4 Gate` 主动 `exit 1`）。
+
+### 6.1 R4-0 的每一项都实测生效
+
+| R4-0 改动 | 第一轮（`82956632293`） | 第二轮（`83046118885`） |
+|---|---|---|
+| 配置步 | 45 min 撞 timeout 被取消 | ✅ **成功**：`-- Configuring done (2905.4s)` = **48.4 分钟** |
+| vcpkg 安装位置 | `build/vcpkg_installed`（缓存不到） | ✅ `Found LibArchive: D:/a/FCEUX11/FCEUX11/vcpkg_installed/x64-windows/lib/archive.lib`、`Found ZLIB: .../vcpkg_installed/x64-windows/lib/z.lib` —— **仓库根** |
+| 测试 DLL PATH 注入 | 指向不存在目录（靠 applocal 兜底） | ✅ `FCEUX11 tests: PATH prepended for vcpkg runtime — D:\a\FCEUX11\FCEUX11\vcpkg_installed\x64-windows\bin` |
+| Build C++ | 从未执行 | ✅ **`[1151/1151]` 全部链接**，含 `fceux11_blargg_runner.exe` |
+| kagami-qa-runner | 从未执行 | ✅ `Finished release profile in 17.01s` |
+| 冷跑告警 | 无此机制 | ✅ `::warning::vcpkg cache miss - ...` 如期出现于日志顶部 |
+| 失败可见性 | 一条被淹没的 `##[warning]No files were found` | ✅ **`R4 Gate` 红灯并指名道姓**：`R4 gate: build/kagamiqa_migration_matrix.json was not produced. ... inspect the earlier steps` |
+
+> **48.4 分钟这个数字直接证明了 timeout 抬升的必要性与充分性**：旧上限 45 分钟差约 3.4 分钟，
+> 而 180 分钟留有约 3.7 倍余量。
+
+### 6.2 缺口 A —— blargg ROM fixtures 在 CI 上根本不存在
+
+**实测**：
+
+- Oracle B：`Total: 177 / Passed: 0 / Failed: 177`，逐条为
+  `{"value":"0xFE","diag":[229,246,127],"status":"FAIL","duration_ms":0}` ——
+  `0xFE` + `duration_ms: 0` 是**加载不到 ROM** 的签名，不是精度失败
+- Oracle A：`kagami_qa_direct_smoke` 红，
+  `kagami_bridge_load_rom('fixtures/blargg/ppu/ppu_vbl_nmi.nes') failed: rc=-2`（4 项中 3 项 LOAD_ERROR）
+  → CI 上 ctest 为 **32/33**，而同一 commit 本地是 34/34
+
+**根因**：`.gitignore:108` 的 `*.nes` 把全部 ROM 排除出仓库（实测：本地磁盘 **177** 个 `.nes`，
+`git ls-files tests/fixtures/blargg` 返回 **0**）。这本身是**有意设计**——ROM 从镜像拉取而非入库，
+项目已备有 `scripts/download_blargg_roms.ps1`——**但两个 workflow 从未调用过它**。
+即 CI 历史上一直在对着空的 fixture 树跑 Oracle B。
+
+**修复（R4-1）**：新增三步——`Cache blargg ROMs`（key 跟随下载脚本哈希，因 ROM 清单声明在脚本里）、
+`Fetch blargg test ROMs`、`Verify blargg ROM fixtures against manifest`。
+
+第三步是必要的：下载脚本汇总失败数但**从不设非零退出码**，部分下载会被静默当成完整的 177 ROM 跑完。
+校验步改为对着 `tests/fixtures/blargg_manifest.json` 的 177 条逐一核对磁盘存在性，缺一即 `::error::` + `exit 1`。
+
+### 6.3 缺口 B —— runner 路径缺少 target 三元组
+
+**实测**：矩阵步输出 `::warning::kagami-qa-runner not built; skipping migration matrix.`，
+而紧邻的上一步 cargo 明确 `Finished release profile [optimized] target(s) in 17.01s`。
+
+**根因**：`src/rust/.cargo/config.toml` 设 `build.target = "x86_64-pc-windows-msvc"`，
+cargo 产物落在 `target/x86_64-pc-windows-msvc/release/`；而 workflow 检查的是
+`src/rust/target/release/kagami-qa-runner.exe`。
+
+**为何本地看不见**：本仓库 `target/release/` 下有一份 **2026-07-28、424,960 字节的陈旧副本**，
+与三元组路径下 **2026-07-30、562,688 字节的真产物**并存。旧路径在开发机上恰好"能用"，
+干净检出的 CI 上必然不存在。
+
+> **顺带的严重隐患**：`docs/BuildGuide.md:363` 此前也写的是 `target/release/...`。
+> 任何按该文档跑 runner 的人，用的都可能是过期二进制，产出的矩阵无法反映当前代码——
+> 这正是 S-4 编译期 `git_rev` stamp 立项要防的问题的另一个入口。已随 R4-1 更正
+> （`docs/tech/KagamiQA.md:28` 一直是对的）。
+
+**修复（R4-1）**：按 `[三元组路径, 平路径]` 顺序解析，取第一个存在者；
+**两者皆无时由 `::warning::` 升级为 `::error::` + `exit 1`** —— 静默跳过矩阵生成，
+正是让本轮看起来像"基础设施抽风"而非真实缺口的原因。
+
+### 6.4 R4-1 的本地实测（5 个用例，非纸面推导）
+
+| # | 用例 | 结果 |
+|---|------|------|
+| A | ROM 校验：本地完整 177 个 | `blargg fixtures: 177 / 177 present`，exit 0 |
+| B | ROM 校验：临时移走 3 个 | `174 / 177`，逐条 `::error::missing ROM: ...`，exit 1 |
+| C | runner 解析：两份都在 | 选中**三元组**路径（即避开了陈旧副本） |
+| D | runner 解析：模拟干净 CI（只有三元组） | 正确选中，exit 0 |
+| E | runner 解析：两者皆无 | `::error::` 列出两个查找路径，exit 1 |
+
+### 6.5 缓存是否已保存（未证实）
+
+日志包中未包含 Post 步骤输出（分步文件从 `19_` 跳到 `38_Post Checkout`），
+**无法从本轮日志证实 vcpkg 缓存条目已保存**。理论依据：`actions/cache@v4` 在作业
+**failed** 时会执行保存（只有 **cancelled** 才跳过），而本轮是 `R4 Gate` 主动 `exit 1` 导致的 failed，
+故大概率已存。**下一轮的 `Cache vcpkg` 步会直接给出答案**：若命中，配置步应从 48.4 分钟降至秒级。
+在那之前，这条只是推断，不作为结论。
+
+---
+
+## 七、本次未做（边界声明）
 
 - **未动 `vcpkg.json`**：未把 Qt 移入 feature、未引入 `install-qt-action`
 - **零代码变更**：C++ / Rust / `CMakeLists.txt` / `tests/CMakeLists.txt` 均未修改
 - **未触碰 §十 R5 / R6**（E-1 PPU VBL/NMI、E-3 APU 桶 C）：二者仍是 instrument-first 前置硬约束
 - **未修 `ci.yml` 缺 `-DFCEUX11_ENABLE_RUST=ON` 的问题**：与本次 R4-0 无关，超出范围
-- **本次整改本身未经 CI 实跑验证**：只能在本地做 YAML 解析、grep 复核、gate 逻辑四向实测、
-  以及「本地构建不受影响」的回归。**整改是否真能让 CI 跑通，须待用户推送后的下一轮 CI 判定** ——
-  在那之前，本文档第三节的修法应被理解为**有依据的处方，而非已验证的结论**。
+- **R4-0 已由第二轮 CI 实测验证**（§六.1），不再是处方；**R4-1（§六.2/6.3）尚未经 CI 验证**，
+  只做了本地 YAML 解析、5 个用例的逻辑实测（§六.4）。R4-1 是否真能让矩阵产出，须待下一轮 CI 判定。
+- **未证实缓存是否已保存**（§六.5），下一轮 `Cache vcpkg` 步会给出答案。
+- **未处理 Oracle A 在 CI 与本地的口径差**：ROM 补齐后 CI 的 ctest 预期回到 33/33（`-LE perf`），
+  但这需要下一轮实测确认，本轮不预判。

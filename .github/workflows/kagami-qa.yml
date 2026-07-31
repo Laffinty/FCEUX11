@@ -157,6 +157,59 @@ jobs:
         run: cargo build --release -p kagami-qa
 
       # -----------------------------------------------------------------------
+      # Blargg test ROM fixtures (Oracle B's ground truth)
+      # -----------------------------------------------------------------------
+      # R4-1 (2026-07-31): run 83046118885 showed Oracle B reporting
+      # "Total: 177 / Passed: 0 / Failed: 177", every entry with
+      # `value: 0xFE, diag:[229,246,127]` -- the ROM-not-loadable signature, not
+      # accuracy failures. `kagami_qa_direct_smoke` failed the same way
+      # (`kagami_bridge_load_rom(...) failed: rc=-2`), dragging CI's ctest to
+      # 32/33 while the same commit is 34/34 locally.
+      #
+      # Root cause: `.gitignore:108` (`*.nes`) keeps all 177 blargg ROMs out of
+      # the repository -- by design, they are fetched from a mirror rather than
+      # vendored -- but no workflow ever invoked the fetch script. So CI has
+      # always run Oracle B against an empty fixture tree.
+      #
+      # scripts/download_blargg_roms.ps1 is idempotent (it skips any file that
+      # already exists and is >256 bytes), so a cache hit makes this a no-op.
+      # The cache key follows the script because the ROM inventory is declared
+      # inside it.
+      - name: Cache blargg ROMs
+        id: cache-blargg
+        uses: actions/cache@v4
+        with:
+          path: tests/fixtures/blargg
+          key: blargg-roms-${{ hashFiles('scripts/download_blargg_roms.ps1') }}
+          restore-keys: blargg-roms-
+
+      - name: Fetch blargg test ROMs
+        shell: pwsh
+        run: ./scripts/download_blargg_roms.ps1
+
+      # The fetch script reports failures but never sets a non-zero exit code,
+      # so a partially-downloaded fixture tree would silently be reported as a
+      # full 177-ROM run. Cross-check the manifest instead: every ROM the
+      # manifest promises must actually be on disk before Oracle B may claim to
+      # have tested it.
+      - name: Verify blargg ROM fixtures against manifest
+        shell: pwsh
+        run: |
+          $manifest = Get-Content tests/fixtures/blargg_manifest.json -Raw | ConvertFrom-Json
+          $missing = @()
+          foreach ($rom in $manifest.roms) {
+            if (-not (Test-Path (Join-Path 'tests' $rom.path))) { $missing += $rom.path }
+          }
+          $have = $manifest.roms.Count - $missing.Count
+          Write-Host "blargg fixtures: $have / $($manifest.roms.Count) present"
+          if ($missing.Count -gt 0) {
+            foreach ($p in ($missing | Select-Object -First 10)) { Write-Host "::error::missing ROM: $p" }
+            if ($missing.Count -gt 10) { Write-Host "::error::... and $($missing.Count - 10) more" }
+            Write-Host "::error::blargg fixture tree is incomplete - Oracle B results would be meaningless. Check scripts/download_blargg_roms.ps1 and the upstream mirror."
+            exit 1
+          }
+
+      # -----------------------------------------------------------------------
       # Oracle A — CTest regression suite
       # -----------------------------------------------------------------------
       - name: Oracle A — CTest
@@ -193,22 +246,44 @@ jobs:
       # so subsequent runs can consume the artifact via download-artifact.
       # Future PR: add a download-artifact step before this one and pass
       # the downloaded baseline as `--baseline`.
+      #
+      # R4-1 (2026-07-31): run 83046118885 skipped this step entirely with
+      # "::warning::kagami-qa-runner not built" even though the preceding cargo
+      # step had just reported `Finished release profile in 17.01s`. Cause:
+      # `src/rust/.cargo/config.toml` sets `build.target =
+      # "x86_64-pc-windows-msvc"`, so cargo emits into
+      # `target/x86_64-pc-windows-msvc/release/`, not `target/release/`. The old
+      # path only ever resolved on developer machines that still had a stale
+      # copy at the untriplet path (this repo has one from 2026-07-28, 424 KB,
+      # next to the real 2026-07-30 binary at 562 KB) -- so the bug was
+      # invisible locally and guaranteed on a clean checkout.
+      #
+      # Resolve the triplet path first, fall back to the plain one, and make a
+      # genuinely missing runner an error rather than a warning: silently
+      # skipping matrix generation is what let run 83046118885 look like an
+      # infrastructure hiccup instead of a real gap.
       - name: KagamiQA — Migration Matrix
         run: |
-          $runner = "src/rust/target/release/kagami-qa-runner.exe"
-          if (Test-Path $runner) {
-            & $runner `
-              --manifest tests/tests.json `
-              --bin-dir build/tests `
-              --output build/kagamiqa_migration_matrix.json `
-              --accuracy-table build/kagamiqa_accuracy_table.md `
-              --known-fail tests/fixtures/blargg_known_fail.json `
-              --save-baseline build/kagamiqa_baseline_next.json
-            $exitCode = $LASTEXITCODE
-            Write-Host "KagamiQA runner exit code: $exitCode"
-          } else {
-            Write-Host "::warning::kagami-qa-runner not built; skipping migration matrix."
+          $candidates = @(
+            "src/rust/target/x86_64-pc-windows-msvc/release/kagami-qa-runner.exe",
+            "src/rust/target/release/kagami-qa-runner.exe"
+          )
+          $runner = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $runner) {
+            Write-Host "::error::kagami-qa-runner.exe not found. Looked in:"
+            foreach ($c in $candidates) { Write-Host "::error::  $c" }
+            exit 1
           }
+          Write-Host "Using runner: $runner"
+          & $runner `
+            --manifest tests/tests.json `
+            --bin-dir build/tests `
+            --output build/kagamiqa_migration_matrix.json `
+            --accuracy-table build/kagamiqa_accuracy_table.md `
+            --known-fail tests/fixtures/blargg_known_fail.json `
+            --save-baseline build/kagamiqa_baseline_next.json
+          $exitCode = $LASTEXITCODE
+          Write-Host "KagamiQA runner exit code: $exitCode"
         shell: pwsh
         continue-on-error: true
 

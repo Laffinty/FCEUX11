@@ -360,8 +360,16 @@ cmake --build build --config Release --target kagami_qa_direct_runner
 ```powershell
 cd src/rust
 cargo build --release -p kagami-qa
-# → target/release/kagami-qa-runner.exe
+# → target/x86_64-pc-windows-msvc/release/kagami-qa-runner.exe
 ```
+
+> **注意产物路径带 target 三元组**：`src/rust/.cargo/config.toml` 设了
+> `build.target = "x86_64-pc-windows-msvc"`，所以 cargo 输出到
+> `target/x86_64-pc-windows-msvc/release/`，**不是** `target/release/`。
+> 本文档此前写的是后者（v1.16 R4-1 已更正）。若你的 `target/release/` 下
+> 也有一个 `kagami-qa-runner.exe`，那是历史遗留的**陈旧副本** —— 按旧路径跑
+> 会用到过期二进制，产出的矩阵无法反映当前代码。以 `git ls-files` 无法察觉，
+> 请以修改时间/大小核对，或直接 `cargo clean`。
 
 > `--features direct-adapter` 启用 in-process 模式（需链接 fceux11_core）。
 
