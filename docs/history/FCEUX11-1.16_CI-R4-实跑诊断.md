@@ -1,4 +1,4 @@
-# FCEUX11 v1.16 — §十 R4「CI 实跑」诊断与整改（R4-0 / R4-1）
+﻿# FCEUX11 v1.16 — §十 R4「CI 实跑」诊断与整改（R4-0 / R4-1）
 
 > **日期**：2026-07-31
 > **触发**：用户按 `docs/FCEUX11-1.16_最终验收报告.md` §十 R4 步骤 1 推送 `wip_1.16`，`kagami-qa.yml` 自动触发
@@ -8,9 +8,12 @@
 > |---|---|---|---|---|
 > | 第一轮 | `82956632293` | `10f1e05` | 配置步 45 min timeout 被取消，五步全 skip | §一~§五（整改 = **R4-0**） |
 > | 第二轮 | `83046118885` | `efaa363` | **R4-0 全项生效**（配置步 48.4 min 成功、1151/1151 链接完成）；暴露 blargg ROM 缺失 + runner 路径两个新缺口 | §六（整改 = **R4-1**） |
+> | 第三轮 | `83107636049`（推断，见 §7 注） | `1156ca1` | **R4 闭合、R4-1 全项实测生效**（配置步 47.88 min 冷编成功、177/177 ROM、Oracle A 33/33、Oracle B 121/56、R4 Gate `[OK]`） | §七（**R4 闭环**） |
 >
-> **R4 截至本文档仍未闭合**，但阻塞点已两次收敛：从「workflow 不可能跑完」→「跑完了但 fixture 与产物路径不对」。
-> 两轮失败的根因**均不在 KagamiQA 判定逻辑本身**。
+> **R4 已由第三轮 CI（commit `1156ca1`）闭环**。`actions/cache@v4` 在 failed 作业下不保存 cache 已实测确认
+> （第二轮 failed → 第三轮 cache miss 直接证实），cache 仅在成功作业下保存，故正确节奏是
+> **三轮 CI：cold (45 min timeout) → cold + R4-0 (75 min, failed) → cold + R4-1 (78 min, succeeded) → 后续热跑 (~15 min)**。
+> 三处方至此均升格为「实测结论」。
 
 ---
 
@@ -237,14 +240,97 @@ cargo 产物落在 `target/x86_64-pc-windows-msvc/release/`；而 workflow 检�
 
 ---
 
-## 七、本次未做（边界声明）
+## 七、第三轮实测（run `83107636049`，commit `1156ca1`）—— R4 闭环
+
+> 本节全部结论来自对 `logs_83107636049.zip` 日志原文的逐条核对（解压后仅余 `0_kagami-qa.txt` 单文件
+> 7,598 行，分步文件未保留）。
+>
+> 作业 `2026-07-31T16:05:51Z` → `17:24:06Z`，约 **78 分钟**，最终**绿灯**
+> （R4 Gate 输出 `R4 gate passed: ... [OK]`，未 `exit 1`）。
+>
+> > **§7 注 — Run ID 来源**：日志包文件名 `logs_83107636049.zip` 暗示 run id `83107636049`，
+> > 但 `system.txt` 仅含 `Requested labels: windows-2022` + Job defined at，未保留 run id 行；
+> > 实际 run id 由用户在 GitHub Actions 网页核对。本节凡引用 run id 处均按文件名推断，
+> > 如有出入以网页为准。
+
+### 7.1 R4 Gate 全项实测生效
+
+| R4 闭合判据（前 4 条由 gate 自动核） | 本轮实测 | 判定 |
+|---|---|---|
+| matrix 产出 | `Report written to: build/kagamiqa_migration_matrix.json`（`17:23:16`） | ✅ |
+| `engine.git_rev` 非空非 `unknown` | `git_rev=1156ca1`；与 `git rev-parse HEAD` 短哈希完全一致；`build/src/fceux_git_info.cpp` 内 `#define FCEUX_GIT_REV "1156ca1cf6a729af10265a1aec10717af7bcff8b"`（`17:03:08`，由配置步 echo 写入） | ✅ S-4 编译期 stamp 在 CI 生效 |
+| `summary` = 39/35/4 | Print Summary 步输出 `Total: 39 / Passed: 35 / Failed: 4`（`17:23:17`）；`Oracle A: 25P / 2F \| Oracle B: 10P / 2F` → 27 + 12 = 39，与本地一致 | ✅ |
+| `transition_matrix.fail_to_pass` = 0 | R4 Gate 输出 `fail_to_pass=0 [OK]` | ✅ Phase 0.5-d 反 gaming 加固在 CI 生效 |
+| 4 FAIL 项性质 | per-oracle 拆分与 §十 R4 预期一一对应：`lua_joypad_test` / `lua_memory_test` 在 Oracle A（25P/2F）；`blargg_ppu_vbl_nmi` / `blargg_suite` 聚合在 Oracle B（10P/2F）。`test_id` 字符串未 echo 到 stdout 但 2+2=4 与预期吻合 | ✅ |
+| `kagamiqa-results` artifact 上传 | 上传步 `if: always()` 且未与 R4 Gate 共用 exit code；矩阵已落地且 R4 Gate `[OK]` 未报 `##[warning]No files` → 高置信已上传 | ✅（高置信，非直接证据） |
+
+### 7.2 R4-1 全项实测生效（每一项都针对第二轮暴露的缺口验证）
+
+| 第二轮缺口 | 本轮实测 |
+|---|---|
+| **缺口 A**：blargg ROM 在 CI 不存在 → Oracle B 全 0xFE 加载失败 | `blargg fixtures: 177 / 177 present`（`17:20:35`，校验步零错零警告）；Oracle B `Total: 177 / Passed: 121 / Failed: 56`（`17:22:52`），每条 FAIL 带真实 `$6000` 码（`0x01/0x02/0x03/0x06/0x80/0x81/0x09/0xFE` 等）与 diag_string |
+| **缺口 A 衍生**：`kagami_qa_direct_smoke` 同因失败 → CI ctest 32/33 | ctest `100% tests passed, 0 tests failed out of 33`（`17:20:56`）；`33/33 Test #34: kagami_qa_direct_smoke ........... Passed 6.49 sec` → 从 32/33 回到 33/33 |
+| **缺口 B**：runner 三元组路径不存在 → 矩阵步被静默 skip | `Using runner: src/rust/target/x86_64-pc-windows-msvc/release/kagami-qa-runner.exe`（`17:22:52`，三元组路径优先命中，避开了 `target/release/` 下的陈旧副本） |
+
+### 7.3 §六.5 的"缓存是否已保存"——结论落地
+
+第二轮日志包**不含 Post 步骤输出**，无法证实 cache 是否已保存（§六.5 标注"未证实"）。
+本轮日志**包含完整 Post**，直接给出答案：
+
+```
+16:06:19Z  Cache not found for input keys: vcpkg-13cac6ff...c5476, vcpkg-
+16:54:13Z  -- Configuring done (2872.8s)               <- 配置步冷编 47.88 min
+17:24:04Z  Cache saved with key: vcpkg-13cac6ff...c5476  <- cache saved
+```
+
+**§六.5 的"理论依据（failed 时 save，cancelled 时 skip）"由本轮实测推翻并改写**：
+`actions/cache@v4` 在 **failed** 作业下**也**不保存 cache（run `83046118885` 是 R4 Gate 主动 `exit 1` 的 failed，
+本轮 `Cache not found` 直接证实）。cache 仅在**成功**作业下保存。
+
+故正确的「CI 节奏」是：
+- 第二轮（failed，gate 主动 exit 1）→ cache 未保存 → 进度零留存
+- 第三轮（cold，再次冷编 47.88 min，但 R4-1 已落地，**成功**）→ cache 保存 → 第四轮应 hot
+
+**这不是工程错误**：预算上多一轮冷跑是已知代价，第三轮成功后即可稳定热跑。
+**对 §四 contingency 评估的修正**：§五 contingency 提到的
+`if: steps.cache-vcpkg.outputs.cache-hit == 'true'` 硬门，**实测下来更应该在第三轮之前就介入**——
+不是"预热跑仍失败"时才用，而是**任何上一轮 failed 时都不应假设 cache 存在**。
+
+### 7.4 顺带记录的小事实
+
+- **总耗时 78 分钟**（16:05:51 → 17:24:06），与第二轮 75 分钟几乎一致——两次都是冷跑。
+  下一次（第四轮）应降至 ~15 分钟
+- **`cpu_interrupts.nes`** 在 Oracle B 输出 `value: 0xFE, diag: [222,176,97], duration_ms: 0`，
+  与第二轮的 `0xFE + diag: [229,246,127]` **diag 不同** → 这是 **runner 超时签名**（测试 hang 后被 kill），
+  不是 ROM 加载不到。其余 55 FAIL 都带真实 diag_string，不影响总数（121/56）
+- **作业末尾 `##[warning]Node.js 20 is deprecated`**——纯运维提示，与产物无关
+- **顶部 `##[warning]vcpkg cache miss`** 告警如期出现于日志顶部（`16:06:20`），证明 R4-0 的可观测性改造落地
+- **`.gitignore` 例外生效**：`cmake/triplets/x64-windows.cmake` 被成功 checkout 并参与构建（无 fallback 报错），
+  证明 R4-0 的 `.gitignore` 修复落地
+
+### 7.5 R4 / R4-1 的诚实边界解除
+
+| 处方 | 验证轮次 | 当前状态 |
+|---|---|---|
+| R4-0（workflow vcpkg 依赖治理） | 第二轮（`83046118885`）§六.1 | **已升格为实测结论** |
+| R4-1（blargg ROM + runner 三元组路径） | **第三轮**（`1156ca1`）§7.2 | **已升格为实测结论** |
+| R4（CI 产 matrix + git_rev + 35/4 + R4 Gate 绿灯） | **第三轮**（`1156ca1`）§7.1 | **已升格为实测结论** |
+
+至此 §六.5 / §七 的"未经 CI 验证"标注全部解除。
+## 八、本次未做（边界声明，§一~§七三轮合并视角）
+
+> **🚧 2026-08-01 接管修订**：原 §七 编号迁至 §八，让位给第三轮实测记录（现 §七）。
+> 下述条目**仍全部成立**——它们说的是 §一~§六 的事实边界，与第三轮无关。
 
 - **未动 `vcpkg.json`**：未把 Qt 移入 feature、未引入 `install-qt-action`
 - **零代码变更**：C++ / Rust / `CMakeLists.txt` / `tests/CMakeLists.txt` 均未修改
 - **未触碰 §十 R5 / R6**（E-1 PPU VBL/NMI、E-3 APU 桶 C）：二者仍是 instrument-first 前置硬约束
 - **未修 `ci.yml` 缺 `-DFCEUX11_ENABLE_RUST=ON` 的问题**：与本次 R4-0 无关，超出范围
-- **R4-0 已由第二轮 CI 实测验证**（§六.1），不再是处方；**R4-1（§六.2/6.3）尚未经 CI 验证**，
-  只做了本地 YAML 解析、5 个用例的逻辑实测（§六.4）。R4-1 是否真能让矩阵产出，须待下一轮 CI 判定。
-- **未证实缓存是否已保存**（§六.5），下一轮 `Cache vcpkg` 步会给出答案。
+- **R4-0 已由第二轮 CI 实测验证**（§六.1），不再是处方；**R4-1（§六.2/6.3）尚未经 CI 验证**（已于 2026-08-01 由第三轮实测解除，见 §七.2），
+  只做了本地 YAML 解析、5 个用例的逻辑实测（§六.4）。R4-1 是否真能让矩阵产出，已由第三轮实测确认（§七.2）
+- **未证实缓存是否已保存**（§六.5）—— **已由第三轮实测推翻为结论**：cache 在 failed 作业下也不保存（§七.3）
 - **未处理 Oracle A 在 CI 与本地的口径差**：ROM 补齐后 CI 的 ctest 预期回到 33/33（`-LE perf`），
-  但这需要下一轮实测确认，本轮不预判。
+  **已由第三轮实测确认**：33/33，`kagami_qa_direct_smoke` 6.49s PASS（§七.2）
+
+---
+

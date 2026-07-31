@@ -2,8 +2,8 @@
 
 > **版本**：v1.16  
 > **性质**：双 Oracle（Oracle A 回归 + Oracle B 硬件一致性）自动化测试系统  
-> **覆盖率（本地构建快照 — commit `623dd39`，`engine.git_rev=623dd39`）**：
-> 待 P1-R4 CI 实跑一轮后按路径 A 统一刷新。
+> **覆盖率（本地构建快照 — commit `1156ca1`，`engine.git_rev=1156ca1`）**：
+> P1-R4 CI 实跑后已按路径 A 统一刷新（2026-08-01）。
 >
 > | 维度 | 数值 | 来源 |
 > |---|---|---|
@@ -11,7 +11,7 @@
 > | `tests/tests.json` 清单条目 | 39 | `python -c "import json; print(len(json.load(open('tests/tests.json'))))"` |
 > | blargg 落盘 ROM | 177 | `find tests/fixtures/blargg -name '*.nes' \| wc -l` |
 > | `blargg_manifest.json` 条目 | 177（与落盘 1:1，死条目 0） | Stage-2 S-1 清掉 3 个重复死条目后 180 → 177 |
-> | 当前矩阵 PASS / FAIL | 35 / 4 | 最近一次 `kagamiqa_migration_matrix.json`（`engine.git_rev = 623dd39`） |
+> | 当前矩阵 PASS / FAIL | 35 / 4 | 最近一次 `kagamiqa_migration_matrix.json`（`engine.git_rev = 1156ca1`，CI run 2026-07-31） |
 >
 > **CI 状态**：每次 push 到 `main` / `wip_1.16` 自动触发，产出迁移矩阵 artifact。
 

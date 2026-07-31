@@ -371,11 +371,9 @@ oracle_breakdown: { A_regression: {pass:25, fail:2}, B_hardware: {pass:10, fail:
   ☑ 判定逻辑与 manifest schema 声明一致        （0.5-1 / 0.5-2 实测）
   ☑ 迁移矩阵不含结构性失真                      （0.5-3 / 0.5-4 实测，fail_to_pass=0）
   ☑ 产物可追溯：matrix 带真实 git_rev=623dd39   （S-4 实测）
-  ☐ CI 常驻、指标由 CI 产物回填                  （已实跑两轮：run 82956632293 配置步 45min timeout；
-                                                    run 83046118885 R4-0 生效、配置步 48.4min 成功、
-                                                    1151/1151 链接完成，但因 blargg ROM 缺失 + runner
-                                                    三元组路径两个缺口仍未产出 matrix。R4-1 已修，待重跑）
-                                                       ↑ 唯一未完全闭合的门槛
+  ☑ CI 常驻、指标由 CI 产物回填                  （run `1156ca1` 实测：R4 Gate 全项绿灯、
+                                                    matrix `git_rev=1156ca1, total=39, passed=35,
+                                                    failed=4, fail_to_pass=0 [OK]`。见诊断文档 §七）
 
 【权威性度量】
   外部真理覆盖率 = 177 / 177 blargg ROM（manifest 与磁盘 1:1，死条目 0）
@@ -394,6 +392,32 @@ oracle_breakdown: { A_regression: {pass:25, fail:2}, B_hardware: {pass:10, fail:
 > - 验收标准 #5（§九.1 表） 仍 🟡
 > - §十 R4 仍是唯一闭合路径，需用户重新推送 `wip_1.16` 或手动 `workflow_dispatch` 触发（第一轮为预热跑，预计 60-90 分钟）
 > - D-7 行号现在已过时：经 P0 整改后 README 中英文锚 commit 由 `5e55129` → `623dd39`（详见 §十 R2）
+>
+> **✅ 2026-08-01 第三轮接管修订（CI 第三轮实跑，R4 闭环）**
+> - 上方"R4-0 已修待验 / 验收标准 #5 仍 🟡 / §十 R4 仍待触发"已全部过期。
+>   CI 第三轮（commit `1156ca1`、run `83107636049` 推断、作业 78 min）R4 Gate 全项绿灯
+>   `git_rev=1156ca1, total=39, passed=35, failed=4, fail_to_pass=0 [OK]`；
+>   Oracle A ctest 33/33；Oracle B 121/56；blargg fixtures 177/177；runner 三元组路径命中。
+> - 验收标准 #5 由 🟡 → ✅；§六 卫生门槛 #5 由 ☐ → ☑；§十 R4 / R4-1 完成判据已勾。
+> - 完整证据链见 `docs/history/FCEUX11-1.16_CI-R4-实跑诊断.md` §七。
+>
+> ---
+>
+> **🚧 2026-08-01 第三轮接管修订：CI 第三轮实跑（R4 全绿）**
+>
+> 用户按 §十 R4 重新推送 `wip_1.16`（commit `1156ca1`），CI run `83107636049`（推断，见诊断文档 §7 注）
+> 触发并**全绿**，作业 `16:05:51Z` → `17:24:06Z`，约 78 分钟：
+>
+> - **R4 Gate 全项绿灯**：`R4 gate passed: git_rev=1156ca1, total=39, passed=35, failed=4, fail_to_pass=0 [OK]`
+> - **R4-1 全项实测生效**：
+>   - `blargg fixtures: 177 / 177 present`（校验步零错）
+>   - Oracle A ctest `100% tests passed, 0 tests failed out of 33`，`33/33 Test #34: kagami_qa_direct_smoke ... Passed 6.49 sec`（从第二轮 32/33 回到 33/33）
+>   - Oracle B `Total: 177 / Passed: 121 / Failed: 56`，每条 FAIL 带真实 `$6000` 码（真实精度口径恢复）
+>   - `Using runner: src/rust/target/x86_64-pc-windows-msvc/release/kagami-qa-runner.exe`（三元组路径优先命中）
+> - **§六.5 假设落地为结论**：`actions/cache@v4` 在 failed 作业下**也**不保存 cache（run `83046118885` 是 gate 主动 `exit 1` 的 failed，本轮 cache miss 直接证实）。cache 仅在成功作业下保存。本轮 cache 已 saved（`17:24:04`），下次跑应秒级命中
+> - **R4 至此完全闭合**——§九.1 标准 #5 由 🟡 → ✅；§十 完成判据 R4 勾掉；README 中英文 + `docs/tech/KagamiQA.md` 三处锚按 R2 路径 A 刷新为 `1156ca1`
+>
+> 完整证据链见 `docs/history/FCEUX11-1.16_CI-R4-实跑诊断.md` §七。本轮未触动 §十 R5 / R6。
 
 ---
 
@@ -462,7 +486,7 @@ v2.0 清理项 E 系列、i18n 债务 H 系列、GUI/movie 层 TODO F 系列、5
 | 2 | 本地 `ctest -LE perf` 与 CI 一致 | 逐项比对 | ✅ **34/34 = 100%** | ✅ |
 | 3 | `lua_bit_test_headless` PASS | Phase B | ✅ Passed 0.03s | ✅ |
 | 4 | `kagami_qa_direct_smoke` PASS | Phase C | ✅ Passed 6.42s | ✅ |
-| 5 | migration matrix 由 CI 产出且 passed 率有据可查 | Phase D | 🟡 本地 35/39、`git_rev=623dd39` 可追溯；CI 已实跑两轮，R4-0 已实测生效但矩阵仍未产出（ROM 缺失 + runner 路径，R4-1 已修待验，见 §十 R4-0/R4-1） | 🟡 |
+| 5 | migration matrix 由 CI 产出且 passed 率有据可查 | Phase D | ✅ **CI 第三轮（commit `1156ca1`，作业 78 min）**：R4 Gate 全项绿灯，`git_rev=1156ca1, total=39, passed=35, failed=4, fail_to_pass=0`；Oracle A ctest 33/33（`kagami_qa_direct_smoke` 6.49s PASS）、Oracle B 121/56（真实精度口径恢复）；详见 `docs/history/FCEUX11-1.16_CI-R4-实跑诊断.md` §七 | ✅ |
 | 6 | Oracle B ROM 覆盖 ≥80%，失败项显式标注 | Phase D | ✅ 177/177 = 100%，失败项带码+分类 | ✅ |
 | 7 | README/KagamiQA.md 数字由 CI 产物回填，中英一致 | Phase D | ✅ 34/39/177 中英一致 | ✅ |
 | 8 | 遗留文档 3 处过期记载已更正 | Phase 0 | ✅ | ✅ |
@@ -481,6 +505,12 @@ v2.0 清理项 E 系列、i18n 债务 H 系列、GUI/movie 层 TODO F 系列、5
 > 已触发并失败于配置步 timeout，未产出 matrix。标准 #5 的性质由「环境性待办」修正为
 > **「已暴露的 workflow 依赖治理缺陷，R4-0 已修待验」**——它确实是一个缺陷，只是不在 KagamiQA 侧。
 > 详见 `docs/history/FCEUX11-1.16_CI-R4-实跑诊断.md`。
+>
+> **🚧 2026-08-01 第三轮接管修订（CI 第三轮实跑，R4 闭环）**：
+> - 第二次修订"已暴露的依赖治理缺陷，R4-0 已修待验"已**实测闭合**：CI run commit `1156ca1`（`83107636049` 推断）
+>   全绿，标准 #5 由 🟡 → ✅
+> - "11 项中 10 项完全闭合"措辞**作废**：现已 **11 项全部闭合**
+> - R4-1 / R4 的"未经 CI 验证"标注全部解除——见诊断文档 §七
 
 ### 9.2 总体裁定
 
@@ -511,6 +541,13 @@ v2.0 清理项 E 系列、i18n 债务 H 系列、GUI/movie 层 TODO F 系列、5
 > - P3 R7（第二 oracle 来源） — 未启动
 >
 > 验收通过判定本身**仍然成立**（构建 + Oracle A ctest 实测通过），但 §十 "100% 完美交付" 路径需在 P2 R5/R6 instrument 落地后再评估时效性。
+>
+> **🚧 2026-08-01 第三轮接管修订：P1 闭环**
+>
+> - **P1（CI 实跑 R4）— ✅ 已闭环**：第三轮 CI（commit `1156ca1`、run `83107636049` 推断、78 min）R4 Gate 全项绿灯，
+>   `git_rev=1156ca1, total=39, passed=35, failed=4, fail_to_pass=0 [OK]`。R4-1 三项缺口实测生效。
+>   §十 R4 / R4-1 完成判据已勾（见 §十「整改完成判据」）。详见 `docs/history/FCEUX11-1.16_CI-R4-实跑诊断.md` §七。
+> - P2 R5 / R6 / P3 R7 状态未变。100% 完美交付路径仍待 P2 instrument 落地后再评估。
 
 ---
 
@@ -592,6 +629,13 @@ v2.0 清理项 E 系列、i18n 债务 H 系列、GUI/movie 层 TODO F 系列、5
 #### R4. CI 实跑一轮 `kagami-qa.yml` 并核验产物
 
 **问题**：卫生门槛第 5 条「CI 常驻、指标由 CI 产物回填」目前 workflow 已就绪（`.github/workflows/kagami-qa.yml:123` matrix 生成 + `:157` `actions/upload-artifact@v4`）但本会话未触发实跑。验收标准 #5 为 🟡。
+
+> **✅ 2026-08-01 第三轮接管修订 — R4 已闭环，验收标准 #5 由 🟡 转 ✅**
+>
+> CI 第三轮（commit `1156ca1`、run `83107636049` 推断、作业 78 min）R4 Gate 全项绿灯：
+> `git_rev=1156ca1, total=39, passed=35, failed=4, fail_to_pass=0 [OK]`。完整证据链见
+> `docs/history/FCEUX11-1.16_CI-R4-实跑诊断.md` §七。本节下方 R4-0 / R4-1 完成判据已勾；§九.1 #5 已 ✅；
+> §六 卫生门槛 #5 已 ☑。
 
 > **🚨 2026-07-31 实测校准 — 已实跑一轮，失败；新增前置子项 R4-0**
 >
@@ -899,8 +943,8 @@ for(int dot=(S==0?delay:0);dot<(kLineTime-1);dot++) runppu(1);  // S=0 跑 321 c
 
 - [ ] **R1-R3**：`grep` 验证文档零偏差（符号名/行号/注释/锚 commit 三处一致）
 - [x] **R4-0**：workflow vcpkg 缓存缺陷已修（`VCPKG_INSTALLED_DIR` + release-only overlay triplet + 缓存路径收窄 + R4 Gate）—— **已由第二轮 CI（run 83046118885）实测生效**：配置步 48.4 min 成功、1151/1151 链接完成、gate 正确判红
-- [x] **R4-1**：补 blargg ROM 拉取+manifest 逐条校验、runner 三元组路径解析、BuildGuide 路径更正；5 用例本地实测通过 —— **未经 CI 验证**
-- [ ] **R4**：CI 实跑一轮，`engine.git_rev` 非 unknown，`passed=35`，`R4 Gate` 步绿，验收标准 #5 转 ✅
+- [x] **R4-1**：补 blargg ROM 拉取+manifest 逐条校验、runner 三元组路径解析、BuildGuide 路径更正 —— **已由第三轮 CI（commit `1156ca1`）实测全项生效**（177/177 ROM + Oracle A 33/33 + Oracle B 121/56 + runner 三元组路径命中）；5 用例本地实测 + 1 轮 CI 验证
+- [x] **R4**：CI 第三轮（commit `1156ca1`、run `83107636049` 推断、作业 78 min）—— `engine.git_rev=1156ca1`、`passed=35`、`R4 Gate` 步输出 `[OK]`、验收标准 #5 转 ✅；详见诊断文档 §七
 - [ ] **R5**：`vbl_01`~`vbl_10` 全 10 ROM 返回 `0x00`；`blargg_ppu_vbl_nmi` 升 `blocking`；Oracle A 维持 34/34
 - [ ] **R6**：7 个 bucket-C sub-test 全转 PASS；`apu_01`~`apu_11` + `pal_apu_*` 不回归；Oracle A 维持 34/34
 - [ ] **R7**（可选）：`oracle 来源数 ≥ 2`
@@ -908,6 +952,10 @@ for(int dot=(S==0?delay:0);dot<(kLineTime-1);dot++) runppu(1);  // S=0 跑 321 c
 - [ ] blargg 全量真实精度 FAIL 面由 38 项下降
 
 > **注意**：R5/R6 是模拟精度攻关，存在「修好一个弄坏另一个」的经典风险，必须严格遵循每步强制回归。若某 ROM 经多轮仍无法在「不回归 Oracle A」前提下修复，应记录为**有据已知限制**（带错误码、诊断串、根因结论、已尝试方案），而非强求 PASS——这本身仍是工程诚实性，符合 §十·五「精确知道什么失败，比『全绿但不测』更权威」的原则。
+
+---
+
+> **🚧 2026-08-01 第三轮接管修订**：P1 全部完成判据已勾。R4 / R4-1 的"未经 CI 验证"标注解除（第三轮 CI `1156ca1` 全绿）。剩余 R5 / R6 / R7 维持原状态，不在本次收尾范围。
 
 ---
 
