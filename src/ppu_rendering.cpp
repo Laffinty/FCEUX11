@@ -79,6 +79,30 @@
 #include <cstdio>
 #include <cstdlib>
 
+// ----------------------------------------------------------------------------
+// E-1 instrument-first probe (R5 Step 1, 2026-08-01)
+// ----------------------------------------------------------------------------
+// Env-gated, zero-intrusion probe for VBL/NMI dot timing. Activated by
+// setting FCEUX11_E1_TRACE=1 in the environment. When inactive, all
+// branches fold to a single getenv result check (~1 ns). The probe
+// records (frame, sl, cycle) at the 3 critical VBL/NMI transitions in
+// the new-PPU working config (ppu_rendering.cpp:1555-1593); the
+// ppudead path (1525-1553) is intentionally NOT instrumented here —
+// vbl_* test ROMs never enter ppudead. See
+// docs/history/e1_survey/vbl_step1_instrument_data_2026-08-01.md for
+// the data collected by this probe.
+namespace fceux11::e1 {
+	static bool trace_on() {
+		// Cached on first call. Setting FCEUX11_E1_TRACE after the
+		// process has started will NOT turn tracing on; restart required.
+		static const bool on = []() {
+			const char* e = std::getenv("FCEUX11_E1_TRACE");
+			return e && e[0] == '1' && e[1] == '\0';
+		}();
+		return on;
+	}
+} // namespace fceux11::e1
+
 // Phase A activation only: this TU is registered in the build with a
 // valid include graph but no function definitions yet. All rendering
 // bodies remain in ppu.cpp. Batches B/C/D incrementally move bodies
@@ -1557,6 +1581,10 @@ int FCEUX_PPU_Loop(int skip) {
 	{
 		// Working config: VBL at cycle 0, clear at cycle 0 = 6820 (01-vbl_basics PASS).
 		// Cycle 0→1 shift (02-vbl_set_time) deferred to focused follow-up.
+		if (fceux11::e1::trace_on()) {
+			fprintf(stderr, "E1 VBL_SET frame=%d sl=%d cycle=%d\n",
+				framectr, ppur.status.sl, ppur.status.cycle);
+		}
 		PPU_status |= 0x80;
 		ppuphase = PPUPHASE_VBL;
 
@@ -1569,13 +1597,17 @@ int FCEUX_PPU_Loop(int skip) {
 		ppur.status.sl = 241;	//for sprite reads
 
 		// NMI fires at cycle 1, same dot as VBL flag (real hardware behavior).
+		if (fceux11::e1::trace_on()) {
+			fprintf(stderr, "E1 NMI_DISPATCH frame=%d sl=%d cycle=%d vblank_on=%d\n",
+				framectr, ppur.status.sl, ppur.status.cycle, VBlankON ? 1 : 0);
+		}
 		if (VBlankON) TriggerNMI();
 
 		//formerly: runppu(delay);
 		for(int dot=0;dot<delay;dot++)
 			runppu(1);
 		int sltodo = PAL?70:20;
-		
+
 		//formerly: runppu(20 * (kLineTime) - delay);
 		for(int S=0;S<sltodo;S++)
 			{
@@ -1584,6 +1616,10 @@ int FCEUX_PPU_Loop(int skip) {
 			ppur.status.sl++;
 		}
 
+		if (fceux11::e1::trace_on()) {
+			fprintf(stderr, "E1 VBL_CLR frame=%d sl=%d cycle=%d\n",
+				framectr, ppur.status.sl, ppur.status.cycle);
+		}
 		PPU_status = 0;
 		//if(!PPUON) { runppu(kLineTime*242); goto finish; }
 
