@@ -303,9 +303,9 @@ oracle_breakdown: { A_regression: {pass:25, fail:2}, B_hardware: {pass:10, fail:
 
 核对中发现 3 处**文档措辞与代码不一致**，均不影响功能，但影响可追溯性：
 
-1. **函数名**：Stage-2 §0.5-1 称修复后调用 `oracle::regression::evaluate`，实际函数名为 `check_expected`。行为完全一致，仅符号名不同。**建议**：更正文档引用以利检索。
-2. **ntdll 归属**：`tests/CMakeLists.txt:645` 注释称「kernel32 and ntdll auto-linked」，实际 `ntdll` 由共享 helper `fceux11_add_headless_test_executable`（`:65-67`）链入，非 link.exe 自动链接。**建议**：修正注释措辞。
-3. **行号偏移**：文档称 `bus.cpp` 的 `/GL-`「near line 593」，实际在 `:598-599`（`:593` 是 `ppu_sprite_lut.cpp`）。**建议**：文档行号更新。
+1. **函数名**：Stage-2 §0.5-1 称修复后调用 `oracle::regression::evaluate`，实际函数名为 `check_expected`。行为完全一致，仅符号名不同。**✅ 已更正** — R1 落地（commit `1fa88f2`）：`evaluate` → `check_expected`，`adapter/subprocess.rs:84` → `:235`，grep 示例同步更新。
+2. **ntdll 归属**：`tests/CMakeLists.txt:645` 注释称「kernel32 and ntdll auto-linked」，实际 `ntdll` 由共享 helper `fceux11_add_headless_test_executable`（`:65-67`）链入，非 link.exe 自动链接。**✅ 已更正** — R3 落地（commit `1fa88f2`）：`:634` + `:645` 注释改为「kernel32 auto-linked, ntdll via fceux11_add_headless_test_executable helper」。
+3. **行号偏移**：文档称 `bus.cpp` 的 `/GL-`「near line 593」，实际在 `:598-599`（`:593` 是 `ppu_sprite_lut.cpp`）。**✅ 已更正** — 接管修订（commit `60df498` 后追加，2026-07-31）：`docs/history/FCEUX11-1.16_Stage2-构建计划.md:298` 「紧邻 `:593`」 → `:598-599`，并同步更新本报告 §十 R1 改法表第 4 行。
 
 ---
 
@@ -477,8 +477,9 @@ v2.0 清理项 E 系列、i18n 债务 H 系列、GUI/movie 层 TODO F 系列、5
 | `docs/history/FCEUX11-1.16_Stage2-构建计划.md:255` | `oracle::regression::evaluate` | `oracle::regression::check_expected`（`oracle/regression.rs:10` `pub fn check_expected`） | 改 `evaluate` → `check_expected` |
 | 同上 `:255` | `adapter/subprocess.rs:84` | 调用点在 `adapter/subprocess.rs:235`（`let passed = check_expected(&probe, &test.expected);`） | 改 `:84` → `:235` |
 | 同上 `:223`（0.5-b 的 grep 示例） | `grep -rn "evaluate\|regression::"` | 实际函数名不含 `evaluate` | 示例改 `"check_expected\|regression::"` |
+| 同上 `:298`（A-6 PR 表文件:行号列） | `src/CMakeLists.txt`（紧邻 `:593`） | bus.cpp `/GL-` 在 `src/CMakeLists.txt:598-599`（`:593` 是 `ppu_sprite_lut.cpp`） | 改 `（紧邻 :593）` → `:598-599` |
 
-**验收**：`grep -rn "regression::evaluate" docs/` 返回空；`grep -rn "check_expected" docs/history/FCEUX11-1.16_Stage2-构建计划.md` 命中且行号正确。
+**验收**：`grep -rn "regression::evaluate" docs/` 返回空；`grep -rn "check_expected" docs/history/FCEUX11-1.16_Stage2-构建计划.md` 命中且行号正确；`grep -n "紧邻 :593" docs/history/FCEUX11-1.16_Stage2-构建计划.md` 返回空。
 
 #### R2. 快照 commit 锚统一刷新
 

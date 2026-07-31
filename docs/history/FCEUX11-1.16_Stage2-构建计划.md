@@ -295,7 +295,7 @@ D:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensio
 | **A-3 ✅ `f7d1994`** | 设 `CMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embed`（`/Z7`）作为 C1041 的第二道防线 | `CMakeLists.txt` | 即使回落 NMake 也不再 PDB 争用；CMake ≥3.25 要求已满足（项目要求 4.0） |
 | **A-4 ✅ `17c9e44`** | `fceu11_direct_storage_probe` 由 `STATIC` 改为 `OBJECT` 库，消除该 `.lib` 落盘 | `src/CMakeLists.txt:570-576` | 不再产出 `fceu11_direct_storage_probe.lib`；消费端 `:639-641` 无需改动 |
 | **A-5 ✅ `c3a8383`** | `do_build.ps1` 增加 LNK1104 重试循环（检测 → kill 残留 `cl/nmake/link` → 删锁定 `.lib` → 重试 ≤3 次） | `scripts/do_build.ps1` | 覆盖全部 6 个静态库，不止 probe 库 |
-| **A-6 ✅ `99f048f`** | 保险：对 `bus.cpp` 预防性加 `/GL-` | `src/CMakeLists.txt`（紧邻 `:593`） | `bus.h:197-198` 的 `aread_[0x10000]`+`bwrite_[0x10000]`（合计 1 MiB）是仅次于 `kSpriteIdxLUT` 的 LTCG 风险点 |
+| **A-6 ✅ `99f048f`** | 保险：对 `bus.cpp` 预防性加 `/GL-` | `src/CMakeLists.txt:598-599` | `bus.h:197-198` 的 `aread_[0x10000]`+`bwrite_[0x10000]`（合计 1 MiB）是仅次于 `kSpriteIdxLUT` 的 LTCG 风险点 |
 
 ### A-6 的风险评估（为什么值得做）
 
