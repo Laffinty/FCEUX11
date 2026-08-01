@@ -24,7 +24,6 @@
 #include "debug.h"
 #include "sound.h"
 #include "bus.h"   // v1.4 Gateway Phase 3 §5.1.3: hot-path g_bus.read/write
-#include "ppu_core.h"  // E-1 probe (R5 Step 2, 2026-08-01): ppur.status.sl/cycle for NMI_ENTRY timestamp
 #ifdef _S9XLUA_H
 #include "fceulua.h"
 #endif
@@ -34,28 +33,6 @@
 #include <array>
 #include <cstring>
 #include <type_traits>
-#include <cstdio>
-#include <cstdlib>
-
-// ----------------------------------------------------------------------------
-// E-1 instrument-first probe (R5 Step 2, 2026-08-01)
-// ----------------------------------------------------------------------------
-// Env-gated, zero-intrusion probe for CPU-side NMI dispatch + PPU reg access.
-// Activated by setting FCEUX11_E1_TRACE=1 in the environment. When inactive,
-// all branches fold to a single getenv result check (~1 ns). This is the
-// CPU-side counterpart to the PPU-side probe in ppu_rendering.cpp:80-103.
-// Documented in docs/history/e1_survey/vbl_step2_instrument_data_2026-08-01.md.
-namespace fceux11::e1 {
-	static bool trace_on() {
-		// Cached on first call. Setting FCEUX11_E1_TRACE after the
-		// process has started will NOT turn tracing on; restart required.
-		static const bool on = []() {
-			const char* e = std::getenv("FCEUX11_E1_TRACE");
-			return e && e[0] == '1' && e[1] == '\0';
-		}();
-		return on;
-	}
-} // namespace fceux11::e1
 
 // v1.3 Legion Phase 1: X, timestamp, soundtimestamp and MapIRQHook are now
 // inline reference aliases into fceu11::cpu_instance() (see src/cpu.h and
@@ -503,15 +480,6 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
     {
      if(!_jammed)
      {
-      // E-1 probe (R5 Step 2, 2026-08-01): record NMI dispatch context.
-      // Captures X/PC just before the three PUSHes save them; sl/cycle
-      // is the PPU timestamp at NMI entry. Frame number omitted (framectr
-      // is file-static to ppu_rendering.cpp) — reconstruct from sl sequences.
-      if (fceux11::e1::trace_on()) {
-          fprintf(stderr, "E1 NMI_ENTRY sl=%d cycle=%d x=0x%02X pc=0x%04X\n",
-              ppur.status.sl, ppur.status.cycle,
-              (unsigned)cpu.x(), (unsigned)cpu.pc());
-      }
       ADDCYC(7);
       PUSH(_PC>>8);
       PUSH(_PC);

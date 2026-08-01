@@ -324,22 +324,6 @@ void ppu_getScroll(int &xpos, int &ypos) {
 }
 //---------------
 
-// ----------------------------------------------------------------------------
-// E-1 instrument-first probe (R5 Step 2, 2026-08-01)
-// ----------------------------------------------------------------------------
-// Env-gated, zero-intrusion probe for $2002 read (VBL flag visibility edge)
-// and $2000 write (NMI enable). Activated by FCEUX11_E1_TRACE=1. See
-// docs/history/e1_survey/vbl_step2_instrument_data_2026-08-01.md.
-namespace fceux11::e1 {
-	static bool trace_on() {
-		static const bool on = []() {
-			const char* e = std::getenv("FCEUX11_E1_TRACE");
-			return e && e[0] == '1' && e[1] == '\0';
-		}();
-		return on;
-	}
-} // namespace fceux11::e1
-
 static DECLFR(A2002) {
 	if (newppu) [[unlikely]] {
 		//once we thought we clear latches here, but that caused midframe glitches.
@@ -350,20 +334,6 @@ static DECLFR(A2002) {
 	uint8 ret;
 
 	FCEUPPU_LineUpdate();
-	// E-1 probe (R5 Step 2, 2026-08-01): record VBL flag 0<->1 transition.
-	// vbl_* test ROMs poll $2002 (via BIT) every iteration; this probe
-	// only fires on the 0->1 (VBL becomes visible) and 1->0 (clear-on-read)
-	// edges, NOT on every read, to keep output tractable.
-	if (fceux11::e1::trace_on()) {
-		static uint8 prev_vbl = 0;
-		uint8 cur_vbl = (PPU_status >> 7) & 1;
-		if (cur_vbl != prev_vbl) {
-			fprintf(stderr, "E1 P2002_VBL_EDGE sl=%d cycle=%d prev=%u cur=%u\n",
-				ppur.status.sl, ppur.status.cycle,
-				(unsigned)prev_vbl, (unsigned)cur_vbl);
-			prev_vbl = cur_vbl;
-		}
-	}
 	ret = PPU_status;
 	ret |= PPUGenLatch & 0x1F;
 
@@ -635,13 +605,6 @@ static DECLFW(B2000) {
 	if (!(PPU[0] & 0x80) && (V & 0x80) && (PPU_status & 0x80))
 		TriggerNMI2();
 
-	// E-1 probe (R5 Step 2, 2026-08-01): record every $2000 write so we can
-	// correlate NMI-enable edges with subsequent VBL/NMI dispatch. Fires
-	// after TriggerNMI2() so the trace captures the actual gate state.
-	if (fceux11::e1::trace_on()) {
-		fprintf(stderr, "E1 P2000_WRITE sl=%d cycle=%d val=0x%02X\n",
-			ppur.status.sl, ppur.status.cycle, (unsigned)V);
-	}
 	PPU[0] = V;
 	TempAddr &= 0xF3FF;
 	TempAddr |= (V & 3) << 10;
