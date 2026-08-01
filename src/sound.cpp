@@ -472,6 +472,12 @@ void FrameSoundUpdate(void)
    (unsigned)fcnt, (unsigned)IRQFrameMode, fhcnt, (unsigned)SIRQStat);
  }
 
+ // R6-2b experiment 2 (2026-08-01): raising IRQ on fcnt==3 instead of
+ // fcnt==0 did NOT fix apu_single_4/5/6 (still FAIL 0x02) and regressed
+ // apu_reset_4017_timing (0x02->0x03). REVERTED to fcnt==0. The real
+ // defect is deeper than IRQ set position or power-on fcnt value — likely
+ // the fhcnt/quarter timing or length-clock phase vs blargg's wait_n
+ // timer window. See r6_step3_fix_data_2026-08-01.md.
  if(!fcnt && !(IRQFrameMode&0x3))
  {
          SIRQStat|=0x40;
@@ -1157,6 +1163,14 @@ void FCEUSND_Reset(void)
 
 	IRQFrameMode=0x0;
 	fhcnt=fhinc;
+	// R6-2b attempt (2026-08-01): setting fcnt=1 here was REVERTED.
+	// Probe + disassembly showed blargg apu_single_4's timer waits ~6
+	// quarter-frames after $4017=$00 before reading $4015, expecting the
+	// frame IRQ NOT yet set; fcnt=1 still raised it at the 4th quarter
+	// (FAIL "too soon"), and it also broke golden_savestate_test + 
+	// savestate_regression_test MD5 hashes. The real defect is the IRQ
+	// set POSITION (if(!fcnt) raises on quarter 1, not the sequence end)
+	// and/or the W4017->IRQ delay, NOT the power-on fcnt initial value.
 	fcnt=0;
 	nreg=1;
 
