@@ -1,6 +1,6 @@
 # FCEUX11 迁移至微软系 UI 框架可行性分析报告
 
-> **报告性质**：v2.x 战略预研（必须在 `docs/v1.x_Modernization_Roadmap.md` 全部完成后方可启动）  
+> **报告性质**：v2.x 战略预研（必须在 `docs/history/plans/v1.x_Modernization_Roadmap.md` 全部完成后方可启动）  
 > **分析对象**：FCEUX11 当前 Qt 6 驱动层 → 微软全系 UI 框架（WinUI 3 → Win32）  
 > **编制日期**：2026-06-21  
 > **版本**：v1.0
@@ -27,7 +27,7 @@ FCEUX11 目前以 **Qt 6.8 LTS** 作为唯一现役 GUI 驱动层（约 10.4 万
 
 ## 2. 前置约束：v1.x 现代化必须先完成
 
-根据 `docs/v1.x_Modernization_Roadmap.md`，v1.x 的核心目标是：
+根据 `docs/history/plans/v1.x_Modernization_Roadmap.md`，v1.x 的核心目标是：
 
 1. **核心引擎去全局化**：`fceu11::Cpu` / `Ppu` / `Apu` / `Bus` / `Cart` 对象化（v1.3~v1.8）。
 2. **Rust 迁移闭环**：ROM 解析、Savestate、工具、Lua 等迁移到 Rust（v1.9~v1.10）。
@@ -498,7 +498,7 @@ v2.0 启动：保留 Qt，先建立新的 Core-Driver 边界（已完成 v1.11 B
 
 ## 10. 参考来源
 
-- FCEUX11 项目内部文档：`docs/v1.x_Modernization_Roadmap.md`
+- FCEUX11 项目内部文档：`docs/history/plans/v1.x_Modernization_Roadmap.md`
 - Microsoft Learn: [What's supported when migrating from UWP to WinUI 3](https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/migrate-to-windows-app-sdk/what-is-supported)
 - Microsoft Learn: [Windows developer FAQ](https://learn.microsoft.com/en-us/windows/apps/get-started/windows-developer-faq)
 - Microsoft Learn: [Apply Mica in Win32 desktop apps](https://learn.microsoft.com/en-us/windows/apps/desktop/modernize/ui/apply-mica-win32)

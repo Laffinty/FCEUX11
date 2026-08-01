@@ -1,17 +1,17 @@
 # P2 精度收敛剩余项 — 独立 Instrument 专项交接档案
 
 > **用途**：FCEUX11 精度收敛（P2）中，R5（E-1 PPU VBL/NMI）与 R6（E-3 APU 帧计数器）剩余未闭合项的**完整诊断档案**。
-> 本文档把散落在 `docs/history/e1_survey/`、`docs/history/e6_survey/` 的 8 份调查文档的关键结论汇总为一份可直接接手攻关的清单。
+> 本文档把散落在 `docs/history/surveys/e1_vbl/`、`docs/history/surveys/e6_apu/` 的 8 份调查文档的关键结论汇总为一份可直接接手攻关的清单。
 >
 > **性质**：仅记录已实证的根因与排除项，**不含构建计划**（攻关方案须在接手时基于本文档数据重新设计）。
 > **适用对象**：后续独立 instrument-first 专项（需 instrument-first 前置硬约束，见 §0）。
-> **关联**：`docs/FCEUX11-1.16_最终验收报告.md` §十 R5/R6（原始处方，部分已被本文档证伪或修正）。
+> **关联**：`docs/history/reports/FCEUX11-1.16_最终验收报告.md` §十 R5/R6（原始处方，部分已被本文档证伪或修正）。
 
 ---
 
 ## 0. 接手前置条件（硬约束）
 
-> 以下来自 `docs/FCEUX11-1.16_最终验收报告.md` §十 R5/R6 的"🚨 实测校准"块与 `docs/继续任务.txt`：
+> 以下来自 `docs/history/reports/FCEUX11-1.16_最终验收报告.md` §十 R5/R6 的"🚨 实测校准"块与 `docs/继续任务.txt`：
 >
 > 1. **instrument-first 是前置硬约束**：任何代码改动前，必须先加 env-gated probe 采集真实时序，用数据证伪/证实假设。
 > 2. **每步强制回归**：Oracle A ctest 34/34 + 相关 ROM 全量，任一红即回滚。
@@ -164,8 +164,8 @@ R4015 fcnt=1  fhcnt=357960  sirq=0x40  ← blargg 读时 IRQ 已置 → FAIL
 
 ### 相关主线文档
 
-- `docs/FCEUX11-1.16_最终验收报告.md` §十 R5/R6（原始处方 + 🚨 校准块）
-- `docs/history/FCEUX11-1.16_Stage2-构建计划.md`（bucket C 分桶）
+- `docs/history/reports/FCEUX11-1.16_最终验收报告.md` §十 R5/R6（原始处方 + 🚨 校准块）
+- `docs/history/plans/FCEUX11-1.16_Stage2-构建计划.md`（bucket C 分桶）
 
 ---
 

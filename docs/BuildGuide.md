@@ -440,7 +440,7 @@ GitHub runner 每次都是干净机器。整改前两个 workflow 的缓存路�
 而 `scripts/do_build.ps1` 不传该参数——它走的是自己的 `-DVCPKG_MANIFEST_MODE=OFF` +
 复用现成 `vcpkg_installed/x64-windows` 的路径（`do_build.ps1:120-135`），与 CI 互不干扰。
 
-完整背景见 `docs/history/FCEUX11-1.16_CI-R4-实跑诊断.md`。
+完整背景见 `docs/history/reports/FCEUX11-1.16_CI-R4-实跑诊断.md`。
 
 ---
 

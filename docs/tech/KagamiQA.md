@@ -19,7 +19,7 @@
 >
 > 上面 4 行数字的**唯一可信来源**是 CI 产物：
 > - CTest / manifest 数字 = `ci.yml` 的 ctest 步骤输出
-> - blargg 落盘数字 = `D-1` 清单（`docs/FCEUX11-1.16_blargg_接入清单.md`）
+> - blargg 落盘数字 = `D-1` 清单（`docs/history/checklists/FCEUX11-1.16_blargg_接入清单.md`）
 > - 矩阵 PASS/FAIL = `kagami-qa.yml` 的 `kagamiqa_migration_matrix.json` artifact
 >
 > **禁止手改本文档的数字**。改之前先跑：
