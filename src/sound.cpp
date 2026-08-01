@@ -32,6 +32,25 @@
 #include <cstdio>
 #include <cstring>
 
+// ----------------------------------------------------------------------------
+// E-3 instrument-first probe (R6 Step 1, 2026-08-01)
+// ----------------------------------------------------------------------------
+// Env-gated, zero-intrusion probe for APU frame counter state machine +
+// $4017 write. Activated by setting FCEUX11_E3_TRACE=1 in the environment.
+// When inactive, all branches fold to a single getenv result check (~1 ns).
+// Records (fcnt, IRQFrameMode, fhcnt, SIRQStat) at every quarter-step, plus
+// before/after state at every $4017 write. See
+// docs/history/e6_survey/r6_step1_instrument_data_2026-08-01.md.
+static bool e3_trace_on() {
+	// Cached on first call. Setting FCEUX11_E3_TRACE after the
+	// process has started will NOT turn tracing on; restart required.
+	static const bool on = []() {
+		const char* e = std::getenv("FCEUX11_E3_TRACE");
+		return e && e[0] == '1' && e[1] == '\0';
+	}();
+	return on;
+}
+
 static uint32 wlookup1[32];
 static uint32 wlookup2[203];
 
@@ -445,6 +464,14 @@ void FrameSoundUpdate(void)
  // Linear counter:  Bit 0-6 of $4008
  // Length counter:  Bit 4-7 of $4003, $4007, $400b, $400f
 
+ // E-3 probe (R6 Step 1, 2026-08-01): record state at every quarter-step
+ // entry. Crucial for understanding whether fcnt==0 IRQ fire happens too
+ // early (defect 1 hypothesis from §十 R6).
+ if (e3_trace_on()) {
+  fprintf(stderr, "E3 FSU fcnt=%u mode=0x%X fhcnt=%d sirq=0x%X\n",
+   (unsigned)fcnt, (unsigned)IRQFrameMode, fhcnt, (unsigned)SIRQStat);
+ }
+
  if(!fcnt && !(IRQFrameMode&0x3))
  {
          SIRQStat|=0x40;
@@ -507,6 +534,12 @@ void FCEU_SoundCPUHook(int cycles)
  fhcnt-=cycles*48;
  if(fhcnt<=0)
  {
+  // E-3 probe (R6 Step 1, 2026-08-01): record quarter-frame boundary hit
+  // with pre/post fhcnt. Useful for verifying fhinc timing constant.
+  if (e3_trace_on()) {
+   fprintf(stderr, "E3 HOOK cycles=%d fhcnt_before=%d fhcnt_after=%d\n",
+    cycles, fhcnt + cycles*48, fhcnt + fhinc);
+  }
   FrameSoundUpdate();
   fhcnt+=fhinc;
  }
@@ -982,6 +1015,15 @@ static void RDoNoise(void)
 
 DECLFW(Write_IRQFM)
 {
+ // E-3 probe (R6 Step 1, 2026-08-01): capture before/after $4017 write
+ // state. Critical for verifying defect 2 hypothesis: $4017 write
+ // unconditionally clears IRQ flag (should only clear when 5-step or
+ // inhibit bit is set).
+ if (e3_trace_on()) {
+  uint8 pre_mode = IRQFrameMode, pre_fcnt = fcnt, pre_sirq = SIRQStat;
+  fprintf(stderr, "E3 W4017_IN V=0x%X pre_mode=0x%X pre_fcnt=%u pre_sirq=0x%X\n",
+   (unsigned)V, (unsigned)pre_mode, (unsigned)pre_fcnt, (unsigned)pre_sirq);
+ }
  V=(V&0xC0)>>6;
  fcnt=0;
  if(V&0x2)
@@ -991,6 +1033,10 @@ DECLFW(Write_IRQFM)
  X6502_IRQEnd(FCEU_IQFCOUNT);
  SIRQStat&=~0x40;
  IRQFrameMode=V;
+ if (e3_trace_on()) {
+  fprintf(stderr, "E3 W4017_OUT post_mode=0x%X post_fcnt=%u post_sirq=0x%X\n",
+   (unsigned)IRQFrameMode, (unsigned)fcnt, (unsigned)SIRQStat);
+ }
 }
 
 void SetNESSoundMap(void)
