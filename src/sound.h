@@ -96,7 +96,7 @@ void SetNESSoundMap(void);
 void FrameSoundUpdate(void);
 
 void FCEUSND_Power(void);
-void FCEUSND_Reset(void);
+void FCEUSND_Reset(bool is_power);
 void FCEUSND_SaveState(void);
 void FCEUSND_LoadState(int version);
 

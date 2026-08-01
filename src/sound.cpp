@@ -1192,21 +1192,24 @@ int GetSoundBuffer(int32 **W)
 due to that whole MegaMan 2 Game Genie thing.
 */
 
-void FCEUSND_Reset(void)
+void FCEUSND_Reset(bool is_power)
 {
 	int x;
 
-	IRQFrameMode=0x0;
+	// P2 Phase 2 Step 2.1 (2026-08-01): power-on / reset 相位分离。
+	// 硬件语义（blargg_apu_2005.07.30 readme "Misc" + apu_reset/readme.txt，P2 方案 §1.2/§1.4）：
+	//  - power-on：APU 等效"$4017=$00 写 + 9~12 时钟延迟"后开始执行 → IRQFrameMode=0x0（4-step，IRQ 使能）。
+	//  - soft reset：重写最后一次写入 $4017 的值（非 $00）→ IRQFrameMode 保留最后写入值；
+	//    bit6 inhibit 按"有时清除"语义处理，先按保留实测（用 apu_reset_4017_written 判据校准）。
+	//  - 两者均为"写后相位"：fcnt=1（首个 IRQ 于第 4 个 quarter=29830，而非 fcnt=0 的首个 quarter≈7459）。
+	// R6-2b (2026-08-01) 曾试 fcnt=1，被 golden 碎裂误伤回滚；P2 方案 §1.4 复核判定方向正确
+	// （当时只修了一半：apu_single_4 走 $4017 写路径，与 power-on fcnt 无关，故未见效）。
+	// 注：运行期起始值变化 → golden_savestate_test 哈希碎裂属预期流程
+	// （tests/CMakeLists.txt:348 `fceux11_golden_savestate_test --generate` 重生，非事故）。
+	if (is_power)
+		IRQFrameMode=0x0;   // power: $4017=$00；reset: 保留最后写入值
 	fhcnt=fhinc;
-	// R6-2b attempt (2026-08-01): setting fcnt=1 here was REVERTED.
-	// Probe + disassembly showed blargg apu_single_4's timer waits ~6
-	// quarter-frames after $4017=$00 before reading $4015, expecting the
-	// frame IRQ NOT yet set; fcnt=1 still raised it at the 4th quarter
-	// (FAIL "too soon"), and it also broke golden_savestate_test + 
-	// savestate_regression_test MD5 hashes. The real defect is the IRQ
-	// set POSITION (if(!fcnt) raises on quarter 1, not the sequence end)
-	// and/or the W4017->IRQ delay, NOT the power-on fcnt initial value.
-	fcnt=0;
+	fcnt=1;
 	nreg=1;
 
 	for(x=0;x<2;x++)
@@ -1281,7 +1284,7 @@ void FCEUSND_Power(void)
 
         SetNESSoundMap();
         memset(PSG,0x00,sizeof(PSG));
-	FCEUSND_Reset();
+	FCEUSND_Reset(true);   // power-on: $4017=$00 相位（P2 Step 2.1）
 
 	memset(Wave,0,sizeof(Wave));
         memset(WaveHi,0,sizeof(WaveHi));

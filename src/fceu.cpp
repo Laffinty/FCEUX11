@@ -897,7 +897,7 @@ void ResetNES(void) {
 	if (!GameInfo) return;
 	GameInterface(GI_RESETM2);
 	fceu11::g_apu.reset();
-	FCEUSND_Reset();
+	FCEUSND_Reset(false);  // soft reset: 保留最后写入 $4017 值（P2 Step 2.1）
 	FCEUPPU_Reset();
 	g_cpu.reset();
 
