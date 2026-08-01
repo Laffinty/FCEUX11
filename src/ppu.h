@@ -20,6 +20,12 @@ void FCEUPPU_Power(void);
 int FCEUPPU_Loop(int skip);
 
 void FCEUPPU_LineUpdate();
+// Step 1.2 ($2002 VBL-set suppression, 2026-08-01): a $2002 read 1 PPU dot
+// before the working-config VBL set boundary suppresses the flag set + NMI
+// for that frame (NESdev PPU_frame_timing). ppu.cpp marks it, the new-PPU
+// VBL block in ppu_rendering.cpp takes (and clears) it.
+void fceu11_ppu_mark_vbl_set_suppressed();
+bool fceu11_ppu_take_vbl_set_suppressed();
 void FCEUPPU_SetVideoSystem(int w);
 
 extern void (*PPU_hook)(uint32 A);

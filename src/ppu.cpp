@@ -324,6 +324,35 @@ void ppu_getScroll(int &xpos, int &ypos) {
 }
 //---------------
 
+// Step 1.2 ($2002 VBL-set suppression, 2026-08-01): file-local marker set
+// by A2002 when a read lands 1 PPU dot before the working-config VBL set
+// boundary (sl240, cycle340), consumed by the new-PPU VBL block in
+// ppu_rendering.cpp. Savestate-neutral (not serialized; re-derived each
+// frame). See docs/history/e1_survey/vbl_step1_1_falsification_2026-08-01.md
+// and docs/history/FCEUX11-1.16_P2-精度收敛三阶段构建方案.md Step 1.2.
+static bool g_vbl_set_suppressed = false;
+
+void fceu11_ppu_mark_vbl_set_suppressed() {
+	g_vbl_set_suppressed = true;
+}
+
+bool fceu11_ppu_take_vbl_set_suppressed() {
+	bool r = g_vbl_set_suppressed;
+	g_vbl_set_suppressed = false;
+	return r;
+}
+
+// E-1 probe (Step 1.2, 2026-08-01): env-gated $2002 read dot recorder.
+// Filters to reads near the VBL set boundary to keep output small
+// (vbl tests otherwise do ~10k reads/sec). Same env var as ppu_rendering.
+static bool e1_ppu_trace_on() {
+	static const bool on = []() {
+		const char* e = std::getenv("FCEUX11_E1_TRACE");
+		return e && e[0] == '1' && e[1] == '\0';
+	}();
+	return on;
+}
+
 static DECLFR(A2002) {
 	if (newppu) [[unlikely]] {
 		//once we thought we clear latches here, but that caused midframe glitches.
@@ -334,6 +363,30 @@ static DECLFR(A2002) {
 	uint8 ret;
 
 	FCEUPPU_LineUpdate();
+
+	// Step 1.2 ($2002 VBL-set suppression, 2026-08-01): newppu only.
+	// Working-config VBL flag sets at the sl240→sl241 boundary (cycle 0 of
+	// the VBL block). Per NESdev PPU_frame_timing:
+	//  - read 1 PPU dot before the set (sl240, cycle340) → suppress the
+	//    flag set + NMI entirely for this frame
+	//  - read at the set dot or 1 dot after (sl241, cycle0-1) → reads as
+	//    set, clears it, and suppresses the NMI (read pulls /NMI back up
+	//    before the CPU samples it)
+	// Reads ≥2 dots away behave normally.
+	if (newppu) {
+		const int rsl = ppur.status.sl;
+		const int rcy = ppur.status.cycle;
+		if (e1_ppu_trace_on()) {
+			if ((rsl == 240 && rcy >= 335) || (rsl == 241 && rcy <= 5))
+				fprintf(stderr, "E1 P2002_READ sl=%d cycle=%d\n", rsl, rcy);
+		}
+		if (rsl == 240 && rcy == 340) {
+			fceu11_ppu_mark_vbl_set_suppressed();
+		} else if (rsl == 241 && rcy <= 1) {
+			X6502_IRQEnd(FCEU_IQNMI);  // cancel pending VBL NMI
+		}
+	}
+
 	ret = PPU_status;
 	ret |= PPUGenLatch & 0x1F;
 

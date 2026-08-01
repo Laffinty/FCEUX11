@@ -1510,6 +1510,20 @@ static inline int PaletteAdjustPixel(int pixel) {
 
 
 // ----------------------------------------------------------------------------
+// E-1 instrument-first probe (Step 1.2, 2026-08-01)
+// ----------------------------------------------------------------------------
+// Env-gated, zero-intrusion probe for PPU VBL/NMI dot timing. Activated by
+// setting FCEUX11_E1_TRACE=1 in the environment (restart required). Silent
+// otherwise (ctest 34/34 unaffected). See docs/history/e1_survey/.
+static bool e1_trace_on() {
+	static const bool on = []() {
+		const char* e = std::getenv("FCEUX11_E1_TRACE");
+		return e && e[0] == '1' && e[1] == '\0';
+	}();
+	return on;
+}
+
+// ----------------------------------------------------------------------------
 // New-PPU main loop (selected when newppu != 0)
 // ----------------------------------------------------------------------------
 int framectr = 0;
@@ -1555,10 +1569,21 @@ int FCEUX_PPU_Loop(int skip) {
 	}
 
 	{
-		// Working config: VBL at cycle 0, clear at cycle 0 = 6820 (01-vbl_basics PASS).
-		// Cycle 0->1 shift (02-vbl_set_time) deferred to focused follow-up.
-		PPU_status |= 0x80;
-		ppuphase = PPUPHASE_VBL;
+		// Step 1.2 (2026-08-01): a $2002 read 1 PPU dot before this boundary
+		// (A2002 at sl240 cycle340) suppresses the VBL flag set + NMI for
+		// this frame (NESdev PPU_frame_timing: "Reading one PPU clock before
+		// VBL-set reads it as clear and never sets the flag or generates NMI").
+		// The VBL period still advances (20 scanlines); only the flag/NMI are
+		// skipped. Marker is consumed (cleared) here each frame.
+		const bool vbl_set_suppressed = fceu11_ppu_take_vbl_set_suppressed();
+		if (!vbl_set_suppressed) {
+			// Working config: VBL at cycle 0, clear at cycle 0 = 6820 (01-vbl_basics PASS).
+			// Cycle 0->1 shift (02-vbl_set_time) deferred to focused follow-up.
+			PPU_status |= 0x80;
+			ppuphase = PPUPHASE_VBL;
+		} else {
+			ppuphase = PPUPHASE_VBL;
+		}
 
 		//Not sure if this is correct.  According to Matt Conte and my own tests, it is.
 		//Timing is probably off, though.
@@ -1577,7 +1602,17 @@ int FCEUX_PPU_Loop(int skip) {
 		// [3,2,2,2,2,2,2,1,1,1] — row 0 overshoot to 3 proves single-param
 		// NMI delay cannot fix vbl_05's per-row phase drift (see
 		// docs/history/e1_survey/vbl_step3_fix_data_2026-08-01.md §9).
-		if (VBlankON) { runppu(3); TriggerNMI(); }
+		// Step 1.2: runppu(3) is ALWAYS done when NMI is enabled so the
+		// frame length stays identical on suppressed and non-suppressed
+		// frames (6823 with NMI on — the pre-existing R5 Step 3 wart — vs
+		// 6820 with NMI off); only TriggerNMI is gated on !vbl_set_suppressed.
+		if (VBlankON) {
+			runppu(3);
+			if (!vbl_set_suppressed) TriggerNMI();
+		}
+		if (e1_trace_on() && vbl_set_suppressed) {
+			fprintf(stderr, "E1 VBL_SUPPRESSED frame=%d\n", framectr);
+		}
 
 		//formerly: runppu(delay);
 		for(int dot=0;dot<delay;dot++)
