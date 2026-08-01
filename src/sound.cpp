@@ -357,6 +357,13 @@ static DECLFR(StatusRead)
    int x;
    uint8 ret;
 
+   // R6 Step 3 (2026-08-01, defect-1 deep probe): record every $4015 read
+   // (blargg's wait_n timer end point) with current frame-counter state.
+   // This pins down exactly when blargg reads the IRQ flag vs when we set it.
+   if (e3_trace_on()) {
+    fprintf(stderr, "E3 R4015 fcnt=%u mode=0x%X fhcnt=%d sirq=0x%X\n",
+     (unsigned)fcnt, (unsigned)IRQFrameMode, fhcnt, (unsigned)SIRQStat);
+   }
    ret=SIRQStat;
 
    for(x=0;x<4;x++) ret|=lengthcount[x]?(1<<x):0;
@@ -537,7 +544,28 @@ static INLINE void DMCDMA(void)
 
 void FCEU_SoundCPUHook(int cycles)
 {
+ // R6 Step 3 (2026-08-01, defect-1 deep probe): two new sample probes
+ // to localize the fhcnt cumulative-drift vs quarter-boundary timing.
+ //  (a) HOOK_SAMPLE: every 4096th hook call (~0.1s) records fhcnt to
+ //      see long-term drift.
+ //  (b) HOOK_TRIG: every quarter-frame trigger records (cycles, fhcnt
+ //      before decrement, fhinc) to see exact trigger moment.
+ // NOTE: skipping tcount here — it's not in Cpu's public API in v1.4
+ // (it lives in private layout_). fhcnt is the primary signal.
+ static uint32_t hook_call_count = 0;
+ hook_call_count++;
  fhcnt-=cycles*48;
+ if (e3_trace_on()) {
+  if ((hook_call_count & 0xFFF) == 0) {
+   fprintf(stderr, "E3 HOOK_SAMPLE call=%u fhcnt=%d\n",
+    hook_call_count, fhcnt);
+  }
+  if (fhcnt <= 0) {
+   int32_t fhcnt_before_decr = fhcnt + cycles*48;
+   fprintf(stderr, "E3 HOOK_TRIG call=%u cycles=%d fhcnt_before=%d fhcnt_after=%d fhinc=%d\n",
+    hook_call_count, cycles, fhcnt_before_decr, fhcnt + fhinc, fhinc);
+  }
+ }
  if(fhcnt<=0)
  {
   // E-3 probe (R6 Step 1, 2026-08-01): record quarter-frame boundary hit
@@ -1042,6 +1070,13 @@ DECLFW(Write_IRQFM)
  if(V&0x2)
   FrameSoundUpdate();
  fcnt=1;
+ // R6-2a (2026-08-01): unconditional fhcnt reset retained.
+ // R6 Step 3 (2026-08-01): removing fhcnt=fhinc was tested as a defect-1
+ // root-cause fix and REVERTED — apu_single_4 still FAIL 0x02 and it
+ // broke golden_savestate_test / savestate_regression_test. See
+ // docs/history/e6_survey/r6_step3_fix_data_2026-08-01.md for the full
+ // analysis (fhcnt drift is not the cause; IRQ set position and fcnt
+ // init value also ruled out).
  fhcnt=fhinc;
  if (raw & 0x40) {
   X6502_IRQEnd(FCEU_IQFCOUNT);

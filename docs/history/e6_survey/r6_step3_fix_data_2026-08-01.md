@@ -124,3 +124,43 @@ enable 写（L41 `W4017 V=0x00`）后，FSU 序列 fcnt=1→2→3→0，**IRQ �
 ---
 
 *诊断记录完。缺陷 1 需更深入调查（fhcnt 时序），非本次 R6-2b 可闭合。*
+---
+
+## 8. 尝试 3：移除 Write_IRQFM 的 fhcnt=fhinc 重置（已回滚，2026-08-01 下午）
+
+**假设**（R6 Step3 probe 深挖后）：`Write_IRQFM` 每次写 $4017 都 `fhcnt=fhinc` 重置，强制写后第一个 FSU 再等满 7457 cyc → IRQ 固定在写后 4 quarters（fcnt 1→2→3→0）置。硬件上帧计数器周期连续，写只重排 fcnt 相位 → IRQ 应更早/按自然相位。
+
+**新 probe**（本轮新增，诊断用）：
+- `E3 HOOK_SAMPLE`：每 4096 次 hook 调用记录 fhcnt（看长期漂移）
+- `E3 HOOK_TRIG`：每次 quarter 触发记录 fhcnt_before/after（看边界稳定）
+- `E3 R4015`：每次 $4015 读记录 fcnt/fhcnt/sirq（定位 blargg 读时刻）
+
+**fhcnt 漂移分析结论**：HOOK_TRIG 的 fhcnt_before range [24, 336], mean=82 → quarter 边界非常稳定，**无累积漂移**（否定了 fhcnt 漂移假设）。
+
+**结果**：
+| 项 | 结果 |
+|---|---|
+| apu_single_4 | 仍 FAIL 0x02（未修复） |
+| apu_single_3（R6-2a） | PASS（保留） |
+| ctest | golden_savestate + savestate_regression FAIL（fhcnt 是 FHCN chunk 运行期值） |
+| 回滚 | ✅ fhcnt=fhinc 恢复 |
+
+**决定性 probe 数据（R4015）**：
+```
+FSU fcnt=3  sirq=0x0      ← 第 3 个 FSU
+FSU fcnt=0  fhcnt=0 sirq=0x0  ← 第 4 个 FSU（IRQ 内置）
+R4015 fcnt=1  fhcnt=357960  sirq=0x40  ← blargg 读时 IRQ 已置
+```
+enable 写后 IRQ 在 ~4 quarters 置，blargg 在 ~4.5 quarters 读 → 已置 → FAIL。
+
+**结论**：三次假设（fcnt 起始值 / IRQ 置位位置 / fhcnt 重置）全部证伪。缺陷 1 根因在 **blargg wait_n 定时器确切语义**层面——需精确反汇编 E342/E358/E440 循环算 blargg 期望的 enable→IRQ 时延，超出当前会话可靠范围。**暂停缺陷 1**，保留 R6-2a（apu_single_3 PASS）为 R6 的净成果。
+
+## 9. R6 当前净成果与状态
+
+| 项 | 状态 |
+|---|---|
+| 缺陷 2（$4017 清标志） | ✅ 修复（R6-2a，apu_single_3 PASS，apu_test 推进越过 irq_flag） |
+| 缺陷 1（帧计数器相位） | ⏸ 暂停（3 次假设证伪，根因在 blargg 定时器语义） |
+| Oracle A ctest | ✅ 34/34（probe 静默时） |
+| golden savestate | ✅ 未碎（回滚后） |
+| wip_1.16 HEAD | `f66b042`（诊断记录）+ 本轮 probe（未 commit） |
