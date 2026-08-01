@@ -1572,9 +1572,11 @@ int FCEUX_PPU_Loop(int skip) {
 		// (3 PPU dots) after VBL flag set. Real-hardware timing: VBL flag
 		// asserts at sl 241 cycle 1, NMI is dispatched ~1 CPU cycle later
 		// on the rising edge. Previously dispatched at the same dot, causing
-		// vbl_05's NMI to fire ~1 iteration earlier than expected
-		// (instrument-first data in docs/history/e1_survey/vbl_step[1-3]
-		// _instrument_data_2026-08-01.md).
+		// vbl_05's NMI to fire ~1 iteration earlier than expected.
+		// Step 4 (runppu(6)) was tried and REVERTED: X became
+		// [3,2,2,2,2,2,2,1,1,1] — row 0 overshoot to 3 proves single-param
+		// NMI delay cannot fix vbl_05's per-row phase drift (see
+		// docs/history/e1_survey/vbl_step3_fix_data_2026-08-01.md §9).
 		if (VBlankON) { runppu(3); TriggerNMI(); }
 
 		//formerly: runppu(delay);
