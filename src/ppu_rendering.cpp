@@ -1601,7 +1601,14 @@ int FCEUX_PPU_Loop(int skip) {
 			fprintf(stderr, "E1 NMI_DISPATCH frame=%d sl=%d cycle=%d vblank_on=%d\n",
 				framectr, ppur.status.sl, ppur.status.cycle, VBlankON ? 1 : 0);
 		}
-		if (VBlankON) TriggerNMI();
+		// R5 Step 3 (2026-08-01, path d): delay NMI dispatch by 1 CPU cycle
+		// (3 PPU dots) after VBL flag set. Real-hardware-style timing:
+		// VBL flag asserts at sl 241 cycle 1, NMI is dispatched ~1 CPU cycle
+		// later on the rising edge of the flag. Previous impl dispatched
+		// NMI at the same dot as the flag, causing vbl_05 to see NMI fire
+		// ~1 iteration earlier than expected (X snapshot [2,1,1,1,1,1,1,0,0,0]
+		// vs expected [2,3,4,5,6,7,8,9,10,11]).
+		if (VBlankON) { runppu(3); TriggerNMI(); }
 
 		//formerly: runppu(delay);
 		for(int dot=0;dot<delay;dot++)
