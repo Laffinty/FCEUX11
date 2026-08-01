@@ -1024,14 +1024,23 @@ DECLFW(Write_IRQFM)
   fprintf(stderr, "E3 W4017_IN V=0x%X pre_mode=0x%X pre_fcnt=%u pre_sirq=0x%X\n",
    (unsigned)V, (unsigned)pre_mode, (unsigned)pre_fcnt, (unsigned)pre_sirq);
  }
+ // R6-2a (2026-08-01): save the raw $4017 value BEFORE the (V&0xC0)>>6
+ // reduction — bit 6 of the raw byte is the IRQ inhibit bit. Per Nesdev,
+ // writing $4017 without the inhibit bit set must NOT clear the frame IRQ
+ // flag; only a write that sets inhibit (raw bit6=1) clears it. blargg
+ // apu_single_3_irq_flag #6 asserts "Writing $00 or $80 to $4017 shouldn't
+ // affect flag". Previously this was unconditional (defect 2).
+ const uint8 raw = V;
  V=(V&0xC0)>>6;
  fcnt=0;
  if(V&0x2)
   FrameSoundUpdate();
  fcnt=1;
  fhcnt=fhinc;
- X6502_IRQEnd(FCEU_IQFCOUNT);
- SIRQStat&=~0x40;
+ if (raw & 0x40) {
+  X6502_IRQEnd(FCEU_IQFCOUNT);
+  SIRQStat&=~0x40;
+ }
  IRQFrameMode=V;
  if (e3_trace_on()) {
   fprintf(stderr, "E3 W4017_OUT post_mode=0x%X post_fcnt=%u post_sirq=0x%X\n",
