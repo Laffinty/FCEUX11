@@ -233,6 +233,18 @@ env-gated 探针 `E1 P2002_READ` / `E1 VBL_SUPPRESSED`。
 **证伪判据**（对应 `04.clock_jitter.asm` 四个 sub-test）：
 - 29830 读 $4015 未置位（sub-test 2 "too soon" 消除）
 - 29832 读 $4015 已置位（sub-test 3 "too late" 消除）
+
+> **✅ 2026-08-02 实测状态（已落地，一阶近似）**：
+> - 已实现：`Write_IRQFM` 计时器重置改为 `fhcnt = fhinc + (1 + odd)*48`（offset=1，`FCEUX11_E3_OFFSET` 可覆盖）；
+>   jitter 相位 = 写时刻 `g_cpu.timestamp & 1`。完整数据见
+>   `docs/history/surveys/e6_apu/p2_step2_2_data_2026-08-02.md`。
+> - ✅ **`apu_single_4_jitter` 0x02 → 0x00 PASS**；40 ROM APU 全量零 PASS→FAIL；
+>   Oracle A 33/33（golden 重生，`fds_bios.fc0` 仅 5 字节 fhcnt/fcnt 运行期值变更）。
+> - ⚠️ **`apu_single_5/6` 0x02 → 0x04 未闭合**（"first too soon"→"second too soon"）：
+>   hook 量化方差（±2-3 cyc）超出 blargg ±1 cyc 容差，**参数级不可收敛**（offset 0-4、
+>   fhinc 7457.5/7458、分数 offset、fcnt==3 +1、tsdelta 递减 全部证伪）。需 cycle-accurate
+>   quarter crossing（消除 hook 量化），改动面与 Phase 1 Step 1.3 同族，记为**有据已知限制**。
+> - `apu_reset_4017_timing`（power 路径 "delay 2"）与 `apu_test` 停在 Step 2.1 状态，未变。
 - 偶数对齐两次 `get_jitter` 结果一致（sub-test 4）、奇数对齐两次结果不同（sub-test 5）→ $6000=0x00
 - `apu_single_6`（irq_timing）$6000=0x00
 
