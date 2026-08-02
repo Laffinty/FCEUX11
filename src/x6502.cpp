@@ -392,13 +392,50 @@ void X6502_IRQEnd(int w)
  _IRQlow&=~w;
 }
 
+// E-1 probe (Phase 1 Step 1.3, 2026-08-02): env-gated absolute-cycle trace
+// for NMI latch set / CPU sampling. Uses FCEUX11_E1_TRACE like the PPU-side
+// probe so one env var drives the whole frame-boundary investigation.
+static bool e1_cpu_trace_on() {
+ static const bool on = []() {
+  const char* e = std::getenv("FCEUX11_E1_TRACE");
+  return e && e[0] == '1' && e[1] == '\0';
+ }();
+ return on;
+}
+
+// E-1 probe (Phase 1 Step 1.3): last instruction PC observed by the CPU at
+// the current boundary, so the PPU VBL block can log exactly where the CPU
+// instruction stream is when the frame boundary fires.
+static uint16 e1_last_pc = 0;
+uint16 fceu11_e1_last_pc() { return e1_last_pc; }
+
+static uint64 e1_cpu_abs() {
+ return g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref();
+}
+
+// E-1 probe (Phase 1 Step 1.3, 2026-08-02): NMI-latch freshness flag.
+// The VBL path (TriggerNMI) is called from the PPU loop between CPU runs;
+// the CPU's next loop-top check happens at the boundary where the previous
+// instruction ENDED (before the latch was asserted), so dispatching there
+// would fire NMI one instruction too early. Per 6502 semantics the line is
+// sampled at the END of each instruction; a latch asserted at/after boundary
+// B must be observed at the NEXT boundary. TriggerNMI2 already defers via
+// the NMI2->NMI conversion on the same check; give TriggerNMI the same
+// one-boundary deferral (04-nmi_control #11 "after NEXT instruction").
+static bool g_e1_nmi_fresh = false;
+
 void TriggerNMI(void)
 {
+ if (e1_cpu_trace_on())
+  fprintf(stderr, "E1 NMI_SET abs=%llu (path=VBL)\n", (unsigned long long)e1_cpu_abs());
  _IRQlow|=FCEU_IQNMI;
+ g_e1_nmi_fresh = true;
 }
 
 void TriggerNMI2(void)
 {
+ if (e1_cpu_trace_on())
+  fprintf(stderr, "E1 NMI_SET2 abs=%llu (path=W2000-edge)\n", (unsigned long long)e1_cpu_abs());
  _IRQlow|=FCEU_IQNMI2;
 }
 
@@ -478,8 +515,20 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
     }
     else if(_IRQlow&FCEU_IQNMI)
     {
-     if(!_jammed)
+     if (g_e1_nmi_fresh)
      {
+      // Latch was asserted at/after this boundary; observe it at the NEXT
+      // instruction boundary (6502 samples the line at instruction end).
+      if (e1_cpu_trace_on())
+       fprintf(stderr, "E1 NMI_DEFER abs=%llu pc=%04X\n",
+        (unsigned long long)e1_cpu_abs(), (unsigned)_PC);
+      g_e1_nmi_fresh = false;
+     }
+     else if(!_jammed)
+     {
+      if (e1_cpu_trace_on())
+       fprintf(stderr, "E1 NMI_DISPATCH abs=%llu pc=%04X\n",
+        (unsigned long long)e1_cpu_abs(), (unsigned)_PC);
       ADDCYC(7);
       PUSH(_PC>>8);
       PUSH(_PC);
@@ -520,6 +569,7 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
    IncrementInstructionsCounters();
 
    _PI=_P;
+   e1_last_pc = (uint16)_PC;
    b1=RdMem(_PC);
 
    ADDCYC(CycTable[b1]);

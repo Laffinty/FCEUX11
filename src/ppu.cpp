@@ -377,8 +377,8 @@ static DECLFR(A2002) {
 		const int rsl = ppur.status.sl;
 		const int rcy = ppur.status.cycle;
 		if (e1_ppu_trace_on()) {
-			if ((rsl == 240 && rcy >= 335) || (rsl == 241 && rcy <= 5))
-				fprintf(stderr, "E1 P2002_READ sl=%d cycle=%d\n", rsl, rcy);
+			fprintf(stderr, "E1 P2002_READ abs=%llu sl=%d cycle=%d\n",
+			 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()), rsl, rcy);
 		}
 		if (rsl == 240 && rcy == 340) {
 			fceu11_ppu_mark_vbl_set_suppressed();
@@ -654,6 +654,11 @@ static DECLFR(A2007) {
 static DECLFW(B2000) {
 	FCEUPPU_LineUpdate();
 	PPUGenLatch = V;
+
+	if (e1_ppu_trace_on())
+		fprintf(stderr, "E1 W2000 abs=%llu V=0x%02X old=0x%02X vbl=%d\n",
+		 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()),
+		 (unsigned)V, (unsigned)PPU[0], (int)((PPU_status & 0x80) != 0));
 
 	if (!(PPU[0] & 0x80) && (V & 0x80) && (PPU_status & 0x80))
 		TriggerNMI2();

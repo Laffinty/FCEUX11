@@ -57,6 +57,10 @@ void X6502_Debug(void (*CPUHook)(X6502 *),
 // directly. The macro keeps the old call sites working.
 void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles);
 #define X6502_Run(cycles) X6502_RunDebug(g_cpu, cycles)
+
+// E-1 probe (Phase 1 Step 1.3): last instruction PC observed at the current
+// CPU boundary (set at the start of each instruction fetch in the run loop).
+uint16 fceu11_e1_last_pc();
 //------------
 
 FCEUX11_DEPRECATED("use fceu11::cpu_instance().timestamp_ref() instead")

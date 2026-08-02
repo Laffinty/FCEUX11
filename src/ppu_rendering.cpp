@@ -1523,6 +1523,17 @@ static bool e1_trace_on() {
 	return on;
 }
 
+// E-1 probe (Phase 1 Step 1.3, 2026-08-02): sweep knob for the PPU dots
+// advanced before the NMI latch is asserted in the VBL block (replaces the
+// hard-coded R5 Step 3 runppu(3)). Env FCEUX11_E1_NMIDELAY, default 3.
+static int e1_nmi_delay() {
+	static const int d = []() {
+		const char* e = std::getenv("FCEUX11_E1_NMIDELAY");
+		return (e && e[0]) ? std::atoi(e) : 3;
+	}();
+	return d;
+}
+
 // ----------------------------------------------------------------------------
 // New-PPU main loop (selected when newppu != 0)
 // ----------------------------------------------------------------------------
@@ -1576,6 +1587,12 @@ int FCEUX_PPU_Loop(int skip) {
 		// The VBL period still advances (20 scanlines); only the flag/NMI are
 		// skipped. Marker is consumed (cleared) here each frame.
 		const bool vbl_set_suppressed = fceu11_ppu_take_vbl_set_suppressed();
+		if (e1_trace_on()) {
+			fprintf(stderr, "E1 VBL_ENTER abs=%llu sl=%d cycle=%d count=%d lastpc=%04X suppressed=%d VBlankON=%d\n",
+			 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()),
+			 ppur.status.sl, ppur.status.cycle, g_cpu.native_layout().count, (unsigned)fceu11_e1_last_pc(),
+			 (int)vbl_set_suppressed, (int)(VBlankON != 0));
+		}
 		if (!vbl_set_suppressed) {
 			// Working config: VBL at cycle 0, clear at cycle 0 = 6820 (01-vbl_basics PASS).
 			// Cycle 0->1 shift (02-vbl_set_time) deferred to focused follow-up.
@@ -1607,7 +1624,13 @@ int FCEUX_PPU_Loop(int skip) {
 		// frames (6823 with NMI on — the pre-existing R5 Step 3 wart — vs
 		// 6820 with NMI off); only TriggerNMI is gated on !vbl_set_suppressed.
 		if (VBlankON) {
-			runppu(3);
+			const int nd = e1_nmi_delay();
+			if (nd > 0) runppu(nd);
+			if (e1_trace_on()) {
+				fprintf(stderr, "E1 VBL_AFTER_NMIDELAY abs=%llu sl=%d cycle=%d delay=%d\n",
+				 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()),
+				 ppur.status.sl, ppur.status.cycle, nd);
+			}
 			if (!vbl_set_suppressed) TriggerNMI();
 		}
 		if (e1_trace_on() && vbl_set_suppressed) {
