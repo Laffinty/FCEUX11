@@ -1,6 +1,6 @@
 # FCEUX11 v1.16 精度收敛 — 三阶段构建方案（P2 深化版）
 
-> **编制日期**：2026-08-01
+> **编制日期**：2026-08-01（**2026-08-02 深化修订**：E-1 Step 1.3 状态回填——vbl_05 PASS、读侧/边沿分源、行号校准）
 > **编制依据**：
 > - `docs/history/reports/FCEUX11-1.16_最终验收报告.md` §十 R5/R6（原始处方 + 🚨/🚧 实测校准块）
 > - `docs/tech/P2_precision_instrument_handoff.md`（E-1/E-3 交接档案，含 6 探针清单）
@@ -9,6 +9,8 @@
 > - **用户决策（2026-08-01）**：P3（第二 oracle 来源）暂不做，"先确保精度再谈别的"。P3 已在验收报告中标注暂缓。
 >
 > **性质**：可执行的构建方案。每个 Phase/Step 含 目标 / 文件:行号 / 改法 / instrument 验证 / 回归集 / 证伪判据。**不是**对交接档案结论的推翻，而是用联机资料把交接档案中"未闭合"的两项（R5-E1、R6-缺陷1）钉到可动手的精度。
+>
+> **最新实测（2026-08-02 收尾核对）**：Phase 1 = vbl 5 PASS / 5 FAIL（vbl_05 已修复，`5581769`）；Phase 2 = E-3 闭合（7 bucket-C 全 PASS）；Oracle A 33/33（golden 已重生，`7ea1d0c`）；Phase 3 未开始。
 
 ---
 
@@ -31,11 +33,11 @@
 
 | 事件 | 硬件真值 | FCEUX working-config 现状 | 差距 |
 |---|---|---|---|
-| VBL flag 置位 | **sl 241 dot 1**（`ppu_rendering.cpp` 注释亦自认 "cycle 1"） | `PPU_status \|= 0x80` 于 **cycle 0**（`ppu_rendering.cpp:1560`） | **早 1 dot** |
-| NMI latch | flag 置位**同 dot**（/NMI 低电平 iff vblank_flag && NMI_output，CPU 下一指令边界采样） | `if (VBlankON) { runppu(3); TriggerNMI(); }`（`:1580`，R5 Step 3 保留的 hack） | runppu(3) 只移 PPU 相位，不修正 flag 置位点；且使 VBL 周期 +3 |
-| VBL flag 清除 | **sl 261 dot 1**（置位后 6820 dots） | `PPU_status = 0`（`:1597`，20 扫描线循环后） | 清除点随置位点联动，需同步对齐 |
-| $2002 读抑制窗口 | 读 **1 dot 前**于置位 → 抑制置位+无 NMI；**同 dot 或 1 dot 后** → 读到置位+清除+抑制 NMI；**≥2 dot** → 正常 | `A2002`（`ppu.cpp:327-349`）仅 `PPU_status &= 0x7F`，**无抑制逻辑** | 缺窗口逻辑 |
-| even/odd 跳点 | rendering on 时奇数帧在 (339,261)→(0,0) 跳 1 clock | `ppu_rendering.cpp:1979-1994` | 位置/相位待 instrument 验证 |
+| VBL flag 置位 | **sl 241 dot 1**（`ppu_rendering.cpp` 注释亦自认 "cycle 1"） | `PPU_status \|= 0x80` 于 **cycle 0**（`ppu_rendering.cpp:1605`） | **早 1 dot**（Step 1.1 已证伪单独调整；6820 set→clear 为硬约束） |
+| NMI latch | flag 置位**同 dot**（/NMI 低电平 iff vblank_flag && NMI_output，CPU 下一指令边界采样） | `if (VBlankON) { X6502_Run(8); TriggerNMI(); }`（`:1642/:1648`，`5581769` 以 X6502_Run(8) 替换 runppu(3)） | **✅ 帧畸变已消除**（NMI-on 帧 6820，探针证实 cycle 恒 0）；vbl_05 PASS |
+| VBL flag 清除 | **sl 261 dot 1**（置位后 6820 dots） | `PPU_status = 0`（`:1667`，20 扫描线循环后） | 清除点随置位点联动（6820 set→clear 保持，vbl_01 PASS） |
+| $2002 读抑制窗口 | 读 **1 dot 前**于置位 → 抑制置位+无 NMI；**同 dot 或 1 dot 后** → 读到置位+清除+抑制 NMI；**≥2 dot** → 正常 | `A2002`（`ppu.cpp:327-349`）Step 1.2 已实现 `(240,340)` 抑制 + `(241,0-1)` NMI 取消 | 🔍 机制已落地但**读落点量化未闭合**（vbl_02/06，`1b5a434`），需读采样相位模型 |
+| even/odd 跳点 | rendering on 时奇数帧在 (339,261)→(0,0) 跳 1 clock | `ppu_rendering.cpp:2060-2064`（`idleSynch` toggle） | 位置/相位待 instrument 验证（Step 1.4，vbl_10 FAIL） |
 
 **vbl_05 期望输出（源码注释原文，目标表）**：`00 4 / 01 4 / 02 4 / 03 3 / 04 3 / 05 3 / 06 3 / 07 3 / 08 3 / 09 2`
 （NMI 落在 5 条 `LDX #1..#5` 中的哪条之后；`05-nmi_timing.s` 原文）。
@@ -49,6 +51,8 @@
 3. **实测定案根因**（Step 1.2 探针数据）：模拟器在**帧边界（sl240→sl241）的 CPU↔PPU 读/NMI 采样时序偏移 ~2-3 dot**——
    vbl_05 "NMI 早 ~2 指令"、vbl_02 "测量 read1 未落在抑制点" 同源。这不是 PPU 置位点问题，是 **CPU 侧相对时序**问题
    （印证 `vbl_step1_instrument_data` §5.2）。修正路径 = Step 1.3（CPU 侧 NMI/读采样模型），非置位点调整。
+   **2026-08-02 进展**：派发侧（vbl_05）经 X6502_Run 帧修复 + NMIDELAY=8 已闭合（`5581769`）；
+   读侧（vbl_02/06）细化定位为读落点量化，待读采样相位模型（`1b5a434`）。
 
 ### 1.2 E-3（APU 帧计数器）硬件真值（blargg_apu_2005.07.30 权威文档 + NESdev Wiki）
 
@@ -95,16 +99,21 @@
 
 ## 2. 三阶段总览
 
-> **🚨 执行现状与优先级修订（2026-08-01 实测后 + 2026-08-02 补充）**：
-> - **Phase 1（E-1）已实测两轮**：Step 1.1 证伪（置位点假设，已回滚）；Step 1.2 抑制机制落地（**零回归**，但 vbl_02 未闭合）。
->   剩余 6 ROM 全部指向**同一深层根因：CPU 侧 NMI/读采样时序 vs PPU 帧边界对齐**（Step 1.3 专项，改动面在 x6502 采样模型，较深）。
+> **🚨 执行现状与优先级修订（2026-08-01 实测后 + 2026-08-02 补充 + 2026-08-02 深化）**：
+> - **Phase 1（E-1）**：Step 1.1 证伪（置位点假设，已回滚）；Step 1.2 抑制机制落地（零回归，vbl_02/06 未闭合）；
+>   **Step 1.3 深化两轮**：NMI fresh 延迟（`7cfb029`）+ **X6502_Run 帧修复 + NMIDELAY=8 → vbl_05 PASS**（`5581769`，
+>   **证伪判据主项达成**）。剩余 5 ROM 已重新分源：
+>   **vbl_02/06 = CPU 侧读采样量化**（读落点被指令边界量化、A2002 (sl,cyc) 坐标失真、Step 1.2 marker 缺口，
+>   需读采样相位模型——深，`1b5a434` 调查）、**vbl_07/08 = $2000 边沿采样**（对 NMIDELAY 5-12 全扫免疫，独立子问题）、
+>   **vbl_10 = Step 1.4 even/odd**（独立机制）。
 > - **Phase 2（R6/APU）已执行（顺序经用户确认）**：**Step 2.1 相位分离 ✅**（2026-08-01，`e3(step2.1)`）+ **Step 2.2 写路径延迟+jitter 一阶近似 ✅**（2026-08-02，`e3(step2.2)`，**`apu_single_4_jitter` 0x02→0x00 PASS**，40 ROM 零回归，Oracle A 33/33）+ **Step 2.2 深化 ✅**（2026-08-02，`e3(step2.2-deep)`：cycle-position 帧计数器，**single_5/6 + reset_4017_timing/written + apu_test 全转 PASS，7 个 bucket-C sub-test 全闭合**，Oracle B 135 PASS 无 apu_* 失败）。
 > - **Phase 2 剩余**：**Step 2.3 已实测证伪（2026-08-02）**——当前 `V&0x2` 即原始 bit7（5-step），
 >   已是硬件正确实现；方案改法 `V&0x1` 方向相反（会使 $40 触发 clock、$80 不触发），实测
 >   `apu_single_1_len_ctr` 0x00→0x04 回归（见 `docs/history/surveys/e6_apu/p2_step2_3_falsification_2026-08-02.md`）。
 > - **建议执行顺序（已确认）**：**Phase 2（R6）→ Phase 1 Step 1.3 → Phase 1 Step 1.4 → Phase 3**。
->   Step 2.3 证伪、Step 2.2 深化落地后，**E-3 已闭合**，下一步唯一路径：
->   **Phase 1 Step 1.3（CPU 侧 NMI/读采样模型，与已落地的 cycle-position 模型同族）**。
+>   E-3 已闭合；Step 1.3 派发侧（vbl_05）已落地，剩余为独立子问题。下一步候选（按改动面/风险排序）：
+>   **Step 1.4（vbl_10 even/odd，机制独立、改动面小）→ vbl_02/06 读侧相位模型（深，单独评估）→
+>   vbl_07/08 边沿采样 → Phase 3**。
 
 | Phase | 目标 | 验收门 | 对应 |
 |---|---|---|---|
@@ -154,6 +163,12 @@ env-gated 探针 `E1 P2002_READ` / `E1 VBL_SUPPRESSED`。
 **实测结论**：全量零回归（Oracle A 34/34、Oracle B 121/56）；vbl_02 **未闭合**——测量 read1 从未落在抑制点
 （探针证实抑制大多在 sync 自旋读触发）；vbl_06/07/08 部分改善。**残余工作并入 Step 1.3**（CPU 侧时序根因）。
 
+> **🔍 2026-08-02 读侧调查（`vbl_step1_3_read_suppression_2026-08-02.md`）**：vbl_02/06 未闭合的精确机制已定位——
+> ① **读落点量化**：测量读被指令边界量化（vbl_06 行 4-9 全部停在 (241,0)、Δ=+4，行 0-3 在 Δ=0，仅 2 个离散落点，
+>    无法还原硬件 1 dot/行漂移的 5+ 落点）；② **坐标失真**：`X6502_Run` 阶段 PPU cycle 停驻使 A2002 的 (sl,cyc) 判定失效；
+> ③ **Step 1.2 缺口**：(241,0-1) 读发生在 `TriggerNMI` **之前**，`X6502_IRQEnd` 无事可清（补 marker 会误伤行 7-9）。
+> **结论**：需 CPU 侧读采样相位模型（与 cycle-position 同族），NMIDELAY 5-12 全扫证伪参数级修复；未落地半修复。
+
 **原证伪判据（未达成，保留为 Step 1.3 目标）**：`vbl_06` 输出 `-N,-N,-N,-N, - -, V-, V-, VN, VN, VN`（$6000=0x00）；
 `vbl_02` 输出与 readme 模式一致；`vbl_01` 不回归。
 
@@ -167,6 +182,17 @@ env-gated 探针 `E1 P2002_READ` / `E1 VBL_SUPPRESSED`。
 > 采样建模（见下），vbl_02/05/06/07/08/10 仍未 PASS。完整数据见
 > `docs/history/surveys/e1_vbl/vbl_step1_3_nmi_sampling_2026-08-02.md`。
 >
+> **✅ 2026-08-02 深化（第二轮，vbl_05 主修复目标达成，`5581769`）**：
+> - **帧修复**：VBL 块 NMI 使能路径 `runppu(nd)` → `X6502_Run(nd)`。runppu(nd) 同时推进 PPU nd dots
+>   并给 CPU nd×16 单位预算，使 NMI-on 帧长 6823 dots（R5 Step 3 遗留畸变——探针证实 `VBL_ENTER cycle`
+>   逐帧 +3，扭曲 nmi_timing 的逐行相位漂移）；`X6502_Run(nd)` 只给 CPU 预算、不推进 PPU，帧恢复
+>   6820-dot VBL（硬件真值，探针证实 cycle 恒 0）。CPU 行为与预算完全一致，仅帧长归一。
+> - **NMIDELAY 校准 3 → 8**：`X6502_Run(8)` = 8 dots ≈ 2.67 周期预算于 latch 前。扫参：
+>   7 → `[4,3,...]`（偏早 1 指令）、**8 → `[4,4,4,3,3,3,3,3,3,2]`（与期望完全一致）**、9 → `[4,4,4,4,3,...]`（转变行晚 1）。
+> - **实测**：vbl_05 **PASS（$6000=0x00）——证伪判据主项达成**；vbl 全 10 ROM 零回归（01/03/04/09 基线保持）；
+>   APU 18 ROM 零回归；Oracle A 33/33（golden nestest 哈希已重生，`7ea1d0c`）。
+>   完整数据见 `docs/history/surveys/e1_vbl/vbl_step1_3_deep_x6502run_2026-08-02.md`。
+>
 > **深层根因定位（本轮决定性数据）**：vbl_05 的 `_count` 残量（= CPU↔PPU 帧相位）
 > 确按 1/3 周期/帧漂移，但 **VBL 块 runppu 预算把派发量化吸收**——固定 NMI 延迟 D
 > 下 DPC 只随 lastpc 三档粗变（E350/E34E/E34B），无法还原期望逐行漂移
@@ -177,16 +203,20 @@ env-gated 探针 `E1 P2002_READ` / `E1 VBL_SUPPRESSED`。
 > **范围修订（2026-08-01 实测后）**：本步从"NMI on/off timing 微调"升格为 **E-1 深层根因专项**。
 > Step 1.1/1.2 实测确认：剩余 6 ROM（02/05/06/07/08/10）同源——**CPU 侧 NMI 采样与 $2002 读在帧边界的相对时序偏移 ~2-3 dot**
 > （vbl_05 "NMI 早 ~2 指令"、vbl_02 "测量 read1 未落抑制点"、vbl_06 rows 05-06 "NMI 抑制未达成" 三表同证）。
-> 目标输出：vbl_05 `4,4,4,3,3,3,3,3,3,2`；vbl_06 全模式；vbl_02/07/08 与 readme 一致。
+> **2026-08-02 细化**：该"同源"假设经实测收窄——派发侧（vbl_05）已独立修复（见上）；vbl_02/06（读侧量化）与
+> vbl_07/08（边沿采样）虽同属 CPU 侧采样族，但为独立子问题，分源与处置见 §2。
+> 目标输出（当前状态）：vbl_05 `4,4,4,3,3,3,3,3,3,2`（**✅ 已达成**）；vbl_06 全模式、vbl_02/07/08 与 readme 一致
+> （未达成——02/06 读侧相位模型、07/08 边沿采样，分源见 §2）。
 
 **依赖**：**不依赖** Step 1.1 置位点（已证伪）。vbl_07（NMI-enable 在 VBL 清除边界）、vbl_08（NMI-disable 在 VBL 置位边界）
 的边沿采样窗口随 NMI 采样模型修正自动对齐。
 **文件**：`src/x6502.cpp:395-403`（`TriggerNMI`/`TriggerNMI2`，立即/延迟 NMI 两路 + CPU 指令边界 NMI 检查）、
-`src/ppu.cpp:327-349`（`A2002`，已含抑制）、`src/ppu_rendering.cpp:1580`（runppu(3) hack 的去留评估）。
+`src/ppu.cpp:327-349`（`A2002`，已含抑制）、`src/ppu_rendering.cpp:1642`（`X6502_Run(nd)`——runppu(3) hack 已替换，2026-08-02）。
 **改法（instrument-first）**：先插桩记录（a）NMI latch 点 vs CPU 指令边界采样点（b）$2002 读点 vs NMI dispatch 顺序，
 量化 ~2-3 dot 偏移的精确来源（CPU 采样提前？NMI 7-cycle 进入延迟缺失？指令边界相位？），再按数据建模——
 候选：NMI 边沿 latch + 指令边界采样相位修正、runppu(3) hack 替换为 CPU 侧等效延迟。
-**证伪判据**：vbl_05 输出 `4,4,4,3,3,3,3,3,3,2`（$6000=0x00）；vbl_02/06/07/08 $6000=0x00；vbl_04（当前 PASS）不回归。
+**证伪判据（当前状态）**：~~vbl_05 输出 `4,4,4,3,3,3,3,3,3,2`（$6000=0x00）~~（**✅ 已达成，`5581769`**）；
+vbl_02/06/07/08 $6000=0x00（未达成）；vbl_04（当前 PASS）不回归（保持）。
 
 ### Step 1.4 — even/odd 跳点（vbl_10）
 
@@ -358,7 +388,9 @@ env-gated 探针 `E1 P2002_READ` / `E1 VBL_SUPPRESSED`。
 | 风险 | 缓解 |
 |---|---|
 | E-1 修好一个 vbl ROM 弄坏另一个（经典互耦） | 每步只动一个机制 + 全 10 ROM 回归；`vbl_01/03/04/09` 是硬基线 |
-| **E-1 深层根因是 CPU 侧 NMI/读采样模型（改动面大、风险高）** | **已实测确认**（Step 1.1/1.2）；转为 Step 1.3 专项，单独评估；不因 E-1 阻塞 R6 |
+| **E-1 深层根因是 CPU 侧 NMI/读采样模型（改动面大、风险高）** | **派发侧（vbl_05）已修复**（`5581769`，X6502_Run 帧修复 + NMIDELAY=8）；剩余 vbl_02/06 读侧量化、vbl_07/08 边沿采样为独立子问题，按 Step 1.3 残余专项单独评估 |
+| vbl_02/06 读落点量化（测量读被指令边界量化，A2002 (sl,cyc) 坐标失真） | 已探针定位（`1b5a434`）；需 CPU 侧读采样相位模型（与 cycle-position 同族），NMIDELAY 5-12 全扫证伪参数级修复；不落地半修复 |
+| vbl_07/08 $2000 边沿采样窗口 | 对 NMIDELAY 全扫免疫（5-12 不变），独立子问题，待专项调查 |
 | VBL 周期 6820 不变量被破坏 → vbl_01 翻红 | **Step 1.1 已证伪此路径并回滚**；set→clear 周期是硬约束，置位点不再单独调整 |
 | golden savestate 哈希碎裂被误判为回归 | 预期流程：`fceux11_golden_savestate_test --generate` 重生，diff 确认仅起始值变化（R6 Step 2.1 必走） |
 | APU 时钟奇偶（jitter）在 FCEUX 架构中无现成信号 | **✅ Step 2.2 已消解**：相位信号 = 写时刻**绝对周期** `timestamp_base + timestamp & 1`（2026-08-02 深化修正：`timestamp` 每帧归零，跨帧奇偶翻转会破坏 sync_apu 对齐；探针实测偶间隔同相位/奇间隔翻转） |
@@ -373,13 +405,13 @@ env-gated 探针 `E1 P2002_READ` / `E1 VBL_SUPPRESSED`。
 3. 不重复 P4-2 length reload（commit `562f0e8`/revert `cda40fe`）
 4. 不"顺手修" $4017 bit 映射 swap（`apu_06` PASS 依赖）
 5. 不改 savestate chunk 结构（`sound.cpp:1462-1466`）
-6. 不用 runppu(N) 盲调 NMI 相位（已证伪两次）
+6. 不用 runppu(N) 盲调 NMI 相位（已证伪两次；`5581769` 已用 `X6502_Run(nd)` 替换——只给 CPU 预算不推进 PPU，NMI-on 帧保持 6820）
 7. `blargg_ppu_vbl_nmi` 全 PASS 前不升 blocking
 
 ### 文件:行号总索引
 
-**E-1**：VBL 置位 `ppu_rendering.cpp:1560`；NMI latch `:1580`；`delay` 旋钮 `:1567`；VBL 清除 `:1595`；$2002 读+清 `ppu.cpp:327-349`；
-$2000 NMI-enable 边沿 `ppu.cpp:601-615`；`TriggerNMI`/`TriggerNMI2` `x6502.cpp:395-403`；even/odd 跳点 `ppu_rendering.cpp:1979-1994`；`runppu` `:1361-1377`
+**E-1**（行号 2026-08-02 校准）：VBL 置位 `ppu_rendering.cpp:1605`；NMI latch `:1648`；`X6502_Run(nd)` NMI 预算 `:1642`；`e1_nmi_delay` 旋钮 `:1529-1541`（默认 8）；VBL 清除 `:1667`；$2002 读+清 `ppu.cpp:327-349`；
+$2000 NMI-enable 边沿 `ppu.cpp:601-615`；`TriggerNMI`/`TriggerNMI2` `x6502.cpp:395-403`（+ E-1 fresh 标记 `:425-432`）；even/odd 跳点 `ppu_rendering.cpp:2060-2064`（`idleSynch` toggle；pre-render 行末跳点块在其附近）；`runppu` `:1363-1377`
 
 **E-3**（行号 2026-08-02 校准）：帧 IRQ 置位 `FrameSoundUpdate :491-525`（`SIRQStat|=0x40` 在内）；5-step 额外周期 `if(fcnt==3) :516-520`；length/sweep 半帧 clock `FrameSoundStuff :404-474`；
 $4017 写 `Write_IRQFM :1081-1140`（`fcnt=0` `:1104`、`if(V&0x2)` `:1105`、`fcnt=1` `:1107`、`fhcnt=...` Step 2.2 `:1132`、条件清 `raw & 0x40` `:1133`）；
