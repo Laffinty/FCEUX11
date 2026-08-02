@@ -183,9 +183,31 @@ static SingleResult run_one_rom(const char* rom_path, int frames) {
     {
         emulate_n(g_reset_after_frames);
         fceu11::ResetNES();
-        emulate_n(frames - g_reset_after_frames);
+        // Some ROMs (apu_reset_4017_written) need a SECOND reset: per the
+        // blargg protocol $6000=0x81 means "waiting for RESET (delayed at
+        // least 100 ms from now)", so after the configured reset we poll
+        // every 6 frames (~100 ms) and press RESET again while 0x81 is
+        // shown, until the frame budget is exhausted.
+        int done = g_reset_after_frames;
+        // 0x81 during the post-reset measurement window is STALE (the ROM
+        // re-runs its check for up to ~14 frames after the vector fires);
+        // only trust 0x81 once it persists past a 20-frame cooldown, then
+        // press RESET again (apu_reset_4017_written needs a second one).
+        int since_reset = 0;
+        const int cooldown = 20;  // frames
+        while (done < frames) {
+            const int chunk = 6;
+            const int step = (frames - done < chunk) ? frames - done : chunk;
+            emulate_n(step);
+            done += step;
+            since_reset += step;
+            if (since_reset >= cooldown && read_probe().code == 0x81) {
+                fceu11::ResetNES();
+                since_reset = 0;
+            }
+        }
     } else {
-        // Run frames. Blargg ROMs are self-checking — they write PASS/FAIL to
+        // Run frames. Blargg ROMs are self-checking - they write PASS/FAIL to
         // $6000-$6003 and then loop. The frame count is tuned so the ROM has
         // time to complete its test sequence and write the result.
         emulate_n(frames);

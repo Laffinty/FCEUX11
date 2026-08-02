@@ -89,7 +89,7 @@
 | H2: IRQ 位置 `if(!fcnt)`→`if(fcnt==3)` | 无效（仍 FAIL 0x02） | fcnt 编号语义：写后 fcnt=1，IRQ 在 fcnt==0 的第 4 quarter=29830 已正确；改 fcnt==3 反而在 3rd quarter=22373 置位，**更早** |
 | H3: 去掉 fhcnt=fhinc | 无效 + 碎 golden | fhcnt 重置本身正确（写后计时起点）；移除只引入漂移，未触及竞态 |
 
-**真因四件套**（Phase 2 逐一修复；2026-08-02 实测后由"三件套"补入 ④）：① power-on/reset 相位（fcnt=1 + reset 保留最后模式）——**✅ Step 2.1 已落地**（`p2_step2_1_fix_data`）；② **W4017→IRQ ~1-2 周期延迟**（一阶近似 + IRQ 可见点；目标值实测校准为 **write+29832（偶）/ +29833（奇）**，见 §1.3 修正）——**✅ Step 2.2 一阶近似已落地**（apu_single_4 PASS）；③ **jitter**（odd/even APU clock 对齐，±1 clock）——**✅ Step 2.2 已落地**（相位信号 = 写时刻 `g_cpu.timestamp & 1`）；④ **hook 量化方差**（quarter 触发被量化到指令边界，±2-3 cyc，超出 blargg ±1 cyc 容差）——**2026-08-02 新发现**，为 single_5/6 残余失败的根因，参数级不可收敛，需 cycle-accurate quarter crossing（记有据已知限制，`p2_step2_2_data` §2.3）。
+**真因四件套**（Phase 2 逐一修复；2026-08-02 实测后由"三件套"补入 ④）：① power-on/reset 相位（fcnt=1 + reset 保留最后模式）——**✅ Step 2.1 已落地**（`p2_step2_1_fix_data`）；② **W4017→IRQ ~1-2 周期延迟**（一阶近似 + IRQ 可见点；目标值实测校准为 **write+29832（偶）/ +29833（奇）**，见 §1.3 修正）——**✅ Step 2.2 一阶近似已落地**（apu_single_4 PASS）；③ **jitter**（odd/even APU clock 对齐，±1 clock）——**✅ Step 2.2 已落地**（相位信号 = 写时刻 `g_cpu.timestamp & 1`）；④ **hook 量化方差**（quarter 触发被量化到指令边界，±2-3 cyc，超出 blargg ±1 cyc 容差）——**✅ 2026-08-02 Step 2.2 深化已修复**：以 RustyNES/Mesen2 已验证模型（cycle-position 表 + 写后 3/4 周期重置 + 绝对周期奇偶）替换均匀 countdown，single_5/6 + reset_4017_timing/written + apu_test 全转 PASS（`p2_step2_2_deep_implementation`）。
 
 ---
 
@@ -98,13 +98,13 @@
 > **🚨 执行现状与优先级修订（2026-08-01 实测后 + 2026-08-02 补充）**：
 > - **Phase 1（E-1）已实测两轮**：Step 1.1 证伪（置位点假设，已回滚）；Step 1.2 抑制机制落地（**零回归**，但 vbl_02 未闭合）。
 >   剩余 6 ROM 全部指向**同一深层根因：CPU 侧 NMI/读采样时序 vs PPU 帧边界对齐**（Step 1.3 专项，改动面在 x6502 采样模型，较深）。
-> - **Phase 2（R6/APU）已执行（顺序经用户确认）**：**Step 2.1 相位分离 ✅**（2026-08-01，`e3(step2.1)`）+ **Step 2.2 写路径延迟+jitter 一阶近似 ✅**（2026-08-02，`e3(step2.2)`，**`apu_single_4_jitter` 0x02→0x00 PASS**，40 ROM 零回归，Oracle A 33/33）。
+> - **Phase 2（R6/APU）已执行（顺序经用户确认）**：**Step 2.1 相位分离 ✅**（2026-08-01，`e3(step2.1)`）+ **Step 2.2 写路径延迟+jitter 一阶近似 ✅**（2026-08-02，`e3(step2.2)`，**`apu_single_4_jitter` 0x02→0x00 PASS**，40 ROM 零回归，Oracle A 33/33）+ **Step 2.2 深化 ✅**（2026-08-02，`e3(step2.2-deep)`：cycle-position 帧计数器，**single_5/6 + reset_4017_timing/written + apu_test 全转 PASS，7 个 bucket-C sub-test 全闭合**，Oracle B 135 PASS 无 apu_* 失败）。
 > - **Phase 2 剩余**：**Step 2.3 已实测证伪（2026-08-02）**——当前 `V&0x2` 即原始 bit7（5-step），
 >   已是硬件正确实现；方案改法 `V&0x1` 方向相反（会使 $40 触发 clock、$80 不触发），实测
 >   `apu_single_1_len_ctr` 0x00→0x04 回归（见 `docs/history/surveys/e6_apu/p2_step2_3_falsification_2026-08-02.md`）。
 > - **建议执行顺序（已确认）**：**Phase 2（R6）→ Phase 1 Step 1.3 → Phase 1 Step 1.4 → Phase 3**。
->   Step 2.3 证伪后无低风险剩余项，下一步唯一路径：
->   **Step 2.2 深化 / Phase 1 Step 1.3**（同为消除指令级量化/采样模型，风险高，建议合并评估）。
+>   Step 2.3 证伪、Step 2.2 深化落地后，**E-3 已闭合**，下一步唯一路径：
+>   **Phase 1 Step 1.3（CPU 侧 NMI/读采样模型，与已落地的 cycle-position 模型同族）**。
 
 | Phase | 目标 | 验收门 | 对应 |
 |---|---|---|---|
@@ -262,6 +262,19 @@ env-gated 探针 `E1 P2002_READ` / `E1 VBL_SUPPRESSED`。
 >   quarter crossing（消除 hook 量化），改动面与 Phase 1 Step 1.3 同族，记为**有据已知限制**。
 > - `apu_reset_4017_timing`（power 路径 "delay 2"）与 `apu_test` 停在 Step 2.1 状态，未变。
 
+> **✅ 2026-08-02 深化（Step 2.2 闭合，`p2_step2_2_deep_implementation`）**：
+> - **根因**：均匀 7457.5 周期模型无法同时满足 length#1∈(14915,14916] 与
+>   length#2∈(29831,29832]（间距必须 14916，均匀模型固定 14915）——任何参数均无解。
+> - **实现**：以 RustyNES/Mesen2 已验证模型替换——cycle-position 表
+>   （NTSC 7457/14913/22371/29828/29829/29830，quarter@7457/14913/22371/29829，
+>   half@14913/29829，IRQ@29828-30）+ $4017 写后 **3/4 周期重置延迟**（偶数/奇数相位）
+>   + **绝对周期奇偶**（`timestamp_base+ts`，修复每帧归零导致的跨帧翻转）
+>   + power/reset 起始相位 D=4 + IRQ flag/line 分离。
+> - **结果**：**`apu_single_5/6`、`apu_reset_4017_timing/written`、`apu_test`
+>   全转 PASS——Phase 2 目标 7 个 bucket-C sub-test 全闭合**；APU 52 ROM 零 apu_* 失败；
+>   Oracle B 135 PASS（基线 121）；golden 重生（compare-layout 仅 SFSND/FHCN 变化）。
+> - runner 升级：`--reset-after` 后按 0x81 协议自动多次复位（4017_written 需两次）。
+
 ### Step 2.3 — ~~5-step 立即 clock 触发条件修正（V&0x1 而非 V&0x2）~~（**已证伪，2026-08-02**）
 
 > **🚨 实测证伪**：本步前提（"当前 `V=(V&0xC0)>>6` 后 `V&0x2` 是 inhibit"）与代码事实相反——
@@ -333,9 +346,9 @@ env-gated 探针 `E1 P2002_READ` / `E1 VBL_SUPPRESSED`。
 | **E-1 深层根因是 CPU 侧 NMI/读采样模型（改动面大、风险高）** | **已实测确认**（Step 1.1/1.2）；转为 Step 1.3 专项，单独评估；不因 E-1 阻塞 R6 |
 | VBL 周期 6820 不变量被破坏 → vbl_01 翻红 | **Step 1.1 已证伪此路径并回滚**；set→clear 周期是硬约束，置位点不再单独调整 |
 | golden savestate 哈希碎裂被误判为回归 | 预期流程：`fceux11_golden_savestate_test --generate` 重生，diff 确认仅起始值变化（R6 Step 2.1 必走） |
-| APU 时钟奇偶（jitter）在 FCEUX 架构中无现成信号 | **✅ Step 2.2 已消解**：相位信号 = 写时刻 `g_cpu.timestamp & 1`（探针实测偶间隔同相位/奇间隔翻转，sub-test 4/5 通过） |
+| APU 时钟奇偶（jitter）在 FCEUX 架构中无现成信号 | **✅ Step 2.2 已消解**：相位信号 = 写时刻**绝对周期** `timestamp_base + timestamp & 1`（2026-08-02 深化修正：`timestamp` 每帧归零，跨帧奇偶翻转会破坏 sync_apu 对齐；探针实测偶间隔同相位/奇间隔翻转） |
 | R6 改 $4017 写路径影响现有 apu_* PASS ROM | **✅ Step 2.2 已验证零回归**（40 ROM 全量，含 apu_01~11/pal/mixer/reset）；Step 2.3 已证伪不落地（改 V&0x1 会使 apu_single_1 翻红） |
-| **Step 2.2 一阶近似无法闭合 single_5/6（hook 量化方差）** | **2026-08-02 实测确认**：quarter 触发量化到指令边界 ±2-3 cyc，超出 blargg ±1 cyc 容差；offset/fhinc/分数/tsdelta 全部证伪。转**有据已知限制**，需 cycle-accurate quarter crossing（与 Step 1.3 同族，合并评估） |
+| **Step 2.2 一阶近似无法闭合 single_5/6（hook 量化方差）** | **✅ 2026-08-02 深化已闭合**：cycle-position 帧计数器（RustyNES/Mesen2 模型 + 3/4 周期重置 + 绝对周期奇偶）落地，single_5/6 + reset_4017_timing/written + apu_test 全 PASS；无参数回退空间（已证伪） |
 | Phase 3 剩余 38 项精度面大、易摊薄 | 分桶后按子系统逐个 PR，宁缺毋滥，保留"有据已知限制"出口 |
 
 ### 禁忌清单（汇总）

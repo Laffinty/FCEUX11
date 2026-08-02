@@ -24,7 +24,7 @@
       "rom":  "fixtures/mapper_nrom.nes",
       "scenario": "title_screen",
       "frames_after_load": 30,
-      "md5":  "a567b6ee44b8eb5fd6f88c585f64a0db",
+      "md5":  "45036ccf3a389fd348508213fdc95dbf",
       "fc0_path": "golden/nrom_smb_title.fc0"
     },
     {
@@ -32,7 +32,7 @@
       "rom":  "fixtures/mapper_nrom.nes",
       "scenario": "in_game",
       "frames_after_load": 300,
-      "md5":  "3d7643cbc749367da095cbab1e416c8c",
+      "md5":  "cef42b9dedcb696cf0e266dfc236f024",
       "fc0_path": "golden/nrom_smb_ingame.fc0"
     },
     {
@@ -40,7 +40,7 @@
       "rom":  "fixtures/mapper_mmc1.nes",
       "scenario": "title_screen",
       "frames_after_load": 30,
-      "md5":  "0519622025b5f0f4d230089a466627f2",
+      "md5":  "1e180b76c3b0756ef5fedd1499660bf7",
       "fc0_path": "golden/mmc1_zelda_title.fc0"
     },
     {
@@ -48,7 +48,7 @@
       "rom":  "fixtures/mapper_mmc1.nes",
       "scenario": "save_screen",
       "frames_after_load": 600,
-      "md5":  "cd6325125c953bbe259d932a59dd2969",
+      "md5":  "fd10fa254e3240948c07c1a7308f809e",
       "fc0_path": "golden/mmc1_zelda_save.fc0"
     },
     {
@@ -56,7 +56,7 @@
       "rom":  "fixtures/mapper_mmc3.nes",
       "scenario": "world_map",
       "frames_after_load": 200,
-      "md5":  "3ae151b3818e78a5ac61c227c4a87fdb",
+      "md5":  "191b2807ee2680a15d375ccdd27019bb",
       "fc0_path": "golden/mmc3_smb3_map.fc0"
     },
     {
@@ -64,7 +64,7 @@
       "rom":  "fixtures/mapper_mmc3.nes",
       "scenario": "in_level",
       "frames_after_load": 600,
-      "md5":  "9ea123a883222f6d29f366d3e637e79e",
+      "md5":  "5fa911a000d71e9a503fda85e8f0c221",
       "fc0_path": "golden/mmc3_smb3_level.fc0"
     },
     {
@@ -72,7 +72,7 @@
       "rom":  "fixtures/mapper_vrc6.nes",
       "scenario": "title_screen",
       "frames_after_load": 30,
-      "md5":  "452d0bb385943daa21ba4c571a24f339",
+      "md5":  "c7bfda7480e7ffbc3ea8c42dd62c11a3",
       "fc0_path": "golden/vrc6_densetsu_title.fc0"
     },
     {
@@ -80,7 +80,7 @@
       "rom":  "fixtures/test_fds.fds",
       "scenario": "bios",
       "frames_after_load": 5,
-      "md5":  "378629e294c421488b3887266360c52d",
+      "md5":  "d660fec14b139827ca9537640eea6d06",
       "fc0_path": "golden/fds_bios.fc0"
     }
   ],

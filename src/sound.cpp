@@ -58,19 +58,27 @@ static bool e3_trace_on() {
 // IRQ trajectory at instruction granularity (Step 2.2 instrument-first).
 static int e3_hook_trace_window = 0;
 
-// P2 Phase 2 Step 2.2 (2026-08-02): calibration knob for the $4017 write ->
-// frame-IRQ delay (cycles). Env FCEUX11_E3_OFFSET overrides the production
-// default so the blargg window can be re-swept without rebuilding.
-// Production default = 1: calibrated so apu_single_4_jitter passes (flag
-// set lands at write+29832 even / +29833 odd; see Write_IRQFM).
-static double e3_step2_offset() {
-	static const double off = []() {
-		const char* e = std::getenv("FCEUX11_E3_OFFSET");
-		if (!e || !e[0]) return 1.0;
-		return std::atof(e);
-	}();
-	return off;
-}
+// P2 Phase 2 Step 2.2 深化 (2026-08-02, instrument-first): absolute cycle
+// counter for the E3 probe. g_cpu.timestamp_ref() wraps at frame boundaries
+// in some runner paths, which makes write->quarter->read deltas ambiguous.
+// This counter is accumulated in FCEU_SoundCPUHook (one add per instruction,
+// before dispatch), so FSU/W4017/R4015 lines stamped during dispatch report
+// the instruction-end absolute cycle. Env-gated with the rest of E3 tracing.
+static uint64_t e3_abs_ts = 0;
+
+// P2 Phase 2 Step 2.2 深化 (2026-08-02): cycle-position frame counter.
+// The legacy uniform-countdown model (quarter = fhinc/48 = 7457.5 cycles)
+// could not satisfy blargg's 05.len_timing window at any offset: the
+// hardware's quarter positions are NON-uniform (7457/14913/22371/29828-30),
+// so the first and second length clocks land at write+14916 / write+29832
+// while a uniform model can only hit one of them. We port the validated
+// Mesen2/RustyNES model: fhcnt now holds the CPU-cycle position since the
+// last sequence start; the $4017 write schedules a 3/4-cycle maturation
+// (fc_reset_in) before the new sequence begins (3 cycles when the write
+// lands on an even CPU cycle = APU-aligned, 4 otherwise - the clock jitter).
+static int32_t fc_reset_in = 0;
+static uint8_t fc_pending_mode = 0;     // reduced 2-bit mode of pending write
+
 
 static uint32 wlookup1[32];
 static uint32 wlookup2[203];
@@ -382,8 +390,8 @@ static DECLFR(StatusRead)
    // (blargg's wait_n timer end point) with current frame-counter state.
    // This pins down exactly when blargg reads the IRQ flag vs when we set it.
    if (e3_trace_on()) {
-    fprintf(stderr, "E3 R4015 ts=%u fcnt=%u mode=0x%X fhcnt=%d sirq=0x%X lc=[%u,%u,%u,%u]\n",
-     (unsigned)g_cpu.timestamp_ref(), (unsigned)fcnt, (unsigned)IRQFrameMode, fhcnt, (unsigned)SIRQStat,
+    fprintf(stderr, "E3 R4015 abs=%llu ts=%u fcnt=%u mode=0x%X fhcnt=%d sirq=0x%X lc=[%u,%u,%u,%u]\n",
+     (unsigned long long)e3_abs_ts, (unsigned)g_cpu.timestamp_ref(), (unsigned)fcnt, (unsigned)IRQFrameMode, fhcnt, (unsigned)SIRQStat,
      (unsigned)lengthcount[0], (unsigned)lengthcount[1], (unsigned)lengthcount[2], (unsigned)lengthcount[3]);
    }
    ret=SIRQStat;
@@ -488,38 +496,102 @@ static void FrameSoundStuff(int V)
   }
 }
 
+// P2 Phase 2 Step 2.2 深化 (2026-08-02): frame-counter event step.
+// Quarter step = FrameSoundStuff(1) (envelope + triangle linear only);
+// half step = FrameSoundStuff(0) (length + sweep + envelope + linear).
+// fcnt tracks the step index for the FCNT savestate chunk / E3 traces.
+static void FrameSoundEvent(bool quarter, bool half)
+{
+ if (e3_trace_on()) {
+  fprintf(stderr, "E3 FSU abs=%llu ts=%u fcnt=%u mode=0x%X fc_cycle=%d sirq=0x%X q=%d h=%d\n",
+   (unsigned long long)e3_abs_ts, (unsigned)g_cpu.timestamp_ref(), (unsigned)fcnt, (unsigned)IRQFrameMode,
+   fhcnt, (unsigned)SIRQStat, (int)quarter, (int)half);
+ }
+ // A step that clocks length+sweep also clocks the envelope/linear units
+ // (single FrameSoundStuff call; matches the legacy half-step behavior).
+ FrameSoundStuff(quarter && !half ? 1 : 0);
+ fcnt=(fcnt+1)&3;
+}
+
+// Frame IRQ flag visibility ($4015 bit 6) vs CPU IRQ line are separate:
+// the flag is set unconditionally at the IRQ step; the line is asserted
+// only when not inhibited (RustyNES Session-26 iter 5, Mesen2 semantics).
+static void FrameIRQSet(void)
+{
+ SIRQStat|=0x40;
+ if (!(IRQFrameMode&0x1))
+  X6502_IRQBegin(FCEU_IQFCOUNT);
+}
+
+static void FrameIRQEnd(void)
+{
+ if (IRQFrameMode&0x1)
+ {
+  SIRQStat&=~0x40;
+  X6502_IRQEnd(FCEU_IQFCOUNT);
+ }
+ else
+ {
+  SIRQStat|=0x40;
+  X6502_IRQBegin(FCEU_IQFCOUNT);
+ }
+}
+
+// Advance the sequencer by one CPU cycle and fire any event at the current
+// position. fhcnt holds the position (cycles since sequence start). Wraps
+// the sequence at the terminal step.
+static void FrameCounterTick(void)
+{
+ fhcnt++;
+ if (IRQFrameMode&0x2)
+ {
+  // 5-step (mode 1): no frame IRQ.
+  if (PAL)
+  {
+   if (fhcnt==8313) FrameSoundEvent(true,false);
+   else if (fhcnt==16627) FrameSoundEvent(true,true);
+   else if (fhcnt==24939) FrameSoundEvent(true,false);
+   else if (fhcnt==41565) { FrameSoundEvent(true,true); }
+   else if (fhcnt==41566) { fhcnt=0; fcnt=0; }
+  }
+  else
+  {
+   if (fhcnt==7457) FrameSoundEvent(true,false);
+   else if (fhcnt==14913) FrameSoundEvent(true,true);
+   else if (fhcnt==22371) FrameSoundEvent(true,false);
+   else if (fhcnt==37281) FrameSoundEvent(true,true);
+   else if (fhcnt==37282) { fhcnt=0; fcnt=0; }
+  }
+ }
+ else
+ {
+  // 4-step (mode 0)
+  if (PAL)
+  {
+   if (fhcnt==8313) FrameSoundEvent(true,false);
+   else if (fhcnt==16627) FrameSoundEvent(true,true);
+   else if (fhcnt==24939) FrameSoundEvent(true,false);
+   else if (fhcnt==33252) FrameIRQSet();
+   else if (fhcnt==33253) { FrameIRQSet(); FrameSoundEvent(true,true); }
+   else if (fhcnt==33254) { FrameIRQEnd(); fhcnt=0; fcnt=0; }
+  }
+  else
+  {
+   if (fhcnt==7457) FrameSoundEvent(true,false);
+   else if (fhcnt==14913) FrameSoundEvent(true,true);
+   else if (fhcnt==22371) FrameSoundEvent(true,false);
+   else if (fhcnt==29828) FrameIRQSet();
+   else if (fhcnt==29829) { FrameIRQSet(); FrameSoundEvent(true,true); }
+   else if (fhcnt==29830) { FrameIRQEnd(); fhcnt=0; fcnt=0; }
+  }
+ }
+}
+
+// Compat wrapper kept for the 5-step immediate clock path (write maturation):
+// fires one quarter+half step without IRQ side effects.
 void FrameSoundUpdate(void)
 {
- // Linear counter:  Bit 0-6 of $4008
- // Length counter:  Bit 4-7 of $4003, $4007, $400b, $400f
-
- // E-3 probe (R6 Step 1, 2026-08-01): record state at every quarter-step
- // entry. Crucial for understanding whether fcnt==0 IRQ fire happens too
- // early (defect 1 hypothesis from §十 R6).
- if (e3_trace_on()) {
-  fprintf(stderr, "E3 FSU ts=%u fcnt=%u mode=0x%X fhcnt=%d sirq=0x%X\n",
-   (unsigned)g_cpu.timestamp_ref(), (unsigned)fcnt, (unsigned)IRQFrameMode, fhcnt, (unsigned)SIRQStat);
- }
-
- // R6-2b experiment 2 (2026-08-01): raising IRQ on fcnt==3 instead of
- // fcnt==0 did NOT fix apu_single_4/5/6 (still FAIL 0x02) and regressed
- // apu_reset_4017_timing (0x02->0x03). REVERTED to fcnt==0. The real
- // defect is deeper than IRQ set position or power-on fcnt value — likely
- // the fhcnt/quarter timing or length-clock phase vs blargg's wait_n
- // timer window. See r6_step3_fix_data_2026-08-01.md.
- if(!fcnt && !(IRQFrameMode&0x3))
- {
-         SIRQStat|=0x40;
-         X6502_IRQBegin(FCEU_IQFCOUNT);
- }
-
- if(fcnt==3)
- {
-	if(IRQFrameMode&0x2)
-	 fhcnt+=fhinc;
- }
- FrameSoundStuff(fcnt);
- fcnt=(fcnt+1)&3;
+ FrameSoundEvent(true,true);
 }
 
 
@@ -576,37 +648,49 @@ void FCEU_SoundCPUHook(int cycles)
  // (it lives in private layout_). fhcnt is the primary signal.
  static uint32_t hook_call_count = 0;
  hook_call_count++;
- fhcnt-=cycles*48;
+ e3_abs_ts += (uint64_t)(uint32_t)cycles;
+ // P2 Phase 2 Step 2.2 深化 (2026-08-02): cycle-position frame counter.
+ // Advance the sequencer one CPU cycle at a time through this instruction,
+ // firing events at the exact table positions (NTSC mode 0: 7457/14913/
+ // 22371/29828/29829/29830), and mature any pending $4017 write reset
+ // (3 cycles on an even CPU cycle, 4 on odd - the clock jitter).
+ const int32_t fhcnt_at_entry = fhcnt;
+ bool fired_quarter = false;
+ int32_t rem = cycles;
+ while (rem > 0) {
+  rem--;
+  if (fc_reset_in > 0) {
+   if (--fc_reset_in == 0) {
+    // Pending $4017 write takes effect: new sequence starts at cycle 0.
+    fhcnt = 0;
+    fcnt = 0;
+    if (fc_pending_mode & 0x2) {
+     // 5-step write: immediate quarter+half clock at reset maturation.
+     FrameSoundUpdate();
+    }
+    fired_quarter = true;
+   }
+   continue;
+  }
+  FrameCounterTick();
+ }
  // P2 Phase 2 Step 2.2 (2026-08-01): windowed per-call trace, armed by the
  // last $4017 write. Records ts/cycles/fhcnt before+after so the
  // write->quarter->IRQ trajectory is measurable at instruction granularity.
  if (e3_trace_on() && e3_hook_trace_window > 0) {
   e3_hook_trace_window--;
-  int32_t fhcnt_before = fhcnt + cycles*48;
-  fprintf(stderr, "E3 HOOKWIN ts=%u cycles=%d fhcnt_before=%d fhcnt_after=%d fcnt=%u win=%d\n",
-   (unsigned)g_cpu.timestamp_ref(), cycles, fhcnt_before, fhcnt, (unsigned)fcnt, e3_hook_trace_window);
+  fprintf(stderr, "E3 HOOKWIN abs=%llu ts=%u cycles=%d fhcnt_before=%d fhcnt_after=%d fcnt=%u win=%d fired=%d\n",
+   (unsigned long long)e3_abs_ts, (unsigned)g_cpu.timestamp_ref(), cycles, fhcnt_at_entry, fhcnt, (unsigned)fcnt, e3_hook_trace_window, (int)fired_quarter);
  }
  if (e3_trace_on()) {
   if ((hook_call_count & 0xFFF) == 0) {
    fprintf(stderr, "E3 HOOK_SAMPLE call=%u fhcnt=%d\n",
     hook_call_count, fhcnt);
   }
-  if (fhcnt <= 0) {
-   int32_t fhcnt_before_decr = fhcnt + cycles*48;
-   fprintf(stderr, "E3 HOOK_TRIG call=%u cycles=%d fhcnt_before=%d fhcnt_after=%d fhinc=%d\n",
-    hook_call_count, cycles, fhcnt_before_decr, fhcnt + fhinc, fhinc);
+  if (fired_quarter) {
+   fprintf(stderr, "E3 HOOK_TRIG call=%u abs=%llu cycles=%d fc_before=%d fc_after=%d fcnt=%u\n",
+    hook_call_count, (unsigned long long)e3_abs_ts, cycles, fhcnt_at_entry, fhcnt, (unsigned)fcnt);
   }
- }
- if(fhcnt<=0)
- {
-  // E-3 probe (R6 Step 1, 2026-08-01): record quarter-frame boundary hit
-  // with pre/post fhcnt. Useful for verifying fhinc timing constant.
-  if (e3_trace_on()) {
-   fprintf(stderr, "E3 HOOK cycles=%d fhcnt_before=%d fhcnt_after=%d\n",
-    cycles, fhcnt + cycles*48, fhcnt + fhinc);
-  }
-  FrameSoundUpdate();
-  fhcnt+=fhinc;
  }
 
  DMCDMA();
@@ -1087,8 +1171,8 @@ DECLFW(Write_IRQFM)
  if (e3_trace_on()) {
   uint8 pre_mode = IRQFrameMode, pre_fcnt = fcnt, pre_sirq = SIRQStat;
   uint32 ts = g_cpu.timestamp_ref();
-  fprintf(stderr, "E3 W4017_IN ts=%u ts_mod4=%u V=0x%X pre_mode=0x%X pre_fcnt=%u pre_sirq=0x%X\n",
-   (unsigned)ts, (unsigned)(ts & 3), (unsigned)V, (unsigned)pre_mode, (unsigned)pre_fcnt, (unsigned)pre_sirq);
+  fprintf(stderr, "E3 W4017_IN abs=%llu ts=%u ts_mod4=%u V=0x%X pre_mode=0x%X pre_fcnt=%u pre_sirq=0x%X\n",
+   (unsigned long long)e3_abs_ts, (unsigned)ts, (unsigned)(ts & 3), (unsigned)V, (unsigned)pre_mode, (unsigned)pre_fcnt, (unsigned)pre_sirq);
   // P2 Phase 2 Step 2.2 (2026-08-01): arm the windowed hook trace so the
   // post-write quarter trajectory is captured at instruction granularity.
   e3_hook_trace_window = 20000;
@@ -1101,43 +1185,31 @@ DECLFW(Write_IRQFM)
  // affect flag". Previously this was unconditional (defect 2).
  const uint8 raw = V;
  V=(V&0xC0)>>6;
- fcnt=0;
- if(V&0x2)
-  FrameSoundUpdate();
- fcnt=1;
- // P2 Phase 2 Step 2.2 (2026-08-01): W4017 -> frame-IRQ delay + APU clock
- // jitter (instrument-first, calibrated against apu_single_4_jitter /
- // apu_single_6_irq_timing on 2026-08-02).
- //
- // Hardware semantics (blargg_apu_2005.07.30 readme + 04.clock_jitter.asm):
- //  - the $4017 write restarts the frame-counter timer only at the next
- //    even APU clock (the /2 clock), a few cycles after the write;
- //  - a write landing on an odd APU clock delays the effect by 1 CPU cycle
- //    (the "clock jitter" blargg's sub-tests 4/5 detect);
- //  - observable target for apu_single_4: after a $00 write, sub-test 2
- //    reads $4015 at write+29831 and requires the IRQ flag CLEAR; sub-test
- //    3 reads at write+29833 and requires SET; get_jitter reads at
- //    write+29832 and must flip with the write's APU-clock phase.
- //
- // Pre-Step-2.2 model set the flag at write+29831 (fixed), so sub-test 2
- // (read at 29831) saw it set -> "Frame irq is set too soon" (0x02).
- // Fix (first-order): start the countdown one cycle LATER (fhcnt = fhinc
- // + 1*48) so the 4th-quarter IRQ lands at write+29832 (even APU clock)
- // or write+29833 (odd APU clock -> +1 jitter). The jitter phase is the
- // CPU timestamp parity at the write (`ts & 1`): two get_jitter calls
- // separated by an even number of cycles share parity -> same result,
- // odd separation -> opposite result (blargg sub-tests 4/5).
- const uint32 ts2 = g_cpu.timestamp_ref();
- const bool e3_odd_apu = (ts2 & 1) != 0;
- fhcnt = fhinc + (int32_t)((e3_step2_offset() + (e3_odd_apu ? 1.0 : 0.0)) * 48.0);
+ // P2 Phase 2 Step 2.2 深化 (2026-08-02): cycle-position model. The write
+ // schedules a reset that matures 3 CPU cycles later when the write lands
+ // on an even CPU cycle (APU-aligned) and 4 cycles later when odd (the
+ // clock jitter; RustyNES/Mesen2 validated). The new sequence starts at
+ // cycle 0; a 5-step write additionally fires an immediate quarter+half
+ // clock when the reset matures (handled in FCEU_SoundCPUHook).
+ // P2 Phase 2 Step 2.2 深化 (2026-08-02): use the MONOTONIC absolute cycle
+ // count for the APU write parity. g_cpu.timestamp_ref() is reset to 0 at
+ // every frame boundary (fceu.cpp FCEU_Emulate), and NTSC frames are
+ // 29780.67 cycles, so the within-frame parity flips at frame boundaries.
+ // The APU-alignment jitter must track the true absolute parity or the
+ // blargg sync_apu phase alignment (bne +/- 1 cycle) picks the wrong branch
+ // after a frame boundary, landing the next $4017 write on the wrong
+ // parity (apu_single_5 M4 "second length too late").
+ const uint64 abs_ts = g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref();
+ fc_reset_in = ((abs_ts & 1) == 0) ? 3 : 4;
+ fc_pending_mode = V;
  if (raw & 0x40) {
   X6502_IRQEnd(FCEU_IQFCOUNT);
   SIRQStat&=~0x40;
  }
  IRQFrameMode=V;
  if (e3_trace_on()) {
-  fprintf(stderr, "E3 W4017_OUT post_mode=0x%X post_fcnt=%u post_sirq=0x%X\n",
-   (unsigned)IRQFrameMode, (unsigned)fcnt, (unsigned)SIRQStat);
+  fprintf(stderr, "E3 W4017_OUT abs=%llu post_mode=0x%X post_fcnt=%u post_sirq=0x%X\n",
+   (unsigned long long)e3_abs_ts, (unsigned)IRQFrameMode, (unsigned)fcnt, (unsigned)SIRQStat);
  }
 }
 
@@ -1260,8 +1332,16 @@ void FCEUSND_Reset(bool is_power)
 	// （tests/CMakeLists.txt:348 `fceux11_golden_savestate_test --generate` 重生，非事故）。
 	if (is_power)
 		IRQFrameMode=0x0;   // power: $4017=$00；reset: 保留最后写入值
-	fhcnt=fhinc;
-	fcnt=1;
+	// P2 Phase 2 Step 2.2 深化 (2026-08-02): at power/reset the APU acts as
+	// if $4017 were written with $00 (power) / the last value (reset) from
+	// 9-12 clocks before the first instruction (blargg apu_reset readme).
+	// Start the sequence already D cycles in so the frame IRQ phase lands in
+	// apu_reset_4017_timing's measured window. Empirically the count tracks
+	// ~count = 5 + D (D=0 -> 5, D=9 -> 14); D=4 -> count ~9, mid-window.
+	// fhcnt holds the CPU-cycle position since sequence start.
+	fhcnt=4;
+	fcnt=0;
+	fc_reset_in=0;
 	nreg=1;
 
 	for(x=0;x<2;x++)
