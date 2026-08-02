@@ -16,7 +16,7 @@
 
 1. **instrument-first 是前置硬约束**：任何代码改动前，先加 env-gated probe 采集真实时序，用数据证实/证伪假设。
 2. **每步强制回归**：Oracle A `ctest -LE perf` 34/34 + 相关 ROM 全量，任一红即回滚该步。
-3. **savestate 兼容**：不得改 `FHCN`/`FCNT`/`IQFM` chunk 名/大小/序（`sound.cpp:1303-1307`）。改运行期起始值会碎
+3. **savestate 兼容**：不得改 `FHCN`/`FCNT`/`IQFM` chunk 名/大小/序（`sound.cpp:1462-1466`）。改运行期起始值会碎
    `golden_savestate_test` / `savestate_regression_test`（MD5 固定参照）——**按 `tests/CMakeLists.txt:348` 用
    `fceux11_golden_savestate_test --generate` 重生 golden 索引**（这是预期流程，不是事故）。
 4. **不开新分支**：v1.16 系开发直接在 `wip_1.16` 分支进行（用户明确要求）。
@@ -77,6 +77,9 @@
 2. **报告 §十 R6"Write_IRQFM 留 fcnt=1 → 仅 3 个 quarter 就置 IRQ（~22371）"是错的**：fcnt=1 后序列为 1,2,3,0，
    IRQ 在第 **4** 个 quarter = **29830**，周期本身正确。真缺陷是 **29830 置位 vs 测试 29830 读的竞态**（硬件可见点 29831），
    即 **W4017→IRQ 缺 ~1-2 周期延迟**；叠加 power-on 相位与 jitter 两个独立缺陷。
+   **2026-08-02 实测校准**：目标 ROM（`apu_single_4_jitter`）的窗口为 **sub-test 2 读 write+29831 须 CLEAR、
+   sub-test 3 读 write+29833 须 SET** → 一阶修复目标 = 置位点落 **write+29832（偶）/ +29833（奇）**，
+   而非方案 §4 原写的 29831（29831 对应 `apu_04` 版本窗口，两 ROM delay 记账差 1 cyc）。已按此校准落地（Step 2.2）。
 
 ### 1.4 对 R6 三个失败假设的重新定位（为什么它们无效，真因是什么）
 
@@ -86,19 +89,20 @@
 | H2: IRQ 位置 `if(!fcnt)`→`if(fcnt==3)` | 无效（仍 FAIL 0x02） | fcnt 编号语义：写后 fcnt=1，IRQ 在 fcnt==0 的第 4 quarter=29830 已正确；改 fcnt==3 反而在 3rd quarter=22373 置位，**更早** |
 | H3: 去掉 fhcnt=fhinc | 无效 + 碎 golden | fhcnt 重置本身正确（写后计时起点）；移除只引入漂移，未触及竞态 |
 
-**真因三件套**（Phase 2 逐一修复）：① power-on/reset 相位（fcnt=1 + reset 保留最后模式）；② **W4017→IRQ ~1-2 周期延迟**（含 3-4 周期计时器重置延迟的一阶近似 + IRQ 可见点 29831）；③ **jitter**（odd/even APU clock 对齐，±1 clock）。
+**真因四件套**（Phase 2 逐一修复；2026-08-02 实测后由"三件套"补入 ④）：① power-on/reset 相位（fcnt=1 + reset 保留最后模式）——**✅ Step 2.1 已落地**（`p2_step2_1_fix_data`）；② **W4017→IRQ ~1-2 周期延迟**（一阶近似 + IRQ 可见点；目标值实测校准为 **write+29832（偶）/ +29833（奇）**，见 §1.3 修正）——**✅ Step 2.2 一阶近似已落地**（apu_single_4 PASS）；③ **jitter**（odd/even APU clock 对齐，±1 clock）——**✅ Step 2.2 已落地**（相位信号 = 写时刻 `g_cpu.timestamp & 1`）；④ **hook 量化方差**（quarter 触发被量化到指令边界，±2-3 cyc，超出 blargg ±1 cyc 容差）——**2026-08-02 新发现**，为 single_5/6 残余失败的根因，参数级不可收敛，需 cycle-accurate quarter crossing（记有据已知限制，`p2_step2_2_data` §2.3）。
 
 ---
 
 ## 2. 三阶段总览
 
-> **🚨 执行现状与优先级修订（2026-08-01 实测后）**：
+> **🚨 执行现状与优先级修订（2026-08-01 实测后 + 2026-08-02 补充）**：
 > - **Phase 1（E-1）已实测两轮**：Step 1.1 证伪（置位点假设，已回滚）；Step 1.2 抑制机制落地（**零回归**，但 vbl_02 未闭合）。
 >   剩余 6 ROM 全部指向**同一深层根因：CPU 侧 NMI/读采样时序 vs PPU 帧边界对齐**（Step 1.3 专项，改动面在 x6502 采样模型，较深）。
-> - **Phase 2（R6/APU）处方已由联机源码实证**（`04.clock_jitter.asm` 的 29830/29831/29832 窗口、power-on/reset 语义、
->   jitter 规则），根因明确、5 ROM 共享单根因，**单次收益高**。
-> - **建议执行顺序修订**：**Phase 2（R6）→ Phase 1 Step 1.3 → Phase 1 Step 1.4 → Phase 3**（E-1 置位点/抑制的
->   剩余收尾并入 Step 1.3 专项）。是否按此顺序执行**待用户确认**（2026-08-01）。
+> - **Phase 2（R6/APU）已执行（顺序经用户确认）**：**Step 2.1 相位分离 ✅**（2026-08-01，`e3(step2.1)`）+ **Step 2.2 写路径延迟+jitter 一阶近似 ✅**（2026-08-02，`e3(step2.2)`，**`apu_single_4_jitter` 0x02→0x00 PASS**，40 ROM 零回归，Oracle A 33/33）。
+> - **Phase 2 剩余**：Step 2.2 深化（消除 hook 量化方差，闭合 single_5/6 + reset_4017_timing；与 Step 1.3 同族风险）→ Step 2.3（5-step 立即 clock `V&0x1`，独立低风险）。
+> - **建议执行顺序（已确认）**：**Phase 2（R6）→ Phase 1 Step 1.3 → Phase 1 Step 1.4 → Phase 3**。下一步两条路径择一：
+>   (a) **Step 2.3**（低风险，先拿掉一个已知错误触发条件）；
+>   (b) **Step 2.2 深化 / Phase 1 Step 1.3**（同为消除指令级量化，风险高，建议合并评估）。
 
 | Phase | 目标 | 验收门 | 对应 |
 |---|---|---|---|
@@ -188,19 +192,25 @@ env-gated 探针 `E1 P2002_READ` / `E1 VBL_SUPPRESSED`。
 
 ## 4. Phase 2 — E-3 APU 帧计数器收敛（独立 PR，每步独立 commit）【**处方已由联机源码实证，建议优先执行**】
 
-> **✅ 2026-08-01 处方实证**：本 Phase 全部改法的硬件依据已从 blargg 原始源码逐行确认——
+> **✅ 2026-08-01 处方实证 + 2026-08-02 执行状态**：本 Phase 全部改法的硬件依据已从 blargg 原始源码逐行确认——
 > `04.clock_jitter.asm`（29830/29831/29832 读取窗口、jitter 检测逻辑）、`apu_reset/readme.txt`（power/reset 语义）、
 > `blargg_apu_2005.07.30/readme.txt`（Mode 0/1 时序表、IRQ ≥29833）。交接档案 R6 缺陷 1 的"wait_n 语义未反汇编"阻塞
-> **已解除**（真因 = power-on 相位 + W4017→IRQ ~1-2 周期延迟 + jitter，见 §1.3/§1.4）。
-> 与 Phase 1（E-1 CPU 侧深层模型）相比，本 Phase 根因明确、5 ROM 共享单根因，**建议先执行**（2026-08-01，待用户确认）。
+> **已解除**（真因 = power-on 相位 + W4017→IRQ ~1-2 周期延迟 + jitter + hook 量化方差，见 §1.3/§1.4）。
+> **已执行**：Step 2.1 ✅（2026-08-01）+ Step 2.2 一阶近似 ✅（2026-08-02，`apu_single_4_jitter` PASS，
+> single_5/6 转有据已知限制）。
 
 > 目标：`apu_single_3_irq_flag`（已修，复验）、`apu_single_4_jitter`、`apu_single_5_len_timing`、`apu_single_6_irq_timing`、
 > `apu_reset_4017_timing`、`apu_reset_4017_written`、`apu_test`（组合套件，停在 sub-test 3）全转 PASS。
 > 跑法：`fceux11_blargg_runner.exe --manifest fixtures/blargg_manifest.json --frames 600`（`apu_reset_*` 加 `--reset-after 60`）
 
-### Step 2.1 — power-on / reset 相位（fcnt=1 + reset 保留最后模式）
+### Step 2.1 — power-on / reset 相位（fcnt=1 + reset 保留最后模式）【**✅ 已落地 2026-08-01**】
 
-**文件**：`src/sound.cpp:1195-1209`（`FCEUSND_Reset`）、`src/fceu.cpp:896-901`（软复位调用点）
+> **✅ 实测状态**：已实现 `FCEUSND_Reset(bool is_power)`（power: IRQFrameMode=0x0 + fcnt=1；reset: 保留最后
+> IRQFrameMode + fcnt=1），`fceu.cpp`/`FCEUSND_Power` 调用点区分。探针证实 power-on 后 fcnt 序列 1,2,3,0、
+> IRQ 于第 4 个 quarter=29830 置位；40 ROM 零 PASS→FAIL、Oracle A 34/34、golden 重生（仅 fhcnt/fcnt 起始值
+> 变更）。完整数据见 `docs/history/surveys/e6_apu/p2_step2_1_fix_data_2026-08-01.md`。
+
+**文件**：`src/sound.cpp:1247-1300`（`FCEUSND_Reset`）、`src/fceu.cpp:896-901`（软复位调用点）
 
 **改法**：
 1. **power-on**：`fcnt=0` → `fcnt=1`（等效"$00 写 + 9~12 时钟"后的相位；IRQ 从第 4 quarter=29830 起算，length 从 14915/29830 起算）。
@@ -220,19 +230,23 @@ env-gated 探针 `E1 P2002_READ` / `E1 VBL_SUPPRESSED`。
 
 ### Step 2.2 — W4017→IRQ ~1-2 周期延迟 + jitter（apu_single_4/6 主修复）
 
-**文件**：`src/sound.cpp:1050-1090`（`Write_IRQFM`）、`src/sound.cpp:543-579`（`FCEU_SoundCPUHook` 的 fhcnt 递减）
+**文件**：`src/sound.cpp:1081-1140`（`Write_IRQFM`）、`src/sound.cpp:567-610`（`FCEU_SoundCPUHook` 的 fhcnt 递减）
 
 **改法（一阶近似，instrument 校准）**：
 1. **计时器重置延迟**：$4017 写生效有 3-4 周期延迟（blargg readme；NESdev wiki "After 3 or 4 CPU clock cycles, the timer is reset"）。
    实现：`Write_IRQFM` 不再立即 `fcnt=1; fhcnt=fhinc`，而是记录 pending 状态，在 `FCEU_SoundCPUHook` 中延后 ~2 周期再应用
    （或等价地：应用时 `fhcnt = fhinc - (2×48)` 并核对 IRQ 可见点落到 **29831**，即 29830 读清 / 29832 读置）。
+   **2026-08-02 校准注**：实测方向与上式相反——现有模型第 4 quarter 落在 write+29831（偏早），
+   需**后移 +1 cyc** 落 write+29832（偶）/ +29833（奇）方可过 apu_single_4 窗口（§1.3 修正 + ✅ 块）。
 2. **jitter**：按写时刻 CPU/APU 时钟奇偶，第一步延迟 1 clock（`fhcnt` 初始多计 48 单位或延迟应用 1 周期）。
    需先 instrument 确定 FCEUX 中"写发生在偶数/奇数 APU clock"的可判定信号（`g_cpu.timestamp` 奇偶 + APU 半速时钟相位）。
-3. 目标表：写 `$00` 后 IRQ flag 可见点 **29831**（jitter 时 29832）；handler ≥29833。
+3. 目标表：写 `$00` 后 IRQ flag 可见点 **29832（偶）/ 29833（奇）**（apu_single_4 版本窗口；handler ≥29833）。
 
 **证伪判据**（对应 `04.clock_jitter.asm` 四个 sub-test）：
 - 29830 读 $4015 未置位（sub-test 2 "too soon" 消除）
 - 29832 读 $4015 已置位（sub-test 3 "too late" 消除）
+- 偶数对齐两次 `get_jitter` 结果一致（sub-test 4）、奇数对齐两次结果不同（sub-test 5）→ $6000=0x00
+- `apu_single_6`（irq_timing）$6000=0x00
 
 > **✅ 2026-08-02 实测状态（已落地，一阶近似）**：
 > - 已实现：`Write_IRQFM` 计时器重置改为 `fhcnt = fhinc + (1 + odd)*48`（offset=1，`FCEUX11_E3_OFFSET` 可覆盖）；
@@ -245,12 +259,10 @@ env-gated 探针 `E1 P2002_READ` / `E1 VBL_SUPPRESSED`。
 >   fhinc 7457.5/7458、分数 offset、fcnt==3 +1、tsdelta 递减 全部证伪）。需 cycle-accurate
 >   quarter crossing（消除 hook 量化），改动面与 Phase 1 Step 1.3 同族，记为**有据已知限制**。
 > - `apu_reset_4017_timing`（power 路径 "delay 2"）与 `apu_test` 停在 Step 2.1 状态，未变。
-- 偶数对齐两次 `get_jitter` 结果一致（sub-test 4）、奇数对齐两次结果不同（sub-test 5）→ $6000=0x00
-- `apu_single_6`（irq_timing）$6000=0x00
 
 ### Step 2.3 — 5-step 立即 clock 触发条件修正（V&0x1 而非 V&0x2）
 
-**文件**：`src/sound.cpp:1070`（`if(V&0x2) FrameSoundUpdate();`）
+**文件**：`src/sound.cpp:1105`（`if(V&0x2) FrameSoundUpdate();`）
 
 **改法**：硬件语义是 **bit7（5-step mode）写触发立即 quarter+half clock**（NESdev wiki side effects；blargg Mode 1 时序 step 0 @ cycle 1），
 非 bit6（inhibit）。当前 `V=(V&0xC0)>>6` 后 `V&0x2` 是 inhibit——**改 `V&0x1`**。
@@ -312,8 +324,9 @@ env-gated 探针 `E1 P2002_READ` / `E1 VBL_SUPPRESSED`。
 | **E-1 深层根因是 CPU 侧 NMI/读采样模型（改动面大、风险高）** | **已实测确认**（Step 1.1/1.2）；转为 Step 1.3 专项，单独评估；不因 E-1 阻塞 R6 |
 | VBL 周期 6820 不变量被破坏 → vbl_01 翻红 | **Step 1.1 已证伪此路径并回滚**；set→clear 周期是硬约束，置位点不再单独调整 |
 | golden savestate 哈希碎裂被误判为回归 | 预期流程：`fceux11_golden_savestate_test --generate` 重生，diff 确认仅起始值变化（R6 Step 2.1 必走） |
-| APU 时钟奇偶（jitter）在 FCEUX 架构中无现成信号 | Step 2.2 instrument 先行，必要时在 hook 侧引入 APU 半速时钟相位跟踪 |
-| R6 改 $4017 写路径影响现有 apu_* PASS ROM | Step 2.3 已标 V&0x1 改法的回归风险；`apu_01` sub-test 4/5、`apu_06` 为关键哨兵 |
+| APU 时钟奇偶（jitter）在 FCEUX 架构中无现成信号 | **✅ Step 2.2 已消解**：相位信号 = 写时刻 `g_cpu.timestamp & 1`（探针实测偶间隔同相位/奇间隔翻转，sub-test 4/5 通过） |
+| R6 改 $4017 写路径影响现有 apu_* PASS ROM | **✅ Step 2.2 已验证零回归**（40 ROM 全量，含 apu_01~11/pal/mixer/reset）；Step 2.3 V&0x1 改法仍以 apu_01 sub-test 4/5、apu_06 为哨兵 |
+| **Step 2.2 一阶近似无法闭合 single_5/6（hook 量化方差）** | **2026-08-02 实测确认**：quarter 触发量化到指令边界 ±2-3 cyc，超出 blargg ±1 cyc 容差；offset/fhinc/分数/tsdelta 全部证伪。转**有据已知限制**，需 cycle-accurate quarter crossing（与 Step 1.3 同族，合并评估） |
 | Phase 3 剩余 38 项精度面大、易摊薄 | 分桶后按子系统逐个 PR，宁缺毋滥，保留"有据已知限制"出口 |
 
 ### 禁忌清单（汇总）
@@ -322,7 +335,7 @@ env-gated 探针 `E1 P2002_READ` / `E1 VBL_SUPPRESSED`。
 2. 不在 newppu 下让 `FCEUPPU_LineUpdate` 非 no-op（`:234-236`，会重引入旧 PPU glitch）
 3. 不重复 P4-2 length reload（commit `562f0e8`/revert `cda40fe`）
 4. 不"顺手修" $4017 bit 映射 swap（`apu_06` PASS 依赖）
-5. 不改 savestate chunk 结构（`sound.cpp:1303-1307`）
+5. 不改 savestate chunk 结构（`sound.cpp:1462-1466`）
 6. 不用 runppu(N) 盲调 NMI 相位（已证伪两次）
 7. `blargg_ppu_vbl_nmi` 全 PASS 前不升 blocking
 
@@ -331,9 +344,9 @@ env-gated 探针 `E1 P2002_READ` / `E1 VBL_SUPPRESSED`。
 **E-1**：VBL 置位 `ppu_rendering.cpp:1560`；NMI latch `:1580`；`delay` 旋钮 `:1567`；VBL 清除 `:1595`；$2002 读+清 `ppu.cpp:327-349`；
 $2000 NMI-enable 边沿 `ppu.cpp:601-615`；`TriggerNMI`/`TriggerNMI2` `x6502.cpp:395-403`；even/odd 跳点 `ppu_rendering.cpp:1979-1994`；`runppu` `:1361-1377`
 
-**E-3**：帧 IRQ 置位 `sound.cpp:488-492`；5-step 额外周期 `:494-498`；length/sweep 半帧 clock `FrameSoundStuff :382-461`；
-$4017 写 `Write_IRQFM :1050-1090`（`fcnt=0` `:1069`、`if(V&0x2)` `:1070`、`fcnt=1` `:1072`、`fhcnt=fhinc` `:1080`、条件清 `raw & 0x40` `:1081-1084`）；
-fhcnt 递减 `FCEU_SoundCPUHook :543-579`；reset 状态 `FCEUSND_Reset :1195-1209`（`fhcnt=fhinc` `:1200`、`fcnt=0` `:1209`）；power `:1280-1284`；savestate chunks `:1303-1307`
+**E-3**（行号 2026-08-02 校准）：帧 IRQ 置位 `FrameSoundUpdate :491-525`（`SIRQStat|=0x40` 在内）；5-step 额外周期 `if(fcnt==3) :516-520`；length/sweep 半帧 clock `FrameSoundStuff :404-474`；
+$4017 写 `Write_IRQFM :1081-1140`（`fcnt=0` `:1104`、`if(V&0x2)` `:1105`、`fcnt=1` `:1107`、`fhcnt=...` Step 2.2 `:1132`、条件清 `raw & 0x40` `:1133`）；
+fhcnt 递减 `FCEU_SoundCPUHook :567-610`；reset 状态 `FCEUSND_Reset :1247-1300`（`fhcnt=fhinc` `:1263`、`fcnt=1` `:1264`）；power `:1333-1336`；savestate chunks `:1462-1466`
 
 ### 参考来源（联机研究，2026-08-01 抓取）
 
