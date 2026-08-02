@@ -51,6 +51,27 @@ static bool e3_trace_on() {
 	return on;
 }
 
+// P2 Phase 2 Step 2.2 (2026-08-01): windowed hook trace. Armed (set to a
+// positive count) on every $4017 write while E3 tracing is on; each
+// FCEU_SoundCPUHook call prints ts/cycles/fhcnt while > 0. Bounded (~8
+// quarters) so stderr stays small. Used to measure the write->quarter->
+// IRQ trajectory at instruction granularity (Step 2.2 instrument-first).
+static int e3_hook_trace_window = 0;
+
+// P2 Phase 2 Step 2.2 (2026-08-02): calibration knob for the $4017 write ->
+// frame-IRQ delay (cycles). Env FCEUX11_E3_OFFSET overrides the production
+// default so the blargg window can be re-swept without rebuilding.
+// Production default = 1: calibrated so apu_single_4_jitter passes (flag
+// set lands at write+29832 even / +29833 odd; see Write_IRQFM).
+static double e3_step2_offset() {
+	static const double off = []() {
+		const char* e = std::getenv("FCEUX11_E3_OFFSET");
+		if (!e || !e[0]) return 1.0;
+		return std::atof(e);
+	}();
+	return off;
+}
+
 static uint32 wlookup1[32];
 static uint32 wlookup2[203];
 
@@ -361,8 +382,9 @@ static DECLFR(StatusRead)
    // (blargg's wait_n timer end point) with current frame-counter state.
    // This pins down exactly when blargg reads the IRQ flag vs when we set it.
    if (e3_trace_on()) {
-    fprintf(stderr, "E3 R4015 fcnt=%u mode=0x%X fhcnt=%d sirq=0x%X\n",
-     (unsigned)fcnt, (unsigned)IRQFrameMode, fhcnt, (unsigned)SIRQStat);
+    fprintf(stderr, "E3 R4015 ts=%u fcnt=%u mode=0x%X fhcnt=%d sirq=0x%X lc=[%u,%u,%u,%u]\n",
+     (unsigned)g_cpu.timestamp_ref(), (unsigned)fcnt, (unsigned)IRQFrameMode, fhcnt, (unsigned)SIRQStat,
+     (unsigned)lengthcount[0], (unsigned)lengthcount[1], (unsigned)lengthcount[2], (unsigned)lengthcount[3]);
    }
    ret=SIRQStat;
 
@@ -475,8 +497,8 @@ void FrameSoundUpdate(void)
  // entry. Crucial for understanding whether fcnt==0 IRQ fire happens too
  // early (defect 1 hypothesis from §十 R6).
  if (e3_trace_on()) {
-  fprintf(stderr, "E3 FSU fcnt=%u mode=0x%X fhcnt=%d sirq=0x%X\n",
-   (unsigned)fcnt, (unsigned)IRQFrameMode, fhcnt, (unsigned)SIRQStat);
+  fprintf(stderr, "E3 FSU ts=%u fcnt=%u mode=0x%X fhcnt=%d sirq=0x%X\n",
+   (unsigned)g_cpu.timestamp_ref(), (unsigned)fcnt, (unsigned)IRQFrameMode, fhcnt, (unsigned)SIRQStat);
  }
 
  // R6-2b experiment 2 (2026-08-01): raising IRQ on fcnt==3 instead of
@@ -555,6 +577,15 @@ void FCEU_SoundCPUHook(int cycles)
  static uint32_t hook_call_count = 0;
  hook_call_count++;
  fhcnt-=cycles*48;
+ // P2 Phase 2 Step 2.2 (2026-08-01): windowed per-call trace, armed by the
+ // last $4017 write. Records ts/cycles/fhcnt before+after so the
+ // write->quarter->IRQ trajectory is measurable at instruction granularity.
+ if (e3_trace_on() && e3_hook_trace_window > 0) {
+  e3_hook_trace_window--;
+  int32_t fhcnt_before = fhcnt + cycles*48;
+  fprintf(stderr, "E3 HOOKWIN ts=%u cycles=%d fhcnt_before=%d fhcnt_after=%d fcnt=%u win=%d\n",
+   (unsigned)g_cpu.timestamp_ref(), cycles, fhcnt_before, fhcnt, (unsigned)fcnt, e3_hook_trace_window);
+ }
  if (e3_trace_on()) {
   if ((hook_call_count & 0xFFF) == 0) {
    fprintf(stderr, "E3 HOOK_SAMPLE call=%u fhcnt=%d\n",
@@ -1055,8 +1086,12 @@ DECLFW(Write_IRQFM)
  // inhibit bit is set).
  if (e3_trace_on()) {
   uint8 pre_mode = IRQFrameMode, pre_fcnt = fcnt, pre_sirq = SIRQStat;
-  fprintf(stderr, "E3 W4017_IN V=0x%X pre_mode=0x%X pre_fcnt=%u pre_sirq=0x%X\n",
-   (unsigned)V, (unsigned)pre_mode, (unsigned)pre_fcnt, (unsigned)pre_sirq);
+  uint32 ts = g_cpu.timestamp_ref();
+  fprintf(stderr, "E3 W4017_IN ts=%u ts_mod4=%u V=0x%X pre_mode=0x%X pre_fcnt=%u pre_sirq=0x%X\n",
+   (unsigned)ts, (unsigned)(ts & 3), (unsigned)V, (unsigned)pre_mode, (unsigned)pre_fcnt, (unsigned)pre_sirq);
+  // P2 Phase 2 Step 2.2 (2026-08-01): arm the windowed hook trace so the
+  // post-write quarter trajectory is captured at instruction granularity.
+  e3_hook_trace_window = 20000;
  }
  // R6-2a (2026-08-01): save the raw $4017 value BEFORE the (V&0xC0)>>6
  // reduction — bit 6 of the raw byte is the IRQ inhibit bit. Per Nesdev,
@@ -1070,14 +1105,31 @@ DECLFW(Write_IRQFM)
  if(V&0x2)
   FrameSoundUpdate();
  fcnt=1;
- // R6-2a (2026-08-01): unconditional fhcnt reset retained.
- // R6 Step 3 (2026-08-01): removing fhcnt=fhinc was tested as a defect-1
- // root-cause fix and REVERTED — apu_single_4 still FAIL 0x02 and it
- // broke golden_savestate_test / savestate_regression_test. See
- // docs/history/e6_survey/r6_step3_fix_data_2026-08-01.md for the full
- // analysis (fhcnt drift is not the cause; IRQ set position and fcnt
- // init value also ruled out).
- fhcnt=fhinc;
+ // P2 Phase 2 Step 2.2 (2026-08-01): W4017 -> frame-IRQ delay + APU clock
+ // jitter (instrument-first, calibrated against apu_single_4_jitter /
+ // apu_single_6_irq_timing on 2026-08-02).
+ //
+ // Hardware semantics (blargg_apu_2005.07.30 readme + 04.clock_jitter.asm):
+ //  - the $4017 write restarts the frame-counter timer only at the next
+ //    even APU clock (the /2 clock), a few cycles after the write;
+ //  - a write landing on an odd APU clock delays the effect by 1 CPU cycle
+ //    (the "clock jitter" blargg's sub-tests 4/5 detect);
+ //  - observable target for apu_single_4: after a $00 write, sub-test 2
+ //    reads $4015 at write+29831 and requires the IRQ flag CLEAR; sub-test
+ //    3 reads at write+29833 and requires SET; get_jitter reads at
+ //    write+29832 and must flip with the write's APU-clock phase.
+ //
+ // Pre-Step-2.2 model set the flag at write+29831 (fixed), so sub-test 2
+ // (read at 29831) saw it set -> "Frame irq is set too soon" (0x02).
+ // Fix (first-order): start the countdown one cycle LATER (fhcnt = fhinc
+ // + 1*48) so the 4th-quarter IRQ lands at write+29832 (even APU clock)
+ // or write+29833 (odd APU clock -> +1 jitter). The jitter phase is the
+ // CPU timestamp parity at the write (`ts & 1`): two get_jitter calls
+ // separated by an even number of cycles share parity -> same result,
+ // odd separation -> opposite result (blargg sub-tests 4/5).
+ const uint32 ts2 = g_cpu.timestamp_ref();
+ const bool e3_odd_apu = (ts2 & 1) != 0;
+ fhcnt = fhinc + (int32_t)((e3_step2_offset() + (e3_odd_apu ? 1.0 : 0.0)) * 48.0);
  if (raw & 0x40) {
   X6502_IRQEnd(FCEU_IQFCOUNT);
   SIRQStat&=~0x40;
