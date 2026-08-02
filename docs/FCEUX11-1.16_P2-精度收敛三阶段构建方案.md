@@ -99,10 +99,12 @@
 > - **Phase 1（E-1）已实测两轮**：Step 1.1 证伪（置位点假设，已回滚）；Step 1.2 抑制机制落地（**零回归**，但 vbl_02 未闭合）。
 >   剩余 6 ROM 全部指向**同一深层根因：CPU 侧 NMI/读采样时序 vs PPU 帧边界对齐**（Step 1.3 专项，改动面在 x6502 采样模型，较深）。
 > - **Phase 2（R6/APU）已执行（顺序经用户确认）**：**Step 2.1 相位分离 ✅**（2026-08-01，`e3(step2.1)`）+ **Step 2.2 写路径延迟+jitter 一阶近似 ✅**（2026-08-02，`e3(step2.2)`，**`apu_single_4_jitter` 0x02→0x00 PASS**，40 ROM 零回归，Oracle A 33/33）。
-> - **Phase 2 剩余**：Step 2.2 深化（消除 hook 量化方差，闭合 single_5/6 + reset_4017_timing；与 Step 1.3 同族风险）→ Step 2.3（5-step 立即 clock `V&0x1`，独立低风险）。
-> - **建议执行顺序（已确认）**：**Phase 2（R6）→ Phase 1 Step 1.3 → Phase 1 Step 1.4 → Phase 3**。下一步两条路径择一：
->   (a) **Step 2.3**（低风险，先拿掉一个已知错误触发条件）；
->   (b) **Step 2.2 深化 / Phase 1 Step 1.3**（同为消除指令级量化，风险高，建议合并评估）。
+> - **Phase 2 剩余**：**Step 2.3 已实测证伪（2026-08-02）**——当前 `V&0x2` 即原始 bit7（5-step），
+>   已是硬件正确实现；方案改法 `V&0x1` 方向相反（会使 $40 触发 clock、$80 不触发），实测
+>   `apu_single_1_len_ctr` 0x00→0x04 回归（见 `docs/history/surveys/e6_apu/p2_step2_3_falsification_2026-08-02.md`）。
+> - **建议执行顺序（已确认）**：**Phase 2（R6）→ Phase 1 Step 1.3 → Phase 1 Step 1.4 → Phase 3**。
+>   Step 2.3 证伪后无低风险剩余项，下一步唯一路径：
+>   **Step 2.2 深化 / Phase 1 Step 1.3**（同为消除指令级量化/采样模型，风险高，建议合并评估）。
 
 | Phase | 目标 | 验收门 | 对应 |
 |---|---|---|---|
@@ -260,17 +262,24 @@ env-gated 探针 `E1 P2002_READ` / `E1 VBL_SUPPRESSED`。
 >   quarter crossing（消除 hook 量化），改动面与 Phase 1 Step 1.3 同族，记为**有据已知限制**。
 > - `apu_reset_4017_timing`（power 路径 "delay 2"）与 `apu_test` 停在 Step 2.1 状态，未变。
 
-### Step 2.3 — 5-step 立即 clock 触发条件修正（V&0x1 而非 V&0x2）
+### Step 2.3 — ~~5-step 立即 clock 触发条件修正（V&0x1 而非 V&0x2）~~（**已证伪，2026-08-02**）
 
-**文件**：`src/sound.cpp:1105`（`if(V&0x2) FrameSoundUpdate();`）
+> **🚨 实测证伪**：本步前提（"当前 `V=(V&0xC0)>>6` 后 `V&0x2` 是 inhibit"）与代码事实相反——
+> 该映射为自然映射：**bit6（inhibit）→ 缩减 bit0、bit7（5-step mode）→ 缩减 bit1**，故当前
+> `if(V&0x2)` 触发条件已是原始 bit7，**即硬件要求的"5-step 写触发立即 quarter+half clock"**；
+> `IRQFrameMode&0x2` 的 5-step 额外周期消费（`:518`）亦印证 bit1=bit7。改 `V&0x1` 反而使
+> `$40`（inhibit）错误触发 clock、`$80`（5-step）错误不触发。
+> 实测（`FCEUX11_E3_TRACE=1`，apu_01 × 600 帧）：基线 `$80` 写 → 立即 FSU、`$40` 写 → 无 FSU
+> （符合硬件）；改动版行为反转，且 **`apu_single_1_len_ctr` 0x00→0x04 翻红**（回滚后复 PASS）。
+> 完整数据见 `docs/history/surveys/e6_apu/p2_step2_3_falsification_2026-08-02.md`。
+> **处置**：本步**无需执行**（当前实现已正确），不留已知错误触发条件；无代码改动落地。
+> **修订后 Phase 2 剩余**：Step 2.2 深化（cycle-accurate quarter crossing，闭合 single_5/6）为唯一硬骨头，
+> 与 Phase 1 Step 1.3（CPU 侧采样模型）同族，建议合并评估。
 
-**改法**：硬件语义是 **bit7（5-step mode）写触发立即 quarter+half clock**（NESdev wiki side effects；blargg Mode 1 时序 step 0 @ cycle 1），
-非 bit6（inhibit）。当前 `V=(V&0xC0)>>6` 后 `V&0x2` 是 inhibit——**改 `V&0x1`**。
-注意：`$80` 写同时置 bit6+bit7，两条件均触发，`apu_01` sub-test 4（"Writing $80 should clock length immediately"）不受影响；
-`$40` 写（仅 inhibit）将**不再**立即 clock——此为正确行为，需确认无现有用例依赖错误行为。
+**文件**：`src/sound.cpp:1105`（`if(V&0x2) FrameSoundUpdate();`）【维持现状，不改】
 
-**证伪判据**：`apu_01`~`apu_11` 全 PASS（`apu_01` sub-test 4/5 尤其）；`pal_apu_*` 10 个 + `apu_mixer_*` 4 个不回归；
-`apu_single_3` 保持 PASS（缺陷 2 修复不回退）。
+**原证伪判据（已达成，用于证明现状正确）**：`apu_01`~`apu_11` 全 PASS、`apu_single_1` 保持 PASS、
+`apu_single_3` 保持 PASS；改动版则使 `apu_single_1` 翻红。
 
 ### Phase 2 强制回归集（每步后必跑）
 
@@ -325,7 +334,7 @@ env-gated 探针 `E1 P2002_READ` / `E1 VBL_SUPPRESSED`。
 | VBL 周期 6820 不变量被破坏 → vbl_01 翻红 | **Step 1.1 已证伪此路径并回滚**；set→clear 周期是硬约束，置位点不再单独调整 |
 | golden savestate 哈希碎裂被误判为回归 | 预期流程：`fceux11_golden_savestate_test --generate` 重生，diff 确认仅起始值变化（R6 Step 2.1 必走） |
 | APU 时钟奇偶（jitter）在 FCEUX 架构中无现成信号 | **✅ Step 2.2 已消解**：相位信号 = 写时刻 `g_cpu.timestamp & 1`（探针实测偶间隔同相位/奇间隔翻转，sub-test 4/5 通过） |
-| R6 改 $4017 写路径影响现有 apu_* PASS ROM | **✅ Step 2.2 已验证零回归**（40 ROM 全量，含 apu_01~11/pal/mixer/reset）；Step 2.3 V&0x1 改法仍以 apu_01 sub-test 4/5、apu_06 为哨兵 |
+| R6 改 $4017 写路径影响现有 apu_* PASS ROM | **✅ Step 2.2 已验证零回归**（40 ROM 全量，含 apu_01~11/pal/mixer/reset）；Step 2.3 已证伪不落地（改 V&0x1 会使 apu_single_1 翻红） |
 | **Step 2.2 一阶近似无法闭合 single_5/6（hook 量化方差）** | **2026-08-02 实测确认**：quarter 触发量化到指令边界 ±2-3 cyc，超出 blargg ±1 cyc 容差；offset/fhinc/分数/tsdelta 全部证伪。转**有据已知限制**，需 cycle-accurate quarter crossing（与 Step 1.3 同族，合并评估） |
 | Phase 3 剩余 38 项精度面大、易摊薄 | 分桶后按子系统逐个 PR，宁缺毋滥，保留"有据已知限制"出口 |
 
