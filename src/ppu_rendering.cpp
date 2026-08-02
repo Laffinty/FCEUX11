@@ -1523,13 +1523,19 @@ static bool e1_trace_on() {
 	return on;
 }
 
-// E-1 probe (Phase 1 Step 1.3, 2026-08-02): sweep knob for the PPU dots
-// advanced before the NMI latch is asserted in the VBL block (replaces the
-// hard-coded R5 Step 3 runppu(3)). Env FCEUX11_E1_NMIDELAY, default 3.
+// E-1 probe (Phase 1 Step 1.3, 2026-08-02): sweep knob for the CPU budget
+// granted before the NMI latch is asserted in the VBL block (replaces the
+// hard-coded R5 Step 3 runppu(3)). Units are PPU dots (1 dot = 1/3 CPU cycle
+// of budget, granted via X6502_Run so the PPU is NOT advanced — the NMI-on
+// frame stays a true 6820-dot VBL). Env FCEUX11_E1_NMIDELAY, default 8.
+// 2026-08-02 Step 1.3 deep calibration: with the runppu(3) frame distortion
+// removed, NMIDELAY=8 makes vbl_05_nmi_timing PASS (X=[4,4,4,3,3,3,3,3,3,2]);
+// 7 -> [4,3,...], 9 -> [4,4,4,4,3,...] (transition 1 line late), 8 is the
+// unique sweet spot. Sweep data in docs/history/surveys/e1_vbl/.
 static int e1_nmi_delay() {
 	static const int d = []() {
 		const char* e = std::getenv("FCEUX11_E1_NMIDELAY");
-		return (e && e[0]) ? std::atoi(e) : 3;
+		return (e && e[0]) ? std::atoi(e) : 8;
 	}();
 	return d;
 }
@@ -1619,13 +1625,21 @@ int FCEUX_PPU_Loop(int skip) {
 		// [3,2,2,2,2,2,2,1,1,1] — row 0 overshoot to 3 proves single-param
 		// NMI delay cannot fix vbl_05's per-row phase drift (see
 		// docs/history/e1_survey/vbl_step3_fix_data_2026-08-01.md §9).
-		// Step 1.2: runppu(3) is ALWAYS done when NMI is enabled so the
+		// Step 1.2: X6502_Run(nd) is ALWAYS done when NMI is enabled so the
 		// frame length stays identical on suppressed and non-suppressed
-		// frames (6823 with NMI on — the pre-existing R5 Step 3 wart — vs
-		// 6820 with NMI off); only TriggerNMI is gated on !vbl_set_suppressed.
+		// frames (6820 with NMI on OR off — the R5 Step 3 runppu(3) wart that
+		// lengthened NMI-on frames to 6823 is removed; hardware VBL is
+		// exactly 20 scanlines = 6820 dots regardless of NMI state).
+		// Phase 1 Step 1.3 deep (2026-08-02): run the CPU budget WITHOUT
+		// advancing the PPU. runppu(nd) advanced the PPU nd dots AND granted
+		// nd*16 units of CPU budget; the PPU advance distorted NMI-on frames
+		// (+3 dots, vbl_05 VBL_ENTER cycle drifted +3/frame), which skews the
+		// per-frame NMI phase drift that blargg's nmi_timing test measures.
+		// X6502_Run(nd) grants the same CPU budget (1 CPU cycle per 3 dots)
+		// with zero PPU advance, keeping the frame at a true 6820-dot VBL.
 		if (VBlankON) {
 			const int nd = e1_nmi_delay();
-			if (nd > 0) runppu(nd);
+			if (nd > 0) X6502_Run(nd);
 			if (e1_trace_on()) {
 				fprintf(stderr, "E1 VBL_AFTER_NMIDELAY abs=%llu sl=%d cycle=%d delay=%d\n",
 				 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()),
