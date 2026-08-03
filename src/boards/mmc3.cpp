@@ -29,6 +29,42 @@
 #include "../unif.h"
 #include "mmc3.h"
 
+#include <cstdarg>
+#include <cstdio>
+#include <cstdlib>
+
+// ----------------------------------------------------------------------------
+// MMC3 instrument probe (Phase 3 Step 3.2, Bucket A — 2026-08-04).
+//
+// Env-gated, zero-intrusion probe for MMC3 IRQ counter / A12 clocking /
+// scanline timing. Activated by setting FCEUX11_MMC3_PROBE=1 in the
+// environment (restart required). Silent otherwise (ctest 34/34 unaffected).
+// Probe data collected under docs/history/surveys/mmc3/.
+//
+// Targets the 12 MMC3 blargg FAILs from Step 3.1 baseline:
+//   0x02 x 6 — IRQ counter reload / set-on-0 (mmc3_2/5/6 + v2_2/5/6)
+//   0x03 x 2 — A12 clocking via PPUADDR (mmc3_1/v2_1)
+//   0x04 x 2 — A12 clocking via PPUADDR write (mmc3_3/v2_3)
+//   0x09 x 2 — scanline 0 IRQ timing (mmc3_4/v2_4)
+// ----------------------------------------------------------------------------
+static bool mmc3_probe_on() {
+    static const bool on = []() {
+        const char* e = std::getenv("FCEUX11_MMC3_PROBE");
+        return e && e[0] == '1' && e[1] == '\0';
+    }();
+    return on;
+}
+
+static void mmc3_probe_log(const char* tag, const char* fmt, ...) {
+    if (!mmc3_probe_on()) return;
+    std::fprintf(stderr, "[MMC3_PROBE %s] ", tag);
+    va_list args;
+    va_start(args, fmt);
+    std::vfprintf(stderr, fmt, args);
+    va_end(args);
+    std::fputc('\n', stderr);
+}
+
 uint8 MMC3_cmd;
 uint8 kt_extra;
 uint8 *WRAM;
@@ -182,6 +218,8 @@ DECLFW(MMC3_CMDWrite) {
 
 DECLFW(MMC3_IRQWrite) {
 //	FCEU_printf("%04x:%04x\n",A,V);
+	mmc3_probe_log("IRQWRITE", "addr=%04X val=%02X sub=%04X",
+		A, V, A & 0xE001);
 	switch (A & 0xE001) {
 	case 0xC000: IRQLatch = V; break;
 	case 0xC001: IRQReload = 1; break;
@@ -210,6 +248,13 @@ DECLFW(KT008HackWrite) {
 
 static void ClockMMC3Counter(void) {
 	int count = IRQCount;
+	const uint8 latch_before = IRQLatch;
+	const uint8 reload_before = IRQReload;
+	const uint8 enabled_before = IRQa;
+	const int sl = g_cpu.scanline();
+	const int cyc = g_cpu.timestamp() & 0x07;
+	mmc3_probe_log("CLOCK_PRE", "sl=%d cyc=%d count=%u latch=%u reload=%u enabled=%u",
+		sl, cyc, count, latch_before, reload_before, enabled_before);
 	if (!count || IRQReload) {
 		IRQCount = IRQLatch;
 		IRQReload = 0;
@@ -217,12 +262,19 @@ static void ClockMMC3Counter(void) {
 		IRQCount--;
 	if ((count | isRevB) && !IRQCount) {
 		if (IRQa) {
+			mmc3_probe_log("CLOCK_IRQ",
+				"sl=%d cyc=%d count_was=%u reload=%d isRevB=%d latch=%u",
+				sl, cyc, count, reload_before, isRevB, latch_before);
 			X6502_IRQBegin(FCEU_IQEXT);
 		}
 	}
+	mmc3_probe_log("CLOCK_POST", "sl=%d cyc=%d count_after=%u reload_after=%u",
+		sl, cyc, IRQCount, IRQReload);
 }
 
 static void MMC3_hb(void) {
+	mmc3_probe_log("HB_PRE", "sl=%d cyc=%d IRQCount=%u IRQLatch=%u IRQa=%u",
+		g_cpu.scanline(), g_cpu.timestamp() & 0x07, IRQCount, IRQLatch, IRQa);
 	ClockMMC3Counter();
 }
 
