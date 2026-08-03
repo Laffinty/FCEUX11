@@ -409,14 +409,37 @@ vbl_02/06/07/08 $6000=0x00（未达成）；vbl_04（当前 PASS）不回归（�
 
 ## 5. Phase 3 — 全量精度收敛与收尾（目标：迁移矩阵 39/39、blargg 精度 FAIL 面下降）
 
-### Step 3.1 — harness 清理重测（零模拟精度改动，先拿掉非精度 FAIL）
+### Step 3.1 — harness 清理重测（零模拟精度改动，先拿掉非精度 FAIL）【**✅ 已落地 2026-08-04**】
 
-现状 56 FAIL = 18 harness + 38 真实精度（Stage-2 分桶）。其中：
-- **12 项 `0x80`（帧预算不足）**：`--frames 600` → 按需提高（这些 ROM 需更多帧完成），重测
-- **6 项 `0x81`（"Press RESET"，批处理未传 `--reset-after`）**：runner 批量路径补 `--reset-after`，重测
-- 重测后重新分桶，确认真实精度 FAIL 面收敛到 38 以下（harness 修正不应改变精度项）
-
-**证伪判据**：Oracle B 重跑后 0x80/0x81 类 FAIL 归零或显著下降；精度项清单逐条可核对。
+> **✅ 2026-08-04 落地状态**(详见 `docs/history/reports/FCEUX11-1.16_P3-Step31_harness_cleanup_2026-08-04.md`):
+>
+> **基线(2026-08-04 06:00 Oracle B)**: 177 ROMs,**126 PASS / 51 FAIL**
+> - 0x80 × 13(帧预算不足)
+> - 0x81 × 8("Press RESET" 中途复位)
+> - 0xFE × 1(`cpu_interrupts.nes` 永久跳过)
+> - 0x01-0x09 × 29(真实精度)
+>
+> **修后(2026-08-04 07:00 Oracle B)**: 177 ROMs,**141 PASS / 36 FAIL** ✅
+> - 0x80 × **0**(全清零)
+> - 0x81 × **0**(全清零)
+> - 0xFE × 1(永久跳过不变)
+> - 0x01-0x0E × **35**(其中 6 项从 0x80/0x81 露出真实精度码)
+>
+> **改动**:
+> - `tests/blargg_runner.cpp`:`ManifestEntry` 加 `reset_after` 字段(per-ROM RESET 覆盖),批处理循环按条目设 `g_reset_after_frames`
+> - `tests/fixtures/blargg_manifest.json`:8 个 0x81 ROM 加 `reset_after: 60`;13 个 0x80 ROM 调高 frames(9 个 cpu → 3000、2 个 ppu → 3000、4 个 apu_mixer → 2400)
+> - `scripts/generate_blargg_manifest.ps1`:增加 `$resetAfterRoms` 表(8 ROM)+ 输出字段
+> - `scripts/analyze_blargg_results.ps1`:加注释说明 `reset_after` 字段含义
+>
+> **验证**:
+> - Oracle A `ctest -LE perf`:33/33 PASS(不变)
+> - 0x80 桶:13 → 0 ✅
+> - 0x81 桶:8 → 0 ✅
+> - 真实精度净修正:15 ROM PASS + 6 ROM 露出真实精度码(预期行为)
+>
+> **不引入回归**:`ppu_vbl_nmi`/`instr_timing`/`instr_timing_v2_1`/`ppu_read_buffer`/`cpu_dummy_writes_oam`/`cpu_reset_regs` 从 0x80/0x81 变为真实精度码,这些是 **harness 掩盖的既有精度问题**,不是新回归(符合 §十·五"精确知道什么失败"原则)。
+>
+> **剩余 36 项 FAIL** 进入 Step 3.2,详见报告 §3 分类(按子系统:CPU 11 / PPU 11 / MMC3 12 / APU 2 / 永久跳过 1)
 
 ### Step 3.2 — 剩余真实精度 FAIL 重分桶 + 逐个收敛
 
