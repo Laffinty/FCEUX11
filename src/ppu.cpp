@@ -674,6 +674,16 @@ static DECLFW(B2000) {
 
 static DECLFW(B2001) {
 	FCEUPPU_LineUpdate();
+	// E-1 probe (Phase 1 Step 1.4, 2026-08-03): $2001 (PPUMASK) write dot
+	// recorder. PPUON = PPU[1]&0x18 (BG/sprite enable) takes effect
+	// immediately here; abs is in CPU cycles (1 cyc = 3 dots) and count is
+	// the CPU budget residual in 1/16-dot units, which resolves the write's
+	// sub-dot position within its instruction batch.
+	if (e1_ppu_trace_on()) {
+		fprintf(stderr, "E1 W2001 abs=%llu sl=%d cycle=%d count=%d val=0x%02X PPUON_after=%d\n",
+		 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()),
+		 ppur.status.sl, ppur.status.cycle, g_cpu.native_layout().count, V, (V & 0x18) ? 1 : 0);
+	}
 	if (paldeemphswap)
 		V = (V&0x9F)|((V&0x40)>>1)|((V&0x20)<<1);
 	PPUGenLatch = V;

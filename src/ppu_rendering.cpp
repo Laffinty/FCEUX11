@@ -2057,6 +2057,19 @@ int FCEUX_PPU_Loop(int skip) {
 			//(not implemented yet)
 			runppu(kFetchTime);
 			if (sl == 0) {
+				// E-1 probe (Phase 1 Step 1.4, 2026-08-03): even/odd skip
+				// decision recorder. Logs the PPU dot where the end_cycle
+				// decision is made, the PPUON state sampled there, and the CPU
+				// budget residual (count, 1/16-dot units) that carries the
+				// sub-dot frame phase (vbl_10 investigation — see
+				// docs/history/surveys/e1_vbl/vbl_step1_4_*).
+				if (e1_trace_on()) {
+					fprintf(stderr, "E1 SKIP_DEC abs=%llu frame=%d sl=%d cycle=%d count=%d PPUON=%d idleSynch=%d PAL=%d end_cycle=%d\n",
+					 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()),
+					 framectr, sl, ppur.status.cycle, g_cpu.native_layout().count,
+					 PPUON ? 1 : 0, idleSynch, PAL ? 1 : 0,
+					 (idleSynch && PPUON && !PAL) ? 340 : 341);
+				}
 				if (idleSynch && PPUON && !PAL)
 					ppur.status.end_cycle = 340;
 				else
