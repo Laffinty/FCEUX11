@@ -97,81 +97,87 @@
       "name": "apu_mixer_dmc",
       "path": "fixtures/blargg/apu/apu_mixer_dmc.nes",
       "category": "apu",
-      "frames": 600,
+      "frames": 2400,
       "probe_addr": 24576,
-      "description": "blargg test ROM: apu_mixer_dmc [apu]"
+      "description": "blargg test ROM: apu_mixer_dmc [apu] (Step 3.1: audio self-test needs more frames)"
     },
     {
       "name": "apu_mixer_noise",
       "path": "fixtures/blargg/apu/apu_mixer_noise.nes",
       "category": "apu",
-      "frames": 600,
+      "frames": 2400,
       "probe_addr": 24576,
-      "description": "blargg test ROM: apu_mixer_noise [apu]"
+      "description": "blargg test ROM: apu_mixer_noise [apu] (Step 3.1: audio self-test needs more frames)"
     },
     {
       "name": "apu_mixer_square",
       "path": "fixtures/blargg/apu/apu_mixer_square.nes",
       "category": "apu",
-      "frames": 600,
+      "frames": 2400,
       "probe_addr": 24576,
-      "description": "blargg test ROM: apu_mixer_square [apu]"
+      "description": "blargg test ROM: apu_mixer_square [apu] (Step 3.1: audio self-test needs more frames)"
     },
     {
       "name": "apu_mixer_triangle",
       "path": "fixtures/blargg/apu/apu_mixer_triangle.nes",
       "category": "apu",
-      "frames": 600,
+      "frames": 2400,
       "probe_addr": 24576,
-      "description": "blargg test ROM: apu_mixer_triangle [apu]"
+      "description": "blargg test ROM: apu_mixer_triangle [apu] (Step 3.1: audio self-test needs more frames)"
     },
     {
       "name": "apu_reset_4015",
       "path": "fixtures/blargg/apu/apu_reset_4015.nes",
       "category": "apu",
       "frames": 600,
+      "reset_after": 60,
       "probe_addr": 24576,
-      "description": "blargg test ROM: apu_reset_4015 [apu]"
+      "description": "blargg test ROM: apu_reset_4015 [apu] (Step 3.1: needs soft reset)"
     },
     {
       "name": "apu_reset_4017_timing",
       "path": "fixtures/blargg/apu/apu_reset_4017_timing.nes",
       "category": "apu",
       "frames": 600,
+      "reset_after": 60,
       "probe_addr": 24576,
-      "description": "blargg test ROM: apu_reset_4017_timing [apu]"
+      "description": "blargg test ROM: apu_reset_4017_timing [apu] (Step 3.1: needs soft reset)"
     },
     {
       "name": "apu_reset_4017_written",
       "path": "fixtures/blargg/apu/apu_reset_4017_written.nes",
       "category": "apu",
       "frames": 600,
+      "reset_after": 60,
       "probe_addr": 24576,
-      "description": "blargg test ROM: apu_reset_4017_written [apu]"
+      "description": "blargg test ROM: apu_reset_4017_written [apu] (Step 3.1: needs soft reset; sometimes needs a SECOND reset)"
     },
     {
       "name": "apu_reset_irq_cleared",
       "path": "fixtures/blargg/apu/apu_reset_irq_cleared.nes",
       "category": "apu",
       "frames": 600,
+      "reset_after": 60,
       "probe_addr": 24576,
-      "description": "blargg test ROM: apu_reset_irq_cleared [apu]"
+      "description": "blargg test ROM: apu_reset_irq_cleared [apu] (Step 3.1: needs soft reset)"
     },
     {
       "name": "apu_reset_len_ctrs",
       "path": "fixtures/blargg/apu/apu_reset_len_ctrs.nes",
       "category": "apu",
       "frames": 600,
+      "reset_after": 60,
       "probe_addr": 24576,
-      "description": "blargg test ROM: apu_reset_len_ctrs [apu]"
+      "description": "blargg test ROM: apu_reset_len_ctrs [apu] (Step 3.1: needs soft reset)"
     },
     {
       "name": "apu_reset_works_imm",
       "path": "fixtures/blargg/apu/apu_reset_works_imm.nes",
       "category": "apu",
       "frames": 600,
+      "reset_after": 60,
       "probe_addr": 24576,
-      "description": "blargg test ROM: apu_reset_works_imm [apu]"
+      "description": "blargg test ROM: apu_reset_works_imm [apu] (Step 3.1: needs soft reset)"
     },
     {
       "name": "apu_single_1_len_ctr",
@@ -457,9 +463,9 @@
       "name": "cpu_dummy_writes_oam",
       "path": "fixtures/blargg/cpu/cpu_dummy_writes_oam.nes",
       "category": "cpu",
-      "frames": 300,
+      "frames": 3000,
       "probe_addr": 24576,
-      "description": "blargg test ROM: cpu_dummy_writes_oam [cpu]"
+      "description": "blargg test ROM: cpu_dummy_writes_oam [cpu] (Step 3.1: OAM DMA timing test needs more frames)"
     },
     {
       "name": "cpu_dummy_writes_ppu",
@@ -473,9 +479,9 @@
       "name": "cpu_exec_space_apu",
       "path": "fixtures/blargg/cpu/cpu_exec_space_apu.nes",
       "category": "cpu",
-      "frames": 300,
+      "frames": 3000,
       "probe_addr": 24576,
-      "description": "blargg test ROM: cpu_exec_space_apu [cpu]"
+      "description": "blargg test ROM: cpu_exec_space_apu [cpu] (Step 3.1: needs more frames; was PASS at 300 before Phase 2, now 0x80 - investigating)"
     },
     {
       "name": "cpu_exec_space_ppuio",
@@ -538,16 +544,18 @@
       "path": "fixtures/blargg/cpu/cpu_reset_ram.nes",
       "category": "cpu",
       "frames": 300,
+      "reset_after": 60,
       "probe_addr": 24576,
-      "description": "blargg test ROM: cpu_reset_ram [cpu]"
+      "description": "blargg test ROM: cpu_reset_ram [cpu] (Step 3.1: needs soft reset)"
     },
     {
       "name": "cpu_reset_regs",
       "path": "fixtures/blargg/cpu/cpu_reset_regs.nes",
       "category": "cpu",
       "frames": 300,
+      "reset_after": 60,
       "probe_addr": 24576,
-      "description": "blargg test ROM: cpu_reset_regs [cpu]"
+      "description": "blargg test ROM: cpu_reset_regs [cpu] (Step 3.1: needs soft reset)"
     },
     {
       "name": "cpu_test5_cpu",
@@ -617,17 +625,17 @@
       "name": "instr_timing",
       "path": "fixtures/blargg/cpu/instr_timing.nes",
       "category": "cpu",
-      "frames": 300,
+      "frames": 3000,
       "probe_addr": 24576,
-      "description": "blargg test ROM: instr_timing [cpu]"
+      "description": "blargg test ROM: instr_timing [cpu] (Step 3.1: 25s timing test needs 3000 frames)"
     },
     {
       "name": "instr_timing_v2_1",
       "path": "fixtures/blargg/cpu/instr_timing_v2_1.nes",
       "category": "cpu",
-      "frames": 300,
+      "frames": 3000,
       "probe_addr": 24576,
-      "description": "blargg test ROM: instr_timing_v2_1 [cpu]"
+      "description": "blargg test ROM: instr_timing_v2_1 [cpu] (Step 3.1: 25s timing test needs 3000 frames)"
     },
     {
       "name": "instr_timing_v2_2",
@@ -641,17 +649,17 @@
       "name": "instr_v3_all",
       "path": "fixtures/blargg/cpu/instr_v3_all.nes",
       "category": "cpu",
-      "frames": 300,
+      "frames": 3000,
       "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v3_all [cpu]"
+      "description": "blargg test ROM: instr_v3_all [cpu] (Step 3.1: comprehensive test needs 3000 frames)"
     },
     {
       "name": "instr_v3_official",
       "path": "fixtures/blargg/cpu/instr_v3_official.nes",
       "category": "cpu",
-      "frames": 300,
+      "frames": 3000,
       "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v3_official [cpu]"
+      "description": "blargg test ROM: instr_v3_official [cpu] (Step 3.1: comprehensive test needs 3000 frames)"
     },
     {
       "name": "instr_v5_01_basics",
@@ -705,9 +713,9 @@
       "name": "instr_v5_07_abs_xy",
       "path": "fixtures/blargg/cpu/instr_v5_07_abs_xy.nes",
       "category": "cpu",
-      "frames": 300,
+      "frames": 3000,
       "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v5_07_abs_xy [cpu]"
+      "description": "blargg test ROM: instr_v5_07_abs_xy [cpu] (Step 3.1: single sub-test but timing-heavy)"
     },
     {
       "name": "instr_v5_08_ind_x",
@@ -1097,9 +1105,9 @@
       "name": "ppu_read_buffer",
       "path": "fixtures/blargg/ppu/ppu_read_buffer.nes",
       "category": "ppu",
-      "frames": 300,
+      "frames": 3000,
       "probe_addr": 24576,
-      "description": "blargg test ROM: ppu_read_buffer [ppu]"
+      "description": "blargg test ROM: ppu_read_buffer [ppu] (Step 3.1: PPU $2007 buffer decay test needs more frames)"
     },
     {
       "name": "ppu_sprite_ram",
@@ -1121,9 +1129,9 @@
       "name": "ppu_vbl_nmi",
       "path": "fixtures/blargg/ppu/ppu_vbl_nmi.nes",
       "category": "ppu",
-      "frames": 300,
+      "frames": 3000,
       "probe_addr": 24576,
-      "description": "blargg test ROM: ppu_vbl_nmi [ppu]"
+      "description": "blargg test ROM: ppu_vbl_nmi [ppu] (Step 3.1: 10 sub-tests need 3000 frames)"
     },
     {
       "name": "ppu_vram_access",

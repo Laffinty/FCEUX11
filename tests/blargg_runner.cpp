@@ -143,11 +143,16 @@ struct SingleResult {
     bool        passed;
     int64_t     duration_ms;
     std::string diag_string;   // $6004+ ASCII diagnostic (blargg error detail)
+    /// Phase 3 Step 3.1: records the reset_after value used for this ROM
+    /// (so analysis scripts can distinguish harness-driven runs from
+    /// baseline). -1 if disabled.
+    int         reset_after_used;
 };
 
 static SingleResult run_one_rom(const char* rom_path, int frames) {
     SingleResult res;
     res.probe_addr = 0x6000;
+    res.reset_after_used = g_reset_after_frames;
 
     // Extract ROM name from path for reporting.
     const char* base = std::strrchr(rom_path, '/');
@@ -258,6 +263,12 @@ struct ManifestEntry {
     std::string name;
     std::string path;
     int         frames;
+    /// Phase 3 Step 3.1: per-ROM reset override. -1 = disabled (legacy
+    /// behaviour), >=0 = press RESET at frame N then continue.
+    /// Required for ROMs that gate their actual test behind a manual
+    /// soft-reset (apu_reset_*, cpu_reset_*, etc.). Without it the ROM
+    /// displays "Press RESET" and writes $6000=0x81 forever.
+    int         reset_after;
     uint32_t    probe_addr;
     std::string description;
 };
@@ -343,6 +354,14 @@ static std::vector<ManifestEntry> load_manifest(const char* manifest_path) {
         e.name        = json_extract_string(obj, "name");
         e.path        = json_extract_string(obj, "path");
         e.frames      = json_extract_int(obj, "frames");
+        // Phase 3 Step 3.1: "reset_after" is optional; missing field
+        // means "no RESET" (legacy behaviour, matches g_reset_after_frames
+        // default of -1). json_extract_int returns 0 for missing keys,
+        // which would erroneously trigger the reset branch, so we detect
+        // presence explicitly.
+        e.reset_after = (obj.find("\"reset_after\"") != std::string::npos)
+            ? json_extract_int(obj, "reset_after")
+            : -1;
         e.probe_addr  = (uint32_t)json_extract_int(obj, "probe_addr");
         e.description = json_extract_string(obj, "description");
 
@@ -385,13 +404,15 @@ static void print_batch_json(const std::vector<SingleResult>& results) {
         const char* comma = (i + 1 < results.size()) ? "," : "";
         std::printf(
             "    {\"rom\":\"%s\",\"addr\":\"0x%04X\",\"value\":\"0x%02X\","
-            "\"diag\":[%d,%d,%d],\"status\":\"%s\",\"duration_ms\":%lld",
+            "\"diag\":[%d,%d,%d],\"status\":\"%s\",\"duration_ms\":%lld,"
+            "\"reset_after\":%d",
             r.rom_name.c_str(),
             r.probe_addr,
             r.value,
             r.diag[0], r.diag[1], r.diag[2],
             r.passed ? "PASS" : "FAIL",
-            static_cast<long long>(r.duration_ms));
+            static_cast<long long>(r.duration_ms),
+            r.reset_after_used);
         if (!r.diag_string.empty()) {
             // Escape JSON special characters in diag_string.
             std::printf(",\"diag_string\":\"");
@@ -456,7 +477,20 @@ int main(int argc, char** argv) {
 
         int fail_count = 0;
         for (const auto& e : entries) {
-            std::fprintf(stderr, "  [%s] %d frames...", e.name.c_str(), e.frames);
+            // Phase 3 Step 3.1: apply per-ROM reset_after override before
+            // each run, restore after so each ROM is isolated. Per-ROM
+            // value takes precedence over the global --reset-after CLI
+            // flag (per-ROM is more specific).
+            const int saved_reset_after = g_reset_after_frames;
+            g_reset_after_frames = e.reset_after;
+
+            if (e.reset_after >= 0) {
+                std::fprintf(stderr, "  [%s] %d frames (reset @ %d)...",
+                    e.name.c_str(), e.frames, e.reset_after);
+            } else {
+                std::fprintf(stderr, "  [%s] %d frames...", e.name.c_str(), e.frames);
+            }
+
             auto r = run_one_rom(e.path.c_str(), e.frames);
             results.push_back(r);
             std::fprintf(stderr, " %s (0x%02X) %lldms\n",
@@ -464,6 +498,8 @@ int main(int argc, char** argv) {
                 r.value,
                 static_cast<long long>(r.duration_ms));
             if (!r.passed) fail_count++;
+
+            g_reset_after_frames = saved_reset_after;  // restore for next ROM
         }
 
         print_batch_json(results);

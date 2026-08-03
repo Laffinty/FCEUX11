@@ -1,4 +1,10 @@
 # KagamiQA P5 — Analyze blargg full batch results.
+#
+# Phase 3 Step 3.1: results JSON now contains a `reset_after` field per
+# ROM (from blargg_runner). This script uses the field to enrich the
+# "harness fix" count: 0x80/0x81 ROMs that did NOT use reset_after are
+# pure frame-budget issues; ones that DID use reset_after but still fail
+# indicate a deeper harness gap.
 param(
     [string]$ResultsJson = "build/blargg_full_results.json",
     [string]$StderrLog  = "build/blargg_full_stderr.txt"
