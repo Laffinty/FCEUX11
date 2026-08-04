@@ -37,18 +37,26 @@ void Ppu::init() noexcept    { /* Phase C/E: real impl */ }
 void Ppu::shutdown() noexcept { /* Phase C/E: real impl */ }
 void Ppu::power() noexcept    { /* Phase C/E: real impl */ }
 void Ppu::reset() noexcept {
-    // hotfix3 C-1: default vnapage_ to point at the class-owned name-table
-    // RAM. Without this, g_ppu.vnapage_[] is nullptr at process startup and
-    // stays nullptr until the mapper's Power() callback installs its own
-    // mapping. hotfix2 P0-3/P0-4 introduced the FetchAndDrawTile<Flags>
-    // template (pputile_template.cpp:106 / :134) which dereferences
-    // vnapage[(RefreshAddr >> 10) & 3]; if the dispatcher fires before a
-    // mapper has populated vnapage_, that deref is UB. Setting all 4
-    // entries to ntaram_ mirrors set_mirror_mode(MI_0) (ppu_class.cpp:113)
-    // and matches v1.0's BSS-time behavior where vnapage defaulted to
-    // NTARAM. ntaram_ is a real 2 KiB backing array, never nullptr.
-    uint8_t* nt = ntaram_;
-    vnapage_[0] = vnapage_[1] = vnapage_[2] = vnapage_[3] = nt;
+    // v1.16 P2 Bucket C fix (2026-08-04): do NOT clobber vnapage_ on
+    // reset. Nametable mirroring is a hardware attribute of the
+    // cartridge — declared in the iNES header and applied by
+    // SetupCartMirroring during load (ines_load.cpp). Resetting all 4
+    // pages to ntaram_ (1-nametable) here wipes the header mirroring
+    // for mappers whose Power() does not re-apply it: CNROM (mapper 3)
+    // LatchPower only calls CNROMSync (setchr8/setprg32/setprg8r),
+    // which never touches mirroring. Net effect on blargg
+    // ppu_read_buffer: header vertical (Mirroring=1) collapses to
+    // 1-nametable at power-on, so $23FF reads back $DD (last write to
+    // $2FFF landing in the same 2 KiB block) and
+    // TEST_NTA_MIRRORING_FAIL_1NTA fails with 0x0E.
+    //
+    // Safety: the default ntaram_ mapping is still installed by the
+    // Ppu constructor at process startup, so vnapage_ is never null
+    // after construction (verified: vnapage()[0..3] == ntaram_ from
+    // ppu_class.cpp:47-51). Mappers that need a different layout
+    // (4-screen, switchable UNROM, MMC5 etc.) call SetupCartMirroring
+    // from their own Power() and override this — unchanged.
+    // (void)ntaram_;  // left empty intentionally; see above.
 }
 int  Ppu::loop(int /*skip*/) noexcept { return 0; /* Phase D: real impl */ }
 

@@ -561,13 +561,25 @@ static DECLFR(A2007) {
 			//buffer is the address - 0x1000, also
 			//if grayscale is set then the return is AND with 0x30
 			//to get a gray color reading
-			if (!(tmp & 3)) {
-				if (!(tmp & 0xC))
+			// v1.16 P2 Bucket C fix (2026-08-04): index the palette RAM
+			// with the LIVE address (RefreshAddr from get_2007access()),
+			// not the stale `tmp` captured at function entry. The PPU
+			// register file (fv/v/h/vt/ht) is the authoritative source
+			// for the current VRAM address; the global RefreshAddr can
+			// lag behind it (e.g. a preceding $2007 read auto-incremented
+			// ppur but an intervening open-bus/$2005 access left the
+			// global stale). Using `tmp` here made palette reads return
+			// whatever PALRAM[tmp&0x1F] held instead of PALRAM[addr&0x1F],
+			// so blargg ppu_read_buffer TEST_PALETTE_READS_UNRELIABLE
+			// (0x30=48) saw non-$0E values at $3F0F.
+			const uint32 paddr = RefreshAddr & 0x1F;
+			if (!(paddr & 3)) {
+				if (!(paddr & 0xC))
 					ret = READPAL(0x00);
 				else
-					ret = READUPAL(((tmp & 0xC) >> 2) - 1);
+					ret = READUPAL(((paddr & 0xC) >> 2) - 1);
 			} else
-				ret = READPAL(tmp & 0x1F);
+				ret = READPAL(paddr);
 			VRAMBuffer = CALL_PPUREAD(RefreshAddr - 0x1000);
 		} else {
 			if (debug_loggingCD && (RefreshAddr < 0x2000))
@@ -576,6 +588,15 @@ static DECLFR(A2007) {
 		}
 		ppur.increment2007(ppur.status.sl >= 0 && ppur.status.sl < 241 && PPUON, INC32 != 0);
 		RefreshAddr = ppur.get_2007access();
+		// v1.16 P2 Bucket C fix (2026-08-04): mirror the old-PPU path's
+		// `PPUGenLatch = VRAMBuffer`. A $2007 read places the returned
+		// value on the PPU data bus; subsequent reads of registers with
+		// no read function ($2000-$2006, open bus) must repeat it.
+		// Without this, blargg ppu_read_buffer TEST_PPU_OPENBUS_MUST_
+		// NOT_COPY_READBUFFER (0x13=19) fails: `cpy PPUCTRL` after
+		// `ldy PPUDATA` reads a stale PPUGenLatch instead of the
+		// just-transferred buffer value.
+		PPUGenLatch = ret;
 		return ret;
 	} else {
 
