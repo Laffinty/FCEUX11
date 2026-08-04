@@ -15,10 +15,11 @@
 | 错误码 | 数量 | ROM | 子类型 |
 |---|---|---|---|
 | 0x06 | 1 | `cpu_dummy_writes_oam` | RMW dummy write on OAM（0xE3 mask + PPU 状态） |
-| 0x09 | 1 | `cpu_dummy_writes_ppu` | RMW dummy write on PPU（$2006/PPUADDR + open bus） |
+| 0x09 | 1 | `cpu_dummy_writes_ppu` | ~~RMW dummy write on PPU（$2006/PPUADDR + open bus）~~ ✅ 桶 C 已修复（`863e9d7`） |
 | 0x05 | 1 | `cpu_exec_space_ppuio` | CPU opcode fetch from PPU I/O mirror |
 
 **初步结论**：3 项全部记入有据已知限制。探针实测揭示深层 OAM 读时序问题（与 Phase 1 vbl_02/06 同族），需 CPU/PPU 联合仿真改造，单 PR 修复不可行。
+**📌 后续收敛(2026-08-05)**：`cpu_dummy_writes_ppu` 已被桶 C 调查修复（`863e9d7`，palette 索引用 RefreshAddr 同族）→ 0x00 PASS。桶 B.3+B.4 实际收敛 1/3，剩余 2/3 保持已知限制。
 
 ---
 
@@ -177,7 +178,7 @@ stx SPRADDR   ; OAMADDR=0
 | ROM | 错误码 | 失败模式 | 初步根因 |
 |---|---|---|---|
 | `cpu_dummy_writes_oam` | 0x06 | oam_read_test 失败，dummy_writes 本身通过 | OAM 读时序（**深模型**） |
-| `cpu_dummy_writes_ppu` | 0x09 | dummy_writes 阶段失败 | PPU 读时序（dummy write 缺失或量化） |
+| `cpu_dummy_writes_ppu` | ~~0x09~~ | ~~dummy_writes 阶段失败~~ ✅ 已修复（桶 C `863e9d7`：palette 索引用 RefreshAddr 同族） | |
 | `cpu_exec_space_ppuio` | 0x05 | exec space PPU I/O 测试失败 | CPU 指令预取 PPU I/O 镜像语义 |
 
 ### 3.4 根因聚类
@@ -194,10 +195,15 @@ stx SPRADDR   ; OAMADDR=0
 
 ### 4.1 桶 B 状态：3 项全部记入有据已知限制
 
+> **📌 状态更新(2026-08-05)**:`cpu_dummy_writes_ppu`(0x09) 已被桶 C 调查修复
+> (`863e9d7`,palette 索引用 RefreshAddr 同族)→ **0x00 PASS**。本桶 B.3+B.4 实际
+> 收敛 1/3,剩余 2/3(`cpu_dummy_writes_oam` 0x06 / `cpu_exec_space_ppuio` 0x05)
+> 保持有据已知限制。
+
 | ROM | 错误码 | 限制类型 |
 |---|---|---|
 | `cpu_dummy_writes_oam` | 0x06 | 已知：OAM 读时序 + 测试子流程（oam_read_test 失败） |
-| `cpu_dummy_writes_ppu` | 0x09 | 已知：PPU 写时序 RMW dummy write 未建模 |
+| `cpu_dummy_writes_ppu` | ~~0x09~~ ✅ 已修复 | ~~PPU 写时序 RMW dummy write 未建模~~（桶 C `863e9d7` 收敛 → 0x00 PASS） |
 | `cpu_exec_space_ppuio` | 0x05 | 已知：CPU 指令预取 PPU I/O 镜像语义未实现 |
 
 ### 4.2 Probe 保留
