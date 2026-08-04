@@ -441,21 +441,42 @@ vbl_02/06/07/08 $6000=0x00（未达成）；vbl_04（当前 PASS）不回归（�
 >
 > **剩余 36 项 FAIL** 进入 Step 3.2,详见报告 §3 分类(按子系统:CPU 11 / PPU 11 / MMC3 12 / APU 2 / 永久跳过 1)
 
-### Step 3.2 — 剩余真实精度 FAIL 重分桶 + 逐个收敛
+### Step 3.2 — 剩余真实精度 FAIL 重分桶 + 逐个收敛【**🚧 进行中 2026-08-04**】
 
 - 重跑全量 Oracle B（Phase 1/2 落地后基线），把剩余真实精度 FAIL 按子系统分桶（CPU 时序 / PPU 渲染 / OAM / DMA / APU 残余 / 其他）
 - 每桶一个独立 PR，沿用 instrument-first + 强制回归纪律；每个 FAIL 保留 $6000 码 + 诊断串 + 根因结论
 - 无法在不回归前提下收敛的项 → 记录为**有据已知限制**（带错误码、诊断、根因、已尝试方案），符合 §十·五"精确知道什么失败"原则
 
+> **🚧 2026-08-04 进度**(Step 3.1 后基线 141 PASS / 36 FAIL):
+>
+> **桶 A — MMC3 (12 ROMs)** ✅ **已完成** → 12/12 全记入有据已知限制
+> - 根因:0x02 IRQ counter reload 边角场景(单 PR 不闭合);0x03/0x04 A12 via PPUADDR 未实现(Mapper 4 无 PPU_hook);0x09 scanline 0 IRQ 时机
+> - 详:`docs/history/surveys/mmc3/stepA_investigation_2026-08-04.md`
+> - 探针保留:`FCEUX11_MMC3_PROBE=1` env-gated(零侵入,Oracle A 33/33 不变),供未来深模型调研复用
+> - 提交:`m(a-investigation)`(`f4a072a`)
+>
+> **桶 B/C/D — 待启动**
+> - B (CPU 时序/中断, 12 项):B.3 dummy write + B.4 exec space 改动面小,优先;B.1/B.2 改动面较大
+> - C (PPU, 9 项):其中 5 项 vbl_* 为 Phase 1 已知限制(vbl_02/06/07/08/10);4 项 ppu_* 待专项
+> - D (APU, 2 项):DMC+SPR DMA 耦合,可能与 Phase 2 帧计数器交互
+>
+> **桶 E — 永久跳过**:`cpu_interrupts.nes`(`eventually_pass=false`)不动
+
 ### Step 3.3 — 全量回归 + 验收复检（100% 完美交付判据）
 
-- [ ] Oracle A：`ctest -LE perf` 34/34；cargo test 40/40
-- [ ] Oracle B：全量重跑，PASS 数 ≥ 当前 121，FAIL 全带码+分类
-- [ ] 迁移矩阵：`total=39, passed=39`（4 FAIL 清零；`lua_joypad_test`/`lua_memory_test` 视实现进度转 PASS 或保留有据 advisory）
-- [ ] README CN/EN + `docs/tech/KagamiQA.md` 三处数字与锚 commit 由 CI 产物回填（R2 路径 A）
-- [ ] CI 实跑一轮全绿（R4 Gate 通过）
-- [ ] `blargg_ppu_vbl_nmi` 升 blocking 且 PASS
-- [ ] P2 交接档案状态摘要更新（R6 缺陷 1 由"暂停"转"已修复"或"有据已知限制"）
+> **2026-08-04 数字同步**(Step 3.1 完成后基线):
+> - Oracle B:**141 PASS / 36 FAIL**(基线 177 ROMs;Step 3.1 后从 121/56 提升到 141/36)
+> - 0x80/0x81 桶:**已清零**(Step 3.1 完成)
+> - 0xFE `cpu_interrupts.nes`:**永久跳过**
+> - Step 3.2 预计记录 35 项为有据已知限制,迁移矩阵按实际调整
+
+- [ ] Oracle A：`ctest -LE perf` 33/33 (排除 perf 标签) + `kagamiqa_migration_matrix.json` 生成
+- [ ] Oracle B：全量重跑,FAIL 全带码+分类(已知限制类 PASS 数无变化即可)
+- [ ] 迁移矩阵：`total=39`,按 Step 3.2 实际收敛度调整 PASS/FAIL 数;`lua_joypad_test`/`lua_memory_test` 视实现进度转 PASS 或保留有据 advisory
+- [ ] README CN/EN + `docs/tech/KagamiQA.md` 三处数字与锚 commit 由 CI 产物回填(R2 路径 A)
+- [ ] CI 实跑一轮全绿(R4 Gate 通过)
+- [ ] `blargg_ppu_vbl_nmi` 升 blocking 且 PASS(**前提**:vbl_10 深模型闭合;否则维持 current,记录为已知限制)
+- [ ] P2 交接档案状态摘要更新(Step 3.1 已落地,R6 缺陷 1 由"暂停"转"已修复"(7 个 bucket-C sub-test 全闭合))
 
 ---
 
