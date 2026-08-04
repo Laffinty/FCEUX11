@@ -455,8 +455,15 @@ vbl_02/06/07/08 $6000=0x00（未达成）；vbl_04（当前 PASS）不回归（�
 > - 探针保留:`FCEUX11_MMC3_PROBE=1` env-gated(零侵入,Oracle A 33/33 不变),供未来深模型调研复用
 > - 提交:`m(a-investigation)`(`f4a072a`)
 >
-> **桶 B/C/D — 待启动**
-> - B (CPU 时序/中断, 12 项):B.3 dummy write + B.4 exec space 改动面小,优先;B.1/B.2 改动面较大
+> **桶 B — CPU (3 ROMs，按 P2 §3 B.3+B.4 优先级)** ✅ **已完成** → 3/3 全记入有据已知限制
+> - `cpu_dummy_writes_oam` 0x06:oam_read_test 失败(OAM 写+读+比较 4096 次迭代),根因为 PPU 隐式 OAM 改写(非 B2004 路径)
+> - `cpu_dummy_writes_ppu` 0x09:PPU $2006 写时序 RMW dummy write 未建模
+> - `cpu_exec_space_ppuio` 0x05:CPU 指令预取 PPU I/O 镜像语义
+> - 详:`docs/history/surveys/cpu_bucketB/stepB_investigation_2026-08-04.md`
+> - 探针:env-gated probe 模式 1/2/3 验证 A2004 读路径正确(ret==SPRAM[PPU[3]]==oam36_was、地址同一性),RMW 宏 abs/abs,X/abs,Y/(zp,X)/(zp),Y 都有 dummy write。根因在 PPU 隐式 OAM 改写,需深模型调研
+> - 提交:`b(investigation)`(`57d3e88`),零代码改动(探针已撤回)
+>
+> **桶 C/D — 待启动**
 > - C (PPU, 9 项):其中 5 项 vbl_* 为 Phase 1 已知限制(vbl_02/06/07/08/10);4 项 ppu_* 待专项
 > - D (APU, 2 项):DMC+SPR DMA 耦合,可能与 Phase 2 帧计数器交互
 >
@@ -464,8 +471,8 @@ vbl_02/06/07/08 $6000=0x00（未达成）；vbl_04（当前 PASS）不回归（�
 
 ### Step 3.3 — 全量回归 + 验收复检（100% 完美交付判据）
 
-> **2026-08-04 数字同步**(Step 3.1 完成后基线):
-> - Oracle B:**141 PASS / 36 FAIL**(基线 177 ROMs;Step 3.1 后从 121/56 提升到 141/36)
+> **2026-08-04 数字同步**(Step 3.1 + Step 3.2 桶 A + 桶 B 完成后基线):
+> - Oracle B:**141 PASS / 36 FAIL**(基线 177 ROMs;桶 A 12 + 桶 B 3 = 15 项记入有据已知限制,与 Step 3.1 后期 36 FAIL 一致——15 项原本就在 36 FAIL 中)
 > - 0x80/0x81 桶:**已清零**(Step 3.1 完成)
 > - 0xFE `cpu_interrupts.nes`:**永久跳过**
 > - Step 3.2 预计记录 35 项为有据已知限制,迁移矩阵按实际调整
