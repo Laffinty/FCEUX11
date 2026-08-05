@@ -12,7 +12,13 @@
 #ifndef FCEU11_PPU_H
 #define FCEU11_PPU_H
 
+#include <cstdint>
+
 #include "ppu_class.h"   // fceu11::Ppu, g_ppu, PPU/NTARAM/vnapage/PPUCHRRAM/PPUNTARAM aliases
+
+// P2 Phase 3 Step 3.2 桶 C — open-bus decay probe (2026-08-05).
+// Implemented in ppu.cpp; called from ppu_rendering.cpp's frame loop.
+void opendecay_log_decay_check();
 
 void FCEUPPU_Init(void);
 void FCEUPPU_Reset(void);

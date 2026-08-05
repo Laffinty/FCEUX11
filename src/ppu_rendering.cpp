@@ -1178,6 +1178,10 @@ int FCEUPPU_Loop(int skip) {
 		return FCEUX_PPU_Loop(skip);
 	}
 
+	// P2 Phase 3 Step 3.2 桶 C — open-bus decay probe (2026-08-05).
+	// Per-frame PPUGenLatch state snapshot for instrument-first analysis.
+	opendecay_log_decay_check();
+
 	//Needed for Knight Rider, possibly others.
 	if (ppudead) {
 		// hotfix2 P3-2 (MICRO-1): ppudead fires for the first ~2-3
@@ -1545,6 +1549,9 @@ static int e1_nmi_delay() {
 // ----------------------------------------------------------------------------
 int framectr = 0;
 int FCEUX_PPU_Loop(int skip) {
+	// P2 Phase 3 Step 3.2 桶 C — open-bus decay probe (2026-08-05).
+	// Per-frame PPUGenLatch state snapshot (newppu path).
+	opendecay_log_decay_check();
 
 	if (new_ppu_reset) // first frame since reset, time to initialize
 	{

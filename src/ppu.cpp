@@ -23,6 +23,8 @@
 #include "x6502.h"
 #include "fceu.h"
 #include "ppu.h"
+
+#include <cstdlib>   // P2 Phase 3 Step 3.2 桶 C — opendecay_atexit (std::atexit)
 #include "ppu_rendering.h"
 #include "ppu_state.h"
 #include "nsf.h"
@@ -353,6 +355,226 @@ static bool e1_ppu_trace_on() {
 	return on;
 }
 
+// ----------------------------------------------------------------------------
+// P2 Phase 3 Step 3.2 桶 C — ppu_open_bus decay probe (instrument-first, 2026-08-05)
+// ----------------------------------------------------------------------------
+// Env-gated, zero-intrusion probe for PPU open-bus (PPUGenLatch) decay
+// behavior. Activated by setting FCEUX11_OPENDECAY_PROBE=1 in the
+// environment (restart required). Silent otherwise (ctest 34/34
+// unaffected). Goal: confirm the test 3 scenario (write $FF to $2002,
+// wait 1000ms with no PPU register access, read $2000 expecting $00)
+// in the current implementation — i.e. observe that PPUGenLatch never
+// decays today, and gather timestamp spacing data to design the
+// threshold for the upcoming fix. See:
+//   docs/history/surveys/ppu_bucketC/opendecay_probe_2026-08-05.md
+static bool opendecay_probe_on() {
+	static const bool on = []() {
+		const char* e = std::getenv("FCEUX11_OPENDECAY_PROBE");
+		return e && e[0] == '1' && e[1] == '\0';
+	}();
+	return on;
+}
+
+// PPUGenLatch open-bus decay timestamp (P2 Phase 3 Step 3.2 桶 C).
+// Defined here (before the probe functions) so that
+// opendecay_log_write can update it without a forward declaration.
+// See the longer P2 Phase 3 comment block below for the design.
+uint64 PPUGenLatch_last_refresh_cycle = 0;
+
+// PPUGenLatch write tracking — last refresh timestamp (CPU cycle units).
+// Note: this is PROBE ONLY state; the actual fix will use a separate
+// `PPUGenLatch_last_refresh` field on a per-write basis.
+static uint64 s_probe_last_write_cycle = 0;
+static uint8  s_probe_last_write_value = 0;
+static uint32 s_probe_write_count = 0;
+static uint32 s_probe_read2000_count = 0;
+static uint32 s_probe_decay_check_count = 0;
+static uint64 s_probe_first_read2000_after_write_cycle = 0;
+static bool   s_probe_first_read2000_seen = false;
+static uint64 s_probe_run_start_cycle = 0;
+
+static inline uint64 opendecay_now_cycle() {
+	return g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref();
+}
+
+static inline void opendecay_log_write(uint8 V) {
+	// Always refresh the decay timestamp — the actual fix relies
+	// on this. Probe logging is gated separately.
+	PPUGenLatch_last_refresh_cycle = opendecay_now_cycle();
+	if (!opendecay_probe_on()) return;
+	const uint64 now = PPUGenLatch_last_refresh_cycle;
+	const uint64 elapsed = s_probe_last_write_cycle
+		? (now - s_probe_last_write_cycle) : 0;
+	fprintf(stderr,
+		"OPENDECAY W PPUGenLatch=0x%02X (prev=0x%02X) cycle=%llu "
+		"elapsed_since_last_write_cycles=%llu writes_so_far=%u\n",
+		(unsigned)V, (unsigned)PPUGenLatch,
+		(unsigned long long)now, (unsigned long long)elapsed,
+		(unsigned)s_probe_write_count);
+	s_probe_last_write_cycle = now;
+	s_probe_last_write_value = V;
+	s_probe_write_count++;
+	s_probe_first_read2000_seen = false;
+	s_probe_first_read2000_after_write_cycle = 0;
+}
+
+static inline void opendecay_log_read2000(uint8 ret) {
+	if (!opendecay_probe_on()) return;
+	const uint64 now = opendecay_now_cycle();
+	const uint64 since_write = s_probe_last_write_cycle
+		? (now - s_probe_last_write_cycle) : 0;
+	if (!s_probe_first_read2000_seen) {
+		s_probe_first_read2000_after_write_cycle = since_write;
+		s_probe_first_read2000_seen = true;
+		fprintf(stderr,
+			"OPENDECAY R2000 FIRST_AFTER_WRITE ret=0x%02X cycle=%llu "
+			"elapsed_since_last_write_cycles=%llu\n",
+			(unsigned)ret, (unsigned long long)now,
+			(unsigned long long)since_write);
+	}
+	s_probe_read2000_count++;
+	if ((s_probe_read2000_count & 0x3FF) == 0) {
+		fprintf(stderr,
+			"OPENDECAY R2000 count=%u ret=0x%02X cycle=%llu "
+			"elapsed_since_last_write_cycles=%llu\n",
+			(unsigned)s_probe_read2000_count, (unsigned)ret,
+			(unsigned long long)now,
+			(unsigned long long)since_write);
+	}
+}
+
+// Forward decl: opendecay_init is defined below.
+static bool opendecay_init();
+
+// ----------------------------------------------------------------------------
+// P2 Phase 3 Step 3.2 桶 C — PPUGenLatch open-bus decay (2026-08-05)
+// ----------------------------------------------------------------------------
+// Per blargg ppu_open_bus readme:
+//   "The PPU effectively has a 'decay register', an 8-bit register.
+//    Each bit can be refreshed with a 0 or 1. If a bit isn't refreshed
+//    with a 1 for about 600 milliseconds, it will decay to 0."
+// Implementation: track the last CPU cycle at which any PPU register
+// was *written* (writes refresh the entire 8-bit latch to the written
+// value; reads do NOT refresh — per blargg the read of write-only
+// registers such as $2000/$2001/$2003/$2005/$2006 returns the decay
+// value without refreshing). At each frame entry (FCEUPPU_Loop /
+// FCEUX_PPU_Loop, ~60 Hz NTSC), check if the elapsed time since the
+// last write exceeds the 600 ms threshold; if so, force PPUGenLatch
+// to 0. Per-frame granularity is sufficient (1 frame ≈ 16.67 ms ≪
+// 600 ms threshold), so decay fires within one frame of crossing the
+// threshold.
+//   Threshold rationale: blargg says "about 600 ms". NTSC CPU clock
+// is 1.789773 MHz, so 600 ms = 1 073 864 cycles. Probe data
+// (FCEUX11_OPENDECAY_PROBE=1 run on ppu_open_bus, see
+// docs/history/surveys/ppu_bucketC/opendecay_probe_2026-08-05.md)
+// confirmed that test 3's `setb $2002,$FF` → `delay_msec 1000` →
+// `lda PPUCTRL` produces a gap of ~1.79 M cycles between the last
+// write and the test read — comfortably above the 600 ms threshold,
+// so a threshold of 1 073 864 cycles triggers decay well before the
+// test reads.
+static constexpr uint64 PPU_OPEN_BUS_DECAY_CYCLES = 1073864; // ~600 ms NTSC
+
+// (PPUGenLatch_last_refresh_cycle is defined earlier in the file
+// so that opendecay_log_write can update the timestamp without an
+// ordering hazard. See the P2 Phase 3 Step 3.2 桶 C comment block.)
+
+static inline void ppu_latch_decay_check() {
+	// Skip work when latch is already 0 (decayed or never written) —
+	// the common case in well-behaved games that don't abuse open
+	// bus. Avoids one CPU timestamp call per frame in that path.
+	if (PPUGenLatch == 0) return;
+	const uint64 now = g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref();
+	// `last_refresh_cycle == 0` means never written since power-on —
+	// PPUGenLatch is 0 in that case (ppu.cpp:122), so we already
+	// returned above. Guard against underflow defensively.
+	if (PPUGenLatch_last_refresh_cycle != 0 &&
+		now > PPUGenLatch_last_refresh_cycle &&
+		now - PPUGenLatch_last_refresh_cycle > PPU_OPEN_BUS_DECAY_CYCLES) {
+		PPUGenLatch = 0;
+	}
+}
+
+// External linkage (not static, not inline) so the symbol is exported
+// from fceux11_core.lib and linkable from ppu_rendering.cpp.obj. The
+// forward declaration in ppu.h matches this linkage. Hot-path calls
+// would not be a concern (only invoked from the per-frame loop),
+// and inlining would force duplicate definitions across TUs that
+// include ppu.h.
+//
+// This function is the single entry point that combines the
+// production decay check (always runs, ~negligible cost) with the
+// env-gated probe snapshot. Called once per frame from
+// FCEUPPU_Loop / FCEUX_PPU_Loop.
+
+// Forward decl: ppu_latch_decay_check is defined above this point in
+// the file but in source order is below the first call site. Keep
+// the prototype here so the call inside opendecay_log_decay_check
+// resolves correctly even with -Werror.
+static inline void ppu_latch_decay_check();
+
+void opendecay_log_decay_check() {
+	// Production decay check — always runs.
+	ppu_latch_decay_check();
+	if (!opendecay_probe_on()) return;
+	opendecay_init();
+	const uint64 now = opendecay_now_cycle();
+	const uint64 since_write = s_probe_last_write_cycle
+		? (now - s_probe_last_write_cycle) : 0;
+	s_probe_decay_check_count++;
+	if (s_probe_decay_check_count < 16 ||
+		(s_probe_decay_check_count & 0x3F) == 0) {
+		fprintf(stderr,
+			"OPENDECAY CHECK n=%u PPUGenLatch=0x%02X cycle=%llu "
+			"elapsed_since_last_write_cycles=%llu\n",
+			(unsigned)s_probe_decay_check_count,
+			(unsigned)PPUGenLatch, (unsigned long long)now,
+			(unsigned long long)since_write);
+	}
+}
+
+static inline void opendecay_log_run_end() {
+	if (!opendecay_probe_on()) return;
+	const uint64 now = opendecay_now_cycle();
+	const uint64 total = now - s_probe_run_start_cycle;
+	fprintf(stderr,
+		"OPENDECAY SUMMARY writes=%u reads2000=%u decay_checks=%u "
+		"final_PPUGenLatch=0x%02X total_cycles=%llu "
+		"first_R2000_after_write_cycles=%llu\n",
+		(unsigned)s_probe_write_count,
+		(unsigned)s_probe_read2000_count,
+		(unsigned)s_probe_decay_check_count,
+		(unsigned)PPUGenLatch, (unsigned long long)total,
+		(unsigned long long)s_probe_first_read2000_after_write_cycle);
+}
+
+static void opendecay_reset() {
+	s_probe_last_write_cycle = 0;
+	s_probe_last_write_value = 0;
+	s_probe_write_count = 0;
+	s_probe_read2000_count = 0;
+	s_probe_decay_check_count = 0;
+	s_probe_first_read2000_after_write_cycle = 0;
+	s_probe_first_read2000_seen = false;
+	s_probe_run_start_cycle = opendecay_now_cycle();
+}
+
+// One-shot atexit handler to dump final stats when probe is on.
+static void opendecay_atexit() {
+	if (!opendecay_probe_on()) return;
+	opendecay_log_run_end();
+}
+
+// One-shot reset on first activation so per-run stats are clean.
+static bool opendecay_init() {
+	static bool done = false;
+	if (done) return false;
+	done = true;
+	opendecay_reset();
+	// atexit fires when the emulator exits cleanly; capture final stats.
+	std::atexit(opendecay_atexit);
+	return true;
+}
+
 static DECLFR(A2002) {
 	if (newppu) [[unlikely]] {
 		//once we thought we clear latches here, but that caused midframe glitches.
@@ -522,10 +744,27 @@ static DECLFR(A2004) {
 					}
 				}
 				spr_read.last = ppur.status.cycle;
+				// v1.16 P2 Phase 3 Step 3.2 桶 C fix (2026-08-05): per
+				// blargg ppu_open_bus readme, a $2004 read refreshes all
+				// 8 bits of the decay register with the SPRAM byte
+				// driven on the bus. Without this, test 11 ("Reading
+				// third byte of a sprite from $2004 should refresh all
+				// bits of decay value") fails: after `setb $2002,$FF /
+				// lda SPRDATA / lda PPUCTRL / and #$1C` the latch still
+				// holds $FF (bits 2-4 set) instead of the attribute byte
+				// at SPRAM[2] (bits 2-4 always clear). The next test's
+				// `cmp #0` (and #$1C) then fails.
+				PPUGenLatch = spr_read.ret;
 				return spr_read.ret;
 			}
-		} else
-			return SPRAM[PPU[3]];
+		} else {
+			// v1.16 P2 Phase 3 Step 3.2 桶 C fix (2026-08-05): same
+			// per-blargg open-bus refresh for the non-rendering path
+			// (VBL or rendering-off). See the inner comment above.
+			const uint8 ret = SPRAM[PPU[3]];
+			PPUGenLatch = ret;
+			return ret;
+		}
 	} else {
 		FCEUPPU_LineUpdate();
 		return PPUGenLatch;
@@ -534,7 +773,9 @@ static DECLFR(A2004) {
 
 static DECLFR(A200x) {	/* Not correct for $2004 reads. */
 	FCEUPPU_LineUpdate();
-	return PPUGenLatch;
+	uint8 ret = PPUGenLatch;
+	if (A == 0x2000) opendecay_log_read2000(ret);
+	return ret;
 }
 
 static DECLFR(A2007) {
@@ -580,6 +821,19 @@ static DECLFR(A2007) {
 					ret = READUPAL(((paddr & 0xC) >> 2) - 1);
 			} else
 				ret = READPAL(paddr);
+			// v1.16 P2 Phase 3 Step 3.2 桶 C fix (2026-08-05): per blargg
+			// ppu_open_bus readme, a $2007 *palette* read returns
+			// "DD-- ----" — high 2 bits are open-bus (from PPUGenLatch),
+			// low 6 bits are PALRAM. Without this OR, the test reads
+			// `lda PPUDATA / and #$C0` against a plain PALRAM value and
+			// blargg ppu_open_bus test 8 ("High 2 bits from $2007 from
+			// palette should be from decay value") sees the wrong high
+			// bits. The PPUGenLatch update below (`PPUGenLatch = ret`)
+			// then naturally does the right per-bit refresh: bits 0-5
+			// come from the new PALRAM data (refreshed) and bits 6-7
+			// come from the old latch (preserved), exactly matching
+			// blargg's "D - " row for the palette column.
+			ret |= (PPUGenLatch & 0xC0);
 			VRAMBuffer = CALL_PPUREAD(RefreshAddr - 0x1000);
 		} else {
 			if (debug_loggingCD && (RefreshAddr < 0x2000))
@@ -675,6 +929,7 @@ static DECLFR(A2007) {
 static DECLFW(B2000) {
 	FCEUPPU_LineUpdate();
 	PPUGenLatch = V;
+	opendecay_log_write(V);
 
 	if (e1_ppu_trace_on())
 		fprintf(stderr, "E1 W2000 abs=%llu V=0x%02X old=0x%02X vbl=%d\n",
@@ -708,6 +963,7 @@ static DECLFW(B2001) {
 	if (paldeemphswap)
 		V = (V&0x9F)|((V&0x40)>>1)|((V&0x20)<<1);
 	PPUGenLatch = V;
+	opendecay_log_write(V);
 	PPU[1] = V;
 	if (V & 0xE0)
 		deemp = V >> 5;
@@ -715,16 +971,19 @@ static DECLFW(B2001) {
 
 static DECLFW(B2002) {
 	PPUGenLatch = V;
+	opendecay_log_write(V);
 }
 
 static DECLFW(B2003) {
 	PPUGenLatch = V;
+	opendecay_log_write(V);
 	PPU[3] = V;
 	PPUSPL = V & 0x7;
 }
 
 static DECLFW(B2004) {
 	PPUGenLatch = V;
+	opendecay_log_write(V);
 	if (newppu) [[unlikely]] {
 		//the attribute upper bits are not connected
 		//so AND them out on write, since reading them
@@ -749,6 +1008,7 @@ static DECLFW(B2005) {
 	uint32 tmp = TempAddr;
 	FCEUPPU_LineUpdate();
 	PPUGenLatch = V;
+	opendecay_log_write(V);
 	if (!vtoggle) {
 		tmp &= 0xFFE0;
 		tmp |= V >> 3;
@@ -771,6 +1031,7 @@ static DECLFW(B2006) {
 	FCEUPPU_LineUpdate();
 
 	PPUGenLatch = V;
+	opendecay_log_write(V);
 	if (!vtoggle) {
 		TempAddr &= 0x00FF;
 		TempAddr |= (V & 0x3f) << 8;
@@ -809,12 +1070,14 @@ static DECLFW(B2007) {
 
 	if (newppu) {
 		PPUGenLatch = V;
+		opendecay_log_write(V);
 		RefreshAddr = ppur.get_2007access() & 0x3FFF;
 		CALL_PPUWRITE(RefreshAddr, V);
 		ppur.increment2007(ppur.status.sl >= 0 && ppur.status.sl < 241 && PPUON, INC32 != 0);
 		RefreshAddr = ppur.get_2007access();
 	} else {
 		PPUGenLatch = V;
+		opendecay_log_write(V);
 		if (tmp < 0x2000) {
 			if (PPUCHRRAM & (1 << (tmp >> 10)))
 				VPage[tmp >> 10][tmp] = V;
