@@ -1,6 +1,7 @@
 # FCEUX11 v1.16 精度收敛 — 三阶段构建方案（P2 深化版）
 
-> **编制日期**：2026-08-01（**2026-08-02 深化修订**：E-1 Step 1.3 状态回填——vbl_05 PASS、读侧/边沿分源、行号校准；**2026-08-04 修订**：Phase 3.2 桶 A+B.3+B.4 完成、§3 Step 3.1 报告桶分类修订为精准版（CPU 13 / PPU 4 / vbl 5 / MMC3 12 / sprdma 2 = 36）、§5 桶 B 拆分为 B.1+B.2 / B.3+B.4、桶 C 拆分为 PPU 真实精度 4 / vbl 已知 5、Step 3.3 数字同步 20 项剩余）
+> **编制日期**：2026-08-01（**2026-08-02 深化修订**：E-1 Step 1.3 状态回填——vbl_05 PASS、读侧/边沿分源、行号校准；**2026-08-04 修订**：Phase 3.2 桶 A+B.3+B.4 完成、§3 Step 3.1 报告桶分类修订为精准版（CPU 13 / PPU 4 / vbl 5 / MMC3 12 / sprdma 2 = 36）、§5 桶 B 拆分为 B.1+B.2 / B.3+B.4、桶 C 拆分为 PPU 真实精度 4 / vbl 已知 5、Step 3.3 数字同步 20 项剩余；
+> **2026-08-05 修订**：Phase 3.2 桶 C `ppu_open_bus` 0x03 → 0x00 PASS（`23b0cdd`）——600ms 时间衰减 + A2007 palette per-bit + A2004 整字节刷新，三处小改零回归；桶 C 2/4 收敛 + 2/4 已知限制；Oracle B 143/34 → 144/33（+1 PASS）；§5 桶 C 状态同步，新增 `FCEUX11_OPENDECAY_PROBE` 探针文档）
 > **2026-08-03 修订**：Step 1.2 闭合可行性评估——测试源码实证 1 dot/行漂移为亚指令粒度、残量在差值中抵消
 > （漂移被帧边界重同步摧毁，非"未建模"）、NMI 取消时序缺口（小修）、决定性残量探针定夺深模型；
 > **2026-08-03 修订 2**：NMI 取消时序缺口实测实施——取消机制正确生效（vbl_06 行 5-6 转 `V -`）但
@@ -18,14 +19,14 @@
 > **最新实测（2026-08-04 收尾核对）**：
 > - **Phase 1 (E-1 PPU VBL/NMI)**:vbl 5 PASS / 5 FAIL(vbl_05 已修复,`5581769`);5 FAIL 全部记入有据已知限制（vbl_02/06 读侧量化、vbl_07/08 边沿采样、vbl_10 写接受边界,均深模型族,`vbl_step1_4_instrument_data_2026-08-03.md` 定案）
 > - **Phase 2 (E-3 APU 帧计数器)**:7 bucket-C sub-test 全 PASS(`f5e7cd0` cycle-position 帧计数器);APU 52 ROM 零 apu_* 失败
-> - **Phase 3 (全量精度收敛)**:**143 PASS / 34 FAIL**(基线 177 ROMs)
+> - **Phase 3 (全量精度收敛)**:**144 PASS / 33 FAIL**(基线 177 ROMs;2026-08-05 `23b0cdd` 后)
 >   - Step 3.1 harness 清理 ✅ 已落地(`821a26e`,0x80/0x81 桶全清零)
 >   - Step 3.2 桶 A (MMC3 12) ✅ 已完成(`f4a072a`)
 >   - Step 3.2 桶 B.3+B.4 (CPU 3) ✅ 已完成(`57d3e88`,零代码改动,探针撤回)
->   - Step 3.2 桶 C (PPU 4) 🚧 1/4 收敛(`863e9d7`):`ppu_read_buffer` 0x0E→0x00 + 顺带修复 `cpu_dummy_writes_ppu` 0x09→0x00;其余 3 项待处理
+>   - Step 3.2 桶 C (PPU 4) ✅ 2/4 收敛(`863e9d7` + `23b0cdd`):`ppu_read_buffer` 0x0E→0x00 + 顺带 `cpu_dummy_writes_ppu` 0x09→0x00 + `ppu_open_bus` 0x03→0x00;余 2 项已知限制
 >   - Step 3.2 桶 B.1+B.2 (CPU 9) / 桶 C.1 (vbl 5) / 桶 D (sprdma 2) ⏳ 未启动
 >   - Step 3.3 全量回归与验收复检 ⏳ 未启动
-> - **Oracle A 34/34**(自 `7ea1d0c` 起的 golden nestest 已稳定);Oracle B 143 PASS
+> - **Oracle A 100% pass**(自 `7ea1d0c` 起的 golden nestest 已稳定);Oracle B **144 PASS**
 >
 > **2026-08-03 复核**:基线重跑确认 vbl_02=0x01(行 04 应 `- -` 实为 `- V`,仅差 1 行)、vbl_06=0x01
 > (行 04-06 应 `- -`/`V -`/`V -` 实为 `V N`,行 07-09 已对)。Step 1.2 闭合可行性评估见 §3 Step 1.2 块
@@ -494,19 +495,28 @@ vbl_02/06/07/08 $6000=0x00（未达成）；vbl_04（当前 PASS）不回归（�
 > - `instr_timing` 0x01 / `instr_timing_v2_1` 0x03:指令时序(可能与 vbl_02 残量探针同族)
 > - 评估建议:启动新一轮 instrument-first 探针,优先尝试 B.1 中 `cpu_int_*` 与 vbl_07/08 边沿采样模型合并建模(共享"CPU 指令边界 NMI 采样"族)
 >
-> **桶 C — PPU (4 ROMs, 真实精度)** 🚧 **1/4 收敛 + 3/4 待处理**
-> - `ppu_read_buffer` 0x0E ✅ **已收敛 → 0x00 PASS**（`863e9d7`）：3 处真实 PPU bug——
->   `Ppu::reset()` 不重置 vnapage（mirroring 保留，修复 NTA_MIRRORING 0x0E）、
->   A2007 newppu 读更新 PPUGenLatch（open bus，修复 0x13）、palette 索引用
->   RefreshAddr 非 tmp（修复 PALETTE_READS_UNRELIABLE 0x30）
+> **桶 C — PPU (4 ROMs, 真实精度)** ✅ **2/4 收敛 + 2/4 已知限制（2026-08-05 修订）**
+> - `ppu_read_buffer` 0x0E ✅ **已收敛 → 0x00 PASS**（`863e9d7`，2026-08-04）：
+>   3 处真实 PPU bug——`Ppu::reset()` 不重置 vnapage（mirroring 保留，修复
+>   NTA_MIRRORING 0x0E）、A2007 newppu 读更新 PPUGenLatch（open bus，
+>   修复 0x13）、palette 索引用 RefreshAddr 非 tmp（修复
+>   PALETTE_READS_UNRELIABLE 0x30）
 > - `cpu_dummy_writes_ppu` 0x09 ✅ **顺带修复 → 0x00 PASS**（palette 索引同族）
-> - `ppu_open_bus` 0x03:open bus decay（PPUGenLatch 电容放电衰减，需衰减模型,改动面小可独立收敛）
-> - `oam_stress` 0x01:OAM 压力测试,与桶 B 的 PPU 隐式 OAM 改写同族(深模型)
-> - `ppu_vbl_nmi` 0x01:manifest frames=300 不足(需 3000);3000 frames 下为 0x01
->   (测试 2 of 10 vbl_set_time,与 Phase 1 vbl_02 同族——CPU 侧读采样量化)
-> - 详:`docs/history/surveys/ppu_bucketC/stepC_investigation_2026-08-04.md`
-> - 验证:Oracle B 143 PASS/34 FAIL(基线 141/36,+2 PASS 零回归);Oracle A 34/34
-> - 提交:`c(fix)`(`863e9d7`)
+> - `ppu_open_bus` 0x03 ✅ **已收敛 → 0x00 PASS**（`23b0cdd`，2026-08-05）：
+>   600ms 时间衰减（PPUGenLatch_last_refresh + per-frame decay check，
+>   1 073 864 CPU cycles 阈值）+ A2007 palette 读 per-bit refresh
+>   （`DD-- ----`：`ret |= PPUGenLatch & 0xC0`）+ A2004 整字节刷新
+>   （`PPUGenLatch = SPRAM[PPU[3]]` 同步）
+> - `oam_stress` 0x01 🚧 已知限制：与桶 B 的 PPU 隐式 OAM 改写同族（深模型）
+> - `ppu_vbl_nmi` 0x01 🚧 已知限制：与 Phase 1 vbl_02 同族（CPU 侧读采样量化）
+> - 详:`docs/history/surveys/ppu_bucketC/stepC_investigation_2026-08-04.md`（桶 C 总览）
+>     + `docs/history/surveys/ppu_bucketC/opendecay_probe_2026-08-05.md`（ppu_open_bus
+>     instrument-first 数据 + 修复方案）
+> - 验证:Oracle B **144 PASS / 33 FAIL**（基线 141/36，+3 PASS 零回归）;
+>   Oracle A 100% pass
+> - 提交:`c(fix)`(`863e9d7`)+ `c(fix)`(`23b0cdd`)
+> - 探针保留:`FCEUX11_OPENDECAY_PROBE=1` env-gated（零侵入）,
+>   供未来深模型调查复用
 >
 > **桶 C.1 — vbl (5 ROMs, Phase 1 已知限制)** ⏳ **不在本桶重做**
 > - vbl_02/06/07/08/10 均在 Phase 1 Step 1.2/1.3/1.4 调查中定案为深模型族限制
@@ -524,18 +534,18 @@ vbl_02/06/07/08 $6000=0x00（未达成）；vbl_04（当前 PASS）不回归（�
 
 ### Step 3.3 — 全量回归 + 验收复检（100% 完美交付判据）
 
-> **2026-08-04 数字同步**(Step 3.1 + Step 3.2 桶 A + 桶 B + 桶 C.1 完成后基线):
-> - Oracle B:**143 PASS / 34 FAIL**(基线 177 ROMs;桶 A 12 + 桶 B.3+B.4 3 = 15 项记入有据已知限制;桶 C.1 `ppu_read_buffer` + `cpu_dummy_writes_ppu` 收敛 +2 PASS,0x80/0x81 已清零)
+> **2026-08-05 数字同步**(Step 3.1 + Step 3.2 桶 A + 桶 B + 桶 C 完成后基线):
+> - Oracle B:**144 PASS / 33 FAIL**(基线 177 ROMs;桶 A 12 + 桶 B.3+B.4 3 = 15 项记入有据已知限制;桶 C 3 项 PASS:`ppu_read_buffer` + `cpu_dummy_writes_ppu` + `ppu_open_bus`;0x80/0x81 已清零)
 > - 0x80/0x81 桶:**已清零**(Step 3.1 完成)
 > - 0xFE `cpu_interrupts.nes`:**永久跳过**(计入 CPU 桶,共 1 项)
-> - **剩余 18 项真实精度 FAIL** 按 P2 §5 桶分类:
+> - **剩余 17 项真实精度 FAIL** 按 P2 §5 桶分类:
 >   - 桶 B.1+B.2:9 项(CPU 中断/复位/指令时序,改动面大)
->   - 桶 C (PPU 真实精度):3 项(ppu_open_bus/oam_stress/ppu_vbl_nmi)
+>   - 桶 C 余项:2 项(`oam_stress` + `ppu_vbl_nmi`,深模型族)
 >   - 桶 C.1 (vbl):5 项(Phase 1 已知限制,不在本桶重做)
 >   - 桶 D (sprdma):2 项(DMC+SPR DMA 耦合)
->   - 小计:9 + 3 + 5 + 2 = 19 项?→ 校正:35 - 15(桶A+B.3+B.4) - 2(桶C.1收敛) = 18 项 ✓
-> - **预计收敛潜力**(按 P2 §3 优先级):桶 C 剩余 3 项(`ppu_open_bus` decay 改动面小优先) > 桶 B.1+B.2 9 项 > 桶 D 2 项;桶 C.1 vbl 5 项 + `oam_stress`/`ppu_vbl_nmi` 待深模型族突破
-> - Step 3.2 全部落地后,迁移矩阵按实际调整(35 真实精度 + 1 永久跳过 = 36 FAIL 基线,已收敛 2 项)
+>   - 小计:9 + 2 + 5 + 2 = 18 项;校正:35 - 15(桶A+B.3+B.4) - 3(桶C收敛) = 17 项 ✓(33 FAIL − 1 永久跳过 − 15 已知限制 = 17 真实精度待修)
+> - **预计收敛潜力**(按 P2 §3 优先级):桶 C 余项 + 桶 D 改动面小优先(但深模型族)> 桶 B.1+B.2 9 项;桶 C.1 vbl 5 项 + 桶 B 中断族待深模型族突破
+> - Step 3.2 全部落地后,迁移矩阵按实际调整(34 真实精度待修 + 1 永久跳过 = 35 FAIL 基线,已收敛 3 项)
 
 - [ ] Oracle A：`ctest -LE perf` 33/33 (排除 perf 标签) + `kagamiqa_migration_matrix.json` 生成
 - [ ] Oracle B：全量重跑,FAIL 全带码+分类(已知限制类 PASS 数无变化即可)

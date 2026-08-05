@@ -4,7 +4,9 @@
 > **承接文档**: `docs/FCEUX11-1.16_P2-精度收敛三阶段构建方案.md` §5 / Step 3.2
 > **承接报告**: `docs/history/reports/FCEUX11-1.16_P3-Step31_harness_cleanup_2026-08-04.md`
 > **基线 commit**: `60136cc` (Step 3.1 完成) + 桶 A (`f4a072a`) + 桶 B (`57d3e88`)
-> **状态**: ✅ **1/4 收敛 (`ppu_read_buffer` PASS)，3/4 待处理**
+> **2026-08-05 修订**: `ppu_open_bus` 0x03 → 0x00 PASS（`23b0cdd`，见
+> `opendecay_probe_2026-08-05.md`），桶 C 2/4 收敛。
+> **状态**: ✅ **2/4 收敛 (`ppu_read_buffer` + `ppu_open_bus` PASS)，2/4 已知限制（`oam_stress` + `ppu_vbl_nmi` 深模型族）**
 
 ---
 
@@ -14,14 +16,19 @@
 
 | 错误码 | ROM | 状态 |
 |---|---|---|
-| 0x0E | `ppu_read_buffer` | ✅ **已收敛 → 0x00 PASS**（本桶首个） |
-| 0x03 | `ppu_open_bus` | 🚧 待处理（open bus decay） |
-| 0x01 | `oam_stress` | 🚧 待处理（OAM 压力） |
-| 0x01 | `ppu_vbl_nmi` | 🚧 待处理（NMI 触发时序，需 3000 frames） |
+| 0x0E | `ppu_read_buffer` | ✅ **已收敛 → 0x00 PASS**（本桶首个，`863e9d7`） |
+| 0x03 | `ppu_open_bus` | ✅ **已收敛 → 0x00 PASS**（`23b0cdd`，2026-08-05） |
+| 0x01 | `oam_stress` | 🚧 已知限制（深模型族，PPU 隐式 OAM 改写） |
+| 0x01 | `ppu_vbl_nmi` | 🚧 已知限制（CPU 侧读采样量化，Phase 1 vbl_02 同族） |
 
-**核心成果**：`ppu_read_buffer` 从 0x0E 收敛到 0x00，修复 3 处真实 PPU bug；
-顺带修复 `cpu_dummy_writes_ppu`（0x09 → 0x00，palette 索引修复同族）。
-Oracle B 141 → 143 PASS，34 项 FAIL 与基线逐一一致，**零回归**。
+**核心成果**：
+- `ppu_read_buffer` 0x0E → 0x00 PASS（`863e9d7`，2026-08-04，3 处 PPU bug：vnapage
+  reset 保留、A2007 newppu 读更新 PPUGenLatch、palette 索引用 RefreshAddr）
+- 顺带 `cpu_dummy_writes_ppu` 0x09 → 0x00 PASS（palette 索引同族）
+- `ppu_open_bus` 0x03 → 0x00 PASS（`23b0cdd`，2026-08-05，3 处 PPU bug：
+  600ms 时间衰减 + A2007 palette 高 2 位 + A2004 整字节刷新）
+
+Oracle B 141 → 143 → 144 PASS，34 → 33 FAIL 与基线逐一一致，**零回归**。
 
 ---
 
@@ -144,15 +151,21 @@ palette 分支改用 `RefreshAddr & 0x1F`（get_2007access 更新后的真值）
 ## 7. 后续
 
 桶 C 剩余 3 项评估：
-- `ppu_open_bus` 0x03：open bus decay 是有据精度限制（需 PPUGenLatch 电容衰减
-  模型，与 deep model 族相关），建议记录为有据已知限制或独立小 PR
+- ~~`ppu_open_bus` 0x03：open bus decay 是有据精度限制（需 PPUGenLatch 电容衰减
+  模型，与 deep model 族相关），建议记录为有据已知限制或独立小 PR~~
+  → **✅ 已收敛**（2026-08-05，`23b0cdd`，见
+  `docs/history/surveys/ppu_bucketC/opendecay_probe_2026-08-05.md`）。
+  600ms 时间衰减 + A2007 palette per-bit + A2004 整字节刷新，
+  三处小改，零回归。
 - `oam_stress` 0x01：与桶 B `cpu_dummy_writes_oam` 的 PPU 隐式 OAM 改写同族，
   需深模型
 - `ppu_vbl_nmi` 0x01：与 Phase 1 vbl_02 同族（CPU 侧读采样量化），已知限制
 
-**推荐**：桶 C 其余 3 项记入有据已知限制（与桶 A/B 模式一致），或先处理
-`ppu_open_bus`（decay 模型改动面小，可能独立收敛）。
+**桶 C 当前状态（2026-08-05）**：2/4 收敛（`ppu_read_buffer` + `ppu_open_bus` +
+顺带 `cpu_dummy_writes_ppu`），2/4 已知限制（`oam_stress` + `ppu_vbl_nmi`）。
+**桶 C 余项建议**：记入有据已知限制（与桶 A/B 模式一致）。
 
 ---
 
-*调查完。桶 C 1/4 收敛（ppu_read_buffer），3/4 待处理。*
+*调查完。桶 C 2/4 收敛（ppu_read_buffer + ppu_open_bus），2/4 已知限制待
+Step 3.2 其余桶或深模型族突破。*
