@@ -532,6 +532,27 @@ void opendecay_log_decay_check() {
 	}
 }
 
+// P2 Phase 3 Step 3.2 桶 D — DMC + SPR DMA bus contention probe (2026-08-05).
+// Records B4014 sprite-DMA entry/exit cycle counts and byte count, so
+// we can correlate the test's "T+ Clocks" output (527/528 per row)
+// against actual SPR DMA duration and any DMC arbitration that fires
+// during the transfer. Env-gated by FCEUX11_OPENDECAY_PROBE (same
+// gate as the open-bus decay probe — the project standard pattern).
+// Defined as a free function so the env-gated branch can be skipped
+// when the probe is off (zero-cost in the hot path).
+static void opendecay_log_sprdma_event(uint32 cycle_before,
+                                        uint32 cycle_after,
+                                        uint32 byte_count) {
+	extern bool opendecay_probe_on();
+	if (!opendecay_probe_on()) return;
+	const uint32 elapsed = cycle_after - cycle_before;
+	const uint32 parity = cycle_before & 1;
+	std::fprintf(stderr,
+		"OPENDECAY SPRDMA bytes=%u cycle_before=%u cycle_after=%u "
+		"elapsed=%u parity_before=%u\n",
+		byte_count, cycle_before, cycle_after, elapsed, parity);
+}
+
 static inline void opendecay_log_run_end() {
 	if (!opendecay_probe_on()) return;
 	const uint64 now = opendecay_now_cycle();
@@ -1110,8 +1131,22 @@ static DECLFW(B4014) {
 	uint32 t = V << 8;
 	int x;
 
+	// P2 Phase 3 Step 3.2 桶 D — instrument-first probe (2026-08-05).
+	// The blargg sprdma_dmc_dma test fails with 0x01 because the current
+	// 512-cycle loop has no DMC bus arbitration. Per NESdev wiki: when
+	// both DMAs are active, the DMC DMA is inserted into the sprite DMA
+	// stream (each fetch ~4 CPU cycles). A correct fix requires a full
+	// Mesen2-style per-cycle DMA state machine with cycle parity
+	// tracking (see NesCpu.cpp::ProcessPendingDma) — a deep-model
+	// change beyond the "改动面小" budget. Probe records the actual
+	// SPR DMA duration for future investigation.
+	const uint32 cycle_before = g_cpu.timestamp_base() + (uint32)g_cpu.timestamp_ref();
+
 	for (x = 0; x < 256; x++)
 		X6502_DMW(0x2004, X6502_DMR(t + x));
+
+	const uint32 cycle_after = g_cpu.timestamp_base() + (uint32)g_cpu.timestamp_ref();
+	opendecay_log_sprdma_event(cycle_before, cycle_after, (uint32)x);
 	SpriteDMA = V;
 }
 
