@@ -492,15 +492,15 @@
     "layer": "lua",
     "input": {
       "binary": "fceux11_lua_runner",
-      "args": ["tests/lua_scripts/test_memory.lua", "--frames", "60"],
+      "args": ["tests/lua_scripts/test_memory.lua", "--rom", "tests/fixtures/mapper_nrom.nes", "--frames", "60"],
       "working_dir": ".",
       "script_path": "tests/lua_scripts/test_memory.lua"
     },
     "expected": { "exit_code": 0 },
     "timeout_seconds": 30,
-    "tags": ["lua", "integration", "memory", "unimplemented-coverage"],
-    "failure_means": "advisory",
-    "provenance": "fceux11-lua | 2026-07-30 demoted to advisory: fceux11_lua_runner lacks full memory binding implementation (readwrite/readwordsigned/getregister/registerexec stall on Lua stack); Lua-side libs work in standalone test, runner-side binding missing. Tracked as 'unimplemented-coverage' — not a regression, never passed. Plan: implement bindings in src/rust/crates/fceux11-lua, then re-enable as blocking."
+    "tags": ["lua", "integration", "memory"],
+    "failure_means": "blocking",
+    "provenance": "fceux11-lua | 2026-07-30 demoted to advisory: fceux11_lua_runner lacks full memory binding implementation; Lua-side libs work in standalone test, runner-side binding missing. Tracked as 'unimplemented-coverage' — not a regression, never passed. 2026-08-05 Phase 4.1: bindings verified complete; root cause of round-trip failure = runner initializes the CPU bus memory tables only when a ROM is loaded, so writebyte() was a no-op (BNull) without --rom. Fix: add --rom tests/fixtures/mapper_nrom.nes (git-tracked, available on CI). Re-enabled as blocking."
   },
   "lua_joypad_test": {
     "id": "lua_joypad_test",
@@ -515,8 +515,8 @@
     },
     "expected": { "exit_code": 0 },
     "timeout_seconds": 30,
-    "tags": ["lua", "integration", "joypad", "unimplemented-coverage"],
-    "failure_means": "advisory",
-    "provenance": "fceux11-lua | 2026-07-30 demoted to advisory: fceux11_lua_runner does not surface joypad.get/joypad.set to Lua state (mask1/mask2 override logic unimplemented in Rust bindings). Plan: implement in src/rust/crates/fceux11-lua/bindings/joypad.rs, then re-enable as blocking."
+    "tags": ["lua", "integration", "joypad"],
+    "failure_means": "blocking",
+    "provenance": "fceux11-lua | 2026-07-30 demoted to advisory: fceux11_lua_runner does not surface joypad.get/joypad.set to Lua state (mask1/mask2 override logic unimplemented in Rust bindings). 2026-08-05 Phase 4.1: bindings verified present; root cause of failure = joypad.get() returned a TABLE (bitmask_to_table) while the FCEUX-compatible contract (and the test script's first assertion) requires a NUMBER bitmask. Fixed in src/rust/crates/fceux11-lua/bindings/joypad.rs (return state as i32). Re-enabled as blocking."
   }
 }

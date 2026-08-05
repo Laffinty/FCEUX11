@@ -40,9 +40,18 @@ pub fn register(lua: &Lua) -> Result<Table> {
 
     joypad.set(
         "get",
-        lua.create_function(|lua, port: i32| {
+        lua.create_function(|_lua, port: i32| {
+            // FCEUX-compatible: `joypad.get(port)` returns the raw button
+            // state as a NUMBER bitmask (bit 0 = A, 1 = B, ... 7 = right),
+            // NOT a table. The blargg/lua API contract is numeric — the
+            // Lua test script asserts `type(joypad.get(1)) == "number"`.
+            // P2 Phase 3 Step 3.2 桶 G3 fix (2026-08-05): the previous
+            // implementation returned `bitmask_to_table(lua, state)` (a
+            // table), which made lua_joypad_test fail its very first
+            // assertion. `bitmask_to_table` remains available for a future
+            // `joypad.getport()` style table accessor.
             let state = unsafe { crate::fceux11_lua_GetJoypadState(port) };
-            bitmask_to_table(lua, state)
+            Ok(state as i32)
         })?,
     )?;
 

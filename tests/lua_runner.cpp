@@ -327,6 +327,34 @@ static LuaResult run_lua_script(const char* script_path, const char* rom_path,
         res.details = "script completed (all assertions passed)";
     }
 
+    // P2 Phase 3 Step 3.2 桶 G3 debug aid (2026-08-05): dump the captured
+    // script output (stdout + stderr) to a fixed path so a failing script's
+    // exact assertion line is observable even when the parent redirects
+    // stdio. Guarded by env FCEUX11_LUA_CAPTURE_DUMP=1 to stay silent in
+    // normal runs. The temp files are normally deleted; re-open the path
+    // only if the files still exist (they are removed by run_lua_script).
+#ifdef _WIN32
+    if (std::getenv("FCEUX11_LUA_CAPTURE_DUMP") && std::getenv("FCEUX11_LUA_CAPTURE_DUMP")[0] == '1') {
+        FILE* dump = std::fopen("C:\\Temp\\lua_capture_dump.txt", "w");
+        if (dump) {
+            std::fprintf(dump, "=== script=%s passed=%d ===\n%s\n--- stderr ---\n%s\n",
+                res.script_name.c_str(), res.passed ? 1 : 0,
+                captured_stdout_str.c_str(), captured_stderr_str.c_str());
+            std::fclose(dump);
+        }
+    }
+#else
+    if (std::getenv("FCEUX11_LUA_CAPTURE_DUMP") && std::getenv("FCEUX11_LUA_CAPTURE_DUMP")[0] == '1') {
+        FILE* dump = std::fopen("/tmp/lua_capture_dump.txt", "w");
+        if (dump) {
+            std::fprintf(dump, "=== script=%s passed=%d ===\n%s\n--- stderr ---\n%s\n",
+                res.script_name.c_str(), res.passed ? 1 : 0,
+                captured_stdout_str.c_str(), captured_stderr_str.c_str());
+            std::fclose(dump);
+        }
+    }
+#endif
+
     return res;
 }
 
@@ -334,11 +362,35 @@ static LuaResult run_lua_script(const char* script_path, const char* rom_path,
 // Print result
 // ---------------------------------------------------------------------------
 static void print_result(const LuaResult& r) {
-    std::printf("LUA_RESULT: script=%s status=%s duration_ms=%lld details=%s\n",
+    // P2 Phase 3 Step 3.2 桶 G3 (2026-08-05): emit LUA_RESULT reliably.
+    // The run_lua_script() body `freopen`s both stdout and stderr to temp
+    // files for script output capture, then tries to restore them with
+    // `freopen("CONOUT$", ...)`. That restore silently fails when the
+    // process's stdio is itself redirected (PowerShell `> file 2>&1`,
+    // CI runners), leaving the FILE* pointing at the now-deleted temp
+    // file — so `printf`/`fprintf` here produce nothing.
+    //   Fix: write the result through the OS-level original handles
+    // (GetStdHandle) on Windows, which are unaffected by stdio freopen.
+    // stdout is also re-attempted for non-Windows / console attach paths.
+    char buf[512];
+    int n = std::snprintf(buf, sizeof(buf),
+        "LUA_RESULT: script=%s status=%s duration_ms=%lld details=%s\n",
         r.script_name.c_str(),
         r.passed ? "PASS" : "FAIL",
         static_cast<long long>(r.duration_ms),
         r.details.c_str());
+    if (n < 0) return;
+    if (n >= static_cast<int>(sizeof(buf))) n = static_cast<int>(sizeof(buf)) - 1;
+#ifdef _WIN32
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (hOut && hOut != INVALID_HANDLE_VALUE) {
+        DWORD written = 0;
+        WriteFile(hOut, buf, static_cast<DWORD>(n), &written, nullptr);
+        return;
+    }
+#endif
+    std::fwrite(buf, 1, static_cast<size_t>(n), stdout);
+    std::fflush(stdout);
 }
 
 // ---------------------------------------------------------------------------
