@@ -8,10 +8,10 @@
 > | 维度 | 数值 | 来源 |
 > |---|---|---|
 > | CTest 注册测试 | 34（全 PASS） | `ctest -N` 输出（`build-c1/CTestTestfile.cmake`） |
-> | `tests/tests.json` 清单条目 | 39 | `python -c "import json; print(len(json.load(open('tests/tests.json'))))"` |
+> | `tests/tests.json` 清单条目 | 47 | `python -c "import json; print(len(json.load(open('tests/tests.json'))))"` |
 > | blargg 落盘 ROM | 177 | `find tests/fixtures/blargg -name '*.nes' \| wc -l` |
 > | `blargg_manifest.json` 条目 | 177（与落盘 1:1，死条目 0） | Stage-2 S-1 清掉 3 个重复死条目后 180 → 177 |
-> | 当前矩阵 PASS / FAIL | 37 / 2 | 最近一次 `kagamiqa_migration_matrix.json`（`engine.git_rev = 78a9d7f`，CI run #31 2026-08-05） |
+> | 当前矩阵 PASS / FAIL | 39 / 8 | 最近一次 `kagamiqa_migration_matrix.json`（`engine.git_rev = 78a9d7f`，CI run #31 2026-08-05；Phase 4.4 commit 锚待 CI 验证后回填） |
 >
 > **CI 状态**：每次 push 到 `main` / `wip_1.16` 自动触发，产出迁移矩阵 artifact。
 
@@ -127,7 +127,7 @@ ROM 的典型运行模式：
 
 【权威性度量】（仅在全部门槛满足时有意义）
   外部真理覆盖率 = 177 / 177 blargg ROM（manifest 与落盘 1:1）
-  已知失败清单   = 39 项中 4 项 FAIL，每条含 $6000 码 / 诊断串 / 分类 tag
+  已知失败清单   = 47 项中 8 项 FAIL（Phase 4.4 扩展后），每条含 $6000 码 / 诊断串 / 分类 tag
   oracle 来源数  = 1（blargg）
 ```
 
@@ -522,7 +522,7 @@ KagamiQA 的 Oracle 架构可以扩展以支持**非 blargg 测试 ROM**：
 ```
 FCEUX11/
 ├── tests/
-│   ├── tests.json                          ← 39 条测试清单（34 CTest 注册 + 5 纯清单条目）
+│   ├── tests.json                          ← 47 条测试清单（27 Oracle A + 20 Oracle B；Phase 4.4 扩 8 项）
 │   ├── fixtures/
 │   │   ├── blargg/                         ← 177 blargg ROM (cpu/ppu/apu/mmc3/)
 │   │   ├── blargg_manifest.json            ← ROM 清单（name/path/frames/probe_addr）

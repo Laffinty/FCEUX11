@@ -518,5 +518,149 @@
     "tags": ["lua", "integration", "joypad"],
     "failure_means": "blocking",
     "provenance": "fceux11-lua | 2026-07-30 demoted to advisory: fceux11_lua_runner does not surface joypad.get/joypad.set to Lua state (mask1/mask2 override logic unimplemented in Rust bindings). 2026-08-05 Phase 4.1: bindings verified present; root cause of failure = joypad.get() returned a TABLE (bitmask_to_table) while the FCEUX-compatible contract (and the test script's first assertion) requires a NUMBER bitmask. Fixed in src/rust/crates/fceux11-lua/bindings/joypad.rs (return state as i32). Re-enabled as blocking."
+  },
+  "blargg_mmc3_4_scanline_timing": {
+    "id": "blargg_mmc3_4_scanline_timing",
+    "description": "blargg MMC3 scanline timing (mmc3_test_4) — bucket A representative (Phase 3 known limit, deep model family)",
+    "oracle_type": "B",
+    "layer": "core",
+    "input": {
+      "binary": "fceux11_blargg_runner",
+      "args": ["--rom", "fixtures/blargg/mmc3/mmc3_4_scanline_timing.nes", "--frames", "300"],
+      "working_dir": "tests",
+      "rom": "fixtures/blargg/mmc3/mmc3_4_scanline_timing.nes",
+      "probe_addr": 24576
+    },
+    "expected": { "exit_code": 0 },
+    "timeout_seconds": 30,
+    "tags": ["blargg", "mmc3", "oracle-b", "bucket-a", "known-limit"],
+    "failure_means": "advisory",
+    "provenance": "blargg mmc3_test_4 scanline timing | Phase 4.4 2026-08-06: added as 桶 A representative (deep model family, code=0x09 known fail, runppu=False). Phase 3 commit f4a072a documented MMC3 12-item known-limit set."
+  },
+  "blargg_mmc3_v2_4_scanline_timing": {
+    "id": "blargg_mmc3_v2_4_scanline_timing",
+    "description": "blargg MMC3 v2 scanline timing (mmc3_test_v2_4) — bucket A representative v2 variant (Phase 3 known limit)",
+    "oracle_type": "B",
+    "layer": "core",
+    "input": {
+      "binary": "fceux11_blargg_runner",
+      "args": ["--rom", "fixtures/blargg/mmc3/mmc3_v2_4_scanline_timing.nes", "--frames", "300"],
+      "working_dir": "tests",
+      "rom": "fixtures/blargg/mmc3/mmc3_v2_4_scanline_timing.nes",
+      "probe_addr": 24576
+    },
+    "expected": { "exit_code": 0 },
+    "timeout_seconds": 30,
+    "tags": ["blargg", "mmc3", "oracle-b", "bucket-a", "known-limit"],
+    "failure_means": "advisory",
+    "provenance": "blargg mmc3_test_v2_4 scanline timing (alternate rev) | Phase 4.4 2026-08-06: 桶 A representative v2, code=0x09 known fail, runppu=False. Cross-check mmc3_test_4 vs v2 parity."
+  },
+  "blargg_cpu_int_2_nmi_brk": {
+    "id": "blargg_cpu_int_2_nmi_brk",
+    "description": "blargg CPU NMI/BRK interaction timing (cpu_int_2) — bucket B representative (Phase 3 known limit)",
+    "oracle_type": "B",
+    "layer": "core",
+    "input": {
+      "binary": "fceux11_blargg_runner",
+      "args": ["--rom", "fixtures/blargg/cpu/cpu_int_2_nmi_brk.nes", "--frames", "300"],
+      "working_dir": "tests",
+      "rom": "fixtures/blargg/cpu/cpu_int_2_nmi_brk.nes",
+      "probe_addr": 24576
+    },
+    "expected": { "exit_code": 0 },
+    "timeout_seconds": 30,
+    "tags": ["blargg", "cpu", "oracle-b", "bucket-b", "known-limit"],
+    "failure_means": "advisory",
+    "provenance": "blargg cpu_int_2 NMI/BRK interaction timing | Phase 4.4 2026-08-06: 桶 B representative, code=0x01 known fail, runppu=False. Cross-checks vbl 中断族收敛状态. Phase 3 eaf4fe1 documented cpu_int_* as deep-model-family known limit."
+  },
+  "blargg_instr_misc": {
+    "id": "blargg_instr_misc",
+    "description": "blargg CPU instruction misc combined (instr_misc) — bucket B representative (Phase 3 known limit)",
+    "oracle_type": "B",
+    "layer": "core",
+    "input": {
+      "binary": "fceux11_blargg_runner",
+      "args": ["--rom", "fixtures/blargg/cpu/instr_misc.nes", "--frames", "300"],
+      "working_dir": "tests",
+      "rom": "fixtures/blargg/cpu/instr_misc.nes",
+      "probe_addr": 24576
+    },
+    "expected": { "exit_code": 0 },
+    "timeout_seconds": 30,
+    "tags": ["blargg", "cpu", "oracle-b", "bucket-b", "known-limit"],
+    "failure_means": "advisory",
+    "provenance": "blargg instr_misc (combined sub-tests) | Phase 4.4 2026-08-06: 桶 B representative, code=0x01 known fail, runppu=False. Phase 3 eaf4fe1 documented instr_* as deep-model-family known limit."
+  },
+  "blargg_oam_stress": {
+    "id": "blargg_oam_stress",
+    "description": "blargg OAM stress (oam_stress) — bucket C representative (Phase 3 known limit, runppu-relevant)",
+    "oracle_type": "B",
+    "layer": "core",
+    "input": {
+      "binary": "fceux11_blargg_runner",
+      "args": ["--rom", "fixtures/blargg/ppu/oam_stress.nes", "--frames", "300"],
+      "working_dir": "tests",
+      "rom": "fixtures/blargg/ppu/oam_stress.nes",
+      "probe_addr": 24576
+    },
+    "expected": { "exit_code": 0 },
+    "timeout_seconds": 30,
+    "tags": ["blargg", "ppu", "oracle-b", "bucket-c", "known-limit", "runppu-relevant"],
+    "failure_means": "advisory",
+    "provenance": "blargg oam_stress (OAM stress, PPU timing sensitive) | Phase 4.4 2026-08-06: 桶 C representative, code=0x01 known fail, runppu=True. Phase 3 commit 116a602 documented oam_stress as deep-model-family known limit."
+  },
+  "blargg_vbl_05_nmi_timing": {
+    "id": "blargg_vbl_05_nmi_timing",
+    "description": "blargg VBL NMI timing (vbl_05) — bucket C PASS monitor (Phase 1 vbl_05 PASS via 5581769)",
+    "oracle_type": "B",
+    "layer": "core",
+    "input": {
+      "binary": "fceux11_blargg_runner",
+      "args": ["--rom", "fixtures/blargg/ppu/vbl_05_nmi_timing.nes", "--frames", "500"],
+      "working_dir": "tests",
+      "rom": "fixtures/blargg/ppu/vbl_05_nmi_timing.nes",
+      "probe_addr": 24576
+    },
+    "expected": { "exit_code": 0 },
+    "timeout_seconds": 30,
+    "tags": ["blargg", "ppu", "vbl", "oracle-b", "bucket-c", "pass-monitor"],
+    "failure_means": "blocking",
+    "provenance": "blargg vbl_05 NMI timing | Phase 1 commit 5581769 fixed vbl_05 to PASS (X6502_Run frame fix + NMIDELAY 8 calibration). Phase 4.4 2026-08-06: added as PASS monitor — any future regression to FAIL will gate R4."
+  },
+  "blargg_ppu_read_buffer": {
+    "id": "blargg_ppu_read_buffer",
+    "description": "blargg PPU $2007 read buffer delay (ppu_read_buffer) — bucket C PASS monitor (Phase 3 commit 863e9d7)",
+    "oracle_type": "B",
+    "layer": "core",
+    "input": {
+      "binary": "fceux11_blargg_runner",
+      "args": ["--rom", "fixtures/blargg/ppu/ppu_read_buffer.nes", "--frames", "2000"],
+      "working_dir": "tests",
+      "rom": "fixtures/blargg/ppu/ppu_read_buffer.nes",
+      "probe_addr": 24576
+    },
+    "expected": { "exit_code": 0 },
+    "timeout_seconds": 60,
+    "tags": ["blargg", "ppu", "oracle-b", "bucket-c", "pass-monitor"],
+    "failure_means": "blocking",
+    "provenance": "blargg ppu_read_buffer ($2007 read buffer delay) | Phase 3 commit 863e9d7 fixed PPU 时序/寻址 in 3 places. Phase 4.4 2026-08-06: added as PASS monitor — keeps Phase 3 fix regression-tested by R4 Gate. Frames budget: 500 frames returns 0x80 (still running), 2000+ frames returns 0x00 (PASS). Empirical 2000 frames in ~3.6s."
+  },
+  "blargg_sprdma_dmc_dma": {
+    "id": "blargg_sprdma_dmc_dma",
+    "description": "blargg sprite DMA + DMC DMA interaction (sprdma_dmc_dma) — bucket D representative (Phase 3 known limit)",
+    "oracle_type": "B",
+    "layer": "core",
+    "input": {
+      "binary": "fceux11_blargg_runner",
+      "args": ["--rom", "fixtures/blargg/apu/sprdma_dmc_dma.nes", "--frames", "300"],
+      "working_dir": "tests",
+      "rom": "fixtures/blargg/apu/sprdma_dmc_dma.nes",
+      "probe_addr": 24576
+    },
+    "expected": { "exit_code": 0 },
+    "timeout_seconds": 30,
+    "tags": ["blargg", "apu", "sprdma", "oracle-b", "bucket-d", "known-limit"],
+    "failure_means": "advisory",
+    "provenance": "blargg sprdma_dmc_dma (sprite DMA + DMC DMA interaction) | Phase 4.4 2026-08-06: 桶 D representative, code=0x01 known fail, runppu=False. Phase 3 commit 4a7f7e2 documented sprdma_dmc_dma as deep-model-family known limit."
   }
 }

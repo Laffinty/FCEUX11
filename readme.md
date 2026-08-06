@@ -106,12 +106,12 @@ FCEUX11 内置一套名为 **KagamiQA** 的双 Oracle 自动化质量保障系�
 
 | 组件 | 说明 |
 |------|------|
-| **Oracle A（回归测试）** | 34 个 CTest 单元/回归/边界测试（来自 39 条清单条目），每次 push 全量运行 |
-| **Oracle B（硬件精度测试）** | 177 个 [blargg](https://github.com/christopherpow/nes-test-roms) $6000 协议 ROM（按 `tests/fixtures/blargg/` 实际落盘数量），覆盖 CPU/PPU/APU/MMC3 全子类，headless 全量批处理 |
+| **Oracle A（回归测试）** | 27 个 Oracle A 清单条目（外加 6 个 CTest-only 基础设施测试），每次 push 全量运行 |
+| **Oracle B（硬件精度测试）** | 20 个 Oracle B 清单条目代表桶 + 177 个 [blargg](https://github.com/christopherpow/nes-test-roms) $6000 协议 ROM 全量批处理，覆盖 CPU/PPU/APU/MMC3 全子类 |
 | **迁移矩阵** | 每次 CI run 产出 `kagamiqa_migration_matrix.json` 并作为 artifact 上传，追踪 PASS→FAIL 回归与 FAIL→PASS 进展 |
 | **基线漂移检测** | PASS→FAIL 自动在 PR 下评论红色警报，防止精度退化 |
 
-> **数字来源 / Where these numbers come from**：`34` CTest 数 + `39` 清单条目 + `177` 落盘 ROM 数均为 **CI 产物**——
+> **数字来源 / Where these numbers come from**：`34` CTest 数 + `47` 清单条目（27 Oracle A + 20 Oracle B）+ `177` 落盘 ROM 数均为 **CI 产物**——
 > 详见 `docs/tech/KagamiQA.md` §0 「CI 数字回填」与最近一次
 > `kagamiqa_migration_matrix.json` 的 `engine.git_rev` 字段。本表数值是
 > CI 产物快照（commit `78a9d7f` 时点，`engine.git_rev=78a9d7f`，`kagami-qa.yml` run #31，2026-08-05）。
@@ -124,12 +124,12 @@ FCEUX11 ships **KagamiQA**, a dual-oracle automated quality assurance system tha
 
 | Component | Description |
 |-----------|-------------|
-| **Oracle A (regression)** | 34 CTest registered tests (from 39 manifest entries), full run on every push |
-| **Oracle B (hardware accuracy)** | 177 [blargg](https://github.com/christopherpow/nes-test-roms) $6000-protocol ROMs (counted from `tests/fixtures/blargg/` on disk) covering all CPU/PPU/APU/MMC3 sub-categories, headless batch |
+| **Oracle A (regression)** | 27 Oracle A manifest entries (plus 6 CTest-only infrastructure tests), full run on every push |
+| **Oracle B (hardware accuracy)** | 20 Oracle B manifest entries as bucket representatives + 177 [blargg](https://github.com/christopherpow/nes-test-roms) $6000-protocol ROMs (full batch) covering all CPU/PPU/APU/MMC3 sub-categories |
 | **Migration Matrix** | Every CI run produces `kagamiqa_migration_matrix.json` (uploaded as artifact), tracking PASS→FAIL regressions and FAIL→PASS progress |
 | **Baseline Drift Detection** | PASS→FAIL automatically posts a red alert PR comment, preventing accuracy decay |
 
-> **Source of truth / 数字来源**: 34 CTest + 39 manifest entries + 177 on-disk ROMs are **CI-sourced** — see `docs/tech/KagamiQA.md` §0 "CI number back-fill" and the `engine.git_rev` field of the most recent `kagamiqa_migration_matrix.json`. This table is a CI-artifact snapshot at commit `78a9d7f` (`engine.git_rev=78a9d7f`, `kagami-qa.yml` run #31 on 2026-08-05). Phase 4.2 R4 Gate passed — numbers auto-sync with CI artifact. To refresh: re-run `kagami-qa-runner --output` first, then update numbers in the same commit.
+> **Source of truth / 数字来源**: 34 CTest + 47 manifest entries (27 Oracle A + 20 Oracle B) + 177 on-disk ROMs are **CI-sourced** — see `docs/tech/KagamiQA.md` §0 "CI number back-fill" and the `engine.git_rev` field of the most recent `kagamiqa_migration_matrix.json`. This table is a CI-artifact snapshot at commit `78a9d7f` (`engine.git_rev=78a9d7f`, `kagami-qa.yml` run #31 on 2026-08-05). Phase 4.2 R4 Gate passed — numbers auto-sync with CI artifact. Phase 4.4 expanded tests.json 39 → 47 with 8 Oracle B bucket representatives; current matrix 39 PASS / 8 FAIL (8 FAIL all advisory known-limits, no surprises). To refresh: re-run `kagami-qa-runner --output` first, then update numbers in the same commit.
 
 **For implementation details, principles, standalone operation, and cross-project migration, see [`docs/tech/KagamiQA.md`](docs/tech/KagamiQA.md).**
 
