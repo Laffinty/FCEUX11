@@ -5,6 +5,95 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16] - 2026-08-06
+
+**Codename: KagamiQA closure.** FCEUX11 v1.16 ships a CI-resident dual-oracle
+quality defense system (`kagami-qa`), backed by 47 test entries in `tests.json`
++ 177 blargg `$6000` ROMs. All Phase 1-4 must-pass items closed (R4 Gate
+sign-off on `wip_1.16`, CI runs #31/#32/#33/#34). See
+`docs/FCEUX11-1.16_P3-KagamiQA闭环四阶段构建方案.md` for the full closure plan.
+
+### Summary (KagamiQA 双 Oracle 质量防线)
+
+| 通道 | 数量 | PASS / FAIL | 备注 |
+|---|---|---|---|
+| **Oracle A** (ctest + 测试清单) | 27 + 6 CTest-only | 33/33 (100%) | ctest `-LE perf` 全绿 |
+| **Oracle B** (tests.json 桶代表) | 20 | 12P / 8F | 8 FAIL 全部 advisory 已知限制 |
+| **Oracle B** (blargg 全量 177 ROM) | 177 | 144P / 33F | 81.4% PASS 率 |
+| **总测试条目** (kagami-qa-runner) | 47 | 39P / 8F | R4 Gate 通过 |
+| **CI 常驻** | ✅ | `kagami-qa.yml` 每次 push 自动跑 | runs #31-#34 success |
+| **R4 Gate** | ✅ | matrix `git_rev` 真实 commit hash + `fail_to_pass=0` 反作弊 | run #31/#32/#33/#34 |
+
+### Added — KagamiQA 框架（Phase 4 收口）
+
+- **`kagami-qa.yml` CI workflow** — `Oracle A` (ctest) + `Oracle B` (blargg 全量) +
+  迁移矩阵生成 + R4 Gate（`engine.git_rev` 真实 commit + `total ≥ 39` +
+  `fail_to_pass = 0` 反作弊门禁）。runs #31/#32/#33/#34 success，约 25 分钟/次。
+- **Lua bindings 完整化**（Phase 4.1, commit `78a9d7f`）：
+  - `joypad.get/set` 返回 number bitmask（FCEUX 兼容契约）
+  - `memory.readwrite/readwordsigned/getregister/registerexec` 完整
+  - `lua_joypad_test` + `lua_memory_test` 由 advisory 升为 blocking，Oracle A 27/27 全绿
+- **Oracle B 覆盖深度扩展**（Phase 4.4, commit `370a3af`）：
+  - `tests.json` 39 → 47 项（+8 桶代表：MMC3 2 + CPU 2 + PPU 3 + sprdma 1）
+  - 2 项 PASS 监控：`blargg_vbl_05_nmi_timing`（Phase 1 修复）、`blargg_ppu_read_buffer`（Phase 3 修复）
+  - 6 项 advisory 已知限制（桶 A/B/C/D 完整覆盖）
+- **P5 runppu 决策正式记录**（Phase 4.5, commit `357ab59`）：
+  - **保持当前 PPU，runppu 切换推迟到 v1.17+**
+  - 32 已知限制均属深模型族（CPU/PPU 寄存器/DMA 层），与渲染路径解耦，runppu 切换零精度收益
+  - v1.17+ 重启条件：(a) 深模型族突破；(b) 新独立外部 oracle 引入；(c) per-cycle 联合仿真
+- **CI 数字回填纪律**（Phase 4.3, commit `18464e6`）：
+  - `docs/tech/KagamiQA.md` §0 + `readme.md` 锚同步到 CI artifact `engine.git_rev=78a9d7f` (run #31)
+  - §0 纪律块由"禁止手改"软化为"以 CI artifact 为准"（Phase 4.2 R4 Gate 闭环后已 CI 同步）
+- **In-process runner 通道**（commit `7c2356b`）：`kagami_qa_direct_runner` 编译进
+  `fceux11_core`（C ABI bridge），`--direct` flag 预留。v1.16 启用 SubprocessAdapter 主路径。
+
+### Fixed — Phase 1-3 精度收敛
+
+| 修复 | commit | 验证 |
+|---|---|---|
+| `vbl_05_nmi_timing` PASS (VBL 周期对齐) | `5581769` + `7cfb029` + `7ea1d0c` | Phase 1 桶 C 真实精度 +2 PASS |
+| `apu_single_4_jitter` PASS (APU clock jitter) | `a025dfb` | Phase 2 桶 C +1 PASS |
+| APU cycle-position 帧计数器（`single_5/6`、`reset_4017`、`apu_test` 全 PASS）| `f5e7cd0` | Phase 2 桶 C +5 PASS |
+| `ppu_read_buffer` PASS（3 处 PPU 时序/寻址修复）| `863e9d7` | Phase 3 桶 C +1 PASS |
+| `ppu_open_bus` PASS（PPUGenLatch time-decay + per-bit open-bus refresh）| `23b0cdd` | Phase 3 桶 C +1 PASS |
+| harness cleanup（per-ROM reset_after + 0x80 frame budget calibration）| `821a26e` | Phase 3 Step 3.1 |
+
+### Known Precision Limitations (defense line, NOT release blocker)
+
+**32 项 blargg ROM 深模型族已知限制** + 1 项永久跳过 = **33 FAIL**，全部归类于 Phase 3 调查记录。
+这不是 release blocker — 精确知道什么失败比"全绿但不测"更权威。详细分类见
+`docs/tech/KagamiQA.md` §1.4 + `tests/fixtures/blargg_known_fail.json`。
+
+| 桶 | 数量 | 根因 | runppu 相关？ |
+|---|---|---|---|
+| **A** MMC3 scanline/IRQ timing | 12 | MMC3 IRQ 计数器时序 | ❌ |
+| **B.1+B.2** CPU instr/int timing | 9 | 6502 指令时序 / 中断族 | ❌ |
+| **B.3+B.4** CPU exec space / dummy writes | 2 | 6502 总线周期 / OAM 写 | ❌ |
+| **C** PPU 真实精度 | 2 | PPU 寄存器读写 | ⚠️ 弱相关 |
+| **C.1** VBL NMI timing | 5 | VBL 周期对齐 | ❌（部分 Phase 1 已修）|
+| **D** sprdma + DMC DMA | 2 | 总线冲突 / DMA 时序 | ❌ |
+| **永久跳过** | 1 | `cpu_interrupts` 0xFE | — |
+
+**P5 runppu 重批决策**：推迟到 v1.17+（零精度收益分析见 Phase 4.5 记录）。
+
+### Changed
+
+- **`src/version.h`** — `FCEU_VERSION_MINOR` 15 → 16；`FCEU_HOTFIX_TAG` 清空；`FCEU_DISPLAY_VERSION` "v1.15 (hotfix6)" → "v1.16"（commit `7c2356b`）。
+- **`tests/tests.json`** — 39 → 47 项 Oracle 桶代表；6 项 Oracle B 桶代表由 Phase 3 known_fail 提升到 tests.json（仍 advisory）。
+- **`tests/fixtures/blargg_manifest.json`** — 22 → 177 条目（S-1 清掉 3 个重复死条目后 180 → 177）。
+- **`tests/fixtures/blargg_known_fail.json`** — 22 → 60 条分类（`code`, `diag`, `eventually_pass`, `runppu` 字段标准化）。
+- **`.github/workflows/kagami-qa.yml`** — R4-0（vcpkg cache 修复）+ R4-1（blargg ROM fixtures 补齐）落地。
+- **`docs/tech/KagamiQA.md`** — Phase 4 收口期大幅更新：§0 CI 数字回填纪律、§1.4 现行口径（门槛+度量分离）、§四 跨项目迁移指南。
+- **`docs/history/plans/`** — P2 三阶段方案归档；P3 闭环四阶段方案 + P5 决策记录。
+
+### Validation
+
+- **本地**：`ctest -LE perf` 33/33 PASS；`kagami-qa-runner` 47 项 → 39P/8F；本地 R4 Gate 三项判据全过。
+- **CI**：`kagami-qa.yml` run #31 (head `78a9d7f`, lua bindings)、run #32 (head `18464e6`, docs sync)、run #33 (head `370a3af`, Phase 4.4)、run #34 (head `357ab59`, P5 decision) — 全部 conclusion: **success**。
+- **Artifact**：`kagamiqa-results.zip` 每次 run 上传，含 `kagamiqa_migration_matrix.json` + `kagamiqa_accuracy_table.md` + `kagamiqa_baseline_next.json` + `blargg_full_output.txt`。
+
+---
+
 ## [1.15(hotfix6)] - 2026-07-26
 
 **Codename: hotfix6.** Translation quality audit-driven fixes. 102 issues
