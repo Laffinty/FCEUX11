@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 quality defense system (`kagami-qa`), backed by 47 test entries in `tests.json`
 + 177 blargg `$6000` ROMs. All Phase 1-4 must-pass items closed (R4 Gate
 sign-off on `wip_1.16`, CI runs #31/#32/#33/#34). See
-`docs/FCEUX11-1.16_P3-KagamiQA闭环四阶段构建方案.md` for the full closure plan.
+`docs/history/plans/FCEUX11-1.16_P3-KagamiQA闭环四阶段构建方案.md` for the full closure plan.
 
 ### Summary (KagamiQA 双 Oracle 质量防线)
 
