@@ -1,7 +1,0 @@
-Qt Warning: SetProcessDpiAwarenessContext() failed: 操作成功完成。
-Qt's default DPI awareness context is DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2. If you know what you are doing, you can overwrite this default using qt.conf (https://doc.qt.io/qt-6/highdpi.html#configuring-windows). (:0, )
-Qt Debug: i18n: auto-detected system language = zh_CN (:0, )
-Qt Debug: i18n: early translator loaded :/i18n/fceux11_zh_CN.qm (:0, )
-Qt Debug: i18n: loaded :/i18n/fceux11_zh_CN.qm (:0, )
-Qt Warning: QObject::killTimer: Timers cannot be stopped from another thread (:0, )
-Qt Warning: QObject::~QObject: Timers cannot be stopped from another thread (:0, )
