@@ -77,6 +77,20 @@ ipch/
 dependencies/
 libs/
 vcpkg_installed/
+# vcpkg source clone (setup_vcpkg.ps1 -> D:\Project\FCEUX11\vcpkg).
+# Add 28 GB; users should clone their own vcpkg to a separate location.
+# Already-installed deps live under vcpkg_installed/ (tracked above).
+/vcpkg/
+
+# cbindgen-generated C header for the Rust FFI bridge — regenerated on
+# every Cargo build; do not commit.
+/src/rust/fceux11_rust.h
+# cbindgen-generated header for the kagami-qa runner C ABI bridge.
+/src/rust/crates/kagami-qa/kagami_bridge.h
+
+# Local kagami-qa-runner output JSONs (artifacts of local reproduce runs).
+# CI produces its own kagamiqa_direct_matrix.json via the runner path.
+/tests/kagami*_local.json
 
 # Generated documentation
 docs/html/
