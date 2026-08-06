@@ -123,13 +123,19 @@ ROM 的典型运行模式：
   ☑ 判定逻辑与 manifest schema 声明一致
   ☑ 迁移矩阵不含结构性失真（new_test 桶 + test_set_diff）
   ☑ 产物可追溯：matrix 带真实 engine.git_rev
-  ☐ CI 常驻，指标由 CI 产物回填而非手写
+  ☑ CI 常驻，指标由 CI 产物回填而非手写  ← Phase 4.2 R4 Gate 闭环（run #31/#32/#33 success）
 
 【权威性度量】（仅在全部门槛满足时有意义）
   外部真理覆盖率 = 177 / 177 blargg ROM（manifest 与落盘 1:1）
   已知失败清单   = 47 项中 8 项 FAIL（Phase 4.4 扩展后），每条含 $6000 码 / 诊断串 / 分类 tag
   oracle 来源数  = 1（blargg）
 ```
+
+**Phase 4.5 runppu 决策**（2026-08-06，本会话正式签发；详见 `docs/history/plans/FCEUX11-1.16_KagamiQA-P5-权威性构建计划.md`）：
+
+> **P5 runppu 重批推迟到 v1.17+**。理由：8 项已知限制全部归类于深模型族（CPU/PPU 寄存器/DMA 层），与渲染路径解耦，runppu 切换**零精度收益** + 引入新回归风险。Phase 1-4 已闭环（双 Oracle 稳定 + 33 FAIL 全部归类 + Lua 集成完整 + R4 Gate 验证），满足 P5 设定的"维持稳定基线"目标。
+>
+> v1.17+ 重新评估 runppu 的 3 个重启条件：(a) 深模型族突破；(b) 新独立外部 oracle 引入；(c) per-cycle 联合仿真就绪。
 
 **「oracle 来源数」为什么单列**：当前唯一的外部真理来源是 blargg ROM 套件，因此
 **权威性上限 = 该套件对真实硅片的保真度**。ROM 覆盖率从 13% 提到 100%，只是把这一个来源用尽，

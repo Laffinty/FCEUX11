@@ -6,6 +6,72 @@
 
 ---
 
+## Phase 4.5 决策记录（2026-08-06，本会话正式签发）
+
+**决策**：**保持当前 PPU，不做 runppu 切换**。P5 runppu 重批推迟到 **v1.17+** 单独评估。
+
+### 决策依据
+
+**门禁评估**（P5 §三 Phase 5D 前置条件 = 本节 3 条件）：
+
+| 门禁 | v1.16 状态 | 评估 |
+|---|---|---|
+| Oracle A 全绿 | ✅ ctest 33/33 PASS（CI run #31/#32/#33）| ✅ |
+| Oracle B 清单稳定 | ✅ Phase 3 33 FAIL 全部归类（32 已知限制 + 1 永久跳过）| ✅ |
+| 收益预期重估通过 | ⏳ 见下 | ✅ 评估完成，决策推迟 |
+
+**收益分析**（基于 Phase 3 + Phase 4 数据）：
+
+| 指标 | 值 | 来源 |
+|---|---|---|
+| blargg PASS 率 | 144/177 = **81.4%** | `blargg_full_results.json`（Phase 3 基线，未变）|
+| Phase 4.4 测试清单扩展 | 39 → 47（+8 Oracle B 桶代表）| commit 370a3af，run #33 success |
+| tests.json FAIL 计数 | 47 项中 8 项 FAIL（全部 advisory 已知限制）| Phase 4.4 验证 |
+| 已知限制归类 | 32 项 = MMC3 12 + CPU 9 + CPU B.3+B.4 2 + sprdma 2 + PPU 2 + vbl 5 | Phase 3 收口 |
+| 永久跳过 | 1 项（cpu_interrupts 0xFE）| Phase 3 记录 |
+
+**32 已知限制的根因分布**（深模型族 = 与渲染路径解耦）：
+
+| 桶 | 数量 | 根因类别 | runppu 相关？ |
+|---|---|---|---|
+| MMC3 scanline/IRQ timing | 12 | MMC3 IRQ 计数器时序 | ❌ 无关 |
+| CPU instr/int timing | 11（含 1 永久跳过）| 6502 指令时序 / 中断族 | ❌ 无关 |
+| sprdma + DMC DMA | 2 | 总线冲突 / DMA 时序 | ❌ 无关 |
+| PPU 真实精度 | 2 | PPU 寄存器读写 | ⚠️ 弱相关但属深模型 |
+| VBL NMI timing | 5 | VBL 周期对齐 | ❌ 部分 Phase 1 已修 |
+
+**结论**：runppu 切换**零精度收益**——32 项已知限制均属深模型族（CPU/PPU 寄存器/DMA 层），与渲染路径解耦。
+
+### 成本与收益对照
+
+| 维度 | runppu 切换 | 保持现状 |
+|---|---|---|
+| 精度提升 | 0（深模型族限制与渲染路径无关）| 0 |
+| 风险 | 引入新回归（渲染路径变更 → 可能破坏 39 PASS Oracle A + 12 PASS Oracle B 监控）| 0 |
+| 工作量 | QA 全量回归 177 ROM × 600 帧 ≈ 3 分钟 × 完整 oracle + savestate 兼容性验证 | 0 |
+| savestate 兼容性 | 可能破坏（savestate 哈希与 runppu 参数耦合）| 不变 |
+| 决策时点 | Phase 3 完成后已显示无收益信号；Phase 4 4 项 must-pass 全部闭环 | v1.16 收口期稳定基线 |
+
+### 推迟条件（v1.17+ 再评估时）
+
+推迟 **不**等于放弃 runppu 路径。当以下任一条件成熟时，v1.17+ 可重启 P5 评估：
+
+1. **深模型族突破**：32 已知限制中 ≥1 项被**非 runppu 路径**修复，揭示剩余限制的根因更清晰
+2. **新外部 oracle 引入**：NESdev 其他套件 / TASVideos 精度表 / 真机采集等独立来源出现，可与 runppu 形成对照
+3. **CPU/PPU 联合仿真**：per-cycle 联合仿真路径就绪，可定量验证 runppu 是否影响深模型族
+
+### 对 P5 §三 的影响
+
+- **Phase 5A**（blargg 覆盖率）：✅ Phase 4.4 完成（tests.json 39 → 47，CI 验证）
+- **Phase 5B**（CI 集成）：✅ Phase 4.2 完成（kagami-qa.yml R4 Gate 闭环，run #31/#32/#33 success）
+- **Phase 5C**（in-process runner）：✅ Phase 1-2 路线已部分落地（kagami_qa_direct_runner C ABI 已编译进 fceux11_core）；runner SubprocessAdapter 已可用，Direct 模式未启用但不影响 v1.16 收口
+- **Phase 5D**（runppu 精度攻坚）：⏸ **本会话决策推迟到 v1.17+**
+- **Phase 5E**（Lua 判定精度）：✅ Phase 4.1 完成（lua_joypad_test + lua_memory_test 全 PASS）
+
+v1.16 收口期 P5 计划以"5A/5B/5C/5E 完成，5D 推迟"结项。
+
+---
+
 ## 〇、TL;DR
 
 KagamiQA 当前是一个**可工作的原型**：清单驱动、双 oracle 分离、迁移矩阵产出均已实现。但它还不是一个**权威的质量防线**——原因有三：
