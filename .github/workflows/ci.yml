@@ -67,6 +67,49 @@ jobs:
           restore-keys: |
             vcpkg-
 
+      # R4-1 (2026-08-07): KagamiQA Oracle B / direct runner depend on
+      # tests/fixtures/blargg/**/*.nes. These ROMs are NOT in git (the
+      # .gitignore `*.nes` exception only covers top-level fixtures, not
+      # subdirectories) — they are fetched from the christopherpow/nes-test-roms
+      # mirror by scripts/download_blargg_roms.ps1. Without these steps, the
+      # `kagami_qa_direct_smoke` ctest gate reports LOAD_ERROR for every
+      # blargg_* entry (rc=-2 on `kagami_bridge_load_rom(...)`), dragging CI
+      # from 33/33 to 32/33 (run #84395196054). Mirrors the steps already
+      # present in .github/workflows/kagami-qa.yml:174-205.
+      - name: Cache blargg ROMs
+        id: cache-blargg
+        uses: actions/cache@v4
+        with:
+          path: tests/fixtures/blargg
+          key: blargg-roms-${{ hashFiles('scripts/download_blargg_roms.ps1') }}
+          restore-keys: blargg-roms-
+
+      - name: Fetch blargg test ROMs
+        shell: pwsh
+        run: ./scripts/download_blargg_roms.ps1
+
+      # Cross-check the manifest: every ROM the manifest promises must
+      # actually be on disk before Oracle B / direct runner may claim to
+      # have tested it. download_blargg_roms.ps1 reports failures but never
+      # sets a non-zero exit code, so a partially-downloaded fixture tree
+      # would silently be reported as a full run without this gate.
+      - name: Verify blargg ROM fixtures against manifest
+        shell: pwsh
+        run: |
+          $manifest = Get-Content tests/fixtures/blargg_manifest.json -Raw | ConvertFrom-Json
+          $missing = @()
+          foreach ($rom in $manifest.roms) {
+            if (-not (Test-Path (Join-Path 'tests' $rom.path))) { $missing += $rom.path }
+          }
+          $have = $manifest.roms.Count - $missing.Count
+          Write-Host "blargg fixtures: $have / $($manifest.roms.Count) present"
+          if ($missing.Count -gt 0) {
+            foreach ($p in ($missing | Select-Object -First 10)) { Write-Host "::error::missing ROM: $p" }
+            if ($missing.Count -gt 10) { Write-Host "::error::... and $($missing.Count - 10) more" }
+            Write-Host "::error::blargg fixture tree is incomplete - Oracle A direct runner and Oracle B blargg suite would fail. Check scripts/download_blargg_roms.ps1 and the upstream mirror."
+            exit 1
+          }
+
       # v0.3.7: Load vcvars64.bat via msvc-dev-cmd so cl.exe is on PATH
       # for the cmake configure step. The previous microsoft/setup-msbuild@v2
       # only located MSBuild, not the C/C++ compiler toolchain; on
