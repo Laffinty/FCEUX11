@@ -59,6 +59,7 @@
 | `FCEUX11-1.15_LTS-hotfix5-PLAN.md` | 🔵 | hotfix5 i18n 重做（执行结果见 `reports/FCEUX11-1.15_翻译质量最终复测报告.md`） |
 | `FCEUX11-1.16_KagamiQA-PLAN.md` | 🔵 | KagamiQA 双 Oracle 测试系统总构建计划 |
 | `FCEUX11-1.16_KagamiQA-P5-权威性构建计划.md` | 🔵 | P5 权威性构建（口径后续修订为 177 ROM） |
+| `FCEUX11-1.16_P3-KagamiQA闭环四阶段构建方案.md` | 🔵 | P3 闭环四阶段构建（Phase 1-3 精度收敛 100% + Phase 4 KagamiQA 系统闭环 + v1.16 发布门禁） |
 | `FCEUX11-1.16_Stage2-构建计划.md` | 🔵 | Stage-2 二阶段构建（含收官状态回填） |
 | `FCEUX11-Stage3-权威性迭代与通用化路线.md` | 🟡 | Stage-3 路线草案（**P3 暂缓**，顶部有 DEFERRED 横幅） |
 | `v1.x_Modernization_Roadmap.md` | 🔵 | v1.x 现代化改造路线图（v1.1~v1.14，已收官） |

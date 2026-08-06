@@ -231,7 +231,7 @@ rustup default stable-x86_64-pc-windows-msvc
 
 ### 7.7 裸 `cmake --build` 报 `C1083 <cstdio>: No such file` 或 `fatal error C1034: stdafx.h`
 
-**原因**：直接 `cmake --build build-c1`（没有走 `do_build.ps1`）时，vcvars 没有被加载，
+**原因**：直接 `cmake --build build`（没有走 `do_build.ps1`）时，vcvars 没有被加载，
 `cl.exe` / `Windows SDK` 不在 `PATH` / `INCLUDE` / `LIB` 上，编译器找不到标准头文件。
 常见于：① 从裸 Git Bash 跑 `cmake --build`；② 在 PowerShell 里手动 `cmake --build` 但没先
 跑过 vcvars。
