@@ -11,14 +11,17 @@
 # msvc-dev-cmd action runs vcvars64.bat and exports PATH/INCLUDE/LIB so
 # that `cmake -DCMAKE_CXX_COMPILER=cl ...` resolves cl. This is the only
 # difference from the v0.3.6.6 workflow.
+#
+# v1.17 A0 (2026-08-07): add wip_v1.17 to trigger branches — the v1.17
+# development branch must run the same build+ctest+benchmark gate as main.
 
 name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, wip_v1.17]
   pull_request:
-    branches: [main]
+    branches: [main, wip_v1.17]
 
 jobs:
   build-windows:

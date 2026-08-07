@@ -1,20 +1,22 @@
 # FCEUX11 v1.16 KagamiQA P5 — CI Workflow
 #
-# Runs the dual-oracle QA system on every push to wip_1.16 / main.
+# Runs the dual-oracle QA system on every push to wip_1.16 / wip_v1.17 / main.
 # Produces a migration matrix artifact, accuracy table, and baseline drift report.
 #
 # Oracle A: CTest regression suite (unit tests, ROM regressions, golden files)
 # Oracle B: Blargg $6000 test ROM suite (180 ROMs, headless batch run)
 #
-# Triggers on push to wip_1.16 and main; also on PRs targeting these branches.
+# Triggers on push to wip_1.16 / wip_v1.17 and main; also on PRs targeting these branches.
+#
+# v1.17 A0 (2026-08-07): add wip_v1.17 to trigger branches (FCEUX11-1.17_计划.md Phase A).
 
 name: KagamiQA
 
 on:
   push:
-    branches: [main, wip_1.16]
+    branches: [main, wip_1.16, wip_v1.17]
   pull_request:
-    branches: [main, wip_1.16]
+    branches: [main, wip_1.16, wip_v1.17]
   workflow_dispatch:  # allow manual trigger
 
 jobs:
@@ -411,10 +413,20 @@ jobs:
             $failures += "transition_matrix.fail_to_pass is $f2pCount, expected 0 (Phase 0.5-d anti-gaming guard did not hold in CI)"
           }
 
+          # Task 5 (FCEUX11-1.17_计划.md §6): release-readiness grade. D/E
+          # means a blocking failure or regression (D) or a broken engine
+          # boot (E) — either forbids merging.
+          $grade = $m.grade
+          if ($null -eq $grade -or $grade -eq '') {
+            $failures += "matrix grade is missing (Task 5 grade field not emitted by runner)"
+          } elseif ($grade -eq 'D' -or $grade -eq 'E') {
+            $failures += "matrix grade is $grade (D/E are release-blocking: blocking failure, regression, or engine-boot failure)"
+          }
+
           if ($failures.Count -gt 0) {
             foreach ($f in $failures) { Write-Host "::error::R4 gate: $f" }
             Write-Host "::error::R4 gate failed - per the acceptance report section 10 R4 falsification criteria, do NOT merge until this is resolved."
             exit 1
           }
 
-          Write-Host "R4 gate passed: git_rev=$gitRev, total=$($m.summary.total), passed=$($m.summary.passed), failed=$($m.summary.failed), fail_to_pass=0 [OK]"
+          Write-Host "R4 gate passed: git_rev=$gitRev, total=$($m.summary.total), passed=$($m.summary.passed), failed=$($m.summary.failed), grade=$grade, fail_to_pass=0 [OK]"
