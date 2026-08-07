@@ -589,6 +589,25 @@ static void FrameCounterTick(void)
    else if (fhcnt==37281) FrameSoundEvent(true,true);
    else if (fhcnt==37282) { fhcnt=0; fcnt=0; }
   }
+  // E-3 Track-B probe (v1.17 R6 task, 2026-08-08): FIVE_STEP_EXTRA
+  // recorder at the 5-step (mode 1) terminal boundary. The 5-step
+  // sequence ends with a length-clock step (fhcnt==37281 NTSC /
+  // 41565 PAL) WITHOUT setting an IRQ and WITHOUT resetting fhcnt on
+  // that same call — the wrap to 0 happens at fhcnt==37282/41566
+  // which is the next iteration. This E3B FIVE_STEP_EXTRA fires only
+  // when the 5-step's *terminal-event* boundary is hit, so the
+  // blargg apu_single_4_jitter / apu_07 / apu_08 inter-IRQ-period
+  // observation can verify the sequence really is 37281.5 cycles
+  // for 5-step (mode 1) vs 29830 for 4-step (mode 0).
+  if (e3_trace_on() && (IRQFrameMode & 0x2)) {
+   const uint32 wrap_target = PAL ? 41566u : 37282u;
+   if ((uint32)fhcnt == wrap_target) {
+    fprintf(stderr, "E3B FIVE_STEP_EXTRA abs=%llu ts=%u fcnt=%u mode=0x%X fhcnt=%d wrap=%u\n",
+     (unsigned long long)e3_abs_ts, (unsigned)g_cpu.timestamp_ref(),
+     (unsigned)fcnt, (unsigned)IRQFrameMode,
+     fhcnt, wrap_target);
+   }
+  }
  }
  else
  {
