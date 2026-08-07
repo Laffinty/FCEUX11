@@ -1386,6 +1386,23 @@ void FCEUSND_Reset(bool is_power)
 {
 	int x;
 
+	// E-3 Track-B probe (v1.17 R6 task, 2026-08-08): RESET_ENTRY
+	// recorder at the start of FCEUSND_Reset, BEFORE any of the state
+	// mutation. Captures the pre-reset fcnt / IRQFrameMode / fhcnt /
+	// SIRQStat byte so the apu_reset_4017_timing / apu_reset_4017_written
+	// ROMs' "before/after power-on" delta can be measured end-to-end.
+	// Distinct probe name (E3B RESET_ENTRY / E3B RESET_POST) so the
+	// existing instrumentation stays intact while this one tags the
+	// reset boundary specifically. Posts the post-state right after the
+	// initial-state block below as E3B RESET_POST.
+	if (e3_trace_on()) {
+		fprintf(stderr, "E3B RESET_ENTRY abs=%llu ts=%u is_power=%d pre_fcnt=%u pre_mode=0x%X pre_fhcnt=%d pre_sirq=0x%X\n",
+		 (unsigned long long)e3_abs_ts, (unsigned)g_cpu.timestamp_ref(),
+		 (int)is_power,
+		 (unsigned)fcnt, (unsigned)IRQFrameMode,
+		 fhcnt, (unsigned)SIRQStat);
+	}
+
 	// P2 Phase 2 Step 2.1 (2026-08-01): power-on / reset 相位分离。
 	// 硬件语义（blargg_apu_2005.07.30 readme "Misc" + apu_reset/readme.txt，P2 方案 §1.2/§1.4）：
 	//  - power-on：APU 等效"$4017=$00 写 + 9~12 时钟延迟"后开始执行 → IRQFrameMode=0x0（4-step，IRQ 使能）。
