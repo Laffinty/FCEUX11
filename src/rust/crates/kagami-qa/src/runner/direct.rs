@@ -89,19 +89,39 @@ pub fn run_direct_rom_tests(
 
 /// Drive a single ROM test through the adapter, returning its verdict
 /// with the measured duration.
+///
+/// v1.17 H-1: honours `spec.reset_after` (manifest `reset_after` field):
+/// - `-1` (default): step all `frames`, then probe. Unchanged behaviour.
+/// - `0`: load → reset → step all `frames` → probe.
+/// - `N > 0`: load → step N → reset → step (frames - N) → probe.
+/// `N >= frames` collapses to load → step N (= frames) → reset → probe 0
+/// (the post-reset probe happens before any post-reset stepping — same as
+/// the C++ `blargg_runner --reset-after` semantics; the post-reset value
+/// reflects state immediately after the soft reset, not after running).
 fn run_one(adapter: &mut dyn SutAdapter, id: &str, test: &TestManifest) -> TestResult {
     let start = Instant::now();
     let spec = InputSpec::from_manifest(test);
 
     let mut result = match adapter.load(&spec) {
         Ok(()) => {
-            let mut step_ok = true;
-            for _f in 0..spec.frames {
-                if adapter.step().is_err() {
-                    step_ok = false;
-                    break;
-                }
-            }
+            // Plan the step sequence honouring reset_after.
+            let frames = spec.frames;
+            let reset_at = if spec.reset_after < 0 {
+                // -1 → no mid-run reset
+                None
+            } else if spec.reset_after == 0 {
+                // 0 → reset immediately, then step all frames
+                Some(0)
+            } else if spec.reset_after as u64 >= frames as u64 {
+                // reset_after >= frames → reset after stepping all frames,
+                // then probe post-reset value (rare; mainly useful for ROMs
+                // whose $6000 only updates right after a reset)
+                Some(frames)
+            } else {
+                Some(spec.reset_after as u32)
+            };
+
+            let step_ok = step_with_optional_reset(adapter, frames, reset_at);
             if step_ok {
                 match adapter.read_oracle_probe(spec.probe_addr) {
                     Ok(val) => {
@@ -133,6 +153,33 @@ fn run_one(adapter: &mut dyn SutAdapter, id: &str, test: &TestManifest) -> TestR
     let _ = adapter.reset();
     result.duration_ms = start.elapsed().as_millis() as u64;
     result
+}
+
+/// Step `frames` total frames, inserting one soft reset at `reset_at` if
+/// Some(N). `reset_at == 0` resets before any stepping; `reset_at ==
+/// frames` resets after all stepping (then the caller probes post-reset).
+/// Returns false on the first step error.
+fn step_with_optional_reset(
+    adapter: &mut dyn SutAdapter,
+    frames: u32,
+    reset_at: Option<u32>,
+) -> bool {
+    if let Some(0) = reset_at {
+        if adapter.reset().is_err() {
+            return false;
+        }
+    }
+    for f in 0..frames {
+        if adapter.step().is_err() {
+            return false;
+        }
+        if Some(f + 1) == reset_at {
+            if adapter.reset().is_err() {
+                return false;
+            }
+        }
+    }
+    true
 }
 
 /// Build a FAIL result for a direct-mode execution failure.
@@ -179,6 +226,13 @@ mod tests {
         }
     }
 
+    fn make_test_with_reset(id: &str, frames: u32, reset_after: i64) -> TestManifest {
+        let mut t = make_test(id, 30);
+        t.input.args = vec!["--frames".into(), frames.to_string()];
+        t.input.reset_after = reset_after;
+        t
+    }
+
     fn manifest_of(tests: Vec<TestManifest>) -> BTreeMap<String, TestManifest> {
         tests.into_iter().map(|t| (t.id.clone(), t)).collect()
     }
@@ -202,6 +256,15 @@ mod tests {
     struct FixedAdapter {
         val: u8,
         step_sleep_ms: u64,
+        /// Counts of `step()` and `reset()` calls — used by reset_after tests.
+        step_count: u32,
+        reset_count: u32,
+    }
+
+    impl FixedAdapter {
+        fn new(val: u8) -> Self {
+            Self { val, step_sleep_ms: 0, step_count: 0, reset_count: 0 }
+        }
     }
 
     impl SutAdapter for FixedAdapter {
@@ -215,6 +278,7 @@ mod tests {
             Ok(())
         }
         fn step(&mut self) -> Result<(), QaError> {
+            self.step_count += 1;
             if self.step_sleep_ms > 0 {
                 std::thread::sleep(std::time::Duration::from_millis(self.step_sleep_ms));
             }
@@ -224,6 +288,7 @@ mod tests {
             Ok(self.val)
         }
         fn reset(&mut self) -> Result<(), QaError> {
+            self.reset_count += 1;
             Ok(())
         }
     }
@@ -234,7 +299,7 @@ mod tests {
             make_test("pass_test", 30),
             make_test("fail_test", 30),
         ]);
-        let mut adapter = FixedAdapter { val: 0x01, step_sleep_ms: 0 };
+        let mut adapter = FixedAdapter::new(0x01);
         // First run: val 0x01 → both FAIL.
         let results = run_direct_rom_tests(&mut adapter, &manifest);
         assert_eq!(results.len(), 2);
@@ -271,7 +336,7 @@ mod tests {
     fn timeout_overrun_is_scored_fail() {
         // timeout_seconds = 1; each step sleeps 250ms × 10 frames = 2.5s.
         let manifest = manifest_of(vec![make_test("slow_test", 1)]);
-        let mut adapter = FixedAdapter { val: 0x00, step_sleep_ms: 250 };
+        let mut adapter = FixedAdapter { val: 0x00, step_sleep_ms: 250, step_count: 0, reset_count: 0 };
         let results = run_direct_rom_tests(&mut adapter, &manifest);
         assert_eq!(results.len(), 1);
         let r = &results[0];
@@ -287,7 +352,7 @@ mod tests {
     #[test]
     fn fast_test_within_budget_stays_pass() {
         let manifest = manifest_of(vec![make_test("fast_test", 30)]);
-        let mut adapter = FixedAdapter { val: 0x00, step_sleep_ms: 0 };
+        let mut adapter = FixedAdapter::new(0x00);
         let results = run_direct_rom_tests(&mut adapter, &manifest);
         assert_eq!(results.len(), 1);
         assert!(results[0].passed);
@@ -299,8 +364,84 @@ mod tests {
         let mut t = make_test("script_test", 30);
         t.input.rom = None;
         let manifest = manifest_of(vec![t]);
-        let mut adapter = FixedAdapter { val: 0x00, step_sleep_ms: 0 };
+        let mut adapter = FixedAdapter::new(0x00);
         let results = run_direct_rom_tests(&mut adapter, &manifest);
         assert!(results.is_empty());
+    }
+
+    // ------------------------------------------------------------------
+    // v1.17 H-1: reset_after behaviour
+    // ------------------------------------------------------------------
+
+    /// Default reset_after = -1 → no mid-run reset. step() runs all frames,
+    /// and the only `reset()` call is the cleanup at the end of `run_one`.
+    #[test]
+    fn reset_after_default_minus_one_no_mid_run_reset() {
+        let manifest = manifest_of(vec![make_test_with_reset("a", 10, -1)]);
+        let mut adapter = FixedAdapter::new(0x00);
+        let _ = run_direct_rom_tests(&mut adapter, &manifest);
+        assert_eq!(adapter.step_count, 10, "all 10 frames stepped");
+        assert_eq!(adapter.reset_count, 1, "only cleanup reset at end");
+    }
+
+    /// reset_after = 0 → load → reset → step all frames → probe.
+    /// 1 mid-run reset + 1 cleanup reset = 2 total resets.
+    #[test]
+    fn reset_after_zero_resets_before_stepping() {
+        let manifest = manifest_of(vec![make_test_with_reset("a", 10, 0)]);
+        let mut adapter = FixedAdapter::new(0x00);
+        let _ = run_direct_rom_tests(&mut adapter, &manifest);
+        assert_eq!(adapter.step_count, 10, "all 10 frames still stepped");
+        assert_eq!(adapter.reset_count, 2, "1 mid-run + 1 cleanup reset");
+    }
+
+    /// reset_after = N > 0 → step N, reset, step (frames - N), probe.
+    /// mid-run reset + cleanup reset.
+    #[test]
+    fn reset_after_mid_value_inserts_reset() {
+        let manifest = manifest_of(vec![make_test_with_reset("a", 10, 4)]);
+        let mut adapter = FixedAdapter::new(0x00);
+        let _ = run_direct_rom_tests(&mut adapter, &manifest);
+        assert_eq!(adapter.step_count, 10, "all 10 frames stepped (4+6)");
+        assert_eq!(adapter.reset_count, 2, "1 mid-run + 1 cleanup reset");
+    }
+
+    /// reset_after > frames → step all frames, then reset, then probe.
+    /// mid-run reset is scheduled after the last step so it acts as a
+    /// post-run reset. The probe happens after this reset, not before.
+    #[test]
+    fn reset_after_larger_than_frames_resets_at_end() {
+        let manifest = manifest_of(vec![make_test_with_reset("a", 5, 100)]);
+        let mut adapter = FixedAdapter::new(0x00);
+        let _ = run_direct_rom_tests(&mut adapter, &manifest);
+        assert_eq!(adapter.step_count, 5, "all 5 frames stepped");
+        assert_eq!(adapter.reset_count, 2, "1 mid-run reset (after step 5) + 1 cleanup");
+    }
+
+    /// reset_after exactly == frames → same as reset_after > frames.
+    #[test]
+    fn reset_after_equal_to_frames() {
+        let manifest = manifest_of(vec![make_test_with_reset("a", 5, 5)]);
+        let mut adapter = FixedAdapter::new(0x00);
+        let _ = run_direct_rom_tests(&mut adapter, &manifest);
+        assert_eq!(adapter.step_count, 5);
+        assert_eq!(adapter.reset_count, 2);
+    }
+
+    /// Multiple tests with mixed reset_after values run independently —
+    /// each test gets its own step/reset accounting.
+    #[test]
+    fn mixed_reset_after_across_tests() {
+        let manifest = manifest_of(vec![
+            make_test_with_reset("no_reset", 10, -1),
+            make_test_with_reset("reset_zero", 10, 0),
+            make_test_with_reset("reset_mid", 10, 3),
+        ]);
+        let mut adapter = FixedAdapter::new(0x00);
+        let _ = run_direct_rom_tests(&mut adapter, &manifest);
+        // 3 tests × 10 frames each = 30 steps
+        assert_eq!(adapter.step_count, 30);
+        // reset counts: 1 (default cleanup only) + 2 (zero) + 2 (mid) = 5
+        assert_eq!(adapter.reset_count, 5);
     }
 }

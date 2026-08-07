@@ -68,6 +68,14 @@ pub struct TestInput {
     /// P3: Lua script path for Lua script channel (run via fceux11_lua_runner).
     #[serde(default)]
     pub script_path: Option<String>,
+    /// v1.17 H-1: if > 0, the runner steps this many frames, then issues a
+    /// soft reset, then steps the remaining frames. -1 = no mid-run reset
+    /// (default). 0 = reset immediately after load. This is a sibling
+    /// parameter to `probe_addr` / `frames` — same scope (Oracle B driving),
+    /// same shape (i64 default), same justification (blargg `$6000` protocol
+    /// has ROMs that need a one-shot reset partway through to converge).
+    #[serde(default)]
+    pub reset_after: i64,
 }
 
 /// Expected outcome for the test.
