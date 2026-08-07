@@ -361,6 +361,7 @@ where
         script_path: None,
         frames: FRAMES_TO_RUN,
         probe_addr: 0x6000,
+        reset_after: -1,
     };
     adapter.load(&spec)?;
     for frame in 0..FRAMES_TO_RUN {

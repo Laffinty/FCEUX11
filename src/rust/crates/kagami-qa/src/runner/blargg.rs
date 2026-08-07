@@ -271,6 +271,7 @@ pub fn run_one_rom<A: SutAdapter + ?Sized>(
         script_path: None,
         frames: entry.frames,
         probe_addr: entry.probe_addr,
+        reset_after: entry.reset_after as i64,
     };
     adapter.load(&spec)?;
 

@@ -299,6 +299,7 @@ where
         script_path: None,
         frames: frame_count,
         probe_addr: 0x6000,
+        reset_after: -1,
     };
     adapter.load(&spec)?;
 
