@@ -556,42 +556,59 @@ FCEUX11/
 │   ├── tests.json                          ← 47 条测试清单（27 Oracle A + 20 Oracle B；Phase 4.4 扩 8 项）
 │   ├── fixtures/
 │   │   ├── blargg/                         ← 177 blargg ROM (cpu/ppu/apu/mmc3/)
-│   │   ├── blargg_manifest.json            ← ROM 清单（name/path/frames/probe_addr）
+│   │   ├── blargg_manifest.json            ← ROM 清单（name/path/frames/probe_addr/reset_after；v1.17 H-1 全条目含 reset_after）
 │   │   ├── blargg_known_fail.json          ← 已知失败分类（60 条，含 runppu 标记）
 │   │   ├── blargg_full_baseline.json       ← P5 全量基线（120 PASS / 60 FAIL）
+│   │   ├── golden/                         ← golden savestate 数据（.fc0 + golden_index.json；v1.17 决策：数据留此处）
 │   │   └── nestest.nes                     ← smoke test ROM
-│   ├── blargg_runner.cpp                   ← Oracle B 执行器（C++, headless）
-│   ├── lua_runner.cpp                      ← Lua 脚本执行器（C++, headless, P5 断言捕获）
-│   └── kagami_direct_main.cpp              ← Direct runner C++ 入口（P5）
+│   ├── kagami/                             ← KagamiQA C++ 资产唯一落点（v1.17 Task2-A1 落位）
+│   │   ├── *.cpp                           ← 🅑 永久驻留：核心单元/门禁/平台测试
+│   │   │                                      （smoke/headless_smoke/core_state/enum_class/
+│   │   │                                       expected_api/config_store/pixbuf_pool/i18n_regression/
+│   │   │                                       ppu_phase_c/d/ppu_rendering_lut）
+│   │   ├── boards/                         ← mapper_load/reset_test.cpp
+│   │   ├── core/                           ← cpu/ppu/apu/bus/mapper/savestate/cart_class/fds_load/
+│   │   │                                      driver_callbacks/core_driver_boundary_test.cpp
+│   │   ├── benchmark/                      ← 5 Google Benchmark + ppu_simd_probe
+│   │   ├── benchmarks/                     ← bench_tolerance_test.cpp（baseline JSON 留 tests/benchmarks/）
+│   │   └── utils/                          ← xstring_microbench.cpp
+│   ├── blargg_runner.cpp                   ← Oracle B 执行器（C++, headless；v1.17 待 Task1 迁移后删除）
+│   ├── lua_runner.cpp                      ← Lua 脚本执行器（C++, headless；待迁移）
+│   ├── kagami_direct_main.cpp              ← Direct runner C++ 入口（待迁移）
+│   ├── rom_regression_test.cpp             ← ROM 回归（C++, 待迁移）
+│   ├── savestate_regression_test.cpp       ← savestate 回归（C++, 待迁移）
+│   ├── core/                               ← 🅐 待迁移：ppu_frame/apu_wav/mapper_byte_diff_test.cpp + test_helpers.h
+│   └── git_info_stub.cpp                   ← 构建支持（留 tests/ 根，v1.17 决策③）
 ├── src/
-│   ├── kagami_bridge.h                     ← C ABI 桥接头文件
+│   ├── kagami_bridge.h                     ← C ABI 桥接头文件（v1.17 Track C：+extract_frame_buffer/save_state）
 │   ├── kagami_bridge.cpp                   ← C ABI 桥接实现（编译进 fceux11_core）
 │   └── rust/crates/kagami-qa/
 │       ├── src/
-│       │   ├── main.rs                     ← CLI runner 二进制
-│       │   ├── lib.rs                      ← Rust 库（含 C-callable direct 入口）
-│       │   ├── adapter/
-│       │   │   ├── trait_def.rs            ← SutAdapter trait + InputSpec/TESTResult
-│       │   │   ├── subprocess.rs           ← SubprocessAdapter（fork 子进程）
-│       │   │   └── direct.rs              ← Fceux11DirectAdapter（C ABI FFI）
-│       │   ├── manifest/                   ← 测试清单加载（tests.json 解析）
-│       │   ├── oracle/
-│       │   │   ├── regression.rs           ← Oracle A 判定（exit code + stdout）
-│       │   │   └── hardware.rs             ← Oracle B 判定（$6000 协议解析）
-│       │   ├── runner/scheduler.rs         ← 测试调度器
-│       │   └── report/
-│       │       ├── matrix.rs               ← 迁移矩阵生成
-│       │       └── baseline.rs            ← 基线加载/保存/漂移检测
+│       │   ├── main.rs                     ← CLI runner 入口（v1.17 Task4 拆分后 <150 行）
+│       │   ├── lib.rs                      ← Rust 库（含 C-callable direct 入口 + blargg/rom_regression/savestate C-ABI）
+│       │   ├── cli/                        ← L7：args/run_subprocess/run_direct/run_report
+│       │   ├── report/                     ← L6：matrix/baseline/grade（v1.17 Task5 A-E 分级）
+│       │   ├── runner/                     ← L5：scheduler + direct（看门狗）+ blargg/rom_regression/savestate harness
+│       │   ├── oracle/                     ← L4：regression.rs(A) / hardware.rs(B)
+│       │   ├── adapter/                    ← L3：trait_def/subprocess/direct
+│       │   ├── manifest/                   ← L2：schema/parser/filter（--filter 表达式）
+│       │   └── core/                       ← L1：config/error
 │       └── Cargo.toml
+├── tools/
+│   ├── add_reset_after.py                  ← v1.17 H-1：manifest reset_after 批量补全
+│   ├── verify_manifest.py                  ← v1.17 H-1：manifest 完整性校验
+│   └── verify_no_0x80.py                   ← v1.17 H-2：0x80/0x81 校准状态检测
 ├── scripts/
 │   ├── download_blargg_roms.ps1            ← ROM 下载（177 条目，幂等）
 │   ├── generate_blargg_manifest.ps1        ← 清单生成器
 │   └── analyze_blargg_results.ps1          ← 结果分析/分类
 ├── .github/workflows/
 │   ├── ci.yml                              ← 主 CI（build + ctest + benchmark）
-│   └── kagami-qa.yml                       ← KagamiQA CI（Oracle A+B + 矩阵 + 漂移检测）
+│   └── kagami-qa.yml                       ← KagamiQA CI（Oracle A+B + 矩阵 + grade + 漂移检测）
 └── docs/tech/
-    └── KagamiQA.md                         ← 本文档
+    ├── KagamiQA.md                         ← 本文档
+    ├── R5_instrument_first_data.md         ← v1.17 R5 (E-1) PPU VBL/NMI 探针数据（Track-B）
+    └── R6_instrument_first_data.md         ← v1.17 R6 (E-3) APU 帧计数器探针数据（Track-B）
 ```
 
 ---
