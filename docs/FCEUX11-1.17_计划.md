@@ -121,22 +121,28 @@ src/rust/crates/kagami-qa/     ← Rust 主体（已独立）
 
 ```
 tests/kagami/                        ← KagamiQA C++ 资产唯一落点（新建）
-  ├── CMakeLists.txt                 ← 独立子构建（或 tests/CMakeLists.txt 内分区）
   ├── blargg_runner.cpp              ← 任务 1 迁移完成后删除（暂存）
   ├── lua_runner.cpp                 ← 任务 1 迁移完成后删除（暂存）
   ├── kagami_direct_main.cpp         ← 任务 1 迁移完成后删除（暂存）
-  └── core/                          ← 不可迁移单元测试集中存放
+  ├── core/ boards/ benchmark/       ← 不可迁移测试分区
+  │      benchmarks/ utils/             （44 文件完整映射见落位清单）
+  └── 无独立 CMakeLists（方案 B：tests/CMakeLists.txt 内改源路径——
+      2026-08-08 已定，避免 CMAKE_CURRENT_SOURCE_DIR 变化破坏 fixture 路径）
 src/kagami/                          ← 引擎侧桥接（决策点 3.4，建议保留于 src/ 根）
   └── kagami_bridge.cpp/h
 ```
+
+> 完整 44 文件映射、CMake 改动点、登记核对表与验收门禁见
+> **`docs/FCEUX11-1.17_Task2-落位清单.md`**（执行级清单，本计划为策略级）。
 
 ### 3.4 实施步骤与决策点
 
 1. **决策点（桥接归属）**：`kagami_bridge` 被编译进 `fceux11_core`，是引擎的 FFI 面（双向资产）。**建议保守处理**：桥接保留在 `src/`（不移动，避免 `src/CMakeLists.txt` 构建链扰动），在文档中显式声明其「KagamiQA 资产但引擎链接」的边界属性。若坚持物理隔离，需单独评估 `src/CMakeLists.txt` 改动与链接顺序风险。
 2. **`tests/kagami/` 落位**：移动不可迁移测试文件；保持 **CTest 测试名不变**（`cpu_test` 等），只改源文件路径，保证 CI 历史对比有效。
-3. **路径修正**：`WORKING_DIRECTORY`、fixture 相对路径（`fixtures/...`）、PATH 注入列表（`tests/CMakeLists.txt` 的 `set_tests_properties` 名单）同步更新。
+3. **路径修正（方案 B 下大部分不变）**：`WORKING_DIRECTORY` 与 fixture 相对路径（`fixtures/...`）**保持不变**（单一 CMakeLists 的收益）；PATH 注入名单（`tests/CMakeLists.txt` 的 `set_tests_properties` 测试名列表）**确认无需改动**；仅 `add_executable` 源路径与 include 目录（`tests/core` → `tests/kagami/core`）需更新。
 4. **manifest 登记核对**：确认 47 条 `tests.json` 条目与 `tests/kagami/` + `tests/` 其余文件一一对应，无游离测试。
 5. **文档**：KagamiQA.md §五「目录结构」更新为统合后布局。
+6. **决策记录（2026-08-08，落位清单 §六 四项已拍板）**：① `ppu_phase_b_test.cpp` 孤儿文件**归档删除**（invariant 已由 phase_c/d 覆盖）；② `golden_savestate_test.cpp` 源码**移入 `tests/kagami/`**（`.fc0` 数据与 `golden_index.json` 留 `fixtures/golden/`）；③ `git_info_stub.cpp` **留 `tests/` 根**（构建支持）；④ bench baseline JSON **留 `tests/benchmarks/`**（`WORKING_DIRECTORY` 不变则路径稳定）。
 
 ### 3.5 验收门禁
 
