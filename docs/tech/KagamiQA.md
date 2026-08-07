@@ -144,6 +144,31 @@ TASVideos 精度表、第二个模拟器差分、真机采集），而非在同�
 
 **权威性不要求 Oracle B 全部 PASS**。精确知道什么失败，比「全绿但不测」更权威。已知失败清单本身就是防线的一部分。
 
+### 1.5 分级标准（v1.17，Task 5）
+
+每次运行产出一个**机器可算、可审计的发布等级**（`report/grade.rs` → 矩阵 JSON `grade` 字段），
+判定基于同一份不可篡改的矩阵数据，不新增判定通道：
+
+| 级 | 名称 | 判定规则（全部满足才升级） | 含义 |
+|---|---|---|---|
+| **A** | 完美通过 | 无任何 FAIL ∧ 无 PASS→FAIL ∧ 无 skipped | 所有测试通过，无已知限制 |
+| **B** | 符合发布标准 | 无 blocking FAIL ∧ 无 PASS→FAIL ∧ 剩余 FAIL 全部在**冻结基线**内（`fail_to_fail`，无 `new_test` FAIL） | 与上版同口径，可发布 |
+| **C** | 可接受的发布标准 | 无 blocking FAIL ∧ 无 PASS→FAIL ∧ 所有 FAIL 均为 advisory（有据已知限制） | 有已知限制但全部有据编目，可发布 |
+| **D** | 不允许发布 | 任一 blocking FAIL ∨ 任一 PASS→FAIL 回归 | 有回归或门禁测试失败 |
+| **E** | 基本功能受损 | `smoke_test` / `headless_smoke_test`（或带 `engine-boot` tag）FAIL | 引擎本身坏了 |
+
+要点：
+
+1. **单调门限**：等级是累积满足关系。B 需要能证明 FAIL 在冻结基线内（即 runner 带 `--baseline`
+   且 transition 显示 `fail_to_fail`）；**无 baseline 时保守封顶 C**——这正是当前 CI 口径
+   （不带 `--baseline`）下 v1.16 基线 = **C 级**的原因，且 `grade_reasons` 会明说差在哪。
+2. **E 级判定源**：`smoke_test` / `headless_smoke_test` 是唯一测「引擎能启动」的测试，
+   按其 id 或 `engine-boot` tag 识别。
+3. **R4 Gate 扩展**（v1.17）：`grade` 为 D/E 时 CI 判红禁止合并；`grade` 从 C 升 B 是
+   v1.17 收敛目标的机器化体现（要求以冻结 baseline 运行并保持无新增已知限制）。
+4. **与反 gaming 兼容**：等级基于同一矩阵数据，新增测试进 `new_test` 桶的纪律不变；
+   「新增 FAIL 即 C」的设计使「用新测试刷等级」无利可图。
+
 ---
 
 ## 二、使用帮助 / Usage

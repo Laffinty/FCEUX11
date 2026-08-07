@@ -13,6 +13,7 @@ use serde::Serialize;
 use std::collections::BTreeMap;
 
 use crate::adapter::trait_def::TestResult;
+use crate::report::grade::Grade;
 
 // ---------------------------------------------------------------------------
 // Engine metadata
@@ -173,6 +174,13 @@ pub struct MigrationMatrix {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub test_set_diff: Option<TestSetDiff>,
     pub details: Vec<TestDetail>,
+    /// Release-readiness grade (Task 5 / FCEUX11-1.17_计划.md §6).
+    /// Set by the report layer via `compute_grade`; defaults to C until
+    /// graded so ungraded matrices serialise deterministically.
+    pub grade: Grade,
+    /// Why the run did not reach a higher grade (empty for A).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub grade_reasons: Vec<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -321,6 +329,8 @@ pub fn build_matrix(
         baseline_drift: drifts,
         test_set_diff,
         details,
+        grade: Grade::default(),
+        grade_reasons: Vec::new(),
     }
 }
 

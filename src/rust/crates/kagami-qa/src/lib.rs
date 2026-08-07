@@ -4,6 +4,7 @@ pub mod runner;
 pub mod oracle;
 pub mod report;
 pub mod adapter;
+pub mod cli;
 
 // =========================================================================
 // P5: C-callable entry point for kagami_qa_direct_runner (CMake target).
@@ -11,23 +12,25 @@ pub mod adapter;
 // Called from tests/kagami_direct_main.cpp when the direct runner is built
 // via CMake with the direct-adapter Cargo feature enabled.
 //
-// This function parses CLI args, loads the test manifest, and runs all
-// Oracle B tests in-process using Fceux11DirectAdapter (C ABI bridge).
+// Task 4 (FCEUX11-1.17_计划.md §5.3 step 2): the per-test driving loop no
+// longer lives here — it was deduplicated into
+// `runner::direct::run_direct_rom_tests`, shared with the CLI `--direct`
+// mode. This module parses CLI args, loads the manifest, delegates to the
+// shared core, and computes the exit code from blocking failures.
 // =========================================================================
 
 #[cfg(feature = "direct-adapter")]
 pub mod direct_entry {
-    use std::collections::BTreeMap;
     use std::ffi::CStr;
     use std::os::raw::c_char;
     use std::path::PathBuf;
 
     use crate::adapter::direct::Fceux11DirectAdapter;
-    use crate::adapter::trait_def::{InputSpec, SutAdapter};
+    use crate::adapter::trait_def::SutAdapter;
     use crate::manifest::parser::load_manifest;
+    use crate::runner::direct::run_direct_rom_tests;
 
     /// Main entry point called from C++ (kagami_direct_main.cpp).
-    /// Parses CLI args and runs Oracle B tests in-process.
     ///
     /// Stage-2 §七 (C-1): this function deliberately does NOT carry
     /// `#[unsafe(no_mangle)]`. The exported C-ABI symbol `kagami_qa_direct_main`
@@ -54,7 +57,7 @@ pub mod direct_entry {
             }
         }
 
-        // Parse key flags (same as main.rs).
+        // Parse key flags (same as the CLI).
         let mut manifest_path = PathBuf::from("tests/tests.json");
         let mut output_path = PathBuf::from("kagamiqa_direct_matrix.json");
         let mut i = 1;
@@ -89,106 +92,46 @@ pub mod direct_entry {
         };
         eprintln!("Loaded {} test entries.", manifest.len());
 
-        // Run Oracle B tests via direct adapter.
+        // Task 4: drive the emulator through the shared execution core —
+        // the same code path the CLI `--direct` mode uses.
         let mut direct_adapter = Fceux11DirectAdapter::new();
-        let mut passed = 0;
-        let mut failed = 0;
-        let mut blocking_failed = 0;
-        let mut results = Vec::new();
+        let results = run_direct_rom_tests(&mut direct_adapter, &manifest);
 
-        for (id, test) in &manifest {
-            if test.input.rom.is_some() {
-                let spec = InputSpec::from_manifest(test);
-                eprint!("  [direct] {}: {} frames...", id, spec.frames);
-
-                match direct_adapter.load(&spec) {
-                    Ok(()) => {
-                        let mut step_ok = true;
-                        for _f in 0..spec.frames {
-                            if direct_adapter.step().is_err() {
-                                step_ok = false;
-                                break;
-                            }
-                        }
-                        if step_ok {
-                            match direct_adapter.read_oracle_probe(spec.probe_addr) {
-                                Ok(val) => {
-                                    let is_pass = val == 0x00;
-                                    if is_pass {
-                                        passed += 1;
-                                        eprintln!(" PASS (0x00)");
-                                    } else {
-                                        failed += 1;
-                                        if matches!(
-                                            test.failure_means,
-                                            crate::manifest::schema::FailureSeverity::Blocking
-                                        ) {
-                                            blocking_failed += 1;
-                                        }
-                                        eprintln!(" FAIL (0x{:02X})", val);
-                                    }
-                                    results.push(crate::adapter::trait_def::TestResult {
-                                        test_id: id.clone(),
-                                        passed: is_pass,
-                                        exit_code: if is_pass { 0 } else { 1 },
-                                        stdout: format!(
-                                            "BLARGG_RESULT: rom={} value=0x{:02X} status={}",
-                                            id,
-                                            val,
-                                            if is_pass { "PASS" } else { "FAIL" }
-                                        ),
-                                        stderr: String::new(),
-                                        duration_ms: 0,
-                                        migration_note: Some("direct-adapter".into()),
-                                    });
-                                }
-                                Err(e) => {
-                                    failed += 1;
-                                    if matches!(
-                                        test.failure_means,
-                                        crate::manifest::schema::FailureSeverity::Blocking
-                                    ) {
-                                        blocking_failed += 1;
-                                    }
-                                    eprintln!(" PROBE_ERROR: {:?}", e);
-                                }
-                            }
-                        } else {
-                            failed += 1;
-                            if matches!(
-                                test.failure_means,
-                                crate::manifest::schema::FailureSeverity::Blocking
-                            ) {
-                                blocking_failed += 1;
-                            }
-                            eprintln!(" STEP_ERROR");
-                        }
-                        let _ = direct_adapter.reset();
-                    }
-                    Err(e) => {
-                        failed += 1;
-                        if matches!(
-                            test.failure_means,
+        let total = results.len();
+        let passed = results.iter().filter(|r| r.passed).count();
+        let failed = total - passed;
+        let blocking_failed = results
+            .iter()
+            .filter(|r| !r.passed)
+            .filter(|r| {
+                manifest
+                    .get(&r.test_id)
+                    .map(|t| {
+                        matches!(
+                            t.failure_means,
                             crate::manifest::schema::FailureSeverity::Blocking
-                        ) {
-                            blocking_failed += 1;
-                        }
-                        eprintln!(" LOAD_ERROR: {:?}", e);
-                    }
-                }
-            }
-        }
+                        )
+                    })
+                    .unwrap_or(false)
+            })
+            .count();
 
+        for r in &results {
+            eprintln!(
+                "  [direct] {}: {}",
+                r.test_id,
+                if r.passed { "PASS" } else { "FAIL" }
+            );
+        }
         eprintln!(
             "Direct run complete: {} total, {} PASS, {} FAIL ({} blocking)",
-            passed + failed,
+            total,
             passed,
             failed,
             blocking_failed
         );
 
         // Write minimal JSON report.
-        let total = passed + failed;
         let report = serde_json::json!({
             "runner": "kagami-qa-direct-runner",
             "mode": "in-process",
@@ -213,4 +156,3 @@ pub mod direct_entry {
         if blocking_failed > 0 { 1 } else { 0 }
     }
 }
-

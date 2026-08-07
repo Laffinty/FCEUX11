@@ -22,7 +22,7 @@ fn default_timeout() -> u64 {
     60
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OracleType {
     /// Regression-equivalence (exit-code based, unit tests).
     #[serde(rename = "A")]
@@ -32,7 +32,7 @@ pub enum OracleType {
     B,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TestLayer {
     #[serde(rename = "core")]
     Core,
@@ -79,7 +79,7 @@ pub struct ExpectedResult {
 }
 
 /// Severity classification for failures.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FailureSeverity {
     /// Must pass; blocks release / CI gate.
     #[serde(rename = "blocking")]
