@@ -1671,6 +1671,19 @@ int FCEUX_PPU_Loop(int skip) {
 			ppur.status.sl++;
 		}
 
+		// E-1 Track-B probe (v1.17 R5 task, 2026-08-08): VBL_CLR recorder.
+		// Captures the pre-clear PPU_status byte plus scanline/cycle/count
+		// so vbl_03 / vbl_09 timing-window FAILs can be characterized with
+		// the exact dot the flag was cleared, regardless of when the existing
+		// VBL_ENTER / VBL_AFTER_NMIDELAY probes fire. Zero-intrusion; env-gated
+		// by FCEUX11_E1_TRACE. Marks the second event of one frame's VBL
+		// span (VBL_SET -> NMI dispatch -> VBL_CLR).
+		if (e1_trace_on()) {
+			fprintf(stderr, "E1B VBL_CLR abs=%llu sl=%d cycle=%d count=%d lastpc=%04X PPU_status_pre=0x%02X\n",
+			 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()),
+			 ppur.status.sl, ppur.status.cycle, g_cpu.native_layout().count,
+			 (unsigned)fceu11_e1_last_pc(), (unsigned)PPU_status);
+		}
 		PPU_status = 0;
 		//if(!PPUON) { runppu(kLineTime*242); goto finish; }
 
