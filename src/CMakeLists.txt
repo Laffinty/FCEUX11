@@ -716,6 +716,27 @@ add_subdirectory(rust)
 if(FCEUX11_RUST_ENABLED)
     add_definitions(-DFCEUX11_RUST_ENABLED)
     target_link_libraries(fceux11_utils PUBLIC ${FCEUX11_RUST_STATIC_LIB})
+    # v1.16 R4-fix (2026-08-07): target_link_libraries above only adds a
+    # LINK-step dependency on the .lib — it does NOT schedule the source
+    # .cpp scanning/compilation of fceux11_utils (and the PUBLIC propagates
+    # only at link time) to wait for the merged header fceux11_rust.h.
+    # The 14 source files listed below #include "rust/fceux11_rust.h"
+    # directly or transitively; without this explicit dependency ninja
+    # schedules their `/scanDependencies` step in parallel with cargo
+    # build, and they all fail with C1083 before the header exists.
+    # See: src/rust/CMakeLists.txt (added ${RUST_MERGED_HEADER} to
+    # add_custom_command OUTPUT) for the matching source-of-truth fix.
+    add_dependencies(fceux11_utils fceux11_rust_build)
+    # PUBLIC link propagation covers boards/core/drivers_common/drivers_qt/
+    # drivers_null at the LINK step only; the source-file compile order is
+    # decided by ninja independently. Mirror the same add_dependencies at
+    # every target that compiles a TU including the merged header, so
+    # scanning waits for cargo build to finish.
+    add_dependencies(fceux11_boards fceux11_rust_build)
+    add_dependencies(fceux11_core fceux11_rust_build)
+    add_dependencies(fceux11_drivers_common fceux11_rust_build)
+    add_dependencies(fceux11_drivers_qt fceux11_rust_build)
+    add_dependencies(fceux11_drivers_null fceux11_rust_build)
 endif()
 
 # Put build timestamp into BUILD_TS environment variable and from there into
