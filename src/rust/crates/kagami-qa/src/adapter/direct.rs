@@ -158,7 +158,9 @@ impl SutAdapter for Fceux11DirectAdapter {
                 "kagami_bridge_reset failed: rc={}", rc
             )));
         }
-        self.rom_loaded = false;
+        // Soft reset: the ROM stays loaded in the bridge (kagami_bridge_reset
+        // now calls fceu11::ResetNES, not CloseGame), so keep rom_loaded true
+        // and allow frame-stepping to continue. Task 1 parity fix.
         Ok(())
     }
 }

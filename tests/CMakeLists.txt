@@ -673,5 +673,39 @@ if(FCEUX11_BUILD_TESTS)
             set_tests_properties(kagami_qa_direct_smoke PROPERTIES ENVIRONMENT_MODIFICATION
                     "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
         endif()
+
+        # =====================================================================
+        # Task 1 / C-1 — Rust blargg batch harness (replaces blargg_runner.cpp).
+        #
+        # Kept alongside the C++ runner until parity over the 177-ROM
+        # blargg_manifest.json is verified (Track C gate). Same link pattern
+        # as kagami_qa_direct_runner: headless null driver + fceux11_rust.lib
+        # carrying kagami_qa_blargg_main + userenv/ws2_32/dbghelp.
+        # =====================================================================
+        fceux11_add_headless_test_executable(kagami_qa_blargg_runner
+            kagami/blargg_rust_main.cpp
+            git_info_stub.cpp
+        )
+        target_include_directories(kagami_qa_blargg_runner PRIVATE
+            ${CMAKE_SOURCE_DIR}/tests/kagami/core
+        )
+        target_link_libraries(kagami_qa_blargg_runner PRIVATE
+            userenv
+            ws2_32
+            dbghelp
+        )
+        target_compile_definitions(kagami_qa_blargg_runner PRIVATE
+            __HEADLESS_DRIVER__
+        )
+        # CTest entry: full 177-ROM batch run via the Rust harness
+        # (WORKING_DIRECTORY = tests/ so manifest 'fixtures/...' paths resolve).
+        add_test(NAME blargg_rust_smoke
+                 COMMAND kagami_qa_blargg_runner
+                 --manifest fixtures/blargg_manifest.json
+                 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+        if(WIN32)
+            set_tests_properties(blargg_rust_smoke PROPERTIES ENVIRONMENT_MODIFICATION
+                    "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+        endif()
     endif()
 endif()

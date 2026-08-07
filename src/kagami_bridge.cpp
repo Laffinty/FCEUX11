@@ -135,15 +135,17 @@ uint8_t kagami_bridge_read_ppu(uint16_t addr) {
 int kagami_bridge_reset(void) {
     if (!g_initialised) return -1;
 
-    if (g_rom_loaded) {
-        fceu11::CloseGame();
-        g_rom_loaded = false;
-    }
-
-    fceu11::Kill();
-    g_initialised = false;
-
-    return kagami_bridge_init();
+    // Soft reset (matches C++ blargg_runner's fceu11::ResetNES()): the ROM
+    // stays loaded and the engine stays initialised, so frame-stepping can
+    // continue after the reset. This is what apu_reset_* / cpu_reset_* blargg
+    // ROMs expect (their test begins only after a manual reset).
+    //
+    // The previous implementation (CloseGame + Kill + re-init) unloaded the
+    // ROM, which made every subsequent step() fail with "no ROM loaded" —
+    // Rust-side reset_after runs then produced 0xFE load-failures. Task 1
+    // parity required matching the C++ semantics exactly.
+    fceu11::ResetNES();
+    return 0;
 }
 
 // ---------------------------------------------------------------------------

@@ -32,3 +32,23 @@ pub unsafe extern "C" fn kagami_qa_direct_main(
     // function replicates this contract verbatim.
     unsafe { kagami_qa::direct_entry::kagami_qa_direct_main(argc, argv) }
 }
+
+// =========================================================================
+// Task 1 / C-1 — re-export of kagami_qa_blargg_main.
+//
+// Same rationale as kagami_qa_direct_main above: the staticlib does not
+// propagate #[no_mangle] symbols from rlib transitive deps, so the blargg
+// batch harness entry point must be re-exported here to survive LTO and
+// reach the produced fceux11_rust.lib. Consumed by a thin C++ shim
+// (tests/kagami/blargg_rust_main.cpp) that replaces tests/blargg_runner.cpp
+// once parity is verified.
+// =========================================================================
+#[cfg(feature = "direct-adapter")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn kagami_qa_blargg_main(
+    argc: i32,
+    argv: *const *const std::os::raw::c_char,
+) -> i32 {
+    // SAFETY: argv is constructed by the C caller per the C-ABI contract.
+    unsafe { kagami_qa::blargg_entry::kagami_qa_blargg_main(argc, argv) }
+}
