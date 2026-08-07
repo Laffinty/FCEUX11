@@ -1609,6 +1609,17 @@ int FCEUX_PPU_Loop(int skip) {
 		if (!vbl_set_suppressed) {
 			// Working config: VBL at cycle 0, clear at cycle 0 = 6820 (01-vbl_basics PASS).
 			// Cycle 0->1 shift (02-vbl_set_time) deferred to focused follow-up.
+			// E-1 Track-B probe (v1.17 R5 task, 2026-08-08): VBL_SET
+			// recorder. Fires immediately before PPU_status|=0x80, recording
+			// the PRE-set PPU_status byte alongside the existing VBL_ENTER
+			// footprint. Distinct probe name so VBL_SET (pre-) and VBL_CLR
+			// (pre-, post-verify via next probe) are co-traceable per frame.
+			if (e1_trace_on()) {
+				fprintf(stderr, "E1B VBL_SET abs=%llu sl=%d cycle=%d count=%d lastpc=%04X PPU_status_pre=0x%02X\n",
+				 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()),
+				 ppur.status.sl, ppur.status.cycle, g_cpu.native_layout().count,
+				 (unsigned)fceu11_e1_last_pc(), (unsigned)PPU_status);
+			}
 			PPU_status |= 0x80;
 			ppuphase = PPUPHASE_VBL;
 		} else {
