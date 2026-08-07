@@ -1,1433 +1,1602 @@
 ﻿{
-  "_comment": "KagamiQA P5 鈥?Full blargg test ROM catalog (expanded from P2 22 ROMs). Each ROM uses `$6000-`$6003 protocol.",
-  "_source": "https://github.com/christopherpow/nes-test-roms",
-  "_protocol": "`$6000 = 0x00 PASS, 0x01+ FAIL with diagnostic code",
-  "_downloader": "scripts/download_blargg_roms.ps1",
-  "_total": 180,
-  "roms": [
-    {
-      "name": "apu_01_len_ctr",
-      "path": "fixtures/blargg/apu/apu_01_len_ctr.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_01_len_ctr [apu]"
-    },
-    {
-      "name": "apu_02_len_table",
-      "path": "fixtures/blargg/apu/apu_02_len_table.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_02_len_table [apu]"
-    },
-    {
-      "name": "apu_03_irq_flag",
-      "path": "fixtures/blargg/apu/apu_03_irq_flag.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_03_irq_flag [apu]"
-    },
-    {
-      "name": "apu_04_clock_jitter",
-      "path": "fixtures/blargg/apu/apu_04_clock_jitter.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_04_clock_jitter [apu]"
-    },
-    {
-      "name": "apu_05_len_mode0",
-      "path": "fixtures/blargg/apu/apu_05_len_mode0.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_05_len_mode0 [apu]"
-    },
-    {
-      "name": "apu_06_len_mode1",
-      "path": "fixtures/blargg/apu/apu_06_len_mode1.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_06_len_mode1 [apu]"
-    },
-    {
-      "name": "apu_07_irq_flag_timing",
-      "path": "fixtures/blargg/apu/apu_07_irq_flag_timing.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_07_irq_flag_timing [apu]"
-    },
-    {
-      "name": "apu_08_irq_timing",
-      "path": "fixtures/blargg/apu/apu_08_irq_timing.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_08_irq_timing [apu]"
-    },
-    {
-      "name": "apu_09_reset_timing",
-      "path": "fixtures/blargg/apu/apu_09_reset_timing.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_09_reset_timing [apu]"
-    },
-    {
-      "name": "apu_10_len_halt",
-      "path": "fixtures/blargg/apu/apu_10_len_halt.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_10_len_halt [apu]"
-    },
-    {
-      "name": "apu_11_len_reload",
-      "path": "fixtures/blargg/apu/apu_11_len_reload.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_11_len_reload [apu]"
-    },
-    {
-      "name": "apu_mixer_dmc",
-      "path": "fixtures/blargg/apu/apu_mixer_dmc.nes",
-      "category": "apu",
-      "frames": 2400,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_mixer_dmc [apu] (Step 3.1: audio self-test needs more frames)"
-    },
-    {
-      "name": "apu_mixer_noise",
-      "path": "fixtures/blargg/apu/apu_mixer_noise.nes",
-      "category": "apu",
-      "frames": 2400,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_mixer_noise [apu] (Step 3.1: audio self-test needs more frames)"
-    },
-    {
-      "name": "apu_mixer_square",
-      "path": "fixtures/blargg/apu/apu_mixer_square.nes",
-      "category": "apu",
-      "frames": 2400,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_mixer_square [apu] (Step 3.1: audio self-test needs more frames)"
-    },
-    {
-      "name": "apu_mixer_triangle",
-      "path": "fixtures/blargg/apu/apu_mixer_triangle.nes",
-      "category": "apu",
-      "frames": 2400,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_mixer_triangle [apu] (Step 3.1: audio self-test needs more frames)"
-    },
-    {
-      "name": "apu_reset_4015",
-      "path": "fixtures/blargg/apu/apu_reset_4015.nes",
-      "category": "apu",
-      "frames": 600,
-      "reset_after": 60,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_reset_4015 [apu] (Step 3.1: needs soft reset)"
-    },
-    {
-      "name": "apu_reset_4017_timing",
-      "path": "fixtures/blargg/apu/apu_reset_4017_timing.nes",
-      "category": "apu",
-      "frames": 600,
-      "reset_after": 60,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_reset_4017_timing [apu] (Step 3.1: needs soft reset)"
-    },
-    {
-      "name": "apu_reset_4017_written",
-      "path": "fixtures/blargg/apu/apu_reset_4017_written.nes",
-      "category": "apu",
-      "frames": 600,
-      "reset_after": 60,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_reset_4017_written [apu] (Step 3.1: needs soft reset; sometimes needs a SECOND reset)"
-    },
-    {
-      "name": "apu_reset_irq_cleared",
-      "path": "fixtures/blargg/apu/apu_reset_irq_cleared.nes",
-      "category": "apu",
-      "frames": 600,
-      "reset_after": 60,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_reset_irq_cleared [apu] (Step 3.1: needs soft reset)"
-    },
-    {
-      "name": "apu_reset_len_ctrs",
-      "path": "fixtures/blargg/apu/apu_reset_len_ctrs.nes",
-      "category": "apu",
-      "frames": 600,
-      "reset_after": 60,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_reset_len_ctrs [apu] (Step 3.1: needs soft reset)"
-    },
-    {
-      "name": "apu_reset_works_imm",
-      "path": "fixtures/blargg/apu/apu_reset_works_imm.nes",
-      "category": "apu",
-      "frames": 600,
-      "reset_after": 60,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_reset_works_imm [apu] (Step 3.1: needs soft reset)"
-    },
-    {
-      "name": "apu_single_1_len_ctr",
-      "path": "fixtures/blargg/apu/apu_single_1_len_ctr.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_single_1_len_ctr [apu]"
-    },
-    {
-      "name": "apu_single_2_len_table",
-      "path": "fixtures/blargg/apu/apu_single_2_len_table.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_single_2_len_table [apu]"
-    },
-    {
-      "name": "apu_single_3_irq_flag",
-      "path": "fixtures/blargg/apu/apu_single_3_irq_flag.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_single_3_irq_flag [apu]"
-    },
-    {
-      "name": "apu_single_4_jitter",
-      "path": "fixtures/blargg/apu/apu_single_4_jitter.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_single_4_jitter [apu]"
-    },
-    {
-      "name": "apu_single_5_len_timing",
-      "path": "fixtures/blargg/apu/apu_single_5_len_timing.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_single_5_len_timing [apu]"
-    },
-    {
-      "name": "apu_single_6_irq_timing",
-      "path": "fixtures/blargg/apu/apu_single_6_irq_timing.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_single_6_irq_timing [apu]"
-    },
-    {
-      "name": "apu_single_7_dmc_basics",
-      "path": "fixtures/blargg/apu/apu_single_7_dmc_basics.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_single_7_dmc_basics [apu]"
-    },
-    {
-      "name": "apu_single_8_dmc_rates",
-      "path": "fixtures/blargg/apu/apu_single_8_dmc_rates.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_single_8_dmc_rates [apu]"
-    },
-    {
-      "name": "apu_test",
-      "path": "fixtures/blargg/apu/apu_test.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: apu_test [apu]"
-    },
-    {
-      "name": "dma_2007_read",
-      "path": "fixtures/blargg/apu/dma_2007_read.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: dma_2007_read [apu]"
-    },
-    {
-      "name": "dma_2007_write",
-      "path": "fixtures/blargg/apu/dma_2007_write.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: dma_2007_write [apu]"
-    },
-    {
-      "name": "dma_4016_read",
-      "path": "fixtures/blargg/apu/dma_4016_read.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: dma_4016_read [apu]"
-    },
-    {
-      "name": "dma_double_2007_read",
-      "path": "fixtures/blargg/apu/dma_double_2007_read.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: dma_double_2007_read [apu]"
-    },
-    {
-      "name": "dma_read_write_2007",
-      "path": "fixtures/blargg/apu/dma_read_write_2007.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: dma_read_write_2007 [apu]"
-    },
-    {
-      "name": "dmc_buffer_retained",
-      "path": "fixtures/blargg/apu/dmc_buffer_retained.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: dmc_buffer_retained [apu]"
-    },
-    {
-      "name": "dmc_latency",
-      "path": "fixtures/blargg/apu/dmc_latency.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: dmc_latency [apu]"
-    },
-    {
-      "name": "dmc_status",
-      "path": "fixtures/blargg/apu/dmc_status.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: dmc_status [apu]"
-    },
-    {
-      "name": "dmc_status_irq",
-      "path": "fixtures/blargg/apu/dmc_status_irq.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: dmc_status_irq [apu]"
-    },
-    {
-      "name": "pal_apu_01_len_ctr",
-      "path": "fixtures/blargg/apu/pal_apu_01_len_ctr.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: pal_apu_01_len_ctr [apu]"
-    },
-    {
-      "name": "pal_apu_02_len_table",
-      "path": "fixtures/blargg/apu/pal_apu_02_len_table.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: pal_apu_02_len_table [apu]"
-    },
-    {
-      "name": "pal_apu_03_irq_flag",
-      "path": "fixtures/blargg/apu/pal_apu_03_irq_flag.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: pal_apu_03_irq_flag [apu]"
-    },
-    {
-      "name": "pal_apu_04_clock_jitter",
-      "path": "fixtures/blargg/apu/pal_apu_04_clock_jitter.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: pal_apu_04_clock_jitter [apu]"
-    },
-    {
-      "name": "pal_apu_05_len_mode0",
-      "path": "fixtures/blargg/apu/pal_apu_05_len_mode0.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: pal_apu_05_len_mode0 [apu]"
-    },
-    {
-      "name": "pal_apu_06_len_mode1",
-      "path": "fixtures/blargg/apu/pal_apu_06_len_mode1.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: pal_apu_06_len_mode1 [apu]"
-    },
-    {
-      "name": "pal_apu_07_irq_flag_timing",
-      "path": "fixtures/blargg/apu/pal_apu_07_irq_flag_timing.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: pal_apu_07_irq_flag_timing [apu]"
-    },
-    {
-      "name": "pal_apu_08_irq_timing",
-      "path": "fixtures/blargg/apu/pal_apu_08_irq_timing.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: pal_apu_08_irq_timing [apu]"
-    },
-    {
-      "name": "pal_apu_10_len_halt",
-      "path": "fixtures/blargg/apu/pal_apu_10_len_halt.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: pal_apu_10_len_halt [apu]"
-    },
-    {
-      "name": "pal_apu_11_len_reload",
-      "path": "fixtures/blargg/apu/pal_apu_11_len_reload.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: pal_apu_11_len_reload [apu]"
-    },
-    {
-      "name": "sprdma_dmc_dma",
-      "path": "fixtures/blargg/apu/sprdma_dmc_dma.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: sprdma_dmc_dma [apu]"
-    },
-    {
-      "name": "sprdma_dmc_dma_512",
-      "path": "fixtures/blargg/apu/sprdma_dmc_dma_512.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: sprdma_dmc_dma_512 [apu]"
-    },
-    {
-      "name": "volume_test",
-      "path": "fixtures/blargg/apu/volume_test.nes",
-      "category": "apu",
-      "frames": 600,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: volume_test [apu]"
-    },
-    {
-      "name": "branch_backward",
-      "path": "fixtures/blargg/cpu/branch_backward.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: branch_backward [cpu]"
-    },
-    {
-      "name": "branch_basics",
-      "path": "fixtures/blargg/cpu/branch_basics.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: branch_basics [cpu]"
-    },
-    {
-      "name": "branch_forward",
-      "path": "fixtures/blargg/cpu/branch_forward.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: branch_forward [cpu]"
-    },
-    {
-      "name": "cpu_dummy_reads",
-      "path": "fixtures/blargg/cpu/cpu_dummy_reads.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: cpu_dummy_reads [cpu]"
-    },
-    {
-      "name": "cpu_dummy_writes_oam",
-      "path": "fixtures/blargg/cpu/cpu_dummy_writes_oam.nes",
-      "category": "cpu",
-      "frames": 3000,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: cpu_dummy_writes_oam [cpu] (Step 3.1: OAM DMA timing test needs more frames)"
-    },
-    {
-      "name": "cpu_dummy_writes_ppu",
-      "path": "fixtures/blargg/cpu/cpu_dummy_writes_ppu.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: cpu_dummy_writes_ppu [cpu]"
-    },
-    {
-      "name": "cpu_exec_space_apu",
-      "path": "fixtures/blargg/cpu/cpu_exec_space_apu.nes",
-      "category": "cpu",
-      "frames": 3000,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: cpu_exec_space_apu [cpu] (Step 3.1: needs more frames; was PASS at 300 before Phase 2, now 0x80 - investigating)"
-    },
-    {
-      "name": "cpu_exec_space_ppuio",
-      "path": "fixtures/blargg/cpu/cpu_exec_space_ppuio.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: cpu_exec_space_ppuio [cpu]"
-    },
-    {
-      "name": "cpu_int_1_cli_latency",
-      "path": "fixtures/blargg/cpu/cpu_int_1_cli_latency.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: cpu_int_1_cli_latency [cpu]"
-    },
-    {
-      "name": "cpu_int_2_nmi_brk",
-      "path": "fixtures/blargg/cpu/cpu_int_2_nmi_brk.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: cpu_int_2_nmi_brk [cpu]"
-    },
-    {
-      "name": "cpu_int_3_nmi_irq",
-      "path": "fixtures/blargg/cpu/cpu_int_3_nmi_irq.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: cpu_int_3_nmi_irq [cpu]"
-    },
-    {
-      "name": "cpu_int_4_irq_dma",
-      "path": "fixtures/blargg/cpu/cpu_int_4_irq_dma.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: cpu_int_4_irq_dma [cpu]"
-    },
-    {
-      "name": "cpu_int_5_branch_irq",
-      "path": "fixtures/blargg/cpu/cpu_int_5_branch_irq.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: cpu_int_5_branch_irq [cpu]"
-    },
-    {
-      "name": "cpu_interrupts",
-      "path": "fixtures/blargg/cpu/cpu_interrupts.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: cpu_interrupts [cpu]"
-    },
-    {
-      "name": "cpu_reset_ram",
-      "path": "fixtures/blargg/cpu/cpu_reset_ram.nes",
-      "category": "cpu",
-      "frames": 300,
-      "reset_after": 60,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: cpu_reset_ram [cpu] (Step 3.1: needs soft reset)"
-    },
-    {
-      "name": "cpu_reset_regs",
-      "path": "fixtures/blargg/cpu/cpu_reset_regs.nes",
-      "category": "cpu",
-      "frames": 300,
-      "reset_after": 60,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: cpu_reset_regs [cpu] (Step 3.1: needs soft reset)"
-    },
-    {
-      "name": "cpu_test5_cpu",
-      "path": "fixtures/blargg/cpu/cpu_test5_cpu.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: cpu_test5_cpu [cpu]"
-    },
-    {
-      "name": "cpu_test5_official",
-      "path": "fixtures/blargg/cpu/cpu_test5_official.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: cpu_test5_official [cpu]"
-    },
-    {
-      "name": "cpu_timing_test6",
-      "path": "fixtures/blargg/cpu/cpu_timing_test6.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: cpu_timing_test6 [cpu]"
-    },
-    {
-      "name": "instr_misc",
-      "path": "fixtures/blargg/cpu/instr_misc.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_misc [cpu]"
-    },
-    {
-      "name": "instr_misc_01_abs_x",
-      "path": "fixtures/blargg/cpu/instr_misc_01_abs_x.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_misc_01_abs_x [cpu]"
-    },
-    {
-      "name": "instr_misc_02_branch",
-      "path": "fixtures/blargg/cpu/instr_misc_02_branch.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_misc_02_branch [cpu]"
-    },
-    {
-      "name": "instr_misc_03_dummy",
-      "path": "fixtures/blargg/cpu/instr_misc_03_dummy.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_misc_03_dummy [cpu]"
-    },
-    {
-      "name": "instr_misc_04_dummy_apu",
-      "path": "fixtures/blargg/cpu/instr_misc_04_dummy_apu.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_misc_04_dummy_apu [cpu]"
-    },
-    {
-      "name": "instr_timing",
-      "path": "fixtures/blargg/cpu/instr_timing.nes",
-      "category": "cpu",
-      "frames": 3000,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_timing [cpu] (Step 3.1: 25s timing test needs 3000 frames)"
-    },
-    {
-      "name": "instr_timing_v2_1",
-      "path": "fixtures/blargg/cpu/instr_timing_v2_1.nes",
-      "category": "cpu",
-      "frames": 3000,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_timing_v2_1 [cpu] (Step 3.1: 25s timing test needs 3000 frames)"
-    },
-    {
-      "name": "instr_timing_v2_2",
-      "path": "fixtures/blargg/cpu/instr_timing_v2_2.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_timing_v2_2 [cpu]"
-    },
-    {
-      "name": "instr_v3_all",
-      "path": "fixtures/blargg/cpu/instr_v3_all.nes",
-      "category": "cpu",
-      "frames": 3000,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v3_all [cpu] (Step 3.1: comprehensive test needs 3000 frames)"
-    },
-    {
-      "name": "instr_v3_official",
-      "path": "fixtures/blargg/cpu/instr_v3_official.nes",
-      "category": "cpu",
-      "frames": 3000,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v3_official [cpu] (Step 3.1: comprehensive test needs 3000 frames)"
-    },
-    {
-      "name": "instr_v5_01_basics",
-      "path": "fixtures/blargg/cpu/instr_v5_01_basics.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v5_01_basics [cpu]"
-    },
-    {
-      "name": "instr_v5_02_implied",
-      "path": "fixtures/blargg/cpu/instr_v5_02_implied.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v5_02_implied [cpu]"
-    },
-    {
-      "name": "instr_v5_03_immediate",
-      "path": "fixtures/blargg/cpu/instr_v5_03_immediate.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v5_03_immediate [cpu]"
-    },
-    {
-      "name": "instr_v5_04_zero_page",
-      "path": "fixtures/blargg/cpu/instr_v5_04_zero_page.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v5_04_zero_page [cpu]"
-    },
-    {
-      "name": "instr_v5_05_zp_xy",
-      "path": "fixtures/blargg/cpu/instr_v5_05_zp_xy.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v5_05_zp_xy [cpu]"
-    },
-    {
-      "name": "instr_v5_06_absolute",
-      "path": "fixtures/blargg/cpu/instr_v5_06_absolute.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v5_06_absolute [cpu]"
-    },
-    {
-      "name": "instr_v5_07_abs_xy",
-      "path": "fixtures/blargg/cpu/instr_v5_07_abs_xy.nes",
-      "category": "cpu",
-      "frames": 3000,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v5_07_abs_xy [cpu] (Step 3.1: single sub-test but timing-heavy)"
-    },
-    {
-      "name": "instr_v5_08_ind_x",
-      "path": "fixtures/blargg/cpu/instr_v5_08_ind_x.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v5_08_ind_x [cpu]"
-    },
-    {
-      "name": "instr_v5_09_ind_y",
-      "path": "fixtures/blargg/cpu/instr_v5_09_ind_y.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v5_09_ind_y [cpu]"
-    },
-    {
-      "name": "instr_v5_10_branches",
-      "path": "fixtures/blargg/cpu/instr_v5_10_branches.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v5_10_branches [cpu]"
-    },
-    {
-      "name": "instr_v5_11_stack",
-      "path": "fixtures/blargg/cpu/instr_v5_11_stack.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v5_11_stack [cpu]"
-    },
-    {
-      "name": "instr_v5_12_jmp_jsr",
-      "path": "fixtures/blargg/cpu/instr_v5_12_jmp_jsr.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v5_12_jmp_jsr [cpu]"
-    },
-    {
-      "name": "instr_v5_13_rts",
-      "path": "fixtures/blargg/cpu/instr_v5_13_rts.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v5_13_rts [cpu]"
-    },
-    {
-      "name": "instr_v5_14_rti",
-      "path": "fixtures/blargg/cpu/instr_v5_14_rti.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v5_14_rti [cpu]"
-    },
-    {
-      "name": "instr_v5_15_brk",
-      "path": "fixtures/blargg/cpu/instr_v5_15_brk.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v5_15_brk [cpu]"
-    },
-    {
-      "name": "instr_v5_16_special",
-      "path": "fixtures/blargg/cpu/instr_v5_16_special.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v5_16_special [cpu]"
-    },
-    {
-      "name": "instr_v5_all",
-      "path": "fixtures/blargg/cpu/instr_v5_all.nes",
-      "category": "cpu",
-      "frames": 3000,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v5_all [cpu] (S-1: needs 3000 frames; 300 returns 0x80 still-running)"
-    },
-    {
-      "name": "instr_v5_official",
-      "path": "fixtures/blargg/cpu/instr_v5_official.nes",
-      "category": "cpu",
-      "frames": 3000,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: instr_v5_official [cpu] (S-1: needs 3000 frames; 300 stops at 'Running test 4 of 16')"
-    },
-    {
-      "name": "nes_instr_01_implied",
-      "path": "fixtures/blargg/cpu/nes_instr_01_implied.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: nes_instr_01_implied [cpu]"
-    },
-    {
-      "name": "nes_instr_02_imm",
-      "path": "fixtures/blargg/cpu/nes_instr_02_imm.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: nes_instr_02_imm [cpu]"
-    },
-    {
-      "name": "nes_instr_03_zp",
-      "path": "fixtures/blargg/cpu/nes_instr_03_zp.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: nes_instr_03_zp [cpu]"
-    },
-    {
-      "name": "nes_instr_04_zp_xy",
-      "path": "fixtures/blargg/cpu/nes_instr_04_zp_xy.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: nes_instr_04_zp_xy [cpu]"
-    },
-    {
-      "name": "nes_instr_05_abs",
-      "path": "fixtures/blargg/cpu/nes_instr_05_abs.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: nes_instr_05_abs [cpu]"
-    },
-    {
-      "name": "nes_instr_06_abs_xy",
-      "path": "fixtures/blargg/cpu/nes_instr_06_abs_xy.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: nes_instr_06_abs_xy [cpu]"
-    },
-    {
-      "name": "nes_instr_07_ind_x",
-      "path": "fixtures/blargg/cpu/nes_instr_07_ind_x.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: nes_instr_07_ind_x [cpu]"
-    },
-    {
-      "name": "nes_instr_08_ind_y",
-      "path": "fixtures/blargg/cpu/nes_instr_08_ind_y.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: nes_instr_08_ind_y [cpu]"
-    },
-    {
-      "name": "nes_instr_09_branches",
-      "path": "fixtures/blargg/cpu/nes_instr_09_branches.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: nes_instr_09_branches [cpu]"
-    },
-    {
-      "name": "nes_instr_10_stack",
-      "path": "fixtures/blargg/cpu/nes_instr_10_stack.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: nes_instr_10_stack [cpu]"
-    },
-    {
-      "name": "nes_instr_11_special",
-      "path": "fixtures/blargg/cpu/nes_instr_11_special.nes",
-      "category": "cpu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: nes_instr_11_special [cpu]"
-    },
-    {
-      "name": "mmc3_1_clocking",
-      "path": "fixtures/blargg/mmc3/mmc3_1_clocking.nes",
-      "category": "mmc3",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: mmc3_1_clocking [mmc3]"
-    },
-    {
-      "name": "mmc3_2_details",
-      "path": "fixtures/blargg/mmc3/mmc3_2_details.nes",
-      "category": "mmc3",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: mmc3_2_details [mmc3]"
-    },
-    {
-      "name": "mmc3_3_A12_clocking",
-      "path": "fixtures/blargg/mmc3/mmc3_3_A12_clocking.nes",
-      "category": "mmc3",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: mmc3_3_A12_clocking [mmc3]"
-    },
-    {
-      "name": "mmc3_4_scanline_timing",
-      "path": "fixtures/blargg/mmc3/mmc3_4_scanline_timing.nes",
-      "category": "mmc3",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: mmc3_4_scanline_timing [mmc3]"
-    },
-    {
-      "name": "mmc3_5_MMC3",
-      "path": "fixtures/blargg/mmc3/mmc3_5_MMC3.nes",
-      "category": "mmc3",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: mmc3_5_MMC3 [mmc3]"
-    },
-    {
-      "name": "mmc3_6_MMC6",
-      "path": "fixtures/blargg/mmc3/mmc3_6_MMC6.nes",
-      "category": "mmc3",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: mmc3_6_MMC6 [mmc3]"
-    },
-    {
-      "name": "mmc3_irq_1_Clocking",
-      "path": "fixtures/blargg/mmc3/mmc3_irq_1_Clocking.nes",
-      "category": "mmc3",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: mmc3_irq_1_Clocking [mmc3]"
-    },
-    {
-      "name": "mmc3_irq_2_Details",
-      "path": "fixtures/blargg/mmc3/mmc3_irq_2_Details.nes",
-      "category": "mmc3",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: mmc3_irq_2_Details [mmc3]"
-    },
-    {
-      "name": "mmc3_irq_3_A12_clocking",
-      "path": "fixtures/blargg/mmc3/mmc3_irq_3_A12_clocking.nes",
-      "category": "mmc3",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: mmc3_irq_3_A12_clocking [mmc3]"
-    },
-    {
-      "name": "mmc3_irq_4_Scanline_timing",
-      "path": "fixtures/blargg/mmc3/mmc3_irq_4_Scanline_timing.nes",
-      "category": "mmc3",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: mmc3_irq_4_Scanline_timing [mmc3]"
-    },
-    {
-      "name": "mmc3_irq_5_MMC3_rev_A",
-      "path": "fixtures/blargg/mmc3/mmc3_irq_5_MMC3_rev_A.nes",
-      "category": "mmc3",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: mmc3_irq_5_MMC3_rev_A [mmc3]"
-    },
-    {
-      "name": "mmc3_irq_6_MMC3_rev_B",
-      "path": "fixtures/blargg/mmc3/mmc3_irq_6_MMC3_rev_B.nes",
-      "category": "mmc3",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: mmc3_irq_6_MMC3_rev_B [mmc3]"
-    },
-    {
-      "name": "mmc3_v2_1_clocking",
-      "path": "fixtures/blargg/mmc3/mmc3_v2_1_clocking.nes",
-      "category": "mmc3",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: mmc3_v2_1_clocking [mmc3]"
-    },
-    {
-      "name": "mmc3_v2_2_details",
-      "path": "fixtures/blargg/mmc3/mmc3_v2_2_details.nes",
-      "category": "mmc3",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: mmc3_v2_2_details [mmc3]"
-    },
-    {
-      "name": "mmc3_v2_3_A12_clocking",
-      "path": "fixtures/blargg/mmc3/mmc3_v2_3_A12_clocking.nes",
-      "category": "mmc3",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: mmc3_v2_3_A12_clocking [mmc3]"
-    },
-    {
-      "name": "mmc3_v2_4_scanline_timing",
-      "path": "fixtures/blargg/mmc3/mmc3_v2_4_scanline_timing.nes",
-      "category": "mmc3",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: mmc3_v2_4_scanline_timing [mmc3]"
-    },
-    {
-      "name": "mmc3_v2_5_MMC3",
-      "path": "fixtures/blargg/mmc3/mmc3_v2_5_MMC3.nes",
-      "category": "mmc3",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: mmc3_v2_5_MMC3 [mmc3]"
-    },
-    {
-      "name": "mmc3_v2_6_MMC3_alt",
-      "path": "fixtures/blargg/mmc3/mmc3_v2_6_MMC3_alt.nes",
-      "category": "mmc3",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: mmc3_v2_6_MMC3_alt [mmc3]"
-    },
-    {
-      "name": "flowing_palette",
-      "path": "fixtures/blargg/ppu/flowing_palette.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: flowing_palette [ppu]"
-    },
-    {
-      "name": "full_palette",
-      "path": "fixtures/blargg/ppu/full_palette.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: full_palette [ppu]"
-    },
-    {
-      "name": "oam_read",
-      "path": "fixtures/blargg/ppu/oam_read.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: oam_read [ppu]"
-    },
-    {
-      "name": "oam_stress",
-      "path": "fixtures/blargg/ppu/oam_stress.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: oam_stress [ppu]"
-    },
-    {
-      "name": "palette_smooth",
-      "path": "fixtures/blargg/ppu/palette_smooth.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: palette_smooth [ppu]"
-    },
-    {
-      "name": "ppu_open_bus",
-      "path": "fixtures/blargg/ppu/ppu_open_bus.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: ppu_open_bus [ppu]"
-    },
-    {
-      "name": "ppu_palette_ram",
-      "path": "fixtures/blargg/ppu/ppu_palette_ram.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: ppu_palette_ram [ppu]"
-    },
-    {
-      "name": "ppu_power_up_palette",
-      "path": "fixtures/blargg/ppu/ppu_power_up_palette.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: ppu_power_up_palette [ppu]"
-    },
-    {
-      "name": "ppu_read_buffer",
-      "path": "fixtures/blargg/ppu/ppu_read_buffer.nes",
-      "category": "ppu",
-      "frames": 3000,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: ppu_read_buffer [ppu] (Step 3.1: PPU $2007 buffer decay test needs more frames)"
-    },
-    {
-      "name": "ppu_sprite_ram",
-      "path": "fixtures/blargg/ppu/ppu_sprite_ram.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: ppu_sprite_ram [ppu]"
-    },
-    {
-      "name": "ppu_vbl_clear_time",
-      "path": "fixtures/blargg/ppu/ppu_vbl_clear_time.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: ppu_vbl_clear_time [ppu]"
-    },
-    {
-      "name": "ppu_vbl_nmi",
-      "path": "fixtures/blargg/ppu/ppu_vbl_nmi.nes",
-      "category": "ppu",
-      "frames": 3000,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: ppu_vbl_nmi [ppu] (Step 3.1: 10 sub-tests need 3000 frames)"
-    },
-    {
-      "name": "ppu_vram_access",
-      "path": "fixtures/blargg/ppu/ppu_vram_access.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: ppu_vram_access [ppu]"
-    },
-    {
-      "name": "scanline",
-      "path": "fixtures/blargg/ppu/scanline.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: scanline [ppu]"
-    },
-    {
-      "name": "scanline_a1",
-      "path": "fixtures/blargg/ppu/scanline_a1.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: scanline_a1 [ppu]"
-    },
-    {
-      "name": "scrolltest",
-      "path": "fixtures/blargg/ppu/scrolltest.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: scrolltest [ppu]"
-    },
-    {
-      "name": "sprite_hit_01_basics",
-      "path": "fixtures/blargg/ppu/sprite_hit_01_basics.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: sprite_hit_01_basics [ppu]"
-    },
-    {
-      "name": "sprite_hit_02_alignment",
-      "path": "fixtures/blargg/ppu/sprite_hit_02_alignment.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: sprite_hit_02_alignment [ppu]"
-    },
-    {
-      "name": "sprite_hit_03_corners",
-      "path": "fixtures/blargg/ppu/sprite_hit_03_corners.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: sprite_hit_03_corners [ppu]"
-    },
-    {
-      "name": "sprite_hit_04_flip",
-      "path": "fixtures/blargg/ppu/sprite_hit_04_flip.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: sprite_hit_04_flip [ppu]"
-    },
-    {
-      "name": "sprite_hit_05_left_clip",
-      "path": "fixtures/blargg/ppu/sprite_hit_05_left_clip.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: sprite_hit_05_left_clip [ppu]"
-    },
-    {
-      "name": "sprite_hit_06_right_edge",
-      "path": "fixtures/blargg/ppu/sprite_hit_06_right_edge.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: sprite_hit_06_right_edge [ppu]"
-    },
-    {
-      "name": "sprite_hit_07_screen_bottom",
-      "path": "fixtures/blargg/ppu/sprite_hit_07_screen_bottom.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: sprite_hit_07_screen_bottom [ppu]"
-    },
-    {
-      "name": "sprite_hit_08_double_height",
-      "path": "fixtures/blargg/ppu/sprite_hit_08_double_height.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: sprite_hit_08_double_height [ppu]"
-    },
-    {
-      "name": "sprite_hit_09_timing",
-      "path": "fixtures/blargg/ppu/sprite_hit_09_timing.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: sprite_hit_09_timing [ppu]"
-    },
-    {
-      "name": "sprite_hit_10_timing_order",
-      "path": "fixtures/blargg/ppu/sprite_hit_10_timing_order.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: sprite_hit_10_timing_order [ppu]"
-    },
-    {
-      "name": "sprite_hit_11_edge_timing",
-      "path": "fixtures/blargg/ppu/sprite_hit_11_edge_timing.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: sprite_hit_11_edge_timing [ppu]"
-    },
-    {
-      "name": "sprite_overflow_1_basics",
-      "path": "fixtures/blargg/ppu/sprite_overflow_1_basics.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: sprite_overflow_1_basics [ppu]"
-    },
-    {
-      "name": "sprite_overflow_2_details",
-      "path": "fixtures/blargg/ppu/sprite_overflow_2_details.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: sprite_overflow_2_details [ppu]"
-    },
-    {
-      "name": "sprite_overflow_3_timing",
-      "path": "fixtures/blargg/ppu/sprite_overflow_3_timing.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: sprite_overflow_3_timing [ppu]"
-    },
-    {
-      "name": "sprite_overflow_4_obscure",
-      "path": "fixtures/blargg/ppu/sprite_overflow_4_obscure.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: sprite_overflow_4_obscure [ppu]"
-    },
-    {
-      "name": "sprite_overflow_5_emu",
-      "path": "fixtures/blargg/ppu/sprite_overflow_5_emu.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: sprite_overflow_5_emu [ppu]"
-    },
-    {
-      "name": "vbl_01_basics",
-      "path": "fixtures/blargg/ppu/vbl_01_basics.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: vbl_01_basics [ppu]"
-    },
-    {
-      "name": "vbl_02_set_time",
-      "path": "fixtures/blargg/ppu/vbl_02_set_time.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: vbl_02_set_time [ppu]"
-    },
-    {
-      "name": "vbl_03_clear_time",
-      "path": "fixtures/blargg/ppu/vbl_03_clear_time.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: vbl_03_clear_time [ppu]"
-    },
-    {
-      "name": "vbl_04_nmi_control",
-      "path": "fixtures/blargg/ppu/vbl_04_nmi_control.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: vbl_04_nmi_control [ppu]"
-    },
-    {
-      "name": "vbl_05_nmi_timing",
-      "path": "fixtures/blargg/ppu/vbl_05_nmi_timing.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: vbl_05_nmi_timing [ppu]"
-    },
-    {
-      "name": "vbl_06_suppression",
-      "path": "fixtures/blargg/ppu/vbl_06_suppression.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: vbl_06_suppression [ppu]"
-    },
-    {
-      "name": "vbl_07_nmi_on_timing",
-      "path": "fixtures/blargg/ppu/vbl_07_nmi_on_timing.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: vbl_07_nmi_on_timing [ppu]"
-    },
-    {
-      "name": "vbl_08_nmi_off_timing",
-      "path": "fixtures/blargg/ppu/vbl_08_nmi_off_timing.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: vbl_08_nmi_off_timing [ppu]"
-    },
-    {
-      "name": "vbl_09_even_odd_frames",
-      "path": "fixtures/blargg/ppu/vbl_09_even_odd_frames.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: vbl_09_even_odd_frames [ppu]"
-    },
-    {
-      "name": "vbl_10_even_odd_timing",
-      "path": "fixtures/blargg/ppu/vbl_10_even_odd_timing.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: vbl_10_even_odd_timing [ppu]"
-    },
-    {
-      "name": "vbl_timing_1_frame",
-      "path": "fixtures/blargg/ppu/vbl_timing_1_frame.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: vbl_timing_1_frame [ppu]"
-    },
-    {
-      "name": "vbl_timing_2_vbl",
-      "path": "fixtures/blargg/ppu/vbl_timing_2_vbl.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: vbl_timing_2_vbl [ppu]"
-    },
-    {
-      "name": "vbl_timing_3_even_odd",
-      "path": "fixtures/blargg/ppu/vbl_timing_3_even_odd.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: vbl_timing_3_even_odd [ppu]"
-    },
-    {
-      "name": "vbl_timing_4_clear_timing",
-      "path": "fixtures/blargg/ppu/vbl_timing_4_clear_timing.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: vbl_timing_4_clear_timing [ppu]"
-    },
-    {
-      "name": "vbl_timing_5_suppression",
-      "path": "fixtures/blargg/ppu/vbl_timing_5_suppression.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: vbl_timing_5_suppression [ppu]"
-    },
-    {
-      "name": "vbl_timing_6_disable",
-      "path": "fixtures/blargg/ppu/vbl_timing_6_disable.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: vbl_timing_6_disable [ppu]"
-    },
-    {
-      "name": "vbl_timing_7_nmi",
-      "path": "fixtures/blargg/ppu/vbl_timing_7_nmi.nes",
-      "category": "ppu",
-      "frames": 300,
-      "probe_addr": 24576,
-      "description": "blargg test ROM: vbl_timing_7_nmi [ppu]"
-    }
-  ]
+    "_comment": "KagamiQA P5 鈥?Full blargg test ROM catalog (expanded from P2 22 ROMs). Each ROM uses `$6000-`$6003 protocol.",
+    "_source": "https://github.com/christopherpow/nes-test-roms",
+    "_protocol": "`$6000 = 0x00 PASS, 0x01+ FAIL with diagnostic code",
+    "_downloader": "scripts/download_blargg_roms.ps1",
+    "_total": 180,
+    "roms": [
+        {
+            "name": "apu_01_len_ctr",
+            "path": "fixtures/blargg/apu/apu_01_len_ctr.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_01_len_ctr [apu]"
+        },
+        {
+            "name": "apu_02_len_table",
+            "path": "fixtures/blargg/apu/apu_02_len_table.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_02_len_table [apu]"
+        },
+        {
+            "name": "apu_03_irq_flag",
+            "path": "fixtures/blargg/apu/apu_03_irq_flag.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_03_irq_flag [apu]"
+        },
+        {
+            "name": "apu_04_clock_jitter",
+            "path": "fixtures/blargg/apu/apu_04_clock_jitter.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_04_clock_jitter [apu]"
+        },
+        {
+            "name": "apu_05_len_mode0",
+            "path": "fixtures/blargg/apu/apu_05_len_mode0.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_05_len_mode0 [apu]"
+        },
+        {
+            "name": "apu_06_len_mode1",
+            "path": "fixtures/blargg/apu/apu_06_len_mode1.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_06_len_mode1 [apu]"
+        },
+        {
+            "name": "apu_07_irq_flag_timing",
+            "path": "fixtures/blargg/apu/apu_07_irq_flag_timing.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_07_irq_flag_timing [apu]"
+        },
+        {
+            "name": "apu_08_irq_timing",
+            "path": "fixtures/blargg/apu/apu_08_irq_timing.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_08_irq_timing [apu]"
+        },
+        {
+            "name": "apu_09_reset_timing",
+            "path": "fixtures/blargg/apu/apu_09_reset_timing.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_09_reset_timing [apu]"
+        },
+        {
+            "name": "apu_10_len_halt",
+            "path": "fixtures/blargg/apu/apu_10_len_halt.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_10_len_halt [apu]"
+        },
+        {
+            "name": "apu_11_len_reload",
+            "path": "fixtures/blargg/apu/apu_11_len_reload.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_11_len_reload [apu]"
+        },
+        {
+            "name": "apu_mixer_dmc",
+            "path": "fixtures/blargg/apu/apu_mixer_dmc.nes",
+            "category": "apu",
+            "frames": 2400,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_mixer_dmc [apu] (Step 3.1: audio self-test needs more frames)"
+        },
+        {
+            "name": "apu_mixer_noise",
+            "path": "fixtures/blargg/apu/apu_mixer_noise.nes",
+            "category": "apu",
+            "frames": 2400,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_mixer_noise [apu] (Step 3.1: audio self-test needs more frames)"
+        },
+        {
+            "name": "apu_mixer_square",
+            "path": "fixtures/blargg/apu/apu_mixer_square.nes",
+            "category": "apu",
+            "frames": 2400,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_mixer_square [apu] (Step 3.1: audio self-test needs more frames)"
+        },
+        {
+            "name": "apu_mixer_triangle",
+            "path": "fixtures/blargg/apu/apu_mixer_triangle.nes",
+            "category": "apu",
+            "frames": 2400,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_mixer_triangle [apu] (Step 3.1: audio self-test needs more frames)"
+        },
+        {
+            "name": "apu_reset_4015",
+            "path": "fixtures/blargg/apu/apu_reset_4015.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": 60,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_reset_4015 [apu] (Step 3.1: needs soft reset)"
+        },
+        {
+            "name": "apu_reset_4017_timing",
+            "path": "fixtures/blargg/apu/apu_reset_4017_timing.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": 60,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_reset_4017_timing [apu] (Step 3.1: needs soft reset)"
+        },
+        {
+            "name": "apu_reset_4017_written",
+            "path": "fixtures/blargg/apu/apu_reset_4017_written.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": 60,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_reset_4017_written [apu] (Step 3.1: needs soft reset; sometimes needs a SECOND reset)"
+        },
+        {
+            "name": "apu_reset_irq_cleared",
+            "path": "fixtures/blargg/apu/apu_reset_irq_cleared.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": 60,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_reset_irq_cleared [apu] (Step 3.1: needs soft reset)"
+        },
+        {
+            "name": "apu_reset_len_ctrs",
+            "path": "fixtures/blargg/apu/apu_reset_len_ctrs.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": 60,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_reset_len_ctrs [apu] (Step 3.1: needs soft reset)"
+        },
+        {
+            "name": "apu_reset_works_imm",
+            "path": "fixtures/blargg/apu/apu_reset_works_imm.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": 60,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_reset_works_imm [apu] (Step 3.1: needs soft reset)"
+        },
+        {
+            "name": "apu_single_1_len_ctr",
+            "path": "fixtures/blargg/apu/apu_single_1_len_ctr.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_single_1_len_ctr [apu]"
+        },
+        {
+            "name": "apu_single_2_len_table",
+            "path": "fixtures/blargg/apu/apu_single_2_len_table.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_single_2_len_table [apu]"
+        },
+        {
+            "name": "apu_single_3_irq_flag",
+            "path": "fixtures/blargg/apu/apu_single_3_irq_flag.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_single_3_irq_flag [apu]"
+        },
+        {
+            "name": "apu_single_4_jitter",
+            "path": "fixtures/blargg/apu/apu_single_4_jitter.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_single_4_jitter [apu]"
+        },
+        {
+            "name": "apu_single_5_len_timing",
+            "path": "fixtures/blargg/apu/apu_single_5_len_timing.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_single_5_len_timing [apu]"
+        },
+        {
+            "name": "apu_single_6_irq_timing",
+            "path": "fixtures/blargg/apu/apu_single_6_irq_timing.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_single_6_irq_timing [apu]"
+        },
+        {
+            "name": "apu_single_7_dmc_basics",
+            "path": "fixtures/blargg/apu/apu_single_7_dmc_basics.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_single_7_dmc_basics [apu]"
+        },
+        {
+            "name": "apu_single_8_dmc_rates",
+            "path": "fixtures/blargg/apu/apu_single_8_dmc_rates.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_single_8_dmc_rates [apu]"
+        },
+        {
+            "name": "apu_test",
+            "path": "fixtures/blargg/apu/apu_test.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: apu_test [apu]"
+        },
+        {
+            "name": "dma_2007_read",
+            "path": "fixtures/blargg/apu/dma_2007_read.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: dma_2007_read [apu]"
+        },
+        {
+            "name": "dma_2007_write",
+            "path": "fixtures/blargg/apu/dma_2007_write.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: dma_2007_write [apu]"
+        },
+        {
+            "name": "dma_4016_read",
+            "path": "fixtures/blargg/apu/dma_4016_read.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: dma_4016_read [apu]"
+        },
+        {
+            "name": "dma_double_2007_read",
+            "path": "fixtures/blargg/apu/dma_double_2007_read.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: dma_double_2007_read [apu]"
+        },
+        {
+            "name": "dma_read_write_2007",
+            "path": "fixtures/blargg/apu/dma_read_write_2007.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: dma_read_write_2007 [apu]"
+        },
+        {
+            "name": "dmc_buffer_retained",
+            "path": "fixtures/blargg/apu/dmc_buffer_retained.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: dmc_buffer_retained [apu]"
+        },
+        {
+            "name": "dmc_latency",
+            "path": "fixtures/blargg/apu/dmc_latency.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: dmc_latency [apu]"
+        },
+        {
+            "name": "dmc_status",
+            "path": "fixtures/blargg/apu/dmc_status.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: dmc_status [apu]"
+        },
+        {
+            "name": "dmc_status_irq",
+            "path": "fixtures/blargg/apu/dmc_status_irq.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: dmc_status_irq [apu]"
+        },
+        {
+            "name": "pal_apu_01_len_ctr",
+            "path": "fixtures/blargg/apu/pal_apu_01_len_ctr.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: pal_apu_01_len_ctr [apu]"
+        },
+        {
+            "name": "pal_apu_02_len_table",
+            "path": "fixtures/blargg/apu/pal_apu_02_len_table.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: pal_apu_02_len_table [apu]"
+        },
+        {
+            "name": "pal_apu_03_irq_flag",
+            "path": "fixtures/blargg/apu/pal_apu_03_irq_flag.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: pal_apu_03_irq_flag [apu]"
+        },
+        {
+            "name": "pal_apu_04_clock_jitter",
+            "path": "fixtures/blargg/apu/pal_apu_04_clock_jitter.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: pal_apu_04_clock_jitter [apu]"
+        },
+        {
+            "name": "pal_apu_05_len_mode0",
+            "path": "fixtures/blargg/apu/pal_apu_05_len_mode0.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: pal_apu_05_len_mode0 [apu]"
+        },
+        {
+            "name": "pal_apu_06_len_mode1",
+            "path": "fixtures/blargg/apu/pal_apu_06_len_mode1.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: pal_apu_06_len_mode1 [apu]"
+        },
+        {
+            "name": "pal_apu_07_irq_flag_timing",
+            "path": "fixtures/blargg/apu/pal_apu_07_irq_flag_timing.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: pal_apu_07_irq_flag_timing [apu]"
+        },
+        {
+            "name": "pal_apu_08_irq_timing",
+            "path": "fixtures/blargg/apu/pal_apu_08_irq_timing.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: pal_apu_08_irq_timing [apu]"
+        },
+        {
+            "name": "pal_apu_10_len_halt",
+            "path": "fixtures/blargg/apu/pal_apu_10_len_halt.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: pal_apu_10_len_halt [apu]"
+        },
+        {
+            "name": "pal_apu_11_len_reload",
+            "path": "fixtures/blargg/apu/pal_apu_11_len_reload.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: pal_apu_11_len_reload [apu]"
+        },
+        {
+            "name": "sprdma_dmc_dma",
+            "path": "fixtures/blargg/apu/sprdma_dmc_dma.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: sprdma_dmc_dma [apu]"
+        },
+        {
+            "name": "sprdma_dmc_dma_512",
+            "path": "fixtures/blargg/apu/sprdma_dmc_dma_512.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: sprdma_dmc_dma_512 [apu]"
+        },
+        {
+            "name": "volume_test",
+            "path": "fixtures/blargg/apu/volume_test.nes",
+            "category": "apu",
+            "frames": 600,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: volume_test [apu]"
+        },
+        {
+            "name": "branch_backward",
+            "path": "fixtures/blargg/cpu/branch_backward.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: branch_backward [cpu]"
+        },
+        {
+            "name": "branch_basics",
+            "path": "fixtures/blargg/cpu/branch_basics.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: branch_basics [cpu]"
+        },
+        {
+            "name": "branch_forward",
+            "path": "fixtures/blargg/cpu/branch_forward.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: branch_forward [cpu]"
+        },
+        {
+            "name": "cpu_dummy_reads",
+            "path": "fixtures/blargg/cpu/cpu_dummy_reads.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: cpu_dummy_reads [cpu]"
+        },
+        {
+            "name": "cpu_dummy_writes_oam",
+            "path": "fixtures/blargg/cpu/cpu_dummy_writes_oam.nes",
+            "category": "cpu",
+            "frames": 3000,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: cpu_dummy_writes_oam [cpu] (Step 3.1: OAM DMA timing test needs more frames)"
+        },
+        {
+            "name": "cpu_dummy_writes_ppu",
+            "path": "fixtures/blargg/cpu/cpu_dummy_writes_ppu.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: cpu_dummy_writes_ppu [cpu]"
+        },
+        {
+            "name": "cpu_exec_space_apu",
+            "path": "fixtures/blargg/cpu/cpu_exec_space_apu.nes",
+            "category": "cpu",
+            "frames": 3000,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: cpu_exec_space_apu [cpu] (Step 3.1: needs more frames; was PASS at 300 before Phase 2, now 0x80 - investigating)"
+        },
+        {
+            "name": "cpu_exec_space_ppuio",
+            "path": "fixtures/blargg/cpu/cpu_exec_space_ppuio.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: cpu_exec_space_ppuio [cpu]"
+        },
+        {
+            "name": "cpu_int_1_cli_latency",
+            "path": "fixtures/blargg/cpu/cpu_int_1_cli_latency.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: cpu_int_1_cli_latency [cpu]"
+        },
+        {
+            "name": "cpu_int_2_nmi_brk",
+            "path": "fixtures/blargg/cpu/cpu_int_2_nmi_brk.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: cpu_int_2_nmi_brk [cpu]"
+        },
+        {
+            "name": "cpu_int_3_nmi_irq",
+            "path": "fixtures/blargg/cpu/cpu_int_3_nmi_irq.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: cpu_int_3_nmi_irq [cpu]"
+        },
+        {
+            "name": "cpu_int_4_irq_dma",
+            "path": "fixtures/blargg/cpu/cpu_int_4_irq_dma.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: cpu_int_4_irq_dma [cpu]"
+        },
+        {
+            "name": "cpu_int_5_branch_irq",
+            "path": "fixtures/blargg/cpu/cpu_int_5_branch_irq.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: cpu_int_5_branch_irq [cpu]"
+        },
+        {
+            "name": "cpu_interrupts",
+            "path": "fixtures/blargg/cpu/cpu_interrupts.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: cpu_interrupts [cpu]"
+        },
+        {
+            "name": "cpu_reset_ram",
+            "path": "fixtures/blargg/cpu/cpu_reset_ram.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": 60,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: cpu_reset_ram [cpu] (Step 3.1: needs soft reset)"
+        },
+        {
+            "name": "cpu_reset_regs",
+            "path": "fixtures/blargg/cpu/cpu_reset_regs.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": 60,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: cpu_reset_regs [cpu] (Step 3.1: needs soft reset)"
+        },
+        {
+            "name": "cpu_test5_cpu",
+            "path": "fixtures/blargg/cpu/cpu_test5_cpu.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: cpu_test5_cpu [cpu]"
+        },
+        {
+            "name": "cpu_test5_official",
+            "path": "fixtures/blargg/cpu/cpu_test5_official.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: cpu_test5_official [cpu]"
+        },
+        {
+            "name": "cpu_timing_test6",
+            "path": "fixtures/blargg/cpu/cpu_timing_test6.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: cpu_timing_test6 [cpu]"
+        },
+        {
+            "name": "instr_misc",
+            "path": "fixtures/blargg/cpu/instr_misc.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_misc [cpu]"
+        },
+        {
+            "name": "instr_misc_01_abs_x",
+            "path": "fixtures/blargg/cpu/instr_misc_01_abs_x.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_misc_01_abs_x [cpu]"
+        },
+        {
+            "name": "instr_misc_02_branch",
+            "path": "fixtures/blargg/cpu/instr_misc_02_branch.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_misc_02_branch [cpu]"
+        },
+        {
+            "name": "instr_misc_03_dummy",
+            "path": "fixtures/blargg/cpu/instr_misc_03_dummy.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_misc_03_dummy [cpu]"
+        },
+        {
+            "name": "instr_misc_04_dummy_apu",
+            "path": "fixtures/blargg/cpu/instr_misc_04_dummy_apu.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_misc_04_dummy_apu [cpu]"
+        },
+        {
+            "name": "instr_timing",
+            "path": "fixtures/blargg/cpu/instr_timing.nes",
+            "category": "cpu",
+            "frames": 3000,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_timing [cpu] (Step 3.1: 25s timing test needs 3000 frames)"
+        },
+        {
+            "name": "instr_timing_v2_1",
+            "path": "fixtures/blargg/cpu/instr_timing_v2_1.nes",
+            "category": "cpu",
+            "frames": 3000,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_timing_v2_1 [cpu] (Step 3.1: 25s timing test needs 3000 frames)"
+        },
+        {
+            "name": "instr_timing_v2_2",
+            "path": "fixtures/blargg/cpu/instr_timing_v2_2.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_timing_v2_2 [cpu]"
+        },
+        {
+            "name": "instr_v3_all",
+            "path": "fixtures/blargg/cpu/instr_v3_all.nes",
+            "category": "cpu",
+            "frames": 3000,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_v3_all [cpu] (Step 3.1: comprehensive test needs 3000 frames)"
+        },
+        {
+            "name": "instr_v3_official",
+            "path": "fixtures/blargg/cpu/instr_v3_official.nes",
+            "category": "cpu",
+            "frames": 3000,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_v3_official [cpu] (Step 3.1: comprehensive test needs 3000 frames)"
+        },
+        {
+            "name": "instr_v5_01_basics",
+            "path": "fixtures/blargg/cpu/instr_v5_01_basics.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_v5_01_basics [cpu]"
+        },
+        {
+            "name": "instr_v5_02_implied",
+            "path": "fixtures/blargg/cpu/instr_v5_02_implied.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_v5_02_implied [cpu]"
+        },
+        {
+            "name": "instr_v5_03_immediate",
+            "path": "fixtures/blargg/cpu/instr_v5_03_immediate.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_v5_03_immediate [cpu]"
+        },
+        {
+            "name": "instr_v5_04_zero_page",
+            "path": "fixtures/blargg/cpu/instr_v5_04_zero_page.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_v5_04_zero_page [cpu]"
+        },
+        {
+            "name": "instr_v5_05_zp_xy",
+            "path": "fixtures/blargg/cpu/instr_v5_05_zp_xy.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_v5_05_zp_xy [cpu]"
+        },
+        {
+            "name": "instr_v5_06_absolute",
+            "path": "fixtures/blargg/cpu/instr_v5_06_absolute.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_v5_06_absolute [cpu]"
+        },
+        {
+            "name": "instr_v5_07_abs_xy",
+            "path": "fixtures/blargg/cpu/instr_v5_07_abs_xy.nes",
+            "category": "cpu",
+            "frames": 3000,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_v5_07_abs_xy [cpu] (Step 3.1: single sub-test but timing-heavy)"
+        },
+        {
+            "name": "instr_v5_08_ind_x",
+            "path": "fixtures/blargg/cpu/instr_v5_08_ind_x.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_v5_08_ind_x [cpu]"
+        },
+        {
+            "name": "instr_v5_09_ind_y",
+            "path": "fixtures/blargg/cpu/instr_v5_09_ind_y.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_v5_09_ind_y [cpu]"
+        },
+        {
+            "name": "instr_v5_10_branches",
+            "path": "fixtures/blargg/cpu/instr_v5_10_branches.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_v5_10_branches [cpu]"
+        },
+        {
+            "name": "instr_v5_11_stack",
+            "path": "fixtures/blargg/cpu/instr_v5_11_stack.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_v5_11_stack [cpu]"
+        },
+        {
+            "name": "instr_v5_12_jmp_jsr",
+            "path": "fixtures/blargg/cpu/instr_v5_12_jmp_jsr.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_v5_12_jmp_jsr [cpu]"
+        },
+        {
+            "name": "instr_v5_13_rts",
+            "path": "fixtures/blargg/cpu/instr_v5_13_rts.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_v5_13_rts [cpu]"
+        },
+        {
+            "name": "instr_v5_14_rti",
+            "path": "fixtures/blargg/cpu/instr_v5_14_rti.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_v5_14_rti [cpu]"
+        },
+        {
+            "name": "instr_v5_15_brk",
+            "path": "fixtures/blargg/cpu/instr_v5_15_brk.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_v5_15_brk [cpu]"
+        },
+        {
+            "name": "instr_v5_16_special",
+            "path": "fixtures/blargg/cpu/instr_v5_16_special.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_v5_16_special [cpu]"
+        },
+        {
+            "name": "instr_v5_all",
+            "path": "fixtures/blargg/cpu/instr_v5_all.nes",
+            "category": "cpu",
+            "frames": 3000,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_v5_all [cpu] (S-1: needs 3000 frames; 300 returns 0x80 still-running)"
+        },
+        {
+            "name": "instr_v5_official",
+            "path": "fixtures/blargg/cpu/instr_v5_official.nes",
+            "category": "cpu",
+            "frames": 3000,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: instr_v5_official [cpu] (S-1: needs 3000 frames; 300 stops at 'Running test 4 of 16')"
+        },
+        {
+            "name": "nes_instr_01_implied",
+            "path": "fixtures/blargg/cpu/nes_instr_01_implied.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: nes_instr_01_implied [cpu]"
+        },
+        {
+            "name": "nes_instr_02_imm",
+            "path": "fixtures/blargg/cpu/nes_instr_02_imm.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: nes_instr_02_imm [cpu]"
+        },
+        {
+            "name": "nes_instr_03_zp",
+            "path": "fixtures/blargg/cpu/nes_instr_03_zp.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: nes_instr_03_zp [cpu]"
+        },
+        {
+            "name": "nes_instr_04_zp_xy",
+            "path": "fixtures/blargg/cpu/nes_instr_04_zp_xy.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: nes_instr_04_zp_xy [cpu]"
+        },
+        {
+            "name": "nes_instr_05_abs",
+            "path": "fixtures/blargg/cpu/nes_instr_05_abs.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: nes_instr_05_abs [cpu]"
+        },
+        {
+            "name": "nes_instr_06_abs_xy",
+            "path": "fixtures/blargg/cpu/nes_instr_06_abs_xy.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: nes_instr_06_abs_xy [cpu]"
+        },
+        {
+            "name": "nes_instr_07_ind_x",
+            "path": "fixtures/blargg/cpu/nes_instr_07_ind_x.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: nes_instr_07_ind_x [cpu]"
+        },
+        {
+            "name": "nes_instr_08_ind_y",
+            "path": "fixtures/blargg/cpu/nes_instr_08_ind_y.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: nes_instr_08_ind_y [cpu]"
+        },
+        {
+            "name": "nes_instr_09_branches",
+            "path": "fixtures/blargg/cpu/nes_instr_09_branches.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: nes_instr_09_branches [cpu]"
+        },
+        {
+            "name": "nes_instr_10_stack",
+            "path": "fixtures/blargg/cpu/nes_instr_10_stack.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: nes_instr_10_stack [cpu]"
+        },
+        {
+            "name": "nes_instr_11_special",
+            "path": "fixtures/blargg/cpu/nes_instr_11_special.nes",
+            "category": "cpu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: nes_instr_11_special [cpu]"
+        },
+        {
+            "name": "mmc3_1_clocking",
+            "path": "fixtures/blargg/mmc3/mmc3_1_clocking.nes",
+            "category": "mmc3",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: mmc3_1_clocking [mmc3]"
+        },
+        {
+            "name": "mmc3_2_details",
+            "path": "fixtures/blargg/mmc3/mmc3_2_details.nes",
+            "category": "mmc3",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: mmc3_2_details [mmc3]"
+        },
+        {
+            "name": "mmc3_3_A12_clocking",
+            "path": "fixtures/blargg/mmc3/mmc3_3_A12_clocking.nes",
+            "category": "mmc3",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: mmc3_3_A12_clocking [mmc3]"
+        },
+        {
+            "name": "mmc3_4_scanline_timing",
+            "path": "fixtures/blargg/mmc3/mmc3_4_scanline_timing.nes",
+            "category": "mmc3",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: mmc3_4_scanline_timing [mmc3]"
+        },
+        {
+            "name": "mmc3_5_MMC3",
+            "path": "fixtures/blargg/mmc3/mmc3_5_MMC3.nes",
+            "category": "mmc3",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: mmc3_5_MMC3 [mmc3]"
+        },
+        {
+            "name": "mmc3_6_MMC6",
+            "path": "fixtures/blargg/mmc3/mmc3_6_MMC6.nes",
+            "category": "mmc3",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: mmc3_6_MMC6 [mmc3]"
+        },
+        {
+            "name": "mmc3_irq_1_Clocking",
+            "path": "fixtures/blargg/mmc3/mmc3_irq_1_Clocking.nes",
+            "category": "mmc3",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: mmc3_irq_1_Clocking [mmc3]"
+        },
+        {
+            "name": "mmc3_irq_2_Details",
+            "path": "fixtures/blargg/mmc3/mmc3_irq_2_Details.nes",
+            "category": "mmc3",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: mmc3_irq_2_Details [mmc3]"
+        },
+        {
+            "name": "mmc3_irq_3_A12_clocking",
+            "path": "fixtures/blargg/mmc3/mmc3_irq_3_A12_clocking.nes",
+            "category": "mmc3",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: mmc3_irq_3_A12_clocking [mmc3]"
+        },
+        {
+            "name": "mmc3_irq_4_Scanline_timing",
+            "path": "fixtures/blargg/mmc3/mmc3_irq_4_Scanline_timing.nes",
+            "category": "mmc3",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: mmc3_irq_4_Scanline_timing [mmc3]"
+        },
+        {
+            "name": "mmc3_irq_5_MMC3_rev_A",
+            "path": "fixtures/blargg/mmc3/mmc3_irq_5_MMC3_rev_A.nes",
+            "category": "mmc3",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: mmc3_irq_5_MMC3_rev_A [mmc3]"
+        },
+        {
+            "name": "mmc3_irq_6_MMC3_rev_B",
+            "path": "fixtures/blargg/mmc3/mmc3_irq_6_MMC3_rev_B.nes",
+            "category": "mmc3",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: mmc3_irq_6_MMC3_rev_B [mmc3]"
+        },
+        {
+            "name": "mmc3_v2_1_clocking",
+            "path": "fixtures/blargg/mmc3/mmc3_v2_1_clocking.nes",
+            "category": "mmc3",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: mmc3_v2_1_clocking [mmc3]"
+        },
+        {
+            "name": "mmc3_v2_2_details",
+            "path": "fixtures/blargg/mmc3/mmc3_v2_2_details.nes",
+            "category": "mmc3",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: mmc3_v2_2_details [mmc3]"
+        },
+        {
+            "name": "mmc3_v2_3_A12_clocking",
+            "path": "fixtures/blargg/mmc3/mmc3_v2_3_A12_clocking.nes",
+            "category": "mmc3",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: mmc3_v2_3_A12_clocking [mmc3]"
+        },
+        {
+            "name": "mmc3_v2_4_scanline_timing",
+            "path": "fixtures/blargg/mmc3/mmc3_v2_4_scanline_timing.nes",
+            "category": "mmc3",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: mmc3_v2_4_scanline_timing [mmc3]"
+        },
+        {
+            "name": "mmc3_v2_5_MMC3",
+            "path": "fixtures/blargg/mmc3/mmc3_v2_5_MMC3.nes",
+            "category": "mmc3",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: mmc3_v2_5_MMC3 [mmc3]"
+        },
+        {
+            "name": "mmc3_v2_6_MMC3_alt",
+            "path": "fixtures/blargg/mmc3/mmc3_v2_6_MMC3_alt.nes",
+            "category": "mmc3",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: mmc3_v2_6_MMC3_alt [mmc3]"
+        },
+        {
+            "name": "flowing_palette",
+            "path": "fixtures/blargg/ppu/flowing_palette.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: flowing_palette [ppu]"
+        },
+        {
+            "name": "full_palette",
+            "path": "fixtures/blargg/ppu/full_palette.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: full_palette [ppu]"
+        },
+        {
+            "name": "oam_read",
+            "path": "fixtures/blargg/ppu/oam_read.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: oam_read [ppu]"
+        },
+        {
+            "name": "oam_stress",
+            "path": "fixtures/blargg/ppu/oam_stress.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: oam_stress [ppu]"
+        },
+        {
+            "name": "palette_smooth",
+            "path": "fixtures/blargg/ppu/palette_smooth.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: palette_smooth [ppu]"
+        },
+        {
+            "name": "ppu_open_bus",
+            "path": "fixtures/blargg/ppu/ppu_open_bus.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: ppu_open_bus [ppu]"
+        },
+        {
+            "name": "ppu_palette_ram",
+            "path": "fixtures/blargg/ppu/ppu_palette_ram.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: ppu_palette_ram [ppu]"
+        },
+        {
+            "name": "ppu_power_up_palette",
+            "path": "fixtures/blargg/ppu/ppu_power_up_palette.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: ppu_power_up_palette [ppu]"
+        },
+        {
+            "name": "ppu_read_buffer",
+            "path": "fixtures/blargg/ppu/ppu_read_buffer.nes",
+            "category": "ppu",
+            "frames": 3000,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: ppu_read_buffer [ppu] (Step 3.1: PPU $2007 buffer decay test needs more frames)"
+        },
+        {
+            "name": "ppu_sprite_ram",
+            "path": "fixtures/blargg/ppu/ppu_sprite_ram.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: ppu_sprite_ram [ppu]"
+        },
+        {
+            "name": "ppu_vbl_clear_time",
+            "path": "fixtures/blargg/ppu/ppu_vbl_clear_time.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: ppu_vbl_clear_time [ppu]"
+        },
+        {
+            "name": "ppu_vbl_nmi",
+            "path": "fixtures/blargg/ppu/ppu_vbl_nmi.nes",
+            "category": "ppu",
+            "frames": 3000,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: ppu_vbl_nmi [ppu] (Step 3.1: 10 sub-tests need 3000 frames)"
+        },
+        {
+            "name": "ppu_vram_access",
+            "path": "fixtures/blargg/ppu/ppu_vram_access.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: ppu_vram_access [ppu]"
+        },
+        {
+            "name": "scanline",
+            "path": "fixtures/blargg/ppu/scanline.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: scanline [ppu]"
+        },
+        {
+            "name": "scanline_a1",
+            "path": "fixtures/blargg/ppu/scanline_a1.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: scanline_a1 [ppu]"
+        },
+        {
+            "name": "scrolltest",
+            "path": "fixtures/blargg/ppu/scrolltest.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: scrolltest [ppu]"
+        },
+        {
+            "name": "sprite_hit_01_basics",
+            "path": "fixtures/blargg/ppu/sprite_hit_01_basics.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: sprite_hit_01_basics [ppu]"
+        },
+        {
+            "name": "sprite_hit_02_alignment",
+            "path": "fixtures/blargg/ppu/sprite_hit_02_alignment.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: sprite_hit_02_alignment [ppu]"
+        },
+        {
+            "name": "sprite_hit_03_corners",
+            "path": "fixtures/blargg/ppu/sprite_hit_03_corners.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: sprite_hit_03_corners [ppu]"
+        },
+        {
+            "name": "sprite_hit_04_flip",
+            "path": "fixtures/blargg/ppu/sprite_hit_04_flip.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: sprite_hit_04_flip [ppu]"
+        },
+        {
+            "name": "sprite_hit_05_left_clip",
+            "path": "fixtures/blargg/ppu/sprite_hit_05_left_clip.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: sprite_hit_05_left_clip [ppu]"
+        },
+        {
+            "name": "sprite_hit_06_right_edge",
+            "path": "fixtures/blargg/ppu/sprite_hit_06_right_edge.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: sprite_hit_06_right_edge [ppu]"
+        },
+        {
+            "name": "sprite_hit_07_screen_bottom",
+            "path": "fixtures/blargg/ppu/sprite_hit_07_screen_bottom.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: sprite_hit_07_screen_bottom [ppu]"
+        },
+        {
+            "name": "sprite_hit_08_double_height",
+            "path": "fixtures/blargg/ppu/sprite_hit_08_double_height.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: sprite_hit_08_double_height [ppu]"
+        },
+        {
+            "name": "sprite_hit_09_timing",
+            "path": "fixtures/blargg/ppu/sprite_hit_09_timing.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: sprite_hit_09_timing [ppu]"
+        },
+        {
+            "name": "sprite_hit_10_timing_order",
+            "path": "fixtures/blargg/ppu/sprite_hit_10_timing_order.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: sprite_hit_10_timing_order [ppu]"
+        },
+        {
+            "name": "sprite_hit_11_edge_timing",
+            "path": "fixtures/blargg/ppu/sprite_hit_11_edge_timing.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: sprite_hit_11_edge_timing [ppu]"
+        },
+        {
+            "name": "sprite_overflow_1_basics",
+            "path": "fixtures/blargg/ppu/sprite_overflow_1_basics.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: sprite_overflow_1_basics [ppu]"
+        },
+        {
+            "name": "sprite_overflow_2_details",
+            "path": "fixtures/blargg/ppu/sprite_overflow_2_details.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: sprite_overflow_2_details [ppu]"
+        },
+        {
+            "name": "sprite_overflow_3_timing",
+            "path": "fixtures/blargg/ppu/sprite_overflow_3_timing.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: sprite_overflow_3_timing [ppu]"
+        },
+        {
+            "name": "sprite_overflow_4_obscure",
+            "path": "fixtures/blargg/ppu/sprite_overflow_4_obscure.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: sprite_overflow_4_obscure [ppu]"
+        },
+        {
+            "name": "sprite_overflow_5_emu",
+            "path": "fixtures/blargg/ppu/sprite_overflow_5_emu.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: sprite_overflow_5_emu [ppu]"
+        },
+        {
+            "name": "vbl_01_basics",
+            "path": "fixtures/blargg/ppu/vbl_01_basics.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: vbl_01_basics [ppu]"
+        },
+        {
+            "name": "vbl_02_set_time",
+            "path": "fixtures/blargg/ppu/vbl_02_set_time.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: vbl_02_set_time [ppu]"
+        },
+        {
+            "name": "vbl_03_clear_time",
+            "path": "fixtures/blargg/ppu/vbl_03_clear_time.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: vbl_03_clear_time [ppu]"
+        },
+        {
+            "name": "vbl_04_nmi_control",
+            "path": "fixtures/blargg/ppu/vbl_04_nmi_control.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: vbl_04_nmi_control [ppu]"
+        },
+        {
+            "name": "vbl_05_nmi_timing",
+            "path": "fixtures/blargg/ppu/vbl_05_nmi_timing.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: vbl_05_nmi_timing [ppu]"
+        },
+        {
+            "name": "vbl_06_suppression",
+            "path": "fixtures/blargg/ppu/vbl_06_suppression.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: vbl_06_suppression [ppu]"
+        },
+        {
+            "name": "vbl_07_nmi_on_timing",
+            "path": "fixtures/blargg/ppu/vbl_07_nmi_on_timing.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: vbl_07_nmi_on_timing [ppu]"
+        },
+        {
+            "name": "vbl_08_nmi_off_timing",
+            "path": "fixtures/blargg/ppu/vbl_08_nmi_off_timing.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: vbl_08_nmi_off_timing [ppu]"
+        },
+        {
+            "name": "vbl_09_even_odd_frames",
+            "path": "fixtures/blargg/ppu/vbl_09_even_odd_frames.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: vbl_09_even_odd_frames [ppu]"
+        },
+        {
+            "name": "vbl_10_even_odd_timing",
+            "path": "fixtures/blargg/ppu/vbl_10_even_odd_timing.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: vbl_10_even_odd_timing [ppu]"
+        },
+        {
+            "name": "vbl_timing_1_frame",
+            "path": "fixtures/blargg/ppu/vbl_timing_1_frame.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: vbl_timing_1_frame [ppu]"
+        },
+        {
+            "name": "vbl_timing_2_vbl",
+            "path": "fixtures/blargg/ppu/vbl_timing_2_vbl.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: vbl_timing_2_vbl [ppu]"
+        },
+        {
+            "name": "vbl_timing_3_even_odd",
+            "path": "fixtures/blargg/ppu/vbl_timing_3_even_odd.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: vbl_timing_3_even_odd [ppu]"
+        },
+        {
+            "name": "vbl_timing_4_clear_timing",
+            "path": "fixtures/blargg/ppu/vbl_timing_4_clear_timing.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: vbl_timing_4_clear_timing [ppu]"
+        },
+        {
+            "name": "vbl_timing_5_suppression",
+            "path": "fixtures/blargg/ppu/vbl_timing_5_suppression.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: vbl_timing_5_suppression [ppu]"
+        },
+        {
+            "name": "vbl_timing_6_disable",
+            "path": "fixtures/blargg/ppu/vbl_timing_6_disable.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: vbl_timing_6_disable [ppu]"
+        },
+        {
+            "name": "vbl_timing_7_nmi",
+            "path": "fixtures/blargg/ppu/vbl_timing_7_nmi.nes",
+            "category": "ppu",
+            "frames": 300,
+            "reset_after": -1,
+            "probe_addr": 24576,
+            "description": "blargg test ROM: vbl_timing_7_nmi [ppu]"
+        }
+    ]
 }

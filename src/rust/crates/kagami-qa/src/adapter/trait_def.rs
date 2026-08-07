@@ -26,6 +26,12 @@ pub struct InputSpec {
     pub frames: u32,
     /// Probe address for $6000 protocol.
     pub probe_addr: u32,
+    /// v1.17 H-1: insert a soft reset after this many frames (sibling to
+    /// `frames` and `probe_addr`). -1 = no mid-run reset (default behaviour,
+    /// i.e. step all `frames` then probe). 0 = reset immediately after load.
+    /// > 0 = step N frames, reset, step remaining frames. See TestInput
+    /// for the manifest-side meaning.
+    pub reset_after: i64,
 }
 
 // Default frame budget when the manifest entry does not state one.
@@ -40,6 +46,7 @@ impl InputSpec {
             script_path: test.input.script_path.clone(),
             frames: frames_from_args(&test.input.args).unwrap_or(DEFAULT_FRAMES),
             probe_addr: test.input.probe_addr.unwrap_or(0x6000),
+            reset_after: test.input.reset_after,
         }
     }
 }
