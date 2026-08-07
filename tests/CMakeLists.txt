@@ -79,14 +79,14 @@ endfunction()
 if(FCEUX11_BUILD_TESTS)
     # Smoke test (Task 1.0)
     fceux11_add_test_executable(fceux11_smoke_test
-        smoke_test.cpp
+        kagami/smoke_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME smoke_test COMMAND fceux11_smoke_test)
 
     # Mapper regression tests (Task 1.1)
     fceux11_add_test_executable(fceux11_mapper_load_test
-        boards/mapper_load_test.cpp
+        kagami/boards/mapper_load_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME mapper_load_test
@@ -94,7 +94,7 @@ if(FCEUX11_BUILD_TESTS)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
     fceux11_add_test_executable(fceux11_mapper_reset_test
-        boards/mapper_reset_test.cpp
+        kagami/boards/mapper_reset_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME mapper_reset_test
@@ -125,7 +125,7 @@ if(FCEUX11_BUILD_TESTS)
 
     # v0.3.3 — tl::expected API tests
     fceux11_add_test_executable(fceux11_expected_api_test
-        expected_api_test.cpp
+        kagami/expected_api_test.cpp
         git_info_stub.cpp
         ${CMAKE_SOURCE_DIR}/src/utils/fceu11_expected.cpp
     )
@@ -138,7 +138,7 @@ if(FCEUX11_BUILD_TESTS)
     # Uses a standalone add_executable rather than
     # fceux11_add_test_executable to skip the heavy engine link.
     add_executable(fceux11_enum_class_bitflags_test
-        enum_class_bitflags_test.cpp
+        kagami/enum_class_bitflags_test.cpp
     )
     target_include_directories(fceux11_enum_class_bitflags_test PRIVATE
         ${CMAKE_SOURCE_DIR}/src)
@@ -151,7 +151,7 @@ if(FCEUX11_BUILD_TESTS)
     # the full Qt application and require a display server / OpenGL ctx
     # to construct). The test reads .ts files and source files only.
     add_executable(fceux11_i18n_regression_test
-        i18n_regression_test.cpp
+        kagami/i18n_regression_test.cpp
     )
     target_include_directories(fceux11_i18n_regression_test PRIVATE
         ${CMAKE_SOURCE_DIR})
@@ -165,7 +165,7 @@ if(FCEUX11_BUILD_TESTS)
     # matches the underlying extern symbol, and that global_state() is a
     # true singleton.
     fceux11_add_test_executable(fceux11_core_state_test
-        core_state_test.cpp
+        kagami/core_state_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME core_state_test
@@ -178,7 +178,7 @@ if(FCEUX11_BUILD_TESTS)
     # regression net for the v1.3-v1.6 objectification work.
     # -------------------------------------------------------------------------
     fceux11_add_test_executable(fceux11_cpu_test
-        core/cpu_test.cpp
+        kagami/core/cpu_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME cpu_test
@@ -186,7 +186,7 @@ if(FCEUX11_BUILD_TESTS)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
     fceux11_add_test_executable(fceux11_ppu_test
-        core/ppu_test.cpp
+        kagami/core/ppu_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME ppu_test
@@ -194,7 +194,7 @@ if(FCEUX11_BUILD_TESTS)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
     fceux11_add_test_executable(fceux11_apu_test
-        core/apu_test.cpp
+        kagami/core/apu_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME apu_test
@@ -202,7 +202,7 @@ if(FCEUX11_BUILD_TESTS)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
     fceux11_add_test_executable(fceux11_bus_test
-        core/bus_test.cpp
+        kagami/core/bus_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME bus_test
@@ -210,7 +210,7 @@ if(FCEUX11_BUILD_TESTS)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
     fceux11_add_test_executable(fceux11_mapper_core_test
-        core/mapper_test.cpp
+        kagami/core/mapper_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME mapper_core_test
@@ -218,7 +218,7 @@ if(FCEUX11_BUILD_TESTS)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
     fceux11_add_test_executable(fceux11_savestate_core_test
-        core/savestate_test.cpp
+        kagami/core/savestate_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME savestate_core_test
@@ -253,7 +253,7 @@ if(FCEUX11_BUILD_TESTS)
     # will fill in real assertions for Cart lifecycle, MirrorMode enum,
     # install_expansion_audio, save/load hooks.
     fceux11_add_test_executable(fceux11_cart_class_test
-        core/cart_class_test.cpp
+        kagami/core/cart_class_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME cart_class_test
@@ -277,7 +277,7 @@ if(FCEUX11_BUILD_TESTS)
 
     # v1.10 Cryptex Task 4 — FDS runtime + Bad ROM detection test
     fceux11_add_test_executable(fceux11_fds_load_test
-        core/fds_load_test.cpp
+        kagami/core/fds_load_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME fds_load_test
@@ -289,7 +289,7 @@ if(FCEUX11_BUILD_TESTS)
     # Headless: does not call fceu11::Initialize() — tests the interface
     # surface, not engine integration.
     fceux11_add_test_executable(fceux11_driver_callbacks_test
-        core/driver_callbacks_test.cpp
+        kagami/core/driver_callbacks_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME driver_callbacks_test
@@ -299,7 +299,7 @@ if(FCEUX11_BUILD_TESTS)
     # v1.11 Bridge Phase H — core/driver boundary regression test.
     # Validates mutex.h pImpl (no Qt leak) + driver.h removal invariants.
     fceux11_add_test_executable(fceux11_core_driver_boundary_test
-        core/core_driver_boundary_test.cpp
+        kagami/core/core_driver_boundary_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME core_driver_boundary_test
@@ -309,7 +309,7 @@ if(FCEUX11_BUILD_TESTS)
     # hotfix2 P0-1: byte-for-byte equivalence test for the new
     # two-stage sprite decode LUT vs. the original 8×if shift chain.
     fceux11_add_test_executable(fceux11_ppu_rendering_lut_test
-        ppu_rendering_lut_test.cpp
+        kagami/ppu_rendering_lut_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME ppu_rendering_lut_test
@@ -321,7 +321,7 @@ if(FCEUX11_BUILD_TESTS)
     # (<1s runtime) that gate every CI cycle against the strict-
     # aliasing UB removal in P2-1 and the SPRB retyping in P2-3.
     fceux11_add_test_executable(fceux11_ppu_phase_c_test
-        ppu_phase_c_test.cpp
+        kagami/ppu_phase_c_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME ppu_phase_c_test
@@ -334,7 +334,7 @@ if(FCEUX11_BUILD_TESTS)
     # tests (<1s) that gate the cleanup PRs without needing a
     # full PPU / mapper exercise.
     fceux11_add_test_executable(fceux11_ppu_phase_d_test
-        ppu_phase_d_test.cpp
+        kagami/ppu_phase_d_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME ppu_phase_d_test
@@ -352,9 +352,9 @@ if(FCEUX11_BUILD_TESTS)
         git_info_stub.cpp
     )
     # v1.2 Census: golden_savestate_test lives under fixtures/golden/, so it
-    # needs an extra include directory to reach core/test_helpers.h.
+    # needs an extra include directory to reach kagami/core/test_helpers.h.
     target_include_directories(fceux11_golden_savestate_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/tests/core
+        ${CMAKE_SOURCE_DIR}/tests/kagami/core
     )
     add_test(NAME golden_savestate_test
              COMMAND fceux11_golden_savestate_test
@@ -365,13 +365,13 @@ if(FCEUX11_BUILD_TESTS)
     # FCEUX11_BENCH_BASELINE=<path>. Run with --generate to write a
     # host-local baseline (not committed).
     fceux11_add_test_executable(fceux11_bench_tolerance_test
-        benchmarks/bench_tolerance_test.cpp
+        kagami/benchmarks/bench_tolerance_test.cpp
         git_info_stub.cpp
     )
     # v1.2 Census: benchmarks/bench_tolerance_test is one directory deep;
-    # needs tests/core in the include path to reach test_helpers.h.
+    # needs tests/kagami/core in the include path to reach test_helpers.h.
     target_include_directories(fceux11_bench_tolerance_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/tests/core
+        ${CMAKE_SOURCE_DIR}/tests/kagami/core
     )
     add_test(NAME bench_tolerance_test
              COMMAND fceux11_bench_tolerance_test
@@ -391,7 +391,7 @@ if(FCEUX11_BUILD_TESTS)
     # Widgets/Gui, so it remains headless-runnable on CI.
     find_package(Qt6 REQUIRED COMPONENTS Core)
     add_executable(fceux11_config_store_test
-        config_store_test.cpp
+        kagami/config_store_test.cpp
     )
     target_link_libraries(fceux11_config_store_test PRIVATE
         Qt6::Core)
@@ -477,7 +477,7 @@ if(FCEUX11_BUILD_TESTS)
     # No __QT_DRIVER__ needed: the test directly instantiates PixBufPool
     # without involving nes_shm_t or the Qt driver.
     fceux11_add_test_executable(fceux11_pixbuf_pool_test
-        pixbuf_pool_test.cpp
+        kagami/pixbuf_pool_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME pixbuf_pool_test
@@ -494,7 +494,7 @@ if(FCEUX11_BUILD_TESTS)
     find_package(benchmark CONFIG QUIET)
     if(benchmark_FOUND)
         message(STATUS "Google Benchmark found — building benchmark targets")
-        add_executable(fceux11_bench_ppu_render benchmark/ppu_render_bench.cpp git_info_stub.cpp)
+        add_executable(fceux11_bench_ppu_render kagami/benchmark/ppu_render_bench.cpp git_info_stub.cpp)
         target_link_libraries(fceux11_bench_ppu_render PRIVATE
             fceux11_drivers_qt fceux11_drivers_common fceux11_core fceux11_boards fceux11_utils
             benchmark::benchmark
@@ -508,7 +508,7 @@ if(FCEUX11_BUILD_TESTS)
             target_link_libraries(fceux11_bench_ppu_render PRIVATE ntdll)
         endif()
 
-        add_executable(fceux11_bench_x6502_exec benchmark/x6502_exec_bench.cpp git_info_stub.cpp)
+        add_executable(fceux11_bench_x6502_exec kagami/benchmark/x6502_exec_bench.cpp git_info_stub.cpp)
         target_link_libraries(fceux11_bench_x6502_exec PRIVATE
             fceux11_drivers_qt fceux11_drivers_common fceux11_core fceux11_boards fceux11_utils
             benchmark::benchmark
@@ -519,7 +519,7 @@ if(FCEUX11_BUILD_TESTS)
             target_link_libraries(fceux11_bench_x6502_exec PRIVATE ntdll)
         endif()
 
-        add_executable(fceux11_bench_apu_mix benchmark/apu_mix_bench.cpp git_info_stub.cpp)
+        add_executable(fceux11_bench_apu_mix kagami/benchmark/apu_mix_bench.cpp git_info_stub.cpp)
         target_link_libraries(fceux11_bench_apu_mix PRIVATE
             fceux11_drivers_qt fceux11_drivers_common fceux11_core fceux11_boards fceux11_utils
             benchmark::benchmark
@@ -531,7 +531,7 @@ if(FCEUX11_BUILD_TESTS)
         endif()
 
         # v1.14 Anvil §14.1 — APU frame benchmark
-        add_executable(fceux11_bench_apu_frame benchmark/apu_frame_bench.cpp git_info_stub.cpp)
+        add_executable(fceux11_bench_apu_frame kagami/benchmark/apu_frame_bench.cpp git_info_stub.cpp)
         target_link_libraries(fceux11_bench_apu_frame PRIVATE
             fceux11_drivers_qt fceux11_drivers_common fceux11_core fceux11_boards fceux11_utils
             benchmark::benchmark
@@ -543,7 +543,7 @@ if(FCEUX11_BUILD_TESTS)
         endif()
 
         # v1.14 Anvil §14.1 — Bus dispatch benchmark
-        add_executable(fceux11_bench_bus_dispatch benchmark/bus_dispatch_bench.cpp git_info_stub.cpp)
+        add_executable(fceux11_bench_bus_dispatch kagami/benchmark/bus_dispatch_bench.cpp git_info_stub.cpp)
         target_link_libraries(fceux11_bench_bus_dispatch PRIVATE
             fceux11_drivers_qt fceux11_drivers_common fceux11_core fceux11_boards fceux11_utils
             benchmark::benchmark
@@ -555,26 +555,26 @@ if(FCEUX11_BUILD_TESTS)
         endif()
     else()
         message(STATUS "Google Benchmark not found — building standalone benchmark executables")
-        fceux11_add_test_executable(fceux11_bench_ppu_render    benchmark/ppu_render_bench.cpp    git_info_stub.cpp)
-        fceux11_add_test_executable(fceux11_bench_x6502_exec    benchmark/x6502_exec_bench.cpp    git_info_stub.cpp)
-        fceux11_add_test_executable(fceux11_bench_apu_mix       benchmark/apu_mix_bench.cpp       git_info_stub.cpp)
-        fceux11_add_test_executable(fceux11_bench_apu_frame     benchmark/apu_frame_bench.cpp     git_info_stub.cpp)
-        fceux11_add_test_executable(fceux11_bench_bus_dispatch  benchmark/bus_dispatch_bench.cpp  git_info_stub.cpp)
+        fceux11_add_test_executable(fceux11_bench_ppu_render    kagami/benchmark/ppu_render_bench.cpp    git_info_stub.cpp)
+        fceux11_add_test_executable(fceux11_bench_x6502_exec    kagami/benchmark/x6502_exec_bench.cpp    git_info_stub.cpp)
+        fceux11_add_test_executable(fceux11_bench_apu_mix       kagami/benchmark/apu_mix_bench.cpp       git_info_stub.cpp)
+        fceux11_add_test_executable(fceux11_bench_apu_frame     kagami/benchmark/apu_frame_bench.cpp     git_info_stub.cpp)
+        fceux11_add_test_executable(fceux11_bench_bus_dispatch  kagami/benchmark/bus_dispatch_bench.cpp  git_info_stub.cpp)
     endif()
 
     # v0.3.11 Phase-2 SIMD probe — standalone, build-only, not registered as CTest.
-    add_executable(fceux11_ppu_simd_probe_scalar benchmark/ppu_simd_probe.cpp)
+    add_executable(fceux11_ppu_simd_probe_scalar kagami/benchmark/ppu_simd_probe.cpp)
     target_compile_definitions(fceux11_ppu_simd_probe_scalar PRIVATE SCALAR_PROBE)
 
-    add_executable(fceux11_ppu_simd_probe_sse42 benchmark/ppu_simd_probe.cpp)
+    add_executable(fceux11_ppu_simd_probe_sse42 kagami/benchmark/ppu_simd_probe.cpp)
     target_compile_options(fceux11_ppu_simd_probe_sse42 PRIVATE /arch:SSE2)
 
-    add_executable(fceux11_ppu_simd_probe_avx2 benchmark/ppu_simd_probe.cpp)
+    add_executable(fceux11_ppu_simd_probe_avx2 kagami/benchmark/ppu_simd_probe.cpp)
     target_compile_options(fceux11_ppu_simd_probe_avx2 PRIVATE /arch:AVX2)
 
     # KagamiQA P1 — Headless smoke test (null driver, no Qt linkage).
     fceux11_add_headless_test_executable(fceux11_headless_smoke_test
-        headless_smoke_test.cpp
+        kagami/headless_smoke_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME headless_smoke_test
@@ -591,7 +591,7 @@ if(FCEUX11_BUILD_TESTS)
         git_info_stub.cpp
     )
     target_include_directories(fceux11_blargg_runner PRIVATE
-        ${CMAKE_SOURCE_DIR}/tests/core
+        ${CMAKE_SOURCE_DIR}/tests/kagami/core
     )
     add_test(NAME blargg_smoke
              COMMAND fceux11_blargg_runner
@@ -608,7 +608,7 @@ if(FCEUX11_BUILD_TESTS)
         git_info_stub.cpp
     )
     target_include_directories(fceux11_lua_runner PRIVATE
-        ${CMAKE_SOURCE_DIR}/tests/core
+        ${CMAKE_SOURCE_DIR}/tests/kagami/core
     )
     add_test(NAME lua_bit_test_headless
              COMMAND fceux11_lua_runner
@@ -640,7 +640,7 @@ if(FCEUX11_BUILD_TESTS)
             git_info_stub.cpp
         )
         target_include_directories(kagami_qa_direct_runner PRIVATE
-            ${CMAKE_SOURCE_DIR}/tests/core
+            ${CMAKE_SOURCE_DIR}/tests/kagami/core
         )
         # Stage-2 §七 C-3: native-static-libs reported by cargo (kernel32
         # auto-linked, ntdll via fceux11_add_headless_test_executable helper;
