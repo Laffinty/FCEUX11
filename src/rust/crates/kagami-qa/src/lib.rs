@@ -7,6 +7,116 @@ pub mod adapter;
 pub mod cli;
 
 // =========================================================================
+// Track C Task 1 / C-1: C-callable entry point for the blargg batch
+// harness — re-implements `tests/blargg_runner.cpp` in Rust.
+//
+// Single-ROM mode (`--rom <path> [--frames N] [--reset-after N]`) prints a
+// `BLARGG_RESULT:` line and returns 0 (PASS) or 1 (FAIL). Batch mode
+// (`--manifest <blargg_manifest.json>`) drives every ROM in the manifest,
+// prints progress to stderr and a JSON document to stdout, returning 0
+// iff every ROM PASSed.
+//
+// Linked into `fceux11_rust.lib` so that the (single, future) C++
+// trampoline can call it. The trampoline is intentionally tiny and lives
+// outside `kagami-qa`.
+// =========================================================================
+#[cfg(feature = "direct-adapter")]
+pub mod blargg_entry {
+    use std::ffi::CStr;
+    use std::io::Write;
+    use std::os::raw::c_char;
+    use std::path::PathBuf;
+
+    use crate::adapter::direct::Fceux11DirectAdapter;
+    use crate::adapter::trait_def::SutAdapter;
+    use crate::runner::blargg::{
+        load_blargg_manifest, parse_cli_args, run_batch, run_single,
+    };
+
+    /// C-ABI entry point replacing `tests/blargg_runner.cpp:main()`.
+    ///
+    /// Symbol is intentionally not `#[unsafe(no_mangle)]` here — the
+    /// owning crate `fceux11-rust` (see its wrapper) declares the exported
+    /// symbol. Keeping `no_mangle` in two places would create a
+    /// duplicate-symbol collision when both libs are linked together.
+    pub unsafe extern "C" fn kagami_qa_blargg_main(
+        argc: i32,
+        argv: *const *const c_char,
+    ) -> i32 {
+        let mut args = Vec::new();
+        for i in 0..argc {
+            let ptr = unsafe { *argv.offset(i as isize) };
+            if ptr.is_null() {
+                break;
+            }
+            let arg = match unsafe { CStr::from_ptr(ptr) }.to_str() {
+                Ok(s) => s.to_string(),
+                Err(_) => String::from("<invalid-utf8>"),
+            };
+            args.push(arg);
+        }
+
+        let cli = match parse_cli_args(&args[1..]) {
+            Ok(c) => c,
+            Err(msg) => {
+                let _ = writeln!(
+                    std::io::stderr(),
+                    "blargg_runner: {}\n\
+                     Usage: fceux11_blargg_runner --rom <path> [--frames N] [--reset-after N]\n\
+                            fceux11_blargg_runner --manifest <path.json>\n\
+                            fceux11_blargg_runner <rom_path> [frames]",
+                    msg
+                );
+                return 1;
+            }
+        };
+
+        if let Some(manifest_path) = cli.manifest_path.clone() {
+            return run_batch_path(&cli, manifest_path);
+        }
+
+        let rom_path = match cli.rom_path {
+            Some(p) => p,
+            None => {
+                let _ = writeln!(
+                    std::io::stderr(),
+                    "Usage: fceux11_blargg_runner --rom <path> [--frames N] [--reset-after N]\n\
+                           fceux11_blargg_runner --manifest <path.json>"
+                );
+                return 1;
+            }
+        };
+
+        let mut adapter = Fceux11DirectAdapter::new();
+        let (code, line) = run_single(&mut adapter, &rom_path, cli.frames, cli.reset_after);
+        let _ = std::io::stdout().write_all(line.as_bytes());
+        code
+    }
+
+    fn run_batch_path(cli: &crate::runner::blargg::BlarggCliArgs, path: PathBuf) -> i32 {
+        let manifest = match load_blargg_manifest(&path) {
+            Ok(m) => m,
+            Err(e) => {
+                let _ = writeln!(std::io::stderr(), "blargg_runner: {}", e);
+                return 1;
+            }
+        };
+        if manifest.roms.is_empty() {
+            let _ = writeln!(std::io::stderr(), "blargg_runner: no valid entries in manifest");
+            return 1;
+        }
+
+        let mut adapter = Fceux11DirectAdapter::new();
+        let mut out = std::io::stdout();
+        let mut err = std::io::stderr();
+        run_batch(&mut adapter, &manifest, &mut out, &mut err)
+        // NB: cli.reset_after is intentionally ignored in batch mode —
+        // per-entry reset_after in the manifest wins (matches C++).
+        .max(0)
+    }
+}
+
+// =========================================================================
 // P5: C-callable entry point for kagami_qa_direct_runner (CMake target).
 //
 // Called from tests/kagami_direct_main.cpp when the direct runner is built

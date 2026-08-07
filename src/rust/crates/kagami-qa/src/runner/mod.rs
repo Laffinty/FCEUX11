@@ -2,7 +2,11 @@
 //!
 //! `scheduler` runs manifest entries through the subprocess adapter;
 //! `direct` is the shared in-process execution core used by both the
-//! CLI `--direct` mode and the C-ABI `direct_entry`.
+//! CLI `--direct` mode and the C-ABI `direct_entry`;
+//! `blargg` is the Track C Task 1 / C-1 harness — re-implements the
+//! C++ `blargg_runner.cpp` semantics (single-ROM `BLARGG_RESULT:` line
+//! and batch `--manifest` JSON output) on top of [`SutAdapter`].
 
+pub mod blargg;
 pub mod direct;
 pub mod scheduler;
