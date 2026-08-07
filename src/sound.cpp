@@ -518,6 +518,21 @@ static void FrameSoundEvent(bool quarter, bool half)
 // only when not inhibited (RustyNES Session-26 iter 5, Mesen2 semantics).
 static void FrameIRQSet(void)
 {
+ // E-3 Track-B probe (v1.17 R6 task, 2026-08-08): IRQ_BEGIN recorder at
+ // the IRQ-set step. The existing E3 FSU probe fires once per quarter-
+ // step call; this E3B IRQ_BEGIN fires specifically when the frame
+ // counter commits to setting the IRQ flag (entry of FrameIRQSet vs.
+ // FrameIRQEnd - the two functions the fhcnt==33253/33254 boundary
+ // toggles between). Distinct probe name (E3B IRQ_BEGIN / E3B IRQ_END)
+ // so we can tag the SET-then-clear transition per frame. Pre-state
+ // captures fcnt + IRQFrameMode + fhcnt + SIRQStat for correlation with
+ // blargg's wait_n / irq_flag tests (apu_single_3_irq_flag,
+ // apu_single_6_irq_timing, apu_reset_4017_timing).
+ if (e3_trace_on()) {
+  fprintf(stderr, "E3B IRQ_BEGIN abs=%llu ts=%u fcnt=%u mode=0x%X fhcnt=%d sirq_pre=0x%X\n",
+   (unsigned long long)e3_abs_ts, (unsigned)g_cpu.timestamp_ref(), (unsigned)fcnt, (unsigned)IRQFrameMode,
+   fhcnt, (unsigned)SIRQStat);
+ }
  SIRQStat|=0x40;
  if (!(IRQFrameMode&0x1))
   X6502_IRQBegin(FCEU_IQFCOUNT);
