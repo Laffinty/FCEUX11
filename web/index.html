@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="dark" />
 <meta name="theme-color" content="#080a09" />
-<title>FCEUX11 — NES/Famicom Emulator for Windows · v1.15 Finale</title>
-<meta name="description" content="FCEUX11 v1.15 Finale — a FCEUX-based NES/Famicom emulator optimized for Windows. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states." />
+<title>FCEUX11 — NES/Famicom Emulator for Windows · v1.16</title>
+<meta name="description" content="FCEUX11 v1.16 — a FCEUX-based NES/Famicom emulator optimized for Windows. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. Fixes more game compatibility issues; official blargg test pass rate rises to 81.4%." />
 <meta name="keywords" content="FCEUX11, FCEUX, NES emulator, FC emulator, Famicom emulator, Windows emulator, TAS editor, Qt6, C++20, game emulator, 8-bit, multi-language, 12 languages, Arabic, RTL, ROM hacking, debugger, Lua scripting" />
 <meta name="author" content="Laffinty" />
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
@@ -32,8 +32,8 @@
 
 <meta property="og:site_name" content="FCEUX11" />
 <meta property="og:type" content="website" />
-<meta property="og:title" content="FCEUX11 — NES/Famicom Emulator for Windows · v1.15 Finale" />
-<meta property="og:description" content="FCEUX11 v1.15 Finale — a FCEUX-based NES/Famicom emulator optimized for Windows. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states." />
+<meta property="og:title" content="FCEUX11 — NES/Famicom Emulator for Windows · v1.16" />
+<meta property="og:description" content="FCEUX11 v1.16 — a FCEUX-based NES/Famicom emulator optimized for Windows. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. Fixes more game compatibility issues; official blargg test pass rate rises to 81.4%." />
 <meta property="og:url" content="https://laffinty.github.io/FCEUX11/" />
 <meta property="og:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <meta property="og:locale" content="en_US" />
@@ -56,8 +56,8 @@
 <meta name="msvalidate.01" content="" />
 
 <meta name="twitter:card" content="summary" />
-<meta name="twitter:title" content="FCEUX11 — NES/Famicom Emulator for Windows · v1.15 Finale" />
-<meta name="twitter:description" content="FCEUX11 v1.15 Finale — a FCEUX-based NES/Famicom emulator optimized for Windows. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states." />
+<meta name="twitter:title" content="FCEUX11 — NES/Famicom Emulator for Windows · v1.16" />
+<meta name="twitter:description" content="FCEUX11 v1.16 — a FCEUX-based NES/Famicom emulator optimized for Windows. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. Fixes more game compatibility issues; official blargg test pass rate rises to 81.4%." />
 <meta name="twitter:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -72,8 +72,8 @@
   "name":"FCEUX11",
   "applicationCategory":"GameApplication",
   "operatingSystem":"Windows 11",
-  "description":"FCEUX11 v1.15 Finale — a FCEUX-based NES/Famicom emulator optimized for Windows. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states.",
-  "softwareVersion":"1.15",
+  "description":"FCEUX11 v1.16 — a FCEUX-based NES/Famicom emulator optimized for Windows. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. Fixes more game compatibility issues; official blargg test pass rate rises to 81.4%.",
+  "softwareVersion":"1.16",
   "license":"https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt",
   "url":"https://laffinty.github.io/FCEUX11/",
   "downloadUrl":"https://github.com/Laffinty/FCEUX11/releases",
@@ -138,7 +138,7 @@
 
 <header class="hero" id="top">
   <div class="wrap">
-    <div class="pill reveal"><span class="dot"></span><span>v1.15 · hotfix6</span></div>
+    <div class="pill reveal"><span class="dot"></span><span>v1.16</span></div>
     <h1 class="reveal"><span class="grad">FCEUX</span><span class="dim">11</span></h1>
     <p class="tagline reveal"><span class="tagline-title">A FCEUX-based NES/Famicom emulator optimized for Windows</span><br>core accuracy, modern native experience, 12 UI languages.</p>
     <div class="cta reveal">
@@ -206,36 +206,38 @@
   <div class="wrap">
     <div class="whatsnew-head reveal">
       <div class="kicker">What's new</div>
-      <h2>v1.15 · hotfix6</h2>
-      <div class="sub">Released 2026-07-24 · v1.0 ~ v1.15 recap</div>
+      <h2>v1.16</h2>
+      <div class="sub">Released 2026-08-06 · v1.15 → v1.16 recap</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3>12 Languages, Fully Translated</h3>
-          <p>All 12 languages are fully translated. The interface, including menus, dialogs, settings, tooltips and prompts, appears in the language you choose. Each language is shown in its own name and script: 简体中文, 繁體中文, English, 日本語, 한국어, Español, Français, Deutsch, Tiếng Việt, ไทย, हिन्दी, العربية, so you can find your language even when the current interface is in another language. FCEUX11 supports these 12 languages.</p>
+          <h3>Compatibility Issues Across Several Games Are Fixed</h3>
+          <p>A small number of games still exhibited minor glitches in the previous release — occasional screen flicker, audio stutter, or input lag. This release corrects several core timing mechanisms: VBL timing alignment, APU clock jitter, PPU data-buffer read, and PPU data-latch decay.</p>
+          <p>Concrete number: the official blargg test-ROM suite (177 ROMs) pass rate rises from 76.3% to 81.4%.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">02</div>
         <div class="wn-text">
-          <h3>Goodbye Crashes</h3>
-          <p>Manual memory management (malloc/free) has been eliminated in favor of automatic memory management. Core crash bugs — including heap double-free corruption — have been fixed. Long play sessions stay rock-solid.</p>
+          <h3>Lua Scripting Interface Fully Aligned with FCEUX</h3>
+          <p>The Lua interfaces commonly used by TAS authors (joypad, memory, etc.) now behave identically in FCEUX11 and FCEUX. Scripts originally written for FCEUX can be used directly in FCEUX11 without adaptation.</p>
+          <p>Interfaces added: joypad.get/set, memory.readwrite, memory.readwordsigned, memory.getregister, memory.registerexec.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">03</div>
         <div class="wn-text">
-          <h3>Faster, Smoother Gameplay</h3>
-          <p>LTO/PGO compilation and linker optimization (/OPT:REF, /OPT:ICF) deliver noticeably faster startup and game loading. Steadier frame pacing means no stuttering and no audio glitches, even on modest hardware.</p>
+          <h3>Lua bit.* Operations Now Conform to the LuaBitOp Standard</h3>
+          <p>The semantics of the bitwise library (bit.rshift, bit.tohex, etc.) now match the LuaBitOp 1.0.2 standard: right shift is logical (high bits filled with 0), tohex outputs uppercase for negative numbers, and so on. Scripts written for FCEUX that rely on bitwise operations no longer produce unexpected results when ported to FCEUX11 due to implementation differences.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">04</div>
         <div class="wn-text">
-          <h3>PPU Rendering Overhaul: 52% Frame-Time Reduction</h3>
-          <p>21 algorithm- and micro-structure-level optimizations reshape the PPU rendering pipeline: two-stage sprite decode LUT, X-bucket sprite pre-classification, strict-aliasing UB fixes, modulo → wrap-around, dispatcher cache reuse. Measured single-threaded PPU frame time drops from 1.125 ms (hotfix1) to 0.535 ms (−52.4%), exceeding the plan's 42% upper bound; 169 mappers pass with 0-byte diff — visual accuracy preserved.</p>
+          <h3>Long Recordings and Save States Are More Stable</h3>
+          <p>Several issues on the PPU timing and addressing path have been fixed (three fixes in ppu_read_buffer, plus ppu_open_bus data-latch decay); long TAS recordings are less likely to drift out of sync mid-recording. Save-state compatibility also has full regression-test coverage.</p>
         </div>
       </div>
     </div>

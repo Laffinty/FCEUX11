@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="dark" />
 <meta name="theme-color" content="#080a09" />
-<title>FCEUX11 — Emulador de NES/Famicom para Windows · v1.15 Finale</title>
-<meta name="description" content="FCEUX11 v1.15 Finale — emulador de NES/Famicom basado en FCEUX, optimizado para Windows. Qt 6.8 + C++20, 12 idiomas con detección automática, herramientas de depuración, editor TAS, scripting Lua y estados de guardado fiables." />
+<title>FCEUX11 — Emulador de NES/Famicom para Windows · v1.16</title>
+<meta name="description" content="FCEUX11 v1.16 — emulador de NES/Famicom basado en FCEUX, optimizado para Windows. Qt 6.8 + C++20, 12 idiomas con detección automática, herramientas de depuración, editor TAS, scripting Lua y estados de guardado fiables. Corrige más problemas de compatibilidad con juegos; la tasa de aprobación de las pruebas oficiales blargg sube al 81,4 %." />
 <meta name="keywords" content="FCEUX11, FCEUX, NES emulator, FC emulator, Famicom emulator, Windows emulator, TAS editor, Qt6, C++20, game emulator, 8-bit, multi-language, 12 languages, Arabic, RTL, ROM hacking, debugger, Lua scripting" />
 <meta name="author" content="Laffinty" />
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
@@ -32,8 +32,8 @@
 
 <meta property="og:site_name" content="FCEUX11" />
 <meta property="og:type" content="website" />
-<meta property="og:title" content="FCEUX11 — Emulador de NES/Famicom para Windows · v1.15 Finale" />
-<meta property="og:description" content="FCEUX11 v1.15 Finale — emulador de NES/Famicom basado en FCEUX, optimizado para Windows. Qt 6.8 + C++20, 12 idiomas con detección automática, herramientas de depuración, editor TAS, scripting Lua y estados de guardado fiables." />
+<meta property="og:title" content="FCEUX11 — Emulador de NES/Famicom para Windows · v1.16" />
+<meta property="og:description" content="FCEUX11 v1.16 — emulador de NES/Famicom basado en FCEUX, optimizado para Windows. Qt 6.8 + C++20, 12 idiomas con detección automática, herramientas de depuración, editor TAS, scripting Lua y estados de guardado fiables. Corrige más problemas de compatibilidad con juegos; la tasa de aprobación de las pruebas oficiales blargg sube al 81,4 %." />
 <meta property="og:url" content="https://laffinty.github.io/FCEUX11/es/" />
 <meta property="og:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <meta property="og:locale" content="es_ES" />
@@ -56,8 +56,8 @@
 <meta name="msvalidate.01" content="" />
 
 <meta name="twitter:card" content="summary" />
-<meta name="twitter:title" content="FCEUX11 — Emulador de NES/Famicom para Windows · v1.15 Finale" />
-<meta name="twitter:description" content="FCEUX11 v1.15 Finale — emulador de NES/Famicom basado en FCEUX, optimizado para Windows. Qt 6.8 + C++20, 12 idiomas con detección automática, herramientas de depuración, editor TAS, scripting Lua y estados de guardado fiables." />
+<meta name="twitter:title" content="FCEUX11 — Emulador de NES/Famicom para Windows · v1.16" />
+<meta name="twitter:description" content="FCEUX11 v1.16 — emulador de NES/Famicom basado en FCEUX, optimizado para Windows. Qt 6.8 + C++20, 12 idiomas con detección automática, herramientas de depuración, editor TAS, scripting Lua y estados de guardado fiables. Corrige más problemas de compatibilidad con juegos; la tasa de aprobación de las pruebas oficiales blargg sube al 81,4 %." />
 <meta name="twitter:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -72,8 +72,8 @@
   "name":"FCEUX11",
   "applicationCategory":"GameApplication",
   "operatingSystem":"Windows 11",
-  "description":"FCEUX11 v1.15 Finale — emulador de NES/Famicom basado en FCEUX, optimizado para Windows. Qt 6.8 + C++20, 12 idiomas con detección automática, herramientas de depuración, editor TAS, scripting Lua y estados de guardado fiables.",
-  "softwareVersion":"1.15",
+  "description":"FCEUX11 v1.16 — emulador de NES/Famicom basado en FCEUX, optimizado para Windows. Qt 6.8 + C++20, 12 idiomas con detección automática, herramientas de depuración, editor TAS, scripting Lua y estados de guardado fiables. Corrige más problemas de compatibilidad con juegos; la tasa de aprobación de las pruebas oficiales blargg sube al 81,4 %.",
+  "softwareVersion":"1.16",
   "license":"https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt",
   "url":"https://laffinty.github.io/FCEUX11/es/",
   "downloadUrl":"https://github.com/Laffinty/FCEUX11/releases",
@@ -138,7 +138,7 @@
 
 <header class="hero" id="top">
   <div class="wrap">
-    <div class="pill reveal"><span class="dot"></span><span>v1.15 · hotfix6</span></div>
+    <div class="pill reveal"><span class="dot"></span><span>v1.16</span></div>
     <h1 class="reveal"><span class="grad">FCEUX</span><span class="dim">11</span></h1>
     <p class="tagline reveal"><span class="tagline-title">Emulador de NES/Famicom basado en FCEUX, optimizado para Windows</span><br>precisión original, experiencia nativa moderna, 12 idiomas en la interfaz.</p>
     <div class="cta reveal">
@@ -206,36 +206,38 @@
   <div class="wrap">
     <div class="whatsnew-head reveal">
       <div class="kicker">Novedades</div>
-      <h2>v1.15 · hotfix6</h2>
-      <div class="sub">Lanzado el 2026-07-24 · resumen de v1.0 ~ v1.15</div>
+      <h2>v1.16</h2>
+      <div class="sub">Lanzado el 2026-08-06 · resumen de v1.15 → v1.16</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3>12 idiomas, completamente traducidos</h3>
-          <p>Los 12 idiomas están completamente traducidos. La interfaz — incluyendo menús, diálogos, ajustes, descripciones emergentes y mensajes — aparece en el idioma que elijas. Cada idioma se muestra con su propio nombre y escritura: 简体中文, 繁體中文, English, 日本語, 한국어, Español, Français, Deutsch, Tiếng Việt, ไทย, हिन्दी, العربية, para que puedas encontrar tu idioma incluso cuando la interfaz actual esté en otro idioma. FCEUX11 es compatible con estos 12 idiomas.</p>
+          <h3>Se corrigieron problemas de compatibilidad en varios juegos</h3>
+          <p>En la versión anterior quedaban algunos juegos con pequeños defectos en pantalla, sonido o respuesta de entrada. Esta versión corrige varios mecanismos de temporización centrales: alineación de temporización VBL, fluctuación del reloj APU, lectura del búfer de datos PPU y decaimiento del latch de datos PPU.</p>
+          <p>Cifra concreta: la tasa de aprobación del conjunto oficial de ROM de prueba blargg (177 ROM) pasa del 76,3 % al 81,4 %.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">02</div>
         <div class="wn-text">
-          <h3>Adiós a los cierres inesperados</h3>
-          <p>Se ha eliminado por completo la gestión manual de memoria (malloc/free) en favor de la automática. Se han corregido errores críticos como la corrupción de pila por double-free. Las sesiones largas de juego permanecen estables.</p>
+          <h3>La interfaz de scripts Lua ahora está totalmente alineada con FCEUX</h3>
+          <p>Las interfaces Lua más usadas por los autores de TAS (joypad, memory, etc.) ahora se comportan de forma idéntica en FCEUX11 y FCEUX. Los scripts escritos originalmente para FCEUX pueden usarse directamente en FCEUX11 sin necesidad de adaptarlos.</p>
+          <p>Interfaces añadidas: joypad.get/set, memory.readwrite, memory.readwordsigned, memory.getregister, memory.registerexec.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">03</div>
         <div class="wn-text">
-          <h3>Arranque más rápido, juego más fluido</h3>
-          <p>La compilación LTO/PGO y la optimización del enlazador (/OPT:REF, /OPT:ICF) ofrecen un arranque en frío y una carga de juegos notablemente más rápidos. El ritmo de fotogramas es más estable: sin tirones ni cortes de audio, incluso en equipos modestos.</p>
+          <h3>Las operaciones bit.* de Lua cumplen el estándar LuaBitOp</h3>
+          <p>La semántica de la biblioteca de operaciones bit a bit (bit.rshift, bit.tohex, etc.) ahora se ajusta al estándar LuaBitOp 1.0.2: el desplazamiento a la derecha es lógico (los bits altos se rellenan con 0), tohex produce mayúsculas para números negativos, etc. Los scripts escritos para FCEUX que dependen de operaciones bit a bit ya no generan resultados inesperados al portarlos a FCEUX11.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">04</div>
         <div class="wn-text">
-          <h3>Renovación del renderizado PPU: 52% menos tiempo por fotograma</h3>
-          <p>21 optimizaciones a nivel de algoritmo y microestructura transforman el pipeline de renderizado PPU: LUT de dos etapas para sprites, preclasificación X-bucket, correcciones de UB por strict aliasing, cambio de módulo a wrap-around, y reutilización de caché del dispatcher. El tiempo medido por fotograma en un solo hilo cae de 1,125 ms (hotfix1) a 0,535 ms (−52,4%), superando el 42% previsto como techo; 169 mappers pasan con 0 bytes de diferencia, conservando la fidelidad visual.</p>
+          <h3>Grabaciones largas y estados de guardado más estables</h3>
+          <p>Se corrigieron varios problemas en la ruta de temporización y direccionamiento de la PPU (tres correcciones en ppu_read_buffer y decaimiento del latch de datos en ppu_open_bus), por lo que las grabaciones TAS largas pierden menos la sincronización a mitad de la grabación. La compatibilidad de los estados de guardado también cuenta con cobertura completa de pruebas de regresión.</p>
         </div>
       </div>
     </div>
