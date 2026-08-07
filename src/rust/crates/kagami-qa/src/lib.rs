@@ -176,6 +176,71 @@ pub mod rom_regression_entry {
 }
 
 // =========================================================================
+// Track C Task 1 / C-3: C-callable entry point for the
+// savestate_regression harness — re-implements
+// `tests/savestate_regression_test.cpp` in Rust.
+//
+// Loads `fixtures/golden_savestate_hashes.json`, drives the 12-ROM
+// table (vrc7 omitted because its savestate contains a non-
+// deterministic heap pointer), 60 frames per ROM, MD5 of the
+// serialised savestate per ROM, compares against the golden hashes,
+// prints the regression summary, and returns 0 iff every hash matches.
+// =========================================================================
+#[cfg(feature = "direct-adapter")]
+pub mod savestate_regression_entry {
+    use std::io::Write;
+    use std::path::{Path, PathBuf};
+
+    use crate::adapter::direct::Fceux11DirectAdapter;
+    use crate::adapter::trait_def::SutAdapter;
+    use crate::runner::savestate_regression::{
+        format_summary, load_golden_savestate_hashes, regression_exit_code, run_regression,
+        StateSnapshot,
+    };
+
+    /// C-ABI entry point replacing `tests/savestate_regression_test.cpp:main()`.
+    pub unsafe extern "C" fn kagami_qa_savestate_regression_main(
+        _argc: i32,
+        _argv: *const *const std::os::raw::c_char,
+    ) -> i32 {
+        // WORKING_DIRECTORY is `tests/` (mirrors CMake CTest entry).
+        let workdir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let golden_path = workdir.join("fixtures/golden_savestate_hashes.json");
+        let golden = match load_golden_savestate_hashes(&golden_path) {
+            Ok(g) => g,
+            Err(e) => {
+                let _ = writeln!(
+                    std::io::stdout,
+                    "Golden hashes file not found: {}\n\n\
+                     No golden hashes found. Run with --generate to create {}\n\
+                     RESULT: FAILED",
+                    golden_path.display(),
+                    golden_path.display(),
+                );
+                let _ = writeln!(std::io::stdout, "{}", e);
+                return 1;
+            }
+        };
+
+        let mut adapter = Fceux11DirectAdapter::new();
+        let outcome = run_regression(&mut adapter, &golden, &workdir);
+        let summary = format_summary(&outcome);
+        let _ = write!(std::io::stdout, "{}", summary);
+        regression_exit_code(&outcome)
+    }
+
+    // Suppress unused-import warnings when only the harness entry is
+    // referenced (the StateSnapshot trait is invoked via
+    // Fceux11DirectAdapter at runtime through the impl below).
+    const _: fn(&Fceux11DirectAdapter) -> Result<Vec<u8>, crate::core::QaError> =
+        |a| <Fceux11DirectAdapter as StateSnapshot>::snapshot_state(a);
+
+    // Reference Path to keep the std::path import active even when
+    // the harness entry is the only consumer of this module.
+    const _: fn(&Path) -> () = |_| ();
+}
+
+// =========================================================================
 // P5: C-callable entry point for kagami_qa_direct_runner (CMake target).
 //
 // Called from tests/kagami_direct_main.cpp when the direct runner is built

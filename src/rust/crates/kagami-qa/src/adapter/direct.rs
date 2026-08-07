@@ -32,6 +32,16 @@ unsafe extern "C" {
     /// or `dst` is NULL. Track C Task 1 / C-2 — used by the Rust
     /// rom_regression harness.
     fn kagami_bridge_extract_frame_buffer(dst: *mut u8, len: u32) -> i32;
+    /// Serialise the current emulator state into `dst` (capacity `cap`)
+    /// and report the total size in `written_out`. Returns 0 on
+    /// success. Track C Task 1 / C-3 — used by the Rust
+    /// savestate_regression harness.
+    fn kagami_bridge_save_state(
+        dst: *mut u8,
+        cap: u32,
+        written_out: *mut u32,
+        compression_level: i32,
+    ) -> i32;
 }
 
 // ---------------------------------------------------------------------------

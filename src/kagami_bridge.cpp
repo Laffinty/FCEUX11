@@ -16,6 +16,7 @@
 #include "sound.h"
 #include "ppu.h"
 #include "video.h"               // for XBuf
+#include "emufile.h"             // for EMUFILE_MEMORY
 #include "drivers/common/nes_shm.h"
 #include "driver_callbacks.h"
 
@@ -170,5 +171,44 @@ int kagami_bridge_extract_frame_buffer(uint8_t *dst, uint32_t len) {
         return -2;
     }
     std::memcpy(dst, XBuf, len);
+    return 0;
+}
+
+// ---------------------------------------------------------------------------
+// Savestate serialisation (Track C Task 1 / C-3)
+//
+// Track C C-3 replaces tests/savestate_regression_test.cpp with a Rust
+// harness under kagami-qa::runner::savestate_regression. The C++
+// harness runs N frames, then FCEUSS_SaveMS into an EMUFILE_MEMORY
+// wrapper and MD5s the bytes; this FFI is the minimal surface that
+// lets the Rust side do the same byte-for-byte.
+//
+// Returns 0 on success. `written_out` always receives the actual
+// savestate size (caller can compare with `cap` to detect truncation
+// and retry with a larger buffer).
+// ---------------------------------------------------------------------------
+int kagami_bridge_save_state(uint8_t *dst, uint32_t cap,
+                             uint32_t *written_out,
+                             int compression_level) {
+    if (!written_out) {
+        return -1;
+    }
+    *written_out = 0;
+    if (cap > 0 && !dst) {
+        return -2;
+    }
+
+    std::vector<std::byte> buffer;
+    EMUFILE_MEMORY file(&buffer);
+    if (!FCEUSS_SaveMS(&file, compression_level)) {
+        return -3;
+    }
+    const size_t total = buffer.size();
+    *written_out = static_cast<uint32_t>(total);
+
+    if (cap > 0) {
+        const size_t to_copy = std::min(static_cast<size_t>(cap), total);
+        std::memcpy(dst, buffer.data(), to_copy);
+    }
     return 0;
 }

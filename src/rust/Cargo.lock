@@ -423,6 +423,8 @@ name = "kagami-qa"
 version = "0.3.5"
 dependencies = [
  "crc32fast",
+ "digest",
+ "md-5",
  "serde",
  "serde_json",
  "tempfile",

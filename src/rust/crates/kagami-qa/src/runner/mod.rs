@@ -7,9 +7,13 @@
 //! C++ `blargg_runner.cpp` semantics (single-ROM `BLARGG_RESULT:` line
 //! and batch `--manifest` JSON output) on top of [`SutAdapter`];
 //! `rom_regression` is the Track C Task 1 / C-2 harness — replaces
-//! `tests/rom_regression_test.cpp` (12-ROM CRC32 frame regression).
+//! `tests/rom_regression_test.cpp` (13-ROM CRC32 frame regression);
+//! `savestate_regression` is the Track C Task 1 / C-3 harness —
+//! replaces `tests/savestate_regression_test.cpp` (12-ROM MD5
+//! savestate regression, vrc7 omitted).
 
 pub mod blargg;
 pub mod direct;
 pub mod rom_regression;
+pub mod savestate_regression;
 pub mod scheduler;
