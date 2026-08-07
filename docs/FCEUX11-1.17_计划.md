@@ -19,7 +19,7 @@ v1.17 的五项任务及其性质：
 | 1 | 可迁移 C++ 测试 → KagamiQA Rust 体系 | 代码迁移（~2,900 LOC） | 消除 C++ harness 双实现，全部测试由 kagami-qa-runner 单一调度 |
 | 2 | 不可迁移 C++ 测试耦合 KagamiQA + 源码区隔 | 结构重组 | KagamiQA 资产集中落位（`tests/kagami/`），与 FCEUX11 引擎代码物理区隔 |
 | 3 | v1.16 遗留项收敛 | 精度攻坚 + harness 修复 | Oracle B 伪失败 18 项清零，真实精度 FAIL 面下降，矩阵数字收敛 |
-| 4 | KagamiQA 架构规范化 | 重构 | 明确七层依赖层级，消除 main.rs god file 与 direct_entry 重复，视作一个整体 |
+| 4 | KagamiQA 架构规范化 | 重构 | 明确七层依赖层级，消除 main.rs god file 与 direct_entry 重复；补 runner `--filter` 与 direct 看门狗；视作一个整体 |
 | 5 | A–E 分级通过标准 | 新功能 | 测试结果有机器可算、可审计的发布等级 |
 
 **一句话收束**：v1.17 把 KagamiQA 从「FCEUX11 的附属测试框架」升级为「**测试体系的唯一归属与唯一门禁**」——所有测试都是它的子项（任务 1/2）、它有明确的分层架构（任务 4）、产出可判读的发布等级（任务 5），同时继续收敛 v1.16 遗留的精度与 harness 问题（任务 3）。
@@ -264,6 +264,8 @@ C++ 侧（KagamiQA 资产，任务 2 落位）
 3. **可见性纪律**：模块间仅暴露必要 pub 接口，内部实现 `pub(crate)` 收敛（Rust 2024 edition 可用 `pub(in crate::...)` 精确控制）。
 4. **README 重写 + 内部架构文档**：`kagami-qa/README.md` 更新为 v1.17 实态；新增架构说明（层级图、依赖规则、模块职责、禁止事项）。
 5. **红线（Stage-3 冻结规则）**：不向共享 schema 添加领域字段；不向 `SutAdapter` 添加方法；现有 `rom`/`probe_addr`/`frames` 不删不改。任务 1 迁移的测试如需新参数，走 `adapter_config` 透传。
+6. **runner `--filter`（开发体验刚需）**：CLI 新增 `--filter <expr>`，支持按 `id` / `tag` / `layer` / `oracle_type` 组合过滤（如 `--filter "tag=blargg"`、`--filter "layer=core & oracle=B"`）。实现放 `cli/args.rs` 解析 + `runner/scheduler.rs` 过滤（manifest 加载后、调度前应用），纯 Rust 无新增依赖。收益：精度攻坚时「只跑 blargg_*」不再依赖外部 grep/ctest。
+7. **direct 模式进程级看门狗（防单测崩溃拖垮全跑）**：direct（in-process）模式当前无进程隔离，一个测试在 C++ core（FFI 内）崩溃即整个 runner 退出。补强分两级：① 每测试超时看门狗（复用 `timeout_seconds`，watchdog 线程中止挂死测试）；② panic 隔离（`catch_unwind` 包裹 per-test 逻辑，panic 记为该测试 FAIL 而非终止全跑）。硬崩溃（segfault）无法在进程内捕获——如需完整隔离，将 direct 测试子进程化（每测试一个子进程跑 direct adapter），代价是失去帧级交互调试；v1.17 先落地 ①②，子进程化列为可选扩展。
 
 ### 5.4 验收门禁
 
@@ -274,6 +276,8 @@ C++ 侧（KagamiQA 资产，任务 2 落位）
 | main.rs | 拆分后主文件 < 150 行 |
 | 重复代码 | `direct_entry` 与 CLI 的 per-test 循环收敛为单一实现（grep 验证无重复模板） |
 | 集成 | `kagami-qa-runner` 对 47 条目产出矩阵与重构前一致（PASS/FAIL 集合逐项相同） |
+| `--filter` | `--filter "tag=blargg"` / `--filter "layer=core & oracle=B"` / `--filter "id=blargg_cpu_instrs"` 三种表达式均正确收敛到预期子集；无过滤时行为与重构前一致 |
+| direct 看门狗 | 构造挂死测试 → 超时中止并记为 FAIL 而非卡死全跑；构造 panic 测试 → 记为 FAIL 且其余测试继续；全跑不因单测崩溃丢失其余结果 |
 
 ---
 
@@ -363,7 +367,7 @@ Phase D  遗留收敛（任务 3，全程并行轨）
 - [ ] **任务 1**：可迁移 C++ harness/Oracle 测试全部迁入 Rust，`kagami-qa-runner` 单一调度 47 条目，无 C++ harness 残留
 - [ ] **任务 2**：不可迁移 C++ 测试集中于 `tests/kagami/`，manifest 登记核对无游离，ctest 34/34
 - [ ] **任务 3**：H-1/H-2 清零 0x80/0x81 伪失败；R5/R6 按 instrument-first 推进（收敛为 PASS 或有据已知限制）；矩阵 advisory 数量下降
-- [ ] **任务 4**：七层架构落地，main.rs < 150 行，direct_entry 重复清零，README/架构文档更新
+- [ ] **任务 4**：七层架构落地，main.rs < 150 行，direct_entry 重复清零，runner `--filter` 与 direct 看门狗就位，README/架构文档更新
 - [ ] **任务 5**：grade.rs 上线，当前基线输出 `grade=C`，五级分界用例全过，R4 Gate 对 D/E 判红
 - [ ] **CI**：`wip_v1.17` push 自动触发 KagamiQA workflow，matrix artifact 含 grade 字段
 - [ ] **文档**：KagamiQA.md 同步（目录结构、分级标准、数字回填）；CHANGELOG v1.17 章节
