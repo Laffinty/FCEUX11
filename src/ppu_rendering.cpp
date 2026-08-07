@@ -1652,6 +1652,21 @@ int FCEUX_PPU_Loop(int skip) {
 				 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()),
 				 ppur.status.sl, ppur.status.cycle, nd);
 			}
+			// E-1 Track-B probe (v1.17 R5 task, 2026-08-08): NMI_LATCH
+			// recorder. Fires immediately BEFORE TriggerNMI() (vs the
+			// existing E1 NMI_SET inside x6502.cpp::TriggerNMI which fires
+			// AFTER _IRQlow|=FCEU_IQNMI). Captures the dispatch site's
+			// PPU status + count + lastpc so vbl_05 / vbl_07 / vbl_08 NMI
+			// dispatch latency can be measured from the CALLER's frame
+			// of reference, not the callee's. Distinct probe name
+			// (E1B NMI_LATCH vs E1 NMI_SET) so dispatcher/callee sites
+			// are both recorded.
+			if (!vbl_set_suppressed && e1_trace_on()) {
+				fprintf(stderr, "E1B NMI_LATCH abs=%llu sl=%d cycle=%d count=%d lastpc=%04X PPU_status=0x%02X VBlankON=%d\n",
+				 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()),
+				 ppur.status.sl, ppur.status.cycle, g_cpu.native_layout().count,
+				 (unsigned)fceu11_e1_last_pc(), (unsigned)PPU_status, 1);
+			}
 			if (!vbl_set_suppressed) TriggerNMI();
 		}
 		if (e1_trace_on() && vbl_set_suppressed) {
