@@ -1427,6 +1427,19 @@ void FCEUSND_Reset(bool is_power)
 	fc_reset_in=0;
 	nreg=1;
 
+	// E-3 Track-B probe (v1.17 R6 task, 2026-08-08): RESET_POST recorder.
+	// Fires AFTER the initial-state block above so a single frame's
+	// reset delta (pre→post for fcnt/mode/fhcnt/sirq) is observable in
+	// two consecutive trace lines without changing any state values.
+	// Complements the matching E3B RESET_ENTRY above.
+	if (e3_trace_on()) {
+		fprintf(stderr, "E3B RESET_POST abs=%llu ts=%u is_power=%d post_fcnt=%u post_mode=0x%X post_fhcnt=%d post_sirq=0x%X\n",
+		 (unsigned long long)e3_abs_ts, (unsigned)g_cpu.timestamp_ref(),
+		 (int)is_power,
+		 (unsigned)fcnt, (unsigned)IRQFrameMode,
+		 fhcnt, (unsigned)SIRQStat);
+	}
+
 	for(x=0;x<2;x++)
 	{
 		wlcount[x]=2048;
