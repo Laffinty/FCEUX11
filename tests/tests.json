@@ -4,10 +4,18 @@
     "description": "Core symbol validity + fceu11::Initialize() smoke test",
     "oracle_type": "A",
     "layer": "core",
-    "input": { "working_dir": "tests", "binary": "fceux11_smoke_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_smoke_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["unit", "smoke"],
+    "tags": [
+      "unit",
+      "smoke"
+    ],
     "failure_means": "blocking",
     "provenance": "v0.2.15"
   },
@@ -16,10 +24,18 @@
     "description": "Iterate all built-in mappers, call iNES load",
     "oracle_type": "A",
     "layer": "boards",
-    "input": { "working_dir": "tests", "binary": "fceux11_mapper_load_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_mapper_load_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 60,
-    "tags": ["unit", "mapper"],
+    "tags": [
+      "unit",
+      "mapper"
+    ],
     "failure_means": "blocking",
     "provenance": "v0.3.0"
   },
@@ -28,10 +44,18 @@
     "description": "Load + reset + power-cycle + reload mappers",
     "oracle_type": "A",
     "layer": "boards",
-    "input": { "working_dir": "tests", "binary": "fceux11_mapper_reset_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_mapper_reset_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 60,
-    "tags": ["unit", "mapper"],
+    "tags": [
+      "unit",
+      "mapper"
+    ],
     "failure_means": "blocking",
     "provenance": "v0.3.0"
   },
@@ -40,10 +64,19 @@
     "description": "12 ROMs x 60 frames, CRC32 video frame checksums vs golden_hashes.json",
     "oracle_type": "B",
     "layer": "core",
-    "input": { "working_dir": "tests", "binary": "fceux11_rom_regression_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_rom_regression_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 120,
-    "tags": ["regression", "rom", "ppu"],
+    "tags": [
+      "regression",
+      "rom",
+      "ppu"
+    ],
     "failure_means": "blocking",
     "provenance": "v0.2.15"
   },
@@ -52,10 +85,18 @@
     "description": "12 ROMs x 60 frames, MD5 savestate snapshots vs golden_savestate_hashes.json",
     "oracle_type": "B",
     "layer": "core",
-    "input": { "working_dir": "tests", "binary": "fceux11_savestate_regression_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_savestate_regression_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 300,
-    "tags": ["regression", "savestate"],
+    "tags": [
+      "regression",
+      "savestate"
+    ],
     "failure_means": "blocking",
     "provenance": "v0.3.12.5"
   },
@@ -64,10 +105,18 @@
     "description": "tl::expected<T,E> API coverage test",
     "oracle_type": "A",
     "layer": "core",
-    "input": { "working_dir": "tests", "binary": "fceux11_expected_api_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_expected_api_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["unit", "api"],
+    "tags": [
+      "unit",
+      "api"
+    ],
     "failure_means": "blocking",
     "provenance": "v0.3.3"
   },
@@ -76,10 +125,18 @@
     "description": "FCEU_ENUM_CLASS_BITFLAGS macro test (header-only, no engine link)",
     "oracle_type": "A",
     "layer": "core",
-    "input": { "working_dir": "tests", "binary": "fceux11_enum_class_bitflags_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_enum_class_bitflags_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["unit", "macro"],
+    "tags": [
+      "unit",
+      "macro"
+    ],
     "failure_means": "blocking",
     "provenance": "v0.3.8"
   },
@@ -88,10 +145,17 @@
     "description": "i18n static analysis: .ts coverage (>90%), simp/trad pollution, retranslateUi() declarations",
     "oracle_type": "A",
     "layer": "core",
-    "input": { "binary": "fceux11_i18n_regression_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "binary": "fceux11_i18n_regression_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["i18n", "static-analysis"],
+    "tags": [
+      "i18n",
+      "static-analysis"
+    ],
     "failure_means": "blocking",
     "provenance": "v0.3.15"
   },
@@ -100,10 +164,18 @@
     "description": "fceu11::State facade wiring (singleton + reference equality, no Init required)",
     "oracle_type": "A",
     "layer": "core",
-    "input": { "working_dir": "tests", "binary": "fceux11_core_state_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_core_state_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["unit", "state"],
+    "tags": [
+      "unit",
+      "state"
+    ],
     "failure_means": "blocking",
     "provenance": "v1.2"
   },
@@ -112,10 +184,18 @@
     "description": "CPU unit tests (>= 10 test cases)",
     "oracle_type": "A",
     "layer": "core",
-    "input": { "working_dir": "tests", "binary": "fceux11_cpu_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_cpu_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["unit", "cpu"],
+    "tags": [
+      "unit",
+      "cpu"
+    ],
     "failure_means": "blocking",
     "provenance": "v1.1"
   },
@@ -124,10 +204,18 @@
     "description": "PPU unit tests",
     "oracle_type": "A",
     "layer": "core",
-    "input": { "working_dir": "tests", "binary": "fceux11_ppu_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_ppu_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["unit", "ppu"],
+    "tags": [
+      "unit",
+      "ppu"
+    ],
     "failure_means": "blocking",
     "provenance": "v1.1"
   },
@@ -136,10 +224,18 @@
     "description": "APU unit tests",
     "oracle_type": "A",
     "layer": "core",
-    "input": { "working_dir": "tests", "binary": "fceux11_apu_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_apu_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["unit", "apu"],
+    "tags": [
+      "unit",
+      "apu"
+    ],
     "failure_means": "blocking",
     "provenance": "v1.1"
   },
@@ -148,10 +244,18 @@
     "description": "Bus unit tests",
     "oracle_type": "A",
     "layer": "core",
-    "input": { "working_dir": "tests", "binary": "fceux11_bus_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_bus_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["unit", "bus"],
+    "tags": [
+      "unit",
+      "bus"
+    ],
     "failure_means": "blocking",
     "provenance": "v1.1"
   },
@@ -160,10 +264,18 @@
     "description": "Mapper core unit tests",
     "oracle_type": "A",
     "layer": "core",
-    "input": { "working_dir": "tests", "binary": "fceux11_mapper_core_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_mapper_core_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["unit", "mapper"],
+    "tags": [
+      "unit",
+      "mapper"
+    ],
     "failure_means": "blocking",
     "provenance": "v1.1"
   },
@@ -172,10 +284,18 @@
     "description": "Savestate core unit tests",
     "oracle_type": "A",
     "layer": "core",
-    "input": { "working_dir": "tests", "binary": "fceux11_savestate_core_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_savestate_core_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["unit", "savestate"],
+    "tags": [
+      "unit",
+      "savestate"
+    ],
     "failure_means": "blocking",
     "provenance": "v1.1"
   },
@@ -184,10 +304,19 @@
     "description": "Visual frame diff regression: 256x240 XBuf vs golden_frames/*.xbuf (0-pixel tolerance)",
     "oracle_type": "B",
     "layer": "core",
-    "input": { "working_dir": "tests", "binary": "fceux11_ppu_frame_diff_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_ppu_frame_diff_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 60,
-    "tags": ["regression", "ppu", "frame"],
+    "tags": [
+      "regression",
+      "ppu",
+      "frame"
+    ],
     "failure_means": "blocking",
     "provenance": "v1.5"
   },
@@ -196,10 +325,19 @@
     "description": "Audio WAV regression: 16-bit mono sound buffer vs golden_wav/*.wav (0-sample tolerance)",
     "oracle_type": "B",
     "layer": "core",
-    "input": { "working_dir": "tests", "binary": "fceux11_apu_wav_diff_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_apu_wav_diff_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 60,
-    "tags": ["regression", "apu", "audio"],
+    "tags": [
+      "regression",
+      "apu",
+      "audio"
+    ],
     "failure_means": "blocking",
     "provenance": "v1.6"
   },
@@ -208,10 +346,18 @@
     "description": "Cart class surface tests (12 initial [SKIP] tests)",
     "oracle_type": "A",
     "layer": "core",
-    "input": { "working_dir": "tests", "binary": "fceux11_cart_class_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_cart_class_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["unit", "cart"],
+    "tags": [
+      "unit",
+      "cart"
+    ],
     "failure_means": "blocking",
     "provenance": "v1.7"
   },
@@ -220,10 +366,18 @@
     "description": "Mapper state byte-diff regression vs golden_mapper/*.bin (169 mappers)",
     "oracle_type": "B",
     "layer": "core",
-    "input": { "working_dir": "tests", "binary": "fceux11_mapper_byte_diff_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_mapper_byte_diff_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 120,
-    "tags": ["regression", "mapper"],
+    "tags": [
+      "regression",
+      "mapper"
+    ],
     "failure_means": "blocking",
     "provenance": "v1.7"
   },
@@ -232,10 +386,18 @@
     "description": "FDS runtime + bad ROM detection test",
     "oracle_type": "A",
     "layer": "core",
-    "input": { "working_dir": "tests", "binary": "fceux11_fds_load_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_fds_load_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["unit", "fds"],
+    "tags": [
+      "unit",
+      "fds"
+    ],
     "failure_means": "blocking",
     "provenance": "v1.10"
   },
@@ -244,10 +406,18 @@
     "description": "g_driver() singleton + register_driver() + POD contract verification",
     "oracle_type": "A",
     "layer": "driver",
-    "input": { "working_dir": "tests", "binary": "fceux11_driver_callbacks_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_driver_callbacks_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["unit", "driver"],
+    "tags": [
+      "unit",
+      "driver"
+    ],
     "failure_means": "blocking",
     "provenance": "v1.11"
   },
@@ -256,10 +426,19 @@
     "description": "Core/driver boundary regression (mutex pImpl, driver.h removal invariants)",
     "oracle_type": "A",
     "layer": "driver",
-    "input": { "working_dir": "tests", "binary": "fceux11_core_driver_boundary_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_core_driver_boundary_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["unit", "driver", "boundary"],
+    "tags": [
+      "unit",
+      "driver",
+      "boundary"
+    ],
     "failure_means": "blocking",
     "provenance": "v1.11"
   },
@@ -268,10 +447,19 @@
     "description": "Byte-for-byte equivalence: two-stage sprite decode LUT vs original 8x shift chain",
     "oracle_type": "A",
     "layer": "core",
-    "input": { "working_dir": "tests", "binary": "fceux11_ppu_rendering_lut_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_ppu_rendering_lut_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["unit", "ppu", "hotfix"],
+    "tags": [
+      "unit",
+      "ppu",
+      "hotfix"
+    ],
     "failure_means": "blocking",
     "provenance": "hotfix2 P0-1"
   },
@@ -280,10 +468,19 @@
     "description": "Atomic byte-pattern fill, SPRB layout invariants, pshift storage width",
     "oracle_type": "A",
     "layer": "core",
-    "input": { "working_dir": "tests", "binary": "fceux11_ppu_phase_c_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_ppu_phase_c_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["unit", "ppu", "hotfix"],
+    "tags": [
+      "unit",
+      "ppu",
+      "hotfix"
+    ],
     "failure_means": "blocking",
     "provenance": "hotfix2 Phase C"
   },
@@ -292,10 +489,19 @@
     "description": "constexpr bitrev LUT involution/coverage; InputScanlineHook nullptr; vnapage 4-slot",
     "oracle_type": "A",
     "layer": "core",
-    "input": { "working_dir": "tests", "binary": "fceux11_ppu_phase_d_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_ppu_phase_d_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["unit", "ppu", "hotfix"],
+    "tags": [
+      "unit",
+      "ppu",
+      "hotfix"
+    ],
     "failure_means": "blocking",
     "provenance": "hotfix2 Phase D"
   },
@@ -304,10 +510,19 @@
     "description": "Load golden .fc0 savestates, run 1 frame, compare MD5 vs golden_index.json",
     "oracle_type": "B",
     "layer": "core",
-    "input": { "working_dir": "tests", "binary": "fceux11_golden_savestate_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_golden_savestate_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 60,
-    "tags": ["regression", "savestate", "golden"],
+    "tags": [
+      "regression",
+      "savestate",
+      "golden"
+    ],
     "failure_means": "blocking",
     "provenance": "v1.1"
   },
@@ -316,10 +531,18 @@
     "description": "Performance tolerance gate: R4 protocol (warmup 3 + timed 7, drop extremes, median vs baseline)",
     "oracle_type": "B",
     "layer": "benchmark",
-    "input": { "working_dir": "tests", "binary": "fceux11_bench_tolerance_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_bench_tolerance_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 120,
-    "tags": ["benchmark", "perf"],
+    "tags": [
+      "benchmark",
+      "perf"
+    ],
     "failure_means": "advisory",
     "provenance": "v1.1"
   },
@@ -328,10 +551,18 @@
     "description": "TypedConfig<T> unit test (Qt6::Core only, no Widgets)",
     "oracle_type": "A",
     "layer": "core",
-    "input": { "working_dir": "tests", "binary": "fceux11_config_store_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_config_store_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["unit", "config"],
+    "tags": [
+      "unit",
+      "config"
+    ],
     "failure_means": "blocking",
     "provenance": "v0.3.15"
   },
@@ -342,12 +573,21 @@
     "layer": "script",
     "input": {
       "binary": "python",
-      "args": ["scripts/check_menu_slots.py", "."],
+      "args": [
+        "scripts/check_menu_slots.py",
+        "."
+      ],
       "working_dir": "."
     },
-    "expected": { "exit_code": 0 },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 60,
-    "tags": ["script", "menu", "static-analysis"],
+    "tags": [
+      "script",
+      "menu",
+      "static-analysis"
+    ],
     "failure_means": "advisory",
     "provenance": "hotfix4 T-1"
   },
@@ -356,10 +596,18 @@
     "description": "PixBufPool resize()/clear()/bytes() unit test",
     "oracle_type": "A",
     "layer": "core",
-    "input": { "working_dir": "tests", "binary": "fceux11_pixbuf_pool_test" },
-    "expected": { "exit_code": 0 },
+    "input": {
+      "working_dir": "tests",
+      "binary": "fceux11_pixbuf_pool_test"
+    },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["unit", "video"],
+    "tags": [
+      "unit",
+      "video"
+    ],
     "failure_means": "blocking",
     "provenance": "hotfix3 D-1"
   },
@@ -369,17 +617,28 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "fceux11_blargg_runner",
-      "args": ["--rom", "fixtures/nestest.nes", "--frames", "60"],
+      "binary": "kagami_qa_blargg_runner",
+      "args": [
+        "--rom",
+        "fixtures/nestest.nes",
+        "--frames",
+        "60"
+      ],
       "working_dir": "tests",
       "rom": "fixtures/nestest.nes",
       "probe_addr": 24576
     },
-    "expected": { "exit_code": 0 },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["blargg", "oracle-b", "smoke"],
+    "tags": [
+      "blargg",
+      "oracle-b",
+      "smoke"
+    ],
     "failure_means": "advisory",
-    "provenance": "blargg test ROM suite v1 / P2"
+    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
   },
   "blargg_cpu_instrs": {
     "id": "blargg_cpu_instrs",
@@ -387,17 +646,28 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "fceux11_blargg_runner",
-      "args": ["--rom", "fixtures/blargg/cpu/instr_v5_all.nes", "--frames", "3000"],
+      "binary": "kagami_qa_blargg_runner",
+      "args": [
+        "--rom",
+        "fixtures/blargg/cpu/instr_v5_all.nes",
+        "--frames",
+        "3000"
+      ],
       "working_dir": "tests",
       "rom": "fixtures/blargg/cpu/instr_v5_all.nes",
       "probe_addr": 24576
     },
-    "expected": { "exit_code": 0 },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 60,
-    "tags": ["blargg", "cpu", "oracle-b"],
+    "tags": [
+      "blargg",
+      "cpu",
+      "oracle-b"
+    ],
     "failure_means": "blocking",
-    "provenance": "blargg instr_test-v5 all_instrs.nes | S-1 2026-07-30: the ROM was never missing — it is on disk as instr_v5_all.nes (download_blargg_roms.ps1 naming). Old 300-frame budget returned 0x80 (still running); measured PASS (0x00) at 3000 frames in ~4.8s. Promoted back to blocking."
+    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
   },
   "blargg_cpu_timing": {
     "id": "blargg_cpu_timing",
@@ -405,17 +675,29 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "fceux11_blargg_runner",
-      "args": ["--rom", "fixtures/blargg/cpu/cpu_timing_test6.nes", "--frames", "500"],
+      "binary": "kagami_qa_blargg_runner",
+      "args": [
+        "--rom",
+        "fixtures/blargg/cpu/cpu_timing_test6.nes",
+        "--frames",
+        "500"
+      ],
       "working_dir": "tests",
       "rom": "fixtures/blargg/cpu/cpu_timing_test6.nes",
       "probe_addr": 24576
     },
-    "expected": { "exit_code": 0 },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["blargg", "cpu", "timing", "oracle-b"],
+    "tags": [
+      "blargg",
+      "cpu",
+      "timing",
+      "oracle-b"
+    ],
     "failure_means": "blocking",
-    "provenance": "blargg cpu_timing_test6 | S-1 2026-07-30: ROM on disk as cpu_timing_test6.nes; measured PASS (0x00) at 300 frames. Promoted back to blocking."
+    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
   },
   "blargg_ppu_vbl_nmi": {
     "id": "blargg_ppu_vbl_nmi",
@@ -423,17 +705,29 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "fceux11_blargg_runner",
-      "args": ["--rom", "fixtures/blargg/ppu/ppu_vbl_nmi.nes", "--frames", "600"],
+      "binary": "kagami_qa_blargg_runner",
+      "args": [
+        "--rom",
+        "fixtures/blargg/ppu/ppu_vbl_nmi.nes",
+        "--frames",
+        "600"
+      ],
       "working_dir": "tests",
       "rom": "fixtures/blargg/ppu/ppu_vbl_nmi.nes",
       "probe_addr": 24576
     },
-    "expected": { "exit_code": 0 },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["blargg", "ppu", "oracle-b", "e1-pending"],
+    "tags": [
+      "blargg",
+      "ppu",
+      "oracle-b",
+      "e1-pending"
+    ],
     "failure_means": "advisory",
-    "provenance": "blargg ppu_tests-v1.1 | E-1 (closed at survey 2026-07-30, plan-only): fresh build shows VBL period correct (period=6820 398/398 frames); failures are per-ROM edge-timing — 02 VBL set +1 row, 05 NMI delivery +1 cycle, 06 suppression/VBL-clear, 07/08 NMI gating, 10 even-odd flag; demoted to advisory until ppu_rendering.cpp edge timing is tuned. Recommended fix order per doc §4: 05 → 02 → 06/07/08 → 10, each step regression-gated by 01/04 + Oracle A (rom_regression_test, golden_savestate_test)."
+    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
   },
   "blargg_suite": {
     "id": "blargg_suite",
@@ -441,15 +735,26 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "fceux11_blargg_runner",
-      "args": ["--manifest", "tests/fixtures/blargg_manifest.json"],
+      "binary": "kagami_qa_blargg_runner",
+      "args": [
+        "--manifest",
+        "tests/fixtures/blargg_manifest.json"
+      ],
       "working_dir": "."
     },
-    "expected": { "exit_code": 0 },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 300,
-    "tags": ["blargg", "oracle-b", "accuracy", "suite", "batch"],
+    "tags": [
+      "blargg",
+      "oracle-b",
+      "accuracy",
+      "suite",
+      "batch"
+    ],
     "failure_means": "advisory",
-    "provenance": "blargg public-domain test ROM suite"
+    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
   },
   "lua_bit_test": {
     "id": "lua_bit_test",
@@ -458,13 +763,21 @@
     "layer": "lua",
     "input": {
       "binary": "fceux11_lua_runner",
-      "args": ["tests/lua_scripts/test_bit.lua"],
+      "args": [
+        "tests/lua_scripts/test_bit.lua"
+      ],
       "working_dir": ".",
       "script_path": "tests/lua_scripts/test_bit.lua"
     },
-    "expected": { "exit_code": 0 },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["lua", "unit", "bit"],
+    "tags": [
+      "lua",
+      "unit",
+      "bit"
+    ],
     "failure_means": "blocking",
     "provenance": "fceux11-lua"
   },
@@ -475,13 +788,23 @@
     "layer": "lua",
     "input": {
       "binary": "fceux11_lua_runner",
-      "args": ["tests/lua_scripts/test_emu.lua", "--frames", "120"],
+      "args": [
+        "tests/lua_scripts/test_emu.lua",
+        "--frames",
+        "120"
+      ],
       "working_dir": ".",
       "script_path": "tests/lua_scripts/test_emu.lua"
     },
-    "expected": { "exit_code": 0 },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 60,
-    "tags": ["lua", "integration", "emu"],
+    "tags": [
+      "lua",
+      "integration",
+      "emu"
+    ],
     "failure_means": "blocking",
     "provenance": "fceux11-lua"
   },
@@ -492,13 +815,25 @@
     "layer": "lua",
     "input": {
       "binary": "fceux11_lua_runner",
-      "args": ["tests/lua_scripts/test_memory.lua", "--rom", "tests/fixtures/mapper_nrom.nes", "--frames", "60"],
+      "args": [
+        "tests/lua_scripts/test_memory.lua",
+        "--rom",
+        "tests/fixtures/mapper_nrom.nes",
+        "--frames",
+        "60"
+      ],
       "working_dir": ".",
       "script_path": "tests/lua_scripts/test_memory.lua"
     },
-    "expected": { "exit_code": 0 },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["lua", "integration", "memory"],
+    "tags": [
+      "lua",
+      "integration",
+      "memory"
+    ],
     "failure_means": "blocking",
     "provenance": "fceux11-lua | 2026-07-30 demoted to advisory: fceux11_lua_runner lacks full memory binding implementation; Lua-side libs work in standalone test, runner-side binding missing. Tracked as 'unimplemented-coverage' — not a regression, never passed. 2026-08-05 Phase 4.1: bindings verified complete; root cause of round-trip failure = runner initializes the CPU bus memory tables only when a ROM is loaded, so writebyte() was a no-op (BNull) without --rom. Fix: add --rom tests/fixtures/mapper_nrom.nes (git-tracked, available on CI). Re-enabled as blocking."
   },
@@ -509,13 +844,23 @@
     "layer": "lua",
     "input": {
       "binary": "fceux11_lua_runner",
-      "args": ["tests/lua_scripts/test_joypad.lua", "--frames", "60"],
+      "args": [
+        "tests/lua_scripts/test_joypad.lua",
+        "--frames",
+        "60"
+      ],
       "working_dir": ".",
       "script_path": "tests/lua_scripts/test_joypad.lua"
     },
-    "expected": { "exit_code": 0 },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["lua", "integration", "joypad"],
+    "tags": [
+      "lua",
+      "integration",
+      "joypad"
+    ],
     "failure_means": "blocking",
     "provenance": "fceux11-lua | 2026-07-30 demoted to advisory: fceux11_lua_runner does not surface joypad.get/joypad.set to Lua state (mask1/mask2 override logic unimplemented in Rust bindings). 2026-08-05 Phase 4.1: bindings verified present; root cause of failure = joypad.get() returned a TABLE (bitmask_to_table) while the FCEUX-compatible contract (and the test script's first assertion) requires a NUMBER bitmask. Fixed in src/rust/crates/fceux11-lua/bindings/joypad.rs (return state as i32). Re-enabled as blocking."
   },
@@ -525,17 +870,30 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "fceux11_blargg_runner",
-      "args": ["--rom", "fixtures/blargg/mmc3/mmc3_4_scanline_timing.nes", "--frames", "300"],
+      "binary": "kagami_qa_blargg_runner",
+      "args": [
+        "--rom",
+        "fixtures/blargg/mmc3/mmc3_4_scanline_timing.nes",
+        "--frames",
+        "300"
+      ],
       "working_dir": "tests",
       "rom": "fixtures/blargg/mmc3/mmc3_4_scanline_timing.nes",
       "probe_addr": 24576
     },
-    "expected": { "exit_code": 0 },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["blargg", "mmc3", "oracle-b", "bucket-a", "known-limit"],
+    "tags": [
+      "blargg",
+      "mmc3",
+      "oracle-b",
+      "bucket-a",
+      "known-limit"
+    ],
     "failure_means": "advisory",
-    "provenance": "blargg mmc3_test_4 scanline timing | Phase 4.4 2026-08-06: added as 桶 A representative (deep model family, code=0x09 known fail, runppu=False). Phase 3 commit f4a072a documented MMC3 12-item known-limit set."
+    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
   },
   "blargg_mmc3_v2_4_scanline_timing": {
     "id": "blargg_mmc3_v2_4_scanline_timing",
@@ -543,17 +901,30 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "fceux11_blargg_runner",
-      "args": ["--rom", "fixtures/blargg/mmc3/mmc3_v2_4_scanline_timing.nes", "--frames", "300"],
+      "binary": "kagami_qa_blargg_runner",
+      "args": [
+        "--rom",
+        "fixtures/blargg/mmc3/mmc3_v2_4_scanline_timing.nes",
+        "--frames",
+        "300"
+      ],
       "working_dir": "tests",
       "rom": "fixtures/blargg/mmc3/mmc3_v2_4_scanline_timing.nes",
       "probe_addr": 24576
     },
-    "expected": { "exit_code": 0 },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["blargg", "mmc3", "oracle-b", "bucket-a", "known-limit"],
+    "tags": [
+      "blargg",
+      "mmc3",
+      "oracle-b",
+      "bucket-a",
+      "known-limit"
+    ],
     "failure_means": "advisory",
-    "provenance": "blargg mmc3_test_v2_4 scanline timing (alternate rev) | Phase 4.4 2026-08-06: 桶 A representative v2, code=0x09 known fail, runppu=False. Cross-check mmc3_test_4 vs v2 parity."
+    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
   },
   "blargg_cpu_int_2_nmi_brk": {
     "id": "blargg_cpu_int_2_nmi_brk",
@@ -561,17 +932,30 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "fceux11_blargg_runner",
-      "args": ["--rom", "fixtures/blargg/cpu/cpu_int_2_nmi_brk.nes", "--frames", "300"],
+      "binary": "kagami_qa_blargg_runner",
+      "args": [
+        "--rom",
+        "fixtures/blargg/cpu/cpu_int_2_nmi_brk.nes",
+        "--frames",
+        "300"
+      ],
       "working_dir": "tests",
       "rom": "fixtures/blargg/cpu/cpu_int_2_nmi_brk.nes",
       "probe_addr": 24576
     },
-    "expected": { "exit_code": 0 },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["blargg", "cpu", "oracle-b", "bucket-b", "known-limit"],
+    "tags": [
+      "blargg",
+      "cpu",
+      "oracle-b",
+      "bucket-b",
+      "known-limit"
+    ],
     "failure_means": "advisory",
-    "provenance": "blargg cpu_int_2 NMI/BRK interaction timing | Phase 4.4 2026-08-06: 桶 B representative, code=0x01 known fail, runppu=False. Cross-checks vbl 中断族收敛状态. Phase 3 eaf4fe1 documented cpu_int_* as deep-model-family known limit."
+    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
   },
   "blargg_instr_misc": {
     "id": "blargg_instr_misc",
@@ -579,17 +963,30 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "fceux11_blargg_runner",
-      "args": ["--rom", "fixtures/blargg/cpu/instr_misc.nes", "--frames", "300"],
+      "binary": "kagami_qa_blargg_runner",
+      "args": [
+        "--rom",
+        "fixtures/blargg/cpu/instr_misc.nes",
+        "--frames",
+        "300"
+      ],
       "working_dir": "tests",
       "rom": "fixtures/blargg/cpu/instr_misc.nes",
       "probe_addr": 24576
     },
-    "expected": { "exit_code": 0 },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["blargg", "cpu", "oracle-b", "bucket-b", "known-limit"],
+    "tags": [
+      "blargg",
+      "cpu",
+      "oracle-b",
+      "bucket-b",
+      "known-limit"
+    ],
     "failure_means": "advisory",
-    "provenance": "blargg instr_misc (combined sub-tests) | Phase 4.4 2026-08-06: 桶 B representative, code=0x01 known fail, runppu=False. Phase 3 eaf4fe1 documented instr_* as deep-model-family known limit."
+    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
   },
   "blargg_oam_stress": {
     "id": "blargg_oam_stress",
@@ -597,17 +994,31 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "fceux11_blargg_runner",
-      "args": ["--rom", "fixtures/blargg/ppu/oam_stress.nes", "--frames", "300"],
+      "binary": "kagami_qa_blargg_runner",
+      "args": [
+        "--rom",
+        "fixtures/blargg/ppu/oam_stress.nes",
+        "--frames",
+        "300"
+      ],
       "working_dir": "tests",
       "rom": "fixtures/blargg/ppu/oam_stress.nes",
       "probe_addr": 24576
     },
-    "expected": { "exit_code": 0 },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["blargg", "ppu", "oracle-b", "bucket-c", "known-limit", "runppu-relevant"],
+    "tags": [
+      "blargg",
+      "ppu",
+      "oracle-b",
+      "bucket-c",
+      "known-limit",
+      "runppu-relevant"
+    ],
     "failure_means": "advisory",
-    "provenance": "blargg oam_stress (OAM stress, PPU timing sensitive) | Phase 4.4 2026-08-06: 桶 C representative, code=0x01 known fail, runppu=True. Phase 3 commit 116a602 documented oam_stress as deep-model-family known limit."
+    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
   },
   "blargg_vbl_05_nmi_timing": {
     "id": "blargg_vbl_05_nmi_timing",
@@ -615,17 +1026,31 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "fceux11_blargg_runner",
-      "args": ["--rom", "fixtures/blargg/ppu/vbl_05_nmi_timing.nes", "--frames", "500"],
+      "binary": "kagami_qa_blargg_runner",
+      "args": [
+        "--rom",
+        "fixtures/blargg/ppu/vbl_05_nmi_timing.nes",
+        "--frames",
+        "500"
+      ],
       "working_dir": "tests",
       "rom": "fixtures/blargg/ppu/vbl_05_nmi_timing.nes",
       "probe_addr": 24576
     },
-    "expected": { "exit_code": 0 },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["blargg", "ppu", "vbl", "oracle-b", "bucket-c", "pass-monitor"],
+    "tags": [
+      "blargg",
+      "ppu",
+      "vbl",
+      "oracle-b",
+      "bucket-c",
+      "pass-monitor"
+    ],
     "failure_means": "blocking",
-    "provenance": "blargg vbl_05 NMI timing | Phase 1 commit 5581769 fixed vbl_05 to PASS (X6502_Run frame fix + NMIDELAY 8 calibration). Phase 4.4 2026-08-06: added as PASS monitor — any future regression to FAIL will gate R4."
+    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
   },
   "blargg_ppu_read_buffer": {
     "id": "blargg_ppu_read_buffer",
@@ -633,17 +1058,30 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "fceux11_blargg_runner",
-      "args": ["--rom", "fixtures/blargg/ppu/ppu_read_buffer.nes", "--frames", "2000"],
+      "binary": "kagami_qa_blargg_runner",
+      "args": [
+        "--rom",
+        "fixtures/blargg/ppu/ppu_read_buffer.nes",
+        "--frames",
+        "2000"
+      ],
       "working_dir": "tests",
       "rom": "fixtures/blargg/ppu/ppu_read_buffer.nes",
       "probe_addr": 24576
     },
-    "expected": { "exit_code": 0 },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 60,
-    "tags": ["blargg", "ppu", "oracle-b", "bucket-c", "pass-monitor"],
+    "tags": [
+      "blargg",
+      "ppu",
+      "oracle-b",
+      "bucket-c",
+      "pass-monitor"
+    ],
     "failure_means": "blocking",
-    "provenance": "blargg ppu_read_buffer ($2007 read buffer delay) | Phase 3 commit 863e9d7 fixed PPU 时序/寻址 in 3 places. Phase 4.4 2026-08-06: added as PASS monitor — keeps Phase 3 fix regression-tested by R4 Gate. Frames budget: 500 frames returns 0x80 (still running), 2000+ frames returns 0x00 (PASS). Empirical 2000 frames in ~3.6s."
+    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
   },
   "blargg_sprdma_dmc_dma": {
     "id": "blargg_sprdma_dmc_dma",
@@ -651,16 +1089,30 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "fceux11_blargg_runner",
-      "args": ["--rom", "fixtures/blargg/apu/sprdma_dmc_dma.nes", "--frames", "300"],
+      "binary": "kagami_qa_blargg_runner",
+      "args": [
+        "--rom",
+        "fixtures/blargg/apu/sprdma_dmc_dma.nes",
+        "--frames",
+        "300"
+      ],
       "working_dir": "tests",
       "rom": "fixtures/blargg/apu/sprdma_dmc_dma.nes",
       "probe_addr": 24576
     },
-    "expected": { "exit_code": 0 },
+    "expected": {
+      "exit_code": 0
+    },
     "timeout_seconds": 30,
-    "tags": ["blargg", "apu", "sprdma", "oracle-b", "bucket-d", "known-limit"],
+    "tags": [
+      "blargg",
+      "apu",
+      "sprdma",
+      "oracle-b",
+      "bucket-d",
+      "known-limit"
+    ],
     "failure_means": "advisory",
-    "provenance": "blargg sprdma_dmc_dma (sprite DMA + DMC DMA interaction) | Phase 4.4 2026-08-06: 桶 D representative, code=0x01 known fail, runppu=False. Phase 3 commit 4a7f7e2 documented sprdma_dmc_dma as deep-model-family known limit."
+    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
   }
 }
