@@ -540,6 +540,18 @@ static void FrameIRQSet(void)
 
 static void FrameIRQEnd(void)
 {
+ // E-3 Track-B probe (v1.17 R6 task, 2026-08-08): IRQ_END recorder at
+ // the IRQ-clear step. Pairs with E3B IRQ_BEGIN so the (set→set→clear)
+ // 3-step topology of blargg_apu.*'s wait_n sequence is observable.
+ // For mode 1 (inhibit, IRQFrameMode&0x1) the flag clears + the CPU
+ // IRQ line is deasserted; for mode 0 the flag stays set + the line
+ // stays asserted (the third IRQ set, which keeps the line asserted
+ // for the entire IRQ window until the next sequence).
+ if (e3_trace_on()) {
+  fprintf(stderr, "E3B IRQ_END abs=%llu ts=%u fcnt=%u mode=0x%X fhcnt=%d sirq_pre=0x%X branch=%s\n",
+   (unsigned long long)e3_abs_ts, (unsigned)g_cpu.timestamp_ref(), (unsigned)fcnt, (unsigned)IRQFrameMode,
+   fhcnt, (unsigned)SIRQStat, (IRQFrameMode&0x1) ? "inhibit" : "keep");
+ }
  if (IRQFrameMode&0x1)
  {
   SIRQStat&=~0x40;
