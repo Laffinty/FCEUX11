@@ -74,8 +74,20 @@ pub struct TestInput {
     /// parameter to `probe_addr` / `frames` — same scope (Oracle B driving),
     /// same shape (i64 default), same justification (blargg `$6000` protocol
     /// has ROMs that need a one-shot reset partway through to converge).
-    #[serde(default)]
+    ///
+    /// Default is -1 (NOT 0) so manifest entries that do not carry the
+    /// field (e.g. tests.json regression entries) keep the pre-H-1
+    /// behaviour of "load → step all frames → probe" with no mid-run
+    /// reset. A serde-default of 0 would have triggered the "reset
+    /// immediately after load" path for every entry lacking the field,
+    /// which breaks the direct adapter (reset() unloads the ROM).
+    #[serde(default = "default_reset_after")]
     pub reset_after: i64,
+}
+
+/// Default `reset_after`: -1 → no mid-run reset.
+fn default_reset_after() -> i64 {
+    -1
 }
 
 /// Expected outcome for the test.
