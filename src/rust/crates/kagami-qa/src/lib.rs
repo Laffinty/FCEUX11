@@ -149,14 +149,14 @@ pub mod rom_regression_entry {
             Ok(g) => g,
             Err(e) => {
                 let _ = writeln!(
-                    std::io::stdout,
+                    std::io::stdout(),
                     "Golden hashes file not found: {}\n\
                      \n\
                      FAIL: Could not read golden hashes. Run with --generate to create baseline.\n\
                      RESULT: FAILED",
                     golden_path.display(),
                 );
-                let _ = writeln!(std::io::stdout, "{}", e);
+                let _ = writeln!(std::io::stdout(), "{}", e);
                 return 1;
             }
         };
@@ -164,7 +164,7 @@ pub mod rom_regression_entry {
         let mut adapter = Fceux11DirectAdapter::new();
         let outcome = run_regression(&mut adapter, &golden, &workdir);
         let summary = format_summary(&outcome);
-        let _ = write!(std::io::stdout, "{}", summary);
+        let _ = write!(std::io::stdout(), "{}", summary);
         regression_exit_code(&outcome)
     }
 
@@ -210,14 +210,14 @@ pub mod savestate_regression_entry {
             Ok(g) => g,
             Err(e) => {
                 let _ = writeln!(
-                    std::io::stdout,
+                    std::io::stdout(),
                     "Golden hashes file not found: {}\n\n\
                      No golden hashes found. Run with --generate to create {}\n\
                      RESULT: FAILED",
                     golden_path.display(),
                     golden_path.display(),
                 );
-                let _ = writeln!(std::io::stdout, "{}", e);
+                let _ = writeln!(std::io::stdout(), "{}", e);
                 return 1;
             }
         };
@@ -225,7 +225,7 @@ pub mod savestate_regression_entry {
         let mut adapter = Fceux11DirectAdapter::new();
         let outcome = run_regression(&mut adapter, &golden, &workdir);
         let summary = format_summary(&outcome);
-        let _ = write!(std::io::stdout, "{}", summary);
+        let _ = write!(std::io::stdout(), "{}", summary);
         regression_exit_code(&outcome)
     }
 
