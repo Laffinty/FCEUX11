@@ -15,6 +15,7 @@
 #include "cart.h"
 #include "sound.h"
 #include "ppu.h"
+#include "video.h"               // for XBuf
 #include "drivers/common/nes_shm.h"
 #include "driver_callbacks.h"
 
@@ -150,4 +151,24 @@ int kagami_bridge_reset(void) {
 void kagami_bridge_set_newppu(int on) {
     extern int newppu;
     newppu = (on != 0) ? 1 : 0;
+}
+
+// ---------------------------------------------------------------------------
+// Frame buffer extraction (Track C Task 1 / C-2)
+//
+// Track C C-2 replaces tests/rom_regression_test.cpp with a Rust harness
+// under kagami-qa::runner::rom_regression. The C++ harness CRC32s the
+// visible 256x240 region of XBuf after each frame; this FFI is the
+// minimal surface that lets the Rust side do the same byte-for-byte.
+// ---------------------------------------------------------------------------
+int kagami_bridge_extract_frame_buffer(uint8_t *dst, uint32_t len) {
+    if (!dst) {
+        return -1;
+    }
+    extern uint8 *XBuf;
+    if (!XBuf) {
+        return -2;
+    }
+    std::memcpy(dst, XBuf, len);
+    return 0;
 }

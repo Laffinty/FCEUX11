@@ -27,6 +27,11 @@ unsafe extern "C" {
     fn kagami_bridge_reset() -> i32;
     fn kagami_bridge_kill();
     fn kagami_bridge_set_newppu(on: i32);
+    /// Copy the visible 256x240 XBuf region (61440 bytes) into the
+    /// caller's buffer. Returns 0 on success, non-zero if XBuf is NULL
+    /// or `dst` is NULL. Track C Task 1 / C-2 — used by the Rust
+    /// rom_regression harness.
+    fn kagami_bridge_extract_frame_buffer(dst: *mut u8, len: u32) -> i32;
 }
 
 // ---------------------------------------------------------------------------

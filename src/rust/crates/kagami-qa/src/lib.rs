@@ -117,6 +117,65 @@ pub mod blargg_entry {
 }
 
 // =========================================================================
+// Track C Task 1 / C-2: C-callable entry point for the rom_regression
+// harness — re-implements `tests/rom_regression_test.cpp` in Rust.
+//
+// Loads `fixtures/golden_hashes.json`, drives the 13-ROM table (12
+// mapper ROMs + nestest), 60 frames per ROM, CRC32 of the visible
+// 256x240 region of XBuf per frame, compares against the golden
+// hashes, prints the regression summary, and returns 0 iff every
+// hash matches.
+// =========================================================================
+#[cfg(feature = "direct-adapter")]
+pub mod rom_regression_entry {
+    use std::io::Write;
+    use std::path::{Path, PathBuf};
+
+    use crate::adapter::direct::Fceux11DirectAdapter;
+    use crate::adapter::trait_def::SutAdapter;
+    use crate::runner::rom_regression::{
+        format_summary, load_golden_hashes, regression_exit_code, run_regression, FrameSource,
+    };
+
+    /// C-ABI entry point replacing `tests/rom_regression_test.cpp:main()`.
+    pub unsafe extern "C" fn kagami_qa_rom_regression_main(
+        _argc: i32,
+        _argv: *const *const std::os::raw::c_char,
+    ) -> i32 {
+        // WORKING_DIRECTORY is `tests/` (mirrors CMake CTest entry).
+        let workdir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let golden_path = workdir.join("fixtures/golden_hashes.json");
+        let golden = match load_golden_hashes(&golden_path) {
+            Ok(g) => g,
+            Err(e) => {
+                let _ = writeln!(
+                    std::io::stdout,
+                    "Golden hashes file not found: {}\n\
+                     \n\
+                     FAIL: Could not read golden hashes. Run with --generate to create baseline.\n\
+                     RESULT: FAILED",
+                    golden_path.display(),
+                );
+                let _ = writeln!(std::io::stdout, "{}", e);
+                return 1;
+            }
+        };
+
+        let mut adapter = Fceux11DirectAdapter::new();
+        let outcome = run_regression(&mut adapter, &golden, &workdir);
+        let summary = format_summary(&outcome);
+        let _ = write!(std::io::stdout, "{}", summary);
+        regression_exit_code(&outcome)
+    }
+
+    // Suppress unused-import warnings when only the harness entry is
+    // referenced (the FrameSource trait is invoked via
+    // Fceux11DirectAdapter at runtime through the impl below).
+    const _: fn(&Fceux11DirectAdapter, &mut [u8]) -> Result<(), crate::core::QaError> =
+        |a, b| <Fceux11DirectAdapter as FrameSource>::extract_frame(a, b);
+}
+
+// =========================================================================
 // P5: C-callable entry point for kagami_qa_direct_runner (CMake target).
 //
 // Called from tests/kagami_direct_main.cpp when the direct runner is built

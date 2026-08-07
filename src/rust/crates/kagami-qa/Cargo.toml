@@ -13,6 +13,10 @@ path = "src/main.rs"
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Track C Task 1 / C-2: CRC32 matches C++ CalcCRC32 (delegates to
+# fceux11_rust_crc32 → crc32fast::Hasher). Adding the crate directly so
+# unit tests can reference it for parity checks.
+crc32fast = "1.4"
 
 [features]
 # P5: Enable the in-process (direct) adapter via C ABI FFI.

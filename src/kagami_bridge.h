@@ -44,6 +44,18 @@ void kagami_bridge_kill(void);
 /// before load_rom for the new-PPU rendering path.
 void kagami_bridge_set_newppu(int on);
 
+/// Copy the first `len` bytes of the current XBuf (NES video buffer)
+/// into `dst`. XBuf is laid out as 256x256 bytes; the visible 256x240
+/// region is the first `256 * 240 = 61440` bytes — the same slice the
+/// C++ `rom_regression_test.cpp` CRC32s.
+///
+/// Returns 0 on success, non-zero if XBuf is NULL (e.g. before the
+/// first frame or after close_game).
+///
+/// # Safety
+/// `dst` must point to at least `len` writable bytes.
+int kagami_bridge_extract_frame_buffer(uint8_t *dst, uint32_t len);
+
 #ifdef __cplusplus
 }
 #endif
