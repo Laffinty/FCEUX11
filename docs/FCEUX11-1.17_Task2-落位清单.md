@@ -170,6 +170,15 @@
 3. **`git_info_stub.cpp`**：保留在 `tests/` 根（构建支持，建议）还是移入 `tests/kagami/`？
 4. **bench baseline JSON**：留 `tests/benchmarks/`（路径稳定，建议）还是随代码移动？
 
+### 决策记录（2026-08-08 执行后追加）
+
+| # | 决策 | 执行状态 |
+|---|---|---|
+| 1 | **归档删除** `ppu_phase_b_test.cpp` | ✅ Track A-1 已删（`e5009fc`） |
+| 2 | **保持 🅐 身份，留 `fixtures/golden/` 不移动** | ✅ 定夺：Track C 已实现 `savestate_regression.rs`（Rust harness，覆盖 `.fc0` 往返），`golden_savestate_test.cpp` 走「parity 通过后随 C++ 删除」路径。移入 `tests/kagami/` 仅产生无意义移动，故不执行计划 §3.4 决策② 的移动，但保留其「数据/代码分离」意图——`.fc0` 数据与 `golden_index.json` 本就留 `fixtures/golden/` |
+| 3 | **留 `tests/` 根**（构建支持） | ✅ Track A-1 已执行（`git_info_stub.cpp` 未移动） |
+| 4 | **留 `tests/benchmarks/`**（路径稳定） | ✅ Track A-1 已执行（baseline JSON 未移动） |
+
 ---
 
 *清单完 — 待 CI 绿 + 决策点拍板后执行*
