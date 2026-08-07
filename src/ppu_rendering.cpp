@@ -1609,6 +1609,17 @@ int FCEUX_PPU_Loop(int skip) {
 		if (!vbl_set_suppressed) {
 			// Working config: VBL at cycle 0, clear at cycle 0 = 6820 (01-vbl_basics PASS).
 			// Cycle 0->1 shift (02-vbl_set_time) deferred to focused follow-up.
+			// E-1 Track-B probe (v1.17 R5 task, 2026-08-08): VBL_SET
+			// recorder. Fires immediately before PPU_status|=0x80, recording
+			// the PRE-set PPU_status byte alongside the existing VBL_ENTER
+			// footprint. Distinct probe name so VBL_SET (pre-) and VBL_CLR
+			// (pre-, post-verify via next probe) are co-traceable per frame.
+			if (e1_trace_on()) {
+				fprintf(stderr, "E1B VBL_SET abs=%llu sl=%d cycle=%d count=%d lastpc=%04X PPU_status_pre=0x%02X\n",
+				 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()),
+				 ppur.status.sl, ppur.status.cycle, g_cpu.native_layout().count,
+				 (unsigned)fceu11_e1_last_pc(), (unsigned)PPU_status);
+			}
 			PPU_status |= 0x80;
 			ppuphase = PPUPHASE_VBL;
 		} else {
@@ -1652,6 +1663,21 @@ int FCEUX_PPU_Loop(int skip) {
 				 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()),
 				 ppur.status.sl, ppur.status.cycle, nd);
 			}
+			// E-1 Track-B probe (v1.17 R5 task, 2026-08-08): NMI_LATCH
+			// recorder. Fires immediately BEFORE TriggerNMI() (vs the
+			// existing E1 NMI_SET inside x6502.cpp::TriggerNMI which fires
+			// AFTER _IRQlow|=FCEU_IQNMI). Captures the dispatch site's
+			// PPU status + count + lastpc so vbl_05 / vbl_07 / vbl_08 NMI
+			// dispatch latency can be measured from the CALLER's frame
+			// of reference, not the callee's. Distinct probe name
+			// (E1B NMI_LATCH vs E1 NMI_SET) so dispatcher/callee sites
+			// are both recorded.
+			if (!vbl_set_suppressed && e1_trace_on()) {
+				fprintf(stderr, "E1B NMI_LATCH abs=%llu sl=%d cycle=%d count=%d lastpc=%04X PPU_status=0x%02X VBlankON=%d\n",
+				 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()),
+				 ppur.status.sl, ppur.status.cycle, g_cpu.native_layout().count,
+				 (unsigned)fceu11_e1_last_pc(), (unsigned)PPU_status, 1);
+			}
 			if (!vbl_set_suppressed) TriggerNMI();
 		}
 		if (e1_trace_on() && vbl_set_suppressed) {
@@ -1671,6 +1697,19 @@ int FCEUX_PPU_Loop(int skip) {
 			ppur.status.sl++;
 		}
 
+		// E-1 Track-B probe (v1.17 R5 task, 2026-08-08): VBL_CLR recorder.
+		// Captures the pre-clear PPU_status byte plus scanline/cycle/count
+		// so vbl_03 / vbl_09 timing-window FAILs can be characterized with
+		// the exact dot the flag was cleared, regardless of when the existing
+		// VBL_ENTER / VBL_AFTER_NMIDELAY probes fire. Zero-intrusion; env-gated
+		// by FCEUX11_E1_TRACE. Marks the second event of one frame's VBL
+		// span (VBL_SET -> NMI dispatch -> VBL_CLR).
+		if (e1_trace_on()) {
+			fprintf(stderr, "E1B VBL_CLR abs=%llu sl=%d cycle=%d count=%d lastpc=%04X PPU_status_pre=0x%02X\n",
+			 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()),
+			 ppur.status.sl, ppur.status.cycle, g_cpu.native_layout().count,
+			 (unsigned)fceu11_e1_last_pc(), (unsigned)PPU_status);
+		}
 		PPU_status = 0;
 		//if(!PPUON) { runppu(kLineTime*242); goto finish; }
 
@@ -1987,6 +2026,21 @@ int FCEUX_PPU_Loop(int skip) {
 				{
 					if (sl == 0 && ppur.status.cycle == 304)
 					{
+						// E-1 Track-B probe (v1.17 R5 task, 2026-08-08):
+						// EVEN_ODD_GATE recorder. Fires the FIRST time the
+						// (sl==0 && cycle==304) gate is entered for a frame
+						// (idleSynch side), capturing the dot-level PPU/CPU
+						// phase BEFORE the existing SKIP_DEC probe decides
+						// end_cycle=340 vs 341. Distinct from E1 SKIP_DEC
+						// (which fires post-decision in kFetchTime block) —
+						// this one captures the gate's PPUON state at the
+						// precise (sl=0,cycle=304) frame boundary.
+						if (e1_trace_on()) {
+							fprintf(stderr, "E1B EVEN_ODD_GATE abs=%llu frame=%d sl=%d cycle=%d count=%d idleSynch=%d PPUON=%d\n",
+							 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()),
+							 framectr, sl, ppur.status.cycle, g_cpu.native_layout().count,
+							 idleSynch, PPUON ? 1 : 0);
+						}
 						runppu(1);
 						if (PPUON) ppur.install_latches();
 						runppu(1);

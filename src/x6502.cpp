@@ -426,6 +426,21 @@ static bool g_e1_nmi_fresh = false;
 
 void TriggerNMI(void)
 {
+ // E-1 Track-B probe (v1.17 R5 task, 2026-08-08): enhanced NMI_LATCH
+ // recorder at the CPU-side callee of the NMI dispatch path. The
+ // existing E1 NMI_SET prints only the absolute timestamp; this E1B
+ // NMI_LATCH_CALLEE adds the CPU budget residual (count, 1/16-dot
+ // units), the freshly-latched IRQ-low byte, and the last PC the CPU
+ // observed, all before _IRQlow|=FCEU_IQNMI mutates state. Distinct
+ // probe name (E1B NMI_LATCH_CALLEE) so the caller-side E1B NMI_LATCH
+ // in ppu_rendering.cpp and this CPU-side line can be cross-correlated
+ // for the vbl_05/vbl_07 NMI dispatch-latency analysis.
+ if (e1_cpu_trace_on())
+  fprintf(stderr, "E1B NMI_LATCH_CALLEE abs=%llu (path=VBL) count=%d IRQlow_pre=0x%X lastpc=%04X\n",
+   (unsigned long long)e1_cpu_abs(),
+   (int)g_cpu.native_layout().count,
+   (unsigned)_IRQlow,
+   (unsigned)e1_last_pc);
  if (e1_cpu_trace_on())
   fprintf(stderr, "E1 NMI_SET abs=%llu (path=VBL)\n", (unsigned long long)e1_cpu_abs());
  _IRQlow|=FCEU_IQNMI;

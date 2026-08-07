@@ -518,6 +518,21 @@ static void FrameSoundEvent(bool quarter, bool half)
 // only when not inhibited (RustyNES Session-26 iter 5, Mesen2 semantics).
 static void FrameIRQSet(void)
 {
+ // E-3 Track-B probe (v1.17 R6 task, 2026-08-08): IRQ_BEGIN recorder at
+ // the IRQ-set step. The existing E3 FSU probe fires once per quarter-
+ // step call; this E3B IRQ_BEGIN fires specifically when the frame
+ // counter commits to setting the IRQ flag (entry of FrameIRQSet vs.
+ // FrameIRQEnd - the two functions the fhcnt==33253/33254 boundary
+ // toggles between). Distinct probe name (E3B IRQ_BEGIN / E3B IRQ_END)
+ // so we can tag the SET-then-clear transition per frame. Pre-state
+ // captures fcnt + IRQFrameMode + fhcnt + SIRQStat for correlation with
+ // blargg's wait_n / irq_flag tests (apu_single_3_irq_flag,
+ // apu_single_6_irq_timing, apu_reset_4017_timing).
+ if (e3_trace_on()) {
+  fprintf(stderr, "E3B IRQ_BEGIN abs=%llu ts=%u fcnt=%u mode=0x%X fhcnt=%d sirq_pre=0x%X\n",
+   (unsigned long long)e3_abs_ts, (unsigned)g_cpu.timestamp_ref(), (unsigned)fcnt, (unsigned)IRQFrameMode,
+   fhcnt, (unsigned)SIRQStat);
+ }
  SIRQStat|=0x40;
  if (!(IRQFrameMode&0x1))
   X6502_IRQBegin(FCEU_IQFCOUNT);
@@ -525,6 +540,18 @@ static void FrameIRQSet(void)
 
 static void FrameIRQEnd(void)
 {
+ // E-3 Track-B probe (v1.17 R6 task, 2026-08-08): IRQ_END recorder at
+ // the IRQ-clear step. Pairs with E3B IRQ_BEGIN so the (set→set→clear)
+ // 3-step topology of blargg_apu.*'s wait_n sequence is observable.
+ // For mode 1 (inhibit, IRQFrameMode&0x1) the flag clears + the CPU
+ // IRQ line is deasserted; for mode 0 the flag stays set + the line
+ // stays asserted (the third IRQ set, which keeps the line asserted
+ // for the entire IRQ window until the next sequence).
+ if (e3_trace_on()) {
+  fprintf(stderr, "E3B IRQ_END abs=%llu ts=%u fcnt=%u mode=0x%X fhcnt=%d sirq_pre=0x%X branch=%s\n",
+   (unsigned long long)e3_abs_ts, (unsigned)g_cpu.timestamp_ref(), (unsigned)fcnt, (unsigned)IRQFrameMode,
+   fhcnt, (unsigned)SIRQStat, (IRQFrameMode&0x1) ? "inhibit" : "keep");
+ }
  if (IRQFrameMode&0x1)
  {
   SIRQStat&=~0x40;
@@ -561,6 +588,25 @@ static void FrameCounterTick(void)
    else if (fhcnt==22371) FrameSoundEvent(true,false);
    else if (fhcnt==37281) FrameSoundEvent(true,true);
    else if (fhcnt==37282) { fhcnt=0; fcnt=0; }
+  }
+  // E-3 Track-B probe (v1.17 R6 task, 2026-08-08): FIVE_STEP_EXTRA
+  // recorder at the 5-step (mode 1) terminal boundary. The 5-step
+  // sequence ends with a length-clock step (fhcnt==37281 NTSC /
+  // 41565 PAL) WITHOUT setting an IRQ and WITHOUT resetting fhcnt on
+  // that same call — the wrap to 0 happens at fhcnt==37282/41566
+  // which is the next iteration. This E3B FIVE_STEP_EXTRA fires only
+  // when the 5-step's *terminal-event* boundary is hit, so the
+  // blargg apu_single_4_jitter / apu_07 / apu_08 inter-IRQ-period
+  // observation can verify the sequence really is 37281.5 cycles
+  // for 5-step (mode 1) vs 29830 for 4-step (mode 0).
+  if (e3_trace_on() && (IRQFrameMode & 0x2)) {
+   const uint32 wrap_target = PAL ? 41566u : 37282u;
+   if ((uint32)fhcnt == wrap_target) {
+    fprintf(stderr, "E3B FIVE_STEP_EXTRA abs=%llu ts=%u fcnt=%u mode=0x%X fhcnt=%d wrap=%u\n",
+     (unsigned long long)e3_abs_ts, (unsigned)g_cpu.timestamp_ref(),
+     (unsigned)fcnt, (unsigned)IRQFrameMode,
+     fhcnt, wrap_target);
+   }
   }
  }
  else
@@ -1164,6 +1210,26 @@ static void RDoNoise(void)
 
 DECLFW(Write_IRQFM)
 {
+ // E-3 Track-B probe (v1.17 R6 task, 2026-08-08): W4017_RAW recorder at
+ // the entry of $4017 write. The existing E3 W4017_IN captures the
+ // already-masked V value (post `(V&0xC0)>>6`); this E3B W4017_RAW
+ // captures the raw V byte's bit 5 (5-step) / bit 6 (inhibit) /
+ // bit 7 (reset immediate) gate indicators before the reduction so the
+ // apu_single_3_irq_flag defect-2 hypothesis (write-without-inhibit
+ // must NOT clear the IRQ flag) is verifiable from the raw bit pattern.
+ // Distinct probe name (E3B W4017_RAW vs E3 W4017_IN) so the existing
+ // instrument stays compatible with prior analyzers while this one
+ // tags the raw bit decomposition.
+ const uint8 raw_V_for_probe = V;
+ if (e3_trace_on()) {
+  fprintf(stderr, "E3B W4017_RAW abs=%llu ts=%u raw=0x%02X bit5_5step=%d bit6_inhibit=%d bit7_reset=%d pre_fhcnt=%d\n",
+   (unsigned long long)e3_abs_ts, (unsigned)g_cpu.timestamp_ref(),
+   (unsigned)raw_V_for_probe,
+   (int)((raw_V_for_probe & 0x20) ? 1 : 0),
+   (int)((raw_V_for_probe & 0x40) ? 1 : 0),
+   (int)((raw_V_for_probe & 0x80) ? 1 : 0),
+   fhcnt);
+ }
  // E-3 probe (R6 Step 1, 2026-08-01): capture before/after $4017 write
  // state. Critical for verifying defect 2 hypothesis: $4017 write
  // unconditionally clears IRQ flag (should only clear when 5-step or
@@ -1320,6 +1386,23 @@ void FCEUSND_Reset(bool is_power)
 {
 	int x;
 
+	// E-3 Track-B probe (v1.17 R6 task, 2026-08-08): RESET_ENTRY
+	// recorder at the start of FCEUSND_Reset, BEFORE any of the state
+	// mutation. Captures the pre-reset fcnt / IRQFrameMode / fhcnt /
+	// SIRQStat byte so the apu_reset_4017_timing / apu_reset_4017_written
+	// ROMs' "before/after power-on" delta can be measured end-to-end.
+	// Distinct probe name (E3B RESET_ENTRY / E3B RESET_POST) so the
+	// existing instrumentation stays intact while this one tags the
+	// reset boundary specifically. Posts the post-state right after the
+	// initial-state block below as E3B RESET_POST.
+	if (e3_trace_on()) {
+		fprintf(stderr, "E3B RESET_ENTRY abs=%llu ts=%u is_power=%d pre_fcnt=%u pre_mode=0x%X pre_fhcnt=%d pre_sirq=0x%X\n",
+		 (unsigned long long)e3_abs_ts, (unsigned)g_cpu.timestamp_ref(),
+		 (int)is_power,
+		 (unsigned)fcnt, (unsigned)IRQFrameMode,
+		 fhcnt, (unsigned)SIRQStat);
+	}
+
 	// P2 Phase 2 Step 2.1 (2026-08-01): power-on / reset 相位分离。
 	// 硬件语义（blargg_apu_2005.07.30 readme "Misc" + apu_reset/readme.txt，P2 方案 §1.2/§1.4）：
 	//  - power-on：APU 等效"$4017=$00 写 + 9~12 时钟延迟"后开始执行 → IRQFrameMode=0x0（4-step，IRQ 使能）。
@@ -1343,6 +1426,19 @@ void FCEUSND_Reset(bool is_power)
 	fcnt=0;
 	fc_reset_in=0;
 	nreg=1;
+
+	// E-3 Track-B probe (v1.17 R6 task, 2026-08-08): RESET_POST recorder.
+	// Fires AFTER the initial-state block above so a single frame's
+	// reset delta (pre→post for fcnt/mode/fhcnt/sirq) is observable in
+	// two consecutive trace lines without changing any state values.
+	// Complements the matching E3B RESET_ENTRY above.
+	if (e3_trace_on()) {
+		fprintf(stderr, "E3B RESET_POST abs=%llu ts=%u is_power=%d post_fcnt=%u post_mode=0x%X post_fhcnt=%d post_sirq=0x%X\n",
+		 (unsigned long long)e3_abs_ts, (unsigned)g_cpu.timestamp_ref(),
+		 (int)is_power,
+		 (unsigned)fcnt, (unsigned)IRQFrameMode,
+		 fhcnt, (unsigned)SIRQStat);
+	}
 
 	for(x=0;x<2;x++)
 	{
