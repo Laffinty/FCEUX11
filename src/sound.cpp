@@ -1210,6 +1210,26 @@ static void RDoNoise(void)
 
 DECLFW(Write_IRQFM)
 {
+ // E-3 Track-B probe (v1.17 R6 task, 2026-08-08): W4017_RAW recorder at
+ // the entry of $4017 write. The existing E3 W4017_IN captures the
+ // already-masked V value (post `(V&0xC0)>>6`); this E3B W4017_RAW
+ // captures the raw V byte's bit 5 (5-step) / bit 6 (inhibit) /
+ // bit 7 (reset immediate) gate indicators before the reduction so the
+ // apu_single_3_irq_flag defect-2 hypothesis (write-without-inhibit
+ // must NOT clear the IRQ flag) is verifiable from the raw bit pattern.
+ // Distinct probe name (E3B W4017_RAW vs E3 W4017_IN) so the existing
+ // instrument stays compatible with prior analyzers while this one
+ // tags the raw bit decomposition.
+ const uint8 raw_V_for_probe = V;
+ if (e3_trace_on()) {
+  fprintf(stderr, "E3B W4017_RAW abs=%llu ts=%u raw=0x%02X bit5_5step=%d bit6_inhibit=%d bit7_reset=%d pre_fhcnt=%d\n",
+   (unsigned long long)e3_abs_ts, (unsigned)g_cpu.timestamp_ref(),
+   (unsigned)raw_V_for_probe,
+   (int)((raw_V_for_probe & 0x20) ? 1 : 0),
+   (int)((raw_V_for_probe & 0x40) ? 1 : 0),
+   (int)((raw_V_for_probe & 0x80) ? 1 : 0),
+   fhcnt);
+ }
  // E-3 probe (R6 Step 1, 2026-08-01): capture before/after $4017 write
  // state. Critical for verifying defect 2 hypothesis: $4017 write
  // unconditionally clears IRQ flag (should only clear when 5-step or
