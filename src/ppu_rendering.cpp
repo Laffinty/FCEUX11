@@ -2000,6 +2000,21 @@ int FCEUX_PPU_Loop(int skip) {
 				{
 					if (sl == 0 && ppur.status.cycle == 304)
 					{
+						// E-1 Track-B probe (v1.17 R5 task, 2026-08-08):
+						// EVEN_ODD_GATE recorder. Fires the FIRST time the
+						// (sl==0 && cycle==304) gate is entered for a frame
+						// (idleSynch side), capturing the dot-level PPU/CPU
+						// phase BEFORE the existing SKIP_DEC probe decides
+						// end_cycle=340 vs 341. Distinct from E1 SKIP_DEC
+						// (which fires post-decision in kFetchTime block) —
+						// this one captures the gate's PPUON state at the
+						// precise (sl=0,cycle=304) frame boundary.
+						if (e1_trace_on()) {
+							fprintf(stderr, "E1B EVEN_ODD_GATE abs=%llu frame=%d sl=%d cycle=%d count=%d idleSynch=%d PPUON=%d\n",
+							 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()),
+							 framectr, sl, ppur.status.cycle, g_cpu.native_layout().count,
+							 idleSynch, PPUON ? 1 : 0);
+						}
 						runppu(1);
 						if (PPUON) ppur.install_latches();
 						runppu(1);
