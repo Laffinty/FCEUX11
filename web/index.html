@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="dark" />
 <meta name="theme-color" content="#080a09" />
-<title>FCEUX11 — NES/Famicom Emulator for Windows · v1.16</title>
-<meta name="description" content="FCEUX11 v1.16 — a FCEUX-based NES/Famicom emulator optimized for Windows. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. Fixes more game compatibility issues; official blargg test pass rate rises to 81.4%." />
+<title>FCEUX11 — NES/Famicom Emulator for Windows · v1.17</title>
+<meta name="description" content="FCEUX11 v1.17 — a FCEUX-based NES/Famicom emulator optimized for Windows. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. v1.17 unifies the KagamiQA quality gate and migrates core test harnesses to Rust; blargg pass rate holds at 81.4%." />
 <meta name="keywords" content="FCEUX11, FCEUX, NES emulator, FC emulator, Famicom emulator, Windows emulator, TAS editor, Qt6, C++20, game emulator, 8-bit, multi-language, 12 languages, Arabic, RTL, ROM hacking, debugger, Lua scripting" />
 <meta name="author" content="Laffinty" />
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
@@ -32,8 +32,8 @@
 
 <meta property="og:site_name" content="FCEUX11" />
 <meta property="og:type" content="website" />
-<meta property="og:title" content="FCEUX11 — NES/Famicom Emulator for Windows · v1.16" />
-<meta property="og:description" content="FCEUX11 v1.16 — a FCEUX-based NES/Famicom emulator optimized for Windows. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. Fixes more game compatibility issues; official blargg test pass rate rises to 81.4%." />
+<meta property="og:title" content="FCEUX11 — NES/Famicom Emulator for Windows · v1.17" />
+<meta property="og:description" content="FCEUX11 v1.17 — a FCEUX-based NES/Famicom emulator optimized for Windows. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. v1.17 unifies the KagamiQA quality gate and migrates core test harnesses to Rust; blargg pass rate holds at 81.4%." />
 <meta property="og:url" content="https://laffinty.github.io/FCEUX11/" />
 <meta property="og:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <meta property="og:locale" content="en_US" />
@@ -56,8 +56,8 @@
 <meta name="msvalidate.01" content="" />
 
 <meta name="twitter:card" content="summary" />
-<meta name="twitter:title" content="FCEUX11 — NES/Famicom Emulator for Windows · v1.16" />
-<meta name="twitter:description" content="FCEUX11 v1.16 — a FCEUX-based NES/Famicom emulator optimized for Windows. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. Fixes more game compatibility issues; official blargg test pass rate rises to 81.4%." />
+<meta name="twitter:title" content="FCEUX11 — NES/Famicom Emulator for Windows · v1.17" />
+<meta name="twitter:description" content="FCEUX11 v1.17 — a FCEUX-based NES/Famicom emulator optimized for Windows. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. v1.17 unifies the KagamiQA quality gate and migrates core test harnesses to Rust; blargg pass rate holds at 81.4%." />
 <meta name="twitter:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -72,8 +72,8 @@
   "name":"FCEUX11",
   "applicationCategory":"GameApplication",
   "operatingSystem":"Windows 11",
-  "description":"FCEUX11 v1.16 — a FCEUX-based NES/Famicom emulator optimized for Windows. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. Fixes more game compatibility issues; official blargg test pass rate rises to 81.4%.",
-  "softwareVersion":"1.16",
+  "description":"FCEUX11 v1.17 — a FCEUX-based NES/Famicom emulator optimized for Windows. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. v1.17 unifies the KagamiQA quality gate and migrates core test harnesses to Rust; blargg pass rate holds at 81.4%.",
+  "softwareVersion":"1.17",
   "license":"https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt",
   "url":"https://laffinty.github.io/FCEUX11/",
   "downloadUrl":"https://github.com/Laffinty/FCEUX11/releases",
@@ -100,6 +100,7 @@
 </head>
 <body>
 
+<div id="progress"><i></i></div>
 <div class="bg"><div class="orb"></div><div class="grid"></div></div>
 
 <nav id="nav">
@@ -138,7 +139,7 @@
 
 <header class="hero" id="top">
   <div class="wrap">
-    <div class="pill reveal"><span class="dot"></span><span>v1.16</span></div>
+    <div class="pill reveal"><span class="dot"></span><span>v1.17</span></div>
     <h1 class="reveal"><span class="grad">FCEUX</span><span class="dim">11</span></h1>
     <p class="tagline reveal"><span class="tagline-title">A FCEUX-based NES/Famicom emulator optimized for Windows</span><br>core accuracy, modern native experience, 12 UI languages.</p>
     <div class="cta reveal">
@@ -206,38 +207,36 @@
   <div class="wrap">
     <div class="whatsnew-head reveal">
       <div class="kicker">What's new</div>
-      <h2>v1.16</h2>
-      <div class="sub">Released 2026-08-06 · v1.15 → v1.16 recap</div>
+      <h2>v1.17</h2>
+      <div class="sub">Released 2026-08-08 · v1.16 → v1.17 recap</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3>Compatibility Issues Across Several Games Are Fixed</h3>
-          <p>A small number of games still exhibited minor glitches in the previous release — occasional screen flicker, audio stutter, or input lag. This release corrects several core timing mechanisms: VBL timing alignment, APU clock jitter, PPU data-buffer read, and PPU data-latch decay.</p>
-          <p>Concrete number: the official blargg test-ROM suite (177 ROMs) pass rate rises from 76.3% to 81.4%.</p>
+          <h3>KagamiQA unified quality gate</h3>
+          <p>KagamiQA is now the single owner and gate of the test system: dual-oracle (regression + hardware accuracy) runs on every push and produces a migration matrix.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">02</div>
         <div class="wn-text">
-          <h3>Lua Scripting Interface Fully Aligned with FCEUX</h3>
-          <p>The Lua interfaces commonly used by TAS authors (joypad, memory, etc.) now behave identically in FCEUX11 and FCEUX. Scripts originally written for FCEUX can be used directly in FCEUX11 without adaptation.</p>
-          <p>Interfaces added: joypad.get/set, memory.readwrite, memory.readwordsigned, memory.getregister, memory.registerexec.</p>
+          <h3>Core test harnesses migrated to Rust</h3>
+          <p>ROM/savestate regression, mapper byte-diff and the Lua runner moved from C++ to Rust with 100% parity.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">03</div>
         <div class="wn-text">
-          <h3>Lua bit.* Operations Now Conform to the LuaBitOp Standard</h3>
-          <p>The semantics of the bitwise library (bit.rshift, bit.tohex, etc.) now match the LuaBitOp 1.0.2 standard: right shift is logical (high bits filled with 0), tohex outputs uppercase for negative numbers, and so on. Scripts written for FCEUX that rely on bitwise operations no longer produce unexpected results when ported to FCEUX11 due to implementation differences.</p>
+          <h3>Accuracy baseline confirmed, no regressions</h3>
+          <p>Official blargg suite holds at 81.4% (144/177 PASS); all 52 APU/PPU/DMC convergence ROMs PASS.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">04</div>
         <div class="wn-text">
-          <h3>Long Recordings and Save States Are More Stable</h3>
-          <p>Several issues on the PPU timing and addressing path have been fixed (three fixes in ppu_read_buffer, plus ppu_open_bus data-latch decay); long TAS recordings are less likely to drift out of sync mid-recording. Save-state compatibility also has full regression-test coverage.</p>
+          <h3>Defense line stays resident in CI</h3>
+          <p>Baseline drift (PASS→FAIL) auto-posts a red alert on PRs; every run archives its migration matrix as a CI artifact.</p>
         </div>
       </div>
     </div>

@@ -16,9 +16,9 @@
 
 ## 简介 / Introduction
 
-**FCEUX11** 是基于 [FCEUX](https://fceux.com) 的 NES/Famicom 模拟器衍生项目，针对 **Windows** 平台深度优化。在继承 FCEUX 卓越模拟精度的同时，采用 Qt6 图形界面重塑了现代 Windows 原生体验，并提供 12 种语言的多语言支持，以及面向开发者和速通玩家的调试与 TAS 工具集。项目持续推进内部核心重构与性能优化工作，致力于让模拟器在高负载场景下依旧保持高效、流畅与稳定。无论你是重温经典红白机游戏，还是深入 ROM 修改与研究，FCEUX11 都能以最顺畅的方式运行你的 NES 游戏。
+**FCEUX11** 是基于 [FCEUX](https://fceux.com) 的 NES/Famicom 模拟器衍生项目，针对 **Windows** 平台深度优化。在继承 FCEUX 卓越模拟精度的同时，采用 Qt6 图形界面重塑了现代 Windows 原生体验，并提供 12 种语言的多语言支持，以及面向开发者和速通玩家的调试与 TAS 工具集。项目持续推进内部核心重构与性能优化工作，致力于让模拟器在高负载场景下依旧保持高效、流畅与稳定。
 
-**FCEUX11** is a derivative of the [FCEUX](https://fceux.com) NES/Famicom emulator, optimized for **Windows**. It inherits FCEUX's renowned emulation accuracy while delivering a polished, modern Windows-native experience powered by Qt6. Multi-language support (12 languages) and a full suite of debugging and TAS tools are built in for developers and speedrunners alike. Ongoing internal refactoring and performance optimization work keeps the emulator efficient, smooth, and stable — even under heavy load. Whether you're revisiting childhood classics or diving into ROM hacking, FCEUX11 runs your NES games smoothly and looks great doing it.
+**FCEUX11** is a derivative of the [FCEUX](https://fceux.com) NES/Famicom emulator, optimized for **Windows**. It inherits FCEUX's renowned emulation accuracy while delivering a polished, modern Windows-native experience powered by Qt6, with 12-language localization and a full suite of debugging and TAS tools for developers and speedrunners. Ongoing internal refactoring and performance optimization keeps the emulator efficient, smooth, and stable even under heavy load.
 
 ---
 
@@ -26,15 +26,15 @@
 
 | 中文 | English |
 |------|---------|
-| **精确模拟**：完整支持 NES、Famicom 及各类 Mapper 扩展芯片，画面与音效高度还原，带来原汁原味的 8 位体验。 | **Accurate Emulation**: Full NES, Famicom, and mapper support with faithful graphics and audio, delivering the authentic 8-bit experience just as you remember it. |
-| **调试工具**：内置 CPU/PPU 调试器、十六进制编辑器、内存搜索与监视、代码/数据日志，满足 ROM 修改与深度研究需求。 | **Debugging Tools**: CPU/PPU debugger, hex editor, RAM search/watch, and code/data logger, covering everything you need for ROM hacking and in-depth analysis. |
-| **TAS 编辑器**：逐帧录制并精确编辑按键输入，轻松制作工具辅助速通（TAS）录像，挑战操作极限。 | **TAS Editor**: Frame-by-frame recording and precise input editing to craft perfect Tool-Assisted Speedruns and push gameplay to its limits. |
-| **Lua 脚本**：通过 Lua 接口编写脚本，实现自定义屏幕叠加显示、自动化操作、内存数据读取等高级玩法。 | **Lua Scripting**: Write Lua scripts to create custom on-screen displays, automate gameplay, or read memory, extending the emulator however you like. |
-| **录像回放**：录制完整游戏过程并支持回放，可导出为 AVI 视频，方便分享你的精彩通关时刻。 | **Movie Recording**: Record full playthroughs, replay them anytime, and export to AVI to share your best runs with the community. |
-| **金手指**：支持 Game Genie 与原始金手指代码，轻松修改游戏内容，重温童年「无敌版」的快乐。 | **Cheats**: Game Genie and raw cheat code support to tweak gameplay, unlock hidden content, or just have fun bending the rules. |
-| **多语言界面**：支持 **12 种语言** —— 简体中文、繁体中文、英文、日语、韩语、西班牙语、法语、德语、越南语、泰语、印地语（beta）、阿拉伯语（beta）；首启自动按系统区域设置匹配语言（`zh-CN` / `ja-JP` / `ar-SA` 等），切换语言后菜单、对话框即时全部重译；阿拉伯语自动启用从右到左布局。 | **Multi-language UI**: Supports **12 languages** — Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Spanish, French, German, Vietnamese, Thai, Hindi (beta), and Arabic (beta). On first launch the language is auto-detected from your system locale (`zh-CN` / `ja-JP` / `ar-SA`, etc.), and menus/dialogs are fully retranslated the moment you switch. Arabic automatically enables right-to-left layout. |
-| **自定义调色板**：加载外部调色板文件，自由调整画面色彩，还原你记忆中最对的那个画面色调。 | **Custom Palettes**: Load custom palette files to fine-tune color rendering and match the exact look you grew up with on your old CRT TV. |
-| **即时存档**：随时随地保存/读取进度，支持自动存档历史记录，再难的关卡也能反复挑战、不留遗憾。 | **Save States**: Save and load anywhere, anytime, with automatic state history so you never lose progress on a tough boss fight again. |
+| **精确模拟**：完整支持 NES、Famicom 及各类 Mapper 扩展芯片，画面与音效高度还原。 | **Accurate Emulation**: Full NES / Famicom / mapper support with faithful graphics and audio. |
+| **调试工具**：内置 CPU/PPU 调试器、十六进制编辑器、内存搜索与监视、代码/数据日志。 | **Debugging Tools**: CPU/PPU debugger, hex editor, RAM search/watch, code/data logger. |
+| **TAS 编辑器**：逐帧录制并精确编辑按键输入，轻松制作工具辅助速通（TAS）录像。 | **TAS Editor**: Frame-by-frame recording and precise input editing for Tool-Assisted Speedruns. |
+| **Lua 脚本**：通过 Lua 接口编写脚本，实现自定义屏幕叠加显示、自动化操作、内存数据读取等高级玩法。 | **Lua Scripting**: Custom on-screen displays, automation, and memory access via Lua. |
+| **录像回放**：录制完整游戏过程并支持回放，可导出为 AVI 视频。 | **Movie Recording**: Record and replay playthroughs, export to AVI. |
+| **金手指**：支持 Game Genie 与原始金手指代码，轻松修改游戏内容。 | **Cheats**: Game Genie and raw cheat code support. |
+| **多语言界面**：支持 **12 种语言** —— 简体中文、繁体中文、英文、日语、韩语、西班牙语、法语、德语、越南语、泰语、印地语（beta）、阿拉伯语（beta）；首启自动按系统区域设置匹配语言，切换语言后菜单、对话框即时全部重译；阿拉伯语自动启用从右到左布局。 | **Multi-language UI**: **12 languages** — Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Spanish, French, German, Vietnamese, Thai, Hindi (beta), and Arabic (beta). Auto-detected from system locale on first launch, instant retranslate on switch, and automatic right-to-left layout for Arabic. |
+| **自定义调色板**：加载外部调色板文件，自由调整画面色彩。 | **Custom Palettes**: Load custom palette files to fine-tune color rendering. |
+| **即时存档**：随时随地保存 / 读取进度，支持自动存档历史记录。 | **Save States**: Save / load anywhere with automatic state history. |
 
 ---
 
@@ -52,30 +52,19 @@
 
 ### 自行编译 / Build from Source
 
-只需安装 **Visual Studio 2022 Community**（免费）和 **Rust**（免费），然后运行两条脚本即可。详见 [`docs/BuildGuide.md`](docs/BuildGuide.md)。
-
-**三步概览：**
+需要 **Visual Studio 2022 Community**（勾选「使用 C++ 的桌面开发」）与 **Rust**（[rustup](https://rustup.rs) 默认安装）。详见 [`docs/BuildGuide.md`](docs/BuildGuide.md)。
 
 ```powershell
-# 1. 安装前置工具（一次性）
-#    ① Visual Studio 2022 Community → 勾选 "使用 C++ 的桌面开发"
-#    ② Rust → https://rustup.rs/ → 默认安装
-
-# 2. 下载源码
 git clone https://github.com/Laffinty/FCEUX11.git
 cd FCEUX11
-
-# 3. 一键安装依赖 + 编译
 .\scripts\setup_vcpkg.ps1
-.\scripts\do_build.ps1 -Config Release
-# do_build.ps1 会用 vswhere 自动发现 Visual Studio 自带的 Ninja；
-# 裸 PATH 查不到 ninja.exe 不代表未安装，也不需要另装一份。
-# → 产物：build\src\fceux11.exe
+$env:VCPKG_ROOT = "$PWD\vcpkg"          # 必设，do_build.ps1 据此定位 vcpkg
+.\scripts\do_build.ps1 -Config Release  # 产物：build\src\fceux11.exe
 ```
 
-仅需两条命令即可完成编译。首次编译约 30-60 分钟（主要耗时在 Qt6 下载和编译），后续增量编译 1-3 分钟。
+`do_build.ps1` 会自动通过 `vswhere` 发现 Visual Studio 自带的 Ninja——裸 PATH 查不到 `ninja.exe` 不代表未安装，也无需另装一份。首次编译约 30-60 分钟（主要为 Qt6 下载与编译），后续增量编译 1-3 分钟。
 
-> 详细说明（含常见错误修复、高级选项），请查阅 [`docs/BuildGuide.md`](docs/BuildGuide.md)。
+> 详细说明（含常见错误修复、高级选项）见 [`docs/BuildGuide.md`](docs/BuildGuide.md)。
 
 ---
 
@@ -91,10 +80,10 @@ Precompiled binaries are available on the **[GitHub Releases](https://github.com
 
 ## 快速开始 / Quick Start
 
-**1.** 启动 `fceux11.exe`。
-**2.** 通过 **File → Open ROM** 加载游戏（支持 `.nes` / `.fds` / `.nsf` / `.unf`）。
-**3.** 键盘或手柄游戏；输入映射在 **Options → Input Config** 调整。
-**4.** **I** 快速存档，**P** 快速读档。
+1. 启动 `fceux11.exe`。
+2. 通过 **File → Open ROM** 加载游戏（支持 `.nes` / `.fds` / `.nsf` / `.unf`）。
+3. 键盘或手柄游戏；输入映射在 **Options → Input Config** 调整。
+4. **I** 快速存档，**P** 快速读档。
 
 Launch `fceux11.exe`, load a game via **File → Open ROM**, play with keyboard or gamepad (remap in **Options → Input Config**). Press **I** to quick-save, **P** to quick-load.
 
@@ -107,43 +96,33 @@ FCEUX11 内置一套名为 **KagamiQA** 的双 Oracle 自动化质量保障系�
 | 组件 | 说明 |
 |------|------|
 | **Oracle A（回归测试）** | 27 个 Oracle A 清单条目（外加 6 个 CTest-only 基础设施测试），每次 push 全量运行 |
-| **Oracle B（硬件精度测试）** | 20 个 Oracle B 清单条目代表桶 + 177 个 [blargg](https://github.com/christopherpow/nes-test-roms) $6000 协议 ROM 全量批处理，覆盖 CPU/PPU/APU/MMC3 全子类 |
+| **Oracle B（硬件精度测试）** | 20 个 Oracle B 清单条目代表桶 + 177 个 [blargg](https://github.com/christopherpow/nes-test-roms) `$6000` 协议 ROM 全量批处理，覆盖 CPU/PPU/APU/MMC3 全子类 |
 | **迁移矩阵** | 每次 CI run 产出 `kagamiqa_migration_matrix.json` 并作为 artifact 上传，追踪 PASS→FAIL 回归与 FAIL→PASS 进展 |
 | **基线漂移检测** | PASS→FAIL 自动在 PR 下评论红色警报，防止精度退化 |
 
-> **数字来源 / Where these numbers come from**：`34` CTest 数 + `47` 清单条目（27 Oracle A + 20 Oracle B）+ `177` 落盘 ROM 数均为 **CI 产物**——
-> 详见 `docs/tech/KagamiQA.md` §0 「CI 数字回填」与最近一次
-> `kagamiqa_migration_matrix.json` 的 `engine.git_rev` 字段。本表数值是
-> CI 产物快照（commit `78a9d7f` 时点，`engine.git_rev=78a9d7f`，`kagami-qa.yml` run #31，2026-08-05）。
-> Phase 4.2 R4 Gate 已闭环，本表数字与 CI artifact 自动同步。下次刷新前请重跑
-> `kagami-qa-runner --output` 并把数字随 commit 一并刷新。
+> **当前 CI 矩阵**（最近一次 `kagamiqa_migration_matrix.json`，run_id `20260808-045058-830d2c`，`engine.git_rev=c572294`，对应 main HEAD `d808c06`，2026-08-08）：47 项 **11 PASS / 36 FAIL（Grade D）**，其中 **25 项 Blocking**、**27 条未审批 PASS→FAIL 漂移**。CHANGELOG v1.17 所述「39P/8F / Grade C (acceptable)」为**发布时点快照**，与当前 main HEAD 矩阵存在落差。数字以 `docs/tech/KagamiQA.md` §0 与最近一次矩阵的 `engine.git_rev` 字段为 source of truth；重跑 `kagami-qa-runner --output` 后随 commit 一并刷新。
 
-**KagamiQA 的实现细节、原理、独立化运行、跨项目迁移指南，请参阅 [`docs/tech/KagamiQA.md`](docs/tech/KagamiQA.md)。**
+**实现细节、原理、独立化运行、跨项目迁移**请参阅 [`docs/tech/KagamiQA.md`](docs/tech/KagamiQA.md)。
 
 FCEUX11 ships **KagamiQA**, a dual-oracle automated quality assurance system that runs continuously in CI:
 
 | Component | Description |
 |-----------|-------------|
 | **Oracle A (regression)** | 27 Oracle A manifest entries (plus 6 CTest-only infrastructure tests), full run on every push |
-| **Oracle B (hardware accuracy)** | 20 Oracle B manifest entries as bucket representatives + 177 [blargg](https://github.com/christopherpow/nes-test-roms) $6000-protocol ROMs (full batch) covering all CPU/PPU/APU/MMC3 sub-categories |
+| **Oracle B (hardware accuracy)** | 20 Oracle B manifest entries as bucket representatives + 177 [blargg](https://github.com/christopherpow/nes-test-roms) `$6000`-protocol ROMs (full batch) covering all CPU/PPU/APU/MMC3 sub-categories |
 | **Migration Matrix** | Every CI run produces `kagamiqa_migration_matrix.json` (uploaded as artifact), tracking PASS→FAIL regressions and FAIL→PASS progress |
 | **Baseline Drift Detection** | PASS→FAIL automatically posts a red alert PR comment, preventing accuracy decay |
 
-> **Source of truth / 数字来源**: 34 CTest + 47 manifest entries (27 Oracle A + 20 Oracle B) + 177 on-disk ROMs are **CI-sourced** — see `docs/tech/KagamiQA.md` §0 "CI number back-fill" and the `engine.git_rev` field of the most recent `kagamiqa_migration_matrix.json`. This table is a CI-artifact snapshot at commit `78a9d7f` (`engine.git_rev=78a9d7f`, `kagami-qa.yml` run #31 on 2026-08-05). Phase 4.2 R4 Gate passed — numbers auto-sync with CI artifact. Phase 4.4 expanded tests.json 39 → 47 with 8 Oracle B bucket representatives; current matrix 39 PASS / 8 FAIL (8 FAIL all advisory known-limits, no surprises). To refresh: re-run `kagami-qa-runner --output` first, then update numbers in the same commit.
+> **Current CI matrix** (most recent `kagamiqa_migration_matrix.json`, run_id `20260808-045058-830d2c`, `engine.git_rev=c572294`, main HEAD `d808c06`, 2026-08-08): 47 entries **11 PASS / 36 FAIL (Grade D)** — **25 blocking** failures, **27 unapproved PASS→FAIL drifts**. The v1.17 CHANGELOG's "39P/8F / Grade C (acceptable)" is a **release-time snapshot** and diverges from the current main HEAD matrix. `docs/tech/KagamiQA.md` §0 and the latest matrix's `engine.git_rev` field are the source of truth; re-run `kagami-qa-runner --output` and refresh in the same commit.
 
-**For implementation details, principles, standalone operation, and cross-project migration, see [`docs/tech/KagamiQA.md`](docs/tech/KagamiQA.md).**
+**For implementation details, principles, standalone operation, and cross-project migration**, see [`docs/tech/KagamiQA.md`](docs/tech/KagamiQA.md).
 
 ---
 
 ## 版本历史 / Changelog
 
 详见 [CHANGELOG.md](CHANGELOG.md)。当前稳定版为 **v1.17**。
-
-**v1.16 主要亮点**：KagamiQA 双 Oracle 质量防线正式上线 — 47 条测试清单（Oracle A 27 + Oracle B 20 桶代表）+ 177 个 blargg `$6000` 协议 ROM 全量批处理，每次 push 自动运行 CI 产出迁移矩阵（runs #31-#34 success，R4 Gate 已闭环）。Phase 1-3 精度收敛：vbl_05 NMI timing / ppu_read_buffer / ppu_open_bus / APU cycle-position 帧计数器等 7 项 PASS 修复；Phase 4 Lua bindings 完整化（lua_joypad_test + lua_memory_test blocking）。**32 项深模型族已知限制归类防御线**（不是 release blocker）+ P5 runppu 重批决策推迟到 v1.17+。详见 [docs/tech/KagamiQA.md](docs/tech/KagamiQA.md)。
-
 See [CHANGELOG.md](CHANGELOG.md). Current stable release is **v1.17**.
-
-**v1.16 highlights**: KagamiQA dual-oracle quality defense line deployed — 47 manifest entries (27 Oracle A + 20 Oracle B bucket representatives) + 177 [blargg](https://github.com/christopherpow/nes-test-roms) `$6000`-protocol ROMs full batch; CI auto-runs on every push producing migration matrix (runs #31-#34 success, R4 Gate closed). Phase 1-3 accuracy convergence: vbl_05 NMI timing / ppu_read_buffer / ppu_open_bus / APU cycle-position frame counter — 7 PASS fixes landed. Phase 4 Lua bindings complete (`lua_joypad_test` + `lua_memory_test` blocking). **32 deep-model-family known limits classified as defense line** (NOT release blocker) + P5 runppu re-batch decision deferred to v1.17+. See [docs/tech/KagamiQA.md](docs/tech/KagamiQA.md).
 
 ---
 
