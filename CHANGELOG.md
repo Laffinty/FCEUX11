@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17] - 2026-08-08 (WIP)
+
+**Codename: KagamiQA 统合.** v1.17 将 KagamiQA 从「FCEUX11 的附属测试框架」升级为
+「测试体系的唯一归属与唯一门禁」。本条目记录 wip_v1.17 上已落地的 Task 1（迁移）与
+Task 3（遗留收敛核查）成果。
+
+### Summary
+
+| 通道 | 数量 | PASS / FAIL | 备注 |
+|---|---|---|---|
+| **Oracle A** (ctest + 测试清单) | 27 + CTest-only | 33/33 (100%) | ctest `-LE perf` 全绿 |
+| **Oracle B** (tests.json 桶代表) | 20 | 12P / 8F | 8 FAIL 全部 advisory 已知限制 |
+| **Oracle B** (blargg 全量 177 ROM) | 177 | 144P / 33F | 81.4% PASS 率（与 v1.16 终态一致，无回归） |
+| **总测试条目** (kagami-qa-runner) | 47 | 39P / 8F | **Grade C (acceptable)** |
+| **cargo test** (kagami-qa lib) | 178 | 178P / 0F | 含新迁移 harness 单元测试 |
+
+### Added — Task 1 迁移（C++ harness → Rust）
+
+- **`mapper_byte_diff` Rust harness**（`runner/mapper_byte_diff.rs`）：175-case mapper
+  状态字节 diff，新增 `kagami_bridge_save_mapper_state` FFI；parity 100%
+  （C++/Rust 均 169 PASS / 6 SKIP / 0 FAIL）。C++ 源已删除。
+- **`lua_runner` Rust port**（`runner/lua.rs`）：headless Lua 脚本执行器，C 级
+  stdout/stderr 捕获（`__acrt_iob_func`/`freopen`，局部 extern 声明避免污染合并
+  header）；4/4 测试脚本 exit code 与 C++ 一致。顺带修复 C++ runner 在 stdio
+  重定向下 `LUA_RESULT` 不可见的 bug。C++ 源已删除。
+- **C-2/C-3 switch-over**：`rom_regression_test.cpp` / `savestate_regression_test.cpp`
+  删除，`tests.json` binary 指向 Rust runner；Rust harness 修复了 C++ 手写
+  JSON 解析器丢失首个条目（nrom）的 bug（nrom 现被真正验证，13 ROM × 60 帧）。
+- **`test_helpers.rs`**：共享工具模块（路径解析 / CRC32 / golden 头），
+  `rom_regression` 与 `mapper_byte_diff` 收敛复用（C++ `test_helpers.h` 的 Rust 等价物）。
+- **CI**：`ci.yml` ROM Regression step 改用 `kagami_qa_rom_regression_runner`。
+
+### Fixed / Verified — Task 3 遗留收敛核查
+
+- **R6 实质收敛完成**：全量矩阵确认全部 52 个 APU/pal_apu/mixer/reset/single/dma/dmc
+  ROM PASS——计划 §4.4 的 bucket-C 目标项（`apu_single_3/4/5/6`、
+  `apu_reset_4017_timing/written`）被 H-1（`reset_after`）/H-2（帧预算）清零。
+- **R5 首次真实探针数据**：Track-B 探针（5 个 E1B）首次在真实 ROM + build 上采集
+  （此前为推断）；vbl_05 确认 PASS；vbl_02/06/07/08/10 + `ppu_vbl_nmi` 为
+  v1.16 已证伪/回滚处方的深模型已知限制（记录于 `docs/tech/R5R6_v1.17_核查结论.md`）。
+- **矩阵基线澄清**：计划 §一 的「121 PASS / 56 FAIL」为过期数据；实测与 v1.16
+  CHANGELOG 一致为 144 PASS / 33 FAIL，v1.17 无回归。
+
 ## [1.16] - 2026-08-06
 
 **Codename: KagamiQA closure.** FCEUX11 v1.16 ships a CI-resident dual-oracle

@@ -306,19 +306,19 @@ Direct 模式通过 C ABI 桥接（`src/kagami_bridge.cpp` → `src/kagami_bridg
 ### 2.6 Lua 脚本测试
 
 ```powershell
-# 运行 Lua 测试（headless）
-.\build\tests\fceux11_lua_runner.exe tests/lua_scripts/test_bit.lua
-.\build\tests\fceux11_lua_runner.exe tests/lua_scripts/test_emu.lua --frames 120
+# 运行 Lua 测试（headless；v1.17 Task1 起为 Rust runner kagami_qa_lua_runner）
+.\build\tests\kagami_qa_lua_runner.exe tests/lua_scripts/test_bit.lua
+.\build\tests\kagami_qa_lua_runner.exe tests/lua_scripts/test_emu.lua --frames 120
 ```
 
-P5 升级后，`lua_runner` 会捕获 Lua `assert()` / `error()` 输出并解析为 PASS/FAIL 信号，不再仅依赖「脚本没崩溃 = PASS」的模糊判定。
+P5 升级后，`lua_runner` 会捕获 Lua `assert()` / `error()` 输出并解析为 PASS/FAIL 信号，不再仅依赖「脚本没崩溃 = PASS」的模糊判定。Rust port 与 C++ 原实现 4/4 脚本 exit code 一致，并修复了 C++ 版在 stdio 重定向下 `LUA_RESULT` 不可见的 bug。
 
 ### 2.7 CI 自动运行
 
-KagamiQA 在每次 push 到 `main` 或 `wip_1.16` 分支时自动运行（`.github/workflows/kagami-qa.yml`）：
+KagamiQA 在每次 push 到 `main`、`wip_1.16` 或 `wip_v1.17` 分支时自动运行（`.github/workflows/kagami-qa.yml`）：
 
 1. **Oracle A**：`ctest --output-on-failure -LE perf`
-2. **Oracle B**：`fceux11_blargg_runner --manifest tests/fixtures/blargg_manifest.json`
+2. **Oracle B**：`kagami_qa_blargg_runner --manifest tests/fixtures/blargg_manifest.json`
 3. **迁移矩阵生成**：`kagami-qa-runner` 产出 JSON + 精度表
 4. **Artifact 上传**：矩阵、精度表、基线作为 workflow artifact 保存 30 天
 5. **基线漂移警报**：PASS→FAIL 自动在 PR 下评论红色警报（`gh pr comment`）
@@ -557,8 +557,8 @@ FCEUX11/
 │   ├── fixtures/
 │   │   ├── blargg/                         ← 177 blargg ROM (cpu/ppu/apu/mmc3/)
 │   │   ├── blargg_manifest.json            ← ROM 清单（name/path/frames/probe_addr/reset_after；v1.17 H-1 全条目含 reset_after）
-│   │   ├── blargg_known_fail.json          ← 已知失败分类（60 条，含 runppu 标记）
-│   │   ├── blargg_full_baseline.json       ← P5 全量基线（120 PASS / 60 FAIL）
+│   │   ├── blargg_known_fail.json          ← 已知失败分类（33 条实测，含 runppu 标记）
+│   │   ├── blargg_full_baseline.json       ← P5 全量基线（144 PASS / 33 FAIL，2026-08-08 实测刷新）
 │   │   ├── golden/                         ← golden savestate 数据（.fc0 + golden_index.json；v1.17 决策：数据留此处）
 │   │   └── nestest.nes                     ← smoke test ROM
 │   ├── kagami/                             ← KagamiQA C++ 资产唯一落点（v1.17 Task2-A1 落位）
@@ -568,27 +568,25 @@ FCEUX11/
 │   │   │                                       ppu_phase_c/d/ppu_rendering_lut）
 │   │   ├── boards/                         ← mapper_load/reset_test.cpp
 │   │   ├── core/                           ← cpu/ppu/apu/bus/mapper/savestate/cart_class/fds_load/
-│   │   │                                      driver_callbacks/core_driver_boundary_test.cpp
+│   │   │                                      driver_callbacks/core_driver_boundary_test.cpp + test_helpers.h
 │   │   ├── benchmark/                      ← 5 Google Benchmark + ppu_simd_probe
 │   │   ├── benchmarks/                     ← bench_tolerance_test.cpp（baseline JSON 留 tests/benchmarks/）
-│   │   └── utils/                          ← xstring_microbench.cpp
-│   ├── blargg_runner.cpp                   ← Oracle B 执行器（C++, headless；v1.17 待 Task1 迁移后删除）
-│   ├── lua_runner.cpp                      ← Lua 脚本执行器（C++, headless；待迁移）
-│   ├── kagami_direct_main.cpp              ← Direct runner C++ 入口（待迁移）
-│   ├── rom_regression_test.cpp             ← ROM 回归（C++, 待迁移）
-│   ├── savestate_regression_test.cpp       ← savestate 回归（C++, 待迁移）
-│   ├── core/                               ← 🅐 待迁移：ppu_frame/apu_wav/mapper_byte_diff_test.cpp + test_helpers.h
+│   │   ├── utils/                          ← xstring_microbench.cpp
+│   │   └── *_rust_main.cpp                 ← v1.17 Task1：Rust harness 的 C++ shim（blargg/rom_regression/
+│   │                                          savestate/mapper_byte_diff/lua，链接 fceux11_rust.lib）
+│   ├── core/                               ← 🅐 待迁移：ppu_frame/apu_wav_test.cpp（v1.17 2.6 时序红线内）
 │   └── git_info_stub.cpp                   ← 构建支持（留 tests/ 根，v1.17 决策③）
 ├── src/
-│   ├── kagami_bridge.h                     ← C ABI 桥接头文件（v1.17 Track C：+extract_frame_buffer/save_state）
+│   ├── kagami_bridge.h                     ← C ABI 桥接头文件（v1.17 Track C：+extract_frame_buffer/save_state；Task1 mapper：+save_mapper_state）
 │   ├── kagami_bridge.cpp                   ← C ABI 桥接实现（编译进 fceux11_core）
 │   └── rust/crates/kagami-qa/
 │       ├── src/
 │       │   ├── main.rs                     ← CLI runner 入口（v1.17 Task4 拆分后 <150 行）
-│       │   ├── lib.rs                      ← Rust 库（含 C-callable direct 入口 + blargg/rom_regression/savestate C-ABI）
+│       │   ├── lib.rs                      ← Rust 库（含 C-callable direct 入口 + blargg/rom_regression/savestate/mapper_byte_diff/lua C-ABI）
 │       │   ├── cli/                        ← L7：args/run_subprocess/run_direct/run_report
 │       │   ├── report/                     ← L6：matrix/baseline/grade（v1.17 Task5 A-E 分级）
-│       │   ├── runner/                     ← L5：scheduler + direct（看门狗）+ blargg/rom_regression/savestate harness
+│       │   ├── runner/                     ← L5：scheduler + direct（看门狗）+ blargg/rom_regression/
+│       │   │                                  savestate/mapper_byte_diff/lua harness + test_helpers 共享工具
 │       │   ├── oracle/                     ← L4：regression.rs(A) / hardware.rs(B)
 │       │   ├── adapter/                    ← L3：trait_def/subprocess/direct
 │       │   ├── manifest/                   ← L2：schema/parser/filter（--filter 表达式）
@@ -608,7 +606,8 @@ FCEUX11/
 └── docs/tech/
     ├── KagamiQA.md                         ← 本文档
     ├── R5_instrument_first_data.md         ← v1.17 R5 (E-1) PPU VBL/NMI 探针数据（Track-B）
-    └── R6_instrument_first_data.md         ← v1.17 R6 (E-3) APU 帧计数器探针数据（Track-B）
+    ├── R6_instrument_first_data.md         ← v1.17 R6 (E-3) APU 帧计数器探针数据（Track-B）
+    └── R5R6_v1.17_核查结论.md              ← v1.17 R5/R6 实测核查（首次真实探针数据 + 权威矩阵）
 ```
 
 ---
