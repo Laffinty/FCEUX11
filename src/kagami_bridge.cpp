@@ -13,6 +13,7 @@
 #include "bus.h"
 #include "state.h"
 #include "cart.h"
+#include "cart_class.h"        // fceu11::g_cart, Cart::save_mapper_state
 #include "sound.h"
 #include "ppu.h"
 #include "video.h"               // for XBuf
@@ -230,6 +231,30 @@ int kagami_bridge_save_state(uint8_t *dst, uint32_t cap,
     if (cap > 0) {
         const size_t to_copy = std::min(static_cast<size_t>(cap), total);
         std::memcpy(dst, buffer.data(), to_copy);
+    }
+    return 0;
+}
+
+int kagami_bridge_save_mapper_state(uint8_t *dst, uint32_t cap,
+                                    uint32_t *written_out) {
+    if (!written_out) {
+        return -1;
+    }
+    *written_out = 0;
+    if (cap > 0 && !dst) {
+        return -2;
+    }
+    if (!fceu11::g_cart) {
+        return -3;
+    }
+
+    const std::vector<uint8_t> body = fceu11::g_cart->save_mapper_state();
+    const size_t total = body.size();
+    *written_out = static_cast<uint32_t>(total);
+
+    if (cap > 0) {
+        const size_t to_copy = std::min(static_cast<size_t>(cap), total);
+        std::memcpy(dst, body.data(), to_copy);
     }
     return 0;
 }

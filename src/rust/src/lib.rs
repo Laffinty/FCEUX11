@@ -82,3 +82,33 @@ pub unsafe extern "C" fn kagami_qa_savestate_regression_main(
     // SAFETY: argv is constructed by the C caller per the C-ABI contract.
     unsafe { kagami_qa::savestate_regression_entry::kagami_qa_savestate_regression_main(argc, argv) }
 }
+
+// =========================================================================
+// Task 1 (mapper) — re-export of kagami_qa_mapper_byte_diff_main.
+//
+// Replaces tests/core/mapper_byte_diff_test.cpp once parity is verified.
+// =========================================================================
+#[cfg(feature = "direct-adapter")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn kagami_qa_mapper_byte_diff_main(
+    argc: i32,
+    argv: *const *const std::os::raw::c_char,
+) -> i32 {
+    // SAFETY: argv is constructed by the C caller per the C-ABI contract.
+    unsafe { kagami_qa::mapper_byte_diff_entry::kagami_qa_mapper_byte_diff_main(argc, argv) }
+}
+
+// =========================================================================
+// Task 1 (lua) — re-export of kagami_qa_lua_main.
+//
+// Replaces tests/lua_runner.cpp once parity is verified.
+// =========================================================================
+#[cfg(feature = "direct-adapter")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn kagami_qa_lua_main(
+    argc: i32,
+    argv: *const *const std::os::raw::c_char,
+) -> i32 {
+    // SAFETY: argv is constructed by the C caller per the C-ABI contract.
+    unsafe { kagami_qa::lua_entry::kagami_qa_lua_main(argc, argv) }
+}

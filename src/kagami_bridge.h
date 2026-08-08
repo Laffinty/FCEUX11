@@ -81,6 +81,20 @@ int kagami_bridge_save_state(uint8_t *dst, uint32_t cap,
                              uint32_t *written_out,
                              int compression_level);
 
+/// Serialise the current cart's mapper state (Cart::save_mapper_state())
+/// and write the first `cap` bytes into `dst`. Returns the total size in
+/// `written_out` (always set, even on truncation).
+///
+/// Returns 0 on success, non-zero if no cart is loaded or the mapper
+/// state cannot be produced. Mirrors the C++ `mapper_byte_diff_test.cpp`
+/// capture step (`fceu11::g_cart->save_mapper_state()`).
+///
+/// # Safety
+/// `dst` must point to at least `cap` writable bytes, or be NULL if
+/// `cap == 0`. `written_out` must point to a valid writable `uint32_t`.
+int kagami_bridge_save_mapper_state(uint8_t *dst, uint32_t cap,
+                                    uint32_t *written_out);
+
 #ifdef __cplusplus
 }
 #endif

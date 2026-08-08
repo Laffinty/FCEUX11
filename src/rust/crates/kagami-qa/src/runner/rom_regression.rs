@@ -260,16 +260,10 @@ pub struct RomRegressionMismatch {
 
 /// CRC32 over a byte slice using the IEEE 802.3 polynomial. Equivalent
 /// to `CalcCRC32(0, buf, len)` in the C++ harness.
-pub fn crc32(buf: &[u8]) -> u32 {
-    crc32_update(0, buf)
-}
-
-/// CRC32 with an explicit initial value (matches `CalcCRC32(crc, buf, len)`).
-pub fn crc32_update(crc: u32, buf: &[u8]) -> u32 {
-    let mut h = crc32fast::Hasher::new_with_initial(crc);
-    h.update(buf);
-    h.finalize()
-}
+///
+/// Re-exported from [`crate::runner::test_helpers`] (shared utilities —
+/// the Rust equivalent of `tests/core/test_helpers.h`).
+pub use crate::runner::test_helpers::{crc32, crc32_update};
 
 // ---------------------------------------------------------------------------
 // Adapter abstraction — Track C adds `extract_frame_buffer` to the FFI
@@ -318,14 +312,9 @@ where
 /// absolute path. Mirrors the C++ implicit behaviour: tests are run
 /// with `WORKING_DIRECTORY = tests/`, so `fixtures/mapper_nrom.nes`
 /// resolves to `tests/fixtures/mapper_nrom.nes`.
-fn resolve_rom_path(workdir: &Path, rel: &str) -> PathBuf {
-    let p = Path::new(rel);
-    if p.is_absolute() {
-        p.to_path_buf()
-    } else {
-        workdir.join(p)
-    }
-}
+///
+/// Re-exported from [`crate::runner::test_helpers`].
+pub use crate::runner::test_helpers::resolve_rom_path;
 
 /// Trait implemented by anything that can produce the per-frame
 /// visible XBuf region. The production `Fceux11DirectAdapter`

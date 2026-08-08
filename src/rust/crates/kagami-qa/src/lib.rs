@@ -245,6 +245,118 @@ pub mod savestate_regression_entry {
 }
 
 // =========================================================================
+// Task 1 (mapper migration): C-callable entry point for the mapper
+// byte-diff harness — re-implements `tests/core/mapper_byte_diff_test.cpp`.
+//
+// Loads `fixtures/golden_mapper/<name>.bin` for each of the 175 mapper
+// test cases, drives the 175-case table (fresh engine per ROM, N frames
+// each, capture `Cart::save_mapper_state()`), compares body bytes against
+// the golden, prints the summary, and returns 0 iff no case failed
+// (SKIP — missing golden / empty body on both sides — is allowed, exactly
+// like the C++ harness).
+// =========================================================================
+#[cfg(feature = "direct-adapter")]
+pub mod mapper_byte_diff_entry {
+    use std::io::Write;
+    use std::path::{Path, PathBuf};
+
+    use crate::adapter::direct::Fceux11DirectAdapter;
+    use crate::runner::mapper_byte_diff::{
+        format_summary, regression_exit_code, run_regression, MapperStateSource,
+    };
+
+    /// C-ABI entry point replacing `tests/core/mapper_byte_diff_test.cpp:main()`.
+    pub unsafe extern "C" fn kagami_qa_mapper_byte_diff_main(
+        _argc: i32,
+        _argv: *const *const std::os::raw::c_char,
+    ) -> i32 {
+        // WORKING_DIRECTORY is `tests/` (mirrors CMake CTest entry).
+        let workdir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let golden_dir = workdir.join("fixtures/golden_mapper");
+
+        let mut adapter = Fceux11DirectAdapter::new();
+        let outcome = run_regression(&mut adapter, &workdir, &golden_dir);
+        let summary = format_summary(&outcome);
+        let _ = write!(std::io::stdout(), "{}", summary);
+        regression_exit_code(&outcome)
+    }
+
+    // Suppress unused-import warnings when only the harness entry is
+    // referenced (the MapperStateSource trait is invoked via
+    // Fceux11DirectAdapter at runtime through the impl below).
+    const _: fn(&Fceux11DirectAdapter) -> Result<Vec<u8>, crate::core::QaError> =
+        |a| <Fceux11DirectAdapter as MapperStateSource>::snapshot_mapper_state(a);
+
+    // Reference Path to keep the std::path import active even when
+    // the harness entry is the only consumer of this module.
+    const _: fn(&Path) -> () = |_| ();
+}
+
+// =========================================================================
+// Task 1 (lua): C-callable entry point for the headless Lua script
+// runner — re-implements `tests/lua_runner.cpp`.
+//
+// Parses `<script_path> [--rom <path>] [--frames N]`, runs the script
+// inside the fceux11-lua engine with C-level stdout/stderr capture,
+// scans the captured output for assertion-failure markers, prints the
+// `LUA_RESULT:` line, and returns 0 (PASS) or 1 (FAIL).
+// =========================================================================
+#[cfg(feature = "direct-adapter")]
+pub mod lua_entry {
+    use std::io::Write;
+
+    use crate::runner::lua::{exit_code, format_result, parse_cli_args, run_lua_script};
+
+    /// C-ABI entry point replacing `tests/lua_runner.cpp:main()`.
+    pub unsafe extern "C" fn kagami_qa_lua_main(
+        argc: i32,
+        argv: *const *const std::os::raw::c_char,
+    ) -> i32 {
+        let mut args: Vec<String> = Vec::new();
+        for i in 0..argc {
+            let ptr = unsafe { *argv.offset(i as isize) };
+            if ptr.is_null() {
+                break;
+            }
+            // SAFETY: ptr points to a null-terminated C string (the
+            // C-ABI contract for argv).
+            let arg = match unsafe { std::ffi::CStr::from_ptr(ptr) }.to_str() {
+                Ok(s) => s.to_string(),
+                Err(_) => String::from("<invalid-utf8>"),
+            };
+            args.push(arg);
+        }
+
+        let cli = match parse_cli_args(&args[1..]) {
+            Ok(c) => c,
+            Err(e) => {
+                let _ = writeln!(
+                    std::io::stdout(),
+                    "LUA_RESULT: script=<invalid> status=FAIL details={}",
+                    e
+                );
+                return 1;
+            }
+        };
+
+        let script_path = match cli.script_path {
+            Some(s) => s,
+            None => {
+                let _ = writeln!(
+                    std::io::stdout(),
+                    "Usage: kagami_qa_lua_runner <script_path> [--rom <path>] [--frames N]"
+                );
+                return 1;
+            }
+        };
+
+        let outcome = run_lua_script(&script_path, cli.rom_path.as_deref(), cli.max_frames);
+        let _ = write!(std::io::stdout(), "{}", format_result(&outcome));
+        exit_code(&outcome)
+    }
+}
+
+// =========================================================================
 // P5: C-callable entry point for kagami_qa_direct_runner (CMake target).
 //
 // Called from tests/kagami_direct_main.cpp when the direct runner is built
