@@ -52,3 +52,33 @@ pub unsafe extern "C" fn kagami_qa_blargg_main(
     // SAFETY: argv is constructed by the C caller per the C-ABI contract.
     unsafe { kagami_qa::blargg_entry::kagami_qa_blargg_main(argc, argv) }
 }
+
+// =========================================================================
+// Task 1 / C-2 — re-export of kagami_qa_rom_regression_main.
+//
+// Replaces tests/rom_regression_test.cpp once parity is verified.
+// =========================================================================
+#[cfg(feature = "direct-adapter")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn kagami_qa_rom_regression_main(
+    argc: i32,
+    argv: *const *const std::os::raw::c_char,
+) -> i32 {
+    // SAFETY: argv is constructed by the C caller per the C-ABI contract.
+    unsafe { kagami_qa::rom_regression_entry::kagami_qa_rom_regression_main(argc, argv) }
+}
+
+// =========================================================================
+// Task 1 / C-3 — re-export of kagami_qa_savestate_regression_main.
+//
+// Replaces tests/savestate_regression_test.cpp once parity is verified.
+// =========================================================================
+#[cfg(feature = "direct-adapter")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn kagami_qa_savestate_regression_main(
+    argc: i32,
+    argv: *const *const std::os::raw::c_char,
+) -> i32 {
+    // SAFETY: argv is constructed by the C caller per the C-ABI contract.
+    unsafe { kagami_qa::savestate_regression_entry::kagami_qa_savestate_regression_main(argc, argv) }
+}

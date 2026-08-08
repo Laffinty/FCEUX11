@@ -697,5 +697,59 @@ if(FCEUX11_BUILD_TESTS)
             set_tests_properties(blargg_rust_smoke PROPERTIES ENVIRONMENT_MODIFICATION
                     "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
         endif()
+
+        # =====================================================================
+        # Task 1 / C-2 — Rust ROM regression harness (replaces
+        # rom_regression_test.cpp). Same link pattern as blargg_rust_runner.
+        # =====================================================================
+        fceux11_add_headless_test_executable(kagami_qa_rom_regression_runner
+            kagami/rom_regression_rust_main.cpp
+            git_info_stub.cpp
+        )
+        target_include_directories(kagami_qa_rom_regression_runner PRIVATE
+            ${CMAKE_SOURCE_DIR}/tests/kagami/core
+        )
+        target_link_libraries(kagami_qa_rom_regression_runner PRIVATE
+            userenv
+            ws2_32
+            dbghelp
+        )
+        target_compile_definitions(kagami_qa_rom_regression_runner PRIVATE
+            __HEADLESS_DRIVER__
+        )
+        add_test(NAME rom_regression_rust_smoke
+                 COMMAND kagami_qa_rom_regression_runner
+                 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+        if(WIN32)
+            set_tests_properties(rom_regression_rust_smoke PROPERTIES ENVIRONMENT_MODIFICATION
+                    "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+        endif()
+
+        # =====================================================================
+        # Task 1 / C-3 — Rust savestate regression harness (replaces
+        # savestate_regression_test.cpp). Same link pattern.
+        # =====================================================================
+        fceux11_add_headless_test_executable(kagami_qa_savestate_regression_runner
+            kagami/savestate_regression_rust_main.cpp
+            git_info_stub.cpp
+        )
+        target_include_directories(kagami_qa_savestate_regression_runner PRIVATE
+            ${CMAKE_SOURCE_DIR}/tests/kagami/core
+        )
+        target_link_libraries(kagami_qa_savestate_regression_runner PRIVATE
+            userenv
+            ws2_32
+            dbghelp
+        )
+        target_compile_definitions(kagami_qa_savestate_regression_runner PRIVATE
+            __HEADLESS_DRIVER__
+        )
+        add_test(NAME savestate_regression_rust_smoke
+                 COMMAND kagami_qa_savestate_regression_runner
+                 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+        if(WIN32)
+            set_tests_properties(savestate_regression_rust_smoke PROPERTIES ENVIRONMENT_MODIFICATION
+                    "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+        endif()
     endif()
 endif()

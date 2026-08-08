@@ -25,6 +25,7 @@ unsafe extern "C" {
     fn kagami_bridge_read_byte(addr: u16) -> u8;
     fn kagami_bridge_read_ppu(addr: u16) -> u8;
     fn kagami_bridge_reset() -> i32;
+    fn kagami_bridge_full_reset() -> i32;
     fn kagami_bridge_kill();
     fn kagami_bridge_set_newppu(on: i32);
     /// Copy the visible 256x240 XBuf region (61440 bytes) into the
@@ -50,6 +51,11 @@ unsafe extern "C" {
 pub struct Fceux11DirectAdapter {
     initialized: bool,
     rom_loaded: bool,
+    /// PPU implementation to use. C++ blargg_runner sets newppu=1; C++
+    /// rom_regression_test and savestate_regression_test do NOT (they use
+    /// the legacy PPU). Default false to match the C-2/C-3 goldens; the
+    /// blargg harness opts into newppu explicitly.
+    use_newppu: bool,
 }
 
 impl Fceux11DirectAdapter {
@@ -57,7 +63,29 @@ impl Fceux11DirectAdapter {
         Self {
             initialized: false,
             rom_loaded: false,
+            use_newppu: false,
         }
+    }
+
+    /// Opt into the new PPU (C++ blargg_runner parity: newppu=1).
+    pub fn with_newppu(mut self) -> Self {
+        self.use_newppu = true;
+        self
+    }
+
+    /// Full teardown + re-init (no ROM loaded afterwards). Mirrors the C++
+    /// savestate harness's per-ROM Initialize/Kill cycle; used by the C-3
+    /// harness between ROMs so each one starts from a pristine engine.
+    pub fn full_reset(&mut self) -> Result<(), QaError> {
+        let rc = unsafe { kagami_bridge_full_reset() };
+        if rc != 0 {
+            return Err(QaError::unsupported(format!(
+                "kagami_bridge_full_reset failed: rc={}", rc
+            )));
+        }
+        self.initialized = true; // bridge re-initialised
+        self.rom_loaded = false;
+        Ok(())
     }
 }
 
@@ -100,8 +128,9 @@ impl SutAdapter for Fceux11DirectAdapter {
                     "kagami_bridge_init failed: rc={}", rc
                 )));
             }
-            // Enable new PPU by default for accuracy tests.
-            unsafe { kagami_bridge_set_newppu(1); }
+            // PPU implementation matches the C++ harness that produced the
+            // golden baseline (blargg → new PPU; regression/savestate → legacy).
+            unsafe { kagami_bridge_set_newppu(if self.use_newppu { 1 } else { 0 }); }
             self.initialized = true;
         }
 

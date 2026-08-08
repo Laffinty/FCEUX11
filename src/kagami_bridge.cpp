@@ -149,6 +149,25 @@ int kagami_bridge_reset(void) {
 }
 
 // ---------------------------------------------------------------------------
+// Full teardown + re-init (mirrors C++ savestate_regression_test.cpp:
+// each computeSavestateHash() does a fresh fceu11::Initialize()/Kill()
+// cycle per ROM). Used by the C-3 savestate harness between ROMs so the
+// engine starts from the same pristine state the golden hashes were
+// generated with.
+// ---------------------------------------------------------------------------
+int kagami_bridge_full_reset(void) {
+    if (g_rom_loaded) {
+        fceu11::CloseGame();
+        g_rom_loaded = false;
+    }
+    if (g_initialised) {
+        fceu11::Kill();
+        g_initialised = false;
+    }
+    return kagami_bridge_init();
+}
+
+// ---------------------------------------------------------------------------
 // PPU mode
 // ---------------------------------------------------------------------------
 void kagami_bridge_set_newppu(int on) {

@@ -218,6 +218,14 @@ pub struct SavestateRegressionMismatch {
 /// Snapshot the emulator state into a freshly allocated byte buffer.
 pub trait StateSnapshot {
     fn snapshot_state(&self) -> Result<Vec<u8>, QaError>;
+
+    /// Optional per-ROM engine teardown+re-init. Default no-op (mock
+    /// adapters in unit tests). `Fceux11DirectAdapter` overrides this to
+    /// call `kagami_bridge_full_reset`, mirroring the C++ savestate
+    /// harness's per-ROM `Initialize`/`Kill` cycle.
+    fn reset_fresh(&mut self) -> Result<(), QaError> {
+        Ok(())
+    }
 }
 
 #[cfg(any(feature = "direct-adapter", not(test)))]
@@ -280,6 +288,18 @@ impl StateSnapshot for crate::adapter::direct::Fceux11DirectAdapter {
         unsafe { buf.set_len(written as usize) };
         Ok(buf)
     }
+
+    /// Full teardown + re-init between ROMs (C++ parity: the golden
+    /// hashes were generated with a fresh Initialize per ROM).
+    fn reset_fresh(&mut self) -> Result<(), QaError> {
+        let rc = unsafe { kagami_bridge_full_reset() };
+        if rc != 0 {
+            return Err(QaError::unsupported(format!(
+                "kagami_bridge_full_reset failed: rc={}", rc
+            )));
+        }
+        Ok(())
+    }
 }
 
 #[cfg(any(feature = "direct-adapter", not(test)))]
@@ -290,6 +310,7 @@ unsafe extern "C" {
         written_out: *mut u32,
         compression_level: i32,
     ) -> i32;
+    fn kagami_bridge_full_reset() -> i32;
 }
 
 // ---------------------------------------------------------------------------
@@ -382,6 +403,11 @@ fn resolve_rom_path(workdir: &Path, rel: &str) -> PathBuf {
 
 /// Run the full harness against the supplied `GoldenSavestateHashes`
 /// baseline.
+///
+/// Between ROMs the harness calls `reset_fresh()` (default no-op for mock
+/// adapters; `Fceux11DirectAdapter` overrides it to issue a full
+/// teardown+re-init, mirroring the C++ savestate harness's per-ROM
+/// `Initialize`/`Kill` cycle that the golden hashes were generated with).
 pub fn run_regression<A>(
     adapter: &mut A,
     golden: &GoldenSavestateHashes,
@@ -395,6 +421,11 @@ where
     let mut missing_baseline: Vec<String> = Vec::new();
 
     for case in savestate_regression_cases() {
+        // C++ parity: fresh engine per ROM (Initialize/Kill each iteration).
+        if adapter.reset_fresh().is_err() {
+            missing_baseline.push(case.name.clone());
+            continue;
+        }
         let _path = resolve_rom_path(workdir, &case.filename);
         let actual = match collect_savestate_hash(adapter, case, workdir) {
             Ok(h) => h,

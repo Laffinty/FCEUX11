@@ -87,7 +87,7 @@ pub mod blargg_entry {
             }
         };
 
-        let mut adapter = Fceux11DirectAdapter::new();
+        let mut adapter = Fceux11DirectAdapter::new().with_newppu();
         let (code, line) = run_single(&mut adapter, &rom_path, cli.frames, cli.reset_after);
         let _ = std::io::stdout().write_all(line.as_bytes());
         code
@@ -106,7 +106,7 @@ pub mod blargg_entry {
             return 1;
         }
 
-        let mut adapter = Fceux11DirectAdapter::new();
+        let mut adapter = Fceux11DirectAdapter::new().with_newppu();
         let mut out = std::io::stdout();
         let mut err = std::io::stderr();
         run_batch(&mut adapter, &manifest, &mut out, &mut err)
@@ -224,6 +224,10 @@ pub mod savestate_regression_entry {
 
         let mut adapter = Fceux11DirectAdapter::new();
         let outcome = run_regression(&mut adapter, &golden, &workdir);
+        // TEMP parity debug: per-ROM hashes for cross-check vs C++.
+        for (name, actual) in &outcome.collected {
+            eprintln!("  [rust-hash] {name}: {actual}");
+        }
         let summary = format_summary(&outcome);
         let _ = write!(std::io::stdout(), "{}", summary);
         regression_exit_code(&outcome)
@@ -328,7 +332,7 @@ pub mod direct_entry {
 
         // Task 4: drive the emulator through the shared execution core —
         // the same code path the CLI `--direct` mode uses.
-        let mut direct_adapter = Fceux11DirectAdapter::new();
+        let mut direct_adapter = Fceux11DirectAdapter::new().with_newppu();
         let results = run_direct_rom_tests(&mut direct_adapter, &manifest);
 
         let total = results.len();

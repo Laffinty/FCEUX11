@@ -37,6 +37,10 @@ uint8_t kagami_bridge_read_ppu(uint16_t addr);
 /// Reset the emulator to post-power-on state.
 int kagami_bridge_reset(void);
 
+/// Full teardown + re-init (Kill then Initialize), leaving no ROM loaded.
+/// Mirrors the C++ savestate harness's per-ROM Initialize/Kill cycle.
+int kagami_bridge_full_reset(void);
+
 /// Tear down the emulator and free resources.
 void kagami_bridge_kill(void);
 
