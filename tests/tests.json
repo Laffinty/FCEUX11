@@ -66,7 +66,7 @@
     "layer": "core",
     "input": {
       "working_dir": "tests",
-      "binary": "fceux11_rom_regression_test"
+      "binary": "kagami_qa_rom_regression_runner"
     },
     "expected": {
       "exit_code": 0
@@ -78,7 +78,7 @@
       "ppu"
     ],
     "failure_means": "blocking",
-    "provenance": "v0.2.15"
+    "provenance": "Task1-C2 rust migration, parity 9488773; Rust fixes C++ first-entry parser miss (nrom now verified, 13 ROMs)"
   },
   "savestate_regression_test": {
     "id": "savestate_regression_test",
@@ -87,7 +87,7 @@
     "layer": "core",
     "input": {
       "working_dir": "tests",
-      "binary": "fceux11_savestate_regression_test"
+      "binary": "kagami_qa_savestate_regression_runner"
     },
     "expected": {
       "exit_code": 0
@@ -98,7 +98,7 @@
       "savestate"
     ],
     "failure_means": "blocking",
-    "provenance": "v0.3.12.5"
+    "provenance": "Task1-C3 rust migration, parity 9488773 (12/12 MD5 identical)"
   },
   "expected_api_test": {
     "id": "expected_api_test",
@@ -368,7 +368,7 @@
     "layer": "core",
     "input": {
       "working_dir": "tests",
-      "binary": "fceux11_mapper_byte_diff_test"
+      "binary": "kagami_qa_mapper_byte_diff_runner"
     },
     "expected": {
       "exit_code": 0
@@ -379,7 +379,7 @@
       "mapper"
     ],
     "failure_means": "blocking",
-    "provenance": "v1.7"
+    "provenance": "Task1 mapper rust migration, parity 175-case identical (169 PASS / 6 SKIP / 0 FAIL)"
   },
   "fds_load_test": {
     "id": "fds_load_test",
@@ -613,7 +613,7 @@
   },
   "blargg_smoke": {
     "id": "blargg_smoke",
-    "description": "blargg runner smoke test using nestest.nes — verifies $6000 probe infrastructure",
+    "description": "blargg runner smoke test using nestest.nes 鈥?verifies $6000 probe infrastructure",
     "oracle_type": "B",
     "layer": "core",
     "input": {
@@ -642,7 +642,7 @@
   },
   "blargg_cpu_instrs": {
     "id": "blargg_cpu_instrs",
-    "description": "blargg CPU all instructions (instr_test-v5 all_instrs) — $6000 protocol",
+    "description": "blargg CPU all instructions (instr_test-v5 all_instrs) 鈥?$6000 protocol",
     "oracle_type": "B",
     "layer": "core",
     "input": {
@@ -671,7 +671,7 @@
   },
   "blargg_cpu_timing": {
     "id": "blargg_cpu_timing",
-    "description": "blargg CPU instruction timing test (cpu_timing_test6) — $6000 protocol",
+    "description": "blargg CPU instruction timing test (cpu_timing_test6) 鈥?$6000 protocol",
     "oracle_type": "B",
     "layer": "core",
     "input": {
@@ -701,7 +701,7 @@
   },
   "blargg_ppu_vbl_nmi": {
     "id": "blargg_ppu_vbl_nmi",
-    "description": "blargg PPU VBL NMI timing test — $6000 protocol [E-1 advisory, fresh survey 2026-07-30: 03/09 PASS, 02/05/06/07/08 FAIL 0x01 with diagnostic, 10 FAIL 0x03 'clock skipped too late'; per-ROM VBL/NMI edge-timing fix pending; see docs/FCEUX11-1.16_E-1-VBL调查记录.md]",
+    "description": "blargg PPU VBL NMI timing test 鈥?$6000 protocol [E-1 advisory, fresh survey 2026-07-30: 03/09 PASS, 02/05/06/07/08 FAIL 0x01 with diagnostic, 10 FAIL 0x03 'clock skipped too late'; per-ROM VBL/NMI edge-timing fix pending; see docs/FCEUX11-1.16_E-1-VBL璋冩煡璁板綍.md]",
     "oracle_type": "B",
     "layer": "core",
     "input": {
@@ -731,7 +731,7 @@
   },
   "blargg_suite": {
     "id": "blargg_suite",
-    "description": "blargg full test ROM suite ($6000 protocol) — Oracle B hardware consistency batch run",
+    "description": "blargg full test ROM suite ($6000 protocol) 鈥?Oracle B hardware consistency batch run",
     "oracle_type": "B",
     "layer": "core",
     "input": {
@@ -762,7 +762,7 @@
     "oracle_type": "A",
     "layer": "lua",
     "input": {
-      "binary": "fceux11_lua_runner",
+      "binary": "kagami_qa_lua_runner",
       "args": [
         "tests/lua_scripts/test_bit.lua"
       ],
@@ -779,7 +779,7 @@
       "bit"
     ],
     "failure_means": "blocking",
-    "provenance": "fceux11-lua"
+    "provenance": "fceux11-lua; Task1 lua rust migration (kagami_qa_lua_runner)"
   },
   "lua_emu_test": {
     "id": "lua_emu_test",
@@ -787,7 +787,7 @@
     "oracle_type": "A",
     "layer": "lua",
     "input": {
-      "binary": "fceux11_lua_runner",
+      "binary": "kagami_qa_lua_runner",
       "args": [
         "tests/lua_scripts/test_emu.lua",
         "--frames",
@@ -806,7 +806,7 @@
       "emu"
     ],
     "failure_means": "blocking",
-    "provenance": "fceux11-lua"
+    "provenance": "fceux11-lua; Task1 lua rust migration (kagami_qa_lua_runner)"
   },
   "lua_memory_test": {
     "id": "lua_memory_test",
@@ -814,7 +814,7 @@
     "oracle_type": "A",
     "layer": "lua",
     "input": {
-      "binary": "fceux11_lua_runner",
+      "binary": "kagami_qa_lua_runner",
       "args": [
         "tests/lua_scripts/test_memory.lua",
         "--rom",
@@ -835,7 +835,7 @@
       "memory"
     ],
     "failure_means": "blocking",
-    "provenance": "fceux11-lua | 2026-07-30 demoted to advisory: fceux11_lua_runner lacks full memory binding implementation; Lua-side libs work in standalone test, runner-side binding missing. Tracked as 'unimplemented-coverage' — not a regression, never passed. 2026-08-05 Phase 4.1: bindings verified complete; root cause of round-trip failure = runner initializes the CPU bus memory tables only when a ROM is loaded, so writebyte() was a no-op (BNull) without --rom. Fix: add --rom tests/fixtures/mapper_nrom.nes (git-tracked, available on CI). Re-enabled as blocking."
+    "provenance": "fceux11-lua | 2026-07-30 demoted to advisory; Task1 lua rust migration (kagami_qa_lua_runner): lacks full memory binding implementation; Lua-side libs work in standalone test, runner-side binding missing. Tracked as 'unimplemented-coverage' 鈥?not a regression, never passed. 2026-08-05 Phase 4.1: bindings verified complete; root cause of round-trip failure = runner initializes the CPU bus memory tables only when a ROM is loaded, so writebyte() was a no-op (BNull) without --rom. Fix: add --rom tests/fixtures/mapper_nrom.nes (git-tracked, available on CI). Re-enabled as blocking."
   },
   "lua_joypad_test": {
     "id": "lua_joypad_test",
@@ -843,7 +843,7 @@
     "oracle_type": "A",
     "layer": "lua",
     "input": {
-      "binary": "fceux11_lua_runner",
+      "binary": "kagami_qa_lua_runner",
       "args": [
         "tests/lua_scripts/test_joypad.lua",
         "--frames",
@@ -862,11 +862,11 @@
       "joypad"
     ],
     "failure_means": "blocking",
-    "provenance": "fceux11-lua | 2026-07-30 demoted to advisory: fceux11_lua_runner does not surface joypad.get/joypad.set to Lua state (mask1/mask2 override logic unimplemented in Rust bindings). 2026-08-05 Phase 4.1: bindings verified present; root cause of failure = joypad.get() returned a TABLE (bitmask_to_table) while the FCEUX-compatible contract (and the test script's first assertion) requires a NUMBER bitmask. Fixed in src/rust/crates/fceux11-lua/bindings/joypad.rs (return state as i32). Re-enabled as blocking."
+    "provenance": "fceux11-lua | 2026-07-30 demoted to advisory; Task1 lua rust migration (kagami_qa_lua_runner): does not surface joypad.get/joypad.set to Lua state (mask1/mask2 override logic unimplemented in Rust bindings). 2026-08-05 Phase 4.1: bindings verified present; root cause of failure = joypad.get() returned a TABLE (bitmask_to_table) while the FCEUX-compatible contract (and the test script's first assertion) requires a NUMBER bitmask. Fixed in src/rust/crates/fceux11-lua/bindings/joypad.rs (return state as i32). Re-enabled as blocking."
   },
   "blargg_mmc3_4_scanline_timing": {
     "id": "blargg_mmc3_4_scanline_timing",
-    "description": "blargg MMC3 scanline timing (mmc3_test_4) — bucket A representative (Phase 3 known limit, deep model family)",
+    "description": "blargg MMC3 scanline timing (mmc3_test_4) 鈥?bucket A representative (Phase 3 known limit, deep model family)",
     "oracle_type": "B",
     "layer": "core",
     "input": {
@@ -897,7 +897,7 @@
   },
   "blargg_mmc3_v2_4_scanline_timing": {
     "id": "blargg_mmc3_v2_4_scanline_timing",
-    "description": "blargg MMC3 v2 scanline timing (mmc3_test_v2_4) — bucket A representative v2 variant (Phase 3 known limit)",
+    "description": "blargg MMC3 v2 scanline timing (mmc3_test_v2_4) 鈥?bucket A representative v2 variant (Phase 3 known limit)",
     "oracle_type": "B",
     "layer": "core",
     "input": {
@@ -928,7 +928,7 @@
   },
   "blargg_cpu_int_2_nmi_brk": {
     "id": "blargg_cpu_int_2_nmi_brk",
-    "description": "blargg CPU NMI/BRK interaction timing (cpu_int_2) — bucket B representative (Phase 3 known limit)",
+    "description": "blargg CPU NMI/BRK interaction timing (cpu_int_2) 鈥?bucket B representative (Phase 3 known limit)",
     "oracle_type": "B",
     "layer": "core",
     "input": {
@@ -959,7 +959,7 @@
   },
   "blargg_instr_misc": {
     "id": "blargg_instr_misc",
-    "description": "blargg CPU instruction misc combined (instr_misc) — bucket B representative (Phase 3 known limit)",
+    "description": "blargg CPU instruction misc combined (instr_misc) 鈥?bucket B representative (Phase 3 known limit)",
     "oracle_type": "B",
     "layer": "core",
     "input": {
@@ -990,7 +990,7 @@
   },
   "blargg_oam_stress": {
     "id": "blargg_oam_stress",
-    "description": "blargg OAM stress (oam_stress) — bucket C representative (Phase 3 known limit, runppu-relevant)",
+    "description": "blargg OAM stress (oam_stress) 鈥?bucket C representative (Phase 3 known limit, runppu-relevant)",
     "oracle_type": "B",
     "layer": "core",
     "input": {
@@ -1022,7 +1022,7 @@
   },
   "blargg_vbl_05_nmi_timing": {
     "id": "blargg_vbl_05_nmi_timing",
-    "description": "blargg VBL NMI timing (vbl_05) — bucket C PASS monitor (Phase 1 vbl_05 PASS via 5581769)",
+    "description": "blargg VBL NMI timing (vbl_05) 鈥?bucket C PASS monitor (Phase 1 vbl_05 PASS via 5581769)",
     "oracle_type": "B",
     "layer": "core",
     "input": {
@@ -1054,7 +1054,7 @@
   },
   "blargg_ppu_read_buffer": {
     "id": "blargg_ppu_read_buffer",
-    "description": "blargg PPU $2007 read buffer delay (ppu_read_buffer) — bucket C PASS monitor (Phase 3 commit 863e9d7)",
+    "description": "blargg PPU $2007 read buffer delay (ppu_read_buffer) 鈥?bucket C PASS monitor (Phase 3 commit 863e9d7)",
     "oracle_type": "B",
     "layer": "core",
     "input": {
@@ -1085,7 +1085,7 @@
   },
   "blargg_sprdma_dmc_dma": {
     "id": "blargg_sprdma_dmc_dma",
-    "description": "blargg sprite DMA + DMC DMA interaction (sprdma_dmc_dma) — bucket D representative (Phase 3 known limit)",
+    "description": "blargg sprite DMA + DMC DMA interaction (sprdma_dmc_dma) 鈥?bucket D representative (Phase 3 known limit)",
     "oracle_type": "B",
     "layer": "core",
     "input": {

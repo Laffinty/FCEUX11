@@ -101,27 +101,12 @@ if(FCEUX11_BUILD_TESTS)
              COMMAND fceux11_mapper_reset_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-    # ROM regression test (v0.2.15 / v0.3.0)
-    fceux11_add_test_executable(fceux11_rom_regression_test
-        rom_regression_test.cpp
-        git_info_stub.cpp
-    )
-    add_test(NAME rom_regression_test
-             COMMAND fceux11_rom_regression_test
-             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-
-    # v0.3.12.5 — byte-level savestate consistency test.
-    # 12 ROMs × 60 frames ≈ 720 frames of emulation. On slow CI nodes this
-    # Phase 0: per-frame watchdog now aborts hangs early, so the CTest
-    # timeout can be tightened to 300s (5min) for fast CI failure.
-    fceux11_add_test_executable(fceux11_savestate_regression_test
-        savestate_regression_test.cpp
-        git_info_stub.cpp
-    )
-    add_test(NAME savestate_regression_test
-             COMMAND fceux11_savestate_regression_test
-             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-    set_tests_properties(savestate_regression_test PROPERTIES TIMEOUT 300)
+    # ROM regression test (v0.2.15 / v0.3.0) — migrated to Rust
+    # (kagami_qa_rom_regression_runner, Task 1 / C-2). The C++ harness
+    # rom_regression_test.cpp was deleted after Rust parity: 12 shared
+    # ROMs byte-identical, plus the Rust harness fixes the C++ parser's
+    # first-entry baseline miss (nrom was never verified in C++).
+    # CTest entry: rom_regression_rust_smoke (defined below).
 
     # v0.3.3 — tl::expected API tests
     fceux11_add_test_executable(fceux11_expected_api_test
@@ -263,18 +248,6 @@ if(FCEUX11_BUILD_TESTS)
     # v1.7 Cartograph §6.3 — mapper state byte-diff regression test.
     # Loads each ROM, runs N frames, captures Cart::save_mapper_state()
     # output, memcmp's against fixtures/golden_mapper/<rom>.bin.
-    # Phase A skeleton: all tests [SKIP] until Cart subclass PoCs land.
-    # Generate first golden with:
-    #   fceux11_mapper_byte_diff_test --generate
-    # (deferred to Phase E for NROM, Phase F for MMC1+MMC3).
-    fceux11_add_test_executable(fceux11_mapper_byte_diff_test
-        core/mapper_byte_diff_test.cpp
-        git_info_stub.cpp
-    )
-    add_test(NAME mapper_byte_diff_test
-             COMMAND fceux11_mapper_byte_diff_test
-             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-
     # v1.10 Cryptex Task 4 — FDS runtime + Bad ROM detection test
     fceux11_add_test_executable(fceux11_fds_load_test
         kagami/core/fds_load_test.cpp
@@ -454,13 +427,13 @@ if(FCEUX11_BUILD_TESTS)
 
         set_tests_properties(
             smoke_test mapper_load_test mapper_reset_test
-            rom_regression_test savestate_regression_test expected_api_test
+            expected_api_test
             enum_class_bitflags_test config_store_test
             core_state_test
             cpu_test ppu_test apu_test bus_test mapper_core_test
         savestate_core_test golden_savestate_test bench_tolerance_test
         ppu_frame_diff_test apu_wav_diff_test
-        cart_class_test mapper_byte_diff_test fds_load_test
+        cart_class_test fds_load_test
         driver_callbacks_test core_driver_boundary_test
         ppu_rendering_lut_test ppu_phase_c_test ppu_phase_d_test
         PROPERTIES ENVIRONMENT_MODIFICATION
@@ -590,15 +563,26 @@ if(FCEUX11_BUILD_TESTS)
     # C++ blargg_runner.cpp deleted after 177/177 parity verified (9488773).
 
     # KagamiQA P3 — Headless Lua script runner (null driver, no Qt).
-    fceux11_add_headless_test_executable(fceux11_lua_runner
-        lua_runner.cpp
+    # v1.17 Task1 (lua): migrated to Rust (kagami_qa_lua_runner);
+    # C++ lua_runner.cpp deleted after parity over the lua test scripts
+    # was verified.
+    fceux11_add_headless_test_executable(kagami_qa_lua_runner
+        kagami/lua_rust_main.cpp
         git_info_stub.cpp
     )
-    target_include_directories(fceux11_lua_runner PRIVATE
+    target_include_directories(kagami_qa_lua_runner PRIVATE
         ${CMAKE_SOURCE_DIR}/tests/kagami/core
     )
+    target_link_libraries(kagami_qa_lua_runner PRIVATE
+        userenv
+        ws2_32
+        dbghelp
+    )
+    target_compile_definitions(kagami_qa_lua_runner PRIVATE
+        __HEADLESS_DRIVER__
+    )
     add_test(NAME lua_bit_test_headless
-             COMMAND fceux11_lua_runner
+             COMMAND kagami_qa_lua_runner
              lua_scripts/test_bit.lua
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     if(WIN32)
@@ -749,6 +733,33 @@ if(FCEUX11_BUILD_TESTS)
                  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
         if(WIN32)
             set_tests_properties(savestate_regression_rust_smoke PROPERTIES ENVIRONMENT_MODIFICATION
+                    "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+        endif()
+
+        # =====================================================================
+        # Task 1 (mapper) — Rust mapper byte-diff harness (replaces
+        # core/mapper_byte_diff_test.cpp). Same link pattern.
+        # =====================================================================
+        fceux11_add_headless_test_executable(kagami_qa_mapper_byte_diff_runner
+            kagami/mapper_byte_diff_rust_main.cpp
+            git_info_stub.cpp
+        )
+        target_include_directories(kagami_qa_mapper_byte_diff_runner PRIVATE
+            ${CMAKE_SOURCE_DIR}/tests/kagami/core
+        )
+        target_link_libraries(kagami_qa_mapper_byte_diff_runner PRIVATE
+            userenv
+            ws2_32
+            dbghelp
+        )
+        target_compile_definitions(kagami_qa_mapper_byte_diff_runner PRIVATE
+            __HEADLESS_DRIVER__
+        )
+        add_test(NAME mapper_byte_diff_rust_smoke
+                 COMMAND kagami_qa_mapper_byte_diff_runner
+                 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+        if(WIN32)
+            set_tests_properties(mapper_byte_diff_rust_smoke PROPERTIES ENVIRONMENT_MODIFICATION
                     "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
         endif()
     endif()
