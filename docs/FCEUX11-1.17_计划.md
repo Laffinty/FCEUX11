@@ -392,3 +392,135 @@ Phase D  遗留收敛（任务 3，全程并行轨）
 ---
 
 *计划完 — 待评审签发后按 Phase A → B → C → D 执行*
+
+---
+
+## 十一、v1.17 主体施工后修订清单（2026-08-08 收口）
+
+> **本节性质**：v1.17 计划（2026-08-07 草案）经主体施工后，**计划文档与实态之间的偏差登记**。目的是为下次开工修订计划本体提供清单，不是改计划本身——计划本体下次开工时按本清单一次性更新（预估 2–3 小时纯文档工作，可作为下一个 PR 的开篇）。
+> **关联文档**：
+> - 实测核查：`docs/tech/R5R6_v1.17_核查结论.md`
+> - 落位清单：`docs/FCEUX11-1.17_Task2-落位清单.md`
+> - CHANGELOG v1.17 章节：`CHANGELOG.md`（Task 1 迁移 + Task 3 收敛）
+> - 决策产物：`docs/tech/Task1-C1/C2/C3_parity_report.md`、`docs/tech/Task1-TrackC-Final-Report.md`
+
+### 11.1 必改（机械性事实更新，6 处）
+
+| # | 计划原文 | 实态 | 修订动作 |
+|---|---|---|---|
+| 1 | 顶部 `状态：📋 计划（尚未施工）` / "待评审签发" | 主体已施工 | 改为 `✅ 主体已施工（2026-08-08）；冻结基线生效为后续收敛项` |
+| 2 | `日期：2026-08-07` | 已收口 | 改 `2026-08-07 草案 / 2026-08-08 主体施工` |
+| 3 | §〇「C 级（8 项 advisory）→ 靠拢 B 级」 | B 级机器化条件 = **冻结基线生效**（无新增已知限制） | 在 §〇或 §六补一句「B 级判定器依赖 `kagamiqa_baseline_frozen.*` 落地」 |
+| 4 | §一 基线快照 `cargo test 40/40 PASS` | 实测 **187/187** | 改 187 |
+| 5 | §一「Oracle B 全量 121 PASS / 56 FAIL」 | 实测 **144 / 33**（H-1/H-2 清零 23 项） | 改 144/33，并注明分类变化（0x80×12 + 0x81×6 全清，剩余 33 全深模型族）|
+| 6 | §九 整体完成判据 7 个 checkbox | 5/7 可勾选 | 勾掉可勾项，未勾项注明残留原因 |
+
+### 11.2 应改（实质性偏差，4 处）
+
+#### 11.2.1 §四.4 R6 收口路径——重大偏差
+
+**计划原文**（§四.4）规划了 Step 0 instrument-first → **Priority 1**（缺陷 1：帧计数器相位，改 `sound.cpp:448` 帧 IRQ 置位条件 / `Write_IRQFM` 预增逻辑）→ **Priority 2**（缺陷 2：`sound.cpp:991-992` 无条件清改为条件化）→ **Priority 3** FIXME 单独标注。
+
+**实际**：R6 **没有动 `sound.cpp` 一行代码**——H-1（`reset_after` 字段）+ H-2（0x80 帧预算校准）就把 7 项 bucket-C 全转 PASS（参见 `R5R6_v1.17_核查结论.md` §3 与 `docs/history/surveys/e6_apu/` 历次调查）。这印证了 bucket-C 失败的根因 = **reset 语义而非相位量化**。
+
+**修订动作**：§四.4 重写为「R6 收敛路径」专题小节，事实记录"harness 修复搞定、无 sound.cpp 改动"，并把原 Priority 1/2/3 处方降级为附录「若 H-1/H-2 未清零则启用」。
+
+#### 11.2.2 §四.3 R5 收口——处方实际由 v1.16 执行完毕
+
+**计划 §4.3 的 Step 0–4**（vbl_05 路径选型、vbl_02_set_time、vbl_06/07/08、vbl_10）——这 4 步的全部尝试、回滚与证伪在 **v1.16 已完成**（证据：`docs/history/surveys/e1_vbl/` 全套调查），v1.17 只是「核查+记录」。`R5R6_v1.17_核查结论.md` §5 表格已罗列对照。
+
+**修订动作**：§四.3 顶部加一句「本节处方 1–4 已由 v1.16 完成（见 `docs/history/surveys/e1_vbl/`），v1.17 仅做实测核查与文档收口」，避免下次有人重复走路径 a/b/c 的证伪循环。
+
+#### 11.2.3 §二.6 时序约束已失效
+
+**计划 §2.6**：「任务 3 的 R5/R6 精度修复先落地（或同步协调 golden 重抓），再迁移这两个测试」
+
+**实际**：R5/R6 已通过已知限制路径收口，**未触发 golden 重抓**；`apu_wav_diff_test` / `ppu_frame_diff_test` 因 §二.6 仍在 `tests/core/` 未迁 Rust。
+
+**修订动作**：把 §二.6 改写为「保留约束『**R5/R6 真实精度回归若发生，需在 ppu_frame_diff 与 apu_wav_diff 迁移前完成 golden 重抓**』」——目前的 `else` 分支（已知限制收口）下，迁移前置条件 = **golden 校验脚本（`tests/fixtures/golden_hashes_audit.json`）追加 R5/R6 diff 行**，不必等真实修复。
+
+#### 11.2.4 §七 执行序与里程碑——实际为并行 3 轨
+
+**计划 §七**描述 Phase A → B → C → D 顺序推进。
+
+**实际**（git log 印证）：
+- **Track A**：`task 2 落位 + H-1 reset_after 全字段 + H-2 verifier`（3 commits，`4b105f6`）
+- **Track B**：`R5/R6 instrument-first probes + docs`（13 commits，`6fa0600`）
+- **Track C**：`Task 1 Rust harness（blargg / rom_regression / savestate_regression）+ FFI + 71 单测`（5 commits，`571cac7`）
+
+三轨并行 + 后续合并（`3286a68`、`0b304e8`）+ 开关切换（`17d2389`、`be02df4`、`0ec4654`）+ docs 收口（`4c7aec4`）。
+
+**修订动作**：§七 加一个 §七.bis「实际执行回溯（Track A/B/C 并行）」，以 commit hash 为锚点列三条轨道与各自的覆盖任务，证明 §八"任务 3 与任务 1/4 零代码耦合、可并行"的论断成立；这对未来 v1.18 排期有指导价值。
+
+### 11.3 不改也不会出错的项（建议保持原状，仅观察）
+
+- §十 非目标 6 项：核心 Rust 化、runppu 切换、R7、通用化、C++ 语言测试退役、追求 A 级——**全部维持原状**
+- §五.3 step 5 Stage-3 冻结规则：守住（`SutAdapter` 未加方法、`TestInput` 领域字段未增）
+- §六.1 A–E 五级定义 + E 级判定源（`smoke_test` / `headless_smoke_test`）：**保持原状**，判定器实现正确
+- §八 风险登记的"如发生"措辞：可保留，无需改写为"已发生"
+
+---
+
+## 十二、实际执行回溯（Track A/B/C 并行）
+
+> 印证 §八"任务 3 与任务 1/4 零代码耦合、可并行推进"假设。三轨各自归属 5–13 commits，全部在 `wip_v1.17` 上落地后合并，最终 docs commit `4c7aec4` 收口。
+
+| 轨道 | 范围 | 关键 commit | 落地状态 |
+|------|------|-------------|----------|
+| **Track A**（任务 2 + H-1/H-2 harness） | `tests/kagami/` 落位 + manifest 登记核对 + `reset_after` 全字段 + 0x80 帧预算校准 | `4b105f6`（merge）→ `99f628d`（merge-fix）→ `3286a68`（duplicate test_helpers.h） | H-1/H-2 ✓（Oracle B 56→33 FAIL） |
+| **Track B**（任务 3 R5/R6 instrument-first） | E-1 PPU VBL 探针 7 提交 + E-3 APU 探针 6 提交 + 数据报告 + 核查结论 | `6fa0600`（merge）→ `f81cdc4`…`5fb111a`（e3/e1 probes）→ `3d60357`、`32fc76d`（数据报告）→ `4c7aec4`（核查结论） | R5 5 项 → 已知限制；R6 7 项 → PASS（不动 sound.cpp）|
+| **Track C**（任务 1 Rust harness） | blargg（C1）+ rom_regression（C2）+ savestate_regression（C3）+ mapper_byte_diff + lua + FFI + 71 单测 | `571cac7`（merge）→ `223d503`、`19266e2`（C2/C3 parity）→ `08797ac`（final report）→ `d634e54`、`d162e0e`、`0ec4654`（开关切换）| blargg / lua / rom_regression / savestate_regression / mapper_byte_diff 全迁完；`apu_wav_diff` / `ppu_frame_diff` 按 §二.6 暂留 |
+
+**总 commit 数**：约 30+ commits（不计探针 13 个 e1/e3 子 commit），三轨并行窗口约 2026-08-04 → 2026-08-08。
+
+---
+
+## 十三、v1.17+ 收敛路线图（roadmap，留待下次开工）
+
+### 13.1 冻结基线生效（B 级判定器前置，半天工时）
+
+**目标**：从当前 `build/kagamiqa_migration_matrix.json` 派生 `kagamiqa_baseline_frozen.json`，标记 33 项已知限制为冻结集。
+
+**步骤**：
+1. 抽取当前 matrix 的 33 项已知限制 → `kagamiqa_baseline_frozen.json`（同 schema）
+2. CI 工作流 `--baseline` 改指向 frozen 版本而非上一轮 baseline
+3. 验收：`compute_grade` 在冻结集下输出 **B 级**（无新增 advisory FAIL）
+
+### 13.2 Task 1 收尾（半天工时）
+
+- `tests/kagami_direct_main.cpp` 删除（verify 入口已迁 Rust CLI）
+- `tests/fixtures/golden/golden_savestate_test.cpp` 移入 `tests/kagami/`（§3.4 决策 #② 补执行）
+- `tests/core/apu_wav_diff_test.cpp` / `ppu_frame_diff_test.cpp` 迁 Rust（按 §二.6 修订后路径，需先扩 `tests/fixtures/golden_hashes_audit.json`）
+- 验收：47/47 全由 `kagami-qa-runner` 单一调度，`tests/core/` 目录清零
+
+### 13.3 CI 闭环补完（小时级）
+
+- 工作流 `.github/workflows/kagami-qa.yml` 的「KagamiQA — Migration Matrix」步骤加 `--pdf-report build/kagamiqa_quality_report.pdf` 钩
+- PDF 报告纳入 `kagamiqa-results` artifact（保留 30 天，与 matrix 同保留期）
+
+### 13.4 代码清扫（可选，小时级）
+
+- `report/pdf.rs` 内 `stroke` / `rect_stroke` 两个未用方法（dead code 警告）
+- 跨模块遗留警告：`runner/lua.rs` 的 `unsafe_op_in_unsafe_fn`（Rust 2024 警告）+ `runner/blargg.rs` 的 `truncate` / `HashMap` import + `runner/mapper_byte_diff.rs`、`runner/rom_regression.rs`、`runner/savestate_regression.rs` 未用 `PathBuf` / `Duration` import
+- 根目录 `blargg_matrix.json` UTF-16 临时文件（PowerShell 重定向产物，runner 自己写用 UTF-8）
+
+### 13.5 当前 WIP 提交
+
+- `src/rust/crates/kagami-qa/src/report/pdf.rs`（新）
+- `src/rust/crates/kagami-qa/src/cli/args.rs`（`--pdf-report` 标志）
+- `src/rust/crates/kagami-qa/src/cli/run_report.rs`（PDF 写入逻辑）
+- `src/rust/crates/kagami-qa/src/report/mod.rs`（`pub mod pdf;`）
+
+---
+
+## 十四、超出原计划项（v1.17 实施中追加）
+
+| 项 | 出处 | 备注 |
+|---|---|---|
+| `report/pdf.rs` 一页 PDF 报告 | 任务 5.3 报告能力延伸（实施中追加） | 零外部依赖、7,264 B、含 grade letter + stat cards + oracle split + fail table + footer；`cli/args.rs` 新增 `--pdf-report <path>` 标志；`cli/run_report.rs` 写入逻辑 |
+| CHANGELOG v1.17 章节 | v1.17 收口产物（`4c7aec4`） | 覆盖 Task 1 迁移 + Task 3 收敛，影响 §一表与 §六.3 |
+| 三轨并行 Track A/B/C | v1.17 实际执行方式 | 印证 §八"任务 3 与 1/4 零耦合"假设 |
+
+---
+
+*计划 + 施工收口附录完。下次开工第一件事：按 §十一清单 2–3 小时修订计划本体，并启动 §十三.1 冻结基线生效工作。*

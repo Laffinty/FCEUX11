@@ -21,6 +21,9 @@ pub struct Args {
     pub save_baseline_path: Option<PathBuf>,
     pub filter_expr: Option<String>,
     pub direct: bool,
+    /// Optional one-page PDF quality report output path (Task 1.17
+    /// add-on: `report/pdf.rs`).
+    pub pdf_report_path: Option<PathBuf>,
 }
 
 impl Args {
@@ -39,6 +42,7 @@ impl Args {
         let mut save_baseline_path: Option<PathBuf> = None;
         let mut filter_expr: Option<String> = None;
         let mut direct = false;
+        let mut pdf_report_path: Option<PathBuf> = None;
 
         let mut iter = args.into_iter();
         while let Some(arg) = iter.next() {
@@ -75,6 +79,9 @@ impl Args {
                 "--direct" => {
                     direct = true;
                 }
+                "--pdf-report" => {
+                    pdf_report_path = Some(PathBuf::from(next_value(&mut iter, "--pdf-report")?));
+                }
                 other => {
                     return Err(format!("Unknown flag: {}", other));
                 }
@@ -92,6 +99,7 @@ impl Args {
             save_baseline_path,
             filter_expr,
             direct,
+            pdf_report_path,
         })
     }
 }
@@ -165,6 +173,12 @@ mod tests {
     fn filter_flag_parses() {
         let a = parse(&["--filter", "tag=blargg"]);
         assert_eq!(a.filter_expr.as_deref(), Some("tag=blargg"));
+    }
+
+    #[test]
+    fn pdf_report_flag_parses() {
+        let a = parse(&["--pdf-report", "build/report.pdf"]);
+        assert_eq!(a.pdf_report_path, Some(PathBuf::from("build/report.pdf")));
     }
 
     #[test]

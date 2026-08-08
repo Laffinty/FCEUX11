@@ -80,6 +80,15 @@ pub fn generate(input: ReportInput) -> Result<i32, Box<dyn std::error::Error>> {
     eprintln!("Report written to: {}", args.output_path.display());
 
     // -------------------------------------------------------------------
+    // Optional one-page PDF quality report (Task 1.17 add-on).
+    // -------------------------------------------------------------------
+    if let Some(ref pdf_path) = args.pdf_report_path {
+        let pdf_bytes = crate::report::pdf::build_grade_report(&matrix);
+        std::fs::write(pdf_path, &pdf_bytes)?;
+        eprintln!("PDF quality report written to: {}", pdf_path.display());
+    }
+
+    // -------------------------------------------------------------------
     // Stdout summary.
     // -------------------------------------------------------------------
     println!("Total:   {}", matrix.summary.total);
