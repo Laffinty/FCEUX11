@@ -100,7 +100,7 @@ FCEUX11 内置一套名为 **KagamiQA** 的双 Oracle 自动化质量保障系�
 | **迁移矩阵** | 每次 CI run 产出 `kagamiqa_migration_matrix.json` 并作为 artifact 上传，追踪 PASS→FAIL 回归与 FAIL→PASS 进展 |
 | **基线漂移检测** | PASS→FAIL 自动在 PR 下评论红色警报，防止精度退化 |
 
-> **当前 CI 矩阵**（最近一次 `kagamiqa_migration_matrix.json`，run_id `20260808-045058-830d2c`，`engine.git_rev=c572294`，对应 main HEAD `d808c06`，2026-08-08）：47 项 **11 PASS / 36 FAIL（Grade D）**，其中 **25 项 Blocking**、**27 条未审批 PASS→FAIL 漂移**。CHANGELOG v1.17 所述「39P/8F / Grade C (acceptable)」为**发布时点快照**，与当前 main HEAD 矩阵存在落差。数字以 `docs/tech/KagamiQA.md` §0 与最近一次矩阵的 `engine.git_rev` 字段为 source of truth；重跑 `kagami-qa-runner --output` 后随 commit 一并刷新。
+> **当前 CI 矩阵**（GitHub CI 最新 artifact `kagamiqa-results.zip`，run_id `20260808-052758-5b7fd8`，`engine.git_rev=ffe80ac`，2026-08-08）：47 项 **39 PASS / 8 FAIL（Grade B）**，Oracle A 27P/0F、Oracle B 12P/8F，**0 条 PASS→FAIL 漂移**；8 个 FAIL 全部为 frozen baseline 内的 advisory 已知限制（blargg CPU/PPU/MMC3 深模型族）。数字以 `docs/tech/KagamiQA.md` §0 与最近一次 `kagamiqa_migration_matrix.json` 的 `engine.git_rev` 字段为 source of truth；重跑 `kagami-qa-runner --output` 后随 commit 一并刷新。
 
 **实现细节、原理、独立化运行、跨项目迁移**请参阅 [`docs/tech/KagamiQA.md`](docs/tech/KagamiQA.md)。
 
@@ -113,7 +113,7 @@ FCEUX11 ships **KagamiQA**, a dual-oracle automated quality assurance system tha
 | **Migration Matrix** | Every CI run produces `kagamiqa_migration_matrix.json` (uploaded as artifact), tracking PASS→FAIL regressions and FAIL→PASS progress |
 | **Baseline Drift Detection** | PASS→FAIL automatically posts a red alert PR comment, preventing accuracy decay |
 
-> **Current CI matrix** (most recent `kagamiqa_migration_matrix.json`, run_id `20260808-045058-830d2c`, `engine.git_rev=c572294`, main HEAD `d808c06`, 2026-08-08): 47 entries **11 PASS / 36 FAIL (Grade D)** — **25 blocking** failures, **27 unapproved PASS→FAIL drifts**. The v1.17 CHANGELOG's "39P/8F / Grade C (acceptable)" is a **release-time snapshot** and diverges from the current main HEAD matrix. `docs/tech/KagamiQA.md` §0 and the latest matrix's `engine.git_rev` field are the source of truth; re-run `kagami-qa-runner --output` and refresh in the same commit.
+> **Current CI matrix** (latest GitHub CI artifact `kagamiqa-results.zip`, run_id `20260808-052758-5b7fd8`, `engine.git_rev=ffe80ac`, 2026-08-08): 47 entries **39 PASS / 8 FAIL (Grade B)** — Oracle A 27P/0F, Oracle B 12P/8F, **0 PASS→FAIL drifts**; the 8 FAILs are all advisory known-limits within the frozen baseline (blargg CPU/PPU/MMC3 deep-model family). `docs/tech/KagamiQA.md` §0 and the latest matrix's `engine.git_rev` field are the source of truth; re-run `kagami-qa-runner --output` and refresh in the same commit.
 
 **For implementation details, principles, standalone operation, and cross-project migration**, see [`docs/tech/KagamiQA.md`](docs/tech/KagamiQA.md).
 
