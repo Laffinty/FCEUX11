@@ -140,8 +140,8 @@ unsafe fn capture_stream(stream_index: c_uint, path: &Path) -> Result<(), String
     let c_path = CString::new(path.to_string_lossy().as_bytes())
         .map_err(|_| "invalid capture path".to_string())?;
     let mode = c"w";
-    let stream = __acrt_iob_func(stream_index);
-    let rc = freopen(c_path.as_ptr(), mode.as_ptr(), stream);
+    let stream = unsafe { __acrt_iob_func(stream_index) };
+    let rc = unsafe { freopen(c_path.as_ptr(), mode.as_ptr(), stream) };
     if rc.is_null() {
         return Err(format!(
             "freopen('{}') failed",
@@ -160,8 +160,8 @@ unsafe fn restore_stream(stream_index: c_uint) {
     }
     let conout = c"CONOUT$";
     let mode = c"w";
-    let stream = __acrt_iob_func(stream_index);
-    let _ = freopen(conout.as_ptr(), mode.as_ptr(), stream);
+    let stream = unsafe { __acrt_iob_func(stream_index) };
+    let _ = unsafe { freopen(conout.as_ptr(), mode.as_ptr(), stream) };
 }
 
 /// Close a C stream handle (used to flush the capture files).
@@ -170,7 +170,7 @@ unsafe fn close_stream(stream_index: c_uint) {
         fn __acrt_iob_func(index: c_uint) -> *mut c_void;
         fn fclose(stream: *mut c_void) -> c_int;
     }
-    let _ = fclose(__acrt_iob_func(stream_index));
+    let _ = unsafe { fclose(__acrt_iob_func(stream_index)) };
 }
 
 /// C-string literal helper (Rust 1.77+ `c"..."`).

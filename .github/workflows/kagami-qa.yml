@@ -293,13 +293,24 @@ jobs:
             exit 1
           }
           Write-Host "Using runner: $runner"
+          # v1.17 §13.1: drive the runner with the frozen baseline so the
+          # release grade can reach B (release standard = every FAIL is a
+          # fail_to_fail against the frozen set). The frozen baseline
+          # snapshots the v1.17/v1.16 advisory known-limit surface — any
+          # new advisory FAIL would land in `new_test(FAIL)` and cap the
+          # grade at C, exactly the regression signal we want.
+          #
+          # Without `--baseline`, the runner conservatively caps grade at C
+          # regardless of failures (see report/grade.rs::compute_grade).
           & $runner `
             --manifest tests/tests.json `
             --bin-dir build/tests `
             --output build/kagamiqa_migration_matrix.json `
             --accuracy-table build/kagamiqa_accuracy_table.md `
             --known-fail tests/fixtures/blargg_known_fail.json `
-            --save-baseline build/kagamiqa_baseline_next.json
+            --baseline tests/fixtures/kagamiqa_baseline_frozen.json `
+            --save-baseline build/kagamiqa_baseline_next.json `
+            --pdf-report build/kagamiqa_quality_report.pdf
           $exitCode = $LASTEXITCODE
           Write-Host "KagamiQA runner exit code: $exitCode"
         shell: pwsh
@@ -318,6 +329,7 @@ jobs:
             build/kagamiqa_accuracy_table.md
             build/kagamiqa_baseline_next.json
             build/blargg_full_output.txt
+            build/kagamiqa_quality_report.pdf
           retention-days: 30
 
       # -----------------------------------------------------------------------

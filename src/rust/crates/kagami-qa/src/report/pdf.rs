@@ -86,19 +86,9 @@ impl Content {
         self.op(&format!("{:.3} {:.3} {:.3} rg", c.0, c.1, c.2));
     }
 
-    /// Set stroke colour + width.
-    fn stroke(&mut self, c: (f32, f32, f32), w: f32) {
-        self.op(&format!("{:.3} {:.3} {:.3} RG {:.2} w", c.0, c.1, c.2, w));
-    }
-
     /// Draw a filled rectangle.
     fn rect(&mut self, x: f32, y: f32, w: f32, h: f32) {
         self.op(&format!("{:.2} {:.2} {:.2} {:.2} re f", x, y, w, h));
-    }
-
-    /// Draw an outlined rectangle (current stroke settings).
-    fn rect_stroke(&mut self, x: f32, y: f32, w: f32, h: f32) {
-        self.op(&format!("{:.2} {:.2} {:.2} {:.2} re S", x, y, w, h));
     }
 
     /// Draw a horizontal hairline.

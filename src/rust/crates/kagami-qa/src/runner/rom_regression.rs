@@ -36,7 +36,7 @@
 //! given input.
 
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::adapter::trait_def::SutAdapter;
 use crate::core::QaError;
@@ -465,6 +465,7 @@ pub fn load_golden_hashes(path: &Path) -> Result<GoldenHashes, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
     use crate::adapter::trait_def::{InputSpec, SutAdapter, TestResult};
     use crate::core::{ErrorKind, QaConfig, QaError};
     use crate::manifest::schema::TestManifest;

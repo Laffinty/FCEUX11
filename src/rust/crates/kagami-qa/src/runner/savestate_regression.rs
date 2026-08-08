@@ -37,7 +37,7 @@
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use crate::adapter::trait_def::SutAdapter;
 use crate::core::QaError;
@@ -503,7 +503,7 @@ pub fn load_golden_savestate_hashes(path: &Path) -> Result<GoldenSavestateHashes
 mod tests {
     use super::*;
     use crate::adapter::trait_def::{InputSpec, SutAdapter, TestResult};
-    use crate::core::{ErrorKind, QaConfig, QaError};
+    use crate::core::{QaConfig, QaError};
     use crate::manifest::schema::TestManifest;
 
     /// Mock adapter that always succeeds at step/load and produces a

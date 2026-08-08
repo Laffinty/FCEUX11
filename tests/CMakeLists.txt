@@ -320,12 +320,19 @@ if(FCEUX11_BUILD_TESTS)
     # the goldens, run:
     #   fceux11_golden_savestate_test --generate
     # once, then commit the produced .fc0 files and updated index.
+    #
+    # v1.17 Task 2 决策 #② (2026-08-08): the source `cpp` moves into
+    # `tests/kagami/` (KagamiQA C++ asset集中落点) but the `.fc0` data
+    # + golden_index.json stay under fixtures/golden/ (data stays where
+    # other fixtures are; WORKING_DIRECTORY is still tests/, so the
+    # manifest paths keep resolving without rewriting).
     fceux11_add_test_executable(fceux11_golden_savestate_test
-        fixtures/golden/golden_savestate_test.cpp
+        kagami/golden_savestate_test.cpp
         git_info_stub.cpp
     )
-    # v1.2 Census: golden_savestate_test lives under fixtures/golden/, so it
-    # needs an extra include directory to reach kagami/core/test_helpers.h.
+    # v1.17: now that the source lives in tests/kagami/, test_helpers.h
+    # is reachable via the parent-include path wired in
+    # fceux11_add_test_executable — no explicit include needed.
     target_include_directories(fceux11_golden_savestate_test PRIVATE
         ${CMAKE_SOURCE_DIR}/tests/kagami/core
     )

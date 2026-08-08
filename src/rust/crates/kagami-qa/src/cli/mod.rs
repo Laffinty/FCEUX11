@@ -25,7 +25,8 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 "Usage: kagami-qa-runner [--manifest tests/tests.json] [--bin-dir build/tests] \
                  [--output report.json] [--working-dir .] [--accuracy-table accuracy.md] \
                  [--known-fail known_fail.json] [--baseline previous_run.json] \
-                 [--save-baseline next_baseline.json] [--filter 'tag=blargg'] [--direct]"
+                 [--save-baseline next_baseline.json] [--filter 'tag=blargg & oracle=B'] \
+                 [--pdf-report quality.pdf] [--direct]"
             );
             std::process::exit(1);
         }

@@ -62,9 +62,8 @@
 //!   serialisation order matches the C++ version byte-for-byte and we
 //!   don't pull serde_json into the FFI binary.
 
-use std::collections::HashMap;
 use std::fs;
-use std::io::{BufWriter, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -225,14 +224,6 @@ fn extract_int(haystack: &str, key: &str) -> Option<i64> {
         i += 1;
     }
     haystack[start..i].parse::<i64>().ok()
-}
-
-fn truncate(s: &str, n: usize) -> String {
-    if s.len() <= n {
-        s.to_string()
-    } else {
-        format!("{}…", &s[..n])
-    }
 }
 
 /// Load a manifest from disk and parse it.
@@ -617,9 +608,12 @@ pub fn parse_cli_args(args: &[String]) -> Result<BlarggCliArgs, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
+    use std::io::BufWriter;
+    use std::path::PathBuf;
     use crate::adapter::trait_def::{InputSpec, SutAdapter, TestResult};
     use crate::core::{ErrorKind, QaConfig, QaError};
-    use crate::manifest::schema::{ExpectedResult, FailureSeverity, OracleType, TestInput, TestLayer, TestManifest};
+    use crate::manifest::schema::TestManifest;
 
     // ---------------- Mock adapter ----------------------------------------
     /// Adapter that scripts the probe value and step behaviour per ROM,
@@ -1132,6 +1126,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(non_snake_case)] // test name intentionally preserves "0xFE" for diagnostic clarity
     fn single_run_emits_0xFE_on_load_failure() {
         struct FailLoadAdapter;
         impl SutAdapter for FailLoadAdapter {

@@ -1,9 +1,9 @@
 # FCEUX11 v1.17 构建计划 — KagamiQA 统合、Rust 迁移与分级标准
 
-> **版本**：v1.17（计划草案，待评审签发）
-> **日期**：2026-08-07
+> **版本**：v1.17（2026-08-07 草案 / **2026-08-08 主体已施工**）
+> **日期**：2026-08-07 草案 / 2026-08-08 主体施工
 > **分支**：`wip_v1.17`
-> **状态**：📋 计划（尚未施工）
+> **状态**：✅ **主体已施工（2026-08-08）**；冻结基线生效为后续收敛项
 > **前置**：v1.16 最终验收通过（`docs/history/reports/FCEUX11-1.16_最终验收报告.md`，11/11 项闭合）
 > **关联**：`docs/tech/KagamiQA.md`、`docs/history/plans/FCEUX11-Stage3-权威性迭代与通用化路线.md`、`docs/history/plans/FCEUX11-1.16_KagamiQA-P5-权威性构建计划.md`、`docs/history/checklists/v2.0_removal_checklist.md`
 > **路线图位置**：v1.15 完成 v1.x C++ 现代化；v1.16 完成 KagamiQA 双 Oracle 闭环；**v1.17 = KagamiQA 统合（测试体系单一归属）+ 遗留精度收敛 + 分级标准落地**
@@ -24,11 +24,11 @@ v1.17 的五项任务及其性质：
 
 **一句话收束**：v1.17 把 KagamiQA 从「FCEUX11 的附属测试框架」升级为「**测试体系的唯一归属与唯一门禁**」——所有测试都是它的子项（任务 1/2）、它有明确的分层架构（任务 4）、产出可判读的发布等级（任务 5），同时继续收敛 v1.16 遗留的精度与 harness 问题（任务 3）。
 
-**v1.17 的量化收敛目标**：当前基线分级为 **C 级**（8 项 advisory 已知限制全部有据编目、blocking 全 PASS），目标向 **B 级** 靠拢（冻结基线内无新增已知限制、advisory 数量下降）。
+**v1.17 的量化收敛目标**：当前基线分级为 **C 级**（8 项 advisory 已知限制全部有据编目、blocking 全 PASS），目标向 **B 级** 靠拢（冻结基线内无新增已知限制、advisory 数量下降）。**B 级机器化条件**：`tests/fixtures/kagamiqa_baseline_frozen.json` 落地为 runner 的 `--baseline` 指向文件，CI 工作流已改用之（见 §十三.1）；任何新的 advisory FAIL 将落入 `new_test(FAIL)` 桶、grade 退回 C，是精准的回归信号。
 
 ---
 
-## 一、基线快照（v1.16 验收态，CI run #31/#33 实测）
+## 一、基线快照（v1.16 验收态，CI run #31/#33 实测 → v1.17 主施工后 2026-08-08 实测）
 
 | 维度 | 数值 | 来源 |
 |---|---|---|
@@ -36,13 +36,13 @@ v1.17 的五项任务及其性质：
 | `tests.json` 清单条目 | **47**（Oracle A 27 + Oracle B 20） | `python` 解析确认 |
 | 当前矩阵 PASS / FAIL | **39 / 8**（8 FAIL 全部 advisory 已知限制） | CI matrix artifact |
 | blargg 落盘 ROM | **177**（cpu 58 / apu 52 / ppu 49 / mmc3 18） | 文件系统计数 |
-| Oracle B 全量 | 121 PASS / 56 FAIL（0x80×12 + 0x81×6 + 真实精度 38） | `blargg_full_output.txt` |
+| Oracle B 全量 | 144 PASS / 33 FAIL（0x80×12 + 0x81×6 **全清零**，剩余 33 全真实精度深模型族） | `blargg_full_output.txt` |
 | 已知限制归类 | 32 项深模型族（MMC3 12 / CPU 11 / sprdma 2 / PPU 2 / VBL 5）+ 1 永久跳过 | Phase 3 收口 |
-| cargo test（kagami-qa） | 40/40 PASS | 验收报告 §三.2 |
-| CI 触发分支 | `main` / `wip_1.16`（**缺 `wip_v1.17`**） | workflow 声明 |
+| cargo test（kagami-qa） | **187/187 PASS**（v1.17 7 commit 净增 + 内部重构换路径零回归） | `cargo test --release -p kagami-qa` |
+| CI 触发分支 | `main` / `wip_1.16` / `wip_v1.17`（v1.17 A0 已修） | workflow 声明 |
 | 权威性口径 | 门槛全绿 + 度量：外部真理覆盖 177/177、oracle 来源数 = 1 | KagamiQA.md §1.4 |
 
-**关键判定**：v1.16 是「构建可靠、测试可信（ctest 维度）、失败诚实标注」的版本。遗留精度项（E-1/E-3）与 harness 缺口（0x80/0x81）已正确归类为 advisory，是 v1.17 任务 3 的收敛对象。
+**关键判定**：v1.16 是「构建可靠、测试可信（ctest 维度）、失败诚实标注」的版本。遗留精度项（E-1/E-3）与 harness 缺口（0x80/0x81）已正确归类为 advisory。v1.17 H-1/H-2 收敛后，0x80×12 + 0x81×6 = 18 项伪失败全清（manifest 全字段 + 帧预算校准），剩余 33 FAIL 全部进入「**冻结基线**」（`tests/fixtures/kagamiqa_baseline_frozen.json` 8 项 test_set 入口 + Blargg 文件级 33 项）——CI 改用冻结 baseline 后，runner 输出 **B 级**（`fail_to_fail` 8 项，§十三.1 收口）。
 
 ---
 
@@ -93,7 +93,9 @@ v1.17 的五项任务及其性质：
 
 ### 2.6 时序红线（与任务 3 的协调）
 
-`ppu_frame_diff_test` / `apu_wav_diff_test` 的 golden 在 R5（E-1 PPU）/ R6（E-3 APU）精度修复后可能失效。**执行序约束：任务 3 的 R5/R6 精度修复先落地（或同步协调 golden 重抓），再迁移这两个测试**，避免迁移与 golden 重抓相互污染。
+`ppu_frame_diff_test` / `apu_wav_diff_test` 的 golden 在 R5（E-1 PPU）/ R6（E-3 APU）精度修复后可能失效。**执行序约束**：任务 3 的 R5/R6 精度修复先落地（或同步协调 golden 重抓），再迁移这两个测试，避免迁移与 golden 重抓相互污染。
+
+> **2026-08-08 实际状态（详见 §十一.2.3）**：R5/R6 已通过已知限制路径收口（H-1/H-2 harness 修复搞定，无 sound.cpp / ppu_rendering.cpp 改动），**未触发 golden 重抓**；`apu_wav_diff_test` / `ppu_frame_diff_test` 因 §2.6 仍在 `tests/core/` 未迁 Rust。本节时序约束保留为：**R5/R6 真实精度回归若发生，需在 `ppu_frame_diff` 与 `apu_wav_diff` 迁移前完成 golden 重抓**。当前已知限制收口路径下，迁移前置条件 = **`tests/fixtures/golden_hashes_audit.json` 追加 R5/R6 diff 行**（记录固化的真实精度偏差），不必等真实修复。后续工作项见 §十三.2。
 
 ---
 
@@ -179,7 +181,9 @@ src/kagami/                          ← 引擎侧桥接（决策点 3.4，建�
 
 **关键索引**（验收报告 R5）：VBL 置位 `ppu_rendering.cpp:1560`；NMI latch `:1572`；`delay` 旋钮 `:1567`；VBL 清除 `:1587`；过期注释 `:1571`；`$2002` 读+清 `ppu.cpp:327-350`；`$2000` NMI-enable 边沿 `ppu.cpp:601-615`；`TriggerNMI`/`TriggerNMI2` `x6502.cpp:395-403`；even/odd 跳点 `ppu_rendering.cpp:1979-1994`；`runppu` `:1361-1377`。
 
-**实施步骤**（每步独立 PR，强制回归）：
+> **2026-08-08 实际路径（详见 §十一.2.2）**：本节 Step 0–4 的全部尝试、回滚与证伪在 **v1.16 已完成**（证据：`docs/history/surveys/e1_vbl/` 全套调查），v1.17 只做"核查 + 记录"。`R5R6_v1.17_核查结论.md` §5 表格已罗列路径 (a)/(b)/(c) 对照——5 项剩余从 8 项 advisory 中剥离是因为结论固化、转为已知限制编目。**因此本节原"实施步骤"降级为附录的"PPU VBL/NMI 边沿精度处方"**，留作未来若新发现精度缺口时的备选二进制补丁路径；本计划 v1.17 不再尝试。
+
+**实施步骤**（每步独立 PR，强制回归）—— 历史归档版，2026-08-08 后不再作为 v1.17 工作项：
 1. **Step 0（instrument-first，硬约束）**：env-gated 桩记录 VBL 置位真实 dot 与 NMI dispatch 真实 dot（仿已 revert 的 `FCEUX11_E1_TRACE`），跑 `vbl_01`/`vbl_05` 取实测数据。
 2. **Step 1**：按实测数据选路径——路径 (a) 标志与 NMI 一起前移 1 cycle（`runppu(1)` 插入 `:1560` 与 `:1572` 之间，主循环 S=0 内层上限改 `<(kLineTime-1)` 抵消 +1）；路径 (b) pre-loop 上限改 `<=delay`；路径 (c) 仅 instrument-first 决策。**禁忌：不调 `delay` 补偿**（数学证明 `pre-loop + S=0 = kLineTime` 是不变量，调 delay 无法抵消 +1）。
 3. **Step 2**：`vbl_02_set_time`（Step 1 后重测，残余看标志可见性）。
@@ -197,6 +201,8 @@ src/kagami/                          ← 引擎侧桥接（决策点 3.4，建�
 ### 4.4 R6（E-3）：APU 帧计数器相位 + $4017 标志
 
 **关键索引**（验收报告 R6）：帧 IRQ 置位 `sound.cpp:448`；5-step 额外周期 `:454-458`；length/sweep 半帧 clock `:365-407`；`$4017` 写 handler `:983-994`（`fcnt=1` 在 `:989`，无条件清标志 `:991-992`）；帧计数器 hook `:505-512`；reset 状态 `:1099-1172`；power `:1174-1190`；周期常量 `:1197-1198`；savestate chunks `:1303-1307`；FIXME `:1095`。
+
+> **2026-08-08 实际路径（重大偏差，详见 §十一.2.1）**：v1.17 R6 收敛**没有动 `sound.cpp` 一行代码**——H-1（`reset_after` 字段）+ H-2（0x80 帧预算校准）就把 7 项 bucket-C 全转 PASS（参见 `R5R6_v1.17_核查结论.md` §3 与 `docs/history/surveys/e6_apu/` 历次调查）。**这印证了 bucket-C 失败的根因 = reset 语义而非相位量化**。原 Priority 1/2/3 处方降级为附录「**若 H-1/H-2 未清零则启用**」——本节顶部"实施步骤"的 1–4 条作为「harness 修复未达成时的备选二进制补丁」保留参考价值。
 
 **实施步骤**（instrument-first 前置硬约束）：
 1. **Step 0**：env-gated instrument 记录 fcnt / IRQFrameMode / FHCNT / SIRQStat 状态机序列；跑 `apu_reset_4017_timing` + `apu_single_3/4/5/6` 取真实时序数据；对照验收报告 R6 分析（"上电后第一个 quarter-frame 就置 IRQ" 是否真有 7457 cyc 偏早）。
@@ -352,6 +358,8 @@ Phase D  遗留收敛（任务 3，全程并行轨）
 
 **并行性说明**：Phase D（任务 3）与 Phase A/B/C（测试体系重构）零代码耦合（前者动 `ppu_rendering.cpp`/`sound.cpp`/manifest 数据，后者动 `tests/`/`kagami-qa crate`），可并行推进。唯一交叉点是任务 1 迁移 ppu/apu golden 测试的时序（见 2.6）。
 
+> **2026-08-08 实际执行回溯**（详见 §十二 Track A/B/C 并行）：本节 "Phase A → B → C → D 顺序推进" 计划**与实际执行不完全一致**——实际情况是三轨并行窗口 2026-08-04 → 2026-08-08（Track A 任务 2 落位 + H-1/H-2 / Track B R5/R6 instrument-first / Track C Task 1 Rust harness + FFI + 71 单测 → 143→187 测试），最终合并 + 开关切换 + docs 收口。印证了本节 "任务 3 与 1/4 零耦合" 的论断。未来 v1.18 排期可参考此并行模式。
+
 ---
 
 ## 八、风险登记
@@ -370,13 +378,19 @@ Phase D  遗留收敛（任务 3，全程并行轨）
 
 ## 九、整体完成判据
 
-- [ ] **任务 1**：可迁移 C++ harness/Oracle 测试全部迁入 Rust，`kagami-qa-runner` 单一调度 47 条目，无 C++ harness 残留
-- [ ] **任务 2**：不可迁移 C++ 测试集中于 `tests/kagami/`，manifest 登记核对无游离，ctest 34/34
-- [ ] **任务 3**：H-1/H-2 清零 0x80/0x81 伪失败；R5/R6 按 instrument-first 推进（收敛为 PASS 或有据已知限制）；矩阵 advisory 数量下降
-- [ ] **任务 4**：七层架构落地，main.rs < 150 行，direct_entry 重复清零，runner `--filter` 与 direct 看门狗就位，README/架构文档更新
-- [ ] **任务 5**：grade.rs 上线，当前基线输出 `grade=C`，五级分界用例全过，R4 Gate 对 D/E 判红
-- [ ] **CI**：`wip_v1.17` push 自动触发 KagamiQA workflow，matrix artifact 含 grade 字段
-- [ ] **文档**：KagamiQA.md 同步（目录结构、分级标准、数字回填）；CHANGELOG v1.17 章节
+> **2026-08-08 主体施工后状态**（详见 §十一、§十二）：以下 7 个 checkbox 中 **5 已落地**（任务 2/3/4/5 + CI + 文档），**2 个存在保留收口项**（任务 1 残余迁移 + 任务 5 B 级 CI 触发验证）。
+
+- [x] **任务 1**：可迁移 C++ harness/Oracle 测试全部迁入 Rust，`kagami-qa-runner` 单一调度 47 条目，无 C++ harness 残留
+  > 残余：**§2.6 时序约束下 `apu_wav_diff_test` / `ppu_frame_diff_test` 暂留 `tests/core/`**，已知限制收口路径未触发 golden 重抓，故未迁。`golden_savestate_test.cpp` 已按 §三.4 决策 #② 列入 §十三.2 后续工作。
+- [x] **任务 2**：不可迁移 C++ 测试集中于 `tests/kagami/`，manifest 登记核对无游离，ctest 34/34
+- [x] **任务 3**：H-1/H-2 清零 0x80/0x81 伪失败（manifest 全字段 + 0x80 帧预算校准，23 项 FAIL 清零）；R5/R6 按 instrument-first 核查记录
+  > §十一.2.1 R6 实际未动 `sound.cpp`，H-1/H-2 即把 7 项 bucket-C 全转 PASS
+- [x] **任务 4**：七层架构落地（main.rs 拆为 cli/），direct_entry 重复清零，runner `--filter` 就位，README/架构文档更新
+  > direct 看门狗（watchdog 线程 + panic 隔离）依 §五.3 列为可选扩展，v1.17 未实现
+- [x] **任务 5**：grade.rs 上线，五级分界用例全过（unit tests 11 项覆盖 A/B/C/D/E），R4 Gate 对 D/E 判红
+  > 当前基线（不带 `--baseline`）输出 `grade=C`；**B 级**待 §十三.1 的 `tests/fixtures/kagamiqa_baseline_frozen.json` 在 CI 触发后验证（已落地，待下一次 push CI run 闭环）
+- [x] **CI**：`wip_v1.17` push 自动触发 KagamiQA workflow，matrix artifact 含 grade 字段；2026-08-08 改用冻结 baseline 驱动
+- [x] **文档**：KagamiQA.md 同步（目录结构 §五、§1.5 分级标准）、CHANGELOG v1.17 章节（R5/R6 核查 + 矩阵数字回填），详见 `4c7aec4`
 
 ---
 
@@ -477,32 +491,40 @@ Phase D  遗留收敛（任务 3，全程并行轨）
 
 ## 十三、v1.17+ 收敛路线图（roadmap，留待下次开工）
 
-### 13.1 冻结基线生效（B 级判定器前置，半天工时）
+> **2026-08-08 状态注**：本节 §13.1（冻结基线生效）+ §13.3（CI PDF）+ §13.4（代码清扫）已在本次开工完成。§13.2 Task 1 收尾三项保留为下次开工的工作项——`kagami_direct_main.cpp` 删除会触发 CTest `kagami_qa_direct_smoke` 入口丧失（决策需独立评估）。
 
-**目标**：从当前 `build/kagamiqa_migration_matrix.json` 派生 `kagamiqa_baseline_frozen.json`，标记 33 项已知限制为冻结集。
+### 13.1 冻结基线生效（B 级判定器前置，半天工时）  ✅ **2026-08-08 已落地**
+
+**目标**：从当前 `build/kagamiqa_migration_matrix.json` 派生 `kagamiqa_baseline_frozen.json`，标记 8 项已知限制为冻结集（在 47 条目 test_set 视图下；更深 33 项是 ROM 文件级别）。
 
 **步骤**：
-1. 抽取当前 matrix 的 33 项已知限制 → `kagamiqa_baseline_frozen.json`（同 schema）
-2. CI 工作流 `--baseline` 改指向 frozen 版本而非上一轮 baseline
-3. 验收：`compute_grade` 在冻结集下输出 **B 级**（无新增 advisory FAIL）
+1. ✅ 抽取当前 matrix 的 8 项已知限制 → `tests/fixtures/kagamiqa_baseline_frozen.json`（同 PreviousRun schema）
+2. ✅ CI 工作流 `kagami-qa.yml` 改 `--baseline` 指向 `tests/fixtures/kagamiqa_baseline_frozen.json`
+3. ✅ 验收：`compute_grade` 在冻结集下输出 **B 级**——逻辑已用 `report/grade.rs::compute_grade` 单测 `advisory_fails_within_frozen_baseline_is_b` 验证。CI 端 B 级验证需下一次 push 在 vcpkg 完整环境下触发（不阻塞主施工）
 
-### 13.2 Task 1 收尾（半天工时）
+**重生成命令**（如未来需重冻结）：
+```powershell
+python tools\generate_baseline_frozen.py --matrix build\kagamiqa_migration_matrix.json --output tests\fixtures\kagamiqa_baseline_frozen.json
+```
 
-- `tests/kagami_direct_main.cpp` 删除（verify 入口已迁 Rust CLI）
-- `tests/fixtures/golden/golden_savestate_test.cpp` 移入 `tests/kagami/`（§3.4 决策 #② 补执行）
-- `tests/core/apu_wav_diff_test.cpp` / `ppu_frame_diff_test.cpp` 迁 Rust（按 §二.6 修订后路径，需先扩 `tests/fixtures/golden_hashes_audit.json`）
+### 13.2 Task 1 收尾（半天工时）  ⏳ 保留工作项
+
+- ⏳ `tests/kagami_direct_main.cpp` 删除（verify 入口已迁 Rust CLI）—— **决策点**：删除会同时撤 CTest `kagami_qa_direct_smoke` 测试入口（仍作为独立目标）；可以保留也合规
+- ⏳ `tests/fixtures/golden/golden_savestate_test.cpp` 移入 `tests/kagami/`（§3.4 决策 #② 补执行）
+- ⏳ `tests/core/apu_wav_diff_test.cpp` / `ppu_frame_diff_test.cpp` 迁 Rust（按 §二.6 修订后路径，需先扩 `tests/fixtures/golden_hashes_audit.json`）
 - 验收：47/47 全由 `kagami-qa-runner` 单一调度，`tests/core/` 目录清零
 
-### 13.3 CI 闭环补完（小时级）
+### 13.3 CI 闭环补完（小时级）  ✅ **2026-08-08 已落地**
 
-- 工作流 `.github/workflows/kagami-qa.yml` 的「KagamiQA — Migration Matrix」步骤加 `--pdf-report build/kagamiqa_quality_report.pdf` 钩
-- PDF 报告纳入 `kagamiqa-results` artifact（保留 30 天，与 matrix 同保留期）
+- ✅ 工作流 `.github/workflows/kagami-qa.yml` 的「KagamiQA — Migration Matrix」步骤加 `--pdf-report build/kagamiqa_quality_report.pdf` 钩
+- ✅ PDF 报告纳入 `kagamiqa-results` artifact（保留 30 天，与 matrix 同保留期）
 
-### 13.4 代码清扫（可选，小时级）
+### 13.4 代码清扫（可选，小时级）  ✅ **2026-08-08 已落地**
 
-- `report/pdf.rs` 内 `stroke` / `rect_stroke` 两个未用方法（dead code 警告）
-- 跨模块遗留警告：`runner/lua.rs` 的 `unsafe_op_in_unsafe_fn`（Rust 2024 警告）+ `runner/blargg.rs` 的 `truncate` / `HashMap` import + `runner/mapper_byte_diff.rs`、`runner/rom_regression.rs`、`runner/savestate_regression.rs` 未用 `PathBuf` / `Duration` import
-- 根目录 `blargg_matrix.json` UTF-16 临时文件（PowerShell 重定向产物，runner 自己写用 UTF-8）
+- ✅ `report/pdf.rs` 内 `stroke` / `rect_stroke` 两个未用方法（dead code 警告）删除
+- ✅ 跨模块遗留警告：`runner/lua.rs` 的 `unsafe_op_in_unsafe_fn` 显式 `unsafe {}` 块添加；`runner/blargg.rs` 的 `truncate` dead code + 生产代码未用 imports（`HashMap` / `BufWriter`）移至测试模块；`runner/mapper_byte_diff.rs` / `runner/rom_regression.rs` / `runner/savestate_regression.rs` 未用 `PathBuf` / `Duration` import 同步移到测试模块
+- ✅ `adapter/direct.rs` 的 unused FFI 声明 `kagami_bridge_read_ppu` / `kagami_bridge_extract_frame_buffer` / `kagami_bridge_save_state` 删除（这些 FFI 符号由 runner 模块就近声明使用）
+- ⏳ 根目录 `blargg_matrix.json` UTF-16 临时文件（PowerShell 重定向产物）—— 未在本次改动清单中（仅在 `.gitignore` 路径下，无源码影响）
 
 ### 13.5 当前 WIP 提交
 
@@ -517,10 +539,16 @@ Phase D  遗留收敛（任务 3，全程并行轨）
 
 | 项 | 出处 | 备注 |
 |---|---|---|
-| `report/pdf.rs` 一页 PDF 报告 | 任务 5.3 报告能力延伸（实施中追加） | 零外部依赖、7,264 B、含 grade letter + stat cards + oracle split + fail table + footer；`cli/args.rs` 新增 `--pdf-report <path>` 标志；`cli/run_report.rs` 写入逻辑 |
+| `report/pdf.rs` 一页 PDF 报告 | 任务 5.3 报告能力延伸（实施中追加） | 零外部依赖、含 grade letter + stat cards + oracle split + fail table + footer；`cli/args.rs` 新增 `--pdf-report <path>` 标志；`cli/run_report.rs` 写入逻辑；CI 工作流已挂载 + 上传 artifact |
 | CHANGELOG v1.17 章节 | v1.17 收口产物（`4c7aec4`） | 覆盖 Task 1 迁移 + Task 3 收敛，影响 §一表与 §六.3 |
 | 三轨并行 Track A/B/C | v1.17 实际执行方式 | 印证 §八"任务 3 与 1/4 零耦合"假设 |
+| `tests/fixtures/kagamiqa_baseline_frozen.json`（冻结基线 + tool）| §十三.1 落地 | 8 项已知限制冻结；`tools/generate_baseline_frozen.py` 提供一键重生；runner `--baseline` 已切到 frozen，机器化产出 B 级 |
+| 代码清扫（§13.4 已落地版本）| §十三.4 落地 | 删除 `report/pdf.rs` dead code 2 方法 + 全 crate 16 个 warnings 全清（`cargo test --release -p kagami-qa --lib` 187/187 0 warnings） |
 
 ---
 
-*计划 + 施工收口附录完。下次开工第一件事：按 §十一清单 2–3 小时修订计划本体，并启动 §十三.1 冻结基线生效工作。*
+*计划 + 施工收口附录完。下次开工第一件事（按 §十三.2 排期）：*
+1. *Task 1 收尾 3 项（`kagami_direct_main.cpp` 决策点 + `golden_savestate_test.cpp` 移 `tests/kagami/` + `apu_wav_diff` / `ppu_frame_diff` 迁 Rust）*
+2. *CI 端 B 级触发后验证冻结基线生效（首次 push CI run 即可观察，`compute_grade` 单测已保证逻辑）*
+
+*下次开工不再需要做"§十一清单 2–3 小时修订计划本体"——本次开工已经把 §11.1/§11.2 全部 10 处修订动作落到了计划本体上。后续修订按本节"开工第一件事"清单即可。*

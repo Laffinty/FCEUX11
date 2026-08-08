@@ -22,7 +22,7 @@
 //! `tests/core/mapper_byte_diff_test.cpp` (169-case table + SKIP/FAIL
 //! classification). Exit 0 iff every non-skipped case passes.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::adapter::trait_def::{InputSpec, SutAdapter};
 use crate::core::QaError;
@@ -478,6 +478,7 @@ pub fn regression_exit_code(outcome: &MapperDiffOutcome) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
     use crate::adapter::trait_def::{InputSpec, SutAdapter, TestResult};
     use crate::core::{ErrorKind, QaConfig, QaError};
     use crate::manifest::schema::TestManifest;

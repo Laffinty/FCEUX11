@@ -23,26 +23,17 @@ unsafe extern "C" {
     fn kagami_bridge_load_rom(path: *const c_char) -> i32;
     fn kagami_bridge_emulate_frame() -> i32;
     fn kagami_bridge_read_byte(addr: u16) -> u8;
-    fn kagami_bridge_read_ppu(addr: u16) -> u8;
     fn kagami_bridge_reset() -> i32;
     fn kagami_bridge_full_reset() -> i32;
     fn kagami_bridge_kill();
     fn kagami_bridge_set_newppu(on: i32);
-    /// Copy the visible 256x240 XBuf region (61440 bytes) into the
-    /// caller's buffer. Returns 0 on success, non-zero if XBuf is NULL
-    /// or `dst` is NULL. Track C Task 1 / C-2 — used by the Rust
-    /// rom_regression harness.
-    fn kagami_bridge_extract_frame_buffer(dst: *mut u8, len: u32) -> i32;
-    /// Serialise the current emulator state into `dst` (capacity `cap`)
-    /// and report the total size in `written_out`. Returns 0 on
-    /// success. Track C Task 1 / C-3 — used by the Rust
-    /// savestate_regression harness.
-    fn kagami_bridge_save_state(
-        dst: *mut u8,
-        cap: u32,
-        written_out: *mut u32,
-        compression_level: i32,
-    ) -> i32;
+    // NOTE: `kagami_bridge_read_ppu` / `kagami_bridge_extract_frame_buffer`
+    // / `kagami_bridge_save_state` are declared in the runner modules that
+    // actually call them (rom_regression, savestate_regression, etc.) —
+    // the adapter itself only needs the seven core primitives above. The
+    // kagami_bridge FFI symbols are resolved once at link time, so the
+    // duplicate `unsafe extern "C"` blocks must not both declare the same
+    // symbol with a different signature (linker error).
 }
 
 // ---------------------------------------------------------------------------
