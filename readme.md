@@ -2,7 +2,7 @@
 
 # FCEUX11
 
-[![Version](https://img.shields.io/badge/version-v1.16-blue)](https://github.com/Laffinty/FCEUX11/releases)
+[![Version](https://img.shields.io/badge/version-v1.17-blue)](https://github.com/Laffinty/FCEUX11/releases)
 [![License](https://img.shields.io/badge/license-GPL--v2-green)](COPYING)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?logo=windows)](https://www.microsoft.com/windows/windows-11)
 [![Qt](https://img.shields.io/badge/Qt-6.8%20LTS-41CD52?logo=qt)](https://www.qt.io)
@@ -137,11 +137,11 @@ FCEUX11 ships **KagamiQA**, a dual-oracle automated quality assurance system tha
 
 ## 版本历史 / Changelog
 
-详见 [CHANGELOG.md](CHANGELOG.md)。当前稳定版为 **v1.16**。
+详见 [CHANGELOG.md](CHANGELOG.md)。当前稳定版为 **v1.17**。
 
 **v1.16 主要亮点**：KagamiQA 双 Oracle 质量防线正式上线 — 47 条测试清单（Oracle A 27 + Oracle B 20 桶代表）+ 177 个 blargg `$6000` 协议 ROM 全量批处理，每次 push 自动运行 CI 产出迁移矩阵（runs #31-#34 success，R4 Gate 已闭环）。Phase 1-3 精度收敛：vbl_05 NMI timing / ppu_read_buffer / ppu_open_bus / APU cycle-position 帧计数器等 7 项 PASS 修复；Phase 4 Lua bindings 完整化（lua_joypad_test + lua_memory_test blocking）。**32 项深模型族已知限制归类防御线**（不是 release blocker）+ P5 runppu 重批决策推迟到 v1.17+。详见 [docs/tech/KagamiQA.md](docs/tech/KagamiQA.md)。
 
-See [CHANGELOG.md](CHANGELOG.md). Current stable release is **v1.16**.
+See [CHANGELOG.md](CHANGELOG.md). Current stable release is **v1.17**.
 
 **v1.16 highlights**: KagamiQA dual-oracle quality defense line deployed — 47 manifest entries (27 Oracle A + 20 Oracle B bucket representatives) + 177 [blargg](https://github.com/christopherpow/nes-test-roms) `$6000`-protocol ROMs full batch; CI auto-runs on every push producing migration matrix (runs #31-#34 success, R4 Gate closed). Phase 1-3 accuracy convergence: vbl_05 NMI timing / ppu_read_buffer / ppu_open_bus / APU cycle-position frame counter — 7 PASS fixes landed. Phase 4 Lua bindings complete (`lua_joypad_test` + `lua_memory_test` blocking). **32 deep-model-family known limits classified as defense line** (NOT release blocker) + P5 runppu re-batch decision deferred to v1.17+. See [docs/tech/KagamiQA.md](docs/tech/KagamiQA.md).
 

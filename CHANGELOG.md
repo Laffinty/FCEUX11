@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.17] - 2026-08-08 (WIP)
+## [1.17] - 2026-08-08
 
 **Codename: KagamiQA 统合.** v1.17 将 KagamiQA 从「FCEUX11 的附属测试框架」升级为
 「测试体系的唯一归属与唯一门禁」。本条目记录 wip_v1.17 上已落地的 Task 1（迁移）与

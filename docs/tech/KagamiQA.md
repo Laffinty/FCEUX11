@@ -315,7 +315,7 @@ P5 升级后，`lua_runner` 会捕获 Lua `assert()` / `error()` 输出并解析
 
 ### 2.7 CI 自动运行
 
-KagamiQA 在每次 push 到 `main`、`wip_1.16` 或 `wip_v1.17` 分支时自动运行（`.github/workflows/kagami-qa.yml`）：
+KagamiQA 在每次 push 到 `main` 或 `wip_1.16` 分支时自动运行（`.github/workflows/kagami-qa.yml`）：
 
 1. **Oracle A**：`ctest --output-on-failure -LE perf`
 2. **Oracle B**：`kagami_qa_blargg_runner --manifest tests/fixtures/blargg_manifest.json`

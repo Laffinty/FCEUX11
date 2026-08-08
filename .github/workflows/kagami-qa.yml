@@ -14,9 +14,9 @@ name: KagamiQA
 
 on:
   push:
-    branches: [main, wip_1.16, wip_v1.17]
+    branches: [main, wip_1.16]
   pull_request:
-    branches: [main, wip_1.16, wip_v1.17]
+    branches: [main, wip_1.16]
   workflow_dispatch:  # allow manual trigger
 
 jobs:

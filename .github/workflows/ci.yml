@@ -19,9 +19,9 @@ name: CI
 
 on:
   push:
-    branches: [main, wip_v1.17]
+    branches: [main]
   pull_request:
-    branches: [main, wip_v1.17]
+    branches: [main]
 
 jobs:
   build-windows:
