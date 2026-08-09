@@ -19,7 +19,7 @@ Task 3（遗留收敛核查）成果。
 | **Oracle B** (tests.json 桶代表) | 20 | 12P / 8F | 8 FAIL 全部 advisory 已知限制 |
 | **Oracle B** (blargg 全量 177 ROM) | 177 | 144P / 33F | 81.4% PASS 率（与 v1.16 终态一致，无回归） |
 | **总测试条目** (kagami-qa-runner) | 47 | 39P / 8F | **Grade C (acceptable)** |
-| **cargo test** (kagami-qa lib) | 178 | 178P / 0F | 含新迁移 harness 单元测试 |
+| **cargo test** (kagami-qa lib) | 187 | 187P / 0F | 含新迁移 harness 单元测试（143 → 187） |
 
 ### Added — Task 1 迁移（C++ harness → Rust）
 
@@ -48,13 +48,60 @@ Task 3（遗留收敛核查）成果。
 - **矩阵基线澄清**：计划 §一 的「121 PASS / 56 FAIL」为过期数据；实测与 v1.16
   CHANGELOG 一致为 144 PASS / 33 FAIL，v1.17 无回归。
 
+### Added — Task 2 / Task 4 / Task 5（体系统合落地）
+
+- **Task 2 — `tests/kagami/` 落位**：44 个不可迁移 C++ 测试源文件（核心内部
+  单元测试 / C++ 语言·平台测试 / 基准）按 `core/`、`boards/`、`benchmark/`、
+  `benchmarks/`、`utils/` 分区集中到 `tests/kagami/`，与引擎代码物理区隔。
+  CTest 测试名、`tests.json` 47 条目与 `WORKING_DIRECTORY=tests/` 全部不变
+  （CI 历史对比有效），`ctest -LE perf` 33/33 PASS。
+- **Task 2 决策记录**（2026-08-08 拍板）：① `ppu_phase_b_test.cpp`（git 跟踪
+  但 CTest 未注册的孤儿，invariant 已由 phase_c/d 覆盖）**归档删除**
+  （`e5009fc`）；② `golden_savestate_test.cpp` 源码**留 `fixtures/golden/` 不移动**
+  （Track C 的 `savestate_regression.rs` Rust harness 已覆盖 `.fc0` 往返，
+  保持「数据/代码分离」意图）；③ `git_info_stub.cpp` 留 `tests/` 根（构建支持）；
+  ④ bench baseline JSON 留 `tests/benchmarks/`（路径稳定）。
+- **Task 4 — KagamiQA 架构规范化**：350 行 `main.rs` god file 拆为
+  `cli/`（`args.rs` / `run_subprocess.rs` / `run_direct.rs` / `run_report.rs`），
+  明确七层单向依赖（L1 `core/` → L7 `cli/`，判定只存在于 L4 `oracle/`、
+  调度只存在于 L5 `runner/`）；`lib.rs::direct_entry` 与 CLI 重复的 per-test
+  循环收敛为共享 runner 核心；CLI 新增 `--filter`（按 `id` / `tag` / `layer` /
+  `oracle_type` 组合过滤）；`kagami-qa/README.md` 重写为 v1.17 实态。
+  direct 模式看门狗（watchdog 线程 + panic 隔离）按计划列为可选扩展，v1.17
+  未实现。
+- **Task 5 — A–E 分级通过标准**：`report/grade.rs` 上线 `compute_grade`——
+  A 完美通过（零已知限制）/ B 符合发布（无新增 PASS→FAIL、advisory 全部在
+  冻结基线内）/ C 可接受（所有 FAIL 均有据编目）/ D 不允许发布（blocking FAIL
+  或回归）/ E 基本功能受损（`smoke_test` / `headless_smoke_test` 失败）。
+  matrix JSON 新增 `grade` + `grade_reasons` 字段，R4 Gate 对 D/E 判红
+  （exit 1 禁止合并），runner stdout 打印 `Grade: C (acceptable)`；
+  11 项 unit tests 覆盖五级分界（每级正/反向用例）。
+
+### Changed — 冻结基线、CI 与代码清扫
+
+- **冻结基线落地**：`tests/fixtures/kagamiqa_baseline_frozen.json`（8 项
+  test_set 已知限制冻结集）+ `tools/generate_baseline_frozen.py` 一键重生；
+  CI `kagami-qa.yml` 改 `--baseline` 指向冻结文件——B 级判定器机器化
+  （任何新 advisory FAIL 落入 `new_test` 桶、grade 退回 C）。
+- **PDF 报告**：`report/pdf.rs` 一页 PDF（零外部依赖，含 grade letter + stat
+  cards + oracle split + fail table + footer），`--pdf-report <path>` 标志，
+  CI 挂载并纳入 `kagamiqa-results` artifact（保留 30 天）。
+- **CI 触发分支修复（A0）**：`ci.yml` / `kagami-qa.yml` branches 增加
+  `wip_v1.17`，v1.17 push 自动触发 KagamiQA workflow。
+- **代码清扫**：全 crate 16 warnings 清零（`report/pdf.rs` dead code 2 方法、
+  `runner/lua.rs` 显式 `unsafe {}` 块、`runner/*.rs` unused imports 移入测试
+  模块、`adapter/direct.rs` 3 个 unused FFI 声明删除）；`cargo test --release
+  -p kagami-qa --lib` 187/187 PASS、0 warnings。
+- **执行方式**：Track A（Task 2 + H-1/H-2）/ Track B（R5/R6 instrument-first
+  probes）/ Track C（Task 1 Rust harness + FFI）三轨并行（2026-08-04 →
+  2026-08-08，约 30+ commits），印证「任务 3 与任务 1/2/4 零代码耦合」假设。
+
 ## [1.16] - 2026-08-06
 
 **Codename: KagamiQA closure.** FCEUX11 v1.16 ships a CI-resident dual-oracle
 quality defense system (`kagami-qa`), backed by 47 test entries in `tests.json`
 + 177 blargg `$6000` ROMs. All Phase 1-4 must-pass items closed (R4 Gate
-sign-off on `wip_1.16`, CI runs #31/#32/#33/#34). See
-`docs/history/plans/FCEUX11-1.16_P3-KagamiQA闭环四阶段构建方案.md` for the full closure plan.
+sign-off on `wip_1.16`, CI runs #31/#32/#33/#34).
 
 ### Summary (KagamiQA 双 Oracle 质量防线)
 
@@ -101,6 +148,54 @@ sign-off on `wip_1.16`, CI runs #31/#32/#33/#34). See
 | `ppu_open_bus` PASS（PPUGenLatch time-decay + per-bit open-bus refresh）| `23b0cdd` | Phase 3 桶 C +1 PASS |
 | harness cleanup（per-ROM reset_after + 0x80 frame budget calibration）| `821a26e` | Phase 3 Step 3.1 |
 
+### Fixed — P4-bridge 与构建/测试基础设施（Stage-2）
+
+- **P4-bridge — new PPU headless 初始化修复**：新 PPU（`FCEUX_PPU_Loop`）
+  ppudead 路径补齐 VBL 置位 + NMI 触发（对齐旧 PPU，消除前 2 帧收不到 NMI
+  的功能缺口）；`runppu()` 周期计数器 `if`→`while`（多 wrap 不再损坏计数器）；
+  `blargg_runner` 在 LoadGame 后正确设置 `newppu=1` + `normalscanlines=241`
+  （commit `02db484`）。
+- **帧 3 崩溃根因**：新 PPU 正常渲染路径首次 `CALL_PPUREAD` 即解引用 NULL——
+  `FFCEUX_PPURead` 被 `ResetGameLoaded()` 置空后，唯一恢复点
+  `PPU_ResetHooks()` 在生产初始化链中从未被调用（仅测试调用）。修复：
+  `FCEUPPU_Power()` 开头调用 `PPU_ResetHooks()`，保证每次上电后
+  `FFCEUX_PPURead`/`FFCEUX_PPUWrite` 均为有效默认函数指针（fail-fast 设计，
+  READ 不判空、WRITE 判空回退默认）。
+- **P4-2 尝试证伪回退**：APU length counter「无条件 reload」被 blargg 证伪
+  （真机在 $4015 disable 时不 reload），`562f0e8` → revert `cda40fe`；
+  原 `EnabledChannels` 门禁被确认正确。
+- **Step 3.1 harness 清理细化**：21 项 harness 问题清零——0x80（帧预算）
+  13→0、0x81（reset）8→0；15 个 ROM 转 PASS，6 个 ROM 从 0x80/0x81「跑不完」
+  露出真实精度失败码（`cpu_dummy_writes_oam` 0x06、`instr_timing` 0x01、
+  `instr_timing_v2_1` 0x03、`ppu_read_buffer` 0x0E、`ppu_vbl_nmi` 0x01、
+  `cpu_reset_regs` 0x02）——「精确知道什么失败」而非回归。8 个 ROM 加
+  `reset_after: 60`，13 个 ROM 帧预算调至 2400/3000（`scripts/generate_blargg_
+  manifest.ps1` 同步）。
+- **M3 — MSVC LTCG 链接器崩溃修复**：`ppu_sprite_lut.cpp` 的 512 KiB
+  `kSpriteIdxLUT`（`alignas(64)` constexpr array + immediately-invoked lambda）
+  在 `/GL` + `/LTCG` 下触发 `c2.dll` 内部错误，产出 2 MiB 全零占位 exe；
+  对该 TU 加 `/GL-` 使 LUT 编译为标准 COFF 数据，`ppu_rendering_lut_test`
+  BAD_COMMAND → PASS。`bus.cpp` 同类预防性 `/GL-`。
+- **四个历史「构建难题」根治**（Stage-2 Phase A，均只存在于旧 NMake + Debug
+  本地路径，CI 的 Ninja + Release 从未触发）：`scripts/do_build.ps1` 用
+  vswhere 定位 VS 内置 Ninja，裸 PowerShell 一次构建成功（Bash vs MSVC）；
+  `CMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embed`（`/Z7`）+ Ninja 消除 PDB C1041；
+  `fceu11_direct_storage_probe` 改 OBJECT 库 + `do_build.ps1` 重试循环消除
+  LNK1104 文件锁。
+- **Lua bit 库修复**（Stage-2 Phase B）：审计判定的「5 个真实 bug」经复核为
+  4 项测试期望值错误 + 1 项 1 行实现修复（`bit.rs` rshift 逻辑右移 /
+  tohex 大小写与宽度）；`lua_bit_test_headless` FAIL → PASS；runner 判定
+  加固（捕获 stdout 并解析 `FAIL:` 行 + `stdout_contains`），消除「脚本没
+  崩溃 = PASS」假阳性。
+- **判定链路加固**（Phase 0.5）：`check_expected` 生效（原为死代码）、
+  `timeout_seconds` 生效（挂死被 kill）、新增测试进 `new_test` 第 5 桶
+  （`fail_to_pass` 不再被灌水）；cargo test 40/40。
+- **`kagami_qa_direct_smoke` 端到端打通**（Stage-2 Phase C）：根因是
+  `tests/CMakeLists.txt` 30 行内 4 个具体缺陷（rlib 产物不可被 link.exe 消费、
+  链接路径缺 target triple、系统库变量未定义、CRT 不匹配），非「跨语言工程
+  复杂性」；修复为 staticlib + 系统库字面量 + 增量依赖建模 + S-2 帧预算，
+  direct runner 从「从未构建」到 PASS 6.42s。
+
 ### Known Precision Limitations (defense line, NOT release blocker)
 
 **32 项 blargg ROM 深模型族已知限制** + 1 项永久跳过 = **33 FAIL**，全部归类于 Phase 3 调查记录。
@@ -123,11 +218,18 @@ sign-off on `wip_1.16`, CI runs #31/#32/#33/#34). See
 
 - **`src/version.h`** — `FCEU_VERSION_MINOR` 15 → 16；`FCEU_HOTFIX_TAG` 清空；`FCEU_DISPLAY_VERSION` "v1.15 (hotfix6)" → "v1.16"（commit `7c2356b`）。
 - **`tests/tests.json`** — 39 → 47 项 Oracle 桶代表；6 项 Oracle B 桶代表由 Phase 3 known_fail 提升到 tests.json（仍 advisory）。
-- **`tests/fixtures/blargg_manifest.json`** — 22 → 177 条目（S-1 清掉 3 个重复死条目后 180 → 177）。
+- **`tests/fixtures/blargg_manifest.json`** — 22 → 177 条目（S-1 清掉 3 个
+  重复死条目后 180 → 177）。S-1 勘误（`bc7c1d8`）：此前判定「3 个 CPU ROM
+  缺失」实为命名错配——`all_instrs` / `official_only` / `cpu_timing_test` 早已
+  按 `download_blargg_roms.ps1` 命名规则落盘（`instr_v5_all` / `instr_v5_official`
+  / `cpu_timing_test6`），压红真因是帧预算不足（`0x80` = 仍在运行而非错误码）；
+  `blargg_cpu_instrs` / `blargg_cpu_timing` 改指实际文件、frames 提至 3000/500
+  后转回 `blocking`。
 - **`tests/fixtures/blargg_known_fail.json`** — 22 → 60 条分类（`code`, `diag`, `eventually_pass`, `runppu` 字段标准化）。
 - **`.github/workflows/kagami-qa.yml`** — R4-0（vcpkg cache 修复）+ R4-1（blargg ROM fixtures 补齐）落地。
 - **`docs/tech/KagamiQA.md`** — Phase 4 收口期大幅更新：§0 CI 数字回填纪律、§1.4 现行口径（门槛+度量分离）、§四 跨项目迁移指南。
-- **`docs/history/plans/`** — P2 三阶段方案归档；P3 闭环四阶段方案 + P5 决策记录。
+- **历史归档文档** — P2 三阶段方案、P3 闭环四阶段方案与 P5 决策记录
+  （原 `docs/history/plans/`）已随归档目录并入本 CHANGELOG 条目。
 
 ### Validation
 
@@ -269,8 +371,7 @@ on hotfix2 PPU optimizations). See
 1 day: Phase A (5 one-line P0/P2 fixes), Phase B (4 i18n + hotkey
 fixes), Phase C (5 feature completeness fixes), Phase D (1 NetPlay
 formal removal + 1 build-policy evaluation), Phase E (T-1 static
-test + total verification). See
-`docs/history/FCEUX11-1.15_LTS-hotfix4-PLAN.md` for full scope.
+test + total verification).
 
 ### Added (Phase E — regression test)
 - **`scripts/check_menu_slots.py`** (T-1) — Static gate that scans
@@ -379,9 +480,7 @@ memory-safety fixes + 2 skip), Phase D (5 performance hot-path
 optimizations), Phase E (3 code-quality cleanups + 2 skip).
 
 ### Fixed (Phase A — CRITICAL cross-thread data races)
-All landed 2026-07-18. See
-`docs/history/v1.15_hotfix3_phase_a_diagnostics.md` and PLAN §二 for
-full diagnostic detail.
+All landed 2026-07-18. See PLAN §二 for full diagnostic detail.
 
 - **`src/rust/crates/fceux11-lua/src/lib.rs`** (hotfix3 A-1+A-2) — Added
   `fceux11_lua_shutdown()` FFI to reclaim the `Box<LuaEngine>` via
@@ -537,9 +636,8 @@ Phase A/B/C landed. BSS-resident video buffers shrunk from 24 MiB to
 branching and one dead memset removed. Phase D does NOT introduce
 benchmarks regression or breakage: HQ audio path untouched; sprite
 output bit-identical; bench baseline (`fixtures/bench_baseline.json`)
-unchanged until hotfix3 release tag. Phase completion report at
-`docs/history/v1.15_hotfix3_phase_d_diagnostics.md`. Phase tag
-`hotfix3-phase-d-done`.
+unchanged until hotfix3 release tag. Phase completion report archived
+in this changelog. Phase tag `hotfix3-phase-d-done`.
 
 - **`src/drivers/Qt/nes_shm.h`, `src/drivers/Qt/nes_shm.cpp`** (hotfix3
   D-1, HIGH risk) — 24 MiB static `pixbuf[5][1048576] + avibuf[1048576]`
@@ -615,8 +713,7 @@ unchanged until hotfix3 release tag. Phase completion report at
 cleanup with two PLAN-misdiagnoses folded into diagnostic-only
 documentation. Phase E does NOT touch hot-path code; it's a final
 sweep over compile-time guards, dead globals, and macro hygiene.
-Phase completion report at
-`docs/history/v1.15_hotfix3_phase_e_diagnostics.md`.
+Phase completion report archived in this changelog.
 
 - **`src/cpu.cpp`** (hotfix3 E-4, LOW) — pin
   `sizeof(Cpu::layout_) == 64` as a third static_assert alongside
@@ -688,9 +785,8 @@ pshift; **P2-5 deferred to v1.16 timing-rewrite**); Phase D (this
 entry) lands P3-1 ~ P3-5 (cleanup: constexpr LUT, ppudead XBuf
 single-memset, [[unlikely]] hook guards, hook-scoped norecurse,
 vnapage review). Tracked in
-`docs/FCEUX11-1.15_LTS-hotfix2-PLAN.md` §十. Completion reports at
-`docs/history/v1.15_hotfix2_phase_a_verify.md` / `_phase_b.md` /
-`_phase_c.md` / `_phase_d.md`.
+`docs/FCEUX11-1.15_LTS-hotfix2-PLAN.md` §十. Completion records
+archived in this changelog.
 
 ### Changed (Phase B — micro-structure)
 
@@ -737,9 +833,9 @@ vnapage review). Tracked in
 
 - **`tests/ppu_phase_b_test.cpp`** — Smoke tests for P1-3 (cycle
   wrap-around) and P1-7 (scanline value-return accessor).
-- **`docs/history/v1.15_hotfix2_phase_b.md`** — Phase B completion
-  report (PR list, file changes, build verification, perf
-  expectations, follow-up todos for Phase C).
+- **Phase B completion record** — archived in this changelog (PR list,
+  file changes, build verification, perf expectations, follow-up todos
+  for Phase C).
 
 ### Changed (Phase C — micro-optimization)
 
@@ -794,15 +890,26 @@ vnapage review). Tracked in
 - **`tests/ppu_phase_d_test.cpp`** — 531 byte-level checks for P3-1
   bitrev LUT (matches-byte-swap, involution, full coverage), P3-3
   hook nullptr contract, P3-5 vnapage 4-slot distinct-pointer shape.
-- **`docs/history/v1.15_hotfix2_phase_c.md`** — Phase C completion
-  report (PR list, file changes, P2-2 audit-rejection rationale,
-  build verification, perf expectations).
-- **`docs/history/v1.15_hotfix2_phase_d.md`** — Phase D completion
-  report (PR list, file changes, build verification, perf
-  expectations, follow-up todos for release).
+- **Phase C completion record** — archived in this changelog (PR list,
+  file changes, P2-2 audit-rejection rationale, build verification,
+  perf expectations).
+- **Phase D completion record** — archived in this changelog (PR list,
+  file changes, build verification, perf expectations, follow-up todos
+  for release).
 
 ### Build / verification status
 
+- **Phase A 验证期附加修复**：`oam_bucket_idx[32][8]` 在
+  `FCEUI_DisableSpriteLimitation(1)`（maxsprites 8→64）下同扫描线 9+ 精灵
+  共享 `x >> 3` 时静默溢出，扩宽为 `[32][64]`（+1.75 KiB BSS，零运行时成本；
+  hotfix1 的 unsplit test ROM 未触发该路径）。
+- **实测 PPU 渲染性能**（2026-07-16，`bench_ppu_frame` 60 帧 × 5 iter 中位数）：
+  1.125 ms/frame（hotfix1 基线）→ **0.535 ms/frame（−52.4%）**，超过 PLAN
+  §九.2 上界 42%；`bench_tolerance_test` 5/5 PASS（`bench_ppu_frame` −50.84%、
+  `bench_full_frame` −48.78%）。
+- **验证矩阵**：ASan ctest 26/27 PASS（与常规套件一致）；`savestate_regression_
+  test` 12/12、`golden_savestate_test` 8/8、`mapper_byte_diff_test` 169/169、
+  `ppu_frame_diff_test` 5/5 全部 0 差异——SPRB 类型化未破坏 SFORMAT 字节布局。
 - Windows MSVC 19.51 (`fceux11_core.lib` including
   `ppu_rendering.cpp`, `pputile_template.cpp`, `cpu.cpp`) compiles
   clean across Phases A/B/C/D.
@@ -1220,9 +1327,12 @@ Performance hardening, LTO/PGO build configuration, and v2.0 readiness.
 
 ### Deprecated (v2.0 preparation)
 
-- **107 `FCEUI_*` inline shims** — All shims in `core_api.h` (61),
-  `io_api.h` (31), `movie.h` (10), `cheat.h` (5) annotated with
+- **105 `FCEUI_*` inline shims** — All shims in `core_api.h` (60),
+  `io_api.h` (30), `movie.h` (10), `cheat.h` (5) annotated with
   `FCEUX11_DEPRECATED("use fceu11::Xxx() instead")`.
+  （v1.15 `v2.0_removal_checklist` 复核审计确认实际为 105 个，原「107」为
+  `remaining_work` 的估算值；`bmap[]` 经复核**未**实际标注 deprecated——
+  registry 完全替代其查找功能前不标注。）
 - **6 global variable aliases** — `X`, `timestamp`, `soundtimestamp`,
   `scanline`, `MapIRQHook` in `x6502.h`; `g_cpu` in `cpu.h` annotated
   with `FCEUX11_DEPRECATED`.
@@ -4681,10 +4791,10 @@ this commit).
   annotated the v0.3.2 row in §4.1 to flag the v0.3.6.6 废止.
 - **Checkpoint report refresh**: corrected stale line ranges and release date
   in the archived v0.3.6.5 checkpoint notes (Q9, Q17).
-- **`CHANGELOG.md`**: the orphan `[0.3.6]` content block (RAII 化 /
+- **`docs/ChangeLog.md`**: the orphan `[0.3.6]` content block (RAII 化 /
   fceuScopedPtr migration / Mapper PRG-RAM RAII / Deprecated / Testing)
   now has the missing `## [0.3.6] - 2026-06-09` header (Q13).
-- **`CHANGELOG.md`**: F-1 entry rewritten from "F-1 (REAL, deferred)" to
+- **`docs/ChangeLog.md`**: F-1 entry rewritten from "F-1 (REAL, deferred)" to
   "F-1 (REAL, CLOSED in v0.3.6.5 errata commit a606561)" with the root cause
   (`sizeof((char*))` sizeof-pointer in `state.cpp:766` + `unif.cpp:158` +
   `bworld.cpp:64,65`) and the fix details (Q11).
