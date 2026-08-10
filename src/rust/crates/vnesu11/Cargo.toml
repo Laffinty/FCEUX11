@@ -11,6 +11,9 @@ name = "vnesu11"
 [dependencies]
 bytemuck = { version = "1.14", features = ["derive"] }
 
+[build-dependencies]
+cbindgen = "0.29.3"
+
 [features]
 # Default: nothing extra. Phase 6+ adds debug feature for CPU regs layout checks.
 default = []

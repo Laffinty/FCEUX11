@@ -25,6 +25,15 @@ void  vnesu11_power_on_bridge(void* soc);
 void  vnesu11_reset_bridge(void* soc);
 
 // -------------------------------------------------------------------------
+// Frame emulation (Phase 0 §1.4: routed under #ifdef VNESU11_CORE_ENABLED
+// in src/fceu.cpp::Emulate). The Phase 0 stub returns -1; Phase 1+ wires
+// real emulation.
+// -------------------------------------------------------------------------
+void vnesu11_emulate_frame_bridge(
+    void* soc, int skip,
+    uint8_t* xbuf, int16_t* sbuf, size_t sbuf_cap, size_t* sbuf_written);
+
+// -------------------------------------------------------------------------
 // Mapper per-range handler registration (Phase 0 — see ADR-010)
 // -------------------------------------------------------------------------
 int vnesu11_set_read_handler_bridge(void* soc, uint16_t start, uint16_t end,

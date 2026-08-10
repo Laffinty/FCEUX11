@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### wip_v2.0 — vNESU11 启动（Phase 0 骨架完成）
+
+详见 `docs/wip_2.0_plan/`。本期为**草案提交**，不引入用户可见变更：
+
+- 新增 Rust crate `crates/vnesu11/`：FFI 骨架（lifecycle + per-range handler +
+  peek/poke savestate stub）、`VNesSoc` skeleton、`CpuRegsLayout` 64 字节布局
+  锁 + 16 条 `offset_of!` 静态断言、per-range `MapperRangeTable`（ADR-010）。
+- C++ 桥接：`src/vnesu11_bridge.{h,cpp}`、FCEUI_* 兼容垫片 `#ifdef VNESU11_CORE`
+  路由（Phase 6 接通用，Phase 0 默认 OFF 不影响行为）。
+- CMake：`option(VNESU11_CORE "..." OFF)` + 独立 build target。
+- 文档：`docs/wip_2.0_plan/`（18 文件）、`AUDIT_20260810.md`（S1-S10 发现）、
+  `DECISIONS_S3_S5_analysis.md`（S3 决策 A + 预留 B 接口；S5 选项③）、
+  `savestate_tags.md`（SFORMAT 契约）、`core_headers_deps.md`（68 include 站点）。
+- `src/x6502struct.h` 加 8 条 `static_assert` 锁字节布局。
+- `src/bus.cpp::SetReadHandler/SetWriteHandler` 在 `VNESU11_CORE_ENABLED` 下双写
+  到 vNESU11 区间表（保留 C++ `aread_[]` 作为 newppu=0 回退路径，ADR-009）。
+- 验证：`cargo test -p vnesu11` 16/16 通过；`cargo build --release` 产出
+  `vnesu11.lib`。C++ 端 cmake 构建待用户本地验证（需 Qt6 + MSVC dev prompt）。
+
+ADR-007/008/009/010 已落（见 `README.md`）。Phase 1+ 待启动。
+
 ## [1.17] - 2026-08-08
 
 **Codename: KagamiQA 统合.** v1.17 将 KagamiQA 从「FCEUX11 的附属测试框架」升级为

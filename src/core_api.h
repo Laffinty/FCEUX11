@@ -76,6 +76,15 @@ namespace fceu11 {
 // v1.14 Anvil §14.5: FCEUI_* → fceu11::* migration shims.
 // Suppressed by default (FCEUX11_NO_DEPRECATION_WARNINGS); enable with
 // -DFCEUX11_SHOW_DEPRECATION_WARNINGS=ON.
+//
+// v2.0 wip (Phase 0 §1.4): under -DVNESU11_CORE_ENABLED=1, the hot-path
+// `fceu11::Emulate()` in src/fceu.cpp routes through the vNESU11 Rust
+// SoC (see src/vnesu11_bridge.cpp). The FCEUI_* shims below remain
+// unchanged because each subsystem (CPU peek/poke, joypad, savestate,
+// APU mixer, etc.) will be routed individually in Phase 6 as the
+// corresponding vNESU11 FFI surface lands. See
+// docs/wip_2.0_plan/phase_6_integration.md §2.5 for the FCEUI_*
+// migration matrix.
 FCEUX11_DEPRECATED("use fceu11::LoadGame() instead")
 inline FCEUGI *FCEUI_LoadGame(const char *name, int OverwriteVidMode, bool silent = false) { return fceu11::LoadGame(name, OverwriteVidMode, silent); }
 FCEUX11_DEPRECATED("use fceu11::LoadGameVirtual() instead")
