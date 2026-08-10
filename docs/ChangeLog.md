@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### wip_v2.0 — vNESU11 启动（Phase 0 骨架完成）
+### wip_v2.0 — vNESU11 启动（Phase 0 骨架 + Phase 1 CPU 解释器）
+
+Phase 1 摘要：`crates/vnesu11` 的 Rust 6502 解释器完成（151 官方 +
+21 undocumented + decimal + 中断 + budget 驱动），51 个测试全绿。
+ROM 验证（nestest.nes / blargg）与性能门禁待用户本地执行。
+
+### wip_v2.0 — Phase 0 骨架完成（历史快照）
 
 详见 `docs/wip_2.0_plan/`。本期为**草案提交**，不引入用户可见变更：
 

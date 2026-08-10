@@ -40,7 +40,7 @@
 | Phase | 标题 | 状态 | 关键交付 | 预计工时 |
 |-------|------|------|---------|---------|
 | 0 | Foundation | ⚠️ 骨架完成（2026-08-10） | FFI 骨架 + cbindgen 生成器、`VNesSoc` skeleton、SFORMAT tag 契约（mapper-registered chunks 部分含糊）、68 站点依赖图、`CpuRegsLayout` 逐字段校验、per-range mapper 表、CMake 注册、`FCEUI_*` hot-path `#ifdef` 路由（Emulate 已接、其余随 Phase 6）。**C++ 端 cmake 构建与 kagami-qa 行为验证待用户本地（需 Qt6 + MSVC dev prompt）** | 2 周 |
-| 1 | CPU | ⚪ 未启动 | 6502 解释器 Rust 版 + blargg cpu_instrs | 4 周 |
+| 1 | CPU | ✅ 解释器完成（2026-08-10） | 6502 解释器 Rust 版（151 官方 + 21 undocumented + decimal + 中断 + budget 驱动）+ 24 集成测试全绿；**blargg/nestest ROM 验证与性能门禁待用户本地** | 4 周 |
 | 2 | Bus + RAM | ⚪ 未启动 | 固定区 `match` + MapperRangeTable 接入、WRAM/VRAM/OAM/Palette、RAM 随机源复刻 | 2 周 |
 | 3 | PPU | ⚪ 未启动 | newppu=1 段驱动 PPU + 渲染 + 精灵 LUT | 6 周 |
 | 4 | APU + DMA + IRQ | � 未启动 | 5 通道、DMA、外部 IRQ（FDS）、IRQ 控制器、scheduler | 4 周 |
@@ -86,3 +86,4 @@
 - **v0.2** (2026-08-10)：**审计修订**——S1/S2 修正 savestate 与布局策略；S3 时序模型定决策 A；S4 mapper 改区间表；S5 newppu 定 ADR-009；S6 系统类型矩阵；S7 RAM 随机源；S8 性能预期降级；S9 影响面 68 站点；S10 shadow run 三级对比
 - **v0.3** (2026-08-10)：**决策点理论分析（联网检索）**——S3 定决策 A + 预留 B 接口（v2.1+）；S5 定选项③（FCEUX 上游实践 + TASVideos 指南）。见 `DECISIONS_S3_S5_analysis.md`
 - **v0.4** (2026-08-10)：**Phase 0 骨架完成**——crates/vnesu11 skeleton + FFI 表面（cbindgen 生成 vnesu11_ffi.h，4852 字节）+ 16 个测试全绿（12 unit + 4 layout_check）；savestate_tags.md（mapper-registered chunks 部分需 Phase 5 补充）与 core_headers_deps.md 产出；x6502struct.h 加 8 条 static_assert（S1）；bus.cpp 加 per-range forwarding stub（#ifdef VNESU11_CORE_ENABLED）；fceu.cpp::Emulate 加 #ifdef VNESU11_CORE_ENABLED 路由（hot-path 接通）；CMake 注册（option(VNESU11_CORE OFF) + add_subdirectory(crates/vnesu11)）。**待用户本地验证**：C++ cmake 构建、kagami-qa 行为不变；**Phase 1 末补漏项**：savestate round-trip、golden 二进制对比、mapper chunk 枚举。详见 phase_0_foundation.md
+- **v0.5** (2026-08-10)：**Phase 1 完成（解释器部分）**——完整 6502 解释器：`CpuCore` + `BusContext` + `run_budget`（复刻 X6502_Run，决策 A）+ 256 项 decoder + 13 寻址模式 + 151 官方指令 + 21 undocumented（LAX/SAX/DCP/ISB/SLO/RLA/SRE/RRA/ANC/ARR/XAA/LAS/AXS/SHA/SHX/SHY/TAS/KIL）+ decimal ADC/SBC + NMI/IRQ/RESET（penultimate 采样 + SEI/CLI 一周期延迟）+ page-cross/RMW/分支周期。`VNesSoc` 接入 `CpuCore` + `VNesBusContext`。24 个集成测试 + 27 既有测试全绿（51 总计）。**待用户本地**：nestest.nes + blargg ROM 验证、性能门禁。详见 phase_1_cpu.md
