@@ -221,6 +221,7 @@ impl CpuCore {
     // =================================================================
 
     // LAX
+    #[inline(always)] pub(crate) fn lax_imm<BC: BusContext>(&mut self, bus: &mut BC) { let v = self.imm(bus); self.lax_common(v); }
     #[inline(always)] pub(crate) fn lax_zp<BC: BusContext>(&mut self, bus: &mut BC) { let v = self.read_zp(bus); self.lax_common(v); }
     #[inline(always)] pub(crate) fn lax_zpy<BC: BusContext>(&mut self, bus: &mut BC) { let v = self.read_zpy(bus); self.lax_common(v); }
     #[inline(always)] pub(crate) fn lax_abs<BC: BusContext>(&mut self, bus: &mut BC) { let v = self.read_abs(bus); self.lax_common(v); }

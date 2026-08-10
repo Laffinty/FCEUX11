@@ -26,9 +26,6 @@
 #include <cstdio>   // fprintf stderr DEBUG
 
 #include "fceu.h"   // ::ANull, ::BNull (DECLFR/DECLFW expansion)
-#ifdef VNESU11_CORE_ENABLED
-#include "vnesu11_bridge.h"   // v2.0 wip: fceu11::g_vnesu11_soc + bridge FFI
-#endif
 #include "ppu.h"    // ::PPUCHRRAM, ::PPUNTARAM, ::vnapage, ::NTARAM
 #include "x6502.h"  // g_cpu (for ::ANull's return value)
 
@@ -169,19 +166,14 @@ void Bus::set_read_handler(uint32_t start, uint32_t end, readfunc fn) noexcept {
     for (uint32_t x = start; x <= end; x++) {
         aread_[x] = fn;
     }
-#ifdef VNESU11_CORE_ENABLED
-    // v2.0 wip (Phase 0, ADR-010/audit S4): also register the handler
-    // with the vNESU11 Rust core's per-range table. When VNESU11 takes
-    // over CPU reads, it uses its own table; the C++ aread_[] is
-    // retained for the newppu=0 fallback path (see ADR-009).
-    if (fceu11::g_vnesu11_soc) {
-        vnesu11_set_read_handler_bridge(
-            fceu11::g_vnesu11_soc,
-            static_cast<uint16_t>(start),
-            static_cast<uint16_t>(end),
-            fn, nullptr);
-    }
-#endif
+    // v2.0 wip (Phase 0 §1.4 audit): the planned forwarding of handler
+    // registrations into the vNESU11 Rust core's per-range table is NOT
+    // done here. `readfunc` = `uint8(*)(uint32)` carries no context
+    // pointer, while the vNESU11 range table requires
+    // `uint8(*)(void*, uint16)` — a direct cast would be an ABI lie and
+    // a dangling-ctx hazard. The correct adapter (mapper instance as
+    // ctx) belongs to the Phase 5 MapperAdapter, which has the `Cart*`.
+    // See docs/wip_2.0_plan/phase_5_mapper_adapter.md.
 }
 
 void Bus::set_write_handler(uint32_t start, uint32_t end, writefunc fn) noexcept {
@@ -190,15 +182,8 @@ void Bus::set_write_handler(uint32_t start, uint32_t end, writefunc fn) noexcept
     for (uint32_t x = start; x <= end; x++) {
         bwrite_[x] = fn;
     }
-#ifdef VNESU11_CORE_ENABLED
-    if (fceu11::g_vnesu11_soc) {
-        vnesu11_set_write_handler_bridge(
-            fceu11::g_vnesu11_soc,
-            static_cast<uint16_t>(start),
-            static_cast<uint16_t>(end),
-            fn, nullptr);
-    }
-#endif
+    // See the read-handler note above: vNESU11 range registration happens
+    // in the Phase 5 MapperAdapter, not here.
 }
 
 // ---------------------------------------------------------------------------

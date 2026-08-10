@@ -186,3 +186,9 @@ build/*_baseline*.json
 build/*_accuracy*.md
 build/*_results*.json
 build/*_output*.txt
+
+vcpkg_installed/
+# v2.0 wip: local junction to vcpkg\installed (see BuildGuide)
+
+src/rust/crates/vnesu11/target/
+# v2.0 wip: Rust build artifacts

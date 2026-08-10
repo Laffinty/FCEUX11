@@ -109,6 +109,14 @@ pub fn execute<BC: BusContext>(cpu: &mut CpuCore, op: u8, bus: &mut BC) {
         0xC1 => cpu.cmp_izx(bus),
         0xD1 => cpu.cmp_izy(bus),
 
+        // ---- CPX / CPY ----
+        0xE0 => cpu.cpx_imm(bus),
+        0xE4 => cpu.cpx_zp(bus),
+        0xEC => cpu.cpx_abs(bus),
+        0xC0 => cpu.cpy_imm(bus),
+        0xC4 => cpu.cpy_zp(bus),
+        0xCC => cpu.cpy_abs(bus),
+
         // ---- Branches ----
         0x90 => cpu.bcc(bus),
         0xB0 => cpu.bcs(bus),
@@ -265,12 +273,14 @@ pub fn execute<BC: BusContext>(cpu: &mut CpuCore, op: u8, bus: &mut BC) {
         0x63 => cpu.rra_izx(bus),
         0x73 => cpu.rra_izy(bus),
 
-        // ANC / ARR / XAA / LAS / AXS
+        // ANC / ARR / XAA / LAS / AXS / LAX-imm / SBC-imm(unofficial)
         0x0B | 0x2B => cpu.anc(bus),
-        0x4B => cpu.arr(bus),
+        0x4B | 0x6B => cpu.arr(bus),
         0x8B => cpu.xaa(bus),
         0xBB => cpu.las(bus),
         0xCB => cpu.axs(bus),
+        0xAB => cpu.lax_imm(bus),
+        0xEB => cpu.sbc_imm(bus),
 
         // SHA / SHX / SHY / TAS
         0x9F => cpu.sha_absy(bus),
@@ -291,9 +301,10 @@ pub fn execute<BC: BusContext>(cpu: &mut CpuCore, op: u8, bus: &mut BC) {
         0x04 | 0x44 | 0x64 | 0x0C | 0x14 | 0x34 | 0x54 | 0x74 | 0xD4 | 0xF4 => {
             cpu.nop_imm(bus); // 1 operand byte
         }
-        0x1A | 0x3A | 0x5A | 0x7A | 0xDA | 0xFA | 0x80 | 0x82 | 0x89 | 0xC2 | 0xE2 => {
+        0x1A | 0x3A | 0x5A | 0x7A | 0xDA | 0xFA | 0x80 | 0x82 | 0x89 | 0xC2 | 0xE2
+        | 0x1C | 0x3C | 0x5C | 0x7C | 0xDC | 0xFC => {
             cpu.nop_imm(bus);
-            cpu.nop_imm(bus); // 2 operand bytes
+            cpu.nop_imm(bus); // 2 operand bytes (3-byte NOP)
         }
 
         // Fallback (should never happen for a valid 6502 opcode —

@@ -726,6 +726,12 @@ if(FCEUX11_RUST_ENABLED)
         target_link_libraries(fceux11_core PUBLIC ${VNESU11_RUST_STATIC_LIB})
         add_dependencies(fceux11_core vnesu11_build)
         add_definitions(-DVNESU11_CORE_ENABLED=1)
+        # vNESU11 cbindgen header lives under the crate's target dir
+        # (src/rust/crates/vnesu11/target/vnesu11_ffi.h). Add it to the
+        # include path so vnesu11_bridge.cpp can find it. The add_dependencies
+        # above ensures cargo (which emits the header) runs first.
+        target_include_directories(fceux11_core PUBLIC
+            ${CMAKE_CURRENT_SOURCE_DIR}/rust/crates/vnesu11/target)
         message(STATUS "vNESU11 Rust core enabled (VNESU11_CORE=ON)")
     endif()
     # v1.16 R4-fix (2026-08-07): target_link_libraries above only adds a

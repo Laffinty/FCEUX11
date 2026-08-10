@@ -56,9 +56,8 @@ void vnesu11_clear_mapper_handlers_bridge(void* soc);
 namespace fceu11 {
 
 // Global SoC handle (set by vnesu11_init, used by per-range forwarding).
-// Exposed as a regular C++ global so bus.cpp etc. can reference it
-// directly without extern "C" dance.
-inline void* g_vnesu11_soc = nullptr;
+// Declared `extern`; the single definition lives in vnesu11_bridge.cpp.
+extern void* g_vnesu11_soc;
 
 void vnesu11_init(void);
 void vnesu11_kill(void);

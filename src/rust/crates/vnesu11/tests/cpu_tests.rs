@@ -251,41 +251,48 @@ fn unofficial_nop_consumes_operand() {
 }
 
 // =====================================================================
-// Decimal mode
+// Decimal-flag parity with C++ FCEUX
+//
+// The C++ core (`src/x6502.cpp` ADC/SBC macros) is BINARY-ONLY: it
+// ignores the D (decimal) flag entirely — there is no `D_FLAG` reference
+// anywhere in x6502.cpp. The migration goal (ADR-008, decision A) is
+// byte-for-byte shadow-run parity with C++, so the Rust core matches:
+// SED sets D but ADC/SBC still compute in binary. These tests lock that
+// parity, NOT "ideal" decimal hardware behavior.
 // =====================================================================
 
 #[test]
-fn decimal_adc_no_carry() {
-    // SED; LDA #$15; ADC #$15 鈫?A=$30 (decimal), C clear.
+fn decimal_flag_set_by_sed() {
+    // SED sets the D flag.
+    let (cpu, _) = run_program(&[0xF8], 2);
+    assert_eq!(cpu.p() & D_FLAG, D_FLAG);
+}
+
+#[test]
+fn adc_binary_ignores_decimal_flag() {
+    // SED; LDA #$15; ADC #$15 → C++-parity: binary 0x15+0x15 = 0x2A
+    // (NOT the BCD-adjusted 0x30), C clear.
     let (cpu, _) = run_program(&[0xF8, 0xA9, 0x15, 0x69, 0x15], 8);
-    assert_eq!(cpu.a(), 0x30);
-    assert_eq!(cpu.p() & D_FLAG, D_FLAG); // still in decimal
+    assert_eq!(cpu.a(), 0x2A, "binary result, not BCD-adjusted");
     assert_eq!(cpu.p() & C_FLAG, 0);
 }
 
 #[test]
-fn decimal_adc_overflow_carry() {
-    // SED; LDA #$99; ADC #$01 鈫?A=$00, C set.
+fn adc_binary_overflow_carry_in_decimal_mode() {
+    // SED; LDA #$99; ADC #$01 → binary 0x99+0x01 = 0x9A, C clear,
+    // N set (parity with C++).
     let (cpu, _) = run_program(&[0xF8, 0xA9, 0x99, 0x69, 0x01], 8);
-    assert_eq!(cpu.a(), 0x00);
-    assert_eq!(cpu.p() & C_FLAG, C_FLAG);
-}
-
-#[test]
-fn decimal_sbc_borrow() {
-    // SED; LDA #$00; SBC #$01 with C clear → A=$98, C clear (borrow).
-    // Decimal: 0 - 1 - borrow(1) = -2 → BCD 98.
-    let (cpu, _) = run_program(&[0xF8, 0xA9, 0x00, 0xE9, 0x01], 8);
-    assert_eq!(cpu.a(), 0x98);
+    assert_eq!(cpu.a(), 0x9A);
     assert_eq!(cpu.p() & C_FLAG, 0);
 }
 
 #[test]
-fn decimal_sbc_no_borrow() {
-    // SEC; LDA #$50; SBC #$30 with C set (borrow=0) → 0x50-0x30=0x20, C set.
-    let (cpu, _) = run_program(&[0xF8, 0x38, 0xA9, 0x50, 0xE9, 0x30], 10);
-    assert_eq!(cpu.a(), 0x20);
-    assert_eq!(cpu.p() & C_FLAG, C_FLAG);
+fn sbc_binary_ignores_decimal_flag() {
+    // SED; LDA #$00; SBC #$01 with C clear → binary 0x00 - 0x01 - 1
+    // = 0xFE, C clear (borrow). (NOT the BCD 0x98.)
+    let (cpu, _) = run_program(&[0xF8, 0xA9, 0x00, 0xE9, 0x01], 8);
+    assert_eq!(cpu.a(), 0xFE);
+    assert_eq!(cpu.p() & C_FLAG, 0);
 }
 
 // =====================================================================

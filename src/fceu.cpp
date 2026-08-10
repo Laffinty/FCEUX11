@@ -762,39 +762,13 @@ extern bool isTaseditorRecording(void);
 extern int KillFCEUXonFrame;
 // v0.3.10 P4.1: see LoadGameVirtual comment above.
 void fceu11::Emulate(uint8 **pXBuf, int32 **SoundBuf, int32 *SoundBufSize, int skip) {
-#ifdef VNESU11_CORE_ENABLED
-	// v2.0 wip (Phase 0 §1.4, Phase 6 接通): when VNESU11_CORE is enabled,
-	// route the frame through the vNESU11 Rust SoC instead of the legacy
-	// X6502_RunDebug/FCEUPPU_Loop path. Phase 0 keeps the legacy fallback
-	// (no-op stub returns -1) so the build is functional; Phase 1+
-	// wires real emulation. See docs/wip_2.0_plan/phase_6_integration.md.
-	extern void* fceu11_g_vnesu11_soc;
-	extern void vnesu11_emulate_frame_bridge(
-	    void* soc, int skip,
-	    uint8_t* xbuf, int16_t* sbuf, size_t sbuf_cap, size_t* sbuf_written);
-	if (fceu11::g_vnesu11_soc) {
-		// Allocate per-call buffers; Phase 6 will reuse caller buffers.
-		static uint8_t  xbuf_local[61440];
-		static int16_t  sbuf_local[48000];
-		size_t sbuf_written = 0;
-		vnesu11_emulate_frame_bridge(
-		    fceu11::g_vnesu11_soc, skip,
-		    xbuf_local, sbuf_local, sizeof(sbuf_local)/sizeof(sbuf_local[0]),
-		    &sbuf_written);
-		*pXBuf = xbuf_local;
-		*SoundBuf = sbuf_local;
-		*SoundBufSize = static_cast<int32_t>(sbuf_written);
-		// Phase 6 wires these side-effects:
-		//   - Frame counter advance + LagFrame tracking (kagami_bridge.cpp parity)
-		//   - Joypad polling + autofire + cheat apply
-		//   - Movie record/playback (MovieData::dumpSavestateTo on F2)
-		//   - Lua LUACALL_BEFOREEMULATION/AFTEREMULATION callbacks
-		// Phase 0 leaves them untouched under VNESU11_CORE so behavior is
-		// identical to the C++ path (since the stub returns -1, the
-		// branch is never entered in practice).
-		return;
-	}
-#endif
+	// v2.0 wip (Phase 0 §1.4 note): the VNESU11_CORE frame-routing branch
+	// is REMOVED until Phase 6 wires the real vnesu11_emulate_frame FFI
+	// (with correct int32* sound-buffer types and side-effect parity).
+	// The Phase 0 stub returned -1 and was never reached, but it could
+	// not compile (int16_t vs int32* mismatch, missing include). Keeping
+	// VNESU11_CORE=ON builds healthy until Phase 6 is the priority.
+	// See docs/wip_2.0_plan/phase_6_integration.md.
 
 	FCEU_PROFILE_FUNC(prof, "Emulate Single Frame");
 	//skip initiates frame skip if 1, or frame skip and sound skip if 2

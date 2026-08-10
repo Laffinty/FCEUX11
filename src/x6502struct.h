@@ -17,22 +17,8 @@
 // v2.0 wip (Phase 0, audit S1): layout assertions for vNESU11 compat.
 // The Rust `CpuRegsLayout` mirrors this struct byte-for-byte; any drift
 // here must be reflected in `src/rust/crates/vnesu11/src/cpu/regs.rs`.
-static_assert(offsetof(X6502, tcount) == 0,   "tcount must be at offset 0");
-static_assert(offsetof(X6502, PC)     == 4,   "PC must be at offset 4");
-static_assert(offsetof(X6502, A)      == 6,   "A must be at offset 6");
-static_assert(offsetof(X6502, jammed) == 12,  "jammed must be at offset 12");
-static_assert(offsetof(X6502, count)  == 16,  "count must be at offset 16");
-static_assert(offsetof(X6502, IRQlow) == 20,  "IRQlow must be at offset 20");
-static_assert(offsetof(X6502, DB)     == 24,  "DB must be at offset 24");
-static_assert(offsetof(X6502, preexec) == 28, "preexec must be at offset 28");
-#ifdef FCEUDEF_DEBUGGER
-static_assert(offsetof(X6502, CPUHook) == 32,  "CPUHook must be at offset 32");
-static_assert(offsetof(X6502, ReadHook) == 40, "ReadHook must be at offset 40");
-static_assert(offsetof(X6502, WriteHook) == 48,"WriteHook must be at offset 48");
-#endif
-static_assert(sizeof(X6502) == 64, "X6502 must be 64 bytes (alignas(64))");
-static_assert(alignof(X6502) == 64, "X6502 must be 64-byte aligned");
-
+// NOTE: the static_asserts must appear AFTER the struct definition
+// (they reference `X6502`), which they do at the bottom of this file.
 typedef struct alignas(64) X6502 {
   int32 tcount;     /* Temporary cycle counter */
   uint16 PC;        /* I'll change this to uint32 later... */
@@ -55,6 +41,26 @@ typedef struct alignas(64) X6502 {
 	#endif
 
 } X6502;
+
+// v2.0 wip (Phase 0, audit S1): per-field offset + size + align locks.
+// The Rust `CpuRegsLayout` mirrors this byte-for-byte; any drift here
+// must be reflected in `src/rust/crates/vnesu11/src/cpu/regs.rs`.
+static_assert(offsetof(X6502, tcount) == 0,   "tcount must be at offset 0");
+static_assert(offsetof(X6502, PC)     == 4,   "PC must be at offset 4");
+static_assert(offsetof(X6502, A)      == 6,   "A must be at offset 6");
+static_assert(offsetof(X6502, jammed) == 12,  "jammed must be at offset 12");
+static_assert(offsetof(X6502, count)  == 16,  "count must be at offset 16");
+static_assert(offsetof(X6502, IRQlow) == 20,  "IRQlow must be at offset 20");
+static_assert(offsetof(X6502, DB)     == 24,  "DB must be at offset 24");
+static_assert(offsetof(X6502, preexec) == 28, "preexec must be at offset 28");
+#ifdef FCEUDEF_DEBUGGER
+static_assert(offsetof(X6502, CPUHook) == 32,  "CPUHook must be at offset 32");
+static_assert(offsetof(X6502, ReadHook) == 40, "ReadHook must be at offset 40");
+static_assert(offsetof(X6502, WriteHook) == 48,"WriteHook must be at offset 48");
+#endif
+static_assert(sizeof(X6502) == 64, "X6502 must be 64 bytes (alignas(64))");
+static_assert(alignof(X6502) == 64, "X6502 must be 64-byte aligned");
+
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif

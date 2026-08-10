@@ -1,25 +1,27 @@
 //! Arithmetic & logical instructions: ADC, SBC, AND, ORA, EOR, CMP.
 
-use super::flags::{set_zn, C_FLAG, D_FLAG, V_FLAG};
+use super::flags::{set_zn, C_FLAG, V_FLAG};
 use super::BusContext;
 use super::CpuCore;
 
 impl CpuCore {
     // -----------------------------------------------------------------
-    // ADC — add with carry (8 modes), decimal mode supported
+    // ADC — add with carry (8 modes)
+    //
+    // NOTE (parity decision): the C++ FCEUX core (`x6502.cpp` ADC macro)
+    // treats ADC/SBC as **binary-only**, ignoring the D (decimal) flag
+    // entirely — there is no `D_FLAG` reference anywhere in x6502.cpp.
+    // NES commercial software never uses decimal mode, and the migration
+    // goal (decision A / ADR-008) is byte-for-byte shadow-run parity with
+    // the C++ core. A "more correct" decimal implementation would break
+    // parity and red-flag every shadow-run diff. So we match C++ exactly:
+    // binary arithmetic regardless of D. If a future phase decides to
+    // implement decimal mode (FCEUX upstream is binary-only too), it must
+    // be a deliberate, separately-gated change.
     // -----------------------------------------------------------------
 
     #[inline(always)]
     pub(crate) fn adc_common(&mut self, val: u8) {
-        if self.p & D_FLAG != 0 {
-            self.adc_decimal(val);
-        } else {
-            self.adc_binary(val);
-        }
-    }
-
-    #[inline(always)]
-    fn adc_binary(&mut self, val: u8) {
         let a = self.a;
         let carry = (self.p & C_FLAG != 0) as u16;
         let sum = a as u16 + val as u16 + carry;
@@ -29,32 +31,6 @@ impl CpuCore {
         self.p = set_zn(self.p, sum as u8);
         self.p = if v { self.p | V_FLAG } else { self.p & !V_FLAG };
         self.p = if sum > 0xFF { self.p | C_FLAG } else { self.p & !C_FLAG };
-        self.a = sum as u8;
-    }
-
-    #[inline(always)]
-    fn adc_decimal(&mut self, val: u8) {
-        let a = self.a;
-        let carry = (self.p & C_FLAG != 0) as u16;
-        // Binary result for V flag (NES behavior).
-        let bin_sum = a as u16 + val as u16 + carry;
-        let v = ((a ^ val) & 0x80 == 0) && ((a ^ (bin_sum as u8)) & 0x80 != 0);
-
-        // Decimal-adjusted sum.
-        let lo = (a & 0x0F) as u16 + (val & 0x0F) as u16 + carry;
-        let hi = (a >> 4) as u16 + (val >> 4) as u16;
-        let mut sum = lo + (hi << 4);
-        if lo > 0x09 {
-            sum += 0x06;
-        }
-        let mut carry_out = false;
-        if sum > 0x99 {
-            sum += 0x60;
-            carry_out = true;
-        }
-        self.p = set_zn(self.p, sum as u8);
-        self.p = if v { self.p | V_FLAG } else { self.p & !V_FLAG };
-        self.p = if carry_out { self.p | C_FLAG } else { self.p & !C_FLAG };
         self.a = sum as u8;
     }
 
@@ -69,52 +45,18 @@ impl CpuCore {
     #[inline(always)] pub(crate) fn adc_izy<BC: BusContext>(&mut self, bus: &mut BC) { let v = self.read_izy(bus); self.adc_common(v); }
 
     // -----------------------------------------------------------------
-    // SBC — subtract with borrow (8 modes), decimal mode supported
+    // SBC — subtract with borrow (8 modes)
+    //
+    // Parity decision (see ADC above): binary-only, matching C++ FCEUX
+    // exactly. SBC = A - val - (1 - C), implemented as ADC of the
+    // complement with the same carry:
+    //   A + !val + C = A + (255-val) + C ≡ A - val - 1 + C (mod 256)
+    //                = A - val - (1 - C). ✓
     // -----------------------------------------------------------------
 
     #[inline(always)]
     pub(crate) fn sbc_common(&mut self, val: u8) {
-        if self.p & D_FLAG != 0 {
-            self.sbc_decimal(val);
-        } else {
-            // SBC = A - val - (1 - C). In binary mode this is exactly
-            // equivalent to ADC with the complement (~val) and the same
-            // carry, because: A + !val + C = A + (255-val) + C
-            //   = A - val + 255 + C ≡ A - val - 1 + C (mod 256)
-            //   = A - val - (1 - C). ✓
-            self.adc_binary(!val);
-        }
-    }
-
-    /// Decimal-mode SBC. The NES 6502 decimal adjust is NOT the same as
-    /// ADC-of-complement; it needs its own correction rules:
-    ///   temp = A - val - (1-C)
-    ///   if (A & 0x0F) < (val & 0x0F) + (1-C):  temp -= 0x06
-    ///   if (temp & 0xF0) > 0x90:               temp -= 0x60
-    #[inline(always)]
-    fn sbc_decimal(&mut self, val: u8) {
-        let a = self.a;
-        let c = self.p & C_FLAG != 0;
-        let borrow: u8 = if c { 0 } else { 1 };
-
-        let mut temp = a.wrapping_sub(val).wrapping_sub(borrow);
-
-        if (a & 0x0F) < (val & 0x0F).wrapping_add(borrow) {
-            temp = temp.wrapping_sub(0x06);
-        }
-        if temp & 0xF0 > 0x90 {
-            temp = temp.wrapping_sub(0x60);
-        }
-
-        // V flag from binary subtraction overflow.
-        let v = ((a ^ val) & 0x80 != 0) && ((a ^ temp) & 0x80 != 0);
-        // Carry = 1 if no borrow out (A >= val + borrow).
-        let no_borrow = (a as u16) >= (val as u16) + borrow as u16;
-
-        self.p = set_zn(self.p, temp);
-        self.p = if v { self.p | V_FLAG } else { self.p & !V_FLAG };
-        self.p = if no_borrow { self.p | C_FLAG } else { self.p & !C_FLAG };
-        self.a = temp;
+        self.adc_common(!val);
     }
 
     #[inline(always)] pub(crate) fn sbc_imm<BC: BusContext>(&mut self, bus: &mut BC) { let v = self.imm(bus); self.sbc_common(v); }
@@ -171,6 +113,30 @@ impl CpuCore {
     #[inline(always)] pub(crate) fn eor_absy<BC: BusContext>(&mut self, bus: &mut BC) { let v = self.read_absy(bus); self.eor_common(v); }
     #[inline(always)] pub(crate) fn eor_izx<BC: BusContext>(&mut self, bus: &mut BC) { let v = self.read_izx(bus); self.eor_common(v); }
     #[inline(always)] pub(crate) fn eor_izy<BC: BusContext>(&mut self, bus: &mut BC) { let v = self.read_izy(bus); self.eor_common(v); }
+
+    // -----------------------------------------------------------------
+    // CPX / CPY — compare X or Y with memory (3 modes each)
+    // -----------------------------------------------------------------
+
+    #[inline(always)]
+    fn cpx_common(&mut self, val: u8) {
+        let r = self.x.wrapping_sub(val);
+        self.p = set_zn(self.p, r);
+        self.p = if self.x >= val { self.p | C_FLAG } else { self.p & !C_FLAG };
+    }
+    #[inline(always)] pub(crate) fn cpx_imm<BC: BusContext>(&mut self, bus: &mut BC) { let v = self.imm(bus); self.cpx_common(v); }
+    #[inline(always)] pub(crate) fn cpx_zp<BC: BusContext>(&mut self, bus: &mut BC) { let v = self.read_zp(bus); self.cpx_common(v); }
+    #[inline(always)] pub(crate) fn cpx_abs<BC: BusContext>(&mut self, bus: &mut BC) { let v = self.read_abs(bus); self.cpx_common(v); }
+
+    #[inline(always)]
+    fn cpy_common(&mut self, val: u8) {
+        let r = self.y.wrapping_sub(val);
+        self.p = set_zn(self.p, r);
+        self.p = if self.y >= val { self.p | C_FLAG } else { self.p & !C_FLAG };
+    }
+    #[inline(always)] pub(crate) fn cpy_imm<BC: BusContext>(&mut self, bus: &mut BC) { let v = self.imm(bus); self.cpy_common(v); }
+    #[inline(always)] pub(crate) fn cpy_zp<BC: BusContext>(&mut self, bus: &mut BC) { let v = self.read_zp(bus); self.cpy_common(v); }
+    #[inline(always)] pub(crate) fn cpy_abs<BC: BusContext>(&mut self, bus: &mut BC) { let v = self.read_abs(bus); self.cpy_common(v); }
 
     // -----------------------------------------------------------------
     // CMP — compare A with memory (8 modes)
