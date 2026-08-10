@@ -74,14 +74,6 @@ pub const IS_RMW: [bool; 256] = {
     t
 };
 
-/// Whether this opcode reads memory (used to decide page-cross penalty).
-/// Read ops: LDA, LDX, LDY, EOR, AND, ORA, ADC, SBC, CMP, BIT, PLA,
-/// plus their unofficial variants.
-pub const IS_READ: [bool; 256] = {
-    let mut t = [false; 256];
-    t
-};
-
 #[cfg(test)]
 mod tests {
     use super::*;

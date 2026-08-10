@@ -1,144 +1,261 @@
-//! 6502 addressing modes.
+//! 6502 addressing modes — effective-address computation + page-cross.
 //!
-//! Each mode provides:
-//! - `mode_size(opcode) -> u8`     number of extra bytes after the opcode
-//! - `fetch_addr(cpu, bus) -> Addr` resolves effective address (and
-//!   reads any operands from memory). May also return a "page-crossed"
-//!   flag for cycle-penalty purposes.
+//! Each method advances `pc` past the operand bytes and returns the
+//! effective address (or value for immediate). Page-cross flags are
+//! returned where the CPU adds a +1 cycle penalty:
 //!
-//! Page-cross penalty rules:
-//! - Read modes: +1 cycle if effective addr page != operand page
-//!   (e.g., LDA $nnnn,Y when nn crosses page)
-//! - Branch modes: +1 cycle if branch taken AND target page != PC page
-//! - RMW absolute indexed: +1 cycle always (per 6502 quirk)
-//! - JMP indirect: $nnnn crossed page is an emulator-defined quirk
-//!   (the 6502 bug where $00FF wraps to $0000 instead of $0100)
+//! * reads via abs,X / abs,Y / (ind),Y
+//! * taken branches whose target crosses a page
+//! * RMW via abs,X / abs,Y always (+1)
 //!
-//! Source conventions: see `src/ops_table.inc` for the C++ macro forms
-//! (LD_IMM, LD_ZP, LD_ZPX, ...).
+//! Zero-page indexed modes wrap within the zero page (no penalty).
+//!
+//! The `read_*` helpers combine address computation + memory read in
+//! SEPARATE statements so Rust's borrow checker accepts the pattern
+//! (avoiding E0499 from nesting `bus.read(self.zp(bus))` in one expr).
 
-use crate::cpu::BusContext;
+use super::BusContext;
+use super::CpuCore;
 
-/// Resolved addressing mode for an operand.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Addr {
-    /// 16-bit effective address.
-    pub addr: u16,
-    /// True if the address computation crossed a page boundary
-    /// (consumes +1 cycle for read modes, +1 for taken branches).
-    pub page_crossed: bool,
-    /// True if the operand was at zero-page (zp, zp,X, zp,Y).
-    /// Used by RMW modes to skip the extra-cycle quirk.
-    pub zero_page: bool,
-}
+impl CpuCore {
+    // -----------------------------------------------------------------
+    // Immediate / implied (no address computation)
+    // -----------------------------------------------------------------
 
-/// Number of operand bytes (after the opcode) for each 6502 opcode.
-/// This matches `opsize[]` in `src/x6502.cpp` (with `BRK_3BYTE_HACK` not
-/// defined, i.e. BRK is 1 byte like every other 6502 implementation —
-/// the "signature byte" is implicit).
-pub fn op_size(opcode: u8) -> u8 {
-    // Source: src/x6502.cpp opsize[256] verbatim.
-    OPSIZE[opcode as usize]
-}
-
-const OPSIZE: [u8; 256] = [
-    /*0x00*/ 1, 2, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 3, 3, 3, 3,
-    /*0x10*/ 2, 2, 0, 0, 0, 2, 2, 0, 1, 3, 0, 0, 0, 3, 3, 0,
-    /*0x20*/ 3, 2, 0, 0, 2, 2, 2, 0, 1, 2, 1, 0, 3, 3, 3, 0,
-    /*0x30*/ 2, 2, 0, 0, 0, 2, 2, 0, 1, 3, 0, 0, 0, 3, 3, 0,
-    /*0x40*/ 1, 2, 0, 0, 0, 2, 2, 0, 1, 2, 1, 0, 3, 3, 3, 0,
-    /*0x50*/ 2, 2, 0, 0, 0, 2, 2, 0, 1, 3, 0, 0, 0, 3, 3, 0,
-    /*0x60*/ 1, 2, 0, 0, 0, 2, 2, 0, 1, 2, 1, 0, 3, 3, 3, 0,
-    /*0x70*/ 2, 2, 0, 0, 0, 2, 2, 0, 1, 3, 0, 0, 0, 3, 3, 0,
-    /*0x80*/ 0, 2, 0, 0, 2, 2, 2, 0, 1, 0, 1, 0, 3, 3, 3, 0,
-    /*0x90*/ 2, 2, 0, 0, 2, 2, 2, 0, 1, 3, 1, 0, 0, 3, 0, 0,
-    /*0xA0*/ 2, 2, 2, 0, 2, 2, 2, 0, 1, 2, 1, 0, 3, 3, 3, 0,
-    /*0xB0*/ 2, 2, 0, 0, 2, 2, 2, 0, 1, 3, 1, 0, 3, 3, 3, 0,
-    /*0xC0*/ 2, 2, 0, 0, 2, 2, 2, 0, 1, 2, 1, 0, 3, 3, 3, 0,
-    /*0xD0*/ 2, 2, 0, 0, 0, 2, 2, 0, 1, 3, 0, 0, 0, 3, 3, 0,
-    /*0xE0*/ 2, 2, 0, 0, 2, 2, 2, 0, 1, 2, 1, 0, 3, 3, 3, 0,
-    /*0xF0*/ 2, 2, 0, 0, 0, 2, 2, 0, 1, 3, 0, 0, 0, 3, 3, 0,
-];
-
-/// Read the byte at `pc` and increment pc. Used by instruction fetch.
-#[inline(always)]
-pub fn fetch_byte<BC: BusContext>(pc: &mut u16, bus: &mut BC) -> u8 {
-    let b = bus.read(*pc);
-    *pc = pc.wrapping_add(1);
-    b
-}
-
-/// Read the little-endian word at `pc` and increment pc by 2.
-#[inline(always)]
-pub fn fetch_word<BC: BusContext>(pc: &mut u16, bus: &mut BC) -> u16 {
-    let lo = bus.read(*pc) as u16;
-    let hi = bus.read(pc.wrapping_add(1)) as u16;
-    *pc = pc.wrapping_add(2);
-    lo | (hi << 8)
-}
-
-/// Read zero-page address at `pc` (wraps within page 0).
-#[inline(always)]
-pub fn fetch_zp<BC: BusContext>(pc: &mut u16, bus: &mut BC) -> u8 {
-    let b = bus.read(*pc);
-    *pc = pc.wrapping_add(1);
-    b
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::cpu::regs::CpuRegsLayout;
-
-    struct TestBus {
-        mem: [u8; 65536],
-        pc: u16,
-        stall: bool,
-    }
-    impl crate::cpu::BusContext for TestBus {
-        fn read(&mut self, addr: u16) -> u8 { self.mem[addr as usize] }
-        fn write(&mut self, addr: u16, val: u8) { self.mem[addr as usize] = val; }
-        fn dma_stalled(&self) -> bool { self.stall }
+    /// Read the immediate byte and advance PC.
+    #[inline(always)]
+    pub(crate) fn imm<BC: BusContext>(&mut self, bus: &mut BC) -> u8 {
+        let b = bus.read(self.pc);
+        self.pc = self.pc.wrapping_add(1);
+        b
     }
 
-    #[test]
-    fn op_size_brk_is_1() {
-        // The upstream `BRK_3BYTE_HACK` is not used in this build —
-        // BRK is a 1-byte instruction (the "signature byte" is implicit).
-        assert_eq!(op_size(0x00), 1);
+    // -----------------------------------------------------------------
+    // Zero-page (no page-cross; wraps within 0x00-0xFF)
+    // -----------------------------------------------------------------
+
+    #[inline(always)]
+    pub(crate) fn zp<BC: BusContext>(&mut self, bus: &mut BC) -> u16 {
+        let a = bus.read(self.pc) as u16;
+        self.pc = self.pc.wrapping_add(1);
+        a
     }
 
-    #[test]
-    fn op_size_jmp_abs_is_3() {
-        // JMP $nnnn
-        assert_eq!(op_size(0x4C), 3);
+    #[inline(always)]
+    pub(crate) fn zpx<BC: BusContext>(&mut self, bus: &mut BC) -> u16 {
+        let a = bus.read(self.pc) as u16;
+        self.pc = self.pc.wrapping_add(1);
+        a.wrapping_add(self.x as u16) & 0xFF
     }
 
-    #[test]
-    fn op_size_lda_imm_is_2() {
-        assert_eq!(op_size(0xA9), 2);
+    #[inline(always)]
+    pub(crate) fn zpy<BC: BusContext>(&mut self, bus: &mut BC) -> u16 {
+        let a = bus.read(self.pc) as u16;
+        self.pc = self.pc.wrapping_add(1);
+        a.wrapping_add(self.y as u16) & 0xFF
     }
 
-    #[test]
-    fn fetch_byte_increments_pc() {
-        let mut bus = TestBus { mem: [0; 65536], pc: 0x100, stall: false };
-        bus.mem[0x100] = 0x42;
-        let mut pc = 0x100;
-        assert_eq!(fetch_byte(&mut pc, &mut bus), 0x42);
-        assert_eq!(pc, 0x101);
+    // -----------------------------------------------------------------
+    // Absolute (16-bit; may page-cross with X/Y)
+    // -----------------------------------------------------------------
+
+    /// Absolute address, no penalty (used for writes and JMP).
+    #[inline(always)]
+    pub(crate) fn abs<BC: BusContext>(&mut self, bus: &mut BC) -> u16 {
+        let lo = bus.read(self.pc) as u16;
+        let hi = bus.read(self.pc.wrapping_add(1)) as u16;
+        self.pc = self.pc.wrapping_add(2);
+        lo | (hi << 8)
     }
 
-    #[test]
-    fn fetch_word_reads_le() {
-        let mut bus = TestBus { mem: [0; 65536], pc: 0x200, stall: false };
-        bus.mem[0x200] = 0x34;
-        bus.mem[0x201] = 0x12;
-        let mut pc = 0x200;
-        assert_eq!(fetch_word(&mut pc, &mut bus), 0x1234);
-        assert_eq!(pc, 0x202);
+    /// Absolute,X — returns (addr, page_crossed).
+    #[inline(always)]
+    pub(crate) fn absx<BC: BusContext>(&mut self, bus: &mut BC) -> (u16, bool) {
+        let base = self.abs(bus);
+        let crossed = (base & 0xFF) + self.x as u16 > 0xFF;
+        (base.wrapping_add(self.x as u16), crossed)
     }
 
-    // Silence unused-import warning when CpuRegsLayout is not used directly.
-    #[allow(dead_code)]
-    fn _ensure_layout_import(_: CpuRegsLayout) {}
+    /// Absolute,Y — returns (addr, page_crossed).
+    #[inline(always)]
+    pub(crate) fn absy<BC: BusContext>(&mut self, bus: &mut BC) -> (u16, bool) {
+        let base = self.abs(bus);
+        let crossed = (base & 0xFF) + self.y as u16 > 0xFF;
+        (base.wrapping_add(self.y as u16), crossed)
+    }
+
+    // -----------------------------------------------------------------
+    // Indirect (JMP only)
+    // -----------------------------------------------------------------
+
+    /// (absolute indirect) — includes the famous 6502 page-wrap bug:
+    /// if `base & 0xFF == 0xFF`, the high byte is read from the same
+    /// page (base & 0xFF00), NOT base+1 across the page boundary.
+    #[inline(always)]
+    pub(crate) fn indirect<BC: BusContext>(&mut self, bus: &mut BC) -> u16 {
+        let base = self.abs(bus);
+        let lo = bus.read(base) as u16;
+        // 6502 bug: high byte address wraps within the page.
+        let hi_addr = (base & 0xFF00) | ((base.wrapping_add(1)) & 0x00FF);
+        let hi = bus.read(hi_addr) as u16;
+        lo | (hi << 8)
+    }
+
+    // -----------------------------------------------------------------
+    // Indexed indirect (zero-page vector)
+    // -----------------------------------------------------------------
+
+    /// (Indirect,X): vector at (zp + X), wraps in zero page.
+    #[inline(always)]
+    pub(crate) fn izx<BC: BusContext>(&mut self, bus: &mut BC) -> u16 {
+        let zp_base = self.zpx(bus); // already & 0xFF
+        self.read_vector(bus, zp_base)
+    }
+
+    /// (Indirect),Y: vector at zp, add Y. Returns (addr, page_crossed).
+    #[inline(always)]
+    pub(crate) fn izy<BC: BusContext>(&mut self, bus: &mut BC) -> (u16, bool) {
+        let zp_base = self.zp(bus);
+        let base = self.read_vector(bus, zp_base);
+        let crossed = (base & 0xFF) + self.y as u16 > 0xFF;
+        (base.wrapping_add(self.y as u16), crossed)
+    }
+
+    /// Read a 16-bit vector at a zero-page address (wraps within page 0).
+    #[inline(always)]
+    fn read_vector<BC: BusContext>(&mut self, bus: &mut BC, zp_addr: u16) -> u16 {
+        let lo = bus.read(zp_addr) as u16;
+        let hi = bus.read((zp_addr.wrapping_add(1)) & 0xFF) as u16;
+        lo | (hi << 8)
+    }
+
+    // -----------------------------------------------------------------
+    // Relative (branches)
+    // -----------------------------------------------------------------
+
+    /// Read the branch offset, compute target, and advance PC past it.
+    /// Returns (target, crossed_page).
+    #[inline(always)]
+    pub(crate) fn relative<BC: BusContext>(&mut self, bus: &mut BC) -> (u16, bool) {
+        let off = self.imm(bus) as i8;
+        let base = self.pc;
+        let target = base.wrapping_add(off as i16 as u16);
+        let crossed = (base & 0xFF00) != (target & 0xFF00);
+        (target, crossed)
+    }
+
+    // -----------------------------------------------------------------
+    // Read helpers — combine address computation + bus read in separate
+    // statements (avoids E0499). Page-cross penalty applied inline.
+    // -----------------------------------------------------------------
+
+    #[inline(always)]
+    pub(crate) fn read_zp<BC: BusContext>(&mut self, bus: &mut BC) -> u8 {
+        let a = self.zp(bus);
+        bus.read(a)
+    }
+
+    #[inline(always)]
+    pub(crate) fn read_zpx<BC: BusContext>(&mut self, bus: &mut BC) -> u8 {
+        let a = self.zpx(bus);
+        bus.read(a)
+    }
+
+    #[inline(always)]
+    pub(crate) fn read_zpy<BC: BusContext>(&mut self, bus: &mut BC) -> u8 {
+        let a = self.zpy(bus);
+        bus.read(a)
+    }
+
+    #[inline(always)]
+    pub(crate) fn read_abs<BC: BusContext>(&mut self, bus: &mut BC) -> u8 {
+        let a = self.abs(bus);
+        bus.read(a)
+    }
+
+    #[inline(always)]
+    pub(crate) fn read_absx<BC: BusContext>(&mut self, bus: &mut BC) -> u8 {
+        let (a, crossed) = self.absx(bus);
+        if crossed {
+            self.count -= 1;
+        }
+        bus.read(a)
+    }
+
+    #[inline(always)]
+    pub(crate) fn read_absy<BC: BusContext>(&mut self, bus: &mut BC) -> u8 {
+        let (a, crossed) = self.absy(bus);
+        if crossed {
+            self.count -= 1;
+        }
+        bus.read(a)
+    }
+
+    #[inline(always)]
+    pub(crate) fn read_izx<BC: BusContext>(&mut self, bus: &mut BC) -> u8 {
+        let a = self.izx(bus);
+        bus.read(a)
+    }
+
+    #[inline(always)]
+    pub(crate) fn read_izy<BC: BusContext>(&mut self, bus: &mut BC) -> u8 {
+        let (a, crossed) = self.izy(bus);
+        if crossed {
+            self.count -= 1;
+        }
+        bus.read(a)
+    }
+
+    // -----------------------------------------------------------------
+    // Write helpers — compute address + bus write (no page-cross
+    // penalty on writes).
+    // -----------------------------------------------------------------
+
+    #[inline(always)]
+    pub(crate) fn write_zp<BC: BusContext>(&mut self, val: u8, bus: &mut BC) {
+        let a = self.zp(bus);
+        bus.write(a, val);
+    }
+
+    #[inline(always)]
+    pub(crate) fn write_zpx<BC: BusContext>(&mut self, val: u8, bus: &mut BC) {
+        let a = self.zpx(bus);
+        bus.write(a, val);
+    }
+
+    #[inline(always)]
+    pub(crate) fn write_zpy<BC: BusContext>(&mut self, val: u8, bus: &mut BC) {
+        let a = self.zpy(bus);
+        bus.write(a, val);
+    }
+
+    #[inline(always)]
+    pub(crate) fn write_abs<BC: BusContext>(&mut self, val: u8, bus: &mut BC) {
+        let a = self.abs(bus);
+        bus.write(a, val);
+    }
+
+    #[inline(always)]
+    pub(crate) fn write_absx<BC: BusContext>(&mut self, val: u8, bus: &mut BC) {
+        let (a, _) = self.absx(bus);
+        bus.write(a, val);
+    }
+
+    #[inline(always)]
+    pub(crate) fn write_absy<BC: BusContext>(&mut self, val: u8, bus: &mut BC) {
+        let (a, _) = self.absy(bus);
+        bus.write(a, val);
+    }
+
+    #[inline(always)]
+    pub(crate) fn write_izx<BC: BusContext>(&mut self, val: u8, bus: &mut BC) {
+        let a = self.izx(bus);
+        bus.write(a, val);
+    }
+
+    #[inline(always)]
+    pub(crate) fn write_izy<BC: BusContext>(&mut self, val: u8, bus: &mut BC) {
+        let (a, _) = self.izy(bus);
+        bus.write(a, val);
+    }
 }

@@ -1,15 +1,18 @@
-//! VNesSoc skeleton — Phase 0 stub.
+//! VNesSoc skeleton — Phase 0 stub + Phase 1 CPU wiring.
 //!
-//! The real implementation lands across Phase 1-5. Phase 0 ships the struct
-//! shape + opaque pointer so the C-ABI surface compiles and links.
+//! Phase 0: struct shape + opaque pointer (C-ABI surface compiles/links).
+//! Phase 1: `CpuCore` replaces `CpuPlaceholder`; a minimal
+//! `VNesBusContext` wires WRAM + mapper handlers so the CPU can execute
+//! against the SoC's own memory.
 
+use crate::cpu::{BusContext, CpuCore};
 use crate::mapper::MapperRangeTable;
 
-/// Top-level SoC struct. Phase 0: all fields are placeholders.
-/// Real fields arrive in Phase 1-5 per `02_architecture.md` §7.
+/// Top-level SoC struct. Phase 1: CPU wired; PPU/APU still placeholders.
+/// Real fields arrive in Phase 3-5 per `02_architecture.md` §7.
 pub struct VNesSoc {
-    /// CPU interpreter. Phase 1 lands here.
-    pub cpu: CpuPlaceholder,
+    /// CPU interpreter (Phase 1 — implemented).
+    pub cpu: CpuCore,
     /// PPU core. Phase 3 lands here (newppu=1 only).
     pub ppu: PpuPlaceholder,
     /// APU core. Phase 4 lands here.
@@ -47,7 +50,7 @@ pub struct VNesSoc {
 impl Default for VNesSoc {
     fn default() -> Self {
         Self {
-            cpu: CpuPlaceholder::default(),
+            cpu: CpuCore::new(),
             ppu: PpuPlaceholder::default(),
             apu: ApuPlaceholder::default(),
             dma: DmaPlaceholder::default(),
@@ -62,6 +65,49 @@ impl Default for VNesSoc {
             frame_buffer: [0; 61440],
             frame_ready: false,
         }
+    }
+}
+
+/// Bus context that lets `CpuCore` read/write through the SoC.
+///
+/// Phase 1: WRAM ($0000-$1FFF) + PRG-ROM stub (mapper region returns
+/// open bus). Phase 2 wires the full match-based decode + mapper table.
+pub struct VNesBusContext<'a> {
+    /// Borrows the mutable parts of the SoC the CPU needs.
+    pub soc: &'a mut VNesSoc,
+    /// PRG-ROM (from ROM load, Phase 5 wires mapper). Stub for now.
+    pub prg_rom: &'a [u8],
+    /// Open-bus value.
+    pub open_bus: u8,
+}
+
+impl BusContext for VNesBusContext<'_> {
+    #[inline(always)]
+    fn read(&mut self, addr: u16) -> u8 {
+        let v = match addr {
+            0x0000..=0x1FFF => self.soc.wram[(addr & 0x07FF) as usize],
+            0x8000..=0xFFFF => {
+                let idx = (addr - 0x8000) as usize % self.prg_rom.len().max(1);
+                self.prg_rom[idx]
+            }
+            _ => self.open_bus,
+        };
+        self.open_bus = v;
+        v
+    }
+
+    #[inline(always)]
+    fn write(&mut self, addr: u16, val: u8) {
+        match addr {
+            0x0000..=0x1FFF => self.soc.wram[(addr & 0x07FF) as usize] = val,
+            _ => {}
+        }
+        self.open_bus = val;
+    }
+
+    #[inline(always)]
+    fn dma_stalled(&self) -> bool {
+        false
     }
 }
 
