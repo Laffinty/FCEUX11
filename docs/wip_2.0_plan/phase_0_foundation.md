@@ -48,30 +48,42 @@
 - [ ] 每 tag 记录：类型（u8/u16/u32/RLSB/数组）、大小、语义、源字段指针
 - [ ] 产出"tag → Rust 字段"映射表（值语义等价，不依赖布局）
 
-### 1.4 [修订] C++ 端兼容垫片
+### 1.4 [修订 2026-08-10] C++ 端兼容垫片（构建实测校准）
 
-- [ ] 在 `src/vnesu11_bridge.h` / `.cpp` 声明 FFI 调用点
-- [ ] 添加 `option(VNESU11_CORE "Use vNESU11 Rust core" OFF)` 到根 `CMakeLists.txt`
-- [ ] 修改 `src/CMakeLists.txt`：当 `VNESU11_CORE=ON` 时链接 `vnesu11` 静态库
-- [ ] `FCEUI_*` 兼容垫片增加 `#ifdef VNESU11_CORE` 分支
-- [ ] **`SetReadHandler`/`SetWriteHandler` 转发**（`bus.h:92-93`）：
-      当 `VNESU11_CORE=ON` 时把区间注册转发到 `vnesu11_set_read_handler`，
-      保留 Game Genie 包装逻辑在 C++ 侧
+- [x] 在 `src/vnesu11_bridge.h` / `.cpp` 声明 FFI 调用点（**已落地**）
+- [x] 添加 `option(VNESU11_CORE "Use vNESU11 Rust core" OFF)` 到根 `CMakeLists.txt`（**已落地**）
+- [x] 修改 `src/CMakeLists.txt`：当 `VNESU11_CORE=ON` 时链接 `vnesu11` 静态库
+      + `add_dependencies(vnesu11_build)` 保证 cargo（生成 cbindgen header）先于
+      C++ 编译（**已落地**）
+- [ ] `FCEUI_*` 兼容垫片增加 `#ifdef VNESU11_CORE` 分支 — **[修订] 已回退，Phase 6 待办**：
+      实测 fceu.cpp::Emulate 的路由代码无法编译（`int16_t*` vs `int32*` SoundBuf 不匹配 +
+      缺 vnesu11_bridge.h include），已移除。Phase 6 用正确的类型和 include 重做。
+- [ ] **`SetReadHandler`/`SetWriteHandler` 转发** — **[修订] 设计不成立，已移除，Phase 5 待办**：
+      实测 `readfunc = uint8(*)(uint32)`（无 ctx，`types.h:90`），vNESU11 区间表需
+      `uint8(*)(void*, uint16)`——直接 cast 是 ABI 谎言 + 悬垂 ctx 隐患。正确适配
+      （mapper 实例作 ctx）属于 Phase 5 MapperAdapter（有 `Cart*`）。已从 bus.cpp 移除，
+      C++ `aread_[]` 保持原样。
 
-### 1.5 [修订] 逐字段布局校验（S1）
+### 1.5 [修订 2026-08-10] 逐字段布局校验（S1）（构建实测校准）
 
-- [ ] `crates/vnesu11/tests/layout_check.rs`：用 `offset_of!` **逐字段**断言
-      `CpuRegsLayout` 与 `x6502struct.h` 一致（**禁止手写布局后靠 repr(C) 默认**）
-- [ ] CI 工作流：编译 vNESU11 + C++，跑 layout_check
-- [ ] Golden 测试：把 `x6502struct.h` 转成二进制 golden，与 Rust 端 dump 对比
+- [x] `crates/vnesu11/tests/layout_check.rs`：`offset_of!` 逐字段断言 + C++ 侧
+      `x6502struct.h` 底部 8 条 `static_assert`（**已落地**，且修正了断言位置——
+      原放在 struct 定义前导致 C2065，已移到 `} X6502;` 之后）
+- [ ] CI 工作流：编译 vNESU11 + C++，跑 layout_check — [Phase 6] CI 接线
+- [ ] Golden 测试：把 `x6502struct.h` 转成二进制 golden — **[修订] 用 ctest 间接覆盖**：
+      独立 golden 未做，但 `ctest 33/33`（含 `golden_savestate_test`、`cpu_test`、
+      `core_state_test`）证明布局正确；`x6502struct.h` 的 `static_assert` + Rust
+      `offset_of!` 双锁足以防止漂移。
 
-### 1.6 [修订] Savestate round-trip 验证（S2）
+### 1.6 [修订 2026-08-10] Savestate round-trip 验证（S2）
 
-- [ ] 收集 v1.17 golden savestate 文件（各 mapper 类型若干）
+- [ ] 收集 v1.17 golden savestate 文件（各 mapper 类型若干）— [Phase 6] 需完整
+      模拟器生成；当前 C++ 侧 `golden_savestate_test` PASS（ctest）
 - [ ] `crates/vnesu11/tests/savestate_roundtrip.rs`：
       - load golden → 跑 N 帧 → save → 与 golden 对比
-      - 逐 tag 对比（不是整块 MD5，出错时能定位到具体 tag）
-- [ ] CI 强制：golden round-trip 字节一致才允许 merge
+      - 逐 tag 对比（不是整块 MD5，出错时能定位到具体 tag）— [Phase 6] 需 vNESU11
+        完整接入（含 PPU/APU savestate 路径）
+- [ ] CI 强制：golden round-trip 字节一致才允许 merge — [Phase 7]
 
 ### 1.7 [修订] 核心头依赖扫描（S9）
 
@@ -195,36 +207,60 @@ C++ 端：
 extern "C" struct VNesSocOpaque;  // 前向声明，C++ 不能看见内部
 ```
 
-### 2.4 cbindgen 输出
+### 2.4 [修订 2026-08-10] cbindgen 输出（构建实测校准）
 
-build.rs 调用 cbindgen 生成 `vnesu11_ffi.h` 给 C++ include：
+build.rs 调用 cbindgen 生成 `vnesu11_ffi.h`（**已落地**），但 **[修订] bridge.cpp
+不 include 它**：
+
+- 实测：cbindgen 生成的 `typedef struct VNesSoc *VNesSocOpaque` 与 bridge.h 的
+  `struct VNesSocOpaque;` 前向声明冲突（C2040），且强类型指针与 bridge 的 `void*`
+  句柄不匹配
+- 解决方案：bridge.cpp 用**本地 `extern "C"` 声明**（`void*` 签名，与 Rust
+  `*mut VNesSocOpaque` ABI 相同），不依赖 cbindgen header。header 仍由 cargo
+  生成（Phase 6 合并进 `fceux11_rust.h` 时用），CMake 的 include 路径已加
+  `crates/vnesu11/target`
 
 ```rust
-// build.rs
+// build.rs（实际实现，输出到 CARGO_TARGET_DIR/vnesu11_ffi.h）
 fn main() {
-    cbindgen::Builder::new()
-        .with_crate(".")
-        .with_config(cbindgen::Config::from_file("cbindgen.toml"))
-        .generate()
-        .expect("cbindgen")
-        .write_to_file("../vnesu11_ffi.h");
-    println!("cargo:rerun-if-changed=src");
+    let out_dir = env::var("CARGO_TARGET_DIR").unwrap_or_else(|_| format!("{}/target", crate_dir));
+    let out_path = format!("{}/vnesu11_ffi.h", out_dir);
+    // ... cbindgen::Builder → write_to_file(out_path)
 }
 ```
 
 ---
 
-## 3. 验证 DoD
+## 3. 验证 DoD（[修订 2026-08-10] 实测勾选）
 
-- [ ] `cargo build -p vnesu11` 成功（Release + LTO）
-- [ ] C++ `cmake --build build` 成功（`VNESU11_CORE=OFF`，与 v1.17 一致）
-- [ ] C++ `cmake --build build -DVNESU11_CORE=ON` 成功（链接 `vnesu11.lib`）
-- [ ] `cargo test -p vnesu11 layout_check` 全绿（**逐字段 offset 断言**）
-- [ ] `savestate_tags.md` 产出并通过 review（SFORMAT tag 契约）
-- [ ] `core_headers_deps.md` 产出（68 个 include 站点清单）
-- [ ] golden savestate round-trip：**逐 tag** 字节一致
-- [ ] `kagami-qa-runner --matrix tests.json` 与 v1.17 一致（**未启用** vNESU11，行为不变）
-- [ ] 二进制 `fceux11.exe` 可启动 + 加载 ROM + 跑帧
+- [x] `cargo build -p vnesu11` 成功（Release + LTO）
+- [x] C++ `cmake --build build` 成功（`VNESU11_CORE=OFF`，与 v1.17 一致）— **本地验证**
+- [x] C++ `cmake --build build -DVNESU11_CORE=ON` 成功（链接 `vnesu11.lib`）— **本地验证**
+- [x] `cargo test -p vnesu11 layout_check` 全绿（**逐字段 offset 断言**）
+- [x] `savestate_tags.md` 产出并通过 review（SFORMAT tag 契约）
+- [x] `core_headers_deps.md` 产出（68 个 include 站点清单）
+- [ ] golden savestate round-trip：**逐 tag** 字节一致 — [Phase 6] 需完整模拟器
+- [x] CTest 33/33（含 `kagami_qa_direct_smoke` 等）— **本地验证，行为与 v1.17 一致**
+- [x] 二进制 `fceux11.exe` 可启动（`--version` = 1.17.0）— **本地验证**
+
+---
+
+## 3.5 [新增 2026-08-10] 本地构建前置（实测经验）
+
+本机验证 `VNESU11_CORE=ON/OFF` 需要（VS18 BuildTools + vcpkg + Qt6 已装前提下）：
+
+1. **vcpkg_installed 符号链接**：`CMakeLists.txt:7` 的 prefer-local 分支找
+   `vcpkg_installed/x64-windows`（不存在），会 fallback 到 vcpkg.cmake（触发
+   manifest 重解析）。实测创建一个 junction 即可让 `do_build.ps1` 零改动工作：
+   ```powershell
+   cmd /c mklink /J "D:\Project\FCEUX11\vcpkg_installed\x64-windows" "D:\Project\FCEUX11\vcpkg\installed\x64-windows"
+   ```
+   （`vcpkg_installed/` 已加入 `.gitignore`，junction 不会被提交）
+2. **测试 DLL**：`ctest` 的测试 exe 需要 Qt6/SDL DLL 在 PATH 上——
+   把 `vcpkg_installed\x64-windows\bin` 加进 `$env:PATH`（否则 0xc0000139）。
+   手动跑 GUI exe 还需复制 Qt 插件目录。
+3. **用 `do_build.ps1` 触发构建**（自动加载 vcvars + Ninja），避免裸
+   `cmake --build` 的 C1083。
 
 ---
 

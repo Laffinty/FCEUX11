@@ -122,19 +122,22 @@
 | 文件 | 主要读取符号 | 迁移路径 | 负责 phase |
 |------|------------|---------|-----------|
 | `bus.cpp` | `ARead[]` / `AWrite[]` / `Page[]` | 自身；**Phase 8 部分删除**（保留 C++ 旧 PPU 的回退路径） | Phase 2 + Phase 8 |
+| `bus.cpp` `SetReadHandler/SetWriteHandler` | 区间注册 | **[修订 2026-08-10]** 不做 vNESU11 转发——`readfunc=uint8(*)(uint32)` 无 ctx，无法直接 cast；正确适配在 Phase 5 MapperAdapter（mapper 实例作 ctx）。已从 bus.cpp 移除该转发 | Phase 5 |
 | `cart.h` | `set_read_handler` / `set_write_handler` | 改用 `vnesu11_set_read_handler`（当 VNESU11_CORE=ON） | Phase 2 + Phase 5 + Phase 6 |
 | `core_state.cpp` | `ARead` 别名 | 走 FFI | Phase 2 + Phase 6 |
 | `fceu.cpp` | `SetReadHandler` / `SetWriteHandler` | 转发到 vNESU11 区间表 | Phase 2 + Phase 5 + Phase 6 |
 | `fceu.h` | `ARead` 全局声明 | 保留（C++ 旧 PPU 仍需） | 不变 |
 | `kagami_bridge.cpp` | `ARead[addr](addr)` 探针 | 走 FFI（QA 关键路径） | Phase 0 + Phase 6 |
 | `pputile_template.cpp` | PPU 总线读 | 走 FFI | Phase 3 + Phase 6 |
-| `x6502.cpp` | `ARead` / `AWrite` 内存访问 | 走 vNESU11 FFI（**核心 hot path**） | Phase 1 + Phase 6 |
+| `x6502.cpp` | `ARead` / `AWrite` 内存访问 | 走 vNESU11 FFI（**核心 hot path**） | Phase 6 |
 
-**总结**：
-- `x6502.cpp` 中 `RdMem`/`WrMem` 是 hot path；Phase 1 末必须改成走 vNESU11
-  `cpu_read`/`cpu_write`（否则 Phase 1 没真正接管）
-- `fceu.cpp::SetReadHandler`/`SetWriteHandler` 是 mapper 注册唯一入口；Phase 5
-  必须在 `VNESU11_CORE=ON` 时转发到 `vnesu11_set_read_handler`
+**总结（[修订 2026-08-10]）**：
+- **[修订]** `x6502.cpp` 的 `RdMem`/`WrMem` **Phase 1 未改动**——Rust CPU 是独立
+  解释器（`crates/vnesu11/src/cpu/`），通过自己的 `BusContext` 访问内存；C++ 的
+  `x6502.cpp` 仍驱动现有模拟器（VNESU11_CORE=ON 时未接管 frame 循环）。真正的
+  切换（C++ `Emulate` 改走 vNESU11）是 Phase 6 的事
+- **[修订]** `fceu.cpp::SetReadHandler`/`SetWriteHandler` 是 mapper 注册唯一入口；
+  Phase 5 的 MapperAdapter 在这里做 vNESU11 区间注册（不是 bus.cpp 转发，见上表）
 - `bus.cpp` 内的 `ARead[]` / `AWrite[]` 表**保留**（C++ 旧 PPU 回退路径仍需）
 
 ---
@@ -157,7 +160,7 @@
 | Phase | 必须确认迁移的站点 |
 |-------|------------------|
 | **Phase 0** | `kagami_bridge.cpp`（QA 探针已可走 FFI stub） |
-| **Phase 1** | `bus.cpp` / `x6502.cpp`（hot path 改走 vNESU11 cpu_read/write）；`core_state.cpp`（CpuView 改走 peek）；`debug.cpp`（寄存器读）；`state.cpp`（SFORMAT 序列化 tag 契约） |
+| **Phase 1** | **[修订 2026-08-10]** 无 C++ 站点改动——Rust CPU 独立解释器，通过 `BusContext` 访问内存；C++ 侧 `x6502.cpp`/`core_state.cpp`/`debug.cpp`/`state.cpp` 的接管在 Phase 6 |
 | **Phase 2** | `cart.h` / `fceu.cpp`（SetReadHandler/SetWriteHandler 转发）；`bus.cpp` / `core_state.cpp` / `kagami_bridge.cpp` |
 | **Phase 3** | `ppu_rendering.cpp` / `pputile_template.cpp`（new PPU 路径删除）；`fceu.cpp`（FCEUPPU_Loop 顶层改）；`core_state.cpp`（PpuView）；`kagami_bridge.cpp`（PPU 探针）；`drivers/Qt/config.cpp`（newppu 保留） |
 | **Phase 4** | `sound.cpp` / `fds.cpp` / `fds_sound.cpp` / `wave.cpp` / `filter.cpp`（APU 走 vNESU11） |

@@ -65,6 +65,27 @@ endif()
 | Mapper FFI | 持平 | thunk 与函数指针等价 |
 | **综合帧时间** | **持平至 +3%，不排除 -2%** | 各路径加总 |
 
+### 3.2 [新增 2026-08-10] Phase 1 实测（CPU 路径）
+
+`run_budget` 热循环优化后，60 帧 nestest CPU 工作量的实测：
+
+| 指标 | Rust（纯 CPU） | C++（全模拟含 PPU/APU） | 结论 |
+|------|---------------|------------------------|------|
+| 60 帧 CPU 时间（best-of-N） | 42.773 ms | 43.441 ms | Rust 追平并略快 |
+| ms/帧 | 0.713 | 0.724 | **Rust 快 1.5%** |
+| 性能门禁（≤ ×1.05） | 0.713 ≤ 0.760 | — | ✅ PASS |
+
+要点：
+- 优化前 Rust 纯 CPU 是 51.6 ms（0.860 ms/帧）；`run_budget` 快速路径（`irq_pending==0`
+  单分支 + 预算局部变量）带来 **-17%**，追平 C++ 全模拟
+- C++ 侧无独立纯 CPU bench，其基准含 PPU/APU（LTCG 压薄）——Rust 纯 CPU 追平是
+  最严格的合理对比
+- **已知伪影**：合成纯 NOP 负载 Rust 偏慢（~1.3 ms/帧），因 `step_inner` 的
+  `self.count` store/load 往返在无内存访问的纯 NOP 下是纯开销；真实游戏负载
+  （nestest）不受影响。后续可优化为 dispatch 直传 `remaining`（改动大，暂缓）
+- 复现工具：`crates/vnesu11/src/bin/cpu_gate_best.rs`（best-of-9）对比
+  `fceux11_bench_x6502_exec.exe`（best-of-5）
+
 **注意**：这个预期是"迁移不改模型"（决策 A，budget 复刻）下的数字。
 如果未来做 dot 级重写（决策 B），性能可能 +5-15%，但那是**行为重写**的收益，
 不是迁移本身的收益，且风险大。
