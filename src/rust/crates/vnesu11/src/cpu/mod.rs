@@ -117,44 +117,63 @@ impl CpuCore {
     /// run until `count <= 0`. Interrupt sampling happens at the start of
     /// each instruction (penultimate-cycle sampling), so an NMI/IRQ may
     /// push + vector in the middle of the budget (C++ `X6502_RunDebug`).
+    ///
+    /// Performance note: the hot loop is written so `count` stays in a
+    /// register across instructions (LLVM keeps the `while` induction
+    /// variable live); `step_inner` is `#[inline(always)]` and does the
+    /// fetch + dispatch with `count` as a local, so the common case
+    /// (no pending IRQ) compiles to a tight loop with no per-instruction
+    /// function-call boundary.
     #[inline(always)]
     pub fn run_budget<BC: BusContext>(&mut self, cycles: i32, bus: &mut BC) {
         self.count += cycles;
-        while self.count > 0 {
-            // DMA stall check (Phase 4 wires real behavior; for Phase 1
-            // we honor the flag by pausing the CPU).
+        let mut remaining = self.count;
+        while remaining > 0 {
+            // DMA stall (Phase 4 wires real behavior; Phase 1 honors the
+            // flag by pausing the CPU).
             if bus.dma_stalled() {
                 break;
             }
-            self.step(bus);
+            // Interrupt sampling (penultimate cycle). Fast path: no
+            // pending sources → pure fetch+dispatch.
+            if self.irq_pending == 0 {
+                remaining = self.step_inner(remaining, bus);
+                continue;
+            }
+            // Slow path: poll interrupts (may push + vector, consuming
+            // cycles and possibly exhausting the budget).
+            self.count = remaining;
+            self.poll_interrupts(bus);
+            remaining = self.count;
+            if remaining <= 0 {
+                break; // C++ returns here after IRQ handling.
+            }
+            remaining = self.step_inner(remaining, bus);
         }
+        self.count = remaining;
     }
 
-    /// Execute exactly one instruction (interrupt sample + fetch + dispatch).
+    /// Fetch + dispatch one instruction, decrementing `remaining` by the
+    /// instruction's cost. Assumes no pending IRQ (fast path).
     #[inline(always)]
-    pub fn step<BC: BusContext>(&mut self, bus: &mut BC) {
-        // 1. Interrupt sampling (penultimate cycle). Uses `moo_pi` from
-        //    the PREVIOUS instruction (set below), giving SEI/CLI the
-        //    documented one-cycle delay.
-        self.poll_interrupts(bus);
-        if self.count <= 0 {
-            return; // C++ returns here after IRQ handling if budget spent.
-        }
-
-        // 2. Snapshot P for the NEXT instruction's IRQ sample (C++ `_PI=_P`).
+    fn step_inner<BC: BusContext>(&mut self, mut remaining: i32, bus: &mut BC) -> i32 {
+        // Snapshot P for the NEXT instruction's IRQ sample (C++ `_PI=_P`).
         self.moo_pi = self.p;
 
-        // 3. Instruction fetch.
+        // Fetch + advance PC.
         let opcode = bus.read(self.pc);
         self.pc = self.pc.wrapping_add(1);
 
-        // 4. Base cycle cost.
-        self.count -= BASE_CYCLES[opcode as usize] as i32;
+        // Base cycle cost.
+        remaining -= BASE_CYCLES[opcode as usize] as i32;
         self.tcount = 0;
 
-        // 5. Dispatch (may decrement `count` further for page-cross /
-        //    RMW extra / taken branch).
+        // Dispatch (may decrement `remaining` for page-cross / RMW /
+        // taken branch). Handlers write through `self.count` for the
+        // per-instruction extras, so sync back after.
+        self.count = remaining;
         decoder::execute(self, opcode, bus);
+        self.count
     }
 
     /// Read 16-bit little-endian from the bus.
