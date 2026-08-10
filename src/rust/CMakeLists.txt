@@ -66,3 +66,8 @@ add_custom_target(fceux11_rust_build DEPENDS ${RUST_STATIC_LIB} ${RUST_MERGED_HE
 
 set(FCEUX11_RUST_ENABLED ON PARENT_SCOPE)
 set(FCEUX11_RUST_STATIC_LIB ${RUST_STATIC_LIB} PARENT_SCOPE)
+
+# v2.0 wip: register the vNESU11 crate as a sibling build target. Its
+# staticlib (vnesu11.lib) is linked separately by the parent when
+# VNESU11_CORE=ON — see src/CMakeLists.txt.
+add_subdirectory(crates/vnesu11)

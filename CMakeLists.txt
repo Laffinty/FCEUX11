@@ -120,6 +120,10 @@ endif()
 
 option(FCEUX11_BUILD_TESTS "Build smoke and regression tests" ON)
 option(FCEUX11_ENABLE_I18N "Enable internationalization (i18n) support" ON)
+# v2.0 wip: enable vNESU11 Rust core (CPU/PPU/APU unified SoC, replaces
+# select C++ sources). Phase 0 ships as OFF (default); Phase 6 flips it
+# to ON after shadow-run validation. See docs/wip_2.0_plan/.
+option(VNESU11_CORE "Use vNESU11 Rust core (experimental, Phase 0)" OFF)
 # v0.3.16 LTS closure / v1.0 carries over: project-wide deprecation
 # control. Per plan v3 §6.3, the FCEUI_* compat shims (250+ inline
 # wrappers in core_api.h / io_api.h / net_api.h / diag_api.h / movie.h)

@@ -27,6 +27,9 @@ fceux11-debug = { path = "crates/fceux11-debug" }
 fceux11-lua = { path = "crates/fceux11-lua" }
 fceux11-core = { path = "crates/fceux11-core" }
 kagami-qa = { path = "crates/kagami-qa" }
+# vnesu11 is intentionally NOT a dep here — it ships as its own staticlib
+# (vnesu11.lib) and is linked separately by CMake when VNESU11_CORE=ON.
+# Adding it here would duplicate symbols. See docs/wip_2.0_plan/02_architecture.md §7.
 
 [features]
 # Stage-2 §七 (C-1): Pass-through to kagami-qa's `direct-adapter` feature.

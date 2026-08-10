@@ -184,6 +184,10 @@ set(SRC_CORE
   	${CMAKE_CURRENT_SOURCE_DIR}/ines_save.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/input.cpp
  	${CMAKE_CURRENT_SOURCE_DIR}/kagami_bridge.cpp
+	# v2.0 wip (Phase 0): vNESU11 C-ABI bridge — thin wrappers around the
+	# Rust extern "C" surface. Behavior is gated by VNESU11_CORE in the
+	# Rust crate's ffi.rs (default OFF).
+  	${CMAKE_CURRENT_SOURCE_DIR}/vnesu11_bridge.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/movie.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/movie_fm2.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/movie_playback.cpp
@@ -716,6 +720,14 @@ add_subdirectory(rust)
 if(FCEUX11_RUST_ENABLED)
     add_definitions(-DFCEUX11_RUST_ENABLED)
     target_link_libraries(fceux11_utils PUBLIC ${FCEUX11_RUST_STATIC_LIB})
+    # v2.0 wip (Phase 0): vNESU11 Rust crate (CPU/PPU/APU SoC). Default OFF;
+    # Phase 6 will enable and wire FCEUI_* compat shims to the FFI surface.
+    if(VNESU11_CORE AND TARGET vnesu11_build)
+        target_link_libraries(fceux11_core PUBLIC ${VNESU11_RUST_STATIC_LIB})
+        add_dependencies(fceux11_core vnesu11_build)
+        add_definitions(-DVNESU11_CORE_ENABLED=1)
+        message(STATUS "vNESU11 Rust core enabled (VNESU11_CORE=ON)")
+    endif()
     # v1.16 R4-fix (2026-08-07): target_link_libraries above only adds a
     # LINK-step dependency on the .lib — it does NOT schedule the source
     # .cpp scanning/compilation of fceux11_utils (and the PUBLIC propagates

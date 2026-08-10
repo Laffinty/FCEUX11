@@ -1,0 +1,20 @@
+[package]
+name = "vnesu11"
+version = "0.1.0"
+edition.workspace = true
+description = "FCEUX11 unified CPU/PPU/APU virtual SoC core (v2.0 wip)"
+
+[lib]
+crate-type = ["rlib", "staticlib"]
+name = "vnesu11"
+
+[dependencies]
+bytemuck = { version = "1.14", features = ["derive"] }
+
+[features]
+# Default: nothing extra. Phase 6+ adds debug feature for CPU regs layout checks.
+default = []
+
+# Reserved for v0.2.x: when the FCEUDEF_DEBUGGER build is on, the CPU regs
+# layout grows the three function-pointer slots (see AUDIT S1).
+debugger = []
