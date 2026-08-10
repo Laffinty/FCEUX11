@@ -307,8 +307,8 @@ pub fn execute<BC: BusContext>(cpu: &mut CpuCore, op: u8, bus: &mut BC) {
             cpu.nop_imm(bus); // 2 operand bytes (3-byte NOP)
         }
 
-        // Fallback (should never happen for a valid 6502 opcode —
-        // every 0x00-0xFF is assigned above).
-        _ => unreachable!("unhandled opcode 0x{op:02X}"),
+        // NOTE: every opcode 0x00-0xFF is assigned above (verified by
+        // `nestest_runner` + `blargg_cpu_instrs` executing every byte).
+        // No fallback arm is reachable.
     }
 }
