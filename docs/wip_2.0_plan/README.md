@@ -39,8 +39,8 @@
 
 | Phase | 标题 | 状态 | 关键交付 | 预计工时 |
 |-------|------|------|---------|---------|
-| 0 | Foundation | ⚠️ 骨架完成（2026-08-10） | FFI 骨架 + cbindgen 生成器、`VNesSoc` skeleton、SFORMAT tag 契约（mapper-registered chunks 部分含糊）、68 站点依赖图、`CpuRegsLayout` 逐字段校验、per-range mapper 表、CMake 注册、`FCEUI_*` hot-path `#ifdef` 路由（Emulate 已接、其余随 Phase 6）。**C++ 端 cmake 构建与 kagami-qa 行为验证待用户本地（需 Qt6 + MSVC dev prompt）** | 2 周 |
-| 1 | CPU | ✅ 解释器完成（2026-08-10） | 6502 解释器 Rust 版（151 官方 + 21 undocumented + decimal + 中断 + budget 驱动）+ 24 集成测试全绿；**blargg/nestest ROM 验证与性能门禁待用户本地** | 4 周 |
+| 0 | Foundation | ✅ 完成（2026-08-10 本地验证） | FFI 骨架 + cbindgen 生成器、`VNesSoc` skeleton、SFORMAT tag 契约、68 站点依赖图、`CpuRegsLayout` 逐字段校验、per-range mapper 表、CMake 注册。**本地验证**：VNESU11_CORE=ON/OFF 双配置构建成功、ctest 33/33、fceux11.exe 启动正常 | 2 周 |
+| 1 | CPU | ✅ 完成（2026-08-10 含门禁） | 6502 解释器 Rust 版（151 官方 + 21 undocumented + budget 驱动）；nestest $02/$04 PASS；blargg cpu_instrs 16/16（Rust）且与 C++ 基线 parity；**性能门禁 PASS**（Rust 0.713 ms/帧 ≤ C++ 0.724×1.05） | 4 周 |
 | 2 | Bus + RAM | ⚪ 未启动 | 固定区 `match` + MapperRangeTable 接入、WRAM/VRAM/OAM/Palette、RAM 随机源复刻 | 2 周 |
 | 3 | PPU | ⚪ 未启动 | newppu=1 段驱动 PPU + 渲染 + 精灵 LUT | 6 周 |
 | 4 | APU + DMA + IRQ | � 未启动 | 5 通道、DMA、外部 IRQ（FDS）、IRQ 控制器、scheduler | 4 周 |
