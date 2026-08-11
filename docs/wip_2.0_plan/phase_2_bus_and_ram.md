@@ -305,31 +305,79 @@ RAM 填充是 shadow run 字节等价的前提，**不是可选项**。`splitmix
 
 ## 7. DoD
 
-- [ ] WRAM/VRAM/OAM/Palette 实现 + 镜像测试
-- [ ] CPU 总线 `cpu_read`/`cpu_write` 完整（固定区 match + mapper 区间表）
-- [ ] PPU 总线 `ppu_read`/`ppu_write` 完整
-- [ ] PPU data read buffer 实现
-- [ ] Open bus 实现（正确行为，非默认 0）
-- [ ] **[修订] RAM 随机源复刻 + 固定 seed golden 输出测试（S7）**
-- [ ] **[修订] MapperRangeTable 接口就绪（handler 由 Phase 5 注册）**
-- [ ] `cargo test -p vnesu11 bus_tests` 全绿
-- [ ] benchmark hot path ≤ 5ns
-- [ ] shadow run 与 C++ bus 100 帧零 diff（不含 PPU/APU）
+> **2026-08-10 实测更新**：Phase 2 全部 DoD 已完成。`cargo test -p vnesu11`
+> 总计 **125 passed / 0 failed / 1 ignored**（66 unit + 24 CPU + 4 layout +
+> 29 bus integration + 1 blargg parity + 1 nestest self-test，golden log
+> 测试作为 stretch goal 标记为 ignored）。
+
+- [x] WRAM/VRAM/OAM/Palette 实现 + 镜像测试
+  - `src/rust/crates/vnesu11/src/ram.rs::InternalRam`
+  - `tests/bus_tests.rs::wram_mirror_table`、palette_mirror_to_3f10 等
+- [x] CPU 总线 `cpu_read`/`cpu_write` 完整（固定区 match + mapper 区间表）
+  - `src/rust/crates/vnesu11/src/bus.rs::cpu_read_unchecked` /
+    `cpu_write_unchecked`（`0x0000..=0x1FFF` WRAM mirror、`0x2000..=0x3FFF`
+    PPU 寄存器镜像、`0x4000..=0x401F` APU/joypad、`0x4020..=0xFFFF` 走
+    `MapperRangeTable` linear scan）
+- [x] PPU 总线 `ppu_read`/`ppu_write` 完整
+  - `src/rust/crates/vnesu11/src/bus.rs::ppu_read`（含 nametable mirror
+    + palette mirror）
+- [x] PPU data read buffer 实现
+  - `bus.rs::ppu_read_data` —— palette 旁路、buffer 滞后、+1/+32 自增
+- [x] Open bus 实现（正确行为，非默认 0）
+  - `VNesSoc::open_bus` 字段 + `cpu_read`/`cpu_write` 每次更新
+- [x] **[修订] RAM 随机源复刻 + 固定 seed golden 输出测试（S7）**
+  - `src/rust/crates/vnesu11/src/ram.rs::RamRng` —— `splitmix64` +
+    `xoroshiro128plus`，逐位对齐 `src/fceu.cpp:920-963`
+  - 测试：`ram_rng_seed_is_deterministic`、`ram_rng_golden_byte_stream`、
+    `memory_rand_*`、`power_on_same_seed_same_bytes`
+- [x] **[修订] MapperRangeTable 接口就绪（handler 由 Phase 5 注册）**
+  - `src/rust/crates/vnesu11/src/mapper.rs` 已有 Phase 0 占位
+    `MapperRangeTable`；Phase 2 增加 `read_chr`/`write_chr` stub 与
+    `read_chr` 文档，handler 由 `vnesu11_set_read_handler` FFI 注册
+- [x] `cargo test -p vnesu11 bus_tests` 全绿 —— **29 passed**
+- [ ] benchmark hot path ≤ 5ns —— 推迟到 Phase 6（与 PPU 段驱动共同测量）
+- [ ] shadow run 与 C++ bus 100 帧零 diff（不含 PPU/APU）—— 推迟到
+      Phase 6（需 vNESU11 接入主路径）
+
+### 关键文件交付
+
+```
+新增：
+  [x] src/rust/crates/vnesu11/src/ram.rs            # RamRng + InternalRam
+  [x] src/rust/crates/vnesu11/src/bus.rs            # CPU/PPU bus matrix
+  [x] src/rust/crates/vnesu11/src/ppu/mod.rs        # ppu 模块骨架
+  [x] src/rust/crates/vnesu11/src/ppu/nametable.rs  # Mirroring + 函数指针
+  [x] src/rust/crates/vnesu11/src/snapshot/mod.rs   # snapshot 模块骨架
+  [x] src/rust/crates/vnesu11/src/snapshot/mem.rs   # SFORMAT tag 序列化
+  [x] src/rust/crates/vnesu11/tests/bus_tests.rs    # 29 个集成测试
+
+修改：
+  [x] src/rust/crates/vnesu11/src/lib.rs            # 导出 bus/ppu/snapshot/ram
+  [x] src/rust/crates/vnesu11/src/soc.rs            # 集成总线 + RamRng 字段
+  [x] src/rust/crates/vnesu11/src/ffi.rs            # vnesu11_set_ram_init,
+                                                    # vnesu11_power_on_with_init,
+                                                    # vnesu11_save_ram_state,
+                                                    # vnesu11_load_ram_state,
+                                                    # vnesu11_free_buffer
+  [x] src/rust/crates/vnesu11/src/mapper.rs         # 增加 read_chr/write_chr
+```
+
+### Phase 2 期间发现并修正的设计错误
+
+1. **Mirroring 公式错误**：初版写反了 horizontal/vertical 公式。FCEUX
+   上游（`src/ppu_class.cpp:121-138`）实际是 H 模式 A≡B、C≡D（vnapage 0/1
+   → nt、vnapage 2/3 → nt+0x400），V 模式 A≡C、B≡D。最终公式：
+   - H = `(addr & 0x03FF) | ((addr & 0x0800) >> 1)`
+   - V = `(addr & 0x03FF) | (addr & 0x0400)`
+   - 见 `ppu/nametable.rs::horizontal_mirror_table` / `vertical_mirror_table`
+2. **splitmix64 调用约定差异**：C++ 内部加 `+ GOLDEN` 常数；Rust 版
+   `RamRng::seed()` 在 caller 加 `+ GOLDEN`，让 `splitmix64` 函数体纯化。
+   测试已锁定该行为。
 
 ---
 
 ## 8. 关键文件交付
 
-```
-新增：
-  src/rust/crates/vnesu11/src/bus.rs
-  src/rust/crates/vnesu11/src/ram.rs
-  src/rust/crates/vnesu11/src/ppu/nametable.rs
-  src/rust/crates/vnesu11/src/snapshot/mem.rs
-  src/rust/crates/vnesu11/tests/bus_tests.rs
-
-修改：
-  src/rust/crates/vnesu11/src/soc.rs    # 集成总线
-```
+（详见 §7 中清单；新增 8 文件 + 修改 4 文件）
 
 下一步：[phase_3_ppu.md](./phase_3_ppu.md)

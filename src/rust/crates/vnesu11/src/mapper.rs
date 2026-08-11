@@ -14,7 +14,7 @@ pub const MAX_RANGES: usize = 64;
 
 /// Per-range read handler. Registered via `vnesu11_set_read_handler`.
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct ReadRangeHandler {
     pub start: u16,
     pub end: u16,
@@ -24,7 +24,7 @@ pub struct ReadRangeHandler {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct WriteRangeHandler {
     pub start: u16,
     pub end: u16,
@@ -33,7 +33,7 @@ pub struct WriteRangeHandler {
 }
 
 /// Internal range table for mapper regions.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MapperRangeTable {
     pub read_ranges: [ReadRangeHandler; MAX_RANGES],
     pub write_ranges: [WriteRangeHandler; MAX_RANGES],

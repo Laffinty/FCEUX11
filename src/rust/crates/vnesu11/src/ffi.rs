@@ -10,6 +10,7 @@
 use core::ffi::{c_int, c_void};
 use crate::cpu::regs::CpuRegsLayout;
 use crate::mapper::{MapperMetaVtable, ReadRangeHandler, WriteRangeHandler};
+use crate::ram::RamInitOption;
 use crate::soc::{VNesSoc, VNesSocOpaque};
 
 // =========================================================================
@@ -41,12 +42,65 @@ pub unsafe extern "C" fn vnesu11_destroy(soc: *mut VNesSocOpaque) {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vnesu11_power_on(_soc: *mut VNesSocOpaque) {
-    // Phase 0: stub.
+    // Phase 0: stub. Phase 2 ships `vnesu11_set_ram_init` + a real
+    // power-on path that consumes it.
+}
+
+/// Phase 2: configure the RAM-init option + seed. Must be called before
+/// `vnesu11_power_on`. Equivalent to C++ setting `RAMInitOption` /
+/// `RAMInitSeed` in `src/drivers/Qt/ConsoleEmuControl.cpp:475-501`.
+///
+/// `option`: 0=Checker (default), 1=AllOnes, 2=AllZeros, 3=Random.
+/// `seed`: 32-bit seed for `splitmix64` (Random mode only).
+///
+/// # Safety
+/// `soc` must be a valid pointer returned by `vnesu11_create`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vnesu11_set_ram_init(
+    soc: *mut VNesSocOpaque,
+    option: u32,
+    seed: u32,
+) -> c_int {
+    let soc_ref = match into_mut(soc) {
+        Some(s) => s,
+        None => return -1,
+    };
+    // SAFETY: any 0..=3 is valid; out-of-range falls back to Checker.
+    soc_ref.ram_init_option = unsafe { RamInitOption::from_raw_unchecked(option) };
+    soc_ref.ram_init_seed = seed;
+    0
+}
+
+/// Phase 2: power on with the previously-set `RamInitOption` + seed.
+/// Mirrors `PowerNES` in `src/fceu.cpp:1000-1025`.
+///
+/// # Safety
+/// `soc` must be a valid pointer returned by `vnesu11_create`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vnesu11_power_on_with_init(soc: *mut VNesSocOpaque) -> c_int {
+    let soc_ref = match into_mut(soc) {
+        Some(s) => s,
+        None => return -1,
+    };
+    let option = soc_ref.ram_init_option;
+    let seed = soc_ref.ram_init_seed;
+    soc_ref.power_on(option, seed);
+    0
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn vnesu11_reset(_soc: *mut VNesSocOpaque) {
-    // Phase 0: stub.
+pub unsafe extern "C" fn vnesu11_reset(soc: *mut VNesSocOpaque) {
+    // Phase 2: minimal — re-init CPU, leave RAM alone.
+    if let Some(s) = into_mut(soc) {
+        let mut bus = crate::soc::VNesBusContext::new(s);
+        s.cpu.reset(&mut bus);
+        s.open_bus = 0;
+        s.ppu_w = false;
+        s.ppu_t = 0;
+        s.ppu_v = 0;
+        s.ppu_x = 0;
+        s.ppu_read_buffer = 0;
+    }
 }
 
 // =========================================================================
@@ -251,6 +305,91 @@ pub unsafe extern "C" fn vnesu11_load_cpu_state(
 }
 
 // =========================================================================
+// Phase 2: save/load the four private RAM banks (WRAM/VRAM/OAM/Palette)
+// =========================================================================
+//
+// The C++ side calls these through the FFI to integrate vNESU11 into the
+// `FCEUSS_SaveMS` / `FCEUSS_LoadMS` flow. The V2-chunked byte stream
+// matches the layout produced by `state.cpp`'s `SFCPU`/`FCEU_NEWPPU_STATEINFO`
+// groups, so a vNESU11 savestate round-trips byte-for-byte with the C++
+// reader.
+
+/// Save the four RAM banks into a heap buffer. Caller takes ownership
+/// of the returned `*mut u8` (free with `vnesu11_free_buffer`).
+///
+/// `out_len`: optional pointer to receive the byte count; pass null if
+/// not needed.
+///
+/// # Safety
+/// `soc` must be a valid pointer returned by `vnesu11_create`. The
+/// returned `*mut u8` must be freed with `vnesu11_free_buffer`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vnesu11_save_ram_state(
+    soc: *const VNesSocOpaque,
+    out_len: *mut usize,
+) -> *mut u8 {
+    let soc_ref = match into_const(soc) {
+        Some(s) => s,
+        None => return core::ptr::null_mut(),
+    };
+    let mut w = crate::snapshot::mem::Writer::with_capacity(8192);
+    soc_ref.ram_banks.save_state(&mut w);
+    let bytes = w.into_bytes();
+    let n = bytes.len();
+    let mut boxed = bytes.into_boxed_slice();
+    let ptr = boxed.as_mut_ptr();
+    core::mem::forget(boxed);
+    if !out_len.is_null() {
+        *out_len = n;
+    }
+    ptr
+}
+
+/// Load the four RAM banks from a V2 byte stream. Returns 0 on success,
+/// negative on error.
+///
+/// # Safety
+/// `soc` must be a valid pointer returned by `vnesu11_create`. `bytes`
+/// must point to a buffer of at least `len` readable bytes (typically
+/// a buffer previously returned by `vnesu11_save_ram_state`).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vnesu11_load_ram_state(
+    soc: *mut VNesSocOpaque,
+    bytes: *const u8,
+    len: usize,
+) -> c_int {
+    let soc_ref = match into_mut(soc) {
+        Some(s) => s,
+        None => return -1,
+    };
+    if bytes.is_null() || len == 0 {
+        return -2;
+    }
+    let slice = core::slice::from_raw_parts(bytes, len);
+    let mut r = crate::snapshot::mem::Reader::new(slice);
+    match soc_ref.ram_banks.load_state(&mut r) {
+        Ok(()) => {
+            soc_ref.sync_ram_banks_to_views();
+            0
+        }
+        Err(_) => -3,
+    }
+}
+
+/// Free a buffer returned by `vnesu11_save_ram_state`.
+///
+/// # Safety
+/// `ptr` must either be null or a pointer returned by
+/// `vnesu11_save_ram_state`; `len` must be the value written to
+/// `out_len` at allocation time.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vnesu11_free_buffer(ptr: *mut u8, len: usize) {
+    if !ptr.is_null() && len > 0 {
+        let _ = Box::from_raw(core::ptr::slice_from_raw_parts_mut(ptr, len));
+    }
+}
+
+// =========================================================================
 // Helpers
 // =========================================================================
 
@@ -264,6 +403,17 @@ unsafe fn into_mut(soc: *mut VNesSocOpaque) -> Option<&'static mut VNesSoc> {
         return None;
     }
     Some(&mut *inner)
+}
+
+unsafe fn into_const(soc: *const VNesSocOpaque) -> Option<&'static VNesSoc> {
+    if soc.is_null() {
+        return None;
+    }
+    let inner = (*soc).0;
+    if inner.is_null() {
+        return None;
+    }
+    Some(&*inner)
 }
 
 #[cfg(test)]
