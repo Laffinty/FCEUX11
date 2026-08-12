@@ -426,7 +426,7 @@ P2（后续会话/Phase 7）：
 
 | ROM | CPU 匹配 | 观察 |
 |-----|---------|------|
-| cpu_dummy_reads.nes | 0/59 | frame 1-2 PC 仅差 1 条指令（E5A6 vs E5A3），随后渐变发散 |
+| cpu_dummy_reads.nes | 2/59 | **2026-08-12 第三版修复后**：frame 1-2 **完全匹配**；frame 3 Rust 提前触发 frame counter IRQ |
 | nestest.nes | 0/30 | 双方 PC 都在推进但不同步 |
 | mapper_axrom.nes | 0/30 | 双方 PC 都在推进但不同步 |
 
@@ -441,10 +441,42 @@ VBlank 状态** → Rust CPU 的 $2002 等待循环无法退出。修复：$2002
 **效果**：frame 1-2 的 PC 从垃圾值（0x3636 循环）收敛到与 C++ 仅差 1 条指令
 （E5A6 vs E5A3）——两核心在帧边界基本对齐。
 
-**剩余发散（Phase 6 持续工作）**：frame 3+ 渐变发散源于 Rust 与 C++ 的
-PPU 段预算/IRQ 采样点时序差异（每帧执行的指令数不完全相同）。闭合需要
-逐段核对预算 + IRQ 采样时机（`cpu/mod.rs::run_budget` vs
-`x6502.cpp::X6502_Run`）。shadow harness 现已具备持续迭代的对比基础设施。
+**已修复（DEY/TAY 周期 + 段预算 + 可见扫描线后随 + $4017 NMI 入口，2026-08-12 第三版）**：
+三个耦合问题：
+1. **DEY (0x88) 和 TAY (0xA8) 周期表错位**：Rust BASE_CYCLES 写 3，C++ CycTable 写 2；
+   两条指令每条多算 1 cycle，使 blargg 测试 ROM 的 DEY/TAY 循环每帧少跑 ~3 条指令。
+   修复：Rust BASE_CYCLES 与 C++ CycTable **逐字节对齐**，并加回归测试
+   `base_cycles_matches_cpp_cyc_table`（pinned against full 256-entry C++ table）。
+2. **可见扫描线只发 256 预算**：原 `next_segment` 仅发出 `Visible { cpu_budget: 256 }`，
+   缺少 C++ DoLine 的 6+63+16=85 cycle HBLANK 后续。修复：新增
+   `PpuCore::sprite_eval_segment()` 发出 85 cycle 后续，与 C++ `X6502_Run(6)+Run(63)+Run(16)` 对齐。
+3. **scanline 241 仅发 1 cycle 预算**：原 `Segment::VBlank { cpu_budget: 1 }` 给 NMI handler
+   入口（7 cycles push + vector）留的空间不够；NMI 路由被推迟。修复：
+   `Segment::VBlank { cpu_budget: CPU_BUDGET_VBLANK_LINE } = 341`，与 C++ DoLine
+   `if (sl >= 240) { X6502_Run(256+69); X6502_Run(16); }` 完全对齐。
+**效果**：frame 1-2 完全匹配（cpu_match 从 0/59 升到 2/59）。
+
+**已修复（每指令 APU tick + 每指令 IRQ 路由，2026-08-12 第四版）**：
+原 `run_segment_inner` 在每段末尾一次性 `apu.tick(budget)`，导致：
+- frame counter 在 7457 / 14913 / 22371 / 29828 的 sub-instruction 边界事件被
+  累积到段尾，丢失 cycle 精度（`fhcnt` 在 `FCEU_SoundCPUHook` 是逐 cycle 推进）。
+- APU 触发的 IRQ 在段边界才被路由到 CPU，比 C++ 的"下一指令 IRQ 检查"晚 1 段。
+修复：`run_segment_inner` 直接展开 `run_budget_with_hook` 循环，每条指令调用
+`self.cpu.step_one(remaining, &mut bus)` → `self.apu.tick(tcount)` →
+`self.route_apu_irqs_to_cpu()`（提取了独立的 helper）。新增 `CpuCore::step_one`
+返回 `(new_remaining, tcount)`，让 caller 决定 per-instruction hook。
+
+**剩余发散（Phase 6 持续工作）**：frame 3+ Rust 提前触发 frame counter IRQ。
+根本原因：Rust `frame_counter.write($4017)` 立即重置 `cycle_count = 0`（同步语义），
+而 C++ 走 3-4 cycle 延迟重置（`fc_reset_in = (parity == 0) ? 3 : 4`，
+引用 `R6 Step 3` 探针深化的 cycle-position 模型）。结果 Rust 的帧计数器比 C++
+早 ~3-4 cycle 到达终端，APU IRQ 提前触发，Rust CPU 在 $2002 spin loop 中途
+进 IRQ handler（`E622 = BIT $4015; RTI`），然后回到 spin loop —— 状态虽与
+C++ 趋同但已错开数条指令。闭合方向：把 Rust frame_counter.write 改成 3-4 cycle
+延迟重置（match `FCEU_SoundCPUHook` 中的 `fc_reset_in` 递减逻辑），并把 parity
+来源从 `g_cpu.timestamp_base()` 改为相对 frame 内部的 cycle 计数。
+
+shadow harness 现已具备持续迭代的对比基础设施。
 
 ---
 

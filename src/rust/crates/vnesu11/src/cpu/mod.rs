@@ -153,6 +153,46 @@ impl CpuCore {
         self.count = remaining;
     }
 
+    /// Step ONE instruction, decrementing `remaining` by the
+    /// instruction's cost. Returns `(new_remaining, tcount)` where
+    /// `tcount` is the total cycle cost of this instruction (base +
+    /// extras). The caller can use `tcount` to tick the APU per
+    /// instruction (matching C++ `FCEU_SoundCPUHook(temp)`) and call
+    /// the mapper IRQ hook with sub-segment granularity.
+    ///
+    /// **Phase 6 P2 shadow fix (2026-08-12)**: callers should now use
+    /// this primitive in their own loop so they can hook the APU per
+    /// instruction (the previous per-segment APU tick had sub-instruction
+    /// timing drift in the frame counter events at 7457/14913/22371/
+    /// 29828-30).
+    pub fn step_one<BC: BusContext>(&mut self, mut remaining: i32, bus: &mut BC) -> (i32, i32) {
+        if bus.dma_stalled() {
+            return (remaining, 0);
+        }
+        // Snapshot P for the NEXT instruction's IRQ sample (C++ `_PI=_P`).
+        self.moo_pi = self.p;
+
+        // Fetch + advance PC.
+        let opcode = bus.read(self.pc);
+        self.pc = self.pc.wrapping_add(1);
+
+        // Base cycle cost.
+        let base = BASE_CYCLES[opcode as usize] as i32;
+        let prev_remaining = remaining;
+        remaining -= base;
+        self.count = remaining;
+        // Dispatch (may decrement `remaining` for page-cross / RMW /
+        // taken branch). Handlers write through `self.count` for the
+        // per-instruction extras, so sync back after.
+        decoder::execute(self, opcode, bus);
+        let new_remaining = self.count;
+        // tcount = base + extras (any `self.count -= 1` in the
+        // handlers above is captured via `prev_remaining - new_remaining`).
+        let tcount = prev_remaining - new_remaining;
+        self.tcount = tcount;
+        (new_remaining, tcount)
+    }
+
     /// Fetch + dispatch one instruction, decrementing `remaining` by the
     /// instruction's cost. Assumes no pending IRQ (fast path).
     #[inline(always)]

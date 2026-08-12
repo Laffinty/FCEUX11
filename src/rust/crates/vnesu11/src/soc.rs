@@ -272,12 +272,79 @@ impl VNesSoc {
             }
             return;
         }
-        // 2. CPU runs its segment budget (X6502_Run semantics).
+        // 2. CPU runs its segment budget (X6502_Run semantics) with
+        //    per-instruction APU ticking AND per-instruction IRQ
+        //    routing from the APU. The per-instruction APU tick is
+        //    needed for sub-instruction frame-counter events (7457
+        //    / 14913 / 22371 / 29828-30) so the IRQ fires at the
+        //    exact cycle — matching `src/sound.cpp::FCEU_SoundCPUHook`
+        //    which advances `fhcnt` one CPU cycle at a time. The
+        //    per-instruction IRQ routing is needed because in C++
+        //    the APU's `X6502_IRQBegin(FCEU_IQFCOUNT)` takes effect
+        //    at the START of the next instruction's IRQ check (i.e.
+        //    within 1 instruction of the APU event), whereas Rust's
+        //    `route_interrupts` only fires at segment boundaries
+        //    (up to 341 cycles late). Without per-instruction routing
+        //    the frame counter IRQ can land in the wrong instruction
+        //    stream and cause PC divergence after a few frames.
         let mut bus = unsafe { VNesBusContext::new(self) };
-        self.cpu.run_budget(budget, &mut bus);
-        // 3. APU ticks the same budget (frame counter + 5 channels +
-        //    mixer → output_buffer).
-        self.apu.tick(budget as u32);
+        self.cpu.count += budget;
+        let mut remaining = self.cpu.count;
+        while remaining > 0 {
+            if bus.dma_stalled() {
+                break;
+            }
+            // No pending IRQ: just step one instruction.
+            if self.cpu.irq_pending == 0 {
+                let (new_remaining, tcount) = self.cpu.step_one(remaining, &mut bus);
+                if tcount > 0 {
+                    self.apu.tick(tcount as u32);
+                    self.route_apu_irqs_to_cpu();
+                }
+                remaining = new_remaining;
+                continue;
+            }
+            // Pending IRQ: poll, then step.
+            self.cpu.count = remaining;
+            self.cpu.poll_interrupts(&mut bus);
+            remaining = self.cpu.count;
+            if remaining <= 0 {
+                break;
+            }
+            let (new_remaining, tcount) = self.cpu.step_one(remaining, &mut bus);
+            if tcount > 0 {
+                self.apu.tick(tcount as u32);
+                self.route_apu_irqs_to_cpu();
+            }
+            remaining = new_remaining;
+        }
+        self.cpu.count = remaining;
+    }
+
+    /// Push any IRQs the APU generated this cycle into the CPU's
+    /// `irq_pending` mask. Called per-instruction from
+    /// `run_segment_inner` to match C++'s sub-instruction IRQ
+    /// timing (the C++ APU's `X6502_IRQBegin` lands at the start of
+    /// the next instruction's IRQ check).  PPU NMI and mapper IRQ
+    /// are still routed only at segment boundaries in
+    /// `route_interrupts` (their latency is acceptable since the
+    /// PPU asserts NMI at scanline boundaries, not mid-instruction).
+    fn route_apu_irqs_to_cpu(&mut self) {
+        let mask = self.apu.take_irq();
+        if mask != 0 {
+            // FCOUNT + DMC bits flow through the IrqController for
+            // unified level semantics (mapper + EXT can override).
+            if mask & crate::apu::IRQ_FCOUNT != 0 {
+                self.irq.assert_irq(crate::apu::IRQ_FCOUNT);
+            }
+            if mask & crate::apu::IRQ_DMC != 0 {
+                self.irq.assert_irq(crate::apu::IRQ_DMC);
+            }
+            let agg = self.irq.aggregate_mask();
+            if agg != 0 {
+                self.cpu.irq_begin(agg);
+            }
+        }
     }
 
     /// Advance one OAM DMA byte: read from the CPU address space and
