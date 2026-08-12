@@ -257,12 +257,18 @@ impl FrameCounter {
         self.cycle_count = self.cycle_count.wrapping_add(1);
         let now = self.cycle_count;
         if now == profile.reset_at {
-            // Reset boundary (C++ `fhcnt==N → FrameIRQEnd; fhcnt=0;
-            // fcnt=0`). In 4-step mode the IRQ is cleared here; in
-            // 5-step mode there was no IRQ to clear.
-            if !self.five_step {
-                *irq_out = false;
-            }
+            // Reset boundary (C++ `fhcnt==N → fhcnt=0; fcnt=0`).
+            // Phase 6 P2 shadow fix (2026-08-12): do NOT clear the
+            // IRQ here. C++ `FrameIRQEnd` only clears FCEU_IQFCOUNT
+            // when mode 1 (inhibit) is set; in mode 0 (non-inhibit)
+            // it KEEPS the line asserted (`SIRQStat|=0x40` and no
+            // X6502_IRQEnd). The IRQ stays pending until the CPU
+            // reads $4015 (StatusRead clears SIRQStat bit6 + IRQlow).
+            // Rust previously cleared `*irq_out` at reset, which
+            // swallowed the IRQ if the set (29828/29829) and reset
+            // (29830) fell inside one `apu.tick(tcount)` call — the
+            // frame-counter IRQ never reached the CPU, diverging the
+            // shadow run.
             self.cycle_count = 0;
             self.quarter_frame = false;
             self.half_frame = false;
@@ -372,9 +378,11 @@ mod tests {
         fc.tick(0, &mut irq);
         assert!(irq, "IRQ stays set at 29829");
         assert!(fc.half_frame);
-        // now == 29830 → IRQ cleared + reset to 0.
+        // now == 29830 → reset to 0; the IRQ KEEPS (C++ FrameIRQEnd
+        // in mode 0 non-inhibit does not clear FCEU_IQFCOUNT — only a
+        // $4015 read does). Phase 6 P2 shadow fix.
         fc.tick(0, &mut irq);
-        assert!(!irq, "IRQ cleared at 29830");
+        assert!(irq, "IRQ stays asserted across the 29830 wrap (mode 0)");
         assert_eq!(fc.cycle_count, 0, "frame counter wraps at 29830");
     }
 
@@ -421,7 +429,7 @@ mod tests {
         fc.tick(0, &mut irq);
         assert!(irq, "PAL IRQ stays set at 33253");
         fc.tick(0, &mut irq);
-        assert!(!irq, "PAL IRQ cleared at 33254");
+        assert!(irq, "PAL IRQ stays asserted across the 33254 wrap (mode 0)");
         assert_eq!(fc.cycle_count, 0, "PAL 4-step wraps at 33254");
     }
 

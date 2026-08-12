@@ -39,13 +39,16 @@ fn apu_silent_inputs_produce_silence() {
 #[test]
 fn apu_frame_counter_irq_at_14914_cycles() {
     let mut a = ApuCore::new();
-    // Tick the frame counter once per CPU cycle (dense, as the SoC
-    // does); the IRQ fires at the 14914-cycle boundary (4-step mode).
+    // Phase 6 P2 (2026-08-12): the 4-step NTSC frame-counter period is
+    // 29830 CPU cycles with the IRQ firing at fhcnt==29828/29829 (the
+    // old 14914 figure was the CYCLE HALF — the previous implementation
+    // was off by 2×). Tick dense and assert the IRQ at the corrected
+    // boundary.
     let mut irq = false;
-    for c in 0..=14914u64 {
+    for c in 0..=29828u64 {
         a.frame_counter.tick(c, &mut irq);
     }
-    assert!(irq, "IRQ should fire at 14914 cycles (4-step mode)");
+    assert!(irq, "IRQ should fire at 29828 cycles (4-step NTSC)");
 }
 
 #[test]
@@ -358,12 +361,16 @@ fn soc_apu_frame_irq_asserts_irq() {
     let mut soc = VNesSoc::default();
     soc.power_on(RamInitOption::AllZeros, 0);
     assert_eq!(soc.irq.aggregate_mask() & vnesu11::apu::IRQ_FCOUNT, 0);
-    // One NTSC frame ≈ 29780 CPU cycles > the 14914-cycle 4-step
-    // frame-counter period → the FCOUNT IRQ fires.
+    // Phase 6 P2 (2026-08-12): one NTSC frame ≈ 29780 CPU cycles is
+    // SHORTER than the corrected 29830-cycle 4-step frame-counter
+    // period, so a single frame does NOT reach the IRQ boundary. Run
+    // two frames: the counter crosses fhcnt==29828 (IRQ set) during
+    // frame 2.
+    soc.run_frame();
     soc.run_frame();
     assert_ne!(
         soc.irq.aggregate_mask() & vnesu11::apu::IRQ_FCOUNT,
         0,
-        "APU frame-counter IRQ must be asserted after a frame"
+        "APU frame-counter IRQ must be asserted after two frames"
     );
 }

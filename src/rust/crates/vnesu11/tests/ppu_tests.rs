@@ -334,7 +334,10 @@ fn vblank_segment_at_241() {
     p.scanline = 241;
     match p.next_segment() {
         Segment::VBlank { cpu_budget } => {
-            assert_eq!(cpu_budget, 1, "VBlank set at dot 1 → budget 1");
+            // Phase 6 P2 (2026-08-12): budget 341 (C++ DoLine
+            // sl>=240 branch) so the NMI entry sequence fits; the old
+            // budget-1 left the NMI handler with no room to run.
+            assert_eq!(cpu_budget, 341, "VBlank set line gets full 341 budget");
         }
         _ => panic!("expected VBlank at scanline 241"),
     }
