@@ -519,6 +519,11 @@ cpu_dummy_reads frame 1-2 完全匹配，frame 3+ 仍发散。指令级诊断（
 4. **根因**：frame 3 时 Rust 的**栈内容**（JSR 推的返回地址）与 C++ 不同（尽管 WRAM
    每帧同步）——指向 JSR/栈语义在 shadow 的每帧状态推送下的差异（Step 3 范围：
    完整 PPU/APU 状态 + CPU 栈语义审计）。
+5. **[2026-08-12 第十版] count 单位错乱**：`vnesu11_cpu_poke_regs` 直接同步 C++
+   `X6502.count`（×16 内部单位）到 Rust 的 count（点单位），换算应为 ÷16。原样同步
+   使 Rust 预算残差每帧差 ~60 点（~20 cycles）→ frame 0-1 指令数差（2-16 条）+
+   frame counter 相位漂移（~7 cycles）。修复后 shadow cpu_match 2 → 3（frame 1-3
+   完全匹配）。剩余 frame 4+ 发散：count÷16 取整 + 每指令时序残差（Step 3）。
 
 shadow harness 现已具备持续迭代的对比基础设施（harness 报告行已包含 APU
 的 IRQ 触发记录 + frame counter 相位跟踪 + 每帧指令数对比 `g_cpu_instr_count_`）。
