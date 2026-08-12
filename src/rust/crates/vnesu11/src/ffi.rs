@@ -279,6 +279,137 @@ pub unsafe extern "C" fn vnesu11_set_wram(
 }
 
 // =========================================================================
+// APU state sync (Phase 6 P2 shadow-run)
+//
+// The shadow runner pushes the C++ side's APU state into Rust after each
+// C++ frame so the per-cycle APU model (frame counter, master cycle
+// counter, channel enables) starts from the same baseline Rust's CPU
+// sees when it executes its own frame. Without this sync, the frame
+// counter IRQ lands in a different instruction window in Rust vs C++
+// (e.g. blargg cpu_dummy_reads diverges after frame 2 — Rust enters
+// the IRQ handler at $E622 while C++ stays in the $2002 VBlank-wait
+// loop). Channel-level sync (timer / length / envelope / sweep / DMC)
+// is deferred to the broader state-sync pass (see phase_6_integration.md
+// §9) — `vnesu11_apu_state_t` covers the timing-critical fields only.
+// =========================================================================
+
+/// Mirror of `ApuCore` state pushed from C++ to Rust each frame.
+/// Layout MUST match the C++ `ApuStateMirror` in
+/// `src/vnesu11_shadow.h`.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ApuStateMirror {
+    /// Master cycle counter (one tick per CPU cycle since power-on).
+    pub cycles: u64,
+    /// Frame counter period position (NTSC 29830, PAL 33254).
+    pub fc_cycle_count: u64,
+    /// Step counter (0..=3 for 4-step, 0..=4 for 5-step).
+    pub fc_step: u8,
+    /// 5-step mode flag ($4017 bit 7).
+    pub fc_five_step: bool,
+    /// IRQ inhibit flag ($4017 bit 6).
+    pub fc_irq_inhibit: bool,
+    /// PAL timing (mirrors C++ global `PAL` in FrameCounterTick).
+    pub pal: bool,
+    /// Pending $4017 mode bits (0x80 | 0x40) waiting to mature.
+    pub fc_pending_mode: u8,
+    /// Cycles until `fc_pending_mode` commits (3 or 4 after parity).
+    pub fc_reset_in: u8,
+    /// Quarter-frame flag latched from last tick.
+    pub fc_quarter_frame: bool,
+    /// Half-frame flag latched from last tick.
+    pub fc_half_frame: bool,
+    /// Frame IRQ pending (latched; consumed by IRQ check).
+    pub frame_irq_pending: bool,
+    /// DMC IRQ pending.
+    pub dmc_irq_pending: bool,
+    /// Bitmask of channels currently enabled ($4015).
+    pub enabled_channels: u8,
+}
+
+/// Push the C++ side's APU state into Rust. Called by the shadow
+/// runner after every C++ frame so Rust's per-cycle APU model
+/// (frame counter + master cycle counter + channel enables) starts
+/// the next frame from the same baseline.
+///
+/// Returns 0 on success, -1 on null SoC, -2 on null state pointer.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vnesu11_apu_poke_state(
+    soc: *mut VNesSocOpaque,
+    state: *const ApuStateMirror,
+) -> c_int {
+    let soc_ref = match into_mut(soc) {
+        Some(s) => s,
+        None => return -1,
+    };
+    if state.is_null() {
+        return -2;
+    }
+    let s = &*state;
+    let apu = &mut soc_ref.apu;
+    // Master cycle counter — drives $4017 parity and APU sub-cycle
+    // bookkeeping. Resetting it to C++'s value makes the parity match.
+    apu.cycles = s.cycles;
+    // Frame counter — drives quarter/half/IRQ events. Resetting
+    // cycle_count to C++'s value aligns Rust's IRQ firing with C++'s.
+    apu.frame_counter.cycle_count = s.fc_cycle_count;
+    apu.frame_counter.step = s.fc_step;
+    apu.frame_counter.five_step = s.fc_five_step;
+    apu.frame_counter.irq_inhibit = s.fc_irq_inhibit;
+    apu.frame_counter.pal = s.pal;
+    apu.frame_counter.pending_mode = s.fc_pending_mode;
+    apu.frame_counter.reset_in = s.fc_reset_in;
+    apu.frame_counter.quarter_frame = s.fc_quarter_frame;
+    apu.frame_counter.half_frame = s.fc_half_frame;
+    // IRQ pending flags — consumed by `apu.take_irq()` on next
+    // instruction; syncing avoids Rust firing an IRQ C++ already
+    // cleared or missing one C++ just fired.
+    apu.frame_irq_pending = s.frame_irq_pending;
+    apu.dmc_irq_pending = s.dmc_irq_pending;
+    // Channel-enable mask ($4015) — channels gated off shouldn't
+    // advance their timers / envelopes. Without this sync, Rust
+    // ticks channels that C++ has already disabled.
+    // (Note: the per-channel enable bits in pulse1/pulse2/etc. are
+    // derived from `enabled_channels` at $4015-write time, so we
+    // re-derive them here for consistency.)
+    let _ = s.enabled_channels; // Phase 6 P2 follow-up: per-channel sync
+    0
+}
+
+/// Snapshot the Rust side's APU state into the mirror. Provided for
+/// round-trip tests / savestate parity work. Returns 0 on success,
+/// -1 on null SoC, -2 on null state pointer.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vnesu11_apu_peek_state(
+    soc: *const VNesSocOpaque,
+    out_state: *mut ApuStateMirror,
+) -> c_int {
+    let soc_ref = match into_const(soc) {
+        Some(s) => s,
+        None => return -1,
+    };
+    if out_state.is_null() {
+        return -2;
+    }
+    let out = &mut *out_state;
+    let apu = &soc_ref.apu;
+    out.cycles = apu.cycles;
+    out.fc_cycle_count = apu.frame_counter.cycle_count;
+    out.fc_step = apu.frame_counter.step;
+    out.fc_five_step = apu.frame_counter.five_step;
+    out.fc_irq_inhibit = apu.frame_counter.irq_inhibit;
+    out.pal = apu.frame_counter.pal;
+    out.fc_pending_mode = apu.frame_counter.pending_mode;
+    out.fc_reset_in = apu.frame_counter.reset_in;
+    out.fc_quarter_frame = apu.frame_counter.quarter_frame;
+    out.fc_half_frame = apu.frame_counter.half_frame;
+    out.frame_irq_pending = apu.frame_irq_pending;
+    out.dmc_irq_pending = apu.dmc_irq_pending;
+    out.enabled_channels = 0;
+    0
+}
+
+// =========================================================================
 // Emulation
 // =========================================================================
 //

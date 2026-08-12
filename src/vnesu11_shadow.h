@@ -65,4 +65,56 @@ int vnesu11_shadow_compare(ShadowCompare* out) noexcept;
 /// `every_n` default — log every 60 frames.
 constexpr uint64_t kShadowLogEveryFrames = 60;
 
+/// Phase 6 P2 APU state mirror. Pushed from C++ into Rust after each
+/// C++ frame via `vnesu11_apu_poke_state`. Layout MUST match the
+/// `ApuStateMirror` `#[repr(C)]` struct in
+/// `crates/vnesu11/src/ffi.rs`. Field order frozen against the FFI
+/// signature (audit S1; verified by tests/layout_check.rs).
+///
+/// Scope: timing-critical fields only (frame counter + master cycle
+/// counter + IRQ pending + channel enables). Per-channel timers /
+/// envelopes / sweeps / DMC buffers are deferred to the broader
+/// state-sync pass (see phase_6_integration.md §9). Without at
+/// least this slice, Rust's frame counter IRQ lands in a different
+/// instruction window than C++'s (e.g. blargg cpu_dummy_reads
+/// diverges after frame 2 — Rust enters the IRQ handler at $E622
+/// while C++ stays in the $2002 VBlank-wait loop).
+struct ApuStateMirror {
+    uint64_t cycles;               // Master cycle counter
+    uint64_t fc_cycle_count;       // Frame counter period position
+    uint8_t  fc_step;              // Step counter (0..=3 / 0..=4)
+    bool     fc_five_step;         // $4017 bit 7
+    bool     fc_irq_inhibit;       // $4017 bit 6
+    bool     pal;                  // PAL timing (C++ global PAL)
+    uint8_t  fc_pending_mode;      // Pending mode bits
+    uint8_t  fc_reset_in;          // Cycles until reset matures
+    bool     fc_quarter_frame;     // Quarter-frame flag latched
+    bool     fc_half_frame;        // Half-frame flag latched
+    bool     frame_irq_pending;    // Frame IRQ pending
+    bool     dmc_irq_pending;      // DMC IRQ pending
+    uint8_t  enabled_channels;     // $4015 channel-enable mask
+};
+
 }  // namespace fceu11
+
+// FFI declarations live OUTSIDE the namespace so they don't get
+// tagged `fceu11::vnesu11_apu_poke_state` (which would mismatch the
+// Rust `#[unsafe(no_mangle)] pub extern "C" fn` symbol).
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/// Push C++'s APU state into Rust. Called by the shadow sync path
+/// after each C++ frame. Returns 0 on success, -1 on null SoC,
+/// -2 on null state pointer.
+int vnesu11_apu_poke_state(void* soc,
+                           const struct fceu11::ApuStateMirror* state);
+
+/// Snapshot Rust's APU state into the mirror. Provided for
+/// round-trip tests / savestate parity work.
+int vnesu11_apu_peek_state(void* soc,
+                           struct fceu11::ApuStateMirror* out_state);
+
+#ifdef __cplusplus
+}
+#endif

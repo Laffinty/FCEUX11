@@ -76,8 +76,10 @@ static uint64_t e3_abs_ts = 0;
 // last sequence start; the $4017 write schedules a 3/4-cycle maturation
 // (fc_reset_in) before the new sequence begins (3 cycles when the write
 // lands on an even CPU cycle = APU-aligned, 4 otherwise - the clock jitter).
-static int32_t fc_reset_in = 0;
-static uint8_t fc_pending_mode = 0;     // reduced 2-bit mode of pending write
+// Phase 6 P2 shadow sync: removed `static` so the shadow harness can
+// read these via `extern` declarations in src/sound.h.
+int32_t fc_reset_in = 0;
+uint8_t fc_pending_mode = 0;     // reduced 2-bit mode of pending write
 
 
 static uint32 wlookup1[32];

@@ -16,16 +16,24 @@
 
 #include "cpu.h"          // g_cpu.native_layout()
 #include "fceu.h"         // ::RAM, X6502
+#include "sound.h"        // fhcnt / fcnt / IRQFrameMode / SIRQStat / EnabledChannels / fc_reset_in / fc_pending_mode
 #include "vnesu11_bridge.h"
 
 #ifdef VNESU11_CORE_ENABLED
 // Rust extern "C" exports (see crates/vnesu11/src/ffi.rs).
+// `vnesu11_apu_poke_state` is declared in vnesu11_shadow.h (FFI
+// block lives outside any namespace).
 extern "C" {
 int vnesu11_set_wram(void* soc, const uint8_t* src);
 void vnesu11_cpu_poke_regs(void* soc, const void* regs);
 void vnesu11_cpu_peek_regs(void* soc, void* out);
 }
 #endif
+
+// Global C++ symbols read by the APU sync below. Declared OUTSIDE the
+// fceu11 namespace so they resolve to ::PAL / ::fhcnt (the definitions
+// in src/fceu.cpp / src/sound.cpp are at global scope).
+extern uint8 PAL;
 
 namespace fceu11 {
 
@@ -120,6 +128,37 @@ void vnesu11_shadow_sync_from_cpp() noexcept {
     //    has the 3 hook pointers at 32/40/48 in both, so the blobs are
     //    layout-identical.
     vnesu11_cpu_poke_regs(g_vnesu11_soc, &g_cpu.native_layout());
+
+    // 3. APU state (Phase 6 P2 — frame counter + master cycle counter).
+    //    The shadow harness previously only synced WRAM + CPU, which
+    //    left Rust's frame counter free-running. That drifted Rust's
+    //    IRQ firing by one frame's worth of cycles from C++'s, causing
+    //    blargg cpu_dummy_reads to diverge at frame 3 (Rust enters
+    //    the IRQ handler at $E622 while C++ stays in the $2002 wait
+    //    loop). Snapshotting the C++ side's fhcnt + fcnt + IRQFrameMode
+    //    + fc_pending_mode + fc_reset_in + cycle count and pushing them
+    //    into Rust aligns the frame counter timing.
+    fceu11::ApuStateMirror apu{};
+    apu.cycles = static_cast<uint64_t>(g_cpu.timestamp_ref())
+               + static_cast<uint64_t>(timestampbase);  // C++ master cycle count
+    apu.fc_cycle_count = static_cast<uint64_t>(fhcnt);
+    apu.fc_step = fcnt;
+    // IRQFrameMode = (raw $4017 & 0xC0) >> 6 — 5-step in bit 1, inhibit in bit 0.
+    apu.fc_five_step = (IRQFrameMode & 0x2) != 0;
+    apu.fc_irq_inhibit = (IRQFrameMode & 0x1) != 0;
+    // PAL timing — C++ global `PAL` (declared above, outside the
+    // namespace, so it resolves to ::PAL not fceu11::PAL).
+    apu.pal = (::PAL != 0);
+    apu.fc_pending_mode = fc_pending_mode & 0xC0;
+    apu.fc_reset_in = static_cast<uint8_t>(fc_reset_in < 0 ? 0 : fc_reset_in);
+    apu.fc_quarter_frame = false; // latched only inside FCEU_SoundCPUHook; not
+                                  // needed for cross-frame sync (consumer is the
+                                  // next instruction's IRQ check, not envelope ticks).
+    apu.fc_half_frame = false;
+    apu.frame_irq_pending = (SIRQStat & 0x40) != 0;
+    apu.dmc_irq_pending = (SIRQStat & 0x80) != 0;
+    apu.enabled_channels = EnabledChannels;
+    vnesu11_apu_poke_state(g_vnesu11_soc, &apu);
 }
 
 #else  // !VNESU11_CORE_ENABLED

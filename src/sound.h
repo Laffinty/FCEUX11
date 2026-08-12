@@ -73,6 +73,12 @@ extern int32_t   (& sqacc           )[2];
 extern uint8_t&    fcnt;
 extern int32_t&    fhcnt;
 extern int32_t&    fhinc;
+// Phase 6 P2 shadow sync: pending $4017 reset state (3-4 cycle
+// delayed reset from src/sound.cpp:1269). Defined (no longer static)
+// in src/sound.cpp so the shadow harness can read them via
+// `vnesu11_apu_poke_state`.
+extern int32_t fc_reset_in;
+extern uint8_t fc_pending_mode;
 
 // ---- Phase C2 aliases: DMC ----
 extern uint8_t&    DMCFormat;
