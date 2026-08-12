@@ -401,10 +401,12 @@ P1（完成）：
   [x] vn_perf_bench（743 us/帧 ≈ 1346 FPS）
 P2（后续会话/Phase 7）：
   [x] Shadow run 端到端 harness（2026-08-12：kagami_qa_shadow_run_runner 构建 + 运行成功）
-  [x] CPU 寄存器差异迭代修复（2026-08-12 第一~九版：$2002 VBlank 路由、DEY/TAY 周期、
+  [x] CPU 寄存器差异迭代修复（2026-08-12 第一~十版：$2002 VBlank 路由、DEY/TAY 周期、
       段预算对齐、per-instruction APU tick、frame counter 全功能 + 状态同步、
-      PPU 状态同步、预算单位补偿、frame counter IRQ 保持——frame 1-2 完全匹配）
-  [ ] CPU 差异迭代剩余（frame 3+ 相位残差 ~50 cycles：IRQ/NMI 服务时序 + PPU v/t/x/w）
+      PPU 状态同步、预算单位补偿、frame counter IRQ 保持、count 单位 ÷16——
+      frame 1-3 完全匹配，cpu_match=3/59）
+  [ ] CPU 差异迭代剩余（frame 4+ 发散：count÷16 取整残差 + 每指令时序残差 +
+      PPU v/t/x/w 同步——见 §9.1.2 Step 2c）
   [ ] MapperMetaVtable::fill_audio（VRC6/FDS/N163 扩展音频）
   [ ] savestate round-trip 100% parity
   [ ] TAS movie round-trip
@@ -433,7 +435,7 @@ P2（后续会话/Phase 7）：
 
 | ROM | CPU 匹配 | 观察 |
 |-----|---------|------|
-| cpu_dummy_reads.nes | 2/59 | **2026-08-12 第六~九版修复后**：frame 1-2 **完全匹配**；frame 3+ 仍发散（frame counter 相位残差 ~50 cycles → IRQ/BRK 时机错开） |
+| cpu_dummy_reads.nes | 3/59 | **2026-08-12 第六~十版修复后**：frame 1-3 **完全匹配**；frame 4+ 仍发散（count÷16 取整 + 每指令时序残差 → 指令流分叉，见下方"剩余发散"第 5 条） |
 | nestest.nes | 0/30 | 双方 PC 都在推进但不同步（依赖完整 PPU/APU channel 同步，Step 3 覆盖） |
 | mapper_axrom.nes | 0/30 | 同上 |
 
@@ -516,9 +518,11 @@ cpu_dummy_reads frame 1-2 完全匹配，frame 3+ 仍发散。指令级诊断（
 3. **Rust frame 3 的 VBlank 轮询（E48A/E48D）退出后**，E48F RTS 返回 E621（"等 NMI"
    子程序的 RTS），**弹出栈顶 0x0022** → 进入 BRK 循环（0022 BRK → E622 BIT $4015 →
    E625 RTI → ...）。C++ frame 4 停在轮询/返回正常调用者（E493）。
-4. **根因**：frame 3 时 Rust 的**栈内容**（JSR 推的返回地址）与 C++ 不同（尽管 WRAM
-   每帧同步）——指向 JSR/栈语义在 shadow 的每帧状态推送下的差异（Step 3 范围：
-   完整 PPU/APU 状态 + CPU 栈语义审计）。
+4. **根因（第九版假设，第十版已证伪）**：frame 3 时 Rust 的**栈内容**（JSR 推的返回
+   地址）与 C++ 不同（尽管 WRAM 每帧同步）——曾指向 JSR/栈语义差异。
+   **第十版 count÷16 修复后 frame 1-3 全匹配**：JSR 推栈语义已审计正确（push PC-1、
+   hi 后 lo，与 C++ 一致）；frame 4+ 的栈内容差异是**相位漂移的下游症状**，
+   **不要再审计 JSR/栈语义**。
 5. **[2026-08-12 第十版] count 单位错乱**：`vnesu11_cpu_poke_regs` 直接同步 C++
    `X6502.count`（×16 内部单位）到 Rust 的 count（点单位），换算应为 ÷16。原样同步
    使 Rust 预算残差每帧差 ~60 点（~20 cycles）→ frame 0-1 指令数差（2-16 条）+
@@ -527,6 +531,107 @@ cpu_dummy_reads frame 1-2 完全匹配，frame 3+ 仍发散。指令级诊断（
 
 shadow harness 现已具备持续迭代的对比基础设施（harness 报告行已包含 APU
 的 IRQ 触发记录 + frame counter 相位跟踪 + 每帧指令数对比 `g_cpu_instr_count_`）。
+
+---
+
+## 9.1 会话接续指引（2026-08-12 定稿，清空上下文后唯一依赖）
+
+> **目标**：任何新会话只读本文件即可接续 Phase 6 收尾。**先跑一遍 §9.1.4 验证
+> 命令确认基线**，再按 §9.1.2 剩余路径执行。不要重复已完成的修复（§9.1.1 清单）。
+
+### 9.1.0 当前精确状态
+
+- **分支** `wip_v2.0`；工作树应干净（§9.1 本修订随提交落地；若检出后发现脏树，
+  先 `git status` 确认无未提交源码改动再继续）。
+- **测试**：`cargo test --release -p vnesu11` 全模块通过（lib 192 + apu 24 + ppu 33
+  + mapper 12 + system_type 等），无 FAILED。
+- **shadow**（cpu_dummy_reads 60 帧）：`cpu_match=3/59`（**frame 1-3 完全匹配**，
+  frame 4+ 发散）。nestest/mapper_axrom 仍 0/N（依赖完整 PPU/APU 同步）。
+- **核心状态**：frame counter IRQ 保持（mode-0）、预算单位 ×3 dots/cycle、
+  count 单位 ÷16、-1 段 dot 对齐——均已修复。
+
+### 9.1.1 已完成的修复链（勿重复）
+
+1. $2002 VBlank 路由（bus.rs read_status）
+2. DEY/TAY 周期表对齐（cycles.rs，含回归测试 `base_cycles_matches_cpp_cyc_table`）
+3. 段预算：VBlank 341 + sprite_eval 85 + -1 段 0（ppu/mod.rs）
+4. per-instruction APU tick + IRQ 路由（soc.rs run_segment_inner + step_one）
+5. frame counter 全功能 NTSC/PAL × 4/5-step（frame_counter.rs，周期 29830）
+6. $4017 延迟重置 3/4-cycle（write_with_parity）
+7. APU/PPU 状态同步（ffi.rs apu_poke_state / ppu_poke_state + shadow.cpp sync）
+8. $4015 读清 cpu.irq_pending FCOUNT（bus.rs apu_status_read）
+9. 预算单位 ×3 dots/cycle（run_segment_inner 补扣 tcount×2）
+10. frame counter IRQ 跨 wrap 保持（FrameIRQEnd mode-0 对齐）
+11. -1 段不推进 dot 时钟（262×341 dots 对齐 C++）
+12. **count 单位 ÷16**（ffi.rs vnesu11_cpu_poke_regs `cpu.count = r.count / 16`）
+
+### 9.1.2 剩余路径（按序执行）
+
+**Step 2c（当前）— frame 4+ 发散收尾**：
+- 根因链：count÷16 取整残差（<16 内部 = <1 点/帧）+ 每指令时序残差（frame counter
+  相位 ~7 cycles/帧）→ frame 4 起指令流分叉（Rust 走 E61E 路径，C++ 走 E493）。
+- **已观测证据（2026-08-12 基线复跑）**：frame 3 末 Rust `s=F8` vs C++ `s=FA`
+  （SP 差 2 字节 → Rust 相对 C++ 多压 2 字节/少弹 2 字节）。WRAM 与 SP 均在帧首
+  同步（源自 C++ 帧末状态），故栈内容本身两端一致；SP 漂移说明 **frame 3 内
+  Rust 的 JSR/RTS 配对次数与 C++ 不同**（如 VBlank 轮询退出时机差一拍 → 多进/
+  少进一次"等 NMI"子程序），frame 4 起 SP 指向与栈内容错位 → Rust 走
+  BRK 处理 + 数据区（pc 0116/4C9F/0C0B/0CF0/22E6/2223/22E3/3E41...），C++
+  稳定在 E2xx/E48x（主循环 + 轮询）。
+- 具体步骤：
+  a. 检查 `vnesu11_cpu_poke_regs` 的 `count/16` 是否应加舍入（C++ count 非 16 倍数
+     时，比较 C++ 的 `count % 16` 语义；必要时同步余数或改用浮点/定点）。
+  b. 逐帧对比 `g_cpu_instr_count_`（C++ 每指令计数）与 Rust run_segment_inner 的
+     step_one 次数（shadow.cpp 已保留计数钩子），确认 frame 3 内哪一拍的
+     JSR/RTS 配对错位（SP 差 2 = 一次未配对的 push）。
+  c. 若分叉源于 PPU $2002 VBlank set 时机，检查 ppu_poke_state 是否需同步 scanline
+     （C++ g_cpu.scanline() 帧末值 → Rust ppu.scanline 映射）。
+
+**Step 3 — APU 5 通道状态同步**：
+- 扩展 `ApuStateMirror`（ffi.rs）：pulse1/2（timer/length/envelope/sweep）、triangle
+  （timer/length/linear）、noise（period/length/envelope/lfsr）、dmc
+  （buffer/address/size/period）。
+- C++ 端（shadow.cpp sync）：从 `PSG[]`、`curfreq[]`、`lengthcount[]`、`EnvUnits[]`、
+  `SweepCount[]`、DMC 全局填。
+- 验证：shadow 三个 ROM 指令数/CPU regs 匹配率提升。
+
+**Step 4 — shadow 验证闭环**：cpu_dummy_reads / nestest / mapper_axrom 60 帧全匹配。
+
+**Step 5 — DoD 三套件**：SMB1/Zelda/Contra（XBuf CRC 零 diff + SNR≥60dB）、MMC3 IRQ
+测试 ROM、blargg cpu_instrs 177 全 PASS。
+
+**Step 6 — 系统类型 + fill_audio + 性能**：FDS/NSF/VS 各 1 文件；
+`MapperMetaVtable::fill_audio`（VRC6/FDS/N163）；纯 vNESU11 帧时间 ≤ v1.17×1.05。
+
+**Step 7 — 文档收口**：§7 DoD 勾选 + §9 更新为最终实测矩阵。
+
+### 9.1.3 关键文件索引（下一步要改的）
+
+- `src/rust/crates/vnesu11/src/ffi.rs`：`ApuStateMirror`/`PpuStateMirror` 扩展、
+  `vnesu11_cpu_poke_regs`（count 单位）、`vnesu11_apu_poke_state`/`ppu_poke_state`
+- `src/vnesu11_shadow.cpp`：`vnesu11_shadow_sync_from_cpp`（填 APU/PPU 状态）
+- `src/vnesu11_shadow.h`：mirror 结构镜像 + extern "C"（namespace 外）
+- `src/rust/crates/vnesu11/src/soc.rs`：`run_segment_inner`（预算/单位/IRQ 路由）
+- `src/rust/crates/vnesu11/src/apu/frame_counter.rs`：周期常量/IRQ 保持
+
+### 9.1.4 验证命令
+
+```
+cd src/rust && cargo test --release -p vnesu11          # 全绿（无 FAILED）
+# C++ 重建（%VCVARS64% 在新 shell 通常未定义，直接用本机路径；PowerShell 用反引号
+# 转义内层引号。BuildTools 备选：
+#   C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat）：
+cmd /c "`"D:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat`" >nul 2>&1 && cd build && cmake --build . --target kagami_qa_shadow_run_runner --config Release"
+# shadow（PATH 需含 vcpkg bin）：
+build\tests\kagami_qa_shadow_run_runner.exe tests/fixtures/blargg/cpu/cpu_dummy_reads.nes --frames 60
+# 期望：SHADOW_RESULT cpu_match 从 3 提升（Step 2c 目标 ≥5，Step 4 目标 60/59）。
+# 注意：cpu_diff>0 时 runner 退出码为 1，属正常；退出码 0 才是全匹配。
+# 基线已复跑验证（2026-08-12）：cpu_match=3/59，且捕获 frame 3 末 SP 差 2 的证据（见 §9.1.2）。
+```
+
+### 9.1.5 纪律
+
+- **不做简化**：不跳过 PPU 敏感 ROM、不放宽判据（用户明确要求）。
+- **文档同步**：每完成一步，更新 §7 DoD + §9（含日期版本号），防止脱节复发。
 
 ---
 
