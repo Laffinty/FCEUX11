@@ -359,6 +359,23 @@ impl VNesSoc {
     fn route_apu_irqs_to_cpu(&mut self) {
         let mask = self.apu.take_irq();
         if mask != 0 {
+            // Phase 6 P2 shadow diagnostics: IRQ re-trigger frequency.
+            {
+                use std::sync::atomic::{AtomicU32, Ordering};
+                static COUNT: AtomicU32 = AtomicU32::new(0);
+                let n = COUNT.fetch_add(1, Ordering::Relaxed);
+                if n < 10 {
+                    let mut stderr = std::io::stderr();
+                    use std::io::Write as _;
+                    let _ = writeln!(
+                        stderr,
+                        "[route_apu_irq] n={} mask={:X} pc={:04X} fc={}",
+                        n, mask, self.cpu.pc(),
+                        self.apu.frame_counter.cycle_count
+                    );
+                    let _ = stderr.flush();
+                }
+            }
             // FCOUNT + DMC bits flow through the IrqController for
             // unified level semantics (mapper + EXT can override).
             if mask & crate::apu::IRQ_FCOUNT != 0 {
