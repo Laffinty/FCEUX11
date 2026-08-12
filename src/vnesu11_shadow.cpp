@@ -17,6 +17,8 @@
 #include "cpu.h"          // g_cpu.native_layout()
 #include "fceu.h"         // ::RAM, X6502
 #include "sound.h"        // fhcnt / fcnt / IRQFrameMode / SIRQStat / EnabledChannels / fc_reset_in / fc_pending_mode
+#include "ppu.h"          // PPUGenLatch, g_ppu (Ppu::reg/ntaram/oam)
+#include "ppu_state.h"    // PALRAM
 #include "vnesu11_bridge.h"
 
 #ifdef VNESU11_CORE_ENABLED
@@ -159,6 +161,31 @@ void vnesu11_shadow_sync_from_cpp() noexcept {
     apu.dmc_irq_pending = (SIRQStat & 0x80) != 0;
     apu.enabled_channels = EnabledChannels;
     vnesu11_apu_poke_state(g_vnesu11_soc, &apu);
+
+    // 4. PPU state (Phase 6 P2 — registers + CPU-observable memory).
+    //    Previously the sync only covered WRAM + CPU + APU frame
+    //    counter, leaving Rust's PPU free-running. The C++ and Rust
+    //    PPUs then diverged, so $2002 reads (e.g. the BIT $2002
+    //    VBlank-wait loop at $E48D in cpu_dummy_reads.nes) returned
+    //    different values and the CPU took different branches after a
+    //    few frames. Syncing the CPU-observable PPU state closes that.
+    fceu11::PpuStateMirror ppu{};
+    // Registers — g_ppu is fceu11::Ppu (see ppu_class.h); reg(0..3)
+    // is the PPU[0..3] register file ($2000-$2003).
+    ppu.ppuctrl = fceu11::g_ppu.reg(0);
+    ppu.ppumask = fceu11::g_ppu.reg(1);
+    ppu.status  = fceu11::g_ppu.reg(2);
+    ppu.oam_addr = fceu11::g_ppu.reg(3);
+    // $2007 read buffer + CPU open bus.
+    ppu.read_buffer = PPUGenLatch;
+    ppu.open_bus = g_cpu.native_layout().DB;
+    // Palette RAM (C++ PALRAM[0x20]).
+    std::memcpy(ppu.palette, PALRAM.data(), sizeof(ppu.palette));
+    // Name-table RAM (C++ NTARAM[0x800] → g_ppu.ntaram()).
+    std::memcpy(ppu.vram, fceu11::g_ppu.ntaram(), sizeof(ppu.vram));
+    // OAM (C++ g_ppu.oam()[256]).
+    std::memcpy(ppu.oam, fceu11::g_ppu.oam(), sizeof(ppu.oam));
+    vnesu11_ppu_poke_state(g_vnesu11_soc, &ppu);
 }
 
 #else  // !VNESU11_CORE_ENABLED

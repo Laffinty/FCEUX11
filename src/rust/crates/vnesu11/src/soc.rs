@@ -306,8 +306,20 @@ impl VNesSoc {
             }
             // Pending IRQ: poll, then step.
             self.cpu.count = remaining;
+            let count_before_poll = self.cpu.count;
             self.cpu.poll_interrupts(&mut bus);
             remaining = self.cpu.count;
+            // Phase 6 P2 shadow fix: the C++ interrupt service path
+            // does `ADDCYC(7)` (push PC/P + vector) which lands in
+            // `_tcount` and is fed to `FCEU_SoundCPUHook` on the next
+            // instruction. Rust's `poll_interrupts` also decrements
+            // count by 7 but nothing ticked the APU for it, so the
+            // frame-counter phase drifted ~7 cycles per NMI/IRQ vs
+            // C++. Feed the consumed cycles to the APU here.
+            let poll_consumed = (count_before_poll - remaining).max(0);
+            if poll_consumed > 0 {
+                self.apu.tick(poll_consumed as u32);
+            }
             if remaining <= 0 {
                 break;
             }

@@ -373,6 +373,22 @@ pub unsafe extern "C" fn vnesu11_apu_poke_state(
     // derived from `enabled_channels` at $4015-write time, so we
     // re-derive them here for consistency.)
     let _ = s.enabled_channels; // Phase 6 P2 follow-up: per-channel sync
+    // If the C++ side's frame/DMC IRQ line is asserted at the frame
+    // boundary, make sure Rust's CPU sees it on the next frame —
+    // `poke_regs` synced `irq_low` from C++ X6502, but the APU slice
+    // below is authoritative for the pending flags. Re-assert through
+    // the IrqController so the next instruction's poll_interrupts
+    // services it at the same time C++'s does.
+    if apu.frame_irq_pending {
+        soc_ref.irq.assert_irq(crate::apu::IRQ_FCOUNT);
+    }
+    if apu.dmc_irq_pending {
+        soc_ref.irq.assert_irq(crate::apu::IRQ_DMC);
+    }
+    let agg = soc_ref.irq.aggregate_mask();
+    if agg != 0 {
+        soc_ref.cpu.irq_begin(agg);
+    }
     0
 }
 
@@ -410,6 +426,114 @@ pub unsafe extern "C" fn vnesu11_apu_peek_state(
 }
 
 // =========================================================================
+// PPU state sync (Phase 6 P2 shadow-run)
+//
+// The shadow runner pushes the C++ side's PPU state into Rust after
+// each C++ frame so the two cores observe identical $2002 / $2007 /
+// $2004 reads on the next frame. Without this, a ROM that branches on
+// the PPU status register (e.g. blargg cpu_dummy_reads' `BIT $2002`
+// VBlank-wait loop at $E48D) diverges after a few frames: the C++ and
+// Rust PPUs start each frame from different internal state, so the CPU
+// sees different values and takes different branches.
+//
+// Scope: registers + memory the CPU can read (status, read buffer,
+// palette, VRAM, OAM). Internal render latches (PPUREGS daisy chain,
+// line buffer, bg/sprite shifters) are NOT synced — they only affect
+// the rendered frame, not CPU-observable state, and the CPU instruction
+// stream stays identical once reads match (the v/t/x/w write sequence
+// replays identically from the synced start).
+//
+// Layout MUST match the C++ `PpuStateMirror` in src/vnesu11_shadow.h.
+// =========================================================================
+
+/// Mirror of the PPU state the CPU can observe. Pushed from C++ to
+/// Rust after each C++ frame.
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct PpuStateMirror {
+    /// $2000 PPUCTRL (C++ PPU[0]).
+    pub ppuctrl: u8,
+    /// $2001 PPUMASK (C++ PPU[1]).
+    pub ppumask: u8,
+    /// $2002 PPUSTATUS (C++ PPU[2]) — VBlank / sprite0 / overflow.
+    pub status: u8,
+    /// $2003 OAMADDR (C++ PPU[3]).
+    pub oam_addr: u8,
+    /// $2007 read buffer (C++ PPUGenLatch).
+    pub read_buffer: u8,
+    /// CPU open-bus value (C++ `_DB` after last read).
+    pub open_bus: u8,
+    /// Palette RAM (C++ PALRAM[0x20]).
+    pub palette: [u8; 32],
+    /// Name-table RAM (C++ NTARAM[0x800], 4 nametables).
+    pub vram: [u8; 2048],
+    /// OAM (C++ g_ppu.oam()[256]).
+    pub oam: [u8; 256],
+}
+
+/// Push the C++ side's PPU state into Rust. Called by the shadow
+/// runner after every C++ frame. Returns 0 on success, -1 on null
+/// SoC, -2 on null state pointer.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vnesu11_ppu_poke_state(
+    soc: *mut VNesSocOpaque,
+    state: *const PpuStateMirror,
+) -> c_int {
+    let soc_ref = match into_mut(soc) {
+        Some(s) => s,
+        None => return -1,
+    };
+    if state.is_null() {
+        return -2;
+    }
+    let s = &*state;
+    // Registers (CPU-observable).
+    soc_ref.ppu.regs.ppuctrl = s.ppuctrl;
+    soc_ref.ppu.regs.ppumask = s.ppumask;
+    soc_ref.ppu.regs.status = s.status;
+    soc_ref.ppu.regs.oam_addr = s.oam_addr;
+    soc_ref.ppu.regs.read_buffer = s.read_buffer;
+    // Keep the SoC's public mirrors in sync (savestate/snapshot path).
+    soc_ref.palette.copy_from_slice(&s.palette);
+    soc_ref.vram.copy_from_slice(&s.vram);
+    soc_ref.oam.copy_from_slice(&s.oam);
+    soc_ref.ram_banks.palette.copy_from_slice(&s.palette);
+    soc_ref.ram_banks.vram.copy_from_slice(&s.vram);
+    soc_ref.ram_banks.oam.copy_from_slice(&s.oam);
+    // Open bus value the CPU reads for unmapped/PPU reads.
+    soc_ref.open_bus = s.open_bus;
+    0
+}
+
+/// Snapshot the Rust side's PPU state into the mirror. Provided for
+/// round-trip tests / savestate parity work. Returns 0 on success,
+/// -1 on null SoC, -2 on null state pointer.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vnesu11_ppu_peek_state(
+    soc: *const VNesSocOpaque,
+    out_state: *mut PpuStateMirror,
+) -> c_int {
+    let soc_ref = match into_const(soc) {
+        Some(s) => s,
+        None => return -1,
+    };
+    if out_state.is_null() {
+        return -2;
+    }
+    let out = &mut *out_state;
+    out.ppuctrl = soc_ref.ppu.regs.ppuctrl;
+    out.ppumask = soc_ref.ppu.regs.ppumask;
+    out.status = soc_ref.ppu.regs.status;
+    out.oam_addr = soc_ref.ppu.regs.oam_addr;
+    out.read_buffer = soc_ref.ppu.regs.read_buffer;
+    out.open_bus = soc_ref.open_bus;
+    out.palette.copy_from_slice(&soc_ref.palette);
+    out.vram.copy_from_slice(&soc_ref.vram);
+    out.oam.copy_from_slice(&soc_ref.oam);
+    0
+}
+
+// =========================================================================
 // Emulation
 // =========================================================================
 //
@@ -438,6 +562,24 @@ pub unsafe extern "C" fn vnesu11_emulate_frame(
 
     // 1. Drive one full frame (CPU + APU + PPU + DMA + IRQ routing).
     let result = soc_ref.run_frame();
+
+    // DEBUG TRACE (Phase 6 P2): frame-boundary frame counter phase.
+    {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        static COUNT: AtomicU32 = AtomicU32::new(0);
+        let n = COUNT.fetch_add(1, Ordering::Relaxed);
+        if n < 8 {
+            let mut stderr = std::io::stderr();
+            use std::io::Write as _;
+            let _ = writeln!(
+                stderr,
+                "[rust_frame_end] n={} pc={:04X} fc_cycle_count={} fc_pending={} irq_pending={:X}",
+                n, soc_ref.cpu.pc(), soc_ref.apu.frame_counter.cycle_count,
+                soc_ref.apu.frame_irq_pending as u8, soc_ref.cpu.irq_pending
+            );
+            let _ = stderr.flush();
+        }
+    }
 
     // 2. Copy the rendered frame buffer (61440 bytes = 256 × 240).
     //    Rust writes palette indices; the C++ side downstream converts

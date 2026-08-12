@@ -230,7 +230,17 @@ impl PpuCore {
 
         match self.scanline {
             sl if sl == PRELINE => Segment::PreRender {
-                cpu_budget: dot_clock::CPU_BUDGET_GB_HBLANK,
+                // **Phase 6 P2 shadow fix (2026-08-12, third edition)**:
+                // budget 0 — this scanline is a Rust-internal artifact
+                // (C++ FCEUPPU_Loop starts at sl=0 and has no separate
+                // pre-render scanline; its pre-render is sl=261, which
+                // already gets the full 341 budget below). Giving it a
+                // nonzero budget added ~85 CPU cycles/frame that C++
+                // never runs, drifting the APU frame counter phase and
+                // misaligning the frame-counter IRQ. The pre-render
+                // PPU work (clear VBlank etc.) still runs in
+                // `tick_preline_segment`; only the CPU budget is 0.
+                cpu_budget: 0,
             },
             sl if (0..=239).contains(&sl) => {
                 // Visible scanline: 256 visible dots (background fetch
@@ -254,10 +264,25 @@ impl PpuCore {
                 cpu_budget: dot_clock::CPU_BUDGET_VBLANK_LINE,
             },
             sl if (242..=260).contains(&sl) => Segment::VBlank {
-                cpu_budget: dot_clock::CPU_BUDGET_GB_HBLANK,
+                // **Phase 6 P2 shadow fix (2026-08-12, third edition)**:
+                // was CPU_BUDGET_GB_HBLANK (85) here. C++ DoLine's
+                // `sl >= 240` branch gives EVERY post-render / VBlank
+                // scanline a full 341 budget (X6502_Run(256+69) +
+                // X6502_Run(16)); Rust was under-budgeting these 19
+                // idle VBlank lines by 256 cycles each. Net effect:
+                // the Rust CPU ran ~5,120 fewer cycles per frame than
+                // C++, so the APU frame counter (ticked per instruction)
+                // drifted ~5k cycles per frame → the frame-counter IRQ
+                // fired at a different phase → shadow CPU divergence
+                // from frame 3 onward even with full state sync.
+                cpu_budget: dot_clock::CPU_BUDGET_VBLANK_LINE,
             },
             sl if sl == 261 => Segment::PreRender {
-                cpu_budget: dot_clock::CPU_BUDGET_GB_HBLANK,
+                // **Phase 6 P2 shadow fix (2026-08-12, third edition)**:
+                // was CPU_BUDGET_GB_HBLANK (85). The pre-render scanline
+                // is `sl >= 240` in C++ DoLine, so it also gets the full
+                // 341 budget.
+                cpu_budget: dot_clock::CPU_BUDGET_VBLANK_LINE,
             },
             _ => Segment::FrameComplete,
         }

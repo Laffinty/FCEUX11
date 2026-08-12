@@ -95,6 +95,28 @@ struct ApuStateMirror {
     uint8_t  enabled_channels;     // $4015 channel-enable mask
 };
 
+/// Phase 6 P2 PPU state mirror. Pushed from C++ into Rust after each
+/// C++ frame via `vnesu11_ppu_poke_state`. Layout MUST match the
+/// `PpuStateMirror` `#[repr(C)]` struct in `crates/vnesu11/src/ffi.rs`.
+///
+/// Scope: registers + memory the CPU can read (status / read buffer /
+/// palette / VRAM / OAM). Internal render latches are NOT synced —
+/// they only affect the rendered frame, not CPU-observable state; the
+/// CPU instruction stream stays identical once the reads match (the
+/// $2005/$2006 write sequence replays identically from the synced
+/// start because both cores begin with v/t/x/w = 0 after power-on).
+struct PpuStateMirror {
+    uint8_t  ppuctrl;      // $2000 PPUCTRL (PPU[0])
+    uint8_t  ppumask;      // $2001 PPUMASK (PPU[1])
+    uint8_t  status;       // $2002 PPUSTATUS (PPU[2])
+    uint8_t  oam_addr;     // $2003 OAMADDR (PPU[3])
+    uint8_t  read_buffer;  // $2007 read buffer (PPUGenLatch)
+    uint8_t  open_bus;     // CPU data-bus open value (X6502.DB)
+    uint8_t  palette[32];  // PALRAM
+    uint8_t  vram[2048];   // NTARAM (4 nametables)
+    uint8_t  oam[256];     // g_ppu.oam() / SPRAM
+};
+
 }  // namespace fceu11
 
 // FFI declarations live OUTSIDE the namespace so they don't get
@@ -114,6 +136,17 @@ int vnesu11_apu_poke_state(void* soc,
 /// round-trip tests / savestate parity work.
 int vnesu11_apu_peek_state(void* soc,
                            struct fceu11::ApuStateMirror* out_state);
+
+/// Push C++'s PPU state (registers + CPU-observable memory) into
+/// Rust. Called by the shadow sync path after each C++ frame.
+/// Returns 0 on success, -1 on null SoC, -2 on null state pointer.
+int vnesu11_ppu_poke_state(void* soc,
+                           const struct fceu11::PpuStateMirror* state);
+
+/// Snapshot Rust's PPU state into the mirror. Provided for
+/// round-trip tests / savestate parity work.
+int vnesu11_ppu_peek_state(void* soc,
+                           struct fceu11::PpuStateMirror* out_state);
 
 #ifdef __cplusplus
 }
