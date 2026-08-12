@@ -691,6 +691,13 @@ pub unsafe extern "C" fn vnesu11_cpu_poke_regs(
     cpu.db = r.db;
 }
 
+/// Shadow diagnostics: executed instruction counter (Phase 6 P2).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vnesu11_instr_count(soc: *const VNesSocOpaque) -> u64 {
+    let Some(s) = into_const(soc) else { return 0 };
+    s.instr_count
+}
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vnesu11_ppu_peek(
     soc: *const VNesSocOpaque,

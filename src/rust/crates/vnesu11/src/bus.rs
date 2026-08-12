@@ -220,7 +220,24 @@ impl VNesSoc {
                 // $2002 PPUSTATUS: VBlank (bit 7) + sprite 0 hit (6) +
                 // overflow (5) from the PpuCore status; reading clears
                 // VBlank + the w toggle (PpuRegisters::read_status).
-                self.ppu.regs.read_status()
+                // Low 5 bits come from the PPU read latch (C++ A2002:
+                // `ret = PPU_status | (PPUGenLatch & 0x1F)`; the latch
+                // is synced into `read_buffer` each frame).
+                //
+                // NOTE (Phase 6 P2, 2026-08-12): C++ (newppu) ALSO
+                // implements VBL-set suppression — a $2002 read at
+                // sl 240, cycle 340 marks the next frame's VBlank set
+                // as skipped (Nesdev PPU_frame_timing). Replicating it
+                // requires matching C++'s sub-scanline read phase,
+                // which drifts frame-to-frame with the count residual
+                // (C++ read positions 338/340/331 across frames; a
+                // fixed segment-dots threshold can't track it — a
+                // [333,341) window over-suppressed and moved the first
+                // shadow divergence from frame 3 to frame 2). See
+                // docs/wip_2.0_plan/phase_6_integration.md §9.1.2
+                // Step 2c. Left unimplemented until the phase model
+                // matches.
+                self.ppu.regs.read_status() | (self.ppu.regs.read_buffer & 0x1F)
             }
             0x04 => {
                 // $2004 OAMDATA read at OAMADDR (read does not advance

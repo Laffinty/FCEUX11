@@ -543,12 +543,14 @@ shadow harness 现已具备持续迭代的对比基础设施（harness 报告行
 
 - **分支** `wip_v2.0`；工作树应干净（§9.1 本修订随提交落地；若检出后发现脏树，
   先 `git status` 确认无未提交源码改动再继续）。
-- **测试**：`cargo test --release -p vnesu11` 全模块通过（lib 192 + apu 24 + ppu 33
+- **测试**：`cargo test --release -p vnesu11` 全模块通过（lib 194 + apu 24 + ppu 33
   + mapper 12 + system_type 等），无 FAILED。
-- **shadow**（cpu_dummy_reads 60 帧）：`cpu_match=3/59`（**frame 1-3 完全匹配**，
-  frame 4+ 发散）。nestest/mapper_axrom 仍 0/N（依赖完整 PPU/APU 同步）。
+- **shadow**（cpu_dummy_reads 60 帧）：`cpu_match=3/59`（**frame 1-2 真匹配**——
+  逐帧指令数 delta=0（8510/8506）；frame 53 为偶然重合；frame 3 起发散，根因是
+  C++ 的 VBL-set suppression 未复刻，见 §9.1.2 Step 2c）。nestest/mapper_axrom
+  仍 0/N（依赖完整 PPU/APU 同步）。
 - **核心状态**：frame counter IRQ 保持（mode-0）、预算单位 ×3 dots/cycle、
-  count 单位 ÷16、-1 段 dot 对齐——均已修复。
+  count 单位 ÷16、-1 段 dot 对齐、**VBlank flag 帧首置位时间线**——均已修复。
 
 ### 9.1.1 已完成的修复链（勿重复）
 
@@ -564,27 +566,62 @@ shadow harness 现已具备持续迭代的对比基础设施（harness 报告行
 10. frame counter IRQ 跨 wrap 保持（FrameIRQEnd mode-0 对齐）
 11. -1 段不推进 dot 时钟（262×341 dots 对齐 C++）
 12. **count 单位 ÷16**（ffi.rs vnesu11_cpu_poke_regs `cpu.count = r.count / 16`）
+13. **VBlank flag 帧首置位时间线**（ppu/mod.rs：PRELINE 置位 + NMI arm、sl 20 清除、
+    sl 241 不再置位——对齐 C++ FCEUX_PPU_Loop 顶部置位；4 个 PPU 测试更新）
+14. **$2002 低 5 位 open-bus**（bus.rs：`read_status | (read_buffer & 0x1F)`，
+    对齐 C++ `PPU_status | (PPUGenLatch & 0x1F)`）
+15. **VBL-set suppression latch 骨架**（bus.rs 判定点 + PpuCore::vbl_set_suppressed
+    + tick_preline_segment 消费——**判定未接相位匹配，见 Step 2c 阻塞点**）
 
 ### 9.1.2 剩余路径（按序执行）
 
-**Step 2c（当前）— frame 4+ 发散收尾**：
-- 根因链：count÷16 取整残差（<16 内部 = <1 点/帧）+ 每指令时序残差（frame counter
-  相位 ~7 cycles/帧）→ frame 4 起指令流分叉（Rust 走 E61E 路径，C++ 走 E493）。
-- **已观测证据（2026-08-12 基线复跑）**：frame 3 末 Rust `s=F8` vs C++ `s=FA`
-  （SP 差 2 字节 → Rust 相对 C++ 多压 2 字节/少弹 2 字节）。WRAM 与 SP 均在帧首
-  同步（源自 C++ 帧末状态），故栈内容本身两端一致；SP 漂移说明 **frame 3 内
-  Rust 的 JSR/RTS 配对次数与 C++ 不同**（如 VBlank 轮询退出时机差一拍 → 多进/
-  少进一次"等 NMI"子程序），frame 4 起 SP 指向与栈内容错位 → Rust 走
-  BRK 处理 + 数据区（pc 0116/4C9F/0C0B/0CF0/22E6/2223/22E3/3E41...），C++
-  稳定在 E2xx/E48x（主循环 + 轮询）。
-- 具体步骤：
-  a. 检查 `vnesu11_cpu_poke_regs` 的 `count/16` 是否应加舍入（C++ count 非 16 倍数
-     时，比较 C++ 的 `count % 16` 语义；必要时同步余数或改用浮点/定点）。
-  b. 逐帧对比 `g_cpu_instr_count_`（C++ 每指令计数）与 Rust run_segment_inner 的
-     step_one 次数（shadow.cpp 已保留计数钩子），确认 frame 3 内哪一拍的
-     JSR/RTS 配对错位（SP 差 2 = 一次未配对的 push）。
-  c. 若分叉源于 PPU $2002 VBlank set 时机，检查 ppu_poke_state 是否需同步 scanline
-     （C++ g_cpu.scanline() 帧末值 → Rust ppu.scanline 映射）。
+**Step 2c（当前）— frame 3+ 发散收尾**（2026-08-12 深度调查后重写）：
+
+**根因 1（已修复）：VBlank flag 时间线**。C++ `FCEUX_PPU_Loop`（newppu=1）在
+**帧首**（loop 顶部）置位 $2002 VBlank flag，保持 20 行（6820 dots）后清除；
+Rust 原来在自身 sl 241（帧末 82181 dots 处）置位。$2002 轮询在两端于**帧内不同
+位置**看到 flag=1 → 指令流分叉。frame 1-2 的"匹配"是假匹配（两端都在 reg 中性
+的轮询循环里结束）。**修复**：`tick_preline_segment` 帧首置位 + NMI arm，
+sl 20 入口清除（`next_segment`），sl 241 不再置位；$2002 低 5 位 OR
+`read_buffer & 0x1F`（对齐 C++ `PPUGenLatch & 0x1F`）。4 个 PPU 测试相应更新。
+
+**根因 2（已定位，未修复）：VBL-set suppression 相位匹配**。C++ A2002 在
+**sl 240, cycle 340**（边界前 1 dot）的 $2002 读取会**抑制下一帧的 flag 置位 +
+NMI**（Nesdev PPU_frame_timing；`fceu11_ppu_mark_vbl_set_suppressed` 在
+FCEUX_PPU_Loop 顶部消费）。实证：`FCEUX11_E1_TRACE=1` 显示 C++ frame 3 的置位
+（abs=119124）`suppressed=1` —— C++ 整帧 flag=0 → 轮询不退出（8544 条轮询）；
+Rust 无 suppression → 照常置位 → 轮询提前退出跑主代码（5257 条）→ frame 3 发散
+（这就是 frame 3 的分叉点，不是 JSR/栈语义）。
+
+**阻塞点：相位漂移**。C++ 的 sl-240 读取位置逐帧漂移（cy 338→340→331），
+Rust 的漂移方向相反（segment_dots 336→324）。已试固定窗口 `[333,341)` ——
+**过抑制，把首发散从 frame 3 提前到 frame 2（cpu_match 3→1），已回退**。
+两模型的预算边界结构不同（C++ 每 dot 授予预算、指令可跨段；Rust 整段预算、
+指令在段边界对齐），导致 sub-scanline 相位无法用固定阈值对齐。Rust 侧
+`vbl_set_suppressed` latch 已实现（bus.rs 判定 + tick_preline_segment 消费），
+只差相位匹配。
+
+**候选解法（按推荐序）**：
+  a. 扩展 `PpuStateMirror` 同步 C++ 的 `ppur.status.sl/cycle` + count 相位到 Rust，
+     让 Rust 在"与 C++ 相同的绝对点位置"判定 suppression（最小改动，shadow 专用）。
+  b. 把 Rust 的预算授予改为 C++ 的每-dot 模型（run_segment_inner 逐 dot
+     X6502_Run 语义）——彻底对齐 sub-scanline 相位，但改动大。
+  c. 通过指令流对齐判定：Rust 轮询读取的"最后一条 sl-240 指令"与 C++ 的
+     cy-340 读取指令一一对应（需先确认逐帧对应关系，当前数据下两端读取数
+     偶有 ±1 差异）。
+
+**已就位的诊断基础设施**：`g_cpu_instr_count_`（C++ 每指令计数，sound.cpp 永久
+钩子）、`vnesu11_instr_count` FFI + `VNesSoc::instr_count`、`frame_count`、
+`segment_dots`（段内已耗 dots）、runner 每帧指令增量日志（`SHADOW frame=N
+instr cpp=... rust=... delta=...`，已验证 frame 1-2 delta=0、frame 3 delta=-3287
+的量化证据）。复跑基线：`cpu_match=3/59`（frame 1-2 真匹配，frame 53 偶然重合）。
+
+**具体步骤（下一会话）**：
+  a. 按候选解法 (a) 同步 C++ sl/cycle → Rust（PpuStateMirror 扩展），在 bus.rs
+     用绝对位置判定 suppression，验证 frame 3 置位被抑制后 cpu_match ≥5。
+  b. 若 (a) 后仍有残差，用 runner 的 per-frame instr delta 逐帧收敛。
+  c. 验证 `count/16` 是否需保留余数（当前观测 C++ 帧末 overshoot 均为 16 倍数，
+     `count % 16 == 0`，取整无损——但需在其它 ROM 复核）。
 
 **Step 3 — APU 5 通道状态同步**：
 - 扩展 `ApuStateMirror`（ffi.rs）：pulse1/2（timer/length/envelope/sweep）、triangle

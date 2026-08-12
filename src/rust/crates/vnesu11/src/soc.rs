@@ -65,6 +65,20 @@ pub struct VNesSoc {
     /// Last frame-ready flag.
     pub frame_ready: bool,
 
+    /// Completed frames since power-on (Phase 6 P2 shadow diagnostics).
+    pub frame_count: u64,
+
+    /// Executed CPU instructions since power-on (Phase 6 P2 shadow
+    /// diagnostics; compared against C++ `g_cpu_instr_count_`).
+    pub instr_count: u64,
+
+    /// Dots consumed in the current segment's CPU budget (Phase 6 P2
+    /// shadow fix: $2002 VBL-set suppression position tracking). The
+    /// PPU dot clock only advances at segment boundaries, so this
+    /// recreates the sub-scanline position C++ exposes as
+    /// `ppur.status.cycle` during a scanline's CPU run.
+    pub segment_dots: u32,
+
     // -----------------------------------------------------------------
     // Bus plumbing (Phase 2)
     // -----------------------------------------------------------------
@@ -147,6 +161,9 @@ impl Default for VNesSoc {
             mapper_meta: None,
             frame_buffer: [0; 61440],
             frame_ready: false,
+            frame_count: 0,
+            instr_count: 0,
+            segment_dots: 0,
 
             open_bus: 0,
 
@@ -236,6 +253,7 @@ impl VNesSoc {
                     // 5. Route interrupts at the segment boundary.
                     self.route_interrupts();
                     if frame_done {
+                        self.frame_count += 1;
                         result.completed = true;
                         break;
                     }
@@ -300,6 +318,7 @@ impl VNesSoc {
         // debiting the extra ×2 (1 cycle = 3 dots) at the scheduler
         // layer, leaving the CPU core in cycle units.
         self.cpu.count += budget;
+        self.segment_dots = 0;
         let mut remaining = self.cpu.count;
         while remaining > 0 {
             if bus.dma_stalled() {
@@ -308,7 +327,9 @@ impl VNesSoc {
             // No pending IRQ: just step one instruction.
             if self.cpu.irq_pending == 0 {
                 let (new_remaining, tcount) = self.cpu.step_one(remaining, &mut bus);
+                self.instr_count += 1; // Phase 6 P2 shadow diagnostics
                 if tcount > 0 {
+                    self.segment_dots = self.segment_dots.saturating_add((tcount * 3) as u32);
                     self.apu.tick(tcount as u32);
                     self.route_apu_irqs_to_cpu();
                 }
@@ -332,6 +353,8 @@ impl VNesSoc {
             // convert the debit to dots (×3: poll debited ×1).
             let poll_consumed = (count_before_poll - remaining).max(0);
             if poll_consumed > 0 {
+                self.segment_dots =
+                    self.segment_dots.saturating_add((poll_consumed * 3) as u32);
                 self.apu.tick(poll_consumed as u32);
                 remaining -= poll_consumed * 2;
             }
@@ -339,7 +362,9 @@ impl VNesSoc {
                 break;
             }
             let (new_remaining, tcount) = self.cpu.step_one(remaining, &mut bus);
+            self.instr_count += 1; // Phase 6 P2 shadow diagnostics
             if tcount > 0 {
+                self.segment_dots = self.segment_dots.saturating_add((tcount * 3) as u32);
                 self.apu.tick(tcount as u32);
                 self.route_apu_irqs_to_cpu();
             }

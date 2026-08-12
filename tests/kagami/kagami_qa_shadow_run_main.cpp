@@ -48,7 +48,12 @@ struct CpuRegsLayoutMirror {
 
 extern "C" {
 void vnesu11_cpu_peek_regs(void* soc, CpuRegsLayoutMirror* out);
+uint64_t vnesu11_instr_count(void* soc);
 }
+
+// C++ per-instruction counter (defined in src/sound.cpp; incremented
+// once per executed instruction via FCEU_SoundCPUHook).
+extern uint64_t g_cpu_instr_count_;
 
 namespace {
 
@@ -117,6 +122,9 @@ int main(int argc, char** argv) {
     int total_frames = 0;
     int cpu_matches = 0;
     int cpu_differs = 0;
+    uint64_t cpp_instr_prev = 0;
+    uint64_t rust_instr_prev = 0;
+    uint64_t rust_delta_prev = 0;
 
     for (int f = 0; f < frames; ++f) {
         // C++ runs frame f: S_f -> S_f+1 (hook: Rust S_f+1 -> S_f+2).
@@ -127,6 +135,8 @@ int main(int argc, char** argv) {
         vnesu11_cpu_peek_regs(fceu11::g_vnesu11_soc, &rust_regs);
         const Regs rust_after{ rust_regs.PC, rust_regs.A, rust_regs.X,
                                rust_regs.Y, rust_regs.S, rust_regs.P };
+        const uint64_t rust_instr = vnesu11_instr_count(fceu11::g_vnesu11_soc);
+        const uint64_t cpp_instr = g_cpu_instr_count_;
 
         if (f >= 1 && have_rust) {
             // Compare C++ S_f+1 (now) vs Rust S_f+1 (captured after
@@ -144,7 +154,21 @@ int main(int argc, char** argv) {
                     rust_state.pc, rust_state.a, rust_state.x, rust_state.y,
                     rust_state.s, rust_state.p);
             }
+            // Phase 6 P2 diagnostics: per-frame instruction deltas.
+            // cpp delta = C++ frame f (S_f -> S_f+1); rust_delta_prev =
+            // Rust frame f-1 (S_f -> S_f+1) — both cover the SAME
+            // transition that the cpu compare above checks.
+            std::fprintf(stderr,
+                "SHADOW frame=%d instr cpp=%llu rust=%llu delta=%lld\n",
+                f,
+                (unsigned long long)(cpp_instr - cpp_instr_prev),
+                (unsigned long long)rust_delta_prev,
+                (long long)((long long)rust_delta_prev -
+                            (long long)(cpp_instr - cpp_instr_prev)));
         }
+        cpp_instr_prev = cpp_instr;
+        rust_delta_prev = rust_instr - rust_instr_prev;
+        rust_instr_prev = rust_instr;
         rust_state = rust_after;
         have_rust = true;
         ++total_frames;
