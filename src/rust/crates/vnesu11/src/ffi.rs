@@ -679,7 +679,14 @@ pub unsafe extern "C" fn vnesu11_cpu_poke_regs(
     cpu.set_p(r.P);
     cpu.moo_pi = r.moo_pi;
     cpu.jammed = r.jammed != 0;
-    cpu.count = r.count;
+    // Phase 6 P2 shadow fix (2026-08-12): C++ `X6502.count` is in the
+    // ×16 internal unit (X6502_Run credits cycles*16, add_cycles debits
+    // c*48), while Rust's count is in dots (budget is 256/85/341 dots,
+    // each instruction debits tcount*3). The conversion is /16. Syncing
+    // the raw value made the Rust budget residual differ by ~60 dots
+    // (~20 cycles) per frame, which drove the frame 0-1 instruction
+    // count delta (2-16) and the frame-counter phase drift (~7 cycles).
+    cpu.count = r.count / 16;
     cpu.irq_pending = r.irq_low;
     cpu.db = r.db;
 }
