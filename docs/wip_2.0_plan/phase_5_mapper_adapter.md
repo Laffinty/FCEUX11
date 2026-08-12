@@ -188,8 +188,10 @@ crates/vnesu11/tests/ppu_tests.rs（扩展）
 
 > **状态**：`crates/vnesu11/src/mapper.rs` 已实现（Phase 0/2 落地）——
 > `MAX_RANGES=64`、`ReadRangeHandler`/`WriteRangeHandler`、`read()/write()`
-> 线性扫描、`clear()`、`MapperMetaVtable`。阶段 1 只需补
-> `tests/mapper_tests.rs`（见 §3.1）并核对 `#[repr(C)]` 布局经 cbindgen 导出。
+> 线性扫描、`clear()`、`MapperMetaVtable`。**2026-08-12 阶段 1 已验证**：
+> `tests/mapper_tests.rs` 12 个测试全绿（null mapper / single range / overlap /
+> capacity / clear / CHR / FFI null 安全 / FFI capacity / FFI meta vtable /
+> 系统类型），`#[repr(C)]` 布局经 cbindgen 导出与 C++ 适配器镜像一致。
 
 ```rust
 // crates/vnesu11/src/mapper.rs
@@ -257,6 +259,12 @@ void Bus::set_read_handler(uint32_t start, uint32_t end, readfunc fn) noexcept {
 **Game Genie / cheat**：`fceu.cpp::SetReadHandler` 在调用 `bus.set_read_handler`
 之前做 genie 包装。适配器**保留该包装顺序**——Rust 端只看到包装后的 `fn` 指针。
 cheat 状态仍由 C++ 管理。
+
+> **2026-08-12 事实修正**：~250 个 board 文件实际调用的是 **`fceu.cpp::SetReadHandler` /
+> `SetWriteHandler`（全局函数）**，而不是 `bus.cpp` 的 `Bus::set_read_handler`（后者
+> 仅被 PowerNES 的 open-bus 初始化使用）。因此转发钩子接在 `fceu.cpp` 的这两个全局
+> 函数内（Genie 包装保留在调用链之前），`Bus::set_read_handler` 保持不变。转发实现见
+> `src/vnesu11_mapper_adapter.cpp`（thunk 池 + 每区间 `ctx` 指向原始 fn）。
 
 **双写策略**：`aread_[]` 表同时更新，保证 `newppu=0` 回退路径（C++ 旧 PPU +
 C++ bus）仍然可用。vNESU11 接管时走 Rust 区间表；回退时走 C++ 表。两套并存
@@ -426,25 +434,29 @@ include = ["RangeHandler", "WriteRangeHandler", "MapperMetaVtable", "Mirroring"]
 
 ### 阶段 0（接线）DoD — [新增 2026-08-11]
 
-- [ ] `run_frame()` 每 segment 驱动 `apu.tick(budget)` + DMA stall + IRQ 路由
-- [ ] `$4000-$4015` APU 寄存器读写全部路由到 `ApuCore` 5 通道
-- [ ] `$4014` OAM DMA 走 `DmaCore::oam.start()`（513/514 stall + 实际搬移）
-- [ ] `$4016/$4017` 走 `JoypadState`；旧 `joypad_latched` 等 4 字段删除
-- [ ] `sprite.rs::render_scanline` 读 CHR 缓存、结果写入 frame_buffer
-- [ ] 端到端测试：APU 输出受寄存器写影响 / 精灵像素非零（§3.0）
-- [ ] `cargo test -p vnesu11` 全绿（含扩展的 apu_tests / ppu_tests / bus_tests）
+> **2026-08-12 实测更新**：阶段 0 全部完成，`cargo test -p vnesu11` **312 passed / 0 failed / 1 ignored**。
+
+- [x] `run_frame()` 每 segment 驱动 `apu.tick(budget)` + DMA stall + IRQ 路由
+- [x] `$4000-$4015` APU 寄存器读写全部路由到 `ApuCore` 5 通道
+- [x] `$4014` OAM DMA 走 `DmaCore::oam.start()`（513/514 stall + 实际搬移）
+- [x] `$4016/$4017` 走 `JoypadState`；旧 `joypad_latched` 等 4 字段删除
+- [x] `sprite.rs::render_scanline` 读 CHR 缓存、结果写入 frame_buffer
+- [x] 端到端测试：APU 输出受寄存器写影响 / 精灵像素非零（§3.0）
+- [x] `cargo test -p vnesu11` 全绿（含扩展的 apu_tests / ppu_tests / bus_tests）
 
 ### 阶段 1（mapper 适配）DoD — [原]
 
-- [ ] `MapperRangeTable` 验证 + `tests/mapper_tests.rs` 全绿
-- [ ] `SetReadHandler`/`SetWriteHandler` 转发（含 Game Genie 包装保留）
-- [ ] `MapperMetaVtable` + `vnesu11_attach_mapper_meta` 验证
-- [ ] LoadGame 集成（`vnesu11_clear_mapper_handlers` + 系统类型 + GI_POWER 自动注册）
-- [ ] mapper_byte_diff 175-case 通过 vNESU11 全 PASS
-- [ ] 主流 mapper (NROM/MMC1/MMC3/VRC2/VRC6/UxROM/CNROM) 跑 SMB1 一致
-- [ ] savestate round-trip 100% parity
-- [ ] 帧时间开销 ≤ 5% baseline
-- [ ] FDS 虚拟 mapper 跑通 fds 测试 ROM
+> **2026-08-12 实测更新**：Rust 侧完成（MapperRangeTable 验证 + 12 个 mapper_tests 全绿 + FFI null/capacity 验证 + `vnesu11_set_system_type` 接线）；C++ 侧完成适配器（`src/vnesu11_mapper_adapter.{h,cpp}`：thunk 池转发 + `MapperMetaVtable` C++ 镜像）+ `fceu.cpp` SetReadHandler/SetWriteHandler 转发 + LoadGame 集成 + CMake 注册，**VNESU11_CORE=ON 下 fceux11_core + fceux11.exe 构建链接成功**。**尚未完成（推迟 Phase 6）**：meta vtable 的 fill_audio/tick_irq 深度接线、mapper_byte_diff 175-case、SMB1 一致性、savestate round-trip、帧时间基准、FDS 虚拟 mapper。
+
+- [x] `MapperRangeTable` 验证 + `tests/mapper_tests.rs` 全绿
+- [x] `SetReadHandler`/`SetWriteHandler` 转发（含 Game Genie 包装保留）
+- [x] `MapperMetaVtable` + `vnesu11_attach_mapper_meta` 验证（Rust FFI 测试 + C++ 适配器 attach）
+- [x] LoadGame 集成（`vnesu11_clear_mapper_handlers` + 系统类型 + GI_POWER 自动注册）
+- [ ] mapper_byte_diff 175-case 通过 vNESU11 全 PASS — [Phase 6]
+- [ ] 主流 mapper (NROM/MMC1/MMC3/VRC2/VRC6/UxROM/CNROM) 跑 SMB1 一致 — [Phase 6]
+- [ ] savestate round-trip 100% parity — [Phase 6]
+- [ ] 帧时间开销 ≤ 5% baseline — [Phase 6]
+- [ ] FDS 虚拟 mapper 跑通 fds 测试 ROM — [Phase 6]
 
 ---
 
@@ -452,37 +464,44 @@ include = ["RangeHandler", "WriteRangeHandler", "MapperMetaVtable", "Mirroring"]
 
 ### 阶段 0（接线）— [新增 2026-08-11]
 
+> **2026-08-12 实测更新**：全部交付完成（✔ = 已提交）。
+
 ```
 新增：
-  crates/vnesu11/tests/mapper_tests.rs   # 阶段 1 用（见下）
+  [✔] crates/vnesu11/tests/mapper_tests.rs   # 阶段 1 用（12 个测试，见下）
 
 修改：
-  crates/vnesu11/src/soc.rs      # run_frame 驱动 APU/DMA/IRQ + route_interrupts()
-  crates/vnesu11/src/bus.rs      # apu_io_read/write 路由 + $4014 DMA + $4016/17 joypad
-  crates/vnesu11/src/ppu/sprite.rs # render_scanline 读 CHR + 写 frame_buffer
-  crates/vnesu11/src/ppu/mod.rs  # 传 pattern_lo/hi 给 sprite.render_scanline
-  crates/vnesu11/src/dma/oam_dma.rs # step() 真正读总线搬 OAM
-  crates/vnesu11/src/soc.rs      # 删除旧 joypad 4 字段
-  crates/vnesu11/tests/apu_tests.rs  # 端到端：寄存器→output_buffer
-  crates/vnesu11/tests/ppu_tests.rs  # 端到端：精灵像素
-  crates/vnesu11/tests/bus_tests.rs  # 适配 JoypadState 新 API
+  [✔] crates/vnesu11/src/soc.rs      # run_frame 驱动 APU/DMA/IRQ + route_interrupts()
+  [✔] crates/vnesu11/src/bus.rs      # apu_io_read/write 路由 + $4014 DMA + $4016/17 joypad
+  [✔] crates/vnesu11/src/ppu/sprite.rs # render_scanline 读 CHR + 写 frame_buffer
+  [✔] crates/vnesu11/src/ppu/mod.rs  # 传 pattern_lo/hi 给 sprite.render_scanline
+  [✔] crates/vnesu11/src/dma/oam_dma.rs # step() 真正读总线搬 OAM（513/514 stall 模型）
+  [✔] crates/vnesu11/src/soc.rs      # 删除旧 joypad 4 字段
+  [✔] crates/vnesu11/tests/apu_tests.rs  # 端到端：寄存器→output_buffer
+  [✔] crates/vnesu11/tests/ppu_tests.rs  # 端到端：精灵像素
+  [✔] crates/vnesu11/tests/bus_tests.rs  # 适配 JoypadState 新 API
+  附：crates/vnesu11/src/apu/mod.rs  # take_irq 清除待处理标志
+  附：crates/vnesu11/src/apu/frame_counter.rs  # 修复 IRQ 越过周期后每周期重触发
+  附：crates/vnesu11/src/apu/mixer.rs  # 修复 f32→i16 直接 cast 全为 0（乘 32767 缩放）
+  附：crates/vnesu11/src/ffi.rs      # vnesu11_joypad_set_button/set_strobe + set_system_type 接线
 ```
 
 ### 阶段 1（mapper 适配）— [原]
 
+> **2026-08-12 实测更新**：Rust 侧 + C++ 适配器完成（✔ = 已提交）；bench + FDS 推迟 Phase 6。
+
 ```
 新增：
-  src/vnesu11_mapper_adapter.h
-  src/vnesu11_mapper_adapter.cpp
-  crates/vnesu11/tests/mapper_tests.rs
-  crates/vnesu11/benches/mapper_range_scan.rs
+  [✔] src/vnesu11_mapper_adapter.h
+  [✔] src/vnesu11_mapper_adapter.cpp
+  [✔] crates/vnesu11/tests/mapper_tests.rs
+  [ ] crates/vnesu11/benches/mapper_range_scan.rs    # 推迟 Phase 6（性能基准）
 
 修改：
-  src/bus.cpp                         # SetReadHandler/SetWriteHandler 转发
-  src/fceu.cpp                        # LoadGame 集成
-  src/CMakeLists.txt                  # vNESU11 mapper adapter 加入构建
-  crates/vnesu11/src/mapper.rs        # [已验证存在] MapperRangeTable
-  crates/vnesu11/src/ffi.rs           # [已验证存在] 区间注册接口
+  [✔] src/fceu.cpp                         # SetReadHandler/SetWriteHandler 转发 + LoadGame 集成
+  [✔] src/CMakeLists.txt                   # vNESU11 mapper adapter 加入构建
+  [✔] crates/vnesu11/src/mapper.rs         # [已存在] MapperRangeTable（验证通过）
+  [✔] crates/vnesu11/src/ffi.rs            # [已存在] 区间注册接口（null/capacity 验证通过）
 ```
 
 ---

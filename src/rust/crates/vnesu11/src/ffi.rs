@@ -184,10 +184,24 @@ pub unsafe extern "C" fn vnesu11_attach_mapper_meta(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vnesu11_set_system_type(
-    _soc: *mut VNesSocOpaque,
-    _system_type: u32,
+    soc: *mut VNesSocOpaque,
+    system_type: u32,
 ) -> c_int {
-    // 0=iNES 1=FDS 2=NSF 3=VS — Phase 0 stub.
+    // C++ `EGIT` encoding (src/git.h): 0=GIT_CART (iNES), 1=GIT_VSUNI
+    // (VS), 2=GIT_FDS (FDS), 3=GIT_NSF (NSF). Out-of-range values are
+    // rejected (-1) rather than silently treated as iNES.
+    if system_type > 3 {
+        return -1;
+    }
+    let soc_ref = match into_mut(soc) {
+        Some(s) => s,
+        None => return -1,
+    };
+    if system_type == 3 {
+        soc_ref.ppu.idle = true;   // NSF — PPU idle stub
+    } else {
+        soc_ref.ppu.idle = false;  // iNES / FDS / VS — normal PPU
+    }
     0
 }
 
@@ -201,20 +215,132 @@ pub unsafe extern "C" fn vnesu11_set_external_irq(
 }
 
 // =========================================================================
+// CHR pages (Phase 6 — mapper adapter Bus::setchr1 forwarding)
+// =========================================================================
+/// Copy a 1 KiB CHR page from `src` into the SoC's `chr_pages[page_idx]`.
+/// Called by the C++ adapter after `Bus::setchr1/4/8` updates the C++
+/// PPU's `vpage_[idx]` pointer, so the Rust PPU's reads at
+/// `$0000-$1FFF` see the same byte stream.
+///
+/// # Safety
+/// `soc` must be a valid pointer returned by `vnesu11_create`. `src`
+/// must point to at least 1024 readable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vnesu11_chr_set_page(
+    soc: *mut VNesSocOpaque,
+    page_idx: u8,
+    src: *const u8,
+) -> c_int {
+    let soc_ref = match into_mut(soc) {
+        Some(s) => s,
+        None => return -1,
+    };
+    if src.is_null() {
+        return -2;
+    }
+    if (page_idx as usize) >= soc_ref.chr_pages.len() {
+        return -3;
+    }
+    core::ptr::copy_nonoverlapping(src, soc_ref.chr_pages[page_idx as usize].as_mut_ptr(), 1024);
+    0
+}
+
+// =========================================================================
+// Shadow-run state sync (Phase 6 §2.5)
+// =========================================================================
+//
+// The C++ emulator is the primary; the Rust core is the shadow. To make
+// a frame-level comparison meaningful, the C++ post-frame CPU + WRAM
+// state is copied into the Rust SoC before each Rust frame runs (the
+// mapper state is already shared via the per-range handler thunks).
+// These two FFIs back the C++ `vnesu11_shadow_sync_from_cpp()` helper.
+
+/// Copy the C++ 2 KiB WRAM (`::RAM`, $0000-$07FF mirrored) into the
+/// SoC. Returns 0 on success.
+///
+/// # Safety
+/// `src` must point to at least 2048 readable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vnesu11_set_wram(
+    soc: *mut VNesSocOpaque,
+    src: *const u8,
+) -> c_int {
+    let soc_ref = match into_mut(soc) {
+        Some(s) => s,
+        None => return -1,
+    };
+    if src.is_null() {
+        return -2;
+    }
+    core::ptr::copy_nonoverlapping(src, soc_ref.wram.as_mut_ptr(), 2048);
+    // Keep the `ram_banks` snapshot in sync (savestate/snapshot path).
+    soc_ref.ram_banks.wram.copy_from_slice(&soc_ref.wram);
+    0
+}
+
+// =========================================================================
 // Emulation
 // =========================================================================
+//
+// Phase 6: real implementation. Always runs a full emulation frame; the
+// shadow runner passes skip=0 to keep both Rust and C++ outputs aligned.
+// Per-CPU-cycle APU sampling produces ~29,780 stereo samples per frame;
+// the shadow run decodes the buffer CRC (Phase 6 §2.5 — frame-level
+// 3-tier diff), not sample-rate-corrected SNR (Phase 7 territory).
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vnesu11_emulate_frame(
-    _soc: *mut VNesSocOpaque,
+    soc: *mut VNesSocOpaque,
     _skip: c_int,
-    _xbuf: *mut u8,
-    _sbuf: *mut i16,
-    _sbuf_cap: usize,
-    _sbuf_written: *mut usize,
+    xbuf: *mut u8,
+    sbuf: *mut i16,
+    sbuf_cap: usize,
+    sbuf_written: *mut usize,
 ) -> c_int {
-    // Phase 0: stub. Phase 1+ wires real emulation.
-    -1
+    let soc_ref = match into_mut(soc) {
+        Some(s) => s,
+        None => return -1,
+    };
+    if xbuf.is_null() {
+        return -2;
+    }
+
+    // 1. Drive one full frame (CPU + APU + PPU + DMA + IRQ routing).
+    let result = soc_ref.run_frame();
+
+    // 2. Copy the rendered frame buffer (61440 bytes = 256 × 240).
+    //    Rust writes palette indices; the C++ side downstream converts
+    //    them to NES colors (Phase 6: shadow run CRC operates on the
+    //    raw palette-index bytes for a deterministic comparison).
+    core::ptr::copy_nonoverlapping(
+        soc_ref.frame_buffer.as_ptr(),
+        xbuf,
+        61440,
+    );
+
+    // 3. Drain the APU output buffer into the caller's sound slot.
+    //    The Rust mixer ticks once per CPU cycle (Phase 5 stage 0
+    //    simplification); Phase 6 shadow-run compares buffer CRCs,
+    //    not sample-rate-corrected SNR (which lands in Phase 7).
+    if !sbuf_written.is_null() {
+        *sbuf_written = 0;
+    }
+    if !sbuf.is_null() && sbuf_cap > 0 {
+        let samples = soc_ref.apu.drain_output();
+        let n = samples.len().min(sbuf_cap);
+        if n > 0 {
+            core::ptr::copy_nonoverlapping(samples.as_ptr(), sbuf, n);
+        }
+        if !sbuf_written.is_null() {
+            *sbuf_written = n;
+        }
+    }
+
+    if result.completed {
+        0
+    } else {
+        1
+    }
 }
 
 // =========================================================================
@@ -223,59 +349,118 @@ pub unsafe extern "C" fn vnesu11_emulate_frame(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vnesu11_cpu_peek(
-    _soc: *const VNesSocOpaque,
-    _addr: u16,
+    soc: *const VNesSocOpaque,
+    addr: u16,
 ) -> u8 {
-    0
+    let Some(s) = into_const(soc) else { return 0 };
+    // `cpu_read` updates open_bus + advances the joypad shift register
+    // on $4016/$4017 (real NES behavior). The FFI guarantees
+    // single-threaded access, so the const handle is re-borrowed
+    // mutably via raw pointers here (matches the `into_mut` pattern
+    // used by the rest of the FFI surface).
+    let raw = core::ptr::addr_of!(*s) as *mut VNesSoc;
+    unsafe { (&mut *raw).cpu_read(addr) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vnesu11_cpu_poke(
-    _soc: *mut VNesSocOpaque,
-    _addr: u16,
-    _val: u8,
+    soc: *mut VNesSocOpaque,
+    addr: u16,
+    val: u8,
 ) {
+    let Some(s) = into_mut(soc) else { return };
+    s.cpu_write(addr, val);
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vnesu11_cpu_peek_regs(
-    _soc: *const VNesSocOpaque,
+    soc: *const VNesSocOpaque,
     out: *mut CpuRegsLayout,
 ) {
-    if !out.is_null() {
-        *out = CpuRegsLayout::default();
-    }
+    let (Some(s), false) = (into_const(soc), out.is_null()) else {
+        if !out.is_null() {
+            *out = CpuRegsLayout::default();
+        }
+        return;
+    };
+    let cpu = &s.cpu;
+    *out = CpuRegsLayout {
+        tcount: cpu.tcount,
+        PC: cpu.pc(),
+        A: cpu.a(),
+        X: cpu.x(),
+        Y: cpu.y(),
+        S: cpu.s(),
+        P: cpu.p(),
+        moo_pi: cpu.moo_pi,
+        jammed: u8::from(cpu.jammed()),
+        count: cpu.count,
+        irq_low: cpu.irq_pending,
+        db: cpu.db,
+        preexec: 0,
+        cpu_hook: core::ptr::null_mut(),
+        read_hook: core::ptr::null_mut(),
+        write_hook: core::ptr::null_mut(),
+    };
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vnesu11_cpu_poke_regs(
-    _soc: *mut VNesSocOpaque,
-    _regs: *const CpuRegsLayout,
+    soc: *mut VNesSocOpaque,
+    regs: *const CpuRegsLayout,
 ) {
+    if regs.is_null() {
+        return;
+    }
+    let Some(s) = into_mut(soc) else { return };
+    let r = &*regs;
+    let cpu = &mut s.cpu;
+    cpu.tcount = r.tcount;
+    cpu.set_pc(r.PC);
+    cpu.set_a(r.A);
+    cpu.set_x(r.X);
+    cpu.set_y(r.Y);
+    cpu.set_s(r.S);
+    cpu.set_p(r.P);
+    cpu.moo_pi = r.moo_pi;
+    cpu.jammed = r.jammed != 0;
+    cpu.count = r.count;
+    cpu.irq_pending = r.irq_low;
+    cpu.db = r.db;
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vnesu11_ppu_peek(
-    _soc: *const VNesSocOpaque,
-    _addr: u16,
+    soc: *const VNesSocOpaque,
+    addr: u16,
 ) -> u8 {
-    0
+    let Some(s) = into_const(soc) else { return 0 };
+    // PPU-side read of CHR / nametable / palette (`ppu_read` is
+    // `&self` — no side effects).
+    s.ppu_read(addr)
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vnesu11_joypad_set_button(
-    _soc: *mut VNesSocOpaque,
-    _pad: u8,
-    _btn: u32,
-    _pressed: bool,
+    soc: *mut VNesSocOpaque,
+    pad: u8,
+    btn: u32,
+    pressed: bool,
 ) {
+    if let Some(s) = into_mut(soc) {
+        s.joypad.set_button(pad as usize, btn as u8, pressed);
+    }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vnesu11_joypad_set_strobe(
-    _soc: *mut VNesSocOpaque,
-    _strobe: bool,
+    soc: *mut VNesSocOpaque,
+    strobe: bool,
 ) {
+    if let Some(s) = into_mut(soc) {
+        let val = if strobe { 1u8 } else { 0u8 };
+        s.joypad.write_strobe(val);
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -434,6 +619,135 @@ mod tests {
             core::ptr::null_mut(), 0, 0, dummy_read, core::ptr::null_mut()
         ) };
         assert_eq!(r, -1);
+    }
+
+    #[test]
+    fn set_system_type_toggles_ppu_idle() {
+        // C++ EGIT encoding: 0=GIT_CART, 1=GIT_VSUNI, 2=GIT_FDS,
+        // 3=GIT_NSF. NSF drives the PPU through the idle stub.
+        let soc = unsafe { vnesu11_create() };
+        assert!(!soc.is_null());
+        let rc = unsafe { vnesu11_set_system_type(soc, 3) };
+        assert_eq!(rc, 0);
+        assert!(unsafe { into_mut(soc) }.unwrap().ppu.idle, "NSF → PPU idle");
+        let rc = unsafe { vnesu11_set_system_type(soc, 0) };
+        assert_eq!(rc, 0);
+        assert!(!unsafe { into_mut(soc) }.unwrap().ppu.idle, "iNES → normal PPU");
+        // Null SoC → -1.
+        let rc = unsafe { vnesu11_set_system_type(core::ptr::null_mut(), 3) };
+        assert_eq!(rc, -1);
+        unsafe { vnesu11_destroy(soc); }
+    }
+
+    /// Phase 6: `vnesu11_emulate_frame` runs one frame, copies the
+    /// 256×240 frame buffer into `xbuf`, and drains APU samples into
+    /// `sbuf`. Returns 0 on success.
+    #[test]
+    fn emulate_frame_runs_and_copies() {
+        let soc = unsafe { vnesu11_create() };
+        assert!(!soc.is_null());
+        unsafe { vnesu11_power_on_with_init(soc) };
+        let mut xbuf = [0u8; 61440];
+        let mut sbuf = vec![0i16; 16384];
+        let mut sbuf_written: usize = 0;
+        let rc = unsafe {
+            vnesu11_emulate_frame(
+                soc,
+                0,
+                xbuf.as_mut_ptr(),
+                sbuf.as_mut_ptr(),
+                sbuf.len(),
+                &mut sbuf_written as *mut usize,
+            )
+        };
+        assert_eq!(rc, 0, "frame must complete");
+        // The SoC frame buffer should now equal xbuf.
+        let s = unsafe { into_const(soc) }.unwrap();
+        assert_eq!(&xbuf[..], &s.frame_buffer[..]);
+        // With no APU registers written the APU output is silent, so
+        // the drained buffer is all-zero.
+        assert!(sbuf_written <= sbuf.len());
+        let written = sbuf_written;
+        assert!(written > 0, "APU must tick during a frame");
+        let all_zero = sbuf[..written].iter().all(|&v| v == 0);
+        assert!(all_zero, "silent APU must output zero samples");
+        unsafe { vnesu11_destroy(soc); }
+    }
+
+    /// Phase 6: writing a pulse channel register → APU produces
+    /// non-zero samples in the drained buffer.
+    #[test]
+    fn emulate_frame_drains_nonzero_apu_output() {
+        let soc = unsafe { vnesu11_create() };
+        assert!(!soc.is_null());
+        unsafe { vnesu11_power_on_with_init(soc) };
+        unsafe { vnesu11_set_ram_init(soc, 0, 0) };
+        // Enable channel 0 + program duty 0, vol 15, timer lo=0x10.
+        let s = unsafe { into_mut(soc) }.unwrap();
+        s.cpu_write(0x4015, 0x01);
+        s.cpu_write(0x4000, 0x3F);
+        s.cpu_write(0x4002, 0x10);
+        s.cpu_write(0x4003, 0x08);
+        // (no drop needed — `s` borrows from `soc` and isn't an owned
+        // value here; we just exit the block scope.)
+        let mut xbuf = [0u8; 61440];
+        let mut sbuf = vec![0i16; 16384];
+        let mut sbuf_written: usize = 0;
+        unsafe {
+            vnesu11_emulate_frame(
+                soc,
+                0,
+                xbuf.as_mut_ptr(),
+                sbuf.as_mut_ptr(),
+                sbuf.len(),
+                &mut sbuf_written as *mut usize,
+            );
+        }
+        assert!(sbuf_written > 0);
+        let any_nonzero = sbuf[..sbuf_written].iter().any(|&v| v != 0);
+        assert!(any_nonzero, "pulse 1 must produce non-zero samples");
+        unsafe { vnesu11_destroy(soc); }
+    }
+
+    /// Phase 6: null SoC returns -1.
+    #[test]
+    fn emulate_frame_null_soc_returns_minus_one() {
+        let mut xbuf = [0u8; 61440];
+        let mut sbuf = [0i16; 16];
+        let mut sbuf_written: usize = 0;
+        let rc = unsafe {
+            vnesu11_emulate_frame(
+                core::ptr::null_mut(),
+                0,
+                xbuf.as_mut_ptr(),
+                sbuf.as_mut_ptr(),
+                sbuf.len(),
+                &mut sbuf_written as *mut usize,
+            )
+        };
+        assert_eq!(rc, -1);
+    }
+
+    /// Phase 6: null xbuf returns -2 (must check xbuf up front to
+    /// avoid copying to null).
+    #[test]
+    fn emulate_frame_null_xbuf_returns_minus_two() {
+        let soc = unsafe { vnesu11_create() };
+        assert!(!soc.is_null());
+        let mut sbuf = [0i16; 16];
+        let mut sbuf_written: usize = 0;
+        let rc = unsafe {
+            vnesu11_emulate_frame(
+                soc,
+                0,
+                core::ptr::null_mut(),
+                sbuf.as_mut_ptr(),
+                sbuf.len(),
+                &mut sbuf_written as *mut usize,
+            )
+        };
+        assert_eq!(rc, -2);
+        unsafe { vnesu11_destroy(soc); }
     }
 
     unsafe extern "C" fn dummy_read(_ctx: *mut core::ffi::c_void, _addr: u16) -> u8 { 0 }

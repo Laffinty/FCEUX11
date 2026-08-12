@@ -12,7 +12,7 @@
 
 use crate::ppu::compositing::Compositor;
 use crate::ppu::oam::OamState;
-use crate::ppu::registers::{PpuRegisters, SpriteSize};
+use crate::ppu::registers::PpuRegisters;
 
 /// Per-sprite rendering state — shifters + x counter + latched
 /// attributes.
@@ -57,9 +57,13 @@ impl SpriteState {
 
     /// Render one scanline of sprites into the frame buffer.
     ///
+    /// `pattern_lo` / `pattern_hi` are the SoC CHR caches (both pattern
+    /// tables, 8192 bytes each — index `(tile_id * 16) + row`). The
+    /// background pass runs first and leaves the encoded BG pixel
+    /// `(bg_palette << 2) | bg_color` in `frame_buffer`; this pass
+    /// composes sprite pixels on top and writes the result back.
+    ///
     /// `compositor` is borrowed mutably to update sprite 0 hit tracking.
-    /// `palette_indices` is a 32-byte slice (16 BG palettes + 16 sprite
-    /// palettes) used to translate NES color index → palette index.
     pub fn render_scanline(
         &mut self,
         scanline: u8,
@@ -67,7 +71,8 @@ impl SpriteState {
         oam: &OamState,
         ppuctrl: u8,
         ppumask: u8,
-        _palette_indices: &[u8; 32],
+        pattern_lo: &[u8; 8192],
+        pattern_hi: &[u8; 8192],
         compositor: &mut Compositor,
     ) {
         if (ppumask & 0x10) == 0 {
@@ -78,23 +83,19 @@ impl SpriteState {
 
         let regs = PpuRegisters { ppuctrl, ppumask, ..Default::default() };
         let sprite_height = regs.sprite_size().height();
-        let pattern_base = regs.sprite_pattern_base();
-        let _ = pattern_base;
 
         self.reset_for_scanline();
 
-        let sprite_y_start = scanline.wrapping_add(1);
         let target_offset = (scanline as usize) * 256;
 
-        // Find up to 8 sprites that fall on this scanline.
+        // Find up to 8 sprites that fall on this scanline (OAM order =
+        // front-to-back; sprite 0 is front-most).
         let mut found = 0u8;
         let mut loaded_sprites: [(u8, u8, u8, u8); 8] = [(0, 0, 0, 0); 8]; // (y, tile, attr, x)
 
         for i in 0..64 {
             let s = oam.sprite(i);
-            let top = s.y.wrapping_add(1);
-            let bottom = top.wrapping_add(sprite_height);
-            if sprite_y_start >= top && sprite_y_start < bottom {
+            if let Some(_row) = s.visible_at(scanline, sprite_height) {
                 if found < 8 {
                     loaded_sprites[found as usize] = (s.y, s.tile, s.attr, s.x);
                     if i == 0 {
@@ -109,92 +110,99 @@ impl SpriteState {
             }
         }
         self.count = found;
-
-        // For Phase 3 we render a simplified per-scanline rasterization.
-        // For each pixel x (0..=255):
-        //   1. Walk through loaded sprites in front-to-back order
-        //   2. For each, compute the pixel's color via the sprite LUT
-        //      (or directly via pattern tables)
-        //   3. The first sprite with a non-transparent pixel is the
-        //      "front" sprite; it determines the output color and
-        //      palette (unless priority says BG wins)
-        let sprite_pattern_lo: [u8; 8192] = [0; 8192]; // Phase 3: zero = no pattern
-        let sprite_pattern_hi: [u8; 8192] = [0; 8192];
-        let _ = (&sprite_pattern_lo, &sprite_pattern_hi);
+        if self.sprite_zero_loaded {
+            compositor.sprite_zero_loaded();
+        }
 
         for pixel_x in 0..256u16 {
-            let mut front_palette: u8 = 0;
-            let mut front_color: u8 = 0;
-            let mut sprite_pixel_visible = false;
-            let mut front_sprite_idx: usize = 0;
+            // BG pixel already rendered by the background pass.
+            let bg_encoded = frame_buffer[target_offset + pixel_x as usize];
+            let bg_color = bg_encoded & 0x03;
+            let bg_palette = (bg_encoded >> 2) & 0x03;
+
+            // Walk loaded sprites front-to-back; the first one with a
+            // non-transparent pixel at this column wins the pixel.
+            let mut sprite_color: u8 = 0;
+            let mut sprite_palette: u8 = 0;
+            let mut sprite_priority: bool = false;
+            let mut front_found = false;
+            let mut front_is_sprite_zero = false;
 
             for n in 0..(found as usize) {
                 let (y, tile, attr, x) = loaded_sprites[n];
-                if (pixel_x as u8) < x {
-                    continue; // sprite hasn't reached this column yet
-                }
-                if (pixel_x as u8).wrapping_sub(x) >= 8 {
-                    continue; // sprite already past
+                let dx = (pixel_x as u8).wrapping_sub(x);
+                if (pixel_x as u8) < x || dx >= 8 {
+                    continue; // sprite hasn't reached this column yet / already past
                 }
 
-                // Determine which row of the sprite is showing.
-                let mut row_in_sprite = sprite_y_start.wrapping_sub(y).wrapping_sub(1);
+                // Row within the sprite (NES: top row is at scanline Y+1).
+                let mut row_in_sprite = scanline.wrapping_sub(y).wrapping_sub(1);
                 if (attr & 0x80) != 0 {
-                    // Vertical flip
+                    // Vertical flip.
                     row_in_sprite = sprite_height.wrapping_sub(1).wrapping_sub(row_in_sprite);
                 }
                 let row_in_tile = row_in_sprite & 0x07;
 
+                // Tile id + pattern bank.
                 // 8x16: tile = even row, tile+1 = odd row, bank from
                 // tile's bit 0.
-                let (_tile_id, _bank) = if sprite_height == 16 {
-                    let bank = (tile & 0x01) as u16 * 0x1000;
-                    let tile_idx = if (row_in_sprite & 0x08) != 0 {
+                let (tile_idx, bank) = if sprite_height == 16 {
+                    let table = (tile & 0x01) as u16; // bank from tile bit 0
+                    let t = if (row_in_sprite & 0x08) != 0 {
                         (tile & 0xFE) + 1
                     } else {
                         tile & 0xFE
                     };
-                    (tile_idx, bank)
+                    (t as u16, table)
                 } else {
-                    (tile, if (ppuctrl & 0x08) != 0 { 0x1000u16 } else { 0x0000u16 })
+                    // 8x8: bank from PPUCTRL bit 3 (sprite pattern table).
+                    let table = if (ppuctrl & 0x08) != 0 { 1 } else { 0 };
+                    (tile as u16, table)
                 };
 
-                let tile_offset = (_tile_id as usize) * 16 + (row_in_tile as usize);
-                let _lo = sprite_pattern_lo[tile_offset];
-                let _hi = sprite_pattern_hi[tile_offset];
+                // pattern_lo/hi cover both pattern tables (512 tiles),
+                // so table 1 tiles live at (tile + 256) * 16 + row.
+                let tile_offset = ((tile_idx + bank * 256) as usize) * 16 + (row_in_tile as usize);
+                let lo = pattern_lo[tile_offset];
+                let hi = pattern_hi[tile_offset];
 
                 // Within-tile x, with horizontal flip if set.
                 let bit_idx = if (attr & 0x40) != 0 {
-                    (pixel_x as u8).wrapping_sub(x) & 0x07
+                    dx & 0x07
                 } else {
-                    7 - ((pixel_x as u8).wrapping_sub(x) & 0x07)
+                    7 - (dx & 0x07)
                 };
-                let _bit_lo = (_lo >> bit_idx) & 1;
-                let _bit_hi = (_hi >> bit_idx) & 1;
-                let color = (_bit_hi << 1) | _bit_lo;
-                let _ = color;
-                let _ = (&front_palette, &front_color, &sprite_pixel_visible, &front_sprite_idx);
-                let _ = (attr, palette_lookup);
-                break; // simplified: take the first sprite found
-            }
-            let _ = frame_buffer;
-            let _ = target_offset;
-            // Phase 3 simplified: no actual pixel write (no pattern
-            // tables are wired). The full per-pixel pipeline is
-            // delegated to BackgroundState / a Phase-4+ SoC-level
-            // compositor that owns the real CHR data.
-        }
-    }
-}
+                let bit_lo = (lo >> bit_idx) & 1;
+                let bit_hi = (hi >> bit_idx) & 1;
+                let color = (bit_hi << 1) | bit_lo;
 
-/// Look up palette index given the sprite's `attr` byte and the
-/// color bits (0..=3). Returns the 0..=3 palette index used to
-/// index into the NES palette.
-fn palette_lookup(attr: u8, color: u8) -> u8 {
-    if color == 0 {
-        0
-    } else {
-        (attr & 0x03) * 4 + color
+                if color != 0 {
+                    sprite_color = color;
+                    sprite_palette = attr & 0x03;
+                    sprite_priority = (attr & 0x20) != 0;
+                    front_found = true;
+                    front_is_sprite_zero = n == 0;
+                    break;
+                }
+            }
+
+            if front_found {
+                // Compose sprite over BG (priority rules in Compositor).
+                let (out_pal, out_color) = Compositor::compose(
+                    bg_color,
+                    bg_palette,
+                    sprite_color,
+                    sprite_palette,
+                    sprite_priority,
+                );
+                frame_buffer[target_offset + pixel_x as usize] = (out_pal << 2) | out_color;
+                // Sprite 0 hit: opaque sprite 0 pixel + opaque BG pixel
+                // at x >= 8 (compositor enforces the clip + stickiness).
+                if front_is_sprite_zero {
+                    compositor.check_sprite_zero_hit(pixel_x as u8, scanline, bg_color != 0, true);
+                }
+            }
+        }
     }
 }
 
@@ -215,17 +223,8 @@ mod tests {
     }
 
     #[test]
-    fn palette_lookup_handling() {
-        // Color 0 (transparent) → palette index 0.
-        assert_eq!(palette_lookup(0x02, 0), 0);
-        // Color 1 with attr palette=2 → palette index 2*4+1 = 9.
-        assert_eq!(palette_lookup(0x02, 1), 9);
-        // Color 3 with attr palette=1 → 1*4+3 = 7.
-        assert_eq!(palette_lookup(0x01, 3), 7);
-    }
-
-    #[test]
     fn sprite_size_height() {
+        use crate::ppu::registers::SpriteSize;
         let mut regs = PpuRegisters::new();
         regs.ppuctrl = 0x00; // 8x8
         assert_eq!(regs.sprite_size(), SpriteSize::Size8x8);

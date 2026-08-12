@@ -181,14 +181,18 @@ impl ApuCore {
     }
 
     /// Take any pending IRQ bitmask (DMC + frame counter).
-    /// Returns `IRQ_FCOUNT | IRQ_DMC` as appropriate.
+    /// Returns `IRQ_FCOUNT | IRQ_DMC` as appropriate and clears the
+    /// pending flags (the SoC re-asserts them into the `IrqController`
+    /// via `route_interrupts`, which owns the level semantics).
     pub fn take_irq(&mut self) -> u32 {
         let mut mask = 0;
         if self.frame_irq_pending {
             mask |= IRQ_FCOUNT;
+            self.frame_irq_pending = false;
         }
         if self.dmc_irq_pending {
             mask |= IRQ_DMC;
+            self.dmc_irq_pending = false;
         }
         mask
     }

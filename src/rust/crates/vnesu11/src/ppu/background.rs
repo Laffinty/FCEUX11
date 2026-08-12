@@ -72,7 +72,7 @@ impl BackgroundState {
     pub fn render_scanline(
         &mut self,
         scanline: u8,
-        frame_buffer: &mut [u8; 61440],
+        _frame_buffer: &mut [u8; 61440],
         ppumask: u8,
         ppuctrl: u8,
     ) {
@@ -267,9 +267,9 @@ mod tests {
     #[test]
     fn transparent_tile_yields_palette_0() {
         let mut nametable = [0u8; 960];
-        let mut attribute = [0u8; 64];
-        let mut pattern_lo = [0u8; 8192];
-        let mut pattern_hi = [0u8; 8192];
+        let attribute = [0u8; 64];
+        let pattern_lo = [0u8; 8192];
+        let pattern_hi = [0u8; 8192];
 
         // Tile 0: empty pattern (every pixel = 0).
         // No need to set pattern bytes; default is 0 = transparent.
@@ -294,7 +294,7 @@ mod tests {
 
     #[test]
     fn attribute_quadrant_selects_palette() {
-        let mut nametable = [0u8; 960];
+        let nametable = [0u8; 960];
         let mut attribute = [0u8; 64];
         let mut pattern_lo = [0u8; 8192];
         let mut pattern_hi = [0u8; 8192];

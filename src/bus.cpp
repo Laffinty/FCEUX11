@@ -29,6 +29,15 @@
 #include "ppu.h"    // ::PPUCHRRAM, ::PPUNTARAM, ::vnapage, ::NTARAM
 #include "x6502.h"  // g_cpu (for ::ANull's return value)
 
+#ifdef VNESU11_CORE_ENABLED
+#include "vnesu11_bridge.h"  // v2.0 wip (Phase 6): fceu11::g_vnesu11_soc
+
+// v2.0 wip (Phase 6): direct call into the Rust SoC for CHR page sync.
+extern "C" {
+int vnesu11_chr_set_page(void* soc, uint8_t page_idx, const uint8_t* src);
+}
+#endif
+
 namespace fceu11 {
 
 // ---------------------------------------------------------------------------
@@ -281,6 +290,18 @@ void Bus::setchr1(uint32_t A, uint32_t V) noexcept {
     else             mask &= ~(1u << (A >> 10));
     ppu_->set_chr_ram(mask);
     set_vpage(A >> 10, &chr_ptr_[0][bank << 10] - A);
+#ifdef VNESU11_CORE_ENABLED
+    // v2.0 wip (Phase 6): copy the 1 KiB page into the Rust SoC so
+    // the newppu=1 PPU sees the same CHR bytes. `vpage_[A>>10]`
+    // is offset by `-A` so the raw page data is at `vpage + A`.
+    if (fceu11::g_vnesu11_soc) {
+        const uint32_t page_idx = A >> 10;
+        vnesu11_chr_set_page(
+            fceu11::g_vnesu11_soc,
+            static_cast<uint8_t>(page_idx),
+            fceu11::g_bus.vpage()[page_idx] + A);
+    }
+#endif
 }
 
 void Bus::setchr4(uint32_t A, uint32_t V) noexcept {
@@ -295,6 +316,20 @@ void Bus::setchr4(uint32_t A, uint32_t V) noexcept {
     if (chr_ram_[0]) mask |= (15u << (A >> 10));
     else             mask &= ~(15u << (A >> 10));
     ppu_->set_chr_ram(mask);
+#ifdef VNESU11_CORE_ENABLED
+    // Phase 6: mirror the 4 KiB setchr4 page into the Rust chr_pages.
+    // The four 1 KiB pages all share the same source (`chr_ptr_[0][bank<<12]`),
+    // so we copy each separately into `chr_pages[page..page+3]`.
+    if (fceu11::g_vnesu11_soc) {
+        const uint32_t base_page = A >> 10;
+        for (uint32_t p = 0; p < 4; ++p) {
+            vnesu11_chr_set_page(
+                fceu11::g_vnesu11_soc,
+                static_cast<uint8_t>(base_page + p),
+                fceu11::g_bus.vpage()[base_page + p] + A + (p << 10));
+        }
+    }
+#endif
 }
 
 void Bus::setchr8(uint32_t V) noexcept {
@@ -305,6 +340,18 @@ void Bus::setchr8(uint32_t V) noexcept {
         set_vpage(x, &chr_ptr_[0][bank << 13]);
     }
     ppu_->set_chr_ram(chr_ram_[0] ? 0xFF : 0x00);
+#ifdef VNESU11_CORE_ENABLED
+    // Phase 6: copy all 8 × 1 KiB pages in one go.
+    if (fceu11::g_vnesu11_soc) {
+        const uint8_t* src = &chr_ptr_[0][bank << 13];
+        for (uint32_t p = 0; p < 8; ++p) {
+            vnesu11_chr_set_page(
+                fceu11::g_vnesu11_soc,
+                static_cast<uint8_t>(p),
+                src + (p << 10));
+        }
+    }
+#endif
 }
 
 // ---------------------------------------------------------------------------

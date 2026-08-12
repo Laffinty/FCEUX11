@@ -690,6 +690,54 @@ if(FCEUX11_BUILD_TESTS)
         endif()
 
         # =====================================================================
+        # Phase 6 §3.3 — vNESU11 shadow run runner (VNESU11_CORE=ON only).
+        # Runs a ROM through the C++ pipeline with the Rust core in
+        # parallel, comparing per-frame CPU registers. Requires the
+        # vNESU11 Rust staticlib, so it's gated on VNESU11_CORE.
+        # =====================================================================
+        if(VNESU11_CORE)
+            fceux11_add_headless_test_executable(kagami_qa_shadow_run_runner
+                kagami/kagami_qa_shadow_run_main.cpp
+                git_info_stub.cpp
+            )
+            target_include_directories(kagami_qa_shadow_run_runner PRIVATE
+                ${CMAKE_SOURCE_DIR}/tests/kagami/core
+                ${CMAKE_SOURCE_DIR}/src
+            )
+            target_link_libraries(kagami_qa_shadow_run_runner PRIVATE
+                fceux11_core
+                ${VNESU11_RUST_LIB}
+                userenv
+                ws2_32
+                dbghelp
+                ntdll
+            )
+            # The src/CMakeLists.txt `add_definitions(-DVNESU11_CORE_ENABLED)`
+            # only reaches src/ targets — the test exe needs it explicitly.
+            target_compile_definitions(kagami_qa_shadow_run_runner PRIVATE
+                VNESU11_CORE_ENABLED=1
+            )
+            # Two Rust staticlibs (fceux11_rust.lib via fceux11_core,
+            # vnesu11.lib) each embed the Rust std runtime. Both are
+            # built by the same cargo toolchain, so the duplicate std
+            # symbols are byte-identical — /FORCE:MULTIPLE lets the
+            # linker pick one copy (standard fix for this layout).
+            if(MSVC)
+                target_link_options(kagami_qa_shadow_run_runner PRIVATE
+                    "/FORCE:MULTIPLE")
+            endif()
+            # CTest entry: shadow run on blargg cpu_dummy_reads (60 frames).
+            add_test(NAME shadow_run_cpu_smoke
+                     COMMAND kagami_qa_shadow_run_runner
+                     fixtures/blargg/cpu/cpu_dummy_reads.nes --frames 60
+                     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+            if(WIN32)
+                set_tests_properties(shadow_run_cpu_smoke PROPERTIES ENVIRONMENT_MODIFICATION
+                        "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+            endif()
+        endif()
+
+        # =====================================================================
         # Task 1 / C-2 — Rust ROM regression harness (replaces
         # rom_regression_test.cpp). Same link pattern as blargg_rust_runner.
         # =====================================================================

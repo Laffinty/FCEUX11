@@ -362,17 +362,89 @@ tests/shadow_run/
 
 ## 7. DoD
 
-- [ ] `VNESU11_CORE=OFF`：行为与 v1.17 完全一致
-- [ ] `VNESU11_CORE=ON`：链接通过，可执行文件可启动
-- [ ] **newppu=1** shadow run：SMB1/Zelda/Contra 60 帧 CRC 零 diff
-- [ ] **newppu=1** shadow run：MMC3 IRQ 测试 ROM 零 diff
-- [ ] **newppu=1** shadow run：blargg cpu_instrs 全 PASS
-- [ ] **newppu=0** 回退：C++ 旧 PPU movie round-trip 通过（ADR-009）
-- [ ] **[修订] 系统类型**：FDS / NSF / VS 各跑一个测试文件通过（S6）
-- [ ] 性能：纯 vNESU11 帧时间 ≤ v1.17 × 1.05
-- [ ] TAS movie round-trip（录放 5 分钟）字节一致
-- [ ] savestate round-trip（每个主流 mapper）字节一致
-- [ ] 真实游戏 10 个跑 5 分钟无 crash
+> **2026-08-12 实测更新（Phase 6 启动）**：P0 全部完成 + P1 骨架落地。
+> `cargo test -p vnesu11` **322 passed / 0 failed / 1 ignored**（新增 4 个
+> `vnesu11_emulate_frame` FFI 测试 + 6 个 system_type 测试 + peek/poke_regs
+> 接线）。`vn_perf_bench` 实测 **743 us/帧 ≈ 1346 FPS**（远低于 16.7ms 预算）。
+> VNESU11_CORE=ON/OFF 双配置 `fceux11.exe` 均构建链接成功。
+> **以下 DoD 中 `[x]` = 已完成；未标 = 后续会话/Phase 7。**
+
+- [x] `VNESU11_CORE=OFF`：行为与 v1.17 完全一致（构建验证通过；OFF 路径无功能改动，`vnesu11_*` 全为 no-op 桩）
+- [x] `VNESU11_CORE=ON`：链接通过，可执行文件可启动
+- [ ] **newppu=1** shadow run：SMB1/Zelda/Contra 60 帧 CRC 零 diff — [后续会话] 需端到端 harness + ROM fixtures
+- [ ] **newppu=1** shadow run：MMC3 IRQ 测试 ROM 零 diff — [后续会话] 同上
+- [ ] **newppu=1** shadow run：blargg cpu_instrs 全 PASS — [后续会话] 同上
+- [ ] **newppu=0** 回退：C++ 旧 PPU movie round-trip 通过（ADR-009）— [Phase 7]
+- [ ] **[修订] 系统类型**：FDS / NSF / VS 各跑一个测试文件通过（S6）— Rust 侧 6 个 system_type 冒烟测试已通过；C++ 端到端 [后续会话]
+- [ ] 性能：纯 vNESU11 帧时间 ≤ v1.17 × 1.05 — `vn_perf_bench` 743us/帧（Phase 1 门禁已证 CPU parity；完整对比 [后续会话]）
+- [ ] TAS movie round-trip（录放 5 分钟）字节一致 — [Phase 7]
+- [ ] savestate round-trip（每个主流 mapper）字节一致 — [Phase 7]
+- [ ] 真实游戏 10 个跑 5 分钟无 crash — [后续会话/Phase 7]
+
+### Phase 6 启动已交付（2026-08-12）
+
+```
+P0（完成）：
+  [x] vnesu11_emulate_frame 真实实现（Rust run_frame + xbuf/sbuf 拷贝 + APU drain，4 个 FFI 测试）
+  [x] fceu.cpp::Emulate() 条件编译接通（shadow harness 并行 C++ + Rust，每 60 帧 CRC log）
+  [x] CHR 转发：Bus::setchr1/4/8 → vnesu11_chr_set_page → VNesSoc::chr_pages[8]
+  [x] MapperMetaVtable::tick_irq 改进（读 g_cpu.native_layout().IRQlow & FCEU_IQEXT）
+P1（完成）：
+  [x] src/vnesu11_shadow.{h,cpp}（ShadowData 导出 + CRC32 + periodic log）
+  [x] vnesu11_power_on_bridge/reset_bridge 接入 vnesu11_shadow_reset
+  [x] vnesu11_cpu_peek/poke + vnesu11_ppu_peek + vnesu11_cpu_peek_regs/poke_regs 接线
+  [x] 6 个 system_type 冒烟测试（iNES/VS/FDS/NSF/unknown/NSF-frame）
+  [x] vn_perf_bench（743 us/帧 ≈ 1346 FPS）
+P2（后续会话/Phase 7）：
+  [x] Shadow run 端到端 harness（2026-08-12：kagami_qa_shadow_run_runner 构建 + 运行成功）
+  [ ] MapperMetaVtable::fill_audio（VRC6/FDS/N163 扩展音频）
+  [ ] CPU 寄存器差异迭代修复（shadow 已暴露：Rust $2002 PPUSTATUS 读未反映 PpuCore VBlank 状态 → wait-loop 无法退出）
+  [ ] savestate round-trip 100% parity
+  [ ] TAS movie round-trip
+```
+
+---
+
+## 9. Shadow run 实测结果（2026-08-12）
+
+`kagami_qa_shadow_run_runner` 端到端跑通（构建 + 运行 + 对比）：
+
+```
+构建：tests/CMakeLists.txt 注册，仅 VNESU11_CORE=ON 构建
+链接要点：
+  - vnesu11.lib 经 ${VNESU11_RUST_LIB} 显式链接（修复了 src/rust/CMakeLists.txt
+    未向上传播变量的 CMake bug：VNESU11_RUST_LIB 需 PARENT_SCOPE 二次导出）
+  - 两个 Rust 静态库（fceux11_rust.lib + vnesu11.lib）各内嵌 std → /FORCE:MULTIPLE
+    （同一 rustc 构建，std 符号一致，安全去重）
+  - 需显式 VNESU11_CORE_ENABLED=1 编译宏（src/ 的 add_definitions 不达 tests/）
+  - 链接 userenv / ws2_32 / dbghelp / ntdll（Rust std winsock 依赖）
+  - 运行 DLL：side-by-side 复制 vcpkg debug DLL + DebugCRT 到 exe 目录
+    （本机 MSVC 14.51 重建 vs vcpkg 14.44 DLL 的 PATH 冲突）
+```
+
+运行结果（3 个 ROM，60 帧）：
+
+| ROM | CPU 匹配 | 观察 |
+|-----|---------|------|
+| cpu_dummy_reads.nes | 0/59 | frame 1-2 PC 仅差 1 条指令（E5A6 vs E5A3），随后渐变发散 |
+| nestest.nes | 0/30 | 双方 PC 都在推进但不同步 |
+| mapper_axrom.nes | 0/30 | 双方 PC 都在推进但不同步 |
+
+**Shadow 捕获**：`frame=60 xbuf_crc=0xEC1C6272 audio_samples=32768`（帧 CRC + APU 样本均正常产出）。
+
+**已修复（VBlank 路由，2026-08-12 第二版）**：shadow 暴露的首个发散根因是
+`bus.rs::ppu_read_register(0x02)` 返回 Phase-2 stub 值，**未反映 PpuCore 的
+VBlank 状态** → Rust CPU 的 $2002 等待循环无法退出。修复：$2002 读改走
+`PpuCore.regs.read_status()`（含读清 VBlank）；$2000/$2001 写路由到
+`PpuCore.regs.ppuctrl/ppumask`；$2003/$2004 路由到 PpuCore OAM；$2005/$2006
+走 `PpuRegisters::write_scroll/write_addr` + 同步渲染器 scroll 缓存。
+**效果**：frame 1-2 的 PC 从垃圾值（0x3636 循环）收敛到与 C++ 仅差 1 条指令
+（E5A6 vs E5A3）——两核心在帧边界基本对齐。
+
+**剩余发散（Phase 6 持续工作）**：frame 3+ 渐变发散源于 Rust 与 C++ 的
+PPU 段预算/IRQ 采样点时序差异（每帧执行的指令数不完全相同）。闭合需要
+逐段核对预算 + IRQ 采样时机（`cpu/mod.rs::run_budget` vs
+`x6502.cpp::X6502_Run`）。shadow harness 现已具备持续迭代的对比基础设施。
 
 ---
 

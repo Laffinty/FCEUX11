@@ -60,6 +60,12 @@ const fn compute_tnd_table() -> [f32; 203] {
 ///
 /// Inputs are the channel output levels (0..=15 for pulse/noise/triangle,
 /// 0..=127 for DMC).
+///
+/// The lookup tables produce unit-scale values in [0, ~0.5]; we scale
+/// to the i16 sample range so active channels produce audible non-zero
+/// samples (Phase 5 stage 0 requires "write registers → non-zero
+/// output").  The exact scaling curve is byte-pinned against upstream
+/// `src/apu.cpp` in the Phase 6 shadow run.
 #[inline]
 pub fn mixer(
     pulse1: u8,
@@ -73,7 +79,7 @@ pub fn mixer(
     let tnd_idx = (3 * (triangle as usize) + 2 * (noise as usize) + (dmc as usize)).min(202);
     let tnd_out = TND_TABLE[tnd_idx];
     // Scale to i16 (sample range ~ -32k..+32k).
-    let sample = (pulse_out + tnd_out) as i16;
+    let sample = ((pulse_out + tnd_out) * 32767.0) as i16;
     (sample, sample)
 }
 
@@ -91,16 +97,12 @@ mod tests {
     #[test]
     fn pulse_only_max_outputs_positive() {
         // Max pulse: p1 = 15, p2 = 15 → index 30 → 95.88 / (8128/30 + 100)
-        // ≈ 0.258.  As i16, this rounds to 0.  The actual audio
-        // output is a small fractional value, not a byte integer.
-        // The mixer uses `as i16` for the sample; Phase 6 shadow-run
-        // will byte-pin against upstream `src/apu.cpp::WPanelOH`.
+        // ≈ 0.258.  Scaled by 32767 → ~8.4k, i.e. a clearly audible,
+        // non-zero i16 sample.
         let (l, _) = mixer(15, 15, 0, 0, 0);
-        // The pulse contribution is ~0.258 — cast to i16 it's 0.
-        // The real test is that the value is non-zero in f32.
+        assert!(l > 0, "pulse output must be a positive i16 sample");
         let pulse_only = PULSE_TABLE[30];
         assert!(pulse_only > 0.0, "pulse table should be non-zero at index 30");
-        assert!(l == 0, "i16 cast saturates to 0 — pre-Pulse 7-bit DAC");
     }
 
     #[test]

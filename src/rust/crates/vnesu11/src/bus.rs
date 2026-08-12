@@ -94,15 +94,24 @@ impl VNesSoc {
 
     /// PPU-side read of CHR / nametable / palette at `addr`.
     ///
-    /// - `$0000-$1FFF`: CHR ROM/RAM via mapper range table (CHR path).
+    /// - `$0000-$1FFF`: CHR ROM/RAM — read from the SoC's `chr_pages`
+    ///   table (Phase 6), populated by the C++ mapper adapter's
+    ///   `Bus::setchr1` hook. `chr_pages` defaults to 0 so unmapped
+    ///   reads return open bus 0 (matches NES hardware).
     /// - `$2000-$2FFF`: nametable, resolved via the active mirror function.
     /// - `$3000-$3EFF`: nametable mirror (alias of `$2000-$2EFF`).
     /// - `$3F00-$3FFF`: palette + mirror logic.
     #[inline]
-    pub fn ppu_read(&mut self, addr: u16) -> u8 {
+    pub fn ppu_read(&self, addr: u16) -> u8 {
         match addr {
-            // CHR / pattern tables — mapper handler if registered, else open.
-            0x0000..=0x1FFF => self.mapper.read_chr(addr).unwrap_or(0),
+            // CHR / pattern tables — SoC chr_pages (mapper adapter hooks
+            // Bus::setchr1 to feed these).
+            0x0000..=0x1FFF => {
+                let page = (addr >> 10) as usize;
+                let off = (addr & 0x3FF) as usize;
+                self.chr_pages[page][off]
+            }
+            // Nametable region $2000-$2FFF — apply mirroring.
             // Nametable region $2000-$2FFF — apply mirroring.
             0x2000..=0x2FFF => {
                 let vram_addr = (self.nametable_mirror_fn)(addr);
@@ -142,8 +151,13 @@ impl VNesSoc {
     #[inline]
     pub fn ppu_write(&mut self, addr: u16, val: u8) {
         match addr {
+            // CHR writes — go into chr_pages (for boards with CHR RAM
+            // such as MMC2/4's CHR RAM). Read-only CHR ROM boards
+            // ignore writes (writes to ROM are no-ops on real hardware).
             0x0000..=0x1FFF => {
-                let _ = self.mapper.write_chr(addr, val);
+                let page = (addr >> 10) as usize;
+                let off = (addr & 0x3FF) as usize;
+                self.chr_pages[page][off] = val;
             }
             0x2000..=0x2FFF => {
                 let vram_addr = (self.nametable_mirror_fn)(addr);
@@ -195,32 +209,30 @@ impl VNesSoc {
     }
 
     // ===================================================================
-    // PPU register stub (Phase 3 wires real behavior; Phase 2 keeps
-    // basic storage for testing the bus plumbing).
+    // PPU register reads/writes — Phase 6: route to PpuCore state so
+    // the Rust PPU's VBlank / scroll / OAM match the C++ side (shadow
+    // run surfaced that $2002 didn't reflect PpuCore.regs.status).
     // ===================================================================
 
-    fn ppu_read_register(&self, reg: u8) -> u8 {
-        // Phase 2: $2002 (PPUSTATUS) returns the w flag + open bus for
-        // low bits; other registers read as open bus. Real implementation
-        // is in Phase 3.
+    fn ppu_read_register(&mut self, reg: u8) -> u8 {
         match reg {
             0x02 => {
-                // Bit 7 = PPU w toggle; bits 0-4 = open bus latch;
-                // bit 5 = sprite overflow (always 0 here); bit 6 = sprite 0 hit.
-                let mut v = self.open_bus & 0x1F;
-                v |= (self.ppu_w as u8) << 7;
-                v
+                // $2002 PPUSTATUS: VBlank (bit 7) + sprite 0 hit (6) +
+                // overflow (5) from the PpuCore status; reading clears
+                // VBlank + the w toggle (PpuRegisters::read_status).
+                self.ppu.regs.read_status()
             }
             0x04 => {
-                // $2004 OAM read: returns OAM[addr]. Phase 3 wires the
-                // full read path; for now expose raw OAM byte.
-                self.oam[self.ppu_oam_addr as usize]
+                // $2004 OAMDATA read at OAMADDR (read does not advance
+                // OAMADDR — NES hardware quirk).
+                let addr = self.ppu.regs.oam_addr as usize;
+                self.ppu.oam.primary[addr]
             }
             0x07 => {
-                // $2007 PPU data — has its own hot path; the general
-                // CPU bus read doesn't use this. Returning open bus here
-                // matches the "other PPU regs" default.
-                self.open_bus
+                // $2007 PPU data — read via the SoC's ppu_read_data
+                // (buffer lag + v increment).
+                let inc = if (self.ppu.regs.ppuctrl & 0x04) != 0 { 32 } else { 1 };
+                self.ppu_read_data(inc)
             }
             _ => self.open_bus,
         }
@@ -229,65 +241,78 @@ impl VNesSoc {
     fn ppu_write_register(&mut self, reg: u8, val: u8) {
         match reg {
             0x00 => {
-                // PPUCTRL: bit 7 = NMI on VBlank, bit 5 = sprite size,
-                // bit 4 = bg pattern table, bit 3 = sprite pattern table,
-                // bit 2 = +32 increment, bits 1-0 = nametable select.
-                self.ppu_ctrl = val;
+                // PPUCTRL: NMI / sprite size / bg+sprite tables /
+                // increment / nametable select.
+                self.ppu.regs.ppuctrl = val;
+                self.ppu_ctrl = val;  // keep the Phase-2 view in sync
             }
             0x01 => {
                 // PPUMASK.
+                self.ppu.regs.ppumask = val;
                 self.ppu_mask = val;
             }
             0x03 => {
                 // OAMADDR.
+                self.ppu.regs.oam_addr = val;
                 self.ppu_oam_addr = val;
             }
             0x04 => {
-                // OAMDMA — Phase 4 wires real DMA controller. For now
-                // ignore.
+                // OAMDATA write at OAMADDR (increments OAMADDR).
+                self.ppu.oam.write_primary(&mut self.ppu.regs.oam_addr, val);
+                self.ppu_oam_addr = self.ppu.regs.oam_addr;
             }
             0x05 => {
-                // PPUSCROLL: writes to scroll registers (paired w/ $2006).
-                if !self.ppu_w {
-                    self.ppu_x = val & 0x07;
-                    self.ppu_t = (self.ppu_t & 0xFFE0) | ((val >> 3) as u16);
-                } else {
-                    self.ppu_t = (self.ppu_t & 0x8C1F)
-                        | (((val & 0x07) as u16) << 12)
-                        | (((val >> 3) as u16) << 5);
-                }
-                self.ppu_w = !self.ppu_w;
+                // PPUSCROLL: paired writes split coarse/fine X/Y.
+                self.ppu.regs.write_scroll(val);
+                // Sync the renderer's scroll cache from t/v.
+                self.sync_ppu_scroll_cache();
             }
             0x06 => {
-                // PPUADDR: writes to v/t (paired w/ $2005).
-                if !self.ppu_w {
-                    self.ppu_t = (self.ppu_t & 0x00FF) | (((val & 0x3F) as u16) << 8);
-                } else {
-                    self.ppu_t = (self.ppu_t & 0xFF00) | val as u16;
-                    self.ppu_v = self.ppu_t;
-                }
-                self.ppu_w = !self.ppu_w;
+                // PPUADDR: paired writes load v from t.
+                self.ppu.regs.write_addr(val);
+                self.sync_ppu_scroll_cache();
             }
             0x07 => {
-                // $2007 PPU data — write side; no buffer involved.
-                let addr = self.ppu_v & 0x3FFF;
+                // $2007 PPU data write at v, then increment.
+                let addr = self.ppu.regs.v.addr();
                 self.ppu_write(addr, val);
-                let increment = if (self.ppu_ctrl & 0x04) != 0 { 32 } else { 1 };
-                self.ppu_v = self.ppu_v.wrapping_add(increment);
+                let inc = if (self.ppu.regs.ppuctrl & 0x04) != 0 { 32 } else { 1 };
+                self.ppu.regs.v.increment(inc);
             }
             _ => {}
         }
     }
 
+    /// Mirror the PpuRegisters v/t scroll into the PpuCore renderer's
+    /// cache fields (`scroll_coarse_x/y` + `fine_x`), which
+    /// `render_background_scanline` reads per scanline.
+    fn sync_ppu_scroll_cache(&mut self) {
+        let regs = &self.ppu.regs;
+        self.ppu.scroll_coarse_x = regs.t.coarse_x() as u8;
+        self.ppu.scroll_coarse_y = regs.t.coarse_y() as u8;
+        self.ppu.fine_x = regs.x;
+        // Also keep the Phase-2 soc view fields coherent.
+        self.ppu_t = regs.t.0;
+        self.ppu_v = regs.v.0;
+        self.ppu_w = regs.w;
+        self.ppu_x = regs.x;
+    }
+
     // ===================================================================
-    // APU / IO ($4000-$401F) — Phase 2 stub. Phase 4 wires real APU.
+    // APU / IO ($4000-$401F) — Phase 5 stage 0: full routing to
+    // ApuCore 5 channels + OAM DMA + JoypadState.
     // ===================================================================
 
     #[inline(always)]
-    fn apu_io_read(&self, addr: u16) -> u8 {
+    fn apu_io_read(&mut self, addr: u16) -> u8 {
         match addr {
-            0x4016 => self.joypad_strobe_latch,
-            0x4017 => self.joypad_strobe_latch,
+            // $4015: channel enable bits + IRQ flags (read clears the
+            // frame-counter IRQ flag, matching src/sound.cpp StatusRead).
+            0x4015 => self.apu_status_read(),
+            // $4016/$4017: joypad serial shift register.
+            0x4016 | 0x4017 => self.joypad.read(addr),
+            // All other APU/IO registers read as open bus (hardware
+            // behavior; the 5 channels have no readable state).
             _ => self.open_bus,
         }
     }
@@ -295,33 +320,112 @@ impl VNesSoc {
     #[inline(always)]
     fn apu_io_write(&mut self, addr: u16, val: u8) {
         match addr {
-            0x4014 => {
-                // OAM DMA: Phase 4 wires. For now, copy 256 bytes from
-                // CPU addr into OAM. Many games use this on boot so a
-                // minimal Phase 2 implementation helps test ROMs.
-                let src_base = (val as u16) << 8;
-                for i in 0..256u16 {
-                    let b = self.cpu_read_for_dma(src_base.wrapping_add(i));
-                    self.oam[i as usize] = b;
-                }
+            // Pulse 1 ($4000-$4003).
+            0x4000 => self.apu.pulse1.write_control(val),
+            0x4001 => self.apu.pulse1.write_sweep(val),
+            0x4002 => self.apu.pulse1.write_timer_lo(val),
+            0x4003 => self.apu.pulse1.write_timer_hi(val),
+            // Pulse 2 ($4004-$4007).
+            0x4004 => self.apu.pulse2.write_control(val),
+            0x4005 => self.apu.pulse2.write_sweep(val),
+            0x4006 => self.apu.pulse2.write_timer_lo(val),
+            0x4007 => self.apu.pulse2.write_timer_hi(val),
+            // Triangle ($4008-$400B).
+            0x4008 => self.apu.triangle.write_control(val),
+            0x400A => self.apu.triangle.write_timer_lo(val),
+            0x400B => self.apu.triangle.write_timer_hi(val),
+            // Noise ($400C-$400F).
+            0x400C => self.apu.noise.write_envelope(val),
+            0x400E => self.apu.noise.write_period(val),
+            0x400F => self.apu.noise.write_length(val),
+            // DMC ($4010-$4013).
+            0x4010 => self.apu.dmc.write_control(val),
+            0x4011 => self.apu.dmc.write_load(val),
+            0x4012 => self.apu.dmc.write_address(val),
+            0x4013 => self.apu.dmc.write_length(val),
+            // $4014: OAM DMA trigger → DmaCore (stall + real transfer
+            // is driven by `run_frame`'s stall path).
+            0x4014 => self.oam_dma_start(val),
+            // $4015: channel enable + IRQ flag clear.
+            0x4015 => self.apu_status_write(val),
+            // $4016: joypad strobe (bit 0).
+            0x4016 => self.joypad.write_strobe(val),
+            // $4017: APU frame counter mode + joypad strobe (bit 0).
+            0x4017 => {
+                self.apu.frame_counter.write(val);
+                self.joypad.write_strobe(val);
             }
-            0x4016 => {
-                // Joypad strobe.
-                self.joypad_strobe = (val & 0x01) != 0;
-                if self.joypad_strobe {
-                    self.joypad_strobe_latch = self.joypad_latched[0];
-                }
-            }
-            _ => { /* APU registers: Phase 4 */ }
+            _ => { /* $4009/$400D are unused on NES 2A03. */ }
         }
+    }
+
+    /// `$4014` write: start an OAM DMA. The stall duration (513/514
+    /// CPU cycles) depends on the CPU cycle parity at trigger time;
+    /// the actual byte transfer happens in `run_frame`'s stall loop.
+    fn oam_dma_start(&mut self, page: u8) {
+        // `cpu.tcount` is the cycles consumed by the current
+        // instruction — its parity decides 513 vs 514.
+        let cycle_odd = (self.cpu.tcount & 1) == 1;
+        self.dma.oam.start(page, cycle_odd);
+    }
+
+    /// `$4015` read — channel enable bits + IRQ flags.
+    ///
+    /// Mirrors `src/sound.cpp::StatusRead`: bit 0-3 = length counter
+    /// active (pulse1/2, triangle, noise), bit 4 = DMC sample in
+    /// progress, bit 6 = frame IRQ flag, bit 7 = DMC IRQ flag.
+    /// Reading clears the frame-counter IRQ flag (bit 6) + deasserts
+    /// the FCOUNT IRQ line.
+    fn apu_status_read(&mut self) -> u8 {
+        let mut v = 0u8;
+        if self.apu.pulse1.length.counter > 0 { v |= 0x01; }
+        if self.apu.pulse2.length.counter > 0 { v |= 0x02; }
+        if self.apu.triangle.length.counter > 0 { v |= 0x04; }
+        if self.apu.noise.length.counter > 0 { v |= 0x08; }
+        if self.apu.dmc.bytes_remaining > 0 { v |= 0x10; }
+        if self.apu.frame_irq_pending { v |= 0x40; }
+        if self.apu.dmc_irq_pending { v |= 0x80; }
+        // Read clears the frame-counter IRQ flag + deasserts the line.
+        self.apu.frame_irq_pending = false;
+        self.irq.deassert_irq(crate::apu::IRQ_FCOUNT);
+        v
+    }
+
+    /// `$4015` write — channel enable + IRQ flag clear.
+    ///
+    /// Mirrors `src/sound.cpp::StatusWrite`: bits 0-3 clear the
+    /// respective length counters when 0, bit 4 enables the DMC
+    /// (starts a sample if one is latched) when set / stops it when
+    /// clear, and bit 7 is unconditionally cleared (DMC IRQ flag).
+    fn apu_status_write(&mut self, val: u8) {
+        self.apu.pulse1.length.set_enabled((val & 0x01) != 0);
+        self.apu.pulse2.length.set_enabled((val & 0x02) != 0);
+        self.apu.triangle.length.set_enabled((val & 0x04) != 0);
+        self.apu.noise.length.set_enabled((val & 0x08) != 0);
+        // DMC enable (bit 4).
+        if (val & 0x10) != 0 {
+            if self.apu.dmc.bytes_remaining == 0 && self.apu.dmc.sample_length > 0 {
+                self.apu.dmc.current_address = self.apu.dmc.sample_address;
+                self.apu.dmc.bytes_remaining = self.apu.dmc.sample_length;
+            }
+        } else {
+            self.apu.dmc.bytes_remaining = 0;
+        }
+        // Writing $4015 clears the DMC IRQ flag (bit 7) + deasserts
+        // the DPCM IRQ line (src/sound.cpp StatusWrite).
+        self.apu.dmc_irq_pending = false;
+        self.irq.deassert_irq(crate::apu::IRQ_DMC);
     }
 
     /// DMA reads from the CPU address space without going through the
     /// normal `cpu_read` (which would update open_bus and risk recursion
     /// when DMA itself is the cause). Returns the byte at `addr` via the
     /// same decode logic minus the open-bus tracking.
+    ///
+    /// `pub(crate)` — the SoC's `step_oam_dma` (Phase 5) drives the
+    /// actual byte transfer through this path.
     #[inline(always)]
-    fn cpu_read_for_dma(&mut self, addr: u16) -> u8 {
+    pub(crate) fn cpu_read_for_dma(&mut self, addr: u16) -> u8 {
         // Same decode as `cpu_read_unchecked` — duplicated here to keep
         // DMA off the open-bus hot path and to avoid `&mut self`-twice.
         match addr {
@@ -567,26 +671,30 @@ mod tests {
         for (i, b) in s.wram.iter_mut().enumerate() {
             *b = i as u8;
         }
-        // DMA from $0200 → should copy 256 bytes into OAM.
+        // DMA from $0200 → the $4014 write starts the transfer; the
+        // actual byte copy happens in `run_frame`'s stall path.
         s.cpu_write(0x4014, 0x02);
+        assert!(s.dma.is_stalling(), "DMA should be active after $4014 write");
+        s.run_frame();
         for i in 0..256 {
             assert_eq!(s.oam[i], i as u8);
         }
+        assert!(!s.dma.is_stalling(), "DMA should have completed");
     }
 
     #[test]
     fn joypad_strobe_clears_then_latches_first_button() {
         let mut s = fresh_soc();
-        s.joypad_latched[0] = 0xAB;
-        // Write 1 to $4016 → strobe on, latch first button state.
+        s.joypad.set_button(0, crate::joypad::BUTTON_RIGHT, true);
+        // Write 1 to $4016 → strobe on, latch button state.
         s.cpu_write(0x4016, 0x01);
-        assert!(s.joypad_strobe);
-        // Reading $4016 in strobe mode returns the latched byte.
+        assert!(s.joypad.strobe);
+        // Reading $4016 in strobe mode returns MSB of button state.
         let v = s.cpu_read(0x4016);
-        assert_eq!(v, 0xAB);
+        assert_eq!(v, 1);
         // Write 0 to $4016 → strobe off (latch state remains).
         s.cpu_write(0x4016, 0x00);
-        assert!(!s.joypad_strobe);
+        assert!(!s.joypad.strobe);
     }
 
     #[test]

@@ -97,16 +97,17 @@ pub struct VNesSoc {
     pub ppu_read_buffer: u8,
 
     // -----------------------------------------------------------------
-    // Joypad (Phase 2 stub — Phase 4 wires full implementation)
+    // CHR pages (Phase 6 §1.1) — 8 × 1 KiB mirroring the C++ PPU's
+    // vpage_[8] table. The C++ adapter's `Bus::setchr1` hook copies
+    // 1 KiB from the current page into `chr_pages[idx]` whenever a
+    // mapper bank-switches CHR. `bus.rs::ppu_read` consults this table
+    // for $0000-$1FFF.
     // -----------------------------------------------------------------
-    /// Latched button state per pad (8 bits, A/B/Select/Start/Up/Down/Left/Right).
-    pub joypad_latched: [u8; 2],
-    /// Strobe bit ($4016 write bit 0).
-    pub joypad_strobe: bool,
-    /// Latched byte returned by $4016 read in strobe mode.
-    pub joypad_strobe_latch: u8,
-    /// Shift register for non-strobe reads ($4016/$4017).
-    pub joypad_shift: [u8; 2],
+    pub chr_pages: [[u8; 1024]; 8],
+
+    // -----------------------------------------------------------------
+    // Joypad (Phase 4 — `JoypadState` owns $4016/$4017 + VS coin)
+    // -----------------------------------------------------------------
 
     // -----------------------------------------------------------------
     // RAM init (Phase 2 — splitmix64 + xoroshiro128plus)
@@ -161,10 +162,7 @@ impl Default for VNesSoc {
             ppu_x: 0,
             ppu_read_buffer: 0,
 
-            joypad_latched: [0; 2],
-            joypad_strobe: false,
-            joypad_strobe_latch: 0,
-            joypad_shift: [0; 2],
+            chr_pages: [[0u8; 1024]; 8],
 
             ram_rng: RamRng::new(),
             ram_init_option: RamInitOption::Checker,
@@ -198,18 +196,19 @@ impl VNesSoc {
     /// Run one full frame of emulation.
     ///
     /// Returns `FrameResult::Complete` when a full frame has rendered.
-    /// The scheduler is the segment-driven master; each segment's
-    /// `cpu_budget` is handed to the CPU via `cpu.run_budget`.
+    /// The PPU is the segment-driven master; each segment's
+    /// `cpu_budget` is handed to the CPU via `cpu.run_budget`, the APU
+    /// via `apu.tick`, and the DMA/IRQ controllers are driven at
+    /// segment boundaries.
     ///
-    /// Phase 3 wires the basic segment loop; the actual per-pixel
-    /// compositing lives in `BackgroundState::render_scanline` /
-    /// `SpriteState::render_scanline` (which currently produce a
-    /// simplified output for testing — Phase 4+ wires real CHR data).
+    /// Phase 5 stage 0 (wiring): the main loop now drives
+    /// - OAM DMA stall (513/514 CPU cycles, real byte transfer)
+    /// - APU channel ticks (frame counter / 5 channels / mixer)
+    /// - IRQ routing (PPU VBlank NMI + APU FCOUNT/DMC + mapper + EXT)
+    ///
+    /// See `docs/wip_2.0_plan/phase_5_mapper_adapter.md` §2.0.1.
     pub fn run_frame(&mut self) -> FrameResult {
         let mut result = FrameResult::default();
-        // Tick PPU until frame is ready.  Each segment gives the CPU
-        // a budget; we honor the budget before yielding back to the
-        // PPU for the next segment's work.
         loop {
             let segment = self.ppu.next_segment();
             match segment {
@@ -219,12 +218,34 @@ impl VNesSoc {
                 }
                 _ => {
                     let budget = segment.cpu_budget();
-                    // Bus context for the CPU's bus reads (lets the CPU
-                    // execute against the SoC's WRAM/mapper).
+                    // 1. DMA stall priority: while an OAM DMA is in
+                    //    flight the CPU is halted (513/514 cycles).
+                    //    Each iteration transfers one byte (or drains
+                    //    a trailing alignment cycle); the PPU does not
+                    //    advance during the stall.
+                    if self.dma.is_stalling() {
+                        if self.dma.oam.active {
+                            self.step_oam_dma();
+                        } else if self.dma.dmc_stall_cycles > 0 {
+                            // DMC DMA stall (Phase 6 wires the real
+                            // arbitration; decrement defensively so a
+                            // pending DMC stall can never spin).
+                            self.dma.dmc_stall_cycles -= 1;
+                        }
+                        continue;
+                    }
+                    // 2. CPU runs its segment budget (X6502_Run semantics).
                     let mut bus = unsafe { VNesBusContext::new(self) };
                     self.cpu.run_budget(budget, &mut bus);
-                    // Advance PPU dot clock + per-segment rendering.
+                    // 3. APU ticks the same budget (frame counter + 5
+                    //    channels + mixer → output_buffer).
+                    if budget > 0 {
+                        self.apu.tick(budget as u32);
+                    }
+                    // 4. PPU renders the segment (background + sprites).
                     let frame_done = self.ppu.advance_to_next_segment();
+                    // 5. Route interrupts at the segment boundary.
+                    self.route_interrupts();
                     if frame_done {
                         result.completed = true;
                         break;
@@ -236,11 +257,72 @@ impl VNesSoc {
         // for external read-out.
         self.frame_buffer.copy_from_slice(&*self.ppu.frame_buffer);
         self.frame_ready = self.ppu.frame_ready;
-        // Drain PPU NMI → CPU IRQ source.
+        result
+    }
+
+    /// Advance one OAM DMA byte: read from the CPU address space and
+    /// write into PPU OAM. Keeps the public `oam` view and the
+    /// `ram_banks` copy in sync so savestate/snapshot see the data.
+    ///
+    /// When all 256 bytes have transferred, trailing alignment cycles
+    /// (513/514 − 512) are drained without moving data.
+    fn step_oam_dma(&mut self) {
+        if !self.dma.oam.active {
+            return;
+        }
+        if self.dma.oam.remaining == 0 {
+            // Residual alignment drain — no data moves.
+            self.dma.oam.step();
+            return;
+        }
+        let offset = 256usize - self.dma.oam.remaining as usize;
+        let addr = ((self.dma.oam.page as u16) << 8) | (offset as u16);
+        let val = self.cpu_read_for_dma(addr);
+        self.ppu.oam.primary[offset] = val;
+        self.oam[offset] = val;
+        self.ram_banks.oam[offset] = val;
+        self.dma.oam.step();
+    }
+
+    /// Route interrupts at a segment boundary:
+    /// - PPU VBlank NMI (edge) → `IrqController::assert_nmi`
+    /// - APU frame-counter / DMC IRQ → `IrqController::assert_irq`
+    /// - Mapper IRQ (via `MapperMetaVtable::tick_irq`) → IRQ_EXT
+    /// - External FDS sources (EXT/EXT2) already in the controller
+    ///
+    /// The aggregated mask is then pushed to the CPU as pending IRQ
+    /// sources (consumed by the next instruction's interrupt sample).
+    fn route_interrupts(&mut self) {
+        // PPU VBlank NMI (edge-triggered).
         if self.ppu.nmi.take() {
+            self.irq.assert_nmi();
+        }
+        // APU IRQs (frame counter + DMC).
+        let apu_irq = self.apu.take_irq();
+        if apu_irq & crate::apu::IRQ_FCOUNT != 0 {
+            self.irq.assert_irq(crate::apu::IRQ_FCOUNT);
+        }
+        if apu_irq & crate::apu::IRQ_DMC != 0 {
+            self.irq.assert_irq(crate::apu::IRQ_DMC);
+        }
+        // Mapper IRQ (meta vtable; FDS disk / mapper timers).
+        if let Some(slot) = &self.mapper_meta {
+            let mut irq = false;
+            unsafe {
+                (slot.meta.tick_irq)(slot.mapper_ctx, &mut irq);
+            }
+            if irq {
+                self.irq.assert_irq(CpuCore::IRQ_EXT);
+            }
+        }
+        // Push to the CPU (NMI edge + level IRQ sources).
+        if self.irq.take_nmi() {
             self.cpu.irq_begin(CpuCore::IRQ_NMI);
         }
-        result
+        let mask = self.irq.aggregate_mask();
+        if mask != 0 {
+            self.cpu.irq_begin(mask);
+        }
     }
 
     /// Power-on: apply `RAMInitOption` + `RAMInitSeed` to all four RAM
@@ -268,6 +350,13 @@ impl VNesSoc {
         self.ppu_v = 0;
         self.ppu_x = 0;
         self.ppu_read_buffer = 0;
+
+        // Phase 5 stage 0: reset APU / DMA / IRQ / joypad to a clean
+        // power-on state so a fresh frame starts from silence.
+        self.apu.power_cycle();
+        self.dma.power_cycle();
+        self.irq.reset();
+        self.joypad.reset();
     }
 }
 

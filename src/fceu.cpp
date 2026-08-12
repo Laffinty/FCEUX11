@@ -34,6 +34,9 @@
 
 #include "cart.h"
 #include "cart_class.h"   // v1.7 Cartograph: fceu11::g_cart
+#include "vnesu11_bridge.h"  // v2.0 wip (Phase 6): fceu11::g_vnesu11_soc + shadow
+#include "vnesu11_shadow.h"  // v2.0 wip (Phase 6): shadow log + sync helpers
+#include "vnesu11_mapper_adapter.h"  // v2.0 wip (Phase 5 §2.4): per-range forwarding
 
 // hotfix1 P2-2: the file-scope `cart` (FCEUXCart*) is defined later in
 // this TU (around line 1388) but FCEU_CloseGame above (~line 143) needs
@@ -308,6 +311,16 @@ void SetReadHandler(int32 start, int32 end, readfunc func) {
 	// non-empty ascending range.
 	if (end < start) return;
 
+	// v2.0 wip (Phase 5 §2.4): when vNESU11 owns the core, forward the
+	// registration into the Rust per-range table. This is the mapper's
+	// single entry point (~250 board files call here); the Rust side
+	// only sees the wrapped handler (Game Genie / cheat wrapping stays
+	// in fceu.cpp). The C++ table is still written below for the
+	// newppu=0 fallback path (double-write strategy).
+#ifdef VNESU11_CORE_ENABLED
+	fceu11::vnesu11_forward_set_read_handler(start, end, func);
+#endif
+
 	if (RWWrap)
 		for (x = end; x >= start; x--) {
 			if (x >= 0x8000)
@@ -338,6 +351,12 @@ void SetWriteHandler(int32 start, int32 end, writefunc func) {
 	// would happily spin past the array boundaries and corrupt unrelated
 	// memory. Bail out before touching anything.
 	if (end < start) return;
+
+	// v2.0 wip (Phase 5 §2.4): forward into the Rust per-range table
+	// (see the read-handler note above).
+#ifdef VNESU11_CORE_ENABLED
+	fceu11::vnesu11_forward_set_write_handler(start, end, func);
+#endif
 
 	if (RWWrap)
 		for (x = end; x >= start; x--) {
@@ -511,6 +530,17 @@ FCEUGI *fceu11::LoadGameVirtual(const char *name, int OverwriteVidMode, bool sil
 
 		if (OverwriteVidMode)
 			FCEU_ResetVidSys();
+
+		// v2.0 wip (Phase 5 §2.5): prepare the vNESU11 SoC for the new
+		// cart — create the SoC if needed, clear the previous game's
+		// handler ranges, set the system type (iNES/FDS/NSF/VS), and
+		// attach the mapper meta vtable. The mapper's Power() below
+		// then registers its per-range handlers straight into the Rust
+		// table via the SetReadHandler / SetWriteHandler forwarding.
+#ifdef VNESU11_CORE_ENABLED
+		fceu11::vnesu11_init();  // idempotent — ensures g_vnesu11_soc exists
+		fceu11::vnesu11_on_game_load(static_cast<int>(GameInfo->type));
+#endif
 
 		if (GameInfo->type != GIT_NSF && 
 			FSettings.GameGenie && 
@@ -874,6 +904,32 @@ void fceu11::Emulate(uint8 **pXBuf, int32 **SoundBuf, int32 *SoundBufSize, int s
 		*SoundBuf = WaveFinal;
 		*SoundBufSize = ssize;
 	}
+
+#ifdef VNESU11_CORE_ENABLED
+	// v2.0 wip (Phase 6 §2.3): shadow run. Run the Rust emulator in
+	// parallel after the C++ pipeline commits its XBuf / SoundBuf.
+	// The Rust xbuf holds palette indices (different format from C++
+	// XBuf NES colors); the Rust sbuf holds i16 stereo at CPU-cycle
+	// rate (~29,780 samples / frame vs C++ WaveFinal ~735). Format
+	// conversion + frame-level CRC / SNR diff lands in Phase 6 §2.5
+	// (the harness skeleton lives in vnesu11_bridge.cpp +
+	// vnesu11_shadow.cpp).
+	if (fceu11::g_vnesu11_soc && skip == 0) {
+		static thread_local uint8_t  rust_xbuf[61440];
+		static thread_local int16_t  rust_sbuf[32768];
+		size_t rust_sbuf_written = 0;
+		// Sync C++ post-frame CPU + WRAM → Rust so the shadow runs
+		// the next frame from the same starting state as C++.
+		fceu11::vnesu11_shadow_sync_from_cpp();
+		vnesu11_emulate_frame_bridge(
+			fceu11::g_vnesu11_soc, 0,
+			rust_xbuf, rust_sbuf,
+			sizeof(rust_sbuf) / sizeof(rust_sbuf[0]),
+			&rust_sbuf_written);
+		// Periodic frame-level status log (every 60 frames).
+		fceu11::vnesu11_shadow_log_every(fceu11::kShadowLogEveryFrames);
+	}
+#endif
 
 	if ((EmulationPaused & EMULATIONPAUSED_FA) && (!frameAdvanceLagSkip || !lagFlag))
 	//Lots of conditions here.  EmulationPaused & EMULATIONPAUSED_FA must be true.  In addition frameAdvanceLagSkip or lagFlag must be false

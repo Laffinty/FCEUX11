@@ -20,7 +20,6 @@
 //! - OAM DMA
 //! - Joypad strobe
 
-use vnesu11::cpu::BusContext;
 use vnesu11::mapper::{MapperRangeTable, ReadRangeHandler, WriteRangeHandler};
 use vnesu11::ppu::nametable::Mirroring;
 use vnesu11::ram::{RamInitOption, RamRng};
@@ -447,10 +446,17 @@ fn oam_dma_copies_256_bytes() {
     for (i, b) in s.wram.iter_mut().enumerate() {
         *b = i as u8;
     }
+    // $4014 write starts the DMA; the byte transfer + 513/514-cycle
+    // CPU stall happen inside `run_frame`'s stall path.
     s.cpu_write(0x4014, 0x02);
+    assert!(s.dma.is_stalling(), "$4014 write must start OAM DMA");
+    let stall = s.dma.total_stall_cycles();
+    assert!(stall == 513 || stall == 514, "stall must be 513 or 514, got {}", stall);
+    s.run_frame();
     for i in 0..256 {
         assert_eq!(s.oam[i], i as u8, "OAM[{}]", i);
     }
+    assert!(!s.dma.is_stalling(), "DMA must complete after run_frame");
 }
 
 // ====================================================================
@@ -460,14 +466,18 @@ fn oam_dma_copies_256_bytes() {
 #[test]
 fn joypad_strobe_latches_then_unlatches() {
     let mut s = soc();
-    s.joypad_latched[0] = 0xAB;
+    // Set the MSB button (Right) so strobe-mode reads are observable.
+    s.joypad.set_button(0, vnesu11::joypad::BUTTON_RIGHT, true);
     s.cpu_write(0x4016, 0x01);
-    assert!(s.joypad_strobe);
-    // In strobe mode, $4016 returns the latched byte.
-    assert_eq!(s.cpu_read(0x4016), 0xAB);
-    // Strobe off → next reads return 0 (no shift register in Phase 2).
+    assert!(s.joypad.strobe);
+    // In strobe mode, $4016 returns the MSB of the current button state.
+    assert_eq!(s.cpu_read(0x4016), 1);
+    // Strobe off → reads shift the latched register: first read still
+    // returns the MSB (1), then it shifts out to 0.
     s.cpu_write(0x4016, 0x00);
-    assert!(!s.joypad_strobe);
+    assert!(!s.joypad.strobe);
+    assert_eq!(s.cpu_read(0x4016), 1);
+    assert_eq!(s.cpu_read(0x4016), 0);
 }
 
 // ====================================================================

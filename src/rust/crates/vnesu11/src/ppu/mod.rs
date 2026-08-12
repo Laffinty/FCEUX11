@@ -336,18 +336,18 @@ impl PpuCore {
         if (self.regs.ppumask & 0x08) != 0 {
             self.render_background_scanline();
         }
-        // Sprites: render at end of scanline (after visible pixels).
-        // Phase 3 (c) — sprite compositing still uses placeholders; the
-        // full pipeline lands in Phase 6 shadow-run integration.
+        // Sprites: compose on top of the background at end of scanline.
+        // Phase 5 stage 0 — real CHR pattern fetch + frame_buffer write
+        // (sprite.rs reads the PpuCore CHR caches).
         if (self.regs.ppumask & 0x10) != 0 {
-            let palette = *self.compositor.palette_indices();
             self.spr.render_scanline(
                 self.scanline as u8,
                 &mut self.frame_buffer,
                 &self.oam,
                 self.regs.ppuctrl,
                 self.regs.ppumask,
-                &palette,
+                &self.pattern_lo,
+                &self.pattern_hi,
                 &mut self.compositor,
             );
         }

@@ -188,6 +188,14 @@ set(SRC_CORE
 	# Rust extern "C" surface. Behavior is gated by VNESU11_CORE in the
 	# Rust crate's ffi.rs (default OFF).
   	${CMAKE_CURRENT_SOURCE_DIR}/vnesu11_bridge.cpp
+	# v2.0 wip (Phase 5): vNESU11 mapper adapter — forwards the C++
+	# mapper SetReadHandler/SetWriteHandler registrations into the Rust
+	# per-range table + attaches the mapper meta vtable.
+  	${CMAKE_CURRENT_SOURCE_DIR}/vnesu11_mapper_adapter.cpp
+	# v2.0 wip (Phase 6): vNESU11 shadow run harness — captures the
+	# Rust emulator output for frame-level 3-tier diff (XBuf CRC /
+	# audio SNR / savestate MD5).
+  	${CMAKE_CURRENT_SOURCE_DIR}/vnesu11_shadow.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/movie.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/movie_fm2.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/movie_playback.cpp
@@ -723,7 +731,7 @@ if(FCEUX11_RUST_ENABLED)
     # v2.0 wip (Phase 0): vNESU11 Rust crate (CPU/PPU/APU SoC). Default OFF;
     # Phase 6 will enable and wire FCEUI_* compat shims to the FFI surface.
     if(VNESU11_CORE AND TARGET vnesu11_build)
-        target_link_libraries(fceux11_core PUBLIC ${VNESU11_RUST_STATIC_LIB})
+        target_link_libraries(fceux11_core PUBLIC ${VNESU11_RUST_LIB})
         add_dependencies(fceux11_core vnesu11_build)
         add_definitions(-DVNESU11_CORE_ENABLED=1)
         # vNESU11 cbindgen header lives under the crate's target dir

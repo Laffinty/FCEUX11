@@ -39,11 +39,12 @@ fn apu_silent_inputs_produce_silence() {
 #[test]
 fn apu_frame_counter_irq_at_14914_cycles() {
     let mut a = ApuCore::new();
-    // Need to run frame counter to position 14914 CPU cycles.
-    // Tick in small chunks; ApuCore::tick isn't fully wired to the
-    // frame counter yet, so we manually tick the frame counter.
+    // Tick the frame counter once per CPU cycle (dense, as the SoC
+    // does); the IRQ fires at the 14914-cycle boundary (4-step mode).
     let mut irq = false;
-    a.frame_counter.tick(14914, &mut irq);
+    for c in 0..=14914u64 {
+        a.frame_counter.tick(c, &mut irq);
+    }
     assert!(irq, "IRQ should fire at 14914 cycles (4-step mode)");
 }
 
@@ -52,7 +53,9 @@ fn apu_frame_counter_no_irq_at_5step() {
     let mut a = ApuCore::new();
     a.frame_counter.write(0x80); // 5-step mode
     let mut irq = false;
-    a.frame_counter.tick(14914, &mut irq);
+    for c in 0..=14914u64 {
+        a.frame_counter.tick(c, &mut irq);
+    }
     assert!(!irq, "5-step mode should not raise IRQ");
 }
 
@@ -86,12 +89,16 @@ fn oam_dma_even_cycle_triggers_514_cycles() {
 }
 
 #[test]
-fn oam_dma_step_256_times_completes() {
+fn oam_dma_step_transfers_all_bytes() {
     let mut d = DmaCore::new();
     d.oam.start(0x02, true);
-    for _ in 0..256 {
-        d.oam.step();
+    let mut transfers = 0;
+    while d.oam.active {
+        if d.oam.step().is_some() {
+            transfers += 1;
+        }
     }
+    assert_eq!(transfers, 256);
     assert!(!d.oam.active);
     assert_eq!(d.oam.remaining, 0);
 }
@@ -100,9 +107,25 @@ fn oam_dma_step_256_times_completes() {
 fn oam_dma_total_stall_reflects_state() {
     let mut d = DmaCore::new();
     d.oam.start(0x02, true);
-    assert_eq!(d.total_stall_cycles(), 256);
+    // Odd trigger → 513 CPU cycles total.
+    assert_eq!(d.total_stall_cycles(), 513);
+    // One byte transfer consumes 2 cycles.
     d.oam.step();
-    assert_eq!(d.total_stall_cycles(), 255);
+    assert_eq!(d.total_stall_cycles(), 511);
+}
+
+#[test]
+fn oam_dma_even_trigger_is_514_cycles() {
+    let mut d = DmaCore::new();
+    d.oam.start(0x02, false);
+    assert_eq!(d.total_stall_cycles(), 514);
+    // Drain fully: 256 bytes × 2 + 2 alignment cycles.
+    let mut steps = 0;
+    while d.oam.active {
+        d.oam.step();
+        steps += 1;
+    }
+    assert_eq!(steps, 258);
 }
 
 // ====================================================================
@@ -238,4 +261,109 @@ fn soc_run_frame_advances_ppu() {
     assert!(end_dot > start_dot || soc.ppu.frame_ready,
             "PPU should have advanced (dot={}, frame_ready={})",
             end_dot, soc.ppu.frame_ready);
+}
+
+// ====================================================================
+// Phase 5 stage 0 — SoC wiring end-to-end (see phase_5_mapper_adapter.md
+// §2.0.6 / §3.0)
+// ====================================================================
+
+/// Write APU registers through the CPU bus → run_frame → the output
+/// buffer reflects the written channel (non-zero samples that change
+/// with the register values).
+#[test]
+fn soc_apu_register_write_drives_output() {
+    use vnesu11::ram::RamInitOption;
+    use vnesu11::soc::VNesSoc;
+    let mut soc = VNesSoc::default();
+    soc.power_on(RamInitOption::AllZeros, 0);
+
+    // Baseline: no APU registers written → the frame produces silence.
+    soc.run_frame();
+    let silence = soc.apu.drain_output();
+    assert!(!silence.is_empty(), "APU must tick during a frame");
+    assert!(silence.iter().all(|&s| s == 0), "silent APU must output 0s");
+
+    // Enable pulse 1, then program duty=0 (0x3F: vol 15, halt), timer
+    // lo=0x10, timer hi=0x08 (loads the length counter since enabled).
+    soc.cpu_write(0x4015, 0x01); // enable channel 0 (pulse 1)
+    soc.cpu_write(0x4000, 0x3F);
+    soc.cpu_write(0x4002, 0x10);
+    soc.cpu_write(0x4003, 0x08);
+
+    soc.run_frame();
+    let samples = soc.apu.drain_output();
+    assert!(!samples.is_empty(), "APU must keep producing samples");
+    assert!(
+        samples.iter().any(|&s| s != 0),
+        "pulse 1 output must be non-zero after register writes"
+    );
+
+    // Changing the volume should change the output level.
+    soc.cpu_write(0x4000, 0x30); // volume 0, duty 0
+    soc.run_frame();
+    let quieter = soc.apu.drain_output();
+    // With volume 0 the envelope outputs 0 → the pulse is silent again
+    // (the frame's later half may still hold the old volume until the
+    // next envelope reload, so we only assert a difference exists).
+    assert_ne!(quieter, samples, "output must change with registers");
+}
+
+/// $4016 read reflects `JoypadState::set_button` state.
+#[test]
+fn soc_joypad_4016_reads_new_state() {
+    use vnesu11::joypad::BUTTON_RIGHT;
+    use vnesu11::ram::RamInitOption;
+    use vnesu11::soc::VNesSoc;
+    let mut soc = VNesSoc::default();
+    soc.power_on(RamInitOption::AllZeros, 0);
+    // Not pressed → strobe read = 0.
+    soc.cpu_write(0x4016, 0x01); // strobe on
+    assert_eq!(soc.cpu_read(0x4016), 0);
+    // Press Right (MSB) → strobe read = 1.
+    soc.joypad.set_button(0, BUTTON_RIGHT, true);
+    assert_eq!(soc.cpu_read(0x4016), 1);
+}
+
+/// $4014 write → real OAM byte transfer + 513/514-cycle CPU stall.
+#[test]
+fn soc_oam_dma_via_4014() {
+    use vnesu11::ram::RamInitOption;
+    use vnesu11::soc::VNesSoc;
+    let mut soc = VNesSoc::default();
+    soc.power_on(RamInitOption::AllZeros, 0);
+    // Fill WRAM $0200-$02FF with 0..=255 (wram[i] = i).
+    for (i, b) in soc.wram.iter_mut().enumerate() {
+        *b = i as u8;
+    }
+    soc.cpu_write(0x4014, 0x02);
+    assert!(soc.dma.is_stalling(), "$4014 must start OAM DMA");
+    let stall = soc.dma.total_stall_cycles();
+    assert!(stall == 513 || stall == 514, "stall must be 513/514, got {}", stall);
+    // Run the frame — the stall loop transfers the 256 bytes.
+    soc.run_frame();
+    for i in 0..256 {
+        assert_eq!(soc.ppu.oam.primary[i], i as u8, "ppu OAM[{}]", i);
+        assert_eq!(soc.oam[i], i as u8, "view OAM[{}]", i);
+    }
+    assert!(!soc.dma.is_stalling(), "DMA must complete within the frame");
+}
+
+/// After a frame, the APU frame-counter IRQ is asserted into the
+/// IrqController's aggregate mask.
+#[test]
+fn soc_apu_frame_irq_asserts_irq() {
+    use vnesu11::ram::RamInitOption;
+    use vnesu11::soc::VNesSoc;
+    let mut soc = VNesSoc::default();
+    soc.power_on(RamInitOption::AllZeros, 0);
+    assert_eq!(soc.irq.aggregate_mask() & vnesu11::apu::IRQ_FCOUNT, 0);
+    // One NTSC frame ≈ 29780 CPU cycles > the 14914-cycle 4-step
+    // frame-counter period → the FCOUNT IRQ fires.
+    soc.run_frame();
+    assert_ne!(
+        soc.irq.aggregate_mask() & vnesu11::apu::IRQ_FCOUNT,
+        0,
+        "APU frame-counter IRQ must be asserted after a frame"
+    );
 }

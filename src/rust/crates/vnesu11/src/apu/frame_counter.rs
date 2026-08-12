@@ -58,36 +58,41 @@ impl FrameCounter {
 
     /// Tick the frame counter by one CPU cycle.
     ///
+    /// `current_cycle` is the absolute APU master cycle (incremented
+    /// once per CPU cycle by `ApuCore`). Events are checked against
+    /// `cycle_count` — the phase within the current period — which is
+    /// reset by `$4017` writes. This fires each event exactly once per
+    /// period (the original implementation compared against the
+    /// absolute cycle and re-fired the IRQ every cycle once the master
+    /// counter passed the period; Phase 5 wiring surfaced that).
+    ///
     /// `irq_out` is set to true on IRQ events (4-step mode only).
     pub fn tick(&mut self, current_cycle: u64, irq_out: &mut bool) {
         // Reset transient flags.
         self.quarter_frame = false;
         self.half_frame = false;
-        // Determine next event cycle based on mode.
-        // Quarter-frame: 3728.5, 11185.5
-        // Half-frame:    7456.5, 14914.5
         let period = if self.five_step { 18640u64 } else { 14914u64 };
-        if current_cycle >= period {
-            // Wrap around; reset cycle count, fire final half-frame event.
+        // Phase within the current period.
+        let phase = self.cycle_count;
+        self.cycle_count = self.cycle_count.wrapping_add(1);
+        if self.cycle_count >= period {
+            // Period boundary: final half-frame event + (4-step) IRQ.
+            self.cycle_count = 0;
             *irq_out = !self.five_step && !self.irq_inhibit;
-            self.cycle_count = current_cycle - period;
-            self.quarter_frame = false;
             self.half_frame = true;
-            self.step = 0;
+            self.quarter_frame = false;
+            let _ = current_cycle;
             return;
         }
-        // Quarter / half events at sub-period cycle counts.
-        let phase = current_cycle;
-        // 4-step: quarter at 3728 + N*7456, half at 7456 + N*7456
+        // Quarter-frame at 3728.5 / 11185.5, half-frame at 7456.5
+        // (and 14914.5 in 5-step mode, where the period is longer).
         if phase == 3728 || phase == 11185 {
             self.quarter_frame = true;
         }
         if phase == 7456 || phase == 14914 {
             self.half_frame = true;
-            if phase == 14914 && !self.five_step && !self.irq_inhibit {
-                *irq_out = true;
-            }
         }
+        let _ = current_cycle;
     }
 
     /// Reset for power-on / reset.
@@ -118,16 +123,24 @@ mod tests {
     fn quarter_frame_at_3728() {
         let mut fc = FrameCounter::new();
         let mut irq = false;
-        fc.tick(3728, &mut irq);
+        // Dense ticks: event fires on the call whose phase is 3728.
+        for c in 0..=3728u64 {
+            fc.tick(c, &mut irq);
+        }
         assert!(fc.quarter_frame);
         assert!(!fc.half_frame);
+        // No re-fire on subsequent cycles.
+        fc.tick(3729, &mut irq);
+        assert!(!fc.quarter_frame);
     }
 
     #[test]
     fn half_frame_at_7456() {
         let mut fc = FrameCounter::new();
         let mut irq = false;
-        fc.tick(7456, &mut irq);
+        for c in 0..=7456u64 {
+            fc.tick(c, &mut irq);
+        }
         assert!(fc.half_frame);
         assert!(!irq);
     }
@@ -136,9 +149,20 @@ mod tests {
     fn irq_at_14914_4step() {
         let mut fc = FrameCounter::new();
         let mut irq = false;
-        fc.tick(14914, &mut irq);
+        // The boundary fires on the call whose phase count reaches the
+        // period (call #14914, 0-indexed phase 14913).
+        for c in 0..=14913u64 {
+            fc.tick(c, &mut irq);
+        }
         assert!(fc.half_frame);
         assert!(irq);
+        // Bug guard (Phase 5): the IRQ must NOT re-fire on every cycle
+        // past the period boundary.
+        irq = false;
+        fc.tick(14914, &mut irq);
+        assert!(!irq, "IRQ must fire once per period, not every cycle");
+        fc.tick(14915, &mut irq);
+        assert!(!irq);
     }
 
     #[test]
@@ -146,7 +170,9 @@ mod tests {
         let mut fc = FrameCounter::new();
         fc.write(0x40); // IRQ inhibit
         let mut irq = false;
-        fc.tick(14914, &mut irq);
+        for c in 0..=14914u64 {
+            fc.tick(c, &mut irq);
+        }
         assert!(!irq);
     }
 
@@ -155,7 +181,9 @@ mod tests {
         let mut fc = FrameCounter::new();
         fc.write(0x80); // 5-step
         let mut irq = false;
-        fc.tick(14914, &mut irq);
+        for c in 0..=14914u64 {
+            fc.tick(c, &mut irq);
+        }
         assert!(!irq);
     }
 }

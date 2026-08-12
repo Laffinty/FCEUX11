@@ -42,7 +42,7 @@ impl DmaCore {
 
     /// Total CPU-cycle stall count (used by scheduler to stretch CPU run).
     pub fn total_stall_cycles(&self) -> i32 {
-        let oam = if self.oam.active { self.oam.remaining as i32 } else { 0 };
+        let oam = if self.oam.active { self.oam.stall_cycles as i32 } else { 0 };
         let dmc = self.dmc_stall_cycles as i32;
         oam + dmc
     }
@@ -81,7 +81,7 @@ mod tests {
     fn total_stall_cycles_sums_oam_and_dmc() {
         let mut d = DmaCore::new();
         d.oam.active = true;
-        d.oam.remaining = 100;
+        d.oam.stall_cycles = 100;
         d.dmc_stall_cycles = 2;
         assert_eq!(d.total_stall_cycles(), 102);
     }

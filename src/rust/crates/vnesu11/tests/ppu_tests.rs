@@ -184,7 +184,7 @@ fn background_attribute_quadrant_picks_palette() {
     //   - pixel x=0: coarse_x=0, pal_quadrant=0 → palette 0
     //   - pixel x=8: coarse_x=1, pal_quadrant=2 → palette 2
     //   - pixel x=16: coarse_x=2, pal_quadrant=0 → palette 0
-    let mut nametable = [0u8; 960];
+    let nametable = [0u8; 960];
     let mut attribute = [0u8; 64];
     let mut pattern_lo = [0u8; 8192];
     let mut pattern_hi = [0u8; 8192];
@@ -522,6 +522,82 @@ fn bg_render_alternating_pattern_produces_visible_stripes() {
     assert_eq!(first_scanline[2], 3);
     assert_eq!(first_scanline[7], 0);
     assert_eq!(first_scanline[8], 3);
+}
+
+// ====================================================================
+// Phase 5 stage 0 — real sprite rendering (Phase 3 (c) completion,
+// see phase_5_mapper_adapter.md §2.0.5 / §3.0)
+// ====================================================================
+
+#[test]
+fn sprite_render_produces_pixels() {
+    // OAM + CHR pattern → run_frame → the frame buffer contains the
+    // sprite's pixels (proves sprite.rs reads the CHR caches and
+    // writes the composited result into frame_buffer).
+    use vnesu11::soc::VNesSoc;
+    let mut soc = VNesSoc::default();
+    let mut ppu = vnesu11::ppu::PpuCore::new();
+
+    // Sprite 0: y=0 (top row at scanline 1), tile 1, attr 0 (palette
+    // 0, in front), x=0.
+    ppu.oam.primary[0] = 0; // y
+    ppu.oam.primary[1] = 1; // tile
+    ppu.oam.primary[2] = 0; // attr
+    ppu.oam.primary[3] = 0; // x
+
+    // Tile 1 pattern: full opaque (color 3 in both planes).
+    for row in 0..8 {
+        ppu.pattern_lo[1 * 16 + row] = 0xFF;
+        ppu.pattern_hi[1 * 16 + row] = 0xFF;
+    }
+
+    // Sprites enabled; BG off so sprite pixels are uncluttered.
+    ppu.regs.ppumask = 0x10;
+    ppu.regs.ppuctrl = 0x00; // 8x8 sprites, pattern table 0
+
+    soc.ppu = ppu;
+    soc.run_frame();
+
+    // Sprite y=0 → top row at scanline 1. Pixels x=0..=7 are opaque
+    // color-3, palette 0 → encoded (0 << 2) | 3 = 3.
+    let scanline1 = &soc.frame_buffer[256..512];
+    for x in 0..8 {
+        assert_eq!(scanline1[x], 3, "sprite pixel at x={} (scanline 1)", x);
+    }
+    // Scanline 0 (before the sprite's top) must stay 0.
+    assert_eq!(soc.frame_buffer[0], 0, "no sprite on scanline 0");
+}
+
+#[test]
+fn sprite_render_respects_x_position_and_palette() {
+    // Sprite at x=16, attr palette 2 → pixels at x 16..=23 encode
+    // (2 << 2) | 3 = 11; the pixels before x=16 stay 0.
+    use vnesu11::soc::VNesSoc;
+    let mut soc = VNesSoc::default();
+    let mut ppu = vnesu11::ppu::PpuCore::new();
+
+    ppu.oam.primary[0] = 0;    // y
+    ppu.oam.primary[1] = 1;    // tile
+    ppu.oam.primary[2] = 0x02; // attr: palette 2
+    ppu.oam.primary[3] = 16;   // x
+
+    for row in 0..8 {
+        ppu.pattern_lo[1 * 16 + row] = 0xFF;
+        ppu.pattern_hi[1 * 16 + row] = 0xFF;
+    }
+    ppu.regs.ppumask = 0x10;
+    ppu.regs.ppuctrl = 0x00;
+
+    soc.ppu = ppu;
+    soc.run_frame();
+
+    let scanline1 = &soc.frame_buffer[256..512];
+    for x in 0..16 {
+        assert_eq!(scanline1[x], 0, "before sprite: x={} must be 0", x);
+    }
+    for x in 16..24 {
+        assert_eq!(scanline1[x], (2 << 2) | 3, "sprite pixel at x={}", x);
+    }
 }
 
 // Helper extension trait so we can call `SpriteLut::get_static` from

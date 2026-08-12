@@ -71,3 +71,8 @@ set(FCEUX11_RUST_STATIC_LIB ${RUST_STATIC_LIB} PARENT_SCOPE)
 # staticlib (vnesu11.lib) is linked separately by the parent when
 # VNESU11_CORE=ON — see src/CMakeLists.txt.
 add_subdirectory(crates/vnesu11)
+
+# v2.0 wip (Phase 6 fix): re-export the vNESU11 static lib path up to
+# src/CMakeLists.txt + tests/CMakeLists.txt (the crates/vnesu11
+# PARENT_SCOPE only reaches this directory's scope).
+set(VNESU11_RUST_LIB ${VNESU11_RUST_LIB} PARENT_SCOPE)
