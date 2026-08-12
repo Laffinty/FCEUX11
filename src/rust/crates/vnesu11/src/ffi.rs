@@ -469,6 +469,12 @@ pub struct PpuStateMirror {
     pub vram: [u8; 2048],
     /// OAM (C++ g_ppu.oam()[256]).
     pub oam: [u8; 256],
+    /// VBL-set suppression latch (C++ `fceu11_ppu_peek_vbl_set_suppressed`).
+    /// Set by a $2002 read at sl 240 cy 340 in the just-finished C++
+    /// frame; consumed at Rust's next frame-start PRELINE so both cores
+    /// suppress the SAME frame's VBlank set (the C++ latch itself is
+    /// consumed at its next VBL_ENTER, which is that same transition).
+    pub vbl_set_suppressed: bool,
 }
 
 /// Push the C++ side's PPU state into Rust. Called by the shadow
@@ -502,6 +508,9 @@ pub unsafe extern "C" fn vnesu11_ppu_poke_state(
     soc_ref.ram_banks.oam.copy_from_slice(&s.oam);
     // Open bus value the CPU reads for unmapped/PPU reads.
     soc_ref.open_bus = s.open_bus;
+    // VBL-set suppression latch (C++ peek; consumed at Rust's next
+    // frame-start PRELINE).
+    soc_ref.ppu.vbl_set_suppressed = s.vbl_set_suppressed;
     0
 }
 

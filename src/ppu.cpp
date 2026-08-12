@@ -338,6 +338,13 @@ void fceu11_ppu_mark_vbl_set_suppressed() {
 	g_vbl_set_suppressed = true;
 }
 
+// Phase 6 P2 shadow sync: peek without consuming (the shadow runner
+// pushes the latch into Rust so both cores suppress the same frame's
+// VBlank set; the C++ core consumes it itself at the next VBL_ENTER).
+bool fceu11_ppu_peek_vbl_set_suppressed() {
+	return g_vbl_set_suppressed;
+}
+
 bool fceu11_ppu_take_vbl_set_suppressed() {
 	bool r = g_vbl_set_suppressed;
 	g_vbl_set_suppressed = false;

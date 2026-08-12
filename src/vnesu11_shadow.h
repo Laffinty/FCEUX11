@@ -115,6 +115,7 @@ struct PpuStateMirror {
     uint8_t  palette[32];  // PALRAM
     uint8_t  vram[2048];   // NTARAM (4 nametables)
     uint8_t  oam[256];     // g_ppu.oam() / SPRAM
+    uint8_t  vbl_set_suppressed;  // fceu11_ppu_peek_vbl_set_suppressed()
 };
 
 }  // namespace fceu11

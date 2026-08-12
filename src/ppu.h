@@ -31,6 +31,7 @@ void FCEUPPU_LineUpdate();
 // for that frame (NESdev PPU_frame_timing). ppu.cpp marks it, the new-PPU
 // VBL block in ppu_rendering.cpp takes (and clears) it.
 void fceu11_ppu_mark_vbl_set_suppressed();
+bool fceu11_ppu_peek_vbl_set_suppressed();
 bool fceu11_ppu_take_vbl_set_suppressed();
 void FCEUPPU_SetVideoSystem(int w);
 

@@ -185,6 +185,12 @@ void vnesu11_shadow_sync_from_cpp() noexcept {
     std::memcpy(ppu.vram, fceu11::g_ppu.ntaram(), sizeof(ppu.vram));
     // OAM (C++ g_ppu.oam()[256]).
     std::memcpy(ppu.oam, fceu11::g_ppu.oam(), sizeof(ppu.oam));
+    // VBL-set suppression latch (Phase 6 P2): set by a $2002 read at
+    // sl 240 cy 340 during the just-finished C++ frame, consumed at
+    // the next frame-start set — which is the SAME transition Rust
+    // frame N runs (C++ call N+1). Peek (not take): the C++ core
+    // consumes its own latch at the next VBL_ENTER.
+    ppu.vbl_set_suppressed = fceu11_ppu_peek_vbl_set_suppressed() ? 1 : 0;
     vnesu11_ppu_poke_state(g_vnesu11_soc, &ppu);
 }
 
