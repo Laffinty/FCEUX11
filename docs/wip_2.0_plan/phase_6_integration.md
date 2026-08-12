@@ -466,17 +466,30 @@ VBlank 状态** → Rust CPU 的 $2002 等待循环无法退出。修复：$2002
 `self.route_apu_irqs_to_cpu()`（提取了独立的 helper）。新增 `CpuCore::step_one`
 返回 `(new_remaining, tcount)`，让 caller 决定 per-instruction hook。
 
-**剩余发散（Phase 6 持续工作）**：frame 3+ Rust 提前触发 frame counter IRQ。
-根本原因：Rust `frame_counter.write($4017)` 立即重置 `cycle_count = 0`（同步语义），
-而 C++ 走 3-4 cycle 延迟重置（`fc_reset_in = (parity == 0) ? 3 : 4`，
-引用 `R6 Step 3` 探针深化的 cycle-position 模型）。结果 Rust 的帧计数器比 C++
-早 ~3-4 cycle 到达终端，APU IRQ 提前触发，Rust CPU 在 $2002 spin loop 中途
-进 IRQ handler（`E622 = BIT $4015; RTI`），然后回到 spin loop —— 状态虽与
-C++ 趋同但已错开数条指令。闭合方向：把 Rust frame_counter.write 改成 3-4 cycle
-延迟重置（match `FCEU_SoundCPUHook` 中的 `fc_reset_in` 递减逻辑），并把 parity
-来源从 `g_cpu.timestamp_base()` 改为相对 frame 内部的 cycle 计数。
+**已修复（$4017 延迟重置，2026-08-12 第五版）**：
+原 `frame_counter.write($4017)` 同步重置 `cycle_count = 0`，与 C++
+`fc_reset_in = (parity == 0) ? 3 : 4` 的 3-4 cycle 延迟重置不一致。
+修复：新增 `pending_mode` + `reset_in` 字段，`write_with_parity(val, parity)`
+记录待提交的模式位 + 延迟 cycle 数；`tick()` 每周期递减 `reset_in`，归零时
+才真正提交模式位 + 清零 `cycle_count`。
 
-shadow harness 现已具备持续迭代的对比基础设施。
+**剩余发散（Phase 6 持续工作 — 2026-08-12 根因）**：
+frame 3+ Rust 提前触发 frame counter IRQ。但**根因不在 cycle parity**，而是
+**shadow runner 的状态同步不完整**：
+- `src/vnesu11_shadow.cpp::vnesu11_shadow_sync_from_cpp()` 只同步
+  `WRAM` + `CpuRegsLayout`（PC/A/X/Y/S/P），**不同步 APU frame counter state**。
+- C++ 跑的帧包含 `$4017 = 0x00` 写（启用 frame counter IRQ），这个写
+  重置 C++ 的 `fhcnt = 0`（带 3-4 cycle 延迟）。Rust 跑下一帧时收不到这个
+  写 —— Rust 的 frame counter 仍维持 power-on 默认 + 自己 tick 的 cycle_count。
+- 结果：Rust 的 IRQ 在 Rust 的 cycle_count = 14914 触发，C++ 的 IRQ 在 C++
+  的 cycle_count = 14914 触发（但 C++ 的 fhcnt 起点不同）。两端相差 = C++ 在
+  $4017 写之前已经 tick 的 cycle 数（约 ~29800 cycles = 一帧）。
+- 闭合方向：扩展 `vnesu11_shadow_sync_from_cpp` 同步 APU 状态：
+  `FrameCounter { five_step, irq_inhibit, cycle_count, pending_mode, reset_in }` +
+  APU channel enable / timer / length / envelope 等。Phase 6 P2 收口时落地。
+
+shadow harness 现已具备持续迭代的对比基础设施（harness 报告行已包含 APU
+的 IRQ 触发记录）。
 
 ---
 
