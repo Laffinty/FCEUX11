@@ -404,24 +404,7 @@ impl VNesSoc {
         // instruction re-enters the handler forever — the shadow run
         // sees the CPU stuck at the IRQ vector (E622) while C++ is
         // back in the main loop.
-        let irq_before = self.cpu.irq_pending;
         self.cpu.irq_end(crate::apu::IRQ_FCOUNT);
-        {
-            use std::sync::atomic::{AtomicU32, Ordering};
-            static COUNT: AtomicU32 = AtomicU32::new(0);
-            let n = COUNT.fetch_add(1, Ordering::Relaxed);
-            if n < 8 {
-                let mut stderr = std::io::stderr();
-                use std::io::Write as _;
-                let _ = writeln!(
-                    stderr,
-                    "[4015read] n={} pc={:04X} irq_pending={:X}->{:X} fc_pending={}",
-                    n, self.cpu.pc, irq_before, self.cpu.irq_pending,
-                    self.apu.frame_irq_pending as u8
-                );
-                let _ = stderr.flush();
-            }
-        }
         v
     }
 

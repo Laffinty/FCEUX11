@@ -288,6 +288,17 @@ impl VNesSoc {
         //    the frame counter IRQ can land in the wrong instruction
         //    stream and cause PC divergence after a few frames.
         let mut bus = unsafe { VNesBusContext::new(self) };
+        // Phase 6 P2 shadow fix (2026-08-12, fifth edition): unit
+        // alignment. The segment budgets (256/85/341) mirror C++
+        // DoLine's X6502_Run arguments, whose unit is PPU DOTS: C++
+        // credits `_count += cycles*16` and debits `_count -= c*48`
+        // per instruction (`Cpu::add_cycles`), i.e. an effective
+        // ×3 dots-per-cycle rate. Rust's `step_one` debits `tcount`
+        // CPU cycles against a dots budget, so the CPU ran ~3× the
+        // instructions C++ does per frame (~89k vs ~29.8k cycles),
+        // drifting the APU frame-counter phase. Compensate here by
+        // debiting the extra ×2 (1 cycle = 3 dots) at the scheduler
+        // layer, leaving the CPU core in cycle units.
         self.cpu.count += budget;
         let mut remaining = self.cpu.count;
         while remaining > 0 {
@@ -301,7 +312,9 @@ impl VNesSoc {
                     self.apu.tick(tcount as u32);
                     self.route_apu_irqs_to_cpu();
                 }
-                remaining = new_remaining;
+                // Convert cycle debit to dots (×3): step_one already
+                // debited tcount (×1); debit the remaining ×2.
+                remaining = new_remaining - tcount * 2;
                 continue;
             }
             // Pending IRQ: poll, then step.
@@ -315,10 +328,12 @@ impl VNesSoc {
             // instruction. Rust's `poll_interrupts` also decrements
             // count by 7 but nothing ticked the APU for it, so the
             // frame-counter phase drifted ~7 cycles per NMI/IRQ vs
-            // C++. Feed the consumed cycles to the APU here.
+            // C++. Feed the consumed cycles to the APU here, and
+            // convert the debit to dots (×3: poll debited ×1).
             let poll_consumed = (count_before_poll - remaining).max(0);
             if poll_consumed > 0 {
                 self.apu.tick(poll_consumed as u32);
+                remaining -= poll_consumed * 2;
             }
             if remaining <= 0 {
                 break;
@@ -328,7 +343,7 @@ impl VNesSoc {
                 self.apu.tick(tcount as u32);
                 self.route_apu_irqs_to_cpu();
             }
-            remaining = new_remaining;
+            remaining = new_remaining - tcount * 2;
         }
         self.cpu.count = remaining;
     }

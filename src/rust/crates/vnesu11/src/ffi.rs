@@ -561,25 +561,9 @@ pub unsafe extern "C" fn vnesu11_emulate_frame(
     }
 
     // 1. Drive one full frame (CPU + APU + PPU + DMA + IRQ routing).
+    let fc_before = soc_ref.apu.frame_counter.cycle_count;
+    let count_before = soc_ref.cpu.count;
     let result = soc_ref.run_frame();
-
-    // DEBUG TRACE (Phase 6 P2): frame-boundary frame counter phase.
-    {
-        use std::sync::atomic::{AtomicU32, Ordering};
-        static COUNT: AtomicU32 = AtomicU32::new(0);
-        let n = COUNT.fetch_add(1, Ordering::Relaxed);
-        if n < 8 {
-            let mut stderr = std::io::stderr();
-            use std::io::Write as _;
-            let _ = writeln!(
-                stderr,
-                "[rust_frame_end] n={} pc={:04X} fc_cycle_count={} fc_pending={} irq_pending={:X}",
-                n, soc_ref.cpu.pc(), soc_ref.apu.frame_counter.cycle_count,
-                soc_ref.apu.frame_irq_pending as u8, soc_ref.cpu.irq_pending
-            );
-            let _ = stderr.flush();
-        }
-    }
 
     // 2. Copy the rendered frame buffer (61440 bytes = 256 × 240).
     //    Rust writes palette indices; the C++ side downstream converts

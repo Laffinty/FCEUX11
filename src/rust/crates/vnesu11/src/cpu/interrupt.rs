@@ -65,22 +65,6 @@ impl CpuCore {
         // instruction, giving SEI/CLI a one-cycle delay).
         let has_irq = self.irq_pending & !(Self::IRQ_NMI | Self::IRQ_NMI2 | Self::IRQ_RESET) != 0;
         if has_irq && self.moo_pi & flags::I_FLAG == 0 && !self.jammed {
-            {
-                use std::sync::atomic::{AtomicU32, Ordering};
-                static COUNT: AtomicU32 = AtomicU32::new(0);
-                let n = COUNT.fetch_add(1, Ordering::Relaxed);
-                if n < 10 {
-                    let mut stderr = std::io::stderr();
-                    use std::io::Write as _;
-                    let _ = writeln!(
-                        stderr,
-                        "[irq_service] n={} pc={:04X} irq_pending={:X} I={} count={}",
-                        n, self.pc, self.irq_pending,
-                        (self.moo_pi & flags::I_FLAG) >> 2, self.count
-                    );
-                    let _ = stderr.flush();
-                }
-            }
             self.count -= 7;
             self.push(bus, (self.pc >> 8) as u8);
             self.push(bus, (self.pc & 0xFF) as u8);
