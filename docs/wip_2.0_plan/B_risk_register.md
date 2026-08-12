@@ -208,6 +208,10 @@
 
 ## 2b. 审计新增风险（2026-08-10，见 AUDIT_20260810.md）
 
+> **2026-08-13 增补**：phase 6 战略转向后,byte-level shadow match 不再是精度判据;
+> R-007 / R-015 等条目的"shadow run"措辞需要从"精度 oracle"降级为"开发期回归检测工具"。
+> 完整判据见 [`../tech/KagamiQA.md`](../tech/KagamiQA.md)。
+
 ### R-014 · Savestate SFORMAT tag 契约漏项（S2）
 
 | 项 | 值 |
@@ -278,6 +282,20 @@
 | **责任人** | Phase 2 owner |
 | **状态** | 修订后新增 |
 
+### R-019 · FCEUX 上游长期脱钩（2026-08-13 战略转向新增）
+
+| 项 | 值 |
+|----|----|
+| **严重度** | 🟠 中 |
+| **概率** | 中 |
+| **阶段** | Phase 6, 7, 8, v2.x 全程 |
+| **触发条件** | v2.0 phase 6 战略转向后，vNESU11 不再逐字节抄录 FCEUX C++；FCEUX 上游 C++ mapper 池 / SFORMAT / FM2 继续演进，3 类强耦合资产若长期不主动 sync 会与上游漂移 |
+| **影响** | 1) 174 个 C++ mapper 错过上游 bug 修复（mapper 行为可能更差）<br>2) 上游改 SFORMAT 字段含义时，FCEUX11 存档不兼容<br>3) 上游改 FM2 格式细节时，TAS 工具链失配 |
+| **缓解** | 1) **年度 sync 流程**：每年（或每次 FCEUX 上游 release）做一次 C++ mapper 池 cherry-pick，记录 FCEUX11 与上游的偏差<br>2) **FCEUX upstream watcher**：CI job 监控 FCEUX 上游 PR 涉及 `src/boards/`、`state.cpp`、`movie*.cpp` 的 commit，自动发提醒<br>3) **KagamiQA Oracle A baseline 锁定 v1.17 47 条 manifest**：基线不动作为 FCEUX C++ 端的锚点；上游 mapper 修了之后可以单独评估是否纳入<br>4) **deliberate deviation registry**：`docs/wip_2.0_plan/deviations.yaml` 登记 Rust 端偏离 FCEUX 的所有行为，避免双向漂移不可追溯 |
+| **检测** | 1) KagamiQA T1 (blargg) 不得退化<br>2) KagamiQA T3 (regression) 47/47 baseline 不变<br>3) 季度 review：`diff -r src/boards/ upstream-FCEUX/src/boards/` 检查 mapper 同步情况 |
+| **责任人** | 长期 owner(项目维护方) |
+| **状态** | 战略转向后新增（2026-08-13） |
+
 ---
 
 ## 3. 风险汇总
@@ -302,6 +320,7 @@
 | **R-016** | 🟠 | 低 | 6, 7 | 修订新增（S5，选项③ 已定） |
 | **R-017** | 🟠 | 中 | 3-5 | 修订新增（S6） |
 | **R-018** | 🔴 | 低 | 2 | 修订新增（S7） |
+| **R-019** | 🟠 | 中 | 6, 7, 全程 | **2026-08-13 战略转向新增——FCEUX 上游 C++ mapper 池 / SFORMAT / FM2 与 vNESU11 长期脱钩风险** |
 
 **🔴 高风险数**：6（R-001, R-002, R-006, R-007, R-014, R-015, R-018 实际 7 个）
 

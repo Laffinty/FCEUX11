@@ -1,5 +1,17 @@
 # 00 · 项目概述
 
+> **2026-08-13 战略声明(本节为 v2.0 phase 6 收口修订,与 phase_6 §0 同步)**
+>
+> FCEUX11 v2.0 的目标是**以 Rust 自由实现 chip 规范**,**不再**追求与 FCEUX C++ 逐字节一致。FCEUX C++ 仍是以下三件事的**契约方**,但**不再是 vNESU11 Rust 实现的参考抄录**:
+>
+> | 仍是 FCEUX C++ 契约方 | 已是 vNESU11 自由实现 |
+> |----------------------|----------------------|
+> | 174 个 C++ mapper(走 FFI 适配)| CPU 解释器 |
+> | SFORMAT savestate 二进制格式 | PPU(newppu=1) |
+> | FM2 movie 格式 | APU 5 通道 |
+>
+> 精度的**正式 oracle**是 `docs/tech/KagamiQA.md`(自 v1.17 起为 FCEUX11 测试体系唯一归属,自 v2.0 phase 6 起升格为精度 oracle)。任何与 FCEUX C++ 的行为偏离,只要通过 KagamiQA 5 层 oracle(blargg + nestest + 回归基线 + mapper byte-diff + 真实游戏 smoke)即视为合规;偏离本身需登记 `deviations.yaml`。详细机制见 [KagamiQA.md §4](../tech/KagamiQA.md)。
+
 ## 1. 项目目标
 
 将 FCEUX11 当前分散在 C++ 端的 **CPU 解释器**（`x6502.cpp` + `cpu.cpp`，约 955 行）与 **PPU 核心**（`ppu*.cpp`，约 3 814 行）合并迁移到一个统一的 Rust crate **`vnesu11`** 中，作为 **虚拟 SoC** 抽象运行。

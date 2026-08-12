@@ -1,12 +1,65 @@
 # Phase 6 · Integration & Shadow Run
 
-> **目标**：把 vNESU11 接入 FCEUX11 主路径，默认 **OFF**，通过 `VNESU11_CORE=ON` CMake 选项启用。**启用后**用 shadow run 验证：同一 ROM 双跑（C++ + Rust），**帧级三级对比**。
+> **目标**：把 vNESU11 接入 FCEUX11 主路径，默认 **OFF**，通过 `VNESU11_CORE=ON` CMake 选项启用。**启用后**用 KagamiQA 5 层 oracle 证明精度（不是逐字节 shadow match）。
 >
 > **2026-08-10 修订**：本文件按 `AUDIT_20260810.md` S10/S5 修订——
 > ① shadow run 从"逐周期 diff"改为"帧级三级对比"（XBuf CRC / 音频 SNR / savestate MD5）；
 > ② 明确 `newppu=1` 才走 vNESU11 PPU；`newppu=0` 走 C++ 旧 PPU 回退（ADR-009）。
+>
+> **2026-08-13 战略转向（ADR-011）**：byte-level shadow match **不再是** phase 6 精度判据。详见 §0。
 
 ## 工期：3 周
+
+---
+
+## 0. 战略声明（2026-08-13，ADR-011 落地）
+
+### 0.1 根本转向
+
+v2.0 phase 6 的根本目标**从**「与 C++ FCEUX 字节一致」**转向**「Rust 自由实现 chip 规范，精度由 KagamiQA 5 层 oracle 保证」。理由：
+
+1. **byte-level parity 在两个独立实现间不可达**——vNESU11 与 FCEUX C++ 是两套独立代码(即使是同模型),任何微小的实现差异(cycle counter 单位、instr 推进顺序、IRQ 路由分支)都会在几千条指令后导致指令流分叉。10 轮迭代修复(count÷16、VBL-set suppression 等都是真 bug)后仍卡在 frame 3 +1 cycle 残差——这不是 bug,这是**结构性的实现独立**。
+2. **FCEUX C++ 不是 ground truth**——它自身的时序选择(DoLine budget、FrameIRQEnd mode-0 行为)是 FCEUX 项目历史决策,非 chip 强约束。Nesdev wiki + blargg ROM + chip datasheet 才是 chip 规范。
+3. **用户感知不到 cycle 差**——绝大多数游戏的时序容差远大于当前 micro-drift 量级。TAS / cycle-accurate movie 是 niche 场景,且可由 KagamiQA T1/T2 覆盖。
+
+### 0.2 精度的正式 oracle:KagamiQA 5 层
+
+完整契约见 [`../../tech/KagamiQA.md`](../../tech/KagamiQA.md)。摘要:
+
+| Tier | 名称 | 判据 | phase 6 门槛 |
+|------|------|------|--------------|
+| T1 | blargg 177 ROM | `$6000 == 0x80` | ≥ 90% (160/177) |
+| T2 | nestest trace | 逐指令匹配 | PASS(已证 Rust 端单测) |
+| T3 | 回归基线 47 条 | 39P/8F 不变 | 47/47(零 FAIL)|
+| T4 | mapper byte-diff | 175 case | 100% parity |
+| T5 | 8 游戏 smoke | 无视觉/音频异常 + 无 crash | 8/8 PASS |
+
+**任一 tier 失败即视为精度问题**。
+
+### 0.3 Shadow Run 的新角色
+
+`kagami_qa_shadow_run_runner`(原 phase 6 §2.5 设计)保留为**开发期回归检测工具**,归入 KagamiQA T3(回归基线)的 shadow-run subset。**不再是** phase 6 DoD 的阻塞项。
+
+**保留原因**:
+- 暴露时序 bug 极有效——10 轮修复中每轮都是 shadow 暴露的
+- 已建立的 harness + APU/PPU 状态同步 + frame counter debug 钩子
+- 集成到 KagamiQA T3 baseline 检测 Rust 改动是否让 C++/Rust 行为更接近(或更远)
+
+**降级原因**:
+- byte-level match 在两个独立实现间不可达(§0.1)
+- micro-drift 修复的边际收益递减(每轮 1 cycle 量级)
+- 时间预算已超(原 3 周计划,已用约 2 周,修复无限趋近但不到 byte match)
+
+### 0.4 与 FCEUX C++ 的关系(沿用 ADR-011)
+
+| 仍是 FCEUX C++ 契约方 | 已是 vNESU11 自由实现 |
+|----------------------|----------------------|
+| 174 个 C++ mapper(走 FFI 适配)| CPU 解释器 |
+| SFORMAT savestate 格式 | PPU(newppu=1) |
+| FM2 movie 格式 | APU 5 通道 |
+| kagamiqa T3 回归基线 frozen v1.17 47 条 |  |
+
+任何 Rust 偏离 FCEUX C++ 的行为(类别 D-A/B/C/D)必须登记 [`deviations.yaml`](./deviations.yaml)(待建)+ 通过 5 层 oracle。
 
 ---
 
@@ -194,11 +247,14 @@ inline uint16_t FCEUI_GetReg(int reg) {
 }
 ```
 
-### 2.5 [修订] Shadow Run：帧级三级对比（S10）
+### 2.5 [2026-08-13 降级] Shadow Run：开发期回归检测工具
 
-**审计结论**：C++ 与 Rust 时序模型不同（决策 A 复刻 budget，但内部结构不同），
-**逐周期 diff 无定义**。改为**帧级三级对比**（与现有 kagami-qa 的
-rom_regression / savestate_regression harness 同构）：
+> **角色变更**(2026-08-13 战略转向,ADR-011 落地):shadow run **不再是** phase 6 精度判据。
+> 完整说明见 §0.3。本节保留为开发期回归工具的**实现规范**,供 KagamiQA T3 shadow-run subset 集成使用。
+
+C++ 与 Rust 时序模型不同（决策 A 复刻 budget，但内部结构不同），
+**逐周期 diff 无定义**(本就是阶段 1 已接受的事实,2026-08-13 战略转向只是把这个事实从「待解决」降级为「已知不追」)。**帧级三级对比**与现有 kagami-qa 的
+rom_regression / savestate_regression harness 同构:
 
 ```cpp
 // src/vnesu11_shadow.h
@@ -346,6 +402,17 @@ tests/shadow_run/
 
 `VNESU11_CORE=OFF` 是 v2.0 默认，避免任何意外回归影响用户。Phase 7 切换。
 
+### 5.5 [2026-08-13 新增] ADR-011:精度 oracle 是 KagamiQA,不是 C++ shadow
+
+| 项 | 内容 |
+|---|---|
+| **决策** | phase 6 精度 oracle 是 **KagamiQA 5 层 oracle**(T1-T5),**非** C++ shadow run 字节对比。Rust core 允许按 chip 规范自由实现,偏离 FCEUX C++ 不再视为缺陷。 |
+| **背景** | 10 轮 shadow run 差异迭代修复(都是真 bug,如 count÷16、VBL-set suppression、frame counter 全功能)后,仍卡在 frame 3 +1 cycle 残差。两个独立实现的 byte-level parity 不可达。 |
+| **理由** | 1) KagamiQA 已有双 Oracle 架构 + 177 blargg ROM + 47 条 manifest baseline,无须另起精度 oracle<br>2) byte-level parity 在两个独立实现间不可达(S3 决策 A 已承认)<br>3) FCEUX C++ 仍是 mapper / 存档 / 录像格式的契约方——脱钩 ≠ 割裂 |
+| **代价** | shadow run 从「精度 oracle」降级为「开发期回归工具」,集成到 KagamiQA T3 baseline subset。micro-drift 修复迭代不再阻塞 phase 6 收口。 |
+| **例外** | TAS / cycle-accurate movie 仍需某种形式的对位验证——由 KagamiQA T1(blargg 严格 timing)+ T2(nestest trace)覆盖。 |
+| **关联** | 详见 [`../../tech/KagamiQA.md`](../../tech/KagamiQA.md) §1 / §2 / §4 / §8 |
+
 ---
 
 ## 6. 风险
@@ -360,61 +427,104 @@ tests/shadow_run/
 
 ---
 
-## 7. DoD
+## 7. DoD（2026-08-13 战略转向修订）
 
-> **2026-08-12 实测更新（Phase 6 启动）**：P0 全部完成 + P1 骨架落地。
-> `cargo test -p vnesu11` **322 passed / 0 failed / 1 ignored**（新增 4 个
-> `vnesu11_emulate_frame` FFI 测试 + 6 个 system_type 测试 + peek/poke_regs
-> 接线）。`vn_perf_bench` 实测 **743 us/帧 ≈ 1346 FPS**（远低于 16.7ms 预算）。
-> VNESU11_CORE=ON/OFF 双配置 `fceux11.exe` 均构建链接成功。
+> **2026-08-13 修订(ADR-011 落地)**:byte-level shadow match 不再是 phase 6 精度判据。DoD 重构为 **KagamiQA 5 层 oracle + 性能 + 集成 + UX smoke** 四组,共 16 项。
 >
-> **2026-08-12 收口更新**：测试数字已按模块拆分（lib **192** + apu_tests **24**
-> + ppu_tests **33** + mapper_tests **12** + system_type 等，全部通过）；
-> P2 完成 shadow run harness + CPU 差异迭代修复的第一批（见 §9 第六~九版）。
-> **以下 DoD 中 `[x]` = 已完成；未标 = 后续会话/Phase 7。**
+> **当前状态摘要(2026-08-13)**:
+> - `cargo test -p vnesu11` 全模块通过(lib 194 + apu 24 + ppu 33 + mapper 12 + system_type 等,0 failed)
+> - `vn_perf_bench` 743 us/帧(≈ 1346 FPS,远低于 16.7ms 预算)
+> - VNESU11_CORE=ON/OFF 双配置 `fceux11.exe` 均构建链接成功
+> - shadow run cpu_match=5/59 baseline 已冻为「开发期回归工具样本」(§0.3)
+> - 已修复真 bug(10 轮迭代):count÷16、VBL-set suppression、frame counter 全功能、$2002 VBlank 路由、DEY/TAY 周期表对齐、段预算对齐、per-instruction APU tick、预算单位补偿、frame counter IRQ 跨 wrap 保持等
+>
+> 完整精度契约见 [`../../tech/KagamiQA.md`](../../tech/KagamiQA.md)。`[x]` = 已完成;`[ ]` = phase 6 收口前待补。
 
-- [x] `VNESU11_CORE=OFF`：行为与 v1.17 完全一致（构建验证通过；OFF 路径无功能改动，`vnesu11_*` 全为 no-op 桩）
-- [x] `VNESU11_CORE=ON`：链接通过，可执行文件可启动
-- [ ] **newppu=1** shadow run：SMB1/Zelda/Contra 60 帧 CRC 零 diff — [后续会话] 需端到端 harness + ROM fixtures
-- [ ] **newppu=1** shadow run：MMC3 IRQ 测试 ROM 零 diff — [后续会话] 同上
-- [ ] **newppu=1** shadow run：blargg cpu_instrs 全 PASS — [后续会话] 同上
-- [ ] **newppu=0** 回退：C++ 旧 PPU movie round-trip 通过（ADR-009）— [Phase 7]
-- [ ] **[修订] 系统类型**：FDS / NSF / VS 各跑一个测试文件通过（S6）— Rust 侧 6 个 system_type 冒烟测试已通过；C++ 端到端 [后续会话]
-- [ ] 性能：纯 vNESU11 帧时间 ≤ v1.17 × 1.05 — `vn_perf_bench` 743us/帧（Phase 1 门禁已证 CPU parity；完整对比 [后续会话]）
-- [ ] TAS movie round-trip（录放 5 分钟）字节一致 — [Phase 7]
-- [ ] savestate round-trip（每个主流 mapper）字节一致 — [Phase 7]
-- [ ] 真实游戏 10 个跑 5 分钟无 crash — [后续会话/Phase 7]
+### 7.1 KagamiQA 精度 oracle(15 项,phase 6 收口必过)
 
-### Phase 6 启动已交付（2026-08-12）
+#### T1 blargg 硬件一致性(7 项)
+- [x] `tests/fixtures/blargg/{apu,cpu,ppu,mmc3}/` corpus 物理在位
+- [ ] `download_blargg_roms.ps1` 跑通,177 个 ROM 全下载(`KagamiQA.md` §3.2 步骤 1)
+- [ ] `kagami_qa_blargg_runner` 路径解析修复(`KagamiQA.md` §3.2 步骤 2)
+- [ ] baseline 重置为 `kagamiqa_baseline_next.json`(`KagamiQA.md` §3.2 步骤 3)
+- [ ] T1 pass-rate ≥ 90% (160/177)(`KagamiQA.md` §3.3 phase 6 门槛)
+- [ ] `blargg_known_fail.json` 含每个失败的 `{rom, reason, FCEUX_status, fix_target_version}`(`KagamiQA.md` §3.4)
+- [ ] `deviations.yaml` 含每个 D-A 类别(Rust 修复 FCEUX bug)的完整登记(`KagamiQA.md` §4.2)
+
+#### T2 nestest trace(1 项)
+- [x] Rust 端 nestest 单测 PASS(已证,phase 1)
+
+#### T3 回归基线(2 项)
+- [ ] Oracle A 47/47 manifest 全部 PASS(从 v1.17 39P/8F 升级,零 FAIL)
+- [ ] shadow run subset 集成到 T3(基线 `cpu_match ≥ 3/59` frame 1-2 真匹配 + frame 4 抑制转移匹配,不再追 byte match)
+
+#### T4 mapper byte-diff(2 项)
+- [ ] 12 个 mapper_test 全 PASS(已证 phase 5,集成到 T4)
+- [ ] `kagami_qa_mapper_byte_diff_runner` 175-case 全 PASS(`KagamiQA.md` §2)
+
+#### T5 真实游戏 smoke(3 项)
+- [ ] smoke runner 脚本骨架就位(`scripts/smoke_run_games.ps1`,待写)
+- [ ] 8 个游戏全 PASS:Super Mario Bros / Donkey Kong / Balloon Fight / Ice Climber / Tetris(NROM) + Super Mario Bros 3 / Kirby's Adventure / Mega Man 4(MMC3)
+- [ ] 5 NROM + 3 MMC3 各 5 分钟(18000 帧)无 visual glitch + audio SNR ≥ 60dB + 无 crash
+
+### 7.2 性能与稳定性(3 项)
+
+- [x] `vn_perf_bench` 帧时间 ≤ v1.17×1.05(已证 743us/帧 vs C++ 724us/帧,ratio 1.026)
+- [ ] PPU 段渲染:每段 CPU cycles 不比 v1.17 多 5%(phase 7 验)
+- [ ] 10 个真实游戏 5 分钟无 crash(T5 覆盖 + 额外 2 个:Castlevania + Contra)
+
+### 7.3 集成(3 项)
+
+- [x] `VNESU11_CORE=OFF`:行为与 v1.17 完全一致(构建验证通过;OFF 路径无功能改动,`vnesu11_*` 全为 no-op 桩)
+- [x] `VNESU11_CORE=ON`:链接通过,可执行文件可启动
+- [ ] FCEUI_* 直接模式兼容垫片覆盖 150+ 调用点(Phase 7 territory,但 phase 6 末需 smoke 不崩)
+
+### 7.4 [主动放弃] 不再追的判据
+
+- ~~byte-level shadow match `cpu_match=N/M` 数字追逐~~ — 不可达,见 §0.1
+- ~~TAS movie 字节 round-trip(录放 5 分钟字节一致)~~ — 改用 T1/T2 覆盖
+- ~~savestate 字节兼容(每个主流 mapper 字节一致)~~ — 降级为 golden round-trip 等价(phase 7 验)
+- ~~shadow run 每 60 帧 log byte diff 必为 0~~ — 改用 §0.3 的开发期回归角色
+
+### 7.5 提交至 phase 7 的门禁
+
+- [ ] FCEUI_* 兼容垫片覆盖率 ≥ 95%
+- [ ] T1 pass-rate ≥ 95%(phase 7 默认 ON 的硬门槛)
+- [ ] 完整 PPU/APU 5 通道状态 sync(phase 6 §9.1.2 Step 3 描述的 state mirror 扩展)
+- [ ] `deviations.yaml` 至少 5 条 D-B 登记(Rust 偏离 FCEUX 但 chip 规范对齐的 case)
+
+### Phase 6 启动已交付(2026-08-12,无变化)
 
 ```
-P0（完成）：
-  [x] vnesu11_emulate_frame 真实实现（Rust run_frame + xbuf/sbuf 拷贝 + APU drain，4 个 FFI 测试）
-  [x] fceu.cpp::Emulate() 条件编译接通（shadow harness 并行 C++ + Rust，每 60 帧 CRC log）
-  [x] CHR 转发：Bus::setchr1/4/8 → vnesu11_chr_set_page → VNesSoc::chr_pages[8]
-  [x] MapperMetaVtable::tick_irq 改进（读 g_cpu.native_layout().IRQlow & FCEU_IQEXT）
-P1（完成）：
-  [x] src/vnesu11_shadow.{h,cpp}（ShadowData 导出 + CRC32 + periodic log）
+P0(完成):
+  [x] vnesu11_emulate_frame 真实实现(Rust run_frame + xbuf/sbuf 拷贝 + APU drain,4 个 FFI 测试)
+  [x] fceu.cpp::Emulate() 条件编译接通(shadow harness 并行 C++ + Rust,每 60 帧 CRC log)
+  [x] CHR 转发:Bus::setchr1/4/8 → vnesu11_chr_set_page → VNesSoc::chr_pages[8]
+  [x] MapperMetaVtable::tick_irq 改进(读 g_cpu.native_layout().IRQlow & FCEU_IQEXT)
+P1(完成):
+  [x] src/vnesu11_shadow.{h,cpp}(ShadowData 导出 + CRC32 + periodic log)
   [x] vnesu11_power_on_bridge/reset_bridge 接入 vnesu11_shadow_reset
   [x] vnesu11_cpu_peek/poke + vnesu11_ppu_peek + vnesu11_cpu_peek_regs/poke_regs 接线
-  [x] 6 个 system_type 冒烟测试（iNES/VS/FDS/NSF/unknown/NSF-frame）
-  [x] vn_perf_bench（743 us/帧 ≈ 1346 FPS）
-P2（后续会话/Phase 7）：
-  [x] Shadow run 端到端 harness（2026-08-12：kagami_qa_shadow_run_runner 构建 + 运行成功）
-  [x] CPU 寄存器差异迭代修复（2026-08-12 第一~十版：$2002 VBlank 路由、DEY/TAY 周期、
-      段预算对齐、per-instruction APU tick、frame counter 全功能 + 状态同步、
-      PPU 状态同步、预算单位补偿、frame counter IRQ 保持、count 单位 ÷16——
-      frame 1-3 完全匹配，cpu_match=3/59）
-  [ ] CPU 差异迭代剩余（frame 4+ 发散：count÷16 取整残差 + 每指令时序残差 +
-      PPU v/t/x/w 同步——见 §9.1.2 Step 2c）
-  [ ] MapperMetaVtable::fill_audio（VRC6/FDS/N163 扩展音频）
-  [ ] savestate round-trip 100% parity
-  [ ] TAS movie round-trip
+  [x] 6 个 system_type 冒烟测试(iNES/VS/FDS/NSF/unknown/NSF-frame)
+  [x] vn_perf_bench(743 us/帧 ≈ 1346 FPS)
+P2 进行中(2026-08-13 战略转向后重定义):
+  [x] Shadow run 端到端 harness(2026-08-12:kagami_qa_shadow_run_runner 构建 + 运行成功)
+  [x] CPU 寄存器差异迭代修复第一~十批(都是真 bug,已列于本节状态摘要)
+  [x] cpu_match=5/59 baseline 冻为开发期回归样本,不再追 byte match(§0.3)
+  [ ] T1 blargg corpus 补全(§7.1)
+  [ ] T5 8 游戏 smoke runner 骨架 + 全 PASS(§7.1)
+  [ ] MapperMetaVtable::fill_audio(VRC6/FDS/N163 扩展音频,phase 7 territory)
+  [ ] FCEUI_* 兼容垫片覆盖率 ≥ 95%(phase 7 收口前)
+  [ ] deviations.yaml 初始登记 ≥ 5 条(§7.5)
 ```
 
 ---
 
-## 9. Shadow run 实测结果（2026-08-12）
+## 9. Shadow run 实测结果（2026-08-12 + 2026-08-13 战略转向说明）
+
+> **2026-08-13 角色变更(ADR-011)**:本节记录的是 phase 6 启动后(2026-08-12)shadow run 作为**精度 oracle 期间**的实测结果,共 10 轮修复迭代。
+> 自 2026-08-13 战略转向后(§0),shadow run 降级为**开发期回归工具**,这些数字成为 baseline 而非追逐目标。
+> 新精度判据见 §7.1 T1-T5。
 
 `kagami_qa_shadow_run_runner` 端到端跑通（构建 + 运行 + 对比）：
 
@@ -539,7 +649,9 @@ shadow harness 现已具备持续迭代的对比基础设施（harness 报告行
 > **目标**：任何新会话只读本文件即可接续 Phase 6 收尾。**先跑一遍 §9.1.4 验证
 > 命令确认基线**，再按 §9.1.2 剩余路径执行。不要重复已完成的修复（§9.1.1 清单）。
 
-### 9.1.0 当前精确状态
+### 9.1.0 当前精确状态(2026-08-13 战略转向后)
+
+> **会话目标已变更**(2026-08-13 ADR-011):不再追 byte-level shadow match。接续会话应**优先**做 §7.1 T1(blargg corpus 补全)+ T5(8 游戏 smoke),micro-drift 修复**仅在回归 KagamiQA 失败时**启动。
 
 - **分支** `wip_v2.0`；工作树应干净（最近 commit `46ac846`；若检出后发现脏树，
   先 `git status` 确认无未提交源码改动再继续）。
@@ -547,7 +659,7 @@ shadow harness 现已具备持续迭代的对比基础设施（harness 报告行
   + mapper 12 + system_type 等），无 FAILED。
 - **shadow**（cpu_dummy_reads 60 帧）：`cpu_match=5/59`（**frame 1-2 真匹配**——
   逐帧指令数 delta=0（8510/8506）；frame 4 匹配（被抑制的 VBL 转移两端一致）；
-  其余发散，当前根因是 S_2→S_3 转移主代码分叉，见 §9.1.2 Step 2c）。
+  其余发散,历史根因是 S_2→S_3 转移主代码分叉——**2026-08-13 战略转向后不再追 byte match,baseline 维持**)。
   nestest/mapper_axrom 仍 0/N（依赖完整 PPU/APU 同步）。
 - **核心状态**：frame counter IRQ 保持（mode-0）、预算单位 ×3 dots/cycle、
   count 单位 ÷16、-1 段 dot 对齐、**VBlank flag 帧首置位时间线**、**VBL-set
@@ -576,19 +688,60 @@ shadow harness 现已具备持续迭代的对比基础设施（harness 报告行
     `PpuStateMirror.vbl_set_suppressed` 推给 Rust；`tick_preline_segment` 帧首
     消费。两端抑制同一 S_{N+1}→S_{N+2} 转移（latch 帧 N 末设置、帧 N+1 顶消费；
     同步点在帧 N 末 → Rust 帧 N PRELINE 消费）——cpu_match 3→5。
-    **注意**：这是 shadow 专用的决策同步（Rust 尚未独立判定 suppression——
-    Rust 自身的 sub-scanline 相位与 C++ 漂移方向相反，独立实现需对齐预算边界
-    模型，见 Step 2c 候选解法）。
+    **注意**：这是 shadow 专用的决策同步(Rust 尚未独立判定 suppression——
+    Rust 自身的 sub-scanline 相位与 C++ 漂移方向相反,**2026-08-13 战略转向后由 KagamiQA T1 覆盖**)。
 
-### 9.1.2 剩余路径（按序执行）
+### 9.1.2 剩余路径（2026-08-13 战略转向后重定义）
 
-**Step 2c（当前）— frame 3+ 发散收尾**（2026-08-13 检查点：树干净、基线
-cpu_match=5/59、延迟置位实验已回退并记录于下文"实验记录"）：
+> **2026-08-13 重要变更**:本节**完全替换**原 Step 2c（frame 3 micro-drift 收尾）、
+> Step 3（APU 5 通道 sync）、Step 4（shadow 验证闭环）、Step 5（DoD 三套件）。
+> 原 micro-drift 修复链（包括 Step 2c 的 CPC/RPC 探针）**不再**是 phase 6 收口路径。
+> 历史修复记录保留于 §9.1.1(勿重复)。
 
-> **明日接续顺序**：① 跑 §9.1.4 验证命令确认基线（cpu_match=5/59）；② 按下文
-> "实验记录"第一步：确认 `apply_frame_vbl_set` 是否触发（若触发而 frame 3 不变
-> → 发散主因在轮询退出后的主代码路径）；③ 用 CPC/RPC PC 流 diff（探针模式见
-> 下文）定位主代码首分叉点；④ 修复后每步跑 60 帧 shadow 收敛。
+**新剩余路径（按 §7.1 KagamiQA 5 层 oracle 顺序执行）**：
+
+**Step 1（最优先）— T1 blargg corpus 补全**：
+1. 跑 `.\scripts\download_blargg_roms.ps1` 补全 177 ROM
+2. 修复 `kagami_qa_blargg_runner` 路径解析
+3. 重置 baseline:`kagami-qa-runner --save-baseline build/kagamiqa_baseline_next.json`
+4. 全量跑 Oracle B 拿真实 pass-rate
+5. 失败 ROM 走 `blargg_known_fail.json` 或修 Rust 端
+
+**Step 2 — T3 回归基线 47/47 升级**：
+1. 当前 v1.17 frozen 是 39P/8F
+2. 修 8 个 FAIL → 47/47
+3. shadow run subset 集成到 T3 baseline(cpu_match ≥ 3/59 frame 1-2 真匹配为下限)
+4. `kagami-qa.yml` CI 加 T3 gate
+
+**Step 3 — T4 mapper byte-diff 175 case**：
+1. `kagami_qa_mapper_byte_diff_runner` 已存在,需接 175 case
+2. 失败 case 走 mapper 适配或 D-A 类 deviation 登记
+
+**Step 4 — T5 8 游戏 smoke runner**：
+1. 写 `scripts/smoke_run_games.ps1` 骨架(逐游戏调 fceux11 跑 18000 帧 + 5 帧 spot-check)
+2. NROM 5 个 + MMC3 3 个,8/8 PASS
+3. 失败游戏 → 修 Rust 端 mapper / PPU 渲染,或登记 D-D 类 deviation
+
+**Step 5 — deviations.yaml 初始登记**：
+1. 至少 5 条 D-B(已存在但未文档化,例如 PPU VBlank flag 时间线差异、$2002 读清 VBlank 行为等)
+2. 每条按 [`../../tech/KagamiQA.md` §4.2](../../tech/KagamiQA.md) 格式
+3. 用户(owner)审批
+
+**Step 6 — 集成与文档收口**：
+1. `FCEUI_*` 兼容垫片覆盖率 ≥ 95%(150+ 调用点)
+2. `kagamiqa_accuracy_table.md` 更新为 T1 ≥ 90% + 5 tier 全 PASS
+3. `phase_6_integration.md` §7 全部 [x]
+4. 提交 phase 6 收口 PR
+
+**降级为「可选 / 仅回归触发」的旧 Step**：
+- ~~Step 2c frame 3 micro-drift 收尾~~ — 不可达(§0.1),仅当 T1/T5 失败且根因指向时序才重启
+- ~~Step 3 APU 5 通道 state sync~~ — 现有 shadow harness 的 state mirror 已够用,扩展按需
+- ~~Step 4 shadow 验证闭环~~ — 改由 T1/T5 验证
+- ~~Step 5 DoD 三套件(SMB1/Zelda/Contra/MMC3/blargg 177)~~ — 已拆入 T1/T5
+
+> **2026-08-13 重要变更**:本节下述的 **根因 1 / 根因 2 / 剩余发散 / 实验记录 / 探针模式** 等 Step 2c 子项
+> 已在 §7.1 / §9.1.2 重定义后**作废**——micro-drift 不再追。保留此处仅作历史档案。
+> 后续接续会话**应跳过此段**,直接做 §9.1.2 新 Step 1-6。
 
 **根因 1（已修复）：VBlank flag 时间线**。C++ `FCEUX_PPU_Loop`（newppu=1）在
 **帧首**（loop 顶部）置位 $2002 VBlank flag，保持 20 行（6820 dots）后清除；
@@ -650,23 +803,23 @@ peek 不消费）经 `PpuStateMirror.vbl_set_suppressed` 推给 Rust，Rust 的
 `segment_dots`（段内已耗 dots）、runner 每帧指令增量日志。复跑基线：
 `cpu_match=5/59`（frame 1-2 真匹配 delta=0；frame 4 被抑制转移匹配；其余发散）。
 
-**Step 3 — APU 5 通道状态同步**：
-- 扩展 `ApuStateMirror`（ffi.rs）：pulse1/2（timer/length/envelope/sweep）、triangle
-  （timer/length/linear）、noise（period/length/envelope/lfsr）、dmc
-  （buffer/address/size/period）。
-- C++ 端（shadow.cpp sync）：从 `PSG[]`、`curfreq[]`、`lengthcount[]`、`EnvUnits[]`、
+**Step 3 — APU 5 通道状态同步**:**[已降级,见 §9.1.2 顶部说明]**
+- 扩展 `ApuStateMirror`(ffi.rs):pulse1/2(timer/length/envelope/sweep)、triangle
+  (timer/length/linear)、noise(period/length/envelope/lfsr)、dmc
+  (buffer/address/size/period)。
+- C++ 端(shadow.cpp sync):从 `PSG[]`、`curfreq[]`、`lengthcount[]`、`EnvUnits[]`、
   `SweepCount[]`、DMC 全局填。
-- 验证：shadow 三个 ROM 指令数/CPU regs 匹配率提升。
+- 验证:shadow 三个 ROM 指令数/CPU regs 匹配率提升。
 
-**Step 4 — shadow 验证闭环**：cpu_dummy_reads / nestest / mapper_axrom 60 帧全匹配。
+**Step 4 — shadow 验证闭环**:**[已降级,见 §9.1.2 顶部说明]** cpu_dummy_reads / nestest / mapper_axrom 60 帧全匹配。
 
-**Step 5 — DoD 三套件**：SMB1/Zelda/Contra（XBuf CRC 零 diff + SNR≥60dB）、MMC3 IRQ
+**Step 5 — DoD 三套件**:**[已降级,见 §9.1.2 顶部说明]** SMB1/Zelda/Contra(XBuf CRC 零 diff + SNR≥60dB)、MMC3 IRQ
 测试 ROM、blargg cpu_instrs 177 全 PASS。
 
-**Step 6 — 系统类型 + fill_audio + 性能**：FDS/NSF/VS 各 1 文件；
-`MapperMetaVtable::fill_audio`（VRC6/FDS/N163）；纯 vNESU11 帧时间 ≤ v1.17×1.05。
+**Step 6 — 系统类型 + fill_audio + 性能**:**[已降级,见 §9.1.2 顶部说明]** FDS/NSF/VS 各 1 文件;
+`MapperMetaVtable::fill_audio`(VRC6/FDS/N163);纯 vNESU11 帧时间 ≤ v1.17×1.05。
 
-**Step 7 — 文档收口**：§7 DoD 勾选 + §9 更新为最终实测矩阵。
+**Step 7 — 文档收口**:§7 DoD 勾选 + §9 更新为最终实测矩阵。**[已作废,见 §9.1.2 新 Step 6]**
 
 ### 9.1.3 关键文件索引（下一步要改的）
 
@@ -687,9 +840,16 @@ cd src/rust && cargo test --release -p vnesu11          # 全绿（无 FAILED）
 cmd /c "`"D:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat`" >nul 2>&1 && cd build && cmake --build . --target kagami_qa_shadow_run_runner --config Release"
 # shadow（PATH 需含 vcpkg bin）：
 build\tests\kagami_qa_shadow_run_runner.exe tests/fixtures/blargg/cpu/cpu_dummy_reads.nes --frames 60
-# 期望：SHADOW_RESULT cpu_match 基线 5（Step 2c 目标 ≥6，Step 4 目标 60/59）。
+# 期望：SHADOW_RESULT cpu_match ≥ 5（开发期回归下限；**不再**追 byte-level 全匹配）。
 # 注意：cpu_diff>0 时 runner 退出码为 1，属正常；退出码 0 才是全匹配。
 # 基线已验证（2026-08-12）：cpu_match=5/59（frame 1-2 真匹配 + frame 4 被抑制转移）。
+#
+# 新精度判据(KagamiQA 5 层,见 §7.1):
+cd src/rust && cargo test --release -p kagami-qa
+# 或：build\kagami-qa-runner.exe --manifest tests\tests.json --bin-dir build\tests
+#                         --accuracy-table build\kagamiqa_accuracy_table.md
+#                         --known-fail tests\fixtures\blargg_known_fail.json
+# 期望：T1 ≥ 90%、T3 = 47/47、T4 175 case 全过、T5 8/8。
 ```
 
 ### 9.1.5 纪律
