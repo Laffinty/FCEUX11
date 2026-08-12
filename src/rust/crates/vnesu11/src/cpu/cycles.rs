@@ -18,6 +18,12 @@
 //! belong here.
 
 /// 256-entry table: base cycles per opcode (NTSC).
+///
+/// **Verified byte-exact against `CycTable[256]` in `src/x6502.cpp:360`**
+/// (Phase 6 shadow-run investigation). Two discrepancies fixed:
+/// `0x88 DEY` (was 3 → 2) and `0xA8 TAY` (was 3 → 2). Those two
+/// instructions each cost 2 cycles on real hardware, but FCEUX's C++
+/// canonical table is the authoritative source for shadow-run parity.
 pub const BASE_CYCLES: [u8; 256] = [
     /*0x00*/ 7, 6, 2, 8, 3, 3, 5, 5, 3, 2, 2, 2, 4, 4, 6, 6,
     /*0x10*/ 2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
@@ -27,9 +33,9 @@ pub const BASE_CYCLES: [u8; 256] = [
     /*0x50*/ 2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
     /*0x60*/ 6, 6, 2, 8, 3, 3, 5, 5, 4, 2, 2, 2, 5, 4, 6, 6,
     /*0x70*/ 2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
-    /*0x80*/ 2, 6, 2, 6, 3, 3, 3, 3, 3, 2, 2, 2, 4, 4, 4, 4,
+    /*0x80*/ 2, 6, 2, 6, 3, 3, 3, 3, 2, 2, 2, 2, 4, 4, 4, 4,
     /*0x90*/ 2, 6, 2, 6, 4, 4, 4, 4, 2, 5, 2, 5, 5, 5, 5, 5,
-    /*0xA0*/ 2, 6, 2, 6, 3, 3, 3, 3, 3, 2, 2, 2, 4, 4, 4, 4,
+    /*0xA0*/ 2, 6, 2, 6, 3, 3, 3, 3, 2, 2, 2, 2, 4, 4, 4, 4,
     /*0xB0*/ 2, 6, 2, 6, 4, 4, 4, 4, 2, 5, 2, 5, 5, 5, 5, 5,
     /*0xC0*/ 2, 6, 2, 8, 3, 3, 5, 5, 2, 2, 2, 2, 4, 4, 6, 6,
     /*0xD0*/ 2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
@@ -101,5 +107,40 @@ mod tests {
         // INC zp,X (0xF6), DEC zp,X (0xD6) — RMW at zp indexed.
         assert!(IS_RMW[0xF6]);
         assert!(IS_RMW[0xD6]);
+    }
+
+    /// **Authoritative parity check**: this table MUST stay byte-exact
+    /// with `CycTable[256]` in `src/x6502.cpp:360`. Any drift breaks the
+    /// shadow-run comparison (Phase 6 §2.5) because the CPU runs fewer
+    /// instructions per segment budget and PC drift accumulates. The
+    /// canonical source is the C++ table — when updating either side,
+    /// update the other too.
+    #[test]
+    fn base_cycles_matches_cpp_cyc_table() {
+        const CPP_CYC_TABLE: [u8; 256] = [
+            7,6,2,8,3,3,5,5,3,2,2,2,4,4,6,6,
+            2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
+            6,6,2,8,3,3,5,5,4,2,2,2,4,4,6,6,
+            2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
+            6,6,2,8,3,3,5,5,3,2,2,2,3,4,6,6,
+            2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
+            6,6,2,8,3,3,5,5,4,2,2,2,5,4,6,6,
+            2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
+            2,6,2,6,3,3,3,3,2,2,2,2,4,4,4,4,
+            2,6,2,6,4,4,4,4,2,5,2,5,5,5,5,5,
+            2,6,2,6,3,3,3,3,2,2,2,2,4,4,4,4,
+            2,6,2,6,4,4,4,4,2,5,2,5,5,5,5,5,
+            2,6,2,8,3,3,5,5,2,2,2,2,4,4,6,6,
+            2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
+            2,6,2,8,3,3,5,5,2,2,2,2,4,4,6,6,
+            2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
+        ];
+        for (op, (rust_c, cpp_c)) in BASE_CYCLES.iter().zip(CPP_CYC_TABLE.iter()).enumerate() {
+            assert_eq!(
+                rust_c, cpp_c,
+                "opcode 0x{:02X} cycle mismatch: rust={} cpp={} (must match src/x6502.cpp CycTable)",
+                op, rust_c, cpp_c
+            );
+        }
     }
 }

@@ -218,32 +218,21 @@ impl VNesSoc {
                 }
                 _ => {
                     let budget = segment.cpu_budget();
-                    // 1. DMA stall priority: while an OAM DMA is in
-                    //    flight the CPU is halted (513/514 cycles).
-                    //    Each iteration transfers one byte (or drains
-                    //    a trailing alignment cycle); the PPU does not
-                    //    advance during the stall.
-                    if self.dma.is_stalling() {
-                        if self.dma.oam.active {
-                            self.step_oam_dma();
-                        } else if self.dma.dmc_stall_cycles > 0 {
-                            // DMC DMA stall (Phase 6 wires the real
-                            // arbitration; decrement defensively so a
-                            // pending DMC stall can never spin).
-                            self.dma.dmc_stall_cycles -= 1;
-                        }
-                        continue;
-                    }
-                    // 2. CPU runs its segment budget (X6502_Run semantics).
-                    let mut bus = unsafe { VNesBusContext::new(self) };
-                    self.cpu.run_budget(budget, &mut bus);
-                    // 3. APU ticks the same budget (frame counter + 5
-                    //    channels + mixer → output_buffer).
-                    if budget > 0 {
-                        self.apu.tick(budget as u32);
-                    }
+                    self.run_segment_inner(budget);
                     // 4. PPU renders the segment (background + sprites).
                     let frame_done = self.ppu.advance_to_next_segment();
+                    // Phase 6 P2 shadow fix (2026-08-12): visible scanlines
+                    // get a follow-up sprite-eval/hblank segment
+                    // (85 cycles) matching C++ DoLine's
+                    // `X6502_Run(6) + Run(63) + Run(16)`. Without this the
+                    // CPU is short ~20k cycles/frame and the shadow PC drifts.
+                    if let Some(extra) = self.ppu.sprite_eval_segment() {
+                        let extra_budget = extra.cpu_budget();
+                        self.run_segment_inner(extra_budget);
+                        // The follow-up segment does NOT advance the
+                        // scanline — sprite eval happens within the same
+                        // scanline as the background render.
+                    }
                     // 5. Route interrupts at the segment boundary.
                     self.route_interrupts();
                     if frame_done {
@@ -258,6 +247,37 @@ impl VNesSoc {
         self.frame_buffer.copy_from_slice(&*self.ppu.frame_buffer);
         self.frame_ready = self.ppu.frame_ready;
         result
+    }
+
+    /// Run one PPU segment: DMA stall → CPU run_budget → APU tick.
+    /// Extracted to share the wiring between the primary segment and
+    /// the visible-scanline sprite-eval follow-up segment (Phase 6 P2
+    /// shadow fix).
+    fn run_segment_inner(&mut self, budget: i32) {
+        if budget <= 0 {
+            return;
+        }
+        // 1. DMA stall priority: while an OAM DMA is in flight the CPU
+        //    is halted (513/514 cycles). Each iteration transfers one
+        //    byte (or drains a trailing alignment cycle); the PPU does
+        //    not advance during the stall.
+        if self.dma.is_stalling() {
+            if self.dma.oam.active {
+                self.step_oam_dma();
+            } else if self.dma.dmc_stall_cycles > 0 {
+                // DMC DMA stall (Phase 6 wires the real arbitration;
+                // decrement defensively so a pending DMC stall can
+                // never spin).
+                self.dma.dmc_stall_cycles -= 1;
+            }
+            return;
+        }
+        // 2. CPU runs its segment budget (X6502_Run semantics).
+        let mut bus = unsafe { VNesBusContext::new(self) };
+        self.cpu.run_budget(budget, &mut bus);
+        // 3. APU ticks the same budget (frame counter + 5 channels +
+        //    mixer → output_buffer).
+        self.apu.tick(budget as u32);
     }
 
     /// Advance one OAM DMA byte: read from the CPU address space and

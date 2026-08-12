@@ -212,6 +212,14 @@ impl PpuCore {
     /// Produce the next scanline segment.  The scheduler consumes the
     /// CPU budget and then calls `advance_to_next_segment()` to tick
     /// the PPU's dot clock forward by the segment's worth of dots.
+    ///
+    /// Per-scanline total budget (must match `src/ppu_rendering.cpp::DoLine`):
+    /// - Visible scanline (sl < 240): **341** = 256 (visible dots) +
+    ///   6 + 63 + 16 (sprite eval + hblank). Emitted as two segments
+    ///   (`Visible` 256, `SpriteEval` 85) so the scheduler can render
+    ///   background before sprite composition (mirrors C++ order).
+    /// - Post-render + VBlank scanlines (sl >= 240): **341** = 256+69+16
+    ///   (mirrors C++ DoLine branch `if (sl >= 240)`).
     pub fn next_segment(&mut self) -> Segment {
         if self.idle {
             // NSF "no PPU" mode — produce one big idle budget per
@@ -226,18 +234,24 @@ impl PpuCore {
             },
             sl if (0..=239).contains(&sl) => {
                 // Visible scanline: 256 visible dots (background fetch
-                // + render) then 85 hblank (sprite eval + boundary).
-                // C++ emits two X6502_Run calls (256 + 69); Rust emits
-                // two segments.
+                // + render). Sprite eval / hblank follows as a second
+                // segment below — see `sprite_phase`.
                 Segment::Visible {
                     cpu_budget: dot_clock::CPU_BUDGET_VISIBLE,
                 }
             }
             sl if sl == 240 => Segment::VBlank {
-                cpu_budget: dot_clock::CPU_BUDGET_GB_HBLANK,
+                cpu_budget: dot_clock::CPU_BUDGET_VBLANK_LINE,
             },
             sl if sl == dot_clock::VBLANK_SCANLINE => Segment::VBlank {
-                cpu_budget: 1, // VBlank flag set at dot 1, then long idle
+                // **Phase 6 P2 shadow fix (2026-08-12)**: was `1` here
+                // which left the CPU with only 1 cycle to enter the NMI
+                // handler. C++ DoLine gives scanline 241 a full 341
+                // budget (256+69+16), so the NMI entry sequence (7 cycles
+                // for push + vector) completes cleanly.  Without this
+                // fix the shadow PC drifts ~3 cycles/frame and diverges
+                // after frame 3.
+                cpu_budget: dot_clock::CPU_BUDGET_VBLANK_LINE,
             },
             sl if (242..=260).contains(&sl) => Segment::VBlank {
                 cpu_budget: dot_clock::CPU_BUDGET_GB_HBLANK,
@@ -246,6 +260,38 @@ impl PpuCore {
                 cpu_budget: dot_clock::CPU_BUDGET_GB_HBLANK,
             },
             _ => Segment::FrameComplete,
+        }
+    }
+
+    /// Emit a follow-up sprite-eval / hblank segment after the visible
+    /// segment for scanlines 0..=239. Returns `None` if no follow-up is
+    /// needed (i.e. scanline has advanced past 239). Called by the
+    /// scheduler **after** `advance_to_next_segment()` runs the
+    /// per-segment render — keeping the sprite composition on the
+    /// correct scanline so CHR patterns land at the right dots.
+    ///
+    /// **Phase 6 P2 shadow fix (2026-08-12)**: previously the visible
+    /// scanline emitted a single 256-budget segment, leaving the CPU
+    /// 85 cycles short per scanline vs C++ (256 + 6 + 63 + 16 = 341).
+    /// Over 240 scanlines that was a ~20k-cycle deficit per frame and
+    /// the CPU drifted significantly behind.
+    pub fn sprite_eval_segment(&mut self) -> Option<Segment> {
+        if self.idle {
+            return None;
+        }
+        // Only meaningful for scanlines that have just finished the
+        // visible (256-cycle) segment. The scheduler bumps scanline
+        // inside `advance_to_next_segment()`, so by the time this is
+        // called the scanline counter is already +1.
+        let just_finished = self.scanline - 1;
+        if (0..=239).contains(&just_finished) {
+            // 85 = 6 (start HBLANK) + 63 (main hblank) + 16 (final
+            // sprite eval slot) — matches ppu_rendering.cpp::DoLine.
+            Some(Segment::SpriteEval {
+                cpu_budget: dot_clock::CPU_BUDGET_HBLANK_TOTAL,
+            })
+        } else {
+            None
         }
     }
 
@@ -449,8 +495,10 @@ mod tests {
         let s = p.next_segment();
         match s {
             Segment::VBlank { cpu_budget } => {
-                // VBlank set scanline has tiny budget (1 cycle = dot 1 set).
-                assert_eq!(cpu_budget, 1);
+                // VBlank-set scanline budget (Phase 6 P2 shadow fix):
+                // matches C++ DoLine X6502_Run(256+69+16) = 341 so the
+                // NMI handler entry (7 cycles for push + vector) fits.
+                assert_eq!(cpu_budget, dot_clock::CPU_BUDGET_VBLANK_LINE);
             }
             _ => panic!("expected VBlank, got {:?}", s),
         }

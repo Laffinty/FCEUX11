@@ -54,6 +54,24 @@ pub const CPU_BUDGET_VISIBLE: i32 = 256;
 pub const CPU_BUDGET_SPRITE_EVAL: i32 = 69;
 pub const CPU_BUDGET_BOUNDARY_FIX: i32 = 16;
 pub const CPU_BUDGET_GB_HBLANK: i32 = 85;
+/// Per-scanline total for post-render (sl=240) and VBlank-set (sl=241)
+/// lines: matches C++ DoLine branch `X6502_Run(256+69) + X6502_Run(16)`
+/// (scanline 240 / 241 / every VBlank line share this total).
+///
+/// **Phase 6 P2 shadow fix (2026-08-12)**: scanline 241 was previously
+/// budgeted at 1 cycle, which broke the NMI handler entry sequence
+/// (needs 7 cycles). C++ allocates 341 here so the NMI push + vector
+/// completes cleanly within the scanline.
+pub const CPU_BUDGET_VBLANK_LINE: i32 = 341;
+/// Total hblank budget following a visible scanline: 6 (start HBLANK)
+/// + 63 (main hblank) + 16 (final sprite eval slot) = 85. Matches
+/// `ppu_rendering.cpp::DoLine` visible-scanline epilogue.
+///
+/// **Phase 6 P2 shadow fix (2026-08-12)**: previously the visible
+/// scanline emitted only `CPU_BUDGET_VISIBLE = 256`, leaving the CPU
+/// 85 cycles short per scanline. Over 240 scanlines that was a
+/// ~20k-cycle deficit per frame and the shadow PC drifted.
+pub const CPU_BUDGET_HBLANK_TOTAL: i32 = 85;
 
 /// Sprites per scanline (hardware limit; 9th sprite sets overflow flag).
 pub const MAX_SPRITES_PER_LINE: usize = 8;
