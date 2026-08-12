@@ -561,8 +561,6 @@ pub unsafe extern "C" fn vnesu11_emulate_frame(
     }
 
     // 1. Drive one full frame (CPU + APU + PPU + DMA + IRQ routing).
-    let fc_before = soc_ref.apu.frame_counter.cycle_count;
-    let count_before = soc_ref.cpu.count;
     let result = soc_ref.run_frame();
 
     // 2. Copy the rendered frame buffer (61440 bytes = 256 × 240).

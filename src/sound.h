@@ -98,6 +98,10 @@ extern char&       DMCHaveSample;
 extern uint8_t&    DMCDMABuf;
 extern uint8_t&    SIRQStat;
 
+// Phase 6 P2 shadow diagnostics: cumulative executed-instruction
+// counter (incremented once per FCEU_SoundCPUHook call).
+extern uint64_t g_cpu_instr_count_;
+
 void SetNESSoundMap(void);
 void FrameSoundUpdate(void);
 

@@ -357,6 +357,21 @@ impl PpuCore {
             _ => {}
         }
 
+        // Phase 6 P2 shadow fix (2026-08-12): the PRELINE scanline is
+        // a Rust-internal extra (C++ FCEUPPU_Loop starts at sl=0; its
+        // pre-render is sl=261, which advances 341 dots like every
+        // other scanline). Giving PRELINE its own 341-dot advance made
+        // the Rust frame 263×341 dots vs C++'s 262×341, shifting the
+        // VBlank-set dot by one scanline → the $2002 wait loop exited
+        // one iteration later → ~2 extra instructions + ~7 cycles of
+        // frame-counter phase drift per frame. Do the preline PPU work
+        // (clear VBlank etc.) but do NOT advance the dot clock, keeping
+        // the frame at exactly 262×341 dots.
+        if self.scanline == PRELINE {
+            self.scanline = 0;
+            return false;
+        }
+
         // Advance to next scanline.
         self.dot = self.dot.wrapping_add(dots_per_segment);
         self.scanline += 1;

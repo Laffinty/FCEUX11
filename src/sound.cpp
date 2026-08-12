@@ -81,6 +81,9 @@ static uint64_t e3_abs_ts = 0;
 int32_t fc_reset_in = 0;
 uint8_t fc_pending_mode = 0;     // reduced 2-bit mode of pending write
 
+// Phase 6 P2 shadow diagnostics: cumulative executed-instruction count.
+uint64_t g_cpu_instr_count_ = 0;
+
 
 static uint32 wlookup1[32];
 static uint32 wlookup2[203];
@@ -696,6 +699,10 @@ void FCEU_SoundCPUHook(int cycles)
  // (it lives in private layout_). fhcnt is the primary signal.
  static uint32_t hook_call_count = 0;
  hook_call_count++;
+ // Phase 6 P2: cumulative instruction counter (FCEU_SoundCPUHook is
+ // called once per executed instruction). The shadow sync reads the
+ // per-frame delta.
+ g_cpu_instr_count_++;  // defined in sound.h (Phase 6 P2)
  e3_abs_ts += (uint64_t)(uint32_t)cycles;
  // P2 Phase 2 Step 2.2 深化 (2026-08-02): cycle-position frame counter.
  // Advance the sequencer one CPU cycle at a time through this instruction,
