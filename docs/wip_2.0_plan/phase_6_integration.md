@@ -367,6 +367,10 @@ tests/shadow_run/
 > `vnesu11_emulate_frame` FFI 测试 + 6 个 system_type 测试 + peek/poke_regs
 > 接线）。`vn_perf_bench` 实测 **743 us/帧 ≈ 1346 FPS**（远低于 16.7ms 预算）。
 > VNESU11_CORE=ON/OFF 双配置 `fceux11.exe` 均构建链接成功。
+>
+> **2026-08-12 收口更新**：测试数字已按模块拆分（lib **192** + apu_tests **24**
+> + ppu_tests **33** + mapper_tests **12** + system_type 等，全部通过）；
+> P2 完成 shadow run harness + CPU 差异迭代修复的第一批（见 §9 第六~九版）。
 > **以下 DoD 中 `[x]` = 已完成；未标 = 后续会话/Phase 7。**
 
 - [x] `VNESU11_CORE=OFF`：行为与 v1.17 完全一致（构建验证通过；OFF 路径无功能改动，`vnesu11_*` 全为 no-op 桩）
@@ -397,8 +401,11 @@ P1（完成）：
   [x] vn_perf_bench（743 us/帧 ≈ 1346 FPS）
 P2（后续会话/Phase 7）：
   [x] Shadow run 端到端 harness（2026-08-12：kagami_qa_shadow_run_runner 构建 + 运行成功）
+  [x] CPU 寄存器差异迭代修复（2026-08-12 第一~九版：$2002 VBlank 路由、DEY/TAY 周期、
+      段预算对齐、per-instruction APU tick、frame counter 全功能 + 状态同步、
+      PPU 状态同步、预算单位补偿、frame counter IRQ 保持——frame 1-2 完全匹配）
+  [ ] CPU 差异迭代剩余（frame 3+ 相位残差 ~50 cycles：IRQ/NMI 服务时序 + PPU v/t/x/w）
   [ ] MapperMetaVtable::fill_audio（VRC6/FDS/N163 扩展音频）
-  [ ] CPU 寄存器差异迭代修复（shadow 已暴露：Rust $2002 PPUSTATUS 读未反映 PpuCore VBlank 状态 → wait-loop 无法退出）
   [ ] savestate round-trip 100% parity
   [ ] TAS movie round-trip
 ```
@@ -426,9 +433,9 @@ P2（后续会话/Phase 7）：
 
 | ROM | CPU 匹配 | 观察 |
 |-----|---------|------|
-| cpu_dummy_reads.nes | 2/59 | **2026-08-12 第三版修复后**：frame 1-2 **完全匹配**；frame 3 Rust 提前触发 frame counter IRQ |
-| nestest.nes | 0/30 | 双方 PC 都在推进但不同步 |
-| mapper_axrom.nes | 0/30 | 双方 PC 都在推进但不同步 |
+| cpu_dummy_reads.nes | 2/59 | **2026-08-12 第六~九版修复后**：frame 1-2 **完全匹配**；frame 3+ 仍发散（frame counter 相位残差 ~50 cycles → IRQ/BRK 时机错开） |
+| nestest.nes | 0/30 | 双方 PC 都在推进但不同步（依赖完整 PPU/APU channel 同步，Step 3 覆盖） |
+| mapper_axrom.nes | 0/30 | 同上 |
 
 **Shadow 捕获**：`frame=60 xbuf_crc=0xEC1C6272 audio_samples=32768`（帧 CRC + APU 样本均正常产出）。
 
@@ -473,23 +480,47 @@ VBlank 状态** → Rust CPU 的 $2002 等待循环无法退出。修复：$2002
 记录待提交的模式位 + 延迟 cycle 数；`tick()` 每周期递减 `reset_in`，归零时
 才真正提交模式位 + 清零 `cycle_count`。
 
-**剩余发散（Phase 6 持续工作 — 2026-08-12 根因）**：
-frame 3+ Rust 提前触发 frame counter IRQ。但**根因不在 cycle parity**，而是
-**shadow runner 的状态同步不完整**：
-- `src/vnesu11_shadow.cpp::vnesu11_shadow_sync_from_cpp()` 只同步
-  `WRAM` + `CpuRegsLayout`（PC/A/X/Y/S/P），**不同步 APU frame counter state**。
-- C++ 跑的帧包含 `$4017 = 0x00` 写（启用 frame counter IRQ），这个写
-  重置 C++ 的 `fhcnt = 0`（带 3-4 cycle 延迟）。Rust 跑下一帧时收不到这个
-  写 —— Rust 的 frame counter 仍维持 power-on 默认 + 自己 tick 的 cycle_count。
-- 结果：Rust 的 IRQ 在 Rust 的 cycle_count = 14914 触发，C++ 的 IRQ 在 C++
-  的 cycle_count = 14914 触发（但 C++ 的 fhcnt 起点不同）。两端相差 = C++ 在
-  $4017 写之前已经 tick 的 cycle 数（约 ~29800 cycles = 一帧）。
-- 闭合方向：扩展 `vnesu11_shadow_sync_from_cpp` 同步 APU 状态：
-  `FrameCounter { five_step, irq_inhibit, cycle_count, pending_mode, reset_in }` +
-  APU channel enable / timer / length / envelope 等。Phase 6 P2 收口时落地。
+**已修复（frame counter 全功能 + 状态同步，2026-08-12 第六~七版）**：
+1. **frame counter 事件位置 2× 偏差**：原实现用 `14914` 作 4-step 周期、事件在
+   3728/7456/11185/14914——**恰好是正确位置（7457/14913/22371/29828）的 cycle
+   半值**。修复为完整 NTSC/PAL × 4/5-step 常量表（`FrameCounterProfile`，
+   byte-pinned 对照 `src/sound.cpp::FrameCounterTick()`），并改用 post-increment
+   比较（`fhcnt++; if (fhcnt==N)`）避免 IRQ 在 29829 被同次 tick 误清。
+2. **APU 状态同步**：新增 `vnesu11_apu_poke_state/peek_state`
+   （frame counter + master cycle + IRQ pending 标志），shadow sync 每帧推入。
+3. **PPU 状态同步**：新增 `vnesu11_ppu_poke_state/peek_state`（$2000-$2003
+   寄存器 + PPUGenLatch + PALRAM + NTARAM + OAM），让 $2002/$2007/$2004 读值
+   两端一致。
+4. **$4015 读清 CPU IRQ 位**：`apu_status_read` 补 `cpu.irq_end(FCOUNT)`，
+   对应 C++ `X6502_IRQEnd(FCEU_IQFCOUNT)`（否则 IRQ handler 的 BIT $4015
+   清不掉 CPU 的 pending 位 → 反复重进 handler 卡死）。
+
+**已修复（每帧预算对齐 + 单位补偿 + IRQ 保持，2026-08-12 第八~九版）**：
+1. **VBlank 段预算**：242-260（19 行）和 261（pre-render）从 85 改 341，
+   -1 段（Rust 内部额外 scanline）改 0——对齐 C++ DoLine 每行 341。
+2. **预算单位错位**（shadow 发散的主根因）：C++ `add_cycles` 按 `c×48` 消耗、
+   `X6502_Run` 按 `×16` 预算（等效 3 dots/cycle）；Rust 把"点"预算当 CPU cycle
+   用，导致 CPU 每帧执行 ~89k cycles（C++ 只 ~29.8k），frame counter 相位漂移。
+   修复：`run_segment_inner` 每指令补扣 `tcount×2`、poll 补扣 `poll_consumed×2`
+   （×3 总费率），CPU 核心保持 cycle 单位。
+3. **frame counter IRQ 跨 wrap 保持**：C++ `FrameIRQEnd` 在 mode 0（非 inhibit）
+   时**保持** IRQ（只清 SIRQStat flag，不清 IRQlow FCOUNT），仅 $4015 读才清。
+   Rust 原在 29830 wrap 时清 IRQ，导致 set(29828/29) 与 reset(29830) 落在同一
+   `apu.tick` 内时 IRQ 被吞。修复：wrap 分支不再清 `*irq_out`。
+
+**剩余发散（Phase 6 持续工作 — 2026-08-12 现状）**：
+cpu_dummy_reads frame 1-2 完全匹配，frame 3+ 仍发散。根因链已收敛到
+**frame counter 相位残差 ~50 cycles/帧**（Rust 29777 vs C++ 29785），导致
+frame counter IRQ / NMI 触发时机错开 ~1 条指令 → frame 3 起指令序列分叉 →
+Rust 走进含 0x00（BRK）的数据区。残差来源（按优先级）：
+1. **IRQ/NMI 服务时序**：poll_interrupts 的 7-cycle 服务与 C++ `ADDCYC(7)`
+   进入 `_tcount` 的精确对齐（当前 poll_consumed 补偿是近似）。
+2. **PPU v/t/x/w 未同步**：$2007 读写地址两端独立演化（依赖指令流一致，
+   一旦分叉就漂移）。
+3. **APU 5 通道状态未同步**（Step 3）：DMC IRQ / channel enable 影响 CPU 行为。
 
 shadow harness 现已具备持续迭代的对比基础设施（harness 报告行已包含 APU
-的 IRQ 触发记录）。
+的 IRQ 触发记录 + frame counter 相位跟踪）。
 
 ---
 
