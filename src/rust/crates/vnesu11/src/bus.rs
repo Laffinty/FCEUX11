@@ -351,8 +351,15 @@ impl VNesSoc {
             // $4016: joypad strobe (bit 0).
             0x4016 => self.joypad.write_strobe(val),
             // $4017: APU frame counter mode + joypad strobe (bit 0).
+            // Phase 6 P2 shadow fix (2026-08-12): the $4017 reset is
+            // scheduled for `reset_in` cycles (3 if even parity, 4 if
+            // odd parity) — matches C++ `fc_reset_in = ((abs_ts & 1)
+            // == 0) ? 3 : 4` in `src/sound.cpp:1269`. Parity comes
+            // from the APU's master cycle counter (which mirrors
+            // g_cpu.timestamp in C++).
             0x4017 => {
-                self.apu.frame_counter.write(val);
+                let parity = (self.apu.cycles & 1) as u8;
+                self.apu.frame_counter.write_with_parity(val, parity);
                 self.joypad.write_strobe(val);
             }
             _ => { /* $4009/$400D are unused on NES 2A03. */ }
