@@ -541,7 +541,7 @@ shadow harness 现已具备持续迭代的对比基础设施（harness 报告行
 
 ### 9.1.0 当前精确状态
 
-- **分支** `wip_v2.0`；工作树应干净（§9.1 本修订随提交落地；若检出后发现脏树，
+- **分支** `wip_v2.0`；工作树应干净（最近 commit `46ac846`；若检出后发现脏树，
   先 `git status` 确认无未提交源码改动再继续）。
 - **测试**：`cargo test --release -p vnesu11` 全模块通过（lib 194 + apu 24 + ppu 33
   + mapper 12 + system_type 等），无 FAILED。
@@ -550,7 +550,8 @@ shadow harness 现已具备持续迭代的对比基础设施（harness 报告行
   其余发散，当前根因是 S_2→S_3 转移主代码分叉，见 §9.1.2 Step 2c）。
   nestest/mapper_axrom 仍 0/N（依赖完整 PPU/APU 同步）。
 - **核心状态**：frame counter IRQ 保持（mode-0）、预算单位 ×3 dots/cycle、
-  count 单位 ÷16、-1 段 dot 对齐、**VBlank flag 帧首置位时间线**——均已修复。
+  count 单位 ÷16、-1 段 dot 对齐、**VBlank flag 帧首置位时间线**、**VBL-set
+  suppression（shadow sync 决策同步）**——均已修复。
 
 ### 9.1.1 已完成的修复链（勿重复）
 
@@ -581,7 +582,13 @@ shadow harness 现已具备持续迭代的对比基础设施（harness 报告行
 
 ### 9.1.2 剩余路径（按序执行）
 
-**Step 2c（当前）— frame 3+ 发散收尾**（2026-08-12 深度调查后重写）：
+**Step 2c（当前）— frame 3+ 发散收尾**（2026-08-13 检查点：树干净、基线
+cpu_match=5/59、延迟置位实验已回退并记录于下文"实验记录"）：
+
+> **明日接续顺序**：① 跑 §9.1.4 验证命令确认基线（cpu_match=5/59）；② 按下文
+> "实验记录"第一步：确认 `apply_frame_vbl_set` 是否触发（若触发而 frame 3 不变
+> → 发散主因在轮询退出后的主代码路径）；③ 用 CPC/RPC PC 流 diff（探针模式见
+> 下文）定位主代码首分叉点；④ 修复后每步跑 60 帧 shadow 收敛。
 
 **根因 1（已修复）：VBlank flag 时间线**。C++ `FCEUX_PPU_Loop`（newppu=1）在
 **帧首**（loop 顶部）置位 $2002 VBlank flag，保持 20 行（6820 dots）后清除；
@@ -605,26 +612,43 @@ peek 不消费）经 `PpuStateMirror.vbl_set_suppressed` 推给 Rust，Rust 的
 
 **剩余发散（2026-08-12 当前）**：frame 3（S_2→S_3 转移）仍 diff——
 `instr cpp=8544 rust=5257`（delta=-3287），rust pc 走入数据区（FCAF）。
-**PC 流 diff 定位（CPC/RPC 探针）**：分叉在**转移的第一条指令**——E48A
-轮询的退出时机：
-- C++：帧边界处轮询的 BIT 读取（跨段指令延续 + count 残差 -48，在置位前
-  读到 flag=0）→ 再循环一次 → 置位（abs=89343，E1 确认非抑制）后的下一次
-  读取（abs=89350, sl=241 cy=13）读到 flag=1 → 退出。
-- Rust：PRELINE 置位发生在帧首**第一次读取之前** → 第一次读取（sl 0 dot 0）
-  就读到 flag=1 → 立即退出（早一次轮询迭代）→ RTS 弹出错误的返回地址
-  （EF01）→ 走入数据区（EF01/EF03/... 与 E622/E625 IRQ handler 交替）。
-- 即：**C++ 的置位发生在 CPU 的帧首读取之间（跨段延续的读取在置位前），
-  Rust 的置位发生在所有帧首读取之前**——边界读取时序差一拍。
-- 候选修复：让 Rust 的帧首置位时机对齐 C++（置位发生在帧首第一次轮询读取
-  **之后**）——需要研究 C++ X6502 的跨段指令延续 + count 残差如何决定
-  "置位前的最后一次读取"，再调整 Rust 的 PRELINE 置位点或增加 nd 延迟等效。
+**PC 流 diff 定位（CPC/RPC 探针，校正 pc 显示偏移后）**：两端帧首第一条指令
+都是 E48A 轮询的 BIT——但读取结果不同：
+- C++：第一次 BIT 读取（abs=89343, sl=240 cy=0，跨段指令延续，发生在
+  VBL_ENTER 置位**之前**）读到 flag=0 → BPL 再循环一次 → 置位（abs=89343，
+  E1 确认非抑制）后的下一次读取（abs=89350, sl=241 cy=13）读到 flag=1 → 退出。
+- Rust：PRELINE 置位发生在帧首第一次读取**之前** → 第一次 BIT 读取
+  （sl 0 dot 0）就读到 flag=1 → 立即退出（早一次轮询迭代）→ 返回路径弹出
+  错误地址（EF01）→ 走入数据区（EF01/EF03/... 与 E622/E625 IRQ handler 交替）。
+- 即：**C++ 的帧首置位在 CPU 的边界跨越读取之后生效；Rust 的 PRELINE 置位在
+  所有帧首读取之前生效**——边界读取时序差一次轮询迭代。
+
+**实验记录（2026-08-12 深夜，已回退）**：尝试"延迟置位"修复——PRELINE 只武装
+`frame_vbl_set_pending`，`soc.rs` 在帧首第一条 step_one 后调
+`PpuCore::apply_frame_vbl_set()` 才真正置位 + NMI arm（对齐 C++ 的边界读取
+时序）。PPU 测试相应更新（全部通过），但 **shadow frame 3 数值完全不变**
+（仍 8544/5257，rust pc=FCAF）。**未验证 apply 是否真的执行**（探针已加、
+运行被中止）。两种可能：(a) apply 未触发（帧首第一条指令可能走 IRQ poll 路径，
+或 fc IRQ 服务路径绕过）；(b) frame 3 发散并非首读 flag 时序，而是轮询退出后
+主代码路径的其它差异。**改动已 `git checkout` 回退**（源码回到 261c42f 提交态）。
+明日第一步：加 `apply_frame_vbl_set` 探针（模式见下）确认 apply 是否触发；
+若触发而 frame 3 不变 → 发散主因在轮询退出后的主代码路径（候选：fc IRQ 服务
+时序、count 残差、或主代码 JSR/RTS 配对），用 CPC/RPC PC 流 diff 逐指令定位。
+
+**探针模式（明日复用）**：
+- C++：`src/sound.cpp` FCEU_SoundCPUHook 内按 `extern int framectr` 门控
+  `fprintf(stderr, "CPC pc=%04X\n", g_cpu.native_layout().PC)`（注意 pc 是
+  **指令后**值）。
+- Rust：`src/rust/crates/vnesu11/src/soc.rs` run_segment_inner 两分支（无 IRQ
+  路径 + poll 路径）step_one 前按 `self.frame_count` 门控
+  `eprintln!("RPC pc={:04X}", self.cpu.pc())`（pc 是**指令前**值）；SoC 需
+  临时加 `pc_trace_count` 字段。对比时把 C++ 下标 k 与 Rust 下标 k+1 对齐
+  （pc 显示偏移）。
 
 **已就位的诊断基础设施**：`g_cpu_instr_count_`（C++ 每指令计数，sound.cpp 永久
 钩子）、`vnesu11_instr_count` FFI + `VNesSoc::instr_count`、`frame_count`、
 `segment_dots`（段内已耗 dots）、runner 每帧指令增量日志。复跑基线：
 `cpu_match=5/59`（frame 1-2 真匹配 delta=0；frame 4 被抑制转移匹配；其余发散）。
-PC 流对比探针模式（CPC 在 FCEU_SoundCPUHook / RPC 在 run_segment_inner 两分支
-step_one 前，按 framectr/frame_count 门控）已验证可用，见本会话历史。
 
 **Step 3 — APU 5 通道状态同步**：
 - 扩展 `ApuStateMirror`（ffi.rs）：pulse1/2（timer/length/envelope/sweep）、triangle
@@ -663,9 +687,9 @@ cd src/rust && cargo test --release -p vnesu11          # 全绿（无 FAILED）
 cmd /c "`"D:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat`" >nul 2>&1 && cd build && cmake --build . --target kagami_qa_shadow_run_runner --config Release"
 # shadow（PATH 需含 vcpkg bin）：
 build\tests\kagami_qa_shadow_run_runner.exe tests/fixtures/blargg/cpu/cpu_dummy_reads.nes --frames 60
-# 期望：SHADOW_RESULT cpu_match 从 3 提升（Step 2c 目标 ≥5，Step 4 目标 60/59）。
+# 期望：SHADOW_RESULT cpu_match 基线 5（Step 2c 目标 ≥6，Step 4 目标 60/59）。
 # 注意：cpu_diff>0 时 runner 退出码为 1，属正常；退出码 0 才是全匹配。
-# 基线已复跑验证（2026-08-12）：cpu_match=3/59，且捕获 frame 3 末 SP 差 2 的证据（见 §9.1.2）。
+# 基线已验证（2026-08-12）：cpu_match=5/59（frame 1-2 真匹配 + frame 4 被抑制转移）。
 ```
 
 ### 9.1.5 纪律
