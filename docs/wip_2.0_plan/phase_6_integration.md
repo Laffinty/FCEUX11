@@ -605,24 +605,26 @@ peek 不消费）经 `PpuStateMirror.vbl_set_suppressed` 推给 Rust，Rust 的
 
 **剩余发散（2026-08-12 当前）**：frame 3（S_2→S_3 转移）仍 diff——
 `instr cpp=8544 rust=5257`（delta=-3287），rust pc 走入数据区（FCAF）。
-此转移两端都置位、都退出 E5A3 轮询，分歧发生在**退出后的主代码**（JSR E490 →
-E442 主循环 → E48A 轮询路径），Rust 的主代码 ~5257 条后走入数据（栈/BRK 症状）。
-**尚未定位**：候选为 fc IRQ 服务时序、count 残差、或主代码内某条 JSR/RTS 配对
-差异。用 runner 的 per-frame instr delta（`SHADOW frame=N instr cpp=... rust=...
-delta=...`）+ PC 流对比（两端 `CPC`/`RPC` 探针模式已建，见本会话历史）逐帧收敛。
+**PC 流 diff 定位（CPC/RPC 探针）**：分叉在**转移的第一条指令**——E48A
+轮询的退出时机：
+- C++：帧边界处轮询的 BIT 读取（跨段指令延续 + count 残差 -48，在置位前
+  读到 flag=0）→ 再循环一次 → 置位（abs=89343，E1 确认非抑制）后的下一次
+  读取（abs=89350, sl=241 cy=13）读到 flag=1 → 退出。
+- Rust：PRELINE 置位发生在帧首**第一次读取之前** → 第一次读取（sl 0 dot 0）
+  就读到 flag=1 → 立即退出（早一次轮询迭代）→ RTS 弹出错误的返回地址
+  （EF01）→ 走入数据区（EF01/EF03/... 与 E622/E625 IRQ handler 交替）。
+- 即：**C++ 的置位发生在 CPU 的帧首读取之间（跨段延续的读取在置位前），
+  Rust 的置位发生在所有帧首读取之前**——边界读取时序差一拍。
+- 候选修复：让 Rust 的帧首置位时机对齐 C++（置位发生在帧首第一次轮询读取
+  **之后**）——需要研究 C++ X6502 的跨段指令延续 + count 残差如何决定
+  "置位前的最后一次读取"，再调整 Rust 的 PRELINE 置位点或增加 nd 延迟等效。
 
 **已就位的诊断基础设施**：`g_cpu_instr_count_`（C++ 每指令计数，sound.cpp 永久
 钩子）、`vnesu11_instr_count` FFI + `VNesSoc::instr_count`、`frame_count`、
 `segment_dots`（段内已耗 dots）、runner 每帧指令增量日志。复跑基线：
 `cpu_match=5/59`（frame 1-2 真匹配 delta=0；frame 4 被抑制转移匹配；其余发散）。
-
-**候选解法（对剩余 frame 3 发散）**：
-  a. 逐指令 PC 流 diff S_2→S_3 转移（C++ 侧 `CPC` 探针在 FCEU_SoundCPUHook、
-     Rust 侧在 run_segment_inner 两分支 step_one 前），定位主代码首分叉点。
-  b. 检查 fc IRQ 服务时序（route_apu_irq 显示 IRQ 在 E622/E625 反复进入，
-     确认服务次数与 C++ 一致）。
-  c. 复核 `count/16` 余数（当前观测 C++ 帧末 overshoot 均为 16 倍数无损，但
-     其它 ROM 需复核）。
+PC 流对比探针模式（CPC 在 FCEU_SoundCPUHook / RPC 在 run_segment_inner 两分支
+step_one 前，按 framectr/frame_count 门控）已验证可用，见本会话历史。
 
 **Step 3 — APU 5 通道状态同步**：
 - 扩展 `ApuStateMirror`（ffi.rs）：pulse1/2（timer/length/envelope/sweep）、triangle
