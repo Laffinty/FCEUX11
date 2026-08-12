@@ -509,18 +509,19 @@ VBlank 状态** → Rust CPU 的 $2002 等待循环无法退出。修复：$2002
    `apu.tick` 内时 IRQ 被吞。修复：wrap 分支不再清 `*irq_out`。
 
 **剩余发散（Phase 6 持续工作 — 2026-08-12 现状）**：
-cpu_dummy_reads frame 1-2 完全匹配，frame 3+ 仍发散。根因链已收敛到
-**frame counter 相位残差 ~50 cycles/帧**（Rust 29777 vs C++ 29785），导致
-frame counter IRQ / NMI 触发时机错开 ~1 条指令 → frame 3 起指令序列分叉 →
-Rust 走进含 0x00（BRK）的数据区。残差来源（按优先级）：
-1. **IRQ/NMI 服务时序**：poll_interrupts 的 7-cycle 服务与 C++ `ADDCYC(7)`
-   进入 `_tcount` 的精确对齐（当前 poll_consumed 补偿是近似）。
-2. **PPU v/t/x/w 未同步**：$2007 读写地址两端独立演化（依赖指令流一致，
-   一旦分叉就漂移）。
-3. **APU 5 通道状态未同步**（Step 3）：DMC IRQ / channel enable 影响 CPU 行为。
+cpu_dummy_reads frame 1-2 完全匹配，frame 3+ 仍发散。指令级诊断（PC 流对比）已定位：
+1. **frame 0-1 指令数几乎一致**（Rust 8508/8490 vs C++ frame 1-2 8510/8506，差 2-16 条），
+   frame 2+ 差 200+ 条（指令流分叉）。
+2. **两端都不服务 NMI/IRQ**（测试 ROM 不开 NMI，I flag 屏蔽 IRQ）——发散**不是**中断时序。
+3. **Rust frame 3 的 VBlank 轮询（E48A/E48D）退出后**，E48F RTS 返回 E621（"等 NMI"
+   子程序的 RTS），**弹出栈顶 0x0022** → 进入 BRK 循环（0022 BRK → E622 BIT $4015 →
+   E625 RTI → ...）。C++ frame 4 停在轮询/返回正常调用者（E493）。
+4. **根因**：frame 3 时 Rust 的**栈内容**（JSR 推的返回地址）与 C++ 不同（尽管 WRAM
+   每帧同步）——指向 JSR/栈语义在 shadow 的每帧状态推送下的差异（Step 3 范围：
+   完整 PPU/APU 状态 + CPU 栈语义审计）。
 
 shadow harness 现已具备持续迭代的对比基础设施（harness 报告行已包含 APU
-的 IRQ 触发记录 + frame counter 相位跟踪）。
+的 IRQ 触发记录 + frame counter 相位跟踪 + 每帧指令数对比 `g_cpu_instr_count_`）。
 
 ---
 
