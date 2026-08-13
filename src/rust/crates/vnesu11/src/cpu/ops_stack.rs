@@ -27,12 +27,14 @@ impl CpuCore {
         self.p = flags::set_zn(self.p, v);
     }
 
-    // PLP — pull P (U always set).
+    // PLP — pull P (U always set). Like CLI/SEI, this must NOT touch
+    // `moo_pi`: the pre-PLP snapshot (whatever I flag was before the
+    // pull) is what the next instruction's IRQ sample uses (C++
+    // `ops.inc` case 0x28 does not set `_PI`).
     #[inline(always)]
     pub(crate) fn plp<BC: BusContext>(&mut self, bus: &mut BC) {
         let v = self.pop(bus);
         self.p = v | U_FLAG;
-        self.moo_pi = self.p;
     }
 
     // JSR — push return-1, jump to absolute.

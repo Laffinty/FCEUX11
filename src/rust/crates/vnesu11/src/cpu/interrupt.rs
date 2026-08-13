@@ -71,6 +71,12 @@ impl CpuCore {
             self.push(bus, (self.p & !B_FLAG) | U_FLAG);
             self.p |= flags::I_FLAG;
             self.pc = self.read16(bus, 0xFFFE);
+            // C++ sets `_PI = _P` after servicing an interrupt (the
+            // `if(_count<=0) { _PI=_P; return; }` path). Without this,
+            // when the 7-cycle debit exhausts the segment budget, the
+            // next segment re-samples the IRQ with the STALE pre-service
+            // moo_pi (I=0) and re-enters the handler forever.
+            self.moo_pi = self.p;
         }
 
         self.irq_pending &= !Self::IRQ_TEMP;
