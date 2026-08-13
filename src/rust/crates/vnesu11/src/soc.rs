@@ -556,8 +556,9 @@ impl VNesSoc {
         self.ppu_x = 0;
         self.ppu_read_buffer = 0;
 
-        // APU / DMA / IRQ / joypad to a clean reset state.
-        self.apu.power_cycle();
+        // APU / DMA / IRQ / joypad to a clean reset state. Soft reset
+        // preserves the last $4017 mode (C++ `FCEUSND_Reset(false)`).
+        self.apu.soft_reset();
         self.dma.power_cycle();
         self.irq.reset();
         self.joypad.reset();

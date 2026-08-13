@@ -105,6 +105,18 @@ impl CpuCore {
         a
     }
 
+    /// RMW (indirect),Y effective address. C++ `GetIYWR`: dummy-read the
+    /// OLD-page address and add NO page-cross cycle (the base table
+    /// already carries the RMW timing). The regular `izy` helper is for
+    /// reads and DOES add the +1 penalty — RMW must not.
+    #[inline(always)]
+    pub(crate) fn rmw_izy<BC: BusContext>(&mut self, bus: &mut BC) -> u16 {
+        let (a, crossed) = self.izy(bus);
+        let dummy = if crossed { (a & 0xFF00).wrapping_sub(0x100) | (a & 0xFF) } else { a };
+        let _ = bus.read(dummy);
+        a
+    }
+
     // -----------------------------------------------------------------
     // Indirect (JMP only)
     // -----------------------------------------------------------------

@@ -273,9 +273,12 @@ pub fn execute<BC: BusContext>(cpu: &mut CpuCore, op: u8, bus: &mut BC) {
         0x63 => cpu.rra_izx(bus),
         0x73 => cpu.rra_izy(bus),
 
-        // ANC / ARR / XAA / LAS / AXS / LAX-imm / SBC-imm(unofficial)
+        // ANC / ALR / ARR / XAA / LAS / AXS / LAX-imm / SBC-imm
+        // (unofficial immediate-mode opcodes). C++ `ops.inc` assigns
+        // 0x4B to ASR (ALR) and 0x6B to ARR — they are distinct.
         0x0B | 0x2B => cpu.anc(bus),
-        0x4B | 0x6B => cpu.arr(bus),
+        0x4B => cpu.alr(bus),
+        0x6B => cpu.arr(bus),
         0x8B => cpu.xaa(bus),
         0xBB => cpu.las(bus),
         0xCB => cpu.axs(bus),
@@ -306,9 +309,11 @@ pub fn execute<BC: BusContext>(cpu: &mut CpuCore, op: u8, bus: &mut BC) {
         | 0x80 | 0x82 | 0x89 | 0xC2 | 0xE2 => {
             cpu.nop_imm(bus); // 1 operand byte (2-byte NOP)
         }
-        0x0C | 0x1C | 0x3C | 0x5C | 0x7C | 0xDC | 0xFC => {
-            cpu.nop_imm(bus);
-            cpu.nop_imm(bus); // 2 operand bytes (3-byte NOP)
+        0x0C => {
+            cpu.nop_abs(bus); // 3-byte NOP absolute
+        }
+        0x1C | 0x3C | 0x5C | 0x7C | 0xDC | 0xFC => {
+            cpu.nop_absx(bus); // 3-byte NOP absolute,X
         }
 
         // NOTE: every opcode 0x00-0xFF is assigned above (verified by

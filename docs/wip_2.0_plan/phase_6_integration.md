@@ -686,34 +686,43 @@ shadow harness 现已具备持续迭代的对比基础设施（harness 报告行
 > **目标**：任何新会话只读本文件即可接续 Phase 6 收尾。**先跑一遍 §9.1.4 验证
 > 命令确认基线**，再按 §9.1.2 剩余路径执行。不要重复已完成的修复（§9.1.1 清单）。
 
-### 9.1.0 当前精确状态(2026-08-13 会话末修订，含"正确栈"重大转向)
+### 9.1.0 当前精确状态(2026-08-13 收口会话修订，含"正确栈"+"APU/CPU 精度"两个转向)
 
 > **会话目标已变更**(2026-08-13 ADR-011):不再追 byte-level shadow match。
-> **并且本会话发现并修复了一个根本构建 bug + 一个 CPU 栈序 bug**，使此前
-> "T1=87%" 被证伪——**诚实 Rust T1 = 62.7%**（见下）。接续会话从"修复剩余
-> 62.7% → 85%+ 的精度缺口"继续。
+> **此前会话**发现并修复了根本构建 bug + CPU 栈序 bug，把此前不可用的
+> "T1=87%/81.36%" 修正为**诚实 Rust T1 = 62.7%**。**本收口会话**在此基础上
+> 修复 APU 长度计数/帧计数/IRQ latch + CPU 非法 opcode/RMW 寻址，把诚实
+> Rust T1 推至 **75.7%**（见下）。接续会话从"修复剩余 75.7% → 85%+ 的精度缺口"
+> 继续。
 
-- **分支** `wip_v2.0`；工作树应干净（最近 commit `443f1b1`；若检出后脏树先
-  `git status` 确认）。
-- **诚实 Rust T1 = 111/177 = 62.7%**（`VNESU11_RUST_PRIMARY=1` 全量实测）。
-  此前报告 87%/81.36% 都不可用：81.36% 实测是 C++ newppu（因为构建宏
-  `VNESU11_CORE_ENABLED` 从未真正生效）；87% 是错误栈序造成的 ~24 个假阳性。
-- **正确栈序已修**（`33d95cf`）：`push` 先写 `$100+S` 再减 S、`pop` 先加 S 再读
-  （对齐 `x6502.cpp` PUSH/POP）。这**降低了**可见 T1（假阳性消失），但揭示了
-  ~24 个被错误栈掩盖的真实 bug。
-- **本会话已提交 4 个 commit**（`git log --oneline -4` 可看）：
-  1. `d7324e3` 构建宏修复（`target_compile_definitions` 让 `VNESU11_CORE_ENABLED`
-     真正生效）+ CPU BASE_CYCLES/NOP 尺寸 + PPU 越界 + Rust-primary 测量模式。
-  2. `33d95cf` 正确栈 + PPU VBlank 时序（置位在 sl 241 先于 CPU budget）+ mapper
-     HBlank vtable 钩子 + page-cross dummy read。
-  3. `d8ef1c8` RMW abs,X/Y 老页 dummy read（`instr_misc_03_dummy` 转绿）。
-  4. `443f1b1` 完整软复位（CPU+APU+PPU+DMA+IRQ+joypad）。
-- **测试**：`cargo test --release -p vnesu11` 全模块通过（lib 194 + apu 24 +
-  ppu 33 + mapper 12 + system_type 6 等），无 FAILED。
-- **剩余 66 个失败**（Rust-primary 实测）：APU ~16（`apu_reset_*`/`apu_single_*`，
-  帧计数/长度计数/复位时序）、CPU ~23（`instr_v5_*` 校验和 + `cpu_int_*` NMI/IRQ
-  采样 + `cpu_exec_space_ppuio`）、MMC3 18（全部 0x80 挂起，缺 A12 时钟）、
-  PPU ~10（`vbl_*` 精确 dot 时序 + `ppu_open_bus`）。
+- **分支** `wip_v2.0`；本收口会话的改动尚未提交（工作树含 11 个 Rust 源文件
+  修改，见 `git status`）。
+- **诚实 Rust T1 = 134/177 = 75.7%**（`VNESU11_RUST_PRIMARY=1` 全量实测，
+  本会话末 `rust_t1_final` 临时产物已删）。较会话开始（111/177 = 62.7%）净
+  **+23 PASS**。
+- **正确栈序已修**（`33d95cf`，上一会话）：`push` 先写 `$100+S` 再减 S、
+  `pop` 先加 S 再读。
+- **本收口会话修复链（未提交）**：
+  1. APU 长度计数：`$4003/$4007/$400B/$400F` 写入在通道使能时**无条件**重载
+     长度计数（C++ `SQReload`），并修 pulse 的 length index 从未写入的 bug。
+  2. APU 长度计数 halt：半帧 tick 按通道 halt 标志保持（pulse/noise bit5、
+     triangle bit7）；补 triangle 长度计数半帧 tick；envelope/linear 改为
+     quarter+half 都 tick（对齐 `FrameSoundStuff`）。
+  3. 帧计数 IRQ latch：`take_irq` 不再清 latch（`$4015` 读清 frame、`$4015`
+     写清 DMC）；`$4017` 写 bit6 立即清 frame-IRQ flag+线；29830 边界第三
+     IRQ set；reset 相位 `cycle_count=9`（实测对齐 C++ `fhcnt=4` 的 count~9）。
+  4. CPU 非法 opcode：`0x4B` 从 ARR 改 ALR；`ANC` 不再误清 V；`0x9C/0x9E`
+     SYA/SXA 地址复用 quirk；SHA/SHX/SHY/TAS 用 base-high 计算。
+  5. CPU RMW 寻址：DCP/ISB/SLO/RLA/SRE/RRA 的 abs,X/Y/(iz),Y 改用 RMW 老页
+     dummy read（无 page-cross 罚周期）；新增 `rmw_izy`。
+  6. NOP abs/abs,X（0x0C/0x1C…0xFC）真实读总线（含 page-cross 罚周期）。
+- **测试**：`cargo test --release -p vnesu11 --lib` 195 passed / 0 failed。
+- **剩余 43 个失败**（Rust-primary 实测）：APU 8（`apu_reset_works_imm`、
+  `apu_single_7/8_dmc_*`、`apu_test`、`sprdma_dmc_dma*2` 等，需完整 DMC）、
+  CPU 12（`cpu_int_*` 中断采样 / `cpu_exec_space_*` / `cpu_reset_regs` /
+  `instr_misc*`）、MMC3 12（其中 5 个已从 0x80 挂起转为 0x02 具体失败，
+  其余 7 个仍缺 A12 时钟）、PPU 13（`vbl_*` 精确 dot 时序 + `ppu_open_bus`
+  + `oam_stress`）。
 
 #### 9.1.0a Rust-primary 测量模式（关键工具）
 

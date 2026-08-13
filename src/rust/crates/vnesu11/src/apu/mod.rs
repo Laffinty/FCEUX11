@@ -111,7 +111,9 @@ impl ApuCore {
         }
     }
 
-    /// Power-on: reset all channels + frame counter + buffer.
+    /// Power-on: reset all channels + frame counter + buffer. Frame
+    /// counter starts in mode 0 ($4017 = $00) at phase `fhcnt=4`,
+    /// matching `FCEUSND_Reset(true)`.
     pub fn power_cycle(&mut self) {
         self.pulse1 = PulseChannel::new(0);
         self.pulse2 = PulseChannel::new(1);
@@ -119,9 +121,32 @@ impl ApuCore {
         self.noise = NoiseChannel::new();
         self.dmc = DmcChannel::new();
         self.frame_counter = FrameCounter::new();
+        self.frame_counter.power_reset();
         self.frame_irq_pending = false;
         self.dmc_irq_pending = false;
         self.cycles = 0;
+        self.output_buffer.clear();
+    }
+
+    /// Soft reset (`FCEUSND_Reset(false)`): preserve the last $4017
+    /// mode, reset the frame-counter phase to `fhcnt=4`, and clear the
+    /// length counters / IRQ flags. Channel register values ($4000-
+    /// $4013) are left intact because the ROM's reset handler re-writes
+    /// them after the reset vector runs.
+    pub fn soft_reset(&mut self) {
+        self.frame_counter.soft_reset();
+        self.frame_irq_pending = false;
+        self.dmc_irq_pending = false;
+        self.cycles = 0;
+        self.pulse1.length.set_enabled(false);
+        self.pulse2.length.set_enabled(false);
+        self.triangle.length.set_enabled(false);
+        self.noise.length.set_enabled(false);
+        // C++ FCEUSND_Reset also clears the sweep enable and the DMC
+        // latches/counters; the raw PSG registers are preserved.
+        self.pulse1.sweep.enabled = false;
+        self.pulse2.sweep.enabled = false;
+        self.dmc = DmcChannel::new();
         self.output_buffer.clear();
     }
 
@@ -142,18 +167,25 @@ impl ApuCore {
         self.frame_counter
             .tick(self.cycles, &mut self.frame_irq_pending);
 
-        // 2. Channels (each advances its timer at appropriate rate)
-        //    Envelope / sweep / length ticks happen at quarter/half frame.
-        if self.frame_counter.quarter_frame {
+        // 2. Channels (each advances its timer at appropriate rate).
+        //    C++ `FrameSoundStuff` clocks envelope decay + the triangle
+        //    linear counter on BOTH quarter and half frame steps; length
+        //    counters + pulse sweep only on half steps. Length counters
+        //    are held when the channel's halt flag is set (pulse/noise
+        //    bit 5, triangle bit 7 of $4008).
+        if self.frame_counter.quarter_frame || self.frame_counter.half_frame {
             self.pulse1.envelope.tick();
             self.pulse2.envelope.tick();
             self.triangle.linear_counter.tick();
             self.noise.envelope.tick();
         }
         if self.frame_counter.half_frame {
-            self.pulse1.length.tick();
-            self.pulse2.length.tick();
-            self.noise.length.tick();
+            self.pulse1.length.tick(self.pulse1.halt_envelope);
+            self.pulse2.length.tick(self.pulse2.halt_envelope);
+            self.triangle
+                .length
+                .tick(self.triangle.linear_counter.control_flag);
+            self.noise.length.tick(self.noise.halt_envelope);
             self.pulse1.sweep.tick();
             self.pulse2.sweep.tick();
         }
@@ -180,19 +212,19 @@ impl ApuCore {
         self.cycles = self.cycles.wrapping_add(1);
     }
 
-    /// Take any pending IRQ bitmask (DMC + frame counter).
-    /// Returns `IRQ_FCOUNT | IRQ_DMC` as appropriate and clears the
-    /// pending flags (the SoC re-asserts them into the `IrqController`
-    /// via `route_interrupts`, which owns the level semantics).
+    /// Return the pending IRQ bitmask (DMC + frame counter) WITHOUT
+    /// clearing the latches. The frame IRQ flag stays set until $4015
+    /// is READ (C++ `SIRQStat` bit 6); the DMC IRQ flag stays set
+    /// until $4015 is WRITTEN (C++ `StatusWrite` clears bit 7). The
+    /// SoC re-asserts these into the `IrqController` on every poll,
+    /// which is the level-triggered semantics the hardware uses.
     pub fn take_irq(&mut self) -> u32 {
         let mut mask = 0;
         if self.frame_irq_pending {
             mask |= IRQ_FCOUNT;
-            self.frame_irq_pending = false;
         }
         if self.dmc_irq_pending {
             mask |= IRQ_DMC;
-            self.dmc_irq_pending = false;
         }
         mask
     }

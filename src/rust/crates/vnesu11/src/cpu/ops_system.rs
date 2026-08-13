@@ -30,6 +30,24 @@ impl CpuCore {
         let _ = self.imm(bus);
     }
 
+    /// NOP absolute (0x0C) — reads the operand address and discards it.
+    #[inline(always)]
+    pub(crate) fn nop_abs<BC: BusContext>(&mut self, bus: &mut BC) {
+        let a = self.abs(bus);
+        let _ = bus.read(a);
+    }
+
+    /// NOP absolute,X (0x1C/0x3C/0x5C/0x7C/0xDC/0xFC) — reads the
+    /// operand address (page-cross penalty applies) and discards it.
+    #[inline(always)]
+    pub(crate) fn nop_absx<BC: BusContext>(&mut self, bus: &mut BC) {
+        let (a, crossed) = self.absx(bus);
+        let _ = bus.read(a);
+        if crossed {
+            self.count -= 1;
+        }
+    }
+
     /// BIT — test bits, sets Z/N/V. 2 modes.
     #[inline(always)]
     pub(crate) fn bit_common(&mut self, val: u8) {
@@ -124,17 +142,20 @@ impl CpuCore {
         self.adc_common(r);
     }
 
-    /// ANC — AND #imm then set C from bit 7, clear V. (0x0B/0x2B)
+    /// ANC — AND #imm then set C from bit 7. (0x0B/0x2B)
+    ///
+    /// C++ `ops.inc`: `LD_IM(AND;_P&=~C_FLAG;_P|=_A>>7)`. N/Z come
+    /// from the AND, C from bit 7 of the result; the V flag is NOT
+    /// modified (the previous Rust implementation wrongly cleared it).
     #[inline(always)]
     pub(crate) fn anc<BC: BusContext>(&mut self, bus: &mut BC) {
         let v = self.imm(bus);
         self.a &= v;
         self.p = flags::set_zn(self.p, self.a);
         self.p = if self.a & 0x80 != 0 { self.p | C_FLAG } else { self.p & !C_FLAG };
-        self.p &= !V_FLAG;
     }
 
-    /// ARR — AND #imm then ROR A, with NES-specific V flag. (0x4B)
+    /// ARR — AND #imm then ROR A, with NES-specific V flag. (0x6B)
     #[inline(always)]
     pub(crate) fn arr<BC: BusContext>(&mut self, bus: &mut BC) {
         let v = self.imm(bus);
@@ -147,6 +168,19 @@ impl CpuCore {
         self.p = if v6 == 1 { self.p | C_FLAG } else { self.p & !C_FLAG };
         self.p = if v6 != v5 { self.p | V_FLAG } else { self.p & !V_FLAG };
         self.p = flags::set_zn(self.p, r);
+    }
+
+    /// ALR (ASR) — AND #imm then LSR A. (0x4B)
+    ///
+    /// C++ `ops.inc`: `LD_IM(AND;LSRA)` — C gets bit 0 of the AND
+    /// result, then A shifts right (N cleared, Z from the result).
+    #[inline(always)]
+    pub(crate) fn alr<BC: BusContext>(&mut self, bus: &mut BC) {
+        let v = self.imm(bus);
+        self.a &= v;
+        self.p = if self.a & 0x01 != 0 { self.p | C_FLAG } else { self.p & !C_FLAG };
+        self.a >>= 1;
+        self.p = flags::set_zn(self.p, self.a);
     }
 
     /// XAA — A = X & imm. (0x8B) — nestest-accepted behavior.
@@ -179,34 +213,40 @@ impl CpuCore {
         self.p = if t >= v { self.p | C_FLAG } else { self.p & !C_FLAG };
     }
 
-    /// SHA (AHX) — store A & X & (high+1).
+    /// SHA (AHX) — store A & X & (base_high+1). C++ uses the BASE
+    /// address high byte (before the index), not the effective one.
     #[inline(always)]
-    pub(crate) fn sha_write<BC: BusContext>(&mut self, addr: u16, bus: &mut BC) {
-        let hi = ((addr >> 8) as u8).wrapping_add(1);
-        let v = self.a & self.x & hi;
+    pub(crate) fn sha_write<BC: BusContext>(&mut self, addr: u16, base_hi: u8, bus: &mut BC) {
+        let v = self.a & self.x & base_hi.wrapping_add(1);
         bus.write(addr, v);
     }
 
-    /// SHX (XAS) — store X & (high+1).
+    /// SXA (0x9E) — write X & (EA_high+1) to the quirk address
+    /// `(value_hi << 8) | EA_low`. C++ `ops.inc` builds the value then
+    /// writes its high byte to the value-as-address.
     #[inline(always)]
-    pub(crate) fn shx_write<BC: BusContext>(&mut self, addr: u16, bus: &mut BC) {
-        let hi = ((addr >> 8) as u8).wrapping_add(1);
-        bus.write(addr, self.x & hi);
+    pub(crate) fn shx_write<BC: BusContext>(&mut self, ea: u16, bus: &mut BC) {
+        let hi = ((ea >> 8) as u8).wrapping_add(1);
+        let val_hi = self.x & hi;
+        let addr = ((val_hi as u16) << 8) | (ea & 0xFF);
+        bus.write(addr, val_hi);
     }
 
-    /// SHY — store Y & (high+1).
+    /// SYA (0x9C) — write Y & (EA_high+1) to the quirk address
+    /// `(value_hi << 8) | EA_low`.
     #[inline(always)]
-    pub(crate) fn shy_write<BC: BusContext>(&mut self, addr: u16, bus: &mut BC) {
-        let hi = ((addr >> 8) as u8).wrapping_add(1);
-        bus.write(addr, self.y & hi);
+    pub(crate) fn shy_write<BC: BusContext>(&mut self, ea: u16, bus: &mut BC) {
+        let hi = ((ea >> 8) as u8).wrapping_add(1);
+        let val_hi = self.y & hi;
+        let addr = ((val_hi as u16) << 8) | (ea & 0xFF);
+        bus.write(addr, val_hi);
     }
 
-    /// TAS (SHS) — S = A & X; store S & (high+1).
+    /// TAS/XAS (0x9B) — S = A & X; store S & (base_high+1).
     #[inline(always)]
-    pub(crate) fn tas<BC: BusContext>(&mut self, addr: u16, bus: &mut BC) {
+    pub(crate) fn tas<BC: BusContext>(&mut self, addr: u16, base_hi: u8, bus: &mut BC) {
         self.s = self.a & self.x;
-        let hi = ((addr >> 8) as u8).wrapping_add(1);
-        bus.write(addr, self.s & hi);
+        bus.write(addr, self.s & base_hi.wrapping_add(1));
     }
 
     /// KIL ($02 etc.) — jam the CPU.
@@ -239,55 +279,55 @@ impl CpuCore {
     #[inline(always)] pub(crate) fn dcp_zp<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.zp(bus); self.dcp_at(a, bus); }
     #[inline(always)] pub(crate) fn dcp_zpx<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.zpx(bus); self.dcp_at(a, bus); }
     #[inline(always)] pub(crate) fn dcp_abs<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.abs(bus); self.dcp_at(a, bus); }
-    #[inline(always)] pub(crate) fn dcp_absx<BC: BusContext>(&mut self, bus: &mut BC) { let (a, c) = self.absx(bus); if c { self.count -= 1; } self.dcp_at(a, bus); }
-    #[inline(always)] pub(crate) fn dcp_absy<BC: BusContext>(&mut self, bus: &mut BC) { let (a, c) = self.absy(bus); if c { self.count -= 1; } self.dcp_at(a, bus); }
+    #[inline(always)] pub(crate) fn dcp_absx<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.rmw_absx(bus); self.dcp_at(a, bus); }
+    #[inline(always)] pub(crate) fn dcp_absy<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.rmw_absy(bus); self.dcp_at(a, bus); }
     #[inline(always)] pub(crate) fn dcp_izx<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.izx(bus); self.dcp_at(a, bus); }
-    #[inline(always)] pub(crate) fn dcp_izy<BC: BusContext>(&mut self, bus: &mut BC) { let (a, c) = self.izy(bus); if c { self.count -= 1; } self.dcp_at(a, bus); }
+    #[inline(always)] pub(crate) fn dcp_izy<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.rmw_izy(bus); self.dcp_at(a, bus); }
 
     // ISB
     #[inline(always)] pub(crate) fn isb_zp<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.zp(bus); self.isb_at(a, bus); }
     #[inline(always)] pub(crate) fn isb_zpx<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.zpx(bus); self.isb_at(a, bus); }
     #[inline(always)] pub(crate) fn isb_abs<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.abs(bus); self.isb_at(a, bus); }
-    #[inline(always)] pub(crate) fn isb_absx<BC: BusContext>(&mut self, bus: &mut BC) { let (a, c) = self.absx(bus); if c { self.count -= 1; } self.isb_at(a, bus); }
-    #[inline(always)] pub(crate) fn isb_absy<BC: BusContext>(&mut self, bus: &mut BC) { let (a, c) = self.absy(bus); if c { self.count -= 1; } self.isb_at(a, bus); }
+    #[inline(always)] pub(crate) fn isb_absx<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.rmw_absx(bus); self.isb_at(a, bus); }
+    #[inline(always)] pub(crate) fn isb_absy<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.rmw_absy(bus); self.isb_at(a, bus); }
     #[inline(always)] pub(crate) fn isb_izx<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.izx(bus); self.isb_at(a, bus); }
-    #[inline(always)] pub(crate) fn isb_izy<BC: BusContext>(&mut self, bus: &mut BC) { let (a, c) = self.izy(bus); if c { self.count -= 1; } self.isb_at(a, bus); }
+    #[inline(always)] pub(crate) fn isb_izy<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.rmw_izy(bus); self.isb_at(a, bus); }
 
     // SLO
     #[inline(always)] pub(crate) fn slo_zp<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.zp(bus); self.slo_at(a, bus); }
     #[inline(always)] pub(crate) fn slo_zpx<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.zpx(bus); self.slo_at(a, bus); }
     #[inline(always)] pub(crate) fn slo_abs<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.abs(bus); self.slo_at(a, bus); }
-    #[inline(always)] pub(crate) fn slo_absx<BC: BusContext>(&mut self, bus: &mut BC) { let (a, c) = self.absx(bus); if c { self.count -= 1; } self.slo_at(a, bus); }
-    #[inline(always)] pub(crate) fn slo_absy<BC: BusContext>(&mut self, bus: &mut BC) { let (a, c) = self.absy(bus); if c { self.count -= 1; } self.slo_at(a, bus); }
+    #[inline(always)] pub(crate) fn slo_absx<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.rmw_absx(bus); self.slo_at(a, bus); }
+    #[inline(always)] pub(crate) fn slo_absy<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.rmw_absy(bus); self.slo_at(a, bus); }
     #[inline(always)] pub(crate) fn slo_izx<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.izx(bus); self.slo_at(a, bus); }
-    #[inline(always)] pub(crate) fn slo_izy<BC: BusContext>(&mut self, bus: &mut BC) { let (a, c) = self.izy(bus); if c { self.count -= 1; } self.slo_at(a, bus); }
+    #[inline(always)] pub(crate) fn slo_izy<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.rmw_izy(bus); self.slo_at(a, bus); }
 
     // RLA
     #[inline(always)] pub(crate) fn rla_zp<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.zp(bus); self.rla_at(a, bus); }
     #[inline(always)] pub(crate) fn rla_zpx<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.zpx(bus); self.rla_at(a, bus); }
     #[inline(always)] pub(crate) fn rla_abs<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.abs(bus); self.rla_at(a, bus); }
-    #[inline(always)] pub(crate) fn rla_absx<BC: BusContext>(&mut self, bus: &mut BC) { let (a, c) = self.absx(bus); if c { self.count -= 1; } self.rla_at(a, bus); }
-    #[inline(always)] pub(crate) fn rla_absy<BC: BusContext>(&mut self, bus: &mut BC) { let (a, c) = self.absy(bus); if c { self.count -= 1; } self.rla_at(a, bus); }
+    #[inline(always)] pub(crate) fn rla_absx<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.rmw_absx(bus); self.rla_at(a, bus); }
+    #[inline(always)] pub(crate) fn rla_absy<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.rmw_absy(bus); self.rla_at(a, bus); }
     #[inline(always)] pub(crate) fn rla_izx<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.izx(bus); self.rla_at(a, bus); }
-    #[inline(always)] pub(crate) fn rla_izy<BC: BusContext>(&mut self, bus: &mut BC) { let (a, c) = self.izy(bus); if c { self.count -= 1; } self.rla_at(a, bus); }
+    #[inline(always)] pub(crate) fn rla_izy<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.rmw_izy(bus); self.rla_at(a, bus); }
 
     // SRE
     #[inline(always)] pub(crate) fn sre_zp<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.zp(bus); self.sre_at(a, bus); }
     #[inline(always)] pub(crate) fn sre_zpx<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.zpx(bus); self.sre_at(a, bus); }
     #[inline(always)] pub(crate) fn sre_abs<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.abs(bus); self.sre_at(a, bus); }
-    #[inline(always)] pub(crate) fn sre_absx<BC: BusContext>(&mut self, bus: &mut BC) { let (a, c) = self.absx(bus); if c { self.count -= 1; } self.sre_at(a, bus); }
-    #[inline(always)] pub(crate) fn sre_absy<BC: BusContext>(&mut self, bus: &mut BC) { let (a, c) = self.absy(bus); if c { self.count -= 1; } self.sre_at(a, bus); }
+    #[inline(always)] pub(crate) fn sre_absx<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.rmw_absx(bus); self.sre_at(a, bus); }
+    #[inline(always)] pub(crate) fn sre_absy<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.rmw_absy(bus); self.sre_at(a, bus); }
     #[inline(always)] pub(crate) fn sre_izx<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.izx(bus); self.sre_at(a, bus); }
-    #[inline(always)] pub(crate) fn sre_izy<BC: BusContext>(&mut self, bus: &mut BC) { let (a, c) = self.izy(bus); if c { self.count -= 1; } self.sre_at(a, bus); }
+    #[inline(always)] pub(crate) fn sre_izy<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.rmw_izy(bus); self.sre_at(a, bus); }
 
     // RRA
     #[inline(always)] pub(crate) fn rra_zp<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.zp(bus); self.rra_at(a, bus); }
     #[inline(always)] pub(crate) fn rra_zpx<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.zpx(bus); self.rra_at(a, bus); }
     #[inline(always)] pub(crate) fn rra_abs<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.abs(bus); self.rra_at(a, bus); }
-    #[inline(always)] pub(crate) fn rra_absx<BC: BusContext>(&mut self, bus: &mut BC) { let (a, c) = self.absx(bus); if c { self.count -= 1; } self.rra_at(a, bus); }
-    #[inline(always)] pub(crate) fn rra_absy<BC: BusContext>(&mut self, bus: &mut BC) { let (a, c) = self.absy(bus); if c { self.count -= 1; } self.rra_at(a, bus); }
+    #[inline(always)] pub(crate) fn rra_absx<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.rmw_absx(bus); self.rra_at(a, bus); }
+    #[inline(always)] pub(crate) fn rra_absy<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.rmw_absy(bus); self.rra_at(a, bus); }
     #[inline(always)] pub(crate) fn rra_izx<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.izx(bus); self.rra_at(a, bus); }
-    #[inline(always)] pub(crate) fn rra_izy<BC: BusContext>(&mut self, bus: &mut BC) { let (a, c) = self.izy(bus); if c { self.count -= 1; } self.rra_at(a, bus); }
+    #[inline(always)] pub(crate) fn rra_izy<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.rmw_izy(bus); self.rra_at(a, bus); }
 
     // =================================================================
     // SHA / SHX / SHY / TAS — undocumented stores with page-cross
@@ -297,27 +337,30 @@ impl CpuCore {
 
     #[inline(always)]
     pub(crate) fn sha_absy<BC: BusContext>(&mut self, bus: &mut BC) {
-        let (a, _) = self.absy(bus);
-        self.sha_write(a, bus);
+        let a = self.rmw_absy(bus);
+        let base_hi = (a.wrapping_sub(self.y as u16) >> 8) as u8;
+        self.sha_write(a, base_hi, bus);
     }
     #[inline(always)]
     pub(crate) fn sha_izy<BC: BusContext>(&mut self, bus: &mut BC) {
-        let (a, _) = self.izy(bus);
-        self.sha_write(a, bus);
+        let a = self.rmw_izy(bus);
+        let base_hi = (a.wrapping_sub(self.y as u16) >> 8) as u8;
+        self.sha_write(a, base_hi, bus);
     }
     #[inline(always)]
     pub(crate) fn shx_absy<BC: BusContext>(&mut self, bus: &mut BC) {
-        let (a, _) = self.absy(bus);
+        let a = self.rmw_absy(bus);
         self.shx_write(a, bus);
     }
     #[inline(always)]
     pub(crate) fn shy_absx<BC: BusContext>(&mut self, bus: &mut BC) {
-        let (a, _) = self.absx(bus);
+        let a = self.rmw_absx(bus);
         self.shy_write(a, bus);
     }
     #[inline(always)]
     pub(crate) fn tas_absy<BC: BusContext>(&mut self, bus: &mut BC) {
-        let (a, _) = self.absy(bus);
-        self.tas(a, bus);
+        let a = self.rmw_absy(bus);
+        let base_hi = (a.wrapping_sub(self.y as u16) >> 8) as u8;
+        self.tas(a, base_hi, bus);
     }
 }

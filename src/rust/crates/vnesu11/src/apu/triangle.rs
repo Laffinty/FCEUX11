@@ -66,10 +66,7 @@ impl TriangleChannel {
     /// $400B write — timer high + length load.
     pub fn write_timer_hi(&mut self, val: u8) {
         self.timer_period = (self.timer_period & 0xFF) | (((val & 0x07) as u16) << 8);
-        self.length.load((val >> 3) & 0x1F);
-        if self.length.enabled {
-            self.length.apply_load();
-        }
+        self.length.load_from_write((val >> 3) & 0x1F);
         // Also reload linear counter on $400B write.
         self.linear_counter.reload_flag = true;
     }

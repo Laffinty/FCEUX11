@@ -377,6 +377,14 @@ impl VNesSoc {
             0x4017 => {
                 let parity = (self.apu.cycles & 1) as u8;
                 self.apu.frame_counter.write_with_parity(val, parity);
+                // C++ `Write_IRQFM`: writing bit 6 (IRQ inhibit) clears
+                // the frame-IRQ flag + deasserts the FCOUNT line
+                // immediately (before the 3/4-cycle mode maturation).
+                if val & 0x40 != 0 {
+                    self.apu.frame_irq_pending = false;
+                    self.irq.deassert_irq(crate::apu::IRQ_FCOUNT);
+                    self.cpu.irq_end(crate::apu::IRQ_FCOUNT);
+                }
                 self.joypad.write_strobe(val);
             }
             _ => { /* $4009/$400D are unused on NES 2A03. */ }

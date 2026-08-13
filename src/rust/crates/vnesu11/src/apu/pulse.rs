@@ -97,10 +97,12 @@ impl PulseChannel {
     /// $4003 / $4007 write — timer high + length counter load.
     pub fn write_timer_hi(&mut self, val: u8) {
         self.timer_period = (self.timer_period & 0xFF) | (((val & 0x07) as u16) << 8);
-        // Reset phase + length counter.
-        if self.length.enabled {
-            self.length.apply_load();
-        }
+        // Reset phase + load length counter (only when enabled, C++
+        // `SQReload`). The phase reset on real hardware goes to the
+        // duty sequence reset position (C++ `RectDutyCount[x]=7`),
+        // but the Rust channel indexes `seq_step` 0..=7 and only the
+        // duty LOOKUP cares about its value; 0 is the matching phase.
+        self.length.load_from_write((val >> 3) & 0x1F);
         self.seq_step = 0;
     }
 
@@ -167,18 +169,17 @@ mod tests {
         p.write_timer_hi(0x40);
         // After write, sequence resets to 0.
         assert_eq!(p.seq_step, 0);
-        // Length counter is NOT reloaded (apply_load only if counter == 0).
-        assert_eq!(p.length.counter, 10);
+        // Length counter reloads from the length table when enabled
+        // (C++ SQReload). index = (0x40 >> 3) & 0x1F = 8.
+        assert_eq!(p.length.counter, super::super::length_counter::LENGTH_TABLE[8]);
     }
 
     #[test]
-    fn pulse_write_timer_hi_reloads_when_counter_zero() {
+    fn pulse_write_timer_hi_reloads_when_enabled() {
         let mut p = PulseChannel::new(0);
         p.length.enabled = true;
         p.length.counter = 0;
-        p.length.load(5);
-        p.write_timer_hi(0x40);
-        // Counter was 0, so apply_load loads from LENGTH_TABLE[5].
+        p.write_timer_hi(0x28); // index = (0x28 >> 3) & 0x1F = 5
         assert_eq!(p.length.counter, super::super::length_counter::LENGTH_TABLE[5]);
     }
 }

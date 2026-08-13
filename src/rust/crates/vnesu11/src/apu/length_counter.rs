@@ -21,8 +21,6 @@ pub struct LengthCounter {
     pub counter: u8,
     /// Enabled flag (set by $4015 bit, cleared by status write).
     pub enabled: bool,
-    /// Loaded on $4003/$4007/etc. write (5-bit index into table).
-    pub load_index: u8,
 }
 
 impl Default for LengthCounter {
@@ -33,21 +31,34 @@ impl Default for LengthCounter {
 
 impl LengthCounter {
     pub const fn new() -> Self {
-        Self { counter: 0, enabled: false, load_index: 0 }
+        Self { counter: 0, enabled: false }
     }
 
-    /// Load counter from $4003/$4007/$400B/$400F write.
+    /// Load the counter from a length-index register write
+    /// ($4003/$4007/$400B/$400F).  Only takes effect when the channel
+    /// is enabled ($4015 bit), matching C++ `SQReload` /
+    /// `Write_PSG case 0x3/0x7/0xB/0xF` which gate on `EnabledChannels`.
     #[inline]
-    pub fn load(&mut self, index: u8) {
-        self.load_index = index & 0x1F;
+    pub fn load_from_write(&mut self, index: u8) {
+        if self.enabled {
+            self.counter = LENGTH_TABLE[(index & 0x1F) as usize];
+        }
     }
 
     /// Half-frame tick (called by frame counter's half-frame event).
+    ///
+    /// `halt` is the channel's length-counter halt flag: bit 5 of
+    /// $4000/$4004/$400C for pulse/noise, bit 7 of $4008 for triangle.
+    /// When set, the counter is held and does not decrement (C++
+    /// `FrameSoundStuff` checks `!(PSG[x]&0x20)` / `!(PSG[8]&0x80)`).
     #[inline]
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self, halt: bool) {
         if !self.enabled {
             // Per NESdev: when disabled, length counter is forced to 0.
             self.counter = 0;
+            return;
+        }
+        if halt {
             return;
         }
         if self.counter > 0 {
@@ -69,17 +80,6 @@ impl LengthCounter {
     pub fn is_silent(&self) -> bool {
         self.counter == 0
     }
-
-    /// Apply the load_index to the counter (called when the channel
-    /// is *not* silenced by other means — e.g. when $4003 write
-    /// happens).  This is a separate call so the channel logic can
-    /// short-circuit (e.g. triangle ulock flag).
-    #[inline]
-    pub fn apply_load(&mut self) {
-        if self.counter == 0 {
-            self.counter = LENGTH_TABLE[self.load_index as usize];
-        }
-    }
 }
 
 #[cfg(test)]
@@ -87,12 +87,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn length_counter_load() {
+    fn length_counter_load_from_write() {
         let mut lc = LengthCounter::new();
-        lc.load(0);
-        assert_eq!(lc.load_index, 0);
-        lc.apply_load();
+        lc.enabled = true;
+        lc.load_from_write(0);
         assert_eq!(lc.counter, 10); // LENGTH_TABLE[0] = 10
+        // Disabled channel ignores the load.
+        let mut disabled = LengthCounter::new();
+        disabled.load_from_write(0);
+        assert_eq!(disabled.counter, 0);
     }
 
     #[test]
@@ -100,10 +103,19 @@ mod tests {
         let mut lc = LengthCounter::new();
         lc.enabled = true;
         lc.counter = 5;
-        lc.tick();
+        lc.tick(false);
         assert_eq!(lc.counter, 4);
-        lc.tick();
+        lc.tick(false);
         assert_eq!(lc.counter, 3);
+    }
+
+    #[test]
+    fn length_counter_halt_holds() {
+        let mut lc = LengthCounter::new();
+        lc.enabled = true;
+        lc.counter = 5;
+        lc.tick(true);
+        assert_eq!(lc.counter, 5);
     }
 
     #[test]
@@ -112,7 +124,7 @@ mod tests {
         lc.enabled = false;
         lc.counter = 5;
         // Per NESdev: when disabled, the length counter is forced to 0.
-        lc.tick();
+        lc.tick(false);
         assert_eq!(lc.counter, 0);
     }
 

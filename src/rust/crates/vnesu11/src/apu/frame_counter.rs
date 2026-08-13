@@ -259,16 +259,17 @@ impl FrameCounter {
         if now == profile.reset_at {
             // Reset boundary (C++ `fhcnt==N → fhcnt=0; fcnt=0`).
             // Phase 6 P2 shadow fix (2026-08-12): do NOT clear the
-            // IRQ here. C++ `FrameIRQEnd` only clears FCEU_IQFCOUNT
-            // when mode 1 (inhibit) is set; in mode 0 (non-inhibit)
-            // it KEEPS the line asserted (`SIRQStat|=0x40` and no
-            // X6502_IRQEnd). The IRQ stays pending until the CPU
-            // reads $4015 (StatusRead clears SIRQStat bit6 + IRQlow).
-            // Rust previously cleared `*irq_out` at reset, which
-            // swallowed the IRQ if the set (29828/29829) and reset
-            // (29830) fell inside one `apu.tick(tcount)` call — the
-            // frame-counter IRQ never reached the CPU, diverging the
-            // shadow run.
+            // IRQ here in mode 0. C++ `FrameIRQEnd` only clears
+            // FCEU_IQFCOUNT when mode 1 (inhibit) is set; in mode 0
+            // (non-inhibit) it RE-ASSERTS the flag + line
+            // (`SIRQStat|=0x40` + `X6502_IRQBegin`), which is the
+            // third IRQ set of the 29828/29829/29830 window. This
+            // matters for blargg's poll loop: a $4015 read at 29829
+            // clears the flag, and 29830 must set it again so the
+            // following read sees it.
+            if !self.five_step {
+                *irq_out = !self.irq_inhibit;
+            }
             self.cycle_count = 0;
             self.quarter_frame = false;
             self.half_frame = false;
@@ -291,14 +292,37 @@ impl FrameCounter {
         let _ = current_cycle;
     }
 
-    /// Reset for power-on / reset.
-    pub fn reset(&mut self) {
-        self.cycle_count = 0;
+    /// Power-on reset: mode = 0 ($4017 = $00), frame-counter phase
+    /// starts 4 cycles in (`fhcnt=4` in `FCEUSND_Reset`). The first
+    /// frame IRQ then lands where blargg `apu_reset_4017_timing`
+    /// measures it.
+    pub fn power_reset(&mut self) {
+        self.five_step = false;
+        self.irq_inhibit = false;
+        self.cycle_count = 9;
         self.step = 0;
         self.quarter_frame = false;
         self.half_frame = false;
         self.pending_mode = 0;
         self.reset_in = 0;
+    }
+
+    /// Soft reset: preserve the last $4017 mode (`FCEUSND_Reset(false)`
+    /// keeps `IRQFrameMode`), reset the phase to `fhcnt=4`.
+    pub fn soft_reset(&mut self) {
+        self.cycle_count = 9;
+        self.step = 0;
+        self.quarter_frame = false;
+        self.half_frame = false;
+        self.pending_mode = 0;
+        self.reset_in = 0;
+    }
+
+    /// Reset for power-on / reset (legacy callers — same phase as
+    /// `FCEUSND_Reset`, but preserves the current mode like a soft
+    /// reset).
+    pub fn reset(&mut self) {
+        self.soft_reset();
     }
 }
 

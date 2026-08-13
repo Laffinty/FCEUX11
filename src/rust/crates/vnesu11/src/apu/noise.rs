@@ -70,10 +70,7 @@ impl NoiseChannel {
 
     /// $400F write — length counter load + envelope start.
     pub fn write_length(&mut self, val: u8) {
-        self.length.load((val >> 3) & 0x1F);
-        if self.length.enabled {
-            self.length.apply_load();
-        }
+        self.length.load_from_write((val >> 3) & 0x1F);
         self.envelope.start_flag = true;
     }
 
