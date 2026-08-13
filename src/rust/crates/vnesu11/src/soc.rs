@@ -538,6 +538,34 @@ impl VNesSoc {
         // power-on state.
         self.ppu = crate::ppu::PpuCore::new();
     }
+
+    /// Soft reset (mirrors C++ `ResetNES` in `src/fceu.cpp:959`):
+    /// CPU + APU + PPU + DMA + IRQ + joypad are reset, but RAM and the
+    /// mapper state are preserved. Previously `vnesu11_reset` only reset
+    /// the CPU, so blargg `apu_reset_*` ROMs (which press RESET and then
+    /// inspect APU state) saw stale APU state and failed.
+    pub fn reset(&mut self) {
+        // CPU reset (does NOT touch S; matches X6502_Reset).
+        let mut bus = unsafe { VNesBusContext::new(self) };
+        self.cpu.reset(&mut bus);
+        self.open_bus = 0;
+        self.frame_ready = false;
+        self.ppu_w = false;
+        self.ppu_t = 0;
+        self.ppu_v = 0;
+        self.ppu_x = 0;
+        self.ppu_read_buffer = 0;
+
+        // APU / DMA / IRQ / joypad to a clean reset state.
+        self.apu.power_cycle();
+        self.dma.power_cycle();
+        self.irq.reset();
+        self.joypad.reset();
+
+        // PPU reset (soft reset still rebuilds the PPU core; the RAM
+        // / VRAM / OAM contents are preserved in ram_banks).
+        self.ppu = crate::ppu::PpuCore::new();
+    }
 }
 
 fn clone_array<const N: usize>(src: &[u8]) -> [u8; N] {

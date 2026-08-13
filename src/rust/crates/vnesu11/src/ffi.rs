@@ -90,16 +90,11 @@ pub unsafe extern "C" fn vnesu11_power_on_with_init(soc: *mut VNesSocOpaque) -> 
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vnesu11_reset(soc: *mut VNesSocOpaque) {
-    // Phase 2: minimal — re-init CPU, leave RAM alone.
+    // Soft reset: CPU + APU + PPU + DMA + IRQ + joypad (RAM + mapper
+    // preserved), matching C++ ResetNES. The old stub only reset the
+    // CPU, which left stale APU/PPU state and broke blargg apu_reset_*.
     if let Some(s) = into_mut(soc) {
-        let mut bus = crate::soc::VNesBusContext::new(s);
-        s.cpu.reset(&mut bus);
-        s.open_bus = 0;
-        s.ppu_w = false;
-        s.ppu_t = 0;
-        s.ppu_v = 0;
-        s.ppu_x = 0;
-        s.ppu_read_buffer = 0;
+        s.reset();
     }
 }
 
