@@ -697,9 +697,8 @@ shadow harness 现已具备持续迭代的对比基础设施（harness 报告行
 
 - **分支** `wip_v2.0`；本收口会话的改动尚未提交（工作树含 11 个 Rust 源文件
   修改，见 `git status`）。
-- **诚实 Rust T1 = 134/177 = 75.7%**（`VNESU11_RUST_PRIMARY=1` 全量实测，
-  本会话末 `rust_t1_final` 临时产物已删）。较会话开始（111/177 = 62.7%）净
-  **+23 PASS**。
+- **诚实 Rust T1 = 135/177 = 76.3%**（`VNESU11_RUST_PRIMARY=1` 全量实测）。
+  较会话开始（111/177 = 62.7%）净 **+24 PASS**。
 - **正确栈序已修**（`33d95cf`，上一会话）：`push` 先写 `$100+S` 再减 S、
   `pop` 先加 S 再读。
 - **本收口会话修复链（未提交）**：
@@ -716,13 +715,17 @@ shadow harness 现已具备持续迭代的对比基础设施（harness 报告行
   5. CPU RMW 寻址：DCP/ISB/SLO/RLA/SRE/RRA 的 abs,X/Y/(iz),Y 改用 RMW 老页
      dummy read（无 page-cross 罚周期）；新增 `rmw_izy`。
   6. NOP abs/abs,X（0x0C/0x1C…0xFC）真实读总线（含 page-cross 罚周期）。
+  7. CLI/SEI/PLP 不再覆盖 `moo_pi`（保留 6502 单指令中断延迟）；通用 IRQ
+     服务后 `moo_pi = P`（对齐 C++ `_PI = _P`），修复 segment 预算耗尽时
+     下个 segment 用陈旧 I=0 重复进 IRQ handler（`cpu_int_1_cli_latency`
+     转 PASS）。
 - **测试**：`cargo test --release -p vnesu11 --lib` 195 passed / 0 failed。
-- **剩余 43 个失败**（Rust-primary 实测）：APU 8（`apu_reset_works_imm`、
+- **剩余 42 个失败**（Rust-primary 实测）：APU 8（`apu_reset_works_imm`、
   `apu_single_7/8_dmc_*`、`apu_test`、`sprdma_dmc_dma*2` 等，需完整 DMC）、
-  CPU 12（`cpu_int_*` 中断采样 / `cpu_exec_space_*` / `cpu_reset_regs` /
-  `instr_misc*`）、MMC3 12（其中 5 个已从 0x80 挂起转为 0x02 具体失败，
-  其余 7 个仍缺 A12 时钟）、PPU 13（`vbl_*` 精确 dot 时序 + `ppu_open_bus`
-  + `oam_stress`）。
+  CPU 11（`cpu_int_2..5` 中断采样（C++ 同样失败）/ `cpu_exec_space_*` /
+  `cpu_reset_regs` / `instr_misc*`）、MMC3 12（其中 5 个已从 0x80 挂起转为
+  0x02 具体失败，其余 7 个仍缺 A12 时钟）、PPU 13（`vbl_*` 需 dot 粒度时序
+  + `ppu_open_bus` + `oam_stress`）。
 
 #### 9.1.0a Rust-primary 测量模式（关键工具）
 
