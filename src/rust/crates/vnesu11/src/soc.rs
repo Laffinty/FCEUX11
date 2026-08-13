@@ -245,7 +245,19 @@ impl VNesSoc {
                     // CPU is short ~20k cycles/frame and the shadow PC drifts.
                     if let Some(extra) = self.ppu.sprite_eval_segment() {
                         let extra_budget = extra.cpu_budget();
-                        self.run_segment_inner(extra_budget);
+                        // Phase C (2026-08-13): drive the C++ mapper HBlank
+                        // IRQ hook (MMC3 scanline counter, MMC5, mapper 90,
+                        // etc.). In Rust-primary mode the C++ PPU never runs,
+                        // so this vtable call is the only thing that advances
+                        // the mapper scanline IRQ counter. Match the C++
+                        // timing: GameHBIRQHook fires after the leading
+                        // X6502_Run(6) + X6502_Run(4) = 10 CPU cycles of
+                        // HBlank, then the remaining 75 run.
+                        self.run_segment_inner(10);
+                        if let Some(slot) = &self.mapper_meta {
+                            unsafe { (slot.meta.hblank_irq)(slot.mapper_ctx); }
+                        }
+                        self.run_segment_inner(extra_budget - 10);
                         // The follow-up segment does NOT advance the
                         // scanline — sprite eval happens within the same
                         // scanline as the background render.
@@ -494,6 +506,10 @@ impl VNesSoc {
         self.sync_ram_banks_to_views();
 
         // Reset CPU too (matches `g_cpu.reset()` in `PowerNES`).
+        // C++ X6502_Power sets _S=0xFD before X6502_Reset; the Rust
+        // CpuCore::reset() deliberately does NOT touch S (mirroring
+        // X6502_Reset), so set the power-on stack pointer here.
+        self.cpu.s = 0xFD;
         // We use a raw-pointer bus context to satisfy the borrow
         // checker — `&mut self.cpu` and `&mut self` can't coexist
         // through `&mut VNesSoc`.

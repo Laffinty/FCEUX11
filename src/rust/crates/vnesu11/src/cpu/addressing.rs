@@ -178,6 +178,12 @@ impl CpuCore {
         let (a, crossed) = self.absx(bus);
         if crossed {
             self.count -= 1;
+            // Page-cross dummy read: the 6502 first reads the address
+            // with the OLD (pre-carry) page, then re-reads the correct
+            // page. The value is discarded but the open-bus side effect
+            // is observable (blargg instr_misc_03_dummy).
+            let dummy = (a & 0xFF00).wrapping_sub(0x100) | (a & 0xFF);
+            let _ = bus.read(dummy);
         }
         bus.read(a)
     }
@@ -187,6 +193,8 @@ impl CpuCore {
         let (a, crossed) = self.absy(bus);
         if crossed {
             self.count -= 1;
+            let dummy = (a & 0xFF00).wrapping_sub(0x100) | (a & 0xFF);
+            let _ = bus.read(dummy);
         }
         bus.read(a)
     }
@@ -202,6 +210,8 @@ impl CpuCore {
         let (a, crossed) = self.izy(bus);
         if crossed {
             self.count -= 1;
+            let dummy = (a & 0xFF00).wrapping_sub(0x100) | (a & 0xFF);
+            let _ = bus.read(dummy);
         }
         bus.read(a)
     }
@@ -237,13 +247,20 @@ impl CpuCore {
 
     #[inline(always)]
     pub(crate) fn write_absx<BC: BusContext>(&mut self, val: u8, bus: &mut BC) {
-        let (a, _) = self.absx(bus);
+        let (a, crossed) = self.absx(bus);
+        // STA abs,X always does a dummy read before the write. On a
+        // page-cross the dummy targets the OLD (pre-carry) page; the
+        // write then lands on the correct page.
+        let dummy = if crossed { (a & 0xFF00).wrapping_sub(0x100) | (a & 0xFF) } else { a };
+        let _ = bus.read(dummy);
         bus.write(a, val);
     }
 
     #[inline(always)]
     pub(crate) fn write_absy<BC: BusContext>(&mut self, val: u8, bus: &mut BC) {
-        let (a, _) = self.absy(bus);
+        let (a, crossed) = self.absy(bus);
+        let dummy = if crossed { (a & 0xFF00).wrapping_sub(0x100) | (a & 0xFF) } else { a };
+        let _ = bus.read(dummy);
         bus.write(a, val);
     }
 
@@ -255,7 +272,9 @@ impl CpuCore {
 
     #[inline(always)]
     pub(crate) fn write_izy<BC: BusContext>(&mut self, val: u8, bus: &mut BC) {
-        let (a, _) = self.izy(bus);
+        let (a, crossed) = self.izy(bus);
+        let dummy = if crossed { (a & 0xFF00).wrapping_sub(0x100) | (a & 0xFF) } else { a };
+        let _ = bus.read(dummy);
         bus.write(a, val);
     }
 }

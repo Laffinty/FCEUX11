@@ -113,6 +113,7 @@ pub struct MapperMetaVtable {
     pub mirroring:   unsafe extern "C" fn(*mut c_void) -> u8,
     pub fill_audio:  unsafe extern "C" fn(*mut c_void, *mut i16, usize),
     pub tick_irq:    unsafe extern "C" fn(*mut c_void, *mut bool),
+    pub hblank_irq:  unsafe extern "C" fn(*mut c_void),
     pub save_state:  unsafe extern "C" fn(*mut c_void, *mut u8, usize, *mut usize) -> i32,
     pub load_state:  unsafe extern "C" fn(*mut c_void, *const u8, usize) -> i32,
 }
@@ -126,12 +127,14 @@ impl Default for MapperMetaVtable {
         unsafe extern "C" fn noop_mirror(_ctx: *mut c_void) -> u8 { 0 }
         unsafe extern "C" fn noop_audio(_ctx: *mut c_void, _out: *mut i16, _n: usize) {}
         unsafe extern "C" fn noop_irq(_ctx: *mut c_void, _out: *mut bool) {}
+        unsafe extern "C" fn noop_hblank(_ctx: *mut c_void) {}
         unsafe extern "C" fn noop_save(_ctx: *mut c_void, _out: *mut u8, _cap: usize, _w: *mut usize) -> i32 { -1 }
         unsafe extern "C" fn noop_load(_ctx: *mut c_void, _in: *const u8, _len: usize) -> i32 { -1 }
         Self {
             mirroring: noop_mirror,
             fill_audio: noop_audio,
             tick_irq: noop_irq,
+            hblank_irq: noop_hblank,
             save_state: noop_save,
             load_state: noop_load,
         }

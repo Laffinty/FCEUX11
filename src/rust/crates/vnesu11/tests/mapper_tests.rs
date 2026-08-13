@@ -238,6 +238,7 @@ fn test_ffi_attach_mapper_meta() {
     unsafe extern "C" fn mirror(_ctx: *mut core::ffi::c_void) -> u8 { 1 }
     unsafe extern "C" fn audio(_ctx: *mut core::ffi::c_void, _out: *mut i16, _n: usize) {}
     unsafe extern "C" fn tick_irq(_ctx: *mut core::ffi::c_void, _out: *mut bool) {}
+    unsafe extern "C" fn hblank(_ctx: *mut core::ffi::c_void) {}
     unsafe extern "C" fn save(
         _ctx: *mut core::ffi::c_void, _out: *mut u8, _cap: usize, _w: *mut usize,
     ) -> i32 { 0 }
@@ -249,6 +250,7 @@ fn test_ffi_attach_mapper_meta() {
         mirroring: mirror,
         fill_audio: audio,
         tick_irq: tick_irq,
+        hblank_irq: hblank,
         save_state: save,
         load_state: load,
     };

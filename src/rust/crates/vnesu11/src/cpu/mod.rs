@@ -99,10 +99,12 @@ impl CpuCore {
         }
     }
 
-    /// Reset: PC = reset vector, P = U|I, S = 0xFD (matches `X6502_Reset`).
+    /// Reset: PC = reset vector, P = U|I. `S` is NOT touched here —
+    /// this matches the C++ `X6502_Reset()` (it only sets
+    /// `_IRQlow = FCEU_IQRESET`); the stack pointer is set to 0xFD at
+    /// power-on by the caller, mirroring `X6502_Power()`.
     pub fn reset<BC: BusContext>(&mut self, bus: &mut BC) {
         self.pc = self.read16(bus, 0xFFFC);
-        self.s = 0xFD;
         self.p = flags::INITIAL_P;
         self.moo_pi = flags::INITIAL_P;
         self.jammed = false;
@@ -230,15 +232,19 @@ impl CpuCore {
 
     #[inline(always)]
     pub(crate) fn push<BC: BusContext>(&mut self, bus: &mut BC, val: u8) {
-        self.s = self.s.wrapping_sub(1);
+        // 6502 PUSH: write at $100+S, THEN decrement S (C++
+        // `WrRAM(0x100+_S, V); _S--;`). Writing first matters for
+        // blargg instr_v5 set_test 5 ("PHA stores at $100+S").
         bus.write(0x0100 | self.s as u16, val);
+        self.s = self.s.wrapping_sub(1);
     }
 
     #[inline(always)]
     pub(crate) fn pop<BC: BusContext>(&mut self, bus: &mut BC) -> u8 {
-        let v = bus.read(0x0100 | self.s as u16);
+        // 6502 POP: increment S, THEN read at $100+S (C++
+        // `RdRAM(0x100+(++_S))`).
         self.s = self.s.wrapping_add(1);
-        v
+        bus.read(0x0100 | self.s as u16)
     }
 
     // -----------------------------------------------------------------
@@ -399,13 +405,14 @@ mod tests {
     }
 
     #[test]
-    fn reset_sets_stack_and_p() {
+    fn reset_sets_pc_and_p_but_not_s() {
         let mut bus = TestBus::default();
         bus.load(0xFFFC, &[0x34, 0x12]);
         let mut cpu = CpuCore::new();
+        cpu.s = 0x20; // pre-existing S must be preserved across reset
         cpu.reset(&mut bus);
         assert_eq!(cpu.pc, 0x1234);
-        assert_eq!(cpu.s, 0xFD);
+        assert_eq!(cpu.s, 0x20); // C++ X6502_Reset does NOT touch S
         assert_eq!(cpu.p, flags::INITIAL_P);
     }
 
@@ -416,9 +423,10 @@ mod tests {
         cpu.s = 0xFE;
         cpu.push(&mut bus, 0xAB);
         assert_eq!(cpu.s, 0xFD);
-        // Stack at 0x0100|S = 0x01FD, which maps to ram[0x01FD & 0x7FF] = ram[0x1FD].
-        assert_eq!(bus.ram[0x1FD], 0xAB);
-        assert_eq!(bus.read(0x01FD), 0xAB);
+        // 6502 PUSH writes at $100+S *before* decrementing: with S=0xFE
+        // the byte lands at $01FE (not $01FD). Maps to ram[0x1FE & 0x7FF].
+        assert_eq!(bus.ram[0x1FE], 0xAB);
+        assert_eq!(bus.read(0x01FE), 0xAB);
         let v = cpu.pop(&mut bus);
         assert_eq!(v, 0xAB);
         assert_eq!(cpu.s, 0xFE);

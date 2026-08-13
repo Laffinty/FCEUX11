@@ -22,6 +22,7 @@
 #include "cart.h"         // CartInfo, currCartInfo
 #include "cart_class.h"   // fceu11::g_cart, Cart::save_mapper_state
 #include "x6502.h"        // g_cpu.native_layout().IRQlow, FCEU_IQEXT
+#include "ppu.h"          // GameHBIRQHook / GameHBIRQHook2 / PPU_hook
 #include "vnesu11_bridge.h"  // fceu11::g_vnesu11_soc
 
 #ifdef VNESU11_CORE_ENABLED
@@ -78,7 +79,7 @@ extern "C" uint8_t vnesu11_mapper_read_thunk(void* ctx, uint16_t addr) {
 
 extern "C" void vnesu11_mapper_write_thunk(void* ctx, uint16_t addr, uint8_t val) {
     auto* t = static_cast<WriteThunk*>(ctx);
-    if (t) t->fn(addr, val);
+    if (t && t->fn) t->fn(addr, val);
 }
 
 // ---------------------------------------------------------------------------
@@ -91,6 +92,7 @@ struct VNesMapperMetaVtable {
     uint8_t (*mirroring)(void*);
     void    (*fill_audio)(void*, int16_t*, size_t);
     void    (*tick_irq)(void*, bool*);
+    void    (*hblank_irq)(void*);
     int32_t (*save_state)(void*, uint8_t*, size_t, size_t*);
     int32_t (*load_state)(void*, const uint8_t*, size_t);
 };
@@ -119,6 +121,19 @@ void mapper_meta_fill_audio(void* /*ctx*/, int16_t* /*out*/, size_t /*count*/) {
 void mapper_meta_tick_irq(void* /*ctx*/, bool* out) {
     if (!out) return;
     *out = (g_cpu.native_layout().IRQlow & FCEU_IQEXT) != 0;
+}
+
+/// Mapper HBlank IRQ hook. Called by the Rust PPU once per scanline at
+/// the HBlank segment boundary (Phase C). In Rust-primary mode the C++
+/// PPU never runs, so this is the only path that advances the MMC3 /
+/// MMC5 / mapper-90 scanline IRQ counters via `GameHBIRQHook`.
+void mapper_meta_hblank_irq(void* /*ctx*/) {
+    if (GameHBIRQHook) {
+        GameHBIRQHook();
+    }
+    if (GameHBIRQHook2) {
+        GameHBIRQHook2();
+    }
 }
 
 /// Serialize the mapper's savestate body (Cart::save_mapper_state).
@@ -229,6 +244,7 @@ void vnesu11_on_game_load(int system_type) noexcept {
         mapper_meta_mirroring,
         mapper_meta_fill_audio,
         mapper_meta_tick_irq,
+        mapper_meta_hblank_irq,
         mapper_meta_save_state,
         mapper_meta_load_state,
     };

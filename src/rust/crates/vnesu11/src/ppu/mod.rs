@@ -254,15 +254,6 @@ impl PpuCore {
                 // Visible scanline: 256 visible dots (background fetch
                 // + render). Sprite eval / hblank follows as a second
                 // segment below — see `sprite_phase`.
-                // Phase 6 P2 shadow fix (2026-08-12): clear the
-                // frame-start VBlank flag when entering scanline 20 —
-                // C++ `FCEUX_PPU_Loop` clears it at VBL_CLR, exactly
-                // 20 scanlines (6820 dots) after the frame-start set.
-                // Sl 19's hblank (sprite-eval 85) still sees flag=1,
-                // matching C++ (its 20 VBlank lines cover dots 0..6820).
-                if sl == 20 {
-                    self.regs.status &= !0x80;
-                }
                 Segment::Visible {
                     cpu_budget: dot_clock::CPU_BUDGET_VISIBLE,
                 }
@@ -270,16 +261,17 @@ impl PpuCore {
             sl if sl == 240 => Segment::VBlank {
                 cpu_budget: dot_clock::CPU_BUDGET_VBLANK_LINE,
             },
-            sl if sl == dot_clock::VBLANK_SCANLINE => Segment::VBlank {
-                // **Phase 6 P2 shadow fix (2026-08-12)**: was `1` here
-                // which left the CPU with only 1 cycle to enter the NMI
-                // handler. C++ DoLine gives scanline 241 a full 341
-                // budget (256+69+16), so the NMI entry sequence (7 cycles
-                // for push + vector) completes cleanly.  Without this
-                // fix the shadow PC drifts ~3 cycles/frame and diverges
-                // after frame 3.
-                cpu_budget: dot_clock::CPU_BUDGET_VBLANK_LINE,
-            },
+            sl if sl == dot_clock::VBLANK_SCANLINE => {
+                // VBlank flag + NMI set BEFORE the CPU budget runs, so the
+                // CPU's $2002 reads during scanline 241 see flag=1 (C++
+                // VBL_ENTER sets `PPU_status |= 0x80` then runs the VBL
+                // budget). The old segment order (set in advance_to_next)
+                // was one segment too late and broke blargg sync_vbl.
+                self.do_vblank_set();
+                Segment::VBlank {
+                    cpu_budget: dot_clock::CPU_BUDGET_VBLANK_LINE,
+                }
+            }
             sl if (242..=260).contains(&sl) => Segment::VBlank {
                 // **Phase 6 P2 shadow fix (2026-08-12, third edition)**:
                 // was CPU_BUDGET_GB_HBLANK (85) here. C++ DoLine's
@@ -418,28 +410,11 @@ impl PpuCore {
     }
 
     fn tick_preline_segment(&mut self) {
-        // Frame-start VBlank set (Phase 6 P2 shadow fix, 2026-08-12):
-        // C++ `FCEUX_PPU_Loop` (newppu=1) sets the $2002 VBlank flag at
-        // the TOP of the loop (frame dot 0), keeps it set for the 20
-        // VBlank scanlines (6820 dots), then clears it before the render
-        // lines. Rust previously set the flag at its own scanline 241
-        // (frame END, dots 82181..89001), so a $2002 poll loop observed
-        // flag=1 at a completely different frame position than C++ and
-        // the instruction streams diverged (frames 1-2 matched only by
-        // coincidence — both cores ended inside the reg-neutral poll).
-        // This scanline is Rust's internal frame-start marker (no dot
-        // advance), so the flag set lands before the first segment's
-        // CPU budget, matching C++'s top-of-loop set.
-        let suppressed = self.vbl_set_suppressed;
-        self.vbl_set_suppressed = false; // consume the latch
-        if !suppressed {
-            self.regs.status |= 0x80; // set VBlank
-            if (self.regs.ppuctrl & 0x80) != 0 {
-                // NMI enabled — arm at the frame-start VBlank set (C++
-                // `TriggerNMI()` fires right after the set + nd delay).
-                self.nmi.arm(self.scanline, self.dot);
-            }
-        }
+        // PRELINE is the Rust-internal frame-start marker (scanline -1,
+        // budget 0). The VBlank flag + NMI are NOT set here — they are
+        // set at scanline 241 (VBlank start) by `tick_vblank_set_segment`,
+        // matching the C++ newppu VBL_ENTER and real hardware.
+        //
         // Sprite 0 hit / overflow are cleared by the real pre-render
         // (scanline 261); the pre-render also resets v ← t.
         self.regs.status &= !0x20; // clear sprite overflow
@@ -512,12 +487,25 @@ impl PpuCore {
         // boundary work if needed.
     }
 
+    /// Set the VBlank flag and arm NMI (if enabled) at scanline 241.
+    /// Called from `next_segment` so the flag is visible to the CPU
+    /// during scanline 241's budget — matching the C++ VBL_ENTER order
+    /// (set flag/NMI, then run the VBlank CPU budget).
+    fn do_vblank_set(&mut self) {
+        let suppressed = self.vbl_set_suppressed;
+        self.vbl_set_suppressed = false; // consume the latch
+        if !suppressed {
+            self.regs.status |= 0x80; // set VBlank
+            if (self.regs.ppuctrl & 0x80) != 0 {
+                self.nmi.arm(self.scanline, self.dot);
+            }
+        }
+    }
+
     fn tick_vblank_set_segment(&mut self) {
-        // Phase 6 P2 shadow fix (2026-08-12): the VBlank flag + NMI
-        // arm moved to the frame-start PRELINE segment (matching C++
-        // FCEUX_PPU_Loop's top-of-loop set). Scanline 241 is now an
-        // ordinary VBlank idle line — the flag was set at frame start
-        // and cleared at scanline 20.
+        // VBlank set now happens in `next_segment` (before the CPU
+        // budget), so this per-segment advance hook is intentionally
+        // empty.
     }
 
     fn tick_prerender_segment(&mut self) {
@@ -606,13 +594,13 @@ mod tests {
     }
 
     #[test]
-    fn vblank_set_at_frame_start_triggers_nmi_when_enabled() {
+    fn vblank_set_at_scanline_241_triggers_nmi_when_enabled() {
         let mut p = PpuCore::new();
-        // Phase 6 P2 shadow fix (2026-08-12): the VBlank flag + NMI arm
-        // happen at the frame-start PRELINE segment, matching C++
-        // FCEUX_PPU_Loop's top-of-loop set (scanline 241 is now an idle
-        // VBlank line).
-        p.scanline = PRELINE;
+        // VBlank flag + NMI arm at scanline 241 (VBlank start), matching
+        // C++ newppu VBL_ENTER. This is the independent-emulation timing
+        // (the old shadow-fix set it at PRELINE, which broke blargg
+        // sync_vbl polling under Rust-primary).
+        p.scanline = dot_clock::VBLANK_SCANLINE;
         p.regs.ppuctrl = 0x80; // NMI enabled
         let _ = p.next_segment();
         p.advance_to_next_segment();
@@ -621,9 +609,9 @@ mod tests {
     }
 
     #[test]
-    fn vblank_set_at_frame_start_no_nmi_when_disabled() {
+    fn vblank_set_at_scanline_241_no_nmi_when_disabled() {
         let mut p = PpuCore::new();
-        p.scanline = PRELINE;
+        p.scanline = dot_clock::VBLANK_SCANLINE;
         p.regs.ppuctrl = 0x00; // NMI disabled
         let _ = p.next_segment();
         p.advance_to_next_segment();
@@ -632,33 +620,26 @@ mod tests {
     }
 
     #[test]
-    fn vblank_flag_cleared_at_scanline_20() {
-        // The frame-start VBlank flag must clear when entering scanline
-        // 20 (C++ VBL_CLR: exactly 20 scanlines / 6820 dots after the
-        // set), so $2002 reads from the render lines see flag=0.
+    fn vblank_flag_cleared_at_prerender_261() {
+        // VBlank flag clears at the pre-render scanline (261), exactly
+        // 20 scanlines after the sl-241 set (C++ `PPU_status = 0` after
+        // `runppu(20 * kLineTime)`).
         let mut p = PpuCore::new();
-        p.scanline = 19;
+        p.scanline = 261;
         p.regs.status |= 0x80;
-        let _ = p.next_segment(); // sl 19 -> Visible (flag stays set)
-        p.advance_to_next_segment();
-        // Scanline is now 20; the next segment's budget runs with
-        // flag already cleared.
-        let seg = p.next_segment();
-        assert_eq!(seg.cpu_budget(), dot_clock::CPU_BUDGET_VISIBLE);
-        assert_eq!(p.regs.status & 0x80, 0, "VBlank flag must be cleared at sl 20");
+        p.advance_to_next_segment(); // calls tick_prerender_segment
+        assert_eq!(p.regs.status & 0x80, 0, "VBlank flag must clear at sl 261");
     }
 
     #[test]
-    fn scanline_241_no_longer_sets_vblank() {
-        // The flag set moved to the frame start; sl 241 is a plain
-        // VBlank idle line and must not set or arm anything.
+    fn scanline_241_sets_vblank() {
         let mut p = PpuCore::new();
         p.scanline = dot_clock::VBLANK_SCANLINE;
         p.regs.ppuctrl = 0x80;
         p.regs.status &= !0x80;
         let _ = p.next_segment();
         p.advance_to_next_segment();
-        assert_eq!(p.regs.status & 0x80, 0, "sl 241 must not set VBlank");
-        assert!(!p.nmi.pending(), "sl 241 must not arm NMI");
+        assert_eq!(p.regs.status & 0x80, 0x80, "sl 241 must set VBlank");
+        assert!(p.nmi.pending(), "sl 241 must arm NMI");
     }
 }
