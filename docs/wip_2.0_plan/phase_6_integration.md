@@ -686,21 +686,61 @@ shadow harness 现已具备持续迭代的对比基础设施（harness 报告行
 > **目标**：任何新会话只读本文件即可接续 Phase 6 收尾。**先跑一遍 §9.1.4 验证
 > 命令确认基线**，再按 §9.1.2 剩余路径执行。不要重复已完成的修复（§9.1.1 清单）。
 
-### 9.1.0 当前精确状态(2026-08-13 战略转向后)
+### 9.1.0 当前精确状态(2026-08-13 会话末修订，含"正确栈"重大转向)
 
-> **会话目标已变更**(2026-08-13 ADR-011):不再追 byte-level shadow match。接续会话应**优先**做 §7.1 T1(blargg corpus 补全)+ T5(8 游戏 smoke),micro-drift 修复**仅在回归 KagamiQA 失败时**启动。
+> **会话目标已变更**(2026-08-13 ADR-011):不再追 byte-level shadow match。
+> **并且本会话发现并修复了一个根本构建 bug + 一个 CPU 栈序 bug**，使此前
+> "T1=87%" 被证伪——**诚实 Rust T1 = 62.7%**（见下）。接续会话从"修复剩余
+> 62.7% → 85%+ 的精度缺口"继续。
 
-- **分支** `wip_v2.0`；工作树应干净（最近 commit `46ac846`；若检出后发现脏树，
-  先 `git status` 确认无未提交源码改动再继续）。
-- **测试**：`cargo test --release -p vnesu11` 全模块通过（lib 194 + apu 24 + ppu 33
-  + mapper 12 + system_type 等），无 FAILED。
-- **shadow**（cpu_dummy_reads 60 帧）：`cpu_match=5/59`（**frame 1-2 真匹配**——
-  逐帧指令数 delta=0（8510/8506）；frame 4 匹配（被抑制的 VBL 转移两端一致）；
-  其余发散,历史根因是 S_2→S_3 转移主代码分叉——**2026-08-13 战略转向后不再追 byte match,baseline 维持**)。
-  nestest/mapper_axrom 仍 0/N（依赖完整 PPU/APU 同步）。
-- **核心状态**：frame counter IRQ 保持（mode-0）、预算单位 ×3 dots/cycle、
-  count 单位 ÷16、-1 段 dot 对齐、**VBlank flag 帧首置位时间线**、**VBL-set
-  suppression（shadow sync 决策同步）**——均已修复。
+- **分支** `wip_v2.0`；工作树应干净（最近 commit `443f1b1`；若检出后脏树先
+  `git status` 确认）。
+- **诚实 Rust T1 = 111/177 = 62.7%**（`VNESU11_RUST_PRIMARY=1` 全量实测）。
+  此前报告 87%/81.36% 都不可用：81.36% 实测是 C++ newppu（因为构建宏
+  `VNESU11_CORE_ENABLED` 从未真正生效）；87% 是错误栈序造成的 ~24 个假阳性。
+- **正确栈序已修**（`33d95cf`）：`push` 先写 `$100+S` 再减 S、`pop` 先加 S 再读
+  （对齐 `x6502.cpp` PUSH/POP）。这**降低了**可见 T1（假阳性消失），但揭示了
+  ~24 个被错误栈掩盖的真实 bug。
+- **本会话已提交 4 个 commit**（`git log --oneline -4` 可看）：
+  1. `d7324e3` 构建宏修复（`target_compile_definitions` 让 `VNESU11_CORE_ENABLED`
+     真正生效）+ CPU BASE_CYCLES/NOP 尺寸 + PPU 越界 + Rust-primary 测量模式。
+  2. `33d95cf` 正确栈 + PPU VBlank 时序（置位在 sl 241 先于 CPU budget）+ mapper
+     HBlank vtable 钩子 + page-cross dummy read。
+  3. `d8ef1c8` RMW abs,X/Y 老页 dummy read（`instr_misc_03_dummy` 转绿）。
+  4. `443f1b1` 完整软复位（CPU+APU+PPU+DMA+IRQ+joypad）。
+- **测试**：`cargo test --release -p vnesu11` 全模块通过（lib 194 + apu 24 +
+  ppu 33 + mapper 12 + system_type 6 等），无 FAILED。
+- **剩余 66 个失败**（Rust-primary 实测）：APU ~16（`apu_reset_*`/`apu_single_*`，
+  帧计数/长度计数/复位时序）、CPU ~23（`instr_v5_*` 校验和 + `cpu_int_*` NMI/IRQ
+  采样 + `cpu_exec_space_ppuio`）、MMC3 18（全部 0x80 挂起，缺 A12 时钟）、
+  PPU ~10（`vbl_*` 精确 dot 时序 + `ppu_open_bus`）。
+
+#### 9.1.0a Rust-primary 测量模式（关键工具）
+
+`VNESU11_RUST_PRIMARY=1` 让 blargg 探针读 Rust RAM（而非 C++ `ARead`），是
+**唯一能测真实 Rust T1** 的路径。默认（不设该变量）仍测 C++ newppu。
+
+```powershell
+# 单 ROM（在 tests/ 目录）：
+$env:VNESU11_RUST_PRIMARY="1"
+..\build\tests\kagami_qa_blargg_runner.exe --rom fixtures\blargg\cpu\<rom>.nes --frames 300
+# 全量：
+$env:VNESU11_RUST_PRIMARY="1"
+..\build\tests\kagami_qa_blargg_runner.exe --manifest fixtures\blargg_manifest.json *> out.txt
+```
+
+#### 9.1.0b 构建要点（改 Rust 源码后）
+
+```powershell
+# 1) 重建 Rust 静态库（vnesu11.lib 在 build/src/rust/crates/vnesu11/target 下）
+cmake --build build --target vnesu11_build
+# 2) 删除 runner 强制重链（否则 ninja 常"no work to do"）
+Remove-Item build\tests\kagami_qa_blargg_runner.exe
+cmake --build build --target kagami_qa_blargg_runner
+```
+
+> 注意：`cmake --build build --target kagami_qa_blargg_runner` 不会自动重链
+> vnesu11.lib（依赖链不完整），必须手动 `vnesu11_build` + 删 exe 重链。
 
 ### 9.1.1 已完成的修复链（勿重复）
 

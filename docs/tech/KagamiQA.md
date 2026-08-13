@@ -64,20 +64,23 @@ FCEUX11 的精度判定分 5 个独立 tier,**任一 tier 失败即视为精度�
 4. 跑全量:`kagami-qa-runner --baseline build/kagamiqa_baseline_frozen.json --filter "oracle=B"`
 5. 生成新 accuracy_table.md,提交
 
-### 3.3 Pass-Rate 门槛(2026-08-13 实测修订)
+### 3.3 Pass-Rate 门槛(2026-08-13 实测修订；会话末再次修订)
 
-> **实测现状**(2026-08-13,commit `cb89175`):**81.36%** (144/177)
-> - 较 v1.16 baseline (120/180 = 66.67%):净改善 +24 PASS / -27 FAIL
-> - 0 个新增 regression
-> - 分项:apu 96.15% / ppu 85.71% / cpu 79.31% / mmc3 33.33%
-> - 距 90% 缺 16 ROM(主要是 mmc3 全 12 fail + ppu VBL 4 fail + cpu interrupts 5 fail)
+> **⚠️ 证伪声明(2026-08-13 会话末)**:本节原"81.36%"不可用——它实测的是 **C++ newppu**,
+> 因为构建宏 `VNESU11_CORE_ENABLED` 从未真正生效。修复构建宏 + 修复 Rust CPU 栈序后,
+> **诚实 Rust T1 = 111/177 = 62.7%**(`VNESU11_RUST_PRIMARY=1` 实测)。见
+> `docs/wip_2.0_plan/phase_6_integration.md` §9.1.0 与 README v0.13。
+
+> **历史实测(已证伪,仅供记录)**(2026-08-13,commit `cb89175`):81.36% (144/177)——该数字
+> 实际是 C++ newppu=1,非 Rust vNESU11。较 v1.16 baseline (120/180 = 66.67%) 的对比
+> 亦不成立。
 
 | 阶段 | T1 门槛 | 含义 | 状态 |
 |------|--------|------|------|
-| **phase 6 收口** | **TBD**(下次构建决策) | 见 §3.3a 3-tier 候选方案 | 81.36% 已测;门槛数值待 owner 决策 |
-| **phase 7 默认切换前** | ≥ 85% (150/177) | 默认 ON 的硬门槛 | 差 6 ROM |
-| **phase 8 清理后** | ≥ 90% (160/177) | mmc3 全部修复后达成 | 差 16 ROM(主工作量) |
-| **v2.1** | ≥ 95% (168/177) | 完整修复 deep model 后 | 差 24 ROM |
+| **phase 6 收口** | **TBD**(下次构建决策) | 见 §3.3a 3-tier 候选方案 | **诚实 62.7% 已测;门槛数值待 owner 决策** |
+| **phase 7 默认切换前** | ≥ 85% (150/177) | 默认 ON 的硬门槛 | 差 39 ROM（从 62.7% 起） |
+| **phase 8 清理后** | ≥ 90% (160/177) | mmc3 全部修复后达成 | 差 49 ROM（从 62.7% 起） |
+| **v2.1** | ≥ 95% (168/177) | 完整修复 deep model 后 | 差 57 ROM（从 62.7% 起） |
 
 #### 3.3a phase 6 门槛 3-tier 候选(待 owner 决策)
 
@@ -268,9 +271,9 @@ FCEUX C++ 不再:
 
 | Tier | 现状 | phase 6 目标 | phase 7 目标 |
 |------|------|--------------|--------------|
-| T1 blargg | 81.36% (144/177,§3.3) | ≥ 80% (候选 A) | ≥ 85% |
+| T1 blargg | **62.7% (111/177,§3.3 诚实 Rust-primary)** | ≥ 80% (候选 A) | ≥ 85% |
 | T2 nestest | PASS(Rust 端单测) | 保持 | 保持 |
-| T3 regression | 40P/8F(phase 6 收口) | 47/47(零 FAIL) | 47/47 |
+| T3 regression | 40P/8F(phase 6 收口,待 Rust-primary 重测) | 47/47(零 FAIL) | 47/47 |
 | T4 mapper | 175-case byte-diff PASS | 175-case byte-diff PASS | 保持 |
 | T5 smoke | 骨架就位,ROM 待投放 | 8 games 全部 PASS | 保持 |
 
