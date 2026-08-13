@@ -733,7 +733,13 @@ if(FCEUX11_RUST_ENABLED)
     if(VNESU11_CORE AND TARGET vnesu11_build)
         target_link_libraries(fceux11_core PUBLIC ${VNESU11_RUST_LIB})
         add_dependencies(fceux11_core vnesu11_build)
-        add_definitions(-DVNESU11_CORE_ENABLED=1)
+        # The directory-level add_definitions() does NOT reach fceux11_core
+        # because the target is created earlier in this file; the define is
+        # silently dropped, leaving the whole VNESU11_CORE=ON build as plain
+        # C++ with the Rust core compiled out. Use the target-scoped
+        # definition so fceu.cpp / vnesu11_*.cpp / kagami_bridge.cpp actually
+        # see VNESU11_CORE_ENABLED.
+        target_compile_definitions(fceux11_core PUBLIC VNESU11_CORE_ENABLED=1)
         # vNESU11 cbindgen header lives under the crate's target dir
         # (src/rust/crates/vnesu11/target/vnesu11_ffi.h). Add it to the
         # include path so vnesu11_bridge.cpp can find it. The add_dependencies

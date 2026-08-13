@@ -20,16 +20,40 @@
 #include "emufile.h"             // for EMUFILE_MEMORY
 #include "drivers/common/nes_shm.h"
 #include "driver_callbacks.h"
+#include "vnesu11_bridge.h"      // fceu11::g_vnesu11_soc
 
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+
+#ifdef VNESU11_CORE_ENABLED
+extern "C" {
+uint8_t vnesu11_cpu_peek(const void* soc, uint16_t addr);
+int     vnesu11_emulate_frame(void* soc, int skip, uint8_t* xbuf,
+                              int16_t* sbuf, size_t sbuf_cap,
+                              size_t* sbuf_written);
+int     vnesu11_power_on_with_init(void* soc);
+int     vnesu11_set_ram_init(void* soc, uint32_t option, uint32_t seed);
+void    vnesu11_reset(void* soc);
+}
+#endif
 
 // ---------------------------------------------------------------------------
 // Singleton state
 // ---------------------------------------------------------------------------
 static bool g_initialised = false;
 static bool g_rom_loaded  = false;
+
+/// When set, the blargg/regression harness measures the vNESU11 Rust core
+/// as the primary emulator instead of the C++ core. This is the missing
+/// measurement path: under the default shadow run, C++ is primary and the
+/// Rust core's output is discarded, so `ARead[]` probes report C++ state.
+/// Env-var gate keeps the default behaviour untouched for the existing
+/// goldens.
+static bool g_rust_primary = []() -> bool {
+    const char* e = std::getenv("VNESU11_RUST_PRIMARY");
+    return e && (std::strcmp(e, "1") == 0);
+}();
 
 // ---------------------------------------------------------------------------
 // Init / Kill
@@ -91,6 +115,18 @@ int kagami_bridge_load_rom(const char *path) {
         return -2;
     }
 
+#ifdef VNESU11_CORE_ENABLED
+    if (g_rust_primary && fceu11::g_vnesu11_soc) {
+        // The Rust core registers mapper handlers via
+        // vnesu11_on_game_load (called inside LoadGame), but it has not
+        // been powered on. Bring its RAM/CPU/PPU/APU to a power-on state
+        // so it emulates the ROM independently of the C++ core.
+        vnesu11_set_ram_init(fceu11::g_vnesu11_soc, 0, 0);
+        vnesu11_power_on_with_init(fceu11::g_vnesu11_soc);
+        vnesu11_reset(fceu11::g_vnesu11_soc);
+    }
+#endif
+
     g_rom_loaded = true;
     return 0;
 }
@@ -108,6 +144,19 @@ int kagami_bridge_emulate_frame(void) {
     int32 *sbuf       = nullptr;
     int    sbuf_size  = 0;
 
+#ifdef VNESU11_CORE_ENABLED
+    if (g_rust_primary && fceu11::g_vnesu11_soc) {
+        uint8_t rust_xbuf[61440];
+        int16_t rust_sbuf[32768];
+        size_t  rust_sbuf_written = 0;
+        const int rc = vnesu11_emulate_frame(
+            fceu11::g_vnesu11_soc, 0, rust_xbuf, rust_sbuf,
+            sizeof(rust_sbuf) / sizeof(rust_sbuf[0]),
+            &rust_sbuf_written);
+        return (rc == 0) ? 0 : -3;
+    }
+#endif
+
     fceu11::Emulate(&xbuf, &sbuf, &sbuf_size, 0);
     return 0;
 }
@@ -117,6 +166,11 @@ int kagami_bridge_emulate_frame(void) {
 // ---------------------------------------------------------------------------
 uint8_t kagami_bridge_read_byte(uint16_t addr) {
     if (addr < 0x10000) {
+#ifdef VNESU11_CORE_ENABLED
+        if (g_rust_primary && fceu11::g_vnesu11_soc) {
+            return vnesu11_cpu_peek(fceu11::g_vnesu11_soc, addr);
+        }
+#endif
         return ARead[addr](addr);
     }
     return 0xFF;
@@ -145,6 +199,12 @@ int kagami_bridge_reset(void) {
     // ROM, which made every subsequent step() fail with "no ROM loaded" —
     // Rust-side reset_after runs then produced 0xFE load-failures. Task 1
     // parity required matching the C++ semantics exactly.
+#ifdef VNESU11_CORE_ENABLED
+    if (g_rust_primary && fceu11::g_vnesu11_soc) {
+        vnesu11_reset(fceu11::g_vnesu11_soc);
+        return 0;
+    }
+#endif
     fceu11::ResetNES();
     return 0;
 }

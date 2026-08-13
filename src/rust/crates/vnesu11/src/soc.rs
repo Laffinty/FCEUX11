@@ -513,6 +513,14 @@ impl VNesSoc {
         self.dma.power_cycle();
         self.irq.reset();
         self.joypad.reset();
+
+        // Phase 7 fix (2026-08-13): the PPU was NOT reset on power-on,
+        // so loading a second ROM in Rust-primary mode carried over the
+        // previous ROM's scanline/dot/frame counter/registers — a
+        // cross-ROM contamination that made the instr_v5 blargg singles
+        // non-deterministic. Rebuild the whole PPU core for a clean
+        // power-on state.
+        self.ppu = crate::ppu::PpuCore::new();
     }
 }
 

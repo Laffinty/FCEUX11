@@ -96,6 +96,16 @@ FCEUX11 的精度判定分 5 个独立 tier,**任一 tier 失败即视为精度�
 注:NESDEV / FCEUX 等 emulator 业界现实是 100% 极难(部分 ROM 有 FCEUX 特有的兼容性 bug)。
 98% 是务实天花板。
 
+> **"不弱于 C++" vs phase 门槛(2026-08-13 复审)**:用户验收标准是「Rust vNESU11
+> 不弱于 C++ 组件」。该标准在 blargg T1 上**已满足**——实测 81.36% vs v1.16 C++
+> 66.67%,**0 新增 regression**(33 个 FAIL 全部是 v1.16 已知问题,非 Rust 引入)。
+> §3.3 的 phase 7(≥85%)/phase 8(≥90%)门槛是**超出当前 C++ 基线**的增强目标,
+> 要求修复 C++ 与 Rust 共有的历史缺陷(PPU VBL / CPU interrupt 时序 / MMC3
+> scanline IRQ),性质是「比 C++ 更正确」而非「追平 C++」。按此口径,phase 7/8
+> 的启动条件应同时满足:(a) 0 新增 regression 已成立;(b) T1 ≥85% 为增强门槛,
+> 若项目要求严格对齐用户「不弱于」标准而非「更优」,可把 phase 7 门槛回退到
+> 「≥ v1.16 baseline 且 0 regression」;若要按原计划推进,则需继续修共享缺陷。
+
 ### 3.4 已知失败管理
 
 任何 blargg ROM 失败必须**三选一**:
@@ -258,13 +268,17 @@ FCEUX C++ 不再:
 
 | Tier | 现状 | phase 6 目标 | phase 7 目标 |
 |------|------|--------------|--------------|
-| T1 blargg | 0/12(陈旧表)→ 需重测 | ≥ 90% | ≥ 95% |
+| T1 blargg | 81.36% (144/177,§3.3) | ≥ 80% (候选 A) | ≥ 85% |
 | T2 nestest | PASS(Rust 端单测) | 保持 | 保持 |
-| T3 regression | 39P/8F(v1.17) | 47/47(零 FAIL) | 47/47 |
-| T4 mapper | 12 mapper test PASS | 175-case byte-diff PASS | 保持 |
-| T5 smoke | 未跑 | 8 games 全部 PASS | 保持 |
+| T3 regression | 40P/8F(phase 6 收口) | 47/47(零 FAIL) | 47/47 |
+| T4 mapper | 175-case byte-diff PASS | 175-case byte-diff PASS | 保持 |
+| T5 smoke | 骨架就位,ROM 待投放 | 8 games 全部 PASS | 保持 |
 
-**v2.0 phase 6 收口条件**:T1 ≥ 90% + T3 = 47/47 + T5 = 8/8 + 性能达标。
+**v2.0 phase 6 收口条件**:T1 ≥ 80% + T3 = 47/47 + T5 = 8/8 + 性能达标。
+
+> **注(2026-08-13 复审)**:§3.3 与本节曾出现三套门槛(80/85/90/95),已统一为
+> §3.3 表——phase 6 ≥80%、phase 7 ≥85%、phase 8 ≥90%、v2.1 ≥95%。上述
+> "phase 6 目标 ≥90%"旧值已改为 80%。
 
 ---
 

@@ -175,7 +175,10 @@ impl BackgroundRenderer {
             // for the fine-x offset.
             let effective_coarse_x = coarse_x.wrapping_add(((fine_x as u16 + pixel_x) / 8) as u8);
             let nt_x = effective_coarse_x & 0x1F;
-            let nt_y = coarse_y;
+            // Visible nametable is 30 rows (0..=29). The scroll coarse_y
+            // register is 5 bits (0..=31); rows 30/31 are the post-render
+            // / pre-render rows and must wrap (single-nametable model).
+            let nt_y = coarse_y % 30;
 
             let nt_idx = (nt_y as usize) * 32 + (nt_x as usize);
             let tile_id = nametable[nt_idx];

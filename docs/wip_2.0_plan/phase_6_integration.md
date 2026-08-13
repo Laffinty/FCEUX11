@@ -496,7 +496,7 @@ tests/shadow_run/
 ### 7.5 提交至 phase 7 的门禁
 
 - [x] FCEUI_* 兼容垫片覆盖率 ≥ 95%(**phase 6 收口已达 100%**;phase 7 维持即可)
-- [ ] T1 pass-rate ≥ 95%(phase 7 默认 ON 的硬门槛;phase 6 收口为 81.36%)
+- [ ] T1 pass-rate ≥ 85%(phase 7 默认 ON 的硬门槛;phase 6 收口为 81.36%;phase 8 为 ≥90%,v2.1 为 ≥95%,见 KagamiQA §3.3)
 - [ ] 完整 PPU/APU 5 通道状态 sync(phase 6 §9.1.2 Step 3 描述的 state mirror 扩展;当前 partial:CPU regs + APU frame counter + PPU status;5 channel 详情 phase 7)
 - [x] **`deviations.yaml` 至少 5 条 D-B 登记**——已交付 6 条(DEV-001 ~ DEV-006,见 `docs/wip_2.0_plan/deviations.yaml`)
 

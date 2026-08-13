@@ -36,7 +36,7 @@ pub const BASE_CYCLES: [u8; 256] = [
     /*0x80*/ 2, 6, 2, 6, 3, 3, 3, 3, 2, 2, 2, 2, 4, 4, 4, 4,
     /*0x90*/ 2, 6, 2, 6, 4, 4, 4, 4, 2, 5, 2, 5, 5, 5, 5, 5,
     /*0xA0*/ 2, 6, 2, 6, 3, 3, 3, 3, 2, 2, 2, 2, 4, 4, 4, 4,
-    /*0xB0*/ 2, 6, 2, 6, 4, 4, 4, 4, 2, 5, 2, 5, 5, 5, 5, 5,
+    /*0xB0*/ 2, 5, 2, 5, 4, 4, 4, 4, 2, 4, 2, 4, 4, 4, 4, 4,
     /*0xC0*/ 2, 6, 2, 8, 3, 3, 5, 5, 2, 2, 2, 2, 4, 4, 6, 6,
     /*0xD0*/ 2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
     /*0xE0*/ 2, 6, 2, 8, 3, 3, 5, 5, 2, 2, 2, 2, 4, 4, 6, 6,
@@ -109,12 +109,13 @@ mod tests {
         assert!(IS_RMW[0xD6]);
     }
 
-    /// **Authoritative parity check**: this table MUST stay byte-exact
-    /// with `CycTable[256]` in `src/x6502.cpp:360`. Any drift breaks the
-    /// shadow-run comparison (Phase 6 §2.5) because the CPU runs fewer
-    /// instructions per segment budget and PC drift accumulates. The
-    /// canonical source is the C++ table — when updating either side,
-    /// update the other too.
+    /// **Authoritative parity check**: this table is pinned against the
+    /// real `CycTable[256]` in `src/x6502.cpp:360`, with one deliberate
+    /// deviation (ADR-011): opcode `0xE2` (3-byte unofficial NOP) uses the
+    /// chip-accurate 2 cycles, whereas FCEUX's C++ table has 3. blargg
+    /// `instr_timing` requires the chip value. Any drift on the remaining
+    /// 255 entries is a bug (cycle-count drift shifts the CPU budget and
+    /// the APU frame-counter phase).
     #[test]
     fn base_cycles_matches_cpp_cyc_table() {
         const CPP_CYC_TABLE: [u8; 256] = [
@@ -129,13 +130,17 @@ mod tests {
             2,6,2,6,3,3,3,3,2,2,2,2,4,4,4,4,
             2,6,2,6,4,4,4,4,2,5,2,5,5,5,5,5,
             2,6,2,6,3,3,3,3,2,2,2,2,4,4,4,4,
-            2,6,2,6,4,4,4,4,2,5,2,5,5,5,5,5,
+            2,5,2,5,4,4,4,4,2,4,2,4,4,4,4,4,
             2,6,2,8,3,3,5,5,2,2,2,2,4,4,6,6,
             2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
-            2,6,2,8,3,3,5,5,2,2,2,2,4,4,6,6,
+            2,6,3,8,3,3,5,5,2,2,2,2,4,4,6,6,
             2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
         ];
         for (op, (rust_c, cpp_c)) in BASE_CYCLES.iter().zip(CPP_CYC_TABLE.iter()).enumerate() {
+            if op == 0xE2 {
+                // Deliberate ADR-011 deviation: chip-accurate 2 vs C++ 3.
+                continue;
+            }
             assert_eq!(
                 rust_c, cpp_c,
                 "opcode 0x{:02X} cycle mismatch: rust={} cpp={} (must match src/x6502.cpp CycTable)",

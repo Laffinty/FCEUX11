@@ -687,6 +687,14 @@ if(FCEUX11_BUILD_TESTS)
         target_compile_definitions(kagami_qa_blargg_runner PRIVATE
             __HEADLESS_DRIVER__
         )
+        # VNESU11_CORE=ON links both fceux11_rust.lib and (transitively via
+        # fceux11_core) vnesu11.lib; both embed the Rust std runtime built
+        # by the same toolchain. /FORCE:MULTIPLE lets link.exe pick one copy
+        # (same fix as kagami_qa_shadow_run_runner below).
+        if(MSVC AND VNESU11_CORE)
+            target_link_options(kagami_qa_blargg_runner PRIVATE
+                "/FORCE:MULTIPLE")
+        endif()
         # CTest entry: smoke run via the Rust harness (nestest 60 frames,
         # expected PASS). The full 177-ROM batch is exercised by the CI
         # matrix step (blargg_rust_smoke_full via kagami-qa.yml), not by
