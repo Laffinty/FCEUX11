@@ -84,6 +84,27 @@ impl CpuCore {
         (base.wrapping_add(self.y as u16), crossed)
     }
 
+    /// RMW abs,X effective address: does the C++ `GetABIWR` dummy read of
+    /// the OLD-page address (always, not just on page-cross), then
+    /// returns the corrected address. RMW abs,X has NO extra page-cross
+    /// cycle penalty — the base table already carries the +1.
+    #[inline(always)]
+    pub(crate) fn rmw_absx<BC: BusContext>(&mut self, bus: &mut BC) -> u16 {
+        let (a, crossed) = self.absx(bus);
+        let dummy = if crossed { (a & 0xFF00).wrapping_sub(0x100) | (a & 0xFF) } else { a };
+        let _ = bus.read(dummy);
+        a
+    }
+
+    /// RMW abs,Y effective address (same dummy-read semantics as abs,X).
+    #[inline(always)]
+    pub(crate) fn rmw_absy<BC: BusContext>(&mut self, bus: &mut BC) -> u16 {
+        let (a, crossed) = self.absy(bus);
+        let dummy = if crossed { (a & 0xFF00).wrapping_sub(0x100) | (a & 0xFF) } else { a };
+        let _ = bus.read(dummy);
+        a
+    }
+
     // -----------------------------------------------------------------
     // Indirect (JMP only)
     // -----------------------------------------------------------------

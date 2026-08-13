@@ -33,8 +33,7 @@ impl CpuCore {
     #[inline(always)] pub(crate) fn asl_zpx<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.zpx(bus); self.asl_mem(a, bus); }
     #[inline(always)] pub(crate) fn asl_abs<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.abs(bus); self.asl_mem(a, bus); }
     #[inline(always)] pub(crate) fn asl_absx<BC: BusContext>(&mut self, bus: &mut BC) {
-        let (a, c) = self.absx(bus);
-        if c { self.count -= 1; } // RMW abs,X always +1
+        let a = self.rmw_absx(bus);
         self.asl_mem(a, bus);
     }
 
@@ -66,8 +65,7 @@ impl CpuCore {
     #[inline(always)] pub(crate) fn rol_zpx<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.zpx(bus); self.rol_mem(a, bus); }
     #[inline(always)] pub(crate) fn rol_abs<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.abs(bus); self.rol_mem(a, bus); }
     #[inline(always)] pub(crate) fn rol_absx<BC: BusContext>(&mut self, bus: &mut BC) {
-        let (a, c) = self.absx(bus);
-        if c { self.count -= 1; }
+        let a = self.rmw_absx(bus);
         self.rol_mem(a, bus);
     }
 
@@ -97,8 +95,7 @@ impl CpuCore {
     #[inline(always)] pub(crate) fn lsr_zpx<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.zpx(bus); self.lsr_mem(a, bus); }
     #[inline(always)] pub(crate) fn lsr_abs<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.abs(bus); self.lsr_mem(a, bus); }
     #[inline(always)] pub(crate) fn lsr_absx<BC: BusContext>(&mut self, bus: &mut BC) {
-        let (a, c) = self.absx(bus);
-        if c { self.count -= 1; }
+        let a = self.rmw_absx(bus);
         self.lsr_mem(a, bus);
     }
 
@@ -130,8 +127,7 @@ impl CpuCore {
     #[inline(always)] pub(crate) fn ror_zpx<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.zpx(bus); self.ror_mem(a, bus); }
     #[inline(always)] pub(crate) fn ror_abs<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.abs(bus); self.ror_mem(a, bus); }
     #[inline(always)] pub(crate) fn ror_absx<BC: BusContext>(&mut self, bus: &mut BC) {
-        let (a, c) = self.absx(bus);
-        if c { self.count -= 1; }
+        let a = self.rmw_absx(bus);
         self.ror_mem(a, bus);
     }
 }

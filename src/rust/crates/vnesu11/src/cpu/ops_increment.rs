@@ -23,8 +23,7 @@ impl CpuCore {
     #[inline(always)] pub(crate) fn inc_zpx<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.zpx(bus); self.inc_at(a, bus); }
     #[inline(always)] pub(crate) fn inc_abs<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.abs(bus); self.inc_at(a, bus); }
     #[inline(always)] pub(crate) fn inc_absx<BC: BusContext>(&mut self, bus: &mut BC) {
-        let (a, c) = self.absx(bus);
-        if c { self.count -= 1; } // RMW abs,X always +1
+        let a = self.rmw_absx(bus);
         self.inc_at(a, bus);
     }
 
@@ -45,8 +44,7 @@ impl CpuCore {
     #[inline(always)] pub(crate) fn dec_zpx<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.zpx(bus); self.dec_at(a, bus); }
     #[inline(always)] pub(crate) fn dec_abs<BC: BusContext>(&mut self, bus: &mut BC) { let a = self.abs(bus); self.dec_at(a, bus); }
     #[inline(always)] pub(crate) fn dec_absx<BC: BusContext>(&mut self, bus: &mut BC) {
-        let (a, c) = self.absx(bus);
-        if c { self.count -= 1; } // RMW abs,X always +1
+        let a = self.rmw_absx(bus);
         self.dec_at(a, bus);
     }
 
