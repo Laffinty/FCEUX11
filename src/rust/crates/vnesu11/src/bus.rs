@@ -356,7 +356,22 @@ impl VNesSoc {
             0x400E => self.apu.noise.write_period(val),
             0x400F => self.apu.noise.write_length(val),
             // DMC ($4010-$4013).
-            0x4010 => self.apu.dmc.write_control(val),
+            0x4010 => {
+                let old_irq = self.apu.dmc_irq_pending;
+                self.apu.dmc.write_control(val);
+                // C++ Write_DMCRegs case 0x00: when the DMC IRQ flag is
+                // already set, the newly-written IRQ-enable bit decides
+                // whether the flag stays asserted or is cleared.
+                if old_irq {
+                    if val & 0x80 == 0 {
+                        self.apu.dmc_irq_pending = false;
+                        self.irq.deassert_irq(crate::apu::IRQ_DMC);
+                        self.cpu.irq_end(crate::apu::IRQ_DMC);
+                    } else {
+                        self.irq.assert_irq(crate::apu::IRQ_DMC);
+                    }
+                }
+            }
             0x4011 => self.apu.dmc.write_load(val),
             0x4012 => self.apu.dmc.write_address(val),
             0x4013 => self.apu.dmc.write_length(val),
@@ -446,17 +461,15 @@ impl VNesSoc {
         self.apu.noise.length.set_enabled((val & 0x08) != 0);
         // DMC enable (bit 4).
         if (val & 0x10) != 0 {
-            if self.apu.dmc.bytes_remaining == 0 && self.apu.dmc.sample_length > 0 {
-                self.apu.dmc.current_address = self.apu.dmc.sample_address;
-                self.apu.dmc.bytes_remaining = self.apu.dmc.sample_length;
-            }
+            self.apu.dmc.enable_if_stopped();
         } else {
-            self.apu.dmc.bytes_remaining = 0;
+            self.apu.dmc.stop_sample();
         }
         // Writing $4015 clears the DMC IRQ flag (bit 7) + deasserts
         // the DPCM IRQ line (src/sound.cpp StatusWrite).
         self.apu.dmc_irq_pending = false;
         self.irq.deassert_irq(crate::apu::IRQ_DMC);
+        self.cpu.irq_end(crate::apu::IRQ_DMC);
     }
 
     /// DMA reads from the CPU address space without going through the

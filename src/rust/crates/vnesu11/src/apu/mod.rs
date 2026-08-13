@@ -32,7 +32,7 @@ pub mod pulse;
 pub mod sweep;
 pub mod triangle;
 
-pub use dmc::DmcChannel;
+pub use dmc::{DmcChannel, DmcDmaOutcome};
 pub use envelope::EnvelopeUnit;
 pub use frame_counter::{FrameCounter, FRAME_IRQ_PERIOD_CYCLES};
 pub use length_counter::LengthCounter;

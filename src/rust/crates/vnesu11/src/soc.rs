@@ -11,6 +11,7 @@
 //!   - `docs/wip_2.0_plan/02_architecture.md` §3 for bus design.
 //!   - `phase_2_bus_and_ram.md` for Phase 2 DoD.
 
+use crate::apu::dmc::DmcDmaOutcome;
 use crate::apu::ApuCore;
 use crate::cpu::{BusContext, CpuCore};
 use crate::dma::DmaCore;
@@ -341,13 +342,18 @@ impl VNesSoc {
                 let (new_remaining, tcount) = self.cpu.step_one(remaining, &mut bus);
                 self.instr_count += 1; // Phase 6 P2 shadow diagnostics
                 if tcount > 0 {
-                    self.segment_dots = self.segment_dots.saturating_add((tcount * 3) as u32);
-                    self.apu.tick(tcount as u32);
+                    let dma_cycles = self.step_dmc_dma();
+                    self.segment_dots =
+                        self.segment_dots.saturating_add(((tcount + dma_cycles) * 3) as u32);
+                    self.apu.tick((tcount + dma_cycles) as u32);
                     self.route_apu_irqs_to_cpu();
+                    // Convert cycle debit to dots (×3): step_one already
+                    // debited tcount (×1); debit the remaining ×2 plus
+                    // the 4-cycle DMC DMA steal (×3).
+                    remaining = new_remaining - tcount * 2 - dma_cycles as i32 * 3;
+                } else {
+                    remaining = new_remaining;
                 }
-                // Convert cycle debit to dots (×3): step_one already
-                // debited tcount (×1); debit the remaining ×2.
-                remaining = new_remaining - tcount * 2;
                 continue;
             }
             // Pending IRQ: poll, then step.
@@ -376,13 +382,38 @@ impl VNesSoc {
             let (new_remaining, tcount) = self.cpu.step_one(remaining, &mut bus);
             self.instr_count += 1; // Phase 6 P2 shadow diagnostics
             if tcount > 0 {
-                self.segment_dots = self.segment_dots.saturating_add((tcount * 3) as u32);
-                self.apu.tick(tcount as u32);
+                let dma_cycles = self.step_dmc_dma();
+                self.segment_dots =
+                    self.segment_dots.saturating_add(((tcount + dma_cycles) * 3) as u32);
+                self.apu.tick((tcount + dma_cycles) as u32);
                 self.route_apu_irqs_to_cpu();
+                remaining = new_remaining - tcount * 2 - dma_cycles as i32 * 3;
+            } else {
+                remaining = new_remaining;
             }
-            remaining = new_remaining - tcount * 2;
         }
         self.cpu.count = remaining;
+    }
+
+    /// Fetch one DMC sample byte via the CPU bus when the channel has
+    /// requested one. Mirrors C++ `DMCDMA()`: three dummy reads plus one
+    /// data read steal four CPU cycles, the address wraps within
+    /// $8000-$FFFF, and a non-looping sample asserts the DMC IRQ when
+    /// its byte count reaches zero.
+    ///
+    /// Returns the number of extra CPU cycles stolen (4) or 0 when no
+    /// DMA was pending.
+    fn step_dmc_dma(&mut self) -> i32 {
+        if !self.apu.dmc.needs_dma() {
+            return 0;
+        }
+        let addr = 0x8000 | (self.apu.dmc.current_address as u16);
+        let byte = self.cpu_read_for_dma(addr);
+        let outcome = self.apu.dmc.complete_dma(byte);
+        if outcome == DmcDmaOutcome::IrqRequested {
+            self.apu.dmc_irq_pending = true;
+        }
+        4
     }
 
     /// Push any IRQs the APU generated this cycle into the CPU's

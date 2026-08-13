@@ -39,13 +39,18 @@ impl CpuCore {
 
     /// NOP absolute,X (0x1C/0x3C/0x5C/0x7C/0xDC/0xFC) — reads the
     /// operand address (page-cross penalty applies) and discards it.
+    /// On a page cross the 6502 also performs a dummy read of the OLD
+    /// (pre-carry) page before reading the effective address (C++
+    /// `GetABIRD`).
     #[inline(always)]
     pub(crate) fn nop_absx<BC: BusContext>(&mut self, bus: &mut BC) {
         let (a, crossed) = self.absx(bus);
-        let _ = bus.read(a);
         if crossed {
             self.count -= 1;
+            let dummy = (a & 0xFF00).wrapping_sub(0x100) | (a & 0xFF);
+            let _ = bus.read(dummy);
         }
+        let _ = bus.read(a);
     }
 
     /// BIT — test bits, sets Z/N/V. 2 modes.
