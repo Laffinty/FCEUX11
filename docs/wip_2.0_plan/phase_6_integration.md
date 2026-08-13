@@ -686,22 +686,22 @@ shadow harness 现已具备持续迭代的对比基础设施（harness 报告行
 > **目标**：任何新会话只读本文件即可接续 Phase 6 收尾。**先跑一遍 §9.1.4 验证
 > 命令确认基线**，再按 §9.1.2 剩余路径执行。不要重复已完成的修复（§9.1.1 清单）。
 
-### 9.1.0 当前精确状态(2026-08-13 收口会话修订，含"正确栈"+"APU/CPU 精度"两个转向)
+### 9.1.0 当前精确状态(2026-08-14 收口会话末修订，含"正确栈"+"APU/CPU 精度"两个转向)
 
 > **会话目标已变更**(2026-08-13 ADR-011):不再追 byte-level shadow match。
 > **此前会话**发现并修复了根本构建 bug + CPU 栈序 bug，把此前不可用的
 > "T1=87%/81.36%" 修正为**诚实 Rust T1 = 62.7%**。**本收口会话**在此基础上
-> 修复 APU 长度计数/帧计数/IRQ latch + CPU 非法 opcode/RMW 寻址，把诚实
-> Rust T1 推至 **75.7%**（见下）。接续会话从"修复剩余 75.7% → 85%+ 的精度缺口"
-> 继续。
+> 修复 APU 长度计数/帧计数/IRQ latch + CPU 非法 opcode/RMW 寻址 + 中断延迟，
+> 把诚实 Rust T1 推至 **76.3%**（见下）。接续会话从"修复剩余 76.3% → 85%+
+> 的精度缺口"继续。
 
-- **分支** `wip_v2.0`；本收口会话的改动尚未提交（工作树含 11 个 Rust 源文件
-  修改，见 `git status`）。
+- **分支** `wip_v2.0`；本收口会话改动已提交 3 个 commit（`3e3e4ef`、
+  `efe9678`、`8992ee9`），工作树干净（`git status` 应为 clean）。
 - **诚实 Rust T1 = 135/177 = 76.3%**（`VNESU11_RUST_PRIMARY=1` 全量实测）。
   较会话开始（111/177 = 62.7%）净 **+24 PASS**。
 - **正确栈序已修**（`33d95cf`，上一会话）：`push` 先写 `$100+S` 再减 S、
   `pop` 先加 S 再读。
-- **本收口会话修复链（未提交）**：
+- **本收口会话修复链（已提交）**：
   1. APU 长度计数：`$4003/$4007/$400B/$400F` 写入在通道使能时**无条件**重载
      长度计数（C++ `SQReload`），并修 pulse 的 length index 从未写入的 bug。
   2. APU 长度计数 halt：半帧 tick 按通道 halt 标志保持（pulse/noise bit5、
@@ -726,6 +726,31 @@ shadow harness 现已具备持续迭代的对比基础设施（harness 报告行
   `cpu_reset_regs` / `instr_misc*`）、MMC3 12（其中 5 个已从 0x80 挂起转为
   0x02 具体失败，其余 7 个仍缺 A12 时钟）、PPU 13（`vbl_*` 需 dot 粒度时序
   + `ppu_open_bus` + `oam_stress`）。
+
+#### 9.1.0c 下次继续（2026-08-14 收口会话末定稿）
+
+> 接续会话只读本节即可。先跑 §9.1.4 确认基线（全量 manifest 应为
+> **135/177 = 76.3%**），再按下列优先级修剩余 42 个失败：
+
+1. **最高 ROI——DMC 完整实现（8 个 APU 测试）**：`apu_reset_works_imm`、
+   `apu_single_7_dmc_basics`、`apu_single_8_dmc_rates`、`apu_test`、
+   `sprdma_dmc_dma`、`sprdma_dmc_dma_512`（+ `apu_mixer_dmc` 已 PASS 需防
+   回归）。缺：DMA 取样（`$8000+DMCAddress` 读 PRG）、采样完成 IRQ、
+   loop 重载、DMC DMA 4 周期仲裁（`run_segment_inner` 的
+   `dma.dmc_stall_cycles` 目前只是占位递减）。参考 C++ `sound.cpp`
+   `DMCDMA()`/`tester()`/`PrepDPCM()`。
+2. **其次——MMC3 5 个 0x02 具体失败**：`mmc3_2_details`、`mmc3_5_MMC3`、
+   `mmc3_6_MMC6`、`mmc3_v2_2_details`、`mmc3_v2_6_MMC3_alt`（帧 IRQ 修复后
+   已从 0x80 挂起转为具体失败，可能还剩 IRQ/A12 边缘）；7 个 0x80 需
+   A12 时钟 deep model（明确 phase 7+ 重活，见 `KagamiQA.md` §3.3）。
+3. **再次——CPU open bus / exec space**：`cpu_dummy_writes_ppu`（0x09 RMW
+   对 $2007 双写）、`ppu_open_bus`（0x02）、`cpu_exec_space_apu`、
+   `cpu_exec_space_ppuio`。
+4. **PPU VBL 13 个**：受限于当前段模型（341 dot/segment，无 sub-scanline
+   精度），是明确的 phase 7+ dot 粒度重活，不建议在 phase 6 追。
+5. 每修一批跑一次全量 manifest + `cargo test --release -p vnesu11 --lib`，
+   确认 0 回归再提交。到 **T1 ≥ 85%（150/177）** 后，phase 7 门禁只剩
+   §7.5 的「完整 PPU/APU 5 通道状态 sync」。
 
 #### 9.1.0a Rust-primary 测量模式（关键工具）
 
@@ -780,7 +805,11 @@ cmake --build build --target kagami_qa_blargg_runner
     **注意**：这是 shadow 专用的决策同步(Rust 尚未独立判定 suppression——
     Rust 自身的 sub-scanline 相位与 C++ 漂移方向相反,**2026-08-13 战略转向后由 KagamiQA T1 覆盖**)。
 
-### 9.1.2 剩余路径（2026-08-13 战略转向后重定义）
+### 9.1.2 剩余路径（历史档案）
+
+> **2026-08-14 提示**:本节 Step 1-6 大多已完成或被后续会话取代，**接续会话
+> 不要照做本节**。当前真实剩余路径见 **§9.1.0c「下次继续」**。本节仅保留为
+> 历史档案（Step 1 的 81.36% 已被证伪，见 §9.1.0）。
 
 > **2026-08-13 重要变更**:本节**完全替换**原 Step 2c（frame 3 micro-drift 收尾）、
 > Step 3（APU 5 通道 sync）、Step 4（shadow 验证闭环）、Step 5（DoD 三套件）。
