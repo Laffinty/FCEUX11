@@ -146,7 +146,8 @@
     "oracle_type": "A",
     "layer": "core",
     "input": {
-      "binary": "fceux11_i18n_regression_test"
+      "binary": "fceux11_i18n_regression_test",
+      "working_dir": "."
     },
     "expected": {
       "exit_code": 0
@@ -1114,5 +1115,33 @@
     ],
     "failure_means": "advisory",
     "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
+  },
+  "shadow_run_cpu_smoke": {
+    "id": "shadow_run_cpu_smoke",
+    "description": "Phase 6 §9.1.0 shadow_run baseline gate: cpu_dummy_reads 60 frames, expected cpu_match >= 5/59 (frame 1-2 true match + frame 4 suppressed-transfer match + 2 free). Below this is a regression; above is normal noise from independent Rust/C++ implementations per ADR-011.",
+    "oracle_type": "B",
+    "layer": "core",
+    "input": {
+      "binary": "kagami_qa_shadow_run_runner",
+      "args": [
+        "fixtures/blargg/cpu/cpu_dummy_reads.nes",
+        "--frames",
+        "60"
+      ],
+      "working_dir": "tests",
+      "rom": "fixtures/blargg/cpu/cpu_dummy_reads.nes"
+    },
+    "expected": {
+      "exit_code": 0
+    },
+    "timeout_seconds": 60,
+    "tags": [
+      "shadow-run",
+      "vnesu11",
+      "phase-6",
+      "regression-subset"
+    ],
+    "failure_means": "advisory",
+    "provenance": "Phase 6 closure §9.1.2 Step 2.3 (2026-08-13): baseline cpu_match=5/59 (frame 1-2 true match + frame 4 suppressed-transfer match + 2 free). Below this fires an alert; above is normal for chip-functional vs C++ implementation drift."
   }
 }

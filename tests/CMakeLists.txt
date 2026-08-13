@@ -41,6 +41,18 @@ function(fceux11_add_test_executable target_name)
     # v0.3.9 acceptance gate 2 (ctest pass) — unblocking this is a
     # test-infrastructure fix, not a v0.3.9 API change.
     target_compile_definitions(${target_name} PRIVATE __QT_DRIVER__)
+
+    # Phase 6 wrap-up: when VNESU11_CORE=ON, fceux11_core transitively
+    # pulls in vnesu11.lib, and the explicit FCEUX11_RUST_STATIC_LIB adds
+    # fceux11_rust.lib. Both Rust staticlibs embed the Rust std runtime
+    # (built by the same cargo toolchain), so the std symbols are
+    # byte-identical duplicates — /FORCE:MULTIPLE lets MSVC link.exe
+    # pick one copy. Same rationale as kagami_qa_shadow_run_runner
+    # below; required to link any of these unit tests in VNESU11_CORE=ON
+    # builds. See tests/CMakeLists.txt near `kagami_qa_shadow_run_runner`.
+    if(MSVC AND VNESU11_CORE)
+        target_link_options(${target_name} PRIVATE "/FORCE:MULTIPLE")
+    endif()
 endfunction()
 
 # KagamiQA P1 — Headless test executable: links null driver instead of Qt.

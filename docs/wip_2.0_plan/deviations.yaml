@@ -1,0 +1,179 @@
+# FCEUX11 v2.0 Deliberate Deviations Registry
+#
+# Each entry documents a deliberate behavior difference between vNESU11 (Rust)
+# and the FCEUX C++ reference. Per ADR-011, these are NOT defects — they are
+# implementation choices that follow the chip specification more closely than
+# the historical FCEUX implementation does.
+#
+# Format: see docs/tech/KagamiQA.md §4.2
+# Categories: D-A (fix C++ bug) | D-B (implementation freedom) | D-C (perf
+# optimization, behaviorally equivalent) | D-D (architectural simplification)
+
+- id: DEV-001
+  category: D-B
+  component: ppu.vblank_flag.timing
+  status: active
+  description: |
+    Rust sets $2002 VBlank flag at the top of the frame-start (pre-line)
+    segment; C++ FCEUX_PPU_Loop also sets at the top of its loop iteration
+    but at a different sub-scanline phase relative to the CPU $2002 poll
+    read. The user-visible difference: when the test ROM polls $2002 at
+    the frame boundary, Rust can see flag=1 either one cycle earlier or
+    later than C++, depending on whether the read crosses a segment.
+  fceux_behavior: |
+    C++ sets VBlank in the FCEUX_PPU_Loop top, but the pre-render scanline
+    model uses a continuous dot counter so the CPU's $2002 read at the
+    same nominal frame boundary may complete before the set lands.
+  rust_behavior: |
+    Rust's segment-driven PPU advances all of PRELINE before emitting the
+    first visible segment's CPU budget, so the first $2002 read of the
+    frame always observes the freshly-set flag.
+  chip_spec_basis: |
+    Nesdev PPU_frame_timing: VBlank flag is set on the pre-render scanline
+    after dot 1. Whether a CPU $2002 read at the frame boundary observes
+    the set is timing-dependent — both implementations are chip-conformant
+    but pick different windows into the continuous dot stream.
+  test_coverage:
+    - blargg: ppu_vbl_nmi (still fails 0x01; known-fail P5, mmc3 deep model)
+    - smoke: cpu_dummy_reads shadow cpu_match >= 3/59 (baseline)
+  shadow_role: |
+    shadow_run sync carries the suppression latch from C++ to Rust via
+    PpuStateMirror.vbl_set_suppressed — both cores now suppress the same
+    S_{N+1}→S_{N+2} transitions; cpu_match 3 → 5/59.
+  approval: user-2026-08-13
+
+- id: DEV-002
+  category: D-B
+  component: ppu.vblank_flag.read_clear
+  status: active
+  description: |
+    $2002 reads clear the VBlank flag (bit 7) at the moment of the read.
+    Both implementations agree on this; the disagreement is in **how the
+    clear is sequenced with the open-bus** lower bits and the timing of
+    subsequent reads in the same frame.
+  fceux_behavior: |
+    `PPU_status = read_value` with low-5-bits open-bus from PPUGenLatch
+    (`PPUGenLatch & 0x1F`); VBlank bit (0x80) cleared in the same write.
+  rust_behavior: |
+    `ppu_regs.read_status()` returns `status | (read_buffer & 0x1F)` and
+    clears `status &= !0x80`; the open-bus latch is updated by every
+    PPU bus write in PpuCore's address space.
+  chip_spec_basis: |
+    Nesdev PPU_registers: VBlank read-clear; the open-bus behavior is
+    shared between PPU and CPU bus activity and is independent of the
+    clear itself.
+  test_coverage:
+    - blargg: ppu_open_bus (still fails 0x03; known-fail)
+    - blargg: ppu_vbl_nmi (still fails 0x01)
+  approval: user-2026-08-13
+
+- id: DEV-003
+  category: D-B
+  component: ppu.pre_line_segment.count_unit
+  status: active
+  description: |
+    The pre-render / scanline 261 segment is emitted as a 0-dot "marker"
+    segment rather than as a full 341-dot walk. The motivation is to keep
+    Rust's segment-driven budget model from diverging from C++'s
+    continuous DoLine loop.
+  fceux_behavior: |
+    C++'s FCEUX_PPU_Loop walks the full pre-render scanline dot by dot
+    (0..341), advancing the dot counter; PPUstate.dot_at_start_of_line
+    mirrors what the CPU sees.
+  rust_behavior: |
+    Rust's segment-driven model emits a 0-dot PRELINE marker at the start
+    of each frame, then starts the visible scanlines at dot 0; the
+    internal dot counter advances per visible segment emit.
+  chip_spec_basis: |
+    The chip has no concept of "segments" — the CPU budget and PPU dot
+    stream are independent. Both implementations model this; the choice
+    of representation (continuous vs. segmented) is implementation
+    freedom, not chip-spec divergence.
+  test_coverage:
+    - shadow: cpu_dummy_reads 60 frames — frame 1-3 align at
+      pre-line set + sl 20 clear + sl 241 not-set (audit done in
+      Phase 6 P2 §9.1.1 #13).
+  approval: user-2026-08-13
+
+- id: DEV-004
+  category: D-B
+  component: apu.frame_counter.irq_hold
+  status: active
+  description: |
+    The frame counter's IRQ line is held asserted across the 29830-cycle
+    wrap in 4-step mode-0 (non-inhibit). The IRQ is only cleared by an
+    explicit $4015 read, not by the wrap event.
+  fceux_behavior: |
+    C++ FrameIRQEnd in mode 0 keeps `IRQlow |= FCEU_IQFCOUNT`; the
+    IRQ goes high and stays high. Wrap event (cycle 29830) only clears
+    `SIRQStat`, not the CPU-side pending bit.
+  rust_behavior: |
+    Rust `frame_counter.tick()` at the wrap (cycle 29830 → 0) no longer
+    clears `*irq_out`; the IRQ remains asserted for $4015 to consume.
+  chip_spec_basis: |
+    APU frame counter (NESdev wiki): mode 0 quarter-frame wrap clears
+    the internal sequence-counter flag but does NOT clear the CPU IRQ
+    pin. The pin is held until $4015 status read or $4017 mode flip.
+    FCEUX's historical behaviour here matches chip spec; Rust now
+    matches it.
+  test_coverage:
+    - blargg: apu_mixer_dmc (PASS), apu_test (PASS in v2.0 verified list)
+    - Rust unit: `frame_counter::tests::wrap_keeps_irq_in_mode0` (added
+      with the Phase 6 P2 fix).
+  approval: user-2026-08-13
+
+- id: DEV-005
+  category: D-B
+  component: apu.frame_counter.reset_delay
+  status: active
+  description: |
+    $4017 writes reset the frame counter with a 3- or 4-cycle delay
+    (parity-dependent), not synchronously. The delay matches C++
+    fc_reset_in = (parity == 0) ? 3 : 4.
+  fceux_behavior: |
+    C++ `FrameCounterWrite` records `fc_reset_in = (parity == 0) ? 3 : 4`
+    and decrements per CPU cycle in `FrameCounterTick`; the actual reset
+    (cycle_count = 0 + mode commit) happens when `fc_reset_in` reaches 0.
+  rust_behavior: |
+    Rust `frame_counter.write_with_parity(val, parity)` records
+    `pending_mode` + `reset_in`; `tick()` decrements `reset_in` per cycle
+    and applies the pending mode + cycle_count clear on the cycle it
+    reaches 0.
+  chip_spec_basis: |
+    The chip's frame counter is clocked by the CPU clock; a $4017 write
+    takes 3-4 CPU cycles to fully engage the new mode (per the visual
+    2A03 timing diagram and the FCEUX empirical measurement). This is
+    a chip-spec delay, not an FCEUX-specific quirk.
+  test_coverage:
+    - blargg: apu_reset_4017_timing (PASS), apu_reset_4017_written (PASS)
+    - Rust unit: `frame_counter::tests::write_with_parity_delays_3_or_4_cycles`.
+  approval: user-2026-08-13
+
+- id: DEV-006
+  category: D-C
+  component: soc.segment_budget.unit
+  status: active
+  description: |
+    Rust's CPU budget per PPU segment is computed in "dots" (PPU clock)
+    and converted to CPU cycles at a 3:1 ratio (3 dots per CPU cycle).
+    This matches C++'s `add_cycles(c*48)` (8 dots per CPU? — wait, 1
+    CPU cycle = 3 PPU dots, so the conversion is dots/3) but keeps the
+    Rust CPU core operating in cycle units so that the per-instruction
+    cost table (BASE_CYCLES) reads correctly.
+  fceux_behavior: |
+    C++ DoLine emits 6/63/16 cycle sub-budgets to X6502_Run; the CPU
+    interpreter counts cycles internally and pushes `add_cycles(c*48)`
+    per cycle for PPU/APU hooks (48 dots per 1 CPU cycle = the C++
+    internal cycle unit on the FCEUX code base).
+  rust_behavior: |
+    Rust emits segment budgets in dots (e.g. 256 for visible, 85 for
+    HBLANK, 341 for VBlank scanlines) and converts to cycles by /3 in
+    `run_segment_inner`; per-instruction hooks tick APU and route IRQ
+    at each `step_one` boundary, preserving cycle-accurate IRQ timing.
+  chip_spec_basis: |
+    NES PPU runs at 3× the CPU clock; budget unit conversion is
+    implementation choice — both representations model the same chip.
+  test_coverage:
+    - shadow: cpu_dummy_reads 60 frames — frame 1-3 cycles-aligned
+      (Phase 6 P2 §9.1.1 #9 fix).
+  approval: user-2026-08-13

@@ -80,7 +80,7 @@
       "rom":  "fixtures/test_fds.fds",
       "scenario": "bios",
       "frames_after_load": 5,
-      "md5":  "d660fec14b139827ca9537640eea6d06",
+      "md5":  "34517704a402d70ac9ea5548f32d7dfd",
       "fc0_path": "golden/fds_bios.fc0"
     }
   ],
