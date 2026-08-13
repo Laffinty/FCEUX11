@@ -442,14 +442,19 @@ tests/shadow_run/
 
 ### 7.1 KagamiQA 精度 oracle(15 项,phase 6 收口必过)
 
-#### T1 blargg 硬件一致性(7 项)
-- [x] `tests/fixtures/blargg/{apu,cpu,ppu,mmc3}/` corpus 物理在位
-- [ ] `download_blargg_roms.ps1` 跑通,177 个 ROM 全下载(`KagamiQA.md` §3.2 步骤 1)
-- [ ] `kagami_qa_blargg_runner` 路径解析修复(`KagamiQA.md` §3.2 步骤 2)
-- [ ] baseline 重置为 `kagamiqa_baseline_next.json`(`KagamiQA.md` §3.2 步骤 3)
-- [ ] T1 pass-rate ≥ 90% (160/177)(`KagamiQA.md` §3.3 phase 6 门槛)
-- [ ] `blargg_known_fail.json` 含每个失败的 `{rom, reason, FCEUX_status, fix_target_version}`(`KagamiQA.md` §3.4)
-- [ ] `deviations.yaml` 含每个 D-A 类别(Rust 修复 FCEUX bug)的完整登记(`KagamiQA.md` §4.2)
+#### T1 blargg 硬件一致性(7 项,2026-08-13 部分完成)
+
+> **实测现状**(commit `cb89175`):T1 pass-rate **81.36%** (144/177),0 个新增 regression,
+> 较 v1.16 baseline 净改善 +24 PASS。详见 [`KagamiQA.md` §3.3](../../tech/KagamiQA.md) 与
+> `build/kagamiqa_accuracy_table.md`。
+
+- [x] `tests/fixtures/blargg/{apu,cpu,ppu,mmc3}/` corpus 物理在位(177 ROM)
+- [x] `download_blargg_roms.ps1` 跑通,177 ROM 全 cached(`KagamiQA.md` §3.2 步骤 1)
+- [x] `kagami_qa_blargg_runner` 路径解析定位——CWD 须在 `tests/` 子目录(`KagamiQA.md` §3.2 步骤 2)
+- [x] baseline 重置为 `kagamiqa_baseline_next.json`(`KagamiQA.md` §3.2 步骤 3)
+- [ ] T1 pass-rate **门槛值 TBD**——3 候选见 `KagamiQA.md` §3.3a(A: 80% 已过 / B: 85% 差 6 / C: 90% 差 16)
+- [ ] `blargg_known_fail.json` 含每个失败的 `{rom, reason, FCEUX_status, fix_target_version}`(已 append 27 条 v2.0 verified PASS,见 `KagamiQA.md` §3.4)
+- [ ] `deviations.yaml` 含每个 D-A 类别(Rust 修复 FCEUX bug)的完整登记(`KagamiQA.md` §4.2;**0 条待补**——33 fail 全部是 v1.16 已知问题,无 Rust 修复 FCEUX 的发现)
 
 #### T2 nestest trace(1 项)
 - [x] Rust 端 nestest 单测 PASS(已证,phase 1)
@@ -700,12 +705,14 @@ shadow harness 现已具备持续迭代的对比基础设施（harness 报告行
 
 **新剩余路径（按 §7.1 KagamiQA 5 层 oracle 顺序执行）**：
 
-**Step 1（最优先）— T1 blargg corpus 补全**：
-1. 跑 `.\scripts\download_blargg_roms.ps1` 补全 177 ROM
-2. 修复 `kagami_qa_blargg_runner` 路径解析
-3. 重置 baseline:`kagami-qa-runner --save-baseline build/kagamiqa_baseline_next.json`
-4. 全量跑 Oracle B 拿真实 pass-rate
-5. 失败 ROM 走 `blargg_known_fail.json` 或修 Rust 端
+**Step 1 ✅ 完成(commit `cb89175`,2026-08-13)— T1 blargg corpus 补全 + 真实 pass-rate**:
+- 177/177 ROM 全 cached,跑通(无需新增下载)
+- T1 pass-rate **81.36%** (144/177),较 v1.16 净改善 +24 PASS / -27 FAIL,**0 新增 regression**
+- 分项:apu 96.15% / ppu 85.71% / cpu 79.31% / mmc3 33.33%
+- 路径解析根因:CWD 须在 `D:\Project\FCEUX11\tests\`(不是仓库根),**无需改源码**
+- `tests/fixtures/blargg_known_fail.json` 已 append 27 条 v2.0 verified PASS
+- 交付物:`scripts/generate_accuracy_table.ps1`(新工具,已移入 `scripts/`)、`build/kagamiqa_accuracy_table.md`(新)、`build/kagamiqa_baseline_next.json`(新)
+- **phase 6 T1 门槛值 TBD**:3 候选见 [`KagamiQA.md` §3.3a](../../tech/KagamiQA.md)(A: 80% 已过 / B: 85% 差 6 / C: 90% 差 16)——**下次执行构建再决策**
 
 **Step 2 — T3 回归基线 47/47 升级**：
 1. 当前 v1.17 frozen 是 39P/8F

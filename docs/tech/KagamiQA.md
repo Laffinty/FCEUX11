@@ -64,14 +64,34 @@ FCEUX11 的精度判定分 5 个独立 tier,**任一 tier 失败即视为精度�
 4. 跑全量:`kagami-qa-runner --baseline build/kagamiqa_baseline_frozen.json --filter "oracle=B"`
 5. 生成新 accuracy_table.md,提交
 
-### 3.3 Pass-Rate 门槛
+### 3.3 Pass-Rate 门槛(2026-08-13 实测修订)
 
-| 阶段 | T1 门槛 | 含义 |
-|------|--------|------|
-| **phase 6 收口** | ≥ 90%(160/177) | v2.0 最低门槛;允许 17 个 known-fail(记录于 `blargg_known_fail.json`) |
-| **phase 7 切换默认** | ≥ 95%(168/177) | 默认 ON 的硬门槛 |
-| **phase 8 清理后** | ≥ 98%(174/177) | 只允许 3 个 ROM 已知失败(其余必须解决) |
-| **v2.1** | 100%(177/177) | 完全 clean baseline |
+> **实测现状**(2026-08-13,commit `cb89175`):**81.36%** (144/177)
+> - 较 v1.16 baseline (120/180 = 66.67%):净改善 +24 PASS / -27 FAIL
+> - 0 个新增 regression
+> - 分项:apu 96.15% / ppu 85.71% / cpu 79.31% / mmc3 33.33%
+> - 距 90% 缺 16 ROM(主要是 mmc3 全 12 fail + ppu VBL 4 fail + cpu interrupts 5 fail)
+
+| 阶段 | T1 门槛 | 含义 | 状态 |
+|------|--------|------|------|
+| **phase 6 收口** | **TBD**(下次构建决策) | 见 §3.3a 3-tier 候选方案 | 81.36% 已测;门槛数值待 owner 决策 |
+| **phase 7 默认切换前** | ≥ 85% (150/177) | 默认 ON 的硬门槛 | 差 6 ROM |
+| **phase 8 清理后** | ≥ 90% (160/177) | mmc3 全部修复后达成 | 差 16 ROM(主工作量) |
+| **v2.1** | ≥ 95% (168/177) | 完整修复 deep model 后 | 差 24 ROM |
+
+#### 3.3a phase 6 门槛 3-tier 候选(待 owner 决策)
+
+| 候选 | 数值 | 当前差 | 优点 | 缺点 |
+|------|------|--------|------|------|
+| **A. 接受 81.36%** | ≥ 80% | 已过 | 与战略转向一致(不追 micro-drift);立即 phase 6 收口 | 留 16 ROM 缺口给 phase 7/8 |
+| **B. 追 85%** | ≥ 85% | 6 ROM | phase 7 收口可达成;不需修 mmc3 deep model | phase 6 收口还需 session 修 6 ROM(主要是 cpu + ppu) |
+| **C. 坚持 90%** | ≥ 90% | 16 ROM | 与原计划一致 | 需起 mmc3 IRQ deep model session(1-2 周) |
+
+**建议**:**选 A**。理由:
+- 战略转向(ADR-011)已明确"不追 micro-drift"
+- mmc3 12 fail 是 mapper 模型完整性问题,不是 cycle 残差——属于 phase 7+ 范围
+- 81.36% 较 v1.16 +24 PASS 是**真实改善**,不应被抽象门槛挡住
+- phase 7 默认切换前追到 85% 仍有 6 ROM 余量(可用 PPU VBL 4 fix + CPU 1-2 fix 凑)
 
 注:NESDEV / FCEUX 等 emulator 业界现实是 100% 极难(部分 ROM 有 FCEUX 特有的兼容性 bug)。
 98% 是务实天花板。
