@@ -495,10 +495,14 @@ tests/shadow_run/
 
 ### 7.5 提交至 phase 7 的门禁
 
-- [x] FCEUI_* 兼容垫片覆盖率 ≥ 95%(**phase 6 收口已达 100%**;phase 7 维持即可)
-- [ ] T1 pass-rate ≥ 85%(phase 7 默认 ON 的硬门槛;phase 6 收口为 81.36%;phase 8 为 ≥90%,v2.1 为 ≥95%,见 KagamiQA §3.3)
-- [ ] 完整 PPU/APU 5 通道状态 sync(phase 6 §9.1.2 Step 3 描述的 state mirror 扩展;当前 partial:CPU regs + APU frame counter + PPU status;5 channel 详情 phase 7)
-- [x] **`deviations.yaml` 至少 5 条 D-B 登记**——已交付 6 条(DEV-001 ~ DEV-006,见 `docs/wip_2.0_plan/deviations.yaml`)
+> **2026-08-14 路径 B 决议更新**：原"phase 7 默认 ON 的硬门槛"已拆分为：
+> - Phase 7a（[计划](./phase_7a_default_switch.md)）：`VNESU11_CORE=ON` 默认 + 精度冻结 80.8% + Release `v2.0.0`。
+> - Phase 7b（[计划](./phase_7b_accuracy.md)）：T1 80.8% → ≥85% + 完整 PPU/APU state mirror + Release `v2.0.1` 或 `v2.1`。
+
+- [x] FCEUI_* 兼容垫片覆盖率 ≥ 95%(**phase 6 收口已达 100%**;phase 7a 维持即可)
+- [ ] T1 pass-rate ≥ 85%（**Phase 7b 目标**；phase 6 收口为 80.8%；phase 8 为 ≥90%，v2.1 为 ≥95%，见 KagamiQA §3.3）
+- [ ] 完整 PPU/APU 5 通道状态 sync（**Phase 7b 目标**；phase 6 §9.1.2 Step 3 描述的 state mirror 扩展；当前 partial：CPU regs + APU frame counter + PPU status；5 channel 详情 Phase 7b）
+- [x] **`deviations.yaml` 至少 5 条 D-B 登记**——已交付 6 条（DEV-001 ~ DEV-006，见 `docs/wip_2.0_plan/deviations.yaml`）
 
 ### Phase 6 启动已交付(2026-08-12,无变化)
 

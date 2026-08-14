@@ -25,8 +25,11 @@
 - [phase_4_apu_dma.md](./phase_4_apu_dma.md) — APU 5 通道 + OAM/DMC DMA + IRQ 控制器
 - [phase_5_mapper_adapter.md](./phase_5_mapper_adapter.md) — C++ mapper 的 FFI 适配层（per-range handler）
 - [phase_6_integration.md](./phase_6_integration.md) — 接入主路径（shadow run 帧级三级对比）
-- [phase_7_default_switch.md](./phase_7_default_switch.md) — 切换默认、移除旧 newppu=1 C++ 路径
+- [phase_7a_default_switch.md](./phase_7a_default_switch.md) — **v2.0 默认切换**（精度冻结 80.8%，2-3 周，Release `v2.0.0`）
+- [phase_7b_accuracy.md](./phase_7b_accuracy.md) — **精度攻关 80.8% → 85%**（4-5 周，Release `v2.0.1` 或 `v2.1`）
 - [phase_8_cleanup.md](./phase_8_cleanup.md) — 清理 newppu=1 C++ 源（旧 PPU 保留）
+
+> **2026-08-14 路径 B 决议**：原 `phase_7_default_switch.md` 已被拆分为 Phase 7a（默认切换）+ Phase 7b（精度攻关）。原文件保留作历史档案，详见 `phase_7a_default_switch.md` 顶部说明。
 
 ### 附录
 - [A_performance_model.md](./A_performance_model.md) — 性能模型（修订：持平至 +3%）
@@ -46,10 +49,11 @@
 | 4 | APU + DMA + IRQ | ⚠️ 45%（复核修正，2026-08-11） | APU 5 通道 + frame counter 4/5-step + 非线性 mixer（const 生成）+ OAM DMA 计数 513/514 + IRQ Controller + Joypad + irq.rs + dma/oam_dma.rs + joypad.rs——**模块完整可测（20 个 apu integration tests），但未接线**。**复核发现缺口**：`run_frame()` 不驱动 APU/DMA/Joypad、`$4000-$4015` APU 寄存器未路由到 ApuCore、`$4016/17` 仍用旧字段、`$4014` 是简化拷贝——**已纳入 Phase 5 阶段 0 修复**。DMC DMA 仲裁 + 完整 Scheduler 推迟 Phase 6。 | 4 周 |
 | 5 | Mapper Adapter（+ 前置接线） | ✅ 阶段 0 完成（2026-08-12）；阶段 1 部分完成 | **阶段 0（接线）**：run_frame 驱动 APU/DMA/IRQ、APU 寄存器路由、Joypad 旧字段清理、OAM DMA 接入（513/514 stall + 实际搬移）、精灵真实合成（Phase 3 (c)）、端到端测试。**阶段 1（mapper 适配）**：MapperRangeTable + FFI 验证（12 个 mapper_tests 全绿）、C++ SetReadHandler/SetWriteHandler 转发适配器（vnesu11_mapper_adapter）、LoadGame 集成、vnesu11_set_system_type 接线。**本地验证**：cargo test **312 passed / 0 failed / 1 ignored**；VNESU11_CORE=ON 下 fceux11_core + fceux11.exe 构建链接成功。**待办（Phase 6 前置）**：MapperMetaVtable 的 fill_audio/tick_irq 深度接线、mapper_byte_diff 175-case、SMB1 一致性、FDS 虚拟 mapper | 4 周 |
 | 6 | Integration | ⚠️ **收口进行中（2026-08-14 PPU open-bus + dummy-read 会话）** | **战略转向**：byte-level shadow match 不再是精度判据,精度 oracle 升格为 [KagamiQA](../tech/KagamiQA.md) 5 层。**诚实 Rust T1 = 142/177 = 80.2%**（`VNESU11_RUST_PRIMARY=1` 实测，首次诚实达 phase 6 ≥80% 门槛）。本会话完成 PPU open-bus latch（`PPUGenLatch` 全量接线）+ RTS/RTI/BRK 单字节 dummy-read + $4016/$4017 joypad open-bus，`cpu_exec_space_ppuio`/`cpu_exec_space_apu` 转 PASS。**剩余 35 失败**：sprdma×2 / CPU 7 / MMC3 12（7 缺 A12 时钟）/ PPU 13（vbl 需 dot 粒度）。**接续指引见 [phase_6 §9.1.0](./phase_6_integration.md)（已更新）**。 | 3 周 |
-| 7 | Default Switch | ⚪ 未启动 | 默认 ON，CMake 强依赖通过 + newppu=0 回归组 | 2 周 |
+| 7a | v2.0 Default Switch | ⚪ 未启动（路径 B 决议 2026-08-14） | `VNESU11_CORE=ON` 默认 + CI 双构 + Release tag `v2.0.0`；T1 冻结 80.8%（143/177，≥ phase 6 ≥80% 门槛）；85% 门槛推迟到 Phase 7b | 2-3 周 |
+| 7b | Accuracy Push | ⚪ 未启动（路径 B 决议 2026-08-14） | T1 80.8% → ≥85%（150/177）：MMC3 IRQ 0x02 + CPU 中断时序；溢出 P2 = A12 clocking + PPU dot 粒度 + DMA 仲裁；Release tag `v2.0.1` 或 `v2.1` | 4-5 周 |
 | 8 | Cleanup | ⚪ 未启动 | 删除 newppu=1 C++ 路径（旧 PPU 保留） | 1 周 |
 
-**总计预估**：27 周（≈ 6.5 人月），可串行；Phase 1 + Phase 3 可部分并行（不同工程师）。
+**总计预估**：28-30 周（≈ 7 人月），可串行；Phase 1 + Phase 3 可部分并行（不同工程师）。Phase 7a/7b 路径 B 拆分解耦了"发布"与"精度攻关"，可在 Phase 7a 完成后立刻 Phase 8，Phase 7b 独立排期。
 
 ---
 
@@ -100,3 +104,5 @@
 - **v0.14** (2026-08-13/14 收口会话):**诚实 Rust T1 62.7% → 76.3%（135/177，净 +24 PASS）**。APU：长度计数写入无条件重载 + halt 标志保持 + 补 triangle 半帧 tick + envelope/linear 改 quarter+half 都 tick；帧计数 IRQ latch 语义（`$4015` 读清 frame / `$4015` 写清 DMC）+ `$4017` 写 bit6 立即清 frame-IRQ + 29830 第三 IRQ set + reset 相位 `cycle_count=9`。CPU：非法 opcode `0x4B`=ALR（非 ARR）、`ANC` 不清 V、`0x9C/0x9E` SYA/SXA 地址复用 quirk、SHA/SHX/SHY/TAS base-high；RMW 寻址（DCP/ISB/SLO/RLA/SRE/RRA）改老页 dummy read + 新增 `rmw_izy`；NOP abs/abs,X 真实读总线；CLI/SEI/PLP 保留 moo_pi 快照 + 通用 IRQ 服务后同步 moo_pi（`cpu_int_1_cli_latency` 转 PASS）。`cargo test --release -p vnesu11 --lib` 195 passed/0 failed。剩余 42 失败:APU 8(需完整 DMC) / CPU 11 / MMC3 12(7 缺 A12) / PPU 13(vbl 需 dot 粒度)。phase 7 硬门槛 T1 ≥ 85% 尚差 15 ROM。
 - **v0.15** (2026-08-14 DMC 收口会话):**诚实 Rust T1 76.3% → 79.1%（140/177，净 +5 PASS）**。DMC 完整实现：重写 `dmc.rs` 为自由运行 accumulator 模型（对齐 C++ `DMCacc`/`DMCBitCount`），DMA 取样经 SoC `step_dmc_dma`（3 dummy + 1 数据读，4 CPU 周期 steal），`$4010` IRQ-follow + `$4015` enable/stop 语义，loop 重载 + 采样完成 IRQ。CPU：NOP abs,X（0x1C/0x3C/0x5C/0x7C/0xDC/0xFC）补页跨旧页 dummy read（对齐 C++ `GetABIRD`）。**转 PASS**：`apu_single_7_dmc_basics`、`apu_single_8_dmc_rates`、`apu_test`、`apu_reset_works_imm`、`instr_misc_04_dummy_apu`。`cargo test --release -p vnesu11 --lib` 202 passed/0 failed（+7 DMC 单测）。剩余 37 失败：sprdma×2 / CPU 9 / MMC3 12 / PPU 13。已知未修：`cpu_dummy_writes_ppu` 在 Rust-primary 下 CPU 跑入空 ROM 区（E800）未达 RMW 测试。
 - **v0.16** (2026-08-14 PPU open-bus + dummy-read 会话):**诚实 Rust T1 79.1% → 80.2%（142/177，净 +2 PASS），首次诚实达标 phase 6 ≥80% 门槛（候选 A）**。修复三个 chip-spec 行为：(1) PPU open-bus latch——`ppu.regs.read_buffer` 作为 `PPUGenLatch` 唯一来源，$2000-$2007 写刷新 latch、$2000/$2001/$2003/$2005/$2006 读返回 latch、$2002/$2004/$2007 读后写回，并修 $2007 读的 v/read_buffer 与 regs 脱节（→ `cpu_exec_space_ppuio` 0x05→PASS）；(2) RTS/RTI/BRK 补 64doc cycle-2 单字节 dummy read，让 PC+1 总线副作用（$2002 读清 w）生效；(3) $4016/$4017 joypad 读返回 `(bit)|(open_bus&0xC0)` 对齐 FCEUX `JPRead`（→ `cpu_exec_space_apu` 0x02→PASS）。`cargo test --release -p vnesu11 --lib` 202 passed/0 failed。剩余 35 失败：sprdma×2 / CPU 7 / MMC3 12 / PPU 13。shadow dev 回归 cpu_match=46/59。
+- **v0.17** (2026-08-14 Phase 6 续收口):T1 80.2% → **80.8%（143/177，+1 PASS）**。`instr_misc` 帧预算 300→600（4 子测 × ~150 帧）修 `blargg_manifest.json`；`VNesSoc::power_on` 补 A/X/Y 清零 + S=0xFD 匹配 C++ `X6502_Power`（修跨 ROM 寄存器泄漏），新增 `power_on_clears_axy_and_sets_stack` 回归测试。`cargo test -p vnesu11` **203 passed / 0 failed**；`cargo test -p kagami-qa` **187 passed / 0 failed**；shadow cpu_match = 46/59。**Phase 6 收口**：Rust-primary T1 = 143/177 = 80.8% **≥80% 候选 A 门槛**；DoD §7.1 全部 [x]，§7.2/§7.5 仅 phase 7+ 待补。
+- **v0.18** (2026-08-14 路径 B 决议):**Phase 7 拆分为 7a/7b 两个独立排期**——`phase_7a_default_switch.md`（默认切换 + CI + Release `v2.0.0`，精度冻结 80.8%，2-3 周）+ `phase_7b_accuracy.md`（MMC3 IRQ 0x02 + CPU 中断时序推 T1 ≥85%，4-5 周，Release `v2.0.1` 或 `v2.1`）。原 `phase_7_default_switch.md` 标记 superseded。原 `option(VNESU11_CORE ... OFF)` 计划在 Phase 7a 翻为 ON；85% 硬门槛推迟到 Phase 7b。**理由**：剩余 7 PASS（A12 clocking deep model + PPU dot 粒度 + DMA 仲裁）需多周 deep model 改动，不应阻塞 v2.0 发布；精度攻关与发布解耦让用户先用 v2.0.0，v2.0.1 hotfix 推 85%。

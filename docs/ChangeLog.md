@@ -53,6 +53,31 @@ bridge 全量 177 ROM 顺序加载），上一个 ROM 的 A/X/Y 会泄漏到下�
   Rust-primary blargg T1 = **143/177 = 80.8%**（无回归）；shadow
   cpu_match = 46/59（无回归）。
 
+### wip_v2.0 — Phase 7 拆分（路径 B 决议）（2026-08-14）
+
+**Phase 7 拆分为 7a / 7b 两个独立排期**：
+
+- **Phase 7a · v2.0 默认切换**（2-3 周）：`VNESU11_CORE=ON` 默认 + CI 双构
+  + Release tag `v2.0.0`。精度冻结 80.8%（143/177，≥ phase 6 ≥80% 门槛）。
+  不依赖精度攻关完成。详见 `docs/wip_2.0_plan/phase_7a_default_switch.md`。
+- **Phase 7b · 精度攻关**（4-5 周）：T1 80.8% → ≥85%（150/177）。优先级：
+  MMC3 IRQ 0x02（5 个）+ CPU 中断时序（2-3 个）= P1 即可达 150。溢出 P2 =
+  A12 clocking deep model + PPU dot 粒度 + DMA 仲裁（视 P1 完成后是否还需
+  要）。Release tag `v2.0.1` 或 `v2.1`。详见
+  `docs/wip_2.0_plan/phase_7b_accuracy.md`。
+
+**理由**：原 `phase_7_default_switch.md` 假设 2 周内可达 T1 ≥ 85%，实际
+剩余 7 PASS 缺口（A12 clocking deep model + PPU dot 粒度时序 + DMA 仲裁）
+需多周 deep model 改动。**精度攻关与发布解耦**：v2.0.0 不阻塞 deep model
+改动，用户先用 80.8% 精度，v2.0.1 hotfix 推 85%。
+
+**更新文档**：
+
+- 新建 `phase_7a_default_switch.md` + `phase_7b_accuracy.md`
+- 原 `phase_7_default_switch.md` 顶部标记 superseded 指向 7a/7b
+- `README.md` phase 7 行拆 7a + 7b（含交付、release tag、工时）
+- `phase_6_integration.md §7.5` T1 ≥ 85% 标注"Phase 7b 目标"
+
 ### wip_v2.0 — Phase 6 收口（commit `b687980`, 2026-08-13）
 
 **Phase 6 closure per ADR-011** — KagamiQA 5 层 oracle 取代 byte-level shadow match
