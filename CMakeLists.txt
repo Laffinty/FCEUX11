@@ -121,9 +121,18 @@ endif()
 option(FCEUX11_BUILD_TESTS "Build smoke and regression tests" ON)
 option(FCEUX11_ENABLE_I18N "Enable internationalization (i18n) support" ON)
 # v2.0 wip: enable vNESU11 Rust core (CPU/PPU/APU unified SoC, replaces
-# select C++ sources). Phase 0 ships as OFF (default); Phase 6 flips it
-# to ON after shadow-run validation. See docs/wip_2.0_plan/.
-option(VNESU11_CORE "Use vNESU11 Rust core (experimental, Phase 0)" OFF)
+# select C++ sources). Phase 0..6 ships as OFF; Phase 7a (v2.0.0)
+# flips default to ON after shadow-run validation proved precision
+# ≥80.8%. CI gate builds both ON + OFF (Phase 8 will remove OFF path
+# entirely). See docs/wip_2.0_plan/phase_7a_default_switch.md.
+option(VNESU11_CORE "Use vNESU11 Rust core (default ON since v2.0)" ON)
+# Note: this option is removed entirely in Phase 8 (v2.0.1); kept only
+# during Phase 7a for the dual-build CI gate (ON + OFF both must build).
+# See docs/wip_2.0_plan/phase_7a_default_switch.md.
+# Phase 7a: shadow run (C++ + Rust side-by-side) is independently
+# controlled so PGO Release builds can disable it for clean perf data.
+# Default ON keeps the ADR-011 dev regression tool active in CI.
+option(VNESU11_SHADOW_RUN "Run C++ and vNESU11 side-by-side for equivalence check (default ON, set OFF for PGO)" ON)
 # v0.3.16 LTS closure / v1.0 carries over: project-wide deprecation
 # control. Per plan v3 §6.3, the FCEUI_* compat shims (250+ inline
 # wrappers in core_api.h / io_api.h / net_api.h / diag_api.h / movie.h)

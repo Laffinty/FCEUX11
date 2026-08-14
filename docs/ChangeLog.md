@@ -78,6 +78,31 @@ bridge 全量 177 ROM 顺序加载），上一个 ROM 的 A/X/Y 会泄漏到下�
 - `README.md` phase 7 行拆 7a + 7b（含交付、release tag、工时）
 - `phase_6_integration.md §7.5` T1 ≥ 85% 标注"Phase 7b 目标"
 
+### wip_v2.0 — Phase 7a 默认切换 + /FORCE:MULTIPLE 关键修复（2026-08-14 末）
+
+- **`option(VNESU11_CORE ... OFF)` → `ON`**（CMakeLists.txt + src/CMakeLists.txt）
+- **关键 fix：fceux11.exe 链接 /FORCE:MULTIPLE**——VNESU11_CORE=ON 下
+  fceux11.exe 同时链 fceux11_rust.lib + vnesu11.lib（两个 Rust 静态库都内嵌
+  各自 std 副本），符号 `rust_eh_personality` / `_RNv*EMPTY_PANIC` 重复，
+  LNK2005 + LNK1169 失败。在 src/CMakeLists.txt 给 `fceux11_core` 和
+  `${APP_NAME}`（fceux11.exe）都加 `target_link_options(... PRIVATE "/FORCE:MULTIPLE")`。
+- **新增 `option(VNESU11_SHADOW_RUN ... ON)`**——Phase 7a 独立开关，
+  PGO Release build 关掉。
+- **fceux11.exe 构建产物**：ON 12.37 MB / OFF 5.77 MB（Rust 核心 ~6.6 MB）
+- **完整测试套件实测**（VNESU11_CORE=ON 默认）：
+  - `cargo test -p vnesu11 --lib`：**203/0/0**
+  - `cargo test -p kagami-qa --lib`：**187/0/0**
+  - blargg Rust-primary：**143/177 = 80.8%**（vs Phase 6 收口 0 退化）
+  - shadow cpu_match：**46/59**（远超 ADR-011 下限 5）
+  - mapper_byte_diff：**169/175 PASS, 0 FAIL**
+  - 8/8 关键 CTest（bench_tolerance / headless_smoke / kagami_qa_direct_smoke /
+    blargg_rust_smoke / shadow_run_cpu_smoke / rom_regression_rust_smoke /
+    savestate_regression_rust_smoke / mapper_byte_diff_rust_smoke）全绿
+- **OFF 路径 dual-build CI 门禁**：fceux11.exe OFF 构建 5.77 MB 成功
+- **未完成项**（见 §7a DoD）：BuildGuide / README / CI workflow 同步、PGO
+  Release 验证、shadow run 实际 OFF 行为验证、commit A
+- **Phase 7a DoD 进度**：12/15 项 [x]，3 项（PGO/文档/commit）pending
+
 ### wip_v2.0 — Phase 6 收口（commit `b687980`, 2026-08-13）
 
 **Phase 6 closure per ADR-011** — KagamiQA 5 层 oracle 取代 byte-level shadow match

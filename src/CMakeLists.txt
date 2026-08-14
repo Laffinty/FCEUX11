@@ -746,6 +746,20 @@ if(FCEUX11_RUST_ENABLED)
         # above ensures cargo (which emits the header) runs first.
         target_include_directories(fceux11_core PUBLIC
             ${CMAKE_CURRENT_SOURCE_DIR}/rust/crates/vnesu11/target)
+        # Phase 7a (v2.0.0): both fceux11_rust.lib and vnesu11.lib are
+        # Rust static libs built by the same rustc toolchain. Each
+        # embeds its own copy of Rust std symbols (rust_eh_personality,
+        # _RNv*EMPTY_PANIC, etc.) — byte-identical, but the linker
+        # rejects the duplicates by default. /FORCE:MULTIPLE lets the
+        # linker pick one copy. Same fix the kagami-qa test runners
+        # use (tests/CMakeLists.txt); see commit b687980.
+        if(NOT VNESU11_SHADOW_RUN)
+            # PGO Release builds: shadow run is also disabled (the
+            # shadow harness still emits a CRC log even when VNESU11_CORE
+            # is on; OFF suppresses it for clean PGO data). The linker
+            # flag stays in place because it doesn't depend on shadow.
+        endif()
+        target_link_options(fceux11_core PRIVATE "/FORCE:MULTIPLE")
         message(STATUS "vNESU11 Rust core enabled (VNESU11_CORE=ON)")
     endif()
     # v1.16 R4-fix (2026-08-07): target_link_libraries above only adds a
@@ -815,6 +829,17 @@ if (WIN32)
    set_target_properties(${APP_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
    target_link_options(${APP_NAME} PRIVATE /MANIFEST:NO)
    target_link_libraries(${APP_NAME} ntdll)
+endif()
+
+# Phase 7a (v2.0.0): VNESU11_CORE default ON. fceux11.exe transitively
+# pulls in both fceux11_rust.lib (from fceux11_utils) and vnesu11.lib
+# (from fceux11_core). Each Rust static lib embeds its own copy of Rust
+# std symbols (rust_eh_personality, _RNv*EMPTY_PANIC, ...) — byte-
+# identical because they share the same toolchain. Without this flag the
+# MSVC linker fails with LNK2005 / LNK1169. See commit b687980 for
+# the analogous fix applied to the kagami-qa test runners.
+if(VNESU11_CORE AND TARGET vnesu11_build)
+    target_link_options(${APP_NAME} PRIVATE "/FORCE:MULTIPLE")
 endif()
 
 
