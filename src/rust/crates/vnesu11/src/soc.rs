@@ -537,9 +537,15 @@ impl VNesSoc {
         self.sync_ram_banks_to_views();
 
         // Reset CPU too (matches `g_cpu.reset()` in `PowerNES`).
-        // C++ X6502_Power sets _S=0xFD before X6502_Reset; the Rust
-        // CpuCore::reset() deliberately does NOT touch S (mirroring
-        // X6502_Reset), so set the power-on stack pointer here.
+        // C++ X6502_Power clears A/X/Y/P then sets _S=0xFD before
+        // X6502_Reset; the Rust CpuCore::reset() deliberately does NOT
+        // touch A/X/Y/S (mirroring X6502_Reset). So clear the data
+        // registers + set the power-on stack pointer here, mirroring
+        // X6502_Power exactly and preventing cross-ROM register leaks
+        // when the SoC is reused across LoadGame cycles.
+        self.cpu.a = 0;
+        self.cpu.x = 0;
+        self.cpu.y = 0;
         self.cpu.s = 0xFD;
         // We use a raw-pointer bus context to satisfy the borrow
         // checker — `&mut self.cpu` and `&mut self` can't coexist
@@ -771,5 +777,24 @@ mod tests {
         soc.ram_banks.wram[0] = 0xBB;
         soc.sync_ram_banks_to_views();
         assert_eq!(soc.wram[0], 0xBB);
+    }
+
+    /// Phase 6 power-on parity: A/X/Y must be cleared and S must be
+    /// 0xFD on power-on, matching C++ `X6502_Power` (which sets
+    /// `_A=_X=_Y=0; _S=0xFD` before `X6502_Reset`). Without this,
+    /// a reused SoC leaks register state across ROM loads.
+    #[test]
+    fn power_on_clears_axy_and_sets_stack() {
+        let mut soc = VNesSoc::default();
+        // Simulate stale state from a previous ROM.
+        soc.cpu.a = 0x4B;
+        soc.cpu.x = 0x05;
+        soc.cpu.y = 0x9C;
+        soc.cpu.s = 0x10;
+        soc.power_on(RamInitOption::AllZeros, 0);
+        assert_eq!(soc.cpu.a, 0, "A must be cleared on power-on");
+        assert_eq!(soc.cpu.x, 0, "X must be cleared on power-on");
+        assert_eq!(soc.cpu.y, 0, "Y must be cleared on power-on");
+        assert_eq!(soc.cpu.s, 0xFD, "S must be 0xFD on power-on");
     }
 }

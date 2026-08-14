@@ -41,6 +41,18 @@ manifest 142 PASS / 35 FAIL（0 回归）；shadow dev 回归 `cpu_match=46/59 �
 
 无 Rust 源码改动；继续保留 `wip_v2.0` 分支作为 phase 7 默认 ON 的工作面。
 
+### wip_v2.0 — Phase 6 power-on 寄存器对齐（2026-08-14 末）
+
+`VNesSoc::power_on` 补上 C++ `X6502_Power` 的 A/X/Y 清零语义：此前只设
+S=0xFD + reset，A/X/Y 依赖 `CpuCore::new` 的初值。SoC 跨 ROM 复用时（kagami
+bridge 全量 177 ROM 顺序加载），上一个 ROM 的 A/X/Y 会泄漏到下一个 ROM。
+
+- `src/rust/crates/vnesu11/src/soc.rs`：`power_on` 显式 `a=x=y=0`（匹配
+  C++ `_A=_X=_Y=0`），新增回归测试 `power_on_clears_axy_and_sets_stack`。
+- 验证：`cargo test -p vnesu11` **203 passed / 0 failed**（+1 新测试）；
+  Rust-primary blargg T1 = **143/177 = 80.8%**（无回归）；shadow
+  cpu_match = 46/59（无回归）。
+
 ### wip_v2.0 — Phase 6 收口（commit `b687980`, 2026-08-13）
 
 **Phase 6 closure per ADR-011** — KagamiQA 5 层 oracle 取代 byte-level shadow match

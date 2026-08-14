@@ -543,6 +543,7 @@ P2 收口补完(2026-08-13 phase 6 closure commit pending):
 | 2026-08-14 | DMC 收口 `fc057e2` | 诚实 Rust T1 76.3%→79.1%（140/177） |
 | 2026-08-14 | PPU open-bus + 单字节 dummy-read `14848f7` | 诚实 Rust T1 79.1%→**80.2%（142/177）**，首次诚实达 phase 6 门槛 |
 | 2026-08-14 | Phase 6 续收口(本会话) | shadow cpu_match 5→46/59(开发期回归基线大幅上扬);`instr_misc` 帧预算 300→600 修 manifest → 诚实 Rust T1 80.2%→**80.8%（143/177）**;Rust-primary 143 vs 默认 141(Rust +2);DoD §7.1 全 [x]、§7.2 仅 phase 7 待补、§7.5 仅 85% 门槛待 phase 7 |
+| 2026-08-14 | power-on 寄存器对齐(pending) | `VNesSoc::power_on` 补 A/X/Y 清零 + S=0xFD,匹配 C++ `X6502_Power`;cargo test 203/0/0(+1 回归测试),T1=143/177 无回归,shadow 46/59 无回归 |
 
 收口实测对比(frozen baseline v1.17 → phase 6 收口):
 
@@ -555,10 +556,10 @@ P2 收口补完(2026-08-13 phase 6 closure commit pending):
 | T1 blargg pass-rate (诚实 Rust-primary) | n/a | **80.8% (143/177)** | n/a |
 | T1 blargg pass-rate (默认 / C++ newppu) | 67.8% (120/177) | **79.7% (141/177)** | **+11.9pp** |
 | Shadow baseline cpu_match | n/a | **46/59** (dev regression only) | n/a |
-| Cargo test (lib) | n/a | 202 passed / 0 failed | n/a |
+| Cargo test (lib) | n/a | **203 passed / 0 failed** | n/a |
 | vn_perf_bench 帧时间 | 724us (C++) | 743us (vNESU11) | +2.6% (within 5% gate) |
 
-**phase 6 收口最终态**:Rust-primary T1 = 143/177 = 80.8% (≥80% 候选 A 门槛,**+0.6pp 上扬**),**phase 6 已达标**;shadow cpu_match = 46/59 ≥ 5 (ADR-011 开发期回归下限,**远超**基线);Cargo 单元测试 202/0/0。所有 [ ] DoD 项明确推迟 phase 7+。
+**phase 6 收口最终态**:Rust-primary T1 = 143/177 = 80.8% (≥80% 候选 A 门槛,**+0.6pp 上扬**),**phase 6 已达标**;shadow cpu_match = 46/59 ≥ 5 (ADR-011 开发期回归下限,**远超**基线);Cargo 单元测试 203/0/0(含新增 power-on 回归测试)。所有 [ ] DoD 项明确推迟 phase 7+。
 ```
 
 ---
