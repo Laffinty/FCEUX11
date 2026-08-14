@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### v2.0.0 — Rust 核心默认启用（Release 候选，2026-08-15）
+
+**vNESU11 Rust core 成为默认 CPU/PPU/APU 实现**（`VNESU11_CORE=ON` 默认）。
+
+**精度基线（冻结）**：
+- 诚实 Rust T1（blargg 177 ROM，`VNESU11_RUST_PRIMARY=1`）：**143/177 = 80.8%**
+  （≥ phase 6 ≥80% 门槛；T1 ≥85% 目标移入 v2.1）
+- shadow dev 回归 cpu_match = **46/59**（远超 ADR-011 下限 5）
+- mapper_byte_diff：169/175 PASS（0 FAIL）
+- 8/8 关键 CTest 全绿（bench_tolerance / shadow_run_cpu_smoke / kagami_qa_direct_smoke
+  / blargg_rust_smoke / rom_regression_rust_smoke / savestate_regression_rust_smoke
+  / mapper_byte_diff_rust_smoke / headless_smoke）
+- cargo test：vnesu11 **203/0/0**；kagami-qa **187/0/0**
+
+**关键变更**：
+- `CMakeLists.txt`：`option(VNESU11_CORE ... OFF)` → **`ON`**（默认）
+- `src/CMakeLists.txt`：fceux11.exe + fceux11_core 加 `/FORCE:MULTIPLE`
+  （双 Rust 静态库 fceux11_rust.lib + vnesu11.lib 符号重复修复，LNK2005/LNK1169）
+- 新增 `option(VNESU11_SHADOW_RUN ... ON)`：shadow run 独立开关（PGO 构建可关）
+- 构建产物：fceux11.exe ON 12.37 MB / OFF 5.77 MB
+
+**回退**：`-DVNESU11_CORE=OFF` 仍可构建纯 C++ CPU/PPU（v2.1 移除）。
+
+**后续**：Phase 8（清理 newppu=1 C++ CPU/PPU 源 + 移除 OFF 路径）与 Phase 7b
+（T1 → 85% 精度攻关）独立排期。详见 `docs/wip_2.0_plan/phase_7a_default_switch.md`。
+
 ### wip_v2.0 — Phase 6 续收口：PPU open-bus + 单字节 opcode dummy-read（2026-08-14）
 
 诚实 Rust T1 **79.1% → 80.2%（142/177，+2 PASS）**，首次以 Rust-primary 实测

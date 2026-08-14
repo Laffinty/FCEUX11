@@ -110,6 +110,19 @@ $env:VCPKG_ROOT = "$PWD\vcpkg"
 3. 编译全部源码（build）
 4. 运行单元测试（test）
 
+> **v2.0.0 起：vNESU11 Rust core 默认启用**（`VNESU11_CORE=ON`）。
+> 这意味着编译时自动构建 `crates/vnesu11`（Rust 静态库）并链接进 `fceux11.exe`，
+> 模拟器 CPU/PPU/APU 由 Rust 实现驱动。
+>
+> - 需要本机已安装 Rust 工具链（`rustc 1.78+`，见 §1.2）。
+> - 如需退回纯 C++ CPU/PPU（v2.0.0 的兼容回退路径，v2.1 移除）：
+>   ```powershell
+>   cmake -B build -DVNESU11_CORE=OFF
+>   cmake --build build
+>   ```
+> - 构建测试二进制时若出现 Rust 静态库符号重复（`LNK2005 rust_eh_personality`），
+>   属已知行为：`/FORCE:MULTIPLE` 已内建在 `src/CMakeLists.txt`，无需干预。
+
 **Ninja 探测口径**：`ninja` 不在裸 PowerShell / Git Bash 的 `PATH` 上，**不等于电脑没有安装 Ninja**。Visual Studio 的 **C++ CMake tools for Windows** 组件自带 Ninja，默认位于：
 
 ```text

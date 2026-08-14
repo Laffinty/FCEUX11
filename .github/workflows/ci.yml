@@ -176,6 +176,29 @@ jobs:
       - name: Build
         run: cmake --build build --config Release --parallel
 
+      # v2.0.0 Phase 7a dual-build gate: VNESU11_CORE defaults to ON (the
+      # main build above exercises it). The legacy C++ CPU/PPU path
+      # (VNESU11_CORE=OFF) must still compile during v2.0.0's migration
+      # window; it is removed entirely in Phase 8 / v2.1. See
+      # docs/wip_2.0_plan/phase_7a_default_switch.md.
+      - name: Legacy OFF build gate (Phase 7a dual-build)
+        shell: pwsh
+        run: |
+          cmake -S . -B build-legacy-off
+            -G "Ninja"
+            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_C_COMPILER=cl
+            -DCMAKE_CXX_COMPILER=cl
+            -DFCEUX11_BUILD_TESTS=ON
+            -DENABLE_LINT_CPPCHECK=OFF
+            -DVCPKG_INSTALLED_DIR=${{ github.workspace }}/vcpkg_installed
+            -DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}/cmake/triplets
+            -DVNESU11_CORE=OFF
+          cmake --build build-legacy-off --config Release --parallel
+        env:
+          # Reuse the vcpkg install tree configured for the main build.
+          VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+
       - name: CTest
         # -LE perf excludes the "perf"-labelled bench_tolerance_test from the
         # gating run. Wall-clock benchmarks are advisory on shared runners
