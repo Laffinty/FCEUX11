@@ -51,6 +51,13 @@ impl CpuCore {
     // RTS — pull return, jump to ret+1.
     #[inline(always)]
     pub(crate) fn rts<BC: BusContext>(&mut self, bus: &mut BC) {
+        // 6502 does a dummy read of the byte after the opcode (64doc RTS
+        // cycle 2). This has bus side effects — e.g. when the opcode was
+        // fetched from a write-only PPU register, the dummy read of PC+1
+        // (the next register) clears the $2006 write toggle. FCEUX C++
+        // omits this read, but the blargg cpu_exec_space_ppuio test
+        // requires it.
+        let _ = bus.read(self.pc);
         let lo = self.pop(bus) as u16;
         let hi = self.pop(bus) as u16;
         self.pc = ((hi << 8) | lo).wrapping_add(1);
@@ -59,6 +66,9 @@ impl CpuCore {
     // RTI — pull P then return.
     #[inline(always)]
     pub(crate) fn rti<BC: BusContext>(&mut self, bus: &mut BC) {
+        // Dummy read of the byte after the opcode (64doc RTI cycle 2),
+        // same bus side effects as RTS.
+        let _ = bus.read(self.pc);
         let p = self.pop(bus);
         self.p = p | U_FLAG;
         self.moo_pi = self.p;

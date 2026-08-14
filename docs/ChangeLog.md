@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### wip_v2.0 — Phase 6 续收口：PPU open-bus + 单字节 opcode dummy-read（2026-08-14）
+
+诚实 Rust T1 **79.1% → 80.2%（142/177，+2 PASS）**，首次以 Rust-primary 实测
+跨越 phase 6 门槛（≥80%，候选 A）。修复三个 chip-spec 行为：
+
+- **PPU open-bus latch**（`crates/vnesu11/src/bus.rs`）：`ppu.regs.read_buffer`
+  作为 `PPUGenLatch` 唯一来源。所有 $2000-$2007 写入刷新 latch；$2000/$2001/
+  $2003/$2005/$2006 读返回 latch（不再误用 CPU open_bus）；$2002/$2004/$2007 读
+  后写回 latch。修 $2007 读路径 `ppu_v`/`ppu_read_buffer` 与 `ppu.regs.v`/
+  `read_buffer` 脱节。→ `cpu_exec_space_ppuio` 0x05→PASS。
+- **RTS/RTI/BRK 单字节 dummy-read**（`crates/vnesu11/src/cpu/ops_stack.rs`、
+  `ops_system.rs`）：按 64doc cycle-2 补 "读下一条指令字节并丢弃" dummy read，
+  使 PC+1 处总线副作用（如 $2002 读清 w toggle）生效。FCEUX C++ 未实现此 dummy
+  read，但 blargg 测试 #5/#14/#18 要求；ADR-011 下 Rust 按 chip 规范自由实现。
+- **$4016/$4017 joypad open-bus**（`crates/vnesu11/src/bus.rs`）：读返回
+  `(joypad bit) | (open_bus & 0xC0)`，对齐 FCEUX `JPRead`。→
+  `cpu_exec_space_apu` 0x02→PASS。
+
+验证：`cargo test --release -p vnesu11 --lib` 202 passed / 0 failed；全量 blargg
+manifest 142 PASS / 35 FAIL（0 回归）；shadow dev 回归 `cpu_match=46/59 ≥ 5`。
+
 ### wip_v2.0 — Phase 6 收口（commit `b687980`, 2026-08-13）
 
 **Phase 6 closure per ADR-011** — KagamiQA 5 层 oracle 取代 byte-level shadow match

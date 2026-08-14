@@ -193,19 +193,24 @@ impl VNesSoc {
     pub fn ppu_read_data(&mut self, increment: u16) -> u8 {
         let addr = self.ppu_v & 0x3FFF;
         let buf = self.ppu_read_buffer;
+        let ret;
         if addr >= 0x3F00 {
-            // Palette reads: no buffering, but palette's low 2 bits OR
-            // into the nametable buffer's low 2 bits in real hardware.
-            // Phase 2 keeps it simple — direct palette value, leave the
-            // buffer untouched.
-            self.ppu_v = self.ppu_v.wrapping_add(increment);
-            self.ppu_read(addr) & 0x3F
+            // Palette reads bypass the lag buffer; the returned byte is
+            // the palette value with the high 2 bits from the PPU
+            // open-bus latch (C++ `A2007` palette path: `ret =
+            // READPAL(paddr); ret |= PPUGenLatch & 0xC0`).
+            ret = (self.ppu_read(addr) & 0x3F) | (self.ppu.regs.read_buffer & 0xC0);
         } else {
+            ret = buf;
             let fresh = self.ppu_read(addr);
             self.ppu_read_buffer = fresh;
-            self.ppu_v = self.ppu_v.wrapping_add(increment);
-            buf
         }
+        self.ppu_v = self.ppu_v.wrapping_add(increment);
+        self.ppu.regs.v.0 = self.ppu_v & 0x7FFF;
+        // A $2007 read refreshes the full 8 bits of the PPU open-bus
+        // latch with the returned byte (C++ `PPUGenLatch = ret`).
+        self.ppu.regs.read_buffer = ret;
+        ret
     }
 
     // ===================================================================
@@ -220,30 +225,23 @@ impl VNesSoc {
                 // $2002 PPUSTATUS: VBlank (bit 7) + sprite 0 hit (6) +
                 // overflow (5) from the PpuCore status; reading clears
                 // VBlank + the w toggle (PpuRegisters::read_status).
-                // Low 5 bits come from the PPU read latch (C++ A2002:
-                // `ret = PPU_status | (PPUGenLatch & 0x1F)`; the latch
-                // is synced into `read_buffer` each frame).
-                //
-                // NOTE (Phase 6 P2, 2026-08-12): C++ (newppu) ALSO
-                // implements VBL-set suppression — a $2002 read at
-                // sl 240, cycle 340 marks the next frame's VBlank set
-                // as skipped (Nesdev PPU_frame_timing). Replicating it
-                // requires matching C++'s sub-scanline read phase,
-                // which drifts frame-to-frame with the count residual
-                // (C++ read positions 338/340/331 across frames; a
-                // fixed segment-dots threshold can't track it — a
-                // [333,341) window over-suppressed and moved the first
-                // shadow divergence from frame 3 to frame 2). See
-                // docs/wip_2.0_plan/phase_6_integration.md §9.1.2
-                // Step 2c. Left unimplemented until the phase model
-                // matches.
-                self.ppu.regs.read_status() | (self.ppu.regs.read_buffer & 0x1F)
+                // Low 5 bits come from the PPU open-bus latch (C++
+                // A2002: `ret = PPU_status | (PPUGenLatch & 0x1F)`).
+                // The read also refreshes the latch with the returned
+                // byte (`PPUGenLatch = ret`), so the low 5 bits only.
+                let status = self.ppu.regs.read_status();
+                let ret = status | (self.ppu.regs.read_buffer & 0x1F);
+                self.ppu.regs.read_buffer = ret;
+                ret
             }
             0x04 => {
                 // $2004 OAMDATA read at OAMADDR (read does not advance
-                // OAMADDR — NES hardware quirk).
+                // OAMADDR — NES hardware quirk). The returned OAM byte
+                // refreshes the PPU open-bus latch (C++ A2004).
                 let addr = self.ppu.regs.oam_addr as usize;
-                self.ppu.oam.primary[addr]
+                let ret = self.ppu.oam.primary[addr];
+                self.ppu.regs.read_buffer = ret;
+                ret
             }
             0x07 => {
                 // $2007 PPU data — read via the SoC's ppu_read_data
@@ -251,11 +249,17 @@ impl VNesSoc {
                 let inc = if (self.ppu.regs.ppuctrl & 0x04) != 0 { 32 } else { 1 };
                 self.ppu_read_data(inc)
             }
-            _ => self.open_bus,
+            // Write-only PPU registers ($2000/$2001/$2003/$2005/$2006)
+            // return the PPU open-bus latch (C++ A200x).
+            _ => self.ppu.regs.read_buffer,
         }
     }
 
     fn ppu_write_register(&mut self, reg: u8, val: u8) {
+        // Every PPU register write drives the PPU data bus, so the
+        // open-bus latch (PPUGenLatch) is refreshed with the written
+        // byte (C++ B2000-B2007 all set `PPUGenLatch = V`).
+        self.ppu.regs.read_buffer = val;
         match reg {
             0x00 => {
                 // PPUCTRL: NMI / sprite size / bg+sprite tables /
@@ -326,8 +330,15 @@ impl VNesSoc {
             // $4015: channel enable bits + IRQ flags (read clears the
             // frame-counter IRQ flag, matching src/sound.cpp StatusRead).
             0x4015 => self.apu_status_read(),
-            // $4016/$4017: joypad serial shift register.
-            0x4016 | 0x4017 => self.joypad.read(addr),
+            // $4016/$4017: joypad serial data in bit 0, open bus in bits
+            // 6-7 (FCEUX JPRead: `ret = joyport->Read() | (_DB & 0xC0)`).
+            // The upper bits must follow the CPU open bus so code
+            // executing from the joypad ports (blargg cpu_exec_space_apu)
+            // sees the same opcode the data bus last carried.
+            0x4016 | 0x4017 => {
+                let bit = self.joypad.read(addr) & 0x01;
+                bit | (self.open_bus & 0xC0)
+            }
             // All other APU/IO registers read as open bus (hardware
             // behavior; the 5 channels have no readable state).
             _ => self.open_bus,

@@ -533,13 +533,15 @@ P2 收口补完(2026-08-13 phase 6 closure commit pending):
 
 ---
 
-## 7.6 Phase 6 收口日志(2026-08-13)
+## 7.6 Phase 6 收口日志(2026-08-13 + 2026-08-14 续)
 
 | 时刻 | commit | 关键事件 |
 |------|--------|---------|
 | 2026-08-13 早 | `cb89175` | T1 blargg corpus 跑通,pass-rate 81.36% |
 | 2026-08-13 早 | `96768f9` | ADR-011 战略转向声明(byte-level → chip-functional) |
 | 2026-08-13 收口 | phase6-closure (pending) | kagami-qa-runner 48 项 40 PASS / 8 FAIL,0 回归 |
+| 2026-08-14 | DMC 收口 `fc057e2` | 诚实 Rust T1 76.3%→79.1%（140/177） |
+| 2026-08-14 | PPU open-bus + dummy-read (pending) | 诚实 Rust T1 79.1%→**80.2%（142/177）**，首次诚实达 phase 6 门槛 |
 
 收口实测对比(frozen baseline v1.17 → phase 6 收口):
 
@@ -549,9 +551,9 @@ P2 收口补完(2026-08-13 phase 6 closure commit pending):
 | Passed | 39 | 40 | +1 |
 | Failed (advisory) | 8 | 8 | 0 |
 | PASS→FAIL 回归 vs frozen | — | 0 | n/a |
-| T1 blargg pass-rate | n/a | 81.36% | n/a |
-| Shadow baseline cpu_match | n/a | 5/59 | n/a |
-| Cargo test (lib + apu + ppu + mapper + system_type) | n/a | 100% (194+24+33+12 cases) | n/a |
+| T1 blargg pass-rate (诚实 Rust-primary) | n/a | **80.2% (142/177)** | n/a |
+| Shadow baseline cpu_match | n/a | 46/59 (dev regression only) | n/a |
+| Cargo test (lib) | n/a | 202 passed / 0 failed | n/a |
 | vn_perf_bench 帧时间 | 724us (C++) | 743us (vNESU11) | +2.6% (within 5% gate) |
 ```
 
@@ -686,73 +688,68 @@ shadow harness 现已具备持续迭代的对比基础设施（harness 报告行
 > **目标**：任何新会话只读本文件即可接续 Phase 6 收尾。**先跑一遍 §9.1.4 验证
 > 命令确认基线**，再按 §9.1.2 剩余路径执行。不要重复已完成的修复（§9.1.1 清单）。
 
-### 9.1.0 当前精确状态(2026-08-14 DMC 收口会话修订，含"正确栈"+"APU/CPU 精度"+"DMC 完整实现"三个转向)
+### 9.1.0 当前精确状态(2026-08-14 PPU open-bus + 单字节 opcode dummy-read 收口会话修订)
 
 > **会话目标已变更**(2026-08-13 ADR-011):不再追 byte-level shadow match。
 > **此前会话**发现并修复了根本构建 bug + CPU 栈序 bug，把此前不可用的
-> "T1=87%/81.36%" 修正为**诚实 Rust T1 = 62.7%**，再推进至 **76.3%**。
-> **本 DMC 收口会话**在此基础上完整实现 DMC + 修 NOP abs,X 页跨 dummy
-> read，把诚实 Rust T1 推至 **140/177 = 79.1%**（见下）。接续会话从
-> "修复剩余 79.1% → 85%+ 的精度缺口"继续。
+> "T1=87%/81.36%" 修正为**诚实 Rust T1 = 62.7%**，再推进至 **76.3%**，
+> DMC 收口会话推进至 **79.1%**。**本收口会话**修复 PPU open-bus latch +
+> RTS/RTI/BRK 单字节 dummy-read + $4016/$4017 joypad open-bus，把诚实
+> Rust T1 推至 **142/177 = 80.2%**，**首次诚实跨越 phase 6 门槛(≥80%，
+> 候选 A)**。接续会话从 "剩余 80.2% → 85%+ 的精度缺口"继续。
 
-- **分支** `wip_v2.0`；上一收口会话改动已提交 3 个 commit（`3e3e4ef`、
-  `efe9678`、`8992ee9`），本 DMC 收口会话改动待提交。
-- **诚实 Rust T1 = 140/177 = 79.1%**（`VNESU11_RUST_PRIMARY=1` 全量实测）。
-  较上一会话（135/177 = 76.3%）净 **+5 PASS**。
-- **正确栈序已修**（`33d95cf`，上一会话）：`push` 先写 `$100+S` 再减 S、
+- **分支** `wip_v2.0`；上一 DMC 收口会话改动已提交（`fc057e2` 等），本
+  会话改动待提交。
+- **诚实 Rust T1 = 142/177 = 80.2%**（`VNESU11_RUST_PRIMARY=1` 全量实测）。
+  较上一会话（140/177 = 79.1%）净 **+2 PASS**（`cpu_exec_space_ppuio`、
+  `cpu_exec_space_apu`）。
+- **正确栈序已修**（`33d95cf`，更早会话）：`push` 先写 `$100+S` 再减 S、
   `pop` 先加 S 再读。
-- **本收口会话修复链（已提交）**：
-  1. APU 长度计数：`$4003/$4007/$400B/$400F` 写入在通道使能时**无条件**重载
-     长度计数（C++ `SQReload`），并修 pulse 的 length index 从未写入的 bug。
-  2. APU 长度计数 halt：半帧 tick 按通道 halt 标志保持（pulse/noise bit5、
-     triangle bit7）；补 triangle 长度计数半帧 tick；envelope/linear 改为
-     quarter+half 都 tick（对齐 `FrameSoundStuff`）。
-  3. 帧计数 IRQ latch：`take_irq` 不再清 latch（`$4015` 读清 frame、`$4015`
-     写清 DMC）；`$4017` 写 bit6 立即清 frame-IRQ flag+线；29830 边界第三
-     IRQ set；reset 相位 `cycle_count=9`（实测对齐 C++ `fhcnt=4` 的 count~9）。
-  4. CPU 非法 opcode：`0x4B` 从 ARR 改 ALR；`ANC` 不再误清 V；`0x9C/0x9E`
-     SYA/SXA 地址复用 quirk；SHA/SHX/SHY/TAS 用 base-high 计算。
-  5. CPU RMW 寻址：DCP/ISB/SLO/RLA/SRE/RRA 的 abs,X/Y/(iz),Y 改用 RMW 老页
-     dummy read（无 page-cross 罚周期）；新增 `rmw_izy`。
-  6. NOP abs/abs,X（0x0C/0x1C…0xFC）真实读总线（含 page-cross 罚周期）。
-  7. CLI/SEI/PLP 不再覆盖 `moo_pi`（保留 6502 单指令中断延迟）；通用 IRQ
-     服务后 `moo_pi = P`（对齐 C++ `_PI = _P`），修复 segment 预算耗尽时
-     下个 segment 用陈旧 I=0 重复进 IRQ handler（`cpu_int_1_cli_latency`
-     转 PASS）。
-- **测试**：`cargo test --release -p vnesu11 --lib` 202 passed / 0 failed
-  （+7 DMC 单测）。注意：`cargo test -p vnesu11` 的
-  `blargg_cpu_instrs_rust_parity` 集成测试在本会话前后均 7/16（pre-existing
-  harness 0x80 sentinel 问题，与本次改动无关）。
-- **剩余 37 个失败**（Rust-primary 实测）：sprdma×2（DMC+Sprite DMA 仲裁）、
-  CPU 9（`cpu_int_2..5` / `cpu_exec_space_*` / `cpu_reset_regs` / `instr_misc`
-  / `cpu_dummy_writes_ppu` / `cpu_interrupts` 永久跳过）、MMC3 12（其中 5 个
-  已从 0x80 挂起转为 0x02 具体失败，其余 7 个仍缺 A12 时钟）、PPU 13
-  （`vbl_*` 需 dot 粒度时序 + `ppu_open_bus` + `oam_stress`）。
+- **本收口会话修复链（待提交）**：
+  1. **PPU open-bus latch（`bus.rs`）**：`ppu.regs.read_buffer` 作为
+     `PPUGenLatch` 的唯一来源。所有 $2000-$2007 写入刷新 latch（C++
+     `B2000-B2007` 均 `PPUGenLatch = V`）；$2000/$2001/$2003/$2005/$2006
+     读返回 latch（不再误用 CPU open_bus）；$2002/$2004/$2007 读后把返回
+     字节写回 latch（C++ `A2002/A2004/A2007` 语义）。修 $2007 读的
+     v/read_buffer 与 `ppu.regs.v/read_buffer` 脱节。→ `cpu_exec_space_ppuio`
+     **0x05→0x00 PASS**（#3 "写 $2003 后读 $2001 应返回同值" 通过）。
+  2. **单字节 opcode dummy-read（`ops_stack.rs`/`ops_system.rs`）**：RTS/
+     RTI/BRK 补 64doc cycle-2 "读下一条指令字节并丢弃" 的 dummy read，让
+     PC+1 处的总线副作用（如 $2002 读清 w toggle）生效。FCEUX C++ 未实现
+     该 dummy read，但 blargg cpu_exec_space_ppuio #5/#14/#18 要求它（Rust
+     按 chip 规范自由实现，ADR-011 允许比 C++ 更准确）。
+  3. **$4016/$4017 joypad open-bus（`bus.rs`）**：读返回
+     `(joypad 串行 bit) | (open_bus & 0xC0)`，对齐 FCEUX `JPRead`
+     `ret = joyport->Read() | (_DB & 0xC0)`。此前只返回 bit0，导致
+     cpu_exec_space_apu 在 $4016 取到 $00(BRK)。→ `cpu_exec_space_apu`
+     **0x02→0x00 PASS**。
+- **测试**：`cargo test --release -p vnesu11 --lib` 202 passed / 0 failed。
+- **剩余 35 个失败**（Rust-primary 实测）：sprdma×2（DMC+Sprite DMA 仲裁）、
+  CPU 7（`cpu_int_2..5` / `cpu_reset_regs` / `instr_misc` /
+  `cpu_dummy_writes_ppu` / `cpu_interrupts` 永久跳过）、MMC3 12（其中 5 个
+  0x02 具体失败，其余 7 个仍缺 A12 时钟）、PPU 13（`vbl_*` 需 dot 粒度时序
+  + `ppu_open_bus` + `oam_stress`）。
 
-#### 9.1.0c 下次继续（2026-08-14 DMC 收口会话末定稿）
+#### 9.1.0c 下次继续（2026-08-14 PPU open-bus + 单字节 dummy-read 会话末定稿）
 
 > 接续会话只读本节即可。先跑 §9.1.4 确认基线（全量 manifest 应为
-> **140/177 = 79.1%**），再按下列优先级修剩余 37 个失败：
+> **142/177 = 80.2%**），再按下列优先级修剩余 35 个失败：
 
-1. **DMC 主体已完成**：`apu_single_7/8_dmc_*`、`apu_test`、
-   `apu_reset_works_imm` 已 PASS；`dmc_buffer_retained`/`dmc_latency`/
-   `dmc_status`/`dmc_status_irq` 亦 PASS。剩余 **sprdma_dmc_dma /
-   sprdma_dmc_dma_512**（需 per-cycle Sprite DMA + DMC DMA 仲裁，Mesen2 式
-   `ProcessPendingDma` 状态机，明确 deep-model，可 phase 7+）。
-2. **其次——MMC3 5 个 0x02 具体失败**：`mmc3_2_details`、`mmc3_5_MMC3`、
+1. **phase 6 门槛已诚实达标**：T1 = 80.2% ≥ 80%（候选 A）。若要冲 phase 7
+   的 85% 门禁（150/177），按下列优先级继续。
+2. **MMC3 5 个 0x02 具体失败**：`mmc3_2_details`、`mmc3_5_MMC3`、
    `mmc3_6_MMC6`、`mmc3_v2_2_details`、`mmc3_v2_6_MMC3_alt`（帧 IRQ 修复后
-   已从 0x80 挂起转为具体失败，可能还剩 IRQ/A12 边缘）；7 个 0x80 需
-   A12 时钟 deep model（明确 phase 7+ 重活，见 `KagamiQA.md` §3.3）。
-3. **再次——CPU open bus / exec space**：`cpu_exec_space_apu`、
-   `cpu_exec_space_ppuio`、`cpu_dummy_writes_ppu`、`instr_misc`。其中
-   `cpu_dummy_writes_ppu`（0x09）已定位为 Rust-primary 下 CPU 跑入空 ROM
-   区（PC=E808/E80B，全 FF）未达 RMW 测试——是 CPU 分歧问题，非 PPU $2007
-   双写本身。
-4. **PPU VBL 13 个**：受限于当前段模型（341 dot/segment，无 sub-scanline
-   精度），是明确的 phase 7+ dot 粒度重活，不建议在 phase 6 追。
+   已从 0x80 挂起转为具体失败，可能还剩 IRQ/A12 边缘；C++ mapper 侧，经
+   Rust `hblank_irq` 驱动）；7 个 0x80 需 A12 时钟 deep model（明确 phase 7+
+   重活，见 `KagamiQA.md` §3.3）。
+3. **CPU 剩余 7 个**：`cpu_reset_regs`（0x81 reset 后 A/X/Y/S 未清）/
+   `instr_misc`（0x80 300 帧仍挂起）/ `cpu_dummy_writes_ppu`（0x09 已定位为
+   Rust-primary 下 CPU 跑入空 ROM 区 E808/E80B）/ `cpu_int_2..5`（NMI/IRQ
+   交互时序）。`cpu_interrupts` 为 ROM load 失败，永久跳过。
+4. **sprdma×2 + PPU VBL 13**：需 per-cycle DMA 仲裁 / dot 粒度时序，明确
+   phase 7+ 重活，不建议在 phase 6 追。
 5. 每修一批跑一次全量 manifest + `cargo test --release -p vnesu11 --lib`，
-   确认 0 回归再提交。到 **T1 ≥ 85%（150/177）** 后，phase 7 门禁只剩
-   §7.5 的「完整 PPU/APU 5 通道状态 sync」。
+   确认 0 回归再提交。
 
 #### 9.1.0a Rust-primary 测量模式（关键工具）
 

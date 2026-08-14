@@ -12,7 +12,12 @@ impl CpuCore {
     /// BRK — force interrupt, push PC+1 + P (B set), vector 0xFFFE.
     #[inline(always)]
     pub(crate) fn brk<BC: BusContext>(&mut self, bus: &mut BC) {
-        let ret = self.pc.wrapping_add(1);
+        // 6502 does a dummy read of the byte after the opcode (64doc BRK
+        // cycle 2) and advances PC past it, then pushes that address.
+        // The read has bus side effects (same as RTS/RTI dummy reads).
+        let _ = bus.read(self.pc);
+        self.pc = self.pc.wrapping_add(1);
+        let ret = self.pc;
         self.push(bus, (ret >> 8) as u8);
         self.push(bus, (ret & 0xFF) as u8);
         self.push(bus, self.p | flags::U_FLAG | flags::B_FLAG);
