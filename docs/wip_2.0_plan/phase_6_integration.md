@@ -539,9 +539,10 @@ P2 收口补完(2026-08-13 phase 6 closure commit pending):
 |------|--------|---------|
 | 2026-08-13 早 | `cb89175` | T1 blargg corpus 跑通,pass-rate 81.36% |
 | 2026-08-13 早 | `96768f9` | ADR-011 战略转向声明(byte-level → chip-functional) |
-| 2026-08-13 收口 | phase6-closure (pending) | kagami-qa-runner 48 项 40 PASS / 8 FAIL,0 回归 |
+| 2026-08-13 收口 | `b687980` | kagami-qa-runner 48 项 40 PASS / 8 FAIL,0 回归 |
 | 2026-08-14 | DMC 收口 `fc057e2` | 诚实 Rust T1 76.3%→79.1%（140/177） |
-| 2026-08-14 | PPU open-bus + dummy-read (pending) | 诚实 Rust T1 79.1%→**80.2%（142/177）**，首次诚实达 phase 6 门槛 |
+| 2026-08-14 | PPU open-bus + 单字节 dummy-read `14848f7` | 诚实 Rust T1 79.1%→**80.2%（142/177）**，首次诚实达 phase 6 门槛 |
+| 2026-08-14 | Phase 6 续收口(本会话) | shadow cpu_match 5→46/59(开发期回归基线大幅上扬);`instr_misc` 帧预算 300→600 修 manifest → 诚实 Rust T1 80.2%→**80.8%（143/177）**;Rust-primary 143 vs 默认 141(Rust +2);DoD §7.1 全 [x]、§7.2 仅 phase 7 待补、§7.5 仅 85% 门槛待 phase 7 |
 
 收口实测对比(frozen baseline v1.17 → phase 6 收口):
 
@@ -551,10 +552,13 @@ P2 收口补完(2026-08-13 phase 6 closure commit pending):
 | Passed | 39 | 40 | +1 |
 | Failed (advisory) | 8 | 8 | 0 |
 | PASS→FAIL 回归 vs frozen | — | 0 | n/a |
-| T1 blargg pass-rate (诚实 Rust-primary) | n/a | **80.2% (142/177)** | n/a |
-| Shadow baseline cpu_match | n/a | 46/59 (dev regression only) | n/a |
+| T1 blargg pass-rate (诚实 Rust-primary) | n/a | **80.8% (143/177)** | n/a |
+| T1 blargg pass-rate (默认 / C++ newppu) | 67.8% (120/177) | **79.7% (141/177)** | **+11.9pp** |
+| Shadow baseline cpu_match | n/a | **46/59** (dev regression only) | n/a |
 | Cargo test (lib) | n/a | 202 passed / 0 failed | n/a |
 | vn_perf_bench 帧时间 | 724us (C++) | 743us (vNESU11) | +2.6% (within 5% gate) |
+
+**phase 6 收口最终态**:Rust-primary T1 = 143/177 = 80.8% (≥80% 候选 A 门槛,**+0.6pp 上扬**),**phase 6 已达标**;shadow cpu_match = 46/59 ≥ 5 (ADR-011 开发期回归下限,**远超**基线);Cargo 单元测试 202/0/0。所有 [ ] DoD 项明确推迟 phase 7+。
 ```
 
 ---
@@ -688,24 +692,35 @@ shadow harness 现已具备持续迭代的对比基础设施（harness 报告行
 > **目标**：任何新会话只读本文件即可接续 Phase 6 收尾。**先跑一遍 §9.1.4 验证
 > 命令确认基线**，再按 §9.1.2 剩余路径执行。不要重复已完成的修复（§9.1.1 清单）。
 
-### 9.1.0 当前精确状态(2026-08-14 PPU open-bus + 单字节 opcode dummy-read 收口会话修订)
+### 9.1.0 当前精确状态(2026-08-14 续收口会话修订)
 
 > **会话目标已变更**(2026-08-13 ADR-011):不再追 byte-level shadow match。
 > **此前会话**发现并修复了根本构建 bug + CPU 栈序 bug，把此前不可用的
 > "T1=87%/81.36%" 修正为**诚实 Rust T1 = 62.7%**，再推进至 **76.3%**，
-> DMC 收口会话推进至 **79.1%**。**本收口会话**修复 PPU open-bus latch +
-> RTS/RTI/BRK 单字节 dummy-read + $4016/$4017 joypad open-bus，把诚实
-> Rust T1 推至 **142/177 = 80.2%**，**首次诚实跨越 phase 6 门槛(≥80%，
-> 候选 A)**。接续会话从 "剩余 80.2% → 85%+ 的精度缺口"继续。
+> DMC 收口会话推进至 **79.1%**。PPU open-bus + 单字节 opcode dummy-read
+> 会话修复 PPU open-bus latch + RTS/RTI/BRK 单字节 dummy-read + $4016/$4017
+> joypad open-bus，把诚实 Rust T1 推至 **142/177 = 80.2%**，**首次诚实跨越
+> phase 6 门槛(≥80%，候选 A)**，提交于 `14848f7`。
+>
+> **本续收口会话**（2026-08-14 末）完成三项收口工作：(1) `§7.6` 收口日志
+> 增补本会话一行 + phase 6 收口最终态汇总；(2) 验证 shadow dev 回归基线
+> cpu_match 由基线 5/59 上扬至 **46/59**（远超 ADR-011 下限）；(3) 验证
+> 默认（不设 `VNESU11_RUST_PRIMARY`）T1 = **141/177 = 79.7%**，Rust-primary
+> 142 vs 默认 141——Rust 略胜。
 
-- **分支** `wip_v2.0`；上一 DMC 收口会话改动已提交（`fc057e2` 等），本
-  会话改动待提交。
+- **分支** `wip_v2.0`；工作树已干净（`14848f7` 已提交），本会话改动待提交。
 - **诚实 Rust T1 = 142/177 = 80.2%**（`VNESU11_RUST_PRIMARY=1` 全量实测）。
   较上一会话（140/177 = 79.1%）净 **+2 PASS**（`cpu_exec_space_ppuio`、
   `cpu_exec_space_apu`）。
+- **默认 T1 = 141/177 = 79.7%**（不设 `VNESU11_RUST_PRIMARY`，测 C++ newppu）。
+  Rust 略胜 +1 PASS（C++ 在 `ppu_open_bus` 上 PASS，Rust FAIL；反之 Rust 在
+  `cpu_exec_space_*` 略胜）。
+- **Shadow dev 回归基线 cpu_match = 46/59**（远超 ADR-011 下限 5/59）。
+  frame 1-2 + frame 4 全匹配 + 大部分后续帧 delta=0（待 §9.1 详述）；frame 3
+  仍存在微小相位差（按 ADR-011 不再追 byte match）。
 - **正确栈序已修**（`33d95cf`，更早会话）：`push` 先写 `$100+S` 再减 S、
   `pop` 先加 S 再读。
-- **本收口会话修复链（待提交）**：
+- **PPU open-bus + dummy-read 会话修复链**（已提交 `14848f7`）：
   1. **PPU open-bus latch（`bus.rs`）**：`ppu.regs.read_buffer` 作为
      `PPUGenLatch` 的唯一来源。所有 $2000-$2007 写入刷新 latch（C++
      `B2000-B2007` 均 `PPUGenLatch = V`）；$2000/$2001/$2003/$2005/$2006
@@ -723,9 +738,13 @@ shadow harness 现已具备持续迭代的对比基础设施（harness 报告行
      `ret = joyport->Read() | (_DB & 0xC0)`。此前只返回 bit0，导致
      cpu_exec_space_apu 在 $4016 取到 $00(BRK)。→ `cpu_exec_space_apu`
      **0x02→0x00 PASS**。
-- **测试**：`cargo test --release -p vnesu11 --lib` 202 passed / 0 failed。
-- **剩余 35 个失败**（Rust-primary 实测）：sprdma×2（DMC+Sprite DMA 仲裁）、
-  CPU 7（`cpu_int_2..5` / `cpu_reset_regs` / `instr_misc` /
+- **测试**：`cargo test --release -p vnesu11 --lib` 202 passed / 0 failed；
+  `cargo test --release -p kagami-qa --lib` 187 passed / 0 failed。
+- **本续收口会话修复**：`blargg_manifest.json` 把 `instr_misc.nes` 帧预算
+  从 300 提到 600（4 子测 × ~150 帧的实测迭代次数）。`blargg_known_fail.json`
+  把 `instr_misc.nes` 从 `failures` 移到 `v2.0_verified_pass_2026-08-14`。
+- **剩余 34 个失败**（Rust-primary 实测）：sprdma×2（DMC+Sprite DMA 仲裁）、
+  CPU 6（`cpu_int_2..5` / `cpu_reset_regs` /
   `cpu_dummy_writes_ppu` / `cpu_interrupts` 永久跳过）、MMC3 12（其中 5 个
   0x02 具体失败，其余 7 个仍缺 A12 时钟）、PPU 13（`vbl_*` 需 dot 粒度时序
   + `ppu_open_bus` + `oam_stress`）。
@@ -733,17 +752,17 @@ shadow harness 现已具备持续迭代的对比基础设施（harness 报告行
 #### 9.1.0c 下次继续（2026-08-14 PPU open-bus + 单字节 dummy-read 会话末定稿）
 
 > 接续会话只读本节即可。先跑 §9.1.4 确认基线（全量 manifest 应为
-> **142/177 = 80.2%**），再按下列优先级修剩余 35 个失败：
+> **143/177 = 80.8%**），再按下列优先级修剩余 34 个失败：
 
-1. **phase 6 门槛已诚实达标**：T1 = 80.2% ≥ 80%（候选 A）。若要冲 phase 7
+1. **phase 6 门槛已诚实达标**：T1 = 80.8% ≥ 80%（候选 A）。若要冲 phase 7
    的 85% 门禁（150/177），按下列优先级继续。
 2. **MMC3 5 个 0x02 具体失败**：`mmc3_2_details`、`mmc3_5_MMC3`、
    `mmc3_6_MMC6`、`mmc3_v2_2_details`、`mmc3_v2_6_MMC3_alt`（帧 IRQ 修复后
    已从 0x80 挂起转为具体失败，可能还剩 IRQ/A12 边缘；C++ mapper 侧，经
    Rust `hblank_irq` 驱动）；7 个 0x80 需 A12 时钟 deep model（明确 phase 7+
    重活，见 `KagamiQA.md` §3.3）。
-3. **CPU 剩余 7 个**：`cpu_reset_regs`（0x81 reset 后 A/X/Y/S 未清）/
-   `instr_misc`（0x80 300 帧仍挂起）/ `cpu_dummy_writes_ppu`（0x09 已定位为
+3. **CPU 剩余 6 个**：`cpu_reset_regs`（0x81 reset 后 A/X/Y/S 未清）/
+   `cpu_dummy_writes_ppu`（0x09 已定位为
    Rust-primary 下 CPU 跑入空 ROM 区 E808/E80B）/ `cpu_int_2..5`（NMI/IRQ
    交互时序）。`cpu_interrupts` 为 ROM load 失败，永久跳过。
 4. **sprdma×2 + PPU VBL 13**：需 per-cycle DMA 仲裁 / dot 粒度时序，明确

@@ -648,10 +648,10 @@
             "name": "instr_misc",
             "path": "fixtures/blargg/cpu/instr_misc.nes",
             "category": "cpu",
-            "frames": 300,
+            "frames": 600,
             "reset_after": -1,
             "probe_addr": 24576,
-            "description": "blargg test ROM: instr_misc [cpu]"
+            "description": "blargg test ROM: instr_misc [cpu] (Step 3.1: 4 sub-tests × ~150 frames need 600 frames; was 300 → test reports 0x80 still-running)"
         },
         {
             "name": "instr_misc_01_abs_x",

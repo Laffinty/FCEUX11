@@ -28,6 +28,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 验证：`cargo test --release -p vnesu11 --lib` 202 passed / 0 failed；全量 blargg
 manifest 142 PASS / 35 FAIL（0 回归）；shadow dev 回归 `cpu_match=46/59 ≥ 5`。
 
+### wip_v2.0 — Phase 6 文档同步收口（2026-08-14 末）
+
+文档 + 1 行 manifest 帧预算：
+
+- **诚实 Rust T1 80.2% → 80.8%（142→143/177，+1 PASS）**：`instr_misc`
+  帧预算 300→600（4 子测 × ~150 帧）修 `blargg_manifest.json`，加 `instr_misc.nes`
+  至 `blargg_known_fail.json` 的 `v2.0_verified_pass_2026-08-14` 列表。
+- `phase_6_integration.md` §7.6 收口日志标记 `b687980` / `14848f7` 两条
+  commit 为已落地（原 "pending" 状态清除），§9.1.0 增补本会话 shadow dev
+  回归 `cpu_match` 5→46/59 的实测上扬 + 默认 T1 = 141/177 对比。
+
+无 Rust 源码改动；继续保留 `wip_v2.0` 分支作为 phase 7 默认 ON 的工作面。
+
 ### wip_v2.0 — Phase 6 收口（commit `b687980`, 2026-08-13）
 
 **Phase 6 closure per ADR-011** — KagamiQA 5 层 oracle 取代 byte-level shadow match

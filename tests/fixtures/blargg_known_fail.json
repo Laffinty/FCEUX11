@@ -40,7 +40,8 @@
     "apu_reset_4017_written.nes",
     "apu_reset_irq_cleared.nes",
     "apu_reset_len_ctrs.nes",
-    "apu_reset_works_imm.nes"
+    "apu_reset_works_imm.nes",
+    "instr_misc.nes"
   ],
   "runppu_relevant_failures": [
     "ppu_vbl_nmi.nes",
