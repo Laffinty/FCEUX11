@@ -167,9 +167,10 @@ pub fn implied<B: Bus + ?Sized>(s: &mut CpuState, bus: &mut B) -> ModeResult {
 #[inline]
 pub fn imm<B: Bus + ?Sized>(s: &mut CpuState, bus: &mut B) -> ModeResult {
     let pc = s.regs.pc;
+    let v = s.rd(bus, pc);
     s.regs.pc = pc.wrapping_add(1);
     ModeResult {
-        addr: s.rd(bus, pc) as u16,
+        addr: v as u16,
         extra_cycles: 0,
     }
 }

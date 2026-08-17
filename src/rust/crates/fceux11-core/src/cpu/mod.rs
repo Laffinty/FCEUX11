@@ -13,13 +13,14 @@
 //! * [`execute::step`] / [`execute::run`] — instruction execution.
 
 pub mod addressing;
+pub mod alu;
 pub mod decode;
 pub mod execute;
 pub mod state;
 
 pub use addressing::{Bus, CpuState, ModeResult};
 pub use decode::{info, OpKind, OpcodeInfo, CYC_TABLE, OP_SIZE};
-pub use execute::{run, step};
+pub use execute::{run, step, CYCLES_PER_CPU_CYCLE};
 pub use state::{Flags, IrqSource, X6502Layout, ZN_TABLE};
 
 /// Quick sanity-check helper: returns true if every opcode's base cycle
