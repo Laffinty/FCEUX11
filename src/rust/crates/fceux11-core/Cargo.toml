@@ -16,6 +16,12 @@ memoffset = "0.9"
 [dev-dependencies]
 # Phase 2: proptest for property-based fuzz over reset-state vectors.
 proptest = "1.4"
+# Phase 4 sub-step 6: criterion for the step() / tick() microbench.
+criterion = { version = "0.5", default-features = false }
 
 [features]
 default = []
+
+[[bench]]
+name = "step_bench"
+harness = false
