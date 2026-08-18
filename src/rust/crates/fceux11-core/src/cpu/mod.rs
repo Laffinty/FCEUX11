@@ -23,6 +23,7 @@ pub mod decode;
 pub mod execute;
 pub mod ffi;
 pub mod state;
+pub mod tick;
 
 pub use addressing::{Bus, CpuState, ModeResult};
 pub use decode::{info, OpKind, OpcodeInfo, CYC_TABLE, OP_SIZE};
