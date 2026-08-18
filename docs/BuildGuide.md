@@ -258,11 +258,25 @@ MSVC include/lib 目录、vcpkg toolchain 一次性注入当前进程的环境�
 ### 8.2 禁用 Rust（纯 C++ 模式）
 
 ```powershell
-cmake -S . -B build-cpp -G Ninja -DFCEUX11_RUST_ENABLED=OFF
+cmake -S . -B build-cpp -G Ninja -DFCEUX11_ENABLE_RUST=OFF
 cmake --build build-cpp
 ```
 
 > Lua 功能需要 Rust crate；禁用 Rust 后 Lua 脚本功能不可用，其余正常。
+> （开关名是 `FCEUX11_ENABLE_RUST`，不是 `FCEUX11_RUST_ENABLED`。）
+
+### 8.2a 启用 Rust 6502 CPU（wip2.0 Phase 3+，默认 OFF）
+
+```powershell
+cmake -S . -B build-rust-cpu -G Ninja -DCMAKE_BUILD_TYPE=Release `
+  -DFCEUX11_ENABLE_RUST=ON -DFCEUX11_RUST_CPU=ON
+cmake --build build-rust-cpu
+```
+
+> `FCEUX11_RUST_CPU=ON` 把 C++ `Cpu` facade（以及 TriggerNMI / IRQ 入口）路由到
+> `fceux11-core` 的 Rust 6502 实现（FFI 符号 `fceux11_cpu_*`）。前提是
+> `FCEUX11_ENABLE_RUST=ON`。Phase 7 会把默认值翻转为 ON 并删除 C++ CPU；当前
+> 处于测量阶段，默认 OFF 保持 C++ 基线。
 
 ### 8.3 关闭单元测试
 
@@ -310,7 +324,8 @@ ctest --test-dir build --output-on-failure
 | `CMAKE_BUILD_TYPE` | Release | `Debug` / `Release` / `RelWithDebInfo` |
 | `FCEUX11_BUILD_TESTS` | ON | 编译单元测试 |
 | `FCEUX11_ENABLE_I18N` | ON | 多语言翻译（12 种语言） |
-| `FCEUX11_RUST_ENABLED` | ON | Rust crate（Lua 引擎） |
+| `FCEUX11_ENABLE_RUST` | ON | Rust crate（Lua 引擎 + FFI 符号） |
+| `FCEUX11_RUST_CPU` | OFF | 用 Rust 6502 CPU 替代 C++ X6502（wip2.0 Phase 3+；需 `FCEUX11_ENABLE_RUST=ON`，Phase 7 将默认 ON） |
 | `FCEUX11_LUA_RUST_ENABLED` | ON | 使用 Rust mlua 作为 Lua 引擎 |
 | `FCEUX11_WGI_BACKEND` | OFF | Windows.Gaming.Input 手柄后端 |
 | `FCEUX11_ASAN` | OFF | AddressSanitizer（仅 Debug） |

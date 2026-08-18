@@ -1,6 +1,43 @@
 # CPU Module v2.0 — Rust-First Reimplementation (Revised)
 
-**Status:** Active — Phase 1+2 landed, A-path adopted · **Branch:** `wip2.0` · **Last revised:** 2026-08-17
+**Status:** Active — Phase 1-3 landed, Phase 4-6 in progress · **Branch:** `wip2.0` · **Last revised:** 2026-08-19
+
+> **Progress note (2026-08-19).** Since the §0.1 delivery table was written
+> (which honestly documented "1-of-6 test-oracle result, FFI missing"),
+> the following has landed on `wip2.0`:
+>
+> * **Phase 3 (revised) complete** — FFI surface (`cpu/bus.rs`, `cpu/ffi.rs`),
+>   `FCEUX11_RUST_CPU` CMake option, C++ `Cpu` facade routed to Rust, and the
+>   C++ baseline measured (34/34 CTest OFF; 30/33 ON with 3 documented fails).
+>   See `docs/plans/phase3-baseline-2026-08-17.md` and
+>   `docs/plans/phase3-ffi-2026-08-17.md`.
+> * **Phase 4 sub-steps 1-3 complete** — `X6502_RunDebug` now delegates to the
+>   FFI on the real hot path (sub-step 1, `8565ca1`); `tests/interrupts.rs`
+>   (15 tests, sub-step 2, `759867f`); `tests/unofficial.rs` (53 tests +
+>   6 real Rust CPU bug fixes, sub-step 3, `d43389a`).
+> * **Phase 4 sub-steps 4-5 partial** — blargg suites run under the Rust CPU
+>   via the kagami bridge (6/7 known-limit blargg sub-tests flipped FAIL→PASS);
+>   per-frame cycle parity is NOT yet closed. `tests/cycle_parity.rs` (15,
+>   `6799cfd`) + the 3x count multiplier (`3496b98`) pin the per-instruction
+>   math; the residual drift is mapper-hook / DMC-steal cycles, bridged by
+>   `cpu/tick.rs` (`86d01b7`) but not yet wired into the C++ shim.
+> * **Phase 5 partial** — unofficial coverage done (sub-step 3 shared);
+>   `cpu/snapshot.rs` savestate round-trip against C++ fixtures NOT done.
+> * **Phase 6 complete** — proptest fuzz (`f9733b3`), criterion microbench
+>   (`3cea304`), `cpu/tick.rs` (`86d01b7`), x6502.h symbol audit
+>   (`docs/plans/phase4-symbol-audit-2026-08-18.md`, `d397df0`).
+> * **Phase 7 not started** — `src/x6502.{cpp,h,struct.h,abbrev.h}` /
+>   `ops.inc` / `ops_table.inc` / `cpu.cpp` still present;
+>   `FCEUX11_RUST_CPU` default still OFF.
+>
+> Test status: `cargo test -p fceux11-core` = 182 PASS.
+> CTest under `FCEUX11_RUST_CPU=ON` = 29/34 (5 documented fails, all
+> sub-step-5 cycle-drift family; `savestate_core_test` and `cpu_test` fixed).
+> **Measurement caveat**: the 29/34 was captured at commit `3496b98`
+> (Phase 4.5). The Phase 4.3 unofficial-opcode fixes (`d43389a`) touched
+> the actual CPU behaviour (ANC/ALR/ARR/XAA/AXS immediate-mode, ARR V/C,
+> NOP imm/absx PC) and have NOT yet been re-measured under ctest — the
+> number may have moved since. Re-measure before treating it as current.
 
 > **Honest status note (added 2026-08-17).** This plan was ambitious; what was actually delivered vs. what was promised diverges in material ways. **Phase 1+2 produced a Rust 6502 that passes `nestest.nes` (5000/5000) in pure-Rust tests, but it is not wired into the C++ executable and has not been validated against any of the six CPU oracles promised in §0.** The original Phase 3–7 sequence assumed a working CTest baseline that the Rust CPU could plug into; that baseline now needs to be rebuilt around the Rust CPU first, because **a CPU that nothing calls cannot have any of its gate conditions measured**. The plan has been restructured to do that measurement step **before** further CPU work.
 

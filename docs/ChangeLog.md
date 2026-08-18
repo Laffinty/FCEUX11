@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - wip2.0 Rust 6502 CPU 迁移（Phase 1-6）
+
+**分支 `wip2.0`**。把 C++ X6502 CPU 替换为 `fceux11-core` 的 Rust 6502
+实现（Rust-first，见 `docs/plans/cpu-rust-v2.md`）。Phase 1-6 已落地，
+Phase 7（删除 C++ CPU）未开始。
+
+### Added
+
+- **Rust 6502 CPU**（`src/rust/crates/fceux11-core/src/cpu/`）：64 字节
+  `X6502Layout`（与 C++ `X6502` savestate 字节兼容）、256 条 opcode 表、
+  13 种寻址模式、全部官方 + 109 非官方 opcode 执行、nestest 5000/5000
+  逐指令匹配。
+- **FFI 桥**：`fceux11_cpu_{init,power,reset,run,trigger_nmi,trigger_nmi2,
+  irq_begin,irq_end,snapshot,restore,set_bus}`，经 cbindgen 写入
+  `src/rust/fceux11_rust.h`。
+- **`FCEUX11_RUST_CPU` CMake 开关**（默认 OFF，Phase 7 将翻转 ON）：
+  把 `Cpu::run()` / TriggerNMI / IRQ 入口路由到 Rust CPU。
+- **`cpu/tick.rs`**：opt-in 每指令 tick 回调（镜像 C++ `map_irq_hook`），
+  FFI 符号 `fceux11_cpu_set_tick` / `fceux11_cpu_set_tick_null`。
+- **criterion microbench**：`cargo bench -p fceux11-core`（step() 内环）。
+
+### Changed
+
+- **cycle-accounting**：Rust `count` 累加改为 `CycTable * 48`（3x 乘数），
+  FFI target 改为 `cycles * 16`，与 C++ `_count -= CycTable * 48` 逐指令
+  对齐。
+
+### Fixed（Rust CPU 真实 bug，均由新增测试暴露）
+
+- NMI defer 误清 NMI bit（NMI 永不派发）
+- maskable IRQ 被 I 屏蔽时多计 7 周期
+- dispatch 后无条件执行 follow-up 与 C++ budget 耗尽提前返回不一致
+- 5 个 Imm-mode handler（ANC/ALR/ARR/XAA/AXS）把立即数当内存地址读
+- ARR V/C 公式用旋转前 bit 而非旋转后 result bit
+- NOP imm 不消耗立即数字节；NOP abs,X 多推进 2 字节 PC
+
+### Tests（`cargo test -p fceux11-core` = 182 PASS）
+
+- `tests/interrupts.rs`（15）：RESET / NMI / NMI edge-detect / IRQ / BRK
+- `tests/unofficial.rs`（53）：109 非官方 opcode 寄存器副作用覆盖
+- `tests/cycle_parity.rs`（15）：per-instruction cycle accounting fence
+- `tests/proptest_fuzz.rs`（5）：随机 state × ROM 鲁棒性 fuzz
+- `tests/nestest.rs`（2）+ `tests/opcodes.rs`（7）+ lib 单测（85）
+
+### Known limits（Phase 4 sub-step 5 剩余）
+
+`FCEUX11_RUST_CPU=ON` 下 ctest 仍有 5 个失败：`apu_wav_diff_test`、
+`golden_savestate_test`、`kagami_qa_direct_smoke`（blargg_cpu_instrs
+子项）、`rom_regression_rust_smoke`（1/780）、`savestate_regression_rust_smoke`
+（12/12）。原因：mapper hook / DMC steal cycles 尚未接入 Rust 热路径
+（`tick.rs` 桥已就位，C++ 侧接线待做）。`savestate_core_test` /
+`cpu_test` 已修复，blargg 子套件 6/7 已知限制由 FAIL 转 PASS。
+
 ## [1.17] - 2026-08-08
 
 **Codename: KagamiQA 统合.** v1.17 将 KagamiQA 从「FCEUX11 的附属测试框架」升级为
