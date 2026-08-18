@@ -35,7 +35,19 @@ const fn dot(cpu_cycles: u8) -> i32 {
 // ---------------------------------------------------------------------------
 
 /// Consume any pending IRQ / NMI / RESET at the instruction boundary.
-/// Returns the cycle cost (0 if no interrupt, 7 for RESET, 7 for IRQ/NMI).
+/// Returns the cycle cost of the *dispatch* itself:
+/// * `0` if no interrupt was pending
+/// * `0` for RESET (the C++ does not `ADDCYC` inside the RESET
+///   dispatch — the cycle cost comes from the subsequent
+///   instruction that runs at the reset vector)
+/// * `0` for the NMI-fresh deferral (deferral eats no cycles, just
+///   clears `nmi_fresh` and the pending NMI bit)
+/// * `7` for a normal NMI (push 3 bytes, jump via `$FFFA`/`$FFFB`)
+/// * `7` for a maskable IRQ (push 3 bytes, jump via `$FFFE`/`$FFFF`)
+///
+/// Mirrors the loop-top of `X6502_RunDebug` in `src/x6502.cpp:519-577`.
+/// The C++ structure is `if-else if-else if-else` with priority
+/// RESET > NMI2 > NMI > maskable IRQ; we mirror that exactly.
 fn dispatch_irq<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
     let irq = state.regs.irq_low;
     if irq == 0 {
@@ -48,11 +60,22 @@ fn dispatch_irq<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
         state.regs.jammed = 0;
         let mut p = state.regs.p;
         p &= !(Flags::BREAK.bits() | Flags::UNUSED.bits());
+        // Per 6502 datasheet: on RESET the P register is
+        // I_FLAG | U_FLAG (the BREAK flag is cleared and U is set).
+        // The C++ sets only I_FLAG, but the missing U_FLAG never
+        // matters in practice because the RESET handler does not
+        // push P; we use the datasheet-correct value to stay safe
+        // for any future caller that observes P after RESET.
         p |= Flags::IRQ_DIS.bits() | Flags::UNUSED.bits();
         state.regs.p = p;
         state.regs.irq_low &= !IrqSource::RESET.bits();
         state.regs.irq_low &= !IrqSource::TEMP.bits();
-        return 7;
+        // RESET dispatch itself eats 0 cycles — the cycle cost
+        // comes from the next instruction (JMP or whatever the
+        // reset vector points at) which step() will fetch+execute
+        // in this same iteration. See `X6502_RunDebug` lines
+        // 519-535 (RESET branch has no ADDCYC).
+        return 0;
     }
     if irq & IrqSource::NMI2.bits() != 0 {
         state.regs.irq_low &= !IrqSource::NMI2.bits();
@@ -142,10 +165,31 @@ fn do_branch<B: Bus + ?Sized>(
 /// through to the fetch+execute path and returns the instruction cost.
 pub fn step<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
 
+    // IRQ / NMI / RESET dispatch at this boundary.
+    //
+    // The C++ `X6502_RunDebug` body has two paths:
+    //   1. `_IRQlow` set → dispatch (RESET/NMI2/NMI/maskable IRQ) →
+    //      check `_count <= 0` → if not exhausted, fall through and
+    //      fetch+execute the next instruction.
+    //   2. `_IRQlow` clear → just fetch+execute the next instruction.
+    //
+    // The Rust mirrors both paths. `dispatch_irq` returns 0 for RESET
+    // and the NMI-fresh deferral (no cycles consumed by the dispatch
+    // itself), and 7 for NMI / maskable IRQ (cycles consumed by the
+    // push-and-jump sequence inside the dispatch). The follow-up
+    // fetch+execute then runs for the instruction at the new PC —
+    // whatever it is. For `nestest.nes` this is `JMP $C5F5` at the
+    // reset vector, but for arbitrary ROMs it can be any opcode.
+    let irq_cycles = dispatch_irq(state, bus);
+
+    // C++ sets `_PI = _P` AFTER the IRQ dispatch (so the NEXT
+    // iteration's maskable-IRQ check sees the post-dispatch I flag).
+    // We mirror that here so dispatch_irq's I-flag set takes effect
+    // immediately on the next boundary. Setting moo_pi BEFORE the
+    // dispatch (as we did originally) is wrong — the C++ semantics
+    // are "use the I flag from the END of the previous instruction".
     state.regs.moo_pi = state.regs.p;
 
-    // IRQ / NMI / RESET dispatch at this boundary.
-    let irq_cycles = dispatch_irq(state, bus);
     if irq_cycles != 0 {
         state.regs.count = state.regs.count.saturating_add(dot(irq_cycles));
         // Continue to fetch + execute the next instruction. The C++
@@ -160,12 +204,18 @@ pub fn step<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
             OpKind::Jump => {
                 cycles += do_jump(state, bus, opcode, op_info.mode);
             }
-            _ => unreachable!(
-                "RESET must be followed by JMP; got opcode ${:02X} kind {:?}",
-                opcode, op_info.kind
-            ),
+            OpKind::Branch => {
+                cycles += do_branch(state, bus, branch_cond(state, opcode));
+            }
+            // Other OpKinds don't add extra cycles beyond the base
+            // cost; fall through. (Previously this branch was an
+            // `unreachable!()` that assumed RESET was always followed
+            // by JMP — the assumption only holds for `nestest.nes`,
+            // not for arbitrary ROMs.)
+            _ => {}
         }
         state.regs.count = state.regs.count.saturating_add(dot(cycles - irq_cycles));
+        state.cycles_in_run = state.cycles_in_run.saturating_add((cycles - irq_cycles) as i32);
         return cycles;
     }
 
@@ -1039,19 +1089,32 @@ fn rmw_addr<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, mode: AddrMode) 
 // Top-level run loop. Mirrors `X6502_RunDebug`.
 // ---------------------------------------------------------------------------
 
-/// Run the CPU for `cycles` 1/16-dot units. Returns number of
-/// instructions executed.
+/// Run the CPU for `cycles` 1/16-dot units. Returns the total CPU
+/// cycles consumed during this run (sum of every opcode's base cycle
+/// cost plus page-cross / branch-taken extras). The C++ FFI shim
+/// uses this to advance `Cpu::timestamp_` / `sound_timestamp_`,
+/// which live on the Cpu object outside the 64-byte X6502 layout.
+///
+/// The C++ `X6502_RunDebug` always does at least one full loop-body
+/// iteration per call (dispatch, fetch opcode, ADDCYC), even when
+/// the cycle budget is zero — that's how the C++ tests that call
+/// `X6502_Run(1)` consume exactly one instruction. The Rust mirrors
+/// this by entering the loop at least once, then running until the
+/// `count` cap is reached, then breaking on `[trapped]` (jammed) state.
 pub fn run<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, cycles: i32) -> i32 {
-    let mut executed = 0i32;
+    let mut executed_cycles = 0i32;
     let target = state.regs.count.saturating_add(cycles);
-    while state.regs.count < target {
-        step(state, bus);
-        executed += 1;
+    loop {
+        let c = step(state, bus);
+        executed_cycles = executed_cycles.saturating_add(c as i32);
         if state.regs.jammed != 0 {
             break;
         }
+        if state.regs.count >= target {
+            break;
+        }
     }
-    executed
+    executed_cycles
 }
 
 #[cfg(test)]

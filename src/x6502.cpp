@@ -24,6 +24,9 @@
 #include "debug.h"
 #include "sound.h"
 #include "bus.h"   // v1.4 Gateway Phase 3 §5.1.3: hot-path g_bus.read/write
+#if FCEUX11_RUST_CPU
+#include "rust/fceux11_rust.h"  // Phase 3 (revised) step 3: FFI dispatch
+#endif
 #ifdef _S9XLUA_H
 #include "fceulua.h"
 #endif
@@ -495,6 +498,18 @@ void X6502_Power(void)
  StackAddrBackup = -1;
 }
 
+#if FCEUX11_RUST_CPU
+// Phase 3 (revised) step 3: when the Rust 6502 is wired in, the FCEUX11
+// `X6502_RunDebug` body itself is bypassed in favour of the Rust CPU
+// via the cbindgen-emitted `fceux11_cpu_*` symbols (see
+// `docs/plans/cpu-rust-v2.md` §4 Phase 3). We delegate to `Cpu::run`
+// which holds the FFI dispatch logic. The C++ dispatch loop is
+// retained only as a reference for the unit-accounting math in
+// `Cpu::run`'s C++ shim — the actual CPU work happens in Rust.
+void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles) {
+    cpu.run(cycles);
+}
+#else
 void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
 {
   // hotfix3 C-3: lift multiply to int64 to avoid signed-overflow UB
@@ -605,6 +620,7 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
    x6502_dispatch[b1](&cpu.native_layout());
   }
 }
+#endif // FCEUX11_RUST_CPU
 
 //--------------------------
 //---Called from debuggers
