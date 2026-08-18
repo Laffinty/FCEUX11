@@ -3,7 +3,7 @@
 //! See `docs/plans/cpu-rust-v2.md` for the architecture plan and
 //! `src/cpu/../state.rs` for the 64-byte savestate-compatible layout.
 //!
-//! Public surface (Phase 1):
+//! Public surface (Phase 1 + 3):
 //! * [`state::X6502Layout`] — the byte-compatible C++ X6502 struct.
 //! * [`state::Flags`] / [`state::IrqSource`] — flag bitflags and IRQ masks.
 //! * [`addressing::Bus`] — minimal CPU bus trait; the real [`crate::traits::Cpu`]
@@ -11,11 +11,17 @@
 //! * [`addressing::CpuState`] — wrapper around the layout + side state.
 //! * [`decode::info`] — `OpcodeInfo` for any of the 256 opcodes.
 //! * [`execute::step`] / [`execute::run`] — instruction execution.
+//! * [`bus::CppBus`] / [`bus::fceux11_cpu_set_bus`] — Phase 3 FFI bridge
+//!   that calls into C++ for memory access when wired in via
+//!   `FCEUX11_RUST_CPU=ON`.
+//! * [`ffi`] — the actual `#[no_mangle] extern "C"` symbols.
 
 pub mod addressing;
 pub mod alu;
+pub mod bus;
 pub mod decode;
 pub mod execute;
+pub mod ffi;
 pub mod state;
 
 pub use addressing::{Bus, CpuState, ModeResult};

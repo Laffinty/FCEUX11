@@ -4,6 +4,18 @@
 
 #include "x6502.h"
 
+#if FCEUX11_RUST_CPU
+// Phase 3 (revised) step 3: when the Rust 6502 is wired in, every
+// facade method that previously called a free `X6502_*` function
+// dispatches into the Rust side via the cbindgen-emitted
+// `fceux11_rust.h`. The 64-byte X6502 layout is byte-compatible
+// between Rust (`X6502Layout`) and C++ (`X6502`); only the bus
+// surface needs special handling (see below).
+#include "rust/fceux11_rust.h"
+#include "bus.h"
+#include <atomic>
+#endif
+
 #include <cstring>
 
 namespace fceu11 {
@@ -60,17 +72,108 @@ void Cpu::set_overclocking(bool v) noexcept { overclocking_ = v; }
 // Lifecycle — delegate to the existing free functions while globals are
 // still backed by this Cpu object via inline aliases.
 // ---------------------------------------------------------------------------
-void Cpu::init() noexcept { X6502_Init(); }
-void Cpu::reset() noexcept { X6502_Reset(); }
-void Cpu::power() noexcept { X6502_Power(); }
-void Cpu::run(int32_t cycles) { X6502_RunDebug(*this, cycles); }
+#if FCEUX11_RUST_CPU
+// Phase 3 (revised) step 3: Cpu facade dispatches into the Rust 6502.
+// Bus access flows back through two thin thunks (see below) that call
+// `fceu11::g_bus.read/write`, mirroring what the C++ X6502_RunDebug
+// loop's `RdMem` / `WrMem` inlines do.
+
+namespace {
+// Thin shims that turn the C-side FFI signature into a fceu11::Bus
+// call. Installed once at process start by `cpu_rust_install_bus`.
+// The shims are `extern "C"` because that's what the Rust FFI's
+// `ReadFn` / `WriteFn` typedefs require; the C++ side wraps them in
+// function-pointer casts that match the typedef.
+extern "C" uint8_t cpu_rust_read_thunk(uint16_t addr) {
+    return fceu11::g_bus.read(addr);
+}
+extern "C" void cpu_rust_write_thunk(uint16_t addr, uint8_t val) {
+    fceu11::g_bus.write(addr, val);
+}
+
+// One-shot installation of the bus callbacks. Called from the Cpu
+// facade before the first FFI call. Safe to call multiple times —
+// the Rust side just overwrites the slots. We avoid static-init
+// order issues by lazily installing on the first Cpu facade call.
+void cpu_rust_install_bus_once() noexcept {
+    static std::atomic<bool> installed{false};
+    bool expected = false;
+    if (installed.compare_exchange_strong(expected, true)) {
+        fceux11_cpu_set_bus(&cpu_rust_read_thunk, &cpu_rust_write_thunk);
+    }
+}
+} // namespace
+#endif // FCEUX11_RUST_CPU
+
+void Cpu::init() noexcept {
+#if FCEUX11_RUST_CPU
+    cpu_rust_install_bus_once();
+    fceux11_cpu_init(reinterpret_cast<uint8_t*>(&layout_));
+#else
+    X6502_Init();
+#endif
+}
+void Cpu::reset() noexcept {
+#if FCEUX11_RUST_CPU
+    cpu_rust_install_bus_once();
+    fceux11_cpu_reset(reinterpret_cast<uint8_t*>(&layout_));
+#else
+    X6502_Reset();
+#endif
+}
+void Cpu::power() noexcept {
+#if FCEUX11_RUST_CPU
+    cpu_rust_install_bus_once();
+    fceux11_cpu_power(reinterpret_cast<uint8_t*>(&layout_));
+#else
+    X6502_Power();
+#endif
+}
+void Cpu::run(int32_t cycles) {
+#if FCEUX11_RUST_CPU
+    cpu_rust_install_bus_once();
+    // The FFI returns the total CPU cycles consumed during this run
+    // (sum of every opcode's base cycle cost + page-cross / branch-
+    // taken extras). We need to advance `timestamp_` /
+    // `sound_timestamp_` ourselves because the Rust CPU doesn't have
+    // direct access to the `Cpu` object — those fields live outside
+    // the 64-byte X6502 layout.
+    int32_t consumed = fceux11_cpu_run(
+        reinterpret_cast<uint8_t*>(&layout_), cycles);
+    timestamp_ += consumed;
+    if (!overclocking_) sound_timestamp_ += consumed;
+#else
+    X6502_RunDebug(*this, cycles);
+#endif
+}
 
 // ---------------------------------------------------------------------------
 // Interrupts
 // ---------------------------------------------------------------------------
-void Cpu::trigger_nmi() noexcept { ::TriggerNMI(); }
-void Cpu::trigger_irq(uint32_t source) noexcept { ::X6502_IRQBegin(static_cast<int>(source)); }
-void Cpu::clear_irq(uint32_t source) noexcept { ::X6502_IRQEnd(static_cast<int>(source)); }
+void Cpu::trigger_nmi() noexcept {
+#if FCEUX11_RUST_CPU
+    cpu_rust_install_bus_once();
+    fceux11_cpu_trigger_nmi(reinterpret_cast<uint8_t*>(&layout_));
+#else
+    ::TriggerNMI();
+#endif
+}
+void Cpu::trigger_irq(uint32_t source) noexcept {
+#if FCEUX11_RUST_CPU
+    cpu_rust_install_bus_once();
+    fceux11_cpu_irq_begin(reinterpret_cast<uint8_t*>(&layout_), source);
+#else
+    ::X6502_IRQBegin(static_cast<int>(source));
+#endif
+}
+void Cpu::clear_irq(uint32_t source) noexcept {
+#if FCEUX11_RUST_CPU
+    cpu_rust_install_bus_once();
+    fceux11_cpu_irq_end(reinterpret_cast<uint8_t*>(&layout_), source);
+#else
+    ::X6502_IRQEnd(static_cast<int>(source));
+#endif
+}
 
 // ---------------------------------------------------------------------------
 // Timestamps

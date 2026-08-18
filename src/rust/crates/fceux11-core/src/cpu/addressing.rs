@@ -40,6 +40,12 @@ pub struct CpuState {
     /// and this to avoid `&mut` issues when the dispatch helper wants to
     /// observe the cycle residual.
     pub nmi_fresh: bool,
+    /// Total CPU cycles consumed since the last reset of this
+    /// accumulator. The FFI shim zeroes it at the start of
+    /// `fceux11_cpu_run` and reads it at the end so the C++ caller
+    /// can advance `Cpu::timestamp_` / `sound_timestamp_` without
+    /// having to know about the 1/16-dot unit semantics.
+    pub cycles_in_run: i32,
 }
 
 impl CpuState {
