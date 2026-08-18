@@ -84,8 +84,13 @@ fn dispatch_irq<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
     if irq & IrqSource::NMI.bits() != 0 {
         if state.nmi_fresh {
             // Latch was set at/after this boundary; defer to next boundary.
+            // Per `X6502_RunDebug` (src/x6502.cpp:548-555) we clear
+            // only `g_e1_nmi_fresh` here, NOT `_IRQlow`'s NMI bit — the
+            // dispatch runs at the NEXT boundary against the still-set
+            // NMI bit. Clearing the NMI bit on defer (the previous
+            // Rust behaviour) makes the NMI never fire, which broke
+            // any code path that triggered an NMI between instructions.
             state.nmi_fresh = false;
-            state.regs.irq_low &= !IrqSource::NMI.bits();
             return 0;
         }
         if state.regs.jammed == 0 {
@@ -115,9 +120,17 @@ fn dispatch_irq<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
         let lo = state.rd(bus, 0xFFFE);
         let hi = state.rd(bus, 0xFFFF);
         state.regs.pc = ((hi as u16) << 8) | lo as u16;
+        state.regs.irq_low &= !IrqSource::TEMP.bits();
+        return 7;
     }
+    // No dispatch fired at this boundary (I flag blocked the maskable
+    // IRQ, or the CPU was jammed, or the only pending source was
+    // something we don't model). Return 0 so step() takes the regular
+    // fetch+execute path instead of treating a blocked dispatch as a
+    // successful 7-cycle push+jump. Mirrors `X6502_RunDebug`'s ADDCYC
+    // being inside the `if(!(_PI&I_FLAG) && !_jammed)` block.
     state.regs.irq_low &= !IrqSource::TEMP.bits();
-    7
+    0
 }
 
 /// Fetch one byte at PC and advance PC.
@@ -190,39 +203,21 @@ pub fn step<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
     // are "use the I flag from the END of the previous instruction".
     state.regs.moo_pi = state.regs.p;
 
+    // Accumulate the dispatch cycle cost (0 or 7). Done BEFORE the
+    // instruction's own cycles so the residual ordering matches the
+    // C++ loop (`ADDCYC(7)` inside the dispatch, then `ADDCYC(CycTable)`
+    // for the follow-up instruction).
     if irq_cycles != 0 {
         state.regs.count = state.regs.count.saturating_add(dot(irq_cycles));
-        // Continue to fetch + execute the next instruction. The C++
-        // loop does both per iteration; mirroring that here keeps the
-        // post-state in sync with the nestest.log entries (which
-        // expect the post-RESET state to be the post-state of the
-        // JMP that loaded the reset vector).
-        let opcode = fetch(state, bus);
-        let op_info = info(opcode);
-        let mut cycles = irq_cycles + op_info.base_cycles;
-        match op_info.kind {
-            OpKind::Jump => {
-                cycles += do_jump(state, bus, opcode, op_info.mode);
-            }
-            OpKind::Branch => {
-                cycles += do_branch(state, bus, branch_cond(state, opcode));
-            }
-            // Other OpKinds don't add extra cycles beyond the base
-            // cost; fall through. (Previously this branch was an
-            // `unreachable!()` that assumed RESET was always followed
-            // by JMP — the assumption only holds for `nestest.nes`,
-            // not for arbitrary ROMs.)
-            _ => {}
-        }
-        state.regs.count = state.regs.count.saturating_add(dot(cycles - irq_cycles));
-        state.cycles_in_run = state.cycles_in_run.saturating_add((cycles - irq_cycles) as i32);
-        return cycles;
     }
 
+    // Always fetch + execute exactly one instruction. PC has either
+    // been left at the current PC (no dispatch) or moved to the
+    // post-dispatch address (dispatch fired) by dispatch_irq.
     let opcode = fetch(state, bus);
     let op_info = info(opcode);
 
-    let mut cycles = op_info.base_cycles;
+    let mut cycles = irq_cycles + op_info.base_cycles;
 
     match op_info.kind {
         OpKind::Jam => {
@@ -367,7 +362,10 @@ pub fn step<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
         }
     }
 
-    state.regs.count = state.regs.count.saturating_add(dot(cycles));
+    // Add the instruction's own cycle cost (excluding the dispatch
+    // portion, which was already added above).
+    state.regs.count = state.regs.count.saturating_add(dot(cycles - irq_cycles));
+    state.cycles_in_run = state.cycles_in_run.saturating_add((cycles - irq_cycles) as i32);
     cycles
 }
 

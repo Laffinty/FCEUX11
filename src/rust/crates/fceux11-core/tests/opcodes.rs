@@ -84,9 +84,11 @@ fn x6502_layout_is_byte_compatible_with_cpp() {
 #[test]
 fn power_then_reset_loads_vector() {
     // Per C++ X6502_RunDebug loop semantics, step() processes both the
-    // IRQ/NMI dispatch AND the next instruction. So after power() (which
-    // sets the RESET bit), step() consumes the RESET (7 cycles) and the
-    // JMP at $C000 (7 cycles) for a total of 14.
+    // IRQ/NMI dispatch AND the next instruction. After power() sets the
+    // RESET bit, the dispatch loads PC from $FFFC/$FFFD and returns 0
+    // (no cycles from the dispatch itself — the C++ RESET branch has no
+    // ADDCYC); step() then fetch+executes the instruction at the reset
+    // vector (here, JMP $8000, 3 cycles). Total = 0 + 3 = 3.
     let mut cpu = CpuState::new();
     cpu.power();
     let mut bus = FlatBus::new();
@@ -95,7 +97,7 @@ fn power_then_reset_loads_vector() {
     bus.mem[0xFFFC] = 0x00;
     bus.mem[0xFFFD] = 0xC0;
     let cycles = step(&mut cpu, &mut bus);
-    assert_eq!(cycles, 7 + 3); // RESET (7) + JMP abs (3)
+    assert_eq!(cycles, 0 + 3); // RESET dispatch (0) + JMP abs (3)
     assert_eq!(cpu.regs.pc, 0x8000);
     assert_eq!(cpu.regs.p & Flags::IRQ_DIS.bits(), Flags::IRQ_DIS.bits());
     assert_eq!(
