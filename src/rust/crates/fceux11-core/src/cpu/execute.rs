@@ -1,4 +1,4 @@
-﻿//! Top-level instruction execution loop.
+//! Top-level instruction execution loop.
 //!
 //! Phase 2 implements the real per-opcode semantics for all 256 entries
 //! of [`crate::cpu::decode::OPCODE_TABLE`]. The dispatch is a single
@@ -227,19 +227,23 @@ pub fn step<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
             state.regs.pc = state.regs.pc.wrapping_sub(1);
         }
         OpKind::NopRead => {
-            // 1-byte NOP (Implied) or 2-byte read-NOP �?just consume operand.
-            let _ = match op_info.mode {
+            // 1-byte NOP (Implied) or 2-byte read-NOP. The previous
+            // code called abs_x_read() twice in the AbsX arm (advancing
+            // PC by 4 instead of 3) and fell through to implied() for Imm
+            // (consuming nothing). Both bugs are fixed by using a single
+            // call per arm.
+            let mode_result = match op_info.mode {
                 AddrMode::Implied => implied(state, bus),
+                AddrMode::Imm => imm(state, bus),
                 AddrMode::ZP => zp(state, bus),
                 AddrMode::ZPX => zpx(state, bus),
                 AddrMode::Abs => absolute(state, bus),
-                AddrMode::AbsX => {
-                    cycles += abs_x_read(state, bus).extra_cycles;
-                    abs_x_read(state, bus)
-                }
+                AddrMode::AbsX => abs_x_read(state, bus),
                 _ => implied(state, bus),
             };
+            cycles += mode_result.extra_cycles;
         }
+
         OpKind::NopReadWrite => {
             // RMW-style NOP �?read M, write it back unchanged. 2A (NOP).
             // The 0xDA / 0xFA / 0xEA NOPs are single-byte NOPs; this
@@ -949,8 +953,7 @@ fn do_unofficial<B: Bus + ?Sized>(
         }
         // ----- ANC (AND imm, then copy bit 7 of A to C) -----
         0x0B | 0x2B => {
-            let imm_addr = imm(state, bus).addr;
-            let m = state.rd(bus, imm_addr);
+            let m = imm(state, bus).addr as u8;
             and(state, bus, m);
             // C = A >> 7.
             if state.regs.a & 0x80 != 0 {
@@ -961,38 +964,39 @@ fn do_unofficial<B: Bus + ?Sized>(
         }
         // ----- ALR (AND imm, then LSR A) -----
         0x4B => {
-            let imm_addr = imm(state, bus).addr;
-            let m = state.rd(bus, imm_addr);
+            let m = imm(state, bus).addr as u8;
             and(state, bus, m);
             let r = lsr(state, state.regs.a);
             state.regs.a = r;
         }
         // ----- ARR (AND imm, then ROR A, then special V/C) -----
         0x6B => {
-            let imm_addr = imm(state, bus).addr;
-            let m = state.rd(bus, imm_addr);
+            let m = imm(state, bus).addr as u8;
             and(state, bus, m);
             // ARR's behaviour depends on the state of the decimal flag and
             // is notoriously hard to capture exactly. The Visual6502 wiki
             // documents the binary (decimal-flag clear) case:
             //   A = (A >> 1) | (C << 7)
-            //   C = A >> 6 ^ A >> 5 (i.e. bit 6 of the unrotated result)
-            //   V = A >> 6 ^ A >> 5 (same XOR)
+            //   C = bit 6 of the *result* A (i.e. the MSB before ROR, which
+            //     after ROR becomes bit 7 of the input -- but the formula is
+            //     documented as bit 6 of the rotated result)
+            //   V = bit 6 of result ^ bit 5 of result
+            // Both V and C are derived from the POST-ROR esult register.
             let c_in = if state.regs.p & Flags::CARRY.bits() != 0 { 1 } else { 0 };
             let a = state.regs.a;
-            let bit7 = a >> 7;
-            let bit6 = (a >> 6) & 1;
-            let bit5 = (a >> 5) & 1;
+            let bit7 = a >> 7; // pre-rotation MSB
             let result = (a >> 1) | (c_in << 7);
+            let result_bit6 = (result >> 6) & 1;
+            let result_bit5 = (result >> 5) & 1;
             state.regs.a = result;
-            // C = bit 6 of A before rotation (i.e. (a >> 6) & 1).
             let mut p = state.regs.p;
             p &= !(Flags::CARRY.bits() | Flags::OVERFLOW.bits() | Flags::ZERO.bits()
                 | Flags::NEGATIVE.bits());
-            p |= bit6;
-            p |= (bit6 ^ bit5) << 6; // V
+            p |= result_bit6; // C = bit 6 of result
+            p |= (result_bit6 ^ result_bit5) << 6; // V
             p |= zn_table_lookup(result);
             state.regs.p = p;
+            let _ = bit7; // unused but kept for documentation
             // Suppress unused warning for bit7.
             let _ = bit7;
         }
@@ -1000,14 +1004,12 @@ fn do_unofficial<B: Bus + ?Sized>(
         0x8B => {
             let tx = state.regs.x;
             state.regs.a = tx;
-            let imm_addr = imm(state, bus).addr;
-            let m = state.rd(bus, imm_addr);
+            let m = imm(state, bus).addr as u8;
             and(state, bus, m);
         }
         // ----- AXS (X = (A & X) - imm, sets NZC) -----
         0xCB => {
-            let imm_addr = imm(state, bus).addr;
-            let m = state.rd(bus, imm_addr);
+            let m = imm(state, bus).addr as u8;
             let t = ((state.regs.a & state.regs.x) as i16) - (m as i16);
             let result = (t & 0xFF) as u8;
             state.regs.x = result;
