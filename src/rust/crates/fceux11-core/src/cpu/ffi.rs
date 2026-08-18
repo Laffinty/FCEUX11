@@ -254,8 +254,15 @@ pub unsafe extern "C" fn fceux11_cpu_run(state: *mut u8, cycles: i32) -> i32 {
         // Use a raw pointer to the mutable static (Rust 2024
         // `static_mut_refs` deny lint forbids `&mut STATIC`).
         let state_ptr = core::ptr::addr_of_mut!(FFI_CPU_STATE);
-        // Match the C++ effective consumption rate: 1/3 of cycles_arg.
-        let scaled_cycles = (cycles / 3) * 16;
+        // Phase 4 sub-step 5: with the per-instruction 3x multiplier
+        // in `step()` (count += dot(cycles) * 3 = CycTable * 48), each
+        // Rust instruction costs the same number of 1/16-dot units as
+        // the C++ `ADDCYC(CycTable)` (which subtracts CycTable * 48).
+        // The previous `(cycles / 3) * 16` integer-truncation made
+        // Rust run ceil((cycles/3)/2) instructions vs C++'s
+        // ceil(cycles/3), an off-by-one for every cycles_arg ∈
+        // {6k+1, 6k+2} call.
+        let scaled_cycles = cycles * 16;
         let cpu_cycles = run(&mut *state_ptr, &mut bus, scaled_cycles);
         // Write the post-state back. Mirrors the C++ `X6502_RunDebug`
         // semantics where `cpu.layout_` is mutated in-place.

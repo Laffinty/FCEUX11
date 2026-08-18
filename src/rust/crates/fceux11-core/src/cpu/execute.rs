@@ -206,9 +206,10 @@ pub fn step<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
     // Accumulate the dispatch cycle cost (0 or 7). Done BEFORE the
     // instruction's own cycles so the residual ordering matches the
     // C++ loop (`ADDCYC(7)` inside the dispatch, then `ADDCYC(CycTable)`
-    // for the follow-up instruction).
+    // for the follow-up instruction). The `* 3` matches the C++
+    // `CycTable * 48 = 3 * 16` per-instruction delta.
     if irq_cycles != 0 {
-        state.regs.count = state.regs.count.saturating_add(dot(irq_cycles));
+        state.regs.count = state.regs.count.saturating_add(dot(irq_cycles) * 3);
     }
 
     // Always fetch + execute exactly one instruction. PC has either
@@ -363,8 +364,9 @@ pub fn step<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
     }
 
     // Add the instruction's own cycle cost (excluding the dispatch
-    // portion, which was already added above).
-    state.regs.count = state.regs.count.saturating_add(dot(cycles - irq_cycles));
+    // portion, which was already added above). The `* 3` matches
+    // C++ `CycTable * 48 = 3 * 16`.
+    state.regs.count = state.regs.count.saturating_add(dot(cycles - irq_cycles) * 3);
     state.cycles_in_run = state.cycles_in_run.saturating_add((cycles - irq_cycles) as i32);
     cycles
 }
