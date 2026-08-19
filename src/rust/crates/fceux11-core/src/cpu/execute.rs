@@ -172,45 +172,53 @@ fn do_branch<B: Bus + ?Sized>(
 /// 2. If the cycle budget isn't exhausted, fetch + execute the next
 ///    instruction.
 ///
-/// If the IRQ dispatch consumed all remaining budget, returns the IRQ
-/// cost (typically 7) without executing a follow-up instruction. If
-/// the IRQ dispatch was a no-op (no pending IRQ), the function falls
-/// through to the fetch+execute path and returns the instruction cost.
-pub fn step<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
+/// If no IRQ is pending, falls through to the fetch+execute path and
+/// returns the instruction cost. Note that if the dispatch DID consume
+/// cycles and exhausted the caller's per-call budget, the *caller*
+/// (`run` / `run_with_tick`) is responsible for not invoking
+/// [`execute_step`] — mirroring the C++ early-exit at
+/// `src/x6502.cpp:586-588`. The plain `step()` API below, by contrast,
+/// always invokes both phases for callers that don't care about
+/// per-call budget semantics.
+pub(crate) fn dispatch_step<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
 
-    // IRQ / NMI / RESET dispatch at this boundary.
+    // IRQ / NMI / RESET dispatch at this boundary. Mirrors the
+    // loop-top of `X6502_RunDebug` in `src/x6502.cpp:519-577`.
     //
-    // The C++ `X6502_RunDebug` body has two paths:
-    //   1. `_IRQlow` set → dispatch (RESET/NMI2/NMI/maskable IRQ) →
-    //      check `_count <= 0` → if not exhausted, fall through and
-    //      fetch+execute the next instruction.
-    //   2. `_IRQlow` clear → just fetch+execute the next instruction.
-    //
-    // The Rust mirrors both paths. `dispatch_irq` returns 0 for RESET
-    // and the NMI-fresh deferral (no cycles consumed by the dispatch
-    // itself), and 7 for NMI / maskable IRQ (cycles consumed by the
-    // push-and-jump sequence inside the dispatch). The follow-up
-    // fetch+execute then runs for the instruction at the new PC —
-    // whatever it is. For `nestest.nes` this is `JMP $C5F5` at the
-    // reset vector, but for arbitrary ROMs it can be any opcode.
+    // `dispatch_irq` returns 0 for RESET and the NMI-fresh deferral
+    // (no cycles consumed by the dispatch itself), and 7 for NMI /
+    // maskable IRQ (cycles consumed by the push-and-jump sequence
+    // inside the dispatch). For `nestest.nes` this is `JMP $C5F5`
+    // at the reset vector; for arbitrary ROMs it can be any opcode.
     let irq_cycles = dispatch_irq(state, bus);
 
     // C++ sets `_PI = _P` AFTER the IRQ dispatch (so the NEXT
     // iteration's maskable-IRQ check sees the post-dispatch I flag).
-    // We mirror that here so dispatch_irq's I-flag set takes effect
-    // immediately on the next boundary. Setting moo_pi BEFORE the
-    // dispatch (as we did originally) is wrong — the C++ semantics
-    // are "use the I flag from the END of the previous instruction".
     state.regs.moo_pi = state.regs.p;
 
-    // Accumulate the dispatch cycle cost (0 or 7). Done BEFORE the
-    // instruction's own cycles so the residual ordering matches the
-    // C++ loop (`ADDCYC(7)` inside the dispatch, then `ADDCYC(CycTable)`
-    // for the follow-up instruction). The `* 3` matches the C++
-    // `CycTable * 48 = 3 * 16` per-instruction delta.
+    // Accumulate the dispatch cycle cost (0 or 7). The `* 3` matches
+    // the C++ `CycTable * 48 = 3 * 16` per-instruction delta.
     if irq_cycles != 0 {
         state.regs.count = state.regs.count.saturating_add(dot(irq_cycles) * 3);
     }
+
+    irq_cycles
+}
+
+/// Fetch + execute the instruction at the current `PC`. Returns the
+/// total CPU cycle cost (base + extras) for this instruction, NOT
+/// including any dispatch cost the caller passed via
+/// `dispatch_irq_cycles` (used only for the return value).
+///
+/// Does NOT update `state.regs.moo_pi` — that's `dispatch_step`'s job.
+/// The C++ call order is `dispatch → fetch → ADDCYC(CycTable[b1])`,
+/// then dispatch the IRQ-only callback separately, so the count
+/// increment here corresponds to the post-dispatch `ADDCYC(CycTable)`.
+pub(crate) fn execute_step<B: Bus + ?Sized>(
+    state: &mut CpuState,
+    bus: &mut B,
+    dispatch_irq_cycles: u8,
+) -> u8 {
 
     // Always fetch + execute exactly one instruction. PC has either
     // been left at the current PC (no dispatch) or moved to the
@@ -218,7 +226,7 @@ pub fn step<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
     let opcode = fetch(state, bus);
     let op_info = info(opcode);
 
-    let mut cycles = irq_cycles + op_info.base_cycles;
+    let mut cycles = dispatch_irq_cycles + op_info.base_cycles;
 
     match op_info.kind {
         OpKind::Jam => {
@@ -368,11 +376,26 @@ pub fn step<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
     }
 
     // Add the instruction's own cycle cost (excluding the dispatch
-    // portion, which was already added above). The `* 3` matches
-    // C++ `CycTable * 48 = 3 * 16`.
-    state.regs.count = state.regs.count.saturating_add(dot(cycles - irq_cycles) * 3);
-    state.cycles_in_run = state.cycles_in_run.saturating_add((cycles - irq_cycles) as i32);
+    // portion, which was already added by dispatch_step). The `* 3`
+    // matches C++ `CycTable * 48 = 3 * 16`.
+    state.regs.count = state.regs.count
+        .saturating_add(dot(cycles - dispatch_irq_cycles) * 3);
+    state.cycles_in_run = state.cycles_in_run
+        .saturating_add((cycles - dispatch_irq_cycles) as i32);
     cycles
+}
+
+/// Public step API: always invokes dispatch + execute atomically.
+/// Used by `tests/unofficial.rs`, `tests/opcodes.rs`, `tests/cycle_
+/// parity.rs`, `tests/interrupts.rs` — every test that does NOT
+/// drive the per-call budget itself.
+///
+/// The `run` / `run_with_tick` loops do NOT use this. They split
+/// dispatch from execute to mirror the C++ early-exit at
+/// `src/x6502.cpp:586-588`.
+pub fn step<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
+    let dc = dispatch_step(state, bus);
+    execute_step(state, bus, dc)
 }
 
 // ---------------------------------------------------------------------------
@@ -1097,18 +1120,48 @@ fn rmw_addr<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, mode: AddrMode) 
 /// uses this to advance `Cpu::timestamp_` / `sound_timestamp_`,
 /// which live on the Cpu object outside the 64-byte X6502 layout.
 ///
-/// The C++ `X6502_RunDebug` always does at least one full loop-body
-/// iteration per call (dispatch, fetch opcode, ADDCYC), even when
-/// the cycle budget is zero — that's how the C++ tests that call
-/// `X6502_Run(1)` consume exactly one instruction. The Rust mirrors
-/// this by entering the loop at least once, then running until the
-/// `count` cap is reached, then breaking on `[trapped]` (jammed) state.
+/// Run the CPU for `cycles` 1/16-dot units. Returns the total CPU
+/// cycles consumed during this run.
+///
+/// Loop structure mirrors `X6502_RunDebug` (`src/x6502.cpp:519-624`):
+/// each iteration first runs the dispatch phase; if the dispatch
+/// consumed all remaining budget, the loop exits BEFORE executing the
+/// follow-up instruction (C++ early-exit at lines 586-588). If budget
+/// remains after dispatch, the loop fetches + executes the next
+/// instruction and updates the mapper/APU tick callbacks via the
+/// `tick_instruction` hook installed by [`crate::cpu::tick`].
+///
+/// The entry body always runs at least once (the dispatch phase),
+/// matching the C++ semantics where `X6502_Run(1)` still consumes one
+/// instruction's worth of dispatch + opcode cost. The loop terminates
+/// when the cycle budget is exhausted or the CPU enters a jammed
+/// state (KIL/STP/HLT).
 pub fn run<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, cycles: i32) -> i32 {
     let mut executed_cycles = 0i32;
     let target = state.regs.count.saturating_add(cycles);
     loop {
-        let c = step(state, bus);
-        executed_cycles = executed_cycles.saturating_add(c as i32);
+        // Phase 1: dispatch. If the dispatch phase consumes the entire
+        // remaining budget, exit WITHOUT executing the follow-up
+        // instruction — mirrors the C++ early-exit at
+        // `src/x6502.cpp:586-588`. The plain `run` does not invoke
+        // the mapper/APU tick callback; that's `run_with_tick`'s job.
+        let dc = dispatch_step(state, bus);
+        if dc != 0 {
+            executed_cycles = executed_cycles.saturating_add(dc as i32);
+            if state.regs.jammed != 0 {
+                break;
+            }
+            if state.regs.count >= target {
+                // Dispatch exhausted the budget. C++ behaviour: skip
+                // the follow-up instruction entirely.
+                break;
+            }
+            let ic = execute_step(state, bus, dc);
+            executed_cycles = executed_cycles.saturating_add(ic as i32);
+        } else {
+            let ic = execute_step(state, bus, 0);
+            executed_cycles = executed_cycles.saturating_add(ic as i32);
+        }
         if state.regs.jammed != 0 {
             break;
         }

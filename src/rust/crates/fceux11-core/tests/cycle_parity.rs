@@ -34,7 +34,7 @@
 //! pin the Rust side; the C++ side is the gold standard.
 
 use fceux11_core::cpu::{
-    decode::info, step, Bus, CpuState, IrqSource,
+    decode::info, run, step, Bus, CpuState, IrqSource,
 };
 
 // ---------------------------------------------------------------------------
@@ -423,6 +423,94 @@ fn ldx_abs_y_with_page_cross_consistent_count() {
     assert_eq!(cpu.regs.x, 0xAB);
     assert_eq!(cpu.regs.pc, 0x4003);
     assert_eq!(cpu.regs.count, (4 + 1) * 48);
+}
+
+// ===========================================================================
+// 7. Multi-instruction cycle accounting: dispatch-budget early-exit
+//    Mirrors the C++ `X6502_RunDebug` early-exit at
+//    `src/x6502.cpp:586-588`. The cycle-drift fix closes this:
+//    when dispatch consumes the entire remaining per-call budget, the
+//    follow-up instruction must NOT execute (matches C++ behaviour
+//    to the byte).
+// ===========================================================================
+
+#[test]
+fn dispatch_just_exhausts_budget_does_not_execute_followup_instruction() {
+    // $4000: NOP, $5000: NOP (the would-be follow-up instruction).
+    // $FFFA/B points to $5000. NMI is pending with a fresh edge so
+    // the second boundary dispatches.
+    //
+    // Budget = 8 cycles -> 8 * 16 = 128 1/16-dot-units.
+    //
+    // Phase 1 (loop iter 1): dispatch defers (NMI fresh, 0 cycles),
+    //   then NOP runs (2 cycles). state.count = 96 < 128. Continue.
+    // Phase 2 (loop iter 2): dispatch fires (7 cycles). state.count
+    //   = 96 + 336 = 432. 432 >= 128 -> EARLY EXIT.
+    //
+    // The follow-up NOP at $5000 must NOT have been executed.
+    let mut cpu = cpu_at(0x4000);
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0xEA; // NOP
+    bus.mem[0xFFFA] = 0x00; // NMI vector LSB
+    bus.mem[0xFFFB] = 0x50; // NMI vector MSB
+    bus.mem[0x5000] = 0xEA; // follow-up NOP (must NOT execute)
+
+    cpu.regs.irq_low = IrqSource::NMI.bits();
+    cpu.nmi_fresh = true;
+
+    let consumed = run(&mut cpu, &mut bus, 8 * 16);
+
+    // Phase 1 consumed: 0 (defer) + 2 (NOP) = 2 cycles.
+    // Phase 2 dispatch consumed: 7 cycles. Follow-up NOP did NOT run.
+    assert_eq!(
+        consumed, 9,
+        "consumed = defer+NOP (2 cycles) + dispatch (7 cycles); follow-up NOP suppressed"
+    );
+    assert_eq!(
+        cpu.regs.pc, 0x5000,
+        "PC must land at NMI vector $5000, NOT past the follow-up NOP at $5000"
+    );
+    assert_eq!(
+        cpu.regs.count, 96 + 336,
+        "state.count = defer+NOP (96) + dispatch (336) = 432"
+    );
+}
+
+#[test]
+fn dispatch_does_not_suppress_followup_when_budget_is_ample() {
+    // Same setup as the early-exit test above, but with a budget
+    // large enough that the follow-up instruction fits comfortably.
+    // Locks the regression case where the loop would under-shoot by
+    // suppressing the follow-up when it shouldn't.
+    let mut cpu = cpu_at(0x4000);
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0xEA; // NOP
+    bus.mem[0xFFFA] = 0x00;
+    bus.mem[0xFFFB] = 0x50;
+    bus.mem[0x5000] = 0xEA; // follow-up NOP (must execute here)
+    // Pad $5001.. with NOPs so the loop doesn't run BRK / HLT / an
+    // arbitrary opcode off the end of the budget run.
+    bus.mem[0x5001..0x5080].fill(0xEA);
+
+    cpu.regs.irq_low = IrqSource::NMI.bits();
+    cpu.nmi_fresh = true;
+
+    // Budget: 100 cycles -> 1600 1/16-units. Plenty for defer+NOP
+    // (96) + dispatch+NOP (432) + many follow-up NOPs.
+    let consumed = run(&mut cpu, &mut bus, 100 * 16);
+
+    // The follow-up NOP at $5000 must have executed. In the early-
+    // exit bug, PC would still be at $5000 (the NMI vector). With
+    // the fix, PC advances past $5000 to at least $5001.
+    assert!(
+        cpu.regs.pc > 0x5000,
+        "PC must advance past the follow-up NOP at $5000 (got ${:04X})",
+        cpu.regs.pc
+    );
+    assert!(
+        consumed > 9,
+        "consumed must include the defer (0) + NOP (2) + dispatch (7) + at least the follow-up NOP (2) = 11+"
+    );
 }
 
 // ===========================================================================

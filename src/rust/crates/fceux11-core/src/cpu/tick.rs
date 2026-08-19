@@ -44,7 +44,7 @@
 //! changing the FFI shape.
 
 use crate::cpu::addressing::{Bus, CpuState};
-use crate::cpu::execute::{run, step};
+use crate::cpu::execute::{dispatch_step, execute_step, run};
 
 /// Signature of the installed tick callback. Mirrors the C++ mapper
 /// hook: called once per executed instruction with the instruction's
@@ -89,8 +89,17 @@ fn tick_instruction(cycles: i32) {
 }
 
 /// Run the CPU for `cycles` 1/16-dot units, invoking the installed
-/// tick callback once per executed instruction with the instruction's
-/// cycle count (dispatch + base + extras, the `step()` return value).
+/// tick callback once per iteration with the iteration's total cycle
+/// count (dispatch cost + base + extras), matching the C++ `temp =
+/// _tcount; hook(temp);` at `src/x6502.cpp:607-615`.
+///
+/// Mirrors `X6502_RunDebug`'s structure (`src/x6502.cpp:519-624`):
+/// the loop first runs `dispatch_step`. If dispatch fires AND its
+/// `7`-cycle cost exhausts the caller's budget, the loop exits
+/// BEFORE running the follow-up instruction AND BEFORE firing the
+/// tick — matching the C++ early-return at `src/x6502.cpp:586-588`.
+/// This is the cycle-drift fix documented in
+/// `docs/plans/phase4-dispatch-budget-fix-2026-08-XX.md`.
 ///
 /// Semantically identical to [`run`] plus the mapper-hook bridge.
 /// Kept separate so the plain [`run`] hot path has zero per-instruction
@@ -103,9 +112,34 @@ pub fn run_with_tick<B: Bus + ?Sized>(
     let mut executed_cycles = 0i32;
     let target = state.regs.count.saturating_add(cycles);
     loop {
-        let c = step(state, bus);
-        executed_cycles = executed_cycles.saturating_add(c as i32);
-        tick_instruction(c as i32);
+        // Phase 1: dispatch. If dispatch exhausted budget, no
+        // instruction + no tick (C++ matches this).
+        let dc = dispatch_step(state, bus);
+        let dc_plus_ic: u8;
+        if dc != 0 {
+            executed_cycles = executed_cycles.saturating_add(dc as i32);
+            if state.regs.jammed != 0 {
+                break;
+            }
+            if state.regs.count >= target {
+                // Dispatch exhausted the budget — no follow-up
+                // instruction, no tick. This is the cycle-drift fix.
+                break;
+            }
+            let ic = execute_step(state, bus, dc);
+            executed_cycles = executed_cycles.saturating_add(ic as i32);
+            dc_plus_ic = dc.saturating_add(ic);
+        } else {
+            let ic = execute_step(state, bus, 0);
+            executed_cycles = executed_cycles.saturating_add(ic as i32);
+            dc_plus_ic = ic;
+        }
+        // Single tick per iteration with the iteration's total cycle
+        // count. Matches C++ `temp = _tcount; hook(temp);` at
+        // `src/x6502.cpp:607-612`, where `_tcount` accumulates both
+        // the dispatch's `ADDCYC(7)` and the opcode's `ADDCYC(CycTable)`
+        // and is reset to 0 only AFTER the hook call.
+        tick_instruction(dc_plus_ic as i32);
         if state.regs.jammed != 0 {
             break;
         }
@@ -226,25 +260,30 @@ mod tests {
         bus.mem[0xFFFA] = 0x00;
         bus.mem[0xFFFB] = 0x50;
         bus.mem[0x5000] = 0xEA;
-        // NMI pending with fresh edge: step 1 defers (0 dispatch
-        // cycles) + executes NOP (2 cycles) -> tick 2, count = 96.
-        // Step 2 dispatches NMI (7) + executes NOP (2) -> tick 9,
-        // count = 96 + 336 + 96 = 528. Budget 8 cycles (8*16 = 128
-        // 1/16-units) stops the loop right after step 2 (528 >= 128),
-        // so exactly two boundaries execute and tick.
+        // NMI pending with fresh edge, budget = 8 cycles (128 1/16-units):
+        //   Step 1: dispatch defers (0 cycles) + NOP runs (2 cycles),
+        //           tick fired once with the iteration's 2-cycle total.
+        //           state.count = 96. 96 < 128, continue.
+        //   Step 2: dispatch fires (7 cycles), state.count = 432.
+        //           432 >= 128 -> EARLY EXIT (mirrors C++
+        //           `src/x6502.cpp:586-588`). No follow-up NOP, no tick.
         cpu.regs.irq_low = IrqSource::NMI.bits();
         cpu.nmi_fresh = true;
 
         let _ = run_with_tick(&mut cpu, &mut bus, 8 * 16);
         assert_eq!(
             TICK_COUNT.load(Ordering::SeqCst),
-            2,
-            "two boundaries executed (defer+NOP, dispatch+NOP)"
+            1,
+            "exactly one tick fires (defer+NOP iteration); dispatch exhausted budget -> no tick on iteration 2"
         );
         assert_eq!(
             TICK_SUM.load(Ordering::SeqCst),
-            2 + 9,
-            "tick sums: defer step 2 cycles + dispatch step 9 cycles"
+            2,
+            "tick sum = defer+NOP iteration's 2 cycles"
+        );
+        assert_eq!(
+            cpu.regs.pc, 0x5000,
+            "PC advanced to NMI vector $5000; follow-up NOP at $5000 NOT executed"
         );
 
         unsafe { fceux11_cpu_set_tick_null(); }
