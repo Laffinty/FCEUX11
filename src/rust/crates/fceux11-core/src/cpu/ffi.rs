@@ -44,6 +44,7 @@ use crate::cpu::addressing::CpuState;
 use crate::cpu::bus::CppBus;
 use crate::cpu::execute::run;
 use crate::cpu::state::{IrqSource, X6502Layout};
+use crate::cpu::tick::run_with_tick;
 
 /// Size of the X6502 state blob. Mirrors `sizeof(X6502)` on the C++
 /// side (pinned to 64 by `static_assert` in `src/cpu.cpp:21–23` and
@@ -271,6 +272,42 @@ pub unsafe extern "C" fn fceux11_cpu_run(state: *mut u8, cycles: i32) -> i32 {
     }
 }
 
+/// Run the CPU for `cycles` CPU cycles, invoking the installed tick
+/// callback (via [`crate::cpu::tick`]) once per executed instruction
+/// with the instruction's cycle count.
+///
+/// This is the mapper-hook-aware counterpart to [`fceux11_cpu_run`];
+/// the C++ side installs a tick thunk that forwards each per-
+/// instruction cycle count to `g_cpu.map_irq_hook()(cycles)` (the
+/// mapper-installed IRQ hook) and `FCEU_SoundCPUHook(cycles)` (the
+/// APU's CPU clock). Without this, mappers whose IRQ counters depend
+/// on the CPU clock (MMC3 scanline, VRC6 clock divider, DMC rate
+/// timer driven by APU) never advance under `FCEUX11_RUST_CPU=ON`,
+/// which is the root cause of the per-frame cycle-accounting drift
+/// reported in `docs/plans/phase4-interrupts-2026-08-18.md` §3.2
+/// (apu_wav_diff_test, golden_savestate_test, savestate_regression
+/// _rust_smoke, rom_regression_rust_smoke).
+///
+/// Return value and `cycles` argument semantics match
+/// [`fceux11_cpu_run`]; only the loop body differs.
+///
+/// Safety contract: identical to [`fceux11_cpu_run`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_cpu_run_with_tick(state: *mut u8, cycles: i32) -> i32 {
+    if state.is_null() || cycles <= 0 {
+        return 0;
+    }
+    unsafe {
+        FFI_CPU_STATE.regs = *(state as *const X6502Layout);
+        let mut bus = CppBus;
+        let state_ptr = core::ptr::addr_of_mut!(FFI_CPU_STATE);
+        let scaled_cycles = cycles * 16;
+        let cpu_cycles = run_with_tick(&mut *state_ptr, &mut bus, scaled_cycles);
+        *(state as *mut X6502Layout) = (*state_ptr).regs;
+        cpu_cycles
+    }
+}
+
 /// Snapshot the 64-byte CPU state to `out` (savestate path).
 ///
 /// Pure `copy_nonoverlapping` — byte-identical to the C++ blob, since
@@ -480,6 +517,93 @@ mod tests {
     }
 
     #[test]
+    fn run_with_tick_invokes_tick_per_instruction() {
+        use crate::cpu::tick::{fceux11_cpu_set_tick, fceux11_cpu_set_tick_null};
+        use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
+
+        // `static AtomicUsize` (not `static mut AtomicUsize`) — the
+        // atomic type provides interior mutability via atomic ops,
+        // matching the pattern in `cpu/tick.rs::tests::TICK_COUNT`.
+        static TICKS: AtomicUsize = AtomicUsize::new(0);
+        static TICKS_SUM: AtomicI32 = AtomicI32::new(0);
+        extern "C" fn counting_tick(cycles: i32) {
+            TICKS.fetch_add(1, Ordering::SeqCst);
+            TICKS_SUM.fetch_add(cycles, Ordering::SeqCst);
+        }
+
+        TICKS.store(0, Ordering::SeqCst);
+        TICKS_SUM.store(0, Ordering::SeqCst);
+        unsafe { fceux11_cpu_set_tick(counting_tick); }
+
+        // NOP sled, RESET vector points at a JMP to the sled.
+        static mut BUS_PTR_FOR_TEST_TICK: FlatBus = FlatBus {
+            mem: [0; 0x10000],
+        };
+        extern "C" fn read_trampoline_tick(addr: u16) -> u8 {
+            use crate::cpu::addressing::Bus;
+            let bus_ptr = core::ptr::addr_of_mut!(BUS_PTR_FOR_TEST_TICK);
+            unsafe { (*bus_ptr).read(addr) }
+        }
+        extern "C" fn write_trampoline_tick(addr: u16, val: u8) {
+            use crate::cpu::addressing::Bus;
+            let bus_ptr = core::ptr::addr_of_mut!(BUS_PTR_FOR_TEST_TICK);
+            unsafe { (*bus_ptr).write(addr, val) }
+        }
+
+        let mut bus = FlatBus::new();
+        bus.mem[0xFFFC] = 0x00;
+        bus.mem[0xFFFD] = 0xC0;
+        bus.mem[0xC000] = 0x4C; // JMP $C5F5
+        bus.mem[0xC001] = 0xF5;
+        bus.mem[0xC002] = 0xC5;
+        bus.mem[0xC5F5..0xC5F5 + 0x10].fill(0xEA); // NOP sled
+
+        unsafe {
+            BUS_PTR_FOR_TEST_TICK = FlatBus { mem: bus.mem };
+            fceux11_cpu_set_bus(read_trampoline_tick, write_trampoline_tick);
+        }
+
+        let mut state = make_state();
+        unsafe {
+            fceux11_cpu_power(&mut *state as *mut X6502Layout as *mut u8);
+        }
+        let consumed = unsafe {
+            fceux11_cpu_run_with_tick(
+                &mut *state as *mut X6502Layout as *mut u8,
+                // Big enough budget to clear RESET+JMP (3 cycles) and
+                // execute several NOPs (2 cycles each). 32 cycles
+                // ⇒ ~10 NOPs after the initial JMP.
+                32,
+            )
+        };
+
+        unsafe { fceux11_cpu_set_tick_null(); }
+
+        let tick_count = TICKS.load(Ordering::SeqCst);
+        let tick_sum = TICKS_SUM.load(Ordering::SeqCst);
+
+        // step() combines the RESET dispatch with the follow-up
+        // instruction (JMP at the reset vector) into a single call,
+        // so tick 1 is the JMP (3 cycles) and subsequent ticks are
+        // NOPs (2 cycles each). tick_count = 1 + N_NOPs and
+        // tick_sum = 3 + N_NOPs * 2 = 2 * tick_count + 1.
+        assert!(
+            tick_count >= 3,
+            "at least 3 instructions executed (RESET+JMP, 2 NOPs); got {}",
+            tick_count
+        );
+        assert_eq!(
+            tick_sum, consumed,
+            "sum of tick cycle counts must equal total consumed cycles"
+        );
+        assert_eq!(
+            tick_sum,
+            2 * (tick_count as i32) + 1,
+            "tick_sum invariant: JMP=3 once + NOP=2 per remaining tick"
+        );
+    }
+
+    #[test]
     fn null_state_is_tolerated() {
         // All entry points must early-return on null pointers rather
         // than crashing. This matches the C++ `X6502_*` functions'
@@ -492,6 +616,7 @@ mod tests {
             fceux11_cpu_irq_begin(core::ptr::null_mut(), 0);
             fceux11_cpu_irq_end(core::ptr::null_mut(), 0);
             assert_eq!(fceux11_cpu_run(core::ptr::null_mut(), 100), 0);
+            assert_eq!(fceux11_cpu_run_with_tick(core::ptr::null_mut(), 100), 0);
             fceux11_cpu_snapshot(core::ptr::null(), core::ptr::null_mut());
             fceux11_cpu_restore(core::ptr::null_mut(), core::ptr::null());
         }

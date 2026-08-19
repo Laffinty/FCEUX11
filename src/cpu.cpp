@@ -13,6 +13,7 @@
 // surface needs special handling (see below).
 #include "rust/fceux11_rust.h"
 #include "bus.h"
+#include "sound.h"   // PR-A: FCEU_SoundCPUHook for the per-instruction tick thunk
 #include <atomic>
 #endif
 
@@ -102,6 +103,39 @@ void cpu_rust_install_bus_once() noexcept {
         fceux11_cpu_set_bus(&cpu_rust_read_thunk, &cpu_rust_write_thunk);
     }
 }
+
+// PR-A (Phase 4 sub-step 6 part 2 follow-up): per-instruction tick
+// thunk. The Rust CPU's `run_with_tick` loop calls `f(cycles)` once
+// per executed instruction with the instruction's CPU cycle count.
+// We forward `cycles` to the mapper-installed IRQ hook (if any) and
+// the APU's CPU clock — matching the body of the C++
+// `X6502_RunDebug` loop at `src/x6502.cpp:611-614`, which exists only
+// in the `#if !FCEUX11_RUST_CPU` branch.
+//
+// The thunk is `extern "C"` so it can be passed to
+// `fceux11_cpu_set_tick` (which takes `extern "C" fn(i32)`); the body
+// freely uses C++ (atomic acquire load on `map_irq_hook_` per hotfix3
+// B-5a, free function `FCEU_SoundCPUHook`).
+//
+// Mirrors the C++ reference loop's exact ordering:
+//   1. mapper IRQ hook (skipped if no mapper hook installed)
+//   2. APU sound CPU hook (skipped under overclocking)
+extern "C" void cpu_rust_tick_thunk(int cycles) {
+    if (const auto hook = g_cpu.map_irq_hook()) [[unlikely]] hook(cycles);
+    if (!g_cpu.overclocking()) [[likely]]
+        FCEU_SoundCPUHook(cycles);
+}
+
+// One-shot installation of the tick thunk. Same lazy pattern as
+// `cpu_rust_install_bus_once` to avoid static-init order issues.
+// Called from `Cpu::run()` before the first `fceux11_cpu_run_with_tick`.
+void cpu_rust_install_tick_once() noexcept {
+    static std::atomic<bool> installed{false};
+    bool expected = false;
+    if (installed.compare_exchange_strong(expected, true)) {
+        fceux11_cpu_set_tick(&cpu_rust_tick_thunk);
+    }
+}
 } // namespace
 #endif // FCEUX11_RUST_CPU
 
@@ -132,13 +166,26 @@ void Cpu::power() noexcept {
 void Cpu::run(int32_t cycles) {
 #if FCEUX11_RUST_CPU
     cpu_rust_install_bus_once();
+    // PR-A: install the tick thunk before each run so that the Rust
+    // CPU's `run_with_tick` loop forwards each per-instruction cycle
+    // count to the mapper IRQ hook + APU sound hook. Matches the
+    // C++ `X6502_RunDebug` body in the OFF build (the reference
+    // branch at src/x6502.cpp:611-614).
+    cpu_rust_install_tick_once();
+    // PR-A: use the tick-aware FFI entry point so per-instruction
+    // mapper/APU hooks fire under `FCEUX11_RUST_CPU=ON`. Without
+    // this, mappers whose IRQ counters depend on CPU cycles (MMC3
+    // scanline, VRC6 clock divider, DMC rate timer) never advance,
+    // producing the per-frame cycle-accounting drift documented in
+    // docs/plans/phase4-interrupts-2026-08-18.md §3.2.
+    //
     // The FFI returns the total CPU cycles consumed during this run
     // (sum of every opcode's base cycle cost + page-cross / branch-
     // taken extras). We need to advance `timestamp_` /
     // `sound_timestamp_` ourselves because the Rust CPU doesn't have
     // direct access to the `Cpu` object — those fields live outside
     // the 64-byte X6502 layout.
-    int32_t consumed = fceux11_cpu_run(
+    int32_t consumed = fceux11_cpu_run_with_tick(
         reinterpret_cast<uint8_t*>(&layout_), cycles);
     timestamp_ += consumed;
     if (!overclocking_) sound_timestamp_ += consumed;
