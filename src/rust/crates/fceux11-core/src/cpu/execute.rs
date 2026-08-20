@@ -58,16 +58,11 @@ fn dispatch_irq<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
         let hi = state.rd(bus, 0xFFFD);
         state.regs.pc = ((hi as u16) << 8) | lo as u16;
         state.regs.jammed = 0;
-        let mut p = state.regs.p;
-        p &= !(Flags::BREAK.bits() | Flags::UNUSED.bits());
-        // Per 6502 datasheet: on RESET the P register is
-        // I_FLAG | U_FLAG (the BREAK flag is cleared and U is set).
-        // The C++ sets only I_FLAG, but the missing U_FLAG never
-        // matters in practice because the RESET handler does not
-        // push P; we use the datasheet-correct value to stay safe
-        // for any future caller that observes P after RESET.
-        p |= Flags::IRQ_DIS.bits() | Flags::UNUSED.bits();
-        state.regs.p = p;
+        // C++ (`src/x6502.cpp` RESET dispatch): `_PI=_P=I_FLAG` — the
+        // status register is wiped to exactly I_FLAG (0x04): B, U and
+        // all arithmetic flags are cleared, matching the reference
+        // byte-for-byte for debugger/Lua observers.
+        state.regs.p = Flags::IRQ_DIS.bits();
         state.regs.irq_low &= !IrqSource::RESET.bits();
         state.regs.irq_low &= !IrqSource::TEMP.bits();
         // RESET dispatch itself eats 0 cycles — the cycle cost
@@ -105,6 +100,11 @@ fn dispatch_irq<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
             let hi = state.rd(bus, 0xFFFB);
             state.regs.pc = ((hi as u16) << 8) | lo as u16;
             state.regs.irq_low &= !IrqSource::NMI.bits();
+            // C++ clears FCEU_IQTEMP unconditionally after dispatch
+            // (`_IRQlow &= ~(FCEU_IQTEMP)` at src/x6502.cpp:604); the
+            // NMI branch clears it too so `sync_irq_to_host` writes
+            // back a blob consistent with the C++ reference.
+            state.regs.irq_low &= !IrqSource::TEMP.bits();
             return 7;
         }
     }
@@ -196,10 +196,20 @@ pub(crate) fn dispatch_step<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) 
     // iteration's maskable-IRQ check sees the post-dispatch I flag).
     state.regs.moo_pi = state.regs.p;
 
-    // Accumulate the dispatch cycle cost (0 or 7). The `* 3` matches
-    // the C++ `CycTable * 48 = 3 * 16` per-instruction delta.
+    // Consume the dispatch cycle cost (0 or 7) from `count`. The
+    // `count` accumulator now mirrors C++'s `_count` exactly:
+    //   - per call: `count += cycles_arg * 16` (adds budget, 1/16 units)
+    //   - per dispatch: `count -= irq_cycles * 48` (C++ `ADDCYC(7)`)
+    //   - per instruction: `count -= CycTable * 48` (C++ `ADDCYC(CycTable)`)
+    //   - loop exits when `count <= 0` (C++ `while (_count > 0)`)
+    //
+    // The `* 3` scales the 1/16-unit budget to the 1/48-unit decrement
+    // (CycTable * 48 = CycTable * 16 * 3), matching C++'s mixed-unit
+    // accounting so both loops terminate after the same number of
+    // instructions per call, including the cross-call residual that
+    // C++ carries (`_count` can go negative / "overdraw").
     if irq_cycles != 0 {
-        state.regs.count = state.regs.count.saturating_add(dot(irq_cycles) * 3);
+        state.regs.count = state.regs.count.saturating_sub(dot(irq_cycles) * 3);
     }
 
     irq_cycles
@@ -208,12 +218,20 @@ pub(crate) fn dispatch_step<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) 
 /// Fetch + execute the instruction at the current `PC`. Returns the
 /// total CPU cycle cost (base + extras) for this instruction, NOT
 /// including any dispatch cost the caller passed via
-/// `dispatch_irq_cycles` (used only for the return value).
+/// `dispatch_irq_cycles` (used only for the count decrement).
 ///
 /// Does NOT update `state.regs.moo_pi` — that's `dispatch_step`'s job.
 /// The C++ call order is `dispatch → fetch → ADDCYC(CycTable[b1])`,
 /// then dispatch the IRQ-only callback separately, so the count
-/// increment here corresponds to the post-dispatch `ADDCYC(CycTable)`.
+/// decrement here corresponds to the post-dispatch `ADDCYC(CycTable)`.
+///
+/// Returns the cycle cost of the instruction EXCLUDING the dispatch
+/// portion (i.e. `base + extras` only). `dispatch_step`'s caller —
+/// `run` / `run_with_tick` / `step` — adds the dispatch cost to the
+/// returned value separately. This keeps the per-instruction cycle
+/// total correct when the caller has already accounted for the
+/// dispatch (the C++ `temp = _tcount` includes dispatch + CycTable
+/// once, never twice).
 pub(crate) fn execute_step<B: Bus + ?Sized>(
     state: &mut CpuState,
     bus: &mut B,
@@ -375,14 +393,20 @@ pub(crate) fn execute_step<B: Bus + ?Sized>(
         }
     }
 
-    // Add the instruction's own cycle cost (excluding the dispatch
-    // portion, which was already added by dispatch_step). The `* 3`
-    // matches C++ `CycTable * 48 = 3 * 16`.
+    // Consume the instruction's own cycle cost (excluding the dispatch
+    // portion, which was already consumed above). Mirrors the C++
+    // `ADDCYC(CycTable)` — see the `dispatch_step` comment for the
+    // full unit rationale (`count` is 1/16 units, decremented by
+    // `CycTable * 48 = CycTable * 16 * 3`).
     state.regs.count = state.regs.count
-        .saturating_add(dot(cycles - dispatch_irq_cycles) * 3);
+        .saturating_sub(dot(cycles - dispatch_irq_cycles) * 3);
     state.cycles_in_run = state.cycles_in_run
         .saturating_add((cycles - dispatch_irq_cycles) as i32);
-    cycles
+    // Return the instruction's own cycle cost (base + extras) only —
+    // NOT including `dispatch_irq_cycles`. The callers (`step`,
+    // `run`, `run_with_tick`) add the dispatch cost themselves, so
+    // dispatch cycles are never double-counted.
+    cycles - dispatch_irq_cycles
 }
 
 /// Public step API: always invokes dispatch + execute atomically.
@@ -395,7 +419,11 @@ pub(crate) fn execute_step<B: Bus + ?Sized>(
 /// `src/x6502.cpp:586-588`.
 pub fn step<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
     let dc = dispatch_step(state, bus);
-    execute_step(state, bus, dc)
+    // execute_step returns base+extras only; add the dispatch cost so
+    // step() keeps returning dispatch + instruction cycles (the total
+    // cost of the boundary), matching the pre-split behaviour and the
+    // C++ loop's `temp = _tcount` (which includes both).
+    dc.saturating_add(execute_step(state, bus, dc))
 }
 
 // ---------------------------------------------------------------------------
@@ -480,17 +508,14 @@ fn do_register_op<B: Bus + ?Sized>(
         }
         // PLP
         0x28 => {
-            // Pop P but ignore B (the 6502 always sets B to 0 on PLP �?it
-            // cannot be cleared by software via this instruction).
-            // Also clear U then OR U bit from popped value (some docs say
-            // U stays set; the C++ implementation just assigns directly).
-            let v = state.pop(bus);
-            // Bits 4 and 5 are not affected by PLP �?keep them from P.
-            let mut p = state.regs.p;
-            p &= !(Flags::ZERO.bits() | Flags::NEGATIVE.bits() | Flags::OVERFLOW.bits()
-                | Flags::DECIMAL.bits() | Flags::IRQ_DIS.bits() | Flags::CARRY.bits());
-            p |= v & !(Flags::BREAK.bits() | Flags::UNUSED.bits());
-            state.regs.p = p;
+            // C++ (`src/ops.inc` `case 0x28`): `_P=POP();` — the full
+            // status byte is restored, including the B (bit 4) and U
+            // (bit 5) flags. The stack byte comes from a PHP / BRK /
+            // IRQ push, all of which explicitly set/clear B and set U,
+            // so the pushed bytes are identical either way; restoring
+            // the full byte keeps the software P register byte-for-byte
+            // identical to the C++ reference (visible via debugger/Lua).
+            state.regs.p = state.pop(bus);
         }
         // INX
         0xE8 => {
@@ -660,35 +685,38 @@ fn do_alu_a<B: Bus + ?Sized>(
 ) -> u8 {
     // Immediate mode: the value IS the byte at PC (no memory re-read).
     // All other modes: the addressing helper returns a memory address.
-    let m = match mode {
-        AddrMode::Imm => imm(state, bus).addr as u8,
+    // The read-path indexed modes (AbsX/AbsY/IndY) charge a page-cross
+    // extra cycle via `extra_cycles`, matching C++ `GetABIRD`/`GetIYRD`
+    // (e.g. `LD_ABX(ADC)` calls `ADDCYC(1)` when the page crosses).
+    let (m, extra) = match mode {
+        AddrMode::Imm => (imm(state, bus).addr as u8, 0),
         AddrMode::ZP => {
             let r = zp(state, bus);
-            state.rd(bus, r.addr)
+            (state.rd(bus, r.addr), 0)
         }
         AddrMode::ZPX => {
             let r = zpx(state, bus);
-            state.rd(bus, r.addr)
+            (state.rd(bus, r.addr), 0)
         }
         AddrMode::Abs => {
             let r = absolute(state, bus);
-            state.rd(bus, r.addr)
+            (state.rd(bus, r.addr), 0)
         }
         AddrMode::AbsX => {
             let r = abs_x_read(state, bus);
-            state.rd(bus, r.addr)
+            (state.rd(bus, r.addr), r.extra_cycles)
         }
         AddrMode::AbsY => {
             let r = abs_y_read(state, bus);
-            state.rd(bus, r.addr)
+            (state.rd(bus, r.addr), r.extra_cycles)
         }
         AddrMode::IndX => {
             let r = ind_x(state, bus);
-            state.rd(bus, r.addr)
+            (state.rd(bus, r.addr), 0)
         }
         AddrMode::IndY => {
             let r = ind_y_read(state, bus);
-            state.rd(bus, r.addr)
+            (state.rd(bus, r.addr), r.extra_cycles)
         }
         _ => unreachable!("AluA mode {:?}", mode),
     };
@@ -703,7 +731,7 @@ fn do_alu_a<B: Bus + ?Sized>(
             _ => unreachable!("AluA opcode ${:02X}", opcode),
         }
     }
-    0
+    extra
 }
 
 
@@ -715,35 +743,37 @@ fn do_compare<B: Bus + ?Sized>(
 ) -> u8 {
     // Immediate mode: the value IS the byte at PC (no memory re-read).
     // All other modes: the addressing helper returns a memory address.
-    let m = match mode {
-        AddrMode::Imm => imm(state, bus).addr as u8,
+    // Read-path indexed modes charge the page-cross extra cycle,
+    // matching C++ `GetABIRD` / `GetIYRD` (e.g. `LD_ABY(CMP)`).
+    let (m, extra) = match mode {
+        AddrMode::Imm => (imm(state, bus).addr as u8, 0),
         AddrMode::ZP => {
             let r = zp(state, bus);
-            state.rd(bus, r.addr)
+            (state.rd(bus, r.addr), 0)
         }
         AddrMode::ZPX => {
             let r = zpx(state, bus);
-            state.rd(bus, r.addr)
+            (state.rd(bus, r.addr), 0)
         }
         AddrMode::Abs => {
             let r = absolute(state, bus);
-            state.rd(bus, r.addr)
+            (state.rd(bus, r.addr), 0)
         }
         AddrMode::AbsX => {
             let r = abs_x_read(state, bus);
-            state.rd(bus, r.addr)
+            (state.rd(bus, r.addr), r.extra_cycles)
         }
         AddrMode::AbsY => {
             let r = abs_y_read(state, bus);
-            state.rd(bus, r.addr)
+            (state.rd(bus, r.addr), r.extra_cycles)
         }
         AddrMode::IndX => {
             let r = ind_x(state, bus);
-            state.rd(bus, r.addr)
+            (state.rd(bus, r.addr), 0)
         }
         AddrMode::IndY => {
             let r = ind_y_read(state, bus);
-            state.rd(bus, r.addr)
+            (state.rd(bus, r.addr), r.extra_cycles)
         }
         _ => unreachable!("Compare mode {:?}", mode),
     };
@@ -754,7 +784,7 @@ fn do_compare<B: Bus + ?Sized>(
         _ => unreachable!("Compare opcode ${:02X}", opcode),
     };
     cmp(state, bus, r, m);
-    0
+    extra
 }
 
 
@@ -815,13 +845,13 @@ fn do_jump<B: Bus + ?Sized>(
         }
         // RTI ($40).
         0x40 => {
-            let v = state.pop(bus);
-            // Bits 4 (B) and 5 (U) are not settable by RTI.
-            let mut p = state.regs.p;
-            p &= !(Flags::ZERO.bits() | Flags::NEGATIVE.bits() | Flags::OVERFLOW.bits()
-                | Flags::DECIMAL.bits() | Flags::IRQ_DIS.bits() | Flags::CARRY.bits());
-            p |= v & !(Flags::BREAK.bits() | Flags::UNUSED.bits());
-            state.regs.p = p;
+            // C++ (`src/ops.inc` `case 0x40`): `_P=POP(); _PI=_P;` — full
+            // restore of the status byte (B/U included), plus a refresh of
+            // the dispatch-time P mirror (redundant here because
+            // `dispatch_step` refreshes `moo_pi` before every instruction,
+            // but kept for exact parity with the C++ reference blob).
+            state.regs.p = state.pop(bus);
+            state.regs.moo_pi = state.regs.p;
             let lo = state.pop(bus) as u16;
             let hi = state.pop(bus) as u16;
             state.regs.pc = (hi << 8) | lo;
@@ -850,6 +880,9 @@ fn do_unofficial<B: Bus + ?Sized>(
     opcode: u8,
     mode: AddrMode,
 ) -> u8 {
+    // Page-cross extra cycles from the read-path indexed modes
+    // (IndY / AbsY), matching the C++ `GetIYRD` / `GetABIRD` penalty.
+    let mut extra = 0u8;
     match opcode {
         // ----- read-NOPs (imm / zp / zpx / abs / absx) -----
         0x1A | 0x3A | 0x5A | 0x7A | 0xDA | 0xEA | 0xFA => {
@@ -926,16 +959,23 @@ fn do_unofficial<B: Bus + ?Sized>(
         }
         // ----- LAX (load A and X) -----
         0xA3 | 0xA7 | 0xAF | 0xB3 | 0xB7 | 0xBF | 0xAB => {
-            let addr = match mode {
-                AddrMode::Imm => imm(state, bus).addr,
-                AddrMode::IndX => ind_x(state, bus).addr,
-                AddrMode::ZP => zp(state, bus).addr,
-                AddrMode::ZPY => zpy(state, bus).addr,
-                AddrMode::Abs => absolute(state, bus).addr,
-                AddrMode::IndY => ind_y_read(state, bus).addr,
-                AddrMode::AbsY => abs_y_read(state, bus).addr,
+            let (addr, ex) = match mode {
+                AddrMode::Imm => (imm(state, bus).addr, 0),
+                AddrMode::IndX => (ind_x(state, bus).addr, 0),
+                AddrMode::ZP => (zp(state, bus).addr, 0),
+                AddrMode::ZPY => (zpy(state, bus).addr, 0),
+                AddrMode::Abs => (absolute(state, bus).addr, 0),
+                AddrMode::IndY => {
+                    let r = ind_y_read(state, bus);
+                    (r.addr, r.extra_cycles)
+                }
+                AddrMode::AbsY => {
+                    let r = abs_y_read(state, bus);
+                    (r.addr, r.extra_cycles)
+                }
                 _ => unreachable!("LAX mode {:?}", mode),
             };
+            extra += ex;
             let m = state.rd(bus, addr);
             state.regs.a = m;
             state.regs.x = m;
@@ -1080,8 +1120,9 @@ fn do_unofficial<B: Bus + ?Sized>(
         }
         // ----- LAS (AbsY): A = X = S = M & S -----
         0xBB => {
-            let addr = abs_y_read(state, bus).addr;
-            let m = state.rd(bus, addr);
+            let r = abs_y_read(state, bus);
+            extra += r.extra_cycles;
+            let m = state.rd(bus, r.addr);
             let v = m & state.regs.s;
             state.regs.a = v;
             state.regs.x = v;
@@ -1093,7 +1134,7 @@ fn do_unofficial<B: Bus + ?Sized>(
         }
         _ => unreachable!("Unofficial op ${:02X} mode {:?}", opcode, mode),
     }
-    0
+    extra
 }
 
 #[inline]
@@ -1120,16 +1161,25 @@ fn rmw_addr<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, mode: AddrMode) 
 /// uses this to advance `Cpu::timestamp_` / `sound_timestamp_`,
 /// which live on the Cpu object outside the 64-byte X6502 layout.
 ///
-/// Run the CPU for `cycles` 1/16-dot units. Returns the total CPU
-/// cycles consumed during this run.
-///
 /// Loop structure mirrors `X6502_RunDebug` (`src/x6502.cpp:519-624`):
-/// each iteration first runs the dispatch phase; if the dispatch
-/// consumed all remaining budget, the loop exits BEFORE executing the
-/// follow-up instruction (C++ early-exit at lines 586-588). If budget
-/// remains after dispatch, the loop fetches + executes the next
-/// instruction and updates the mapper/APU tick callbacks via the
-/// `tick_instruction` hook installed by [`crate::cpu::tick`].
+///
+/// ```text
+/// C++:  _count += cycles * 16;            // add budget (1/16 units)
+///       while (_count > 0) {              // budget remaining?
+///           dispatch (maybe _count -= 7*48)
+///           if (_count <= 0) return;      // early exit
+///           _count -= CycTable * 48;      // consume instruction cost
+///           ...execute...
+///       }
+/// ```
+///
+/// Rust `run` mirrors this exactly: `count` is added the same budget,
+/// then each dispatch / instruction decrements it by the same
+/// `* 48`-scaled amount, and the loop exits when `count <= 0`. The
+/// `count` accumulator carries the residual across calls (it may go
+/// negative — "overdraw"), exactly like C++ `_count`, which is what
+/// keeps the per-call instruction count identical between the two
+/// implementations. See `dispatch_step`'s comment for the unit math.
 ///
 /// The entry body always runs at least once (the dispatch phase),
 /// matching the C++ semantics where `X6502_Run(1)` still consumes one
@@ -1138,20 +1188,36 @@ fn rmw_addr<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, mode: AddrMode) 
 /// state (KIL/STP/HLT).
 pub fn run<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, cycles: i32) -> i32 {
     let mut executed_cycles = 0i32;
-    let target = state.regs.count.saturating_add(cycles);
-    loop {
+    // Add the per-call budget, exactly like C++ `_count += cycles*16`.
+    // `cycles` arrives already scaled (cycles_arg * 16) from the FFI
+    // shim (see `fceux11_cpu_run_with_tick`).
+    state.regs.count = state.regs.count.saturating_add(cycles);
+    // Top-of-loop budget check mirrors C++ `while (_count > 0)`: if the
+    // residual from the previous call is already <= 0 (overdrawn), no
+    // dispatch or instruction runs in this call — the loop exits
+    // immediately. This is what keeps the per-call instruction count
+    // identical to C++, including the cross-call residual behaviour.
+    while state.regs.count > 0 {
+        // Pull in any IRQ lines asserted by the C++ side since the
+        // last dispatch (mapper hooks, APU frame-counter IRQ via the
+        // tick bridge mutate the C++ `IRQlow` blob mid-call, which our
+        // snapshot taken at call start does not see).
+        bus.sync_irq_from_host(state);
         // Phase 1: dispatch. If the dispatch phase consumes the entire
         // remaining budget, exit WITHOUT executing the follow-up
         // instruction — mirrors the C++ early-exit at
         // `src/x6502.cpp:586-588`. The plain `run` does not invoke
         // the mapper/APU tick callback; that's `run_with_tick`'s job.
         let dc = dispatch_step(state, bus);
+        // Push back bits consumed by dispatch (e.g. NMI) so the C++
+        // blob doesn't re-assert them on the next call's snapshot.
+        bus.sync_irq_to_host(state);
         if dc != 0 {
             executed_cycles = executed_cycles.saturating_add(dc as i32);
             if state.regs.jammed != 0 {
                 break;
             }
-            if state.regs.count >= target {
+            if state.regs.count <= 0 {
                 // Dispatch exhausted the budget. C++ behaviour: skip
                 // the follow-up instruction entirely.
                 break;
@@ -1165,9 +1231,8 @@ pub fn run<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, cycles: i32) -> i
         if state.regs.jammed != 0 {
             break;
         }
-        if state.regs.count >= target {
-            break;
-        }
+        // No bottom-of-loop check: the `while state.regs.count > 0`
+        // at the top is the C++ loop condition.
     }
     executed_cycles
 }

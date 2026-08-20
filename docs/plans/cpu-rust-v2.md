@@ -1,6 +1,46 @@
 # CPU Module v2.0 — Rust-First Reimplementation (Revised)
 
-**Status:** Active — Phase 1-3 landed, Phase 4-6 in progress · **Branch:** `wip2.0` · **Last revised:** 2026-08-19
+**Status:** Active — Phase 1-3 landed, Phase 4-6 in progress · **Branch:** `wip2.0` · **Last revised:** 2026-08-20
+
+> **Progress note (2026-08-20).** Phase 4.5 cycle-drift closure. The
+> cycle-drift family that the 2026-08-19 note below left open is now
+> resolved; the authoritative evidence is per-frame cycle traces that
+> are **byte-identical** between `FCEUX11_RUST_CPU=ON` and `=OFF`:
+>
+> * **IRQ bridge** (`cpu/bus.rs` `sync_irq_from_host` / `sync_irq_to_host`,
+>   `IRQ_BRIDGE_INSTALLED`): the C++ `X6502::IRQlow` blob is the truth for
+>   mapper / APU-frame IRQs and `$4017` clears; Rust now overwrites its
+>   snapshot from the host at every dispatch boundary. Result: the
+>   mmc3_4 42-frame trace is fully identical (`first PC div=None`).
+> * **Per-instruction timestamp advance** (`cpu.cpp` tick thunk): C++
+>   `add_cycles` moves `timestamp_`/`sound_timestamp_` per instruction;
+>   the Rust thunk now does the same, so the MMC1 `lreset` write-throttle
+>   (mmc1.cpp:136-138) no longer drops legitimate register writes.
+>   Result: instr_v5 100-frame trace fully identical.
+> * **P-register semantics aligned to C++** (`execute.rs` PLP/RTI, RESET
+>   dispatch): C++ `_P=POP()` restores the B/U bits from the stack and
+>   RESET wipes P to exactly `I_FLAG`; the Rust implementation previously
+>   masked B/U (datasheet semantics). 244,254-line register traces are
+>   now 100% identical (was: B-only / U-only diffs). `nestest.rs` and
+>   `interrupts.rs` were updated for the C++-parity semantics.
+> * **Page-cross extra-cycle fix (the dominant residual)** (`execute.rs`
+>   `do_alu_a` / `do_compare` / LAX / LAS): ORA/AND/EOR/ADC/SBC/CMP/CPX/
+>   CPY and the unofficial LAX/LAS discarded the addressing-mode
+>   `extra_cycles` for abs,X / abs,Y / (zp),Y — a missing +1 cycle per
+>   page cross (C++ `GetABIRD`/`GetIYRD` charge it). This was the
+>   frame-135 divergence in the 300-frame instr_v5 trace; after the fix
+>   the full 300-frame trace is byte-identical (`first PC div=None`,
+>   `first irq div=None`). See
+>   `docs/plans/phase4.5-cycle-drift-closure-2026-08-20.md`.
+>
+> Test status: `cargo test -p fceux11-core` = 185 PASS.
+> CTest under `FCEUX11_RUST_CPU=ON` = 30/34 (4 remaining: the blargg
+> direct-smoke known-fails — all entries in `blargg_known_fail.json`,
+> i.e. the C++ baseline fails them too — plus 1-mismatch residuals in
+> `rom_regression_rust_smoke` (780 frames) and
+> `savestate_regression_rust_smoke` (12 ROMs), and the perf-baseline
+> `bench_tolerance_test` which is machine-dependent, not a correctness
+> gate). `golden_savestate_test` now PASSES under ON.
 
 > **Progress note (2026-08-19).** Since the §0.1 delivery table was written
 > (which honestly documented "1-of-6 test-oracle result, FFI missing"),

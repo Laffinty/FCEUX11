@@ -24,6 +24,7 @@
 #include "debug.h"
 #include "sound.h"
 #include "bus.h"   // v1.4 Gateway Phase 3 §5.1.3: hot-path g_bus.read/write
+#include "kagami_bridge.h"   // Phase 4.5 cycle-trace hook (Cpu::run / X6502_RunDebug)
 #if FCEUX11_RUST_CPU
 #include "rust/fceux11_rust.h"  // Phase 3 (revised) step 3: FFI dispatch
 #endif
@@ -35,6 +36,7 @@
 
 #include <array>
 #include <cstring>
+#include <cstdlib>  // std::getenv (cycle_trace_enabled_x6502)
 #include <type_traits>
 
 // v1.3 Legion Phase 1: X, timestamp, soundtimestamp and MapIRQHook are now
@@ -55,11 +57,11 @@
 //normal memory read
 static INLINE uint8 RdMem(unsigned int A)
 {
- _DB=fceu11::g_bus.read(static_cast<uint16_t>(A));
- #ifdef _S9XLUA_H
- CallRegisteredLuaMemHook(A, 1, _DB, LUAMEMHOOK_READ);
- #endif
- return(_DB);
+	_DB=fceu11::g_bus.read(static_cast<uint16_t>(A));
+	#ifdef _S9XLUA_H
+	CallRegisteredLuaMemHook(A, 1, _DB, LUAMEMHOOK_READ);
+	#endif
+	return(_DB);
 }
 
 //normal memory write
@@ -498,6 +500,20 @@ void X6502_Power(void)
  StackAddrBackup = -1;
 }
 
+// Phase 4.5 cycle-trace diagnostic — env-var-cached lookup. Defined
+// outside the `#if FCEUX11_RUST_CPU` block so it's reachable from
+// both the ON branch (trace record in `cpu.cpp::Cpu::run`) and the
+// OFF branch (post-loop trace record in `X6502_RunDebug` below).
+// The cached bool eliminates the per-`X6502_RunDebug` syscall
+// overhead — `getenv` is called once at first call.
+static bool cycle_trace_enabled_x6502() {
+    static const bool enabled = []() {
+        const char* p = std::getenv("FCEUX11_CYCLE_LOG");
+        return p != nullptr && *p != '\0';
+    }();
+    return enabled;
+}
+
 #if FCEUX11_RUST_CPU
 // Phase 3 (revised) step 3: when the Rust 6502 is wired in, the FCEUX11
 // `X6502_RunDebug` body itself is bypassed in favour of the Rust CPU
@@ -509,6 +525,7 @@ void X6502_Power(void)
 void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles) {
     cpu.run(cycles);
 }
+
 #else
 void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
 {
@@ -618,6 +635,22 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
    #endif
    _PC++;
    x6502_dispatch[b1](&cpu.native_layout());
+  }
+  // Phase 4.5 cycle-trace diagnostic: post-loop trace record under
+  // Rust CPU=OFF. Mirrors the Rust-CPU=ON record in `Cpu::run`. The
+  // `pc_after` is the PC that the loop terminated at; cycles_arg is
+  // the input budget; cum_count is the residual `_count` (in 1/48
+  // dot units since C++ uses that polarity under OFF). NOTE: the
+  // polarity mismatch with the Rust CPU=ON path is intentional —
+  // diffing the two CSVs both visually (per row) and via Python's
+  // cross_lang_diff.py surfaces any per-call drift, regardless of
+  // sign convention.
+  if (cycle_trace_enabled_x6502()) [[unlikely]] {
+      uint16_t pc = cpu.native_layout().PC;
+      uint32_t cum_count = static_cast<uint32_t>(cpu.native_layout().count);
+      uint32_t irq_low = static_cast<uint32_t>(cpu.native_layout().IRQlow);
+      kagami_bridge_cycle_trace_record(
+          static_cast<uint32_t>(cycles), pc, cum_count, irq_low);
   }
 }
 #endif // FCEUX11_RUST_CPU

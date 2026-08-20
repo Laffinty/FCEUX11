@@ -690,6 +690,26 @@ if(FCEUX11_BUILD_TESTS)
         endif()
 
         # =====================================================================
+        # Phase 4.5 cycle-drift diagnostic harness.
+        #
+        # Direct-mode harness that drives the emulator frame-by-frame and
+        # records per-call cycle accounting under both FCEUX11_RUST_CPU=ON
+        # and FCEUX11_RUST_CPU=OFF to a CSV for cross-language diffing. See
+        # docs/plans/phase4-dispatch-budget-fix-2026-08-19.md §5 and the
+        # session-level plan.md "Decision after the diagnostic" table.
+        #
+        # NOT registered with add_test — invoked manually twice (once per
+        # FCEUX11_RUST_CPU setting) and the CSVs diffed via
+        # tools/cross_lang_diff.py. The harness is built by the same CMake
+        # build (links kagami_bridge.cpp + fceux11_rust.lib, no extra Rust
+        # crate), so it tracks the source tree.
+        # =====================================================================
+        fceux11_add_headless_test_executable(kagami_qa_cycle_trace
+            kagami/cycle_trace_harness.cpp
+            git_info_stub.cpp
+        )
+
+        # =====================================================================
         # Task 1 / C-2 — Rust ROM regression harness (replaces
         # rom_regression_test.cpp). Same link pattern as blargg_rust_runner.
         # =====================================================================

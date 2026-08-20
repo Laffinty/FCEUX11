@@ -11,9 +11,9 @@
 //! For each step:
 //!   1. `step()` return value == `CycTable[opcode] + extras` (page-cross,
 //!      branch-taken, RMW dummy cycles)
-//!   2. `state.regs.count` delta == `(CycTable + extras) * 16` (matches
-//!      the C++ `_count -= CycTable * 48` accounting in 1/16-CPU-cycle
-//!      units, modulo the 3x amortisation factor)
+//!   2. `state.regs.count` delta == `(CycTable + extras) * 16` (the
+//!      `count` accumulator is in 1/16-CPU-cycle units, matching the
+//!      C++ `_count += cycles * 16` budget scaling)
 //!   3. PC advanced to the expected post-instruction address
 //!
 //! The tests run on a flat 64 KiB bus with NO IRQ / NMI / RESET firing,
@@ -23,15 +23,18 @@
 //! ## C++ reference math
 //!
 //! For `X6502_RunDebug(cycles)` in `src/x6502.cpp`:
-//!   - `_count += cycles * 16`        (1/16-CPU-cycle units, ascending for budget)
-//!   - Each instruction: `_count -= CycTable * 48` (= 3 * 16)
+//!   - `_count += cycles * 16`        (ascending budget, 1/16 units)
+//!   - Each instruction: `_count -= CycTable * 48` (decrement in
+//!     1/48-CPU-cycle units, i.e. 1/3 of the Rust count unit)
 //!   - Loop breaks when `_count <= 0`
 //!
 //! The Rust `fceux11_cpu_run` does the equivalent with the polarity
-//! inverted: ascending `count`, `target = (cycles/3) * 16`, each step
-//! adds `(base + extras) * 16`. Per-instruction, both should accumulate
-//! the same count delta for the same instruction stream. These tests
-//! pin the Rust side; the C++ side is the gold standard.
+//! inverted: ascending `count`, each step adds
+//! `(base + extras) * 16`. The unit conversion between the two is
+//! folded into the FFI shim's `cycles * 16` scaling — per-instruction,
+//! both should accumulate the same count delta for the same
+//! instruction stream. These tests pin the Rust side; the C++ side is
+//! the gold standard.
 
 use fceux11_core::cpu::{
     decode::info, run, step, Bus, CpuState, IrqSource,
@@ -91,7 +94,7 @@ fn nop_base_2_no_extras() {
     bus.mem[0x4000] = 0xEA;
     let c = step(&mut cpu, &mut bus);
     assert_eq!(c, 2, "NOP base cycle cost");
-    assert_eq!(cpu.regs.count, 96, "count delta = 2 * 48 (CycTable*48)");
+    assert_eq!(cpu.regs.count, -96, "count delta = -2 * 48 (C++ _count polarity)");
     assert_eq!(cpu.regs.pc, 0x4001);
     assert!(cpu.regs.jammed == 0);
 }
@@ -104,7 +107,7 @@ fn lda_imm_base_2() {
     bus.mem[0x4001] = 0x42;
     let c = step(&mut cpu, &mut bus);
     assert_eq!(c, 2, "LDA #imm base");
-    assert_eq!(cpu.regs.count, 96);
+    assert_eq!(cpu.regs.count, -96);
     assert_eq!(cpu.regs.a, 0x42);
     assert_eq!(cpu.regs.pc, 0x4002);
 }
@@ -118,7 +121,7 @@ fn lda_zp_base_3() {
     bus.mem[0x0010] = 0x77;
     let c = step(&mut cpu, &mut bus);
     assert_eq!(c, 3, "LDA zp base");
-    assert_eq!(cpu.regs.count, 144);
+    assert_eq!(cpu.regs.count, -144);
     assert_eq!(cpu.regs.a, 0x77);
 }
 
@@ -132,7 +135,7 @@ fn lda_abs_base_4() {
     bus.mem[0x2000] = 0xAB;
     let c = step(&mut cpu, &mut bus);
     assert_eq!(c, 4, "LDA abs base");
-    assert_eq!(cpu.regs.count, 192);
+    assert_eq!(cpu.regs.count, -192);
     assert_eq!(cpu.regs.a, 0xAB);
 }
 
@@ -150,7 +153,7 @@ fn brk_base_7_no_dispatch() {
     bus.mem[0x5000] = 0xEA; // NOP at the IRQ vector (next step's job)
     let c = step(&mut cpu, &mut bus);
     assert_eq!(c, 7, "BRK base cycle cost");
-    assert_eq!(cpu.regs.count, 336, "count delta = 7 * 48");
+    assert_eq!(cpu.regs.count, -336, "count delta = -7 * 48");
     assert_eq!(cpu.regs.pc, 0x5000, "PC = BRK vector");
     assert_eq!(cpu.regs.s, 0xFA, "3 pushes (PCH/PCL/P|B)");
 }
@@ -171,7 +174,7 @@ fn lda_abs_x_no_page_cross_base_4() {
     bus.mem[0x2000] = 0xCD;
     let c = step(&mut cpu, &mut bus);
     assert_eq!(c, 4, "LDA abs,X base when no page cross (base=4, no extra)");
-    assert_eq!(cpu.regs.count, 192);
+    assert_eq!(cpu.regs.count, -192);
     assert_eq!(cpu.regs.a, 0xCD);
 }
 
@@ -187,7 +190,7 @@ fn lda_abs_x_page_cross_extra_1() {
     bus.mem[0x2100] = 0xEE;
     let c = step(&mut cpu, &mut bus);
     assert_eq!(c, 4 + 1, "LDA abs,X with page cross");
-    assert_eq!(cpu.regs.count, (4 + 1) * 48);
+    assert_eq!(cpu.regs.count, (4 + 1) * -48);
     assert_eq!(cpu.regs.a, 0xEE);
 }
 
@@ -202,7 +205,7 @@ fn branch_taken_no_page_cross_extra_1() {
     bus.mem[0x4007] = 0xEA; // NOP at branch target
     let c = step(&mut cpu, &mut bus);
     assert_eq!(c, 2 + 1, "BEQ taken, no page cross (base=2 + taken=1)");
-    assert_eq!(cpu.regs.count, (2 + 1) * 48);
+    assert_eq!(cpu.regs.count, (2 + 1) * -48);
     assert_eq!(cpu.regs.pc, 0x4007);
 }
 
@@ -219,7 +222,7 @@ fn branch_taken_page_cross_extra_2() {
     bus.mem[0x4100] = 0xEA;
     let c = step(&mut cpu, &mut bus);
     assert_eq!(c, 2 + 1 + 1, "BCC taken, page crossed (base=2 + taken=1 + page=1)");
-    assert_eq!(cpu.regs.count, (2 + 1 + 1) * 48);
+    assert_eq!(cpu.regs.count, (2 + 1 + 1) * -48);
     assert_eq!(cpu.regs.pc, 0x4100);
 }
 
@@ -234,7 +237,7 @@ fn branch_not_taken_no_extra() {
     bus.mem[0x4002] = 0xEA;
     let c = step(&mut cpu, &mut bus);
     assert_eq!(c, 2, "BEQ not taken, no extra");
-    assert_eq!(cpu.regs.count, 96);
+    assert_eq!(cpu.regs.count, -96);
     assert_eq!(cpu.regs.pc, 0x4002);
 }
 
@@ -253,7 +256,7 @@ fn stream_256_nops_sums_to_512_cycles() {
         total_cycles = total_cycles.saturating_add(c as u32);
     }
     assert_eq!(total_cycles, 512, "256 NOPs @ 2 cycles each = 512");
-    assert_eq!(cpu.regs.count, 512 * 48, "count delta = 512 * 48 = 24576");
+    assert_eq!(cpu.regs.count, -(512 * 48), "count delta = -512 * 48 = -24576");
     assert_eq!(cpu.regs.pc, 0x4100, "PC advanced 256 bytes from $4000");
 }
 
@@ -261,13 +264,13 @@ fn stream_256_nops_sums_to_512_cycles() {
 // 4. Run() budget parity: each X6502_Run(n) call consumes ~ n/3 cycles
 // ===========================================================================
 
-/// Pin the FFI shim's `(cycles/3)*16` scaling formula. For a 96-NOP
-/// stream:
-///   - C++: _count += 96*16 = 1536; each NOP subtracts 96 → 16 NOPs
-///     exhausted at _count = 0 (1536/96 = 16). Runs 16 NOPs per call,
-///     so 96 NOPs / 16 = 6 calls minimum.
-///   - Rust: target = (cycles/3)*16; with cycles=96 → target = 32*16 = 512.
-///     Each NOP adds 32 → 16 NOPs to reach 512.
+/// Pin the `run()` cycle-budget math. For a NOP stream with
+/// `scaled_cycles = cycles * 16` (1/16-CPU-cycle units):
+///   - `count` starts as `start + scaled_cycles` (budget added, like
+///     C++ `_count += cycles*16`)
+///   - each NOP decrements `count` by `dot(2) * 3 = 96`
+///   - the loop exits when `count <= 0` (C++ `while (_count > 0)`)
+///   - N NOPs needed: N*96 >= scaled_cycles
 #[test]
 fn run_cycles_consumes_proportional_to_budget() {
     use fceux11_core::cpu::run;
@@ -276,15 +279,15 @@ fn run_cycles_consumes_proportional_to_budget() {
     bus.fill(0x4000, &[0xEA; 4096]);
     let start_count = cpu.regs.count;
 
-    // The FFI passes scaled_cycles = cycles * 16 to run(). With the
-    // per-instruction 3x multiplier (count += dot * 3 = CycTable * 48),
-    // each NOP adds 96 to count → 16 NOPs to reach target 1536.
-    let scaled = 96 * 16;
+    // The FFI passes scaled_cycles = cycles * 16 to run(). Budget is
+    // added, then each NOP decrements 96. For scaled = 1536, the loop
+    // runs 16 NOPs (16*96 = 1536) and returns count to its start value.
+    let scaled = 96 * 16; // 96 cycles in 1/16 units
     let consumed = run(&mut cpu, &mut bus, scaled);
     let inst_count = cpu.regs.count - start_count;
-    assert_eq!(inst_count, scaled, "16 NOPs * 96 count units = 1536");
-    assert_eq!(inst_count % 96, 0, "count delta must be a multiple of 96");
-    let n_nops = (inst_count / 96) as i32;
+    assert_eq!(inst_count, 0, "16 NOPs * -96 exactly exhaust the 1536 budget");
+    assert_eq!(inst_count % 96, 0, "count delta must be a multiple of -96");
+    let n_nops = (scaled / 96) as i32;
     assert_eq!(consumed, n_nops * 2, "consumed cycles = 2 per NOP");
     assert_eq!(n_nops, 16);
     assert_eq!(cpu.regs.pc, 0x4010, "16 bytes of NOPs consumed");
@@ -422,7 +425,7 @@ fn ldx_abs_y_with_page_cross_consistent_count() {
     assert_eq!(c, 4 + 1, "LDX abs,Y page-crossed");
     assert_eq!(cpu.regs.x, 0xAB);
     assert_eq!(cpu.regs.pc, 0x4003);
-    assert_eq!(cpu.regs.count, (4 + 1) * 48);
+    assert_eq!(cpu.regs.count, (4 + 1) * -48);
 }
 
 // ===========================================================================
@@ -460,8 +463,10 @@ fn dispatch_just_exhausts_budget_does_not_execute_followup_instruction() {
 
     let consumed = run(&mut cpu, &mut bus, 8 * 16);
 
-    // Phase 1 consumed: 0 (defer) + 2 (NOP) = 2 cycles.
-    // Phase 2 dispatch consumed: 7 cycles. Follow-up NOP did NOT run.
+    // Budget added first: count = 0 + 128 = 128.
+    // Phase 1 consumed: defer (0) + NOP (2 cycles) → count -= 96 → 32.
+    // Phase 2 dispatch consumed: 7 cycles → count -= 336 → -304 ≤ 0
+    //   → EARLY EXIT. Follow-up NOP did NOT run.
     assert_eq!(
         consumed, 9,
         "consumed = defer+NOP (2 cycles) + dispatch (7 cycles); follow-up NOP suppressed"
@@ -471,8 +476,8 @@ fn dispatch_just_exhausts_budget_does_not_execute_followup_instruction() {
         "PC must land at NMI vector $5000, NOT past the follow-up NOP at $5000"
     );
     assert_eq!(
-        cpu.regs.count, 96 + 336,
-        "state.count = defer+NOP (96) + dispatch (336) = 432"
+        cpu.regs.count, 128 - 432,
+        "state.count = budget 128 - (NOP 96 + dispatch 336) = -304"
     );
 }
 
@@ -534,7 +539,7 @@ fn blocked_irq_returns_base_cycles_no_dispatch_cycles() {
         c, 2,
         "NOP must return only its base 2 cycles; no spurious +7 from blocked IRQ"
     );
-    assert_eq!(cpu.regs.count - start_count, 96);
+    assert_eq!(cpu.regs.count - start_count, -96);
     assert_eq!(cpu.regs.pc, 0x4001);
     assert_ne!(
         cpu.regs.irq_low & IrqSource::EXTERNAL.bits(),

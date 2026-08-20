@@ -177,6 +177,53 @@ void kagami_bridge_set_newppu(int on) {
 }
 
 // ---------------------------------------------------------------------------
+// CPU PC peek — Phase 4.5 cycle-drift diagnostic.
+//
+// The diagnostic harness `kagami-qa-cycle-trace` records per
+// `X6502_RunDebug` call's cycles_arg + post-call PC to a CSV (gated by
+// `FCEUX11_CYCLE_LOG`). Both Rust CPU ON and OFF paths funnel through
+// here so the diff can be byte-equal across the two builds.
+//
+// Reading `pc()` from the Cpu accessor goes through `Cpu::pc()` which
+// reads `layout_.PC` — pinned by `static_assert` on the savestate
+// layout. The value is a CPU register, not a memory address.
+// ---------------------------------------------------------------------------
+uint16_t kagami_bridge_get_cpu_pc(void) {
+    return fceu11::cpu_instance().pc();
+}
+
+// ---------------------------------------------------------------------------
+// CPU IRQlow peek/poke — Phase 4.5 cycle-drift fix.
+//
+// The Rust CPU's `Bus::sync_irq_from_host` / `sync_irq_to_host` read /
+// write the C++ `X6502::IRQlow` blob around every dispatch boundary so
+// that IRQs asserted by the C++ side during a Rust `run_with_tick`
+// call (mapper `X6502_IRQBegin`, APU frame-counter IRQ via
+// `FCEU_SoundCPUHook`) are visible to the Rust dispatch, and bits the
+// Rust dispatch consumed (NMI) are not re-asserted on the next call.
+// ---------------------------------------------------------------------------
+uint32_t kagami_bridge_get_cpu_irq_low(void) {
+    return fceu11::cpu_instance().native_layout().IRQlow;
+}
+
+void kagami_bridge_set_cpu_irq_low(uint32_t v) {
+    fceu11::cpu_instance().native_layout().IRQlow = v;
+}
+
+// ---------------------------------------------------------------------------
+// Cycle-trace sink — Phase 4.5 cycle-drift diagnostic.
+//
+// `FCEUX11_CYCLE_LOG=<path>` activates a per-`X6502_RunDebug` (or its
+// FFI equivalent) CSV log with one row per Cpu::run call. Rows have
+// no frames column on the wire (the trace span is bounded by the
+// caller that opens the file); instead we use `pc_after` as the
+// canary for cross-language diffing.
+//
+// Activation reads the env var ONCE on construction; the sink is a
+// function-local static so no header changes leak beyond kagami_bridge.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
 // Frame buffer extraction (Track C Task 1 / C-2)
 //
 // Track C C-2 replaces tests/rom_regression_test.cpp with a Rust harness
@@ -257,4 +304,100 @@ int kagami_bridge_save_mapper_state(uint8_t *dst, uint32_t cap,
         std::memcpy(dst, body.data(), to_copy);
     }
     return 0;
+}
+
+// ---------------------------------------------------------------------------
+// Cycle-trace sink (Phase 4.5 cycle-drift diagnostic)
+//
+// `FCEUX11_CYCLE_LOG=<path>` activates a one-row-per-`Cpu::run` CSV.
+// The Rust harness `kagami-qa-cycle-trace` runs the same ROM under
+// both `FCEUX11_RUST_CPU=ON` and `FCEUX11_RUST_CPU=OFF` and diffs the
+// two CSVs to localize the dominant cycle drift root cause.
+//
+// Header: `frame,call_idx,cycles_arg,pc_after,cum_count`
+//   - `frame` is filled by the harness BEFORE calling `emulate_frame`
+//     (passed via the env-var-controlled `current_frame_idx` global).
+//   - `call_idx` is a monotonic counter incremented by `record`.
+//   - `cycles_arg` is the `cycles` argument to the matching `Cpu::run`.
+//   - `pc_after` is the program counter at end of the call.
+//   - `cum_count` is `Cpu::count` (1/16-dot-unit accumulator) at end.
+// ---------------------------------------------------------------------------
+namespace {
+
+struct CycleTraceSink {
+    FILE* fp = nullptr;
+    uint32_t call_idx = 0;
+    uint32_t current_frame_idx = 0;
+    uint64_t row_count = 0;
+
+    CycleTraceSink() {
+        const char* path = std::getenv("FCEUX11_CYCLE_LOG");
+        if (!path || !*path) {
+            return;
+        }
+        fp = std::fopen(path, "w");
+        if (!fp) {
+            std::fprintf(stderr, "kagami_bridge: cannot open FCEUX11_CYCLE_LOG='%s'\n", path);
+            return;
+        }
+        std::fprintf(fp, "frame,call_idx,cycles_arg,pc_after,cum_count,irq_low\n");
+        std::fflush(fp);
+    }
+
+    ~CycleTraceSink() {
+        if (fp) {
+            std::fclose(fp);
+            fp = nullptr;
+        }
+    }
+
+    void set_frame(uint32_t f) {
+        current_frame_idx = f;
+    }
+
+    void record(uint32_t cycles_arg, uint16_t pc_after, uint32_t cum_count,
+                uint32_t irq_low) {
+        if (!fp) return;
+        std::fprintf(fp, "%u,%u,%u,%u,%u,%u\n",
+                     current_frame_idx,
+                     call_idx,
+                     cycles_arg,
+                     pc_after,
+                     cum_count,
+                     irq_low);
+        ++call_idx;
+        ++row_count;
+        if ((row_count & 0x3FF) == 0) {
+            std::fflush(fp);
+        }
+    }
+};
+
+// Singleton sink, lazily opened at first use. Re-checking the env on
+// every Cpu::run call would add a syscall per call; this is checked
+// once at first call (process-lifetime).
+CycleTraceSink& sink() {
+    static CycleTraceSink s;
+    return s;
+}
+
+} // namespace
+
+extern "C" void kagami_bridge_cycle_trace_record(uint32_t cycles_arg,
+                                                uint16_t pc_after,
+                                                uint32_t cumulative_count,
+                                                uint32_t irq_low) {
+    sink().record(cycles_arg, pc_after, cumulative_count, irq_low);
+}
+
+extern "C" void kagami_bridge_cycle_trace_set_frame(uint32_t frame_idx) {
+    sink().set_frame(frame_idx);
+}
+
+extern "C" uint32_t kagami_bridge_cycle_trace_current_frame(void) {
+    return sink().current_frame_idx;
+}
+
+extern "C" uint64_t kagami_bridge_cycle_trace_row_count(void) {
+    return sink().row_count;
 }

@@ -93,6 +93,41 @@ pub extern "C" fn fceux11_cpu_noop_write_thunk(_addr: u16, _val: u8) {
 /// it's a zero-sized type.
 pub struct CppBus;
 
+// IRQ-lookup callbacks for the C++ `X6502::IRQlow` blob. The C++ side's
+// `X6502_IRQBegin`/`X6502_IRQEnd` (called from mapper hooks and the
+// APU frame-counter IRQ during the tick bridge) mutate this blob while
+// a Rust `run_with_tick` call is in flight; the Rust state snapshot
+// taken at call start is stale, so `Bus::sync_irq_*` re-reads /
+// re-writes it around every dispatch boundary. Implemented as callback
+// slots (like `READ_FN`/`WRITE_FN`) rather than direct extern symbols
+// so the crate still links in pure-Rust test binaries.
+type IrqGetFn = extern "C" fn() -> u32;
+type IrqSetFn = extern "C" fn(u32);
+
+extern "C" fn noop_irq_get() -> u32 {
+    0
+}
+extern "C" fn noop_irq_set(_v: u32) {}
+
+static mut IRQ_GET_FN: IrqGetFn = noop_irq_get;
+static mut IRQ_SET_FN: IrqSetFn = noop_irq_set;
+// Set when the C++ side installs the IRQ bridge. When unset (pure-Rust
+// test binaries), `sync_irq_*` are no-ops so the Rust state's own IRQ
+// bits (e.g. RESET from `fceux11_cpu_power`) are preserved.
+static mut IRQ_BRIDGE_INSTALLED: bool = false;
+
+/// Install the IRQ-low read/write callbacks (C++ side calls this once
+/// at init with `kagami_bridge_get_cpu_irq_low` /
+/// `kagami_bridge_set_cpu_irq_low`).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_cpu_set_irq_bridge(get_fn: IrqGetFn, set_fn: IrqSetFn) {
+    unsafe {
+        IRQ_GET_FN = get_fn;
+        IRQ_SET_FN = set_fn;
+        IRQ_BRIDGE_INSTALLED = true;
+    }
+}
+
 impl Bus for CppBus {
     #[inline]
     fn read(&mut self, addr: u16) -> u8 {
@@ -105,6 +140,28 @@ impl Bus for CppBus {
     fn write(&mut self, addr: u16, val: u8) {
         // SAFETY: single-threaded; see `read`.
         unsafe { WRITE_FN(addr, val) }
+    }
+
+    #[inline]
+    fn sync_irq_from_host(&mut self, state: &mut crate::cpu::addressing::CpuState) {
+        // The C++ `X6502::IRQlow` blob is the source of truth for the
+        // IRQ lines: mapper hooks and the APU frame counter (fired via
+        // the tick bridge) set bits on it mid-call, and the $4017 write
+        // path clears bits on it. Overwrite the Rust state so both the
+        // new assertions AND the clears are visible to the next
+        // dispatch. No-op when the bridge is not installed (tests).
+        if unsafe { IRQ_BRIDGE_INSTALLED } {
+            state.regs.irq_low = unsafe { IRQ_GET_FN() };
+        }
+    }
+
+    #[inline]
+    fn sync_irq_to_host(&mut self, state: &mut crate::cpu::addressing::CpuState) {
+        // Push back bits consumed by Rust's dispatch (e.g. NMI) so the
+        // C++ blob doesn't re-assert them on the next call.
+        if unsafe { IRQ_BRIDGE_INSTALLED } {
+            unsafe { IRQ_SET_FN(state.regs.irq_low) };
+        }
     }
 }
 

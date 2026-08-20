@@ -98,8 +98,13 @@ fn tick_instruction(cycles: i32) {
 /// `7`-cycle cost exhausts the caller's budget, the loop exits
 /// BEFORE running the follow-up instruction AND BEFORE firing the
 /// tick — matching the C++ early-return at `src/x6502.cpp:586-588`.
-/// This is the cycle-drift fix documented in
-/// `docs/plans/phase4-dispatch-budget-fix-2026-08-XX.md`.
+/// `count` follows the C++ `_count` polarity (budget added per call,
+/// decremented per dispatch/instruction, exit when `count <= 0`),
+/// so the per-call instruction count and the cross-call residual
+/// match C++ exactly. See `execute::dispatch_step`'s comment for the
+/// unit math and
+/// `docs/plans/phase4-dispatch-budget-fix-2026-08-19.md` §5.2 for
+/// the drift diagnosis this closes.
 ///
 /// Semantically identical to [`run`] plus the mapper-hook bridge.
 /// Kept separate so the plain [`run`] hot path has zero per-instruction
@@ -110,18 +115,29 @@ pub fn run_with_tick<B: Bus + ?Sized>(
     cycles: i32,
 ) -> i32 {
     let mut executed_cycles = 0i32;
-    let target = state.regs.count.saturating_add(cycles);
-    loop {
+    // Add the per-call budget, exactly like C++ `_count += cycles*16`.
+    state.regs.count = state.regs.count.saturating_add(cycles);
+    // Top-of-loop budget check mirrors C++ `while (_count > 0)` — an
+    // overdrawn residual from the previous call exits immediately.
+    while state.regs.count > 0 {
+        // Pull in any IRQ lines asserted by the C++ side since the
+        // last dispatch — mapper hooks and the APU frame-counter IRQ
+        // (fired by `FCEU_SoundCPUHook` in the tick thunk) mutate the
+        // C++ `IRQlow` blob mid-call; see `Bus::sync_irq_from_host`.
+        bus.sync_irq_from_host(state);
         // Phase 1: dispatch. If dispatch exhausted budget, no
         // instruction + no tick (C++ matches this).
         let dc = dispatch_step(state, bus);
+        // Push back bits consumed by dispatch so the C++ blob doesn't
+        // re-assert them on the next call's snapshot.
+        bus.sync_irq_to_host(state);
         let dc_plus_ic: u8;
         if dc != 0 {
             executed_cycles = executed_cycles.saturating_add(dc as i32);
             if state.regs.jammed != 0 {
                 break;
             }
-            if state.regs.count >= target {
+            if state.regs.count <= 0 {
                 // Dispatch exhausted the budget — no follow-up
                 // instruction, no tick. This is the cycle-drift fix.
                 break;
@@ -143,9 +159,8 @@ pub fn run_with_tick<B: Bus + ?Sized>(
         if state.regs.jammed != 0 {
             break;
         }
-        if state.regs.count >= target {
-            break;
-        }
+        // No bottom-of-loop check: the `while state.regs.count > 0`
+        // at the top is the C++ loop condition.
     }
     executed_cycles
 }

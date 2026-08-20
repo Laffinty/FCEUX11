@@ -225,22 +225,21 @@ pub unsafe extern "C" fn fceux11_cpu_irq_end(state: *mut u8, src: u32) {
 /// and `_count -= CycTable[opcode] * 48` per instruction. The two
 /// multipliers (16 vs 48) are different units: 16 represents
 /// "1/16-CPU-cycle units per input cycle", 48 represents
-/// "1/48-CPU-cycle units per consumed cycle". Net: each input
-/// CPU-cycle budget translates into 1/3 of a CPU cycle consumed
-/// per call — the C++ empirically works because FCEUPPU_Loop makes
-/// multiple `X6502_Run` calls per frame and the cumulative work
-/// matches the expected per-frame cycle count.
+/// "1/48-CPU-cycle units per consumed cycle". Per instruction the
+/// consumed-cycles delta is `CycTable * 48` (1/48 units), which is
+/// 3x the Rust `count` delta in 1/16 units — both reduce to
+/// `CycTable` CPU cycles.
 ///
 /// The Rust `cpu::run()` uses the inverse convention: `count` is a
-/// *cumulative* counter incremented by `CycTable * 16` per
-/// instruction, and the loop exits when `count >= target`. To
-/// produce the same "1/3 of cycles_arg CPU cycles consumed"
-/// behaviour we pass `cycles_arg / 3 * 16` (i.e., the budget the
-/// C++ would consume, scaled to Rust's 1/16-CPU-cycle unit).
+/// *cumulative* counter incremented by `CycTable * 16` (1/16 units)
+/// per instruction, and the loop exits when `count >= target`. The
+/// FFI shim passes `cycles_arg * 16` as the target so that a
+/// `cycles_arg` CPU-cycle budget maps to the same instruction count
+/// as the C++ loop.
 ///
 /// Math: Rust terminates when `sum(CycTable * 16) >= target`, i.e.
-/// when `sum(CycTable) >= target / 16`. We want
-/// `sum(CycTable) == cycles_arg / 3`, so `target == cycles_arg / 3 * 16`.
+/// when `sum(CycTable) >= target / 16 = cycles_arg`. So the target
+/// is exactly the input budget in CPU cycles.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_cpu_run(state: *mut u8, cycles: i32) -> i32 {
     if state.is_null() || cycles <= 0 {
@@ -255,14 +254,11 @@ pub unsafe extern "C" fn fceux11_cpu_run(state: *mut u8, cycles: i32) -> i32 {
         // Use a raw pointer to the mutable static (Rust 2024
         // `static_mut_refs` deny lint forbids `&mut STATIC`).
         let state_ptr = core::ptr::addr_of_mut!(FFI_CPU_STATE);
-        // Phase 4 sub-step 5: with the per-instruction 3x multiplier
-        // in `step()` (count += dot(cycles) * 3 = CycTable * 48), each
-        // Rust instruction costs the same number of 1/16-dot units as
-        // the C++ `ADDCYC(CycTable)` (which subtracts CycTable * 48).
-        // The previous `(cycles / 3) * 16` integer-truncation made
-        // Rust run ceil((cycles/3)/2) instructions vs C++'s
-        // ceil(cycles/3), an off-by-one for every cycles_arg ∈
-        // {6k+1, 6k+2} call.
+        // Each Rust instruction adds `CycTable * 16` to count (1/16
+        // units); the C++ loop subtracts `CycTable * 48` (1/48 units)
+        // — the same number of CPU cycles per instruction. Passing
+        // `cycles_arg * 16` makes the loop terminate when
+        // `sum(CycTable) >= cycles_arg`, matching C++'s behaviour.
         let scaled_cycles = cycles * 16;
         let cpu_cycles = run(&mut *state_ptr, &mut bus, scaled_cycles);
         // Write the post-state back. Mirrors the C++ `X6502_RunDebug`

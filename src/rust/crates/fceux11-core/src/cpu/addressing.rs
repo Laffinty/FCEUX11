@@ -27,6 +27,26 @@ use crate::cpu::state::X6502Layout;
 pub trait Bus {
     fn read(&mut self, addr: u16) -> u8;
     fn write(&mut self, addr: u16, val: u8);
+
+    /// Synchronise the pending-IRQ bitmask from the host (C++) side
+    /// into the Rust CPU state. The host's `X6502_IRQBegin` /
+    /// `X6502_IRQEnd` mutate the C++ `X6502::IRQlow` blob (e.g. from
+    /// mapper hooks and the APU frame-counter IRQ fired via the tick
+    /// bridge), which the Rust state does NOT see because it was
+    /// snapshotted at call start. Called at the top of every
+    /// dispatch loop iteration before `dispatch_irq` reads
+    /// `state.regs.irq_low`.
+    ///
+    /// Default: no-op (pure-Rust buses have no host side).
+    fn sync_irq_from_host(&mut self, _state: &mut CpuState) {}
+
+    /// Push the Rust CPU state's pending-IRQ bitmask back to the host
+    /// (C++) side after dispatch has consumed bits (e.g. NMI). Without
+    /// this the C++ blob keeps a stale `IRQlow` and the next call's
+    /// snapshot re-introduces already-consumed interrupts.
+    ///
+    /// Default: no-op.
+    fn sync_irq_to_host(&mut self, _state: &mut CpuState) {}
 }
 
 /// CPU state wrapper that carries the [`X6502Layout`] together with

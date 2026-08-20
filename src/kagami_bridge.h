@@ -95,6 +95,54 @@ int kagami_bridge_save_state(uint8_t *dst, uint32_t cap,
 int kagami_bridge_save_mapper_state(uint8_t *dst, uint32_t cap,
                                     uint32_t *written_out);
 
+/// Read the 6502 PC from the singleton `fceu11::Cpu`. Used by the
+/// Phase 4.5 cycle-drift diagnostic harness
+/// (`kagami-qa-cycle-trace`) to record per-call PC values for
+/// cross-language diffing (see
+/// `docs/plans/phase4-dispatch-budget-fix-2026-08-19.md` §5.2).
+///
+/// Returns the program counter as a 16-bit value (0x0000–0xFFFF). The
+/// value is undefined if no CPU is initialised.
+uint16_t kagami_bridge_get_cpu_pc(void);
+
+/// Read the C++ `X6502::IRQlow` pending-interrupt bitmask. Phase 4.5
+/// cycle-drift fix: the Rust CPU synchronises its `state.regs.irq_low`
+/// with this host value around every dispatch boundary (via
+/// `Bus::sync_irq_from_host` / `sync_irq_to_host`), because IRQs
+/// asserted from the C++ side during a Rust call (mapper hooks, APU
+/// frame-counter IRQ) mutate this blob and are otherwise invisible to
+/// the Rust snapshot taken at call start.
+uint32_t kagami_bridge_get_cpu_irq_low(void);
+
+/// Write the C++ `X6502::IRQlow` pending-interrupt bitmask (the
+/// counterpart of `kagami_bridge_get_cpu_irq_low`). Pushes back bits
+/// the Rust dispatch consumed so they are not re-asserted next call.
+void kagami_bridge_set_cpu_irq_low(uint32_t v);
+
+// ---------------------------------------------------------------------------
+// Cycle-trace hooks — Phase 4.5 cycle-drift diagnostic.
+//
+// Activated by setting `FCEUX11_CYCLE_LOG=<path>` before the first
+// `kagami_bridge_init`. The CSV row format is documented at the
+// `CycleTraceSink` definition in `src/kagami_bridge.cpp`.
+//
+// `set_frame` is called by the harness binary BEFORE each
+// `kagami_bridge_emulate_frame` so per-frame boundaries appear in
+// the CSV. `record` is invoked from `Cpu::run` (and possibly from
+// `X6502_RunDebug` under Rust CPU=OFF) to capture every per-call
+// cycle accounting delta.
+// ---------------------------------------------------------------------------
+void kagami_bridge_cycle_trace_set_frame(uint32_t frame_idx);
+
+uint32_t kagami_bridge_cycle_trace_current_frame(void);
+
+void kagami_bridge_cycle_trace_record(uint32_t cycles_arg,
+                                      uint16_t pc_after,
+                                      uint32_t cumulative_count,
+                                      uint32_t irq_low);
+
+uint64_t kagami_bridge_cycle_trace_row_count(void);
+
 #ifdef __cplusplus
 }
 #endif

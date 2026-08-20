@@ -166,12 +166,17 @@ fn nestest_first_5000_instructions_match_log() {
     iter_lines.next();
 
     while let Some(log) = iter_lines.next() {
-        // Compare PRE-instruction state.
+        // Compare PRE-instruction state. The nestest.log P column uses
+        // the classic display convention (B always 0, U always 1 —
+        // the P value as observed on the bus), so the internal P is
+        // converted to that form before comparing. The internal P
+        // itself follows the C++ reference (B/U restored by PLP/RTI).
+        let p_display = (cpu.regs.p & !Flags::BREAK.bits()) | Flags::UNUSED.bits();
         let ok = cpu.regs.a == log.a
             && cpu.regs.x == log.x
             && cpu.regs.y == log.y
             && cpu.regs.s == log.sp
-            && cpu.regs.p == log.p;
+            && p_display == log.p;
         if !ok {
             failures.push(format!(
                 "PRE-mismatch @ log PC ${:04X} ({}.): log A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X}  vs  CPU A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X}",

@@ -164,9 +164,10 @@ bitflags! {
 }
 
 impl Flags {
-    /// P register value after a 6502 reset / power-on. Per the data sheet:
-    /// the U flag is set, the I flag is set, all others are 0.
-    pub const RESET: Flags = Flags::from_bits_truncate(Self::UNUSED.bits() | Self::IRQ_DIS.bits());
+    /// P register value after a 6502 reset / power-on, matching the C++
+    /// reference exactly (`src/x6502.cpp` RESET dispatch: `_PI=_P=I_FLAG`).
+    /// Only I is set; B, U and all arithmetic flags are cleared.
+    pub const RESET: Flags = Flags::from_bits_truncate(Self::IRQ_DIS.bits());
 
     /// Flags observed on the **stack** during a push (BRK / PHP / IRQ entry):
     /// U flag always set, B flag set when pushed from BRK / IRQ.
@@ -281,10 +282,11 @@ mod tests {
     #[test]
     fn reset_flags_match_cpp() {
         // X6502_Power() / X6502_RunDebug(): after consuming RESET,
-        // _P = I_FLAG (the U flag is *not* stored in _P).
+        // `_PI=_P=I_FLAG` — P is wiped to exactly 0x04 (I only).
         let reset = Flags::RESET;
+        assert_eq!(reset.bits(), 0x04);
         assert!(reset.contains(Flags::IRQ_DIS));
-        assert!(reset.contains(Flags::UNUSED));
+        assert!(!reset.contains(Flags::UNUSED));
         assert!(!reset.contains(Flags::BREAK));
     }
 

@@ -4,6 +4,12 @@
 
 #include "x6502.h"
 
+// Phase 4.5 cycle-drift diagnostic: Cpu::run invokes the cycle-trace
+// sink whenever `FCEUX11_CYCLE_LOG` is set (env-var-gated, single
+// branch per call). The C++ bridge owns the sink; see
+// src/kagami_bridge.cpp::CycleTraceSink.
+#include "kagami_bridge.h"
+
 #if FCEUX11_RUST_CPU
 // Phase 3 (revised) step 3: when the Rust 6502 is wired in, every
 // facade method that previously called a free `X6502_*` function
@@ -17,6 +23,7 @@
 #include <atomic>
 #endif
 
+#include <cstdlib>  // std::getenv
 #include <cstring>
 
 namespace fceu11 {
@@ -96,11 +103,24 @@ extern "C" void cpu_rust_write_thunk(uint16_t addr, uint8_t val) {
 // facade before the first FFI call. Safe to call multiple times —
 // the Rust side just overwrites the slots. We avoid static-init
 // order issues by lazily installing on the first Cpu facade call.
+// `fceux11_cpu_set_irq_bridge` is declared manually here because the
+// cbindgen-emitted `fceux11_rust.h` does not yet carry the IRQ-sync
+// symbols (Phase 4.5 addition).
+extern "C" void fceux11_cpu_set_irq_bridge(
+    uint32_t (*get_fn)(void), void (*set_fn)(uint32_t));
 void cpu_rust_install_bus_once() noexcept {
     static std::atomic<bool> installed{false};
     bool expected = false;
     if (installed.compare_exchange_strong(expected, true)) {
         fceux11_cpu_set_bus(&cpu_rust_read_thunk, &cpu_rust_write_thunk);
+        // Phase 4.5: install the IRQ-low sync callbacks. The Rust CPU
+        // re-reads / re-writes the C++ `X6502::IRQlow` blob around
+        // every dispatch boundary so IRQs asserted by the C++ side
+        // during a Rust call (mapper hooks, APU frame-counter IRQ)
+        // are visible to the Rust dispatch, and bits the Rust dispatch
+        // consumed are not re-asserted on the next call.
+        fceux11_cpu_set_irq_bridge(&kagami_bridge_get_cpu_irq_low,
+                                   &kagami_bridge_set_cpu_irq_low);
     }
 }
 
@@ -120,10 +140,25 @@ void cpu_rust_install_bus_once() noexcept {
 // Mirrors the C++ reference loop's exact ordering:
 //   1. mapper IRQ hook (skipped if no mapper hook installed)
 //   2. APU sound CPU hook (skipped under overclocking)
+//
+// Phase 4.5 (IRQ/bank-sync fix): the thunk ALSO advances
+// `timestamp_` / `sound_timestamp_` per instruction, exactly like the
+// C++ `add_cycles()` does per `ADDCYC`. Without this, `timestamp_`
+// only moves once per `Cpu::run` call (the `consumed` return), so
+// hardware that checks `timestamp` BETWEEN instructions within a
+// single call — e.g. the MMC1 `lreset` write-throttle at
+// `src/boards/mmc1.cpp:136-138` ("busy, ignore the write") — sees a
+// frozen timestamp and drops legitimate writes. Per-instruction
+// advancement restores the C++ reference behaviour.
 extern "C" void cpu_rust_tick_thunk(int cycles) {
     if (const auto hook = g_cpu.map_irq_hook()) [[unlikely]] hook(cycles);
-    if (!g_cpu.overclocking()) [[likely]]
+    if (!g_cpu.overclocking()) [[likely]] {
         FCEU_SoundCPUHook(cycles);
+        g_cpu.timestamp_ref() += cycles;
+        g_cpu.sound_timestamp_ref() += cycles;
+    } else {
+        g_cpu.timestamp_ref() += cycles;
+    }
 }
 
 // One-shot installation of the tick thunk. Same lazy pattern as
@@ -163,6 +198,18 @@ void Cpu::power() noexcept {
     X6502_Power();
 #endif
 }
+// Cached lookup of `FCEUX11_CYCLE_LOG`. The env-var is read once
+// at first call; subsequent calls read the cached bool. This is
+// the difference between 0-cycle overhead (disabled) and a
+// 3.5× empirical regression caused by per-call std::getenv.
+static bool cycle_trace_enabled() {
+    static const bool enabled = []() {
+        const char* p = std::getenv("FCEUX11_CYCLE_LOG");
+        return p != nullptr && *p != '\0';
+    }();
+    return enabled;
+}
+
 void Cpu::run(int32_t cycles) {
 #if FCEUX11_RUST_CPU
     cpu_rust_install_bus_once();
@@ -187,11 +234,30 @@ void Cpu::run(int32_t cycles) {
     // the 64-byte X6502 layout.
     int32_t consumed = fceux11_cpu_run_with_tick(
         reinterpret_cast<uint8_t*>(&layout_), cycles);
-    timestamp_ += consumed;
-    if (!overclocking_) sound_timestamp_ += consumed;
+    // Phase 4.5: timestamp_ / sound_timestamp_ are advanced by the
+    // per-instruction tick thunk (see `cpu_rust_tick_thunk`), NOT by
+    // the whole-call `consumed` return. Advancing them here once per
+    // call would leave them frozen BETWEEN instructions within the
+    // call, breaking hardware that reads `timestamp` mid-call (the
+    // MMC1 `lreset` write throttle at src/boards/mmc1.cpp:136-138).
+    (void)consumed;
 #else
     X6502_RunDebug(*this, cycles);
 #endif
+
+    // Phase 4.5 cycle-trace diagnostic: when `FCEUX11_CYCLE_LOG` is
+    // set, record this call's input cycle budget, the post-call PC,
+    // and `state.count` (1/16-dot-unit accumulator that survived the
+    // call). The env-var lookup is cached once at first call (see
+    // `cycle_trace_enabled()` below) so the disabled path is a
+    // single load-and-branch — no syscalls per `Cpu::run` call.
+    if (cycle_trace_enabled()) [[unlikely]] {
+        uint16_t pc = layout_.PC;
+        uint32_t cum_count = static_cast<uint32_t>(layout_.count);
+        uint32_t irq_low = static_cast<uint32_t>(layout_.IRQlow);
+        kagami_bridge_cycle_trace_record(
+            static_cast<uint32_t>(cycles), pc, cum_count, irq_low);
+    }
 }
 
 // ---------------------------------------------------------------------------

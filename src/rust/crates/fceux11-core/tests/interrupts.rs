@@ -81,7 +81,8 @@ fn trigger_nmi(cpu: &mut CpuState) {
 
 /// After `power()`, the first `step()` consumes the RESET bit (loads PC
 /// from $FFFC/$FFFD) without charging any cycles itself, then executes
-/// the instruction at the reset vector. P ends up with I | U set.
+/// the instruction at the reset vector. P ends up with exactly I set
+/// (`_PI=_P=I_FLAG` in the C++ reference) — U is cleared, not set.
 ///
 /// This is the regression test for the Phase 4.1 cycle-count fix:
 /// `dispatch_irq` must return 0 for RESET, not 7. The 7 cycles were
@@ -105,9 +106,9 @@ fn reset_does_not_consume_cycles_then_executes_vector() {
         "RESET bit must be cleared after dispatch",
     );
     assert_eq!(
-        cpu.regs.p & (Flags::IRQ_DIS.bits() | Flags::UNUSED.bits()),
-        Flags::IRQ_DIS.bits() | Flags::UNUSED.bits(),
-        "P must carry I | U after RESET",
+        cpu.regs.p,
+        Flags::IRQ_DIS.bits(),
+        "P must be exactly I_FLAG after RESET (C++ `_PI=_P=I_FLAG`)",
     );
 }
 
