@@ -978,3 +978,333 @@ fn ahx_absy_stores_a_and_x_and_h_plus_1() {
     // A=0xFF & X=0x0F = 0x0F, & (H+1=0x61) = 0x01
     assert_eq!(bus.mem[0x6005], 0x01);
 }
+
+// ===========================================================================
+// Phase 5 closeout: per-opcode register-effect coverage for the
+// remaining addressing-mode variants (RLA/SRE/RRA/DCP/ISC abs, zp,X,
+// abs,Y, abs,X, ind,Y; SAX ind,X; ANC #imm duplicate 2B).
+// ===========================================================================
+
+#[test]
+fn anc_imm_2b_sets_carry_from_high_bit() {
+    // ANC #$80 via opcode 2B (duplicate of 0B): C = bit 7 of result.
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0xFF;
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0x2B; // ANC #imm
+    bus.mem[0x4001] = 0x80;
+    step(&mut cpu, &mut bus);
+    assert_eq!(cpu.regs.a, 0x80, "A = FF & 80 = 80");
+    assert_ne!(cpu.regs.p & Flags::CARRY.bits(), 0, "C=1 (bit 7 of result)");
+    assert_ne!(cpu.regs.p & Flags::NEGATIVE.bits(), 0, "N=1");
+}
+
+#[test]
+fn rla_abs_rotates_left_then_ands_into_a() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0xFF;
+    cpu.regs.p = Flags::IRQ_DIS.bits() | Flags::UNUSED.bits(); // C=0
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0x2F; // RLA abs
+    bus.mem[0x4001] = 0x00;
+    bus.mem[0x4002] = 0x20;
+    bus.mem[0x2000] = 0x0F; // ROL(C=0) -> 0x1E
+    step(&mut cpu, &mut bus);
+    assert_eq!(bus.mem[0x2000], 0x1E);
+    assert_eq!(cpu.regs.a, 0x1E, "A = FF & 1E = 1E");
+    assert_eq!(cpu.regs.p & Flags::CARRY.bits(), 0, "C=0");
+}
+
+#[test]
+fn rla_zpx_rotates_left_then_ands_into_a() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0xFF;
+    cpu.regs.x = 0x03;
+    cpu.regs.p = Flags::IRQ_DIS.bits() | Flags::UNUSED.bits();
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0x37; // RLA zp,X
+    bus.mem[0x4001] = 0x10;
+    bus.mem[0x0013] = 0x0F; // $10 + X=3 -> $13
+    step(&mut cpu, &mut bus);
+    assert_eq!(bus.mem[0x0013], 0x1E);
+    assert_eq!(cpu.regs.a, 0x1E);
+}
+
+#[test]
+fn rla_absy_rotates_left_then_ands_into_a() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0xFF;
+    cpu.regs.y = 0x05;
+    cpu.regs.p = Flags::IRQ_DIS.bits() | Flags::UNUSED.bits();
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0x3B; // RLA abs,Y
+    bus.mem[0x4001] = 0x00;
+    bus.mem[0x4002] = 0x60;
+    bus.mem[0x6005] = 0x0F; // $6000 + Y=5
+    step(&mut cpu, &mut bus);
+    assert_eq!(bus.mem[0x6005], 0x1E);
+    assert_eq!(cpu.regs.a, 0x1E);
+}
+
+#[test]
+fn sre_indy_shifts_right_then_eors_into_a() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0x0F;
+    cpu.regs.y = 0x05;
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0x53; // SRE (ind),Y
+    bus.mem[0x4001] = 0x10;
+    bus.mem[0x0010] = 0x00;
+    bus.mem[0x0011] = 0x30; // ptr = $3000
+    bus.mem[0x3005] = 0x05; // LSR -> 0x02, C=1
+    step(&mut cpu, &mut bus);
+    assert_eq!(bus.mem[0x3005], 0x02);
+    assert_eq!(cpu.regs.a, 0x0D, "A = 0F ^ 02 = 0D");
+    assert_ne!(cpu.regs.p & Flags::CARRY.bits(), 0, "C=1");
+}
+
+#[test]
+fn sre_zpx_shifts_right_then_eors_into_a() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0x0F;
+    cpu.regs.x = 0x03;
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0x57; // SRE zp,X
+    bus.mem[0x4001] = 0x10;
+    bus.mem[0x0013] = 0x05;
+    step(&mut cpu, &mut bus);
+    assert_eq!(bus.mem[0x0013], 0x02);
+    assert_eq!(cpu.regs.a, 0x0D);
+}
+
+#[test]
+fn sre_absy_shifts_right_then_eors_into_a() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0x0F;
+    cpu.regs.y = 0x05;
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0x5B; // SRE abs,Y
+    bus.mem[0x4001] = 0x00;
+    bus.mem[0x4002] = 0x60;
+    bus.mem[0x6005] = 0x05;
+    step(&mut cpu, &mut bus);
+    assert_eq!(bus.mem[0x6005], 0x02);
+    assert_eq!(cpu.regs.a, 0x0D);
+}
+
+#[test]
+fn sre_absx_shifts_right_then_eors_into_a() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0x0F;
+    cpu.regs.x = 0x03;
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0x5F; // SRE abs,X
+    bus.mem[0x4001] = 0x00;
+    bus.mem[0x4002] = 0x60;
+    bus.mem[0x6003] = 0x05;
+    step(&mut cpu, &mut bus);
+    assert_eq!(bus.mem[0x6003], 0x02);
+    assert_eq!(cpu.regs.a, 0x0D);
+}
+
+#[test]
+fn rra_abs_rotates_right_then_adcs_into_a() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0x05;
+    cpu.regs.p = Flags::IRQ_DIS.bits() | Flags::UNUSED.bits(); // C=0
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0x6F; // RRA abs
+    bus.mem[0x4001] = 0x00;
+    bus.mem[0x4002] = 0x20;
+    bus.mem[0x2000] = 0x04; // ROR(C=0) -> 0x02
+    step(&mut cpu, &mut bus);
+    assert_eq!(bus.mem[0x2000], 0x02);
+    assert_eq!(cpu.regs.a, 0x07, "A = 05 + 02 = 07");
+    assert_eq!(cpu.regs.p & Flags::CARRY.bits(), 0, "C=0 (no carry)");
+}
+
+#[test]
+fn rra_indy_rotates_right_then_adcs_into_a() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0x05;
+    cpu.regs.y = 0x05;
+    cpu.regs.p = Flags::IRQ_DIS.bits() | Flags::UNUSED.bits();
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0x73; // RRA (ind),Y
+    bus.mem[0x4001] = 0x10;
+    bus.mem[0x0010] = 0x00;
+    bus.mem[0x0011] = 0x30;
+    bus.mem[0x3005] = 0x04;
+    step(&mut cpu, &mut bus);
+    assert_eq!(bus.mem[0x3005], 0x02);
+    assert_eq!(cpu.regs.a, 0x07);
+}
+
+#[test]
+fn rra_absy_rotates_right_then_adcs_into_a() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0x05;
+    cpu.regs.y = 0x05;
+    cpu.regs.p = Flags::IRQ_DIS.bits() | Flags::UNUSED.bits();
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0x7B; // RRA abs,Y
+    bus.mem[0x4001] = 0x00;
+    bus.mem[0x4002] = 0x60;
+    bus.mem[0x6005] = 0x04;
+    step(&mut cpu, &mut bus);
+    assert_eq!(bus.mem[0x6005], 0x02);
+    assert_eq!(cpu.regs.a, 0x07);
+}
+
+#[test]
+fn sax_indx_stores_a_and_x() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0xF0;
+    cpu.regs.x = 0x03;
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0x83; // SAX (ind,X)
+    bus.mem[0x4001] = 0x10;
+    bus.mem[0x0013] = 0x00; // ($10 + X=3) -> $13
+    bus.mem[0x0014] = 0x30; // ptr = $3000
+    step(&mut cpu, &mut bus);
+    assert_eq!(bus.mem[0x3000], 0xF0 & 0x03, "M = A & X");
+}
+
+#[test]
+fn dcp_abs_decrements_then_compares() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0x05;
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0xCF; // DCP abs
+    bus.mem[0x4001] = 0x00;
+    bus.mem[0x4002] = 0x20;
+    bus.mem[0x2000] = 0x04; // DEC -> 3; CMP 3 vs A=5
+    step(&mut cpu, &mut bus);
+    assert_eq!(bus.mem[0x2000], 0x03);
+    assert_eq!(cpu.regs.a, 0x05, "A unchanged");
+    assert_ne!(cpu.regs.p & Flags::CARRY.bits(), 0, "C=1 (A>=M)");
+}
+
+#[test]
+fn dcp_indy_decrements_then_compares() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0x05;
+    cpu.regs.y = 0x05;
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0xD3; // DCP (ind),Y
+    bus.mem[0x4001] = 0x10;
+    bus.mem[0x0010] = 0x00;
+    bus.mem[0x0011] = 0x30;
+    bus.mem[0x3005] = 0x04;
+    step(&mut cpu, &mut bus);
+    assert_eq!(bus.mem[0x3005], 0x03);
+    assert_ne!(cpu.regs.p & Flags::CARRY.bits(), 0);
+}
+
+#[test]
+fn dcp_zpx_decrements_then_compares() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0x05;
+    cpu.regs.x = 0x03;
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0xD7; // DCP zp,X
+    bus.mem[0x4001] = 0x10;
+    bus.mem[0x0013] = 0x04;
+    step(&mut cpu, &mut bus);
+    assert_eq!(bus.mem[0x0013], 0x03);
+    assert_ne!(cpu.regs.p & Flags::CARRY.bits(), 0);
+}
+
+#[test]
+fn dcp_absy_decrements_then_compares() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0x05;
+    cpu.regs.y = 0x05;
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0xDB; // DCP abs,Y
+    bus.mem[0x4001] = 0x00;
+    bus.mem[0x4002] = 0x60;
+    bus.mem[0x6005] = 0x04;
+    step(&mut cpu, &mut bus);
+    assert_eq!(bus.mem[0x6005], 0x03);
+    assert_ne!(cpu.regs.p & Flags::CARRY.bits(), 0);
+}
+
+#[test]
+fn dcp_absx_decrements_then_compares() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0x05;
+    cpu.regs.x = 0x03;
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0xDF; // DCP abs,X
+    bus.mem[0x4001] = 0x00;
+    bus.mem[0x4002] = 0x60;
+    bus.mem[0x6003] = 0x04;
+    step(&mut cpu, &mut bus);
+    assert_eq!(bus.mem[0x6003], 0x03);
+    assert_ne!(cpu.regs.p & Flags::CARRY.bits(), 0);
+}
+
+#[test]
+fn isc_abs_increments_then_sbcs_from_a() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0x05;
+    cpu.regs.p = Flags::IRQ_DIS.bits() | Flags::UNUSED.bits() | Flags::CARRY.bits();
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0xEF; // ISC abs
+    bus.mem[0x4001] = 0x00;
+    bus.mem[0x4002] = 0x20;
+    bus.mem[0x2000] = 0x02; // INC -> 3; SBC 5 - 3 = 2
+    step(&mut cpu, &mut bus);
+    assert_eq!(bus.mem[0x2000], 0x03);
+    assert_eq!(cpu.regs.a, 0x02);
+    assert_ne!(cpu.regs.p & Flags::CARRY.bits(), 0, "C=1 (no borrow)");
+}
+
+#[test]
+fn isc_indy_increments_then_sbcs_from_a() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0x05;
+    cpu.regs.y = 0x05;
+    cpu.regs.p = Flags::IRQ_DIS.bits() | Flags::UNUSED.bits() | Flags::CARRY.bits();
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0xF3; // ISC (ind),Y
+    bus.mem[0x4001] = 0x10;
+    bus.mem[0x0010] = 0x00;
+    bus.mem[0x0011] = 0x30;
+    bus.mem[0x3005] = 0x02;
+    step(&mut cpu, &mut bus);
+    assert_eq!(bus.mem[0x3005], 0x03);
+    assert_eq!(cpu.regs.a, 0x02);
+}
+
+#[test]
+fn isc_zpx_increments_then_sbcs_from_a() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0x05;
+    cpu.regs.x = 0x03;
+    cpu.regs.p = Flags::IRQ_DIS.bits() | Flags::UNUSED.bits() | Flags::CARRY.bits();
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0xF7; // ISC zp,X
+    bus.mem[0x4001] = 0x10;
+    bus.mem[0x0013] = 0x02;
+    step(&mut cpu, &mut bus);
+    assert_eq!(bus.mem[0x0013], 0x03);
+    assert_eq!(cpu.regs.a, 0x02);
+}
+
+#[test]
+fn isc_absy_increments_then_sbcs_from_a() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0x05;
+    cpu.regs.y = 0x05;
+    cpu.regs.p = Flags::IRQ_DIS.bits() | Flags::UNUSED.bits() | Flags::CARRY.bits();
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0xFB; // ISC abs,Y
+    bus.mem[0x4001] = 0x00;
+    bus.mem[0x4002] = 0x60;
+    bus.mem[0x6005] = 0x02;
+    step(&mut cpu, &mut bus);
+    assert_eq!(bus.mem[0x6005], 0x03);
+    assert_eq!(cpu.regs.a, 0x02);
+}

@@ -1,6 +1,19 @@
 # CPU Module v2.0 — Rust-First Reimplementation (Revised)
 
-**Status:** Active — Phase 1-3, 4, 6 complete; Phase 5 partial; Phase 7 pending · **Branch:** `wip2.0` · **Last revised:** 2026-08-21
+**Status:** Active — Phase 1-6 complete; Phase 7 pending · **Branch:** `wip2.0` · **Last revised:** 2026-08-21** `wip2.0` · **Last revised:** 2026-08-21
+
+> **Progress note (2026-08-21) - Phase 5 closed.** Unofficial coverage audit
+> found 21 opcodes with no direct register-effect test (the abs/zp,X/abs,Y/
+> abs,X/(ind),Y variants of RLA/SRE/RRA/DCP/ISC, SAX (ind),X and ANC 2B);
+> one test per opcode added - all 105 opcodes marked `official: false` in
+> `decode.rs` are now covered (`cargo test --test unofficial` = 74 PASS).
+> New `cpu/snapshot.rs` provides `snapshot_bytes` / `restore_bytes` on
+> `CpuState` (64-byte savestate blob) with 4 unit tests, including a
+> resume-determinism round trip and a cross-check against the FFI copy
+> path. Gate verified: `fceux11_golden_savestate_test` byte-equal under
+> ON (all 8 fixtures), `savestate_regression_rust_smoke` 0/12; total
+> `cargo test` 210 PASS. See
+> `docs/plans/phase5-closeout-2026-08-21.md`.
 
 > **Progress note (2026-08-21) - Phase 4 closed.** The two residuals left by
 > Phase 4.5 were root-caused and fixed; see

@@ -22,6 +22,7 @@ pub mod bus;
 pub mod decode;
 pub mod execute;
 pub mod ffi;
+pub mod snapshot;
 pub mod state;
 pub mod tick;
 
