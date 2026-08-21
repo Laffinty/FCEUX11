@@ -459,6 +459,13 @@ void TriggerNMI2(void)
  _IRQlow|=FCEU_IQNMI2;
 }
 
+// Phase 4 closeout: NMI-fresh flag accessors for the IRQ bridge. The
+// Rust CPU (FCEUX11_RUST_CPU=ON) reads/writes this flag through
+// `kagami_bridge_*` so the C++ one-instruction NMI deferral is honored
+// at the same boundaries as the reference dispatch.
+bool x6502_nmi_fresh_get(void) { return g_e1_nmi_fresh; }
+void x6502_nmi_fresh_set(bool v) { g_e1_nmi_fresh = v; }
+
 void X6502_Reset(void)
 {
  _IRQlow=FCEU_IQRESET;

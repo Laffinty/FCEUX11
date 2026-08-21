@@ -60,6 +60,14 @@ pub type TickFn = extern "C" fn(cycles: i32);
 /// the rest of the FFI's `static mut` slots in `cpu/bus.rs`.
 static mut TICK_FN: Option<TickFn> = None;
 
+/// Phase 4 closeout: post-body timestamp-advance callback. C++
+/// `add_cycles` advances `timestamp_` / `sound_timestamp_` by the
+/// iteration's full total (dispatch + base + extras), which is NOT
+/// the same as the pre-body hook `temp` (prev extras + dispatch +
+/// base). The Rust loop fires the hook before the instruction body
+/// and this callback after it, mirroring C++ exactly.
+static mut TICK_CYCLES_FN: Option<TickFn> = None;
+
 /// Install / replace the tick callback. Mirrors
 /// `Cpu::set_map_irq_hook`. Pass the sentinel
 /// [`fceux11_cpu_set_tick_null`] to disable.
@@ -70,23 +78,61 @@ pub unsafe extern "C" fn fceux11_cpu_set_tick(f: TickFn) {
     }
 }
 
+/// Install the post-body timestamp-advance callback (C++ side calls
+/// this once at init with `cpu_rust_tick_cycles_thunk`).
+
 /// Disable the tick callback.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_cpu_set_tick_cycles(f: TickFn) {
+    unsafe {
+        TICK_CYCLES_FN = Some(f);
+    }
+}
+
+/// Disable the tick callbacks.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_cpu_set_tick_null() {
     unsafe {
         TICK_FN = None;
+        TICK_CYCLES_FN = None;
     }
 }
 
-/// Internal: call the installed hook with `cycles`, if any.
+/// Phase 4 closeout: pre-body hook point. Mirrors C++
+/// `temp = _tcount; _tcount = 0; hook(temp); SoundCPUHook(temp);`
+/// at `src/x6502.cpp:606-614` ? the hook receives the accumulated
+/// `tcount` (prev extras + dispatch + base) and `tcount` is reset
+/// every iteration exactly like C++. Without the reset the
+/// savestate-visible `tcount` (ICoa) diverges; without the C++-exact
+/// temp the APU frame counter (FHCN) drifts (nestest).
 #[inline]
-fn tick_instruction(cycles: i32) {
+pub(crate) fn tick_pre_body(state: &mut CpuState) {
+    let temp = state.regs.tcount;
+    state.regs.tcount = 0;
     unsafe {
         if let Some(f) = TICK_FN {
+            f(temp);
+        }
+    }
+}
+
+/// Phase 4 closeout: post-body timestamp advance with the iteration's
+/// full total (dispatch + base + extras), matching C++ `add_cycles`
+/// totals.
+#[inline]
+pub(crate) fn tick_post_body(cycles: i32) {
+    unsafe {
+        if let Some(f) = TICK_CYCLES_FN {
             f(cycles);
         }
     }
 }
+
+/// Serializes tests that install the shared `TICK_FN` /
+/// `TICK_CYCLES_FN` slots (both `tick.rs` and `ffi.rs` drive the same
+/// statics under cargo test's parallel harness). Test-only.
+#[cfg(test)]
+pub(crate) static TICK_SLOT_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// Run the CPU for `cycles` 1/16-dot units, invoking the installed
 /// tick callback once per iteration with the iteration's total cycle
@@ -131,7 +177,6 @@ pub fn run_with_tick<B: Bus + ?Sized>(
         // Push back bits consumed by dispatch so the C++ blob doesn't
         // re-assert them on the next call's snapshot.
         bus.sync_irq_to_host(state);
-        let dc_plus_ic: u8;
         if dc != 0 {
             executed_cycles = executed_cycles.saturating_add(dc as i32);
             if state.regs.jammed != 0 {
@@ -140,22 +185,19 @@ pub fn run_with_tick<B: Bus + ?Sized>(
             if state.regs.count <= 0 {
                 // Dispatch exhausted the budget — no follow-up
                 // instruction, no tick. This is the cycle-drift fix.
+                // Phase 4 closeout: C++ `ADDCYC(7)` already advanced
+                // `timestamp_` before the early return; mirror it.
+                crate::cpu::tick::tick_post_body(dc as i32);
                 break;
             }
             let ic = execute_step(state, bus, dc);
             executed_cycles = executed_cycles.saturating_add(ic as i32);
-            dc_plus_ic = dc.saturating_add(ic);
         } else {
             let ic = execute_step(state, bus, 0);
             executed_cycles = executed_cycles.saturating_add(ic as i32);
-            dc_plus_ic = ic;
         }
-        // Single tick per iteration with the iteration's total cycle
-        // count. Matches C++ `temp = _tcount; hook(temp);` at
-        // `src/x6502.cpp:607-612`, where `_tcount` accumulates both
-        // the dispatch's `ADDCYC(7)` and the opcode's `ADDCYC(CycTable)`
-        // and is reset to 0 only AFTER the hook call.
-        tick_instruction(dc_plus_ic as i32);
+        // Phase 4 closeout: the pre-body mapper/APU hook and the
+        // post-body timestamp advance now happen inside `execute_step`.
         if state.regs.jammed != 0 {
             break;
         }
@@ -193,7 +235,7 @@ mod tests {
     // Serialize the tick tests: they share the static TICK_FN slot and
     // the atomic counters, so running them in parallel (Rust test
     // harness default) would cross-contaminate.
-    static TICK_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    // TICK_SLOT_LOCK is the module-level test lock (see above).
 
     extern "C" fn counting_tick(cycles: i32) {
         TICK_COUNT.fetch_add(1, Ordering::SeqCst);
@@ -213,7 +255,7 @@ mod tests {
 
     #[test]
     fn tick_called_once_per_instruction_with_cycle_count() {
-        let _guard = TICK_TEST_LOCK.lock().unwrap();
+        let _guard = TICK_SLOT_LOCK.lock().unwrap();
         TICK_COUNT.store(0, Ordering::SeqCst);
         TICK_SUM.store(0, Ordering::SeqCst);
         unsafe { fceux11_cpu_set_tick(counting_tick); }
@@ -248,7 +290,7 @@ mod tests {
 
     #[test]
     fn no_hook_installed_is_noop() {
-        let _guard = TICK_TEST_LOCK.lock().unwrap();
+        let _guard = TICK_SLOT_LOCK.lock().unwrap();
         unsafe { fceux11_cpu_set_tick_null(); }
         let mut cpu = cpu_at(0x4000);
         let mut bus = FlatBus::new();
@@ -264,7 +306,7 @@ mod tests {
 
     #[test]
     fn dispatch_cycles_are_included_in_tick() {
-        let _guard = TICK_TEST_LOCK.lock().unwrap();
+        let _guard = TICK_SLOT_LOCK.lock().unwrap();
         TICK_COUNT.store(0, Ordering::SeqCst);
         TICK_SUM.store(0, Ordering::SeqCst);
         unsafe { fceux11_cpu_set_tick(counting_tick); }

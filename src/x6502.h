@@ -108,6 +108,10 @@ void X6502_Power(void);
 void TriggerNMI(void);
 void TriggerNMI2(void);
 
+// Phase 4 closeout: NMI-fresh flag bridge accessors (see x6502.cpp).
+bool x6502_nmi_fresh_get(void);
+void x6502_nmi_fresh_set(bool v);
+
 uint8 X6502_DMR(uint32 A);
 void X6502_DMW(uint32 A, uint8 V);
 

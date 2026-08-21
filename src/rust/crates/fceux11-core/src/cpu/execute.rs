@@ -143,17 +143,27 @@ fn fetch<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
 }
 
 /// Branch: relative addressing with page-cross cycle penalty.
+///
+/// C++ parity (Phase 4 closeout): the reference `JR` macro reads the
+/// operand byte ONLY when the branch is taken (`if(cond) {
+/// disp=RdMem(_PC); ... } else _PC++;` at src/x6502.cpp). Reading it
+/// for untaken branches changes the DB latch, which is observable via
+/// open-bus reads ($4016 etc.) and breaks the C++-baseline regression
+/// hashes (nestest NMI handler reads $4016).
 fn do_branch<B: Bus + ?Sized>(
     state: &mut CpuState,
     bus: &mut B,
     cond: bool,
 ) -> u8 {
     let pc = state.regs.pc;
+    if !cond {
+        // Not taken: skip the operand read (C++ `else _PC++;`), no
+        // extra cycles.
+        state.regs.pc = pc.wrapping_add(1);
+        return 0;
+    }
     let disp = state.rd(bus, pc) as i8 as i16 as u16;
     state.regs.pc = pc.wrapping_add(1);
-    if !cond {
-        return 0; // not taken: extra cycles = 0
-    }
     let pre = state.regs.pc;
     let target = pre.wrapping_add(disp);
     state.regs.pc = target;
@@ -210,6 +220,10 @@ pub(crate) fn dispatch_step<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) 
     // C++ carries (`_count` can go negative / "overdraw").
     if irq_cycles != 0 {
         state.regs.count = state.regs.count.saturating_sub(dot(irq_cycles) * 3);
+        // Phase 4 closeout: C++ `ADDCYC(7)` also accumulates into
+        // `_tcount`; the next iteration's hook forwards it (or it
+        // remains as the early-exit residual, exactly like C++).
+        state.regs.tcount = state.regs.tcount.saturating_add(irq_cycles as i32);
     }
 
     irq_cycles
@@ -243,8 +257,21 @@ pub(crate) fn execute_step<B: Bus + ?Sized>(
     // post-dispatch address (dispatch fired) by dispatch_irq.
     let opcode = fetch(state, bus);
     let op_info = info(opcode);
+    let base = op_info.base_cycles;
 
-    let mut cycles = dispatch_irq_cycles + op_info.base_cycles;
+    // Phase 4 closeout: charge the base cost and mirror C++'s tick
+    // bridge (`src/x6502.cpp:606-614`). C++ does
+    // `b1=RdMem(_PC); ADDCYC(CycTable[b1]); temp=_tcount; _tcount=0;
+    // hook(temp); SoundCPUHook(temp);` BEFORE the opcode handler runs,
+    // so the mapper/APU hooks receive `prev_extras + dispatch + base`
+    // and this instruction's extras are forwarded on the NEXT
+    // iteration. `tcount` is maintained identically; the post-body
+    // timestamp advance uses the full iteration total.
+    state.regs.count = state.regs.count.saturating_sub(dot(base) * 3);
+    state.regs.tcount = state.regs.tcount.saturating_add(base as i32);
+    crate::cpu::tick::tick_pre_body(state);
+
+    let mut extras = 0u8;
 
     match op_info.kind {
         OpKind::Jam => {
@@ -267,7 +294,7 @@ pub(crate) fn execute_step<B: Bus + ?Sized>(
                 AddrMode::AbsX => abs_x_read(state, bus),
                 _ => implied(state, bus),
             };
-            cycles += mode_result.extra_cycles;
+            extras += mode_result.extra_cycles;
         }
 
         OpKind::NopReadWrite => {
@@ -289,7 +316,7 @@ pub(crate) fn execute_step<B: Bus + ?Sized>(
         }
         OpKind::Branch => {
             // BCC, BCS, BEQ, BNE, BMI, BPL, BVC, BVS.
-            cycles += do_branch(state, bus, branch_cond(state, opcode));
+            extras += do_branch(state, bus, branch_cond(state, opcode));
         }
         OpKind::Load => {
             // LDA, LDX, LDY. The mode carries the operand:
@@ -343,7 +370,7 @@ pub(crate) fn execute_step<B: Bus + ?Sized>(
                 }
                 _ => unreachable!("Load with non-load mode: {:?}", op_info.mode),
             };
-            cycles += mode_result.extra_cycles;
+            extras += mode_result.extra_cycles;
             let reg = load_reg_for_load(opcode);
             load_reg(state, bus, reg, m);
         }
@@ -363,50 +390,53 @@ pub(crate) fn execute_step<B: Bus + ?Sized>(
                 AddrMode::IndY => ind_y_write(state, bus),
                 _ => unreachable!("Store with non-store mode: {:?}", op_info.mode),
             };
-            cycles += mode_result.extra_cycles;
+            extras += mode_result.extra_cycles;
             let v = store_reg(state, opcode);
             state.wr(bus, mode_result.addr, v);
         }
         OpKind::Rmw => {
             // ASL, ROL, LSR, ROR, INC, DEC �?memory RMW.
-            cycles += do_rmw(state, bus, op_info.mode, opcode);
+            extras += do_rmw(state, bus, op_info.mode, opcode);
         }
         OpKind::AluA => {
             // ORA, AND, EOR, ADC, SBC (also covers LDA-style via Load).
-            cycles += do_alu_a(state, bus, op_info.mode, opcode);
+            extras += do_alu_a(state, bus, op_info.mode, opcode);
         }
         OpKind::Compare => {
             // CMP, CPX, CPY.
-            cycles += do_compare(state, bus, op_info.mode, opcode);
+            extras += do_compare(state, bus, op_info.mode, opcode);
         }
         OpKind::Bit => {
             // BIT.
-            cycles += do_bit(state, bus, op_info.mode);
+            extras += do_bit(state, bus, op_info.mode);
         }
         OpKind::Jump => {
             // JMP abs / ind, JSR, RTS, RTI, BRK.
-            cycles += do_jump(state, bus, opcode, op_info.mode);
+            extras += do_jump(state, bus, opcode, op_info.mode);
         }
         OpKind::Unofficial => {
             // All 109 unofficial opcodes.
-            cycles += do_unofficial(state, bus, opcode, op_info.mode);
+            extras += do_unofficial(state, bus, opcode, op_info.mode);
         }
     }
 
-    // Consume the instruction's own cycle cost (excluding the dispatch
-    // portion, which was already consumed above). Mirrors the C++
-    // `ADDCYC(CycTable)` — see the `dispatch_step` comment for the
-    // full unit rationale (`count` is 1/16 units, decremented by
-    // `CycTable * 48 = CycTable * 16 * 3`).
-    state.regs.count = state.regs.count
-        .saturating_sub(dot(cycles - dispatch_irq_cycles) * 3);
+    // Charge the extras (C++ `ADDCYC(extras)` inside the opcode
+    // handler) and keep `tcount` per C++ (`add_cycles` accumulates
+    // every ADDCYC into `_tcount`; the next iteration's hook
+    // forwards them).
+    state.regs.count = state.regs.count.saturating_sub(dot(extras) * 3);
+    state.regs.tcount = state.regs.tcount.saturating_add(extras as i32);
     state.cycles_in_run = state.cycles_in_run
-        .saturating_add((cycles - dispatch_irq_cycles) as i32);
+        .saturating_add((base + extras) as i32);
+    // Phase 4 closeout: post-body timestamp advance with the full
+    // iteration total (dispatch + base + extras), matching C++
+    // `add_cycles` totals.
+    crate::cpu::tick::tick_post_body((dispatch_irq_cycles + base + extras) as i32);
     // Return the instruction's own cycle cost (base + extras) only —
     // NOT including `dispatch_irq_cycles`. The callers (`step`,
     // `run`, `run_with_tick`) add the dispatch cost themselves, so
     // dispatch cycles are never double-counted.
-    cycles - dispatch_irq_cycles
+    base + extras
 }
 
 /// Public step API: always invokes dispatch + execute atomically.
@@ -1220,6 +1250,9 @@ pub fn run<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, cycles: i32) -> i
             if state.regs.count <= 0 {
                 // Dispatch exhausted the budget. C++ behaviour: skip
                 // the follow-up instruction entirely.
+                // Phase 4 closeout: C++ `ADDCYC(7)` already advanced
+                // `timestamp_` before the early return; mirror it.
+                crate::cpu::tick::tick_post_body(dc as i32);
                 break;
             }
             let ic = execute_step(state, bus, dc);

@@ -210,6 +210,14 @@ void kagami_bridge_set_cpu_irq_low(uint32_t v) {
     fceu11::cpu_instance().native_layout().IRQlow = v;
 }
 
+bool kagami_bridge_get_cpu_nmi_fresh(void) {
+    return x6502_nmi_fresh_get();
+}
+
+void kagami_bridge_set_cpu_nmi_fresh(bool v) {
+    x6502_nmi_fresh_set(v);
+}
+
 // ---------------------------------------------------------------------------
 // Cycle-trace sink — Phase 4.5 cycle-drift diagnostic.
 //

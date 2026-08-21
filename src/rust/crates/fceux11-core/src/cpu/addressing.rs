@@ -47,6 +47,16 @@ pub trait Bus {
     ///
     /// Default: no-op.
     fn sync_irq_to_host(&mut self, _state: &mut CpuState) {}
+
+    /// Phase 4 closeout: sync the NMI-fresh deferral flag from the host
+    /// (C++) side. The VBL NMI's one-instruction deferral lives outside
+    /// the `IRQlow` blob (`g_e1_nmi_fresh`); without this the Rust CPU
+    /// dispatches the NMI one boundary early. Default: no-op.
+    fn fresh_sync_from_host(&mut self, _state: &mut CpuState) {}
+
+    /// Push the Rust NMI-fresh flag back to the host (C++) side after
+    /// dispatch consumed or deferred it. Default: no-op.
+    fn fresh_sync_to_host(&mut self, _state: &mut CpuState) {}
 }
 
 /// CPU state wrapper that carries the [`X6502Layout`] together with
@@ -85,8 +95,14 @@ impl CpuState {
     /// `RdMem` / `RdRAM` side-effect in the C++ code).
     #[inline]
     pub fn rd<B: Bus + ?Sized>(&mut self, bus: &mut B, addr: u16) -> u8 {
+        // Phase 4 closeout: mirror the current Rust DB into the C++ blob
+        // BEFORE the access so mid-call handlers see the same open-bus
+        // value as the C++ reference dispatch (JPRead $4016, mapper
+        // open-bus, FDS/VSUni/cart). C++ `RdMem` sets `_DB` on every read.
+        crate::cpu::bus::sync_db_to_blob(self.regs.db, self.regs.count);
         let v = bus.read(addr);
         self.regs.db = v;
+        crate::cpu::bus::sync_db_to_blob(self.regs.db, self.regs.count);
         v
     }
 
@@ -94,8 +110,10 @@ impl CpuState {
     /// `WrMem` / `WrRAM` side-effect).
     #[inline]
     pub fn wr<B: Bus + ?Sized>(&mut self, bus: &mut B, addr: u16, val: u8) {
+        crate::cpu::bus::sync_db_to_blob(self.regs.db, self.regs.count);
         bus.write(addr, val);
         self.regs.db = val;
+        crate::cpu::bus::sync_db_to_blob(self.regs.db, self.regs.count);
     }
 
     /// Push a byte on the hardware stack at `$0100 + S`.

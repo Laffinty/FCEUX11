@@ -250,6 +250,7 @@ pub unsafe extern "C" fn fceux11_cpu_run(state: *mut u8, cycles: i32) -> i32 {
         // every call so the C++ side can mutate the blob between calls
         // (it doesn't, but the ABI permits it).
         FFI_CPU_STATE.regs = *(state as *const X6502Layout);
+        crate::cpu::bus::set_blob_ptr(state as *mut X6502Layout);
         let mut bus = CppBus;
         // Use a raw pointer to the mutable static (Rust 2024
         // `static_mut_refs` deny lint forbids `&mut STATIC`).
@@ -295,6 +296,7 @@ pub unsafe extern "C" fn fceux11_cpu_run_with_tick(state: *mut u8, cycles: i32) 
     }
     unsafe {
         FFI_CPU_STATE.regs = *(state as *const X6502Layout);
+        crate::cpu::bus::set_blob_ptr(state as *mut X6502Layout);
         let mut bus = CppBus;
         let state_ptr = core::ptr::addr_of_mut!(FFI_CPU_STATE);
         let scaled_cycles = cycles * 16;
@@ -344,6 +346,10 @@ pub unsafe extern "C" fn fceux11_cpu_restore(state: *mut u8, inp: *const u8) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    // FFI_CPU_STATE is a process-global; cargo test runs these in
+    // parallel, so serialize the whole module (the tick test also
+    // holds tick.rs's TICK_SLOT_LOCK for the shared TICK_FN slot).
+    static FFI_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
     use crate::cpu::bus::{fceux11_cpu_set_bus, FlatBus};
     use crate::cpu::state::Flags;
 
@@ -357,6 +363,7 @@ mod tests {
 
     #[test]
     fn init_zeroes_state() {
+        let _ffi_guard = FFI_TEST_LOCK.lock().unwrap();
         let mut buf = make_state();
         buf.p = 0xFF;
         unsafe {
@@ -368,6 +375,7 @@ mod tests {
 
     #[test]
     fn power_sets_reset_and_s() {
+        let _ffi_guard = FFI_TEST_LOCK.lock().unwrap();
         let mut buf = make_state();
         unsafe {
             fceux11_cpu_power(&mut *buf as *mut X6502Layout as *mut u8);
@@ -378,6 +386,7 @@ mod tests {
 
     #[test]
     fn reset_only_sets_reset_bit() {
+        let _ffi_guard = FFI_TEST_LOCK.lock().unwrap();
         let mut buf = make_state();
         buf.irq_low = IrqSource::NMI.bits(); // pre-existing NMI
         unsafe {
@@ -391,6 +400,7 @@ mod tests {
 
     #[test]
     fn trigger_nmi_sets_nmi_bit_and_fresh() {
+        let _ffi_guard = FFI_TEST_LOCK.lock().unwrap();
         let mut buf = make_state();
         unsafe {
             fceux11_cpu_trigger_nmi(&mut *buf as *mut X6502Layout as *mut u8);
@@ -406,6 +416,7 @@ mod tests {
 
     #[test]
     fn irq_begin_end_round_trip() {
+        let _ffi_guard = FFI_TEST_LOCK.lock().unwrap();
         let mut buf = make_state();
         unsafe {
             fceux11_cpu_irq_begin(&mut *buf as *mut X6502Layout as *mut u8, 0x001);
@@ -419,6 +430,7 @@ mod tests {
 
     #[test]
     fn snapshot_restore_round_trip() {
+        let _ffi_guard = FFI_TEST_LOCK.lock().unwrap();
         let mut src = make_state();
         src.p = 0xC0;
         src.a = 0x42;
@@ -453,6 +465,7 @@ mod tests {
 
     #[test]
     fn run_executes_nestest_reset_to_c000() {
+        let _ffi_guard = FFI_TEST_LOCK.lock().unwrap();
         use crate::cpu::addressing::Bus;
 
         // The FFI read/write callbacks are `extern "C" fn` (no
@@ -514,8 +527,11 @@ mod tests {
 
     #[test]
     fn run_with_tick_invokes_tick_per_instruction() {
-        use crate::cpu::tick::{fceux11_cpu_set_tick, fceux11_cpu_set_tick_null};
+        let _ffi_guard = FFI_TEST_LOCK.lock().unwrap();
+        use crate::cpu::tick::{fceux11_cpu_set_tick, fceux11_cpu_set_tick_null, TICK_SLOT_LOCK};
         use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
+        // Serialize against tick.rs tests: they share the TICK_FN slot.
+        let _tick_guard = TICK_SLOT_LOCK.lock().unwrap();
 
         // `static AtomicUsize` (not `static mut AtomicUsize`) — the
         // atomic type provides interior mutability via atomic ops,
@@ -601,6 +617,7 @@ mod tests {
 
     #[test]
     fn null_state_is_tolerated() {
+        let _ffi_guard = FFI_TEST_LOCK.lock().unwrap();
         // All entry points must early-return on null pointers rather
         // than crashing. This matches the C++ `X6502_*` functions'
         // defensive behaviour on bad inputs.

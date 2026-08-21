@@ -108,6 +108,9 @@ extern "C" void cpu_rust_write_thunk(uint16_t addr, uint8_t val) {
 // symbols (Phase 4.5 addition).
 extern "C" void fceux11_cpu_set_irq_bridge(
     uint32_t (*get_fn)(void), void (*set_fn)(uint32_t));
+extern "C" void fceux11_cpu_set_nmi_fresh_bridge(
+    bool (*get_fn)(void), void (*set_fn)(bool));
+extern "C" void fceux11_cpu_set_tick_cycles(void (*fn)(int));
 void cpu_rust_install_bus_once() noexcept {
     static std::atomic<bool> installed{false};
     bool expected = false;
@@ -121,6 +124,12 @@ void cpu_rust_install_bus_once() noexcept {
         // consumed are not re-asserted on the next call.
         fceux11_cpu_set_irq_bridge(&kagami_bridge_get_cpu_irq_low,
                                    &kagami_bridge_set_cpu_irq_low);
+        // Phase 4 closeout: sync the NMI-fresh deferral flag too. The
+        // C++ `g_e1_nmi_fresh` is the reference for the VBL NMI's
+        // one-instruction deferral; without this bridge the Rust CPU
+        // dispatches the NMI one boundary early (nestest NMI test).
+        fceux11_cpu_set_nmi_fresh_bridge(&kagami_bridge_get_cpu_nmi_fresh,
+                                         &kagami_bridge_set_cpu_nmi_fresh);
     }
 }
 
@@ -150,10 +159,17 @@ void cpu_rust_install_bus_once() noexcept {
 // `src/boards/mmc1.cpp:136-138` ("busy, ignore the write") — sees a
 // frozen timestamp and drops legitimate writes. Per-instruction
 // advancement restores the C++ reference behaviour.
-extern "C" void cpu_rust_tick_thunk(int cycles) {
-    if (const auto hook = g_cpu.map_irq_hook()) [[unlikely]] hook(cycles);
+// Phase 4 closeout: the pre-body hook call now receives C++'s exact
+// `temp = _tcount` (prev extras + dispatch + base), and the post-body
+// timestamp advance uses the iteration's full total (dispatch + base
+// + extras), matching C++ `add_cycles` totals. See
+// docs/plans/phase4-closeout-2026-08-20.md.
+extern "C" void cpu_rust_tick_thunk(int temp) {
+    if (const auto hook = g_cpu.map_irq_hook()) [[unlikely]] hook(temp);
+    if (!g_cpu.overclocking()) [[likely]] FCEU_SoundCPUHook(temp);
+}
+extern "C" void cpu_rust_tick_cycles_thunk(int cycles) {
     if (!g_cpu.overclocking()) [[likely]] {
-        FCEU_SoundCPUHook(cycles);
         g_cpu.timestamp_ref() += cycles;
         g_cpu.sound_timestamp_ref() += cycles;
     } else {
@@ -169,6 +185,8 @@ void cpu_rust_install_tick_once() noexcept {
     bool expected = false;
     if (installed.compare_exchange_strong(expected, true)) {
         fceux11_cpu_set_tick(&cpu_rust_tick_thunk);
+        // Phase 4 closeout: post-body timestamp advance (see thunk).
+        fceux11_cpu_set_tick_cycles(&cpu_rust_tick_cycles_thunk);
     }
 }
 } // namespace

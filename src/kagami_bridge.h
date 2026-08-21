@@ -119,6 +119,13 @@ uint32_t kagami_bridge_get_cpu_irq_low(void);
 /// the Rust dispatch consumed so they are not re-asserted next call.
 void kagami_bridge_set_cpu_irq_low(uint32_t v);
 
+/// Read the C++ `g_e1_nmi_fresh` NMI-deferral flag. Phase 4 closeout:
+/// the Rust CPU reads it through the IRQ bridge so VBL NMIs are deferred
+/// one instruction exactly like the C++ reference dispatch.
+bool kagami_bridge_get_cpu_nmi_fresh(void);
+/// Write the C++ `g_e1_nmi_fresh` flag (counterpart of the getter).
+void kagami_bridge_set_cpu_nmi_fresh(bool v);
+
 // ---------------------------------------------------------------------------
 // Cycle-trace hooks — Phase 4.5 cycle-drift diagnostic.
 //

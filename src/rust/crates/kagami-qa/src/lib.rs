@@ -163,6 +163,16 @@ pub mod rom_regression_entry {
 
         let mut adapter = Fceux11DirectAdapter::new();
         let outcome = run_regression(&mut adapter, &golden, &workdir);
+        // Per-mismatch detail lines (mirror the C++ harness, which prints
+        // up to 5 mismatch lines with rom/frame/expected/actual). The
+        // summary alone hides which ROM/frame diverged.
+        for m in &outcome.mismatches {
+            let _ = writeln!(
+                std::io::stdout(),
+                "Mismatch for {}: frame {} expected 0x{:08x} actual 0x{:08x}",
+                m.rom_name, m.frame, m.expected, m.actual
+            );
+        }
         let summary = format_summary(&outcome);
         let _ = write!(std::io::stdout(), "{}", summary);
         regression_exit_code(&outcome)
@@ -227,6 +237,15 @@ pub mod savestate_regression_entry {
         // TEMP parity debug: per-ROM hashes for cross-check vs C++.
         for (name, actual) in &outcome.collected {
             eprintln!("  [rust-hash] {name}: {actual}");
+        }
+        // Per-mismatch detail lines (mirror the C++ harness): name +
+        // expected/actual MD5.
+        for m in &outcome.mismatches {
+            let _ = writeln!(
+                std::io::stdout(),
+                "Mismatch for {}: expected {} actual {}",
+                m.rom_name, m.expected, m.actual
+            );
         }
         let summary = format_summary(&outcome);
         let _ = write!(std::io::stdout(), "{}", summary);

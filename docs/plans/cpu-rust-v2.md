@@ -1,6 +1,26 @@
 # CPU Module v2.0 — Rust-First Reimplementation (Revised)
 
-**Status:** Active — Phase 1-3 landed, Phase 4-6 in progress · **Branch:** `wip2.0` · **Last revised:** 2026-08-20
+**Status:** Active — Phase 1-3, 4, 6 complete; Phase 5 partial; Phase 7 pending · **Branch:** `wip2.0` · **Last revised:** 2026-08-21
+
+> **Progress note (2026-08-21) - Phase 4 closed.** The two residuals left by
+> Phase 4.5 were root-caused and fixed; see
+> `docs/plans/phase4-closeout-2026-08-20.md`. Five parity gaps closed:
+> (1) the VBL NMI-fresh deferral flag now crosses the IRQ bridge (fixes the
+> nestest NMI test's pushed return PC / RAM `$0204`); (2) untaken branches
+> no longer read the operand (DB-latch / $4016 open-bus parity); (3) the
+> Rust DB latch (and cycle counter) are mirrored into the C++ blob around
+> every bus access (mid-call C++ readers such as `JPRead` see the live
+> value); (4) the tick bridge now fires pre-body with C++'s exact `temp =
+> _tcount` and maintains `tcount`, and post-body advances timestamps with
+> the full iteration total (APU frame counter FHCN parity); (5) dispatch-
+> early-exit now advances timestamps. Result: `savestate_regression_rust_smoke`
+> PASS (0/12), `golden_savestate_test` + frame-4/60 savestates byte-identical,
+> CTest ON 32/34, CTest OFF 34/34, cargo test 185 PASS. Remaining:
+> `kagami_qa_direct_smoke` blargg known-fails (C++ baseline fails them too;
+> Phase 6/7 PPU/APU accuracy work) and a documented 16-pixel render-timing
+> artifact on nestest's transition frame in `rom_regression_rust_smoke`
+> (1/780; all CPU observables byte-identical; deferred with the other
+> PPU-timing work).
 
 > **Progress note (2026-08-20).** Phase 4.5 cycle-drift closure. The
 > cycle-drift family that the 2026-08-19 note below left open is now

@@ -48,6 +48,34 @@ extern "C" fn noop_read(_addr: u16) -> u8 {
 /// the C++ side installs a real one.
 extern "C" fn noop_write(_addr: u16, _val: u8) {}
 
+// Phase 4 closeout: pointer to the C++ `X6502` blob for the current run,
+// used to mirror the Rust DB latch into the blob before/after every bus
+// access. The FFI runs the CPU on an internal `CpuState` copy and only
+// writes the blob back at call end, so WITHOUT this mirror, mid-call C++
+// bus handlers that read `g_cpu.native_layout().DB` (JPRead $4016,
+// mapper open-bus, FDS sound, VSUni, cart open-bus) observe a stale DB
+// and diverge from the C++ reference dispatch (nestest NMI handler).
+// Null in pure-Rust tests; `sync_db_to_blob` is then a no-op.
+static mut BLOB_PTR: *mut crate::cpu::state::X6502Layout = core::ptr::null_mut();
+
+/// Set the C++ blob pointer for the duration of a run (FFI entry points).
+pub(crate) unsafe fn set_blob_ptr(p: *mut crate::cpu::state::X6502Layout) {
+    unsafe { BLOB_PTR = p; }
+}
+
+/// Mirror the Rust DB latch and cycle counter into the C++ blob.
+/// Active only when the IRQ bridge is installed (the FFI/C++ path);
+/// pure-Rust tests never install it, so the global `BLOB_PTR` cannot
+/// leak between tests running in parallel.
+pub(crate) fn sync_db_to_blob(db: u8, count: i32) {
+    unsafe {
+        if IRQ_BRIDGE_INSTALLED && !BLOB_PTR.is_null() {
+            (*BLOB_PTR).db = db;
+            (*BLOB_PTR).count = count;
+        }
+    }
+}
+
 // The two callback slots. `static mut` is acceptable here because:
 //   1. The C++ emulator is single-threaded (mirrors `fceu11::g_bus`).
 //   2. We only mutate from `fceux11_cpu_set_bus`, called once at init.
@@ -116,6 +144,20 @@ static mut IRQ_SET_FN: IrqSetFn = noop_irq_set;
 // bits (e.g. RESET from `fceux11_cpu_power`) are preserved.
 static mut IRQ_BRIDGE_INSTALLED: bool = false;
 
+// Phase 4 closeout: NMI-fresh deferral flag bridge. The C++ VBL NMI
+// path (`TriggerNMI`) sets `g_e1_nmi_fresh` so the reference dispatch
+// defers the NMI by one instruction boundary; that flag lives outside
+// the `X6502::IRQlow` blob, so `sync_irq_*` must carry it separately.
+// Without this the Rust CPU dispatches the VBL NMI one boundary early
+// (nestest NMI test diverges: pushed return PC differs).
+type FreshGetFn = extern "C" fn() -> bool;
+type FreshSetFn = extern "C" fn(bool);
+extern "C" fn noop_fresh_get() -> bool { false }
+extern "C" fn noop_fresh_set(_v: bool) {}
+static mut FRESH_GET_FN: FreshGetFn = noop_fresh_get;
+static mut FRESH_SET_FN: FreshSetFn = noop_fresh_set;
+static mut FRESH_BRIDGE_INSTALLED: bool = false;
+
 /// Install the IRQ-low read/write callbacks (C++ side calls this once
 /// at init with `kagami_bridge_get_cpu_irq_low` /
 /// `kagami_bridge_set_cpu_irq_low`).
@@ -125,6 +167,21 @@ pub unsafe extern "C" fn fceux11_cpu_set_irq_bridge(get_fn: IrqGetFn, set_fn: Ir
         IRQ_GET_FN = get_fn;
         IRQ_SET_FN = set_fn;
         IRQ_BRIDGE_INSTALLED = true;
+    }
+}
+
+/// Install the NMI-fresh flag read/write callbacks (C++ side calls this
+/// once at init with `kagami_bridge_get_cpu_nmi_fresh` /
+/// `kagami_bridge_set_cpu_nmi_fresh`).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_cpu_set_nmi_fresh_bridge(
+    get_fn: FreshGetFn,
+    set_fn: FreshSetFn,
+) {
+    unsafe {
+        FRESH_GET_FN = get_fn;
+        FRESH_SET_FN = set_fn;
+        FRESH_BRIDGE_INSTALLED = true;
     }
 }
 
@@ -153,6 +210,7 @@ impl Bus for CppBus {
         if unsafe { IRQ_BRIDGE_INSTALLED } {
             state.regs.irq_low = unsafe { IRQ_GET_FN() };
         }
+        self.fresh_sync_from_host(state);
     }
 
     #[inline]
@@ -161,6 +219,21 @@ impl Bus for CppBus {
         // C++ blob doesn't re-assert them on the next call.
         if unsafe { IRQ_BRIDGE_INSTALLED } {
             unsafe { IRQ_SET_FN(state.regs.irq_low) };
+        }
+        self.fresh_sync_to_host(state);
+    }
+
+    #[inline]
+    fn fresh_sync_from_host(&mut self, state: &mut crate::cpu::addressing::CpuState) {
+        if unsafe { FRESH_BRIDGE_INSTALLED } {
+            state.nmi_fresh = unsafe { FRESH_GET_FN() };
+        }
+    }
+
+    #[inline]
+    fn fresh_sync_to_host(&mut self, state: &mut crate::cpu::addressing::CpuState) {
+        if unsafe { FRESH_BRIDGE_INSTALLED } {
+            unsafe { FRESH_SET_FN(state.nmi_fresh) };
         }
     }
 }
