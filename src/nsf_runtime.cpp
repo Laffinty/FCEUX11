@@ -3,7 +3,7 @@
 // Formerly 226 lines of C++; now ~140 lines of bridge code.
 
 #include "types.h"
-#include "x6502.h"
+#include "cpu.h"
 #include "fceu.h"
 #include "cart.h"
 #include "nsf.h"

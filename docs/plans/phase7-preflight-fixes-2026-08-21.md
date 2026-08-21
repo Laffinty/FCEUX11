@@ -232,6 +232,73 @@ review's "5" was an off-by-one in the measured write-up.
 | `savestate_regression_rust_smoke` | PASS (0/12) under ON |
 | `bench_tolerance_test` | PASS under ON and OFF |
 
-The entry standard (section 0, checks 1-6) is met. Phase 7 itself
-(delete the C++ CPU, flip `FCEUX11_RUST_CPU` default, CMake/scripts
-updates) remains a separate, user-approved step.
+The entry standard (section 0, checks 1-6) is met.
+
+## 6. Phase 7 execution results (completed 2026-08-22)
+
+Phase 7 was executed after user approval ("执行phase7", 2026-08-22) on
+top of commit `31c5b35` (the preflight fixes above).
+
+### 6.1 Deletions (7 files)
+
+- `src/x6502.cpp` (708 LOC C++ dispatch loop) — deleted.
+- `src/x6502.h` — deleted; kept surface migrated to `src/cpu.h`.
+- `src/x6502struct.h` — deleted; X6502 struct moved into `src/cpu.h`.
+- `src/x6502abbrev.h` — deleted; register macros moved into `src/cpu.h`.
+- `src/ops.inc`, `src/ops_table.inc` — deleted.
+- `scripts/generate_x6502_dispatch.py` — deleted.
+- `scripts/_rebuild_off_target.ps1` — deleted (OFF build no longer exists).
+
+`src/cpu.cpp` was **retained** as the Rust FFI integration facade: its
+`#if FCEUX11_RUST_CPU` guards and `#else` C++-CPU branches were
+removed, making the Rust path unconditional. (The plan's Phase 7 file
+list included cpu.cpp as "the 96-line facade"; that line predates the
+Phase 3-6 FFI landing that turned cpu.cpp into the Rust bridge.)
+
+### 6.2 Migrations
+
+- `src/cpu.h` now owns: `X6502` struct, `_A`/`_X`/... register macros,
+  flag + IRQ constants, `dendy`/`NTSC_CPU`/`PAL_CPU`, `opsize`/`optype`/
+  `opwrite` externs, `X6502_Run` macro (→ `cpu_instance().run`),
+  `TriggerNMI/2`, `X6502_IRQBegin/End`, `X6502_DMR/DMW`,
+  `X6502_GetOpcodeCycles`, `x6502_nmi_fresh_get/set`, `fceu11_e1_last_pc`.
+- `src/cpu.cpp` now defines the migrated helpers (DMR/DMW with Lua hooks,
+  IRQ pin control, CycTable + 3 opcode tables, TriggerNMI/2 + e1 probes,
+  `fceu11::NMI/IRQ`, `FCEUI_GetIVectors`).
+- ~22 consumer files switched `#include "x6502.h"` → `#include "cpu.h"`
+  (incl. board common header `src/boards/mapinc_bus.h` and
+  `src/input/share.h`).
+
+### 6.3 CMake / build
+
+- `FCEUX11_RUST_CPU` default flipped **ON**; `=OFF` is a configure-time
+  fatal error (option retained for build-flag compatibility).
+- `src/CMakeLists.txt`: `x6502.cpp` removed from SRC_CORE; Rust staticlib
+  link + cbindgen-header dependency unconditional; the
+  `-DFCEUX11_RUST_CPU=1` define removed (no source guards remain).
+- Root `CMakeLists.txt`: `/wd4244` comment updated (ops_table.inc/x6502.cpp
+  gone). `tests/CMakeLists.txt`: cycle-trace harness comment updated
+  (ON-only).
+- `COPYRIGHT_AUDIT.{csv,md}`: the 4 deleted x6502 file rows removed.
+
+### 6.4 Verification (post-deletion, Rust CPU only)
+
+| Check | Result |
+|---|---|
+| `cargo test -p fceux11-core` | **221 PASS** (unchanged: lib 89, unofficial 80, cycle_parity 23, interrupts 15, opcodes 7, proptest 5, nestest 2) |
+| `cargo clippy -p fceux11-core --all-targets --no-deps` | clean (exit 0) |
+| `cargo fmt --check -p fceux11-core` | clean |
+| CMake build `build-rust-cpu` (default ON) | clean build |
+| CTest (non-perf) | **32/34** - same two documented residuals (`kagami_qa_direct_smoke`, `rom_regression_rust_smoke` 1/780) |
+| `golden_savestate_test` | byte-equal |
+| `savestate_regression_rust_smoke` | PASS (0/12) |
+| `fceux11_pp_frame_diff` / `fceux11_ppu_frame_diff_test` | PASS (0-pixel) |
+
+### 6.5 Gate deviations (documented)
+
+1. The plan gate "8 deleted files" counts cpu.cpp; only 7 files were
+   deleted because cpu.cpp is the Rust facade (see §6.1). The 7
+   deletions appear in `git log --diff-filter=D`.
+2. `ctest` "exits 0" is interpreted per the preflight entry standard
+   (§0 item 5): 32/34 with the two documented residuals, which the
+   C++ baseline also fails or which are PPU-side (not CPU).

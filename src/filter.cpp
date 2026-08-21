@@ -9,7 +9,7 @@
 #include "types.h"
 
 #include "sound.h"
-#include "x6502.h"
+#include "cpu.h"
 #include "fceu.h"
 #include "filter.h"
 

@@ -48,7 +48,7 @@
 #include "../../types.h"
 #include "../../fceu.h"
 #include "../../cart.h"
-#include "../../x6502.h"
+#include "../../cpu.h"
 #include "../../debug.h"
 #include "../../asm.h"
 #include "../../ppu.h"

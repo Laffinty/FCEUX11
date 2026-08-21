@@ -9,7 +9,7 @@
 #include "types.h"
 #include "fceu.h"
 #include "driver.h"
-#include "x6502.h"
+#include "cpu.h"
 #include "bus.h"
 #include "state.h"
 #include "cart.h"
@@ -318,9 +318,11 @@ int kagami_bridge_save_mapper_state(uint8_t *dst, uint32_t cap,
 // Cycle-trace sink (Phase 4.5 cycle-drift diagnostic)
 //
 // `FCEUX11_CYCLE_LOG=<path>` activates a one-row-per-`Cpu::run` CSV.
-// The Rust harness `kagami-qa-cycle-trace` runs the same ROM under
-// both `FCEUX11_RUST_CPU=ON` and `FCEUX11_RUST_CPU=OFF` and diffs the
-// two CSVs to localize the dominant cycle drift root cause.
+// The Rust harness `kagami-qa-cycle-trace` runs a ROM and records the
+// CSV. Pre-Phase-7 the same ROM was also run under
+// `FCEUX11_RUST_CPU=OFF` and the two CSVs diffed to localize the
+// dominant cycle drift root cause; since Phase 7 deleted the C++ CPU,
+// only the Rust-CPU side exists.
 //
 // Header: `frame,call_idx,cycles_arg,pc_after,cum_count`
 //   - `frame` is filled by the harness BEFORE calling `emulate_frame`

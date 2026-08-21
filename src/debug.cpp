@@ -2,7 +2,7 @@
 /// \brief Implements core debugging facilities
 #include "types.h"
 #include "utils/safe_string.h"
-#include "x6502.h"
+#include "cpu.h"
 #include "fceu.h"
 #include "cart.h"
 #include "ines.h"
@@ -14,8 +14,6 @@
 #include "diag_api.h"
 #include "ppu.h"
 #include "rust/fceux11_rust.h"
-
-#include "x6502abbrev.h"
 
 #include <cstdlib>
 #include <cstring>

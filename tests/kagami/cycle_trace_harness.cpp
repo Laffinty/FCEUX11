@@ -8,14 +8,12 @@
 // (the same entry points used by `kagami_qa_direct_runner`), with the
 // `FCEUX11_CYCLE_LOG` environment variable set to <output.csv>. The C++
 // `CycleTraceSink` (defined in src/kagami_bridge.cpp) opens the CSV at
-// first use and appends one row per `Cpu::run` call. The resulting CSV
-// can be diffed against a matching run with the other `FCEUX11_RUST_CPU`
-// setting via tools/cross_lang_diff.py.
+// first use and appends one row per `Cpu::run` call.
 //
-// Designed to be run TWICE — once under `FCEUX11_RUST_CPU=ON`, once
-// under `FCEUX11_RUST_CPU=OFF` — to localize the dominant per-frame
-// cycle drift root cause (see
-// docs/plans/phase4-dispatch-budget-fix-2026-08-19.md §5.2).
+// Pre-Phase-7 this was run TWICE (once per `FCEUX11_RUST_CPU` setting)
+// and the CSVs diffed via tools/cross_lang_diff.py to localize per-frame
+// cycle drift (docs/plans/phase4-dispatch-budget-fix-2026-08-19.md §5.2);
+// since Phase 7 deleted the C++ CPU, only the Rust-CPU side exists.
 
 #include "kagami_bridge.h"
 

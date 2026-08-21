@@ -30,7 +30,7 @@
 #include "diag_api.h"
 
 #include "cart.h"
-#include "x6502.h"
+#include "cpu.h"
 
 #include "file.h"
 #include "utils/memory.h"

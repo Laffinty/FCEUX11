@@ -18,7 +18,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 #include "types.h"
-#include "x6502.h"
+#include "cpu.h"
 #include "fceu.h"
 #include "fds.h"
 #include "sound.h"

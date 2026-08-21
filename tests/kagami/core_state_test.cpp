@@ -14,7 +14,7 @@
 
 #include "types.h"
 #include "fceu.h"
-#include "x6502.h"
+#include "cpu.h"
 #include "ppu.h"
 #include "sound.h"
 #include "ines.h"

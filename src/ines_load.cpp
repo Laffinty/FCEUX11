@@ -3,7 +3,7 @@
 
 #include "types.h"
 #include "utils/safe_string.h"
-#include "x6502.h"
+#include "cpu.h"
 #include "fceu.h"
 #include "cart.h"
 #include "apu.h"

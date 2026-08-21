@@ -20,7 +20,7 @@
 
 #include "types.h"
 #include "cpu.h"
-#include "x6502.h"
+#include "cpu.h"
 #include "fceu.h"
 #include "bus.h"      // v1.4 Post-Release Optimization Plan §1.1: g_bus.init()
 #include "ppu.h"

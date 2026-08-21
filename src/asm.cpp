@@ -5,7 +5,7 @@
 #include "utils/xstring.h"
 #include "debug.h"
 #include "asm.h"
-#include "x6502.h"
+#include "cpu.h"
 #include "rust/fceux11_rust.h"
 
 #include <cstring>

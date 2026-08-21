@@ -27,7 +27,7 @@
 #include "cpu.h"  // hotfix3 B-5a: Cpu::RefProxy return type for irq_hook()
 
 // Forward declarations at GLOBAL scope so the accessors can reference the
-// real type (defined in x6502struct.h, cart.h, sound.h, etc.). Putting
+// real type (defined in cpu.h, cart.h, sound.h, etc.). Putting
 // them inside namespace fceu11 would create distinct types — the global
 // X6502 used by `::X` is not the same C++ type as fceu11::X6502.
 //
@@ -37,7 +37,7 @@
 // spellings as the same type.
 // hotfix1 P3-1: the previous forward decl was `struct __X6502`, an
 // identifier reserved for the implementation. Renamed to `struct X6502`
-// in x6502struct.h; this forward declaration follows.
+// in cpu.h; this forward declaration follows.
 struct X6502;
 struct fceu_settings_struct;
 struct CartInfo;

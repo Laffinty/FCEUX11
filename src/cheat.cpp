@@ -33,7 +33,7 @@
 
 #include "types.h"
 #include "utils/safe_string.h"
-#include "x6502.h"
+#include "cpu.h"
 #include "cheat.h"
 #include "fceu.h"
 #include "file.h"

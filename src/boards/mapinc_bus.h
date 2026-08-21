@@ -6,6 +6,6 @@
 #define FCEU11_MAPINC_BUS_H
 
 #include "mapinc_state.h"
-#include "../x6502.h"
+#include "../cpu.h"   // X6502_IRQBegin/End, FCEU_IQ* (Phase 7: was ../x6502.h)
 
 #endif

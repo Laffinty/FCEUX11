@@ -23,7 +23,7 @@
 #include "version.h"
 #include "utils/safe_string.h"
 #include "types.h"
-#include "x6502.h"
+#include "cpu.h"
 #include "fceu.h"
 #include "sound.h"
 #include "utils/endian.h"

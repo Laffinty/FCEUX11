@@ -62,7 +62,7 @@ add_compile_options(/W4 /WX /permissive- /guard:cf /GS /sdl
     /wd4267  # pre-existing: size_t→int in mappers / TasEditor / file.cpp (pre-v0.3.10)
     # /wd4456 removed in v1.13 Purify I §11
     /wd4200  # pre-existing: zero-length array in cbindgen-generated fceux11_rust.h
-    /wd4244  # pre-existing: narrowing conversion in ops_table.inc / x6502.cpp / vsuni.cpp
+    /wd4244  # pre-existing: narrowing conversion in vsuni.cpp / legacy tables (pre-v0.3.10)
     # /wd4514 removed in v1.13 Purify I §11
     # /wd4710 removed in v1.13 Purify I §11
     /wd4820  # pre-existing: padding added (Q_OBJECT vtables, Rust #[repr(C)] structs)
@@ -124,15 +124,15 @@ option(FCEUX11_ENABLE_I18N "Enable internationalization (i18n) support" ON)
 # Phase 3 (revised) — FCEUX11_RUST_CPU switch.
 # Routes the C++ `Cpu::run()` facade (and the TriggerNMI/IRQ
 # surface) into the Rust 6502 implementation living in
-# `fceux11-core::cpu::ffi`. The Rust CPU is opt-in for this
-# phase so the C++ baseline can be measured against itself before
-# any divergence is introduced; the gate (Phase 3 step 5) is "no
-# new failures relative to the FCEUX11_RUST_CPU=OFF snapshot".
+# `fceux11-core::cpu::ffi`. Phase 7 (2026-08-22): the C++ 6502 CPU
+# (src/x6502.{cpp,h,struct.h,abbrev.h} + src/ops.inc +
+# src/ops_table.inc) was deleted, so the Rust CPU is the only
+# implementation and the option now defaults to ON; setting it OFF is
+# a configure-time error (see src/CMakeLists.txt).
 #
 # Requires FCEUX11_ENABLE_RUST=ON (the Rust staticlib is needed
-# for the FFI symbols). Off by default for the measurement phase;
-# the Phase 7 plan turns this ON and deletes the C++ CPU.
-option(FCEUX11_RUST_CPU "Use the Rust 6502 CPU implementation behind the C++ Cpu facade (Phase 3 — off by default for the regression baseline)" OFF)
+# for the FFI symbols).
+option(FCEUX11_RUST_CPU "Use the Rust 6502 CPU implementation behind the C++ Cpu facade (ON since Phase 7; the C++ CPU is deleted)" ON)
 # v0.3.16 LTS closure / v1.0 carries over: project-wide deprecation
 # control. Per plan v3 §6.3, the FCEUI_* compat shims (250+ inline
 # wrappers in core_api.h / io_api.h / net_api.h / diag_api.h / movie.h)

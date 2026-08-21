@@ -27,7 +27,7 @@
 
 #include "fceu.h"   // ::ANull, ::BNull (DECLFR/DECLFW expansion)
 #include "ppu.h"    // ::PPUCHRRAM, ::PPUNTARAM, ::vnapage, ::NTARAM
-#include "x6502.h"  // g_cpu (for ::ANull's return value)
+#include "cpu.h"  // g_cpu (for ::ANull's return value)
 
 namespace fceu11 {
 

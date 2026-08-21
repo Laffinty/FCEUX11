@@ -34,7 +34,7 @@
 #include "../../cart.h"
 #include "../../ines.h"
 #include "../../asm.h"
-#include "../../x6502.h"
+#include "../../cpu.h"
 
 #include "Qt/fceuWrapper.h"
 #include "Qt/SymbolicDebug.h"

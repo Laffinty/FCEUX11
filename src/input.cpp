@@ -20,7 +20,7 @@
 */
 
 #include "types.h"
-#include "x6502.h"
+#include "cpu.h"
 
 #include "fceu.h"
 #include "sound.h"

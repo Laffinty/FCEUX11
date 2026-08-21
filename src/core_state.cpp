@@ -1,7 +1,7 @@
 // FCEUX11 — v1.2 Census: Global-state access facade (definition)
 //
 // Every accessor resolves to the existing file-scope `extern` declaration
-// in its owning header (x6502.h, ppu.h, sound.h, cart.h, etc.). v1.2 adds
+// in its owning header (cpu.h, ppu.h, sound.h, cart.h, etc.). v1.2 adds
 // no new state; v1.3+ replace these references with object members as the
 // Cpu/Bus/Ppu/Apu/Cart classes come online. The implementation is a thin
 // layer of static_casts to keep the accessors `noexcept` and inlinable.
@@ -9,9 +9,7 @@
 #include "core_state.h"
 
 #include "bus.h"        // fceu11::g_bus (State::bus()), inline aliases for ::ARead/::BWrite/::Page/::VPage/::PRGptr/::CHRptr
-#include "cpu.h"        // fceu11::cpu_instance()
-#include "x6502.h"      // X6502, legacy inline aliases
-#include "x6502struct.h" // X6502 (struct definition)
+#include "cpu.h"        // X6502 (struct definition), fceu11::cpu_instance()
 #include "ppu.h"        // ::PPU, ::NTARAM, ::vnapage, ::VPage, ::PPUNTARAM, ::PPUCHRRAM, ::ppuphase, ::PPU_hook, ::GameHBIRQHook
 #include "sound.h"      // ::Wave, ::WaveFinal, ::WaveHi, ::nesincsize, ::soundtsinc, ::soundtsoffs, ::swapDuty, ::GameExpSound
 #include "fceu.h"       // ::PAL, ::dendy, ::movieSubtitles, ::FSettings, ::RAMInitOption, ::RAM, ::EmulationPaused, ::frameAdvance_Delay, ::GameAttributes, ::timestampbase, ::normalscanlines, ::totalscanlines, ::QTAIHack, ::QTAINTRAM, ::qtaintramreg

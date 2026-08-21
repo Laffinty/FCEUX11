@@ -70,7 +70,7 @@
 #include "../../ines.h"
 #include "../../asm.h"
 #include "../../ppu.h"
-#include "../../x6502.h"
+#include "../../cpu.h"
 #include "common/os_utils.h"
 #include "common/configSys.h"
 

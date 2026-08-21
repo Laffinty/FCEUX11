@@ -1,8 +1,18 @@
 // FCEUX11 — v1.3 Legion: CPU objectification skeleton (implementation)
+//
+// Phase 7 (2026-08-22): the C++ 6502 CPU was deleted; the Rust 6502 in
+// fceux11-core is the only implementation. Every facade method
+// dispatches into the Rust side via the cbindgen-emitted
+// `fceux11_rust.h`. The 64-byte X6502 layout is byte-compatible
+// between Rust (`X6502Layout`) and C++ (`X6502`); only the bus
+// surface needs special handling (see below).
 
 #include "cpu.h"
 
-#include "x6502.h"
+#include "types.h"
+#include "fceu.h"         // ::fceuindbg (FCEUI_GetIVectors)
+#include "core_api.h"     // fceu11::NMI/IRQ, FCEUI_GetIVectors
+#include "utils/cache.h"  // FCEUX11_CACHE_ALIGN (opcode tables)
 
 // Phase 4.5 cycle-drift diagnostic: Cpu::run invokes the cycle-trace
 // sink whenever `FCEUX11_CYCLE_LOG` is set (env-var-gated, single
@@ -10,19 +20,14 @@
 // src/kagami_bridge.cpp::CycleTraceSink.
 #include "kagami_bridge.h"
 
-#if FCEUX11_RUST_CPU
-// Phase 3 (revised) step 3: when the Rust 6502 is wired in, every
-// facade method that previously called a free `X6502_*` function
-// dispatches into the Rust side via the cbindgen-emitted
-// `fceux11_rust.h`. The 64-byte X6502 layout is byte-compatible
-// between Rust (`X6502Layout`) and C++ (`X6502`); only the bus
-// surface needs special handling (see below).
 #include "rust/fceux11_rust.h"
 #include "bus.h"
 #include "sound.h"   // PR-A: FCEU_SoundCPUHook for the per-instruction tick thunk
-#include <atomic>
+#ifdef _S9XLUA_H
+#include "fceulua.h" // CallRegisteredLuaMemHook (X6502_DMR/X6502_DMW)
 #endif
-
+#include <atomic>
+#include <cstdio>   // e1 trace probes (TriggerNMI)
 #include <cstdlib>  // std::getenv
 #include <cstring>
 
@@ -77,14 +82,13 @@ bool Cpu::overclocking() const noexcept { return overclocking_; }
 void Cpu::set_overclocking(bool v) noexcept { overclocking_ = v; }
 
 // ---------------------------------------------------------------------------
-// Lifecycle — delegate to the existing free functions while globals are
-// still backed by this Cpu object via inline aliases.
+// Lifecycle — delegate to the Rust 6502 (the only CPU implementation
+// since Phase 7).
 // ---------------------------------------------------------------------------
-#if FCEUX11_RUST_CPU
-// Phase 3 (revised) step 3: Cpu facade dispatches into the Rust 6502.
+// Cpu facade dispatches into the Rust 6502.
 // Bus access flows back through two thin thunks (see below) that call
-// `fceu11::g_bus.read/write`, mirroring what the C++ X6502_RunDebug
-// loop's `RdMem` / `WrMem` inlines do.
+// `fceu11::g_bus.read/write`, mirroring what the deleted C++
+// `X6502_RunDebug` loop's `RdMem` / `WrMem` inlines do.
 
 namespace {
 // Thin shims that turn the C-side FFI signature into a fceu11::Bus
@@ -137,9 +141,9 @@ void cpu_rust_install_bus_once() noexcept {
 // thunk. The Rust CPU's `run_with_tick` loop calls `f(cycles)` once
 // per executed instruction with the instruction's CPU cycle count.
 // We forward `cycles` to the mapper-installed IRQ hook (if any) and
-// the APU's CPU clock — matching the body of the C++
-// `X6502_RunDebug` loop at `src/x6502.cpp:611-614`, which exists only
-// in the `#if !FCEUX11_RUST_CPU` branch.
+// the APU's CPU clock — matching the body of the deleted C++
+// `X6502_RunDebug` loop (which existed only in the pre-Phase-7 OFF
+// build).
 //
 // The thunk is `extern "C"` so it can be passed to
 // `fceux11_cpu_set_tick` (which takes `extern "C" fn(i32)`); the body
@@ -190,31 +194,18 @@ void cpu_rust_install_tick_once() noexcept {
     }
 }
 } // namespace
-#endif // FCEUX11_RUST_CPU
 
 void Cpu::init() noexcept {
-#if FCEUX11_RUST_CPU
     cpu_rust_install_bus_once();
     fceux11_cpu_init(reinterpret_cast<uint8_t*>(&layout_));
-#else
-    X6502_Init();
-#endif
 }
 void Cpu::reset() noexcept {
-#if FCEUX11_RUST_CPU
     cpu_rust_install_bus_once();
     fceux11_cpu_reset(reinterpret_cast<uint8_t*>(&layout_));
-#else
-    X6502_Reset();
-#endif
 }
 void Cpu::power() noexcept {
-#if FCEUX11_RUST_CPU
     cpu_rust_install_bus_once();
     fceux11_cpu_power(reinterpret_cast<uint8_t*>(&layout_));
-#else
-    X6502_Power();
-#endif
 }
 // Cached lookup of `FCEUX11_CYCLE_LOG`. The env-var is read once
 // at first call; subsequent calls read the cached bool. This is
@@ -229,16 +220,15 @@ static bool cycle_trace_enabled() {
 }
 
 void Cpu::run(int32_t cycles) {
-#if FCEUX11_RUST_CPU
     cpu_rust_install_bus_once();
     // PR-A: install the tick thunk before each run so that the Rust
     // CPU's `run_with_tick` loop forwards each per-instruction cycle
     // count to the mapper IRQ hook + APU sound hook. Matches the
-    // C++ `X6502_RunDebug` body in the OFF build (the reference
-    // branch at src/x6502.cpp:611-614).
+    // body of the deleted C++ `X6502_RunDebug` loop (which existed
+    // only in the pre-Phase-7 OFF build).
     cpu_rust_install_tick_once();
     // PR-A: use the tick-aware FFI entry point so per-instruction
-    // mapper/APU hooks fire under `FCEUX11_RUST_CPU=ON`. Without
+    // mapper/APU hooks fire. Without
     // this, mappers whose IRQ counters depend on CPU cycles (MMC3
     // scanline, VRC6 clock divider, DMC rate timer) never advance,
     // producing the per-frame cycle-accounting drift documented in
@@ -259,9 +249,6 @@ void Cpu::run(int32_t cycles) {
     // call, breaking hardware that reads `timestamp` mid-call (the
     // MMC1 `lreset` write throttle at src/boards/mmc1.cpp:136-138).
     (void)consumed;
-#else
-    X6502_RunDebug(*this, cycles);
-#endif
 
     // Phase 4.5 cycle-trace diagnostic: when `FCEUX11_CYCLE_LOG` is
     // set, record this call's input cycle budget, the post-call PC,
@@ -282,28 +269,16 @@ void Cpu::run(int32_t cycles) {
 // Interrupts
 // ---------------------------------------------------------------------------
 void Cpu::trigger_nmi() noexcept {
-#if FCEUX11_RUST_CPU
     cpu_rust_install_bus_once();
     fceux11_cpu_trigger_nmi(reinterpret_cast<uint8_t*>(&layout_));
-#else
-    ::TriggerNMI();
-#endif
 }
 void Cpu::trigger_irq(uint32_t source) noexcept {
-#if FCEUX11_RUST_CPU
     cpu_rust_install_bus_once();
     fceux11_cpu_irq_begin(reinterpret_cast<uint8_t*>(&layout_), source);
-#else
-    ::X6502_IRQBegin(static_cast<int>(source));
-#endif
 }
 void Cpu::clear_irq(uint32_t source) noexcept {
-#if FCEUX11_RUST_CPU
     cpu_rust_install_bus_once();
     fceux11_cpu_irq_end(reinterpret_cast<uint8_t*>(&layout_), source);
-#else
-    ::X6502_IRQEnd(static_cast<int>(source));
-#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -344,3 +319,282 @@ Cpu& cpu_instance() noexcept {
 }
 
 } // namespace fceu11
+
+// ---------------------------------------------------------------------------
+// Phase 7: legacy CPU-facing free functions migrated from the deleted
+// src/x6502.cpp. These are thin helpers around the Rust-backed Cpu
+// facade that the remaining C++ modules (boards, ppu, sound, debugger,
+// ines loader) still call. The C++ X6502 dispatch loop itself is gone.
+// ---------------------------------------------------------------------------
+
+// v1.3 Legion Phase 3: cycle accounting method on fceu11::Cpu (kept for
+// the migrated DMR/DMW helpers below, matching the deleted C++ loop).
+#define ADDCYC(x) g_cpu.add_cycles(x)
+
+// Legacy direct-memory read/write (DMC DMA, trainer check, OAM readback).
+// Charge one CPU cycle and fire the Lua memory hooks exactly like the
+// deleted C++ dispatch loop's RdMem/WrMem did.
+uint8 X6502_DMR(uint32 A)
+{
+ ADDCYC(1);
+ _DB=fceu11::g_bus.read(static_cast<uint16_t>(A));
+ #ifdef _S9XLUA_H
+ CallRegisteredLuaMemHook(A, 1, _DB, LUAMEMHOOK_READ);
+ #endif
+ return(_DB);
+}
+
+void X6502_DMW(uint32 A, uint8 V)
+{
+ ADDCYC(1);
+ fceu11::g_bus.write(static_cast<uint16_t>(A), V);
+ #ifdef _S9XLUA_H
+ CallRegisteredLuaMemHook(A, 1, V, LUAMEMHOOK_WRITE);
+ #endif
+ _DB = V;
+}
+
+// IRQ pin control: OR/AND the `IRQlow` blob bits. The Rust CPU
+// re-reads that blob from the host at every dispatch boundary via the
+// IRQ bridge (cpu/bus.rs `sync_irq_from_host`), so IRQs asserted
+// between Rust calls are visible to the next dispatch — same semantics
+// as the deleted C++ loop.
+void X6502_IRQBegin(int w)
+{
+ _IRQlow|=w;
+}
+
+void X6502_IRQEnd(int w)
+{
+ _IRQlow&=~w;
+}
+
+FCEUX11_CACHE_ALIGN static uint8 CycTable[256] =
+{
+/*0x00*/ 7,6,2,8,3,3,5,5,3,2,2,2,4,4,6,6,
+/*0x10*/ 2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
+/*0x20*/ 6,6,2,8,3,3,5,5,4,2,2,2,4,4,6,6,
+/*0x30*/ 2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
+/*0x40*/ 6,6,2,8,3,3,5,5,3,2,2,2,3,4,6,6,
+/*0x50*/ 2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
+/*0x60*/ 6,6,2,8,3,3,5,5,4,2,2,2,5,4,6,6,
+/*0x70*/ 2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
+/*0x80*/ 2,6,2,6,3,3,3,3,2,2,2,2,4,4,4,4,
+/*0x90*/ 2,6,2,6,4,4,4,4,2,5,2,5,5,5,5,5,
+/*0xA0*/ 2,6,2,6,3,3,3,3,2,2,2,2,4,4,4,4,
+/*0xB0*/ 2,5,2,5,4,4,4,4,2,4,2,4,4,4,4,4,
+/*0xC0*/ 2,6,2,8,3,3,5,5,2,2,2,2,4,4,6,6,
+/*0xD0*/ 2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
+/*0xE0*/ 2,6,3,8,3,3,5,5,2,2,2,2,4,4,6,6,
+/*0xF0*/ 2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
+};
+
+int X6502_GetOpcodeCycles( int op )
+{
+	return CycTable[op];
+}
+
+// E-1 probe (Phase 1 Step 1.3, 2026-08-02): env-gated absolute-cycle trace
+// for NMI latch set / CPU sampling. Uses FCEUX11_E1_TRACE like the PPU-side
+// probe so one env var drives the whole frame-boundary investigation.
+static bool e1_cpu_trace_on() {
+ static const bool on = []() {
+  const char* e = std::getenv("FCEUX11_E1_TRACE");
+  return e && e[0] == '1' && e[1] == '\0';
+ }();
+ return on;
+}
+
+// E-1 probe (Phase 1 Step 1.3): last instruction PC observed by the CPU at
+// the current boundary, so the PPU VBL block can log exactly where the CPU
+// instruction stream is when the frame boundary fires. Under the Rust CPU
+// the probe is diagnostic-only (the Rust dispatch does not update it).
+static uint16 e1_last_pc = 0;
+uint16 fceu11_e1_last_pc() { return e1_last_pc; }
+
+static uint64 e1_cpu_abs() {
+ return g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref();
+}
+
+// E-1 probe (Phase 1 Step 1.3, 2026-08-02): NMI-latch freshness flag.
+// The VBL path (TriggerNMI) is called from the PPU loop between CPU runs;
+// the CPU's next loop-top check happens at the boundary where the previous
+// instruction ENDED (before the latch was asserted), so dispatching there
+// would fire NMI one instruction too early. Per 6502 semantics the line is
+// sampled at the END of each instruction; a latch asserted at/after boundary
+// B must be observed at the NEXT boundary. TriggerNMI2 already defers via
+// the NMI2->NMI conversion on the same check; give TriggerNMI the same
+// one-boundary deferral (04-nmi_control #11 "after NEXT instruction").
+static bool g_e1_nmi_fresh = false;
+
+void TriggerNMI(void)
+{
+ // E-1 Track-B probe (v1.17 R5 task, 2026-08-08): enhanced NMI_LATCH
+ // recorder at the CPU-side callee of the NMI dispatch path. The
+ // existing E1 NMI_SET prints only the absolute timestamp; this E1B
+ // NMI_LATCH_CALLEE adds the CPU budget residual (count, 1/16-dot
+ // units), the freshly-latched IRQ-low byte, and the last PC the CPU
+ // observed, all before _IRQlow|=FCEU_IQNMI mutates state. Distinct
+ // probe name (E1B NMI_LATCH_CALLEE) so the caller-side E1B NMI_LATCH
+ // in ppu_rendering.cpp and this CPU-side line can be cross-correlated
+ // for the vbl_05/vbl_07 NMI dispatch-latency analysis.
+ if (e1_cpu_trace_on())
+  fprintf(stderr, "E1B NMI_LATCH_CALLEE abs=%llu (path=VBL) count=%d IRQlow_pre=0x%X lastpc=%04X\n",
+   (unsigned long long)e1_cpu_abs(),
+   (int)g_cpu.native_layout().count,
+   (unsigned)_IRQlow,
+   (unsigned)e1_last_pc);
+ if (e1_cpu_trace_on())
+  fprintf(stderr, "E1 NMI_SET abs=%llu (path=VBL)\n", (unsigned long long)e1_cpu_abs());
+ _IRQlow|=FCEU_IQNMI;
+ g_e1_nmi_fresh = true;
+}
+
+void TriggerNMI2(void)
+{
+ if (e1_cpu_trace_on())
+  fprintf(stderr, "E1 NMI_SET2 abs=%llu (path=W2000-edge)\n", (unsigned long long)e1_cpu_abs());
+ _IRQlow|=FCEU_IQNMI2;
+}
+
+// Phase 4 closeout: NMI-fresh flag accessors for the IRQ bridge. The
+// Rust CPU reads/writes this flag through `kagami_bridge_*` so the C++
+// one-instruction NMI deferral is honored at the same boundaries as the
+// reference dispatch.
+bool x6502_nmi_fresh_get(void) { return g_e1_nmi_fresh; }
+void x6502_nmi_fresh_set(bool v) { g_e1_nmi_fresh = v; }
+
+namespace fceu11 {
+
+// v0.3.10 P4.1: definitions live in fceu11:: per plan v3 §5 v0.3.10;
+// the global FCEUI_NMI / FCEUI_IRQ symbols are preserved via the inline
+// reference aliases declared in core_api.h.
+void NMI()
+{
+ _IRQlow|=FCEU_IQNMI;
+}
+
+void IRQ()
+{
+ _IRQlow|=FCEU_IQTEMP;
+}
+
+} // namespace fceu11
+
+void FCEUI_GetIVectors(uint16 *reset, uint16 *irq, uint16 *nmi)
+{
+ fceuindbg=1;
+
+ // Vector reads go through the same bus path + Lua mem hooks as the
+ // deleted C++ dispatch loop's RdMem did (including the _DB latch).
+ auto rd = [](unsigned int A) -> uint8 {
+  uint8 v = fceu11::g_bus.read(static_cast<uint16_t>(A));
+  _DB = v;
+  #ifdef _S9XLUA_H
+  CallRegisteredLuaMemHook(A, 1, v, LUAMEMHOOK_READ);
+  #endif
+  return v;
+ };
+ *reset=rd(0xFFFC);
+ *reset|=rd(0xFFFD)<<8;
+ *nmi=rd(0xFFFA);
+ *nmi|=rd(0xFFFB)<<8;
+ *irq=rd(0xFFFE);
+ *irq|=rd(0xFFFF)<<8;
+ fceuindbg=0;
+}
+
+//the opsize table is used to quickly grab the instruction sizes (in bytes)
+FCEUX11_CACHE_ALIGN const uint8 opsize[256] = {
+#ifdef BRK_3BYTE_HACK
+/*0x00*/	3, //BRK
+#else
+/*0x00*/	1, //BRK
+#endif
+/*0x01*/      2,0,0,0,2,2,0,1,2,1,0,0,3,3,0,
+/*0x10*/	2,2,0,0,0,2,2,0,1,3,0,0,0,3,3,0,
+/*0x20*/	3,2,0,0,2,2,2,0,1,2,1,0,3,3,3,0,
+/*0x30*/	2,2,0,0,0,2,2,0,1,3,0,0,0,3,3,0,
+/*0x40*/	1,2,0,0,0,2,2,0,1,2,1,0,3,3,3,0,
+/*0x50*/	2,2,0,0,0,2,2,0,1,3,0,0,0,3,3,0,
+/*0x60*/	1,2,0,0,0,2,2,0,1,2,1,0,3,3,3,0,
+/*0x70*/	2,2,0,0,0,2,2,0,1,3,0,0,0,3,3,0,
+/*0x80*/	0,2,0,0,2,2,2,0,1,0,1,0,3,3,3,0,
+/*0x90*/	2,2,0,0,2,2,2,0,1,3,1,0,0,3,0,0,
+/*0xA0*/	2,2,2,0,2,2,2,0,1,2,1,0,3,3,3,0,
+/*0xB0*/	2,2,0,0,2,2,2,0,1,3,1,0,3,3,3,0,
+/*0xC0*/	2,2,0,0,2,2,2,0,1,2,1,0,3,3,3,0,
+/*0xD0*/	2,2,0,0,0,2,2,0,1,3,0,0,0,3,3,0,
+/*0xE0*/	2,2,0,0,2,2,2,0,1,2,1,0,3,3,3,0,
+/*0xF0*/	2,2,0,0,0,2,2,0,1,3,0,0,0,3,3,0
+};
+
+
+//the optype table is a quick way to grab the addressing mode for any 6502 opcode
+//
+//  0 = Implied\Accumulator\Immediate\Branch\NULL
+//  1 = (Indirect,X)
+//  2 = Zero Page
+//  3 = Absolute
+//  4 = (Indirect),Y
+//  5 = Zero Page,X
+//  6 = Absolute,Y
+//  7 = Absolute,X
+//  8 = Zero Page,Y
+//
+FCEUX11_CACHE_ALIGN const uint8 optype[256] = {
+/*0x00*/	0,1,0,1,2,2,2,2,0,0,0,0,3,3,3,3,
+/*0x10*/	0,4,0,3,5,5,5,5,0,6,0,6,7,7,7,7,
+/*0x20*/	0,1,0,1,2,2,2,2,0,0,0,0,3,3,3,3,
+/*0x30*/	0,4,0,3,5,5,5,5,0,6,0,6,7,7,7,7,
+/*0x40*/	0,1,0,1,2,2,2,2,0,0,0,0,3,3,3,3,
+/*0x50*/	0,4,0,3,5,5,5,5,0,6,0,6,7,7,7,7,
+/*0x60*/	0,1,0,1,2,2,2,2,0,0,0,0,3,3,3,3,
+/*0x70*/	0,4,0,3,5,5,5,5,0,6,0,6,7,7,7,7,
+/*0x80*/	0,1,0,1,2,2,2,2,0,0,0,0,3,3,3,3,
+/*0x90*/	0,4,0,3,5,5,8,8,0,6,0,6,7,7,6,6,
+/*0xA0*/	0,1,0,1,2,2,2,2,0,0,0,0,3,3,3,3,
+/*0xB0*/	0,4,0,3,5,5,8,8,0,6,0,6,7,7,6,6,
+/*0xC0*/	0,1,0,1,2,2,2,2,0,0,0,0,3,3,3,3,
+/*0xD0*/	0,4,0,3,5,5,5,5,0,6,0,6,7,7,7,7,
+/*0xE0*/	0,1,0,1,2,2,2,2,0,0,0,0,3,3,3,3,
+/*0xF0*/	0,4,0,3,5,5,5,5,0,6,0,6,7,7,7,7,
+};
+
+// the opwrite table aids in predicting the value written for any 6502 opcode
+//
+//  0 = No value written
+//  1 = Write from A
+//  2 = Write from X
+//  3 = Write from Y
+//  4 = Write from P
+//  5 = ASL (SLO)
+//  6 = LSR (SRE)
+//  7 = ROL (RLA)
+//  8 = ROR (RRA)
+//  9 = INC (ISC)
+// 10 = DEC (DCP)
+// 11 = (SAX)
+// 12 = (AHX)
+// 13 = (SHY)
+// 14 = (SHX)
+// 15 = (TAS)
+
+FCEUX11_CACHE_ALIGN const uint8 opwrite[256] = {
+/*0x00*/	 0, 0, 0, 5, 0, 0, 5, 5, 4, 0, 0, 0, 0, 0, 5, 5,
+/*0x10*/	 0, 0, 0, 5, 0, 0, 5, 5, 0, 0, 0, 5, 0, 0, 5, 5,
+/*0x20*/	 0, 0, 0, 7, 0, 0, 7, 7, 0, 0, 7, 0, 0, 0, 7, 7,
+/*0x30*/	 0, 0, 0, 7, 0, 0, 7, 7, 0, 0, 0, 7, 0, 0, 7, 7,
+/*0x40*/	 0, 0, 0, 6, 0, 0, 6, 6, 1, 0, 6, 0, 0, 0, 6, 6,
+/*0x50*/	 0, 0, 0, 6, 0, 0, 6, 6, 0, 0, 0, 6, 0, 0, 6, 6,
+/*0x60*/	 0, 0, 0, 8, 0, 0, 8, 8, 0, 0, 8, 0, 0, 0, 8, 8,
+/*0x70*/	 0, 0, 0, 8, 0, 0, 8, 8, 0, 0, 0, 8, 0, 0, 8, 8,
+/*0x80*/	 0, 1, 0,11, 3, 1, 2,11, 0, 0, 0, 0, 3, 1, 2,11,
+/*0x90*/	 0, 1, 0,12, 3, 1, 2,11, 0, 1, 0,15,13, 1,14,12,
+/*0xA0*/	 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/*0xB0*/	 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/*0xC0*/	 0, 0, 0,10, 0, 0,10,10, 0, 0, 0, 0, 0, 0,10,10,
+/*0xD0*/	 0, 0, 0,10, 0, 0,10,10, 0, 0, 0,10, 0, 0,10,10,
+/*0xE0*/	 0, 0, 0, 9, 0, 0, 9, 9, 0, 0, 0, 0, 0, 0, 9, 9,
+/*0xF0*/	 0, 0, 0, 9, 0, 0, 9, 9, 0, 0, 0, 9, 0, 0, 9, 9,
+};

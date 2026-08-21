@@ -1,7 +1,7 @@
 // iNES game interface hooks — extracted from ines.cpp for v1.10 Cryptex Phase A.3.
 
 #include "types.h"
-#include "x6502.h"
+#include "cpu.h"
 #include "fceu.h"
 #include "cart.h"
 #include "ines.h"

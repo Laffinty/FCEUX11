@@ -302,8 +302,6 @@
 - `src/video.h`
 - `src/vsuni.h`
 - `src/wave.h`
-- `src/x6502abbrev.h`
-- `src/x6502struct.h`
 - `src/rust/crates/fceux11-core/src/bus.rs`
 - `src/rust/crates/fceux11-core/src/lib.rs`
 - `src/rust/crates/fceux11-core/src/state_file.rs`
@@ -1449,10 +1447,6 @@
 | OK | root | `src/vsuni.h` | Unknown/None |  |
 | OK | root | `src/wave.cpp` | GPLv2+ |  |
 | OK | root | `src/wave.h` | Unknown/None |  |
-| OK | root | `src/x6502.cpp` | GPLv2+ | * Copyright (C) 2002 Xodnizel |
-| OK | root | `src/x6502.h` | GPLv2+ | * Copyright (C) 2002 Xodnizel |
-| OK | root | `src/x6502abbrev.h` | Unknown/None |  |
-| OK | root | `src/x6502struct.h` | Unknown/None |  |
 | OK | utils | `src/utils/backward.cpp` | Unknown/None |  |
 | OK | utils | `src/utils/ConvertUTF.c` | GPLv2+ |  |
 | OK | utils | `src/utils/ConvertUTF.h` | Unknown/None | * Copyright 2001-2004 Unicode, Inc. |

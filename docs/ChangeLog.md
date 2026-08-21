@@ -5,13 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - wip2.0 Rust 6502 CPU 迁移（Phase 1-6）
+## [Unreleased] - wip2.0 Rust 6502 CPU 迁移（Phase 1-7）
 
 **分支 `wip2.0`**。把 C++ X6502 CPU 替换为 `fceux11-core` 的 Rust 6502
-实现（Rust-first，见 `docs/plans/cpu-rust-v2.md`）。Phase 1-6 已落地，
-Phase 7 前检查（`docs/plans/phase7-preflight-review-2026-08-21.md`）与
-修复（`docs/plans/phase7-preflight-fixes-2026-08-21.md`）已完成，
-Phase 7（删除 C++ CPU）未开始。
+实现（Rust-first，见 `docs/plans/cpu-rust-v2.md`）。Phase 1-7 已全部落地：
+Phase 7（`2026-08-22`）删除了 C++ CPU（`src/x6502.{cpp,h,struct.h,abbrev.h}`、
+`src/ops.inc`、`src/ops_table.inc`、`scripts/generate_x6502_dispatch.py`），
+`FCEUX11_RUST_CPU` 默认翻转为 ON，Rust CPU 成为唯一实现。
 
 ### Added
 
@@ -22,8 +22,9 @@ Phase 7（删除 C++ CPU）未开始。
 - **FFI 桥**：`fceux11_cpu_{init,power,reset,run,trigger_nmi,trigger_nmi2,
   irq_begin,irq_end,snapshot,restore,set_bus}`，经 cbindgen 写入
   `src/rust/fceux11_rust.h`。
-- **`FCEUX11_RUST_CPU` CMake 开关**（默认 OFF，Phase 7 将翻转 ON）：
-  把 `Cpu::run()` / TriggerNMI / IRQ 入口路由到 Rust CPU。
+- **`FCEUX11_RUST_CPU` CMake 开关**（Phase 7 起默认 ON；C++ CPU 已删除，
+  设为 OFF 是配置期错误）：把 `Cpu::run()` / TriggerNMI / IRQ 入口路由到
+  Rust CPU。
 - **`cpu/tick.rs`**：opt-in 每指令 tick 回调（镜像 C++ `map_irq_hook`），
   FFI 符号 `fceux11_cpu_set_tick` / `fceux11_cpu_set_tick_cycles` /
   `fceux11_cpu_set_tick_null`。
@@ -61,7 +62,7 @@ Phase 7（删除 C++ CPU）未开始。
 - 非官方 opcode 覆盖率 105/105；`cpu/snapshot.rs` + 4 个 savestate
   测试；`golden_savestate_test` 字节相等；`savestate_regression` 0/12。
 
-### Phase 7 preflight 修复（2026-08-21，工作树未提交）
+### Phase 7 preflight 修复（2026-08-21，`31c5b35`）
 
 - **非官方 opcode 奇偶性（MUST-FIX，`execute.rs::do_unofficial`）**：
   - SHX `0x9E` 索引寄存器 X→Y（`abs_y_write`），并应用 C++ 写地址高位
@@ -80,6 +81,30 @@ Phase 7（删除 C++ CPU）未开始。
   tick_cycles 时间戳）；`decode.rs` codegen 延期说明；ARR `0x6B` 死代码
   清理；`cargo clippy -p fceux11-core --all-targets --no-deps` 干净
   （含 FFI `# Safety` 文档/模块级 allow）；`cargo fmt` 干净。
+
+### Phase 7 收口（2026-08-22）— 删除 C++ CPU
+
+- **删除**：`src/x6502.cpp`、`src/x6502.h`、`src/x6502struct.h`、
+  `src/x6502abbrev.h`、`src/ops.inc`、`src/ops_table.inc`、
+  `scripts/generate_x6502_dispatch.py`（C++ 派发循环 ~2940 LOC）。
+- **`FCEUX11_RUST_CPU` 默认翻转为 ON**；`OFF` 为配置期错误（C++ CPU 已
+  不存在）。`src/CMakeLists.txt` 移除 `x6502.cpp` 编译单元，Rust
+  staticlib 链接与 cbindgen 头依赖无条件生效。
+- **保留符号迁移**：仍被 C++ 侧消费的符号从被删头文件迁入
+  `src/cpu.h`（`X6502` 64 字节 savestate 结构体、`_A` 等寄存器宏、
+  flag/IRQ 常量、`opsize/optype/opwrite` 表声明、`X6502_Run` 宏、
+  `TriggerNMI/2`、`X6502_IRQBegin/End`、`X6502_DMR/DMW`、
+  `X6502_GetOpcodeCycles`、`x6502_nmi_fresh_get/set`、`fceu11_e1_last_pc`、
+  `NTSC_CPU`/`PAL_CPU`/`dendy`）与 `src/cpu.cpp`（对应定义：总线辅助、
+  IRQ pin 控制、CycTable + 三张 opcode 表、NMI 断言路径、
+  `fceu11::NMI/IRQ`、`FCEUI_GetIVectors`）。~20 个 C++ 消费方
+  （board 公共头 `mapinc_bus.h`、`input/share.h`、ppu/sound/state/
+  debug/测试）的 `x6502.h` include 改为 `cpu.h`。
+- **`cpu.cpp` 剥离 OFF 分支**：`#if FCEUX11_RUST_CPU` guard 与
+  `#else`（C++ CPU）分支全部移除，Rust FFI 路径无条件。`cpu.cpp`
+  保留为 Rust 集成 facade（计划撰写时的"96 行 facade"在 Phase 3-6
+  已成为 FFI 集成层，故保留而非删除——删除清单以"C++ CPU 实现"为准）。
+- **`scripts/_rebuild_off_target.ps1` 删除**（OFF 构建不再存在）。
 
 ### Fixed（Rust CPU 真实 bug，均由新增测试暴露）
 
@@ -100,11 +125,11 @@ Phase 7（删除 C++ CPU）未开始。
 - `tests/proptest_fuzz.rs`（5）：随机 state × ROM 鲁棒性 fuzz
 - `tests/nestest.rs`（2）+ `tests/opcodes.rs`（7）+ lib 单测（89）
 
-### Known limits（Phase 7 前状态）
+### Known limits（Phase 7 后状态）
 
-`FCEUX11_RUST_CPU=ON` 下 ctest 32/34，仅两个已记录残留：
-`kagami_qa_direct_smoke` blargg known-fails（全部在
-`blargg_known_fail.json`，C++ 基线同样失败）与
+Phase 7 后只存在 Rust CPU 构建（`FCEUX11_RUST_CPU=ON`）。ctest 非 perf
+32/34，仅两个已记录残留：`kagami_qa_direct_smoke` blargg known-fails
+（全部在 `blargg_known_fail.json`，C++ 基线同样失败）与
 `rom_regression_rust_smoke` 的 1/780（nestest 过渡帧 16-pixel PPU
 渲染时序产物，所有 CPU 可观测量字节一致）。`cargo clippy -p
 fceux11-formats` 的既有错误（预先存在、超出 CPU 范围）记录于此，推迟到

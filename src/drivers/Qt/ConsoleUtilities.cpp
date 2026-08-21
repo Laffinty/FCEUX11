@@ -38,7 +38,7 @@
 #endif
 
 #include "../../fceu.h"
-#include "../../x6502.h"
+#include "../../cpu.h"
 #include "Qt/fceuWrapper.h"
 #include "Qt/ConsoleUtilities.h"
 

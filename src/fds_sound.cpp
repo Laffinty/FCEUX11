@@ -4,7 +4,7 @@
 // FDSSound are the only entry points called from fds.cpp.
 
 #include "types.h"
-#include "x6502.h"
+#include "cpu.h"
 #include "fceu.h"
 #include "fds.h"
 #include "sound.h"

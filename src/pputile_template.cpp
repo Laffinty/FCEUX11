@@ -13,7 +13,7 @@
 #include "pputile_template.h"
 
 #include "types.h"
-#include "x6502.h"
+#include "cpu.h"
 #include "fceu.h"            // MMC5Hack*, qtaintramreg, PPU_hook
 #include "ppu.h"
 #include "ppu_rendering.h"

@@ -20,7 +20,7 @@
 #include "net_api.h"
 #include "diag_api.h"
 #include "cheat.h"
-#include "x6502.h"
+#include "cpu.h"
 #include "ppu.h"
 #include "utils/xstring.h"
 #include "utils/memory.h"
@@ -47,8 +47,6 @@ extern char FileBase[];
 #include <atomic>
 #include <algorithm>
 #include <bitset>
-
-#include "x6502abbrev.h"
 
 // ==========================================================================
 // FCEUX11 Rust Lua Engine: only FFI bridge functions and shared state.

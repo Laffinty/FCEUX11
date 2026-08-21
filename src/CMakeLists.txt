@@ -216,7 +216,6 @@ set(SRC_CORE
   	${CMAKE_CURRENT_SOURCE_DIR}/video.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/vsuni.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/wave.cpp
-  	${CMAKE_CURRENT_SOURCE_DIR}/x6502.cpp
 	${LUA_ENGINE_SOURCE}
 	${CMAKE_CURRENT_SOURCE_DIR}/utils/ioapi.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/utils/unzip.cpp
@@ -738,28 +737,31 @@ if(FCEUX11_RUST_ENABLED)
     add_dependencies(fceux11_drivers_qt fceux11_rust_build)
     add_dependencies(fceux11_drivers_null fceux11_rust_build)
 
-    # Phase 3 (revised) step 3: when FCEUX11_RUST_CPU is on, the C++
-    # Cpu facade dispatches into the Rust CPU via the FFI symbols in
-    # fceux11_rust.h (produced by cbindgen from fceux11-core). Emit
-    # the compile-time guard so src/cpu.cpp picks the right branch
-    # and propagate the Rust staticlib link into fceux11_core (which
-    # owns the cpu.cpp TU). Without this, the link step would miss
-    # the fceux11_cpu_* symbols exported by fceux11_rust.lib.
-    if(FCEUX11_RUST_CPU)
-        if(NOT FCEUX11_ENABLE_RUST)
-            message(FATAL_ERROR
-                "FCEUX11_RUST_CPU=ON requires FCEUX11_ENABLE_RUST=ON "
-                "(the Rust staticlib provides the FFI symbols).")
-        endif()
-        message(STATUS
-            "FCEUX11_RUST_CPU=ON: routing Cpu facade through Rust 6502 "
-            "(see src/cpu.cpp). Phase 3 regression gate active.")
-        add_definitions(-DFCEUX11_RUST_CPU=1)
-        # fceux11_core owns src/cpu.cpp — propagate the Rust staticlib
-        # link into it so the FFI symbols resolve at link time.
-        target_link_libraries(fceux11_core PUBLIC ${FCEUX11_RUST_STATIC_LIB})
-        add_dependencies(fceux11_core fceux11_rust_build)
+    # Phase 7 (2026-08-22): the C++ 6502 CPU was deleted; the Rust CPU
+    # in fceux11-core is the only CPU implementation. The C++ Cpu facade
+    # dispatches into it via the FFI symbols in fceux11_rust.h (produced
+    # by cbindgen from fceux11-core). The Rust staticlib link must be
+    # propagated into fceux11_core (which owns the cpu.cpp TU);
+    # without this, the link step would miss the fceux11_cpu_* symbols
+    # exported by fceux11_rust.lib.
+    if(NOT FCEUX11_RUST_CPU)
+        message(FATAL_ERROR
+            "FCEUX11_RUST_CPU=OFF is no longer supported: the C++ 6502 "
+            "CPU was deleted in Phase 7 (cpu-rust-v2.md). The Rust CPU "
+            "is the only implementation.")
     endif()
+    if(NOT FCEUX11_ENABLE_RUST)
+        message(FATAL_ERROR
+            "FCEUX11_RUST_CPU=ON requires FCEUX11_ENABLE_RUST=ON "
+            "(the Rust staticlib provides the FFI symbols).")
+    endif()
+    message(STATUS
+        "FCEUX11_RUST_CPU=ON: routing Cpu facade through Rust 6502 "
+        "(see src/cpu.cpp). Rust CPU is the only CPU since Phase 7.")
+    # fceux11_core owns src/cpu.cpp — propagate the Rust staticlib
+    # link into it so the FFI symbols resolve at link time.
+    target_link_libraries(fceux11_core PUBLIC ${FCEUX11_RUST_STATIC_LIB})
+    add_dependencies(fceux11_core fceux11_rust_build)
 endif()
 
 # Put build timestamp into BUILD_TS environment variable and from there into
