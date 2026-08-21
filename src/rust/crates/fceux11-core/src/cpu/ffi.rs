@@ -39,6 +39,11 @@
 //! single-threaded-emulator invariant the C++ side already has.
 //! `unsafe` on the `extern "C"` boundary documents that callers must
 //! uphold the invariants; the FFI does no further synchronisation.
+//!
+//! Every unsafe entry point below implements the same contract;
+//! silence the per-function `# Safety` lint rather than repeating it
+//! on each function.
+#![allow(clippy::missing_safety_doc)]
 
 use crate::cpu::addressing::CpuState;
 use crate::cpu::bus::CppBus;
@@ -210,36 +215,37 @@ pub unsafe extern "C" fn fceux11_cpu_irq_end(state: *mut u8, src: u32) {
 /// Run the CPU for `cycles` CPU cycles. Returns the total CPU
 /// cycles consumed during this run (NOT the number of instructions).
 ///
-/// The C++ side uses this return value to advance `Cpu::timestamp_`
-/// / `sound_timestamp_` — those fields live on the `fceu11::Cpu`
-/// object outside the 64-byte X6502 layout that this FFI operates
-/// on, so the Rust side can't update them directly.
-///
 /// Mirrors `X6502_RunDebug(fceu11::Cpu&, int32 cycles)`'s loop body.
 /// Each instruction boundary first dispatches any pending IRQ/NMI/
 /// RESET, then fetches + executes the next instruction.
 ///
+/// The return value is informational only — the C++ side discards it
+/// (`(void)consumed;` in `src/cpu.cpp::Cpu::run`). `Cpu::timestamp_`
+/// / `sound_timestamp_` are advanced per-instruction by the tick
+/// bridge installed via [`fceux11_cpu_set_tick_cycles`]
+/// (`cpu_rust_tick_cycles_thunk`), matching C++ `add_cycles` between
+/// instructions; a whole-call advance would leave them frozen
+/// mid-call (breaking e.g. the MMC1 write throttle that reads
+/// `timestamp` mid-call). Most callers should use
+/// [`fceux11_cpu_run_with_tick`], which is what `Cpu::run(cycles)`
+/// actually invokes.
+///
 /// ## Cycle accounting — read this before debugging
 ///
-/// The C++ `X6502_RunDebug` does `_count += cycles_arg * 16` at start
-/// and `_count -= CycTable[opcode] * 48` per instruction. The two
-/// multipliers (16 vs 48) are different units: 16 represents
-/// "1/16-CPU-cycle units per input cycle", 48 represents
-/// "1/48-CPU-cycle units per consumed cycle". Per instruction the
-/// consumed-cycles delta is `CycTable * 48` (1/48 units), which is
-/// 3x the Rust `count` delta in 1/16 units — both reduce to
-/// `CycTable` CPU cycles.
+/// `state.regs.count` follows the C++ `_count` polarity exactly:
+///   - per call: `count += cycles_arg * 16` (budget added in
+///     1/16-CPU-cycle units, mirroring C++ `_count += cycles * 16`)
+///   - per dispatch: `count -= irq_cycles * 48` (C++ `ADDCYC(7)`)
+///   - per instruction: `count -= CycTable[opcode] * 48` (C++'s
+///     1/48-CPU-cycle-unit decrement — 3x the 1/16-unit budget scale,
+///     so `CycTable * 48 == CycTable * 16 * 3`)
+///   - the loop exits when `count <= 0` (C++ `while (_count > 0)`),
+///     so the residual — including "overdraw" into the negative —
+///     carries across calls exactly like C++ `_count`
 ///
-/// The Rust `cpu::run()` uses the inverse convention: `count` is a
-/// *cumulative* counter incremented by `CycTable * 16` (1/16 units)
-/// per instruction, and the loop exits when `count >= target`. The
-/// FFI shim passes `cycles_arg * 16` as the target so that a
-/// `cycles_arg` CPU-cycle budget maps to the same instruction count
-/// as the C++ loop.
-///
-/// Math: Rust terminates when `sum(CycTable * 16) >= target`, i.e.
-/// when `sum(CycTable) >= target / 16 = cycles_arg`. So the target
-/// is exactly the input budget in CPU cycles.
+/// The FFI shim passes `cycles_arg * 16` as the budget so a
+/// `cycles_arg`-CPU-cycle input maps to the same per-call
+/// instruction count as the C++ loop.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_cpu_run(state: *mut u8, cycles: i32) -> i32 {
     if state.is_null() || cycles <= 0 {
@@ -350,7 +356,7 @@ mod tests {
     // parallel, so serialize the whole module (the tick test also
     // holds tick.rs's TICK_SLOT_LOCK for the shared TICK_FN slot).
     static FFI_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-    use crate::cpu::bus::{fceux11_cpu_set_bus, FlatBus};
+    use crate::cpu::bus::{FlatBus, fceux11_cpu_set_bus};
     use crate::cpu::state::Flags;
 
     /// Mimic a 64-byte aligned buffer. The X6502Layout type is
@@ -407,9 +413,8 @@ mod tests {
         }
         assert_ne!(buf.irq_low & IrqSource::NMI.bits(), 0);
         let state_ptr = core::ptr::addr_of_mut!(FFI_CPU_STATE);
-        assert_eq!(
+        assert!(
             unsafe { (*state_ptr).nmi_fresh },
-            true,
             "trigger_nmi must set the nmi_fresh flag for next-boundary deferral"
         );
     }
@@ -466,16 +471,13 @@ mod tests {
     #[test]
     fn run_executes_nestest_reset_to_c000() {
         let _ffi_guard = FFI_TEST_LOCK.lock().unwrap();
-        use crate::cpu::addressing::Bus;
 
         // The FFI read/write callbacks are `extern "C" fn` (no
         // closure captures), so we can't smuggle the FlatBus pointer
         // through the type system. Mirror the C++ side's pattern:
         // keep a single global `FlatBus` slot the trampoline reads
         // from, and copy our local bus into it before exercising.
-        static mut BUS_PTR_FOR_TEST: FlatBus = FlatBus {
-            mem: [0; 0x10000],
-        };
+        static mut BUS_PTR_FOR_TEST: FlatBus = FlatBus { mem: [0; 0x10000] };
         extern "C" fn read_trampoline(addr: u16) -> u8 {
             use crate::cpu::addressing::Bus;
             let bus_ptr = core::ptr::addr_of_mut!(BUS_PTR_FOR_TEST);
@@ -528,7 +530,7 @@ mod tests {
     #[test]
     fn run_with_tick_invokes_tick_per_instruction() {
         let _ffi_guard = FFI_TEST_LOCK.lock().unwrap();
-        use crate::cpu::tick::{fceux11_cpu_set_tick, fceux11_cpu_set_tick_null, TICK_SLOT_LOCK};
+        use crate::cpu::tick::{TICK_SLOT_LOCK, fceux11_cpu_set_tick, fceux11_cpu_set_tick_null};
         use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
         // Serialize against tick.rs tests: they share the TICK_FN slot.
         let _tick_guard = TICK_SLOT_LOCK.lock().unwrap();
@@ -545,12 +547,12 @@ mod tests {
 
         TICKS.store(0, Ordering::SeqCst);
         TICKS_SUM.store(0, Ordering::SeqCst);
-        unsafe { fceux11_cpu_set_tick(counting_tick); }
+        unsafe {
+            fceux11_cpu_set_tick(counting_tick);
+        }
 
         // NOP sled, RESET vector points at a JMP to the sled.
-        static mut BUS_PTR_FOR_TEST_TICK: FlatBus = FlatBus {
-            mem: [0; 0x10000],
-        };
+        static mut BUS_PTR_FOR_TEST_TICK: FlatBus = FlatBus { mem: [0; 0x10000] };
         extern "C" fn read_trampoline_tick(addr: u16) -> u8 {
             use crate::cpu::addressing::Bus;
             let bus_ptr = core::ptr::addr_of_mut!(BUS_PTR_FOR_TEST_TICK);
@@ -589,7 +591,9 @@ mod tests {
             )
         };
 
-        unsafe { fceux11_cpu_set_tick_null(); }
+        unsafe {
+            fceux11_cpu_set_tick_null();
+        }
 
         let tick_count = TICKS.load(Ordering::SeqCst);
         let tick_sum = TICKS_SUM.load(Ordering::SeqCst);

@@ -98,6 +98,12 @@ pub unsafe extern "C" fn fceux11_rust_sformat_serialize(
 }
 
 /// Free a buffer returned by `fceux11_rust_sformat_serialize`.
+///
+/// # Safety
+/// `buf` must be the exact pointer previously written by
+/// `fceux11_rust_sformat_serialize` (a `Vec<u8>` returned as raw
+/// parts), and `len` must match the length written there. Passing any
+/// other pointer is undefined behaviour.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_sformat_buf_free(buf: *mut u8, len: usize) {
     if !buf.is_null() && len > 0 {
@@ -111,6 +117,14 @@ pub unsafe extern "C" fn fceux11_rust_sformat_buf_free(buf: *mut u8, len: usize)
 // Deserialization (bytes → C++ memory)
 // ============================================================
 
+// hotfix1 P1-5 (C-07): refuse any individual SFORMAT entry larger than
+// 1 MiB. The savestate stream header declares the size, and the old
+// code trusted it without bound — a 32-bit `size` field of 0xFFFFFFFF
+// plus any pointer-deref target would copy ~4 GiB into the destination
+// even though legitimate entries never exceed a few KB. We bail out
+// before doing any memcpy.
+const MAX_SFORMAT_ENTRY_SIZE: usize = 1 << 20;
+
 /// Deserialize a SFORMAT byte stream into C++ memory regions.
 ///
 /// For each entry in the stream (desc + size + data), finds the matching
@@ -121,14 +135,6 @@ pub unsafe extern "C" fn fceux11_rust_sformat_buf_free(buf: *mut u8, len: usize)
 /// `entries` must point to a valid array of `count` SFORMAT entries.
 /// Each entry's `v` pointer must be valid for writes of `entry.s & !FLAGS` bytes.
 /// The array must be terminated by an entry with `v == null`.
-// hotfix1 P1-5 (C-07): refuse any individual SFORMAT entry larger than
-// 1 MiB. The savestate stream header declares the size, and the old
-// code trusted it without bound — a 32-bit `size` field of 0xFFFFFFFF
-// plus any pointer-deref target would copy ~4 GiB into the destination
-// even though legitimate entries never exceed a few KB. We bail out
-// before doing any memcpy.
-const MAX_SFORMAT_ENTRY_SIZE: usize = 1 << 20;
-
 pub unsafe extern "C" fn fceux11_rust_sformat_deserialize(
     stream_data: *const u8,
     stream_len: usize,
@@ -145,7 +151,12 @@ pub unsafe extern "C" fn fceux11_rust_sformat_deserialize(
 
     let mut pos = 0usize;
     while pos + 8 <= stream.len() {
-        let desc = [stream[pos], stream[pos + 1], stream[pos + 2], stream[pos + 3]];
+        let desc = [
+            stream[pos],
+            stream[pos + 1],
+            stream[pos + 2],
+            stream[pos + 3],
+        ];
         let size = u32::from_le_bytes([
             stream[pos + 4],
             stream[pos + 5],
@@ -225,10 +236,7 @@ fn find_entry_mut<'a>(
 /// # Safety
 /// `data` must point to `len` valid bytes.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fceux11_rust_sformat_crc32(
-    data: *const u8,
-    len: usize,
-) -> u32 {
+pub unsafe extern "C" fn fceux11_rust_sformat_crc32(data: *const u8, len: usize) -> u32 {
     if data.is_null() || len == 0 {
         return 0;
     }
@@ -245,10 +253,7 @@ pub unsafe extern "C" fn fceux11_rust_sformat_crc32(
 /// # Safety
 /// `data` must point to `len` valid bytes.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fceux11_rust_sformat_validate(
-    data: *const u8,
-    len: usize,
-) -> i32 {
+pub unsafe extern "C" fn fceux11_rust_sformat_validate(data: *const u8, len: usize) -> i32 {
     if len == 0 {
         return 0; // empty stream is valid
     }
@@ -313,10 +318,7 @@ pub unsafe extern "C" fn fceux11_rust_sformat_to_chunk(
     }
 
     let data = unsafe { Vec::from_raw_parts(buf_ptr, buf_len, buf_len) };
-    let chunk = StateChunk {
-        chunk_type,
-        data,
-    };
+    let chunk = StateChunk { chunk_type, data };
 
     unsafe {
         std::ptr::write(out_chunk, chunk);
@@ -333,11 +335,7 @@ mod tests {
     use super::*;
 
     // Helper: create a FceuxSformatEntry with desc as a static pointer.
-    fn make_entry<'a>(
-        v: *const u8,
-        s: u32,
-        desc: &'static [u8; 4],
-    ) -> FceuxSformatEntry {
+    fn make_entry(v: *const u8, s: u32, desc: &'static [u8; 4]) -> FceuxSformatEntry {
         FceuxSformatEntry {
             v,
             s,
@@ -355,9 +353,7 @@ mod tests {
         let mut out_buf: *mut u8 = std::ptr::null_mut();
         let mut out_len: usize = 0;
 
-        assert!(unsafe {
-            fceux11_rust_sformat_serialize(&entry, 1, &mut out_buf, &mut out_len)
-        });
+        assert!(unsafe { fceux11_rust_sformat_serialize(&entry, 1, &mut out_buf, &mut out_len) });
 
         assert!(!out_buf.is_null());
         assert_eq!(out_len, 4 + 4 + 4); // desc + size + data
@@ -411,9 +407,7 @@ mod tests {
         let mut out_buf: *mut u8 = std::ptr::null_mut();
         let mut out_len: usize = 0;
 
-        assert!(unsafe {
-            fceux11_rust_sformat_serialize(&entry, 1, &mut out_buf, &mut out_len)
-        });
+        assert!(unsafe { fceux11_rust_sformat_serialize(&entry, 1, &mut out_buf, &mut out_len) });
 
         let result = unsafe { std::slice::from_raw_parts(out_buf, out_len) };
         assert_eq!(&result[4..8], &4u32.to_le_bytes());
@@ -429,9 +423,7 @@ mod tests {
         let mut out_buf: *mut u8 = std::ptr::null_mut();
         let mut out_len: usize = 0;
 
-        assert!(unsafe {
-            fceux11_rust_sformat_serialize(&entry, 1, &mut out_buf, &mut out_len)
-        });
+        assert!(unsafe { fceux11_rust_sformat_serialize(&entry, 1, &mut out_buf, &mut out_len) });
 
         assert_eq!(out_len, 0);
     }

@@ -1,6 +1,31 @@
 # CPU Module v2.0 — Rust-First Reimplementation (Revised)
 
-**Status:** Active — Phase 1-6 complete; Phase 7 pending · **Branch:** `wip2.0` · **Last revised:** 2026-08-21** `wip2.0` · **Last revised:** 2026-08-21
+**Status:** Active — Phase 1-6 complete + Phase 7 preflight fixes done; Phase 7 pending · **Branch:** `wip2.0` · **Last revised:** 2026-08-21
+
+> **Progress note (2026-08-21) - Phase 7 preflight review + fixes done.**
+> The pre-Phase-7 audit (`docs/plans/phase7-preflight-review-2026-08-21.md`)
+> found four MUST-FIX unofficial-opcode parity gaps in
+> `execute.rs::do_unofficial` that no existing gate exercised, plus
+> SHOULD-FIX hygiene items. The fix plan
+> (`docs/plans/phase7-preflight-fixes-2026-08-21.md`) is implemented:
+> SHX `0x9E` now indexes by Y and applies the C++ write-address
+> high-byte replacement; SHY `0x9C` applies the same replacement; AHX
+> `0x93/0x9F` and TAS `0x9B` use base-high+1 (`(eff-Y)>>8)+1`) instead
+> of effective-high+1; LAS `0xBB` is RMW write-mode with two
+> write-backs (page-cross cost 5→4). All four are covered by
+> triggering-vector tests (X != Y, page-cross) in `tests/unofficial.rs`
+> and per-instruction cycle tests in `tests/cycle_parity.rs`. Test
+> stability: the TICK_FN slot now fires only on the installing thread
+> (parallel-test pollution fixed) and the proptest NMI-jammed assertion
+> follows the C++ `else if(!_jammed)` semantics. Hygiene:
+> `cargo clippy -p fceux11-core --all-targets --no-deps` clean,
+> `cargo fmt --check -p fceux11-core` clean, stale FFI/decode comments
+> rewritten, `ChangeLog.md` updated. Verified: `cargo test -p
+> fceux11-core` = 221 PASS; CTest ON 32/34 (the same two documented
+> residuals: `kagami_qa_direct_smoke` blargg known-fails and
+> `rom_regression_rust_smoke` 1/780 PPU render-timing artifact); CTest
+> OFF 34/34. Ready to request Phase 7 approval (delete the C++ CPU,
+> flip `FCEUX11_RUST_CPU` default, CMake/scripts updates).
 
 > **Progress note (2026-08-21) - Phase 5 closed.** Unofficial coverage audit
 > found 21 opcodes with no direct register-effect test (the abs/zp,X/abs,Y/

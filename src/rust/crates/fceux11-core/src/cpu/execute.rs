@@ -10,13 +10,11 @@
 //! first 5,000 instructions.
 
 use crate::cpu::addressing::{
-    abs_x_read, abs_x_write, abs_y_read, abs_y_write, absolute, imm, implied, ind_x,
-    ind_y_read, ind_y_write, indirect, zp, zpx, zpy, AddrMode, Bus, CpuState,
+    AddrMode, Bus, CpuState, abs_x_read, abs_x_write, abs_y_read, abs_y_write, absolute, imm,
+    implied, ind_x, ind_y_read, ind_y_write, indirect, zp, zpx, zpy,
 };
-use crate::cpu::alu::{
-    adc, and, asl, bit, cmp, eor, load_reg, lsr, ora, rol, ror, sbc, LoadReg,
-};
-use crate::cpu::decode::{info, OpKind};
+use crate::cpu::alu::{LoadReg, adc, and, asl, bit, cmp, eor, load_reg, lsr, ora, rol, ror, sbc};
+use crate::cpu::decode::{OpKind, info};
 use crate::cpu::state::{Flags, IrqSource};
 
 /// Cycles per CPU cycle in 1/16-dot units. The C++ loop uses
@@ -150,11 +148,7 @@ fn fetch<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
 /// for untaken branches changes the DB latch, which is observable via
 /// open-bus reads ($4016 etc.) and breaks the C++-baseline regression
 /// hashes (nestest NMI handler reads $4016).
-fn do_branch<B: Bus + ?Sized>(
-    state: &mut CpuState,
-    bus: &mut B,
-    cond: bool,
-) -> u8 {
+fn do_branch<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, cond: bool) -> u8 {
     let pc = state.regs.pc;
     if !cond {
         // Not taken: skip the operand read (C++ `else _PC++;`), no
@@ -191,7 +185,6 @@ fn do_branch<B: Bus + ?Sized>(
 /// always invokes both phases for callers that don't care about
 /// per-call budget semantics.
 pub(crate) fn dispatch_step<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
-
     // IRQ / NMI / RESET dispatch at this boundary. Mirrors the
     // loop-top of `X6502_RunDebug` in `src/x6502.cpp:519-577`.
     //
@@ -251,7 +244,6 @@ pub(crate) fn execute_step<B: Bus + ?Sized>(
     bus: &mut B,
     dispatch_irq_cycles: u8,
 ) -> u8 {
-
     // Always fetch + execute exactly one instruction. PC has either
     // been left at the current PC (no dispatch) or moved to the
     // post-dispatch address (dispatch fired) by dispatch_irq.
@@ -426,8 +418,7 @@ pub(crate) fn execute_step<B: Bus + ?Sized>(
     // forwards them).
     state.regs.count = state.regs.count.saturating_sub(dot(extras) * 3);
     state.regs.tcount = state.regs.tcount.saturating_add(extras as i32);
-    state.cycles_in_run = state.cycles_in_run
-        .saturating_add((base + extras) as i32);
+    state.cycles_in_run = state.cycles_in_run.saturating_add((base + extras) as i32);
     // Phase 4 closeout: post-body timestamp advance with the full
     // iteration total (dispatch + base + extras), matching C++
     // `add_cycles` totals.
@@ -461,12 +452,7 @@ pub fn step<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
 // opcode(s) and returns any extra cycles beyond the base.
 // ---------------------------------------------------------------------------
 
-fn do_register_op<B: Bus + ?Sized>(
-    state: &mut CpuState,
-    bus: &mut B,
-    opcode: u8,
-    _mode: AddrMode,
-) {
+fn do_register_op<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, opcode: u8, _mode: AddrMode) {
     match opcode {
         // TAX
         0xAA => {
@@ -523,8 +509,9 @@ fn do_register_op<B: Bus + ?Sized>(
         }
         // PHP
         0x08 => {
-            // Push P with B|U set.
-            let v = (state.regs.p | Flags::BREAK.bits() | Flags::UNUSED.bits()) & 0xFF;
+            // Push P with B|U set. P is u8, so no mask is needed
+            // (the C++ side's `& 0xFF` is a no-op on uint8 too).
+            let v = state.regs.p | Flags::BREAK.bits() | Flags::UNUSED.bits();
             state.push(bus, v);
         }
         // PLA
@@ -615,10 +602,10 @@ fn do_flag_op(state: &mut CpuState, opcode: u8) {
 fn branch_cond(state: &CpuState, opcode: u8) -> bool {
     let p = state.regs.p;
     match opcode {
-        0x90 => p & Flags::CARRY.bits() == 0, // BCC
-        0xB0 => p & Flags::CARRY.bits() != 0, // BCS
-        0xF0 => p & Flags::ZERO.bits() != 0,  // BEQ
-        0xD0 => p & Flags::ZERO.bits() == 0,  // BNE
+        0x90 => p & Flags::CARRY.bits() == 0,    // BCC
+        0xB0 => p & Flags::CARRY.bits() != 0,    // BCS
+        0xF0 => p & Flags::ZERO.bits() != 0,     // BEQ
+        0xD0 => p & Flags::ZERO.bits() == 0,     // BNE
         0x30 => p & Flags::NEGATIVE.bits() != 0, // BMI
         0x10 => p & Flags::NEGATIVE.bits() == 0, // BPL
         0x50 => p & Flags::OVERFLOW.bits() == 0, // BVC
@@ -648,12 +635,7 @@ fn store_reg(state: &CpuState, opcode: u8) -> u8 {
     }
 }
 
-fn do_rmw<B: Bus + ?Sized>(
-    state: &mut CpuState,
-    bus: &mut B,
-    mode: AddrMode,
-    opcode: u8,
-) -> u8 {
+fn do_rmw<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, mode: AddrMode, opcode: u8) -> u8 {
     let addr = match mode {
         AddrMode::ZP => zp(state, bus).addr,
         AddrMode::ZPX => zpx(state, bus).addr,
@@ -707,12 +689,7 @@ fn do_rmw<B: Bus + ?Sized>(
     0
 }
 
-fn do_alu_a<B: Bus + ?Sized>(
-    state: &mut CpuState,
-    bus: &mut B,
-    mode: AddrMode,
-    opcode: u8,
-) -> u8 {
+fn do_alu_a<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, mode: AddrMode, opcode: u8) -> u8 {
     // Immediate mode: the value IS the byte at PC (no memory re-read).
     // All other modes: the addressing helper returns a memory address.
     // The read-path indexed modes (AbsX/AbsY/IndY) charge a page-cross
@@ -750,7 +727,10 @@ fn do_alu_a<B: Bus + ?Sized>(
         }
         _ => unreachable!("AluA mode {:?}", mode),
     };
-    if matches!(opcode, 0xE9 | 0xE5 | 0xF5 | 0xED | 0xFD | 0xF9 | 0xE1 | 0xF1 | 0xEB) {
+    if matches!(
+        opcode,
+        0xE9 | 0xE5 | 0xF5 | 0xED | 0xFD | 0xF9 | 0xE1 | 0xF1 | 0xEB
+    ) {
         sbc(state, bus, m);
     } else {
         match opcode {
@@ -763,7 +743,6 @@ fn do_alu_a<B: Bus + ?Sized>(
     }
     extra
 }
-
 
 fn do_compare<B: Bus + ?Sized>(
     state: &mut CpuState,
@@ -817,7 +796,6 @@ fn do_compare<B: Bus + ?Sized>(
     extra
 }
 
-
 fn do_bit<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, mode: AddrMode) -> u8 {
     let addr = match mode {
         AddrMode::ZP => zp(state, bus).addr,
@@ -829,12 +807,7 @@ fn do_bit<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, mode: AddrMode) ->
     0
 }
 
-fn do_jump<B: Bus + ?Sized>(
-    state: &mut CpuState,
-    bus: &mut B,
-    opcode: u8,
-    mode: AddrMode,
-) -> u8 {
+fn do_jump<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, opcode: u8, mode: AddrMode) -> u8 {
     match opcode {
         // JMP absolute ($4C).
         0x4C => {
@@ -923,8 +896,8 @@ fn do_unofficial<B: Bus + ?Sized>(
             // Immediate 2-byte NOPs (read & discard).
             let _ = imm(state, bus);
         }
-        0x04 | 0x44 | 0x64 | 0x14 | 0x34 | 0x54 | 0x74 | 0xD4 | 0xF4 | 0x0C
-        | 0x1C | 0x3C | 0x5C | 0x7C | 0xDC | 0xFC => {
+        0x04 | 0x44 | 0x64 | 0x14 | 0x34 | 0x54 | 0x74 | 0xD4 | 0xF4 | 0x0C | 0x1C | 0x3C
+        | 0x5C | 0x7C | 0xDC | 0xFC => {
             // ZP / Abs / ZPX / AbsX read-NOPs (2 or 3 bytes).
             // (0x9C is excluded - it's SHY, handled separately below.)
             match mode {
@@ -1075,23 +1048,25 @@ fn do_unofficial<B: Bus + ?Sized>(
             //     documented as bit 6 of the rotated result)
             //   V = bit 6 of result ^ bit 5 of result
             // Both V and C are derived from the POST-ROR esult register.
-            let c_in = if state.regs.p & Flags::CARRY.bits() != 0 { 1 } else { 0 };
+            let c_in = if state.regs.p & Flags::CARRY.bits() != 0 {
+                1
+            } else {
+                0
+            };
             let a = state.regs.a;
-            let bit7 = a >> 7; // pre-rotation MSB
             let result = (a >> 1) | (c_in << 7);
             let result_bit6 = (result >> 6) & 1;
             let result_bit5 = (result >> 5) & 1;
             state.regs.a = result;
             let mut p = state.regs.p;
-            p &= !(Flags::CARRY.bits() | Flags::OVERFLOW.bits() | Flags::ZERO.bits()
+            p &= !(Flags::CARRY.bits()
+                | Flags::OVERFLOW.bits()
+                | Flags::ZERO.bits()
                 | Flags::NEGATIVE.bits());
             p |= result_bit6; // C = bit 6 of result
             p |= (result_bit6 ^ result_bit5) << 6; // V
             p |= zn_table_lookup(result);
             state.regs.p = p;
-            let _ = bit7; // unused but kept for documentation
-            // Suppress unused warning for bit7.
-            let _ = bit7;
         }
         // ----- XAA (TXA then AND imm) �?unstable.  Use TXA result.
         0x8B => {
@@ -1112,47 +1087,72 @@ fn do_unofficial<B: Bus + ?Sized>(
             p |= zn_table_lookup(result);
             state.regs.p = p;
         }
-        // ----- AHX (AbsY / IndY): store A & X & (high byte of addr + 1) -----
-        // Visual6502 captures: A & X & H, where H = high byte of the
-        // **bank-determined** address (in NES this is always $01 for the
-        // stack / $00 / $80 etc. depending on mapper). The published
-        // behaviour for nestest testing uses H = (addr >> 8) + 1, but
-        // some emulators use high byte of effective addr. We follow the
-        // common Mesen2 / nestest-passing formula:
+        // ----- AHX (AbsY / IndY): store A & X & (base high byte + 1) -----
+        // C++ reference (`ST_ABY` / `ST_IY` in `src/ops.inc`):
+        //   GetABIWR / GetIYWR compute the effective address `A`
+        //   (write-mode, no page-cross penalty), then store
+        //   A & X & (((A - Y) >> 8) + 1). `A - Y` recovers the base
+        //   operand (absolute address / zero-page pointer), so H is the
+        //   BASE high byte + 1, NOT the effective address's high byte.
+        //   On a page-cross (base $xxFF, Y = 1) the stored value uses
+        //   `$xx + 1`, not `$(xx+1) + 1`.
         0x93 | 0x9F => {
             let addr = match mode {
                 AddrMode::IndY => ind_y_write(state, bus).addr,
                 AddrMode::AbsY => abs_y_write(state, bus).addr,
                 _ => unreachable!("AHX mode {:?}", mode),
             };
-            let h = (addr >> 8).wrapping_add(1) as u8;
+            let base = addr.wrapping_sub(state.regs.y as u16);
+            let h = ((base >> 8) as u8).wrapping_add(1);
             state.wr(bus, addr, state.regs.a & state.regs.x & h);
         }
-        // ----- SHX (AbsX): store X & (high byte of addr + 1) -----
+        // ----- SHX (AbsY): store X & (eff high byte + 1) -----
+        // C++ reference (`src/ops.inc:473-476`):
+        //   GetABIWR(A,_Y); A = ((_X&((A>>8)+1)) << 8) | (A & 0xff);
+        //   WrMem(A, A>>8);
+        // i.e. the STORE VALUE is X & (eff_hi + 1) and the WRITE
+        // ADDRESS is that masked high byte concatenated with eff's low
+        // byte — the write itself can land on a different page than
+        // the effective address.
         0x9E => {
-            let addr = abs_x_write(state, bus).addr;
-            let h = (addr >> 8).wrapping_add(1) as u8;
-            state.wr(bus, addr, state.regs.x & h);
+            let eff = abs_y_write(state, bus).addr;
+            let hi = ((eff >> 8) as u8).wrapping_add(1);
+            let masked = state.regs.x & hi;
+            let write_addr = ((masked as u16) << 8) | (eff & 0x00FF);
+            state.wr(bus, write_addr, masked);
         }
-        // ----- SHY (AbsX): store Y & (high byte of addr + 1) -----
+        // ----- SHY (AbsX): store Y & (eff high byte + 1) -----
+        // C++ reference (`src/ops.inc:467-470`): same shape as SHX but
+        // indexed by X and storing Y.
         0x9C => {
-            let addr = abs_x_write(state, bus).addr;
-            let h = (addr >> 8).wrapping_add(1) as u8;
-            state.wr(bus, addr, state.regs.y & h);
+            let eff = abs_x_write(state, bus).addr;
+            let hi = ((eff >> 8) as u8).wrapping_add(1);
+            let masked = state.regs.y & hi;
+            let write_addr = ((masked as u16) << 8) | (eff & 0x00FF);
+            state.wr(bus, write_addr, masked);
         }
-        // ----- TAS (AbsY): S = A & X; store S & (high byte of addr + 1) -----
+        // ----- TAS (AbsY): S = A & X; store S & (base high byte + 1) -----
+        // C++ reference (`src/ops.inc:479`):
+        //   _S=_A&_X; ST_ABY(_S& (((A-_Y)>>8)+1) );
+        // H = base high byte + 1, like AHX (not the effective address).
         0x9B => {
             let addr = abs_y_write(state, bus).addr;
             let s = state.regs.a & state.regs.x;
             state.regs.s = s;
-            let h = (addr >> 8).wrapping_add(1) as u8;
+            let base = addr.wrapping_sub(state.regs.y as u16);
+            let h = ((base >> 8) as u8).wrapping_add(1);
             state.wr(bus, addr, s & h);
         }
         // ----- LAS (AbsY): A = X = S = M & S -----
+        // C++ reference (`src/ops.inc:408`): RMW_ABY — write-mode
+        // addressing (no page-cross penalty, dummy read at the
+        // non-crossed address), then read + write-back + op + write-back.
+        // Both write-backs store the ORIGINAL read value `m`, matching
+        // `RMW_ABI` (`src/x6502.cpp:334`).
         0xBB => {
-            let r = abs_y_read(state, bus);
-            extra += r.extra_cycles;
-            let m = state.rd(bus, r.addr);
+            let addr = abs_y_write(state, bus).addr;
+            let m = state.rd(bus, addr);
+            state.wr(bus, addr, m);
             let v = m & state.regs.s;
             state.regs.a = v;
             state.regs.x = v;
@@ -1161,6 +1161,7 @@ fn do_unofficial<B: Bus + ?Sized>(
             p &= !(Flags::ZERO.bits() | Flags::NEGATIVE.bits());
             p |= zn_table_lookup(v);
             state.regs.p = p;
+            state.wr(bus, addr, m);
         }
         _ => unreachable!("Unofficial op ${:02X} mode {:?}", opcode, mode),
     }
@@ -1187,9 +1188,10 @@ fn rmw_addr<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, mode: AddrMode) 
 
 /// Run the CPU for `cycles` 1/16-dot units. Returns the total CPU
 /// cycles consumed during this run (sum of every opcode's base cycle
-/// cost plus page-cross / branch-taken extras). The C++ FFI shim
-/// uses this to advance `Cpu::timestamp_` / `sound_timestamp_`,
-/// which live on the Cpu object outside the 64-byte X6502 layout.
+/// cost plus page-cross / branch-taken extras). Informational: the
+/// C++ FFI shim discards the return and advances `Cpu::timestamp_` /
+/// `sound_timestamp_` per-instruction via the tick-cycles callback
+/// installed by `fceux11_cpu_set_tick_cycles` (see `ffi.rs`).
 ///
 /// Loop structure mirrors `X6502_RunDebug` (`src/x6502.cpp:519-624`):
 ///
@@ -1292,14 +1294,14 @@ mod tests {
         }
     }
 
-fn cpu_no_irq() -> CpuState {
+    fn cpu_no_irq() -> CpuState {
         let mut s = CpuState::new();
         s.regs.s = 0xFD;
         s.regs.p = Flags::UNUSED.bits() | Flags::IRQ_DIS.bits();
         s
     }
 
-        #[test]
+    #[test]
     fn lda_imm_loads_a_and_sets_flags() {
         let mut s = CpuState::new();
         let mut bus = FlatBus::new();
@@ -1352,7 +1354,6 @@ fn cpu_no_irq() -> CpuState {
     }
 
     #[test]
-        #[test]
     fn branch_page_cross_adds_two_cycles() {
         // BEQ at $10FE with offset $FF (-1). After fetch+offset, PC=$1100.
         // Target = $1100 + (-1) = $10FF (page $10), pre = $1100 (page $11)

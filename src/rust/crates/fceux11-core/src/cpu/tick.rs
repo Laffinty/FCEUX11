@@ -43,8 +43,14 @@
 //! land mid-instruction), it can be added on top of this without
 //! changing the FFI shape.
 
+// The unsafe FFI entry points below implement the same single-threaded
+// safety contract documented at module level (install-then-run on the
+// emulator thread, caller-owned callbacks) and in `ffi.rs`'s "## Safety"
+// section; silence the per-function lint rather than repeating it.
+#![allow(clippy::missing_safety_doc)]
+
 use crate::cpu::addressing::{Bus, CpuState};
-use crate::cpu::execute::{dispatch_step, execute_step, run};
+use crate::cpu::execute::{dispatch_step, execute_step};
 
 /// Signature of the installed tick callback. Mirrors the C++ mapper
 /// hook: called once per executed instruction with the instruction's
@@ -68,25 +74,47 @@ static mut TICK_FN: Option<TickFn> = None;
 /// and this callback after it, mirroring C++ exactly.
 static mut TICK_CYCLES_FN: Option<TickFn> = None;
 
+// Marks the thread that installed the tick callbacks. The callbacks
+// fire only on that thread (see `tick_pre_body` / `tick_post_body`).
+//
+// Why: the C++ emulator is single-threaded — `Cpu::run` installs the
+// tick thunk via `cpu_rust_install_tick_once` and every
+// `fceux11_cpu_run_with_tick` call happens on the same thread, so the
+// gate is transparent in production. In the cargo test harness,
+// however, every test runs on its own thread and the shared
+// `TICK_FN` slot would otherwise fire into a tick test's counting
+// callback from unrelated tests' `step()` calls (the lib unit tests
+// step the CPU without holding `TICK_SLOT_LOCK`), polluting the
+// counters and flaking the tick assertions.
+thread_local! {
+    static TICK_THREAD_ACTIVE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
 /// Install / replace the tick callback. Mirrors
 /// `Cpu::set_map_irq_hook`. Pass the sentinel
 /// [`fceux11_cpu_set_tick_null`] to disable.
+///
+/// Marks the calling thread as the tick thread (see
+/// `TICK_THREAD_ACTIVE`); the C++ side installs this on the emulator
+/// thread, which is also where every CPU run happens.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_cpu_set_tick(f: TickFn) {
     unsafe {
         TICK_FN = Some(f);
     }
+    TICK_THREAD_ACTIVE.with(|a| a.set(true));
 }
 
 /// Install the post-body timestamp-advance callback (C++ side calls
-/// this once at init with `cpu_rust_tick_cycles_thunk`).
-
-/// Disable the tick callback.
+/// this once at init with `cpu_rust_tick_cycles_thunk`). Marks the
+/// calling thread as the tick thread, same as
+/// [`fceux11_cpu_set_tick`].
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_cpu_set_tick_cycles(f: TickFn) {
     unsafe {
         TICK_CYCLES_FN = Some(f);
     }
+    TICK_THREAD_ACTIVE.with(|a| a.set(true));
 }
 
 /// Disable the tick callbacks.
@@ -96,6 +124,7 @@ pub unsafe extern "C" fn fceux11_cpu_set_tick_null() {
         TICK_FN = None;
         TICK_CYCLES_FN = None;
     }
+    TICK_THREAD_ACTIVE.with(|a| a.set(false));
 }
 
 /// Phase 4 closeout: pre-body hook point. Mirrors C++
@@ -111,7 +140,10 @@ pub(crate) fn tick_pre_body(state: &mut CpuState) {
     state.regs.tcount = 0;
     unsafe {
         if let Some(f) = TICK_FN {
-            f(temp);
+            // Fire only on the installing thread (see TICK_THREAD_ACTIVE).
+            if TICK_THREAD_ACTIVE.with(|a| a.get()) {
+                f(temp);
+            }
         }
     }
 }
@@ -123,7 +155,10 @@ pub(crate) fn tick_pre_body(state: &mut CpuState) {
 pub(crate) fn tick_post_body(cycles: i32) {
     unsafe {
         if let Some(f) = TICK_CYCLES_FN {
-            f(cycles);
+            // Fire only on the installing thread (see TICK_THREAD_ACTIVE).
+            if TICK_THREAD_ACTIVE.with(|a| a.get()) {
+                f(cycles);
+            }
         }
     }
 }
@@ -155,11 +190,7 @@ pub(crate) static TICK_SLOT_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new((
 /// Semantically identical to [`run`] plus the mapper-hook bridge.
 /// Kept separate so the plain [`run`] hot path has zero per-instruction
 /// branch overhead when no mapper hook is active.
-pub fn run_with_tick<B: Bus + ?Sized>(
-    state: &mut CpuState,
-    bus: &mut B,
-    cycles: i32,
-) -> i32 {
+pub fn run_with_tick<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, cycles: i32) -> i32 {
     let mut executed_cycles = 0i32;
     // Add the per-call budget, exactly like C++ `_count += cycles*16`.
     state.regs.count = state.regs.count.saturating_add(cycles);
@@ -210,6 +241,7 @@ pub fn run_with_tick<B: Bus + ?Sized>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cpu::execute::run;
     use crate::cpu::state::IrqSource;
     use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 
@@ -258,7 +290,9 @@ mod tests {
         let _guard = TICK_SLOT_LOCK.lock().unwrap();
         TICK_COUNT.store(0, Ordering::SeqCst);
         TICK_SUM.store(0, Ordering::SeqCst);
-        unsafe { fceux11_cpu_set_tick(counting_tick); }
+        unsafe {
+            fceux11_cpu_set_tick(counting_tick);
+        }
 
         let mut cpu = cpu_at(0x4000);
         let mut bus = FlatBus::new();
@@ -269,7 +303,11 @@ mod tests {
         // Loop terminates when sum(step_cycles) >= 32/3 ≈ 10.67,
         // i.e. after ~6 NOPs (6*2 = 12 >= 10.67).
         let consumed = run_with_tick(&mut cpu, &mut bus, 32 * 16);
-        assert!(consumed >= 8, "at least ~4 instructions executed, got {}", consumed);
+        assert!(
+            consumed >= 8,
+            "at least ~4 instructions executed, got {}",
+            consumed
+        );
 
         // One tick per executed instruction; NOPs are 2 cycles, so
         // instruction count = consumed / 2.
@@ -285,13 +323,17 @@ mod tests {
             "sum of ticked cycles must equal total consumed"
         );
 
-        unsafe { fceux11_cpu_set_tick_null(); }
+        unsafe {
+            fceux11_cpu_set_tick_null();
+        }
     }
 
     #[test]
     fn no_hook_installed_is_noop() {
         let _guard = TICK_SLOT_LOCK.lock().unwrap();
-        unsafe { fceux11_cpu_set_tick_null(); }
+        unsafe {
+            fceux11_cpu_set_tick_null();
+        }
         let mut cpu = cpu_at(0x4000);
         let mut bus = FlatBus::new();
         bus.mem[0x4000] = 0xEA;
@@ -309,7 +351,9 @@ mod tests {
         let _guard = TICK_SLOT_LOCK.lock().unwrap();
         TICK_COUNT.store(0, Ordering::SeqCst);
         TICK_SUM.store(0, Ordering::SeqCst);
-        unsafe { fceux11_cpu_set_tick(counting_tick); }
+        unsafe {
+            fceux11_cpu_set_tick(counting_tick);
+        }
 
         let mut cpu = cpu_at(0x4000);
         let mut bus = FlatBus::new();
@@ -343,6 +387,8 @@ mod tests {
             "PC advanced to NMI vector $5000; follow-up NOP at $5000 NOT executed"
         );
 
-        unsafe { fceux11_cpu_set_tick_null(); }
+        unsafe {
+            fceux11_cpu_set_tick_null();
+        }
     }
 }

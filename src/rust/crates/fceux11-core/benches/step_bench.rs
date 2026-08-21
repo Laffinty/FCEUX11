@@ -11,7 +11,7 @@
 //! Use both together: the micro for the inner-loop ceiling, the
 //! full for the realistic hot-path.
 
-use fceux11_core::cpu::{step, Bus, CpuState, IrqSource};
+use fceux11_core::cpu::{Bus, CpuState, IrqSource, step};
 
 struct FlatBus {
     mem: [u8; 0x10000],
@@ -115,7 +115,8 @@ fn bench_step_with_nmi_dispatch(c: &mut criterion::Criterion) {
     });
 }
 
-criterion::criterion_group!(benches,
+criterion::criterion_group!(
+    benches,
     bench_step_nop_sled,
     bench_step_lda_abs,
     bench_step_with_nmi_dispatch,

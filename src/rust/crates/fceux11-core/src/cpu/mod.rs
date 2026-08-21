@@ -27,8 +27,8 @@ pub mod state;
 pub mod tick;
 
 pub use addressing::{Bus, CpuState, ModeResult};
-pub use decode::{info, OpKind, OpcodeInfo, CYC_TABLE, OP_SIZE};
-pub use execute::{run, step, CYCLES_PER_CPU_CYCLE};
+pub use decode::{CYC_TABLE, OP_SIZE, OpKind, OpcodeInfo, info};
+pub use execute::{CYCLES_PER_CPU_CYCLE, run, step};
 pub use state::{Flags, IrqSource, X6502Layout, ZN_TABLE};
 
 /// Quick sanity-check helper: returns true if every opcode's base cycle

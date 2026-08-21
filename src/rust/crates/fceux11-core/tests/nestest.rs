@@ -24,7 +24,7 @@
 //! (the canonical test convention; otherwise it would boot at $C004
 //! which is past the diagnostic header).
 
-use fceux11_core::cpu::{Bus, CpuState, Flags, IrqSource};
+use fceux11_core::cpu::{Bus, CpuState, Flags};
 
 /// 64 KiB bus backed by a flat array. PRG ROM is loaded at $C000.
 struct FlatRomBus {
@@ -165,7 +165,7 @@ fn nestest_first_5000_instructions_match_log() {
     // Skip the first log line ($C000 JMP) since we already consumed it.
     iter_lines.next();
 
-    while let Some(log) = iter_lines.next() {
+    for log in iter_lines {
         // Compare PRE-instruction state. The nestest.log P column uses
         // the classic display convention (B always 0, U always 1 —
         // the P value as observed on the bus), so the internal P is
@@ -195,8 +195,6 @@ fn nestest_first_5000_instructions_match_log() {
             break;
         }
         // Debug hook: print instructions around the known divergence point.
-        if checked >= 70 && checked <= 75 {
-        }
         if checked >= 5000 {
             break;
         }

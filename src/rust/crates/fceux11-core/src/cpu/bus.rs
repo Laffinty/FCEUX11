@@ -24,6 +24,12 @@
 //! No locking is performed — calling [`fceux11_cpu_run`] from a thread
 //! other than the one that called [`fceux11_cpu_set_bus`] is undefined
 //! behaviour, exactly as it is on the C++ side.
+//!
+//! The unsafe FFI entry points below all implement this same contract
+//! (caller-owned callback pointers installed once at init on the
+//! emulator thread); silence the per-function `# Safety` lint rather
+//! than repeating the contract on each function.
+#![allow(clippy::missing_safety_doc)]
 
 use crate::cpu::addressing::Bus;
 
@@ -60,7 +66,9 @@ static mut BLOB_PTR: *mut crate::cpu::state::X6502Layout = core::ptr::null_mut()
 
 /// Set the C++ blob pointer for the duration of a run (FFI entry points).
 pub(crate) unsafe fn set_blob_ptr(p: *mut crate::cpu::state::X6502Layout) {
-    unsafe { BLOB_PTR = p; }
+    unsafe {
+        BLOB_PTR = p;
+    }
 }
 
 /// Mirror the Rust DB latch and cycle counter into the C++ blob.
@@ -95,6 +103,8 @@ static mut WRITE_FN: WriteFn = noop_write;
 /// direction; reads then return `0`, writes are dropped.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_cpu_set_bus(read_fn: ReadFn, write_fn: WriteFn) {
+    // SAFETY: single-threaded emulator; the caller (C++ init) installs
+    // these once before any run. See the module-level thread-safety note.
     unsafe {
         READ_FN = read_fn;
         WRITE_FN = write_fn;
@@ -152,7 +162,9 @@ static mut IRQ_BRIDGE_INSTALLED: bool = false;
 // (nestest NMI test diverges: pushed return PC differs).
 type FreshGetFn = extern "C" fn() -> bool;
 type FreshSetFn = extern "C" fn(bool);
-extern "C" fn noop_fresh_get() -> bool { false }
+extern "C" fn noop_fresh_get() -> bool {
+    false
+}
 extern "C" fn noop_fresh_set(_v: bool) {}
 static mut FRESH_GET_FN: FreshGetFn = noop_fresh_get;
 static mut FRESH_SET_FN: FreshSetFn = noop_fresh_set;
@@ -163,6 +175,7 @@ static mut FRESH_BRIDGE_INSTALLED: bool = false;
 /// `kagami_bridge_set_cpu_irq_low`).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_cpu_set_irq_bridge(get_fn: IrqGetFn, set_fn: IrqSetFn) {
+    // SAFETY: single-threaded emulator; installed once at init.
     unsafe {
         IRQ_GET_FN = get_fn;
         IRQ_SET_FN = set_fn;
@@ -174,10 +187,8 @@ pub unsafe extern "C" fn fceux11_cpu_set_irq_bridge(get_fn: IrqGetFn, set_fn: Ir
 /// once at init with `kagami_bridge_get_cpu_nmi_fresh` /
 /// `kagami_bridge_set_cpu_nmi_fresh`).
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fceux11_cpu_set_nmi_fresh_bridge(
-    get_fn: FreshGetFn,
-    set_fn: FreshSetFn,
-) {
+pub unsafe extern "C" fn fceux11_cpu_set_nmi_fresh_bridge(get_fn: FreshGetFn, set_fn: FreshSetFn) {
+    // SAFETY: single-threaded emulator; installed once at init.
     unsafe {
         FRESH_GET_FN = get_fn;
         FRESH_SET_FN = set_fn;

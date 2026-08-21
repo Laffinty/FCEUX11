@@ -375,8 +375,7 @@ fn compress_payload(payload: &[u8], compression_level: i32) -> Result<(Vec<u8>, 
         _ => Compression::default(),
     };
     let mut encoder = ZlibEncoder::new(Vec::new(), level);
-    std::io::Write::write_all(&mut encoder, payload)
-        .map_err(|_| StateError::CompressionFailed)?;
+    std::io::Write::write_all(&mut encoder, payload).map_err(|_| StateError::CompressionFailed)?;
     let compressed = encoder
         .finish()
         .map_err(|_| StateError::CompressionFailed)?;
@@ -821,7 +820,7 @@ mod tests {
         let chunks: Vec<StateChunk> = (0..10)
             .map(|i| StateChunk {
                 chunk_type: i,
-                data: vec![i as u8; 1024],
+                data: vec![i; 1024],
             })
             .collect();
 
@@ -885,13 +884,7 @@ mod tests {
         };
 
         assert!(unsafe {
-            fceux11_rust_state_file_save(
-                inputs.as_ptr(),
-                inputs.len(),
-                42,
-                0,
-                &mut out_buf,
-            )
+            fceux11_rust_state_file_save(inputs.as_ptr(), inputs.len(), 42, 0, &mut out_buf)
         });
 
         assert!(!out_buf.ptr.is_null());
@@ -955,12 +948,7 @@ mod tests {
         };
 
         assert!(unsafe {
-            fceux11_rust_state_file_save_v2(
-                inputs.as_ptr(),
-                inputs.len(),
-                0,
-                &mut out_buf,
-            )
+            fceux11_rust_state_file_save_v2(inputs.as_ptr(), inputs.len(), 0, &mut out_buf)
         });
 
         assert!(!out_buf.ptr.is_null());

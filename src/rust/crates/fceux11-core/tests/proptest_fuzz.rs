@@ -22,9 +22,7 @@
 //! accepts `Arbitrary` types; custom strategies need explicit
 //! `TestRunner` plumbing.
 
-use fceux11_core::cpu::{
-    run, step, Bus, CpuState, IrqSource,
-};
+use fceux11_core::cpu::{Bus, CpuState, IrqSource, run, step};
 use proptest::prelude::*;
 use proptest::test_runner::{Config, TestRunner};
 
@@ -151,7 +149,11 @@ fn step_never_panics_and_returns_sane_cycles() {
         let mut bus = bus;
         let c = step(&mut cpu, &mut bus);
         prop_assert!(c <= 16, "step() returned {} cycles (max expected 16)", c);
-        prop_assert!(cpu.regs.pc as u32 <= 0xFFFF, "PC out of range: {:04X}", cpu.regs.pc);
+        prop_assert!(
+            cpu.regs.pc as u32 <= 0xFFFF,
+            "PC out of range: {:04X}",
+            cpu.regs.pc
+        );
         Ok(())
     });
     assert!(result.is_ok(), "fuzz failure: {:?}", result);
@@ -232,13 +234,19 @@ fn nmi_fresh_coalesces_and_fires_once() {
         // First step: defer (clears nmi_fresh) + execute one instruction.
         let _ = step(&mut cpu, &mut bus);
         prop_assert!(!cpu.nmi_fresh, "nmi_fresh not cleared by defer");
-        // Second step: dispatch NMI (clears NMI bit).
+        // Second step: dispatch NMI (clears NMI bit). Exception: if the
+        // first step's random instruction was a JAM/KIL, the CPU is
+        // jammed and the C++ reference suppresses NMI dispatch
+        // (`else if(!_jammed)` at src/x6502.cpp:582), leaving the NMI
+        // bit pending — that is correct behaviour, not a leak.
         let _ = step(&mut cpu, &mut bus);
-        prop_assert_eq!(
-            cpu.regs.irq_low & IrqSource::NMI.bits(),
-            0,
-            "NMI bit not consumed by dispatch"
-        );
+        if cpu.regs.jammed == 0 {
+            prop_assert_eq!(
+                cpu.regs.irq_low & IrqSource::NMI.bits(),
+                0,
+                "NMI bit not consumed by dispatch"
+            );
+        }
         prop_assert!(cpu.regs.pc as u32 <= 0xFFFF);
         Ok(())
     });

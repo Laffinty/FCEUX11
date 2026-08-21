@@ -324,7 +324,8 @@ pub fn abs_x_write<B: Bus + ?Sized>(s: &mut CpuState, bus: &mut B) -> ModeResult
     let hi = s.rd(bus, pc.wrapping_add(1)) as u16;
     s.regs.pc = pc.wrapping_add(2);
     let base = (hi << 8) | lo;
-    let target = base.wrapping_add(s.regs.x as u16) & 0xFFFF;
+    // u16 arithmetic wraps at 16 bits exactly like the C++ `& 0xFFFF`.
+    let target = base.wrapping_add(s.regs.x as u16);
     let _ = s.rd(bus, (target & 0x00FF) | (base & 0xFF00));
     ModeResult {
         addr: target,
@@ -340,7 +341,8 @@ pub fn abs_y_write<B: Bus + ?Sized>(s: &mut CpuState, bus: &mut B) -> ModeResult
     let hi = s.rd(bus, pc.wrapping_add(1)) as u16;
     s.regs.pc = pc.wrapping_add(2);
     let base = (hi << 8) | lo;
-    let target = base.wrapping_add(s.regs.y as u16) & 0xFFFF;
+    // u16 arithmetic wraps at 16 bits exactly like the C++ `& 0xFFFF`.
+    let target = base.wrapping_add(s.regs.y as u16);
     let _ = s.rd(bus, (target & 0x00FF) | (base & 0xFF00));
     ModeResult {
         addr: target,
@@ -378,7 +380,11 @@ pub fn indirect<B: Bus + ?Sized>(s: &mut CpuState, bus: &mut B) -> ModeResult {
     let ptr = (hi << 8) | lo;
     let target_lo = s.rd(bus, ptr) as u16;
     // Bug: if low byte is $FF, the high byte is read from $xx00 not $(xx+1)00.
-    let target_hi_addr = if lo == 0xFF { ptr & 0xFF00 } else { ptr.wrapping_add(1) };
+    let target_hi_addr = if lo == 0xFF {
+        ptr & 0xFF00
+    } else {
+        ptr.wrapping_add(1)
+    };
     let target_hi = s.rd(bus, target_hi_addr) as u16;
     ModeResult {
         addr: (target_hi << 8) | target_lo,
@@ -434,7 +440,8 @@ pub fn ind_y_write<B: Bus + ?Sized>(s: &mut CpuState, bus: &mut B) -> ModeResult
     let lo = s.rd(bus, tmp as u16);
     let hi = s.rd(bus, tmp.wrapping_add(1) as u16);
     let base = ((hi as u16) << 8) | lo as u16;
-    let target = base.wrapping_add(s.regs.y as u16) & 0xFFFF;
+    // u16 arithmetic wraps at 16 bits exactly like the C++ `& 0xFFFF`.
+    let target = base.wrapping_add(s.regs.y as u16);
     let _ = s.rd(bus, (target & 0x00FF) | (base & 0xFF00));
     ModeResult {
         addr: target,

@@ -9,9 +9,15 @@
 //!
 //! Plus a richer [`OpcodeInfo`] table we build ourselves. Instead of
 //! pulling in `serde` + a TOML parser just for Phase 1, we hand-author
-//! the equivalent data as a `const [OpcodeInfo; 256]` literal. Phase 2
-//! will swap this for a `build.rs`-generated file sourced from
-//! `table_gen/opcodes.toml`.
+//! the equivalent data as a `const [OpcodeInfo; 256]` literal.
+//!
+//! NOTE: the `build.rs`-generated table (sourced from
+//! `table_gen/opcodes.toml`) that the original plan called for was
+//! explicitly deferred — see the Phase 1 caveat in
+//! `docs/plans/cpu-rust-v2.md` ("`build.rs` codegen ❌ deferred to
+//! Phase 3"; the hand-authored table is not a correctness requirement).
+//! If a new authoritative source ever needs to drive the tables, the
+//! codegen path can be added without changing this module's API.
 //!
 //! Authority for all numeric values:
 //! * [NESdev Wiki — 6502 instructions](https://www.nesdev.org/wiki/6502_instructions)
@@ -24,6 +30,9 @@ use crate::cpu::addressing::AddrMode;
 /// Base cycle count for each opcode. Source: `CycTable` in
 /// `src/x6502.cpp:363–377`. This is the cycle cost **before** any
 /// page-cross / branch-taken / RMW extra cycle.
+// The one-row-per-page layout mirrors the C++ `CycTable` literal
+// line-for-line for review; rustfmt would reflow it, so skip it.
+#[rustfmt::skip]
 pub const CYC_TABLE: [u8; 256] = [
     /*0x00*/ 7, 6, 2, 8, 3, 3, 5, 5, 3, 2, 2, 2, 4, 4, 6, 6,
     /*0x10*/ 2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
@@ -49,6 +58,8 @@ pub const CYC_TABLE: [u8; 256] = [
 /// the addressing-mode helper still consumes operand bytes for these,
 /// so the "0" is purely a debugger-disassembly marker, not a real
 /// PC-doesn't-advance signal.
+// Same row-per-page layout as `CYC_TABLE`; skip rustfmt reflow.
+#[rustfmt::skip]
 pub const OP_SIZE: [u8; 256] = [
     /*0x00*/ 1, 2, 0, 0, 0, 2, 2, 0, 1, 2, 1, 0, 0, 3, 3, 0,
     /*0x10*/ 2, 2, 0, 0, 0, 2, 2, 0, 1, 3, 0, 0, 0, 3, 3, 0,
@@ -123,10 +134,12 @@ pub struct OpcodeInfo {
 }
 
 /// 256-entry decode table. Hand-authored from the NESdev wiki opcode
-/// matrix and the FCE Ultra tables above (cross-checked). Phase 2 will
-/// replace this with a `build.rs`-generated file.
+/// matrix and the FCE Ultra tables above (cross-checked). The
+/// `build.rs`-generated replacement was explicitly deferred (see the
+/// module-level note); the table is authoritative as-is.
 pub static OPCODE_TABLE: [OpcodeInfo; 256] = build_opcode_table();
 
+#[rustfmt::skip]
 const fn build_opcode_table() -> [OpcodeInfo; 256] {
     // Build entries by hand. Each line picks the (mode, kind, official)
     // triple for one opcode, pulling base_cycles and size from the
@@ -466,7 +479,11 @@ mod tests {
         // Every entry's base_cycles and size must agree with the
         // byte-for-byte imported CYC_TABLE / OP_SIZE.
         for (op, info) in OPCODE_TABLE.iter().enumerate() {
-            assert_eq!(info.base_cycles, CYC_TABLE[op], "op ${:02X} base_cycles", op);
+            assert_eq!(
+                info.base_cycles, CYC_TABLE[op],
+                "op ${:02X} base_cycles",
+                op
+            );
             assert_eq!(info.size, OP_SIZE[op], "op ${:02X} size", op);
         }
     }

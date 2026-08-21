@@ -32,7 +32,7 @@
 //! Per the NESdev CPU unofficial opcodes matrix
 //! (https://www.nesdev.org/wiki/CPU_unofficial_opcodes).
 
-use fceux11_core::cpu::{step, Bus, CpuState, Flags};
+use fceux11_core::cpu::{Bus, CpuState, Flags, step};
 
 struct FlatBus {
     mem: [u8; 0x10000],
@@ -112,7 +112,11 @@ fn slo_zp_shifts_left_then_oras_into_a() {
     step(&mut cpu, &mut bus);
     assert_eq!(bus.mem[0x0010], 0x42, "M shifted left to 0x42");
     assert_eq!(cpu.regs.a, 0x4F, "A = 0x0F | 0x42 = 0x4F");
-    assert_eq!(cpu.regs.p & Flags::NEGATIVE.bits(), 0, "N flag from 0x42 (bit 7 not set)");
+    assert_eq!(
+        cpu.regs.p & Flags::NEGATIVE.bits(),
+        0,
+        "N flag from 0x42 (bit 7 not set)"
+    );
     assert_eq!(cpu.regs.p & Flags::ZERO.bits(), 0, "Z not set");
     assert_eq!(cpu.regs.p & Flags::CARRY.bits(), 0, "C=0 from 0x21 << 1");
 }
@@ -164,8 +168,16 @@ fn rla_zp_rotates_left_then_ands_into_a() {
     step(&mut cpu, &mut bus);
     assert_eq!(bus.mem[0x0010], 0x1E, "M rotated left to 0x1E");
     assert_eq!(cpu.regs.a, 0x1E, "A = 0xFF & 0x1E = 0x1E");
-    assert_eq!(cpu.regs.p & Flags::NEGATIVE.bits(), 0, "N=0 (bit 7 of 0x1E not set)");
-    assert_eq!(cpu.regs.p & Flags::CARRY.bits(), 0, "C=0 (bit 7 of M=0x0F was 0)");
+    assert_eq!(
+        cpu.regs.p & Flags::NEGATIVE.bits(),
+        0,
+        "N=0 (bit 7 of 0x1E not set)"
+    );
+    assert_eq!(
+        cpu.regs.p & Flags::CARRY.bits(),
+        0,
+        "C=0 (bit 7 of M=0x0F was 0)"
+    );
 }
 
 #[test]
@@ -181,7 +193,11 @@ fn rla_zp_rotates_left_with_carry_in() {
     step(&mut cpu, &mut bus);
     assert_eq!(bus.mem[0x0010], 0x81);
     assert_eq!(cpu.regs.a, 0x81);
-    assert_eq!(cpu.regs.p & Flags::CARRY.bits(), 0, "C=0 (bit 7 of M was 0)");
+    assert_eq!(
+        cpu.regs.p & Flags::CARRY.bits(),
+        0,
+        "C=0 (bit 7 of M was 0)"
+    );
 }
 
 // ===========================================================================
@@ -218,7 +234,11 @@ fn rra_zp_rotates_right_then_adcs_into_a() {
     step(&mut cpu, &mut bus);
     assert_eq!(bus.mem[0x0010], 0x02);
     assert_eq!(cpu.regs.a, 0x07, "A = 0x05 + 0x02 = 0x07");
-    assert_eq!(cpu.regs.p & Flags::CARRY.bits(), 0, "C=0 + 0x02 + 0x05 = 0x07, no carry");
+    assert_eq!(
+        cpu.regs.p & Flags::CARRY.bits(),
+        0,
+        "C=0 + 0x02 + 0x05 = 0x07, no carry"
+    );
 }
 
 // ===========================================================================
@@ -277,7 +297,11 @@ fn lax_zp_loads_a_and_x() {
     step(&mut cpu, &mut bus);
     assert_eq!(cpu.regs.a, 0x42);
     assert_eq!(cpu.regs.x, 0x42);
-    assert_eq!(cpu.regs.p & Flags::NEGATIVE.bits(), 0, "N=0 from 0x42 (bit 7 not set)");
+    assert_eq!(
+        cpu.regs.p & Flags::NEGATIVE.bits(),
+        0,
+        "N=0 from 0x42 (bit 7 not set)"
+    );
     assert_eq!(cpu.regs.p & Flags::ZERO.bits(), 0);
 }
 
@@ -374,7 +398,11 @@ fn isc_zp_increments_then_sbcs_from_a() {
     assert_eq!(bus.mem[0x0010], 0x03, "M incremented to 3");
     assert_eq!(cpu.regs.a, 0x02, "A = 5 - 3 = 2");
     assert_ne!(cpu.regs.p & Flags::CARRY.bits(), 0, "C=1 (no borrow)");
-    assert_eq!(cpu.regs.p & Flags::NEGATIVE.bits(), 0, "N=0 (positive result)");
+    assert_eq!(
+        cpu.regs.p & Flags::NEGATIVE.bits(),
+        0,
+        "N=0 (positive result)"
+    );
 }
 
 // ===========================================================================
@@ -444,8 +472,16 @@ fn arr_ands_then_rors() {
     bus.mem[0x4001] = 0x80;
     step(&mut cpu, &mut bus);
     assert_eq!(cpu.regs.a, 0x40, "A = 0xFF & 0x80 = 0x80, ROR = 0x40");
-    assert_ne!(cpu.regs.p & Flags::CARRY.bits(), 0, "C=1 (bit 6 of result 0x40)");
-    assert_ne!(cpu.regs.p & Flags::OVERFLOW.bits(), 0, "V=1 (bit 6 ^ bit 5 of result)");
+    assert_ne!(
+        cpu.regs.p & Flags::CARRY.bits(),
+        0,
+        "C=1 (bit 6 of result 0x40)"
+    );
+    assert_ne!(
+        cpu.regs.p & Flags::OVERFLOW.bits(),
+        0,
+        "V=1 (bit 6 ^ bit 5 of result)"
+    );
 }
 
 // ===========================================================================
@@ -496,7 +532,10 @@ fn axs_with_borrow() {
     bus.mem[0x4000] = 0xCB;
     bus.mem[0x4001] = 0x80;
     step(&mut cpu, &mut bus);
-    assert_eq!(cpu.regs.x, 0x90, "X = (A & X) - imm = 0x10 - 0x80 = 0x90 (wrapping)");
+    assert_eq!(
+        cpu.regs.x, 0x90,
+        "X = (A & X) - imm = 0x10 - 0x80 = 0x90 (wrapping)"
+    );
     assert_eq!(cpu.regs.p & Flags::CARRY.bits(), 0, "C=0 (borrow)");
     assert_ne!(cpu.regs.p & Flags::NEGATIVE.bits(), 0, "N=1");
 }
@@ -522,45 +561,141 @@ fn ahx_indy_stores_a_and_x_and_h_plus_1() {
     assert_eq!(bus.mem[0x3000], 0x00);
 }
 
-// ===========================================================================
-// SHX (X & H+1 → mem) — opcode 9E
-// ===========================================================================
-
 #[test]
-fn shx_absx_stores_x_and_h_plus_1() {
+fn ahx_indy_page_cross_uses_base_high_byte() {
+    // Triggering vector from the Phase 7 review: ptr = $60FF, Y=1 →
+    // eff = $6100. A&X = 0x0F; base_hi+1 = 0x61 → stored 0x01.
+    // (The old effective-addr formula gave 0x62 → stored 0x02.)
     let mut cpu = cpu_at(0x4000);
-    cpu.regs.x = 0x42;
-    cpu.regs.y = 0x00;
+    cpu.regs.a = 0xFF;
+    cpu.regs.x = 0x0F;
+    cpu.regs.y = 0x01;
     let mut bus = FlatBus::new();
-    bus.mem[0x4000] = 0x9E;
+    bus.mem[0x4000] = 0x93;
     bus.mem[0x4001] = 0x00;
-    bus.mem[0x4002] = 0x30; // abs = $3000; abs+X = $3042
+    bus.mem[0x0000] = 0xFF;
+    bus.mem[0x0001] = 0x60; // ptr = $60FF; eff = $6100
     step(&mut cpu, &mut bus);
-    // X=0x42 & (H+1=0x31) = 0x00
-    assert_eq!(bus.mem[0x3042], 0x00, "X=0x42 & 0x31 = 0x00");
+    assert_eq!(
+        bus.mem[0x6100], 0x01,
+        "stored A & X & (base_hi+1) = 0x0F & 0x61 = 0x01"
+    );
 }
 
 // ===========================================================================
-// SHY (Y & H+1 → mem) — opcode 9C
+// SHX (X & H+1 → mem) — opcode 9E (abs,Y)
 // ===========================================================================
+// C++ reference (`src/ops.inc:473-476`):
+//   GetABIWR(A,_Y); A = ((_X&((A>>8)+1)) << 8) | (A & 0xff); WrMem(A, A>>8);
+// i.e. the effective address is indexed by **Y**, the stored value is
+// X & (eff_hi + 1), and the WRITE ADDRESS's high byte is replaced with
+// that masked value. The write can therefore land on a different page
+// than the effective address.
 
 #[test]
-fn shy_absx_stores_y_and_h_plus_1() {
+fn shx_absy_non_cross_x_ne_y_writes_masked_high_byte_address() {
+    // Triggering vector from the Phase 7 review: X=1, Y=2, base $6000.
+    // eff = $6002; masked = X & (0x60+1) = 0x01; write_addr = $0102.
     let mut cpu = cpu_at(0x4000);
-    cpu.regs.x = 0x00;
+    cpu.regs.x = 0x01;
+    cpu.regs.y = 0x02;
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0x9E;
+    bus.mem[0x4001] = 0x00;
+    bus.mem[0x4002] = 0x60; // abs = $6000; eff = $6000 + Y = $6002
+    step(&mut cpu, &mut bus);
+    assert_eq!(
+        bus.mem[0x0102], 0x01,
+        "C++ formula writes masked value at replaced address"
+    );
+    assert_eq!(
+        bus.mem[0x6001], 0x00,
+        "old X-indexed behaviour must not write $6001"
+    );
+    assert_eq!(
+        bus.mem[0x6002], 0x00,
+        "nothing written at the plain effective address"
+    );
+}
+
+#[test]
+fn shx_absy_page_cross_x_ne_y() {
+    // base $30FF, X=$42, Y=2 → eff = $3101 (page cross).
+    // masked = 0x42 & (0x31+1=0x32) = 0x02; write_addr = $0201.
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.x = 0x42;
+    cpu.regs.y = 0x02;
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0x9E;
+    bus.mem[0x4001] = 0xFF;
+    bus.mem[0x4002] = 0x30; // abs = $30FF; eff = $3101
+    step(&mut cpu, &mut bus);
+    assert_eq!(
+        bus.mem[0x0201], 0x02,
+        "page-cross SHX write address = masked hi : eff lo"
+    );
+    assert_eq!(
+        bus.mem[0x3141], 0x00,
+        "old X-indexed page-cross target must stay untouched"
+    );
+}
+
+// ===========================================================================
+// SHY (Y & H+1 → mem) — opcode 9C (abs,X)
+// ===========================================================================
+// C++ reference (`src/ops.inc:467-470`): same shape as SHX but indexed
+// by X and storing Y.
+
+#[test]
+fn shy_absx_non_cross_x_ne_y_writes_masked_high_byte_address() {
+    // Triggering vector from the Phase 7 review: X=2, Y=1, base $6000.
+    // eff = $6002; masked = Y & (0x60+1) = 0x01; write_addr = $0102.
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.x = 0x02;
+    cpu.regs.y = 0x01;
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0x9C;
+    bus.mem[0x4001] = 0x00;
+    bus.mem[0x4002] = 0x60; // abs = $6000; eff = $6000 + X = $6002
+    step(&mut cpu, &mut bus);
+    assert_eq!(
+        bus.mem[0x0102], 0x01,
+        "C++ formula writes masked value at replaced address"
+    );
+    assert_eq!(
+        bus.mem[0x6002], 0x00,
+        "nothing written at the plain effective address"
+    );
+}
+
+#[test]
+fn shy_absx_page_cross_x_ne_y() {
+    // base $40FF, X=1, Y=$FF → eff = $4100 (page cross).
+    // masked = 0xFF & (0x41+1=0x42) = 0x42; write_addr = $4200.
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.x = 0x01;
     cpu.regs.y = 0xFF;
     let mut bus = FlatBus::new();
     bus.mem[0x4000] = 0x9C;
     bus.mem[0x4001] = 0xFF;
-    bus.mem[0x4002] = 0x40; // abs = $40FF
+    bus.mem[0x4002] = 0x40; // abs = $40FF; eff = $4100
     step(&mut cpu, &mut bus);
-    // Y=0xFF & (H+1=0x41) = 0x41
-    assert_eq!(bus.mem[0x40FF], 0x41);
+    assert_eq!(
+        bus.mem[0x4200], 0x42,
+        "page-cross SHY write address = masked hi : eff lo"
+    );
+    assert_eq!(
+        bus.mem[0x4100], 0x00,
+        "nothing written at the plain effective address"
+    );
 }
 
 // ===========================================================================
 // TAS (S = A & X; store S & H+1) — opcode 9B
 // ===========================================================================
+// C++ reference (`src/ops.inc:479`):
+//   _S=_A&_X; ST_ABY(_S& (((A-_Y)>>8)+1) );
+// H uses the BASE high byte + 1 (A - Y), not the effective address's.
 
 #[test]
 fn tas_absy_sets_s_and_stores() {
@@ -577,9 +712,34 @@ fn tas_absy_sets_s_and_stores() {
     assert_eq!(bus.mem[0x5000], 0x00, "stored S & (H+1) = 0x00");
 }
 
+#[test]
+fn tas_absy_page_cross_uses_base_high_byte() {
+    // Triggering vector from the Phase 7 review: base $60FF, Y=1 →
+    // eff = $6100 (page cross). S = A & X = 0x0F.
+    // base_hi + 1 = 0x60 + 1 = 0x61 → stored = 0x0F & 0x61 = 0x01.
+    // (The old effective-addr formula gave 0x62 → stored 0x02.)
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0xFF;
+    cpu.regs.x = 0x0F;
+    cpu.regs.y = 0x01;
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0x9B;
+    bus.mem[0x4001] = 0xFF;
+    bus.mem[0x4002] = 0x60; // abs = $60FF; eff = $6100
+    step(&mut cpu, &mut bus);
+    assert_eq!(cpu.regs.s, 0x0F, "S = A & X = 0x0F");
+    assert_eq!(
+        bus.mem[0x6100], 0x01,
+        "stored S & (base_hi+1) = 0x0F & 0x61 = 0x01"
+    );
+}
+
 // ===========================================================================
-// LAS (A = X = S = mem & S) — opcode BB
+// LAS (A = X = S = mem & S) — opcode BB (abs,Y, RMW write-mode)
 // ===========================================================================
+// C++ reference (`src/ops.inc:408`): RMW_ABY — write-mode addressing
+// (no page-cross penalty), then read + write-back + register update +
+// write-back. Both write-backs store the ORIGINAL read value.
 
 #[test]
 fn las_absy_loads_a_x_s_with_mem_and_s() {
@@ -595,6 +755,67 @@ fn las_absy_loads_a_x_s_with_mem_and_s() {
     assert_eq!(cpu.regs.a, 0x00, "A = mem & S = 0x0F & 0xF0 = 0x00");
     assert_eq!(cpu.regs.x, 0x00, "X = mem & S = 0x00");
     assert_eq!(cpu.regs.s, 0x00, "S = mem & S = 0x00");
+    assert_eq!(
+        bus.mem[0x6001], 0x0F,
+        "write-backs store the original value, mem unchanged"
+    );
+}
+
+/// Bus that records every write (address + value) for RMW write-back
+/// verification.
+struct RecordingBus {
+    mem: [u8; 0x10000],
+    writes: Vec<(u16, u8)>,
+}
+
+impl RecordingBus {
+    fn new() -> Self {
+        Self {
+            mem: [0; 0x10000],
+            writes: Vec::new(),
+        }
+    }
+}
+
+impl Bus for RecordingBus {
+    fn read(&mut self, addr: u16) -> u8 {
+        self.mem[addr as usize]
+    }
+    fn write(&mut self, addr: u16, val: u8) {
+        self.writes.push((addr, val));
+        self.mem[addr as usize] = val;
+    }
+}
+
+#[test]
+fn las_absy_page_cross_does_two_write_backs_of_original() {
+    // base $60FF, Y=1 → eff = $6100 (page cross). C++ RMW_ABY has no
+    // page-cross penalty and performs exactly two write-backs of the
+    // ORIGINAL read value, at the effective address.
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.s = 0x0F;
+    cpu.regs.y = 0x01;
+    let mut bus = RecordingBus::new();
+    bus.mem[0x4000] = 0xBB;
+    bus.mem[0x4001] = 0xFF;
+    bus.mem[0x4002] = 0x60; // abs = $60FF; eff = $6100
+    bus.mem[0x6100] = 0xAA;
+    let cycles = step(&mut cpu, &mut bus);
+    // CycTable[0xBB] = 4; write-mode addressing adds no page-cross
+    // extra, so a page-crossing LAS is still 4 cycles (C++ reference).
+    assert_eq!(
+        cycles, 4,
+        "LAS page-cross must not add a cycle (write-mode RMW)"
+    );
+    assert_eq!(cpu.regs.a, 0x0A, "A = mem & S = 0xAA & 0x0F = 0x0A");
+    assert_eq!(cpu.regs.x, 0x0A, "X = 0x0A");
+    assert_eq!(cpu.regs.s, 0x0A, "S = 0x0A");
+    assert_eq!(
+        bus.writes,
+        vec![(0x6100, 0xAA), (0x6100, 0xAA)],
+        "exactly two write-backs of the ORIGINAL value at the effective address"
+    );
+    assert_eq!(bus.mem[0x6100], 0xAA, "memory unchanged by the write-backs");
 }
 
 // ===========================================================================
@@ -618,7 +839,11 @@ fn nop_zp_does_not_change_memory_or_registers() {
         let a_before = cpu.regs.a;
         let x_before = cpu.regs.x;
         step(&mut cpu, &mut bus);
-        assert_eq!(cpu.regs.pc, pc_before + 2, "PC advanced by 2 (opcode + operand)");
+        assert_eq!(
+            cpu.regs.pc,
+            pc_before + 2,
+            "PC advanced by 2 (opcode + operand)"
+        );
         assert_eq!(cpu.regs.a, a_before, "A unchanged by opcode ${:02X}", op);
         assert_eq!(cpu.regs.x, x_before, "X unchanged by opcode ${:02X}", op);
         // 0x44 and 0x64 are read+write; mem unchanged.
@@ -977,6 +1202,26 @@ fn ahx_absy_stores_a_and_x_and_h_plus_1() {
     step(&mut cpu, &mut bus);
     // A=0xFF & X=0x0F = 0x0F, & (H+1=0x61) = 0x01
     assert_eq!(bus.mem[0x6005], 0x01);
+}
+
+#[test]
+fn ahx_absy_page_cross_uses_base_high_byte() {
+    // Triggering vector from the Phase 7 review: base $60FF, Y=1 →
+    // eff = $6100 (page cross). A&X = 0x0F; base_hi+1 = 0x61 →
+    // stored 0x01 (the old effective-addr formula gave 0x02).
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0xFF;
+    cpu.regs.x = 0x0F;
+    cpu.regs.y = 0x01;
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0x9F; // AHX abs,Y
+    bus.mem[0x4001] = 0xFF;
+    bus.mem[0x4002] = 0x60; // abs = $60FF; eff = $6100
+    step(&mut cpu, &mut bus);
+    assert_eq!(
+        bus.mem[0x6100], 0x01,
+        "stored A & X & (base_hi+1) = 0x0F & 0x61 = 0x01"
+    );
 }
 
 // ===========================================================================

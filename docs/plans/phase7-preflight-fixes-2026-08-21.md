@@ -152,3 +152,86 @@ All four reference lines are in `src/ops.inc` / `src/x6502.cpp`
 - A separate Phase 7 approval request is then submitted to the user
   (delete C++ CPU, flip FCEUX11_RUST_CPU default, CMake/scripts
   updates) - not started by this plan.
+
+## 5. Execution results (completed 2026-08-21)
+
+All MUST-FIX and SHOULD-FIX items are implemented in the working tree
+(not yet committed; branch `wip2.0`).
+
+### 5.1 MUST-FIX - do_unofficial parity (execute.rs)
+
+1. **SHX 0x9E**: now indexes by **Y** (`abs_y_write`) and applies the
+   C++ write-address high-byte replacement
+   `((X&(eff_hi+1))<<8)|eff_lo` with store value `X&(eff_hi+1)`.
+2. **SHY 0x9C**: keeps the X index and applies the same replacement.
+3. **AHX 0x93/0x9F** and **TAS 0x9B**: H is now `base_hi + 1` where
+   `base = eff - Y` (recovering the absolute/pointer operand), exactly
+   like the C++ `(((A-_Y)>>8)+1)`.
+4. **LAS 0xBB**: RMW write-mode (`abs_y_write`, no page-cross extra)
+   with two write-backs of the ORIGINAL read value, matching
+   `RMW_ABI`.
+
+Tests: 8 new triggering-vector tests in `tests/unofficial.rs` (SHX x2,
+SHY x2, AHX-indY page-cross, AHX-absY page-cross, TAS page-cross, LAS
+write-back/count) plus 6 per-instruction cycle tests in
+`tests/cycle_parity.rs`.
+
+**Correction to the review's measured numbers**: the review stated
+"C++ LAS cycles=5 always". The authoritative source (shared `CycTable`
+`0xBB` = 4 in both `src/x6502.cpp:365-377` and `decode.rs`, plus the
+`RMW_ABY` handler which contains no `ADDCYC`) gives LAS = 4 cycles on
+every execution, page-cross or not. The fix and tests assert 4; the
+review's "5" was an off-by-one in the measured write-up.
+
+### 5.2 SHOULD-FIX
+
+1. `ffi.rs` `fceux11_cpu_run` doc rewritten (C++-polarity count: budget
+   added, decremented per dispatch/instruction, exit on `count <= 0`;
+   timestamps advanced by the tick-cycles callback; return value
+   informational). `execute.rs::run` header corrected likewise.
+2. `decode.rs` Phase-1-era comment now documents the explicit codegen
+   deferral (with `cpu-rust-v2.md` reference); the C++-mirroring table
+   rows are preserved via `#[rustfmt::skip]`.
+3. ARR 0x6B dead `bit7` removed.
+4. Clippy clean: `cargo clippy -p fceux11-core --all-targets --no-deps`
+   exits 0 (missing-safety-doc handled via module-level allows with
+   justification for bus/ffi/tick, per-function `# Safety` for sformat;
+   identity-op masks, unused imports/variables, duplicated `#[test]`,
+   unnecessary unsafe blocks, test lint noise all fixed).
+5. `cargo fmt --check -p fceux11-core` clean.
+6. `ChangeLog.md` updated (Phase 4/4.5/5 entries with commit hashes,
+   preflight-fix entry, current test counts, known-limits rewrite).
+7. `fceux11-formats` clippy errors documented in `ChangeLog.md`;
+   deferred to a separate cleanup, not a Phase 7 blocker.
+
+### 5.3 Extra stability fixes found during execution
+
+- **Parallel-test pollution (pre-existing flake)**: the global `TICK_FN`
+  slot fired into a tick test's counting callback from unrelated lib
+  tests' `step()` calls running on other threads, making
+  `cargo test -p fceux11-core` fail ~deterministically in parallel mode.
+  Fix: the tick callbacks now fire only on the installing thread
+  (`TICK_THREAD_ACTIVE` thread-local in `tick.rs`); production is
+  single-threaded install-then-run, so behaviour is unchanged.
+- **proptest `nmi_fresh_coalesces_and_fires_once`**: the random PC can
+  point at a JAM opcode; step 1 jams the CPU and step 2's NMI dispatch
+  is correctly suppressed (C++ `else if(!_jammed)`,
+  `src/x6502.cpp:582`), leaving the NMI bit set. The assertion is now
+  conditional on `jammed == 0`.
+
+### 5.4 Verification matrix (all green)
+
+| Check | Result |
+|---|---|
+| `cargo test -p fceux11-core` | **221 PASS** (lib 89, unofficial 80, cycle_parity 23, interrupts 15, opcodes 7, proptest 5, nestest 2) |
+| `cargo clippy -p fceux11-core --all-targets --no-deps` | clean (exit 0) |
+| `cargo fmt --check -p fceux11-core` | clean |
+| CTest `FCEUX11_RUST_CPU=ON` (non-perf) | **32/34** - only `kagami_qa_direct_smoke` (blargg known-fails, C++ baseline fails them too) and `rom_regression_rust_smoke` (documented 1/780 PPU render-timing artifact) |
+| CTest `FCEUX11_RUST_CPU=OFF` (non-perf) | **34/34** |
+| `golden_savestate_test` | PASS under ON and OFF (byte-equal) |
+| `savestate_regression_rust_smoke` | PASS (0/12) under ON |
+| `bench_tolerance_test` | PASS under ON and OFF |
+
+The entry standard (section 0, checks 1-6) is met. Phase 7 itself
+(delete the C++ CPU, flip `FCEUX11_RUST_CPU` default, CMake/scripts
+updates) remains a separate, user-approved step.

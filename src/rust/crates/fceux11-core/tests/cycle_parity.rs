@@ -36,9 +36,7 @@
 //! instruction stream. These tests pin the Rust side; the C++ side is
 //! the gold standard.
 
-use fceux11_core::cpu::{
-    decode::info, run, step, Bus, CpuState, IrqSource,
-};
+use fceux11_core::cpu::{Bus, CpuState, IrqSource, decode::info, run, step};
 
 // ---------------------------------------------------------------------------
 // Test harness
@@ -94,7 +92,10 @@ fn nop_base_2_no_extras() {
     bus.mem[0x4000] = 0xEA;
     let c = step(&mut cpu, &mut bus);
     assert_eq!(c, 2, "NOP base cycle cost");
-    assert_eq!(cpu.regs.count, -96, "count delta = -2 * 48 (C++ _count polarity)");
+    assert_eq!(
+        cpu.regs.count, -96,
+        "count delta = -2 * 48 (C++ _count polarity)"
+    );
     assert_eq!(cpu.regs.pc, 0x4001);
     assert!(cpu.regs.jammed == 0);
 }
@@ -221,7 +222,11 @@ fn branch_taken_page_cross_extra_2() {
     bus.mem[0x4081] = 0x7E; // +$7E → $4100 (page crossed)
     bus.mem[0x4100] = 0xEA;
     let c = step(&mut cpu, &mut bus);
-    assert_eq!(c, 2 + 1 + 1, "BCC taken, page crossed (base=2 + taken=1 + page=1)");
+    assert_eq!(
+        c,
+        2 + 1 + 1,
+        "BCC taken, page crossed (base=2 + taken=1 + page=1)"
+    );
     assert_eq!(cpu.regs.count, (2 + 1 + 1) * -48);
     assert_eq!(cpu.regs.pc, 0x4100);
 }
@@ -256,7 +261,11 @@ fn stream_256_nops_sums_to_512_cycles() {
         total_cycles = total_cycles.saturating_add(c as u32);
     }
     assert_eq!(total_cycles, 512, "256 NOPs @ 2 cycles each = 512");
-    assert_eq!(cpu.regs.count, -(512 * 48), "count delta = -512 * 48 = -24576");
+    assert_eq!(
+        cpu.regs.count,
+        -(512 * 48),
+        "count delta = -512 * 48 = -24576"
+    );
     assert_eq!(cpu.regs.pc, 0x4100, "PC advanced 256 bytes from $4000");
 }
 
@@ -285,9 +294,12 @@ fn run_cycles_consumes_proportional_to_budget() {
     let scaled = 96 * 16; // 96 cycles in 1/16 units
     let consumed = run(&mut cpu, &mut bus, scaled);
     let inst_count = cpu.regs.count - start_count;
-    assert_eq!(inst_count, 0, "16 NOPs * -96 exactly exhaust the 1536 budget");
+    assert_eq!(
+        inst_count, 0,
+        "16 NOPs * -96 exactly exhaust the 1536 budget"
+    );
     assert_eq!(inst_count % 96, 0, "count delta must be a multiple of -96");
-    let n_nops = (scaled / 96) as i32;
+    let n_nops = scaled / 96;
     assert_eq!(consumed, n_nops * 2, "consumed cycles = 2 per NOP");
     assert_eq!(n_nops, 16);
     assert_eq!(cpu.regs.pc, 0x4010, "16 bytes of NOPs consumed");
@@ -476,7 +488,8 @@ fn dispatch_just_exhausts_budget_does_not_execute_followup_instruction() {
         "PC must land at NMI vector $5000, NOT past the follow-up NOP at $5000"
     );
     assert_eq!(
-        cpu.regs.count, 128 - 432,
+        cpu.regs.count,
+        128 - 432,
         "state.count = budget 128 - (NOP 96 + dispatch 336) = -304"
     );
 }
@@ -546,4 +559,114 @@ fn blocked_irq_returns_base_cycles_no_dispatch_cycles() {
         0,
         "EXTERNAL bit must remain pending",
     );
+}
+
+// ===========================================================================
+// 8. Unofficial store/RMW cycle parity (Phase 7 preflight)
+//
+// SHX/SHY/AHX/TAS/LAS all use WRITE-mode addressing on the C++ side
+// (`GetABIWR` / `GetIYWR` — `src/x6502.cpp:255-263, 312-325`), which
+// never adds a page-cross cycle. The base CycTable value is the total
+// cycle cost whether or not the effective address crosses a page.
+// LAS (0xBB) is a read-modify-write (`RMW_ABY`, `src/x6502.cpp:334`)
+// with the same write-mode addressing: base CycTable[0xBB] = 4, no
+// extra even on a page-cross.
+// ===========================================================================
+
+#[test]
+fn las_absy_page_cross_is_4_cycles() {
+    // base $60FF, Y=1 → eff $6100 (page cross). CycTable[0xBB] = 4;
+    // RMW write-mode adds no page-cross penalty and no write-back cost.
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.s = 0x0F;
+    cpu.regs.y = 0x01;
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0xBB;
+    bus.mem[0x4001] = 0xFF;
+    bus.mem[0x4002] = 0x60; // abs = $60FF; eff = $6100
+    bus.mem[0x6100] = 0xAA;
+    let c = step(&mut cpu, &mut bus);
+    assert_eq!(c, 4, "LAS base 4, no page-cross extra (write-mode RMW)");
+    assert_eq!(cpu.regs.count, -192, "count delta = -4 * 48");
+    assert_eq!(cpu.regs.pc, 0x4003);
+    assert_eq!(cpu.regs.a, 0x0A, "A = 0xAA & 0x0F");
+}
+
+#[test]
+fn shx_absy_page_cross_is_5_cycles() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.x = 0x42;
+    cpu.regs.y = 0x01;
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0x9E;
+    bus.mem[0x4001] = 0xFF;
+    bus.mem[0x4002] = 0x30; // abs = $30FF; eff = $3100 (page cross)
+    let c = step(&mut cpu, &mut bus);
+    assert_eq!(c, 5, "SHX base 5, write-mode (no page-cross extra)");
+    assert_eq!(cpu.regs.count, -240, "count delta = -5 * 48");
+    assert_eq!(cpu.regs.pc, 0x4003);
+}
+
+#[test]
+fn shy_absx_page_cross_is_5_cycles() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.x = 0x01;
+    cpu.regs.y = 0xFF;
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0x9C;
+    bus.mem[0x4001] = 0xFF;
+    bus.mem[0x4002] = 0x40; // abs = $40FF; eff = $4100 (page cross)
+    let c = step(&mut cpu, &mut bus);
+    assert_eq!(c, 5, "SHY base 5, write-mode (no page-cross extra)");
+    assert_eq!(cpu.regs.count, -240, "count delta = -5 * 48");
+    assert_eq!(cpu.regs.pc, 0x4003);
+}
+
+#[test]
+fn tas_absy_page_cross_is_5_cycles() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0xFF;
+    cpu.regs.x = 0x0F;
+    cpu.regs.y = 0x01;
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0x9B;
+    bus.mem[0x4001] = 0xFF;
+    bus.mem[0x4002] = 0x60; // abs = $60FF; eff = $6100 (page cross)
+    let c = step(&mut cpu, &mut bus);
+    assert_eq!(c, 5, "TAS base 5, write-mode (no page-cross extra)");
+    assert_eq!(cpu.regs.count, -240, "count delta = -5 * 48");
+    assert_eq!(cpu.regs.pc, 0x4003);
+}
+
+#[test]
+fn ahx_absy_page_cross_is_5_cycles() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0xFF;
+    cpu.regs.x = 0x0F;
+    cpu.regs.y = 0x01;
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0x9F;
+    bus.mem[0x4001] = 0xFF;
+    bus.mem[0x4002] = 0x60; // abs = $60FF; eff = $6100 (page cross)
+    let c = step(&mut cpu, &mut bus);
+    assert_eq!(c, 5, "AHX abs,Y base 5, write-mode (no page-cross extra)");
+    assert_eq!(cpu.regs.count, -240, "count delta = -5 * 48");
+    assert_eq!(cpu.regs.pc, 0x4003);
+}
+
+#[test]
+fn ahx_indy_page_cross_is_6_cycles() {
+    let mut cpu = cpu_at(0x4000);
+    cpu.regs.a = 0xFF;
+    cpu.regs.x = 0x0F;
+    cpu.regs.y = 0x01;
+    let mut bus = FlatBus::new();
+    bus.mem[0x4000] = 0x93;
+    bus.mem[0x4001] = 0x00;
+    bus.mem[0x0000] = 0xFF;
+    bus.mem[0x0001] = 0x60; // ptr = $60FF; eff = $6100 (page cross)
+    let c = step(&mut cpu, &mut bus);
+    assert_eq!(c, 6, "AHX (ind),Y base 6, write-mode (no page-cross extra)");
+    assert_eq!(cpu.regs.count, -288, "count delta = -6 * 48");
+    assert_eq!(cpu.regs.pc, 0x4002);
 }

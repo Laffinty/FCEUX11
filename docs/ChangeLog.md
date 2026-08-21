@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **分支 `wip2.0`**。把 C++ X6502 CPU 替换为 `fceux11-core` 的 Rust 6502
 实现（Rust-first，见 `docs/plans/cpu-rust-v2.md`）。Phase 1-6 已落地，
+Phase 7 前检查（`docs/plans/phase7-preflight-review-2026-08-21.md`）与
+修复（`docs/plans/phase7-preflight-fixes-2026-08-21.md`）已完成，
 Phase 7（删除 C++ CPU）未开始。
 
 ### Added
@@ -23,7 +25,8 @@ Phase 7（删除 C++ CPU）未开始。
 - **`FCEUX11_RUST_CPU` CMake 开关**（默认 OFF，Phase 7 将翻转 ON）：
   把 `Cpu::run()` / TriggerNMI / IRQ 入口路由到 Rust CPU。
 - **`cpu/tick.rs`**：opt-in 每指令 tick 回调（镜像 C++ `map_irq_hook`），
-  FFI 符号 `fceux11_cpu_set_tick` / `fceux11_cpu_set_tick_null`。
+  FFI 符号 `fceux11_cpu_set_tick` / `fceux11_cpu_set_tick_cycles` /
+  `fceux11_cpu_set_tick_null`。
 - **criterion microbench**：`cargo bench -p fceux11-core`（step() 内环）。
 
 ### Changed
@@ -31,6 +34,52 @@ Phase 7（删除 C++ CPU）未开始。
 - **cycle-accounting**：Rust `count` 累加改为 `CycTable * 48`（3x 乘数），
   FFI target 改为 `cycles * 16`，与 C++ `_count -= CycTable * 48` 逐指令
   对齐。
+
+### Phase 4 / 4.5 收口（`cc2c8bd` / `2b3917f` / `4bfde52` / `f522451`，2026-08-20/21）
+
+- **NMI-fresh 桥**：VBL NMI 的延迟一指令语义跨越 IRQ 桥（`g_e1_nmi_fresh`
+  经 `fceux11_cpu_set_nmi_fresh_bridge` 同步），修复 nestest NMI 测试的
+  返回 PC / RAM `$0204` 分歧。
+- **DB/count blob 镜像**：每次总线访问前后把 Rust DB 锁存与 cycle 计数
+  镜像进 C++ `X6502` blob，mid-call C++ 读取方（`JPRead $4016`、mapper
+  open-bus、FDS/VSUni）看到与 C++ 参考派发一致的 open-bus 值。
+- **C++-exact tick 语义**：pre-body hook 收到 `temp = _tcount`（前次 extras
+  + dispatch + base），post-body 时间戳推进使用迭代全量（dispatch + base +
+  extras），`tcount` 每迭代复位——与 C++ `add_cycles` 总量一致。
+- **IRQ 桥**：`fceux11_cpu_set_irq_bridge` 让 Rust 派发在每个边界重读
+  C++ `IRQlow` blob（mapper/APU 帧计数器在 tick 回调中置位），消费掉的
+  bit 写回，避免下次调用快照重新断言。
+- **每指令时间戳推进**：`fceux11_cpu_set_tick_cycles` post-body 回调替代
+  整次调用的 `consumed` 返回值（该返回值现为 informational，C++ 侧
+  `(void)consumed`），修复 MMC1 `lreset` 写节流等 mid-call 读时间戳的硬件。
+- **`step()` 拆分 + C++-style 提前返回**：dispatch 耗尽预算时不执行
+  follow-up 指令，跨调用残差（含负值 overdraw）与 C++ `_count` 逐调用
+  一致。
+
+### Phase 5 收口（`0819b3e`，2026-08-21）
+
+- 非官方 opcode 覆盖率 105/105；`cpu/snapshot.rs` + 4 个 savestate
+  测试；`golden_savestate_test` 字节相等；`savestate_regression` 0/12。
+
+### Phase 7 preflight 修复（2026-08-21，工作树未提交）
+
+- **非官方 opcode 奇偶性（MUST-FIX，`execute.rs::do_unofficial`）**：
+  - SHX `0x9E` 索引寄存器 X→Y（`abs_y_write`），并应用 C++ 写地址高位
+    替换 `((X&(eff_hi+1))<<8)|eff_lo`（与 SHY `0x9C` 一致）。
+  - AHX `0x93/0x9F`、TAS `0x9B` 的 H 改为 base-high+1（`(eff-Y)>>8)+1`），
+    页跨向量（base `$60FF`, Y=1）存储值从错误的 0x02 修正为 0x01。
+  - LAS `0xBB` 由 read 模式改为 RMW 写模式（`abs_y_write` + 两次原值
+    写回），页跨周期 5→4（CycTable 基准，无额外周期）。
+  - 触发向量测试（X != Y、页跨）加入 `tests/unofficial.rs`；per-instruction
+    周期测试加入 `tests/cycle_parity.rs`。
+- **测试稳定性**：tick 回调改为仅在安装线程触发（`TICK_THREAD_ACTIVE`
+  thread-local），消除并行测试下 TICK_FN 计数器污染；proptest
+  `nmi_fresh_coalesces_and_fires_once` 对 jammed CPU 的 NMI 抑制断言按
+  C++ `else if(!_jammed)` 语义修正。
+- **卫生**：`fceux11_cpu_run` / `run()` 过时文档注释更新（count 极性 +
+  tick_cycles 时间戳）；`decode.rs` codegen 延期说明；ARR `0x6B` 死代码
+  清理；`cargo clippy -p fceux11-core --all-targets --no-deps` 干净
+  （含 FFI `# Safety` 文档/模块级 allow）；`cargo fmt` 干净。
 
 ### Fixed（Rust CPU 真实 bug，均由新增测试暴露）
 
@@ -41,22 +90,25 @@ Phase 7（删除 C++ CPU）未开始。
 - ARR V/C 公式用旋转前 bit 而非旋转后 result bit
 - NOP imm 不消耗立即数字节；NOP abs,X 多推进 2 字节 PC
 
-### Tests（`cargo test -p fceux11-core` = 182 PASS）
+### Tests（`cargo test -p fceux11-core` = 221 PASS）
 
 - `tests/interrupts.rs`（15）：RESET / NMI / NMI edge-detect / IRQ / BRK
-- `tests/unofficial.rs`（53）：109 非官方 opcode 寄存器副作用覆盖
-- `tests/cycle_parity.rs`（15）：per-instruction cycle accounting fence
+- `tests/unofficial.rs`（80）：109 非官方 opcode 寄存器副作用覆盖，含
+  SHX/SHY/AHX/TAS/LAS 的 X!=Y 与页跨触发向量
+- `tests/cycle_parity.rs`（23）：per-instruction cycle accounting fence，
+  含非官方 store/RMW 写模式周期（LAS=4, SHX/SHY/TAS/AHX-absY=5, AHX-indY=6）
 - `tests/proptest_fuzz.rs`（5）：随机 state × ROM 鲁棒性 fuzz
-- `tests/nestest.rs`（2）+ `tests/opcodes.rs`（7）+ lib 单测（85）
+- `tests/nestest.rs`（2）+ `tests/opcodes.rs`（7）+ lib 单测（89）
 
-### Known limits（Phase 4 sub-step 5 剩余）
+### Known limits（Phase 7 前状态）
 
-`FCEUX11_RUST_CPU=ON` 下 ctest 仍有 5 个失败：`apu_wav_diff_test`、
-`golden_savestate_test`、`kagami_qa_direct_smoke`（blargg_cpu_instrs
-子项）、`rom_regression_rust_smoke`（1/780）、`savestate_regression_rust_smoke`
-（12/12）。原因：mapper hook / DMC steal cycles 尚未接入 Rust 热路径
-（`tick.rs` 桥已就位，C++ 侧接线待做）。`savestate_core_test` /
-`cpu_test` 已修复，blargg 子套件 6/7 已知限制由 FAIL 转 PASS。
+`FCEUX11_RUST_CPU=ON` 下 ctest 32/34，仅两个已记录残留：
+`kagami_qa_direct_smoke` blargg known-fails（全部在
+`blargg_known_fail.json`，C++ 基线同样失败）与
+`rom_regression_rust_smoke` 的 1/780（nestest 过渡帧 16-pixel PPU
+渲染时序产物，所有 CPU 可观测量字节一致）。`cargo clippy -p
+fceux11-formats` 的既有错误（预先存在、超出 CPU 范围）记录于此，推迟到
+独立清理，不作为 Phase 7 阻塞项。
 
 ## [1.17] - 2026-08-08
 

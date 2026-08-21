@@ -27,7 +27,11 @@ where
     B: ?Sized,
 {
     let a = state.regs.a;
-    let c = if state.regs.p & Flags::CARRY.bits() != 0 { 1u16 } else { 0u16 };
+    let c = if state.regs.p & Flags::CARRY.bits() != 0 {
+        1u16
+    } else {
+        0u16
+    };
     let l = a as u16 + m as u16 + c;
     let result = l as u8;
     // Overflow: signed carry-in differs from signed carry-out.
@@ -35,7 +39,10 @@ where
     //     — C++ form: (((_A ^ x) & 0x80) ^ 0x80) & ((_A ^ l) & 0x80)) >> 1
     let v = (((a ^ m) as u16 ^ 0x80) & (a as u16 ^ l) & 0x80) != 0;
     let mut p = state.regs.p;
-    p &= !(Flags::ZERO.bits() | Flags::CARRY.bits() | Flags::NEGATIVE.bits() | Flags::OVERFLOW.bits());
+    p &= !(Flags::ZERO.bits()
+        | Flags::CARRY.bits()
+        | Flags::NEGATIVE.bits()
+        | Flags::OVERFLOW.bits());
     p |= (l >> 8) as u8 & Flags::CARRY.bits();
     if v {
         p |= Flags::OVERFLOW.bits();
@@ -52,14 +59,21 @@ where
     B: ?Sized,
 {
     let a = state.regs.a;
-    let c = if state.regs.p & Flags::CARRY.bits() != 0 { 1i16 } else { 0i16 };
+    let c = if state.regs.p & Flags::CARRY.bits() != 0 {
+        1i16
+    } else {
+        0i16
+    };
     // Subtraction = addition of one's complement plus carry-in.
     let l = (a as i16) - (m as i16) - (1 - c);
     let result = l as u8;
     // V: signed overflow on subtraction.
     let v = ((a as i16 ^ result as i16) & (a as i16 ^ m as i16) & 0x80) != 0;
     let mut p = state.regs.p;
-    p &= !(Flags::ZERO.bits() | Flags::CARRY.bits() | Flags::NEGATIVE.bits() | Flags::OVERFLOW.bits());
+    p &= !(Flags::ZERO.bits()
+        | Flags::CARRY.bits()
+        | Flags::NEGATIVE.bits()
+        | Flags::OVERFLOW.bits());
     // Carry is **inverted** on subtraction: C set means no borrow.
     p |= (((l >> 8) & 1) as u8) ^ Flags::CARRY.bits();
     if v {
@@ -180,7 +194,11 @@ pub fn lsr(state: &mut CpuState, m: u8) -> u8 {
 /// ROL — Rotate Left on memory (9-bit rotation through C).
 #[inline]
 pub fn rol(state: &mut CpuState, m: u8) -> u8 {
-    let c_in = if state.regs.p & Flags::CARRY.bits() != 0 { 1 } else { 0 };
+    let c_in = if state.regs.p & Flags::CARRY.bits() != 0 {
+        1
+    } else {
+        0
+    };
     let c_out = m >> 7;
     let result = (m << 1) | c_in;
     let mut p = state.regs.p;
@@ -194,7 +212,11 @@ pub fn rol(state: &mut CpuState, m: u8) -> u8 {
 /// ROR — Rotate Right on memory.
 #[inline]
 pub fn ror(state: &mut CpuState, m: u8) -> u8 {
-    let c_in = if state.regs.p & Flags::CARRY.bits() != 0 { 0x80 } else { 0 };
+    let c_in = if state.regs.p & Flags::CARRY.bits() != 0 {
+        0x80
+    } else {
+        0
+    };
     let c_out = m & 1;
     let result = (m >> 1) | c_in;
     let mut p = state.regs.p;
@@ -241,8 +263,7 @@ mod tests {
         fn read(&mut self, _addr: u16) -> u8 {
             0
         }
-        fn write(&mut self, _addr: u16, _val: u8) {
-        }
+        fn write(&mut self, _addr: u16, _val: u8) {}
     }
 
     #[test]
@@ -344,7 +365,6 @@ mod tests {
     fn asl_shift_left() {
         let mut s = CpuState::new();
         s.regs.p = 0;
-        let mut bus = NoBus;
         let r = asl(&mut s, 0x80);
         assert_eq!(r, 0x00);
         assert!(s.regs.p & Flags::CARRY.bits() != 0);
@@ -355,7 +375,6 @@ mod tests {
     fn lsr_shift_right() {
         let mut s = CpuState::new();
         s.regs.p = 0;
-        let mut bus = NoBus;
         let r = lsr(&mut s, 0x01);
         assert_eq!(r, 0x00);
         assert!(s.regs.p & Flags::CARRY.bits() != 0);
@@ -366,7 +385,6 @@ mod tests {
     fn rol_through_carry() {
         let mut s = CpuState::new();
         s.regs.p = Flags::CARRY.bits();
-        let mut bus = NoBus;
         let r = rol(&mut s, 0x00);
         assert_eq!(r, 0x01);
         assert_eq!(s.regs.p & Flags::CARRY.bits(), 0); // rotated out

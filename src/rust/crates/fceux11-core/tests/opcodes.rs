@@ -5,9 +5,7 @@
 //! trivial flat 64 KiB bus without panicking, and the per-opcode cycle
 //! cost matches the legacy `CycTable` byte-for-byte.
 
-use fceux11_core::cpu::{
-    cycle_count, size_of, step, Bus, CpuState, Flags, IrqSource, X6502Layout,
-};
+use fceux11_core::cpu::{Bus, CpuState, Flags, IrqSource, X6502Layout, cycle_count, step};
 
 /// Flat 64 KiB RAM bus — trivial, no mapper, no PPU.
 struct FlatBus {
@@ -43,7 +41,6 @@ fn all_256_opcodes_step_without_panic() {
     // is checked by the targeted `addressing_*` unit tests instead.
     use fceux11_core::cpu::decode::info;
     let mut passed = 0;
-    let mut total_cycles = 0u32;
     for opcode in 0u16..=0xFF {
         let mut bus = FlatBus::new();
         let mut cpu = CpuState::new();
@@ -56,7 +53,9 @@ fn all_256_opcodes_step_without_panic() {
             assert!(
                 cycles as u8 >= cycle_count(opcode as u8),
                 "opcode ${:02X}: branch cycle {} < base {}",
-                opcode, cycles, cycle_count(opcode as u8)
+                opcode,
+                cycles,
+                cycle_count(opcode as u8)
             );
         } else {
             assert_eq!(
@@ -67,7 +66,6 @@ fn all_256_opcodes_step_without_panic() {
             );
         }
         passed += 1;
-        total_cycles += cycles as u32;
     }
     assert_eq!(passed, 256);
 }
@@ -93,11 +91,13 @@ fn power_then_reset_loads_vector() {
     cpu.power();
     let mut bus = FlatBus::new();
     // Reset vector: $C000 (nestest convention).
-    bus.mem[0xC000] = 0x4C; bus.mem[0xC001] = 0x00; bus.mem[0xC002] = 0x80; // JMP $8000
+    bus.mem[0xC000] = 0x4C;
+    bus.mem[0xC001] = 0x00;
+    bus.mem[0xC002] = 0x80; // JMP $8000
     bus.mem[0xFFFC] = 0x00;
     bus.mem[0xFFFD] = 0xC0;
     let cycles = step(&mut cpu, &mut bus);
-    assert_eq!(cycles, 0 + 3); // RESET dispatch (0) + JMP abs (3)
+    assert_eq!(cycles, 3); // RESET dispatch (0) + JMP abs (3)
     assert_eq!(cpu.regs.pc, 0x8000);
     assert_eq!(cpu.regs.p & Flags::IRQ_DIS.bits(), Flags::IRQ_DIS.bits());
     assert_eq!(
@@ -155,11 +155,7 @@ fn op_size_table_consistent() {
     for opcode in 0u16..=0xFF {
         let info = fceux11_core::cpu::decode::info(opcode as u8);
         if info.official {
-            assert!(
-                info.size >= 1,
-                "official opcode ${:02X} has size 0",
-                opcode
-            );
+            assert!(info.size >= 1, "official opcode ${:02X} has size 0", opcode);
         }
     }
 }

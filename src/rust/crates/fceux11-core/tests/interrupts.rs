@@ -24,9 +24,7 @@
 //! 6502 samples the line at instruction end). `nmi_fresh` is cleared on
 //! the defer; the NMI bit in `irq_low` stays set until the dispatch runs.
 
-use fceux11_core::cpu::{
-    step, Bus, CpuState, Flags, IrqSource,
-};
+use fceux11_core::cpu::{Bus, CpuState, Flags, IrqSource, step};
 
 // ---------------------------------------------------------------------------
 // Test harness — local FlatBus (the one in cpu/bus.rs is #[cfg(test)]
@@ -98,7 +96,7 @@ fn reset_does_not_consume_cycles_then_executes_vector() {
     bus.mem[0xFFFC] = 0x00;
     bus.mem[0xFFFD] = 0xC0;
     let cycles = step(&mut cpu, &mut bus);
-    assert_eq!(cycles, 0 + 2, "RESET dispatch (0) + NOP (2)");
+    assert_eq!(cycles, 2, "RESET dispatch (0) + NOP (2)");
     assert_eq!(cpu.regs.pc, 0xC001);
     assert_eq!(
         cpu.regs.irq_low & IrqSource::RESET.bits(),
@@ -123,7 +121,7 @@ fn reset_loads_pc_from_fffc_vector() {
     bus.mem[0xFFFC] = 0xEF;
     bus.mem[0xFFFD] = 0xBE;
     let cycles = step(&mut cpu, &mut bus);
-    assert_eq!(cycles, 0 + 2);
+    assert_eq!(cycles, 2);
     assert_eq!(cpu.regs.a, 0x42);
     assert_eq!(cpu.regs.pc, 0xBEF1);
 }
@@ -238,7 +236,10 @@ fn nmi_pushes_pch_pcl_p_with_b_clear() {
     // After dispatch, S was 0xFD; three pushes -> S = 0xFA.
     assert_eq!(cpu.regs.s, 0xFA);
     assert_eq!(bus.mem[0x01FD], 0x40, "PCH pushed first");
-    assert_eq!(bus.mem[0x01FC], 0x02, "PCL pushed second (PC was $4002 post-NOP)");
+    assert_eq!(
+        bus.mem[0x01FC], 0x02,
+        "PCL pushed second (PC was $4002 post-NOP)"
+    );
     // Pushed P: per NMI dispatch in execute.rs, push value is
     // `(p | U) & ~B`. With p = 0xEF the push value is 0xEF (U already set).
     // The sibling test below covers the case where B was set in P.
@@ -338,7 +339,7 @@ fn nmi_edge_two_consecutive_triggers_yield_one_dispatch() {
     bus.mem[0x4000] = 0xEA;
     bus.mem[0x4001] = 0xEA;
     bus.mem[0x5001] = 0xEA; // NOP after the NMI vector (otherwise the uninitialised
-                             // 0x00 byte is BRK, which jumps PC to the IRQ vector)
+    // 0x00 byte is BRK, which jumps PC to the IRQ vector)
     bus.mem[0xFFFA] = 0x00;
     bus.mem[0xFFFB] = 0x50;
     bus.mem[0x5000] = 0xEA;
@@ -506,7 +507,10 @@ fn irq_loads_pc_from_fffe_vector_and_sets_i() {
     // PCL pushed second. The dispatch happens BEFORE fetch in step(),
     // so the pushed PC is the pre-fetch value ($4000); the post-dispatch
     // fetch at $5000 then advances PC to $5002 after LDA #imm completes.
-    assert_eq!(bus.mem[0x01FC], 0x00, "PCL pushed second (pre-fetch PC=$4000)");
+    assert_eq!(
+        bus.mem[0x01FC], 0x00,
+        "PCL pushed second (pre-fetch PC=$4000)"
+    );
     let pushed_p = bus.mem[0x01FB];
     assert_eq!(
         pushed_p & Flags::BREAK.bits(),
@@ -558,11 +562,7 @@ fn brk_pushes_pc_and_p_with_b_set_and_loads_irq_vector() {
         "B flag MUST be set in BRK-pushed P (got ${:02X})",
         pushed_p
     );
-    assert_ne!(
-        pushed_p & Flags::UNUSED.bits(),
-        0,
-        "U flag set in pushed P",
-    );
+    assert_ne!(pushed_p & Flags::UNUSED.bits(), 0, "U flag set in pushed P",);
 
     // The next step() runs the IRQ-vector instruction (NOP), advancing
     // PC by 1. This verifies the refactored step() always executes
