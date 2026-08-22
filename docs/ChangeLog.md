@@ -158,8 +158,73 @@ Rust-only 构建后逐字节复现并处理：
 ### 阶段记录归档（原 docs/plans → 2026-08-22 迁移至本文件）
 
 > 2026-08-22 收尾：`docs/plans/` 下 11 份 Phase 1-7 计划/报告已全部核实并归档于此
-> （有效内容保留、过程性规划文字精简），原文件已删除。发布级优化方案见
-> `docs/plans/v2.0-release-optimization.md`。
+> （有效内容保留、过程性规划文字精简），原文件已删除。2026-08-23 追加归档
+> `v2.0-release-optimization.md`（v2.0 发布级优化方案，已完成，见下节），随后
+> `docs/plans/` 清空；v2.1 规划文档另建于 `docs/plans/`。
+
+#### v2.0-release-optimization.md — v2.0 发布级优化（KagamiQA 目标评级 A / B，已完成）
+
+- 基准 commit：`3511aa0`（tag `cpu-rust-v2.0-complete`）；审计来源：2026-08-22 两份 CI 日志
+  （kagami-qa `logs_88207115244`、build-windows `logs_88207115289`）。目标：v2.0 发布编译在
+  KagamiQA 全量运行达到 **B 级（发布标准）**，A 级（全绿）作为远期精度工程目标。
+- **评级规则**（`kagami-qa/src/report/grade.rs::compute_grade` 机器计算）：A = 0 失败 / 0 跳过；
+  B = 无 blocking 失败、无 PASS→FAIL 回归、剩余失败全部为冻结基线内 fail_to_fail（且带
+  `--baseline` 运行）；C = 无 blocking/回归，但存在基线外新失败或未提供基线证明；D = 任一
+  blocking 失败或任一 PASS→FAIL 回归；E = 引擎启动（smoke / headless）失败。冻结基线：
+  `tests/fixtures/kagamiqa_baseline_frozen.json`（v1.17 时代快照，run_id
+  `20260808-022802-1777cc-frozen`）。
+- **审计证据**：检出 `3511aa0` 后 kagami-qa 全量 **47 项 37P/10F Grade D（blocked）**、2 条
+  PASS→FAIL 回归（`blargg_cpu_instrs`、`rom_regression_test`，两者均 `failure_means:
+  "blocking"`）、Oracle A 27P/0F、Oracle B 10P/10F；build-windows Release 构建成功但 CTest
+  31P/2F（`kagami_qa_direct_smoke` 12 项 4P/8F 含 1 blocking；`rom_regression_rust_smoke`
+  nestest 第 4 帧 `0x6a65307c→0x7f4f43bf`，780 帧 1 mismatch）。冻结基线中两条回归项均为 true
+  → 真回归而非 CI 抖动（8/18 本地 C++ CPU 构建跑同一测试全绿佐证）。
+- **根因与修复（详见上文「Known limits / 发布评审」）**：
+  - R1 `blargg_cpu_instrs`（instr_v5_all 第 3 组 "AB ATX #n"）：0xAB LAX/ATX #imm 与内存模式
+    LAX 合并分支，把立即数当零页地址二次读取（`state.rd(bus, imm)`）；修复 + 强化
+    `lax_imm_loads_a_and_x` 回归测试（imm=0x42 且 `mem[$0042]=0x99`，断言 A=X=0x42）。
+    已落地 `c312634`。
+  - R2 `rom_regression_test`：C++ 在取指后即 `ADDCYC(base)` 推进 `timestamp_`，Rust 原在指令
+    末尾一次性推进 → mid-instruction 的 PPU 总线访问看到的时间戳落后该指令 base 周期（STA=4），
+    legacy 渲染器 `GETLASTPIXEL` 偏移 `4*48/15≈12` 像素（nestest 过渡帧 row 22 16-pixel 水平
+    偏移）。修复：dispatch 7 周期在预算提前退出前推进、base 在取指后/handler 前推进、extras 在
+    指令末尾推进；新增 `timestamp_advances_before_mid_instruction_bus_access` 回归测试；
+    PPUTS 渲染时序探针 5038/5038 与 C++ 参考逐行一致。已落地 `163c9d7`。
+  - R3 其余 8 个失败（`cpu_int_2_nmi_brk`、`instr_misc`、`mmc3_4_scanline_timing`、
+    `mmc3_v2_4_scanline_timing`、`oam_stress`、`ppu_vbl_nmi`、`sprdma_dmc_dma`、
+    `blargg_suite`）：冻结基线内 advisory known-limit（C++ 基线同样失败），不阻塞 B 级。
+- **路径 A（已走通并落地）**：修复 R2 后 rom_regression 0/780、CTest 34/34、全量矩阵 47 项
+  **39P/8F Grade B**（pass_to_fail=0、fail_to_fail=8、fail_to_pass=0），未修改冻结基线。
+  v2.0 已发布（tag `v2.0.0`；`76818db` 更新 version.h、`40b7dcb` GitHub Pages 同步）。
+- **路径 B（备用治理流程，未采用）**：若 R2 判定为过渡帧渲染工具/超出收尾范围，可将
+  `rom_regression_test` 冻结为 known-limit：改 `kagamiqa_baseline_frozen.json` 该条目为
+  false + 更新 `generated_at`/`run_id` + ChangeLog 记录 `baseline_drift (approved)`；预期
+  38P/9F Grade B；代价是接受一处与 C++ 基线不同的渲染帧，后续由 PPU 精度工程
+  （vbl_05/mmc3_4 同族）一并消解。未采用原因：路径 A 已把 root cause 定位为 CPU timestamp
+  推进点差异并修复，无需动基线。
+- **发布验证矩阵（可复现）**：本地（vcvars64 环境）重建 runner：
+  `cmake --build Z:\Project\FCEUX11\build --target kagami_qa_direct_runner
+  kagami_qa_blargg_runner kagami_qa_rom_regression_runner --config Release`；
+  `cargo test -p fceux11-core`（221 PASS）；全量矩阵：
+  `kagami-qa-runner --manifest tests/tests.json --bin-dir build/tests
+  --known-fail tests/fixtures/blargg_known_fail.json
+  --baseline tests/fixtures/kagamiqa_baseline_frozen.json
+  --save-baseline build/kagamiqa_baseline_next.json`（路径 A 后 39P/8F Grade B）。CI 侧以
+  kagami-qa R4 gate（grade=B、fail_to_pass=0）与 build-windows CTest 34/34 为最终裁决。
+- **A 级远期路线图（v2.1+，本次未收尾）**：消解 8 个 remaining 失败 = 7 个 blargg 桶
+  （PPU VBL/NMI 时序 `ppu_vbl_nmi`/`oam_stress`、CPU NMI/BRK `cpu_int_2_nmi_brk`、
+  `instr_misc`、MMC3 扫描线 `mmc3_4`/`mmc3_v2_4`、APU DMA `sprdma_dmc_dma`）+
+  `blargg_suite` 全量批（known-fail 60 项，绝大多数 `expected_to_eventually_pass=true`），属
+  PPU/APU/MMC3 深度精度工程（对应原 Phase 6/7 accuracy 遗留），建议作为 v2.1+ 路线图、
+  不阻塞 v2.0 发布。
+- **风险与回滚**：R1 改动面极小（仅 LAX #imm 分支），221 单测 + 12 项 blargg direct 全绿，
+  意外回归可 `git revert` 单文件回退；路径 B 的基线变更会被 `baseline_drift` 标记为 approved
+  且须在 PR 中体现；本地与 CI 均为 Rust-only 构建后行为一致，不存在"本地过、CI 挂"的构建差异；
+  本地构建需 MSVC vcvars64 + vcpkg PATH，CI 为 windows-2022 托管 runner，工具链差异不影响
+  正确性。
+- 执行清单最终状态：R1 ✅（`c312634`）、R2 路径 A ✅（`163c9d7`）、本地验证 ✅（221 PASS /
+  direct 5P/7F 0 blocking / 47 项 39P/8F Grade B / CTest 34/34）、CI 全量 + R4 gate ✅（以
+  v2.0.0 发布时的 CI 全量 run 为最终裁决）、ChangeLog/readme 更新 + tag `v2.0.0` ✅。
 
 #### cpu-rust-v2.md — CPU 模块 v2.0 Rust 化总计划（Phase 1-7，已完成）
 
