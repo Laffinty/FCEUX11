@@ -242,7 +242,7 @@ pub(crate) fn dispatch_step<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) 
 pub(crate) fn execute_step<B: Bus + ?Sized>(
     state: &mut CpuState,
     bus: &mut B,
-    dispatch_irq_cycles: u8,
+    _dispatch_irq_cycles: u8,
 ) -> u8 {
     // Always fetch + execute exactly one instruction. PC has either
     // been left at the current PC (no dispatch) or moved to the
@@ -257,10 +257,20 @@ pub(crate) fn execute_step<B: Bus + ?Sized>(
     // hook(temp); SoundCPUHook(temp);` BEFORE the opcode handler runs,
     // so the mapper/APU hooks receive `prev_extras + dispatch + base`
     // and this instruction's extras are forwarded on the NEXT
-    // iteration. `tcount` is maintained identically; the post-body
-    // timestamp advance uses the full iteration total.
+    // iteration. `tcount` is maintained identically; the timestamp
+    // advance is incremental (base here, extras below, dispatch in the
+    // caller), matching C++ `add_cycles` at each ADDCYC point.
     state.regs.count = state.regs.count.saturating_sub(dot(base) * 3);
     state.regs.tcount = state.regs.tcount.saturating_add(base as i32);
+    // R2 fix (2026-08-22): C++ advances `timestamp_` via
+    // `ADDCYC(CycTable[b1])` right after the fetch and BEFORE the
+    // mapper/APU hooks and the opcode handler run. Mid-instruction PPU
+    // reads/writes therefore observe `timestamp` already advanced by the
+    // base cost; advance incrementally here to match. The previous single
+    // post-body advance left `timestamp` behind by `base` at PPU access
+    // points, shifting the legacy renderer's pixel position by
+    // `base*48/15` (the nestest frame-4 row-22 16-pixel residual).
+    crate::cpu::tick::tick_post_body(base as i32);
     crate::cpu::tick::tick_pre_body(state);
 
     let mut extras = 0u8;
@@ -419,10 +429,12 @@ pub(crate) fn execute_step<B: Bus + ?Sized>(
     state.regs.count = state.regs.count.saturating_sub(dot(extras) * 3);
     state.regs.tcount = state.regs.tcount.saturating_add(extras as i32);
     state.cycles_in_run = state.cycles_in_run.saturating_add((base + extras) as i32);
-    // Phase 4 closeout: post-body timestamp advance with the full
-    // iteration total (dispatch + base + extras), matching C++
-    // `add_cycles` totals.
-    crate::cpu::tick::tick_post_body((dispatch_irq_cycles + base + extras) as i32);
+    // R2 fix: extras are charged (and `timestamp_` advanced) at the end
+    // of the instruction. C++ charges them at the exact point inside the
+    // handler; PPU-register stores have no extras and page-crossed PPU
+    // reads are not exercised by the regression goldens, so the net
+    // effect is identical for the renderer-timing paths.
+    crate::cpu::tick::tick_post_body(extras as i32);
     // Return the instruction's own cycle cost (base + extras) only —
     // NOT including `dispatch_irq_cycles`. The callers (`step`,
     // `run`, `run_with_tick`) add the dispatch cost themselves, so
@@ -440,6 +452,11 @@ pub(crate) fn execute_step<B: Bus + ?Sized>(
 /// `src/x6502.cpp:586-588`.
 pub fn step<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
     let dc = dispatch_step(state, bus);
+    if dc != 0 {
+        // R2 fix: mirror the C++ dispatch `ADDCYC(7)` timestamp advance
+        // before the instruction body runs.
+        crate::cpu::tick::tick_post_body(dc as i32);
+    }
     // execute_step returns base+extras only; add the dispatch cost so
     // step() keeps returning dispatch + instruction cycles (the total
     // cost of the boundary), matching the pre-split behaviour and the
@@ -1257,15 +1274,16 @@ pub fn run<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, cycles: i32) -> i
         bus.sync_irq_to_host(state);
         if dc != 0 {
             executed_cycles = executed_cycles.saturating_add(dc as i32);
+            // R2 fix: C++ `ADDCYC(7)` at dispatch advances
+            // `timestamp_` before the early-exit check; advance here so
+            // both the early-exit and normal paths observe it.
+            crate::cpu::tick::tick_post_body(dc as i32);
             if state.regs.jammed != 0 {
                 break;
             }
             if state.regs.count <= 0 {
                 // Dispatch exhausted the budget. C++ behaviour: skip
                 // the follow-up instruction entirely.
-                // Phase 4 closeout: C++ `ADDCYC(7)` already advanced
-                // `timestamp_` before the early return; mirror it.
-                crate::cpu::tick::tick_post_body(dc as i32);
                 break;
             }
             let ic = execute_step(state, bus, dc);

@@ -140,10 +140,15 @@ Rust-only 构建后逐字节复现并处理：
   内存模式 LAX 合并的 0xAB。已修复（execute.rs）并强化
   `lax_imm_loads_a_and_x` 回归测试；修复后 direct smoke 5P/7F、0 blocking，
   与冻结基线一致。
-- `rom_regression_test`（nestest 第 4 帧 0x6a65307c→0x7f4f43bf）：即 Phase 4
-  closeout 记录的 1/780 PPU 渲染时序残差（过渡帧 row 22 16-pixel 偏移；CPU
-  侧全部可观测量字节一致），属 PPU-timing 类而非 CPU 缺口；发布前按
-  `docs/plans/v2.0-release-optimization.md` 决策（修复或按治理冻结基线）。
+- `rom_regression_test`（nestest 第 4 帧 0x6a65307c→0x7f4f43bf）：Phase 4
+  closeout 曾记为 1/780 PPU 渲染时序残差（过渡帧 row 22 16-pixel 偏移）并误判为
+  "CPU 侧零差异、属 PPU-timing 类"。2026-08-22 路径 A 排查（临时 PPUTS 探针 +
+  31c5b35 C++ CPU 参考构建对比）定案：根因是 **Rust CPU 的 timestamp 增量推进
+  缺失**——C++ 在取指后即 `ADDCYC(base)` 推进 `timestamp_`，Rust 在指令末尾一次性
+  推进，导致 mid-instruction 的 PPU 读写看到的 timestamp 落后该指令 base 周期
+  （STA=4），legacy 渲染器 `GETLASTPIXEL` 偏移 `4*48/15≈12` 像素。已修复
+  （execute.rs/tick.rs 增量推进 + 回归测试）；修复后 rom_regression **0/780**、
+  CTest **34/34**、全量矩阵 47 项 **39P/8F Grade B**（pass_to_fail=0）。
 
 其余失败均为冻结基线内 advisory known-limit（7 个 blargg 桶 +
 `blargg_suite`）。`cargo test -p fceux11-core` = 221 PASS（含本次修复）。

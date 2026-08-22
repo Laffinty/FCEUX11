@@ -210,15 +210,16 @@ pub fn run_with_tick<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, cycles:
         bus.sync_irq_to_host(state);
         if dc != 0 {
             executed_cycles = executed_cycles.saturating_add(dc as i32);
+            // R2 fix: C++ `ADDCYC(7)` at dispatch advances
+            // `timestamp_` before the early-exit check; advance here so
+            // both the early-exit and normal paths observe it.
+            crate::cpu::tick::tick_post_body(dc as i32);
             if state.regs.jammed != 0 {
                 break;
             }
             if state.regs.count <= 0 {
                 // Dispatch exhausted the budget — no follow-up
                 // instruction, no tick. This is the cycle-drift fix.
-                // Phase 4 closeout: C++ `ADDCYC(7)` already advanced
-                // `timestamp_` before the early return; mirror it.
-                crate::cpu::tick::tick_post_body(dc as i32);
                 break;
             }
             let ic = execute_step(state, bus, dc);
@@ -241,7 +242,7 @@ pub fn run_with_tick<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, cycles:
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cpu::execute::run;
+    use crate::cpu::execute::{run, step};
     use crate::cpu::state::IrqSource;
     use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 
@@ -264,6 +265,7 @@ mod tests {
 
     static TICK_COUNT: AtomicUsize = AtomicUsize::new(0);
     static TICK_SUM: AtomicI32 = AtomicI32::new(0);
+    static TICK_CYCLES_SUM: AtomicI32 = AtomicI32::new(0);
     // Serialize the tick tests: they share the static TICK_FN slot and
     // the atomic counters, so running them in parallel (Rust test
     // harness default) would cross-contaminate.
@@ -272,6 +274,37 @@ mod tests {
     extern "C" fn counting_tick(cycles: i32) {
         TICK_COUNT.fetch_add(1, Ordering::SeqCst);
         TICK_SUM.fetch_add(cycles, Ordering::SeqCst);
+    }
+
+    extern "C" fn counting_tick_cycles(cycles: i32) {
+        TICK_CYCLES_SUM.fetch_add(cycles, Ordering::SeqCst);
+    }
+
+    struct RecordingBus {
+        mem: [u8; 0x10000],
+        write_sum: i32,
+        write_addr: u16,
+    }
+    impl RecordingBus {
+        fn new() -> Self {
+            Self {
+                mem: [0; 0x10000],
+                write_sum: -1,
+                write_addr: 0,
+            }
+        }
+    }
+    impl Bus for RecordingBus {
+        fn read(&mut self, addr: u16) -> u8 {
+            self.mem[addr as usize]
+        }
+        fn write(&mut self, addr: u16, val: u8) {
+            // Snapshot the accumulated tick-cycles (C++ `timestamp_` mirror)
+            // at the moment the store lands.
+            self.write_sum = TICK_CYCLES_SUM.load(Ordering::SeqCst);
+            self.write_addr = addr;
+            self.mem[addr as usize] = val;
+        }
     }
 
     fn cpu_at(pc: u16) -> CpuState {
@@ -385,6 +418,47 @@ mod tests {
         assert_eq!(
             cpu.regs.pc, 0x5000,
             "PC advanced to NMI vector $5000; follow-up NOP at $5000 NOT executed"
+        );
+
+        unsafe {
+            fceux11_cpu_set_tick_null();
+        }
+    }
+
+    // R2 regression (2026-08-22): the nestest frame-4 render residual was
+    // traced to C++ advancing `timestamp_` via `ADDCYC(base)` BEFORE the
+    // opcode handler runs, while the Rust CPU advanced it once at the end
+    // of the instruction. Mid-instruction PPU reads/writes therefore saw
+    // `timestamp` behind by the instruction base cost (4 for STA), shifting
+    // GETLASTPIXEL by base*48/15 pixels in the legacy renderer. This test
+    // pins the incremental advance: a store must observe the base cost
+    // already charged at the moment of the write.
+    #[test]
+    fn timestamp_advances_before_mid_instruction_bus_access() {
+        let _guard = TICK_SLOT_LOCK.lock().unwrap();
+        TICK_CYCLES_SUM.store(0, Ordering::SeqCst);
+        unsafe {
+            fceux11_cpu_set_tick_cycles(counting_tick_cycles);
+        }
+
+        let mut cpu = cpu_at(0x4000);
+        let mut bus = RecordingBus::new();
+        // STA $2000 (abs): opcode 0x8D, operand $00 $20. Base = 4 cycles.
+        bus.mem[0x4000] = 0x8D;
+        bus.mem[0x4001] = 0x00;
+        bus.mem[0x4002] = 0x20;
+
+        let _ = step(&mut cpu, &mut bus);
+        assert_eq!(bus.write_addr, 0x2000, "STA $2000 must target $2000");
+        assert_eq!(
+            bus.write_sum, 4,
+            "timestamp must be advanced by the STA base cost (4) BEFORE the mid-instruction store;
+            a single post-body advance sees 0 at the write point (R2)"
+        );
+        assert_eq!(
+            TICK_CYCLES_SUM.load(Ordering::SeqCst),
+            4,
+            "total timestamp advance for STA abs = 4"
         );
 
         unsafe {
