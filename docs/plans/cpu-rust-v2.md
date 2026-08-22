@@ -391,9 +391,15 @@ The original §5 listed CPU-internal risks (savestate drift, open-bus, DMC cycle
 | 64-byte alignment breaks `#[derive(Default)]` | Low (already handled) | — | Hand-written `Default` impl + explicit padding arrays. |
 | `alignas` mismatch on C++ side after struct reorder | Low (now structurally prevented) | — | The FFI never reorders fields; it passes the 64-byte blob by pointer. C++ `static_assert(sizeof == 64)` continues to fire if anyone touches the layout. |
 
-## 6. What we delete (still applies, contingent on Phase 7)
+## 6. What we delete (DONE, Phase 7 2026-08-22)
 
-Unchanged from the original plan. The 8 files in the "C++ deleted" table remain the deletion target. **None of them are deleted as of `wip2.0` head**; they are still the production CPU.
+The 8 files in the "C++ deleted" table were the deletion target. As of
+the Phase 7 commit (`9700094`) the C++ CPU implementation is deleted:
+`src/x6502.{cpp,h,struct.h,abbrev.h}` + `src/ops.inc` +
+`src/ops_table.inc` + `scripts/generate_x6502_dispatch.py` (7 files).
+`src/cpu.cpp` was retained as the Rust FFI facade (its C++-CPU branches
+removed) — see the Phase 7 gate notes in §4 and the Phase 7 execution
+results in `docs/plans/phase7-preflight-fixes-2026-08-21.md` §6.
 
 ## 7. Acceptance criteria — REVISED
 

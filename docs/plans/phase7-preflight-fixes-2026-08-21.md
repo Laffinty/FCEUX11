@@ -153,10 +153,10 @@ All four reference lines are in `src/ops.inc` / `src/x6502.cpp`
   (delete C++ CPU, flip FCEUX11_RUST_CPU default, CMake/scripts
   updates) - not started by this plan.
 
-## 5. Execution results (completed 2026-08-21)
+## 5. Execution results (completed 2026-08-21, committed as `31c5b35`)
 
 All MUST-FIX and SHOULD-FIX items are implemented in the working tree
-(not yet committed; branch `wip2.0`).
+(committed on `wip2.0` as `31c5b35`, 2026-08-21).
 
 ### 5.1 MUST-FIX - do_unofficial parity (execute.rs)
 

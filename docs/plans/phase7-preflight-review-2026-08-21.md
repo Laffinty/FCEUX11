@@ -1,9 +1,15 @@
 # Phase 7 Preflight - Phase 1-6 quality review (2026-08-21)
 
-**Status:** Plan - executing a pre-Phase-7 audit. **Branch:** `wip2.0`.
+**Status:** Completed. **Branch:** `wip2.0`.
 **Gate:** Phase 7 (delete the C++ CPU, flip `FCEUX11_RUST_CPU` default,
 CMake/scripts updates) must NOT start until the user formally approves
 this review's outcome.
+
+> **Outcome (2026-08-22):** the review found 4 MUST-FIX unofficial-opcode
+> parity gaps and SHOULD-FIX hygiene items; the fix plan
+> (`docs/plans/phase7-preflight-fixes-2026-08-21.md`) closed them (commit
+> `31c5b35`) and the user approved Phase 7, which was executed on
+> 2026-08-22 (commit `9700094`, see the fixes doc §6).
 
 ## 0. Why this review
 
