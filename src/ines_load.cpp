@@ -96,8 +96,13 @@ static void ines_log_info(const FceuInesCartResult& cart, int round, uint32 not_
 	FCEU_printf(" Trained: %s\n", cart.trainer_size > 0 ? "Yes" : "No");
 }
 
-// Helper: apply corrections and check for bad ROM
-static int ines_apply_corrections(const FceuInesCartResult& cart, uint64 partialmd5) {
+// Helper: apply corrections and check for bad ROM.
+// `mapperNo` is an in/out parameter: the header-declared mapper number
+// from the caller, possibly rewritten by the iNES-correction database
+// (tofix & 1) or the VS UniSystem table — exactly the pre-v1.10
+// semantics where `MapperNo = res.mapper` updated the caller's local
+// before iNES_Init() ran.
+static int ines_apply_corrections(const FceuInesCartResult& cart, uint64 partialmd5, int& mapperNo) {
 	FceuInesHInfoResult hinfo;
 	FceuMasterRomInfoResult masterInfo;
 	int32 tofix = 0;
@@ -125,14 +130,14 @@ static int ines_apply_corrections(const FceuInesCartResult& cart, uint64 partial
 	parseResult.tv_system = cart.tv_system;
 
 	tofix = fceux11_rust_ines_apply_corrections(&parseResult, &hinfo, partialmd5, VROM_size > 0);
-	if (tofix & 1) { /* MapperNo updated via parseResult */ }
+	if (tofix & 1) mapperNo = parseResult.mapper_no;
 	if (tofix & 2) Mirroring = parseResult.mirroring;
 	if (tofix & 4) head.ROM_type |= 2;
 	// v1.13 Purify F2b: VROM is allocated with FCEU_malloc() (line 181); use matching FCEU_free()
 	if (tofix & 8 && VROM_size) { VROM_size = 0; FCEU_free(VROM); VROM = NULL; }
 
 	fceux11_rust_ines_lookup_master_info(partialmd5, &masterInfo);
-	FCEU_VSUniCheck(partialmd5, const_cast<int*>(&reinterpret_cast<const int&>(cart.mapper_no)), &Mirroring);
+	FCEU_VSUniCheck(partialmd5, &mapperNo, &Mirroring);
 	CheckBad(partialmd5);
 
 	return tofix;
@@ -242,7 +247,11 @@ int iNESLoadCore(const char *name, FCEUFILE *fp, CartInfo& iNESCart, FceuMallocP
 	// Apply corrections
 	SetInput();
 	if (iNES2) SetInputNes20(0);
-	ines_apply_corrections(cart, partialmd5);
+	ines_apply_corrections(cart, partialmd5, MapperNo);
+	// Corrections may have rewritten MapperNo (iNES-correction database /
+	// VS UniSystem table). Refresh mappernum so the rest of the core —
+	// including iNES_Init() below — sees the corrected board.
+	GameInfo->mappernum = MapperNo;
 
 	if (VROM_size)
 		SetupCartCHRMapping(0, VROM, VROM_size * 0x2000, 0);
