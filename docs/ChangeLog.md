@@ -5,10 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - wip2.0 Rust 6502 CPU 迁移（Phase 1-7）
+## [2.0.0] - 2026-08-22 — Rust 6502 CPU 迁移完成（Phase 1-7）与 KagamiQA 发布评审
 
 **分支 `wip2.0`**。把 C++ X6502 CPU 替换为 `fceux11-core` 的 Rust 6502
-实现（Rust-first，见 `docs/plans/cpu-rust-v2.md`）。Phase 1-7 已全部落地：
+实现（Rust-first）。Phase 1-7 计划与阶段报告已归档至下文「阶段记录归档」。各阶段已全部落地：
 Phase 7（`2026-08-22`）删除了 C++ CPU（`src/x6502.{cpp,h,struct.h,abbrev.h}`、
 `src/ops.inc`、`src/ops_table.inc`、`scripts/generate_x6502_dispatch.py`），
 `FCEUX11_RUST_CPU` 默认翻转为 ON，Rust CPU 成为唯一实现。
@@ -125,15 +125,180 @@ Phase 7（`2026-08-22`）删除了 C++ CPU（`src/x6502.{cpp,h,struct.h,abbrev.h
 - `tests/proptest_fuzz.rs`（5）：随机 state × ROM 鲁棒性 fuzz
 - `tests/nestest.rs`（2）+ `tests/opcodes.rs`（7）+ lib 单测（89）
 
-### Known limits（Phase 7 后状态）
+### Known limits / 发布评审（2026-08-22 审计后状态）
 
-Phase 7 后只存在 Rust CPU 构建（`FCEUX11_RUST_CPU=ON`）。ctest 非 perf
-32/34，仅两个已记录残留：`kagami_qa_direct_smoke` blargg known-fails
-（全部在 `blargg_known_fail.json`，C++ 基线同样失败）与
-`rom_regression_rust_smoke` 的 1/780（nestest 过渡帧 16-pixel PPU
-渲染时序产物，所有 CPU 可观测量字节一致）。`cargo clippy -p
-fceux11-formats` 的既有错误（预先存在、超出 CPU 范围）记录于此，推迟到
-独立清理，不作为 Phase 7 阻塞项。
+Phase 7 后只存在 Rust CPU 构建（`FCEUX11_RUST_CPU=ON`）。2026-08-22 对
+`3511aa0`（tag `cpu-rust-v2.0-complete`）的两份 CI 审计（kagami-qa 与
+build-windows）测得 KagamiQA **Grade D**：47 项 37P/10F、2 条 PASS→FAIL
+回归（`blargg_cpu_instrs`、`rom_regression_test`）、R4 门禁失败。本地重建
+Rust-only 构建后逐字节复现并处理：
+
+- `blargg_cpu_instrs`（instr_v5_all，03-immediate 子测试 "AB ATX #n"）：
+  根因为 **0xAB LAX/ATX #imm 把立即数当零页地址二次读取**
+  （`state.rd(bus, imm)`；C++ 参考 `LD_IM(_A|=0xFF;AND;_X=_A)`）。
+  Phase 7 preflight 修过 ANC/ALR/ARR/XAA/AXS 五个立即数 handler，漏掉与
+  内存模式 LAX 合并的 0xAB。已修复（execute.rs）并强化
+  `lax_imm_loads_a_and_x` 回归测试；修复后 direct smoke 5P/7F、0 blocking，
+  与冻结基线一致。
+- `rom_regression_test`（nestest 第 4 帧 0x6a65307c→0x7f4f43bf）：即 Phase 4
+  closeout 记录的 1/780 PPU 渲染时序残差（过渡帧 row 22 16-pixel 偏移；CPU
+  侧全部可观测量字节一致），属 PPU-timing 类而非 CPU 缺口；发布前按
+  `docs/plans/v2.0-release-optimization.md` 决策（修复或按治理冻结基线）。
+
+其余失败均为冻结基线内 advisory known-limit（7 个 blargg 桶 +
+`blargg_suite`）。`cargo test -p fceux11-core` = 221 PASS（含本次修复）。
+`cargo clippy -p fceux11-formats` 的既有错误（预先存在、超出 CPU 范围）
+记录于此，推迟到独立清理。
+
+### 阶段记录归档（原 docs/plans → 2026-08-22 迁移至本文件）
+
+> 2026-08-22 收尾：`docs/plans/` 下 11 份 Phase 1-7 计划/报告已全部核实并归档于此
+> （有效内容保留、过程性规划文字精简），原文件已删除。发布级优化方案见
+> `docs/plans/v2.0-release-optimization.md`。
+
+#### cpu-rust-v2.md — CPU 模块 v2.0 Rust 化总计划（Phase 1-7，已完成）
+
+- 目标：以 `fceux11-core` 的 Rust 6502 替换 C++ X6502 CPU
+  （`src/x6502.{cpp,h,struct.h,abbrev.h}` + `ops.inc` + `ops_table.inc`，约 2,940
+  LOC），保持 64 字节 savestate 布局兼容，并通过既有全部 CPU 门禁。非目标：JIT、
+  6502 重写、Mesen2 克隆。
+- 架构落地：`cpu/{state,decode,addressing,alu,execute,ffi,bus,tick,snapshot}.rs`；
+  256 项 opcode 表为手写（未走 build.rs codegen，已注明推迟）；13 种寻址模式。
+- Phase 状态：P1 脚手架 ✅（`92ec9d1`）、P2 指令执行 ✅（`741ad00`）、
+  P3 FFI 集成 + CTest 基线 ✅、P4 中断/DMC/mapper-IRQ 对齐 ✅、P4.5 周期漂移
+  收口 ✅、P5 非官方 opcode 105/105 + savestate 往返 ✅、P6 加固
+  （proptest / criterion / tick / 符号审计）✅、P7 删除 C++ CPU ✅（`9700094`）。
+- 验收标准（8 项）：C++ 基线、Rust FFI 接线、ON 无回归、中断/DMC 对齐、非官方
+  +savestate 对齐、性能 ≤105%、删除 C++ CPU、文档；除性能为机器相关外均落地。
+- 诚实附录：原计划曾记录"1/6 oracle、FFI 缺失、C++ 未重建"的缺口，修订后按
+  "先测量后迭代"重排；附录 B 记录了与原计划的差异。
+
+#### phase3-baseline-2026-08-17.md — C++ 基线（Phase 3 step 1）
+
+- 构建：MSVC 19.36+ / Ninja / CMake 4.2.3，589 步 0 错误。
+- CTest（下载 177/177 blargg ROM 后）：**34/34 PASS**；`cpu_test` 802/802。
+- blargg 12 项直接测试：5 PASS / 7 FAIL，7 项均为 `tests.json` 中
+  `known-limit, advisory`（C++ CPU 既有限制，非 Rust 回归）。
+- 锁定的回归口径：ON 模式不得引入任何新的 blocking 失败；advisory 项
+  FAIL→PASS 欢迎、PASS→FAIL 视为回归。
+
+#### phase3-ffi-2026-08-17.md — FFI 集成（Phase 3 step 2/3/5）
+
+- FFI 符号（cbindgen 写入 `src/rust/fceux11_rust.h`）：
+  `fceux11_cpu_{init,power,reset,run,trigger_nmi,trigger_nmi2,irq_begin,irq_end,
+  snapshot,restore,set_bus}`；bus 回调采用非空函数指针 + no-op 哨兵（规避
+  cbindgen 的 `Option<fn>` 不可用问题）。
+- 64 字节 `X6502Layout` 与 C++ `X6502` 逐字段 offset 对齐（`offset_of!` 断言）。
+- 周期核算单位：C++ `_count += cycles*16; _count -= CycTable*48`；Rust 采用反号
+  约定 `target = count + cycles_arg`、`count += CycTable*16`，FFI 传
+  `(cycles_arg/3)*16` 对齐。
+- 修复 `X6502_Reset` 的 IRQlow 语义（OR → overwrite）。
+- CTest：OFF 34/34；ON 30/33（3 项失败均为周期敏感回归路径，移交 Phase 4）。
+
+#### phase4-interrupts-2026-08-18.md — FFI 接线修复（Phase 4 step 1）
+
+- 关键发现：`X6502_RunDebug` 才是实际热路径入口（FCEUPPU_Loop 53 处调用）；
+  Phase 3 只改了 `Cpu::run`，FFI 实际被绕过。修复：ON 时 `X6502_RunDebug`
+  一行转发到 `cpu.run(cycles)`。
+- 其余修复：RESET dispatch 返回 7→0 周期；`step()` 不再假设 RESET 后是 JMP；
+  `_PI = _P` 移到 dispatch 之后（C++ 顺序）；`X6502_Reset` 覆盖 IRQlow；
+  `nmi_fresh` 侧状态在 power/reset/restore 均清 false；`timestamp_` 由 FFI
+  返回值驱动。
+- 修复后：OFF 34/34；ON 28/33（5 项失败归为两个症状类：`X6502_Run(1)` 短路与
+  周期核算漂移，移交后续子步骤）。
+
+#### phase4-symbol-audit-2026-08-18.md — 公开符号审计（sub-step 6）
+
+- x6502.h 全量符号映射：7 个生命周期 + dispatch FFI、8 个 flag 常量、8 个 IRQ
+  位掩码、`X6502_GetOpcodeCycles` 均 OK；`optype/opwrite/opsize` 表 DEFER；
+  `X6502_Debug/X6502_DMW/dendy/NTSC_CPU_freq/PAL_CPU` 随 C++ CPU 删除（REMOVE）。
+- 64 字节布局契约：任何改动必须同步 `state.rs` 与 C++ static_assert。
+
+#### phase4-dispatch-budget-fix-2026-08-19.md — dispatch 预算提前退出
+
+- 对齐 C++ `_count <= 0` 提前返回：dispatch 耗尽预算时不执行后续指令、不触发
+  tick；`step()` 拆分为 `dispatch_step` + `execute_step`。
+- 结果：`cpu_test` 799/802 → 802/802；但 cycle-drift 家族（apu_wav /
+  golden_savestate / rom_regression / savestate_regression）未闭环，假设被证伪
+  （apu 1540 样本不变）。
+- 候选根因优先级：DMC/OAM DMA steal 周期、count 饱和边界、PPU 循环逐调用时长、
+  CycTable 漂移。
+
+#### phase4.5-cycle-drift-closure-2026-08-20.md — 周期漂移收口
+
+- 四个根因全部修复：
+  1. IRQ 桥（`bus.rs` `sync_irq_from_host/to_host`）：C++ `IRQlow` blob 为权威，
+     Rust 在每个 dispatch 边界覆盖快照（修复 mmc3_4）。
+  2. 每指令时间戳推进（`cpu.cpp` tick thunk）：修复 MMC1 `lreset` 写节流
+     （cpu_instrs）。
+  3. P 寄存器 B/U 语义：PLP/RTI 恢复完整栈字节、RESET 精确置 `I`（与 C++
+     一致），244,254 行寄存器轨迹 100% 一致。
+  4. 页交叉额外周期（主导残差）：ALU/比较/LAX/LAS 的 abs,X / abs,Y / (zp),Y
+     丢弃 `extra_cycles`，补 +1 后 300 帧 instr_v5 轨迹逐字节一致。
+- 修复后：`cargo test` 185 PASS；CTest ON 30/34（剩余均为 blargg known-fails +
+  2 个 1-mismatch 残差 + 机器相关 bench）。
+- 诚实余量：`rom_regression_rust_smoke` 1/780 与 `savestate_regression_rust_smoke`
+  1/12 当时未定位（下一任务处理）。
+
+#### phase4-closeout-2026-08-20.md — Phase 4 收口
+
+- 五个根因修复：
+  1. NMI-fresh 标志跨 IRQ 桥（修 nestest NMI 测试的返回 PC / RAM `$0204`）。
+  2. 未采用分支不再读操作数字节（DB latch / `$4016` open-bus 对齐）。
+  3. FFI 私拷贝问题：DB/count 在每次总线访问前后镜像回 C++ blob（mid-call C++
+     读取方看到实时值）。
+  4. tick 桥前置钩子精确复刻 C++ `temp = _tcount`，post-body 用迭代全量推进
+     时间戳（APU FHCN 对齐）。
+  5. dispatch 提前退出推进时间戳。
+- 证据：60 帧 56,030 行逐调用周期轨迹、总线轨迹、帧 4/60 savestate 均与 C++
+  逐字节一致；`savestate_regression` 0/12。
+- 遗留（已记录）：`rom_regression_rust_smoke` 1/780 —— nestest 过渡帧
+  （第 5 仿真帧）row 22 出现 16-pixel 水平偏移（palette 0x0F 从列 40 变 56），
+  帧 0-3 与 6-59 均一致，CPU 侧零差异；判定为 legacy（newppu=0）渲染器的
+  per-dot 渲染时序产物，与 vbl_05 / mmc3_4 等 PPU-timing known-fail 同族，
+  移交 Phase 6/7 精度工作而非 Phase 4 CPU 对齐。
+
+#### phase5-closeout-2026-08-21.md — Phase 5 收口
+
+- 非官方 opcode 覆盖 105/105：新增 21 个逐 opcode 寄存器效应测试（ANC 2B、
+  RLA 2F/37/3B、SRE 53/57/5B/5F、RRA 6F/73/7B、SAX 83、DCP CF/D3/D7/DB/DF、
+  ISC EF/F3/F7/FB）；`unofficial` 74 PASS。
+- `cpu/snapshot.rs`：64 字节 snapshot/restore + 4 个单测（含恢复后确定性继续
+  执行）；`golden_savestate_test` 8/8 byte-equal；`savestate_regression` 0/12。
+- `cargo test` 210 PASS；rom_regression 1/780 残差维持（PPU 渲染时序）。
+
+#### phase7-preflight-review-2026-08-21.md — Phase 7 前质量评审
+
+- 4 个 MUST-FIX 非官方 opcode 奇偶性缺口（既有门禁均未覆盖）：
+  1. SHX `0x9E` 用错索引寄存器（应为 Y，用了 X）；
+  2. SHX/SHY 缺少 C++ 写地址高位替换 `((reg & (eff_hi+1)) << 8) | eff_lo`；
+  3. AHX `0x93/0x9F`、TAS `0x9B` 的 H 应为 base 高位 +1 而非 effective；
+  4. LAS `0xBB` 应为 RMW 写模式 + 两次写回（误用读模式，页交叉多计 1 周期）。
+- SHOULD-FIX：`ffi.rs`/`decode.rs` 过时注释、ARR 死变量、clippy/fmt 清理、
+  ChangeLog 补录。
+- 结论：NO-GO（修复完成后另行审批 Phase 7）。
+
+#### phase7-preflight-fixes-2026-08-21.md — 修复执行 + Phase 7 执行结果
+
+- 5.1 MUST-FIX 全部落地（`31c5b35`）：SHX 按 Y 索引 + 高位替换；SHY 同替换；
+  AHX/TAS 改 base-high+1；LAS 改 RMW 写模式 + 两次写回（周期按共享 CycTable
+  修正为 4，评审稿中的"5"为测量笔误）。新增 8 个触发向量测试（X != Y、页交叉）
+  + 6 个逐指令周期测试。
+- 5.2 卫生项完成（clippy / fmt 干净、注释重写、ChangeLog 补录；
+  `fceux11-formats` 既有 clippy 错误推迟，不阻塞）。
+- 5.3 额外稳定性：TICK_FN 仅安装线程触发（消除并行测试污染）；proptest
+  NMI-jammed 断言按 C++ `else if(!_jammed)` 语义修正。
+- 5.4 验证矩阵全绿：cargo 221 PASS；clippy/fmt 干净；CTest ON 32/34（仅两个
+  已记录残留）；OFF 34/34；golden_savestate byte-equal；savestate_regression
+  0/12；bench_tolerance PASS。
+- 6 Phase 7 执行（`9700094`，2026-08-22）：删除 7 个文件（`x6502.cpp/h/
+  struct.h/abbrev.h`、`ops.inc`、`ops_table.inc`、`generate_x6502_dispatch.py`）
+  + `_rebuild_off_target.ps1`；`src/cpu.h` 承接迁移符号、`src/cpu.cpp` 保留为
+  Rust 集成 facade（移除 `#else` 分支）；`FCEUX11_RUST_CPU` 默认 ON、OFF 为
+  配置期致命错误；约 22 个消费者改 include `cpu.h`；COPYRIGHT_AUDIT 移除
+  4 行删除文件。
+- 6.5 门禁偏差（已记录）：删除 7 个而非计划 8 个文件（cpu.cpp 保留为 facade）；
+  ctest "exits 0" 按 preflight 口径 32/34 解释。
 
 ## [1.17] - 2026-08-08
 

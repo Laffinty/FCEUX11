@@ -963,6 +963,13 @@ fn do_unofficial<B: Bus + ?Sized>(
         // ----- LAX (load A and X) -----
         0xA3 | 0xA7 | 0xAF | 0xB3 | 0xB7 | 0xBF | 0xAB => {
             let (addr, ex) = match mode {
+                // Imm: imm() already fetched the operand byte; per the
+                // ModeResult contract the `addr` field carries the raw
+                // VALUE for Imm, not an address to dereference. Re-reading
+                // memory here would treat the immediate as a zero-page
+                // address (Phase 7 preflight missed this one - blargg
+                // instr_v5 test 3 `AB ATX #n` fails). C++ reference:
+                // `case 0xAB: LD_IM(_A|=0xFF;AND;_X=_A)`.
                 AddrMode::Imm => (imm(state, bus).addr, 0),
                 AddrMode::IndX => (ind_x(state, bus).addr, 0),
                 AddrMode::ZP => (zp(state, bus).addr, 0),
@@ -979,7 +986,11 @@ fn do_unofficial<B: Bus + ?Sized>(
                 _ => unreachable!("LAX mode {:?}", mode),
             };
             extra += ex;
-            let m = state.rd(bus, addr);
+            let m = if mode == AddrMode::Imm {
+                addr as u8
+            } else {
+                state.rd(bus, addr)
+            };
             state.regs.a = m;
             state.regs.x = m;
             let mut p = state.regs.p;

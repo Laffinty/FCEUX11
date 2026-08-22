@@ -310,11 +310,18 @@ fn lax_imm_loads_a_and_x() {
     let mut cpu = cpu_at(0x4000);
     let mut bus = FlatBus::new();
     bus.mem[0x4000] = 0xAB; // LAX imm
-    bus.mem[0x4001] = 0x00;
+    bus.mem[0x4001] = 0x42;
+    // Regression: the immediate must be used as the VALUE, not as a
+    // zero-page address to dereference. blargg instr_v5 "AB ATX #n"
+    // (03-immediate) exposed this: the old code read the byte at $0042
+    // instead of using the immediate operand 0x42.
+    bus.mem[0x0042] = 0x99;
     step(&mut cpu, &mut bus);
-    assert_eq!(cpu.regs.a, 0x00);
-    assert_eq!(cpu.regs.x, 0x00);
-    assert_ne!(cpu.regs.p & Flags::ZERO.bits(), 0);
+    assert_eq!(cpu.regs.a, 0x42, "A = immediate operand, not mem[imm]");
+    assert_eq!(cpu.regs.x, 0x42, "X = immediate operand, not mem[imm]");
+    assert_eq!(cpu.regs.pc, 0x4002, "PC advanced past opcode + operand");
+    assert_eq!(cpu.regs.p & Flags::ZERO.bits(), 0, "Z clear for 0x42");
+    assert_eq!(cpu.regs.p & Flags::NEGATIVE.bits(), 0, "N clear for 0x42");
 }
 
 #[test]
