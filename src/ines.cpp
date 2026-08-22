@@ -63,11 +63,19 @@ int iNESLoad(const char *name, FCEUFILE *fp, int OverwriteVidMode) {
 	currCartInfo = &iNESCart;
 
 	auto cart_obj = fceu11::create_cart_for_mapper(MapperNo, fceu11::g_bus);
+	const bool has_cart_obj = cart_obj != nullptr;
 	fceu11::assign_cart(cart_obj ? std::move(cart_obj) : nullptr);
 	iNESCart.cart_obj = fceu11::g_cart;
-	iNESCart.Power = CartInfo_PowerForward;
-	iNESCart.Reset = CartInfo_ResetForward;
-	iNESCart.Close = CartInfo_CloseForward;
+	// Only install the CartInfo forwarders when a concrete Cart subclass
+	// exists. Legacy boards without a registered factory keep the function
+	// pointers installed by MapperNN_Init (e.g. datalatch Mapper241's
+	// LatchPower); unconditionally overwriting them left those boards with
+	// a no-op Power and no PRG mapping at reset (hotfix1: 10083).
+	if (has_cart_obj) {
+		iNESCart.Power = CartInfo_PowerForward;
+		iNESCart.Reset = CartInfo_ResetForward;
+		iNESCart.Close = CartInfo_CloseForward;
+	}
 
 	if (currCartInfo && currCartInfo->cart_obj)
 		currCartInfo->cart_obj->install_expansion_audio(fceu11::g_apu);

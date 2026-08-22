@@ -958,19 +958,30 @@ pub unsafe extern "C" fn fceux11_rust_ines_load(
     };
     let trainer_size: u32 = if parse_result.trainer { 512 } else { 0 };
 
-    // PRG-ROM
-    let prg_size = layout.prg_size_bytes as usize;
+    // PRG-ROM. iNES 1.0 sizes are rounded up to a power of two for
+    // power-of-two mappers, but pirate ROMs often carry non-power-of-two
+    // bank counts whose rounded size exceeds the actual file. Tolerate
+    // that by clamping to the file length (hotfix1: 10021/10302) while
+    // still rejecting genuinely truncated files.
+    let prg_min = (parse_result.rom_size_raw as usize) << 14;
+    let mut prg_size = layout.prg_size_bytes as usize;
     if offset + prg_size > file_len {
-        return false;
+        if offset + prg_min > file_len {
+            return false;
+        }
+        prg_size = ((file_len - offset) / 0x4000) * 0x4000;
     }
     let prg_data = unsafe { file_data.add(offset) };
     offset += prg_size;
 
-    // CHR-ROM
-    let chr_size = layout.chr_size_bytes as usize;
+    // CHR-ROM: same clamp for non-power-of-two CHR sizes.
+    let mut chr_size = layout.chr_size_bytes as usize;
     let chr_data = if chr_size > 0 {
         if offset + chr_size > file_len {
-            return false;
+            chr_size = ((file_len - offset) / 0x2000) * 0x2000;
+            if chr_size == 0 {
+                return false;
+            }
         }
         unsafe { file_data.add(offset) }
     } else {
@@ -986,9 +997,9 @@ pub unsafe extern "C" fn fceux11_rust_ines_load(
     unsafe {
         fceux11_rust_ines_compute_hash(
             prg_data,
-            layout.prg_size_bytes,
+            prg_size as u32,
             chr_data,
-            layout.chr_size_bytes,
+            chr_size as u32,
             &mut hash_result,
         );
     }
@@ -997,9 +1008,9 @@ pub unsafe extern "C" fn fceux11_rust_ines_load(
     unsafe {
         *out_cart = FceuInesCartResult {
             prg_data,
-            prg_size: layout.prg_size_bytes,
+            prg_size: prg_size as u32,
             chr_data,
-            chr_size: layout.chr_size_bytes,
+            chr_size: chr_size as u32,
             trainer_data,
             trainer_size,
             mapper_no: parse_result.mapper_no,
@@ -1020,8 +1031,8 @@ pub unsafe extern "C" fn fceux11_rust_ines_load(
             vram_size: parse_result.vram_size,
             battery_vram_size: parse_result.battery_vram_size,
             rom_size_raw: parse_result.rom_size_raw,
-            rom_size_16kb: parse_result.rom_size_16kb,
-            vrom_size_8kb: parse_result.vrom_size_8kb,
+            rom_size_16kb: (prg_size as u32) >> 14,
+            vrom_size_8kb: (chr_size as u32) >> 13,
         };
     }
 
