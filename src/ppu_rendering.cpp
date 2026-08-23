@@ -1611,19 +1611,19 @@ int FCEUX_PPU_Loop(int skip) {
 			 (int)vbl_set_suppressed, (int)(VBlankON != 0));
 		}
 		if (!vbl_set_suppressed) {
-			// Working config: VBL at cycle 0, clear at cycle 0 = 6820 (01-vbl_basics PASS).
-			// Cycle 0->1 shift (02-vbl_set_time) deferred to focused follow-up.
-			// E-1 Track-B probe (v1.17 R5 task, 2026-08-08): VBL_SET
-			// recorder. Fires immediately before PPU_status|=0x80, recording
-			// the PRE-set PPU_status byte alongside the existing VBL_ENTER
-			// footprint. Distinct probe name so VBL_SET (pre-) and VBL_CLR
-			// (pre-, post-verify via next probe) are co-traceable per frame.
+			// v2.0_hotfix1 Phase A (2026-08-24): VBL flag set at cycle 1
+			// instead of cycle 0. Per NESdev PPU_frame_timing and blargg
+			// vbl_02_set_time: real hardware asserts VBL at sl 241 cycle 1.
+			// runppu(1) advances the PPU from cycle 0 to cycle 1 before
+			// setting the flag. Frame length stays at 6820 dots (compensated
+			// by delay 20→19 below).
 			if (e1_trace_on()) {
 				fprintf(stderr, "E1B VBL_SET abs=%llu sl=%d cycle=%d count=%d lastpc=%04X PPU_status_pre=0x%02X\n",
 				 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()),
 				 ppur.status.sl, ppur.status.cycle, g_cpu.native_layout().count,
 				 (unsigned)fceu11_e1_last_pc(), (unsigned)PPU_status);
 			}
+			runppu(1);  // advance PPU from cycle 0 to cycle 1
 			PPU_status |= 0x80;
 			ppuphase = PPUPHASE_VBL;
 		} else {
@@ -1634,7 +1634,10 @@ int FCEUX_PPU_Loop(int skip) {
 		//Timing is probably off, though.
 		//NOTE:  Not having this here breaks a Super Donkey Kong game.
 		PPU[3] = PPUSPL = 0;
-		const int delay = 20;
+		// v2.0_hotfix1 Phase A: delay reduced 20→19 to compensate for
+		// runppu(1) consumed before VBL flag set. Total frame length
+		// stays at 6820 dots (1 + 19 + 20*341 - 1 = 6820).
+		const int delay = 19;
 
 		ppur.status.sl = 241;	//for sprite reads
 
