@@ -71,8 +71,14 @@ fn dispatch_irq<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
         return 0;
     }
     if irq & IrqSource::NMI2.bits() != 0 {
+        // v2.0_hotfix1 Phase D: NMI2 (from $2000 write edge) sets
+        // nmi_fresh to defer by one boundary, matching hardware behavior
+        // where NMI assertion is sampled at the next instruction boundary.
+        // Without fresh, NMI2 dispatches immediately at the same boundary
+        // as the conversion, which is 1 cycle too early for blargg vbl_07.
         state.regs.irq_low &= !IrqSource::NMI2.bits();
         state.regs.irq_low |= IrqSource::NMI.bits();
+        state.nmi_fresh = true;
     }
     if irq & IrqSource::NMI.bits() != 0 {
         if state.nmi_fresh {
