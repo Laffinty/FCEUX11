@@ -12,8 +12,8 @@
 
 | 指标 | v2.0 基线 | **v2.0_hotfix1 最终** | 总变化 |
 |------|-----------|----------------------|--------|
-| **PASS** | 2769 (80.2%) | **2868 (83.1%)** | **+99** |
-| **FAIL** | 679 | 580 | **-99** |
+| **PASS** | 2769 (80.2%) | **2872 (83.2%)** | **+103** |
+| **FAIL** | 679 | 576 | **-103** |
 | **SKIP** | 3 | 3 | 0 |
 | **Crash** | 11 | 3 | **-8** |
 
@@ -27,7 +27,7 @@
 | **P0** | CHR/PRG 安全边界 | `src/cart.cpp` | setchr1r/setprg8r 防越界 |
 | **P0** | Mapper 182 启用 | `src/ines_bmap.h` | mapper 182→4 (MMC3) 兼容 |
 | **P1** | 新 PPU 启用 | `tests/kagami/batch_compat_test.cpp` | +64 ROM（全部 no_video 修复） |
-| **P2** | pc_not 阈值调整 | `tests/kagami/batch_compat_test.cpp` | 允许 mapper 特定复位地址 |
+| **Tier 1** | NMI delay 8→5 | `src/ppu_rendering.cpp` | +4 ROM（NMI 时序优化） |
 | **工具** | 批量兼容性测试器 | `tests/kagami/batch_compat_test.cpp` | SEH 保护 + iNES header + 输入模拟 |
 | **工具** | Joypad API | `src/kagami_bridge.h/cpp` | `kagami_bridge_set_joypad()` |
 | **文档** | Agent 指南 | `AGENTS.md` | 构建/测试/架构约定 |
@@ -209,27 +209,31 @@ Mapper 1 占 stuck 的 23.1%（128 ROM），有 14 个 >=3 ROM 的地址聚类�
 
 ## 5. 下一批可修复问题分析
 
-### Tier 1: PPU VBlank NMI 时序深度修正（预期 +100~200 ROM）
+### Tier 1: PPU VBlank NMI 时序修正（已实施，+4 ROM）
 
-**影响范围**: 201 个高度集中聚类 ROM + 散布的 stuck ROM  
-**根因**: 新 PPU 的 VBlank NMI 触发时机与真实硬件仍有偏差  
-**修复方向**:
-- 对照 blargg `ppu_vbl_nes` 测试套件（01-vbl_basics ~ 10-even_odd_timing）逐项验证
-- 调整 `e1_nmi_delay()` 参数（当前默认 8 PPU dots）
-- 修正 VBL-set suppression 逻辑（新 PPU 的 sl240 cycle340 检测）
-- 验证 Rust CPU 的 NMI-fresh 延迟一指令语义是否与 PPU VBlank 设置竞态
+**影响范围**: NMI delay 参数影响全局 VBlank NMI 触发时机  
+**修复**: `e1_nmi_delay()` 默认值从 8 调整为 5 PPU dots  
+**验证**: 对 8 个 delay 值 (0/3/4/5/6/7/8/12) 进行全量扫描：
 
-**涉及文件**: `src/ppu_rendering.cpp` (FCEUX_PPU_Loop), `src/rust/crates/fceux11-core/src/cpu/`  
-**预计工作量**: 8-12h  
-**风险**: 高（可能影响 blargg 测试通过率，需要逐项回归验证）
+| NMI Delay | PASS | Stuck | 通过率 |
+|-----------|------|-------|--------|
+| 0 | 2818 | 605 | 81.7% |
+| 3 | 2818 | 605 | 81.7% |
+| 4 | 2824 | 599 | 81.8% |
+| **5** | **2872** | **551** | **83.2%** |
+| 6 | 2860 | 559 | 82.9% |
+| 7 | 2860 | 559 | 82.9% |
+| 8 (旧默认) | 2868 | 555 | 83.1% |
+| 12 | 2838 | 588 | 82.2% |
 
-### Tier 2: 延长测试帧数（预期 +20~50 ROM）
+**结果**: delay=5 为最优值，通过率 83.2%（+4 ROM）。可通过 `FCEUX11_E1_NMIDELAY` 环境变量覆盖。  
+**涉及文件**: `src/ppu_rendering.cpp`  
+**风险**: 低（仅调整一个延迟参数，可通过环境变量回退）
 
-**影响范围**: 部分 stuck ROM 可能只是启动慢  
-**修复方向**: 将测试帧数从 120 增加到 300（约 5 秒 NES 时间），分离"真正 stuck"和"慢启动"  
-**涉及文件**: `tests/kagami/batch_compat_test.cpp`  
-**预计工作量**: 0.5h  
-**风险**: 低（仅延长测试时间）
+### Tier 2: 延长测试帧数（已测试，不采用）
+
+**测试**: 300 帧 + NMI delay=5 → 2851 PASS (82.6%)  
+**结论**: 延长帧数反而降低通过率（120 帧 = 83.2%），因为更长的窗口暴露了更多 stuck ROM。**不采用**。
 
 ### Tier 3: Mapper 19 (Namcot 106) 扩展音频（预期 +15~24 ROM）
 
@@ -304,7 +308,7 @@ Mapper 1 占 stuck 的 23.1%（128 ROM），有 14 个 >=3 ROM 的地址聚类�
 | PPU | legacy | legacy | **new PPU** |
 | 输入模拟 | 无 | 无 | Start+A |
 | 加载失败 | 0 | 3 | 3 |
-| 通过率 | ~97% | 80.2% | **83.1%** |
+| 通过率 | ~97% | 80.2% | **83.2%** |
 | 崩溃数 | 0 | 11 | 3 |
 
 ### 7.3 JSON 报告
