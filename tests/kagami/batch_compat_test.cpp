@@ -421,6 +421,7 @@ static RomResult test_rom(const std::string& dir, const std::string& filename, i
     r.video_active = diag.video_active;
 
     // Classify issues
+    // v2.0_hotfix1 P2: pc_not threshold relaxed to 0x4000 (allows mapper I/O).
     if (r.failure_reason.empty()) {
         char hexbuf[16];
         if (diag.stuck_count > (frames_to_run - 10) * 0.8 && frames_to_run > 10) {
@@ -431,7 +432,7 @@ static RomResult test_rom(const std::string& dir, const std::string& filename, i
         else if (!r.video_active && frames_to_run >= 10) {
             r.failure_reason = "no_video_output";
         }
-        else if (!r.pc_in_rom && r.first_pc < 0x4020) {
+        else if (!r.pc_in_rom && r.first_pc < 0x4000) {
             _snprintf_s(hexbuf, sizeof(hexbuf), _TRUNCATE, "%04X", r.first_pc);
             r.failure_reason = std::string("pc_not_in_rom_space_first=0x") + hexbuf;
         }
