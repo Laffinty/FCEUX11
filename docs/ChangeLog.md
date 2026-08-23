@@ -5,7 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.1] - 2026-08-24 - 兼容性优化 hotfix1（3451 ROM 全量扫描 + P0/P1/Tier1 修复）
+## [2.0.1] - 2026-08-24 - 兼容性优化 hotfix1（3451 ROM 全量扫描 + PPU 时序修正）
+
+- **最终通过率**: 2894/3451 = **83.9%**（基线 80.2%，净提升 +125 ROM）
+- **崩溃修复**: 11→3（-8），剩余 3 个为 UNIF 格式快打魂斗罗（SEH 已捕获）
+- **PPU VBlank NMI 时序修正**（Phase A-D）:
+  - Phase A: VBL flag 在 sl241 cycle1 设置（原 cycle0），修复 blargg vbl_02 对齐
+  - Phase B: `runppu(nd)` 替代 `X6502_Run(nd)` 保持 PPU/CPU 同步，消除 per-frame NMI phase drift
+  - Phase C: $2002 suppression window 更新至 sl241 cycle0/cycle1
+  - Phase D: NMI2（$2000 写入边沿）设置 nmi_fresh 实现一指令延迟
+- **Mapper 兼容性修复**:
+  - Mapper 187 CHR 越界保护（src/boards/187.cpp）
+  - UNIF Cart 创建修复（src/unif.cpp）
+  - Mapper 182→MMC3 别名（src/ines_bmap.h）
+  - Mapper 19 IRQ 状态重置（src/boards/n106.cpp）
+  - 格式预验证 + Joypad API（src/kagami_bridge.h/cpp）
+  - CHR/PRG 安全边界（src/cart.cpp）
+- **新工具**: `batch_compat_test` 无头批量兼容性测试器（SEH 崩溃保护 + iNES header + 输入模拟 + new PPU + mapper 识别）
+- **新 PPU 启用**: 测试器使用 new PPU（ppu_rendering.cpp），修复全部 69 个 no_video ROM
+- **已知瓶颈**: 剩余 554 个 FAIL 主要为 PPU 时序精度不足（需 cycle-accurate PPU 模型），详见 `docs/plans/cycle_accurate_ppu_necessity.md`
+- **详细报告**: `docs/history/compat_report_v2.0_hotfix1.md`（已存档）
 
 - **扩大化批量兼容性测试**: 全量测试 3451 个 NES ROM（此前为 123 样本），通过率 80.2%（2769/3451）。
 - 失败分类: CPU 卡死 573 (84.4%)、无视频输出 83 (12.2%)、PC 异常 12 (1.8%)、SEH 崩溃 11 (1.6%)、加载失败 3 (0.1%)。
