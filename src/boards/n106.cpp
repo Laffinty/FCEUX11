@@ -385,6 +385,13 @@ static int battery = 0;
 
 static void N106_Power(void) {
 	int x;
+	// v2.0_hotfix1 Tier 3: Reset IRQ state on power. Without this,
+	// IRQCount/IRQa retain stale values from the previous ROM load,
+	// causing games to see unexpected IRQ counter state on startup.
+	IRQCount = 0;
+	IRQa = 0;
+	X6502_IRQEnd(FCEU_IQEXT);
+
 	SetReadHandler(0x8000, 0xFFFF, CartBR);
 	SetWriteHandler(0x8000, 0xffff, Mapper19_write);
 	SetWriteHandler(0x4020, 0x5fff, Mapper19_write);
