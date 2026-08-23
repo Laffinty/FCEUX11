@@ -1,0 +1,18 @@
+﻿{
+    "results":  {
+                    "blargg_scanline":  true,
+                    "blargg_scanline_a1":  true,
+                    "blargg_ppu_vbl_nmi":  false,
+                    "blargg_ppu_vbl_clear_time":  true
+                },
+    "branch":  "wip2.1",
+    "git_head":  "1714feea0a6ca7fbcc2fcab1a672fb08737ae278",
+    "json_schema":  {
+                        "test_id":  "bool: true=PASS, false=FAIL, null=inconclusive"
+                    },
+    "frames_per_rom":  "vbl_nmi=600, vbl_clear=600, scanline=300, scanline_a1=300",
+    "scope":  "v2.1 PPU Rust refactor Phase 0 鈥?VBL/NMI/scanline frozen subset",
+    "generated_at":  "2026-08-23T22:42:47.1290958Z",
+    "run_id":  "phase0-1714fee",
+    "fceux11_exe_sha256":  "972FF8C4732CDDEFDC6FACC7E4905FFD7BDADE028A2B5595132140907C18F7DB"
+}
