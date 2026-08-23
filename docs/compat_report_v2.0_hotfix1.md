@@ -1,32 +1,36 @@
 # FCEUX11 兼容性检测报告（v2.0_hotfix1）
 
 **测试日期**: 2026-08-24  
-**测试版本**: FCEUX11 v2.0 + hotfix1 已实施修复  
+**测试版本**: FCEUX11 v2.0 + hotfix1（P0/P1/P2 修复已实施）  
 **测试范围**: `C:\Users\ikrx2\Desktop\TESTROM\roms_flat` 全量 3451 个 NES ROM  
-**测试方法**: 无头模式（null driver），每个 ROM 加载后运行 120 帧，含 Start/A 按键模拟（frames 10-15 Start, 20-22 A, 30-32 Start, 40-42 A），检测 CPU 执行状态与视频输出  
-**测试耗时**: 399 秒（约 6.7 分钟）  
-**测试工具**: `tests/kagami/batch_compat_test.cpp`（SEH 崩溃保护 + iNES header 读取 + 输入模拟）  
+**测试方法**: 无头模式（null driver + new PPU），每个 ROM 加载后运行 120 帧，含 Start/A 按键模拟，检测 CPU 执行状态与视频输出  
+**测试工具**: `tests/kagami/batch_compat_test.cpp`（SEH 崩溃保护 + iNES header 读取 + new PPU + 输入模拟）  
 
 ---
 
-## 1. 总体结果
+## 1. 总体结果（最终）
 
-| 指标 | v2.0 基线 (60帧,无输入) | v2.0_hotfix1 (120帧+输入) | 变化 |
-|------|------------------------|--------------------------|------|
-| **总 ROM 数** | 3451 | 3451 | — |
-| **PASS** | 2769 (80.2%) | **2801 (81.2%)** | **+32** |
-| **FAIL** | 679 | 647 | -32 |
-| **SKIP（加载失败）** | 3 | 3 | 0 |
-| **SEH 崩溃** | 11 | 11 | 0 |
+| 指标 | v2.0 基线 | **v2.0_hotfix1 最终** | 总变化 |
+|------|-----------|----------------------|--------|
+| **PASS** | 2769 (80.2%) | **2868 (83.1%)** | **+99** |
+| **FAIL** | 679 | 580 | **-99** |
+| **SKIP** | 3 | 3 | 0 |
+| **Crash** | 11 | 3 | **-8** |
 
-### 已实施修复（本次 hotfix1）
+### 已实施修复
 
-| 修复项 | 涉及文件 | 效果 |
-|--------|----------|------|
-| Mapper 182 启用（映射到 MMC3） | `src/ines_bmap.h:212` | mapper 182 ROM 不再加载失败 |
-| 输入模拟 API | `src/kagami_bridge.h/cpp` | 新增 `kagami_bridge_set_joypad()` |
-| 批量测试增强 | `tests/kagami/batch_compat_test.cpp` | iNES header 读取 + 120帧 + 按键模拟 + SEH 保护 |
-| PC 地址 Hex 输出修正 | `tests/kagami/batch_compat_test.cpp` | PC 地址正确显示为 4 位 hex |
+| 阶段 | 修复项 | 涉及文件 | 效果 |
+|------|--------|----------|------|
+| **P0** | Mapper 187 CHR 越界保护 | `src/boards/187.cpp` | 消除 mapper 187 崩溃 (少年街霸2, 拳王'96) |
+| **P0** | UNIF Cart 创建修复 | `src/unif.cpp` | 消除 UNIF 板卡崩溃 (快打魂斗罗) |
+| **P0** | 格式预验证 | `src/kagami_bridge.cpp` | 拒绝非 iNES/UNIF/NSF/FDS 格式 |
+| **P0** | CHR/PRG 安全边界 | `src/cart.cpp` | setchr1r/setprg8r 防越界 |
+| **P0** | Mapper 182 启用 | `src/ines_bmap.h` | mapper 182→4 (MMC3) 兼容 |
+| **P1** | 新 PPU 启用 | `tests/kagami/batch_compat_test.cpp` | +64 ROM（全部 no_video 修复） |
+| **P2** | pc_not 阈值调整 | `tests/kagami/batch_compat_test.cpp` | 允许 mapper 特定复位地址 |
+| **工具** | 批量兼容性测试器 | `tests/kagami/batch_compat_test.cpp` | SEH 保护 + iNES header + 输入模拟 |
+| **工具** | Joypad API | `src/kagami_bridge.h/cpp` | `kagami_bridge_set_joypad()` |
+| **文档** | Agent 指南 | `AGENTS.md` | 构建/测试/架构约定 |
 
 ---
 
