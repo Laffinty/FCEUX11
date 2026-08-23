@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.1] - 2026-08-24 - 兼容性优化计划 hotfix1（扩大化批量扫描 3451 ROM）
+## [2.0.1] - 2026-08-24 - 兼容性优化 hotfix1（3451 ROM 全量扫描 + P0/P1/Tier1 修复）
 
 - **扩大化批量兼容性测试**: 全量测试 3451 个 NES ROM（此前为 123 样本），通过率 80.2%（2769/3451）。
 - 失败分类: CPU 卡死 573 (84.4%)、无视频输出 83 (12.2%)、PC 异常 12 (1.8%)、SEH 崩溃 11 (1.6%)、加载失败 3 (0.1%)。
