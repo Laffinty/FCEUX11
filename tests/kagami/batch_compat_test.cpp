@@ -487,7 +487,11 @@ int main(int argc, char** argv) {
         fprintf(stderr, "FATAL: kagami_bridge_init() failed\n");
         return 2;
     }
-    printf("Emulator initialized.\n\n");
+    // P1: Enable new PPU for better NMI/IRQ timing accuracy.
+    // The legacy PPU has known timing issues that cause many games
+    // to hang in VBlank wait loops. The new PPU passes blargg timing tests.
+    kagami_bridge_set_newppu(1);
+    printf("Emulator initialized (new PPU enabled).\n\n");
 
     // Run tests
     auto global_start = std::chrono::steady_clock::now();
