@@ -1537,13 +1537,13 @@ static bool e1_trace_on() {
 // 7 -> [4,3,...], 9 -> [4,4,4,4,3,...] (transition 1 line late), 8 is the
 // unique sweet spot. Sweep data in docs/history/surveys/e1_vbl/.
 static int e1_nmi_delay() {
-	// v2.0_hotfix1 Tier 1: NMI delay tuned from 8→5 PPU dots.
+	// v2.0_hotfix1 CI regression fix: default restored to 8 PPU dots for blargg vbl_05.
 	// Swept 0/3/4/5/6/7/8/12 against 3451 ROM suite (new PPU, 120 frames).
 	// delay=5 maximizes pass rate (2872/3451 = 83.2%) vs default 8 (2868 = 83.1%).
 	// Override via FCEUX11_E1_NMIDELAY env var.
 	static const int d = []() {
 		const char* e = std::getenv("FCEUX11_E1_NMIDELAY");
-		return (e && e[0]) ? std::atoi(e) : 5;
+		return (e && e[0]) ? std::atoi(e) : 8;
 	}();
 	return d;
 }
@@ -1611,19 +1611,19 @@ int FCEUX_PPU_Loop(int skip) {
 			 (int)vbl_set_suppressed, (int)(VBlankON != 0));
 		}
 		if (!vbl_set_suppressed) {
-			// v2.0_hotfix1 Phase A (2026-08-24): VBL flag set at cycle 1
-			// instead of cycle 0. Per NESdev PPU_frame_timing and blargg
-			// vbl_02_set_time: real hardware asserts VBL at sl 241 cycle 1.
-			// runppu(1) advances the PPU from cycle 0 to cycle 1 before
-			// setting the flag. Frame length stays at 6820 dots (compensated
-			// by delay 20→19 below).
+			// Working config: VBL at cycle 0, clear at cycle 0 = 6820 (01-vbl_basics PASS).
+			// Cycle 0->1 shift (02-vbl_set_time) deferred to focused follow-up.
+			// E-1 Track-B probe (v1.17 R5 task, 2026-08-08): VBL_SET
+			// recorder. Fires immediately before PPU_status|=0x80, recording
+			// the PRE-set PPU_status byte alongside the existing VBL_ENTER
+			// footprint. Distinct probe name so VBL_SET (pre-) and VBL_CLR
+			// (pre-, post-verify via next probe) are co-traceable per frame.
 			if (e1_trace_on()) {
 				fprintf(stderr, "E1B VBL_SET abs=%llu sl=%d cycle=%d count=%d lastpc=%04X PPU_status_pre=0x%02X\n",
 				 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()),
 				 ppur.status.sl, ppur.status.cycle, g_cpu.native_layout().count,
 				 (unsigned)fceu11_e1_last_pc(), (unsigned)PPU_status);
 			}
-			runppu(1);  // advance PPU from cycle 0 to cycle 1
 			PPU_status |= 0x80;
 			ppuphase = PPUPHASE_VBL;
 		} else {
@@ -1634,10 +1634,7 @@ int FCEUX_PPU_Loop(int skip) {
 		//Timing is probably off, though.
 		//NOTE:  Not having this here breaks a Super Donkey Kong game.
 		PPU[3] = PPUSPL = 0;
-		// v2.0_hotfix1 Phase A+B: delay compensates for runppu(1) before
-		// VBL flag and runppu(nd) for NMI delay. Total frame = 6820 dots.
-		const int nd_val = e1_nmi_delay();  // typically 5
-		const int delay = 19;
+		const int delay = 20;
 
 		ppur.status.sl = 241;	//for sprite reads
 
@@ -1650,20 +1647,26 @@ int FCEUX_PPU_Loop(int skip) {
 		// [3,2,2,2,2,2,2,1,1,1] — row 0 overshoot to 3 proves single-param
 		// NMI delay cannot fix vbl_05's per-row phase drift (see
 		// docs/history/e1_survey/vbl_step3_fix_data_2026-08-01.md §9).
-		// v2.0_hotfix1 Phase B: runppu(nd) ALWAYS done (inside or outside
-		// VBlankON) so frame length stays identical on suppressed and
-		// non-suppressed frames (6820 dots). runppu advances both PPU
-		// and CPU in sync, fixing per-frame NMI phase drift.
-		{
-			const int nd = nd_val;
-			if (nd > 0) runppu(nd);
+		// Step 1.2: X6502_Run(nd) is ALWAYS done when NMI is enabled so the
+		// frame length stays identical on suppressed and non-suppressed
+		// frames (6820 with NMI on OR off — the R5 Step 3 runppu(3) wart that
+		// lengthened NMI-on frames to 6823 is removed; hardware VBL is
+		// exactly 20 scanlines = 6820 dots regardless of NMI state).
+		// Phase 1 Step 1.3 deep (2026-08-02): run the CPU budget WITHOUT
+		// advancing the PPU. runppu(nd) advanced the PPU nd dots AND granted
+		// nd*16 units of CPU budget; the PPU advance distorted NMI-on frames
+		// (+3 dots, vbl_05 VBL_ENTER cycle drifted +3/frame), which skews the
+		// per-frame NMI phase drift that blargg's nmi_timing test measures.
+		// X6502_Run(nd) grants the same CPU budget (1 CPU cycle per 3 dots)
+		// with zero PPU advance, keeping the frame at a true 6820-dot VBL.
+		if (VBlankON) {
+			const int nd = e1_nmi_delay();
+			if (nd > 0) X6502_Run(nd);
 			if (e1_trace_on()) {
 				fprintf(stderr, "E1 VBL_AFTER_NMIDELAY abs=%llu sl=%d cycle=%d delay=%d\n",
 				 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()),
 				 ppur.status.sl, ppur.status.cycle, nd);
 			}
-		}
-		if (VBlankON) {
 			// E-1 Track-B probe (v1.17 R5 task, 2026-08-08): NMI_LATCH
 			// recorder. Fires immediately BEFORE TriggerNMI() (vs the
 			// existing E1 NMI_SET inside x6502.cpp::TriggerNMI which fires

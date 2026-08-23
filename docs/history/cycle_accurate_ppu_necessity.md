@@ -1,4 +1,6 @@
-# Cycle-Accurate PPU 模型必要性论证
+# Cycle-Accurate PPU 模型必要性论证 — 已归档
+
+> ⚠️ 已归档（2026-08-23）：本文档是 v2.0_hotfix1 阶段对 cycle-accurate PPU 必要性的前置论证，已作为 v2.1 Rust PPU 重构方案的历史依据归档。请勿再基于本文档直接执行构建任务；后续实施以 `docs/plans/v2.1_ppu_rust_refactor_plan.md` 为准。
 
 > **文档性质**: v2.1 版本迭代理论依据  
 > **生成时间**: 2026-08-24  
