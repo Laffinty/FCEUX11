@@ -180,12 +180,13 @@ Mapper 1 占 stuck 的 23.2%（128 ROM），以下为独占地址：
 
 | 优先级 | 修复项 | 预期收益 | 工作量 | 风险 |
 |--------|--------|----------|--------|------|
-| **Tier 3** | Mapper 19 (Namcot 106) 扩展音频 IRQ | +15~24 ROM | 3-4h | 中 |
+| **Tier 3** | Mapper 19 IRQ 状态重置（已实施） | +0（防御性修复） | 1h | 低 |
 | **Tier 4** | Mapper 1 (MMC1) PRG bank 优化 | +30~50 ROM | 2-3h | 中 |
 | **Tier 5** | 零页 stuck (0x0000) NMI 向量修复 | +4 ROM | 2-3h | 低 |
 | **深层** | PPU VBlank NMI 精确时序重写 | +100~200 ROM | 8-12h | 高 |
 
-> **Tier 3-5 完成后预计兼容率可达 ~88-90%**。  
+> **Tier 3 根因发现**: Mapper 19 的 15 个三国志2 stuck ROM 是新 PPU 回归（legacy PPU 下 PASS）。9 个预存问题是 IRQ 时序精度不足。两者均需深层 PPU 修正。  
+> **Tier 4-5 完成后预计兼容率可达 ~86-88%**。  
 > **深层 PPU 修正后预计可达 ~92-95%**。
 
 ---
@@ -246,6 +247,7 @@ Mapper 1 占 stuck 的 23.2%（128 ROM），以下为独占地址：
 | `src/kagami_bridge.h/cpp` | 格式预验证 + Joypad API | P0 |
 | `src/unif.cpp` | UNIF Cart 创建修复 | P0 |
 | `src/ppu_rendering.cpp` | NMI delay 8→5 | Tier 1 |
+| `src/boards/n106.cpp` | Mapper 19 IRQ 状态重置 | Tier 3 |
 | `src/tests/AGENTS.md` | 交叉引用 | — |
 | `tests/CMakeLists.txt` | batch_compat_test 构建目标 | — |
 | `tests/kagami/batch_compat_test.cpp` | 批量兼容性测试器 | P0/P1/P2 |
