@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-08-23 - 兼容性优化计划 hotfix1（TESTNES 批量扫描）
+
+- Fix A（iNES 尺寸容错）：已实施于 src/rust/crates/fceux11-formats/src/ines.rs：加载时按文件实际长度截断 rounded 尺寸（不低于 raw 尺寸），输出尺寸字段同步为实际值，哈希按实际长度计算。
+  - 验证：10021_魂斗罗3代、10302_吞食天地2 均可加载；10021 30 帧 32090 条轨迹全部在 ROM 区。
+  - 已知限制：10302 复位后正常运行 ROM 初始化（首条 PC=0xF13E），随后跳入 0x5000-0x5FFF（该卡 MMC3 克隆的扩展映射区，模拟器未实现），需板级支持，列入后续。
+- Fix B（传统板卡 Power 转发）：已实施于 src/ines.cpp：仅当存在 Cart 子类时才把 info->Power/Reset/Close 覆写为转发器；无子类的传统板卡保留 MapperNN_Init 设置的函数指针。
+  - 验证：10083_西天取经 复位向量读到 0xFFD0，30 帧 27050 条轨迹全部在 ROM 区（修复前 100% 卡在 0x3434）。
+- Fix C（10004_雪人兄弟）：调查结论——调色板/名称表已正确初始化、CPU 正常（600 帧仍冻结在 0xC4xx 轮询），XBuf 保持 0x80；判定为等待输入型，非确定模拟器缺陷，需 GUI 人工确认。
+- 回归：全量复扫 123 个样本，0 加载失败；ctest 34/34 通过；9ad00a01 回归通过。
+
 ## [2.0.0] - 2026-08-22 — Rust 6502 CPU 迁移完成（Phase 1-7）与 KagamiQA 发布评审
 
 **分支 `wip2.0`**。把 C++ X6502 CPU 替换为 `fceux11-core` 的 Rust 6502
