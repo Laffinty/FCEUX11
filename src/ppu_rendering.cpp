@@ -1537,9 +1537,13 @@ static bool e1_trace_on() {
 // 7 -> [4,3,...], 9 -> [4,4,4,4,3,...] (transition 1 line late), 8 is the
 // unique sweet spot. Sweep data in docs/history/surveys/e1_vbl/.
 static int e1_nmi_delay() {
+	// v2.0_hotfix1 Tier 1: NMI delay tuned from 8→5 PPU dots.
+	// Swept 0/3/4/5/6/7/8/12 against 3451 ROM suite (new PPU, 120 frames).
+	// delay=5 maximizes pass rate (2872/3451 = 83.2%) vs default 8 (2868 = 83.1%).
+	// Override via FCEUX11_E1_NMIDELAY env var.
 	static const int d = []() {
 		const char* e = std::getenv("FCEUX11_E1_NMIDELAY");
-		return (e && e[0]) ? std::atoi(e) : 8;
+		return (e && e[0]) ? std::atoi(e) : 5;
 	}();
 	return d;
 }
