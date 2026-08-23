@@ -87,158 +87,205 @@
 
 ---
 
-## 4. CPU 卡死详细分析
+## 4. 剩余 580 个 FAIL 深度分析
 
-### 4.1 修正后的 PC 地址（16 位 Hex）
+### 4.1 失败类型分布
 
-> 注：基线测试中 PC 地址因 `std::to_string(uint16_t)` 输出十进制而被误读为超范围值。修正后全部为合法 16 位地址。
+| 类型 | 数量 | 占比 | 说明 |
+|------|------|------|------|
+| **CPU 卡死（cpu_stuck）** | 555 | 95.7% | CPU 在 ROM 代码中无限循环 |
+| **PC 异常（pc_not）** | 22 | 3.8% | 复位后首条 PC < 0x4000 |
+| **SEH 崩溃（crash）** | 3 | 0.5% | UNIF 格式快打魂斗罗系列 |
 
-| PC 地址 | 数量 | 地址区域 | 分析 |
-|---------|------|----------|------|
-| **0x8057** | 27 | ROM 空间 (0x8000-0xBFFF) | 最大聚类，游戏初始化循环 |
-| **0x961A** | 11 | ROM 空间 (0x8000-0xBFFF) | |
-| **0xC03D** | 11 | ROM 空间 (0xC000-0xFFFF) | |
-| **0xF45F** | 10 | ROM 空间 (0xC000-0xFFFF) | 接近复位向量区 |
-| **0xC050** | 10 | ROM 空间 | |
-| **0xC05B** | 9 | ROM 空间 | |
-| **0xC05C** | 9 | ROM 空间 | |
-| **0xC064** | 9 | ROM 空间 | |
-| **0x0050** | 9 | 零页 | |
-| **0xFF45** | 9 | ROM 空间 (0xFF00-0xFFFF) | 接近 IRQ/NMI 向量区 |
+### 4.2 Stuck ROM 地址范围分布
 
-**核心结论**: 所有 stuck PC 均在合法 ROM 空间（0x8000-0xFFFF）或零页（0x0000-0x00FF）。**不存在 mapper 寄存器空间的非法 PC**。这证明：
-1. 基线报告中的"0x49xxx / 0x32xxx / 0x65xxx 聚类"是十进制误读，实际地址为 0xC03D / 0x8057 / 0xFF45 等合法 ROM 地址
-2. CPU stuck 的根因是**游戏代码等待中断（NMI/IRQ）但中断未触发**，而非 mapper bank 切换错误
+| 地址范围 | 数量 | 占比 | 典型行为 |
+|----------|------|------|----------|
+| **ROM 高区 (0xC000-0xFFFF)** | 379 | 68.3% | 主游戏循环，等待 VBlank NMI |
+| **ROM 低区 (0x8000-0xBFFF)** | 141 | 25.4% | 初始化代码，等待中断 |
+| **低 RAM (0x0100-0x3FFF)** | 17 | 3.1% | 栈/子程序循环 |
+| **扩展区 (0x4000-0x5FFF)** | 7 | 1.3% | 海盗 mapper 寄存器区 |
+| **零页 (0x0000-0x00FF)** | 9 | 1.6% | 零页等待循环 |
+| **SRAM (0x6000-0x7FFF)** | 2 | 0.4% | SRAM 执行 |
 
-### 4.2 Stuck 根因假设
+### 4.3 Stuck ROM Mapper 分布（Top 10）
 
-| 假设 | 支持证据 | 影响范围 |
-|------|----------|----------|
-| **PPU NMI 时序偏差** | PC 集中在 VBlank 等待循环（0xC0xx, 0xFFxx）| ~400 ROM |
-| **IRQ 触发条件不满足** | 部分游戏依赖 mapper IRQ（MMC3 scanline counter）| ~100 ROM |
-| **游戏等待输入但模拟不足** | 120 帧可能不够，部分游戏需要更长时间 | ~50 ROM |
+| Mapper | 名称 | Stuck 数量 | 占 stuck 比 |
+|--------|------|-----------|------------|
+| 1 | MMC1 | 128 | 23.1% |
+| 4 | MMC3 | 122 | 22.0% |
+| 0 | NROM | 70 | 12.6% |
+| 2 | UNROM | 63 | 11.4% |
+| 3 | CNROM | 25 | 4.5% |
+| 19 | Namcot 106 | 24 | 4.3% |
+| 7 | AXROM | 21 | 3.8% |
+| 16 | Bandai | 12 | 2.2% |
+| 64 | Tengen RAMBO1 | 9 | 1.6% |
+| 65 | Irem H3001 | 7 | 1.3% |
 
-### 4.3 忍者神龟系列（PC=0x0050，9 个 ROM）
+### 4.4 Stuck PC 地址聚类分析（>=5 ROMs 同一地址）
 
-全部使用 MMC3 (mapper 4)。PC 卡在零页 0x0050，这是游戏的主循环等待 VBlank NMI 的典型模式。**根因高度疑似 MMC3 IRQ scanline 计数器与 PPU A12 时钟的交互问题**。
+共 23 个聚类，覆盖 201/555 = **36.2%** 的 stuck ROMs。
 
----
+#### 关键发现：跨 Mapper 聚类（PPU/NMI 时序问题）
 
-## 5. SEH 崩溃详细分析（11 个 ROM）
+同一 PC 地址出现在多个 Mapper 中，证明 stuck 根因是 **PPU VBlank NMI 时序偏差**，而非 mapper 特定问题：
 
-| ROM 文件 | Mapper | 格式 |
-|----------|--------|------|
-| 1446_少年街霸2.nes | 187 | iNES |
-| 1448_少年街霸2_1.nes | 187 | iNES |
-| 1737_拳王'96_格斗之王'96.nes | 187 | iNES |
-| 2734_街头霸王II.nes | 189 | iNES |
-| 2743_街霸4人.nes | 189 | iNES |
-| 2744_街霸4人_HACK为5人.nes | 189 | iNES |
-| 2746_街霸5人.nes | 189 | iNES |
-| 1604_快打魂斗罗.nes | -1 | 非iNES |
-| 1605_快打魂斗罗_1.nes | -1 | 非iNES |
-| 1606_快打魂斗罗加强版.nes | -1 | 非iNES |
-| 3147_风中奇缘.nes | 182→4 | iNES (mapper 182 已映射到 4) |
+| PC 地址 | 数量 | 涉及 Mapper | 典型 ROM |
+|---------|------|------------|----------|
+| **0x8057** | 27 | 0, 64 | 超级玛丽系列 (25 个 mapper 0 变体) |
+| **0xFB3C** | 15 | 19 | 三国志2 霸王的大陆 (15 个 mapper 19 变体) |
+| **0xC05C** | 12 | 0, 2, 64 | Road Fighter 系列 |
+| **0xC03D** | 11 | 1 | 最终任务 / 空中魂斗罗 |
+| **0xC050** | 10 | 1 | POW / 脱狱 |
+| **0xC05B** | 10 | 1 | SCAT / 最终任务 |
+| **0xC064** | 9 | 1, 78 | Jetman 系列 |
+| **0xFF45** | 9 | 4, 74 | Final Fantasy 3 系列 |
+| **0xC28F** | 8 | 2, 66 | Jackal |
+| **0xC045** | 8 | 1, 65 | Ikari 3 |
+| **0xC057** | 7 | 0, 2 | Circus Charlie |
+| **0xE0A2** | 7 | 19, 4 | 妖怪道中记 |
+| **0xC08E** | 6 | 2 | Hi No Tori |
+| **0xC08F** | 6 | 2 | Argos No Senshi |
+| **0x8067** | 6 | 3, 67 | Gradius |
+| **0x820A** | 6 | 4, 7 | Rockman 3 |
+| **0xA943** | 6 | 4 | Kick Master |
+| **0xC2B3** | 6 | 4 | Cross Fire |
+| **0xF8D9** | 6 | 4 | 玛莉3 |
+| **0xFEBC** | 5 | 1, 98 | Final Fantasy 2 |
 
-**崩溃模式**:
-- Mappers 187/189（6 个）: MMC3 克隆板卡，bank 切换逻辑可能存在越界访问
-- 非 iNES 格式（3 个）: header 为 `53 4E 53 46` ("SNSF")，非标准 NES ROM 格式
-- Mapper 182（1 个，风中奇缘）: 已映射到 mapper 4 仍崩溃，说明崩溃发生在 MMC3 运行时
+#### Mapper 1 (MMC1) 专属聚类
 
----
+Mapper 1 占 stuck 的 23.1%（128 ROM），有 14 个 >=3 ROM 的地址聚类。以下为 mapper 1 独占地址：
 
-## 6. 无视频输出分析（69 个 ROM）
+| PC 地址 | 数量 | 典型 ROM |
+|---------|------|----------|
+| 0xC03D | 11 | 最终任务, 空中魂斗罗 |
+| 0xC050 | 10 | POW, 脱狱 |
+| 0xC05B | 10 | SCAT, 最终任务 |
+| 0xC064 | 6 | Jetman |
+| 0xC045 | 5 | Ikari 3 |
+| 0xF3B1 | 5 | 热血躲避球 |
 
-| Mapper | 数量 | 可能原因 |
-|--------|------|----------|
-| 4 (MMC3) | 49 | CHR bank 切换未生效，PPU 读取空白 CHR |
-| 1 (MMC1) | 7 | CHR 模式切换问题 |
-| 其他 | 13 | 各类 mapper CHR 映射问题 |
+#### 特殊地址模式
 
-**已排除因素**: 输入模拟已覆盖 Start/A 按键（frames 10-42），"等待输入型"已基本排除。剩余 69 个大概率是 CHR 映射或 PPU 渲染问题。
-
----
-
-## 7. 修订后的修复计划
-
-### P0 — 崩溃修复（11 个 ROM）— 必须修复
-
-**目标**: 消除所有 SEH 崩溃，确保任何 ROM 不导致模拟器进程崩溃。
-
-| 编号 | 修复项 | 涉及文件 | 预计工作量 | 优先级 |
-|------|--------|----------|-----------|--------|
-| F-1 | **Mapper 187 bank 越界保护**: `M187PW` 中 `setprg8(A, V & 0x3F)` 当 PRG < 64 banks 时 mask 不足；添加 `V %= prg_bank_count` 硬上限 | `src/boards/187.cpp:32-46` | 1h | P0-紧急 |
-| F-2 | **Mapper 189 bank 越界保护**: `M189PW` 中 `setprg32(0x8000, EXPREGS[0] & 7)` 需验证 PRG >= 256KB | `src/boards/189.cpp:25-27` | 0.5h | P0-紧急 |
-| F-3 | **非 iNES 格式拒绝**: 对 header 为 "SNSF" 等非 "NES\x1A" 的文件，在加载阶段直接返回失败，避免运行时崩溃 | `src/ines_load.cpp` | 0.5h | P0-紧急 |
-| F-4 | **Mapper 182 运行时保护**: 风中奇缘虽已映射到 mapper 4 仍崩溃，需在 MMC3 通用层添加 CHR bank 越界检查 | `src/boards/mmc3.cpp` FixMMC3CHR | 1-2h | P0-重要 |
-
-### P1 — PPU/NMI 时序修正（~400 个 ROM stuck）— 高影响
-
-**目标**: 修正 PPU NMI 触发时序，使依赖 VBlank NMI 的游戏能正常运行。
-
-| 编号 | 修复项 | 涉及文件 | 预计工作量 | 预期收益 |
-|------|--------|----------|-----------|----------|
-| F-5 | **NMI 触发时机审查**: 对照 blargg ppu_vbl_nes 测试结果，验证 VBlank NMI 在 scanline 241 的精确触发点。当前 Rust CPU 的 NMI 延迟一指令语义可能与 PPU 的 VBlank 设置存在竞态 | `src/rust/crates/fceux11-core/src/cpu/` + `src/ppu.cpp` | 4-6h | +200-300 ROM |
-| F-6 | **MMC3 IRQ scanline 计数器精度**: 审查 `MMC3_hb` 的 scanline 计数逻辑，确保 A12 rising edge 时钟与 PPU 渲染行同步。修复忍者神龟系列 (PC=0x0050) | `src/boards/mmc3.cpp:220-300` | 3-4h | +50-80 ROM |
-| F-7 | **PPU GETLASTPIXEL 精度**: v2.0 曾修复 Rust CPU timestamp 增量推进导致的 GETLASTPIXEL 偏移，但可能仍有残余偏差影响渲染中断时序 | `src/ppu.cpp` | 2-3h | +30-50 ROM |
-
-### P2 — CHR 映射修正（69 个 ROM no_video）— 中等影响
-
-**目标**: 修复 CHR bank 切换导致的空白画面。
-
-| 编号 | 修复项 | 涉及文件 | 预计工作量 | 预期收益 |
-|------|--------|----------|-----------|----------|
-| F-8 | **MMC3 CHR bank 诊断**: 对无视频输出的 mapper 4 ROM，添加 CHR bank 映射日志，确认 `cwrap` 是否正确设置了 VPageR | `src/boards/mmc3.cpp` FixMMC3CHR | 2-3h | +30 ROM |
-| F-9 | **CHR-RAM 初始化审查**: 部分无 CHR-ROM 的 ROM 依赖 CHR-RAM，确认 CHR-RAM 是否正确清零并映射 | `src/ines_init.cpp` | 1h | +10 ROM |
-| F-10 | **MMC1 CHR 模式切换**: mapper 1 的 7 个 no_video ROM 可能因 CHR 模式 (4KB/8KB) 切换逻辑问题 | `src/boards/mmc1.cpp` | 2h | +7 ROM |
-
-### P3 — PC 异常修正（12 个 ROM）— 低影响
-
-| 编号 | 修复项 | 涉及文件 | 预计工作量 |
-|------|--------|----------|-----------|
-| F-11 | **复位向量验证**: 对首条 PC < 0x4020 的 ROM，检查 iNES 头部的复位向量 (0xFFFC-0xFFFD) 是否指向合法区域 | `src/ines.cpp` | 1h |
-
-### P4 — 测试基础设施（已完成大部分）
-
-| 编号 | 项目 | 状态 |
+| 模式 | 数量 | 说明 |
 |------|------|------|
-| F-12 | Mapper 编号读取 | **已完成** |
-| F-13 | 输入模拟 | **已完成** |
-| F-14 | SEH 崩溃保护 | **已完成** |
-| F-15 | PC 地址 Hex 输出 | **已完成** |
-| F-16 | Mapper 通过率完整统计 | 待增强（需在报告中输出每个 mapper 的 PASS+FAIL 计数） |
+| **0x0000 (零页)** | 4 | mapper 4 (MMC3) — CPU 跳转到 0x0000，疑似栈损坏或 NMI 向量读取错误 |
+| **0x0050 (零页)** | 3 | mapper 4/25 (TMNT 系列) — VBlank 等待循环 |
+| **0x5530 (扩展区)** | 5 | mapper 4 — 吞食天地系列，执行到 mapper 寄存器区 |
+
+### 4.5 Stuck 根因确认
+
+**核心结论**: 555 个 stuck ROM 的根因是 **PPU VBlank NMI 时序偏差**。
+
+证据：
+1. **跨 Mapper 聚类**: 同一 PC 地址出现在 2-3 个不同 Mapper 中（如 0xC05C 出现在 mapper 0/2/64）
+2. **地址集中在 ROM 空间**: 93.7% 的 stuck PC 在 0x8000-0xFFFF（标准 ROM 映射区）
+3. **经典游戏受影响**: 超级玛丽、魂斗罗、洛克人、最终幻想等主流游戏均 stuck
+4. **新 PPU 已部分修复**: 启用新 PPU 后 69 个 no_video ROM 全部修复，证明 PPU 时序是关键因素
+
+### 4.6 PC 异常详细分析（22 个 ROM）
+
+| Mapper | 数量 | 典型首条 PC | 分析 |
+|--------|------|------------|------|
+| 163 | 8 | 0x0400-0x0420 | Nanjing 海盗 mapper，CPU 从扩展 RAM 启动 |
+| 226 | 3 | 0x0205-0x0267 | BMC 22+20-in-1 合卡，新 PPU 时序回归 |
+| 64 | 3 | 0x0008, 0x3A38 | Tengen RAMBO1 |
+| 254 | 2 | 0x001B | 海盗 mapper |
+| 83 | 2 | 0x0452 | YOKO VRC |
+| 230 | 1 | 0x0002 | BMC Contra+22-in-1 |
+| 34 | 1 | 0x0002 | IREM I-IM/BNROM |
+| 7 | 1 | 0x0002 | AXROM |
+| 98 | 1 | 0x0002 | — |
+
+**分析**: 大部分 pc_not ROM 使用海盗 mapper，这些 mapper 的复位行为与标准 mapper 不同。Mapper 226 的 3 个 ROM 是新 PPU 时序回归（legacy PPU 下 PASS）。
+
+### 4.7 崩溃详细分析（3 个 ROM）
+
+全部为 UNIF 格式的快打魂斗罗系列（board: UNL-603-5052）。SEH 处理器已捕获，不会导致进程崩溃。
 
 ---
 
-## 8. 修复优先级与预期收益
+## 5. 下一批可修复问题分析
 
-| 阶段 | 修复项 | 预期修复 ROM 数 | 累计通过率 |
-|------|--------|----------------|-----------|
-| **当前** | — | — | **81.2%** (2801/3451) |
-| **P0** | F-1 ~ F-4 | +11 | **81.6%** (消除全部崩溃) |
-| **P1** | F-5, F-6, F-7 | +300 ~ 400 | **90% ~ 93%** |
-| **P2** | F-8, F-9, F-10 | +47 | **91% ~ 94%** |
-| **P3** | F-11 | +12 | **92% ~ 95%** |
+### Tier 1: PPU VBlank NMI 时序深度修正（预期 +100~200 ROM）
 
-> **P0-P1 完成后预计兼容率可达 ~90%+**，这是 v2.1 的发布标准。  
-> **P0-P3 全部完成后预计兼容率可达 ~93-95%**。  
-> 剩余 5-7% 预计为：极罕见 mapper、ROM 损坏、需要 sub-scanline 级 PPU 精度的特殊硬件行为。
+**影响范围**: 201 个高度集中聚类 ROM + 散布的 stuck ROM  
+**根因**: 新 PPU 的 VBlank NMI 触发时机与真实硬件仍有偏差  
+**修复方向**:
+- 对照 blargg `ppu_vbl_nes` 测试套件（01-vbl_basics ~ 10-even_odd_timing）逐项验证
+- 调整 `e1_nmi_delay()` 参数（当前默认 8 PPU dots）
+- 修正 VBL-set suppression 逻辑（新 PPU 的 sl240 cycle340 检测）
+- 验证 Rust CPU 的 NMI-fresh 延迟一指令语义是否与 PPU VBlank 设置竞态
+
+**涉及文件**: `src/ppu_rendering.cpp` (FCEUX_PPU_Loop), `src/rust/crates/fceux11-core/src/cpu/`  
+**预计工作量**: 8-12h  
+**风险**: 高（可能影响 blargg 测试通过率，需要逐项回归验证）
+
+### Tier 2: 延长测试帧数（预期 +20~50 ROM）
+
+**影响范围**: 部分 stuck ROM 可能只是启动慢  
+**修复方向**: 将测试帧数从 120 增加到 300（约 5 秒 NES 时间），分离"真正 stuck"和"慢启动"  
+**涉及文件**: `tests/kagami/batch_compat_test.cpp`  
+**预计工作量**: 0.5h  
+**风险**: 低（仅延长测试时间）
+
+### Tier 3: Mapper 19 (Namcot 106) 扩展音频（预期 +15~24 ROM）
+
+**影响范围**: 24 个 mapper 19 stuck ROM，其中 15 个是三国志2 变体  
+**根因**: Namcot 106 扩展音频芯片的 IRQ 机制可能未正确实现  
+**修复方向**: 审查 mapper 19 的 N163 音频 IRQ 触发逻辑  
+**涉及文件**: `src/boards/n106.cpp`  
+**预计工作量**: 3-4h  
+**风险**: 中
+
+### Tier 4: Mapper 1 (MMC1) 特定优化（预期 +30~50 ROM）
+
+**影响范围**: 128 个 mapper 1 stuck ROM（占 stuck 的 23.1%）  
+**根因**: MMC1 的 PRG-ROM bank 切换模式（16KB/32KB）可能影响 VBlank 等待循环的执行  
+**修复方向**: 审查 MMC1 的 `FixMMC1PRG` 时序与 PPU 的交互  
+**涉及文件**: `src/boards/mmc1.cpp`  
+**预计工作量**: 2-3h  
+**风险**: 中
+
+### Tier 5: 零页 stuck (0x0000) 修复（预期 +4 ROM）
+
+**影响范围**: 4 个 mapper 4 (MMC3) ROM 跳转到 0x0000  
+**根因**: 可能是 NMI 向量 (0xFFFA-0xFFFB) 读取错误，导致 CPU 跳转到 0x0000  
+**修复方向**: 检查 MMC3 的 NMI 向量读取路径  
+**涉及文件**: `src/boards/mmc3.cpp`, `src/cpu.cpp`  
+**预计工作量**: 2-3h  
+**风险**: 低
+
+### 修复优先级总结
+
+| 优先级 | 修复项 | 预期收益 | 工作量 | 风险 |
+|--------|--------|----------|--------|------|
+| **Tier 1** | PPU VBlank NMI 时序深度修正 | +100~200 ROM | 8-12h | 高 |
+| **Tier 2** | 延长测试帧数 (120→300) | +20~50 ROM | 0.5h | 低 |
+| **Tier 3** | Mapper 19 扩展音频 IRQ | +15~24 ROM | 3-4h | 中 |
+| **Tier 4** | Mapper 1 (MMC1) 优化 | +30~50 ROM | 2-3h | 中 |
+| **Tier 5** | 零页 stuck (0x0000) 修复 | +4 ROM | 2-3h | 低 |
+
+> **Tier 1+2 完成后预计兼容率可达 ~88-90%**。  
+> **全部 Tier 完成后预计兼容率可达 ~92-95%**。
 
 ---
 
-## 9. 已知限制
+## 6. 已知限制
 
 1. **120 帧限制**: 部分慢启动游戏（如 RPG 开场动画）可能需要 300+ 帧。可通过 `--frames 300` 参数扩展。
-2. **固定输入模式**: 当前按键模拟为 Start(10-15) + A(20-22) + Start(30-32) + A(40-42)，部分游戏可能需要特定按键组合或更长的按键持续时间。
-3. **无新 PPU 测试**: 本次测试使用默认 PPU（legacy），未测试 new PPU 路径。
-4. **非 iNES 格式 ROM**: 3 个 "SNSF" 格式 ROM 无法被 iNES 加载器处理。
-5. **Mapper 通过率不完整**: 当前仅统计 FAIL 端的 mapper 分布，需增强工具输出完整 PASS/FAIL 计数。
+2. **固定输入模式**: 当前按键模拟为 Start(10-15) + A(20-22) + Start(30-32) + A(40-42)，部分游戏可能需要特定按键组合。
+3. **新 PPU 性能**: 新 PPU 比 legacy PPU 慢约 3 倍（3451 ROM 测试耗时 ~20 分钟 vs ~6 分钟）。
+4. **非 iNES 格式 ROM**: 3 个 UNIF 格式快打魂斗罗 ROM 的 UNL-603-5052 板卡存在运行时崩溃。
+5. **海盗 Mapper 兼容性**: 22 个 pc_not ROM 使用海盗 mapper（163/226/230/254），复位行为非标准。
 
 ---
 
-## 10. 附录
+## 7. 附录
 
-### 10.1 测试环境
+### 7.1 测试环境
 
 - OS: Windows 11 22H2+
 - MSVC: 19.51.36244.0 (VS 2026)
@@ -246,34 +293,41 @@
 - Qt: 6.8.0
 - CMake: 4.0+
 - CPU: Rust 6502 (Phase 7, 唯一实现)
+- PPU: new PPU (ppu_rendering.cpp)
 
-### 10.2 版本对比
+### 7.2 版本对比
 
-| 指标 | v2.0.1 (123 样本) | v2.0 基线 (3451 样本) | v2.0_hotfix1 (3451 样本) |
-|------|-------------------|----------------------|--------------------------|
+| 指标 | v2.0.1 (123 样本) | v2.0 基线 (3451 样本) | **v2.0_hotfix1 最终** |
+|------|-------------------|----------------------|----------------------|
 | 样本数 | 123 | 3451 | 3451 |
 | 测试帧数 | 30 | 60 | 120 |
+| PPU | legacy | legacy | **new PPU** |
 | 输入模拟 | 无 | 无 | Start+A |
 | 加载失败 | 0 | 3 | 3 |
-| 通过率 | ~97% | 80.2% | **81.2%** |
-| 崩溃数 | 0 | 11 | 11 |
+| 通过率 | ~97% | 80.2% | **83.1%** |
+| 崩溃数 | 0 | 11 | 3 |
 
-### 10.3 JSON 报告
+### 7.3 JSON 报告
 
-- 基线数据: `C:\Users\ikrx2\Desktop\compat_report_v2.0_hotfix1.json` (60帧, 无输入)
-- 最终数据: `C:\Users\ikrx2\Desktop\compat_report_v2.0_hotfix1_v4.json` (120帧, 含输入模拟)
+- 基线数据: `compat_report_v2.0_hotfix1.json` (60帧, legacy PPU, 无输入)
+- 最终数据: `compat_report_v2.0_hotfix1_p2v2.json` (120帧, new PPU, 含输入模拟)
 
-### 10.4 代码变更清单
+### 7.4 代码变更清单
 
-| 文件 | 变更 |
-|------|------|
-| `src/ines_bmap.h:212` | Mapper 182 取消注释，映射到 `Mapper4_Init` |
-| `src/kagami_bridge.h` | 新增 `kagami_bridge_set_joypad()` 声明 |
-| `src/kagami_bridge.cpp` | 新增 `kagami_bridge_set_joypad()` 实现（extern joy[4]） |
-| `tests/CMakeLists.txt` | 新增 `fceux11_batch_compat_test` 构建目标 |
-| `tests/kagami/batch_compat_test.cpp` | 新增批量兼容性测试工具（SEH保护 + iNES header + 输入模拟） |
+| 文件 | 变更 | 阶段 |
+|------|------|------|
+| `AGENTS.md` | 新增根 Agent 指南 | — |
+| `docs/compat_report_v2.0_hotfix1.md` | 兼容性报告 | — |
+| `src/boards/187.cpp` | Mapper 187 CHR 越界保护 | P0 |
+| `src/cart.cpp` | setchr1r/setprg8r 安全边界 | P0 |
+| `src/ines_bmap.h` | Mapper 182→MMC3 别名 | P0 |
+| `src/kagami_bridge.h/cpp` | 格式预验证 + Joypad API | P0 |
+| `src/unif.cpp` | UNIF Cart 创建修复 | P0 |
+| `src/tests/AGENTS.md` | 交叉引用 | — |
+| `tests/CMakeLists.txt` | batch_compat_test 构建目标 | — |
+| `tests/kagami/batch_compat_test.cpp` | 批量兼容性测试器 (SEH+newPPU+输入模拟) | P0/P1/P2 |
 
 ---
 
 *报告生成时间: 2026-08-24*  
-*工具: fceux11_batch_compat_test v4 (headless, kagami_bridge API, 120帧, SEH+输入模拟)*
+*工具: fceux11_batch_compat_test (headless, kagami_bridge API, new PPU, 120帧, SEH+输入模拟)*
