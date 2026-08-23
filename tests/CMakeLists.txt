@@ -565,6 +565,16 @@ if(FCEUX11_BUILD_TESTS)
                 "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
     endif()
 
+    # v2.0_hotfix1 — Batch ROM compatibility tester.
+    # Headless tool that loads every .nes from a directory, runs N frames,
+    # and classifies each ROM as PASS/FAIL/SKIP with diagnostics.
+    # Usage: batch_compat_test <rom_dir> [--frames N] [--output report.json]
+    # Not registered as CTest — standalone tool invoked manually.
+    fceux11_add_headless_test_executable(fceux11_batch_compat_test
+        kagami/batch_compat_test.cpp
+        git_info_stub.cpp
+    )
+
     # KagamiQA P2 — blargg $6000 test ROM runner (Oracle B executor).
     # v1.17 Task1-C1: migrated to Rust (kagami_qa_blargg_runner target below);
     # C++ blargg_runner.cpp deleted after 177/177 parity verified (9488773).

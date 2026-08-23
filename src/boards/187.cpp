@@ -23,10 +23,17 @@
 #include "simple_carts.h"          // v1.8 Phase F
 
 static void M187CW(uint32 A, uint8 V) {
-	if ((A & 0x1000) == static_cast<uint32>((MMC3_cmd & 0x80) << 5))
-		setchr1(A, V | 0x100);
-	else
+	// v2.0_hotfix1 P0: Clamp high bit to actual CHR bank count.
+	// The original code unconditionally set bit 8 (V | 0x100) which
+	// exceeded the CHR mask for ROMs with < 512KB CHR, causing
+	// out-of-bounds PPU reads and SEH crashes (0xC0000005).
+	uint32 chr_banks = fceu11::g_bus.chr_size()[0] >> 10; // 1KB units
+	if ((A & 0x1000) == static_cast<uint32>((MMC3_cmd & 0x80) << 5)) {
+		uint32 high = (chr_banks > 256) ? 0x100 : 0;
+		setchr1(A, V | high);
+	} else {
 		setchr1(A, V);
+	}
 }
 
 static void M187PW(uint32 A, uint8 V) {

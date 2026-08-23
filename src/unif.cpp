@@ -48,13 +48,13 @@ int UNIFLoad(const char *name, FCEUFILE *fp) {
 	GameInterface = UNIFGI;
 	currCartInfo = &UNIFCart;
 
-	if (auto cart = fceu11::create_cart_for_mapper(0, fceu11::g_bus)) {
-		fceu11::assign_cart(std::move(cart));
-		UNIFCart.cart_obj = fceu11::g_cart;
-		UNIFCart.Power = CartInfo_PowerForward;
-		UNIFCart.Reset = CartInfo_ResetForward;
-		UNIFCart.Close = CartInfo_CloseForward;
-	}
+	// v2.0_hotfix1 P0: Skip Cart object creation for UNIF boards.
+	// UNIF boards are identified by name (not mapper number), so
+	// create_cart_for_mapper(0) would create a wrong NROM Cart for
+	// MMC3-based boards (e.g. 603-5052), causing crashes. The legacy
+	// function pointers (info->Power/Reset/Close) set by the board
+	// Init function are sufficient — CartInfo forwarders are only
+	// needed for iNES boards where the Cart subclass manages state.
 
 	if (currCartInfo && currCartInfo->cart_obj)
 		currCartInfo->cart_obj->install_expansion_audio(fceu11::g_apu);

@@ -85,6 +85,28 @@ int kagami_bridge_load_rom(const char *path) {
         g_rom_loaded = false;
     }
 
+    // v2.0_hotfix1 P0 F-3: Pre-validate file format. Reject files whose
+    // first 4 bytes are neither "NES\x1A" (iNES) nor "UNIF" to avoid
+    // crashing the emulator with unsupported formats (SNSF, NSF2, etc.)
+    // disguised with .nes extension.
+    {
+        FILE* f = std::fopen(path, "rb");
+        if (f) {
+            uint8_t magic[4] = {};
+            std::fread(magic, 1, 4, f);
+            std::fclose(f);
+            bool is_ines = (magic[0]=='N' && magic[1]=='E' && magic[2]=='S' && magic[3]==0x1A);
+            bool is_unif = (magic[0]=='U' && magic[1]=='N' && magic[2]=='I' && magic[3]=='F');
+            bool is_nsf  = (magic[0]=='N' && magic[1]=='E' && magic[2]=='S' && magic[3]=='M');
+            bool is_fds  = (magic[0]=='F' && magic[1]=='D' && magic[2]=='S' && magic[3]==0x1A);
+            if (!is_ines && !is_unif && !is_nsf && !is_fds) {
+                std::fprintf(stderr, "kagami_bridge: unsupported format (magic=%02X%02X%02X%02X) '%s'\n",
+                             magic[0], magic[1], magic[2], magic[3], path);
+                return -2;
+            }
+        }
+    }
+
     FCEUGI *gi = fceu11::LoadGame(path, 1, true);
     if (!gi) {
         std::fprintf(stderr, "kagami_bridge: LoadGame('%s') failed\n", path);
@@ -410,4 +432,13 @@ extern "C" uint32_t kagami_bridge_cycle_trace_current_frame(void) {
 
 extern "C" uint64_t kagami_bridge_cycle_trace_row_count(void) {
     return sink().row_count;
+}
+
+// ---------------------------------------------------------------------------
+// Joypad input simulation
+// ---------------------------------------------------------------------------
+extern uint8 joy[4];  // declared in input.cpp (non-static for movie support)
+
+extern "C" void kagami_bridge_set_joypad(uint8_t buttons) {
+    joy[0] = buttons;
 }

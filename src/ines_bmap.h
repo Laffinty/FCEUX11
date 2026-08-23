@@ -209,7 +209,7 @@ BMAPPINGLocal bmap[] = {
 //	{"",					179, Mapper179_Init},
 	{"",					180, Mapper180_Init},
 	{"",					181, Mapper181_Init},
-//	{"",					182, Mapper182_Init},	// Deprecated, dupe
+	{"",					182, Mapper4_Init},	// Deprecated dupe of MMC3 — alias to mapper 4 for compatibility (v2.0_hotfix1)
 	{"",					183, Mapper183_Init},
 	{"",					184, Mapper184_Init},
 	{"",					185, Mapper185_Init},

@@ -141,7 +141,7 @@ void setprg8r(int r, uint32 A, uint32 V) {
 	if (fceu11::g_bus.prg_size()[r] >= 8192) {
 		V &= fceu11::g_bus.prg_mask8()[r];
 		setpageptr(8, A, fceu11::g_bus.prg_ptr()[r] ? (&fceu11::g_bus.prg_ptr()[r][V << 13]) : 0, fceu11::g_bus.prg_ram()[r]);
-	} else {
+	} else if (fceu11::g_bus.prg_size()[r] > 0) {
 		uint32 VA = V << 2;
 		int x;
 		for (x = 0; x < 4; x++)
@@ -179,6 +179,11 @@ void setchr1r(int r, uint32 A, uint32 V) {
 	if (!fceu11::g_bus.chr_ptr()[r]) return;
 	FCEUPPU_LineUpdate();
 	V &= fceu11::g_bus.chr_mask1()[r];
+	// v2.0_hotfix1 P0: Extra safety — clamp to actual CHR size to
+	// protect against mappers that bypass the mask (e.g. mapper 187's
+	// V | 0x100 before the mask was applied).
+	uint32 chr_sz = fceu11::g_bus.chr_size()[r];
+	if (chr_sz > 0 && (V << 10) >= chr_sz) V = 0;
 	if (fceu11::g_bus.chr_ram()[r])
 		PPUCHRRAM |= (1 << (A >> 10));
 	else

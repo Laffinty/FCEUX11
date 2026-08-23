@@ -150,6 +150,12 @@ void kagami_bridge_cycle_trace_record(uint32_t cycles_arg,
 
 uint64_t kagami_bridge_cycle_trace_row_count(void);
 
+/// Set joypad button state for port 0 (NES standard controller).
+/// Buttons are a bitmask: bit0=A, bit1=B, bit2=Select, bit3=Start,
+/// bit4=Up, bit5=Down, bit6=Left, bit7=Right.
+/// Call after init and before emulate_frame. Persists until next call.
+void kagami_bridge_set_joypad(uint8_t buttons);
+
 #ifdef __cplusplus
 }
 #endif

@@ -1,5 +1,7 @@
 # FCEUX11 Test Suite — Agent Guide
 
+> **Parent guide**: see [`AGENTS.md` (root)](../../AGENTS.md) for build commands, architecture, toolchain constraints, and KagamiQA.
+
 ## Overview
 
 This directory contains the **headless regression test suite** for FCEUX11 core emulation behavior. It runs **without Qt GUI initialization**, enabling fast CI validation of mapper loading, NES power-on/reset sequences, and core symbol integrity.

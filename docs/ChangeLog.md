@@ -1,11 +1,18 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.1] - 2026-08-23 - 兼容性优化计划 hotfix1（TESTNES 批量扫描）
+## [2.0.1] - 2026-08-24 - 兼容性优化计划 hotfix1（扩大化批量扫描 3451 ROM）
+
+- **扩大化批量兼容性测试**: 全量测试 3451 个 NES ROM（此前为 123 样本），通过率 80.2%（2769/3451）。
+- 失败分类: CPU 卡死 573 (84.4%)、无视频输出 83 (12.2%)、PC 异常 12 (1.8%)、SEH 崩溃 11 (1.6%)、加载失败 3 (0.1%)。
+- 失败聚类分析: 0x49xxx 范围 167 个 ROM（疑似 MMC3 克隆 mapper 问题）、0x32xxx 范围 69 个（SRAM 映射问题）、0x65xxx 范围 38 个（CPU 状态损坏）。
+- 新增 batch_compat_test 无头批量兼容性测试工具（SEH 崩溃保护、自动恢复）。
+- 详细报告: docs/compat_report_v2.0_hotfix1.md。
+- 修复计划: P0 崩溃修复 (+11 ROM)、P1 Mapper 兼容性 (+250 ROM)、P2 CPU 保护 (+38 ROM)、P3 视频输出 (+83 ROM)，预计修复后兼容率提升至 ~91%。
 
 - Fix A（iNES 尺寸容错）：已实施于 src/rust/crates/fceux11-formats/src/ines.rs：加载时按文件实际长度截断 rounded 尺寸（不低于 raw 尺寸），输出尺寸字段同步为实际值，哈希按实际长度计算。
   - 验证：10021_魂斗罗3代、10302_吞食天地2 均可加载；10021 30 帧 32090 条轨迹全部在 ROM 区。
