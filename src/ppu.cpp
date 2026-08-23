@@ -625,7 +625,11 @@ static DECLFR(A2002) {
 		}
 		if (rsl == 240 && rcy == 340) {
 			fceu11_ppu_mark_vbl_set_suppressed();
-		} else if (rsl == 241 && rcy <= 1) {
+		} else if (rsl == 241 && rcy == 1) {
+			// v2.0_hotfix1 Phase C: VBL flag now set at cycle 1 (Phase A).
+			// Reading $2002 at the exact VBL-set dot (cycle 1) reads the
+			// flag as set and cancels the pending NMI. Reads at cycle 0
+			// see the flag as clear (1 dot before VBL-set).
 			X6502_IRQEnd(FCEU_IQNMI);  // cancel pending VBL NMI
 		}
 	}
