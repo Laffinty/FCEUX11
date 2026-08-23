@@ -1634,9 +1634,9 @@ int FCEUX_PPU_Loop(int skip) {
 		//Timing is probably off, though.
 		//NOTE:  Not having this here breaks a Super Donkey Kong game.
 		PPU[3] = PPUSPL = 0;
-		// v2.0_hotfix1 Phase A: delay reduced 20→19 to compensate for
-		// runppu(1) consumed before VBL flag set. Total frame length
-		// stays at 6820 dots (1 + 19 + 20*341 - 1 = 6820).
+		// v2.0_hotfix1 Phase A+B: delay compensates for runppu(1) before
+		// VBL flag and runppu(nd) for NMI delay. Total frame = 6820 dots.
+		const int nd_val = e1_nmi_delay();  // typically 5
 		const int delay = 19;
 
 		ppur.status.sl = 241;	//for sprite reads
@@ -1650,26 +1650,20 @@ int FCEUX_PPU_Loop(int skip) {
 		// [3,2,2,2,2,2,2,1,1,1] — row 0 overshoot to 3 proves single-param
 		// NMI delay cannot fix vbl_05's per-row phase drift (see
 		// docs/history/e1_survey/vbl_step3_fix_data_2026-08-01.md §9).
-		// Step 1.2: X6502_Run(nd) is ALWAYS done when NMI is enabled so the
-		// frame length stays identical on suppressed and non-suppressed
-		// frames (6820 with NMI on OR off — the R5 Step 3 runppu(3) wart that
-		// lengthened NMI-on frames to 6823 is removed; hardware VBL is
-		// exactly 20 scanlines = 6820 dots regardless of NMI state).
-		// Phase 1 Step 1.3 deep (2026-08-02): run the CPU budget WITHOUT
-		// advancing the PPU. runppu(nd) advanced the PPU nd dots AND granted
-		// nd*16 units of CPU budget; the PPU advance distorted NMI-on frames
-		// (+3 dots, vbl_05 VBL_ENTER cycle drifted +3/frame), which skews the
-		// per-frame NMI phase drift that blargg's nmi_timing test measures.
-		// X6502_Run(nd) grants the same CPU budget (1 CPU cycle per 3 dots)
-		// with zero PPU advance, keeping the frame at a true 6820-dot VBL.
-		if (VBlankON) {
-			const int nd = e1_nmi_delay();
-			if (nd > 0) X6502_Run(nd);
+		// v2.0_hotfix1 Phase B: runppu(nd) ALWAYS done (inside or outside
+		// VBlankON) so frame length stays identical on suppressed and
+		// non-suppressed frames (6820 dots). runppu advances both PPU
+		// and CPU in sync, fixing per-frame NMI phase drift.
+		{
+			const int nd = nd_val;
+			if (nd > 0) runppu(nd);
 			if (e1_trace_on()) {
 				fprintf(stderr, "E1 VBL_AFTER_NMIDELAY abs=%llu sl=%d cycle=%d delay=%d\n",
 				 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()),
 				 ppur.status.sl, ppur.status.cycle, nd);
 			}
+		}
+		if (VBlankON) {
 			// E-1 Track-B probe (v1.17 R5 task, 2026-08-08): NMI_LATCH
 			// recorder. Fires immediately BEFORE TriggerNMI() (vs the
 			// existing E1 NMI_SET inside x6502.cpp::TriggerNMI which fires

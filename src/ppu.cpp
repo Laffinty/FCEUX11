@@ -607,15 +607,13 @@ static DECLFR(A2002) {
 
 	FCEUPPU_LineUpdate();
 
-	// Step 1.2 ($2002 VBL-set suppression, 2026-08-01): newppu only.
-	// Working-config VBL flag sets at the sl240→sl241 boundary (cycle 0 of
-	// the VBL block). Per NESdev PPU_frame_timing:
-	//  - read 1 PPU dot before the set (sl240, cycle340) → suppress the
+	// v2.0_hotfix1 Phase C (2026-08-24): Updated for VBL at cycle 1 (Phase A).
+	// Per NESdev PPU_frame_timing:
+	//  - read 1 PPU dot before VBL-set (sl241, cycle0) → suppress the
 	//    flag set + NMI entirely for this frame
-	//  - read at the set dot or 1 dot after (sl241, cycle0-1) → reads as
-	//    set, clears it, and suppresses the NMI (read pulls /NMI back up
-	//    before the CPU samples it)
-	// Reads ≥2 dots away behave normally.
+	//  - read at the set dot (sl241, cycle1) → reads as set, clears it,
+	//    and suppresses the NMI
+	//  - read at cycle 2+ → normal behavior
 	if (newppu) {
 		const int rsl = ppur.status.sl;
 		const int rcy = ppur.status.cycle;
@@ -623,13 +621,11 @@ static DECLFR(A2002) {
 			fprintf(stderr, "E1 P2002_READ abs=%llu sl=%d cycle=%d\n",
 			 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()), rsl, rcy);
 		}
-		if (rsl == 240 && rcy == 340) {
+		if (rsl == 241 && rcy == 0) {
+			// 1 dot before VBL-set (cycle 1): suppress flag + NMI
 			fceu11_ppu_mark_vbl_set_suppressed();
 		} else if (rsl == 241 && rcy == 1) {
-			// v2.0_hotfix1 Phase C: VBL flag now set at cycle 1 (Phase A).
-			// Reading $2002 at the exact VBL-set dot (cycle 1) reads the
-			// flag as set and cancels the pending NMI. Reads at cycle 0
-			// see the flag as clear (1 dot before VBL-set).
+			// At VBL-set dot: flag reads as set, cancel NMI
 			X6502_IRQEnd(FCEU_IQNMI);  // cancel pending VBL NMI
 		}
 	}
