@@ -24,6 +24,9 @@
 #include "fceu.h"
 #include "bus.h"      // v1.4 Post-Release Optimization Plan §1.1: g_bus.init()
 #include "ppu.h"
+#ifdef FCEUX11_RUST_PPU
+#include "ppu_rust_bridge.h"
+#endif
 #include "apu.h"
 #include "sound.h"
 #include "netplay.h"
@@ -618,6 +621,14 @@ bool fceu11::Initialize() {
 
 	FCEUPPU_Init();
 
+#ifdef FCEUX11_RUST_PPU
+	// v2.1 Phase 3: initialise the Rust PPU bridge so the
+	// `FCEUPPU_Loop` dispatch in `src/ppu_rendering.cpp:1189`
+	// routes through `ppu_rust_bridge_emit_frame`. The bridge owns
+	// the Rust PpuState handle and the C++ bus vtable that
+	// forwards reads/writes to `g_bus.aread_[]` / `bwrite_[]`.
+	ppu_rust_bridge_init();
+#endif
 	g_cpu.init();
 
 	// v1.6 Resonance §10.2: instantiate APU scaffolding.

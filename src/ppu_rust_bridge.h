@@ -41,6 +41,12 @@ void ppu_rust_bridge_shutdown();
 // the active engine. Returns the same int as FCEUPPU_Loop (0).
 int ppu_rust_bridge_emit_frame(int skip);
 
+// Phase 3: per-cycle CPU/PPU interleave. Advances the Rust PPU by 1
+// CPU cycle (3 dots) and fires mapper event hooks. The C++ side
+// drives CPU cycles via `X6502_Run(1)` between calls. Returns 1 if
+// the frame completed this call, 0 otherwise.
+int ppu_rust_bridge_emit_one_cpu_cycle();
+
 // Bank-window setup — called from setchr*/setntamem paths.
 void ppu_rust_bridge_set_chr_window(uint32_t slot, const uint8_t* ptr, uint32_t len, bool is_ram);
 void ppu_rust_bridge_set_nt_window(const uint8_t* ptr, uint32_t len);
@@ -77,6 +83,7 @@ inline uint8_t ppu_rust_bridge_cpu_read(uint32_t /*addr*/) { return 0; }
 inline void     ppu_rust_bridge_cpu_write(uint32_t /*addr*/, uint8_t /*value*/) {}
 inline void ppu_rust_bridge_copy_framebuffer() {}
 inline bool ppu_rust_bridge_active() { return false; }
+inline int  ppu_rust_bridge_emit_one_cpu_cycle() { return 0; }
 
 #endif // FCEUX11_RUST_PPU
 

@@ -18,9 +18,11 @@ pub mod ffi;
 pub mod frame;
 pub mod render;
 pub mod registers;
+pub mod scheduler;
 pub mod state;
 
 pub use bus::{FlatBus, PpuBus};
 pub use frame::{TickOutcome, tick_dot};
 pub use registers::{Registers, ctrl_bits, mask_bits, status_bits};
+pub use scheduler::{NesScheduler, NTSC_CPU_CYCLES_PER_FRAME, PAL_CPU_CYCLES_PER_FRAME, PPU_DOTS_PER_CPU_CYCLE};
 pub use state::PpuState;

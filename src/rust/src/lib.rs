@@ -1,3 +1,11 @@
+// Root staticlib crate — Rust 2024 made `unsafe_op_in_unsafe_fn` deny
+// by default, but this crate is a thin pass-through re-export layer
+// that forwards every entry point straight to a per-crate FFI shim.
+// The inner crates already wrap their unsafe calls in explicit
+// `unsafe {}` blocks; allowing the lint here keeps the wrapper
+// surface noise-free.
+#![allow(unsafe_op_in_unsafe_fn)]
+
 pub use fceux11_core;
 pub use fceux11_debug;
 pub use fceux11_formats;
@@ -227,6 +235,13 @@ pub unsafe extern "C" fn fceux11_ppu_tick_cpu_cycle(
     n_cycles: u32,
 ) -> i32 {
     fceux11_ppu::ffi::fceux11_ppu_tick_cpu_cycle(state, n_cycles)
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_ppu_tick_one_cpu_cycle(
+    state: *mut fceux11_ppu::PpuState,
+) -> i32 {
+    fceux11_ppu::ffi::fceux11_ppu_tick_one_cpu_cycle(state)
 }
 
 #[unsafe(no_mangle)]

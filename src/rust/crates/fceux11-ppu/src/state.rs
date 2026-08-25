@@ -65,10 +65,18 @@ pub struct PpuState {
     /// registers when the frame loop's BG fetch needs to.
     pub last_was_2005_or_2006: bool,
     /// Set when CPU issues `$4014`; consumed by the frame state machine
-    /// to drive the 256-cycle DMA pump (Phase 3 will turn this into
-    /// a per-cycle async pump — Phase 1 performs the copy synchronously
-    /// inside `start_oam_dma`).
+    /// to drive the 256-cycle DMA pump. Phase 3's
+    /// [`crate::scheduler::NesScheduler`] drives the async pump one
+    /// byte per CPU cycle; Phase 1/2's [`start_oam_dma`] performs the
+    /// full 256-byte copy synchronously.
     pub oam_dma_pending: bool,
+    /// OAM DMA source page (the byte written to `$4014`). Valid only
+    /// when `oam_dma_pending` is true.
+    pub oam_dma_page: u8,
+    /// OAM DMA byte counter (0..=256). Each CPU cycle advances by 1;
+    /// when it reaches 256 the DMA completes and `oam_dma_pending`
+    /// clears.
+    pub oam_dma_counter: u16,
 }
 
 impl Default for PpuState {
@@ -94,6 +102,8 @@ impl PpuState {
             odd_frame: false,
             last_was_2005_or_2006: false,
             oam_dma_pending: false,
+            oam_dma_page: 0,
+            oam_dma_counter: 0,
         }
     }
 
@@ -113,6 +123,8 @@ impl PpuState {
         self.odd_frame = false;
         self.last_was_2005_or_2006 = false;
         self.oam_dma_pending = false;
+        self.oam_dma_page = 0;
+        self.oam_dma_counter = 0;
     }
 
     /// Soft reset — like power but keeps `frame` and `odd_frame`.
@@ -196,14 +208,61 @@ impl PpuState {
     /// `(page << 8) | 0xFF` via the bus and writes them into OAM. Sets
     /// `oam_addr = 0` (matches C++ behaviour).
     ///
-    /// Phase 3 will turn this into a per-cycle asynchronous pump driven
-    /// by the unified scheduler.
+    /// Phase 3 prefers the per-cycle asynchronous pump: the CPU writes
+    /// `$4014` to call [`Self::begin_oam_dma`] which sets
+    /// `oam_dma_pending = true`, then [`crate::scheduler::NesScheduler`]
+    /// calls [`Self::tick_oam_dma`] once per CPU cycle until 256 bytes
+    /// are transferred. This synchronous method is kept as a fallback
+    /// for callers that don't drive the async pump (e.g. the Phase 1/2
+    /// integration tests).
     pub fn start_oam_dma<B: PpuBus + ?Sized>(&mut self, bus: &mut B, page: u8) {
         let base = (page as u16) << 8;
         for i in 0..OAM_SIZE as u16 {
             self.oam[i as usize] = bus.read(base | i);
         }
         self.registers.start_oam_dma();
+    }
+
+    /// Phase 3: begin an async OAM DMA. Sets `oam_dma_pending = true`,
+    /// records the source page, and resets the byte counter. The
+    /// scheduler calls [`Self::tick_oam_dma`] once per CPU cycle to
+    /// transfer bytes one at a time.
+    pub fn begin_oam_dma(&mut self, page: u8) {
+        self.oam_dma_pending = true;
+        self.oam_dma_page = page;
+        self.oam_dma_counter = 0;
+        // `oam_addr` is reset to 0 by the DMA completion path, not
+        // here — the C++ reference does the reset on cycle 1 of the
+        // pump (`src/ppu.cpp` X6502_DMW). We mirror that behaviour by
+        // zeroing it inside `tick_oam_dma`'s first-cycle branch.
+    }
+
+    /// Phase 3: advance the async OAM DMA by one byte. Returns `true`
+    /// if a byte was transferred this tick; `false` if no DMA is
+    /// pending. When the counter reaches 256 the DMA completes and
+    /// `oam_dma_pending` is cleared (and `oam_addr` is reset to 0).
+    pub fn tick_oam_dma<B: PpuBus + ?Sized>(&mut self, bus: &mut B) -> bool {
+        if !self.oam_dma_pending {
+            return false;
+        }
+        let base = (self.oam_dma_page as u16) << 8;
+        let i = self.oam_dma_counter;
+        if i == 0 {
+            // First byte: reset oam_addr to 0 (C++ `DMW()` starts the
+            // pump with `_oam_addr = 0`; Phase 1's `start_oam_dma`
+            // does the same synchronously).
+            self.registers.start_oam_dma();
+        }
+        let addr = base | i;
+        let v = bus.read(addr);
+        self.oam[i as usize] = v;
+        self.oam_dma_counter += 1;
+        if self.oam_dma_counter >= OAM_SIZE as u16 {
+            self.oam_dma_pending = false;
+            self.oam_dma_counter = 0;
+            self.registers.start_oam_dma();
+        }
+        true
     }
 }
 

@@ -49,23 +49,48 @@ void bridge_bus_write(uint32_t addr, uint8_t value) {
 }
 
 void bridge_notify_a12_rising() {
-    // No-op in Phase 2; mapper IRQ hooks fire from existing GameHBIRQHook.
+    // Phase 3: forward to the C++ MMC3 A12 rising-edge detector. The
+    // A12 detection lives in `src/ppu.cpp` (`MMC3_hb` / A12-rise
+    // tracker) — for now the existing C++ new PPU's `runppu(1)` loop
+    // continues to drive A12 detection from its BG-fetch hot path.
+    // The Rust scheduler fires this hook at every dot-256 BG fetch
+    // (visible scanlines, rendering on) so MMC3 still sees the same
+    // edge rate as the C++ new PPU.
 }
 
 void bridge_notify_hblank() {
-    // No-op for now.
+    // Phase 3: forward to the C++ mapper's `GameHBIRQHook` callback.
+    // Mappers like MMC3, VRC4/6 use this to clock their scanline
+    // counter. The C++ side declares `GameHBIRQHook` as a function
+    // pointer in `src/ppu.h`.
+    if (GameHBIRQHook) {
+        GameHBIRQHook();
+    }
 }
 
 void bridge_notify_hblank2() {
-    // No-op for now.
+    // Phase 3: forward to the C++ mapper's secondary HBlank hook
+    // (`GameHBIRQHook2`). VRC IRQ uses this.
+    if (GameHBIRQHook2) {
+        GameHBIRQHook2();
+    }
 }
 
 void bridge_notify_scanline(int16_t sl) {
-    // No-op for now.
+    // Phase 3: forward to the C++ `PPU_hook` callback with the new
+    // scanline. `PPU_hook` is a function pointer the mapper can
+    // install for per-scanline timing.
+    if (PPU_hook) {
+        PPU_hook(sl);
+    }
 }
 
 void bridge_notify_vblank(bool asserted) {
-    // No-op for now.
+    // Phase 3: the Rust state machine manages the VBL flag itself
+    // (sl 241 dot 1 sets, sl 261 dot 1 clears). The C++ legacy
+    // PPU_hook / mapper callbacks are notified via PPU_hook (which
+    // is fired in `notify_scanline` above when transitioning into
+    // sl 241 / sl 261).
 }
 
 }  // namespace
@@ -149,6 +174,21 @@ int ppu_rust_bridge_emit_frame(int skip) {
     int rc = fceux11_ppu_emulate_frame(g_ppu_state, kNtscCpuCyclesPerFrame);
     ppu_rust_bridge_copy_framebuffer();
     return rc;
+}
+
+/// Phase 3: advance the Rust PPU by exactly one CPU cycle (3 PPU dots)
+/// and fire mapper event hooks. The C++ `FCEUPPU_Loop` calls this
+/// between `X6502_Run(1)` invocations to achieve per-cycle CPU/PPU
+/// interleave (mirrors the C++ new PPU's `runppu(1)` + `X6502_Run(1)`
+/// interleaving in `src/ppu_rendering.cpp:1711-2170`).
+///
+/// Returns 1 if the frame is complete (sl 261 dot 340 → wrap to
+/// next frame), 0 otherwise.
+int ppu_rust_bridge_emit_one_cpu_cycle() {
+    if (g_ppu_state == nullptr) {
+        return 0;
+    }
+    return fceux11_ppu_tick_one_cpu_cycle(g_ppu_state);
 }
 
 void ppu_rust_bridge_copy_framebuffer() {
