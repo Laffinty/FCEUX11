@@ -26,6 +26,7 @@ fceux11-formats = { path = "crates/fceux11-formats" }
 fceux11-debug = { path = "crates/fceux11-debug" }
 fceux11-lua = { path = "crates/fceux11-lua" }
 fceux11-core = { path = "crates/fceux11-core" }
+fceux11-ppu = { path = "crates/fceux11-ppu" }
 kagami-qa = { path = "crates/kagami-qa" }
 
 [features]

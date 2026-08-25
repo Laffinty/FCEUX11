@@ -275,6 +275,23 @@ if(FCEUX11_ENABLE_I18N)
     find_package(Qt6 REQUIRED COMPONENTS LinguistTools)
 endif()
 
+# v2.1 PPU Refactor — Phase 2 infra fix (2026-08-25): cl.exe does NOT
+# default its include search path to the MSVC tools dir outside a
+# Developer PowerShell (Ninja does not propagate vcvars env to cl.exe).
+# C TUs that #include "rust/fceux11_rust.h" need <stdint.h>/<stdbool.h>
+# from the MSVC tools dir; C++ TUs need <cstdio> etc. Set the flags at
+# the TOP level (before add_subdirectory(src) and add_subdirectory(tests))
+# so every target in both trees picks up the path.
+if(MSVC)
+    get_filename_component(_msvc_bin_dir "${CMAKE_C_COMPILER}" DIRECTORY)
+    get_filename_component(_msvc_root "${_msvc_bin_dir}" DIRECTORY)
+    if(EXISTS "${_msvc_root}/include/stdio.h")
+        message(STATUS "MSVC tools include appended to C/CXX flags: ${_msvc_root}/include")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /I\"${_msvc_root}/include\"")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /I\"${_msvc_root}/include\"")
+    endif()
+endif()
+
 add_subdirectory( src )
 
 if(FCEUX11_BUILD_TESTS)

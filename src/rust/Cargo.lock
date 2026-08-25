@@ -379,6 +379,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "fceux11-ppu"
+version = "0.3.5"
+dependencies = [
+ "proptest",
+]
+
+[[package]]
 name = "fceux11-rom-tests"
 version = "0.3.5"
 dependencies = [
@@ -396,6 +403,7 @@ dependencies = [
  "fceux11-formats",
  "fceux11-lua",
  "fceux11-media",
+ "fceux11-ppu",
  "fceux11-utils",
  "kagami-qa",
 ]

@@ -7,6 +7,12 @@ set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 function(fceux11_add_test_executable target_name)
     add_executable(${target_name} ${ARGN})
 
+    # v2.1 PPU Refactor — Phase 2 infra fix (2026-08-25): /EHsc keeps
+    # MSVC 14.51 std headers (chrono, ostream) from emitting C4530,
+    # which /WX promotes to a C2220 error. Required since a clean build
+    # recompiles every TU (no stale .obj cache to mask it).
+    target_compile_options(${target_name} PRIVATE /EHsc)
+
     target_link_libraries(${target_name} PRIVATE
         fceux11_drivers_qt
         fceux11_drivers_common
@@ -46,6 +52,12 @@ endfunction()
 # KagamiQA P1 — Headless test executable: links null driver instead of Qt.
 function(fceux11_add_headless_test_executable target_name)
     add_executable(${target_name} ${ARGN})
+
+    # v2.1 PPU Refactor — Phase 2 infra fix (2026-08-25): /EHsc keeps
+    # MSVC 14.51 std headers (chrono, ostream) from emitting C4530,
+    # which /WX promotes to a C2220 error in headless targets that use
+    # the standard library (e.g. batch_compat_test.cpp uses <chrono>).
+    target_compile_options(${target_name} PRIVATE /EHsc)
 
     target_link_libraries(${target_name} PRIVATE
         fceux11_drivers_null
@@ -138,11 +150,38 @@ if(FCEUX11_BUILD_TESTS)
     add_executable(fceux11_i18n_regression_test
         kagami/i18n_regression_test.cpp
     )
+    # v2.1 PPU Refactor — Phase 2 infra fix (2026-08-25): this target is
+    # a bare add_executable (no /EHsc). MSVC 14.51 std headers emit
+    # C4530 (exceptions not enabled) which /WX promotes to C2220 error.
+    target_compile_options(fceux11_i18n_regression_test PRIVATE /EHsc)
     target_include_directories(fceux11_i18n_regression_test PRIVATE
         ${CMAKE_SOURCE_DIR})
     add_test(NAME i18n_regression_test
              COMMAND fceux11_i18n_regression_test
              WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+    # v2.1 PPU Refactor — Phase 2: Rust PPU FFI smoke test. Verifies the
+    # cbindgen export surface is callable from C++ end-to-end (create,
+    # install bus, power, emulate_frame, framebuffer, destroy). Does NOT
+    # compare against any golden frame — the renderer is a Phase 2 stub;
+    # bit-exact NROM gates live in Phase 4. Always built (independent of
+    # FCEUX11_RUST_PPU=ON; the FFI symbols are always exported from
+    # fceux11_rust.lib).
+    fceux11_add_test_executable(fceux11_rust_ppu_smoke_test
+        kagami/rust_ppu_smoke_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME rust_ppu_smoke_test
+             COMMAND fceux11_rust_ppu_smoke_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    # v2.1 PPU Refactor — Phase 2 (2026-08-25): the smoke test links
+    # Qt6Widgets / SDL2 / zlib (transitively via fceux11_drivers_qt),
+    # so ctest must run it with the vcpkg runtime DLLs on PATH
+    # (Qt6Core.dll etc.), otherwise it fails with 0xc0000135
+    # (DLL not found). vcpkg_installed bin dir is the canonical
+    # location for these.
+    set_tests_properties(rust_ppu_smoke_test PROPERTIES
+        ENVIRONMENT "PATH=${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows/bin;$ENV{PATH}")
 
     # v1.2 Census §2.2 — facade wiring test. Pure compile/link check;
     # does not call fceu11::Initialize() so it can run without a Qt event
@@ -484,6 +523,9 @@ if(FCEUX11_BUILD_TESTS)
         # targets also need __QT_DRIVER__ to bypass the version.h
         # scmrev.h include (pre-existing build infrastructure gap).
         target_compile_definitions(fceux11_bench_ppu_render PRIVATE __QT_DRIVER__)
+        # v2.1 PPU Refactor — Phase 2 infra fix (2026-08-25): /EHsc keeps
+        # MSVC 14.51 std headers from emitting C4530 (→ /WX C2220).
+        target_compile_options(fceux11_bench_ppu_render PRIVATE /EHsc)
         if(WIN32)
             target_link_libraries(fceux11_bench_ppu_render PRIVATE ntdll)
         endif()
@@ -495,6 +537,7 @@ if(FCEUX11_BUILD_TESTS)
         )
         target_include_directories(fceux11_bench_x6502_exec PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/drivers)
         target_compile_definitions(fceux11_bench_x6502_exec PRIVATE __QT_DRIVER__)
+        target_compile_options(fceux11_bench_x6502_exec PRIVATE /EHsc)
         if(WIN32)
             target_link_libraries(fceux11_bench_x6502_exec PRIVATE ntdll)
         endif()
@@ -506,6 +549,7 @@ if(FCEUX11_BUILD_TESTS)
         )
         target_include_directories(fceux11_bench_apu_mix PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/drivers)
         target_compile_definitions(fceux11_bench_apu_mix PRIVATE __QT_DRIVER__)
+        target_compile_options(fceux11_bench_apu_mix PRIVATE /EHsc)
         if(WIN32)
             target_link_libraries(fceux11_bench_apu_mix PRIVATE ntdll)
         endif()
@@ -518,6 +562,7 @@ if(FCEUX11_BUILD_TESTS)
         )
         target_include_directories(fceux11_bench_apu_frame PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/drivers)
         target_compile_definitions(fceux11_bench_apu_frame PRIVATE __QT_DRIVER__)
+        target_compile_options(fceux11_bench_apu_frame PRIVATE /EHsc)
         if(WIN32)
             target_link_libraries(fceux11_bench_apu_frame PRIVATE ntdll)
         endif()
@@ -530,6 +575,7 @@ if(FCEUX11_BUILD_TESTS)
         )
         target_include_directories(fceux11_bench_bus_dispatch PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/drivers)
         target_compile_definitions(fceux11_bench_bus_dispatch PRIVATE __QT_DRIVER__)
+        target_compile_options(fceux11_bench_bus_dispatch PRIVATE /EHsc)
         if(WIN32)
             target_link_libraries(fceux11_bench_bus_dispatch PRIVATE ntdll)
         endif()
@@ -543,14 +589,17 @@ if(FCEUX11_BUILD_TESTS)
     endif()
 
     # v0.3.11 Phase-2 SIMD probe — standalone, build-only, not registered as CTest.
+    # v2.1 PPU Refactor — Phase 2 infra fix (2026-08-25): add /EHsc to
+    # avoid MSVC C4530-in-std-headers → C2220 under /WX.
     add_executable(fceux11_ppu_simd_probe_scalar kagami/benchmark/ppu_simd_probe.cpp)
+    target_compile_options(fceux11_ppu_simd_probe_scalar PRIVATE /EHsc)
     target_compile_definitions(fceux11_ppu_simd_probe_scalar PRIVATE SCALAR_PROBE)
 
     add_executable(fceux11_ppu_simd_probe_sse42 kagami/benchmark/ppu_simd_probe.cpp)
-    target_compile_options(fceux11_ppu_simd_probe_sse42 PRIVATE /arch:SSE2)
+    target_compile_options(fceux11_ppu_simd_probe_sse42 PRIVATE /EHsc /arch:SSE2)
 
     add_executable(fceux11_ppu_simd_probe_avx2 kagami/benchmark/ppu_simd_probe.cpp)
-    target_compile_options(fceux11_ppu_simd_probe_avx2 PRIVATE /arch:AVX2)
+    target_compile_options(fceux11_ppu_simd_probe_avx2 PRIVATE /EHsc /arch:AVX2)
 
     # KagamiQA P1 — Headless smoke test (null driver, no Qt linkage).
     fceux11_add_headless_test_executable(fceux11_headless_smoke_test

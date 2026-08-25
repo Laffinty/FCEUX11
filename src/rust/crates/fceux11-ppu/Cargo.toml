@@ -1,0 +1,15 @@
+[package]
+name = "fceux11-ppu"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+
+[dev-dependencies]
+proptest = "1.4"
+
+[features]
+default = []

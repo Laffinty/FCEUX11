@@ -161,6 +161,12 @@ set(SRC_CORE
 	${CMAKE_CURRENT_SOURCE_DIR}/asm.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/bus.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/cart.cpp
+  )
+if(FCEUX11_RUST_PPU)
+    list(APPEND SRC_CORE ${CMAKE_CURRENT_SOURCE_DIR}/ppu_rust_bridge.cpp)
+endif()
+set(SRC_CORE ${SRC_CORE}
+	${CMAKE_CURRENT_SOURCE_DIR}/cart_class.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/cart_class.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/cheat.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/conddebug.cpp
@@ -714,6 +720,7 @@ list(APPEND SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/main.cpp)
 add_subdirectory(rust)
 if(FCEUX11_RUST_ENABLED)
     add_definitions(-DFCEUX11_RUST_ENABLED)
+
     target_link_libraries(fceux11_utils PUBLIC ${FCEUX11_RUST_STATIC_LIB})
     # v1.16 R4-fix (2026-08-07): target_link_libraries above only adds a
     # LINK-step dependency on the .lib — it does NOT schedule the source
@@ -762,6 +769,22 @@ if(FCEUX11_RUST_ENABLED)
     # link into it so the FFI symbols resolve at link time.
     target_link_libraries(fceux11_core PUBLIC ${FCEUX11_RUST_STATIC_LIB})
     add_dependencies(fceux11_core fceux11_rust_build)
+endif()
+
+# Phase 2: optional Rust PPU engine. Default OFF so C++ PPU continues
+# to be the canonical engine; turn ON to route $2000-$2007/$4014 through
+# the Rust PPU FFI surface and have frame timing driven by Rust.
+option(FCEUX11_RUST_PPU "Use Rust PPU engine (Phase 2 experimental)" OFF)
+if(FCEUX11_RUST_PPU)
+    if(NOT FCEUX11_RUST_ENABLED)
+        message(FATAL_ERROR
+            "FCEUX11_RUST_PPU=ON requires FCEUX11_RUST_ENABLED=ON "
+            "(the Rust staticlib provides fceux11-ppu symbols).")
+    endif()
+    add_definitions(-DFCEUX11_RUST_PPU)
+    message(STATUS
+        "FCEUX11_RUST_PPU=ON: $2000-$2007 / \$4014 / frame loop "
+        "delegated to Rust PPU through ppu_rust_bridge.cpp")
 endif()
 
 # Put build timestamp into BUILD_TS environment variable and from there into

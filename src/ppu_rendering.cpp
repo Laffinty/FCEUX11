@@ -48,6 +48,14 @@
 #include "cpu.h"
 #include "fceu.h"
 #include "ppu.h"
+
+#ifdef FCEUX11_RUST_PPU
+// v2.1 PPU Refactor — Phase 2: route FCEUPPU_Loop to the Rust PPU
+// engine when the CMake option `FCEUX11_RUST_PPU=ON` is set. The
+// bridge (`src/ppu_rust_bridge.{h,cpp}`) owns the Rust PpuState and
+// the bus vtable; this dispatch just hands control over.
+#include "ppu_rust_bridge.h"
+#endif
 #include "ppu_rendering.h"
 #include "ppu_state.h"
 #include "ppu_core.h"
@@ -1173,6 +1181,16 @@ void CopySprites(uint8 *target) {
 // Old-PPU main loop (called from fceu.cpp frame driver)
 // ----------------------------------------------------------------------------
 int FCEUPPU_Loop(int skip) {
+#ifdef FCEUX11_RUST_PPU
+	// v2.1 Phase 2 — Rust PPU engine path. Wins over both old-PPU and
+	// new-PPU (`FCEUX_PPU_Loop`) when the bridge is active. The
+	// bridge handles its own initialisation via `FCEUPPU_Init` /
+	// `FCEUPPU_Power`; this function only needs to drive the frame.
+	if (ppu_rust_bridge_active()) [[unlikely]] {
+		return ppu_rust_bridge_emit_frame(skip);
+	}
+#endif
+
 	if ((newppu) && (GameInfo->type != GIT_NSF)) [[unlikely]] {
 		int FCEUX_PPU_Loop(int skip);
 		return FCEUX_PPU_Loop(skip);
