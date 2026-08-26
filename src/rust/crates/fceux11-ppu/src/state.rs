@@ -77,6 +77,65 @@ pub struct PpuState {
     /// when it reaches 256 the DMA completes and `oam_dma_pending`
     /// clears.
     pub oam_dma_counter: u16,
+
+    // -----------------------------------------------------------------
+    // Phase 4: rendering state. Used by the per-tile fetch + per-pixel
+    // output in `crate::rendering::render_scanline`. These fields are
+    // pre-loaded at the start of each visible scanline and advanced
+    // tile-by-tile during the visible region.
+    // -----------------------------------------------------------------
+
+    /// 16-bit shift registers for the two pattern bit planes (BG).
+    /// `pshift[0]` = plane 0 (low bit), `pshift[1]` = plane 1 (high bit).
+    /// Pre-loaded with two tiles' worth of pattern data at the start
+    /// of each visible scanline. The render loop shifts left by 8
+    /// each tile fetch and ORs in the newly fetched pattern bytes.
+    pub bg_pshift: [u16; 2],
+    /// 4-bit attribute latch for the current tile. Holds the palette
+    /// quadrant (2 bits) replicated to bits 0..=3 of a 4-bit value.
+    /// `atlatch` is shifted right by 2 every tile and ORed with the new
+    /// quadrant's bits in the upper 2 bits.
+    pub bg_atlatch: u8,
+    /// Latches for the next tile (4 bytes: name table, attribute,
+    /// pattern low, pattern high). Loaded by the per-tile fetch and
+    /// committed to the shift registers + atlatch on the next tile.
+    pub bg_next_nt: u8,
+    /// Next attribute byte.
+    pub bg_next_at: u8,
+    /// Next pattern low byte (bit plane 0).
+    pub bg_next_pattern_lo: u8,
+    /// Next pattern high byte (bit plane 1).
+    pub bg_next_pattern_hi: u8,
+    /// True if at least one tile has been fetched since the start of
+    /// the current visible scanline. The pre-load "tile -2" and
+    /// "tile -1" populate the shift register with zero so the first
+    /// 16 pixels use the zeros (rather than garbage from a previous
+    /// scanline).
+    pub bg_primed: bool,
+    /// True if the rendering engine is in the visible part of a
+    /// visible scanline (i.e. tile fetches are happening). Set by
+    /// the dot driver at sl 0..239 dot 0, cleared at sl 240.
+    pub bg_active: bool,
+    /// Sprite pattern shift registers: 8 sprites × 2 planes × 8 bits.
+    /// `sprite_shift[i][0]` = plane 0, `sprite_shift[i][1]` = plane 1.
+    /// Each sprite has an 8-bit shift register, shifted left by 1
+    /// each visible dot.
+    pub sprite_shift: [[u8; 2]; 8],
+    /// Sprite attribute latches: 8 sprites × 1 byte (palette + flags).
+    /// Bit 5 of the attribute is the priority (0 = front, 1 = behind
+    /// BG). Bits 0..1 are the palette quadrant.
+    pub sprite_attr: [u8; 8],
+    /// Sprite X position counters: 8 sprites × 1 byte. Decremented
+    /// each visible dot. When the counter reaches 0, the sprite's
+    /// pixels are output (until the next sprite or end of tile).
+    pub sprite_x: [u8; 8],
+    /// Sprite 0 is in range (set during sprite eval if sprite 0 is
+    /// one of the 8 sprites for the current scanline). Used for
+    /// sprite 0 hit detection.
+    pub sprite0_in_range: bool,
+    /// True if sprite eval already happened for the current scanline
+    /// (so we don't re-evaluate every dot).
+    pub sprite_eval_done: bool,
 }
 
 impl Default for PpuState {
@@ -104,6 +163,19 @@ impl PpuState {
             oam_dma_pending: false,
             oam_dma_page: 0,
             oam_dma_counter: 0,
+            bg_pshift: [0u16; 2],
+            bg_atlatch: 0,
+            bg_next_nt: 0,
+            bg_next_at: 0,
+            bg_next_pattern_lo: 0,
+            bg_next_pattern_hi: 0,
+            bg_primed: false,
+            bg_active: false,
+            sprite_shift: [[0u8; 2]; 8],
+            sprite_attr: [0u8; 8],
+            sprite_x: [0u8; 8],
+            sprite0_in_range: false,
+            sprite_eval_done: false,
         }
     }
 
@@ -125,6 +197,19 @@ impl PpuState {
         self.oam_dma_pending = false;
         self.oam_dma_page = 0;
         self.oam_dma_counter = 0;
+        self.bg_pshift = [0u16; 2];
+        self.bg_atlatch = 0;
+        self.bg_next_nt = 0;
+        self.bg_next_at = 0;
+        self.bg_next_pattern_lo = 0;
+        self.bg_next_pattern_hi = 0;
+        self.bg_primed = false;
+        self.bg_active = false;
+        self.sprite_shift = [[0u8; 2]; 8];
+        self.sprite_attr = [0u8; 8];
+        self.sprite_x = [0u8; 8];
+        self.sprite0_in_range = false;
+        self.sprite_eval_done = false;
     }
 
     /// Soft reset — like power but keeps `frame` and `odd_frame`.

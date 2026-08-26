@@ -320,3 +320,19 @@ pub unsafe extern "C" fn fceux11_ppu_set_status_vbl_set_suppressed(
 ) {
     fceux11_ppu::ffi::fceux11_ppu_set_status_vbl_set_suppressed(state)
 }
+
+// Debug accessors (added for Phase 4 bridge window-install verification)
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_ppu_get_register_state(
+    state: *const fceux11_ppu::PpuState,
+    reg: u32,
+) -> u8 {
+    unsafe { fceux11_ppu::ffi::fceux11_ppu_get_register_state(state, reg) }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_ppu_get_v_state(
+    state: *const fceux11_ppu::PpuState,
+) -> u16 {
+    unsafe { fceux11_ppu::ffi::fceux11_ppu_get_v_state(state) }
+}

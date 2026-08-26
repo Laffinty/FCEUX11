@@ -280,6 +280,7 @@ mod tests {
     use super::*;
     use crate::bus::FlatBus;
     use crate::registers::{ctrl_bits, mask_bits};
+    use crate::state::DOTS_PER_SCANLINE;
 
     /// Basic sanity check: `tick_one_ppu_dot` advances dot by 1 and
     /// fires the scanline hook on transitions.

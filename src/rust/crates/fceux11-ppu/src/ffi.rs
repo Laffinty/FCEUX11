@@ -442,6 +442,12 @@ fn make_bus_adapter(sb: &mut StateBox) -> CppBus {
 /// `src/ppu_rendering.cpp`). The CPU-side hookup for the per-cycle
 /// interleave is wired separately by
 /// `fceux11_cpu_step_one_instruction` (Phase 3 follow-on).
+///
+/// Phase 4: at the start of each visible scanline (sl 0..239 dot 0),
+/// the BG renderer is invoked to write 256 pixels into the
+/// framebuffer. This is the bit-exact NROM gate; the algorithm
+/// matches `pputile.inc::FetchAndDrawTile<kFNormal>` and produces
+/// the same per-tile output as the C++ reference.
 pub unsafe extern "C" fn fceux11_ppu_emulate_frame(state: *mut PpuState, n_cycles: u32) -> i32 {
     let sb = lookup(state);
     let mut bus = make_bus_adapter(sb);
@@ -455,6 +461,26 @@ pub unsafe extern "C" fn fceux11_ppu_emulate_frame(state: *mut PpuState, n_cycle
     let total_dots = n_cycles.saturating_mul(crate::scheduler::PPU_DOTS_PER_CPU_CYCLE);
     let mut last_outcome = TickOutcome::default();
     while sched.ppu_dots_consumed() < total_dots {
+        // Phase 4: BG render at the start of each visible scanline.
+        // The C++ algorithm runs `RefreshLine` once per visible
+        // scanline (at sl N, dot 0); we do the same.
+        if sb.state.scanline >= 0
+            && sb.state.scanline <= 239
+            && sb.state.dot == 0
+        {
+            render_visible_scanline(
+                &mut sb.state,
+                &mut bus,
+                &mut sb.framebuffer,
+                sb.mirror,
+                sb.chr_window_ptr,
+                sb.chr_window_len,
+                sb.nt_window_ptr,
+                sb.nt_window_len,
+                sb.pal_window_ptr,
+                sb.pal_window_len,
+            );
+        }
         last_outcome = sched.tick_one_ppu_dot(&mut sb.state, &mut bus);
         // OAM DMA pump fires once per CPU cycle (= every 3 PPU dots).
         if sb.state.oam_dma_pending
@@ -468,6 +494,79 @@ pub unsafe extern "C" fn fceux11_ppu_emulate_frame(state: *mut PpuState, n_cycle
         // into XBuf via `fceux11_ppu_get_framebuffer`.
     }
     0
+}
+
+/// Phase 4: invoke the BG renderer for the current scanline. Reads
+/// from the CHR/NT/Palette windows installed by the C++ bridge
+/// (`fceux11_ppu_set_chr_window` etc.) and writes into the
+/// 256×256 framebuffer. Falls back to per-byte bus reads when the
+/// windows are not installed.
+fn render_visible_scanline<B: crate::bus::PpuBus + ?Sized>(
+    state: &mut PpuState,
+    bus: &mut B,
+    framebuffer: &mut [u8; 256 * 256],
+    mirror_mode: u8,
+    chr_window_ptr: *const u8,
+    chr_window_len: usize,
+    nt_window_ptr: *const u8,
+    nt_window_len: usize,
+    pal_window_ptr: *const u8,
+    pal_window_len: usize,
+) {
+    // Phase 4: build NT/CHR/Palette windows either from the
+    // pre-installed direct pointers (set via
+    // `fceux11_ppu_set_chr_window` etc.) or from the bus.
+    //
+    // SAFETY: the pointers are valid for the lifetime of the
+    // installed windows. The StateBox guarantees that.
+    let nt_window_storage: [u8; 2048];
+    let nt_window: &[u8; 2048] = if !nt_window_ptr.is_null() && nt_window_len >= 2048 {
+        unsafe { &*(nt_window_ptr as *const [u8; 2048]) }
+    } else {
+        nt_window_storage = {
+            let mut w = [0u8; 2048];
+            for i in 0..2048u16 {
+                w[i as usize] = bus.read(0x2000 + i);
+            }
+            w
+        };
+        &nt_window_storage
+    };
+    let chr_window_storage: [u8; 8192];
+    let chr_window: &[u8; 8192] = if !chr_window_ptr.is_null() && chr_window_len >= 8192 {
+        unsafe { &*(chr_window_ptr as *const [u8; 8192]) }
+    } else {
+        chr_window_storage = {
+            let mut w = [0u8; 8192];
+            for i in 0..8192u16 {
+                w[i as usize] = bus.read(i);
+            }
+            w
+        };
+        &chr_window_storage
+    };
+    let pal_window_storage: [u8; 32];
+    let pal_window: &[u8; 32] = if !pal_window_ptr.is_null() && pal_window_len >= 32 {
+        unsafe { &*(pal_window_ptr as *const [u8; 32]) }
+    } else {
+        pal_window_storage = {
+            let mut w = [0u8; 32];
+            for i in 0..32u16 {
+                w[i as usize] = bus.read(0x3F00 + i);
+            }
+            w
+        };
+        &pal_window_storage
+    };
+    crate::rendering::render_scanline(
+        state,
+        bus,
+        nt_window,
+        chr_window,
+        pal_window,
+        mirror_mode,
+        framebuffer,
+    );
 }
 
 /// Tick `n_cycles` worth of CPU cycles (i.e. `n_cycles * 3` PPU dots).
@@ -529,6 +628,24 @@ pub unsafe extern "C" fn fceux11_ppu_get_dot(state: *const PpuState) -> u16 {
 
 pub unsafe extern "C" fn fceux11_ppu_get_frame_count(state: *const PpuState) -> u64 {
     lookup_const(state).state.frame
+}
+
+/// Debug accessor: read a single PPU register byte (0=ctrl, 1=mask,
+/// 2=status, 3=oam_addr). Returns 0 if `reg` is out of range.
+pub unsafe extern "C" fn fceux11_ppu_get_register_state(state: *const PpuState, reg: u32) -> u8 {
+    let sb = lookup_const(state);
+    match reg {
+        0 => sb.state.registers.ctrl,
+        1 => sb.state.registers.mask,
+        2 => sb.state.registers.status,
+        3 => sb.state.registers.oam_addr,
+        _ => 0,
+    }
+}
+
+/// Debug accessor: read the current VRAM address (v).
+pub unsafe extern "C" fn fceux11_ppu_get_v_state(state: *const PpuState) -> u16 {
+    lookup_const(state).state.registers.v
 }
 
 // ===========================================================================

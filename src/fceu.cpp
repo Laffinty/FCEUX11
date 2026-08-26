@@ -1054,6 +1054,13 @@ void PowerNES(void) {
 	if (GameInfo->type == GIT_VSUNI)
 		FCEU_VSUniPower();
 
+	// Phase 4: now that the mapper has populated g_bus.vpage[] and
+	// g_ppu.vnapage() via Ppu::set_mirror_page etc., re-install the
+	// Rust PPU's CHR/NT/Palette windows from the actual bus state.
+	// (The earlier call from FCEUPPU_Power happens BEFORE the mapper
+	// Power; this call is the one with real CHR/NT pointers.)
+	ppu_rust_bridge_power();
+
 	//if we are in a movie, then reset the saveram
 	extern int disableBatteryLoading;
 	if (disableBatteryLoading)

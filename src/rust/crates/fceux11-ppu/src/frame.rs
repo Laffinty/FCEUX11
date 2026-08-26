@@ -102,10 +102,16 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
     }
 
     // Visible scanline scroll increment: BG fetch clock at dot 256,
-    // vertical copy at dot 257.
+    // vertical copy at dot 257, fine_y increment at dot 256.
     if (0..=239).contains(&sl) && state.rendering_enabled() {
         if dot == 256 {
             state.registers.increment_coarse_x();
+            // Phase 4: increment fine_y (and coarse_y / nametable_y
+            // on roll-over) at the end of each visible scanline so
+            // the next render_scanline call uses the next row of
+            // pattern data. Mirrors the C++ new PPU's
+            // `increment_fine_y` at the end of RefreshLine.
+            state.registers.increment_fine_y();
         }
         if dot == 257 {
             state.registers.copy_vertical();
@@ -138,6 +144,14 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
     // also reset the suppression flag here for the *next* frame.
     if sl == 261 && dot == 340 {
         state.vbl_suppressed_this_frame = false;
+    }
+
+    // Pre-render line: at dot 280, copy t's vertical bits to v so
+    // the first visible scanline starts with the right scroll
+    // position. The C++ ppu_rendering.cpp::DoLine calls
+    // `copy_vertical` at sl -1 dot 280.
+    if sl == -1 && dot == 280 && state.rendering_enabled() {
+        state.registers.copy_vertical();
     }
 
     // Sprite 0 hit latched by eval: copy the latched flag onto PPU[2]

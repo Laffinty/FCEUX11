@@ -12,12 +12,16 @@
 //! - [`frame`]: `tick_dot` — the dot-level main state machine.
 //! - [`ffi`]: C-ABI surface (`fceux11_ppu_*` exports).
 //! - [`render`]: NROM BG/sprite/palette pipeline (Phase 2 stub; Phase 4 full).
+//! - [`rendering`]: Phase 4 per-scanline BG fetch + pixel output.
+//! - [`luts`]: precomputed ppulut1/2/3 lookup tables (Phase 4).
 
 pub mod bus;
 pub mod ffi;
 pub mod frame;
+pub mod luts;
 pub mod render;
 pub mod registers;
+pub mod rendering;
 pub mod scheduler;
 pub mod state;
 

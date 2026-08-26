@@ -23,6 +23,7 @@
 #include "cpu.h"
 #include "fceu.h"
 #include "ppu.h"
+#include "ppu_rust_bridge.h"
 
 #include <cstdlib>   // P2 Phase 3 Step 3.2 桶 C — opendecay_atexit (std::atexit)
 #include "ppu_rendering.h"
@@ -1201,6 +1202,16 @@ void FCEUPPU_Power(void) {
 		BWrite[x + 7] = B2007;
 	}
 	BWrite[0x4014] = B4014;
+
+	// Phase 4: bridge install. Called AFTER FCEUPPU_Reset (which
+	// sets the ARead/BWrite tables above) but the mapper's Power
+	// handler hasn't run yet — it runs via GameInterface(GI_POWER)
+	// after FCEUPPU_Power returns. The bridge's `ppu_rust_bridge_power`
+	// re-installs the windows once the bus is fully populated
+	// (it's called again at the end of PowerNES in fceu.cpp).
+	// This call here just resets the Rust PPU state and primes
+	// the windows from whatever is currently installed.
+	ppu_rust_bridge_power();
 }
 
 void FCEUPPU_Init(void) {
