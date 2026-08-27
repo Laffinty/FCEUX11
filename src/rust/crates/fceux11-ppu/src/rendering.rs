@@ -34,6 +34,7 @@
 //! and include this quirk, so we replicate it for bit-exact matching.
 
 use crate::bus::PpuBus;
+use crate::registers::mask_bits;
 use crate::state::PpuState;
 #[cfg(test)]
 use crate::luts::{PPULUT1, PPULUT2};
@@ -46,18 +47,28 @@ const TILES_PER_SCANLINE: usize = 34;
 const PIXELS_PER_TILE: usize = 8;
 /// Number of visible pixels per scanline.
 const VISIBLE_PIXELS: usize = 256;
-/// Bit 7 of $2001: emphasis red.
-const EMPH_RED: u8 = 1 << 5;
-/// Bit 6 of $2001: emphasis green.
-const EMPH_GREEN: u8 = 1 << 6;
-/// Bit 7 of $2001: emphasis blue.
-const EMPH_BLUE: u8 = 1 << 7;
 /// Bit 0 of $2001: grayscale.
 const GRAYSCALE: u8 = 1 << 0;
 /// Bit 3 of $2001: show BG.
 const SHOW_BG: u8 = 1 << 3;
 /// Bit 4 of $2000: BG pattern table select.
 const BG_PATTERN_BIT: u8 = 1 << 4;
+
+/// Replicates the C++ `PaletteAdjustPixel` XBuf byte format
+/// (`src/ppu_rendering.cpp:1524-1531`). The framebuffer the bridge
+/// copies into XBuf must carry the same high-bit flags as the C++
+/// new PPU's output: no emphasis → `(color & 0x3F) | 0x80`, any
+/// emphasis (not all three) → `color | 0x40`, all three emphasis
+/// bits ($2001 >> 5 == 0x7) → `(color & 0x3F) | 0xC0`.
+pub fn palette_adjust_pixel(color: u8, mask: u8) -> u8 {
+    if (mask >> 5) == 0x7 {
+        (color & 0x3F) | 0xC0
+    } else if (mask & 0xE0) != 0 {
+        color | 0x40
+    } else {
+        (color & 0x3F) | 0x80
+    }
+}
 
 /// Maps a 14-bit VRAM address to the corresponding 1 KiB nametable
 /// page, applying the configured mirroring mode. Returns the index
@@ -97,11 +108,10 @@ pub fn render_scanline<B: PpuBus + ?Sized>(
     if !(0..=239).contains(&sl) {
         return;
     }
-    let bg_show = (state.registers.mask & SHOW_BG) != 0;
-    let grayscale = (state.registers.mask & GRAYSCALE) != 0;
-    let emph_red = (state.registers.mask & EMPH_RED) != 0;
-    let emph_green = (state.registers.mask & EMPH_GREEN) != 0;
-    let emph_blue = (state.registers.mask & EMPH_BLUE) != 0;
+    let mask = state.registers.mask;
+    let bg_show = (mask & SHOW_BG) != 0;
+    let sprite_show = (mask & (1 << mask_bits::SHOW_SPRITES)) != 0;
+    let grayscale = (mask & GRAYSCALE) != 0;
     let fine_x = (state.registers.fine_x & 0x07) as u32;
     let bg_pattern_base: u16 = if state.registers.ctrl & BG_PATTERN_BIT != 0 {
         0x1000
@@ -113,6 +123,27 @@ pub fn render_scanline<B: PpuBus + ?Sized>(
     let mut atlatch: u32 = state.bg_atlatch as u32;
     let mut v = state.registers.v;
     let row_off = (sl as usize) * 256;
+
+    // Rendering-disabled fill (C++ new-PPU blank path,
+    // `src/ppu_rendering.cpp:1841-1886`). Every visible scanline is
+    // written every frame even when BG display is off, so a frame
+    // with $2001 rendering bits cleared shows the backdrop color
+    // instead of stale framebuffer content. With ScreenON and
+    // SpriteON both clear the C++ reads the pixel from $2006's value
+    // (`get_2007access`) when it points into palette RAM; indices
+    // $04/$08/$0C read back through UPALRAM in C++, which PowerNES
+    // initializes identical to our window's mirrored entries, so a
+    // direct PALRAM lookup matches for all reachable states.
+    if !bg_show {
+        let pix: usize = if !sprite_show && (v & 0x3F00) == 0x3F00 {
+            (v & 0x1F) as usize
+        } else {
+            0
+        };
+        let gray_mask: u8 = if grayscale { 0x30 } else { 0xFF };
+        let out = palette_adjust_pixel(palette[pix] & gray_mask, mask);
+        framebuffer[row_off..row_off + VISIBLE_PIXELS].fill(out);
+    }
 
     for x1 in 0..TILES_PER_SCANLINE {
         // Step 1: render 8 pixels of the current tile (skip the two
@@ -143,15 +174,15 @@ pub fn render_scanline<B: PpuBus + ?Sized>(
                 let shiftr: u32 = if px < 4 { 0 } else { 2 };
                 let attr_quadrant = ((atlatch >> shiftr) & 0x3) as u8;
                 let color_4bit = color_2bit | (attr_quadrant << 2);
+                let gray_mask: u8 = if grayscale { 0x30 } else { 0xFF };
                 let pal_idx = if color_4bit == 0 {
-                    palette[0] & if grayscale { 0x30 } else { 0xFF }
+                    palette[0] & gray_mask
                 } else {
-                    palette[color_4bit as usize] & if grayscale { 0x30 } else { 0xFF }
+                    palette[color_4bit as usize] & gray_mask
                 };
                 let out_idx = (x1 - 2) * PIXELS_PER_TILE + px;
                 if out_idx < VISIBLE_PIXELS {
-                    framebuffer[row_off + out_idx] =
-                        apply_emphasis(pal_idx, emph_red, emph_green, emph_blue);
+                    framebuffer[row_off + out_idx] = palette_adjust_pixel(pal_idx, mask);
                 }
             }
         }
@@ -202,21 +233,6 @@ pub fn render_scanline<B: PpuBus + ?Sized>(
     state.registers.v = v;
 }
 
-/// Apply the emphasis bits from $2001 to a palette index.
-fn apply_emphasis(pal_idx: u8, red: bool, green: bool, blue: bool) -> u8 {
-    let mut v = pal_idx & 0x3F;
-    if red {
-        v |= 0x40;
-    }
-    if green {
-        v |= 0x80;
-    }
-    if blue {
-        v |= 0x20;
-    }
-    v
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -246,11 +262,19 @@ mod tests {
     }
 
     #[test]
-    fn apply_emphasis_red_green_blue() {
-        assert_eq!(apply_emphasis(0x10, true, false, false), 0x10 | 0x40);
-        assert_eq!(apply_emphasis(0x10, false, true, false), 0x10 | 0x80);
-        assert_eq!(apply_emphasis(0x10, false, false, true), 0x10 | 0x20);
-        assert_eq!(apply_emphasis(0x10, true, true, true), 0x10 | 0xE0);
+    fn palette_adjust_pixel_matches_cpp() {
+        // C++ PaletteAdjustPixel (src/ppu_rendering.cpp:1524-1531):
+        // no emphasis → (color & 0x3F) | 0x80, any emphasis but not
+        // all three → color | 0x40, all three ($2001>>5==0x7) →
+        // (color & 0x3F) | 0xC0.
+        assert_eq!(palette_adjust_pixel(0x16, 0x00), 0x96);
+        assert_eq!(palette_adjust_pixel(0x30, 0x01), 0xB0); // grayscale set, no emphasis
+        let any_emph = 0x20; // red only
+        assert_eq!(palette_adjust_pixel(0x16, any_emph), 0x56);
+        let two_emph = 0xA0; // green+blue
+        assert_eq!(palette_adjust_pixel(0x3F, two_emph), 0x7F);
+        let all_emph = 0xE0;
+        assert_eq!(palette_adjust_pixel(0xFF, all_emph), 0xFF);
     }
 
     #[test]

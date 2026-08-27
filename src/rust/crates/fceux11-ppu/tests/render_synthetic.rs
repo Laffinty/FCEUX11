@@ -15,8 +15,13 @@ use fceux11_ppu::bus::FlatBus;
 fn render_solid_color_pattern() {
     // Scenario: 32 nametable tiles all pointing to CHR tile 0, which
     // is a solid-color pattern (all 1s on both planes). With
-    // attribute = 0 and palette[0] = 0x00, the output is 0.
-    // With palette[0] = 0x16, the output is 0x16 across the row.
+    // attribute = 0 and palette[0] = 0x00, the output is the
+    // XBuf-formatted backdrop byte.
+    // With palette[0] = 0x16, the output is PaletteAdjustPixel(0x16)
+    // = (0x16 & 0x3F) | 0x80 = 0x96 across the row — the C++ new PPU
+    // writes every visible pixel through PaletteAdjustPixel, which
+    // sets bit 7 when no emphasis bits are set
+    // (src/ppu_rendering.cpp:1524-1531).
     let mut state = PpuState::new();
     // 8x8 solid color tile at CHR tile 0.
     let mut chr = [0u8; 8192];
@@ -51,12 +56,9 @@ fn render_solid_color_pattern() {
     let mut bus = FlatBus::new();
     render_scanline(&mut state, &mut bus, &nt, &chr, &palette, 0, &mut fb);
 
-    // The output should be 0x16 across the row.
+    // The output should be PaletteAdjustPixel(0x16) = 0x96 per row.
     for x in 0..256 {
-        assert_eq!(
-            fb[x as usize], 0x16,
-            "pixel x={} should be 0x16 (solid palette[0])", x
-        );
+        assert_eq!(fb[x as usize], 0x96, "solid palette[0] pixel {}", x);
     }
 }
 
@@ -123,35 +125,40 @@ fn render_attribute_quadrant() {
     //                   pixels 4..7 = attr at coarse_x=4 = 0 (new attr byte).
     //                   �?pixels 0..3 = 0x07, pixels 4..7 = 0x03.
     for px in 0..8 {
-        // Tile 0 (x=0..7): all 0x03.
-        assert_eq!(fb[0 * 8 + px], 0x03, "tile 0 px {} should be 0x03", px);
+        // Tile 0 (x=0..7): all PaletteAdjustPixel(0x03) = 0x83.
+        assert_eq!(fb[0 * 8 + px], 0x83, "tile 0 px {} should be 0x83", px);
     }
     for px in 0..4 {
-        // Tile 1 (x=8..11): 0x03.
-        assert_eq!(fb[1 * 8 + px], 0x03, "tile 1 px {} (lo) should be 0x03", px);
+        // Tile 1 (x=8..11): 0x83.
+        assert_eq!(fb[1 * 8 + px], 0x83, "tile 1 px {} (lo) should be 0x83", px);
     }
     for px in 4..8 {
-        // Tile 1 (x=12..15): 0x07 (C++ quirk: next tile's attr).
-        assert_eq!(fb[1 * 8 + px], 0x07, "tile 1 px {} (hi) should be 0x07 (quirk)", px);
+        // Tile 1 (x=12..15): 0x87 (C++ quirk: next tile's attr).
+        assert_eq!(fb[1 * 8 + px], 0x87, "tile 1 px {} (hi) quirk", px);
     }
     for px in 0..8 {
-        // Tile 2 (x=16..23): all 0x07.
-        assert_eq!(fb[2 * 8 + px], 0x07, "tile 2 px {} should be 0x07", px);
+        // Tile 2 (x=16..23): all 0x87.
+        assert_eq!(fb[2 * 8 + px], 0x87, "tile 2 px {} should be 0x87", px);
     }
     for px in 0..4 {
-        // Tile 3 (x=24..27): 0x07.
-        assert_eq!(fb[3 * 8 + px], 0x07, "tile 3 px {} (lo) should be 0x07", px);
+        // Tile 3 (x=24..27): 0x87.
+        assert_eq!(fb[3 * 8 + px], 0x87, "tile 3 px {} (lo) should be 0x87", px);
     }
     for px in 4..8 {
-        // Tile 3 (x=28..31): 0x03 (C++ quirk: next attr byte's first quadrant).
-        assert_eq!(fb[3 * 8 + px], 0x03, "tile 3 px {} (hi) should be 0x03 (new attr byte)", px);
+        // Tile 3 (x=28..31): 0x83 (C++ quirk: next attr byte's first quadrant).
+        assert_eq!(fb[3 * 8 + px], 0x83, "tile 3 px {} (hi) new attr", px);
     }
 }
 
 #[test]
-fn render_rendering_off_returns_zero() {
-    // When BG is disabled (mask bit 3 = 0), the output should be
-    // 0x00 (background color) regardless of pattern data.
+fn render_rendering_off_fills_backdrop() {
+    // When rendering is fully disabled (mask = 0), the C++ new PPU
+    // still writes every visible scanline with the backdrop color
+    // through PaletteAdjustPixel (src/ppu_rendering.cpp:1841-1886).
+    // With palette[0] = 0x00 and no emphasis set, that byte is
+    // (0x00 & 0x3F) | 0x80 = 0x80 — the same value the C++ PPU's
+    // ppudead/default-background frames produce on the golden
+    // frame-diff targets.
     let mut state = PpuState::new();
     let chr = [0u8; 8192];
     let nt = [0u8; 2048];
@@ -167,10 +174,8 @@ fn render_rendering_off_returns_zero() {
     let mut bus = FlatBus::new();
     render_scanline(&mut state, &mut bus, &nt, &chr, &palette, 0, &mut fb);
 
-    // When BG is off, the renderer skips pixel output, so the
-    // framebuffer remains 0.
     for x in 0..256 {
-        assert_eq!(fb[x as usize], 0, "pixel x={} should be 0 (rendering off)", x);
+        assert_eq!(fb[x as usize], 0x80, "backdrop fill pixel {}", x);
     }
 }
 
@@ -202,10 +207,7 @@ fn render_grayscale_masks_palette() {
     render_scanline(&mut state, &mut bus, &nt, &chr, &palette, 0, &mut fb);
 
     for x in 0..256 {
-        assert_eq!(
-            fb[x as usize], 0x30,
-            "grayscale pixel x={} should be 0x30 (palette masked)", x
-        );
+        assert_eq!(fb[x as usize], 0xB0, "grayscale masked pixel {}", x);
     }
 }
 
@@ -239,9 +241,6 @@ fn render_mirroring_horizontal() {
     render_scanline(&mut state, &mut bus, &nt, &chr, &palette, 0, &mut fb);
 
     for x in 0..256 {
-        assert_eq!(
-            fb[x as usize], 0x10,
-            "horizontal mirror: pixel x={} should be 0x10 (page 2 mirrors page 0)", x
-        );
+        assert_eq!(fb[x as usize], 0x90, "page 2 mirrors page 0 pixel {}", x);
     }
 }
