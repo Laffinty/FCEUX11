@@ -238,10 +238,18 @@ pub unsafe extern "C" fn fceux11_ppu_tick_cpu_cycle(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fceux11_ppu_tick_one_cpu_cycle(
+pub unsafe extern "C" fn fceux11_ppu_tick_dots(
+    state: *mut fceux11_ppu::PpuState,
+    n_dots: u32,
+) -> i32 {
+    fceux11_ppu::ffi::fceux11_ppu_tick_dots(state, n_dots)
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_ppu_take_nmi_pending(
     state: *mut fceux11_ppu::PpuState,
 ) -> i32 {
-    fceux11_ppu::ffi::fceux11_ppu_tick_one_cpu_cycle(state)
+    fceux11_ppu::ffi::fceux11_ppu_take_nmi_pending(state)
 }
 
 #[unsafe(no_mangle)]

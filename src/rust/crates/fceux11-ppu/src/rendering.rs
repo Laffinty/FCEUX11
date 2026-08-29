@@ -95,10 +95,16 @@ fn attribute_quadrant(at_byte: u8, coarse_x: u16, coarse_y_bit1: u8) -> u8 {
 }
 
 /// Render one visible scanline's 256 pixels into the framebuffer.
+///
+/// The NT window is the full 4 KiB the C++ bridge installs
+/// (`ppu_rust_bridge_power` copies vnapage[0..4]): the four-screen
+/// mirror mode (mode 4) maps addresses across the whole 0x0000-0x0FFF
+/// range, so a 2 KiB view would read out of bounds for four-screen
+/// mappers (MMC5 etc.).
 pub fn render_scanline<B: PpuBus + ?Sized>(
     state: &mut PpuState,
     _bus: &mut B,
-    nt_window: &[u8; 2048],
+    nt_window: &[u8; 4096],
     chr_window: &[u8; 8192],
     palette: &[u8; 32],
     mirror_mode: u8,

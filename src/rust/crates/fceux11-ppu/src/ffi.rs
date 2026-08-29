@@ -132,6 +132,12 @@ struct StateBox {
     /// Palette window (32 bytes).
     pal_window_ptr: *const u8,
     pal_window_len: usize,
+    /// Phase 5.1: persistent per-dot scheduler. Lives across FFI calls
+    /// so `notify_scanline` / `notify_vblank` fire only on true
+    /// transitions between the ~89342 per-dot calls the C++ bridge
+    /// makes per frame; a fresh scheduler per call would re-fire
+    /// `notify_scanline` on every call (its `last_scanline` resets).
+    sched: crate::scheduler::NesScheduler,
 }
 
 impl StateBox {
@@ -149,6 +155,13 @@ impl StateBox {
             nt_window_len: 0,
             pal_window_ptr: std::ptr::null(),
             pal_window_len: 0,
+            // begin_frame() arms the scanline sentinel so the very
+            // first tick reports the power-on pre-render line (-1).
+            sched: {
+                let mut s = crate::scheduler::NesScheduler::new();
+                s.begin_frame();
+                s
+            },
         }
     }
 }
@@ -318,7 +331,7 @@ pub unsafe extern "C" fn fceux11_ppu_set_mirror_mode(state: *mut PpuState, mode:
 pub unsafe extern "C" fn fceux11_ppu_cpu_read(state: *mut PpuState, addr: u16) -> u8 {
     let sb = lookup(state);
     let reg = (addr & 0x0007) as u8;
-    crate::registers::Registers::read_status(&mut sb.state.registers)
+    let ret = crate::registers::Registers::read_status(&mut sb.state.registers)
         .wrapping_add(match reg {
             0 => sb.state.registers.ctrl,
             1 => sb.state.registers.mask,
@@ -356,7 +369,23 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_read(state: *mut PpuState, addr: u16) -
                 sb.state.registers.read_data(&mut bus_adapter, sb.state.registers.ctrl)
             }
             _ => 0,
-        })
+        });
+    ret
+}
+
+/// Phase 5.1: take-and-clear the PPU NMI latch. Returns 1 when the
+/// frame state machine asserted NMI since the last call (sl 241 dot 1
+/// with NMI enabled and no VBL suppression); the C++ bridge forwards
+/// this to the canonical `TriggerNMI()` so the CPU samples the NMI
+/// line with the same one-instruction deferral as the C++ engines.
+/// Exported through the root crate's cbindgen wrapper
+/// (`src/rust/src/lib.rs`) — keep this one `no_mangle`-free so the
+/// symbol is not doubly defined under LTO.
+pub unsafe extern "C" fn fceux11_ppu_take_nmi_pending(state: *mut PpuState) -> i32 {
+    let sb = lookup(state);
+    let pending = sb.state.nmi_pending;
+    sb.state.nmi_pending = false;
+    pending as i32
 }
 
 /// Write to a CPU-visible PPU register (`$2000`————C`$2007`) or trigger
@@ -463,24 +492,10 @@ pub unsafe extern "C" fn fceux11_ppu_emulate_frame(state: *mut PpuState, n_cycle
     while sched.ppu_dots_consumed() < total_dots {
         // Phase 4: BG render at the start of each visible scanline.
         // The C++ algorithm runs `RefreshLine` once per visible
-        // scanline (at sl N, dot 0); we do the same.
-        if sb.state.scanline >= 0
-            && sb.state.scanline <= 239
-            && sb.state.dot == 0
-        {
-            render_visible_scanline(
-                &mut sb.state,
-                &mut bus,
-                &mut sb.framebuffer,
-                sb.mirror,
-                sb.chr_window_ptr,
-                sb.chr_window_len,
-                sb.nt_window_ptr,
-                sb.nt_window_len,
-                sb.pal_window_ptr,
-                sb.pal_window_len,
-            );
-        }
+        // scanline (at sl N, dot 0); we do the same. The condition +
+        // ordering live in `render_scanline_if_start` so the Phase 5.1
+        // per-cycle driver stays bit-identical.
+        render_scanline_if_start(sb, &mut bus);
         last_outcome = sched.tick_one_ppu_dot(&mut sb.state, &mut bus);
         // OAM DMA pump fires once per CPU cycle (= every 3 PPU dots).
         if sb.state.oam_dma_pending
@@ -519,13 +534,15 @@ fn render_visible_scanline<B: crate::bus::PpuBus + ?Sized>(
     //
     // SAFETY: the pointers are valid for the lifetime of the
     // installed windows. The StateBox guarantees that.
-    let nt_window_storage: [u8; 2048];
-    let nt_window: &[u8; 2048] = if !nt_window_ptr.is_null() && nt_window_len >= 2048 {
-        unsafe { &*(nt_window_ptr as *const [u8; 2048]) }
+    let nt_window_storage: [u8; 4096];
+    let nt_window: &[u8; 4096] = if !nt_window_ptr.is_null()
+        && nt_window_len >= 4096
+    {
+        unsafe { &*(nt_window_ptr as *const [u8; 4096]) }
     } else {
         nt_window_storage = {
-            let mut w = [0u8; 2048];
-            for i in 0..2048u16 {
+            let mut w = [0u8; 4096];
+            for i in 0..4096u16 {
                 w[i as usize] = bus.read(0x2000 + i);
             }
             w
@@ -569,6 +586,32 @@ fn render_visible_scanline<B: crate::bus::PpuBus + ?Sized>(
     );
 }
 
+/// Phase 5.1: shared render-at-scanline-start step. Renders the
+/// current visible scanline when the state machine is entering it
+/// (sl 0..=239, dot == 0, checked BEFORE the dot advances) — the exact
+/// condition and ordering `fceux11_ppu_emulate_frame` has used since
+/// Phase 4, so the batch and per-cycle frame drivers render
+/// bit-identically.
+fn render_scanline_if_start(sb: &mut StateBox, bus: &mut CppBus) {
+    if sb.state.scanline >= 0
+        && sb.state.scanline <= 239
+        && sb.state.dot == 0
+    {
+        render_visible_scanline(
+            &mut sb.state,
+            bus,
+            &mut sb.framebuffer,
+            sb.mirror,
+            sb.chr_window_ptr,
+            sb.chr_window_len,
+            sb.nt_window_ptr,
+            sb.nt_window_len,
+            sb.pal_window_ptr,
+            sb.pal_window_len,
+        );
+    }
+}
+
 /// Tick `n_cycles` worth of CPU cycles (i.e. `n_cycles * 3` PPU dots).
 /// Phase 3's NesScheduler uses this for per-instruction interleaving.
 pub unsafe extern "C" fn fceux11_ppu_tick_cpu_cycle(state: *mut PpuState, n_cycles: u32) -> i32 {
@@ -584,34 +627,55 @@ pub unsafe extern "C" fn fceux11_ppu_tick_cpu_cycle(state: *mut PpuState, n_cycl
     0
 }
 
-/// Phase 3: advance the Rust PPU by exactly one CPU cycle (3 PPU dots)
-/// and fire mapper event hooks. Returns 1 if the frame completed this
-/// call (sl 261 dot 340 wrap), 0 otherwise. Used by the C++ bridge's
-/// `ppu_rust_bridge_emit_one_cpu_cycle` for per-cycle CPU/PPU
-/// interleaving.
-pub unsafe extern "C" fn fceux11_ppu_tick_one_cpu_cycle(state: *mut PpuState) -> i32 {
+/// Phase 5.1: advance the Rust PPU by exactly `n_dots` PPU dots —
+/// rendering visible scanlines at their start, firing mapper event
+/// hooks (notify_scanline / notify_hblank / notify_hblank2 /
+/// notify_a12_rising / notify_vblank) and pumping the OAM DMA — with
+/// the same per-dot ordering as `fceux11_ppu_emulate_frame`.
+///
+/// The scheduler is PERSISTENT (stored in the `StateBox`): the C++
+/// per-cycle loop calls this ~29781 times per frame, and a fresh
+/// scheduler per call would re-fire `notify_scanline` on every call.
+///
+/// Returns 1 if the frame wrapped during this call, 0 otherwise.
+pub unsafe extern "C" fn fceux11_ppu_tick_dots(state: *mut PpuState, n_dots: u32) -> i32 {
     let sb = lookup(state);
     let mut bus = make_bus_adapter(sb);
-    let mut sched = crate::scheduler::NesScheduler::new();
+    // Take the persistent scheduler out so `sb` and the scheduler can
+    // be borrowed mutably side by side; put it back before returning.
+    let mut sched = std::mem::take(&mut sb.sched);
     sched.set_video_system(sb.pal);
-    // Track dots in a per-call scheduler; the C++ side calls this
-    // ~89342 times per frame (one per CPU cycle), so per-call
-    // allocation is acceptable.
-    let outcome = sched.tick_one_ppu_dot(&mut sb.state, &mut bus);
-    sched.tick_one_ppu_dot(&mut sb.state, &mut bus);
-    sched.tick_one_ppu_dot(&mut sb.state, &mut bus);
-    // OAM DMA pump: one byte per CPU cycle.
-    if sb.state.oam_dma_pending {
-        sb.state.tick_oam_dma(&mut bus);
+    let mut frame_advanced = false;
+    for _ in 0..n_dots {
+        // Render when ENTERING a visible scanline, BEFORE the dot
+        // tick (so the fill/BG use the carry-over v — the placement
+        // the ppu_frame_diff goldens were pinned against; a
+        // post-tick variant broke them and did not fix rom_regression
+        // frames 3-7).
+        render_scanline_if_start(sb, &mut bus);
+        let outcome = sched.tick_one_ppu_dot(&mut sb.state, &mut bus);
+        // Phase 5.1: latch PPU NMI assertions so the C++ side can
+        // forward them to the canonical `TriggerNMI()` path.
+        if outcome.nmi_asserted {
+            sb.state.nmi_pending = true;
+        }
+        if outcome.frame_advanced {
+            // Next dot starts a new frame: reset the per-frame dot
+            // counter (keeps the OAM DMA pump aligned to %3) without
+            // re-arming the scanline sentinel — the transition into
+            // the pre-render line already fired inside the wrap tick.
+            sched.reset_frame_counters();
+            frame_advanced = true;
+        }
+        // OAM DMA pump fires once per CPU cycle (= every 3 PPU dots).
+        if sb.state.oam_dma_pending
+            && sched.ppu_dots_consumed() % crate::scheduler::PPU_DOTS_PER_CPU_CYCLE == 0
+        {
+            sb.state.tick_oam_dma(&mut bus);
+        }
     }
-    if outcome.frame_advanced || sched.ppu_dots_consumed() >= 1 {
-        // Frame completed if the underlying frame counter advanced.
-        // The C++ side doesn't need a strong frame-completion signal
-        // here because `FCEUPPU_Loop` calls `ppu_rust_bridge_emit_frame`
-        // once per frame; this entry point is for sub-frame interleaving.
-        let _ = sched.ppu_dots_consumed();
-    }
-    0
+    sb.sched = sched;
+    frame_advanced as i32
 }
 
 // ===========================================================================

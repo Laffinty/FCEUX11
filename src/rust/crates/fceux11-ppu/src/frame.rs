@@ -135,14 +135,21 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
         }
     }
 
-    // Post-render (sl 261 dot 1 for NTSC): VBL flag clear.
-    if sl == 261 && dot == 1 {
+    // Post-render: VBL flag clears at the start of the pre-render line
+    // (sl -1, dot 1 for NTSC — hardware scanline 261). Phase 5.1: this
+    // used to live at sl 261, but the frame also STARTS at sl -1, so
+    // the pre-render line was visited twice per frame (263 scanlines =
+    // 89683 dots) while the CPU budget is 89342 dots (262 lines) — a
+    // one-scanline phase drift per frame that broke the savestate /
+    // nestest gates. The wrap now goes 260 → -1 directly.
+    if sl == -1 && dot == 1 {
         state.registers.clear_vbl_flag();
     }
 
-    // Frame boundary: sl 261 dot 340 rolls into sl -1 dot 0; we
-    // also reset the suppression flag here for the *next* frame.
-    if sl == 261 && dot == 340 {
+    // Frame boundary: the last dot of the pre-render line (-1, 340)
+    // resets the suppression flag for the *next* frame (and decides
+    // the even/odd skip above).
+    if sl == -1 && dot == 340 {
         state.vbl_suppressed_this_frame = false;
     }
 
@@ -186,8 +193,15 @@ fn advance(state: &mut PpuState, out: &mut TickOutcome) {
         out.dot_wrapped = true;
         state.dot = 0;
         let next_sl = state.scanline + 1;
-        if next_sl >= NTSC_SCANLINES {
-            // Wrap frame: sl 261 → sl -1.
+        // Phase 5.1: the pre-render line is sl -1 (hardware 261). The
+        // frame visits -1, 0..=260 — exactly NTSC's 262 scanlines
+        // (89342 dots) — so the wrap fires from sl 260 directly. The
+        // old `next_sl >= NTSC_SCANLINES` threshold also let sl 261
+        // occur, double-counting the pre-render line (263-line frames
+        // = 89683 dots) and drifting one scanline per frame against
+        // the CPU budget.
+        if next_sl >= NTSC_SCANLINES - 1 {
+            // Wrap frame: sl 260 → sl -1 (next frame's pre-render).
             state.scanline = -1;
             out.frame_advanced = true;
         } else {
@@ -305,16 +319,18 @@ mod tests {
     }
 
     #[test]
-    fn vbl_flag_clears_at_sl_261_dot_1() {
+    fn vbl_flag_clears_at_pre_render_dot_1() {
         let mut s = PpuState::new();
         let mut bus = FlatBus::new();
         // Manually set the VBL flag to prove the state machine clears it.
+        // Phase 5.1 geometry: the pre-render line is sl -1 (hardware 261);
+        // sl 261 no longer occurs inside a frame.
         s.registers.set_vbl_flag();
-        tick_to(&mut s, &mut bus, 261, 1);
+        tick_to(&mut s, &mut bus, -1, 1);
         assert_eq!(
             s.registers.status & (1 << status_bits::VBL),
             0,
-            "VBL flag should be cleared at sl 261 dot 1"
+            "VBL flag should be cleared at the pre-render line dot 1"
         );
     }
 
@@ -379,10 +395,12 @@ mod tests {
         let mut s = PpuState::new();
         let mut bus = FlatBus::new();
         s.vbl_suppressed_this_frame = true;
-        // Tick to sl 261 dot 340 → suppression reset, then wrap to next frame.
-        tick_to(&mut s, &mut bus, 261, 340);
+        // Tick to the last dot of the pre-render line (-1, 340) →
+        // suppression reset; the same tick advances into sl 0 (no
+        // even/odd skip: rendering is off in this test).
+        tick_to(&mut s, &mut bus, -1, 340);
         assert!(!s.vbl_suppressed_this_frame);
-        assert_eq!(s.scanline, -1, "wrapped into next frame's pre-render");
+        assert_eq!(s.scanline, 0, "advanced into the next frame's sl 0");
         assert_eq!(s.dot, 0);
     }
 

@@ -29,7 +29,7 @@ fn render_solid_color_pattern() {
         chr[i] = 0xFF; // all 1s on both planes
     }
     // Nametable: all entries = 0 (pointing to tile 0).
-    let mut nt = [0u8; 2048];
+    let mut nt = [0u8; 4096];
     // Attribute table: all zeros (palette 0 for all tiles).
     // The first 64 bytes of NT are the nametable; the next 64 are
     // the attribute table (interleaved at offset 0x3C0).
@@ -38,7 +38,7 @@ fn render_solid_color_pattern() {
     // Page 0: $2000-$23BF = name (960 bytes), $23C0-$23FF = attr (64 bytes).
     // Page 1: $2400-$27BF = name, $27C0-$27FF = attr.
     // We fill the name portion with zeros (tile 0) and attr with zeros.
-    // Already done by nt = [0; 2048].
+    // Already done by nt = [0; 4096].
 
     // Palette: $3F00 = 0x16 (the visible color).
     let palette = [0x16u8; 32];
@@ -71,7 +71,7 @@ fn render_attribute_quadrant() {
     for i in 0..16 {
         chr[i] = 0xFF;
     }
-    let mut nt = [0u8; 2048];
+    let mut nt = [0u8; 4096];
     // Attribute byte at $23C0: top-left=0, top-right=1,
     // bottom-left=2, bottom-right=3. (Quadrants 0..3.)
     // Bit layout: cc = 0b11_10_01_00 = 0xE4.
@@ -161,7 +161,7 @@ fn render_rendering_off_fills_backdrop() {
     // frame-diff targets.
     let mut state = PpuState::new();
     let chr = [0u8; 8192];
-    let nt = [0u8; 2048];
+    let nt = [0u8; 4096];
     let palette = [0u8; 32]; // all 0s
 
     state.registers.write_mask(0); // no rendering
@@ -188,7 +188,7 @@ fn render_grayscale_masks_palette() {
     for i in 0..16 {
         chr[i] = 0xFF;
     }
-    let nt = [0u8; 2048];
+    let nt = [0u8; 4096];
     let mut palette = [0u8; 32];
     // Pattern 0xFF �?2-bit color = 3. With attr=0, palette index = 3.
     // Set palette[3] = 0x3F (max NES palette color); in grayscale
@@ -220,7 +220,7 @@ fn render_mirroring_horizontal() {
     for i in 0..16 {
         chr[i] = 0xFF;
     }
-    let mut nt = [0u8; 2048];
+    let mut nt = [0u8; 4096];
     // Put a non-zero color in page 0's tile 0.
     // (Default is 0, which renders palette[0].)
     // We'll use palette[0] = 0x10 to make it visible.

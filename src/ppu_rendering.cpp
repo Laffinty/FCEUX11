@@ -1182,12 +1182,45 @@ void CopySprites(uint8 *target) {
 // ----------------------------------------------------------------------------
 int FCEUPPU_Loop(int skip) {
 #ifdef FCEUX11_RUST_PPU
-	// v2.1 Phase 2 — Rust PPU engine path. Wins over both old-PPU and
-	// new-PPU (`FCEUX_PPU_Loop`) when the bridge is active. The
-	// bridge handles its own initialisation via `FCEUPPU_Init` /
-	// `FCEUPPU_Power`; this function only needs to drive the frame.
+	// v2.1 Phase 5.1 — CPU/PPU per-cycle interleave (plan §5.1).
+	// The Rust PPU path advances ONE PPU dot at a time:
+	//
+	//   ppu_rust_bridge_advance_ppu_dots(1)   → PPU +1 dot (render,
+	//                                           mapper hooks, OAM DMA)
+	//   fceu11::cpu_instance().run(1)         → CPU +1 dot unit (1/3 cycle)
+	//
+	// `Cpu::run(n)` takes n in PPU-dot units (1 CPU cycle = 3 units,
+	// the legacy X6502_Run convention), so a fixed budget of
+	// PPU_RUST_NTSC_PPU_DOTS_PER_FRAME units advances the CPU exactly
+	// one frame's worth of time while the PPU advances the same 89342
+	// dots. This is the exact `runppu(1)` + `X6502_Run(1)` granularity
+	// of the C++ new PPU (`FCEUX_PPU_Loop`) — the 3-dot chunking tried
+	// first in Phase 5.1 shifted the sub-instruction CPU/PPU phase
+	// enough to change when nestest's vblwait exits, which moved its
+	// $2006/$3Fxx write window and failed the rom_regression golden
+	// for frames 3-7.
+	//
+	// This keeps `timestamp` / `::scanline` live mid-frame and lets
+	// mapper hooks (GameHBIRQHook / GameHBIRQHook2 / PPU_hook) fire at
+	// the PPU dot they belong to, with IRQ lines serviced by the CPU
+	// within the same frame — the property the batch `emit_frame`
+	// model lacked.
 	if (ppu_rust_bridge_active()) [[unlikely]] {
-		return ppu_rust_bridge_emit_frame(skip);
+		for (uint32_t dot = 0; dot < PPU_RUST_NTSC_PPU_DOTS_PER_FRAME; ++dot) {
+			ppu_rust_bridge_advance_ppu_dots(1);
+			// Phase 5.1: forward the Rust PPU's VBL NMI assertion to
+			// the CPU. `TriggerNMI()` ORs FCEU_IQNMI and arms the
+			// one-instruction "fresh" deferral — the exact latch the
+			// C++ engines use. Without this the PPU NMI never reaches
+			// the CPU and ROMs that wait for a VBL interrupt
+			// (nestest's IRQ-wait at $C28F) spin forever.
+			if (ppu_rust_bridge_take_nmi()) {
+				TriggerNMI();
+			}
+			fceu11::cpu_instance().run(1);
+		}
+		ppu_rust_bridge_copy_framebuffer();
+		return 0;
 	}
 #endif
 

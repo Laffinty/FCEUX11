@@ -23,10 +23,14 @@ pub const OAM_SIZE: usize = 0x100;
 pub const SECONDARY_OAM_SIZE: usize = 0x20;
 /// Maximum sprites per scanline.
 pub const MAX_SPRITES_PER_LINE: usize = 8;
-/// NTSC scanlines per frame, indexed `-1` (pre-render) ..= `261`
-/// (post-render / VBL clear) — 263 indices total. `NTSC_SCANLINES` is
-/// the count exclusive of the pre-render: `next_sl >= NTSC_SCANLINES`
-/// triggers a frame wrap.
+/// NTSC scanlines per frame. The state machine indexes the pre-render
+/// line as `-1` (hardware scanline 261) and visible/post/VBL lines as
+/// `0..=260` — 262 scanlines × 341 dots = 89342 dots per frame, matching
+/// the C++ `Cpu::run` frame budget. Phase 5.1: the wrap fires from
+/// sl 260 directly to sl -1 (`next_sl >= NTSC_SCANLINES - 1`); the old
+/// `>= NTSC_SCANLINES` threshold also let sl 261 occur, double-counting
+/// the pre-render line (263-line / 89683-dot frames) and drifting one
+/// scanline per frame against the CPU budget.
 pub const NTSC_SCANLINES: i16 = 262;
 /// PPU dots per scanline (visible 256 + hblank 85 = 341, indexed 0..=340).
 pub const DOTS_PER_SCANLINE: u16 = 341;
@@ -56,6 +60,15 @@ pub struct PpuState {
     /// Set by `$2002` read at sl 241 dot 0; consulted by frame state
     /// machine to suppress VBL flag set + NMI for this frame.
     pub vbl_suppressed_this_frame: bool,
+    /// Phase 5.1: NMI line latch. Set by the per-dot driver when the
+    /// frame state machine asserts NMI (sl 241 dot 1 with NMI enabled
+    /// and no VBL suppression); consumed (taken-and-cleared) by the
+    /// C++ bridge via `fceux11_ppu_take_nmi_pending`, which forwards
+    /// it to the canonical C++ `TriggerNMI()` latch. Without this the
+    /// PPU NMI never reaches the CPU and any ROM that waits for a VBL
+    /// interrupt (nestest's IRQ-wait at $C28F, blargg vbl tests) spins
+    /// forever.
+    pub nmi_pending: bool,
     /// Toggles every pre-render to drive even/odd skip.
     pub odd_frame: bool,
     /// Tracks whether the most recent CPU write was `$2005`/`$2006`
@@ -158,6 +171,7 @@ impl PpuState {
             dot: 0,
             frame: 0,
             vbl_suppressed_this_frame: false,
+            nmi_pending: false,
             odd_frame: false,
             last_was_2005_or_2006: false,
             oam_dma_pending: false,

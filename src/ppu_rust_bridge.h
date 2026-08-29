@@ -39,13 +39,41 @@ void ppu_rust_bridge_shutdown();
 
 // Frame driver — replaces FCEUPPU_Loop's inner loop when Rust PPU is
 // the active engine. Returns the same int as FCEUPPU_Loop (0).
+//
+// Phase 5.1+: FCEUPPU_Loop no longer calls this for the whole frame;
+// it drives the per-cycle interleave loop below instead. This entry
+// point is kept as the legacy batch-model stub (cold-start only; no
+// active call site in v2.1).
 int ppu_rust_bridge_emit_frame(int skip);
 
-// Phase 3: per-cycle CPU/PPU interleave. Advances the Rust PPU by 1
-// CPU cycle (3 dots) and fires mapper event hooks. The C++ side
-// drives CPU cycles via `X6502_Run(1)` between calls. Returns 1 if
-// the frame completed this call, 0 otherwise.
+// Phase 5.1 frame geometry. NTSC: one frame = 89342 PPU dots
+// (262 scanlines x 341 dots). `fceu11::Cpu::run(n)` and the legacy
+// X6502_Run take n in PPU-dot units (1 CPU cycle = 3 units; the
+// deleted X6502_RunDebug added `cycles * 16` to the budget and each
+// ADDCYC(c) subtracted `c * 48`), so one frame of CPU time = 89342
+// units = 29780 whole cycles + a 2-unit remainder (89342 = 3*29780+2).
+#define PPU_RUST_NTSC_PPU_DOTS_PER_FRAME   89342u
+#define PPU_RUST_NTSC_CPU_UNITS_PER_FRAME  89342u
+#define PPU_RUST_NTSC_CPU_CYCLES_PER_FRAME 29780u
+
+// Phase 5.1: per-cycle CPU/PPU interleave. Advances the Rust PPU by 3
+// PPU dots (one CPU cycle's worth), rendering visible scanlines at
+// their start and firing mapper event hooks. The C++ side drives the
+// CPU via `fceu11::cpu_instance().run(3)` between calls (3 dot units
+// = 1 CPU cycle). Returns 1 if the frame completed this call, 0
+// otherwise.
 int ppu_rust_bridge_emit_one_cpu_cycle();
+
+// Phase 5.1: advance the Rust PPU by an arbitrary dot count with the
+// same per-dot pipeline (render / hooks / OAM DMA). Used by the
+// FCEUPPU_Loop interleave loop for the 2-dot frame remainder
+// (89342 - 3*29780).
+void ppu_rust_bridge_advance_ppu_dots(uint32_t dots);
+
+// Phase 5.1: take-and-clear the Rust PPU's NMI latch (set when the
+// frame state machine asserts NMI at sl 241 dot 1). Returns non-zero
+// when the caller must pulse the CPU NMI line via `TriggerNMI()`.
+int ppu_rust_bridge_take_nmi();
 
 // Bank-window setup — called from setchr*/setntamem paths.
 void ppu_rust_bridge_set_chr_window(uint32_t slot, const uint8_t* ptr, uint32_t len, bool is_ram);
@@ -84,6 +112,8 @@ inline void     ppu_rust_bridge_cpu_write(uint32_t /*addr*/, uint8_t /*value*/) 
 inline void ppu_rust_bridge_copy_framebuffer() {}
 inline bool ppu_rust_bridge_active() { return false; }
 inline int  ppu_rust_bridge_emit_one_cpu_cycle() { return 0; }
+inline void ppu_rust_bridge_advance_ppu_dots(uint32_t /*dots*/) {}
+inline int  ppu_rust_bridge_take_nmi() { return 0; }
 
 #endif // FCEUX11_RUST_PPU
 

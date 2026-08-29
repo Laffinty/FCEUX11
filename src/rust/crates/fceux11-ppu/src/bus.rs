@@ -49,7 +49,7 @@ pub trait PpuBus {
     fn notify_scanline(&mut self, _sl: i16) {}
 
     /// Called when VBlank asserts/deasserts. `asserted=true` on enter,
-    /// `asserted=false` on exit (sl 261 for NTSC).
+    /// `asserted=false` on exit (the pre-render line, sl -1).
     fn notify_vblank(&mut self, _asserted: bool) {}
 }
 

@@ -24,16 +24,18 @@ fn vbl_flag_set_at_sl_241_dot_1_with_nmi_enable() {
 }
 
 #[test]
-fn vbl_flag_clear_at_sl_261_dot_1() {
+fn vbl_flag_clear_at_pre_render_dot_1() {
     let mut s = PpuState::new();
     let mut bus = FlatBus::new();
     // Pre-set the VBL flag to prove the state machine clears it.
+    // Phase 5.1 geometry: the pre-render line is sl -1 (hardware 261);
+    // sl 261 no longer occurs inside a frame.
     s.registers.set_vbl_flag();
-    let _ = tick_to(&mut s, &mut bus, 261, 1);
+    let _ = tick_to(&mut s, &mut bus, -1, 1);
     assert_eq!(
         s.registers.status & (1 << status_bits::VBL),
         0,
-        "VBL flag should be cleared at sl 261 dot 1"
+        "VBL flag should be cleared at the pre-render line dot 1"
     );
 }
 
@@ -189,11 +191,12 @@ fn suppression_flag_resets_at_frame_boundary() {
     let mut s = PpuState::new();
     s.vbl_suppressed_this_frame = true;
     let mut bus = FlatBus::new();
-    // Tick to sl 261 dot 340 (the boundary tick that fires the reset +
-    // wrap). After this, we're in the next frame at sl -1 dot 0.
-    let _ = tick_to(&mut s, &mut bus, 261, 340);
+    // Tick to the last dot of the pre-render line (-1, 340) — the
+    // boundary tick that fires the suppression reset, then advances
+    // into the next frame's sl 0 (no even/odd skip: rendering off).
+    let _ = tick_to(&mut s, &mut bus, -1, 340);
     assert!(!s.vbl_suppressed_this_frame);
-    assert_eq!(s.scanline, -1);
+    assert_eq!(s.scanline, 0);
     assert_eq!(s.dot, 0);
 }
 

@@ -24,6 +24,16 @@ extern "C" {
 #include <cstdio>
 #include <array>
 
+// Phase 5.1: canonical PPU-space accessors (src/ppu.cpp / ppu.h). The
+// Rust PPU's bus callbacks route through these so nametable RAM /
+// CHR / palette semantics (RAM gating, palette mirroring, mapper
+// bank state) match the C++ engine exactly — and so PPU-space
+// addresses never re-enter this bridge's own CPU-space register
+// handlers (see bridge_bus_read).
+extern uint8_t (*FFCEUX_PPURead)(uint32_t);
+// Palette RAM (defined in ppu.cpp); the palette window mirrors it.
+extern std::array<uint8_t, 0x20> PALRAM;
+
 namespace {
 
 // ---------------------------------------------------------------------------
@@ -35,19 +45,118 @@ bool      g_active    = false;
 
 constexpr uint32_t kNtscCpuCyclesPerFrame = 89342;
 
+// CHR/NT window backing stores (namespace-scope so both
+// `bridge_refresh_windows` and the power path share them; the Rust
+// side holds these pointers, so they must outlive any single call).
+uint8_t g_chr_window[8192];
+uint8_t g_nt_window[4096];
+
+// Phase 5.1: (re)install the CHR/NT/Palette windows from the live C++
+// bus state. Called from `ppu_rust_bridge_power` and after every
+// CPU-space $2007 write: the Rust renderer reads these COPIES, so
+// without the refresh, PPU-space writes (nametable text, palette
+// changes, CHR-RAM uploads) would never become visible to the Rust
+// renderer — rom_regression's nestest frames diverged from frame 3
+// (the first display-write frame) for exactly this reason.
+//
+// CHR: build a contiguous 8 KiB window by reading through
+// g_bus.vpage[p] for each 1 KiB page $0000-$1FFF. For NROM all 8
+// pages point to the same 8 KiB buffer; for mappers with CHR
+// banking, each page can resolve to a different bank.
+void bridge_refresh_windows() {
+    auto& vpage = fceu11::g_bus.vpage();
+    for (uint32_t p = 0; p < 8; ++p) {
+        // g_bus.set_vpage stores `ptr - addr` so a read of
+        // `vpage_[idx] + addr` recovers `ptr`. We undo that here.
+        const uint8_t* page_base = vpage[p] + (p << 10);
+        for (uint32_t i = 0; i < 1024; ++i) {
+            g_chr_window[p * 1024 + i] = page_base[i];
+        }
+    }
+    fceux11_ppu_set_chr_window(g_ppu_state, 0, g_chr_window, 8192, false);
+    // NT: 4 KiB window covering vnapage[0..4]. The C++ vnapage table
+    // is set up by the mapper's Power handler via Ppu::set_mirror_page
+    // / set_mirror_mode; the Rust renderer's `map_nametable_addr` has
+    // a four-screen case that uses pages 2/3 directly, so all four
+    // pages must be present. (A 2 KiB buffer here was also the
+    // static-buffer-overflow root cause fixed in this phase: the old
+    // 4-page loop wrote 4096 bytes into 2048 on every Power.)
+    auto& vnapage = fceu11::g_ppu.vnapage();
+    for (uint32_t p = 0; p < 4; ++p) {
+        const uint8_t* page_base = vnapage[p];
+        if (page_base == nullptr) {
+            // Mapper hasn't set this page; fall back to NTARAM
+            // base. This happens for mappers that only configure
+            // pages 0/1 and rely on the default for 2/3.
+            page_base = &fceu11::g_ppu.ntaram()[0];
+        }
+        for (uint32_t i = 0; i < 1024; ++i) {
+            g_nt_window[p * 1024 + i] = page_base[i];
+        }
+    }
+    fceux11_ppu_set_nt_window(g_ppu_state, g_nt_window, 4096);
+    // Palette: 32 bytes from PALRAM (declared at file scope above).
+    fceux11_ppu_set_palette_window(g_ppu_state, PALRAM.data(), static_cast<uint32_t>(PALRAM.size()));
+    // Mirror mode detection: compare the 4 vnapage pointers to
+    // figure out which FCEUX mirror mode the mapper selected.
+    // This avoids the need to thread the mode byte through Bus
+    // and lets us auto-detect from the side-effect of
+    // Ppu::set_mirror_mode.
+    const uint8_t* nt_base = &fceu11::g_ppu.ntaram()[0];
+    auto is_p0 = vnapage[0] == nt_base;
+    auto is_p1 = vnapage[1] == nt_base + 0x400;
+    auto is_p2 = vnapage[2] == nt_base;
+    auto is_p3 = vnapage[3] == nt_base + 0x400;
+    uint32_t mode = 0;
+    if (is_p0 && is_p1 && !is_p2 && !is_p3) {
+        mode = 0;  // horizontal (vnapage[0]=vnapage[1]=base, [2]=[3]=base+0x400)
+    } else if (is_p0 && !is_p1 && is_p2 && !is_p3) {
+        mode = 1;  // vertical (vnapage[0]=vnapage[2]=base, [1]=[3]=base+0x400)
+    } else if (vnapage[0] == nt_base && vnapage[1] == nt_base && vnapage[2] == nt_base && vnapage[3] == nt_base) {
+        mode = 2;  // single-low
+    } else if (vnapage[0] == nt_base + 0x400 && vnapage[1] == nt_base + 0x400) {
+        mode = 3;  // single-high
+    } else {
+        mode = 4;  // four-screen or other
+    }
+    fceux11_ppu_set_mirror_mode(g_ppu_state, mode);
+}
+
+
 // ---------------------------------------------------------------------------
 // C++ thunks for the bus callback vtable. Forward to existing g_bus
 // tables, matching the legacy FFCEUX_PPURead / FFCEUX_PPUWrite hooks.
 // ---------------------------------------------------------------------------
 
 uint8_t bridge_bus_read(uint32_t addr) {
-    if (addr >= 0x10000) return 0x00;
-    return fceu11::g_bus.aread_table()[addr](addr);
+    // Phase 5.1: `addr` is a PPU-space ($0000-$3FFF) byte address. It
+    // MUST go through the C++ PPU-space accessors (FFCEUX_PPURead /
+    // FFCEUX_PPURead_Default), NOT the CPU-space dispatch table:
+    // `g_bus.aread_table()[$2000-$2007]` now holds THIS bridge's own
+    // CPU-register handlers (installed by bridge_init/bridge_power),
+    // so a PPU-space read/write landing in $2000-$2007 would
+    // re-enter `fceux11_ppu_cpu_read/write` → `read_data`/`write_data`
+    // → bus.read/write → back here — unbounded recursion (observed as
+    // a STATUS_STACK_OVERFLOW once nestest's $2007 nametable writes
+    // land on v == $2007).
+    addr &= 0x3FFF;
+    if (FFCEUX_PPURead) return FFCEUX_PPURead(addr);
+    return FFCEUX_PPURead_Default(addr);
 }
 
 void bridge_bus_write(uint32_t addr, uint8_t value) {
-    if (addr >= 0x10000) return;
-    fceu11::g_bus.bwrite_table()[addr](addr, value);
+    if (addr >= 0x4000) {
+        // Defensive: the Rust side never emits out-of-PPU addresses.
+        return;
+    }
+    // Phase 5.1: same re-entrancy argument as bridge_bus_read — route
+    // PPU-space writes through the C++ PPU-space accessor, never the
+    // CPU-space table (whose $2000-$2007 slots are our own handlers).
+    if (FFCEUX_PPUWrite) {
+        FFCEUX_PPUWrite(addr, value);
+    }
+    // Else: hooks not yet installed (pre-Power). Old engines dropped
+    // $2007 writes then too.
 }
 
 void bridge_notify_a12_rising() {
@@ -82,6 +191,13 @@ void bridge_notify_scanline(int16_t sl) {
     // Phase 3: forward to the C++ `PPU_hook` callback with the new
     // scanline. `PPU_hook` is a function pointer the mapper can
     // install for per-scanline timing.
+    //
+    // Phase 5.1: also keep the legacy `::scanline` view live. The
+    // per-cycle interleave fires this thunk on every true scanline
+    // transition mid-frame, so consumers reading `g_cpu.scanline()`
+    // (e.g. MMC3_hb_PALStarWarsHack, savestate CPU views) observe the
+    // current line instead of a stale frame-end snapshot.
+    fceu11::cpu_instance().set_scanline(sl);
     if (PPU_hook) {
         PPU_hook(sl);
     }
@@ -176,78 +292,12 @@ void ppu_rust_bridge_power() {
             ppu_rust_bridge_cpu_write(A, V);
         });
 
-        // Phase 4: install CHR/NT/Palette windows from the C++ bus
+        // Phase 4/5.1: install CHR/NT/Palette windows from the C++ bus
         // state. The mapper's Power handler has already populated
-        // `g_bus.vpage[]` and `g_ppu.vnapage()` by this point.
-        //
-        // CHR: build a contiguous 8 KiB window by reading through
-        // g_bus.vpage[p] for each 1 KiB page $0000-$1FFF. For NROM
-        // all 8 pages point to the same 8 KiB buffer; for mappers
-        // with CHR banking, each page can resolve to a different
-        // bank. We do the resolution eagerly (one read per byte)
-        // so the Rust PPU's hot path can do direct array indexing
-        // without going through the FFI bus callback. This is the
-        // "CHR window cache" the v2.1 plan §6.5 calls for.
-        auto& vpage = fceu11::g_bus.vpage();
-        static uint8_t chr_window[8192];
-        for (uint32_t p = 0; p < 8; ++p) {
-            // g_bus.set_vpage stores `ptr - addr` so a read of
-            // `vpage_[idx] + addr` recovers `ptr`. We undo that here.
-            const uint8_t* page_base = vpage[p] + (p << 10);
-            for (uint32_t i = 0; i < 1024; ++i) {
-                chr_window[p * 1024 + i] = page_base[i];
-            }
-        }
-        fceux11_ppu_set_chr_window(g_ppu_state, 0, chr_window, 8192, false);
-        // NT: 2 KiB window covering vnapage[0] (page 0) and
-        // vnapage[1] (page 1). The C++ vnapage table is set up by
-        // the mapper's Power handler via Ppu::set_mirror_page /
-        // set_mirror_mode. For four-screen or 4-page mappers,
-        // vnapage[2] and vnapage[3] are also used; we copy them too
-        // so the Rust renderer's `map_nametable_addr` works for
-        // all 5 mirror modes (it has a four-screen case that uses
-        // page 2/3 directly).
-        auto& vnapage = fceu11::g_ppu.vnapage();
-        static uint8_t nt_window[2048];
-        for (uint32_t p = 0; p < 4; ++p) {
-            const uint8_t* page_base = vnapage[p];
-            if (page_base == nullptr) {
-                // Mapper hasn't set this page; fall back to NTARAM
-                // base. This happens for mappers that only configure
-                // pages 0/1 and rely on the default for 2/3.
-                page_base = &fceu11::g_ppu.ntaram()[0];
-            }
-            for (uint32_t i = 0; i < 1024; ++i) {
-                nt_window[p * 1024 + i] = page_base[i];
-            }
-        }
-        fceux11_ppu_set_nt_window(g_ppu_state, nt_window, 2048);
-        // Palette: 32 bytes from PALRAM (declared in ppu.cpp).
-        extern std::array<uint8_t, 0x20> PALRAM;
-        fceux11_ppu_set_palette_window(g_ppu_state, PALRAM.data(), static_cast<uint32_t>(PALRAM.size()));
-        // Mirror mode detection: compare the 4 vnapage pointers to
-        // figure out which FCEUX mirror mode the mapper selected.
-        // This avoids the need to thread the mode byte through Bus
-        // and lets us auto-detect from the side-effect of
-        // Ppu::set_mirror_mode.
-        const uint8_t* nt_base = &fceu11::g_ppu.ntaram()[0];
-        auto is_p0 = vnapage[0] == nt_base;
-        auto is_p1 = vnapage[1] == nt_base + 0x400;
-        auto is_p2 = vnapage[2] == nt_base;
-        auto is_p3 = vnapage[3] == nt_base + 0x400;
-        uint32_t mode = 0;
-        if (is_p0 && is_p1 && !is_p2 && !is_p3) {
-            mode = 0;  // horizontal (vnapage[0]=vnapage[1]=base, [2]=[3]=base+0x400)
-        } else if (is_p0 && !is_p1 && is_p2 && !is_p3) {
-            mode = 1;  // vertical (vnapage[0]=vnapage[2]=base, [1]=[3]=base+0x400)
-        } else if (vnapage[0] == nt_base && vnapage[1] == nt_base && vnapage[2] == nt_base && vnapage[3] == nt_base) {
-            mode = 2;  // single-low
-        } else if (vnapage[0] == nt_base + 0x400 && vnapage[1] == nt_base + 0x400) {
-            mode = 3;  // single-high
-        } else {
-            mode = 4;  // four-screen or other
-        }
-        fceux11_ppu_set_mirror_mode(g_ppu_state, mode);
+        // `g_bus.vpage[]` and `g_ppu.vnapage()` by this point. The
+        // copy logic lives in `bridge_refresh_windows` (shared with
+        // the post-$2007-write refresh path).
+        bridge_refresh_windows();
     }
 }
 
@@ -268,33 +318,59 @@ int ppu_rust_bridge_emit_frame(int skip) {
         return 0;
     }
     (void)skip;  // Phase 2 doesn't differentiate skip frames.
-    // Phase 4: drive the CPU and the Rust PPU. The C++ Emulate()
-    // function only calls FCEUPPU_Loop, which delegates to the
-    // bridge — the CPU is NOT driven by anyone else. So we must
-    // run the CPU here. The "per-cycle interleave" documented in
-    // Phase 3 §10.2 is a follow-on; for now we use the simpler
-    // "run CPU for the full frame, then advance PPU" model. This
-    // is enough for NROM bit-exact because the NROM mapper has no
-    // per-cycle PPU side effects beyond $2000-$2007 writes.
+    // Phase 5.1+ ONLY: use the per-cycle interleave driven from
+    // `FCEUPPU_Loop` (`ppu_rust_bridge_emit_one_cpu_cycle` +
+    // `fceu11::cpu_instance().run(3)`). This batch model — run the
+    // CPU for the full frame, then advance the PPU — is the old
+    // cold-start stub kept for the pre-per-cycle wiring. It is not
+    // called by any active v2.1 call site: under it the CPU runs with
+    // the PPU frozen at the frame boundary, mapper hooks fire one
+    // frame late, and `fceux11_ppu_emulate_frame(89342)` advances 3
+    // PPU frames (its `n_cycles` argument is a CPU-cycle budget that
+    // the FFI multiplies by 3) while `cpu.run(89342)` advances 1.
     fceu11::cpu_instance().run(static_cast<int32_t>(kNtscCpuCyclesPerFrame));
     int rc = fceux11_ppu_emulate_frame(g_ppu_state, kNtscCpuCyclesPerFrame);
     ppu_rust_bridge_copy_framebuffer();
     return rc;
 }
 
-/// Phase 3: advance the Rust PPU by exactly one CPU cycle (3 PPU dots)
-/// and fire mapper event hooks. The C++ `FCEUPPU_Loop` calls this
-/// between `X6502_Run(1)` invocations to achieve per-cycle CPU/PPU
-/// interleave (mirrors the C++ new PPU's `runppu(1)` + `X6502_Run(1)`
-/// interleaving in `src/ppu_rendering.cpp:1711-2170`).
+/// Phase 5.1: advance the Rust PPU by exactly one CPU cycle's worth of
+/// PPU dots (3) — rendering visible scanlines at their start, firing
+/// mapper event hooks, and pumping the OAM DMA. `FCEUPPU_Loop`'s
+/// per-cycle interleave calls this between
+/// `fceu11::cpu_instance().run(3)` invocations (3 dot units = 1 CPU
+/// cycle in the `Cpu::run` dot-unit convention), mirroring the C++
+/// new PPU's `runppu(1)` + `X6502_Run(1)` interleaving.
 ///
-/// Returns 1 if the frame is complete (sl 261 dot 340 → wrap to
+/// Returns 1 if the frame is complete (sl 260 dot 340 → wrap to
 /// next frame), 0 otherwise.
 int ppu_rust_bridge_emit_one_cpu_cycle() {
     if (g_ppu_state == nullptr) {
         return 0;
     }
-    return fceux11_ppu_tick_one_cpu_cycle(g_ppu_state);
+    return fceux11_ppu_tick_dots(g_ppu_state, 3);
+}
+
+/// Phase 5.1: advance the Rust PPU by an arbitrary dot count with the
+/// same per-dot pipeline as `emit_one_cpu_cycle`. The FCEUPPU_Loop
+/// per-dot interleave calls this with 1 for each of the 89342 dots of
+/// an NTSC frame.
+void ppu_rust_bridge_advance_ppu_dots(uint32_t dots) {
+    if (g_ppu_state == nullptr || dots == 0) {
+        return;
+    }
+    fceux11_ppu_tick_dots(g_ppu_state, dots);
+}
+
+/// Phase 5.1: take-and-clear the Rust PPU's NMI latch. The per-cycle
+/// interleave polls this every dot and pulses the CPU NMI line via
+/// `TriggerNMI()` when set — the same latch path the C++ engines use
+/// for the VBL NMI (including the one-instruction "fresh" deferral).
+int ppu_rust_bridge_take_nmi() {
+    if (g_ppu_state == nullptr) {
+        return 0;
+    }
+    return fceux11_ppu_take_nmi_pending(g_ppu_state);
 }
 
 void ppu_rust_bridge_copy_framebuffer() {
@@ -349,6 +425,15 @@ void ppu_rust_bridge_cpu_write(uint32_t addr, uint8_t value) {
         return;
     }
     fceux11_ppu_cpu_write(g_ppu_state, static_cast<uint16_t>(addr), value);
+    // Phase 5.1: a $2007 write landed in CHR/NT/palette space (the
+    // Rust `write_data` routed it to the C++ authoritative arrays via
+    // bridge_bus_write). Refresh the renderer's window copies so the
+    // next render observes the write. Without this, the Rust renderer
+    // reads its at-Power snapshot forever and post-boot display
+    // writes are invisible (rom_regression nestest frames 3+).
+    if (addr == 0x2007) {
+        bridge_refresh_windows();
+    }
 }
 
 bool ppu_rust_bridge_active() {

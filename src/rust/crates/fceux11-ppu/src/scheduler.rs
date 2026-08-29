@@ -103,6 +103,19 @@ impl NesScheduler {
         self.vbl_asserted = false;
     }
 
+    /// Phase 5.1: reset the per-frame accumulators after the frame
+    /// wrap detected by the per-dot driver
+    /// (`ffi::fceux11_ppu_tick_dots`). Unlike [`Self::begin_frame`],
+    /// this does NOT re-arm the scanline sentinel: the transition into
+    /// the pre-render line already fired inside the wrap tick, and
+    /// re-arming would double-fire `notify_scanline(-1)` on the first
+    /// tick of the new frame.
+    pub fn reset_frame_counters(&mut self) {
+        self.cpu_cycles_consumed = 0;
+        self.ppu_dots_consumed = 0;
+        self.vbl_asserted = false;
+    }
+
     /// Total CPU cycles consumed by the current frame so far.
     #[inline]
     pub fn cpu_cycles_consumed(&self) -> u32 {
