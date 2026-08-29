@@ -23,6 +23,7 @@ pub mod render;
 pub mod registers;
 pub mod rendering;
 pub mod scheduler;
+pub mod snapshot;
 pub mod state;
 
 pub use bus::{FlatBus, PpuBus};
