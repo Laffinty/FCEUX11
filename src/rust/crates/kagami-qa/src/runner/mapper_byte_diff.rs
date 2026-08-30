@@ -1035,28 +1035,51 @@ unsafe extern "C" {
 
 /// Drive one case: fresh engine → load → run N frames → capture mapper
 /// state. Returns the captured body, or `Err` on load/step failure.
+///
+/// `frames_override`, when `Some(n)`, replaces `case.frames` for this
+/// call. Phase 6.1.c uses this to gate `mapper_mmc1_frame0_byte_diff`
+/// at frame 0 (`--frames 1`) without authoring a separate table entry.
 fn collect_mapper_state<A>(
     adapter: &mut A,
     case: &RomMapperCase,
     workdir: &Path,
+    frames_override: Option<u32>,
 ) -> Result<Vec<u8>, QaError>
 where
     A: SutAdapter + MapperStateSource,
 {
     adapter.reset_fresh()?;
     let rom_path = resolve_rom_path(workdir, &case.filename);
+    let frames = frames_override.unwrap_or(case.frames);
     let spec = InputSpec {
         rom_path: Some(rom_path.to_string_lossy().to_string()),
         script_path: None,
-        frames: case.frames,
+        frames,
         probe_addr: 0x6000,
         reset_after: -1,
     };
     adapter.load(&spec)?;
-    for _ in 0..case.frames {
+    for _ in 0..frames {
         adapter.step()?;
     }
     adapter.snapshot_mapper_state()
+}
+
+/// Phase 6.1.c: drive one case and return its mapper state body — same
+/// pipeline as `collect_mapper_state`, but the failures are surfaced as
+/// `String` (not the QaError enum) so the `--generate` entry can print
+/// the reason without leaking error types across the module boundary.
+pub fn collect_for_generate<A>(
+    adapter: &mut A,
+    case: &RomMapperCase,
+    workdir: &Path,
+    frames_override: Option<u32>,
+) -> Result<Vec<u8>, String>
+where
+    A: SutAdapter + MapperStateSource,
+{
+    collect_mapper_state(adapter, case, workdir, frames_override)
+        .map_err(|e| format!("{e:?}"))
 }
 
 /// Compare one case's live body against its golden file.
@@ -1065,11 +1088,12 @@ fn classify_case<A>(
     case: &RomMapperCase,
     workdir: &Path,
     golden_dir: &Path,
+    frames_override: Option<u32>,
 ) -> MapperCaseVerdict
 where
     A: SutAdapter + MapperStateSource,
 {
-    let body = match collect_mapper_state(adapter, case, workdir) {
+    let body = match collect_mapper_state(adapter, case, workdir, frames_override) {
         Ok(b) => b,
         Err(_) => {
             // C++ prints "[FAIL] <name>: core_init/load_rom failed".
@@ -1131,17 +1155,24 @@ where
 /// runs the full 175-case table — the Phase 5.3 mapper-specific ctests
 /// (`mapper_mmc1_byte_diff` etc.) pass one name each so a single mapper
 /// regression is individually gated in ctest.
+///
+/// `frames_override`, when `Some(n)`, replaces the per-case `frames`
+/// budget for every case the harness runs. Phase 6.1.c `--frames N`
+/// consumes this; the golden for the override case MUST be regenerated
+/// at the same frame count (the C++ harness's 90-frame `mmc1.bin` and
+/// the new 1-frame `mmc1_frame0.bin` are independent fixtures).
 pub fn run_regression_filtered<A>(
     adapter: &mut A,
     workdir: &Path,
     golden_dir: &Path,
     only: &[String],
+    frames_override: Option<u32>,
 ) -> MapperDiffOutcome
 where
     A: SutAdapter + MapperStateSource,
 {
     if only.is_empty() {
-        return run_regression(adapter, workdir, golden_dir);
+        return run_regression(adapter, workdir, golden_dir, frames_override);
     }
     let mut outcome = MapperDiffOutcome::default();
     for name in only {
@@ -1152,7 +1183,7 @@ where
                 .push((name.clone(), format!("unknown case name '{name}'")));
             continue;
         };
-        match classify_case(adapter, case, workdir, golden_dir) {
+        match classify_case(adapter, case, workdir, golden_dir, frames_override) {
             MapperCaseVerdict::Pass { .. } => outcome.passed += 1,
             MapperCaseVerdict::Skip => outcome.skipped += 1,
             MapperCaseVerdict::Fail { reason } => {
@@ -1165,7 +1196,12 @@ where
     outcome
 }
 
-pub fn run_regression<A>(adapter: &mut A, workdir: &Path, golden_dir: &Path) -> MapperDiffOutcome
+pub fn run_regression<A>(
+    adapter: &mut A,
+    workdir: &Path,
+    golden_dir: &Path,
+    frames_override: Option<u32>,
+) -> MapperDiffOutcome
 where
     A: SutAdapter + MapperStateSource,
 {
@@ -1173,7 +1209,7 @@ where
     outcome.total = mapper_cases().len();
 
     for case in mapper_cases() {
-        match classify_case(adapter, case, workdir, golden_dir) {
+        match classify_case(adapter, case, workdir, golden_dir, frames_override) {
             MapperCaseVerdict::Pass { .. } => outcome.passed += 1,
             MapperCaseVerdict::Skip => outcome.skipped += 1,
             MapperCaseVerdict::Fail { reason } => {
@@ -1354,7 +1390,7 @@ mod tests {
             name: "nrom".into(),
             frames: 60,
         };
-        let v = classify_case(&mut a, &case, Path::new("."), &tmp);
+        let v = classify_case(&mut a, &case, Path::new("."), &tmp, None);
         assert_eq!(v, MapperCaseVerdict::Pass { body_size: 4 });
         assert_eq!(a.step_count, 60);
         assert_eq!(a.reset_fresh_calls, 1);
@@ -1371,7 +1407,7 @@ mod tests {
             name: "no_such_mapper".into(),
             frames: 60,
         };
-        let v = classify_case(&mut a, &case, Path::new("."), &tmp);
+        let v = classify_case(&mut a, &case, Path::new("."), &tmp, None);
         assert_eq!(v, MapperCaseVerdict::Skip);
         let _ = std::fs::remove_dir_all(&tmp);
     }
@@ -1387,7 +1423,7 @@ mod tests {
             name: "mmc1".into(),
             frames: 60,
         };
-        let v = classify_case(&mut a, &case, Path::new("."), &tmp);
+        let v = classify_case(&mut a, &case, Path::new("."), &tmp, None);
         match v {
             MapperCaseVerdict::Fail { reason } => {
                 assert!(reason.contains("byte-diff at offset 2"));
@@ -1408,7 +1444,7 @@ mod tests {
             name: "vrc6".into(),
             frames: 90,
         };
-        let v = classify_case(&mut a, &case, Path::new("."), &tmp);
+        let v = classify_case(&mut a, &case, Path::new("."), &tmp, None);
         assert!(matches!(v, MapperCaseVerdict::Fail { .. }));
         let _ = std::fs::remove_dir_all(&tmp);
     }
@@ -1424,7 +1460,7 @@ mod tests {
             name: "nrom".into(),
             frames: 60,
         };
-        let v = classify_case(&mut a, &case, Path::new("."), &tmp);
+        let v = classify_case(&mut a, &case, Path::new("."), &tmp, None);
         assert!(matches!(v, MapperCaseVerdict::Fail { .. }));
         let _ = std::fs::remove_dir_all(&tmp);
     }
@@ -1440,8 +1476,30 @@ mod tests {
             name: "empty".into(),
             frames: 60,
         };
-        let v = classify_case(&mut a, &case, Path::new("."), &tmp);
+        let v = classify_case(&mut a, &case, Path::new("."), &tmp, None);
         assert_eq!(v, MapperCaseVerdict::Skip);
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    // ---------------- Frames override (Phase 6.1.c) ---------------------
+
+    #[test]
+    fn frames_override_replaces_case_budget() {
+        let tmp = std::env::temp_dir().join("kagami_mapper_test_frames_override");
+        let _ = std::fs::remove_dir_all(&tmp);
+        write_golden(&tmp, "mmc1", &[0xAA, 0xBB]);
+        let mut a = MockAdapter::new(vec![0xAA, 0xBB]);
+        let case = RomMapperCase {
+            filename: "fixtures/x.nes".into(),
+            name: "mmc1".into(),
+            frames: 90,
+        };
+        // Override 90 -> 1 frame: case.frames stays 90, only the
+        // step budget is clipped by the override.
+        let v = classify_case(&mut a, &case, Path::new("."), &tmp, Some(1));
+        assert_eq!(v, MapperCaseVerdict::Pass { body_size: 2 });
+        assert_eq!(a.step_count, 1, "override must replace frames budget");
+        assert_eq!(a.reset_fresh_calls, 1);
         let _ = std::fs::remove_dir_all(&tmp);
     }
 

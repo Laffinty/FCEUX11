@@ -252,6 +252,21 @@ void ppu_rust_bridge_init() {
             ppu_rust_bridge_cpu_write(A, V);
         });
     }
+    // Phase 6.1.d: install $2008-$3FFF mirrors so reads at $200A
+    // ($2002 mirror) route through the Rust bridge — otherwise the
+    // C++ A2002 handler returns the legacy C++ `PPU_status` which
+    // is NOT advanced when the Rust PPU is active (FCEUPPU_Loop
+    // delegates to ppu_rust_bridge_run_frame_interleaved and skips
+    // FCEUX_PPU_Loop). The blargg vbl_basics subtest 1 asserts
+    // $2002 == $200A; if $200A goes to C++ A2002 we return stale
+    // C++ status, failing the test. Routing $2008-$3FFF through the
+    // bridge keeps both reads observing the same Rust PPU state.
+    // (Writes are not mirrored: only $2000-$2007 are write-enabled.)
+    for (uint32_t a = 0x2008; a < 0x4000; a++) {
+        fceu11::g_bus.set_read_handler(a, a, [](uint32_t A) -> uint8_t {
+            return ppu_rust_bridge_cpu_read(A);
+        });
+    }
     // $4014 — OAM DMA. Single address, single read handler.
     fceu11::g_bus.set_read_handler(0x4014, 0x4014, [](uint32_t /*A*/) -> uint8_t {
         // $4014 is write-only; reads return open bus.
@@ -283,6 +298,14 @@ void ppu_rust_bridge_power() {
             });
             fceu11::g_bus.set_write_handler(a, a, [](uint32_t A, uint8_t V) {
                 ppu_rust_bridge_cpu_write(A, V);
+            });
+        }
+        // Phase 6.1.d: re-install $2008-$3FFF read mirrors (see
+        // bridge_init for rationale; C++ FCEUPPU_Power line 1186
+        // installs the original A200x/A2002/etc. mirrors here).
+        for (uint32_t a = 0x2008; a < 0x4000; a++) {
+            fceu11::g_bus.set_read_handler(a, a, [](uint32_t A) -> uint8_t {
+                return ppu_rust_bridge_cpu_read(A);
             });
         }
         fceu11::g_bus.set_read_handler(0x4014, 0x4014, [](uint32_t /*A*/) -> uint8_t {
@@ -440,13 +463,45 @@ uint8_t ppu_rust_bridge_cpu_read(uint32_t addr) {
     if (g_ppu_state == nullptr) {
         return 0;
     }
-    // NOTE (Phase 6.1.b intermediate state): only B2000 (rising-edge
-    // NMI enable) is ported so far. A2002 (sl240 cy340 suppression +
-    // sl241 cy≤1 cancellation) port is queued for Phase 6.1.d with a
-    // mapper_mmc1-frame-0 regression gate (per Phase 5.3 §5.3.4 note:
-    // "direct port regressed mapper_mmc1 frame 0 — windows interact
-    // with ppudead"). Until then, blargg 06-suppression parity is
-    // incomplete.
+    // Phase 6.1.d — A2002 port: $2002 reads near the VBL set boundary
+    // either suppress the upcoming flag set or cancel the pending NMI.
+    // C++ reference (src/ppu.cpp:608-632):
+    //   if (rsl == 240 && rcy == 340) {
+    //       fceu11_ppu_mark_vbl_set_suppressed();
+    //   } else if (rsl == 241 && rcy <= 1) {
+    //       X6502_IRQEnd(FCEU_IQNMI);  // cancel pending VBL NMI
+    //   }
+    // The Rust PPU's frame state machine sets VBL at sl 241 dot 1
+    // (frame.rs:122-138). Reads 1 dot BEFORE that (sl 240 dot 340)
+    // suppress the set entirely for the frame; reads at or 1 dot after
+    // the set (sl 241 dot ≤ 1) read VBL=1 + clear it AND additionally
+    // we clear nmi_pending so the per-dot interleave's `TriggerNMI`
+    // callback (the same one the C++ engines use for VBL NMI) does not
+    // fire — mirrors `X6502_IRQEnd(FCEU_IQNMI)`.
+    //
+    // Both paths consult the Rust PPU's live (scanline, dot) so the
+    // timing matches the C++ reference's `ppur.status.sl / cycle` query
+    // exactly. Regression net: tests/CMakeLists.txt
+    // `mapper_mmc1_frame0_byte_diff` ctest gate + the
+    // `rust_ppu_vbl_nmi_timing_test` blargg gate (enabled by 6.1.d).
+    if (addr == 0x2002) {
+        const int16_t sl = fceux11_ppu_get_scanline(g_ppu_state);
+        const uint16_t dot = fceux11_ppu_get_dot(g_ppu_state);
+        if (sl == 240 && dot == 340) {
+            // Suppress next-frame VBL set + NMI.
+            fceux11_ppu_mark_vbl_set_suppressed(g_ppu_state);
+        } else if (sl == 241 && dot <= 1) {
+            // Cancel pending VBL NMI. The Rust PPU has already set
+            // nmi_pending at sl 241 dot 1 (frame.rs:128); reading
+            // $2002 now returns VBL=1 + clears the flag (via the
+            // underlying read_status), and we additionally clear
+            // nmi_pending so the interleave's TriggerNMI callback
+            // (cpp/ppu_rust_bridge.cpp:bridge_trigger_nmi) does not
+            // fire — same effect as the C++ engine's
+            // X6502_IRQEnd(FCEU_IQNMI).
+            (void)fceux11_ppu_take_nmi_pending(g_ppu_state);
+        }
+    }
     return fceux11_ppu_cpu_read(g_ppu_state, static_cast<uint16_t>(addr));
 }
 

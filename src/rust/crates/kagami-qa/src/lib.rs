@@ -352,6 +352,7 @@ pub mod mapper_byte_diff_entry {
     use std::path::{Path, PathBuf};
 
     use crate::adapter::direct::Fceux11DirectAdapter;
+    use crate::adapter::trait_def::SutAdapter;
     use crate::runner::mapper_byte_diff::{
         format_summary, regression_exit_code, run_regression_filtered, MapperStateSource,
     };
@@ -361,6 +362,19 @@ pub mod mapper_byte_diff_entry {
     /// Phase 5.3: supports `--only <name>` (repeatable) to run a single
     /// mapper case — the `mapper_<name>_byte_diff` ctest entries gate one
     /// mapper each. With no `--only`, the full 175-case table runs.
+    ///
+    /// Phase 6.1.c: `--frames N` overrides the per-case frame budget for
+    /// every selected case. Used by `mapper_mmc1_frame0_byte_diff` to
+    /// gate the A2002-port regression at frame 0 only (Phase 5.3 §5.3.4:
+    /// "direct port regressed mapper_mmc1 frame 0 — windows interact
+    /// with ppudead"). `--frames 0` is rejected as nonsense (must be ≥ 1).
+    ///
+    /// `--generate`: writes each selected case's live mapper state into
+    /// the golden file (overwriting the existing `<name>.bin`). Combined
+    /// with `--only <name> --frames N`, used to author a fresh golden at
+    /// a non-default frame count (e.g. `mmc1_frame0.bin` for the
+    /// A2002-port regression net). Exit 0 on full success; non-zero if
+    /// any case fails to capture.
     pub unsafe extern "C" fn kagami_qa_mapper_byte_diff_main(
         argc: i32,
         argv: *const *const std::os::raw::c_char,
@@ -370,6 +384,8 @@ pub mod mapper_byte_diff_entry {
         let golden_dir = workdir.join("fixtures/golden_mapper");
 
         let mut only: Vec<String> = Vec::new();
+        let mut frames_override: Option<u32> = None;
+        let mut generate = false;
         let mut args: Vec<String> = Vec::new();
         for i in 0..argc {
             let ptr = unsafe { *argv.offset(i as isize) };
@@ -390,21 +406,153 @@ pub mod mapper_byte_diff_entry {
                 match it.next() {
                     Some(name) => only.push(name.clone()),
                     None => {
-                        let _ = write!(std::io::stdout(), "--only requires a case name
-");
+                        let _ = write!(std::io::stdout(), "--only requires a case name\n");
                         return 2;
                     }
                 }
+            } else if a == "--frames" {
+                match it.next() {
+                    Some(n) => match n.parse::<u32>() {
+                        Ok(v) if v >= 1 => frames_override = Some(v),
+                        Ok(_) => {
+                            let _ = write!(
+                                std::io::stdout(),
+                                "--frames requires a positive integer (got '{n}')\n"
+                            );
+                            return 2;
+                        }
+                        Err(_) => {
+                            let _ = write!(
+                                std::io::stdout(),
+                                "--frames requires an integer (got '{n}')\n"
+                            );
+                            return 2;
+                        }
+                    },
+                    None => {
+                        let _ = write!(std::io::stdout(), "--frames requires an integer\n");
+                        return 2;
+                    }
+                }
+            } else if a == "--generate" {
+                generate = true;
             }
             // Unknown args are ignored for backward compatibility (the
             // pre-5.3 entry ignored argv entirely).
         }
 
         let mut adapter = Fceux11DirectAdapter::new();
-        let outcome = run_regression_filtered(&mut adapter, &workdir, &golden_dir, &only);
+        if generate {
+            return generate_filtered(
+                &mut adapter,
+                &workdir,
+                &golden_dir,
+                &only,
+                frames_override,
+            );
+        }
+        let outcome = run_regression_filtered(
+            &mut adapter,
+            &workdir,
+            &golden_dir,
+            &only,
+            frames_override,
+        );
         let summary = format_summary(&outcome);
         let _ = write!(std::io::stdout(), "{}", summary);
         regression_exit_code(&outcome)
+    }
+
+    /// Phase 6.1.c: drive every selected case and overwrite its golden
+    /// file with the live mapper state. Mirrors the C++ harness's
+    /// pre-deletion `--generate` mode but in pure Rust. Output files
+    /// are written under `<golden_dir>/<case_name>.bin`; if a frame
+    /// override is set, the override is in effect for every case
+    /// (the user MUST supply a `--only` filter that names a single
+    /// case, otherwise all 175 goldens are clobbered at the new frame
+    /// count — same convention as the C++ harness).
+    fn generate_filtered<A>(
+        adapter: &mut A,
+        workdir: &Path,
+        golden_dir: &Path,
+        only: &[String],
+        frames_override: Option<u32>,
+    ) -> i32
+    where
+        A: SutAdapter + MapperStateSource,
+    {
+        use crate::runner::test_helpers::{GOLDEN_HEADER_SIZE, GOLDEN_MAGIC, GOLDEN_VERSION};
+
+        let cases: Vec<&crate::runner::mapper_byte_diff::RomMapperCase> = if only.is_empty() {
+            crate::runner::mapper_byte_diff::mapper_cases().iter().collect()
+        } else {
+            only.iter()
+                .filter_map(|name| {
+                    crate::runner::mapper_byte_diff::mapper_cases()
+                        .iter()
+                        .find(|c| &c.name == name)
+                })
+                .collect()
+        };
+
+        if let Err(e) = std::fs::create_dir_all(golden_dir) {
+            let _ = write!(
+                std::io::stdout(),
+                "GENERATE: failed to create {}: {e}\n",
+                golden_dir.display()
+            );
+            return 1;
+        }
+
+        let mut failures: Vec<(String, String)> = Vec::new();
+        for case in &cases {
+            let body = match crate::runner::mapper_byte_diff::collect_for_generate(
+                adapter,
+                case,
+                workdir,
+                frames_override,
+            ) {
+                Ok(b) => b,
+                Err(reason) => {
+                    let _ = write!(
+                        std::io::stdout(),
+                        "GENERATE FAIL: {}: {reason}\n",
+                        case.name
+                    );
+                    failures.push((case.name.clone(), reason));
+                    continue;
+                }
+            };
+            let mut data = Vec::with_capacity(GOLDEN_HEADER_SIZE + body.len());
+            data.extend_from_slice(&GOLDEN_MAGIC);
+            data.extend_from_slice(&GOLDEN_VERSION.to_le_bytes());
+            data.extend_from_slice(&(body.len() as u32).to_le_bytes());
+            data.extend_from_slice(&body);
+            let path = golden_dir.join(format!("{}.bin", case.name));
+            if let Err(e) = std::fs::write(&path, &data) {
+                let _ = write!(
+                    std::io::stdout(),
+                    "GENERATE FAIL: {}: write {}: {e}\n",
+                    case.name,
+                    path.display()
+                );
+                failures.push((case.name.clone(), format!("write: {e}")));
+                continue;
+            }
+            let _ = write!(
+                std::io::stdout(),
+                "GENERATE OK: {} ({} bytes body) -> {}\n",
+                case.name,
+                body.len(),
+                path.display()
+            );
+        }
+
+        if failures.is_empty() {
+            0
+        } else {
+            1
+        }
     }
 
     // Suppress unused-import warnings when only the harness entry is

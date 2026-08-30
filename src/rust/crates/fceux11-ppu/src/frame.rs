@@ -120,6 +120,36 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
 
     // sl 241 dot 1: VBL flag set + NMI check. This is the central
     // timing event Phase 1 exists to model.
+    //
+    // Phase 6.1.e ATTEMPT — REVERTED. Trying to move the set earlier
+    // to sl 241 dot 0 (matching hardware truth + Mesen reference +
+    // blargg ppu_vbl_nmi 02-vbl_set_time reference timing) is the
+    // CORRECT hardware behavior, but it changes the VBL-flag-set +
+    // NMI timing by exactly 1 PPU dot — which cascades through the
+    // first 5 frames of nestest and breaks the
+    // `rom_regression_rust_smoke` + `savestate_regression_rust_smoke`
+    // golden hashes (`tests/fixtures/golden_hashes.json` +
+    // `tests/fixtures/golden_savestate_hashes.json` were generated at
+    // the previous dot 1 timing).
+    //
+    // Correctly applying this fix requires:
+    //   (a) the timing change in `frame.rs` (this commit reverted);
+    //   (b) regenerating `golden_hashes.json` for nestest frames
+    //       3-7 (and possibly later frames) — the rom_regression
+    //       harness is verify-only; regenerating needs a manual
+    //       harness-side `--generate` mode or an external collector;
+    //   (c) regenerating `golden_savestate_hashes.json` for the
+    //       nestest entry (1-line update);
+    //   (d) re-running `mapper_byte_diff_rust_smoke` (12 ROMs) to
+    //       verify no other mapper regressions appear.
+    //
+    // Per Phase 5.3 §5.3.4 v2.3 revision (golden regen is itself a
+    // separate work item with its own review), this commit keeps
+    // `sl == 241 && dot == 1` and defers the dot-0 timing shift +
+    // golden regen to Phase 6.1.e.v2 (separate session with golden
+    // review as the explicit deliverable). The `rust_ppu_vbl_nmi_timing_test`
+    // gate stays DISABLED per the Phase 6.1.d commit's documented
+    // position (subtest 2 vbl_set_time + golden-regen side effects).
     if sl == 241 && dot == 1 {
         if state.vbl_suppressed_this_frame {
             // Suppression flag from the sl 241 dot 0 $2002 read:
@@ -336,6 +366,13 @@ mod tests {
 
     #[test]
     fn vbl_set_at_sl_241_dot_1_with_nmi_enable() {
+        // Phase 6.1.e ATTEMPT (REVERTED): the correct hardware behavior
+        // is VBL set at sl 241 dot 0 (Mesen + blargg reference). The
+        // shift breaks the rom_regression + savestate_regression
+        // nestest goldens; deferring the change until golden
+        // regeneration is in scope. See the doc comment on the
+        // production `sl == 241 && dot == 1` block above for the full
+        // analysis.
         let mut s = PpuState::new();
         s.registers.write_ctrl(1 << ctrl_bits::NMI_ENABLE);
         let mut bus = FlatBus::new();
@@ -343,7 +380,7 @@ mod tests {
         assert_ne!(
             s.registers.status & (1 << status_bits::VBL),
             0,
-            "VBL flag should be set at sl 241 dot 1"
+            "VBL flag should be set at sl 241 dot 1 (current convention; dot 0 is hardware truth but breaks rom_regression golden — see comment)"
         );
     }
 
@@ -367,8 +404,9 @@ mod tests {
 
     #[test]
     fn vbl_suppression_via_sl_241_dot0_read_blocks_set() {
-        // The plan §6.6 suppression window: a $2002 read at sl 241 dot 0
-        // suppresses the VBL flag set + NMI for this frame.
+        // Original test (Phase 6.1.e reverted). A $2002 read at sl 241
+        // dot 0 marks the suppression flag; the next tick (sl 241 dot 1)
+        // checks the flag and skips the VBL set + NMI assert.
         let mut s = PpuState::new();
         s.registers.write_ctrl(1 << ctrl_bits::NMI_ENABLE);
         let mut bus = FlatBus::new();

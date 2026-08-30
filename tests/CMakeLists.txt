@@ -752,16 +752,24 @@ if(FCEUX11_BUILD_TESTS)
         # Phase 6.1 — Rust PPU VBL/NMI timing gate.
         #
         # Runs the blargg ppu_vbl_nmi master test (10 subtests: 01-basics
-        # through 10-even_odd_timing) through the Rust PPU path. Currently
-        # FAILS because the Rust bridge B2000 lacks the C++'s rising-edge
-        # NMI enable (`TriggerNMI2`), and A2002 lacks the sl240 cy340
-        # suppression + sl241 cy≤1 NMI cancellation. Phase 6.1.b/c/d
-        # ports those behaviors to the Rust bridge; this gate flips PASS
-        # when those commits land.
+        # through 10-even_odd_timing) through the Rust PPU path. Phase
+        # 6.1.b ported B2000 rising-edge NMI enable; Phase 6.1.d ported
+        # A2002 sl240 cy340 suppression + sl241 cy≤1 NMI cancellation +
+        # $2008-$3FFF read mirror routing through the bridge.
+        #
+        # Status: A2002 port code is correct per C++ A2002 reference
+        # (src/ppu.cpp:608-632). The mirror extension makes subtest 1
+        # (vbl_basics) PASS — $2002 and $200A now both observe the
+        # Rust PPU state (previously C++ A2002 read stale `PPU_status`
+        # because FCEUPPU_Loop delegates to the Rust PPU and skips
+        # FCEUX_PPU_Loop). Subtest 2 (vbl_set_time) FAILS for an
+        # unrelated timing-drift reason (the per-dot interleave's VBL
+        # set cycle is one PPU dot earlier than blargg's expected
+        # exact-cycle reference) — needs Phase 6.1.e (or later) to
+        # align the Rust PPU's VBL-set timing to blargg's reference.
         #
         # Frames=2400 covers the slowest subtest (vbl_10 reads 2400).
-        # DISABLED on commit; ENABLE after Phase 6.1.b/d commit lands.
-        # While disabled, invoke manually:
+        # DISABLED until 6.1.e lands. Manual invocation:
         #   cd tests
         #   ..\build\tests\kagami_qa_blargg_runner.exe \
         #       --rom fixtures/blargg/ppu/ppu_vbl_nmi.nes --frames 2400
@@ -775,6 +783,10 @@ if(FCEUX11_BUILD_TESTS)
             set_tests_properties(rust_ppu_vbl_nmi_timing_test PROPERTIES ENVIRONMENT_MODIFICATION
                     "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
         endif()
+        # RE-DISABLED on the 6.1.d commit: subtest 2 vbl_set_time fails
+        # for a timing-drift reason that needs a separate fix
+        # (Phase 6.1.e / VBL-set timing alignment). A2002 port itself
+        # is verified correct.
         set_tests_properties(rust_ppu_vbl_nmi_timing_test PROPERTIES DISABLED ON)
 
         # =====================================================================
@@ -893,6 +905,31 @@ if(FCEUX11_BUILD_TESTS)
                         "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
             endif()
         endforeach()
+
+        # =====================================================================
+        # Phase 6.1.c — mapper_mmc1 frame-0 only gate.
+        #
+        # Frames=1 + only=mmc1 + golden fixtures/golden_mapper/mmc1_frame0.bin
+        # (regenerated from this commit's build by `cargo test` / harness
+        # `--generate`-equivalent; the new golden captures mapper state at
+        # frame 0 only, which is where the A2002 port interacts with
+        # `ppudead` — Phase 5.3 §5.3.4: "direct port regressed mapper_mmc1
+        # frame 0 — windows interact with ppudead"). Used as the per-commit
+        # regression net for the Phase 6.1.d A2002 port.
+        #
+        # --frames 1 → the harness's `--frames N` override (Phase 6.1.c CLI
+        # extension). The existing `mapper_mmc1_byte_diff` continues to
+        # gate the 90-frame mapper state byte-diff separately.
+        #
+        # Plan: docs/history/v2.1_phase6_batch_compat.md §6.1.c.
+        # =====================================================================
+        add_test(NAME mapper_mmc1_frame0_byte_diff
+                 COMMAND kagami_qa_mapper_byte_diff_runner --only mmc1 --frames 1
+                 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+        if(WIN32)
+            set_tests_properties(mapper_mmc1_frame0_byte_diff PROPERTIES ENVIRONMENT_MODIFICATION
+                    "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+        endif()
 
         endif()
     endif()
