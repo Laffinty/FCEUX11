@@ -440,31 +440,39 @@ uint8_t ppu_rust_bridge_cpu_read(uint32_t addr) {
     if (g_ppu_state == nullptr) {
         return 0;
     }
+    // NOTE (Phase 6.1.b intermediate state): only B2000 (rising-edge
+    // NMI enable) is ported so far. A2002 (sl240 cy340 suppression +
+    // sl241 cy≤1 cancellation) port is queued for Phase 6.1.d with a
+    // mapper_mmc1-frame-0 regression gate (per Phase 5.3 §5.3.4 note:
+    // "direct port regressed mapper_mmc1 frame 0 — windows interact
+    // with ppudead"). Until then, blargg 06-suppression parity is
+    // incomplete.
     return fceux11_ppu_cpu_read(g_ppu_state, static_cast<uint16_t>(addr));
-    // NOTE (Phase 5.3 open item, DO NOT "fix" without a dedicated gate):
-    // the C++ A2002 handler (src/ppu.cpp:614-632) adds two newppu-only
-    // behaviors the bridge path lacks — (1) $2002 read at 1 dot before
-    // the VBL set suppresses the flag set + NMI for the frame; (2) read
-    // at/1 dot after the set cancels the pending VBL NMI
-    // (X6502_IRQEnd(FCEU_IQNMI)). A direct port was attempted in 5.3 and
-    // REGRESSED mapper_mmc1 frame 0 (rom_regression) — the windows
-    // interact with ppudead frames and the Rust flag set point (dot 1
-    // vs C++ cy 0). blargg 05-nmi_timing / 06-suppression parity is
-    // deferred to Phase 6 with a dedicated test gate.
 }
 
 void ppu_rust_bridge_cpu_write(uint32_t addr, uint8_t value) {
     if (g_ppu_state == nullptr) {
         return;
     }
-    // NOTE (Phase 5.3 open item): the C++ B2000 (src/ppu.cpp:961) also
-    // fires TriggerNMI2() on a rising $2000 NMI-enable edge while the
-    // VBL flag is set. A direct port here improved blargg 05-nmi_timing
-    // odd offsets but the even-offset cases still never fire — the
-    // remaining gap is the missing A2002 suppression/cancellation
-    // (see ppu_rust_bridge_cpu_read) — so the edge is deferred to the
-    // same Phase 6 NMI-timing gate rather than partially ported.
-    fceux11_ppu_cpu_write(g_ppu_state, static_cast<uint16_t>(addr), value);
+    // Phase 6.1.b — port B2000 rising-edge NMI-enable to Rust bridge.
+    // C++ reference (src/ppu.cpp:958-962):
+    //   if (!(PPU[0] & 0x80) && (V & 0x80) && (PPU_status & 0x80))
+    //       TriggerNMI2();
+    // We detect the 0→1 transition on bit 7 BEFORE the write by
+    // reading ctrl via fceux11_ppu_get_register_state, then check VBL
+    // status AFTER the write (Rust PPU's tick_dot asserts VBL on sl
+    // 241 dot 1, so by the time the CPU executes B2000 the flag is
+    // visible per get_register_state).
+    if (addr == 0x2000) {
+        const uint8_t old_ctrl = fceux11_ppu_get_register_state(g_ppu_state, 0);
+        fceux11_ppu_cpu_write(g_ppu_state, static_cast<uint16_t>(addr), value);
+        const uint8_t status = fceux11_ppu_get_register_state(g_ppu_state, 2);
+        if (!(old_ctrl & 0x80) && (value & 0x80) && (status & 0x80)) {
+            TriggerNMI2();
+        }
+    } else {
+        fceux11_ppu_cpu_write(g_ppu_state, static_cast<uint16_t>(addr), value);
+    }
     // Phase 5.1: a $2007 write landed in CHR/NT/palette space (the
     // Rust `write_data` routed it to the C++ authoritative arrays via
     // bridge_bus_write). Refresh the renderer's window copies so the
