@@ -783,10 +783,28 @@ if(FCEUX11_BUILD_TESTS)
             set_tests_properties(rust_ppu_vbl_nmi_timing_test PROPERTIES ENVIRONMENT_MODIFICATION
                     "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
         endif()
-        # RE-DISABLED on the 6.1.d commit: subtest 2 vbl_set_time fails
-        # for a timing-drift reason that needs a separate fix
-        # (Phase 6.1.e / VBL-set timing alignment). A2002 port itself
-        # is verified correct.
+        # Phase 6.1.e.v3 — RE-DISABLED. Investigated across dot-0 vs
+        # dot-1 VBL set timing + bridge A2002 port vs no-port. The
+        # 02-vbl_set_time subtest fails in ALL four configurations
+        # (different diagnostic hash each time), confirming the failure
+        # is NOT caused by the A2002 port or the dot-0/dot-1 timing
+        # choice. Root cause: timing drift somewhere else in the PPU
+        # state machine (likely the per-dot NMI latch interplay with
+        # bridge_trigger_nmi callback timing). The test was already
+        # failing in Phase 5.3 (6057e8d) before any of these changes,
+        # so this is a pre-existing limitation.
+        #
+        # 9 of 10 subtests pass with Phase 6.1.e.v3: vbl_basics (1)
+        # + suppression (3) + nmi_control (4) + nmi_timing (5/7/9) +
+        # even_odd_frames (9) + even_odd_timing (10). Only
+        # vbl_set_time (2) remains failing. See
+        # docs/history/v2.1_phase6_batch_compat.md §6.1.e.v3.
+        #
+        # DISABLED until a deeper investigation identifies the root
+        # cause. The bridge A2002 port (Phase 6.1.d) was REMOVED in
+        # 6.1.e.v3 to restore the Phase 5.3 baseline; it can be
+        # re-added with the correct dot-1 timing when the VBL/NMI
+        # timing model is stabilized.
         set_tests_properties(rust_ppu_vbl_nmi_timing_test PROPERTIES DISABLED ON)
 
         # =====================================================================

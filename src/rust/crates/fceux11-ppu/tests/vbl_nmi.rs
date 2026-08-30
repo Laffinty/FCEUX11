@@ -72,7 +72,7 @@ fn nmi_asserted_only_at_sl_241_dot_1_when_enabled() {
 #[test]
 fn status_read_at_sl_241_dot_0_suppresses_vbl_flag_set() {
     // The plan §6.6 suppression window: a $2002 read at sl 241 dot 0
-    // (one PPU dot before the working-config VBL set boundary)
+    // (one PPU dot before the Mesen/fceux VBL set boundary)
     // suppresses the VBL flag set + NMI for this frame.
     let mut s = PpuState::new();
     s.registers.write_ctrl(1 << ctrl_bits::NMI_ENABLE);

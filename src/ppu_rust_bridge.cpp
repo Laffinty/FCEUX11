@@ -205,10 +205,10 @@ void bridge_notify_scanline(int16_t sl) {
 
 void bridge_notify_vblank(bool asserted) {
     // Phase 3: the Rust state machine manages the VBL flag itself
-    // (sl 241 dot 1 sets, sl 261 dot 1 clears). The C++ legacy
+    // (sl 241 dot 0 sets, sl -1 dot 1 clears). The C++ legacy
     // PPU_hook / mapper callbacks are notified via PPU_hook (which
     // is fired in `notify_scanline` above when transitioning into
-    // sl 241 / sl 261).
+    // sl 241 / sl -1).
 }
 
 }  // namespace
@@ -463,45 +463,27 @@ uint8_t ppu_rust_bridge_cpu_read(uint32_t addr) {
     if (g_ppu_state == nullptr) {
         return 0;
     }
-    // Phase 6.1.d — A2002 port: $2002 reads near the VBL set boundary
-    // either suppress the upcoming flag set or cancel the pending NMI.
-    // C++ reference (src/ppu.cpp:608-632):
-    //   if (rsl == 240 && rcy == 340) {
-    //       fceu11_ppu_mark_vbl_set_suppressed();
-    //   } else if (rsl == 241 && rcy <= 1) {
-    //       X6502_IRQEnd(FCEU_IQNMI);  // cancel pending VBL NMI
-    //   }
-    // The Rust PPU's frame state machine sets VBL at sl 241 dot 1
-    // (frame.rs:122-138). Reads 1 dot BEFORE that (sl 240 dot 340)
-    // suppress the set entirely for the frame; reads at or 1 dot after
-    // the set (sl 241 dot ≤ 1) read VBL=1 + clear it AND additionally
-    // we clear nmi_pending so the per-dot interleave's `TriggerNMI`
-    // callback (the same one the C++ engines use for VBL NMI) does not
-    // fire — mirrors `X6502_IRQEnd(FCEU_IQNMI)`.
+    // NOTE (Phase 6.1.e.v3): the C++ A2002 handler (src/ppu.cpp:608-632)
+    // adds two newppu-only behaviors the bridge path lacks:
+    //   (1) $2002 read at 1 dot before the VBL set suppresses the flag
+    //       set + NMI for the frame;
+    //   (2) read at/1 dot after the set cancels the pending VBL NMI
+    //       (X6502_IRQEnd(FCEU_IQNMI)).
+    // A direct port was attempted in Phase 5.3 (commit 6057e8d, see the
+    // NOTE in that file's ppu_rust_bridge_cpu_read) and REGRESSED
+    // mapper_mmc1 frame 0 (rom_regression) — the windows interact with
+    // ppudead. The Phase 6.1.d commit (`6f6d2ca` + `946ee31`)
+    // re-attempted the port and broke `rust_ppu_vbl_nmi_timing_test`
+    // subtest 2 (vbl_set_time) — see the Phase 6.1.e.v3 commit log.
     //
-    // Both paths consult the Rust PPU's live (scanline, dot) so the
-    // timing matches the C++ reference's `ppur.status.sl / cycle` query
-    // exactly. Regression net: tests/CMakeLists.txt
-    // `mapper_mmc1_frame0_byte_diff` ctest gate + the
-    // `rust_ppu_vbl_nmi_timing_test` blargg gate (enabled by 6.1.d).
-    if (addr == 0x2002) {
-        const int16_t sl = fceux11_ppu_get_scanline(g_ppu_state);
-        const uint16_t dot = fceux11_ppu_get_dot(g_ppu_state);
-        if (sl == 240 && dot == 340) {
-            // Suppress next-frame VBL set + NMI.
-            fceux11_ppu_mark_vbl_set_suppressed(g_ppu_state);
-        } else if (sl == 241 && dot <= 1) {
-            // Cancel pending VBL NMI. The Rust PPU has already set
-            // nmi_pending at sl 241 dot 1 (frame.rs:128); reading
-            // $2002 now returns VBL=1 + clears the flag (via the
-            // underlying read_status), and we additionally clear
-            // nmi_pending so the interleave's TriggerNMI callback
-            // (cpp/ppu_rust_bridge.cpp:bridge_trigger_nmi) does not
-            // fire — same effect as the C++ engine's
-            // X6502_IRQEnd(FCEU_IQNMI).
-            (void)fceux11_ppu_take_nmi_pending(g_ppu_state);
-        }
-    }
+    // Phase 6.1.e.v3 deliberately does NOT port the A2002 suppression
+    // / NMI-cancel behavior into the bridge. The blargg vbl_nmi
+    // ROM's subtests pass without it (Phase 5.3 baseline), and the
+    // mapper_mmc1 regression net stays intact. The $2008-$3FFF read
+    // mirror installed in Phase 6.1.d (lines below) is kept because
+    // it is required for blargg vbl_basics subtest 1 ($2002 == $200A
+    // when the Rust PPU is active — the C++ A2002 handler returns
+    // stale data otherwise).
     return fceux11_ppu_cpu_read(g_ppu_state, static_cast<uint16_t>(addr));
 }
 
