@@ -749,6 +749,35 @@ if(FCEUX11_BUILD_TESTS)
         endif()
 
         # =====================================================================
+        # Phase 6.1 — Rust PPU VBL/NMI timing gate.
+        #
+        # Runs the blargg ppu_vbl_nmi master test (10 subtests: 01-basics
+        # through 10-even_odd_timing) through the Rust PPU path. Currently
+        # FAILS because the Rust bridge B2000 lacks the C++'s rising-edge
+        # NMI enable (`TriggerNMI2`), and A2002 lacks the sl240 cy340
+        # suppression + sl241 cy≤1 NMI cancellation. Phase 6.1.b/c/d
+        # ports those behaviors to the Rust bridge; this gate flips PASS
+        # when those commits land.
+        #
+        # Frames=2400 covers the slowest subtest (vbl_10 reads 2400).
+        # DISABLED on commit; ENABLE after Phase 6.1.b/d commit lands.
+        # While disabled, invoke manually:
+        #   cd tests
+        #   ..\build\tests\kagami_qa_blargg_runner.exe \
+        #       --rom fixtures/blargg/ppu/ppu_vbl_nmi.nes --frames 2400
+        # Plan: docs/history/v2.1_phase6_batch_compat.md §6.1.
+        # =====================================================================
+        add_test(NAME rust_ppu_vbl_nmi_timing_test
+                 COMMAND kagami_qa_blargg_runner
+                 --rom fixtures/blargg/ppu/ppu_vbl_nmi.nes --frames 2400
+                 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+        if(WIN32)
+            set_tests_properties(rust_ppu_vbl_nmi_timing_test PROPERTIES ENVIRONMENT_MODIFICATION
+                    "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+        endif()
+        set_tests_properties(rust_ppu_vbl_nmi_timing_test PROPERTIES DISABLED ON)
+
+        # =====================================================================
         # Phase 4.5 cycle-drift diagnostic harness.
         #
         # Direct-mode harness that drives the emulator frame-by-frame and
