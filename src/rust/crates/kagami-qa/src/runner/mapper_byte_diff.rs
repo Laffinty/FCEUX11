@@ -56,181 +56,881 @@ pub fn mapper_cases() -> &'static [RomMapperCase] {
     static CELL: OnceLock<Vec<RomMapperCase>> = OnceLock::new();
     CELL.get_or_init(|| {
         vec![
-            RomMapperCase { filename: "fixtures/mapper_nrom.nes".into(), name: "nrom".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mmc1.nes".into(), name: "mmc1".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mmc3.nes".into(), name: "mmc3".into(), frames: 120 },
-            RomMapperCase { filename: "fixtures/mapper_vrc6.nes".into(), name: "vrc6".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_uxrom.nes".into(), name: "uxrom".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_cnrom.nes".into(), name: "cnrom".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_axrom.nes".into(), name: "axrom".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_colordreams.nes".into(), name: "colordreams".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_gnrom.nes".into(), name: "gnrom".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_vrc2and4.nes".into(), name: "vrc2and4".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_vrc7.nes".into(), name: "vrc7".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mmc5.nes".into(), name: "mmc5".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_cprom.nes".into(), name: "cprom".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper28.nes".into(), name: "mapper28".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper32.nes".into(), name: "mapper32".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper33.nes".into(), name: "mapper33".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper34.nes".into(), name: "mapper34".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper36.nes".into(), name: "mapper36".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper38.nes".into(), name: "mapper38".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper40.nes".into(), name: "mapper40".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper41.nes".into(), name: "mapper41".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper42.nes".into(), name: "mapper42".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper43.nes".into(), name: "mapper43".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper46.nes".into(), name: "mapper46".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper50.nes".into(), name: "mapper50".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_vrc22.nes".into(), name: "vrc22".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_vrc23.nes".into(), name: "vrc23".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_vrc25.nes".into(), name: "vrc25".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper12.nes".into(), name: "mapper12".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper37.nes".into(), name: "mapper37".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper44.nes".into(), name: "mapper44".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper45.nes".into(), name: "mapper45".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper47.nes".into(), name: "mapper47".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper49.nes".into(), name: "mapper49".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper52.nes".into(), name: "mapper52".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper74.nes".into(), name: "mapper74".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper105.nes".into(), name: "mapper105".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper114.nes".into(), name: "mapper114".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper115.nes".into(), name: "mapper115".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper116.nes".into(), name: "mapper116".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper118.nes".into(), name: "mapper118".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper119.nes".into(), name: "mapper119".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper165.nes".into(), name: "mapper165".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper205.nes".into(), name: "mapper205".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper245.nes".into(), name: "mapper245".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper249.nes".into(), name: "mapper249".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper250.nes".into(), name: "mapper250".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper254.nes".into(), name: "mapper254".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper406.nes".into(), name: "mapper406".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper192.nes".into(), name: "mapper192".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper194.nes".into(), name: "mapper194".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper195.nes".into(), name: "mapper195".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper198.nes".into(), name: "mapper198".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mmc2.nes".into(), name: "mmc2".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mmc4.nes".into(), name: "mmc4".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper15.nes".into(), name: "mapper15".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper48.nes".into(), name: "mapper48".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_bandai.nes".into(), name: "bandai".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper18.nes".into(), name: "mapper18".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_vrc6var26.nes".into(), name: "vrc6var26".into(), frames: 90 },
-            RomMapperCase { filename: "fixtures/mapper_mapper70.nes".into(), name: "mapper70".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper78.nes".into(), name: "mapper78".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper86.nes".into(), name: "mapper86".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper87.nes".into(), name: "mapper87".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper89.nes".into(), name: "mapper89".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper94.nes".into(), name: "mapper94".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper97.nes".into(), name: "mapper97".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper51.nes".into(), name: "mapper51".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper57.nes".into(), name: "mapper57".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper61.nes".into(), name: "mapper61".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper62.nes".into(), name: "mapper62".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper64.nes".into(), name: "mapper64".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper65.nes".into(), name: "mapper65".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper67.nes".into(), name: "mapper67".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper68.nes".into(), name: "mapper68".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper71.nes".into(), name: "mapper71".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper72.nes".into(), name: "mapper72".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper73.nes".into(), name: "mapper73".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper75.nes".into(), name: "mapper75".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper77.nes".into(), name: "mapper77".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper79.nes".into(), name: "mapper79".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper80.nes".into(), name: "mapper80".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper82.nes".into(), name: "mapper82".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper90.nes".into(), name: "mapper90".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper91.nes".into(), name: "mapper91".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper92.nes".into(), name: "mapper92".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper93.nes".into(), name: "mapper93".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper96.nes".into(), name: "mapper96".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper99.nes".into(), name: "mapper99".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper53.nes".into(), name: "mapper53".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper58.nes".into(), name: "mapper58".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper60.nes".into(), name: "mapper60".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper76.nes".into(), name: "mapper76".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper95.nes".into(), name: "mapper95".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper88.nes".into(), name: "mapper88".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper6.nes".into(), name: "mapper6".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper17.nes".into(), name: "mapper17".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper19.nes".into(), name: "mapper19".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper210.nes".into(), name: "mapper210".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper105.nes".into(), name: "mapper105".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper114.nes".into(), name: "mapper114".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper115.nes".into(), name: "mapper115".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper116.nes".into(), name: "mapper116".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper118.nes".into(), name: "mapper118".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper119.nes".into(), name: "mapper119".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper165.nes".into(), name: "mapper165".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper192.nes".into(), name: "mapper192".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper194.nes".into(), name: "mapper194".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper195.nes".into(), name: "mapper195".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper198.nes".into(), name: "mapper198".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper205.nes".into(), name: "mapper205".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper245.nes".into(), name: "mapper245".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper249.nes".into(), name: "mapper249".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper250.nes".into(), name: "mapper250".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper254.nes".into(), name: "mapper254".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper406.nes".into(), name: "mapper406".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper69.nes".into(), name: "mapper69".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper206.nes".into(), name: "mapper206".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper59.nes".into(), name: "mapper59".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper103.nes".into(), name: "mapper103".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper106.nes".into(), name: "mapper106".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper108.nes".into(), name: "mapper108".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper112.nes".into(), name: "mapper112".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper117.nes".into(), name: "mapper117".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper120.nes".into(), name: "mapper120".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper121.nes".into(), name: "mapper121".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper151.nes".into(), name: "mapper151".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper156.nes".into(), name: "mapper156".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper177.nes".into(), name: "mapper177".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper178.nes".into(), name: "mapper178".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper111.nes".into(), name: "mapper111".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper123.nes".into(), name: "mapper123".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper125.nes".into(), name: "mapper125".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper132.nes".into(), name: "mapper132".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper133.nes".into(), name: "mapper133".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper136.nes".into(), name: "mapper136".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper137.nes".into(), name: "mapper137".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper138.nes".into(), name: "mapper138".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper139.nes".into(), name: "mapper139".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper141.nes".into(), name: "mapper141".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper142.nes".into(), name: "mapper142".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper143.nes".into(), name: "mapper143".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper145.nes".into(), name: "mapper145".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper146.nes".into(), name: "mapper146".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper147.nes".into(), name: "mapper147".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper148.nes".into(), name: "mapper148".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper149.nes".into(), name: "mapper149".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper150.nes".into(), name: "mapper150".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper160.nes".into(), name: "mapper160".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper162.nes".into(), name: "mapper162".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper163.nes".into(), name: "mapper163".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper164.nes".into(), name: "mapper164".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper166.nes".into(), name: "mapper166".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper167.nes".into(), name: "mapper167".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper168.nes".into(), name: "mapper168".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper170.nes".into(), name: "mapper170".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper172.nes".into(), name: "mapper172".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper173.nes".into(), name: "mapper173".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper175.nes".into(), name: "mapper175".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper176.nes".into(), name: "mapper176".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper181.nes".into(), name: "mapper181".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper183.nes".into(), name: "mapper183".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper185.nes".into(), name: "mapper185".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper186.nes".into(), name: "mapper186".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper187.nes".into(), name: "mapper187".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper188.nes".into(), name: "mapper188".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper189.nes".into(), name: "mapper189".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper190.nes".into(), name: "mapper190".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper193.nes".into(), name: "mapper193".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper14.nes".into(), name: "mapper14".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper27.nes".into(), name: "mapper27".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper30.nes".into(), name: "mapper30".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper31.nes".into(), name: "mapper31".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper35.nes".into(), name: "mapper35".into(), frames: 60 },
-            RomMapperCase { filename: "fixtures/mapper_mapper83.nes".into(), name: "mapper83".into(), frames: 60 },
+            RomMapperCase {
+                filename: "fixtures/mapper_nrom.nes".into(),
+                name: "nrom".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mmc1.nes".into(),
+                name: "mmc1".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mmc3.nes".into(),
+                name: "mmc3".into(),
+                frames: 120,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_vrc6.nes".into(),
+                name: "vrc6".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_uxrom.nes".into(),
+                name: "uxrom".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_cnrom.nes".into(),
+                name: "cnrom".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_axrom.nes".into(),
+                name: "axrom".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_colordreams.nes".into(),
+                name: "colordreams".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_gnrom.nes".into(),
+                name: "gnrom".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_vrc2and4.nes".into(),
+                name: "vrc2and4".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_vrc7.nes".into(),
+                name: "vrc7".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mmc5.nes".into(),
+                name: "mmc5".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_cprom.nes".into(),
+                name: "cprom".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper28.nes".into(),
+                name: "mapper28".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper32.nes".into(),
+                name: "mapper32".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper33.nes".into(),
+                name: "mapper33".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper34.nes".into(),
+                name: "mapper34".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper36.nes".into(),
+                name: "mapper36".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper38.nes".into(),
+                name: "mapper38".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper40.nes".into(),
+                name: "mapper40".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper41.nes".into(),
+                name: "mapper41".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper42.nes".into(),
+                name: "mapper42".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper43.nes".into(),
+                name: "mapper43".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper46.nes".into(),
+                name: "mapper46".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper50.nes".into(),
+                name: "mapper50".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_vrc22.nes".into(),
+                name: "vrc22".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_vrc23.nes".into(),
+                name: "vrc23".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_vrc25.nes".into(),
+                name: "vrc25".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper12.nes".into(),
+                name: "mapper12".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper37.nes".into(),
+                name: "mapper37".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper44.nes".into(),
+                name: "mapper44".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper45.nes".into(),
+                name: "mapper45".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper47.nes".into(),
+                name: "mapper47".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper49.nes".into(),
+                name: "mapper49".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper52.nes".into(),
+                name: "mapper52".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper74.nes".into(),
+                name: "mapper74".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper105.nes".into(),
+                name: "mapper105".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper114.nes".into(),
+                name: "mapper114".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper115.nes".into(),
+                name: "mapper115".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper116.nes".into(),
+                name: "mapper116".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper118.nes".into(),
+                name: "mapper118".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper119.nes".into(),
+                name: "mapper119".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper165.nes".into(),
+                name: "mapper165".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper205.nes".into(),
+                name: "mapper205".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper245.nes".into(),
+                name: "mapper245".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper249.nes".into(),
+                name: "mapper249".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper250.nes".into(),
+                name: "mapper250".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper254.nes".into(),
+                name: "mapper254".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper406.nes".into(),
+                name: "mapper406".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper192.nes".into(),
+                name: "mapper192".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper194.nes".into(),
+                name: "mapper194".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper195.nes".into(),
+                name: "mapper195".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper198.nes".into(),
+                name: "mapper198".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mmc2.nes".into(),
+                name: "mmc2".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mmc4.nes".into(),
+                name: "mmc4".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper15.nes".into(),
+                name: "mapper15".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper48.nes".into(),
+                name: "mapper48".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_bandai.nes".into(),
+                name: "bandai".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper18.nes".into(),
+                name: "mapper18".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_vrc6var26.nes".into(),
+                name: "vrc6var26".into(),
+                frames: 90,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper70.nes".into(),
+                name: "mapper70".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper78.nes".into(),
+                name: "mapper78".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper86.nes".into(),
+                name: "mapper86".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper87.nes".into(),
+                name: "mapper87".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper89.nes".into(),
+                name: "mapper89".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper94.nes".into(),
+                name: "mapper94".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper97.nes".into(),
+                name: "mapper97".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper51.nes".into(),
+                name: "mapper51".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper57.nes".into(),
+                name: "mapper57".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper61.nes".into(),
+                name: "mapper61".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper62.nes".into(),
+                name: "mapper62".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper64.nes".into(),
+                name: "mapper64".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper65.nes".into(),
+                name: "mapper65".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper67.nes".into(),
+                name: "mapper67".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper68.nes".into(),
+                name: "mapper68".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper71.nes".into(),
+                name: "mapper71".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper72.nes".into(),
+                name: "mapper72".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper73.nes".into(),
+                name: "mapper73".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper75.nes".into(),
+                name: "mapper75".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper77.nes".into(),
+                name: "mapper77".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper79.nes".into(),
+                name: "mapper79".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper80.nes".into(),
+                name: "mapper80".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper82.nes".into(),
+                name: "mapper82".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper90.nes".into(),
+                name: "mapper90".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper91.nes".into(),
+                name: "mapper91".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper92.nes".into(),
+                name: "mapper92".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper93.nes".into(),
+                name: "mapper93".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper96.nes".into(),
+                name: "mapper96".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper99.nes".into(),
+                name: "mapper99".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper53.nes".into(),
+                name: "mapper53".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper58.nes".into(),
+                name: "mapper58".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper60.nes".into(),
+                name: "mapper60".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper76.nes".into(),
+                name: "mapper76".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper95.nes".into(),
+                name: "mapper95".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper88.nes".into(),
+                name: "mapper88".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper6.nes".into(),
+                name: "mapper6".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper17.nes".into(),
+                name: "mapper17".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper19.nes".into(),
+                name: "mapper19".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper210.nes".into(),
+                name: "mapper210".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper105.nes".into(),
+                name: "mapper105".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper114.nes".into(),
+                name: "mapper114".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper115.nes".into(),
+                name: "mapper115".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper116.nes".into(),
+                name: "mapper116".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper118.nes".into(),
+                name: "mapper118".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper119.nes".into(),
+                name: "mapper119".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper165.nes".into(),
+                name: "mapper165".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper192.nes".into(),
+                name: "mapper192".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper194.nes".into(),
+                name: "mapper194".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper195.nes".into(),
+                name: "mapper195".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper198.nes".into(),
+                name: "mapper198".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper205.nes".into(),
+                name: "mapper205".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper245.nes".into(),
+                name: "mapper245".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper249.nes".into(),
+                name: "mapper249".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper250.nes".into(),
+                name: "mapper250".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper254.nes".into(),
+                name: "mapper254".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper406.nes".into(),
+                name: "mapper406".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper69.nes".into(),
+                name: "mapper69".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper206.nes".into(),
+                name: "mapper206".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper59.nes".into(),
+                name: "mapper59".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper103.nes".into(),
+                name: "mapper103".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper106.nes".into(),
+                name: "mapper106".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper108.nes".into(),
+                name: "mapper108".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper112.nes".into(),
+                name: "mapper112".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper117.nes".into(),
+                name: "mapper117".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper120.nes".into(),
+                name: "mapper120".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper121.nes".into(),
+                name: "mapper121".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper151.nes".into(),
+                name: "mapper151".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper156.nes".into(),
+                name: "mapper156".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper177.nes".into(),
+                name: "mapper177".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper178.nes".into(),
+                name: "mapper178".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper111.nes".into(),
+                name: "mapper111".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper123.nes".into(),
+                name: "mapper123".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper125.nes".into(),
+                name: "mapper125".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper132.nes".into(),
+                name: "mapper132".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper133.nes".into(),
+                name: "mapper133".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper136.nes".into(),
+                name: "mapper136".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper137.nes".into(),
+                name: "mapper137".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper138.nes".into(),
+                name: "mapper138".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper139.nes".into(),
+                name: "mapper139".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper141.nes".into(),
+                name: "mapper141".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper142.nes".into(),
+                name: "mapper142".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper143.nes".into(),
+                name: "mapper143".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper145.nes".into(),
+                name: "mapper145".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper146.nes".into(),
+                name: "mapper146".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper147.nes".into(),
+                name: "mapper147".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper148.nes".into(),
+                name: "mapper148".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper149.nes".into(),
+                name: "mapper149".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper150.nes".into(),
+                name: "mapper150".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper160.nes".into(),
+                name: "mapper160".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper162.nes".into(),
+                name: "mapper162".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper163.nes".into(),
+                name: "mapper163".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper164.nes".into(),
+                name: "mapper164".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper166.nes".into(),
+                name: "mapper166".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper167.nes".into(),
+                name: "mapper167".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper168.nes".into(),
+                name: "mapper168".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper170.nes".into(),
+                name: "mapper170".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper172.nes".into(),
+                name: "mapper172".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper173.nes".into(),
+                name: "mapper173".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper175.nes".into(),
+                name: "mapper175".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper176.nes".into(),
+                name: "mapper176".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper181.nes".into(),
+                name: "mapper181".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper183.nes".into(),
+                name: "mapper183".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper185.nes".into(),
+                name: "mapper185".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper186.nes".into(),
+                name: "mapper186".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper187.nes".into(),
+                name: "mapper187".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper188.nes".into(),
+                name: "mapper188".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper189.nes".into(),
+                name: "mapper189".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper190.nes".into(),
+                name: "mapper190".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper193.nes".into(),
+                name: "mapper193".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper14.nes".into(),
+                name: "mapper14".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper27.nes".into(),
+                name: "mapper27".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper30.nes".into(),
+                name: "mapper30".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper31.nes".into(),
+                name: "mapper31".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper35.nes".into(),
+                name: "mapper35".into(),
+                frames: 60,
+            },
+            RomMapperCase {
+                filename: "fixtures/mapper_mapper83.nes".into(),
+                name: "mapper83".into(),
+                frames: 60,
+            },
         ]
     })
 }
@@ -238,11 +938,15 @@ pub fn mapper_cases() -> &'static [RomMapperCase] {
 /// Outcome of comparing one ROM's live mapper state against its golden.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MapperCaseVerdict {
-    Pass { body_size: u32 },
+    Pass {
+        body_size: u32,
+    },
     /// Golden file not present (or empty on both sides) — allowed, not a
     /// regression (mirrors the C++ `[SKIP]` classification).
     Skip,
-    Fail { reason: String },
+    Fail {
+        reason: String,
+    },
 }
 
 /// Outcome of running the mapper_byte_diff harness once.
@@ -409,7 +1113,9 @@ where
             return MapperCaseVerdict::Fail {
                 reason: format!(
                     "byte-diff at offset {} (live=0x{:02X}, golden=0x{:02X})",
-                    j, body[j], golden[HEADER_SIZE + j]
+                    j,
+                    body[j],
+                    golden[HEADER_SIZE + j]
                 ),
             };
         }
@@ -421,11 +1127,45 @@ where
 }
 
 /// Run the full harness against the golden directory.
-pub fn run_regression<A>(
+/// Optional case-name filter (`--only <name>`, repeatable). Empty slice
+/// runs the full 175-case table — the Phase 5.3 mapper-specific ctests
+/// (`mapper_mmc1_byte_diff` etc.) pass one name each so a single mapper
+/// regression is individually gated in ctest.
+pub fn run_regression_filtered<A>(
     adapter: &mut A,
     workdir: &Path,
     golden_dir: &Path,
+    only: &[String],
 ) -> MapperDiffOutcome
+where
+    A: SutAdapter + MapperStateSource,
+{
+    if only.is_empty() {
+        return run_regression(adapter, workdir, golden_dir);
+    }
+    let mut outcome = MapperDiffOutcome::default();
+    for name in only {
+        let Some(case) = mapper_cases().iter().find(|c| &c.name == name) else {
+            outcome.failed += 1;
+            outcome
+                .failures
+                .push((name.clone(), format!("unknown case name '{name}'")));
+            continue;
+        };
+        match classify_case(adapter, case, workdir, golden_dir) {
+            MapperCaseVerdict::Pass { .. } => outcome.passed += 1,
+            MapperCaseVerdict::Skip => outcome.skipped += 1,
+            MapperCaseVerdict::Fail { reason } => {
+                outcome.failed += 1;
+                outcome.failures.push((case.name.clone(), reason));
+            }
+        }
+    }
+    outcome.total = outcome.passed + outcome.skipped + outcome.failed;
+    outcome
+}
+
+pub fn run_regression<A>(adapter: &mut A, workdir: &Path, golden_dir: &Path) -> MapperDiffOutcome
 where
     A: SutAdapter + MapperStateSource,
 {
@@ -464,11 +1204,7 @@ pub fn format_summary(outcome: &MapperDiffOutcome) -> String {
 }
 
 pub fn regression_exit_code(outcome: &MapperDiffOutcome) -> i32 {
-    if outcome.failed == 0 {
-        0
-    } else {
-        1
-    }
+    if outcome.failed == 0 { 0 } else { 1 }
 }
 
 // ---------------------------------------------------------------------------
@@ -478,10 +1214,10 @@ pub fn regression_exit_code(outcome: &MapperDiffOutcome) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
     use crate::adapter::trait_def::{InputSpec, SutAdapter, TestResult};
     use crate::core::{ErrorKind, QaConfig, QaError};
     use crate::manifest::schema::TestManifest;
+    use std::path::PathBuf;
 
     /// Mock adapter with a fixed mapper-state body, counting calls.
     struct MockAdapter {
@@ -619,10 +1355,7 @@ mod tests {
             frames: 60,
         };
         let v = classify_case(&mut a, &case, Path::new("."), &tmp);
-        assert_eq!(
-            v,
-            MapperCaseVerdict::Pass { body_size: 4 }
-        );
+        assert_eq!(v, MapperCaseVerdict::Pass { body_size: 4 });
         assert_eq!(a.step_count, 60);
         assert_eq!(a.reset_fresh_calls, 1);
         let _ = std::fs::remove_dir_all(&tmp);
@@ -723,7 +1456,10 @@ mod tests {
 
     #[test]
     fn table_names_unique_except_known_dupes() {
-        let names = mapper_cases().iter().map(|c| c.name.as_str()).collect::<Vec<_>>();
+        let names = mapper_cases()
+            .iter()
+            .map(|c| c.name.as_str())
+            .collect::<Vec<_>>();
         // The 19 duplicated names are exactly the MMC3-pirate set.
         let mut seen = std::collections::HashMap::new();
         let mut dupes = Vec::new();
@@ -745,10 +1481,23 @@ mod tests {
                 d.starts_with("mapper")
                     && matches!(
                         *d,
-                        "mapper105" | "mapper114" | "mapper115" | "mapper116" | "mapper118"
-                            | "mapper119" | "mapper165" | "mapper192" | "mapper194"
-                            | "mapper195" | "mapper198" | "mapper205" | "mapper245"
-                            | "mapper249" | "mapper250" | "mapper254" | "mapper406"
+                        "mapper105"
+                            | "mapper114"
+                            | "mapper115"
+                            | "mapper116"
+                            | "mapper118"
+                            | "mapper119"
+                            | "mapper165"
+                            | "mapper192"
+                            | "mapper194"
+                            | "mapper195"
+                            | "mapper198"
+                            | "mapper205"
+                            | "mapper245"
+                            | "mapper249"
+                            | "mapper250"
+                            | "mapper254"
+                            | "mapper406"
                     ),
                 "unexpected duplicate: {}",
                 d
@@ -762,7 +1511,10 @@ mod tests {
     fn real_golden_dir_present() {
         let gp = golden_path();
         if !gp.exists() {
-            eprintln!("skipping: golden_mapper not checked out at {}", gp.display());
+            eprintln!(
+                "skipping: golden_mapper not checked out at {}",
+                gp.display()
+            );
             return;
         }
         let entries = std::fs::read_dir(&gp).unwrap().count();

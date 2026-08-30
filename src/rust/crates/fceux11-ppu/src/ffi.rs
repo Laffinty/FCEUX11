@@ -1,4 +1,4 @@
-﻿//! C ABI surface for the Rust PPU.
+//! C ABI surface for the Rust PPU.
 //!
 //! Phase 2 of the v2.1 PPU refactor plan (`docs/plans/v2.1_ppu_rust_refactor_plan.md`
 //! ————————Phase 2). Every entry point is `#[unsafe(no_mangle)] pub unsafe extern "C" fn fceux11_ppu_*`
@@ -207,6 +207,14 @@ fn lookup_const<'a>(state: *const PpuState) -> &'a StateBox {
     unsafe { &*(state as *const StateBox) }
 }
 
+/// Registry-check-free `lookup` for the Phase 5.3 per-dot hot path.
+/// SAFETY (call sites): `state` must be a handle previously validated by
+/// [`lookup`] (every entry point validates once at its front door; the
+/// per-dot loop validates on frame entry).
+fn lookup_unchecked<'a>(state: *mut PpuState) -> &'a mut StateBox {
+    unsafe { &mut *(state as *mut StateBox) }
+}
+
 fn drop_from_registry(state: *mut PpuState) {
     let key = state as usize;
     let mut registry = REGISTRY.lock().unwrap();
@@ -300,14 +308,22 @@ pub unsafe extern "C" fn fceux11_ppu_set_chr_window(
 }
 
 /// Install the NTARAM (name-table RAM) window. Phase 2 only uses 1 KiB.
-pub unsafe extern "C" fn fceux11_ppu_set_nt_window(state: *mut PpuState, ptr: *const u8, len: usize) {
+pub unsafe extern "C" fn fceux11_ppu_set_nt_window(
+    state: *mut PpuState,
+    ptr: *const u8,
+    len: usize,
+) {
     let sb = lookup(state);
     sb.nt_window_ptr = ptr;
     sb.nt_window_len = len;
 }
 
 /// Install the palette window (32 bytes).
-pub unsafe extern "C" fn fceux11_ppu_set_palette_window(state: *mut PpuState, ptr: *const u8, len: usize) {
+pub unsafe extern "C" fn fceux11_ppu_set_palette_window(
+    state: *mut PpuState,
+    ptr: *const u8,
+    len: usize,
+) {
     let sb = lookup(state);
     sb.pal_window_ptr = ptr;
     sb.pal_window_len = len;
@@ -331,8 +347,8 @@ pub unsafe extern "C" fn fceux11_ppu_set_mirror_mode(state: *mut PpuState, mode:
 pub unsafe extern "C" fn fceux11_ppu_cpu_read(state: *mut PpuState, addr: u16) -> u8 {
     let sb = lookup(state);
     let reg = (addr & 0x0007) as u8;
-    let ret = crate::registers::Registers::read_status(&mut sb.state.registers)
-        .wrapping_add(match reg {
+    let ret =
+        crate::registers::Registers::read_status(&mut sb.state.registers).wrapping_add(match reg {
             0 => sb.state.registers.ctrl,
             1 => sb.state.registers.mask,
             // 2 ————————?status (handled above)
@@ -366,7 +382,9 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_read(state: *mut PpuState, addr: u16) -
                         notify_vblank: None,
                     }),
                 };
-                sb.state.registers.read_data(&mut bus_adapter, sb.state.registers.ctrl)
+                sb.state
+                    .registers
+                    .read_data(&mut bus_adapter, sb.state.registers.ctrl)
             }
             _ => 0,
         });
@@ -407,6 +425,10 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_write(state: *mut PpuState, addr: u16, 
     let reg = (addr & 0x0007) as u8;
     match reg {
         0 => {
+            // NOTE (Phase 5.3): the "enable NMI while VBL flag is set"
+            // edge belongs to the C++ bridge (B2000 parity — deferred
+            // TriggerNMI2 with the C++ CPU's nmi_fresh semantics), NOT
+            // here. See ppu_rust_bridge_cpu_write.
             sb.state.registers.write_ctrl(val);
         }
         1 => {
@@ -433,7 +455,9 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_write(state: *mut PpuState, addr: u16, 
         7 => {
             // $2007 data write.
             let mut bus_adapter = make_bus_adapter(sb);
-            sb.state.registers.write_data(&mut bus_adapter, sb.state.registers.ctrl, val);
+            sb.state
+                .registers
+                .write_data(&mut bus_adapter, sb.state.registers.ctrl, val);
         }
         _ => {}
     }
@@ -535,9 +559,7 @@ fn render_visible_scanline<B: crate::bus::PpuBus + ?Sized>(
     // SAFETY: the pointers are valid for the lifetime of the
     // installed windows. The StateBox guarantees that.
     let nt_window_storage: [u8; 4096];
-    let nt_window: &[u8; 4096] = if !nt_window_ptr.is_null()
-        && nt_window_len >= 4096
-    {
+    let nt_window: &[u8; 4096] = if !nt_window_ptr.is_null() && nt_window_len >= 4096 {
         unsafe { &*(nt_window_ptr as *const [u8; 4096]) }
     } else {
         nt_window_storage = {
@@ -593,10 +615,7 @@ fn render_visible_scanline<B: crate::bus::PpuBus + ?Sized>(
 /// Phase 4, so the batch and per-cycle frame drivers render
 /// bit-identically.
 fn render_scanline_if_start(sb: &mut StateBox, bus: &mut CppBus) {
-    if sb.state.scanline >= 0
-        && sb.state.scanline <= 239
-        && sb.state.dot == 0
-    {
+    if sb.state.scanline >= 0 && sb.state.scanline <= 239 && sb.state.dot == 0 {
         render_visible_scanline(
             &mut sb.state,
             bus,
@@ -676,6 +695,50 @@ pub unsafe extern "C" fn fceux11_ppu_tick_dots(state: *mut PpuState, n_dots: u32
     }
     sb.sched = sched;
     frame_advanced as i32
+}
+
+/// Phase 5.3: lock-free variants of the hot per-dot entries. The
+/// per-frame interleave loop (root crate, `fceux11_run_frame_interleaved`)
+/// calls these ONCE PER DOT in-process; taking the REGISTRY mutex on every
+/// dot was the dominant frame-time cost (bench_tolerance_test +378% on the
+/// reference machine). They are byte-for-byte the validated
+/// [`fceux11_ppu_tick_dots(1)`] / [`fceux11_ppu_take_nmi_pending`] bodies
+/// with `lookup` swapped for the registry-check-free `lookup_unchecked` —
+/// deliberately NOT fused into a single whole-frame function, because the
+/// fused variant changed codegen enough (LTO + `&mut` noalias across the
+/// C++ hook re-entrancy) to diverge mapper_mmc1 frame 0.
+pub unsafe extern "C" fn fceux11_ppu_tick_dots_direct(state: *mut PpuState, n_dots: u32) -> i32 {
+    let sb = lookup_unchecked(state);
+    let mut bus = make_bus_adapter(sb);
+    let mut sched = std::mem::take(&mut sb.sched);
+    sched.set_video_system(sb.pal);
+    let mut frame_advanced = false;
+    for _ in 0..n_dots {
+        render_scanline_if_start(sb, &mut bus);
+        let outcome = sched.tick_one_ppu_dot(&mut sb.state, &mut bus);
+        if outcome.nmi_asserted {
+            sb.state.nmi_pending = true;
+        }
+        if outcome.frame_advanced {
+            sched.reset_frame_counters();
+            frame_advanced = true;
+        }
+        if sb.state.oam_dma_pending
+            && sched.ppu_dots_consumed() % crate::scheduler::PPU_DOTS_PER_CPU_CYCLE == 0
+        {
+            sb.state.tick_oam_dma(&mut bus);
+        }
+    }
+    sb.sched = sched;
+    frame_advanced as i32
+}
+
+/// See [`fceux11_ppu_tick_dots_direct`].
+pub unsafe extern "C" fn fceux11_ppu_take_nmi_direct(state: *mut PpuState) -> i32 {
+    let sb = lookup_unchecked(state);
+    let pending = sb.state.nmi_pending;
+    sb.state.nmi_pending = false;
+    pending as i32
 }
 
 // ===========================================================================

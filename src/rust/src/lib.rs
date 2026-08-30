@@ -6,6 +6,8 @@
 // surface noise-free.
 #![allow(unsafe_op_in_unsafe_fn)]
 
+use std::path::Path;
+
 pub use fceux11_core;
 pub use fceux11_debug;
 pub use fceux11_formats;
@@ -88,7 +90,9 @@ pub unsafe extern "C" fn kagami_qa_savestate_regression_main(
     argv: *const *const std::os::raw::c_char,
 ) -> i32 {
     // SAFETY: argv is constructed by the C caller per the C-ABI contract.
-    unsafe { kagami_qa::savestate_regression_entry::kagami_qa_savestate_regression_main(argc, argv) }
+    unsafe {
+        kagami_qa::savestate_regression_entry::kagami_qa_savestate_regression_main(argc, argv)
+    }
 }
 
 // =========================================================================
@@ -155,7 +159,10 @@ pub unsafe extern "C" fn fceux11_ppu_reset(state: *mut fceux11_ppu::PpuState) {
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fceux11_ppu_set_video_system(state: *mut fceux11_ppu::PpuState, pal: bool) {
+pub unsafe extern "C" fn fceux11_ppu_set_video_system(
+    state: *mut fceux11_ppu::PpuState,
+    pal: bool,
+) {
     fceux11_ppu::ffi::fceux11_ppu_set_video_system(state, pal)
 }
 
@@ -197,18 +204,12 @@ pub unsafe extern "C" fn fceux11_ppu_set_palette_window(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fceux11_ppu_set_mirror_mode(
-    state: *mut fceux11_ppu::PpuState,
-    mode: u32,
-) {
+pub unsafe extern "C" fn fceux11_ppu_set_mirror_mode(state: *mut fceux11_ppu::PpuState, mode: u32) {
     fceux11_ppu::ffi::fceux11_ppu_set_mirror_mode(state, mode)
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fceux11_ppu_cpu_read(
-    state: *mut fceux11_ppu::PpuState,
-    addr: u16,
-) -> u8 {
+pub unsafe extern "C" fn fceux11_ppu_cpu_read(state: *mut fceux11_ppu::PpuState, addr: u16) -> u8 {
     fceux11_ppu::ffi::fceux11_ppu_cpu_read(state, addr)
 }
 
@@ -246,37 +247,27 @@ pub unsafe extern "C" fn fceux11_ppu_tick_dots(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fceux11_ppu_take_nmi_pending(
-    state: *mut fceux11_ppu::PpuState,
-) -> i32 {
+pub unsafe extern "C" fn fceux11_ppu_take_nmi_pending(state: *mut fceux11_ppu::PpuState) -> i32 {
     fceux11_ppu::ffi::fceux11_ppu_take_nmi_pending(state)
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fceux11_ppu_get_scanline(
-    state: *const fceux11_ppu::PpuState,
-) -> i16 {
+pub unsafe extern "C" fn fceux11_ppu_get_scanline(state: *const fceux11_ppu::PpuState) -> i16 {
     fceux11_ppu::ffi::fceux11_ppu_get_scanline(state)
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fceux11_ppu_get_dot(
-    state: *const fceux11_ppu::PpuState,
-) -> u16 {
+pub unsafe extern "C" fn fceux11_ppu_get_dot(state: *const fceux11_ppu::PpuState) -> u16 {
     fceux11_ppu::ffi::fceux11_ppu_get_dot(state)
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fceux11_ppu_get_frame_count(
-    state: *const fceux11_ppu::PpuState,
-) -> u64 {
+pub unsafe extern "C" fn fceux11_ppu_get_frame_count(state: *const fceux11_ppu::PpuState) -> u64 {
     fceux11_ppu::ffi::fceux11_ppu_get_frame_count(state)
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fceux11_ppu_get_framebuffer(
-    state: *mut fceux11_ppu::PpuState,
-) -> *mut u8 {
+pub unsafe extern "C" fn fceux11_ppu_get_framebuffer(state: *mut fceux11_ppu::PpuState) -> *mut u8 {
     fceux11_ppu::ffi::fceux11_ppu_get_framebuffer(state)
 }
 
@@ -288,9 +279,7 @@ pub unsafe extern "C" fn fceux11_ppu_get_framebuffer_stride(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fceux11_ppu_emergency_reset(
-    state: *mut fceux11_ppu::PpuState,
-) {
+pub unsafe extern "C" fn fceux11_ppu_emergency_reset(state: *mut fceux11_ppu::PpuState) {
     fceux11_ppu::ffi::fceux11_ppu_emergency_reset(state)
 }
 
@@ -302,16 +291,12 @@ pub unsafe extern "C" fn fceux11_ppu_take_vbl_set_suppressed(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fceux11_ppu_mark_vbl_set_suppressed(
-    state: *mut fceux11_ppu::PpuState,
-) {
+pub unsafe extern "C" fn fceux11_ppu_mark_vbl_set_suppressed(state: *mut fceux11_ppu::PpuState) {
     fceux11_ppu::ffi::fceux11_ppu_mark_vbl_set_suppressed(state)
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fceux11_ppu_render_frame(
-    state: *mut fceux11_ppu::PpuState,
-) {
+pub unsafe extern "C" fn fceux11_ppu_render_frame(state: *mut fceux11_ppu::PpuState) {
     fceux11_ppu::ffi::fceux11_ppu_render_frame(state)
 }
 
@@ -329,6 +314,66 @@ pub unsafe extern "C" fn fceux11_ppu_set_status_vbl_set_suppressed(
     fceux11_ppu::ffi::fceux11_ppu_set_status_vbl_set_suppressed(state)
 }
 
+// =========================================================================
+// v2.1 Phase 5.3 — in-Rust CPU/PPU per-dot interleave loop.
+//
+// Phase 5.1 drove the interleave from C++ (`FCEUPPU_Loop`): per dot it
+// made THREE FFI crossings (advance_ppu_dots + take_nmi + Cpu::run).
+// At 89342 dots/frame that is ~268k boundary crossings per frame and
+// the dominant cost of the bench_tolerance_test +165% regression.
+//
+// This entry point moves the loop itself into Rust — one FFI per
+// frame — while keeping the EXACT per-dot operation sequence the
+// Phase 5.1 C++ loop validated (tick 1 dot → take NMI latch → run CPU
+// by 1 dot unit). The CPU call reuses `fceux11_cpu_run_with_tick`
+// verbatim (including its per-call working-copy sync of the 64-byte
+// C++ blob), so C++-side state mutation visibility is unchanged; only
+// the call-site orchestration moved across the boundary. Mapper event
+// hooks still reach C++ through the existing vtable thunks and the
+// per-instruction tick thunk, at the same dots as before.
+// =========================================================================
+
+/// Pulse the CPU NMI line (`TriggerNMI()` on the C++ side) at the dot
+/// the Rust PPU asserts the VBL NMI — the Phase 5.1 loop's
+/// `if (take_nmi()) TriggerNMI();` forwarded across the boundary.
+///
+/// Phase 5.3: the whole per-dot interleave loop now lives HERE (in
+/// Rust, one FFI per frame) instead of in `FCEUPPU_Loop` (three FFIs
+/// per dot). Two deliberate design constraints, both learned by
+/// regression in this phase:
+///
+/// 1. The per-dot PPU calls go through `fceux11_ppu_tick_dots_direct`
+///    / `fceux11_ppu_take_nmi_direct` — byte-identical to the validated
+///    FFI bodies with only the per-call REGISTRY MUTEX removed. An
+///    earlier fully-fused whole-frame function (single borrow chain,
+///    callbacks called from within) diverged mapper_mmc1 frame 0 under
+///    LTO and was discarded — see the ppu crate ffi.rs note.
+/// 2. The CPU step calls the same `fceux11_cpu_run_with_tick(cpu, 1)`
+///    the C++ `Cpu::run(1)` invoked, keeping the per-dot working-copy
+///    sync (C++-side IRQ mutations from mapper hooks stay bit-exact).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_run_frame_interleaved(
+    ppu_state: *mut fceux11_ppu::PpuState,
+    cpu_state: *mut u8,
+    trigger_nmi: Option<unsafe extern "C" fn()>,
+    dots: u32,
+) -> i32 {
+    if ppu_state.is_null() || cpu_state.is_null() {
+        return -1;
+    }
+    let mut frame_done = 0;
+    for _ in 0..dots {
+        fceux11_ppu::ffi::fceux11_ppu_tick_dots_direct(ppu_state, 1);
+        if fceux11_ppu::ffi::fceux11_ppu_take_nmi_direct(ppu_state) != 0 {
+            if let Some(cb) = trigger_nmi {
+                unsafe { cb() }
+            }
+        }
+        fceux11_core::cpu::ffi::fceux11_cpu_run_with_tick(cpu_state, 1);
+    }
+    frame_done
+}
+
 // Debug accessors (added for Phase 4 bridge window-install verification)
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_ppu_get_register_state(
@@ -339,8 +384,6 @@ pub unsafe extern "C" fn fceux11_ppu_get_register_state(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fceux11_ppu_get_v_state(
-    state: *const fceux11_ppu::PpuState,
-) -> u16 {
+pub unsafe extern "C" fn fceux11_ppu_get_v_state(state: *const fceux11_ppu::PpuState) -> u16 {
     unsafe { fceux11_ppu::ffi::fceux11_ppu_get_v_state(state) }
 }

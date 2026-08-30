@@ -847,6 +847,24 @@ if(FCEUX11_BUILD_TESTS)
         if(WIN32)
             set_tests_properties(mapper_byte_diff_rust_smoke PROPERTIES ENVIRONMENT_MODIFICATION
                     "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+
+        # =====================================================================
+        # Phase 5.3 (plan Section 5.3 item 1) - mapper-specific byte-diff gates.
+        # Same harness as mapper_byte_diff_rust_smoke, but one mapper per ctest
+        # so a single-mapper regression is individually visible and gated. The
+        # four names are entries in the harness 175-case table
+        # (fixtures/golden_mapper/<name>.bin).
+        # =====================================================================
+        foreach(_mapper mmc1 mmc3 mmc5 vrc6)
+            add_test(NAME mapper_${_mapper}_byte_diff
+                     COMMAND kagami_qa_mapper_byte_diff_runner --only ${_mapper}
+                     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+            if(WIN32)
+                set_tests_properties(mapper_${_mapper}_byte_diff PROPERTIES ENVIRONMENT_MODIFICATION
+                        "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+            endif()
+        endforeach()
+
         endif()
     endif()
 endif()

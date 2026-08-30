@@ -3,6 +3,8 @@ pub mod manifest;
 pub mod runner;
 pub mod oracle;
 pub mod report;
+use std::path::Path;
+
 pub mod adapter;
 pub mod cli;
 
@@ -138,31 +140,54 @@ pub mod rom_regression_entry {
     };
 
     /// C-ABI entry point replacing `tests/rom_regression_test.cpp:main()`.
+    ///
+    /// Phase 5.3: `--generate` writes the freshly collected per-frame CRCs
+    /// to `fixtures/golden_hashes.json` (plan 5.3 item 4 - golden
+    /// regeneration under the Do-NOT #3 three-piece process; the semantic
+    /// basis is the plan v2.2 hardware-truth revision, NOT "make the test
+    /// shut up"). Exit code stays 0 on a generate run.
     pub unsafe extern "C" fn kagami_qa_rom_regression_main(
-        _argc: i32,
-        _argv: *const *const std::os::raw::c_char,
+        argc: i32,
+        argv: *const *const std::os::raw::c_char,
     ) -> i32 {
         // WORKING_DIRECTORY is `tests/` (mirrors CMake CTest entry).
         let workdir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         let golden_path = workdir.join("fixtures/golden_hashes.json");
+        let generate = argc > 1
+            && (0..argc).any(|i| unsafe {
+                let p = *argv.offset(i as isize);
+                !p.is_null() && std::ffi::CStr::from_ptr(p).to_string_lossy() == "--generate"
+            });
         let golden = match load_golden_hashes(&golden_path) {
-            Ok(g) => g,
+            Ok(g) => Some(g),
             Err(e) => {
-                let _ = writeln!(
-                    std::io::stdout(),
-                    "Golden hashes file not found: {}\n\
-                     \n\
-                     FAIL: Could not read golden hashes. Run with --generate to create baseline.\n\
-                     RESULT: FAILED",
-                    golden_path.display(),
-                );
-                let _ = writeln!(std::io::stdout(), "{}", e);
-                return 1;
+                if !generate {
+                    let _ = writeln!(
+                        std::io::stdout(),
+                        "Golden hashes file not found: {}\n\
+                         \n\
+                         FAIL: Could not read golden hashes. Run with --generate to create baseline.\n\
+                         RESULT: FAILED",
+                        golden_path.display(),
+                    );
+                    let _ = writeln!(std::io::stdout(), "{}", e);
+                    return 1;
+                }
+                None
             }
         };
+        let missing = golden.is_none();
 
         let mut adapter = Fceux11DirectAdapter::new();
-        let outcome = run_regression(&mut adapter, &golden, &workdir);
+        let empty_golden = crate::runner::rom_regression::GoldenHashes {
+            names: Vec::new(),
+            frames: Vec::new(),
+        };
+        let outcome = run_regression(
+            &mut adapter,
+            golden.as_ref().unwrap_or(&empty_golden),
+            &workdir,
+        );
         // Per-mismatch detail lines (mirror the C++ harness, which prints
         // up to 5 mismatch lines with rom/frame/expected/actual). The
         // summary alone hides which ROM/frame diverged.
@@ -175,6 +200,18 @@ pub mod rom_regression_entry {
         }
         let summary = format_summary(&outcome);
         let _ = write!(std::io::stdout(), "{}", summary);
+
+        if generate {
+            write_golden_hashes_json(&golden_path, &outcome.collected);
+            let _ = writeln!(
+                std::io::stdout(),
+                "GENERATE: wrote {} frame-CRC entries to {}{}",
+                outcome.collected.len(),
+                golden_path.display(),
+                if missing { " (file was missing)" } else { "" },
+            );
+            return 0;
+        }
         regression_exit_code(&outcome)
     }
 
@@ -209,31 +246,53 @@ pub mod savestate_regression_entry {
     };
 
     /// C-ABI entry point replacing `tests/savestate_regression_test.cpp:main()`.
+    ///
+    /// Phase 5.3: `--generate` writes the freshly collected per-ROM MD5s
+    /// to `fixtures/golden_savestate_hashes.json` (plan 5.3 item 4 -
+    /// golden regeneration under the Do-NOT #3 three-piece process; the
+    /// semantic basis is the plan v2.2 hardware-truth revision). Exit
+    /// code stays 0 on a generate run.
     pub unsafe extern "C" fn kagami_qa_savestate_regression_main(
-        _argc: i32,
-        _argv: *const *const std::os::raw::c_char,
+        argc: i32,
+        argv: *const *const std::os::raw::c_char,
     ) -> i32 {
         // WORKING_DIRECTORY is `tests/` (mirrors CMake CTest entry).
         let workdir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         let golden_path = workdir.join("fixtures/golden_savestate_hashes.json");
+        let generate = argc > 1
+            && (0..argc).any(|i| unsafe {
+                let p = *argv.offset(i as isize);
+                !p.is_null() && std::ffi::CStr::from_ptr(p).to_string_lossy() == "--generate"
+            });
         let golden = match load_golden_savestate_hashes(&golden_path) {
-            Ok(g) => g,
+            Ok(g) => Some(g),
             Err(e) => {
-                let _ = writeln!(
-                    std::io::stdout(),
-                    "Golden hashes file not found: {}\n\n\
-                     No golden hashes found. Run with --generate to create {}\n\
-                     RESULT: FAILED",
-                    golden_path.display(),
-                    golden_path.display(),
-                );
-                let _ = writeln!(std::io::stdout(), "{}", e);
-                return 1;
+                if !generate {
+                    let _ = writeln!(
+                        std::io::stdout(),
+                        "Golden hashes file not found: {}\n\n\
+                         No golden hashes found. Run with --generate to create {}\n\
+                         RESULT: FAILED",
+                        golden_path.display(),
+                        golden_path.display(),
+                    );
+                    let _ = writeln!(std::io::stdout(), "{}", e);
+                    return 1;
+                }
+                None
             }
         };
 
         let mut adapter = Fceux11DirectAdapter::new();
-        let outcome = run_regression(&mut adapter, &golden, &workdir);
+        let empty_golden = crate::runner::savestate_regression::GoldenSavestateHashes {
+            names: Vec::new(),
+            hashes: Vec::new(),
+        };
+        let outcome = run_regression(
+            &mut adapter,
+            golden.as_ref().unwrap_or(&empty_golden),
+            &workdir,
+        );
         // TEMP parity debug: per-ROM hashes for cross-check vs C++.
         for (name, actual) in &outcome.collected {
             eprintln!("  [rust-hash] {name}: {actual}");
@@ -249,6 +308,17 @@ pub mod savestate_regression_entry {
         }
         let summary = format_summary(&outcome);
         let _ = write!(std::io::stdout(), "{}", summary);
+
+        if generate {
+            write_golden_savestate_hashes_json(&golden_path, &outcome.collected);
+            let _ = writeln!(
+                std::io::stdout(),
+                "GENERATE: wrote {} savestate-MD5 entries to {}",
+                outcome.collected.len(),
+                golden_path.display(),
+            );
+            return 0;
+        }
         regression_exit_code(&outcome)
     }
 
@@ -281,20 +351,55 @@ pub mod mapper_byte_diff_entry {
 
     use crate::adapter::direct::Fceux11DirectAdapter;
     use crate::runner::mapper_byte_diff::{
-        format_summary, regression_exit_code, run_regression, MapperStateSource,
+        format_summary, regression_exit_code, run_regression_filtered, MapperStateSource,
     };
 
     /// C-ABI entry point replacing `tests/core/mapper_byte_diff_test.cpp:main()`.
+    ///
+    /// Phase 5.3: supports `--only <name>` (repeatable) to run a single
+    /// mapper case — the `mapper_<name>_byte_diff` ctest entries gate one
+    /// mapper each. With no `--only`, the full 175-case table runs.
     pub unsafe extern "C" fn kagami_qa_mapper_byte_diff_main(
-        _argc: i32,
-        _argv: *const *const std::os::raw::c_char,
+        argc: i32,
+        argv: *const *const std::os::raw::c_char,
     ) -> i32 {
         // WORKING_DIRECTORY is `tests/` (mirrors CMake CTest entry).
         let workdir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         let golden_dir = workdir.join("fixtures/golden_mapper");
 
+        let mut only: Vec<String> = Vec::new();
+        let mut args: Vec<String> = Vec::new();
+        for i in 0..argc {
+            let ptr = unsafe { *argv.offset(i as isize) };
+            if ptr.is_null() {
+                break;
+            }
+            // SAFETY: ptr points to a null-terminated C string (the
+            // C-ABI contract for argv).
+            let arg = match unsafe { std::ffi::CStr::from_ptr(ptr) }.to_str() {
+                Ok(s) => s.to_string(),
+                Err(_) => String::from("<invalid-utf8>"),
+            };
+            args.push(arg);
+        }
+        let mut it = args.iter().skip(1);
+        while let Some(a) = it.next() {
+            if a == "--only" {
+                match it.next() {
+                    Some(name) => only.push(name.clone()),
+                    None => {
+                        let _ = write!(std::io::stdout(), "--only requires a case name
+");
+                        return 2;
+                    }
+                }
+            }
+            // Unknown args are ignored for backward compatibility (the
+            // pre-5.3 entry ignored argv entirely).
+        }
+
         let mut adapter = Fceux11DirectAdapter::new();
-        let outcome = run_regression(&mut adapter, &workdir, &golden_dir);
+        let outcome = run_regression_filtered(&mut adapter, &workdir, &golden_dir, &only);
         let summary = format_summary(&outcome);
         let _ = write!(std::io::stdout(), "{}", summary);
         regression_exit_code(&outcome)
@@ -523,5 +628,60 @@ pub mod direct_entry {
         // the matrix but do not propagate to the process exit code —
         // the same convention as kagami-qa-runner (subprocess mode).
         if blocking_failed > 0 { 1 } else { 0 }
+    }
+}
+
+// =========================================================================
+// Phase 5.3 - golden writers for the `--generate` mode of the
+// rom/savestate regression harnesses (plan 5.3 item 4). Both emit the
+// exact document shape the original C++ writers produced, which the
+// hand-rolled tolerant parsers in this crate read back.
+// =========================================================================
+
+/// Write `golden_hashes.json`: `{ "name": { "frames": [u32; 60] } }` per ROM.
+fn write_golden_hashes_json(path: &Path, collected: &std::collections::BTreeMap<String, Vec<u32>>) {
+    let mut s = String::from("{\n");
+    for (i, (name, frames)) in collected.iter().enumerate() {
+        s.push_str("  \"");
+        s.push_str(name);
+        s.push_str("\": {\n    \"frames\": [");
+        for (j, f) in frames.iter().enumerate() {
+            if j > 0 {
+                s.push_str(", ");
+            }
+            s.push_str(&f.to_string());
+        }
+        s.push_str("]\n  }");
+        if i + 1 < collected.len() {
+            s.push(',');
+        }
+        s.push('\n');
+    }
+    s.push_str("}\n");
+    if let Err(e) = std::fs::write(path, s) {
+        eprintln!("GENERATE: failed to write {}: {e}", path.display());
+    }
+}
+
+/// Write `golden_savestate_hashes.json`: `{ "name": { "hash": "md5" } }` per ROM.
+fn write_golden_savestate_hashes_json(
+    path: &Path,
+    collected: &std::collections::BTreeMap<String, String>,
+) {
+    let mut s = String::from("{\n");
+    for (i, (name, hash)) in collected.iter().enumerate() {
+        s.push_str("  \"");
+        s.push_str(name);
+        s.push_str("\": {\n    \"hash\": \"");
+        s.push_str(hash);
+        s.push_str("\"\n  }");
+        if i + 1 < collected.len() {
+            s.push(',');
+        }
+        s.push('\n');
+    }
+    s.push_str("}\n");
+    if let Err(e) = std::fs::write(path, s) {
+        eprintln!("GENERATE: failed to write {}: {e}", path.display());
     }
 }

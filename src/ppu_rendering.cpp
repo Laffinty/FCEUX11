@@ -1206,20 +1206,27 @@ int FCEUPPU_Loop(int skip) {
 	// within the same frame — the property the batch `emit_frame`
 	// model lacked.
 	if (ppu_rust_bridge_active()) [[unlikely]] {
+		// Phase 5.3: the per-dot interleave loop now runs inside Rust
+		// (`fceux11_run_frame_interleaved`) — ONE FFI per frame instead
+		// of three per dot (~268k boundary crossings/frame in the
+		// Phase 5.1 C++ loop; that was the dominant bench_tolerance_test
+		// regression). The per-dot operation sequence is unchanged:
+		// tick 1 PPU dot (render / mapper hooks / OAM DMA pump) →
+		// pulse TriggerNMI() when the PPU latch fires → advance the
+		// CPU by one dot unit (1 CPU cycle = 3 dot units, the legacy
+		// X6502_Run convention). The validated 1-dot granularity of
+		// Phase 5.1 is preserved — the 3-dot chunking variant broke
+		// sub-instruction CPU/PPU phase (see plan §5.1).
+		if (ppu_rust_bridge_run_frame_interleaved(PPU_RUST_NTSC_PPU_DOTS_PER_FRAME) == 0) {
+			ppu_rust_bridge_copy_framebuffer();
+			return 0;
+		}
+		// Fallback (bridge active but no PPU state — defensive): the
+		// Phase 5.1 C++ loop with the PPU advance no-oped, i.e. a
+		// CPU-only frame advance.
 		for (uint32_t dot = 0; dot < PPU_RUST_NTSC_PPU_DOTS_PER_FRAME; ++dot) {
-			ppu_rust_bridge_advance_ppu_dots(1);
-			// Phase 5.1: forward the Rust PPU's VBL NMI assertion to
-			// the CPU. `TriggerNMI()` ORs FCEU_IQNMI and arms the
-			// one-instruction "fresh" deferral — the exact latch the
-			// C++ engines use. Without this the PPU NMI never reaches
-			// the CPU and ROMs that wait for a VBL interrupt
-			// (nestest's IRQ-wait at $C28F) spin forever.
-			if (ppu_rust_bridge_take_nmi()) {
-				TriggerNMI();
-			}
 			fceu11::cpu_instance().run(1);
 		}
-		ppu_rust_bridge_copy_framebuffer();
 		return 0;
 	}
 #endif

@@ -75,6 +75,17 @@ void ppu_rust_bridge_advance_ppu_dots(uint32_t dots);
 // when the caller must pulse the CPU NMI line via `TriggerNMI()`.
 int ppu_rust_bridge_take_nmi();
 
+// Phase 5.3: run the whole per-dot CPU/PPU interleave loop inside one
+// FFI call (the loop itself now lives in Rust; see
+// fceux11_run_frame_interleaved in src/rust/src/lib.rs). Advances the
+// Rust PPU by `dots` single dots, pulses the CPU NMI line via
+// TriggerNMI() when the PPU latch fires, and advances the CPU by one
+// dot unit per dot — the exact Phase 5.1 per-dot operation sequence,
+// minus the two FFI boundary crossings per dot. Returns 0 when the
+// loop ran; -1 when the bridge has no PPU state (caller falls back to
+// the C++-driven loop).
+int ppu_rust_bridge_run_frame_interleaved(uint32_t dots);
+
 // Bank-window setup — called from setchr*/setntamem paths.
 void ppu_rust_bridge_set_chr_window(uint32_t slot, const uint8_t* ptr, uint32_t len, bool is_ram);
 void ppu_rust_bridge_set_nt_window(const uint8_t* ptr, uint32_t len);
@@ -114,6 +125,7 @@ inline bool ppu_rust_bridge_active() { return false; }
 inline int  ppu_rust_bridge_emit_one_cpu_cycle() { return 0; }
 inline void ppu_rust_bridge_advance_ppu_dots(uint32_t /*dots*/) {}
 inline int  ppu_rust_bridge_take_nmi() { return 0; }
+inline int  ppu_rust_bridge_run_frame_interleaved(uint32_t /*dots*/) { return -1; }
 
 #endif // FCEUX11_RUST_PPU
 

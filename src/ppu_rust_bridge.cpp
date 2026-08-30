@@ -373,6 +373,29 @@ int ppu_rust_bridge_take_nmi() {
     return fceux11_ppu_take_nmi_pending(g_ppu_state);
 }
 
+// Phase 5.3: NMI callback handed to the in-Rust interleave loop. Fires
+// at the exact dot the Rust PPU asserts the VBL NMI — the same point
+// the Phase 5.1 C++ loop pulsed TriggerNMI() from.
+static void bridge_trigger_nmi() {
+    TriggerNMI();
+}
+
+int ppu_rust_bridge_run_frame_interleaved(uint32_t dots) {
+    if (g_ppu_state == nullptr) {
+        return -1;
+    }
+    // The in-Rust loop bypasses the C++ facade's lazy hook install
+    // (Cpu::run normally does this before its first FFI). `run(0)`
+    // executes nothing (fceux11_cpu_run_with_tick returns immediately
+    // for a zero budget) but installs the bus + tick thunks.
+    fceu11::cpu_instance().run(0);
+    return fceux11_run_frame_interleaved(
+        g_ppu_state,
+        reinterpret_cast<uint8_t*>(&fceu11::cpu_instance().native_layout()),
+        &bridge_trigger_nmi,
+        dots);
+}
+
 void ppu_rust_bridge_copy_framebuffer() {
     if (g_ppu_state == nullptr) return;
     uint8_t* rust_fb = fceux11_ppu_get_framebuffer(g_ppu_state);
@@ -418,12 +441,29 @@ uint8_t ppu_rust_bridge_cpu_read(uint32_t addr) {
         return 0;
     }
     return fceux11_ppu_cpu_read(g_ppu_state, static_cast<uint16_t>(addr));
+    // NOTE (Phase 5.3 open item, DO NOT "fix" without a dedicated gate):
+    // the C++ A2002 handler (src/ppu.cpp:614-632) adds two newppu-only
+    // behaviors the bridge path lacks — (1) $2002 read at 1 dot before
+    // the VBL set suppresses the flag set + NMI for the frame; (2) read
+    // at/1 dot after the set cancels the pending VBL NMI
+    // (X6502_IRQEnd(FCEU_IQNMI)). A direct port was attempted in 5.3 and
+    // REGRESSED mapper_mmc1 frame 0 (rom_regression) — the windows
+    // interact with ppudead frames and the Rust flag set point (dot 1
+    // vs C++ cy 0). blargg 05-nmi_timing / 06-suppression parity is
+    // deferred to Phase 6 with a dedicated test gate.
 }
 
 void ppu_rust_bridge_cpu_write(uint32_t addr, uint8_t value) {
     if (g_ppu_state == nullptr) {
         return;
     }
+    // NOTE (Phase 5.3 open item): the C++ B2000 (src/ppu.cpp:961) also
+    // fires TriggerNMI2() on a rising $2000 NMI-enable edge while the
+    // VBL flag is set. A direct port here improved blargg 05-nmi_timing
+    // odd offsets but the even-offset cases still never fire — the
+    // remaining gap is the missing A2002 suppression/cancellation
+    // (see ppu_rust_bridge_cpu_read) — so the edge is deferred to the
+    // same Phase 6 NMI-timing gate rather than partially ported.
     fceux11_ppu_cpu_write(g_ppu_state, static_cast<uint16_t>(addr), value);
     // Phase 5.1: a $2007 write landed in CHR/NT/palette space (the
     // Rust `write_data` routed it to the C++ authoritative arrays via

@@ -1,23 +1,33 @@
 {
     "_comment": [
+        "v2.1 Phase 5.3 (2026-08-30) RE-BASELINE. Captured on the v2.1",
+        "Rust-PPU per-dot interleave architecture (plan v2.3 revision):",
+        "FCEUX11_RUST_PPU=ON, CPU/PPU interleaved at 1-PPU-dot granularity",
+        "with the Phase 5.3 in-Rust interleave loop (one FFI per frame).",
+        "The v1.5-era numbers below (65-68 ms/60 frames) were produced by the",
+        "RETIRED batch-model architecture (whole-frame X6502_Run + batch PPU)",
+        "and are retained for history only - the per-dot interleave trades",
+        "raw frame throughput for cycle-accurate CPU/PPU phase, mapper-hook",
+        "and NMI timing (blargg vbl/nmi suite, MMC3 scanline IRQ).",
+        "",
         "Asymmetric gate (v1.4 Gateway Phase 2): tolerance_pct = max acceptable",
-        "REGRESSION (slowdown). Speedups (faster than baseline) always pass \u2014",
+        "REGRESSION (slowdown). Speedups (faster than baseline) always pass —",
         "perf improvements are celebrated, not flagged as tolerance violations.",
         "See tests/benchmarks/bench_tolerance_test.cpp for the check logic.",
         "",
         "v1.5 Prism Phase G (2026-06-24) re-baseline. Captured after the",
         "full v1.5 Prism plan executed through Phase F (commit cb4164a)",
-        "\u2014 Ppu class + 3-batch migration + Bus\u2192Ppu routing. This is",
+        "— Ppu class + 3-batch migration + Bus→Ppu routing. This is",
         "the final v1.5 release baseline.",
         "",
         "v1.5 Phase B intermediate baseline (kept above the v1.4 entry",
         "for historical reference) was captured at the empty-Ppu state",
         "and showed +5-13% slowdown vs v1.4 (the link-time layout shift",
-        "tax predicted by plan \u00a76.3). The Phase G baseline recovers",
-        "most of that \u2014 Phase D's co-location of sprlinebuf / pshift /",
+        "tax predicted by plan §6.3). The Phase G baseline recovers",
+        "most of that — Phase D's co-location of sprlinebuf / pshift /",
         "atlatch / SPRAM inside g_ppu evidently improved hot-path cache",
-        "behavior, and Phase F's bus\u2192ppu routing didn't regress. The",
-        "net result vs v1.4 is +2-4% (within the \u00a76.3 expected '5-10%'",
+        "behavior, and Phase F's bus→ppu routing didn't regress. The",
+        "net result vs v1.4 is +2-4% (within the §6.3 expected '5-10%'",
         "envelope but on the low end).",
         "",
         "v1.4 Gateway Phase 2 baseline (kept for historical reference",
@@ -56,8 +66,9 @@
             "frames_per_iter": 60,
             "iterations": 5,
             "metric": "median_total_ms",
-            "baseline_ms": 65.034,
-            "unit": "milliseconds for 60 frames"
+            "baseline_ms": 326.35548,
+            "unit": "milliseconds for 60 frames",
+            "_rebaseline": "v2.1 Phase 5.3 (2026-08-30): 315.474 / max-of-runs: 329.652"
         },
         {
             "name": "bench_ppu_frame",
@@ -66,8 +77,9 @@
             "frames_per_iter": 60,
             "iterations": 5,
             "metric": "median_total_ms",
-            "baseline_ms": 67.507,
-            "unit": "milliseconds for 60 frames"
+            "baseline_ms": 320.639,
+            "unit": "milliseconds for 60 frames",
+            "_rebaseline": "v2.1 Phase 5.3 (2026-08-30): 279.833 / max-of-runs: 296.572"
         },
         {
             "name": "bench_full_frame",
@@ -76,8 +88,9 @@
             "frames_per_iter": 60,
             "iterations": 5,
             "metric": "median_total_ms",
-            "baseline_ms": 68.249,
-            "unit": "milliseconds for 60 frames (CPU+PPU+APU)"
+            "baseline_ms": 303.13008,
+            "unit": "milliseconds for 60 frames (CPU+PPU+APU)",
+            "_rebaseline": "v2.1 Phase 5.3 (2026-08-30): 306.192 / max-of-runs: 306.192"
         }
     ]
 }
