@@ -186,3 +186,4 @@ build/*_baseline*.json
 build/*_accuracy*.md
 build/*_results*.json
 build/*_output*.txt
+tests/benchmarks/baseline_v1.0.local.json
