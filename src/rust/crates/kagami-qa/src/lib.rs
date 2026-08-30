@@ -138,6 +138,7 @@ pub mod rom_regression_entry {
     use crate::runner::rom_regression::{
         format_summary, load_golden_hashes, regression_exit_code, run_regression, FrameSource,
     };
+    use crate::write_golden_hashes_json;
 
     /// C-ABI entry point replacing `tests/rom_regression_test.cpp:main()`.
     ///
@@ -244,6 +245,7 @@ pub mod savestate_regression_entry {
         format_summary, load_golden_savestate_hashes, regression_exit_code, run_regression,
         StateSnapshot,
     };
+    use crate::write_golden_savestate_hashes_json;
 
     /// C-ABI entry point replacing `tests/savestate_regression_test.cpp:main()`.
     ///
