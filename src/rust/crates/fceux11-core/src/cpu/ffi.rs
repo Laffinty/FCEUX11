@@ -344,6 +344,57 @@ pub unsafe extern "C" fn fceux11_cpu_restore(state: *mut u8, inp: *const u8) {
     }
 }
 
+/// Phase 6.3.c.1: adjust the CPU's `count` budget by `n * 16` 1/16-CPU-
+/// cycle units **without executing any instructions**. Positive `n`
+/// adds budget (rare — equivalent to letting the CPU "borrow" cycles
+/// from a future call); negative `n` subtracts budget (the DMC DMA
+/// arbitration path uses this to model the CPU being stalled for N
+/// cycles while the APU fetches a DMC sample byte).
+///
+/// Per-cycle arithmetic (matches `fceux11_cpu_run` / `_run_with_tick`
+/// at lines 269/307): the dispatch path decrements `count` by
+/// `CycTable[opcode] * 48` per instruction, and the per-call budget
+/// is `cycles_arg * 16`. Subtracting `n * 16` therefore consumes
+/// exactly N CPU cycles of "would-have-run" budget, exactly like
+/// `g_cpu.timestamp_ref() += n` on the C++ side but applied to the
+/// Rust-side `count` field that drives instruction dispatch.
+///
+/// **Why not a "timestamp_ref" mirror?** The Rust CPU's notion of
+/// "elapsed CPU cycles" is encoded implicitly in `count` + the
+/// dispatch history. The C++ side has its own `g_cpu.timestamp_ref`
+/// which is the authoritative clock for mapper hooks (the
+/// `cpu_rust_tick_thunk` at `src/cpu.cpp:172-180` mirrors the Rust
+/// tick into `timestamp_ref` on every instruction). DMC DMA's
+/// `X6502_DMR` calls `ADDCYC(1)` which advances `g_cpu.timestamp_ref`
+/// directly — that part is already correct. The Rust CPU's `count`
+/// is the only thing that drifts, and `advance_cycles` corrects it.
+///
+/// Safety contract: identical to [`fceux11_cpu_run`]. `state` must
+/// have been initialised via `fceux11_cpu_init`/`power`/`reset`/`restore`.
+/// `n == 0` is a no-op; `n < 0` is the DMC DMA stall path; `n > 0`
+/// is reserved for future test scaffolding.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_cpu_advance_cycles(state: *mut u8, n: i32) {
+    if state.is_null() || n == 0 {
+        return;
+    }
+    unsafe {
+        // Pull the latest blob so we can mutate the working copy.
+        FFI_CPU_STATE.regs = *(state as *const X6502Layout);
+        // Mirror the C++ `ADDCYC` polarity: positive n adds cycles
+        // (would borrow from future budget), negative n subtracts
+        // (DMC stall). Saturating arithmetic matches C++'s
+        // `g_cpu.timestamp_ref() += n` behaviour at integer boundaries.
+        let delta = (n as i64) * 16;
+        let current = FFI_CPU_STATE.regs.count as i64;
+        let new = current.saturating_add(delta);
+        FFI_CPU_STATE.regs.count = new.clamp(i32::MIN as i64, i32::MAX as i64) as i32;
+        // Write back so the next fceux11_cpu_run* call observes the
+        // updated count.
+        *(state as *mut X6502Layout) = FFI_CPU_STATE.regs;
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tests — exercise the FFI surface on a synthetic 64-byte buffer so we
 // can build + run the crate without C++ linkage. These are pure-Rust

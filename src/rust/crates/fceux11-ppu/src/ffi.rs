@@ -886,6 +886,22 @@ pub unsafe extern "C" fn fceux11_ppu_dmc_dma_arbitration(
     sb.dmc_dma_pending_stall = stall_cycles;
 }
 
+/// Phase 6.3.c.1: take-and-clear the pending DMC DMA stall request.
+/// Called by the per-dot interleave loop (`fceux11_run_frame_interleaved`)
+/// once per dot; if the return value is non-zero, the loop calls
+/// `fceux11_cpu_advance_cycles(cpu_state, -returned_value)` to consume
+/// the stall from the Rust CPU's `count` budget before the next
+/// `fceux11_cpu_run_with_tick(cpu_state, 1)` call. This mirrors the
+/// C++ `g_cpu.timestamp_ref()` advance that the DMC's
+/// `X6502_DMR → ADDCYC(1)` chain already performs, so the two sides
+/// stay in sync.
+pub unsafe extern "C" fn fceux11_ppu_take_dmc_dma_stall(state: *mut PpuState) -> u8 {
+    let sb = lookup(state);
+    let stall = sb.dmc_dma_pending_stall;
+    sb.dmc_dma_pending_stall = 0;
+    stall
+}
+
 /// Phase 6.3.a: refresh the PPU internal data-bus open-bus value and
 /// stamp the current CPU cycle. Called by the C++ bridge after every
 /// CPU write to a PPU register (and after every PPU-side read that

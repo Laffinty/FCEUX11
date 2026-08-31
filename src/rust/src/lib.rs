@@ -371,6 +371,16 @@ pub unsafe extern "C" fn fceux11_ppu_dmc_dma_arbitration(
     fceux11_ppu::ffi::fceux11_ppu_dmc_dma_arbitration(state, stall_cycles)
 }
 
+// Phase 6.3.c.1: take-and-clear companion to
+// fceux11_ppu_dmc_dma_arbitration. Consumed by the per-dot interleave
+// loop in `fceux11_run_frame_interleaved` below.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_ppu_take_dmc_dma_stall(
+    state: *mut fceux11_ppu::PpuState,
+) -> u8 {
+    fceux11_ppu::ffi::fceux11_ppu_take_dmc_dma_stall(state)
+}
+
 // =========================================================================
 // v2.1 Phase 5.3 — in-Rust CPU/PPU per-dot interleave loop.
 //
@@ -426,7 +436,28 @@ pub unsafe extern "C" fn fceux11_run_frame_interleaved(
                 unsafe { cb() }
             }
         }
-        fceux11_core::cpu::ffi::fceux11_cpu_run_with_tick(cpu_state, 1);
+        // Phase 6.3.c.1: drain any pending DMC DMA stall that the C++
+        // APU's `DMCDMA()` recorded via
+        // `fceux11_ppu_dmc_dma_arbitration`. We mirror the C++
+        // `g_cpu.timestamp_ref() += stall` semantics on the Rust CPU
+        // by subtracting `stall * 16` from the `count` budget — this
+        // makes the next `run_with_tick` consume that many cycles of
+        // "would-have-run" budget without actually executing them,
+        // exactly like the C++ APU's stalled cycles during a DMC
+        // fetch. The PPU continues normally; only the CPU skips.
+        //
+        // When `fceux11_ppu_dmc_dma_arbitration` is not yet wired
+        // (Phase 6.3.c.2 follow-up), the take returns 0 and this
+        // branch is dead code.
+        let stall = fceux11_ppu::ffi::fceux11_ppu_take_dmc_dma_stall(ppu_state);
+        if stall > 0 {
+            fceux11_core::cpu::ffi::fceux11_cpu_advance_cycles(
+                cpu_state,
+                -(stall as i32),
+            );
+        } else {
+            fceux11_core::cpu::ffi::fceux11_cpu_run_with_tick(cpu_state, 1);
+        }
     }
     frame_done
 }

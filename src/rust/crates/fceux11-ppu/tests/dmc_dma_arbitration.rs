@@ -18,6 +18,7 @@
 
 use fceux11_ppu::ffi::{
     fceux11_ppu_create, fceux11_ppu_destroy, fceux11_ppu_dmc_dma_arbitration,
+    fceux11_ppu_take_dmc_dma_stall,
 };
 
 #[test]
@@ -67,6 +68,35 @@ fn dmc_dma_arbitration_overwrites_previous_value() {
         // value simply persists. No getter to assert against yet —
         // see §6.3.b "Open items" in
         // docs/history/v2.1_phase6_batch_compat.md.
+        fceux11_ppu_destroy(state);
+    }
+}
+
+#[test]
+fn take_dmc_dma_stall_returns_and_clears() {
+    // Phase 6.3.c.1: take-and-clear companion. Once the C++ APU
+    // hook is wired (Phase 6.3.c.2), the per-dot loop in
+    // `fceux11_run_frame_interleaved` calls this once per dot,
+    // passing the result to `fceux11_cpu_advance_cycles` so the
+    // Rust CPU's `count` budget reflects the APU's stalled cycles.
+    unsafe {
+        let state = fceux11_ppu_create();
+        assert!(!state.is_null());
+        // Empty case: nothing pending, take returns 0 and leaves
+        // the slot at 0.
+        assert_eq!(fceux11_ppu_take_dmc_dma_stall(state), 0);
+        // Set + take: returns the value and clears the slot.
+        fceux11_ppu_dmc_dma_arbitration(state, 4);
+        assert_eq!(fceux11_ppu_take_dmc_dma_stall(state), 4);
+        assert_eq!(
+            fceux11_ppu_take_dmc_dma_stall(state),
+            0,
+            "second take must return 0 (cleared)"
+        );
+        // Re-arm works after consume.
+        fceux11_ppu_dmc_dma_arbitration(state, 2);
+        assert_eq!(fceux11_ppu_take_dmc_dma_stall(state), 2);
+        assert_eq!(fceux11_ppu_take_dmc_dma_stall(state), 0);
         fceux11_ppu_destroy(state);
     }
 }
