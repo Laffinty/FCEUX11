@@ -121,21 +121,6 @@ void ppu_rust_bridge_copy_framebuffer();
 // decide whether to delegate to the Rust path.
 bool ppu_rust_bridge_active();
 
-// Phase 6.3.c.2: APU-side hook for DMC DMA arbitration. The C++ APU's
-// `DMCDMA()` (`src/sound.cpp:659-686`) performs four `X6502_DMR`
-// reads per fetch; each read stalls the CPU for one cycle. Calling
-// this thunk after the reads lets the Rust scheduler know to skip
-// the corresponding CPU cycles in the per-dot loop via
-// `fceux11_cpu_advance_cycles(cpu, -stall_cycles)`. No-op when the
-// Rust PPU is inactive.
-void ppu_rust_bridge_dmc_dma_arbitration(uint8_t stall_cycles);
-
-// Phase 6.3.c.2: accessor for the Rust PPU state handle. Returns
-// nullptr when the Rust PPU is inactive. Used by code that needs
-// to call FFIs directly (DMC arbitration above already wraps the
-// FFI; future APU integration or the kagami bridge can use this).
-PpuState* ppu_rust_bridge_get_state();
-
 #else  // !FCEUX11_RUST_PPU
 
 // When the option is off, the bridge functions are no-ops returning
