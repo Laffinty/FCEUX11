@@ -606,6 +606,22 @@ fn render_visible_scanline<B: crate::bus::PpuBus + ?Sized>(
         mirror_mode,
         framebuffer,
     );
+    // Phase 6.2: sprite pixel composition over the BG pixels just
+    // written. The batch renderer bypasses the per-cycle hblank
+    // fetch + per-dot shift register path used by the C++ engine and
+    // re-scans primary OAM for the current scanline instead — byte-
+    // identical output for the 8x8 / 8x16 sprite shapes the NESdev
+    // docs describe, but without the cycle-accurate oddities
+    // (mid-tile reload, left-edge 8-pixel clip, overflow re-scan).
+    // See `sprites.rs` for the detailed limitations list.
+    crate::sprites::render_sprites_for_scanline(
+        state,
+        bus,
+        framebuffer,
+        pal_window,
+        state.registers.mask,
+        state.scanline,
+    );
 }
 
 /// Phase 5.1: shared render-at-scanline-start step. Renders the

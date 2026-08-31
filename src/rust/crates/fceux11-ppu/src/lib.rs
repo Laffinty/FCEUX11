@@ -13,21 +13,25 @@
 //! - [`ffi`]: C-ABI surface (`fceux11_ppu_*` exports).
 //! - [`render`]: NROM BG/sprite/palette pipeline (Phase 2 stub; Phase 4 full).
 //! - [`rendering`]: Phase 4 per-scanline BG fetch + pixel output.
+//! - [`sprites`]: Phase 6.2 sprite pixel composition (post-BG pass).
 //! - [`luts`]: precomputed ppulut1/2/3 lookup tables (Phase 4).
 
 pub mod bus;
 pub mod ffi;
 pub mod frame;
 pub mod luts;
-pub mod render;
 pub mod registers;
+pub mod render;
 pub mod rendering;
 pub mod scheduler;
 pub mod snapshot;
+pub mod sprites;
 pub mod state;
 
 pub use bus::{FlatBus, PpuBus};
 pub use frame::{TickOutcome, tick_dot};
 pub use registers::{Registers, ctrl_bits, mask_bits, status_bits};
-pub use scheduler::{NesScheduler, NTSC_CPU_CYCLES_PER_FRAME, PAL_CPU_CYCLES_PER_FRAME, PPU_DOTS_PER_CPU_CYCLE};
+pub use scheduler::{
+    NTSC_CPU_CYCLES_PER_FRAME, NesScheduler, PAL_CPU_CYCLES_PER_FRAME, PPU_DOTS_PER_CPU_CYCLE,
+};
 pub use state::PpuState;
