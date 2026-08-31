@@ -243,7 +243,13 @@ fn write_payload(out: &mut [u8], state: &PpuState) {
     out[off + 10] = state.registers.fine_x;
     out[off + 11] = 0; // pad
     out[off + 12] = state.registers.vram_buffer;
-    out[off + 13] = 0; // pad
+    // Phase 6.3.a: data_bus occupies the formerly-pad byte at offset
+    // 13. v1 decoders zeroed this byte on load so any save file
+    // written by an earlier build round-trips with data_bus=0; v1
+    // encoders written by this build round-trip with data_bus
+    // preserved. We do NOT bump RPU1_VERSION because the byte was
+    // reserved pad in v1.
+    out[off + 13] = state.registers.data_bus;
     out[off + 14..off + 16].copy_from_slice(&[0, 0]); // pad to 16
     off += 16;
 
@@ -332,7 +338,12 @@ fn read_payload(buf: &[u8], state: &mut PpuState) {
     state.registers.fine_x = buf[off + 10];
     // off + 11 = pad
     state.registers.vram_buffer = buf[off + 12];
-    // off + 13..15 = pad
+    // Phase 6.3.a: data_bus lives at offset 13 (was pad before this
+    // phase). v1 savestates written before this phase have 0 here,
+    // which is the correct cold-boot value (data_bus is initialised
+    // to 0 in `Registers::new` and the first CPU write overwrites it).
+    state.registers.data_bus = buf[off + 13];
+    // off + 14..15 = trailing pad
     off += 16;
 
     state.oam.copy_from_slice(&buf[off..off + 256]);

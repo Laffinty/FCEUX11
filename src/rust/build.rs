@@ -336,6 +336,21 @@ fn merge_headers(
     output.push_str("  fceux11_ppu_notify_vblank_fn notify_vblank;\n");
     output.push_str("} fceux11_ppu_bus_callbacks;\n\n");
 
+    // v2.1 Phase 6.3.a — PPU internal data-bus open-bus FFI. The
+    // fceux11-ppu crate's cbindgen output is empty (cbindgen 0.29.3
+    // cannot emit Rust-2024 `pub unsafe extern "C" fn` declarations
+    // — see block comment above). The root crate re-exports these via
+    // `#[unsafe(no_mangle)]` wrappers in src/rust/src/lib.rs but those
+    // wrappers are themselves invisible to cbindgen (root crate's
+    // body extraction strips everything except what cbindgen emits,
+    // and cbindgen doesn't follow `fceux11_ppu::ffi::f` calls). We
+    // therefore inject the prototypes here, matching the existing
+    // "manually appended" pattern below.
+    output.push_str("/* === Phase 6.3.a: PPU data-bus open-bus + decay FFI === */\n");
+    output.push_str("void fceux11_ppu_set_current_cpu_cycle(PpuState *state, uint64_t current_cpu_cycle);\n");
+    output.push_str("void fceux11_ppu_refresh_data_bus(PpuState *state, uint8_t val, uint64_t current_cpu_cycle);\n");
+    output.push_str("void fceux11_ppu_check_data_bus_decay(PpuState *state, uint64_t current_cpu_cycle);\n\n");
+
     if !root_body.is_empty() {
         output.push('\n');
     }

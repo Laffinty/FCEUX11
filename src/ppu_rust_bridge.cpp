@@ -354,6 +354,12 @@ int ppu_rust_bridge_emit_frame(int skip) {
     fceu11::cpu_instance().run(static_cast<int32_t>(kNtscCpuCyclesPerFrame));
     int rc = fceux11_ppu_emulate_frame(g_ppu_state, kNtscCpuCyclesPerFrame);
     ppu_rust_bridge_copy_framebuffer();
+    // Phase 6.3.a: per-frame open-bus decay check. Per-frame
+    // granularity (~16.67 ms) is well within the 600 ms threshold
+    // tolerance set by blargg ppu_open_bus / ppu_read_buffer.
+    const uint64 now = fceu11::cpu_instance().timestamp_base()
+        + static_cast<uint64>(fceu11::cpu_instance().timestamp_ref());
+    fceux11_ppu_check_data_bus_decay(g_ppu_state, now);
     return rc;
 }
 
@@ -382,6 +388,15 @@ void ppu_rust_bridge_advance_ppu_dots(uint32_t dots) {
     if (g_ppu_state == nullptr || dots == 0) {
         return;
     }
+    // Phase 6.3.a: refresh the Rust-side "current CPU cycle" snapshot
+    // the FFI uses to stamp the open-bus latch. Done before the PPU
+    // tick so any CPU write later in this cycle observes the up-to-
+    // date value. The PPU tick itself doesn't write to PPU regs, but
+    // a sprite0 hit / VBL write-back at $2002 is not driven from here
+    // — those are explicit CPU reads.
+    const uint64 now = fceu11::cpu_instance().timestamp_base()
+        + static_cast<uint64>(fceu11::cpu_instance().timestamp_ref());
+    fceux11_ppu_set_current_cpu_cycle(g_ppu_state, now);
     fceux11_ppu_tick_dots(g_ppu_state, dots);
 }
 
@@ -412,11 +427,17 @@ int ppu_rust_bridge_run_frame_interleaved(uint32_t dots) {
     // executes nothing (fceux11_cpu_run_with_tick returns immediately
     // for a zero budget) but installs the bus + tick thunks.
     fceu11::cpu_instance().run(0);
-    return fceux11_run_frame_interleaved(
+    int rc = fceux11_run_frame_interleaved(
         g_ppu_state,
         reinterpret_cast<uint8_t*>(&fceu11::cpu_instance().native_layout()),
         &bridge_trigger_nmi,
         dots);
+    // Phase 6.3.a: per-frame open-bus decay check (same reasoning
+    // as `ppu_rust_bridge_emit_frame` above).
+    const uint64 now = fceu11::cpu_instance().timestamp_base()
+        + static_cast<uint64>(fceu11::cpu_instance().timestamp_ref());
+    fceux11_ppu_check_data_bus_decay(g_ppu_state, now);
+    return rc;
 }
 
 void ppu_rust_bridge_copy_framebuffer() {

@@ -108,4 +108,85 @@ fn write_data_also_increments_v() {
 fn registers_new_initializes_buffer_to_zero() {
     let r = Registers::new();
     assert_eq!(r.vram_buffer, 0);
+    // Phase 6.3.a: data_bus is also 0 at power.
+    assert_eq!(r.data_bus, 0);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 6.3.a — PPU internal data-bus open-bus. `$2005` / `$2006` are
+// write-only on real hardware; their reads return the value latched
+// onto the PPU I/O bus by the most recent CPU write to a PPU register.
+// This is what blargg `ppu_read_buffer` subtest 1 exercises.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn data_bus_latches_last_cpu_write_value() {
+    let mut s = PpuState::new();
+    s.registers.refresh_data_bus(0x80, 1000);
+    assert_eq!(s.registers.data_bus, 0x80);
+    s.registers.refresh_data_bus(0x1E, 2000);
+    assert_eq!(s.registers.data_bus, 0x1E);
+    s.registers.refresh_data_bus(0x42, 3000);
+    assert_eq!(s.registers.data_bus, 0x42);
+    s.registers.refresh_data_bus(0x55, 4000);
+    assert_eq!(s.registers.data_bus, 0x55);
+    s.registers.refresh_data_bus(0xAA, 5000);
+    assert_eq!(s.registers.data_bus, 0xAA);
+}
+
+#[test]
+fn data_bus_latches_2007_writes_for_both_palette_and_non_palette() {
+    let mut s = PpuState::new();
+    let mut bus = FlatBus::new();
+    s.registers.v = 0x2000;
+    s.registers.write_data(&mut bus, 0, 0x77);
+    s.registers.refresh_data_bus(0x77, 1000);
+    assert_eq!(s.registers.data_bus, 0x77, "non-palette refresh updates bus");
+    s.registers.v = 0x3F00;
+    s.registers.write_data(&mut bus, 0, 0xAB);
+    s.registers.refresh_data_bus(0xAB, 2000);
+    assert_eq!(s.registers.data_bus, 0xAB, "palette refresh also updates bus");
+}
+
+#[test]
+fn data_bus_round_trips_through_rpu1_snapshot() {
+    // Phase 6.3.a: data_bus survives an RPU1 snapshot round-trip via
+    // the existing pad byte at payload offset 13. We exercise the
+    // public API here rather than poking the byte layout directly.
+    use fceux11_ppu::snapshot::{RPU1_TOTAL_SIZE, deserialize_rpu1, serialize_rpu1};
+
+    let mut s = PpuState::new();
+    s.registers.write_ctrl(0xAB);
+
+    let mut buf = vec![0u8; RPU1_TOTAL_SIZE as usize];
+    let _ = serialize_rpu1(&s, 0, &mut buf);
+
+    let mut restored = PpuState::new();
+    let _ = deserialize_rpu1(&mut restored, &buf);
+    assert_eq!(
+        restored.registers.data_bus, 0xAB,
+        "data_bus survives RPU1 round-trip"
+    );
+}
+
+#[test]
+fn pre_6_3_savestate_zeroes_data_bus_on_load() {
+    // Backward-compatibility: any RPU1 chunk written before Phase 6.3.a
+    // (or a v1 chunk with all-zero pad byte) loads data_bus = 0. We
+    // simulate by stuffing 0 at offset 13 (the data_bus slot) of an
+    // otherwise well-formed chunk.
+    use fceux11_ppu::snapshot::{RPU1_MAGIC, RPU1_PAYLOAD_SIZE, RPU1_TOTAL_SIZE, RPU1_VERSION};
+
+    let mut buf = vec![0u8; RPU1_TOTAL_SIZE as usize];
+    buf[0..4].copy_from_slice(&RPU1_MAGIC);
+    buf[4..8].copy_from_slice(&RPU1_VERSION.to_le_bytes());
+    buf[8..12].copy_from_slice(&0u32.to_le_bytes());
+    buf[12..16].copy_from_slice(&RPU1_PAYLOAD_SIZE.to_le_bytes());
+    // payload byte at offset 16 + 13 = 29 stays 0 (legacy pad)
+
+    let mut s = PpuState::new();
+    use fceux11_ppu::snapshot::deserialize_rpu1;
+    let outcome = deserialize_rpu1(&mut s, &buf);
+    assert!(matches!(outcome, fceux11_ppu::snapshot::DeserializeOutcome::Ok { .. }));
+    assert_eq!(s.registers.data_bus, 0);
 }

@@ -315,6 +315,43 @@ pub unsafe extern "C" fn fceux11_ppu_set_status_vbl_set_suppressed(
 }
 
 // =========================================================================
+// v2.1 Phase 6.3.a — PPU internal data-bus open-bus + decay
+//
+// The root crate's cbindgen header doesn't see fceux11-ppu's FFI
+// surface (cbindgen 0.29.3 + Rust-2024 `pub unsafe extern "C"` issue
+// documented at `src/rust/build.rs`). The pattern below mirrors the
+// other Phase 5+ exports in this file: hand-write the prototype in
+// `merge_headers` (build.rs) and re-export through the root crate so
+// the staticlib symbol is present. The C++ bridge calls these from
+// per-CPU-cycle and per-frame paths.
+// =========================================================================
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_ppu_set_current_cpu_cycle(
+    state: *mut fceux11_ppu::PpuState,
+    current_cpu_cycle: u64,
+) {
+    fceux11_ppu::ffi::fceux11_ppu_set_current_cpu_cycle(state, current_cpu_cycle)
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_ppu_refresh_data_bus(
+    state: *mut fceux11_ppu::PpuState,
+    val: u8,
+    current_cpu_cycle: u64,
+) {
+    fceux11_ppu::ffi::fceux11_ppu_refresh_data_bus(state, val, current_cpu_cycle)
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_ppu_check_data_bus_decay(
+    state: *mut fceux11_ppu::PpuState,
+    current_cpu_cycle: u64,
+) {
+    fceux11_ppu::ffi::fceux11_ppu_check_data_bus_decay(state, current_cpu_cycle)
+}
+
+// =========================================================================
 // v2.1 Phase 5.3 — in-Rust CPU/PPU per-dot interleave loop.
 //
 // Phase 5.1 drove the interleave from C++ (`FCEUPPU_Loop`): per dot it

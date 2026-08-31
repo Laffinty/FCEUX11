@@ -138,6 +138,14 @@ struct StateBox {
     /// makes per frame; a fresh scheduler per call would re-fire
     /// `notify_scanline` on every call (its `last_scanline` resets).
     sched: crate::scheduler::NesScheduler,
+    /// Phase 6.3.a: absolute NTSC CPU cycle count, set by the C++
+    /// bridge via `fceux11_ppu_set_current_cpu_cycle` once per CPU
+    /// cycle (in the per-cycle interleave path). Used by the
+    /// `fceux11_ppu_cpu_write` and `fceux11_ppu_check_data_bus_decay`
+    /// entry points to refresh / age the open-bus latch with the
+    /// correct timestamp without taking an extra parameter on the
+    /// hot-path FFI surface.
+    current_cpu_cycle: u64,
 }
 
 impl StateBox {
@@ -162,6 +170,7 @@ impl StateBox {
                 s.begin_frame();
                 s
             },
+            current_cpu_cycle: 0,
         }
     }
 }
@@ -361,16 +370,18 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_read(state: *mut PpuState, addr: u16) -
                 v
             }
             5 => {
-                // $2005 / $2006 write-only; reads return open bus / 0.
-                // Phase 2 reads return 0 for simplicity.
-                0
+                // $2005 — write-only on real hardware; reads return
+                // the PPU internal data-bus open-bus value (latched
+                // on every CPU write to a PPU register). Phase 6.3.a:
+                // blargg `ppu_read_buffer` subtest 1 expects this.
+                sb.state.registers.data_bus
             }
             6 => {
-                // $2006 ————————?write-only.
-                0
+                // $2006 — write-only; same data-bus open-bus as $2005.
+                sb.state.registers.data_bus
             }
             7 => {
-                // $2007 ————————?read with buffered behaviour.
+                // $2007 — read with buffered behaviour.
                 let mut bus_adapter = CppBus {
                     cb: sb.bus.unwrap_or(fceux11_ppu_bus_callbacks {
                         read: None,
@@ -419,6 +430,14 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_write(state: *mut PpuState, addr: u16, 
         // synchronous `start_oam_dma` would otherwise perform
         // (which masks real CPU-side bus contention for the next
         // 256 cycles).
+        //
+        // Phase 6.3.a: $4014 writes also drive the PPU internal
+        // data-bus open-bus value (per nesdev wiki, any CPU write
+        // to $4014 places the page byte on the I/O bus; reads of
+        // $2005/$2006 then return this byte). Without this update
+        // a DMA write followed by a $2005 read would leak the
+        // previous write's value.
+        sb.state.registers.refresh_data_bus(val, sb.current_cpu_cycle);
         sb.state.begin_oam_dma(val);
         return;
     }
@@ -441,7 +460,10 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_write(state: *mut PpuState, addr: u16, 
             sb.state.registers.write_oam_addr(val);
         }
         4 => {
-            // $2004 OAM data write.
+            // $2004 OAM data write. Also updates the PPU internal
+            // data bus (Phase 6.3.a) so subsequent $2005/$2006 reads
+            // return the value just written to OAM.
+            sb.state.registers.refresh_data_bus(val, sb.current_cpu_cycle);
             let addr = sb.state.registers.oam_addr;
             sb.state.oam[addr as usize] = val;
             sb.state.registers.increment_oam_addr();
@@ -810,6 +832,54 @@ pub unsafe extern "C" fn fceux11_ppu_get_framebuffer_stride(_state: *const PpuSt
 // ===========================================================================
 // Debug / emergency
 // ===========================================================================
+
+/// Phase 6.3.a: stash the absolute NTSC CPU cycle count the C++
+/// bridge is currently on. The C++ side calls this once per CPU
+/// cycle (in the per-cycle interleave path of `FCEUPPU_Loop`)
+/// before any CPU write to a PPU register that frame can possibly
+/// observe. The Rust side then uses this value to stamp the
+/// `data_bus_refresh_cycle` timestamp on every write so the open-bus
+/// decay check has a reliable baseline. Per-cycle refresh matches
+/// the C++ reference's per-write `PPUGenLatch_last_refresh_cycle =
+/// now` semantic — the bridge can't drop a cycle since the writes
+/// within a cycle all observe the same value.
+pub unsafe extern "C" fn fceux11_ppu_set_current_cpu_cycle(
+    state: *mut PpuState,
+    current_cpu_cycle: u64,
+) {
+    let sb = lookup(state);
+    sb.current_cpu_cycle = current_cpu_cycle;
+}
+
+/// Phase 6.3.a: zero `data_bus` if more than ~600 ms (1 073 864 NTSC
+/// CPU cycles) have elapsed since the last refresh. Called once per
+/// frame from the C++ bridge (`ppu_rust_bridge_emit_frame` and the
+/// per-cycle interleave path) — per-frame granularity is well within
+/// the decay threshold tolerance. The decay timestamp lives in
+/// `Registers::data_bus_refresh_cycle`; the C++ side just needs to
+/// pass its current absolute CPU cycle count
+/// (`g_cpu.timestamp_base() + g_cpu.timestamp_ref()`).
+pub unsafe extern "C" fn fceux11_ppu_check_data_bus_decay(
+    state: *mut PpuState,
+    current_cpu_cycle: u64,
+) {
+    let sb = lookup(state);
+    sb.state.registers.check_data_bus_decay(current_cpu_cycle);
+}
+
+/// Phase 6.3.a: refresh the PPU internal data-bus open-bus value and
+/// stamp the current CPU cycle. Called by the C++ bridge after every
+/// CPU write to a PPU register (and after every PPU-side read that
+/// drives the bus, like `bridge_bus_read` for palette/CHR/nametable
+/// accesses). The C++ side has the authoritative CPU timestamp.
+pub unsafe extern "C" fn fceux11_ppu_refresh_data_bus(
+    state: *mut PpuState,
+    val: u8,
+    current_cpu_cycle: u64,
+) {
+    let sb = lookup(state);
+    sb.state.registers.refresh_data_bus(val, current_cpu_cycle);
+}
 
 pub unsafe extern "C" fn fceux11_ppu_emergency_reset(state: *mut PpuState) {
     let sb = lookup(state);

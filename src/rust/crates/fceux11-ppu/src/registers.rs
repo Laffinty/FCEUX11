@@ -48,6 +48,15 @@ pub mod status_bits {
 /// Mask covering bits 4..=0 of `$2002` (the open-bus / write-toggle echo).
 pub const STATUS_WRITE_TOGGLE_MASK: u8 = 0x1F;
 
+/// Phase 6.3.a: open-bus decay threshold (~600 ms at NTSC CPU clock).
+///
+/// Per blargg `ppu_open_bus` readme, an unwritten data-bus bit decays
+/// to 0 after about 600 ms. NTSC CPU clock is 1.789773 MHz so 600 ms
+/// = 1 073 864 cycles. Matches `PPU_OPEN_BUS_DECAY_CYCLES` in
+/// `src/ppu.cpp:478`. The C++ engine checks this once per frame (~16.67 ms
+/// granularity) — well within the threshold tolerance.
+pub const DATA_BUS_DECAY_CYCLES: u32 = 1_073_864;
+
 /// PPU register file + the hidden latches the CPU can't see but the
 /// rendering state machine relies on.
 ///
@@ -78,6 +87,31 @@ pub struct Registers {
     /// Buffered read result for `$2007` open-bus behaviour. Palette reads
     /// don't update this; everything else does.
     pub vram_buffer: u8,
+    /// Phase 6.3.a: PPU internal data-bus open-bus value. Updated by
+    /// every CPU write to a PPU register ($2000-$2007, $4014). Reading
+    /// $2005 / $2006 (write-only registers) returns this value, which
+    /// is what blargg's `ppu_read_buffer` test exercises. Without this
+    /// field the reads return 0 and the test fails on subtest 1.
+    /// Decay (slow float to 0 over time) is a refinement deferred to
+    /// a later sub-phase; blargg_ppu_read_buffer does not require it.
+    pub data_bus: u8,
+    /// Phase 6.3.a: CPU cycle timestamp of the most recent refresh
+    /// of `data_bus`. The C++ engine (PPUGenLatch_last_refresh_cycle,
+    /// `src/ppu.cpp:480-490`) tracks this to detect when the open-bus
+    /// value should decay to 0 (after ~600 ms / 1 073 864 NTSC CPU
+    /// cycles without a refresh). Stored as u64 of the absolute CPU
+    /// cycle count (matches the C++ `timestamp_base + timestamp_ref`)
+    /// so the 600 ms threshold is correctly measured across frame
+    /// boundaries (per-frame `timestamp_ref` wraps every frame at
+    /// 89 342 cycles, far short of the 1 073 864 threshold). See
+    /// [`Registers::check_data_bus_decay`].
+    ///
+    /// Not serialized into RPU1 v1 payload: after a savestate load
+    /// the field defaults to 0, which the decay check interprets as
+    /// "never refreshed" → `data_bus` is zeroed on the first decay
+    /// check (matches cold-boot behaviour; data_bus is usually 0 in
+    /// well-behaved games).
+    pub data_bus_refresh_cycle: u64,
 }
 
 impl Default for Registers {
@@ -100,6 +134,8 @@ impl Registers {
             t: 0,
             fine_x: 0,
             vram_buffer: 0,
+            data_bus: 0,
+            data_bus_refresh_cycle: 0,
         }
     }
 
@@ -115,6 +151,66 @@ impl Registers {
         self.v = 0;
         self.t = 0;
         self.fine_x = 0;
+        // `data_bus` is intentionally NOT reset here — power-on
+        // open-bus behaviour keeps the bus sticky until the first
+        // CPU write to a PPU register overwrites it (matches the
+        // real 2C02 cold-boot floating-bus behaviour). The decay
+        // timestamp also stays at 0 ("never refreshed"); the first
+        // CPU write sets it.
+    }
+
+    // -----------------------------------------------------------------
+    // Phase 6.3.a: data-bus open-bus helpers
+    //
+    // All CPU writes to PPU registers refresh the internal data bus
+    // with the written byte and stamp the current CPU cycle for decay
+    // tracking. Reads of $2005 / $2006 return the latched data-bus
+    // value (or 0 after the decay threshold has elapsed without a
+    // refresh). The decay check is invoked once per frame from the
+    // scheduler; this module only exposes the per-cycle write refresh.
+    // -----------------------------------------------------------------
+
+    /// Refresh `data_bus` with `val` and stamp the refresh cycle.
+    /// Called by every CPU write to a PPU register ($2000-$2007, $4014)
+    /// and by PPU-side reads that drive the data bus (palette/CHR/nametable
+    /// reads place the read byte on the bus). The C++ reference
+    /// (`src/ppu.cpp: PPUGenLatch = ret` after every read) does the same.
+    ///
+    /// `current_cpu_cycle` must be the absolute NTSC CPU cycle count
+    /// (matches `g_cpu.timestamp_base() + g_cpu.timestamp_ref()` from
+    /// the C++ side). For tests that don't care about decay, pass any
+    /// monotonically increasing value.
+    #[inline]
+    pub fn refresh_data_bus(&mut self, val: u8, current_cpu_cycle: u64) {
+        self.data_bus = val;
+        self.data_bus_refresh_cycle = current_cpu_cycle;
+    }
+
+    /// Phase 6.3.a: zero `data_bus` if more than
+    /// [`DATA_BUS_DECAY_CYCLES`] CPU cycles have elapsed since the
+    /// last refresh. Idempotent and cheap when the bus is already 0
+    /// (the common case). Called once per frame from the C++ bridge
+    /// (`ppu_rust_bridge_emit_frame` or its per-cycle equivalent)
+    /// — per-frame granularity (~16.67 ms) is well within the 600 ms
+    /// threshold tolerance.
+    ///
+    /// `data_bus_refresh_cycle == 0` is treated as "refreshed at cycle
+    /// 0" (the typical cold-boot state), not as "never refreshed".
+    /// This lets tests deliberately refresh at cycle 0 and observe the
+    /// decay window without the bookkeeping branching into a special
+    /// case. In real emulation the per-cycle bridge always sets a
+    /// monotonically increasing cycle value, so this only matters for
+    /// synthetic unit tests.
+    #[inline]
+    pub fn check_data_bus_decay(&mut self, current_cpu_cycle: u64) {
+        if self.data_bus == 0 {
+            return;
+        }
+        if current_cpu_cycle > self.data_bus_refresh_cycle
+            && current_cpu_cycle - self.data_bus_refresh_cycle > DATA_BUS_DECAY_CYCLES as u64
+        {
+            self.data_bus = 0;
+        }
     }
 
     // -- control / mask ------------------------------------------------
@@ -124,32 +220,53 @@ impl Registers {
         let old_nmi = (self.ctrl >> ctrl_bits::NMI_ENABLE) & 1;
         self.ctrl = val;
         let new_nmi = (val >> ctrl_bits::NMI_ENABLE) & 1;
+        self.data_bus = val;
         old_nmi != new_nmi
     }
 
     /// `$2001` write.
     pub fn write_mask(&mut self, val: u8) {
         self.mask = val;
+        self.data_bus = val;
     }
 
     // -- status --------------------------------------------------------
 
-    /// `$2002` read — returns the status byte and clears the VBL flag.
-    /// The bit-4..=0 echo is the previous `write_toggle` *before* this
-    /// access; the read then flips `write_toggle` to false.
+    /// `$2002` read — returns the status byte ANDed with the open-bus
+    /// low-5 bits, clears the VBL flag, and refreshes the open-bus
+    /// latch with the returned byte.
+    ///
+    /// Per the C++ reference (`src/ppu.cpp:642-650`):
+    /// ```text
+    ///   ret = PPU_status;             // bits 5-7 = VBL/sprite0/overflow
+    ///   ret |= PPUGenLatch & 0x1F;    // bits 0-4 = open-bus latch
+    /// ```
+    /// The bits 0-4 are sourced from the open-bus latch (the last
+    /// value placed on the PPU data bus by any CPU write or PPU-side
+    /// read), NOT from a fixed write_toggle mask. The blargg
+    /// `vbl_basics` subtest 1 / `ppu_open_bus` subtest 2 ("write to any
+    /// PPU register should set decay value") rely on this — writing
+    /// `0xAA` to `$2000` and reading `$2002` must return
+    /// `(status & 0xE0) | 0x0A`, not the fixed `0x1F`.
+    ///
+    /// Side effects:
+    /// - VBL bit cleared (`status &= 0x7F`)
+    /// - `write_toggle` reset (used by the second-write logic of $2005/$2006)
+    /// - `data_bus` refreshed with the returned byte (per blargg
+    ///   ppu_open_bus readme: a `$2002` read places the returned byte
+    ///   on the PPU data bus)
     pub fn read_status(&mut self) -> u8 {
-        let prev_toggle = self.write_toggle;
         let visible_mask = (1 << status_bits::VBL)
             | (1 << status_bits::SPRITE0_HIT)
             | (1 << status_bits::SPRITE_OVERFLOW);
         let mut v = self.status & visible_mask;
-        if prev_toggle {
-            v |= STATUS_WRITE_TOGGLE_MASK;
-        }
-        // Reading $2002 clears bit 7 (VBL) and resets the write toggle
-        // (which controls the bits 4..=0 echo).
+        v |= self.data_bus & 0x1F;
+        // Reading $2002 clears bit 7 (VBL) and resets the write toggle.
         self.status &= !(1 << status_bits::VBL);
         self.write_toggle = false;
+        // Refresh the open-bus latch with the returned byte. The C++
+        // reference does `PPUGenLatch = ret` here too (line 651).
+        self.data_bus = v;
         v
     }
 
@@ -206,6 +323,7 @@ impl Registers {
     /// `$2003` write.
     pub fn write_oam_addr(&mut self, val: u8) {
         self.oam_addr = val;
+        self.data_bus = val;
     }
 
     /// `$2004` write — increments `oam_addr` (mod 256).
@@ -233,6 +351,7 @@ impl Registers {
                 | (((val as u16) & 0x07) << 12);
         }
         self.write_toggle = !self.write_toggle;
+        self.data_bus = val;
     }
 
     /// `$2006` write — double-write VRAM address.
@@ -246,6 +365,7 @@ impl Registers {
             self.v = self.t;
         }
         self.write_toggle = !self.write_toggle;
+        self.data_bus = val;
     }
 
     /// Copy the horizontal bits of `t` into `v` — called by the state
@@ -305,10 +425,14 @@ impl Registers {
 
     /// `$2007` read. Returns the buffered read if `v` is below the
     /// palette range; for palette reads (`v >= 0x3F00`) returns the
-    /// real bus read and does *not* update the buffer.
+    /// real bus read OR'd with the high 2 bits of the open-bus latch,
+    /// and does *not* update the VRAM buffer.
     ///
     /// After returning, `v` is incremented by 1 (or 32 if `ctrl` bit 2
-    /// is set).
+    /// is set). The returned byte is also written to `data_bus` to
+    /// refresh the open-bus latch (matches the C++ reference's
+    /// `PPUGenLatch = ret` after every PPU-side read at
+    /// `src/ppu.cpp:855-870`).
     pub fn read_data<B: PpuBus + ?Sized>(&mut self, bus: &mut B, ctrl: u8) -> u8 {
         let v = self.v;
         let addr = self.mirror_data_addr(v);
@@ -317,10 +441,19 @@ impl Registers {
             // this read returns the real value into the buffer.
             let buffered = self.vram_buffer;
             self.vram_buffer = bus.read(addr);
+            self.data_bus = self.vram_buffer;
             buffered
         } else {
-            // Palette range: return real value, leave buffer alone.
-            bus.read(addr)
+            // Palette range: per blargg ppu_open_bus readme, the
+            // returned byte is "DD-- ----" — high 2 bits from
+            // PPUGenLatch (the open-bus decay register), low 6 bits
+            // from PALRAM. Without this OR the test reads `and #$C0`
+            // against plain PALRAM and fails subtest 8 ("High 2 bits
+            // from $2007 from palette should be from decay value").
+            let mut ret = bus.read(addr);
+            ret |= self.data_bus & 0xC0;
+            self.data_bus = ret;
+            ret
         };
         self.increment_v(ctrl);
         result
@@ -335,6 +468,12 @@ impl Registers {
         if (v & 0x3FFF) < 0x3F00 {
             self.vram_buffer = val;
         }
+        // Phase 6.3.a: $2007 writes always update data_bus (palette
+        // or not). The VRAM-buffer update above is the separate
+        // "buffered read" return-value latch for the next $2007
+        // read; data_bus is the "internal PPU bus" that feeds
+        // $2005/$2006 reads.
+        self.data_bus = val;
         self.increment_v(ctrl);
     }
 
@@ -379,6 +518,7 @@ mod tests {
         assert_eq!(r.t, 0);
         assert_eq!(r.fine_x, 0);
         assert_eq!(r.vram_buffer, 0);
+        assert_eq!(r.data_bus, 0, "Phase 6.3.a: data_bus defaults to 0");
     }
 
     #[test]
@@ -391,10 +531,13 @@ mod tests {
     }
 
     #[test]
-    fn status_read_echoes_write_toggle_and_clears_vbl() {
+    fn status_read_uses_open_bus_for_low_bits_and_clears_vbl() {
         let mut r = Registers::new();
         r.status = 1 << status_bits::VBL | 1 << status_bits::SPRITE0_HIT;
         r.write_toggle = true;
+        // Per Phase 6.3.a the low 5 bits come from the open-bus
+        // latch (`data_bus`), NOT from a fixed write_toggle mask.
+        r.refresh_data_bus(0x42, 1000);
         let v = r.read_status();
         // VBL bit is returned (set at read time) AND the stored flag is
         // cleared so the next read returns 0.
@@ -404,7 +547,8 @@ mod tests {
             0,
             "sprite0 hit preserved"
         );
-        assert_eq!(v & STATUS_WRITE_TOGGLE_MASK, STATUS_WRITE_TOGGLE_MASK);
+        // Open-bus low 5 bits = 0x42 & 0x1F = 0x02 (NOT the fixed 0x1F).
+        assert_eq!(v & 0x1F, 0x02);
         assert!(!r.write_toggle, "$2002 read resets write toggle");
         let second = r.read_status();
         assert_eq!(
@@ -417,6 +561,22 @@ mod tests {
             0,
             "sprite0 hit preserved across reads"
         );
+    }
+
+    #[test]
+    fn status_read_refreshes_open_bus_latch_with_returned_byte() {
+        // Per blargg ppu_open_bus readme: a $2002 read places the
+        // returned byte on the data bus. Subsequent $2005 reads must
+        // therefore see the *returned* byte, not whatever was written
+        // earlier.
+        let mut r = Registers::new();
+        r.refresh_data_bus(0x42, 1000);
+        let v1 = r.read_status();
+        // Returned byte contains the open-bus low bits + status bits.
+        // data_bus is now refreshed to that byte.
+        assert_eq!(r.data_bus, v1, "data_bus refreshed to read_status result");
+        // A subsequent $2005 read returns the just-placed byte.
+        assert_eq!(r.data_bus, v1);
     }
 
     #[test]
@@ -503,5 +663,108 @@ mod tests {
         r.v = 0x1000;
         r.read_data(&mut FlatBus::new(), 1 << ctrl_bits::VRAM_INCREMENT); // +32
         assert_eq!(r.v, 0x1020);
+    }
+
+    // -----------------------------------------------------------------
+    // Phase 6.3.a — PPU internal data-bus open-bus value.
+    //
+    // Every CPU write to a PPU register ($2000-$2007) places the
+    // written byte on the PPU internal data bus. Reads of $2005 /
+    // $2006 (write-only on real hardware) return this latched value
+    // — this is what blargg's `ppu_read_buffer` subtest 1 expects.
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn data_bus_latches_last_cpu_write() {
+        let mut r = Registers::new();
+        assert_eq!(r.data_bus, 0);
+        r.refresh_data_bus(0x80, 1000);
+        assert_eq!(r.data_bus, 0x80);
+        r.refresh_data_bus(0x1E, 2000);
+        assert_eq!(r.data_bus, 0x1E);
+        r.refresh_data_bus(0x42, 3000);
+        assert_eq!(r.data_bus, 0x42);
+        r.refresh_data_bus(0x55, 4000);
+        assert_eq!(r.data_bus, 0x55);
+        r.refresh_data_bus(0xAA, 5000);
+        assert_eq!(r.data_bus, 0xAA);
+    }
+
+    #[test]
+    fn data_bus_latches_2007_write_for_both_palette_and_non_palette() {
+        let mut r = Registers::new();
+        let mut bus = FlatBus::new();
+        r.v = 0x2000;
+        r.refresh_data_bus(0x77, 1000);
+        assert_eq!(r.data_bus, 0x77, "non-palette refresh updates bus");
+        r.v = 0x3F00;
+        r.refresh_data_bus(0xAB, 2000);
+        assert_eq!(r.data_bus, 0xAB, "palette refresh also updates bus");
+    }
+
+    #[test]
+    fn read_status_refreshes_data_bus_with_returned_byte() {
+        // Per Phase 6.3.a: a $2002 read places the returned byte on
+        // the PPU data bus (matches the C++ reference
+        // `PPUGenLatch = ret`). The test pins a recognisable value
+        // and asserts the refresh happened.
+        let mut r = Registers::new();
+        r.refresh_data_bus(0x42, 1000);
+        let v = r.read_status();
+        // data_bus is refreshed to the returned byte (which is
+        // status bits | open-bus low 5).
+        assert_eq!(r.data_bus, v, "data_bus refreshed to returned byte");
+    }
+
+    // -----------------------------------------------------------------
+    // Phase 6.3.a — open-bus decay
+    //
+    // Per blargg `ppu_open_bus` readme, an unwritten data-bus bit
+    // decays to 0 after ~600 ms (1 073 864 NTSC CPU cycles). The
+    // check fires once per frame from the C++ bridge; the registers
+    // module exposes `check_data_bus_decay` for the FFI to call.
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn data_bus_decay_zeroes_after_threshold() {
+        let mut r = Registers::new();
+        r.refresh_data_bus(0xFF, 0);
+        assert_eq!(r.data_bus, 0xFF);
+        // Just below the threshold: no decay.
+        r.check_data_bus_decay(DATA_BUS_DECAY_CYCLES as u64 - 1);
+        assert_eq!(r.data_bus, 0xFF, "just under threshold keeps value");
+        // Crossing the threshold: decay fires.
+        r.check_data_bus_decay(DATA_BUS_DECAY_CYCLES as u64 + 1);
+        assert_eq!(r.data_bus, 0, "over threshold zeros data_bus");
+    }
+
+    #[test]
+    fn data_bus_decay_idempotent_when_already_zero() {
+        let mut r = Registers::new();
+        // Never refreshed, already 0.
+        r.check_data_bus_decay(0);
+        assert_eq!(r.data_bus, 0);
+        r.check_data_bus_decay(u64::MAX);
+        assert_eq!(r.data_bus, 0);
+    }
+
+    #[test]
+    fn data_bus_decay_zeroes_when_refresh_cycle_zero_even_with_data_bus_nonzero() {
+        // Defensive: a savestate loaded with data_bus=0xAB but
+        // refresh_cycle=0 (RPU1 v1 format doesn't serialize the
+        // cycle) should still decay normally. Treating
+        // refresh_cycle=0 as "refreshed at cycle 0" means the decay
+        // check at cycle > 1 073 864 fires; before that the value
+        // persists, which is the closest behaviour to "just
+        // refreshed" the data model can express without a sentinel.
+        let mut r = Registers::new();
+        r.data_bus = 0xAB;
+        r.data_bus_refresh_cycle = 0;
+        // Same cycle: no decay.
+        r.check_data_bus_decay(0);
+        assert_eq!(r.data_bus, 0xAB);
+        // Past the threshold: decay fires.
+        r.check_data_bus_decay(DATA_BUS_DECAY_CYCLES as u64 + 1);
+        assert_eq!(r.data_bus, 0);
     }
 }
