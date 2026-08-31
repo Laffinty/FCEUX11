@@ -146,6 +146,15 @@ struct StateBox {
     /// correct timestamp without taking an extra parameter on the
     /// hot-path FFI surface.
     current_cpu_cycle: u64,
+    /// Phase 6.3.b (scaffolding): most recent DMC DMA stall
+    /// request, in CPU cycles. Set by `fceux11_ppu_dmc_dma_arbitration`
+    /// when the C++ APU's `DMCDMA()` decides to fetch a DMC sample
+    /// byte. The per-dot interleave loop currently does not consume
+    /// this — once the Rust scheduler gains an
+    /// `fceux11_cpu_advance_cycles(cpu_state, stall_cycles)` API,
+    /// this field drives the "skip CPU exec, advance timestamp"
+    /// branch. See `docs/history/v2.1_phase6_batch_compat.md` §6.3.b.
+    dmc_dma_pending_stall: u8,
 }
 
 impl StateBox {
@@ -171,6 +180,7 @@ impl StateBox {
                 s
             },
             current_cpu_cycle: 0,
+            dmc_dma_pending_stall: 0,
         }
     }
 }
@@ -851,20 +861,29 @@ pub unsafe extern "C" fn fceux11_ppu_set_current_cpu_cycle(
     sb.current_cpu_cycle = current_cpu_cycle;
 }
 
-/// Phase 6.3.a: zero `data_bus` if more than ~600 ms (1 073 864 NTSC
-/// CPU cycles) have elapsed since the last refresh. Called once per
-/// frame from the C++ bridge (`ppu_rust_bridge_emit_frame` and the
-/// per-cycle interleave path) — per-frame granularity is well within
-/// the decay threshold tolerance. The decay timestamp lives in
-/// `Registers::data_bus_refresh_cycle`; the C++ side just needs to
-/// pass its current absolute CPU cycle count
-/// (`g_cpu.timestamp_base() + g_cpu.timestamp_ref()`).
-pub unsafe extern "C" fn fceux11_ppu_check_data_bus_decay(
+/// Phase 6.3.b (placeholder): notify the Rust scheduler that a DMC
+/// DMA fetch has just started and will stall the CPU for
+/// `stall_cycles` CPU cycles (1-4 per `X6502_DMR` call; the C++ APU's
+/// `DMCDMA` performs 4 such reads per fetch — see
+/// `src/sound.cpp:660-686`).
+///
+/// **Status: scaffolding only.** The C++ APU's DMC arbitration hook
+/// is not yet wired (see `docs/history/v2.1_phase6_batch_compat.md`
+/// §6.3.b for the full design). When implemented, the per-dot
+/// interleave loop will skip `cpu.run(1)` for `stall_cycles` cycles
+/// after this notification, advancing only the Rust CPU timestamp
+/// (`fceux11_cpu_advance_cycles`) so the C++ APU's DMC timing math
+/// (`g_cpu.timestamp_ref` consumed by `X6502_DMR` via `ADDCYC`)
+/// stays consistent.
+///
+/// Until then, this FFI just records the most recent stall request
+/// in `StateBox` for instrumentation; the per-dot loop ignores it.
+pub unsafe extern "C" fn fceux11_ppu_dmc_dma_arbitration(
     state: *mut PpuState,
-    current_cpu_cycle: u64,
+    stall_cycles: u8,
 ) {
     let sb = lookup(state);
-    sb.state.registers.check_data_bus_decay(current_cpu_cycle);
+    sb.dmc_dma_pending_stall = stall_cycles;
 }
 
 /// Phase 6.3.a: refresh the PPU internal data-bus open-bus value and
@@ -879,6 +898,22 @@ pub unsafe extern "C" fn fceux11_ppu_refresh_data_bus(
 ) {
     let sb = lookup(state);
     sb.state.registers.refresh_data_bus(val, current_cpu_cycle);
+}
+
+/// Phase 6.3.a: zero `data_bus` if more than ~600 ms (1 073 864 NTSC
+/// CPU cycles) have elapsed since the last refresh. Called once per
+/// frame from the C++ bridge (`ppu_rust_bridge_emit_frame` and the
+/// per-cycle interleave path) — per-frame granularity is well within
+/// the decay threshold tolerance. The decay timestamp lives in
+/// `Registers::data_bus_refresh_cycle`; the C++ side passes its
+/// current absolute CPU cycle count
+/// (`g_cpu.timestamp_base() + g_cpu.timestamp_ref()`).
+pub unsafe extern "C" fn fceux11_ppu_check_data_bus_decay(
+    state: *mut PpuState,
+    current_cpu_cycle: u64,
+) {
+    let sb = lookup(state);
+    sb.state.registers.check_data_bus_decay(current_cpu_cycle);
 }
 
 pub unsafe extern "C" fn fceux11_ppu_emergency_reset(state: *mut PpuState) {

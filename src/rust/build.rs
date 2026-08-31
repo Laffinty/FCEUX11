@@ -349,7 +349,9 @@ fn merge_headers(
     output.push_str("/* === Phase 6.3.a: PPU data-bus open-bus + decay FFI === */\n");
     output.push_str("void fceux11_ppu_set_current_cpu_cycle(PpuState *state, uint64_t current_cpu_cycle);\n");
     output.push_str("void fceux11_ppu_refresh_data_bus(PpuState *state, uint8_t val, uint64_t current_cpu_cycle);\n");
-    output.push_str("void fceux11_ppu_check_data_bus_decay(PpuState *state, uint64_t current_cpu_cycle);\n\n");
+    output.push_str("void fceux11_ppu_check_data_bus_decay(PpuState *state, uint64_t current_cpu_cycle);\n");
+    output.push_str("/* === Phase 6.3.b: DMC DMA arbitration scaffolding FFI === */\n");
+    output.push_str("void fceux11_ppu_dmc_dma_arbitration(PpuState *state, uint8_t stall_cycles);\n\n");
 
     if !root_body.is_empty() {
         output.push('\n');

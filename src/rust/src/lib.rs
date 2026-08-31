@@ -352,6 +352,26 @@ pub unsafe extern "C" fn fceux11_ppu_check_data_bus_decay(
 }
 
 // =========================================================================
+// v2.1 Phase 6.3.b — DMC DMA arbitration (scaffolding)
+//
+// Records the most recent DMC DMA stall request from the C++ APU.
+// Currently inert — see `docs/history/v2.1_phase6_batch_compat.md`
+// §6.3.b for the deferred per-dot-loop integration. The actual stall
+// (skip `cpu.run(1)` for N cycles + advance timestamp) requires a new
+// `fceux11_cpu_advance_cycles` API on the Rust CPU crate, which is a
+// multi-session task. This FFI exists so the C++ APU can wire its
+// hook NOW without having to revisit the build later.
+// =========================================================================
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_ppu_dmc_dma_arbitration(
+    state: *mut fceux11_ppu::PpuState,
+    stall_cycles: u8,
+) {
+    fceux11_ppu::ffi::fceux11_ppu_dmc_dma_arbitration(state, stall_cycles)
+}
+
+// =========================================================================
 // v2.1 Phase 5.3 — in-Rust CPU/PPU per-dot interleave loop.
 //
 // Phase 5.1 drove the interleave from C++ (`FCEUPPU_Loop`): per dot it
