@@ -448,6 +448,36 @@ void ppu_rust_bridge_copy_framebuffer() {
     std::memcpy(XBuf, rust_fb, 256 * 240);
 }
 
+// Phase 6.3.c.2: accessor for the Rust PPU state handle. Used by
+// the C++ APU's `DMCDMA()` (`src/sound.cpp:659-686`) via the
+// `ppu_rust_bridge_dmc_dma_arbitration` thunk below; future
+// integration points (kagami bridge, additional APU hooks) can
+// request the handle via this without re-defining it.
+//
+// Returns `nullptr` when the Rust PPU is inactive (e.g.
+// `FCEUX11_RUST_PPU=OFF` build, or the bridge hasn't initialised
+// yet — `ppu_rust_bridge_init` is lazy, gated on the first
+// `FCEUPPU_Loop` call from the C++ side).
+PpuState* ppu_rust_bridge_get_state() {
+    return g_ppu_state;
+}
+
+// Phase 6.3.c.2: forward DMC DMA stall notification from the C++
+// APU to the Rust scheduler. `sound.cpp::DMCDMA()` calls this
+// after its four `X6502_DMR` reads so the Rust side's per-dot
+// loop can consume the stall via `fceux11_cpu_advance_cycles(cpu,
+// -stall_cycles)` and keep `count`/`timestamp_ref` in sync.
+//
+// No-op when the bridge hasn't installed a state (i.e.
+// `g_ppu_state == nullptr`); the per-dot loop sees
+// `take_dmc_dma_stall == 0` and falls through to the regular
+// `cpu_run_with_tick` branch — behaviour identical to the
+// pre-Phase-6.3.c.2 baseline.
+void ppu_rust_bridge_dmc_dma_arbitration(uint8_t stall_cycles) {
+    if (g_ppu_state == nullptr) return;
+    fceux11_ppu_dmc_dma_arbitration(g_ppu_state, stall_cycles);
+}
+
 // ---------------------------------------------------------------------------
 // Bank-window setup — installed from setchr*/setntamem/setmirror*
 // ---------------------------------------------------------------------------

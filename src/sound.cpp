@@ -23,6 +23,7 @@
 
 #include "fceu.h"
 #include "sound.h"
+#include "ppu_rust_bridge.h"
 #include "filter.h"
 #include "state.h"
 #include "wave.h"
@@ -679,7 +680,21 @@ static INLINE void DMCDMA(void)
      }
     }
    }
- }
+   // Phase 6.3.c.2: notify the Rust PPU scheduler that the DMC
+   // just stalled the CPU for the 4 cycles consumed by the four
+   // X6502_DMR calls above. `ppu_rust_bridge_dmc_dma_arbitration`
+   // is a no-op when the Rust PPU is inactive (FCEUX11_RUST_PPU=OFF
+   // or the bridge hasn't initialised yet), so the legacy C++ PPU
+   // path sees no overhead. When the Rust PPU is active, the
+   // per-dot interleave loop in `fceux11_run_frame_interleaved`
+   // reads the recorded stall via `fceux11_ppu_take_dmc_dma_stall`
+   // and subtracts 4 from the Rust CPU's `count` budget via
+   // `fceux11_cpu_advance_cycles(cpu, -4)`, keeping the two sides
+   // in sync so `g_cpu.timestamp_ref()` (which advances inside
+   // each `X6502_DMR` via `ADDCYC(1)`) and the Rust CPU's
+   // `state.regs.count` stay aligned.
+   ppu_rust_bridge_dmc_dma_arbitration(4);
+  }
 }
 
 void FCEU_SoundCPUHook(int cycles)
