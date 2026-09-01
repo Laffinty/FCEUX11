@@ -156,10 +156,12 @@ fn even_frame_skips_one_dot_at_pre_render_boundary() {
     s.registers.write_mask(0x08 | 0x10); // show BG + show sprites
     let mut bus = FlatBus::new();
 
-    // Start at (-1, 0) with odd_frame=false (even). Advance to (-1, 340).
+    // Phase 6.1.e follow-up: cold start is (sl 241, dot 0). Drive to
+    // the pre-render line dot 340 — the even/odd decision tick.
     let pre = tick_to(&mut s, &mut bus, -1, 340);
     assert!(pre.pre_render_decision);
-    // Skip fired → state at (0, 1), not (0, 0).
+    // Skip fired → state advances to (0, 1), not (0, 0). This is an
+    // intra-frame transition (-1 → 0), not the frame wrap.
     assert_eq!(s.scanline, 0);
     assert_eq!(s.dot, 1);
     assert!(s.odd_frame, "odd_frame toggled to true after even skip");
@@ -204,7 +206,9 @@ fn suppression_flag_resets_at_frame_boundary() {
     let mut bus = FlatBus::new();
     // Tick to the last dot of the pre-render line (-1, 340) — the
     // boundary tick that fires the suppression reset, then advances
-    // into the next frame's sl 0 (no even/odd skip: rendering off).
+    // into the same frame's sl 0 (no even/odd skip: rendering off).
+    // Phase 6.1.e follow-up: this is an intra-frame transition
+    // (-1 → 0). The frame wrap goes sl 240 → sl 241 (separate path).
     let _ = tick_to(&mut s, &mut bus, -1, 340);
     assert!(!s.vbl_suppressed_this_frame);
     assert_eq!(s.scanline, 0);

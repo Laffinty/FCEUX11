@@ -302,12 +302,15 @@ mod tests {
         let mut sched = NesScheduler::new();
         let mut ppu = PpuState::new();
         let mut bus = FlatBus::new();
-        assert_eq!((ppu.scanline, ppu.dot), (-1, 0));
+        // Phase 6.1.e follow-up (VBL-first layout): cold start is
+        // (sl 241, dot 0); scheduler's initial last_scanline is -1
+        // so the first tick fires notify_scanline(241).
+        assert_eq!((ppu.scanline, ppu.dot), (241, 0));
 
         let _ = sched.tick_one_ppu_dot(&mut ppu, &mut bus);
-        assert_eq!((ppu.scanline, ppu.dot), (-1, 1));
+        assert_eq!((ppu.scanline, ppu.dot), (241, 1));
         assert_eq!(sched.ppu_dots_consumed, 1);
-        assert_eq!(sched.last_scanline, -1);
+        assert_eq!(sched.last_scanline, 241);
     }
 
     /// Drive to sl 241 dot 1 and confirm the scheduler fires
@@ -320,13 +323,19 @@ mod tests {
         ppu.registers.write_ctrl(1 << ctrl_bits::NMI_ENABLE);
         let mut bus = FlatBus::new();
 
-        // Walk the PPU to (241, 1).
-        let target_dots = (242 * DOTS_PER_SCANLINE as i32 + 2) as u32;
-        for _ in 0..target_dots {
+        // Phase 6.1.e follow-up (VBL-first layout): cold start is
+        // (sl 241, dot 0). VBL fires at the (sl 241, dot 1) tick —
+        // 2 ticks from start. The ppudead=0 path (normal frame VBL
+        // set) is what we test; the natural sl 241 dot 1 VBL set
+        // event runs with `state.ppudead == 0` (PpuState::new()
+        // initialises ppudead=1, so explicitly clear it).
+        ppu.ppudead = 0;
+        // Walk 2 dots to land at (sl 241, dot 2).
+        for _ in 0..2 {
             let _ = sched.tick_one_ppu_dot(&mut ppu, &mut bus);
         }
         assert_eq!(ppu.scanline, 241);
-        assert_eq!(ppu.dot, 2, "should be 2 ticks past sl 241 dot 1");
+        assert_eq!(ppu.dot, 2, "should be 2 ticks past (sl 241, dot 1)");
         assert!(sched.vbl_asserted, "vbl_asserted must be true after sl 241 dot 1");
     }
 
@@ -338,12 +347,21 @@ mod tests {
         ppu.registers.write_mask(1 << mask_bits::SHOW_BG);
         let mut bus = FlatBus::new();
 
-        // Tick to (0, 256).
-        let target_dots = (DOTS_PER_SCANLINE as u32) + 256;
+        // Phase 6.1.e follow-up (VBL-first layout): cold start is
+        // (sl 241, dot 0). To reach (sl 0, dot 256) we traverse
+        // sl 241..=260 (20 lines) → sl -1 (1 line) → sl 0 dot 256
+        // = 21 full scanlines × 341 dots + 256 = 7417 dots — but
+        // rendering on + odd_frame = false (initial) fires the even
+        // skip at (sl -1, dot 340), advancing twice (skip_one_dot)
+        // and consuming 1 extra tick to land at (sl 0, dot 1).
+        // Subtract 1 from the linear estimate to account for the
+        // skip: 21 * 341 + 256 - 1 = 7416 ticks.
+        let target_dots = 21 * DOTS_PER_SCANLINE as u32 + 256 - 1;
         for _ in 0..target_dots {
             let _ = sched.tick_one_ppu_dot(&mut ppu, &mut bus);
         }
         assert_eq!(ppu.scanline, 0);
+        assert_eq!(ppu.dot, 256);
         // We ticked to dot 256; the next tick would advance to 257.
         // The hblank + A12 hook fires when dot transitions to 256
         // (i.e. on the dot==256 tick). Verify last_scanline is 0 and

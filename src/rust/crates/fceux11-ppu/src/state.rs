@@ -26,11 +26,16 @@ pub const MAX_SPRITES_PER_LINE: usize = 8;
 /// NTSC scanlines per frame. The state machine indexes the pre-render
 /// line as `-1` (hardware scanline 261) and visible/post/VBL lines as
 /// `0..=260` — 262 scanlines × 341 dots = 89342 dots per frame, matching
-/// the C++ `Cpu::run` frame budget. Phase 5.1: the wrap fires from
-/// sl 260 directly to sl -1 (`next_sl >= NTSC_SCANLINES - 1`); the old
-/// `>= NTSC_SCANLINES` threshold also let sl 261 occur, double-counting
-/// the pre-render line (263-line / 89683-dot frames) and drifting one
-/// scanline per frame against the CPU budget.
+/// the C++ `Cpu::run` frame budget.
+///
+/// Frame visit sequence: Phase 6.1.e follow-up (§6.4.3, VBL-block-phase
+/// alignment) made the layout VBL-first to match the C++ engine:
+/// `[241..=260, -1, 0..=240]` (262 scanlines). The wrap fires from sl
+/// 240 to sl 241 (`next_sl == 241` — the unique pre-image is sl 240).
+/// Phase 5.1 had set the wrap to fire from sl 260 to sl -1
+/// (`next_sl >= NTSC_SCANLINES - 1` = 261), which is the pre-render-first
+/// layout. The sl index numbers don't change between layouts; only the
+/// order in which they're visited changes.
 pub const NTSC_SCANLINES: i16 = 262;
 /// PPU dots per scanline (visible 256 + hblank 85 = 341, indexed 0..=340).
 pub const DOTS_PER_SCANLINE: u16 = 341;
@@ -51,7 +56,11 @@ pub struct PpuState {
     pub sprite_overflow: bool,
     /// Sprite 0 hit latch — set when sprite 0 overlaps non-transparent BG.
     pub sprite0_hit: bool,
-    /// Current scanline: -1 (pre-render) .. 260 (post-render).
+    /// Current scanline. Phase 6.1.e follow-up (VBL-first layout): the
+    /// frame visit sequence is `[241..=260, -1, 0..=240]` so `scanline`
+    /// still indexes pre-render as `-1` and visible as `0..=239`, but
+    /// the frame start is `(241, 0)` (see `PpuState::new`) and the
+    /// frame wrap goes `sl 240 → sl 241` instead of `sl 260 → sl -1`.
     pub scanline: i16,
     /// Current dot within scanline: 0..=340.
     pub dot: u16,
@@ -173,6 +182,17 @@ impl Default for PpuState {
 
 impl PpuState {
     /// Cold-state init — everything zero, scanline/dot at frame start.
+    ///
+    /// Phase 6.1.e follow-up (VBL-block-phase alignment, see
+    /// `docs/history/v2.1_phase6_batch_compat.md` §6.4.3): the frame
+    /// layout is now VBL-first to match the C++ engine's frame
+    /// boundary at sl 240 → sl 241. The frame visit sequence is
+    /// `[241..=260, -1, 0..=240]` (262 scanlines × 341 dots = 89342
+    /// dots per frame, matching `kNtscCpuCyclesPerFrame`). Frame start
+    /// sits at `(sl 241, dot 0)` so the VBL flag set event at
+    /// `(sl 241, dot 1)` lands in dot 1 of the frame, matching the
+    /// C++ `PPU_status |= 0x80; ppur.status.sl = 241; runppu(20 *
+    /// kLineTime)` sequence.
     pub const fn new() -> Self {
         Self {
             registers: Registers::new(),
@@ -181,7 +201,7 @@ impl PpuState {
             secondary_oam_count: 0,
             sprite_overflow: false,
             sprite0_hit: false,
-            scanline: -1,
+            scanline: 241,
             dot: 0,
             frame: 0,
             vbl_suppressed_this_frame: false,
@@ -218,7 +238,9 @@ impl PpuState {
         self.secondary_oam_count = 0;
         self.sprite_overflow = false;
         self.sprite0_hit = false;
-        self.scanline = -1;
+        // Phase 6.1.e follow-up (VBL-block-phase alignment): frame
+        // start is (sl 241, dot 0). See `PpuState::new` for rationale.
+        self.scanline = 241;
         self.dot = 0;
         self.vbl_suppressed_this_frame = false;
         self.odd_frame = false;
@@ -398,7 +420,9 @@ mod tests {
         s.oam[0] = 0xAB;
         s.registers.ctrl = 0xFF;
         s.power();
-        assert_eq!(s.scanline, -1);
+        // Phase 6.1.e follow-up (VBL-first layout): power() places
+        // (sl, dot) at (241, 0). Pre-Phase-6.1.e tests expected -1.
+        assert_eq!(s.scanline, 241);
         assert_eq!(s.dot, 0);
         assert_eq!(s.frame, 5, "power preserves the frame counter");
         assert_eq!(s.oam[0], 0);

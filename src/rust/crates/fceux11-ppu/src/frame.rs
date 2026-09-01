@@ -170,8 +170,15 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
     // the pre-render line was visited twice per frame (263 scanlines =
     // 89683 dots) while the CPU budget is 89342 dots (262 lines) — a
     // one-scanline phase drift per frame that broke the savestate /
-    // nestest gates. The wrap now goes 260 → -1 directly.
-    if sl == -1 && dot == 1 && state.ppudead == 0 {
+    // nestest gates. The wrap now goes 240 → 241 directly (VBL-first
+    // layout, Phase 6.1.e follow-up).
+    //
+    // Phase 6.1.e follow-up: in VBL-first layout, the ppudead path
+    // sets VBL at (sl 241, dot 0) (1 dot earlier than normal); the
+    // natural (sl -1, dot 1) clear fires 20 scanlines + 1 dot later,
+    // matching the observable VBL-window semantic the C++ engine
+    // approximates with its own `PPU_status = 0` mid-frame clear.
+    if sl == -1 && dot == 1 {
         state.registers.clear_vbl_flag();
     }
 
@@ -181,21 +188,25 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
     // = the first 20 scanlines (`runppu(20*kLineTime)` then
     // `PPU_status = 0`), and the normal sl-241 set / sl-1 clear are
     // skipped for this frame. The C++ decrements ppudead after the
-    // frame's full 262 lines — here, at the last dot (260, 340).
+    // frame's full 262 lines.
+    //
+    // Phase 6.1.e follow-up (VBL-block-phase alignment, §6.4.3): the
+    // frame is VBL-first, so the frame start sits at (sl 241, dot 0)
+    // instead of (sl -1, dot 0). The VBL flag set moves to (sl 241,
+    // dot 0) so it lands at frame dot 0 (matching C++ ppudead start);
+    // the natural sl -1 dot 1 VBL clear (already present for normal
+    // frames) fires 20 scanlines + 1 dot later — same observable
+    // 6820-dot VBL window as C++ ppudead. The decrement moves to the
+    // new frame-end (sl 240, dot 340).
     if state.ppudead > 0 {
-        if sl == -1 && dot == 0 {
+        if sl == 241 && dot == 0 {
             state.registers.set_vbl_flag();
             out.vbl_entered = true;
             if state.nmi_enabled() {
                 out.nmi_asserted = true;
             }
         }
-        if sl == 19 && dot == 0 {
-            // End of the 20-scanline VBL window (C++ clears the whole
-            // status byte; at boot every other bit is 0 anyway).
-            state.registers.clear_vbl_flag();
-        }
-        if sl == 260 && dot == 340 {
+        if sl == 240 && dot == 340 {
             state.ppudead -= 1;
         }
     }
@@ -247,16 +258,31 @@ fn advance(state: &mut PpuState, out: &mut TickOutcome) {
         out.dot_wrapped = true;
         state.dot = 0;
         let next_sl = state.scanline + 1;
-        // Phase 5.1: the pre-render line is sl -1 (hardware 261). The
-        // frame visits -1, 0..=260 — exactly NTSC's 262 scanlines
-        // (89342 dots) — so the wrap fires from sl 260 directly. The
-        // old `next_sl >= NTSC_SCANLINES` threshold also let sl 261
-        // occur, double-counting the pre-render line (263-line frames
-        // = 89683 dots) and drifting one scanline per frame against
-        // the CPU budget.
-        if next_sl >= NTSC_SCANLINES - 1 {
-            // Wrap frame: sl 260 → sl -1 (next frame's pre-render).
+        // Phase 6.1.e follow-up (VBL-block-phase alignment,
+        // `docs/history/v2.1_phase6_batch_compat.md` §6.4.3): the
+        // frame is VBL-first — visit sequence per frame is
+        // `[241..=260, -1, 0..=240]` (262 scanlines × 341 dots =
+        // 89342 dots per frame). Two non-monotonic transitions
+        // happen on dot-340 wrap:
+        //
+        //   sl 260 → sl -1 (VBL-block end → pre-render, intra-frame)
+        //   sl 240 → sl 241 (post-render → next frame's VBL-block
+        //                    start, FRAME WRAP — `frame_advanced`)
+        //
+        // The previous `next_sl >= NTSC_SCANLINES - 1` (= 261) wrap
+        // was pre-render-first (visit `-1, 0..=260`), which placed
+        // the VBL block at the END of each frame and gave the VBL
+        // flag a different visible window vs the C++ engine's
+        // `[VBL 20][pre-render + visible 242]` layout — a 20-scanline
+        // constant phase offset behind C++ that broke
+        // `rust_ppu_vbl_nmi_timing_test` 02-vbl_set_time and several
+        // blargg ppu_open_bus / ppu_read_buffer cases.
+        if state.scanline == 260 {
+            // VBL-block end → pre-render (intra-frame, no wrap).
             state.scanline = -1;
+        } else if state.scanline == 240 {
+            // Post-render → next frame's VBL-block start (FRAME WRAP).
+            state.scanline = 241;
             out.frame_advanced = true;
         } else {
             state.scanline = next_sl;
@@ -286,7 +312,16 @@ pub fn tick_to<B: PpuBus + ?Sized>(
     target_dot: u16,
 ) -> TickOutcome {
     let mut guard = 0u32;
-    let max_ticks = (NTSC_SCANLINES as u32 + 2) * DOTS_PER_SCANLINE as u32;
+    // Phase 6.1.e follow-up (VBL-first layout): the even/odd skip at
+    // (sl -1, dot 340) sits ~7161 ticks into a frame (after the
+    // 20-scanline VBL block), and a test that starts with
+    // ppudead=1 + rendering on converges only when the second frame's
+    // (sl -1, dot 340) ticks no-skip — that's 2 full frames deep
+    // (~96504 ticks for the standard `tick_to(0, 0)` reachability
+    // probe). The previous `(NTSC_SCANLINES + 2) * DOTS_PER_SCANLINE`
+    // guard (~89904 ticks) was sized for the pre-render-first layout
+    // where the skip sits 340 ticks in; allow up to 2 frames.
+    let max_ticks = 2 * NTSC_SCANLINES as u32 * DOTS_PER_SCANLINE as u32;
     while (state.scanline, state.dot) != (target_sl, target_dot) {
         tick_dot(state, bus);
         guard += 1;
@@ -315,9 +350,11 @@ mod tests {
     fn tick_advances_dot_within_scanline() {
         let mut s = PpuState::new();
         let mut bus = FlatBus::new();
-        assert_eq!((s.scanline, s.dot), (-1, 0));
+        // Phase 6.1.e follow-up (VBL-first layout): frame start is
+        // (sl 241, dot 0).
+        assert_eq!((s.scanline, s.dot), (241, 0));
         tick_dot(&mut s, &mut bus);
-        assert_eq!((s.scanline, s.dot), (-1, 1));
+        assert_eq!((s.scanline, s.dot), (241, 1));
     }
 
     #[test]
@@ -325,6 +362,9 @@ mod tests {
         let mut s = PpuState::new();
         let mut bus = FlatBus::new();
         // tick_to(-1, 340) fires the (-1, 340) tick and advances.
+        // VBL-first layout: from sl -1 the next scanline is sl 0,
+        // NOT sl 241 (sl 241 is the wrap target of the previous
+        // frame's sl 240 → 241 boundary).
         let out = tick_to(&mut s, &mut bus, -1, 340);
         assert!(out.dot_wrapped);
         assert!(out.scanline_changed);
@@ -334,7 +374,7 @@ mod tests {
     #[test]
     fn even_frame_skips_one_dot_after_pre_render() {
         // odd_frame starts false (even); with rendering on, the
-        // pre-render dot 340 → sl 0 dot 1 (skip).
+        // pre-render dot 340 → next scanline dot 1 (skip).
         let mut s = PpuState::new();
         s.registers.write_mask(1 << mask_bits::SHOW_BG);
         let mut bus = FlatBus::new();
@@ -458,10 +498,13 @@ mod tests {
         s.vbl_suppressed_this_frame = true;
         // Tick to the last dot of the pre-render line (-1, 340) →
         // suppression reset; the same tick advances into sl 0 (no
-        // even/odd skip: rendering is off in this test).
+        // even/odd skip: rendering is off in this test). The frame
+        // wrap (sl 240 → sl 241) is separate from this intra-frame
+        // dot-340 transition — sl -1 still proceeds to sl 0 within
+        // the same frame.
         tick_to(&mut s, &mut bus, -1, 340);
         assert!(!s.vbl_suppressed_this_frame);
-        assert_eq!(s.scanline, 0, "advanced into the next frame's sl 0");
+        assert_eq!(s.scanline, 0, "advanced into the same frame's sl 0");
         assert_eq!(s.dot, 0);
     }
 
@@ -471,9 +514,17 @@ mod tests {
         // Set t = some non-zero scroll value, leave v = 0.
         s.registers.t = 0x1234;
         s.registers.write_mask(1 << mask_bits::SHOW_BG);
+        // Phase 6.1.e follow-up (VBL-first layout): with ppudead=1 +
+        // rendering on + odd_frame=false (cold start), the even skip
+        // at (sl -1, dot 340) skips (sl 0, dot 0) on frame 1, so the
+        // first reachable (sl 0, dot 0) tick lands on frame 2 (after
+        // ppudead decrements and odd_frame toggles). Setting
+        // `odd_frame = true` here disables the frame-1 skip so the test
+        // can probe (sl 0, dot 0) directly within frame 1, matching
+        // the pre-Phase-6.1.e behaviour the test was written against.
+        s.odd_frame = true;
         let mut bus = FlatBus::new();
-        // Tick to sl 0 dot 0 — copy_horizontal should run.
-        tick_to(&mut s, &mut bus, 0, 0);
+        let _ = tick_to(&mut s, &mut bus, 0, 0);
         assert_eq!(s.registers.v & 0x041F, 0x1234 & 0x041F);
     }
 
@@ -486,5 +537,61 @@ mod tests {
         tick_to(&mut s, &mut bus, 100, 256);
         tick_dot(&mut s, &mut bus); // dot 256 → increment
         assert_eq!(s.registers.v & 0x001F, 1);
+    }
+
+    // Phase 6.1.e follow-up (VBL-block-phase alignment, §6.4.3):
+    // the frame wrap goes sl 240 → sl 241 (VBL-first layout).
+    #[test]
+    fn frame_wraps_from_sl_240_to_sl_241() {
+        let mut s = PpuState::new();
+        s.ppudead = 0; // post-boot state machine under test
+        let mut bus = FlatBus::new();
+        // Drive to the last dot of the frame's last visible scanline.
+        let out = tick_to(&mut s, &mut bus, 240, 340);
+        assert!(out.dot_wrapped, "dot 340 → dot 0 wrap fires");
+        assert!(out.scanline_changed, "scanline transition fires");
+        assert!(
+            out.frame_advanced,
+            "frame wrap detected — sl 240 → next frame's sl 241"
+        );
+        assert_eq!(s.scanline, 241, "wrapped to next frame's VBL-block start");
+        assert_eq!(s.dot, 0);
+    }
+
+    #[test]
+    fn frame_starts_at_sl_241_dot_0() {
+        // Cold-state: PpuState::new() must place (sl, dot) at (241, 0)
+        // (VBL-block-first layout, §6.4.3).
+        let s = PpuState::new();
+        assert_eq!((s.scanline, s.dot), (241, 0));
+    }
+
+    #[test]
+    fn ppudead_sets_vbl_at_sl_241_dot_0_and_decrements_at_sl_240() {
+        // Phase 6.1.e follow-up: ppudead frame mirrors C++
+        // ppu_rendering.cpp:1626-1655 (VBL set at frame dot 0,
+        // VBL block, normal frame, decrement at frame end).
+        let mut s = PpuState::new();
+        s.registers.write_ctrl(1 << ctrl_bits::NMI_ENABLE);
+        // PpuState::new() initialises ppudead = 1.
+        let mut bus = FlatBus::new();
+
+        // (sl 241, dot 0): ppudead VBL set + NMI assert.
+        let first = tick_to(&mut s, &mut bus, 241, 0);
+        assert!(first.vbl_entered, "VBL set at frame start of ppudead");
+        assert!(first.nmi_asserted, "NMI fires at frame start of ppudead");
+        assert_eq!(s.ppudead, 1, "ppudead still pending for the rest of frame");
+
+        // (sl 240, dot 340): ppudead decrement + frame wrap.
+        // `tick_to(240, 340)` fires the (240, 340) tick — which
+        // decrements ppudead — and advances to (sl 241, dot 0) of
+        // the NEXT frame (frame_advanced = true).
+        let out = tick_to(&mut s, &mut bus, 240, 340);
+        assert_eq!(
+            s.ppudead, 0,
+            "ppudead decremented at frame end (sl 240 dot 340)"
+        );
+        assert!(out.frame_advanced, "frame wrapped at sl 240 → sl 241");
+        assert_eq!((s.scanline, s.dot), (241, 0), "next frame starts at (241, 0)");
     }
 }
