@@ -266,6 +266,13 @@ static int run_frames_seh(int frames_to_run, EmuDiag* diag) {
                 diag->pc_in_rom = (pc >= 0x8000);
             }
             diag->last_pc = pc;
+            // Debug trace: print every 5th frame up to frame 30 for NROM-stuck diagnosis
+            if (f < 30 && (f % 1 == 0)) {
+                uint8_t status = kagami_bridge_read_byte(0x2002);
+                uint8_t ctrl = kagami_bridge_read_byte(0x2000);
+                fprintf(stderr, "  [trace] f=%3d pc=0x%04X $2000=0x%02X $2002=0x%02X\n",
+                        f, pc, ctrl, status);
+            }
 
             if (f > 0 && pc == prev_pc) {
                 diag->stuck_count++;
@@ -459,13 +466,38 @@ int main(int argc, char** argv) {
     std::string rom_dir = argv[1];
     int frames = 60;
     const char* output_path = "compat_report.json";
+    const char* debug_rom = nullptr;
 
     for (int i = 2; i < argc; ++i) {
         if (strcmp(argv[i], "--frames") == 0 && i + 1 < argc) {
             frames = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--output") == 0 && i + 1 < argc) {
             output_path = argv[++i];
+        } else if (strcmp(argv[i], "--debug-rom") == 0 && i + 1 < argc) {
+            debug_rom = argv[++i];
         }
+    }
+
+    // --debug-rom <name>: run JUST this one ROM and dump PC trace per frame
+    if (debug_rom != nullptr) {
+        printf("=== FCEUX11 Batch Compat Debug Trace ===\n");
+        printf("ROM: %s\n", debug_rom);
+        printf("Frames: %d\n\n", frames);
+        EmuDiag diag{};
+        RomResult r = test_rom(rom_dir, debug_rom, frames);
+        printf("\n=== Result ===\n");
+        printf("  status         = %s\n", r.failure_reason.empty() ? "PASS" : "FAIL");
+        printf("  load_status    = %d\n", r.load_status);
+        printf("  frames_run     = %d\n", r.frames_run);
+        printf("  frames_blank   = %d\n", r.frames_blanked);
+        printf("  first_pc       = 0x%04X\n", r.first_pc);
+        printf("  last_pc        = 0x%04X\n", r.last_pc);
+        printf("  pc_stuck       = %s\n", r.pc_stuck ? "true" : "false");
+        printf("  video_active   = %s\n", r.video_active ? "true" : "false");
+        if (!r.failure_reason.empty()) {
+            printf("  failure_reason = %s\n", r.failure_reason.c_str());
+        }
+        return r.failure_reason.empty() ? 0 : 1;
     }
 
     printf("=== FCEUX11 Batch ROM Compatibility Test (v2.0_hotfix1) ===\n");
