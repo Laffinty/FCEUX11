@@ -37,17 +37,21 @@ fn write_data_updates_buffer_for_non_palette() {
 }
 
 #[test]
-fn palette_read_does_not_update_buffer() {
+fn palette_read_refills_buffer_from_nt_mirror() {
+    // Phase 6.4 (was `palette_read_does_not_update_buffer`): C++
+    // A2007 refills VRAMBuffer from the NT mirror under the palette
+    // (`CALL_PPUREAD(RefreshAddr - 0x1000)`, src/ppu.cpp:865).
     let mut s = PpuState::new();
     let mut bus = FlatBus::new();
     bus.write(0x3F00, 0x12);
+    bus.write(0x2F00, 0xAB);
     s.registers.vram_buffer = 0xCD; // sentinel from prior frame
     s.registers.v = 0x3F00;
     let v = s.registers.read_data(&mut bus, s.registers.ctrl);
     assert_eq!(v, 0x12, "palette returns real bus value");
     assert_eq!(
-        s.registers.vram_buffer, 0xCD,
-        "palette read must NOT touch the buffer"
+        s.registers.vram_buffer, 0xAB,
+        "palette read refills the buffer from the NT mirror (v-0x1000)"
     );
 }
 

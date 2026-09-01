@@ -327,6 +327,13 @@ fn read_payload(buf: &[u8], state: &mut PpuState) {
     debug_assert_eq!(buf.len(), RPU1_PAYLOAD_SIZE as usize);
     let mut off = 0usize;
 
+    // Phase 6.4: ppudead is not part of the payload — savestates are
+    // always captured past the process's first frame, so a restored
+    // PpuState must not re-run the ppudead VBL layout (PpuState::new()
+    // initialises it to 1). Pin to 0 here; keeps the payload
+    // byte-identical to the golden RPU1 chunk layout.
+    state.ppudead = 0;
+
     state.registers.ctrl = buf[off];
     state.registers.mask = buf[off + 1];
     state.registers.status = buf[off + 2];

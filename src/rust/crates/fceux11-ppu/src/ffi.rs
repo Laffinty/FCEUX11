@@ -366,49 +366,53 @@ pub unsafe extern "C" fn fceux11_ppu_set_mirror_mode(state: *mut PpuState, mode:
 pub unsafe extern "C" fn fceux11_ppu_cpu_read(state: *mut PpuState, addr: u16) -> u8 {
     let sb = lookup(state);
     let reg = (addr & 0x0007) as u8;
-    let ret =
-        crate::registers::Registers::read_status(&mut sb.state.registers).wrapping_add(match reg {
-            0 => sb.state.registers.ctrl,
-            1 => sb.state.registers.mask,
-            // 2 ————————?status (handled above)
-            3 => sb.state.registers.oam_addr,
-            4 => {
-                // $2004 ————————?primary OAM read. Phase 1 model.
-                let addr = sb.state.registers.oam_addr;
-                let v = sb.state.oam[addr as usize];
-                sb.state.registers.increment_oam_addr();
-                v
-            }
-            5 => {
-                // $2005 — write-only on real hardware; reads return
-                // the PPU internal data-bus open-bus value (latched
-                // on every CPU write to a PPU register). Phase 6.3.a:
-                // blargg `ppu_read_buffer` subtest 1 expects this.
-                sb.state.registers.data_bus
-            }
-            6 => {
-                // $2006 — write-only; same data-bus open-bus as $2005.
-                sb.state.registers.data_bus
-            }
-            7 => {
-                // $2007 — read with buffered behaviour.
-                let mut bus_adapter = CppBus {
-                    cb: sb.bus.unwrap_or(fceux11_ppu_bus_callbacks {
-                        read: None,
-                        write: None,
-                        notify_a12_rising: None,
-                        notify_hblank: None,
-                        notify_hblank2: None,
-                        notify_scanline: None,
-                        notify_vblank: None,
-                    }),
-                };
-                sb.state
-                    .registers
-                    .read_data(&mut bus_adapter, sb.state.registers.ctrl)
-            }
-            _ => 0,
-        });
+    // Phase 6.4: register-read parity with the C++ handlers. The old
+    // Phase 1 model called `read_status()` unconditionally and ADDED
+    // its result to every register read: any $2000/$2001/$2003/$2005/
+    // $2006/$2007 read also cleared the VBL flag, reset the write
+    // toggle, overwrote the open-bus latch, and polluted the return
+    // value with (status & 0xE0) | (latch & 0x1F). The gates only ever
+    // exercised $2002 (reg==2 → `_ => 0` arm) so it survived. C++
+    // reference semantics (src/ppu.cpp):
+    //   A2002 → status | latch&0x1F, latch ← ret            (line 643)
+    //   A2004 → OAM byte, latch ← ret, oam_addr NOT bumped  (line 771+)
+    //   A200x ($2000-$2006 it doesn't handle) → PPUGenLatch (line 795)
+    //   A2007 → buffered read; latch ← returned value       (line 875)
+    let ret = match reg {
+        2 => crate::registers::Registers::read_status(&mut sb.state.registers),
+        4 => {
+            // $2004 — primary OAM read (Phase 1 model: direct OAM
+            // byte; the C++ rendering-on path returns the sprite-eval
+            // byte spr_read.ret instead — a §6.2.4 follow-up). Reads
+            // do NOT increment oam_addr, and the byte drives the
+            // open-bus latch (blargg ppu_open_bus test 11).
+            let a = sb.state.registers.oam_addr;
+            let v = sb.state.oam[a as usize];
+            sb.state.registers.data_bus = v;
+            v
+        }
+        7 => {
+            // $2007 — read with buffered behaviour.
+            let mut bus_adapter = CppBus {
+                cb: sb.bus.unwrap_or(fceux11_ppu_bus_callbacks {
+                    read: None,
+                    write: None,
+                    notify_a12_rising: None,
+                    notify_hblank: None,
+                    notify_hblank2: None,
+                    notify_scanline: None,
+                    notify_vblank: None,
+                }),
+            };
+            sb.state
+                .registers
+                .read_data(&mut bus_adapter, sb.state.registers.ctrl)
+        }
+        // $2000/$2001/$2003/$2005/$2006 — write-only or open bus; the
+        // C++ A200x fallback returns PPUGenLatch for every register it
+        // doesn't handle specially (src/ppu.cpp:795-800).
+        _ => sb.state.registers.data_bus,
+    };
     ret
 }
 

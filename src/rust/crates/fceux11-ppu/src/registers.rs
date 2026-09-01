@@ -441,7 +441,16 @@ impl Registers {
             // this read returns the real value into the buffer.
             let buffered = self.vram_buffer;
             self.vram_buffer = bus.read(addr);
-            self.data_bus = self.vram_buffer;
+            // Phase 6.4: the open-bus latch gets the byte RETURNED to
+            // the CPU, not the freshly fetched one. C++ A2007 (newppu)
+            // does `PPUGenLatch = ret` where ret == the pre-read
+            // VRAMBuffer; the new fetch lands in VRAMBuffer only
+            // (src/ppu.cpp:816/873). Refreshing with the new fetch
+            // made $2002/$2005/$2006 open-bus readback observe the
+            // NEXT buffer contents — the divergence blargg
+            // ppu_read_buffer detects (A/B verified 2026-08-31:
+            // C++ PPU value=0x00 PASS, Rust value=0x80 FAIL, §6.3.a.4).
+            self.data_bus = buffered;
             buffered
         } else {
             // Palette range: per blargg ppu_open_bus readme, the
@@ -453,6 +462,16 @@ impl Registers {
             let mut ret = bus.read(addr);
             ret |= self.data_bus & 0xC0;
             self.data_bus = ret;
+            // Phase 6.4: C++ A2007 also refills VRAMBuffer from the
+            // nametable mirror underneath the palette
+            // (`VRAMBuffer = CALL_PPUREAD(RefreshAddr - 0x1000)`,
+            // src/ppu.cpp:865) — the next non-palette $2007 read
+            // returns this byte. Note it uses the RAW $2Fxx mirror
+            // address, not the palette-folded `addr`. The Rust path
+            // never loaded the buffer here, so a palette read followed
+            // by a non-palette read returned stale buffer content
+            // (blargg ppu_read_buffer divergence, §6.3.a.4 A/B).
+            self.vram_buffer = bus.read((v & 0x3FFF) - 0x1000);
             ret
         };
         self.increment_v(ctrl);
@@ -632,17 +651,22 @@ mod tests {
     }
 
     #[test]
-    fn palette_read_does_not_update_buffer() {
+    fn palette_read_refills_buffer_from_nt_mirror() {
+        // Phase 6.4 (was `palette_read_does_not_update_buffer`): C++
+        // A2007 refills VRAMBuffer from the nametable mirror under the
+        // palette (`CALL_PPUREAD(RefreshAddr - 0x1000)`,
+        // src/ppu.cpp:865) — $3F00 reads load the byte at $2F00.
         let mut r = Registers::new();
         r.vram_buffer = 0xCD;
         let mut bus = FlatBus::new();
         bus.write(0x3F00, 0x12);
+        bus.write(0x2F00, 0xAB);
         r.v = 0x3F00;
         let v = r.read_data(&mut bus, r.ctrl);
         assert_eq!(v, 0x12, "palette returns the real bus value");
         assert_eq!(
-            r.vram_buffer, 0xCD,
-            "palette read does not touch the buffer"
+            r.vram_buffer, 0xAB,
+            "palette read refills the buffer from the NT mirror (v-0x1000)"
         );
     }
 

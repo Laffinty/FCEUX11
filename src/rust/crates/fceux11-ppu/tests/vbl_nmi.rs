@@ -12,6 +12,7 @@ use fceux11_ppu::{FlatBus, PpuState, Registers, ctrl_bits, frame::tick_to, statu
 #[test]
 fn vbl_flag_set_at_sl_241_dot_1_with_nmi_enable() {
     let mut s = PpuState::new();
+    s.ppudead = 0; // post-boot state machine under test (Phase 6.4)
     s.registers.write_ctrl(1 << ctrl_bits::NMI_ENABLE);
     let mut bus = FlatBus::new();
 
@@ -26,6 +27,7 @@ fn vbl_flag_set_at_sl_241_dot_1_with_nmi_enable() {
 #[test]
 fn vbl_flag_clear_at_pre_render_dot_1() {
     let mut s = PpuState::new();
+    s.ppudead = 0; // post-boot state machine under test (Phase 6.4)
     let mut bus = FlatBus::new();
     // Pre-set the VBL flag to prove the state machine clears it.
     // Phase 5.1 geometry: the pre-render line is sl -1 (hardware 261);
@@ -42,6 +44,7 @@ fn vbl_flag_clear_at_pre_render_dot_1() {
 #[test]
 fn nmi_not_asserted_when_nmi_disable_bit_off() {
     let mut s = PpuState::new();
+    s.ppudead = 0; // post-boot state machine under test (Phase 6.4)
     s.registers.write_ctrl(0); // NMI off
     let mut bus = FlatBus::new();
     let out = tick_to(&mut s, &mut bus, 241, 1);
@@ -55,6 +58,7 @@ fn nmi_not_asserted_when_nmi_disable_bit_off() {
 #[test]
 fn nmi_asserted_only_at_sl_241_dot_1_when_enabled() {
     let mut s = PpuState::new();
+    s.ppudead = 0; // post-boot state machine under test (Phase 6.4)
     s.registers.write_ctrl(1 << ctrl_bits::NMI_ENABLE);
     let mut bus = FlatBus::new();
 
@@ -75,6 +79,7 @@ fn status_read_at_sl_241_dot_0_suppresses_vbl_flag_set() {
     // (one PPU dot before the Mesen/fceux VBL set boundary)
     // suppresses the VBL flag set + NMI for this frame.
     let mut s = PpuState::new();
+    s.ppudead = 0; // post-boot state machine under test (Phase 6.4)
     s.registers.write_ctrl(1 << ctrl_bits::NMI_ENABLE);
     let mut bus = FlatBus::new();
 
@@ -107,6 +112,7 @@ fn status_read_at_sl_241_dot_1_clears_vbl_flag() {
     // Reading $2002 at sl 241 dot 1 returns VBL=1 (set this same tick)
     // and clears it for subsequent reads.
     let mut s = PpuState::new();
+    s.ppudead = 0; // post-boot state machine under test (Phase 6.4)
     let mut bus = FlatBus::new();
     let _ = tick_to(&mut s, &mut bus, 241, 1);
     let first = s.registers.read_status();
@@ -126,6 +132,7 @@ fn nmi_enable_off_to_on_after_vbl_does_not_retrigger() {
     // off→on *after* the sl 241 dot 1 NMI doesn't fire a fresh NMI on
     // the same frame.
     let mut s = PpuState::new();
+    s.ppudead = 0; // post-boot state machine under test (Phase 6.4)
     s.registers.write_ctrl(1 << ctrl_bits::NMI_ENABLE);
     let mut bus = FlatBus::new();
     let first = tick_to(&mut s, &mut bus, 241, 1);
@@ -144,6 +151,7 @@ fn nmi_enable_off_to_on_after_vbl_does_not_retrigger() {
 #[test]
 fn even_frame_skips_one_dot_at_pre_render_boundary() {
     let mut s = PpuState::new();
+    s.ppudead = 0; // post-boot state machine under test (Phase 6.4)
     // Enable rendering so even/odd logic fires.
     s.registers.write_mask(0x08 | 0x10); // show BG + show sprites
     let mut bus = FlatBus::new();
@@ -160,6 +168,7 @@ fn even_frame_skips_one_dot_at_pre_render_boundary() {
 #[test]
 fn odd_frame_runs_full_pre_render() {
     let mut s = PpuState::new();
+    s.ppudead = 0; // post-boot state machine under test (Phase 6.4)
     s.odd_frame = true;
     s.registers.write_mask(0x08 | 0x10);
     let mut bus = FlatBus::new();
@@ -174,6 +183,7 @@ fn odd_frame_runs_full_pre_render() {
 #[test]
 fn rendering_off_freezes_odd_frame() {
     let mut s = PpuState::new();
+    s.ppudead = 0; // post-boot state machine under test (Phase 6.4)
     // mask stays 0 — rendering off.
     s.odd_frame = false;
     let mut bus = FlatBus::new();
@@ -189,6 +199,7 @@ fn rendering_off_freezes_odd_frame() {
 #[test]
 fn suppression_flag_resets_at_frame_boundary() {
     let mut s = PpuState::new();
+    s.ppudead = 0; // post-boot state machine under test (Phase 6.4)
     s.vbl_suppressed_this_frame = true;
     let mut bus = FlatBus::new();
     // Tick to the last dot of the pre-render line (-1, 340) — the

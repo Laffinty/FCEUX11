@@ -36,6 +36,10 @@ use fceux11_ppu::state::{OAM_SIZE, PpuState, SECONDARY_OAM_SIZE};
 #[test]
 fn rpu1_roundtrip_preserves_every_field() {
     let mut src = PpuState::new();
+    // Phase 6.4: ppudead is not part of the RPU1 payload (savestates
+    // are always captured past the process's first frame; read_payload
+    // pins it to 0), so the roundtrip source models a post-boot state.
+    src.ppudead = 0;
 
     // Registers
     src.registers.ctrl = 0b1010_0101;

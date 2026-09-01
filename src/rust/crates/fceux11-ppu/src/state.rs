@@ -149,6 +149,20 @@ pub struct PpuState {
     /// True if sprite eval already happened for the current scanline
     /// (so we don't re-evaluate every dot).
     pub sprite_eval_done: bool,
+    /// Phase 6.4: C++ `ppudead` mirror (src/ppu.cpp:90). The C++ new
+    /// PPU's FIRST frame after process start runs a different layout —
+    /// VBL flag set at frame dot 0, VBL window = the first 20
+    /// scanlines, no sl-241 set (ppu_rendering.cpp:1626-1655) — and
+    /// blargg ROMs sync to 2 VBLs at init, so missing this frame shifts
+    /// the whole test timeline by one VBL occurrence (trace-diff:
+    /// first VBL-set read cycle 27516 Rust vs 29786 C++, §6.3.a.4
+    /// follow-up). 1 only for the process's first frame: PpuState is
+    /// created once per bridge init and reused across game loads, and
+    /// `power()`/`reset()` must NOT re-set it (mirrors the C++ static,
+    /// which Power/Reset don't touch either). Not part of the RPU1
+    /// savestate payload; `read_payload` pins it to 0 (restores are
+    /// always past boot).
+    pub ppudead: u8,
 }
 
 impl Default for PpuState {
@@ -190,6 +204,7 @@ impl PpuState {
             sprite_x: [0u8; 8],
             sprite0_in_range: false,
             sprite_eval_done: false,
+            ppudead: 1,
         }
     }
 

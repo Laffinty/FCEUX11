@@ -1211,7 +1211,9 @@ void FCEUPPU_Power(void) {
 	// (it's called again at the end of PowerNES in fceu.cpp).
 	// This call here just resets the Rust PPU state and primes
 	// the windows from whatever is currently installed.
+#ifdef FCEUX11_RUST_PPU
 	ppu_rust_bridge_power();
+#endif
 }
 
 void FCEUPPU_Init(void) {

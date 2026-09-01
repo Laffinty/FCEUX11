@@ -1059,7 +1059,9 @@ void PowerNES(void) {
 	// Rust PPU's CHR/NT/Palette windows from the actual bus state.
 	// (The earlier call from FCEUPPU_Power happens BEFORE the mapper
 	// Power; this call is the one with real CHR/NT pointers.)
+#ifdef FCEUX11_RUST_PPU
 	ppu_rust_bridge_power();
+#endif
 
 	//if we are in a movie, then reset the saveram
 	extern int disableBatteryLoading;

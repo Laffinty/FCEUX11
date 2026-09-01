@@ -90,7 +90,20 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
     // Visible scanline starts: sprite eval (sl 0..239 at dot 0).
     // Real hardware evaluates sprites during dots 0..=63 of each visible
     // line; we collapse it into dot 0 for the Phase 1 minimal model.
-    if (0..=239).contains(&sl) && dot == 0 {
+    //
+    // Phase 6.4: gate eval on rendering_enabled() — the C++ engine only
+    // runs sprite evaluation inside its rendering path, so with $2001
+    // rendering bits clear (incl. every boot frame before the game
+    // enables rendering) the overflow flag must never set. The Rust
+    // model evaluated unconditionally: with OAM all-zero at boot, every
+    // visible scanline 0..=7 saw 64 in-range sprites and latched
+    // status bit 5, so ALL $2002 reads returned 0x20 instead of 0x00 —
+    // the root divergence behind blargg ppu_open_bus (Failed #2) /
+    // ppu_read_buffer (value=0x80), A/B verified via trace-diff
+    // (§6.3.a.4 follow-up; first divergence = access #3, first $2002
+    // read after power). The vbl_nmi ROMs kept passing only because
+    // their wait loops branch on bit 7 alone.
+    if (0..=239).contains(&sl) && dot == 0 && state.rendering_enabled() {
         let sprite_height = if state.registers.ctrl & (1 << ctrl_bits::SPRITE_SIZE) != 0 {
             16
         } else {
@@ -136,7 +149,7 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
     // Golden baseline (commit b06388c^, pre-6.1.e): nestest frames
     // 3-7 + savestate hash kept at the dot-1 timing values.
     // (See `docs/history/v2.1_phase6_batch_compat.md` §6.1.e.v3.)
-    if sl == 241 && dot == 1 {
+    if sl == 241 && dot == 1 && state.ppudead == 0 {
         if state.vbl_suppressed_this_frame {
             // Suppression flag from the sl 241 dot 0 $2002 read:
             // do not set the flag, do not assert NMI.
@@ -158,8 +171,33 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
     // 89683 dots) while the CPU budget is 89342 dots (262 lines) — a
     // one-scanline phase drift per frame that broke the savestate /
     // nestest gates. The wrap now goes 260 → -1 directly.
-    if sl == -1 && dot == 1 {
+    if sl == -1 && dot == 1 && state.ppudead == 0 {
         state.registers.clear_vbl_flag();
+    }
+
+    // Phase 6.4: ppudead — the process's FIRST frame mirrors the C++
+    // new-PPU layout (ppu_rendering.cpp:1626-1655): VBL flag set at
+    // frame dot 0 (`PPU_status |= 0x80` before any runppu), VBL window
+    // = the first 20 scanlines (`runppu(20*kLineTime)` then
+    // `PPU_status = 0`), and the normal sl-241 set / sl-1 clear are
+    // skipped for this frame. The C++ decrements ppudead after the
+    // frame's full 262 lines — here, at the last dot (260, 340).
+    if state.ppudead > 0 {
+        if sl == -1 && dot == 0 {
+            state.registers.set_vbl_flag();
+            out.vbl_entered = true;
+            if state.nmi_enabled() {
+                out.nmi_asserted = true;
+            }
+        }
+        if sl == 19 && dot == 0 {
+            // End of the 20-scanline VBL window (C++ clears the whole
+            // status byte; at boot every other bit is 0 anyway).
+            state.registers.clear_vbl_flag();
+        }
+        if sl == 260 && dot == 340 {
+            state.ppudead -= 1;
+        }
     }
 
     // Frame boundary: the last dot of the pre-render line (-1, 340)
@@ -337,6 +375,7 @@ mod tests {
     #[test]
     fn vbl_flag_clears_at_pre_render_dot_1() {
         let mut s = PpuState::new();
+        s.ppudead = 0; // post-boot state machine under test
         let mut bus = FlatBus::new();
         // Manually set the VBL flag to prove the state machine clears it.
         // Phase 5.1 geometry: the pre-render line is sl -1 (hardware 261);
@@ -355,6 +394,7 @@ mod tests {
         // Phase 6.1.e.v3: VBL set is at sl 241 dot 1 (Mesen/fceux
         // reference; blargg ppu_vbl_nmi 02-vbl_set_time calibration).
         let mut s = PpuState::new();
+        s.ppudead = 0; // post-boot state machine under test
         s.registers.write_ctrl(1 << ctrl_bits::NMI_ENABLE);
         let mut bus = FlatBus::new();
         tick_to(&mut s, &mut bus, 241, 1);
@@ -377,6 +417,7 @@ mod tests {
     #[test]
     fn nmi_asserted_at_sl_241_dot_1_when_enabled() {
         let mut s = PpuState::new();
+        s.ppudead = 0; // post-boot state machine under test
         s.registers.write_ctrl(1 << ctrl_bits::NMI_ENABLE);
         let mut bus = FlatBus::new();
         let out = tick_to(&mut s, &mut bus, 241, 1);

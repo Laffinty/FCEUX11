@@ -51,6 +51,21 @@ constexpr uint32_t kNtscCpuCyclesPerFrame = 89342;
 uint8_t g_chr_window[8192];
 uint8_t g_nt_window[4096];
 
+// Phase 6.4: page-base pointers captured by the last window refresh.
+// The Rust renderer reads the window backing stores through the
+// pointers installed at power (which never change), so a mid-frame
+// mapper bank switch only needs the CONTENTS re-copied — no FFI
+// re-install. Comparing these pointers is a cheap dirty test
+// (12 compares) run at every scanline boundary.
+const uint8_t* g_chr_page_base[8] = {};
+const uint8_t* g_nt_page_base[4] = {};
+// Mirror mode last pushed to the Rust side; a mismatch with the
+// pattern derived from vnapage means the push is stale and is
+// re-done at the next frame boundary (see
+// bridge_push_mirror_mode_if_dirty).
+uint32_t g_mirror_mode_pushed = 0;
+bool     g_mirror_mode_pushed_valid = false;
+
 // Phase 5.1: (re)install the CHR/NT/Palette windows from the live C++
 // bus state. Called from `ppu_rust_bridge_power` and after every
 // CPU-space $2007 write: the Rust renderer reads these COPIES, so
@@ -63,12 +78,19 @@ uint8_t g_nt_window[4096];
 // g_bus.vpage[p] for each 1 KiB page $0000-$1FFF. For NROM all 8
 // pages point to the same 8 KiB buffer; for mappers with CHR
 // banking, each page can resolve to a different bank.
+// Phase 6.4: mirror-mode derivation from the vnapage pointer pattern
+// (defined below bridge_refresh_windows; forward-declared because the
+// full install records the pushed mode alongside the copy).
+uint32_t bridge_derive_mirror_mode();
+
 void bridge_refresh_windows() {
     auto& vpage = fceu11::g_bus.vpage();
+    const uint8_t* nt_base = &fceu11::g_ppu.ntaram()[0];
     for (uint32_t p = 0; p < 8; ++p) {
         // g_bus.set_vpage stores `ptr - addr` so a read of
         // `vpage_[idx] + addr` recovers `ptr`. We undo that here.
         const uint8_t* page_base = vpage[p] + (p << 10);
+        g_chr_page_base[p] = page_base;
         for (uint32_t i = 0; i < 1024; ++i) {
             g_chr_window[p * 1024 + i] = page_base[i];
         }
@@ -88,8 +110,9 @@ void bridge_refresh_windows() {
             // Mapper hasn't set this page; fall back to NTARAM
             // base. This happens for mappers that only configure
             // pages 0/1 and rely on the default for 2/3.
-            page_base = &fceu11::g_ppu.ntaram()[0];
+            page_base = nt_base;
         }
+        g_nt_page_base[p] = page_base;
         for (uint32_t i = 0; i < 1024; ++i) {
             g_nt_window[p * 1024 + i] = page_base[i];
         }
@@ -102,24 +125,86 @@ void bridge_refresh_windows() {
     // This avoids the need to thread the mode byte through Bus
     // and lets us auto-detect from the side-effect of
     // Ppu::set_mirror_mode.
+    const uint32_t mode = bridge_derive_mirror_mode();
+    fceux11_ppu_set_mirror_mode(g_ppu_state, mode);
+    g_mirror_mode_pushed = mode;
+    g_mirror_mode_pushed_valid = true;
+}
+
+// Phase 6.4: mirror-mode derivation from the vnapage pointer pattern.
+// Extracted verbatim from bridge_refresh_windows so both the full
+// install and the deferred re-push (frame boundary) share it.
+uint32_t bridge_derive_mirror_mode() {
+    auto& vnapage = fceu11::g_ppu.vnapage();
     const uint8_t* nt_base = &fceu11::g_ppu.ntaram()[0];
     auto is_p0 = vnapage[0] == nt_base;
     auto is_p1 = vnapage[1] == nt_base + 0x400;
     auto is_p2 = vnapage[2] == nt_base;
     auto is_p3 = vnapage[3] == nt_base + 0x400;
-    uint32_t mode = 0;
     if (is_p0 && is_p1 && !is_p2 && !is_p3) {
-        mode = 0;  // horizontal (vnapage[0]=vnapage[1]=base, [2]=[3]=base+0x400)
-    } else if (is_p0 && !is_p1 && is_p2 && !is_p3) {
-        mode = 1;  // vertical (vnapage[0]=vnapage[2]=base, [1]=[3]=base+0x400)
-    } else if (vnapage[0] == nt_base && vnapage[1] == nt_base && vnapage[2] == nt_base && vnapage[3] == nt_base) {
-        mode = 2;  // single-low
-    } else if (vnapage[0] == nt_base + 0x400 && vnapage[1] == nt_base + 0x400) {
-        mode = 3;  // single-high
-    } else {
-        mode = 4;  // four-screen or other
+        return 0;  // horizontal (vnapage[0]=vnapage[1]=base, [2]=[3]=base+0x400)
     }
+    if (is_p0 && !is_p1 && is_p2 && !is_p3) {
+        return 1;  // vertical (vnapage[0]=vnapage[2]=base, [1]=[3]=base+0x400)
+    }
+    if (vnapage[0] == nt_base && vnapage[1] == nt_base && vnapage[2] == nt_base && vnapage[3] == nt_base) {
+        return 2;  // single-low
+    }
+    if (vnapage[0] == nt_base + 0x400 && vnapage[1] == nt_base + 0x400) {
+        return 3;  // single-high
+    }
+    return 4;      // four-screen or other
+}
+
+// Phase 6.4: scanline-granularity CHR/NT window invalidation — the
+// "CHR 窗口缓存与失效" deliverable (plan §7 Phase 6). Multi-bank
+// mappers (MMC3/VRC4/…) rewrite `g_bus.vpage[]` mid-frame via bank
+// registers; previously the Rust renderer's window snapshot went
+// stale until the next $2007 write, so games that switch CHR banks
+// per scanline (status bars, split screens) rendered with boot-time
+// banks.
+//
+// Re-copies ONLY the pages whose base pointer moved. Runs from
+// `bridge_notify_scanline`, which fires on the Rust scheduler's call
+// stack while the StateBox borrow is held — so this must NOT call
+// any `fceux11_ppu_*` FFI (re-entry would alias the borrow; the same
+// hazard the Phase 5.1 bridge-recursion fix eliminated). Plain
+// C++-side memory copies suffice: the renderer reads the window
+// backing stores through the power-time pointers, and the notify
+// lands BEFORE the new scanline's dot-0 render, so the next
+// render_scanline sees the new banks at scanline granularity —
+// matching how hblank-timed bank switches are meant to be observed.
+//
+// NT page moves (mirroring changes) re-copy the page contents here
+// too; the mode byte itself is re-pushed at the next frame boundary
+// (bridge_push_mirror_mode_if_dirty) because that push is an FFI.
+void bridge_refresh_window_contents_if_dirty() {
+    auto& vpage = fceu11::g_bus.vpage();
+    for (uint32_t p = 0; p < 8; ++p) {
+        const uint8_t* page_base = vpage[p] + (p << 10);
+        if (page_base == g_chr_page_base[p]) continue;
+        g_chr_page_base[p] = page_base;
+        std::memcpy(&g_chr_window[p * 1024], page_base, 1024);
+    }
+    auto& vnapage = fceu11::g_ppu.vnapage();
+    const uint8_t* nt_base = &fceu11::g_ppu.ntaram()[0];
+    for (uint32_t p = 0; p < 4; ++p) {
+        const uint8_t* page_base = vnapage[p] ? vnapage[p] : nt_base;
+        if (page_base == g_nt_page_base[p]) continue;
+        g_nt_page_base[p] = page_base;
+        std::memcpy(&g_nt_window[p * 1024], page_base, 1024);
+    }
+}
+
+// Phase 6.4: deferred mirror-mode re-push. Frame-boundary C++ code
+// only (never from the scanline callback — see
+// bridge_refresh_window_contents_if_dirty for the borrow rationale).
+void bridge_push_mirror_mode_if_dirty() {
+    if (g_ppu_state == nullptr || !g_mirror_mode_pushed_valid) return;
+    const uint32_t mode = bridge_derive_mirror_mode();
+    if (mode == g_mirror_mode_pushed) return;
     fceux11_ppu_set_mirror_mode(g_ppu_state, mode);
+    g_mirror_mode_pushed = mode;
 }
 
 
@@ -198,6 +283,14 @@ void bridge_notify_scanline(int16_t sl) {
     // (e.g. MMC3_hb_PALStarWarsHack, savestate CPU views) observe the
     // current line instead of a stale frame-end snapshot.
     fceu11::cpu_instance().set_scanline(sl);
+    // Phase 6.4: scanline-granularity CHR/NT window invalidation.
+    // Fires BEFORE the new scanline's dot-0 render (the scheduler
+    // notifies on the transition tick; render_scanline_if_start runs
+    // at the top of the next dot iteration), so bank switches made
+    // during the previous scanline are visible to it. Content-only:
+    // no PPU-crate FFI from inside this callback (StateBox borrow is
+    // held; see bridge_refresh_window_contents_if_dirty).
+    bridge_refresh_window_contents_if_dirty();
     if (PPU_hook) {
         PPU_hook(sl);
     }
@@ -427,6 +520,13 @@ int ppu_rust_bridge_run_frame_interleaved(uint32_t dots) {
     // executes nothing (fceux11_cpu_run_with_tick returns immediately
     // for a zero budget) but installs the bus + tick thunks.
     fceu11::cpu_instance().run(0);
+    // Phase 6.4: deferred mirror-mode re-push. Mirroring changes made
+    // mid-frame (mapper writes during vblank/NMI) re-copied the NT
+    // page contents at the scanline boundary; the mode byte itself
+    // could not be pushed from the callback (FFI while the Rust
+    // scheduler holds the StateBox borrow), so it lands here —
+    // before the first visible scanline of the coming frame.
+    bridge_push_mirror_mode_if_dirty();
     int rc = fceux11_run_frame_interleaved(
         g_ppu_state,
         reinterpret_cast<uint8_t*>(&fceu11::cpu_instance().native_layout()),
@@ -542,6 +642,17 @@ void ppu_rust_bridge_cpu_write(uint32_t addr, uint8_t value) {
     if (g_ppu_state == nullptr) {
         return;
     }
+    // Phase 6.4: stamp the open-bus decay reference with the CPU's
+    // live cycle at write time. The only other stamp site was the
+    // retired Phase 5.1 per-dot C++ loop (`advance_ppu_dots`); since
+    // Phase 5.3 the frame loop runs in Rust and never updated
+    // `current_cpu_cycle`, so every `refresh_data_bus` stamped cycle
+    // 0 and the per-frame decay check zeroed the latch ~600 ms after
+    // boot regardless of write recency (blargg ppu_open_bus /
+    // ppu_read_buffer divergence; §6.3.a.4 A/B follow-up).
+    const uint64 now = fceu11::cpu_instance().timestamp_base()
+        + static_cast<uint64>(fceu11::cpu_instance().timestamp_ref());
+    fceux11_ppu_set_current_cpu_cycle(g_ppu_state, now);
     // Phase 6.1.b — port B2000 rising-edge NMI-enable to Rust bridge.
     // C++ reference (src/ppu.cpp:958-962):
     //   if (!(PPU[0] & 0x80) && (V & 0x80) && (PPU_status & 0x80))
