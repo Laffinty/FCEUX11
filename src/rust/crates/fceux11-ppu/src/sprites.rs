@@ -15,21 +15,37 @@
 //!   sets the overflow flag (state.sprite_overflow).
 //! - Priority MUX: attribute bit 5 = 0 renders in front of BG,
 //!   = 1 renders behind (only visible where BG is transparent).
-//! - Sprite 0 hit: set when sprite 0's opaque pixel overlaps an
-//!   opaque BG pixel at x 1..=254, with front priority.
+//! - Sprite 0 hit (Phase 6.6 Session A): the batch pass records the
+//!   FIRST pixel where sprite 0's opaque pixel overlaps an opaque BG
+//!   pixel at x 0..=254 into `state.sprite0_hit_dot` (pixel x outputs
+//!   at dot x+1); the frame state machine (`frame::tick_dot`) latches
+//!   `state.sprite0_hit` when it reaches that dot, giving the flag
+//!   per-pixel timing. The sprite priority bit does NOT gate the hit
+//!   (hardware + C++ `CheckSpriteHit` reference both ignore it).
+//! - BG transparency is judged by backdrop-value equality: the BG
+//!   renderer canonicalizes every color-index-0 pixel to
+//!   `palette[0] & gray_mask` (+ tags), so a framebuffer byte equal
+//!   to that value is exactly a transparent BG pixel. (The previous
+//!   low-4-bits-of-color heuristic misjudged palette colors like
+//!   0x30 (white) as transparent and could mask real hits.)
 //!
 //! Known simplifications vs. cycle-accurate hardware:
 //! - No per-dot shift registers: the pattern row is fetched once per
 //!   scanline and indexed per pixel.
 //! - No flip handling is wired through the batch path (attr bits 6/7
 //!   are latched but horizontal/vertical flip are not applied yet).
-//! - The left-edge 8-pixel clip ($2001 bits 1-2) is not applied.
+//! - The left-edge 8-pixel clip ($2001 bits 1-2) is not applied, so
+//!   hit checks at x 0..=7 are only correct when clipping is off.
 //! - Palette lookup uses `palette[color_2bit | quadrant << 2]`
 //!   (0x00-0x0F region), matching the BG writer's convention.
+//! - Opaque BG pixels whose palette entry happens to duplicate the
+//!   backdrop color are misjudged transparent (the framebuffer stores
+//!   palette RAM *values*, not indices — an exact bitmap would need a
+//!   side-channel from `render_scanline`).
 
 use crate::bus::PpuBus;
 use crate::rendering::palette_adjust_pixel;
-use crate::state::{MAX_SPRITES_PER_LINE, PpuState};
+use crate::state::{NO_SPRITE0_HIT_DOT, MAX_SPRITES_PER_LINE, PpuState};
 
 // $2000 (ctrl) bits.
 /// Bit 5 of $2000: sprite size (0 = 8x8, 1 = 8x16).
@@ -58,10 +74,14 @@ const CHR_ADDR_MASK: u16 = 0x1FFF;
 /// composites sprite pixels over the BG pixels already present in
 /// `framebuffer` for row `sl`.
 ///
-/// `palette` is the 32-byte PALRAM window; `mask` is the $2001 value.
+/// `chr_window` is the 8 KiB CHR snapshot the BG renderer used for
+/// this scanline (or `None` in unit tests, where patterns come from
+/// `bus.peek_chr` instead). `palette` is the 32-byte PALRAM window;
+/// `mask` is the $2001 value.
 pub fn render_sprites_for_scanline<B: PpuBus + ?Sized>(
     state: &mut PpuState,
     bus: &mut B,
+    chr_window: Option<&[u8; 8192]>,
     framebuffer: &mut [u8; 256 * 256],
     palette: &[u8; 32],
     mask: u8,
@@ -117,8 +137,16 @@ pub fn render_sprites_for_scanline<B: PpuBus + ?Sized>(
             spr_tile[n_sprites] = tile;
             spr_attr[n_sprites] = attr;
             spr_x[n_sprites] = x;
-            spr_pat_lo[n_sprites] = bus.peek_chr(pat_addr & CHR_ADDR_MASK);
-            spr_pat_hi[n_sprites] = bus.peek_chr((pat_addr + 8) & CHR_ADDR_MASK);
+            let a0 = (pat_addr & CHR_ADDR_MASK) as usize;
+            let a1 = ((pat_addr + 8) & CHR_ADDR_MASK) as usize;
+            spr_pat_lo[n_sprites] = match chr_window {
+                Some(w) => w[a0],
+                None => bus.peek_chr(a0 as u16),
+            };
+            spr_pat_hi[n_sprites] = match chr_window {
+                Some(w) => w[a1],
+                None => bus.peek_chr(a1 as u16),
+            };
             if i == 0 {
                 sprite0_in_range = true;
             }
@@ -151,6 +179,17 @@ pub fn render_sprites_for_scanline<B: PpuBus + ?Sized>(
     state.secondary_oam_count = n_sprites as u8;
 
     let row_off = (sl as usize) * 256;
+    // Backdrop value: every BG color-index-0 pixel the BG renderer
+    // wrote this scanline is byte-equal to this (same masking + tags),
+    // so byte equality is the exact transparency test for the pixels
+    // `render_scanline` produced. See the module docs for the one
+    // known false-negative (opaque pixel duplicating the backdrop
+    // color).
+    let backdrop_out = palette_adjust_pixel(palette[0] & gray_mask, mask);
+    // First pixel where sprite 0's opaque pixel overlaps an opaque BG
+    // pixel (x 0..=254, priority-independent). The frame state machine
+    // latches `sprite0_hit` at dot `x + 1`.
+    let mut sprite0_hit_x: Option<u16> = None;
 
     // Step 2 + 3 + 4: per-pixel sprite lookup + priority MUX + sprite0 hit.
     for x in 0..256u16 {
@@ -189,13 +228,10 @@ pub fn render_sprites_for_scanline<B: PpuBus + ?Sized>(
         }
 
         let bg_out = framebuffer[row_off + x_usize];
-        // BG transparency: the framebuffer stores the final palette
-        // RAM index (with emphasis/grayscale tags in the upper bits),
-        // so a "transparent" BG pixel is the backdrop entry — low
-        // color bits and attribute quadrant both 0.
-        let bg_color_2bit = bg_out & 0x3;
-        let bg_palette = (bg_out >> 2) & 0x3;
-        let bg_is_transparent = !bg_show || (bg_color_2bit == 0 && bg_palette == 0);
+        // BG transparency: the BG renderer canonicalizes color-index-0
+        // pixels to the backdrop value, so byte equality with it is
+        // the transparency test (see module docs).
+        let bg_is_transparent = !bg_show || bg_out == backdrop_out;
 
         let new_pixel = match chosen {
             None => bg_out,
@@ -219,20 +255,27 @@ pub fn render_sprites_for_scanline<B: PpuBus + ?Sized>(
         }
 
         // Sprite 0 hit: sprite 0's opaque pixel over an opaque BG
-        // pixel, front priority only, x in 1..=254 (hardware skips
-        // the left/right edge columns).
-        if let Some((i, _)) = chosen {
-            if sprite0_in_range
-                && i == 0
-                && x >= 1
-                && x <= 254
-                && !bg_is_transparent
-                && (spr_attr[i] & SPRITE_PRIORITY_BIT) == 0
-            {
-                state.sprite0_hit = true;
-            }
+        // pixel, x in 0..=254 (hardware skips x=255; the left-edge
+        // clip is not modelled). The sprite priority bit does NOT
+        // gate the hit — chosen index 0 (first opaque sprite in OAM
+        // order) already means sprite 0's own pixel is opaque.
+        if sprite0_hit_x.is_none()
+            && sprite0_in_range
+            && matches!(chosen, Some((0, _)))
+            && x <= 254
+            && !bg_is_transparent
+        {
+            sprite0_hit_x = Some(x);
         }
     }
+
+    // Persist the hit dot for the frame state machine (pixel x
+    // outputs at dot x+1). Cleared per scanline: a scanline without a
+    // hit invalidates any dot recorded for earlier scanlines.
+    state.sprite0_hit_dot = match sprite0_hit_x {
+        Some(hx) => hx.saturating_add(1).min(255),
+        None => NO_SPRITE0_HIT_DOT,
+    };
 
     // `spr_tile` is only used for pattern addressing above; keep the
     // binding alive for future mid-scanline reload work.
@@ -264,7 +307,8 @@ mod tests {
         sl: i16,
     ) -> [u8; 256] {
         let mut fb = [0u8; 256 * 256];
-        render_sprites_for_scanline(state, bus, &mut fb, palette, mask, sl);
+        let chr_window = bus.chr;
+        render_sprites_for_scanline(state, bus, Some(&chr_window), &mut fb, palette, mask, sl);
         let row_off = (sl as usize) * 256;
         let mut row = [0u8; 256];
         row.copy_from_slice(&fb[row_off..row_off + 256]);
@@ -286,7 +330,8 @@ mod tests {
         for x in 0..256 {
             fb[row_off + x] = bg_pixel;
         }
-        render_sprites_for_scanline(state, bus, &mut fb, palette, mask, sl);
+        let chr_window = bus.chr;
+        render_sprites_for_scanline(state, bus, Some(&chr_window), &mut fb, palette, mask, sl);
         let mut row = [0u8; 256];
         row.copy_from_slice(&fb[row_off..row_off + 256]);
         row
@@ -377,14 +422,15 @@ mod tests {
     }
 
     #[test]
-    fn sprite_zero_hit_only_with_front_priority_and_opaque_bg() {
+    fn sprite_zero_hit_records_dot_regardless_of_priority() {
         let mut palette = [0u8; 32];
         palette[1] = 0x16;
         palette[5] = 0x25;
         let opaque_bg = palette_adjust_pixel(0x25, SHOW_BG_AND_SPRITES);
         let backdrop_bg = palette_adjust_pixel(0x00, SHOW_BG_AND_SPRITES);
 
-        // Front sprite 0 + opaque BG → hit.
+        // Front sprite 0 + opaque BG → hit recorded at the first
+        // overlap pixel (x=10 → dot 11).
         let mut state = PpuState::new();
         state.registers.write_mask(SHOW_BG_AND_SPRITES);
         set_sprite(&mut state.oam, 0, 0, 0x01, 0x00, 10);
@@ -398,9 +444,14 @@ mod tests {
             0,
             opaque_bg,
         );
-        assert!(state.sprite0_hit, "front sprite 0 over opaque BG sets hit");
+        assert_eq!(
+            state.sprite0_hit_dot, 11,
+            "front sprite 0 over opaque BG records dot x+1"
+        );
 
-        // Behind-priority sprite 0 + opaque BG → no hit.
+        // Behind-priority sprite 0 + opaque BG → STILL hits: the
+        // priority bit does not gate sprite 0 hit (hardware + C++
+        // CheckSpriteHit reference).
         let mut state = PpuState::new();
         state.registers.write_mask(SHOW_BG_AND_SPRITES);
         set_sprite(&mut state.oam, 0, 0, 0x01, 0x20, 10);
@@ -414,7 +465,10 @@ mod tests {
             0,
             opaque_bg,
         );
-        assert!(!state.sprite0_hit, "behind-priority sprite 0 does not hit");
+        assert_eq!(
+            state.sprite0_hit_dot, 11,
+            "behind-priority sprite 0 still hits"
+        );
 
         // Front sprite 0 + backdrop BG → no hit.
         let mut state = PpuState::new();
@@ -430,9 +484,35 @@ mod tests {
             0,
             backdrop_bg,
         );
-        assert!(
-            !state.sprite0_hit,
+        assert_eq!(
+            state.sprite0_hit_dot,
+            NO_SPRITE0_HIT_DOT,
             "sprite 0 over transparent BG does not hit"
+        );
+
+        // Opaque BG whose palette entry duplicates the backdrop COLOR
+        // (0x30 white here): the backdrop-equality heuristic judges it
+        // transparent — documented limitation, asserted here to pin
+        // the behaviour.
+        palette[0] = 0x30;
+        let white_bg = palette_adjust_pixel(0x30, SHOW_BG_AND_SPRITES);
+        let mut state = PpuState::new();
+        state.registers.write_mask(SHOW_BG_AND_SPRITES);
+        set_sprite(&mut state.oam, 0, 0, 0x01, 0x00, 10);
+        let mut bus = FlatBus::new();
+        bus.chr[0x01 * 16] = 0xFF;
+        let _ = render_row_over_bg(
+            &mut state,
+            &mut bus,
+            &palette,
+            SHOW_BG_AND_SPRITES,
+            0,
+            white_bg,
+        );
+        assert_eq!(
+            state.sprite0_hit_dot,
+            NO_SPRITE0_HIT_DOT,
+            "BG pixel whose color equals the backdrop color is treated transparent"
         );
     }
 

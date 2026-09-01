@@ -34,6 +34,11 @@ pub struct fceux11_ppu_bus_callbacks {
     pub read: Option<unsafe extern "C" fn(addr: u32) -> u8>,
     /// Write to CPU/PPU bus address (16-bit).
     pub write: Option<unsafe extern "C" fn(addr: u32, value: u8)>,
+    /// CPU-address-space read (`g_bus.read` dispatch), used by the OAM
+    /// DMA source fetch. Distinct from `read` (which routes PPU space
+    /// through `FFCEUX_PPURead`) — the two spaces overlap in
+    /// `$0000-$3FFF` and must not be confused.
+    pub cpu_read: Option<unsafe extern "C" fn(addr: u32) -> u8>,
     /// Rising edge on PPU A12 (used by MMC3 IRQ counter).
     pub notify_a12_rising: Option<unsafe extern "C" fn()>,
     /// HBlank hook (visible scanline enters hblank region).
@@ -73,6 +78,12 @@ impl PpuBus for CppBus {
     }
     fn peek_chr(&mut self, _addr: u16) -> u8 {
         0
+    }
+    fn read_cpu(&mut self, addr: u16) -> u8 {
+        match self.cb.cpu_read {
+            Some(f) => unsafe { f(addr as u32) },
+            None => 0,
+        }
     }
     fn notify_a12_rising(&mut self) {
         if let Some(f) = self.cb.notify_a12_rising {
@@ -397,6 +408,7 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_read(state: *mut PpuState, addr: u16) -
                 cb: sb.bus.unwrap_or(fceux11_ppu_bus_callbacks {
                     read: None,
                     write: None,
+                    cpu_read: None,
                     notify_a12_rising: None,
                     notify_hblank: None,
                     notify_hblank2: None,
@@ -504,6 +516,7 @@ fn make_bus_adapter(sb: &mut StateBox) -> CppBus {
         cb: sb.bus.unwrap_or(fceux11_ppu_bus_callbacks {
             read: None,
             write: None,
+            cpu_read: None,
             notify_a12_rising: None,
             notify_hblank: None,
             notify_hblank2: None,
@@ -650,9 +663,18 @@ fn render_visible_scanline<B: crate::bus::PpuBus + ?Sized>(
     // docs describe, but without the cycle-accurate oddities
     // (mid-tile reload, left-edge 8-pixel clip, overflow re-scan).
     // See `sprites.rs` for the detailed limitations list.
+    // Phase 6.6 (Session A): the batch sprite renderer fetches pattern
+    // rows from the SAME CHR window snapshot the BG renderer just used,
+    // so sprite and BG pixels always observe the same mapper bank state
+    // for the scanline. (The CppBus `peek_chr` callback is a stub in
+    // the bridge path — before this change every sprite pattern byte
+    // read 0x00, making ALL sprites invisible in the Rust engine and
+    // sprite 0 hit unreachable — the root cause of the 27-ROM Super
+    // Mario family `cpu_stuck_pc=0x8153` class.)
     crate::sprites::render_sprites_for_scanline(
         state,
         bus,
+        Some(&chr_window),
         framebuffer,
         pal_window,
         state.registers.mask,

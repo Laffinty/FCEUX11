@@ -40,6 +40,10 @@ pub const NTSC_SCANLINES: i16 = 262;
 /// PPU dots per scanline (visible 256 + hblank 85 = 341, indexed 0..=340).
 pub const DOTS_PER_SCANLINE: u16 = 341;
 
+/// Sentinel for [`PpuState::sprite0_hit_dot`] — no sprite 0 hit is
+/// pending on the current scanline.
+pub const NO_SPRITE0_HIT_DOT: u16 = 0xFFFF;
+
 /// PPU state aggregate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PpuState {
@@ -56,6 +60,14 @@ pub struct PpuState {
     pub sprite_overflow: bool,
     /// Sprite 0 hit latch — set when sprite 0 overlaps non-transparent BG.
     pub sprite0_hit: bool,
+    /// Phase 6.6 (Session A): the dot on the current scanline at which
+    /// the sprite 0 hit should latch (pixel `x` outputs at dot `x + 1`),
+    /// recorded by the batch sprite render. The frame state machine
+    /// sets `sprite0_hit` when it reaches this dot. Transient —
+    /// recomputed every visible scanline, cleared at the pre-render
+    /// line, NOT part of the RPU1 payload (pinned to
+    /// [`NO_SPRITE0_HIT_DOT`] on load, like `ppudead`).
+    pub sprite0_hit_dot: u16,
     /// Current scanline. Phase 6.1.e follow-up (VBL-first layout): the
     /// frame visit sequence is `[241..=260, -1, 0..=240]` so `scanline`
     /// still indexes pre-render as `-1` and visible as `0..=239`, but
@@ -201,6 +213,7 @@ impl PpuState {
             secondary_oam_count: 0,
             sprite_overflow: false,
             sprite0_hit: false,
+            sprite0_hit_dot: NO_SPRITE0_HIT_DOT,
             scanline: 241,
             dot: 0,
             frame: 0,
@@ -238,6 +251,7 @@ impl PpuState {
         self.secondary_oam_count = 0;
         self.sprite_overflow = false;
         self.sprite0_hit = false;
+        self.sprite0_hit_dot = NO_SPRITE0_HIT_DOT;
         // Phase 6.1.e follow-up (VBL-block-phase alignment): frame
         // start is (sl 241, dot 0). See `PpuState::new` for rationale.
         self.scanline = 241;
@@ -354,7 +368,7 @@ impl PpuState {
     pub fn start_oam_dma<B: PpuBus + ?Sized>(&mut self, bus: &mut B, page: u8) {
         let base = (page as u16) << 8;
         for i in 0..OAM_SIZE as u16 {
-            self.oam[i as usize] = bus.read(base | i);
+            self.oam[i as usize] = bus.read_cpu(base | i);
         }
         self.registers.start_oam_dma();
     }
@@ -390,7 +404,7 @@ impl PpuState {
             self.registers.start_oam_dma();
         }
         let addr = base | i;
-        let v = bus.read(addr);
+        let v = bus.read_cpu(addr);
         self.oam[i as usize] = v;
         self.oam_dma_counter += 1;
         if self.oam_dma_counter >= OAM_SIZE as u16 {

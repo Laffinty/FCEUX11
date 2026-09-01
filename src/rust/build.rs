@@ -329,6 +329,7 @@ fn merge_headers(
     output.push_str("typedef struct fceux11_ppu_bus_callbacks {\n");
     output.push_str("  fceux11_ppu_bus_read_fn read;\n");
     output.push_str("  fceux11_ppu_bus_write_fn write;\n");
+    output.push_str("  fceux11_ppu_bus_read_fn cpu_read;\n");
     output.push_str("  fceux11_ppu_notify_a12_fn notify_a12_rising;\n");
     output.push_str("  fceux11_ppu_notify_hblank_fn notify_hblank;\n");
     output.push_str("  fceux11_ppu_notify_hblank2_fn notify_hblank2;\n");

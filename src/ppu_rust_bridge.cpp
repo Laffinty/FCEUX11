@@ -244,6 +244,17 @@ void bridge_bus_write(uint32_t addr, uint8_t value) {
     // $2007 writes then too.
 }
 
+uint8_t bridge_cpu_read(uint32_t addr) {
+    // Phase 6.6 (Session A): CPU-address-space read for the OAM DMA
+    // source fetch ($4014 copies from CPU page $xx00-$xxFF). Routes
+    // through the CPU-space dispatch table (`g_bus.read`, the
+    // `X6502_DMR` data path) — NOT the PPU-space `bridge_bus_read`
+    // chain, which resolved DMA source bytes out of CHR/nametable
+    // space and filled OAM with garbage (the Rust engine's sprites
+    // have been reading PPU-space bytes as OAM since Phase 3).
+    return fceu11::g_bus.read(static_cast<uint16_t>(addr));
+}
+
 void bridge_notify_a12_rising() {
     // Phase 3: forward to the C++ MMC3 A12 rising-edge detector. The
     // A12 detection lives in `src/ppu.cpp` (`MMC3_hb` / A12-rise
@@ -324,6 +335,7 @@ void ppu_rust_bridge_init() {
     fceux11_ppu_bus_callbacks cb = {
         &bridge_bus_read,
         &bridge_bus_write,
+        &bridge_cpu_read,
         &bridge_notify_a12_rising,
         &bridge_notify_hblank,
         &bridge_notify_hblank2,

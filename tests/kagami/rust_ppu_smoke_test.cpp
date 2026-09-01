@@ -61,6 +61,7 @@ int main() {
     fceux11_ppu_bus_callbacks cb = {
         &counted_bus_read,
         &counted_bus_write,
+        nullptr, // cpu_read (unused in this test)
         &counted_notify_a12,
         &counted_notify_hblank,
         &counted_notify_hblank2,

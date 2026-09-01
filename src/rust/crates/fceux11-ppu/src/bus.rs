@@ -33,6 +33,15 @@ pub trait PpuBus {
         0
     }
 
+    /// CPU-address-space read, used by the OAM DMA source fetch
+    /// (`$4014` copies from CPU page `$xx00-$xxFF`). Defaults to
+    /// [`PpuBus::read`]; the C++ bridge overrides it because its `read`
+    /// callback routes PPU space (`FFCEUX_PPURead`) while DMA needs the
+    /// CPU space dispatch (`g_bus.read`, the `X6502_DMR` data path).
+    fn read_cpu(&mut self, addr: u16) -> u8 {
+        self.read(addr)
+    }
+
     /// Rising edge on PPU A12 (PPU address bit 12). MMC3 uses this to
     /// clock its IRQ counter. Phase 1 leaves it as a no-op; Phase 4
     /// wires the MMC3 mapper through it.

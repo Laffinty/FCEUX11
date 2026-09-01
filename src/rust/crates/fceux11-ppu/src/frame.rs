@@ -180,6 +180,15 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
     // approximates with its own `PPU_status = 0` mid-frame clear.
     if sl == -1 && dot == 1 {
         state.registers.clear_vbl_flag();
+        // Phase 6.6 (Session A): hardware clears sprite 0 hit and
+        // sprite overflow at dot 1 of the pre-render line (nesdev
+        // PPU frame timing). The Rust model previously never cleared
+        // either flag, so a single hit/overflow latched the status
+        // bit for the rest of the run — games polling "wait for hit
+        // clear, then wait for set" saw stale values.
+        state.sprite0_hit = false;
+        state.sprite0_hit_dot = crate::state::NO_SPRITE0_HIT_DOT;
+        state.sprite_overflow = false;
     }
 
     // Phase 6.4: ppudead — the process's FIRST frame mirrors the C++
@@ -226,13 +235,34 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
         state.registers.copy_vertical();
     }
 
-    // Sprite 0 hit latched by eval: copy the latched flag onto PPU[2]
-    // bit 6. Phase 1 just mirrors `state.sprite0_hit` onto `status`.
+    // Phase 6.6 (Session A): per-pixel sprite 0 hit timing. The batch
+    // render records the dot (pixel x + 1) at which the first hit
+    // pixel outputs on this scanline; latch the flag when the state
+    // machine reaches it. Until then the mirror block below keeps
+    // PPU[2] bit 6 clear, so a $2002 read mid-scanline only sees the
+    // hit from the correct pixel onward.
+    if (0..=239).contains(&sl)
+        && state.sprite0_hit_dot != crate::state::NO_SPRITE0_HIT_DOT
+        && dot >= state.sprite0_hit_dot
+    {
+        state.sprite0_hit = true;
+        state.sprite0_hit_dot = crate::state::NO_SPRITE0_HIT_DOT;
+    }
+
+    // Sprite 0 hit + sprite overflow latched by eval: mirror the state
+    // flags onto PPU[2] bits 6/5 every tick. With the pre-render clear
+    // above this stays consistent with hardware: both flags clear once
+    // per frame and re-set only where the pipeline sets them.
     if state.sprite0_hit {
         state.registers.set_sprite0_hit();
         out.sprite0_hit_now = true;
     } else {
         state.registers.clear_sprite0_hit();
+    }
+    if state.sprite_overflow {
+        state.registers.set_sprite_overflow();
+    } else {
+        state.registers.clear_sprite_overflow();
     }
 
     // -----------------------------------------------------------------
@@ -593,5 +623,107 @@ mod tests {
         );
         assert!(out.frame_advanced, "frame wrapped at sl 240 → sl 241");
         assert_eq!((s.scanline, s.dot), (241, 0), "next frame starts at (241, 0)");
+    }
+
+    // -----------------------------------------------------------------
+    // Phase 6.6 (Session A): per-pixel sprite 0 hit + per-frame flag
+    // clears.
+    // -----------------------------------------------------------------
+
+    /// Render scanline 0's sprite pass over an opaque BG row and tick
+    /// through the scanline: PPU[2] bit 6 must stay clear until the
+    /// recorded hit dot (pixel x + 1) and set from that dot onward.
+    #[test]
+    fn sprite0_hit_latches_at_recorded_dot() {
+        use crate::rendering::palette_adjust_pixel;
+        use crate::sprites::render_sprites_for_scanline;
+
+        let mut s = PpuState::new();
+        s.ppudead = 0;
+        s.registers
+            .write_mask((1 << mask_bits::SHOW_BG) | (1 << mask_bits::SHOW_SPRITES));
+        // Sprite 0: y=0 (visible on scanline 0), tile 1, x=10, front.
+        s.oam[0..4].copy_from_slice(&[0, 0x01, 0x00, 10]);
+        let mut bus = FlatBus::new();
+        bus.chr[0x01 * 16] = 0xFF; // pattern row 0 fully opaque
+
+        let mask = s.registers.mask;
+        let mut palette = [0u8; 32];
+        palette[1] = 0x16;
+        let mut fb = [0u8; 256 * 256];
+        // Pre-fill the BG row with an opaque (non-backdrop) pixel the
+        // BG pass would have written.
+        for x in 0..256 {
+            fb[x] = palette_adjust_pixel(0x25, mask);
+        }
+        let chr_window = bus.chr;
+        render_sprites_for_scanline(&mut s, &mut bus, Some(&chr_window), &mut fb, &palette, mask, 0);
+        assert_eq!(s.sprite0_hit_dot, 11, "hit recorded at pixel 10 → dot 11");
+        assert!(!s.sprite0_hit, "flag must NOT latch during the render pass");
+
+        // Drive the state machine to the start of scanline 0 and tick
+        // through it: tick i fires the events of dot i.
+        s.scanline = 0;
+        s.dot = 0;
+        let bit6 = 1 << status_bits::SPRITE0_HIT;
+        for dot in 0u16..=12 {
+            let _ = tick_dot(&mut s, &mut bus);
+            if dot < 11 {
+                assert_eq!(
+                    s.registers.status & bit6,
+                    0,
+                    "dot {dot}: hit must not be visible yet"
+                );
+            } else {
+                assert_ne!(
+                    s.registers.status & bit6,
+                    0,
+                    "dot {dot}: hit latched at its recorded dot"
+                );
+            }
+        }
+    }
+
+    /// Sprite 0 hit and sprite overflow clear at the pre-render line
+    /// dot 1 (hardware PPU frame timing), including the status bits.
+    #[test]
+    fn sprite0_hit_and_overflow_clear_at_pre_render_dot_1() {
+        let mut s = PpuState::new();
+        s.ppudead = 0;
+        s.sprite0_hit = true;
+        s.sprite_overflow = true;
+        s.registers.set_sprite0_hit();
+        s.registers.set_sprite_overflow();
+        let mut bus = FlatBus::new();
+        tick_to(&mut s, &mut bus, -1, 1);
+        assert!(!s.sprite0_hit, "hit latch cleared at pre-render dot 1");
+        assert!(!s.sprite_overflow, "overflow cleared at pre-render dot 1");
+        assert_eq!(
+            s.registers.status & (1 << status_bits::SPRITE0_HIT),
+            0,
+            "status bit 6 cleared"
+        );
+        assert_eq!(
+            s.registers.status & (1 << status_bits::SPRITE_OVERFLOW),
+            0,
+            "status bit 5 cleared"
+        );
+    }
+
+    /// The status overflow bit must follow the state flag every tick —
+    /// a stale set bit with `sprite_overflow == false` clears on the
+    /// next tick (previously the bit latched for the whole run).
+    #[test]
+    fn overflow_status_bit_mirrors_state_flag() {
+        let mut s = PpuState::new();
+        s.ppudead = 0;
+        s.registers.set_sprite_overflow();
+        let mut bus = FlatBus::new();
+        let _ = tick_dot(&mut s, &mut bus);
+        assert_eq!(
+            s.registers.status & (1 << status_bits::SPRITE_OVERFLOW),
+            0,
+            "stale overflow bit cleared by the state mirror"
+        );
     }
 }

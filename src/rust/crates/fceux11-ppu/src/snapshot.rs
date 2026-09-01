@@ -364,6 +364,11 @@ fn read_payload(buf: &[u8], state: &mut PpuState) {
     state.sprite0_hit = buf[off + 2] != 0;
     // off + 3 = pad
     off += 4;
+    // Phase 6.6 (Session A): sprite0_hit_dot is transient per-scanline
+    // state, not part of the payload — pin to "no hit pending" (the
+    // next scanline's batch render re-records it). Same lifecycle as
+    // `ppudead`.
+    state.sprite0_hit_dot = crate::state::NO_SPRITE0_HIT_DOT;
 
     state.scanline = i16::from_le_bytes([buf[off], buf[off + 1]]);
     state.dot = u16::from_le_bytes([buf[off + 2], buf[off + 3]]);
