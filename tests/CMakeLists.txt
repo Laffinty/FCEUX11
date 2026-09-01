@@ -769,7 +769,8 @@ if(FCEUX11_BUILD_TESTS)
         # align the Rust PPU's VBL-set timing to blargg's reference.
         #
         # Frames=2400 covers the slowest subtest (vbl_10 reads 2400).
-        # DISABLED until 6.1.e lands. Manual invocation:
+        # Phase 6.1.e follow-up (commit 00eb56c) re-enabled — see
+        # §6.1.e follow-up report below. Manual invocation:
         #   cd tests
         #   ..\build\tests\kagami_qa_blargg_runner.exe \
         #       --rom fixtures/blargg/ppu/ppu_vbl_nmi.nes --frames 2400
@@ -783,29 +784,29 @@ if(FCEUX11_BUILD_TESTS)
             set_tests_properties(rust_ppu_vbl_nmi_timing_test PROPERTIES ENVIRONMENT_MODIFICATION
                     "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
         endif()
-        # Phase 6.1.e.v3 — RE-DISABLED. Investigated across dot-0 vs
-        # dot-1 VBL set timing + bridge A2002 port vs no-port. The
-        # 02-vbl_set_time subtest fails in ALL four configurations
-        # (different diagnostic hash each time), confirming the failure
-        # is NOT caused by the A2002 port or the dot-0/dot-1 timing
-        # choice. Root cause: timing drift somewhere else in the PPU
-        # state machine (likely the per-dot NMI latch interplay with
-        # bridge_trigger_nmi callback timing). The test was already
-        # failing in Phase 5.3 (6057e8d) before any of these changes,
-        # so this is a pre-existing limitation.
+        # Phase 6.1.e follow-up (VBL-block-phase alignment, commit
+        # 00eb56c) — re-enabled. The §6.4.3 root-cause fix (Rust frame
+        # layout VBL-first, frame start (sl 241, dot 0)) shifts the
+        # VBL flag set timing by ~20 scanlines = 2270 CPU cycles,
+        # matching the C++ engine's `[VBL 20][pre-render + visible
+        # 242]` layout. §6.1.e.v3's 02-vbl_set_time FAIL was a
+        # downstream symptom of the 2270-cycle phase offset behind
+        # C++ — alignment should now make all 10 subtests pass.
         #
-        # 9 of 10 subtests pass with Phase 6.1.e.v3: vbl_basics (1)
-        # + suppression (3) + nmi_control (4) + nmi_timing (5/7/9) +
-        # even_odd_frames (9) + even_odd_timing (10). Only
-        # vbl_set_time (2) remains failing. See
-        # docs/history/v2.1_phase6_batch_compat.md §6.1.e.v3.
+        # Historical context (kept for reference): §6.1.e.v3 left this
+        # test DISABLED after investigating dot-0 vs dot-1 VBL set +
+        # bridge A2002 port vs no-port across 4 configurations. All 4
+        # produced distinct FAIL hashes (proving the failure was not
+        # A2002- or dot-specific), pointing to a structural VBL-block-
+        # phase drift between Rust and C++ — which §6.4.3 quantified
+        # as a 2270-cycle offset and assigned to §6.1.e follow-up
+        # (now resolved). If 02-vbl_set_time STILL fails post-fix, the
+        # residual root cause is orthogonal to frame layout (per
+        # §6.1.e.v3.4 candidate list) and needs a separate fix.
         #
-        # DISABLED until a deeper investigation identifies the root
-        # cause. The bridge A2002 port (Phase 6.1.d) was REMOVED in
-        # 6.1.e.v3 to restore the Phase 5.3 baseline; it can be
-        # re-added with the correct dot-1 timing when the VBL/NMI
-        # timing model is stabilized.
-        set_tests_properties(rust_ppu_vbl_nmi_timing_test PROPERTIES DISABLED ON)
+        # Full investigation log: docs/history/v2.1_phase6_batch_compat.md
+        # §6.1.e.v3.4 (4-config matrix + dot-1/dot-0 trade-off + Mesen
+        # ref check) + §6.1.e follow-up.1 (frame layout shift).
 
         # =====================================================================
         # Phase 4.5 cycle-drift diagnostic harness.
