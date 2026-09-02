@@ -771,10 +771,10 @@ if(FCEUX11_RUST_ENABLED)
     add_dependencies(fceux11_core fceux11_rust_build)
 endif()
 
-# Phase 2: optional Rust PPU engine. Default OFF so C++ PPU continues
-# to be the canonical engine; turn ON to route $2000-$2007/$4014 through
-# the Rust PPU FFI surface and have frame timing driven by Rust.
-option(FCEUX11_RUST_PPU "Use Rust PPU engine (Phase 2 experimental)" OFF)
+# Phase 2/6/7: Rust PPU is the canonical engine (Rust-first, see plan
+# v2.1 §6.6 + Phase 7). Default ON; the C++ PPU path is retained as a
+# fallback only (`-DFCEUX11_RUST_PPU=OFF`) and is not the default build.
+option(FCEUX11_RUST_PPU "Use Rust PPU engine (canonical since Phase 7)" ON)
 if(FCEUX11_RUST_PPU)
     if(NOT FCEUX11_RUST_ENABLED)
         message(FATAL_ERROR

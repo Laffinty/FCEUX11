@@ -1,4 +1,4 @@
-// FCEUX11 v2.1 PPU Refactor — Phase 2: C++ bridge implementation.
+﻿// FCEUX11 v2.1 PPU Refactor — Phase 2: C++ bridge implementation.
 //
 // Compiled only when CMake option `FCEUX11_RUST_PPU=ON` (see
 // `src/CMakeLists.txt`). When off, this file is excluded and the
@@ -626,27 +626,40 @@ uint8_t ppu_rust_bridge_cpu_read(uint32_t addr) {
     if (g_ppu_state == nullptr) {
         return 0;
     }
-    // NOTE (Phase 6.1.e.v3): the C++ A2002 handler (src/ppu.cpp:608-632)
-    // adds two newppu-only behaviors the bridge path lacks:
-    //   (1) $2002 read at 1 dot before the VBL set suppresses the flag
-    //       set + NMI for the frame;
-    //   (2) read at/1 dot after the set cancels the pending VBL NMI
-    //       (X6502_IRQEnd(FCEU_IQNMI)).
-    // A direct port was attempted in Phase 5.3 (commit 6057e8d, see the
-    // NOTE in that file's ppu_rust_bridge_cpu_read) and REGRESSED
-    // mapper_mmc1 frame 0 (rom_regression) — the windows interact with
-    // ppudead. The Phase 6.1.d commit (`6f6d2ca` + `946ee31`)
-    // re-attempted the port and broke `rust_ppu_vbl_nmi_timing_test`
-    // subtest 2 (vbl_set_time) — see the Phase 6.1.e.v3 commit log.
-    //
-    // Phase 6.1.e.v3 deliberately does NOT port the A2002 suppression
-    // / NMI-cancel behavior into the bridge. The blargg vbl_nmi
-    // ROM's subtests pass without it (Phase 5.3 baseline), and the
-    // mapper_mmc1 regression net stays intact. The $2008-$3FFF read
-    // mirror installed in Phase 6.1.d (lines below) is kept because
-    // it is required for blargg vbl_basics subtest 1 ($2002 == $200A
-    // when the Rust PPU is active — the C++ A2002 handler returns
-    // stale data otherwise).
+    // A2002 suppression / NMI-cancel: intentionally NOT ported in the
+    // bridge. The Rust PPU owns the A2002 mechanism via its internal
+    // `vbl_suppressed_this_frame` flag (see fceux11-ppu/src/frame.rs
+    // and fceux11-ppu/src/ffi.rs). Per §6.6.ter.12 of
+    // docs/plans/v2.1_ppu_rust_refactor_plan.md, a bridge-layer A2002
+    // port caused a net -25 batch_compat regression (256 FIXED - 281
+    // BROKEN); removing the bridge layer restores the §6.6 baseline
+    // 2899/84.0% from 2874/83.3%. Bridge role: message forwarding only,
+    // no state-machine logic.
+    // Session C v3 (PPU/CPU phase investigation): dump every $2002
+    // read with (last PC, PPU sl, dot, CPU cycle). Env-gated by
+    // FCEUX11_PPU_PHASE_TRACE=1; silent otherwise. fceu11_e1_last_pc()
+    // gives the PC of the last instruction that was dispatched by
+    // the Cpu facade (so the $2002 read in this instruction is the
+    // next CPU op to run). The trace lets us compare the Rust PPU's
+    // (sl, dot) landing for the same instruction against the C++
+    // engine's E1 P2002_READ stream.
+    if (addr == 0x2002) {
+        static const bool on = []() {
+            const char* e = std::getenv("FCEUX11_PPU_PHASE_TRACE");
+            return e && e[0] == '1' && e[1] == '\0';
+        }();
+        if (on) {
+            const int16_t sl = fceux11_ppu_get_scanline(g_ppu_state);
+            const uint16_t dot = fceux11_ppu_get_dot(g_ppu_state);
+            const uint16_t pc = fceu11_e1_last_pc();
+            const uint64 now = fceu11::cpu_instance().timestamp_base()
+                + static_cast<uint64>(fceu11::cpu_instance().timestamp_ref());
+            std::fprintf(stderr,
+                "R3 P2002_READ abs=%llu sl=%d dot=%d pc=0x%04X\n",
+                (unsigned long long)now, (int)sl, (int)dot,
+                (unsigned)pc);
+        }
+    }
     return fceux11_ppu_cpu_read(g_ppu_state, static_cast<uint16_t>(addr));
 }
 
