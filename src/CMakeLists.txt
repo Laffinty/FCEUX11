@@ -157,6 +157,21 @@ include_directories( ${CMAKE_SOURCE_DIR}/src )
 include_directories( ${CMAKE_SOURCE_DIR}/src/drivers )
 
 
+# v2.1 Phase 7 (2026-09-03): defensive default for the early
+# `if(FCEUX11_RUST_PPU)` check below. The `option(FCEUX11_RUST_PPU)`
+# is declared much later in this file (around line 777, after the
+# SRC_CORE list is built), so without this set() the variable is
+# undefined when checked here, CMake treats it as false, and
+# `ppu_rust_bridge.cpp` is silently dropped from the build — leading
+# to LNK2001 errors for `ppu_rust_bridge_init` etc. when linking
+# `fceux11_core.lib` into the test executables. The `option()` at
+# line 777 remains the authoritative declaration; this is a no-op
+# when the option is already defined and only fires when CMake
+# reaches the SRC_CORE block before option() is processed.
+if(NOT DEFINED FCEUX11_RUST_PPU)
+    set(FCEUX11_RUST_PPU ON)
+endif()
+
 set(SRC_CORE
 	${CMAKE_CURRENT_SOURCE_DIR}/asm.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/bus.cpp

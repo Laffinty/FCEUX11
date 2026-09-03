@@ -377,6 +377,20 @@ pub unsafe extern "C" fn fceux11_ppu_set_mirror_mode(state: *mut PpuState, mode:
 pub unsafe extern "C" fn fceux11_ppu_cpu_read(state: *mut PpuState, addr: u16) -> u8 {
     let sb = lookup(state);
     let reg = (addr & 0x0007) as u8;
+
+    // Plan §0.8 step 1D.1: $2002 suppression window. Delegates to
+    // `PpuState::apply_a2002_suppression` so the logic lives on
+    // the state (and is unit-testable without an unsafe StateBox).
+    // Per NESdev PPU frame timing:
+    //   (sl 240, dot 340) 1 dot before VBL set
+    //     -> reads VBL=0 and never sets VBL/NMI for this frame
+    //   (sl 241, dot 0/1) same dot or 1 dot later than the VBL set
+    //     -> reads VBL=1, clears, suppresses NMI (the read pulls
+    //        /NMI back up before the CPU samples it)
+    if reg == 2 {
+        sb.state.apply_a2002_suppression();
+    }
+
     // Phase 6.4: register-read parity with the C++ handlers. The old
     // Phase 1 model called `read_status()` unconditionally and ADDED
     // its result to every register read: any $2000/$2001/$2003/$2005/

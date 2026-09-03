@@ -24,6 +24,41 @@ use crate::bus::PpuBus;
 use crate::registers::{ctrl_bits, mask_bits, status_bits};
 use crate::state::{DOTS_PER_SCANLINE, NTSC_SCANLINES, PpuState};
 
+/// Plan §0.8 step 1C: env-gated PPU phase trace. When
+/// `FCEUX11_PPU_PHASE_TRACE=1`, the three timing-sensitive events
+/// (VBL flag set, NMI assert, pre-render VBL clear) emit a single
+/// `eprintln!` line. The companion bridge-side trace at
+/// `ppu_rust_bridge.cpp:646-650` already covers the $2002 read path;
+/// together they let us replay the Rust PPU's cycle-level events
+/// against the C++ engine's E1 P2002_READ stream for diffing.
+///
+/// The check is cached in an `AtomicU8` (one-shot env read per
+/// process) so the per-dot fast path stays a single load+compare.
+fn phase_trace_on() -> bool {
+    use std::sync::atomic::{AtomicU8, Ordering};
+    static CACHE: AtomicU8 = AtomicU8::new(2); // 0=off, 1=on, 2=uninit
+    match CACHE.load(Ordering::Relaxed) {
+        0 => false,
+        1 => true,
+        _ => {
+            let on = std::env::var("FCEUX11_PPU_PHASE_TRACE")
+                .map(|v| v == "1")
+                .unwrap_or(false);
+            CACHE.store(if on { 1 } else { 0 }, Ordering::Relaxed);
+            on
+        }
+    }
+}
+
+#[allow(unused_macros)]
+macro_rules! phase_trace {
+    ($($arg:tt)*) => {
+        if $crate::frame::phase_trace_on() {
+            eprintln!($($arg)*);
+        }
+    };
+}
+
 /// Result of a single `tick_dot` call.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct TickOutcome {
@@ -151,15 +186,26 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
     // (See `docs/history/v2.1_phase6_batch_compat.md` §6.1.e.v3.)
     if sl == 241 && dot == 1 && state.ppudead == 0 {
         if state.vbl_suppressed_this_frame {
-            // Suppression flag from the sl 241 dot 0 $2002 read:
-            // do not set the flag, do not assert NMI.
+            // Suppression flag from the (sl 240, dot 340) $2002 read
+            // (NESdev PPU frame timing: read 1 PPU clock before the
+            // VBL set dot suppresses VBL+NMI for the entire frame).
             out.vbl_entered = false;
             out.nmi_asserted = false;
+            phase_trace!(
+                "R3 PPU_VBL_SET sl=241 dot=1 suppressed=1 reason=early_read"
+            );
         } else {
             state.registers.set_vbl_flag();
             out.vbl_entered = true;
             if state.nmi_enabled() {
                 out.nmi_asserted = true;
+                phase_trace!(
+                    "R3 PPU_NMI_ASSERT sl=241 dot=1 vbl_set=1 nmi_enabled=1"
+                );
+            } else {
+                phase_trace!(
+                    "R3 PPU_VBL_SET sl=241 dot=1 suppressed=0 vbl_set=1 nmi_enabled=0"
+                );
             }
         }
     }
@@ -189,6 +235,7 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
         state.sprite0_hit = false;
         state.sprite0_hit_dot = crate::state::NO_SPRITE0_HIT_DOT;
         state.sprite_overflow = false;
+        phase_trace!("R3 PPU_VBL_CLEAR sl=-1 dot=1");
     }
 
     // Phase 6.4: ppudead — the process's FIRST frame mirrors the C++
@@ -213,10 +260,18 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
             out.vbl_entered = true;
             if state.nmi_enabled() {
                 out.nmi_asserted = true;
+                phase_trace!(
+                    "R3 PPU_VBL_SET_PPUDEAD sl=241 dot=0 vbl_set=1 nmi_enabled=1"
+                );
+            } else {
+                phase_trace!(
+                    "R3 PPU_VBL_SET_PPUDEAD sl=241 dot=0 vbl_set=1 nmi_enabled=0"
+                );
             }
         }
         if sl == 240 && dot == 340 {
             state.ppudead -= 1;
+            phase_trace!("R3 PPU_PPUDEAD_DECR sl=240 dot=340 remaining={}", state.ppudead);
         }
     }
 
@@ -224,7 +279,9 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
     // resets the suppression flag for the *next* frame (and decides
     // the even/odd skip above).
     if sl == -1 && dot == 340 {
+        let was_suppressed = state.vbl_suppressed_this_frame;
         state.vbl_suppressed_this_frame = false;
+        phase_trace!("R3 PPU_VBL_SUPPRESS_RESET sl=-1 dot=340 was={}", was_suppressed);
     }
 
     // Pre-render line: at dot 280, copy t's vertical bits to v so

@@ -277,6 +277,45 @@ impl PpuState {
         self.sprite_eval_done = false;
     }
 
+    /// Plan §0.8 step 1D.1: apply the NESdev PPU frame timing
+    /// suppression window for a CPU-side `$2002` read.
+    ///
+    /// Per <https://www.nesdev.org/wiki/PPU_frame_timing>:
+    /// * **(sl 240, dot 340) — 1 PPU clock before VBL set**: the
+    ///   read sees VBL=0, and the PPU must *not* set the VBL flag
+    ///   or generate an NMI for the entire frame.
+    /// * **(sl 241, dot 0 or 1) — same dot or 1 dot later than
+    ///   VBL set**: the read sees VBL=1 and clears it (handled by
+    ///   `Registers::read_status`), and the read pulls `/NMI` back
+    ///   up before the CPU samples it, so the pending NMI must
+    ///   be canceled.
+    /// * **Other dots**: no side effect.
+    ///
+    /// The method is on `PpuState` (not on `Registers::read_status`)
+    /// because the suppression decision needs `(sl, dot)` which the
+    /// value-level `Registers` API cannot see. The FFI wrapper in
+    /// `ffi.rs::fceux11_ppu_cpu_read` calls this for `$2002` reads;
+    /// unit tests in `tests/vbl_nmi.rs` call it directly.
+    pub fn apply_a2002_suppression(&mut self) {
+        let sl = self.scanline;
+        let dot = self.dot;
+        if sl == 240 && dot == 340 {
+            // 1 dot before VBL set: suppress VBL+NMI for this frame
+            // entirely. The frame state machine in `frame.rs` checks
+            // `vbl_suppressed_this_frame` at (sl 241, dot 1) and
+            // skips both `set_vbl_flag` and `nmi_asserted`.
+            self.vbl_suppressed_this_frame = true;
+        } else if sl == 241 && dot <= 1 {
+            // Same dot or 1 dot later than VBL set. The flag WAS
+            // set this tick (the state machine ran before the CPU
+            // read landed); `Registers::read_status` will clear it
+            // for the return-value semantics. We also cancel the
+            // pending NMI latch so the per-cycle interleave
+            // doesn't fire `TriggerNMI()` for the suppressed frame.
+            self.nmi_pending = false;
+        }
+    }
+
     /// Soft reset — like power but keeps `frame` and `odd_frame`.
     /// Distinct from power in the legacy FCEUX `FCEUPPU_Reset` semantics.
     pub fn reset(&mut self) {

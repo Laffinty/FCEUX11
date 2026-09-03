@@ -7,7 +7,8 @@ param(
     [string]$Config = "Release",
 
     [string]$BuildDir = "build",
-    [switch]$Clean
+    [switch]$Clean,
+    [string]$Target = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -152,7 +153,9 @@ for ($attempt = 1; $attempt -le $maxBuildAttempts; $attempt++) {
         # Windows PowerShell promotes redirected native stderr to ErrorRecord;
         # keep it capturable without letting the global Stop policy abort here.
         $ErrorActionPreference = "Continue"
-        & cmake --build $BuildDir --config $Config 2>&1 |
+        $targetArg = ""
+        if ($Target -ne "") { $targetArg = "--target $Target" }
+        & cmake --build $BuildDir --config $Config $targetArg 2>&1 |
             ForEach-Object { $_.ToString() } |
             Tee-Object -Variable buildOutput
         $buildExitCode = $LASTEXITCODE
