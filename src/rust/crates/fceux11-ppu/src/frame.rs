@@ -518,8 +518,9 @@ mod tests {
 
     #[test]
     fn vbl_set_at_sl_241_dot_1_with_nmi_enable() {
-        // Phase 6.1.e.v3: VBL set is at sl 241 dot 1 (Mesen/fceux
-        // reference; blargg ppu_vbl_nmi 02-vbl_set_time calibration).
+        // Phase 6.1.e.v3: VBL set is at sl 241 dot 1 (PPU programmer
+        // reference, Mesen reference; blargg ppu_vbl_nmi
+        // 02-vbl_set_time calibration per §6.6.ter.5).
         let mut s = PpuState::new();
         s.ppudead = 0; // post-boot state machine under test
         s.registers.write_ctrl(1 << ctrl_bits::NMI_ENABLE);
@@ -528,7 +529,7 @@ mod tests {
         assert_ne!(
             s.registers.status & (1 << status_bits::VBL),
             0,
-            "VBL flag should be set at sl 241 dot 1 (Mesen/fceux reference)"
+            "VBL flag should be set at sl 241 dot 1"
         );
     }
 
@@ -552,29 +553,30 @@ mod tests {
     }
 
     #[test]
-    fn vbl_suppression_via_sl_241_dot0_read_blocks_set() {
-        // A $2002 read at sl 241 dot 0 — 1 PPU dot before the
-        // (Mesen/fceux-reference) VBL set at sl 241 dot 1 — marks
-        // the suppression flag; the next (241, 1) tick checks the
-        // flag and skips the VBL set + NMI assert.
+    fn vbl_suppression_via_sl_240_dot_340_read_blocks_set() {
+        // A $2002 read at (240, 340) — 1 PPU dot before the
+        // (PPU-programmer-reference) VBL set at (241, 1) — marks
+        // `vbl_suppressed_this_frame` via
+        // `apply_a2002_suppression`; the (241, 1) tick checks the
+        // flag and skips both `set_vbl_flag` and `nmi_asserted`.
         let mut s = PpuState::new();
+        s.ppudead = 0; // post-boot state machine under test
         s.registers.write_ctrl(1 << ctrl_bits::NMI_ENABLE);
         let mut bus = FlatBus::new();
 
-        // Tick to sl 241 dot 0.
-        tick_to(&mut s, &mut bus, 241, 0);
-        // Read $2002 at sl 241 dot 0 — this is the suppressing read.
-        let _ = s.registers.read_status();
-        s.vbl_suppressed_this_frame = true;
+        // Tick to (240, 340) and apply the suppression window as
+        // the bridge would on a $2002 read.
+        tick_to(&mut s, &mut bus, 240, 340);
+        s.apply_a2002_suppression();
 
-        // Advance into sl 241 dot 1 — VBL should NOT be set, NMI should NOT fire.
+        // Advance into (241, 1) — VBL should NOT be set, NMI should NOT fire.
         let out = tick_dot(&mut s, &mut bus);
         assert!(!out.vbl_entered);
         assert!(!out.nmi_asserted);
         assert_eq!(
             s.registers.status & (1 << status_bits::VBL),
             0,
-            "VBL flag should NOT be set after suppression"
+            "VBL flag should NOT be set after (240, 340) suppression"
         );
     }
 

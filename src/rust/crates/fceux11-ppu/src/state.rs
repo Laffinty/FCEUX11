@@ -281,14 +281,22 @@ impl PpuState {
     /// suppression window for a CPU-side `$2002` read.
     ///
     /// Per <https://www.nesdev.org/wiki/PPU_frame_timing>:
-    /// * **(sl 240, dot 340) — 1 PPU clock before VBL set**: the
-    ///   read sees VBL=0, and the PPU must *not* set the VBL flag
-    ///   or generate an NMI for the entire frame.
-    /// * **(sl 241, dot 0 or 1) — same dot or 1 dot later than
+    /// * **(sl 240, dot 340) — 1 PPU clock before VBL set**:
+    ///   the read sees VBL=0, and the PPU must *not* set the VBL
+    ///   flag or generate an NMI for the entire frame.
+    /// * **(sl 241, dot 0) — same alignment as above** (the sl→241
+    ///   wrap puts dot 0 and the previous dot 340 on the same PPU
+    ///   tick). The PPU programmer reference is explicit that the
+    ///   "1 clock before" suppression extends here, so the read
+    ///   must also suppress VBL+NMI for the entire frame.
+    /// * **(sl 241, dot 1 or 2) — same dot or 1 dot later than
     ///   VBL set**: the read sees VBL=1 and clears it (handled by
     ///   `Registers::read_status`), and the read pulls `/NMI` back
     ///   up before the CPU samples it, so the pending NMI must
-    ///   be canceled.
+    ///   be canceled. (VBL was already set at (241, 1), so the
+    ///   flag is set on read; this is the "1 dot later" window
+    ///   per the PPU programmer reference's "may even be
+    ///   suppressed by reads landing on the following dot or two".)
     /// * **Other dots**: no side effect.
     ///
     /// The method is on `PpuState` (not on `Registers::read_status`)
@@ -296,23 +304,41 @@ impl PpuState {
     /// value-level `Registers` API cannot see. The FFI wrapper in
     /// `ffi.rs::fceux11_ppu_cpu_read` calls this for `$2002` reads;
     /// unit tests in `tests/vbl_nmi.rs` call it directly.
+    ///
+    /// Phase 6.6.quater stage 3 (= plan §0.8 step 1) fix: the
+    /// previous implementation used `sl == 241 && dot <= 1` as the
+    /// second branch, which (a) failed to set `vbl_suppressed_this_frame`
+    /// at (241, 0) and (b) skipped the (241, 2) "1 dot later" cancel
+    /// window. Both were non-spec deviations. They are corrected
+    /// here so the suppression window matches NESdev frame timing
+    /// and `ppu_vbl_nmi 02-vbl_set_time` can pass.
     pub fn apply_a2002_suppression(&mut self) {
         let sl = self.scanline;
         let dot = self.dot;
-        if sl == 240 && dot == 340 {
-            // 1 dot before VBL set: suppress VBL+NMI for this frame
-            // entirely. The frame state machine in `frame.rs` checks
-            // `vbl_suppressed_this_frame` at (sl 241, dot 1) and
-            // skips both `set_vbl_flag` and `nmi_asserted`.
-            self.vbl_suppressed_this_frame = true;
-        } else if sl == 241 && dot <= 1 {
-            // Same dot or 1 dot later than VBL set. The flag WAS
-            // set this tick (the state machine ran before the CPU
-            // read landed); `Registers::read_status` will clear it
-            // for the return-value semantics. We also cancel the
-            // pending NMI latch so the per-cycle interleave
-            // doesn't fire `TriggerNMI()` for the suppressed frame.
-            self.nmi_pending = false;
+        match (sl, dot) {
+            (240, 340) | (241, 0) => {
+                // 1 PPU clock before VBL set: suppress VBL+NMI for
+                // this frame entirely. The frame state machine in
+                // `frame.rs` checks `vbl_suppressed_this_frame` at
+                // (sl 241, dot 1) and skips both `set_vbl_flag` and
+                // `nmi_asserted`. The nmi_pending clear is belt-and-
+                // suspenders; at (240, 340) nmi_pending is normally
+                // false, and at (241, 0) the per-dot interleave has
+                // not yet set it.
+                self.vbl_suppressed_this_frame = true;
+                self.nmi_pending = false;
+            }
+            (241, 1) | (241, 2) => {
+                // Same dot or 1 dot later than VBL set. The flag WAS
+                // set at (241, 1) (the state machine ran before the
+                // CPU read landed); `Registers::read_status` will
+                // clear it for the return-value semantics. We also
+                // cancel the pending NMI latch so the per-cycle
+                // interleave doesn't fire `TriggerNMI()` for the
+                // suppressed frame.
+                self.nmi_pending = false;
+            }
+            _ => {}
         }
     }
 

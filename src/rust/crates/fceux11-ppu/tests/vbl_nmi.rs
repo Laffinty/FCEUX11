@@ -76,25 +76,16 @@ fn nmi_asserted_only_at_sl_241_dot_1_when_enabled() {
 #[test]
 fn status_read_at_sl_241_dot_0_suppresses_vbl_flag_set() {
     // The plan §6.6 suppression window: a $2002 read at sl 241 dot 0
-    // (one PPU dot before the Mesen/fceux VBL set boundary)
-    // suppresses the VBL flag set + NMI for this frame.
+    // (one PPU dot before the PPU-programmer-reference VBL set at
+    // sl 241 dot 1) suppresses the VBL flag set + NMI for this frame.
     let mut s = PpuState::new();
     s.ppudead = 0; // post-boot state machine under test (Phase 6.4)
     s.registers.write_ctrl(1 << ctrl_bits::NMI_ENABLE);
     let mut bus = FlatBus::new();
 
-    // Tick to sl 241 dot 0.
-    let _ = tick_to(&mut s, &mut bus, 241, 0);
-
-    // CPU reads $2002 here. The legacy C++ flag is `fceu11_ppu_mark_vbl_set_suppressed`;
-    // here we toggle the state flag directly (Phase 2 will wire it through FFI).
-    let v = s.registers.read_status();
-    assert_eq!(
-        v & (1 << status_bits::VBL),
-        0,
-        "VBL not yet set at sl 241 dot 0"
-    );
-    s.vbl_suppressed_this_frame = true;
+    // Tick to sl 241 dot 0 and call apply_a2002_suppression.
+    tick_to(&mut s, &mut bus, 241, 0);
+    s.apply_a2002_suppression();
 
     // Advance into sl 241 dot 1 — VBL should NOT be set, NMI should NOT fire.
     let out = tick_to(&mut s, &mut bus, 241, 1);
@@ -103,7 +94,7 @@ fn status_read_at_sl_241_dot_0_suppresses_vbl_flag_set() {
     assert_eq!(
         s.registers.status & (1 << status_bits::VBL),
         0,
-        "VBL flag should NOT be set after suppression"
+        "VBL flag should NOT be set after (241, 0) suppression"
     );
 }
 
@@ -284,15 +275,22 @@ fn nmi_pending_cleared_at_sl_241_dot_1() {
 }
 
 #[test]
-fn nmi_pending_cleared_at_sl_241_dot_0() {
-    // (241, 0) is the dot BEFORE the VBL set. Per NESdev "same PPU
-    // clock or one later", the spec window for NMI suppression is
-    // (241, 1) and (241, 2); (241, 0) is the same alignment as
-    // (240, 340) — one PPU clock before set, which suppresses VBL
-    // for the entire frame, not NMI. Our implementation uses
-    // `dot <= 1` to also cancel NMI at (241, 0); this test pins
-    // that behaviour so a future tightening of the window to the
-    // strict spec text triggers a conscious decision.
+fn suppression_window_extends_to_sl_241_dot_0() {
+    // Phase 6.6.quater stage 3 (= plan §0.8 step 1) fix: (241, 0)
+    // is the same PPU tick as (240, 340) — the scanline wrap puts
+    // dot 0 and the previous dot 340 on the same PPU clock. Per
+    // NESdev PPU programmer reference:
+    //   "Reading the flag on the dot before it is set
+    //    (scanline 241, dot 0) causes it to read as 0 and be
+    //    cleared, so polling PPUSTATUS for the vblank flag can
+    //    miss vblank and cause games to stutter. NMI is also
+    //    suppressed when this occurs."
+    // So (241, 0) — like (240, 340) — must mark
+    // `vbl_suppressed_this_frame` for the entire frame AND clear
+    // any pending NMI. The previous implementation only cleared
+    // nmi_pending at (241, 0) and let the VBL flag still be set
+    // at (241, 1) (bug — caused `ppu_vbl_nmi 02-vbl_set_time` to
+    // fail).
     let mut s = PpuState::new();
     s.ppudead = 0;
     s.scanline = 241;
@@ -300,14 +298,40 @@ fn nmi_pending_cleared_at_sl_241_dot_0() {
     s.nmi_pending = true;
     s.apply_a2002_suppression();
     assert!(
-        !s.nmi_pending,
-        "current impl: (241, 0) also cancels NMI pending (see comment)"
+        s.vbl_suppressed_this_frame,
+        "(241, 0) must mark vbl_suppressed_this_frame (same PPU tick as (240, 340))"
     );
-    // vbl_suppressed_this_frame is NOT touched at (241, 0) — only
-    // (240, 340) does that.
+    assert!(
+        !s.nmi_pending,
+        "(241, 0) must also clear the pending NMI"
+    );
+}
+
+#[test]
+fn nmi_pending_cleared_at_sl_241_dot_2() {
+    // (241, 2) is the "1 dot later than VBL set" position. The
+    // NESdev PPU programmer reference states:
+    //   "NMI is also suppressed when this occurs, and may even be
+    //    suppressed by reads landing on the following dot or two."
+    // So (241, 1) and (241, 2) both clear `nmi_pending` without
+    // affecting `vbl_suppressed_this_frame` (VBL was already set
+    // at (241, 1) and `Registers::read_status` will clear it on
+    // read; the NMI line is just pulled back up before the CPU
+    // samples it). The previous implementation missed (241, 2)
+    // entirely.
+    let mut s = PpuState::new();
+    s.ppudead = 0;
+    s.scanline = 241;
+    s.dot = 2;
+    s.nmi_pending = true;
+    s.apply_a2002_suppression();
+    assert!(
+        !s.nmi_pending,
+        "(241, 2) is the '1 dot later' window — must cancel pending NMI"
+    );
     assert!(
         !s.vbl_suppressed_this_frame,
-        "(241, 0) does not mark vbl_suppressed_this_frame"
+        "(241, 2) is after VBL set — must NOT mark the frame as suppressed"
     );
 }
 
