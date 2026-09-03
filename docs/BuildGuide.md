@@ -327,6 +327,7 @@ ctest --test-dir build --output-on-failure
 | `FCEUX11_ENABLE_I18N` | ON | 多语言翻译（12 种语言） |
 | `FCEUX11_ENABLE_RUST` | ON | Rust crate（Lua 引擎 + FFI 符号） |
 | `FCEUX11_RUST_CPU` | ON | Rust 6502 CPU 是唯一实现（wip2.0 Phase 7 起；C++ X6502 已删除，设为 OFF 为配置期错误；需 `FCEUX11_ENABLE_RUST=ON`） |
+| `FCEUX11_RUST_PPU` | ON | Rust PPU 引擎（v2.1 Phase 6 §6.6.quater 阶段 1 起默认 ON，Phase 7 起 canonical）。`-DFCEUX11_RUST_PPU=OFF` 保留 C++ PPU fallback 至 v2.2。**缓存陷阱**：这是 CMake 缓存选项——2026-09-03 之前配置过的 build 目录可能缓存 `OFF`（已知默认 `build/` 即为 OFF），须 `cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DFCEUX11_RUST_PPU=ON` 重配或删除缓存，否则会**静默使用 C++ PPU**。v2.1 收尾统一用 `build-rust-ppu/`（cache ON，见 plan v2.1 §0.8） |
 | `FCEUX11_LUA_RUST_ENABLED` | ON | 使用 Rust mlua 作为 Lua 引擎 |
 | `FCEUX11_WGI_BACKEND` | OFF | Windows.Gaming.Input 手柄后端 |
 | `FCEUX11_ASAN` | OFF | AddressSanitizer（仅 Debug） |

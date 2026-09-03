@@ -44,6 +44,7 @@ Test executables must include `git_info_stub.cpp` to satisfy `fceu_get_git_url`/
 | `FCEUX11_BUILD_TESTS` | ON | Build test suite |
 | `FCEUX11_ENABLE_RUST` | ON | Rust crate (CPU + Lua + FFI). OFF disables Lua too |
 | `FCEUX11_RUST_CPU` | ON | Rust 6502 CPU is the only implementation (C++ CPU deleted in Phase 7). OFF is a configure error |
+| `FCEUX11_RUST_PPU` | ON | Rust PPU engine (default ON since v2.1 Phase 6 stage 1). `-DFCEUX11_RUST_PPU=OFF` keeps the C++ PPU fallback until v2.2. **Cache trap** — see Gotcha 11 |
 | `FCEUX11_ENABLE_I18N` | ON | Qt Linguist i18n (12 languages) |
 | `FCEUX11_ASAN` | OFF | MSVC AddressSanitizer |
 | `FCEUX11_UBSAN` | OFF | MSVC runtime UB checks (/RTC1) |
@@ -158,3 +159,4 @@ python scripts/lupdate_run.py
 8. **`fceux11-lua` crate tests**: most require C++ FFI symbols. Use `cargo test --workspace --exclude fceux11-lua` for pure-Rust testing.
 9. **KagamiQA Cargo output** is at `target/x86_64-pc-windows-msvc/release/` not `target/release/`. A stale binary at the wrong path will silently produce outdated results.
 10. **MSVC lock** is intentional for ABI/savestate byte-level compatibility. Do not attempt to add clang/gcc support.
+11. **`FCEUX11_RUST_PPU` is a cached CMake option**: build dirs configured before 2026-09-03 may hold `OFF` (the default flip to ON does not overwrite an existing cache value) — the **default `build/` dir is currently cached OFF** and would silently build the C++ PPU. Check with `grep RUST_PPU <build-dir>/CMakeCache.txt`, or reconfigure with `-DFCEUX11_RUST_PPU=ON`. v2.1 PPU work standardizes on `build-rust-ppu/` (cached ON); note `scripts/run_matrix.ps1` hardcodes `build/` paths. See plan `docs/plans/v2.1_ppu_rust_refactor_plan.md` §0.8.
