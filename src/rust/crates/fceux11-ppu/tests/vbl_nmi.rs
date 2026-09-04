@@ -275,22 +275,25 @@ fn nmi_pending_cleared_at_sl_241_dot_1() {
 }
 
 #[test]
-fn suppression_window_extends_to_sl_241_dot_0() {
-    // Phase 6.6.quater stage 3 (= plan §0.8 step 1) fix: (241, 0)
-    // is the same PPU tick as (240, 340) — the scanline wrap puts
-    // dot 0 and the previous dot 340 on the same PPU clock. Per
-    // NESdev PPU programmer reference:
-    //   "Reading the flag on the dot before it is set
-    //    (scanline 241, dot 0) causes it to read as 0 and be
-    //    cleared, so polling PPUSTATUS for the vblank flag can
-    //    miss vblank and cause games to stutter. NMI is also
-    //    suppressed when this occurs."
-    // So (241, 0) — like (240, 340) — must mark
-    // `vbl_suppressed_this_frame` for the entire frame AND clear
-    // any pending NMI. The previous implementation only cleared
-    // nmi_pending at (241, 0) and let the VBL flag still be set
-    // at (241, 1) (bug — caused `ppu_vbl_nmi 02-vbl_set_time` to
-    // fail).
+fn a2002_read_at_sl_241_dot_0_cancels_nmi_only() {
+    // Plan §0.8 step 2 (Option B) follow-up: the original c872db7
+    // fix marked (241, 0) as a "set vbl_suppressed_this_frame" dot
+    // based on the NESdev PPU programmer reference's "the dot
+    // before it is set (scanline 241, dot 0)" wording. That
+    // broke `blargg_ppu_read_buffer` and
+    // `blargg_vbl_05_nmi_timing` (kagami_qa_direct_smoke 5P/7F
+    // -> 3P/9F).
+    //
+    // The project's C++ engine baseline at `src/ppu.cpp:625-629`
+    // implements VBL set at the (sl 240 -> sl 241) boundary
+    // (i.e. (241, 0) IS the VBL set dot), and treats reads at
+    // (241, 0) / (241, 1) as NMI-cancel-only without marking the
+    // VBL set as suppressed. To match the C++ engine working
+    // config, (241, 0) is now in the NMI-cancel-only arm.
+    //
+    // (240, 340) remains the only "set vbl_suppressed_this_frame"
+    // dot (1 clock before the VBL set on the previous scanline
+    // tick).
     let mut s = PpuState::new();
     s.ppudead = 0;
     s.scanline = 241;
@@ -298,12 +301,12 @@ fn suppression_window_extends_to_sl_241_dot_0() {
     s.nmi_pending = true;
     s.apply_a2002_suppression();
     assert!(
-        s.vbl_suppressed_this_frame,
-        "(241, 0) must mark vbl_suppressed_this_frame (same PPU tick as (240, 340))"
+        !s.vbl_suppressed_this_frame,
+        "(241, 0) is the VBL set dot per C++ engine (src/ppu.cpp:625-629) - must NOT mark vbl_suppressed_this_frame"
     );
     assert!(
         !s.nmi_pending,
-        "(241, 0) must also clear the pending NMI"
+        "(241, 0) must cancel the pending NMI (the read pulls /NMI back up before the CPU samples it)"
     );
 }
 

@@ -305,37 +305,48 @@ impl PpuState {
     /// `ffi.rs::fceux11_ppu_cpu_read` calls this for `$2002` reads;
     /// unit tests in `tests/vbl_nmi.rs` call it directly.
     ///
-    /// Phase 6.6.quater stage 3 (= plan §0.8 step 1) fix: the
-    /// previous implementation used `sl == 241 && dot <= 1` as the
-    /// second branch, which (a) failed to set `vbl_suppressed_this_frame`
-    /// at (241, 0) and (b) skipped the (241, 2) "1 dot later" cancel
-    /// window. Both were non-spec deviations. They are corrected
-    /// here so the suppression window matches NESdev frame timing
-    /// and `ppu_vbl_nmi 02-vbl_set_time` can pass.
+    /// Plan §0.8 step 2 (Option B) follow-up: the original c872db7
+    /// fix added (241, 0) to the "set vbl_suppressed_this_frame"
+    /// arm based on the NESdev PPU programmer reference
+    /// interpretation that (241, 0) is "the dot before VBL set".
+    /// That broke `blargg_ppu_read_buffer` and
+    /// `blargg_vbl_05_nmi_timing` (kagami_qa_direct_smoke 5P/7F
+    /// -> 3P/9F).
+    ///
+    /// The project's own C++ engine baseline at `src/ppu.cpp:625-629`
+    /// implements the VBL set at the (sl 240 -> sl 241) boundary,
+    /// i.e. (241, 0) IS the VBL set dot, and reads landing on
+    /// (241, 0) / (241, 1) only cancel the pending NMI without
+    /// marking `vbl_suppressed_this_frame`. To match the C++
+    /// engine working config (which is the project-wide reference
+    /// for v2.1's "Rust PPU replaces C++ PPU" goal), (241, 0) is
+    /// moved to the NMI-cancel-only arm. The (241, 2) "1 dot later"
+    /// NMI cancel is retained from c872db7 per the PPU programmer
+    /// reference's "may even be suppressed by reads landing on the
+    /// following dot or two" text.
     pub fn apply_a2002_suppression(&mut self) {
         let sl = self.scanline;
         let dot = self.dot;
         match (sl, dot) {
-            (240, 340) | (241, 0) => {
+            (240, 340) => {
                 // 1 PPU clock before VBL set: suppress VBL+NMI for
                 // this frame entirely. The frame state machine in
                 // `frame.rs` checks `vbl_suppressed_this_frame` at
                 // (sl 241, dot 1) and skips both `set_vbl_flag` and
                 // `nmi_asserted`. The nmi_pending clear is belt-and-
                 // suspenders; at (240, 340) nmi_pending is normally
-                // false, and at (241, 0) the per-dot interleave has
-                // not yet set it.
+                // false.
                 self.vbl_suppressed_this_frame = true;
                 self.nmi_pending = false;
             }
-            (241, 1) | (241, 2) => {
-                // Same dot or 1 dot later than VBL set. The flag WAS
-                // set at (241, 1) (the state machine ran before the
-                // CPU read landed); `Registers::read_status` will
-                // clear it for the return-value semantics. We also
-                // cancel the pending NMI latch so the per-cycle
-                // interleave doesn't fire `TriggerNMI()` for the
-                // suppressed frame.
+            (241, 0) | (241, 1) | (241, 2) => {
+                // VBL set dot, 1 dot later, or 2 dots later. The
+                // flag WAS set at (241, 0) per the C++ engine
+                // working config (VBL set = sl 240->sl 241 boundary);
+                // `Registers::read_status` will clear it for the
+                // return-value semantics. We also cancel the pending
+                // NMI latch so the per-cycle interleave doesn't
+                // fire `TriggerNMI()` for the suppressed frame.
                 self.nmi_pending = false;
             }
             _ => {}
