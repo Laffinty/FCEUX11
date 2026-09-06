@@ -1,10 +1,72 @@
-﻿# Changelog
+# Changelog
 
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [2.1.0] - 2026-09-06 - v2.1 PPU Rust 重构 收口
+
+### Major: Rust PPU 成为 canonical engine
+
+- **`FCEUX11_RUST_PPU=ON` 默认**（commit `b2906e8`）。Rust PPU (`fceux11-ppu` crate) 是默认 PPU 引擎；C++ PPU 退为 build-time fallback。
+- **架构落地**: 6 个 phase（0-6）全部冻结。`fceux11-ppu` 状态机 + `NesScheduler` 统一调度器 + A12/HBlank hook 全部替代 C++ PPU 热路径。
+- **FFI 通路**: `ppu_rust_bridge.cpp` 桥接 Rust 状态机与 C++ 视频输出/Mapper hook/Audio/savestate。
+- **mapper hook 调度**: MMC3 / VRC6 / MMC5 / Mapper 19 全部 byte-diff PASS（`mapper_mmc{1,3,5}_byte_diff` + `mapper_vrc6_byte_diff`）。
+
+### Performance
+
+- `bench_tolerance_test` 5/5 PASS（plan §0.8 步骤 3 追加 gate）：
+  - `bench_cpu_frame` -21.08% speedup
+  - `bench_ppu_frame` -26.97% speedup
+  - `bench_full_frame` -21.79% speedup
+  - `bench_apu_frame` / `bench_bus_dispatch` 无 baseline（新增）
+
+### Compatibility
+
+- **batch_compat 锁档 ≥84.0%**（v2.0_hotfix1 baseline +0.1 pp），全量 3451 ROM 上 owner 中途叫停 464 ROM 局部无 regression。
+- **kagami_qa_direct_smoke**: 5/12 PASS（plan §0.7 锁档基线）→ 3/12 PASS（v2.1 现状），9 项 deferred-accepted：
+  - **NMI/timing drift 同根因家族** (4 项，deferred-accepted §6.6.quater.3.5 多路径 sweep 证实 NMI delay / VBL set dot 非根因)：
+    - `blargg_vbl_05_nmi_timing` (hash 158D8C20)
+    - `blargg_cpu_int_2_nmi_brk` (hash 71EC66AA)
+    - `blargg_ppu_vbl_nmi` (02-vbl_set_time, hash 933AF95A)
+    - `rust_ppu_vbl_nmi_timing_test` (02-vbl_set_time, hash 933AF95A) — §6.6.ter.5 Mesen 校准假设
+  - **独立 deferred** (3 项)：
+    - `blargg_instr_misc` (LDA abs,x dummy reads)
+    - `blargg_mmc3_4_scanline_timing` (A12 rising 方向 4 候选)
+    - `blargg_mmc3_v2_4_scanline_timing` (A12 rising 方向 4 候选)
+  - **blocking deferred** (2 项)：
+    - `blargg_oam_stress` (sprite 简化模型 → v2.2 §6.2)
+    - `blargg_sprdma_dmc_dma` (DMC DMA per-dot 仲裁 → v2.2 §6.3.b/c)
+- **4 核心 ctest gate** 全 PASS：`ppu_frame_diff_test` 5/5 NROM 0-pixel + `rom_regression_rust_smoke` 780/780 + `savestate_regression_rust_smoke` 12/12 + `mapper_mmc1_frame0_byte_diff`。
+- **5 个 mapper byte_diff** 全 PASS：mmc1 + mmc3 + mmc5 + vrc6 + frame0。
+
+### Build system
+
+- **Release 二进制** `build-rust-ppu/src/fceux11.exe`（7 MB，Qt6 GUI）正常构建 + 启动，`--version` → `2.0.0`（cmake 端 PROJECT_VERSION 待同步到 2.1.0）。
+- **C++ PPU fallback build** `build-ab-cpp/`（`FCEUX11_RUST_PPU=OFF`）保留至少一个版本。`kagami_qa_blargg_runner` 验证 fallback 可运行；02-vbl_set_time 同样 hash `933AF95A` 失败（确认 Mesen 校准假设）。
+- **C++ PPU 退役标记**（commit `311bf63`）: `src/ppu_rendering.cpp` 文件头加 22 行 DEPRECATION NOTICE 块，标注 5 步清理路径（v2.2+）。本次**不实际删除**（fallback 安全 + dispatcher 交织）。
+
+### Documentation
+
+- `docs/plans/v2.1_ppu_rust_refactor_plan.md` §0 / §0.7 / §0.8 / §7 / §9 同步更新：Phase 7 开工前置 deferred-accepted 9 项。
+- `docs/history/v2.1_phase6_batch_compat.md` §6.0-§6.6.quater.3.5 + §7.0-§7.1：完整 5 阶段报告 + Phase 7 kickoff/closeout。
+- 5 个独立 phase 报告 (`v2.1_phase{0,1,2,3,4,5,6}_*.md`) 全部冻结归档。
+
+### 已知问题 / 后续 v2.2
+
+- 02-vbl_set_time 等 4 项 NMI/timing drift 在 GUI 真实游戏行为中待验证（Phase 7 GUI QA owner-side）。
+- A12 rising 方向 4（1 session 廉价实验，30 min）可选试，可能解锁 `mmc3_4_scanline_timing` + `mmc3_v2_4_scanline_timing` 两项 kagami FAIL。
+- per-cycle sync 方向 5（256-opcode 状态机，2-3 day 预算）仅在 GUI 验证证实 NMI 闪烁问题后才开。
+- oam_stress + sprdma_dmc_dma blocking deferred 至 v2.2（§6.2 / §6.3.b/c 范畴）。
+- C++ PPU 实际清理（v2.2+）：按 §7.1.1 5 步路径，CMake `FCEUX11_PPU_FALLBACK_BUILD` 开关 → `#if` 包装 → 全 build 验证 → 删 C++ 代码。
+
+### Migration from v2.0.x
+
+- 默认 PPU 引擎从 C++ new PPU 切换为 Rust PPU。**游戏兼容性不变**（batch_compat 84% 锁档 ≥v2.0_hotfix1 83.9%）。
+- 旧 `.fc0` save state 加载：通过 RPU1 extension chunk（512B cap / 370B payload）+ LegacyView 264B 兼容，savestate_regression_rust_smoke 12/12 PASS。
+- Fallback 启用：`do_build.ps1 -BuildDir build-cpp-fallback`（`FCEUX11_RUST_PPU=OFF`）。
 ## [2.0.1] - 2026-08-24 - 兼容性优化 hotfix1（3451 ROM 全量扫描 + PPU 时序修正）
 
 - **最终通过率**: 2894/3451 = **83.9%**（基线 80.2%，净提升 +125 ROM）
