@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [2.1.0] - 2026-09-06 - v2.1 PPU Rust 重构 收口
+## [2.1.0] - 2026-09-06 - v2.1 PPU Rust 重构 收口 (batch_compat 83.4% 已知接受, -0.6pp vs §6.6 锁档)
 
 ### Major: Rust PPU 成为 canonical engine
 
@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Compatibility
 
-- **batch_compat 锁档 ≥84.0%**（v2.0_hotfix1 baseline +0.1 pp），全量 3451 ROM 上 owner 中途叫停 464 ROM 局部无 regression。
+- **batch_compat 实际 83.4%（2879/3451）**（v2.0_hotfix1 baseline 83.9% -0.55 pp, vs §6.6 锁档 84.0% -0.6 pp）。**锁档 line 未满足**—owner 2026-09-07 决议：接受回归\uff08选项 A\uff09，cpu_stuck 549→418\uff08-131, NMI/timing 修复收益\uff09抑衅总体失守。详见 `docs/history/v2.1_phase6_batch_compat.md §7.2` 完整分析。
 - **kagami_qa_direct_smoke**: 5/12 PASS（plan §0.7 锁档基线）→ 3/12 PASS（v2.1 现状），9 项 deferred-accepted：
   - **NMI/timing drift 同根因家族** (4 项，deferred-accepted §6.6.quater.3.5 多路径 sweep 证实 NMI delay / VBL set dot 非根因)：
     - `blargg_vbl_05_nmi_timing` (hash 158D8C20)
