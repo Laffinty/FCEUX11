@@ -9,6 +9,30 @@
 //     CheckSpriteHit / ResetRL / FCEUPPU_LineUpdate / Fixit1 / Fixit2)
 //   - Old-PPU main loop (FCEUPPU_Loop + PPU_MASTER)
 //   - New-PPU main loop (FCEUX_PPU_Loop)
+//
+// Phase 7.1 (2026-09-06) DEPRECATION NOTICE:
+// ===================================
+// The C++ PPU code in this file (FCEUPPU_Loop, FCEUX_PPU_Loop, FetchAndDrawTile,
+// RefreshLine, PPU_MASTER, ppur state, e1_nmi_delay, opendecay_log_decay_check, etc.)
+// is RETAINED ONLY as a v2.1 build-time fallback when FCEUX11_RUST_PPU=OFF.
+//
+// As of v2.1.0 (commit b10f7a6):
+//   - Default build: FCEUX11_RUST_PPU=ON, Rust PPU is the engine.
+//     FCEUPPU_Loop body becomes a thin Rust interleave dispatcher (per-dot).
+//     FCEUX_PPU_Loop / FetchAndDrawTile / PPU_MASTER / e1_nmi_delay are DEAD CODE
+//     but kept compiled-in for runtime fallback safety.
+//   - Fallback build: build-ab-cpp/ with FCEUX11_RUST_PPU=OFF. C++ PPU is the engine.
+//
+// Removal plan (post-v2.1, v2.2+):
+//   1. Add CMake option FCEUX11_PPU_FALLBACK_BUILD (default ON for v2.1.x).
+//   2. When OFF, wrap the entire C++ PPU implementation in
+//      `#if FCEUX11_PPU_FALLBACK_BUILD` ... `#endif`.
+//   3. Verify FCEUX11_RUST_PPU=ON + FCEUX11_PPU_FALLBACK_BUILD=OFF builds + ctest 38/40 PASS.
+//   4. Verify FCEUX11_RUST_PPU=OFF (fallback) still builds + ctest PASS.
+//   5. Delete the C++ PPU code (v2.2 release).
+//
+// Tracking: docs/history/v2.1_phase6_batch_compat.md §7.1
+//
 //   - Hot helpers (runppu / BGData / bgdata / PaletteAdjustPixel)
 //   - Render-plane toggles (fceu11::SetRenderPlanes / GetRenderPlanes)
 //   - Palette lookup tables (ppulut1/2/3 + makeppulut)
