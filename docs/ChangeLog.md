@@ -50,7 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
-- `docs/plans/v2.1_ppu_rust_refactor_plan.md` §0 / §0.7 / §0.8 / §7 / §9 同步更新：Phase 7 开工前置 deferred-accepted 9 项。
+- `docs/history/v2.1_ppu_rust_refactor_plan_2026-09-07_done.md` (archived 2026-09-07) §0 / §0.7 / §0.8 / §7 / §9 同步更新：Phase 7 开工前置 deferred-accepted 9 项。
 - `docs/history/v2.1_phase6_batch_compat.md` §6.0-§6.6.quater.3.5 + §7.0-§7.1：完整 5 阶段报告 + Phase 7 kickoff/closeout。
 - 5 个独立 phase 报告 (`v2.1_phase{0,1,2,3,4,5,6}_*.md`) 全部冻结归档。
 
