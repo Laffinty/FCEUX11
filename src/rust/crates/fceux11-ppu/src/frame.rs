@@ -184,7 +184,7 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
     // Golden baseline (commit b06388c^, pre-6.1.e): nestest frames
     // 3-7 + savestate hash kept at the dot-1 timing values.
     // (See `docs/history/v2.1_phase6_batch_compat.md` §6.1.e.v3.)
-    if sl == 241 && dot == 1 && state.ppudead == 0 {
+    if sl == 241 && dot == 0 && state.ppudead == 0 {
         if state.vbl_suppressed_this_frame {
             // Suppression flag from the (sl 240, dot 340) $2002 read
             // (NESdev PPU frame timing: read 1 PPU clock before the
