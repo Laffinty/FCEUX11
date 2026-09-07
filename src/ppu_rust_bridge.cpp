@@ -648,6 +648,7 @@ uint8_t ppu_rust_bridge_cpu_read(uint32_t addr) {
             const char* e = std::getenv("FCEUX11_PPU_PHASE_TRACE");
             return e && e[0] == '1' && e[1] == '\0';
         }();
+        const uint8_t ret = fceux11_ppu_cpu_read(g_ppu_state, static_cast<uint16_t>(addr));
         if (on) {
             const int16_t sl = fceux11_ppu_get_scanline(g_ppu_state);
             const uint16_t dot = fceux11_ppu_get_dot(g_ppu_state);
@@ -655,10 +656,57 @@ uint8_t ppu_rust_bridge_cpu_read(uint32_t addr) {
             const uint64 now = fceu11::cpu_instance().timestamp_base()
                 + static_cast<uint64>(fceu11::cpu_instance().timestamp_ref());
             std::fprintf(stderr,
-                "R3 P2002_READ abs=%llu sl=%d dot=%d pc=0x%04X\n",
+                "R3 P2002_READ abs=%llu sl=%d dot=%d pc=0x%04X ret=0x%02X\n",
                 (unsigned long long)now, (int)sl, (int)dot,
-                (unsigned)pc);
+                (unsigned)pc, ret);
+            // Phase A debug probe (v2.1.1): periodic blargg text-protocol
+            // dump at $6004+ (same cadence/format as the C++ engine's
+            // e1_dump_wram_text in src/ppu.cpp). Gated by its own env
+            // (FCEUX11_BLARGG_TEXT) so a text timeline can be captured
+            // without the per-read trace.
         }
+        static const bool text_on = []() {
+            const char* e = std::getenv("FCEUX11_BLARGG_TEXT");
+            return e && e[0] == '1' && e[1] == '\0';
+        }();
+        if (text_on) {
+            const uint64 now_t = fceu11::cpu_instance().timestamp_base()
+                + static_cast<uint64>(fceu11::cpu_instance().timestamp_ref());
+            static uint64_t last_dump = 0;
+            if (now_t - last_dump >= 100000) {
+                last_dump = now_t;
+                std::fprintf(stderr, "R3 WRAM_TEXT abs=%llu: \"",
+                    (unsigned long long)now_t);
+                for (int i = 0; i < 480; ++i) {
+                    const uint32_t a = 0x6004 + static_cast<uint32_t>(i);
+                    const uint8_t* page = fceu11::g_bus.page()[a >> 11];
+                    if (page == nullptr) break;
+                    const uint8_t b = page[a];
+                    if (b == 0) break;
+                    std::fputc((b >= 0x20 && b < 0x7F) ? b : '.', stderr);
+                }
+                std::fprintf(stderr, "\"\n");
+            }
+        }
+        return ret;
+    }
+    // Phase A probe (v2.1.1): $2007 access stream for engine-vs-engine
+    // diffing (same format as the C++ engine's E1 P2007_* probes; gated
+    // by FCEUX11_E1_TRACE on BOTH engines so one env drives both).
+    if (addr == 0x2007) {
+        static const bool e1on = []() {
+            const char* e = std::getenv("FCEUX11_E1_TRACE");
+            return e && e[0] == '1' && e[1] == '\0';
+        }();
+        const uint16_t v_pre = fceux11_ppu_get_v_state(g_ppu_state);
+        const uint8_t ret7 = fceux11_ppu_cpu_read(g_ppu_state, static_cast<uint16_t>(addr));
+        if (e1on) {
+            const uint64 now7 = fceu11::cpu_instance().timestamp_base()
+                + static_cast<uint64>(fceu11::cpu_instance().timestamp_ref());
+            std::fprintf(stderr, "R3 P2007_READ abs=%llu v=%04X ret=0x%02X\n",
+                (unsigned long long)now7, v_pre, ret7);
+        }
+        return ret7;
     }
     return fceux11_ppu_cpu_read(g_ppu_state, static_cast<uint16_t>(addr));
 }
@@ -693,6 +741,38 @@ void ppu_rust_bridge_cpu_write(uint32_t addr, uint8_t value) {
         const uint8_t status = fceux11_ppu_get_register_state(g_ppu_state, 2);
         if (!(old_ctrl & 0x80) && (value & 0x80) && (status & 0x80)) {
             TriggerNMI2();
+        }
+    } else if (addr == 0x2007) {
+        // Phase A probe: v (pre-increment) + value, same semantics as the
+        // C++ engine's E1 P2007_WRITE probe.
+        static const bool e1on_w = []() {
+            const char* e = std::getenv("FCEUX11_E1_TRACE");
+            return e && e[0] == '1' && e[1] == '\0';
+        }();
+        const uint16_t v_pre = fceux11_ppu_get_v_state(g_ppu_state);
+        fceux11_ppu_cpu_write(g_ppu_state, static_cast<uint16_t>(addr), value);
+        if (e1on_w) {
+            const uint64 now7 = fceu11::cpu_instance().timestamp_base()
+                + static_cast<uint64>(fceu11::cpu_instance().timestamp_ref());
+            std::fprintf(stderr, "R3 P2007_WRITE abs=%llu v=%04X val=0x%02X\n",
+                (unsigned long long)now7, v_pre, value);
+        }
+    } else if (addr == 0x2005 || addr == 0x2006) {
+        // Phase A probe: scroll/address register writes (the $2006
+        // double-write protocol feeds v; divergence here corrupts every
+        // subsequent $2007 access).
+        static const bool e1on_s = []() {
+            const char* e = std::getenv("FCEUX11_E1_TRACE");
+            return e && e[0] == '1' && e[1] == '\0';
+        }();
+        const uint16_t v_pre = fceux11_ppu_get_v_state(g_ppu_state);
+        const uint8_t t_pre = fceux11_ppu_get_register_state(g_ppu_state, 5) /*not used*/;
+        (void)t_pre;
+        fceux11_ppu_cpu_write(g_ppu_state, static_cast<uint16_t>(addr), value);
+        if (e1on_s) {
+            const uint16_t v_post = fceux11_ppu_get_v_state(g_ppu_state);
+            std::fprintf(stderr, "R3 P%04X_WRITE v=%04X->%04X val=0x%02X\n",
+                addr, v_pre, v_post, value);
         }
     } else {
         fceux11_ppu_cpu_write(g_ppu_state, static_cast<uint16_t>(addr), value);

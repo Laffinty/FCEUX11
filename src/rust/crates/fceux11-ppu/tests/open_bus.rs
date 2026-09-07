@@ -17,9 +17,9 @@ fn read_data_returns_buffered_byte_then_real_value() {
     let mut bus = FlatBus::new();
     bus.write(0x2000, 0xAB);
     s.registers.v = 0x2000;
-    let first = s.registers.read_data(&mut bus, s.registers.ctrl);
+    let first = s.registers.read_data(&mut bus, s.registers.ctrl, false);
     assert_eq!(first, 0, "first read returns prior buffer (0)");
-    let second = s.registers.read_data(&mut bus, s.registers.ctrl);
+    let second = s.registers.read_data(&mut bus, s.registers.ctrl, false);
     assert_eq!(second, 0xAB, "second read returns what was buffered");
 }
 
@@ -28,11 +28,11 @@ fn write_data_updates_buffer_for_non_palette() {
     let mut s = PpuState::new();
     let mut bus = FlatBus::new();
     s.registers.v = 0x2000;
-    s.registers.write_data(&mut bus, s.registers.ctrl, 0x55);
+    s.registers.write_data(&mut bus, s.registers.ctrl, 0x55, false);
     assert_eq!(bus.read(0x2000), 0x55, "value reaches the bus");
     assert_eq!(s.registers.vram_buffer, 0x55, "buffer updated to write");
     // Next read returns the buffer.
-    let r = s.registers.read_data(&mut bus, s.registers.ctrl);
+    let r = s.registers.read_data(&mut bus, s.registers.ctrl, false);
     assert_eq!(r, 0x55);
 }
 
@@ -47,7 +47,7 @@ fn palette_read_refills_buffer_from_nt_mirror() {
     bus.write(0x2F00, 0xAB);
     s.registers.vram_buffer = 0xCD; // sentinel from prior frame
     s.registers.v = 0x3F00;
-    let v = s.registers.read_data(&mut bus, s.registers.ctrl);
+    let v = s.registers.read_data(&mut bus, s.registers.ctrl, false);
     assert_eq!(v, 0x12, "palette returns real bus value");
     assert_eq!(
         s.registers.vram_buffer, 0xAB,
@@ -69,7 +69,7 @@ fn palette_mirrors_collapse() {
     // but our read_data consults the bus at the *mirrored* address.
     // Read from $3F10 should return whatever was at $3F00 (alias).
     s.registers.v = 0x3F10;
-    let v = s.registers.read_data(&mut bus, s.registers.ctrl);
+    let v = s.registers.read_data(&mut bus, s.registers.ctrl, false);
     assert_eq!(v, 0x42, "$3F10 aliases $3F00");
 }
 
@@ -84,7 +84,7 @@ fn read_data_increments_v_by_one_by_default() {
     let mut s = PpuState::new();
     let mut bus = FlatBus::new();
     s.registers.v = 0x2000;
-    s.registers.read_data(&mut bus, s.registers.ctrl);
+    s.registers.read_data(&mut bus, s.registers.ctrl, false);
     assert_eq!(s.registers.v, 0x2001);
 }
 
@@ -95,7 +95,7 @@ fn read_data_increments_v_by_thirty_two_when_ctrl_bit2_set() {
     s.registers.v = 0x2000;
     // ctrl bit 2 = VRAM_INCREMENT.
     let ctrl = 1 << 2;
-    s.registers.read_data(&mut bus, ctrl);
+    s.registers.read_data(&mut bus, ctrl, false);
     assert_eq!(s.registers.v, 0x2020, "v += 32 when ctrl bit 2 is set");
 }
 
@@ -104,7 +104,7 @@ fn write_data_also_increments_v() {
     let mut s = PpuState::new();
     let mut bus = FlatBus::new();
     s.registers.v = 0x2050;
-    s.registers.write_data(&mut bus, s.registers.ctrl, 0x00);
+    s.registers.write_data(&mut bus, s.registers.ctrl, 0x00, false);
     assert_eq!(s.registers.v, 0x2051);
 }
 
@@ -143,11 +143,11 @@ fn data_bus_latches_2007_writes_for_both_palette_and_non_palette() {
     let mut s = PpuState::new();
     let mut bus = FlatBus::new();
     s.registers.v = 0x2000;
-    s.registers.write_data(&mut bus, 0, 0x77);
+    s.registers.write_data(&mut bus, 0, 0x77, false);
     s.registers.refresh_data_bus(0x77, 1000);
     assert_eq!(s.registers.data_bus, 0x77, "non-palette refresh updates bus");
     s.registers.v = 0x3F00;
-    s.registers.write_data(&mut bus, 0, 0xAB);
+    s.registers.write_data(&mut bus, 0, 0xAB, false);
     s.registers.refresh_data_bus(0xAB, 2000);
     assert_eq!(s.registers.data_bus, 0xAB, "palette refresh also updates bus");
 }

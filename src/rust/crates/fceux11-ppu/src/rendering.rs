@@ -151,7 +151,19 @@ pub fn render_scanline<B: PpuBus + ?Sized>(
         framebuffer[row_off..row_off + VISIBLE_PIXELS].fill(out);
     }
 
-    for x1 in 0..TILES_PER_SCANLINE {
+    // Phase A (v2.1.1): the tile-fetch walk below mutates the live v
+    // register (34 coarse-X increments with NT-X flips + the write-back
+    // at the end). With $2001 rendering bits clear the C++ engine's
+    // blank path (src/ppu_rendering.cpp:1841-1886) never touches v —
+    // the unconditional walk here corrupted v mid-$2007-sequence on
+    // every scanline start (blargg ppu_read_buffer "basic PPU memory
+    // I/O": v jumped $2044→$2446 at the sl boundary via 34 phantom
+    // coarse-X increments + NT-X flip, then the ROM's verification loop
+    // never completed and the test hung at $6000=0x80). Hardware also
+    // freezes v entirely when rendering is off. Skip the whole fetch
+    // walk — pixel output above already handled the !bg_show fill.
+    if bg_show {
+        for x1 in 0..TILES_PER_SCANLINE {
         // Step 1: render 8 pixels of the current tile (skip the two
         // pre-loads at x1=0,1 and the next-tile preload at x1=32,33).
         if x1 >= 2 && x1 < 34 && bg_show {
@@ -233,10 +245,11 @@ pub fn render_scanline<B: PpuBus + ?Sized>(
         }
     }
 
-    // Persist pshift and atlatch for the next scanline's preload.
-    state.bg_pshift = pshift;
-    state.bg_atlatch = (atlatch & 0xFF) as u8;
-    state.registers.v = v;
+        // Persist pshift and atlatch for the next scanline's preload.
+        state.bg_pshift = pshift;
+        state.bg_atlatch = (atlatch & 0xFF) as u8;
+        state.registers.v = v;
+    }
 }
 
 #[cfg(test)]

@@ -428,10 +428,38 @@ pub unsafe extern "C" fn fceux11_run_frame_interleaved(
     if ppu_state.is_null() || cpu_state.is_null() {
         return -1;
     }
+    // Phase A (v2.1.1) — NMI dispatch delay, port of the C++ engine's
+    // "R5 Step 3 path d" semantics (src/ppu_rendering.cpp, FCEUX_PPU_Loop):
+    // at the VBL-set dot, grant `nd` PPU dots of CPU-only budget BEFORE
+    // latching the NMI; the facade's one-boundary `nmi_fresh` deferral then
+    // applies as before. The C++ engine's history records that dispatching
+    // at the same dot makes vbl_05's NMI fire ~1 instruction earlier than
+    // hardware (Rust measured table [3,2,2,2,2,2,1,1,1,1] vs blargg's
+    // expected [4,4,4,3,3,3,3,3,2,…]); 8 dots (≈2.67 CPU cycles) is the
+    // value the C++ engine ships for blargg vbl_05 parity (e1_nmi_delay
+    // default). Env-overridable with the same knob the C++ engine uses
+    // (FCEUX11_E1_NMIDELAY) so both engines' batch 口径 stay aligned.
+    static NMI_DELAY_DOTS: std::sync::OnceLock<i32> = std::sync::OnceLock::new();
+    let nmi_delay_dots = *NMI_DELAY_DOTS.get_or_init(|| {
+        std::env::var("FCEUX11_E1_NMIDELAY")
+            .ok()
+            .and_then(|v| v.trim().parse::<i32>().ok())
+            .unwrap_or(8)
+    });
     let mut frame_done = 0;
     for _ in 0..dots {
         fceux11_ppu::ffi::fceux11_ppu_tick_dots_direct(ppu_state, 1);
         if fceux11_ppu::ffi::fceux11_ppu_take_nmi_direct(ppu_state) != 0 {
+            // Grant the pre-latch CPU budget with the PPU frozen (this
+            // iteration's PPU dot already ticked; the grant below runs
+            // only the CPU) — same shape as the C++ engine's
+            // `if (nd > 0) X6502_Run(nd);` before `TriggerNMI()`.
+            if nmi_delay_dots > 0 {
+                fceux11_core::cpu::ffi::fceux11_cpu_run_with_tick(
+                    cpu_state,
+                    nmi_delay_dots,
+                );
+            }
             if let Some(cb) = trigger_nmi {
                 unsafe { cb() }
             }

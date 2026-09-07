@@ -597,6 +597,34 @@ static bool opendecay_init() {
 	return true;
 }
 
+// Phase A debug probe (v2.1.1): periodically dump the blargg text
+// protocol buffer at $6004+ (read through the CPU-space page table) so
+// E1 traces show which sub-test a ROM is executing. Prints at most one
+// line per ~100k CPU cycles, stopping at the moving zero terminator.
+// Gated independently by FCEUX11_BLARGG_TEXT so a text timeline can be
+// captured without the (very large) per-read E1 trace.
+static void e1_dump_wram_text() {
+	static bool text_on = []() {
+		const char* e = std::getenv("FCEUX11_BLARGG_TEXT");
+		return e && e[0] == '1';
+	}();
+	static uint64 last_dump = 0;
+	if (!text_on) return;
+	const uint64 now = g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref();
+	if (now - last_dump < 100000) return;
+	last_dump = now;
+	fprintf(stderr, "E1 WRAM_TEXT abs=%llu: \"", (unsigned long long)now);
+	for (int i = 0; i < 480; ++i) {
+		const uint32 a = 0x6004 + (uint32)i;
+		const uint8 *page = fceu11::g_bus.page()[a >> 11];
+		if (page == 0) break;
+		const uint8 b = page[a];
+		if (b == 0) break;
+		fputc((b >= 0x20 && b < 0x7F) ? b : '.', stderr);
+	}
+	fprintf(stderr, "\"\n");
+}
+
 static DECLFR(A2002) {
 	if (newppu) [[unlikely]] {
 		//once we thought we clear latches here, but that caused midframe glitches.
@@ -620,10 +648,6 @@ static DECLFR(A2002) {
 	if (newppu) {
 		const int rsl = ppur.status.sl;
 		const int rcy = ppur.status.cycle;
-		if (e1_ppu_trace_on()) {
-			fprintf(stderr, "E1 P2002_READ abs=%llu sl=%d cycle=%d\n",
-			 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()), rsl, rcy);
-		}
 		if (rsl == 240 && rcy == 340) {
 			fceu11_ppu_mark_vbl_set_suppressed();
 		} else if (rsl == 241 && rcy <= 1) {
@@ -641,6 +665,14 @@ static DECLFR(A2002) {
 		vtoggle = 0;
 		PPU_status &= 0x7F;
 		PPUGenLatch = ret;
+	}
+
+	if (newppu) {
+		if (e1_ppu_trace_on()) {
+			fprintf(stderr, "E1 P2002_READ abs=%llu sl=%d cycle=%d ret=0x%02X\n",
+			 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()), ppur.status.sl, ppur.status.cycle, ret);
+		}
+		e1_dump_wram_text();
 	}
 
 	return ret;
@@ -818,6 +850,7 @@ static DECLFR(A2007) {
 	if (newppu) [[unlikely]] {
 		ret = VRAMBuffer;
 		RefreshAddr = ppur.get_2007access() & 0x3FFF;
+		const uint32 v_pre_2007 = RefreshAddr;  // Phase A probe: pre-increment v
 		if ((RefreshAddr & 0x3F00) == 0x3F00) {
 			//if it is in the palette range bypass the
 			//delayed read, and what gets filled in the temp
@@ -873,6 +906,11 @@ static DECLFR(A2007) {
 		// `ldy PPUDATA` reads a stale PPUGenLatch instead of the
 		// just-transferred buffer value.
 		PPUGenLatch = ret;
+		if (e1_ppu_trace_on()) {
+			fprintf(stderr, "E1 P2007_READ abs=%llu v=%04X ret=0x%02X\n",
+			 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()),
+			 (unsigned)v_pre_2007, ret);
+		}
 		return ret;
 	} else {
 
@@ -1079,6 +1117,14 @@ static DECLFW(B2006) {
 		ppur.install_latches();
 	}
 
+	// Phase A probe: $2005/$2006 writes (t = vtoggle before this write:
+	// 0 = first write of the pair, 1 = second).
+	if (e1_ppu_trace_on()) {
+		fprintf(stderr, "E1 P%04X_WRITE v=%04X->%04X t=%d val=0x%02X\n",
+		 A, (unsigned)ppur.get_2007access() & 0x3FFF, (unsigned)TempAddr & 0x3FFF,
+		 (int)vtoggle, V);
+	}
+
 	vtoggle ^= 1;
 }
 
@@ -1095,6 +1141,11 @@ static DECLFW(B2007) {
 		opendecay_log_write(V);
 		RefreshAddr = ppur.get_2007access() & 0x3FFF;
 		CALL_PPUWRITE(RefreshAddr, V);
+		if (e1_ppu_trace_on()) {
+			fprintf(stderr, "E1 P2007_WRITE abs=%llu v=%04X val=0x%02X\n",
+			 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()),
+			 (unsigned)RefreshAddr, V);
+		}
 		ppur.increment2007(ppur.status.sl >= 0 && ppur.status.sl < 241 && PPUON, INC32 != 0);
 		RefreshAddr = ppur.get_2007access();
 	} else {
