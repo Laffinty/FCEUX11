@@ -6,8 +6,6 @@
 // surface noise-free.
 #![allow(unsafe_op_in_unsafe_fn)]
 
-use std::path::Path;
-
 pub use fceux11_core;
 pub use fceux11_debug;
 pub use fceux11_formats;
@@ -464,7 +462,7 @@ pub unsafe extern "C" fn fceux11_run_frame_interleaved(
             .and_then(|v| v.trim().parse::<i32>().ok())
             .unwrap_or(8)
     });
-    let mut frame_done = 0;
+    let frame_done = 0;
     for _ in 0..dots {
         fceux11_ppu::ffi::fceux11_ppu_tick_dots_direct(ppu_state, 1);
         if fceux11_ppu::ffi::fceux11_ppu_take_nmi_direct(ppu_state) != 0 {
