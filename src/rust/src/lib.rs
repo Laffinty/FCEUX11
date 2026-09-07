@@ -428,10 +428,56 @@ pub unsafe extern "C" fn fceux11_run_frame_interleaved(
     if ppu_state.is_null() || cpu_state.is_null() {
         return -1;
     }
+    // Phase A (v2.1.1) — NMI dispatch delay, port of the C++ engine's
+    // "R5 Step 3 path d" semantics (src/ppu_rendering.cpp::FCEUX_PPU_Loop,
+    // e1_nmi_delay):
+    //
+    //   if (VBlankON) {
+    //       const int nd = e1_nmi_delay();   // default 8
+    //       if (nd > 0) X6502_Run(nd);       // CPU-only budget, PPU frozen
+    //       TriggerNMI();
+    //   }
+    //
+    // The C++ engine's history (e1_vbl/ sweep, 2026-08-02) records that
+    // dispatching at the same dot makes blargg vbl_05's NMI fire ~1
+    // instruction earlier than hardware. Granting 8 CPU cycles of CPU-only
+    // budget BEFORE latching the NMI aligns the Rust engine with the C++
+    // engine's vbl_05 result table [4,4,4,3,3,3,3,3,3,2].
+    //
+    // **Unit clarification (vs the C++ comment at ppu_rendering.cpp:1614
+    // which reads "Units are PPU dots")**: the C++ comment is misleading.
+    // X6502_Run takes CPU cycles, and the value 8 in FCEUX11_E1_NMIDELAY
+    // is the C++ engine's hand-tuned magic number for vbl_05 PASS (= 8 CPU
+    // cycles = 24 PPU dots worth of CPU time, NOT 8 PPU dots = 2.67 CPU
+    // cycles). This Rust port passes the same 8 to
+    // fceux11_cpu_run_with_tick(state, cycles) (cycles parameter -- see
+    // src/rust/crates/fceux11-core/src/cpu/ffi.rs:299), which scales
+    // internally by 16 (cycles -> 16 ticks/cycle), preserving the same
+    // numerical parity with the C++ engine.
+    //
+    // Env knob FCEUX11_E1_NMIDELAY (default 8) is shared with the C++
+    // engine so both engines' batch 口径 stay aligned.
+    static NMI_DELAY_CYCLES: std::sync::OnceLock<i32> = std::sync::OnceLock::new();
+    let nmi_delay_cycles = *NMI_DELAY_CYCLES.get_or_init(|| {
+        std::env::var("FCEUX11_E1_NMIDELAY")
+            .ok()
+            .and_then(|v| v.trim().parse::<i32>().ok())
+            .unwrap_or(8)
+    });
     let mut frame_done = 0;
     for _ in 0..dots {
         fceux11_ppu::ffi::fceux11_ppu_tick_dots_direct(ppu_state, 1);
         if fceux11_ppu::ffi::fceux11_ppu_take_nmi_direct(ppu_state) != 0 {
+            // Grant the pre-latch CPU budget with the PPU frozen (this
+            // iteration's PPU dot already ticked; the grant below runs
+            // only the CPU) -- same shape as the C++ engine's
+            // `if (nd > 0) X6502_Run(nd);` before `TriggerNMI()`.
+            if nmi_delay_cycles > 0 {
+                fceux11_core::cpu::ffi::fceux11_cpu_run_with_tick(
+                    cpu_state,
+                    nmi_delay_cycles,
+                );
+            }
             if let Some(cb) = trigger_nmi {
                 unsafe { cb() }
             }
