@@ -433,7 +433,7 @@ impl Registers {
     /// refresh the open-bus latch (matches the C++ reference's
     /// `PPUGenLatch = ret` after every PPU-side read at
     /// `src/ppu.cpp:855-870`).
-    pub fn read_data<B: PpuBus + ?Sized>(&mut self, bus: &mut B, ctrl: u8, rendering: bool) -> u8 {
+    pub fn read_data<B: PpuBus + ?Sized>(&mut self, bus: &mut B, ctrl: u8) -> u8 {
         let v = self.v;
         let addr = self.mirror_data_addr(v);
         let result = if (v & 0x3FFF) < 0x3F00 {
@@ -474,13 +474,13 @@ impl Registers {
             self.vram_buffer = bus.read((v & 0x3FFF) - 0x1000);
             ret
         };
-        self.increment_v(ctrl, rendering);
+        self.increment_v(ctrl);
         result
     }
 
     /// `$2007` write. Writes through `v`; updates the open-bus buffer
     /// only if `v` is below the palette range.
-    pub fn write_data<B: PpuBus + ?Sized>(&mut self, bus: &mut B, ctrl: u8, val: u8, rendering: bool) {
+    pub fn write_data<B: PpuBus + ?Sized>(&mut self, bus: &mut B, ctrl: u8, val: u8) {
         let v = self.v;
         let addr = self.mirror_data_addr(v);
         bus.write(addr, val);
@@ -493,50 +493,13 @@ impl Registers {
         // read; data_bus is the "internal PPU bus" that feeds
         // $2005/$2006 reads.
         self.data_bus = val;
-        self.increment_v(ctrl, rendering);
+        self.increment_v(ctrl);
     }
 
-    /// Apply the `$2007` increment to `v`.
-    ///
-    /// Phase A (v2.1.1) — port of the C++ reference `Ppu::increment2007`
-    /// (src/ppu_class.h:147): during active rendering the increment is
-    /// the coarse-Y/fine-Y "Y increment" walk (`increment_vs()`), NOT a
-    /// flat +1/+32; outside rendering the walk is field-wise, and the
-    /// +32 form increments coarse-Y only, dropping the carry into the
-    /// nametable-Y bit. The flat `v += 1/32` previously used here
-    /// diverged from the C++ engine the moment a ROM touched $2007
-    /// while rendering was on (blargg ppu_read_buffer "basic PPU memory
-    /// I/O" phase: C++ v walked $2045→, Rust jumped to $2457 — the v
-    /// streams diverged at frame 3 and the ROM's verification loop
-    /// never completed).
-    fn increment_v(&mut self, ctrl: u8, rendering: bool) {
-        if rendering {
-            // increment_vs(): fv++, carry into coarse-Y at 8, NT-Y flip
-            // when coarse-Y wraps at 30. Field layout (flat v):
-            // fv = bits 14-12, v_nt = bit 11, coarse_y = bits 9-5
-            // (matches C++ ppur.{fv,v,vt} in get_2007access).
-            let mut fv = (self.v >> 12) & 0x7;
-            let mut coarse_y = (self.v >> 5) & 0x1F;
-            let mut v_nt = (self.v >> 11) & 0x1;
-            fv += 1;
-            let fv_overflow = fv >> 3;
-            coarse_y = (coarse_y + fv_overflow) & 0x1F;
-            if coarse_y == 30 && fv_overflow == 1 {
-                v_nt += 1;
-                coarse_y = 0;
-            }
-            fv &= 0x7;
-            v_nt &= 0x1;
-            self.v = (self.v & !0x7BE0_u16)
-                | (fv << 12)
-                | (v_nt << 11)
-                | (coarse_y << 5);
-            return;
-        }
+    /// Apply the `$2007` increment to `v` based on `ctrl` bit 2.
+    fn increment_v(&mut self, ctrl: u8) {
         if ctrl & (1 << ctrl_bits::VRAM_INCREMENT) != 0 {
-            // by32: coarse-Y only, carry dropped (C++ `vt++; ... vt &= 31`).
-            let coarse_y = ((self.v >> 5) + 1) & 0x1F;
-            self.v = (self.v & !0x03E0_u16) | (coarse_y << 5);
+            self.v = self.v.wrapping_add(32) & 0x7FFF;
         } else {
             self.v = self.v.wrapping_add(1) & 0x7FFF;
         }
@@ -681,9 +644,9 @@ mod tests {
         let mut bus = FlatBus::new();
         bus.write(0x2000, 0xAA);
         r.v = 0x2000;
-        let first = r.read_data(&mut bus, r.ctrl, false);
+        let first = r.read_data(&mut bus, r.ctrl);
         assert_eq!(first, 0, "first read returns the prior buffer (0)");
-        let second = r.read_data(&mut bus, r.ctrl, false);
+        let second = r.read_data(&mut bus, r.ctrl);
         assert_eq!(second, 0xAA, "second read returns what was buffered");
     }
 
@@ -699,7 +662,7 @@ mod tests {
         bus.write(0x3F00, 0x12);
         bus.write(0x2F00, 0xAB);
         r.v = 0x3F00;
-        let v = r.read_data(&mut bus, r.ctrl, false);
+        let v = r.read_data(&mut bus, r.ctrl);
         assert_eq!(v, 0x12, "palette returns the real bus value");
         assert_eq!(
             r.vram_buffer, 0xAB,
@@ -719,10 +682,10 @@ mod tests {
     fn v_increment_uses_ctrl_bit2() {
         let mut r = Registers::new();
         r.v = 0x1000;
-        r.read_data(&mut FlatBus::new(), 0, false); // +1
+        r.read_data(&mut FlatBus::new(), 0); // +1
         assert_eq!(r.v, 0x1001);
         r.v = 0x1000;
-        r.read_data(&mut FlatBus::new(), 1 << ctrl_bits::VRAM_INCREMENT, false); // +32
+        r.read_data(&mut FlatBus::new(), 1 << ctrl_bits::VRAM_INCREMENT); // +32
         assert_eq!(r.v, 0x1020);
     }
 

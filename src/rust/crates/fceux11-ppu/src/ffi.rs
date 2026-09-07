@@ -432,7 +432,7 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_read(state: *mut PpuState, addr: u16) -
             };
             sb.state
                 .registers
-                .read_data(&mut bus_adapter, sb.state.registers.ctrl, rendering_2007(sb))
+                .read_data(&mut bus_adapter, sb.state.registers.ctrl)
         }
         // $2000/$2001/$2003/$2005/$2006 — write-only or open bus; the
         // C++ A200x fallback returns PPUGenLatch for every register it
@@ -519,21 +519,10 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_write(state: *mut PpuState, addr: u16, 
             let mut bus_adapter = make_bus_adapter(sb);
             sb.state
                 .registers
-                .write_data(&mut bus_adapter, sb.state.registers.ctrl, val, rendering_2007(sb));
+                .write_data(&mut bus_adapter, sb.state.registers.ctrl, val);
         }
         _ => {}
     }
-}
-
-
-/// Phase A (v2.1.1): the `$2007` rendering-time increment condition,
-/// ported from the C++ `$2007` handlers' `ppur.increment2007(...)`
-/// first argument (`src/ppu.cpp` A2007/B2007): scanline inside the
-/// visible+post-render window and PPU rendering enabled (mask bits 3-4,
-/// either BG or sprites — the C++ `PPUON` macro is `PPU[1] & 0x18`).
-fn rendering_2007(sb: &StateBox) -> bool {
-    let sl = sb.state.scanline;
-    sl >= 0 && sl < 241 && (sb.state.registers.mask & 0x18) != 0
 }
 
 fn make_bus_adapter(sb: &mut StateBox) -> CppBus {
