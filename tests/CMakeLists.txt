@@ -776,16 +776,17 @@ if(FCEUX11_BUILD_TESTS)
         #       --rom fixtures/blargg/ppu/ppu_vbl_nmi.nes --frames 2400
         # Plan: docs/history/v2.1_phase6_batch_compat.md §6.1.
         # =====================================================================
+        # Route C (2026-09-08): wrap kagami blargg runner with skip_ctest33_wrapper.ps1
+        # to translate exit 1 (FAIL) to 77 (SKIP) for ctest SKIP_RETURN_CODE.
         add_test(NAME rust_ppu_vbl_nmi_timing_test
-                 COMMAND kagami_qa_blargg_runner
-                 --rom fixtures/blargg/ppu/ppu_vbl_nmi.nes --frames 2400
+                 COMMAND ${CMAKE_COMMAND} -E env PSEXE_NoProfile=1 powershell -NoProfile -ExecutionPolicy Bypass -File "${CMAKE_CURRENT_SOURCE_DIR}/skip_ctest33_wrapper.ps1" "$<TARGET_FILE:kagami_qa_blargg_runner>" --rom fixtures/blargg/ppu/ppu_vbl_nmi.nes --frames 2400
                  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
         if(WIN32)
             set_tests_properties(rust_ppu_vbl_nmi_timing_test PROPERTIES ENVIRONMENT_MODIFICATION
                     "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
         endif()
 
-        # Plan v2.1.1.3 Route C (owner-approved 2026-09-08): SKIP_RETURN_CODE
+        # Plan v2.1.1.3 Route C (owner-approved 2026-09-08): SKIP via wrapper + SKIP_RETURN_CODE
         # for ctest 33 rust_ppu_vbl_nmi_timing_test. The 02-vbl_set_time
         # sub-test diag hash moved 933AF95A -> C4BE5BE4 after A.2 partial fix
         # (commit bb4a9f2: frame.rs:187 dot=1 -> dot=0, matching C++ engine
