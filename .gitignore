@@ -162,6 +162,10 @@ output/
 
 # Local scratch / unused first-level junk (matches "first level only" usage below)
 /discard/
+# _artifacts/ — staging dir for one-off scripts, log dumps, commit-msg
+# drafts, .bak files generated during iterative debugging. Regenerable
+# locally; never meant to be committed.
+/_artifacts/
 
 # Copyrighted FDS BIOS for local FDS testing (never commit)
 /.dr/
