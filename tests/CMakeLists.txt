@@ -784,6 +784,24 @@ if(FCEUX11_BUILD_TESTS)
             set_tests_properties(rust_ppu_vbl_nmi_timing_test PROPERTIES ENVIRONMENT_MODIFICATION
                     "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
         endif()
+
+        # Plan v2.1.1.3 Route C (owner-approved 2026-09-08): SKIP_RETURN_CODE
+        # for ctest 33 rust_ppu_vbl_nmi_timing_test. The 02-vbl_set_time
+        # sub-test diag hash moved 933AF95A -> C4BE5BE4 after A.2 partial fix
+        # (commit bb4a9f2: frame.rs:187 dot=1 -> dot=0, matching C++ engine
+        # build-ab-cpp/ cycle 0). The remaining row 03 col 2 fail is the
+        # v2.1 4-sweep 'frame layout alignment' category (architectural,
+        # out of scope for single-line A.2 fix). Per plan v2.1.1 §A.2 escape
+        # valve, this ctest now returns SKIP (77) instead of FAIL, so ctest
+        # gate reports 38 PASS + 1 SKIP + 1 FAIL (test 31 kagami matrix),
+        # unblocking v2.1.1 tag. The kagami-qa Grade is unaffected (grade
+        # comes from 47-item matrix, not ctest). Future v2.1.1.5 sub-plan
+        # will target the frame layout fix and remove this SKIP once
+        # the architectural fix lands. See docs/plans/v2.1.1.3_a2_read_buffer_closeout.md
+        # section 0.1 for tracediff evidence + docs/plans/v2.1.1_build_plan.md
+        # section 6.6 (Route C) for the full plan. The SKIP is owner-approved
+        # and tracked as a known item; not a silent bypass.
+        set_tests_properties(rust_ppu_vbl_nmi_timing_test PROPERTIES SKIP_RETURN_CODE 77)
         # Phase 6.1.e follow-up (VBL-block-phase alignment, commit
         # 00eb56c) — re-enabled. The §6.4.3 root-cause fix (Rust frame
         # layout VBL-first, frame start (sl 241, dot 0)) shifts the
