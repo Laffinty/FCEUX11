@@ -478,20 +478,20 @@ impl Registers {
         result
     }
 
-    /// `$2007` write. Writes through `v`; updates the open-bus buffer
-    /// only if `v` is below the palette range.
+    /// `$2007` write. Writes through `v`; **does not update
+    /// `vram_buffer`** (NESdev PPU_read_buffer: only `$2007` read
+    /// and `$2006` second write change the buffered value -- `$2007`
+    /// write leaves it untouched so the next `$2007` read still sees
+    /// the prior contents, which were latched either by the last
+    /// `$2007` read or by the `$2006` set that put `v` here).
+    /// `data_bus` (the internal PPU I/O bus for `$2005`/`$2006`
+    /// open-bus readback) does refresh, matching the C++ reference
+    /// `PPUGenLatch = V;` in `B2007` (`src/ppu.cpp:1093-1102`).
     pub fn write_data<B: PpuBus + ?Sized>(&mut self, bus: &mut B, ctrl: u8, val: u8, rendering: bool) {
         let v = self.v;
         let addr = self.mirror_data_addr(v);
         bus.write(addr, val);
-        if (v & 0x3FFF) < 0x3F00 {
-            self.vram_buffer = val;
-        }
-        // Phase 6.3.a: $2007 writes always update data_bus (palette
-        // or not). The VRAM-buffer update above is the separate
-        // "buffered read" return-value latch for the next $2007
-        // read; data_bus is the "internal PPU bus" that feeds
-        // $2005/$2006 reads.
+        // vram_buffer intentionally NOT refreshed on $2007 write.
         self.data_bus = val;
         self.increment_v(ctrl, rendering);
     }

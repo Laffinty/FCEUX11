@@ -24,16 +24,64 @@ fn read_data_returns_buffered_byte_then_real_value() {
 }
 
 #[test]
-fn write_data_updates_buffer_for_non_palette() {
+fn write_data_does_not_update_buffer() {
+    // NESdev PPU_read_buffer: $2007 write leaves the read buffer untouched.
+    // Only $2007 read and the $2006 second write reload the buffer. A
+    // $2007 write must NOT clobber it, otherwise a write-then-read returns
+    // the just-written value (instead of the value the read should have
+    // pre-latched at the post-increment v). The pre-fix Rust implementation
+    // and its dedicated test `write_data_updates_buffer_for_non_palette`
+    // matched a stale v0.3.0 reading that was wrong per NESdev; both
+    // corrected here. The C++ engine `B2007` (src/ppu.cpp:1085-1102)
+    // already gets this right and is the reference behaviour.
     let mut s = PpuState::new();
     let mut bus = FlatBus::new();
+    // Pre-load a known sentinel into the buffer (simulating a prior
+    // $2007 read or $2006 second write that latched the bus).
+    s.registers.vram_buffer = 0x77;
     s.registers.v = 0x2000;
     s.registers.write_data(&mut bus, s.registers.ctrl, 0x55, false);
     assert_eq!(bus.read(0x2000), 0x55, "value reaches the bus");
-    assert_eq!(s.registers.vram_buffer, 0x55, "buffer updated to write");
-    // Next read returns the buffer.
+    assert_eq!(
+        s.registers.vram_buffer, 0x77,
+        "$2007 write must NOT update the read buffer"
+    );
+    // data_bus DOES refresh on $2007 write (matches C++ PPUGenLatch = V
+    // in B2007). Check before the next read, which itself overwrites
+    // data_bus with the returned byte (C++ PPUGenLatch = ret).
+    assert_eq!(
+        s.registers.data_bus, 0x55,
+        "$2007 write refreshes data_bus"
+    );
+    // After the $2007 write, v is 0x2001 and the buffer is still 0x77.
+    // The next $2007 read returns the (unchanged) buffer, then reloads
+    // the buffer with vram[v] (= vram[0x2001] = 0x00 in this FlatBus).
+    // Pre-fix the buffer was clobbered to 0x55, the read returned 0x55,
+    // and blargg `ppu_read_buffer` saw the wrong value.
     let r = s.registers.read_data(&mut bus, s.registers.ctrl, false);
-    assert_eq!(r, 0x55);
+    assert_eq!(r, 0x77, "next $2007 read returns the unchanged buffer");
+    assert_eq!(
+        s.registers.vram_buffer, 0x00,
+        "buffer then reloads with vram[v] (= vram[0x2001] = 0)"
+    );
+}
+
+#[test]
+fn write_data_does_not_update_buffer_for_palette_either() {
+    // Belt-and-suspenders: palette-range $2007 writes also leave the
+    // buffer untouched, just as for non-palette (the prior pre-fix code
+    // already skipped the buffer update inside the palette branch, but
+    // we want an explicit guard so future refactors don't regress).
+    let mut s = PpuState::new();
+    let mut bus = FlatBus::new();
+    s.registers.vram_buffer = 0x99;
+    s.registers.v = 0x3F10; // palette range
+    s.registers.write_data(&mut bus, s.registers.ctrl, 0xAB, false);
+    assert_eq!(
+        s.registers.vram_buffer, 0x99,
+        "palette-range $2007 write must NOT update the read buffer"
+    );
+    assert_eq!(s.registers.data_bus, 0xAB, "data_bus still refreshes");
 }
 
 #[test]
