@@ -28,6 +28,7 @@
 #include "types.h"
 #include "ppu.h"
 #include "ppu_state.h"
+#include "ppu_bridge_state.h"  // v2.1.1.7 Step B.1: savestate staging
 #include "state.h"
 #include "utils/memory.h"
 
@@ -48,71 +49,76 @@ void FCEUPPU_LoadState(int version) {
 	RefreshAddr = RefreshAddrT;
 }
 
-// NOTE: chunk-3 (PPUR/SPRA/PSPL/XOFF/VTGL/RADD/TADD/VBUF/PGEN) currently
-// stores tombstone values. Under the default Rust PPU build, no live code
-// path writes to these fields, so SaveState captures a power-zero image
-// and LoadState does not restore the real PPU state. This is a pre-existing
-// defect, not introduced by v2.1.1.7. See plan §0.1 conclusion (1) and
-// §B.1 for the D1-A remediation (bridge-owned staging + 2 new FFIs).
+// v2.1.1.7 Step B.1 (D1-A): chunk-3 (PPUR/SPRA/PSPL/XOFF/VTGL/RADD/
+// TADD/VBUF/PGEN) and chunk-31 (PST0/PST1) no longer serialise the C++
+// engine globals. They serialise the bridge-owned staging block in
+// ppu_bridge_state.cpp, which FCEUPPU_SaveState() below refreshes from the
+// Rust PPU. NTAR / PRAM keep pointing at the C++ authoritative arrays.
+// See plan §0.1 conclusion (1) and §B.1 for the D1-A design.
 
 SFORMAT FCEUPPU_STATEINFO[] = {
 	{ NTARAM, 0x800, "NTAR" },
 	{ PALRAM.data(), 0x20, "PRAM" },
-	{ SPRAM, 0x100, "SPRA" },
-	{ PPU, 0x4, "PPUR" },
-	{ &kook, 1, "KOOK" },
-	{ &ppudead, 1, "DEAD" },
-	{ &PPUSPL, 1, "PSPL" },
-	{ &XOffset, 1, "XOFF" },
-	{ &vtoggle, 1, "VTGL" },
-	{ &RefreshAddrT, 2 | FCEUSTATE_RLSB, "RADD" },
-	{ &TempAddrT, 2 | FCEUSTATE_RLSB, "TADD" },
-	{ &VRAMBuffer, 1, "VBUF" },
-	{ &PPUGenLatch, 1, "PGEN" },
+	{ bridge_oam, 0x100, "SPRA" },
+	{ bridge_ppu_regs, 0x4, "PPUR" },
+	{ &bridge_kook, 1, "KOOK" },
+	{ &bridge_ppudead, 1, "DEAD" },
+	{ &bridge_ppuspl, 1, "PSPL" },
+	{ &bridge_xoffset, 1, "XOFF" },
+	{ &bridge_vtoggle, 1, "VTGL" },
+	{ &bridge_refresh_addr, 2 | FCEUSTATE_RLSB, "RADD" },
+	{ &bridge_temp_addr, 2 | FCEUSTATE_RLSB, "TADD" },
+	{ &bridge_vram_buffer, 1, "VBUF" },
+	{ &bridge_ppu_gen_latch, 1, "PGEN" },
 	{ 0 }
 };
 
 SFORMAT FCEU_NEWPPU_STATEINFO[] = {
-	{ &idleSynch, 1, "IDLS" },
-	{ &spr_read.num, 4 | FCEUSTATE_RLSB, "SR_0" },
-	{ &spr_read.count, 4 | FCEUSTATE_RLSB, "SR_1" },
-	{ &spr_read.fetch, 4 | FCEUSTATE_RLSB, "SR_2" },
-	{ &spr_read.found, 4 | FCEUSTATE_RLSB, "SR_3" },
+	{ &bridge_newppu_idle_synch, 1, "IDLS" },
+	{ &bridge_newppu_spr_slots[0], 4 | FCEUSTATE_RLSB, "SR_0" },
+	{ &bridge_newppu_spr_slots[1], 4 | FCEUSTATE_RLSB, "SR_1" },
+	{ &bridge_newppu_spr_slots[2], 4 | FCEUSTATE_RLSB, "SR_2" },
+	{ &bridge_newppu_spr_slots[3], 4 | FCEUSTATE_RLSB, "SR_3" },
 	// hotfix1 P0-2 (C-02): the eight SFORMAT entries for sprite positions
 	// all pointed at found_pos[0], so save/load only ever persisted slot 0
 	// and the remaining 7 sprites desynchronised after load. Each label
 	// now maps to its own array element (labels preserved for savestate
 	// compatibility with v1.15 LTS).
-	{ &spr_read.found_pos[0], 4 | FCEUSTATE_RLSB, "SRx0" },
-	{ &spr_read.found_pos[1], 4 | FCEUSTATE_RLSB, "SRx1" },
-	{ &spr_read.found_pos[2], 4 | FCEUSTATE_RLSB, "SRx2" },
-	{ &spr_read.found_pos[3], 4 | FCEUSTATE_RLSB, "SRx3" },
-	{ &spr_read.found_pos[4], 4 | FCEUSTATE_RLSB, "SRx4" },
-	{ &spr_read.found_pos[5], 4 | FCEUSTATE_RLSB, "SRx5" },
-	{ &spr_read.found_pos[6], 4 | FCEUSTATE_RLSB, "SRx6" },
-	{ &spr_read.found_pos[7], 4 | FCEUSTATE_RLSB, "SRx7" },
-	{ &spr_read.ret, 4 | FCEUSTATE_RLSB, "SR_4" },
-	{ &spr_read.last, 4 | FCEUSTATE_RLSB, "SR_5" },
-	{ &spr_read.mode, 4 | FCEUSTATE_RLSB, "SR_6" },
-	{ &ppur.fv, 4 | FCEUSTATE_RLSB, "PFVx" },
-	{ &ppur.v, 4 | FCEUSTATE_RLSB, "PVxx" },
-	{ &ppur.h, 4 | FCEUSTATE_RLSB, "PHxx" },
-	{ &ppur.vt, 4 | FCEUSTATE_RLSB, "PVTx" },
-	{ &ppur.ht, 4 | FCEUSTATE_RLSB, "PHTx" },
-	{ &ppur._fv, 4 | FCEUSTATE_RLSB, "P_FV" },
-	{ &ppur._v, 4 | FCEUSTATE_RLSB, "P_Vx" },
-	{ &ppur._h, 4 | FCEUSTATE_RLSB, "P_Hx" },
-	{ &ppur._vt, 4 | FCEUSTATE_RLSB, "P_VT" },
-	{ &ppur._ht, 4 | FCEUSTATE_RLSB, "P_HT" },
-	{ &ppur.fh, 4 | FCEUSTATE_RLSB, "PFHx" },
-	{ &ppur.s, 4 | FCEUSTATE_RLSB, "PSxx" },
-	{ &ppur.status.sl, 4 | FCEUSTATE_RLSB, "PST0" },
-	{ &ppur.status.cycle, 4 | FCEUSTATE_RLSB, "PST1" },
-	{ &ppur.status.end_cycle, 4 | FCEUSTATE_RLSB, "PST2" },
+	{ &bridge_newppu_spr_slots[4], 4 | FCEUSTATE_RLSB, "SRx0" },
+	{ &bridge_newppu_spr_slots[5], 4 | FCEUSTATE_RLSB, "SRx1" },
+	{ &bridge_newppu_spr_slots[6], 4 | FCEUSTATE_RLSB, "SRx2" },
+	{ &bridge_newppu_spr_slots[7], 4 | FCEUSTATE_RLSB, "SRx3" },
+	{ &bridge_newppu_spr_slots[8], 4 | FCEUSTATE_RLSB, "SRx4" },
+	{ &bridge_newppu_spr_slots[9], 4 | FCEUSTATE_RLSB, "SRx5" },
+	{ &bridge_newppu_spr_slots[10], 4 | FCEUSTATE_RLSB, "SRx6" },
+	{ &bridge_newppu_spr_slots[11], 4 | FCEUSTATE_RLSB, "SRx7" },
+	{ &bridge_newppu_spr_slots[12], 4 | FCEUSTATE_RLSB, "SR_4" },
+	{ &bridge_newppu_spr_slots[13], 4 | FCEUSTATE_RLSB, "SR_5" },
+	{ &bridge_newppu_spr_slots[14], 4 | FCEUSTATE_RLSB, "SR_6" },
+	{ &bridge_newppu_ppur_slots[0], 4 | FCEUSTATE_RLSB, "PFVx" },
+	{ &bridge_newppu_ppur_slots[1], 4 | FCEUSTATE_RLSB, "PVxx" },
+	{ &bridge_newppu_ppur_slots[2], 4 | FCEUSTATE_RLSB, "PHxx" },
+	{ &bridge_newppu_ppur_slots[3], 4 | FCEUSTATE_RLSB, "PVTx" },
+	{ &bridge_newppu_ppur_slots[4], 4 | FCEUSTATE_RLSB, "PHTx" },
+	{ &bridge_newppu_ppur_slots[5], 4 | FCEUSTATE_RLSB, "P_FV" },
+	{ &bridge_newppu_ppur_slots[6], 4 | FCEUSTATE_RLSB, "P_Vx" },
+	{ &bridge_newppu_ppur_slots[7], 4 | FCEUSTATE_RLSB, "P_Hx" },
+	{ &bridge_newppu_ppur_slots[8], 4 | FCEUSTATE_RLSB, "P_VT" },
+	{ &bridge_newppu_ppur_slots[9], 4 | FCEUSTATE_RLSB, "P_HT" },
+	{ &bridge_newppu_ppur_slots[10], 4 | FCEUSTATE_RLSB, "PFHx" },
+	{ &bridge_newppu_ppur_slots[11], 4 | FCEUSTATE_RLSB, "PSxx" },
+	{ &bridge_newppu_ppur_slots[12], 4 | FCEUSTATE_RLSB, "PST0" },
+	{ &bridge_newppu_ppur_slots[13], 4 | FCEUSTATE_RLSB, "PST1" },
+	{ &bridge_newppu_ppur_slots[14], 4 | FCEUSTATE_RLSB, "PST2" },
 	{ 0 }
 };
 
 void FCEUPPU_SaveState(void) {
+	// v2.1.1.7 Step B.1 (D1-A): pull the live Rust PPU state into the
+	// bridge staging block before the SFORMAT tables serialise it.
+	// TempAddrT / RefreshAddrT are no longer referenced by chunk-3; the
+	// scratch copies stay until batch 4 rewires FCEUPPU_LoadState().
+	bridge_state_refresh_from_rust();
 	TempAddrT = TempAddr;
 	RefreshAddrT = RefreshAddr;
 }
