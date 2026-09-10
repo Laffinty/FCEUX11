@@ -129,6 +129,14 @@ void ppu_rust_bridge_copy_framebuffer();
 // decide whether to delegate to the Rust path.
 bool ppu_rust_bridge_active();
 
+// v2.1.1.7 Step B.1 (D1-A): savestate staging helpers. The CHR/NT/
+// palette window copies and the mirror-mode cache live in this TU, so
+// `bridge_state_apply_to_rust()` (ppu_bridge_state.cpp) must restore
+// them through these two wrappers after pushing a state block back
+// into the Rust PPU. See ppu_bridge_state.h for the load contract.
+void ppu_rust_bridge_refresh_windows();
+void ppu_rust_bridge_push_mirror_mode_if_dirty();
+
 #else  // !FCEUX11_RUST_PPU
 
 // When the option is off, the bridge functions are no-ops returning
@@ -145,6 +153,8 @@ inline uint8_t ppu_rust_bridge_cpu_read(uint32_t /*addr*/) { return 0; }
 inline void     ppu_rust_bridge_cpu_write(uint32_t /*addr*/, uint8_t /*value*/) {}
 inline void ppu_rust_bridge_copy_framebuffer() {}
 inline bool ppu_rust_bridge_active() { return false; }
+inline void ppu_rust_bridge_refresh_windows() {}
+inline void ppu_rust_bridge_push_mirror_mode_if_dirty() {}
 inline int  ppu_rust_bridge_emit_one_cpu_cycle() { return 0; }
 inline void ppu_rust_bridge_advance_ppu_dots(uint32_t /*dots*/) {}
 inline int  ppu_rust_bridge_take_nmi() { return 0; }

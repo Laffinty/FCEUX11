@@ -631,6 +631,21 @@ void ppu_rust_bridge_set_mirror_mode(uint32_t mode) {
     }
 }
 
+// v2.1.1.7 Step B.1 (D1-A): expose the two anonymous-namespace helpers
+// above to ppu_bridge_state.cpp, which must re-install the CHR/NT/
+// palette windows and the mirror mode after it applies a loaded state
+// block to the Rust PPU.
+void ppu_rust_bridge_refresh_windows() {
+    if (g_ppu_state == nullptr) {
+        return;
+    }
+    bridge_refresh_windows();
+}
+
+void ppu_rust_bridge_push_mirror_mode_if_dirty() {
+    bridge_push_mirror_mode_if_dirty();  // null-guarded internally
+}
+
 // ---------------------------------------------------------------------------
 // CPU-side $2000-$2007 / $4014 routing
 // ---------------------------------------------------------------------------
