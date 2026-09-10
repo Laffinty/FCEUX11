@@ -1062,6 +1062,102 @@ pub unsafe extern "C" fn fceux11_ppu_set_status_vbl_set_suppressed(state: *mut P
     sb.state.vbl_suppressed_this_frame = true;
 }
 
+// ==============================================================================
+// Step B.1 (D1-A): savestate bridge state block.
+//
+// The byte block is the canonical source-of-truth payload that the C++
+// side turns into the chunk-3 / chunk-31 staging variables. It is HOST
+// LITTLE-ENDIAN by design (matches the existing "2 | FCEUSTATE_RLSB"
+// SFORMAT semantics on MSVC/x86-64; the RLSB swap is a no-op there, see
+// src/state.cpp:172-188).
+//
+// Return value: 0 on success, -1 on bad arguments (null pointer or
+// mismatched length). Length must equal STATE_BLOCK_SIZE.
+// ==============================================================================
+
+pub const STATE_BLOCK_SIZE: usize = 272;
+
+/// Export the live PPU runtime state into "out".
+///
+/// Reads registers.{ctrl, mask, status, oam_addr} + the full primary
+/// OAM + scroll latches + open-bus buffer + scanline/dot and packs
+/// them into a fixed 272-byte host-little-endian blob.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_ppu_state_block_export(
+    state: *mut PpuState,
+    out: *mut u8,
+    len: u32,
+) -> i32 {
+    if state.is_null() || out.is_null() || (len as usize) != STATE_BLOCK_SIZE {
+        return -1;
+    }
+    let sb = lookup(state);
+    let buf = unsafe { std::slice::from_raw_parts_mut(out, STATE_BLOCK_SIZE) };
+
+    // 0..4: regs[4]
+    buf[0] = sb.state.registers.ctrl;
+    buf[1] = sb.state.registers.mask;
+    buf[2] = sb.state.registers.status;
+    buf[3] = sb.state.registers.oam_addr;
+
+    // 4..260: oam[256]
+    buf[4..4 + 0x100].copy_from_slice(&sb.state.oam);
+
+    // 260..264: four single-byte fields
+    buf[260] = sb.state.registers.write_toggle as u8;
+    buf[261] = sb.state.registers.vram_buffer;
+    buf[262] = sb.state.registers.fine_x;
+    buf[263] = sb.state.registers.data_bus;
+
+    // 264..272: four LE-encoded integers (v, t, scanline, dot)
+    buf[264..266].copy_from_slice(&sb.state.registers.v.to_le_bytes());
+    buf[266..268].copy_from_slice(&sb.state.registers.t.to_le_bytes());
+    buf[268..270].copy_from_slice(&sb.state.scanline.to_le_bytes());
+    buf[270..272].copy_from_slice(&sb.state.dot.to_le_bytes());
+
+    0
+}
+
+/// Apply a previously-exported state block back into the live PPU.
+///
+/// Counterpart of fceux11_ppu_state_block_export. After this returns
+/// the C++ side MUST refresh the CHR/NT/palette windows and push the
+/// mirror mode (see ppu_bridge_state.cpp for the load contract).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_ppu_state_block_apply(
+    state: *mut PpuState,
+    buf: *const u8,
+    len: u32,
+) -> i32 {
+    if state.is_null() || buf.is_null() || (len as usize) != STATE_BLOCK_SIZE {
+        return -1;
+    }
+    let sb = lookup(state);
+    let src = unsafe { std::slice::from_raw_parts(buf, STATE_BLOCK_SIZE) };
+
+    // 0..4
+    sb.state.registers.ctrl = src[0];
+    sb.state.registers.mask = src[1];
+    sb.state.registers.status = src[2];
+    sb.state.registers.oam_addr = src[3];
+
+    // 4..260
+    sb.state.oam.copy_from_slice(&src[4..4 + 0x100]);
+
+    // 260..264
+    sb.state.registers.write_toggle = src[260] != 0;
+    sb.state.registers.vram_buffer = src[261];
+    sb.state.registers.fine_x = src[262];
+    sb.state.registers.data_bus = src[263];
+
+    // 264..272
+    sb.state.registers.v = u16::from_le_bytes([src[264], src[265]]);
+    sb.state.registers.t = u16::from_le_bytes([src[266], src[267]]);
+    sb.state.scanline = i16::from_le_bytes([src[268], src[269]]);
+    sb.state.dot = u16::from_le_bytes([src[270], src[271]]);
+
+    0
+}
 // ===========================================================================
 // Internal helpers ————————?suppress unused warnings.
 // ===========================================================================
