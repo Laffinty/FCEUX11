@@ -2,6 +2,13 @@
 
 NES/Famicom emulator derived from FCEUX. Windows 11 only, MSVC 2022+ only. Qt6 GUI, Rust CPU rewrite (since v2.0), C++20.
 
+## Branch / Git Workflow
+
+- **当前开发分支：`wip2.1rc2`**（v2.1.1.7 "C++ PPU 退役" 工作线）。本任务的构建、测试、提交一律在这条分支上进行。
+- **未经 owner 明确确认，不得切回 `main`**，也不得切换到其它分支或另建分支。owner 未确认前执行 `git checkout main` / `git switch main` 一律视为违规操作。
+- 构建与验证目录统一用 **`build-rust-ppu/`**（`CMakeCache` 内 `FCEUX11_RUST_PPU:BOOL=ON`）。默认的 `build/` 是历史遗留目录，其缓存为 `FCEUX11_RUST_PPU=OFF`，**不要**用它验证 Rust PPU 路径（见 Gotcha 11）。
+- 提交信息使用 conventional commits（见 Code Style）。
+
 ## Build
 
 Always use the build script — it loads vcvars, finds Ninja, and injects vcpkg. Running bare `cmake --build` from a normal shell fails with `C1083 <cstdio>`.
