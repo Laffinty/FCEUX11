@@ -4,6 +4,19 @@
 // `src/CMakeLists.txt`). When off, this file is excluded and the
 // `ppu_rust_bridge.h` no-op inlines take over.
 
+// BRIDGE-OWNED: PPU runtime state is owned by the Rust PPU engine
+// (fceux11-ppu crate). The C++ symbols PPU[0..3] / SPRAM / PPUSPL /
+// VRAMBuffer / PPUGenLatch / XOffset / TempAddr / RefreshAddr / vtoggle /
+// SpriteDMA / kook / ppudead are tombstones (read-only mirrors; no live
+// writer outside FCEUPPU_Reset's power-zero path). All mutation flows
+// Rust -> bridge -> C++ staging; never the reverse.
+// See docs/plans/v2.1.1.7_cpp_ppu_removal.md §0.1 / Step A.
+//
+// Direction of authority (v2.1.1.7 §0.1):
+//   (1) Rust -> C++ has zero register/OAM writes (C++ tombstones).
+//   (2) C++ -> Rust NT/CHR/palette are copied, not shared (refresh on
+//       $2007 write or page-pointer change; stale until then).
+
 #ifdef FCEUX11_RUST_PPU
 
 #include "ppu_rust_bridge.h"

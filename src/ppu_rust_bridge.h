@@ -20,6 +20,14 @@
 // Off by default; the C++ PPU path remains bit-identical to Phase 0/1
 // when `FCEUX11_RUST_PPU` is not defined.
 
+// BRIDGE-OWNED: PPU runtime state is owned by the Rust PPU engine
+// (fceux11-ppu crate). The C++ symbols PPU[0..3] / SPRAM / PPUSPL /
+// VRAMBuffer / PPUGenLatch / XOffset / TempAddr / RefreshAddr / vtoggle /
+// SpriteDMA / kook / ppudead are tombstones (read-only mirrors; no live
+// writer outside FCEUPPU_Reset's power-zero path). All mutation flows
+// Rust -> bridge -> C++ staging; never the reverse.
+// See docs/plans/v2.1.1.7_cpp_ppu_removal.md §0.1 / Step A.
+
 #ifndef FCEU11_PPU_RUST_BRIDGE_H
 #define FCEU11_PPU_RUST_BRIDGE_H
 

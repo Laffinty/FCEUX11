@@ -1,3 +1,10 @@
+// BRIDGE-OWNED: PPU runtime state is owned by the Rust PPU engine
+// (fceux11-ppu crate). The C++ symbols PPU[0..3] / SPRAM / PPUSPL /
+// VRAMBuffer / PPUGenLatch / XOffset / TempAddr / RefreshAddr / vtoggle /
+// SpriteDMA / kook / ppudead are tombstones (read-only mirrors; no live
+// writer outside FCEUPPU_Reset's power-zero path). All mutation flows
+// Rust -> bridge -> C++ staging; never the reverse.
+// See docs/plans/v2.1.1.7_cpp_ppu_removal.md §0.1 / Step A.
 // FCEUX11 — v1.5 Prism §1: fceu11::Ppu class declaration.
 //
 // Goal: encapsulate PPU register file, name-table RAM, and rendering

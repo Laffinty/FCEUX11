@@ -48,6 +48,13 @@ void FCEUPPU_LoadState(int version) {
 	RefreshAddr = RefreshAddrT;
 }
 
+// NOTE: chunk-3 (PPUR/SPRA/PSPL/XOFF/VTGL/RADD/TADD/VBUF/PGEN) currently
+// stores tombstone values. Under the default Rust PPU build, no live code
+// path writes to these fields, so SaveState captures a power-zero image
+// and LoadState does not restore the real PPU state. This is a pre-existing
+// defect, not introduced by v2.1.1.7. See plan §0.1 conclusion (1) and
+// §B.1 for the D1-A remediation (bridge-owned staging + 2 new FFIs).
+
 SFORMAT FCEUPPU_STATEINFO[] = {
 	{ NTARAM, 0x800, "NTAR" },
 	{ PALRAM.data(), 0x20, "PRAM" },
