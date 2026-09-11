@@ -11,6 +11,8 @@
 //     correct mapper if it accepts)
 //   * Save twice → first vs second differs in PC if PC moved
 //   * Save / Load with no Power first fails gracefully
+//   * Save → run N frames → Load restores the Rust PPU runtime state
+//     (register file, OAM, v/t/fine_x, scanline/dot; v2.1.1.7 Step B.1-6)
 //   * SFORMAT is a well-formed struct with v/s/desc
 //   * FCEUSS_SaveMS roundtrip preserves every byte
 //   * FCEUSS_LoadFP accepts a freshly saved buffer
@@ -18,6 +20,8 @@
 //   * BackupLoadState does not crash
 
 #include "test_helpers.h"
+#include "ppu_bridge_state.h"  // v2.1.1.7 Step B.1: bridge-owned savestate staging
+#include "bus.h"                    // fceu11::g_bus.write: CPU-bus path used by the PPU pokes
 
 #include <cstdio>
 #include <cstdint>
@@ -248,6 +252,111 @@ void test_resetexstate(TestContext& ctx) {
     FCEU11_EXPECT(ctx, true, "engine survives ResetExState call");
 }
 
+// ---------------------------------------------------------------------------
+// v2.1.1.7 Step B.1-6 (D1-A): a loaded savestate must reach the Rust PPU.
+//
+// bridge_state_refresh_from_rust() copies the live Rust PPU runtime state
+// (register file, primary OAM, the v/t address latches, the write toggle,
+// fine X, the open-bus data latch and scanline/dot) into the bridge-owned
+// staging block - the same accessor FCEUPPU_SaveState() uses before
+// chunk-3 / chunk-31 serialise. Reading it before the save and again after
+// the load therefore observes the Rust engine, not a C++ mirror.
+//
+// Before batch 4 the load path only restored the C++-local TempAddrT /
+// RefreshAddrT scratch copies, so the post-load comparison saw the advanced
+// state and failed. It is now the positive evidence for the load contract
+// in docs/plans/v2.1.1.7_cpp_ppu_removal.md section B.1.
+// ---------------------------------------------------------------------------
+struct RustPpuSnap {
+    uint8_t  regs[4];        // 2000/2001/2002/2003
+    uint8_t  oam[0x100];
+    uint8_t  fine_x;
+    uint8_t  vtoggle;
+    uint8_t  vram_buffer;
+    uint8_t  data_bus;
+    uint16_t v;
+    uint16_t t;
+    int32_t  scanline;
+    int32_t  dot;
+};
+
+static RustPpuSnap snap_rust_ppu() {
+    RustPpuSnap s{};
+    bridge_state_refresh_from_rust();
+    std::memcpy(s.regs, bridge_ppu_regs, sizeof(s.regs));
+    std::memcpy(s.oam, bridge_oam, sizeof(s.oam));
+    s.fine_x      = bridge_xoffset;
+    s.vtoggle     = bridge_vtoggle;
+    s.vram_buffer = bridge_vram_buffer;
+    s.data_bus    = bridge_ppu_gen_latch;
+    s.v           = bridge_refresh_addr;
+    s.t           = bridge_temp_addr;
+    s.scanline    = bridge_newppu_ppur_slots[bridge_newppu_pst0];
+    s.dot         = bridge_newppu_ppur_slots[bridge_newppu_pst1];
+    return s;
+}
+
+static bool rust_ppu_changed(const RustPpuSnap& a, const RustPpuSnap& b) {
+    return std::memcmp(a.regs, b.regs, sizeof(a.regs)) != 0 ||
+           std::memcmp(a.oam, b.oam, sizeof(a.oam)) != 0 ||
+           a.fine_x != b.fine_x || a.vtoggle != b.vtoggle ||
+           a.vram_buffer != b.vram_buffer || a.data_bus != b.data_bus ||
+           a.v != b.v || a.t != b.t ||
+           a.scanline != b.scanline || a.dot != b.dot;
+}
+
+void test_save_load_restores_rust_ppu_state(TestContext& ctx) {
+    emulate_n(8);
+    const RustPpuSnap saved = snap_rust_ppu();
+
+    std::vector<std::byte> buf;
+    EMUFILE_MEMORY f(&buf);
+    const bool save_ok = FCEUSS_SaveMS(&f, 0) != 0;
+    FCEU11_EXPECT(ctx, save_ok, "FCEUSS_SaveMS succeeds for the Rust PPU state test");
+    if (!save_ok) return;
+
+    // Drive the PPU register window (2000-2007) through the same CPU-bus
+    // path the emulated 6502 uses, so the post-load comparison cannot
+    // pass by accident: the register file, the v/t latches, the open-bus
+    // latch and OAM are then guaranteed to differ from the save point.
+    // Negative control: with bridge_state_apply_to_rust() neutered this
+    // test goes red (see docs/history/v2.1.1.7_b1_batch6.md).
+    fceu11::g_bus.write(0x2000, 0x90);  // PPUCTRL
+    fceu11::g_bus.write(0x2001, 0x1E);  // PPUMASK
+    fceu11::g_bus.write(0x2003, 0x40);  // OAMADDR
+    fceu11::g_bus.write(0x2004, 0xA5);  // OAMDATA
+    fceu11::g_bus.write(0x2005, 0x0F);  // scroll write 1 (fine X)
+    fceu11::g_bus.write(0x2005, 0x2A);  // scroll write 2 (fine Y)
+    fceu11::g_bus.write(0x2006, 0x22);  // v/t high
+    fceu11::g_bus.write(0x2006, 0x84);  // v/t low
+    fceu11::g_bus.write(0x2007, 0x5A);  // VRAM write + open-bus latch
+    const RustPpuSnap advanced = snap_rust_ppu();
+    FCEU11_EXPECT(ctx, rust_ppu_changed(saved, advanced),
+                  "Rust PPU state changes when 2000-2007 are written (accessor is live)");
+
+    EMUFILE_MEMORY r(buf.data(), buf.size());
+    const bool load_ok = FCEUSS_LoadFP(&r, SSLOADPARAM_NOBACKUP);
+    FCEU11_EXPECT(ctx, load_ok, "FCEUSS_LoadFP succeeds for the Rust PPU state test");
+    const RustPpuSnap after = snap_rust_ppu();
+
+    FCEU11_EXPECT(ctx,
+                  after.regs[0] == saved.regs[0] && after.regs[1] == saved.regs[1] &&
+                      after.regs[2] == saved.regs[2] && after.regs[3] == saved.regs[3],
+                  "Rust PPU register file (2000-2003) matches the save point after load");
+    FCEU11_EXPECT(ctx, std::memcmp(after.oam, saved.oam, 16) == 0,
+                  "Rust PPU OAM first 16 bytes match the save point after load");
+    FCEU11_EXPECT(ctx, after.scanline == saved.scanline && after.dot == saved.dot,
+                  "Rust PPU raster (scanline/dot) matches the save point after load");
+    FCEU11_EXPECT(ctx,
+                  after.fine_x == saved.fine_x && after.vtoggle == saved.vtoggle &&
+                      after.vram_buffer == saved.vram_buffer &&
+                      after.data_bus == saved.data_bus && after.v == saved.v &&
+                      after.t == saved.t,
+                  "Rust PPU scroll latches (v/t/fine_x/write-toggle/data-bus) match");
+    FCEU11_EXPECT(ctx, std::memcmp(after.oam, saved.oam, sizeof(after.oam)) == 0,
+                  "Rust PPU primary OAM (256 bytes) matches the save point after load");
+}
+
 int main() {
     std::setvbuf(stdout, nullptr, _IONBF, 0);
 
@@ -262,6 +371,7 @@ int main() {
 
     test_save_load_preserves_cpu(ctx);
     test_save_load_preserves_ram(ctx);
+    test_save_load_restores_rust_ppu_state(ctx);
     test_save_load_after_reset(ctx);
     test_sformat_struct(ctx);
     test_save_load_byte_identical(ctx);
