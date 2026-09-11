@@ -1,4 +1,4 @@
-﻿// FCEUX11 v2.1 PPU Refactor — Phase 2: C++ bridge implementation.
+// FCEUX11 v2.1 PPU Refactor — Phase 2: C++ bridge implementation.
 //
 // Compiled only when CMake option `FCEUX11_RUST_PPU=ON` (see
 // `src/CMakeLists.txt`). When off, this file is excluded and the
@@ -28,6 +28,7 @@
 #include "video.h"         // XBuf
 #include "ppu.h"           // FCEUPPU_Init / Power / Shutdown / FCEUX_PPURead
 #include "ppu_class.h"     // fceu11::g_ppu.ntaram() / vnapage()
+#include "ppu_bridge_state.h"  // Step B.4: bridge_state_refresh_from_rust / bridge_oam
 
 extern "C" {
 #include "rust/fceux11_rust.h"  // cbindgen output for fceux11_ppu_*
@@ -644,6 +645,77 @@ void ppu_rust_bridge_refresh_windows() {
 
 void ppu_rust_bridge_push_mirror_mode_if_dirty() {
     bridge_push_mirror_mode_if_dirty();  // null-guarded internally
+}
+
+// ---------------------------------------------------------------------------
+// v2.1.1.7 Step B.4: bridge accessor contract (plan section B.4).
+//
+// Read accessors for the debugger / viewers / cheat and watchpoint code.
+// Every value comes from the Rust PPU - the C++ PPU[] / SPRAM / RefreshAddr
+// globals are tombstones under this build (plan section 0.1).
+//
+// Threading: call these from the GUI/debug thread (paused, or between
+// frames). They must NOT be called from inside a Rust scheduler callback -
+// the StateBox borrow is held there (see
+// bridge_refresh_window_contents_if_dirty for the same rationale).
+// ---------------------------------------------------------------------------
+
+uint8_t ppu_rust_bridge_get_register(uint32_t idx) {
+    if (g_ppu_state == nullptr) {
+        return 0;
+    }
+    return fceux11_ppu_get_register_state(g_ppu_state, idx);
+}
+
+uint8_t ppu_rust_bridge_get_oam(uint32_t addr) {
+    if (g_ppu_state == nullptr) {
+        return 0;
+    }
+    // No per-byte OAM query FFI exists; reuse the B.1 state-block export
+    // through the staging mirrors, which own the block layout. One export
+    // per read is fine for the debugger paths that use this.
+    bridge_state_refresh_from_rust();
+    return bridge_oam[addr & 0xFF];
+}
+
+int16_t ppu_rust_bridge_get_scanline() {
+    if (g_ppu_state == nullptr) {
+        return 0;
+    }
+    return fceux11_ppu_get_scanline(g_ppu_state);
+}
+
+uint16_t ppu_rust_bridge_get_dot() {
+    if (g_ppu_state == nullptr) {
+        return 0;
+    }
+    return fceux11_ppu_get_dot(g_ppu_state);
+}
+
+uint16_t ppu_rust_bridge_get_v() {
+    if (g_ppu_state == nullptr) {
+        return 0;
+    }
+    return fceux11_ppu_get_v_state(g_ppu_state);
+}
+
+void ppu_rust_bridge_note_nt_write(uint32_t ppu_addr) {
+    if (g_ppu_state == nullptr) {
+        return;
+    }
+    if (ppu_addr >= 0x4000) {
+        return;  // defensive: PPU address space is $0000-$3FFF
+    }
+    // TODO(v2.1.1.7 Step B.3a): page-granular refresh once the B.3a
+    // measurement justifies it; until then the full rebuild is deliberate.
+    bridge_refresh_windows();
+}
+
+void ppu_rust_bridge_note_palette_write() {
+    // No-op by design: the palette window is a live pointer into PALRAM
+    // (installed by bridge_refresh_windows), so palette writes are already
+    // visible to the Rust renderer without a copy. Kept as an explicit
+    // entry point so Step D call sites have one write-through hook to call.
 }
 
 // ---------------------------------------------------------------------------

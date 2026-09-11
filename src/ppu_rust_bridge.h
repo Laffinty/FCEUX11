@@ -137,6 +137,29 @@ bool ppu_rust_bridge_active();
 void ppu_rust_bridge_refresh_windows();
 void ppu_rust_bridge_push_mirror_mode_if_dirty();
 
+// ---------------------------------------------------------------------------
+// v2.1.1.7 Step B.4: bridge accessor contract (plan section B.4).
+//
+// The Rust PPU owns PPU[0..3] / OAM / v / scanline / dot; the same-named
+// C++ globals are tombstones (plan section 0.1). Debuggers, the memory
+// viewer and cheat/watchpoint code read through these accessors instead
+// of the globals. `get_oam` is served from the bridge-owned staging
+// mirrors (the same export the savestate path uses); the rest map onto
+// existing Rust query FFIs.
+//
+// Write-through entry points: call `note_nt_write` / `note_palette_write`
+// after mutating nametable / palette memory so the Rust renderer's window
+// copies are refreshed. `note_palette_write` is a documented no-op - the
+// palette window is a live pointer into PALRAM (plan section B.3).
+// ---------------------------------------------------------------------------
+uint8_t  ppu_rust_bridge_get_register(uint32_t idx);   // 0..3 -> ctrl/mask/status/oam_addr
+uint8_t  ppu_rust_bridge_get_oam(uint32_t addr);       // $2004 semantics (addr & 0xFF)
+int16_t  ppu_rust_bridge_get_scanline();
+uint16_t ppu_rust_bridge_get_dot();
+uint16_t ppu_rust_bridge_get_v();                      // NES v / FCEUX RefreshAddr
+void     ppu_rust_bridge_note_nt_write(uint32_t ppu_addr);
+void     ppu_rust_bridge_note_palette_write();
+
 #else  // !FCEUX11_RUST_PPU
 
 // When the option is off, the bridge functions are no-ops returning
@@ -155,6 +178,13 @@ inline void ppu_rust_bridge_copy_framebuffer() {}
 inline bool ppu_rust_bridge_active() { return false; }
 inline void ppu_rust_bridge_refresh_windows() {}
 inline void ppu_rust_bridge_push_mirror_mode_if_dirty() {}
+inline uint8_t  ppu_rust_bridge_get_register(uint32_t /*idx*/) { return 0; }
+inline uint8_t  ppu_rust_bridge_get_oam(uint32_t /*addr*/) { return 0; }
+inline int16_t  ppu_rust_bridge_get_scanline() { return 0; }
+inline uint16_t ppu_rust_bridge_get_dot() { return 0; }
+inline uint16_t ppu_rust_bridge_get_v() { return 0; }
+inline void     ppu_rust_bridge_note_nt_write(uint32_t /*ppu_addr*/) {}
+inline void     ppu_rust_bridge_note_palette_write() {}
 inline int  ppu_rust_bridge_emit_one_cpu_cycle() { return 0; }
 inline void ppu_rust_bridge_advance_ppu_dots(uint32_t /*dots*/) {}
 inline int  ppu_rust_bridge_take_nmi() { return 0; }
