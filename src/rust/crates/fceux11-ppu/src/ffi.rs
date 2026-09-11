@@ -18,6 +18,7 @@ use crate::bus::PpuBus;
 use crate::frame::TickOutcome;
 use crate::registers::{ctrl_bits, status_bits};
 use crate::state::PpuState;
+use crate::video_system::VideoSystem;
 use std::sync::Mutex;
 
 /// C-side bus callback vtable installed by C++ during bridge init.
@@ -127,8 +128,10 @@ struct StateBox {
     /// stored here so the `&mut dyn PpuBus` passed into `tick_dot` can
     /// be reconstructed on each call.
     bus: Option<fceux11_ppu_bus_callbacks>,
-    /// Video system flag. `false` = NTSC, `true` = PAL.
-    pal: bool,
+    /// Region timings (Step B.5-2a). The C ABI still takes the legacy
+    /// `pal: bool` (NTSC/PAL); Dendy gains an explicit spelling in
+    /// Step B.5-2b.
+    video_system: VideoSystem,
     /// Mirroring mode (0=horizontal, 1=vertical, 2=single_lo, 3=single_hi, 4=four).
     mirror: u8,
     /// CHR ROM/RAM window: `[ptr, len, is_ram]`. Phase 2 only models a
@@ -174,7 +177,7 @@ impl StateBox {
             state: PpuState::new(),
             framebuffer: [0u8; 256 * 256],
             bus: None,
-            pal: false,
+            video_system: VideoSystem::Ntsc,
             mirror: 0,
             chr_window_ptr: std::ptr::null(),
             chr_window_len: 0,
@@ -290,7 +293,7 @@ pub unsafe extern "C" fn fceux11_ppu_reset(state: *mut PpuState) {
 /// for PAL/Dendy.
 pub unsafe extern "C" fn fceux11_ppu_set_video_system(state: *mut PpuState, pal: bool) {
     let sb = lookup(state);
-    sb.pal = pal;
+    sb.video_system = VideoSystem::from_pal_flag(pal);
 }
 
 // ===========================================================================
@@ -583,7 +586,7 @@ pub unsafe extern "C" fn fceux11_ppu_emulate_frame(state: *mut PpuState, n_cycle
     // A12/HBlank/scanline hooks to the C++ mapper globals
     // (`GameHBIRQHook` / `GameHBIRQHook2` / `PPU_hook`).
     let mut sched = crate::scheduler::NesScheduler::new();
-    sched.set_video_system(sb.pal);
+    sched.set_video_system(sb.video_system);
     sched.begin_frame();
     let total_dots = n_cycles.saturating_mul(crate::scheduler::PPU_DOTS_PER_CPU_CYCLE);
     let mut last_outcome = TickOutcome::default();
@@ -736,7 +739,7 @@ pub unsafe extern "C" fn fceux11_ppu_tick_cpu_cycle(state: *mut PpuState, n_cycl
     let sb = lookup(state);
     let mut bus = make_bus_adapter(sb);
     let mut sched = crate::scheduler::NesScheduler::new();
-    sched.set_video_system(sb.pal);
+    sched.set_video_system(sb.video_system);
     sched.begin_frame();
     let total_dots = n_cycles.saturating_mul(crate::scheduler::PPU_DOTS_PER_CPU_CYCLE);
     while sched.ppu_dots_consumed() < total_dots {
@@ -762,7 +765,7 @@ pub unsafe extern "C" fn fceux11_ppu_tick_dots(state: *mut PpuState, n_dots: u32
     // Take the persistent scheduler out so `sb` and the scheduler can
     // be borrowed mutably side by side; put it back before returning.
     let mut sched = std::mem::take(&mut sb.sched);
-    sched.set_video_system(sb.pal);
+    sched.set_video_system(sb.video_system);
     let mut frame_advanced = false;
     for _ in 0..n_dots {
         // Render when ENTERING a visible scanline, BEFORE the dot
@@ -810,7 +813,7 @@ pub unsafe extern "C" fn fceux11_ppu_tick_dots_direct(state: *mut PpuState, n_do
     let sb = lookup_unchecked(state);
     let mut bus = make_bus_adapter(sb);
     let mut sched = std::mem::take(&mut sb.sched);
-    sched.set_video_system(sb.pal);
+    sched.set_video_system(sb.video_system);
     let mut frame_advanced = false;
     for _ in 0..n_dots {
         render_scanline_if_start(sb, &mut bus);
