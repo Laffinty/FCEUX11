@@ -18,7 +18,7 @@
 
 **FCEUX11** 是基于 [FCEUX](https://fceux.com) 的 NES/Famicom 模拟器衍生项目，针对 Windows 平台深度优化，提供完整的 mapper 兼容体系、调试工具、TAS 逐帧编辑器与录像回放功能；基于 Rust 语言全新重构 CPU/PPU 核心，具备更清晰的模块边界，更稳定的运行表现，同时严格保持硬件级的时序精度与行为还原度，支持简体中文、繁体中文、英文、日语、韩语、西班牙语、法语、德语、越南语、泰语、印地语（beta）、阿拉伯语（beta）共 12 种语言。
 
-**FCEUX11** is a derivative of the [FCEUX](https://fceux.com) NES/Famicom emulator. It fully retains FCEUX's mapper compatibility system, full debugging toolkit, frame-by-frame TAS editor, and movie recording & playback capabilities. The core 6502 CPU and PPU have each been independently reimplemented in Rust, and the original C++ core implementations will be fully removed. The Rust-based core engine features clearer module boundaries and more stable runtime performance, while strictly preserving hardware-level timing accuracy and behavioral fidelity. The graphical user interface and 12-language localization content have been redesigned and refined on the basis of the original project.
+**FCEUX11** is a derivative of the [FCEUX](https://fceux.com) NES/Famicom emulator, optimized for the Windows platform. It features full mapper compatibility, a comprehensive suite of debugging tools, a frame-by-frame TAS editor, and movie recording and playback functionality. The CPU and PPU cores have been completely reengineered from the ground up in Rust, delivering cleaner module boundaries and more stable runtime performance while strictly preserving hardware-level timing accuracy and behavioral fidelity. Localization support is provided for 12 languages: Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Spanish, French, German, Vietnamese, Thai, Hindi (beta), and Arabic (beta).
 
 ---
 
