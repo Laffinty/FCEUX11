@@ -165,6 +165,14 @@ pub unsafe extern "C" fn fceux11_ppu_set_video_system(
 }
 
 #[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_ppu_set_video_system_ex(
+    state: *mut fceux11_ppu::PpuState,
+    system: u32,
+) {
+    fceux11_ppu::ffi::fceux11_ppu_set_video_system_ex(state, system)
+}
+
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_ppu_install_bus_callbacks(
     state: *mut fceux11_ppu::PpuState,
     cb: *const fceux11_ppu::ffi::fceux11_ppu_bus_callbacks,

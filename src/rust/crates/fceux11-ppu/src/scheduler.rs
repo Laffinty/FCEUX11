@@ -179,7 +179,12 @@ impl NesScheduler {
         // VBlank transition. The PPU state machine sets the VBL flag
         // at sl 241 dot 1; we observe `outcome.vbl_entered` and fire
         // notify_vblank on the rising edge.
-        let vbl_now = outcome.vbl_entered || (state.scanline >= 241 && state.scanline <= 260);
+        // Step B.5-2b: VBL window from the region table (NTSC 241..=260,
+        // PAL 241..=310, Dendy 291..=310).
+        let timings = state.video_system.timings();
+        let vbl_now = outcome.vbl_entered
+            || (state.scanline >= timings.vbl_set_scanline
+                && state.scanline <= timings.vbl_end_scanline);
         if vbl_now != self.vbl_asserted {
             self.vbl_asserted = vbl_now;
             bus.notify_vblank(vbl_now);

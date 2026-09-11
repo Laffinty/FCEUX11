@@ -163,6 +163,17 @@ uint8_t  ppu_rust_bridge_get_data_bus();               // open-bus latch / FCEUX
 void     ppu_rust_bridge_note_nt_write(uint32_t ppu_addr);
 void     ppu_rust_bridge_note_palette_write();
 
+// ---------------------------------------------------------------------------
+// v2.1.1.7 Step B.5-2b: region wiring.
+//
+// `FCEUPPU_SetVideoSystem` forwards the C++ video-system state here; the
+// Rust PPU then drives its raster (scanline count, VBL/NMI line, frame
+// budget, odd-frame dot skip) from the matching region table row
+// (NTSC / PAL / Dendy - see plan section B.5 D4.1).
+// ---------------------------------------------------------------------------
+void     ppu_rust_bridge_set_video_system(bool pal, bool dendy);
+uint32_t ppu_rust_bridge_ppu_dots_per_frame();
+
 #else  // !FCEUX11_RUST_PPU
 
 // When the option is off, the bridge functions are no-ops returning
@@ -191,6 +202,8 @@ inline uint8_t  ppu_rust_bridge_get_vram_buffer() { return 0; }
 inline uint8_t  ppu_rust_bridge_get_data_bus() { return 0; }
 inline void     ppu_rust_bridge_note_nt_write(uint32_t /*ppu_addr*/) {}
 inline void     ppu_rust_bridge_note_palette_write() {}
+inline void     ppu_rust_bridge_set_video_system(bool /*pal*/, bool /*dendy*/) {}
+inline uint32_t ppu_rust_bridge_ppu_dots_per_frame() { return PPU_RUST_NTSC_PPU_DOTS_PER_FRAME; }
 inline int  ppu_rust_bridge_emit_one_cpu_cycle() { return 0; }
 inline void ppu_rust_bridge_advance_ppu_dots(uint32_t /*dots*/) {}
 inline int  ppu_rust_bridge_take_nmi() { return 0; }

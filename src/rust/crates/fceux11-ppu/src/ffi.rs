@@ -290,10 +290,23 @@ pub unsafe extern "C" fn fceux11_ppu_reset(state: *mut PpuState) {
 }
 
 /// Set the video system: `pal=false` for NTSC (default), `pal=true`
-/// for PAL/Dendy.
+/// for PAL. The two-state spelling cannot express Dendy - use
+/// [`fceux11_ppu_set_video_system_ex`] for that (Step B.5-2b).
 pub unsafe extern "C" fn fceux11_ppu_set_video_system(state: *mut PpuState, pal: bool) {
     let sb = lookup(state);
-    sb.video_system = VideoSystem::from_pal_flag(pal);
+    let vs = VideoSystem::from_pal_flag(pal);
+    sb.video_system = vs;
+    sb.state.video_system = vs;
+}
+
+/// Region selector with an explicit Dendy spelling (Step B.5-2b):
+/// 0 = NTSC, 1 = PAL, 2 = Dendy. Out-of-range codes are ignored.
+pub unsafe extern "C" fn fceux11_ppu_set_video_system_ex(state: *mut PpuState, system: u32) {
+    let sb = lookup(state);
+    if let Some(vs) = VideoSystem::from_code(system) {
+        sb.video_system = vs;
+        sb.state.video_system = vs;
+    }
 }
 
 // ===========================================================================

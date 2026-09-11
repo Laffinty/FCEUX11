@@ -92,6 +92,10 @@ void FCEUPPU_SetVideoSystem(int w) {
 		FSettings.LastSLine = FSettings.UsrLastSLine[0];
 		//paldeemphswap = 0;
 	}
+	// v2.1.1.7 Step B.5-2b: the Rust PPU drives its raster from the
+	// region table; `w` is PAL and `dendy` is the Dendy quirk (312 lines,
+	// VBL set at 291). Both feed the same table the crate unit-tests pin.
+	ppu_rust_bridge_set_video_system(w != 0, dendy != 0);
 }
 
 void PPU_ResetHooks() {

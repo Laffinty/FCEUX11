@@ -44,6 +44,26 @@ impl VideoSystem {
         matches!(self, Self::Pal | Self::Dendy)
     }
 
+    /// Numeric spelling used by the C ABI
+    /// (`fceux11_ppu_set_video_system_ex`): 0 = NTSC, 1 = PAL, 2 = Dendy.
+    pub const fn from_code(code: u32) -> Option<Self> {
+        match code {
+            0 => Some(Self::Ntsc),
+            1 => Some(Self::Pal),
+            2 => Some(Self::Dendy),
+            _ => None,
+        }
+    }
+
+    /// Inverse of [`Self::from_code`].
+    pub const fn code(self) -> u32 {
+        match self {
+            Self::Ntsc => 0,
+            Self::Pal => 1,
+            Self::Dendy => 2,
+        }
+    }
+
     /// One row of the region timing table (see the module docs for sources).
     pub const fn timings(self) -> VideoSystemTimings {
         match self {
@@ -178,6 +198,14 @@ mod tests {
             let is_3_2 = t.ppu_dots_per_cpu_cycle_num * 5 == t.ppu_dots_per_cpu_cycle_den * 16;
             assert_eq!(is_3_2, sys == VideoSystem::Pal, "{sys:?}");
         }
+    }
+
+    #[test]
+    fn codes_round_trip() {
+        for sys in [VideoSystem::Ntsc, VideoSystem::Pal, VideoSystem::Dendy] {
+            assert_eq!(VideoSystem::from_code(sys.code()), Some(sys));
+        }
+        assert_eq!(VideoSystem::from_code(3), None);
     }
 
     #[test]

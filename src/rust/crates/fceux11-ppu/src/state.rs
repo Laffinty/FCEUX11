@@ -78,6 +78,11 @@ pub struct PpuState {
     pub dot: u16,
     /// Frame counter — wraps only by convention (u64 is plenty).
     pub frame: u64,
+    /// Region timing set (Step B.5-2b). Drives the scanline count,
+    /// VBL/NMI line and the odd-frame dot skip. Not part of any
+    /// savestate payload — the region is machine configuration, not
+    /// emulation state.
+    pub video_system: crate::video_system::VideoSystem,
     /// Set by `$2002` read at sl 241 dot 0; consulted by frame state
     /// machine to suppress VBL flag set + NMI for this frame.
     pub vbl_suppressed_this_frame: bool,
@@ -217,6 +222,7 @@ impl PpuState {
             scanline: 241,
             dot: 0,
             frame: 0,
+            video_system: crate::video_system::VideoSystem::Ntsc,
             vbl_suppressed_this_frame: false,
             nmi_pending: false,
             odd_frame: false,

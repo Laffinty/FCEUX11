@@ -72,6 +72,12 @@ uint8_t g_nt_window[4096];
 // mapper bank switch only needs the CONTENTS re-copied — no FFI
 // re-install. Comparing these pointers is a cheap dirty test
 // (12 compares) run at every scanline boundary.
+// Step B.5-2b: region state mirrored from `FCEUPPU_SetVideoSystem`.
+// The Rust side owns the timing table; these two flags only remember
+// which row to push (and what the C++ frame budget is).
+bool g_pal = false;
+bool g_dendy = false;
+
 const uint8_t* g_chr_page_base[8] = {};
 const uint8_t* g_nt_page_base[4] = {};
 // Mirror mode last pushed to the Rust side; a mismatch with the
@@ -332,6 +338,13 @@ void bridge_notify_vblank(bool asserted) {
 
 }  // namespace
 
+namespace {
+// Step B.5-2b: declared here (file-scope unnamed namespace, same one the
+// definition lives in further down) so `ppu_rust_bridge_power` can push
+// the region before the B.4 accessor block.
+uint32_t BridgeVideoSystemCode();
+}  // namespace
+
 // ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
@@ -403,7 +416,9 @@ void ppu_rust_bridge_power() {
     if (g_ppu_state != nullptr) {
         fceux11_ppu_power(g_ppu_state);
         // After power, sync the per-state defaults.
-        fceux11_ppu_set_video_system(g_ppu_state, false /* PAL=false for NTSC */);
+        // Step B.5-2b: re-push the region FCEUPPU_SetVideoSystem recorded
+        // (power may run before or after the first SetVideoSystem call).
+        fceux11_ppu_set_video_system_ex(g_ppu_state, BridgeVideoSystemCode());
 
         // Phase 4: re-install $2000-$2007 / $4014 handlers. FCEUPPU_Power
         // (called before the mapper Power via ppu.cpp:1208) overwrote
@@ -734,6 +749,30 @@ void ppu_rust_bridge_note_nt_write(uint32_t ppu_addr) {
     // TODO(v2.1.1.7 Step B.3a): page-granular refresh once the B.3a
     // measurement justifies it; until then the full rebuild is deliberate.
     bridge_refresh_windows();
+}
+
+namespace {
+// 0 = NTSC, 1 = PAL, 2 = Dendy (mirrors crate::video_system::VideoSystem::code).
+uint32_t BridgeVideoSystemCode() {
+    if (g_dendy) {
+        return 2;
+    }
+    return g_pal ? 1 : 0;
+}
+}  // namespace
+
+void ppu_rust_bridge_set_video_system(bool pal, bool dendy) {
+    g_pal = pal;
+    g_dendy = dendy;
+    if (g_ppu_state != nullptr) {
+        fceux11_ppu_set_video_system_ex(g_ppu_state, BridgeVideoSystemCode());
+    }
+}
+
+uint32_t ppu_rust_bridge_ppu_dots_per_frame() {
+    // 262 x 341 = 89342 (NTSC); 312 x 341 = 106392 (PAL/Dendy) -
+    // plan section B.5 D4.1.
+    return (g_pal || g_dendy) ? 106392u : PPU_RUST_NTSC_PPU_DOTS_PER_FRAME;
 }
 
 void ppu_rust_bridge_note_palette_write() {

@@ -1230,14 +1230,14 @@ int FCEUPPU_Loop(int skip) {
 		// X6502_Run convention). The validated 1-dot granularity of
 		// Phase 5.1 is preserved — the 3-dot chunking variant broke
 		// sub-instruction CPU/PPU phase (see plan §5.1).
-		if (ppu_rust_bridge_run_frame_interleaved(PPU_RUST_NTSC_PPU_DOTS_PER_FRAME) == 0) {
+		if (ppu_rust_bridge_run_frame_interleaved(ppu_rust_bridge_ppu_dots_per_frame()) == 0) {
 			ppu_rust_bridge_copy_framebuffer();
 			return 0;
 		}
 		// Fallback (bridge active but no PPU state — defensive): the
 		// Phase 5.1 C++ loop with the PPU advance no-oped, i.e. a
 		// CPU-only frame advance.
-		for (uint32_t dot = 0; dot < PPU_RUST_NTSC_PPU_DOTS_PER_FRAME; ++dot) {
+		for (uint32_t dot = 0; dot < ppu_rust_bridge_ppu_dots_per_frame(); ++dot) {
 			fceu11::cpu_instance().run(1);
 		}
 		return 0;
