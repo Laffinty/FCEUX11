@@ -1,4 +1,4 @@
-﻿/* FCE Ultra - NES/Famicom Emulator
+/* FCE Ultra - NES/Famicom Emulator
  *
  * Copyright notice for this file:
  *  Copyright (C) 2020 mjbudd77
@@ -510,7 +510,8 @@ void fceuWrapperRequestAppExit(void)
 static const char *DriverUsage =
 "Option         Value   Description\n"
 "--pal          {0|1}   Use PAL timing.\n"
-"--newppu       {0|1}   Enable the new PPU core. (WARNING: May break savestates)\n"
+"--newppu       {0|1}   Legacy PPU switch: kept for movie/config compatibility;\n"
+"                       the Rust PPU is always used (v2.1.1.7 Step B.5).\n"
 "--input(1,2)   d       Set which input device to emulate for input 1 or 2.\n"
 "                         Devices:  gamepad zapper powerpad.0 powerpad.1\n"
 "                         arkanoid\n"

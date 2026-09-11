@@ -601,6 +601,22 @@ if(FCEUX11_BUILD_TESTS)
     add_executable(fceux11_ppu_simd_probe_avx2 kagami/benchmark/ppu_simd_probe.cpp)
     target_compile_options(fceux11_ppu_simd_probe_avx2 PRIVATE /EHsc /arch:AVX2)
 
+    # FCEUX11 v2.1.1.7 Step B.5 (D3-a) — `newppu` neutrality gate.
+    # Runs the same ROM with newppu = 0 / 1 and requires identical frame
+    # buffer CRCs (the switch must not select an engine any more). Skips
+    # itself when the gitignored fixture ROM is absent.
+    fceux11_add_headless_test_executable(fceux11_newppu_neutrality_test
+        kagami/newppu_neutrality_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME newppu_neutrality_test
+             COMMAND fceux11_newppu_neutrality_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    if(WIN32)
+        set_tests_properties(newppu_neutrality_test PROPERTIES ENVIRONMENT_MODIFICATION
+                "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+    endif()
+
     # KagamiQA P1 — Headless smoke test (null driver, no Qt linkage).
     fceux11_add_headless_test_executable(fceux11_headless_smoke_test
         kagami/headless_smoke_test.cpp

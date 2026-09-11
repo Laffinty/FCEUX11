@@ -38,8 +38,21 @@
 // external callers (debugger, frame limiter) can introspect timing.
 // ----------------------------------------------------------------------------
 
-int newppu_get_scanline() { return ppur.status.sl; }
-int newppu_get_dot() { return ppur.status.cycle; }
+// v2.1.1.7 Step B.5 (D3-a): `newppu` no longer selects an engine. Under the
+// Rust PPU these report the live Rust raster; the C++ `ppur` counters are
+// tombstones there (plan section 0.1).
+int newppu_get_scanline() {
+	if (ppu_rust_bridge_active()) {
+		return ppu_rust_bridge_get_scanline();
+	}
+	return ppur.status.sl;
+}
+int newppu_get_dot() {
+	if (ppu_rust_bridge_active()) {
+		return ppu_rust_bridge_get_dot();
+	}
+	return ppur.status.cycle;
+}
 void newppu_hacky_emergency_reset()
 {
 	if(ppur.status.end_cycle == 0)

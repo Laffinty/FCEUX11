@@ -1,4 +1,4 @@
-﻿/* FCE Ultra - NES/Famicom Emulator
+/* FCE Ultra - NES/Famicom Emulator
  *
  * Copyright notice for this file:
  *  Copyright (C) 2021 mjbudd77
@@ -140,7 +140,9 @@ void applyMovieInputConfig(void)
 	RefreshThrottleFPS();
 	//PushCurrentVideoSettings();
 	// update PPU type
-	newppu = currMovieData.PPUflag;
+	// v2.1.1.7 Step B.5 (D3-a): the movie PPUflag is historical metadata only.
+// It no longer selects an engine - the Rust PPU is the only engine, and
+// MoviePlay shows the flag as display text.
 	//SetMainWindowText();
 	// return focus to TAS Editor window
 	//SetFocus(taseditorWindow.hwndTASEditor);

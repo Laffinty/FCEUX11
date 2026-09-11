@@ -4373,7 +4373,7 @@ void  ConsoleDebugger::updateRegisterView(void)
 		snprintf( str2, sizeof(str2), "%d", ppupixel);
 	}
 
-	if(newppu)
+	if (newppu || ppu_rust_bridge_active())
 	{
 		snprintf(str, sizeof(str),"%d",newppu_get_scanline());
 		snprintf( str2, sizeof(str2),"%d",newppu_get_dot());

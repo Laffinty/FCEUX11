@@ -24,6 +24,7 @@
 #include "share.h"
 #include "zapper.h"
 #include "../movie.h"
+#include "../ppu_rust_bridge.h"
 
 ZAPPER ZD[2];
 
@@ -86,7 +87,10 @@ endo:
 static INLINE int CheckColor(int w)
 {
 
-    if(newppu)
+    // v2.1.1.7 Step B.5 (D3-a): the `newppu` beam-scan branch is part of the
+    // retired C++ engine. Under the Rust PPU both switch values take the
+    // legacy timestamp path, so the switch cannot change zapper behaviour.
+    if (newppu && !ppu_rust_bridge_active())
     {
         int x = (int)ZD[w].mzx;
         int y = (int)ZD[w].mzy;
