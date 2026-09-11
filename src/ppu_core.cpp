@@ -30,6 +30,7 @@
 #include "fceu.h"
 #include "ppu.h"
 #include "ppu_core.h"
+#include "ppu_rust_bridge.h"
 
 // ----------------------------------------------------------------------------
 // Accessor helpers. Pure read-only wrappers around the new-PPU state
@@ -123,6 +124,15 @@ void FCEUPPU_Reset(void) {
 
 uint32 FCEUPPU_PeekAddress()
 {
+	// v2.1.1.7 Step B.4: under the Rust PPU the v latch lives in the Rust
+	// engine; the C++ ppur / RefreshAddr latches are tombstones there
+	// (plan section 0.1). Falls back to the legacy path when the bridge is
+	// inactive (Rust PPU disabled, or not initialised yet).
+	if (ppu_rust_bridge_active())
+	{
+		return ppu_rust_bridge_get_v() & 0x3FFF;
+	}
+
 	if (newppu)
 	{
 		return ppur.get_2007access() & 0x3FFF;

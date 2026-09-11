@@ -70,6 +70,7 @@
 #include "../../ines.h"
 #include "../../asm.h"
 #include "../../ppu.h"
+#include "../../ppu_rust_bridge.h"
 #include "../../cpu.h"
 #include "common/os_utils.h"
 #include "common/configSys.h"
@@ -84,6 +85,12 @@
 #include "Qt/ConsoleUtilities.h"
 #include "Qt/TraceLogger.h"
 #include "Qt/ColorMenu.h"
+
+// v2.1.1.7 Step B.4: PPU[0..3] are tombstones under the Rust PPU (plan
+// section 0.1); read the live values through the bridge when it is active.
+static inline uint8_t PpuRegRead(uint32_t idx) {
+	return ppu_rust_bridge_active() ? ppu_rust_bridge_get_register(idx) : PPU[idx];
+}
 
 // Where are these defined?
 extern int vblankScanLines;
@@ -4319,19 +4326,19 @@ void  ConsoleDebugger::updateRegisterView(void)
 	cpuInstrsVal->setText( tr(stmp) );
 
 	// PPU Labels
-	snprintf( stmp, sizeof(stmp), "$%02X", PPU[0] );
+	snprintf( stmp, sizeof(stmp), "$%02X", PpuRegRead(0) );
 	ppuCtrlReg->setText( tr(stmp) );
 
-	snprintf( stmp, sizeof(stmp), "$%02X", PPU[1] );
+	snprintf( stmp, sizeof(stmp), "$%02X", PpuRegRead(1) );
 	ppuMaskReg->setText( tr(stmp) );
 
-	snprintf( stmp, sizeof(stmp), "$%02X", PPU[2] );
+	snprintf( stmp, sizeof(stmp), "$%02X", PpuRegRead(2) );
 	ppuStatReg->setText( tr(stmp) );
 
 	snprintf( stmp, sizeof(stmp), "$%04X", static_cast<int>(FCEUPPU_PeekAddress()));
 	ppuAddrDsp->setText( tr(stmp) );
 
-	snprintf( stmp, sizeof(stmp), "$%02X", PPU[3] );
+	snprintf( stmp, sizeof(stmp), "$%02X", PpuRegRead(3) );
 	oamAddrDsp->setText( tr(stmp) );
 
 	extern int linestartts;
@@ -7548,27 +7555,32 @@ ppuRegPopup::ppuRegPopup( QWidget *parent )
 	sprite0hit_cbox   = new QCheckBox( tr("Sprite 0 Hit") );
 	spriteOvrflw_cbox = new QCheckBox( tr("Sprite Overflow") );
 
-	snprintf( stmp, sizeof(stmp), "$%04X", 0x2000 + (0x400*(PPU[0] & 0x03)));
+	// v2.1.1.7 Step B.4: read the live Rust registers once per refresh.
+	const uint8_t ppuCtrl = PpuRegRead(0);
+	const uint8_t ppuMask = PpuRegRead(1);
+	const uint8_t ppuStat = PpuRegRead(2);
+
+	snprintf( stmp, sizeof(stmp), "$%04X", 0x2000 + (0x400*(ppuCtrl & 0x03)));
 	ppuBgAddr->setText( tr(stmp) );
 
-	snprintf( stmp, sizeof(stmp), "$%04X", (PPU[0] & 0x08) ? 0x1000 : 0x0000 );
+	snprintf( stmp, sizeof(stmp), "$%04X", (ppuCtrl & 0x08) ? 0x1000 : 0x0000 );
 	ppuSprAddr->setText( tr(stmp) );
 
-	  nmiBlank_cbox->setChecked( PPU[0] & 0x80 );
-	sprite8x16_cbox->setChecked( PPU[0] & 0x20 );
+	  nmiBlank_cbox->setChecked( ppuCtrl & 0x80 );
+	sprite8x16_cbox->setChecked( ppuCtrl & 0x20 );
 
-	 grayscale_cbox->setChecked( PPU[1] & 0x01 );
-	drawLeftBg_cbox->setChecked( PPU[1] & 0x02 );
-	drawLeftFg_cbox->setChecked( PPU[1] & 0x04 );
-	 bgEnabled_cbox->setChecked( PPU[1] & 0x08 );
-	   sprites_cbox->setChecked( PPU[1] & 0x10 );
-	      iRed_cbox->setChecked( PPU[1] & 0x20 );
-	      iGrn_cbox->setChecked( PPU[1] & 0x40 );
-	      iBlu_cbox->setChecked( PPU[1] & 0x80 );
+	 grayscale_cbox->setChecked( ppuMask & 0x01 );
+	drawLeftBg_cbox->setChecked( ppuMask & 0x02 );
+	drawLeftFg_cbox->setChecked( ppuMask & 0x04 );
+	 bgEnabled_cbox->setChecked( ppuMask & 0x08 );
+	   sprites_cbox->setChecked( ppuMask & 0x10 );
+	      iRed_cbox->setChecked( ppuMask & 0x20 );
+	      iGrn_cbox->setChecked( ppuMask & 0x40 );
+	      iBlu_cbox->setChecked( ppuMask & 0x80 );
 
-	      vblank_cbox->setChecked( PPU[2] & 0x80 );
-	  sprite0hit_cbox->setChecked( PPU[2] & 0x40 );
-	spriteOvrflw_cbox->setChecked( PPU[2] & 0x20 );
+	      vblank_cbox->setChecked( ppuStat & 0x80 );
+	  sprite0hit_cbox->setChecked( ppuStat & 0x40 );
+	spriteOvrflw_cbox->setChecked( ppuStat & 0x20 );
 
 	grid1->addWidget( bgEnabled_cbox   , 3, 0 );
 	grid1->addWidget( sprites_cbox     , 4, 0 );

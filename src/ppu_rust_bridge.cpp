@@ -29,6 +29,7 @@
 #include "ppu.h"           // FCEUPPU_Init / Power / Shutdown / FCEUX_PPURead
 #include "ppu_class.h"     // fceu11::g_ppu.ntaram() / vnapage()
 #include "ppu_bridge_state.h"  // Step B.4: bridge_state_refresh_from_rust / bridge_oam
+#include "debug.h"             // SpriteDMA mirror (see $4014 below)
 
 extern "C" {
 #include "rust/fceux11_rust.h"  // cbindgen output for fceux11_ppu_*
@@ -699,6 +700,30 @@ uint16_t ppu_rust_bridge_get_v() {
     return fceux11_ppu_get_v_state(g_ppu_state);
 }
 
+uint8_t ppu_rust_bridge_get_x_offset() {
+    if (g_ppu_state == nullptr) {
+        return 0;
+    }
+    bridge_state_refresh_from_rust();  // staging mirrors hold fine X
+    return bridge_xoffset;
+}
+
+uint8_t ppu_rust_bridge_get_vram_buffer() {
+    if (g_ppu_state == nullptr) {
+        return 0;
+    }
+    bridge_state_refresh_from_rust();  // staging mirrors hold the $2007 read buffer
+    return bridge_vram_buffer;
+}
+
+uint8_t ppu_rust_bridge_get_data_bus() {
+    if (g_ppu_state == nullptr) {
+        return 0;
+    }
+    bridge_state_refresh_from_rust();  // staging mirrors hold the open-bus latch
+    return bridge_ppu_gen_latch;
+}
+
 void ppu_rust_bridge_note_nt_write(uint32_t ppu_addr) {
     if (g_ppu_state == nullptr) {
         return;
@@ -805,6 +830,13 @@ void ppu_rust_bridge_cpu_write(uint32_t addr, uint8_t value) {
     // writes are invisible (rom_regression nestest frames 3+).
     if (addr == 0x2007) {
         bridge_refresh_windows();
+    }
+    if (addr == 0x4014) {
+        // Step B.4: keep the legacy SpriteDMA mirror live. The retired C++
+        // B4014 handler was its only writer (ppu.cpp:1151); the Rust PPU
+        // owns the DMA now, so the bridge mirrors the page byte for
+        // debug.cpp's memory viewer ($4014 register display).
+        SpriteDMA = value;
     }
 }
 

@@ -157,6 +157,9 @@ uint8_t  ppu_rust_bridge_get_oam(uint32_t addr);       // $2004 semantics (addr 
 int16_t  ppu_rust_bridge_get_scanline();
 uint16_t ppu_rust_bridge_get_dot();
 uint16_t ppu_rust_bridge_get_v();                      // NES v / FCEUX RefreshAddr
+uint8_t  ppu_rust_bridge_get_x_offset();               // fine X / FCEUX XOffset
+uint8_t  ppu_rust_bridge_get_vram_buffer();            // $2007 read buffer / FCEUX VRAMBuffer
+uint8_t  ppu_rust_bridge_get_data_bus();               // open-bus latch / FCEUX PPUGenLatch
 void     ppu_rust_bridge_note_nt_write(uint32_t ppu_addr);
 void     ppu_rust_bridge_note_palette_write();
 
@@ -183,6 +186,9 @@ inline uint8_t  ppu_rust_bridge_get_oam(uint32_t /*addr*/) { return 0; }
 inline int16_t  ppu_rust_bridge_get_scanline() { return 0; }
 inline uint16_t ppu_rust_bridge_get_dot() { return 0; }
 inline uint16_t ppu_rust_bridge_get_v() { return 0; }
+inline uint8_t  ppu_rust_bridge_get_x_offset() { return 0; }
+inline uint8_t  ppu_rust_bridge_get_vram_buffer() { return 0; }
+inline uint8_t  ppu_rust_bridge_get_data_bus() { return 0; }
 inline void     ppu_rust_bridge_note_nt_write(uint32_t /*ppu_addr*/) {}
 inline void     ppu_rust_bridge_note_palette_write() {}
 inline int  ppu_rust_bridge_emit_one_cpu_cycle() { return 0; }
