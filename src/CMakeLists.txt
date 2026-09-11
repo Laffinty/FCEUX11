@@ -225,6 +225,7 @@ set(SRC_CORE ${SRC_CORE}
   	${CMAKE_CURRENT_SOURCE_DIR}/ppu_rendering.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/ppu_state.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/ppu_bridge_state.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/ppu_shared.cpp        # v2.1.1.7 Step B.2: no-op FCEUPPU_LineUpdate stub
   	${CMAKE_CURRENT_SOURCE_DIR}/ppu_sprite_lut.cpp   # hotfix2 P0-1: 65536-entry sprite LUT
   	${CMAKE_CURRENT_SOURCE_DIR}/pputile_template.cpp # hotfix2 P0-3: template<uint8_t Flags> FetchAndDrawTile
   	${CMAKE_CURRENT_SOURCE_DIR}/ppu_core.cpp

@@ -14,9 +14,7 @@
 #include "ppu_class.h"
 
 // Forward decl — ppu.h can't be included here (circular: ppu.h
-// already includes ppu_class.h). The actual definition is in ppu.cpp;
-// notify_line_update() below calls it.
-void FCEUPPU_LineUpdate();
+// already includes ppu_class.h).
 
 namespace fceu11 {
 
@@ -155,11 +153,11 @@ void Ppu::set_mirror_pages(uint8_t a, uint8_t b, uint8_t c, uint8_t d) noexcept 
     vnapage_[3] = nt + (d & 0x3) * 0x400;
 }
 void Ppu::notify_line_update() noexcept {
-    // FCEUPPU_LineUpdate is defined in ppu.cpp. We can't include
-    // ppu.h here (circular: ppu.h includes ppu_class.h), so the
-    // declaration is provided as a forward decl at the top of this
-    // file.
-    FCEUPPU_LineUpdate();
+    // B.2: this used to forward to FCEUPPU_LineUpdate(), the mid-line
+    // flush. That flush is a no-op under the Rust PPU engine (the
+    // renderer reads CHR/NT window copies refreshed at scanline
+    // granularity), so the call was removed with the B.2 batch. The
+    // entry point stays until Step C retires the class.
 }
 
 // ---------------------------------------------------------------------------

@@ -21,7 +21,7 @@
 //     batch).
 //
 // Register-port handlers (DECLFR/DECLFW A2002-B4014) and old render
-// helpers (DoLine / RefreshLine / FCEUPPU_LineUpdate) STAY in ppu.cpp
+// helpers (DoLine / RefreshLine) STAY in ppu.cpp
 // for this batch. They form a tightly-coupled unit (B2007 reads via
 // the same VRAMBuffer/PPUGenLatch that A2007 writes; B2001 writes
 // `deemp` that FCEUPPU_Loop reads). Splitting them requires promoting

@@ -85,7 +85,6 @@ endo:
 
 static INLINE int CheckColor(int w)
 {
-	FCEUPPU_LineUpdate();
 
     if(newppu)
     {

@@ -86,7 +86,6 @@ static void ZapperFrapper(uint8 *bg, uint8 *spr, uint32  linets, int final)
 
 static INLINE int CheckColor(void)
 { 
- FCEUPPU_LineUpdate();
  
  if((ZD.zaphit+10)>=(timestampbase+g_cpu.timestamp_ref())) return(0);
  

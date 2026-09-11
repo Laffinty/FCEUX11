@@ -258,22 +258,11 @@ void ResetRL(uint8 *target) {
 	Pline = target;
 	firsttile = 0;
 	linestartts = g_cpu.timestamp_ref() * 48 + g_cpu.native_layout().count;
-	tofix = 0;
-	FCEUPPU_LineUpdate();
+	// B.2: the mid-line flush (FCEUPPU_LineUpdate) is a no-op under the
+	// Rust PPU engine; the call went away with the B.2 batch, and the
+	// symbol itself stays as an empty definition in ppu_shared.cpp
+	// until Step C deletes this file.
 	tofix = 1;
-}
-
-void FCEUPPU_LineUpdate(void) {
-	if (newppu)
-		return;
-
-#ifdef FCEUDEF_DEBUGGER
-	if (!fceuindbg)
-#endif
-	if (Pline) {
-		int l = GETLASTPIXEL;
-		RefreshLine(l);
-	}
 }
 
 void fceu11::SetRenderPlanes(bool sprites, bool bg) {

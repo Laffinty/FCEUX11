@@ -614,7 +614,6 @@ static DECLFR(A2002) {
 
 	uint8 ret;
 
-	FCEUPPU_LineUpdate();
 
 	// Step 1.2 ($2002 VBL-set suppression, 2026-08-01): newppu only.
 	// Working-config VBL flag sets at the sl240→sl241 boundary (cycle 0 of
@@ -796,13 +795,11 @@ static DECLFR(A2004) {
 			return ret;
 		}
 	} else {
-		FCEUPPU_LineUpdate();
 		return PPUGenLatch;
 	}
 }
 
 static DECLFR(A200x) {	/* Not correct for $2004 reads. */
-	FCEUPPU_LineUpdate();
 	uint8 ret = PPUGenLatch;
 	if (A == 0x2000) opendecay_log_read2000(ret);
 	return ret;
@@ -885,7 +882,6 @@ static DECLFR(A2007) {
 	} else {
 
 		//OLDPPU
-		FCEUPPU_LineUpdate();
 
 		if (tmp >= 0x3F00) {	// Palette RAM tied directly to the output data, without VRAM buffer
 			if (!(tmp & 3)) {
@@ -957,7 +953,6 @@ static DECLFR(A2007) {
 }
 
 static DECLFW(B2000) {
-	FCEUPPU_LineUpdate();
 	PPUGenLatch = V;
 	opendecay_log_write(V);
 
@@ -979,7 +974,6 @@ static DECLFW(B2000) {
 }
 
 static DECLFW(B2001) {
-	FCEUPPU_LineUpdate();
 	// E-1 probe (Phase 1 Step 1.4, 2026-08-03): $2001 (PPUMASK) write dot
 	// recorder. PPUON = PPU[1]&0x18 (BG/sprite enable) takes effect
 	// immediately here; abs is in CPU cycles (1 cyc = 3 dots) and count is
@@ -1036,7 +1030,6 @@ static DECLFW(B2004) {
 
 static DECLFW(B2005) {
 	uint32 tmp = TempAddr;
-	FCEUPPU_LineUpdate();
 	PPUGenLatch = V;
 	opendecay_log_write(V);
 	if (!vtoggle) {
@@ -1058,7 +1051,6 @@ static DECLFW(B2005) {
 
 
 static DECLFW(B2006) {
-	FCEUPPU_LineUpdate();
 
 	PPUGenLatch = V;
 	opendecay_log_write(V);

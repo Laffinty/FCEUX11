@@ -87,6 +87,9 @@ void GetRenderPlanes(bool& sprites, bool& bg);
 // FCEUPPU_Loop / FCEUX_PPU_Loop are already declared in ppu.h (transitive
 // include via ppu_rendering.h). FCEUPPU_LineUpdate is declared in ppu.h
 // too. Definitions moved from ppu.cpp to ppu_rendering.cpp (Batch D).
+// B.2 (2026-09-11): FCEUPPU_LineUpdate moved again, to ppu_shared.cpp, as
+// an empty function - the mid-line flush is a no-op under the Rust PPU
+// engine.
 
 // makeppulut initializes ppulut1/2/3 (file-static in ppu_rendering.cpp).
 // Called once from FCEUPPU_Init (lives in ppu.cpp) and once from

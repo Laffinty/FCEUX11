@@ -177,7 +177,6 @@ void setprg32r(int r, uint32 A, uint32 V) {
 
 void setchr1r(int r, uint32 A, uint32 V) {
 	if (!fceu11::g_bus.chr_ptr()[r]) return;
-	FCEUPPU_LineUpdate();
 	V &= fceu11::g_bus.chr_mask1()[r];
 	// v2.0_hotfix1 P0: Extra safety — clamp to actual CHR size to
 	// protect against mappers that bypass the mask (e.g. mapper 187's
@@ -193,7 +192,6 @@ void setchr1r(int r, uint32 A, uint32 V) {
 
 void setchr2r(int r, uint32 A, uint32 V) {
 	if (!fceu11::g_bus.chr_ptr()[r]) return;
-	FCEUPPU_LineUpdate();
 	V &= fceu11::g_bus.chr_mask2()[r];
 	VPageR[(A) >> 10] = VPageR[((A) >> 10) + 1] = &fceu11::g_bus.chr_ptr()[r][(V) << 11] - (A);
 	if (fceu11::g_bus.chr_ram()[r])
@@ -204,7 +202,6 @@ void setchr2r(int r, uint32 A, uint32 V) {
 
 void setchr4r(int r, unsigned int A, unsigned int V) {
 	if (!fceu11::g_bus.chr_ptr()[r]) return;
-	FCEUPPU_LineUpdate();
 	V &= fceu11::g_bus.chr_mask4()[r];
 	VPageR[(A) >> 10] = VPageR[((A) >> 10) + 1] =
 							VPageR[((A) >> 10) + 2] = VPageR[((A) >> 10) + 3] = &fceu11::g_bus.chr_ptr()[r][(V) << 12] - (A);
@@ -218,7 +215,6 @@ void setchr8r(int r, uint32 V) {
 	int x;
 
 	if (!fceu11::g_bus.chr_ptr()[r]) return;
-	FCEUPPU_LineUpdate();
 	V &= fceu11::g_bus.chr_mask8()[r];
 	for (x = 7; x >= 0; x--)
 		VPageR[x] = &fceu11::g_bus.chr_ptr()[r][V << 13];
