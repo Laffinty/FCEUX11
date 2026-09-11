@@ -35,18 +35,25 @@
 #include <cstdint>
 
 // ----------------------------------------------------------------------------
-// Savestate scratch addresses.
+// Savestate load path.
 //
-// These mirror `TempAddr` / `RefreshAddr` (declared as reference aliases in
-// ppu_class.h) at the moment of FCEUPPU_SaveState and restore them on
-// FCEUPPU_LoadState. They live here in ppu_state.cpp because the only
-// sites that touch them are the Save/LoadState hooks in this file.
+// v2.1.1.7 Step B.1 batch 4 (D1-A): a loaded savestate no longer round-trips
+// the C++ engine globals. chunk-3 / chunk-31 deserialise straight into the
+// bridge-owned staging block (see ppu_bridge_state.cpp), and this hook pushes
+// that block back into the live Rust PPU - register file, primary OAM, the
+// v/t address latches, the $2005/$2006 write toggle, the open-bus data latch
+// and the raster position - then re-installs the CHR / NT / palette window
+// copies and the mirror mode, so the first frame after the load renders from
+// the loaded state instead of stale window data.
+//
+// The pre-batch-4 body restored the file-static `TempAddrT` / `RefreshAddrT`
+// scratch copies. Those were in-process only (chunk-3 stopped serialising
+// them in batch 3, so they could never survive a state file), and the write
+// path that kept them fresh is gone with them.
 // ----------------------------------------------------------------------------
-static uint16 TempAddrT, RefreshAddrT;
 
 void FCEUPPU_LoadState(int version) {
-	TempAddr = TempAddrT;
-	RefreshAddr = RefreshAddrT;
+	bridge_state_apply_to_rust();
 }
 
 // v2.1.1.7 Step B.1 (D1-A): chunk-3 (PPUR/SPRA/PSPL/XOFF/VTGL/RADD/
@@ -116,9 +123,5 @@ SFORMAT FCEU_NEWPPU_STATEINFO[] = {
 void FCEUPPU_SaveState(void) {
 	// v2.1.1.7 Step B.1 (D1-A): pull the live Rust PPU state into the
 	// bridge staging block before the SFORMAT tables serialise it.
-	// TempAddrT / RefreshAddrT are no longer referenced by chunk-3; the
-	// scratch copies stay until batch 4 rewires FCEUPPU_LoadState().
 	bridge_state_refresh_from_rust();
-	TempAddrT = TempAddr;
-	RefreshAddrT = RefreshAddr;
 }
