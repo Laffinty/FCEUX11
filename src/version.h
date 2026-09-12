@@ -56,10 +56,10 @@
 #define FCEU_COMPILER_DETAIL ""
 #endif
 
-// v2.1-rc1 — Phase A v2.1.1 re-baseline (read_buffer spec parity) + rc1 release build
+// v2.1.2 (2026-09-13): Rust PPU rendering, sprite and palette fixes
 inline constexpr int FCEU_VERSION_MAJOR = 2;
 inline constexpr int FCEU_VERSION_MINOR = 1;
-inline constexpr int FCEU_VERSION_PATCH = 0;
+inline constexpr int FCEU_VERSION_PATCH = 2;
 inline constexpr int FCEU_VERSION_TWEAK = 0;
 
 inline constexpr int FCEU_VERSION_NUMERIC = (FCEU_VERSION_MAJOR * 10000) + (FCEU_VERSION_MINOR * 100) + FCEU_VERSION_PATCH;
@@ -67,12 +67,12 @@ inline constexpr int FCEU_VERSION_MAJOR_DECODE(int x) { return x / 10000; }
 inline constexpr int FCEU_VERSION_MINOR_DECODE(int x) { return (x / 100) % 100; }
 inline constexpr int FCEU_VERSION_PATCH_DECODE(int x) { return x % 100; }
 
-// v2.1-rc1 release candidate — no hotfix tag.
+// v2.1.2 release build.
 // Clear FCEU_HOTFIX_TAG to "" for final release builds.
 #define FCEU_HOTFIX_TAG ""
 
-#define FCEU_VERSION_STRING "2.1-rc1 " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
-#define FCEU_DISPLAY_VERSION "v2.1-rc1"
+#define FCEU_VERSION_STRING "2.1.2 " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
+#define FCEU_DISPLAY_VERSION "v2.1.2"
 #define FCEU_NAME_AND_VERSION FCEU_NAME " " FCEU_DISPLAY_VERSION
 
 // FCEUX11 Contributors — Derivative work based on FCEUX

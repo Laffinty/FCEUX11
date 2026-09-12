@@ -6,6 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [2.1.2] - 2026-09-13 - Rust PPU 渲染与颜色修复（KIRA.nes 全链路排障）
+
+### Fixed
+
+- **MMC3 IRQ 行不再被 FFI 回写覆盖**（7c8ccd4）：Rust CPU 每次 run 结束整块写回 X6502 blob 时，会把调用开始快照里的 irq_low 一并写回，覆盖 mapper/APU 在同一次调用中途对 IRQ 行的改动。KIRA.nes 的 MMC3 中断应答（写 E000）因此被抹掉，CPU 无限重入 IRQ 处理程序、画面冻结。现在 host 拥有的 IRQ 线（EXTERNAL/EXTERNAL2/DPCM/FRAME）一律以 host 当前值为准。
+- **dot 257 应复制水平滚动位**（feecb3e）：可见扫描线的 dot 257 误用 copy_vertical，导致每行都把垂直滚动重置回 t，每行取同一行 tile、水平位还带着取块的 34 步偏移；真实游戏只剩一片底色加精灵噪点。按 PPU_frame_timing 与 PPU_scrolling 改为 copy_horizontal（垂直复制只属于预渲染行的 dots 280-304）。
+
+- **精灵调色板区、翻转与 8x16 寻址**（d099db1）：精灵像素误用 palette[0..15]（背景调色板），现改为 3F10-3F1F 区（0x10 加 attr 选择乘 4 加 color）；补上 OAM 属性 bit6/bit7 的水平与垂直翻转（含 8x16 两块交换）；8x16 下半块改用奇数 tile 的 lo/hi 平面。
+- **调色板地址折叠**（fc1aec9）：mirror_data_addr 曾把 3F00-3FFF 全部折叠到 3F00-3F0F，写 3F11（精灵调色板）会落到 3F01（背景调色板），精灵调色板永远为空（角色变纯灰）且背景调色板被精灵写覆盖（界面颜色异常）。按 PPU_palettes 改为：索引等于 addr 与 0x1F，仅低 4 位为 0 的项与 3F0x 共享存储。
+
+### Added
+
+- **docs/knowledge_base/**：把 NESdev Wiki 权威页面（PPU 渲染/滚动/调色板/OAM/寄存器/帧时序/命名表/上电状态/开放总线、APU 帧计数器、iNES 与 NES 2.0 头、MMC3、NTSC 视频）整理为 Markdown 知识库，按子系统分类、统一命名并保留来源头。
+- **docs/knowledge_base/engineering/**：本次排障沉淀的方法论条目（无头导帧排障、Rust 与 C++ 共享状态所有权、测试门禁陷阱）。
+
+
+### Changed
+
+- 版本号提升到 **v2.1.2**（src/version.h）：主窗口标题与「关于」对话框显示 FCEUX11 v2.1.2。
+
+### Tests
+
+- cargo test -p fceux11-ppu --lib 89/89；全量 ctest 41 项等于 40 PASS / 1 SKIP / 0 FAIL。
+- 基准再生成：tests/fixtures/golden_hashes.json（nestest 帧 3-7）与 tests/fixtures/golden_savestate_hashes.json（nestest）；其余 11 个 ROM、全部 mapper byte-diff 与像素门禁不变。
+
+### Known limitations
+
+- 左 8 像素裁剪（2001 的 bit1 与 bit2）尚未实现：依赖它做分屏遮罩的游戏会在左边缘多出 8 像素内容。
+- Rust PPU 尚未驱动显示侧的 XDBuf（逐像素 emphasis 位平面）：使用 emphasis 的游戏强调色可能仍不完全准确。
+
+
+
 ## [2.1.1] - 2026-09-12 - C++ PPU 退役线收口
 
 ### Changed

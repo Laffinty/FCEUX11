@@ -70,3 +70,14 @@
 - 其他权威资料：Mesen2 / Nestopia UE / ares 源码注释中的时序说明（作为交叉验证，不作为唯一依据）。
 - 官方文档：NES 开发手册（如 Nintendo 的 2A03/2C02 手册扫描件，若可获得）。
 
+
+## 7. engineering 目录（工程经验，非硬件事实）
+
+该目录收录本项目自己的排障与工程经验，命名用 <topic>.md（与硬件页面的命名规则区分开）。
+
+| 主题 | 文件 | 用途 |
+|---|---|---|
+| PPU 画面回归排障方法论 | [engineering/debugging_ppu_regressions.md](engineering/debugging_ppu_regressions.md) | 症状到检查点映射、导帧/ASCII/探针/A-B 工具链 |
+| Rust 与 C++ 共享状态所有权 | [engineering/rust_state_ownership.md](engineering/rust_state_ownership.md) | X6502 blob 整块回写陷阱（IRQ 行案例） |
+| 测试门禁的陷阱与设计 | [engineering/test_gate_pitfalls.md](engineering/test_gate_pitfalls.md) | 弱基准陷阱、反向验证、基准再生成纪律 |
+
