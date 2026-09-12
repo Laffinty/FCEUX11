@@ -32,12 +32,12 @@
 //! Known simplifications vs. cycle-accurate hardware:
 //! - No per-dot shift registers: the pattern row is fetched once per
 //!   scanline and indexed per pixel.
-//! - No flip handling is wired through the batch path (attr bits 6/7
-//!   are latched but horizontal/vertical flip are not applied yet).
+//! - Horizontal (OAM attr bit 6) and vertical (bit 7) flip ARE applied,
+//!   including the 8x16 subtile exchange for vertical flip (PPU_OAM).
 //! - The left-edge 8-pixel clip ($2001 bits 1-2) is not applied, so
 //!   hit checks at x 0..=7 are only correct when clipping is off.
-//! - Palette lookup uses `palette[color_2bit | quadrant << 2]`
-//!   (0x00-0x0F region), matching the BG writer's convention.
+//! - Sprite pixels read the sprite palette region (0x10 plus attr select
+//!   times 4 plus the 2-bit color); BG pixels read the 0x00 region.
 //! - Opaque BG pixels whose palette entry happens to duplicate the
 //!   backdrop color are misjudged transparent (the framebuffer stores
 //!   palette RAM *values*, not indices — an exact bitmap would need a
@@ -126,13 +126,26 @@ pub fn render_sprites_for_scanline<B: PpuBus + ?Sized>(
         let in_range = y < 0xFF && (y as i16) <= sl && sl < (y as i16) + sprite_height;
         if in_range && n_sprites < MAX_SPRITES_PER_LINE {
             let fine_y = (sl - y as i16) as u16;
+            // OAM attribute bit 7 = vertical flip: mirror the row inside the
+            // sprite. In 8x16 mode this also exchanges the two subtiles --
+            // nesdev PPU_OAM: the odd-numbered tile of a vertically flipped
+            // sprite is drawn on top -- the pair addressing below handles the exchange
+            let row = if attr & 0x80 != 0 {
+                (sprite_height as u16) - 1 - fine_y
+            } else {
+                fine_y
+            };
             let pat_addr = if sprite_height == 16 {
                 // 8x16: tile bit 0 selects the pattern table, the
                 // upper 7 bits select the tile pair.
                 let base: u16 = if tile & 1 != 0 { 0x1000 } else { 0x0000 };
-                base + (tile as u16 & 0xFE) * 16 + fine_y
+                // Tile pair: rows 0..7 use the even tile, rows 8..15 the odd
+                // one (PPU_OAM). Adding row directly would read the previous
+                // tile hi-plane for the lower half. Vertical flip exchanges
+                // the two tiles here for free.
+                base + ((tile as u16 & 0xFE) + (row >> 3)) * 16 + (row & 7)
             } else {
-                sprite_pattern_base + tile as u16 * 16 + fine_y
+                sprite_pattern_base + tile as u16 * 16 + row
             };
             spr_tile[n_sprites] = tile;
             spr_attr[n_sprites] = attr;
@@ -214,8 +227,14 @@ pub fn render_sprites_for_scanline<B: PpuBus + ?Sized>(
             if x - sprite_x_pos >= 8 {
                 continue;
             }
-            // Bit position within the 8-bit pattern: 7 - (x - sprite_x_pos).
-            let bit = 7u16 - (x - sprite_x_pos);
+            // Bit position within the 8-bit pattern. OAM attribute bit 6 =
+            // horizontal flip: the leftmost pixel then comes from pattern bit
+            // 0 (nesdev PPU_OAM).
+            let bit = if spr_attr[i] & 0x40 != 0 {
+                x - sprite_x_pos
+            } else {
+                7u16 - (x - sprite_x_pos)
+            };
             let pat0 = (spr_pat_lo[i] >> bit) & 1;
             let pat1 = (spr_pat_hi[i] >> bit) & 1;
             let color_2bit = pat0 | (pat1 << 1);
@@ -242,7 +261,11 @@ pub fn render_sprites_for_scanline<B: PpuBus + ?Sized>(
                 let sprite_color_4bit = color_2bit | (attr_quadrant << 2);
                 let sprite_wins = !priority_behind_bg || bg_is_transparent;
                 if sprite_wins {
-                    let pal_idx = palette[sprite_color_4bit as usize] & gray_mask;
+                    // Sprites address palettes 3F10-3F1F: the 5-bit palette-RAM
+                    // index is 0x10 plus (attr select times 4) plus the 2-bit
+                    // pattern color (nesdev PPU_palettes). Reading palette[0..15]
+                    // here handed sprites the background palettes.
+                    let pal_idx = palette[0x10 + sprite_color_4bit as usize] & gray_mask;
                     palette_adjust_pixel(pal_idx, mask)
                 } else {
                     bg_out
@@ -348,7 +371,7 @@ mod tests {
         bus.chr[0x01 * 16] = 0xFF;
 
         let mut palette = [0u8; 32];
-        palette[1] = 0x16;
+        palette[0x11] = 0x16;
 
         let row = render_row(&mut state, &mut bus, &palette, SHOW_SPRITES_ONLY, 0);
         let expected = palette_adjust_pixel(0x16, SHOW_SPRITES_ONLY);
@@ -369,7 +392,7 @@ mod tests {
         bus.chr[0x01 * 16] = 0xFF;
 
         let mut palette = [0u8; 32];
-        palette[1] = 0x16;
+        palette[0x11] = 0x16;
         // Backdrop entry 0 → the BG pass writes the "transparent"
         // backdrop pixel (low 6 bits all zero).
         palette[0] = 0x00;
@@ -400,7 +423,7 @@ mod tests {
         bus.chr[0x01 * 16] = 0xFF;
 
         let mut palette = [0u8; 32];
-        palette[1] = 0x16;
+        palette[0x11] = 0x16;
         // Opaque BG pixel: a non-backdrop palette entry (low bits set).
         palette[5] = 0x25;
         let bg_pixel = palette_adjust_pixel(0x25, SHOW_BG_AND_SPRITES);
@@ -424,7 +447,7 @@ mod tests {
     #[test]
     fn sprite_zero_hit_records_dot_regardless_of_priority() {
         let mut palette = [0u8; 32];
-        palette[1] = 0x16;
+        palette[0x11] = 0x16;
         palette[5] = 0x25;
         let opaque_bg = palette_adjust_pixel(0x25, SHOW_BG_AND_SPRITES);
         let backdrop_bg = palette_adjust_pixel(0x00, SHOW_BG_AND_SPRITES);
@@ -531,7 +554,7 @@ mod tests {
         bus.chr[0x01 * 16] = 0xFF;
 
         let mut palette = [0u8; 32];
-        palette[1] = 0x16;
+        palette[0x11] = 0x16;
         let expected = palette_adjust_pixel(0x16, SHOW_SPRITES_ONLY);
 
         let row = render_row(&mut state, &mut bus, &palette, SHOW_SPRITES_ONLY, 0);
@@ -554,7 +577,7 @@ mod tests {
         bus.chr[0x01 * 16] = 0xFF;
 
         let mut palette = [0u8; 32];
-        palette[1] = 0x16;
+        palette[0x11] = 0x16;
         let expected = palette_adjust_pixel(0x16, SHOW_SPRITES_ONLY);
 
         // Sprite Y=10 covers scanlines 10..17.
@@ -583,7 +606,7 @@ mod tests {
         bus.chr[0x1000] = 0xFF;
 
         let mut palette = [0u8; 32];
-        palette[1] = 0x16;
+        palette[0x11] = 0x16;
         let expected = palette_adjust_pixel(0x16, SHOW_SPRITES_ONLY);
 
         let row = render_row(&mut state, &mut bus, &palette, SHOW_SPRITES_ONLY, 0);
@@ -600,7 +623,7 @@ mod tests {
         bus.chr[0x01 * 16] = 0xFF;
 
         let mut palette = [0u8; 32];
-        palette[1] = 0x16;
+        palette[0x11] = 0x16;
 
         let row = render_row(&mut state, &mut bus, &palette, SHOW_BG, 0);
         assert!(
@@ -608,4 +631,68 @@ mod tests {
             "no sprite pixels when SHOW_SPRITES is cleared"
         );
     }
+
+    #[test]
+    fn sprite_uses_sprite_palette_region() {
+        let mut state = PpuState::new();
+        state.registers.write_mask(SHOW_SPRITES_ONLY);
+        set_sprite(&mut state.oam, 0, 0, 0x01, 0x00, 10);
+        let mut bus = FlatBus::new();
+        bus.chr[0x01 * 16] = 0xFF;
+        let mut palette = [0u8; 32];
+        palette[0x11] = 0x16;
+        palette[0x01] = 0x11;
+        let row = render_row(&mut state, &mut bus, &palette, SHOW_SPRITES_ONLY, 0);
+        let expected = palette_adjust_pixel(0x16, SHOW_SPRITES_ONLY);
+        assert_eq!(row[10], expected, "sprite pixel must use the 3F10 sprite palette");
+    }
+
+    #[test]
+    fn sprite_horizontal_flip_mirrors_pattern() {
+        let mut state = PpuState::new();
+        state.registers.write_mask(SHOW_SPRITES_ONLY);
+        set_sprite(&mut state.oam, 0, 0, 0x01, 0x40, 10);
+        let mut bus = FlatBus::new();
+        bus.chr[0x01 * 16] = 0x80;
+        let mut palette = [0u8; 32];
+        palette[0x11] = 0x16;
+        let row = render_row(&mut state, &mut bus, &palette, SHOW_SPRITES_ONLY, 0);
+        let expected = palette_adjust_pixel(0x16, SHOW_SPRITES_ONLY);
+        assert_eq!(row[10], 0, "flipped sprite: pattern bit 7 is no longer leftmost");
+        assert_eq!(row[17], expected, "flipped sprite: bit 7 shows at the right edge");
+    }
+
+
+    #[test]
+    fn sprite_vertical_flip_mirrors_rows() {
+        let mut state = PpuState::new();
+        state.registers.write_mask(SHOW_SPRITES_ONLY);
+        set_sprite(&mut state.oam, 0, 0, 0x01, 0x80, 10);
+        let mut bus = FlatBus::new();
+        bus.chr[0x01 * 16] = 0x80;
+        bus.chr[0x01 * 16 + 7] = 0x01;
+        let mut palette = [0u8; 32];
+        palette[0x11] = 0x16;
+        let row = render_row(&mut state, &mut bus, &palette, SHOW_SPRITES_ONLY, 0);
+        let expected = palette_adjust_pixel(0x16, SHOW_SPRITES_ONLY);
+        assert_eq!(row[10], 0, "vertical flip: sl 0 must use pattern row 7");
+        assert_eq!(row[17], expected, "vertical flip: pattern row 7 bit 0 is rightmost");
+    }
+
+    #[test]
+    fn eight_by_sixteen_lower_half_uses_the_odd_tile() {
+        let mut state = PpuState::new();
+        state.registers.write_mask(SHOW_SPRITES_ONLY);
+        state.registers.write_ctrl(0x20);
+        set_sprite(&mut state.oam, 0, 0, 0x02, 0x00, 10);
+        let mut bus = FlatBus::new();
+        bus.chr[0x20] = 0x00;
+        bus.chr[0x30] = 0xFF;
+        let mut palette = [0u8; 32];
+        palette[0x11] = 0x16;
+        let row = render_row(&mut state, &mut bus, &palette, SHOW_SPRITES_ONLY, 8);
+        let expected = palette_adjust_pixel(0x16, SHOW_SPRITES_ONLY);
+        assert_eq!(row[10], expected, "sl 8 of an 8x16 sprite must read tile 0x30");
+    }
+
 }
