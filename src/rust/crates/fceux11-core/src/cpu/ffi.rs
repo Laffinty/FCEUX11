@@ -257,7 +257,7 @@ pub unsafe extern "C" fn fceux11_cpu_run(state: *mut u8, cycles: i32) -> i32 {
         // (it doesn't, but the ABI permits it).
         FFI_CPU_STATE.regs = *(state as *const X6502Layout);
         crate::cpu::bus::set_blob_ptr(state as *mut X6502Layout);
-        let mut bus = CppBus;
+        let mut bus = CppBus::new();
         // Use a raw pointer to the mutable static (Rust 2024
         // `static_mut_refs` deny lint forbids `&mut STATIC`).
         let state_ptr = core::ptr::addr_of_mut!(FFI_CPU_STATE);
@@ -303,7 +303,7 @@ pub unsafe extern "C" fn fceux11_cpu_run_with_tick(state: *mut u8, cycles: i32) 
     unsafe {
         FFI_CPU_STATE.regs = *(state as *const X6502Layout);
         crate::cpu::bus::set_blob_ptr(state as *mut X6502Layout);
-        let mut bus = CppBus;
+        let mut bus = CppBus::new();
         let state_ptr = core::ptr::addr_of_mut!(FFI_CPU_STATE);
         let scaled_cycles = cycles * 16;
         let cpu_cycles = run_with_tick(&mut *state_ptr, &mut bus, scaled_cycles);
@@ -326,7 +326,7 @@ pub unsafe extern "C" fn fceux11_cpu_run_ticks(state: *mut u8, ticks: i32) -> i3
     unsafe {
         FFI_CPU_STATE.regs = *(state as *const X6502Layout);
         crate::cpu::bus::set_blob_ptr(state as *mut X6502Layout);
-        let mut bus = CppBus;
+        let mut bus = CppBus::new();
         let state_ptr = core::ptr::addr_of_mut!(FFI_CPU_STATE);
         let cpu_cycles = run_with_tick(&mut *state_ptr, &mut bus, ticks);
         *(state as *mut X6502Layout) = (*state_ptr).regs;

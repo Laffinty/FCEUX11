@@ -129,7 +129,25 @@ pub extern "C" fn fceux11_cpu_noop_write_thunk(_addr: u16, _val: u8) {
 ///
 /// Constructed inline on every `fceux11_cpu_run` call; cheap because
 /// it's a zero-sized type.
-pub struct CppBus;
+pub struct CppBus {
+    /// IRQ blob value loaded from the host at the last
+    /// sync_irq_from_host. sync_irq_to_host uses it to clear only the
+    /// bits this dispatch consumed (v2.1.2 fix).
+    irq_in_snapshot: u32,
+}
+
+impl CppBus {
+    /// Build a bus with an empty IRQ snapshot.
+    pub fn new() -> Self {
+        Self { irq_in_snapshot: 0 }
+    }
+}
+
+impl Default for CppBus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 // IRQ-lookup callbacks for the C++ `X6502::IRQlow` blob. The C++ side's
 // `X6502_IRQBegin`/`X6502_IRQEnd` (called from mapper hooks and the
@@ -219,7 +237,9 @@ impl Bus for CppBus {
         // new assertions AND the clears are visible to the next
         // dispatch. No-op when the bridge is not installed (tests).
         if unsafe { IRQ_BRIDGE_INSTALLED } {
-            state.regs.irq_low = unsafe { IRQ_GET_FN() };
+            let host = unsafe { IRQ_GET_FN() };
+            self.irq_in_snapshot = host;
+            state.regs.irq_low = host;
         }
         self.fresh_sync_from_host(state);
     }
@@ -229,7 +249,17 @@ impl Bus for CppBus {
         // Push back bits consumed by Rust's dispatch (e.g. NMI) so the
         // C++ blob doesn't re-assert them on the next call.
         if unsafe { IRQ_BRIDGE_INSTALLED } {
-            unsafe { IRQ_SET_FN(state.regs.irq_low) };
+            // v2.1.2: merge instead of overwrite. The host blob owns the
+            // mapper and APU IRQ lines, and a mapper hook can assert or
+            // clear a bit DURING this dispatch (the MMC3 acknowledge
+            // write to 0xE000 is exactly that). Overwriting the blob with
+            // the Rust snapshot resurrected acknowledged IRQs, so the
+            // CPU re-entered the handler forever (KIRA.nes: irq_low
+            // stuck at 0x0001 from frame 400). Clear in the host only
+            // the bits this dispatch actually consumed.
+            let host_now = unsafe { IRQ_GET_FN() };
+            let consumed = self.irq_in_snapshot & !state.regs.irq_low;
+            unsafe { IRQ_SET_FN(host_now & !consumed) };
         }
         self.fresh_sync_to_host(state);
     }
