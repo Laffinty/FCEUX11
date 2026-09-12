@@ -51,7 +51,7 @@
 
 ## 4. 与实现/计划文档的关系
 
-- 实现细节与验收记录：[docs/plans/v2.1.2_mmc3_irq_clock.md](../plans/v2.1.2_mmc3_irq_clock.md)（PPU Rust 迁移期间的 IRQ、滚动、精灵修复）。
+- 实现细节与验收记录：[docs/history/v2.1.2_mmc3_irq_clock_archived_2026-09-13.md](../history/v2.1.2_mmc3_irq_clock_archived_2026-09-13.md)（PPU Rust 迁移期间的 IRQ、滚动、精灵修复）。
 - 本知识库只放硬件/格式事实，不放实现结论；实现结论写在 plan/commit 中。
 - 引用硬件行为时，建议在代码注释里同时写出本知识库的相对路径，便于溯源。
 

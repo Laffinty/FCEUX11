@@ -1,6 +1,6 @@
 # FCEUX11 编译指南 / Build Guide
 
-> **适用版本**：FCEUX11 v1.16+
+> **适用版本**：FCEUX11 v2.1.2
 > **目标平台**：Windows 11 22H2+（64-bit）
 > **预计首次编译时间**：30-60 分钟（取决于网络和 CPU）
 
@@ -15,7 +15,7 @@ git clone https://github.com/Laffinty/FCEUX11.git
 cd FCEUX11
 .\scripts\setup_vcpkg.ps1
 $env:VCPKG_ROOT = "$PWD\vcpkg"
-.\scripts\do_build.ps1 -Config Release
+.\scripts\do_build.ps1 -Config Release -BuildDir build-rust-ppu
 ```
 
 产物：`build\src\fceux11.exe`
@@ -101,7 +101,7 @@ $env:VCPKG_ROOT = "$PWD\vcpkg"
 ## 4. 编译
 
 ```powershell
-.\scripts\do_build.ps1 -Config Release
+.\scripts\do_build.ps1 -Config Release -BuildDir build-rust-ppu
 ```
 
 这个脚本自动完成：
@@ -124,7 +124,7 @@ $env:VCPKG_ROOT = "$PWD\vcpkg"
 
 > 如果需要完全干净重建（清空缓存重来）：
 > ```powershell
-> .\scripts\do_build.ps1 -Config Release -Clean
+> .\scripts\do_build.ps1 -Config Release -Clean -BuildDir build-rust-ppu
 > ```
 
 ---
@@ -150,7 +150,7 @@ $env:VCPKG_ROOT = "$PWD\vcpkg"
 .\scripts\copy_dependencies.ps1 -ExecutablePath .\build\src\fceux11.exe -OutputDir .\dist
 
 # 打包
-Compress-Archive -Path dist\* -DestinationPath FCEUX11-v1.16-win64.zip
+Compress-Archive -Path dist\* -DestinationPath FCEUX11-v2.1.2-win64.zip
 ```
 
 `dist` 目录可直接运行，复制到任意 Windows 11 电脑都能启动。
@@ -201,7 +201,7 @@ echo $env:VCPKG_ROOT
 $env:VCPKG_ROOT = "$PWD\vcpkg"
 
 # 重新编译
-.\scripts\do_build.ps1 -Config Release
+.\scripts\do_build.ps1 -Config Release -BuildDir build-rust-ppu
 ```
 
 ### 7.4 编译中途崩溃（编译器内存不足）
@@ -231,7 +231,7 @@ rustup default stable-x86_64-pc-windows-msvc
 
 ### 7.7 裸 `cmake --build` 报 `C1083 <cstdio>: No such file` 或 `fatal error C1034: stdafx.h`
 
-**原因**：直接 `cmake --build build`（没有走 `do_build.ps1`）时，vcvars 没有被加载，
+**原因**：直接 `cmake --build build-rust-ppu`（没有走 `do_build.ps1`）时，vcvars 没有被加载，
 `cl.exe` / `Windows SDK` 不在 `PATH` / `INCLUDE` / `LIB` 上，编译器找不到标准头文件。
 常见于：① 从裸 Git Bash 跑 `cmake --build`；② 在 PowerShell 里手动 `cmake --build` 但没先
 跑过 vcvars。
@@ -252,25 +252,21 @@ MSVC include/lib 目录、vcpkg toolchain 一次性注入当前进程的环境�
 ### 8.1 编译 Debug 版本
 
 ```powershell
-.\scripts\do_build.ps1 -Config Debug
+.\scripts\do_build.ps1 -Config Debug -BuildDir build-rust-ppu
 ```
 
-### 8.2 禁用 Rust（纯 C++ 模式）
+### 8.2 非 Rust 构建（已移除）
+
+C++ 引擎已全部退役：Rust 6502 CPU 自 Phase 7 起是唯一 CPU 实现，Rust PPU 自 v2.1.1.7 Step C 起是唯一 PPU 实现。
+因此 -DFCEUX11_ENABLE_RUST=OFF、-DFCEUX11_RUST_CPU=OFF、-DFCEUX11_RUST_PPU=OFF 都会在 CMake 配置期直接报错；
+FCEUX11_ENABLE_RUST 的正确取值是 ON（也是默认值）。
+
+### 8.2a Rust CPU 与 PPU（v2.0 / v2.1 起唯一实现，默认 ON）
 
 ```powershell
-cmake -S . -B build-cpp -G Ninja -DFCEUX11_ENABLE_RUST=OFF
-cmake --build build-cpp
-```
-
-> Lua 功能需要 Rust crate；禁用 Rust 后 Lua 脚本功能不可用，其余正常。
-> （开关名是 `FCEUX11_ENABLE_RUST`，不是 `FCEUX11_RUST_ENABLED`。）
-
-### 8.2a Rust 6502 CPU（wip2.0 Phase 3+；Phase 7 起唯一实现，默认 ON）
-
-```powershell
-cmake -S . -B build-rust-cpu -G Ninja -DCMAKE_BUILD_TYPE=Release `
+cmake -S . -B build-rust-ppu -G Ninja -DCMAKE_BUILD_TYPE=Release `
   -DFCEUX11_ENABLE_RUST=ON
-cmake --build build-rust-cpu
+cmake --build build-rust-ppu
 ```
 
 > `FCEUX11_RUST_CPU` 把 C++ `Cpu` facade（以及 TriggerNMI / IRQ 入口）路由到
@@ -282,8 +278,8 @@ cmake --build build-rust-cpu
 ### 8.3 关闭单元测试
 
 ```powershell
-cmake -S . -B build -G Ninja -DFCEUX11_BUILD_TESTS=OFF
-cmake --build build
+cmake -S . -B build-rust-ppu -G Ninja -DFCEUX11_BUILD_TESTS=OFF
+cmake --build build-rust-ppu
 ```
 
 ### 8.4 手动分步编译（不用一键脚本）
@@ -309,13 +305,13 @@ $env:PATH = "$(Split-Path -Parent $ninja);$env:PATH"
 & $ninja --version
 
 # 3. 配置
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake -S . -B build-rust-ppu -G Ninja -DCMAKE_BUILD_TYPE=Release
 
 # 4. 编译
-cmake --build build
+cmake --build build-rust-ppu
 
 # 5. 测试
-ctest --test-dir build --output-on-failure
+ctest --test-dir build-rust-ppu --output-on-failure
 ```
 
 ### 8.5 完整 CMake 选项
@@ -356,20 +352,20 @@ KagamiQA 是 FCEUX11 的双 Oracle 质量保障系统。详见 [`docs/tech/Kagam
 
 ```powershell
 # 完整构建（包含 blargg_runner、lua_runner 等）
-.\scripts\do_build.ps1 -Config Release
+.\scripts\do_build.ps1 -Config Release -BuildDir build-rust-ppu
 ```
 
 单独（重新）编译 KagamiQA 组件：
 
 ```powershell
 # blargg $6000 ROM runner (Oracle B 执行器)
-cmake --build build --config Release --target fceux11_blargg_runner
+cmake --build build-rust-ppu --config Release --target fceux11_blargg_runner
 
 # Lua 脚本 runner
-cmake --build build --config Release --target fceux11_lua_runner
+cmake --build build-rust-ppu --config Release --target fceux11_lua_runner
 
 # In-process direct runner (C ABI 直驱，需 Rust)
-cmake --build build --config Release --target kagami_qa_direct_runner
+cmake --build build-rust-ppu --config Release --target kagami_qa_direct_runner
 ```
 
 ### 10.2 编译 Rust kagami-qa-runner
@@ -401,7 +397,7 @@ cargo build --release -p kagami-qa
 ### 10.4 运行 Oracle A（CTest 回归）
 
 ```powershell
-ctest --test-dir build --build-config Release --output-on-failure -LE perf
+ctest --test-dir build-rust-ppu --build-config Release --output-on-failure -LE perf
 ```
 
 ### 10.5 运行 Oracle B（blargg 全量批处理）

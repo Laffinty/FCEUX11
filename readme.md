@@ -2,7 +2,7 @@
 
 # FCEUX11
 
-[![Version](https://img.shields.io/badge/version-v2.1.1-blue)](https://github.com/Laffinty/FCEUX11/releases)
+[![Version](https://img.shields.io/badge/version-v2.1.2-blue)](https://github.com/Laffinty/FCEUX11/releases)
 [![License](https://img.shields.io/badge/license-GPL--v2-green)](COPYING)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?logo=windows)](https://www.microsoft.com/windows/windows-11)
 [![Qt](https://img.shields.io/badge/Qt-6.8%20LTS-41CD52?logo=qt)](https://www.qt.io)
@@ -16,9 +16,8 @@
 
 ## 简介 / Introduction
 
-**FCEUX11** 是基于 [FCEUX](https://fceux.com) 的 NES/Famicom 模拟器衍生项目，针对 Windows 平台深度优化，提供完整的 mapper 兼容体系、调试工具、TAS 逐帧编辑器与录像回放功能；基于 Rust 语言全新重构 CPU/PPU 核心，具备更清晰的模块边界，更稳定的运行表现，同时严格保持硬件级的时序精度与行为还原度，支持简体中文、繁体中文、英文、日语、韩语、西班牙语、法语、德语、越南语、泰语、印地语（beta）、阿拉伯语（beta）共 12 种语言。
-
-**FCEUX11** is a derivative of the [FCEUX](https://fceux.com) NES/Famicom emulator, optimized for the Windows platform. It features full mapper compatibility, a comprehensive suite of debugging tools, a frame-by-frame TAS editor, and movie recording and playback functionality. The CPU and PPU cores have been completely reengineered from the ground up in Rust, delivering cleaner module boundaries and more stable runtime performance while strictly preserving hardware-level timing accuracy and behavioral fidelity. Localization support is provided for 12 languages: Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Spanish, French, German, Vietnamese, Thai, Hindi (beta), and Arabic (beta).
+**FCEUX11** 是基于 [FCEUX](https://fceux.com) 的 NES/Famicom 模拟器衍生项目，针对 Windows 平台深度优化：完整的 mapper 兼容体系、调试工具、TAS 逐帧编辑器、录像回放与 12 种语言界面。CPU 与 PPU 核心已用 Rust 从零重写（自 v2.0 起 6502 CPU 为纯 Rust 实现，自 v2.1.1 起 PPU 亦为纯 Rust 实现，C++ 引擎已退役），模块边界更清晰、状态更可控；在保持硬件级时序与行为还原的前提下仍有充足实时余量（实测数据与复现命令见下方「性能」一节）。
+**FCEUX11** is a derivative of the [FCEUX](https://fceux.com) NES/Famicom emulator, optimized for Windows: a complete mapper set, debugging tools, a frame-by-frame TAS editor, movie recording/playback and a 12-language UI. Both cores have been rewritten from scratch in Rust (6502 CPU since v2.0, PPU since v2.1.1; the C++ engines are retired), giving cleaner module boundaries and more controllable state, and - with hardware-level timing and behavioural fidelity preserved - leaves ample real-time headroom (see the Performance section for measured numbers and how to reproduce them).
 
 ---
 
@@ -38,6 +37,24 @@
 | **即时存档**：随时随地保存 / 读取进度，支持自动存档历史记录。 | **Save States**: Save / load anywhere with automatic state history. |
 
 ---
+
+---
+
+## 性能 / Performance
+
+以下是 v2.1.2 Release 构建在本项目参考机器上的实测值（无头模式，每种基准 5 次取平均；60 帧 = NTSC 1 秒）：
+
+| 基准 | ROM | 60 帧耗时 | 每帧 | 相对实时 |
+|---|---|---|---|---|
+| 整机 CPU+PPU+APU | mapper_mmc3 | 241 ms | 4.0 ms | 约 4.1 倍 |
+| PPU 渲染 | mapper_nrom | 245 ms | 4.1 ms | 约 4.1 倍 |
+| CPU（nestest，CPU 密集） | nestest | 373 ms | 6.2 ms | 约 2.7 倍 |
+| Bus dispatch | nestest | 369 ms | 6.2 ms | 约 2.7 倍 |
+
+- **复现**：运行 ctest --test-dir build-rust-ppu -R bench_tolerance_test --output-on-failure，或直接运行 tests 目录下的 fceux11_bench_x6502_exec.exe、fceux11_bench_ppu_render.exe、fceux11_bench_apu_mix.exe、fceux11_bench_bus_dispatch.exe，参数为对应 ROM 路径。
+- **性能门禁**：bench_tolerance_test 以 tests/fixtures/bench_baseline.json 为基线，容忍 2.5% 的回退、加速永远通过；当前 5/5 PASS。
+- **架构原因**：CPU/PPU 以 1 个 PPU dot 为粒度交错，整帧只跨 FFI 一次；早期由 C++ 侧驱动的逐 dot 循环约 26.8 万次边界跨越每帧，是当时约 +165% 性能回退的主因。
+- **客观说明**：v2.1 的逐 dot 交错用原始吞吐换取了周期级相位精度：退役的批处理模型在旧基线上是 65-68 ms 每 60 帧，但无法保证 CPU/PPU 相位、mapper hook 与 NMI 时序；v2.1.2 另外修复了会造成画面冻结的 IRQ 风暴与逐扫描线滚动错误，因此实际游玩更顺。以上数字为特定机器与 ROM 组合下的实测值，仅供参考。
 
 ## 系统要求 / System Requirements
 
@@ -86,18 +103,10 @@ Launch `fceux11.exe`, load a game via **File → Open ROM**, play with keyboard 
 
 ---
 
-## 质量保障 / Quality Assurance
-
-FCEUX11 在 CI 上以 **KagamiQA** 双 Oracle 体系持续追踪回归与硬件精度：Oracle A 为 CTest 回归套件（ctest、ROM 回归、savestate 回归、mapper 字节级比对），Oracle B 为 blargg ROM 硬件精度对比。最新的基线冻结、Grade 等级与已知失败项见 [ChangeLog.md](docs/ChangeLog.md)。
-
-FCEUX11 tracks regressions and hardware accuracy in CI through the **KagamiQA** dual-oracle system: Oracle A is the CTest regression suite (ctest, ROM regression, savestate regression, mapper byte-diff), Oracle B is the blargg-ROM hardware-accuracy comparison. The latest frozen baseline, grade, and known failures live in [ChangeLog.md](docs/ChangeLog.md).
-
----
-
 ## 版本历史 / Changelog
 
-详见 [ChangeLog.md](docs/ChangeLog.md)。当前稳定版为 **v2.1.1**。
-See [ChangeLog.md](docs/ChangeLog.md). Current stable release is **v2.1.1**.
+详见 [ChangeLog.md](docs/ChangeLog.md)。当前稳定版为 **v2.1.2**。
+See [ChangeLog.md](docs/ChangeLog.md). Current stable release is **v2.1.2**.
 
 ---
 

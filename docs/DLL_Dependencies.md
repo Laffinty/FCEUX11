@@ -1,8 +1,21 @@
-# FCEUX11 DLL Dependencies (v1.15 hotfix4)
+# FCEUX11 DLL Dependencies (v2.1.2)
 
 > **Toolchain**: MSVC 2022+ + vcpkg (Qt 6.8 LTS / SDL2)
 > **Deployment**: Use `cmake --install` or `scripts\copy_dependencies.ps1`
-> **Last refreshed from**: `C:\Users\ikrx2\Desktop\fceux11-v1.15_hotfix4-windows-amd64`
+> **Last refreshed from**: build-rust-ppu (Release, v2.1.2, 2026-09-13)
+
+---
+
+## Direct dependencies (v2.1.2, measured)
+
+dumpbin /dependents on the v2.1.2 Release build (build-rust-ppu/src/fceux11.exe) reports only:
+
+- Qt: Qt6Widgets.dll, Qt6OpenGL.dll, Qt6Gui.dll, Qt6Core.dll
+- Media and archive: SDL2.dll, z.dll, archive.dll
+- MSVC runtime: MSVCP140.dll, VCRUNTIME140.dll, VCRUNTIME140_1.dll (plus the UCRT api-ms-win-crt-* set that ships with Windows 10/11)
+- Windows: KERNEL32.dll, USER32.dll, SHELL32.dll, ole32.dll, ADVAPI32.dll, MSVFW32.dll, bcryptprimitives.dll, ntdll.dll
+
+Everything else in the tables below is a **transitive** dependency of those libraries (Qt plugins, ICU, HarfBuzz, Brotli, and the PostgreSQL client libraries pulled in by QtSql) and is collected automatically by cmake --install or scripts/copy_dependencies.ps1.
 
 ---
 
@@ -10,11 +23,11 @@
 
 ```powershell
 # Recommended: CMake handles everything
-cmake --install build --prefix dist
+cmake --install build-rust-ppu --prefix dist
 
 # Or use the PowerShell helper
 .\scripts\copy_dependencies.ps1 `
-    -ExecutablePath "build\src\fceux11.exe" `
+    -ExecutablePath "build-rust-ppu\src\fceux11.exe" `
     -OutputDir "dist"
 ```
 
@@ -106,8 +119,8 @@ All runtime DLLs are sourced from `vcpkg_installed\x64-windows\bin` (or your vcp
 ## Rebuild from Scratch
 
 ```powershell
-Remove-Item -Path build -Recurse -Force
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-ctest --test-dir build --output-on-failure
+Remove-Item -Path build-rust-ppu -Recurse -Force
+cmake -S . -B build-rust-ppu -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build-rust-ppu
+ctest --test-dir build-rust-ppu --output-on-failure
 ```
