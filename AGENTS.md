@@ -4,8 +4,8 @@ NES/Famicom emulator derived from FCEUX. Windows 11 only, MSVC 2022+ only. Qt6 G
 
 ## Branch / Git Workflow
 
-- **当前开发分支：`wip2.1rc2`**（v2.1.1.7 "C++ PPU 退役" 工作线）。本任务的构建、测试、提交一律在这条分支上进行。
-- **未经 owner 明确确认，不得切回 `main`**，也不得切换到其它分支或另建分支。owner 未确认前执行 `git checkout main` / `git switch main` 一律视为违规操作。
+- **当前开发分支：`main`**（唯一分支；`wip2.1rc2` 已于 2026-09-12 并入 main 后删除）。所有构建、测试、提交一律在 `main` 上进行。
+- **不再保留长期分支**：远端与本地都只维护 `main`；改动直接提交到 `main`。如确需实验分支，用完须立即合回并删除，不得留下构建分支。
 - 构建与验证目录统一用 **`build-rust-ppu/`**（`CMakeCache` 内 `FCEUX11_RUST_PPU:BOOL=ON`）。`FCEUX11_RUST_PPU=OFF` 自 v2.1.1.7 Step C（C++ PPU 退役）起是 configure 错误，历史遗留的 `build/` 目录需先删除或重新配置后才能使用。
 - 提交信息使用 conventional commits（见 Code Style）。
 
