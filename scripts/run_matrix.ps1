@@ -1,4 +1,7 @@
 # Phase 6 kickoff regression matrix (Oracle A via the kagami-qa runner).
+# v2.1.1.7 Step C.3 (2026-09-12): retargeted from build/ to build-rust-ppu/ -
+# the Rust PPU is the only engine, and build/ (the legacy C++ PPU fallback
+# directory) no longer configures.
 #
 # History: the original version of this script was written against the
 # Phase-0-era layout (D:\Project\FCEUX11, build-c1, src/rust/target).
@@ -17,15 +20,15 @@ param(
 $ErrorActionPreference = "Continue"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $ProjectRoot
-$env:PATH = "$ProjectRoot\build\tests;$ProjectRoot\vcpkg_installed\x64-windows\bin;$ProjectRoot\vcpkg_installed\x64-windows\debug\bin;" + $env:PATH
+$env:PATH = "$ProjectRoot\build-rust-ppu\tests;$ProjectRoot\vcpkg_installed\x64-windows\bin;$ProjectRoot\vcpkg_installed\x64-windows\debug\bin;" + $env:PATH
 
-$runner = "$ProjectRoot\build\src\rust\target\x86_64-pc-windows-msvc\release\kagami-qa-runner.exe"
+$runner = "$ProjectRoot\build-rust-ppu\src\rust\target\x86_64-pc-windows-msvc\release\kagami-qa-runner.exe"
 if (-not (Test-Path $runner)) {
     # Cargo output path is pinned by src/rust/.cargo/config.toml to
     # target/x86_64-pc-windows-msvc/<profile>/ (NOT target/release).
     Write-Host "[ERROR] kagami-qa-runner.exe not found at $runner"
     Write-Host "        Build it with (from a Developer PowerShell):"
-    Write-Host '          $env:CARGO_TARGET_DIR = "<root>\build\src\rust\target"'
+    Write-Host '          $env:CARGO_TARGET_DIR = "<root>\build-rust-ppu\src\rust\target"'
     Write-Host '          cargo build --release -p kagami-qa --bin kagami-qa-runner'
     exit 2
 }
@@ -42,7 +45,7 @@ if ($Baseline) {
 
 & $runner `
     --manifest "$ProjectRoot\tests\tests.json" `
-    --bin-dir  "$ProjectRoot\build\tests" `
-    --output   "$ProjectRoot\build\kagamiqa_migration_matrix.json" `
+    --bin-dir  "$ProjectRoot\build-rust-ppu\tests" `
+    --output   "$ProjectRoot\build-rust-ppu\kagamiqa_migration_matrix.json" `
     @baselineArgs
 Write-Host ("EXIT=" + $LASTEXITCODE)

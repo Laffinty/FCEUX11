@@ -1,61 +1,45 @@
 // ppu_core.h
 //
 // v1.12 Scissors Phase E-B (scope v1): PPU lifecycle + accessor split.
+// v2.1.1.7 Step C (M4, 2026-09-12): the C++ PPU engine was deleted
+// (src/ppu.cpp / ppu_rendering.cpp / ppu_core.cpp). This header now only
+// carries the cross-TU declarations that survive:
 //
-// Pure code move from src/ppu.cpp — lines 295-301, 369-370, 1757-1828,
-// 2040-2048.
+//   * scanlines_per_frame - written by FCEUPPU_SetVideoSystem
+//     (src/ppu_shared.cpp), still read by the legacy frame-length arithmetic
+//     in the drivers;
+//   * the tombstone mirrors the savestate staging (src/ppu_state.cpp) and the
+//     debugger take addresses of. Their definitions live in
+//     src/ppu_legacy_stub.cpp; the live state is Rust-owned.
 //
-// Scope of this batch:
-//   - newppu_get_scanline / newppu_get_dot / newppu_hacky_emergency_reset
-//   - PPU_hook, GameHBIRQHook, GameHBIRQHook2 (function-pointer definitions)
-//   - FCEUPPU_SetVideoSystem / PPU_ResetHooks / Reset
-//   - FCEUPPU_PeekAddress
-//
-// NOT moved in this batch (stay in ppu.cpp):
-//   - FCEUPPU_Init: calls makeppulut(), which writes file-static ppulut*[]
-//     arrays; the ppulut globals stay in ppu.cpp until E-C.
-//   - FCEUPPU_Power: assigns file-static DECLFR/DECLFW function pointers
-//     (A2002/A200x/B2000/B2001/.../B4014) into the ARead[]/BWrite[]
-//     memory-read/write tables; those static register handlers don't
-//     move until the register-port half of the split (a follow-up
-//     batch).
-//
-// Register-port handlers (DECLFR/DECLFW A2002-B4014) and old render
-// helpers (DoLine / RefreshLine) STAY in ppu.cpp
-// for this batch. They form a tightly-coupled unit (B2007 reads via
-// the same VRAMBuffer/PPUGenLatch that A2007 writes; B2001 writes
-// `deemp` that FCEUPPU_Loop reads). Splitting them requires promoting
-// ~13 file-static globals to extern and adding `extern void DoLine();`
-// declarations — a larger surface that warrants its own gate.
-//
-// Cross-TU promotions in this batch:
-//   - scanlines_per_frame (file-static → extern), written by
-//     FCEUPPU_SetVideoSystem in ppu_core, read by FCEUPPU_Loop in
-//     ppu.cpp (moves to ppu_rendering.cpp in E-C).
+// The engine-side declarations (newppu_get_*, PPU_hook, FCEUPPU_Reset,
+// FCEUPPU_SetVideoSystem, PPU_ResetHooks, FCEUPPU_PeekAddress, FCEUPPU_Power,
+// FCEUPPU_Init) moved into src/ppu_shared.cpp and are declared in src/ppu.h.
 
 #pragma once
 
+#include "types.h"
 #include "ppu_class.h"   // fceu11::Ppu, PPUREGS / PPUSTATUS / SPRITE_READ structs
 
-// ----------------------------------------------------------------------------
-// Cross-TU promotion (file-static → extern).
-// ----------------------------------------------------------------------------
-
 // Total scanlines per frame (NTSC=262, PAL=312). Written by
-// FCEUPPU_SetVideoSystem (ppu_core), read by FCEUPPU_Loop /
-// FCEUX_PPU_Loop (ppu.cpp; moves to ppu_rendering.cpp in E-C).
+// FCEUPPU_SetVideoSystem (src/ppu_shared.cpp).
 extern unsigned int scanlines_per_frame;
 
-// Phase E-A: PPU globals now referenced from this TU (via
-// newppu_get_* / FCEUPPU_Reset).
+// ---------------------------------------------------------------------------
+// Tombstone mirrors (definitions in src/ppu_legacy_stub.cpp).
+//
+// The retired C++ engine was their only writer. They stay zero-initialised so
+// anything that still takes their address sees the historical power-on bytes;
+// reading them for behaviour would be a bug (plan section 0.1).
+// ---------------------------------------------------------------------------
 extern PPUREGS ppur;
-extern uint8 PPUSPL;
+extern struct SPRITE_READ spr_read;
 extern uint8 idleSynch;
+extern bool new_ppu_reset;
+extern uint8 PPUSPL;
 extern int ppudead;
 extern int kook;
-extern bool new_ppu_reset;
 
-// Phase E-A: PPU_status is a #define macro in ppu.cpp pointing at
-// PPU[2]; the macro doesn't expand across TU. Drop-static promotion
-// of the underlying register file already lives in ppu_class.h.
-#include "ppu.h"   // PPU[4] reference alias + PPU_status macro
+// PPU_status was a #define macro in the deleted ppu.cpp; the alias in
+// ppu_class.h (PPU[2]) is the only surviving spelling.
+#include "ppu.h"

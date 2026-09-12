@@ -442,27 +442,6 @@
     "failure_means": "blocking",
     "provenance": "v1.11"
   },
-  "ppu_rendering_lut_test": {
-    "id": "ppu_rendering_lut_test",
-    "description": "Byte-for-byte equivalence: two-stage sprite decode LUT vs original 8x shift chain",
-    "oracle_type": "A",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_ppu_rendering_lut_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "unit",
-      "ppu",
-      "hotfix"
-    ],
-    "failure_means": "blocking",
-    "provenance": "hotfix2 P0-1"
-  },
   "ppu_phase_c_test": {
     "id": "ppu_phase_c_test",
     "description": "Atomic byte-pattern fill, SPRB layout invariants, pshift storage width",
@@ -483,27 +462,6 @@
     ],
     "failure_means": "blocking",
     "provenance": "hotfix2 Phase C"
-  },
-  "ppu_phase_d_test": {
-    "id": "ppu_phase_d_test",
-    "description": "constexpr bitrev LUT involution/coverage; InputScanlineHook nullptr; vnapage 4-slot",
-    "oracle_type": "A",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_ppu_phase_d_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "unit",
-      "ppu",
-      "hotfix"
-    ],
-    "failure_means": "blocking",
-    "provenance": "hotfix2 Phase D"
   },
   "golden_savestate_test": {
     "id": "golden_savestate_test",

@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`newppu` 去引擎语义**：配置项 / CLI / GUI 勾选 / movie `PPUflag` 读写全部保留，但不再选择引擎（Rust PPU 是唯一引擎）。`newppu` 不再影响画面高度、超频预算或光枪行为。
 
+### Removed
+
+- **C++ PPU 引擎退役（Step C）**：删除 `src/ppu.cpp`、`src/ppu_rendering.cpp/h`、`src/ppu_core.cpp`、`src/ppu_sprite_lut.cpp/h`、`src/pputile_template.cpp/h`、`src/pputile.inc`（净删约 4.4k 行）；仍存活的符号迁入 `src/ppu_shared.cpp`，纯墓碑数据（`ppur` / `spr_read` / `idleSynch` / `SPRBUF` / `linestartts`）留在新增的 `src/ppu_legacy_stub.cpp`。
+- **`FCEUX11_RUST_PPU=OFF` 改为配置期错误（Step C.2）**：C++ PPU 已删除，不存在 fallback；缓存仍为 OFF 的 `build/` 目录必须删除或重新配置。
+- **退役两个自证测试目标**：`ppu_rendering_lut_test`（LUT 实现已删除）与 `ppu_phase_d_test`（本地副本算法）；`ppu_phase_c_test` 保留（`SPRBUF` 布局仍由墓碑提供）。
+
 ### Known limitations
 
 - **Dendy 帧结构存在来源分歧**：本版按 Mesen2（312 行；VBL/NMI 置位在 291）实现，FCEUX 旧 C++ 代码为 262 行。Dendy 行为在发布前需确认（plan `docs/plans/v2.1.1.7_cpp_ppu_removal.md` §B.5 D4.7）。

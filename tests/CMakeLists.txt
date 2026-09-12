@@ -318,16 +318,6 @@ if(FCEUX11_BUILD_TESTS)
              COMMAND fceux11_core_driver_boundary_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-    # hotfix2 P0-1: byte-for-byte equivalence test for the new
-    # two-stage sprite decode LUT vs. the original 8×if shift chain.
-    fceux11_add_test_executable(fceux11_ppu_rendering_lut_test
-        kagami/ppu_rendering_lut_test.cpp
-        git_info_stub.cpp
-    )
-    add_test(NAME ppu_rendering_lut_test
-             COMMAND fceux11_ppu_rendering_lut_test
-             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-
     # hotfix2 Phase C — atomic byte-pattern fill, SPRB layout
     # invariants, pshift storage width. Pure byte-level tests
     # (<1s runtime) that gate every CI cycle against the strict-
@@ -338,19 +328,6 @@ if(FCEUX11_BUILD_TESTS)
     )
     add_test(NAME ppu_phase_c_test
              COMMAND fceux11_ppu_phase_c_test
-             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-
-    # hotfix2 Phase D — P3 cleanup invariants: constexpr bitrev LUT
-    # involution / coverage; InputScanlineHook nullptr contract;
-    # vnapage 4-slot distinct-pointer contract. Pure byte-level
-    # tests (<1s) that gate the cleanup PRs without needing a
-    # full PPU / mapper exercise.
-    fceux11_add_test_executable(fceux11_ppu_phase_d_test
-        kagami/ppu_phase_d_test.cpp
-        git_info_stub.cpp
-    )
-    add_test(NAME ppu_phase_d_test
-             COMMAND fceux11_ppu_phase_d_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
     # v1.1 Sentinel §1.2 — golden savestate regression test.
@@ -481,7 +458,7 @@ if(FCEUX11_BUILD_TESTS)
         ppu_frame_diff_test apu_wav_diff_test
         cart_class_test fds_load_test
         driver_callbacks_test core_driver_boundary_test
-        ppu_rendering_lut_test ppu_phase_c_test ppu_phase_d_test
+        ppu_phase_c_test
         PROPERTIES ENVIRONMENT_MODIFICATION
                 "${_FCEUX11_TEST_PATH_MODIFICATIONS}"
         )

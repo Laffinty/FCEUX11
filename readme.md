@@ -61,7 +61,7 @@ $env:VCPKG_ROOT = "$PWD\vcpkg"          # 必设，do_build.ps1 据此定位 vcp
 # 产物：build-rust-ppu\src\fceux11.exe
 ```
 
-> 自 v2.1.1 起，Rust CPU 与 Rust PPU 是唯一实现，不存在 C++ 引擎可回退。`build-rust-ppu/` 是当前在维护的验证目录；不要使用 `build/` —— 该目录的 `CMakeCache.txt` 仍缓存着 `FCEUX11_RUST_PPU=OFF` 的历史配置，会以旧版 C++ PPU 引擎静默链接出二进制，与源码现状不一致。
+> 自 v2.1.1 起，Rust CPU 与 Rust PPU 是唯一实现，不存在 C++ 引擎可回退；自 v2.1.1.7 Step C（C++ PPU 退役）起，`-DFCEUX11_RUST_PPU=OFF` 是配置期错误。`build-rust-ppu/` 是当前在维护的验证目录；历史遗留的 `build/`（缓存为 OFF，已无法 configure）须先删除或重新配置。
 
 ---
 
