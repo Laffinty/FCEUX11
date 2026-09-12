@@ -549,9 +549,11 @@ impl Registers {
         if lo < 0x3F00 {
             lo
         } else {
-            // Palette mirrors: $3F00/$3F04/$3F08/$3F0C are the same entry;
+            // Entry index is (addr and 0x1F); only entries with low nibble 0
             // $3F10/$3F14/$3F18/$3F1C alias to $3F00/$3F04/$3F08/$3F0C.
-            0x3F00 | (lo & 0x000F)
+            let idx = lo & 0x1F;
+            let entry = if (idx & 0x0F) == 0 { idx & 0x0F } else { idx };
+            0x3F00 | entry
         }
     }
 }
@@ -827,4 +829,26 @@ mod tests {
         r.check_data_bus_decay(DATA_BUS_DECAY_CYCLES as u64 + 1);
         assert_eq!(r.data_bus, 0);
     }
+
+    #[test]
+    fn palette_sprite_entries_are_distinct_from_background() {
+        let mut r = Registers::new();
+        let mut bus = FlatBus::new();
+        bus.cpu[0x3F01] = 0x11;
+        r.v = 0x3F11;
+        r.write_data(&mut bus, 0x00, 0x21, false);
+        assert_eq!(bus.cpu[0x3F11], 0x21, "sprite palette entry 1 must be written");
+        assert_eq!(bus.cpu[0x3F01], 0x11, "background palette entry 1 must be untouched");
+    }
+
+    #[test]
+    fn palette_entry_zero_aliases_collapse() {
+        let mut r = Registers::new();
+        let mut bus = FlatBus::new();
+        r.v = 0x3F10;
+        r.write_data(&mut bus, 0x00, 0x30, false);
+        assert_eq!(bus.cpu[0x3F00], 0x30, "3F10 aliases the shared backdrop cell");
+        assert_eq!(bus.cpu[0x3F10], 0, "the alias targets the 3F00 cell");
+    }
+
 }
