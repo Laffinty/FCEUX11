@@ -299,6 +299,13 @@ pub unsafe extern "C" fn fceux11_ppu_set_video_system(state: *mut PpuState, pal:
     sb.state.video_system = vs;
 }
 
+/// CPU `count` budget units per PPU dot for the current region
+/// (Step B.5-2c): 16 for the NTSC/Dendy 3.0 ratio, 15 for PAL's 3.2.
+/// The unit is 1/48 of a CPU cycle (C++ `X6502._count` scale).
+pub unsafe extern "C" fn fceux11_ppu_cpu_ticks_per_dot(state: *const PpuState) -> u32 {
+    lookup_const(state).state.video_system.timings().cpu_ticks_per_dot()
+}
+
 /// Region selector with an explicit Dendy spelling (Step B.5-2b):
 /// 0 = NTSC, 1 = PAL, 2 = Dendy. Out-of-range codes are ignored.
 pub unsafe extern "C" fn fceux11_ppu_set_video_system_ex(state: *mut PpuState, system: u32) {

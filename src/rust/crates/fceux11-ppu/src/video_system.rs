@@ -138,6 +138,16 @@ pub struct VideoSystemTimings {
     pub odd_frame_skips_dot: bool,
 }
 
+impl VideoSystemTimings {
+    /// CPU `count` budget units consumed by one PPU dot, at the
+    /// 1/48-CPU-cycle scale the C++ `X6502._count` uses
+    /// (`48 * dots_per_cpu_cycle` = 16 for the 3.0 ratios, 15 for PAL's
+    /// 3.2). Step B.5-2c consumes this from the interleave loop.
+    pub const fn cpu_ticks_per_dot(self) -> u32 {
+        48 * self.ppu_dots_per_cpu_cycle_den / self.ppu_dots_per_cpu_cycle_num
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -189,6 +199,13 @@ mod tests {
                 "{sys:?} frame budget must equal scanlines * dots/scanline"
             );
         }
+    }
+
+    #[test]
+    fn cpu_ticks_per_dot_matches_the_interleave_ratio() {
+        assert_eq!(VideoSystem::Ntsc.timings().cpu_ticks_per_dot(), 16);
+        assert_eq!(VideoSystem::Dendy.timings().cpu_ticks_per_dot(), 16);
+        assert_eq!(VideoSystem::Pal.timings().cpu_ticks_per_dot(), 15);
     }
 
     #[test]

@@ -421,9 +421,12 @@ pub unsafe extern "C" fn fceux11_ppu_take_dmc_dma_stall(
 ///    earlier fully-fused whole-frame function (single borrow chain,
 ///    callbacks called from within) diverged mapper_mmc1 frame 0 under
 ///    LTO and was discarded — see the ppu crate ffi.rs note.
-/// 2. The CPU step calls the same `fceux11_cpu_run_with_tick(cpu, 1)`
-///    the C++ `Cpu::run(1)` invoked, keeping the per-dot working-copy
-///    sync (C++-side IRQ mutations from mapper hooks stay bit-exact).
+/// 2. The CPU step is the same per-dot grant the C++ `Cpu::run(1)`
+///    performed (16 count units = 1/3 CPU cycle at the NTSC ratio),
+///    keeping the per-dot working-copy sync (C++-side IRQ mutations
+///    from mapper hooks stay bit-exact). Step B.5-2c made the grant
+///    region-aware: 16 units per dot for NTSC/Dendy (3.0 ratio), 15 for
+///    PAL (3.2 = 16:5).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_run_frame_interleaved(
     ppu_state: *mut fceux11_ppu::PpuState,
@@ -470,6 +473,12 @@ pub unsafe extern "C" fn fceux11_run_frame_interleaved(
             .and_then(|v| v.trim().parse::<i32>().ok())
             .unwrap_or(8)
     });
+    // Step B.5-2c: the per-dot CPU grant is region-aware. One PPU dot
+    // costs `cpu_ticks_per_dot` count units at the 1/48-CPU-cycle scale:
+    // 16 at the NTSC/Dendy 3.0 ratio, 15 at PAL's 3.2 (16:5). NTSC parity
+    // is exact - the old `run_with_tick(cpu, 1)` added the same 16 units.
+    let ticks_per_dot: i32 =
+        fceux11_ppu::ffi::fceux11_ppu_cpu_ticks_per_dot(ppu_state) as i32;
     let frame_done = 0;
     for _ in 0..dots {
         fceux11_ppu::ffi::fceux11_ppu_tick_dots_direct(ppu_state, 1);
@@ -508,7 +517,7 @@ pub unsafe extern "C" fn fceux11_run_frame_interleaved(
                 -(stall as i32),
             );
         } else {
-            fceux11_core::cpu::ffi::fceux11_cpu_run_with_tick(cpu_state, 1);
+            fceux11_core::cpu::ffi::fceux11_cpu_run_ticks(cpu_state, ticks_per_dot);
         }
     }
     frame_done

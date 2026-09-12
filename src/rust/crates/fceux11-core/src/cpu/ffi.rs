@@ -312,6 +312,28 @@ pub unsafe extern "C" fn fceux11_cpu_run_with_tick(state: *mut u8, cycles: i32) 
     }
 }
 
+/// Run the CPU for `ticks` raw `count` budget units - the 1/48-CPU-cycle
+/// scale the C++ `X6502._count` uses, with no x16 scaling.
+///
+/// Step B.5-2c: the PAL/NTSC interleave needs a per-dot grant below the
+/// 16-unit granularity of [`fceux11_cpu_run_with_tick`] - one PPU dot
+/// costs 16 units at the 3.0 ratio (NTSC/Dendy) and 15 at PAL's 3.2.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_cpu_run_ticks(state: *mut u8, ticks: i32) -> i32 {
+    if state.is_null() || ticks <= 0 {
+        return 0;
+    }
+    unsafe {
+        FFI_CPU_STATE.regs = *(state as *const X6502Layout);
+        crate::cpu::bus::set_blob_ptr(state as *mut X6502Layout);
+        let mut bus = CppBus;
+        let state_ptr = core::ptr::addr_of_mut!(FFI_CPU_STATE);
+        let cpu_cycles = run_with_tick(&mut *state_ptr, &mut bus, ticks);
+        *(state as *mut X6502Layout) = (*state_ptr).regs;
+        cpu_cycles
+    }
+}
+
 /// Snapshot the 64-byte CPU state to `out` (savestate path).
 ///
 /// Pure `copy_nonoverlapping` — byte-identical to the C++ blob, since
