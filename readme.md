@@ -16,9 +16,9 @@
 
 ## 简介 / Introduction
 
-**FCEUX11** 是基于 [FCEUX](https://fceux.com) 的 NES/Famicom 模拟器衍生项目，针对 Windows 平台深度优化，提供完整的 mapper 兼容体系、调试工具、TAS 逐帧编辑器与录像回放功能；基于 Rust 语言全新重构的 CPU/PPU 核心（C++ 引擎已退役）：模块边界更清晰、状态更可控，严格保持硬件级时序与行为还原的同时仍有充足实时余量；参考机器实测整机一帧约 4.0 ms （约 4.1 倍实时）；v2.1.2 修掉了会造成卡死的 IRQ 风暴，实际游玩比旧核心更流畅，支持简体中文、繁体中文、英文、日语、韩语、西班牙语、法语、德语、越南语、泰语、印地语（beta）、阿拉伯语（beta）共 12 种语言。
+FCEUX11 是基于 FCEUX 的 NES/Famicom 模拟器衍生项目，针对 Windows 平台深度优化，提供完整的 mapper 兼容体系、调试工具、TAS 逐帧编辑器与录像回放功能；使用 Rust 全新重构的 CPU/PPU 核心，模块边界更清晰、状态更可控，严格保持硬件级时序与行为还原的同时仍有充足实时余量，全面提升实际运行的流畅度，支持简体中文、繁体中文、英文、日语、韩语、西班牙语、法语、德语、越南语、泰语、印地语（beta）、阿拉伯语（beta）共 12 种语言。
 
-**FCEUX11** is a derivative of the [FCEUX](https://fceux.com) NES/Famicom emulator, optimized for the Windows platform. It features full mapper compatibility, a comprehensive suite of debugging tools, a frame-by-frame TAS editor, and movie recording and playback functionality. The CPU/PPU cores have been completely reengineered in Rust (the C++ engines are retired), giving cleaner module boundaries and more controllable state; while strictly preserving hardware-level timing and behavioural fidelity they still leave ample real-time headroom (about 4.0 ms for a full CPU+PPU+APU frame on the reference machine, roughly 4x real-time), and the v2.1.2 fixes removed the IRQ storm that used to stall gameplay, so play is smoother than with the old cores. Localization support is provided for 12 languages: Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Spanish, French, German, Vietnamese, Thai, Hindi (beta), and Arabic (beta).
+FCEUX11 is a derivative of the FCEUX NES/Famicom emulator, heavily optimized for Windows. It provides a complete mapper compatibility set, debugging tools, a frame-by-frame TAS editor and movie recording/playback. Its CPU and PPU cores have been fully rebuilt in Rust, giving cleaner module boundaries and more controllable state; hardware-level timing and behaviour are still preserved exactly, while plenty of real-time headroom remains, so games run noticeably smoother in practice. The interface is available in 12 languages: Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Spanish, French, German, Vietnamese, Thai, Hindi (beta) and Arabic (beta).
 
 ---
 
