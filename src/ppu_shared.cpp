@@ -164,7 +164,7 @@ void (*FFCEUX_PPUWrite)(uint32 A, uint8 V) = 0;
 // ---------------------------------------------------------------------------
 
 // Frame phase. The retired C++ renderer was the only writer
-// (docs/plans/v2.1.1.7_cpp_ppu_removal.md section 0.4), so under the Rust PPU
+// (docs/history/v2.1.1.7_cpp_ppu_removal_archived_2026-09-12.md section 0.4), so under the Rust PPU
 // this stays at its power-on value; boards/mmc5.cpp still reads it in the
 // MMC5 CL-mode resolver (pre-existing since Phase 7, not introduced by
 // Step C).

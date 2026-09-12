@@ -10,7 +10,7 @@
 // SpriteDMA / kook / ppudead are tombstones (read-only mirrors; no live
 // writer outside FCEUPPU_Reset's power-zero path). All mutation flows
 // Rust -> bridge -> C++ staging; never the reverse.
-// See docs/plans/v2.1.1.7_cpp_ppu_removal.md §0.1 / Step A.
+// See docs/history/v2.1.1.7_cpp_ppu_removal_archived_2026-09-12.md §0.1 / Step A.
 //
 // Direction of authority (v2.1.1.7 §0.1):
 //   (1) Rust -> C++ has zero register/OAM writes (C++ tombstones).
@@ -700,6 +700,20 @@ uint8_t ppu_rust_bridge_get_oam(uint32_t addr) {
     // per read is fine for the debugger paths that use this.
     bridge_state_refresh_from_rust();
     return bridge_oam[addr & 0xFF];
+}
+
+void ppu_rust_bridge_copy_oam(uint8_t* out) {
+    if (out == nullptr) {
+        return;
+    }
+    if (g_ppu_state == nullptr) {
+        std::memset(out, 0, 0x100);
+        return;
+    }
+    // v2.1.1.7 M5: one staging export for all 256 bytes; get_oam would
+    // export once per byte for the PPU Viewer sprite list.
+    bridge_state_refresh_from_rust();
+    std::memcpy(out, bridge_oam, 0x100);
 }
 
 int16_t ppu_rust_bridge_get_scanline() {

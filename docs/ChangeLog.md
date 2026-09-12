@@ -6,7 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [2.1.1.7] - Unreleased - C++ PPU 退役 + PAL/Dendy 时序
+## [2.1.1] - 2026-09-12 - C++ PPU 退役线收口
+
+### Changed
+
+- **Rust PPU 成为唯一实现**：`FCEUX11_RUST_PPU=OFF` 从回退到 C++ 引擎改为 configure 错误；C++ PPU 引擎 TU（约 4.5k 行）删除，存活符号迁入 `ppu_shared.cpp`，墓碑数据留在 `ppu_legacy_stub.cpp`
+- **savestate 值来源变更（D1-A）**：chunk 布局与尺寸不变，取值源换成 Rust 侧 staging；golden 按 v2.1.1.2 流程重生
+
+### Fixed
+
+- **2007 read buffer 语义与 C++ 参照对齐**（v2.1.1.4）：2007 读路径改为写入 VRAMBuffer；advisory 分类重排（v2.1.1.5）后重新冻结基线（v2.1.1.6）
+- **PPU 直读点迁移**：GUI 编辑器 / 调试器 / mapper 钩子的寄存器与 OAM 直读改走 bridge accessor（v2.1.1.7 Step D）；OAM 单字节与批量读取在 M5 收尾补齐
+
+### Known limitations
+
+- test 33 `rust_ppu_vbl_nmi_timing_test` 按 owner 决定 SKIP（Route C）
+
+## [2.1.1.7] - 2026-09-12 - C++ PPU 退役 + PAL/Dendy 时序
 
 ### Added
 
@@ -26,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Known limitations
 
-- **Dendy 帧结构存在来源分歧**：本版按 Mesen2（312 行；VBL/NMI 置位在 291）实现，FCEUX 旧 C++ 代码为 262 行。Dendy 行为在发布前需确认（plan `docs/plans/v2.1.1.7_cpp_ppu_removal.md` §B.5 D4.7）。
+- **Dendy 帧结构存在来源分歧**：本版按 Mesen2（312 行；VBL/NMI 置位在 291）实现，FCEUX 旧 C++ 代码为 262 行。Dendy 行为在发布前需确认（plan `docs/history/v2.1.1.7_cpp_ppu_removal_archived_2026-09-12.md` §B.5 D4.7）。
 - PAL/Dendy 的精灵评估窗口（NMI+24 行）为近似实现；PAL 专属 CPU 行为（DMA 只能在取 opcode 时启动、IRQ/NMI 首读检查 DMA）与视频制式滤波/色彩解码不在本版范围（plan §B.5 D4.5）。
 
 

@@ -269,6 +269,10 @@ static int getPPU( unsigned int i )
 //----------------------------------------------------------------------------
 static int getOAM( unsigned int i )
 {
+	// v2.1.1.7 Step D/M5: SPRAM is a tombstone under the Rust PPU
+	// (power-on random, never updated): read the live OAM via the bridge.
+	if ( ppu_rust_bridge_active() )
+		return ppu_rust_bridge_get_oam( i );
 	return SPRAM[i & 0xFF];
 }
 //----------------------------------------------------------------------------

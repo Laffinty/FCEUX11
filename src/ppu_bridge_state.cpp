@@ -1,7 +1,7 @@
 // ppu_bridge_state.cpp
 //
 // FCEUX11 v2.1.1.7 Step B.1 (D1-A). See ppu_bridge_state.h for the
-// contract and docs/plans/v2.1.1.7_cpp_ppu_removal.md section B.1 for
+// contract and docs/history/v2.1.1.7_cpp_ppu_removal_archived_2026-09-12.md section B.1 for
 // the design rationale.
 
 #include "types.h"

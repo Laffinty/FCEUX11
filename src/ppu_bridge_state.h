@@ -9,7 +9,7 @@
 // source of values changes: they point at the staging variables
 // declared here instead of the C++ engine globals.
 //
-// Data flow (docs/plans/v2.1.1.7_cpp_ppu_removal.md section B.1):
+// Data flow (docs/history/v2.1.1.7_cpp_ppu_removal_archived_2026-09-12.md section B.1):
 //
 //   Save:  FCEUPPU_SaveState() -> bridge_state_refresh_from_rust()
 //                              -> serialise staging (chunk-3 / chunk-31)

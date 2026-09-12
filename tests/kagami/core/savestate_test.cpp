@@ -265,7 +265,7 @@ void test_resetexstate(TestContext& ctx) {
 // Before batch 4 the load path only restored the C++-local TempAddrT /
 // RefreshAddrT scratch copies, so the post-load comparison saw the advanced
 // state and failed. It is now the positive evidence for the load contract
-// in docs/plans/v2.1.1.7_cpp_ppu_removal.md section B.1.
+// in docs/history/v2.1.1.7_cpp_ppu_removal_archived_2026-09-12.md section B.1.
 // ---------------------------------------------------------------------------
 struct RustPpuSnap {
     uint8_t  regs[4];        // 2000/2001/2002/2003

@@ -26,7 +26,7 @@
 // SpriteDMA / kook / ppudead are tombstones (read-only mirrors; no live
 // writer outside FCEUPPU_Reset's power-zero path). All mutation flows
 // Rust -> bridge -> C++ staging; never the reverse.
-// See docs/plans/v2.1.1.7_cpp_ppu_removal.md §0.1 / Step A.
+// See docs/history/v2.1.1.7_cpp_ppu_removal_archived_2026-09-12.md §0.1 / Step A.
 
 #ifndef FCEU11_PPU_RUST_BRIDGE_H
 #define FCEU11_PPU_RUST_BRIDGE_H
@@ -191,6 +191,11 @@ uint8_t  ppu_rust_bridge_get_mask_mirror();
 // through this entry point when the bridge is active.
 void     ppu_rust_bridge_write_oam(uint32_t addr, uint8_t value);
 
+// v2.1.1.7 M5: bulk OAM read for the PPU Viewer sprite list - one staging
+// export instead of 256. Gate on ppu_rust_bridge_active(); the OFF build
+// keeps its own SPRAM copy.
+void     ppu_rust_bridge_copy_oam(uint8_t* out);
+
 #else  // !FCEUX11_RUST_PPU
 
 // When the option is off, the bridge functions are no-ops returning
@@ -221,6 +226,7 @@ inline void     ppu_rust_bridge_note_nt_write(uint32_t /*ppu_addr*/) {}
 inline void     ppu_rust_bridge_note_palette_write() {}
 inline uint8_t  ppu_rust_bridge_get_mask_mirror() { return 0; }
 inline void     ppu_rust_bridge_write_oam(uint32_t /*addr*/, uint8_t /*value*/) {}
+inline void     ppu_rust_bridge_copy_oam(uint8_t* /*out*/) {}
 inline void     ppu_rust_bridge_set_video_system(bool /*pal*/, bool /*dendy*/) {}
 inline uint32_t ppu_rust_bridge_ppu_dots_per_frame() { return 89342u; }  // NTSC (262 x 341)
 inline int  ppu_rust_bridge_emit_one_cpu_cycle() { return 0; }

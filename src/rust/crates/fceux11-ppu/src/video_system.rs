@@ -7,7 +7,7 @@
 //! behaviour; the state machine keeps using its existing constants.
 //!
 //! Values come from the cross-verified table in
-//! `docs/plans/v2.1.1.7_cpp_ppu_removal.md` section B.5 D4.1
+//! `docs/history/v2.1.1.7_cpp_ppu_removal_archived_2026-09-12.md` section B.5 D4.1
 //! (primary source: Mesen2 `Core/NES/NesPpu.cpp::UpdateTimings`,
 //! `Core/NES/NesCpu.cpp:119-136`, `Core/NES/NesConstants.h`; secondary:
 //! Nestopia UE `source/core/NstPpu.cpp:551-670`):

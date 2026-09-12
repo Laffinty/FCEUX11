@@ -4,7 +4,7 @@
 // SpriteDMA / kook / ppudead are tombstones (read-only mirrors; no live
 // writer outside FCEUPPU_Reset's power-zero path). All mutation flows
 // Rust -> bridge -> C++ staging; never the reverse.
-// See docs/plans/v2.1.1.7_cpp_ppu_removal.md §0.1 / Step A.
+// See docs/history/v2.1.1.7_cpp_ppu_removal_archived_2026-09-12.md §0.1 / Step A.
 // FCEUX11 — v1.5 Prism §1: fceu11::Ppu class declaration.
 //
 // Goal: encapsulate PPU register file, name-table RAM, and rendering

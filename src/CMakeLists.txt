@@ -770,7 +770,7 @@ option(FCEUX11_RUST_PPU "Use Rust PPU engine (the only engine since v2.1.1.7 Ste
 if(NOT FCEUX11_RUST_PPU)
     message(FATAL_ERROR
         "FCEUX11_RUST_PPU=OFF is no longer supported: the C++ PPU engine "
-        "was deleted in v2.1.1.7 Step C (docs/plans/v2.1.1.7_cpp_ppu_removal.md). "
+        "was deleted in v2.1.1.7 Step C (docs/history/v2.1.1.7_cpp_ppu_removal_archived_2026-09-12.md). "
         "The Rust PPU is the only implementation. Delete the build directory or "
         "reconfigure with -DFCEUX11_RUST_PPU=ON.")
 endif()
