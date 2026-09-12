@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="dark" />
 <meta name="theme-color" content="#080a09" />
-<title>FCEUX11 — โปรแกรมจำลอง NES/Famicom สำหรับ Windows · v2.0</title>
-<meta name="description" content="FCEUX11 v2.0 — โปรแกรมจำลอง NES/Famicom บนพื้นฐาน FCEUX เพิ่มประสิทธิภาพสำหรับ Windows คอร์ CPU ที่เขียนใหม่ช่วยเพิ่มความแม่นยำและความเสถียร รองรับ 12 ภาษาตรวจจับอัตโนมัติ มาพร้อมเครื่องมือดีบัก ตัวแก้ไข TAS Lua และเซฟสเตทที่เชื่อถือได้" />
+<title>FCEUX11 — โปรแกรมจำลอง NES/Famicom สำหรับ Windows · v2.1.2</title>
+<meta name="description" content="FCEUX11 v2.1.2 — โปรแกรมจำลอง NES/Famicom สร้าง FCEUX เพิ่มปริหัตความเสมียชมพโคตสำหรบ้านหนึ่ง CPU และ PPU ใหม่ด้วย Rust ซ่่งเพิ่มความแม่่ยตกว้างและมีความเส้่ยคองไม่ว่า. 12 ภาษาตรวจสอบอัตโนมัติ, เครื่องมือใช้งาน, ตัวแก้ไข TAS, สคริปต์ Lua, และ save state ที่เชื่อถอได้" />
 <meta name="keywords" content="FCEUX11, FCEUX, NES emulator, FC emulator, Famicom emulator, Windows emulator, TAS editor, Qt6, C++20, game emulator, 8-bit, multi-language, 12 languages, Arabic, RTL, ROM hacking, debugger, Lua scripting" />
 <meta name="author" content="Laffinty" />
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
@@ -32,8 +32,8 @@
 
 <meta property="og:site_name" content="FCEUX11" />
 <meta property="og:type" content="website" />
-<meta property="og:title" content="FCEUX11 — โปรแกรมจำลอง NES/Famicom สำหรับ Windows · v2.0" />
-<meta property="og:description" content="FCEUX11 v2.0 — โปรแกรมจำลอง NES/Famicom บนพื้นฐาน FCEUX เพิ่มประสิทธิภาพสำหรับ Windows คอร์ CPU ที่เขียนใหม่ช่วยเพิ่มความแม่นยำและความเสถียร รองรับ 12 ภาษาตรวจจับอัตโนมัติ มาพร้อมเครื่องมือดีบัก ตัวแก้ไข TAS Lua และเซฟสเตทที่เชื่อถือได้" />
+<meta property="og:title" content="FCEUX11 — โปรแกรมจำลอง NES/Famicom สำหรับ Windows · v2.1.2" />
+<meta property="og:description" content="FCEUX11 v2.1.2 — โปรแกรมจำลอง NES/Famicom สร้าง FCEUX เพิ่มปริหัตความเสมียชมพโคตสำหรบ้านหนึ่ง CPU และ PPU ใหม่ด้วย Rust ซ่่งเพิ่มความแม่่ยตกว้างและมีความเส้่ยคองไม่ว่า. 12 ภาษาตรวจสอบอัตโนมัติ, เครื่องมือใช้งาน, ตัวแก้ไข TAS, สคริปต์ Lua, และ save state ที่เชื่อถอได้" />
 <meta property="og:url" content="https://laffinty.github.io/FCEUX11/th/" />
 <meta property="og:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <meta property="og:locale" content="th_TH" />
@@ -56,8 +56,8 @@
 <meta name="msvalidate.01" content="" />
 
 <meta name="twitter:card" content="summary" />
-<meta name="twitter:title" content="FCEUX11 — โปรแกรมจำลอง NES/Famicom สำหรับ Windows · v2.0" />
-<meta name="twitter:description" content="FCEUX11 v2.0 — โปรแกรมจำลอง NES/Famicom บนพื้นฐาน FCEUX เพิ่มประสิทธิภาพสำหรับ Windows คอร์ CPU ที่เขียนใหม่ช่วยเพิ่มความแม่นยำและความเสถียร รองรับ 12 ภาษาตรวจจับอัตโนมัติ มาพร้อมเครื่องมือดีบัก ตัวแก้ไข TAS Lua และเซฟสเตทที่เชื่อถือได้" />
+<meta name="twitter:title" content="FCEUX11 — โปรแกรมจำลอง NES/Famicom สำหรับ Windows · v2.1.2" />
+<meta name="twitter:description" content="FCEUX11 v2.1.2 — โปรแกรมจำลอง NES/Famicom สร้าง FCEUX เพิ่มปริหัตความเสมียชมพโคตสำหรบ้านหนึ่ง CPU และ PPU ใหม่ด้วย Rust ซ่่งเพิ่มความแม่่ยตกว้างและมีความเส้่ยคองไม่ว่า. 12 ภาษาตรวจสอบอัตโนมัติ, เครื่องมือใช้งาน, ตัวแก้ไข TAS, สคริปต์ Lua, และ save state ที่เชื่อถอได้" />
 <meta name="twitter:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -72,8 +72,8 @@
   "name":"FCEUX11",
   "applicationCategory":"GameApplication",
   "operatingSystem":"Windows 11",
-  "description":"FCEUX11 v2.0 — โปรแกรมจำลอง NES/Famicom บนพื้นฐาน FCEUX เพิ่มประสิทธิภาพสำหรับ Windows คอร์ CPU ที่เขียนใหม่ช่วยเพิ่มความแม่นยำและความเสถียร รองรับ 12 ภาษาตรวจจับอัตโนมัติ มาพร้อมเครื่องมือดีบัก ตัวแก้ไข TAS Lua และเซฟสเตทที่เชื่อถือได้",
-  "softwareVersion":"2.0",
+  "description":"FCEUX11 v2.1.2 — โปรแกรมจำลอง NES/Famicom สร้าง FCEUX เพิ่มปริหัตความเสมียชมพโคตสำหรบ้านหนึ่ง CPU และ PPU ใหม่ด้วย Rust ซ่่งเพิ่มความแม่่ยตกว้างและมีความเส้่ยคองไม่ว่า. 12 ภาษาตรวจสอบอัตโนมัติ, เครื่องมือใช้งาน, ตัวแก้ไข TAS, สคริปต์ Lua, และ save state ที่เชื่อถอได้",
+  "softwareVersion":"2.1.2",
   "license":"https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt",
   "url":"https://laffinty.github.io/FCEUX11/th/",
   "downloadUrl":"https://github.com/Laffinty/FCEUX11/releases",
@@ -139,7 +139,7 @@
 
 <header class="hero" id="top">
   <div class="wrap">
-    <div class="pill reveal"><span class="dot"></span><span>v2.0</span></div>
+    <div class="pill reveal"><span class="dot"></span><span>v2.1.2</span></div>
     <h1 class="reveal"><span class="grad">FCEUX</span><span class="dim">11</span></h1>
     <p class="tagline reveal"><span class="tagline-title">โปรแกรมจำลอง NES/Famicom บนพื้นฐาน FCEUX เพิ่มประสิทธิภาพสำหรับ Windows</span><br>ความแม่นยำดั้งเดิม ประสบการณ์เนทีฟยุคใหม่ รองรับ 12 ภาษา.</p>
     <div class="cta reveal">
@@ -163,7 +163,7 @@
       <div class="feat">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 14a9 9 0 0 1 18 0"/><path d="M12 14l5-5"/><circle cx="12" cy="14" r="1.2" fill="currentColor" stroke="none"/></svg></div>
         <h3>คอร์ Rust</h3>
-        <p>คอร์ที่เขียนใหม่เพื่อความแม่นยำและความเสถียรที่ดียิ่งขึ้น</p>
+        <p>CPU และ PPU เขียนใหม่ด้วย Rust เพื่มความแม่่ยตกว้างและเส้่ยคองไม่ว่า</p>
       </div>
       <div class="feat">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m8 2-4 6 4 6M16 2l4 6-4 6M14 4l-4 16"/></svg></div>
@@ -196,9 +196,9 @@
       <h2>บทนำ</h2>
     </div>
     <div class="about-body reveal">
-      <p>FCEUX11 เป็นโครงการที่แยกมาจากโปรแกรมจำลอง NES/Famicom <em>FCEUX</em> เพิ่มประสิทธิภาพสำหรับ <em>Windows</em>.</p>
-      <p>สืบทอดความแม่นยำในการจำลองอันเป็นที่ยอมรับของ FCEUX พร้อมมอบประสบการณ์เนทีฟที่ทันสมัยบน Windows ด้วยอินเทอร์เฟซที่อิง <em>Qt 6</em> มาพร้อมการรองรับ <em>12 ภาษา</em> และชุดเครื่องมือดีบักและ TAS ครบถ้วนสำหรับทั้งนักพัฒนาและสปีดรันเนอร์</p>
-      <p>ทีมงานยังคงปรับโครงสร้างภายในและเพิ่มประสิทธิภาพอย่างต่อเนื่อง เพื่อให้โปรแกรมจำลองทำงานได้อย่างมีประสิทธิภาพ ลื่นไหล และเสถียรแม้ภายใต้โหลดหนัก ไม่ว่าคุณจะหวนคืนสู่เกมคลาสสิกในวัยเด็กหรือเจาะลึกการดัดแปลง ROM FCEUX11 ก็รันเกม NES ของคุณได้อย่างราบรื่นและสวยงามที่สุด</p>
+      <p>FCEUX11 เป็นโครงการที่สลองมาจาก FCEUX NES/Famicom โดยเสริมประสิทธิชาพเพื่มปริหัตความ Windows.</p>
+      <p>มีชุดทาง mapper ที่ควบคุมเต็มชุด, เครื่องมือใช้งาน, ตัวแก้ไข TAS ที่แม่่ยตอ็รองเฟรม, และความสามารทถึชช์เกมส์.</p>
+      <p>Core CPU และ PPU ได้ถูกเขียนใหม่ด้วย Rust ทั้งหมด ทำให้ขอบดขหนะชัดเส้นและสามารถึชสาร์ดิงดีขึ้น. คอเรสะบัดสีเรื่องและพฤติการระดับสาร์คองแชช์แม่ชี่เสย์, และยังคงเหลือเบียนเวลาสำหรบอย่างเพียงพอหับ — ส่วนให้เกมส์เล่นไหว่าทำงานในชีวิถี. อินเตอร์เพียงใช้งาน 12 ภาษา: จีนเบสส้วย, จีนดัดเทิม, อังกฤษ, ญี่ปุ่น, เกาหลี, สเปน, ฝรั่งเสย, เขมนาร์, เวียดนาม, ไทย, ฮินดี (เบต้า) และอาหรับ (เบต้า).</p>
     </div>
   </div>
 </section>
@@ -207,39 +207,32 @@
   <div class="wrap">
     <div class="whatsnew-head reveal">
       <div class="kicker">มีอะไรใหม่</div>
-      <h2>v2.0</h2>
-      <div class="sub">เปิดตัว 2026-08-22 · ทบทวน v1.17 → v2.0</div>
+      <h2>v2.1.2</h2>
+      <div class="sub">เปิดตัว 2026-09-13 · ทบทวน v2.0 → v2.1.2</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3>เขียนคอร์ CPU ใหม่</h3>
-          <p>คอร์ CPU ตอนนี้เขียนด้วย Rust ช่วยให้การจำลองแม่นยำและเสถียรขึ้น</p>
+          <h3>แกนทั้งหมดเป็น Rust</h3>
+          <p>CPU และ PPU ต่องเขียนใหม่ด้วย Rust แล้ว. แกนทั้งสองเป็นอย่่างอย่่่้ด ปัญหาในแกนหนึ่งไม่ลำคลุดลอยไปยังแกนอี่น. ขอบเขตที่ชัดเส้นขึ้นส่วนเหลือเบียนเวลาแบบนส่งงานเพียงขึ้น เกมส์จึงเล่นไหว่าทำงานในชีวิถี.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">02</div>
         <div class="wn-text">
-          <h3>ความเข้ากันได้ของเกมที่ดีขึ้น</h3>
-          <p>เกมที่ใช้คำสั่ง CPU ที่ไม่ค่อยพบบ่อยตอนนี้ทำงานได้อย่างถูกต้อง</p>
+          <h3>ลดบ์อความผิดพลาดที่เสียงธรรม</h3>
+          <p>แก้ไขปัญหาการแสดงภาพของ PPU ที่ปราชกู์ใน v2.0 แล้ว: สีขอย่างของ sprite, การพลิก sprite, sprite 8×16, การเลื่อนหน้าตางเส้นในสคานสเกน, และการจัดการที่อย่อยที่ส่งงานแปลละเทีย. เกมส์ที่เคยบะเสมอดอย่างบ่อยๆๆ ตอนนี้แสดงได้ดี.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">03</div>
         <div class="wn-text">
-          <h3>เซฟสเตทเข้ากันได้</h3>
-          <p>เซฟสเตทจากเวอร์ชันก่อนหน้ายังใช้กับคอร์ใหม่ได้</p>
+          <h3>รองรับ PAL และ Dendy</h3>
+          <p>PAL และ Dendy ได้รองสาร์แบบเป็นทางการที่ถูกต้องแล้ว. เกมขำมาตเยร์ป และเกมสำหรบบ์เครื่อง Dendy ทำงานด้วยความเร็วและฝัตตาเฟรมที่ถูกต้อง พรอยกับคุณาส่วนโคลดการเส้นช่วง.</p>
         </div>
       </div>
-      <div class="wn-item">
-        <div class="wn-num">04</div>
-        <div class="wn-text">
-          <h3>ตรวจสอบคุณภาพอัตโนมัติ</h3>
-          <p>ระบบทดสอบ KagamiQA ในตัวทำงานต่อเนื่องเพื่อตรวจสอบความแม่นยำและจับปัญหาก่อนวางจำหน่าย</p>
-        </div>
       </div>
-    </div>
     <div class="wn-cta reveal">
       <a href="https://github.com/Laffinty/FCEUX11/blob/main/docs/ChangeLog.md" target="_blank" rel="noopener">ดูบันทึกการเปลี่ยนแปลงทั้งหมด →</a>
     </div>

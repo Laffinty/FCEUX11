@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="dark" />
 <meta name="theme-color" content="#080a09" />
-<title>FCEUX11 — NES/Famicom Emulator for Windows · v2.0</title>
-<meta name="description" content="FCEUX11 v2.0 — a FCEUX-based NES/Famicom emulator optimized for Windows. A rewritten CPU core improves emulation accuracy and stability. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and reliable save states." />
+<title>FCEUX11 — NES/Famicom Emulator for Windows · v2.1.2</title>
+<meta name="description" content="FCEUX11 v2.1.2 — a FCEUX-based NES/Famicom emulator optimized for Windows. CPU and PPU reimplemented in Rust for accurate, stable emulation. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and reliable save states." />
 <meta name="keywords" content="FCEUX11, FCEUX, NES emulator, FC emulator, Famicom emulator, Windows emulator, TAS editor, Qt6, C++20, game emulator, 8-bit, multi-language, 12 languages, Arabic, RTL, ROM hacking, debugger, Lua scripting" />
 <meta name="author" content="Laffinty" />
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
@@ -32,8 +32,8 @@
 
 <meta property="og:site_name" content="FCEUX11" />
 <meta property="og:type" content="website" />
-<meta property="og:title" content="FCEUX11 — NES/Famicom Emulator for Windows · v2.0" />
-<meta property="og:description" content="FCEUX11 v2.0 — a FCEUX-based NES/Famicom emulator optimized for Windows. A rewritten CPU core improves emulation accuracy and stability. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and reliable save states." />
+<meta property="og:title" content="FCEUX11 — NES/Famicom Emulator for Windows · v2.1.2" />
+<meta property="og:description" content="FCEUX11 v2.1.2 — a FCEUX-based NES/Famicom emulator optimized for Windows. CPU and PPU reimplemented in Rust for accurate, stable emulation. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and reliable save states." />
 <meta property="og:url" content="https://laffinty.github.io/FCEUX11/" />
 <meta property="og:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <meta property="og:locale" content="en_US" />
@@ -56,8 +56,8 @@
 <meta name="msvalidate.01" content="" />
 
 <meta name="twitter:card" content="summary" />
-<meta name="twitter:title" content="FCEUX11 — NES/Famicom Emulator for Windows · v2.0" />
-<meta name="twitter:description" content="FCEUX11 v2.0 — a FCEUX-based NES/Famicom emulator optimized for Windows. A rewritten CPU core improves emulation accuracy and stability. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and reliable save states." />
+<meta name="twitter:title" content="FCEUX11 — NES/Famicom Emulator for Windows · v2.1.2" />
+<meta name="twitter:description" content="FCEUX11 v2.1.2 — a FCEUX-based NES/Famicom emulator optimized for Windows. CPU and PPU reimplemented in Rust for accurate, stable emulation. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and reliable save states." />
 <meta name="twitter:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -72,8 +72,8 @@
   "name":"FCEUX11",
   "applicationCategory":"GameApplication",
   "operatingSystem":"Windows 11",
-  "description":"FCEUX11 v2.0 — a FCEUX-based NES/Famicom emulator optimized for Windows. A rewritten CPU core improves emulation accuracy and stability. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and reliable save states.",
-  "softwareVersion":"2.0",
+  "description":"FCEUX11 v2.1.2 — a FCEUX-based NES/Famicom emulator optimized for Windows. CPU and PPU reimplemented in Rust for accurate, stable emulation. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and reliable save states.",
+  "softwareVersion":"2.1.2",
   "license":"https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt",
   "url":"https://laffinty.github.io/FCEUX11/",
   "downloadUrl":"https://github.com/Laffinty/FCEUX11/releases",
@@ -139,7 +139,7 @@
 
 <header class="hero" id="top">
   <div class="wrap">
-    <div class="pill reveal"><span class="dot"></span><span>v2.0</span></div>
+    <div class="pill reveal"><span class="dot"></span><span>v2.1.2</span></div>
     <h1 class="reveal"><span class="grad">FCEUX</span><span class="dim">11</span></h1>
     <p class="tagline reveal"><span class="tagline-title">A FCEUX-based NES/Famicom emulator optimized for Windows</span><br>core accuracy, modern native experience, 12 UI languages.</p>
     <div class="cta reveal">
@@ -163,7 +163,7 @@
       <div class="feat">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 14a9 9 0 0 1 18 0"/><path d="M12 14l5-5"/><circle cx="12" cy="14" r="1.2" fill="currentColor" stroke="none"/></svg></div>
         <h3>Rust Core</h3>
-        <p>Rewritten core for better accuracy and stability</p>
+        <p>CPU and PPU reimplemented in Rust for sharper emulation and smoother play</p>
       </div>
       <div class="feat">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m8 2-4 6 4 6M16 2l4 6-4 6M14 4l-4 16"/></svg></div>
@@ -196,9 +196,9 @@
       <h2>Introduction</h2>
     </div>
     <div class="about-body reveal">
-      <p>FCEUX11 is a derivative of the <em>FCEUX</em> NES/Famicom emulator, optimized for <em>Windows</em>.</p>
-      <p>It inherits FCEUX's renowned emulation accuracy while delivering a polished, modern Windows-native experience powered by <em>Qt 6</em>. Multi-language support — covering <em>12 languages</em> — and a full suite of debugging and TAS tools are built in for developers and speedrunners alike.</p>
-      <p>Ongoing internal refactoring and performance optimization keep the emulator efficient, smooth, and stable — even under heavy load. Whether you're revisiting childhood classics or diving into ROM hacking, FCEUX11 runs your NES games smoothly and looks great doing it.</p>
+      <p>FCEUX11 is a derivative of the <em>FCEUX</em> NES/Famicom emulator, heavily optimized for Windows.</p>
+      <p>It provides a complete mapper compatibility set, along with debugging tools, a frame-by-frame TAS editor and movie recording/playback.</p>
+      <p>Its CPU and PPU cores have been fully rewritten in Rust, giving cleaner module boundaries and more controllable state. Hardware-level timing and behaviour are still preserved exactly, while plenty of real-time headroom remains — so games run noticeably smoother in practice. The interface is available in 12 languages: Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Spanish, French, German, Vietnamese, Thai, Hindi (beta) and Arabic (beta).</p>
     </div>
   </div>
 </section>
@@ -207,39 +207,32 @@
   <div class="wrap">
     <div class="whatsnew-head reveal">
       <div class="kicker">What's new</div>
-      <h2>v2.0</h2>
-      <div class="sub">Released 2026-08-22 · v1.17 → v2.0 recap</div>
+      <h2>v2.1.2</h2>
+      <div class="sub">Released 2026-09-13 · v2.0 → v2.1.2 recap</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3>Rewritten CPU core</h3>
-          <p>The CPU core is now written in Rust, improving emulation accuracy and stability.</p>
+          <h3>Rust throughout</h3>
+          <p>The CPU and the PPU are now both written in Rust. The two cores are independent, so a problem in one cannot affect the other. Cleaner module boundaries also leave more real-time headroom, so games run noticeably smoother in practice.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">02</div>
         <div class="wn-text">
-          <h3>Better game compatibility</h3>
-          <p>Games that rely on uncommon CPU instructions now run correctly.</p>
+          <h3>Fewer visual glitches</h3>
+          <p>Several sprite and palette rendering issues from v2.0 are now fixed: sprite palette colors, sprite flipping, 8×16 sprites, mid-scanline scrolling, and palette address handling. Games that previously showed small visual glitches now render correctly.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">03</div>
         <div class="wn-text">
-          <h3>Save states preserved</h3>
-          <p>Save states created with earlier versions remain compatible with the new core.</p>
+          <h3>PAL and Dendy support</h3>
+          <p>PAL and Dendy timing are now supported. European-region games and Dendy-clone titles run at the correct speed and frame rate, with the right region-specific timing.</p>
         </div>
       </div>
-      <div class="wn-item">
-        <div class="wn-num">04</div>
-        <div class="wn-text">
-          <h3>Automated quality checks</h3>
-          <p>The built-in KagamiQA test system runs continuously to verify emulation accuracy and catch issues before each release.</p>
-        </div>
       </div>
-    </div>
     <div class="wn-cta reveal">
       <a href="https://github.com/Laffinty/FCEUX11/blob/main/docs/ChangeLog.md" target="_blank" rel="noopener">View full changelog →</a>
     </div>

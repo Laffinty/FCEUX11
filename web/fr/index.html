@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="dark" />
 <meta name="theme-color" content="#080a09" />
-<title>FCEUX11 — Émulateur NES/Famicom pour Windows · v2.0</title>
-<meta name="description" content="FCEUX11 v2.0 — émulateur NES/Famicom basé sur FCEUX, optimisé pour Windows. Un cœur de CPU réécrit améliore la précision et la stabilité de l'émulation. 12 langues avec détection automatique, outils de débogage, éditeur TAS, scripts Lua et sauvegardes fiables." />
+<title>FCEUX11 — Émulateur NES/Famicom pour Windows · v2.1.2</title>
+<meta name="description" content="FCEUX11 v2.1.2 — émulateur NES/Famicom basé sur FCEUX, optimisé pour Windows. CPU et PPU réimplémentés en Rust pour une émulation plus précise et plus stable. 12 langues avec détection automatique, outils de débogage, éditeur TAS, scripts Lua et sauvegardes fiables." />
 <meta name="keywords" content="FCEUX11, FCEUX, NES emulator, FC emulator, Famicom emulator, Windows emulator, TAS editor, Qt6, C++20, game emulator, 8-bit, multi-language, 12 languages, Arabic, RTL, ROM hacking, debugger, Lua scripting" />
 <meta name="author" content="Laffinty" />
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
@@ -32,8 +32,8 @@
 
 <meta property="og:site_name" content="FCEUX11" />
 <meta property="og:type" content="website" />
-<meta property="og:title" content="FCEUX11 — Émulateur NES/Famicom pour Windows · v2.0" />
-<meta property="og:description" content="FCEUX11 v2.0 — émulateur NES/Famicom basé sur FCEUX, optimisé pour Windows. Un cœur de CPU réécrit améliore la précision et la stabilité de l'émulation. 12 langues avec détection automatique, outils de débogage, éditeur TAS, scripts Lua et sauvegardes fiables." />
+<meta property="og:title" content="FCEUX11 — Émulateur NES/Famicom pour Windows · v2.1.2" />
+<meta property="og:description" content="FCEUX11 v2.1.2 — émulateur NES/Famicom basé sur FCEUX, optimisé pour Windows. CPU et PPU réimplémentés en Rust pour une émulation plus précise et plus stable. 12 langues avec détection automatique, outils de débogage, éditeur TAS, scripts Lua et sauvegardes fiables." />
 <meta property="og:url" content="https://laffinty.github.io/FCEUX11/fr/" />
 <meta property="og:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <meta property="og:locale" content="fr_FR" />
@@ -56,8 +56,8 @@
 <meta name="msvalidate.01" content="" />
 
 <meta name="twitter:card" content="summary" />
-<meta name="twitter:title" content="FCEUX11 — Émulateur NES/Famicom pour Windows · v2.0" />
-<meta name="twitter:description" content="FCEUX11 v2.0 — émulateur NES/Famicom basé sur FCEUX, optimisé pour Windows. Un cœur de CPU réécrit améliore la précision et la stabilité de l'émulation. 12 langues avec détection automatique, outils de débogage, éditeur TAS, scripts Lua et sauvegardes fiables." />
+<meta name="twitter:title" content="FCEUX11 — Émulateur NES/Famicom pour Windows · v2.1.2" />
+<meta name="twitter:description" content="FCEUX11 v2.1.2 — émulateur NES/Famicom basé sur FCEUX, optimisé pour Windows. CPU et PPU réimplémentés en Rust pour une émulation plus précise et plus stable. 12 langues avec détection automatique, outils de débogage, éditeur TAS, scripts Lua et sauvegardes fiables." />
 <meta name="twitter:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -72,8 +72,8 @@
   "name":"FCEUX11",
   "applicationCategory":"GameApplication",
   "operatingSystem":"Windows 11",
-  "description":"FCEUX11 v2.0 — émulateur NES/Famicom basé sur FCEUX, optimisé pour Windows. Un cœur de CPU réécrit améliore la précision et la stabilité de l'émulation. 12 langues avec détection automatique, outils de débogage, éditeur TAS, scripts Lua et sauvegardes fiables.",
-  "softwareVersion":"2.0",
+  "description":"FCEUX11 v2.1.2 — émulateur NES/Famicom basé sur FCEUX, optimisé pour Windows. CPU et PPU réimplémentés en Rust pour une émulation plus précise et plus stable. 12 langues avec détection automatique, outils de débogage, éditeur TAS, scripts Lua et sauvegardes fiables.",
+  "softwareVersion":"2.1.2",
   "license":"https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt",
   "url":"https://laffinty.github.io/FCEUX11/fr/",
   "downloadUrl":"https://github.com/Laffinty/FCEUX11/releases",
@@ -139,7 +139,7 @@
 
 <header class="hero" id="top">
   <div class="wrap">
-    <div class="pill reveal"><span class="dot"></span><span>v2.0</span></div>
+    <div class="pill reveal"><span class="dot"></span><span>v2.1.2</span></div>
     <h1 class="reveal"><span class="grad">FCEUX</span><span class="dim">11</span></h1>
     <p class="tagline reveal"><span class="tagline-title">Émulateur NES/Famicom basé sur FCEUX, optimisé pour Windows</span><br>précision d'origine, expérience native moderne, 12 langues d'interface.</p>
     <div class="cta reveal">
@@ -163,7 +163,7 @@
       <div class="feat">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 14a9 9 0 0 1 18 0"/><path d="M12 14l5-5"/><circle cx="12" cy="14" r="1.2" fill="currentColor" stroke="none"/></svg></div>
         <h3>Cœur Rust</h3>
-        <p>Cœur réécrit pour une meilleure précision et stabilité</p>
+        <p>CPU et PPU réimplémentés en Rust pour une émulation plus précise et plus stable</p>
       </div>
       <div class="feat">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m8 2-4 6 4 6M16 2l4 6-4 6M14 4l-4 16"/></svg></div>
@@ -196,9 +196,9 @@
       <h2>Présentation</h2>
     </div>
     <div class="about-body reveal">
-      <p>FCEUX11 est un dérivé de l'émulateur NES/Famicom <em>FCEUX</em>, optimisé pour <em>Windows</em>.</p>
-      <p>Il hérite de la précision d'émulation reconnue de FCEUX tout en offrant une expérience native moderne sur Windows grâce à une interface basée sur <em>Qt 6</em>. Il intègre la prise en charge de <em>12 langues</em> ainsi qu'une suite complète d'outils de débogage et de TAS pour les développeurs et les speedrunners.</p>
-      <p>Le projet poursuit en permanence la refactorisation interne et l'optimisation des performances pour maintenir l'émulateur efficace, fluide et stable, même sous forte charge. Que vous revisitiez les classiques de votre enfance ou que vous vous plongiez dans le hack de ROM, FCEUX11 exécute vos jeux NES avec une fluidité exemplaire.</p>
+      <p>FCEUX11 est un dérivé de l’émulateur NES/Famicom <em>FCEUX</em>, profondément optimisé pour Windows.</p>
+      <p>Il propose un ensemble complet de compatibilité des mappers, des outils de débogage, un éditeur TAS image par image, ainsi que l’enregistrement et la lecture de films.</p>
+      <p>Ses cœurs CPU et PPU ont été entièrement réécrits en Rust, avec des frontières de modules plus nettes et un état plus contrôlable. La temporisation et le comportement au niveau matériel sont préservés à l’identique, tandis qu’il reste une marge confortable en temps réel — les jeux tournent donc sensiblement plus fluidement en pratique. L’interface est disponible en 12 langues : chinois simplifié, chinois traditionnel, anglais, japonais, coréen, espagnol, français, allemand, vietnamien, thaï, hindi (bêta) et arabe (bêta).</p>
     </div>
   </div>
 </section>
@@ -207,39 +207,32 @@
   <div class="wrap">
     <div class="whatsnew-head reveal">
       <div class="kicker">Nouveautés</div>
-      <h2>v2.0</h2>
-      <div class="sub">Publié le 2026-08-22 · récapitulatif v1.17 → v2.0</div>
+      <h2>v2.1.2</h2>
+      <div class="sub">Publié le 2026-09-13 · récapitulatif v2.0 → v2.1.2</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3>Cœur de CPU réécrit</h3>
-          <p>Le cœur du CPU est désormais écrit en Rust, ce qui améliore la précision et la stabilité de l'émulation.</p>
+          <h3>Rust de bout en bout</h3>
+          <p>Le CPU et le PPU sont désormais tous deux écrits en Rust. Les deux cœurs sont indépendants : un problème dans l’un ne se propage pas à l’autre. Des frontières de modules plus nettes laissent aussi plus de marge en temps réel, si bien que les jeux tournent sensiblement plus fluidement en pratique.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">02</div>
         <div class="wn-text">
-          <h3>Meilleure compatibilité des jeux</h3>
-          <p>Les jeux qui utilisent des instructions CPU peu courantes fonctionnent désormais correctement.</p>
+          <h3>Moins de petits défauts visuels</h3>
+          <p>Plusieurs problèmes de rendu du PPU présents en v2.0 sont corrigés : couleurs de palette des sprites, retournement des sprites, sprites 8×16, défilement horizontal en milieu de scanline et prise en compte du miroir de palette. Les jeux qui présentaient de petits artefacts visuels s’affichent désormais correctement.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">03</div>
         <div class="wn-text">
-          <h3>Sauvegardes compatibles</h3>
-          <p>Les sauvegardes créées avec les versions précédentes restent compatibles avec le nouveau cœur.</p>
+          <h3>Prise en charge de PAL et Dendy</h3>
+          <p>La temporisation PAL et Dendy est désormais officiellement prise en charge. Les jeux européens et les titres pour clones Dendy tournent à la bonne vitesse et à la bonne fréquence d’image, avec la temporisation spécifique à leur région.</p>
         </div>
       </div>
-      <div class="wn-item">
-        <div class="wn-num">04</div>
-        <div class="wn-text">
-          <h3>Contrôles qualité automatisés</h3>
-          <p>Le système de tests KagamiQA intégré vérifie en continu la précision et détecte les problèmes avant chaque publication.</p>
-        </div>
       </div>
-    </div>
     <div class="wn-cta reveal">
       <a href="https://github.com/Laffinty/FCEUX11/blob/main/docs/ChangeLog.md" target="_blank" rel="noopener">Voir le journal complet →</a>
     </div>
