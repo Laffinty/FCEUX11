@@ -375,8 +375,7 @@ impl Registers {
         self.v = (self.v & !0x041F) | (self.t & 0x041F);
     }
 
-    /// Copy vertical bits of `t` into `v` — called at the end of the
-    /// visible portion of each scanline (around dot 257).
+    /// Copy vertical bits of `t` into `v` — called on the pre-render scanline (dots 280..=304)
     pub fn copy_vertical(&mut self) {
         // v.coarse_y, v.nametable_y, v.fine_y come from t.
         self.v = (self.v & !0x7BE0) | (self.t & 0x7BE0);

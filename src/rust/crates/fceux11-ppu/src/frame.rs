@@ -154,8 +154,13 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
         state.registers.copy_horizontal();
     }
 
-    // Visible scanline scroll increment: BG fetch clock at dot 256,
-    // vertical copy at dot 257, fine_y increment at dot 256.
+    // Visible scanline scroll increment (NESdev PPU frame timing):
+    // dot 256 = increment Y (fine Y, carry into coarse Y / NT-Y);
+    // dot 257 = copy the HORIZONTAL bits of t into v. The vertical bits
+    // are copied only on the pre-render line (dots 280..=304, see below).
+    // Copying the vertical bits here instead reset the vertical scroll on
+    // every visible scanline, so every line fetched the same tile row and
+    // real games rendered as a flat backdrop plus sprites.
     if (0..=239).contains(&sl) && state.rendering_enabled() {
         if dot == 256 {
             state.registers.increment_coarse_x();
@@ -167,7 +172,7 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
             state.registers.increment_fine_y();
         }
         if dot == 257 {
-            state.registers.copy_vertical();
+            state.registers.copy_horizontal();
         }
     }
 
@@ -665,15 +670,31 @@ mod tests {
     }
 
     #[test]
-    fn coarse_x_increments_at_dot_256_during_render() {
+    fn dot_257_copies_horizontal_bits_from_t() {
         let mut s = PpuState::new();
         s.registers.write_mask(1 << mask_bits::SHOW_BG);
-        s.registers.v = 0x1000; // coarse_x = 0
+        s.registers.v = 0x1000; // coarse_x = 0, vertical bits nonzero
+        s.registers.t = 0x021F; // h bits: coarse_x = 31, nametable_x = 0
         let mut bus = FlatBus::new();
         tick_to(&mut s, &mut bus, 100, 256);
-        tick_dot(&mut s, &mut bus); // dot 256 → increment
-        assert_eq!(s.registers.v & 0x001F, 1);
+        tick_dot(&mut s, &mut bus); // dot 256: coarse-X increment
+        tick_dot(&mut s, &mut bus); // dot 257: t -> v horizontal copy
+        assert_eq!(
+            s.registers.v & 0x041F,
+            s.registers.t & 0x041F,
+            "dot 257 copies the horizontal scroll bits of t into v"
+        );
+        // The vertical bits must survive a visible scanline untouched:
+        // copying them here reset the vertical scroll every line, which
+        // made every scanline fetch the same tile row (KIRA.nes: flat
+        // backdrop plus sprites only).
+        assert_ne!(
+            s.registers.v & 0x7BE0,
+            s.registers.t & 0x7BE0,
+            "a visible scanline must not copy the vertical bits of t into v"
+        );
     }
+
 
     // Phase 6.1.e follow-up (VBL-block-phase alignment, §6.4.3):
     // the frame wrap goes sl 240 → sl 241 (VBL-first layout).
