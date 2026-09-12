@@ -281,13 +281,12 @@ uint8_t bridge_cpu_read(uint32_t addr) {
 }
 
 void bridge_notify_a12_rising() {
-    // Phase 3: forward to the C++ MMC3 A12 rising-edge detector. The
-    // A12 detection lives in `src/ppu.cpp` (`MMC3_hb` / A12-rise
-    // tracker) — for now the existing C++ new PPU's `runppu(1)` loop
-    // continues to drive A12 detection from its BG-fetch hot path.
-    // The Rust scheduler fires this hook at every dot-256 BG fetch
-    // (visible scanlines, rendering on) so MMC3 still sees the same
-    // edge rate as the C++ new PPU.
+    // v2.1.2: A12-level rising-edge detection is NOT wired yet. The Rust
+    // PPU clocks the MMC3-family IRQ counter through the gated HBlank hook
+    // instead (bridge_notify_hblank -> GameHBIRQHook), which mirrors
+    // the deleted C++ reference (src/ppu_rendering.cpp, sprite slot s == 2,
+    // gated on PPUON and on the pattern-table choice). A real A12 watcher
+    // with the low-level filter is planned as v2.1.2 batch 2.
 }
 
 void bridge_notify_hblank() {

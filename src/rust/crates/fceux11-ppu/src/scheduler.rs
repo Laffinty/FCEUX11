@@ -170,7 +170,9 @@ impl NesScheduler {
         // - notify_hblank2: scanline enters the very-end hblank
         //   (dot 320+) — VRC6 IRQ hook.
         if (0..=239).contains(&state.scanline) && state.dot == 256 {
-            bus.notify_hblank();
+            if state.rendering_enabled() && (state.registers.ctrl & 0x18) != 0x18 {
+                bus.notify_hblank();
+            }
         }
         if state.dot == 320 && state.scanline >= 0 {
             bus.notify_hblank2();
@@ -382,6 +384,49 @@ mod tests {
         // (i.e. on the dot==256 tick). Verify last_scanline is 0 and
         // ppu_dots_consumed matches.
         assert_eq!(sched.ppu_dots_consumed, target_dots);
+    }
+
+    /// v2.1.2: the mapper IRQ clock must not advance while rendering is off,
+    /// and must fire exactly once per visible scanline when it is on.
+    #[test]
+    fn mapper_irq_clock_requires_rendering_enabled() {
+        let frame_dots = DOTS_PER_SCANLINE as u32 * 262;
+
+        let mut sched = NesScheduler::new();
+        let mut ppu = PpuState::new();
+        ppu.registers.write_mask(0);
+        let mut bus = HookCountBus::new();
+        for _ in 0..frame_dots {
+            let _ = sched.tick_one_ppu_dot(&mut ppu, &mut bus);
+        }
+        assert_eq!(bus.hblank, 0, "rendering off must not clock the mapper IRQ");
+
+        let mut sched = NesScheduler::new();
+        let mut ppu = PpuState::new();
+        ppu.registers.write_mask(1 << mask_bits::SHOW_BG);
+        let mut bus = HookCountBus::new();
+        for _ in 0..frame_dots {
+            let _ = sched.tick_one_ppu_dot(&mut ppu, &mut bus);
+        }
+        assert_eq!(bus.hblank, 240, "one mapper IRQ clock per visible scanline");
+    }
+
+    struct HookCountBus {
+        inner: FlatBus,
+        hblank: u32,
+    }
+
+    impl HookCountBus {
+        fn new() -> Self {
+            Self { inner: FlatBus::new(), hblank: 0 }
+        }
+    }
+
+    impl PpuBus for HookCountBus {
+        fn read(&mut self, addr: u16) -> u8 { self.inner.read(addr) }
+        fn write(&mut self, addr: u16, val: u8) { self.inner.write(addr, val) }
+        fn peek_chr(&mut self, addr: u16) -> u8 { self.inner.peek_chr(addr) }
+        fn notify_hblank(&mut self) { self.hblank += 1; }
     }
 
     /// OAM DMA pump transfers one byte per CPU cycle (= 3 PPU dots).
