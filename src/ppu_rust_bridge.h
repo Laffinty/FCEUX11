@@ -186,6 +186,11 @@ uint32_t ppu_rust_bridge_ppu_dots_per_frame();
 // ---------------------------------------------------------------------------
 uint8_t  ppu_rust_bridge_get_mask_mirror();
 
+// Step D (M3): write-through for the OAM editors. `SPRAM` is a tombstone
+// under the Rust PPU, so `HexEditor` / `ppuViewer` must apply OAM edits
+// through this entry point when the bridge is active.
+void     ppu_rust_bridge_write_oam(uint32_t addr, uint8_t value);
+
 #else  // !FCEUX11_RUST_PPU
 
 // When the option is off, the bridge functions are no-ops returning
@@ -215,6 +220,7 @@ inline uint8_t  ppu_rust_bridge_get_data_bus() { return 0; }
 inline void     ppu_rust_bridge_note_nt_write(uint32_t /*ppu_addr*/) {}
 inline void     ppu_rust_bridge_note_palette_write() {}
 inline uint8_t  ppu_rust_bridge_get_mask_mirror() { return 0; }
+inline void     ppu_rust_bridge_write_oam(uint32_t /*addr*/, uint8_t /*value*/) {}
 inline void     ppu_rust_bridge_set_video_system(bool /*pal*/, bool /*dendy*/) {}
 inline uint32_t ppu_rust_bridge_ppu_dots_per_frame() { return 89342u; }  // NTSC (262 x 341)
 inline int  ppu_rust_bridge_emit_one_cpu_cycle() { return 0; }

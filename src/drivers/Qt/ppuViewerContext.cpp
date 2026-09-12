@@ -100,6 +100,7 @@ void PalettePoke(uint32_t addr, uint8_t data)
 	{
 		PALRAM[addr] = data;
 	}
+	ppu_rust_bridge_note_palette_write();
 }
 
 int writeMemPPU(unsigned int addr, int value)
@@ -108,10 +109,13 @@ int writeMemPPU(unsigned int addr, int value)
 	if (addr < 0x2000)
 	{
 		VPage[addr >> 10][addr] = value;
+		// Step D (M3): refresh the Rust renderer's window copies.
+		ppu_rust_bridge_note_nt_write(addr);
 	}
 	if ((addr >= 0x2000) && (addr < 0x3F00))
 	{
 		vnapage[(addr >> 10) & 0x3][addr & 0x3FF] = value;
+		ppu_rust_bridge_note_nt_write(addr);
 	}
 	if ((addr >= 0x3F00) && (addr < 0x3FFF))
 	{

@@ -781,6 +781,13 @@ uint8_t ppu_rust_bridge_get_mask_mirror() {
     return g_ppu_mask_mirror;
 }
 
+void ppu_rust_bridge_write_oam(uint32_t addr, uint8_t value) {
+    if (g_ppu_state == nullptr) {
+        return;
+    }
+    fceux11_ppu_set_oam_byte(g_ppu_state, addr, value);
+}
+
 uint32_t ppu_rust_bridge_ppu_dots_per_frame() {
     // 262 x 341 = 89342 (NTSC); 312 x 341 = 106392 (PAL/Dendy) -
     // plan section B.5 D4.1.

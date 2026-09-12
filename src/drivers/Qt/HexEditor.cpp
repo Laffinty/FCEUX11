@@ -53,6 +53,7 @@
 #include "../../palette.h"
 #include "../../fds.h"
 #include "../../ppu.h"
+#include "../../ppu_rust_bridge.h"
 #include "../../cart.h"
 #include "../../ines.h"
 #include "../common/configSys.h"
@@ -312,6 +313,9 @@ static void PalettePoke(uint32 addr, uint8 data)
 	{
 		PALRAM[addr] = data;
 	}
+	// Step D (M3): palette window is a live PALRAM pointer, so this is a
+	// documented no-op hook keeping the write-through contract explicit.
+	ppu_rust_bridge_note_palette_write();
 }
 //----------------------------------------------------------------------------
 static int writeMem( int mode, unsigned int addr, int value )
@@ -351,10 +355,14 @@ static int writeMem( int mode, unsigned int addr, int value )
 			if (addr < 0x2000)
 			{
 				VPage[addr >> 10][addr] = value; //todo: detect if this is vrom and turn it red if so
+				// Step D (M3): Rust renders from copies - refresh them so the
+				// edit is visible (bridge_refresh_windows rebuilds CHR + NT).
+				ppu_rust_bridge_note_nt_write(addr);
 			}
 			if ((addr >= 0x2000) && (addr < 0x3F00))
 			{
 				vnapage[(addr >> 10) & 0x3][addr & 0x3FF] = value; //todo: this causes 0x3000-0x3f00 to mirror 0x2000-0x2f00, is this correct?
+				ppu_rust_bridge_note_nt_write(addr);
 			}
 			if ((addr >= 0x3F00) && (addr < 0x3FFF))
 			{
@@ -365,7 +373,12 @@ static int writeMem( int mode, unsigned int addr, int value )
 		case QHexEdit::MODE_NES_OAM:
 		{
 			addr &= 0xFF;
-			SPRAM[addr] = value;
+			// Step D (M3): SPRAM is a tombstone under the Rust PPU - route
+			// the edit into the Rust engine's OAM.
+			if (ppu_rust_bridge_active())
+				ppu_rust_bridge_write_oam(addr, static_cast<uint8_t>(value));
+			else
+				SPRAM[addr] = value;
 		}
 		break;
 		case QHexEdit::MODE_NES_ROM:

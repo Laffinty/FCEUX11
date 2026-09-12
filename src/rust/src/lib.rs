@@ -165,6 +165,15 @@ pub unsafe extern "C" fn fceux11_ppu_set_video_system(
 }
 
 #[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_ppu_set_oam_byte(
+    state: *mut fceux11_ppu::PpuState,
+    addr: u32,
+    value: u8,
+) {
+    fceux11_ppu::ffi::fceux11_ppu_set_oam_byte(state, addr, value)
+}
+
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_ppu_set_video_system_ex(
     state: *mut fceux11_ppu::PpuState,
     system: u32,

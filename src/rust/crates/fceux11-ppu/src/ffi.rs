@@ -299,6 +299,14 @@ pub unsafe extern "C" fn fceux11_ppu_set_video_system(state: *mut PpuState, pal:
     sb.state.video_system = vs;
 }
 
+/// Write one byte of primary OAM (Step D / M3). The HexEditor and the PPU
+/// viewer edit OAM directly; under the Rust PPU the C++ `SPRAM` global is a
+/// tombstone, so those editors must route the write here.
+pub unsafe extern "C" fn fceux11_ppu_set_oam_byte(state: *mut PpuState, addr: u32, value: u8) {
+    let sb = lookup(state);
+    sb.state.oam[(addr & 0xFF) as usize] = value;
+}
+
 /// CPU `count` budget units per PPU dot for the current region
 /// (Step B.5-2c): 16 for the NTSC/Dendy 3.0 ratio, 15 for PAL's 3.2.
 /// The unit is 1/48 of a CPU cycle (C++ `X6502._count` scale).
