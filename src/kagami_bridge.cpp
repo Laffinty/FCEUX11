@@ -198,6 +198,15 @@ void kagami_bridge_set_newppu(int on) {
     newppu = (on != 0) ? 1 : 0;
 }
 
+// v2.1.1.7 Step B.5-2d: region override for the PAL/Dendy timing gate.
+// `dendy` is the FCEUX global the load path also reads, so set it first
+// and then run the normal FCEUPPU_SetVideoSystem entry point (which is
+// what forwards the region to the Rust PPU bridge).
+void kagami_bridge_set_video_system(int pal, int dendy_on) {
+    ::dendy = (dendy_on != 0) ? 1 : 0;
+    FCEUPPU_SetVideoSystem((pal != 0 || ::dendy != 0) ? 1 : 0);
+}
+
 // ---------------------------------------------------------------------------
 // CPU PC peek — Phase 4.5 cycle-drift diagnostic.
 //

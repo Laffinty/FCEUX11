@@ -2,7 +2,7 @@
 
 # FCEUX11
 
-[![Version](https://img.shields.io/badge/version-v2.0-blue)](https://github.com/Laffinty/FCEUX11/releases)
+[![Version](https://img.shields.io/badge/version-v2.1.1-blue)](https://github.com/Laffinty/FCEUX11/releases)
 [![License](https://img.shields.io/badge/license-GPL--v2-green)](COPYING)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?logo=windows)](https://www.microsoft.com/windows/windows-11)
 [![Qt](https://img.shields.io/badge/Qt-6.8%20LTS-41CD52?logo=qt)](https://www.qt.io)
@@ -16,9 +16,9 @@
 
 ## 简介 / Introduction
 
-**FCEUX11** 是基于 [FCEUX](https://fceux.com) 的 NES/Famicom 模拟器衍生项目，针对 **Windows** 平台深度优化。在继承 FCEUX 卓越模拟精度的同时，采用 Qt6 图形界面重塑了现代 Windows 原生体验，并提供 12 种语言的多语言支持，以及面向开发者和速通玩家的调试与 TAS 工具集。自 v2.0 起，核心 CPU 由 Rust 重写，模拟精度与运行稳定性进一步提升。
+**FCEUX11** 是基于 [FCEUX](https://fceux.com) 的 NES/Famicom 模拟器衍生项目，针对 Windows 平台深度优化，提供完整的 mapper 兼容体系、调试工具、TAS 逐帧编辑器与录像回放功能；基于 Rust 语言全新重构 CPU/PPU 核心，具备更清晰的模块边界，更稳定的运行表现，同时严格保持硬件级的时序精度与行为还原度，支持简体中文、繁体中文、英文、日语、韩语、西班牙语、法语、德语、越南语、泰语、印地语（beta）、阿拉伯语（beta）共 12 种语言。
 
-**FCEUX11** is a derivative of the [FCEUX](https://fceux.com) NES/Famicom emulator, optimized for **Windows**. It inherits FCEUX's renowned emulation accuracy while delivering a polished, modern Windows-native experience powered by Qt6, with 12-language localization and a full suite of debugging and TAS tools for developers and speedrunners. Since v2.0, the core CPU has been rewritten in Rust for even better accuracy and stability.
+**FCEUX11** is a derivative of the [FCEUX](https://fceux.com) NES/Famicom emulator, optimized for the Windows platform. It features full mapper compatibility, a comprehensive suite of debugging tools, a frame-by-frame TAS editor, and movie recording and playback functionality. The CPU and PPU cores have been completely reengineered from the ground up in Rust, delivering cleaner module boundaries and more stable runtime performance while strictly preserving hardware-level timing accuracy and behavioral fidelity. Localization support is provided for 12 languages: Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Spanish, French, German, Vietnamese, Thai, Hindi (beta), and Arabic (beta).
 
 ---
 
@@ -27,7 +27,7 @@
 | 中文 | English |
 |------|---------|
 | **精确模拟**：完整支持 NES、Famicom 及各类 Mapper 扩展芯片，画面与音效高度还原。 | **Accurate Emulation**: Full NES / Famicom / mapper support with faithful graphics and audio. |
-| **Rust 核心引擎**：v2.0 起核心 CPU 由 Rust 重写，精度与稳定性进一步提升。 | **Rust Core Engine**: since v2.0 the core CPU is rewritten in Rust for improved accuracy and stability. |
+| **独立 Rust CPU 与 PPU**：自 v2.0 起 6502 CPU 由 Rust 完整实现（`fceux11-core` crate），自 v2.1.1 起 PPU 同样由 Rust 完整实现（`fceux11-ppu` crate），二者相互独立、互不共享状态。 | **Independent Rust CPU and PPU**: The 6502 CPU has been fully implemented in Rust since v2.0 (`fceux11-core` crate); the PPU has been fully implemented in Rust since v2.1.1 (`fceux11-ppu` crate). The two engines are independent of each other and share no state. |
 | **调试工具**：内置 CPU/PPU 调试器、十六进制编辑器、内存搜索与监视、代码/数据日志。 | **Debugging Tools**: CPU/PPU debugger, hex editor, RAM search/watch, code/data logger. |
 | **TAS 编辑器**：逐帧录制并精确编辑按键输入，轻松制作工具辅助速通（TAS）录像。 | **TAS Editor**: Frame-by-frame recording and precise input editing for Tool-Assisted Speedruns. |
 | **Lua 脚本**：通过 Lua 接口编写脚本，实现自定义屏幕叠加显示、自动化操作、内存数据读取等高级玩法。 | **Lua Scripting**: Custom on-screen displays, automation, and memory access via Lua. |
@@ -57,15 +57,11 @@ git clone https://github.com/Laffinty/FCEUX11.git
 cd FCEUX11
 .\scripts\setup_vcpkg.ps1
 $env:VCPKG_ROOT = "$PWD\vcpkg"          # 必设，do_build.ps1 据此定位 vcpkg
-.\scripts\do_build.ps1 -Config Release  # 产物：build\src\fceux11.exe
+.\scripts\do_build.ps1 -Config Release -BuildDir build-rust-ppu
+# 产物：build-rust-ppu\src\fceux11.exe
 ```
 
----
-
-## 已知移除 / Known Removal
-
-自 v1.15 (hotfix4) 起，**NetPlay（联机对战）** 正式移除——上游 FCEUX 的该功能本已不可用，相关 CLI 选项与不可达代码已清理。详见 [ChangeLog.md](docs/ChangeLog.md)。
-Since v1.15 (hotfix4), **NetPlay** has been formally removed — it was already broken upstream, and related CLI options and unreachable code were cleaned up. See [ChangeLog.md](docs/ChangeLog.md).
+> 自 v2.1.1 起，Rust CPU 与 Rust PPU 是唯一实现，不存在 C++ 引擎可回退；自 v2.1.1.7 Step C（C++ PPU 退役）起，`-DFCEUX11_RUST_PPU=OFF` 是配置期错误。`build-rust-ppu/` 是当前在维护的验证目录；历史遗留的 `build/`（缓存为 OFF，已无法 configure）须先删除或重新配置。
 
 ---
 
@@ -92,16 +88,16 @@ Launch `fceux11.exe`, load a game via **File → Open ROM**, play with keyboard 
 
 ## 质量保障 / Quality Assurance
 
-FCEUX11 内置 **KagamiQA** 双 Oracle 自动化质量保障系统，在 CI 上持续追踪回归与硬件精度（CPU/PPU/APU/MMC3）。实现细节见 [`docs/tech/KagamiQA.md`](docs/tech/KagamiQA.md)，最新结果见 [ChangeLog.md](docs/ChangeLog.md)。
+FCEUX11 在 CI 上以 **KagamiQA** 双 Oracle 体系持续追踪回归与硬件精度：Oracle A 为 CTest 回归套件（ctest、ROM 回归、savestate 回归、mapper 字节级比对），Oracle B 为 blargg ROM 硬件精度对比。最新的基线冻结、Grade 等级与已知失败项见 [ChangeLog.md](docs/ChangeLog.md)。
 
-FCEUX11 ships **KagamiQA**, a dual-oracle automated quality assurance system that continuously tracks regressions and hardware accuracy (CPU/PPU/APU/MMC3) in CI. Implementation details: [`docs/tech/KagamiQA.md`](docs/tech/KagamiQA.md); latest results: [ChangeLog.md](docs/ChangeLog.md).
+FCEUX11 tracks regressions and hardware accuracy in CI through the **KagamiQA** dual-oracle system: Oracle A is the CTest regression suite (ctest, ROM regression, savestate regression, mapper byte-diff), Oracle B is the blargg-ROM hardware-accuracy comparison. The latest frozen baseline, grade, and known failures live in [ChangeLog.md](docs/ChangeLog.md).
 
 ---
 
 ## 版本历史 / Changelog
 
-详见 [ChangeLog.md](docs/ChangeLog.md)。当前稳定版为 **v2.0**。
-See [ChangeLog.md](docs/ChangeLog.md). Current stable release is **v2.0**.
+详见 [ChangeLog.md](docs/ChangeLog.md)。当前稳定版为 **v2.1.1**。
+See [ChangeLog.md](docs/ChangeLog.md). Current stable release is **v2.1.1**.
 
 ---
 

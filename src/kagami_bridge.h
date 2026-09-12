@@ -48,6 +48,12 @@ void kagami_bridge_kill(void);
 /// before load_rom for the new-PPU rendering path.
 void kagami_bridge_set_newppu(int on);
 
+/// Select the emulated region (v2.1.1.7 Step B.5-2d). `pal` selects the
+/// 312-line / 50 Hz PAL timing, `dendy` the Dendy quirk (312 lines with
+/// VBL/NMI at scanline 291). Call after `kagami_bridge_load_rom` — the
+/// load path re-applies the ROM's own region.
+void kagami_bridge_set_video_system(int pal, int dendy);
+
 /// Copy the first `len` bytes of the current XBuf (NES video buffer)
 /// into `dst`. XBuf is laid out as 256x256 bytes; the visible 256x240
 /// region is the first `256 * 240 = 61440` bytes — the same slice the

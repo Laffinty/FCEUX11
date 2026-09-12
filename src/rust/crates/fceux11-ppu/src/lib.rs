@@ -27,6 +27,7 @@ pub mod scheduler;
 pub mod snapshot;
 pub mod sprites;
 pub mod state;
+pub mod video_system;
 
 pub use bus::{FlatBus, PpuBus};
 pub use frame::{TickOutcome, tick_dot};
@@ -35,3 +36,4 @@ pub use scheduler::{
     NTSC_CPU_CYCLES_PER_FRAME, NesScheduler, PAL_CPU_CYCLES_PER_FRAME, PPU_DOTS_PER_CPU_CYCLE,
 };
 pub use state::PpuState;
+pub use video_system::{VideoSystem, VideoSystemTimings};

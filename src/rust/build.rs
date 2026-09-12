@@ -356,6 +356,16 @@ fn merge_headers(
     output.push_str("/* === Phase 6.3.c.1: take-and-clear companion to 6.3.b === */\n");
     output.push_str("uint8_t fceux11_ppu_take_dmc_dma_stall(PpuState *state);\n\n");
 
+    // v2.1.1.7 Step B.1 (D1-A): savestate bridge state block. The
+    // fceux11-ppu crate FFI is hand-appended here because cbindgen
+    // 0.29.3 cannot emit Rust-2024 `pub unsafe extern " C fn` declarations
+    // (see the long block comment above). The matching
+    // Rust implementation lives in
+    // src/rust/crates/fceux11-ppu/src/ffi.rs (search for STATE_BLOCK_SIZE).
+    output.push_str("/* === Step B.1 (D1-A): savestate bridge state block === */\n");
+    output.push_str("int32_t fceux11_ppu_state_block_export(PpuState *state, uint8_t *out, uint32_t len);\n");
+    output.push_str("int32_t fceux11_ppu_state_block_apply(PpuState *state, const uint8_t *buf, uint32_t len);\n\n");
+
     if !root_body.is_empty() {
         output.push('\n');
     }

@@ -99,6 +99,7 @@
 #include "mapinc_bus.h"
 #include "../unif.h"
 #include "../ppu.h"
+#include "../ppu_rust_bridge.h"
 
 const uint32 SAVE_FLASH_SIZE = 1024 * 1024 * 8;
 const uint32 FLASH_SECTOR_SIZE = 128 * 1024;
@@ -1890,7 +1891,9 @@ static DECLFR(MAFRAM) {
 	// MMC5
 	if ((mapper == 0b001111) && (A == 0x5204))
 	{
-		int ppuon = (PPU[1] & 0x18);
+		// v2.1.1.7 Step D (M3): same borrow-safe mirror path as mmc5.cpp.
+		const int ppu_mask = ppu_rust_bridge_active() ? ppu_rust_bridge_get_mask_mirror() : PPU[1];
+		int ppuon = (ppu_mask & 0x18);
 		uint8 r = (!ppuon || g_cpu.scanline_ref() + 1 >= 241) ? 0 : 1;
 		uint8 p = mmc5_irq_out;
 		X6502_IRQEnd(FCEU_IQEXT);

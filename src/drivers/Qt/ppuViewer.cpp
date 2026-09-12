@@ -37,6 +37,7 @@
 #include "../../cart.h"
 #include "../../ppu.h"
 #include "../../debug.h"
+#include "../../ppu_rust_bridge.h"
 #include "../../palette.h"
 
 #include "Qt/ppuViewer.h"
@@ -545,7 +546,12 @@ void fceWrapper_UpdatePPUView(int scanline, int refreshchr)
 
 	if ( spriteViewWindow != NULL )
 	{
-		memcpy( oam, SPRAM, 256 );
+		// v2.1.1.7 Step D/M5: SPRAM is a tombstone under the Rust PPU (power-on
+		// random, never updated): take the live OAM from the bridge.
+		if ( ppu_rust_bridge_active() )
+			ppu_rust_bridge_copy_oam( oam );
+		else
+			memcpy( oam, SPRAM, 256 );
 
 		drawSpriteTable();
 	}

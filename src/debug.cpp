@@ -14,6 +14,7 @@
 #include "diag_api.h"
 #include "ppu.h"
 #include "rust/fceux11_rust.h"
+#include "ppu_rust_bridge.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -314,17 +315,37 @@ uint8 *GetNesCHRPointer(int A){
 	return CHRptr[0]+A;
 }
 
+// v2.1.1.7 Step B.4: the PPU[0..3] / SPRAM / XOffset / VRAMBuffer /
+// PPUGenLatch globals are tombstones under the Rust PPU (plan section
+// 0.1). Debug reads go through the bridge accessors while the Rust engine
+// is active, and fall back to the globals otherwise.
+static inline uint8_t PpuRegRead(uint32_t idx) {
+	return ppu_rust_bridge_active() ? ppu_rust_bridge_get_register(idx) : PPU[idx];
+}
+static inline uint8_t PpuOamRead(uint32_t addr) {
+	return ppu_rust_bridge_active() ? ppu_rust_bridge_get_oam(addr) : SPRAM[addr & 0xFF];
+}
+static inline uint8_t PpuXOffsetRead() {
+	return ppu_rust_bridge_active() ? ppu_rust_bridge_get_x_offset() : XOffset;
+}
+static inline uint8_t PpuVramBufferRead() {
+	return ppu_rust_bridge_active() ? ppu_rust_bridge_get_vram_buffer() : VRAMBuffer;
+}
+static inline uint8_t PpuDataBusRead() {
+	return ppu_rust_bridge_active() ? ppu_rust_bridge_get_data_bus() : PPUGenLatch;
+}
+
 uint8 GetMem(uint16 A) {
 	if ((A >= 0x2000) && (A < 0x4000)) // PPU regs and their mirrors
 		switch (A&7) {
-			case 0: return PPU[0];
-			case 1: return PPU[1];
-			case 2: return PPU[2]|(PPUGenLatch&0x1F);
-			case 3: return PPU[3];
-			case 4: return SPRAM[PPU[3]];
-			case 5: return XOffset;
+			case 0: return PpuRegRead(0);
+			case 1: return PpuRegRead(1);
+			case 2: return PpuRegRead(2)|(PpuDataBusRead()&0x1F);
+			case 3: return PpuRegRead(3);
+			case 4: return PpuOamRead(PpuRegRead(3));
+			case 5: return PpuXOffsetRead();
 			case 6: return FCEUPPU_PeekAddress() & 0xFF;
-			case 7: return VRAMBuffer;
+			case 7: return PpuVramBufferRead();
 		}
 	// feos: added more registers
 	else if ((A >= 0x4000) && (A < 0x4010))
@@ -759,11 +780,11 @@ static void breakpoint(uint8 *opcode, uint16 A, int size) {
 				{
 					if (watchpoint[i].endaddress)
 					{
-						if ((watchpoint[i].address <= PPU[3]) && (watchpoint[i].endaddress >= PPU[3]))
+						if ((watchpoint[i].address <= PpuRegRead(3)) && (watchpoint[i].endaddress >= PpuRegRead(3)))
 							BREAKHIT(i);
 					} else
 					{
-						if (watchpoint[i].address == PPU[3])
+						if (watchpoint[i].address == PpuRegRead(3))
 						BREAKHIT(i);
 					}
 				} else if ((watchpoint[i].flags & WP_W) && (A == 0x4014))

@@ -40,6 +40,7 @@
 #include "../../ines.h"
 #include "../../debug.h"
 #include "../../palette.h"
+#include "../../ppu_rust_bridge.h"
 
 #include "Qt/ColorMenu.h"
 #include "Qt/ConsoleWindow.h"
@@ -52,6 +53,12 @@
 #include "Qt/config.h"
 #include "Qt/ppuViewer.h"
 #include "Qt/fceuWrapper.h"
+
+// v2.1.1.7 Step B.4: PPU[0..3] are tombstones under the Rust PPU (plan
+// section 0.1); read the live values through the bridge when it is active.
+static inline uint8_t PpuRegRead(uint32_t idx) {
+	return ppu_rust_bridge_active() ? ppu_rust_bridge_get_register(idx) : PPU[idx];
+}
 
 static ppuNameTableViewerDialog_t *nameTableViewWindow = NULL;
 static uint8_t palcache[36]; //palette cache
@@ -1179,7 +1186,7 @@ void ppuNameTableView_t::computeNameTableProperties( int NameTable, int TileX, i
 	{
 		return;
 	}
-	if (PPU[0]&0x10){ //use the correct pattern table based on this bit
+	if (PpuRegRead(0)&0x10){ //use the correct pattern table based on this bit
 		ptable=0x1000;
 	}
 
@@ -1691,7 +1698,7 @@ static void DrawNameTable(int scanline, int ntnum, bool invalidateCache)
 
 	int a, ptable=0;
 	
-	if (PPU[0]&0x10){ //use the correct pattern table based on this bit
+	if (PpuRegRead(0)&0x10){ //use the correct pattern table based on this bit
 		ptable=0x1000;
 	}
 

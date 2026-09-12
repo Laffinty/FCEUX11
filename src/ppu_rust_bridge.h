@@ -20,6 +20,14 @@
 // Off by default; the C++ PPU path remains bit-identical to Phase 0/1
 // when `FCEUX11_RUST_PPU` is not defined.
 
+// BRIDGE-OWNED: PPU runtime state is owned by the Rust PPU engine
+// (fceux11-ppu crate). The C++ symbols PPU[0..3] / SPRAM / PPUSPL /
+// VRAMBuffer / PPUGenLatch / XOffset / TempAddr / RefreshAddr / vtoggle /
+// SpriteDMA / kook / ppudead are tombstones (read-only mirrors; no live
+// writer outside FCEUPPU_Reset's power-zero path). All mutation flows
+// Rust -> bridge -> C++ staging; never the reverse.
+// See docs/history/v2.1.1.7_cpp_ppu_removal_archived_2026-09-12.md §0.1 / Step A.
+
 #ifndef FCEU11_PPU_RUST_BRIDGE_H
 #define FCEU11_PPU_RUST_BRIDGE_H
 
@@ -121,6 +129,73 @@ void ppu_rust_bridge_copy_framebuffer();
 // decide whether to delegate to the Rust path.
 bool ppu_rust_bridge_active();
 
+// v2.1.1.7 Step B.1 (D1-A): savestate staging helpers. The CHR/NT/
+// palette window copies and the mirror-mode cache live in this TU, so
+// `bridge_state_apply_to_rust()` (ppu_bridge_state.cpp) must restore
+// them through these two wrappers after pushing a state block back
+// into the Rust PPU. See ppu_bridge_state.h for the load contract.
+void ppu_rust_bridge_refresh_windows();
+void ppu_rust_bridge_push_mirror_mode_if_dirty();
+
+// ---------------------------------------------------------------------------
+// v2.1.1.7 Step B.4: bridge accessor contract (plan section B.4).
+//
+// The Rust PPU owns PPU[0..3] / OAM / v / scanline / dot; the same-named
+// C++ globals are tombstones (plan section 0.1). Debuggers, the memory
+// viewer and cheat/watchpoint code read through these accessors instead
+// of the globals. `get_oam` is served from the bridge-owned staging
+// mirrors (the same export the savestate path uses); the rest map onto
+// existing Rust query FFIs.
+//
+// Write-through entry points: call `note_nt_write` / `note_palette_write`
+// after mutating nametable / palette memory so the Rust renderer's window
+// copies are refreshed. `note_palette_write` is a documented no-op - the
+// palette window is a live pointer into PALRAM (plan section B.3).
+// ---------------------------------------------------------------------------
+uint8_t  ppu_rust_bridge_get_register(uint32_t idx);   // 0..3 -> ctrl/mask/status/oam_addr
+uint8_t  ppu_rust_bridge_get_oam(uint32_t addr);       // $2004 semantics (addr & 0xFF)
+int16_t  ppu_rust_bridge_get_scanline();
+uint16_t ppu_rust_bridge_get_dot();
+uint16_t ppu_rust_bridge_get_v();                      // NES v / FCEUX RefreshAddr
+uint8_t  ppu_rust_bridge_get_x_offset();               // fine X / FCEUX XOffset
+uint8_t  ppu_rust_bridge_get_vram_buffer();            // $2007 read buffer / FCEUX VRAMBuffer
+uint8_t  ppu_rust_bridge_get_data_bus();               // open-bus latch / FCEUX PPUGenLatch
+void     ppu_rust_bridge_note_nt_write(uint32_t ppu_addr);
+void     ppu_rust_bridge_note_palette_write();
+
+// ---------------------------------------------------------------------------
+// v2.1.1.7 Step B.5-2b: region wiring.
+//
+// `FCEUPPU_SetVideoSystem` forwards the C++ video-system state here; the
+// Rust PPU then drives its raster (scanline count, VBL/NMI line, frame
+// budget, odd-frame dot skip) from the matching region table row
+// (NTSC / PAL / Dendy - see plan section B.5 D4.1).
+// ---------------------------------------------------------------------------
+void     ppu_rust_bridge_set_video_system(bool pal, bool dendy);
+uint32_t ppu_rust_bridge_ppu_dots_per_frame();
+
+// ---------------------------------------------------------------------------
+// v2.1.1.7 Step D (M3): cached mirror of `$2001` (the PPU mask).
+//
+// Mapper hooks that read the mask (MMC5_hb, the coolgirl `$5204` path) run
+// INSIDE the Rust scheduler callback with the StateBox borrow held, where
+// calling any `fceux11_ppu_*` FFI would alias that borrow - the B.4
+// accessors are explicitly forbidden there. This mirror is a plain C++
+// byte updated by the bridge whenever the mask can change ($2001 write,
+// power, savestate load), so those hooks can read it without any FFI.
+// ---------------------------------------------------------------------------
+uint8_t  ppu_rust_bridge_get_mask_mirror();
+
+// Step D (M3): write-through for the OAM editors. `SPRAM` is a tombstone
+// under the Rust PPU, so `HexEditor` / `ppuViewer` must apply OAM edits
+// through this entry point when the bridge is active.
+void     ppu_rust_bridge_write_oam(uint32_t addr, uint8_t value);
+
+// v2.1.1.7 M5: bulk OAM read for the PPU Viewer sprite list - one staging
+// export instead of 256. Gate on ppu_rust_bridge_active(); the OFF build
+// keeps its own SPRAM copy.
+void     ppu_rust_bridge_copy_oam(uint8_t* out);
+
 #else  // !FCEUX11_RUST_PPU
 
 // When the option is off, the bridge functions are no-ops returning
@@ -137,6 +212,23 @@ inline uint8_t ppu_rust_bridge_cpu_read(uint32_t /*addr*/) { return 0; }
 inline void     ppu_rust_bridge_cpu_write(uint32_t /*addr*/, uint8_t /*value*/) {}
 inline void ppu_rust_bridge_copy_framebuffer() {}
 inline bool ppu_rust_bridge_active() { return false; }
+inline void ppu_rust_bridge_refresh_windows() {}
+inline void ppu_rust_bridge_push_mirror_mode_if_dirty() {}
+inline uint8_t  ppu_rust_bridge_get_register(uint32_t /*idx*/) { return 0; }
+inline uint8_t  ppu_rust_bridge_get_oam(uint32_t /*addr*/) { return 0; }
+inline int16_t  ppu_rust_bridge_get_scanline() { return 0; }
+inline uint16_t ppu_rust_bridge_get_dot() { return 0; }
+inline uint16_t ppu_rust_bridge_get_v() { return 0; }
+inline uint8_t  ppu_rust_bridge_get_x_offset() { return 0; }
+inline uint8_t  ppu_rust_bridge_get_vram_buffer() { return 0; }
+inline uint8_t  ppu_rust_bridge_get_data_bus() { return 0; }
+inline void     ppu_rust_bridge_note_nt_write(uint32_t /*ppu_addr*/) {}
+inline void     ppu_rust_bridge_note_palette_write() {}
+inline uint8_t  ppu_rust_bridge_get_mask_mirror() { return 0; }
+inline void     ppu_rust_bridge_write_oam(uint32_t /*addr*/, uint8_t /*value*/) {}
+inline void     ppu_rust_bridge_copy_oam(uint8_t* /*out*/) {}
+inline void     ppu_rust_bridge_set_video_system(bool /*pal*/, bool /*dendy*/) {}
+inline uint32_t ppu_rust_bridge_ppu_dots_per_frame() { return 89342u; }  // NTSC (262 x 341)
 inline int  ppu_rust_bridge_emit_one_cpu_cycle() { return 0; }
 inline void ppu_rust_bridge_advance_ppu_dots(uint32_t /*dots*/) {}
 inline int  ppu_rust_bridge_take_nmi() { return 0; }

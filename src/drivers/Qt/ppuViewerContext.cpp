@@ -13,6 +13,7 @@
 #include "../../debug.h"
 #include "../../palette.h"
 #include "../../types.h"
+#include "../../ppu_rust_bridge.h"
 
 #include "Qt/main.h"
 #include "Qt/dface.h"
@@ -22,6 +23,12 @@
 
 #include "Qt/ConsoleWindow.h"
 #include "Qt/ConsoleUtilities.h"
+
+// v2.1.1.7 Step B.4: PPU[0..3] are tombstones under the Rust PPU (plan
+// section 0.1); read the live values through the bridge when it is active.
+static inline uint8_t PpuRegRead(uint32_t idx) {
+	return ppu_rust_bridge_active() ? ppu_rust_bridge_get_register(idx) : PPU[idx];
+}
 
 ppuPatternTable_t pattern0;
 ppuPatternTable_t pattern1;
@@ -93,6 +100,7 @@ void PalettePoke(uint32_t addr, uint8_t data)
 	{
 		PALRAM[addr] = data;
 	}
+	ppu_rust_bridge_note_palette_write();
 }
 
 int writeMemPPU(unsigned int addr, int value)
@@ -101,10 +109,13 @@ int writeMemPPU(unsigned int addr, int value)
 	if (addr < 0x2000)
 	{
 		VPage[addr >> 10][addr] = value;
+		// Step D (M3): refresh the Rust renderer's window copies.
+		ppu_rust_bridge_note_nt_write(addr);
 	}
 	if ((addr >= 0x2000) && (addr < 0x3F00))
 	{
 		vnapage[(addr >> 10) & 0x3][addr & 0x3FF] = value;
+		ppu_rust_bridge_note_nt_write(addr);
 	}
 	if ((addr >= 0x3F00) && (addr < 0x3FFF))
 	{
@@ -185,7 +196,7 @@ void drawSpriteTable(void)
 	{
 		return;
 	}
-	oamPattern.mode8x16 = (PPU[0] & 0x20) ? 1 : 0;
+	oamPattern.mode8x16 = (PpuRegRead(0) & 0x20) ? 1 : 0;
 
 	for (int i = 0; i < 64; i++)
 	{
@@ -205,7 +216,7 @@ void drawSpriteTable(void)
 		}
 		else
 		{
-			spr->bank = (PPU[0] & 0x08) ? 1 : 0;
+			spr->bank = (PpuRegRead(0) & 0x08) ? 1 : 0;
 			spr->tNum = (oam[j + 1]);
 		}
 

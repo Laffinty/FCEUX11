@@ -114,7 +114,8 @@ pub fn render_scanline<B: PpuBus + ?Sized>(
     if !(0..=239).contains(&sl) {
         return;
     }
-    let mask = state.registers.mask;
+    // Step B.5-2d: PAL/Dendy swap the green/red emphasis bits.
+    let mask = state.effective_mask();
     let bg_show = (mask & SHOW_BG) != 0;
     let sprite_show = (mask & (1 << mask_bits::SHOW_SPRITES)) != 0;
     let grayscale = (mask & GRAYSCALE) != 0;

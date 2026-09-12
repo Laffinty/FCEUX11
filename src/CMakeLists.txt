@@ -157,29 +157,14 @@ include_directories( ${CMAKE_SOURCE_DIR}/src )
 include_directories( ${CMAKE_SOURCE_DIR}/src/drivers )
 
 
-# v2.1 Phase 7 (2026-09-03): defensive default for the early
-# `if(FCEUX11_RUST_PPU)` check below. The `option(FCEUX11_RUST_PPU)`
-# is declared much later in this file (around line 777, after the
-# SRC_CORE list is built), so without this set() the variable is
-# undefined when checked here, CMake treats it as false, and
-# `ppu_rust_bridge.cpp` is silently dropped from the build — leading
-# to LNK2001 errors for `ppu_rust_bridge_init` etc. when linking
-# `fceux11_core.lib` into the test executables. The `option()` at
-# line 777 remains the authoritative declaration; this is a no-op
-# when the option is already defined and only fires when CMake
-# reaches the SRC_CORE block before option() is processed.
-if(NOT DEFINED FCEUX11_RUST_PPU)
-    set(FCEUX11_RUST_PPU ON)
-endif()
-
 set(SRC_CORE
 	${CMAKE_CURRENT_SOURCE_DIR}/asm.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/bus.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/cart.cpp
   )
-if(FCEUX11_RUST_PPU)
-    list(APPEND SRC_CORE ${CMAKE_CURRENT_SOURCE_DIR}/ppu_rust_bridge.cpp)
-endif()
+# v2.1.1.7 Step C.2: the bridge is unconditional - the Rust PPU is the only
+# engine, and FCEUX11_RUST_PPU=OFF is a configure error (see option() below).
+list(APPEND SRC_CORE ${CMAKE_CURRENT_SOURCE_DIR}/ppu_rust_bridge.cpp)
 set(SRC_CORE ${SRC_CORE}
 	${CMAKE_CURRENT_SOURCE_DIR}/cart_class.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/cart_class.cpp
@@ -221,12 +206,10 @@ set(SRC_CORE ${SRC_CORE}
   	${CMAKE_CURRENT_SOURCE_DIR}/oldmovie.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/palette.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/profiler.cpp
-  	${CMAKE_CURRENT_SOURCE_DIR}/ppu.cpp
-  	${CMAKE_CURRENT_SOURCE_DIR}/ppu_rendering.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/ppu_state.cpp
-  	${CMAKE_CURRENT_SOURCE_DIR}/ppu_sprite_lut.cpp   # hotfix2 P0-1: 65536-entry sprite LUT
-  	${CMAKE_CURRENT_SOURCE_DIR}/pputile_template.cpp # hotfix2 P0-3: template<uint8_t Flags> FetchAndDrawTile
-  	${CMAKE_CURRENT_SOURCE_DIR}/ppu_core.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/ppu_bridge_state.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/ppu_shared.cpp        # v2.1.1.7 Step B.2: no-op FCEUPPU_LineUpdate stub
+	${CMAKE_CURRENT_SOURCE_DIR}/ppu_legacy_stub.cpp # v2.1.1.7 Step C (M4): tombstone placeholders
   	${CMAKE_CURRENT_SOURCE_DIR}/ppu_class.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/apu.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/expansion_audio.cpp
@@ -606,12 +589,6 @@ target_include_directories(fceux11_boards PUBLIC ${CMAKE_SOURCE_DIR}/src)
 add_library(fceux11_core STATIC ${SRC_CORE})
 target_link_libraries(fceux11_core PUBLIC fceux11_boards fceux11_utils ${ZLIB_LIBRARIES} SDL2::SDL2)
 target_include_directories(fceux11_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
-# M3-fix: MSVC LTCG linker (c2.dll) crashes when materialising the 512 KiB
-# kSpriteIdxLUT from IL during link-time code gen — produces a 2 MB zero file
-# for fceux11_ppu_rendering_lut_test (the only consumer). Compile this source
-# without /GL so the LUT is emitted as real COFF data, skipping the LTCG path.
-set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/ppu_sprite_lut.cpp PROPERTIES
-    COMPILE_FLAGS "/GL-")
 # Stage-2 A-6: bus.cpp owns two 0x10000-entry function-pointer tables
 # (1 MiB total). Keep that large object out of LTCG as a preventive guard
 # against the same c2.dll materialisation failure.
@@ -787,20 +764,25 @@ if(FCEUX11_RUST_ENABLED)
 endif()
 
 # Phase 2/6/7: Rust PPU is the canonical engine (Rust-first, see plan
-# v2.1 §6.6 + Phase 7). Default ON; the C++ PPU path is retained as a
-# fallback only (`-DFCEUX11_RUST_PPU=OFF`) and is not the default build.
-option(FCEUX11_RUST_PPU "Use Rust PPU engine (canonical since Phase 7)" ON)
-if(FCEUX11_RUST_PPU)
-    if(NOT FCEUX11_RUST_ENABLED)
-        message(FATAL_ERROR
-            "FCEUX11_RUST_PPU=ON requires FCEUX11_RUST_ENABLED=ON "
-            "(the Rust staticlib provides fceux11-ppu symbols).")
-    endif()
-    add_definitions(-DFCEUX11_RUST_PPU)
-    message(STATUS
-        "FCEUX11_RUST_PPU=ON: $2000-$2007 / \$4014 / frame loop "
-        "delegated to Rust PPU through ppu_rust_bridge.cpp")
+# v2.1 §6.6 + Phase 7). The C++ PPU path it used to guard was deleted
+# in v2.1.1.7 Step C.1, so OFF is a configure error, not a fallback.
+option(FCEUX11_RUST_PPU "Use Rust PPU engine (the only engine since v2.1.1.7 Step C)" ON)
+if(NOT FCEUX11_RUST_PPU)
+    message(FATAL_ERROR
+        "FCEUX11_RUST_PPU=OFF is no longer supported: the C++ PPU engine "
+        "was deleted in v2.1.1.7 Step C (docs/history/v2.1.1.7_cpp_ppu_removal_archived_2026-09-12.md). "
+        "The Rust PPU is the only implementation. Delete the build directory or "
+        "reconfigure with -DFCEUX11_RUST_PPU=ON.")
 endif()
+if(NOT FCEUX11_RUST_ENABLED)
+    message(FATAL_ERROR
+        "FCEUX11_RUST_PPU=ON requires FCEUX11_RUST_ENABLED=ON "
+        "(the Rust staticlib provides fceux11-ppu symbols).")
+endif()
+add_definitions(-DFCEUX11_RUST_PPU)
+message(STATUS
+    "FCEUX11_RUST_PPU=ON: $2000-$2007 / \$4014 / frame loop "
+    "delegated to Rust PPU through ppu_rust_bridge.cpp")
 
 # Put build timestamp into BUILD_TS environment variable and from there into
 # the FCEUX_BUILD_TIMESTAMP preprocessor definition.

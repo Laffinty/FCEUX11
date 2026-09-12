@@ -41,18 +41,20 @@
 use crate::bus::PpuBus;
 use crate::frame::{TickOutcome, tick_dot};
 use crate::state::PpuState;
+use crate::video_system::VideoSystem;
 
-/// NTSC CPU cycles per frame. Mirrors `kNtscCpuCyclesPerFrame` in
-/// `src/ppu_rust_bridge.cpp` and the C++ `FCEUPPU_Loop` budget.
-pub const NTSC_CPU_CYCLES_PER_FRAME: u32 = 89342;
-/// PAL/Dendy CPU cycles per frame.
-pub const PAL_CPU_CYCLES_PER_FRAME: u32 = 106392;
-/// PPU dots per CPU cycle. NTSC = 5 dots per CPU cycle (the C++ uses
-/// 5 in `runppu`); PAL = 5 too. The 3:1 ratio in the v2.1 plan is the
-/// "PPU master clock" ratio used by `tick_dot`, which is 1 CPU cycle
-/// = 3 PPU dots. Real hardware: NTSC PPU runs at 5.369318 MHz, CPU at
-/// 1.789773 MHz — ratio = 3.0. This constant matches the cycle budget
-/// in `X6502_Run` (which advances CPU by 1 cycle = 3 PPU dots).
+/// NTSC frame budget (PPU dots per frame). Kept as a named constant for
+/// the existing call sites; the authoritative table lives in
+/// [`crate::video_system`] (Step B.5-2a).
+pub const NTSC_CPU_CYCLES_PER_FRAME: u32 =
+    VideoSystem::Ntsc.timings().dots_per_frame;
+/// PAL/Dendy frame budget (PPU dots per frame).
+pub const PAL_CPU_CYCLES_PER_FRAME: u32 =
+    VideoSystem::Pal.timings().dots_per_frame;
+/// PPU dots per CPU cycle for the NTSC/Dendy ratio (1 CPU cycle = 3 PPU
+/// dots). PAL uses 16 dots per 5 CPU cycles (3.2) - wiring that into the
+/// interleave loop is Step B.5-2c; until then this constant is what all
+/// call sites use. See `crate::video_system::VideoSystemTimings`.
 pub const PPU_DOTS_PER_CPU_CYCLE: u32 = 3;
 
 /// Unified scheduler state.
@@ -64,8 +66,10 @@ pub struct NesScheduler {
     /// Total PPU dots consumed since last frame start. Used to decide
     /// when the frame is complete.
     ppu_dots_consumed: u32,
-    /// Frame budget. `NTSC_CPU_CYCLES_PER_FRAME` for NTSC.
+    /// Frame budget (PPU dots per frame) - from the region table.
     frame_cycles: u32,
+    /// Region timings this scheduler was configured for (B.5-2a).
+    video_system: VideoSystem,
     /// Last scanline seen — used to fire `notify_scanline` only on
     /// transitions.
     last_scanline: i16,
@@ -80,18 +84,24 @@ impl NesScheduler {
             cpu_cycles_consumed: 0,
             ppu_dots_consumed: 0,
             frame_cycles: NTSC_CPU_CYCLES_PER_FRAME,
+            video_system: VideoSystem::Ntsc,
             last_scanline: -1,
             vbl_asserted: false,
         }
     }
 
-    /// Configure the scheduler for NTSC (default) or PAL/Dendy.
-    pub fn set_video_system(&mut self, pal: bool) {
-        self.frame_cycles = if pal {
-            PAL_CPU_CYCLES_PER_FRAME
-        } else {
-            NTSC_CPU_CYCLES_PER_FRAME
-        };
+    /// Configure the scheduler for a region. Step B.5-2a: the frame
+    /// budget now comes from the [`VideoSystem`] timing table; the
+    /// raster/interleave still run the NTSC path until B.5-2b/c.
+    pub fn set_video_system(&mut self, system: VideoSystem) {
+        self.video_system = system;
+        self.frame_cycles = system.timings().dots_per_frame;
+    }
+
+    /// Region this scheduler was configured for.
+    #[inline]
+    pub fn video_system(&self) -> VideoSystem {
+        self.video_system
     }
 
     /// Reset the per-frame accumulators (called at the start of every
@@ -169,7 +179,12 @@ impl NesScheduler {
         // VBlank transition. The PPU state machine sets the VBL flag
         // at sl 241 dot 1; we observe `outcome.vbl_entered` and fire
         // notify_vblank on the rising edge.
-        let vbl_now = outcome.vbl_entered || (state.scanline >= 241 && state.scanline <= 260);
+        // Step B.5-2b: VBL window from the region table (NTSC 241..=260,
+        // PAL 241..=310, Dendy 291..=310).
+        let timings = state.video_system.timings();
+        let vbl_now = outcome.vbl_entered
+            || (state.scanline >= timings.vbl_set_scanline
+                && state.scanline <= timings.vbl_end_scanline);
         if vbl_now != self.vbl_asserted {
             self.vbl_asserted = vbl_now;
             bus.notify_vblank(vbl_now);

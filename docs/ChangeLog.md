@@ -6,6 +6,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [2.1.1] - 2026-09-12 - C++ PPU 退役线收口
+
+### Changed
+
+- **Rust PPU 成为唯一实现**：`FCEUX11_RUST_PPU=OFF` 从回退到 C++ 引擎改为 configure 错误；C++ PPU 引擎 TU（约 4.5k 行）删除，存活符号迁入 `ppu_shared.cpp`，墓碑数据留在 `ppu_legacy_stub.cpp`
+- **savestate 值来源变更（D1-A）**：chunk 布局与尺寸不变，取值源换成 Rust 侧 staging；golden 按 v2.1.1.2 流程重生
+
+### Fixed
+
+- **2007 read buffer 语义与 C++ 参照对齐**（v2.1.1.4）：2007 读路径改为写入 VRAMBuffer；advisory 分类重排（v2.1.1.5）后重新冻结基线（v2.1.1.6）
+- **PPU 直读点迁移**：GUI 编辑器 / 调试器 / mapper 钩子的寄存器与 OAM 直读改走 bridge accessor（v2.1.1.7 Step D）；OAM 单字节与批量读取在 M5 收尾补齐
+
+### Known limitations
+
+- test 33 `rust_ppu_vbl_nmi_timing_test` 按 owner 决定 SKIP（Route C）
+
+## [2.1.1.7] - 2026-09-12 - C++ PPU 退役 + PAL/Dendy 时序
+
+### Added
+
+- **PAL / Dendy 制式支持（Rust PPU）**：制式表（NTSC 262 行 / PAL 312 行 / Dendy 312 行）、VBL・NMI 行、帧预算（89342 / 106392 PPU dots）与 CPU:PPU 交错比例（NTSC・Dendy 3.0、PAL 3.2 = 16:5）全部按制式驱动。新增 `fceux11_ppu_set_video_system_ex` 与 `pal_timing_test` gate（三制式几何 + PAL 连跑 600 帧）。
+- **Bridge accessor 契约**：`ppu_rust_bridge_get_register / get_oam / get_scanline / get_dot / get_v`，以及 `note_nt_write` / `note_palette_write` 写穿入口（debugger / 查看器改走 Rust 权威状态）。
+- **`newppu_neutrality_test`**：同一 ROM 以 `newppu=0/1` 各跑 60 帧，帧缓冲 CRC 必须一致。
+
+### Changed
+
+- **`newppu` 去引擎语义**：配置项 / CLI / GUI 勾选 / movie `PPUflag` 读写全部保留，但不再选择引擎（Rust PPU 是唯一引擎）。`newppu` 不再影响画面高度、超频预算或光枪行为。
+
+### Removed
+
+- **C++ PPU 引擎退役（Step C）**：删除 `src/ppu.cpp`、`src/ppu_rendering.cpp/h`、`src/ppu_core.cpp`、`src/ppu_sprite_lut.cpp/h`、`src/pputile_template.cpp/h`、`src/pputile.inc`（净删约 4.4k 行）；仍存活的符号迁入 `src/ppu_shared.cpp`，纯墓碑数据（`ppur` / `spr_read` / `idleSynch` / `SPRBUF` / `linestartts`）留在新增的 `src/ppu_legacy_stub.cpp`。
+- **`FCEUX11_RUST_PPU=OFF` 改为配置期错误（Step C.2）**：C++ PPU 已删除，不存在 fallback；缓存仍为 OFF 的 `build/` 目录必须删除或重新配置。
+- **退役两个自证测试目标**：`ppu_rendering_lut_test`（LUT 实现已删除）与 `ppu_phase_d_test`（本地副本算法）；`ppu_phase_c_test` 保留（`SPRBUF` 布局仍由墓碑提供）。
+
+### Known limitations
+
+- **Dendy 帧结构存在来源分歧**：本版按 Mesen2（312 行；VBL/NMI 置位在 291）实现，FCEUX 旧 C++ 代码为 262 行。Dendy 行为在发布前需确认（plan `docs/history/v2.1.1.7_cpp_ppu_removal_archived_2026-09-12.md` §B.5 D4.7）。
+- PAL/Dendy 的精灵评估窗口（NMI+24 行）为近似实现；PAL 专属 CPU 行为（DMA 只能在取 opcode 时启动、IRQ/NMI 首读检查 DMA）与视频制式滤波/色彩解码不在本版范围（plan §B.5 D4.5）。
+
+
 ## [2.1.0] - 2026-09-06 - v2.1 PPU Rust 重构 收口 (batch_compat 83.4% 已知接受, -0.6pp vs §6.6 锁档)
 
 ### Major: Rust PPU 成为 canonical engine

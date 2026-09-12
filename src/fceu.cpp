@@ -136,9 +136,17 @@ bool CheckFileExists(const char* filename) {
 	}
 }
 
+// v2.1.1.7 Step B.5 (D3-a): `newppu` is a legacy compatibility switch. The
+// Rust PPU is the only engine (plan section 0.1), so the switch must not
+// change emulation geometry or timing budgets. Returns 0 whenever the Rust
+// PPU is active; the C++ value is kept for config / CLI / movie compat.
+static inline int NewppuEngineDelta(void) {
+	return ppu_rust_bridge_active() ? 0 : newppu;
+}
+
 void FCEU_TogglePPU(void) {
 	newppu ^= 1;
-	if (newppu) {
+	if (NewppuEngineDelta()) {
 		FCEU_DispMessage("New PPU loaded", 0);
 		FCEU_printf("New PPU loaded");
 		overclock_enabled = 0;
@@ -146,7 +154,7 @@ void FCEU_TogglePPU(void) {
 		FCEU_DispMessage("Old PPU loaded", 0);
 		FCEU_printf("Old PPU loaded");
 	}
-	normalscanlines = (dendy ? 290 : 240)+newppu; // use flag as number!
+	normalscanlines = (dendy ? 290 : 240)+NewppuEngineDelta(); // legacy switch: 0 under the Rust PPU
 }
 
 static void FCEU_CloseGame(void)
@@ -1095,10 +1103,10 @@ void FCEU_ResetVidSys(void) {
 	if (PAL)
 		dendy = 0;
 
-	if (newppu)
+	if (NewppuEngineDelta())
 		overclock_enabled = 0;
 
-	normalscanlines = (dendy ? 290 : 240)+newppu; // use flag as number!
+	normalscanlines = (dendy ? 290 : 240)+NewppuEngineDelta(); // legacy switch: 0 under the Rust PPU
 	totalscanlines = normalscanlines + (overclock_enabled ? postrenderscanlines : 0);
 	FCEUPPU_SetVideoSystem(w || dendy);
 	SetSoundVariables();
@@ -1219,7 +1227,7 @@ void fceu11::SetRegion(int region, int notify)
 			}
 			break;
 	}
-	normalscanlines += newppu;
+	normalscanlines += NewppuEngineDelta();
 	totalscanlines = normalscanlines + (overclock_enabled ? postrenderscanlines : 0);
 	fceu11::SetVidSystem(pal_emulation);
 	RefreshThrottleFPS();

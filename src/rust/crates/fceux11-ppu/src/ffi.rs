@@ -18,6 +18,7 @@ use crate::bus::PpuBus;
 use crate::frame::TickOutcome;
 use crate::registers::{ctrl_bits, status_bits};
 use crate::state::PpuState;
+use crate::video_system::VideoSystem;
 use std::sync::Mutex;
 
 /// C-side bus callback vtable installed by C++ during bridge init.
@@ -127,8 +128,10 @@ struct StateBox {
     /// stored here so the `&mut dyn PpuBus` passed into `tick_dot` can
     /// be reconstructed on each call.
     bus: Option<fceux11_ppu_bus_callbacks>,
-    /// Video system flag. `false` = NTSC, `true` = PAL.
-    pal: bool,
+    /// Region timings (Step B.5-2a). The C ABI still takes the legacy
+    /// `pal: bool` (NTSC/PAL); Dendy gains an explicit spelling in
+    /// Step B.5-2b.
+    video_system: VideoSystem,
     /// Mirroring mode (0=horizontal, 1=vertical, 2=single_lo, 3=single_hi, 4=four).
     mirror: u8,
     /// CHR ROM/RAM window: `[ptr, len, is_ram]`. Phase 2 only models a
@@ -174,7 +177,7 @@ impl StateBox {
             state: PpuState::new(),
             framebuffer: [0u8; 256 * 256],
             bus: None,
-            pal: false,
+            video_system: VideoSystem::Ntsc,
             mirror: 0,
             chr_window_ptr: std::ptr::null(),
             chr_window_len: 0,
@@ -287,10 +290,38 @@ pub unsafe extern "C" fn fceux11_ppu_reset(state: *mut PpuState) {
 }
 
 /// Set the video system: `pal=false` for NTSC (default), `pal=true`
-/// for PAL/Dendy.
+/// for PAL. The two-state spelling cannot express Dendy - use
+/// [`fceux11_ppu_set_video_system_ex`] for that (Step B.5-2b).
 pub unsafe extern "C" fn fceux11_ppu_set_video_system(state: *mut PpuState, pal: bool) {
     let sb = lookup(state);
-    sb.pal = pal;
+    let vs = VideoSystem::from_pal_flag(pal);
+    sb.video_system = vs;
+    sb.state.video_system = vs;
+}
+
+/// Write one byte of primary OAM (Step D / M3). The HexEditor and the PPU
+/// viewer edit OAM directly; under the Rust PPU the C++ `SPRAM` global is a
+/// tombstone, so those editors must route the write here.
+pub unsafe extern "C" fn fceux11_ppu_set_oam_byte(state: *mut PpuState, addr: u32, value: u8) {
+    let sb = lookup(state);
+    sb.state.oam[(addr & 0xFF) as usize] = value;
+}
+
+/// CPU `count` budget units per PPU dot for the current region
+/// (Step B.5-2c): 16 for the NTSC/Dendy 3.0 ratio, 15 for PAL's 3.2.
+/// The unit is 1/48 of a CPU cycle (C++ `X6502._count` scale).
+pub unsafe extern "C" fn fceux11_ppu_cpu_ticks_per_dot(state: *const PpuState) -> u32 {
+    lookup_const(state).state.video_system.timings().cpu_ticks_per_dot()
+}
+
+/// Region selector with an explicit Dendy spelling (Step B.5-2b):
+/// 0 = NTSC, 1 = PAL, 2 = Dendy. Out-of-range codes are ignored.
+pub unsafe extern "C" fn fceux11_ppu_set_video_system_ex(state: *mut PpuState, system: u32) {
+    let sb = lookup(state);
+    if let Some(vs) = VideoSystem::from_code(system) {
+        sb.video_system = vs;
+        sb.state.video_system = vs;
+    }
 }
 
 // ===========================================================================
@@ -583,7 +614,7 @@ pub unsafe extern "C" fn fceux11_ppu_emulate_frame(state: *mut PpuState, n_cycle
     // A12/HBlank/scanline hooks to the C++ mapper globals
     // (`GameHBIRQHook` / `GameHBIRQHook2` / `PPU_hook`).
     let mut sched = crate::scheduler::NesScheduler::new();
-    sched.set_video_system(sb.pal);
+    sched.set_video_system(sb.video_system);
     sched.begin_frame();
     let total_dots = n_cycles.saturating_mul(crate::scheduler::PPU_DOTS_PER_CPU_CYCLE);
     let mut last_outcome = TickOutcome::default();
@@ -736,7 +767,7 @@ pub unsafe extern "C" fn fceux11_ppu_tick_cpu_cycle(state: *mut PpuState, n_cycl
     let sb = lookup(state);
     let mut bus = make_bus_adapter(sb);
     let mut sched = crate::scheduler::NesScheduler::new();
-    sched.set_video_system(sb.pal);
+    sched.set_video_system(sb.video_system);
     sched.begin_frame();
     let total_dots = n_cycles.saturating_mul(crate::scheduler::PPU_DOTS_PER_CPU_CYCLE);
     while sched.ppu_dots_consumed() < total_dots {
@@ -762,7 +793,7 @@ pub unsafe extern "C" fn fceux11_ppu_tick_dots(state: *mut PpuState, n_dots: u32
     // Take the persistent scheduler out so `sb` and the scheduler can
     // be borrowed mutably side by side; put it back before returning.
     let mut sched = std::mem::take(&mut sb.sched);
-    sched.set_video_system(sb.pal);
+    sched.set_video_system(sb.video_system);
     let mut frame_advanced = false;
     for _ in 0..n_dots {
         // Render when ENTERING a visible scanline, BEFORE the dot
@@ -810,7 +841,7 @@ pub unsafe extern "C" fn fceux11_ppu_tick_dots_direct(state: *mut PpuState, n_do
     let sb = lookup_unchecked(state);
     let mut bus = make_bus_adapter(sb);
     let mut sched = std::mem::take(&mut sb.sched);
-    sched.set_video_system(sb.pal);
+    sched.set_video_system(sb.video_system);
     let mut frame_advanced = false;
     for _ in 0..n_dots {
         render_scanline_if_start(sb, &mut bus);
@@ -1062,6 +1093,102 @@ pub unsafe extern "C" fn fceux11_ppu_set_status_vbl_set_suppressed(state: *mut P
     sb.state.vbl_suppressed_this_frame = true;
 }
 
+// ==============================================================================
+// Step B.1 (D1-A): savestate bridge state block.
+//
+// The byte block is the canonical source-of-truth payload that the C++
+// side turns into the chunk-3 / chunk-31 staging variables. It is HOST
+// LITTLE-ENDIAN by design (matches the existing "2 | FCEUSTATE_RLSB"
+// SFORMAT semantics on MSVC/x86-64; the RLSB swap is a no-op there, see
+// src/state.cpp:172-188).
+//
+// Return value: 0 on success, -1 on bad arguments (null pointer or
+// mismatched length). Length must equal STATE_BLOCK_SIZE.
+// ==============================================================================
+
+pub const STATE_BLOCK_SIZE: usize = 272;
+
+/// Export the live PPU runtime state into "out".
+///
+/// Reads registers.{ctrl, mask, status, oam_addr} + the full primary
+/// OAM + scroll latches + open-bus buffer + scanline/dot and packs
+/// them into a fixed 272-byte host-little-endian blob.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_ppu_state_block_export(
+    state: *mut PpuState,
+    out: *mut u8,
+    len: u32,
+) -> i32 {
+    if state.is_null() || out.is_null() || (len as usize) != STATE_BLOCK_SIZE {
+        return -1;
+    }
+    let sb = lookup(state);
+    let buf = unsafe { std::slice::from_raw_parts_mut(out, STATE_BLOCK_SIZE) };
+
+    // 0..4: regs[4]
+    buf[0] = sb.state.registers.ctrl;
+    buf[1] = sb.state.registers.mask;
+    buf[2] = sb.state.registers.status;
+    buf[3] = sb.state.registers.oam_addr;
+
+    // 4..260: oam[256]
+    buf[4..4 + 0x100].copy_from_slice(&sb.state.oam);
+
+    // 260..264: four single-byte fields
+    buf[260] = sb.state.registers.write_toggle as u8;
+    buf[261] = sb.state.registers.vram_buffer;
+    buf[262] = sb.state.registers.fine_x;
+    buf[263] = sb.state.registers.data_bus;
+
+    // 264..272: four LE-encoded integers (v, t, scanline, dot)
+    buf[264..266].copy_from_slice(&sb.state.registers.v.to_le_bytes());
+    buf[266..268].copy_from_slice(&sb.state.registers.t.to_le_bytes());
+    buf[268..270].copy_from_slice(&sb.state.scanline.to_le_bytes());
+    buf[270..272].copy_from_slice(&sb.state.dot.to_le_bytes());
+
+    0
+}
+
+/// Apply a previously-exported state block back into the live PPU.
+///
+/// Counterpart of fceux11_ppu_state_block_export. After this returns
+/// the C++ side MUST refresh the CHR/NT/palette windows and push the
+/// mirror mode (see ppu_bridge_state.cpp for the load contract).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_ppu_state_block_apply(
+    state: *mut PpuState,
+    buf: *const u8,
+    len: u32,
+) -> i32 {
+    if state.is_null() || buf.is_null() || (len as usize) != STATE_BLOCK_SIZE {
+        return -1;
+    }
+    let sb = lookup(state);
+    let src = unsafe { std::slice::from_raw_parts(buf, STATE_BLOCK_SIZE) };
+
+    // 0..4
+    sb.state.registers.ctrl = src[0];
+    sb.state.registers.mask = src[1];
+    sb.state.registers.status = src[2];
+    sb.state.registers.oam_addr = src[3];
+
+    // 4..260
+    sb.state.oam.copy_from_slice(&src[4..4 + 0x100]);
+
+    // 260..264
+    sb.state.registers.write_toggle = src[260] != 0;
+    sb.state.registers.vram_buffer = src[261];
+    sb.state.registers.fine_x = src[262];
+    sb.state.registers.data_bus = src[263];
+
+    // 264..272
+    sb.state.registers.v = u16::from_le_bytes([src[264], src[265]]);
+    sb.state.registers.t = u16::from_le_bytes([src[266], src[267]]);
+    sb.state.scanline = i16::from_le_bytes([src[268], src[269]]);
+    sb.state.dot = u16::from_le_bytes([src[270], src[271]]);
+
+    0
+}
 // ===========================================================================
 // Internal helpers ————————?suppress unused warnings.
 // ===========================================================================

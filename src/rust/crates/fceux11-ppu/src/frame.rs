@@ -22,7 +22,7 @@
 use crate::bus::PpuBus;
 #[allow(unused_imports)] // mask_bits / status_bits used only by #[cfg(test)] modules.
 use crate::registers::{ctrl_bits, mask_bits, status_bits};
-use crate::state::{DOTS_PER_SCANLINE, NTSC_SCANLINES, PpuState};
+use crate::state::{DOTS_PER_SCANLINE, PpuState};
 
 /// Plan §0.8 step 1C: env-gated PPU phase trace. When
 /// `FCEUX11_PPU_PHASE_TRACE=1`, the three timing-sensitive events
@@ -92,6 +92,9 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
     let mut out = TickOutcome::default();
     let sl = state.scanline;
     let dot = state.dot;
+    // Step B.5-2b: the raster geometry is region-dependent (NTSC 262
+    // lines, PAL/Dendy 312) - see crate::video_system.
+    let timings = state.video_system.timings();
 
     // -----------------------------------------------------------------
     // Events that fire as we enter (sl, dot)
@@ -107,7 +110,9 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
     let mut skip_one_dot = false;
     if sl == -1 && dot == 340 {
         out.pre_render_decision = true;
-        if state.rendering_enabled() {
+        // NTSC-only: "This behavior is NTSC-specific - PAL frames are
+        // always the same number of cycles" (Mesen2 NesPpu.cpp:950-954).
+        if timings.odd_frame_skips_dot && state.rendering_enabled() {
             if !state.odd_frame {
                 // Even frame + rendering: skip one dot of the next
                 // scanline. We'll advance twice below so (0, 0) never
@@ -184,7 +189,7 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
     // Golden baseline (commit b06388c^, pre-6.1.e): nestest frames
     // 3-7 + savestate hash kept at the dot-1 timing values.
     // (See `docs/history/v2.1_phase6_batch_compat.md` §6.1.e.v3.)
-    if sl == 241 && dot == 0 && state.ppudead == 0 {
+    if sl == timings.vbl_set_scanline && dot == 0 && state.ppudead == 0 {
         if state.vbl_suppressed_this_frame {
             // Suppression flag from the (sl 240, dot 340) $2002 read
             // (NESdev PPU frame timing: read 1 PPU clock before the
@@ -255,7 +260,7 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
     // 6820-dot VBL window as C++ ppudead. The decrement moves to the
     // new frame-end (sl 240, dot 340).
     if state.ppudead > 0 {
-        if sl == 241 && dot == 0 {
+        if sl == timings.vbl_set_scanline && dot == 0 {
             state.registers.set_vbl_flag();
             out.vbl_entered = true;
             if state.nmi_enabled() {
@@ -364,7 +369,7 @@ fn advance(state: &mut PpuState, out: &mut TickOutcome) {
         // constant phase offset behind C++ that broke
         // `rust_ppu_vbl_nmi_timing_test` 02-vbl_set_time and several
         // blargg ppu_open_bus / ppu_read_buffer cases.
-        if state.scanline == 260 {
+        if state.scanline == state.video_system.timings().vbl_end_scanline {
             // VBL-block end → pre-render (intra-frame, no wrap).
             state.scanline = -1;
         } else if state.scanline == 240 {
@@ -408,7 +413,8 @@ pub fn tick_to<B: PpuBus + ?Sized>(
     // probe). The previous `(NTSC_SCANLINES + 2) * DOTS_PER_SCANLINE`
     // guard (~89904 ticks) was sized for the pre-render-first layout
     // where the skip sits 340 ticks in; allow up to 2 frames.
-    let max_ticks = 2 * NTSC_SCANLINES as u32 * DOTS_PER_SCANLINE as u32;
+    let timings = state.video_system.timings();
+    let max_ticks = 2 * timings.scanlines as u32 * timings.dots_per_scanline as u32;
     while (state.scanline, state.dot) != (target_sl, target_dot) {
         tick_dot(state, bus);
         guard += 1;
@@ -543,13 +549,50 @@ mod tests {
     }
 
     #[test]
-    fn nmi_asserted_at_sl_241_dot_1_when_enabled() {
+    /// Step B.5-2b gate: one frame of dots must equal the region table's
+    /// `dots_per_frame`, and the VBL flag must be set on the region's
+    /// `vbl_set_scanline` (Dendy = 291, NTSC/PAL = 241).
+    #[test]
+    fn frame_length_and_vbl_line_follow_the_region_table() {
+        use crate::video_system::VideoSystem;
+        for sys in [VideoSystem::Ntsc, VideoSystem::Pal, VideoSystem::Dendy] {
+            let t = sys.timings();
+            let mut s = PpuState::new();
+            s.ppudead = 0;
+            s.video_system = sys;
+            let mut bus = FlatBus::new();
+
+            // Rendering stays off, so the NTSC odd-frame dot skip is inert
+            // and the frame length is exactly the table value.
+            let mut dots = 0u32;
+            let mut vbl_line: Option<i16> = None;
+            loop {
+                let out = tick_dot(&mut s, &mut bus);
+                dots += 1;
+                if out.vbl_entered && vbl_line.is_none() {
+                    vbl_line = Some(s.scanline);
+                }
+                if out.frame_advanced {
+                    break;
+                }
+                assert!(dots < 2 * t.dots_per_frame, "{sys:?} frame never wrapped");
+            }
+            assert_eq!(dots, t.dots_per_frame, "{sys:?} frame length");
+            assert_eq!(vbl_line, Some(t.vbl_set_scanline), "{sys:?} VBL set line");
+        }
+    }
+
+    #[test]
+    fn nmi_asserted_at_sl_241_dot_0_when_enabled() {
+        // Renamed/retargeted in Step B.5-2d: commit `bb4a9f2` ("A.2 VBL set
+        // dot - switch Rust from dot=1 to dot=0") moved the set point but
+        // left this test asserting the old dot-1 timing.
         let mut s = PpuState::new();
         s.ppudead = 0; // post-boot state machine under test
         s.registers.write_ctrl(1 << ctrl_bits::NMI_ENABLE);
         let mut bus = FlatBus::new();
-        let out = tick_to(&mut s, &mut bus, 241, 1);
-        assert!(out.nmi_asserted, "NMI should fire on sl 241 dot 1 tick");
+        let out = tick_to(&mut s, &mut bus, 241, 0);
+        assert!(out.nmi_asserted, "NMI should fire on sl 241 dot 0 tick");
     }
 
     #[test]
@@ -564,12 +607,16 @@ mod tests {
         s.registers.write_ctrl(1 << ctrl_bits::NMI_ENABLE);
         let mut bus = FlatBus::new();
 
-        // Tick to (240, 340) and apply the suppression window as
-        // the bridge would on a $2002 read.
-        tick_to(&mut s, &mut bus, 240, 340);
+        // Step B.5-2d: apply_a2002_suppression matches the CURRENT (sl, dot)
+        // and tick_to leaves the state one dot PAST its target, so tick to
+        // (240, 339) to actually be at (240, 340) when the read happens.
+        tick_to(&mut s, &mut bus, 240, 339);
+        assert_eq!((s.scanline, s.dot), (240, 340), "precondition");
         s.apply_a2002_suppression();
 
-        // Advance into (241, 1) — VBL should NOT be set, NMI should NOT fire.
+        // The (240, 340) tick advances to (241, 0); the VBL set is
+        // processed on the following tick.
+        tick_dot(&mut s, &mut bus);
         let out = tick_dot(&mut s, &mut bus);
         assert!(!out.vbl_entered);
         assert!(!out.nmi_asserted);

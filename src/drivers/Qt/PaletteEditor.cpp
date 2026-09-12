@@ -39,6 +39,7 @@
 #include "../../fceu.h"
 #include "../../cart.h"
 #include "../../ppu.h"
+#include "../../ppu_rust_bridge.h"
 #include "../../debug.h"
 #include "../../palette.h"
 
@@ -1084,6 +1085,7 @@ static void PalettePoke(uint32 addr, uint8 data)
 	{
 		PALRAM[addr] = data;
 	}
+	ppu_rust_bridge_note_palette_write();
 }
 //----------------------------------------------------------------------------
 nesPalettePickerView::nesPalettePickerView( QWidget *parent)

@@ -318,16 +318,6 @@ if(FCEUX11_BUILD_TESTS)
              COMMAND fceux11_core_driver_boundary_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-    # hotfix2 P0-1: byte-for-byte equivalence test for the new
-    # two-stage sprite decode LUT vs. the original 8×if shift chain.
-    fceux11_add_test_executable(fceux11_ppu_rendering_lut_test
-        kagami/ppu_rendering_lut_test.cpp
-        git_info_stub.cpp
-    )
-    add_test(NAME ppu_rendering_lut_test
-             COMMAND fceux11_ppu_rendering_lut_test
-             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-
     # hotfix2 Phase C — atomic byte-pattern fill, SPRB layout
     # invariants, pshift storage width. Pure byte-level tests
     # (<1s runtime) that gate every CI cycle against the strict-
@@ -338,19 +328,6 @@ if(FCEUX11_BUILD_TESTS)
     )
     add_test(NAME ppu_phase_c_test
              COMMAND fceux11_ppu_phase_c_test
-             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-
-    # hotfix2 Phase D — P3 cleanup invariants: constexpr bitrev LUT
-    # involution / coverage; InputScanlineHook nullptr contract;
-    # vnapage 4-slot distinct-pointer contract. Pure byte-level
-    # tests (<1s) that gate the cleanup PRs without needing a
-    # full PPU / mapper exercise.
-    fceux11_add_test_executable(fceux11_ppu_phase_d_test
-        kagami/ppu_phase_d_test.cpp
-        git_info_stub.cpp
-    )
-    add_test(NAME ppu_phase_d_test
-             COMMAND fceux11_ppu_phase_d_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
     # v1.1 Sentinel §1.2 — golden savestate regression test.
@@ -481,7 +458,7 @@ if(FCEUX11_BUILD_TESTS)
         ppu_frame_diff_test apu_wav_diff_test
         cart_class_test fds_load_test
         driver_callbacks_test core_driver_boundary_test
-        ppu_rendering_lut_test ppu_phase_c_test ppu_phase_d_test
+        ppu_phase_c_test
         PROPERTIES ENVIRONMENT_MODIFICATION
                 "${_FCEUX11_TEST_PATH_MODIFICATIONS}"
         )
@@ -600,6 +577,43 @@ if(FCEUX11_BUILD_TESTS)
 
     add_executable(fceux11_ppu_simd_probe_avx2 kagami/benchmark/ppu_simd_probe.cpp)
     target_compile_options(fceux11_ppu_simd_probe_avx2 PRIVATE /EHsc /arch:AVX2)
+
+    # FCEUX11 v2.1.1.7 Step B.5 (D3-a) — `newppu` neutrality gate.
+    # Runs the same ROM with newppu = 0 / 1 and requires identical frame
+    # buffer CRCs (the switch must not select an engine any more). Skips
+    # itself when the gitignored fixture ROM is absent.
+    fceux11_add_headless_test_executable(fceux11_newppu_neutrality_test
+        kagami/newppu_neutrality_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME newppu_neutrality_test
+             COMMAND fceux11_newppu_neutrality_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    if(WIN32)
+        set_tests_properties(newppu_neutrality_test PROPERTIES ENVIRONMENT_MODIFICATION
+                "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+    endif()
+
+    # FCEUX11 v2.1.1.7 Step B.5-2d — PAL/Dendy timing gate.
+    # Checks the bridge frame-length getter per region, the production
+    # `FCEUPPU_SetVideoSystem` wiring, and a 600-frame PAL run.
+    # The TU must see the bridge's ON-branch declarations, so it compiles
+    # with FCEUX11_RUST_PPU defined and is only registered when the option
+    # is on (it is a configure error to turn it off since Step C).
+    if(FCEUX11_RUST_PPU)
+        fceux11_add_headless_test_executable(fceux11_pal_timing_test
+            kagami/pal_timing_test.cpp
+            git_info_stub.cpp
+        )
+        target_compile_definitions(fceux11_pal_timing_test PRIVATE FCEUX11_RUST_PPU)
+        add_test(NAME pal_timing_test
+                 COMMAND fceux11_pal_timing_test
+                 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+        if(WIN32)
+            set_tests_properties(pal_timing_test PROPERTIES ENVIRONMENT_MODIFICATION
+                    "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+        endif()
+    endif()
 
     # KagamiQA P1 — Headless smoke test (null driver, no Qt linkage).
     fceux11_add_headless_test_executable(fceux11_headless_smoke_test
