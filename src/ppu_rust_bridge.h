@@ -174,6 +174,18 @@ void     ppu_rust_bridge_note_palette_write();
 void     ppu_rust_bridge_set_video_system(bool pal, bool dendy);
 uint32_t ppu_rust_bridge_ppu_dots_per_frame();
 
+// ---------------------------------------------------------------------------
+// v2.1.1.7 Step D (M3): cached mirror of `$2001` (the PPU mask).
+//
+// Mapper hooks that read the mask (MMC5_hb, the coolgirl `$5204` path) run
+// INSIDE the Rust scheduler callback with the StateBox borrow held, where
+// calling any `fceux11_ppu_*` FFI would alias that borrow - the B.4
+// accessors are explicitly forbidden there. This mirror is a plain C++
+// byte updated by the bridge whenever the mask can change ($2001 write,
+// power, savestate load), so those hooks can read it without any FFI.
+// ---------------------------------------------------------------------------
+uint8_t  ppu_rust_bridge_get_mask_mirror();
+
 #else  // !FCEUX11_RUST_PPU
 
 // When the option is off, the bridge functions are no-ops returning
@@ -202,6 +214,7 @@ inline uint8_t  ppu_rust_bridge_get_vram_buffer() { return 0; }
 inline uint8_t  ppu_rust_bridge_get_data_bus() { return 0; }
 inline void     ppu_rust_bridge_note_nt_write(uint32_t /*ppu_addr*/) {}
 inline void     ppu_rust_bridge_note_palette_write() {}
+inline uint8_t  ppu_rust_bridge_get_mask_mirror() { return 0; }
 inline void     ppu_rust_bridge_set_video_system(bool /*pal*/, bool /*dendy*/) {}
 inline uint32_t ppu_rust_bridge_ppu_dots_per_frame() { return 89342u; }  // NTSC (262 x 341)
 inline int  ppu_rust_bridge_emit_one_cpu_cycle() { return 0; }

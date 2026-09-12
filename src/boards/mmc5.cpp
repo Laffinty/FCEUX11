@@ -23,6 +23,7 @@
 #include "mapinc_audio.h"
 #include "../unif.h"
 #include "../ppu.h"
+#include "../ppu_rust_bridge.h"
 #include "simple_carts.h"          // v1.8 Phase E.2 step 9.1: Mmc5Cart
 #include "legacy_expansion_audio.h"  // v1.8 Phase G
 
@@ -673,7 +674,11 @@ void MMC5_hb(int scanline) {
 	//zero 24-jul-2014 - revised for newer understanding, to fix metal slader glory credits. see r7371 in bizhawk
 	
 	int sl = scanline + 1;
-	int ppuon = (PPU[1] & 0x18);
+	// v2.1.1.7 Step D (M3): PPU[1] is a tombstone under the Rust PPU, and
+	// this hook runs inside the Rust scheduler callback - so read the
+	// bridge's cached mirror (plain memory, no FFI) instead.
+	const int ppu_mask = ppu_rust_bridge_active() ? ppu_rust_bridge_get_mask_mirror() : PPU[1];
+	int ppuon = (ppu_mask & 0x18);
 
 	if (!ppuon || sl >= 241)
 	{

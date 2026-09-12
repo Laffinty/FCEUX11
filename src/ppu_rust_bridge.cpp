@@ -78,6 +78,10 @@ uint8_t g_nt_window[4096];
 bool g_pal = false;
 bool g_dendy = false;
 
+// Step D (M3): cached `$2001` mirror - see ppu_rust_bridge.h. Only the
+// bridge writes it, and only on the events that can change the register.
+uint8_t g_ppu_mask_mirror = 0;
+
 const uint8_t* g_chr_page_base[8] = {};
 const uint8_t* g_nt_page_base[4] = {};
 // Mirror mode last pushed to the Rust side; a mismatch with the
@@ -419,6 +423,8 @@ void ppu_rust_bridge_power() {
         // Step B.5-2b: re-push the region FCEUPPU_SetVideoSystem recorded
         // (power may run before or after the first SetVideoSystem call).
         fceux11_ppu_set_video_system_ex(g_ppu_state, BridgeVideoSystemCode());
+        // Step D (M3): refresh the cached $2001 mirror after power.
+        g_ppu_mask_mirror = fceux11_ppu_get_register_state(g_ppu_state, 1);
 
         // Phase 4: re-install $2000-$2007 / $4014 handlers. FCEUPPU_Power
         // (called before the mapper Power via ppu.cpp:1208) overwrote
@@ -657,6 +663,8 @@ void ppu_rust_bridge_refresh_windows() {
         return;
     }
     bridge_refresh_windows();
+    // Step D (M3): the load path can restore a different $2001.
+    g_ppu_mask_mirror = fceux11_ppu_get_register_state(g_ppu_state, 1);
 }
 
 void ppu_rust_bridge_push_mirror_mode_if_dirty() {
@@ -769,6 +777,10 @@ void ppu_rust_bridge_set_video_system(bool pal, bool dendy) {
     }
 }
 
+uint8_t ppu_rust_bridge_get_mask_mirror() {
+    return g_ppu_mask_mirror;
+}
+
 uint32_t ppu_rust_bridge_ppu_dots_per_frame() {
     // 262 x 341 = 89342 (NTSC); 312 x 341 = 106392 (PAL/Dendy) -
     // plan section B.5 D4.1.
@@ -869,6 +881,12 @@ void ppu_rust_bridge_cpu_write(uint32_t addr, uint8_t value) {
     // writes are invisible (rom_regression nestest frames 3+).
     if (addr == 0x2007) {
         bridge_refresh_windows();
+    }
+    if (addr == 0x2001) {
+        // Step D (M3): mirror the mask for mapper hooks that cannot use
+        // an FFI (see g_ppu_mask_mirror). Rust stores $2001 verbatim
+        // (`Registers::write_mask`), so the written byte is the new value.
+        g_ppu_mask_mirror = value;
     }
     if (addr == 0x4014) {
         // Step B.4: keep the legacy SpriteDMA mirror live. The retired C++
