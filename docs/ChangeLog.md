@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [2.1.1.7] - Unreleased - C++ PPU 退役 + PAL/Dendy 时序
+
+### Added
+
+- **PAL / Dendy 制式支持（Rust PPU）**：制式表（NTSC 262 行 / PAL 312 行 / Dendy 312 行）、VBL・NMI 行、帧预算（89342 / 106392 PPU dots）与 CPU:PPU 交错比例（NTSC・Dendy 3.0、PAL 3.2 = 16:5）全部按制式驱动。新增 `fceux11_ppu_set_video_system_ex` 与 `pal_timing_test` gate（三制式几何 + PAL 连跑 600 帧）。
+- **Bridge accessor 契约**：`ppu_rust_bridge_get_register / get_oam / get_scanline / get_dot / get_v`，以及 `note_nt_write` / `note_palette_write` 写穿入口（debugger / 查看器改走 Rust 权威状态）。
+- **`newppu_neutrality_test`**：同一 ROM 以 `newppu=0/1` 各跑 60 帧，帧缓冲 CRC 必须一致。
+
+### Changed
+
+- **`newppu` 去引擎语义**：配置项 / CLI / GUI 勾选 / movie `PPUflag` 读写全部保留，但不再选择引擎（Rust PPU 是唯一引擎）。`newppu` 不再影响画面高度、超频预算或光枪行为。
+
+### Known limitations
+
+- **Dendy 帧结构存在来源分歧**：本版按 Mesen2（312 行；VBL/NMI 置位在 291）实现，FCEUX 旧 C++ 代码为 262 行。Dendy 行为在发布前需确认（plan `docs/plans/v2.1.1.7_cpp_ppu_removal.md` §B.5 D4.7）。
+- PAL/Dendy 的精灵评估窗口（NMI+24 行）为近似实现；PAL 专属 CPU 行为（DMA 只能在取 opcode 时启动、IRQ/NMI 首读检查 DMA）与视频制式滤波/色彩解码不在本版范围（plan §B.5 D4.5）。
+
+
 ## [2.1.0] - 2026-09-06 - v2.1 PPU Rust 重构 收口 (batch_compat 83.4% 已知接受, -0.6pp vs §6.6 锁档)
 
 ### Major: Rust PPU 成为 canonical engine

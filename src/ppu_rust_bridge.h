@@ -203,7 +203,7 @@ inline uint8_t  ppu_rust_bridge_get_data_bus() { return 0; }
 inline void     ppu_rust_bridge_note_nt_write(uint32_t /*ppu_addr*/) {}
 inline void     ppu_rust_bridge_note_palette_write() {}
 inline void     ppu_rust_bridge_set_video_system(bool /*pal*/, bool /*dendy*/) {}
-inline uint32_t ppu_rust_bridge_ppu_dots_per_frame() { return PPU_RUST_NTSC_PPU_DOTS_PER_FRAME; }
+inline uint32_t ppu_rust_bridge_ppu_dots_per_frame() { return 89342u; }  // NTSC (262 x 341)
 inline int  ppu_rust_bridge_emit_one_cpu_cycle() { return 0; }
 inline void ppu_rust_bridge_advance_ppu_dots(uint32_t /*dots*/) {}
 inline int  ppu_rust_bridge_take_nmi() { return 0; }

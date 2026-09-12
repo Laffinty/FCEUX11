@@ -330,6 +330,24 @@ impl PpuState {
     /// NMI cancel is retained from c872db7 per the PPU programmer
     /// reference's "may even be suppressed by reads landing on the
     /// following dot or two" text.
+    /// `$2001` mask with the PAL/Dendy emphasis-bit swap applied.
+    ///
+    /// "Note that on the Dendy and PAL NES, the green and red bits swap
+    /// meaning." (Mesen2 `Core/NES/NesPpu.cpp:569-570`.) Bits 5 (green)
+    /// and 6 (red) trade places on the 50 Hz systems; every other bit,
+    /// including grayscale and the sprite/BG enables, is unchanged.
+    /// (Step B.5-2d.)
+    pub fn effective_mask(&self) -> u8 {
+        let mask = self.registers.mask;
+        if self.video_system.is_50hz() {
+            let green = mask & 0x20;
+            let red = mask & 0x40;
+            (mask & !0x60) | (green << 1) | (red >> 1)
+        } else {
+            mask
+        }
+    }
+
     pub fn apply_a2002_suppression(&mut self) {
         let sl = self.scanline;
         let dot = self.dot;

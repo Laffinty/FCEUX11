@@ -617,6 +617,27 @@ if(FCEUX11_BUILD_TESTS)
                 "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
     endif()
 
+    # FCEUX11 v2.1.1.7 Step B.5-2d — PAL/Dendy timing gate.
+    # Checks the bridge frame-length getter per region, the production
+    # `FCEUPPU_SetVideoSystem` wiring, and a 600-frame PAL run.
+    # The TU must see the bridge's ON-branch declarations, so it compiles
+    # with FCEUX11_RUST_PPU defined and is only registered when the option
+    # is on (it is a configure error to turn it off since Step C).
+    if(FCEUX11_RUST_PPU)
+        fceux11_add_headless_test_executable(fceux11_pal_timing_test
+            kagami/pal_timing_test.cpp
+            git_info_stub.cpp
+        )
+        target_compile_definitions(fceux11_pal_timing_test PRIVATE FCEUX11_RUST_PPU)
+        add_test(NAME pal_timing_test
+                 COMMAND fceux11_pal_timing_test
+                 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+        if(WIN32)
+            set_tests_properties(pal_timing_test PROPERTIES ENVIRONMENT_MODIFICATION
+                    "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+        endif()
+    endif()
+
     # KagamiQA P1 — Headless smoke test (null driver, no Qt linkage).
     fceux11_add_headless_test_executable(fceux11_headless_smoke_test
         kagami/headless_smoke_test.cpp

@@ -583,13 +583,16 @@ mod tests {
     }
 
     #[test]
-    fn nmi_asserted_at_sl_241_dot_1_when_enabled() {
+    fn nmi_asserted_at_sl_241_dot_0_when_enabled() {
+        // Renamed/retargeted in Step B.5-2d: commit `bb4a9f2` ("A.2 VBL set
+        // dot - switch Rust from dot=1 to dot=0") moved the set point but
+        // left this test asserting the old dot-1 timing.
         let mut s = PpuState::new();
         s.ppudead = 0; // post-boot state machine under test
         s.registers.write_ctrl(1 << ctrl_bits::NMI_ENABLE);
         let mut bus = FlatBus::new();
-        let out = tick_to(&mut s, &mut bus, 241, 1);
-        assert!(out.nmi_asserted, "NMI should fire on sl 241 dot 1 tick");
+        let out = tick_to(&mut s, &mut bus, 241, 0);
+        assert!(out.nmi_asserted, "NMI should fire on sl 241 dot 0 tick");
     }
 
     #[test]
@@ -604,12 +607,16 @@ mod tests {
         s.registers.write_ctrl(1 << ctrl_bits::NMI_ENABLE);
         let mut bus = FlatBus::new();
 
-        // Tick to (240, 340) and apply the suppression window as
-        // the bridge would on a $2002 read.
-        tick_to(&mut s, &mut bus, 240, 340);
+        // Step B.5-2d: apply_a2002_suppression matches the CURRENT (sl, dot)
+        // and tick_to leaves the state one dot PAST its target, so tick to
+        // (240, 339) to actually be at (240, 340) when the read happens.
+        tick_to(&mut s, &mut bus, 240, 339);
+        assert_eq!((s.scanline, s.dot), (240, 340), "precondition");
         s.apply_a2002_suppression();
 
-        // Advance into (241, 1) — VBL should NOT be set, NMI should NOT fire.
+        // The (240, 340) tick advances to (241, 0); the VBL set is
+        // processed on the following tick.
+        tick_dot(&mut s, &mut bus);
         let out = tick_dot(&mut s, &mut bus);
         assert!(!out.vbl_entered);
         assert!(!out.nmi_asserted);
