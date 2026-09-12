@@ -212,6 +212,26 @@ pub unsafe extern "C" fn fceux11_cpu_irq_end(state: *mut u8, src: u32) {
     }
 }
 
+/// Write the post-run register blob back to the C++ `X6502` blob.
+///
+/// Everything except `irq_low` is copied from the Rust run state. The
+/// IRQ-line bits go through
+/// [`crate::cpu::bus::merge_post_run_irq_low`] so the C++-owned mapper /
+/// APU lines - asserted or acknowledged at any point during the run,
+/// including from the mapper hook fired by the per-instruction tick thunk -
+/// are never clobbered by the call-start snapshot.
+///
+/// KIRA.nes regression (v2.1.2): the wholesale write-back resurrected the
+/// MMC3 `EXTERNAL` bit that the IRQ handler had just acknowledged, which
+/// pinned the CPU in the handler from frame 368 and froze the picture.
+#[inline]
+unsafe fn store_post_run_regs(dst: *mut X6502Layout, run: &X6502Layout) {
+    let host_irq_low = unsafe { (*dst).irq_low };
+    let mut out = *run;
+    out.irq_low = crate::cpu::bus::merge_post_run_irq_low(host_irq_low, run.irq_low);
+    unsafe { *dst = out };
+}
+
 /// Run the CPU for `cycles` CPU cycles. Returns the total CPU
 /// cycles consumed during this run (NOT the number of instructions).
 ///
@@ -270,7 +290,7 @@ pub unsafe extern "C" fn fceux11_cpu_run(state: *mut u8, cycles: i32) -> i32 {
         let cpu_cycles = run(&mut *state_ptr, &mut bus, scaled_cycles);
         // Write the post-state back. Mirrors the C++ `X6502_RunDebug`
         // semantics where `cpu.layout_` is mutated in-place.
-        *(state as *mut X6502Layout) = (*state_ptr).regs;
+        store_post_run_regs(state as *mut X6502Layout, &(*state_ptr).regs);
         cpu_cycles
     }
 }
@@ -307,7 +327,7 @@ pub unsafe extern "C" fn fceux11_cpu_run_with_tick(state: *mut u8, cycles: i32) 
         let state_ptr = core::ptr::addr_of_mut!(FFI_CPU_STATE);
         let scaled_cycles = cycles * 16;
         let cpu_cycles = run_with_tick(&mut *state_ptr, &mut bus, scaled_cycles);
-        *(state as *mut X6502Layout) = (*state_ptr).regs;
+        store_post_run_regs(state as *mut X6502Layout, &(*state_ptr).regs);
         cpu_cycles
     }
 }
@@ -329,7 +349,7 @@ pub unsafe extern "C" fn fceux11_cpu_run_ticks(state: *mut u8, ticks: i32) -> i3
         let mut bus = CppBus::new();
         let state_ptr = core::ptr::addr_of_mut!(FFI_CPU_STATE);
         let cpu_cycles = run_with_tick(&mut *state_ptr, &mut bus, ticks);
-        *(state as *mut X6502Layout) = (*state_ptr).regs;
+        store_post_run_regs(state as *mut X6502Layout, &(*state_ptr).regs);
         cpu_cycles
     }
 }
@@ -504,6 +524,80 @@ mod tests {
             fceux11_cpu_irq_end(&mut *buf as *mut X6502Layout as *mut u8, 0x001);
         }
         assert_eq!(buf.irq_low & 0x001, 0);
+    }
+
+    /// v2.1.2 KIRA.nes regression: the MMC3 acknowledges its scanline IRQ
+    /// by writing 0xE000, which calls X6502_IRQEnd on the shared C++ blob
+    /// while the Rust run is in flight. The FFI write-back must not
+    /// resurrect the EXTERNAL bit from the call-start snapshot - that is
+    /// what pinned the CPU in the IRQ handler from frame 368 onwards.
+    #[test]
+    fn run_writeback_keeps_host_irq_acknowledge() {
+        let _ffi_guard = FFI_TEST_LOCK.lock().unwrap();
+        static mut ACK_BUS: FlatBus = FlatBus { mem: [0; 0x10000] };
+        static mut HOST_STATE: *mut X6502Layout = core::ptr::null_mut();
+        extern "C" fn read_trampoline(addr: u16) -> u8 {
+            use crate::cpu::addressing::Bus;
+            let p = core::ptr::addr_of_mut!(ACK_BUS);
+            unsafe { (*p).read(addr) }
+        }
+        extern "C" fn write_trampoline(addr: u16, val: u8) {
+            use crate::cpu::addressing::Bus;
+            let p = core::ptr::addr_of_mut!(ACK_BUS);
+            unsafe {
+                (*p).write(addr, val);
+                if addr == 0xE000 {
+                    // MMC3 acknowledge: X6502_IRQEnd(FCEU_IQEXT).
+                    let st = HOST_STATE;
+                    if !st.is_null() {
+                        (*st).irq_low &= !0x001;
+                    }
+                }
+            }
+        }
+
+        // LDA #0x00 / STA 0xE000 - the IRQ handler acknowledge idiom.
+        unsafe {
+            ACK_BUS.mem[0x0200] = 0xA9;
+            ACK_BUS.mem[0x0201] = 0x00;
+            ACK_BUS.mem[0x0202] = 0x8D;
+            ACK_BUS.mem[0x0203] = 0x00;
+            ACK_BUS.mem[0x0204] = 0xE0;
+            fceux11_cpu_set_bus(read_trampoline, write_trampoline);
+            HOST_STATE = core::ptr::null_mut();
+        }
+
+        let mut state = make_state();
+        state.pc = 0x0200;
+        state.p = Flags::IRQ_DIS.bits() | Flags::UNUSED.bits();
+        state.moo_pi = Flags::IRQ_DIS.bits() | Flags::UNUSED.bits();
+        state.irq_low = 0x001;
+        unsafe {
+            HOST_STATE = &mut *state as *mut X6502Layout;
+            fceux11_cpu_run(&mut *state as *mut X6502Layout as *mut u8, 12);
+            HOST_STATE = core::ptr::null_mut();
+        }
+        assert_eq!(
+            state.irq_low & 0x001,
+            0,
+            "the mapper acknowledge must survive the FFI write-back"
+        );
+    }
+
+    /// The C++ side owns the mapper / APU IRQ lines; the Rust dispatcher
+    /// owns RESET / NMI2 / NMI / TEMP. The post-run merge must take each
+    /// bit from its owner and never let a stale snapshot win.
+    #[test]
+    fn post_run_irq_merge_takes_each_bit_from_its_owner() {
+        use crate::cpu::bus::merge_post_run_irq_low as merge;
+        // Host-owned bits: the mapper ack (host cleared) always wins.
+        assert_eq!(merge(0, 0x001), 0);
+        assert_eq!(merge(0x001, 0), 0x001);
+        assert_eq!(merge(0x002 | 0x100, 0x002), 0x102);
+        // Rust-managed bits: the dispatcher state wins (NMI2 -> NMI relay).
+        assert_eq!(merge(0, 0x080), 0x080);
+        assert_eq!(merge(0x080, 0), 0);
+        assert_eq!(merge(0x040, 0x080), 0x080);
     }
 
     #[test]

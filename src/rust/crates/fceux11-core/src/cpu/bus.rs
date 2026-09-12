@@ -32,6 +32,7 @@
 #![allow(clippy::missing_safety_doc)]
 
 use crate::cpu::addressing::Bus;
+use crate::cpu::state::IrqSource;
 
 /// C++ bus read callback signature. Installed by the C++ side at
 /// `fceu11::Cpu::init()` time.
@@ -171,6 +172,44 @@ static mut IRQ_SET_FN: IrqSetFn = noop_irq_set;
 // test binaries), `sync_irq_*` are no-ops so the Rust state's own IRQ
 // bits (e.g. RESET from `fceux11_cpu_power`) are preserved.
 static mut IRQ_BRIDGE_INSTALLED: bool = false;
+/// IRQ-source bits the *Rust* dispatcher manages: it clears them when it
+/// vectors (`RESET`, `NMI`, `TEMP`) or rewrites `NMI2` into `NMI` at the
+/// next instruction boundary.
+///
+/// Every other bit belongs to the C++ side: the mapper hooks and the APU
+/// assert and acknowledge their own lines through `X6502_IRQBegin` /
+/// `X6502_IRQEnd`, which write straight into the shared `X6502::IRQlow`
+/// blob (the MMC3 IRQ acknowledge write is the canonical case). Those
+/// bits must never be written back from a Rust snapshot; see
+/// [`merge_post_run_irq_low`].
+pub(crate) const RUST_MANAGED_IRQ_BITS: u32 = IrqSource::RESET.bits()
+    | IrqSource::NMI2.bits()
+    | IrqSource::NMI.bits()
+    | IrqSource::TEMP.bits();
+
+/// Merge the Rust dispatcher IRQ view into the C++ `IRQlow` blob at the
+/// end of a CPU run.
+///
+/// `irq_low` is shared state, not a private copy: the C++ side owns the
+/// mapper and APU lines (`EXTERNAL`, `EXTERNAL2`, `DPCM`, `FRAME`) and
+/// mutates them directly at any point during a run, including after the
+/// Rust snapshot was taken and after the last `sync_irq_to_host`. Writing
+/// the snapshot back wholesale therefore resurrects lines the mapper
+/// already acknowledged.
+///
+/// That is exactly the KIRA.nes failure (mapper 4 / MMC3): the game
+/// enables the scanline IRQ at frame 368, the handler acknowledges it by
+/// writing the MMC3 acknowledge register (`X6502_IRQEnd(FCEU_IQEXT)`),
+/// and the FFI write-back then restored the stale `EXTERNAL` bit from the
+/// call-start snapshot. The CPU re-entered the handler forever, so the
+/// picture froze at scanline 128 of every frame with the 0x001 bit stuck.
+///
+/// Host-owned bits always come from `host_now`; only
+/// [`RUST_MANAGED_IRQ_BITS`] come from `rust_now`.
+#[inline]
+pub(crate) fn merge_post_run_irq_low(host_now: u32, rust_now: u32) -> u32 {
+    (host_now & !RUST_MANAGED_IRQ_BITS) | (rust_now & RUST_MANAGED_IRQ_BITS)
+}
 
 // Phase 4 closeout: NMI-fresh deferral flag bridge. The C++ VBL NMI
 // path (`TriggerNMI`) sets `g_e1_nmi_fresh` so the reference dispatch
