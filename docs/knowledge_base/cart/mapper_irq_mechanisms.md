@@ -101,6 +101,20 @@ conversion: compiled research note (facts paraphrased with attribution; Mesen2 i
 - 结果约定：$6000=状态（$80 运行中，$00-$7F 结果），$6004 起文本（签名 $DE $B0 $61），画面文字或音频音调。
 - 无 VRC 专用 IRQ 测试套件。
 
+### 6.1 源码级校准事实（2026-09-13 补充，v2.1.3 批次 1 实现依据）
+
+以下事实直接从 blargg 套件的**汇编源码**（christopherpow/nes-test-roms 的 `mmc3_irq_tests/source/*.asm`、`mmc3_test/source/*.s`、`mmc3_test_2/source/*.s` + `common/`）推导，比 readme 更精确，是滤波取值与计数点校准的一手依据：
+
+- **滤波窗口 [5, 68] PPU dot 的推导**：
+  - 下界：精灵取指窗口（dots 257-320）每 8-dot 组有 2 次 garbage NT 取指（`$2xxx`，A12=0），组间低电平恰 4 dot。blargg 2.Details 子测试 7 断言标准配置每帧**恰好 241 次时钟**（= 预渲染行 1 + 可见行 240，即每取指行 1 次）——若 4-dot 低电平可通过滤波，每行会计数 8 次。故 filter > 4 dot。
+  - 上界：旧套件 4-scanline_timing 的常数给出 `scanline_0_10 = scanline_0_08 - 256`：$10 模式（BG $1000）下启用渲染后的首个边沿落在预渲染行 **dot 5**（首个 BG pattern 取指，启用前总线 = v 呈低电平、低电平时长不计入限制）；而稳态反配置每行恰 1 次计数、落在上一行预载组 pattern 取指（dot ~325，低电平 68 dot）——行内 BG 边沿的低电平只有 4 dot 必须被拒，预载组边沿的 68-dot 低电平必须被接受。故 filter ≤ 68 dot。
+  - 本仓取 **9 dot（= 3 个 M2 下降沿）**，落在窗口内且与 Furrtek 硅片逆向一致。
+- **$2006 手动时钟的低电平实测**：`clock_counter` 例程（$0000↔$1000 翻转）在两次写之间的 A12 低电平约 6-26 CPU 周期（18-78 dot），任何 filter ≤ 78 dot 都能通过测试 1/3。
+- **$2006 首写不上总线**：测试 3 子测试 3 用"高位写 $10 + 低位写 $00"的配对证明 v 只在第二次写时变化——渲染关闭期只在 `$2006` 第二写、`$2007` 读/写递增后上报 v。
+- **8x16 精灵"每行最多 4 次边沿"（Wiki 说法）与 garbage-NT 结构 + >4-dot 滤波矛盾**：在本仓 9-dot 滤波下 8x16 混表每行仍 ~1 次计数。blargg 套件不覆盖此场景；标为**待校准项**（需真机逻辑分析仪数据）。
+- **Mesen2 滤波值矛盾（待解，勿照抄）**：Mesen2 MMC3 内联滤波 = 3 master clocks（≈0.75 dot）且精灵窗口逐组上报 garbage NT/AT + pattern 地址（`NesPpu.cpp` ProcessScanlineImpl case 0/2/4）——按此模型标准配置每行应计数 8 次，与 2.Details 子测试 7 的 241 矛盾。要么 Mesen2 未通过该 ROM，要么存在本文未覆盖的机制。本仓以 blargg 源码推导为准。
+- **旧套件 4-scanline_timing / mmc3_test_2 的 4 号（±1 PPU dot）测的是 IRQ→中断处理竞态**：判定位 `$21/$22` 取决于处理程序 asl 与主线的 `inc irq_flag` 的相对位置，与 CPU 中断进入时序（逐指令 vs 逐周期）耦合；逐指令 CPU 的可观察量子是 1 CPU 周期（3 dot），无法稳定命中 1-dot 窗口。该两项属于逐周期调度（批次 3）的验收项，不属于 A12 watcher 本身。
+
 ## 7. 来源与许可
 
 - NESdev Wiki（MMC3/MMC6/MMC5/VRC4/VRC6/VRC7/Sunsoft FME-7/JY Company/GTROM/PPU_rendering/PPU_OAM/PPU_registers/PPU_scrolling/Sprite-0_hit/Talk:MMC3/Tricky_to_emulate_games）：社区文档，许可为 **CC BY-SA**（见 Wiki 版权页）；本页全部为带出处的释义转述，未整段复制。

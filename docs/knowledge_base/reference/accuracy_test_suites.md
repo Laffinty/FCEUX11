@@ -12,13 +12,13 @@ conversion: compiled research note（套件事实转述 + 本仓集成现状）
 ## 1. 本仓集成现状（2026-09-13 实测）
 
 - **清单**：`tests/fixtures/blargg_manifest.json`（177 ROM，类别 apu/cpu/ppu/mmc3/other，字段 frames / reset_after / probe_addr）。
-- **运行器**：`build-rust-ppu/tests/kagami_qa_blargg_runner.exe --manifest fixtures/blargg_manifest.json`（在 tests/ 目录下运行；注意需把 `vcpkg_installed/x64-windows/bin` 加入 PATH，否则 runner 报缺 z.dll）。全量批处理输出 JSON（rom/addr/value/diag/status/duration_ms），exit code 非零表示存在 FAIL。
+- **运行器**：`build-rust-ppu/tests/kagami_qa_blargg_runner.exe --manifest fixtures/blargg_manifest.json`（在 tests/ 目录下运行；注意需把 `vcpkg_installed/x64-windows/bin` 加入 PATH，否则 runner 报缺 z.dll）。全量批处理的 stdout 是逐 ROM 三行（`[名称] N frames...` + `PASS (0x..)`/`FAIL (0x..)`），exit code 非零表示存在 FAIL（CI 语义，不是运行错误）；单 ROM 模式（`--rom <path>`）才输出 `BLARGG_RESULT:` 行。
 - **结果协议**（blargg 套件通用，readme 原文）：状态字节在 $6000（$80=运行中，$81=需 reset，$00-$7F=结果码）；$6001-$6003 签名 $DE $B0 $61；$6004 起文本；音频音调 0=通过、≥2=错误码。
-- **当前结果（v2.1.2 引擎，2026-09-13 全量实测）**：**138 PASS / 39 FAIL**。失败簇与 v2.1.3 批次的对应：
+- **当前结果（v2.1.3 批次 1 引擎，2026-09-13 全量实测）**：**146 PASS / 31 FAIL**（批次 1 前 v2.1.2 为 138/39；MMC3 族 6/18 → 14/18，无既有 PASS→FAIL）。失败簇与 v2.1.3 批次的对应：
 
 | 失败簇 | 项数 | 计划批次（docs/plans/v2.1.3_ppu_accuracy_plan.md） |
 |---|---|---|
-| MMC3 族（mmc3_1..6、mmc3_v2_1..6） | 12 | 批次 1（A12 watcher） |
+| MMC3 族剩余（mmc3_4、mmc3_v2_4：±1 PPU dot 竞态，依赖逐周期 CPU；mmc3_6、mmc3_v2_6：RevA 语义修订互斥项） | 4 | mmc3_4/v2_4 → 批次 3；6 号两支 = 修订差异记录（默认 RevB） |
 | VBL/NMI 1 周期精度（ppu_vbl_nmi、vbl_02/03/04/06/07/08/10） | 8 | 批次 3（逐周期调度） |
 | CPU 中断/定时簇（cpu_int_2..5、cpu_interrupts、instr_timing*、instr_misc*、cpu_reset_regs） | 11 | 批次 3 |
 | 假写/执行区副作用（cpu_dummy_writes_oam/ppu、cpu_exec_space_ppuio、sprdma_dmc_dma*） | 5 | 批次 3+4 |

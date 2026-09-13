@@ -1,13 +1,21 @@
 # FCEUX11 知识库（docs/knowledge_base）
 
 本目录汇总本项目实现所依据的权威硬件/格式资料，供实现、排障与评审时查阅。
-当前内容以 NESdev Wiki 页面（由 owner 提供的离线网页存档）为第一批来源，整理为 Markdown。
+第一批来源是 NESdev Wiki 页面（owner 提供的离线网页存档），随后按主题引入了论坛实测帖、硅片逆向、参照实现源码与精度测试套件源码等多类来源，整理为 Markdown。
 
 ## 1. 来源与许可
 
-- 来源：NESdev Wiki（https://www.nesdev.org/wiki/ ）。
+**来源不只有 NESdev Wiki。** 各文件头部的 source 字段记录其实际来源，当前共六类：
+
+1. **NESdev Wiki**（https://www.nesdev.org/wiki/ ）——主体来源，owner 提供的离线网页存档。
+2. **nesdev.org 直连镜像核验**：本环境直连 Wiki 被 Cloudflare 403 拦截，检索经 web.archive.org 快照与 nesdev-wiki.nes.science 镜像交叉核验（见 `cart/mapper_irq_mechanisms.md` 头注）。
+3. **nesdev 论坛实测帖**（lidnariq 等的硬件测量、逻辑分析仪数据）——`cart/mapper_irq_mechanisms.md` §7。
+4. **硅片逆向**：Furrtek / VGChips 的 MMC3C 逆向（A12 滤波电路、/C16 语义）。
+5. **参照实现源码**（行为事实提取，许可见第 3 条红线）：Mesen2（GPL-3.0）、Nestopia / puNES / FCEUX（GPL-2.0）、ares（ISC）、Nintendulator——汇总见 `reference/dot_ppu_designs.md`。
+6. **blargg 精度测试套件的 ROM 与汇编源码**（christopherpow/nes-test-roms）：readme、`.asm`/`.s` 源码与 `common/` 公共库（sync_vbl.s、delay.s、test_mmc3.inc 等）是时序常量与滤波边界的一手推导依据——见 `cart/mapper_irq_mechanisms.md` §6.1、`reference/accuracy_test_suites.md`。
+
 - 许可：据 owner 说明，NESdev Wiki 内容为公有领域（public domain），可自由用于本项目（GPLv2）。2026-09-13 复核：Wiki 的《Nesdev wiki:General disclaimer》原文写明 "Any information posted on this wiki is considered public domain … You can use the information from this wiki any way you want"，现行页脚也无 CC 声明（社区常误传为 CC BY-SA，经一手核验不成立）。
-- 每个文件头部都保留了原始页面 URL 与抓取日期，便于回溯与核对；如需引用第三方资料，请同样注明来源与许可。
+- 每个文件头部都保留了原始页面 URL（或源码仓库路径）与抓取日期，便于回溯与核对；如需引用第三方资料，请同样注明来源与许可。
 - 第三方许可红线（2026-09-13 研究核实，详见 reference/dot_ppu_designs.md §4）：**Mesen2 是 GPL-3.0，与本项目 GPLv2 不兼容——只可学习事实，禁止复制代码**；puNES/Nestopia/Nintendulator/FCEUX 为 GPL-2.0、ares 为 ISC，代码复用合法但须署名；blargg 测试 ROM 与聚合仓未声明许可，再分发需保留署名。
 
 ## 2. 目录结构与命名规范
@@ -54,7 +62,7 @@
 | Sprite-0 hit 规则与套件预期 | [ppu/ppu_sprite_hit.md](ppu/ppu_sprite_hit.md) | 命中判定、精确时序、blargg 逐项预期、优先级 MUX |
 | 渲染期寄存器写语义 | [ppu/ppu_mid_frame_writes.md](ppu/ppu_mid_frame_writes.md) | mid-frame 写 $2000/$2005/$2006/$2007、分屏滚动、游戏实践 |
 | 逐 dot PPU 参照设计综述 | [reference/dot_ppu_designs.md](reference/dot_ppu_designs.md) | Mesen2/Nintendulator/ares/puNES/Nestopia/FCEUX 设计与许可红线 |
-| 精度测试套件目录与集成现状 | [reference/accuracy_test_suites.md](reference/accuracy_test_suites.md) | blargg 套件覆盖、运行协议、当前 138/177、失败簇→批次映射 |
+| 精度测试套件目录与集成现状 | [reference/accuracy_test_suites.md](reference/accuracy_test_suites.md) | blargg 套件覆盖、运行协议、当前 146/177（v2.1.3 批次 1）、失败簇→批次映射 |
 
 ## 4. 与实现/计划文档的关系
 

@@ -39,3 +39,11 @@
 - **临时探针必须回退**：用 git show HEAD 加路径显式还原被污染的 TU，再只提交真实修复。
 - **先做 A/B**：同一 ROM 在修复前与修复后各导一帧，用 ASCII 与统计对比，避免凭感觉判断。
 
+## 5. v2.1.3 批次 1 补充（2026-09-13，MMC3 A12 watcher 排障沉淀）
+
+- **先验 ROM 文件完整性，再怀疑代码**：blargg ROM 截断下载（实测 `mmc3_2_details.nes` 14948/40976 字节）表现为 `kagami_bridge: LoadGame failed`、结果 `value=0xFE diag=[00,00,00]`——与精度失败完全不同。校验式：文件大小 ≥ 16 + 头[4]×16384 + 头[5]×8192。fix = 从 christopherpow/nes-test-roms 对应路径重新下载。
+- **Rust 调度器回调内禁止 fceux11_ppu_* FFI——日志参数会被急切求值**：env 门控探针里把 FFI 写成 `log(..., ppu_rust_bridge_get_dot(), ...)` 的参数，探针关闭时**照样执行**（C/C++ 实参先于形参求值），在 StateBox &mut 借用存活期间重入 Rust 引发间歇性 SegFault（本次 rust_ppu_smoke_test 复现）。正确做法：包一层惰性访问器（内部先查 env 开关再调 FFI）。
+- **bench_tolerance_test 对机器负载敏感**：与构建/其他测试并行时 CPU/全帧基准会虚高 +6~+17%（阈值 max-regression +2.5%）。判定真实回归前必须静机单独复跑；本次 +16.8% 的"回归"静机复测为 PASS。
+- **git stash 是零成本回归归因工具**：可疑项（本例 3 个"known-fail 清单外失败"）在改动状态与 HEAD 状态各跑一次，1 个增量重建就能区分"我的回归"与"预存失败"；untracked 新文件要先移出工作树再 stash。
+- **C++ 文件行尾**：仓库 blob 实际是 LF（尽管 .editorconfig 写 CRLF）；编辑工具可能把整个文件归一成 CRLF 导致 900+ 行假 diff。提交前 `sed -i 's/$//'` 恢复，保持 diff 只含真实改动。
+- **探针观测 CPU 域量化**：CPU 时间戳按 CPU 周期（3 PPU dot）量化——移动 1 dot 的边沿若不跨周期边界，探针 ts 不变；调校 ±1 dot 级时序时先算清量子边界（也解释了 ±1 dot 测试对逐指令 CPU 不可稳定命中）。
