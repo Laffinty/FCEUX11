@@ -52,6 +52,7 @@ conversion: compiled research note（硬件事实转述 + 参照实现的时序�
 
 | 游戏 | 机制 | 失真表现（引擎精度不足时） |
 |---|---|---|
+| Super Mario Bros. 1（含改版/汉化） | sprite-0 hit 定时的帧中 $2005 双写做状态栏分屏；顶砖块经**渲染期 $2007 写**改写命名表单元格；水面动画靠 CPU 周期性重写水 tile 的 NTAM 单元（$82/$84 ↔ $83/$85 交替，本仓 2026-09-13 批次 2 验收时在 NTAM 转储中直接观测到） | 分屏行错位/状态栏撕裂；被顶的砖块不复位或错格；水面不动画 | 
 | Super Mario Bros. 3 | 帧中四次 $2006 写（调色板指针 + 滚动复位），依赖渲染关闭期 backdrop=v 花招 | 底色/状态栏 bank 错 |
 | Marble Madness / Mother (J) / Pirates | 扫描线中途切 CHR bank 画文本框 | 文本框贴图错（写入在后续 tile 边界生效） |
 | Battletoads / Bill & Ted's Excellent Adventure | 中途开关渲染（后者借此换 CHR bank） | 撕裂/冻结 |

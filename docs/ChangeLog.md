@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [2.1.3] - 2026-09-13 - 模拟精度：硬件级 A12/MMC3 IRQ 时序与逐 dot 背景渲染流水线
+
+### Added
+
+- **硬件级 A12 watcher（批次 1，4ae0189）**：PPU 按取指流水线逐 dot 上报总线地址，过滤型 watcher（A12 低电平 ≥9 PPU dot = 3 个 M2 下降沿）只在真实上升沿时钟 MMC3 族 IRQ 计数器；渲染关闭期 $2006 第二写、$2007 读/写递增、$2001 关渲染同样上报。每取指行恰好 1 次计数（预渲染行 + 240 可见行 = 241 次/帧，与 blargg 2.Details 断言一致）。调度器退役 dot-256 每扫描线近似时钟。
+- **逐 dot 背景取指流水线（批次 2）**：`rendering.rs` 重写为硬件形态的 dot 状态机——dots 1-256/321-336 每 8-dot 组取 NT/AT/PT-lo/PT-hi，pattern 与属性移位寄存器逐 dot 移位、组末装载；像素 x 在 dot x+1 输出、fine X 逐像素选位。**FCEUX 遗传的 atlatch quirk（tile 后 4 像素用下一 tile 属性）按硬件模型移除**；行中滚动写入、帧中命名表更新、行内 CHR 换 bank 即时生效。精灵层改为 prepare_line/pick_pixel，sprite-0 hit 在命中像素所在 dot 直接锁存。存档内部格式 RPU1 v1→v2。
+- **CHR/NT 窗口脏标记 + 8-dot 组刷新**：mapper 换 bank 置原子脏标记，逐 dot 循环每 8 dot 轮询重拷窗口页，行内换 bank 在下一个取指组可见。
+- **docs/knowledge_base/**：新增 blargg 测试源码推导的 MMC3 滤波窗口 [5,68] dot 与校准事实（cart/mapper_irq_mechanisms.md §6.1）、SMB1 类分屏/顶砖块/水动画的渲染期写语义（ppu/ppu_mid_frame_writes.md）、批次验收方法论（engineering/debugging_ppu_regressions.md §5-6）。
+
+### Changed
+
+- **MMC3 RevA 触发条件修复**：`(count > 0 || reload_before) && counter == 0`（此前漏"清零后重载到 0 也触发"）；RevB（默认，MMC3C/MMC6 硅片）不变。
+- blargg 精度套件 **138 → 146 PASS / 177**（MMC3 族 6/18 → 14/18，零既有 PASS→FAIL）；ctest 41/41 全绿。
+- 性能：逐 dot 流水线使 PPU 基准提速约 15.6%、全帧基准提速约 9.6%（bench 基线已重生）。
+- 版本号提升到 **v2.1.3**（src/version.h）：主窗口标题与「关于」对话框显示 FCEUX11 v2.1.3。
+
+### Fixed
+
+- MMC3 族 IRQ 时机漂移/风暴导致的"间歇性整屏 bank 错、偶发卡死"（owner 报告症状），KIRA.nes 类 ROM 全链路修复。
+- 帧中滚动写入只影响"下一整行"造成的分屏整行错位/撕裂。
+
+### Known issues
+
+- 3186_Mario_1.nes（NROM 魔改）游玩场景左侧仍可能出现标题画面残留竖条——存量缺陷（v2.1.2 实测更严重），归因于渲染期 $2007 写语义与 sprite-0 hit 分屏的 CPU 时序，随批次 3/5（v2.1.4）处理。
+- mmc3_4/v2_4（±1 PPU dot 中断竞态）与 VBL/NMI 簇 7 项等待逐周期 CPU 调度（批次 3，v2.1.4）。
+
 ## [2.1.2] - 2026-09-13 - Rust PPU 渲染与颜色修复（KIRA.nes 全链路排障）
 
 ### Fixed
