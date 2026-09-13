@@ -19,6 +19,7 @@
 //! (`src/ppu_rendering.cpp`) implements, modulo the Phase 1 simplifications
 //! documented at each `match` arm.
 
+use crate::a12;
 use crate::bus::PpuBus;
 #[allow(unused_imports)] // mask_bits / status_bits used only by #[cfg(test)] modules.
 use crate::registers::{ctrl_bits, mask_bits, status_bits};
@@ -95,6 +96,43 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
     // Step B.5-2b: the raster geometry is region-dependent (NTSC 262
     // lines, PAL/Dendy 312) - see crate::video_system.
     let timings = state.video_system.timings();
+
+    // v2.1.3 batch 1: advance the A12 watcher's dot clock, then present
+    // the fetch-cycle bus address for this dot to the filtered watcher.
+    // While rendering is enabled on a fetch line (pre-render -1 or
+    // visible 0..=239) the PPU bus carries the hardware fetch addresses
+    // (nesdev PPU rendering cycle table — `crate::a12::fetch_bus_address`);
+    // every filtered rising edge clocks the MMC3-family IRQ counters
+    // through `PpuBus::notify_a12_rising`. With rendering off the bus
+    // carries `v` and the reporting happens from the CPU access path
+    // (`ffi.rs` $2006/$2007/$2001 handlers) — blargg MMC3 test 3 counts
+    // those whether or not rendering is on. This replaces the v2.1.2
+    // per-scanline dot-256 approximation (one `notify_hblank` per
+    // visible line), which the scheduler no longer fires.
+    state.a12.advance_tick();
+    if state.rendering_enabled() && (sl == -1 || (0..=239).contains(&sl)) {
+        if let Some(addr) = a12::fetch_bus_address(
+            sl,
+            dot,
+            state.registers.ctrl,
+            &state.secondary_oam,
+            state.secondary_oam_count,
+        ) {
+            if state.a12.observe(addr) {
+                _bus.notify_a12_rising();
+            }
+        }
+    }
+    // Entering the post-render line (sl 240): fetching stops and the bus
+    // drops back to `v` (Mesen2 does the same SetBusAddress at scanline
+    // 240 cycle 0). Rendering-off mid-frame transitions are reported by
+    // the `$2001` write handler in `ffi.rs`.
+    if sl == 240 && dot == 0 {
+        let v = state.registers.v & 0x3FFF;
+        if state.a12.observe(v) {
+            _bus.notify_a12_rising();
+        }
+    }
 
     // -----------------------------------------------------------------
     // Events that fire as we enter (sl, dot)

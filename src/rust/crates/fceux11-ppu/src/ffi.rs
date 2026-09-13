@@ -51,6 +51,13 @@ pub struct fceux11_ppu_bus_callbacks {
     pub notify_scanline: Option<unsafe extern "C" fn(sl: i16)>,
     /// Called when VBlank asserts/deasserts.
     pub notify_vblank: Option<unsafe extern "C" fn(asserted: bool)>,
+    /// v2.1.3 batch 1: window-dirty poll, fired by the per-dot loops
+    /// every 8 dots (once per BG/sprite fetch group). C++ mapper bank
+    /// switches set a shared atomic dirty flag; this callback re-copies
+    /// the CHR/NT window pages whose base pointers moved, so a bank
+    /// switch becomes visible to the renderer at fetch-group
+    /// granularity instead of scanline granularity.
+    pub refresh_windows: Option<unsafe extern "C" fn()>,
 }
 
 // SAFETY: the callback function pointers are C-ABI and the struct is
@@ -109,6 +116,11 @@ impl PpuBus for CppBus {
     fn notify_vblank(&mut self, asserted: bool) {
         if let Some(f) = self.cb.notify_vblank {
             unsafe { f(asserted) }
+        }
+    }
+    fn refresh_windows(&mut self) {
+        if let Some(f) = self.cb.refresh_windows {
+            unsafe { f() }
         }
     }
 }
@@ -449,6 +461,7 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_read(state: *mut PpuState, addr: u16) -
         }
         7 => {
             // $2007 — read with buffered behaviour.
+            let v_before = sb.state.registers.v;
             let mut bus_adapter = CppBus {
                 cb: sb.bus.unwrap_or(fceux11_ppu_bus_callbacks {
                     read: None,
@@ -459,11 +472,20 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_read(state: *mut PpuState, addr: u16) -
                     notify_hblank2: None,
                     notify_scanline: None,
                     notify_vblank: None,
+                    refresh_windows: None,
                 }),
             };
-            sb.state
+            let ret = sb
+                .state
                 .registers
-                .read_data(&mut bus_adapter, sb.state.registers.ctrl, rendering_2007(sb))
+                .read_data(&mut bus_adapter, sb.state.registers.ctrl, rendering_2007(sb));
+            // v2.1.3 batch 1: the post-read v increment pushes the new
+            // address onto the PPU bus when the PPU isn't rendering —
+            // blargg MMC3 test 3 subtest 5 counts that 0→1 A12 jump.
+            if sb.state.registers.v != v_before {
+                a12_report_v(sb, &mut bus_adapter);
+            }
+            return ret;
         }
         // $2000/$2001/$2003/$2005/$2006 — write-only or open bus; the
         // C++ A200x fallback returns PPUGenLatch for every register it
@@ -471,6 +493,28 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_read(state: *mut PpuState, addr: u16) -
         _ => sb.state.registers.data_bus,
     };
     ret
+}
+
+/// v2.1.3 batch 1: true when the PPU bus carries `v` rather than fetch
+/// addresses, i.e. CPU-driven `v` changes must be reported to the A12
+/// watcher (blargg MMC3 test 3: `$2006` second write, `$2007` read and
+/// `$2007` write all clock the counter whether or not rendering is on).
+/// During rendering on a fetch line the bus stays fetch-driven and the
+/// CPU write does not reach the cartridge address pins as a `v` push.
+fn a12_reports_v(sb: &StateBox) -> bool {
+    sb.state.scanline >= 240 || !sb.state.rendering_enabled()
+}
+
+/// Present a CPU-driven address to the watcher and forward a filtered
+/// rising edge to the C++ mapper hook. `v` is the post-change value
+/// already stored in `state.registers.v` by the caller.
+fn a12_report_v(sb: &mut StateBox, adapter: &mut CppBus) {
+    if a12_reports_v(sb) {
+        let v = sb.state.registers.v & 0x3FFF;
+        if sb.state.a12.observe(v) {
+            adapter.notify_a12_rising();
+        }
+    }
 }
 
 /// Phase 5.1: take-and-clear the PPU NMI latch. Returns 1 when the
@@ -522,7 +566,20 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_write(state: *mut PpuState, addr: u16, 
             sb.state.registers.write_ctrl(val);
         }
         1 => {
+            // v2.1.3 batch 1: disabling rendering mid-frame drops the
+            // bus from fetch addresses back to `v` (Mesen2
+            // UpdateState → SetBusAddress(v)); report the level change
+            // so a later `$2006`-driven rise still measures against a
+            // fresh low period.
+            let was_rendering = sb.state.rendering_enabled();
             sb.state.registers.write_mask(val);
+            if was_rendering && !sb.state.rendering_enabled() && sb.state.scanline < 240 {
+                let v = sb.state.registers.v & 0x3FFF;
+                let mut bus_adapter = make_bus_adapter(sb);
+                if sb.state.a12.observe(v) {
+                    bus_adapter.notify_a12_rising();
+                }
+            }
         }
         2 => {
             // $2002 read-only.
@@ -543,14 +600,29 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_write(state: *mut PpuState, addr: u16, 
             sb.state.registers.write_scroll(val);
         }
         6 => {
+            // v2.1.3 batch 1: only the SECOND `$2006` write commits
+            // `v = t` and thereby changes the PPU bus address when the
+            // PPU isn't rendering (blargg MMC3 test 3 subtests 2-4:
+            // first writes and A12-unchanged pairs never clock).
+            let v_before = sb.state.registers.v;
             sb.state.registers.write_addr(val);
+            if sb.state.registers.v != v_before {
+                let mut bus_adapter = make_bus_adapter(sb);
+                a12_report_v(sb, &mut bus_adapter);
+            }
         }
         7 => {
             // $2007 data write.
+            let v_before = sb.state.registers.v;
             let mut bus_adapter = make_bus_adapter(sb);
             sb.state
                 .registers
                 .write_data(&mut bus_adapter, sb.state.registers.ctrl, val, rendering_2007(sb));
+            // v2.1.3 batch 1: the post-write v increment lands on the
+            // bus when not rendering (blargg MMC3 test 3 subtest 6).
+            if sb.state.registers.v != v_before {
+                a12_report_v(sb, &mut bus_adapter);
+            }
         }
         _ => {}
     }
@@ -578,6 +650,7 @@ fn make_bus_adapter(sb: &mut StateBox) -> CppBus {
             notify_hblank2: None,
             notify_scanline: None,
             notify_vblank: None,
+            refresh_windows: None,
         }),
     }
 }
@@ -619,6 +692,7 @@ pub unsafe extern "C" fn fceux11_ppu_emulate_frame(state: *mut PpuState, n_cycle
     let total_dots = n_cycles.saturating_mul(crate::scheduler::PPU_DOTS_PER_CPU_CYCLE);
     let mut last_outcome = TickOutcome::default();
     while sched.ppu_dots_consumed() < total_dots {
+        poll_refresh_windows(sb, &mut bus);
         // Phase 4: BG render at the start of each visible scanline.
         // The C++ algorithm runs `RefreshLine` once per visible
         // scanline (at sl N, dot 0); we do the same. The condition +
@@ -738,6 +812,17 @@ fn render_visible_scanline<B: crate::bus::PpuBus + ?Sized>(
     );
 }
 
+/// v2.1.3 batch 1: window-dirty poll — fired once per fetch group
+/// (every 8 dots) so a mapper bank switch made mid-scanline re-copies
+/// the moved CHR/NT window pages before the next fetch group reads
+/// them, instead of waiting for the next scanline boundary.
+#[inline]
+fn poll_refresh_windows(sb: &StateBox, bus: &mut CppBus) {
+    if sb.state.dot & 0x7 == 0 {
+        bus.refresh_windows();
+    }
+}
+
 /// Phase 5.1: shared render-at-scanline-start step. Renders the
 /// current visible scanline when the state machine is entering it
 /// (sl 0..=239, dot == 0, checked BEFORE the dot advances) — the exact
@@ -771,6 +856,7 @@ pub unsafe extern "C" fn fceux11_ppu_tick_cpu_cycle(state: *mut PpuState, n_cycl
     sched.begin_frame();
     let total_dots = n_cycles.saturating_mul(crate::scheduler::PPU_DOTS_PER_CPU_CYCLE);
     while sched.ppu_dots_consumed() < total_dots {
+        poll_refresh_windows(sb, &mut bus);
         sched.tick_one_ppu_dot(&mut sb.state, &mut bus);
     }
     0
@@ -796,6 +882,7 @@ pub unsafe extern "C" fn fceux11_ppu_tick_dots(state: *mut PpuState, n_dots: u32
     sched.set_video_system(sb.video_system);
     let mut frame_advanced = false;
     for _ in 0..n_dots {
+        poll_refresh_windows(sb, &mut bus);
         // Render when ENTERING a visible scanline, BEFORE the dot
         // tick (so the fill/BG use the carry-over v — the placement
         // the ppu_frame_diff goldens were pinned against; a
@@ -844,6 +931,7 @@ pub unsafe extern "C" fn fceux11_ppu_tick_dots_direct(state: *mut PpuState, n_do
     sched.set_video_system(sb.video_system);
     let mut frame_advanced = false;
     for _ in 0..n_dots {
+        poll_refresh_windows(sb, &mut bus);
         render_scanline_if_start(sb, &mut bus);
         let outcome = sched.tick_one_ppu_dot(&mut sb.state, &mut bus);
         if outcome.nmi_asserted {

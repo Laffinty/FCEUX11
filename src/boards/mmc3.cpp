@@ -28,6 +28,7 @@
 #include "../ppu.h"
 #include "../unif.h"
 #include "mmc3.h"
+#include "../ppu_rust_bridge.h"  // mmc3_probe_log: PPU (sl, dot) at each clock
 
 #include <cstdarg>
 #include <cstdio>
@@ -63,6 +64,15 @@ static void mmc3_probe_log(const char* tag, const char* fmt, ...) {
     std::vfprintf(stderr, fmt, args);
     va_end(args);
     std::fputc('\n', stderr);
+}
+
+// Probe-only PPU dot accessor. MUST stay lazy (never evaluated as an
+// eager log argument): it is an FFI into the Rust PPU, which is illegal
+// while a scheduler callback holds the StateBox borrow — see
+// bridge_refresh_window_contents_if_dirty's re-entrancy note. Allowed
+// only under FCEUX11_MMC3_PROBE=1 (diagnostic runs).
+static int mmc3_probe_dot(void) {
+    return mmc3_probe_on() ? static_cast<int>(ppu_rust_bridge_get_dot()) : 0;
 }
 
 uint8 MMC3_cmd;
@@ -218,8 +228,8 @@ DECLFW(MMC3_CMDWrite) {
 
 DECLFW(MMC3_IRQWrite) {
 //	FCEU_printf("%04x:%04x\n",A,V);
-	mmc3_probe_log("IRQWRITE", "addr=%04X val=%02X sub=%04X",
-		A, V, A & 0xE001);
+	mmc3_probe_log("IRQWRITE", "addr=%04X val=%02X sub=%04X sl=%d dot=%d ts=%u",
+		A, V, A & 0xE001, g_cpu.scanline(), mmc3_probe_dot(), (unsigned)g_cpu.timestamp());
 	switch (A & 0xE001) {
 	case 0xC000: IRQLatch = V; break;
 	case 0xC001: IRQReload = 1; break;
@@ -253,18 +263,36 @@ static void ClockMMC3Counter(void) {
 	const uint8 enabled_before = IRQa;
 	const int sl = g_cpu.scanline();
 	const int cyc = g_cpu.timestamp() & 0x07;
-	mmc3_probe_log("CLOCK_PRE", "sl=%d cyc=%d count=%u latch=%u reload=%u enabled=%u",
-		sl, cyc, count, latch_before, reload_before, enabled_before);
+	mmc3_probe_log("CLOCK_PRE", "sl=%d dot=%d ts=%u cyc=%d count=%u latch=%u reload=%u enabled=%u",
+		sl, mmc3_probe_dot(), (unsigned)g_cpu.timestamp(), cyc, count, latch_before, reload_before, enabled_before);
 	if (!count || IRQReload) {
 		IRQCount = IRQLatch;
 		IRQReload = 0;
 	} else
 		IRQCount--;
-	if ((count | isRevB) && !IRQCount) {
-		if (IRQa) {
+	// v2.1.3 batch 1: revision semantics per
+	// docs/knowledge_base/cart/mapper_irq_mechanisms.md §2.3.
+	// Rev B (Sharp MMC3C / bold-S MMC3B, default): "counter == 0"
+	// after the clock — reload latch 0 fires every clock (blargg
+	// 6.MMC3_rev_B subtest 2).
+	// Rev A (NEC MMC3A, mapper 12/114): fires on decrement-to-zero or
+	// on reloading to zero after a $C001 clear, but NOT on a reload
+	// that follows a normal zero-reach (blargg 5.MMC3_rev_A subtests
+	// 2-3; Mesen2 `(count > 0 || reload) && counter == 0`).
+	if (isRevB) {
+		if (!IRQCount) {
+			if (IRQa) {
+				mmc3_probe_log("CLOCK_IRQ",
+					"sl=%d dot=%d ts=%u cyc=%d count_was=%u reload=%d isRevB=%d latch=%u",
+					sl, mmc3_probe_dot(), (unsigned)g_cpu.timestamp(), cyc, count, reload_before, isRevB, latch_before);
+				X6502_IRQBegin(FCEU_IQEXT);
+			}
+		}
+	} else {
+		if ((count > 0 || reload_before) && !IRQCount && IRQa) {
 			mmc3_probe_log("CLOCK_IRQ",
-				"sl=%d cyc=%d count_was=%u reload=%d isRevB=%d latch=%u",
-				sl, cyc, count, reload_before, isRevB, latch_before);
+				"sl=%d dot=%d ts=%u cyc=%d count_was=%u reload=%d isRevB=%d latch=%u",
+				sl, mmc3_probe_dot(), (unsigned)g_cpu.timestamp(), cyc, count, reload_before, isRevB, latch_before);
 			X6502_IRQBegin(FCEU_IQEXT);
 		}
 	}

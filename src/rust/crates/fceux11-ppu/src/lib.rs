@@ -6,6 +6,7 @@
 //! Rust PPU through `ppu_rust_bridge.cpp`.
 //!
 //! Modules:
+//! - [`a12`]: filtered A12 watcher + per-dot fetch-address model (v2.1.3 batch 1).
 //! - [`bus`]: `PpuBus` trait + the `FlatBus` test stub used by the integration tests.
 //! - [`registers`]: `$2000`-`$2007`, `$4014`, scroll latches, open-bus buffer.
 //! - [`state`]: `PpuState` aggregate (registers + OAM + secondary OAM + frame counters).
@@ -16,6 +17,7 @@
 //! - [`sprites`]: Phase 6.2 sprite pixel composition (post-BG pass).
 //! - [`luts`]: precomputed ppulut1/2/3 lookup tables (Phase 4).
 
+pub mod a12;
 pub mod bus;
 pub mod ffi;
 pub mod frame;

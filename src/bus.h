@@ -23,6 +23,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <atomic>
 
 #include "types.h"             // readfunc / writefunc typedef
 #include "utils/cache.h"       // FCEUX11_CACHE_ALIGN, fceu11::kCacheLineSize
@@ -242,6 +243,16 @@ private:
 // direct array-index + indirect-call sequence identical to
 // v1.3.0's `::ARead[addr](addr)` machine code.
 extern Bus g_bus;
+
+// v2.1.3 batch 1: CHR/NT window dirty flag for the Rust PPU's fetch-
+// group window refresh. Mapper bank-switch helpers (Bus::set_vpage,
+// setmirror/setmirrorw/setntamem) set it; the bridge polls it through
+// the PPU bus vtable's refresh_windows callback once every 8 dots and
+// re-copies the window pages whose base pointers moved. Atomic so
+// mapper writes (CPU context) and the poll (PPU tick context) need no
+// extra synchronization; relaxed ordering suffices because both sides
+// run on the emulation thread.
+extern std::atomic<uint8_t> g_ppu_windows_dirty;
 
 } // namespace fceu11
 

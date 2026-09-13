@@ -128,7 +128,12 @@ void Bus::reset_mapping() noexcept {
 // ---------------------------------------------------------------------------
 
 void Bus::set_page(uint32_t idx, uint8_t* ptr) noexcept  { page_[idx]  = ptr; }
-void Bus::set_vpage(uint32_t idx, uint8_t* ptr) noexcept { vpage_[idx] = ptr; }
+void Bus::set_vpage(uint32_t idx, uint8_t* ptr) noexcept {
+    vpage_[idx] = ptr;
+    // v2.1.3 batch 1: the CHR window pages the Rust renderer reads may
+    // have moved — mark the window dirty for the 8-dot poll.
+    g_ppu_windows_dirty.store(1, std::memory_order_relaxed);
+}
 
 // ---------------------------------------------------------------------------
 // Direct memory access (debugger / DMR / DMW). Routes through the
@@ -307,6 +312,7 @@ void Bus::setchr8(uint32_t V) noexcept {
 // ---------------------------------------------------------------------------
 void Bus::setmirror(uint32_t m) noexcept {
     ppu_->notify_line_update();
+    g_ppu_windows_dirty.store(1, std::memory_order_relaxed);
     if (!mirror_hard_) {
         ppu_->set_mirror_mode(m);
     }
@@ -314,11 +320,13 @@ void Bus::setmirror(uint32_t m) noexcept {
 
 void Bus::setmirrorw(uint32_t a, uint32_t b, uint32_t c, uint32_t d) noexcept {
     ppu_->notify_line_update();
+    g_ppu_windows_dirty.store(1, std::memory_order_relaxed);
     ppu_->set_mirror_pages(a, b, c, d);
 }
 
 void Bus::setntamem(uint8_t* p, int ram, uint32_t b) noexcept {
     ppu_->notify_line_update();
+    g_ppu_windows_dirty.store(1, std::memory_order_relaxed);
     ppu_->set_mirror_page(b, p);
     uint8_t mask = ppu_->nt_ram_mask() & ~(1u << b);
     if (ram) mask |= (1u << b);
@@ -415,6 +423,11 @@ void Bus::setup_mirroring(int m, int hard, uint8_t* extra) noexcept {
 // bind to its members).
 // ---------------------------------------------------------------------------
 Bus g_bus;
+
+// v2.1.3 batch 1: CHR/NT window dirty flag (see bus.h). The mapper
+// bank-switch helpers below set it; the bridge's refresh_windows
+// vtable callback polls it every 8 PPU dots.
+std::atomic<uint8_t> g_ppu_windows_dirty{0};
 
 } // namespace fceu11
 

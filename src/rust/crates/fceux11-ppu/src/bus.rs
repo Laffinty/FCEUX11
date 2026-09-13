@@ -60,6 +60,12 @@ pub trait PpuBus {
     /// Called when VBlank asserts/deasserts. `asserted=true` on enter,
     /// `asserted=false` on exit (the pre-render line, sl -1).
     fn notify_vblank(&mut self, _asserted: bool) {}
+
+    /// v2.1.3 batch 1: window-dirty poll. Fired by the per-dot frame
+    /// loops once per fetch group (every 8 dots); the C++ bridge
+    /// re-copies the CHR/NT window pages whose base pointers moved
+    /// since the last poll. Default no-op for test stubs.
+    fn refresh_windows(&mut self) {}
 }
 
 // ---------------------------------------------------------------------------

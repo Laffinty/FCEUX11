@@ -233,6 +233,22 @@ void bridge_push_mirror_mode_if_dirty() {
 }
 
 
+// v2.1.3 batch 1: window-dirty poll, fired from the Rust per-dot loops
+// every 8 dots (one fetch group) through the bus vtable's
+// refresh_windows callback. Mapper bank switches set
+// fceu11::g_ppu_windows_dirty (Bus::set_vpage / setmirror / setmirrorw /
+// setntamem); on poll, re-copy the CHR/NT window pages whose base
+// pointers moved. Content-only: no fceux11_ppu_* FFI from inside a
+// scheduler-callback context (StateBox borrow is held — same hazard
+// bridge_refresh_window_contents_if_dirty documents); the mirror-mode
+// byte re-push stays at the frame boundary
+// (bridge_push_mirror_mode_if_dirty).
+void bridge_poll_windows_dirty() {
+    if (fceu11::g_ppu_windows_dirty.exchange(0, std::memory_order_relaxed) != 0) {
+        bridge_refresh_window_contents_if_dirty();
+    }
+}
+
 // ---------------------------------------------------------------------------
 // C++ thunks for the bus callback vtable. Forward to existing g_bus
 // tables, matching the legacy FFCEUX_PPURead / FFCEUX_PPUWrite hooks.
@@ -281,12 +297,20 @@ uint8_t bridge_cpu_read(uint32_t addr) {
 }
 
 void bridge_notify_a12_rising() {
-    // v2.1.2: A12-level rising-edge detection is NOT wired yet. The Rust
-    // PPU clocks the MMC3-family IRQ counter through the gated HBlank hook
-    // instead (bridge_notify_hblank -> GameHBIRQHook), which mirrors
-    // the deleted C++ reference (src/ppu_rendering.cpp, sprite slot s == 2,
-    // gated on PPUON and on the pattern-table choice). A real A12 watcher
-    // with the low-level filter is planned as v2.1.2 batch 2.
+    // v2.1.3 batch 1: the Rust PPU's filtered A12 watcher (fetch-address
+    // model during rendering, CPU-driven `v` pushes otherwise — see
+    // src/rust/crates/fceux11-ppu/src/a12.rs) emits REAL rising edges
+    // through this hook. MMC3-family counters (MMC3/MMC6/clones, and the
+    // other A12-clocked scanline counters wired to GameHBIRQHook) clock
+    // here, once per filtered edge — typically 1-3 per scanline, no
+    // per-fetch FFI. This replaces the v2.1.2 per-scanline approximation
+    // (bridge_notify_hblank at dot 256, no longer fired by the Rust
+    // scheduler; routing both would double-clock the counter) and the
+    // rendering-on gate that came with it (rendering off → no fetches,
+    // only CPU-driven edges — which blargg MMC3 tests 1/3 require).
+    if (GameHBIRQHook) {
+        GameHBIRQHook();
+    }
 }
 
 void bridge_notify_hblank() {
@@ -372,6 +396,7 @@ void ppu_rust_bridge_init() {
         &bridge_notify_hblank2,
         &bridge_notify_scanline,
         &bridge_notify_vblank,
+        &bridge_poll_windows_dirty,
     };
     fceux11_ppu_install_bus_callbacks(g_ppu_state, &cb);
 

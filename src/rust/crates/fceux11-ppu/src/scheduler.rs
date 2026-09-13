@@ -29,13 +29,17 @@
 //! The scheduler fires the [`PpuBus`] trait's `notify_*` callbacks at
 //! the natural PPU-side boundaries:
 //!
-//! - `notify_hblank` fires when the PPU enters a visible scanline's
-//!   hblank region (dot 256).
 //! - `notify_hblank2` fires when entering the post-render hblank
-//!   (sl 240+).
+//!   (sl 240+, dot 320).
 //! - `notify_scanline(sl)` fires on every scanline boundary change.
-//! - `notify_a12_rising` fires when the PPU increments coarse X /
-//!   reads from `$1000-$1FFF` CHR (MMC3 IRQ counter hook).
+//! - `notify_a12_rising` fires on **filtered** PPU A12 rising edges
+//!   (v2.1.3 batch 1): the fetch-address model in [`crate::a12`]
+//!   presents every fetch address to the watcher inside
+//!   [`crate::frame::tick_dot`], and the CPU access path reports the
+//!   `v`-driven transitions while rendering is off. This replaces the
+//!   v2.1.2 per-scanline approximation (which fired `notify_hblank`
+//!   once per visible scanline at dot 256) — `notify_hblank` is no
+//!   longer fired by this scheduler.
 //! - `notify_vblank(asserted)` fires on VBL flag transitions.
 
 use crate::bus::PpuBus;
@@ -164,16 +168,13 @@ impl NesScheduler {
             self.last_scanline = state.scanline;
         }
 
-        // HBlank / HBlank2 hooks fire at the natural dot boundaries:
-        // - notify_hblank: visible scanline enters hblank at dot 256
-        //   (BG fetch region ends).
+        // HBlank hooks fire at the natural dot boundaries:
         // - notify_hblank2: scanline enters the very-end hblank
-        //   (dot 320+) — VRC6 IRQ hook.
-        if (0..=239).contains(&state.scanline) && state.dot == 256 {
-            if state.rendering_enabled() && (state.registers.ctrl & 0x18) != 0x18 {
-                bus.notify_hblank();
-            }
-        }
+        //   (dot 320+) — VRC IRQ hook.
+        // (v2.1.3 batch 1: notify_hblank at dot 256 was the v2.1.2
+        // per-scanline MMC3 IRQ approximation; the filtered A12 path in
+        // `crate::frame::tick_dot` supersedes it, so it no longer
+        // fires — routing both would double-clock MMC3 counters.)
         if state.dot == 320 && state.scanline >= 0 {
             bus.notify_hblank2();
         }
@@ -192,15 +193,9 @@ impl NesScheduler {
             bus.notify_vblank(vbl_now);
         }
 
-        // A12 rising edge hook. The PPU increments coarse X at dot
-        // 256 of visible scanlines (`crate::frame::tick_dot` does
-        // this internally); we fire notify_a12_rising when that
-        // happens. This is the MMC3 IRQ counter observation point.
-        if (0..=239).contains(&state.scanline) && state.dot == 256 {
-            if state.rendering_enabled() {
-                bus.notify_a12_rising();
-            }
-        }
+        // (v2.1.3 batch 1: the dot-256 notify_a12_rising firing — an
+        // unfiltered once-per-scanline approximation — is gone; real
+        // filtered edges now come from the fetch-address watcher.)
 
         outcome
     }
@@ -356,40 +351,42 @@ mod tests {
         assert!(sched.vbl_asserted, "vbl_asserted must be true after sl 241 dot 1");
     }
 
-    /// Rendering on + visible scanline → dot 256 fires hblank and A12.
+    /// Rendering on + visible scanline: the scheduler itself must NOT
+    /// fire any hook at dot 256 anymore. v2.1.3 batch 1 replaced the
+    /// v2.1.2 per-scanline MMC3 approximation (notify_hblank +
+    /// notify_a12_rising at dot 256) with the filtered fetch-address
+    /// watcher inside `tick_dot`; routing both would double-clock MMC3
+    /// counters. (Kept as a behaviour record of the retirement.)
     #[test]
-    fn hblank_and_a12_fire_at_dot_256_visible() {
+    fn scheduler_no_longer_fires_hblank_at_dot_256() {
         let mut sched = NesScheduler::new();
         let mut ppu = PpuState::new();
         ppu.registers.write_mask(1 << mask_bits::SHOW_BG);
-        let mut bus = FlatBus::new();
+        let mut bus = HookCountBus::new();
 
-        // Phase 6.1.e follow-up (VBL-first layout): cold start is
-        // (sl 241, dot 0). To reach (sl 0, dot 256) we traverse
-        // sl 241..=260 (20 lines) → sl -1 (1 line) → sl 0 dot 256
-        // = 21 full scanlines × 341 dots + 256 = 7417 dots — but
-        // rendering on + odd_frame = false (initial) fires the even
-        // skip at (sl -1, dot 340), advancing twice (skip_one_dot)
-        // and consuming 1 extra tick to land at (sl 0, dot 1).
-        // Subtract 1 from the linear estimate to account for the
-        // skip: 21 * 341 + 256 - 1 = 7416 ticks.
+        // Cold start is (sl 241, dot 0); drive into sl 0 and through
+        // dot 256 of the first visible scanline.
         let target_dots = 21 * DOTS_PER_SCANLINE as u32 + 256 - 1;
         for _ in 0..target_dots {
             let _ = sched.tick_one_ppu_dot(&mut ppu, &mut bus);
         }
         assert_eq!(ppu.scanline, 0);
         assert_eq!(ppu.dot, 256);
-        // We ticked to dot 256; the next tick would advance to 257.
-        // The hblank + A12 hook fires when dot transitions to 256
-        // (i.e. on the dot==256 tick). Verify last_scanline is 0 and
-        // ppu_dots_consumed matches.
-        assert_eq!(sched.ppu_dots_consumed, target_dots);
+        assert_eq!(bus.hblank, 0, "dot-256 notify_hblank is retired");
+        assert_eq!(bus.a12, 0, "dot-256 notify_a12_rising is retired");
     }
 
-    /// v2.1.2: the mapper IRQ clock must not advance while rendering is off,
-    /// and must fire exactly once per visible scanline when it is on.
+    /// v2.1.3 batch 1: the MMC3-family IRQ clock is the FILTERED A12
+    /// rising edge. With rendering off there are no fetches and no
+    /// CPU-driven address changes, so no edges fire; with rendering on
+    /// and the standard CHR configuration ($2000 = $08: BG $0000,
+    /// sprites $1000, empty secondary OAM → dummy $FF fetches from
+    /// $1xxx) exactly one edge lands per fetch line — 241 per frame
+    /// (pre-render + 240 visible), the blargg 2.Details subtest 7
+    /// anchor. (This replaces the v2.1.2
+    /// `mapper_irq_clock_requires_rendering_enabled` hblank test.)
     #[test]
-    fn mapper_irq_clock_requires_rendering_enabled() {
+    fn a12_edges_require_rendering_and_count_241_per_frame() {
         let frame_dots = DOTS_PER_SCANLINE as u32 * 262;
 
         let mut sched = NesScheduler::new();
@@ -399,26 +396,31 @@ mod tests {
         for _ in 0..frame_dots {
             let _ = sched.tick_one_ppu_dot(&mut ppu, &mut bus);
         }
-        assert_eq!(bus.hblank, 0, "rendering off must not clock the mapper IRQ");
+        assert_eq!(bus.a12, 0, "rendering off must not produce A12 edges");
 
         let mut sched = NesScheduler::new();
         let mut ppu = PpuState::new();
-        ppu.registers.write_mask(1 << mask_bits::SHOW_BG);
+        ppu.registers.write_ctrl(0x08); // sprite pattern table $1000
+        ppu.registers.write_mask(0x18); // BG + sprites on
         let mut bus = HookCountBus::new();
-        for _ in 0..frame_dots {
+        for _ in 0..2 * frame_dots {
             let _ = sched.tick_one_ppu_dot(&mut ppu, &mut bus);
         }
-        assert_eq!(bus.hblank, 240, "one mapper IRQ clock per visible scanline");
+        // 241 fetch lines per frame (pre-render + 240 visible) × 2
+        // frames; the even-frame dot skip shortens frame 1 without
+        // removing its pre-render line.
+        assert_eq!(bus.a12, 482, "one filtered A12 edge per fetch line");
     }
 
     struct HookCountBus {
         inner: FlatBus,
         hblank: u32,
+        a12: u32,
     }
 
     impl HookCountBus {
         fn new() -> Self {
-            Self { inner: FlatBus::new(), hblank: 0 }
+            Self { inner: FlatBus::new(), hblank: 0, a12: 0 }
         }
     }
 
@@ -427,6 +429,7 @@ mod tests {
         fn write(&mut self, addr: u16, val: u8) { self.inner.write(addr, val) }
         fn peek_chr(&mut self, addr: u16) -> u8 { self.inner.peek_chr(addr) }
         fn notify_hblank(&mut self) { self.hblank += 1; }
+        fn notify_a12_rising(&mut self) { self.a12 += 1; }
     }
 
     /// OAM DMA pump transfers one byte per CPU cycle (= 3 PPU dots).

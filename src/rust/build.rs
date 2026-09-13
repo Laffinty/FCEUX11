@@ -326,6 +326,7 @@ fn merge_headers(
     output.push_str("typedef void (*fceux11_ppu_notify_hblank2_fn)(void);\n");
     output.push_str("typedef void (*fceux11_ppu_notify_scanline_fn)(int16_t sl);\n");
     output.push_str("typedef void (*fceux11_ppu_notify_vblank_fn)(bool asserted);\n");
+    output.push_str("typedef void (*fceux11_ppu_refresh_windows_fn)(void);\n");
     output.push_str("typedef struct fceux11_ppu_bus_callbacks {\n");
     output.push_str("  fceux11_ppu_bus_read_fn read;\n");
     output.push_str("  fceux11_ppu_bus_write_fn write;\n");
@@ -335,6 +336,7 @@ fn merge_headers(
     output.push_str("  fceux11_ppu_notify_hblank2_fn notify_hblank2;\n");
     output.push_str("  fceux11_ppu_notify_scanline_fn notify_scanline;\n");
     output.push_str("  fceux11_ppu_notify_vblank_fn notify_vblank;\n");
+    output.push_str("  fceux11_ppu_refresh_windows_fn refresh_windows;\n");
     output.push_str("} fceux11_ppu_bus_callbacks;\n\n");
 
     // v2.1 Phase 6.3.a — PPU internal data-bus open-bus FFI. The

@@ -13,6 +13,7 @@
 //!   sl 241 dot 0 and consumed by the frame state machine.
 //! - The odd-frame flag (toggles every pre-render to decide even/odd skip).
 
+use crate::a12::A12Watcher;
 use crate::bus::PpuBus;
 #[allow(unused_imports)] // status_bits used only by #[cfg(test)] modules.
 use crate::registers::{Registers, ctrl_bits, mask_bits, status_bits};
@@ -177,6 +178,7 @@ pub struct PpuState {
     pub sprite_eval_done: bool,
     /// Phase 6.4: C++ `ppudead` mirror (src/ppu.cpp:90). The C++ new
     /// PPU's FIRST frame after process start runs a different layout —
+    /// VBL flag set at frame dot 0, VBL window = the first 20 scanlines,
     /// VBL flag set at frame dot 0, VBL window = the first 20
     /// scanlines, no sl-241 set (ppu_rendering.cpp:1626-1655) — and
     /// blargg ROMs sync to 2 VBLs at init, so missing this frame shifts
@@ -189,6 +191,12 @@ pub struct PpuState {
     /// savestate payload; `read_payload` pins it to 0 (restores are
     /// always past boot).
     pub ppudead: u8,
+    /// v2.1.3 batch 1: filtered A12 watcher + monotonic dot clock
+    /// (`crate::a12`). Transient microstate like `sprite0_hit_dot` —
+    /// not part of the RPU1 payload; a fresh watcher after a savestate
+    /// load only delays the next filtered edge by at most one low-
+    /// period measurement.
+    pub a12: A12Watcher,
 }
 
 impl Default for PpuState {
@@ -244,6 +252,7 @@ impl PpuState {
             sprite0_in_range: false,
             sprite_eval_done: false,
             ppudead: 1,
+            a12: A12Watcher::new(),
         }
     }
 
@@ -281,6 +290,7 @@ impl PpuState {
         self.sprite_x = [0u8; 8];
         self.sprite0_in_range = false;
         self.sprite_eval_done = false;
+        self.a12 = A12Watcher::new();
     }
 
     /// Plan §0.8 step 1D.1: apply the NESdev PPU frame timing
