@@ -190,15 +190,17 @@ uint32_t bridge_derive_mirror_mode() {
 // banks.
 //
 // Re-copies ONLY the pages whose base pointer moved. Runs from
-// `bridge_notify_scanline`, which fires on the Rust scheduler's call
-// stack while the StateBox borrow is held — so this must NOT call
+// `bridge_notify_scanline` and from the bus vtable's `refresh_windows`
+// poll, which fires on the Rust scheduler's call stack while the
+// StateBox borrow is held — so this must NOT call
 // any `fceux11_ppu_*` FFI (re-entry would alias the borrow; the same
 // hazard the Phase 5.1 bridge-recursion fix eliminated). Plain
 // C++-side memory copies suffice: the renderer reads the window
-// backing stores through the power-time pointers, and the notify
-// lands BEFORE the new scanline's dot-0 render, so the next
-// render_scanline sees the new banks at scanline granularity —
-// matching how hblank-timed bank switches are meant to be observed.
+// backing stores through the power-time pointers. Since v2.1.3 batch 2
+// the background pipeline fetches per dot and polls this once per
+// 8-dot fetch group, so a mid-scanline bank switch is visible to the
+// group that follows it (the scanline-boundary call remains as the
+// coarse fallback).
 //
 // NT page moves (mirroring changes) re-copy the page contents here
 // too; the mode byte itself is re-pushed at the next frame boundary
@@ -342,10 +344,10 @@ void bridge_notify_scanline(int16_t sl) {
     // (e.g. MMC3_hb_PALStarWarsHack, savestate CPU views) observe the
     // current line instead of a stale frame-end snapshot.
     fceu11::cpu_instance().set_scanline(sl);
-    // Phase 6.4: scanline-granularity CHR/NT window invalidation.
-    // Fires BEFORE the new scanline's dot-0 render (the scheduler
-    // notifies on the transition tick; render_scanline_if_start runs
-    // at the top of the next dot iteration), so bank switches made
+    // Phase 6.4: CHR/NT window invalidation at the scanline boundary.
+    // Fires BEFORE the new scanline's first dot is rendered (the
+    // scheduler notifies on the transition tick; the per-dot renderer
+    // runs at the top of the next dot iteration), so bank switches made
     // during the previous scanline are visible to it. Content-only:
     // no PPU-crate FFI from inside this callback (StateBox borrow is
     // held; see bridge_refresh_window_contents_if_dirty).

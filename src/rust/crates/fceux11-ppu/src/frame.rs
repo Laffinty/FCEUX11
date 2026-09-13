@@ -2,9 +2,17 @@
 //!
 //! Each call advances the PPU by exactly one PPU dot. The current scanline
 //! and dot are consulted to determine which side effects fire this tick:
-//! VBlank flag set/clear, NMI sampling, scroll increment on visible
-//! scanlines, secondary-OAM reload at scanline start, even/odd skip on
+//! VBlank flag set/clear, NMI sampling, the background fetch cycle's
+//! scroll updates (coarse-X increments at the end of each 8-dot fetch
+//! group, fine-Y increment at dot 256, horizontal reload at dot 257),
+//! sprite evaluation at the start of a visible scanline, even/odd skip on
 //! the pre-render line.
+//!
+//! v2.1.3 batch 2: the fetches themselves, and the pixels they produce,
+//! live in [`crate::rendering::tick_dot`], which the per-dot drivers call
+//! immediately *before* this function for the same dot. The split keeps
+//! the scroll model in the state machine while the data-dependent
+//! pipeline stays with the renderer (which holds the NT/CHR windows).
 //!
 //! All register-level side effects (writes to `$2000`/`$2005`/`$2006`,
 //! reads from `$2002`/`$2004`/`$2007`) live on [`crate::registers::Registers`].
@@ -19,7 +27,6 @@
 //! (`src/ppu_rendering.cpp`) implements, modulo the Phase 1 simplifications
 //! documented at each `match` arm.
 
-use crate::a12;
 use crate::bus::PpuBus;
 #[allow(unused_imports)] // mask_bits / status_bits used only by #[cfg(test)] modules.
 use crate::registers::{ctrl_bits, mask_bits, status_bits};
@@ -97,32 +104,15 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
     // lines, PAL/Dendy 312) - see crate::video_system.
     let timings = state.video_system.timings();
 
-    // v2.1.3 batch 1: advance the A12 watcher's dot clock, then present
-    // the fetch-cycle bus address for this dot to the filtered watcher.
-    // While rendering is enabled on a fetch line (pre-render -1 or
-    // visible 0..=239) the PPU bus carries the hardware fetch addresses
-    // (nesdev PPU rendering cycle table — `crate::a12::fetch_bus_address`);
-    // every filtered rising edge clocks the MMC3-family IRQ counters
-    // through `PpuBus::notify_a12_rising`. With rendering off the bus
-    // carries `v` and the reporting happens from the CPU access path
+    // v2.1.3 batch 2: advance the A12 watcher's dot clock. The fetch
+    // addresses themselves are reported by the background pipeline
+    // (`crate::rendering::tick_dot`), which the per-dot drivers run just
+    // before this function for the same dot and which knows the address
+    // each fetch actually places on the bus. With rendering off there
+    // are no fetches, so the reporting comes from the CPU access path
     // (`ffi.rs` $2006/$2007/$2001 handlers) — blargg MMC3 test 3 counts
-    // those whether or not rendering is on. This replaces the v2.1.2
-    // per-scanline dot-256 approximation (one `notify_hblank` per
-    // visible line), which the scheduler no longer fires.
+    // those whether or not rendering is on.
     state.a12.advance_tick();
-    if state.rendering_enabled() && (sl == -1 || (0..=239).contains(&sl)) {
-        if let Some(addr) = a12::fetch_bus_address(
-            sl,
-            dot,
-            state.registers.ctrl,
-            &state.secondary_oam,
-            state.secondary_oam_count,
-        ) {
-            if state.a12.observe(addr) {
-                _bus.notify_a12_rising();
-            }
-        }
-    }
     // Entering the post-render line (sl 240): fetching stops and the bus
     // drops back to `v` (Mesen2 does the same SetBusAddress at scanline
     // 240 cycle 0). Rendering-off mid-frame transitions are reported by
@@ -188,25 +178,33 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
             8
         };
         state.eval_sprites(sprite_height);
-        // Reset scroll for the start of the visible line: copy t → v (h bits).
-        state.registers.copy_horizontal();
     }
 
-    // Visible scanline scroll increment (NESdev PPU frame timing):
-    // dot 256 = increment Y (fine Y, carry into coarse Y / NT-Y);
-    // dot 257 = copy the HORIZONTAL bits of t into v. The vertical bits
-    // are copied only on the pre-render line (dots 280..=304, see below).
-    // Copying the vertical bits here instead reset the vertical scroll on
-    // every visible scanline, so every line fetched the same tile row and
-    // real games rendered as a flat backdrop plus sprites.
-    if (0..=239).contains(&sl) && state.rendering_enabled() {
-        if dot == 256 {
+    // Background fetch-cycle scroll updates (v2.1.3 batch 2, nesdev PPU
+    // rendering / PPU frame timing):
+    //
+    // - coarse X increments at the last dot of every 8-dot fetch group:
+    //   dots 8, 16, ..., 256 for the visible tile walk and dots 328 /
+    //   336 for the two-tile preload of the next scanline;
+    // - fine Y (with carry into coarse Y / nametable Y) increments at
+    //   dot 256;
+    // - the horizontal bits of t are copied into v at dot 257.
+    //
+    // The pre-render line runs the same cycle — its preload groups feed
+    // the first two tiles of scanline 0 — so it gets the same updates.
+    // `crate::rendering::tick_dot` reads `v` at each fetch; keeping the
+    // scroll updates here leaves the whole loopy model in the dot state
+    // machine instead of the (bridge-side) renderer.
+    //
+    // The dot-0 `copy_horizontal` this replaced was a batch-renderer
+    // artifact: the pipeline's preload groups already leave coarse X at
+    // t.coarseX + 2 for the line's first fetched tile.
+    if (sl == -1 || (0..=239).contains(&sl)) && state.rendering_enabled() {
+        let in_fetch_region = (1..=256).contains(&dot) || (321..=336).contains(&dot);
+        if in_fetch_region && dot % 8 == 0 {
             state.registers.increment_coarse_x();
-            // Phase 4: increment fine_y (and coarse_y / nametable_y
-            // on roll-over) at the end of each visible scanline so
-            // the next render_scanline call uses the next row of
-            // pattern data. Mirrors the C++ new PPU's
-            // `increment_fine_y` at the end of RefreshLine.
+        }
+        if dot == 256 {
             state.registers.increment_fine_y();
         }
         if dot == 257 {
@@ -281,7 +279,6 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
         // bit for the rest of the run — games polling "wait for hit
         // clear, then wait for set" saw stale values.
         state.sprite0_hit = false;
-        state.sprite0_hit_dot = crate::state::NO_SPRITE0_HIT_DOT;
         state.sprite_overflow = false;
         phase_trace!("R3 PPU_VBL_CLEAR sl=-1 dot=1");
     }
@@ -340,24 +337,14 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
         state.registers.copy_vertical();
     }
 
-    // Phase 6.6 (Session A): per-pixel sprite 0 hit timing. The batch
-    // render records the dot (pixel x + 1) at which the first hit
-    // pixel outputs on this scanline; latch the flag when the state
-    // machine reaches it. Until then the mirror block below keeps
-    // PPU[2] bit 6 clear, so a $2002 read mid-scanline only sees the
-    // hit from the correct pixel onward.
-    if (0..=239).contains(&sl)
-        && state.sprite0_hit_dot != crate::state::NO_SPRITE0_HIT_DOT
-        && dot >= state.sprite0_hit_dot
-    {
-        state.sprite0_hit = true;
-        state.sprite0_hit_dot = crate::state::NO_SPRITE0_HIT_DOT;
-    }
+    // v2.1.3 batch 2: sprite-0 hit is latched by
+    // `crate::rendering::tick_dot` at the exact dot the hit pixel is
+    // output; there is no separate recorded hit dot to replay here.
 
-    // Sprite 0 hit + sprite overflow latched by eval: mirror the state
-    // flags onto PPU[2] bits 6/5 every tick. With the pre-render clear
-    // above this stays consistent with hardware: both flags clear once
-    // per frame and re-set only where the pipeline sets them.
+    // Sprite 0 hit + sprite overflow latched by eval/pipeline: mirror the
+    // state flags onto PPU[2] bits 6/5 every tick. With the pre-render
+    // clear above this stays consistent with hardware: both flags clear
+    // once per frame and re-set only where the pipeline sets them.
     if state.sprite0_hit {
         state.registers.set_sprite0_hit();
         out.sprite0_hit_now = true;
@@ -687,24 +674,37 @@ mod tests {
         assert_eq!(s.dot, 0);
     }
 
+    /// v2.1.3 batch 2: the horizontal scroll is reloaded at dot 257 only
+    /// — the batch renderer's extra dot-0 reload would undo the two
+    /// coarse-X increments the preload groups make for the next line.
     #[test]
-    fn scroll_copy_horizontal_at_visible_scanline_start() {
+    fn horizontal_reload_at_dot_257_and_preload_advances_coarse_x() {
         let mut s = PpuState::new();
-        // Set t = some non-zero scroll value, leave v = 0.
-        s.registers.t = 0x1234;
+        s.registers.t = 0x1234; // coarse X = 0x14
         s.registers.write_mask(1 << mask_bits::SHOW_BG);
         // Phase 6.1.e follow-up (VBL-first layout): with ppudead=1 +
         // rendering on + odd_frame=false (cold start), the even skip
         // at (sl -1, dot 340) skips (sl 0, dot 0) on frame 1, so the
-        // first reachable (sl 0, dot 0) tick lands on frame 2 (after
-        // ppudead decrements and odd_frame toggles). Setting
-        // `odd_frame = true` here disables the frame-1 skip so the test
-        // can probe (sl 0, dot 0) directly within frame 1, matching
-        // the pre-Phase-6.1.e behaviour the test was written against.
+        // first reachable (sl 0, dot 0) tick lands on frame 2. Setting
+        // `odd_frame = true` disables the frame-1 skip so the test can
+        // probe (sl 0, dot 0) within frame 1.
         s.odd_frame = true;
         let mut bus = FlatBus::new();
         let _ = tick_to(&mut s, &mut bus, 0, 0);
-        assert_eq!(s.registers.v & 0x041F, 0x1234 & 0x041F);
+        // The pre-render line's dot-257 reload set v's horizontal bits
+        // from t; its two preload groups then incremented coarse X
+        // twice, so the visible line fetches tile 3 at t.coarseX + 2.
+        assert_eq!(
+            s.registers.v & 0x1F,
+            (s.registers.t & 0x1F) + 2,
+            "preload groups advance coarse X past the dot-257 reload"
+        );
+        let _ = tick_to(&mut s, &mut bus, 0, 257);
+        assert_eq!(
+            s.registers.v & 0x041F,
+            s.registers.t & 0x041F,
+            "dot 257 reloads the horizontal scroll bits of t into v"
+        );
     }
 
     #[test]
@@ -795,55 +795,72 @@ mod tests {
     // clears.
     // -----------------------------------------------------------------
 
-    /// Render scanline 0's sprite pass over an opaque BG row and tick
-    /// through the scanline: PPU[2] bit 6 must stay clear until the
-    /// recorded hit dot (pixel x + 1) and set from that dot onward.
+    /// Sprite 0's opaque pixel over an opaque BG pixel latches PPU[2]
+    /// bit 6 exactly at the dot the pixel is output (pixel x → dot
+    /// x + 1); earlier dots of the same scanline must still read clear.
     #[test]
-    fn sprite0_hit_latches_at_recorded_dot() {
-        use crate::rendering::palette_adjust_pixel;
-        use crate::sprites::render_sprites_for_scanline;
+    fn sprite0_hit_latches_at_the_hit_dot() {
+        use crate::rendering::{RenderWindows, tick_dot as render_dot};
+        use crate::registers::mask_bits as mb;
 
         let mut s = PpuState::new();
         s.ppudead = 0;
         s.registers
-            .write_mask((1 << mask_bits::SHOW_BG) | (1 << mask_bits::SHOW_SPRITES));
+            .write_mask((1 << mb::SHOW_BG) | (1 << mb::SHOW_SPRITES));
         // Sprite 0: y=0 (visible on scanline 0), tile 1, x=10, front.
         s.oam[0..4].copy_from_slice(&[0, 0x01, 0x00, 10]);
-        let mut bus = FlatBus::new();
-        bus.chr[0x01 * 16] = 0xFF; // pattern row 0 fully opaque
 
-        let mask = s.registers.mask;
-        let mut palette = [0u8; 32];
-        palette[1] = 0x16;
-        let mut fb = [0u8; 256 * 256];
-        // Pre-fill the BG row with an opaque (non-backdrop) pixel the
-        // BG pass would have written.
-        for x in 0..256 {
-            fb[x] = palette_adjust_pixel(0x25, mask);
+        let mut chr = [0u8; 8192];
+        chr[0x01 * 16] = 0xFF; // sprite pattern row 0 fully opaque
+        for i in 0..16 {
+            chr[i] = 0xFF; // BG tile 0 opaque
         }
-        let chr_window = bus.chr;
-        render_sprites_for_scanline(&mut s, &mut bus, Some(&chr_window), &mut fb, &palette, mask, 0);
-        assert_eq!(s.sprite0_hit_dot, 11, "hit recorded at pixel 10 → dot 11");
-        assert!(!s.sprite0_hit, "flag must NOT latch during the render pass");
+        let nt = [0u8; 4096];
+        let mut palette = [0u8; 32];
+        palette[3] = 0x25; // BG colour 3
+        palette[0x11] = 0x16; // sprite palette 0, colour 1
 
-        // Drive the state machine to the start of scanline 0 and tick
-        // through it: tick i fires the events of dot i.
+        let win = RenderWindows {
+            nt: &nt,
+            chr: &chr,
+            palette: &palette,
+            mirror: 0,
+        };
+        let mut bus = FlatBus::new();
+        let bit6 = 1 << status_bits::SPRITE0_HIT;
+        let mut fb = [0u8; 256 * 256];
+
+        s.registers.v = 0x2000;
+        s.registers.t = 0x2000;
         s.scanline = 0;
         s.dot = 0;
-        let bit6 = 1 << status_bits::SPRITE0_HIT;
-        for dot in 0u16..=12 {
-            let _ = tick_dot(&mut s, &mut bus);
-            if dot < 11 {
+        // Priming pass fills the BG shift registers.
+        for _ in 0..crate::state::DOTS_PER_SCANLINE {
+            render_dot(&mut s, &mut bus, &win, &mut fb);
+            tick_dot(&mut s, &mut bus);
+        }
+        // Resume at dot 0 with the previous line's preload increments.
+        s.registers.v = 0x2000;
+        s.registers.increment_coarse_x();
+        s.registers.increment_coarse_x();
+        s.scanline = 0;
+        s.dot = 0;
+        s.sprite0_hit = false;
+
+        for dot in 0..256u16 {
+            render_dot(&mut s, &mut bus, &win, &mut fb);
+            tick_dot(&mut s, &mut bus);
+            if dot >= 11 {
+                assert_ne!(
+                    s.registers.status & bit6,
+                    0,
+                    "dot {dot}: hit latched at its pixel's dot"
+                );
+            } else {
                 assert_eq!(
                     s.registers.status & bit6,
                     0,
                     "dot {dot}: hit must not be visible yet"
-                );
-            } else {
-                assert_ne!(
-                    s.registers.status & bit6,
-                    0,
-                    "dot {dot}: hit latched at its recorded dot"
                 );
             }
         }

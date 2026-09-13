@@ -1,12 +1,15 @@
-//! Phase 6.2: sprite pixel composition (post-BG pass).
+//! Sprite layer preparation + per-pixel lookup (v2.1.3 batch 2).
 //!
-//! The per-cycle sprite pipeline (secondary-OAM eval at dots 65-256,
+//! The per-dot sprite pipeline (secondary-OAM eval at dots 65-256,
 //! garbled fetch at dots 257-320, per-dot shift registers with x
-//! counters, mid-scanline tile reloads) is deferred to a follow-up
-//! sub-task. For the batch renderer we instead re-scan primary OAM
-//! once per visible scanline, fetch each in-range sprite's pattern
-//! row directly from CHR, and composite the pixels over the BG
-//! output that `rendering::render_scanline` just wrote.
+//! counters, mid-scanline tile reloads) is batch 4 of
+//! `docs/plans/v2.1.3_ppu_accuracy_plan.md`. Until then
+//! [`prepare_line`] re-scans primary OAM once per visible scanline 鈥?//! called from the BG pipeline at dot 0 鈥?and loads the eight-sprite
+//! selection into `PpuState::sprite_shift` / `sprite_attr` /
+//! `sprite_x`. [`pick_pixel`] then resolves one pixel on demand, so the
+//! background pipeline composes background and sprite pixels at the
+//! exact dot it produces them (the batch compositor that wrote whole
+//! scanlines into the framebuffer is gone).
 //!
 //! Implemented behaviors (matching nesdev):
 //! - 8x8 and 8x16 sprites, with the 8x16 tile bit 0 selecting the
@@ -15,37 +18,19 @@
 //!   sets the overflow flag (state.sprite_overflow).
 //! - Priority MUX: attribute bit 5 = 0 renders in front of BG,
 //!   = 1 renders behind (only visible where BG is transparent).
-//! - Sprite 0 hit (Phase 6.6 Session A): the batch pass records the
-//!   FIRST pixel where sprite 0's opaque pixel overlaps an opaque BG
-//!   pixel at x 0..=254 into `state.sprite0_hit_dot` (pixel x outputs
-//!   at dot x+1); the frame state machine (`frame::tick_dot`) latches
-//!   `state.sprite0_hit` when it reaches that dot, giving the flag
-//!   per-pixel timing. The sprite priority bit does NOT gate the hit
-//!   (hardware + C++ `CheckSpriteHit` reference both ignore it).
-//! - BG transparency is judged by backdrop-value equality: the BG
-//!   renderer canonicalizes every color-index-0 pixel to
-//!   `palette[0] & gray_mask` (+ tags), so a framebuffer byte equal
-//!   to that value is exactly a transparent BG pixel. (The previous
-//!   low-4-bits-of-color heuristic misjudged palette colors like
-//!   0x30 (white) as transparent and could mask real hits.)
+//! - Horizontal (attribute bit 6) and vertical (bit 7) flip, including
+//!   the 8x16 subtile exchange for vertical flip (nesdev PPU_OAM).
+//! - Sprite pixels address the sprite palette region (0x10 plus the
+//!   attribute select times 4 plus the 2-bit color).
 //!
-//! Known simplifications vs. cycle-accurate hardware:
+//! Known simplifications vs. cycle-accurate hardware (batch 4):
 //! - No per-dot shift registers: the pattern row is fetched once per
 //!   scanline and indexed per pixel.
-//! - Horizontal (OAM attr bit 6) and vertical (bit 7) flip ARE applied,
-//!   including the 8x16 subtile exchange for vertical flip (PPU_OAM).
-//! - The left-edge 8-pixel clip ($2001 bits 1-2) is not applied, so
-//!   hit checks at x 0..=7 are only correct when clipping is off.
-//! - Sprite pixels read the sprite palette region (0x10 plus attr select
-//!   times 4 plus the 2-bit color); BG pixels read the 0x00 region.
-//! - Opaque BG pixels whose palette entry happens to duplicate the
-//!   backdrop color are misjudged transparent (the framebuffer stores
-//!   palette RAM *values*, not indices — an exact bitmap would need a
-//!   side-channel from `render_scanline`).
+//! - The left-edge 8-pixel clip ($2001 bits 1-2) is not applied.
+//! - OAM de-emphasis / corruption and the OAMADDR quirks are not
+//!   modelled.
 
-use crate::bus::PpuBus;
-use crate::rendering::palette_adjust_pixel;
-use crate::state::{NO_SPRITE0_HIT_DOT, MAX_SPRITES_PER_LINE, PpuState};
+use crate::state::{MAX_SPRITES_PER_LINE, PpuState};
 
 // $2000 (ctrl) bits.
 /// Bit 5 of $2000: sprite size (0 = 8x8, 1 = 8x16).
@@ -53,44 +38,22 @@ const SPRITE_SIZE: u8 = 1 << 5;
 /// Bit 3 of $2000: sprite pattern table base ($0000 or $1000).
 const SPRITE_PATTERN: u8 = 1 << 3;
 // $2001 (mask) bits.
-/// Bit 3 of $2001: show background.
-const SHOW_BG: u8 = 1 << 3;
 /// Bit 4 of $2001: show sprites.
 const SHOW_SPRITES: u8 = 1 << 4;
-/// Bit 0 of $2001: grayscale.
-const GRAYSCALE: u8 = 1 << 0;
-// OAM attribute bits.
-/// Bit 5 of the attribute byte: priority (0 = front, 1 = behind BG).
-const SPRITE_PRIORITY_BIT: u8 = 1 << 5;
 
 /// Maximum CHR address (pattern tables live in $0000-$1FFF).
 const CHR_ADDR_MASK: u16 = 0x1FFF;
 
-/// Phase 6.2 per-scanline batch sprite composition.
+/// Load the eight-sprite selection for one visible scanline.
 ///
-/// Re-scans primary OAM for the current scanline (the secondary-OAM
-/// copy is left to the cycle-accurate path; here we bypass its
-/// start-of-scanline timing entirely), fetches pattern rows, and
-/// composites sprite pixels over the BG pixels already present in
-/// `framebuffer` for row `sl`.
-///
-/// `chr_window` is the 8 KiB CHR snapshot the BG renderer used for
-/// this scanline (or `None` in unit tests, where patterns come from
-/// `bus.peek_chr` instead). `palette` is the 32-byte PALRAM window;
-/// `mask` is the $2001 value.
-pub fn render_sprites_for_scanline<B: PpuBus + ?Sized>(
-    state: &mut PpuState,
-    bus: &mut B,
-    chr_window: Option<&[u8; 8192]>,
-    framebuffer: &mut [u8; 256 * 256],
-    palette: &[u8; 32],
-    mask: u8,
-    sl: i16,
-) {
-    if !((0..=239).contains(&sl)) {
-        return;
-    }
-    if (mask & SHOW_SPRITES) == 0 {
+/// Re-scans primary OAM in order (the secondary-OAM copy and the
+/// dot-by-dot evaluation timing are batch 4), fetches each in-range
+/// sprite's pattern row from `chr`, and stores the result in
+/// [`PpuState::sprite_shift`] / [`PpuState::sprite_attr`] /
+/// [`PpuState::sprite_x`] for [`pick_pixel`]. Also maintains
+/// `sprite0_in_range`, `sprite_overflow` and `secondary_oam_count`.
+pub fn prepare_line(state: &mut PpuState, chr: &[u8; 8192], sl: i16, mask: u8) {
+    if !(0..=239).contains(&sl) || (mask & SHOW_SPRITES) == 0 {
         return;
     }
 
@@ -104,18 +67,13 @@ pub fn render_sprites_for_scanline<B: PpuBus + ?Sized>(
     } else {
         0x0000
     };
-    let bg_show = (mask & SHOW_BG) != 0;
-    let gray_mask: u8 = if mask & GRAYSCALE != 0 { 0x30 } else { 0xFF };
 
-    // Step 1: scan primary OAM for in-range sprites (max 8, OAM order).
-    let mut spr_tile = [0u8; MAX_SPRITES_PER_LINE];
-    let mut spr_attr = [0u8; MAX_SPRITES_PER_LINE];
-    let mut spr_x = [0u8; MAX_SPRITES_PER_LINE];
-    let mut spr_pat_lo = [0u8; MAX_SPRITES_PER_LINE];
-    let mut spr_pat_hi = [0u8; MAX_SPRITES_PER_LINE];
     let mut n_sprites = 0usize;
     let mut sprite_overflow = false;
     let mut sprite0_in_range = false;
+    let mut shift = [[0u8; 2]; MAX_SPRITES_PER_LINE];
+    let mut attrs = [0u8; MAX_SPRITES_PER_LINE];
+    let mut xs = [0u8; MAX_SPRITES_PER_LINE];
 
     for i in 0..64usize {
         let y = state.oam[i * 4];
@@ -147,172 +105,66 @@ pub fn render_sprites_for_scanline<B: PpuBus + ?Sized>(
             } else {
                 sprite_pattern_base + tile as u16 * 16 + row
             };
-            spr_tile[n_sprites] = tile;
-            spr_attr[n_sprites] = attr;
-            spr_x[n_sprites] = x;
-            let a0 = (pat_addr & CHR_ADDR_MASK) as usize;
-            let a1 = ((pat_addr + 8) & CHR_ADDR_MASK) as usize;
-            spr_pat_lo[n_sprites] = match chr_window {
-                Some(w) => w[a0],
-                None => bus.peek_chr(a0 as u16),
-            };
-            spr_pat_hi[n_sprites] = match chr_window {
-                Some(w) => w[a1],
-                None => bus.peek_chr(a1 as u16),
-            };
+            attrs[n_sprites] = attr;
+            xs[n_sprites] = x;
+            shift[n_sprites][0] = chr[(pat_addr & CHR_ADDR_MASK) as usize];
+            shift[n_sprites][1] = chr[((pat_addr + 8) & CHR_ADDR_MASK) as usize];
             if i == 0 {
                 sprite0_in_range = true;
             }
             n_sprites += 1;
         } else if in_range {
+            // 9th+ in-range sprite: overflow (nesdev). Keep scanning so
+            // OAM order is preserved for the eight that were kept.
             sprite_overflow = true;
-            // 9th+ in-range sprite: overflow per nesdev. The status
-            // bit is set elsewhere (rendering.rs mirror); here we
-            // just record the flag for future status updates.
-            // Don't break — keep scanning to maintain OAM order in
-            // case future code wants sprite count beyond 8.
         }
     }
 
-    // Persist for the snapshot / frame state machine.
     state.sprite_overflow = sprite_overflow;
     state.sprite0_in_range = sprite0_in_range;
-
-    // Pre-fill the per-sprite shift register / attribute / x arrays.
-    // The Phase 6.2 batch renderer doesn't actually use these (we
-    // re-fetch pattern bytes inline below), but `state.sprite_shift`
-    // is read by `fceux11_ppu_get_*` debug accessors and must stay
-    // self-consistent for the savestate round-trip.
-    for i in 0..MAX_SPRITES_PER_LINE {
-        state.sprite_shift[i][0] = if i < n_sprites { spr_pat_lo[i] } else { 0 };
-        state.sprite_shift[i][1] = if i < n_sprites { spr_pat_hi[i] } else { 0 };
-        state.sprite_attr[i] = if i < n_sprites { spr_attr[i] } else { 0 };
-        state.sprite_x[i] = if i < n_sprites { spr_x[i] } else { 0 };
-    }
+    state.sprite_shift = shift;
+    state.sprite_attr = attrs;
+    state.sprite_x = xs;
     state.secondary_oam_count = n_sprites as u8;
+}
 
-    let row_off = (sl as usize) * 256;
-    // Backdrop value: every BG color-index-0 pixel the BG renderer
-    // wrote this scanline is byte-equal to this (same masking + tags),
-    // so byte equality is the exact transparency test for the pixels
-    // `render_scanline` produced. See the module docs for the one
-    // known false-negative (opaque pixel duplicating the backdrop
-    // color).
-    let backdrop_out = palette_adjust_pixel(palette[0] & gray_mask, mask);
-    // First pixel where sprite 0's opaque pixel overlaps an opaque BG
-    // pixel (x 0..=254, priority-independent). The frame state machine
-    // latches `sprite0_hit` at dot `x + 1`.
-    let mut sprite0_hit_x: Option<u16> = None;
-
-    // Step 2 + 3 + 4: per-pixel sprite lookup + priority MUX + sprite0 hit.
-    for x in 0..256u16 {
-        let x_usize = x as usize;
-
-        // Pick the highest-priority sprite visible at this pixel.
-        // (i = 0 is highest priority per OAM ordering.)
-        let mut chosen: Option<(usize, u8)> = None; // (sprite idx, color_2bit)
-        for i in 0..n_sprites {
-            let sprite_x_pos = spr_x[i] as u16;
-            if x < sprite_x_pos {
-                continue;
-            }
-            // Sprite covers 8 pixels starting at sprite_x_pos. Pixels
-            // past sprite_x_pos + 8 belong to the NEXT tile of the
-            // same sprite (in the cycle-accurate engine); for the
-            // Phase 6.2 batch model we simply say "this sprite has
-            // already finished its first tile" and skip it. The next
-            // tile would be loaded with the pattern bytes for the
-            // following 8 rows; the Phase 6.2 batch simplifies to "one
-            // tile per scanline" (fine_y is the only row dimension).
-            if x - sprite_x_pos >= 8 {
-                continue;
-            }
-            // Bit position within the 8-bit pattern. OAM attribute bit 6 =
-            // horizontal flip: the leftmost pixel then comes from pattern bit
-            // 0 (nesdev PPU_OAM).
-            let bit = if spr_attr[i] & 0x40 != 0 {
-                x - sprite_x_pos
-            } else {
-                7u16 - (x - sprite_x_pos)
-            };
-            let pat0 = (spr_pat_lo[i] >> bit) & 1;
-            let pat1 = (spr_pat_hi[i] >> bit) & 1;
-            let color_2bit = pat0 | (pat1 << 1);
-            if color_2bit == 0 {
-                // Transparent sprite pixel — try the next sprite.
-                continue;
-            }
-            chosen = Some((i, color_2bit));
-            break;
+/// Highest-priority opaque sprite pixel at framebuffer column `x`.
+///
+/// Returns `(sprite index, 2-bit pattern colour)` for the first sprite in
+/// OAM order that is opaque at `x`; `None` when every selected sprite is
+/// transparent there. Index 0 is OAM sprite 0, which is what the
+/// sprite-0 hit test keys on.
+#[inline]
+pub fn pick_pixel(state: &PpuState, x: u16) -> Option<(usize, u8)> {
+    let n = (state.secondary_oam_count as usize).min(MAX_SPRITES_PER_LINE);
+    for i in 0..n {
+        let sprite_x_pos = state.sprite_x[i] as u16;
+        if x < sprite_x_pos || x - sprite_x_pos >= 8 {
+            continue;
         }
-
-        let bg_out = framebuffer[row_off + x_usize];
-        // BG transparency: the BG renderer canonicalizes color-index-0
-        // pixels to the backdrop value, so byte equality with it is
-        // the transparency test (see module docs).
-        let bg_is_transparent = !bg_show || bg_out == backdrop_out;
-
-        let new_pixel = match chosen {
-            None => bg_out,
-            Some((i, color_2bit)) => {
-                let attr = spr_attr[i];
-                let attr_quadrant = attr & 0x3;
-                let priority_behind_bg = (attr & SPRITE_PRIORITY_BIT) != 0;
-                let sprite_color_4bit = color_2bit | (attr_quadrant << 2);
-                let sprite_wins = !priority_behind_bg || bg_is_transparent;
-                if sprite_wins {
-                    // Sprites address palettes 3F10-3F1F: the 5-bit palette-RAM
-                    // index is 0x10 plus (attr select times 4) plus the 2-bit
-                    // pattern color (nesdev PPU_palettes). Reading palette[0..15]
-                    // here handed sprites the background palettes.
-                    let pal_idx = palette[0x10 + sprite_color_4bit as usize] & gray_mask;
-                    palette_adjust_pixel(pal_idx, mask)
-                } else {
-                    bg_out
-                }
-            }
+        // OAM attribute bit 6 = horizontal flip: the leftmost pixel then
+        // comes from pattern bit 0 (nesdev PPU_OAM).
+        let bit = if state.sprite_attr[i] & 0x40 != 0 {
+            x - sprite_x_pos
+        } else {
+            7 - (x - sprite_x_pos)
         };
-
-        if new_pixel != bg_out {
-            framebuffer[row_off + x_usize] = new_pixel;
-        }
-
-        // Sprite 0 hit: sprite 0's opaque pixel over an opaque BG
-        // pixel, x in 0..=254 (hardware skips x=255; the left-edge
-        // clip is not modelled). The sprite priority bit does NOT
-        // gate the hit — chosen index 0 (first opaque sprite in OAM
-        // order) already means sprite 0's own pixel is opaque.
-        if sprite0_hit_x.is_none()
-            && sprite0_in_range
-            && matches!(chosen, Some((0, _)))
-            && x <= 254
-            && !bg_is_transparent
-        {
-            sprite0_hit_x = Some(x);
+        let pat0 = (state.sprite_shift[i][0] >> bit) & 1;
+        let pat1 = (state.sprite_shift[i][1] >> bit) & 1;
+        let color_2bit = pat0 | (pat1 << 1);
+        if color_2bit != 0 {
+            return Some((i, color_2bit));
         }
     }
-
-    // Persist the hit dot for the frame state machine (pixel x
-    // outputs at dot x+1). Cleared per scanline: a scanline without a
-    // hit invalidates any dot recorded for earlier scanlines.
-    state.sprite0_hit_dot = match sprite0_hit_x {
-        Some(hx) => hx.saturating_add(1).min(255),
-        None => NO_SPRITE0_HIT_DOT,
-    };
-
-    // `spr_tile` is only used for pattern addressing above; keep the
-    // binding alive for future mid-scanline reload work.
-    let _ = spr_tile;
+    None
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bus::FlatBus;
     use crate::state::PpuState;
 
     const SHOW_SPRITES_ONLY: u8 = SHOW_SPRITES;
-    const SHOW_BG_AND_SPRITES: u8 = SHOW_BG | SHOW_SPRITES;
 
     fn set_sprite(oam: &mut [u8; 256], idx: usize, y: u8, tile: u8, attr: u8, x: u8) {
         oam[idx * 4] = y;
@@ -321,250 +173,50 @@ mod tests {
         oam[idx * 4 + 3] = x;
     }
 
-    /// Render one scanline into a fresh framebuffer and return row `sl`.
-    fn render_row(
+    /// Prepare scanline `sl` and return the composed sprite layer as
+    /// `(sprite index, 2-bit colour)` per framebuffer column.
+    fn pick_row(
         state: &mut PpuState,
-        bus: &mut FlatBus,
-        palette: &[u8; 32],
+        chr: &[u8; 8192],
         mask: u8,
         sl: i16,
-    ) -> [u8; 256] {
-        let mut fb = [0u8; 256 * 256];
-        let chr_window = bus.chr;
-        render_sprites_for_scanline(state, bus, Some(&chr_window), &mut fb, palette, mask, sl);
-        let row_off = (sl as usize) * 256;
-        let mut row = [0u8; 256];
-        row.copy_from_slice(&fb[row_off..row_off + 256]);
-        row
-    }
-
-    /// Same as [`render_row`] but with a pre-filled BG row (the caller
-    /// supplies the pixel value the BG pass would have written).
-    fn render_row_over_bg(
-        state: &mut PpuState,
-        bus: &mut FlatBus,
-        palette: &[u8; 32],
-        mask: u8,
-        sl: i16,
-        bg_pixel: u8,
-    ) -> [u8; 256] {
-        let mut fb = [0u8; 256 * 256];
-        let row_off = (sl as usize) * 256;
-        for x in 0..256 {
-            fb[row_off + x] = bg_pixel;
-        }
-        let chr_window = bus.chr;
-        render_sprites_for_scanline(state, bus, Some(&chr_window), &mut fb, palette, mask, sl);
-        let mut row = [0u8; 256];
-        row.copy_from_slice(&fb[row_off..row_off + 256]);
-        row
+    ) -> [Option<(usize, u8)>; 256] {
+        prepare_line(state, chr, sl, mask);
+        std::array::from_fn(|x| pick_pixel(state, x as u16))
     }
 
     #[test]
-    fn single_sprite_in_front_renders() {
+    fn prepare_line_selects_in_range_sprites_in_oam_order() {
         let mut state = PpuState::new();
         state.registers.write_mask(SHOW_SPRITES_ONLY);
-        set_sprite(&mut state.oam, 0, 0, 0x01, 0x00, 10);
+        set_sprite(&mut state.oam, 0, 45, 0x01, 0x00, 10);
+        set_sprite(&mut state.oam, 1, 48, 0x02, 0x01, 20);
+        set_sprite(&mut state.oam, 2, 50, 0x03, 0x02, 30);
+        set_sprite(&mut state.oam, 3, 80, 0x04, 0x03, 40); // out of range
 
-        let mut bus = FlatBus::new();
-        // Tile $01 row 0, all bits set → the whole 8-pixel row is opaque.
-        bus.chr[0x01 * 16] = 0xFF;
-
-        let mut palette = [0u8; 32];
-        palette[0x11] = 0x16;
-
-        let row = render_row(&mut state, &mut bus, &palette, SHOW_SPRITES_ONLY, 0);
-        let expected = palette_adjust_pixel(0x16, SHOW_SPRITES_ONLY);
-        // Sprite x=10 covers x 10..17 (bit 7 at x=10 … bit 0 at x=17).
-        assert_eq!(row[10], expected, "sprite 0 first column (bit 7)");
-        assert_eq!(row[17], expected, "sprite 0 last column (bit 0)");
-        assert_eq!(row[9], 0, "pixel before sprite stays BG");
-        assert_eq!(row[18], 0, "pixel after sprite stays BG");
+        let chr = [0u8; 8192];
+        prepare_line(&mut state, &chr, 50, SHOW_SPRITES_ONLY);
+        assert_eq!(state.secondary_oam_count, 3);
+        assert_eq!(state.sprite_x[0], 10);
+        assert_eq!(state.sprite_x[1], 20);
+        assert_eq!(state.sprite_x[2], 30);
+        assert!(state.sprite0_in_range, "OAM sprite 0 is in range");
+        assert!(!state.sprite_overflow);
     }
 
     #[test]
-    fn sprite_behind_renders_when_bg_transparent() {
-        let mut state = PpuState::new();
-        state.registers.write_mask(SHOW_BG_AND_SPRITES);
-        set_sprite(&mut state.oam, 0, 0, 0x01, 0x20, 10); // attr bit 5: behind BG
-
-        let mut bus = FlatBus::new();
-        bus.chr[0x01 * 16] = 0xFF;
-
-        let mut palette = [0u8; 32];
-        palette[0x11] = 0x16;
-        // Backdrop entry 0 → the BG pass writes the "transparent"
-        // backdrop pixel (low 6 bits all zero).
-        palette[0] = 0x00;
-        let bg_pixel = palette_adjust_pixel(0x00, SHOW_BG_AND_SPRITES);
-
-        let row = render_row_over_bg(
-            &mut state,
-            &mut bus,
-            &palette,
-            SHOW_BG_AND_SPRITES,
-            0,
-            bg_pixel,
-        );
-        let expected = palette_adjust_pixel(0x16, SHOW_BG_AND_SPRITES);
-        assert_eq!(
-            row[10], expected,
-            "behind-sprite visible where BG is backdrop"
-        );
-    }
-
-    #[test]
-    fn sprite_priority_bit_routes_to_bg() {
-        let mut state = PpuState::new();
-        state.registers.write_mask(SHOW_BG_AND_SPRITES);
-        set_sprite(&mut state.oam, 0, 0, 0x01, 0x20, 10); // behind BG
-
-        let mut bus = FlatBus::new();
-        bus.chr[0x01 * 16] = 0xFF;
-
-        let mut palette = [0u8; 32];
-        palette[0x11] = 0x16;
-        // Opaque BG pixel: a non-backdrop palette entry (low bits set).
-        palette[5] = 0x25;
-        let bg_pixel = palette_adjust_pixel(0x25, SHOW_BG_AND_SPRITES);
-
-        let row = render_row_over_bg(
-            &mut state,
-            &mut bus,
-            &palette,
-            SHOW_BG_AND_SPRITES,
-            0,
-            bg_pixel,
-        );
-        // BG opaque + sprite behind → BG pixel stays.
-        assert_eq!(row[10], bg_pixel, "opaque BG hides behind-priority sprite");
-        assert_eq!(
-            row[17], bg_pixel,
-            "opaque BG hides behind-priority sprite (bit 0)"
-        );
-    }
-
-    #[test]
-    fn sprite_zero_hit_records_dot_regardless_of_priority() {
-        let mut palette = [0u8; 32];
-        palette[0x11] = 0x16;
-        palette[5] = 0x25;
-        let opaque_bg = palette_adjust_pixel(0x25, SHOW_BG_AND_SPRITES);
-        let backdrop_bg = palette_adjust_pixel(0x00, SHOW_BG_AND_SPRITES);
-
-        // Front sprite 0 + opaque BG → hit recorded at the first
-        // overlap pixel (x=10 → dot 11).
-        let mut state = PpuState::new();
-        state.registers.write_mask(SHOW_BG_AND_SPRITES);
-        set_sprite(&mut state.oam, 0, 0, 0x01, 0x00, 10);
-        let mut bus = FlatBus::new();
-        bus.chr[0x01 * 16] = 0xFF;
-        let _ = render_row_over_bg(
-            &mut state,
-            &mut bus,
-            &palette,
-            SHOW_BG_AND_SPRITES,
-            0,
-            opaque_bg,
-        );
-        assert_eq!(
-            state.sprite0_hit_dot, 11,
-            "front sprite 0 over opaque BG records dot x+1"
-        );
-
-        // Behind-priority sprite 0 + opaque BG → STILL hits: the
-        // priority bit does not gate sprite 0 hit (hardware + C++
-        // CheckSpriteHit reference).
-        let mut state = PpuState::new();
-        state.registers.write_mask(SHOW_BG_AND_SPRITES);
-        set_sprite(&mut state.oam, 0, 0, 0x01, 0x20, 10);
-        let mut bus = FlatBus::new();
-        bus.chr[0x01 * 16] = 0xFF;
-        let _ = render_row_over_bg(
-            &mut state,
-            &mut bus,
-            &palette,
-            SHOW_BG_AND_SPRITES,
-            0,
-            opaque_bg,
-        );
-        assert_eq!(
-            state.sprite0_hit_dot, 11,
-            "behind-priority sprite 0 still hits"
-        );
-
-        // Front sprite 0 + backdrop BG → no hit.
-        let mut state = PpuState::new();
-        state.registers.write_mask(SHOW_BG_AND_SPRITES);
-        set_sprite(&mut state.oam, 0, 0, 0x01, 0x00, 10);
-        let mut bus = FlatBus::new();
-        bus.chr[0x01 * 16] = 0xFF;
-        let _ = render_row_over_bg(
-            &mut state,
-            &mut bus,
-            &palette,
-            SHOW_BG_AND_SPRITES,
-            0,
-            backdrop_bg,
-        );
-        assert_eq!(
-            state.sprite0_hit_dot,
-            NO_SPRITE0_HIT_DOT,
-            "sprite 0 over transparent BG does not hit"
-        );
-
-        // Opaque BG whose palette entry duplicates the backdrop COLOR
-        // (0x30 white here): the backdrop-equality heuristic judges it
-        // transparent — documented limitation, asserted here to pin
-        // the behaviour.
-        palette[0] = 0x30;
-        let white_bg = palette_adjust_pixel(0x30, SHOW_BG_AND_SPRITES);
-        let mut state = PpuState::new();
-        state.registers.write_mask(SHOW_BG_AND_SPRITES);
-        set_sprite(&mut state.oam, 0, 0, 0x01, 0x00, 10);
-        let mut bus = FlatBus::new();
-        bus.chr[0x01 * 16] = 0xFF;
-        let _ = render_row_over_bg(
-            &mut state,
-            &mut bus,
-            &palette,
-            SHOW_BG_AND_SPRITES,
-            0,
-            white_bg,
-        );
-        assert_eq!(
-            state.sprite0_hit_dot,
-            NO_SPRITE0_HIT_DOT,
-            "BG pixel whose color equals the backdrop color is treated transparent"
-        );
-    }
-
-    #[test]
-    fn eight_sprite_limit_observed() {
+    fn eight_sprite_limit_observed_and_overflow_flagged() {
         let mut state = PpuState::new();
         state.registers.write_mask(SHOW_SPRITES_ONLY);
-        // 10 sprites in a row at x = 10 + 8*i so each occupies a
-        // distinct pixel range; sprites 8 and 9 exceed the 8-sprite
-        // per-line limit and must be dropped.
         for i in 0..10usize {
             set_sprite(&mut state.oam, i, 0, 0x01, 0x00, (10 + 8 * i) as u8);
         }
-
-        let mut bus = FlatBus::new();
-        bus.chr[0x01 * 16] = 0xFF;
-
-        let mut palette = [0u8; 32];
-        palette[0x11] = 0x16;
-        let expected = palette_adjust_pixel(0x16, SHOW_SPRITES_ONLY);
-
-        let row = render_row(&mut state, &mut bus, &palette, SHOW_SPRITES_ONLY, 0);
-        assert_eq!(row[10], expected, "sprite 0 rendered");
-        assert_eq!(row[66], expected, "sprite 7 rendered");
-        assert_eq!(row[73], expected, "sprite 7 last column rendered");
-        assert_eq!(row[74], 0, "sprite 8 dropped by 8-sprite limit");
-        assert_eq!(row[82], 0, "sprite 9 dropped by 8-sprite limit");
-        assert!(state.sprite_overflow, "9th+ in-range sprite sets overflow");
+        let chr = [0u8; 8192];
+        prepare_line(&mut state, &chr, 0, SHOW_SPRITES_ONLY);
         assert_eq!(state.secondary_oam_count, 8);
+        assert!(state.sprite_overflow, "9th+ in-range sprite sets overflow");
+        // Sprite 8 exists but is not part of the selection.
+        assert_eq!(state.sprite_x[7], 66);
     }
 
     #[test]
@@ -572,79 +224,69 @@ mod tests {
         let mut state = PpuState::new();
         state.registers.write_mask(SHOW_SPRITES_ONLY);
         set_sprite(&mut state.oam, 0, 10, 0x01, 0x00, 0);
-
-        let mut bus = FlatBus::new();
-        bus.chr[0x01 * 16] = 0xFF;
-
-        let mut palette = [0u8; 32];
-        palette[0x11] = 0x16;
-        let expected = palette_adjust_pixel(0x16, SHOW_SPRITES_ONLY);
-
-        // Sprite Y=10 covers scanlines 10..17.
-        let row = render_row(&mut state, &mut bus, &palette, SHOW_SPRITES_ONLY, 10);
-        assert_eq!(row[0], expected, "sprite Y=10 visible at sl=10");
-        assert_eq!(row[7], expected, "sprite Y=10 last column at sl=10");
-
-        let row = render_row(&mut state, &mut bus, &palette, SHOW_SPRITES_ONLY, 0);
-        assert_eq!(row[0], 0, "sprite Y=10 not visible at sl=0");
-
-        let row = render_row(&mut state, &mut bus, &palette, SHOW_SPRITES_ONLY, 18);
-        assert_eq!(row[0], 0, "sprite Y=10 not visible at sl=18 (past Y+8)");
-    }
-
-    #[test]
-    fn eight_by_sixteen_sprites_select_pattern_table_via_tile_bit0() {
-        let mut state = PpuState::new();
-        state.registers.write_mask(SHOW_SPRITES_ONLY);
-        state.registers.ctrl |= SPRITE_SIZE; // 8x16 sprites
-        set_sprite(&mut state.oam, 0, 0, 0x01, 0x00, 10); // tile bit 0 = 1 → $1000
-
-        let mut bus = FlatBus::new();
-        // 8x16 tile $01: bit 0 = 1 → pattern table $1000, tile pair
-        // index (0x01 & 0xFE) = 0. Row 0 (fine_y = 0) plane 0 is at
-        // $1000, plane 1 at $1008.
-        bus.chr[0x1000] = 0xFF;
-
-        let mut palette = [0u8; 32];
-        palette[0x11] = 0x16;
-        let expected = palette_adjust_pixel(0x16, SHOW_SPRITES_ONLY);
-
-        let row = render_row(&mut state, &mut bus, &palette, SHOW_SPRITES_ONLY, 0);
-        assert_eq!(row[10], expected, "8x16 tile $01 fetches from $1000");
+        let chr = [0u8; 8192];
+        prepare_line(&mut state, &chr, 17, SHOW_SPRITES_ONLY);
+        assert_eq!(state.secondary_oam_count, 1, "sl 17 is inside Y=10..17");
+        prepare_line(&mut state, &chr, 18, SHOW_SPRITES_ONLY);
+        assert_eq!(state.secondary_oam_count, 0, "sl 18 is past Y+8");
+        prepare_line(&mut state, &chr, 9, SHOW_SPRITES_ONLY);
+        assert_eq!(state.secondary_oam_count, 0, "sl 9 precedes Y=10");
     }
 
     #[test]
     fn sprite_hidden_when_show_sprites_cleared() {
+        const SHOW_BG: u8 = 1 << 3;
         let mut state = PpuState::new();
         state.registers.write_mask(SHOW_BG); // sprites off
         set_sprite(&mut state.oam, 0, 0, 0x01, 0x00, 10);
-
-        let mut bus = FlatBus::new();
-        bus.chr[0x01 * 16] = 0xFF;
-
-        let mut palette = [0u8; 32];
-        palette[0x11] = 0x16;
-
-        let row = render_row(&mut state, &mut bus, &palette, SHOW_BG, 0);
-        assert!(
-            row.iter().all(|&p| p == 0),
-            "no sprite pixels when SHOW_SPRITES is cleared"
+        let mut chr = [0u8; 8192];
+        chr[0x01 * 16] = 0xFF;
+        prepare_line(&mut state, &chr, 0, SHOW_BG);
+        assert_eq!(
+            state.secondary_oam_count, 0,
+            "no sprite selection while SHOW_SPRITES is clear"
         );
     }
 
     #[test]
-    fn sprite_uses_sprite_palette_region() {
+    fn pick_pixel_returns_none_for_transparent_pattern() {
         let mut state = PpuState::new();
         state.registers.write_mask(SHOW_SPRITES_ONLY);
         set_sprite(&mut state.oam, 0, 0, 0x01, 0x00, 10);
-        let mut bus = FlatBus::new();
-        bus.chr[0x01 * 16] = 0xFF;
-        let mut palette = [0u8; 32];
-        palette[0x11] = 0x16;
-        palette[0x01] = 0x11;
-        let row = render_row(&mut state, &mut bus, &palette, SHOW_SPRITES_ONLY, 0);
-        let expected = palette_adjust_pixel(0x16, SHOW_SPRITES_ONLY);
-        assert_eq!(row[10], expected, "sprite pixel must use the 3F10 sprite palette");
+        let chr = [0u8; 8192]; // both planes zero 鈫?fully transparent
+        let picks = pick_row(&mut state, &chr, SHOW_SPRITES_ONLY, 0);
+        assert!(picks.iter().all(|p| p.is_none()));
+    }
+
+    #[test]
+    fn sprite_in_front_selects_its_pattern_bits() {
+        let mut state = PpuState::new();
+        state.registers.write_mask(SHOW_SPRITES_ONLY);
+        set_sprite(&mut state.oam, 0, 0, 0x01, 0x00, 10);
+        let mut chr = [0u8; 8192];
+        chr[0x01 * 16] = 0xFF; // plane 0 all ones 鈫?colour 1
+        let picks = pick_row(&mut state, &chr, SHOW_SPRITES_ONLY, 0);
+        for x in 10..18 {
+            assert_eq!(picks[x], Some((0, 1)), "sprite covers x {x}");
+        }
+        assert_eq!(picks[9], None, "pixel before the sprite");
+        assert_eq!(picks[18], None, "pixel after the sprite");
+    }
+
+    #[test]
+    fn pick_pixel_prefers_the_lower_oam_index() {
+        let mut state = PpuState::new();
+        state.registers.write_mask(SHOW_SPRITES_ONLY);
+        // Sprite 0 covers x 10..18 with colour 1, sprite 1 overlaps at
+        // x 12..20 with colour 2; OAM order gives sprite 0 priority.
+        set_sprite(&mut state.oam, 0, 0, 0x01, 0x00, 10);
+        set_sprite(&mut state.oam, 1, 0, 0x02, 0x00, 12);
+        let mut chr = [0u8; 8192];
+        chr[0x01 * 16] = 0xFF; // colour 1
+        chr[0x02 * 16] = 0xFE; // colour: bit 0 clear, others set
+        let picks = pick_row(&mut state, &chr, SHOW_SPRITES_ONLY, 0);
+        assert_eq!(picks[12], Some((0, 1)), "sprite 0 wins inside its span");
+        assert_eq!(picks[18], Some((1, 1)), "sprite 1 shows past sprite 0");
     }
 
     #[test]
@@ -652,47 +294,96 @@ mod tests {
         let mut state = PpuState::new();
         state.registers.write_mask(SHOW_SPRITES_ONLY);
         set_sprite(&mut state.oam, 0, 0, 0x01, 0x40, 10);
-        let mut bus = FlatBus::new();
-        bus.chr[0x01 * 16] = 0x80;
-        let mut palette = [0u8; 32];
-        palette[0x11] = 0x16;
-        let row = render_row(&mut state, &mut bus, &palette, SHOW_SPRITES_ONLY, 0);
-        let expected = palette_adjust_pixel(0x16, SHOW_SPRITES_ONLY);
-        assert_eq!(row[10], 0, "flipped sprite: pattern bit 7 is no longer leftmost");
-        assert_eq!(row[17], expected, "flipped sprite: bit 7 shows at the right edge");
+        let mut chr = [0u8; 8192];
+        chr[0x01 * 16] = 0x80; // only pattern bit 7 set
+        let picks = pick_row(&mut state, &chr, SHOW_SPRITES_ONLY, 0);
+        assert_eq!(picks[10], None, "unflipped bit 7 moved to the right edge");
+        assert_eq!(
+            picks[17],
+            Some((0, 1)),
+            "flipped bit 7 shows at the right edge"
+        );
     }
-
 
     #[test]
     fn sprite_vertical_flip_mirrors_rows() {
         let mut state = PpuState::new();
         state.registers.write_mask(SHOW_SPRITES_ONLY);
         set_sprite(&mut state.oam, 0, 0, 0x01, 0x80, 10);
-        let mut bus = FlatBus::new();
-        bus.chr[0x01 * 16] = 0x80;
-        bus.chr[0x01 * 16 + 7] = 0x01;
-        let mut palette = [0u8; 32];
-        palette[0x11] = 0x16;
-        let row = render_row(&mut state, &mut bus, &palette, SHOW_SPRITES_ONLY, 0);
-        let expected = palette_adjust_pixel(0x16, SHOW_SPRITES_ONLY);
-        assert_eq!(row[10], 0, "vertical flip: sl 0 must use pattern row 7");
-        assert_eq!(row[17], expected, "vertical flip: pattern row 7 bit 0 is rightmost");
+        let mut chr = [0u8; 8192];
+        chr[0x01 * 16] = 0x80; // row 0
+        chr[0x01 * 16 + 7] = 0x01; // row 7
+        let picks = pick_row(&mut state, &chr, SHOW_SPRITES_ONLY, 0);
+        assert_eq!(picks[10], None, "vertical flip: sl 0 uses pattern row 7");
+        assert_eq!(
+            picks[17],
+            Some((0, 1)),
+            "row 7 bit 0 is the rightmost pixel"
+        );
+    }
+
+    #[test]
+    fn eight_by_sixteen_sprites_select_pattern_table_via_tile_bit0() {
+        let mut state = PpuState::new();
+        state.registers.write_mask(SHOW_SPRITES_ONLY);
+        state.registers.ctrl |= SPRITE_SIZE; // 8x16 sprites
+        set_sprite(&mut state.oam, 0, 0, 0x01, 0x00, 10); // tile bit 0 = 1 鈫?$1000
+        let mut chr = [0u8; 8192];
+        chr[0x1000] = 0xFF; // tile $00/$01 pair, row 0 plane 0
+        prepare_line(&mut state, &chr, 0, SHOW_SPRITES_ONLY);
+        assert_eq!(
+            state.sprite_shift[0][0], 0xFF,
+            "8x16 tile $01 must read the $1000 pattern table"
+        );
     }
 
     #[test]
     fn eight_by_sixteen_lower_half_uses_the_odd_tile() {
         let mut state = PpuState::new();
         state.registers.write_mask(SHOW_SPRITES_ONLY);
-        state.registers.write_ctrl(0x20);
+        state.registers.ctrl |= SPRITE_SIZE;
         set_sprite(&mut state.oam, 0, 0, 0x02, 0x00, 10);
-        let mut bus = FlatBus::new();
-        bus.chr[0x20] = 0x00;
-        bus.chr[0x30] = 0xFF;
-        let mut palette = [0u8; 32];
-        palette[0x11] = 0x16;
-        let row = render_row(&mut state, &mut bus, &palette, SHOW_SPRITES_ONLY, 8);
-        let expected = palette_adjust_pixel(0x16, SHOW_SPRITES_ONLY);
-        assert_eq!(row[10], expected, "sl 8 of an 8x16 sprite must read tile 0x30");
+        let mut chr = [0u8; 8192];
+        chr[0x20] = 0x00; // tile $02 row 0
+        chr[0x30] = 0xFF; // tile $03 row 0 (rows 8..15 of the pair)
+        prepare_line(&mut state, &chr, 8, SHOW_SPRITES_ONLY);
+        assert_eq!(
+            state.sprite_shift[0][0], 0xFF,
+            "sl 8 of an 8x16 sprite must read the odd tile of the pair"
+        );
     }
 
+    #[test]
+    fn sprite_uses_sprite_palette_region() {
+        // The composition (rendering.rs) reads palette[0x10 + ...]; the
+        // sprite layer only supplies the 2-bit colour plus the attribute
+        // select, so this pins the attribute plumbing.
+        let mut state = PpuState::new();
+        state.registers.write_mask(SHOW_SPRITES_ONLY);
+        set_sprite(&mut state.oam, 0, 0, 0x01, 0x02, 10); // palette select 2
+        let mut chr = [0u8; 8192];
+        chr[0x01 * 16] = 0xFF; // plane 0
+        chr[0x01 * 16 + 8] = 0xFF; // plane 1
+        let picks = pick_row(&mut state, &chr, SHOW_SPRITES_ONLY, 0);
+        let (idx, color) = picks[10].expect("opaque sprite pixel");
+        assert_eq!(idx, 0);
+        assert_eq!(color, 3, "both planes set 鈫?2-bit colour 3");
+        assert_eq!(
+            state.sprite_attr[0] & 0x03,
+            0x02,
+            "palette select preserved"
+        );
+    }
+
+    #[test]
+    fn prepare_line_is_inert_outside_visible_lines() {
+        let mut state = PpuState::new();
+        state.registers.write_mask(SHOW_SPRITES_ONLY);
+        set_sprite(&mut state.oam, 0, 0, 0x01, 0x00, 10);
+        let chr = [0u8; 8192];
+        prepare_line(&mut state, &chr, 240, SHOW_SPRITES_ONLY);
+        assert_eq!(state.secondary_oam_count, 0);
+        prepare_line(&mut state, &chr, -1, SHOW_SPRITES_ONLY);
+        assert_eq!(state.secondary_oam_count, 0);
+    }
 }

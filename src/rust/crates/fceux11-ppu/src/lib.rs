@@ -6,15 +6,17 @@
 //! Rust PPU through `ppu_rust_bridge.cpp`.
 //!
 //! Modules:
-//! - [`a12`]: filtered A12 watcher + per-dot fetch-address model (v2.1.3 batch 1).
+//! - [`a12`]: filtered A12 watcher (v2.1.3 batch 1; batch 2 feeds it the
+//!   real fetch addresses from [`rendering`]).
 //! - [`bus`]: `PpuBus` trait + the `FlatBus` test stub used by the integration tests.
 //! - [`registers`]: `$2000`-`$2007`, `$4014`, scroll latches, open-bus buffer.
 //! - [`state`]: `PpuState` aggregate (registers + OAM + secondary OAM + frame counters).
-//! - [`frame`]: `tick_dot` — the dot-level main state machine.
+//! - [`frame`]: `tick_dot` — the dot-level main state machine (timing events,
+//!   the fetch cycle's scroll updates, sprite evaluation).
 //! - [`ffi`]: C-ABI surface (`fceux11_ppu_*` exports).
 //! - [`render`]: NROM BG/sprite/palette pipeline (Phase 2 stub; Phase 4 full).
-//! - [`rendering`]: Phase 4 per-scanline BG fetch + pixel output.
-//! - [`sprites`]: Phase 6.2 sprite pixel composition (post-BG pass).
+//! - [`rendering`]: v2.1.3 batch 2 per-dot BG fetch + pixel pipeline.
+//! - [`sprites`]: sprite layer preparation + per-pixel lookup.
 //! - [`luts`]: precomputed ppulut1/2/3 lookup tables (Phase 4).
 
 pub mod a12;

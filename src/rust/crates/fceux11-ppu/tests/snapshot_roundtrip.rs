@@ -77,15 +77,13 @@ fn rpu1_roundtrip_preserves_every_field() {
     src.oam_dma_page = 0x07;
     src.oam_dma_counter = 199;
 
-    // BG render state
+    // BG pipeline state
     src.bg_pshift = [0xABCD, 0x1234];
-    src.bg_atlatch = 0x5A;
-    src.bg_next_nt = 0x11;
-    src.bg_next_at = 0x22;
-    src.bg_next_pattern_lo = 0x33;
-    src.bg_next_pattern_hi = 0x44;
-    src.bg_primed = true;
-    src.bg_active = true;
+    src.bg_attr_shift = [0x00FF, 0xFF00];
+    src.bg_latch_nt = 0x11;
+    src.bg_latch_attr = 0x33 & 0x03;
+    src.bg_latch_lo = 0x44;
+    src.bg_latch_hi = 0x55;
 
     // Sprite render state — every byte unique
     for i in 0..8 {
@@ -165,15 +163,13 @@ fn rpu1_roundtrip_preserves_every_field() {
     assert_eq!(dst.oam_dma_page, src.oam_dma_page);
     assert_eq!(dst.oam_dma_counter, src.oam_dma_counter);
 
-    // BG render state
+    // BG pipeline state
     assert_eq!(dst.bg_pshift, src.bg_pshift);
-    assert_eq!(dst.bg_atlatch, src.bg_atlatch);
-    assert_eq!(dst.bg_next_nt, src.bg_next_nt);
-    assert_eq!(dst.bg_next_at, src.bg_next_at);
-    assert_eq!(dst.bg_next_pattern_lo, src.bg_next_pattern_lo);
-    assert_eq!(dst.bg_next_pattern_hi, src.bg_next_pattern_hi);
-    assert_eq!(dst.bg_primed, src.bg_primed);
-    assert_eq!(dst.bg_active, src.bg_active);
+    assert_eq!(dst.bg_attr_shift, src.bg_attr_shift);
+    assert_eq!(dst.bg_latch_nt, src.bg_latch_nt);
+    assert_eq!(dst.bg_latch_attr, src.bg_latch_attr);
+    assert_eq!(dst.bg_latch_lo, src.bg_latch_lo);
+    assert_eq!(dst.bg_latch_hi, src.bg_latch_hi);
 
     // Sprite render state
     assert_eq!(dst.sprite_shift, src.sprite_shift);

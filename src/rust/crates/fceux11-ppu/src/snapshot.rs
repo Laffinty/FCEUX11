@@ -68,14 +68,12 @@
 //! | 326 | 2 | `oam_dma_counter` (u16) |
 //! | 328 | 4 | `bg_pshift[0]` (u16) + pad |
 //! | 332 | 4 | `bg_pshift[1]` (u16) + pad |
-//! | 336 | 1 | `bg_atlatch` |
-//! | 337 | 1 | `bg_next_nt` |
-//! | 338 | 1 | `bg_next_at` |
-//! | 339 | 1 | `bg_next_pattern_lo` |
-//! | 340 | 1 | `bg_next_pattern_hi` |
-//! | 341 | 1 | `bg_primed` |
-//! | 342 | 1 | `bg_active` |
-//! | 343 | 1 | pad |
+//! | 336 | 2 | `bg_attr_shift[0]` |
+//! | 338 | 2 | `bg_attr_shift[1]` |
+//! | 340 | 1 | `bg_latch_nt` |
+//! | 341 | 1 | `bg_latch_attr` |
+//! | 342 | 1 | `bg_latch_lo` |
+//! | 343 | 1 | `bg_latch_hi` |
 //! | 344 | 16 | `sprite_shift[0..7][0/1]` |
 //! | 360 | 8 | `sprite_attr[0..7]` |
 //! | 368 | 8 | `sprite_x[0..7]` |
@@ -119,7 +117,13 @@ use crate::state::PpuState;
 pub const RPU1_MAGIC: [u8; 4] = *b"RPU1";
 
 /// Current RPU1 format version. Bump on any payload change.
-pub const RPU1_VERSION: u32 = 1;
+///
+/// v2 (v2.1.3 batch 2): the 16-byte BG block now carries the per-dot
+/// pipeline state (`bg_attr_cur` / `bg_attr_next` / `bg_latch_*`) in
+/// place of the retired batch-renderer fields (`bg_atlatch` /
+/// `bg_next_*` / `bg_primed` / `bg_active`). Same size, different
+/// meaning — v1 payloads must not be read as v2.
+pub const RPU1_VERSION: u32 = 2;
 
 /// Total size of the RPU1 payload (everything after the 16-byte
 /// header). 380 bytes — see the layout table in the module docs.
@@ -292,14 +296,12 @@ fn write_payload(out: &mut [u8], state: &PpuState) {
     out[off + 2..off + 4].copy_from_slice(&[0, 0]);
     out[off + 4..off + 6].copy_from_slice(&state.bg_pshift[1].to_le_bytes());
     out[off + 6..off + 8].copy_from_slice(&[0, 0]);
-    out[off + 8] = state.bg_atlatch;
-    out[off + 9] = state.bg_next_nt;
-    out[off + 10] = state.bg_next_at;
-    out[off + 11] = state.bg_next_pattern_lo;
-    out[off + 12] = state.bg_next_pattern_hi;
-    out[off + 13] = state.bg_primed as u8;
-    out[off + 14] = state.bg_active as u8;
-    out[off + 15] = 0;
+    out[off + 8..off + 10].copy_from_slice(&state.bg_attr_shift[0].to_le_bytes());
+    out[off + 10..off + 12].copy_from_slice(&state.bg_attr_shift[1].to_le_bytes());
+    out[off + 12] = state.bg_latch_nt;
+    out[off + 13] = state.bg_latch_attr;
+    out[off + 14] = state.bg_latch_lo;
+    out[off + 15] = state.bg_latch_hi;
     off += 16;
 
     // Sprite shift / attr / x (16 + 8 + 8 = 32 bytes)
@@ -364,11 +366,6 @@ fn read_payload(buf: &[u8], state: &mut PpuState) {
     state.sprite0_hit = buf[off + 2] != 0;
     // off + 3 = pad
     off += 4;
-    // Phase 6.6 (Session A): sprite0_hit_dot is transient per-scanline
-    // state, not part of the payload — pin to "no hit pending" (the
-    // next scanline's batch render re-records it). Same lifecycle as
-    // `ppudead`.
-    state.sprite0_hit_dot = crate::state::NO_SPRITE0_HIT_DOT;
 
     state.scanline = i16::from_le_bytes([buf[off], buf[off + 1]]);
     state.dot = u16::from_le_bytes([buf[off + 2], buf[off + 3]]);
@@ -399,14 +396,12 @@ fn read_payload(buf: &[u8], state: &mut PpuState) {
     // off + 2..4 = pad
     state.bg_pshift[1] = u16::from_le_bytes([buf[off + 4], buf[off + 5]]);
     // off + 6..8 = pad
-    state.bg_atlatch = buf[off + 8];
-    state.bg_next_nt = buf[off + 9];
-    state.bg_next_at = buf[off + 10];
-    state.bg_next_pattern_lo = buf[off + 11];
-    state.bg_next_pattern_hi = buf[off + 12];
-    state.bg_primed = buf[off + 13] != 0;
-    state.bg_active = buf[off + 14] != 0;
-    // off + 15 = pad
+    state.bg_attr_shift[0] = u16::from_le_bytes([buf[off + 8], buf[off + 9]]);
+    state.bg_attr_shift[1] = u16::from_le_bytes([buf[off + 10], buf[off + 11]]);
+    state.bg_latch_nt = buf[off + 12];
+    state.bg_latch_attr = buf[off + 13];
+    state.bg_latch_lo = buf[off + 14];
+    state.bg_latch_hi = buf[off + 15];
     off += 16;
 
     for sprite in state.sprite_shift.iter_mut() {

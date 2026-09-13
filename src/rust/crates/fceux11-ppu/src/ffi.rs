@@ -674,18 +674,17 @@ fn make_bus_adapter(sb: &mut StateBox) -> CppBus {
 /// interleave is wired separately by
 /// `fceux11_cpu_step_one_instruction` (Phase 3 follow-on).
 ///
-/// Phase 4: at the start of each visible scanline (sl 0..239 dot 0),
-/// the BG renderer is invoked to write 256 pixels into the
-/// framebuffer. This is the bit-exact NROM gate; the algorithm
-/// matches `pputile.inc::FetchAndDrawTile<kFNormal>` and produces
-/// the same per-tile output as the C++ reference.
+/// v2.1.3 batch 2: the background renderer runs once per dot
+/// ([`render_dot`]) instead of once per scanline, so mid-scanline
+/// register writes and mapper bank switches are visible to the fetches
+/// that follow them.
 pub unsafe extern "C" fn fceux11_ppu_emulate_frame(state: *mut PpuState, n_cycles: u32) -> i32 {
     let sb = lookup(state);
     let mut bus = make_bus_adapter(sb);
-    // Use the scheduler so notify_* hooks fire on scanline transitions
-    // and at dot 256. The scheduler's per-dot advance is what wires
-    // A12/HBlank/scanline hooks to the C++ mapper globals
-    // (`GameHBIRQHook` / `GameHBIRQHook2` / `PPU_hook`).
+    // Use the scheduler so notify_* hooks fire on scanline transitions.
+    // The scheduler's per-dot advance is what wires the HBlank/scanline
+    // hooks to the C++ mapper globals (`GameHBIRQHook` / `GameHBIRQHook2`
+    // / `PPU_hook`); the A12 edges come from the fetch pipeline.
     let mut sched = crate::scheduler::NesScheduler::new();
     sched.set_video_system(sb.video_system);
     sched.begin_frame();
@@ -693,12 +692,7 @@ pub unsafe extern "C" fn fceux11_ppu_emulate_frame(state: *mut PpuState, n_cycle
     let mut last_outcome = TickOutcome::default();
     while sched.ppu_dots_consumed() < total_dots {
         poll_refresh_windows(sb, &mut bus);
-        // Phase 4: BG render at the start of each visible scanline.
-        // The C++ algorithm runs `RefreshLine` once per visible
-        // scanline (at sl N, dot 0); we do the same. The condition +
-        // ordering live in `render_scanline_if_start` so the Phase 5.1
-        // per-cycle driver stays bit-identical.
-        render_scanline_if_start(sb, &mut bus);
+        render_dot(sb, &mut bus);
         last_outcome = sched.tick_one_ppu_dot(&mut sb.state, &mut bus);
         // OAM DMA pump fires once per CPU cycle (= every 3 PPU dots).
         if sb.state.oam_dma_pending
@@ -714,102 +708,48 @@ pub unsafe extern "C" fn fceux11_ppu_emulate_frame(state: *mut PpuState, n_cycle
     0
 }
 
-/// Phase 4: invoke the BG renderer for the current scanline. Reads
-/// from the CHR/NT/Palette windows installed by the C++ bridge
-/// (`fceux11_ppu_set_chr_window` etc.) and writes into the
-/// 256×256 framebuffer. Falls back to per-byte bus reads when the
-/// windows are not installed.
-fn render_visible_scanline<B: crate::bus::PpuBus + ?Sized>(
-    state: &mut PpuState,
-    bus: &mut B,
-    framebuffer: &mut [u8; 256 * 256],
-    mirror_mode: u8,
-    chr_window_ptr: *const u8,
-    chr_window_len: usize,
-    nt_window_ptr: *const u8,
-    nt_window_len: usize,
-    pal_window_ptr: *const u8,
-    pal_window_len: usize,
-) {
-    // Phase 4: build NT/CHR/Palette windows either from the
-    // pre-installed direct pointers (set via
-    // `fceux11_ppu_set_chr_window` etc.) or from the bus.
-    //
-    // SAFETY: the pointers are valid for the lifetime of the
-    // installed windows. The StateBox guarantees that.
-    let nt_window_storage: [u8; 4096];
-    let nt_window: &[u8; 4096] = if !nt_window_ptr.is_null() && nt_window_len >= 4096 {
-        unsafe { &*(nt_window_ptr as *const [u8; 4096]) }
-    } else {
-        nt_window_storage = {
-            let mut w = [0u8; 4096];
-            for i in 0..4096u16 {
-                w[i as usize] = bus.read(0x2000 + i);
-            }
-            w
-        };
-        &nt_window_storage
+/// v2.1.3 batch 2: advance the per-dot background pipeline for the
+/// current `(scanline, dot)`.
+///
+/// Called once per PPU dot *before* the scheduler's `tick_one_ppu_dot`,
+/// so the fetches this dot performs see the `v` / `fine_x` / mapper bank
+/// state as of this dot (`frame::tick_dot` owns the scroll updates, and
+/// runs after this for the same dot).
+///
+/// The windows are installed by the C++ bridge at power time
+/// (`fceux11_ppu_set_chr_window` / `_nt_window` / `_palette_window`).
+/// Without them there is nothing authoritative to render from — the
+/// standalone C++ smoke test drives the FFI with a null-callback bus —
+/// so the pipeline is skipped and the framebuffer keeps its contents.
+fn render_dot(sb: &mut StateBox, bus: &mut CppBus) {
+    // Cheapest rejection first: the pipeline does nothing on the
+    // post-render and VBlank lines (21 of 262), and this runs once per
+    // dot (~89k calls/frame).
+    let sl = sb.state.scanline;
+    if !(sl == -1 || (0..=239).contains(&sl)) {
+        return;
+    }
+    if sb.nt_window_ptr.is_null()
+        || sb.nt_window_len < 4096
+        || sb.chr_window_ptr.is_null()
+        || sb.chr_window_len < 8192
+        || sb.pal_window_ptr.is_null()
+        || sb.pal_window_len < 32
+    {
+        return;
+    }
+    let mirror = sb.mirror;
+    let (nt_ptr, chr_ptr, pal_ptr) = (sb.nt_window_ptr, sb.chr_window_ptr, sb.pal_window_ptr);
+    // SAFETY: the pointers are installed by `fceux11_ppu_set_*_window`
+    // (power time and savestate load) and stay valid for the lifetime of
+    // the mapper; the length checks above guarantee the fixed-size reads.
+    let win = crate::rendering::RenderWindows {
+        nt: unsafe { &*(nt_ptr as *const [u8; 4096]) },
+        chr: unsafe { &*(chr_ptr as *const [u8; 8192]) },
+        palette: unsafe { &*(pal_ptr as *const [u8; 32]) },
+        mirror,
     };
-    let chr_window_storage: [u8; 8192];
-    let chr_window: &[u8; 8192] = if !chr_window_ptr.is_null() && chr_window_len >= 8192 {
-        unsafe { &*(chr_window_ptr as *const [u8; 8192]) }
-    } else {
-        chr_window_storage = {
-            let mut w = [0u8; 8192];
-            for i in 0..8192u16 {
-                w[i as usize] = bus.read(i);
-            }
-            w
-        };
-        &chr_window_storage
-    };
-    let pal_window_storage: [u8; 32];
-    let pal_window: &[u8; 32] = if !pal_window_ptr.is_null() && pal_window_len >= 32 {
-        unsafe { &*(pal_window_ptr as *const [u8; 32]) }
-    } else {
-        pal_window_storage = {
-            let mut w = [0u8; 32];
-            for i in 0..32u16 {
-                w[i as usize] = bus.read(0x3F00 + i);
-            }
-            w
-        };
-        &pal_window_storage
-    };
-    crate::rendering::render_scanline(
-        state,
-        bus,
-        nt_window,
-        chr_window,
-        pal_window,
-        mirror_mode,
-        framebuffer,
-    );
-    // Phase 6.2: sprite pixel composition over the BG pixels just
-    // written. The batch renderer bypasses the per-cycle hblank
-    // fetch + per-dot shift register path used by the C++ engine and
-    // re-scans primary OAM for the current scanline instead — byte-
-    // identical output for the 8x8 / 8x16 sprite shapes the NESdev
-    // docs describe, but without the cycle-accurate oddities
-    // (mid-tile reload, left-edge 8-pixel clip, overflow re-scan).
-    // See `sprites.rs` for the detailed limitations list.
-    // Phase 6.6 (Session A): the batch sprite renderer fetches pattern
-    // rows from the SAME CHR window snapshot the BG renderer just used,
-    // so sprite and BG pixels always observe the same mapper bank state
-    // for the scanline. (The CppBus `peek_chr` callback is a stub in
-    // the bridge path — before this change every sprite pattern byte
-    // read 0x00, making ALL sprites invisible in the Rust engine and
-    // sprite 0 hit unreachable — the root cause of the 27-ROM Super
-    // Mario family `cpu_stuck_pc=0x8153` class.)
-    crate::sprites::render_sprites_for_scanline(
-        state,
-        bus,
-        Some(&chr_window),
-        framebuffer,
-        pal_window,
-        state.registers.mask,
-        state.scanline,
-    );
+    crate::rendering::tick_dot(&mut sb.state, bus, &win, &mut sb.framebuffer);
 }
 
 /// v2.1.3 batch 1: window-dirty poll — fired once per fetch group
@@ -820,29 +760,6 @@ fn render_visible_scanline<B: crate::bus::PpuBus + ?Sized>(
 fn poll_refresh_windows(sb: &StateBox, bus: &mut CppBus) {
     if sb.state.dot & 0x7 == 0 {
         bus.refresh_windows();
-    }
-}
-
-/// Phase 5.1: shared render-at-scanline-start step. Renders the
-/// current visible scanline when the state machine is entering it
-/// (sl 0..=239, dot == 0, checked BEFORE the dot advances) — the exact
-/// condition and ordering `fceux11_ppu_emulate_frame` has used since
-/// Phase 4, so the batch and per-cycle frame drivers render
-/// bit-identically.
-fn render_scanline_if_start(sb: &mut StateBox, bus: &mut CppBus) {
-    if sb.state.scanline >= 0 && sb.state.scanline <= 239 && sb.state.dot == 0 {
-        render_visible_scanline(
-            &mut sb.state,
-            bus,
-            &mut sb.framebuffer,
-            sb.mirror,
-            sb.chr_window_ptr,
-            sb.chr_window_len,
-            sb.nt_window_ptr,
-            sb.nt_window_len,
-            sb.pal_window_ptr,
-            sb.pal_window_len,
-        );
     }
 }
 
@@ -857,14 +774,15 @@ pub unsafe extern "C" fn fceux11_ppu_tick_cpu_cycle(state: *mut PpuState, n_cycl
     let total_dots = n_cycles.saturating_mul(crate::scheduler::PPU_DOTS_PER_CPU_CYCLE);
     while sched.ppu_dots_consumed() < total_dots {
         poll_refresh_windows(sb, &mut bus);
+        render_dot(sb, &mut bus);
         sched.tick_one_ppu_dot(&mut sb.state, &mut bus);
     }
     0
 }
 
 /// Phase 5.1: advance the Rust PPU by exactly `n_dots` PPU dots —
-/// rendering visible scanlines at their start, firing mapper event
-/// hooks (notify_scanline / notify_hblank / notify_hblank2 /
+/// running the background pipeline, firing mapper event hooks
+/// (notify_scanline / notify_hblank / notify_hblank2 /
 /// notify_a12_rising / notify_vblank) and pumping the OAM DMA — with
 /// the same per-dot ordering as `fceux11_ppu_emulate_frame`.
 ///
@@ -883,12 +801,11 @@ pub unsafe extern "C" fn fceux11_ppu_tick_dots(state: *mut PpuState, n_dots: u32
     let mut frame_advanced = false;
     for _ in 0..n_dots {
         poll_refresh_windows(sb, &mut bus);
-        // Render when ENTERING a visible scanline, BEFORE the dot
-        // tick (so the fill/BG use the carry-over v — the placement
-        // the ppu_frame_diff goldens were pinned against; a
-        // post-tick variant broke them and did not fix rom_regression
-        // frames 3-7).
-        render_scanline_if_start(sb, &mut bus);
+        // Fetch, shift and emit this dot's pixel BEFORE the dot's
+        // state-machine events, so the fetch reads the v/fine_x the
+        // previous dot left behind and `frame::tick_dot`'s scroll
+        // updates land after the addresses they precede.
+        render_dot(sb, &mut bus);
         let outcome = sched.tick_one_ppu_dot(&mut sb.state, &mut bus);
         // Phase 5.1: latch PPU NMI assertions so the C++ side can
         // forward them to the canonical `TriggerNMI()` path.
@@ -932,7 +849,7 @@ pub unsafe extern "C" fn fceux11_ppu_tick_dots_direct(state: *mut PpuState, n_do
     let mut frame_advanced = false;
     for _ in 0..n_dots {
         poll_refresh_windows(sb, &mut bus);
-        render_scanline_if_start(sb, &mut bus);
+        render_dot(sb, &mut bus);
         let outcome = sched.tick_one_ppu_dot(&mut sb.state, &mut bus);
         if outcome.nmi_asserted {
             sb.state.nmi_pending = true;

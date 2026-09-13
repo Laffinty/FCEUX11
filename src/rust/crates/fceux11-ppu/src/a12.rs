@@ -1,16 +1,17 @@
-//! Filtered PPU A12 watcher + per-dot fetch-address model (v2.1.3 batch 1).
+//! Filtered PPU A12 watcher (v2.1.3 batch 1; batch 2 moved the address
+//! source into the rendering pipeline).
 //!
 //! MMC3-family mappers clock their IRQ counter on *filtered* PPU A12
-//! rising edges. Batch 1 replaces the v2.1.2 per-scanline approximation
+//! rising edges. Batch 1 replaced the v2.1.2 per-scanline approximation
 //! (one `notify_hblank` per visible scanline at dot 256) with a
 //! hardware-shaped model:
 //!
-//! 1. [`fetch_bus_address`] reconstructs the address the PPU presents on
-//!    its bus at each dot of the fetch lines (pre-render + visible),
-//!    following the nesdev PPU rendering cycle table. Reporting covers
-//!    every fetch (NT / AT / pattern), not just the pattern fetches: the
-//!    NT/AT addresses (`$2xxx`) are what pull A12 low and give the filter
-//!    its low-period measurements.
+//! 1. Batch 1 reconstructed the offered address with a pure function of
+//!    `(scanline, dot, $2000, secondary OAM)`. Batch 2 replaced that
+//!    approximation with the real fetch state machine
+//!    ([`crate::rendering::tick_dot`]), which reports the address each
+//!    fetch actually places on the bus — including mid-scanline
+//!    `$2000`/`$2005`/`$2006` changes that re-point the fetches.
 //! 2. [`A12Watcher`] applies the cartridge-side A12 filter: a rising edge
 //!    only counts after A12 has stayed low for
 //!    [`A12_MIN_LOW_DOTS`] PPU dots. Hardware evidence (Furrtek's MMC3C
@@ -24,8 +25,8 @@
 //!    - blargg's `$2006`-toggle sequences leave A12 low for ~26 CPU
 //!      cycles (~78 dots) and MUST clock the counter (tests 1/3).
 //!
-//! Only bit 12 of the reported address is meaningful, so the model is a
-//! pure function of `(scanline, dot, $2000, secondary OAM)`:
+//! Only bit 12 of the reported address is meaningful, so the pipeline's
+//! reporting reduces to:
 //! - NT/AT fetches (BG + the sprite window's garbage fetches) → `$2xxx`
 //!   region, A12 = 0;
 //! - BG pattern fetches → A12 = `$2000` bit 4;
@@ -47,10 +48,11 @@ pub const A12_MIN_LOW_DOTS: u64 = 9;
 
 /// Filtered A12 edge detector.
 ///
-/// `tick` is a monotonic PPU-dot counter advanced once per `tick_dot`;
-/// CPU-driven address pushes (which happen between dots) observe the
-/// counter as-is, which is within one dot of the true transition point —
-/// far below the 9-dot filter resolution.
+/// `tick` is a monotonic PPU-dot counter advanced once per
+/// [`crate::frame::tick_dot`]. The rendering pipeline observes the
+/// address for the dot it is processing *before* that tick advance, which
+/// shortens every recorded timestamp by one dot — low-period *durations*
+/// (what the filter measures) are unaffected.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct A12Watcher {
     /// Last A12 level seen (`true` = high, address bit 12 set).
@@ -116,7 +118,7 @@ impl A12Watcher {
 /// scanline's fetch window (dots 257-320). Slot order and the dummy
 /// `$FF` fetch for empty slots follow nesdev sprite evaluation /
 /// `ppu_sprite_evaluation.md`.
-fn sprite_pattern_addr(
+pub(crate) fn sprite_pattern_addr(
     slot: usize,
     ctrl: u8,
     scanline: i16,
@@ -155,103 +157,6 @@ fn sprite_pattern_addr(
         let row = row.clamp(0, 7) as u16;
         table | (tile << 4) | row
     }
-}
-
-/// PPU bus address presented at `(scanline, dot)` while rendering is
-/// enabled on a fetch line (pre-render `-1` or visible `0..=239`).
-///
-/// `None` when the model has no fetch event at this dot (the address
-/// presented is the previous fetch's — reporting it again would not
-/// change A12). Only bit 12 of the returned address is significant; the
-/// low bits are filled in to look like the hardware address for debug
-/// value, not for accuracy.
-///
-/// Cycle table per nesdev PPU rendering:
-/// - dot 0 (visible lines only): idle cycle showing the CHR address dot 5
-///   will use — the BG pattern table region (Mesen2 does the same
-///   `SetBusAddress` at scanline start; the pre-render line keeps `v` on
-///   the bus until the first fetch at dot 1).
-/// - dots 1-256: 32 tile groups of 8 dots — NT at 8g+1, AT at 8g+3,
-///   pattern-low at 8g+6 (presented at 8g+5; the +1 is the M2-edge
-///   sighting offset, see the match arm comment; pattern-high at 8g+8
-///   shares bit 12 and is skipped).
-/// - dots 257-320: 8 sprite groups — garbage NT at 257+8s, garbage
-///   second fetch at 259+8s (both `$2xxx`), pattern-low at 262+8s.
-/// - dots 321-336: the two next-line preload groups, same shape as
-///   dots 1-256.
-/// - dots 337 / 339: the two garbage NT fetches.
-pub fn fetch_bus_address(
-    scanline: i16,
-    dot: u16,
-    ctrl: u8,
-    secondary_oam: &[u8; 32],
-    secondary_count: u8,
-) -> Option<u16> {
-    // NT/AT fetches (and the sprite window's garbage fetches) always
-    // address the nametable region: bit 12 clear, bit 13 set.
-    const NT_REGION: u16 = 0x2000;
-    let bg_table: u16 = if ctrl & (1 << 4) != 0 { 0x1000 } else { 0x0000 };
-
-    if !(0..341).contains(&dot) {
-        return None;
-    }
-    if dot == 0 {
-        // Idle cycle: visible lines present the upcoming BG pattern
-        // address (pre-render keeps `v` — handled by the CPU path).
-        return if (0..=239).contains(&scanline) {
-            Some(bg_table)
-        } else {
-            None
-        };
-    }
-    // Sighting offset: the MMC3 samples A12 against M2 (CPU clock)
-    // edges and its analog chain lands the effective counter clock
-    // slightly after the PPU-domain presentation. blargg's suite pins
-    // the offset to ~1 PPU dot (4-scanline_timing; see the plan's
-    // calibration notes — the residual sub-dot gap is a per-cycle-CPU
-    // (batch 3) concern).
-    let shift: u16 = 1;
-    if (1..=256).contains(&dot) {
-        let phase = (dot - 1) & 0x7;
-        return match phase {
-            0 => Some(NT_REGION),     // nametable fetch
-            2 => Some(NT_REGION | 0x03C0), // attribute fetch
-            // Pattern low: presented at phase 4; the reported sighting is
-            // shifted by `sighting_shift()` (M2-edge sampling + analog
-            // chain delay, calibrated against blargg 4-scanline_timing).
-            p if p == 4 + shift as u16 => Some(bg_table),
-            _ => None,
-        };
-    }
-    if (257..=320).contains(&dot) {
-        let slot = ((dot - 257) >> 3) as usize;
-        let phase = (dot - 257) & 0x7;
-        return match phase {
-            0 => Some(NT_REGION),        // garbage nametable fetch
-            2 => Some(NT_REGION | 0x03C0), // garbage second fetch
-            p if p == 4 + shift as u16 => Some(sprite_pattern_addr(
-                slot,
-                ctrl,
-                scanline,
-                secondary_oam,
-                secondary_count,
-            )),
-            _ => None,
-        };
-    }
-    if (321..=336).contains(&dot) {
-        let phase = (dot - 321) & 0x7;
-        return match phase {
-            0 => Some(NT_REGION),
-            2 => Some(NT_REGION | 0x03C0),
-            p if p == 4 + shift as u16 => Some(bg_table),
-            _ => None,
-        };
-    }
-    if dot == 337 || dot == 339 {
-        return Some(NT_REGION); // two garbage NT fetches
-    }
-    None
 }
 
 #[cfg(test)]
@@ -302,108 +207,40 @@ mod tests {
         assert!(!w.observe(0x0FFF), "1→0 transition never clocks");
     }
 
+    /// Standard CHR configuration ($2000 bit 3 set): 8x8 sprites take the
+    /// $1000 table whatever the tile index, and an empty slot fetches the
+    /// dummy tile — which is still `$1xxx`. One rise per slot, and the
+    /// rise moves to $0000 when the slot is filled with a table-0 sprite.
     #[test]
-    fn fetch_model_standard_config_one_rise_per_line() {
-        // Standard config: $2000 = $08 (sprites $1000, BG $0000), 8x8,
-        // empty secondary OAM → all 8 slots fetch dummy tile $FF from
-        // $1xxx. Exactly ONE filtered rising edge per fetch line, at the
-        // first sprite pattern fetch (dot 261) — the blargg 2.Details
-        // 241-clocks-per-frame anchor.
-        let ctrl: u8 = 0x08;
+    fn sprite_pattern_addr_8x8_uses_ctrl_bit3() {
         let oam = [0u8; 32];
-        for sl in [-1, 0, 137, 239] {
-            let mut rises = 0usize;
-            let mut w = A12Watcher::new();
-            // Prime with the previous line's last sprite fetch (high),
-            // then fall at 321 — mirrors the steady-state frame.
-            assert!(!w.observe(0x1000));
-            for dot in 0..341u16 {
-                w.advance_tick();
-                if let Some(addr) = fetch_bus_address(sl, dot, ctrl, &oam, 0) {
-                    if w.observe(addr) {
-                        rises += 1;
-                        assert_eq!(dot, 262, "single rise lands at dot 262");
-                    }
-                }
-            }
-            assert_eq!(rises, 1, "scanline {sl}: exactly one rise per fetch line");
-        }
+        assert_eq!(sprite_pattern_addr(0, 0x08, 10, &oam, 0) & 0x1000, 0x1000);
+        assert_eq!(sprite_pattern_addr(0, 0x00, 10, &oam, 0) & 0x1000, 0x0000);
     }
 
+    /// 8x16: the table comes from the tile index bit 0, so two sprites on
+    /// one scanline can pull A12 in opposite directions — the multiple
+    /// edges per line blargg's `A12_clocking` case exercises.
     #[test]
-    fn fetch_model_bg_at_1000_counts_at_preload_window() {
-        // Inverted config: BG $1000 ($2000 = $10), sprites $0000. The
-        // BG pattern fetches raise A12 with only 4-dot low periods
-        // (rejected by the filter); the single count lands at the first
-        // preload pattern fetch (dot 325) after the 68-dot sprite-window
-        // low — the KB's "反配置计数点 dot 324 附近".
-        let ctrl: u8 = 0x10;
-        let oam = [0u8; 32];
-        let mut w = A12Watcher::new();
-        assert!(!w.observe(0x0000)); // steady state: bus low
-        let mut rises = Vec::new();
-        for dot in 0..341u16 {
-            w.advance_tick();
-            if let Some(addr) = fetch_bus_address(-1, dot, ctrl, &oam, 0) {
-                if w.observe(addr) {
-                    rises.push(dot);
-                }
-            }
-        }
-        assert_eq!(rises, vec![326], "inverted config counts at dot 326 only");
-    }
-
-    #[test]
-    fn fetch_model_8x16_per_slot_table_bit() {
-        // 8x16 sprites ($2000 = $20): slots take the table from tile bit
-        // 0. With slots [tile $02 (table 0), tile $01 (table 1), rest
-        // empty (dummy $FF → table 1)] the sprite window is: slot 0
-        // low, slots 1-7 high. The rises land at the first high slot's
-        // pattern fetch (dot 269) and — because slot 0 pulled A12 low
-        // for only 4 dots before it — nowhere else.
-        let ctrl: u8 = 0x20;
+    fn sprite_pattern_addr_8x16_uses_tile_bit0() {
         let mut oam = [0u8; 32];
-        // Two in-range sprites for scanline 50: Y=50, tiles $02 / $01.
-        oam[0..4].copy_from_slice(&[50, 0x02, 0x00, 10]);
-        oam[4..8].copy_from_slice(&[50, 0x01, 0x00, 20]);
-        let mut w = A12Watcher::new();
-        assert!(!w.observe(0x0000)); // bus low entering the line
-        let mut rises = Vec::new();
-        for dot in 0..341u16 {
-            w.advance_tick();
-            if let Some(addr) = fetch_bus_address(50, dot, ctrl, &oam, 2) {
-                if w.observe(addr) {
-                    rises.push(dot);
-                }
-            }
-        }
-        assert_eq!(rises, vec![270], "first $1xxx sprite slot clocks at dot 270");
+        oam[0..4].copy_from_slice(&[50, 0x02, 0x00, 10]); // tile bit 0 = 0
+        oam[4..8].copy_from_slice(&[50, 0x01, 0x00, 20]); // tile bit 0 = 1
+        assert_eq!(sprite_pattern_addr(0, 0x20, 50, &oam, 2) & 0x1000, 0x0000);
+        assert_eq!(sprite_pattern_addr(1, 0x20, 50, &oam, 2) & 0x1000, 0x1000);
+        // Empty slots fetch the dummy $FF tile → always table 1.
+        assert_eq!(sprite_pattern_addr(2, 0x20, 50, &oam, 2) & 0x1000, 0x1000);
     }
 
     #[test]
-    fn fetch_model_dots_without_fetch_are_none() {
-        let oam = [0u8; 32];
-        for dot in [0u16, 2, 5, 8, 258, 261, 330, 338, 340] {
-            let addr = fetch_bus_address(0, dot, 0x08, &oam, 0);
-            if dot == 0 {
-                assert!(addr.is_some());
-            } else {
-                assert!(addr.is_none(), "dot {dot} has no fetch event");
-            }
-        }
-    }
-
-    #[test]
-    fn fetch_model_all_reported_addresses_respect_14bit() {
-        // The PPU address bus is 14 bits ($0000-$3FFF).
+    fn sprite_pattern_addr_stays_within_14_bits() {
         let mut oam = [0u8; 32];
         for i in 0..8 {
             oam[i * 4..i * 4 + 4].copy_from_slice(&[10, 0xFF, 0xFF, 0xFF]);
         }
-        for dot in 0..341u16 {
-            if let Some(addr) = fetch_bus_address(50, dot, 0x38, &oam, 8) {
-                assert!(addr <= 0x3FFF, "dot {dot} address {addr:#06x} over 14 bits");
-            }
+        for slot in 0..8 {
+            assert!(sprite_pattern_addr(slot, 0x38, 50, &oam, 8) <= 0x3FFF);
+            assert!(sprite_pattern_addr(slot, 0x20, 50, &oam, 3) <= 0x3FFF);
         }
     }
 }

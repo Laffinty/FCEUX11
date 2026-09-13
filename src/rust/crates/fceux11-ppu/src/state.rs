@@ -41,10 +41,6 @@ pub const NTSC_SCANLINES: i16 = 262;
 /// PPU dots per scanline (visible 256 + hblank 85 = 341, indexed 0..=340).
 pub const DOTS_PER_SCANLINE: u16 = 341;
 
-/// Sentinel for [`PpuState::sprite0_hit_dot`] — no sprite 0 hit is
-/// pending on the current scanline.
-pub const NO_SPRITE0_HIT_DOT: u16 = 0xFFFF;
-
 /// PPU state aggregate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PpuState {
@@ -60,15 +56,10 @@ pub struct PpuState {
     /// at the right dot in Phase 4).
     pub sprite_overflow: bool,
     /// Sprite 0 hit latch — set when sprite 0 overlaps non-transparent BG.
+    /// v2.1.3 batch 2: latched by `crate::rendering::tick_dot` at the
+    /// exact dot the hit pixel is output (previously pre-computed by the
+    /// batch sprite pass and latched from a recorded dot).
     pub sprite0_hit: bool,
-    /// Phase 6.6 (Session A): the dot on the current scanline at which
-    /// the sprite 0 hit should latch (pixel `x` outputs at dot `x + 1`),
-    /// recorded by the batch sprite render. The frame state machine
-    /// sets `sprite0_hit` when it reaches this dot. Transient —
-    /// recomputed every visible scanline, cleared at the pre-render
-    /// line, NOT part of the RPU1 payload (pinned to
-    /// [`NO_SPRITE0_HIT_DOT`] on load, like `ppudead`).
-    pub sprite0_hit_dot: u16,
     /// Current scanline. Phase 6.1.e follow-up (VBL-first layout): the
     /// frame visit sequence is `[241..=260, -1, 0..=240]` so `scanline`
     /// still indexes pre-render as `-1` and visible as `0..=239`, but
@@ -119,43 +110,41 @@ pub struct PpuState {
     pub oam_dma_counter: u16,
 
     // -----------------------------------------------------------------
-    // Phase 4: rendering state. Used by the per-tile fetch + per-pixel
-    // output in `crate::rendering::render_scanline`. These fields are
-    // pre-loaded at the start of each visible scanline and advanced
-    // tile-by-tile during the visible region.
+    // v2.1.3 batch 2: per-dot BG fetch pipeline state. Advanced by
+    // `crate::rendering::tick_dot`, which the per-dot drivers call once
+    // per PPU dot while rendering is enabled. The 8-dot position within
+    // a fetch group selects the NT / AT / pattern-low / pattern-high
+    // access; the fetched bytes are latched here and loaded into the
+    // shift registers at the last dot of the group.
     // -----------------------------------------------------------------
-
     /// 16-bit shift registers for the two pattern bit planes (BG).
     /// `pshift[0]` = plane 0 (low bit), `pshift[1]` = plane 1 (high bit).
-    /// Pre-loaded with two tiles' worth of pattern data at the start
-    /// of each visible scanline. The render loop shifts left by 8
-    /// each tile fetch and ORs in the newly fetched pattern bytes.
+    /// Bits 8..=15 hold the tile currently being output, bits 0..=7 the
+    /// prefetched tile. The register shifts left once per dot inside a
+    /// fetch region; the prefetched byte is loaded at the last dot of
+    /// each 8-dot group.
     pub bg_pshift: [u16; 2],
-    /// 4-bit attribute latch for the current tile. Holds the palette
-    /// quadrant (2 bits) replicated to bits 0..=3 of a 4-bit value.
-    /// `atlatch` is shifted right by 2 every tile and ORed with the new
-    /// quadrant's bits in the upper 2 bits.
-    pub bg_atlatch: u8,
-    /// Latches for the next tile (4 bytes: name table, attribute,
-    /// pattern low, pattern high). Loaded by the per-tile fetch and
-    /// committed to the shift registers + atlatch on the next tile.
-    pub bg_next_nt: u8,
-    /// Next attribute byte.
-    pub bg_next_at: u8,
-    /// Next pattern low byte (bit plane 0).
-    pub bg_next_pattern_lo: u8,
-    /// Next pattern high byte (bit plane 1).
-    pub bg_next_pattern_hi: u8,
-    /// True if at least one tile has been fetched since the start of
-    /// the current visible scanline. The pre-load "tile -2" and
-    /// "tile -1" populate the shift register with zero so the first
-    /// 16 pixels use the zeros (rather than garbage from a previous
-    /// scanline).
-    pub bg_primed: bool,
-    /// True if the rendering engine is in the visible part of a
-    /// visible scanline (i.e. tile fetches are happening). Set by
-    /// the dot driver at sl 0..239 dot 0, cleared at sl 240.
-    pub bg_active: bool,
+    /// Attribute bits (2) of the tile currently in bits 8..=15 of
+    /// [`Self::bg_pshift`]. Hardware latches one attribute per 8-pixel
+    /// string, so this is uniform across the tile (v2.1.3 batch 2
+    /// replaced the FCEUX `atlatch` half-tile delay with this model).
+    ///
+    /// Two 16-bit shift registers, one per attribute bit, with the same
+    /// shift/reload structure as `bg_pshift`: bits 8..=15 hold the
+    /// current string's attribute bit replicated eight times, bits 0..=7
+    /// the prefetched string's. `fine_x` selects the same relative bit
+    /// as it does for the pattern data, so the first pixels of a group
+    /// correctly take the previous tile's attribute when fine X scrolls
+    /// across a tile boundary.
+    pub bg_attr_shift: [u16; 2],
+    /// Nametable byte latched by the current 8-dot fetch group.
+    pub bg_latch_nt: u8,
+    /// Attribute quadrant (2 bits) latched by the current fetch group.
+    pub bg_latch_attr: u8,
+    /// Pattern low-plane byte latched by the current fetch group.
+    pub bg_latch_lo: u8,
+    /// Pattern high-plane byte latched by the current fetch group.
+    pub bg_latch_hi: u8,
     /// Sprite pattern shift registers: 8 sprites × 2 planes × 8 bits.
     /// `sprite_shift[i][0]` = plane 0, `sprite_shift[i][1]` = plane 1.
     /// Each sprite has an 8-bit shift register, shifted left by 1
@@ -192,10 +181,12 @@ pub struct PpuState {
     /// always past boot).
     pub ppudead: u8,
     /// v2.1.3 batch 1: filtered A12 watcher + monotonic dot clock
-    /// (`crate::a12`). Transient microstate like `sprite0_hit_dot` —
-    /// not part of the RPU1 payload; a fresh watcher after a savestate
-    /// load only delays the next filtered edge by at most one low-
-    /// period measurement.
+    /// (`crate::a12`), fed the real fetch addresses by
+    /// [`crate::rendering::tick_dot`] and, with rendering off, by the
+    /// CPU access path in `ffi.rs`. Transient microstate — not part of
+    /// the RPU1 payload; a fresh watcher after a savestate load only
+    /// delays the next filtered edge by at most one low-period
+    /// measurement.
     pub a12: A12Watcher,
 }
 
@@ -226,7 +217,6 @@ impl PpuState {
             secondary_oam_count: 0,
             sprite_overflow: false,
             sprite0_hit: false,
-            sprite0_hit_dot: NO_SPRITE0_HIT_DOT,
             scanline: 241,
             dot: 0,
             frame: 0,
@@ -239,13 +229,11 @@ impl PpuState {
             oam_dma_page: 0,
             oam_dma_counter: 0,
             bg_pshift: [0u16; 2],
-            bg_atlatch: 0,
-            bg_next_nt: 0,
-            bg_next_at: 0,
-            bg_next_pattern_lo: 0,
-            bg_next_pattern_hi: 0,
-            bg_primed: false,
-            bg_active: false,
+            bg_attr_shift: [0u16; 2],
+            bg_latch_nt: 0,
+            bg_latch_attr: 0,
+            bg_latch_lo: 0,
+            bg_latch_hi: 0,
             sprite_shift: [[0u8; 2]; 8],
             sprite_attr: [0u8; 8],
             sprite_x: [0u8; 8],
@@ -266,7 +254,6 @@ impl PpuState {
         self.secondary_oam_count = 0;
         self.sprite_overflow = false;
         self.sprite0_hit = false;
-        self.sprite0_hit_dot = NO_SPRITE0_HIT_DOT;
         // Phase 6.1.e follow-up (VBL-block-phase alignment): frame
         // start is (sl 241, dot 0). See `PpuState::new` for rationale.
         self.scanline = 241;
@@ -278,13 +265,11 @@ impl PpuState {
         self.oam_dma_page = 0;
         self.oam_dma_counter = 0;
         self.bg_pshift = [0u16; 2];
-        self.bg_atlatch = 0;
-        self.bg_next_nt = 0;
-        self.bg_next_at = 0;
-        self.bg_next_pattern_lo = 0;
-        self.bg_next_pattern_hi = 0;
-        self.bg_primed = false;
-        self.bg_active = false;
+        self.bg_attr_shift = [0u16; 2];
+        self.bg_latch_nt = 0;
+        self.bg_latch_attr = 0;
+        self.bg_latch_lo = 0;
+        self.bg_latch_hi = 0;
         self.sprite_shift = [[0u8; 2]; 8];
         self.sprite_attr = [0u8; 8];
         self.sprite_x = [0u8; 8];

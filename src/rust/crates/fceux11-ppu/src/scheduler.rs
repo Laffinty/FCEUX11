@@ -376,24 +376,35 @@ mod tests {
         assert_eq!(bus.a12, 0, "dot-256 notify_a12_rising is retired");
     }
 
-    /// v2.1.3 batch 1: the MMC3-family IRQ clock is the FILTERED A12
-    /// rising edge. With rendering off there are no fetches and no
-    /// CPU-driven address changes, so no edges fire; with rendering on
-    /// and the standard CHR configuration ($2000 = $08: BG $0000,
-    /// sprites $1000, empty secondary OAM → dummy $FF fetches from
-    /// $1xxx) exactly one edge lands per fetch line — 241 per frame
-    /// (pre-render + 240 visible), the blargg 2.Details subtest 7
-    /// anchor. (This replaces the v2.1.2
-    /// `mapper_irq_clock_requires_rendering_enabled` hblank test.)
+    /// v2.1.3 batch 1/2: the MMC3-family IRQ clock is the FILTERED A12
+    /// rising edge reported by the background fetch pipeline. With
+    /// rendering off there are no fetches and no CPU-driven address
+    /// changes, so no edges fire; with rendering on and the standard CHR
+    /// configuration ($2000 = $08: BG $0000, sprites $1000) exactly one
+    /// edge lands per fetch line — 241 per frame (pre-render + 240
+    /// visible), the blargg 2.Details subtest 7 anchor.
     #[test]
     fn a12_edges_require_rendering_and_count_241_per_frame() {
+        use crate::rendering::{RenderWindows, tick_dot as render_dot};
+
         let frame_dots = DOTS_PER_SCANLINE as u32 * 262;
+        let nt = [0u8; 4096];
+        let chr = [0u8; 8192];
+        let palette = [0u8; 32];
+        let win = RenderWindows {
+            nt: &nt,
+            chr: &chr,
+            palette: &palette,
+            mirror: 0,
+        };
+        let mut fb = [0u8; 256 * 256];
 
         let mut sched = NesScheduler::new();
         let mut ppu = PpuState::new();
         ppu.registers.write_mask(0);
         let mut bus = HookCountBus::new();
         for _ in 0..frame_dots {
+            render_dot(&mut ppu, &mut bus, &win, &mut fb);
             let _ = sched.tick_one_ppu_dot(&mut ppu, &mut bus);
         }
         assert_eq!(bus.a12, 0, "rendering off must not produce A12 edges");
@@ -404,12 +415,50 @@ mod tests {
         ppu.registers.write_mask(0x18); // BG + sprites on
         let mut bus = HookCountBus::new();
         for _ in 0..2 * frame_dots {
+            render_dot(&mut ppu, &mut bus, &win, &mut fb);
             let _ = sched.tick_one_ppu_dot(&mut ppu, &mut bus);
         }
         // 241 fetch lines per frame (pre-render + 240 visible) × 2
         // frames; the even-frame dot skip shortens frame 1 without
         // removing its pre-render line.
         assert_eq!(bus.a12, 482, "one filtered A12 edge per fetch line");
+
+        // Mid-frame rendering disable stops the fetches, so no further
+        // A12 edges come from fetch addresses. The one exception is the
+        // post-render handoff at (sl 240, dot 0), where the state machine
+        // drops the bus back to `v` and observes it (batch 1 design);
+        // with rendering off that observation is the only remaining one
+        // for the rest of the frame.
+        let mut sched = NesScheduler::new();
+        let mut ppu = PpuState::new();
+        ppu.registers.write_ctrl(0x08);
+        ppu.registers.write_mask(0x18);
+        let mut bus = HookCountBus::new();
+        let mut before_disable = 0;
+        let mut late_edges = 0;
+        for dot in 0..frame_dots {
+            if dot == 100 * DOTS_PER_SCANLINE as u32 {
+                before_disable = bus.a12;
+                ppu.registers.write_mask(0);
+            }
+            render_dot(&mut ppu, &mut bus, &win, &mut fb);
+            let before = bus.a12;
+            let _ = sched.tick_one_ppu_dot(&mut ppu, &mut bus);
+            if bus.a12 != before {
+                late_edges += 1;
+                assert_eq!(
+                    (ppu.scanline, ppu.dot),
+                    (240, 1),
+                    "only the post-render bus handoff may clock A12 after the disable"
+                );
+            }
+        }
+        assert!(before_disable > 0, "edges were counted while rendering");
+        assert_eq!(
+            bus.a12,
+            before_disable + late_edges,
+            "no fetch-driven A12 edges once rendering is disabled"
+        );
     }
 
     struct HookCountBus {
