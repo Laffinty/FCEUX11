@@ -204,9 +204,22 @@ kagamiqa_direct_matrix.json
 blargg_full_results.json
 blargg_full_output.txt
 blargg_full_stderr.txt
+# Local blargg batch-run outputs at repo root: the exact names scripts/_run_blargg.ps1
+# writes (blargg_result.json / blargg_stderr.txt) and versioned copies of manual
+# full-suite runs (e.g. blargg_v212_result.json). Reproduce with the runner +
+# tests/fixtures/blargg_manifest.json; the committed baselines live in
+# tests/fixtures/blargg_known_fail.json (governed — never regenerate casually).
+/blargg_result.json
+/blargg_stderr.txt
+/blargg_v*_result.json
+/blargg_v*_stderr.txt
 build/*_matrix.json
 build/*_baseline*.json
 build/*_accuracy*.md
 build/*_results*.json
 build/*_output*.txt
 tests/benchmarks/baseline_v1.0.local.json
+
+# Transient task artifacts under docs/ (same convention as the root-anchored
+# /_*.txt rules above): e.g. docs/_chlog_head.txt from the release changelog flow.
+/docs/_*.txt
