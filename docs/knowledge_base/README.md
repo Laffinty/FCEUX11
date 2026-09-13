@@ -6,12 +6,13 @@
 ## 1. 来源与许可
 
 - 来源：NESdev Wiki（https://www.nesdev.org/wiki/ ）。
-- 许可：据 owner 说明，NESdev Wiki 内容为公有领域（public domain），可自由用于本项目（GPLv2）。
+- 许可：据 owner 说明，NESdev Wiki 内容为公有领域（public domain），可自由用于本项目（GPLv2）。2026-09-13 复核：Wiki 的《Nesdev wiki:General disclaimer》原文写明 "Any information posted on this wiki is considered public domain … You can use the information from this wiki any way you want"，现行页脚也无 CC 声明（社区常误传为 CC BY-SA，经一手核验不成立）。
 - 每个文件头部都保留了原始页面 URL 与抓取日期，便于回溯与核对；如需引用第三方资料，请同样注明来源与许可。
+- 第三方许可红线（2026-09-13 研究核实，详见 reference/dot_ppu_designs.md §4）：**Mesen2 是 GPL-3.0，与本项目 GPLv2 不兼容——只可学习事实，禁止复制代码**；puNES/Nestopia/Nintendulator/FCEUX 为 GPL-2.0、ares 为 ISC，代码复用合法但须署名；blargg 测试 ROM 与聚合仓未声明许可，再分发需保留署名。
 
 ## 2. 目录结构与命名规范
 
-- 目录按硬件子系统划分：@ppu/@、@apu/@、@cart/@、@video/@（后续可加 @cpu/@、@system/@）。
+- 目录按硬件子系统划分：@ppu/@、@apu/@、@cart/@、@video/@，以及 @reference/@（参照实现设计综述与测试套件目录，2026-09-13 新增）（后续可加 @cpu/@、@system/@）。
 - 文件名统一使用小写 snake_case：
   - 子系统页面：@<subsystem>_<topic>.md@（例：@ppu_rendering.md@、@apu_frame_counter.md@）
   - 卡带 mapper：@mapper_<name>.md@（例：@mapper_mmc3.md@）
@@ -46,8 +47,14 @@
 | APU 帧计数器 | [apu/apu_frame_counter.md](apu/apu_frame_counter.md) | 帧中断线与 4017 |
 | iNES 头 | [cart/ines_header.md](cart/ines_header.md) | ROM 加载 |
 | NES 2.0 头 | [cart/nes2_header.md](cart/nes2_header.md) | 扩展头解析 |
-| MMC3 | [cart/mapper_mmc3.md](cart/mapper_mmc3.md) | A12 时钟与 IRQ 时序 |
+| MMC3 | [cart/mapper_mmc3.md](cart/mapper_mmc3.md) | A12 时钟与 IRQ 时序（逐字存档） |
+| Mapper IRQ 机制分类与 A12 watcher 参照 | [cart/mapper_irq_mechanisms.md](cart/mapper_irq_mechanisms.md) | MMC3 族/克隆/JY/MMC5/VRC 分类、Rev A/B、滤波取值边界、Mesen2 行为、问题游戏 |
 | NTSC 视频信号与调色板生成 | [video/ntsc_video.md](video/ntsc_video.md) | 颜色输出建模 |
+| 精灵评估与 OAM 渲染期行为 | [ppu/ppu_sprite_evaluation.md](ppu/ppu_sprite_evaluation.md) | 逐 dot 评估、OAM rot、overflow bug、OAM 衰减 |
+| Sprite-0 hit 规则与套件预期 | [ppu/ppu_sprite_hit.md](ppu/ppu_sprite_hit.md) | 命中判定、精确时序、blargg 逐项预期、优先级 MUX |
+| 渲染期寄存器写语义 | [ppu/ppu_mid_frame_writes.md](ppu/ppu_mid_frame_writes.md) | mid-frame 写 $2000/$2005/$2006/$2007、分屏滚动、游戏实践 |
+| 逐 dot PPU 参照设计综述 | [reference/dot_ppu_designs.md](reference/dot_ppu_designs.md) | Mesen2/Nintendulator/ares/puNES/Nestopia/FCEUX 设计与许可红线 |
+| 精度测试套件目录与集成现状 | [reference/accuracy_test_suites.md](reference/accuracy_test_suites.md) | blargg 套件覆盖、运行协议、当前 138/177、失败簇→批次映射 |
 
 ## 4. 与实现/计划文档的关系
 
@@ -66,8 +73,9 @@
 
 ## 6. 待补充来源（下一步）
 
-- NESdev Wiki 尚未抓取的页面：PPU sprite evaluation、APU DMC / APU length counter、CPU 内存映射、MMC1/VRC 系列 Mapper 页。
-- 其他权威资料：Mesen2 / Nestopia UE / ares 源码注释中的时序说明（作为交叉验证，不作为唯一依据）。
+- 2026-09-13 研究新增：PPU sprite evaluation / OAMADDR / sprite-0 hit / mid-frame 写语义 / MMC3 族 IRQ 机制 / 参照实现综述 / 测试套件目录（ppu/、cart/、reference/ 本轮新增条目）。
+- NESdev Wiki 尚未抓取的页面：APU DMC / APU length counter、CPU 内存映射、MMC1/VRC 系列 Mapper 页。
+- 其他权威资料：loopy 滚动文档与 Brad Taylor 2C02 技术参考的独立条目化（两文均无版权声明，转述需署名；摘要已并入 reference/dot_ppu_designs.md）。
 - 官方文档：NES 开发手册（如 Nintendo 的 2A03/2C02 手册扫描件，若可获得）。
 
 
