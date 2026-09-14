@@ -260,6 +260,55 @@ fn lookup_unchecked<'a>(state: *mut PpuState) -> &'a mut StateBox {
     unsafe { &mut *(state as *mut StateBox) }
 }
 
+// ---------------------------------------------------------------------
+// v2.1.3 batch 2.1: mid-frame write probe.
+//
+// When the environment variable `FCEUX11_MID_FRAME_WRITE_PROBE=1` is
+// set, every CPU write to a rendering-time PPU register ($2000 /
+// $2005 / $2006 / $2007) is logged to stderr with its
+// `(scanline, dot, register, value, delayed_until_dot)` tuple. The
+// probe is opt-in (zero overhead in production), and the output is
+// read by `tools/run_batch21_regression.ps1 -Probe` to investigate
+// per-ROM regressions that the synthetic tests don't cover. See
+// `docs/plans/v2.1.3_ppu_accuracy_plan.md` §4 batch 2.1 gate 7.
+// ---------------------------------------------------------------------
+#[inline]
+fn mid_frame_write_probe(
+    sb: &StateBox,
+    reg: &str,
+    val: u8,
+    delayed_until_dot: Option<u16>,
+) {
+    if !mid_frame_write_probe_enabled() {
+        return;
+    }
+    let sl = sb.state.scanline;
+    let dot = sb.state.dot;
+    let cpu_cycle = sb.current_cpu_cycle;
+    let pending = match (sb.state.v_addr_pending, sb.state.v_addr_delay) {
+        (Some(v), d) if d > 0 => format!("v_pending=0x{:04X} v_delay={}", v & 0x7FFF, d),
+        _ => String::new(),
+    };
+    let delay_str = match delayed_until_dot {
+        Some(target) => format!(" →+{} dots", target.saturating_sub(dot)),
+        None => String::new(),
+    };
+    eprintln!(
+        "[mfw-probe] cpu={} sl={} dot={} reg={} val=0x{:02X}{}{} {}",
+        cpu_cycle, sl, dot, reg, val, delay_str, if pending.is_empty() { "" } else { " " }, pending
+    );
+}
+
+#[inline]
+fn mid_frame_write_probe_enabled() -> bool {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ENABLED.get_or_init(|| {
+        std::env::var("FCEUX11_MID_FRAME_WRITE_PROBE")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true") || v.eq_ignore_ascii_case("yes"))
+            .unwrap_or(false)
+    })
+}
+
 fn drop_from_registry(state: *mut PpuState) {
     let key = state as usize;
     let mut registry = REGISTRY.lock().unwrap();
@@ -673,6 +722,12 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_write(state: *mut PpuState, addr: u16, 
                     // the counter reaches 0.
                     sb.state.v_addr_pending = Some(pending);
                     sb.state.v_addr_delay = 3;
+                    mid_frame_write_probe(
+                        sb,
+                        "$2006",
+                        val,
+                        Some(sb.state.dot.wrapping_add(3)),
+                    );
                     // A12 reporting for the rendering-off-style v
                     // push does NOT fire here — the address bus
                     // remains fetch-driven through the delay. The
@@ -699,6 +754,12 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_write(state: *mut PpuState, addr: u16, 
                     .registers
                     .write_data_rendering(&mut bus_adapter, val);
                 sb.state.vram_write_cooldown = 1;
+                mid_frame_write_probe(
+                    sb,
+                    "$2007",
+                    val,
+                    Some(sb.state.dot.wrapping_add(1)),
+                );
             } else {
                 sb.state
                     .registers
