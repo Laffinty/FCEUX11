@@ -448,6 +448,26 @@ pub(crate) fn execute_step<B: Bus + ?Sized>(
     base + extras
 }
 
+/// Batch 3a (v2.1.4 plan §2.1): peek the base cycle cost of the next
+/// instruction at `PC` **without executing it or mutating any state**.
+///
+/// Decode-only: one opcode fetch + table lookup. The scheduler's
+/// per-dot loop (`fceux11_run_frame_interleaved`) uses this to see the
+/// upcoming instruction boundary before granting CPU budget, which is
+/// the foundation for milestone 3b's write-landing precision
+/// (registers currently land at instruction-atomic granularity, plan
+/// v2.1.3 §15.1 E2). Not yet wired into the production loop.
+///
+/// Note: the opcode fetch goes through the bus, so peeking an opcode
+/// that lives in side-effect-mapped space (blargg's `cpu_exec_space`
+/// executes from `$4020+`) would double-read it. Production callers
+/// must either cache the byte or restrict peeking to non-MMIO PC
+/// ranges — decided at the 3b wiring, not here.
+pub fn peek_next_instruction_cycles<B: Bus + ?Sized>(state: &CpuState, bus: &mut B) -> u8 {
+    let opcode = bus.read(state.regs.pc);
+    info(opcode).base_cycles
+}
+
 /// Public step API: always invokes dispatch + execute atomically.
 /// Used by `tests/unofficial.rs`, `tests/opcodes.rs`, `tests/cycle_
 /// parity.rs`, `tests/interrupts.rs` — every test that does NOT
@@ -1460,5 +1480,86 @@ mod tests {
         assert_eq!(s.regs.a, 0x80);
         assert_eq!(s.regs.p & Flags::CARRY.bits(), 0);
         assert!(s.regs.p & Flags::NEGATIVE.bits() != 0);
+    }
+
+    // -----------------------------------------------------------------
+    // Batch 3a (v2.1.4 plan §2.1): peek_next_instruction_cycles.
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn peek_returns_base_cycles_without_mutating_state() {
+        let mut s = CpuState::new();
+        let mut bus = FlatBus::new();
+        // 0xA9 = LDA #imm (2 cycles), 0x8D = STA abs (4 cycles),
+        // 0x00 = BRK (7 cycles).
+        bus.mem[0x0000] = 0xA9;
+        bus.mem[0x0001] = 0x11;
+        bus.mem[0x0002] = 0x8D;
+        bus.mem[0x0003] = 0x00;
+        bus.mem[0x0004] = 0x20;
+        bus.mem[0x0005] = 0x00;
+        let before = (s.regs.pc, s.regs.a, s.regs.count, s.regs.tcount);
+
+        s.regs.pc = 0x0000;
+        assert_eq!(peek_next_instruction_cycles(&s, &mut bus), 2, "LDA #imm");
+        assert_eq!(
+            (s.regs.pc, s.regs.a, s.regs.count, s.regs.tcount),
+            before,
+            "peek must not mutate CPU state"
+        );
+        s.regs.pc = 0x0002;
+        let before = (s.regs.pc, s.regs.a, s.regs.count, s.regs.tcount);
+        assert_eq!(peek_next_instruction_cycles(&s, &mut bus), 4, "STA abs");
+        assert_eq!(
+            (s.regs.pc, s.regs.a, s.regs.count, s.regs.tcount),
+            before,
+            "peek must not mutate CPU state"
+        );
+        s.regs.pc = 0x0005;
+        let before = (s.regs.pc, s.regs.a, s.regs.count, s.regs.tcount);
+        assert_eq!(peek_next_instruction_cycles(&s, &mut bus), 7, "BRK");
+        assert_eq!(
+            (s.regs.pc, s.regs.a, s.regs.count, s.regs.tcount),
+            before,
+            "peek must not mutate CPU state"
+        );
+        // ...and must not run the instruction (A unchanged, mem intact).
+        assert_eq!(bus.mem[0x0001], 0x11);
+    }
+
+    #[test]
+    fn peek_matches_step_cost_for_a_sample_of_opcodes() {
+        // Cross-check against the executed cost for opcodes with no
+        // runtime-dependent extras: base == actual for these.
+        let cases: &[(u8, u8)] = &[
+            (0xEA, 2), // NOP
+            (0xA5, 3), // LDA zp
+            (0xAD, 4), // LDA abs
+            (0x85, 3), // STA zp
+            (0x8D, 4), // STA abs
+            (0xE6, 5), // INC zp
+            (0x20, 6), // JSR abs
+            (0x60, 6), // RTS
+        ];
+        for &(op, expected) in cases {
+            let mut s = CpuState::new();
+            s.regs.s = 0xFD;
+            s.regs.p = Flags::UNUSED.bits() | Flags::IRQ_DIS.bits();
+            let mut bus = FlatBus::new();
+            bus.mem[0] = op;
+            bus.mem[1] = 0x34;
+            bus.mem[2] = 0x12;
+            s.regs.pc = 0;
+            assert_eq!(
+                peek_next_instruction_cycles(&s, &mut bus),
+                expected,
+                "peek mismatch for opcode {op:#04X}"
+            );
+            let actual = step(&mut s, &mut bus);
+            assert_eq!(
+                actual, expected,
+                "executed cost mismatch for opcode {op:#04X}"
+            );
+        }
     }
 }

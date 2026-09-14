@@ -437,6 +437,35 @@ pub unsafe extern "C" fn fceux11_cpu_advance_cycles(state: *mut u8, n: i32) {
     }
 }
 
+/// Batch 3a (v2.1.4 plan §2.1): peek the base cycle cost of the next
+/// instruction at `PC`, read-only. Returns 0 for a null state.
+///
+/// Mirrors [`fceux11_cpu_run_ticks`]'s working-copy load (blob in,
+/// `set_blob_ptr`, `CppBus::new`) but performs NO execution and NO
+/// write-back — the C++ blob is untouched. The per-dot loop
+/// (`fceux11_run_frame_interleaved`) will use this at milestone 3b to
+/// see the upcoming instruction boundary before granting CPU budget.
+/// Not yet called from production code.
+///
+/// Caveat inherited from [`peek_next_instruction_cycles`]: the opcode
+/// fetch goes through the bus, so peeking code that lives in
+/// side-effect-mapped space double-reads it. Not a concern while the
+/// only callers are unit tests on a flat bus; revisit at the 3b
+/// wiring.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_cpu_peek_next_instruction_cycles(state: *mut u8) -> u8 {
+    if state.is_null() {
+        return 0;
+    }
+    unsafe {
+        FFI_CPU_STATE.regs = *(state as *const X6502Layout);
+        crate::cpu::bus::set_blob_ptr(state as *mut X6502Layout);
+        let mut bus = CppBus::new();
+        let state_ptr = core::ptr::addr_of!(FFI_CPU_STATE);
+        crate::cpu::execute::peek_next_instruction_cycles(&*state_ptr, &mut bus)
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tests — exercise the FFI surface on a synthetic 64-byte buffer so we
 // can build + run the crate without C++ linkage. These are pure-Rust
