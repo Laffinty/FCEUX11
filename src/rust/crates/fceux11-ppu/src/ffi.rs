@@ -717,11 +717,18 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_write(state: *mut PpuState, addr: u16, 
                     .write_addr_rendering(val)
                 {
                     // Second write: queue the v commit and arm the
-                    // 3-PPU-dot countdown. The per-dot consumer in
-                    // `crate::rendering::tick_dot` will commit when
-                    // the counter reaches 0.
+                    // 1-PPU-dot countdown (Lidnariq PPU_glitches
+                    // wiki: "on the next pixel"). The per-dot
+                    // consumer in `crate::rendering::tick_dot` will
+                    // commit when the counter reaches 0. The KB §1.1
+                    // value of 3 PPU dots is the Mesen2 VisualNES
+                    // calibration, which folds several 2C02 pipeline
+                    // effects (early-write open-bus, the dot 257/258
+                    // t-coarse-X shoot-through) into a single
+                    // 3-dot budget; the bare-hardware 2C02 commits
+                    // on the next pixel.
                     sb.state.v_addr_pending = Some(pending);
-                    sb.state.v_addr_delay = 3;
+                    sb.state.v_addr_delay = 1;
                     mid_frame_write_probe(
                         sb,
                         "$2006",
