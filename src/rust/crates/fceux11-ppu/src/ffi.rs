@@ -273,29 +273,21 @@ fn lookup_unchecked<'a>(state: *mut PpuState) -> &'a mut StateBox {
 // `docs/plans/v2.1.3_ppu_accuracy_plan.md` §4 batch 2.1 gate 7.
 // ---------------------------------------------------------------------
 #[inline]
-fn mid_frame_write_probe(
-    sb: &StateBox,
-    reg: &str,
-    val: u8,
-    delayed_until_dot: Option<u16>,
-) {
+fn mid_frame_write_probe(sb: &StateBox, reg: &str, val: u8, ctx: u16) {
     if !mid_frame_write_probe_enabled() {
         return;
     }
     let sl = sb.state.scanline;
     let dot = sb.state.dot;
     let cpu_cycle = sb.current_cpu_cycle;
-    let pending = match (sb.state.v_addr_pending, sb.state.v_addr_delay) {
-        (Some(v), d) if d > 0 => format!("v_pending=0x{:04X} v_delay={}", v & 0x7FFF, d),
-        _ => String::new(),
-    };
-    let delay_str = match delayed_until_dot {
-        Some(target) => format!(" →+{} dots", target.saturating_sub(dot)),
-        None => String::new(),
-    };
+    // ctx = the loopy address the write is about to consume: for $2007
+    // this is the pre-write `v` (the VRAM cell being targeted); for
+    // $2000/$2005/$2006 it is the post-write `t` (what v will become on
+    // the next commit/copy). Plan §16 P1 attribution needs the target
+    // cell, not just the landing dot.
     eprintln!(
-        "[mfw-probe] cpu={} sl={} dot={} reg={} val=0x{:02X}{}{} {}",
-        cpu_cycle, sl, dot, reg, val, delay_str, if pending.is_empty() { "" } else { " " }, pending
+        "[mfw-probe] cpu={} sl={} dot={} reg={} val=0x{:02X} ctx=0x{:04X} mask=0x{:02X}",
+        cpu_cycle, sl, dot, reg, val, ctx & 0x7FFF, sb.state.registers.mask
     );
 }
 
@@ -628,9 +620,7 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_write(state: *mut PpuState, addr: u16, 
             // visible-line $2000 write so its landing dot is on
             // record. (Plan §15.5: the batch 2.1 dot-257 race that
             // consumed the recorded dot was reverted; see §15.2/§15.3.)
-            if rendering_2007(sb) {
-                mid_frame_write_probe(sb, "$2000", val, None);
-            }
+            mid_frame_write_probe(sb, "$2000", val, sb.state.registers.t);
         }
         1 => {
             // v2.1.3 batch 1: disabling rendering mid-frame drops the
@@ -673,9 +663,7 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_write(state: *mut PpuState, addr: u16, 
             sb.state.registers.write_scroll(val);
             // Audit probe (2026-09-14): same rationale as the $2000
             // probe — the split idiom writes $2005 twice mid-frame.
-            if rendering_2007(sb) {
-                mid_frame_write_probe(sb, "$2005", val, None);
-            }
+            mid_frame_write_probe(sb, "$2005", val, sb.state.registers.t);
         }
         6 => {
             // v2.1.3 batch 1: only the SECOND `$2006` write commits
@@ -695,10 +683,9 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_write(state: *mut PpuState, addr: u16, 
             sb.state.registers.write_addr(val);
             if sb.state.registers.v != v_before {
                 // Second write committed. Probe visible-line writes so
-                // split-scroll landing dots stay on record (§15.6).
-                if rendering_2007(sb) {
-                    mid_frame_write_probe(sb, "$2006", val, None);
-                }
+                // split-scroll landing dots stay on record (§15.6);
+                // ctx = the committed t (= v).
+                mid_frame_write_probe(sb, "$2006", val, sb.state.registers.t);
                 a12_report_v(sb, &mut bus_adapter);
             }
         }
@@ -709,6 +696,11 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_write(state: *mut PpuState, addr: u16, 
             // 6 sees the A12 jump on the same CPU instruction.)
             let v_before = sb.state.registers.v;
             let mut bus_adapter = make_bus_adapter(sb);
+            // Audit probe (2026-09-14): $2007 writes on any scanline
+            // (the vblank NTAM update stream is the interstitial-card
+            // attribution target); ctx = pre-write v, i.e. the exact
+            // VRAM cell this byte lands in (plan §16 P1).
+            mid_frame_write_probe(sb, "$2007", val, v_before);
             sb.state.registers.write_data(
                 &mut bus_adapter,
                 sb.state.registers.ctrl,
@@ -717,11 +709,6 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_write(state: *mut PpuState, addr: u16, 
             );
             if sb.state.registers.v != v_before {
                 a12_report_v(sb, &mut bus_adapter);
-            }
-            // Audit probe (2026-09-14): visible-line $2007 writes (the
-            // brick-bump / water-tile idiom) with their landing dots.
-            if rendering_2007(sb) {
-                mid_frame_write_probe(sb, "$2007", val, None);
             }
         }
         _ => {}
