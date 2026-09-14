@@ -146,18 +146,6 @@ fn report_bus<B: PpuBus + ?Sized>(state: &mut PpuState, bus: &mut B, addr: u16) 
     }
 }
 
-/// Audit probe (2026-09-14): opt-in race-fire logging, keyed on the
-/// same `FCEUX11_MID_FRAME_WRITE_PROBE` env var as the CPU-write probe
-/// in `crate::ffi`. Zero overhead when unset.
-fn race_probe_enabled() -> bool {
-    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ENABLED.get_or_init(|| {
-        std::env::var("FCEUX11_MID_FRAME_WRITE_PROBE")
-            .map(|v| v == "1" || v.eq_ignore_ascii_case("true") || v.eq_ignore_ascii_case("yes"))
-            .unwrap_or(false)
-    })
-}
-
 /// Advance the background pipeline by one PPU dot and emit the pixel
 /// that dot produces.
 ///
@@ -174,90 +162,17 @@ pub fn tick_dot<B: PpuBus + ?Sized>(
     let sl = state.scanline;
     let dot = state.dot;
 
-    // v2.1.3 batch 2.1: mid-frame PPU register write delay queue. Run
-    // before the per-dot fetch so the BG fetch this dot performs sees
-    // any cooldown that just hit zero.
-    //
-    // Order of decrements matches the KB `ppu/ppu_mid_frame_writes.md`
-    // §1 / Mesen2 `UpdateState` flow: $2006 second write v commit
-    // fires before the BG fetch group's first NT/AT/PT access; $2007
-    // write v increment fires after the BG fetch; the read cooldown
-    // is observed by the next `$2007` read in the CPU path
-    // (`crate::ffi::fceux11_ppu_cpu_read`), not here.
-    //
-    // v2.1.3 batch 2.1 hotfix (2026-09-14, owner-reported freeze on
-    // 3186_Mario_1.nes): the per-dot decrement is skipped entirely
-    // when we are crossing the frame boundary (scanline -1 dot 0).
-    // Without this guard, a CPU write that armed a $2006 delay in
-    // the previous frame's post-render line would, on the new
-    // frame's pre-render line, have its delay elapse and the
-    // pending v commit would clobber `v` exactly when the new
-    // frame is supposed to copy_vertical (scanline -1 dot 280).
-    // The visible symptom was the status bar text row going blank
-    // mid-game: a `v` mutated at scanline -1 dot 280 means
-    // `copy_vertical` ran AFTER the clobber, so the new frame's
-    // top 8 pixels were drawn with the wrong coarse-Y / fine-Y.
-    // We pin the decrement to a positive scanline range and let
-    // the pre-render / post-render lines keep their existing state
-    // untouched (the queue's $2006 commit still fires; it just
-    // fires on scanline >= 0 dots, which is the first scanline the
-    // BG fetch actually draws).
-    let in_visible_window = (0..=239).contains(&sl);
-    if in_visible_window {
-        if state.v_addr_delay > 0 {
-            state.v_addr_delay -= 1;
-            if state.v_addr_delay == 0 {
-                if let Some(pending) = state.v_addr_pending.take() {
-                    state.registers.commit_v_addr(pending);
-                }
-            }
-        }
-        if state.vram_write_cooldown > 0 {
-            state.vram_write_cooldown -= 1;
-            if state.vram_write_cooldown == 0 {
-                state.registers
-                    .commit_v_inc(state.registers.ctrl, true);
-            }
-        }
-        if state.vram_read_cooldown > 0 {
-            state.vram_read_cooldown -= 1;
-        }
-    }
-    // v2.1.3 batch 2.1: dot 257 open-bus race. A `$2000` or `$2005`
-    // CPU write at dot 255-257 of a visible scanline causes the
-    // nametable bits of `t` to be mixed with the open-bus latch low 2
-    // bits BEFORE the frame state machine's `copy_horizontal()` (which
-    // runs *after* this function for the same dot via
-    // `crate::frame::tick_dot`). Mesen2 calls this
-    // `ProcessTmpAddrScrollGlitch`; ares the same at `lx == 257`. The
-    // bug shows up in 3186_Mario_1.nes' title-screen WORLD text and
-    // any mid-screen split-scroll that writes $2000/$2005 within 2
-    // dots of the 257 boundary.
-    if dot == 257 && (0..=239).contains(&sl) {
-        let last = state.last_scroll_write_dot;
-        if last != 0xFFFF && last >= 255 && last <= 257 {
-            let open_bus = (state.registers.data_bus as u16) & 0x03;
-            // Audit probe (2026-09-14): log every actual race firing
-            // with the triggering write's dot, so field logs can be
-            // correlated with visible artifacts frame-by-frame.
-            if race_probe_enabled() {
-                eprintln!(
-                    "[mfw-race] sl={} dot=257 last_write_dot={} open_bus=0x{:02X} \
-                     t.nt {} -> {}",
-                    sl, last, open_bus,
-                    (state.registers.t >> 10) & 0x03,
-                    open_bus & 0x03,
-                );
-            }
-            state.registers.t =
-                (state.registers.t & !0x0C00) | (open_bus << 10);
-        }
-    }
-    // Clear `last_scroll_write_dot` at the scanline boundary so the
-    // dot 257 race only fires when the write happened *this* scanline.
-    if dot == 0 {
-        state.last_scroll_write_dot = 0xFFFF;
-    }
+    // NOTE (2026-09-14, plan §15.5 P0 revert): the batch 2.1 per-dot
+    // delay-queue consumer and the dot 257 open-bus race that lived here
+    // are removed. Field data (plan §15.2) showed the race fired on
+    // hardware-safe write timings (dots 255/256 vs the authoritative
+    // 257-258 window, KB `ppu_registers.md:120-124`) and corrupted `t`
+    // persistently instead of glitching only the next scanline — the
+    // direct cause of the owner-visible status-bar loss, wrong-nametable
+    // blocks and the sprite-0-hit polling freeze on 3186_Mario_1.nes.
+    // The queue state fields stay in `PpuState` (serialized, RPU1 v3
+    // layout) but are never armed; do not wire them back without probe
+    // evidence per plan §15.7.
 
     if !(0..=239).contains(&sl) {
         // Pre-render line: the full fetch cycle runs (it preloads the
@@ -1043,6 +958,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "ignored: batch 2.1 delay-queue consumer removed by the plan §15.5 P0 revert (behavior record only)"]
     fn mid_frame_addr_write_three_dot_delay_then_commit() {
         // Plan §4 batch 2.1 change point 1: a rendering-time $2006
         // second write commits v=t after 3 PPU dots. Set up a visible
@@ -1089,6 +1005,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "ignored: batch 2.1 delay-queue consumer removed by the plan §15.5 P0 revert (behavior record only)"]
     fn mid_frame_data_write_one_dot_delay_then_increment() {
         // Plan §4 batch 2.1 change point 2: a rendering-time $2007
         // write lands the byte on the bus immediately but defers the
@@ -1146,6 +1063,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "ignored: batch 2.1 dot-257 race removed by the plan §15.5 P0 revert — implementation contradicted KB ppu_registers.md:120-124 (see plan §15.3)"]
     fn dot_257_open_bus_race_with_scroll_write_at_dot_256() {
         // Plan §4 batch 2.1 change point 3: a $2005 (or $2000)
         // write within 0-2 dots of the dot 257 horizontal copy mixes
@@ -1220,6 +1138,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "ignored: batch 2.1 dot-257 race bookkeeping removed by the plan §15.5 P0 revert (behavior record only)"]
     fn last_scroll_write_dot_resets_at_scanline_boundary() {
         // The dot-0 reset of `last_scroll_write_dot` is what makes
         // the race per-scanline: a $2005 write at scanline N dot 300

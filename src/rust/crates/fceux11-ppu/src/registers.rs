@@ -391,6 +391,11 @@ impl Registers {
     /// second write the value goes into `t`, `write_toggle` flips back,
     /// and the method returns `Some(self.t)` so the caller can enqueue it.
     /// No `v = t` happens here.
+    // Unwired since the plan §15.5 P0 revert (2026-09-14): production
+    // write/read paths are synchronous again; kept as behavior record and
+    // exercised by the retained unit tests below. Do not wire back without
+    // probe evidence per plan §15.7.
+    #[allow(dead_code)]
     pub fn write_addr_rendering(&mut self, val: u8) -> Option<u16> {
         let mut pending: Option<u16> = None;
         if !self.write_toggle {
@@ -552,6 +557,11 @@ impl Registers {
     /// `crate::rendering::tick_dot` will call
     /// [`Self::commit_v_inc`] on the next dot to apply the same
     /// `increment_v` that would have run on the write dot.
+    // Unwired since the plan §15.5 P0 revert (2026-09-14): production
+    // write/read paths are synchronous again; kept as behavior record and
+    // exercised by the retained unit tests below. Do not wire back without
+    // probe evidence per plan §15.7.
+    #[allow(dead_code)]
     pub fn write_data_rendering<B: PpuBus + ?Sized>(&mut self, bus: &mut B, val: u8) {
         let v = self.v;
         let addr = self.mirror_data_addr(v);
@@ -567,6 +577,11 @@ impl Registers {
     /// [`Self::read_data`]). The C++ bridge sets `throttle_active =
     /// PpuState::vram_read_cooldown > 0` and arms the cooldown on
     /// every real read.
+    // Unwired since the plan §15.5 P0 revert (2026-09-14): production
+    // write/read paths are synchronous again; kept as behavior record and
+    // exercised by the retained unit tests below. Do not wire back without
+    // probe evidence per plan §15.7.
+    #[allow(dead_code)]
     pub fn read_data_throttled<B: PpuBus + ?Sized>(
         &mut self,
         bus: &mut B,
@@ -600,6 +615,11 @@ impl Registers {
     /// re-snapshotted `v` whose bit 15 was set by a stray open-bus
     /// write) would silently pollute the `v` increment for the
     /// rest of the frame.
+    // Unwired since the plan §15.5 P0 revert (2026-09-14): production
+    // write/read paths are synchronous again; kept as behavior record and
+    // exercised by the retained unit tests below. Do not wire back without
+    // probe evidence per plan §15.7.
+    #[allow(dead_code)]
     pub fn commit_v_addr(&mut self, pending: u16) {
         self.v = pending & 0x7FFF;
     }
@@ -610,6 +630,11 @@ impl Registers {
     /// the trailing `increment_v` of [`Self::write_data`] — kept as a
     /// named entry point so the per-dot consumer does not need to
     /// peek at `ctrl` / `rendering` to call the right path.
+    // Unwired since the plan §15.5 P0 revert (2026-09-14): production
+    // write/read paths are synchronous again; kept as behavior record and
+    // exercised by the retained unit tests below. Do not wire back without
+    // probe evidence per plan §15.7.
+    #[allow(dead_code)]
     pub fn commit_v_inc(&mut self, ctrl: u8, rendering: bool) {
         self.increment_v(ctrl, rendering);
     }
@@ -1185,6 +1210,7 @@ mod tests {
     // -----------------------------------------------------------------
 
     #[test]
+    #[ignore = "batch 2.1 per-dot delay queue unwired by plan §15.5 P0 revert (behavior record only)"]
     fn hotfix_repro_pending_v_must_commit_within_3_ppu_dots() {
         // Contract: when the queue is armed with delay=3, the per-dot
         // consumer in `crate::rendering::tick_dot` MUST decrement it
@@ -1253,6 +1279,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "batch 2.1 per-dot delay queue unwired by plan §15.5 P0 revert (behavior record only)"]
     fn hotfix_repro_cooldowns_must_not_leak_across_frame_boundary() {
         // Contract: if a $2007 write on a visible scanline arms the
         // 1-dot cooldown, the cooldown MUST commit exactly one v
@@ -1309,6 +1336,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "batch 2.1 per-dot delay queue unwired by plan §15.5 P0 revert (behavior record only)"]
     fn hotfix_repro_cooldowns_paused_outside_visible_window() {
         // Hotfix contract: the cooldown queue is paused outside the
         // visible scanline window (0..=239). A cooldown armed at
