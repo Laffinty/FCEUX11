@@ -346,6 +346,26 @@ fn write_payload(out: &mut [u8], state: &PpuState) {
     out[off + 3] = 0;
     off += 4;
 
+    // Batch 2.1 mid-frame write queue fields (payload 380..388). Plan
+    // §15.5: the queue is retained but never armed since the revert —
+    // these serialize the (always-default) fields so the documented
+    // v3 layout and the debug_assert below hold.
+    match state.v_addr_pending {
+        Some(v) => {
+            out[off] = 1;
+            out[off + 1..off + 3].copy_from_slice(&v.to_le_bytes());
+        }
+        None => {
+            out[off] = 0;
+            out[off + 1..off + 3].copy_from_slice(&[0, 0]);
+        }
+    }
+    out[off + 3] = state.v_addr_delay;
+    out[off + 4] = state.vram_read_cooldown;
+    out[off + 5] = state.vram_write_cooldown;
+    out[off + 6..off + 8].copy_from_slice(&state.last_scroll_write_dot.to_le_bytes());
+    off += 8;
+
     debug_assert_eq!(off, RPU1_PAYLOAD_SIZE as usize);
 }
 
@@ -442,6 +462,18 @@ fn read_payload(buf: &[u8], state: &mut PpuState) {
     state.sprite_eval_done = buf[off + 1] != 0;
     // off + 2..4 = trailing pad
     off += 4;
+
+    // Batch 2.1 mid-frame write queue fields (payload 380..388) — see
+    // the matching write_payload block; always default since the §15.5
+    // revert disarmed the queue.
+    let pending_tag = buf[off];
+    let pending_val = u16::from_le_bytes([buf[off + 1], buf[off + 2]]);
+    state.v_addr_pending = if pending_tag != 0 { Some(pending_val) } else { None };
+    state.v_addr_delay = buf[off + 3];
+    state.vram_read_cooldown = buf[off + 4];
+    state.vram_write_cooldown = buf[off + 5];
+    state.last_scroll_write_dot = u16::from_le_bytes([buf[off + 6], buf[off + 7]]);
+    off += 8;
 
     debug_assert_eq!(off, RPU1_PAYLOAD_SIZE as usize);
 }
