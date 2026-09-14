@@ -162,6 +162,58 @@ pub fn tick_dot<B: PpuBus + ?Sized>(
     let sl = state.scanline;
     let dot = state.dot;
 
+    // v2.1.3 batch 2.1: mid-frame PPU register write delay queue. Run
+    // before the per-dot fetch so the BG fetch this dot performs sees
+    // any cooldown that just hit zero.
+    //
+    // Order of decrements matches the KB `ppu/ppu_mid_frame_writes.md`
+    // §1 / Mesen2 `UpdateState` flow: $2006 second write v commit
+    // fires before the BG fetch group's first NT/AT/PT access; $2007
+    // write v increment fires after the BG fetch; the read cooldown
+    // is observed by the next `$2007` read in the CPU path
+    // (`crate::ffi::fceux11_ppu_cpu_read`), not here.
+    if state.v_addr_delay > 0 {
+        state.v_addr_delay -= 1;
+        if state.v_addr_delay == 0 {
+            if let Some(pending) = state.v_addr_pending.take() {
+                state.registers.commit_v_addr(pending);
+            }
+        }
+    }
+    if state.vram_write_cooldown > 0 {
+        state.vram_write_cooldown -= 1;
+        if state.vram_write_cooldown == 0 {
+            state.registers
+                .commit_v_inc(state.registers.ctrl, true);
+        }
+    }
+    if state.vram_read_cooldown > 0 {
+        state.vram_read_cooldown -= 1;
+    }
+    // v2.1.3 batch 2.1: dot 257 open-bus race. A `$2000` or `$2005`
+    // CPU write at dot 255-257 of a visible scanline causes the
+    // nametable bits of `t` to be mixed with the open-bus latch low 2
+    // bits BEFORE the frame state machine's `copy_horizontal()` (which
+    // runs *after* this function for the same dot via
+    // `crate::frame::tick_dot`). Mesen2 calls this
+    // `ProcessTmpAddrScrollGlitch`; ares the same at `lx == 257`. The
+    // bug shows up in 3186_Mario_1.nes' title-screen WORLD text and
+    // any mid-screen split-scroll that writes $2000/$2005 within 2
+    // dots of the 257 boundary.
+    if dot == 257 && (0..=239).contains(&sl) {
+        let last = state.last_scroll_write_dot;
+        if last != 0xFFFF && last >= 255 && last <= 257 {
+            let open_bus = (state.registers.data_bus as u16) & 0x03;
+            state.registers.t =
+                (state.registers.t & !0x0C00) | (open_bus << 10);
+        }
+    }
+    // Clear `last_scroll_write_dot` at the scanline boundary so the
+    // dot 257 race only fires when the write happened *this* scanline.
+    if dot == 0 {
+        state.last_scroll_write_dot = 0xFFFF;
+    }
+
     if !(0..=239).contains(&sl) {
         // Pre-render line: the full fetch cycle runs (it preloads the
         // first two tiles of scanline 0 and clocks the A12 watcher), but
@@ -913,5 +965,237 @@ mod tests {
         for x in 0..256 {
             assert_eq!(r[x], 0x90, "page 2 mirrors page 0 pixel {x}");
         }
+    }
+
+    // -----------------------------------------------------------------
+    // v2.1.3 batch 2.1 — mid-frame write delay integration tests.
+    //
+    // Each test drives a real per-dot loop (one `rendering::tick_dot`
+    // + one `frame::tick_dot` per dot) and asserts the timing of the
+    // commit hooks. The CPU writes themselves are simulated inline
+    // (the FFI `cpu_write` path lives behind a Mutex and is harder
+    // to drive from a unit test); the queue arming it does is what
+    // these tests verify.
+    // -----------------------------------------------------------------
+
+    /// Run `count` dot pairs (rendering tick + frame tick) on `state`
+    /// with a null bus and zeroed window. Used by the four
+    /// integration tests below to advance time without producing
+    /// meaningful pixels.
+    fn advance_dots(state: &mut PpuState, count: u32) {
+        let win = RenderWindows {
+            nt: &[0u8; 4096],
+            chr: &[0u8; 8192],
+            palette: &[0u8; 32],
+            mirror: 0,
+        };
+        let mut bus = FlatBus::new();
+        let mut fb = [0u8; 256 * 256];
+        for _ in 0..count {
+            tick_dot(state, &mut bus, &win, &mut fb);
+            crate::frame::tick_dot(state, &mut bus);
+        }
+    }
+
+    #[test]
+    fn mid_frame_addr_write_three_dot_delay_then_commit() {
+        // Plan §4 batch 2.1 change point 1: a rendering-time $2006
+        // second write commits v=t after 3 PPU dots. Set up a visible
+        // scanline at dot 100, simulate the two CPU writes (which the
+        // ffi.rs path bundles into the v_addr_pending queue), then
+        // run 3 dots and verify the commit happened.
+        let mut state = PpuState::new();
+        state.ppudead = 0;
+        state.scanline = 50;
+        state.dot = 100;
+        state
+            .registers
+            .write_mask(1 << mask_bits::SHOW_BG);
+        // First $2006 write: high byte into t.
+        let pending = state.registers.write_addr_rendering(0x21);
+        assert!(pending.is_none(), "first write has no pending v");
+        // Second $2006 write: low byte, returns the new t.
+        let pending = state.registers.write_addr_rendering(0xCA);
+        assert_eq!(pending, Some(0x21CA & 0x7FFF));
+        // The ffi.rs path now arms the queue.
+        state.v_addr_pending = pending;
+        state.v_addr_delay = 3;
+        // v is NOT updated yet.
+        assert_eq!(
+            state.registers.v, 0,
+            "v stays at prior value until 3-dot delay elapses"
+        );
+        // Run 1 dot: cooldown should drop 3 -> 2, no commit yet.
+        advance_dots(&mut state, 1);
+        assert_eq!(state.registers.v, 0, "dot 1: still 0");
+        assert_eq!(state.v_addr_delay, 2);
+        // Run 1 more dot: cooldown 2 -> 1, no commit.
+        advance_dots(&mut state, 1);
+        assert_eq!(state.registers.v, 0, "dot 2: still 0");
+        assert_eq!(state.v_addr_delay, 1);
+        // Run 1 more dot: cooldown 1 -> 0, commit fires.
+        advance_dots(&mut state, 1);
+        assert_eq!(
+            state.registers.v,
+            0x21CA & 0x7FFF,
+            "dot 3: v commit lands"
+        );
+        assert_eq!(state.v_addr_delay, 0);
+    }
+
+    #[test]
+    fn mid_frame_data_write_one_dot_delay_then_increment() {
+        // Plan §4 batch 2.1 change point 2: a rendering-time $2007
+        // write lands the byte on the bus immediately but defers the
+        // v increment by 1 PPU dot. Set v=0 (fv=0), do a render-time
+        // write, run 1 dot, verify v=0x1000 (commit_v_inc applied
+        // the field-wise Y walk: fv 0→1, no overflow).
+        let mut state = PpuState::new();
+        state.ppudead = 0;
+        state.scanline = 50;
+        state.dot = 100;
+        state
+            .registers
+            .write_mask(1 << mask_bits::SHOW_BG);
+        state.registers.v = 0x0000;
+        let mut bus = FlatBus::new();
+        // The ffi.rs path arms the cooldown after the rendering-time
+        // bus write. Replicate that here.
+        state.registers.write_data_rendering(&mut bus, 0x42);
+        assert_eq!(bus.cpu[0x0000], 0x42, "bus write is immediate");
+        state.vram_write_cooldown = 1;
+        // v unchanged after the write.
+        assert_eq!(state.registers.v, 0x0000, "v deferred at write dot");
+        // 1 dot later: cooldown hits 0, commit fires.
+        advance_dots(&mut state, 1);
+        assert_eq!(
+            state.registers.v, 0x1000,
+            "1 dot later: commit_v_inc applied (field-wise Y walk)"
+        );
+        assert_eq!(state.vram_write_cooldown, 0);
+    }
+
+    #[test]
+    fn mid_frame_data_write_no_increment_when_rendering_off() {
+        // Plan §4 batch 2.1 batch 2 contract: the rendering-off
+        // path keeps the immediate write_addr / write_data behaviour.
+        // The per-dot consumer must not see a cooldown when the FFI
+        // didn't arm one.
+        let mut state = PpuState::new();
+        state.ppudead = 0;
+        state.scanline = 50;
+        state.dot = 100;
+        // Mask is 0 (rendering off). v is already 0x2000.
+        state.registers.v = 0x2000;
+        let mut bus = FlatBus::new();
+        state.registers.write_data(&mut bus, 0, 0x42, false);
+        // The FFI rendering-off path doesn't arm the cooldown, so
+        // `advance_dots` shouldn't trigger a phantom commit.
+        advance_dots(&mut state, 5);
+        // v is whatever the immediate path left it at (0x2000 + 1
+        // under the +1 mode; field-wise Y walk would advance fv, but
+        // the immediate path was called with rendering=false so it
+        // went through the +1 / +32 branch).
+        assert_eq!(state.registers.v, 0x2001, "rendering-off v+1");
+        assert_eq!(state.vram_write_cooldown, 0, "no cooldown armed");
+    }
+
+    #[test]
+    fn dot_257_open_bus_race_with_scroll_write_at_dot_256() {
+        // Plan §4 batch 2.1 change point 3: a $2005 (or $2000)
+        // write within 0-2 dots of the dot 257 horizontal copy mixes
+        // the open-bus latch's low 2 bits into t.nametable.
+        let mut state = PpuState::new();
+        state.ppudead = 0;
+        state.scanline = 100;
+        state.dot = 250;
+        state
+            .registers
+            .write_mask(1 << mask_bits::SHOW_BG);
+        // coarse_x = 5, nametable bits = 0 in t.
+        state.registers.t = 0x0005;
+        // The ffi.rs path: CPU $2005 write at dot 256 records the dot
+        // and writes the new t.
+        state.registers.write_scroll(0xA5);
+        // t.coarse_x now 0x14; fine_x = 0xA5 & 0x07 = 5.
+        // Open-bus latch after the write holds 0xA5.
+        state.last_scroll_write_dot = 256;
+        // Run 8 dots: 7 from dot 250 land on dot 257, but the per-dot
+        // tick advances *after* each pair, so we need +8 to land on
+        // a tick_dot invocation whose `dot == 257` is the active
+        // condition.
+        advance_dots(&mut state, 8);
+        // After the race, t.nametable bits (10-11) should be the
+        // open-bus latch low 2 bits (0xA5 & 0x03 = 0x01).
+        let nt_bits = (state.registers.t >> 10) & 0x03;
+        assert_eq!(
+            nt_bits, 0x01,
+            "dot 257 race: t.nametable mixed with open-bus low 2 bits (latch=0xA5)"
+        );
+    }
+
+    #[test]
+    fn dot_257_no_race_when_scroll_write_far_from_boundary() {
+        // The dot 257 race is sensitive: a $2005 write at, say,
+        // dot 100 must NOT trigger the race. The dot-0
+        // `last_scroll_write_dot` reset ensures the window is
+        // per-scanline.
+        let mut state = PpuState::new();
+        state.ppudead = 0;
+        state.scanline = 100;
+        state.dot = 100;
+        state
+            .registers
+            .write_mask(1 << mask_bits::SHOW_BG);
+        state.registers.t = 0x2005; // nt bit 10 = 1
+        state.registers.write_scroll(0x42);
+        state.last_scroll_write_dot = 100; // far from 257
+        // The open-bus latch now holds 0x42 (low 2 = 0x02).
+        // Run to dot 257.
+        for _ in 0..(257 - 100) {
+            advance_dots(&mut state, 1);
+        }
+        // t.nametable bits should NOT have been mixed with the
+        // open-bus latch (the write was at dot 100, not 255-257).
+        let nt_bits = (state.registers.t >> 10) & 0x03;
+        // The scroll write updated t.coarse_x to 0x42 >> 3 = 0x08
+        // (low byte), but nt bits were not in 0x42 — t.bit 10 came
+        // from the original 0x2005 value.
+        // The post-write t should have:
+        //   t.coarse_x = 0x42 >> 3 = 0x08 (5 bits)
+        //   t.nametable_x = bit 10 (untouched by $2005 first write)
+        // We can't strictly assert "untouched" because
+        // increment_coarse_x etc. might have run, but the open-bus
+        // race's distinguishing symptom is the *mixing* — so we
+        // assert nt_bits != 0x02 (the open-bus low 2 from 0x42).
+        assert_ne!(
+            nt_bits, 0x02,
+            "no open-bus race when $2005 was written at dot 100"
+        );
+    }
+
+    #[test]
+    fn last_scroll_write_dot_resets_at_scanline_boundary() {
+        // The dot-0 reset of `last_scroll_write_dot` is what makes
+        // the race per-scanline: a $2005 write at scanline N dot 300
+        // must not leak into scanline N+1 dot 257.
+        let mut state = PpuState::new();
+        state.ppudead = 0;
+        state.scanline = 50;
+        state.dot = 200;
+        state
+            .registers
+            .write_mask(1 << mask_bits::SHOW_BG);
+        state.registers.write_scroll(0xAA);
+        state.last_scroll_write_dot = 200;
+        // 142 dots wraps scanline 50 (340 -> 51,0) AND the next
+        // tick_dot pair lands on dot 0 of scanline 51, where the
+        // reset runs. (141 would land on dot 340, where the
+        // `dot == 0` reset is not active.)
+        advance_dots(&mut state, 142);
+        assert_eq!(
+            state.last_scroll_write_dot, 0xFFFF,
+            "dot 0 of new scanline clears the per-scanline race window"
+        );
     }
 }

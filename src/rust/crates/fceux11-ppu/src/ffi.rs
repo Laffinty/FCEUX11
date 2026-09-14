@@ -475,15 +475,39 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_read(state: *mut PpuState, addr: u16) -
                     refresh_windows: None,
                 }),
             };
-            let ret = sb
-                .state
-                .registers
-                .read_data(&mut bus_adapter, sb.state.registers.ctrl, rendering_2007(sb));
-            // v2.1.3 batch 1: the post-read v increment pushes the new
-            // address onto the PPU bus when the PPU isn't rendering —
-            // blargg MMC3 test 3 subtest 5 counts that 0→1 A12 jump.
-            if sb.state.registers.v != v_before {
-                a12_report_v(sb, &mut bus_adapter);
+            // v2.1.3 batch 2.1: rendering-time reads go through the
+            // 6-PPU-dot throttle. `vram_read_cooldown` is set by the
+            // per-dot consumer (`crate::rendering::tick_dot`) and
+            // armed by every real read. Reads inside the cooldown
+            // window return the buffered byte without touching the
+            // bus or `v`. Rendering-off reads are unthrottled
+            // (matches the pre-batch-2.1 behaviour and the C++ new
+            // PPU's `_ignoreVramRead` gating on `PPU[1] & 0x18`).
+            let throttle = rendering_2007(sb)
+                && sb.state.vram_read_cooldown > 0;
+            let ret = sb.state.registers.read_data_throttled(
+                &mut bus_adapter,
+                sb.state.registers.ctrl,
+                rendering_2007(sb),
+                throttle,
+            );
+            if !throttle {
+                if rendering_2007(sb) {
+                    // Arm the cooldown for the next 6 PPU dots.
+                    sb.state.vram_read_cooldown = 6;
+                }
+                // v2.1.3 batch 1: the post-read v increment pushes
+                // the new address onto the PPU bus when the PPU
+                // isn't rendering — blargg MMC3 test 3 subtest 5
+                // counts that 0→1 A12 jump. With rendering on, the
+                // cooldown window starts now and `v` only changes
+                // after the cooldown expires (handled implicitly by
+                // the immediate read; the bus-watch call below
+                // compares the post-increment v against the
+                // pre-read v).
+                if sb.state.registers.v != v_before {
+                    a12_report_v(sb, &mut bus_adapter);
+                }
             }
             return ret;
         }
@@ -564,6 +588,16 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_write(state: *mut PpuState, addr: u16, 
             // TriggerNMI2 with the C++ CPU's nmi_fresh semantics), NOT
             // here. See ppu_rust_bridge_cpu_write.
             sb.state.registers.write_ctrl(val);
+            // v2.1.3 batch 2.1: record this write's dot for the
+            // dot 257 open-bus race (rendering-time $2000 writes
+            // within 0-2 dots of dot 257 cause t.nametable bits to
+            // mix with the open-bus latch).
+            if sb.state.rendering_enabled()
+                && sb.state.scanline >= 0
+                && sb.state.scanline < 240
+            {
+                sb.state.last_scroll_write_dot = sb.state.dot;
+            }
         }
         1 => {
             // v2.1.3 batch 1: disabling rendering mid-frame drops the
@@ -579,6 +613,13 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_write(state: *mut PpuState, addr: u16, 
                 if sb.state.a12.observe(v) {
                     bus_adapter.notify_a12_rising();
                 }
+            }
+            // v2.1.3 batch 2.1: rendering off clears the throttle so
+            // a later $2007 read (e.g. reading palette entries) is
+            // not artificially held back by a stale window from the
+            // last visible-line read.
+            if !sb.state.rendering_enabled() {
+                sb.state.vram_read_cooldown = 0;
             }
         }
         2 => {
@@ -597,31 +638,74 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_write(state: *mut PpuState, addr: u16, 
             sb.state.registers.increment_oam_addr();
         }
         5 => {
+            // v2.1.3 batch 2.1: $2005 always commits to t
+            // immediately (its `fine_x` is observed by the BG fetch
+            // pipeline on the very next dot). What we need to
+            // record is "did a $2005 write happen near dot 257?", to
+            // drive the open-bus race in `crate::rendering::tick_dot`.
             sb.state.registers.write_scroll(val);
+            if sb.state.rendering_enabled()
+                && sb.state.scanline >= 0
+                && sb.state.scanline < 240
+            {
+                sb.state.last_scroll_write_dot = sb.state.dot;
+            }
         }
         6 => {
-            // v2.1.3 batch 1: only the SECOND `$2006` write commits
-            // `v = t` and thereby changes the PPU bus address when the
-            // PPU isn't rendering (blargg MMC3 test 3 subtests 2-4:
-            // first writes and A12-unchanged pairs never clock).
+            // v2.1.3 batch 2.1: $2006 second write commits `v = t`
+            // after a 3-PPU-dot delay when rendering is on (Mesen2
+            // VisualNES calibration, KB
+            // `ppu/ppu_mid_frame_writes.md` §1.1). Rendering-off
+            // writes are still synchronous so blargg MMC3 test 3
+            // subtests 2-4 can clock the A12 counter on the same
+            // CPU instruction.
             let v_before = sb.state.registers.v;
-            sb.state.registers.write_addr(val);
-            if sb.state.registers.v != v_before {
-                let mut bus_adapter = make_bus_adapter(sb);
-                a12_report_v(sb, &mut bus_adapter);
+            let mut bus_adapter = make_bus_adapter(sb);
+            if rendering_2007(sb) {
+                if let Some(pending) = sb
+                    .state
+                    .registers
+                    .write_addr_rendering(val)
+                {
+                    // Second write: queue the v commit and arm the
+                    // 3-PPU-dot countdown. The per-dot consumer in
+                    // `crate::rendering::tick_dot` will commit when
+                    // the counter reaches 0.
+                    sb.state.v_addr_pending = Some(pending);
+                    sb.state.v_addr_delay = 3;
+                    // A12 reporting for the rendering-off-style v
+                    // push does NOT fire here — the address bus
+                    // remains fetch-driven through the delay. The
+                    // delayed commit reports A12 in the per-dot
+                    // consumer when the v commit lands.
+                }
+            } else {
+                sb.state.registers.write_addr(val);
+                if sb.state.registers.v != v_before {
+                    a12_report_v(sb, &mut bus_adapter);
+                }
             }
         }
         7 => {
-            // $2007 data write.
+            // v2.1.3 batch 2.1: rendering-time $2007 write: bus write
+            // is immediate, v increment is delayed 1 PPU dot. With
+            // rendering off, the original immediate path is used so
+            // blargg MMC3 test 3 subtest 6 sees the A12 jump on the
+            // same CPU instruction.
             let v_before = sb.state.registers.v;
             let mut bus_adapter = make_bus_adapter(sb);
-            sb.state
-                .registers
-                .write_data(&mut bus_adapter, sb.state.registers.ctrl, val, rendering_2007(sb));
-            // v2.1.3 batch 1: the post-write v increment lands on the
-            // bus when not rendering (blargg MMC3 test 3 subtest 6).
-            if sb.state.registers.v != v_before {
-                a12_report_v(sb, &mut bus_adapter);
+            if rendering_2007(sb) {
+                sb.state
+                    .registers
+                    .write_data_rendering(&mut bus_adapter, val);
+                sb.state.vram_write_cooldown = 1;
+            } else {
+                sb.state
+                    .registers
+                    .write_data(&mut bus_adapter, sb.state.registers.ctrl, val, false);
+                if sb.state.registers.v != v_before {
+                    a12_report_v(sb, &mut bus_adapter);
+                }
             }
         }
         _ => {}

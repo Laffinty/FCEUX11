@@ -79,10 +79,16 @@
 //! | 368 | 8 | `sprite_x[0..7]` |
 //! | 376 | 1 | `sprite0_in_range` |
 //! | 377 | 1 | `sprite_eval_done` |
-//! | 378 | 2 | trailing pad (so payload size is a multiple of 4) |
+//! | 378 | 2 | trailing pad (so v2 payload size is a multiple of 4) |
+//! | 380 | 1 | `v_addr_pending` tag (0=None, 1=Some) |
+//! | 381 | 2 | `v_addr_pending` value (u16 LE, ignored when tag=0) |
+//! | 383 | 1 | `v_addr_delay` (u8) |
+//! | 384 | 1 | `vram_read_cooldown` (u8) |
+//! | 385 | 1 | `vram_write_cooldown` (u8) |
+//! | 386 | 2 | `last_scroll_write_dot` (u16 LE) |
 //!
-//! Payload size = 380 bytes. Total RPU1 size = 4 (magic) + 4 (version)
-//! + 4 (ts_ref) + 4 (payload_size) + 380 (payload) = 396 bytes.
+//! Payload size = 388 bytes. Total RPU1 size = 4 (magic) + 4 (version)
+//! + 4 (ts_ref) + 4 (payload_size) + 388 (payload) = 404 bytes.
 //!
 //! ## Versioning
 //!
@@ -118,16 +124,34 @@ pub const RPU1_MAGIC: [u8; 4] = *b"RPU1";
 
 /// Current RPU1 format version. Bump on any payload change.
 ///
-/// v2 (v2.1.3 batch 2): the 16-byte BG block now carries the per-dot
+/// v3 (v2.1.3 batch 2.1): the payload grows from 380 to 388 bytes to
+/// carry the mid-frame PPU register write delay queue (KB
+/// `ppu/ppu_mid_frame_writes.md` §1):
+/// - `v_addr_pending` (Option<u16>, 3 bytes: 1-byte tag + 2-byte LE
+///   value) and `v_addr_delay` (1 byte) for the 3-PPU-dot `$2006`
+///   second-write queue.
+/// - `vram_read_cooldown` (1 byte) for the 6-PPU-dot render-time
+///   `$2007` read throttle.
+/// - `vram_write_cooldown` (1 byte) for the 1-PPU-dot render-time
+///   `$2007` write v increment delay.
+/// - `last_scroll_write_dot` (2-byte LE) for the dot 257 open-bus
+///   race detection on `$2000`/`$2005` writes.
+///
+/// v1/v2 payloads must not be read as v3 (the field semantics are
+/// different). v3 readers that load a v2 chunk see all-0 in the
+/// appended bytes (defensive behaviour; the snapshotted state
+/// continues to work because the cooldowns start at 0).
+///
+/// v2 (v2.1.3 batch 2): the 16-byte BG block carries the per-dot
 /// pipeline state (`bg_attr_cur` / `bg_attr_next` / `bg_latch_*`) in
 /// place of the retired batch-renderer fields (`bg_atlatch` /
 /// `bg_next_*` / `bg_primed` / `bg_active`). Same size, different
 /// meaning — v1 payloads must not be read as v2.
-pub const RPU1_VERSION: u32 = 2;
+pub const RPU1_VERSION: u32 = 3;
 
 /// Total size of the RPU1 payload (everything after the 16-byte
-/// header). 380 bytes — see the layout table in the module docs.
-pub const RPU1_PAYLOAD_SIZE: u32 = 380;
+/// header). 388 bytes — see the layout table in the module docs.
+pub const RPU1_PAYLOAD_SIZE: u32 = 388;
 
 /// Total size of the RPU1 chunk on the wire (header + payload).
 /// Used by callers that want to size an `out` buffer without doing
