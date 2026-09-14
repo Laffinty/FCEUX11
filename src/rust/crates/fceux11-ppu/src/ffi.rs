@@ -647,6 +647,13 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_write(state: *mut PpuState, addr: u16, 
             {
                 sb.state.last_scroll_write_dot = sb.state.dot;
             }
+            // Audit probe (2026-09-14): the split-scroll idiom this
+            // ROM family uses is $2005/$2005/$2000 — log every
+            // visible-line $2000 write so its landing dot is on
+            // record (the dot-257 race window check reads this).
+            if rendering_2007(sb) {
+                mid_frame_write_probe(sb, "$2000", val, None);
+            }
         }
         1 => {
             // v2.1.3 batch 1: disabling rendering mid-frame drops the
@@ -698,6 +705,11 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_write(state: *mut PpuState, addr: u16, 
                 && sb.state.scanline < 240
             {
                 sb.state.last_scroll_write_dot = sb.state.dot;
+            }
+            // Audit probe (2026-09-14): same rationale as the $2000
+            // probe — the split idiom writes $2005 twice mid-frame.
+            if rendering_2007(sb) {
+                mid_frame_write_probe(sb, "$2005", val, None);
             }
         }
         6 => {

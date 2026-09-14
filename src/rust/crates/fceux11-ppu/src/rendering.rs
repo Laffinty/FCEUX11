@@ -146,6 +146,18 @@ fn report_bus<B: PpuBus + ?Sized>(state: &mut PpuState, bus: &mut B, addr: u16) 
     }
 }
 
+/// Audit probe (2026-09-14): opt-in race-fire logging, keyed on the
+/// same `FCEUX11_MID_FRAME_WRITE_PROBE` env var as the CPU-write probe
+/// in `crate::ffi`. Zero overhead when unset.
+fn race_probe_enabled() -> bool {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ENABLED.get_or_init(|| {
+        std::env::var("FCEUX11_MID_FRAME_WRITE_PROBE")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true") || v.eq_ignore_ascii_case("yes"))
+            .unwrap_or(false)
+    })
+}
+
 /// Advance the background pipeline by one PPU dot and emit the pixel
 /// that dot produces.
 ///
@@ -225,6 +237,18 @@ pub fn tick_dot<B: PpuBus + ?Sized>(
         let last = state.last_scroll_write_dot;
         if last != 0xFFFF && last >= 255 && last <= 257 {
             let open_bus = (state.registers.data_bus as u16) & 0x03;
+            // Audit probe (2026-09-14): log every actual race firing
+            // with the triggering write's dot, so field logs can be
+            // correlated with visible artifacts frame-by-frame.
+            if race_probe_enabled() {
+                eprintln!(
+                    "[mfw-race] sl={} dot=257 last_write_dot={} open_bus=0x{:02X} \
+                     t.nt {} -> {}",
+                    sl, last, open_bus,
+                    (state.registers.t >> 10) & 0x03,
+                    open_bus & 0x03,
+                );
+            }
             state.registers.t =
                 (state.registers.t & !0x0C00) | (open_bus << 10);
         }
