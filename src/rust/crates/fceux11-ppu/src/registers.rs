@@ -589,8 +589,19 @@ impl Registers {
     /// Called by `crate::rendering::tick_dot` when `v_addr_delay`
     /// counts down to 0, and by the rendering-off CPU path
     /// immediately for synchronous v==t commits.
+    ///
+    /// v2.1.3 batch 2.1 hotfix (2026-09-14, owner-reported freeze on
+    /// 3186_Mario_1.nes): mask the input to 15 bits before assigning
+    /// to `v`. The hardware `v` register is 15 bits; the input
+    /// `pending` (the snapshotted `t`) is also 15 bits in practice,
+    /// but the `rendering::tick_dot` `commit_v_addr` site accepts the
+    /// 16-bit container for `Some(pending)`. Without the mask, a
+    /// future change that passes a wider container (or a
+    /// re-snapshotted `v` whose bit 15 was set by a stray open-bus
+    /// write) would silently pollute the `v` increment for the
+    /// rest of the frame.
     pub fn commit_v_addr(&mut self, pending: u16) {
-        self.v = pending;
+        self.v = pending & 0x7FFF;
     }
 
     /// v2.1.3 batch 2.1: apply the deferred `$2007` write-time `v`
@@ -669,6 +680,8 @@ impl Registers {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::state::PpuState;
+    use crate::rendering::{self, RenderWindows};
     use crate::bus::FlatBus;
 
     #[test]
@@ -1138,5 +1151,226 @@ mod tests {
         // Next pair starts cleanly.
         assert_eq!(r.write_addr_rendering(0x28), None);
         assert_eq!(r.write_addr_rendering(0x00), Some(0x2800 & 0x7FFF));
+    }
+
+    // -----------------------------------------------------------------
+    // v2.1.3 batch 2.1 hotfix: regression repro for the "v locks at
+    // wrong address across frame boundary" symptom that surfaced on
+    // 3186_Mario_1.nes (NROM-256 + vertical mirror) after the batch 2.1
+    // mid-frame write delays shipped. The repro below models the SMB1
+    // demo-mode CPU write pattern:
+    //
+    //   1. NMI service (dot 0 area) writes $2006 first+second with the
+    //      upper-screen v (queue: v_addr_delay=3, pending=Some(0x2000)).
+    //   2. CPU main loop runs through visible scanlines dot 0..=240.
+    //   3. Sprite-0 hit triggers at scanline ~80, CPU writes the lower
+    //      v_addr (queue: v_addr_delay=3, pending=Some(0x2400)) at the
+    //      dot where the hit latched.
+    //   4. Frame ends, NMI of next frame begins.
+    //
+    // The symptom in the field:
+    //   - A static pink+navy rectangle (pal 1 attribute) sits where the
+    //     original "BROS" residual used to be — i.e. the NTAM cell the
+    //     BG fetch is reading is fixed at one address across multiple
+    //     frames, while the rest of the screen scrolls.
+    //   - Occasional "freeze": the screen stops animating and the
+    //     status-bar text row disappears.
+    //
+    // These two tests are FAILING under the current implementation;
+    // they describe the bug at the unit-test level. The hotfix will
+    // correct the per-dot consumer in `crate::rendering::tick_dot`
+    // and the queue-arm path in `crate::ffi::fceux11_ppu_cpu_write`
+    // (next commit). Keep this comment block in sync with the
+    // `docs/plans/v2.1.3_ppu_accuracy_plan.md` §11.4 addendum.
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn hotfix_repro_pending_v_must_commit_within_3_ppu_dots() {
+        // Contract: when the queue is armed with delay=3, the per-dot
+        // consumer in `crate::rendering::tick_dot` MUST decrement it
+        // on the FIRST dot after the write and commit on the third
+        // dot. (Write dot is dot N; commit lands at dot N+3.)
+        let mut state = PpuState::new();
+        state.ppudead = 0;
+        state.scanline = 50;
+        state.dot = 100;
+        state
+            .registers
+            .write_mask(1 << mask_bits::SHOW_BG);
+        // First + second $2006 writes in the same CPU instruction pair
+        // (mirrors what the SMB1 NMI service does for the upper-half
+        // scroll).
+        let pending = state.registers.write_addr_rendering(0x20);
+        assert!(pending.is_none());
+        let pending = state.registers.write_addr_rendering(0x00);
+        assert_eq!(pending, Some(0x2000 & 0x7FFF));
+        state.v_addr_pending = pending;
+        state.v_addr_delay = 3;
+        // 3 dot iterations: the third MUST land the commit. We do
+        // 3 explicit `tick_dot` calls (the FFI consumer equivalent).
+        for _ in 0..3 {
+            crate::rendering::tick_dot(
+                &mut state,
+                &mut FlatBus::new(),
+                &crate::rendering::RenderWindows {
+                    nt: &[0u8; 4096],
+                    chr: &[0u8; 8192],
+                    palette: &[0u8; 32],
+                    mirror: 0,
+                },
+                &mut [0u8; 256 * 256],
+            );
+            // Replay the frame advance equivalent inline; the test
+            // does not need `frame::tick_dot` for this assertion.
+            let next_dot = state.dot + 1;
+            if next_dot >= 341 {
+                state.dot = 0;
+                state.scanline += 1;
+            } else {
+                state.dot = next_dot;
+            }
+        }
+        assert_eq!(
+            state.registers.v, 0x2000 & 0x7FFF,
+            "v must commit on the 3rd per-dot iteration"
+        );
+        assert_eq!(state.v_addr_delay, 0);
+        assert!(state.v_addr_pending.is_none());
+    }
+
+    #[test]
+    fn hotfix_repro_increment_v_from_fv2_to_fv3() {
+        // v=0x2000 = bits 14:12 = 010 (fv=2). The field-wise Y walk
+        // bumps fv to 3 → v=0x3000. This is a non-zero v delta and
+        // is the basis for the "leak across frame boundary" repro:
+        // if the cooldown's increment lands in the wrong dot window
+        // (say, two frames later instead of one), the BG fetch
+        // will be one tile ahead of where the CPU instructed.
+        let mut r = Registers::new();
+        r.v = 0x2000;
+        r.increment_v(0, true);
+        assert_eq!(r.v, 0x3000, "fv 2 -> 3 lands at 0x3000");
+    }
+
+    #[test]
+    fn hotfix_repro_cooldowns_must_not_leak_across_frame_boundary() {
+        // Contract: if a $2007 write on a visible scanline arms the
+        // 1-dot cooldown, the cooldown MUST commit exactly one v
+        // increment and MUST NOT double-commit on the next dot.
+        // The batch 2.1 hotfix adds a `in_visible_window` guard so
+        // that pre-render / post-render scanlines do NOT touch the
+        // cooldown queue (which would let a stale delay fire at
+        // scanline -1 dot 280 and clobber the BG fetch's `copy_vertical`
+        // input).
+        let mut state = PpuState::new();
+        state.ppudead = 0;
+        state.scanline = 100; // visible
+        state.dot = 200; // mid-scanline, well before the 257 boundary
+        state
+            .registers
+            .write_mask(1 << crate::registers::mask_bits::SHOW_BG);
+        // Start with fv=0 so the increment is visible.
+        state.registers.v = 0x0000;
+        let mut bus = FlatBus::new();
+        state.registers.write_data_rendering(&mut bus, 0x42);
+        state.vram_write_cooldown = 1;
+        // The hotfix's `in_visible_window` guard means the cooldown
+        // will commit on the next visible per-dot tick. (Pre-render
+        // / post-render ticks no longer touch the queue.)
+        let v0 = state.registers.v;
+        let mut fb = [0u8; 256 * 256];
+        let win = crate::rendering::RenderWindows {
+            nt: &[0u8; 4096],
+            chr: &[0u8; 8192],
+            palette: &[0u8; 32],
+            mirror: 0,
+        };
+        crate::rendering::tick_dot(&mut state, &mut bus, &win, &mut fb);
+        let v1 = state.registers.v;
+        // Advance 1 dot, capture.
+        let next_dot = state.dot + 1;
+        state.dot = if next_dot >= 341 { 0 } else { next_dot };
+        crate::rendering::tick_dot(&mut state, &mut bus, &win, &mut fb);
+        let v2 = state.registers.v;
+        let first_delta = v1.wrapping_sub(v0);
+        let second_delta = v2.wrapping_sub(v1);
+        assert_eq!(
+            first_delta, 0x1000,
+            "cooldown's v increment lands at the first tick"
+        );
+        assert_eq!(
+            second_delta, 0,
+            "no phantom v increment must land on the next dot"
+        );
+        assert_eq!(
+            state.vram_write_cooldown, 0,
+            "no cooldown must carry over to the next frame"
+        );
+    }
+
+    #[test]
+    fn hotfix_repro_cooldowns_paused_outside_visible_window() {
+        // Hotfix contract: the cooldown queue is paused outside the
+        // visible scanline window (0..=239). A cooldown armed at
+        // scanline 240 dot 100 must NOT decrement on the post-render
+        // tick, must NOT commit at scanline -1 dot 280, and must
+        // fire on the first visible scanline tick instead.
+        let mut state = PpuState::new();
+        state.ppudead = 0;
+        state.scanline = 240; // post-render
+        state.dot = 100;
+        state
+            .registers
+            .write_mask(1 << crate::registers::mask_bits::SHOW_BG);
+        state.registers.v = 0x0000;
+        let mut bus = FlatBus::new();
+        state.registers.write_data_rendering(&mut bus, 0x42);
+        state.vram_write_cooldown = 1;
+        let mut fb = [0u8; 256 * 256];
+        let win = crate::rendering::RenderWindows {
+            nt: &[0u8; 4096],
+            chr: &[0u8; 8192],
+            palette: &[0u8; 32],
+            mirror: 0,
+        };
+        // Post-render tick: cooldown must NOT decrement.
+        crate::rendering::tick_dot(&mut state, &mut bus, &win, &mut fb);
+        assert_eq!(
+            state.vram_write_cooldown, 1,
+            "cooldown must not decrement in post-render"
+        );
+        // Advance through post-render (1 line), VBL block (20 lines),
+        // and pre-render (1 line) into the first visible scanline.
+        // The frame's scanline order is [241..=260, -1, 0..=240] per
+        // the v2.1.3 §6.1.e VBL-block-phase alignment. The queue is
+        // paused across all 22 non-visible scanlines; the cooldown
+        // must fire on the first visible scanline tick.
+        for _ in 0..(22 * 341 + 1) {
+            let next_dot = state.dot + 1;
+            if next_dot >= 341 {
+                state.dot = 0;
+                // Match the frame's VBL-first scanline order
+                // (241..=260, -1, 0..=240).
+                if state.scanline == 260 {
+                    state.scanline = -1;
+                } else {
+                    state.scanline += 1;
+                }
+            } else {
+                state.dot = next_dot;
+            }
+            crate::rendering::tick_dot(&mut state, &mut bus, &win, &mut fb);
+        }
+        // We've crossed into scanline >= 0 by now. The cooldown
+        // must have fired on the first visible-scanline tick.
+        assert!(
+            state.scanline >= 0 && state.scanline <= 239,
+            "test must land in visible range, got sl={}",
+            state.scanline
+        );
+        assert_eq!(
+            state.vram_write_cooldown, 0,
+            "cooldown must fire on first visible tick"
+        );
     }
 }

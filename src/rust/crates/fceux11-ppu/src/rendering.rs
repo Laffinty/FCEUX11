@@ -172,23 +172,44 @@ pub fn tick_dot<B: PpuBus + ?Sized>(
     // write v increment fires after the BG fetch; the read cooldown
     // is observed by the next `$2007` read in the CPU path
     // (`crate::ffi::fceux11_ppu_cpu_read`), not here.
-    if state.v_addr_delay > 0 {
-        state.v_addr_delay -= 1;
-        if state.v_addr_delay == 0 {
-            if let Some(pending) = state.v_addr_pending.take() {
-                state.registers.commit_v_addr(pending);
+    //
+    // v2.1.3 batch 2.1 hotfix (2026-09-14, owner-reported freeze on
+    // 3186_Mario_1.nes): the per-dot decrement is skipped entirely
+    // when we are crossing the frame boundary (scanline -1 dot 0).
+    // Without this guard, a CPU write that armed a $2006 delay in
+    // the previous frame's post-render line would, on the new
+    // frame's pre-render line, have its delay elapse and the
+    // pending v commit would clobber `v` exactly when the new
+    // frame is supposed to copy_vertical (scanline -1 dot 280).
+    // The visible symptom was the status bar text row going blank
+    // mid-game: a `v` mutated at scanline -1 dot 280 means
+    // `copy_vertical` ran AFTER the clobber, so the new frame's
+    // top 8 pixels were drawn with the wrong coarse-Y / fine-Y.
+    // We pin the decrement to a positive scanline range and let
+    // the pre-render / post-render lines keep their existing state
+    // untouched (the queue's $2006 commit still fires; it just
+    // fires on scanline >= 0 dots, which is the first scanline the
+    // BG fetch actually draws).
+    let in_visible_window = (0..=239).contains(&sl);
+    if in_visible_window {
+        if state.v_addr_delay > 0 {
+            state.v_addr_delay -= 1;
+            if state.v_addr_delay == 0 {
+                if let Some(pending) = state.v_addr_pending.take() {
+                    state.registers.commit_v_addr(pending);
+                }
             }
         }
-    }
-    if state.vram_write_cooldown > 0 {
-        state.vram_write_cooldown -= 1;
-        if state.vram_write_cooldown == 0 {
-            state.registers
-                .commit_v_inc(state.registers.ctrl, true);
+        if state.vram_write_cooldown > 0 {
+            state.vram_write_cooldown -= 1;
+            if state.vram_write_cooldown == 0 {
+                state.registers
+                    .commit_v_inc(state.registers.ctrl, true);
+            }
         }
-    }
-    if state.vram_read_cooldown > 0 {
-        state.vram_read_cooldown -= 1;
+        if state.vram_read_cooldown > 0 {
+            state.vram_read_cooldown -= 1;
+        }
     }
     // v2.1.3 batch 2.1: dot 257 open-bus race. A `$2000` or `$2005`
     // CPU write at dot 255-257 of a visible scanline causes the
