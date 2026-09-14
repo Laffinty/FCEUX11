@@ -188,6 +188,61 @@ pub struct PpuState {
     /// delays the next filtered edge by at most one low-period
     /// measurement.
     pub a12: A12Watcher,
+
+    // -----------------------------------------------------------------
+    // v2.1.3 batch 2.1: mid-frame PPU register write delay queue.
+    //
+    // Hardware does NOT make $2006/$2007 writes visible to the fetch
+    // pipeline on the very next dot. Per Mesen2 (VisualNES calibration)
+    // and `docs/knowledge_base/ppu/ppu_mid_frame_writes.md` §1:
+    // - $2006 second write: v = t is delayed 3 PPU dots.
+    // - $2007 render-time read: 6 PPU dot throttle (subsequent reads
+    //   within the window return the buffered value, no v increment).
+    // - $2007 render-time write: v increment delayed 1 PPU dot.
+    // - $2000/$2005 dot 257 write: open-bus race on the nametable bits.
+    //
+    // The queue lives in PpuState (not Registers) because the per-dot
+    // consumer is `crate::rendering::tick_dot` and the per-write
+    // producer is `crate::ffi::fceux11_ppu_cpu_write`. RPU1 v3
+    // (snapshot bump) carries these five fields across savestate;
+    // values that fall to 0 are not actively cleared to keep RPU1
+    // layout additive.
+    // -----------------------------------------------------------------
+    /// v2.1.3 batch 2.1: pending `$2006` second-write v value, applied
+    /// to `registers.v` when `v_addr_delay` counts down to 0. The
+    /// [`crate::rendering::tick_dot`] per-dot consumer decrements
+    /// `v_addr_delay` on every dot while rendering is enabled; with
+    /// rendering off the C++ bridge calls `apply_pending_v_addr`
+    /// immediately (matches pre-batch-2.1 behaviour; blargg MMC3 test 3
+    /// subtests 2-4 rely on rendering-off v==t synchrony for the A12
+    /// counter to clock).
+    pub v_addr_pending: Option<u16>,
+    /// v2.1.3 batch 2.1: PPU-dot count-down for the pending `$2006`
+    /// second write. 0 = no pending write. Reset to 3 on every
+    /// `$2006` second write; cleared when the value is committed.
+    pub v_addr_delay: u8,
+    /// v2.1.3 batch 2.1: 6 PPU dot throttle for rendering-time
+    /// `$2007` reads. 0 = no throttle active. After a real `$2007`
+    /// read with rendering on, this is set to 6 and decremented every
+    /// dot; reads while `> 0` return the buffered value and skip the
+    /// v increment. Cleared immediately when rendering turns off (the
+    /// off-state bus path is unthrottled).
+    pub vram_read_cooldown: u8,
+    /// v2.1.3 batch 2.1: 1 PPU dot delay for rendering-time `$2007`
+    /// write v increment. The bus write (and PALRAM/NTAM update) lands
+    /// immediately; only the v increment is delayed. Reset to 1 on
+    /// every rendering-time `$2007` write; cleared when the increment
+    /// is applied.
+    pub vram_write_cooldown: u8,
+    /// v2.1.3 batch 2.1: dot of the most recent `$2000` or `$2005`
+    /// CPU write in the current scanline. Used by
+    /// [`crate::rendering::tick_dot`] at dot 257 to detect the
+    /// open-bus race (`$2000`/`$2005` written 0-2 dots before dot 257
+    /// has the new nametable bits mixed with the open-bus latch on
+    /// `t` → `v` horizontal copy; mesen2 `ProcessTmpAddrScrollGlitch`).
+    /// 0xFFFF sentinel means "no recent scroll/ctrl write this
+    /// scanline". Cleared on `scanline` advance.
+    pub last_scroll_write_dot: u16,
 }
 
 impl Default for PpuState {
@@ -241,6 +296,11 @@ impl PpuState {
             sprite_eval_done: false,
             ppudead: 1,
             a12: A12Watcher::new(),
+            v_addr_pending: None,
+            v_addr_delay: 0,
+            vram_read_cooldown: 0,
+            vram_write_cooldown: 0,
+            last_scroll_write_dot: 0xFFFF,
         }
     }
 
@@ -276,6 +336,13 @@ impl PpuState {
         self.sprite0_in_range = false;
         self.sprite_eval_done = false;
         self.a12 = A12Watcher::new();
+        // v2.1.3 batch 2.1: mid-frame write delay queue is transient
+        // microstate and clears on power/reset.
+        self.v_addr_pending = None;
+        self.v_addr_delay = 0;
+        self.vram_read_cooldown = 0;
+        self.vram_write_cooldown = 0;
+        self.last_scroll_write_dot = 0xFFFF;
     }
 
     /// Plan §0.8 step 1D.1: apply the NESdev PPU frame timing

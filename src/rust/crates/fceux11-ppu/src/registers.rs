@@ -355,6 +355,17 @@ impl Registers {
     }
 
     /// `$2006` write — double-write VRAM address.
+    ///
+    /// **v2.1.3 batch 2.1 (mid-frame writes)**: this method keeps the
+    /// pre-batch behaviour of `v = t` on the second write. The render-time
+    /// delayed path is [`Self::write_addr_rendering`], used by
+    /// `crate::ffi::fceux11_ppu_cpu_write` when rendering is on, which
+    /// writes `t` but defers `v = t` to the 3-PPU-dot queue in
+    /// `crate::state::PpuState::v_addr_pending` / `v_addr_delay`.
+    /// Rendering-off writes still call this method directly so the
+    /// rendering-off bus path is synchronous (blargg MMC3 test 3 subtests
+    /// 2-4 require v==t to update the A12 counter on the same CPU
+    /// instruction).
     pub fn write_addr(&mut self, val: u8) {
         if !self.write_toggle {
             // First write: high 6 bits into bits 13..=8 of t.
@@ -366,6 +377,31 @@ impl Registers {
         }
         self.write_toggle = !self.write_toggle;
         self.data_bus = val;
+    }
+
+    /// v2.1.3 batch 2.1: render-time `$2006` write that does **not**
+    /// commit `v = t` on the second write. The caller
+    /// (`crate::ffi::fceux11_ppu_cpu_write`) is responsible for queueing
+    /// `v_addr_pending = Some(self.t)` and `v_addr_delay = 3`; the per-dot
+    /// consumer in `crate::rendering::tick_dot` commits the value when
+    /// the delay counts down to 0.
+    ///
+    /// On the first write the value goes into `t` and `write_toggle`
+    /// flips to "second pending" exactly as [`Self::write_addr`]. On the
+    /// second write the value goes into `t`, `write_toggle` flips back,
+    /// and the method returns `Some(self.t)` so the caller can enqueue it.
+    /// No `v = t` happens here.
+    pub fn write_addr_rendering(&mut self, val: u8) -> Option<u16> {
+        let mut pending: Option<u16> = None;
+        if !self.write_toggle {
+            self.t = (self.t & !0x3F00) | (((val as u16) & 0x3F) << 8);
+        } else {
+            self.t = (self.t & !0x00FF) | ((val as u16) & 0x00FF);
+            pending = Some(self.t);
+        }
+        self.write_toggle = !self.write_toggle;
+        self.data_bus = val;
+        pending
     }
 
     /// Copy the horizontal bits of `t` into `v` — called by the state
@@ -432,6 +468,13 @@ impl Registers {
     /// refresh the open-bus latch (matches the C++ reference's
     /// `PPUGenLatch = ret` after every PPU-side read at
     /// `src/ppu.cpp:855-870`).
+    ///
+    /// **v2.1.3 batch 2.1 (mid-frame writes)**: this method always
+    /// performs a real bus read and increments `v`; the render-time
+    /// 6-dot throttle is implemented by [`Self::read_data_throttled`]
+    /// which the `crate::ffi::fceux11_ppu_cpu_read` path calls when
+    /// `PpuState::vram_read_cooldown > 0` (it returns the buffered
+    /// value without touching `v` or the bus).
     pub fn read_data<B: PpuBus + ?Sized>(&mut self, bus: &mut B, ctrl: u8, rendering: bool) -> u8 {
         let v = self.v;
         let addr = self.mirror_data_addr(v);
@@ -486,12 +529,77 @@ impl Registers {
     /// `data_bus` (the internal PPU I/O bus for `$2005`/`$2006`
     /// open-bus readback) does refresh, matching the C++ reference
     /// `PPUGenLatch = V;` in `B2007` (`src/ppu.cpp:1093-1102`).
+    ///
+    /// **v2.1.3 batch 2.1 (mid-frame writes)**: this method performs
+    /// the bus write AND increments `v` immediately. The render-time
+    /// 1-dot delayed path is [`Self::write_data_rendering`], which the
+    /// `crate::ffi::fceux11_ppu_cpu_write` path uses when rendering is
+    /// on, to defer the `v` increment to the next PPU dot.
     pub fn write_data<B: PpuBus + ?Sized>(&mut self, bus: &mut B, ctrl: u8, val: u8, rendering: bool) {
         let v = self.v;
         let addr = self.mirror_data_addr(v);
         bus.write(addr, val);
         // vram_buffer intentionally NOT refreshed on $2007 write.
         self.data_bus = val;
+        self.increment_v(ctrl, rendering);
+    }
+
+    /// v2.1.3 batch 2.1: render-time `$2007` write. Writes the byte
+    /// to the bus immediately (so PALRAM/NTAM updates land now) and
+    /// refreshes the open-bus latch, but does **not** call
+    /// `increment_v`. The caller is responsible for queueing
+    /// `PpuState::vram_write_cooldown = 1`; the per-dot consumer in
+    /// `crate::rendering::tick_dot` will call
+    /// [`Self::commit_v_inc`] on the next dot to apply the same
+    /// `increment_v` that would have run on the write dot.
+    pub fn write_data_rendering<B: PpuBus + ?Sized>(&mut self, bus: &mut B, val: u8) {
+        let v = self.v;
+        let addr = self.mirror_data_addr(v);
+        bus.write(addr, val);
+        // vram_buffer intentionally NOT refreshed on $2007 write.
+        self.data_bus = val;
+    }
+
+    /// v2.1.3 batch 2.1: render-time `$2007` read with a 6-PPU-dot
+    /// throttle. If `throttle_active` is `true` the function returns
+    /// the buffered value without touching the bus or `v`; otherwise
+    /// it performs a real bus read and increments `v` (same as
+    /// [`Self::read_data`]). The C++ bridge sets `throttle_active =
+    /// PpuState::vram_read_cooldown > 0` and arms the cooldown on
+    /// every real read.
+    pub fn read_data_throttled<B: PpuBus + ?Sized>(
+        &mut self,
+        bus: &mut B,
+        ctrl: u8,
+        rendering: bool,
+        throttle_active: bool,
+    ) -> u8 {
+        if throttle_active {
+            // Cooldown window: return the current buffer without
+            // touching the bus or v. Per Mesen2 `_ignoreVramRead` /
+            // Nintendulator IOMode 6 PPU cycle behaviour. The
+            // open-bus latch is NOT refreshed on a throttled read
+            // (no real bus activity).
+            return self.vram_buffer;
+        }
+        self.read_data(bus, ctrl, rendering)
+    }
+
+    /// v2.1.3 batch 2.1: apply the queued `v_addr_pending` to `v`.
+    /// Called by `crate::rendering::tick_dot` when `v_addr_delay`
+    /// counts down to 0, and by the rendering-off CPU path
+    /// immediately for synchronous v==t commits.
+    pub fn commit_v_addr(&mut self, pending: u16) {
+        self.v = pending;
+    }
+
+    /// v2.1.3 batch 2.1: apply the deferred `$2007` write-time `v`
+    /// increment. Called by `crate::rendering::tick_dot` when
+    /// `vram_write_cooldown` counts down to 0. Identical in effect to
+    /// the trailing `increment_v` of [`Self::write_data`] — kept as a
+    /// named entry point so the per-dot consumer does not need to
+    /// peek at `ctrl` / `rendering` to call the right path.
+    pub fn commit_v_inc(&mut self, ctrl: u8, rendering: bool) {
         self.increment_v(ctrl, rendering);
     }
 
@@ -851,4 +959,184 @@ mod tests {
         assert_eq!(bus.cpu[0x3F10], 0, "the alias targets the 3F00 cell");
     }
 
+    // -----------------------------------------------------------------
+    // v2.1.3 batch 2.1 — mid-frame PPU register write delay semantics.
+    //
+    // The five new behaviours:
+    // 1. $2006 second write (rendering on): v=t is **deferred** to the
+    //    per-dot consumer; `write_addr_rendering` returns `Some(t)` and
+    //    leaves v unchanged.
+    // 2. $2007 read (rendering on): throttled inside a 6-PPU-dot
+    //    window; `read_data_throttled` returns the buffered value
+    //    without bus access or v increment.
+    // 3. $2007 write (rendering on): bus write is immediate, v
+    //    increment is deferred to the next dot; `write_data_rendering`
+    //    does not call `increment_v`.
+    // 4. $2006 second write (rendering off): still synchronous
+    //    `v = t` (matches pre-batch behaviour; blargg MMC3 test 3
+    //    subtests 2-4 require this).
+    // 5. `commit_v_addr` / `commit_v_inc` are the per-dot apply
+    //    hooks; the rendering loop calls them when the cooldowns
+    //    count to 0.
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn write_addr_rendering_defers_v_on_second_write() {
+        let mut r = Registers::new();
+        // First write: t gets the high 6 bits, no pending value.
+        assert_eq!(r.write_addr_rendering(0x21), None);
+        assert_eq!((r.t >> 8) & 0x3F, 0x21);
+        assert_eq!(r.v, 0, "v untouched on first write");
+        // Second write: t gets the low 8 bits AND we get the new t
+        // back for queueing; v is NOT yet updated.
+        let pending = r.write_addr_rendering(0xCA);
+        assert_eq!(pending, Some(0x21CA & 0x7FFF));
+        assert_eq!(r.t, 0x21CA & 0x7FFF);
+        assert_eq!(
+            r.v, 0,
+            "v stays at its prior value until commit_v_addr is called"
+        );
+        // The per-dot consumer calls commit_v_addr when the cooldown
+        // expires; verify that one-shot commit does the right thing.
+        r.commit_v_addr(pending.unwrap());
+        assert_eq!(r.v, 0x21CA & 0x7FFF);
+    }
+
+    #[test]
+    fn write_addr_rendering_does_not_dirty_write_toggle_polarity() {
+        // The first/second write toggle must behave identically to the
+        // immediate variant so the second-write detection in mesen2
+        // calibration (3-dot delay) lines up.
+        let mut r = Registers::new();
+        assert!(!r.write_toggle);
+        r.write_addr_rendering(0x21);
+        assert!(r.write_toggle, "first write sets toggle to true");
+        r.write_addr_rendering(0xCA);
+        assert!(!r.write_toggle, "second write resets toggle to false");
+    }
+
+    #[test]
+    fn write_addr_immediate_still_copies_v_for_rendering_off_path() {
+        // Backwards-compat: blargg MMC3 test 3 subtests 2-4 require
+        // v = t on the second $2006 write **when rendering is off**
+        // so the A12 counter clocks on the same CPU instruction.
+        let mut r = Registers::new();
+        r.write_addr(0x21);
+        r.write_addr(0xCA);
+        assert_eq!(r.v, 0x21CA & 0x7FFF);
+        assert_eq!(r.t, 0x21CA & 0x7FFF);
+    }
+
+    #[test]
+    fn write_data_rendering_writes_bus_but_defers_v_increment() {
+        let mut r = Registers::new();
+        let mut bus = FlatBus::new();
+        r.v = 0x0000;
+        r.write_data_rendering(&mut bus, 0x42);
+        // Bus was written immediately.
+        assert_eq!(bus.cpu[0x0000], 0x42, "bus write is immediate");
+        assert_eq!(r.data_bus, 0x42, "open-bus latch refreshed");
+        // v has NOT been incremented yet — the per-dot consumer
+        // will run `commit_v_inc` on the next dot.
+        assert_eq!(r.v, 0x0000, "v increment deferred");
+        // The trailing commit brings v forward exactly as the old
+        // immediate path did (rendering on, +1 → field-wise Y walk,
+        // fv 0 → 1 → v = 0x1000).
+        r.commit_v_inc(r.ctrl, true);
+        assert_eq!(r.v, 0x1000, "commit_v_inc matches the field-wise Y walk");
+    }
+
+    #[test]
+    fn commit_v_inc_matches_immediate_write_data_path() {
+        // Cross-check: starting from the same v, the deferred path
+        // (write_data_rendering + commit_v_inc) produces exactly the
+        // v the immediate path (write_data) would have produced.
+        let mut r_immediate = Registers::new();
+        r_immediate.v = 0x0000;
+        let mut bus_immediate = FlatBus::new();
+        r_immediate.write_data(&mut bus_immediate, 0, 0x42, true);
+
+        let mut r_deferred = Registers::new();
+        r_deferred.v = 0x0000;
+        let mut bus_deferred = FlatBus::new();
+        r_deferred.write_data_rendering(&mut bus_deferred, 0x42);
+        r_deferred.commit_v_inc(0, true);
+
+        assert_eq!(
+            r_immediate.v, r_deferred.v,
+            "deferred path v must equal immediate path v"
+        );
+    }
+
+    #[test]
+    fn read_data_throttled_skips_bus_and_v_during_cooldown() {
+        let mut r = Registers::new();
+        let mut bus = FlatBus::new();
+        bus.write(0x2000, 0xAB);
+        r.v = 0x2000;
+        // First read (no throttle): returns the prior buffer (0),
+        // refills the buffer from 0x2000, increments v (field-wise
+        // Y walk: fv 0→1, coarse_y 0, v_nt 0 → v = 0x3000).
+        let v0 = r.read_data_throttled(&mut bus, r.ctrl, true, false);
+        assert_eq!(v0, 0, "first real read returns prior buffer");
+        assert_eq!(r.vram_buffer, 0xAB, "buffer refilled from bus");
+        assert_eq!(r.v, 0x3000, "v incremented after first real read");
+        // Second read inside the throttle window: returns the
+        // buffered 0xAB, does NOT touch the bus, does NOT increment v.
+        let v1 = r.read_data_throttled(&mut bus, r.ctrl, true, true);
+        assert_eq!(v1, 0xAB, "throttled read returns the buffered byte");
+        assert_eq!(r.v, 0x3000, "v unchanged during throttle");
+        // Cooldown expires: third read is a real read again.
+        let v2 = r.read_data_throttled(&mut bus, r.ctrl, true, false);
+        assert_eq!(v2, 0xAB, "post-cooldown read returns the new buffer");
+        // v advances through another field-wise Y walk step.
+        let v_after = r.v;
+        assert!(v_after > 0x3000, "v increments after cooldown");
+    }
+
+    #[test]
+    fn read_data_throttled_does_not_refresh_open_bus_latch() {
+        // Mesen2 behaviour: a throttled read is "no real bus
+        // activity", so the open-bus latch is NOT refreshed. Without
+        // this, a burst of throttled reads leaks the buffer content
+        // back into $2002/$2005 readback.
+        let mut r = Registers::new();
+        let mut bus = FlatBus::new();
+        r.refresh_data_bus(0x77, 1000);
+        bus.write(0x2000, 0xAB);
+        r.v = 0x2000;
+        r.read_data_throttled(&mut bus, r.ctrl, true, true);
+        assert_eq!(
+            r.data_bus, 0x77,
+            "throttled read leaves the open-bus latch alone"
+        );
+    }
+
+    #[test]
+    fn commit_v_inc_matches_increment_v_for_rendering_off_path() {
+        // Sanity: commit_v_inc is a thin wrapper around increment_v
+        // for both rendering paths; check the +32 (VRAM_INCREMENT
+        // bit) path.
+        let mut r = Registers::new();
+        r.v = 0x1000;
+        r.commit_v_inc(1 << ctrl_bits::VRAM_INCREMENT, false);
+        assert_eq!(r.v, 0x1020, "rendering-off +32 path");
+        r.v = 0x1000;
+        r.commit_v_inc(0, false);
+        assert_eq!(r.v, 0x1001, "rendering-off +1 path");
+    }
+
+    #[test]
+    fn write_addr_rendering_double_toggle_then_rearm() {
+        // Two consecutive render-time $2006 pairs must each
+        // independently yield one `Some(t)` from the second write.
+        let mut r = Registers::new();
+        assert_eq!(r.write_addr_rendering(0x10), None);
+        assert_eq!(r.write_addr_rendering(0x00), Some(0x1000 & 0x7FFF));
+        // Pair ends — toggle reset to first-write position.
+        assert!(!r.write_toggle);
+        // Next pair starts cleanly.
+        assert_eq!(r.write_addr_rendering(0x28), None);
+        assert_eq!(r.write_addr_rendering(0x00), Some(0x2800 & 0x7FFF));
+    }
 }
