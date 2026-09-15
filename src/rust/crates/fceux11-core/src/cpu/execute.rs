@@ -31,8 +31,7 @@ pub const CYCLES_PER_CPU_CYCLE: i32 = 16;
 /// instruction's cost) and simply goes stale between instructions,
 /// which is fine: the only reader is a store handler invoked from
 /// inside an instruction.
-pub static LAST_FETCH_BASE: std::sync::atomic::AtomicU8 =
-    std::sync::atomic::AtomicU8::new(0);
+pub static LAST_FETCH_BASE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
 /// Base cycle cost of the instruction currently executing (0 outside
 /// instruction bodies). See [`LAST_FETCH_BASE`].
@@ -159,7 +158,7 @@ fn dispatch_irq<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
 
 /// Fetch one byte at PC and advance PC.
 #[inline]
-fn fetch<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
+pub(crate) fn fetch<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
     let pc = state.regs.pc;
     let op = state.rd(bus, pc);
     state.regs.pc = pc.wrapping_add(1);
@@ -286,6 +285,18 @@ pub(crate) fn execute_step<B: Bus + ?Sized>(
     // been left at the current PC (no dispatch) or moved to the
     // post-dispatch address (dispatch fired) by dispatch_irq.
     let opcode = fetch(state, bus);
+    execute_step_after_fetch(state, bus, opcode)
+}
+
+/// Batch 3c.2 increment i: the `execute_step` prologue + body for an
+/// ALREADY-fetched opcode. Shared between the atomic `execute_step` and
+/// the grant model's `microops::instruction_begin` (fallback path for
+/// non-eligible opcodes) so both run byte-identical semantics.
+pub(crate) fn execute_step_after_fetch<B: Bus + ?Sized>(
+    state: &mut CpuState,
+    bus: &mut B,
+    opcode: u8,
+) -> u8 {
     let op_info = info(opcode);
     let base = op_info.base_cycles;
     // Batch 3b: publish this instruction's base cost before any body
@@ -315,6 +326,20 @@ pub(crate) fn execute_step<B: Bus + ?Sized>(
     crate::cpu::tick::tick_post_body(base as i32);
     crate::cpu::tick::tick_pre_body(state);
 
+    execute_body(state, bus, opcode, op_info, base)
+}
+
+/// The per-opcode body of `execute_step` (the `match op_info.kind` plus
+/// the extras charge and cycle accumulation), split out so the grant
+/// model can reuse it for non-eligible opcodes. `base` has ALREADY been
+/// charged by the caller; this function only charges `extras`.
+pub(crate) fn execute_body<B: Bus + ?Sized>(
+    state: &mut CpuState,
+    bus: &mut B,
+    opcode: u8,
+    op_info: crate::cpu::decode::OpcodeInfo,
+    base: u8,
+) -> u8 {
     let mut extras = 0u8;
 
     match op_info.kind {
@@ -515,6 +540,19 @@ pub fn peek_next_instruction_cycles<B: Bus + ?Sized>(state: &CpuState, bus: &mut
 /// dispatch from execute to mirror the C++ early-exit at
 /// `src/x6502.cpp:586-588`.
 pub fn step<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
+    // Batch 3c.2 increment i: under the grant model a `step` call is one
+    // grant — continue a pending instruction, or dispatch + begin a new
+    // one (the begin fetches; eligible classes leave a continuation).
+    if crate::cpu::microops::micro_grant_enabled() {
+        if crate::cpu::microops::has_pending(state) {
+            return crate::cpu::microops::micro_op_step(state, bus);
+        }
+        let dc = dispatch_step(state, bus);
+        if dc != 0 {
+            crate::cpu::tick::tick_post_body(dc as i32);
+        }
+        return dc.saturating_add(crate::cpu::microops::instruction_begin(state, bus));
+    }
     let dc = dispatch_step(state, bus);
     if dc != 0 {
         // R2 fix: mirror the C++ dispatch `ADDCYC(7)` timestamp advance
@@ -722,7 +760,7 @@ fn branch_cond(state: &CpuState, opcode: u8) -> bool {
     }
 }
 
-fn load_reg_for_load(opcode: u8) -> LoadReg {
+pub(crate) fn load_reg_for_load(opcode: u8) -> LoadReg {
     match opcode {
         0xA9 | 0xA5 | 0xB5 | 0xAD | 0xBD | 0xB9 | 0xA1 | 0xB1 => LoadReg::A,
         0xA2 | 0xA6 | 0xB6 | 0xAE | 0xBE => LoadReg::X,
@@ -731,7 +769,7 @@ fn load_reg_for_load(opcode: u8) -> LoadReg {
     }
 }
 
-fn store_reg(state: &CpuState, opcode: u8) -> u8 {
+pub(crate) fn store_reg(state: &CpuState, opcode: u8) -> u8 {
     match opcode {
         // STA family
         0x85 | 0x95 | 0x8D | 0x9D | 0x99 | 0x81 | 0x91 => state.regs.a,
@@ -1358,12 +1396,30 @@ pub fn run<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, cycles: i32) -> i
     // `cycles` arrives already scaled (cycles_arg * 16) from the FFI
     // shim (see `fceux11_cpu_run_with_tick`).
     state.regs.count = state.regs.count.saturating_add(cycles);
+    // Batch 3c.2 increment i: hoist the grant-model flag (one atomic
+    // load per call; it cannot change mid-call).
+    let micro = crate::cpu::microops::micro_grant_enabled();
     // Top-of-loop budget check mirrors C++ `while (_count > 0)`: if the
     // residual from the previous call is already <= 0 (overdrawn), no
     // dispatch or instruction runs in this call — the loop exits
     // immediately. This is what keeps the per-call instruction count
     // identical to C++, including the cross-call residual behaviour.
     while state.regs.count > 0 {
+        // Batch 3c.2 increment i: a pending micro-op continuation is
+        // one grant — execute exactly one micro-op (48 units), then let
+        // the budget check schedule the next grant (3 dots later at the
+        // NTSC 16-units/dot rate). No IRQ sync / dispatch mid-instruction:
+        // interrupts are taken at instruction boundaries, and the sync
+        // cadence stays once per instruction exactly like the atomic
+        // model.
+        if micro && crate::cpu::microops::has_pending(state) {
+            let ic = crate::cpu::microops::micro_op_step(state, bus);
+            executed_cycles = executed_cycles.saturating_add(ic as i32);
+            if state.regs.jammed != 0 || ic == 0 {
+                break;
+            }
+            continue;
+        }
         // Pull in any IRQ lines asserted by the C++ side since the
         // last dispatch (mapper hooks, APU frame-counter IRQ via the
         // tick bridge mutate the C++ `IRQlow` blob mid-call, which our
@@ -1392,10 +1448,18 @@ pub fn run<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, cycles: i32) -> i
                 // the follow-up instruction entirely.
                 break;
             }
-            let ic = execute_step(state, bus, dc);
+            let ic = if micro {
+                crate::cpu::microops::instruction_begin(state, bus)
+            } else {
+                execute_step(state, bus, dc)
+            };
             executed_cycles = executed_cycles.saturating_add(ic as i32);
         } else {
-            let ic = execute_step(state, bus, 0);
+            let ic = if micro {
+                crate::cpu::microops::instruction_begin(state, bus)
+            } else {
+                execute_step(state, bus, 0)
+            };
             executed_cycles = executed_cycles.saturating_add(ic as i32);
         }
         if state.regs.jammed != 0 {

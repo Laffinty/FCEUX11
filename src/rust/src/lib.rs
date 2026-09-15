@@ -481,6 +481,36 @@ fn bus_access_hook_enabled() -> bool {
 }
 
 // =========================================================================
+// Batch 3c.2 increment i — unified grant model (FCEUX11_UNIFIED_GRANT).
+//
+// The grant model makes the interleave loop's existing budget arithmetic
+// grant exactly ONE CPU cycle per 3 PPU dots (NTSC; PAL 3.2 via the 15-
+// units/dot rate) and turns eligible instructions (increment i: ZP/Abs ×
+// Load/Store/Compare/Bit) into micro-op programs continued across
+// grants — every bus access lands on its datasheet cycle's dot instead
+// of the instruction's first dot. The core crate owns the mechanics
+// (`fceux11_core::cpu::microops`); this loop only:
+//   1. flips the core flag from the env var,
+//   2. skips the increment-1 bus-access hook (mutually exclusive — the
+//      hook advances the PPU mid-instruction, which the grant model
+//      already does structurally; enabling both would double-advance),
+//   3. drains any pending continuation at frame end so a frame boundary
+//      stays an instruction boundary (count-residual parity with the
+//      atomic model).
+//
+// Default OFF = v2.1.3 semantics, byte for byte (blargg 147 baseline).
+// =========================================================================
+
+fn unified_grant_enabled() -> bool {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ENABLED.get_or_init(|| {
+        std::env::var("FCEUX11_UNIFIED_GRANT")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true") || v.eq_ignore_ascii_case("yes"))
+            .unwrap_or(false)
+    })
+}
+
+// =========================================================================
 // v2.1 Phase 5.3 — in-Rust CPU/PPU per-dot interleave loop.
 //
 // Phase 5.1 drove the interleave from C++ (`FCEUPPU_Loop`): per dot it
@@ -577,7 +607,11 @@ pub unsafe extern "C" fn fceux11_run_frame_interleaved(
     // those are deducted from `budget` after each grant. With the hook
     // OFF the accounting is identical to the previous
     // `for _ in 0..dots` form.
-    let hook_on = bus_access_hook_enabled();
+    // Batch 3c.2 increment i: the unified grant model supersedes the
+    // hook — the two are mutually exclusive (double-advance risk).
+    let micro_on = unified_grant_enabled();
+    fceux11_core::cpu::set_micro_grant_enabled(micro_on);
+    let hook_on = bus_access_hook_enabled() && !micro_on;
     if hook_on {
         HOOK_PPU_STATE.store(ppu_state, std::sync::atomic::Ordering::Relaxed);
         fceux11_core::cpu::ffi::fceux11_cpu_set_bus_access_hook(Some(bus_access_hook_impl));
@@ -629,6 +663,13 @@ pub unsafe extern "C" fn fceux11_run_frame_interleaved(
             let adv = HOOK_ADVANCED_DOTS.swap(0, std::sync::atomic::Ordering::Relaxed);
             budget = budget.saturating_sub(adv);
         }
+    }
+    // Batch 3c.2 increment i: frame-end drain — finish a pending
+    // micro-op continuation back-to-back so a frame boundary is always
+    // an instruction boundary (savestate / per-frame-observer safety;
+    // count residual matches the atomic model's overdraw exactly).
+    if micro_on {
+        fceux11_core::cpu::ffi::fceux11_cpu_drain_micro_continuation(cpu_state);
     }
     if hook_on {
         HOOK_PPU_STATE.store(std::ptr::null_mut(), std::sync::atomic::Ordering::Relaxed);

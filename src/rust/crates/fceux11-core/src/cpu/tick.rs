@@ -194,9 +194,27 @@ pub fn run_with_tick<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, cycles:
     let mut executed_cycles = 0i32;
     // Add the per-call budget, exactly like C++ `_count += cycles*16`.
     state.regs.count = state.regs.count.saturating_add(cycles);
+    // Batch 3c.2 increment i: hoist the grant-model flag (one atomic
+    // load per call; it cannot change mid-call).
+    let micro = crate::cpu::microops::micro_grant_enabled();
     // Top-of-loop budget check mirrors C++ `while (_count > 0)` — an
     // overdrawn residual from the previous call exits immediately.
     while state.regs.count > 0 {
+        // Batch 3c.2 increment i: a pending micro-op continuation is
+        // one grant — execute exactly one micro-op (48 units), then let
+        // the budget check schedule the next grant (3 dots later at the
+        // NTSC 16-units/dot rate). No IRQ sync / dispatch
+        // mid-instruction: interrupts are taken at instruction
+        // boundaries, and the sync cadence stays once per instruction
+        // exactly like the atomic model.
+        if micro && crate::cpu::microops::has_pending(state) {
+            let ic = crate::cpu::microops::micro_op_step(state, bus);
+            executed_cycles = executed_cycles.saturating_add(ic as i32);
+            if state.regs.jammed != 0 || ic == 0 {
+                break;
+            }
+            continue;
+        }
         // Pull in any IRQ lines asserted by the C++ side since the
         // last dispatch — mapper hooks and the APU frame-counter IRQ
         // (fired by `FCEU_SoundCPUHook` in the tick thunk) mutate the
@@ -222,10 +240,18 @@ pub fn run_with_tick<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, cycles:
                 // instruction, no tick. This is the cycle-drift fix.
                 break;
             }
-            let ic = execute_step(state, bus, dc);
+            let ic = if micro {
+                crate::cpu::microops::instruction_begin(state, bus)
+            } else {
+                execute_step(state, bus, dc)
+            };
             executed_cycles = executed_cycles.saturating_add(ic as i32);
         } else {
-            let ic = execute_step(state, bus, 0);
+            let ic = if micro {
+                crate::cpu::microops::instruction_begin(state, bus)
+            } else {
+                execute_step(state, bus, 0)
+            };
             executed_cycles = executed_cycles.saturating_add(ic as i32);
         }
         // Phase 4 closeout: the pre-body mapper/APU hook and the

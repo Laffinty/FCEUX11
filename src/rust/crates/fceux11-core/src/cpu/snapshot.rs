@@ -42,6 +42,10 @@ impl CpuState {
             );
         }
         self.nmi_fresh = false;
+        // Batch 3c.2 increment i: the micro-op continuation is
+        // runtime-only and must not survive a restore (see the FFI
+        // `fceux11_cpu_restore` note).
+        self.micro = None;
     }
 }
 

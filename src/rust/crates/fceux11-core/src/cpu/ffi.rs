@@ -81,6 +81,7 @@ static mut FFI_CPU_STATE: CpuState = CpuState {
     nmi_fresh: false,
     cycles_in_run: 0,
     cycle_in_phase: 0,
+    micro: None,
 };
 
 /// Initialize the 64-byte CPU state to all-zeros.
@@ -99,6 +100,9 @@ pub unsafe extern "C" fn fceux11_cpu_init(state: *mut u8) {
         *layout = X6502Layout::zeroed();
         FFI_CPU_STATE.regs = X6502Layout::zeroed();
         FFI_CPU_STATE.nmi_fresh = false;
+        // Batch 3c.2 increment i: drop any in-flight micro-op
+        // continuation (runtime-only state, never in the blob).
+        FFI_CPU_STATE.micro = None;
     }
 }
 
@@ -129,6 +133,7 @@ pub unsafe extern "C" fn fceux11_cpu_power(state: *mut u8) {
         // Sync the side-state slot.
         FFI_CPU_STATE.regs = *layout;
         FFI_CPU_STATE.nmi_fresh = false;
+        FFI_CPU_STATE.micro = None;
     }
 }
 
@@ -147,6 +152,7 @@ pub unsafe extern "C" fn fceux11_cpu_reset(state: *mut u8) {
         let layout = &mut *(state as *mut X6502Layout);
         layout.irq_low = IrqSource::RESET.bits();
         FFI_CPU_STATE.regs = *layout;
+        FFI_CPU_STATE.micro = None;
     }
 }
 
@@ -355,6 +361,33 @@ pub unsafe extern "C" fn fceux11_cpu_run_ticks(state: *mut u8, ticks: i32) -> i3
     }
 }
 
+/// Batch 3c.2 increment i (unified grant model): finish any pending
+/// micro-op continuation back-to-back (no budget, no PPU advancement).
+///
+/// The root crate's interleave loop calls this at frame end so a frame
+/// boundary is always an instruction boundary — savestates and per-frame
+/// observers never see mid-instruction CPU state, and the `count`
+/// residual carried across the frame boundary matches the atomic model's
+/// overdraw exactly (the drained cycles charge 48 units each, identical
+/// to the atomic full-instruction charge).
+///
+/// No-op when no continuation is pending (grant model OFF, or the last
+/// instruction completed inside the frame budget).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_cpu_drain_micro_continuation(state: *mut u8) {
+    if state.is_null() {
+        return;
+    }
+    unsafe {
+        FFI_CPU_STATE.regs = *(state as *const X6502Layout);
+        crate::cpu::bus::set_blob_ptr(state as *mut X6502Layout);
+        let mut bus = CppBus::new();
+        let state_ptr = core::ptr::addr_of_mut!(FFI_CPU_STATE);
+        crate::cpu::microops::drain(&mut *state_ptr, &mut bus);
+        store_post_run_regs(state as *mut X6502Layout, &(*state_ptr).regs);
+    }
+}
+
 /// Snapshot the 64-byte CPU state to `out` (savestate path).
 ///
 /// Pure `copy_nonoverlapping` — byte-identical to the C++ blob, since
@@ -384,6 +417,12 @@ pub unsafe extern "C" fn fceux11_cpu_restore(state: *mut u8, inp: *const u8) {
         // restored regs and starts with a clean NMI-fresh flag.
         FFI_CPU_STATE.regs = *(state as *const X6502Layout);
         FFI_CPU_STATE.nmi_fresh = false;
+        // Batch 3c.2 increment i: a restored blob is an instruction-
+        // boundary snapshot (the interleave loop drains pending
+        // continuations at frame end), so the continuation state must
+        // NOT survive a restore — resuming a stale micro-op program
+        // against a restored PC would corrupt execution.
+        FFI_CPU_STATE.micro = None;
     }
 }
 

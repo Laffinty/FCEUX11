@@ -23,6 +23,7 @@ pub mod bus_hook;
 pub mod decode;
 pub mod execute;
 pub mod ffi;
+pub mod microops;
 pub mod snapshot;
 pub mod state;
 pub mod stepper;
@@ -31,6 +32,7 @@ pub mod tick;
 pub use addressing::{Bus, CpuState, ModeResult};
 pub use decode::{CYC_TABLE, OP_SIZE, OpKind, OpcodeInfo, info};
 pub use execute::{CYCLES_PER_CPU_CYCLE, run, step};
+pub use microops::{drain, micro_grant_enabled, set_micro_grant_enabled};
 pub use state::{Flags, IrqSource, X6502Layout, ZN_TABLE};
 pub use stepper::{CpuBusAccessHook, CpuStepper, HookBus};
 

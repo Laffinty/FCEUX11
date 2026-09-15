@@ -82,6 +82,11 @@ pub struct CpuState {
     /// read by the per-access PPU catch-up hook (see `cpu::bus_hook`).
     /// Runtime-only — not part of the 64-byte blob or savestates.
     pub cycle_in_phase: u8,
+    /// Batch 3c.2 increment i (unified grant model): continuation state
+    /// for an in-flight instruction, `None` at instruction boundaries.
+    /// See `cpu::microops`. Runtime-only — NOT part of the 64-byte blob;
+    /// cleared by every restore/power/init path.
+    pub micro: Option<crate::cpu::microops::MicroCont>,
 }
 
 impl CpuState {
