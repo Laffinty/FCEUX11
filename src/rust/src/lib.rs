@@ -234,7 +234,37 @@ pub unsafe extern "C" fn fceux11_ppu_cpu_write(
     addr: u16,
     val: u8,
 ) {
+    // Batch 3b (v2.1.4 plan §2, milestone 3b): defer PPU-register
+    // stores to their instruction's final cycle. The executing store's
+    // base cost is published by the CPU core (`execute_step`); the
+    // landing is `base*3 − 1` PPU dots after the instruction's start
+    // dot, delivered by the per-dot tick loops. Opt-in until the
+    // baseline-regeneration review lands: set
+    // `FCEUX11_WRITE_LANDING=1` to enable; default OFF reproduces the
+    // v2.1.3 release semantics bit-for-bit.
+    if write_landing_enabled()
+        && ((0x2000..=0x2007).contains(&addr) || addr == 0x4014)
+        && !state.is_null()
+    {
+        let base = fceux11_core::cpu::ffi::fceux11_cpu_last_fetch_base_cycles();
+        if base > 0 {
+            fceux11_ppu::ffi::fceux11_ppu_queue_deferred_register_write(
+                state, addr, val, base,
+            );
+            return;
+        }
+    }
     fceux11_ppu::ffi::fceux11_ppu_cpu_write(state, addr, val)
+}
+
+/// Batch 3b: `FCEUX11_WRITE_LANDING` opt-in switch (default OFF).
+fn write_landing_enabled() -> bool {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ENABLED.get_or_init(|| {
+        std::env::var("FCEUX11_WRITE_LANDING")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true") || v.eq_ignore_ascii_case("yes"))
+            .unwrap_or(false)
+    })
 }
 
 #[unsafe(no_mangle)]

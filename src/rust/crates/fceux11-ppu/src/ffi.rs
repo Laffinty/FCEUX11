@@ -586,8 +586,128 @@ pub unsafe extern "C" fn fceux11_ppu_take_nmi_pending(state: *mut PpuState) -> i
 /// Write to a CPU-visible PPU register (`$2000`————C`$2007`) or trigger
 /// `$4014` (OAM DMA). `addr` is the full CPU address; the function
 /// dispatches on `addr & 0x0007` (or `0x4014`).
+///
+/// This is the **immediate** entry: the write applies at the caller's
+/// current dot. When batch 3b write-landing is enabled, the ROOT
+/// crate's `fceux11_ppu_cpu_write` wrapper routes register stores to
+/// [`fceux11_ppu_queue_deferred_register_write`] instead (deferring
+/// the landing to the store instruction's final cycle); this entry
+/// then serves the flag-off path and the loop's own delivery
+/// re-dispatch.
 pub unsafe extern "C" fn fceux11_ppu_cpu_write(state: *mut PpuState, addr: u16, val: u8) {
     let sb = lookup(state);
+    apply_register_write_now(sb, addr, val);
+}
+
+/// Batch 3b: queue a PPU-register write for delivery
+/// `base_cycles*3 − 1` dots from now — a store's effect becomes
+/// visible on the PPU dot after its final CPU cycle, matching
+/// hardware's store timing (the root crate's
+/// `fceux11_ppu_cpu_write` wrapper computes `base_cycles` from
+/// `fceux11_cpu_last_fetch_base_cycles`). `$2007` entries are fully
+/// resolved at enqueue (VRAM address + `v` increment decision) so
+/// delivery cannot be perturbed by intervening state changes.
+///
+/// `base_cycles == 0` (no instruction context — direct test calls)
+/// applies immediately.
+pub unsafe extern "C" fn fceux11_ppu_queue_deferred_register_write(
+    state: *mut PpuState,
+    addr: u16,
+    val: u8,
+    base_cycles: u8,
+) {
+    let sb = lookup(state);
+    if base_cycles == 0 {
+        apply_register_write_now(sb, addr, val);
+        return;
+    }
+    let delay = (base_cycles as u16) * 3 - 1;
+    let data = if addr & 0x0007 == 0x0007 && addr < 0x4014 {
+        Some(crate::state::DataWriteResolution {
+            resolved_addr: sb.state.registers.mirror_data_addr(sb.state.registers.v),
+            ctrl: sb.state.registers.ctrl,
+            rendering: rendering_2007(sb),
+        })
+    } else {
+        None
+    };
+    sb.state.deferred_register_writes.push(crate::state::DeferredPpuWrite {
+        delay_dots: delay,
+        addr,
+        val,
+        data,
+    });
+}
+
+/// Test/analysis entry: drain due deferred writes for the current dot
+/// (the production per-dot tick entries call this internally; tests
+/// use it to step the landing clock explicitly).
+pub unsafe extern "C" fn fceux11_ppu_deliver_due_deferred_writes(state: *mut PpuState) {
+    let sb = lookup(state);
+    let mut bus = make_bus_adapter(sb);
+    deliver_due_deferred_writes(sb, &mut bus);
+}
+
+/// Apply due deferred writes at the end of a ticked dot. Entries whose
+/// delay reached zero run through the immediate handler (register
+/// writes re-dispatch; `$2007` applies its enqueue-time resolution).
+pub unsafe fn deliver_due_deferred_writes(sb: &mut StateBox, bus: &mut CppBus) {
+    if sb.state.deferred_register_writes.is_empty() {
+        return;
+    }
+    let mut i = 0;
+    while i < sb.state.deferred_register_writes.len() {
+        if sb.state.deferred_register_writes[i].delay_dots > 0 {
+            sb.state.deferred_register_writes[i].delay_dots -= 1;
+        }
+        if sb.state.deferred_register_writes[i].delay_dots == 0 {
+            let w = sb.state.deferred_register_writes.remove(i);
+            apply_resolved_write(sb, bus, w);
+        } else {
+            i += 1;
+        }
+    }
+}
+
+/// Flush ALL queued writes immediately (frame wrap: a write in flight
+/// at the frame boundary lands in the frame it was issued in).
+pub unsafe fn flush_deferred_writes(sb: &mut StateBox, bus: &mut CppBus) {
+    while !sb.state.deferred_register_writes.is_empty() {
+        let w = sb.state.deferred_register_writes.remove(0);
+        apply_resolved_write(sb, bus, w);
+    }
+}
+
+unsafe fn apply_resolved_write(sb: &mut StateBox, bus: &mut CppBus, w: crate::state::DeferredPpuWrite) {
+    if let Some(res) = w.data {
+        // $2007 with enqueue-time resolution: the bus write lands now
+        // (the deferred effect), the v increment uses the captured
+        // (ctrl, rendering) — hardware semantics: the whole write
+        // (cell + increment) completes in the store's final cycle.
+        bus.write(res.resolved_addr, w.val);
+        sb.state.registers.data_bus = w.val;
+        sb.state
+            .registers
+            .increment_v(res.ctrl, res.rendering);
+        mid_frame_write_probe(sb, "$2007", w.val, res.resolved_addr);
+        return;
+    }
+    if w.addr == 0x4014 {
+        sb.state
+            .registers
+            .refresh_data_bus(w.val, sb.current_cpu_cycle);
+        sb.state.begin_oam_dma(w.val);
+        mid_frame_write_probe(sb, "$4014", w.val, w.val as u16);
+        return;
+    }
+    apply_register_write_now(sb, w.addr, w.val);
+}
+
+/// The immediate write handler — one whole register store, applied at
+/// the caller's current dot. Shared by the immediate ffi entry, the
+/// batch 3b delivery path (register writes re-dispatch), and the
+/// zero-base fallback.
+unsafe fn apply_register_write_now(sb: &mut StateBox, addr: u16, val: u8) {
     if addr == 0x4014 {
         // OAM DMA: begin the async pump. The Phase 3 scheduler
         // (`fceux11-ppu/src/scheduler.rs`) calls
@@ -913,6 +1033,16 @@ pub unsafe extern "C" fn fceux11_ppu_tick_dots(state: *mut PpuState, n_dots: u32
         {
             sb.state.tick_oam_dma(&mut bus);
         }
+        // Batch 3b: deliver register writes whose landing dot is this
+        // one (applied after the dot's fetch, so the effect is visible
+        // from the next dot — same relative visibility as an immediate
+        // write, at the hardware-exact dot).
+        deliver_due_deferred_writes(sb, &mut bus);
+        if outcome.frame_advanced {
+            // A write in flight across the frame boundary lands in the
+            // frame it was issued in.
+            flush_deferred_writes(sb, &mut bus);
+        }
     }
     sb.sched = sched;
     frame_advanced as i32
@@ -949,6 +1079,16 @@ pub unsafe extern "C" fn fceux11_ppu_tick_dots_direct(state: *mut PpuState, n_do
             && sched.ppu_dots_consumed() % crate::scheduler::PPU_DOTS_PER_CPU_CYCLE == 0
         {
             sb.state.tick_oam_dma(&mut bus);
+        }
+        // Batch 3b: deliver register writes whose landing dot is this
+        // one (applied after the dot's fetch, so the effect is visible
+        // from the next dot — same relative visibility as an immediate
+        // write, at the hardware-exact dot).
+        deliver_due_deferred_writes(sb, &mut bus);
+        if outcome.frame_advanced {
+            // A write in flight across the frame boundary lands in the
+            // frame it was issued in.
+            flush_deferred_writes(sb, &mut bus);
         }
     }
     sb.sched = sched;

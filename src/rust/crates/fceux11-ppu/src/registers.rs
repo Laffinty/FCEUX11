@@ -652,7 +652,7 @@ impl Registers {
     /// I/O" phase: C++ v walked $2045→, Rust jumped to $2457 — the v
     /// streams diverged at frame 3 and the ROM's verification loop
     /// never completed).
-    fn increment_v(&mut self, ctrl: u8, rendering: bool) {
+    pub(crate) fn increment_v(&mut self, ctrl: u8, rendering: bool) {
         if rendering {
             // increment_vs(): fv++, carry into coarse-Y at 8, NT-Y flip
             // when coarse-Y wraps at 30. Field layout (flat v):
@@ -688,7 +688,7 @@ impl Registers {
     /// Apply the address-space mirroring that the real PPU uses for
     /// `$2007` access: $3F00-$3FFF mirror down to $3F00-$3FFF
     /// (palette aliases $3F00/$3F04/$3F08/$3F0C collapse to 0x00/0x04/0x08/0x0C).
-    fn mirror_data_addr(&self, v: u16) -> u16 {
+    pub(crate) fn mirror_data_addr(&self, v: u16) -> u16 {
         let lo = v & 0x3FFF;
         if lo < 0x3F00 {
             lo

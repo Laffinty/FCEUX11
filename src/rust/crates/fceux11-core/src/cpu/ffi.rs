@@ -437,6 +437,16 @@ pub unsafe extern "C" fn fceux11_cpu_advance_cycles(state: *mut u8, n: i32) {
     }
 }
 
+/// Batch 3b (v2.1.4 plan §2): base cycle cost of the instruction the
+/// CPU is currently executing (0 outside instruction bodies). Read by
+/// the root crate's `fceux11_ppu_cpu_write` wrapper to compute the
+/// deferred landing of PPU-register stores: `delay = base*3 − 1` PPU
+/// dots. See `execute::LAST_FETCH_BASE`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_cpu_last_fetch_base_cycles() -> u8 {
+    crate::cpu::execute::last_fetch_base_cycles()
+}
+
 /// Batch 3a (v2.1.4 plan §2.1): peek the base cycle cost of the next
 /// instruction at `PC`, read-only. Returns 0 for a null state.
 ///

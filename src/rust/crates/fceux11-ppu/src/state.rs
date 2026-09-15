@@ -243,6 +243,49 @@ pub struct PpuState {
     /// 0xFFFF sentinel means "no recent scroll/ctrl write this
     /// scanline". Cleared on `scanline` advance.
     pub last_scroll_write_dot: u16,
+    /// Batch 3b (v2.1.4 plan §2): PPU-register writes awaiting their
+    /// hardware landing dot. The per-dot loop's write path queues
+    /// `$2000`-`$2007`/`$4014` stores with
+    /// `delay_dots = instruction_base_cycles * 3 - 1` (a store's
+    /// effect becomes visible on the PPU dot after its final CPU
+    /// cycle), and the tick loop delivers entries whose delay reached
+    /// zero at the end of that dot — the same relative visibility
+    /// (next-dot) the immediate path has, at the hardware-exact dot.
+    ///
+    /// `$2007` entries are fully resolved at enqueue time (resolved
+    /// VRAM address + the `v` increment decision), so delivery cannot
+    /// be perturbed by state changes in between. The queue is
+    /// transient microstate: drained on every frame wrap and cleared
+    /// on power/reset, and deliberately NOT serialized (savestates
+    /// capture at frame boundaries where it is empty).
+    pub deferred_register_writes: Vec<DeferredPpuWrite>,
+}
+
+/// One queued PPU-register write. See
+/// [`PpuState::deferred_register_writes`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeferredPpuWrite {
+    /// Dots remaining until delivery. Decremented once per ticked
+    /// dot; the write applies at the end of the dot where this
+    /// reaches 0.
+    pub delay_dots: u16,
+    /// `$2000`-`$2007`: register address (re-dispatched through the
+    /// immediate write handler at delivery). `$4014`: OAM DMA start.
+    pub addr: u16,
+    /// Written byte.
+    pub val: u8,
+    /// `$2007` only: enqueue-time resolution — the VRAM address the
+    /// byte lands in (`mirror_data_addr(v)`) and the `(ctrl,
+    /// rendering)` pair captured for the `v` increment.
+    pub data: Option<DataWriteResolution>,
+}
+
+/// `$2007` enqueue-time resolution. See [`DeferredPpuWrite`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DataWriteResolution {
+    pub resolved_addr: u16,
+    pub ctrl: u8,
+    pub rendering: bool,
 }
 
 impl Default for PpuState {
@@ -301,6 +344,7 @@ impl PpuState {
             vram_read_cooldown: 0,
             vram_write_cooldown: 0,
             last_scroll_write_dot: 0xFFFF,
+            deferred_register_writes: Vec::new(),
         }
     }
 
@@ -343,6 +387,10 @@ impl PpuState {
         self.vram_read_cooldown = 0;
         self.vram_write_cooldown = 0;
         self.last_scroll_write_dot = 0xFFFF;
+        // Batch 3b: deferred register writes are transient microstate;
+        // power/reset discards them (a write mid-flight at a reset is
+        // forfeited, same as hardware losing the bus cycle).
+        self.deferred_register_writes.clear();
     }
 
     /// Plan §0.8 step 1D.1: apply the NESdev PPU frame timing

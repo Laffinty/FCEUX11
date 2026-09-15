@@ -25,7 +25,11 @@
 //!    register write sequences (they are kept serialized for savestate
 //!    layout stability but must never influence behavior).
 
-use fceux11_ppu::ffi::{fceux11_ppu_cpu_read, fceux11_ppu_cpu_write, fceux11_ppu_create, fceux11_ppu_destroy};
+use fceux11_ppu::ffi::{
+    fceux11_ppu_cpu_read, fceux11_ppu_cpu_write, fceux11_ppu_create,
+    fceux11_ppu_deliver_due_deferred_writes, fceux11_ppu_destroy, fceux11_ppu_queue_deferred_register_write,
+    fceux11_ppu_tick_dots,
+};
 use fceux11_ppu::frame;
 use fceux11_ppu::rendering::{tick_dot as render_dot, RenderWindows};
 use fceux11_ppu::{FlatBus, PpuState};
@@ -198,4 +202,111 @@ fn queue_fields_stay_disarmed_after_full_register_sweep() {
     assert_eq!(st.vram_read_cooldown, 0);
     assert_eq!(st.vram_write_cooldown, 0);
     assert_eq!(st.last_scroll_write_dot, 0xFFFF);
+}
+
+// ---------------------------------------------------------------------------
+// Batch 3b — deferred write landing (plan v2.1.4 §2 milestone 3b).
+// The queue path is exercised through the real ffi entries; the root
+// wrapper's env switch is OFF by default, so these tests drive the
+// queue fn directly with an explicit base cost.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn deferred_ctrl_write_lands_after_base_times_3_minus_1_dots() {
+    // STA $2000 = 4 cycles → delay = 4*3-1 = 11 dots. The ctrl byte
+    // must be unchanged until the 11th dot has been delivered, and
+    // updated by it.
+    let mut s = visible_rendering_state();
+    unsafe {
+        fceux11_ppu_queue_deferred_register_write(s.0, 0x2000, 0x1E, 4);
+    }
+    assert_eq!(
+        s.state().registers.ctrl & 0x1E,
+        0,
+        "ctrl must not change at enqueue"
+    );
+    for dot in 1..=11 {
+        unsafe {
+            fceux11_ppu_deliver_due_deferred_writes(s.0);
+        }
+        if dot < 11 {
+            assert_eq!(
+                s.state().registers.ctrl & 0x1E,
+                0,
+                "ctrl must stay unchanged through dot {dot}"
+            );
+        } else {
+            assert_eq!(
+                s.state().registers.ctrl & 0x1E,
+                0x1E,
+                "ctrl lands on dot 11"
+            );
+        }
+    }
+    assert!(s.state().deferred_register_writes.is_empty());
+}
+
+#[test]
+fn deferred_data_write_resolves_addr_and_increments_at_delivery() {
+    // $2007 write queued with rendering on: the VRAM cell is resolved
+    // at enqueue (v here), and the rendering-on v increment applies at
+    // DELIVERY, not enqueue.
+    let mut s = visible_rendering_state();
+    s.state().registers.v = 0x2009; // NT cell target
+    unsafe {
+        fceux11_ppu_queue_deferred_register_write(s.0, 0x2007, 0x77, 4);
+    }
+    let v_at_enqueue = s.state().registers.v;
+    assert_eq!(
+        s.state().registers.v, v_at_enqueue,
+        "v increment deferred with the write"
+    );
+    for _ in 0..11 {
+        unsafe {
+            fceux11_ppu_deliver_due_deferred_writes(s.0);
+        }
+    }
+    // Rendering-on walk: fv for v=$2009 is 2 (bits 14-12 = 010), so the
+    // increment moves fv 2→3 → v = $3009.
+    assert_eq!(
+        s.state().registers.v, 0x3009,
+        "v increment applied once, at delivery"
+    );
+    assert!(s.state().deferred_register_writes.is_empty());
+}
+
+#[test]
+fn deferred_writes_deliver_in_fifo_order() {
+    // Two $2000 writes queued back-to-back (bases 4 and 4): the second
+    // must land strictly after the first — the observable end state is
+    // the second value, and no reorder can occur because delivery is
+    // FIFO.
+    let mut s = visible_rendering_state();
+    unsafe {
+        fceux11_ppu_queue_deferred_register_write(s.0, 0x2000, 0x0E, 4);
+        fceux11_ppu_queue_deferred_register_write(s.0, 0x2000, 0x1E, 4);
+    }
+    for _ in 0..15 {
+        unsafe {
+            fceux11_ppu_deliver_due_deferred_writes(s.0);
+        }
+    }
+    assert_eq!(s.state().registers.ctrl & 0x1E, 0x1E, "second write wins");
+    assert!(s.state().deferred_register_writes.is_empty());
+}
+
+#[test]
+fn per_dot_tick_loop_delivers_deferred_writes() {
+    // The production per-dot entries (tick_dots) must drain the queue
+    // themselves — the loop, not the caller, owns delivery.
+    let mut s = visible_rendering_state();
+    unsafe {
+        fceux11_ppu_queue_deferred_register_write(s.0, 0x2000, 0x1E, 4);
+        // 11 landing dots + slack; each call ticks exactly 1 dot.
+        for _ in 0..14 {
+            fceux11_ppu_tick_dots(s.0, 1);
+        }
+    }
+    assert_eq!(s.state().registers.ctrl & 0x1E, 0x1E, "tick loop delivers");
+    assert!(s.state().deferred_register_writes.is_empty());
 }

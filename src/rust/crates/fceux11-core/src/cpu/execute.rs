@@ -21,6 +21,26 @@ use crate::cpu::state::{Flags, IrqSource};
 /// `_count = cycles * (PAL ? 15 : 16)`. We hardcode NTSC = 16.
 pub const CYCLES_PER_CPU_CYCLE: i32 = 16;
 
+/// Batch 3b (v2.1.4 plan §2): the base cycle cost of the instruction
+/// currently being executed by [`execute_step`], published so the
+/// register-write landing path (root crate's `fceux11_ppu_cpu_write`
+/// wrapper) can defer PPU-register writes to the instruction's final
+/// cycle — `delay = base*3 − 1` PPU dots — matching hardware. The
+/// value is written at opcode fetch (before any memory access of the
+/// body runs, so a store handler reading it always sees its own
+/// instruction's cost) and simply goes stale between instructions,
+/// which is fine: the only reader is a store handler invoked from
+/// inside an instruction.
+pub static LAST_FETCH_BASE: std::sync::atomic::AtomicU8 =
+    std::sync::atomic::AtomicU8::new(0);
+
+/// Base cycle cost of the instruction currently executing (0 outside
+/// instruction bodies). See [`LAST_FETCH_BASE`].
+#[inline]
+pub fn last_fetch_base_cycles() -> u8 {
+    LAST_FETCH_BASE.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 /// One CPU cycle in dot-clock units. The `CycTable` is in CPU cycles.
 #[inline]
 const fn dot(cpu_cycles: u8) -> i32 {
@@ -256,6 +276,10 @@ pub(crate) fn execute_step<B: Bus + ?Sized>(
     let opcode = fetch(state, bus);
     let op_info = info(opcode);
     let base = op_info.base_cycles;
+    // Batch 3b: publish this instruction's base cost before any body
+    // memory access runs, so PPU-register store handlers can defer to
+    // the instruction's final cycle (see LAST_FETCH_BASE).
+    LAST_FETCH_BASE.store(base, std::sync::atomic::Ordering::Relaxed);
 
     // Phase 4 closeout: charge the base cost and mirror C++'s tick
     // bridge (`src/x6502.cpp:606-614`). C++ does
