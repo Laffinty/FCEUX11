@@ -19,6 +19,7 @@
 pub mod addressing;
 pub mod alu;
 pub mod bus;
+pub mod bus_hook;
 pub mod decode;
 pub mod execute;
 pub mod ffi;

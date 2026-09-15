@@ -76,6 +76,12 @@ pub struct CpuState {
     /// can advance `Cpu::timestamp_` / `sound_timestamp_` without
     /// having to know about the 1/16-dot unit semantics.
     pub cycles_in_run: i32,
+    /// Batch 3c.2: 1-based index of the current bus access within the
+    /// current instruction phase (instruction body or interrupt
+    /// dispatch). Reset at `execute_step` / `dispatch_step` entry;
+    /// read by the per-access PPU catch-up hook (see `cpu::bus_hook`).
+    /// Runtime-only — not part of the 64-byte blob or savestates.
+    pub bus_access_index: u8,
 }
 
 impl CpuState {
@@ -95,6 +101,11 @@ impl CpuState {
     /// `RdMem` / `RdRAM` side-effect in the C++ code).
     #[inline]
     pub fn rd<B: Bus + ?Sized>(&mut self, bus: &mut B, addr: u16) -> u8 {
+        // Batch 3c.2: per-access PPU catch-up (see cpu::bus_hook). The
+        // hook fires BEFORE the bus access so the PPU lands on the dot
+        // this access belongs to.
+        self.bus_access_index = self.bus_access_index.wrapping_add(1);
+        crate::cpu::bus_hook::on_bus_access(addr, false, self.bus_access_index);
         // Phase 4 closeout: mirror the current Rust DB into the C++ blob
         // BEFORE the access so mid-call handlers see the same open-bus
         // value as the C++ reference dispatch (JPRead $4016, mapper
@@ -110,6 +121,9 @@ impl CpuState {
     /// `WrMem` / `WrRAM` side-effect).
     #[inline]
     pub fn wr<B: Bus + ?Sized>(&mut self, bus: &mut B, addr: u16, val: u8) {
+        // Batch 3c.2: per-access PPU catch-up (see cpu::bus_hook).
+        self.bus_access_index = self.bus_access_index.wrapping_add(1);
+        crate::cpu::bus_hook::on_bus_access(addr, true, self.bus_access_index);
         crate::cpu::bus::sync_db_to_blob(self.regs.db, self.regs.count);
         bus.write(addr, val);
         self.regs.db = val;

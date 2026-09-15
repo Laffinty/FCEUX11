@@ -211,6 +211,9 @@ fn do_branch<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, cond: bool) -> 
 /// always invokes both phases for callers that don't care about
 /// per-call budget semantics.
 pub(crate) fn dispatch_step<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
+    // Batch 3c.2: the dispatch sequence is its own access phase — the
+    // vector reads restart the access index (see cpu::bus_hook).
+    state.bus_access_index = 0;
     // IRQ / NMI / RESET dispatch at this boundary. Mirrors the
     // loop-top of `X6502_RunDebug` in `src/x6502.cpp:519-577`.
     //
@@ -270,6 +273,9 @@ pub(crate) fn execute_step<B: Bus + ?Sized>(
     bus: &mut B,
     _dispatch_irq_cycles: u8,
 ) -> u8 {
+    // Batch 3c.2: each instruction body is its own access phase — the
+    // op fetch is access #1 (see cpu::bus_hook).
+    state.bus_access_index = 0;
     // Always fetch + execute exactly one instruction. PC has either
     // been left at the current PC (no dispatch) or moved to the
     // post-dispatch address (dispatch fired) by dispatch_irq.
@@ -1125,7 +1131,7 @@ fn do_unofficial<B: Bus + ?Sized>(
             //     after ROR becomes bit 7 of the input -- but the formula is
             //     documented as bit 6 of the rotated result)
             //   V = bit 6 of result ^ bit 5 of result
-            // Both V and C are derived from the POST-ROR esult register.
+            // Both V and C are derived from the POST-ROR result register.
             let c_in = if state.regs.p & Flags::CARRY.bits() != 0 {
                 1
             } else {

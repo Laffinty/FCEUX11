@@ -427,6 +427,60 @@ pub unsafe extern "C" fn fceux11_ppu_take_dmc_dma_stall(
 }
 
 // =========================================================================
+// Batch 3c.2 — per-bus-access PPU catch-up hook (FCEUX11_BUS_ACCESS_HOOK).
+//
+// The 6502 performs one bus access per CPU cycle; the PPU advances 3 dots
+// per cycle with phase-locked clocks. Under the atomic-instruction model
+// the whole instruction executes at one grant dot, smearing CPU-PPU
+// relative timing by +-4 dots (plan v2.1.4 §5 3c.2: the vbl_02
+// visibility-table smear). The hook restores phase locking: `rd`/`wr`
+// call it before each bus access, and every access beyond the
+// instruction's first advances the PPU by 3 dots (full per-dot pipeline:
+// render / frame events / DMA pump / deferred-write delivery), placing
+// access k at grant_dot + 3(k-1) dots.
+//
+// Opt-in via FCEUX11_BUS_ACCESS_HOOK=1 (default OFF = v2.1.3 semantics).
+// The interleave loop must run to the PPU frame wrap (not a fixed dot
+// count) while the hook is active, because the hook consumes dots from
+// the frame budget mid-grant.
+static HOOK_PPU_STATE: std::sync::atomic::AtomicPtr<fceux11_ppu::PpuState> =
+    std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
+
+/// Dots advanced by the hook during the most recent CPU grant. The loop
+/// swaps this to 0 after each grant and deducts it from the frame's dot
+/// budget (no double-counting: the hook's ticks are the same ticks the
+/// loop would otherwise have run).
+static HOOK_ADVANCED_DOTS: std::sync::atomic::AtomicU32 =
+    std::sync::atomic::AtomicU32::new(0);
+
+/// While set, the hook does not advance the PPU — the E1 NMI-delay
+/// grant runs the CPU with the PPU FROZEN (its hand-tuned vbl_05
+/// calibration contract), so accesses inside that grant must not
+/// consume frame budget.
+static PPU_FROZEN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+unsafe extern "C" fn bus_access_hook_impl(_addr: u16, _is_write: bool, access_index: u8) {
+    if access_index > 1 && !PPU_FROZEN.load(std::sync::atomic::Ordering::Relaxed) {
+        let st = HOOK_PPU_STATE.load(std::sync::atomic::Ordering::Relaxed);
+        if !st.is_null() {
+            fceux11_ppu::ffi::fceux11_ppu_tick_dots_direct(st, 3);
+            // The pre-advanced dots are real elapsed frame budget — the
+            // interleave loop deducts them after the grant.
+            HOOK_ADVANCED_DOTS.fetch_add(3, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+}
+
+fn bus_access_hook_enabled() -> bool {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ENABLED.get_or_init(|| {
+        std::env::var("FCEUX11_BUS_ACCESS_HOOK")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true") || v.eq_ignore_ascii_case("yes"))
+            .unwrap_or(false)
+    })
+}
+
+// =========================================================================
 // v2.1 Phase 5.3 — in-Rust CPU/PPU per-dot interleave loop.
 //
 // Phase 5.1 drove the interleave from C++ (`FCEUPPU_Loop`): per dot it
@@ -518,19 +572,32 @@ pub unsafe extern "C" fn fceux11_run_frame_interleaved(
     // is exact - the old `run_with_tick(cpu, 1)` added the same 16 units.
     let ticks_per_dot: i32 =
         fceux11_ppu::ffi::fceux11_ppu_cpu_ticks_per_dot(ppu_state) as i32;
-    let frame_done = 0;
-    for _ in 0..dots {
+    // Batch 3c.2: with the per-bus-access hook active the hook
+    // pre-advances frame-budget dots mid-grant (real elapsed time);
+    // those are deducted from `budget` after each grant. With the hook
+    // OFF the accounting is identical to the previous
+    // `for _ in 0..dots` form.
+    let hook_on = bus_access_hook_enabled();
+    if hook_on {
+        HOOK_PPU_STATE.store(ppu_state, std::sync::atomic::Ordering::Relaxed);
+        fceux11_core::cpu::ffi::fceux11_cpu_set_bus_access_hook(Some(bus_access_hook_impl));
+    }
+    let mut budget = dots;
+    while budget > 0 {
         fceux11_ppu::ffi::fceux11_ppu_tick_dots_direct(ppu_state, 1);
+        budget -= 1;
         if fceux11_ppu::ffi::fceux11_ppu_take_nmi_direct(ppu_state) != 0 {
             // Grant the pre-latch CPU budget with the PPU frozen (this
             // iteration's PPU dot already ticked; the grant below runs
             // only the CPU) -- same shape as the C++ engine's
             // `if (nd > 0) X6502_Run(nd);` before `TriggerNMI()`.
             if nmi_delay_cycles > 0 {
+                PPU_FROZEN.store(true, std::sync::atomic::Ordering::Relaxed);
                 fceux11_core::cpu::ffi::fceux11_cpu_run_with_tick(
                     cpu_state,
                     nmi_delay_cycles,
                 );
+                PPU_FROZEN.store(false, std::sync::atomic::Ordering::Relaxed);
             }
             if let Some(cb) = trigger_nmi {
                 unsafe { cb() }
@@ -558,8 +625,16 @@ pub unsafe extern "C" fn fceux11_run_frame_interleaved(
         } else {
             fceux11_core::cpu::ffi::fceux11_cpu_run_ticks(cpu_state, ticks_per_dot);
         }
+        if hook_on {
+            let adv = HOOK_ADVANCED_DOTS.swap(0, std::sync::atomic::Ordering::Relaxed);
+            budget = budget.saturating_sub(adv);
+        }
     }
-    frame_done
+    if hook_on {
+        HOOK_PPU_STATE.store(std::ptr::null_mut(), std::sync::atomic::Ordering::Relaxed);
+        fceux11_core::cpu::ffi::fceux11_cpu_set_bus_access_hook(None);
+    }
+    0
 }
 
 // Debug accessors (added for Phase 4 bridge window-install verification)

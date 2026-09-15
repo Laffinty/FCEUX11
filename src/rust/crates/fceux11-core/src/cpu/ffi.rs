@@ -80,6 +80,7 @@ static mut FFI_CPU_STATE: CpuState = CpuState {
     regs: X6502Layout::zeroed(),
     nmi_fresh: false,
     cycles_in_run: 0,
+    bus_access_index: 0,
 };
 
 /// Initialize the 64-byte CPU state to all-zeros.
@@ -435,6 +436,20 @@ pub unsafe extern "C" fn fceux11_cpu_advance_cycles(state: *mut u8, n: i32) {
         // updated count.
         *(state as *mut X6502Layout) = FFI_CPU_STATE.regs;
     }
+}
+
+/// Batch 3c.2 (v2.1.4 plan §2): install the per-bus-access PPU
+/// catch-up hook. The hook is invoked by `CpuState::rd`/`wr` BEFORE
+/// each bus access with `(addr, is_write, access_index)`; the host
+/// (root crate's interleave loop) advances the PPU by 3 dots per
+/// access beyond the first so access *k* lands at
+/// grant_dot + 3(k−1) dots. `None` clears it (default — zero change
+/// to the atomic-instruction timing).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fceux11_cpu_set_bus_access_hook(
+    hook: Option<unsafe extern "C" fn(u16, bool, u8)>,
+) {
+    crate::cpu::bus_hook::set_bus_access_hook(hook);
 }
 
 /// Batch 3b (v2.1.4 plan §2): base cycle cost of the instruction the
