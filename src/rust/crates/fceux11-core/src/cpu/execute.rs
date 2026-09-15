@@ -187,10 +187,12 @@ fn do_branch<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, cond: bool) -> 
     let pre = state.regs.pc;
     let target = pre.wrapping_add(disp);
     state.regs.pc = target;
-    // +1 for taking the branch, +1 more if page-cross.
+    // +1 for taking the branch (an internal cycle), +1 more if page-cross.
     let mut extra = 1u8;
+    state.tick_internal_cycle();
     if (pre ^ target) & 0x0100 != 0 {
         extra += 1;
+        state.tick_internal_cycle();
     }
     extra
 }
@@ -213,7 +215,11 @@ fn do_branch<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, cond: bool) -> 
 pub(crate) fn dispatch_step<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B) -> u8 {
     // Batch 3c.2: the dispatch sequence is its own access phase — the
     // vector reads restart the access index (see cpu::bus_hook).
-    state.bus_access_index = 0;
+    state.cycle_in_phase = 0;
+    // Batch 3c.2: the hardware interrupt sequence opens with 2 internal
+    // cycles before the register pushes.
+    state.tick_internal_cycle();
+    state.tick_internal_cycle();
     // IRQ / NMI / RESET dispatch at this boundary. Mirrors the
     // loop-top of `X6502_RunDebug` in `src/x6502.cpp:519-577`.
     //
@@ -275,7 +281,7 @@ pub(crate) fn execute_step<B: Bus + ?Sized>(
 ) -> u8 {
     // Batch 3c.2: each instruction body is its own access phase — the
     // op fetch is access #1 (see cpu::bus_hook).
-    state.bus_access_index = 0;
+    state.cycle_in_phase = 0;
     // Always fetch + execute exactly one instruction. PC has either
     // been left at the current PC (no dispatch) or moved to the
     // post-dispatch address (dispatch fired) by dispatch_irq.
@@ -351,6 +357,8 @@ pub(crate) fn execute_step<B: Bus + ?Sized>(
         OpKind::Flag => {
             // CLC, SEC, CLD, SED, CLI, SEI, CLV.
             do_flag_op(state, opcode);
+            // Batch 3c.2: cycle 2 is internal.
+            state.tick_internal_cycle();
         }
         OpKind::Branch => {
             // BCC, BCS, BEQ, BNE, BMI, BPL, BVC, BVS.
@@ -535,6 +543,8 @@ fn do_register_op<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, opcode: u8
             p &= !(Flags::ZERO.bits() | Flags::NEGATIVE.bits());
             p |= zn_table_lookup(v);
             state.regs.p = p;
+            // Batch 3c.2: cycle 2 is internal.
+            state.tick_internal_cycle();
         }
         // TAY
         0xA8 => {
@@ -544,6 +554,8 @@ fn do_register_op<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, opcode: u8
             p &= !(Flags::ZERO.bits() | Flags::NEGATIVE.bits());
             p |= zn_table_lookup(v);
             state.regs.p = p;
+            // Batch 3c.2: cycle 2 is internal.
+            state.tick_internal_cycle();
         }
         // TSX
         0xBA => {
@@ -553,6 +565,8 @@ fn do_register_op<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, opcode: u8
             p &= !(Flags::ZERO.bits() | Flags::NEGATIVE.bits());
             p |= zn_table_lookup(v);
             state.regs.p = p;
+            // Batch 3c.2: cycle 2 is internal.
+            state.tick_internal_cycle();
         }
         // TXA
         0x8A => {
@@ -562,6 +576,8 @@ fn do_register_op<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, opcode: u8
             p &= !(Flags::ZERO.bits() | Flags::NEGATIVE.bits());
             p |= zn_table_lookup(v);
             state.regs.p = p;
+            // Batch 3c.2: cycle 2 is internal.
+            state.tick_internal_cycle();
         }
         // TYA
         0x98 => {
@@ -571,24 +587,35 @@ fn do_register_op<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, opcode: u8
             p &= !(Flags::ZERO.bits() | Flags::NEGATIVE.bits());
             p |= zn_table_lookup(v);
             state.regs.p = p;
+            // Batch 3c.2: cycle 2 is internal.
+            state.tick_internal_cycle();
         }
         // TXS �?does NOT update flags.
         0x9A => {
             state.regs.s = state.regs.x;
+            // Batch 3c.2: cycle 2 is internal.
+            state.tick_internal_cycle();
         }
         // PHA
         0x48 => {
+            // Batch 3c.2: cycle 2 is an internal cycle; the push is cycle 3.
+            state.tick_internal_cycle();
             state.push(bus, state.regs.a);
         }
         // PHP
         0x08 => {
             // Push P with B|U set. P is u8, so no mask is needed
             // (the C++ side's `& 0xFF` is a no-op on uint8 too).
+            // Batch 3c.2: cycle 2 is internal; the push is cycle 3.
+            state.tick_internal_cycle();
             let v = state.regs.p | Flags::BREAK.bits() | Flags::UNUSED.bits();
             state.push(bus, v);
         }
         // PLA
         0x68 => {
+            // Batch 3c.2: cycles 2-3 are internal; the pop read is cycle 4.
+            state.tick_internal_cycle();
+            state.tick_internal_cycle();
             let v = state.pop(bus);
             state.regs.a = v;
             let mut p = state.regs.p;
@@ -615,6 +642,8 @@ fn do_register_op<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, opcode: u8
             p &= !(Flags::ZERO.bits() | Flags::NEGATIVE.bits());
             p |= zn_table_lookup(v);
             state.regs.p = p;
+            // Batch 3c.2: cycle 2 is internal.
+            state.tick_internal_cycle();
         }
         // INY
         0xC8 => {
@@ -624,6 +653,8 @@ fn do_register_op<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, opcode: u8
             p &= !(Flags::ZERO.bits() | Flags::NEGATIVE.bits());
             p |= zn_table_lookup(v);
             state.regs.p = p;
+            // Batch 3c.2: cycle 2 is internal.
+            state.tick_internal_cycle();
         }
         // DEX
         0xCA => {
@@ -633,6 +664,8 @@ fn do_register_op<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, opcode: u8
             p &= !(Flags::ZERO.bits() | Flags::NEGATIVE.bits());
             p |= zn_table_lookup(v);
             state.regs.p = p;
+            // Batch 3c.2: cycle 2 is internal.
+            state.tick_internal_cycle();
         }
         // DEY
         0x88 => {
@@ -642,6 +675,8 @@ fn do_register_op<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, opcode: u8
             p &= !(Flags::ZERO.bits() | Flags::NEGATIVE.bits());
             p |= zn_table_lookup(v);
             state.regs.p = p;
+            // Batch 3c.2: cycle 2 is internal.
+            state.tick_internal_cycle();
         }
         _ => unreachable!("Register op ${:02X} not handled", opcode),
     }
@@ -728,6 +763,9 @@ fn do_rmw<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, mode: AddrMode, op
                 _ => unreachable!("Accumulator RMW ${:02X}", opcode),
             };
             state.regs.a = r;
+            // Batch 3c.2: ASL A / ROL A / LSR A / ROR A are 2 cycles —
+            // cycle 2 is internal.
+            state.tick_internal_cycle();
             return 0;
         }
         _ => unreachable!("RMW mode {:?}", mode),
@@ -758,6 +796,8 @@ fn do_rmw<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, mode: AddrMode, op
         }
         _ => unreachable!("RMW opcode ${:02X}", opcode),
     };
+    // Batch 3c.2: the modify cycle between the read and the write-back.
+    state.tick_internal_cycle();
     state.wr(bus, addr, r);
     0
 }
@@ -915,9 +955,14 @@ fn do_jump<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, opcode: u8, mode:
         }
         // RTS ($60).
         0x60 => {
+            // Batch 3c.2: cycles 2-3 are internal; pops are 4-5; cycle 6 internal.
+            state.tick_internal_cycle();
+            state.tick_internal_cycle();
             let lo = state.pop(bus) as u16;
             let hi = state.pop(bus) as u16;
             state.regs.pc = ((hi << 8) | lo).wrapping_add(1);
+            // Batch 3c.2: cycle 6 (PC+1) is internal.
+            state.tick_internal_cycle();
         }
         // RTI ($40).
         0x40 => {
@@ -926,6 +971,9 @@ fn do_jump<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, opcode: u8, mode:
             // the dispatch-time P mirror (redundant here because
             // `dispatch_step` refreshes `moo_pi` before every instruction,
             // but kept for exact parity with the C++ reference blob).
+            // Batch 3c.2: cycles 2-3 are internal; pops are 4-6.
+            state.tick_internal_cycle();
+            state.tick_internal_cycle();
             state.regs.p = state.pop(bus);
             state.regs.moo_pi = state.regs.p;
             let lo = state.pop(bus) as u16;
@@ -941,6 +989,8 @@ fn do_jump<B: Bus + ?Sized>(state: &mut CpuState, bus: &mut B, opcode: u8, mode:
             let push_p = state.regs.p | Flags::UNUSED.bits() | Flags::BREAK.bits();
             state.push(bus, push_p);
             state.regs.p |= Flags::IRQ_DIS.bits();
+            // Batch 3c.2: cycle 6 is internal; the vector reads are 7-8.
+            state.tick_internal_cycle();
             let lo = state.rd(bus, 0xFFFE);
             let hi = state.rd(bus, 0xFFFF);
             state.regs.pc = (hi as u16) << 8 | lo as u16;

@@ -81,7 +81,7 @@ pub struct CpuState {
     /// dispatch). Reset at `execute_step` / `dispatch_step` entry;
     /// read by the per-access PPU catch-up hook (see `cpu::bus_hook`).
     /// Runtime-only — not part of the 64-byte blob or savestates.
-    pub bus_access_index: u8,
+    pub cycle_in_phase: u8,
 }
 
 impl CpuState {
@@ -104,8 +104,8 @@ impl CpuState {
         // Batch 3c.2: per-access PPU catch-up (see cpu::bus_hook). The
         // hook fires BEFORE the bus access so the PPU lands on the dot
         // this access belongs to.
-        self.bus_access_index = self.bus_access_index.wrapping_add(1);
-        crate::cpu::bus_hook::on_bus_access(addr, false, self.bus_access_index);
+        self.cycle_in_phase = self.cycle_in_phase.wrapping_add(1);
+        crate::cpu::bus_hook::on_bus_access(addr, false, self.cycle_in_phase);
         // Phase 4 closeout: mirror the current Rust DB into the C++ blob
         // BEFORE the access so mid-call handlers see the same open-bus
         // value as the C++ reference dispatch (JPRead $4016, mapper
@@ -122,12 +122,23 @@ impl CpuState {
     #[inline]
     pub fn wr<B: Bus + ?Sized>(&mut self, bus: &mut B, addr: u16, val: u8) {
         // Batch 3c.2: per-access PPU catch-up (see cpu::bus_hook).
-        self.bus_access_index = self.bus_access_index.wrapping_add(1);
-        crate::cpu::bus_hook::on_bus_access(addr, true, self.bus_access_index);
+        self.cycle_in_phase = self.cycle_in_phase.wrapping_add(1);
+        crate::cpu::bus_hook::on_bus_access(addr, true, self.cycle_in_phase);
         crate::cpu::bus::sync_db_to_blob(self.regs.db, self.regs.count);
         bus.write(addr, val);
         self.regs.db = val;
         crate::cpu::bus::sync_db_to_blob(self.regs.db, self.regs.count);
+    }
+
+    /// Batch 3c.2: signal one INTERNAL (no-bus-access) CPU cycle of the
+    /// current instruction phase — the modify cycle of an RMW, the dummy
+    /// cycles of branches/stack/interrupt sequences. Advances the PPU 3
+    /// dots via the same hook as `rd`/`wr` (a CPU cycle is a CPU cycle
+    /// whether or not the bus is accessed).
+    #[inline]
+    pub fn tick_internal_cycle(&mut self) {
+        self.cycle_in_phase = self.cycle_in_phase.wrapping_add(1);
+        crate::cpu::bus_hook::on_bus_access(0, false, self.cycle_in_phase);
     }
 
     /// Push a byte on the hardware stack at `$0100 + S`.

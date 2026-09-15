@@ -80,7 +80,7 @@ static mut FFI_CPU_STATE: CpuState = CpuState {
     regs: X6502Layout::zeroed(),
     nmi_fresh: false,
     cycles_in_run: 0,
-    bus_access_index: 0,
+    cycle_in_phase: 0,
 };
 
 /// Initialize the 64-byte CPU state to all-zeros.
