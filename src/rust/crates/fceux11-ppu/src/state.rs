@@ -462,25 +462,26 @@ impl PpuState {
         let sl = self.scanline;
         let dot = self.dot;
         match (sl, dot) {
-            (240, 340) => {
-                // 1 PPU clock before VBL set: suppress VBL+NMI for
-                // this frame entirely. The frame state machine in
-                // `frame.rs` checks `vbl_suppressed_this_frame` at
-                // (sl 241, dot 1) and skips both `set_vbl_flag` and
-                // `nmi_asserted`. The nmi_pending clear is belt-and-
-                // suspenders; at (240, 340) nmi_pending is normally
-                // false.
+            (241, 0) => {
+                // Batch 3c.1: the VBL set now lands at (241, 1) — a
+                // $2002 read 1 PPU clock before it (nesdev PPU frame
+                // timing) returns VBL=0 AND suppresses the VBL set +
+                // NMI for this frame entirely. The frame state
+                // machine in `frame.rs` checks
+                // `vbl_suppressed_this_frame` at (sl 241, dot 1) and
+                // skips both `set_vbl_flag` and `nmi_asserted`.
                 self.vbl_suppressed_this_frame = true;
                 self.nmi_pending = false;
             }
-            (241, 0) | (241, 1) | (241, 2) => {
-                // VBL set dot, 1 dot later, or 2 dots later. The
-                // flag WAS set at (241, 0) per the C++ engine
-                // working config (VBL set = sl 240->sl 241 boundary);
-                // `Registers::read_status` will clear it for the
-                // return-value semantics. We also cancel the pending
-                // NMI latch so the per-cycle interleave doesn't
-                // fire `TriggerNMI()` for the suppressed frame.
+            (241, 1) | (241, 2) => {
+                // Read at the set dot or 1 dot later: the flag WAS
+                // set at (241, 1); `Registers::read_status` clears it
+                // for the return-value semantics. We also cancel the
+                // pending NMI latch so the per-cycle interleave
+                // doesn't fire `TriggerNMI()` after the read pulled
+                // /NMI back up. (A read 2 dots before the set —
+                // (240, 340) — returns the old value with the normal
+                // set: NO suppression, per the same nesdev table.)
                 self.nmi_pending = false;
             }
             _ => {}

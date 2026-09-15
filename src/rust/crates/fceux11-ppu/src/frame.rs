@@ -230,7 +230,17 @@ pub fn tick_dot<B: PpuBus + ?Sized>(state: &mut PpuState, _bus: &mut B) -> TickO
     // Golden baseline (commit b06388c^, pre-6.1.e): nestest frames
     // 3-7 + savestate hash kept at the dot-1 timing values.
     // (See `docs/history/v2.1_phase6_batch_compat.md` §6.1.e.v3.)
-    if sl == timings.vbl_set_scanline && dot == 0 && state.ppudead == 0 {
+    // Batch 3c.1 (v2.1.4 plan §2, milestone 3c): restored the documented
+    // dot-1 set point. The code below had drifted back to `dot == 0`
+    // (commit bb4a9f2, the v2.1.1-era A.2 tracediff trade) while this
+    // comment block, the suppression design, the vbl_nmi integration
+    // tests, and the Mesen/fceux-original/Nestopia calibration all
+    // specify **sl 241 dot 1** — the flag set lands on the second dot
+    // of the VBL line, with the suppression window on the dot-0 $2002
+    // read. Verified locally against the real blargg suite (177 ROMs,
+    // fixtures downloaded): dot=0 fails vbl_02/03/04/06/07/08/10 +
+    // ppu_vbl_nmi; see the 3c.1 commit for the after numbers.
+    if sl == timings.vbl_set_scanline && dot == 1 && state.ppudead == 0 {
         if state.vbl_suppressed_this_frame {
             // Suppression flag from the (sl 240, dot 340) $2002 read
             // (NESdev PPU frame timing: read 1 PPU clock before the
@@ -613,23 +623,25 @@ mod tests {
     }
 
     #[test]
-    fn nmi_asserted_at_sl_241_dot_0_when_enabled() {
-        // Renamed/retargeted in Step B.5-2d: commit `bb4a9f2` ("A.2 VBL set
-        // dot - switch Rust from dot=1 to dot=0") moved the set point but
-        // left this test asserting the old dot-1 timing.
+    fn nmi_asserted_at_sl_241_dot_1_when_enabled() {
+        // Batch 3c.1: restored the documented dot-1 set point (the
+        // bb4a9f2 dot-0 trade is reverted; see the VBL set block).
         let mut s = PpuState::new();
         s.ppudead = 0; // post-boot state machine under test
         s.registers.write_ctrl(1 << ctrl_bits::NMI_ENABLE);
         let mut bus = FlatBus::new();
         let out = tick_to(&mut s, &mut bus, 241, 0);
-        assert!(out.nmi_asserted, "NMI should fire on sl 241 dot 0 tick");
+        assert!(!out.nmi_asserted, "NMI must NOT fire on dot 0");
+        assert!(!out.vbl_entered, "VBL must NOT set on dot 0");
+        let out = tick_to(&mut s, &mut bus, 241, 1);
+        assert!(out.nmi_asserted, "NMI fires on the sl 241 dot 1 tick");
+        assert!(out.vbl_entered, "VBL sets on the sl 241 dot 1 tick");
     }
 
     #[test]
-    fn vbl_suppression_via_sl_240_dot_340_read_blocks_set() {
-        // A $2002 read at (240, 340) — 1 PPU dot before the
-        // (PPU-programmer-reference) VBL set at (241, 1) — marks
-        // `vbl_suppressed_this_frame` via
+    fn vbl_suppression_via_sl_241_dot_0_read_blocks_set() {
+        // Batch 3c.1: a $2002 read at (241, 0) — 1 PPU dot before the
+        // VBL set at (241, 1) — marks `vbl_suppressed_this_frame` via
         // `apply_a2002_suppression`; the (241, 1) tick checks the
         // flag and skips both `set_vbl_flag` and `nmi_asserted`.
         let mut s = PpuState::new();
@@ -637,23 +649,21 @@ mod tests {
         s.registers.write_ctrl(1 << ctrl_bits::NMI_ENABLE);
         let mut bus = FlatBus::new();
 
-        // Step B.5-2d: apply_a2002_suppression matches the CURRENT (sl, dot)
-        // and tick_to leaves the state one dot PAST its target, so tick to
-        // (240, 339) to actually be at (240, 340) when the read happens.
-        tick_to(&mut s, &mut bus, 240, 339);
-        assert_eq!((s.scanline, s.dot), (240, 340), "precondition");
+        // apply_a2002_suppression matches the CURRENT (sl, dot) and
+        // tick_to leaves the state one dot PAST its target, so tick to
+        // (240, 340) to actually be at (241, 0) when the read happens.
+        tick_to(&mut s, &mut bus, 240, 340);
+        assert_eq!((s.scanline, s.dot), (241, 0), "precondition");
         s.apply_a2002_suppression();
 
-        // The (240, 340) tick advances to (241, 0); the VBL set is
-        // processed on the following tick.
-        tick_dot(&mut s, &mut bus);
+        // The (241, 1) tick processes the (suppressed) VBL set.
         let out = tick_dot(&mut s, &mut bus);
         assert!(!out.vbl_entered);
         assert!(!out.nmi_asserted);
         assert_eq!(
             s.registers.status & (1 << status_bits::VBL),
             0,
-            "VBL flag should NOT be set after (240, 340) suppression"
+            "VBL flag should NOT be set after (241, 0) suppression"
         );
     }
 
