@@ -1,4 +1,5 @@
 # Track C — Task 1 Final Report
+> **STATUS: COMPLETED**（2026-09-19 归档自 docs/tech；正文未改动，长期有效结论已并入 docs/tech 知识库）
 
 > **Scope**: FCEUX11 v1.17, wip_v1.17 branch, Track C subagent
 > **Worktree**: `subagent-019fddfc-4442-7eb2-bbbb-36e89198c09a`
@@ -11,9 +12,9 @@
 
 | Subtask | C++ source | Rust implementation | Tests | Parity report | Deletion of C++ |
 |---|---|---|---|---|---|
-| **C-1** | `tests/blargg_runner.cpp` (533 LOC) | `src/rust/crates/kagami-qa/src/runner/blargg.rs` + C-ABI entry `lib.rs::blargg_entry` | 32 new | `docs/tech/Task1-C1_parity_report.md` | ⏸ Deferred to Track A |
-| **C-2** | `tests/rom_regression_test.cpp` (329 LOC) | `src/rust/crates/kagami-qa/src/runner/rom_regression.rs` + C-ABI entry `lib.rs::rom_regression_entry` | 19 new | `docs/tech/Task1-C2_parity_report.md` | ⏸ Deferred to Track A |
-| **C-3** | `tests/savestate_regression_test.cpp` (325 LOC) | `src/rust/crates/kagami-qa/src/runner/savestate_regression.rs` + C-ABI entry `lib.rs::savestate_regression_entry` | 18 new | `docs/tech/Task1-C3_parity_report.md` | ⏸ Deferred to Track A |
+| **C-1** | `tests/blargg_runner.cpp` (533 LOC) | `src/rust/crates/kagami-qa/src/runner/blargg.rs` + C-ABI entry `lib.rs::blargg_entry` | 32 new | `docs/history/reports/Task1-C1_parity_report.md` | ⏸ Deferred to Track A |
+| **C-2** | `tests/rom_regression_test.cpp` (329 LOC) | `src/rust/crates/kagami-qa/src/runner/rom_regression.rs` + C-ABI entry `lib.rs::rom_regression_entry` | 19 new | `docs/history/reports/Task1-C2_parity_report.md` | ⏸ Deferred to Track A |
+| **C-3** | `tests/savestate_regression_test.cpp` (325 LOC) | `src/rust/crates/kagami-qa/src/runner/savestate_regression.rs` + C-ABI entry `lib.rs::savestate_regression_entry` | 18 new | `docs/history/reports/Task1-C3_parity_report.md` | ⏸ Deferred to Track A |
 
 **Total Rust harness code**: 2,481 LOC across three modules + 69 unit tests + 3 C-ABI entry points.
 
@@ -192,7 +193,7 @@ graceful degradation consistent with the existing Task 4 watchdog
 | FFI for savestate (`kagami_bridge_save_state`) | ✅ Added, declared, gated by direct-adapter feature |
 | C-ABI entry points for all three | ✅ Added under `lib.rs::{blargg,rom_regression,savestate_regression}_entry` |
 | Unit tests (`cargo test -p kagami-qa`) | ✅ 142 passed (was 71; +71 new) |
-| Parity reports | ✅ All three in `docs/tech/Task1-{C1,C2,C3}_parity_report.md` |
+| Parity reports | ✅ All three in `docs/history/reports/Task1-{C1,C2,C3}_parity_report.md` |
 | C++ deletion + tests.json update | ⏸ Deferred to Track A post-parity-verification |
 | Oracle A regression check | ⏸ Deferred to Track A (no `build/` here) |
 | Runtime parity diff (177/177, 780/780, 12/12) | ⏸ Deferred to Track A (no vcpkg here) |

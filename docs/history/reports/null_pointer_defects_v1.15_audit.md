@@ -1,4 +1,5 @@
 # FCEUX11 v1.15 空指针解引用审计报告
+> **STATUS: COMPLETED**（2026-09-19 归档自 docs/tech；正文未改动，长期有效结论已并入 docs/tech 知识库）
 
 > **报告性质**：v1.15 Finale 发布前 CODE REVIEW 发现项，建议 v2.0 修复  
 > **编制日期**：2026-07-11  

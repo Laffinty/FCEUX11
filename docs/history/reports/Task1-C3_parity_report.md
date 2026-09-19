@@ -1,4 +1,5 @@
 # Task 1 / C-3 Parity Report — savestate_regression_test.cpp → kagami-qa::runner::savestate_regression
+> **STATUS: COMPLETED**（2026-09-19 归档自 docs/tech；正文未改动，长期有效结论已并入 docs/tech 知识库）
 
 > **Status**: ⚠️ **DESIGN-LEVEL PARITY VERIFIED / RUNTIME PARITY DEFERRED**
 > **Track**: C (Task 1 / C-3, wip_v1.17)
@@ -28,7 +29,7 @@ are absent). The Rust implementation is unit-tested with a mocked
 `SutAdapter + StateSnapshot` pair that exercises every observable
 harness behaviour; once the next full CMake build lands, Track A's
 CI matrix will give us the 12-element list diff required by §2.4 of
-`docs/FCEUX11-1.17_计划.md`.
+`docs/history/plans/FCEUX11-1.17_计划.md`.
 
 **Discipline compliance**:
 
@@ -91,7 +92,7 @@ the existing 12-ROM manifest:
 
 ## 4. What the parity check would measure
 
-Per `FCEUX11-1.17_计划.md §2.4`, the gate is:
+Per `docs/history/plans/FCEUX11-1.17_计划.md §2.4`, the gate is:
 
 > 逐测试 parity: C++ vs Rust harness 输出 100% 一致（哈希/判定/exit code）
 

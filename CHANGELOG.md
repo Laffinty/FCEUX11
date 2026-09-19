@@ -44,7 +44,7 @@ Task 3（遗留收敛核查）成果。
   `apu_reset_4017_timing/written`）被 H-1（`reset_after`）/H-2（帧预算）清零。
 - **R5 首次真实探针数据**：Track-B 探针（5 个 E1B）首次在真实 ROM + build 上采集
   （此前为推断）；vbl_05 确认 PASS；vbl_02/06/07/08/10 + `ppu_vbl_nmi` 为
-  v1.16 已证伪/回滚处方的深模型已知限制（记录于 `docs/tech/R5R6_v1.17_核查结论.md`）。
+  v1.16 已证伪/回滚处方的深模型已知限制（记录于 `docs/history/surveys/r5r6_v1.17/R5R6_v1.17_核查结论.md`）。
 - **矩阵基线澄清**：计划 §一 的「121 PASS / 56 FAIL」为过期数据；实测与 v1.16
   CHANGELOG 一致为 144 PASS / 33 FAIL，v1.17 无回归。
 

@@ -469,7 +469,7 @@ kernel32.lib ntdll.lib userenv.lib ws2_32.lib dbghelp.lib /defaultlib:libcmt
   > `(assert(FFCEUX_PPURead != nullptr), FFCEUX_PPURead(A))`。逗号表达式保持宏的**表达式语义与返回类型**
   > 不变（全部 10 处调用点都是简单赋值），`NDEBUG` 下 `assert` 展开为 `((void)0)` → Release 零成本。
 
-> ⚠️ 需与 `docs/tech/null_pointer_defects_v1.15_audit.md` 的 5 项空指针缺陷区分：那些覆盖 `currCartInfo` / `XBackBuf` / `GameInfo->type`，与 L4 的论证**不冲突**，且各自只需 1 行 guard。它们被标记为 v2.0，本计划**不纳入**，但若 Phase E 有余量可低成本顺带处理。
+> ⚠️ 需与 `docs/history/reports/null_pointer_defects_v1.15_audit.md` 的 5 项空指针缺陷区分：那些覆盖 `currCartInfo` / `XBackBuf` / `GameInfo->type`，与 L4 的论证**不冲突**，且各自只需 1 行 guard。它们被标记为 v2.0，本计划**不纳入**，但若 Phase E 有余量可低成本顺带处理。
 
 ---
 

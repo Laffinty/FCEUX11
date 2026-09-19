@@ -1,5 +1,6 @@
 # FCEUX11 v1.17 构建计划 — KagamiQA 统合、Rust 迁移与分级标准
 
+> **STATUS: COMPLETED**（v1.17 已于 2026-09 发布至 main；本计划随之归档，遗留收敛项见 §十三）
 > **版本**：v1.17（2026-08-07 草案 / **2026-08-08 主体已施工**）
 > **日期**：2026-08-07 草案 / 2026-08-08 主体施工
 > **分支**：`wip_v1.17`
@@ -135,7 +136,7 @@ src/kagami/                          ← 引擎侧桥接（决策点 3.4，建�
 ```
 
 > 完整 44 文件映射、CMake 改动点、登记核对表与验收门禁见
-> **`docs/FCEUX11-1.17_Task2-落位清单.md`**（执行级清单，本计划为策略级）。
+> **`docs/history/checklists/FCEUX11-1.17_Task2-落位清单.md`**（执行级清单，本计划为策略级）。
 
 ### 3.4 实施步骤与决策点
 
@@ -413,10 +414,10 @@ Phase D  遗留收敛（任务 3，全程并行轨）
 
 > **本节性质**：v1.17 计划（2026-08-07 草案）经主体施工后，**计划文档与实态之间的偏差登记**。目的是为下次开工修订计划本体提供清单，不是改计划本身——计划本体下次开工时按本清单一次性更新（预估 2–3 小时纯文档工作，可作为下一个 PR 的开篇）。
 > **关联文档**：
-> - 实测核查：`docs/tech/R5R6_v1.17_核查结论.md`
-> - 落位清单：`docs/FCEUX11-1.17_Task2-落位清单.md`
+> - 实测核查：`docs/history/surveys/r5r6_v1.17/R5R6_v1.17_核查结论.md`
+> - 落位清单：`docs/history/checklists/FCEUX11-1.17_Task2-落位清单.md`
 > - CHANGELOG v1.17 章节：`CHANGELOG.md`（Task 1 迁移 + Task 3 收敛）
-> - 决策产物：`docs/tech/Task1-C1/C2/C3_parity_report.md`、`docs/tech/Task1-TrackC-Final-Report.md`
+> - 决策产物：`docs/history/reports/Task1-C1/C2/C3_parity_report.md`、`docs/history/reports/Task1-TrackC-Final-Report.md`
 
 ### 11.1 必改（机械性事实更新，6 处）
 

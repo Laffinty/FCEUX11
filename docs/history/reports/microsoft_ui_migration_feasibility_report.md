@@ -1,4 +1,5 @@
 # FCEUX11 迁移至微软系 UI 框架可行性分析报告
+> **STATUS: COMPLETED**（2026-09-19 归档自 docs/tech；正文未改动，长期有效结论已并入 docs/tech 知识库）
 
 > **报告性质**：v2.x 战略预研（必须在 `docs/history/plans/v1.x_Modernization_Roadmap.md` 全部完成后方可启动）  
 > **分析对象**：FCEUX11 当前 Qt 6 驱动层 → 微软全系 UI 框架（WinUI 3 → Win32）  

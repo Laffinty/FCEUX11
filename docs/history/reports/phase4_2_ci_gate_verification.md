@@ -1,4 +1,5 @@
 # Phase 4.2 CI Gate 验证（R4 通过）— 验收记录
+> **STATUS: COMPLETED**（2026-09-19 归档自 docs/tech；正文未改动，长期有效结论已并入 docs/tech 知识库）
 
 > **执行日期**：2026-08-06
 > **执行环境**：本地 PowerShell + GitHub Actions API

@@ -10,7 +10,7 @@
 > 记录为有据已知限制，见 `docs/history/surveys/e1_vbl/vbl_step1_2_nmi_cancel_gap_2026-08-03.md`）
 > **编制依据**：
 > - `docs/history/reports/FCEUX11-1.16_最终验收报告.md` §十 R5/R6（原始处方 + 🚨/🚧 实测校准块）
-> - `docs/tech/P2_precision_instrument_handoff.md`（E-1/E-3 交接档案，含 6 探针清单）
+> - `docs/history/surveys/p2_instrument/P2_precision_instrument_handoff.md`（E-1/E-3 交接档案，含 6 探针清单）
 > - **本次联机研究**（2026-08-01）：NESdev Wiki（APU Frame Counter / PPU frame timing / NMI）+ blargg 原始测试包源码
 >   （`christopherpow/nes-test-roms`：`ppu_vbl_nmi/source/*.s`、`blargg_apu_2005.07.30/source/*.asm` + readme/tests.txt、`apu_reset/readme.txt`）
 > - **用户决策（2026-08-01）**：P3（第二 oracle 来源）暂不做，"先确保精度再谈别的"。P3 已在验收报告中标注暂缓。

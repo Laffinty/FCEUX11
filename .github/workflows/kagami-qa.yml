@@ -8,7 +8,7 @@
 #
 # Triggers on push to wip_1.16 / wip_v1.17 and main; also on PRs targeting these branches.
 #
-# v1.17 A0 (2026-08-07): add wip_v1.17 to trigger branches (FCEUX11-1.17_计划.md Phase A).
+# v1.17 A0 (2026-08-07): add wip_v1.17 to trigger branches (docs/history/plans/FCEUX11-1.17_计划.md Phase A).
 
 name: KagamiQA
 
@@ -441,7 +441,7 @@ jobs:
             $failures += "transition_matrix.fail_to_pass is $f2pCount, expected 0 (Phase 0.5-d anti-gaming guard did not hold in CI)"
           }
 
-          # Task 5 (FCEUX11-1.17_计划.md §6): release-readiness grade. D/E
+          # Task 5 (docs/history/plans/FCEUX11-1.17_计划.md §6): release-readiness grade. D/E
           # means a blocking failure or regression (D) or a broken engine
           # boot (E) — either forbids merging.
           $grade = $m.grade

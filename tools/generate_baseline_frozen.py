@@ -2,7 +2,7 @@
 """Derive ``tests/fixtures/kagamiqa_baseline_frozen.json`` from a current
 migration matrix.
 
-Background (FCEUX11-1.17_计划.md §13.1):
+Background (docs/history/plans/FCEUX11-1.17_计划.md §13.1):
 The release-readiness grade (Task 5, ``report/grade.rs``) conservatively
 caps at ``C`` unless the runner is invoked with ``--baseline``. With the
 frozen baseline pointing at this file, every advisory known-limit failure

@@ -1,4 +1,5 @@
 # R5 — PPU VBL/NMI 边沿时序（Instrument-First 探针数据）
+> **STATUS: COMPLETED**（2026-09-19 归档自 docs/tech；正文未改动，长期有效结论已并入 docs/tech 知识库）
 
 > **任务归属**：FCEUX11 v1.17 任务 4.3 R5（E-1 PPU VBL/NMI 边沿时序，Bucket-A / 精度攻坚）
 > **Track**：B（探针施工 — 不动任何 PPU/CPU 时序逻辑，仅 env-gated printf 注入）

@@ -1,8 +1,8 @@
 # FCEUX11 内部文档归档（docs/history）
 
-> **定位**：FCEUX11 各版本（v1.4 ~ v1.16）已完成/在途的构建计划、执行报告、审计验收、
-> 调查实验数据与清单的**历史归档**。当前**在途工作**的构建方案见 `docs/` 根目录（如
-> `docs/FCEUX11-1.16_P2-精度收敛三阶段构建方案.md`），技术参考文档见 `docs/tech/`。
+> **定位**：FCEUX11 各版本（v1.4 ~ v1.17）已完成/在途的构建计划、执行报告、审计验收、
+> 调查实验数据与清单的**历史归档**。当前**在途工作**的构建方案放 `docs/` 根目录，技术
+> 知识库见 `docs/tech/`（索引：`docs/tech/README.md`）。
 > **归档整理日期**：2026-08-01（依据 Diátaxis 文档架构思想 + Rust RFC 状态机惯例）
 
 ---
@@ -15,7 +15,7 @@
 |------|------|------|
 | `plans/` | 历史构建/实施计划与路线图（已完成 🔵 或暂缓 🟡） | hotfix1~5 PLAN、Stage-2、v1.x Roadmap |
 | `reports/` | 阶段完成、验证、审计、验收报告 | hotfix2/3 phase 报告、KagamiQA 审计/验收、最终验收报告 |
-| `surveys/` | 调查与实验数据（两条在途链：`e1_vbl/` PPU VBL/NMI、`e6_apu/` APU 帧计数器） | vbl_step*、r6_step* |
+| `surveys/` | 调查与实验数据（按调查链分子目录：`e1_vbl/` PPU VBL/NMI、`e6_apu/` APU 帧计数器、`r5r6_v1.17/`、`p2_instrument/`，另有 cpu_bucketB、mmc3、ppu_bucketC、sprdma_bucketD） | vbl_step*、r6_step* |
 | `checklists/` | 接入清单、移除清单、问题清单、手工场景 | blargg 接入清单、v2.0 移除清单 |
 | `obsolete/` | **已被取代**的文档（仅作审计链保留，文件顶部有 🔴 OBSOLETE 横幅） | 翻译质量复测报告（v2） |
 | `history.md` | v1.4 ~ v1.13 综合构建史（早期单文件已合并于此） | — |
@@ -61,6 +61,7 @@
 | `FCEUX11-1.16_KagamiQA-P5-权威性构建计划.md` | 🔵 | P5 权威性构建（口径后续修订为 177 ROM） |
 | `FCEUX11-1.16_P3-KagamiQA闭环四阶段构建方案.md` | 🔵 | P3 闭环四阶段构建（Phase 1-3 精度收敛 100% + Phase 4 KagamiQA 系统闭环 + v1.16 发布门禁） |
 | `FCEUX11-1.16_Stage2-构建计划.md` | 🔵 | Stage-2 二阶段构建（含收官状态回填） |
+| `FCEUX11-1.17_计划.md` | 🔵 | v1.17 构建计划 — KagamiQA 统合、Rust 迁移与分级标准（2026-09 随 v1.17 发布归档） |
 | `FCEUX11-Stage3-权威性迭代与通用化路线.md` | 🟡 | Stage-3 路线草案（**P3 暂缓**，顶部有 DEFERRED 横幅） |
 | `v1.x_Modernization_Roadmap.md` | 🔵 | v1.x 现代化改造路线图（v1.1~v1.14，已收官） |
 
@@ -88,6 +89,13 @@
 | `FCEUX11-1.16_CI-R4-实跑诊断.md` | 🔵 | CI R4 三轮实跑诊断与整改（1156ca1 闭环） |
 | `ci-r4-closure-memory-2026-08-01.md` | 🟢 | R4 闭环结论落档（最新，为下一 PR/任务留对接提示，与上者配合使用） |
 | `FCEUX11-1.16_最终验收报告.md` | 🔵 | v1.16 最终验收（通过）+ §十 P0~P3 整改建议（P2 精度收敛的处方来源） |
+| `Task1-C1_parity_report.md` | 🔵 | v1.17 Task1 Track-C C-1：blargg runner parity（2026-09-19 自 docs/tech 移入） |
+| `Task1-C2_parity_report.md` | 🔵 | Track-C C-2：ROM 回归 parity（同上） |
+| `Task1-C3_parity_report.md` | 🔵 | Track-C C-3：savestate 回归 parity（同上） |
+| `Task1-TrackC-Final-Report.md` | 🔵 | Track-C 汇总（含迁移 parity 纪律，同上） |
+| `microsoft_ui_migration_feasibility_report.md` | 🟡 | v2.x UI 迁移可行性预研（2026-09-19 自 docs/tech 移入） |
+| `null_pointer_defects_v1.15_audit.md` | 🟢 | v1.15 空指针审计 5 项（v2.0 待修清单仍有效，同上） |
+| `phase4_2_ci_gate_verification.md` | 🔵 | Phase 4.2 R4 Gate 验收记录（同上） |
 
 ### 2.3 `surveys/e1_vbl/` — E-1 PPU VBL/NMI 调查链（在途 🟢）
 
@@ -111,23 +119,43 @@
 | `r6_step3_fix_data_2026-08-01.md` | R6 缺陷 1 两次修复尝试失败记录（已回滚，**未修复**） |
 | `p2_step2_1_fix_data_2026-08-01.md` | **P2 Phase 2 Step 2.1** power/reset 相位分离实测（fcnt=1,2,3,0 证实；零回归；未闭合项指向 Step 2.2） |
 
-### 2.5 `checklists/` — 清单
+### 2.5 `surveys/r5r6_v1.17/` — v1.17 R5/R6 迁移与核查链（🔵，2026-09-19 自 docs/tech 移入）
+
+| 文件 | 说明 |
+|------|------|
+| `R5_instrument_first_data.md` | R5（ppu_frame_diff 迁移）E1B 探针仪器数据（Track-B，5 探针） |
+| `R6_instrument_first_data.md` | R6（apu_wav_diff 迁移）E3B 探针仪器数据（Track-B，6 探针） |
+| `R5R6_v1.17_核查结论.md` | v1.17 R5/R6 实测核查结论（剩余 FAIL 面与根因定性） |
+
+### 2.6 `surveys/p2_instrument/` — P2 精度收敛交接档案（🔵，2026-09-19 自 docs/tech 移入）
+
+| 文件 | 说明 |
+|------|------|
+| `P2_precision_instrument_handoff.md` | P2 调查交接档案（8 份 survey 汇总、instrument-first 纪律与 savestate 禁忌出处） |
+
+### 2.6a 其他链（未逐文件列表，按文件名自明）
+
+`cpu_bucketB/`（CPU 残差调查 2 文件）、`mmc3/`（MMC3 IRQ 调查）、
+`ppu_bucketC/`（open-bus decay 探针 3 文件）、`sprdma_bucketD/`（SPR-DMA 探针）。
+
+### 2.7 `checklists/` — 清单
 
 | 文件 | 状态 | 说明 |
 |------|------|------|
 | `FCEUX11-1.16_blargg_接入清单.md` | 🟢 | blargg ROM 统一 177 基线（被 CI 文档沿用） |
 | `FCEUX11-1.16_KagamiQA-遗留问题与构建难题.md` | 🔵 | 遗留问题与构建难题清单（4 项不修复 + 4 项难题，含就地勘误） |
+| `FCEUX11-1.17_Task2-落位清单.md` | 🔵 | v1.17 Task 2 `tests/kagami/` 落位清单（已执行） |
 | `v1.15_hotfix2_manual_scenarios.md` | 🔵 | hotfix2 手动冒烟场景清单 |
 | `v2.0_removal_checklist.md` | 🟢 | v2.0 前置移除清单（FCEUI_* 105 个、bmap[] 等） |
 
-### 2.6 `obsolete/` — 已过时（🔴，仅审计链保留）
+### 2.8 `obsolete/` — 已过时（🔴，仅审计链保留）
 
 | 文件 | 取代者 |
 |------|--------|
 | `FCEUX11-1.15_翻译质量复测报告.md` | `reports/FCEUX11-1.15_翻译质量最终复测报告.md`（v3 ✅ 通过） |
 | `FCEUX11-1.16_KagamiQA-P2-accuracy-table.md` | 22 ROM 快照 → 177 ROM 统一基线（`checklists/FCEUX11-1.16_blargg_接入清单.md`） |
 
-### 2.7 根目录
+### 2.9 根目录
 
 | 文件 | 说明 |
 |------|------|
@@ -139,7 +167,7 @@
 
 以下引用在历史文档中**刻意保留原样**（属历史陈述，非断链；整理时已逐条核实）：
 
-- **`docs/继续任务.txt`**：已移除的输入文件（其内容已转录进 `docs/tech/P2_precision_instrument_handoff.md` 与
+- **`docs/继续任务.txt`**：已移除的输入文件（其内容已转录进 `docs/history/surveys/p2_instrument/P2_precision_instrument_handoff.md` 与
   `reports/ci-r4-closure-memory-2026-08-01.md`），历史文档中仍保留对它的引用。
 - **`docs/internal/*`**：旧目录名（现为 `docs/history/`）。早期单文件已合并入 `history.md`；
   `v1.x_Modernization_Roadmap.md` 内的 `docs/internal/global_state_audit.md`、
@@ -152,5 +180,9 @@
 - **`docs/tech/KagamiQA-方法论.md`**：Stage-3 建议产出的未来文档（与被测物无关的规范）。
 - **`v1.15_hotfix3_phase_b_diagnostics.md`**：从未单独生成（Phase B 诊断并入
   `reports/v1.15_hotfix3_overview.md`，hotfix3-PLAN 内有说明）。
-- **`docs/blob/docs/...`**（在 `docs/tech/microsoft_ui_migration_feasibility_report.md` 中）：
+- **`docs/blob/docs/...`**（在 `docs/history/reports/microsoft_ui_migration_feasibility_report.md` 中）：
   微软官方文档的外部链接，非本仓库文件。
+- **v0.x 时代的 `docs/tech/` 知识库文件**（`05_Project_Development_Guide`、`06_v0...`、
+  `16_~22_*.txt`、`Menu_Migration_v0.*`、`i18n_Architecture_zh_CN.md`、`i18n_review_log.md`）：
+  已随 v1.x 重构移除，`CHANGELOG.md` 中对它们的引用是**历史陈述**，不视为断链。
+  现行技术知识库为 `docs/tech/`（见 `docs/tech/README.md`）。

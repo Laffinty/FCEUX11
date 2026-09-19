@@ -1,4 +1,5 @@
 # R6 — APU 帧计数器相位 + $4017 标志（Instrument-First 探针数据）
+> **STATUS: COMPLETED**（2026-09-19 归档自 docs/tech；正文未改动，长期有效结论已并入 docs/tech 知识库）
 
 > **任务归属**：FCEUX11 v1.17 任务 4.4 R6（E-3 APU 帧计数器相位，Bucket-A / 精度攻坚）
 > **Track**：B（探针施工 — 不动任何 APU 时序逻辑，仅 env-gated printf 注入）

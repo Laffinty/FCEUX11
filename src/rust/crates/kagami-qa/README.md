@@ -4,7 +4,7 @@ KagamiQA（「鏡」QA）是 FCEUX11 的**双通道、零耦合模拟器精度�
 唯一编排层：全部测试（CTest 回归、blargg 硬件一致性、Lua 脚本、基准）都以 `tests.json`
 清单条目的形式成为它的子项，由 `kagami-qa-runner` 统一调度、判定、报告与门禁。
 
-> v1.17 定位（`docs/FCEUX11-1.17_计划.md`）：把 KagamiQA 从「FCEUX11 的附属测试框架」升级为
+> v1.17 定位（`docs/history/plans/FCEUX11-1.17_计划.md`）：把 KagamiQA 从「FCEUX11 的附属测试框架」升级为
 > 「测试体系的唯一归属与唯一门禁」。本文档对应 v1.17 实态（47 条清单 / 双 Oracle / CI 闭环 /
 > 七层架构）。
 

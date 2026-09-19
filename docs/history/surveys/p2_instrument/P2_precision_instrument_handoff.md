@@ -1,4 +1,5 @@
 # P2 精度收敛剩余项 — 独立 Instrument 专项交接档案
+> **STATUS: COMPLETED**（2026-09-19 归档自 docs/tech；正文未改动，长期有效结论已并入 docs/tech 知识库）
 
 > **用途**：FCEUX11 精度收敛（P2）中，R5（E-1 PPU VBL/NMI）与 R6（E-3 APU 帧计数器）剩余未闭合项的**完整诊断档案**。
 > 本文档把散落在 `docs/history/surveys/e1_vbl/`、`docs/history/surveys/e6_apu/` 的 8 份调查文档的关键结论汇总为一份可直接接手攻关的清单。

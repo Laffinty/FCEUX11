@@ -1,4 +1,5 @@
 # Task 1 / C-1 Parity Report — blargg_runner.cpp → kagami-qa::runner::blargg
+> **STATUS: COMPLETED**（2026-09-19 归档自 docs/tech；正文未改动，长期有效结论已并入 docs/tech 知识库）
 
 > **Status**: ⚠️ **DESIGN-LEVEL PARITY VERIFIED / RUNTIME PARITY DEFERRED**
 > **Track**: C (Task 1 / C-1, wip_v1.17)
@@ -23,7 +24,7 @@ build** because this worktree has no CMake/vcpkg infrastructure
 is unit-tested with a mocked `SutAdapter` that exercises every
 observable harness behaviour; once the next full CMake build lands,
 Track A's CI matrix will give us the 177/177 list diff required by
-§2.5 of `docs/FCEUX11-1.17_计划.md`.
+§2.5 of `docs/history/plans/FCEUX11-1.17_计划.md`.
 
 **Discipline compliance**:
 
@@ -79,7 +80,7 @@ the existing 177-ROM manifest, but they tighten the harness contract:
 
 ## 4. What the parity check would measure
 
-Per `FCEUX11-1.17_计划.md §2.4`, the gate is:
+Per `docs/history/plans/FCEUX11-1.17_计划.md §2.4`, the gate is:
 
 > 逐测试 parity: C++ vs Rust harness 输出 100% 一致（哈希/判定/exit code）
 
