@@ -58,7 +58,7 @@ def run_fetch_snapshot(args) -> int:
         return 1
     cmd = [
         sys.executable, str(fetch_script),
-        '--pin', str(args.pin),
+        '--pin', str(args.manifest),
         '--tests-json', str(args.tests_json),
         '--output-dir', str(REPO_ROOT / 'tests' / 'fixtures'),
     ]

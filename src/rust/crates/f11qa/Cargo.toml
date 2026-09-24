@@ -1,5 +1,5 @@
 [package]
-name = "kagami-qa"
+name = "f11qa"
 version.workspace = true
 edition.workspace = true
 
@@ -7,8 +7,14 @@ edition.workspace = true
 crate-type = ["rlib"]
 
 [[bin]]
-name = "kagami-qa-runner"
+name = "f11qa-runner"
 path = "src/main.rs"
+
+# F11QA v1.8 §5 — 统一 ROM runner dispatcher (kgmqa-048~112 + blargg 系列路由)
+# Phase 5 framework; Phase 9 实战时每个 suite 适配 $6000 / 屏幕 hash / log diff 等协议
+[[bin]]
+name = "f11qa-rom-runner"
+path = "src/bin/rom_runner.rs"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

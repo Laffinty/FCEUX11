@@ -799,11 +799,13 @@
       "spec_source": "internal",
       "license": "GPL-2.0",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/nestest/nestest.nes",
+          "--kgmqa-id",
+          "kgmqa-031-blargg-smoke",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -835,11 +837,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#instr_test_v5",
       "license": "GPL-2.0",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/cpu/instr_v5_all.nes",
+          "--kgmqa-id",
+          "kgmqa-032-cpu-instrs-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "3000"
         ]
@@ -870,11 +874,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#cpu_timing_test6",
       "license": "GPL-2.0",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/cpu/cpu_timing_test6.nes",
+          "--kgmqa-id",
+          "kgmqa-033-cpu-timing-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -906,11 +912,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#ppu_vbl_nmi",
       "license": "GPL-2.0",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/ppu/ppu_vbl_nmi.nes",
+          "--kgmqa-id",
+          "kgmqa-034-ppu-vbl-nmi-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -943,11 +951,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#mmc3_test",
       "license": "GPL-2.0",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/mmc3/mmc3_test_4.nes",
+          "--kgmqa-id",
+          "kgmqa-035-mmc3-4-scanline-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -979,11 +989,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#mmc3_test",
       "license": "GPL-2.0",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/mmc3/mmc3_test_2_4.nes",
+          "--kgmqa-id",
+          "kgmqa-036-mmc3-v2-4-scanline-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -1016,11 +1028,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#cpu_interrupts_v2",
       "license": "GPL-2.0",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/cpu/cpu_interrupts_v2_2.nes",
+          "--kgmqa-id",
+          "kgmqa-037-cpu-int-2-nmi-brk-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -1052,11 +1066,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#instr_misc",
       "license": "GPL-2.0",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/cpu/instr_misc.nes",
+          "--kgmqa-id",
+          "kgmqa-038-instr-misc-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -1088,11 +1104,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#oam_stress",
       "license": "GPL-2.0",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/ppu/oam_stress.nes",
+          "--kgmqa-id",
+          "kgmqa-039-oam-stress-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -1124,11 +1142,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#vbl_nmi_timing",
       "license": "GPL-2.0",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/vbl_nmi_timing/5.nmi_suppression.nes",
+          "--kgmqa-id",
+          "kgmqa-040-vbl-05-nmi-timing-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -1161,11 +1181,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#ppu_read_buffer",
       "license": "GPL-2.0",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/ppu/blargg_ppu_2005_vram_access.nes",
+          "--kgmqa-id",
+          "kgmqa-041-ppu-read-buffer-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -1197,11 +1219,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#sprdma",
       "license": "GPL-2.0",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/sprdma/sprdma_and_dmc_dma.nes",
+          "--kgmqa-id",
+          "kgmqa-042-sprdma-dmc-dma-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -1234,11 +1258,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests",
       "license": "GPL-2.0",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--batch",
-          "tests/fixtures/blargg_manifest.json",
+          "--kgmqa-id",
+          "kgmqa-043-blargg-suite",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -1396,13 +1422,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#nestest",
       "license": "PD",
       "input": {
-        "binary": "f11qa_nestest_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/nestest/nestest.nes",
-          "--log",
-          "tests/fixtures/nestest/nestest.log",
+          "--kgmqa-id",
+          "kgmqa-048-nestest",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "255"
         ]
@@ -1434,11 +1460,13 @@
       "spec_source": "bisqwit.iki.fi/src/nes_tests",
       "license": "zlib",
       "input": {
-        "binary": "f11qa_bisqwit_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/bisqwit/test_ppu_read_buffer.nes",
+          "--kgmqa-id",
+          "kgmqa-049-ppu-read-buffer-bisqwit",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -1469,11 +1497,13 @@
       "spec_source": "bisqwit.iki.fi/src/nes_tests",
       "license": "zlib",
       "input": {
-        "binary": "f11qa_bisqwit_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/bisqwit/cpu_dummy_writes_oam.nes",
+          "--kgmqa-id",
+          "kgmqa-050-cpu-dummy-writes-bisqwit",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -1504,11 +1534,13 @@
       "spec_source": "bisqwit.iki.fi/src/nes_tests",
       "license": "zlib",
       "input": {
-        "binary": "f11qa_bisqwit_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/bisqwit/test_cpu_exec_space_apu.nes",
+          "--kgmqa-id",
+          "kgmqa-051-cpu-exec-space-bisqwit",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -1539,11 +1571,13 @@
       "spec_source": "bisqwit.iki.fi/src/nes_tests",
       "license": "zlib",
       "input": {
-        "binary": "f11qa_bisqwit_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/bisqwit/cpu_flag_concurrency.nes",
+          "--kgmqa-id",
+          "kgmqa-052-cpu-flag-concurrency-bisqwit",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -1574,11 +1608,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests",
       "license": "PD",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/cpu/branch_timing_1.Branch_Basics.nes",
+          "--kgmqa-id",
+          "kgmqa-053-branch-timing-tests-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -1609,11 +1645,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#cpu_interrupts_v2",
       "license": "PD",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/cpu/cpu_interrupts_v2_1-cli_latency.nes",
+          "--kgmqa-id",
+          "kgmqa-054-cpu-interrupts-v2-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -1644,11 +1682,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#cpu_reset",
       "license": "PD",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/cpu/cpu_reset_registers.nes",
+          "--kgmqa-id",
+          "kgmqa-055-cpu-reset-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -1679,11 +1719,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#instr_timing",
       "license": "PD",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/cpu/instr_timing_instr_timing.nes",
+          "--kgmqa-id",
+          "kgmqa-056-instr-timing-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -1714,11 +1756,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#instr_test",
       "license": "PD",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/cpu/instr_test_v3_all_instrs.nes",
+          "--kgmqa-id",
+          "kgmqa-057-instr-test-v3-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "3000"
         ]
@@ -1750,11 +1794,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#sprite_hit",
       "license": "PD",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/ppu/sprite_hit_01.basics.nes",
+          "--kgmqa-id",
+          "kgmqa-058-ppu-sprite-hit-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -1785,11 +1831,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#sprite_overflow",
       "license": "PD",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/ppu/sprite_overflow_1.Basics.nes",
+          "--kgmqa-id",
+          "kgmqa-059-sprite-overflow-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -1820,11 +1868,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#ppu_open_bus",
       "license": "PD",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/ppu/ppu_open_bus.nes",
+          "--kgmqa-id",
+          "kgmqa-060-ppu-open-bus-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -1855,11 +1905,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#nmi_sync",
       "license": "PD",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/ppu/04-nmi_control.nes",
+          "--kgmqa-id",
+          "kgmqa-061-nmi-sync-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -1890,11 +1942,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#oam_read",
       "license": "PD",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/ppu/oam_read.nes",
+          "--kgmqa-id",
+          "kgmqa-062-oam-read-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -1925,11 +1979,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#apu_test",
       "license": "PD",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/apu/apu_test.nes",
+          "--kgmqa-id",
+          "kgmqa-063-apu-test-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -1959,11 +2015,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#apu_mixer",
       "license": "PD",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/apu/apu_mixer.nes",
+          "--kgmqa-id",
+          "kgmqa-064-apu-mixer-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -1994,11 +2052,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#dmc",
       "license": "PD",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/apu/dmc_tests_buffer_retained.nes",
+          "--kgmqa-id",
+          "kgmqa-065-dmc-tests-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -2029,11 +2089,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#dmc_dma_during_read",
       "license": "PD",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/apu/dmc_dma_during_read4_dma_2007_read.nes",
+          "--kgmqa-id",
+          "kgmqa-066-dmc-dma-during-read-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -2065,11 +2127,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#square_timer",
       "license": "PD",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/apu/square_timer_div2.nes",
+          "--kgmqa-id",
+          "kgmqa-067-square-timer-div2-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -2101,11 +2165,13 @@
       "spec_source": "github.com/christopherpow/nes-test-roms/tree/master/volume_tests",
       "license": "zlib",
       "input": {
-        "binary": "f11qa_volume_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/damianyerrick/volume_tests/volumes.nes",
+          "--kgmqa-id",
+          "kgmqa-068-volume-tests-damianyerrick",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -2137,11 +2203,13 @@
       "spec_source": "forums.nesdev.org/viewtopic.php?p=261236",
       "license": "PD",
       "input": {
-        "binary": "f11qa_mmc3_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/nk/mmc3irqtest/mmc3irqtest.nes",
+          "--kgmqa-id",
+          "kgmqa-069-mmc3ir-test-nk",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -2173,11 +2241,13 @@
       "spec_source": "forums.nesdev.org/viewtopic.php?t=11028",
       "license": "PD",
       "input": {
-        "binary": "f11qa_mmc5_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/drag/mmc5test/mmc5test.nes",
+          "--kgmqa-id",
+          "kgmqa-070-mmc5test-drag",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -2208,11 +2278,13 @@
       "spec_source": "forums.nesdev.org/viewtopic.php?t=11028",
       "license": "PD",
       "input": {
-        "binary": "f11qa_mmc5_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/awj/mmc5test_v2/mmc5test.nes",
+          "--kgmqa-id",
+          "kgmqa-071-mmc5test-v2-awj",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -2243,11 +2315,13 @@
       "spec_source": "forums.nesdev.org/viewtopic.php?t=11028",
       "license": "PD",
       "input": {
-        "binary": "f11qa_vrc24_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/awj/vrc24test/vrc24test.nes",
+          "--kgmqa-id",
+          "kgmqa-072-vrc24test-awj",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -2278,11 +2352,13 @@
       "spec_source": "forums.nesdev.org/viewtopic.php?t=11028",
       "license": "PD",
       "input": {
-        "binary": "f11qa_vrc6_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/natt/vrc6test/vrc6test.nes",
+          "--kgmqa-id",
+          "kgmqa-073-vrc6test-natt",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -2313,11 +2389,13 @@
       "spec_source": "github.com/christopherpow/nes-test-roms",
       "license": "PD",
       "input": {
-        "binary": "f11qa_mmc1_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/tepples/mmc1atest/mmc1atest.nes",
+          "--kgmqa-id",
+          "kgmqa-074-mmc1atest-tepples",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -2347,11 +2425,13 @@
       "spec_source": "github.com/christopherpow/nes-test-roms",
       "license": "PD",
       "input": {
-        "binary": "f11qa_mmc3_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/tepples/mmc3bigchrram/mmc3bigchrram.nes",
+          "--kgmqa-id",
+          "kgmqa-075-mmc3bigchrram-tepples",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -2382,11 +2462,13 @@
       "spec_source": "github.com/christopherpow/nes-test-roms",
       "license": "PD",
       "input": {
-        "binary": "f11qa_test28_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/tepples/test28/test28.nes",
+          "--kgmqa-id",
+          "kgmqa-076-test28-tepples",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -2417,11 +2499,13 @@
       "spec_source": "github.com/pinobatch/holy-mapperel",
       "license": "zlib",
       "input": {
-        "binary": "f11qa_holy_mapperel_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--batch",
-          "tests/fixtures/holy_mapperel_manifest.json",
+          "--kgmqa-id",
+          "kgmqa-077-holy-mapperel-tepples",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -2454,11 +2538,13 @@
       "spec_source": "forums.nesdev.org/viewtopic.php?f=3&t=9350",
       "license": "PD",
       "input": {
-        "binary": "f11qa_mmc1_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/lidnariq/serom/serom.nes",
+          "--kgmqa-id",
+          "kgmqa-078-serom-lidnariq",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -2490,11 +2576,13 @@
       "spec_source": "qmtpro.com/~nes",
       "license": "PD",
       "input": {
-        "binary": "f11qa_mmc5_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/quietust/mmc5exram.nes",
+          "--kgmqa-id",
+          "kgmqa-079-exram-quietust",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -2525,11 +2613,13 @@
       "spec_source": "qmtpro.com/~nes",
       "license": "PD",
       "input": {
-        "binary": "f11qa_scanline_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/quietust/scanline.nes",
+          "--kgmqa-id",
+          "kgmqa-080-scanline-quietust",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -2560,11 +2650,13 @@
       "spec_source": "github.com/Sour",
       "license": "MIT",
       "input": {
-        "binary": "f11qa_fds_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/sour/fdsirqtests/fdsirqtestsV7_patched.fds",
+          "--kgmqa-id",
+          "kgmqa-081-fds-irq-tests-sour",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -2595,11 +2687,13 @@
       "spec_source": "github.com/TakuikaNinja/FDS-Mirroring-Test",
       "license": "PD",
       "input": {
-        "binary": "f11qa_fds_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/takuikaninja/FDS-Mirroring-Test/mirroring-test.fds",
+          "--kgmqa-id",
+          "kgmqa-082-fds-mirroring-takuikaninja",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -2630,11 +2724,13 @@
       "spec_source": "github.com/TakuikaNinja/FDS-Audio-Registers",
       "license": "PD",
       "input": {
-        "binary": "f11qa_fds_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/takuikaninja/FDS-Audio-Registers/audio-registers.fds",
+          "--kgmqa-id",
+          "kgmqa-083-fds-audio-registers-takuikaninja",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -2665,11 +2761,13 @@
       "spec_source": "github.com/TakuikaNinja/FDS-4030D1-Addr",
       "license": "PD",
       "input": {
-        "binary": "f11qa_fds_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/takuikaninja/FDS-4030D1-Addr/4030d1-addr.fds",
+          "--kgmqa-id",
+          "kgmqa-084-fds-4030d1-addr-takuikaninja",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -2700,11 +2798,13 @@
       "spec_source": "github.com/TakuikaNinja/FDS-4023-Test",
       "license": "PD",
       "input": {
-        "binary": "f11qa_fds_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/takuikaninja/FDS-4023-Test/4023-test.fds",
+          "--kgmqa-id",
+          "kgmqa-085-fds-4023-test-takuikaninja",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -2735,11 +2835,13 @@
       "spec_source": "forums.nesdev.org/viewtopic.php?t=12085",
       "license": "PD",
       "input": {
-        "binary": "f11qa_submapper_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/rainwarrior/submapper/2_test.nes",
+          "--kgmqa-id",
+          "kgmqa-086-nes2-submapper-2-test",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -2771,11 +2873,13 @@
       "spec_source": "forums.nesdev.org/viewtopic.php?t=12085",
       "license": "PD",
       "input": {
-        "binary": "f11qa_submapper_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/rainwarrior/submapper/3_test.nes",
+          "--kgmqa-id",
+          "kgmqa-087-nes2-submapper-3-test",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -2807,11 +2911,13 @@
       "spec_source": "forums.nesdev.org/viewtopic.php?t=12085",
       "license": "PD",
       "input": {
-        "binary": "f11qa_submapper_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/rainwarrior/submapper/7_test.nes",
+          "--kgmqa-id",
+          "kgmqa-088-nes2-submapper-7-test",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -2843,11 +2949,13 @@
       "spec_source": "forums.nesdev.org/viewtopic.php?t=12085",
       "license": "PD",
       "input": {
-        "binary": "f11qa_submapper_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/rainwarrior/submapper/34_test.nes",
+          "--kgmqa-id",
+          "kgmqa-089-nes2-submapper-34-test",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -2879,11 +2987,13 @@
       "spec_source": "forums.nesdev.org/viewtopic.php?p=244062",
       "license": "PD",
       "input": {
-        "binary": "f11qa_mmc5_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/rainwarrior/mmc5ramsize/mmc5ramsize.nes",
+          "--kgmqa-id",
+          "kgmqa-090-mmc5ramsize-rainwarrior",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -2914,11 +3024,13 @@
       "spec_source": "forums.nesdev.org/viewtopic.php?p=284414",
       "license": "PD",
       "input": {
-        "binary": "f11qa_n163_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/rainwarrior/n163_soundram/n163_soundram.nes",
+          "--kgmqa-id",
+          "kgmqa-091-n163-soundram-rainwarrior",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -2949,11 +3061,13 @@
       "spec_source": "forums.nesdev.org/viewtopic.php?p=284414",
       "license": "PD",
       "input": {
-        "binary": "f11qa_n163_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/rainwarrior/n163_soundram/n163_soundram_init.nes",
+          "--kgmqa-id",
+          "kgmqa-092-n163-soundram-init-rainwarrior",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -2985,11 +3099,13 @@
       "spec_source": "forums.nesdev.org/viewtopic.php?p=79826",
       "license": "PD",
       "input": {
-        "binary": "f11qa_bntest_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/tepples/bntest/bntest-aorom.nes",
+          "--kgmqa-id",
+          "kgmqa-093-bntest",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -3021,11 +3137,13 @@
       "spec_source": "forums.nesdev.org/viewtopic.php?f=3&t=12085",
       "license": "PD",
       "input": {
-        "binary": "f11qa_bxrom_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/rainwarrior/bxrom_512k_test/bxrom_512k_test.nes",
+          "--kgmqa-id",
+          "kgmqa-094-bxrom-512k-test-rainwarrior",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -3056,11 +3174,13 @@
       "spec_source": "forums.nesdev.org/viewtopic.php?f=3&t=13120",
       "license": "PD",
       "input": {
-        "binary": "f11qa_mapper31_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/rainwarrior/31_test/31_test.nes",
+          "--kgmqa-id",
+          "kgmqa-095-31-test",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -3090,11 +3210,13 @@
       "spec_source": "github.com/christopherpow/nes-test-roms",
       "license": "PD",
       "input": {
-        "binary": "f11qa_fme7_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/tepples/fme7/fme7acktest.nes",
+          "--kgmqa-id",
+          "kgmqa-096-fme7acktest-tepples",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -3126,11 +3248,13 @@
       "spec_source": "github.com/christopherpow/nes-test-roms",
       "license": "PD",
       "input": {
-        "binary": "f11qa_fme7_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/tepples/fme7/fme7ramtest.nes",
+          "--kgmqa-id",
+          "kgmqa-097-fme7ramtest-tepples",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -3161,11 +3285,13 @@
       "spec_source": "rainwarrior.ca/projects/nes/famicom_audio_swap_tests.zip",
       "license": "PD",
       "input": {
-        "binary": "f11qa_famicom_audio_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/rainwarrior/famicom_audio_swap_tests/famicom_audio_swap.nes",
+          "--kgmqa-id",
+          "kgmqa-098-famicom-audio-swap-tests",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "300"
         ]
@@ -3197,11 +3323,13 @@
       "spec_source": "github.com/pinobatch/240p-test-mini",
       "license": "GPL-2.0",
       "input": {
-        "binary": "f11qa_240pee_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/240pee/240pee.nes",
+          "--kgmqa-id",
+          "kgmqa-099-240pee-damianyerrick",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -3235,11 +3363,13 @@
       "spec_source": "github.com/christopherpow/nes-test-roms",
       "license": "PD",
       "input": {
-        "binary": "f11qa_tvpassfail_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/tepples/tvpassfail/tv.nes",
+          "--kgmqa-id",
+          "kgmqa-100-tvpassfail-tepples",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -3272,11 +3402,13 @@
       "spec_source": "github.com/christopherpow/nes-test-roms",
       "license": "PD",
       "input": {
-        "binary": "f11qa_allpads_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/tepples/porttest/porttest.nes",
+          "--kgmqa-id",
+          "kgmqa-101-allpads-tepples",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -3307,11 +3439,13 @@
       "spec_source": "github.com/christopherpow/nes-test-roms",
       "license": "PD",
       "input": {
-        "binary": "f11qa_zap_ruder_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/tepples/zap_ruder/zap_ruder.nes",
+          "--kgmqa-id",
+          "kgmqa-102-zap-ruder-tepples",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -3343,11 +3477,13 @@
       "spec_source": "github.com/christopherpow/nes-test-roms",
       "license": "PD",
       "input": {
-        "binary": "f11qa_spad_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/tepples/spadtest/spadtest.nes",
+          "--kgmqa-id",
+          "kgmqa-103-spadtest-tepples",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -3378,11 +3514,13 @@
       "spec_source": "github.com/christopherpow/nes-test-roms",
       "license": "PD",
       "input": {
-        "binary": "f11qa_powerpad_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/tepples/powerpad/POWERPAD.NES",
+          "--kgmqa-id",
+          "kgmqa-104-powerpad-tepples",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -3413,11 +3551,13 @@
       "spec_source": "forums.nesdev.org/viewtopic.php?t=11028",
       "license": "PD",
       "input": {
-        "binary": "f11qa_paddle_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/3gengames/PaddleTest3/PaddleTest.nes",
+          "--kgmqa-id",
+          "kgmqa-105-paddle-test3-3gengames",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -3448,11 +3588,13 @@
       "spec_source": "forums.nesdev.org/viewtopic.php?t=23801",
       "license": "PD",
       "input": {
-        "binary": "f11qa_vaus_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/lidnariq/vaus/vaus.nes",
+          "--kgmqa-id",
+          "kgmqa-106-vaus-test-lidnariq",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -3485,11 +3627,13 @@
       "spec_source": "forums.nesdev.org/viewtopic.php?p=231608",
       "license": "PD",
       "input": {
-        "binary": "f11qa_mset_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/rainwarrior/mset/mset.nes",
+          "--kgmqa-id",
+          "kgmqa-107-mset-rainwarrior",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -3520,11 +3664,13 @@
       "spec_source": "forums.nesdev.org/viewtopic.php?p=231608",
       "license": "PD",
       "input": {
-        "binary": "f11qa_mict_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/rainwarrior/mict/mict.nes",
+          "--kgmqa-id",
+          "kgmqa-108-mict-rainwarrior",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -3555,11 +3701,13 @@
       "spec_source": "github.com/christopherpow/nes-test-roms",
       "license": "PD",
       "input": {
-        "binary": "f11qa_tellinglys_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/tepples/tellinglys/tellinglys.nes",
+          "--kgmqa-id",
+          "kgmqa-109-telling-lys-tepples",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -3590,11 +3738,13 @@
       "spec_source": "forums.nesdev.org/viewtopic.php?t=14319",
       "license": "PD",
       "input": {
-        "binary": "f11qa_dma_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/rahsennor/dma_sync_test_v2/dma_sync_test_v2.nes",
+          "--kgmqa-id",
+          "kgmqa-110-dma-sync-test-v2-rahsennor",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -3625,11 +3775,13 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests#read_joy3",
       "license": "PD",
       "input": {
-        "binary": "f11qa_blargg_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/blargg/read_joy3/test_buttons.nes",
+          "--kgmqa-id",
+          "kgmqa-111-read-joy3-blargg",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
@@ -3661,11 +3813,13 @@
       "spec_source": "nesdev wiki",
       "license": "PD",
       "input": {
-        "binary": "f11qa_nesstress_runner",
+        "binary": "f11qa-rom-runner",
         "working_dir": "tests",
         "args": [
-          "--rom",
-          "tests/fixtures/nesstress/NEStress/NEStress.NES",
+          "--kgmqa-id",
+          "kgmqa-112-nesstress-flubba",
+          "--tests-json",
+          "tests/tests.json",
           "--frames",
           "600"
         ]
