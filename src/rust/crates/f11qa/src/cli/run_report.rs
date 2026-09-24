@@ -51,6 +51,12 @@ pub fn generate(input: ReportInput) -> Result<i32, Box<dyn std::error::Error>> {
         drifts,
     );
 
+    // F11QA v1.8 §五 Phase 7.1 follow-up:
+    // vendor_state 三态计数待 f11qa-runner schema 完全迁移到 v1.8 后启用。
+    // 当前 v1.17 manifest schema 与 tests.json v1.8 ({schema_version, cases:[...]})
+    // 形状不兼容；直接启用会让 runner 加载 tests.json 失败。
+    // 见 src/rust/crates/f11qa/src/manifest/schema.rs 注释。
+
     // -------------------------------------------------------------------
     // Task 5 — release-readiness grade (A–E) attached to the matrix.
     // -------------------------------------------------------------------

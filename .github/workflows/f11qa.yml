@@ -1,26 +1,31 @@
-# FCEUX11 v1.16 KagamiQA P5 — CI Workflow
+# FCEUX11 v1.8 F11QA — CI Workflow
 #
-# Runs the dual-oracle QA system on every push to wip_1.16 / wip_v1.17 / main.
-# Produces a migration matrix artifact, accuracy table, and baseline drift report.
+# Runs the v1.8 QA pipeline on every push to wip1.8 / main. Produces a
+# migration matrix artifact, accuracy table, and baseline drift report.
 #
-# Oracle A: CTest regression suite (unit tests, ROM regressions, golden files)
-# Oracle B: Blargg $6000 test ROM suite (180 ROMs, headless batch run)
-#
-# Triggers on push to wip_1.16 / wip_v1.17 and main; also on PRs targeting these branches.
-#
-# v1.17 A0 (2026-08-07): add wip_v1.17 to trigger branches (docs/history/plans/FCEUX11-1.17_计划.md Phase A).
+# v1.8 changes (commit WIP, Phase 7 R4 gate upgrade):
+#   * Trigger branches: wip_1.16 → wip1.8
+#   * name: KagamiQA → F11QA
+#   * job id: kagami-qa → f11qa
+#   * Cargo package: kagami-qa → f11qa (Phase 1 retrofix; 同步 Cargo.toml rename)
+#   * Binary: kagami-qa-runner.exe → f11qa-runner.exe
+#   * ROM fetch: download_blargg_roms.ps1 → fetch_roms_from_mirror.py
+#     (single fetch 取代 22 个 downloader, v1.8 §四 §4.6 接入协议)
+#   * Pre-flight: kgmqa-117 mirror_snapshot_check 必跑 (早于所有 rom-suite 用例)
+#   * R4 gate: total==120 strict (取代 v1.17 的 total>=39), vendor_state 通道校验
+#   * Artifact names: kagamiqa_* → f11qa_*
 
-name: KagamiQA
+name: F11QA
 
 on:
   push:
-    branches: [main, wip_1.16]
+    branches: [main, wip1.8]
   pull_request:
-    branches: [main, wip_1.16]
+    branches: [main, wip1.8]
   workflow_dispatch:  # allow manual trigger
 
 jobs:
-  kagami-qa:
+  f11qa:
     runs-on: windows-2022
     # R4-0 (2026-07-31): raised 45 -> 180. Run 82956632293 was killed by the
     # 45-minute cap while still inside the CMake configure step, building
@@ -105,8 +110,8 @@ jobs:
             src/rust/target
             ~/.cargo/registry
             ~/.cargo/git
-          key: rust-kagami-${{ hashFiles('src/rust/Cargo.lock') }}
-          restore-keys: rust-kagami-
+          key: rust-f11qa-${{ hashFiles('src/rust/Cargo.lock') }}
+          restore-keys: rust-f11qa-
 
       # -----------------------------------------------------------------------
       # Build C++ project (with tests)
@@ -152,62 +157,60 @@ jobs:
         run: cmake --build build --config Release --parallel
 
       # -----------------------------------------------------------------------
-      # Build KagamiQA Rust runner
+      # Pre-flight — kgmqa-117 mirror_snapshot_check
       # -----------------------------------------------------------------------
-      - name: Build kagami-qa-runner
-        working-directory: src/rust
-        run: cargo build --release -p kagami-qa
-
-      # -----------------------------------------------------------------------
-      # Blargg test ROM fixtures (Oracle B's ground truth)
-      # -----------------------------------------------------------------------
-      # R4-1 (2026-07-31): run 83046118885 showed Oracle B reporting
-      # "Total: 177 / Passed: 0 / Failed: 177", every entry with
-      # `value: 0xFE, diag:[229,246,127]` -- the ROM-not-loadable signature, not
-      # accuracy failures. `kagami_qa_direct_smoke` failed the same way
-      # (`kagami_bridge_load_rom(...) failed: rc=-2`), dragging CI's ctest to
-      # 32/33 while the same commit is 34/34 locally.
-      #
-      # Root cause: `.gitignore:108` (`*.nes`) keeps all 177 blargg ROMs out of
-      # the repository -- by design, they are fetched from a mirror rather than
-      # vendored -- but no workflow ever invoked the fetch script. So CI has
-      # always run Oracle B against an empty fixture tree.
-      #
-      # scripts/download_blargg_roms.ps1 is idempotent (it skips any file that
-      # already exists and is >256 bytes), so a cache hit makes this a no-op.
-      # The cache key follows the script because the ROM inventory is declared
-      # inside it.
-      - name: Cache blargg ROMs
-        id: cache-blargg
-        uses: actions/cache@v4
-        with:
-          path: tests/fixtures/blargg
-          key: blargg-roms-${{ hashFiles('scripts/download_blargg_roms.ps1') }}
-          restore-keys: blargg-roms-
-
-      - name: Fetch blargg test ROMs
-        shell: pwsh
-        run: ./scripts/download_blargg_roms.ps1
-
-      # The fetch script reports failures but never sets a non-zero exit code,
-      # so a partially-downloaded fixture tree would silently be reported as a
-      # full 177-ROM run. Cross-check the manifest instead: every ROM the
-      # manifest promises must actually be on disk before Oracle B may claim to
-      # have tested it.
-      - name: Verify blargg ROM fixtures against manifest
+      # v1.8 §四 §4.5: kgmqa-117 必须在所有 rom-suite 用例之前 PASS，否则 fetch
+      # 出来的 ROM 与 tests.json mirror_ref 不一致，整套 78 项 rom-suite 都是
+      # 假数据。静态检查（--skip-fetch）足以捕获 schema / license / mirror_ref
+      # 不一致；完整 fetch（含 git clone mirror + SHA-256SUMS 校验）由 Phase 9
+      # Linux runner 实跑。
+      - name: Pre-flight — kgmqa-117 mirror_snapshot_check
         shell: pwsh
         run: |
-          $manifest = Get-Content tests/fixtures/blargg_manifest.json -Raw | ConvertFrom-Json
-          $missing = @()
-          foreach ($rom in $manifest.roms) {
-            if (-not (Test-Path (Join-Path 'tests' $rom.path))) { $missing += $rom.path }
+          python tests/f11qa/mirror_snapshot_check.py --skip-fetch
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::error::kgmqa-117 mirror_snapshot_check FAILED - mirror pin / license accepted set / mirror_ref 一致性 任一项不通过会阻塞所有 rom-suite 用例"
+            exit 1
           }
-          $have = $manifest.roms.Count - $missing.Count
-          Write-Host "blargg fixtures: $have / $($manifest.roms.Count) present"
-          if ($missing.Count -gt 0) {
-            foreach ($p in ($missing | Select-Object -First 10)) { Write-Host "::error::missing ROM: $p" }
-            if ($missing.Count -gt 10) { Write-Host "::error::... and $($missing.Count - 10) more" }
-            Write-Host "::error::blargg fixture tree is incomplete - Oracle B results would be meaningless. Check scripts/download_blargg_roms.ps1 and the upstream mirror."
+
+      # -----------------------------------------------------------------------
+      # Build F11QA Rust runner
+      # -----------------------------------------------------------------------
+      - name: Build f11qa-runner
+        working-directory: src/rust
+        run: cargo build --release -p f11qa
+
+      # -----------------------------------------------------------------------
+      # Test ROM fixtures (Oracle B + rom-suite 用例)
+      # -----------------------------------------------------------------------
+      # v1.8 §四 §4.6: 单 fetch 脚本取代 v1.17 的 22 个 download_<suite>_roms.ps1
+      # download_blargg_roms.ps1 只下 blargg 套件；fetch_roms_from_mirror.py
+      # 接管整个 Laffinty/f11qa-rom-mirror 镜像源（21 个 suite 目录，约 191 ROM）。
+      # Python 而非 PowerShell：避免 PowerShell 5.1 ConvertFrom-Json UTF-8 解析
+      # 硬限制（v1.8 plan 5.4 §5.4 决策）。
+      #
+      # CI 调用：python scripts/fetch_roms_from_mirror.py
+      # --pin tests/fixtures/f11qa_mirror_pin.json
+      # --tests-json tests/tests.json
+      # --output-dir tests/fixtures
+      # exit code != 0 ⇒ 整套 rom-suite 用例都失去 fixture ground truth。
+      - name: Cache f11qa ROM fixtures
+        id: cache-f11qa-roms
+        uses: actions/cache@v4
+        with:
+          path: tests/fixtures/_mirror_snapshot
+          key: f11qa-roms-${{ hashFiles('tests/fixtures/f11qa_mirror_pin.json', 'scripts/fetch_roms_from_mirror.py') }}
+          restore-keys: f11qa-roms-
+
+      - name: Fetch test ROMs from mirror
+        shell: pwsh
+        run: |
+          python scripts/fetch_roms_from_mirror.py `
+            --pin tests/fixtures/f11qa_mirror_pin.json `
+            --tests-json tests/tests.json `
+            --output-dir tests/fixtures
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::error::fetch_roms_from_mirror.py exit=$LASTEXITCODE - 镜像源 fetch 失败，rom-suite 用例无 fixture"
             exit 1
           }
 
@@ -244,33 +247,12 @@ jobs:
         continue-on-error: true
 
       # -----------------------------------------------------------------------
-      # KagamiQA — Migration matrix generation
+      # F11QA — Migration matrix generation
       # -----------------------------------------------------------------------
-      # Stage-2 §八 D-4: The previous revision passed `--baseline` pointing
-      # to the SAME path as `--output` (`build/kagamiqa_migration_matrix.json`).
-      # The runner then compared the matrix against itself and reported an
-      # empty `transition_matrix` on every run, masking real regressions.
-      # Fix: omit `--baseline` for this run (no prior artifact available
-      # without an explicit download step) and only emit `--save-baseline`
-      # so subsequent runs can consume the artifact via download-artifact.
-      # Future PR: add a download-artifact step before this one and pass
-      # the downloaded baseline as `--baseline`.
-      #
-      # R4-1 (2026-07-31): run 83046118885 skipped this step entirely with
-      # "::warning::kagami-qa-runner not built" even though the preceding cargo
-      # step had just reported `Finished release profile in 17.01s`. Cause:
-      # `src/rust/.cargo/config.toml` sets `build.target =
-      # "x86_64-pc-windows-msvc"`, so cargo emits into
-      # `target/x86_64-pc-windows-msvc/release/`, not `target/release/`. The old
-      # path only ever resolved on developer machines that still had a stale
-      # copy at the untriplet path (this repo has one from 2026-07-28, 424 KB,
-      # next to the real 2026-07-30 binary at 562 KB) -- so the bug was
-      # invisible locally and guaranteed on a clean checkout.
-      #
-      # Resolve the triplet path first, fall back to the plain one, and make a
-      # genuinely missing runner an error rather than a warning: silently
-      # skipping matrix generation is what let run 83046118885 look like an
-      # infrastructure hiccup instead of a real gap.
+      # v1.8 §五 Phase 7: 总用例数从 39 → 120 (kgmqa-001 ~ kgmqa-120)。
+      # kgmqa-117 mirror_snapshot_check 已在上一步 (pre-flight) PASS，
+      # 这里只生成 matrix + 评分。frozen baseline 由
+      # tests/fixtures/f11qa_baseline_frozen.json 提供（Phase 8 将录入 120 项）。
       #
       # R4-2 (2026-08-08): prepend the vcpkg bin dir to PATH. The runner
       # spawns the CTest test exes via SubprocessAdapter, which prepends only
@@ -279,57 +261,48 @@ jobs:
       # so the subprocesses die with STATUS_DLL_NOT_FOUND and every
       # Qt-linking test (incl. smoke_test) is scored FAIL — run #46 exposed
       # this as matrix grade=E on the first warm run.
-      - name: KagamiQA — Migration Matrix
+      - name: F11QA — Migration Matrix
         run: |
           $env:PATH = "${{ github.workspace }}/vcpkg_installed/x64-windows/bin;${{ github.workspace }}/vcpkg_installed/x64-windows/debug/bin;$env:PATH"
           $candidates = @(
-            "src/rust/target/x86_64-pc-windows-msvc/release/kagami-qa-runner.exe",
-            "src/rust/target/release/kagami-qa-runner.exe"
+            "src/rust/target/x86_64-pc-windows-msvc/release/f11qa-runner.exe",
+            "src/rust/target/release/f11qa-runner.exe"
           )
           $runner = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
           if (-not $runner) {
-            Write-Host "::error::kagami-qa-runner.exe not found. Looked in:"
+            Write-Host "::error::f11qa-runner.exe not found. Looked in:"
             foreach ($c in $candidates) { Write-Host "::error::  $c" }
             exit 1
           }
           Write-Host "Using runner: $runner"
-          # v1.17 §13.1: drive the runner with the frozen baseline so the
-          # release grade can reach B (release standard = every FAIL is a
-          # fail_to_fail against the frozen set). The frozen baseline
-          # snapshots the v1.17/v1.16 advisory known-limit surface — any
-          # new advisory FAIL would land in `new_test(FAIL)` and cap the
-          # grade at C, exactly the regression signal we want.
-          #
-          # Without `--baseline`, the runner conservatively caps grade at C
-          # regardless of failures (see report/grade.rs::compute_grade).
           & $runner `
             --manifest tests/tests.json `
             --bin-dir build/tests `
-            --output build/kagamiqa_migration_matrix.json `
-            --accuracy-table build/kagamiqa_accuracy_table.md `
+            --output build/f11qa_migration_matrix.json `
+            --accuracy-table build/f11qa_accuracy_table.md `
             --known-fail tests/fixtures/blargg_known_fail.json `
-            --baseline tests/fixtures/kagamiqa_baseline_frozen.json `
-            --save-baseline build/kagamiqa_baseline_next.json `
-            --pdf-report build/kagamiqa_quality_report.pdf
+            --baseline tests/fixtures/f11qa_baseline_frozen.json `
+            --save-baseline build/f11qa_baseline_next.json `
+            --pdf-report build/f11qa_quality_report.pdf
           $exitCode = $LASTEXITCODE
-          Write-Host "KagamiQA runner exit code: $exitCode"
+          Write-Host "F11QA runner exit code: $exitCode"
         shell: pwsh
         continue-on-error: true
 
       # -----------------------------------------------------------------------
       # Upload artifacts
       # -----------------------------------------------------------------------
-      - name: Upload KagamiQA Artifacts
+      - name: Upload F11QA Artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: kagamiqa-results
+          name: f11qa-results
           path: |
-            build/kagamiqa_migration_matrix.json
-            build/kagamiqa_accuracy_table.md
-            build/kagamiqa_baseline_next.json
+            build/f11qa_migration_matrix.json
+            build/f11qa_accuracy_table.md
+            build/f11qa_baseline_next.json
             build/blargg_full_output.txt
-            build/kagamiqa_quality_report.pdf
+            build/f11qa_quality_report.pdf
           retention-days: 30
 
       # -----------------------------------------------------------------------
@@ -339,7 +312,7 @@ jobs:
         if: github.event_name == 'pull_request'
         shell: pwsh
         run: |
-          $matrixPath = "build/kagamiqa_migration_matrix.json"
+          $matrixPath = "build/f11qa_migration_matrix.json"
           if (-not (Test-Path $matrixPath)) {
             Write-Host "::warning::No migration matrix found; skipping drift detection."
             exit 0
@@ -347,7 +320,7 @@ jobs:
           $matrix = Get-Content $matrixPath | ConvertFrom-Json
           $passToFail = $matrix.transition_matrix.pass_to_fail
           if ($passToFail -and $passToFail.Count -gt 0) {
-            $msg = "## ⚠️ KagamiQA Baseline Drift Alert`n`n"
+            $msg = "## ⚠️ F11QA Baseline Drift Alert`n`n"
             $msg += "**PASS→FAIL regressions detected:** $($passToFail.Count)`n`n"
             foreach ($entry in $passToFail) {
               $msg += "- ❌ **$($entry.id)**`n"
@@ -370,9 +343,9 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "========================================"
-          Write-Host "KagamiQA P5 CI Run Complete"
+          Write-Host "F11QA v1.8 CI Run Complete"
           Write-Host "========================================"
-          $matrixPath = "build/kagamiqa_migration_matrix.json"
+          $matrixPath = "build/f11qa_migration_matrix.json"
           if (Test-Path $matrixPath) {
             $m = Get-Content $matrixPath | ConvertFrom-Json
             Write-Host "Total:   $($m.summary.total)"
@@ -380,6 +353,9 @@ jobs:
             Write-Host "Failed:  $($m.summary.failed)"
             Write-Host "Oracle A: $($m.oracle_breakdown.a_regression.pass)P / $($m.oracle_breakdown.a_regression.fail)F"
             Write-Host "Oracle B: $($m.oracle_breakdown.b_hardware.pass)P / $($m.oracle_breakdown.b_hardware.fail)F"
+            if ($m.summary.vendor_state) {
+              Write-Host "Vendor state: vendored=$($m.summary.vendor_state.vendored) advisory=$($m.summary.vendor_state.advisory) pending-vendor=$($m.summary.vendor_state.pending_vendor)"
+            }
           }
 
       # -----------------------------------------------------------------------
@@ -402,17 +378,21 @@ jobs:
       # purpose: a gate failure must still leave the artifacts downloadable for
       # diagnosis. It fails the job, it does not hide evidence.
       #
-      # `total` is compared with -lt 39 rather than -ne 39 so that legitimately
-      # adding test cases later cannot turn this gate red for the wrong reason.
-      - name: R4 Gate — migration matrix must exist and be sane
+      # v1.8 R4 gate strict:
+      #   - total == 120 (不是 v1.17 的 total >= 39；v1.8 严格 120 项)
+      #   - vendor_state breakdown 通道：vendored / advisory / pending-vendor
+      #     数量必须与 tests.json 一致（runner emit summary.vendor_state 字段）
+      #   - kgmqa-117 mirror_snapshot_check 已在上一步 (pre-flight) PASS，
+      #     这里只校验 summary 字段是否被 runner 正确 emit
+      - name: R4 Gate — migration matrix must exist and be sane (v1.8)
         if: always()
         shell: pwsh
         run: |
-          $matrixPath = "build/kagamiqa_migration_matrix.json"
+          $matrixPath = "build/f11qa_migration_matrix.json"
           $failures = @()
 
           if (-not (Test-Path $matrixPath)) {
-            Write-Host "::error::R4 gate: $matrixPath was not produced. The KagamiQA pipeline did not reach the migration-matrix stage - inspect the earlier steps (configure / build / runner) for the real cause."
+            Write-Host "::error::R4 gate: $matrixPath was not produced. The F11QA pipeline did not reach the migration-matrix stage - inspect the earlier steps (configure / build / runner) for the real cause."
             exit 1
           }
 
@@ -426,11 +406,10 @@ jobs:
             $failures += "engine.git_rev is '$gitRev' (expected a real commit short hash; S-4 compile-time stamp did not take effect in CI)"
           }
 
-          # Coverage floor: the manifest carries 39 unique entries (S-1 removed
-          # the 3 duplicate dead entries). Fewer means the runner silently
-          # skipped cases.
-          if ($m.summary.total -lt 39) {
-            $failures += "summary.total is $($m.summary.total), expected >= 39 (test cases were silently skipped)"
+          # v1.8 §五 Phase 7: 总用例数严格等于 120 (kgmqa-001 ~ kgmqa-120)。
+          # 用 -ne 严格相等：少 1 个或多个 1 个都失败；防止新加用例偷偷漏掉。
+          if ($m.summary.total -ne 120) {
+            $failures += "summary.total is $($m.summary.total), expected == 120 (v1.8 严格 120 项 kgmqa-001~120；测试用例被静默跳过或新增未登记)"
           }
 
           # Phase 0.5-d anti-gaming guard: newly added tests must land in the
@@ -439,6 +418,19 @@ jobs:
           $f2pCount = if ($null -eq $f2p) { 0 } elseif ($f2p -is [array]) { $f2p.Count } else { [int]$f2p }
           if ($f2pCount -ne 0) {
             $failures += "transition_matrix.fail_to_pass is $f2pCount, expected 0 (Phase 0.5-d anti-gaming guard did not hold in CI)"
+          }
+
+          # v1.8 vendor_state 通道：runner 必须 emit summary.vendor_state 三态计数
+          # （vendored / advisory / pending_vendor），且总数等于 78 项 rom-suite。
+          # advisory / pending-vendor 不能 fail_to_pass；vendored 失败 = blocking。
+          if (-not $m.summary.vendor_state) {
+            $failures += "summary.vendor_state missing (runner must emit vendored/advisory/pending_vendor 三态计数；v1.8 vendor_state 通道未启用)"
+          } else {
+            $vs = $m.summary.vendor_state
+            $vsSum = ([int]$vs.vendored) + ([int]$vs.advisory) + ([int]$vs.pending_vendor)
+            if ($vsSum -ne 78) {
+              $failures += "vendor_state 三态总和 is $vsSum (vendored=$($vs.vendored) advisory=$($vs.advisory) pending-vendor=$($vs.pending_vendor))，expected == 78 (rom-suite 用例总数)"
+            }
           }
 
           # Task 5 (docs/history/plans/FCEUX11-1.17_计划.md §6): release-readiness grade. D/E
@@ -457,4 +449,4 @@ jobs:
             exit 1
           }
 
-          Write-Host "R4 gate passed: git_rev=$gitRev, total=$($m.summary.total), passed=$($m.summary.passed), failed=$($m.summary.failed), grade=$grade, fail_to_pass=0 [OK]"
+          Write-Host "R4 gate passed: git_rev=$gitRev, total=$($m.summary.total), passed=$($m.summary.passed), failed=$($m.summary.failed), grade=$grade, fail_to_pass=0, vendor_state={v=$($vs.vendored) a=$($vs.advisory) p=$($vs.pending_vendor)} [OK]"

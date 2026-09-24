@@ -46,6 +46,19 @@ pub struct MatrixSummary {
     pub passed: usize,
     pub failed: usize,
     pub skipped: usize,
+    // F11QA v1.8 §五 Phase 7: vendor_state 三态计数（仅 78 项 rom-suite）。
+    // 待 Phase 7.1: f11qa-runner Rust schema 迁移（v1.17 → v1.8 tests.json）后
+    // 启用。R4 gate v1.8 校验此字段 sum == 78；启用后未迁移前 gate 会 FAIL。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vendor_state: Option<VendorStateBreakdown>,
+}
+
+/// F11QA v1.8 vendor_state 三态计数。
+#[derive(Debug, Default, Serialize)]
+pub struct VendorStateBreakdown {
+    pub vendored: usize,
+    pub advisory: usize,
+    pub pending_vendor: usize,
 }
 
 // ---------------------------------------------------------------------------
@@ -320,6 +333,10 @@ pub fn build_matrix(
             passed,
             failed,
             skipped,
+            // Filled in by cli/run_report.rs after build_matrix returns
+            // (needs manifest to count vendor_state from each TestManifest).
+            // Phase 7.1: f11qa-runner schema 迁移前这里保持 None。
+            vendor_state: None,
         },
         transition_matrix: transition,
         oracle_breakdown: OracleBreakdown {

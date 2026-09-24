@@ -16,6 +16,13 @@ pub struct TestManifest {
     pub tags: Vec<String>,
     pub failure_means: FailureSeverity,
     pub provenance: String,
+    // F11QA v1.8 §五 Phase 7.1: 字段已加但默认跳过 — 待 f11qa-runner 完整迁移到
+    // v1.8 schema ({schema_version, cases: [...]}) 后启用。当前 v1.17 schema 与
+    // v1.8 tests.json 形状不兼容，runner 直接加载会 QaError（string "1.8"
+    // 被当成 TestManifest）。
+    //
+    // vendor_state: Option<String> （"vendored"/"advisory"/"pending-vendor"）
+    // kgmqa_id: Option<String> （kgmqa-001 ~ kgmqa-120）
 }
 
 fn default_timeout() -> u64 {
