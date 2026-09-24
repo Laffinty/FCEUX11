@@ -88,7 +88,19 @@ def ensure_snapshot(pin: dict, snapshot_dir: Path, skip_fetch: bool, dry_run: bo
 
     if snapshot_dir.exists():
         log(f"[snapshot] removing stale {snapshot_dir}")
-        shutil.rmtree(snapshot_dir)
+        # Windows 文件锁容错: git pack 文件可能被 OS 暂时锁住
+        def _on_rm_error(func, path, exc_info):
+            try:
+                os.chmod(path, 0o777)
+            except Exception:
+                pass
+            try:
+                func(path)
+            except Exception as e:
+                log(f"  [rm-warn] {func.__name__} {path}: {e}")
+        shutil.rmtree(snapshot_dir, onerror=_on_rm_error)
+        if snapshot_dir.exists():
+            log(f"  [rm-warn] {snapshot_dir} still exists (partial cleanup); will be overwritten by git clone")
 
     if tag_exists:
         log(f"[snapshot] cloning tag {ref} from {pin['mirror_repo']}...")
