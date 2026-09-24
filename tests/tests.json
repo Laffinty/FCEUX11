@@ -1,1118 +1,3916 @@
 {
-  "smoke_test": {
-    "id": "smoke_test",
-    "description": "Core symbol validity + fceu11::Initialize() smoke test",
-    "oracle_type": "A",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_smoke_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "unit",
-      "smoke"
+  "schema_version": "1.8",
+  "suite_id": "f11qa-v1.8",
+  "generated_at": "2026-09-24T19:30:00Z",
+  "policy": {
+    "license_allowed": [
+      "PD",
+      "CC0",
+      "zlib",
+      "GPL-2.0",
+      "GPL-2.0-only",
+      "GPL-2.0-or-later",
+      "GPL-3.0",
+      "GPL-3.0-only",
+      "GPL-3.0-or-later",
+      "MIT",
+      "BSD",
+      "Apache",
+      "CC-BY"
     ],
-    "failure_means": "blocking",
-    "provenance": "v0.2.15"
+    "mirror_repo": "https://github.com/Laffinty/f11qa-rom-mirror",
+    "r4_gate_thresholds": {
+      "total_min": 120,
+      "fail_to_pass_max": 0,
+      "mirror_snapshot_check_required": true
+    }
   },
-  "mapper_load_test": {
-    "id": "mapper_load_test",
-    "description": "Iterate all built-in mappers, call iNES load",
-    "oracle_type": "A",
-    "layer": "boards",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_mapper_load_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 60,
-    "tags": [
-      "unit",
-      "mapper"
-    ],
-    "failure_means": "blocking",
-    "provenance": "v0.3.0"
-  },
-  "mapper_reset_test": {
-    "id": "mapper_reset_test",
-    "description": "Load + reset + power-cycle + reload mappers",
-    "oracle_type": "A",
-    "layer": "boards",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_mapper_reset_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 60,
-    "tags": [
-      "unit",
-      "mapper"
-    ],
-    "failure_means": "blocking",
-    "provenance": "v0.3.0"
-  },
-  "rom_regression_test": {
-    "id": "rom_regression_test",
-    "description": "12 ROMs x 60 frames, CRC32 video frame checksums vs golden_hashes.json",
-    "oracle_type": "B",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "f11qa_rom_regression_runner"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 120,
-    "tags": [
-      "regression",
-      "rom",
-      "ppu"
-    ],
-    "failure_means": "blocking",
-    "provenance": "Task1-C2 rust migration, parity 9488773; Rust fixes C++ first-entry parser miss (nrom now verified, 13 ROMs)"
-  },
-  "savestate_regression_test": {
-    "id": "savestate_regression_test",
-    "description": "12 ROMs x 60 frames, MD5 savestate snapshots vs golden_savestate_hashes.json",
-    "oracle_type": "B",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "f11qa_savestate_regression_runner"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 300,
-    "tags": [
-      "regression",
-      "savestate"
-    ],
-    "failure_means": "blocking",
-    "provenance": "Task1-C3 rust migration, parity 9488773 (12/12 MD5 identical)"
-  },
-  "expected_api_test": {
-    "id": "expected_api_test",
-    "description": "tl::expected<T,E> API coverage test",
-    "oracle_type": "A",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_expected_api_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "unit",
-      "api"
-    ],
-    "failure_means": "blocking",
-    "provenance": "v0.3.3"
-  },
-  "enum_class_bitflags_test": {
-    "id": "enum_class_bitflags_test",
-    "description": "FCEU_ENUM_CLASS_BITFLAGS macro test (header-only, no engine link)",
-    "oracle_type": "A",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_enum_class_bitflags_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "unit",
-      "macro"
-    ],
-    "failure_means": "blocking",
-    "provenance": "v0.3.8"
-  },
-  "i18n_regression_test": {
-    "id": "i18n_regression_test",
-    "description": "i18n static analysis: .ts coverage (>90%), simp/trad pollution, retranslateUi() declarations",
-    "oracle_type": "A",
-    "layer": "core",
-    "input": {
-      "binary": "fceux11_i18n_regression_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "i18n",
-      "static-analysis"
-    ],
-    "failure_means": "blocking",
-    "provenance": "v0.3.15"
-  },
-  "core_state_test": {
-    "id": "core_state_test",
-    "description": "fceu11::State facade wiring (singleton + reference equality, no Init required)",
-    "oracle_type": "A",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_core_state_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "unit",
-      "state"
-    ],
-    "failure_means": "blocking",
-    "provenance": "v1.2"
-  },
-  "cpu_test": {
-    "id": "cpu_test",
-    "description": "CPU unit tests (>= 10 test cases)",
-    "oracle_type": "A",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_cpu_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "unit",
-      "cpu"
-    ],
-    "failure_means": "blocking",
-    "provenance": "v1.1"
-  },
-  "ppu_test": {
-    "id": "ppu_test",
-    "description": "PPU unit tests",
-    "oracle_type": "A",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_ppu_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "unit",
-      "ppu"
-    ],
-    "failure_means": "blocking",
-    "provenance": "v1.1"
-  },
-  "apu_test": {
-    "id": "apu_test",
-    "description": "APU unit tests",
-    "oracle_type": "A",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_apu_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "unit",
-      "apu"
-    ],
-    "failure_means": "blocking",
-    "provenance": "v1.1"
-  },
-  "bus_test": {
-    "id": "bus_test",
-    "description": "Bus unit tests",
-    "oracle_type": "A",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_bus_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "unit",
-      "bus"
-    ],
-    "failure_means": "blocking",
-    "provenance": "v1.1"
-  },
-  "mapper_core_test": {
-    "id": "mapper_core_test",
-    "description": "Mapper core unit tests",
-    "oracle_type": "A",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_mapper_core_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "unit",
-      "mapper"
-    ],
-    "failure_means": "blocking",
-    "provenance": "v1.1"
-  },
-  "savestate_core_test": {
-    "id": "savestate_core_test",
-    "description": "Savestate core unit tests",
-    "oracle_type": "A",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_savestate_core_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "unit",
-      "savestate"
-    ],
-    "failure_means": "blocking",
-    "provenance": "v1.1"
-  },
-  "ppu_frame_diff_test": {
-    "id": "ppu_frame_diff_test",
-    "description": "Visual frame diff regression: 256x240 XBuf vs golden_frames/*.xbuf (0-pixel tolerance)",
-    "oracle_type": "B",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_ppu_frame_diff_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 60,
-    "tags": [
-      "regression",
-      "ppu",
-      "frame"
-    ],
-    "failure_means": "blocking",
-    "provenance": "v1.5"
-  },
-  "apu_wav_diff_test": {
-    "id": "apu_wav_diff_test",
-    "description": "Audio WAV regression: 16-bit mono sound buffer vs golden_wav/*.wav (0-sample tolerance)",
-    "oracle_type": "B",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_apu_wav_diff_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 60,
-    "tags": [
-      "regression",
-      "apu",
-      "audio"
-    ],
-    "failure_means": "blocking",
-    "provenance": "v1.6"
-  },
-  "cart_class_test": {
-    "id": "cart_class_test",
-    "description": "Cart class surface tests (12 initial [SKIP] tests)",
-    "oracle_type": "A",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_cart_class_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "unit",
-      "cart"
-    ],
-    "failure_means": "blocking",
-    "provenance": "v1.7"
-  },
-  "mapper_byte_diff_test": {
-    "id": "mapper_byte_diff_test",
-    "description": "Mapper state byte-diff regression vs golden_mapper/*.bin (169 mappers)",
-    "oracle_type": "B",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "f11qa_mapper_byte_diff_runner"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 120,
-    "tags": [
-      "regression",
-      "mapper"
-    ],
-    "failure_means": "blocking",
-    "provenance": "Task1 mapper rust migration, parity 175-case identical (169 PASS / 6 SKIP / 0 FAIL)"
-  },
-  "fds_load_test": {
-    "id": "fds_load_test",
-    "description": "FDS runtime + bad ROM detection test",
-    "oracle_type": "A",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_fds_load_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "unit",
-      "fds"
-    ],
-    "failure_means": "blocking",
-    "provenance": "v1.10"
-  },
-  "driver_callbacks_test": {
-    "id": "driver_callbacks_test",
-    "description": "g_driver() singleton + register_driver() + POD contract verification",
-    "oracle_type": "A",
-    "layer": "driver",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_driver_callbacks_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "unit",
-      "driver"
-    ],
-    "failure_means": "blocking",
-    "provenance": "v1.11"
-  },
-  "core_driver_boundary_test": {
-    "id": "core_driver_boundary_test",
-    "description": "Core/driver boundary regression (mutex pImpl, driver.h removal invariants)",
-    "oracle_type": "A",
-    "layer": "driver",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_core_driver_boundary_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "unit",
-      "driver",
-      "boundary"
-    ],
-    "failure_means": "blocking",
-    "provenance": "v1.11"
-  },
-  "ppu_rendering_lut_test": {
-    "id": "ppu_rendering_lut_test",
-    "description": "Byte-for-byte equivalence: two-stage sprite decode LUT vs original 8x shift chain",
-    "oracle_type": "A",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_ppu_rendering_lut_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "unit",
-      "ppu",
-      "hotfix"
-    ],
-    "failure_means": "blocking",
-    "provenance": "hotfix2 P0-1"
-  },
-  "ppu_phase_c_test": {
-    "id": "ppu_phase_c_test",
-    "description": "Atomic byte-pattern fill, SPRB layout invariants, pshift storage width",
-    "oracle_type": "A",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_ppu_phase_c_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "unit",
-      "ppu",
-      "hotfix"
-    ],
-    "failure_means": "blocking",
-    "provenance": "hotfix2 Phase C"
-  },
-  "ppu_phase_d_test": {
-    "id": "ppu_phase_d_test",
-    "description": "constexpr bitrev LUT involution/coverage; InputScanlineHook nullptr; vnapage 4-slot",
-    "oracle_type": "A",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_ppu_phase_d_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "unit",
-      "ppu",
-      "hotfix"
-    ],
-    "failure_means": "blocking",
-    "provenance": "hotfix2 Phase D"
-  },
-  "golden_savestate_test": {
-    "id": "golden_savestate_test",
-    "description": "Load golden .fc0 savestates, run 1 frame, compare MD5 vs golden_index.json",
-    "oracle_type": "B",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_golden_savestate_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 60,
-    "tags": [
-      "regression",
-      "savestate",
-      "golden"
-    ],
-    "failure_means": "blocking",
-    "provenance": "v1.1"
-  },
-  "bench_tolerance_test": {
-    "id": "bench_tolerance_test",
-    "description": "Performance tolerance gate: R4 protocol (warmup 3 + timed 7, drop extremes, median vs baseline)",
-    "oracle_type": "B",
-    "layer": "benchmark",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_bench_tolerance_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 120,
-    "tags": [
-      "benchmark",
-      "perf"
-    ],
-    "failure_means": "advisory",
-    "provenance": "v1.1"
-  },
-  "config_store_test": {
-    "id": "config_store_test",
-    "description": "TypedConfig<T> unit test (Qt6::Core only, no Widgets)",
-    "oracle_type": "A",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_config_store_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "unit",
-      "config"
-    ],
-    "failure_means": "blocking",
-    "provenance": "v0.3.15"
-  },
-  "menu_slot_check": {
-    "id": "menu_slot_check",
-    "description": "Qt SLOT static-analysis gate: detect undeclared slots connected via SLOT() macro",
-    "oracle_type": "A",
-    "layer": "script",
-    "input": {
-      "binary": "python",
-      "args": [
-        "scripts/check_menu_slots.py",
-        "."
+  "cases": [
+    {
+      "kgmqa_id": "kgmqa-001-smoke-cpp",
+      "legacy_id": "smoke_test",
+      "title": "核心符号 + fceu11::Initialize() 烟雾",
+      "kind": [
+        "unit-cpp",
+        "smoke"
       ],
-      "working_dir": "."
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 60,
-    "tags": [
-      "script",
-      "menu",
-      "static-analysis"
-    ],
-    "failure_means": "advisory",
-    "provenance": "hotfix4 T-1"
-  },
-  "pixbuf_pool_test": {
-    "id": "pixbuf_pool_test",
-    "description": "PixBufPool resize()/clear()/bytes() unit test",
-    "oracle_type": "A",
-    "layer": "core",
-    "input": {
-      "working_dir": "tests",
-      "binary": "fceux11_pixbuf_pool_test"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "unit",
-      "video"
-    ],
-    "failure_means": "blocking",
-    "provenance": "hotfix3 D-1"
-  },
-  "blargg_smoke": {
-    "id": "blargg_smoke",
-    "description": "blargg runner smoke test using nestest.nes 鈥?verifies $6000 probe infrastructure",
-    "oracle_type": "B",
-    "layer": "core",
-    "input": {
-      "binary": "f11qa_blargg_runner",
-      "args": [
-        "--rom",
-        "fixtures/nestest.nes",
-        "--frames",
-        "60"
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_smoke_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 30,
+      "tags": [
+        "unit",
+        "smoke"
       ],
-      "working_dir": "tests",
-      "rom": "fixtures/nestest.nes",
-      "probe_addr": 24576
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
     },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "blargg",
-      "oracle-b",
-      "smoke"
-    ],
-    "failure_means": "advisory",
-    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
-  },
-  "blargg_cpu_instrs": {
-    "id": "blargg_cpu_instrs",
-    "description": "blargg CPU all instructions (instr_test-v5 all_instrs) 鈥?$6000 protocol",
-    "oracle_type": "B",
-    "layer": "core",
-    "input": {
-      "binary": "f11qa_blargg_runner",
-      "args": [
-        "--rom",
-        "fixtures/blargg/cpu/instr_v5_all.nes",
-        "--frames",
-        "3000"
+    {
+      "kgmqa_id": "kgmqa-002-cpu",
+      "legacy_id": "cpu_test",
+      "title": "CPU 单元 ≥10 case",
+      "kind": [
+        "unit-cpp"
       ],
-      "working_dir": "tests",
-      "rom": "fixtures/blargg/cpu/instr_v5_all.nes",
-      "probe_addr": 24576
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 60,
-    "tags": [
-      "blargg",
-      "cpu",
-      "oracle-b"
-    ],
-    "failure_means": "blocking",
-    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
-  },
-  "blargg_cpu_timing": {
-    "id": "blargg_cpu_timing",
-    "description": "blargg CPU instruction timing test (cpu_timing_test6) 鈥?$6000 protocol",
-    "oracle_type": "B",
-    "layer": "core",
-    "input": {
-      "binary": "f11qa_blargg_runner",
-      "args": [
-        "--rom",
-        "fixtures/blargg/cpu/cpu_timing_test6.nes",
-        "--frames",
-        "500"
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_cpu_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "unit",
+        "cpu"
       ],
-      "working_dir": "tests",
-      "rom": "fixtures/blargg/cpu/cpu_timing_test6.nes",
-      "probe_addr": 24576
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
     },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "blargg",
-      "cpu",
-      "timing",
-      "oracle-b"
-    ],
-    "failure_means": "blocking",
-    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
-  },
-  "blargg_ppu_vbl_nmi": {
-    "id": "blargg_ppu_vbl_nmi",
-    "description": "blargg PPU VBL NMI timing test 鈥?$6000 protocol [E-1 advisory, fresh survey 2026-07-30: 03/09 PASS, 02/05/06/07/08 FAIL 0x01 with diagnostic, 10 FAIL 0x03 'clock skipped too late'; per-ROM VBL/NMI edge-timing fix pending; see docs/FCEUX11-1.16_E-1-VBL璋冩煡璁板綍.md]",
-    "oracle_type": "B",
-    "layer": "core",
-    "input": {
-      "binary": "f11qa_blargg_runner",
-      "args": [
-        "--rom",
-        "fixtures/blargg/ppu/ppu_vbl_nmi.nes",
-        "--frames",
-        "600"
+    {
+      "kgmqa_id": "kgmqa-003-ppu",
+      "legacy_id": "ppu_test",
+      "title": "PPU 单元",
+      "kind": [
+        "unit-cpp"
       ],
-      "working_dir": "tests",
-      "rom": "fixtures/blargg/ppu/ppu_vbl_nmi.nes",
-      "probe_addr": 24576
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "blargg",
-      "ppu",
-      "oracle-b",
-      "e1-pending"
-    ],
-    "failure_means": "advisory",
-    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
-  },
-  "blargg_suite": {
-    "id": "blargg_suite",
-    "description": "blargg full test ROM suite ($6000 protocol) 鈥?Oracle B hardware consistency batch run",
-    "oracle_type": "B",
-    "layer": "core",
-    "input": {
-      "binary": "f11qa_blargg_runner",
-      "args": [
-        "--manifest",
-        "tests/fixtures/blargg_manifest.json"
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_ppu_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "unit",
+        "ppu"
       ],
-      "working_dir": "."
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
     },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 300,
-    "tags": [
-      "blargg",
-      "oracle-b",
-      "accuracy",
-      "suite",
-      "batch"
-    ],
-    "failure_means": "advisory",
-    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
-  },
-  "lua_bit_test": {
-    "id": "lua_bit_test",
-    "description": "Lua bit library: bor/band/bxor/bnot/lshift/rshift/arshift/rol/ror/bswap/tohex/tobit",
-    "oracle_type": "A",
-    "layer": "lua",
-    "input": {
-      "binary": "f11qa_lua_runner",
-      "args": [
-        "tests/lua_scripts/test_bit.lua"
+    {
+      "kgmqa_id": "kgmqa-004-apu",
+      "legacy_id": "apu_test",
+      "title": "APU 单元",
+      "kind": [
+        "unit-cpp"
       ],
-      "working_dir": ".",
-      "script_path": "tests/lua_scripts/test_bit.lua"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "lua",
-      "unit",
-      "bit"
-    ],
-    "failure_means": "blocking",
-    "provenance": "fceux11-lua; Task1 lua rust migration (f11qa_lua_runner)"
-  },
-  "lua_emu_test": {
-    "id": "lua_emu_test",
-    "description": "Lua emu library: framecount/lagcount/frameadvance/speedmode/registerbefore/after/exit/poweron/softreset",
-    "oracle_type": "A",
-    "layer": "lua",
-    "input": {
-      "binary": "f11qa_lua_runner",
-      "args": [
-        "tests/lua_scripts/test_emu.lua",
-        "--frames",
-        "120"
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_apu_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "unit",
+        "apu"
       ],
-      "working_dir": ".",
-      "script_path": "tests/lua_scripts/test_emu.lua"
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
     },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 60,
-    "tags": [
-      "lua",
-      "integration",
-      "emu"
-    ],
-    "failure_means": "blocking",
-    "provenance": "fceux11-lua; Task1 lua rust migration (f11qa_lua_runner)"
-  },
-  "lua_memory_test": {
-    "id": "lua_memory_test",
-    "description": "Lua memory library: readbyte/readbytesigned/readword/readwordsigned/writebyte/getregister/registerwrite/registerread/registerexec",
-    "oracle_type": "A",
-    "layer": "lua",
-    "input": {
-      "binary": "f11qa_lua_runner",
-      "args": [
-        "tests/lua_scripts/test_memory.lua",
-        "--rom",
-        "tests/fixtures/mapper_nrom.nes",
-        "--frames",
-        "60"
+    {
+      "kgmqa_id": "kgmqa-005-bus",
+      "legacy_id": "bus_test",
+      "title": "Bus 单元",
+      "kind": [
+        "unit-cpp"
       ],
-      "working_dir": ".",
-      "script_path": "tests/lua_scripts/test_memory.lua"
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "lua",
-      "integration",
-      "memory"
-    ],
-    "failure_means": "blocking",
-    "provenance": "fceux11-lua | 2026-07-30 demoted to advisory; Task1 lua rust migration (f11qa_lua_runner): lacks full memory binding implementation; Lua-side libs work in standalone test, runner-side binding missing. Tracked as 'unimplemented-coverage' 鈥?not a regression, never passed. 2026-08-05 Phase 4.1: bindings verified complete; root cause of round-trip failure = runner initializes the CPU bus memory tables only when a ROM is loaded, so writebyte() was a no-op (BNull) without --rom. Fix: add --rom tests/fixtures/mapper_nrom.nes (git-tracked, available on CI). Re-enabled as blocking."
-  },
-  "lua_joypad_test": {
-    "id": "lua_joypad_test",
-    "description": "Lua joypad library: get/set with mask1/mask2 override logic",
-    "oracle_type": "A",
-    "layer": "lua",
-    "input": {
-      "binary": "f11qa_lua_runner",
-      "args": [
-        "tests/lua_scripts/test_joypad.lua",
-        "--frames",
-        "60"
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_bus_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 30,
+      "tags": [
+        "unit",
+        "bus"
       ],
-      "working_dir": ".",
-      "script_path": "tests/lua_scripts/test_joypad.lua"
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
     },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "lua",
-      "integration",
-      "joypad"
-    ],
-    "failure_means": "blocking",
-    "provenance": "fceux11-lua | 2026-07-30 demoted to advisory; Task1 lua rust migration (f11qa_lua_runner): does not surface joypad.get/joypad.set to Lua state (mask1/mask2 override logic unimplemented in Rust bindings). 2026-08-05 Phase 4.1: bindings verified present; root cause of failure = joypad.get() returned a TABLE (bitmask_to_table) while the FCEUX-compatible contract (and the test script's first assertion) requires a NUMBER bitmask. Fixed in src/rust/crates/fceux11-lua/bindings/joypad.rs (return state as i32). Re-enabled as blocking."
-  },
-  "blargg_mmc3_4_scanline_timing": {
-    "id": "blargg_mmc3_4_scanline_timing",
-    "description": "blargg MMC3 scanline timing (mmc3_test_4) 鈥?bucket A representative (Phase 3 known limit, deep model family)",
-    "oracle_type": "B",
-    "layer": "core",
-    "input": {
-      "binary": "f11qa_blargg_runner",
-      "args": [
-        "--rom",
-        "fixtures/blargg/mmc3/mmc3_4_scanline_timing.nes",
-        "--frames",
-        "300"
+    {
+      "kgmqa_id": "kgmqa-006-mapper-core",
+      "legacy_id": "mapper_core_test",
+      "title": "Mapper core 单元",
+      "kind": [
+        "unit-cpp"
       ],
-      "working_dir": "tests",
-      "rom": "fixtures/blargg/mmc3/mmc3_4_scanline_timing.nes",
-      "probe_addr": 24576
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "blargg",
-      "mmc3",
-      "oracle-b",
-      "bucket-a",
-      "known-limit"
-    ],
-    "failure_means": "advisory",
-    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
-  },
-  "blargg_mmc3_v2_4_scanline_timing": {
-    "id": "blargg_mmc3_v2_4_scanline_timing",
-    "description": "blargg MMC3 v2 scanline timing (mmc3_test_v2_4) 鈥?bucket A representative v2 variant (Phase 3 known limit)",
-    "oracle_type": "B",
-    "layer": "core",
-    "input": {
-      "binary": "f11qa_blargg_runner",
-      "args": [
-        "--rom",
-        "fixtures/blargg/mmc3/mmc3_v2_4_scanline_timing.nes",
-        "--frames",
-        "300"
+      "layer": "boards",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_mapper_core_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "unit",
+        "mapper"
       ],
-      "working_dir": "tests",
-      "rom": "fixtures/blargg/mmc3/mmc3_v2_4_scanline_timing.nes",
-      "probe_addr": 24576
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
     },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "blargg",
-      "mmc3",
-      "oracle-b",
-      "bucket-a",
-      "known-limit"
-    ],
-    "failure_means": "advisory",
-    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
-  },
-  "blargg_cpu_int_2_nmi_brk": {
-    "id": "blargg_cpu_int_2_nmi_brk",
-    "description": "blargg CPU NMI/BRK interaction timing (cpu_int_2) 鈥?bucket B representative (Phase 3 known limit)",
-    "oracle_type": "B",
-    "layer": "core",
-    "input": {
-      "binary": "f11qa_blargg_runner",
-      "args": [
-        "--rom",
-        "fixtures/blargg/cpu/cpu_int_2_nmi_brk.nes",
-        "--frames",
-        "300"
+    {
+      "kgmqa_id": "kgmqa-007-cart-class",
+      "legacy_id": "cart_class_test",
+      "title": "Cart class 表面",
+      "kind": [
+        "unit-cpp"
       ],
-      "working_dir": "tests",
-      "rom": "fixtures/blargg/cpu/cpu_int_2_nmi_brk.nes",
-      "probe_addr": 24576
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "blargg",
-      "cpu",
-      "oracle-b",
-      "bucket-b",
-      "known-limit"
-    ],
-    "failure_means": "advisory",
-    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
-  },
-  "blargg_instr_misc": {
-    "id": "blargg_instr_misc",
-    "description": "blargg CPU instruction misc combined (instr_misc) 鈥?bucket B representative (Phase 3 known limit)",
-    "oracle_type": "B",
-    "layer": "core",
-    "input": {
-      "binary": "f11qa_blargg_runner",
-      "args": [
-        "--rom",
-        "fixtures/blargg/cpu/instr_misc.nes",
-        "--frames",
-        "300"
+      "layer": "boards",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_cart_class_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 30,
+      "tags": [
+        "unit",
+        "cart"
       ],
-      "working_dir": "tests",
-      "rom": "fixtures/blargg/cpu/instr_misc.nes",
-      "probe_addr": 24576
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
     },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "blargg",
-      "cpu",
-      "oracle-b",
-      "bucket-b",
-      "known-limit"
-    ],
-    "failure_means": "advisory",
-    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
-  },
-  "blargg_oam_stress": {
-    "id": "blargg_oam_stress",
-    "description": "blargg OAM stress (oam_stress) 鈥?bucket C representative (Phase 3 known limit, runppu-relevant)",
-    "oracle_type": "B",
-    "layer": "core",
-    "input": {
-      "binary": "f11qa_blargg_runner",
-      "args": [
-        "--rom",
-        "fixtures/blargg/ppu/oam_stress.nes",
-        "--frames",
-        "300"
+    {
+      "kgmqa_id": "kgmqa-008-driver-callbacks",
+      "legacy_id": "driver_callbacks_test",
+      "title": "g_driver + register_driver POD 契约",
+      "kind": [
+        "unit-cpp"
       ],
-      "working_dir": "tests",
-      "rom": "fixtures/blargg/ppu/oam_stress.nes",
-      "probe_addr": 24576
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "blargg",
-      "ppu",
-      "oracle-b",
-      "bucket-c",
-      "known-limit",
-      "runppu-relevant"
-    ],
-    "failure_means": "advisory",
-    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
-  },
-  "blargg_vbl_05_nmi_timing": {
-    "id": "blargg_vbl_05_nmi_timing",
-    "description": "blargg VBL NMI timing (vbl_05) 鈥?bucket C PASS monitor (Phase 1 vbl_05 PASS via 5581769)",
-    "oracle_type": "B",
-    "layer": "core",
-    "input": {
-      "binary": "f11qa_blargg_runner",
-      "args": [
-        "--rom",
-        "fixtures/blargg/ppu/vbl_05_nmi_timing.nes",
-        "--frames",
-        "500"
+      "layer": "driver",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_driver_callbacks_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 30,
+      "tags": [
+        "unit",
+        "driver"
       ],
-      "working_dir": "tests",
-      "rom": "fixtures/blargg/ppu/vbl_05_nmi_timing.nes",
-      "probe_addr": 24576
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
     },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 30,
-    "tags": [
-      "blargg",
-      "ppu",
-      "vbl",
-      "oracle-b",
-      "bucket-c",
-      "pass-monitor"
-    ],
-    "failure_means": "blocking",
-    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
-  },
-  "blargg_ppu_read_buffer": {
-    "id": "blargg_ppu_read_buffer",
-    "description": "blargg PPU $2007 read buffer delay (ppu_read_buffer) 鈥?bucket C PASS monitor (Phase 3 commit 863e9d7)",
-    "oracle_type": "B",
-    "layer": "core",
-    "input": {
-      "binary": "f11qa_blargg_runner",
-      "args": [
-        "--rom",
-        "fixtures/blargg/ppu/ppu_read_buffer.nes",
-        "--frames",
-        "2000"
+    {
+      "kgmqa_id": "kgmqa-009-core-driver-boundary",
+      "legacy_id": "core_driver_boundary_test",
+      "title": "core/driver 边界 mutex pImpl 不变量",
+      "kind": [
+        "unit-cpp"
       ],
-      "working_dir": "tests",
-      "rom": "fixtures/blargg/ppu/ppu_read_buffer.nes",
-      "probe_addr": 24576
-    },
-    "expected": {
-      "exit_code": 0
-    },
-    "timeout_seconds": 60,
-    "tags": [
-      "blargg",
-      "ppu",
-      "oracle-b",
-      "bucket-c",
-      "pass-monitor"
-    ],
-    "failure_means": "blocking",
-    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
-  },
-  "blargg_sprdma_dmc_dma": {
-    "id": "blargg_sprdma_dmc_dma",
-    "description": "blargg sprite DMA + DMC DMA interaction (sprdma_dmc_dma) 鈥?bucket D representative (Phase 3 known limit)",
-    "oracle_type": "B",
-    "layer": "core",
-    "input": {
-      "binary": "f11qa_blargg_runner",
-      "args": [
-        "--rom",
-        "fixtures/blargg/apu/sprdma_dmc_dma.nes",
-        "--frames",
-        "300"
+      "layer": "driver",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_core_driver_boundary_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 30,
+      "tags": [
+        "unit",
+        "boundary"
       ],
-      "working_dir": "tests",
-      "rom": "fixtures/blargg/apu/sprdma_dmc_dma.nes",
-      "probe_addr": 24576
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
     },
-    "expected": {
-      "exit_code": 0
+    {
+      "kgmqa_id": "kgmqa-010-savestate-core",
+      "legacy_id": "savestate_core_test",
+      "title": "FCEUSS_SaveMS / LoadMS 字段完整性",
+      "kind": [
+        "unit-cpp"
+      ],
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_savestate_core_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 30,
+      "tags": [
+        "unit",
+        "savestate"
+      ],
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
     },
-    "timeout_seconds": 30,
-    "tags": [
-      "blargg",
-      "apu",
-      "sprdma",
-      "oracle-b",
-      "bucket-d",
-      "known-limit"
-    ],
-    "failure_means": "advisory",
-    "provenance": "Task1-C1 rust migration, parity 9488773 (177/177)"
-  }
+    {
+      "kgmqa_id": "kgmqa-011-fds-load",
+      "legacy_id": "fds_load_test",
+      "title": "FDS 加载 + 坏 ROM 检测",
+      "kind": [
+        "unit-cpp"
+      ],
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_fds_load_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 30,
+      "tags": [
+        "unit",
+        "fds"
+      ],
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-012-ppu-rendering-lut",
+      "legacy_id": "ppu_rendering_lut_test",
+      "title": "LUT 两阶段 sprite 解码 vs 8x 移位链",
+      "kind": [
+        "unit-cpp"
+      ],
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_ppu_rendering_lut_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 30,
+      "tags": [
+        "unit",
+        "ppu",
+        "lut"
+      ],
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-013-ppu-phase-c",
+      "legacy_id": "ppu_phase_c_test",
+      "title": "原子字节填充 + SPRB + pshift",
+      "kind": [
+        "unit-cpp"
+      ],
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_ppu_phase_c_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 30,
+      "tags": [
+        "unit",
+        "ppu"
+      ],
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-014-ppu-phase-d",
+      "legacy_id": "ppu_phase_d_test",
+      "title": "constexpr bitrev LUT + InputScanlineHook + vnapage",
+      "kind": [
+        "unit-cpp"
+      ],
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_ppu_phase_d_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 30,
+      "tags": [
+        "unit",
+        "ppu"
+      ],
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-015-expected-api",
+      "legacy_id": "expected_api_test",
+      "title": "tl::expected<T,E> API 覆盖",
+      "kind": [
+        "unit-cpp"
+      ],
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_expected_api_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 30,
+      "tags": [
+        "unit",
+        "api"
+      ],
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-016-mapper-load",
+      "legacy_id": "mapper_load_test",
+      "title": "遍历所有内置 mapper iNES 加载",
+      "kind": [
+        "unit-cpp"
+      ],
+      "layer": "boards",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_mapper_load_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "unit",
+        "mapper"
+      ],
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-017-mapper-reset",
+      "legacy_id": "mapper_reset_test",
+      "title": "加载+reset+power-cycle+reload",
+      "kind": [
+        "unit-cpp"
+      ],
+      "layer": "boards",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_mapper_reset_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "unit",
+        "mapper"
+      ],
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-018-config-store",
+      "legacy_id": "config_store_test",
+      "title": "TypedConfig<T>",
+      "kind": [
+        "unit-cpp"
+      ],
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_config_store_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 30,
+      "tags": [
+        "unit",
+        "config"
+      ],
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-019-pixbuf-pool",
+      "legacy_id": "pixbuf_pool_test",
+      "title": "PixBufPool resize/clear/bytes",
+      "kind": [
+        "unit-cpp"
+      ],
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_pixbuf_pool_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 30,
+      "tags": [
+        "unit",
+        "pixbuf"
+      ],
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-020-enum-class-bitflags",
+      "legacy_id": "enum_class_bitflags_test",
+      "title": "FCEU_ENUM_CLASS_BITFLAGS 宏",
+      "kind": [
+        "unit-hdr"
+      ],
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_enum_class_bitflags_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 30,
+      "tags": [
+        "unit",
+        "header"
+      ],
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-021-rom-regression-cpp",
+      "legacy_id": "rom_regression_test",
+      "title": "12 ROM × 60 帧 → CRC32 vs golden_hashes.json",
+      "kind": [
+        "harness-cpp"
+      ],
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_rom_regression_runner",
+        "working_dir": "tests",
+        "golden_hashes": "tests/fixtures/golden_hashes.json"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 120,
+      "tags": [
+        "regression",
+        "rom",
+        "ppu"
+      ],
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-022-savestate-regression-cpp",
+      "legacy_id": "savestate_regression_test",
+      "title": "12 ROM × 60 帧 → MD5 vs golden_savestate_hashes.json",
+      "kind": [
+        "harness-cpp"
+      ],
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_savestate_regression_runner",
+        "working_dir": "tests",
+        "golden_hashes": "tests/fixtures/golden_savestate_hashes.json"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 300,
+      "tags": [
+        "regression",
+        "savestate"
+      ],
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-023-ppu-frame-diff",
+      "legacy_id": "ppu_frame_diff_test",
+      "title": "256×240 XBuf 整帧字节 vs golden_frames/*.xbuf",
+      "kind": [
+        "harness-cpp"
+      ],
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_ppu_frame_diff_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "ppu",
+        "diff"
+      ],
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-024-apu-wav-diff",
+      "legacy_id": "apu_wav_diff_test",
+      "title": "16-bit mono vs golden_wav/*.wav",
+      "kind": [
+        "harness-cpp"
+      ],
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_apu_wav_diff_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "apu",
+        "wav",
+        "diff"
+      ],
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-025-mapper-byte-diff-cpp",
+      "legacy_id": "mapper_byte_diff_test",
+      "title": "mapper 状态字节 vs golden_mapper/*.bin (169 mapper)",
+      "kind": [
+        "harness-cpp"
+      ],
+      "layer": "boards",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_mapper_byte_diff_runner",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "mapper",
+        "diff"
+      ],
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-026-golden-savestate",
+      "legacy_id": "golden_savestate_test",
+      "title": "加载 .fc0 → 1 帧 → MD5 vs golden_index.json",
+      "kind": [
+        "harness-cpp"
+      ],
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_golden_savestate_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 30,
+      "tags": [
+        "savestate",
+        "golden"
+      ],
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-027-rom-regression-rust",
+      "legacy_id": null,
+      "title": "Rust harness: CRC32 视频帧 (Task1-C2 迁移自 cpp)",
+      "kind": [
+        "harness-rust"
+      ],
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "f11qa_rom_regression_runner",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 120,
+      "tags": [
+        "regression",
+        "rom",
+        "ppu",
+        "rust"
+      ],
+      "failure_means": "blocking",
+      "provenance": "Task1-C2 rust migration, parity 9488773; Rust fixes C++ first-entry parser miss (nrom now verified, 13 ROMs); F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-028-savestate-regression-rust",
+      "legacy_id": null,
+      "title": "Rust harness: MD5 savestate (Task1-C3 迁移自 cpp)",
+      "kind": [
+        "harness-rust"
+      ],
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "f11qa_savestate_regression_runner",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 300,
+      "tags": [
+        "regression",
+        "savestate",
+        "rust"
+      ],
+      "failure_means": "blocking",
+      "provenance": "Task1-C3 rust migration, parity 9488773 (12/12 MD5 identical); F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-029-mapper-byte-diff-rust",
+      "legacy_id": null,
+      "title": "Rust harness: mapper 字节差 (Task1-C3 迁移自 cpp)",
+      "kind": [
+        "harness-rust"
+      ],
+      "layer": "boards",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "f11qa_mapper_byte_diff_runner",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "mapper",
+        "diff",
+        "rust"
+      ],
+      "failure_means": "blocking",
+      "provenance": "Task1-C3 rust migration; mapper 字节差 Rust harness; F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-030-blargg-runner",
+      "legacy_id": "blargg_suite",
+      "title": "$6000 协议 runner (180 ROM 全量入口)",
+      "kind": [
+        "harness-rust"
+      ],
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 600,
+      "tags": [
+        "blargg",
+        "runner"
+      ],
+      "failure_means": "blocking",
+      "provenance": "Task1-C1 blargg harness Rust parity 177/177 + reset semantics fix; F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-031-blargg-smoke",
+      "legacy_id": "blargg_smoke",
+      "title": "nestest.nes 烟雾",
+      "kind": [
+        "rom-suite",
+        "harness-rust",
+        "smoke"
+      ],
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/nestest/nestest.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "smoke",
+        "nestest"
+      ],
+      "failure_means": "blocking",
+      "provenance": "Task1-C1 nestest smoke; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "nestest/nestest.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-032-cpu-instrs-blargg",
+      "legacy_id": "blargg_cpu_instrs",
+      "title": "instr_test-v5 all_instrs (blargg CPU 全指令)",
+      "kind": [
+        "rom-suite",
+        "harness-rust"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#instr_test_v5",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/cpu/instr_v5_all.nes",
+          "--frames",
+          "3000"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "cpu"
+      ],
+      "failure_means": "blocking",
+      "provenance": "Task1-C1 rust migration, parity 9488773 (177/177); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/cpu/instr_test_v5_all.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-033-cpu-timing-blargg",
+      "legacy_id": "blargg_cpu_timing",
+      "title": "cpu_timing_test6",
+      "kind": [
+        "rom-suite",
+        "harness-rust"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#cpu_timing_test6",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/cpu/cpu_timing_test6.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "cpu",
+        "timing"
+      ],
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/cpu/cpu_timing_test6.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-034-ppu-vbl-nmi-blargg",
+      "legacy_id": "blargg_ppu_vbl_nmi",
+      "title": "ppu_vbl_nmi (advisory 已知限制)",
+      "kind": [
+        "rom-suite",
+        "harness-rust"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#ppu_vbl_nmi",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/ppu/ppu_vbl_nmi.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "ppu",
+        "vbl",
+        "nmi"
+      ],
+      "failure_means": "advisory",
+      "provenance": "advisory: VBL/NMI 精度属于 PPU 子系统已记录限制; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/ppu/ppu_vbl_nmi.nes",
+      "vendor_state": "pending-vendor"
+    },
+    {
+      "kgmqa_id": "kgmqa-035-mmc3-4-scanline-blargg",
+      "legacy_id": "blargg_mmc3_4_scanline_timing",
+      "title": "mmc3_test_4 (bucket A)",
+      "kind": [
+        "rom-suite",
+        "harness-rust"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#mmc3_test",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/mmc3/mmc3_test_4.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "mmc3",
+        "scanline"
+      ],
+      "failure_means": "advisory",
+      "provenance": "mmc3 scanline (bucket A — 已通过); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/mmc3/mmc3_test_4.nes",
+      "vendor_state": "pending-vendor"
+    },
+    {
+      "kgmqa_id": "kgmqa-036-mmc3-v2-4-scanline-blargg",
+      "legacy_id": "blargg_mmc3_v2_4_scanline_timing",
+      "title": "mmc3_test_v2_4",
+      "kind": [
+        "rom-suite",
+        "harness-rust"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#mmc3_test",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/mmc3/mmc3_test_2_4.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "mmc3",
+        "scanline",
+        "v2"
+      ],
+      "failure_means": "advisory",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/mmc3/mmc3_test_2_4.nes",
+      "vendor_state": "pending-vendor"
+    },
+    {
+      "kgmqa_id": "kgmqa-037-cpu-int-2-nmi-brk-blargg",
+      "legacy_id": "blargg_cpu_int_2_nmi_brk",
+      "title": "cpu_int_2 (bucket B)",
+      "kind": [
+        "rom-suite",
+        "harness-rust"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#cpu_interrupts_v2",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/cpu/cpu_interrupts_v2_2.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "cpu",
+        "interrupt"
+      ],
+      "failure_means": "blocking",
+      "provenance": "cpu interrupt (bucket B); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/cpu/cpu_interrupts_v2_2.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-038-instr-misc-blargg",
+      "legacy_id": "blargg_instr_misc",
+      "title": "instr_misc (bucket B)",
+      "kind": [
+        "rom-suite",
+        "harness-rust"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#instr_misc",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/cpu/instr_misc.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "cpu",
+        "misc"
+      ],
+      "failure_means": "blocking",
+      "provenance": "instr_misc (bucket B); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/cpu/instr_misc.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-039-oam-stress-blargg",
+      "legacy_id": "blargg_oam_stress",
+      "title": "oam_stress (bucket C)",
+      "kind": [
+        "rom-suite",
+        "harness-rust"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#oam_stress",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/ppu/oam_stress.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 120,
+      "tags": [
+        "blargg",
+        "ppu",
+        "oam"
+      ],
+      "failure_means": "advisory",
+      "provenance": "oam_stress (bucket C); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/ppu/oam_stress.nes",
+      "vendor_state": "pending-vendor"
+    },
+    {
+      "kgmqa_id": "kgmqa-040-vbl-05-nmi-timing-blargg",
+      "legacy_id": "blargg_vbl_05_nmi_timing",
+      "title": "vbl_05_nmi_timing (PASS monitor)",
+      "kind": [
+        "rom-suite",
+        "harness-rust"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#vbl_nmi_timing",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/vbl_nmi_timing/5.nmi_suppression.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "vbl",
+        "nmi",
+        "timing"
+      ],
+      "failure_means": "blocking",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/vbl_nmi_timing/5.nmi_suppression.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-041-ppu-read-buffer-blargg",
+      "legacy_id": "blargg_ppu_read_buffer",
+      "title": "ppu_read_buffer (PASS monitor)",
+      "kind": [
+        "rom-suite",
+        "harness-rust"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#ppu_read_buffer",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/ppu/blargg_ppu_2005_vram_access.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "ppu",
+        "read-buffer"
+      ],
+      "failure_means": "advisory",
+      "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/ppu/blargg_ppu_2005_vram_access.nes",
+      "vendor_state": "pending-vendor"
+    },
+    {
+      "kgmqa_id": "kgmqa-042-sprdma-dmc-dma-blargg",
+      "legacy_id": "blargg_sprdma_dmc_dma",
+      "title": "sprdma_dmc_dma (bucket D)",
+      "kind": [
+        "rom-suite",
+        "harness-rust"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#sprdma",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/sprdma/sprdma_and_dmc_dma.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 120,
+      "tags": [
+        "blargg",
+        "sprdma",
+        "dmc",
+        "dma"
+      ],
+      "failure_means": "advisory",
+      "provenance": "sprdma_dmc_dma (bucket D); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/sprdma/sprdma_and_dmc_dma.nes",
+      "vendor_state": "pending-vendor"
+    },
+    {
+      "kgmqa_id": "kgmqa-043-blargg-suite",
+      "legacy_id": "blargg_suite",
+      "title": "全套 180 ROM batch",
+      "kind": [
+        "rom-suite",
+        "harness-rust"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--batch",
+          "tests/fixtures/blargg_manifest.json",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 1800,
+      "tags": [
+        "blargg",
+        "suite"
+      ],
+      "failure_means": "blocking",
+      "provenance": "全套 180 ROM batch runner; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/cpu/instr_test_v5_all.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-044-lua-bit",
+      "legacy_id": "lua_bit_test",
+      "title": "bit 库 11 函数",
+      "kind": [
+        "lua-api",
+        "harness-rust"
+      ],
+      "layer": "lua",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "f11qa_lua_runner",
+        "working_dir": ".",
+        "args": [
+          "tests/lua_scripts/test_bit.lua",
+          "--frames",
+          "60"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 30,
+      "tags": [
+        "lua",
+        "integration",
+        "bit"
+      ],
+      "failure_means": "blocking",
+      "provenance": "fceux11-lua bit library binding tests; F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-045-lua-emu",
+      "legacy_id": "lua_emu_test",
+      "title": "emu 库",
+      "kind": [
+        "lua-api",
+        "harness-rust"
+      ],
+      "layer": "lua",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "f11qa_lua_runner",
+        "working_dir": ".",
+        "args": [
+          "tests/lua_scripts/test_emu.lua",
+          "--frames",
+          "60"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 30,
+      "tags": [
+        "lua",
+        "integration",
+        "emu"
+      ],
+      "failure_means": "blocking",
+      "provenance": "fceux11-lua emu library binding tests; F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-046-lua-memory",
+      "legacy_id": "lua_memory_test",
+      "title": "memory 库 9 函数",
+      "kind": [
+        "lua-api",
+        "harness-rust"
+      ],
+      "layer": "lua",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "f11qa_lua_runner",
+        "working_dir": ".",
+        "args": [
+          "tests/lua_scripts/test_memory.lua",
+          "--frames",
+          "60"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 30,
+      "tags": [
+        "lua",
+        "integration",
+        "memory"
+      ],
+      "failure_means": "blocking",
+      "provenance": "fceux11-lua memory library binding tests; F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-047-lua-joypad",
+      "legacy_id": "lua_joypad_test",
+      "title": "joypad 库 get/set + mask1/mask2",
+      "kind": [
+        "lua-api",
+        "harness-rust"
+      ],
+      "layer": "lua",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "f11qa_lua_runner",
+        "working_dir": ".",
+        "args": [
+          "tests/lua_scripts/test_joypad.lua",
+          "--frames",
+          "60"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 30,
+      "tags": [
+        "lua",
+        "integration",
+        "joypad"
+      ],
+      "failure_means": "blocking",
+      "provenance": "fceux11-lua | 2026-07-30 demoted to advisory; Task1 lua rust migration (f11qa_lua_runner): does not surface joypad.get/joypad.set to Lua state (mask1/mask2 override logic unimplemented in Rust bindings). 2026-08-05 Phase 4.1: bindings verified present; root cause of failure = joypad.get() returned a TABLE (bitmask_to_table) while the FCEUX-compatible contract (and the test script's first assertion) requires a NUMBER bitmask. Fixed in src/rust/crates/fceux11-lua/bindings/joypad.rs (return state as i32). Re-enabled as blocking.; F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-048-nestest",
+      "legacy_id": null,
+      "title": "kevtris nestest CPU trace vs Nintendulator 黄金日志",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#nestest",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_nestest_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/nestest/nestest.nes",
+          "--log",
+          "tests/fixtures/nestest/nestest.log",
+          "--frames",
+          "255"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "kevtris",
+        "cpu",
+        "trace",
+        "TASVideos-required"
+      ],
+      "failure_means": "blocking",
+      "provenance": "v1.8 新增: kevtris nestest CPU 全指令 trace vs Nintendulator 参考日志; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "nestest/nestest.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-049-ppu-read-buffer-bisqwit",
+      "legacy_id": null,
+      "title": "bisqwit ppu_read_buffer ($2007 读缓冲怪兽级测试)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "bisqwit.iki.fi/src/nes_tests",
+      "license": "zlib",
+      "input": {
+        "binary": "f11qa_bisqwit_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/bisqwit/test_ppu_read_buffer.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "bisqwit",
+        "ppu",
+        "read-buffer"
+      ],
+      "failure_means": "blocking",
+      "provenance": "bisqwit ppu_read_buffer; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "bisqwit/test_ppu_read_buffer.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-050-cpu-dummy-writes-bisqwit",
+      "legacy_id": null,
+      "title": "bisqwit cpu_dummy_writes",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "bisqwit.iki.fi/src/nes_tests",
+      "license": "zlib",
+      "input": {
+        "binary": "f11qa_bisqwit_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/bisqwit/cpu_dummy_writes_oam.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "bisqwit",
+        "cpu",
+        "dummy-writes"
+      ],
+      "failure_means": "blocking",
+      "provenance": "bisqwit cpu_dummy_writes (oam); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "bisqwit/cpu_dummy_writes_oam.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-051-cpu-exec-space-bisqwit",
+      "legacy_id": null,
+      "title": "bisqwit cpu_exec_space",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "bisqwit.iki.fi/src/nes_tests",
+      "license": "zlib",
+      "input": {
+        "binary": "f11qa_bisqwit_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/bisqwit/test_cpu_exec_space_apu.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "bisqwit",
+        "cpu",
+        "exec-space"
+      ],
+      "failure_means": "blocking",
+      "provenance": "bisqwit cpu_exec_space (apu); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "bisqwit/test_cpu_exec_space_apu.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-052-cpu-flag-concurrency-bisqwit",
+      "legacy_id": null,
+      "title": "bisqwit cpu_flag_concurrency (zip 内待解析)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "bisqwit.iki.fi/src/nes_tests",
+      "license": "zlib",
+      "input": {
+        "binary": "f11qa_bisqwit_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/bisqwit/cpu_flag_concurrency.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "bisqwit",
+        "cpu",
+        "flag-concurrency"
+      ],
+      "failure_means": "advisory",
+      "provenance": "⏸ advisory: bisqwit zip-aware 解压分支尚未实现；镜像源中 zip 内多 ROM 待解析; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "bisqwit/cpu_flag_concurrency.nes",
+      "vendor_state": "advisory"
+    },
+    {
+      "kgmqa_id": "kgmqa-053-branch-timing-tests-blargg",
+      "legacy_id": null,
+      "title": "blargg branch_timing_tests",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/cpu/branch_timing_1.Branch_Basics.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "branch",
+        "timing"
+      ],
+      "failure_means": "blocking",
+      "provenance": "blargg branch timing; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/cpu/branch_timing_1.Branch_Basics.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-054-cpu-interrupts-v2-blargg",
+      "legacy_id": null,
+      "title": "blargg cpu_interrupts_v2",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#cpu_interrupts_v2",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/cpu/cpu_interrupts_v2_1-cli_latency.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "cpu",
+        "interrupt"
+      ],
+      "failure_means": "blocking",
+      "provenance": "cpu_interrupts_v2 cli_latency; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/cpu/cpu_interrupts_v2_1-cli_latency.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-055-cpu-reset-blargg",
+      "legacy_id": null,
+      "title": "blargg cpu_reset",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#cpu_reset",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/cpu/cpu_reset_registers.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "cpu",
+        "reset"
+      ],
+      "failure_means": "blocking",
+      "provenance": "cpu_reset registers; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/cpu/cpu_reset_registers.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-056-instr-timing-blargg",
+      "legacy_id": null,
+      "title": "blargg instr_timing",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#instr_timing",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/cpu/instr_timing_instr_timing.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "cpu",
+        "instr-timing"
+      ],
+      "failure_means": "blocking",
+      "provenance": "instr_timing; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/cpu/instr_timing_instr_timing.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-057-instr-test-v3-blargg",
+      "legacy_id": null,
+      "title": "blargg instr_test_v3 (vs v5 互补)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#instr_test",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/cpu/instr_test_v3_all_instrs.nes",
+          "--frames",
+          "3000"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "cpu",
+        "instr-test",
+        "v3"
+      ],
+      "failure_means": "blocking",
+      "provenance": "instr_test_v3; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/cpu/instr_test_v3_all_instrs.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-058-ppu-sprite-hit-blargg",
+      "legacy_id": null,
+      "title": "blargg ppu_sprite_hit",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#sprite_hit",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/ppu/sprite_hit_01.basics.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "ppu",
+        "sprite-hit"
+      ],
+      "failure_means": "advisory",
+      "provenance": "❌ pending-vendor: mirror 中 blargg/ppu/ 子目录待补; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/ppu/sprite_hit_01.basics.nes",
+      "vendor_state": "pending-vendor"
+    },
+    {
+      "kgmqa_id": "kgmqa-059-sprite-overflow-blargg",
+      "legacy_id": null,
+      "title": "blargg sprite_overflow_tests",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#sprite_overflow",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/ppu/sprite_overflow_1.Basics.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "ppu",
+        "sprite-overflow"
+      ],
+      "failure_means": "advisory",
+      "provenance": "❌ pending-vendor: mirror 中 blargg/ppu/ 子目录待补; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/ppu/sprite_overflow_1.Basics.nes",
+      "vendor_state": "pending-vendor"
+    },
+    {
+      "kgmqa_id": "kgmqa-060-ppu-open-bus-blargg",
+      "legacy_id": null,
+      "title": "blargg ppu_open_bus",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#ppu_open_bus",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/ppu/ppu_open_bus.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "ppu",
+        "open-bus"
+      ],
+      "failure_means": "advisory",
+      "provenance": "❌ pending-vendor: mirror 中 blargg/ppu/ 子目录待补; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/ppu/ppu_open_bus.nes",
+      "vendor_state": "pending-vendor"
+    },
+    {
+      "kgmqa_id": "kgmqa-061-nmi-sync-blargg",
+      "legacy_id": null,
+      "title": "blargg nmi_sync",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#nmi_sync",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/ppu/04-nmi_control.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "ppu",
+        "nmi-sync"
+      ],
+      "failure_means": "advisory",
+      "provenance": "❌ pending-vendor; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/ppu/04-nmi_control.nes",
+      "vendor_state": "pending-vendor"
+    },
+    {
+      "kgmqa_id": "kgmqa-062-oam-read-blargg",
+      "legacy_id": null,
+      "title": "blargg oam_read",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#oam_read",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/ppu/oam_read.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "ppu",
+        "oam-read"
+      ],
+      "failure_means": "advisory",
+      "provenance": "❌ pending-vendor; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/ppu/oam_read.nes",
+      "vendor_state": "pending-vendor"
+    },
+    {
+      "kgmqa_id": "kgmqa-063-apu-test-blargg",
+      "legacy_id": null,
+      "title": "blargg apu_test",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#apu_test",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/apu/apu_test.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "apu"
+      ],
+      "failure_means": "advisory",
+      "provenance": "❌ pending-vendor: blargg apu/ 子目录待补; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/apu/apu_test.nes",
+      "vendor_state": "pending-vendor"
+    },
+    {
+      "kgmqa_id": "kgmqa-064-apu-mixer-blargg",
+      "legacy_id": null,
+      "title": "blargg apu_mixer",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#apu_mixer",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/apu/apu_mixer.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "apu",
+        "mixer"
+      ],
+      "failure_means": "advisory",
+      "provenance": "❌ pending-vendor; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/apu/apu_mixer.nes",
+      "vendor_state": "pending-vendor"
+    },
+    {
+      "kgmqa_id": "kgmqa-065-dmc-tests-blargg",
+      "legacy_id": null,
+      "title": "blargg dmc_tests",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#dmc",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/apu/dmc_tests_buffer_retained.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "apu",
+        "dmc"
+      ],
+      "failure_means": "advisory",
+      "provenance": "❌ pending-vendor; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/apu/dmc_tests_buffer_retained.nes",
+      "vendor_state": "pending-vendor"
+    },
+    {
+      "kgmqa_id": "kgmqa-066-dmc-dma-during-read-blargg",
+      "legacy_id": null,
+      "title": "blargg dmc_dma_during_read4",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#dmc_dma_during_read",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/apu/dmc_dma_during_read4_dma_2007_read.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "apu",
+        "dmc",
+        "dma"
+      ],
+      "failure_means": "advisory",
+      "provenance": "❌ pending-vendor; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/apu/dmc_dma_during_read4_dma_2007_read.nes",
+      "vendor_state": "pending-vendor"
+    },
+    {
+      "kgmqa_id": "kgmqa-067-square-timer-div2-blargg",
+      "legacy_id": null,
+      "title": "blargg square_timer_div2",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#square_timer",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/apu/square_timer_div2.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "apu",
+        "square",
+        "timer"
+      ],
+      "failure_means": "advisory",
+      "provenance": "❌ pending-vendor; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/apu/square_timer_div2.nes",
+      "vendor_state": "pending-vendor"
+    },
+    {
+      "kgmqa_id": "kgmqa-068-volume-tests-damianyerrick",
+      "legacy_id": null,
+      "title": "Damian Yerrick volume_tests (音频通道混音)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "github.com/christopherpow/nes-test-roms/tree/master/volume_tests",
+      "license": "zlib",
+      "input": {
+        "binary": "f11qa_volume_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/damianyerrick/volume_tests/volumes.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 120,
+      "tags": [
+        "damianyerrick",
+        "pinobatch",
+        "audio",
+        "volume"
+      ],
+      "failure_means": "blocking",
+      "provenance": "v1.8 新增: 音频通道混音; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "damianyerrick/volume_tests/volumes.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-069-mmc3ir-test-nk",
+      "legacy_id": null,
+      "title": "N-K mmc3irqtest (MMC3 scanline IRQ + $C000 glitch)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "boards",
+      "spec_source": "forums.nesdev.org/viewtopic.php?p=261236",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_mmc3_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/nk/mmc3irqtest/mmc3irqtest.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "nk",
+        "mmc3",
+        "irq",
+        "scanline"
+      ],
+      "failure_means": "blocking",
+      "provenance": "N-K mmc3irqtest; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "nk/mmc3irqtest/mmc3irqtest.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-070-mmc5test-drag",
+      "legacy_id": null,
+      "title": "Drag mmc5test (MMC5 scanline)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "boards",
+      "spec_source": "forums.nesdev.org/viewtopic.php?t=11028",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_mmc5_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/drag/mmc5test/mmc5test.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "drag",
+        "mmc5",
+        "scanline"
+      ],
+      "failure_means": "blocking",
+      "provenance": "Drag mmc5test; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "drag/mmc5test/mmc5test.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-071-mmc5test-v2-awj",
+      "legacy_id": null,
+      "title": "AWJ mmc5test_v2",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "boards",
+      "spec_source": "forums.nesdev.org/viewtopic.php?t=11028",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_mmc5_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/awj/mmc5test_v2/mmc5test.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "awj",
+        "mmc5",
+        "v2"
+      ],
+      "failure_means": "blocking",
+      "provenance": "AWJ mmc5test_v2; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "awj/mmc5test_v2/mmc5test.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-072-vrc24test-awj",
+      "legacy_id": null,
+      "title": "AWJ vrc24test (VRC2/4 全变体)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "boards",
+      "spec_source": "forums.nesdev.org/viewtopic.php?t=11028",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_vrc24_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/awj/vrc24test/vrc24test.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "awj",
+        "vrc2",
+        "vrc4"
+      ],
+      "failure_means": "advisory",
+      "provenance": "❌ pending-vendor: AWJ 余项; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "awj/vrc24test/vrc24test.nes",
+      "vendor_state": "pending-vendor"
+    },
+    {
+      "kgmqa_id": "kgmqa-073-vrc6test-natt",
+      "legacy_id": null,
+      "title": "natt vrc6test",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "boards",
+      "spec_source": "forums.nesdev.org/viewtopic.php?t=11028",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_vrc6_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/natt/vrc6test/vrc6test.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "natt",
+        "vrc6",
+        "mirroring"
+      ],
+      "failure_means": "advisory",
+      "provenance": "❌ pending-vendor: natt 整 suite 未 vendor; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "natt/vrc6test/vrc6test.nes",
+      "vendor_state": "pending-vendor"
+    },
+    {
+      "kgmqa_id": "kgmqa-074-mmc1atest-tepples",
+      "legacy_id": null,
+      "title": "tepples mmc1atest (MMC1A vs MMC1B)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "boards",
+      "spec_source": "github.com/christopherpow/nes-test-roms",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_mmc1_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/tepples/mmc1atest/mmc1atest.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "tepples",
+        "mmc1"
+      ],
+      "failure_means": "advisory",
+      "provenance": "❌ pending-vendor: tepples mmc1atest 未在 mirror; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "tepples/mmc1atest/mmc1atest.nes",
+      "vendor_state": "pending-vendor"
+    },
+    {
+      "kgmqa_id": "kgmqa-075-mmc3bigchrram-tepples",
+      "legacy_id": null,
+      "title": "tepples mmc3bigchrram (32KB CHR RAM)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "boards",
+      "spec_source": "github.com/christopherpow/nes-test-roms",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_mmc3_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/tepples/mmc3bigchrram/mmc3bigchrram.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "tepples",
+        "mmc3",
+        "chr-ram"
+      ],
+      "failure_means": "blocking",
+      "provenance": "tepples mmc3bigchrram; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "tepples/mmc3bigchrram/mmc3bigchrram.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-076-test28-tepples",
+      "legacy_id": null,
+      "title": "tepples test28 (mapper 28 / Action 53)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "boards",
+      "spec_source": "github.com/christopherpow/nes-test-roms",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_test28_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/tepples/test28/test28.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "tepples",
+        "mapper-28",
+        "action-53"
+      ],
+      "failure_means": "blocking",
+      "provenance": "tepples test28; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "tepples/test28/test28.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-077-holy-mapperel-tepples",
+      "legacy_id": null,
+      "title": "Holy Mapperel (13 mapper 自动识别, 47 ROM aggregate)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "boards",
+      "spec_source": "github.com/pinobatch/holy-mapperel",
+      "license": "zlib",
+      "input": {
+        "binary": "f11qa_holy_mapperel_runner",
+        "working_dir": "tests",
+        "args": [
+          "--batch",
+          "tests/fixtures/holy_mapperel_manifest.json",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 1800,
+      "tags": [
+        "pinobatch",
+        "tepples",
+        "mapper",
+        "auto-identify",
+        "aggregate"
+      ],
+      "failure_means": "blocking",
+      "provenance": "v1.8 新增: Holy Mapperel aggregate (47 ROM 在 runner 内部循环, 全 PASS 才 PASS, kgmqa-077 不拆); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "holy_mapperel/M0_P32K_C8K_V.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-078-serom-lidnariq",
+      "legacy_id": null,
+      "title": "lidnariq serom (MMC1 SEROM/SHROM 约束)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "boards",
+      "spec_source": "forums.nesdev.org/viewtopic.php?f=3&t=9350",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_mmc1_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/lidnariq/serom/serom.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "lidnariq",
+        "mmc1",
+        "serom",
+        "shrom"
+      ],
+      "failure_means": "blocking",
+      "provenance": "lidnariq serom; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "lidnariq/serom/serom.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-079-exram-quietust",
+      "legacy_id": null,
+      "title": "Quietust exram (MMC5 ExRAM)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "boards",
+      "spec_source": "qmtpro.com/~nes",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_mmc5_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/quietust/mmc5exram.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "quietust",
+        "mmc5",
+        "exram"
+      ],
+      "failure_means": "blocking",
+      "provenance": "Quietust MMC5 ExRAM; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "quietust/mmc5exram.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-080-scanline-quietust",
+      "legacy_id": null,
+      "title": "Quietust scanline (PPU 扫描线精度)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "qmtpro.com/~nes",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_scanline_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/quietust/scanline.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "quietust",
+        "ppu",
+        "scanline"
+      ],
+      "failure_means": "blocking",
+      "provenance": "Quietust scanline; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "quietust/scanline.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-081-fds-irq-tests-sour",
+      "legacy_id": null,
+      "title": "Sour FdsIrqTests v7",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "github.com/Sour",
+      "license": "MIT",
+      "input": {
+        "binary": "f11qa_fds_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/sour/fdsirqtests/fdsirqtestsV7_patched.fds",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 120,
+      "tags": [
+        "sour",
+        "fds",
+        "irq"
+      ],
+      "failure_means": "blocking",
+      "provenance": "Sour FdsIrqTests v7 (patched); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "sour/fdsirqtests/fdsirqtestsV7_patched.fds",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-082-fds-mirroring-takuikaninja",
+      "legacy_id": null,
+      "title": "TakuikaNinja FDS-Mirroring-Test",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "github.com/TakuikaNinja/FDS-Mirroring-Test",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_fds_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/takuikaninja/FDS-Mirroring-Test/mirroring-test.fds",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "takuikaninja",
+        "fds",
+        "mirroring"
+      ],
+      "failure_means": "advisory",
+      "provenance": "⏸ advisory: TakuikaNinja 上游 4 repo 均无 LICENSE; 联系上游补 LICENSE 后升级; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "takuikaninja/FDS-Mirroring-Test/mirroring-test.fds",
+      "vendor_state": "advisory"
+    },
+    {
+      "kgmqa_id": "kgmqa-083-fds-audio-registers-takuikaninja",
+      "legacy_id": null,
+      "title": "TakuikaNinja FDS-Audio-Registers",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "github.com/TakuikaNinja/FDS-Audio-Registers",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_fds_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/takuikaninja/FDS-Audio-Registers/audio-registers.fds",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "takuikaninja",
+        "fds",
+        "audio"
+      ],
+      "failure_means": "advisory",
+      "provenance": "⏸ advisory: 等 LICENSE; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "takuikaninja/FDS-Audio-Registers/audio-registers.fds",
+      "vendor_state": "advisory"
+    },
+    {
+      "kgmqa_id": "kgmqa-084-fds-4030d1-addr-takuikaninja",
+      "legacy_id": null,
+      "title": "TakuikaNinja FDS-4030D1-Addr (DRAM 刷新 IRQ)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "github.com/TakuikaNinja/FDS-4030D1-Addr",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_fds_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/takuikaninja/FDS-4030D1-Addr/4030d1-addr.fds",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "takuikaninja",
+        "fds",
+        "dram-refresh"
+      ],
+      "failure_means": "advisory",
+      "provenance": "⏸ advisory: 等 LICENSE; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "takuikaninja/FDS-4030D1-Addr/4030d1-addr.fds",
+      "vendor_state": "advisory"
+    },
+    {
+      "kgmqa_id": "kgmqa-085-fds-4023-test-takuikaninja",
+      "legacy_id": null,
+      "title": "TakuikaNinja FDS-4023-Test",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "github.com/TakuikaNinja/FDS-4023-Test",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_fds_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/takuikaninja/FDS-4023-Test/4023-test.fds",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "takuikaninja",
+        "fds",
+        "4023"
+      ],
+      "failure_means": "advisory",
+      "provenance": "⏸ advisory: 等 LICENSE; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "takuikaninja/FDS-4023-Test/4023-test.fds",
+      "vendor_state": "advisory"
+    },
+    {
+      "kgmqa_id": "kgmqa-086-nes2-submapper-2-test",
+      "legacy_id": null,
+      "title": "rainwarrior 2_test (UxROM submapper 0/1/2)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "boards",
+      "spec_source": "forums.nesdev.org/viewtopic.php?t=12085",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_submapper_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/rainwarrior/submapper/2_test.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "rainwarrior",
+        "nes2",
+        "submapper",
+        "uxrom"
+      ],
+      "failure_means": "advisory",
+      "provenance": "⏸ advisory: rainwarrior 4 项 submapper 暂搁（沙箱拿不到 .nes 实体）; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "rainwarrior/submapper/2_test.nes",
+      "vendor_state": "advisory"
+    },
+    {
+      "kgmqa_id": "kgmqa-087-nes2-submapper-3-test",
+      "legacy_id": null,
+      "title": "rainwarrior 3_test (CNROM)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "boards",
+      "spec_source": "forums.nesdev.org/viewtopic.php?t=12085",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_submapper_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/rainwarrior/submapper/3_test.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "rainwarrior",
+        "nes2",
+        "submapper",
+        "cnrom"
+      ],
+      "failure_means": "advisory",
+      "provenance": "⏸ advisory: 同上; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "rainwarrior/submapper/3_test.nes",
+      "vendor_state": "advisory"
+    },
+    {
+      "kgmqa_id": "kgmqa-088-nes2-submapper-7-test",
+      "legacy_id": null,
+      "title": "rainwarrior 7_test (AxROM)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "boards",
+      "spec_source": "forums.nesdev.org/viewtopic.php?t=12085",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_submapper_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/rainwarrior/submapper/7_test.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "rainwarrior",
+        "nes2",
+        "submapper",
+        "axrom"
+      ],
+      "failure_means": "advisory",
+      "provenance": "⏸ advisory: 同上; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "rainwarrior/submapper/7_test.nes",
+      "vendor_state": "advisory"
+    },
+    {
+      "kgmqa_id": "kgmqa-089-nes2-submapper-34-test",
+      "legacy_id": null,
+      "title": "rainwarrior 34_test (BNROM)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "boards",
+      "spec_source": "forums.nesdev.org/viewtopic.php?t=12085",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_submapper_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/rainwarrior/submapper/34_test.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "rainwarrior",
+        "nes2",
+        "submapper",
+        "bnrom"
+      ],
+      "failure_means": "advisory",
+      "provenance": "⏸ advisory: 同上; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "rainwarrior/submapper/34_test.nes",
+      "vendor_state": "advisory"
+    },
+    {
+      "kgmqa_id": "kgmqa-090-mmc5ramsize-rainwarrior",
+      "legacy_id": null,
+      "title": "rainwarrior mmc5ramsize (MMC5 PRG-RAM)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "boards",
+      "spec_source": "forums.nesdev.org/viewtopic.php?p=244062",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_mmc5_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/rainwarrior/mmc5ramsize/mmc5ramsize.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "rainwarrior",
+        "mmc5",
+        "prg-ram"
+      ],
+      "failure_means": "blocking",
+      "provenance": "rainwarrior mmc5ramsize; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "rainwarrior/mmc5ramsize/mmc5ramsize.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-091-n163-soundram-rainwarrior",
+      "legacy_id": null,
+      "title": "rainwarrior n163_soundram (Namco 163 音频 RAM 读回)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "forums.nesdev.org/viewtopic.php?p=284414",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_n163_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/rainwarrior/n163_soundram/n163_soundram.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "rainwarrior",
+        "n163",
+        "sound-ram"
+      ],
+      "failure_means": "advisory",
+      "provenance": "⏸ advisory: rainwarrior 暂搁，wayback 无 .nes 实体; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "rainwarrior/n163_soundram/n163_soundram.nes",
+      "vendor_state": "advisory"
+    },
+    {
+      "kgmqa_id": "kgmqa-092-n163-soundram-init-rainwarrior",
+      "legacy_id": null,
+      "title": "rainwarrior n163_soundram_init (通电初值)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "forums.nesdev.org/viewtopic.php?p=284414",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_n163_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/rainwarrior/n163_soundram/n163_soundram_init.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "rainwarrior",
+        "n163",
+        "sound-ram",
+        "init"
+      ],
+      "failure_means": "advisory",
+      "provenance": "⏸ advisory: 同上; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "rainwarrior/n163_soundram/n163_soundram_init.nes",
+      "vendor_state": "advisory"
+    },
+    {
+      "kgmqa_id": "kgmqa-093-bntest",
+      "legacy_id": null,
+      "title": "tepples BNTest (BxROM / BNROM 边界)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "boards",
+      "spec_source": "forums.nesdev.org/viewtopic.php?p=79826",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_bntest_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/tepples/bntest/bntest-aorom.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "tepples",
+        "bntest",
+        "bxrom",
+        "bnrom"
+      ],
+      "failure_means": "blocking",
+      "provenance": "tepples BNTest (aorom 变体; mirror bnxest_aorom.nes 由 tepples 与 bntest/ 子目录同名, 需消歧); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "tepples/bntest/bntest-aorom.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-094-bxrom-512k-test-rainwarrior",
+      "legacy_id": null,
+      "title": "rainwarrior bxrom_512k_test",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "boards",
+      "spec_source": "forums.nesdev.org/viewtopic.php?f=3&t=12085",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_bxrom_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/rainwarrior/bxrom_512k_test/bxrom_512k_test.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "rainwarrior",
+        "bxrom",
+        "512k"
+      ],
+      "failure_means": "blocking",
+      "provenance": "rainwarrior bxrom_512k_test; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "rainwarrior/bxrom_512k_test/bxrom_512k_test.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-095-31-test",
+      "legacy_id": null,
+      "title": "rainwarrior 31_test (mapper 31 子 mapper)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "boards",
+      "spec_source": "forums.nesdev.org/viewtopic.php?f=3&t=13120",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_mapper31_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/rainwarrior/31_test/31_test.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "rainwarrior",
+        "mapper-31"
+      ],
+      "failure_means": "advisory",
+      "provenance": "⏸ advisory: rainwarrior 暂搁; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "rainwarrior/31_test/31_test.nes",
+      "vendor_state": "advisory"
+    },
+    {
+      "kgmqa_id": "kgmqa-096-fme7acktest-tepples",
+      "legacy_id": null,
+      "title": "tepples fme7acktest-r1 (FME-7 IRQ ack)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "boards",
+      "spec_source": "github.com/christopherpow/nes-test-roms",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_fme7_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/tepples/fme7/fme7acktest.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "tepples",
+        "fme7",
+        "irq",
+        "ack"
+      ],
+      "failure_means": "blocking",
+      "provenance": "tepples fme7acktest; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "tepples/fme7/fme7acktest.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-097-fme7ramtest-tepples",
+      "legacy_id": null,
+      "title": "tepples fme7ramtest-r1 (FME-7 WRAM)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "boards",
+      "spec_source": "github.com/christopherpow/nes-test-roms",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_fme7_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/tepples/fme7/fme7ramtest.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "tepples",
+        "fme7",
+        "wram"
+      ],
+      "failure_means": "blocking",
+      "provenance": "tepples fme7ramtest; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "tepples/fme7/fme7ramtest.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-098-famicom-audio-swap-tests",
+      "legacy_id": null,
+      "title": "rainwarrior famicom_audio_swap_tests (扩展音频互换)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "rainwarrior.ca/projects/nes/famicom_audio_swap_tests.zip",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_famicom_audio_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/rainwarrior/famicom_audio_swap_tests/famicom_audio_swap.nes",
+          "--frames",
+          "300"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "rainwarrior",
+        "famicom",
+        "audio",
+        "swap"
+      ],
+      "failure_means": "advisory",
+      "provenance": "⏸ advisory: zip 内多文件, zip-aware 解压分支待实现; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "rainwarrior/famicom_audio_swap_tests/famicom_audio_swap.nes",
+      "vendor_state": "advisory"
+    },
+    {
+      "kgmqa_id": "kgmqa-099-240pee-damianyerrick",
+      "legacy_id": null,
+      "title": "Damian Yerrick 240pee (NTSC/PAL/Dendy 时序 + TV)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "github.com/pinobatch/240p-test-mini",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "f11qa_240pee_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/240pee/240pee.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "damianyerrick",
+        "pinobatch",
+        "tv",
+        "ntsc",
+        "pal",
+        "dendy"
+      ],
+      "failure_means": "blocking",
+      "provenance": "240pee; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "240pee/240pee.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-100-tvpassfail-tepples",
+      "legacy_id": null,
+      "title": "tepples tvpassfail (NTSC 色彩 + NTSC-PAL pixel aspect ratio)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "github.com/christopherpow/nes-test-roms",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_tvpassfail_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/tepples/tvpassfail/tv.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "tepples",
+        "tv",
+        "ntsc",
+        "pal",
+        "color"
+      ],
+      "failure_means": "blocking",
+      "provenance": "tepples tvpassfail; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "tepples/tvpassfail/tv.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-101-allpads-tepples",
+      "legacy_id": null,
+      "title": "tepples allpads (多控制器综合, 等价 porttest)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "github.com/christopherpow/nes-test-roms",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_allpads_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/tepples/porttest/porttest.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "tepples",
+        "input",
+        "controller"
+      ],
+      "failure_means": "blocking",
+      "provenance": "tepples porttest (等价 allpads); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "tepples/porttest/porttest.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-102-zap-ruder-tepples",
+      "legacy_id": null,
+      "title": "tepples Zap Ruder (光枪 / 双持)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "github.com/christopherpow/nes-test-roms",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_zap_ruder_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/tepples/zap_ruder/zap_ruder.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "tepples",
+        "input",
+        "zapper",
+        "dual-hold"
+      ],
+      "failure_means": "advisory",
+      "provenance": "❌ pending-vendor: tepples 余项; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "tepples/zap_ruder/zap_ruder.nes",
+      "vendor_state": "pending-vendor"
+    },
+    {
+      "kgmqa_id": "kgmqa-103-spadtest-tepples",
+      "legacy_id": null,
+      "title": "tepples spadtest-nes (SNES 手柄)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "github.com/christopherpow/nes-test-roms",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_spad_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/tepples/spadtest/spadtest.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "tepples",
+        "input",
+        "snes-pad"
+      ],
+      "failure_means": "advisory",
+      "provenance": "❌ pending-vendor; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "tepples/spadtest/spadtest.nes",
+      "vendor_state": "pending-vendor"
+    },
+    {
+      "kgmqa_id": "kgmqa-104-powerpad-tepples",
+      "legacy_id": null,
+      "title": "tepples POWERPAD.NES / powerpadgesture",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "github.com/christopherpow/nes-test-roms",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_powerpad_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/tepples/powerpad/POWERPAD.NES",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "tepples",
+        "input",
+        "power-pad"
+      ],
+      "failure_means": "advisory",
+      "provenance": "❌ pending-vendor; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "tepples/powerpad/POWERPAD.NES",
+      "vendor_state": "pending-vendor"
+    },
+    {
+      "kgmqa_id": "kgmqa-105-paddle-test3-3gengames",
+      "legacy_id": null,
+      "title": "3gengames PaddleTest3 (Arkanoid 旋转电位器)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "forums.nesdev.org/viewtopic.php?t=11028",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_paddle_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/3gengames/PaddleTest3/PaddleTest.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "3gengames",
+        "input",
+        "paddle"
+      ],
+      "failure_means": "blocking",
+      "provenance": "PaddleTest3; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "3gengames/PaddleTest3/PaddleTest.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-106-vaus-test-lidnariq",
+      "legacy_id": null,
+      "title": "lidnariq vaus / Damian Yerrick vaus-test (Arkanoid 9-bit)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "forums.nesdev.org/viewtopic.php?t=23801",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_vaus_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/lidnariq/vaus/vaus.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "lidnariq",
+        "damianyerrick",
+        "input",
+        "vaus",
+        "arkanoid"
+      ],
+      "failure_means": "blocking",
+      "provenance": "vaus + vaus-test (lidnariq 与 damianyerrick/ 各一 ROM 共用 kgmqa-106); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "lidnariq/vaus/vaus.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-107-mset-rainwarrior",
+      "legacy_id": null,
+      "title": "rainwarrior mset (SNES 鼠标)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "forums.nesdev.org/viewtopic.php?p=231608",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_mset_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/rainwarrior/mset/mset.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "rainwarrior",
+        "input",
+        "mouse"
+      ],
+      "failure_means": "blocking",
+      "provenance": "mset; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "rainwarrior/mset/mset.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-108-mict-rainwarrior",
+      "legacy_id": null,
+      "title": "rainwarrior mict (Famicom 麦克风)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "forums.nesdev.org/viewtopic.php?p=231608",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_mict_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/rainwarrior/mict/mict.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "rainwarrior",
+        "input",
+        "microphone"
+      ],
+      "failure_means": "blocking",
+      "provenance": "mict; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "rainwarrior/mict/mict.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-109-telling-lys-tepples",
+      "legacy_id": null,
+      "title": "tepples Telling LYs? (输入扫描线精度)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "github.com/christopherpow/nes-test-roms",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_tellinglys_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/tepples/tellinglys/tellinglys.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "tepples",
+        "input",
+        "scanline"
+      ],
+      "failure_means": "blocking",
+      "provenance": "tellinglys; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "tepples/tellinglys/tellinglys.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-110-dma-sync-test-v2-rahsennor",
+      "legacy_id": null,
+      "title": "Rahsennor dma_sync_test_v2 (DMC DMA 读取损坏)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "forums.nesdev.org/viewtopic.php?t=14319",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_dma_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/rahsennor/dma_sync_test_v2/dma_sync_test_v2.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "rahsennor",
+        "dma",
+        "dmc"
+      ],
+      "failure_means": "blocking",
+      "provenance": "dma_sync_test_v2; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "rahsennor/dma_sync_test_v2/dma_sync_test_v2.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-111-read-joy3-blargg",
+      "legacy_id": null,
+      "title": "blargg read_joy3 (手柄 + DMC DMA 损坏)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#read_joy3",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_blargg_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/blargg/read_joy3/test_buttons.nes",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "input",
+        "joy3",
+        "dmc"
+      ],
+      "failure_means": "blocking",
+      "provenance": "blargg read_joy3; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/read_joy3/test_buttons.nes",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-112-nesstress-flubba",
+      "legacy_id": null,
+      "title": "Flubba NEStress (综合压力)",
+      "kind": [
+        "rom-suite"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev wiki",
+      "license": "PD",
+      "input": {
+        "binary": "f11qa_nesstress_runner",
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "tests/fixtures/nesstress/NEStress/NEStress.NES",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "flubba",
+        "stress"
+      ],
+      "failure_means": "blocking",
+      "provenance": "NEStress; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "nesstress/NEStress/NEStress.NES",
+      "vendor_state": "vendored"
+    },
+    {
+      "kgmqa_id": "kgmqa-113-i18n-regression",
+      "legacy_id": "i18n_regression_test",
+      "title": "i18n .ts 覆盖率 >90% + simp/trad 污染 + retranslateUi() 完备",
+      "kind": [
+        "static-analysis"
+      ],
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_i18n_regression_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 30,
+      "tags": [
+        "i18n",
+        "static-analysis"
+      ],
+      "failure_means": "blocking",
+      "provenance": "v0.3.15; F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-114-menu-slot-check",
+      "legacy_id": "menu_slot_check",
+      "title": "Qt SLOT 静态分析 (Python scripts/check_menu_slots.py)",
+      "kind": [
+        "static-analysis"
+      ],
+      "layer": "driver",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_menu_slot_check",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 30,
+      "tags": [
+        "qt",
+        "static-analysis"
+      ],
+      "failure_means": "blocking",
+      "provenance": "v1.17 menu_slot_check; Python static analysis; F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-115-bench-tolerance",
+      "legacy_id": "bench_tolerance_test",
+      "title": "R4 协议 (warmup 3 + timed 7, drop extremes, median vs baseline)",
+      "kind": [
+        "perf"
+      ],
+      "layer": "benchmark",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_bench_tolerance_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 600,
+      "tags": [
+        "perf",
+        "benchmark"
+      ],
+      "failure_means": "blocking",
+      "provenance": "v1.17 bench_tolerance_test; R4 gate 性能门禁; F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-116-headless-smoke",
+      "legacy_id": null,
+      "title": "null driver 编译/链接/启动",
+      "kind": [
+        "smoke"
+      ],
+      "layer": "driver",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_headless_smoke_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 30,
+      "tags": [
+        "smoke",
+        "headless",
+        "null-driver"
+      ],
+      "failure_means": "blocking",
+      "provenance": "v1.8 新增: headless smoke (null driver 编译/链接/启动); F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-117-mirror-snapshot-check",
+      "legacy_id": null,
+      "title": "mirror snapshot 一致性 + license accepted set 校验",
+      "kind": [
+        "static-license"
+      ],
+      "layer": "core",
+      "spec_source": "docs/plans/FCEUX11-v1.8_F11QA-构建计划.md",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "python",
+        "working_dir": "tests",
+        "args": [
+          "tests/f11qa/mirror_snapshot_check.py",
+          "--manifest",
+          "tests/fixtures/f11qa_mirror_pin.json"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "license",
+        "mirror",
+        "snapshot"
+      ],
+      "failure_means": "blocking",
+      "provenance": "v1.8 新增: mirror_snapshot_check (Python 实现); 取代 v1.17 license_manifest_check; F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-118-config-store-rust",
+      "legacy_id": null,
+      "title": "TypedConfig<T> Rust 端 (对偶 kgmqa-018)",
+      "kind": [
+        "unit-rust"
+      ],
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "cargo_test_config_store",
+        "working_dir": ".",
+        "args": [
+          "-p",
+          "f11qa",
+          "--test",
+          "config_store"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 120,
+      "tags": [
+        "rust",
+        "config",
+        "unit"
+      ],
+      "failure_means": "blocking",
+      "provenance": "v1.8 新增: Rust crate 内 TypedConfig<T> 对偶 C++ 测试; F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-119-pixbuf-pool-rust",
+      "legacy_id": null,
+      "title": "PixBufPool Rust 端 (对偶 kgmqa-019)",
+      "kind": [
+        "unit-rust"
+      ],
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "cargo_test_pixbuf_pool",
+        "working_dir": ".",
+        "args": [
+          "-p",
+          "f11qa",
+          "--test",
+          "pixbuf_pool"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "rust",
+        "pixbuf",
+        "unit"
+      ],
+      "failure_means": "blocking",
+      "provenance": "v1.8 新增: PixBufPool Rust 对偶 C++ 测试; F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-120-state-facade-rust",
+      "legacy_id": null,
+      "title": "fceux11::State Rust 端 (对偶 kgmqa-009)",
+      "kind": [
+        "unit-rust"
+      ],
+      "layer": "driver",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "cargo_test_state_facade",
+        "working_dir": ".",
+        "args": [
+          "-p",
+          "f11qa",
+          "--test",
+          "state_facade"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "rust",
+        "state",
+        "unit"
+      ],
+      "failure_means": "blocking",
+      "provenance": "v1.8 新增: fceux11::State Rust 对偶 C++ 测试; F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    }
+  ]
 }
