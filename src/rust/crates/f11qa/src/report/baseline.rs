@@ -41,6 +41,11 @@ pub fn snapshot_from_results(
         run_id: run_id.to_string(),
         generated_at: chrono_now(),
         results: results.clone(),
+        // Phase 8: vendor_state 通道按 caller 实际状态填充；
+        // snapshot_from_results 只拿到 PASS/FAIL map，没 vendor_state 信息。
+        // 完整 vendor_state 信息由 cli/run_report.rs 在 build_matrix 之后
+        // 通过 outcome.manifest 单独填入 (后续 Phase 9 扩展)。
+        vendor_state: None,
     }
 }
 
@@ -168,6 +173,7 @@ mod tests {
             run_id: "20260727-test".into(),
             generated_at: "2026-07-27T00:00:00Z".into(),
             results,
+            vendor_state: None,
         };
 
         let tmp = tempfile::NamedTempFile::new().unwrap();
@@ -201,6 +207,7 @@ mod tests {
             run_id: "run-1".into(),
             generated_at: "2026-07-27T00:00:00Z".into(),
             results: prev_results,
+            vendor_state: None,
         };
 
         let mut current_results = BTreeMap::new();
@@ -223,6 +230,7 @@ mod tests {
             run_id: "run-1".into(),
             generated_at: "2026-07-27T00:00:00Z".into(),
             results: prev_results,
+            vendor_state: None,
         };
 
         let mut current_results = BTreeMap::new();
@@ -242,6 +250,7 @@ mod tests {
             run_id: "run-1".into(),
             generated_at: "2026-07-27T00:00:00Z".into(),
             results: prev_results,
+            vendor_state: None,
         };
 
         let mut current_results = BTreeMap::new();

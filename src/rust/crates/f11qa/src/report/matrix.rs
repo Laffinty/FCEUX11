@@ -202,11 +202,20 @@ pub struct MigrationMatrix {
 
 /// Minimal snapshot of a previous run: test_id → passed.
 /// Serialised alongside the full report so the next run can diff against it.
+///
+/// F11QA v1.8 Phase 8: 增加 `vendor_state` 可选字段，记录 rom-suite 用例的
+/// 三态 vendor 状态（vendored / advisory / pending-vendor）。`None` 时表示
+/// 老 v1.17 baseline，无此维度；runner 在比对 transition_matrix 时按 kgmqa_id
+/// 同步读 vendor_state 以便 advisory/pending-vendor 通道不被误算 fail_to_pass。
 #[derive(Debug, Serialize, serde::Deserialize)]
 pub struct PreviousRun {
     pub run_id: String,
     pub generated_at: String,
-    pub results: BTreeMap<String, bool>, // test_id → passed
+    pub results: BTreeMap<String, bool>, // test_id (kgmqa_id) → passed
+    /// F11QA v1.8 §五 Phase 8: 仅 rom-suite 用例填，键为 kgmqa_id。
+    /// v1.17 baseline 无此字段（Option）— runner 检测 None 视作旧版本 baseline。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vendor_state: Option<BTreeMap<String, String>>,
 }
 
 // ---------------------------------------------------------------------------
@@ -464,6 +473,7 @@ mod tests {
             run_id: "prev".into(),
             generated_at: "2026-01-01T00:00:00Z".into(),
             results: prev_results,
+            vendor_state: None,
         };
 
         // Current run: a still PASS, b now PASS (fixed!), c now FAIL (regression!)
@@ -509,6 +519,7 @@ mod tests {
             run_id: "prev".into(),
             generated_at: "2026-01-01T00:00:00Z".into(),
             results: empty_prev,
+            vendor_state: None,
         };
         // Brand-new test that PASSES in current run.
         let results = vec![make_result("brand_new_pass", true, 0)];
@@ -538,6 +549,7 @@ mod tests {
             run_id: "prev".into(),
             generated_at: "2026-01-01T00:00:00Z".into(),
             results: empty_prev,
+            vendor_state: None,
         };
         // Brand-new test that FAILS in current run.
         let results = vec![make_result("brand_new_fail", false, 1)];
@@ -571,6 +583,7 @@ mod tests {
             run_id: "prev".into(),
             generated_at: "2026-01-01T00:00:00Z".into(),
             results: prev_results,
+            vendor_state: None,
         };
         let results = vec![
             make_result("a", true, 0),  // PASS → PASS  (in baseline)
@@ -630,6 +643,7 @@ mod tests {
             run_id: "prev".into(),
             generated_at: "2026-01-01T00:00:00Z".into(),
             results: prev_results,
+            vendor_state: None,
         };
         // Current run: keeps 'a', drops 'b', adds 'c'.
         let results = vec![
@@ -666,6 +680,7 @@ mod tests {
             run_id: "prev".into(),
             generated_at: "2026-01-01T00:00:00Z".into(),
             results: prev_results,
+            vendor_state: None,
         };
         let results = vec![
             make_result("original", true, 0),

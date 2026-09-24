@@ -269,6 +269,7 @@ mod tests {
             run_id: "prev".into(),
             generated_at: "2026-08-08T00:00:00Z".into(),
             results,
+            vendor_state: None,
         });
         build_matrix(results, &Default::default(), &Default::default(), previous.as_ref(), vec![])
     }
