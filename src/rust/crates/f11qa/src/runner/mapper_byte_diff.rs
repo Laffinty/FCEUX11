@@ -288,7 +288,7 @@ pub trait MapperStateSource {
     }
 }
 
-#[cfg(any(feature = "direct-adapter", not(test)))]
+#[cfg(feature = "direct-adapter")]
 impl MapperStateSource for crate::adapter::direct::Fceux11DirectAdapter {
     fn snapshot_mapper_state(&self) -> Result<Vec<u8>, QaError> {
         // First call asks for the size (cap=0), then allocate + fetch.
@@ -320,7 +320,7 @@ impl MapperStateSource for crate::adapter::direct::Fceux11DirectAdapter {
     }
 }
 
-#[cfg(any(feature = "direct-adapter", not(test)))]
+#[cfg(feature = "direct-adapter")]
 unsafe extern "C" {
     fn kagami_bridge_save_mapper_state(dst: *mut u8, cap: u32, written_out: *mut u32) -> i32;
 }

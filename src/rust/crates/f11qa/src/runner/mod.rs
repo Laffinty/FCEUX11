@@ -21,7 +21,14 @@
 //! (headless Lua script runner with C-level stdout/stderr capture).
 
 pub mod blargg;
+// `direct` is the C-ABI FFI runner; only available with the
+// "direct-adapter" feature (see adapter/mod.rs for rationale).
+#[cfg(feature = "direct-adapter")]
 pub mod direct;
+// `lua` declares FFI to fceux11-lua + kagami_bridge C symbols that only
+// the CMake `direct-adapter` build links against. Plain cargo / cargo test
+// excludes it so the linker never sees the unresolved externs.
+#[cfg(feature = "direct-adapter")]
 pub mod lua;
 pub mod mapper_byte_diff;
 pub mod rom_regression;

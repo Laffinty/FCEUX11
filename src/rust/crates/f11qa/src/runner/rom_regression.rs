@@ -326,7 +326,7 @@ pub trait FrameSource {
     fn extract_frame(&self, buf: &mut [u8]) -> Result<(), QaError>;
 }
 
-#[cfg(any(feature = "direct-adapter", not(test)))]
+#[cfg(feature = "direct-adapter")]
 impl FrameSource for crate::adapter::direct::Fceux11DirectAdapter {
     fn extract_frame(&self, buf: &mut [u8]) -> Result<(), QaError> {
         if buf.len() != FRAME_BUF_SIZE {
@@ -352,7 +352,7 @@ impl FrameSource for crate::adapter::direct::Fceux11DirectAdapter {
 // FFI declaration (mirrors adapter/direct.rs but is `pub(crate)` so it
 // can be used by both adapter::direct and runner::rom_regression
 // without re-declaring). Marked unsafe to keep callers honest.
-#[cfg(any(feature = "direct-adapter", not(test)))]
+#[cfg(feature = "direct-adapter")]
 unsafe extern "C" {
     fn kagami_bridge_extract_frame_buffer(dst: *mut u8, len: u32) -> i32;
 }

@@ -228,7 +228,7 @@ pub trait StateSnapshot {
     }
 }
 
-#[cfg(any(feature = "direct-adapter", not(test)))]
+#[cfg(feature = "direct-adapter")]
 impl StateSnapshot for crate::adapter::direct::Fceux11DirectAdapter {
     fn snapshot_state(&self) -> Result<Vec<u8>, QaError> {
         // First attempt: probe with a small buffer to learn the size.
@@ -302,7 +302,7 @@ impl StateSnapshot for crate::adapter::direct::Fceux11DirectAdapter {
     }
 }
 
-#[cfg(any(feature = "direct-adapter", not(test)))]
+#[cfg(feature = "direct-adapter")]
 unsafe extern "C" {
     fn kagami_bridge_save_state(
         dst: *mut u8,
