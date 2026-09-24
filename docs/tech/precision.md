@@ -47,7 +47,7 @@ baseline 更新需与代码变更同等级 review**）。180 ROM：PASS 120 / FA
 | `ppu_frame_diff_test` | XBuf 可见区 61440 字节裸 memcmp，金标 `tests/fixtures/golden_frames/` | 拒绝 PNG/PPM（理由见测试头注释）；**仅在有意的 PPU 变更落地时重生成** |
 | `golden_hashes.json` | 多 ROM 帧 CRC/MD5 链 | R5/R6 若发生真实精度回归需追加 diff 行 |
 | `golden_savestate_test` | savestate 字节金标 | 见 §3 禁忌 |
-| blargg 180 ROM | KagamiQA 双 Oracle（A 回归 / B 硬件一致性） | 见 KagamiQA.md |
+| blargg 180 ROM | F11QA 双 Oracle（A 回归 / B 硬件一致性） | 见 F11QA.md |
 | 游戏级锚（注释级） | Knight Rider→ppudead、Super Donkey Kong→OAMADDR、3-D WorldRunner→dot257、SMB3/Crystalis→MMC3 hook、Bee 52→FRAMESKIP | 改注释锚指向的行为前先跑对应游戏 |
 
 ## 3. 禁忌清单（改了会碎东西）
@@ -67,7 +67,7 @@ baseline 更新需与代码变更同等级 review**）。180 ROM：PASS 120 / FA
 - **Instrument-first**：改时序代码前，必须先以 env-gated 探针采集数据
   （`FCEUX11_E1_TRACE`/`E3_TRACE`/`E1_NMIDELAY`/`OPENDECAY_PROBE`，生产零开销）。
 - **CI 数字回填纪律**：任何 CI 数字以 artifact `engine.git_rev` 为唯一可信来源，
-  禁止手改（KagamiQA.md §0）。
+  禁止手改（F11QA.md §0）。
 - **迁移 parity 纪律**：Rust harness 必须逐字节镜像 C++ 驱动可观测行为（CLI、
   输出格式、退出码、CRC 链、watchdog）；任何 parity miss → 该测试留在 C++
   （Task1 Track C 结论）。
@@ -85,6 +85,6 @@ baseline 更新需与代码变更同等级 review**）。180 ROM：PASS 120 / FA
 
 ## 6. 相关文档
 
-- 测试框架与 CI 门禁：[KagamiQA.md](KagamiQA.md)
+- 测试框架与 CI 门禁：[F11QA.md](F11QA.md)
 - 各模块细节：[cpu.md](cpu.md) §四、[ppu.md](ppu.md) §三、[apu.md](apu.md) §三
 - 归档规则：[../history/README.md](../history/README.md)

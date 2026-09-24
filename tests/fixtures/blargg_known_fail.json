@@ -1,5 +1,5 @@
 {
-  "_comment": "KagamiQA P5 — Known-failure baseline for blargg test ROM suite (expanded from P4 22 ROMs → P5 180 ROMs).",
+  "_comment": "F11QA P5 — Known-failure baseline for blargg test ROM suite (expanded from P4 22 ROMs → P5 180 ROMs).",
   "_policy": "This file is version-controlled. Each entry documents a ROM known to FAIL. Entries with expected_to_eventually_pass=true are accuracy bugs to fix. Entries with expected_to_eventually_pass=false are permanent skips (e.g. unsupported features or ROM format issues).",
   "_governance": "AI shall not modify expected values. Baseline updates require the same review as code changes.",
   "baseline_version": "v1.16.0-P5",

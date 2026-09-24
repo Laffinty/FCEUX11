@@ -1,4 +1,4 @@
-# KagamiQA P5 — Generate blargg_manifest.json from downloaded ROMs.
+# F11QA P5 — Generate blargg_manifest.json from downloaded ROMs.
 #
 # Walks tests/fixtures/blargg/ and produces a manifest with all .nes files,
 # categorized by parent directory (cpu/ppu/apu/mmc3).
@@ -54,7 +54,7 @@ Get-ChildItem -Path $RomDir -Recurse -Filter *.nes | Sort-Object FullName | ForE
 # Build JSON manually for clean formatting
 $lines = @()
 $lines += '{'
-$lines += '  "_comment": "KagamiQA P5 — Full blargg test ROM catalog (expanded from P2 22 ROMs). Each ROM uses `$6000-`$6003 protocol.",'
+$lines += '  "_comment": "F11QA P5 — Full blargg test ROM catalog (expanded from P2 22 ROMs). Each ROM uses `$6000-`$6003 protocol.",'
 $lines += '  "_source": "https://github.com/christopherpow/nes-test-roms",'
 $lines += '  "_protocol": "`$6000 = 0x00 PASS, 0x01+ FAIL with diagnostic code",'
 $lines += '  "_downloader": "scripts/download_blargg_roms.ps1",'

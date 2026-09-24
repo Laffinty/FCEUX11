@@ -1,4 +1,4 @@
-# KagamiQA P2 — Build C++ blargg runner and run full accuracy suite.
+# F11QA P2 — Build C++ blargg runner and run full accuracy suite.
 #
 # Prerequisites:
 #   - Run from a Visual Studio Developer PowerShell (or cmd with VsDevCmd.bat called first)
@@ -20,7 +20,7 @@ $BuildDir = Join-Path $RootDir "build"
 $TestsDir = Join-Path $RootDir "tests"
 $RustDir = Join-Path $RootDir "src/rust"
 
-Write-Host "=== KagamiQA P2: Build & Run Blargg Suite ==="
+Write-Host "=== F11QA P2: Build & Run Blargg Suite ==="
 Write-Host "Root:     $RootDir"
 Write-Host "Build:    $BuildDir"
 Write-Host ""
@@ -36,12 +36,12 @@ if (-not $SkipDownload) {
 }
 
 # ---------------------------------------------------------------------------
-# Step 2: Build Rust kagami-qa runner
+# Step 2: Build Rust f11qa runner
 # ---------------------------------------------------------------------------
-Write-Host "[2/5] Building Rust kagami-qa-runner..."
+Write-Host "[2/5] Building Rust f11qa-runner..."
 Push-Location $RustDir
 try {
-    cargo build --package kagami-qa --bin kagami-qa-runner --release
+    cargo build --package f11qa --bin f11qa-runner --release
     if ($LASTEXITCODE -ne 0) { throw "Rust build failed" }
     Write-Host "  Rust build OK"
 } finally {
@@ -155,20 +155,20 @@ if (Test-Path $ManifestPath) {
     Write-Host ""
 
     # Save batch output.
-    $BatchOutPath = Join-Path $RootDir "kagamiqa_blargg_batch_output.json"
+    $BatchOutPath = Join-Path $RootDir "f11qa_blargg_batch_output.json"
     $BatchOutput | Out-File -FilePath $BatchOutPath -Encoding utf8
     Write-Host "Batch output saved to: $BatchOutPath"
 
     # Generate accuracy table using the Rust runner.
     Write-Host ""
     Write-Host "--- Generating accuracy table ---"
-    $AccuracyTablePath = Join-Path $RootDir "docs/FCEUX11-1.16_KagamiQA-P2-accuracy-table.md"
-    $RustRunnerPath = Join-Path $RustDir "target/release/kagami-qa-runner.exe"
+    $AccuracyTablePath = Join-Path $RootDir "docs/FCEUX11-1.16_F11QA-P2-accuracy-table.md"
+    $RustRunnerPath = Join-Path $RustDir "target/release/f11qa-runner.exe"
     if (Test-Path $RustRunnerPath) {
         # Note: the --accuracy-table flag generates from parsed BLARGG_RESULT lines.
         # For now, we use the Python helper to parse batch JSON → markdown.
-        Write-Host "See kagamiqa_blargg_batch_output.json for raw results."
-        Write-Host "Run: kagami-qa-runner --manifest tests/tests.json --bin-dir $BuildDir/tests --accuracy-table $AccuracyTablePath"
+        Write-Host "See f11qa_blargg_batch_output.json for raw results."
+        Write-Host "Run: f11qa-runner --manifest tests/tests.json --bin-dir $BuildDir/tests --accuracy-table $AccuracyTablePath"
     }
 } else {
     Write-Host "NOTE: blargg_manifest.json not found. Run scripts/download_blargg_roms.ps1 first."

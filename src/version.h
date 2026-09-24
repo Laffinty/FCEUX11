@@ -56,7 +56,7 @@
 #define FCEU_COMPILER_DETAIL ""
 #endif
 
-// v1.17 — KagamiQA closure + release build
+// v1.17 — F11QA closure + release build
 inline constexpr int FCEU_VERSION_MAJOR = 1;
 inline constexpr int FCEU_VERSION_MINOR = 17;
 inline constexpr int FCEU_VERSION_PATCH = 0;

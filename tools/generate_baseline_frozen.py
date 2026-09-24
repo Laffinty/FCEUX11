@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Derive ``tests/fixtures/kagamiqa_baseline_frozen.json`` from a current
+"""Derive ``tests/fixtures/f11qa_baseline_frozen.json`` from a current
 migration matrix.
 
 Background (docs/history/plans/FCEUX11-1.17_计划.md §13.1):
@@ -14,8 +14,8 @@ producing the precise regression signal the grader is designed for.
 Usage::
 
     python tools/generate_baseline_frozen.py \
-        --matrix build/kagamiqa_migration_matrix.json \
-        --output tests/fixtures/kagamiqa_baseline_frozen.json
+        --matrix build/f11qa_migration_matrix.json \
+        --output tests/fixtures/f11qa_baseline_frozen.json
 """
 import argparse
 import json
@@ -29,13 +29,13 @@ def main() -> int:
         "--matrix",
         type=Path,
         required=True,
-        help="Source MigrationMatrix JSON (e.g. build/kagamiqa_migration_matrix.json)",
+        help="Source MigrationMatrix JSON (e.g. build/f11qa_migration_matrix.json)",
     )
     parser.add_argument(
         "--output",
         type=Path,
         required=True,
-        help="Destination PreviousRun JSON (matches kagami_qa::report::baseline::PreviousRun)",
+        help="Destination PreviousRun JSON (matches f11qa::report::baseline::PreviousRun)",
     )
     parser.add_argument(
         "--run-id-suffix",

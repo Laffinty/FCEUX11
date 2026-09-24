@@ -17,7 +17,7 @@
 | [cartridge.md](cartridge.md) | iNES/NES 2.0/UNIF、mapper 双注册制、MMC1/MMC3/UxROM 实现要点、MMC3 IRQ 与 A12 | 加 mapper、改加载器 |
 | [constants.md](constants.md) | **模数与经验常数总表**：时钟频率、帧时序、APU 序列、混音公式、行为性魔数、性能约束 | 写代码/review 前速查 |
 | [precision.md](precision.md) | 精度治理：已知失败面及根因、黄金回归体系、**禁忌清单**、纪律规则、调查数据索引 | 动任何时序代码**之前必读** |
-| [KagamiQA.md](KagamiQA.md) | KagamiQA 测试框架：双 Oracle、口径、CI 数字回填纪律、迁移指南 | 测试体系、CI 门禁 |
+| [F11QA.md](F11QA.md) | F11QA 测试框架：双 Oracle、口径、CI 数字回填纪律、迁移指南 | 测试体系、CI 门禁 |
 
 阅读顺序建议：新人先 [constants.md](constants.md) 建立量纲，再按任务读对应模块文档；
 任何时序/精度改动先过 [precision.md](precision.md) §3 禁忌清单。

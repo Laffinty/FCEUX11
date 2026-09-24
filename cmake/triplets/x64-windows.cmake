@@ -3,7 +3,7 @@
 # WHY THIS FILE EXISTS
 # --------------------
 # GitHub-hosted runners start with an empty vcpkg binary cache, so
-# `kagami-qa.yml` / `ci.yml` used to build all 33 manifest ports from source
+# `f11qa.yml` / `ci.yml` used to build all 33 manifest ports from source
 # on every run — including Qt 6.8.0 in BOTH debug and release. Run
 # 82956632293 (2026-07-31, commit 10f1e05) was killed by
 # `timeout-minutes: 45` while still inside the CMake configure step, at
@@ -45,7 +45,7 @@
 #     -DVCPKG_INSTALLED_DIR=<workspace>/vcpkg_installed \
 #     -DVCPKG_OVERLAY_TRIPLETS=<workspace>/cmake/triplets
 #
-# Both `.github/workflows/kagami-qa.yml` and `.github/workflows/ci.yml` pass
+# Both `.github/workflows/f11qa.yml` and `.github/workflows/ci.yml` pass
 # these. `scripts/do_build.ps1` does NOT, so local developer builds keep
 # using whatever `vcpkg_installed/x64-windows` they already have (debug half
 # included) and are unaffected by this file.

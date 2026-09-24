@@ -1,4 +1,4 @@
-# KagamiQA P5 — Analyze blargg full batch results.
+# F11QA P5 — Analyze blargg full batch results.
 #
 # Phase 3 Step 3.1: results JSON now contains a `reset_after` field per
 # ROM (from blargg_runner). This script uses the field to enrich the
@@ -19,7 +19,7 @@ $passCount = ($results | Where-Object { $_.status -eq 'PASS' }).Count
 $failCount = ($results | Where-Object { $_.status -eq 'FAIL' }).Count
 
 Write-Host "========================================"
-Write-Host "KagamiQA P5 — Blargg Full Batch Results"
+Write-Host "F11QA P5 — Blargg Full Batch Results"
 Write-Host "========================================"
 Write-Host "Total ROMs: $($results.Count)"
 Write-Host "PASS: $passCount"

@@ -329,20 +329,20 @@ FCEUX11 强制使用 **MSVC 2022+** 工具链，不支持 MinGW / clang / MSYS2�
 
 ---
 
-## 10. KagamiQA — 编译与运行
+## 10. F11QA — 编译与运行
 
-KagamiQA 是 FCEUX11 的双 Oracle 质量保障系统。详见 [`docs/tech/KagamiQA.md`](tech/KagamiQA.md)。
+F11QA 是 FCEUX11 的双 Oracle 质量保障系统。详见 [`docs/tech/F11QA.md`](tech/F11QA.md)。
 
-### 10.1 编译 KagamiQA 组件
+### 10.1 编译 F11QA 组件
 
-标准编译（`do_build.ps1`）会自动编译 KagamiQA 相关测试目标：
+标准编译（`do_build.ps1`）会自动编译 F11QA 相关测试目标：
 
 ```powershell
 # 完整构建（包含 blargg_runner、lua_runner 等）
 .\scripts\do_build.ps1 -Config Release
 ```
 
-单独（重新）编译 KagamiQA 组件：
+单独（重新）编译 F11QA 组件：
 
 ```powershell
 # blargg $6000 ROM runner (Oracle B 执行器)
@@ -352,22 +352,22 @@ cmake --build build --config Release --target fceux11_blargg_runner
 cmake --build build --config Release --target fceux11_lua_runner
 
 # In-process direct runner (C ABI 直驱，需 Rust)
-cmake --build build --config Release --target kagami_qa_direct_runner
+cmake --build build --config Release --target f11qa_direct_runner
 ```
 
-### 10.2 编译 Rust kagami-qa-runner
+### 10.2 编译 Rust f11qa-runner
 
 ```powershell
 cd src/rust
-cargo build --release -p kagami-qa
-# → target/x86_64-pc-windows-msvc/release/kagami-qa-runner.exe
+cargo build --release -p f11qa
+# → target/x86_64-pc-windows-msvc/release/f11qa-runner.exe
 ```
 
 > **注意产物路径带 target 三元组**：`src/rust/.cargo/config.toml` 设了
 > `build.target = "x86_64-pc-windows-msvc"`，所以 cargo 输出到
 > `target/x86_64-pc-windows-msvc/release/`，**不是** `target/release/`。
 > 本文档此前写的是后者（v1.16 R4-1 已更正）。若你的 `target/release/` 下
-> 也有一个 `kagami-qa-runner.exe`，那是历史遗留的**陈旧副本** —— 按旧路径跑
+> 也有一个 `f11qa-runner.exe`，那是历史遗留的**陈旧副本** —— 按旧路径跑
 > 会用到过期二进制，产出的矩阵无法反映当前代码。以 `git ls-files` 无法察觉，
 > 请以修改时间/大小核对，或直接 `cargo clean`。
 
@@ -397,18 +397,18 @@ cd tests
 ### 10.6 生成迁移矩阵
 
 ```powershell
-cargo run --release -p kagami-qa -- `
+cargo run --release -p f11qa -- `
   --manifest tests/tests.json `
   --bin-dir build/tests `
-  --output build/kagamiqa_migration_matrix.json `
-  --accuracy-table build/kagamiqa_accuracy_table.md `
+  --output build/f11qa_migration_matrix.json `
+  --accuracy-table build/f11qa_accuracy_table.md `
   --known-fail tests/fixtures/blargg_known_fail.json `
-  --save-baseline build/kagamiqa_baseline_next.json
+  --save-baseline build/f11qa_baseline_next.json
 ```
 
 ### 10.7 CI 自动运行
 
-KagamiQA 在 CI 上自动运行（`.github/workflows/kagami-qa.yml`）：
+F11QA 在 CI 上自动运行（`.github/workflows/f11qa.yml`）：
 - 每次 push 到 `main` / `wip_1.16` 触发
 - Oracle A + Oracle B 全量运行
 - 迁移矩阵 + 精度对照表作为 artifact 上传
@@ -423,7 +423,7 @@ KagamiQA 在 CI 上自动运行（`.github/workflows/kagami-qa.yml`）：
 
 GitHub runner 每次都是干净机器。整改前两个 workflow 的缓存路径写错（缓存了空目录、且
 `${{ env.LOCALAPPDATA }}` 在 workflow 级上下文展开为空串），导致缓存从未生效、**每一轮 CI 都在从源码
-冷编 Qt 6.8.0**——`kagami-qa.yml` 因此在配置阶段撞 45 分钟超时被取消（run `82956632293`）。
+冷编 Qt 6.8.0**——`f11qa.yml` 因此在配置阶段撞 45 分钟超时被取消（run `82956632293`）。
 
 现在的机制：
 

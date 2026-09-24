@@ -183,7 +183,7 @@ set(SRC_CORE
   	${CMAKE_CURRENT_SOURCE_DIR}/ines_gi.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/ines_save.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/input.cpp
- 	${CMAKE_CURRENT_SOURCE_DIR}/kagami_bridge.cpp
+ 	${CMAKE_CURRENT_SOURCE_DIR}/f11qa_bridge.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/movie.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/movie_fm2.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/movie_playback.cpp
@@ -649,7 +649,7 @@ target_include_directories(fceux11_drivers_qt PUBLIC
     ${CMAKE_SOURCE_DIR}/src/drivers
 )
 
-# KagamiQA P1 — Null driver (headless, no Qt / SDL / OpenGL).
+# F11QA P1 — Null driver (headless, no Qt / SDL / OpenGL).
 set(SRC_DRIVERS_NULL
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/null/null_driver.cpp
 )

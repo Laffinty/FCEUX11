@@ -1,5 +1,5 @@
 ﻿{
-    "_comment": "KagamiQA P5 鈥?Full blargg test ROM catalog (expanded from P2 22 ROMs). Each ROM uses `$6000-`$6003 protocol.",
+    "_comment": "F11QA P5 鈥?Full blargg test ROM catalog (expanded from P2 22 ROMs). Each ROM uses `$6000-`$6003 protocol.",
     "_source": "https://github.com/christopherpow/nes-test-roms",
     "_protocol": "`$6000 = 0x00 PASS, 0x01+ FAIL with diagnostic code",
     "_downloader": "scripts/download_blargg_roms.ps1",

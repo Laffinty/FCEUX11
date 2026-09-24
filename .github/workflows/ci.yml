@@ -45,7 +45,7 @@ jobs:
 
       # v1.16 R4-0 (2026-07-31) — this cache never produced a usable entry, so
       # every run rebuilt all 33 manifest ports (Qt 6.8.0 debug + release) from
-      # source. Two independent defects, both observed in KagamiQA run
+      # source. Two independent defects, both observed in F11QA run
       # 82956632293 whose log shows `Cache not found for input keys: vcpkg-...`:
       #   * `path: vcpkg_installed` pointed at the repo root while manifest mode
       #     installs under the CMake binary dir (`build/vcpkg_installed/...`),
@@ -70,15 +70,15 @@ jobs:
           restore-keys: |
             vcpkg-
 
-      # R4-1 (2026-08-07): KagamiQA Oracle B / direct runner depend on
+      # R4-1 (2026-08-07): F11QA Oracle B / direct runner depend on
       # tests/fixtures/blargg/**/*.nes. These ROMs are NOT in git (the
       # .gitignore `*.nes` exception only covers top-level fixtures, not
       # subdirectories) — they are fetched from the christopherpow/nes-test-roms
       # mirror by scripts/download_blargg_roms.ps1. Without these steps, the
-      # `kagami_qa_direct_smoke` ctest gate reports LOAD_ERROR for every
-      # blargg_* entry (rc=-2 on `kagami_bridge_load_rom(...)`), dragging CI
+      # `f11qa_direct_smoke` ctest gate reports LOAD_ERROR for every
+      # blargg_* entry (rc=-2 on `f11qa_bridge_load_rom(...)`), dragging CI
       # from 33/33 to 32/33 (run #84395196054). Mirrors the steps already
-      # present in .github/workflows/kagami-qa.yml:174-205.
+      # present in .github/workflows/f11qa.yml:174-205.
       - name: Cache blargg ROMs
         id: cache-blargg
         uses: actions/cache@v4
@@ -351,7 +351,7 @@ jobs:
           # v1.17 Task1-C2: Rust rom_regression runner replaces the C++
           # fceux11_rom_regression_test.exe (parity verified; Rust also
           # fixes the C++ first-entry parser miss — nrom is now checked).
-          $regTest = "../build/tests/kagami_qa_rom_regression_runner.exe"
+          $regTest = "../build/tests/f11qa_rom_regression_runner.exe"
           if (-not (Test-Path "fixtures/golden_hashes.json")) {
             & $regTest --generate
           }

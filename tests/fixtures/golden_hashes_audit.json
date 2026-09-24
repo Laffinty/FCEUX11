@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "analysis_date": "2026-07-27",
-  "audit_by": "KagamiQA P1",
+  "audit_by": "F11QA P1",
   "source_file": "tests/fixtures/golden_hashes.json",
   "known_baseline": {
     "value": 2072644093,

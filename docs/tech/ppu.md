@@ -190,4 +190,4 @@ PAL/Dendy 在 pre-render 与 render 行上每周期只跑 1 次 CPU tick 相关�
 - 模数总表：[constants.md](constants.md)
 - MMC3 IRQ 与 mapper 交互：[cartridge.md](cartridge.md) §B
 - 调查数据链：`docs/history/surveys/e1_vbl/`（VBL/NMI 探针）、`docs/history/surveys/r5r6_v1.17/`
-- KagamiQA 测试框架：[KagamiQA.md](KagamiQA.md)
+- F11QA 测试框架：[F11QA.md](F11QA.md)

@@ -94,7 +94,7 @@
 ### 2.5 Savestate 兼容（**禁忌**）
 
 chunk 名/大小/序 `FHCN`/`PSG`/`LEN0..3`/`5ACC` 等不可改（`sound.cpp:1303-1307, 1633-1688`），
-改了会碎 golden savestate 测试（`tests/kagami/golden_savestate_test.cpp`）；改运行期
+改了会碎 golden savestate 测试（`tests/f11qa/golden_savestate_test.cpp`）；改运行期
 起始值同样危险（`DMC_7bit` 兼容 hack，:337-353）。详见 precision.md §3。
 
 ---
@@ -120,4 +120,4 @@ chunk 名/大小/序 `FHCN`/`PSG`/`LEN0..3`/`5ACC` 等不可改（`sound.cpp:130
 - 帧计数器与 R6 调查：[precision.md](precision.md)、`docs/history/surveys/e6_apu/`
 - 模数总表：[constants.md](constants.md)
 - 扩展音频 mapper（VRC6/VRC7/N163）：[cartridge.md](cartridge.md)
-- 测试治理：[KagamiQA.md](KagamiQA.md)
+- 测试治理：[F11QA.md](F11QA.md)

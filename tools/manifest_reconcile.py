@@ -21,7 +21,7 @@ DOCUMENTED_EXCEPTIONS = {
     "menu_slot_check": "python script, not a manifest-tracked test",
     "blargg_smoke": "CTest smoke for blargg_runner binary; manifest tracks blargg_* ROM entries instead",
     "lua_bit_test_headless": "CTest name for lua runner; manifest entry is lua_bit_test",
-    "kagami_qa_direct_smoke": "CTest smoke for direct runner; manifest tracks the 47 matrix entries",
+    "f11qa_direct_smoke": "CTest smoke for direct runner; manifest tracks the 47 matrix entries",
     "headless_smoke_test": "CTest-only gate (engine boot / grade E); manifest tracks the 47 matrix entries",
     # CTest-name → manifest-name mapping differences
     "mapper_core_test": "manifest id is mapper_test",

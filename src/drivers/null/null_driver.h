@@ -1,4 +1,4 @@
-// KagamiQA P1 — Null Driver (headless test harness foundation).
+// F11QA P1 — Null Driver (headless test harness foundation).
 //
 // Provides globals that the core engine expects (dendy, pal_emulation)
 // without linking Qt or SDL. Registers all-nullptr DriverCallbacks so

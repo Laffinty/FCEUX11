@@ -1,13 +1,13 @@
-# FCEUX11 v1.8 构建计划 — KagamiQA → F11QA 重组、扁平清单与第三方 ROM 套件扩展（接入 f11qa-rom-mirror）
+# FCEUX11 v1.8 构建计划 — F11QA → F11QA 重组、扁平清单与第三方 ROM 套件扩展（接入 f11qa-rom-mirror）
 
 > **STATUS: PROPOSED**（v1.8 设计阶段；草案 v0.2，由 F11QA 工作组 2026-09-24 修订；决策 1-10 已回签，**用户已选 A / 8b / 3A / 10a**——见 §十一 决策点回签栏）
 > **版本**：v1.8（草案 v0.2）
 > **日期**：2026-09-24
 > **分支**：`wip1.8`（用户已建）
-> **前置**：v1.17 已合并至 main（`docs/history/plans/FCEUX11-1.17_计划.md` STATUS: COMPLETED）；冻结基线 `tests/fixtures/kagamiqa_baseline_frozen.json` 已落地
-> **关联**：`docs/tech/KagamiQA.md`（将改名 `F11QA.md`）、`docs/history/plans/FCEUX11-1.16_KagamiQA-PLAN.md`、`docs/history/plans/FCEUX11-1.16_KagamiQA-P5-权威性构建计划.md`、`docs/history/plans/FCEUX11-Stage3-权威性迭代与通用化路线.md`、`docs/history/checklists/v2.0_removal_checklist.md`
+> **前置**：v1.17 已合并至 main（`docs/history/plans/FCEUX11-1.17_计划.md` STATUS: COMPLETED）；冻结基线 `tests/fixtures/f11qa_baseline_frozen.json` 已落地
+> **关联**：`docs/tech/F11QA.md`（将改名 `F11QA.md`）、`docs/history/plans/FCEUX11-1.16_KagamiQA-PLAN.md`、`docs/history/plans/FCEUX11-1.16_KagamiQA-P5-权威性构建计划.md`、`docs/history/plans/FCEUX11-Stage3-权威性迭代与通用化路线.md`、`docs/history/checklists/v2.0_removal_checklist.md`
 > **ROM 镜像源**：`https://github.com/Laffinty/f11qa-rom-mirror`（OWNER `@Laffinty`；接受 PD/CC0/zlib/GPL-2/GPL-3/MIT/BSD/Apache；ROM bytes 不接受 PR，OWNER 单人 vendor；详见 §四 §4.6 接入协议 + 镜像源内 `LICENSES.md` / `SHA256SUMS.txt` / `docs/ROM_SOURCE_MAP.md`）
-> **路线图位置**：v1.15 完成 v1.x C++ 现代化；v1.16 完成 KagamiQA 双 Oracle 闭环；v1.17 完成 KagamiQA 统合 + 遗留精度收敛；**v1.8 = KagamiQA 改名 F11QA + 扁平清单改造 + 第三方 ROM 套件扩展（覆盖率从 180 → ~290 ROM）+ 接入 `Laffinty/f11qa-rom-mirror` 镜像源（单一权威源 / git tag pin）+ 许可证合规链**
+> **路线图位置**：v1.15 完成 v1.x C++ 现代化；v1.16 完成 F11QA 双 Oracle 闭环；v1.17 完成 F11QA 统合 + 遗留精度收敛；**v1.8 = F11QA 改名 F11QA + 扁平清单改造 + 第三方 ROM 套件扩展（覆盖率从 180 → ~290 ROM）+ 接入 `Laffinty/f11qa-rom-mirror` 镜像源（单一权威源 / git tag pin）+ 许可证合规链**
 
 ---
 
@@ -17,7 +17,7 @@ v1.8 的三项主任务与性质：
 
 | # | 任务 | 性质 | 目标 |
 |---|---|---|---|
-| 1 | KagamiQA → **F11QA** 重命名 | 命名统一 | 测试体系名称与项目代号（FCEUX11 → F11）一致；去 "Kagami" 残留字样；CI workflow / docs / commit history 批量改名 |
+| 1 | F11QA → **F11QA** 重命名 | 命名统一 | 测试体系名称与项目代号（FCEUX11 → F11）一致；去 "Kagami" 残留字样；CI workflow / docs / commit history 批量改名 |
 | 2 | **扁平清单重组**（Oracle A/B 二分 → 1..N + kind 标签） | 架构调整 | 弃用 `oracle_type` 字段，引入 10 种 `kind` 标签；保留全部 47 个 v1.17 用例并重新编号为 `kgmqa-001 ~ kgmqa-120` |
 | 3 | **第三方 ROM 套件扩展**（从 blargg 180 → 多作者 18-22 套件 / ~290 ROM）+ **接入 `Laffinty/f11qa-rom-mirror` 镜像源** | 覆盖率提升 + 供应链简化 | 通过镜像源（git tag pin `mirror_ref`）单一权威源统一管理 18-22 套件；license manifest 校验直接对照镜像源的 `LICENSES.md` + `SHA256SUMS.txt` snapshot；22 个独立 downloader → 1 个 `fetch_roms_from_mirror.ps1` |
 
@@ -34,52 +34,52 @@ v1.8 的三项主任务与性质：
 | Downloader 数 | 1 个 | **1 个** `scripts/fetch_roms_from_mirror.ps1` |
 | 许可证明示 | 隐式 | **每条用例显式** + mirror `LICENSES.md` snapshot 校验（kgmqa-117） |
 | 类型分组 | Oracle A/B 二分 | **10 种 kind 标签**（flat tag，不是层级） |
-| 命名 | KagamiQA | **F11QA**（Kagami 残留清零） |
+| 命名 | F11QA | **F11QA**（Kagami 残留清零） |
 | R4 gate 阈值 | `total ≥ 39`，`grade ∈ {A,B,C}` | `total == 120`，**`mirror_snapshot_check` PASS** 为前置 |
 | 总工期 | — | **12 周**（节省 2 周；Phase 3 downloader batch 2 周 → 0.5 周） |
 
 ---
 
-## 一、命名变更：KagamiQA → F11QA
+## 一、命名变更：F11QA → F11QA
 
 ### 1.1 变更原因
 
-"Kagami" 一词来源于项目早期 `docs/history/plans/FCEUX11-1.16_KagamiQA-PLAN.md` 的 "鏡"（kagami，日语"镜子"）隐喻——意指 QA 体系是模拟器的"镜子"。但项目主体已演进为 **FCEUX11 v1.x**，继续保留日语音译名字带来三个问题：
+"Kagami" 一词来源于项目早期 `docs/history/plans/FCEUX11-1.16_KagamiQA-PLAN.md` 的 "鏡"（f11qa，日语"镜子"）隐喻——意指 QA 体系是模拟器的"镜子"。但项目主体已演进为 **FCEUX11 v1.x**，继续保留日语音译名字带来三个问题：
 
 1. **品牌一致性**：项目代号 FCEUX11 / F11，QA 子系统叫 F11QA 才符合 "测试体系是项目不可分割部分" 的工程哲学。
-2. **检索可发现性**：GitHub、CI artifact、commit 历史中 `KagamiQA` 字符串散落，新人维护成本高。
-3. **许可证文档一致性**：v1.17 的 `kagamiqa_baseline_frozen.json`、`kagamiqa_migration_matrix.json`、`kagami-qa` Rust crate 等命名都需要统一收口。
+2. **检索可发现性**：GitHub、CI artifact、commit 历史中 `F11QA` 字符串散落，新人维护成本高。
+3. **许可证文档一致性**：v1.17 的 `f11qa_baseline_frozen.json`、`f11qa_migration_matrix.json`、`f11qa` Rust crate 等命名都需要统一收口。
 
 ### 1.2 改名范围（白名单，不波及历史）
 
 | 类别 | 改动 | 说明 |
 |---|---|---|
-| **当前 docs** | `docs/tech/KagamiQA.md` → `docs/tech/F11QA.md`，内部文本 `KagamiQA` → `F11QA` | active 文档全面改名 |
-| **CI workflow** | `.github/workflows/kagami-qa.yml` → `.github/workflows/f11qa.yml` | workflow 文件名 + workflow `name:` 字段 + job 名 + artifact 命名 |
-| **GitHub Actions** | `name: KagamiQA` → `name: F11QA`；artifacts `kagamiqa-results` → `f11qa-results` | 触发 PR 评论的标签 |
-| **tests.json 字段** | `suite_id: "kagamiqa-v1.17"` → `suite_id: "f11qa-v1.8"` | manifest 顶层版本号 |
-| **冻结基线** | `tests/fixtures/kagamiqa_baseline_frozen.json` → `tests/fixtures/f11qa_baseline_frozen.json` | 字段名同步 |
-| **Rust crate** | `src/rust/crates/kagami-qa/` → `src/rust/crates/f11qa/`；`kagami-qa-runner.exe` → `f11qa-runner.exe` | crate 改名 + 二进制改名 |
-| **C ABI 桥** | `src/kagami_bridge.{h,cpp}` → `src/f11qa_bridge.{h,cpp}` | 头/源同步 |
-| **kagami_qa_*** 二进制 | `kagami_qa_blargg_runner` / `kagami_qa_lua_runner` / `kagami_qa_rom_regression_runner` 等 → `f11qa_blargg_runner` / `f11qa_lua_runner` / `f11qa_rom_regression_runner` | runner 改名 |
-| **kagami_direct_main.cpp** | `tests/kagami_direct_main.cpp` → `tests/f11qa_direct_main.cpp` | 直接模式入口改名 |
-| **tests/kagami/** 目录 | → `tests/f11qa/`（C++ 测试源码落点） | 物理目录改名 |
-| **kagami_*** 子目录 | 同步 | — |
-| **CI 注释 / commit message** | 历史 commit 中的 `KagamiQA` **不改写**（保护 git 历史） | 但新 commit 一律 `F11QA` |
+| **当前 docs** | `docs/tech/F11QA.md` → `docs/tech/F11QA.md`，内部文本 `F11QA` → `F11QA` | active 文档全面改名 |
+| **CI workflow** | `.github/workflows/f11qa.yml` → `.github/workflows/f11qa.yml` | workflow 文件名 + workflow `name:` 字段 + job 名 + artifact 命名 |
+| **GitHub Actions** | `name: F11QA` → `name: F11QA`；artifacts `f11qa-results` → `f11qa-results` | 触发 PR 评论的标签 |
+| **tests.json 字段** | `suite_id: "f11qa-v1.17"` → `suite_id: "f11qa-v1.8"` | manifest 顶层版本号 |
+| **冻结基线** | `tests/fixtures/f11qa_baseline_frozen.json` → `tests/fixtures/f11qa_baseline_frozen.json` | 字段名同步 |
+| **Rust crate** | `src/rust/crates/f11qa/` → `src/rust/crates/f11qa/`；`f11qa-runner.exe` → `f11qa-runner.exe` | crate 改名 + 二进制改名 |
+| **C ABI 桥** | `src/f11qa_bridge.{h,cpp}` → `src/f11qa_bridge.{h,cpp}` | 头/源同步 |
+| **f11qa_*** 二进制 | `f11qa_blargg_runner` / `f11qa_lua_runner` / `f11qa_rom_regression_runner` 等 → `f11qa_blargg_runner` / `f11qa_lua_runner` / `f11qa_rom_regression_runner` | runner 改名 |
+| **f11qa_direct_main.cpp** | `tests/f11qa_direct_main.cpp` → `tests/f11qa_direct_main.cpp` | 直接模式入口改名 |
+| **tests/f11qa/** 目录 | → `tests/f11qa/`（C++ 测试源码落点） | 物理目录改名 |
+| **f11qa_*** 子目录 | 同步 | — |
+| **CI 注释 / commit message** | 历史 commit 中的 `F11QA` **不改写**（保护 git 历史） | 但新 commit 一律 `F11QA` |
 | **v1.8 新增：mirror snapshot** | — | `tests/fixtures/f11qa_mirror_pin.json`（pinned git tag + commit SHA） |
 
 ### 1.3 不改名的项
 
-- **`docs/history/`** 下所有归档：保留 KagamiQA 历史命名，是 v1.16/v1.17 的**历史事实**，重写会破坏 commit 链接与考古价值
+- **`docs/history/`** 下所有归档：保留 F11QA 历史命名，是 v1.16/v1.17 的**历史事实**，重写会破坏 commit 链接与考古价值
 - **commit message 历史**：用 `git log --follow` 仍可追溯；CI 不需要历史重写
-- **git tag `v1.16-KagamiQA-*` / `v1.17-KagamiQA-*`**：保留
+- **git tag `v1.16-F11QA-*` / `v1.17-F11QA-*`**：保留
 
 ### 1.4 重命名工具
 
 ```bash
 # 仅在 wip1.8 分支执行；保护历史 docs/history/ 与 git history
 # 1. 二进制名 + 文件名（git mv 保护历史）
-find tests scripts src .github -type f \( -name "*kagami*" -o -name "*Kagami*" \) -print0 \
+find tests scripts src .github -type f \( -name "*f11qa*" -o -name "*Kagami*" \) -print0 \
   | while IFS= read -r -d '' f; do
       new="$(echo "$f" | sed -E 's/[kK]agamiQA/F11QA/g; s/[kK]agami_qa/f11qa/g; s/[kK]agami-qa/f11qa/g; s/[kK]agamiqa/f11qa/g')"
       git mv "$f" "$new"
@@ -87,9 +87,9 @@ find tests scripts src .github -type f \( -name "*kagami*" -o -name "*Kagami*" \
 
 # 2. 文本替换（仅 active 文件）
 grep -rl --include='*.{h,cpp,rs,toml,yml,yaml,md,json,jsonc,ps1,sh,py}' \
-     -E 'KagamiQA|kagamiqa|kagami_qa|kagami-qa' \
+     -E 'F11QA|f11qa|f11qa|f11qa' \
      .github tests scripts src docs/tech docs/plans | \
-  xargs sed -i -E 's/KagamiQA/F11QA/g; s/kagamiqa/f11qa/g; s/kagami_qa/f11qa/g; s/kagami-qa/f11qa/g'
+  xargs sed -i -E 's/F11QA/F11QA/g; s/f11qa/f11qa/g; s/f11qa/f11qa/g; s/f11qa/f11qa/g'
 
 # 3. 排除历史与 .git
 echo "docs/history/" >> .sed_exclude
@@ -112,9 +112,9 @@ echo ".git/" >> .sed_exclude
 |---|---|---|---|
 | `unit-cpp` | C++ 单元测试（链接引擎），CTEST 框架 | 全部 Oracle A "unit" tag | 19 |
 | `unit-hdr` | Header-only C++（不链引擎） | enum_class_bitflags_test | 1 |
-| `unit-rust` | Rust 单元 / 集成测试（kagami-qa → f11qa crate 内部 #[test]） | 0（v1.17 缺失） | 3（新增） |
+| `unit-rust` | Rust 单元 / 集成测试（f11qa → f11qa crate 内部 #[test]） | 0（v1.17 缺失） | 3（新增） |
 | `harness-cpp` | C++ harness（字节级差分，CRC32/MD5） | rom/savestate/frame/wav/mapper diff 测试 | 6 |
-| `harness-rust` | Rust harness（$6000 协议 / 调用 C ABI 桥 / kagami_qa_blargg_runner 之类） | blargg/lua runner 各项 | 17 |
+| `harness-rust` | Rust harness（$6000 协议 / 调用 C ABI 桥 / f11qa_blargg_runner 之类） | blargg/lua runner 各项 | 17 |
 | `rom-suite` | 第三方 ROM 套件（依赖 mirror snapshot，详见 §四） | blargg_suite + blargg_*_subitem（拆细为 ~67 项） | 65 |
 | `static-analysis` | 源码扫描（i18n / Qt SLOT） | i18n_regression / menu_slot_check | 2 |
 | `static-license` | **新增**：mirror snapshot 校验（kgmqa-117） | 无（v1.17 缺失） | 1（新增） |
@@ -181,7 +181,7 @@ echo ".git/" >> .sed_exclude
 
 | 字段 | v1.17 | v1.8 | 迁移规则 |
 |---|---|---|---|
-| `suite_id` | `"kagamiqa-v1.17"` | `"f11qa-v1.8"` | 必改 |
+| `suite_id` | `"f11qa-v1.17"` | `"f11qa-v1.8"` | 必改 |
 | `id` | `"smoke_test"` | `kgmqa_id: "kgmqa-001-smoke-cpp"` | 重命名 + 编号 |
 | — | — | `legacy_id: "smoke_test"` | 新增（保留 v1.17 id） |
 | `oracle_type` | `"A"` / `"B"` | 删除 | 由 `kind` 表达 |
@@ -677,17 +677,17 @@ foreach ($c in $cases) {
 
 | v1.17 | v1.8 |
 |---|---|
-| `.github/workflows/kagami-qa.yml` | `.github/workflows/f11qa.yml` |
+| `.github/workflows/f11qa.yml` | `.github/workflows/f11qa.yml` |
 
 ### 5.2 workflow 名称与 artifact
 
 ```yaml
-name: F11QA  # 旧: KagamiQA
+name: F11QA  # 旧: F11QA
 
 # 上传 artifact
 - uses: actions/upload-artifact@v4
   with:
-    name: f11qa-results      # 旧: kagamiqa-results
+    name: f11qa-results      # 旧: f11qa-results
     path: |
       build/f11qa_migration_matrix.json
       build/f11qa_accuracy_table.md
@@ -851,7 +851,7 @@ on:
 | Cache | Key | 失效条件 |
 |---|---|---|
 | vcpkg | `vcpkg-${{ hashFiles('vcpkg.json') }}` | vcpkg.json 变化 |
-| Rust | `rust-kagami-${{ hashFiles('src/rust/Cargo.lock') }}` | Cargo.lock 变化 |
+| Rust | `rust-f11qa-${{ hashFiles('src/rust/Cargo.lock') }}` | Cargo.lock 变化 |
 | **v1.8 新增** Mirror snapshot | `f11qa-mirror-${{ hashFiles('tests/fixtures/f11qa_mirror_pin.json') }}` | mirror_ref 变化（即 `f11qa_mirror_pin.json` 的 mirror_ref 字段升级） |
 | **v1.8 移除** Blargg 单 suite cache | ~~`blargg-roms-...`~~ | — |
 
@@ -940,7 +940,7 @@ on:
 
 | 维度 | v1.17 | v1.8 |
 |---|---|---|
-| 文件 | `tests/fixtures/kagamiqa_baseline_frozen.json` | `tests/fixtures/f11qa_baseline_frozen.json` |
+| 文件 | `tests/fixtures/f11qa_baseline_frozen.json` | `tests/fixtures/f11qa_baseline_frozen.json` |
 | 条目数 | 47 | **120** |
 | 字段 | `{ results: { "kgmqa_id": bool } }` | 同 v1.17 + `kgmqa_id` 替代 `id` |
 | vendor_state 维度（v1.8 新增） | — | baseline 中每条 rom-suite 用例记录 `vendor_state`；CI 比对 vendor_state 变化作为 advisory 通道 |
@@ -953,15 +953,15 @@ on:
 
 | 旧路径 | 新路径 | 类型 |
 |---|---|---|
-| `tests/kagami/` | `tests/f11qa/` | 目录 |
-| `tests/kagami_direct_main.cpp` | `tests/f11qa_direct_main.cpp` | C++ 源 |
-| `src/kagami_bridge.h` | `src/f11qa_bridge.h` | C 头 |
-| `src/kagami_bridge.cpp` | `src/f11qa_bridge.cpp` | C++ 实现 |
-| `src/rust/crates/kagami-qa/` | `src/rust/crates/f11qa/` | Rust crate 目录 |
-| `.github/workflows/kagami-qa.yml` | `.github/workflows/f11qa.yml` | workflow |
-| `docs/tech/KagamiQA.md` | `docs/tech/F11QA.md` | active doc |
-| `tests/fixtures/kagamiqa_baseline_frozen.json` | `tests/fixtures/f11qa_baseline_frozen.json` | manifest |
-| `tests/fixtures/kagamiqa_full_baseline.json` | `tests/fixtures/f11qa_full_baseline.json` | manifest（如存在）|
+| `tests/f11qa/` | `tests/f11qa/` | 目录 |
+| `tests/f11qa_direct_main.cpp` | `tests/f11qa_direct_main.cpp` | C++ 源 |
+| `src/f11qa_bridge.h` | `src/f11qa_bridge.h` | C 头 |
+| `src/f11qa_bridge.cpp` | `src/f11qa_bridge.cpp` | C++ 实现 |
+| `src/rust/crates/f11qa/` | `src/rust/crates/f11qa/` | Rust crate 目录 |
+| `.github/workflows/f11qa.yml` | `.github/workflows/f11qa.yml` | workflow |
+| `docs/tech/F11QA.md` | `docs/tech/F11QA.md` | active doc |
+| `tests/fixtures/f11qa_baseline_frozen.json` | `tests/fixtures/f11qa_baseline_frozen.json` | manifest |
+| `tests/fixtures/f11qa_full_baseline.json` | `tests/fixtures/f11qa_full_baseline.json` | manifest（如存在）|
 | `scripts/download_blargg_roms.ps1` | **删除**（合并到 `fetch_roms_from_mirror.ps1`） | downloader |
 | 全部 `scripts/download_kagami_*.ps1`（如有）| **删除**（合并到 `fetch_roms_from_mirror.ps1`） | downloader |
 | **v1.8 新增** | `tests/fixtures/f11qa_mirror_pin.json` | mirror pin |
@@ -975,10 +975,10 @@ on:
 
 | 旧字符串 | 新字符串 | 影响范围 |
 |---|---|---|
-| `KagamiQA` | `F11QA` | active docs / workflow / source comments / commit messages（新） |
-| `kagamiqa` | `f11qa` | manifest / file paths / config keys |
-| `kagami-qa` | `f11qa` | Rust crate name / binary name |
-| `kagami_qa` | `f11qa` | C function prefix / binary prefix / gitignore 模式 |
+| `F11QA` | `F11QA` | active docs / workflow / source comments / commit messages（新） |
+| `f11qa` | `f11qa` | manifest / file paths / config keys |
+| `f11qa` | `f11qa` | Rust crate name / binary name |
+| `f11qa` | `f11qa` | C function prefix / binary prefix / gitignore 模式 |
 
 ### 8.3 新增（增量工作）
 
@@ -996,7 +996,7 @@ on:
 
 ### 8.4 不改的项
 
-- **历史 docs (`docs/history/`)**：完整保留 KagamiQA 命名
+- **历史 docs (`docs/history/`)**：完整保留 F11QA 命名
 - **git tag / branch 历史**：保留
 - **历史 commit messages**：保护 git history
 
@@ -1042,8 +1042,8 @@ on:
 |---|---|---|
 | `id: "blargg_cpu_instrs"` | `kgmqa_id: "kgmqa-032-cpu-instrs-blargg"` | 旧 id 移入 `legacy_id` 字段，可双向查询 |
 | `oracle_type: "A"` / `"B"` | 字段删除，由 `kind[]` 表达 | **破坏性**：旧脚本读 oracle_type 会失败——文档化迁移 |
-| `suite_id: "kagamiqa-v1.17"` | `suite_id: "f11qa-v1.8"` | 破坏性 |
-| `kagamiqa_baseline_frozen.json` | `f11qa_baseline_frozen.json` | 路径破坏性 |
+| `suite_id: "f11qa-v1.17"` | `suite_id: "f11qa-v1.8"` | 破坏性 |
+| `f11qa_baseline_frozen.json` | `f11qa_baseline_frozen.json` | 路径破坏性 |
 | 47 项 cases | 120 项 cases | **强制**：旧 baseline 已包含 47 → 新 baseline 扩充到 120 |
 | 单脚本 `download_blargg_roms.ps1` 拉取 | `scripts/fetch_roms_from_mirror.ps1` + mirror_ref pin | **破坏性**：旧 downloader 文件删除 |
 | 隐式 license | 显式 `license` + `mirror_ref` + `mirror_path` + `vendor_state` | 破坏性：tests.json 字段全量重写 |
@@ -1051,7 +1051,7 @@ on:
 ### 10.3 验收标准（v1.8 收口必须满足）
 
 - [ ] `tests/tests.json` schema_version == "1.8"，suite_id == "f11qa-v1.8"，cases 数量 == 120
-- [ ] 所有 active docs（`docs/tech/`、`docs/plans/`）中 KagamiQA → F11QA 改名完成
+- [ ] 所有 active docs（`docs/tech/`、`docs/plans/`）中 F11QA → F11QA 改名完成
 - [ ] CI workflow 改名 + wip1.8 触发分支 + mirror_snapshot_check 前置 + 单一 fetch 脚本
 - [ ] `scripts/fetch_roms_from_mirror.ps1` 可从镜像源 mirror_ref tag 拉取全部 ✅ vendored ROM
 - [ ] `tests/fixtures/f11qa_mirror_pin.json` mirror_ref 字段非空且为有效 git tag
@@ -1060,7 +1060,7 @@ on:
 - [ ] R4 gate v1.8 在 3 次连续 CI 上 PASS（grade B 或 A）
 - [ ] `docs/plans/FCEUX11-v1.8_F11QA-构建计划.md` → `docs/history/plans/` 归档
 - [ ] `docs/tech/F11QA.md` active 文本反映 v1.8 状态
-- [ ] v1.17 的 `kagamiqa_baseline_frozen.json` 仍保留为对照参考（**不删除**）
+- [ ] v1.17 的 `f11qa_baseline_frozen.json` 仍保留为对照参考（**不删除**）
 
 ---
 
@@ -1068,7 +1068,7 @@ on:
 
 本计划 v0.2 待用户确认以下 10 个决策点。**决策 1-10 全部回签后进入施工期（Phase 1 启动）**。
 
-- [x] **决策 1**：是否接受 `KagamiQA → F11QA` 重命名（含 git mv + active docs + workflow 改名，历史归档与 commit 保持原状）？ — **✅ 用户回签（v0.1）**
+- [x] **决策 1**：是否接受 `F11QA → F11QA` 重命名（含 git mv + active docs + workflow 改名，历史归档与 commit 保持原状）？ — **✅ 用户回签（v0.1）**
 - [x] **决策 2**：是否接受扁平清单 + 10 种 `kind` multi-tag 模型（替代 Oracle A/B 二分）？ — **✅ 用户回签（v0.1）**
 - [x] **决策 3**：是否纳入 §三 F 节列出的 65 项第三方 ROM 用例（kgmqa-048 ~ kgmqa-112）？ — **✅ 用户回签（v0.1）**
 - [x] **决策 4**（v0.1 原方案）：是否接受"每套件独立 downloader + license manifest + SHA-256 校验"模式？ — **⚠️ v0.2 修订**：被决策 7 完全替换，不再适用
@@ -1111,7 +1111,7 @@ on:
 | 6 | [AprNes Testing Methodology](https://www.baxermux.org/myemu/AprNes/report/methodology.html) | 测试方法论 |
 | 7 | [Nesium Test ROM Suite](https://deepwiki.com/mikai233/nesium/6.3-test-rom-suite) | 40+ 套件分类 |
 | 8 | [Pinky Test Statuses](https://pioptiop.uk/starrhorne/nes-rust) | Pinky 模拟器测试套件 |
-| 9 | `docs/tech/KagamiQA.md`（v1.17）→ `docs/tech/F11QA.md`（v1.8） | 体系总览 |
+| 9 | `docs/tech/F11QA.md`（v1.17）→ `docs/tech/F11QA.md`（v1.8） | 体系总览 |
 | 10 | `docs/history/plans/FCEUX11-1.17_计划.md` | v1.17 前置基线 |
 | **11** | **`https://github.com/Laffinty/f11qa-rom-mirror`** | **v1.8 新增：第三方 ROM 镜像源（OWNER @Laffinty）** |
 | 12 | 镜像源 `LICENSES.md` | 每 ROM 的 license + upstream URL + author + SHA-256 |
@@ -1151,17 +1151,17 @@ on:
 
 ### 附录 D：术语对照表
 
-| 旧术语（KagamiQA） | 新术语（F11QA v1.8） | 说明 |
+| 旧术语（F11QA） | 新术语（F11QA v1.8） | 说明 |
 |---|---|---|
 | Oracle A | `kind: unit-cpp / unit-hdr / unit-rust / harness-cpp / lua-api / smoke / static-analysis` | 旧 Oracle A 拆分为多种 kind |
 | Oracle B | `kind: rom-suite / harness-rust` | 旧 Oracle B 主要对应这两类 |
 | Oracle type | `kind` (multi-tag) | 字段废弃 |
 | `id` | `kgmqa_id` | 重命名 |
-| `kagamiqa-v1.17` | `f11qa-v1.8` | suite_id |
-| `kagamiqa_baseline_frozen.json` | `f11qa_baseline_frozen.json` | 重命名 |
-| `kagami-qa-runner.exe` | `f11qa-runner.exe` | Rust crate 二进制 |
-| `kagami_qa_*` | `f11qa_*` | C function / binary 前缀 |
-| `kagami-qa` | `f11qa` | Rust crate name |
+| `f11qa-v1.17` | `f11qa-v1.8` | suite_id |
+| `f11qa_baseline_frozen.json` | `f11qa_baseline_frozen.json` | 重命名 |
+| `f11qa-runner.exe` | `f11qa-runner.exe` | Rust crate 二进制 |
+| `f11qa_*` | `f11qa_*` | C function / binary 前缀 |
+| `f11qa` | `f11qa` | Rust crate name |
 | **v1.7 隐式 license** | **`license` + `mirror_ref` + `mirror_path` + `vendor_state` 四元组** | **v1.8 新增四字段** |
 | **v1.7 隐式 downloader** | **`scripts/fetch_roms_from_mirror.ps1`** + mirror_ref pin | **v1.8 单一 fetch 脚本** |
 | **v1.7 无 license_manifest** | **`tests/fixtures/f11qa_mirror_pin.json` + kgmqa-117 `mirror_snapshot_check`** | **v1.8 镜像源快照校验** |

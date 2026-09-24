@@ -41,7 +41,7 @@ set(RUST_STATIC_LIB ${CARGO_TARGET_DIR}/${RUST_TARGET}/release/fceux11_rust.lib)
 # know it is produced here — otherwise downstream C++ source files that
 # #include "rust/fceux11_rust.h" are scheduled in parallel with cargo build
 # and fail with C1083 "Cannot open include file" before the header exists.
-# CI failure mode (build-windows run #84481955022, kagami-qa #84481955105):
+# CI failure mode (build-windows run #84481955022, f11qa #84481955105):
 # [11/1151] Scanning src/utils/general.cpp FAILED C1083
 # [16/1151] Building Rust crate (too late — ninja already aborted).
 set(RUST_MERGED_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/fceux11_rust.h)

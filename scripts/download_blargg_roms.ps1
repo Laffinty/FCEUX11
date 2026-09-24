@@ -1,4 +1,4 @@
-# KagamiQA P5 — Download complete blargg test ROM suite from GitHub mirror.
+# F11QA P5 — Download complete blargg test ROM suite from GitHub mirror.
 #
 # Expanded from P2 (22 ROMs) to full coverage: CPU ~73, PPU ~45, APU ~52, Mapper ~20
 # Target: >=140 ROMs covering all blargg sub-categories for authoritative QA defense line.
@@ -346,7 +346,7 @@ $null = New-Item -ItemType Directory -Force -Path $OutDir
 # ---------------------------------------------------------------------------
 # Download each ROM
 # ---------------------------------------------------------------------------
-Write-Host "=== KagamiQA P5: Downloading complete blargg test ROM suite ==="
+Write-Host "=== F11QA P5: Downloading complete blargg test ROM suite ==="
 Write-Host "Source: $BaseRaw"
 Write-Host "Output: $(Resolve-Path $OutDir -ErrorAction SilentlyContinue)"
 Write-Host "Total ROMs: $($Roms.Count)"

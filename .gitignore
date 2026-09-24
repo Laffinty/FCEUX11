@@ -85,12 +85,12 @@ vcpkg_installed/
 # cbindgen-generated C header for the Rust FFI bridge — regenerated on
 # every Cargo build; do not commit.
 /src/rust/fceux11_rust.h
-# cbindgen-generated header for the kagami-qa runner C ABI bridge.
-/src/rust/crates/kagami-qa/kagami_bridge.h
+# cbindgen-generated header for the f11qa runner C ABI bridge.
+/src/rust/crates/f11qa/f11qa_bridge.h
 
-# Local kagami-qa-runner output JSONs (artifacts of local reproduce runs).
-# CI produces its own kagamiqa_direct_matrix.json via the runner path.
-/tests/kagami*_local.json
+# Local f11qa-runner output JSONs (artifacts of local reproduce runs).
+# CI produces its own f11qa_direct_matrix.json via the runner path.
+/tests/f11qa*_local.json
 
 # Generated documentation
 docs/html/
@@ -101,7 +101,7 @@ docs/history/logs_*.zip
 docs/history/unpacked/
 
 # One-off CI investigation log dirs at repo root (regenerable from
-# the CI workflow's job log — see .github/workflows/kagami-qa.yml).
+# the CI workflow's job log — see .github/workflows/f11qa.yml).
 /logs_r*/
 
 # Claude Code
@@ -171,13 +171,13 @@ __pycache__/
 scripts/_build_extract.js
 
 # ---------------------------------------------------------------------------
-# KagamiQA artifacts (migration matrix, accuracy table, batch results)
+# F11QA artifacts (migration matrix, accuracy table, batch results)
 # These are CI-produced reports — not source code.
 # ---------------------------------------------------------------------------
-kagamiqa_migration_matrix.json
-kagamiqa_accuracy_table.md
-kagamiqa_baseline_next.json
-kagamiqa_direct_matrix.json
+f11qa_migration_matrix.json
+f11qa_accuracy_table.md
+f11qa_baseline_next.json
+f11qa_direct_matrix.json
 blargg_full_results.json
 blargg_full_output.txt
 blargg_full_stderr.txt

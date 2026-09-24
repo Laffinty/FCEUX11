@@ -1,6 +1,6 @@
 {
   "baseline_version": "v1.16.0-P5",
-  "engine": "FCEUX11 v1.16 wip_1.16 HEAD (newppu=1, KagamiQA P5 full batch)",
+  "engine": "FCEUX11 v1.16 wip_1.16 HEAD (newppu=1, F11QA P5 full batch)",
   "timestamp": "2026-07-28",
   "summary": {
     "total": 180,

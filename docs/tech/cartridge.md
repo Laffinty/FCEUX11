@@ -117,4 +117,4 @@ VRC6/VRC7/FDS/N163/5B 等 mapper 音源经 `ExpansionAudio` 基类（`src/expans
 
 - MMC3 IRQ 与 PPU 的耦合细节：[ppu.md](ppu.md) §2.4
 - mapper 号清单与板文件对照：`src/ines_bmap.h`（权威）
-- 测试治理（MMC3 18 条 ROM）：[KagamiQA.md](KagamiQA.md)
+- 测试治理（MMC3 18 条 ROM）：[F11QA.md](F11QA.md)

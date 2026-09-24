@@ -66,7 +66,7 @@
     "layer": "core",
     "input": {
       "working_dir": "tests",
-      "binary": "kagami_qa_rom_regression_runner"
+      "binary": "f11qa_rom_regression_runner"
     },
     "expected": {
       "exit_code": 0
@@ -87,7 +87,7 @@
     "layer": "core",
     "input": {
       "working_dir": "tests",
-      "binary": "kagami_qa_savestate_regression_runner"
+      "binary": "f11qa_savestate_regression_runner"
     },
     "expected": {
       "exit_code": 0
@@ -368,7 +368,7 @@
     "layer": "core",
     "input": {
       "working_dir": "tests",
-      "binary": "kagami_qa_mapper_byte_diff_runner"
+      "binary": "f11qa_mapper_byte_diff_runner"
     },
     "expected": {
       "exit_code": 0
@@ -617,7 +617,7 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "kagami_qa_blargg_runner",
+      "binary": "f11qa_blargg_runner",
       "args": [
         "--rom",
         "fixtures/nestest.nes",
@@ -646,7 +646,7 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "kagami_qa_blargg_runner",
+      "binary": "f11qa_blargg_runner",
       "args": [
         "--rom",
         "fixtures/blargg/cpu/instr_v5_all.nes",
@@ -675,7 +675,7 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "kagami_qa_blargg_runner",
+      "binary": "f11qa_blargg_runner",
       "args": [
         "--rom",
         "fixtures/blargg/cpu/cpu_timing_test6.nes",
@@ -705,7 +705,7 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "kagami_qa_blargg_runner",
+      "binary": "f11qa_blargg_runner",
       "args": [
         "--rom",
         "fixtures/blargg/ppu/ppu_vbl_nmi.nes",
@@ -735,7 +735,7 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "kagami_qa_blargg_runner",
+      "binary": "f11qa_blargg_runner",
       "args": [
         "--manifest",
         "tests/fixtures/blargg_manifest.json"
@@ -762,7 +762,7 @@
     "oracle_type": "A",
     "layer": "lua",
     "input": {
-      "binary": "kagami_qa_lua_runner",
+      "binary": "f11qa_lua_runner",
       "args": [
         "tests/lua_scripts/test_bit.lua"
       ],
@@ -779,7 +779,7 @@
       "bit"
     ],
     "failure_means": "blocking",
-    "provenance": "fceux11-lua; Task1 lua rust migration (kagami_qa_lua_runner)"
+    "provenance": "fceux11-lua; Task1 lua rust migration (f11qa_lua_runner)"
   },
   "lua_emu_test": {
     "id": "lua_emu_test",
@@ -787,7 +787,7 @@
     "oracle_type": "A",
     "layer": "lua",
     "input": {
-      "binary": "kagami_qa_lua_runner",
+      "binary": "f11qa_lua_runner",
       "args": [
         "tests/lua_scripts/test_emu.lua",
         "--frames",
@@ -806,7 +806,7 @@
       "emu"
     ],
     "failure_means": "blocking",
-    "provenance": "fceux11-lua; Task1 lua rust migration (kagami_qa_lua_runner)"
+    "provenance": "fceux11-lua; Task1 lua rust migration (f11qa_lua_runner)"
   },
   "lua_memory_test": {
     "id": "lua_memory_test",
@@ -814,7 +814,7 @@
     "oracle_type": "A",
     "layer": "lua",
     "input": {
-      "binary": "kagami_qa_lua_runner",
+      "binary": "f11qa_lua_runner",
       "args": [
         "tests/lua_scripts/test_memory.lua",
         "--rom",
@@ -835,7 +835,7 @@
       "memory"
     ],
     "failure_means": "blocking",
-    "provenance": "fceux11-lua | 2026-07-30 demoted to advisory; Task1 lua rust migration (kagami_qa_lua_runner): lacks full memory binding implementation; Lua-side libs work in standalone test, runner-side binding missing. Tracked as 'unimplemented-coverage' 鈥?not a regression, never passed. 2026-08-05 Phase 4.1: bindings verified complete; root cause of round-trip failure = runner initializes the CPU bus memory tables only when a ROM is loaded, so writebyte() was a no-op (BNull) without --rom. Fix: add --rom tests/fixtures/mapper_nrom.nes (git-tracked, available on CI). Re-enabled as blocking."
+    "provenance": "fceux11-lua | 2026-07-30 demoted to advisory; Task1 lua rust migration (f11qa_lua_runner): lacks full memory binding implementation; Lua-side libs work in standalone test, runner-side binding missing. Tracked as 'unimplemented-coverage' 鈥?not a regression, never passed. 2026-08-05 Phase 4.1: bindings verified complete; root cause of round-trip failure = runner initializes the CPU bus memory tables only when a ROM is loaded, so writebyte() was a no-op (BNull) without --rom. Fix: add --rom tests/fixtures/mapper_nrom.nes (git-tracked, available on CI). Re-enabled as blocking."
   },
   "lua_joypad_test": {
     "id": "lua_joypad_test",
@@ -843,7 +843,7 @@
     "oracle_type": "A",
     "layer": "lua",
     "input": {
-      "binary": "kagami_qa_lua_runner",
+      "binary": "f11qa_lua_runner",
       "args": [
         "tests/lua_scripts/test_joypad.lua",
         "--frames",
@@ -862,7 +862,7 @@
       "joypad"
     ],
     "failure_means": "blocking",
-    "provenance": "fceux11-lua | 2026-07-30 demoted to advisory; Task1 lua rust migration (kagami_qa_lua_runner): does not surface joypad.get/joypad.set to Lua state (mask1/mask2 override logic unimplemented in Rust bindings). 2026-08-05 Phase 4.1: bindings verified present; root cause of failure = joypad.get() returned a TABLE (bitmask_to_table) while the FCEUX-compatible contract (and the test script's first assertion) requires a NUMBER bitmask. Fixed in src/rust/crates/fceux11-lua/bindings/joypad.rs (return state as i32). Re-enabled as blocking."
+    "provenance": "fceux11-lua | 2026-07-30 demoted to advisory; Task1 lua rust migration (f11qa_lua_runner): does not surface joypad.get/joypad.set to Lua state (mask1/mask2 override logic unimplemented in Rust bindings). 2026-08-05 Phase 4.1: bindings verified present; root cause of failure = joypad.get() returned a TABLE (bitmask_to_table) while the FCEUX-compatible contract (and the test script's first assertion) requires a NUMBER bitmask. Fixed in src/rust/crates/fceux11-lua/bindings/joypad.rs (return state as i32). Re-enabled as blocking."
   },
   "blargg_mmc3_4_scanline_timing": {
     "id": "blargg_mmc3_4_scanline_timing",
@@ -870,7 +870,7 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "kagami_qa_blargg_runner",
+      "binary": "f11qa_blargg_runner",
       "args": [
         "--rom",
         "fixtures/blargg/mmc3/mmc3_4_scanline_timing.nes",
@@ -901,7 +901,7 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "kagami_qa_blargg_runner",
+      "binary": "f11qa_blargg_runner",
       "args": [
         "--rom",
         "fixtures/blargg/mmc3/mmc3_v2_4_scanline_timing.nes",
@@ -932,7 +932,7 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "kagami_qa_blargg_runner",
+      "binary": "f11qa_blargg_runner",
       "args": [
         "--rom",
         "fixtures/blargg/cpu/cpu_int_2_nmi_brk.nes",
@@ -963,7 +963,7 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "kagami_qa_blargg_runner",
+      "binary": "f11qa_blargg_runner",
       "args": [
         "--rom",
         "fixtures/blargg/cpu/instr_misc.nes",
@@ -994,7 +994,7 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "kagami_qa_blargg_runner",
+      "binary": "f11qa_blargg_runner",
       "args": [
         "--rom",
         "fixtures/blargg/ppu/oam_stress.nes",
@@ -1026,7 +1026,7 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "kagami_qa_blargg_runner",
+      "binary": "f11qa_blargg_runner",
       "args": [
         "--rom",
         "fixtures/blargg/ppu/vbl_05_nmi_timing.nes",
@@ -1058,7 +1058,7 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "kagami_qa_blargg_runner",
+      "binary": "f11qa_blargg_runner",
       "args": [
         "--rom",
         "fixtures/blargg/ppu/ppu_read_buffer.nes",
@@ -1089,7 +1089,7 @@
     "oracle_type": "B",
     "layer": "core",
     "input": {
-      "binary": "kagami_qa_blargg_runner",
+      "binary": "f11qa_blargg_runner",
       "args": [
         "--rom",
         "fixtures/blargg/apu/sprdma_dmc_dma.nes",

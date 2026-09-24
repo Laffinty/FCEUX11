@@ -43,7 +43,7 @@ function(fceux11_add_test_executable target_name)
     target_compile_definitions(${target_name} PRIVATE __QT_DRIVER__)
 endfunction()
 
-# KagamiQA P1 — Headless test executable: links null driver instead of Qt.
+# F11QA P1 — Headless test executable: links null driver instead of Qt.
 function(fceux11_add_headless_test_executable target_name)
     add_executable(${target_name} ${ARGN})
 
@@ -79,14 +79,14 @@ endfunction()
 if(FCEUX11_BUILD_TESTS)
     # Smoke test (Task 1.0)
     fceux11_add_test_executable(fceux11_smoke_test
-        kagami/smoke_test.cpp
+        f11qa/smoke_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME smoke_test COMMAND fceux11_smoke_test)
 
     # Mapper regression tests (Task 1.1)
     fceux11_add_test_executable(fceux11_mapper_load_test
-        kagami/boards/mapper_load_test.cpp
+        f11qa/boards/mapper_load_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME mapper_load_test
@@ -94,7 +94,7 @@ if(FCEUX11_BUILD_TESTS)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
     fceux11_add_test_executable(fceux11_mapper_reset_test
-        kagami/boards/mapper_reset_test.cpp
+        f11qa/boards/mapper_reset_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME mapper_reset_test
@@ -102,7 +102,7 @@ if(FCEUX11_BUILD_TESTS)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
     # ROM regression test (v0.2.15 / v0.3.0) — migrated to Rust
-    # (kagami_qa_rom_regression_runner, Task 1 / C-2). The C++ harness
+    # (f11qa_rom_regression_runner, Task 1 / C-2). The C++ harness
     # rom_regression_test.cpp was deleted after Rust parity: 12 shared
     # ROMs byte-identical, plus the Rust harness fixes the C++ parser's
     # first-entry baseline miss (nrom was never verified in C++).
@@ -110,7 +110,7 @@ if(FCEUX11_BUILD_TESTS)
 
     # v0.3.3 — tl::expected API tests
     fceux11_add_test_executable(fceux11_expected_api_test
-        kagami/expected_api_test.cpp
+        f11qa/expected_api_test.cpp
         git_info_stub.cpp
         ${CMAKE_SOURCE_DIR}/src/utils/fceu11_expected.cpp
     )
@@ -123,7 +123,7 @@ if(FCEUX11_BUILD_TESTS)
     # Uses a standalone add_executable rather than
     # fceux11_add_test_executable to skip the heavy engine link.
     add_executable(fceux11_enum_class_bitflags_test
-        kagami/enum_class_bitflags_test.cpp
+        f11qa/enum_class_bitflags_test.cpp
     )
     target_include_directories(fceux11_enum_class_bitflags_test PRIVATE
         ${CMAKE_SOURCE_DIR}/src)
@@ -136,7 +136,7 @@ if(FCEUX11_BUILD_TESTS)
     # the full Qt application and require a display server / OpenGL ctx
     # to construct). The test reads .ts files and source files only.
     add_executable(fceux11_i18n_regression_test
-        kagami/i18n_regression_test.cpp
+        f11qa/i18n_regression_test.cpp
     )
     target_include_directories(fceux11_i18n_regression_test PRIVATE
         ${CMAKE_SOURCE_DIR})
@@ -150,7 +150,7 @@ if(FCEUX11_BUILD_TESTS)
     # matches the underlying extern symbol, and that global_state() is a
     # true singleton.
     fceux11_add_test_executable(fceux11_core_state_test
-        kagami/core_state_test.cpp
+        f11qa/core_state_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME core_state_test
@@ -163,7 +163,7 @@ if(FCEUX11_BUILD_TESTS)
     # regression net for the v1.3-v1.6 objectification work.
     # -------------------------------------------------------------------------
     fceux11_add_test_executable(fceux11_cpu_test
-        kagami/core/cpu_test.cpp
+        f11qa/core/cpu_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME cpu_test
@@ -171,7 +171,7 @@ if(FCEUX11_BUILD_TESTS)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
     fceux11_add_test_executable(fceux11_ppu_test
-        kagami/core/ppu_test.cpp
+        f11qa/core/ppu_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME ppu_test
@@ -179,7 +179,7 @@ if(FCEUX11_BUILD_TESTS)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
     fceux11_add_test_executable(fceux11_apu_test
-        kagami/core/apu_test.cpp
+        f11qa/core/apu_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME apu_test
@@ -187,7 +187,7 @@ if(FCEUX11_BUILD_TESTS)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
     fceux11_add_test_executable(fceux11_bus_test
-        kagami/core/bus_test.cpp
+        f11qa/core/bus_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME bus_test
@@ -195,7 +195,7 @@ if(FCEUX11_BUILD_TESTS)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
     fceux11_add_test_executable(fceux11_mapper_core_test
-        kagami/core/mapper_test.cpp
+        f11qa/core/mapper_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME mapper_core_test
@@ -203,7 +203,7 @@ if(FCEUX11_BUILD_TESTS)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
     fceux11_add_test_executable(fceux11_savestate_core_test
-        kagami/core/savestate_test.cpp
+        f11qa/core/savestate_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME savestate_core_test
@@ -238,7 +238,7 @@ if(FCEUX11_BUILD_TESTS)
     # will fill in real assertions for Cart lifecycle, MirrorMode enum,
     # install_expansion_audio, save/load hooks.
     fceux11_add_test_executable(fceux11_cart_class_test
-        kagami/core/cart_class_test.cpp
+        f11qa/core/cart_class_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME cart_class_test
@@ -250,7 +250,7 @@ if(FCEUX11_BUILD_TESTS)
     # output, memcmp's against fixtures/golden_mapper/<rom>.bin.
     # v1.10 Cryptex Task 4 — FDS runtime + Bad ROM detection test
     fceux11_add_test_executable(fceux11_fds_load_test
-        kagami/core/fds_load_test.cpp
+        f11qa/core/fds_load_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME fds_load_test
@@ -262,7 +262,7 @@ if(FCEUX11_BUILD_TESTS)
     # Headless: does not call fceu11::Initialize() — tests the interface
     # surface, not engine integration.
     fceux11_add_test_executable(fceux11_driver_callbacks_test
-        kagami/core/driver_callbacks_test.cpp
+        f11qa/core/driver_callbacks_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME driver_callbacks_test
@@ -272,7 +272,7 @@ if(FCEUX11_BUILD_TESTS)
     # v1.11 Bridge Phase H — core/driver boundary regression test.
     # Validates mutex.h pImpl (no Qt leak) + driver.h removal invariants.
     fceux11_add_test_executable(fceux11_core_driver_boundary_test
-        kagami/core/core_driver_boundary_test.cpp
+        f11qa/core/core_driver_boundary_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME core_driver_boundary_test
@@ -282,7 +282,7 @@ if(FCEUX11_BUILD_TESTS)
     # hotfix2 P0-1: byte-for-byte equivalence test for the new
     # two-stage sprite decode LUT vs. the original 8×if shift chain.
     fceux11_add_test_executable(fceux11_ppu_rendering_lut_test
-        kagami/ppu_rendering_lut_test.cpp
+        f11qa/ppu_rendering_lut_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME ppu_rendering_lut_test
@@ -294,7 +294,7 @@ if(FCEUX11_BUILD_TESTS)
     # (<1s runtime) that gate every CI cycle against the strict-
     # aliasing UB removal in P2-1 and the SPRB retyping in P2-3.
     fceux11_add_test_executable(fceux11_ppu_phase_c_test
-        kagami/ppu_phase_c_test.cpp
+        f11qa/ppu_phase_c_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME ppu_phase_c_test
@@ -307,7 +307,7 @@ if(FCEUX11_BUILD_TESTS)
     # tests (<1s) that gate the cleanup PRs without needing a
     # full PPU / mapper exercise.
     fceux11_add_test_executable(fceux11_ppu_phase_d_test
-        kagami/ppu_phase_d_test.cpp
+        f11qa/ppu_phase_d_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME ppu_phase_d_test
@@ -322,19 +322,19 @@ if(FCEUX11_BUILD_TESTS)
     # once, then commit the produced .fc0 files and updated index.
     #
     # v1.17 Task 2 决策 #② (2026-08-08): the source `cpp` moves into
-    # `tests/kagami/` (KagamiQA C++ asset集中落点) but the `.fc0` data
+    # `tests/f11qa/` (F11QA C++ asset集中落点) but the `.fc0` data
     # + golden_index.json stay under fixtures/golden/ (data stays where
     # other fixtures are; WORKING_DIRECTORY is still tests/, so the
     # manifest paths keep resolving without rewriting).
     fceux11_add_test_executable(fceux11_golden_savestate_test
-        kagami/golden_savestate_test.cpp
+        f11qa/golden_savestate_test.cpp
         git_info_stub.cpp
     )
-    # v1.17: now that the source lives in tests/kagami/, test_helpers.h
+    # v1.17: now that the source lives in tests/f11qa/, test_helpers.h
     # is reachable via the parent-include path wired in
     # fceux11_add_test_executable — no explicit include needed.
     target_include_directories(fceux11_golden_savestate_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/tests/kagami/core
+        ${CMAKE_SOURCE_DIR}/tests/f11qa/core
     )
     add_test(NAME golden_savestate_test
              COMMAND fceux11_golden_savestate_test
@@ -345,13 +345,13 @@ if(FCEUX11_BUILD_TESTS)
     # FCEUX11_BENCH_BASELINE=<path>. Run with --generate to write a
     # host-local baseline (not committed).
     fceux11_add_test_executable(fceux11_bench_tolerance_test
-        kagami/benchmarks/bench_tolerance_test.cpp
+        f11qa/benchmarks/bench_tolerance_test.cpp
         git_info_stub.cpp
     )
     # v1.2 Census: benchmarks/bench_tolerance_test is one directory deep;
-    # needs tests/kagami/core in the include path to reach test_helpers.h.
+    # needs tests/f11qa/core in the include path to reach test_helpers.h.
     target_include_directories(fceux11_bench_tolerance_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/tests/kagami/core
+        ${CMAKE_SOURCE_DIR}/tests/f11qa/core
     )
     add_test(NAME bench_tolerance_test
              COMMAND fceux11_bench_tolerance_test
@@ -371,7 +371,7 @@ if(FCEUX11_BUILD_TESTS)
     # Widgets/Gui, so it remains headless-runnable on CI.
     find_package(Qt6 REQUIRED COMPONENTS Core)
     add_executable(fceux11_config_store_test
-        kagami/config_store_test.cpp
+        f11qa/config_store_test.cpp
     )
     target_link_libraries(fceux11_config_store_test PRIVATE
         Qt6::Core)
@@ -457,7 +457,7 @@ if(FCEUX11_BUILD_TESTS)
     # No __QT_DRIVER__ needed: the test directly instantiates PixBufPool
     # without involving nes_shm_t or the Qt driver.
     fceux11_add_test_executable(fceux11_pixbuf_pool_test
-        kagami/pixbuf_pool_test.cpp
+        f11qa/pixbuf_pool_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME pixbuf_pool_test
@@ -474,7 +474,7 @@ if(FCEUX11_BUILD_TESTS)
     find_package(benchmark CONFIG QUIET)
     if(benchmark_FOUND)
         message(STATUS "Google Benchmark found — building benchmark targets")
-        add_executable(fceux11_bench_ppu_render kagami/benchmark/ppu_render_bench.cpp git_info_stub.cpp)
+        add_executable(fceux11_bench_ppu_render f11qa/benchmark/ppu_render_bench.cpp git_info_stub.cpp)
         target_link_libraries(fceux11_bench_ppu_render PRIVATE
             fceux11_drivers_qt fceux11_drivers_common fceux11_core fceux11_boards fceux11_utils
             benchmark::benchmark
@@ -488,7 +488,7 @@ if(FCEUX11_BUILD_TESTS)
             target_link_libraries(fceux11_bench_ppu_render PRIVATE ntdll)
         endif()
 
-        add_executable(fceux11_bench_x6502_exec kagami/benchmark/x6502_exec_bench.cpp git_info_stub.cpp)
+        add_executable(fceux11_bench_x6502_exec f11qa/benchmark/x6502_exec_bench.cpp git_info_stub.cpp)
         target_link_libraries(fceux11_bench_x6502_exec PRIVATE
             fceux11_drivers_qt fceux11_drivers_common fceux11_core fceux11_boards fceux11_utils
             benchmark::benchmark
@@ -499,7 +499,7 @@ if(FCEUX11_BUILD_TESTS)
             target_link_libraries(fceux11_bench_x6502_exec PRIVATE ntdll)
         endif()
 
-        add_executable(fceux11_bench_apu_mix kagami/benchmark/apu_mix_bench.cpp git_info_stub.cpp)
+        add_executable(fceux11_bench_apu_mix f11qa/benchmark/apu_mix_bench.cpp git_info_stub.cpp)
         target_link_libraries(fceux11_bench_apu_mix PRIVATE
             fceux11_drivers_qt fceux11_drivers_common fceux11_core fceux11_boards fceux11_utils
             benchmark::benchmark
@@ -511,7 +511,7 @@ if(FCEUX11_BUILD_TESTS)
         endif()
 
         # v1.14 Anvil §14.1 — APU frame benchmark
-        add_executable(fceux11_bench_apu_frame kagami/benchmark/apu_frame_bench.cpp git_info_stub.cpp)
+        add_executable(fceux11_bench_apu_frame f11qa/benchmark/apu_frame_bench.cpp git_info_stub.cpp)
         target_link_libraries(fceux11_bench_apu_frame PRIVATE
             fceux11_drivers_qt fceux11_drivers_common fceux11_core fceux11_boards fceux11_utils
             benchmark::benchmark
@@ -523,7 +523,7 @@ if(FCEUX11_BUILD_TESTS)
         endif()
 
         # v1.14 Anvil §14.1 — Bus dispatch benchmark
-        add_executable(fceux11_bench_bus_dispatch kagami/benchmark/bus_dispatch_bench.cpp git_info_stub.cpp)
+        add_executable(fceux11_bench_bus_dispatch f11qa/benchmark/bus_dispatch_bench.cpp git_info_stub.cpp)
         target_link_libraries(fceux11_bench_bus_dispatch PRIVATE
             fceux11_drivers_qt fceux11_drivers_common fceux11_core fceux11_boards fceux11_utils
             benchmark::benchmark
@@ -535,26 +535,26 @@ if(FCEUX11_BUILD_TESTS)
         endif()
     else()
         message(STATUS "Google Benchmark not found — building standalone benchmark executables")
-        fceux11_add_test_executable(fceux11_bench_ppu_render    kagami/benchmark/ppu_render_bench.cpp    git_info_stub.cpp)
-        fceux11_add_test_executable(fceux11_bench_x6502_exec    kagami/benchmark/x6502_exec_bench.cpp    git_info_stub.cpp)
-        fceux11_add_test_executable(fceux11_bench_apu_mix       kagami/benchmark/apu_mix_bench.cpp       git_info_stub.cpp)
-        fceux11_add_test_executable(fceux11_bench_apu_frame     kagami/benchmark/apu_frame_bench.cpp     git_info_stub.cpp)
-        fceux11_add_test_executable(fceux11_bench_bus_dispatch  kagami/benchmark/bus_dispatch_bench.cpp  git_info_stub.cpp)
+        fceux11_add_test_executable(fceux11_bench_ppu_render    f11qa/benchmark/ppu_render_bench.cpp    git_info_stub.cpp)
+        fceux11_add_test_executable(fceux11_bench_x6502_exec    f11qa/benchmark/x6502_exec_bench.cpp    git_info_stub.cpp)
+        fceux11_add_test_executable(fceux11_bench_apu_mix       f11qa/benchmark/apu_mix_bench.cpp       git_info_stub.cpp)
+        fceux11_add_test_executable(fceux11_bench_apu_frame     f11qa/benchmark/apu_frame_bench.cpp     git_info_stub.cpp)
+        fceux11_add_test_executable(fceux11_bench_bus_dispatch  f11qa/benchmark/bus_dispatch_bench.cpp  git_info_stub.cpp)
     endif()
 
     # v0.3.11 Phase-2 SIMD probe — standalone, build-only, not registered as CTest.
-    add_executable(fceux11_ppu_simd_probe_scalar kagami/benchmark/ppu_simd_probe.cpp)
+    add_executable(fceux11_ppu_simd_probe_scalar f11qa/benchmark/ppu_simd_probe.cpp)
     target_compile_definitions(fceux11_ppu_simd_probe_scalar PRIVATE SCALAR_PROBE)
 
-    add_executable(fceux11_ppu_simd_probe_sse42 kagami/benchmark/ppu_simd_probe.cpp)
+    add_executable(fceux11_ppu_simd_probe_sse42 f11qa/benchmark/ppu_simd_probe.cpp)
     target_compile_options(fceux11_ppu_simd_probe_sse42 PRIVATE /arch:SSE2)
 
-    add_executable(fceux11_ppu_simd_probe_avx2 kagami/benchmark/ppu_simd_probe.cpp)
+    add_executable(fceux11_ppu_simd_probe_avx2 f11qa/benchmark/ppu_simd_probe.cpp)
     target_compile_options(fceux11_ppu_simd_probe_avx2 PRIVATE /arch:AVX2)
 
-    # KagamiQA P1 — Headless smoke test (null driver, no Qt linkage).
+    # F11QA P1 — Headless smoke test (null driver, no Qt linkage).
     fceux11_add_headless_test_executable(fceux11_headless_smoke_test
-        kagami/headless_smoke_test.cpp
+        f11qa/headless_smoke_test.cpp
         git_info_stub.cpp
     )
     add_test(NAME headless_smoke_test
@@ -565,31 +565,31 @@ if(FCEUX11_BUILD_TESTS)
                 "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
     endif()
 
-    # KagamiQA P2 — blargg $6000 test ROM runner (Oracle B executor).
-    # v1.17 Task1-C1: migrated to Rust (kagami_qa_blargg_runner target below);
+    # F11QA P2 — blargg $6000 test ROM runner (Oracle B executor).
+    # v1.17 Task1-C1: migrated to Rust (f11qa_blargg_runner target below);
     # C++ blargg_runner.cpp deleted after 177/177 parity verified (9488773).
 
-    # KagamiQA P3 — Headless Lua script runner (null driver, no Qt).
-    # v1.17 Task1 (lua): migrated to Rust (kagami_qa_lua_runner);
+    # F11QA P3 — Headless Lua script runner (null driver, no Qt).
+    # v1.17 Task1 (lua): migrated to Rust (f11qa_lua_runner);
     # C++ lua_runner.cpp deleted after parity over the lua test scripts
     # was verified.
-    fceux11_add_headless_test_executable(kagami_qa_lua_runner
-        kagami/lua_rust_main.cpp
+    fceux11_add_headless_test_executable(f11qa_lua_runner
+        f11qa/lua_rust_main.cpp
         git_info_stub.cpp
     )
-    target_include_directories(kagami_qa_lua_runner PRIVATE
-        ${CMAKE_SOURCE_DIR}/tests/kagami/core
+    target_include_directories(f11qa_lua_runner PRIVATE
+        ${CMAKE_SOURCE_DIR}/tests/f11qa/core
     )
-    target_link_libraries(kagami_qa_lua_runner PRIVATE
+    target_link_libraries(f11qa_lua_runner PRIVATE
         userenv
         ws2_32
         dbghelp
     )
-    target_compile_definitions(kagami_qa_lua_runner PRIVATE
+    target_compile_definitions(f11qa_lua_runner PRIVATE
         __HEADLESS_DRIVER__
     )
     add_test(NAME lua_bit_test_headless
-             COMMAND kagami_qa_lua_runner
+             COMMAND f11qa_lua_runner
              lua_scripts/test_bit.lua
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     if(WIN32)
@@ -598,57 +598,57 @@ if(FCEUX11_BUILD_TESTS)
     endif()
 
     # =========================================================================
-    # KagamiQA P5 — In-process direct runner (Stage-2 §七 C-3 + C-5).
+    # F11QA P5 — In-process direct runner (Stage-2 §七 C-3 + C-5).
     #
     # Stage-2 collapses the original P5 implementation into the headless test
-    # helper. The Rust side exports kagami_qa_direct_main via fceux11_rust.lib
-    # (see C-1 in src/rust/src/lib.rs); no separate kagami_qa.lib is produced
+    # helper. The Rust side exports f11qa_direct_main via fceux11_rust.lib
+    # (see C-1 in src/rust/src/lib.rs); no separate f11qa.lib is produced
     # and no second cargo invocation is needed.
     #
-    # Produces: kagami_qa_direct_runner.exe
+    # Produces: f11qa_direct_runner.exe
     # Links:    fceux11_drivers_null + fceux11_core + fceux11_utils
-    #           + fceux11_rust.lib (carrying kagami_qa_direct_main)
+    #           + fceux11_rust.lib (carrying f11qa_direct_main)
     #           + userenv / ws2_32 / dbghelp (per `cargo rustc --print
     #           native-static-libs`; kernel32 auto-linked, ntdll via
     #           fceux11_add_headless_test_executable helper at line 65-67).
     # =========================================================================
     if(FCEUX11_ENABLE_RUST)
-        fceux11_add_headless_test_executable(kagami_qa_direct_runner
-            kagami_direct_main.cpp
+        fceux11_add_headless_test_executable(f11qa_direct_runner
+            f11qa_direct_main.cpp
             git_info_stub.cpp
         )
-        target_include_directories(kagami_qa_direct_runner PRIVATE
-            ${CMAKE_SOURCE_DIR}/tests/kagami/core
+        target_include_directories(f11qa_direct_runner PRIVATE
+            ${CMAKE_SOURCE_DIR}/tests/f11qa/core
         )
         # Stage-2 §七 C-3: native-static-libs reported by cargo (kernel32
         # auto-linked, ntdll via fceux11_add_headless_test_executable helper;
         # userenv / ws2_32 / dbghelp must be explicit because MSVC's
         # link.exe does not auto-resolve them from rlib object imports).
-        target_link_libraries(kagami_qa_direct_runner PRIVATE
+        target_link_libraries(f11qa_direct_runner PRIVATE
             userenv
             ws2_32
             dbghelp
         )
-        target_compile_definitions(kagami_qa_direct_runner PRIVATE
+        target_compile_definitions(f11qa_direct_runner PRIVATE
             __HEADLESS_DRIVER__
         )
 
         # P5: CTest entry for direct runner Oracle B validation.
         # Compares direct mode output vs subprocess mode to verify parity.
         #
-        # Stage-2 fix (kagami_qa_direct_smoke WORKING_DIRECTORY): the
+        # Stage-2 fix (f11qa_direct_smoke WORKING_DIRECTORY): the
         # manifest ROM paths are authored as 'fixtures/...' relative to
         # the tests/ directory, not to the project root. Setting
         # WORKING_DIRECTORY to tests/ makes those paths resolve correctly
         # without rewriting the manifest or having the runner prepend
         # 'tests/'.
-        add_test(NAME kagami_qa_direct_smoke
-                 COMMAND kagami_qa_direct_runner
+        add_test(NAME f11qa_direct_smoke
+                 COMMAND f11qa_direct_runner
                  --manifest tests.json
-                 --output ${CMAKE_BINARY_DIR}/kagamiqa_direct_matrix.json
+                 --output ${CMAKE_BINARY_DIR}/f11qa_direct_matrix.json
                  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
         if(WIN32)
-            set_tests_properties(kagami_qa_direct_smoke PROPERTIES ENVIRONMENT_MODIFICATION
+            set_tests_properties(f11qa_direct_smoke PROPERTIES ENVIRONMENT_MODIFICATION
                     "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
         endif()
 
@@ -657,31 +657,31 @@ if(FCEUX11_BUILD_TESTS)
         #
         # Kept alongside the C++ runner until parity over the 177-ROM
         # blargg_manifest.json is verified (Track C gate). Same link pattern
-        # as kagami_qa_direct_runner: headless null driver + fceux11_rust.lib
-        # carrying kagami_qa_blargg_main + userenv/ws2_32/dbghelp.
+        # as f11qa_direct_runner: headless null driver + fceux11_rust.lib
+        # carrying f11qa_blargg_main + userenv/ws2_32/dbghelp.
         # =====================================================================
-        fceux11_add_headless_test_executable(kagami_qa_blargg_runner
-            kagami/blargg_rust_main.cpp
+        fceux11_add_headless_test_executable(f11qa_blargg_runner
+            f11qa/blargg_rust_main.cpp
             git_info_stub.cpp
         )
-        target_include_directories(kagami_qa_blargg_runner PRIVATE
-            ${CMAKE_SOURCE_DIR}/tests/kagami/core
+        target_include_directories(f11qa_blargg_runner PRIVATE
+            ${CMAKE_SOURCE_DIR}/tests/f11qa/core
         )
-        target_link_libraries(kagami_qa_blargg_runner PRIVATE
+        target_link_libraries(f11qa_blargg_runner PRIVATE
             userenv
             ws2_32
             dbghelp
         )
-        target_compile_definitions(kagami_qa_blargg_runner PRIVATE
+        target_compile_definitions(f11qa_blargg_runner PRIVATE
             __HEADLESS_DRIVER__
         )
         # CTest entry: smoke run via the Rust harness (nestest 60 frames,
         # expected PASS). The full 177-ROM batch is exercised by the CI
-        # matrix step (blargg_rust_smoke_full via kagami-qa.yml), not by
+        # matrix step (blargg_rust_smoke_full via f11qa.yml), not by
         # CTest, because the batch legitimately exits 1 when the 33 known
         # precision FAILs are present.
         add_test(NAME blargg_rust_smoke
-                 COMMAND kagami_qa_blargg_runner
+                 COMMAND f11qa_blargg_runner
                  --rom fixtures/nestest.nes --frames 60
                  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
         if(WIN32)
@@ -693,23 +693,23 @@ if(FCEUX11_BUILD_TESTS)
         # Task 1 / C-2 — Rust ROM regression harness (replaces
         # rom_regression_test.cpp). Same link pattern as blargg_rust_runner.
         # =====================================================================
-        fceux11_add_headless_test_executable(kagami_qa_rom_regression_runner
-            kagami/rom_regression_rust_main.cpp
+        fceux11_add_headless_test_executable(f11qa_rom_regression_runner
+            f11qa/rom_regression_rust_main.cpp
             git_info_stub.cpp
         )
-        target_include_directories(kagami_qa_rom_regression_runner PRIVATE
-            ${CMAKE_SOURCE_DIR}/tests/kagami/core
+        target_include_directories(f11qa_rom_regression_runner PRIVATE
+            ${CMAKE_SOURCE_DIR}/tests/f11qa/core
         )
-        target_link_libraries(kagami_qa_rom_regression_runner PRIVATE
+        target_link_libraries(f11qa_rom_regression_runner PRIVATE
             userenv
             ws2_32
             dbghelp
         )
-        target_compile_definitions(kagami_qa_rom_regression_runner PRIVATE
+        target_compile_definitions(f11qa_rom_regression_runner PRIVATE
             __HEADLESS_DRIVER__
         )
         add_test(NAME rom_regression_rust_smoke
-                 COMMAND kagami_qa_rom_regression_runner
+                 COMMAND f11qa_rom_regression_runner
                  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
         if(WIN32)
             set_tests_properties(rom_regression_rust_smoke PROPERTIES ENVIRONMENT_MODIFICATION
@@ -720,23 +720,23 @@ if(FCEUX11_BUILD_TESTS)
         # Task 1 / C-3 — Rust savestate regression harness (replaces
         # savestate_regression_test.cpp). Same link pattern.
         # =====================================================================
-        fceux11_add_headless_test_executable(kagami_qa_savestate_regression_runner
-            kagami/savestate_regression_rust_main.cpp
+        fceux11_add_headless_test_executable(f11qa_savestate_regression_runner
+            f11qa/savestate_regression_rust_main.cpp
             git_info_stub.cpp
         )
-        target_include_directories(kagami_qa_savestate_regression_runner PRIVATE
-            ${CMAKE_SOURCE_DIR}/tests/kagami/core
+        target_include_directories(f11qa_savestate_regression_runner PRIVATE
+            ${CMAKE_SOURCE_DIR}/tests/f11qa/core
         )
-        target_link_libraries(kagami_qa_savestate_regression_runner PRIVATE
+        target_link_libraries(f11qa_savestate_regression_runner PRIVATE
             userenv
             ws2_32
             dbghelp
         )
-        target_compile_definitions(kagami_qa_savestate_regression_runner PRIVATE
+        target_compile_definitions(f11qa_savestate_regression_runner PRIVATE
             __HEADLESS_DRIVER__
         )
         add_test(NAME savestate_regression_rust_smoke
-                 COMMAND kagami_qa_savestate_regression_runner
+                 COMMAND f11qa_savestate_regression_runner
                  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
         if(WIN32)
             set_tests_properties(savestate_regression_rust_smoke PROPERTIES ENVIRONMENT_MODIFICATION
@@ -747,23 +747,23 @@ if(FCEUX11_BUILD_TESTS)
         # Task 1 (mapper) — Rust mapper byte-diff harness (replaces
         # core/mapper_byte_diff_test.cpp). Same link pattern.
         # =====================================================================
-        fceux11_add_headless_test_executable(kagami_qa_mapper_byte_diff_runner
-            kagami/mapper_byte_diff_rust_main.cpp
+        fceux11_add_headless_test_executable(f11qa_mapper_byte_diff_runner
+            f11qa/mapper_byte_diff_rust_main.cpp
             git_info_stub.cpp
         )
-        target_include_directories(kagami_qa_mapper_byte_diff_runner PRIVATE
-            ${CMAKE_SOURCE_DIR}/tests/kagami/core
+        target_include_directories(f11qa_mapper_byte_diff_runner PRIVATE
+            ${CMAKE_SOURCE_DIR}/tests/f11qa/core
         )
-        target_link_libraries(kagami_qa_mapper_byte_diff_runner PRIVATE
+        target_link_libraries(f11qa_mapper_byte_diff_runner PRIVATE
             userenv
             ws2_32
             dbghelp
         )
-        target_compile_definitions(kagami_qa_mapper_byte_diff_runner PRIVATE
+        target_compile_definitions(f11qa_mapper_byte_diff_runner PRIVATE
             __HEADLESS_DRIVER__
         )
         add_test(NAME mapper_byte_diff_rust_smoke
-                 COMMAND kagami_qa_mapper_byte_diff_runner
+                 COMMAND f11qa_mapper_byte_diff_runner
                  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
         if(WIN32)
             set_tests_properties(mapper_byte_diff_rust_smoke PROPERTIES ENVIRONMENT_MODIFICATION

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """v1.17 Task1-C1 switch-over: repoint tests.json blargg entries to the Rust runner.
 
-Changes binary: fceux11_blargg_runner -> kagami_qa_blargg_runner and adds a
+Changes binary: fceux11_blargg_runner -> f11qa_blargg_runner and adds a
 provenance marker with the parity commit for each blargg_* entry.
 """
 import json
@@ -28,14 +28,14 @@ for e in entries:
         continue
     inp = e.get("input", {})
     if inp.get("binary") == "fceux11_blargg_runner":
-        inp["binary"] = "kagami_qa_blargg_runner"
+        inp["binary"] = "f11qa_blargg_runner"
         e["provenance"] = f"Task1-C1 rust migration, parity {PARITY_COMMIT} (177/177)"
         changed += 1
     # blargg_suite has no binary; add provenance note only
     elif eid == "blargg_suite":
         e["provenance"] = f"Task1-C1 rust migration, parity {PARITY_COMMIT} (177/177)"
 
-print(f"repointed {changed} blargg entries to kagami_qa_blargg_runner")
+print(f"repointed {changed} blargg entries to f11qa_blargg_runner")
 
 new_text = json.dumps(data, indent=2, ensure_ascii=False)
 new_bytes = (b"\xef\xbb\xbf" if has_bom else b"") + new_text.encode("utf-8")
