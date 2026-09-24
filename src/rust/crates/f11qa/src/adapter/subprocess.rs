@@ -143,7 +143,7 @@ impl SutAdapter for SubprocessAdapter {
                 kind: ErrorKind::TestExecFailed,
                 message: format!(
                     "Failed to spawn test '{}' ({}): {}",
-                    test.id, bin_path.display(), e
+                    test.kgmqa_id, bin_path.display(), e
                 ),
             })?;
 
@@ -193,7 +193,7 @@ impl SutAdapter for SubprocessAdapter {
                         kind: ErrorKind::TestExecFailed,
                         message: format!(
                             "Failed waiting on test '{}': {}",
-                            test.id, e
+                            test.kgmqa_id, e
                         ),
                     });
                 }
@@ -223,7 +223,7 @@ impl SutAdapter for SubprocessAdapter {
         // so that schema-declared `expected.stdout_contains` actually takes effect.
         // Stage-2 §四·五 Phase 0.5 / PR 0.5-1.
         let probe = TestResult {
-            test_id: test.id.clone(),
+            test_id: test.kgmqa_id.clone(),
             // placeholder; check_expected only reads exit_code + stdout
             passed: false,
             exit_code,
@@ -235,7 +235,7 @@ impl SutAdapter for SubprocessAdapter {
         let passed = check_expected(&probe, &test.expected);
 
         Ok(TestResult {
-            test_id: test.id.clone(),
+            test_id: test.kgmqa_id.clone(),
             passed,
             exit_code,
             stdout,
@@ -296,8 +296,10 @@ mod tests {
     fn test_binary_not_found() {
         let adapter = SubprocessAdapter::new("/nonexistent");
         let test = TestManifest {
-            id: "fake".into(),
-            description: "fake".into(),
+            kgmqa_id: "kgmqa-001-fake".into(),
+            legacy_id: None,
+            title: "fake".into(),
+            kind: vec![],
             oracle_type: OracleType::A,
             layer: TestLayer::Core,
             input: TestInput {
@@ -312,6 +314,11 @@ mod tests {
             tags: vec![],
             failure_means: FailureSeverity::Blocking,
             provenance: "test".into(),
+            vendor_state: None,
+            spec_source: None,
+            license: None,
+            mirror_ref: None,
+            mirror_path: None,
         };
         let result = adapter.run_test(&test);
         assert!(result.is_err());
@@ -324,8 +331,10 @@ mod tests {
         let adapter = SubprocessAdapter::new(".");
         let cmd = std::path::PathBuf::from(std::env::var("COMSPEC").unwrap_or_else(|_| "C:\\Windows\\System32\\cmd.exe".into()));
         let test = TestManifest {
-            id: "echo_test".into(),
-            description: "simple echo".into(),
+            kgmqa_id: "kgmqa-001-echo".into(),
+            legacy_id: None,
+            title: "simple echo".into(),
+            kind: vec![],
             oracle_type: OracleType::A,
             layer: TestLayer::Core,
             input: TestInput {
@@ -341,6 +350,11 @@ mod tests {
             tags: vec![],
             failure_means: FailureSeverity::Blocking,
             provenance: "test".into(),
+            vendor_state: None,
+            spec_source: None,
+            license: None,
+            mirror_ref: None,
+            mirror_path: None,
         };
         let result = adapter.run_test(&test).unwrap();
         assert!(result.passed);
@@ -359,8 +373,10 @@ mod tests {
             std::env::var("COMSPEC").unwrap_or_else(|_| "C:\\Windows\\System32\\cmd.exe".into()),
         );
         let test = TestManifest {
-            id: "stdout_mismatch".into(),
-            description: "exit 0 but stdout must NOT contain 'NEVER_MATCHES_42'".into(),
+            kgmqa_id: "kgmqa-001-stdout-mismatch".into(),
+            legacy_id: None,
+            title: "exit 0 but stdout must NOT contain 'NEVER_MATCHES_42'".into(),
+            kind: vec![],
             oracle_type: OracleType::A,
             layer: TestLayer::Core,
             input: TestInput {
@@ -377,6 +393,11 @@ mod tests {
             tags: vec![],
             failure_means: FailureSeverity::Blocking,
             provenance: "test".into(),
+            vendor_state: None,
+            spec_source: None,
+            license: None,
+            mirror_ref: None,
+            mirror_path: None,
         };
         let result = adapter.run_test(&test).unwrap();
         assert!(!result.passed, "exit_code 0 + missing stdout_contains must FAIL");
@@ -405,8 +426,10 @@ mod tests {
             return;
         }
         let test = TestManifest {
-            id: "hang_test".into(),
-            description: "sleep 30s — must trip timeout".into(),
+            kgmqa_id: "kgmqa-001-hang".into(),
+            legacy_id: None,
+            title: "sleep 30s — must trip timeout".into(),
+            kind: vec![],
             oracle_type: OracleType::A,
             layer: TestLayer::Core,
             input: TestInput {
@@ -426,6 +449,11 @@ mod tests {
             tags: vec![],
             failure_means: FailureSeverity::Blocking,
             provenance: "test".into(),
+            vendor_state: None,
+            spec_source: None,
+            license: None,
+            mirror_ref: None,
+            mirror_path: None,
         };
         let start = std::time::Instant::now();
         let result = adapter.run_test(&test).unwrap();

@@ -67,7 +67,8 @@ impl Filter {
 impl Term {
     fn matches(&self, test: &TestManifest) -> bool {
         match self {
-            Term::IdContains(needle) => test.id.contains(needle.as_str()),
+            // v1.8 Phase 7.1: filter 匹配 kgmqa_id（v1.17 是 id）。
+            Term::IdContains(needle) => test.kgmqa_id.contains(needle.as_str()),
             Term::TagEquals(tag) => test.tags.iter().any(|t| t == tag),
             Term::LayerEquals(layer) => &test.layer == layer,
             Term::OracleEquals(oracle) => &test.oracle_type == oracle,
@@ -118,10 +119,12 @@ mod tests {
     use super::*;
     use crate::manifest::schema::{ExpectedResult, FailureSeverity, TestInput};
 
-    fn make_test(id: &str, oracle: OracleType, layer: TestLayer, tags: &[&str]) -> TestManifest {
+    fn make_test(kgmqa_id: &str, oracle: OracleType, layer: TestLayer, tags: &[&str]) -> TestManifest {
         TestManifest {
-            id: id.into(),
-            description: String::new(),
+            kgmqa_id: kgmqa_id.into(),
+            legacy_id: None,
+            title: String::new(),
+            kind: Vec::new(),
             oracle_type: oracle,
             layer,
             input: TestInput::default(),
@@ -133,6 +136,11 @@ mod tests {
             tags: tags.iter().map(|s| s.to_string()).collect(),
             failure_means: FailureSeverity::Blocking,
             provenance: "test".into(),
+            vendor_state: None,
+            spec_source: None,
+            license: None,
+            mirror_ref: None,
+            mirror_path: None,
         }
     }
 

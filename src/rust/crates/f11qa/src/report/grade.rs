@@ -222,10 +222,12 @@ mod tests {
         }
     }
 
-    fn make_manifest_entry(id: &str, blocking: bool, tags: &[&str]) -> TestManifest {
+    fn make_manifest_entry(kgmqa_id: &str, blocking: bool, tags: &[&str]) -> TestManifest {
         TestManifest {
-            id: id.into(),
-            description: String::new(),
+            kgmqa_id: kgmqa_id.into(),
+            legacy_id: None,
+            title: String::new(),
+            kind: Vec::new(),
             oracle_type: OracleType::A,
             layer: TestLayer::Core,
             input: TestInput::default(),
@@ -241,11 +243,18 @@ mod tests {
                 FailureSeverity::Advisory
             },
             provenance: "test".into(),
+            vendor_state: None,
+            spec_source: None,
+            license: None,
+            mirror_ref: None,
+            mirror_path: None,
         }
     }
 
+    fn _silence_unused(_x: TestManifest) {}
+
     fn manifest_with(entries: Vec<TestManifest>) -> BTreeMap<String, TestManifest> {
-        entries.into_iter().map(|t| (t.id.clone(), t)).collect()
+        entries.into_iter().map(|t| (t.kgmqa_id.clone(), t)).collect()
     }
 
     fn build(

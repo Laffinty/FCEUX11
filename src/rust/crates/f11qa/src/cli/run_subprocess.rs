@@ -43,7 +43,15 @@ pub fn run(args: &Args) -> Result<SubprocessOutcome, Box<dyn std::error::Error>>
     let mut oracle_types = BTreeMap::new();
     let mut layers = BTreeMap::new();
     for (id, test) in &manifest {
-        oracle_types.insert(id.clone(), format!("{:?}", test.oracle_type));
+        // v1.8 §三 §3.6: derive oracle_type from kind if absent.
+        // kind contains "rom-suite" → B (hardware-consistency);
+        // otherwise → A (regression-equivalence).
+        let oracle_str = if test.kind.iter().any(|k| k == "rom-suite") {
+            "B".to_string()
+        } else {
+            format!("{:?}", test.oracle_type)
+        };
+        oracle_types.insert(id.clone(), oracle_str);
         layers.insert(id.clone(), format!("{:?}", test.layer));
     }
 

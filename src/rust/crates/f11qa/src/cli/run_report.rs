@@ -51,11 +51,24 @@ pub fn generate(input: ReportInput) -> Result<i32, Box<dyn std::error::Error>> {
         drifts,
     );
 
-    // F11QA v1.8 §五 Phase 7.1 follow-up:
-    // vendor_state 三态计数待 f11qa-runner schema 完全迁移到 v1.8 后启用。
-    // 当前 v1.17 manifest schema 与 tests.json v1.8 ({schema_version, cases:[...]})
-    // 形状不兼容；直接启用会让 runner 加载 tests.json 失败。
-    // 见 src/rust/crates/f11qa/src/manifest/schema.rs 注释。
+    // -------------------------------------------------------------------
+    // F11QA v1.8 §五 Phase 7 R4 gate: vendor_state 三态计数 (仅 78 项 rom-suite)。
+    // R4 gate v1.8 校验: sum(vendored + advisory + pending_vendor) == 78。
+    // -------------------------------------------------------------------
+    let mut breakdown = crate::report::matrix::VendorStateBreakdown::default();
+    for (_id, tm) in &outcome.manifest {
+        if let Some(vs) = tm.vendor_state.as_deref() {
+            match vs {
+                "vendored" => breakdown.vendored += 1,
+                "advisory" => breakdown.advisory += 1,
+                "pending-vendor" => breakdown.pending_vendor += 1,
+                _ => {}
+            }
+        }
+    }
+    if breakdown.vendored + breakdown.advisory + breakdown.pending_vendor > 0 {
+        matrix.summary.vendor_state = Some(breakdown);
+    }
 
     // -------------------------------------------------------------------
     // Task 5 — release-readiness grade (A–E) attached to the matrix.

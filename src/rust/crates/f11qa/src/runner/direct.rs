@@ -203,10 +203,12 @@ mod tests {
         ExpectedResult, FailureSeverity, OracleType, TestInput, TestLayer,
     };
 
-    fn make_test(id: &str, timeout_seconds: u64) -> TestManifest {
+    fn make_test(kgmqa_id: &str, timeout_seconds: u64) -> TestManifest {
         TestManifest {
-            id: id.into(),
-            description: String::new(),
+            kgmqa_id: kgmqa_id.into(),
+            legacy_id: None,
+            title: String::new(),
+            kind: Vec::new(),
             oracle_type: OracleType::B,
             layer: TestLayer::Core,
             input: TestInput {
@@ -223,6 +225,11 @@ mod tests {
             tags: vec!["direct-test".into()],
             failure_means: FailureSeverity::Blocking,
             provenance: "test".into(),
+            vendor_state: None,
+            spec_source: None,
+            license: None,
+            mirror_ref: None,
+            mirror_path: None,
         }
     }
 
@@ -234,7 +241,7 @@ mod tests {
     }
 
     fn manifest_of(tests: Vec<TestManifest>) -> BTreeMap<String, TestManifest> {
-        tests.into_iter().map(|t| (t.id.clone(), t)).collect()
+        tests.into_iter().map(|t| (t.kgmqa_id.clone(), t)).collect()
     }
 
     /// Adapter whose `load` always panics — exercises panic isolation.

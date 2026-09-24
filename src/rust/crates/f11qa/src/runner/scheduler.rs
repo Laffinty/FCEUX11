@@ -24,7 +24,7 @@ impl TestScheduler {
             match adapter.run_test(test) {
                 Ok(result) => results.push(result),
                 Err(e) => results.push(TestResult {
-                    test_id: test.id.clone(),
+                    test_id: test.kgmqa_id.clone(),
                     passed: false,
                     exit_code: -1,
                     stdout: String::new(),
