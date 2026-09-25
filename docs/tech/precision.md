@@ -6,31 +6,33 @@
 
 ---
 
-## 1. 当前已知失败面（blargg baseline v1.16.0-P5）
+## 1. 当前已知失败面（blargg baseline v1.16.0-P5.1）
 
 权威文件：`tests/fixtures/blargg_known_fail.json`（**治理规则：AI 不得修改期望值；
-baseline 更新需与代码变更同等级 review**）。180 ROM：PASS 120 / FAIL 60。
+baseline 更新需与代码变更同等级 review**）。177 ROM：PASS 144 / FAIL 33
+（2026-09-26 实测；相对 P5 的 60 条已清零 25 条精度项 + 2 条重复条目）。
 
-### 1.1 PPU / runppu 相关（9 条，新 PPU 主战场）
+### 1.1 PPU / runppu 相关（7 条，新 PPU 主战场）
 
 | ROM | 根因 | 修复方向 |
 |---|---|---|
 | `vbl_02_set_time` | VBL 置位在 cy0 而非 cy1（「Cycle 0→1 shift deferred」，ppu_rendering.cpp:1609-1627） | 平移整个 VBL 事件链，连带检查 NMI 注入点 |
-| `vbl_05_nmi_timing` | NMI 延迟 8 dot 为经验校准 | 重校准需新探针数据 |
 | `vbl_06_suppression` / `vbl_07/08_nmi_*` | $2002 读抑制、$2000 写触发的 dot 级窗口 | 依赖 vbl_02 先修 |
 | `vbl_10_even_odd_timing` | odd skip 只在 sl==0 判定 | **`ppu_rendering.cpp:2057` 跳点块是禁忌保留项，勿改** |
 | `oam_stress` | sprite 评估/overflow 行为近似 | 补做需先复现硬件 overflow bug |
-| `ppu_open_bus` | 已按 blargg 逐 test 修复但仍有残留 | 查 e1_vbl 链 decay probe 数据 |
 | `ppu_vbl_nmi`（综合） | 上述各项组合 | — |
 
-### 1.2 CPU 相关（21 条）
+> 已清零（P5.1）：`vbl_05_nmi_timing`（NMI 延迟重校准通过）、`ppu_open_bus`（open decay 修复通过）。
 
-- 指令级 `instr_v5_*`/`all_instrs`/`instr_timing`：组合挂、单组过的 accuracy gap。
+### 1.2 CPU 相关（12 条）
+
+- 指令级 `instr_timing`/`instr_misc*`：组合挂、单组过的 accuracy gap。
+  （`instr_v3_*`/`instr_v5_*`/`all_instrs` 组合项已清零。）
 - `cpu_int_2/3/4/5`：**结构性近似**——中断只在指令边界轮询（无 hijack/branch-delay，
   `x6502.cpp:515-579`）；修复要把轮询下沉到指令内固定周期点。
-- `cpu_dummy_writes_oam/ppu`、`cpu_exec_space_ppuio`、`instr_misc*`：差距在
+- `cpu_dummy_writes_oam`、`cpu_exec_space_ppuio`：差距在
   $4014 OAM DMA 与 PPU 区路径，不在 RMW 宏。
-- `cpu_reset_ram/regs`：复位状态细节。
+- `cpu_reset_regs`：复位状态细节。
 - `cpu_interrupts`：ROM 格式不兼容，**永久跳过**（eventually_pass=false）。
 
 ### 1.3 跨子系统的结构性近似
@@ -47,7 +49,7 @@ baseline 更新需与代码变更同等级 review**）。180 ROM：PASS 120 / FA
 | `ppu_frame_diff_test` | XBuf 可见区 61440 字节裸 memcmp，金标 `tests/fixtures/golden_frames/` | 拒绝 PNG/PPM（理由见测试头注释）；**仅在有意的 PPU 变更落地时重生成** |
 | `golden_hashes.json` | 多 ROM 帧 CRC/MD5 链 | R5/R6 若发生真实精度回归需追加 diff 行 |
 | `golden_savestate_test` | savestate 字节金标 | 见 §3 禁忌 |
-| blargg 180 ROM | F11QA 双 Oracle（A 回归 / B 硬件一致性） | 见 F11QA.md |
+| blargg 177 ROM | F11QA 双 Oracle（A 回归 / B 硬件一致性） | 见 F11QA.md |
 | 游戏级锚（注释级） | Knight Rider→ppudead、Super Donkey Kong→OAMADDR、3-D WorldRunner→dot257、SMB3/Crystalis→MMC3 hook、Bee 52→FRAMESKIP | 改注释锚指向的行为前先跑对应游戏 |
 
 ## 3. 禁忌清单（改了会碎东西）

@@ -1,94 +1,300 @@
 {
-  "_comment": "F11QA P5 — Known-failure baseline for blargg test ROM suite (expanded from P4 22 ROMs → P5 180 ROMs).",
-  "_policy": "This file is version-controlled. Each entry documents a ROM known to FAIL. Entries with expected_to_eventually_pass=true are accuracy bugs to fix. Entries with expected_to_eventually_pass=false are permanent skips (e.g. unsupported features or ROM format issues).",
+  "_comment": "F11QA P5.1 - Known-failure baseline for blargg test ROM suite (P5 180 ROMs -> P5.1 177 ROMs, 33 known FAILs).",
+  "_policy": "This file is version-controlled. Each entry documents a ROM known to FAIL. Entries with eventually_pass=true are accuracy bugs to fix. Entries with eventually_pass=false are permanent skips (e.g. unsupported features or ROM format issues).",
   "_governance": "AI shall not modify expected values. Baseline updates require the same review as code changes.",
-  "baseline_version": "v1.16.0-P5",
-  "previous_baseline": "v1.16.0-P4",
-  "generated_at": "2026-07-28",
-  "engine": "FCEUX11 v1.16 wip_1.16 HEAD (newppu=1, P5 full batch over 180 ROMs)",
+  "baseline_version": "v1.16.0-P5.1",
+  "previous_baseline": "v1.16.0-P5",
+  "generated_at": "2026-09-26",
+  "engine": "FCEUX11 wip1.8 1d84627 (newppu=1, 177-ROM batch 2026-09-26: 144 PASS / 33 FAIL)",
   "summary": {
-    "total": 180,
-    "pass": 120,
-    "fail": 60,
+    "total": 177,
+    "pass": 144,
+    "fail": 33,
     "error": 0,
-    "rom_coverage": "180 ROMs covering CPU (56), PPU (49), APU (52), MMC3 (18), OTHER (5)"
+    "rom_coverage": "177 ROMs covering CPU, PPU, APU, MMC3 (manifest fixtures/blargg_manifest.json)"
   },
   "runppu_relevant_failures": [
     "ppu_vbl_nmi.nes",
     "vbl_02_set_time.nes",
-    "vbl_05_nmi_timing.nes",
     "vbl_06_suppression.nes",
     "vbl_07_nmi_on_timing.nes",
     "vbl_08_nmi_off_timing.nes",
     "vbl_10_even_odd_timing.nes",
-    "oam_stress.nes",
-    "ppu_open_bus.nes"
+    "oam_stress.nes"
   ],
   "runppu_reassessment": {
-    "conclusion": "PROCEED — 9 runppu-relevant VBL/NMI/PPU timing failures identified. Combined with 39 PPU PASSes, this confirms new PPU direction is correct and runppu can deliver measurable improvement.",
-    "high_priority": ["vbl_02_set_time", "vbl_05_nmi_timing", "vbl_06_suppression"],
-    "previously_fixed_p4": "vbl_01_basics — confirmed still PASS in P5 baseline"
+    "conclusion": "PROCEED - 7 runppu-relevant VBL/NMI/PPU timing failures remain (vbl_05_nmi_timing and ppu_open_bus cleared in P5.1). Combined with 42 PPU PASSes, this confirms new PPU direction is correct and runppu can deliver measurable improvement.",
+    "high_priority": [
+      "vbl_02_set_time",
+      "vbl_06_suppression",
+      "vbl_07_nmi_on_timing"
+    ],
+    "previously_fixed_p4": "vbl_01_basics - confirmed still PASS; vbl_05_nmi_timing + ppu_open_bus cleared in P5.1 (2026-09-26)"
   },
   "failures": [
-    {"rom":"all_instrs.nes","category":"cpu","code":"0x80","eventually_pass":true,"runppu":false,"reason":"CPU all instructions (unofficial) — combined fails while individual opcode groups pass."},
-    {"rom":"official_only.nes","category":"cpu","code":"0x80","eventually_pass":true,"runppu":false,"reason":"CPU official instructions — combined fails while individual groups pass."},
-    {"rom":"instr_v3_all.nes","category":"cpu","code":"0x80","eventually_pass":true,"runppu":false,"reason":"instr_test-v3 all instructions — same class as v5."},
-    {"rom":"instr_v3_official.nes","category":"cpu","code":"0x80","eventually_pass":true,"runppu":false,"reason":"instr_test-v3 official only."},
-    {"rom":"instr_v5_all.nes","category":"cpu","code":"0x80","eventually_pass":true,"runppu":false,"reason":"instr_test-v5 all instructions — known CPU accuracy gap."},
-    {"rom":"instr_v5_official.nes","category":"cpu","code":"0x80","eventually_pass":true,"runppu":false,"reason":"instr_test-v5 official only."},
-    {"rom":"instr_v5_07_abs_xy.nes","category":"cpu","code":"0x80","eventually_pass":true,"runppu":false,"reason":"CPU abs,x/y addressing mode single test."},
-    {"rom":"instr_timing.nes","category":"cpu","code":"0x80","eventually_pass":true,"runppu":false,"reason":"CPU instruction cycle timing combined."},
-    {"rom":"instr_timing_v2_1.nes","category":"cpu","code":"0x80","eventually_pass":true,"runppu":false,"reason":"CPU instruction timing v2 main."},
-    {"rom":"cpu_interrupts.nes","category":"cpu","code":"0xFE","eventually_pass":false,"runppu":false,"reason":"ROM load failure — format incompatible with LoadGame. Permanent skip."},
-    {"rom":"cpu_int_2_nmi_brk.nes","category":"cpu","code":"0x01","eventually_pass":true,"runppu":false,"reason":"NMI and BRK interaction timing."},
-    {"rom":"cpu_int_3_nmi_irq.nes","category":"cpu","code":"0x01","eventually_pass":true,"runppu":false,"reason":"NMI and IRQ interaction timing."},
-    {"rom":"cpu_int_4_irq_dma.nes","category":"cpu","code":"0x01","eventually_pass":true,"runppu":false,"reason":"IRQ and DMA interaction."},
-    {"rom":"cpu_int_5_branch_irq.nes","category":"cpu","code":"0x01","eventually_pass":true,"runppu":false,"reason":"Branch delays IRQ timing."},
-    {"rom":"cpu_reset_ram.nes","category":"cpu","code":"0x81","eventually_pass":true,"runppu":false,"reason":"RAM state after reset."},
-    {"rom":"cpu_reset_regs.nes","category":"cpu","code":"0x81","eventually_pass":true,"runppu":false,"reason":"CPU register state after reset."},
-    {"rom":"cpu_dummy_writes_oam.nes","category":"cpu","code":"0x80","eventually_pass":true,"runppu":false,"reason":"CPU dummy writes to OAM DMA registers."},
-    {"rom":"cpu_dummy_writes_ppu.nes","category":"cpu","code":"0x09","eventually_pass":true,"runppu":false,"reason":"CPU dummy writes to PPU memory region."},
-    {"rom":"cpu_exec_space_ppuio.nes","category":"cpu","code":"0x05","eventually_pass":true,"runppu":false,"reason":"CPU execution space: PPU I/O register reads."},
-    {"rom":"instr_misc.nes","category":"cpu","code":"0x01","eventually_pass":true,"runppu":false,"reason":"Instruction misc combined."},
-    {"rom":"instr_misc_03_dummy.nes","category":"cpu","code":"0x03","eventually_pass":true,"runppu":false,"reason":"CPU dummy reads behavior single."},
-    {"rom":"ppu_vbl_nmi.nes","category":"ppu","code":"0x80","eventually_pass":true,"runppu":true,"reason":"PPU VBL/NMI combined — VBL flag and NMI timing at 1-PPU-cycle accuracy. Core runppu target."},
-    {"rom":"vbl_02_set_time.nes","category":"ppu","code":"0x01","eventually_pass":true,"runppu":true,"reason":"VBL set time — cycle-0-vs-cycle-1 alignment. Key runppu target."},
-    {"rom":"vbl_05_nmi_timing.nes","category":"ppu","code":"0x01","eventually_pass":true,"runppu":true,"reason":"NMI assertion timing relative to VBL."},
-    {"rom":"vbl_06_suppression.nes","category":"ppu","code":"0x01","eventually_pass":true,"runppu":true,"reason":"NMI suppression via $2002 read."},
-    {"rom":"vbl_07_nmi_on_timing.nes","category":"ppu","code":"0x01","eventually_pass":true,"runppu":true,"reason":"NMI enable timing via $2000 write."},
-    {"rom":"vbl_08_nmi_off_timing.nes","category":"ppu","code":"0x01","eventually_pass":true,"runppu":true,"reason":"NMI disable timing via $2000 write."},
-    {"rom":"vbl_10_even_odd_timing.nes","category":"ppu","code":"0x03","eventually_pass":true,"runppu":true,"reason":"Even/odd frame PPU timing alternation."},
-    {"rom":"oam_stress.nes","category":"ppu","code":"0x01","eventually_pass":true,"runppu":true,"reason":"OAM stress — partially PPU timing sensitive."},
-    {"rom":"ppu_open_bus.nes","category":"ppu","code":"0x03","eventually_pass":true,"runppu":true,"reason":"PPU open bus behavior — PPU bus accuracy."},
-    {"rom":"ppu_read_buffer.nes","category":"ppu","code":"0x80","eventually_pass":true,"runppu":false,"reason":"PPU $2007 read buffer delay."},
-    {"rom":"apu_test.nes","category":"apu","code":"0x01","eventually_pass":true,"runppu":false,"reason":"APU combined (length counters, envelope, sweep, DMC)."},
-    {"rom":"apu_single_3_irq_flag.nes","category":"apu","code":"0x06","eventually_pass":true,"runppu":false,"reason":"APU IRQ flag behavior."},
-    {"rom":"apu_single_4_jitter.nes","category":"apu","code":"0x02","eventually_pass":true,"runppu":false,"reason":"APU clock jitter."},
-    {"rom":"apu_single_5_len_timing.nes","category":"apu","code":"0x02","eventually_pass":true,"runppu":false,"reason":"APU length counter timing."},
-    {"rom":"apu_single_6_irq_timing.nes","category":"apu","code":"0x02","eventually_pass":true,"runppu":false,"reason":"APU IRQ flag timing."},
-    {"rom":"apu_mixer_dmc.nes","category":"apu","code":"0x80","eventually_pass":true,"runppu":false,"reason":"APU DMC mixing — audio self-test, not $6000 protocol."},
-    {"rom":"apu_mixer_noise.nes","category":"apu","code":"0x80","eventually_pass":true,"runppu":false,"reason":"APU noise mixing — audio self-test."},
-    {"rom":"apu_mixer_square.nes","category":"apu","code":"0x80","eventually_pass":true,"runppu":false,"reason":"APU square mixing — audio self-test."},
-    {"rom":"apu_mixer_triangle.nes","category":"apu","code":"0x80","eventually_pass":true,"runppu":false,"reason":"APU triangle mixing — audio self-test."},
-    {"rom":"apu_reset_4015.nes","category":"apu","code":"0x81","eventually_pass":true,"runppu":false,"reason":"APU $4015 register on reset."},
-    {"rom":"apu_reset_4017_timing.nes","category":"apu","code":"0x02","eventually_pass":true,"runppu":false,"reason":"APU $4017 timing after reset."},
-    {"rom":"apu_reset_4017_written.nes","category":"apu","code":"0x02","eventually_pass":true,"runppu":false,"reason":"APU $4017 written value after reset."},
-    {"rom":"apu_reset_irq_cleared.nes","category":"apu","code":"0x81","eventually_pass":true,"runppu":false,"reason":"APU IRQ flag cleared on reset."},
-    {"rom":"apu_reset_len_ctrs.nes","category":"apu","code":"0x81","eventually_pass":true,"runppu":false,"reason":"APU length counters on reset."},
-    {"rom":"apu_reset_works_imm.nes","category":"apu","code":"0x81","eventually_pass":true,"runppu":false,"reason":"APU works immediately after reset."},
-    {"rom":"sprdma_dmc_dma.nes","category":"apu","code":"0x01","eventually_pass":true,"runppu":false,"reason":"Sprite DMA + DMC DMA interaction."},
-    {"rom":"sprdma_dmc_dma_512.nes","category":"apu","code":"0x01","eventually_pass":true,"runppu":false,"reason":"Sprite DMA + DMC DMA 512 variant."},
-    {"rom":"mmc3_1_clocking.nes","category":"mmc3","code":"0x03","eventually_pass":true,"runppu":false,"reason":"MMC3 IRQ clocking."},
-    {"rom":"mmc3_2_details.nes","category":"mmc3","code":"0x02","eventually_pass":true,"runppu":false,"reason":"MMC3 IRQ details."},
-    {"rom":"mmc3_3_A12_clocking.nes","category":"mmc3","code":"0x04","eventually_pass":true,"runppu":false,"reason":"MMC3 A12 clocking for scanline detection."},
-    {"rom":"mmc3_4_scanline_timing.nes","category":"mmc3","code":"0x09","eventually_pass":true,"runppu":false,"reason":"MMC3 scanline timing."},
-    {"rom":"mmc3_5_MMC3.nes","category":"mmc3","code":"0x02","eventually_pass":true,"runppu":false,"reason":"MMC3 comprehensive."},
-    {"rom":"mmc3_6_MMC6.nes","category":"mmc3","code":"0x02","eventually_pass":true,"runppu":false,"reason":"MMC6 variant."},
-    {"rom":"mmc3_v2_1_clocking.nes","category":"mmc3","code":"0x03","eventually_pass":true,"runppu":false,"reason":"MMC3 v2 clocking alternate."},
-    {"rom":"mmc3_v2_2_details.nes","category":"mmc3","code":"0x02","eventually_pass":true,"runppu":false,"reason":"MMC3 v2 details alternate."},
-    {"rom":"mmc3_v2_3_A12_clocking.nes","category":"mmc3","code":"0x04","eventually_pass":true,"runppu":false,"reason":"MMC3 v2 A12 clocking alternate."},
-    {"rom":"mmc3_v2_4_scanline_timing.nes","category":"mmc3","code":"0x09","eventually_pass":true,"runppu":false,"reason":"MMC3 v2 scanline timing alternate."},
-    {"rom":"mmc3_v2_5_MMC3.nes","category":"mmc3","code":"0x02","eventually_pass":true,"runppu":false,"reason":"MMC3 v2 comprehensive alternate."},
-    {"rom":"mmc3_v2_6_MMC3_alt.nes","category":"mmc3","code":"0x02","eventually_pass":true,"runppu":false,"reason":"MMC3 v2 alternate board variant."}
+    {
+      "rom": "instr_timing.nes",
+      "category": "cpu",
+      "code": "0x80",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "CPU instruction cycle timing combined."
+    },
+    {
+      "rom": "instr_timing_v2_1.nes",
+      "category": "cpu",
+      "code": "0x80",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "CPU instruction timing v2 main."
+    },
+    {
+      "rom": "cpu_interrupts.nes",
+      "category": "cpu",
+      "code": "0xFE",
+      "eventually_pass": false,
+      "runppu": false,
+      "reason": "ROM load failure 鈥?format incompatible with LoadGame. Permanent skip."
+    },
+    {
+      "rom": "cpu_int_2_nmi_brk.nes",
+      "category": "cpu",
+      "code": "0x01",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "NMI and BRK interaction timing."
+    },
+    {
+      "rom": "cpu_int_3_nmi_irq.nes",
+      "category": "cpu",
+      "code": "0x01",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "NMI and IRQ interaction timing."
+    },
+    {
+      "rom": "cpu_int_4_irq_dma.nes",
+      "category": "cpu",
+      "code": "0x01",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "IRQ and DMA interaction."
+    },
+    {
+      "rom": "cpu_int_5_branch_irq.nes",
+      "category": "cpu",
+      "code": "0x01",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "Branch delays IRQ timing."
+    },
+    {
+      "rom": "cpu_reset_regs.nes",
+      "category": "cpu",
+      "code": "0x81",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "CPU register state after reset."
+    },
+    {
+      "rom": "cpu_dummy_writes_oam.nes",
+      "category": "cpu",
+      "code": "0x80",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "CPU dummy writes to OAM DMA registers."
+    },
+    {
+      "rom": "cpu_exec_space_ppuio.nes",
+      "category": "cpu",
+      "code": "0x05",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "CPU execution space: PPU I/O register reads."
+    },
+    {
+      "rom": "instr_misc.nes",
+      "category": "cpu",
+      "code": "0x01",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "Instruction misc combined."
+    },
+    {
+      "rom": "instr_misc_03_dummy.nes",
+      "category": "cpu",
+      "code": "0x03",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "CPU dummy reads behavior single."
+    },
+    {
+      "rom": "ppu_vbl_nmi.nes",
+      "category": "ppu",
+      "code": "0x80",
+      "eventually_pass": true,
+      "runppu": true,
+      "reason": "PPU VBL/NMI combined 鈥?VBL flag and NMI timing at 1-PPU-cycle accuracy. Core runppu target."
+    },
+    {
+      "rom": "vbl_02_set_time.nes",
+      "category": "ppu",
+      "code": "0x01",
+      "eventually_pass": true,
+      "runppu": true,
+      "reason": "VBL set time 鈥?cycle-0-vs-cycle-1 alignment. Key runppu target."
+    },
+    {
+      "rom": "vbl_06_suppression.nes",
+      "category": "ppu",
+      "code": "0x01",
+      "eventually_pass": true,
+      "runppu": true,
+      "reason": "NMI suppression via $2002 read."
+    },
+    {
+      "rom": "vbl_07_nmi_on_timing.nes",
+      "category": "ppu",
+      "code": "0x01",
+      "eventually_pass": true,
+      "runppu": true,
+      "reason": "NMI enable timing via $2000 write."
+    },
+    {
+      "rom": "vbl_08_nmi_off_timing.nes",
+      "category": "ppu",
+      "code": "0x01",
+      "eventually_pass": true,
+      "runppu": true,
+      "reason": "NMI disable timing via $2000 write."
+    },
+    {
+      "rom": "vbl_10_even_odd_timing.nes",
+      "category": "ppu",
+      "code": "0x03",
+      "eventually_pass": true,
+      "runppu": true,
+      "reason": "Even/odd frame PPU timing alternation."
+    },
+    {
+      "rom": "oam_stress.nes",
+      "category": "ppu",
+      "code": "0x01",
+      "eventually_pass": true,
+      "runppu": true,
+      "reason": "OAM stress 鈥?partially PPU timing sensitive."
+    },
+    {
+      "rom": "sprdma_dmc_dma.nes",
+      "category": "apu",
+      "code": "0x01",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "Sprite DMA + DMC DMA interaction."
+    },
+    {
+      "rom": "sprdma_dmc_dma_512.nes",
+      "category": "apu",
+      "code": "0x01",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "Sprite DMA + DMC DMA 512 variant."
+    },
+    {
+      "rom": "mmc3_1_clocking.nes",
+      "category": "mmc3",
+      "code": "0x03",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "MMC3 IRQ clocking."
+    },
+    {
+      "rom": "mmc3_2_details.nes",
+      "category": "mmc3",
+      "code": "0x02",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "MMC3 IRQ details."
+    },
+    {
+      "rom": "mmc3_3_A12_clocking.nes",
+      "category": "mmc3",
+      "code": "0x04",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "MMC3 A12 clocking for scanline detection."
+    },
+    {
+      "rom": "mmc3_4_scanline_timing.nes",
+      "category": "mmc3",
+      "code": "0x09",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "MMC3 scanline timing."
+    },
+    {
+      "rom": "mmc3_5_MMC3.nes",
+      "category": "mmc3",
+      "code": "0x02",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "MMC3 comprehensive."
+    },
+    {
+      "rom": "mmc3_6_MMC6.nes",
+      "category": "mmc3",
+      "code": "0x02",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "MMC6 variant."
+    },
+    {
+      "rom": "mmc3_v2_1_clocking.nes",
+      "category": "mmc3",
+      "code": "0x03",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "MMC3 v2 clocking alternate."
+    },
+    {
+      "rom": "mmc3_v2_2_details.nes",
+      "category": "mmc3",
+      "code": "0x02",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "MMC3 v2 details alternate."
+    },
+    {
+      "rom": "mmc3_v2_3_A12_clocking.nes",
+      "category": "mmc3",
+      "code": "0x04",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "MMC3 v2 A12 clocking alternate."
+    },
+    {
+      "rom": "mmc3_v2_4_scanline_timing.nes",
+      "category": "mmc3",
+      "code": "0x09",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "MMC3 v2 scanline timing alternate."
+    },
+    {
+      "rom": "mmc3_v2_5_MMC3.nes",
+      "category": "mmc3",
+      "code": "0x02",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "MMC3 v2 comprehensive alternate."
+    },
+    {
+      "rom": "mmc3_v2_6_MMC3_alt.nes",
+      "category": "mmc3",
+      "code": "0x02",
+      "eventually_pass": true,
+      "runppu": false,
+      "reason": "MMC3 v2 alternate board variant."
+    }
   ]
 }

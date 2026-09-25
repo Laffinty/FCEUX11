@@ -118,7 +118,7 @@
 
 ## 四、CPU 侧已知精度限制
 
-（详见 [precision.md](precision.md) 与 `tests/fixtures/blargg_known_fail.json` v1.16.0-P5）
+（详见 [precision.md](precision.md) 与 `tests/fixtures/blargg_known_fail.json` v1.16.0-P5.1）
 
 - 指令级：`instr_v5_*`/`all_instrs`（组合挂、单组过的 accuracy gap）、`instr_timing`
   （周期表+边界加罚不精确）。

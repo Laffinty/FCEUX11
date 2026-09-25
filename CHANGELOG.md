@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed — blargg known-fail baseline P5 → P5.1（2026-09-26）
+
+- **`tests/fixtures/blargg_known_fail.json`**：60 → 33 条。划掉 25 个已实测 PASS 的 ROM
+  （15 项 APU mixer/reset/single、`instr_v3_*`/`instr_v5_*` 组合项、`cpu_dummy_writes_ppu`、
+  `cpu_reset_ram`、`ppu_open_bus`、`ppu_read_buffer`、`vbl_05_nmi_timing`）；
+  另删 2 条重复条目（`all_instrs`/`official_only`，活条目 `instr_v5_all`/`instr_v5_official`）。
+  runppu 相关 9 → 7（清零 `vbl_05_nmi_timing`、`ppu_open_bus`）。
+- **`tests/fixtures/blargg_full_baseline.json`**：摘要同步为 177 ROM / 144 PASS / 33 FAIL（81.4%）。
+- **`docs/tech/precision.md` / `cpu.md` / `F11QA.md`**：已知失败面统计与版本号同步 P5.1。
+
+> 实测依据：`f11qa_blargg_runner --manifest fixtures/blargg_manifest.json`（wip1.8 `1d84627`），
+> 33 FAIL 全部落在保留名单内，零意外 FAIL。baseline 更新经人工授权（precision.md §3.6）。
+
 ## [1.17] - 2026-08-08
 
 **Codename: KagamiQA 统合.** v1.17 将 KagamiQA 从「FCEUX11 的附属测试框架」升级为

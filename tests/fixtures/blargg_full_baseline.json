@@ -1,20 +1,19 @@
 {
-  "baseline_version": "v1.16.0-P5",
-  "engine": "FCEUX11 v1.16 wip_1.16 HEAD (newppu=1, F11QA P5 full batch)",
-  "timestamp": "2026-07-28",
+  "baseline_version": "v1.16.0-P5.1",
+  "engine": "FCEUX11 wip1.8 1d84627 (newppu=1, 177-ROM batch 2026-09-26)",
+  "timestamp": "2026-09-26",
   "summary": {
-    "total": 180,
-    "passed": 120,
-    "failed": 60,
+    "total": 177,
+    "passed": 144,
+    "failed": 33,
     "error": 0,
-    "coverage_pct": 66.7
+    "coverage_pct": 81.4
   },
   "category_breakdown": {
-    "CPU": { "total": 56, "passed": 37, "failed": 19 },
-    "PPU": { "total": 49, "passed": 39, "failed": 10 },
-    "APU": { "total": 52, "passed": 35, "failed": 17 },
-    "MMC3": { "total": 18, "passed": 6, "failed": 12 },
-    "OTHER": { "total": 5, "passed": 3, "failed": 2 }
+    "CPU": { "total": 58, "passed": 46, "failed": 12 },
+    "PPU": { "total": 49, "passed": 42, "failed": 7 },
+    "APU": { "total": 52, "passed": 50, "failed": 2 },
+    "MMC3": { "total": 18, "passed": 6, "failed": 12 }
   },
-  "reclassify_note": "P5 initial full baseline. 60 failures classified below. See blargg_known_fail.json for per-ROM disposition and runppu relevance."
+  "reclassify_note": "P5.1 refresh 2026-09-26. 33 failures classified in blargg_known_fail.json. Compared to P5 (180/120/60): +24 PASS from accuracy fixes (15 APU mixer/reset + instr_v3/v5 combined + ppu_read_buffer/ppu_open_bus/vbl_05_nmi_timing/cpu_dummy_writes_ppu/cpu_reset_ram); 2 orphan dups (all_instrs/official_only) dropped with inventory cleanup. See blargg_known_fail.json for per-ROM disposition and runppu relevance."
 }

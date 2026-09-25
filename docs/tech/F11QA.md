@@ -558,7 +558,7 @@ FCEUX11/
 │   │   ├── blargg/                         ← 177 blargg ROM (cpu/ppu/apu/mmc3/)
 │   │   ├── blargg_manifest.json            ← ROM 清单（name/path/frames/probe_addr/reset_after；v1.17 H-1 全条目含 reset_after）
 │   │   ├── blargg_known_fail.json          ← 已知失败分类（33 条实测，含 runppu 标记）
-│   │   ├── blargg_full_baseline.json       ← P5 全量基线（144 PASS / 33 FAIL，2026-08-08 实测刷新）
+│   │   ├── blargg_full_baseline.json       ← P5 全量基线（144 PASS / 33 FAIL，2026-09-26 实测刷新）
 │   │   ├── golden/                         ← golden savestate 数据（.fc0 + golden_index.json；v1.17 决策：数据留此处）
 │   │   └── nestest.nes                     ← smoke test ROM
 │   ├── kagami/                             ← KagamiQA C++ 资产唯一落点（v1.17 Task2-A1 落位）
