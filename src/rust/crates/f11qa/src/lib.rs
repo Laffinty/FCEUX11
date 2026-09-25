@@ -6,6 +6,11 @@ pub mod report;
 pub mod adapter;
 pub mod cli;
 
+// F11QA v1.8 Phase 5.1 — rom-suite protocol selection + fixture discovery.
+// Shared by `f11qa-rom-runner` (bin) so the routing rules are unit-testable
+// without spawning the C++ `f11qa_blargg_runner`.
+pub mod rom_protocol;
+
 // F11QA v1.8 §五 Phase 6 — Rust 端对偶模块（kgmqa-118/119/120）
 // 对应 C++ tests/f11qa/{config_store,pixbuf_pool,core_state}_test.cpp
 pub mod config_store;

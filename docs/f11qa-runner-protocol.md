@@ -166,25 +166,42 @@ Phase 5 已把全部 stub 换成真实协议分发（`rom_runner.rs`）：
 
 ## 8. 落地验证
 
-本地 smoke（已完成）：
+本地 smoke（Phase 5.1 已完成，2026-09-25）：
 
 ```pwsh
-$ # kgmqa-082 advisory → skip + exit 0
-& src\rust\target\x86_64-pc-windows-msvc\debug\f11qa-rom-runner.exe `
-  --kgmqa-id kgmqa-082-fds-mirroring-takuikaninja `
-  --tests-json tests\tests.json
+$bin = "src\rust\target\x86_64-pc-windows-msvc\debug\f11qa-rom-runner.exe"
 
-$ # kgmqa-048 nestest → ROM/log 派生路径正确（缺文件时 exit 2 + hint）
-& src\rust\target\x86_64-pc-windows-msvc\debug\f11qa-rom-runner.exe `
-  --kgmqa-id kgmqa-048-nestest `
-  --tests-json tests\tests.json
+# kgmqa-082 advisory → skip + exit 0
+& $bin --kgmqa-id kgmqa-082-fds-mirroring-takuikaninja --tests-json tests\tests.json
+# exit=0
+
+# kgmqa-049 vendored 但 ROM 未 fetch → exit 2 + fetch hint（真实协议前置检查）
+& $bin --kgmqa-id kgmqa-049-ppu-read-buffer-bisqwit --tests-json tests\tests.json --frames 600
+# exit=2
+
+# kgmqa-077 聚合 0 成员 → exit 2
+& $bin --kgmqa-id kgmqa-077-holy-mapperel-tepples --tests-json tests\tests.json --frames 60
+# exit=2
+
+# kgmqa-077 聚合 3 假成员 + blargg_runner 不在 PATH → 逐个调度，exit 3（环境失败）
+# kgmqa-048 nestest 缺 .log → exit 2
 ```
 
-CI 验证（Linux runner，等 Phase 8 冻结基线）：
+单元测试：`cargo test -p f11qa` → **179 passed**（含 `rom_protocol` 9 项：协议推断 / leaf_pattern / list_fixtures 单通配）。
 
-1. 跑 `python scripts/fetch_roms_from_mirror.py` 拉 ROM
+协议完备性（`scripts/phase5_add_protocol.py` + validator）：
+78 条 rom-suite 全部带 `protocol` 字段，取值 ∈ {`$6000`, `nestest-trace`, `aggregate-mapperel`}，无缺失/未知。
+
+CI 验证（Linux runner，等 v1.8.0-mirror tag + Phase 8 冻结基线）：
+
+1. 跑 `python scripts/fetch_roms_from_mirror.py` 拉 ROM（聚合用例走 `mirror_glob`）
 2. 跑 `ctest -R '^kgmqa-0(31|32|33|48|53|54|55|111|...)'` 跑 vendored 子集
 3. 看 matrix 里 78 项 rom-suite 的 transition；advisory / pending-vendor 应保持 skip，vendored 应全 PASS
+
+**待闭环**（依赖外部条件）：
+- `f11qa_blargg_runner` 需 CMake + vcpkg 构建后上 PATH，才能跑真 ROM 端到端（本机 vcpkg 未就位）
+- 真实第三方 ROM 字节依赖镜像源 `v1.8.0-mirror` tag 发布；发布后按上表跑 vendored 子集确认 `$6000` 协议
+- 若个别 ROM 被证实不走 `$6000`：tests.json 加 `protocol: "<新协议>"` + `rom_protocol.rs` 加分支即可
 
 ## 9. 与 kgmqa-117 mirror_snapshot_check 的关系
 

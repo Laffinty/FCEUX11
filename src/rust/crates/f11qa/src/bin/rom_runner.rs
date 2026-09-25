@@ -23,6 +23,10 @@
 //
 // 返回码：0=PASS 或 skip；1=FAIL；2=参数/文件缺失；3=底层 runner spawn 失败。
 
+use f11qa::rom_protocol::{
+    self as proto, leaf_pattern, list_fixtures, resolve_protocol, PROTO_6000, PROTO_AGGREGATE,
+    PROTO_NESTEST,
+};
 use std::env;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
@@ -168,35 +172,6 @@ fn main() -> ExitCode {
 }
 
 // ============================================================================
-// Protocol resolution
-// ============================================================================
-
-/// Standard blargg-style status-port protocol: after `frames` steps, `$6000`
-/// reads 0x00 for PASS. Used by the NES test-ROM community (bisqwit, tepples,
-/// damianyerrick, lidnariq, rainwarrior, awj, natt, nk, drag, quietust, sour,
-/// 3gengames, rahsennor, flubba, …) as well as blargg's own suites.
-const PROTO_6000: &str = "$6000";
-/// kevtris nestest: CPU trace compared against a Nintendulator golden log.
-const PROTO_NESTEST: &str = "nestest-trace";
-/// Holy Mapperel: 47 mapper-identification ROMs, all must PASS.
-const PROTO_AGGREGATE: &str = "aggregate-mapperel";
-
-/// Explicit `protocol` field wins; otherwise infer from kgmqa_id. All
-/// rom-suite cases default to the $6000 status-port protocol.
-fn resolve_protocol(case: &serde_json::Value, kgmqa_id: &str) -> String {
-    if let Some(p) = case.get("protocol").and_then(|v| v.as_str()) {
-        return p.to_string();
-    }
-    if kgmqa_id.starts_with("kgmqa-048") {
-        return PROTO_NESTEST.to_string();
-    }
-    if kgmqa_id.starts_with("kgmqa-077") {
-        return PROTO_AGGREGATE.to_string();
-    }
-    PROTO_6000.to_string()
-}
-
-// ============================================================================
 // Dispatch helpers
 // ============================================================================
 
@@ -310,9 +285,9 @@ fn dispatch_aggregate(
     let glob = case
         .get("mirror_glob")
         .and_then(|v| v.as_str())
-        .unwrap_or("holy_mapperel/M*.nes");
-    let leaf_pat = glob.rsplit_once('/').map(|x| x.1).unwrap_or(glob);
-    let roms = match list_fixtures(leaf_pat) {
+        .unwrap_or(proto::HOLY_MAPPEREL_GLOB);
+    let leaf_pat = leaf_pattern(glob);
+    let roms = match list_fixtures(Path::new("tests/fixtures"), leaf_pat) {
         Ok(v) => v,
         Err(e) => {
             eprintln!("[fail] list tests/fixtures ({}): {}", leaf_pat, e);
@@ -385,38 +360,7 @@ fn dispatch_aggregate(
 fn rom_local_path(mirror_path: &str) -> PathBuf {
     // mirror_path = "<suite>/<rom>.nes" → tests/fixtures/<rom>.nes (just basename)
     // 与 scripts/fetch_roms_from_mirror.py 的 shutil.copy2(dst=output_dir/leaf) 一致
-    let leaf = mirror_path.rsplit_once('/').map(|x| x.1).unwrap_or(mirror_path);
-    Path::new("tests/fixtures").join(leaf)
-}
-
-/// List `tests/fixtures/<pattern>` where `pattern` supports a single `*`
-/// wildcard (enough for `M*.nes`). Returns basenames sorted for stable order.
-fn list_fixtures(pattern: &str) -> std::io::Result<Vec<PathBuf>> {
-    let dir = Path::new("tests/fixtures");
-    let (prefix, suffix) = match pattern.split_once('*') {
-        Some((p, s)) => (p, s),
-        None => {
-            // literal filename
-            let p = dir.join(pattern);
-            return Ok(if p.exists() { vec![p] } else { Vec::new() });
-        }
-    };
-    let mut out = Vec::new();
-    for entry in std::fs::read_dir(dir)? {
-        let entry = entry?;
-        if !entry.file_type()?.is_file() {
-            continue;
-        }
-        let name = entry.file_name().to_string_lossy().to_string();
-        if name.len() >= prefix.len() + suffix.len()
-            && name.starts_with(prefix)
-            && name.ends_with(suffix)
-        {
-            out.push(entry.path());
-        }
-    }
-    out.sort();
-    Ok(out)
+    Path::new("tests/fixtures").join(leaf_pattern(mirror_path))
 }
 
 // ============================================================================
