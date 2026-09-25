@@ -192,6 +192,11 @@ $bin = "src\rust\target\x86_64-pc-windows-msvc\debug\f11qa-rom-runner.exe"
 协议完备性（`scripts/phase5_add_protocol.py` + validator）：
 78 条 rom-suite 全部带 `protocol` 字段，取值 ∈ {`$6000`, `nestest-trace`, `aggregate-mapperel`}，无缺失/未知。
 
+路由完备性（`scripts/phase5_probe_routes.py`，2026-09-25 实跑）：
+78/78 出口码全部 ∈ {0,1,2,3}，零 panic。分布 `{0: 35, 2: 41, 3: 2}` =
+35 skip（13 advisory + 22 pending-vendor）+ 41 缺 ROM 文件 + 2 已就位但 spawn 失败
+（kgmqa-031 用 nestest.nes、kgmqa-043 用 blargg_manifest.json，均在 fixtures）。
+
 CI 验证（Linux runner，等 v1.8.0-mirror tag + Phase 8 冻结基线）：
 
 1. 跑 `python scripts/fetch_roms_from_mirror.py` 拉 ROM（聚合用例走 `mirror_glob`）
