@@ -4,7 +4,7 @@
 // kagami-qa crate can drive the emulator in-process.  Uses the null
 // driver (no Qt) and provides frame-by-frame oracle probe access.
 
-#include "kagami_bridge.h"
+#include "f11qa_bridge.h"
 
 #include "types.h"
 #include "fceu.h"

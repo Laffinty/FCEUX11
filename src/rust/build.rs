@@ -227,7 +227,7 @@ fn merge_headers(
     }
     output.push_str(&f11qa_body);
 
-    // Stage-2 §七 (C-1): the exported C-ABI symbol `f11qa_direct_main` now
+    // Stage-2 §七 (C-1): the exported C-ABI symbol `kagami_qa_direct_main` now
     // lives in the root crate fceux11-rust (see src/lib.rs wrapper). It is
     // NOT part of any individual member crate's cbindgen output, so we append
     // its declaration here to keep fceux11_rust.h self-contained.
@@ -237,7 +237,7 @@ fn merge_headers(
     output.push_str(" * Main entry point called from C++ (f11qa_direct_main.cpp).\n");
     output.push_str(" * Parses CLI args and runs Oracle B tests in-process.\n");
     output.push_str(" */\n");
-    output.push_str("int32_t f11qa_direct_main(int32_t argc, const char *const *argv);\n");
+    output.push_str("int32_t kagami_qa_direct_main(int32_t argc, const char *const *argv);\n");
 
     output.push_str("\n#ifdef __cplusplus\n}\n#endif\n\n");
     output.push_str("#endif /* FCEUX11_RUST_H */\n");
