@@ -40,10 +40,14 @@ f11qa-rom-runner
 | kgmqa_id 前缀             | 协议              | 底层调用                                       |
 | ------------------------- | ----------------- | ---------------------------------------------- |
 | kgmqa-048-nestest         | nestest trace     | `f11qa_blargg_runner --rom <p> --log <p.log> --kgmqa-id <id>` |
-| kgmqa-031 ~ 043, 053 ~ 067, 111 | blargg $6000 | `f11qa_blargg_runner --rom <p> --kgmqa-id <id>`        |
-| kgmqa-049 ~ 112 (其余)    | protocol-stub     | exit 0（Phase 5 框架；Phase 9 实战时填充） |
+| kgmqa-043-blargg-suite    | blargg batch      | `f11qa_blargg_runner --manifest blargg_manifest.json --kgmqa-id <id>` |
+| kgmqa-077-holy-mapperel   | aggregate-mapperel| 47 ROM 循环 × `$6000`，全部 PASS 才 PASS        |
+| 其余全部 rom-suite        | `$6000` 状态口    | `f11qa_blargg_runner --rom <p> --kgmqa-id <id>` |
 
-### 3.1 nestest（kgmqa-048）
+协议字段优先级：cases 的显式 `protocol` 字段 > 按 kgmqa_id 推断 > rom-suite 默认 `$6000`。
+`tests/tests.json` 已对 78 条 rom-suite 全部落 `protocol` 字段（`$6000` ×76 / `nestest-trace` ×1 / `aggregate-mapperel` ×1）。
+
+### 3.1 nestest（kgmqa-048，protocol=`nestest-trace`）
 
 `nestest.nes` 是 NES 社区 CPU 指令正确性基准套件，输出走 `$6000` 端口写文本。本地期望值存在 `tests/fixtures/nestest.log`，由 v1.17 baseline 冻结。
 
@@ -51,26 +55,42 @@ dispatcher 派生：
 - ROM 路径：`tests/fixtures/<basename>` ← `mirror_path` 的末段
 - log 路径：同 basename 换 `.log` 扩展名
 
-### 3.2 blargg 系列（27 项）
+### 3.2 `$6000` 状态口协议（protocol=`$6000`，rom-suite 默认）
 
-`f11qa_blargg_runner` 是 v1.17 已经实现的 $6000 文本 ROM 跑器（已在 `src/rust/crates/f11qa/src/runner/blargg.rs`）。Phase 5 直接复用，dispatcher 只负责：
+NES 测试 ROM 社区标准结果上报协议（blargg 最早推广）：跑 `--frames N` 帧后读 CPU `$6000`，`0x00`=PASS，`0x81`=运行中/需复位，其他值=FAIL 码（诊断串在 `$6001+`）。
 
-- 解析 kgmqa_id，从 tests.json 读 vendor_state
-- vendor_state=vendored → spawn blargg runner
-- vendor_state=advisory / pending-vendor → skip + exit 0
-- 派生 `--rom` 路径；其他 forwarded args（`--frames`, `--reset-after`）原样转发
+**适用 suite**（寄存器/屏幕/log 差分是套件内部测试手法，结果仍走 `$6000`）：
 
-### 3.3 protocol-stub（53 项）
+| suite | kgmqa | 说明 |
+|-------|-------|------|
+| blargg | 031~043, 053~067, 111 | 原生 $6000 |
+| bisqwit | 049, 050, 051, 052 | $6000 |
+| damianyerrick / pinobatch | 068, 099 | $6000 |
+| nk / drag / awj / natt | 069, 070, 071, 072, 073 | $6000 |
+| tepples | 074, 075, 076, 093, 096, 097, 100, 101, 102, 103, 104, 109 | $6000（tvpassfail/porttest 等亦是） |
+| lidnariq | 078, 106 | $6000 |
+| quietust | 079, 080 | $6000（寄存器为测试对象） |
+| sour FDS | 081 | $6000 |
+| rainwarrior | 086~095, 098, 107, 108 | $6000 |
+| 3gengames | 105 | $6000 |
+| rahsennor | 110 | $6000（DMA 时序为测试对象） |
+| flubba NEStress | 112 | $6000 |
 
-kgmqa-049 ~ 112 中除 048 外的 53 项第三方 ROM 套件，每项的协议细节（$6000 / 屏幕 hash / log diff）尚未在 Phase 5 实现。dispatcher 在 Phase 5 行为：
+`f11qa_blargg_runner` 的单 ROM 模式对任意 `$6000` ROM 通用：`--rom <p> --frames N`，返回 0/1。
 
-```
-[protocol-stub] kgmqa_id=<id> mirror_path=<path>
-[protocol-stub] Phase 5 framework; Phase 9 will implement suite-specific protocol.
-[protocol-stub] exit 0 (Phase 5 stub; Phase 9 will replace with real PASS/FAIL)
-```
+### 3.3 aggregate-mapperel（kgmqa-077，protocol=`aggregate-mapperel`）
 
-vendor_state=advisory / pending-vendor 的用例**不会**到达 protocol-stub；它们在 routing 早期 skip。
+Holy Mapperel（pinobatch）47 个 mapper 识别 ROM，`mirror_glob: holy_mapperel/M*.nes`。
+
+dispatcher 行为：
+1. `list_fixtures("M*.nes")` 枚举 `tests/fixtures/` 下成员（fetch 脚本按同一扁平 basename 规则复制）
+2. 逐个跑 `$6000` 协议，`--kgmqa-id kgmqa-077-...:<rom>` 区分成员
+3. 全部 PASS → exit 0；任一 FAIL → exit 1；纯 spawn 环境失败 → exit 3；0 成员 → exit 2
+
+### 3.4 vendor_state 三态（先于协议分发）
+
+`advisory` / `pending-vendor` 在路由早期 skip + exit 0，**不会**进入协议分发。
+`vendored` 缺 ROM 字节 → exit 2 + fetch hint（真实协议的文件前置检查，不是 stub）。
 
 ## 4. ROM 路径派生规则
 
@@ -108,31 +128,35 @@ if vendor_state == "advisory" || vendor_state == "pending-vendor" {
 }
 ```
 
-## 6. kgmqa-049 ~ 112 protocol-stub 路线图
+## 6. 协议落地状态（原 protocol-stub 路线图 → 已实现）
 
-Phase 9 (CI 实战) 时按 suite 分批实现：
+Phase 5 已把全部 stub 换成真实协议分发（`rom_runner.rs`）：
 
 | suite              | kgmqa                | 协议            | 状态 |
 | ------------------ | -------------------- | --------------- | ---- |
-| bisqwit            | 049, 050, 051, 052   | $6000 文本     | Phase 9.A |
-| holy_mapperel      | 077                  | 47 ROM 聚合，all-PASS = 整体 PASS | Phase 9.B |
-| FDS (sour / takuikaninja) | 081 ~ 085     | $6000 文本     | Phase 9.C |
-| rainwarrior submapper | 086 ~ 089          | $6000 文本     | Phase 9.D |
-| rainwarrior n163   | 091, 092             | 寄存器 + log   | Phase 9.D |
-| rainwarrior mapper | 090, 094             | $6000 文本     | Phase 9.D |
-| tepples            | 074, 075, 076, 093, 096, 097, 100, 101, 102, 103, 104, 109 | $6000 / 屏幕 | Phase 9.E |
-| nk / drag          | 069, 070             | 寄存器时序     | Phase 9.F |
-| awj                | 071, 072             | $6000 文本     | Phase 9.F |
-| natt               | 073                  | $6000 文本     | Phase 9.F |
-| lidnariq           | 078, 106             | $6000 文本     | Phase 9.G |
-| quietust           | 079, 080             | 寄存器         | Phase 9.G |
-| rainwarrior misc   | 098, 107, 108        | $6000 文本     | Phase 9.D |
-| damianyerrick      | 068, 099             | $6000 文本     | Phase 9.H |
-| 3gengames          | 105                  | $6000 文本     | Phase 9.H |
-| rahsennor          | 110                  | DMA 时序       | Phase 9.H |
-| nesstress          | 112                  | log diff       | Phase 9.I |
+| bisqwit            | 049, 050, 051, 052   | `$6000`         | ✅ 路由到 f11qa_blargg_runner |
+| holy_mapperel      | 077                  | `aggregate-mapperel`（47 ROM 聚合） | ✅ dispatch_aggregate |
+| FDS (sour / takuikaninja) | 081 ~ 085     | `$6000`         | ✅ |
+| rainwarrior submapper | 086 ~ 089          | `$6000`         | ✅ |
+| rainwarrior n163   | 091, 092             | `$6000`         | ✅ |
+| rainwarrior mapper | 090, 094             | `$6000`         | ✅ |
+| tepples            | 074, 075, 076, 093, 096, 097, 100, 101, 102, 103, 104, 109 | `$6000` | ✅ |
+| nk / drag          | 069, 070             | `$6000`         | ✅ |
+| awj                | 071, 072             | `$6000`         | ✅ |
+| natt               | 073                  | `$6000`         | ✅ |
+| lidnariq           | 078, 106             | `$6000`         | ✅ |
+| quietust           | 079, 080             | `$6000`         | ✅ |
+| rainwarrior misc   | 098, 107, 108        | `$6000`         | ✅ |
+| damianyerrick      | 068, 099             | `$6000`         | ✅ |
+| 3gengames          | 105                  | `$6000`         | ✅ |
+| rahsennor          | 110                  | `$6000`         | ✅ |
+| nesstress          | 112                  | `$6000`         | ✅ |
 
-Phase 9 实战时，dispatcher 加 `match kgmqa_id` 分支，对每个 suite 实现对应协议；协议细节写 `docs/f11qa-runner-protocol-<suite>.md`。
+协议选择依据：这些 ROM 采用 NES 测试 ROM 社区标准状态口上报（跑 N 帧 → `$6000`==0x00 即 PASS），
+"寄存器 / 屏幕 / log 差分"描述的是套件**内部测试对象**，不是结果上报通道。
+若某 ROM 在 CI 实战中被证实不走 `$6000`（如需屏幕 hash / log diff 黄金值），
+在 tests.json 该条目加 `protocol: "<新协议>"` 并在 `rom_runner.rs` 的 `match protocol` 加分支即可，
+无需改路由骨架。协议细节可写 `docs/f11qa-runner-protocol-<suite>.md`。
 
 ## 7. 与 v1.17 f11qa_blargg_runner 的关系
 

@@ -1,5 +1,5 @@
 // F11QA v1.8 — f11qa-rom-runner
-// 统一 ROM runner dispatcher（kgmqa-031 ~ 067 + 048 + 111 第三方 ROM + blargg 系列）。
+// 统一 ROM runner dispatcher（kgmqa-031 ~ 112 全部 rom-suite 用例）。
 //
 // 用法：
 //   f11qa-rom-runner --kgmqa-id <kgmqa-NNN-...> [--tests-json <path>] [case args...]
@@ -9,14 +9,19 @@
 //   - 其他参数（--frames, --log, --reset-after 等）→ 转发给底层 runner
 //   - --rom 不接受 forwarded；dispatcher 从 mirror_path 派生 tests/fixtures/<basename>
 //
-// 调度分支：
-//   - kgmqa-031 ~ 043, 053 ~ 067, 111 (blargg 系列)        → f11qa_blargg_runner --rom <derived>
-//   - kgmqa-048 (nestest)                                  → f11qa_blargg_runner --rom + --log
-//   - kgmqa-049 ~ 112 其他第三方 ROM（协议未实现）            → protocol-stub exit 0
-//   - vendor_state=advisory / pending-vendor                 → skip + exit 0
+// 协议分发（Phase 5 真实协议，取代 protocol-stub）：
+//   - vendor_state=advisory / pending-vendor  → skip + exit 0
+//   - kgmqa-043 (blargg suite batch)          → f11qa_blargg_runner --manifest
+//   - protocol=nestest-trace  (kgmqa-048)     → f11qa_blargg_runner --rom + --log
+//   - protocol=aggregate-mapperel (kgmqa-077) → 47-ROM 循环，全部 PASS 才 PASS
+//   - protocol=$6000 (rom-suite 默认)         → f11qa_blargg_runner --rom
+//         NES 测试 ROM 社区标准状态口协议：跑 N 帧后读 $6000，0x00=PASS。
+//         bisqwit / tepples / damianyerrick / lidnariq / rainwarrior / awj /
+//         natt / nk / drag / quietust / sour / 3gengames / rahsennor / flubba
+//         等 suite 的测试 ROM 均按此协议上报结果（寄存器/屏幕/log 差分是
+//         套件内部测试手法，结果仍走 $6000）。与 blargg 系列共用同一执行器。
 //
-// Phase 5 框架：v1.8 §四 §4.6 runner protocol 抽象层。
-// Phase 9 (CI 实战) 时填充每个 suite-specific 协议细节（$6000 / 屏幕 hash / log diff 等）。
+// 返回码：0=PASS 或 skip；1=FAIL；2=参数/文件缺失；3=底层 runner spawn 失败。
 
 use std::env;
 use std::path::{Path, PathBuf};
@@ -35,10 +40,12 @@ fn main() -> ExitCode {
              --kgmqa-id     required; identifies the test case\n  \
              --tests-json   default tests/tests.json\n\n\
              Forwarded args passed through to underlying runner:\n  \
-             --frames N     blargg-series frame count\n  \
-             --log <path>   nestest trace log path\n  \
-             --reset-after N blargg reset cadence\n  \
-             --rom is NOT forwarded; dispatcher derives it from mirror_path"
+             --frames N     frame budget for $6000 / aggregate protocols\n  \
+             --log <path>   nestest trace log path (nestest-trace only)\n  \
+             --reset-after N mid-run soft-reset cadence\n  \
+             --rom is NOT forwarded; dispatcher derives it from mirror_path\n\n\
+             Protocols: $6000 (default) | nestest-trace | aggregate-mapperel\n\
+             vendor_state=advisory/pending-vendor → skip + exit 0"
         );
         return ExitCode::from(2);
     }
@@ -120,13 +127,12 @@ fn main() -> ExitCode {
     let mirror_path =
         case.get("mirror_path").and_then(|v| v.as_str()).unwrap_or("");
 
-    eprintln!(
-        "[f11qa-rom-runner] kgmqa_id={} kind={:?} vendor_state={:?} mirror_path={:?}",
-        kgmqa_id, kind, vendor_state, mirror_path
-    );
-
     // Advisory / pending-vendor: skip + exit 0
     if vendor_state == "advisory" || vendor_state == "pending-vendor" {
+        eprintln!(
+            "[f11qa-rom-runner] kgmqa_id={} kind={:?} vendor_state={:?}",
+            kgmqa_id, kind, vendor_state
+        );
         eprintln!(
             "[skip] vendor_state={}; ROM not fetched; exit 0",
             vendor_state
@@ -134,67 +140,84 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
-    // Dispatch by kgmqa_id prefix (Phase 5 framework)
-    if is_blargg_series(&kgmqa_id) {
-        return dispatch_blargg(&kgmqa_id, mirror_path, &forwarded);
-    }
+    // Dispatch: real protocols (Phase 5 — no more protocol-stub)
+    let protocol = resolve_protocol(&case, &kgmqa_id);
+
+    eprintln!(
+        "[f11qa-rom-runner] kgmqa_id={} protocol={} kind={:?} vendor_state={:?} mirror_path={:?}",
+        kgmqa_id, protocol, kind, vendor_state, mirror_path
+    );
+
+    // kgmqa-043 — 整套 blargg manifest batch（无单 ROM mirror_path）
     if kgmqa_id.starts_with("kgmqa-043-blargg-suite") {
-        // kgmqa-043 — 整套 blargg manifest batch 跑
         return dispatch_blargg_batch(&kgmqa_id, &forwarded);
     }
-    if kgmqa_id.starts_with("kgmqa-048-nestest") {
-        return dispatch_nestest(&kgmqa_id, mirror_path, &forwarded);
-    }
 
-    // Phase 5 framework: 第三方 ROM (kgmqa-049 ~ 112 大部分) — protocol-stub
-    // Phase 9 实战时,每个 suite 适配 ($6000 / 屏幕 hash / log 文本 等)
-    eprintln!(
-        "[protocol-stub] kgmqa_id={} mirror_path={}",
-        kgmqa_id, mirror_path
-    );
-    eprintln!("[protocol-stub] Phase 5 framework; Phase 9 will implement suite-specific protocol.");
-    eprintln!("[protocol-stub] exit 0 (Phase 5 stub; Phase 9 will replace with real PASS/FAIL)");
-    ExitCode::SUCCESS
+    match protocol.as_str() {
+        PROTO_NESTEST => dispatch_nestest(&kgmqa_id, mirror_path, &forwarded),
+        PROTO_AGGREGATE => dispatch_aggregate(&kgmqa_id, &case, &forwarded),
+        PROTO_6000 => dispatch_blargg(&kgmqa_id, mirror_path, &forwarded),
+        other => {
+            eprintln!(
+                "[fail] unknown protocol {:?} for {} (expected '{}', '{}', '{}')",
+                other, kgmqa_id, PROTO_6000, PROTO_NESTEST, PROTO_AGGREGATE
+            );
+            ExitCode::from(2)
+        }
+    }
+}
+
+// ============================================================================
+// Protocol resolution
+// ============================================================================
+
+/// Standard blargg-style status-port protocol: after `frames` steps, `$6000`
+/// reads 0x00 for PASS. Used by the NES test-ROM community (bisqwit, tepples,
+/// damianyerrick, lidnariq, rainwarrior, awj, natt, nk, drag, quietust, sour,
+/// 3gengames, rahsennor, flubba, …) as well as blargg's own suites.
+const PROTO_6000: &str = "$6000";
+/// kevtris nestest: CPU trace compared against a Nintendulator golden log.
+const PROTO_NESTEST: &str = "nestest-trace";
+/// Holy Mapperel: 47 mapper-identification ROMs, all must PASS.
+const PROTO_AGGREGATE: &str = "aggregate-mapperel";
+
+/// Explicit `protocol` field wins; otherwise infer from kgmqa_id. All
+/// rom-suite cases default to the $6000 status-port protocol.
+fn resolve_protocol(case: &serde_json::Value, kgmqa_id: &str) -> String {
+    if let Some(p) = case.get("protocol").and_then(|v| v.as_str()) {
+        return p.to_string();
+    }
+    if kgmqa_id.starts_with("kgmqa-048") {
+        return PROTO_NESTEST.to_string();
+    }
+    if kgmqa_id.starts_with("kgmqa-077") {
+        return PROTO_AGGREGATE.to_string();
+    }
+    PROTO_6000.to_string()
 }
 
 // ============================================================================
 // Dispatch helpers
 // ============================================================================
 
-fn is_blargg_series(kgmqa_id: &str) -> bool {
-    // blargg 系列 (kgmqa-031~043, 053~067, 111)
-    let prefixes = [
-        "kgmqa-031-blargg-smoke",
-        "kgmqa-032-cpu-instrs-blargg",
-        "kgmqa-033-cpu-timing-blargg",
-        "kgmqa-034-ppu-vbl-nmi-blargg",
-        "kgmqa-035-mmc3-4-scanline-blargg",
-        "kgmqa-036-mmc3-v2-4-scanline-blargg",
-        "kgmqa-037-cpu-int-2-nmi-brk-blargg",
-        "kgmqa-038-instr-misc-blargg",
-        "kgmqa-039-oam-stress-blargg",
-        "kgmqa-040-vbl-05-nmi-timing-blargg",
-        "kgmqa-041-ppu-read-buffer-blargg",
-        "kgmqa-042-sprdma-dmc-dma-blargg",
-        "kgmqa-043-blargg-suite",
-        "kgmqa-053-branch-timing-tests-blargg",
-        "kgmqa-054-cpu-interrupts-v2-blargg",
-        "kgmqa-055-cpu-reset-blargg",
-        "kgmqa-056-instr-timing-blargg",
-        "kgmqa-057-instr-test-v3-blargg",
-        "kgmqa-058-ppu-sprite-hit-blargg",
-        "kgmqa-059-sprite-overflow-blargg",
-        "kgmqa-060-ppu-open-bus-blargg",
-        "kgmqa-061-nmi-sync-blargg",
-        "kgmqa-062-oam-read-blargg",
-        "kgmqa-063-apu-test-blargg",
-        "kgmqa-064-apu-mixer-blargg",
-        "kgmqa-065-dmc-tests-blargg",
-        "kgmqa-066-dmc-dma-during-read-blargg",
-        "kgmqa-067-square-timer-div2-blargg",
-        "kgmqa-111-read-joy3-blargg",
-    ];
-    prefixes.iter().any(|p| kgmqa_id.starts_with(p))
+fn spawn_blargg(args: &[String]) -> ExitCode {
+    eprintln!(
+        "[dispatch] -> {} {:?}",
+        BLARGG_RUNNER_BIN,
+        args
+    );
+    let mut cmd = Command::new(BLARGG_RUNNER_BIN);
+    for a in args {
+        cmd.arg(a);
+    }
+    match cmd.status() {
+        Ok(s) if s.success() => ExitCode::SUCCESS,
+        Ok(s) => ExitCode::from(s.code().unwrap_or(1) as u8),
+        Err(e) => {
+            eprintln!("[fail] {} spawn: {}", BLARGG_RUNNER_BIN, e);
+            ExitCode::from(3)
+        }
+    }
 }
 
 fn dispatch_blargg(
@@ -212,27 +235,14 @@ fn dispatch_blargg(
         eprintln!("[hint] run scripts/fetch_roms_from_mirror.py first");
         return ExitCode::from(2);
     }
-    eprintln!(
-        "[dispatch] kgmqa={} -> {} --rom {} (forwarded={:?})",
-        kgmqa_id,
-        BLARGG_RUNNER_BIN,
-        rom_local.display(),
-        forwarded
-    );
-    let mut cmd = Command::new(BLARGG_RUNNER_BIN);
-    cmd.arg("--rom").arg(&rom_local);
-    cmd.arg("--kgmqa-id").arg(kgmqa_id);
-    for a in forwarded {
-        cmd.arg(a);
-    }
-    match cmd.status() {
-        Ok(s) if s.success() => ExitCode::SUCCESS,
-        Ok(s) => ExitCode::from(s.code().unwrap_or(1) as u8),
-        Err(e) => {
-            eprintln!("[fail] {} spawn: {}", BLARGG_RUNNER_BIN, e);
-            ExitCode::from(3)
-        }
-    }
+    let mut args = vec![
+        "--rom".to_string(),
+        rom_local.display().to_string(),
+        "--kgmqa-id".to_string(),
+        kgmqa_id.to_string(),
+    ];
+    args.extend_from_slice(forwarded);
+    spawn_blargg(&args)
 }
 
 fn dispatch_blargg_batch(
@@ -248,27 +258,14 @@ fn dispatch_blargg_batch(
         );
         return ExitCode::from(2);
     }
-    eprintln!(
-        "[dispatch] kgmqa={} -> {} --manifest {} (forwarded={:?})",
-        kgmqa_id,
-        BLARGG_RUNNER_BIN,
-        manifest.display(),
-        forwarded
-    );
-    let mut cmd = Command::new(BLARGG_RUNNER_BIN);
-    cmd.arg("--manifest").arg(manifest);
-    cmd.arg("--kgmqa-id").arg(kgmqa_id);
-    for a in forwarded {
-        cmd.arg(a);
-    }
-    match cmd.status() {
-        Ok(s) if s.success() => ExitCode::SUCCESS,
-        Ok(s) => ExitCode::from(s.code().unwrap_or(1) as u8),
-        Err(e) => {
-            eprintln!("[fail] {} spawn: {}", BLARGG_RUNNER_BIN, e);
-            ExitCode::from(3)
-        }
-    }
+    let mut args = vec![
+        "--manifest".to_string(),
+        manifest.display().to_string(),
+        "--kgmqa-id".to_string(),
+        kgmqa_id.to_string(),
+    ];
+    args.extend_from_slice(forwarded);
+    spawn_blargg(&args)
 }
 
 fn dispatch_nestest(
@@ -287,27 +284,100 @@ fn dispatch_nestest(
         );
         return ExitCode::from(2);
     }
-    eprintln!(
-        "[dispatch] kgmqa={} -> {} --rom {} --log {} (forwarded={:?})",
-        kgmqa_id,
-        BLARGG_RUNNER_BIN,
-        rom_local.display(),
-        log_local.display(),
-        forwarded
-    );
-    let mut cmd = Command::new(BLARGG_RUNNER_BIN);
-    cmd.arg("--rom").arg(&rom_local);
-    cmd.arg("--log").arg(&log_local);
-    cmd.arg("--kgmqa-id").arg(kgmqa_id);
-    for a in forwarded {
-        cmd.arg(a);
-    }
-    match cmd.status() {
-        Ok(s) if s.success() => ExitCode::SUCCESS,
-        Ok(s) => ExitCode::from(s.code().unwrap_or(1) as u8),
+    let mut args = vec![
+        "--rom".to_string(),
+        rom_local.display().to_string(),
+        "--log".to_string(),
+        log_local.display().to_string(),
+        "--kgmqa-id".to_string(),
+        kgmqa_id.to_string(),
+    ];
+    args.extend_from_slice(forwarded);
+    spawn_blargg(&args)
+}
+
+/// Holy Mapperel aggregate (kgmqa-077): 47 mapper-identification ROMs run
+/// through the $6000 protocol one by one; every member must PASS.
+///
+/// Member discovery uses `mirror_glob` (default `holy_mapperel/M*.nes`);
+/// the leaf pattern is matched against `tests/fixtures/` with the same
+/// flat-basename rule as `rom_local_path` (see fetch_roms_from_mirror.py).
+fn dispatch_aggregate(
+    kgmqa_id: &str,
+    case: &serde_json::Value,
+    forwarded: &[String],
+) -> ExitCode {
+    let glob = case
+        .get("mirror_glob")
+        .and_then(|v| v.as_str())
+        .unwrap_or("holy_mapperel/M*.nes");
+    let leaf_pat = glob.rsplit_once('/').map(|x| x.1).unwrap_or(glob);
+    let roms = match list_fixtures(leaf_pat) {
+        Ok(v) => v,
         Err(e) => {
-            eprintln!("[fail] {} spawn: {}", BLARGG_RUNNER_BIN, e);
+            eprintln!("[fail] list tests/fixtures ({}): {}", leaf_pat, e);
+            return ExitCode::from(2);
+        }
+    };
+    if roms.is_empty() {
+        eprintln!(
+            "[fail] aggregate {}: no ROMs match tests/fixtures/{} (mirror_glob={})",
+            kgmqa_id, leaf_pat, glob
+        );
+        eprintln!("[hint] run scripts/fetch_roms_from_mirror.py first");
+        return ExitCode::from(2);
+    }
+    eprintln!(
+        "[aggregate] kgmqa={} members={} pattern={}",
+        kgmqa_id,
+        roms.len(),
+        leaf_pat
+    );
+    let mut failed: Vec<String> = Vec::new();
+    let mut spawn_failed = 0usize;
+    for (i, rom) in roms.iter().enumerate() {
+        let member_id = format!(
+            "{}:{}",
+            kgmqa_id,
+            rom.file_name().unwrap_or_default().to_string_lossy()
+        );
+        let mut args = vec![
+            "--rom".to_string(),
+            rom.display().to_string(),
+            "--kgmqa-id".to_string(),
+            member_id,
+        ];
+        args.extend_from_slice(forwarded);
+        eprintln!(
+            "[aggregate] ({}/{}) {}",
+            i + 1,
+            roms.len(),
+            rom.display()
+        );
+        let code = spawn_blargg(&args);
+        if code != ExitCode::SUCCESS {
+            failed.push(rom.display().to_string());
+            if code == ExitCode::from(3) {
+                spawn_failed += 1;
+            }
+        }
+    }
+    if failed.is_empty() {
+        eprintln!("[aggregate] {} all {} members PASS", kgmqa_id, roms.len());
+        ExitCode::SUCCESS
+    } else {
+        eprintln!(
+            "[aggregate] {} FAIL: {}/{} members failed: {:?}",
+            kgmqa_id,
+            failed.len(),
+            roms.len(),
+            failed
+        );
+        // Pure environment failure (runner binary missing) is not a test FAIL.
+        if spawn_failed == failed.len() {
             ExitCode::from(3)
+        } else {
+            ExitCode::from(1)
         }
     }
 }
@@ -317,6 +387,36 @@ fn rom_local_path(mirror_path: &str) -> PathBuf {
     // 与 scripts/fetch_roms_from_mirror.py 的 shutil.copy2(dst=output_dir/leaf) 一致
     let leaf = mirror_path.rsplit_once('/').map(|x| x.1).unwrap_or(mirror_path);
     Path::new("tests/fixtures").join(leaf)
+}
+
+/// List `tests/fixtures/<pattern>` where `pattern` supports a single `*`
+/// wildcard (enough for `M*.nes`). Returns basenames sorted for stable order.
+fn list_fixtures(pattern: &str) -> std::io::Result<Vec<PathBuf>> {
+    let dir = Path::new("tests/fixtures");
+    let (prefix, suffix) = match pattern.split_once('*') {
+        Some((p, s)) => (p, s),
+        None => {
+            // literal filename
+            let p = dir.join(pattern);
+            return Ok(if p.exists() { vec![p] } else { Vec::new() });
+        }
+    };
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.len() >= prefix.len() + suffix.len()
+            && name.starts_with(prefix)
+            && name.ends_with(suffix)
+        {
+            out.push(entry.path());
+        }
+    }
+    out.sort();
+    Ok(out)
 }
 
 // ============================================================================

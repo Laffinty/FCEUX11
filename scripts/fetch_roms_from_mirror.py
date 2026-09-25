@@ -177,6 +177,11 @@ def sha256_file(path: Path) -> str:
 def copy_roms(cases: list, snapshot_dir: Path, output_dir: Path,
               dry_run: bool, sha_index: dict) -> tuple:
     """复制 vendor_state=vendored 的 ROM 到 output_dir。
+
+    单 ROM 用例走 mirror_path；聚合用例（Holy Mapperel 等）走 mirror_glob，
+    把快照内所有匹配文件按扁平 basename 复制（与 f11qa-rom-runner 的
+    list_fixtures 派生规则一致）。
+
     返回 (ok_count, fail_count, skip_advisory, skip_pending)。"""
     ok = 0
     fail = 0
@@ -186,6 +191,7 @@ def copy_roms(cases: list, snapshot_dir: Path, output_dir: Path,
         kgid = c['kgmqa_id']
         vs = c.get('vendor_state')
         mirror_path = c.get('mirror_path', '').replace('\\', '/')
+        mirror_glob = (c.get('mirror_glob') or '').replace('\\', '/')
         if vs == 'pending-vendor':
             log(f"  [skip-pending]   {kgid} vendor_state=pending-vendor")
             skip_pending += 1
@@ -194,7 +200,40 @@ def copy_roms(cases: list, snapshot_dir: Path, output_dir: Path,
             log(f"  [skip-advisory]  {kgid} vendor_state=advisory")
             skip_advisory += 1
             continue
-        # vendored
+        # vendored — 聚合用例展开 mirror_glob
+        if mirror_glob:
+            members = sorted(snapshot_dir.glob(mirror_glob))
+            if not members and not dry_run:
+                log(f"  [MISS]           {kgid}: glob {mirror_glob} matched 0 files in snapshot")
+                fail += 1
+                continue
+            if dry_run:
+                log(f"  [dry-aggregate]  {kgid} <- {mirror_glob} ({len(members)} members)")
+                ok += len(members) if members else 1
+                continue
+            member_fail = 0
+            for src in members:
+                rel = src.relative_to(snapshot_dir).as_posix()
+                leaf = src.name
+                dst = output_dir / leaf
+                shutil.copy2(src, dst)
+                expected = sha_index.get(rel)
+                if expected is None:
+                    log(f"  [NO-EXPECTED-HASH] {kgid}: {rel} not listed in SHA256SUMS.txt")
+                    member_fail += 1
+                    continue
+                actual = sha256_file(dst)
+                if actual != expected:
+                    log(f"  [HASH-MISMATCH] {kgid}: {rel} expected={expected[:12]} actual={actual[:12]}")
+                    member_fail += 1
+                    continue
+            if member_fail:
+                fail += 1
+                log(f"  [agg-fail]       {kgid}: {member_fail}/{len(members)} members bad")
+            else:
+                ok += 1
+                log(f"  [ok-aggregate]   {kgid} <- {mirror_glob} ({len(members)} members)")
+            continue
         src = snapshot_dir / mirror_path
         if not src.exists() and not dry_run:
             log(f"  [MISS]           {kgid}: {mirror_path} not in snapshot")

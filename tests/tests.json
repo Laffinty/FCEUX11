@@ -823,7 +823,8 @@
       "provenance": "Task1-C1 nestest smoke; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "nestest/nestest.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-032-cpu-instrs-blargg",
@@ -860,7 +861,8 @@
       "provenance": "Task1-C1 rust migration, parity 9488773 (177/177); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/cpu/instr_test_v5_all.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-033-cpu-timing-blargg",
@@ -898,7 +900,8 @@
       "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/cpu/cpu_timing_test6.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-034-ppu-vbl-nmi-blargg",
@@ -937,7 +940,8 @@
       "provenance": "advisory: VBL/NMI 精度属于 PPU 子系统已记录限制; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/ppu/ppu_vbl_nmi.nes",
-      "vendor_state": "pending-vendor"
+      "vendor_state": "pending-vendor",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-035-mmc3-4-scanline-blargg",
@@ -975,7 +979,8 @@
       "provenance": "mmc3 scanline (bucket A — 已通过); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/mmc3/mmc3_test_4.nes",
-      "vendor_state": "pending-vendor"
+      "vendor_state": "pending-vendor",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-036-mmc3-v2-4-scanline-blargg",
@@ -1014,7 +1019,8 @@
       "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/mmc3/mmc3_test_2_4.nes",
-      "vendor_state": "pending-vendor"
+      "vendor_state": "pending-vendor",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-037-cpu-int-2-nmi-brk-blargg",
@@ -1052,7 +1058,8 @@
       "provenance": "cpu interrupt (bucket B); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/cpu/cpu_interrupts_v2_2.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-038-instr-misc-blargg",
@@ -1090,7 +1097,8 @@
       "provenance": "instr_misc (bucket B); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/cpu/instr_misc.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-039-oam-stress-blargg",
@@ -1128,7 +1136,8 @@
       "provenance": "oam_stress (bucket C); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/ppu/oam_stress.nes",
-      "vendor_state": "pending-vendor"
+      "vendor_state": "pending-vendor",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-040-vbl-05-nmi-timing-blargg",
@@ -1167,7 +1176,8 @@
       "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/vbl_nmi_timing/5.nmi_suppression.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-041-ppu-read-buffer-blargg",
@@ -1205,7 +1215,8 @@
       "provenance": "F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/ppu/blargg_ppu_2005_vram_access.nes",
-      "vendor_state": "pending-vendor"
+      "vendor_state": "pending-vendor",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-042-sprdma-dmc-dma-blargg",
@@ -1244,7 +1255,8 @@
       "provenance": "sprdma_dmc_dma (bucket D); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/sprdma/sprdma_and_dmc_dma.nes",
-      "vendor_state": "pending-vendor"
+      "vendor_state": "pending-vendor",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-043-blargg-suite",
@@ -1281,7 +1293,8 @@
       "provenance": "全套 180 ROM batch runner; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/cpu/instr_test_v5_all.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-044-lua-bit",
@@ -1447,7 +1460,8 @@
       "provenance": "v1.8 新增: kevtris nestest CPU 全指令 trace vs Nintendulator 参考日志; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "nestest/nestest.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "nestest-trace"
     },
     {
       "kgmqa_id": "kgmqa-049-ppu-read-buffer-bisqwit",
@@ -1484,7 +1498,8 @@
       "provenance": "bisqwit ppu_read_buffer; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "bisqwit/test_ppu_read_buffer.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-050-cpu-dummy-writes-bisqwit",
@@ -1521,7 +1536,8 @@
       "provenance": "bisqwit cpu_dummy_writes (oam); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "bisqwit/cpu_dummy_writes_oam.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-051-cpu-exec-space-bisqwit",
@@ -1558,7 +1574,8 @@
       "provenance": "bisqwit cpu_exec_space (apu); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "bisqwit/test_cpu_exec_space_apu.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-052-cpu-flag-concurrency-bisqwit",
@@ -1595,7 +1612,8 @@
       "provenance": "⏸ advisory: bisqwit zip-aware 解压分支尚未实现；镜像源中 zip 内多 ROM 待解析; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "bisqwit/cpu_flag_concurrency.nes",
-      "vendor_state": "advisory"
+      "vendor_state": "advisory",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-053-branch-timing-tests-blargg",
@@ -1632,7 +1650,8 @@
       "provenance": "blargg branch timing; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/cpu/branch_timing_1.Branch_Basics.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-054-cpu-interrupts-v2-blargg",
@@ -1669,7 +1688,8 @@
       "provenance": "cpu_interrupts_v2 cli_latency; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/cpu/cpu_interrupts_v2_1-cli_latency.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-055-cpu-reset-blargg",
@@ -1706,7 +1726,8 @@
       "provenance": "cpu_reset registers; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/cpu/cpu_reset_registers.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-056-instr-timing-blargg",
@@ -1743,7 +1764,8 @@
       "provenance": "instr_timing; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/cpu/instr_timing_instr_timing.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-057-instr-test-v3-blargg",
@@ -1781,7 +1803,8 @@
       "provenance": "instr_test_v3; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/cpu/instr_test_v3_all_instrs.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-058-ppu-sprite-hit-blargg",
@@ -1818,7 +1841,8 @@
       "provenance": "❌ pending-vendor: mirror 中 blargg/ppu/ 子目录待补; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/ppu/sprite_hit_01.basics.nes",
-      "vendor_state": "pending-vendor"
+      "vendor_state": "pending-vendor",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-059-sprite-overflow-blargg",
@@ -1855,7 +1879,8 @@
       "provenance": "❌ pending-vendor: mirror 中 blargg/ppu/ 子目录待补; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/ppu/sprite_overflow_1.Basics.nes",
-      "vendor_state": "pending-vendor"
+      "vendor_state": "pending-vendor",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-060-ppu-open-bus-blargg",
@@ -1892,7 +1917,8 @@
       "provenance": "❌ pending-vendor: mirror 中 blargg/ppu/ 子目录待补; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/ppu/ppu_open_bus.nes",
-      "vendor_state": "pending-vendor"
+      "vendor_state": "pending-vendor",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-061-nmi-sync-blargg",
@@ -1929,7 +1955,8 @@
       "provenance": "❌ pending-vendor; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/ppu/04-nmi_control.nes",
-      "vendor_state": "pending-vendor"
+      "vendor_state": "pending-vendor",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-062-oam-read-blargg",
@@ -1966,7 +1993,8 @@
       "provenance": "❌ pending-vendor; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/ppu/oam_read.nes",
-      "vendor_state": "pending-vendor"
+      "vendor_state": "pending-vendor",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-063-apu-test-blargg",
@@ -2002,7 +2030,8 @@
       "provenance": "❌ pending-vendor: blargg apu/ 子目录待补; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/apu/apu_test.nes",
-      "vendor_state": "pending-vendor"
+      "vendor_state": "pending-vendor",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-064-apu-mixer-blargg",
@@ -2039,7 +2068,8 @@
       "provenance": "❌ pending-vendor; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/apu/apu_mixer.nes",
-      "vendor_state": "pending-vendor"
+      "vendor_state": "pending-vendor",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-065-dmc-tests-blargg",
@@ -2076,7 +2106,8 @@
       "provenance": "❌ pending-vendor; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/apu/dmc_tests_buffer_retained.nes",
-      "vendor_state": "pending-vendor"
+      "vendor_state": "pending-vendor",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-066-dmc-dma-during-read-blargg",
@@ -2114,7 +2145,8 @@
       "provenance": "❌ pending-vendor; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/apu/dmc_dma_during_read4_dma_2007_read.nes",
-      "vendor_state": "pending-vendor"
+      "vendor_state": "pending-vendor",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-067-square-timer-div2-blargg",
@@ -2152,7 +2184,8 @@
       "provenance": "❌ pending-vendor; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/apu/square_timer_div2.nes",
-      "vendor_state": "pending-vendor"
+      "vendor_state": "pending-vendor",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-068-volume-tests-damianyerrick",
@@ -2190,7 +2223,8 @@
       "provenance": "v1.8 新增: 音频通道混音; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "damianyerrick/volume_tests/volumes.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-069-mmc3ir-test-nk",
@@ -2228,7 +2262,8 @@
       "provenance": "N-K mmc3irqtest; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "nk/mmc3irqtest/mmc3irqtest.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-070-mmc5test-drag",
@@ -2265,7 +2300,8 @@
       "provenance": "Drag mmc5test; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "drag/mmc5test/mmc5test.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-071-mmc5test-v2-awj",
@@ -2302,7 +2338,8 @@
       "provenance": "AWJ mmc5test_v2; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "awj/mmc5test_v2/mmc5test.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-072-vrc24test-awj",
@@ -2339,7 +2376,8 @@
       "provenance": "❌ pending-vendor: AWJ 余项; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "awj/vrc24test/vrc24test.nes",
-      "vendor_state": "pending-vendor"
+      "vendor_state": "pending-vendor",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-073-vrc6test-natt",
@@ -2376,7 +2414,8 @@
       "provenance": "❌ pending-vendor: natt 整 suite 未 vendor; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "natt/vrc6test/vrc6test.nes",
-      "vendor_state": "pending-vendor"
+      "vendor_state": "pending-vendor",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-074-mmc1atest-tepples",
@@ -2412,7 +2451,8 @@
       "provenance": "❌ pending-vendor: tepples mmc1atest 未在 mirror; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "tepples/mmc1atest/mmc1atest.nes",
-      "vendor_state": "pending-vendor"
+      "vendor_state": "pending-vendor",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-075-mmc3bigchrram-tepples",
@@ -2449,7 +2489,8 @@
       "provenance": "tepples mmc3bigchrram; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "tepples/mmc3bigchrram/mmc3bigchrram.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-076-test28-tepples",
@@ -2486,7 +2527,8 @@
       "provenance": "tepples test28; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "tepples/test28/test28.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-077-holy-mapperel-tepples",
@@ -2525,7 +2567,9 @@
       "provenance": "v1.8 新增: Holy Mapperel aggregate (47 ROM 在 runner 内部循环, 全 PASS 才 PASS, kgmqa-077 不拆); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "holy_mapperel/M0_P32K_C8K_V.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "aggregate-mapperel",
+      "mirror_glob": "holy_mapperel/M*.nes"
     },
     {
       "kgmqa_id": "kgmqa-078-serom-lidnariq",
@@ -2563,7 +2607,8 @@
       "provenance": "lidnariq serom; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "lidnariq/serom/serom.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-079-exram-quietust",
@@ -2600,7 +2645,8 @@
       "provenance": "Quietust MMC5 ExRAM; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "quietust/mmc5exram.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-080-scanline-quietust",
@@ -2637,7 +2683,8 @@
       "provenance": "Quietust scanline; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "quietust/scanline.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-081-fds-irq-tests-sour",
@@ -2674,7 +2721,8 @@
       "provenance": "Sour FdsIrqTests v7 (patched); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "sour/fdsirqtests/fdsirqtestsV7_patched.fds",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-082-fds-mirroring-takuikaninja",
@@ -2711,7 +2759,8 @@
       "provenance": "⏸ advisory: TakuikaNinja 上游 4 repo 均无 LICENSE; 联系上游补 LICENSE 后升级; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "takuikaninja/FDS-Mirroring-Test/mirroring-test.fds",
-      "vendor_state": "advisory"
+      "vendor_state": "advisory",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-083-fds-audio-registers-takuikaninja",
@@ -2748,7 +2797,8 @@
       "provenance": "⏸ advisory: 等 LICENSE; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "takuikaninja/FDS-Audio-Registers/audio-registers.fds",
-      "vendor_state": "advisory"
+      "vendor_state": "advisory",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-084-fds-4030d1-addr-takuikaninja",
@@ -2785,7 +2835,8 @@
       "provenance": "⏸ advisory: 等 LICENSE; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "takuikaninja/FDS-4030D1-Addr/4030d1-addr.fds",
-      "vendor_state": "advisory"
+      "vendor_state": "advisory",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-085-fds-4023-test-takuikaninja",
@@ -2822,7 +2873,8 @@
       "provenance": "⏸ advisory: 等 LICENSE; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "takuikaninja/FDS-4023-Test/4023-test.fds",
-      "vendor_state": "advisory"
+      "vendor_state": "advisory",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-086-nes2-submapper-2-test",
@@ -2860,7 +2912,8 @@
       "provenance": "⏸ advisory: rainwarrior 4 项 submapper 暂搁（沙箱拿不到 .nes 实体）; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "rainwarrior/submapper/2_test.nes",
-      "vendor_state": "advisory"
+      "vendor_state": "advisory",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-087-nes2-submapper-3-test",
@@ -2898,7 +2951,8 @@
       "provenance": "⏸ advisory: 同上; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "rainwarrior/submapper/3_test.nes",
-      "vendor_state": "advisory"
+      "vendor_state": "advisory",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-088-nes2-submapper-7-test",
@@ -2936,7 +2990,8 @@
       "provenance": "⏸ advisory: 同上; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "rainwarrior/submapper/7_test.nes",
-      "vendor_state": "advisory"
+      "vendor_state": "advisory",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-089-nes2-submapper-34-test",
@@ -2974,7 +3029,8 @@
       "provenance": "⏸ advisory: 同上; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "rainwarrior/submapper/34_test.nes",
-      "vendor_state": "advisory"
+      "vendor_state": "advisory",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-090-mmc5ramsize-rainwarrior",
@@ -3011,7 +3067,8 @@
       "provenance": "rainwarrior mmc5ramsize; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "rainwarrior/mmc5ramsize/mmc5ramsize.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-091-n163-soundram-rainwarrior",
@@ -3048,7 +3105,8 @@
       "provenance": "⏸ advisory: rainwarrior 暂搁，wayback 无 .nes 实体; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "rainwarrior/n163_soundram/n163_soundram.nes",
-      "vendor_state": "advisory"
+      "vendor_state": "advisory",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-092-n163-soundram-init-rainwarrior",
@@ -3086,7 +3144,8 @@
       "provenance": "⏸ advisory: 同上; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "rainwarrior/n163_soundram/n163_soundram_init.nes",
-      "vendor_state": "advisory"
+      "vendor_state": "advisory",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-093-bntest",
@@ -3124,7 +3183,8 @@
       "provenance": "tepples BNTest (aorom 变体; mirror bnxest_aorom.nes 由 tepples 与 bntest/ 子目录同名, 需消歧); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "tepples/bntest/bntest-aorom.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-094-bxrom-512k-test-rainwarrior",
@@ -3161,7 +3221,8 @@
       "provenance": "rainwarrior bxrom_512k_test; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "rainwarrior/bxrom_512k_test/bxrom_512k_test.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-095-31-test",
@@ -3197,7 +3258,8 @@
       "provenance": "⏸ advisory: rainwarrior 暂搁; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "rainwarrior/31_test/31_test.nes",
-      "vendor_state": "advisory"
+      "vendor_state": "advisory",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-096-fme7acktest-tepples",
@@ -3235,7 +3297,8 @@
       "provenance": "tepples fme7acktest; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "tepples/fme7/fme7acktest.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-097-fme7ramtest-tepples",
@@ -3272,7 +3335,8 @@
       "provenance": "tepples fme7ramtest; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "tepples/fme7/fme7ramtest.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-098-famicom-audio-swap-tests",
@@ -3310,7 +3374,8 @@
       "provenance": "⏸ advisory: zip 内多文件, zip-aware 解压分支待实现; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "rainwarrior/famicom_audio_swap_tests/famicom_audio_swap.nes",
-      "vendor_state": "advisory"
+      "vendor_state": "advisory",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-099-240pee-damianyerrick",
@@ -3350,7 +3415,8 @@
       "provenance": "240pee; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "240pee/240pee.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-100-tvpassfail-tepples",
@@ -3389,7 +3455,8 @@
       "provenance": "tepples tvpassfail; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "tepples/tvpassfail/tv.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-101-allpads-tepples",
@@ -3426,7 +3493,8 @@
       "provenance": "tepples porttest (等价 allpads); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "tepples/porttest/porttest.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-102-zap-ruder-tepples",
@@ -3464,7 +3532,8 @@
       "provenance": "❌ pending-vendor: tepples 余项; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "tepples/zap_ruder/zap_ruder.nes",
-      "vendor_state": "pending-vendor"
+      "vendor_state": "pending-vendor",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-103-spadtest-tepples",
@@ -3501,7 +3570,8 @@
       "provenance": "❌ pending-vendor; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "tepples/spadtest/spadtest.nes",
-      "vendor_state": "pending-vendor"
+      "vendor_state": "pending-vendor",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-104-powerpad-tepples",
@@ -3538,7 +3608,8 @@
       "provenance": "❌ pending-vendor; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "tepples/powerpad/POWERPAD.NES",
-      "vendor_state": "pending-vendor"
+      "vendor_state": "pending-vendor",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-105-paddle-test3-3gengames",
@@ -3575,7 +3646,8 @@
       "provenance": "PaddleTest3; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "3gengames/PaddleTest3/PaddleTest.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-106-vaus-test-lidnariq",
@@ -3614,7 +3686,8 @@
       "provenance": "vaus + vaus-test (lidnariq 与 damianyerrick/ 各一 ROM 共用 kgmqa-106); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "lidnariq/vaus/vaus.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-107-mset-rainwarrior",
@@ -3651,7 +3724,8 @@
       "provenance": "mset; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "rainwarrior/mset/mset.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-108-mict-rainwarrior",
@@ -3688,7 +3762,8 @@
       "provenance": "mict; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "rainwarrior/mict/mict.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-109-telling-lys-tepples",
@@ -3725,7 +3800,8 @@
       "provenance": "tellinglys; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "tepples/tellinglys/tellinglys.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-110-dma-sync-test-v2-rahsennor",
@@ -3762,7 +3838,8 @@
       "provenance": "dma_sync_test_v2; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "rahsennor/dma_sync_test_v2/dma_sync_test_v2.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-111-read-joy3-blargg",
@@ -3800,7 +3877,8 @@
       "provenance": "blargg read_joy3; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/read_joy3/test_buttons.nes",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-112-nesstress-flubba",
@@ -3836,7 +3914,8 @@
       "provenance": "NEStress; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "nesstress/NEStress/NEStress.NES",
-      "vendor_state": "vendored"
+      "vendor_state": "vendored",
+      "protocol": "$6000"
     },
     {
       "kgmqa_id": "kgmqa-113-i18n-regression",

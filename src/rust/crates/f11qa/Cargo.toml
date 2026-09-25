@@ -10,8 +10,8 @@ crate-type = ["rlib"]
 name = "f11qa-runner"
 path = "src/main.rs"
 
-# F11QA v1.8 §5 — 统一 ROM runner dispatcher (kgmqa-048~112 + blargg 系列路由)
-# Phase 5 framework; Phase 9 实战时每个 suite 适配 $6000 / 屏幕 hash / log diff 等协议
+# F11QA v1.8 §5 — 统一 ROM runner dispatcher (kgmqa-031~112 全部 rom-suite)
+# 真实协议分发: $6000 状态口 (默认) / nestest-trace / aggregate-mapperel
 [[bin]]
 name = "f11qa-rom-runner"
 path = "src/bin/rom_runner.rs"
