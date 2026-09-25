@@ -102,9 +102,14 @@ def ensure_snapshot(pin: dict, snapshot_dir: Path, skip_fetch: bool, dry_run: bo
         if snapshot_dir.exists():
             log(f"  [rm-warn] {snapshot_dir} still exists (partial cleanup); will be overwritten by git clone")
 
+    # Fixture/ROM bytes must match SHA256SUMS.txt exactly; never CRLF-mangle.
+    # Windows git defaults to core.autocrlf=true which rewrites text blobs.
+    git_base = ['git', '-c', 'core.autocrlf=false', '-c', 'core.eol=lf',
+                '-c', 'core.safecrlf=false']
+
     if tag_exists:
         log(f"[snapshot] cloning tag {ref} from {pin['mirror_repo']}...")
-        clone_args = ['git', 'clone', '--depth=1', '--branch', ref,
+        clone_args = git_base + ['clone', '--depth=1', '--branch', ref,
                       pin['mirror_repo'], str(snapshot_dir)]
         r = subprocess.run(clone_args, capture_output=True, text=True, encoding='utf-8')
         if r.returncode != 0:
@@ -112,42 +117,66 @@ def ensure_snapshot(pin: dict, snapshot_dir: Path, skip_fetch: bool, dry_run: bo
     else:
         log(f"[snapshot] tag {ref!r} not yet published; fetching commit {sha[:12]}...")
         # 先 shallow clone 默认 branch，再 fetch + checkout 目标 SHA
-        clone_args = ['git', 'clone', '--depth=50', pin['mirror_repo'], str(snapshot_dir)]
+        clone_args = git_base + ['clone', '--depth=50', pin['mirror_repo'], str(snapshot_dir)]
         r = subprocess.run(clone_args, capture_output=True, text=True, encoding='utf-8')
         if r.returncode != 0:
             die(f"git clone (depth=50) failed: {r.stderr.strip()}")
         # fetch + checkout 目标 SHA
-        fetch_args = ['git', 'fetch', '--depth=1', 'origin', sha]
+        fetch_args = git_base + ['fetch', '--depth=1', 'origin', sha]
         r = subprocess.run(fetch_args, cwd=str(snapshot_dir),
                            capture_output=True, text=True, encoding='utf-8')
         if r.returncode != 0:
             die(f"git fetch {sha[:12]} failed: {r.stderr.strip()}")
-        checkout_args = ['git', 'checkout', sha]
+        checkout_args = git_base + ['checkout', '-f', sha]
         r = subprocess.run(checkout_args, cwd=str(snapshot_dir),
                            capture_output=True, text=True, encoding='utf-8')
         if r.returncode != 0:
             die(f"git checkout {sha[:12]} failed: {r.stderr.strip()}")
         log(f"[snapshot] checked out {sha[:12]}")
 
+    # Belt-and-braces: pin autocrlf off in the snapshot worktree, then
+    # re-materialize files so any host-level default cannot CRLF-mangle them.
+    subprocess.run(['git', 'config', 'core.autocrlf', 'false'],
+                   cwd=str(snapshot_dir), capture_output=True, text=True, encoding='utf-8')
+    subprocess.run(['git', 'config', 'core.eol', 'lf'],
+                   cwd=str(snapshot_dir), capture_output=True, text=True, encoding='utf-8')
+    r = subprocess.run(git_base + ['checkout', '-f', 'HEAD'],
+                       cwd=str(snapshot_dir), capture_output=True, text=True, encoding='utf-8')
+    if r.returncode != 0:
+        log(f"[snapshot] re-checkout warn: {r.stderr.strip()}")
+
 def verify_sha256sums(snapshot_dir: Path, skip_verify: bool, dry_run: bool):
-    """sha256sum -c SHA256SUMS.txt --strict."""
+    """Verify SHA256SUMS.txt in pure Python (Windows has no sha256sum)."""
     if skip_verify:
         log("[verify] SKIPPED (--skip-verify)")
         return
     if dry_run:
-        log("[verify] SKIPPED (--dry-run; would run: sha256sum -c SHA256SUMS.txt --strict)")
+        log("[verify] SKIPPED (--dry-run; would verify SHA256SUMS.txt in pure Python)")
         return
     sums_file = snapshot_dir / 'SHA256SUMS.txt'
     if not sums_file.exists():
         die(f"SHA256SUMS.txt missing in {snapshot_dir}")
-    log("[verify] sha256sum -c SHA256SUMS.txt --strict")
-    r = subprocess.run(['sha256sum', '-c', 'SHA256SUMS.txt', '--strict'],
-                       cwd=snapshot_dir, capture_output=True, text=True, encoding='utf-8')
-    if r.returncode != 0:
-        log(r.stdout)
-        log(r.stderr)
-        die("sha256sum check FAILED")
-    ok = sum(1 for line in r.stdout.splitlines() if line.endswith(': OK'))
+    log("[verify] SHA256SUMS.txt (pure-python)")
+    sums = parse_sha256sums(snapshot_dir)
+    if not sums:
+        die("SHA256SUMS.txt has no parseable entries")
+    ok, bad, missing = 0, [], []
+    for rel, expect in sums.items():
+        f = snapshot_dir / rel
+        if not f.exists():
+            missing.append(rel)
+            continue
+        h = hashlib.sha256(f.read_bytes()).hexdigest()
+        if h == expect:
+            ok += 1
+        else:
+            bad.append(f"{rel} (got {h[:12]}... want {expect[:12]}...)")
+    if missing or bad:
+        for m in missing:
+            log(f"  MISSING {m}")
+        for b in bad:
+            log(f"  MISMATCH {b}")
+        die(f"SHA256SUMS check FAILED: {len(missing)} missing, {len(bad)} mismatch")
     log(f"[verify] {ok} entries passed")
 
 def parse_sha256sums(snapshot_dir: Path) -> dict:
@@ -257,6 +286,22 @@ def copy_roms(cases: list, snapshot_dir: Path, output_dir: Path,
             log(f"  [HASH-MISMATCH] {kgid}: expected={expected[:12]} actual={actual[:12]}")
             fail += 1
             continue
+        # Companion sidecar (nestest-trace needs nestest.log next to nestest.nes).
+        # Copy any sibling with the same stem and a different extension that is
+        # listed in SHA256SUMS; ignore absence for ordinary ROMs.
+        stem_src = src.with_suffix('')
+        for sidecar in snapshot_dir.joinpath(Path(mirror_path).parent).glob(stem_src.name + '.*'):
+            if sidecar == src or not sidecar.is_file():
+                continue
+            rel = sidecar.relative_to(snapshot_dir).as_posix()
+            if rel not in sha_index:
+                continue
+            side_dst = output_dir / sidecar.name
+            shutil.copy2(sidecar, side_dst)
+            side_ok = sha256_file(side_dst) == sha_index[rel]
+            log(f"  [sidecar]        {kgid}: {sidecar.name} {'ok' if side_ok else 'HASH-MISMATCH'}")
+            if not side_ok:
+                fail += 1
         log(f"  [ok]             {kgid} <- {mirror_path}")
         ok += 1
     return ok, fail, skip_advisory, skip_pending

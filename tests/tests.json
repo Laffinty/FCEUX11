@@ -1057,7 +1057,7 @@
       "failure_means": "blocking",
       "provenance": "cpu interrupt (bucket B); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
       "mirror_ref": "v1.8.0-mirror",
-      "mirror_path": "blargg/cpu/cpu_interrupts_v2_2.nes",
+      "mirror_path": "blargg/cpu/cpu_interrupts_v2_2-nmi_and_brk.nes",
       "vendor_state": "vendored",
       "protocol": "$6000"
     },

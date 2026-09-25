@@ -583,6 +583,14 @@ pub fn parse_cli_args(args: &[String]) -> Result<BlarggCliArgs, String> {
                     .parse::<i32>()
                     .map_err(|e| format!("Invalid --reset-after value '{}': {}", v, e))?;
             }
+            // Dispatcher-forwarded tags: accepted and ignored by the blargg
+            // harness itself. f11qa-rom-runner injects --kgmqa-id (case id)
+            // and nestest-trace injects --log (sidecar path) into argv; the
+            // $6000 protocol does not consume them, but rejecting them would
+            // break the Phase 5 dispatch chain.
+            "--kgmqa-id" | "--log" => {
+                let _ = iter.next(); // consume value
+            }
             other if other.starts_with("--") => {
                 return Err(format!("Unknown flag: {}", other));
             }
