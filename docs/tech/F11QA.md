@@ -1,40 +1,34 @@
-# KagamiQA — FCEUX11 双 Oracle 质量防线
+# F11QA — FCEUX11 双 Oracle 质量防线
 
-> **版本**：v1.16  
-> **性质**：双 Oracle（Oracle A 回归 + Oracle B 硬件一致性）自动化测试系统  
-> **覆盖率（CI 产物快照 — commit `78a9d7f`，`engine.git_rev=78a9d7f`，`kagami-qa.yml` run #31）**：
-> Phase 4.2 CI Gate（R4 通过）后按路径 A 统一刷新（2026-08-06）。
+> **版本**：v1.8（原 KagamiQA；F11QA 改名见 `docs/plans/FCEUX11-v1.8_F11QA-构建计划.md`）
+> **性质**：双 Oracle（Oracle A 回归 + Oracle B 硬件一致性）自动化测试系统
+> **覆盖率（CI 产物快照 — commit `f19fa7d`，`f11qa.yml` R4 gate passed）**：
 >
 > | 维度 | 数值 | 来源 |
 > |---|---|---|
-> | CTest 注册测试 | 34（全 PASS） | `ctest -N` 输出（`build-c1/CTestTestfile.cmake`） |
-> | `tests/tests.json` 清单条目 | 47 | `python -c "import json; print(len(json.load(open('tests/tests.json'))))"` |
-> | blargg 落盘 ROM | 177 | `find tests/fixtures/blargg -name '*.nes' \| wc -l` |
-> | `blargg_manifest.json` 条目 | 177（与落盘 1:1，死条目 0） | Stage-2 S-1 清掉 3 个重复死条目后 180 → 177 |
-> | 当前矩阵 PASS / FAIL | 39 / 8 | 最近一次 `kagamiqa_migration_matrix.json`（`engine.git_rev = 78a9d7f`，CI run #31 2026-08-05；Phase 4.4 commit 锚待 CI 验证后回填） |
+> | `tests/tests.json` 清单条目 | 120（kgmqa-001 ~ kgmqa-120） | v1.8 扁平清单 |
+> | 迁移矩阵 PASS / FAIL | 106 / 14 | `f11qa_migration_matrix.json`（grade B） |
+> | Oracle A（CTest） | 42P / 0F | ctest 全绿 |
+> | Oracle B（blargg 177 ROM） | 145 PASS / 32 FAIL | `f11qa_blargg_runner --manifest` |
+> | advisory known-limit 占比 | 14/120 = 11.7%（cap 15%） | R4 gate + precision.md §4 |
+> | 发布评级 | **B (release)** | grade.rs；R4 四项硬门禁全过 |
 >
-> **CI 状态**：每次 push 到 `main` / `wip_1.16` 自动触发，产出迁移矩阵 artifact。
+> **CI 状态**：push 到 `main` / `wip1.8` 自动触发 `f11qa.yml`；R4 gate 要求
+> `total==120`、`fail_to_pass==0`、vendor_state 三态、advisory≤15%、grade∉{D,E}。
 
-> **§0. CI 数字回填纪律（Stage-2 P2-5 → Phase 4.2 R4 通过后已 CI 同步）**
+> **§0. CI 数字回填纪律**
 >
-> 上面 4 行数字的**唯一可信来源**是 CI 产物：
-> - CTest / manifest 数字 = `ci.yml` 的 ctest 步骤输出
-> - blargg 落盘数字 = `D-1` 清单（`docs/history/checklists/FCEUX11-1.16_blargg_接入清单.md`）
-> - 矩阵 PASS/FAIL = `kagami-qa.yml` 的 `kagamiqa_migration_matrix.json` artifact
->
-> **本文档数字以 CI artifact 为准**。Phase 4.2 R4 Gate 已闭环（run #31 `engine.git_rev=78a9d7f`，2026-08-05），无需手动同步。
-> 下次刷新前可按以下流程重跑 runner：
+> 上表数字以 CI artifact（`f11qa_migration_matrix.json` + `engine.git_rev`）为唯一可信来源。
+> 本地重生 matrix：
 > ```powershell
-> # 1. 重生 matrix
-> & src\rust\target\x86_64-pc-windows-msvc\release\kagami-qa-runner.exe `
->   --manifest tests\tests.json --bin-dir build-c1\tests --working-dir . `
->   --output build-c1\kagamiqa_migration_matrix.json
-> # 2. 跑 ctest 列注册测试
-> ctest --test-dir build-c1 -N | Select-String 'Test #' | Measure-Object
-> # 3. 数落盘 ROM
-> (Get-ChildItem -Recurse tests\fixtures\blargg\*.nes).Count
-> # 4. 在同一 commit 里刷新本表 + 更新表头 commit 锚
+> & build\tests\f11qa-runner.exe `
+>   --manifest tests\tests.json --bin-dir build\tests `
+>   --output build\f11qa_migration_matrix.json `
+>   --known-fail tests\fixtures\blargg_known_fail.json `
+>   --baseline tests\fixtures\f11qa_baseline_frozen.json `
+>   --save-baseline build\f11qa_baseline_next.json
 > ```
+> known_fail / frozen baseline 更新须人工授权（precision.md §3.6 / §4）。
 
 ---
 

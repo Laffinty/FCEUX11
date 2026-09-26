@@ -346,10 +346,10 @@ F11QA 是 FCEUX11 的双 Oracle 质量保障系统。详见 [`docs/tech/F11QA.md
 
 ```powershell
 # blargg $6000 ROM runner (Oracle B 执行器)
-cmake --build build --config Release --target fceux11_blargg_runner
+cmake --build build --config Release --target f11qa_blargg_runner
 
 # Lua 脚本 runner
-cmake --build build --config Release --target fceux11_lua_runner
+cmake --build build --config Release --target f11qa_lua_runner
 
 # In-process direct runner (C ABI 直驱，需 Rust)
 cmake --build build --config Release --target f11qa_direct_runner
@@ -391,7 +391,7 @@ ctest --test-dir build --build-config Release --output-on-failure -LE perf
 
 ```powershell
 cd tests
-..\build\tests\fceux11_blargg_runner.exe --manifest fixtures/blargg_manifest.json
+..\build\tests\f11qa_blargg_runner.exe --manifest fixtures/blargg_manifest.json
 ```
 
 ### 10.6 生成迁移矩阵

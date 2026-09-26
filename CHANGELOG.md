@@ -7,18 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed — blargg known-fail baseline P5 → P5.1（2026-09-26）
+### Added — v1.8 R4 gate green at grade B（2026-09-26）
 
-- **`tests/fixtures/blargg_known_fail.json`**：60 → 33 条。划掉 25 个已实测 PASS 的 ROM
-  （15 项 APU mixer/reset/single、`instr_v3_*`/`instr_v5_*` 组合项、`cpu_dummy_writes_ppu`、
-  `cpu_reset_ram`、`ppu_open_bus`、`ppu_read_buffer`、`vbl_05_nmi_timing`）；
-  另删 2 条重复条目（`all_instrs`/`official_only`，活条目 `instr_v5_all`/`instr_v5_official`）。
-  runppu 相关 9 → 7（清零 `vbl_05_nmi_timing`、`ppu_open_bus`）。
-- **`tests/fixtures/blargg_full_baseline.json`**：摘要同步为 177 ROM / 144 PASS / 33 FAIL（81.4%）。
-- **`docs/tech/precision.md` / `cpu.md` / `F11QA.md`**：已知失败面统计与版本号同步 P5.1。
+- **R4 gate（`f11qa.yml`）**：`total==120`、`fail_to_pass==0`、`vendor_state` 三态、
+  `advisory-FAIL ≤ 15%`、`grade ∉ {D,E}` 全部机器可验证；`engine.git_rev` 编译期戳。
+- **advisory known-limit 15% 护栏**（precision.md §4）：禁止无评审把 blocking 改
+  advisory / 净增；调整须带 `provenance` 根因。当前 14/120 = 11.7%。
+- **矩阵**：120 项 kgmqa 清单，**106P / 14F**，**Grade B (release)**；
+  Oracle A 42P/0F，Oracle B blargg **145P/32F**。
+- **精度攻关**（`docs/tech/f11qa-accuracy-backlog.md`）：
+  - A-055 `cpu_reset_regs` 清零（上电 P=$34 S=$FD；软复位 P|=I、S-=3；$6000==$81 握手复位）
+  - B-093 `bntest` 清零（ANROM $6000 窗口误吞协议写）
+- **流水线修复**：vcpkg 全依赖、blargg 177 下载、`f11qa_blargg_runner` 目标名、
+  rom-runner 调度 / working_dir、kgmqa-117 CI 编码、PS5.1 下载脚本 BOM。
 
-> 实测依据：`f11qa_blargg_runner --manifest fixtures/blargg_manifest.json`（wip1.8 `1d84627`），
-> 33 FAIL 全部落在保留名单内，零意外 FAIL。baseline 更新经人工授权（precision.md §3.6）。
+### Changed — blargg known-fail baseline P5 → P5.2（2026-09-26）
+
+- **`tests/fixtures/blargg_known_fail.json`**：60 → 32 条。
+  - P5.1：划掉 25 项已 PASS + 2 条重复条目；runppu 相关 9 → 7。
+  - P5.2：`cpu_reset_regs` 精度修复后清零。
+  - 当前 **177 ROM：145 PASS / 32 FAIL**。
+- **`tests/fixtures/blargg_full_baseline.json`** / **`f11qa_baseline_frozen.json`**：
+  按实测回填，`pass_to_fail=0`、`fail_to_pass=0`。
+- **savestate 金标**：CPU 上电/复位语义有意变更后按 `--generate` 刷新
+  （`golden/` + `golden_savestate_hashes.json`）。
+- **`docs/tech/precision.md` / `cpu.md` / `F11QA.md` / `BuildGuide.md`**：
+  品牌 F11QA、runner 目标名、基线统计与 R4 语义对齐 v1.8。
+
+> 实测锚：`f11qa.yml` run `git_rev=f19fa7d`，R4 gate passed，grade=B。
+> known_fail / frozen baseline / savestate 金标更新均经人工授权。
 
 ## [1.17] - 2026-08-08
 
