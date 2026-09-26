@@ -1,6 +1,6 @@
 # FCEUX11 v1.8 收口验收单
 
-> **日期**：2026-09-26　**分支**：`wip1.8`　**R4 锚**：`f19fa7d`（grade B）
+> **日期**：2026-09-26　**分支**：`wip1.8`　**R4 锚**：`f19fa7d`（grade B）　**3× CI：#15–#19 全绿**
 > **计划归档**：`docs/history/plans/FCEUX11-v1.8_F11QA-构建计划.md`（STATUS: CLOSED）
 
 ## §10.3 验收清单
@@ -14,7 +14,7 @@
 | 5 | `f11qa_mirror_pin.json` mirror_ref 非空有效 | ⚠️ | `v1.8.0-mirror` 已填；**tag 尚未在镜像源发布**（回退 mirror_commit_sha） |
 | 6 | kgmqa-117 CI 稳定 PASS | ✅ | preflight 每轮绿 |
 | 7 | 65 条 rom-suite 四元组填齐 | ✅ | 78 条（D 节 13 + F 节 65） |
-| 8 | R4 gate 3 次连续 CI PASS | 🟡 **1/3** | `f19fa7d` grade B 全绿；本收口提交为第 2 次 |
+| 8 | R4 gate 3 次连续 CI PASS | ✅ | **#15~#19 五连绿**（0731c03…6783de9）；R4 grade B |
 | 9 | 计划归档 → `docs/history/plans/` | ✅ | 本文同目录 |
 | 10 | `docs/tech/F11QA.md` 反映 v1.8 | ✅ | 头表 + 正文 f11qa 命名 |
 | 11 | v1.17 frozen baseline 保留 | ✅ | `f11qa_baseline_frozen.v1.17.json` |
@@ -32,6 +32,6 @@
 
 ## 未尽事项（不阻塞 v1.8 标签，列出供跟踪）
 
-1. **3× CI green**：还需 1 次（本提交后的 push 可计第 2 次）
+1. ~~3× CI green~~ **已完成**（#15–#19 五连绿）
 2. **mirror tag `v1.8.0-mirror`**：OWNER 在 `Laffinty/f11qa-rom-mirror` 打 tag 后更新 pin
 3. **精度 backlog** 14 项 advisory：`docs/tech/f11qa-accuracy-backlog.md`（055/093 已清零）

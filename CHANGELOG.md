@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   品牌 F11QA、runner 目标名、基线统计与 R4 语义对齐 v1.8。
 
 > 实测锚：`f11qa.yml` run `git_rev=f19fa7d`，R4 gate passed，grade=B。
+> **Phase 9 验收**：CI run #15–#19 五连绿（2026-09-26），3× R4 gate 达标。
 > known_fail / frozen baseline / savestate 金标更新均经人工授权。
 
 ## [1.17] - 2026-08-08
