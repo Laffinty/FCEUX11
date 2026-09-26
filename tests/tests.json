@@ -539,7 +539,7 @@
       "spec_source": "internal",
       "license": "GPL-2.0",
       "input": {
-        "binary": "fceux11_rom_regression_runner",
+        "binary": "f11qa_rom_regression_runner",
         "working_dir": "tests",
         "golden_hashes": "tests/fixtures/golden_hashes.json"
       },
@@ -566,7 +566,7 @@
       "spec_source": "internal",
       "license": "GPL-2.0",
       "input": {
-        "binary": "fceux11_savestate_regression_runner",
+        "binary": "f11qa_savestate_regression_runner",
         "working_dir": "tests",
         "golden_hashes": "tests/fixtures/golden_savestate_hashes.json"
       },
@@ -643,7 +643,7 @@
       "spec_source": "internal",
       "license": "GPL-2.0",
       "input": {
-        "binary": "fceux11_mapper_byte_diff_runner",
+        "binary": "f11qa_mapper_byte_diff_runner",
         "working_dir": "tests"
       },
       "expected": {
@@ -800,7 +800,7 @@
       "license": "GPL-2.0",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-031-blargg-smoke",
@@ -839,7 +839,7 @@
       "license": "GPL-2.0",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-032-cpu-instrs-blargg",
@@ -877,7 +877,7 @@
       "license": "GPL-2.0",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-033-cpu-timing-blargg",
@@ -916,7 +916,7 @@
       "license": "GPL-2.0",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-034-ppu-vbl-nmi-blargg",
@@ -956,7 +956,7 @@
       "license": "GPL-2.0",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-035-mmc3-4-scanline-blargg",
@@ -995,7 +995,7 @@
       "license": "GPL-2.0",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-036-mmc3-v2-4-scanline-blargg",
@@ -1035,7 +1035,7 @@
       "license": "GPL-2.0",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-037-cpu-int-2-nmi-brk-blargg",
@@ -1074,7 +1074,7 @@
       "license": "GPL-2.0",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-038-instr-misc-blargg",
@@ -1113,7 +1113,7 @@
       "license": "GPL-2.0",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-039-oam-stress-blargg",
@@ -1152,7 +1152,7 @@
       "license": "GPL-2.0",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-040-vbl-05-nmi-timing-blargg",
@@ -1192,7 +1192,7 @@
       "license": "GPL-2.0",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-041-ppu-read-buffer-blargg",
@@ -1231,7 +1231,7 @@
       "license": "GPL-2.0",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-042-sprdma-dmc-dma-blargg",
@@ -1271,7 +1271,7 @@
       "license": "GPL-2.0",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-043-blargg-suite",
@@ -1436,7 +1436,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-048-nestest",
@@ -1475,7 +1475,7 @@
       "license": "zlib",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-049-ppu-read-buffer-bisqwit",
@@ -1513,7 +1513,7 @@
       "license": "zlib",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-050-cpu-dummy-writes-bisqwit",
@@ -1551,7 +1551,7 @@
       "license": "zlib",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-051-cpu-exec-space-bisqwit",
@@ -1589,7 +1589,7 @@
       "license": "zlib",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-052-cpu-flag-concurrency-bisqwit",
@@ -1627,7 +1627,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-053-branch-timing-tests-blargg",
@@ -1665,7 +1665,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-054-cpu-interrupts-v2-blargg",
@@ -1703,7 +1703,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-055-cpu-reset-blargg",
@@ -1741,7 +1741,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-056-instr-timing-blargg",
@@ -1779,7 +1779,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-057-instr-test-v3-blargg",
@@ -1818,7 +1818,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-058-ppu-sprite-hit-blargg",
@@ -1856,7 +1856,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-059-sprite-overflow-blargg",
@@ -1894,7 +1894,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-060-ppu-open-bus-blargg",
@@ -1932,7 +1932,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-061-nmi-sync-blargg",
@@ -1970,7 +1970,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-062-oam-read-blargg",
@@ -2008,7 +2008,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-063-apu-test-blargg",
@@ -2045,7 +2045,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-064-apu-mixer-blargg",
@@ -2083,7 +2083,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-065-dmc-tests-blargg",
@@ -2121,7 +2121,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-066-dmc-dma-during-read-blargg",
@@ -2160,7 +2160,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-067-square-timer-div2-blargg",
@@ -2199,7 +2199,7 @@
       "license": "zlib",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-068-volume-tests-damianyerrick",
@@ -2238,7 +2238,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-069-mmc3ir-test-nk",
@@ -2277,7 +2277,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-070-mmc5test-drag",
@@ -2315,7 +2315,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-071-mmc5test-v2-awj",
@@ -2353,7 +2353,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-072-vrc24test-awj",
@@ -2391,7 +2391,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-073-vrc6test-natt",
@@ -2429,7 +2429,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-074-mmc1atest-tepples",
@@ -2466,7 +2466,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-075-mmc3bigchrram-tepples",
@@ -2504,7 +2504,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-076-test28-tepples",
@@ -2542,7 +2542,7 @@
       "license": "zlib",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-077-holy-mapperel-tepples",
@@ -2583,7 +2583,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-078-serom-lidnariq",
@@ -2622,7 +2622,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-079-exram-quietust",
@@ -2660,7 +2660,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-080-scanline-quietust",
@@ -2698,7 +2698,7 @@
       "license": "MIT",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-081-fds-irq-tests-sour",
@@ -2736,7 +2736,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-082-fds-mirroring-takuikaninja",
@@ -2774,7 +2774,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-083-fds-audio-registers-takuikaninja",
@@ -2812,7 +2812,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-084-fds-4030d1-addr-takuikaninja",
@@ -2850,7 +2850,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-085-fds-4023-test-takuikaninja",
@@ -2888,7 +2888,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-086-nes2-submapper-2-test",
@@ -2927,7 +2927,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-087-nes2-submapper-3-test",
@@ -2966,7 +2966,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-088-nes2-submapper-7-test",
@@ -3005,7 +3005,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-089-nes2-submapper-34-test",
@@ -3044,7 +3044,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-090-mmc5ramsize-rainwarrior",
@@ -3082,7 +3082,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-091-n163-soundram-rainwarrior",
@@ -3120,7 +3120,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-092-n163-soundram-init-rainwarrior",
@@ -3159,7 +3159,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-093-bntest",
@@ -3198,7 +3198,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-094-bxrom-512k-test-rainwarrior",
@@ -3236,7 +3236,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-095-31-test",
@@ -3273,7 +3273,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-096-fme7acktest-tepples",
@@ -3312,7 +3312,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-097-fme7ramtest-tepples",
@@ -3350,7 +3350,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-098-famicom-audio-swap-tests",
@@ -3389,7 +3389,7 @@
       "license": "GPL-2.0",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-099-240pee-damianyerrick",
@@ -3430,7 +3430,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-100-tvpassfail-tepples",
@@ -3470,7 +3470,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-101-allpads-tepples",
@@ -3508,7 +3508,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-102-zap-ruder-tepples",
@@ -3547,7 +3547,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-103-spadtest-tepples",
@@ -3585,7 +3585,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-104-powerpad-tepples",
@@ -3623,7 +3623,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-105-paddle-test3-3gengames",
@@ -3661,7 +3661,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-106-vaus-test-lidnariq",
@@ -3701,7 +3701,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-107-mset-rainwarrior",
@@ -3739,7 +3739,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-108-mict-rainwarrior",
@@ -3777,7 +3777,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-109-telling-lys-tepples",
@@ -3815,7 +3815,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-110-dma-sync-test-v2-rahsennor",
@@ -3853,7 +3853,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-111-read-joy3-blargg",
@@ -3892,7 +3892,7 @@
       "license": "PD",
       "input": {
         "binary": "f11qa-rom-runner",
-        "working_dir": "tests",
+        "working_dir": ".",
         "args": [
           "--kgmqa-id",
           "kgmqa-112-nesstress-flubba",
@@ -4032,9 +4032,12 @@
         "binary": "python",
         "working_dir": "tests",
         "args": [
-          "tests/f11qa/mirror_snapshot_check.py",
+          "f11qa/mirror_snapshot_check.py",
           "--manifest",
-          "tests/fixtures/f11qa_mirror_pin.json"
+          "fixtures/f11qa_mirror_pin.json",
+          "--tests-json",
+          "tests.json",
+          "--skip-fetch"
         ]
       },
       "expected": {
@@ -4060,12 +4063,13 @@
       "spec_source": "internal",
       "license": "GPL-2.0",
       "input": {
-        "binary": "cargo_test_config_store",
-        "working_dir": ".",
+        "binary": "cargo",
+        "working_dir": "src/rust",
         "args": [
+          "test",
           "-p",
           "f11qa",
-          "--test",
+          "--release",
           "config_store"
         ]
       },
@@ -4092,12 +4096,13 @@
       "spec_source": "internal",
       "license": "GPL-2.0",
       "input": {
-        "binary": "cargo_test_pixbuf_pool",
-        "working_dir": ".",
+        "binary": "cargo",
+        "working_dir": "src/rust",
         "args": [
+          "test",
           "-p",
           "f11qa",
-          "--test",
+          "--release",
           "pixbuf_pool"
         ]
       },
@@ -4124,12 +4129,13 @@
       "spec_source": "internal",
       "license": "GPL-2.0",
       "input": {
-        "binary": "cargo_test_state_facade",
-        "working_dir": ".",
+        "binary": "cargo",
+        "working_dir": "src/rust",
         "args": [
+          "test",
           "-p",
           "f11qa",
-          "--test",
+          "--release",
           "state_facade"
         ]
       },

@@ -185,7 +185,13 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Build f11qa-runner
         working-directory: src/rust
-        run: cargo build --release -p f11qa
+        run: |
+          cargo build --release -p f11qa
+          # SubprocessAdapter resolves bare names in --bin-dir (build/tests).
+          # Stage the Rust CLIs next to the C++ test exes so rom-suite cases
+          # (binary: f11qa-rom-runner) and matrix host can be spawned.
+          Copy-Item target/x86_64-pc-windows-msvc/release/f11qa-rom-runner.exe ${{ github.workspace }}/build/tests/ -Force
+          Copy-Item target/x86_64-pc-windows-msvc/release/f11qa-runner.exe ${{ github.workspace }}/build/tests/ -Force
 
       # -----------------------------------------------------------------------
       # Test ROM fixtures (Oracle B + rom-suite 用例)
