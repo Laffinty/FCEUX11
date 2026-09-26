@@ -70,6 +70,11 @@ jobs:
           toolchain: stable
           targets: x86_64-pc-windows-msvc
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       # -----------------------------------------------------------------------
       # Cache
       # -----------------------------------------------------------------------
@@ -167,7 +172,9 @@ jobs:
       - name: Pre-flight — kgmqa-117 mirror_snapshot_check
         shell: pwsh
         run: |
-          python tests/f11qa/mirror_snapshot_check.py --skip-fetch
+          Write-Host "python: $(Get-Command python | Select-Object -ExpandProperty Source)"
+          python --version
+          python -X utf8 tests/f11qa/mirror_snapshot_check.py --skip-fetch
           if ($LASTEXITCODE -ne 0) {
             Write-Host "::error::kgmqa-117 mirror_snapshot_check FAILED - mirror pin / license accepted set / mirror_ref 一致性 任一项不通过会阻塞所有 rom-suite 用例"
             exit 1

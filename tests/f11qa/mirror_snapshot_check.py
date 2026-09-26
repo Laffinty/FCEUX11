@@ -91,6 +91,18 @@ def check_license_accepted(cases: list, accepted_set: set, rejected_set: set) ->
     return errors
 
 def main():
+    # CI forensics: uncaught exceptions used to exit 1 with no stdout.
+    try:
+        _main_inner()
+    except SystemExit:
+        raise
+    except Exception as e:
+        import traceback
+        log('FAIL: uncaught exception in mirror_snapshot_check')
+        traceback.print_exc()
+        sys.exit(1)
+
+def _main_inner():
     p = argparse.ArgumentParser(description='F11QA kgmqa-117 mirror_snapshot_check')
     p.add_argument('--manifest', type=Path,
                    default=REPO_ROOT / 'tests/fixtures/f11qa_mirror_pin.json')
@@ -101,15 +113,26 @@ def main():
     args = p.parse_args()
 
     log('=== F11QA kgmqa-117 mirror_snapshot_check ===')
+    log(f'[env] python={sys.version.split()[0]} exe={sys.executable}')
+    log(f'[env] REPO_ROOT={REPO_ROOT}')
+    log(f'[env] pin={args.manifest} exists={args.manifest.exists()}')
+    log(f'[env] tests={args.tests_json} exists={args.tests_json.exists()}')
     log('')
 
     # 1. 加载 pin + tests.json
     pin = load_pin(args.manifest)
     tests = load_tests_json(args.tests_json)
-    cases = [c for c in tests.get('cases', []) if 'rom-suite' in c.get('kind', [])]
+    # NOTE: use explicit None-check — `c.get('kind', [])` returns None (not [])
+    # when the key exists with a null value, which would make `in` raise.
+    cases = []
+    for c in tests.get('cases', []):
+        kind = c.get('kind') or []
+        if 'rom-suite' in kind:
+            cases.append(c)
     log(f"[pin] mirror_repo={pin['mirror_repo']} mirror_ref={pin['mirror_ref']} "
-        f"commit={pin['mirror_commit_sha'][:12]}...")
+        f"commit={str(pin.get('mirror_commit_sha',''))[:12]}...")
     log(f"[tests.json] rom-suite cases: {len(cases)}")
+    log(f"[tests.json] total cases: {len(tests.get('cases', []))}")
     log('')
 
     accepted = set(pin.get('license_accepted_set', []))
