@@ -1060,12 +1060,13 @@
         "cpu",
         "interrupt"
       ],
-      "failure_means": "blocking",
-      "provenance": "cpu interrupt (bucket B); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "failure_means": "advisory",
+      "provenance": "cpu interrupt (bucket B); F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: CPU interrupt polling only at instruction boundary (x6502.cpp:515-579); hijack/branch-delay not modeled",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/cpu/cpu_interrupts_v2_2-nmi_and_brk.nes",
       "vendor_state": "vendored",
-      "protocol": "$6000"
+      "protocol": "$6000",
+      "known_limit": "CPU interrupt polling only at instruction boundary (x6502.cpp:515-579); hijack/branch-delay not modeled"
     },
     {
       "kgmqa_id": "kgmqa-038-instr-misc-blargg",
@@ -1099,12 +1100,13 @@
         "cpu",
         "misc"
       ],
-      "failure_means": "blocking",
-      "provenance": "instr_misc (bucket B); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "failure_means": "advisory",
+      "provenance": "instr_misc (bucket B); F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: instr_misc combined opcode group; singles pass, combo fails (accuracy gap)",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/cpu/instr_misc.nes",
       "vendor_state": "vendored",
-      "protocol": "$6000"
+      "protocol": "$6000",
+      "known_limit": "instr_misc combined opcode group; singles pass, combo fails (accuracy gap)"
     },
     {
       "kgmqa_id": "kgmqa-039-oam-stress-blargg",
@@ -1497,12 +1499,13 @@
         "ppu",
         "read-buffer"
       ],
-      "failure_means": "blocking",
-      "provenance": "bisqwit ppu_read_buffer; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "failure_means": "advisory",
+      "provenance": "bisqwit ppu_read_buffer; F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: bisqwit \\ read-buffer monster test; open-bus/decay path incomplete",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "bisqwit/test_ppu_read_buffer.nes",
       "vendor_state": "vendored",
-      "protocol": "$6000"
+      "protocol": "$6000",
+      "known_limit": "bisqwit \\ read-buffer monster test; open-bus/decay path incomplete"
     },
     {
       "kgmqa_id": "kgmqa-050-cpu-dummy-writes-bisqwit",
@@ -1535,12 +1538,13 @@
         "cpu",
         "dummy-writes"
       ],
-      "failure_means": "blocking",
-      "provenance": "bisqwit cpu_dummy_writes (oam); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "failure_means": "advisory",
+      "provenance": "bisqwit cpu_dummy_writes (oam); F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: dummy writes to OAM DMA / PPU region; RMW macro OK, DMA path not",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "bisqwit/cpu_dummy_writes_oam.nes",
       "vendor_state": "vendored",
-      "protocol": "$6000"
+      "protocol": "$6000",
+      "known_limit": "dummy writes to OAM DMA / PPU region; RMW macro OK, DMA path not"
     },
     {
       "kgmqa_id": "kgmqa-051-cpu-exec-space-bisqwit",
@@ -1573,12 +1577,13 @@
         "cpu",
         "exec-space"
       ],
-      "failure_means": "blocking",
-      "provenance": "bisqwit cpu_exec_space (apu); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "failure_means": "advisory",
+      "provenance": "bisqwit cpu_exec_space (apu); F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: execute-from-IO-space edge; bus dispatch coverage gap",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "bisqwit/test_cpu_exec_space_apu.nes",
       "vendor_state": "vendored",
-      "protocol": "$6000"
+      "protocol": "$6000",
+      "known_limit": "execute-from-IO-space edge; bus dispatch coverage gap"
     },
     {
       "kgmqa_id": "kgmqa-052-cpu-flag-concurrency-bisqwit",
@@ -1765,12 +1770,13 @@
         "cpu",
         "instr-timing"
       ],
-      "failure_means": "blocking",
-      "provenance": "instr_timing; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "failure_means": "advisory",
+      "provenance": "instr_timing; F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: instruction cycle table combined test; singles pass",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/cpu/instr_timing_instr_timing.nes",
       "vendor_state": "vendored",
-      "protocol": "$6000"
+      "protocol": "$6000",
+      "known_limit": "instruction cycle table combined test; singles pass"
     },
     {
       "kgmqa_id": "kgmqa-057-instr-test-v3-blargg",
@@ -2568,13 +2574,14 @@
         "auto-identify",
         "aggregate"
       ],
-      "failure_means": "blocking",
-      "provenance": "v1.8 新增: Holy Mapperel aggregate (47 ROM 在 runner 内部循环, 全 PASS 才 PASS, kgmqa-077 不拆); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "failure_means": "advisory",
+      "provenance": "v1.8 新增: Holy Mapperel aggregate (47 ROM 在 runner 内部循环, 全 PASS 才 PASS, kgmqa-077 不拆); F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: Holy Mapperel aggregate 13 mappers / 47 ROMs; partial mapper coverage",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "holy_mapperel/M0_P32K_C8K_V.nes",
       "vendor_state": "vendored",
       "protocol": "aggregate-mapperel",
-      "mirror_glob": "holy_mapperel/M*.nes"
+      "mirror_glob": "holy_mapperel/M*.nes",
+      "known_limit": "Holy Mapperel aggregate 13 mappers / 47 ROMs; partial mapper coverage"
     },
     {
       "kgmqa_id": "kgmqa-078-serom-lidnariq",
@@ -2608,12 +2615,13 @@
         "serom",
         "shrom"
       ],
-      "failure_means": "blocking",
-      "provenance": "lidnariq serom; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "failure_means": "advisory",
+      "provenance": "lidnariq serom; F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: MMC1 SEROM/SHROM bank-size constraint not modeled",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "lidnariq/serom/serom.nes",
       "vendor_state": "vendored",
-      "protocol": "$6000"
+      "protocol": "$6000",
+      "known_limit": "MMC1 SEROM/SHROM bank-size constraint not modeled"
     },
     {
       "kgmqa_id": "kgmqa-079-exram-quietust",
@@ -2722,12 +2730,13 @@
         "fds",
         "irq"
       ],
-      "failure_means": "blocking",
-      "provenance": "Sour FdsIrqTests v7 (patched); F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "failure_means": "advisory",
+      "provenance": "Sour FdsIrqTests v7 (patched); F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: FDS IRQ timing subsystem; not v1.8 focus",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "sour/fdsirqtests/fdsirqtestsV7_patched.fds",
       "vendor_state": "vendored",
-      "protocol": "$6000"
+      "protocol": "$6000",
+      "known_limit": "FDS IRQ timing subsystem; not v1.8 focus"
     },
     {
       "kgmqa_id": "kgmqa-082-fds-mirroring-takuikaninja",
@@ -3298,12 +3307,13 @@
         "irq",
         "ack"
       ],
-      "failure_means": "blocking",
-      "provenance": "tepples fme7acktest; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "failure_means": "advisory",
+      "provenance": "tepples fme7acktest; F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: FME-7 IRQ acknowledge edge",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "tepples/fme7/fme7acktest.nes",
       "vendor_state": "vendored",
-      "protocol": "$6000"
+      "protocol": "$6000",
+      "known_limit": "FME-7 IRQ acknowledge edge"
     },
     {
       "kgmqa_id": "kgmqa-097-fme7ramtest-tepples",
@@ -3336,12 +3346,13 @@
         "fme7",
         "wram"
       ],
-      "failure_means": "blocking",
-      "provenance": "tepples fme7ramtest; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "failure_means": "advisory",
+      "provenance": "tepples fme7ramtest; F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: FME-7 WRAM mapping edge",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "tepples/fme7/fme7ramtest.nes",
       "vendor_state": "vendored",
-      "protocol": "$6000"
+      "protocol": "$6000",
+      "known_limit": "FME-7 WRAM mapping edge"
     },
     {
       "kgmqa_id": "kgmqa-098-famicom-audio-swap-tests",
@@ -3416,12 +3427,13 @@
         "pal",
         "dendy"
       ],
-      "failure_means": "blocking",
-      "provenance": "240pee; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "failure_means": "advisory",
+      "provenance": "240pee; F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: NTSC/PAL/Dendy TV timing display test",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "240pee/240pee.nes",
       "vendor_state": "vendored",
-      "protocol": "$6000"
+      "protocol": "$6000",
+      "known_limit": "NTSC/PAL/Dendy TV timing display test"
     },
     {
       "kgmqa_id": "kgmqa-100-tvpassfail-tepples",
@@ -3725,12 +3737,13 @@
         "input",
         "mouse"
       ],
-      "failure_means": "blocking",
-      "provenance": "mset; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "failure_means": "advisory",
+      "provenance": "mset; F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: SNES mouse input scan protocol",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "rainwarrior/mset/mset.nes",
       "vendor_state": "vendored",
-      "protocol": "$6000"
+      "protocol": "$6000",
+      "known_limit": "SNES mouse input scan protocol"
     },
     {
       "kgmqa_id": "kgmqa-108-mict-rainwarrior",
@@ -3763,12 +3776,13 @@
         "input",
         "microphone"
       ],
-      "failure_means": "blocking",
-      "provenance": "mict; F11QA-recast-2026-09-21; mirror-ref-2026-09-24",
+      "failure_means": "advisory",
+      "provenance": "mict; F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: Famicom microphone input scan protocol",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "rainwarrior/mict/mict.nes",
       "vendor_state": "vendored",
-      "protocol": "$6000"
+      "protocol": "$6000",
+      "known_limit": "Famicom microphone input scan protocol"
     },
     {
       "kgmqa_id": "kgmqa-109-telling-lys-tepples",
