@@ -365,6 +365,33 @@ def main():
     ok, fail, skip_adv, skip_pend = copy_roms(
         cases, args.snapshot_dir, args.output_dir, args.dry_run, sha_index)
     log('')
+
+    # 5. 部署 blargg 套件树（Oracle B / blargg_manifest.json 用）
+    # tests.json 的 rom-suite 用例只覆盖「每套件代表 ROM」，而
+    # fixtures/blargg_manifest.json 引用的是 fixtures/blargg/** 下 177 个
+    # $6000 ROM。整棵 blargg/ 目录从镜像快照按相对路径落到 output_dir，
+    # 与 download_blargg_roms.ps1 的落盘布局一致。
+    blargg_src = args.snapshot_dir / 'blargg'
+    blargg_dst = args.output_dir / 'blargg'
+    n_blargg = 0
+    if blargg_src.is_dir():
+        if args.dry_run:
+            n_blargg = sum(1 for _ in blargg_src.rglob('*.nes'))
+            log(f"[dry-blargg-suite] would deploy {n_blargg} ROMs -> {blargg_dst}")
+        else:
+            blargg_dst.mkdir(parents=True, exist_ok=True)
+            for src in sorted(blargg_src.rglob('*')):
+                if not src.is_file():
+                    continue
+                rel = src.relative_to(blargg_src)
+                dst = blargg_dst / rel
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dst)
+                n_blargg += 1
+            log(f"[blargg-suite] deployed {n_blargg} files -> {blargg_dst}")
+    else:
+        log(f"[blargg-suite] snapshot has no blargg/ tree; Oracle B will fail LoadGame")
+    log('')
     log('=== fetch summary ===')
     log(f"  copied (vendored + sha256-ok): {ok}")
     log(f"  missing/mismatch/failed:       {fail}")
