@@ -2,7 +2,7 @@
 
 # FCEUX11
 
-[![Version](https://img.shields.io/badge/version-v1.17-blue)](https://github.com/Laffinty/FCEUX11/releases)
+[![Version](https://img.shields.io/badge/version-v1.8-blue)](https://github.com/Laffinty/FCEUX11/releases)
 [![License](https://img.shields.io/badge/license-GPL--v2-green)](COPYING)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?logo=windows)](https://www.microsoft.com/windows/windows-11)
 [![Qt](https://img.shields.io/badge/Qt-6.8%20LTS-41CD52?logo=qt)](https://www.qt.io)
@@ -89,40 +89,50 @@ Launch `fceux11.exe`, load a game via **File → Open ROM**, play with keyboard 
 
 ---
 
-## 质量保障 / Quality Assurance — KagamiQA
+## 质量保障 / Quality Assurance — F11QA
 
-FCEUX11 内置一套名为 **KagamiQA** 的双 Oracle 自动化质量保障系统，在 CI 上常驻运行：
+FCEUX11 内置一套名为 **F11QA**（原 KagamiQA）的双 Oracle 自动化质量保障系统，在 CI 上常驻运行：
 
 | 组件 | 说明 |
 |------|------|
-| **Oracle A（回归测试）** | 27 个 Oracle A 清单条目（外加 6 个 CTest-only 基础设施测试），每次 push 全量运行 |
-| **Oracle B（硬件精度测试）** | 20 个 Oracle B 清单条目代表桶 + 177 个 [blargg](https://github.com/christopherpow/nes-test-roms) `$6000` 协议 ROM 全量批处理，覆盖 CPU/PPU/APU/MMC3 全子类 |
-| **迁移矩阵** | 每次 CI run 产出 `kagamiqa_migration_matrix.json` 并作为 artifact 上传，追踪 PASS→FAIL 回归与 FAIL→PASS 进展 |
-| **基线漂移检测** | PASS→FAIL 自动在 PR 下评论红色警报，防止精度退化 |
+| **Oracle A（回归测试）** | CTest 注册测试 + 120 项扁平清单中的 unit/harness 条目，每次 push 全量运行 |
+| **Oracle B（硬件精度测试）** | 78 项 rom-suite 代表（vendor_state 三态）+ 177 个 [blargg](https://github.com/christopherpow/nes-test-roms) `$6000` 协议 ROM 全量批处理，覆盖 CPU/PPU/APU/MMC3 |
+| **迁移矩阵** | 每次 CI 产出 `f11qa_migration_matrix.json`（artifact），追踪 PASS→FAIL 回归与 FAIL→PASS 进展 |
+| **R4 门禁** | `total==120`、`fail_to_pass==0`、vendor_state 三态、advisory≤15%、grade∉{D,E} 机器校验 |
 
-> **当前 CI 矩阵**（GitHub CI 最新 artifact `kagamiqa-results.zip`，run_id `20260808-052758-5b7fd8`，`engine.git_rev=ffe80ac`，2026-08-08）：47 项 **39 PASS / 8 FAIL（Grade B）**，Oracle A 27P/0F、Oracle B 12P/8F，**0 条 PASS→FAIL 漂移**；8 个 FAIL 全部为 frozen baseline 内的 advisory 已知限制（blargg CPU/PPU/MMC3 深模型族）。数字以 `docs/tech/KagamiQA.md` §0 与最近一次 `kagamiqa_migration_matrix.json` 的 `engine.git_rev` 字段为 source of truth；重跑 `kagami-qa-runner --output` 后随 commit 一并刷新。
+> **当前 CI 矩阵**（`f11qa.yml`，`engine.git_rev=f19fa7d`，R4 gate passed，grade **B**）：
+> **120 项 / 106 PASS / 14 FAIL**；Oracle A **42P/0F**，Oracle B **64P/14F**
+> （blargg 全量 **145P/32F**）；advisory known-limit 14/120 = 11.7%（cap 15%）；
+> **0 条 PASS→FAIL 漂移**。数字以 CI artifact 的 `engine.git_rev` 为准；
+> 详见 [`docs/tech/F11QA.md`](docs/tech/F11QA.md) 与
+> [`docs/history/plans/FCEUX11-v1.8_收口验收.md`](docs/history/plans/FCEUX11-v1.8_收口验收.md)。
 
-**实现细节、原理、独立化运行、跨项目迁移**请参阅 [`docs/tech/KagamiQA.md`](docs/tech/KagamiQA.md)。
+**实现细节、原理、独立化运行**请参阅 [`docs/tech/F11QA.md`](docs/tech/F11QA.md)。
 
-FCEUX11 ships **KagamiQA**, a dual-oracle automated quality assurance system that runs continuously in CI:
+FCEUX11 ships **F11QA** (formerly KagamiQA), a dual-oracle automated quality assurance system that runs continuously in CI:
 
 | Component | Description |
 |-----------|-------------|
-| **Oracle A (regression)** | 27 Oracle A manifest entries (plus 6 CTest-only infrastructure tests), full run on every push |
-| **Oracle B (hardware accuracy)** | 20 Oracle B manifest entries as bucket representatives + 177 [blargg](https://github.com/christopherpow/nes-test-roms) `$6000`-protocol ROMs (full batch) covering all CPU/PPU/APU/MMC3 sub-categories |
-| **Migration Matrix** | Every CI run produces `kagamiqa_migration_matrix.json` (uploaded as artifact), tracking PASS→FAIL regressions and FAIL→PASS progress |
-| **Baseline Drift Detection** | PASS→FAIL automatically posts a red alert PR comment, preventing accuracy decay |
+| **Oracle A (regression)** | CTest suite + unit/harness entries of the 120-case flat manifest, full run on every push |
+| **Oracle B (hardware accuracy)** | 78 rom-suite representatives (vendor_state tri-state) + 177 [blargg](https://github.com/christopherpow/nes-test-roms) `$6000`-protocol ROMs covering CPU/PPU/APU/MMC3 |
+| **Migration Matrix** | `f11qa_migration_matrix.json` per CI run, tracking PASS→FAIL regressions and FAIL→PASS progress |
+| **R4 Gate** | Machine-checked: `total==120`, `fail_to_pass==0`, vendor_state, advisory≤15%, grade∉{D,E} |
 
-> **Current CI matrix** (latest GitHub CI artifact `kagamiqa-results.zip`, run_id `20260808-052758-5b7fd8`, `engine.git_rev=ffe80ac`, 2026-08-08): 47 entries **39 PASS / 8 FAIL (Grade B)** — Oracle A 27P/0F, Oracle B 12P/8F, **0 PASS→FAIL drifts**; the 8 FAILs are all advisory known-limits within the frozen baseline (blargg CPU/PPU/MMC3 deep-model family). `docs/tech/KagamiQA.md` §0 and the latest matrix's `engine.git_rev` field are the source of truth; re-run `kagami-qa-runner --output` and refresh in the same commit.
+> **Current CI matrix** (`f11qa.yml`, `engine.git_rev=f19fa7d`, R4 gate passed, grade **B**):
+> **120 cases / 106 PASS / 14 FAIL**; Oracle A **42P/0F**, Oracle B **64P/14F**
+> (blargg batch **145P/32F**); advisory known-limits 14/120 = 11.7% (cap 15%);
+> **0 PASS→FAIL drifts**. Source of truth is `engine.git_rev` in the CI artifact;
+> see [`docs/tech/F11QA.md`](docs/tech/F11QA.md) and the
+> [v1.8 closeout sheet](docs/history/plans/FCEUX11-v1.8_收口验收.md).
 
-**For implementation details, principles, standalone operation, and cross-project migration**, see [`docs/tech/KagamiQA.md`](docs/tech/KagamiQA.md).
+**For implementation details, principles, and standalone operation**, see [`docs/tech/F11QA.md`](docs/tech/F11QA.md).
 
 ---
 
 ## 版本历史 / Changelog
 
-详见 [CHANGELOG.md](CHANGELOG.md)。当前稳定版为 **v1.17**。
-See [CHANGELOG.md](CHANGELOG.md). Current stable release is **v1.17**.
+详见 [CHANGELOG.md](CHANGELOG.md)。当前主线为 **v1.8**（上一稳定发布 **v1.17**）。
+See [CHANGELOG.md](CHANGELOG.md). Mainline is **v1.8** (previous stable **v1.17**).
 
 ---
 
