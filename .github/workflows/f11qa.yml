@@ -233,10 +233,17 @@ jobs:
             exit 1
           }
           powershell -ExecutionPolicy Bypass -File scripts/download_blargg_roms.ps1
-          $n = (Get-ChildItem tests/fixtures/blargg -Recurse -Filter '*.nes' -ErrorAction SilentlyContinue | Measure-Object).Count
-          Write-Host "blargg ROMs on disk: $n"
-          if ($n -lt 170) {
-            Write-Host "::error::blargg suite under-downloaded ($n < 170); Oracle B cannot run"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::error::download_blargg_roms.ps1 exit=$LASTEXITCODE"
+            exit 1
+          }
+          # Validate against manifest paths (mirror deploy uses different basenames,
+          # so a raw *.nes count is not enough).
+          $missing = python -c "import json,pathlib; m=json.load(open('tests/fixtures/blargg_manifest.json',encoding='utf-8-sig')); miss=[r['path'] for r in m['roms'] if not pathlib.Path('tests', r['path']).exists()]; print(len(miss)); [print('MISS', x) for x in miss[:10]]"
+          $missCount = [int]($missing | Select-Object -First 1)
+          Write-Host "blargg manifest paths missing: $missCount / 177"
+          if ($missCount -gt 0) {
+            Write-Host "::error::$missCount blargg ROM paths missing from manifest layout; Oracle B cannot run"
             exit 1
           }
 

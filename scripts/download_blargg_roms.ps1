@@ -1,4 +1,4 @@
-# F11QA P5 — Download complete blargg test ROM suite from GitHub mirror.
+﻿# F11QA P5 - Download complete blargg test ROM suite from GitHub mirror.
 #
 # Expanded from P2 (22 ROMs) to full coverage: CPU ~73, PPU ~45, APU ~52, Mapper ~20
 # Target: >=140 ROMs covering all blargg sub-categories for authoritative QA defense line.
@@ -24,35 +24,35 @@ $ErrorActionPreference = "Stop"
 $BaseRaw = "https://raw.githubusercontent.com/christopherpow/nes-test-roms/master"
 
 # ---------------------------------------------------------------------------
-# ROM inventory — name → [source_rel_path, dest_rel_path, frames, category]
+# ROM inventory - name -> [source_rel_path, dest_rel_path, frames, category]
 #
 # Categories map repository directories to our fixture layout:
-#   cpu/   — CPU instruction, timing, interrupt, reset tests
-#   ppu/   — PPU VBL/NMI, sprite, open bus, OAM, scanline tests
-#   apu/   — APU length counter, envelope, sweep, DMC, mixer tests
-#   mmc3/  — MMC3 IRQ, scanline, and CHR banking tests
+#   cpu/   - CPU instruction, timing, interrupt, reset tests
+#   ppu/   - PPU VBL/NMI, sprite, open bus, OAM, scanline tests
+#   apu/   - APU length counter, envelope, sweep, DMC, mixer tests
+#   mmc3/  - MMC3 IRQ, scanline, and CHR banking tests
 # ---------------------------------------------------------------------------
 
 $Roms = @(
 
     # =========================================================================
-    # CPU — Instruction tests (blargg_nes_cpu_test5)
+    # CPU - Instruction tests (blargg_nes_cpu_test5)
     # =========================================================================
     @{Name="cpu_test5_cpu";       Src="blargg_nes_cpu_test5/cpu.nes";            Cat="cpu"; Frames=500},
     @{Name="cpu_test5_official";  Src="blargg_nes_cpu_test5/official.nes";       Cat="cpu"; Frames=500},
 
     # =========================================================================
-    # CPU — Instruction tests v3 (instr_test-v3)
+    # CPU - Instruction tests v3 (instr_test-v3)
     # =========================================================================
     @{Name="instr_v3_all";        Src="instr_test-v3/all_instrs.nes";            Cat="cpu"; Frames=300},
     @{Name="instr_v3_official";   Src="instr_test-v3/official_only.nes";         Cat="cpu"; Frames=300},
 
     # =========================================================================
-    # CPU — Instruction tests v5 (instr_test-v5) — already have all_instrs/official_only
+    # CPU - Instruction tests v5 (instr_test-v5) - already have all_instrs/official_only
     # =========================================================================
     @{Name="instr_v5_all";        Src="instr_test-v5/all_instrs.nes";            Cat="cpu"; Frames=300},
     @{Name="instr_v5_official";   Src="instr_test-v5/official_only.nes";         Cat="cpu"; Frames=300},
-    # v5 rom_singles — individual instruction group tests
+    # v5 rom_singles - individual instruction group tests
     @{Name="instr_v5_01_basics";       Src="instr_test-v5/rom_singles/01-basics.nes";       Cat="cpu"; Frames=300},
     @{Name="instr_v5_02_implied";      Src="instr_test-v5/rom_singles/02-implied.nes";      Cat="cpu"; Frames=300},
     @{Name="instr_v5_03_immediate";    Src="instr_test-v5/rom_singles/03-immediate.nes";    Cat="cpu"; Frames=300},
@@ -71,34 +71,34 @@ $Roms = @(
     @{Name="instr_v5_16_special";      Src="instr_test-v5/rom_singles/16-special.nes";      Cat="cpu"; Frames=300},
 
     # =========================================================================
-    # CPU — Instruction timing (instr_timing)
+    # CPU - Instruction timing (instr_timing)
     # =========================================================================
     @{Name="instr_timing";         Src="instr_timing/instr_timing.nes";               Cat="cpu"; Frames=500},
     @{Name="instr_timing_v2_1";    Src="instr_timing/rom_singles/1-instr_timing.nes"; Cat="cpu"; Frames=500},
     @{Name="instr_timing_v2_2";    Src="instr_timing/rom_singles/2-branch_timing.nes";Cat="cpu"; Frames=500},
 
     # =========================================================================
-    # CPU — Branch timing
+    # CPU - Branch timing
     # =========================================================================
     @{Name="branch_basics";        Src="branch_timing_tests/1.Branch_Basics.nes";    Cat="cpu"; Frames=300},
     @{Name="branch_backward";      Src="branch_timing_tests/2.Backward_Branch.nes";  Cat="cpu"; Frames=300},
     @{Name="branch_forward";       Src="branch_timing_tests/3.Forward_Branch.nes";   Cat="cpu"; Frames=300},
 
     # =========================================================================
-    # CPU — Dummy reads / writes
+    # CPU - Dummy reads / writes
     # =========================================================================
     @{Name="cpu_dummy_reads";      Src="cpu_dummy_reads/cpu_dummy_reads.nes";           Cat="cpu"; Frames=300},
     @{Name="cpu_dummy_writes_oam"; Src="cpu_dummy_writes/cpu_dummy_writes_oam.nes";     Cat="cpu"; Frames=300},
     @{Name="cpu_dummy_writes_ppu"; Src="cpu_dummy_writes/cpu_dummy_writes_ppumem.nes";  Cat="cpu"; Frames=300},
 
     # =========================================================================
-    # CPU — Exec space
+    # CPU - Exec space
     # =========================================================================
     @{Name="cpu_exec_space_apu";   Src="cpu_exec_space/test_cpu_exec_space_apu.nes";   Cat="cpu"; Frames=300},
     @{Name="cpu_exec_space_ppuio"; Src="cpu_exec_space/test_cpu_exec_space_ppuio.nes"; Cat="cpu"; Frames=300},
 
     # =========================================================================
-    # CPU — Interrupts v2 (already have cpu_interrupts.nes)
+    # CPU - Interrupts v2 (already have cpu_interrupts.nes)
     # =========================================================================
     @{Name="cpu_interrupts";       Src="cpu_interrupts_v2/cpu_interrupts.nes";              Cat="cpu"; Frames=500},
     @{Name="cpu_int_1_cli_latency";   Src="cpu_interrupts_v2/rom_singles/1-cli_latency.nes";    Cat="cpu"; Frames=300},
@@ -108,18 +108,18 @@ $Roms = @(
     @{Name="cpu_int_5_branch_irq";    Src="cpu_interrupts_v2/rom_singles/5-branch_delays_irq.nes"; Cat="cpu"; Frames=300},
 
     # =========================================================================
-    # CPU — Reset
+    # CPU - Reset
     # =========================================================================
     @{Name="cpu_reset_ram";        Src="cpu_reset/ram_after_reset.nes";  Cat="cpu"; Frames=300},
     @{Name="cpu_reset_regs";       Src="cpu_reset/registers.nes";        Cat="cpu"; Frames=300},
 
     # =========================================================================
-    # CPU — Timing test 6
+    # CPU - Timing test 6
     # =========================================================================
     @{Name="cpu_timing_test6";     Src="cpu_timing_test6/cpu_timing_test.nes";  Cat="cpu"; Frames=500},
 
     # =========================================================================
-    # CPU — Instruction misc
+    # CPU - Instruction misc
     # =========================================================================
     @{Name="instr_misc";           Src="instr_misc/instr_misc.nes";              Cat="cpu"; Frames=300},
     @{Name="instr_misc_01_abs_x";     Src="instr_misc/rom_singles/01-abs_x_wrap.nes";       Cat="cpu"; Frames=300},
@@ -128,7 +128,7 @@ $Roms = @(
     @{Name="instr_misc_04_dummy_apu";  Src="instr_misc/rom_singles/04-dummy_reads_apu.nes"; Cat="cpu"; Frames=300},
 
     # =========================================================================
-    # CPU — nes_instr_test (11 rom_singles)
+    # CPU - nes_instr_test (11 rom_singles)
     # =========================================================================
     @{Name="nes_instr_01_implied";  Src="nes_instr_test/rom_singles/01-implied.nes";    Cat="cpu"; Frames=300},
     @{Name="nes_instr_02_imm";      Src="nes_instr_test/rom_singles/02-immediate.nes";  Cat="cpu"; Frames=300},
@@ -143,7 +143,7 @@ $Roms = @(
     @{Name="nes_instr_11_special";  Src="nes_instr_test/rom_singles/11-special.nes";    Cat="cpu"; Frames=300},
 
     # =========================================================================
-    # PPU — VBL/NMI (already have main ROM; add rom_singles)
+    # PPU - VBL/NMI (already have main ROM; add rom_singles)
     # =========================================================================
     @{Name="ppu_vbl_nmi";              Src="ppu_vbl_nmi/ppu_vbl_nmi.nes";                    Cat="ppu"; Frames=300},
     @{Name="vbl_01_basics";            Src="ppu_vbl_nmi/rom_singles/01-vbl_basics.nes";      Cat="ppu"; Frames=300},
@@ -158,7 +158,7 @@ $Roms = @(
     @{Name="vbl_10_even_odd_timing";   Src="ppu_vbl_nmi/rom_singles/10-even_odd_timing.nes"; Cat="ppu"; Frames=300},
 
     # =========================================================================
-    # PPU — VBL/NMI timing (blargg_ppu_tests_2005.09.15b)
+    # PPU - VBL/NMI timing (blargg_ppu_tests_2005.09.15b)
     # =========================================================================
     @{Name="ppu_palette_ram";       Src="blargg_ppu_tests_2005.09.15b/palette_ram.nes";      Cat="ppu"; Frames=300},
     @{Name="ppu_power_up_palette";  Src="blargg_ppu_tests_2005.09.15b/power_up_palette.nes"; Cat="ppu"; Frames=300},
@@ -167,7 +167,7 @@ $Roms = @(
     @{Name="ppu_vram_access";       Src="blargg_ppu_tests_2005.09.15b/vram_access.nes";      Cat="ppu"; Frames=300},
 
     # =========================================================================
-    # PPU — VBL/NMI timing (vbl_nmi_timing directory)
+    # PPU - VBL/NMI timing (vbl_nmi_timing directory)
     # =========================================================================
     @{Name="vbl_timing_1_frame";        Src="vbl_nmi_timing/1.frame_basics.nes";        Cat="ppu"; Frames=300},
     @{Name="vbl_timing_2_vbl";          Src="vbl_nmi_timing/2.vbl_timing.nes";          Cat="ppu"; Frames=300},
@@ -178,7 +178,7 @@ $Roms = @(
     @{Name="vbl_timing_7_nmi";          Src="vbl_nmi_timing/7.nmi_timing.nes";          Cat="ppu"; Frames=300},
 
     # =========================================================================
-    # PPU — Sprite overflow (already have all 5)
+    # PPU - Sprite overflow (already have all 5)
     # =========================================================================
     @{Name="sprite_overflow_1_basics";   Src="sprite_overflow_tests/1.Basics.nes";    Cat="ppu"; Frames=300},
     @{Name="sprite_overflow_2_details";  Src="sprite_overflow_tests/2.Details.nes";   Cat="ppu"; Frames=300},
@@ -187,7 +187,7 @@ $Roms = @(
     @{Name="sprite_overflow_5_emu";      Src="sprite_overflow_tests/5.Emulator.nes";  Cat="ppu"; Frames=300},
 
     # =========================================================================
-    # PPU — Sprite 0 hit (already have all 11)
+    # PPU - Sprite 0 hit (already have all 11)
     # =========================================================================
     @{Name="sprite_hit_01_basics";       Src="sprite_hit_tests_2005.10.05/01.basics.nes";        Cat="ppu"; Frames=300},
     @{Name="sprite_hit_02_alignment";    Src="sprite_hit_tests_2005.10.05/02.alignment.nes";     Cat="ppu"; Frames=300},
@@ -202,7 +202,7 @@ $Roms = @(
     @{Name="sprite_hit_11_edge_timing";  Src="sprite_hit_tests_2005.10.05/11.edge_timing.nes";   Cat="ppu"; Frames=300},
 
     # =========================================================================
-    # PPU — Open bus, OAM, scanline
+    # PPU - Open bus, OAM, scanline
     # =========================================================================
     @{Name="ppu_open_bus";      Src="ppu_open_bus/ppu_open_bus.nes";            Cat="ppu"; Frames=300},
     @{Name="ppu_read_buffer";   Src="ppu_read_buffer/test_ppu_read_buffer.nes"; Cat="ppu"; Frames=300},
@@ -212,7 +212,7 @@ $Roms = @(
     @{Name="scanline_a1";       Src="scanline-a1/scanline.nes";                 Cat="ppu"; Frames=300},
 
     # =========================================================================
-    # PPU — Other visual/behavioral tests
+    # PPU - Other visual/behavioral tests
     # =========================================================================
     @{Name="full_palette";         Src="full_palette/full_palette.nes";          Cat="ppu"; Frames=300},
     @{Name="flowing_palette";      Src="full_palette/flowing_palette.nes";       Cat="ppu"; Frames=300},
@@ -220,7 +220,7 @@ $Roms = @(
     @{Name="scrolltest";           Src="scrolltest/scroll.nes";                  Cat="ppu"; Frames=300},
 
     # =========================================================================
-    # APU — Length counter, envelope, sweep, DMC (blargg_apu_2005.07.30)
+    # APU - Length counter, envelope, sweep, DMC (blargg_apu_2005.07.30)
     # =========================================================================
     @{Name="apu_01_len_ctr";        Src="blargg_apu_2005.07.30/01.len_ctr.nes";           Cat="apu"; Frames=600},
     @{Name="apu_02_len_table";      Src="blargg_apu_2005.07.30/02.len_table.nes";         Cat="apu"; Frames=600},
@@ -235,7 +235,7 @@ $Roms = @(
     @{Name="apu_11_len_reload";     Src="blargg_apu_2005.07.30/11.len_reload_timing.nes"; Cat="apu"; Frames=600},
 
     # =========================================================================
-    # APU — apu_test (already have main ROM; add rom_singles)
+    # APU - apu_test (already have main ROM; add rom_singles)
     # =========================================================================
     @{Name="apu_test";             Src="apu_test/apu_test.nes";                     Cat="apu"; Frames=600},
     @{Name="apu_single_1_len_ctr";      Src="apu_test/rom_singles/1-len_ctr.nes";         Cat="apu"; Frames=600},
@@ -248,7 +248,7 @@ $Roms = @(
     @{Name="apu_single_8_dmc_rates";    Src="apu_test/rom_singles/8-dmc_rates.nes";       Cat="apu"; Frames=600},
 
     # =========================================================================
-    # APU — Reset
+    # APU - Reset
     # =========================================================================
     @{Name="apu_reset_4015";         Src="apu_reset/4015_cleared.nes";        Cat="apu"; Frames=300},
     @{Name="apu_reset_4017_timing";  Src="apu_reset/4017_timing.nes";         Cat="apu"; Frames=300},
@@ -258,7 +258,7 @@ $Roms = @(
     @{Name="apu_reset_works_imm";    Src="apu_reset/works_immediately.nes";   Cat="apu"; Frames=300},
 
     # =========================================================================
-    # APU — Mixer (square, triangle, noise, DMC)
+    # APU - Mixer (square, triangle, noise, DMC)
     # =========================================================================
     @{Name="apu_mixer_square";    Src="apu_mixer/square.nes";     Cat="apu"; Frames=600},
     @{Name="apu_mixer_triangle";  Src="apu_mixer/triangle.nes";   Cat="apu"; Frames=600},
@@ -266,7 +266,7 @@ $Roms = @(
     @{Name="apu_mixer_dmc";       Src="apu_mixer/dmc.nes";        Cat="apu"; Frames=600},
 
     # =========================================================================
-    # APU — DMC tests
+    # APU - DMC tests
     # =========================================================================
     @{Name="dmc_buffer_retained";  Src="dmc_tests/buffer_retained.nes";  Cat="apu"; Frames=300},
     @{Name="dmc_latency";          Src="dmc_tests/latency.nes";          Cat="apu"; Frames=300},
@@ -274,7 +274,7 @@ $Roms = @(
     @{Name="dmc_status_irq";       Src="dmc_tests/status_irq.nes";       Cat="apu"; Frames=300},
 
     # =========================================================================
-    # APU — DMC DMA during read
+    # APU - DMC DMA during read
     # =========================================================================
     @{Name="dma_2007_read";        Src="dmc_dma_during_read4/dma_2007_read.nes";      Cat="apu"; Frames=300},
     @{Name="dma_2007_write";       Src="dmc_dma_during_read4/dma_2007_write.nes";     Cat="apu"; Frames=300},
@@ -283,18 +283,18 @@ $Roms = @(
     @{Name="dma_read_write_2007";  Src="dmc_dma_during_read4/read_write_2007.nes";    Cat="apu"; Frames=300},
 
     # =========================================================================
-    # APU — Sprite DMA + DMC DMA
+    # APU - Sprite DMA + DMC DMA
     # =========================================================================
     @{Name="sprdma_dmc_dma";     Src="sprdma_and_dmc_dma/sprdma_and_dmc_dma.nes";     Cat="apu"; Frames=300},
     @{Name="sprdma_dmc_dma_512"; Src="sprdma_and_dmc_dma/sprdma_and_dmc_dma_512.nes"; Cat="apu"; Frames=300},
 
     # =========================================================================
-    # APU — Volume tests
+    # APU - Volume tests
     # =========================================================================
     @{Name="volume_test"; Src="volume_tests/volumes.nes"; Cat="apu"; Frames=300},
 
     # =========================================================================
-    # APU — PAL APU tests
+    # APU - PAL APU tests
     # =========================================================================
     @{Name="pal_apu_01_len_ctr";        Src="pal_apu_tests/01.len_ctr.nes";           Cat="apu"; Frames=600},
     @{Name="pal_apu_02_len_table";      Src="pal_apu_tests/02.len_table.nes";         Cat="apu"; Frames=600},
@@ -308,7 +308,7 @@ $Roms = @(
     @{Name="pal_apu_11_len_reload";     Src="pal_apu_tests/11.len_reload_timing.nes"; Cat="apu"; Frames=600},
 
     # =========================================================================
-    # Mapper — MMC3 tests
+    # Mapper - MMC3 tests
     # =========================================================================
     @{Name="mmc3_1_clocking";        Src="mmc3_test/1-clocking.nes";           Cat="mmc3"; Frames=300},
     @{Name="mmc3_2_details";         Src="mmc3_test/2-details.nes";            Cat="mmc3"; Frames=300},
@@ -318,7 +318,7 @@ $Roms = @(
     @{Name="mmc3_6_MMC6";            Src="mmc3_test/6-MMC6.nes";              Cat="mmc3"; Frames=300},
 
     # =========================================================================
-    # Mapper — MMC3 IRQ tests
+    # Mapper - MMC3 IRQ tests
     # =========================================================================
     @{Name="mmc3_irq_1_Clocking";        Src="mmc3_irq_tests/1.Clocking.nes";        Cat="mmc3"; Frames=300},
     @{Name="mmc3_irq_2_Details";         Src="mmc3_irq_tests/2.Details.nes";         Cat="mmc3"; Frames=300},
@@ -328,7 +328,7 @@ $Roms = @(
     @{Name="mmc3_irq_6_MMC3_rev_B";      Src="mmc3_irq_tests/6.MMC3_rev_B.nes";      Cat="mmc3"; Frames=300},
 
     # =========================================================================
-    # Mapper — MMC3 test 2 (alternate versions)
+    # Mapper - MMC3 test 2 (alternate versions)
     # =========================================================================
     @{Name="mmc3_v2_1_clocking";         Src="mmc3_test_2/rom_singles/1-clocking.nes";         Cat="mmc3"; Frames=300},
     @{Name="mmc3_v2_2_details";          Src="mmc3_test_2/rom_singles/2-details.nes";          Cat="mmc3"; Frames=300},
@@ -367,17 +367,17 @@ foreach ($rom in $Roms) {
     if (Test-Path $destPath) {
         $size = (Get-Item $destPath).Length
         if ($size -gt 256) {
-            Write-Host "  [$($rom.Cat)] $($rom.Name).nes — cached ($size bytes)"
+            Write-Host "  [$($rom.Cat)] $($rom.Name).nes - cached ($size bytes)"
             $ok++
             continue
         } else {
-            Write-Host "  [$($rom.Cat)] $($rom.Name).nes — cached file too small ($size bytes), re-fetching"
+            Write-Host "  [$($rom.Cat)] $($rom.Name).nes - cached file too small ($size bytes), re-fetching"
             Remove-Item $destPath -Force
         }
     }
 
     try {
-        Write-Host "  [$($rom.Cat)] $($rom.Name).nes — downloading..."
+        Write-Host "  [$($rom.Cat)] $($rom.Name).nes - downloading..."
         Invoke-WebRequest -Uri $srcUrl -OutFile $destPath -ErrorAction Stop
         $size = (Get-Item $destPath).Length
         if ($size -gt 256) {
