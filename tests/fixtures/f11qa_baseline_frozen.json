@@ -1,7 +1,7 @@
 {
   "schema_version": "1.8",
-  "generated_at": "2026-09-26T06:43:30Z",
-  "run_id": "v1.8-baseline-frozen-real-2026-09-26b",
+  "generated_at": "2026-09-26T12:53:02Z",
+  "run_id": "v1.8-baseline-055-fix",
   "results": {
     "kgmqa-001-smoke-cpp": true,
     "kgmqa-002-cpu": true,
@@ -57,7 +57,7 @@
     "kgmqa-052-cpu-flag-concurrency-bisqwit": true,
     "kgmqa-053-branch-timing-tests-blargg": true,
     "kgmqa-054-cpu-interrupts-v2-blargg": true,
-    "kgmqa-055-cpu-reset-blargg": false,
+    "kgmqa-055-cpu-reset-blargg": true,
     "kgmqa-056-instr-timing-blargg": false,
     "kgmqa-057-instr-test-v3-blargg": true,
     "kgmqa-058-ppu-sprite-hit-blargg": true,

@@ -2,14 +2,14 @@
   "_comment": "F11QA P5.1 - Known-failure baseline for blargg test ROM suite (P5 180 ROMs -> P5.1 177 ROMs, 33 known FAILs).",
   "_policy": "This file is version-controlled. Each entry documents a ROM known to FAIL. Entries with eventually_pass=true are accuracy bugs to fix. Entries with eventually_pass=false are permanent skips (e.g. unsupported features or ROM format issues).",
   "_governance": "AI shall not modify expected values. Baseline updates require the same review as code changes.",
-  "baseline_version": "v1.16.0-P5.1",
-  "previous_baseline": "v1.16.0-P5",
+  "baseline_version": "v1.16.0-P5.2",
+  "previous_baseline": "v1.16.0-P5.1",
   "generated_at": "2026-09-26",
-  "engine": "FCEUX11 wip1.8 1d84627 (newppu=1, 177-ROM batch 2026-09-26: 144 PASS / 33 FAIL)",
+  "engine": "FCEUX11 wip1.8 (newppu=1, 177-ROM batch: 145 PASS / 32 FAIL after cpu_reset_regs fix)",
   "summary": {
     "total": 177,
-    "pass": 144,
-    "fail": 33,
+    "pass": 145,
+    "fail": 32,
     "error": 0,
     "rom_coverage": "177 ROMs covering CPU, PPU, APU, MMC3 (manifest fixtures/blargg_manifest.json)"
   },
@@ -87,14 +87,6 @@
       "eventually_pass": true,
       "runppu": false,
       "reason": "Branch delays IRQ timing."
-    },
-    {
-      "rom": "cpu_reset_regs.nes",
-      "category": "cpu",
-      "code": "0x81",
-      "eventually_pass": true,
-      "runppu": false,
-      "reason": "CPU register state after reset."
     },
     {
       "rom": "cpu_dummy_writes_oam.nes",

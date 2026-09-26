@@ -486,10 +486,18 @@ void X6502_Init(void)
 }
 
 extern int StackAddrBackup;
+// Set true by X6502_Power so the next RESET vector fetch (power-on)
+// does not apply the soft-reset S-=3 rule. blargg cpu_reset_regs.
+static bool g_power_on_reset_pending = true;
 void X6502_Power(void)
 {
  _count=_tcount=_IRQlow=_PC=_A=_X=_Y=_P=_PI=_DB=_jammed=0;
+ // blargg cpu_reset_regs: at power A,X,Y=0, P=$34 (U|B|I), S=$FD.
+ // The subsequent RESET vector fetch must NOT apply the soft-reset
+ // S-=3 rule — that applies only to a later reset-button press.
+ _P=_PI=(U_FLAG|B_FLAG|I_FLAG);
  _S=0xFD;
+ g_power_on_reset_pending = true;
  g_cpu.timestamp_ref()=g_cpu.sound_timestamp_ref()=0;
  X6502_Reset();
  StackAddrBackup = -1;
@@ -520,7 +528,23 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
      _PC=RdMem(0xFFFC);
      _PC|=RdMem(0xFFFD)<<8;
      _jammed=0;
-     _PI=_P=I_FLAG;
+     // blargg cpu_reset_regs:
+     //   power-on RESET: A=X=Y=0, P=$34, S=$FD (already set by X6502_Power;
+     //   do not apply the soft-reset rule below).
+     //   soft reset:     A/X/Y unchanged; P |= I ($04); S -= 3;
+     //                   nothing written to stack.
+     if (g_power_on_reset_pending) {
+      g_power_on_reset_pending = false;
+      // Power-on: force the blargg cpu_reset_regs contract even if
+      // PowerNES was not the last lifecycle call (LoadGame may only reset).
+      _A=_X=_Y=0;
+      _P=_PI=(U_FLAG|B_FLAG|I_FLAG);
+      _S=0xFD;
+     } else {
+      _P |= I_FLAG;
+      _S = (uint8)(_S - 3);
+     }
+     _PI = _P;
      _IRQlow&=~FCEU_IQRESET;
     }
     else if(_IRQlow&FCEU_IQNMI2)

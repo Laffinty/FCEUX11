@@ -1713,7 +1713,9 @@
           "--tests-json",
           "tests/tests.json",
           "--frames",
-          "300"
+          "600",
+          "--reset-after",
+          "60"
         ]
       },
       "expected": {

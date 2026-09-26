@@ -267,21 +267,37 @@ pub fn run_one_rom<A: SutAdapter + ?Sized>(
     adapter.load(&spec)?;
 
     if entry.frames > 0 && reset_after_used >= 0 && (reset_after_used as u32) < entry.frames {
-        step_n(adapter, reset_after_used as u32)?;
-        adapter.reset()?;
-        // Re-reset polling: while $6000 reads 0x81 after a 20-frame
-        // cooldown, press RESET again. apu_reset_4017_written needs this
-        // second reset.
-        let mut done = reset_after_used as u32;
+        // Blargg "needs reset" ROMs (run_at_reset.s) set $6000=$81 only
+        // AFTER their prompt delay (cpu_reset_regs waits ~2s). Resetting on
+        // a fixed frame index is too early and leaves num_resets==0, so the
+        // suite re-enters the power-on path and fails set_test 2. Wait for
+        // the $81 handshake instead, then press RESET once.
+        let mut done: u32 = 0;
+        let mut pressed = false;
         let mut since_reset: u32 = 0;
         while done < entry.frames {
             let step = std::cmp::min(RESET_POLL_CHUNK, entry.frames - done);
             step_n(adapter, step)?;
             done += step;
-            since_reset += step;
-            if since_reset >= RESET_COOLDOWN_FRAMES && adapter.read_oracle_probe(entry.probe_addr)? == 0x81 {
-                adapter.reset()?;
-                since_reset = 0;
+            if !pressed {
+                let v = adapter.read_oracle_probe(entry.probe_addr)?;
+                if v == 0x81 {
+                    adapter.reset()?;
+                    pressed = true;
+                    since_reset = 0;
+                }
+            } else {
+                since_reset += step;
+                // One extra reset is allowed for APU suites that need it
+                // (apu_reset_4017_written). Cool down first so we do not
+                // stomp the post-reset handler while $6000 is still $81.
+                if entry.name.contains("apu_reset")
+                    && since_reset >= RESET_COOLDOWN_FRAMES
+                    && adapter.read_oracle_probe(entry.probe_addr)? == 0x81
+                {
+                    adapter.reset()?;
+                    since_reset = 0;
+                }
             }
         }
     } else {
