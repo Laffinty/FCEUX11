@@ -773,7 +773,13 @@
       "license": "GPL-2.0",
       "input": {
         "binary": "f11qa_blargg_runner",
-        "working_dir": "tests"
+        "working_dir": "tests",
+        "args": [
+          "--rom",
+          "fixtures/nestest.nes",
+          "--frames",
+          "60"
+        ]
       },
       "expected": {
         "exit_code": 0
@@ -1270,15 +1276,10 @@
       "spec_source": "nesdev.org/wiki/Emulator_tests",
       "license": "GPL-2.0",
       "input": {
-        "binary": "f11qa-rom-runner",
+        "binary": "python",
         "working_dir": ".",
         "args": [
-          "--kgmqa-id",
-          "kgmqa-043-blargg-suite",
-          "--tests-json",
-          "tests/tests.json",
-          "--frames",
-          "600"
+          "scripts/run_blargg_suite_oracle.py"
         ]
       },
       "expected": {
@@ -1376,6 +1377,8 @@
         "working_dir": ".",
         "args": [
           "tests/lua_scripts/test_memory.lua",
+          "--rom",
+          "tests/fixtures/nestest.nes",
           "--frames",
           "60"
         ]
@@ -3929,7 +3932,7 @@
       "license": "GPL-2.0",
       "input": {
         "binary": "fceux11_i18n_regression_test",
-        "working_dir": "tests"
+        "working_dir": "."
       },
       "expected": {
         "exit_code": 0
@@ -3953,8 +3956,12 @@
       "spec_source": "internal",
       "license": "GPL-2.0",
       "input": {
-        "binary": "fceux11_menu_slot_check",
-        "working_dir": "tests"
+        "binary": "python",
+        "working_dir": ".",
+        "args": [
+          "scripts/check_menu_slots.py",
+          "."
+        ]
       },
       "expected": {
         "exit_code": 0
@@ -4032,6 +4039,8 @@
         "binary": "python",
         "working_dir": "tests",
         "args": [
+          "-X",
+          "utf8",
           "f11qa/mirror_snapshot_check.py",
           "--manifest",
           "fixtures/f11qa_mirror_pin.json",
