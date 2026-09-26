@@ -221,6 +221,25 @@ jobs:
             exit 1
           }
 
+      # blargg_manifest.json 的 177 条 path 用的是 christopherpow 下载器命名
+      # （apu_01_len_ctr.nes）；f11qa-rom-mirror 里的同套件是另一套命名
+      # （apu_test_1-len_ctr.nes），basename 仅 14/177 重合。Oracle B 必须用
+      # download_blargg_roms.ps1 落盘的目录树，否则 LoadGame 全挂 0xFE。
+      - name: Download blargg suite ROMs (Oracle B fixtures)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path tests/fixtures/blargg_manifest.json)) {
+            Write-Host "::error::blargg_manifest.json missing"
+            exit 1
+          }
+          powershell -ExecutionPolicy Bypass -File scripts/download_blargg_roms.ps1
+          $n = (Get-ChildItem tests/fixtures/blargg -Recurse -Filter '*.nes' -ErrorAction SilentlyContinue | Measure-Object).Count
+          Write-Host "blargg ROMs on disk: $n"
+          if ($n -lt 170) {
+            Write-Host "::error::blargg suite under-downloaded ($n < 170); Oracle B cannot run"
+            exit 1
+          }
+
       # -----------------------------------------------------------------------
       # Oracle A — CTest regression suite
       # -----------------------------------------------------------------------
