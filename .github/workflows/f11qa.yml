@@ -241,14 +241,14 @@ jobs:
         working-directory: tests
         run: |
           $env:PATH = "${{ github.workspace }}/vcpkg_installed/x64-windows/bin;${{ github.workspace }}/vcpkg_installed/x64-windows/debug/bin;$env:PATH"
-          $runner = "../build/tests/fceux11_blargg_runner.exe"
+          $runner = "../build/tests/f11qa_blargg_runner.exe"
           if (Test-Path $runner) {
             & $runner --manifest fixtures/blargg_manifest.json 2>&1 | Tee-Object -FilePath ../build/blargg_full_output.txt
             $exitCode = $LASTEXITCODE
             Write-Host "Blargg suite exit code: $exitCode"
           } else {
-            Write-Host "::warning::blargg_runner not built; skipping Oracle B."
-            exit 0
+            Write-Host "::error::f11qa_blargg_runner.exe not built; Oracle B cannot run. Expected at $runner"
+            exit 1
           }
         shell: pwsh
         continue-on-error: true
