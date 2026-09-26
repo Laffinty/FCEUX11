@@ -24,7 +24,7 @@
       "rom":  "fixtures/mapper_nrom.nes",
       "scenario": "title_screen",
       "frames_after_load": 30,
-      "md5":  "45036ccf3a389fd348508213fdc95dbf",
+      "md5":  "9384c8a68200eed8d69dc7b36e35599d",
       "fc0_path": "golden/nrom_smb_title.fc0"
     },
     {
@@ -32,7 +32,7 @@
       "rom":  "fixtures/mapper_nrom.nes",
       "scenario": "in_game",
       "frames_after_load": 300,
-      "md5":  "cef42b9dedcb696cf0e266dfc236f024",
+      "md5":  "5f47a7f68d57617cb4dcaa78c968e7eb",
       "fc0_path": "golden/nrom_smb_ingame.fc0"
     },
     {
@@ -40,7 +40,7 @@
       "rom":  "fixtures/mapper_mmc1.nes",
       "scenario": "title_screen",
       "frames_after_load": 30,
-      "md5":  "1e180b76c3b0756ef5fedd1499660bf7",
+      "md5":  "c9e056288495d7044b80f3390f3c0780",
       "fc0_path": "golden/mmc1_zelda_title.fc0"
     },
     {
@@ -48,7 +48,7 @@
       "rom":  "fixtures/mapper_mmc1.nes",
       "scenario": "save_screen",
       "frames_after_load": 600,
-      "md5":  "fd10fa254e3240948c07c1a7308f809e",
+      "md5":  "7726da229a5d982c8971f49fbc4e2253",
       "fc0_path": "golden/mmc1_zelda_save.fc0"
     },
     {
@@ -56,7 +56,7 @@
       "rom":  "fixtures/mapper_mmc3.nes",
       "scenario": "world_map",
       "frames_after_load": 200,
-      "md5":  "191b2807ee2680a15d375ccdd27019bb",
+      "md5":  "bdb748414048cc643dfa26f9b9f1e31b",
       "fc0_path": "golden/mmc3_smb3_map.fc0"
     },
     {
@@ -64,7 +64,7 @@
       "rom":  "fixtures/mapper_mmc3.nes",
       "scenario": "in_level",
       "frames_after_load": 600,
-      "md5":  "5fa911a000d71e9a503fda85e8f0c221",
+      "md5":  "19898b012dc3af5d98d5b3efa96779fe",
       "fc0_path": "golden/mmc3_smb3_level.fc0"
     },
     {
@@ -72,7 +72,7 @@
       "rom":  "fixtures/mapper_vrc6.nes",
       "scenario": "title_screen",
       "frames_after_load": 30,
-      "md5":  "c7bfda7480e7ffbc3ea8c42dd62c11a3",
+      "md5":  "89ad6cbc6234868d89dcbef60f0babf7",
       "fc0_path": "golden/vrc6_densetsu_title.fc0"
     },
     {

@@ -207,8 +207,13 @@ static void ANROMSync() {
 	setchr8(0);
 }
 
+// AxROM decodes PRG bank/mirroring on $8000-$FFFF only. The previous
+// 0x4020-0xFFFF window swallowed $6000 blargg-protocol writes as latch
+// updates (bntest saw open-bus $6000 and never completed).
+// wram=1 maps $6000-$7FFF as RAM so the blargg $6000 result protocol works
+// (header typically has no WRAM; this is emulator-side compatibility RAM).
 void ANROM_Init(CartInfo *info) {
-	Latch_Init(info, ANROMSync, 0, 0x4020, 0xFFFF, 0, 0);
+	Latch_Init(info, ANROMSync, 0, 0x8000, 0xFFFF, 1, 0);
 }
 
 //------------------ Map 8 ---------------------------

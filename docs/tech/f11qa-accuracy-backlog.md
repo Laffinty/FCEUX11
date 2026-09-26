@@ -1,6 +1,6 @@
 # F11QA v1.8 精度攻关 backlog（2026-09-26 启动）
 
-> 实测矩阵 **103P / 17F**（Oracle A 42P/0F，Oracle B 61P/17F）。
+> 实测矩阵 **106P / 14F**（Oracle A 42P/0F，Oracle B 61P/17F）。
 > 流水线与 baseline 已稳：`pass_to_fail=0`、`fail_to_pass=0`、Oracle A 全绿。
 > 剩余 17 项为 **vendored 第三方 ROM 真实精度缺口**，是 R4 grade D 的唯一原因。
 
@@ -60,5 +60,5 @@
 
 R4 grade B 需要 blocking FAIL 明显下降。建议路径：
 1. **Phase A-055** 复位寄存器 → **已清零**（145/32）
-2. **Phase B-093** BNROM → 期望 +1
+2. **Phase B-093** BNROM/AxROM → **已清零**
 3. 再评估 037 中断轮询下沉（工程量大，单独立项）

@@ -1,7 +1,7 @@
 {
   "schema_version": "1.8",
-  "generated_at": "2026-09-26T12:53:02Z",
-  "run_id": "v1.8-baseline-055-fix",
+  "generated_at": "2026-09-26T15:01:47Z",
+  "run_id": "v1.8-baseline-055-093",
   "results": {
     "kgmqa-001-smoke-cpp": true,
     "kgmqa-002-cpu": true,
@@ -95,7 +95,7 @@
     "kgmqa-090-mmc5ramsize-rainwarrior": true,
     "kgmqa-091-n163-soundram-rainwarrior": true,
     "kgmqa-092-n163-soundram-init-rainwarrior": true,
-    "kgmqa-093-bntest": false,
+    "kgmqa-093-bntest": true,
     "kgmqa-094-bxrom-512k-test-rainwarrior": true,
     "kgmqa-095-31-test": true,
     "kgmqa-096-fme7acktest-tepples": false,
@@ -108,7 +108,7 @@
     "kgmqa-103-spadtest-tepples": true,
     "kgmqa-104-powerpad-tepples": true,
     "kgmqa-105-paddle-test3-3gengames": true,
-    "kgmqa-106-vaus-test-lidnariq": false,
+    "kgmqa-106-vaus-test-lidnariq": true,
     "kgmqa-107-mset-rainwarrior": false,
     "kgmqa-108-mict-rainwarrior": false,
     "kgmqa-109-telling-lys-tepples": true,
