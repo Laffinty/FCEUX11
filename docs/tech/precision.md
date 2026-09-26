@@ -75,6 +75,11 @@ baseline 更新需与代码变更同等级 review**）。177 ROM：PASS 144 / FA
   （Task1 Track C 结论）。
 - **有据已知限制**：每个 FAIL 必须有探针数据支撑的根因描述，才能标「有据」；
   无据的 FAIL 视为 bug。
+- **advisory 名单护栏（15% 上限）**：`failure_means=advisory` 且仍 FAIL 的用例
+  占 `tests.json` 总数比例不得 **> 15%**（R4 机器门禁）。禁止在无评审的情况下
+  把 blocking 改成 advisory 或净增 advisory；每次调整必须带 known-limit 根因
+  （写入 `provenance`）并走与代码同级 review。精度攻关清零一项，应同步把该项
+  翻回 PASS（不再是 advisory-FAIL）。
 
 ## 5. 调查数据索引（docs/history/surveys/）
 

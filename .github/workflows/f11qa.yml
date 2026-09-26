@@ -482,6 +482,26 @@ jobs:
             $failures += "matrix grade is $grade (D/E are release-blocking: blocking failure, regression, or engine-boot failure)"
           }
 
+          # Advisory known-limit guard (precision.md §4): failing advisory cases
+          # must stay <= 15% of the suite. Prevents diluting grade B by dumping
+          # hard tests into advisory without review.
+          try {
+            $manifest = Get-Content tests/tests.json -Raw | ConvertFrom-Json
+            $advFail = 0
+            $failIds = @($m.details | Where-Object { -not $_.passed } | ForEach-Object { $_.test_id })
+            foreach ($c in $manifest.cases) {
+              if ($c.failure_means -eq 'advisory' -and $failIds -contains $c.kgmqa_id) { $advFail++ }
+            }
+            $total = [int]$m.summary.total
+            $advPct = if ($total -gt 0) { [math]::Round(100.0 * $advFail / $total, 1) } else { 0 }
+            Write-Host "Advisory-FAIL: $advFail / $total = $advPct% (cap 15%)"
+            if ($advPct -gt 15) {
+              $failures += "advisory-FAIL ratio ${advPct}% ($advFail/$total) exceeds 15% cap (precision.md section 4; do not dump blocking tests into advisory without review)"
+            }
+          } catch {
+            $failures += "advisory-FAIL ratio check failed to run: $($_.Exception.Message)"
+          }
+
           if ($failures.Count -gt 0) {
             foreach ($f in $failures) { Write-Host "::error::R4 gate: $f" }
             Write-Host "::error::R4 gate failed - per the acceptance report section 10 R4 falsification criteria, do NOT merge until this is resolved."
