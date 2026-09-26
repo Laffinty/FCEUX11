@@ -1,6 +1,7 @@
 # F11QA — FCEUX11 双 Oracle 质量防线
 
-> **版本**：v1.8（原 KagamiQA；F11QA 改名见 `docs/plans/FCEUX11-v1.8_F11QA-构建计划.md`）
+> **版本**：v1.8（原 KagamiQA；改名与收口见
+> [`docs/history/plans/FCEUX11-v1.8_收口验收.md`](../history/plans/FCEUX11-v1.8_收口验收.md)）
 > **性质**：双 Oracle（Oracle A 回归 + Oracle B 硬件一致性）自动化测试系统
 > **覆盖率（CI 产物快照 — commit `f19fa7d`，`f11qa.yml` R4 gate passed）**：
 >
@@ -34,9 +35,9 @@
 
 ## 一、原理 / Principles
 
-### 1.1 什么是 KagamiQA
+### 1.1 什么是 F11QA
 
-KagamiQA（「鏡」QA）是一个**双通道、零耦合的模拟器精度验证系统**。它的设计出发点是：**模拟器的 Bug 有两种完全不同的来源**——
+F11QA（原 KagamiQA，「鏡」QA）是一个**双通道、零耦合的模拟器精度验证系统**。它的设计出发点是：**模拟器的 Bug 有两种完全不同的来源**——
 
 | 来源 | 示例 | 检测方式 |
 |------|------|----------|
@@ -49,8 +50,8 @@ KagamiQA（「鏡」QA）是一个**双通道、零耦合的模拟器精度验�
 
 ```
 ┌──────────────────────────────────────────────────┐
-│                  KagamiQA Runner                  │
-│  (Rust crate kagami-qa → kagami-qa-runner.exe)   │
+│                  F11QA Runner                  │
+│  (Rust crate f11qa → f11qa-runner.exe)   │
 ├──────────────────────────────────────────────────┤
 │                                                   │
 │  ┌──────────────┐       ┌──────────────────────┐ │
@@ -230,37 +231,37 @@ ctest --test-dir build --build-config Release -R rom_regression
 
 ```powershell
 cd src/rust
-cargo run --release -p kagami-qa -- `
+cargo run --release -p f11qa -- `
   --manifest ../../tests/tests.json `
   --bin-dir ../../build/tests `
-  --output ../../build/kagamiqa_migration_matrix.json `
-  --accuracy-table ../../build/kagamiqa_accuracy_table.md `
+  --output ../../build/f11qa_migration_matrix.json `
+  --accuracy-table ../../build/f11qa_accuracy_table.md `
   --known-fail ../../tests/fixtures/blargg_known_fail.json `
-  --baseline ../../build/kagamiqa_migration_matrix.json `
-  --save-baseline ../../build/kagamiqa_baseline_next.json
+  --baseline ../../build/f11qa_migration_matrix.json `
+  --save-baseline ../../build/f11qa_baseline_next.json
 ```
 
 输出文件说明：
 
 | 文件 | 内容 |
 |------|------|
-| `kagamiqa_migration_matrix.json` | SWE-bench 同构迁移矩阵：`fail_to_pass` / `pass_to_pass` / `pass_to_fail` / `fail_to_fail` / `new_test` |
-| `kagamiqa_accuracy_table.md` | Oracle B 精度对照表（Markdown），每个 ROM 的 PASS/FAIL + 错误码 |
-| `kagamiqa_baseline_next.json` | 当前运行快照，保存为下次对比的基线 |
+| `f11qa_migration_matrix.json` | SWE-bench 同构迁移矩阵：`fail_to_pass` / `pass_to_pass` / `pass_to_fail` / `fail_to_fail` / `new_test` |
+| `f11qa_accuracy_table.md` | Oracle B 精度对照表（Markdown），每个 ROM 的 PASS/FAIL + 错误码 |
+| `f11qa_baseline_next.json` | 当前运行快照，保存为下次对比的基线 |
 
 ### 2.4 基线漂移检测
 
 ```powershell
 # 第一次运行 — 无基线，生成基线
-cargo run --release -p kagami-qa -- `
+cargo run --release -p f11qa -- `
   --manifest tests/tests.json --bin-dir build/tests `
   --save-baseline build/kagamiqa_baseline.json
 
 # 后续运行 — 对照上次基线
-cargo run --release -p kagami-qa -- `
+cargo run --release -p f11qa -- `
   --manifest tests/tests.json --bin-dir build/tests `
   --baseline build/kagamiqa_baseline.json `
-  --save-baseline build/kagamiqa_baseline_next.json
+  --save-baseline build/f11qa_baseline_next.json
 ```
 
 漂移检测逻辑：
@@ -400,7 +401,7 @@ git clone https://github.com/christopherpow/nes-test-roms.git
 # ...
 
 # 4. 运行 kagami-qa-runner（使用你的模拟器包装器）
-cargo run --release -p kagami-qa -- `
+cargo run --release -p f11qa -- `
   --manifest my_manifest.json `
   --bin-dir path\to\your\emu\binaries `
   --output my_migration_matrix.json `
@@ -475,7 +476,7 @@ BLARGG_RESULT: rom=<name> addr=0x6000 value=0x<XX> diag=[0x<XX>,0x<XX>,0x<XX>] s
 **步骤 3**：运行 kagami-qa-runner：
 
 ```powershell
-cargo run --release -p kagami-qa -- `
+cargo run --release -p f11qa -- `
   --manifest my_tests.json `
   --bin-dir path/to/my/emu/binaries `
   --output my_results.json
