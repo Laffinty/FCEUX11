@@ -109,7 +109,7 @@ v1.8 把 F11QA 门槛抬到 **120 用例 / R4 四硬门禁 / grade B**。本计�
 |---|---|---|---|---|---|---|
 | ★☆☆☆☆ | **T0** | kgmqa-056 | 指令周期表 2 条非法指令 | 1–3 天 | 1 | **DONE** |
 | ★★☆☆☆ | **T0** | kgmqa-078 | MMC1 SEROM/SHROM 板约束 | 2–4 天 | 2 | **DONE** |
-| ★★☆☆☆ | **T0** | kgmqa-038 | `LDA abs,x` dummy read | 3–5 天 | 3 | TODO |
+| ★★☆☆☆→**待重估** | **T0** | kgmqa-038 | `LDA abs,x` dummy read | ~~3–5 天~~ | 3 | TODO（**阻塞点已定位，见 §三③**） |
 | ★★☆☆☆ | **T1** | kgmqa-097 | FME-7 WRAM 映射 | 2–4 天 | 4 | TODO |
 | ★★★☆☆ | **T1** | kgmqa-096 | FME-7 IRQ ack | 3–7 天 | 5 | TODO |
 | ★★★☆☆ | **T1** | kgmqa-050 | OAM DMA dummy write | 4–7 天 | 6 | TODO |
@@ -364,7 +364,7 @@ f11qa_baseline_frozen  kgmqa-078  false -> true（同 PR 更新，见 §7.1）
 
 ---
 
-### ③ T0 · kgmqa-038-instr-misc-blargg　`TODO`
+### ③ T0 · kgmqa-038-instr-misc-blargg　`TODO`（**2026-09-27 调查后未修复，见下**）
 
 | 字段 | 值 |
 |---|---|
@@ -399,6 +399,80 @@ While running test 3 of 4
 **验收**：kgmqa-038 PASS；`instr_misc*.nes` L2 全 PASS。
 
 **风险**：低。dummy read 影响 open-bus / 外设副作用，注意不要连带改动 $2007/$4016 路径。
+
+#### ③ 调查记录（2026-09-27，v1.18.3 任务）—— **未修复，根因改判**
+
+本轮没有交出修复。计划里的一行根因（"`LDA abs,x` dummy read 不完整"）经实测**不成立**，
+以下全部是量出来的，不是推断。
+
+##### 复现（矩阵同一路径）
+
+| ROM | mapper | 结果 |
+|---|---|---|
+| `instr_misc.nes`（组合） | **1 / MMC1 / 64K PRG** | FAIL `0x01` |
+| `instr_misc_03_dummy.nes` | 0 / NROM / 32K PRG | FAIL `0x03` |
+| `instr_misc_03-dummy_reads.nes` | 0 / NROM | FAIL `0x03` |
+| `instr_misc_01_abs_x.nes` / `_01-abs_x_wrap.nes` | 0 | PASS |
+| `instr_misc_04_dummy_apu.nes` / `_04-dummy_reads_apu.nes` | 0 | PASS |
+
+`--frames 600` 与 `3000` 结果一致（**本项不是 ① 那种帧数陷阱**）。
+
+##### 计划需要修正的三处
+
+1. **`02-branch` / `02_branch_wrap` 两个 ROM 在 fixture 集里根本不存在**
+   （`_mirror_snapshot` 里也没有）。"四项子测试"只有 3 组可本地验证。
+2. **组合 ROM 是 mapper 1（MMC1），子项是 mapper 0（NROM）**。
+   组合 ROM 靠 MMC1 在子测试间切 bank，所以组合的失败并不等价于"03 的同一份代码"。
+3. **它查的不是一件事，而是 8 种指令形式**。ROM 自带字符串：
+
+```
+03-dummy_reads
+Test requires $2002 mirroring every 8 bytes to $3FFA
+LDA abs,x     STA abs,x     LDA (z),y     STA (z),y
+LDA (z,x)     STA (z,x)     ROL abs       ROL abs,x
+```
+
+##### 前提条件已满足，不是阻塞点
+
+`ppu.cpp:1185` 已经在 `for (x = 0x2000; x < 0x4000; x += 8)` 里把每个 8 字节的 +2 偏移
+都指向 `A2002`，即 `$2002 … $3FFA` 全部命中。ROM 要求的 "$2002 mirroring" 早就有了。
+
+##### CPU 里确实存在 dummy read 不对称 —— 但不是阻塞点
+
+| 形式 | 宏 | dummy read |
+|---|---|---|
+| `LDA abs,x` / `abs,y` | `GetABIRD` | **仅跨页时** |
+| `STA abs,x` / `ROL abs,x` | `GetABIWR` | 无条件 ✓ 已正确 |
+| `LDA (z),y` | `GetIYRD` | **仅跨页时**（同样的 bug） |
+| `LDA (z,x)` / `STA (z,x)` | `GetIX` | **完全没有**，也没有跨页周期 |
+
+本轮把 `GetABIRD` 改成硬件行为（未修正地址无条件读，周期数不变），
+**测试结果没有任何变化**（仍 `0x03`）。探针（env-gated、400 事件预算）实测到 33 次
+abs 索引读，**全部 no-cross**，此时未修正地址 == 真实地址，多读一次放到总线上的值完全相同
+→ 观察上为零。该改动**已回退**（无法验证的核心时序改动不合项目纪律）。
+
+##### 真正的阻塞点：FCEUX11 没有 CPU 数据总线模型
+
+- `Cpu::set_db()` 在 `cpu.h:61` 声明、`cpu.cpp:51` 定义，
+  **全仓库零调用点**；`DB` 字段从未被赋值。
+- `::ANull`（`fceu.cpp:264`）未映射读返回 `DB`，因此恒为常量。
+- `PPUGenLatch` 只由 PPU 寄存器写、`$2002` / `$2007` / `$2000` 读更新
+  （`ppu.cpp:642/778/786/874/906` 等），**不跟随通用 CPU 总线访问**。
+
+一个"观察 dummy read 往总线上放了什么值"的测试，在当前实现里**没有任何东西可观察** ——
+加多少 dummy read 都不可能让它通过。
+
+这也解释了 **04_dummy_reads_apu 为什么 PASS**：它经 APU 自己的寄存器路径观察 dummy read，
+那条路径 FCEUX 建模了；03 走 $2000–$3FFF 镜像路径，需要裸总线。
+
+##### 结论与后续
+
+要让 038 通过，需要**实现 CPU 数据总线锁存**：每次总线访问记录它放到总线上的值，
+并让该值可经 $2000–$3FFF 镜像路径读出。这是**结构性总线改动**，
+与 ⑨ `kgmqa-049`（PPU 读缓冲，★★★★★，2–4 周）同一族，**不是周期表/语义补丁**。
+
+因此本项的 **★★☆☆☆ / 3–5 天 / 风险低** 预估**明显偏低**，建议按 ⑨ 同量级重估。
+在数据总线模型落地前，038 属于"已定位阻塞点、待立项"，不是"照计划改两行即可"。
 
 ---
 
