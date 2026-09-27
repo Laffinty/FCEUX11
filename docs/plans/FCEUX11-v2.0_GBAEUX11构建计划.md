@@ -1,12 +1,12 @@
 # FCEUX11 v2.0 构建计划 — GBAEUX11 模块（GBA 运行能力移植）
 
-> **STATUS: FINAL（已定稿）**（2026-09-27 四次修订后关闭全部未决项；执行期发现按 §十一 回写，变更须记入 §十四 变更记录）
+> **STATUS: FINAL（r6 · 采纳 r3 终审）**（2026-09-27 六次修订；执行期发现按 §十一 回写，变更须记入 §十四）
 > **模块名**：**GBAEUX11**（FCEUX11 Rust 侧的第二模拟核心）
 > **版本**：v2.0（BETA 阶段）
-> **日期**：2026-09-27 立项 / 二次修订（M4A 延期）/ 三次修订（音频契约）/ 四次修订（架构审计响应 + 定稿）
+> **日期**：2026-09-27 立项 / 二次（M4A 延期）/ 三次（音频契约）/ 四次（r1 审计）/ 五次（定稿）/ **六次（r3 终审，具名上游 + SWI 扩展点修正）**
 > **分支**：S0 开工时创建
 > **前置**：v1.18.1 已发布（`main` @ `3e33f2b`）；F11QA R4 gate green，grade B
-> **关联**：`docs/plans/FCEUX11-v2.0_GBAEUX11构建计划_架构审计报告.md`、`COPYRIGHT_AUDIT.md`、`DERIVATIVE_WORK_NOTICE.txt`
+> **关联**：`docs/plans/FCEUX11-v2.0_GBAEUX11构建计划_架构审计报告.md`（r3 终审）、`COPYRIGHT_AUDIT.md`、`DERIVATIVE_WORK_NOTICE.txt`
 
 ---
 
@@ -61,20 +61,40 @@ v2.0 只做一件事：**让 FCEUX11 能运行 GBA 游戏**，前端复用现有
 
 ## 二、核心选型实证
 
+### 2.0 上游具名（构建可执行性要求）
+
+| 项 | 值 |
+|---|---|
+| **项目** | **clementine** |
+| **仓库** | `https://github.com/RIP-Comm/clementine` |
+| **许可** | MIT |
+| **基线 commit SHA** | `ee77922dd293b70e945458e104f3b2de794f0151`（`main`，2026-08-27，PGP 签名） |
+| **wait cycle 跟踪 issue** | `https://github.com/RIP-Comm/clementine/issues/204` |
+| **测试套件** | `emu/tests/jsmolka.rs`（对 `jsmolka/gba-tests`） |
+| **唯一取用部分** | `emu/` crate（硬件核心）。`ui/`（egui 调试器）与 `src/main.rs`（CLI）**整包丢弃** |
+
+> **命名纪律（分层，勿混淆）**：
+> - **构建计划文档**（含本节）必须具名上游，供构建 agent 与审查者直接定位代码库。
+> - **源代码 / 架构 / crate / 目录命名**继续使用功能性命名（`f11gba` / `gba-core` / `vendor/`），不散落上游标识。
+> - **`ATTRIBUTION.md`** 保留完整出处与 MIT 许可全文（发行合规层）。
+
+### 2.1 基本事实
+
 | 维度 | 事实 |
 |---|---|
 | 许可 | MIT，无附加条款 |
-| 核心规模 | 45 文件 / **19,547 行** |
+| 核心规模 | `emu/` 45 文件 / **19,547 行** |
 | 构建 | `cargo check` **37s 通过** |
 | 依赖 | 仅 `rtrb` / `serde` / `serde_with` / `tracing` — **零 GUI 库** |
 | 分层 | 硬件核心 / CLI / 调试器 UI 三分，**仅取硬件核心** |
-| 活跃度 | 最后提交 2026-08-27，PGP 签名，近 8 次提交集中于安全加固 |
+| 活跃度 | 最后提交 2026-08-27；73 star |
 | Rust 版本 | **edition 2024** — 与 FCEUX11 `src/rust` workspace 一致 |
 | 存档类型识别 | 核心内 `BackupType::detect()` 扫描 ROM 正文签名串 |
-| RTC | 核心内 `hardware/rtc.rs`（10.6 KB，S3511 over GPIO） |
-| 即时存档 | 核心内 `#[derive(Serialize, Deserialize)]` + 版本化 + 完整性校验 |
+| RTC | 核心内 `cpu/hardware/rtc.rs`（S3511 over GPIO） |
+| 即时存档 | `Arm7tdmi` / `Bus` / `InternalMemory` 均 `#[derive(Serialize, Deserialize)]`，版本化 |
+| **SWI HLE 骨架** | **`handle_swi_hle()`（`arm7tdmi.rs:1044`）已存在**，覆盖 0x00–0x0C；`_ => false`（`:1322`）回落到真 BIOS |
 
-> **审查入口**：以上全部事实主张的可核验出处（仓库 URL、基线 commit SHA、上游 issue 链接）**统一记录于 `crates/f11gba/ATTRIBUTION.md`**，该文件在 S0 首个 commit 落地。审查者必须先读该文件方能核验本节。此安排是「对外发行物使用功能性命名」与「内部事实可独立审查」两条要求的分离实现。
+> **S0 剩余核验项**（r3 审计未覆盖）：基线 SHA 落库确认、`BackupType::detect` 实际行为、savestate 格式版本策略。
 
 ### 2.1 上游已验证的精度
 
@@ -91,9 +111,10 @@ v2.0 只做一件事：**让 FCEUX11 能运行 GBA 游戏**，前端复用现有
 |---|---|
 | `Gba::new(bios: [u8; 0x4000], cartridge: &[u8])` | 只需喂 16KB |
 | `step() -> bool` | `true` = 进入 VBlank |
-| `init_audio(output_rate: u32, capacity: usize)` | **采样率由调用方指定**，核心内部重采样（见 §4.2） |
+| `init_audio(output_rate: u32, capacity: usize)` | **采样率由调用方指定**，核心内部以 sample-and-hold 重采样（见 §4.2） |
 | 视频 | 240×160，15-bit |
 | `battery_data()` / `load_battery()` / `save_dirty` | 存档硬件在核心内；`.srm` 文件 I/O 需自写 |
+| **`handle_swi_hle(swi_num, old_cpsr, return_addr) -> bool`** | **SWI 扩展点已存在**（`arm7tdmi.rs:1044`），由 `arm7tdmi.rs:670` 调用；返回 `false` 则回落到真 BIOS |
 
 ---
 
@@ -166,9 +187,14 @@ int         gba_frame_buffer(uint8_t *dst, uint32_t len);   // 240*160*4 RGBA，
 void        gba_set_buttons(uint16_t mask);
 void        gba_set_overlay(int enable);                     // 见 §7.1 双策略
 
-// 音频（调用层次见 §4.3）
-int         gba_render_audio(int32_t *dst, uint32_t frames);  // 已下混 + 音量
-uint32_t    gba_samples_per_frame(void);                      // 由帧率算出，避免调用方猜
+// 音频（调用层次见 §4.3；分数采样见 §4.2）
+int32_t     gba_render_audio(int32_t *dst, uint32_t cap, uint32_t *out_frames);
+                    // 返回 GBA_OK/GBA_ERR_*；实际产出帧数走 out_frames。
+                    // 因每帧目标样本数为分数（44100/59.7275 ≈ 738.35），
+                    // 以定点累加 + 残余结转决定本帧产出量（仿 sound.cpp:1359-1366 的 soundtsoffs/left），
+                    // 且必然出现 out_frames 不等于 dst 所按 738 计算的值的情形。
+void        gba_samples_per_frame_fixed(uint32_t *num, uint32_t *den);  // 返回帧率比分数
+void        gba_set_overlay(int enable);   // 发布构建中 enable=0 返回 GBA_ERR_STATE（语义不可关闭）
 
 // 存档
 int         gba_savestate_size(uint32_t *size);                // 必补：避免调用方猜 cap
@@ -207,13 +233,17 @@ uint32 GetWriteSound();
 | 音量 | **`WriteSound` 不施加音量** → GBAEUX11 须自行应用 `FSettings.SoundVolume` | `sdl-sound.cpp:354-366` |
 | Turbo 抑制 | `WriteSound` 内建 | `sdl-sound.cpp:363-367` |
 
-**采样率转换归属（前版误判已更正）**：
+**采样率转换归属（经 r3 终审核验确认）**：
 
-- 上游核心的 `Gba::init_audio(output_rate, capacity)` **接受调用方指定的宿主采样率**，核心内部即以 sample-and-hold 重采样到该率。`rtrb` 流中不存在「硬件原生率」，故**不需要我们再实现 SRC**。
-- 唯一仍需处理的是**分数样本数**：`samplesPerFrame = 采样率 / 帧率`。GBA 帧率 59.7275 Hz，`44100 / 59.7275 ≈ 738.35` 非整数。
-  该问题**并非 GBA 特有**：NES 同样非整数（`44100 / 60.0988 ≈ 733.8`），FCEUX11 已有 `frmRateAdjRatio` / `g_fpsScale` 处理。
-  → GBAEUX11 复用同一套机制，**不自造第二套**。
-- 新增 `gba_samples_per_frame()` 由帧率统一算出，避免调用方与驱动各算一遍产生漂移。
+- 上游 `Gba::init_audio(output_rate, capacity)` **接受调用方指定的宿主采样率**，核心内部即以 sample-and-hold 重采样到该率（`sound.rs:81-82`；`cycle_accumulator += cycles * output_rate`）。`rtrb` 流中**不存在「硬件原生率」**，故**不需要我们再实现 SRC**。
+- **但分数样本问题仍在，且与之无关**：
+  - `44100 / 59.7275 ≈ 738.35` 非整数；
+  - 前版提议「复用 FCEUX11 既有 `frmRateAdjRatio` 机制」**经核验为错误**：`frmRateAdjRatio` 是**帧节流**参数（`sdl-throttle.cpp`），且在 `sound.cpp:759` 仅作为 `DoPCM` 定时 fudge 使用，**不参与防漂移**。
+  - NES 真正的防漂移在 `FlushEmulateSound`（`sound.cpp:1293`）以 `soundtsoffs` / `left` 做**残余结转**（`sound.cpp:1359-1366`）。
+  - → **GBAEUX11 必须自持同样的分数累加 + 残余结转**，不能复用 `frmRateAdjRatio`，也不应假设 `int` 帧长可表达 738.35。
+- ABI 相应修正（见 §4.1）：`gba_render_audio` **不得以 `int` 返回值兼作错误码与样本数**，须分离。
+
+**音质取舍**：核心使用 sample-and-hold 上采样，存在镜像/混叠劣化。登记为 R11（已知音质取舍），非缺陷。
 
 ### 4.3 音频分层与增益结构（前版分层混乱已更正）
 
@@ -226,12 +256,14 @@ gba_step_frame()
    ├─ 下混：(L + R) × 0.5            ← 必须，先于放大，否则双声道同相必削波
    ├─ × 32768
    ├─ × 音量系数（FSettings.SoundVolume / 最大值）
-   └─ 饱和截断到 int32 → 帧缓冲
+   ├─ 饱和截断到 int32 → 帧缓冲
+   └─ 分数累加：phase += samples_per_frame 分子×rate
+                本帧产出 floor(phase/分母)，残余结转到下帧   ← 防漂移，见 §4.2
                     ↓
-   驱动层：gba_render_audio(buf, gba_samples_per_frame()) → WriteSound(buf, n)
+   驱动层：gba_render_audio(buf, cap, &n) → WriteSound(buf, n)
 ```
 
-**调用方只调 `WriteSound`**；下混、增益、截断全部在 `f11gba` 内完成，`WriteSound` 仅作环形缓冲搬运。
+**调用方只调 `WriteSound`**；下混、增益、截断、分数采样全部在 `f11gba` 内完成，`WriteSound` 仅作环形缓冲搬运。
 
 **立体声取舍（诚实表述）**：GBA 硬件为立体声（2×PSG + 2×Direct Sound，可声像）。BETA 受限于 `WriteSound` 的单声道设备契约而放弃立体声。改为立体声需另开 SDL 设备，与「复用现有声卡」决议冲突，故留待 GA 后评估。
 
@@ -262,24 +294,46 @@ gba_step_frame()
 | **stub BIOS（16KB）** | 复位向量 → 跳转到卡带入口；异常向量；IRQ 经 `0x03007FFC` 间接跳转 | `bios/stub.s`，约 30 条指令 |
 | **SWI 语义** | 0x00–0x2A 的实际功能 | `f11gba/src/swi/`，Rust |
 
-SWI 拦截点在 vendored 核心内，**仅两处**，均为单行调用：
+SWI 拦截点**已在上游核心中存在**，无需新建：
 
-| 位置 | 现状 |
+| 位置 | 内容 |
 |---|---|
-| `arm7tdmi.rs:504-506`（ARM 模式） | `ArmModeInstruction::SoftwareInterrupt => self.handle_exception(SoftwareInterrupt)` |
-| `arm7tdmi.rs:628-630`（Thumb 模式） | `Instruction::Swi => self.handle_exception(SoftwareInterrupt)` |
+| `arm7tdmi.rs:670` | 异常处理中先尝试 HLE：`if self.handle_swi_hle(swi_num, old_cpsr, next_ins) { return; }` |
+| `arm7tdmi.rs:1044` | `fn handle_swi_hle(&mut self, swi_num: u32, old_cpsr: Psr, return_addr: u32) -> bool` |
+| `arm7tdmi.rs:1322` | `_ => false` —— 未覆盖的 SWI 回落真 BIOS |
+| `arm7tdmi.rs:1327` | `swi_return()` 辅助函数 |
 
-改动量：两处各插入「若注册了 hook 且 immediate 命中分发表，则原生执行并跳过异常」；另需让解码器携带 SWI immediate。**合计约 50–100 行，跨 2–3 个文件**，非重写。
+**故 S1 的实际工作量是「向 `handle_swi_hle` 的 `match` 补分支 + 实现算法」，而非搭建拦截机制。**
+
+> **前版表述更正**：r5 曾称「两处各插入 hook、约 50–100 行、跨 2–3 文件」。此说法不准确——扩展点本已存在，改动集中于 `handle_swi_hle` 一处 `match`。但**「hook 小」不等于「SWI 语义小」**：真正的工作量在算法实现（LZ77 / Huffman / RL / 仿射 / wait 类），见 §5.3。
 
 ### 5.3 SWI 实现分档
 
-| 档 | SWI | 说明 |
-|---|---|---|
-| **T1（BETA 必须）** | `CpuSet` `CpuFastSet` `Div` `DivArm` `Lz77UnCompWram/Vram` `HuffmanUnComp` `RlUnCompWram/Vram` `Halt` `Stop` `IntrWait` `VBlankIntrWait` `RegisterRamReset` `GetBiosChecksum` | 缺任一则大量游戏无法启动或黑屏 |
-| **T2（BETA 应做）** | `Sqrt` `ArcTan` `ArcTan2` `BgAffineSet` `ObjAffineSet` `BitUnPack` `SoftReset` | 影响 mode 7、精灵缩放、部分 2D 游戏 |
-| **T3（可延后）** | `Diff*UnFilter`×3 `MidiKey2Freq` `MultiBoot` `SoundDriver*` 段 | 低频；声音段依据 §六 结论可 Nop |
+**前置事实（已核源）**：`handle_swi_hle` 覆盖 0x00–0x0C，但其中**四个 wait 类分支是空壳**：
+
+```rust
+// arm7tdmi.rs:1146-1157
+0x02 => { self.swi_return(old_cpsr, return_addr);   // 空壳
+          /* just return because the main loop will handle waiting */ true }
+0x03..=0x05 => { self.swi_return(old_cpsr, return_addr); true }   // 同样空壳
+```
+
+且 `RegisterRamReset`(0x01) 的 **IWRAM 清空被主动跳过**（`arm7tdmi.rs:1106-1115`，源码 TODO：*"would break IRQ handlers"*）。
+
+**故「上游已实现」与「已实现」是两回事，分档如下**：
+
+| 档 | SWI | 上游现状 | 缺口 |
+|---|---|---|---|
+| **T1-a** | `CpuSet` `CpuFastSet` `Div` `DivArm` `SoftReset` | ✅ 已实现 | 无（回归验证即可） |
+| **T1-b** | `Halt` `Stop` `IntrWait` `VBlankIntrWait` | ⚠️ **空壳** | **必须真做**：halt 到中断、ack IF/IE 语义 |
+| **T1-c** | `RegisterRamReset` | ⚠️ **部分实现** | IWRAM 清空缺失，须按 GBATEK 补全或显式记入已知限制 |
+| **T1-d** | `Lz77UnCompWram/Vram` `HuffmanUnComp` `RlUnCompWram/Vram` `GetBiosChecksum` | ❌ **未 HLE**，回落真 BIOS | **必须补全**，缺则图形管线主干失效 |
+| **T2** | `Sqrt` `ArcTan` `ArcTan2` `BgAffineSet` `ObjAffineSet` `BitUnPack` | ❌ 未 HLE | 影响 mode 7 / 精灵缩放 / 部分 2D |
+| **T3** | `Diff*UnFilter`×3 `MidiKey2Freq` `MultiBoot` `SoundDriver*` 段 | ❌ 未 HLE | 低频；声音段依 §六 可 Nop |
 
 `ArcTan` 需与 BIOS 的 16.16 定点多项式**逐位对齐**，是 T2 中唯一高风险项，单独设验证点。
+
+**stub BIOS 下的硬性要求**：`handle_swi_hle` 覆盖 0x00–0x0C 之外的所有 SWI 会因 `_ => false` 落进 `handle_exception` 跳向 `0x00000008`，而 stub BIOS 不会实现它们 → 行为未定义。**T1-d 与 T2 必须全部补齐**，否则 stub 路线下这些 SWI 等于直接落进 stub 的空实现。
 
 ### 5.4 实现来源与许可纪律
 
@@ -317,8 +371,9 @@ SWI 拦截点在 vendored 核心内，**仅两处**，均为单行调用：
 |---|---|
 | 位置 | 游戏画面左上角常驻 |
 | 合成点 | Rust 侧（`overlay.rs`，出帧前一步），单一合成点 → 窗口/截图/录像全覆盖 |
-| 机制 | **构建期 `GBA_BETA_OVERLAY` 开关**：发布构建**强制 ON 且无运行时关闭入口**；测试构建可 OFF（供未来帧校验基线使用） |
-| GA | 关闭开关并移除 `gba_set_overlay` 运行时入口 |
+| 机制 | **构建期 `GBA_BETA_OVERLAY` 开关**：发布构建**强制 ON**；测试构建可 OFF（供未来帧校验基线使用） |
+| 运行时入口 | `gba_set_overlay()` **始终导出**（避免 ABI 随构建变体漂移），但**发布构建中 `gba_set_overlay(0)` 返回 `GBA_ERR_STATE` 并不生效**；仅测试构建接受关闭 |
+| GA | 关闭编译期开关；发布构建下该调用恒返回 `GBA_ERR_STATE` |
 
 > 修正前版「编译期/运行期开关」「无隐藏开关」「测试以关闭状态建基线」三处口径矛盾：现统一为**发布构建不可关闭、测试构建可关闭**。
 
@@ -392,16 +447,20 @@ SWI 拦截点在 vendored 核心内，**仅两处**，均为单行调用：
 | 阶段 | 内容 | 出口标准 | 估 |
 |---|---|---|---|
 | **S0** | 建 `f11gba` + `gba-core` 两个 crate，vendor 核心，落地 `ATTRIBUTION.md`；确定 ROM 来源策略 | `cargo check` 过；CMake 产出含新符号的 `fceux11_rust.lib`；NES 构建零回归 | 3–5 天 |
-| **S1a** | stub BIOS（汇编 + 产物入库）；SWI hook 接入核心；`CpuSet`/`CpuFastSet`/`Div`/wait 类 | jsmolka `arm`/`thumb` 通过；可启动到游戏画面 | 1 周 |
-| **S1b** | **T1 解压类 SWI**：LZ77×2 / Huffman / RL×2 / `RegisterRamReset` / `GetBiosChecksum` | **jsmolka `memory.gba` 全绿**；`bios.gba` 由 `#[ignore]` 转 pass | 1–1.5 周 |
-| **S1c** | **T2 高级 SWI**：`Sqrt` / `ArcTan`×2 / `BgAffineSet` / `ObjAffineSet` / `BitUnPack` / `SoftReset` | 逐位对齐验证；mode 7 与精灵缩放样例通过 | 1–1.5 周 |
-| **S2** | C ABI + Qt 前端：`.gba` 识别、240×160 渲染、音频接入、RTC 暴露、`BETA` 水印 | 可玩游戏，画面/音频正常；**性能验收线达标**（见下） | 2 周 |
-| **S3** | NES 兼容键位、`.srm` 存档（含覆盖机制与跨模拟器互通）、即时存档、RTC | 存档跨会话可读、跨模拟器字节级互通、键位符合 §7.2 | 1–1.5 周 |
+| **S1a** | 回归验证 T1-a（已实现项）；**T1-b 真做**：`Halt`/`Stop`/`IntrWait`/`VBlankIntrWait` 的真等待语义 | jsmolka `arm`/`thumb` 通过；可启动到游戏画面；wait 类有专项验证（非空壳） | 1 周 |
+| **S1b** | **T1-c** `RegisterRamReset` 补 IWRAM；**T1-d** 解压类：`Lz77×2` / `Huffman` / `Rl×2` / `GetBiosChecksum` | **jsmolka `memory.gba` 在 stub BIOS 下全绿**（判据重定义，见下） | 1–1.5 周 |
+| **S1c** | **T2**：`Sqrt` / `ArcTan`×2 / `BgAffineSet` / `ObjAffineSet` / `BitUnPack` | 逐位对齐验证；mode 7 与精灵缩放样例通过 | 1–1.5 周 |
+| **S2** | C ABI + Qt 前端：`.gba` 识别、240×160 渲染、音频接入（含 §4.2 分数采样）、RTC 暴露、`BETA` 水印 | 可玩游戏，画面/音频正常；**性能验收线达标**（见下）；30 分钟无音画漂移 | 2 周 |
+| **S3** | NES 兼容键位、`.srm` 存档（含覆盖机制与跨模拟器互通）、即时存档（含**加载后重挂 `init_audio`**）、RTC | 存档跨会话可读、跨模拟器字节级互通、键位符合 §7.2、**savestate 往返后音频不哑** | 1–1.5 周 |
 | **S4** | 手工实测清单逐游戏过 | 清单内游戏可玩，已知限制逐条编目 | 长尾 |
 
 **合计约 8–10 周**（前版「约 3 周」的估算已作废，原因是 §5 的 BIOS 路线重估）。
 
-**性能验收线（F-15 补入）**：在中档桌面（i5-8xxx / 16GB）下，240×160 稳定 59.7275 FPS，音频 underrun 计数为 0，实测 30 分钟无音画漂移。
+**`bios.gba` 判据重定义（重要）**：上游测试**当前依赖真 BIOS**（README 硬编码 `gba_bios.bin`），其 `bios.gba` 失败基线是「以真 BIOS 运行」的结果。stub BIOS 是**新交付物**，不是「换个 blob」。
+故 S1b 的验收判据是 **「`memory.gba` 在 stub 下全绿」**（该 ROM 专项测 SWI 0x0B/0x0C/0x11–0x18，正是 T1-d 的靶子）。
+`bios.gba` **不作为 BETA 判据**——它测的是 BIOS 函数行为，在 stub 下部分语义本就不等价；是否转 pass 列为 GA 后事项（§8.1 P5）。
+
+**性能验收线（F-15 补入）**：在中档桌面（i5-8xxx / 16GB）下，240×160 稳定 59.7275 FPS，音频 underrun 计数为 0，**连续 30 分钟无音画漂移**（此项直接检验 §4.2 的分数采样实现）。
 
 ### 8.1 GA 后排期
 
@@ -411,6 +470,7 @@ SWI 拦截点在 vendored 核心内，**仅两处**，均为单行调用：
 | **P2** | wait cycle 补齐、已知限制清零 | 另议 |
 | **P3** | 接入 F11QA / KagamiQA（jsmolka 通道产品化） | 另议 |
 | **P4** | 立体声输出评估（另开 SDL 设备） | 另议 |
+| **P5** | `bios.gba` 在 stub 下的可达成范围评估 | 另议 |
 
 ### 8.2 GA 门禁（前版缺失，本次补入）
 
@@ -440,6 +500,9 @@ SWI 拦截点在 vendored 核心内，**仅两处**，均为单行调用：
 | **R8** | **BETA 无 M4A 增强** | 混音沿用原驱动 sample-and-hold | 已显式声明；GA 后 P1 |
 | **R9** | **stub BIOS 的 IRQ 间接跳转**若实现有误，表现为随机崩溃 | 难以定位 | 与 `irq.gba` 类用例对照；stub 极小，可逐条核 |
 | **R10** | **CMake `GLOB_RECURSE` 不触发重配置** | 新 crate 未被纳入构建而不报错 | 改用 `CONFIGURE_DEPENDS` 或显式列出；S0 验证 |
+| **R11** | **sample-and-hold 音质**。核心以 S&H 上采样，存在镜像/混叠 | 音质弱于高阶重采样 | 已知取舍，非缺陷；如需改善须改核心或自行重采样 |
+| **R12** | **分数采样实现错误**。`int` 帧长无法表达 738.35，若实现偷懒取整必长期漂移 | 音画不同步 | ABI 分离错误码与样本数（§4.1）；30 分钟无漂移为 S2 硬判据 |
+| **R13** | **wait 类空壳被误当已实现**（上游 `0x02` / `0x03..=0x05` 均为 `swi_return`） | 游戏以 100% CPU 空转、耗电、行为异常 | S1a 硬性要求真实现，并设专项验证 |
 
 ---
 
@@ -449,7 +512,7 @@ SWI 拦截点在 vendored 核心内，**仅两处**，均为单行调用：
 2. **前端复用不打折**：不得为 GBA 另起 UI 框架或分叉 Qt 驱动。
 3. **BIOS 不夹带任天堂代码**：绝不提交真 BIOS；真 BIOS 仅存于用户本地路径。
 4. **许可可审计**：保留上游文件头与版权行 + 随发行物附许可全文；出处集中于 `ATTRIBUTION.md`。**目录/crate 可改名，文件头不可删。**
-5. **BETA 水印在发布构建中不可关闭**；仅测试构建可关（§7.1）。
+5. **BETA 水印在发布构建中不可关闭**：`gba_set_overlay(0)` 在发布构建返回 `GBA_ERR_STATE`；仅测试构建可关（§7.1）。
 6. **HLE 与真 BIOS 双路径均须可用**，真 BIOS 须过长度与校验和双检。
 7. **延期项须显式声明**：M4A、立体声、wait cycle、F11QA 接入均为**已决议的范围取舍**，不是遗漏；不得在 BETA 文案中暗示具备。
 8. **GBA 侧为独立可裁剪项**：置于 cargo feature + CMake option 之后，NES-only 构建可物理剔除，结构性保证不变式 1。
@@ -473,7 +536,7 @@ SWI 拦截点在 vendored 核心内，**仅两处**，均为单行调用：
 | # | 事项 | 决议 |
 |---|---|---|
 | 1 | ~~ROM 版权与来源策略~~ | ✅ **已定：ROM 完全由玩家自行准备，与 NES 同策略**（§7.7） |
-| 2 | ~~审查入口形式~~ | ✅ **已定：出处集中于 `ATTRIBUTION.md`，计划正文不具名上游标识**（§二「审查入口」） |
+| 2 | ~~审查入口形式~~ | ✅ **已定：计划正文具名上游（clementine + URL + 基线 SHA + issue #204），见 §二.0；源代码/架构/目录命名仍功能性** |
 | 3 | 阶段分支命名 | S0 开工时确定（唯一剩余的执行期决定） |
 | 4 | 商业 ROM 实测清单具体条目 | 属 §7.5 本地手工环节，由执行者按 §7.7 约束自行选取 |
 | 5 | 2.0 GA 是否移除 `BETA` 水印 | 计划移除，GA 前确认（§7.1 已定机制，GA 只需确认执行） |
@@ -482,54 +545,67 @@ SWI 拦截点在 vendored 核心内，**仅两处**，均为单行调用：
 
 ## 十三、第三方架构审计响应
 
-审计报告：[`FCEUX11-v2.0_GBAEUX11构建计划_架构审计报告.md`](./FCEUX11-v2.0_GBAEUX11构建计划_架构审计报告.md)（r1，2026-09-27，结论：有条件不通过）。
+审计报告：[`FCEUX11-v2.0_GBAEUX11构建计划_架构审计报告.md`](./FCEUX11-v2.0_GBAEUX11构建计划_架构审计报告.md)
 
-### 13.1 逐条处置
+| 轮次 | 日期 | 结论 | 本计划的响应 |
+|---|---|---|---|
+| **r1** 初审 | 2026-09-27 | 有条件不通过（4×P0） | 触发 **r4 修订**：BIOS 路线整体重写，工期重估 |
+| **r2** 复审 | 2026-09-27 | 有条件通过（仅 S0） | 本计划 r5 未采纳其「正文不具名」折中 |
+| **r3** 终审 | 2026-09-27 | **批准进入 S0 与 S1** | 触发 **r6 修订**：具名上游 + SWI 扩展点修正 + wait 类空壳发现 |
+
+### 13.1 r1 逐条处置（已闭环）
 
 | ID | 严重度 | 审计主张 | 处置 | 说明 |
 |---|---|---|---|---|
-| F-01 | P0 | HLE BIOS「零改动」不成立，SWI 语义在 mGBA C 侧 | **完全采纳** | 已独立核源 `bios.c` 的 `GBASwi16()` 确认。审计成立且描述的问题比前版更严重。**BIOS 路线整体重写**（§五），工期由 2–3 天改为 2–3 周 |
-| F-02 | P0 | 上游匿名化致计划不可独立审查 | **部分采纳** | 出处集中于 `ATTRIBUTION.md`（§二「审查入口」），S0 首个 commit 落地。**但「目录命名去上游标识」是用户明确指令**，故不在计划正文具名。已列为 §十二#5 待用户裁定 |
-| F-03 | P1 | 缺 SRC 设计 | **部分驳回 + 采纳结论** | 审计前提有误：`init_audio(output_rate, capacity)` 接受宿主率，核心内部即完成重采样，`rtrb` 流不存在「硬件原生率」，**无需我们实现 SRC**。但「分数样本数」问题成立且已纳入 §4.2（复用 FCEUX11 既有机制，不自造第二套） |
-| F-04 | P1 | 存档识别机制描述错误 | **完全采纳** | 前版「按 ROM 头部 ID 识别」确属错误。已改写为三级机制（§7.3），并补入手动覆盖、`.srm` 跨模拟器互通、类型不明时拒写 |
-| F-05 | P1 | RTC 缺席 | **完全采纳** | 属实。核心内已有 `hardware/rtc.rs`（S3511），仅需暴露。已进 S2 |
-| F-06 | P1 | 即时存档能力未证实 | **采纳（降级为待核实）** | 核心内有 `Serialize/Deserialize` 派生与版本化状态。S0 出口标准加入「核实 savestate 能力与格式版本策略」，不在 S3 前假设 |
-| F-07 | P1 | C ABI 契约不完整 | **完全采纳** | 已补错误码、`gba_set_bios`、`gba_unload_rom`/`gba_reset`、线程模型、UTF-8 路径约定（§4.1） |
-| F-08 | P1 | `vendor/` 与 Cargo 语义冲突；汇编器工具链未落实 | **完全采纳** | 已改为独立 path 依赖 crate；`stub.bin` 入库免工具链依赖，`stub.s` + `REGENERATE.md` 保留可重建性（§四） |
-| F-09 | P1 | 「前端零重写」低估；遗产能力未声明 | **完全采纳** | 已补 §7.4 显式处置表；S2 由 1–2 周上调至 2 周 |
-| F-10 | P1 | 水印开关三处口径矛盾 | **完全采纳** | 已统一为「发布构建强制 ON 无运行时入口 / 测试构建可 OFF」（§7.1） |
-| F-11 | P1 | 阶段编号悬空；工期矛盾；GA 门禁缺失 | **完全采纳** | 已重排 S0/S1a/S1b/S1c/S2/S3/S4；工期改为 8–10 周；新增 §8.2 GA 门禁 |
-| F-12 | P2 | MPL 合规表述缺前提 | **已消解** | 自建 stub 后不再使用任何 MPL-2.0 代码，合规问题整体消失。MIT 义务表述已加强（§三） |
-| F-13 | P2 | 「音源以单声道为主」不成立；增益未定义 | **完全采纳** | 已改为诚实表述（放弃立体声）+ 明确 `(L+R)×0.5` 下混与增益顺序（§4.3） |
-| F-14 | P2 | `gba_read_audio` / `WriteSound` 分层混乱 | **完全采纳** | 已固定分层图（§4.3），调用方只调 `WriteSound` |
-| F-15 | P2 | 无性能验收线 | **完全采纳** | 已补具体指标（§八 S2） |
-| F-16 | P2 | 测试策略过弱；ROM 版权时点过晚 | **完全采纳** | 已分三层（§7.5），版权策略提前至 S0 前必答（§十二#1） |
-| F-17 | P2 | CMake GLOB 脆弱 | **完全采纳** | 已登记 R10，S0 验证 |
-| F-18 | P3 | 优化建议 | **部分采纳** | 采纳 1（feature 隔离→不变式 8）、2（BIOS 校验和→§5.5）、4（`.mb` 显式拒绝→§1.2/§7.6）、5（产品叙事）。删除 `m4a.rs` 空占位（YAGNI）已执行。6/7 留作后续 |
+| F-01 | P0 | HLE BIOS「零改动」不成立，SWI 语义在 mGBA C 侧 | **完全采纳** | 已独立核源 `bios.c` 的 `GBASwi16()` 确认。**BIOS 路线整体重写**（§五） |
+| F-02 | P0 | 上游匿名化致计划不可独立审查 | **r3 已闭合** | r5 曾按「正文不具名」折中；r3 经用户澄清后**改为正文具名**（§二.0） |
+| F-03 | P1 | 缺 SRC 设计 | **r3 终审完全接受我方主张** | `init_audio` 确含重采样；但分数样本问题独立成立，见 §4.2 |
+| F-04 | P1 | 存档识别机制描述错误 | **完全采纳** | 三级识别 + 手动覆盖 + 跨模拟器互通（§7.3） |
+| F-05 | P1 | RTC 缺席 | **完全采纳** | 核心内已有 `rtc.rs`，仅需暴露（§1.1、S2） |
+| F-06 | P1 | 即时存档能力未证实 | **采纳（转为 S0 核验项）** | §二 已记「savestate 格式版本」为 S0 剩余核验项 |
+| F-07 | P1 | C ABI 契约不完整 | **完全采纳** | 错误码 / 生命周期 / 线程模型 / UTF-8 路径（§4.1） |
+| F-08 | P1 | `vendor/` 与 Cargo 语义冲突；汇编器未落实 | **完全采纳** | 独立 path 依赖 crate；`stub.bin` 入库免工具链依赖（§四） |
+| F-09 | P1 | 「前端零重写」低估；遗产能力未声明 | **完全采纳** | §7.4 显式禁用表；S2 上调至 2 周 |
+| F-10 | P1 | 水印开关口径矛盾 | **完全采纳** | 统一为发布构建语义不可关闭（§7.1、不变式 5） |
+| F-11 | P1 | 阶段编号悬空；工期矛盾；GA 门禁缺失 | **完全采纳** | 重排 S0–S4；§8.2 GA 门禁 |
+| F-12 | P2 | MPL 合规表述缺前提 | **已消解** | 自建 stub 后不使用任何 MPL-2.0 代码 |
+| F-13 | P2 | 「音源以单声道为主」不成立；增益未定义 | **完全采纳** | §4.3 明确放弃立体声 + `(L+R)×0.5` |
+| F-14 | P2 | 音频分层混乱 | **完全采纳** | §4.3 分层图 |
+| F-15 | P2 | 无性能验收线 | **完全采纳** | §八 S2 + §8.2 |
+| F-16 | P2 | 测试策略过弱；ROM 版权时点过晚 | **完全采纳** | §7.5 三层；版权策略落为 §7.7「不得获取」 |
+| F-17 | P2 | CMake GLOB 脆弱 | **完全采纳** | 登记 R10 |
+| F-18 | P3 | 优化建议 | **部分采纳** | 1→不变式 8；2→§5.5；4→§7.6；`m4a.rs` 空占位已删 |
 
-### 13.2 对审计结论的保留意见
+### 13.2 r3 终审逐条处置（本轮）
 
-审计整体质量高，**F-01 是本次修订的关键驱动**，其价值在于暴露了计划的自相矛盾。但有三点需记录在案：
+| ID | 内容 | 处置 | 落地位置 |
+|---|---|---|---|
+| **裁定 ③** | **计划正文必须具名 clementine + URL + 基线 SHA + issue #204** | **完全采纳** | 新增 §二.0 上游具名表；命名纪律分层写明 |
+| **裁定 ①** | `init_audio` 已含重采样，无需自研 SRC | **完全接受** | §4.2 已据此表述（r5 即为此结论，r3 完成核验） |
+| **裁定 ① 尾巴 1** | 分数样本问题独立成立；**「复用 `frmRateAdjRatio`」被驳回** | **完全采纳** | §4.2 已改为「自持定点累加 + 残余结转（仿 `sound.cpp:1359-1366`）」；ABI 分离错误码与样本数（§4.1）；登记 R12 |
+| **裁定 ① 尾巴 2** | sample-and-hold 音质取舍 | **采纳** | §4.2 末段 + R11 |
+| **裁定 ②** | hook 行号命中但 **`handle_swi_hle` 已存在**；wait 类是空壳 | **完全采纳** | §5.2 改为「扩展点已存在，补 match 分支」；§5.3 按 T1-a/b/c/d 重分档；登记 R13 |
+| **N-04** | `Halt`/`Stop`/`IntrWait`/`VBlankIntrWait` 为空壳 | **采纳（已自行核源 `arm7tdmi.rs:1146-1157` 确认）** | §5.3 T1-b「必须真做」+ S1a 出口设专项验证 |
+| **N-09** | `RegisterRamReset` 的 IWRAM 清空被上游跳过 | **采纳（已核源 `arm7tdmi.rs:1106-1115` 确认）** | §5.3 T1-c「部分实现」+ S1b 补全或记入已知限制 |
+| **N-10** | savestate 不序列化音频 producer | **采纳** | S3 出口增补「savestate 往返后音频不哑」；§7.3 相关 |
+| **N-11** | 上游当前强制真 BIOS，`bios.gba` 基线依赖真 BIOS | **采纳** | `bios.gba` **移出 BETA 判据**；S1b 判据改为「`memory.gba` 在 stub 下全绿」；新增 §8.1 P5 |
+| **N-07** | `gba_set_overlay` 与「无运行时入口」冲突 | **采纳** | §7.1 改为「ABI 恒导出，发布构建中 `gba_set_overlay(0)` 返回 `GBA_ERR_STATE`」；不变式 5 同步 |
+| **N-08** | R1「仅 SWI hook」措辞；S1a 出口过度承诺 | **采纳** | §5.2 加「前版表述更正」注；S1a 出口改为「wait 类有专项验证」 |
 
-1. **F-03 的事实前提不成立**（SRC 已由核心提供），若照单全收会导致重复实现。
-2. **F-01 的方案成本被高估**。审计未掌握 vendored 核心的 SWI 分派点仅有两处单行调用这一事实，据此判断「工作量远超 S1」并不准确。实际改动约 50–100 行、跨 2–3 文件。
-3. **F-02 与用户明确指令冲突**。合规匿名化（发行物命名）与计划可审查性可以分离，但审计主张的「计划正文具名」与用户「尽量少提及原项目」的指令直接冲突，已提交用户裁定（§十二#5）。
+### 13.3 自评与放行
 
-### 13.3 放行条件自评
+**已独立复核的 r3 关键 claim**（构建方自行核源，非转述）：
 
-| 审计放行条件 | 状态 |
-|---|---|
-| F-01 选定方案并写入计划，S1 估期重估 | ✅ 选定方案：自建 stub + Rust 原生 SWI（§五），已重排为 S1a/S1b/S1c |
-| F-02 §二 具名上游 repo + 基线 SHA | ⚠️ 部分：出处集中于 `ATTRIBUTION.md`（S0 落地），计划正文未具名（依用户指令，待 §十二#5 裁定） |
-| F-03 §4.2 补齐 SRC 与分数采样设计 | ✅ 已补（§4.2），并驳回「需自行实现 SRC」的前提 |
-| F-04 §7.3 改写存档识别，S3 出口增补覆盖与互通 | ✅ 已补（§7.3、§八 S3、§8.2） |
-| F-07 / F-14 / F-15（S2 放行条件） | ✅ 已补（§4.1、§4.3、§八 S2） |
-| F-05 / F-16（GA 放行条件） | ✅ 已补（§1.1、§7.5、§8.2） |
-| F-11 GA 门禁 | ✅ 已补（§8.2） |
+| claim | 核验 | 结果 |
+|---|---|---|
+| `handle_swi_hle` 存在于 `arm7tdmi.rs:1044`，由 `:670` 调用，`:1322` 为 `_ => false` | 直读源码 | ✅ 属实 |
+| `0x02` 与 `0x03..=0x05` 为空壳 `swi_return` | 直读 `arm7tdmi.rs:1146-1157` | ✅ 属实 |
+| `RegisterRamReset` IWRAM 清空被跳过（TODO） | 直读 `arm7tdmi.rs:1106-1115` | ✅ 属实 |
+| NES 防漂移在 `FlushEmulateSound` 的 `soundtsoffs`/`left` 残余结转，而非 `frmRateAdjRatio` | 直读 `sound.cpp:1293,1359-1366` | ✅ 属实，我方 r5 判断有误 |
 
-**自评**：审计所列全部 P0/P1/P2 均已处置；F-02 的具名形式已由用户裁定为「集中于 `ATTRIBUTION.md`」（§十二#2）。原「§十二尚有 2 项待定」一句作废。
+**自评**：r3 全部主张已处置。**我方 r5 存在两处实质判断失误**（① 误以为需新建 SWI hook，实际扩展点已存在；② 误提议复用 `frmRateAdjRatio` 防漂移），均已更正。
 
-**放行结论**：**具备进入 S0 的条件。** 未决项已于定稿时全部关闭（§十二），仅余分支命名一项属执行期决定。
+**放行结论**：r3 终审已批准 S0 与 S1；本计划已同步至 r6。
 
 ---
 
@@ -542,5 +618,6 @@ SWI 拦截点在 vendored 核心内，**仅两处**，均为单行调用：
 | r3 | 2026-09-27 | 音频契约更正为 `WriteSound(int32*, int)`；标注 `WriteSound` 不施加音量 | 核实 `dface.h` / `sdl-sound.cpp` |
 | r4 | 2026-09-27 | **BIOS 路线整体重写**：自建 stub + Rust 原生 SWI；工期重估 8–10 周；新增 §十三 审计响应、§8.2 GA 门禁；F-04/05/07/08/09/10/11/13/14/15/16/17 处置 | 第三方架构审计（CONDITIONAL FAIL） |
 | **r5** | 2026-09-27 | **定稿**：STATUS → FINAL；新增 §7.7 ROM 来源策略（玩家自备，同 NES）；关闭 §十二 全部未决项 | 用户裁定 |
+| **r6** | 2026-09-27 | **采纳 r3 终审**：① §二.0 上游具名（clementine + URL + 基线 SHA + issue #204）；② §5.2 更正 SWI 扩展点为**已存在的 `handle_swi_hle`**；③ §5.3 按 T1-a/b/c/d 重分档，wait 类与 `RegisterRamReset` 降级为「空壳/部分实现」；④ §4.2 撤回「复用 `frmRateAdjRatio`」，改为自持定点累加 + 残余结转，ABI 分离错误码与样本数；⑤ `bios.gba` 移出 BETA 判据；⑥ savestate 后重挂音频；⑦ 新增 R11/R12/R13 | r3 终审（批准 S0/S1） |
 
 > **定稿后的变更纪律**：本计划状态为 FINAL。执行期若发现计划与实态不符，**先记入本表再改**，不得静默偏离 §八 的阶段出口标准与 §十 的不变式。
