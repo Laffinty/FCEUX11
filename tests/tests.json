@@ -3308,12 +3308,12 @@
         "ack"
       ],
       "failure_means": "advisory",
-      "provenance": "tepples fme7acktest; F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: FME-7 IRQ acknowledge edge",
+      "provenance": "tepples fme7acktest; F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit (2026-09-28 human-authorized): survey ROM does not implement the $6000 result protocol, so it can never report PASS; a real FME-7 IRQ ack defect is known and deliberately left unfixed",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "tepples/fme7/fme7acktest.nes",
       "vendor_state": "vendored",
       "protocol": "$6000",
-      "known_limit": "FME-7 IRQ acknowledge edge"
+      "known_limit": "Survey ROM: does not implement the blargg $6000 result protocol. Static scan of the 32 KiB PRG finds 0 absolute accesses to $6000; the reported value/diag (A2 0F 8E 00) equals PRG ROM bank 3 offset 0-3 byte for byte, because upstream init_fme7 writes reg 8 = 3 and the FME-7 correctly selects PRG ROM at $6000 when +CE (bit 7) and RAM/ROM select (bit 6) are both 0. Results are kept in zero page and only drawn on screen. Harness PASS requires probe_addr==0x00 (runner/blargg.rs:316) and probe_addr is pinned to $6000 with no per-case override, so no mapper change can make this case pass. SEPARATELY, a real defect is known and deliberately NOT fixed (human ruling 2026-09-28): hardware requires an IRQ acknowledge only when bit 0 of register $0D is clear (agreed by PowerPak, Everdrive and Nintendulator), but src/boards/69.cpp does case 0xD: IRQa = V; X6502_IRQEnd(FCEU_IQEXT) unconditionally, so $0D=$01 and $0D=$81 wrongly Ack. Note nesdev.org/wiki/Sunsoft_FME-7 currently states that ALL writes to register $0D acknowledge the IRQ, but that text was changed to match FCEUX and contradicts the hardware measurements. One-line fix and its verification path (new ctest driving $8000/$A000 via AWrite[] and asserting X.IRQlow & FCEU_IQEXT) are recorded in docs/plans/long-term-evolution/ FCEUX11-v1.18 report, section §三①. This defect affects real FME-7 games (Batman: Return of the Joker, Gimmick!) and shows up in no F11QA metric."
     },
     {
       "kgmqa_id": "kgmqa-097-fme7ramtest-tepples",
