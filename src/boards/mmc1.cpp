@@ -22,8 +22,35 @@
 #include "mapinc_bus.h"
 #include "simple_carts.h"          // v1.8 Phase E.2 step 9.1: Mapper105Cart
 
+#include <cstdio>
+#include <cstdlib>
+
+// v1.18.2 kgmqa-078 probe: FCEUX11_MMC1_PROBE=1 dumps the board geometry the
+// loader actually handed MMC1 (declared PRG/CHR vs. the ROM's real size) and,
+// on every MMC1PRG sync, which 16K banks land at $8000 / $C000 and whether the
+// PRG bank register was allowed to move them. Silent otherwise, so ctest 34/34
+// is unaffected. Kept in-tree: it is the evidence behind the submapper-5
+// "Fixed PRG" model documented in
+// docs/plans/long-term-evolution/T0-指令时序与板级约束.md ②.
+#define MMC1_PROBE_LOG(...) do { if (mmc1_probe_on()) { std::fprintf(stderr, __VA_ARGS__); std::fflush(stderr); } } while (0)
+
+static bool mmc1_probe_on() {
+	static const bool on = []() {
+		const char* e = std::getenv("FCEUX11_MMC1_PROBE");
+		return e && e[0] == '1' && e[1] == '\0';
+	}();
+	return on;
+}
+
 static void GenMMC1Power(void);
 static void GenMMC1Init(CartInfo *info, int prg, int chr, int wram, int bram);
+
+// v1.18.2 kgmqa-078: NES 2.0 header byte 8 high nibble. Per the NES 2.0
+// submapper table, mapper 001 submapper 5 is "Fixed PRG" (SEROM / SHROM /
+// SH1ROM): PRG ROM A14 goes straight to CPU A14 instead of through the MMC1,
+// so the PRG bank register cannot move anything. Reference:
+// https://www.nesdev.org/wiki/NES_2.0_submappers#001:_5_Fixed_PRG
+#define MMC1_SUBMAPPER_FIXED_PRG 5
 
 FCEUX11_MAPPER_HOT static uint8 DRegs[4];
 static uint8 Buffer, BufferShift;
@@ -39,6 +66,7 @@ static FceuMallocPtr WRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destructi
 static uint8 *CHRRAM = NULL;
 static FceuMallocPtr CHRRAM_owner;  // v0.3.6: RAII owner; FCEU_gfree on destruction
 static int is155, is171;
+static int isFixedPRG;	// v1.18.2 kgmqa-078: NES 2.0 submapper 5 (SEROM/SHROM/SH1ROM)
 
 static DECLFW(MBWRAM) {
 	if (!(DRegs[3] & 0x10) || is155)
@@ -79,6 +107,50 @@ static void MMC1CHR(void) {
 static void MMC1PRG(void) {
 	uint8 offs_16banks = DRegs[1] & 0x10;
 	uint8 prg_reg = DRegs[3] & 0xF; //homebrewers arent allowed to use more banks on MMC1. use another mapper.
+	if (mmc1_probe_on()) {
+		// What a plain MMC1 WOULD have mapped here, versus what actually gets
+		// mapped. On a submapper-5 board the two differ by construction: the
+		// real hardware ignores the bank register. Note that with only 32K of
+		// PRG the mask is 1, so `(prg_reg & ~1) & 1 == 0` and the plain path
+		// is already numerically identical — i.e. this ROM cannot tell the two
+		// models apart. See Mapper1_Init for why the fix is still correct.
+		const uint32 mask16 = fceu11::g_bus.prg_mask16()[0];
+		uint32 lo, hi;
+		switch (DRegs[0] & 0xC) {
+		case 0xC: lo = (uint32)(prg_reg + offs_16banks) & mask16;
+		           hi = (uint32)(0xF + offs_16banks) & mask16; break;
+		case 0x8: lo = (uint32)offs_16banks & mask16;
+		           hi = (uint32)(prg_reg + offs_16banks) & mask16; break;
+		default:  lo = (uint32)((prg_reg & ~1) + offs_16banks) & mask16;
+		           hi = (uint32)((prg_reg & ~1) + offs_16banks + 1) & mask16; break;
+		}
+		const bool differs = (lo != 0) || (hi != mask16);
+		MMC1_PROBE_LOG("MMC1PRG mode=%X DRegs1=%02X DRegs3=%02X prg_reg=%u | "
+		            "PRGmask16=%u (%u x 16K) | plain_mmc1_would_map: "
+		            "$8000=bank%u $C000=bank%u | fixed_prg=%d actual: $8000=bank%u "
+		            "$C000=bank%u%s\n",
+		            DRegs[0] & 0xC, DRegs[1], DRegs[3], prg_reg,
+		            mask16, mask16 + 1, lo, hi, isFixedPRG ? 1 : 0,
+		            0u, mask16,
+		            differs ? "  <- banking suppressed by fixed-PRG" : "");
+	}
+	// v1.18.2 kgmqa-078: submapper-5 "Fixed PRG" boards (SEROM / SHROM /
+	// SH1ROM) have no PRG banking at all — A14 is hardwired to CPU A14 — so
+	// neither the mode bits in DRegs[0] nor the bank register in DRegs[3] (nor
+	// the CHR0 bit-4 alias in DRegs[1]) may influence decoding. $8000-BFFF is
+	// permanently the low 16K bank, $C000-FFFF the high one. The register
+	// writes still latch into DRegs so that CHR/mirroring keep working and
+	// savestates stay byte-identical in shape.
+	if (isFixedPRG) {
+		if (MMC1PRGHook16) {
+			MMC1PRGHook16(0x8000, 0);
+			MMC1PRGHook16(0xC000, PRGmask16[0]);
+		} else {
+			setprg16(0x8000, 0);
+			setprg16(0xC000, PRGmask16[0]);
+		}
+		return;
+	}
 	if (MMC1PRGHook16) {
 		switch (DRegs[0] & 0xC) {
 		case 0xC:
@@ -136,7 +208,7 @@ static DECLFW(MMC1_write) {
 	*/
 	if ((timestampbase + g_cpu.timestamp_ref()) < (lreset + 2))
 		return;
-//	FCEU_printf("Write %04x:%02x\n",A,V);
+//	MMC1_PROBE_LOG("Write %04x:%02x\n",A,V);
 	if (V & 0x80) {
 		DRegs[0] |= 0xC;
 		BufferShift = Buffer = 0;
@@ -214,7 +286,7 @@ static int DetectMMC1WRAMSize(CartInfo *info, int *bs) {
 		}
 	}
 	if (ws > 8)
-		FCEU_printf(" >8KB external WRAM present.  Use NES 2.0 if you hack the ROM image.\n");
+		MMC1_PROBE_LOG(" >8KB external WRAM present.  Use NES 2.0 if you hack the ROM image.\n");
 	return ws;
 }
 
@@ -293,6 +365,7 @@ static void GenMMC1Close(void) {
 
 static void GenMMC1Init(CartInfo *info, int prg, int chr, int wram, int bram) {
 	is155 = 0;
+	isFixedPRG = 0;
 
 	info->Close = GenMMC1Close;
 	MMC1PRGHook16 = MMC1CHRHook4 = 0;
@@ -301,6 +374,24 @@ static void GenMMC1Init(CartInfo *info, int prg, int chr, int wram, int bram) {
 	PRGmask16[0] &= (prg >> 14) - 1;
 	CHRmask4[0] &= (chr >> 12) - 1;
 	CHRmask8[0] &= (chr >> 13) - 1;
+
+	if (mmc1_probe_on()) {
+		// The masks above are derived from the *declared* board geometry, while
+		// prg_size() is what the iNES loader really allocated. A mismatch means
+		// setprg16r() will index past the end of the PRG-ROM buffer.
+		MMC1_PROBE_LOG("MMC1INIT declared prg=%dK chr=%dK wram=%dK bram=%dK | "
+		            "real prg_size=%uK chr_size=%uK ines2=%d submapper=%u mapper=%d "
+		            "crc=%08X\n",
+		            prg, chr, wram, bram,
+		            fceu11::g_bus.prg_size()[0] / 1024,
+		            fceu11::g_bus.chr_size()[0] / 1024,
+		            info->ines2 ? 1 : 0, info->submapper, info->mapper_number,
+		            info->CRC32);
+		MMC1_PROBE_LOG("MMC1INIT masks: PRGmask16=%u (%u x 16K -> up to %uK) "
+		            "CHRmask4=%u CHRmask8=%u\n",
+		            PRGmask16[0], PRGmask16[0] + 1, (PRGmask16[0] + 1) * 16,
+		            CHRmask4[0], CHRmask8[0]);
+	}
 
 	if (WRAMSIZE) {
 		WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped
@@ -329,6 +420,42 @@ static void GenMMC1Init(CartInfo *info, int prg, int chr, int wram, int bram) {
 void Mapper1_Init(CartInfo *info) {
 	int bs = info->battery ? 8 : 0;
 	int ws = DetectMMC1WRAMSize(info, &bs);
+	MMC1_PROBE_LOG("Mapper1_Init: ines2=%d submapper=%u mapper=%d battery=%d "
+	                "ws=%d bs=%d real_prg=%u real_chr=%u -> %s\n",
+	                info->ines2 ? 1 : 0, info->submapper, info->mapper_number,
+	                info->battery ? 1 : 0, ws, bs,
+	                fceu11::g_bus.prg_size()[0], fceu11::g_bus.chr_size()[0],
+	                (info->ines2 && info->submapper == MMC1_SUBMAPPER_FIXED_PRG)
+	                    ? "FIXED_PRG" : "plain MMC1");
+	// v1.18.2 kgmqa-078. NES 2.0 mapper 001 submapper 5 is "Fixed PRG"
+	// (SEROM / SHROM / SH1ROM). bmap[] is keyed on mapper number alone, so
+	// this submapper never reached the mapper before. Two separate defects;
+	// (1) masks (2) completely, so both are recorded here.
+	//
+	// (1) $6000 was unmapped, so the failure was not about banking at all.
+	//     This NES 2.0 image declares no PRG-RAM, and DetectMMC1WRAMSize
+	//     trusts the header for NES 2.0 carts — while a plain iNES MMC1 image
+	//     falls through to that function's 8 KB default. The blargg $6000
+	//     result register was therefore unwritable, and every run reported the
+	//     same constant 0xC3 no matter what the mapper did. Submapper 5 places
+	//     no requirement on PRG RAM (every real SEROM/SHROM board carries
+	//     8 KB), so fall back to the conventional size when the header
+	//     specifies nothing. Blast radius: only mapper 001 submapper 5 images
+	//     with an empty PRG-RAM field — serom.nes is the only such image in
+	//     the fixture set.
+	//
+	// (2) Submapper 5 also has no PRG banking: A14 is hardwired to CPU A14.
+	if (info->ines2 && info->submapper == MMC1_SUBMAPPER_FIXED_PRG) {
+		if (ws == 0) ws = 8;
+		// Geometry args stay identical to the plain path on purpose: the only
+		// behavioural delta should be the bank register going dead. GenMMC1Init
+		// masks with &= against the loader's real-size masks (bus.cpp derives
+		// those from the actual ROM), so the declared values can only narrow.
+		GenMMC1Init(info, 512, 256, ws, bs);
+		isFixedPRG = 1;
+		MMC1PRG();  // GenMMC1Init synced before the flag was set
+		return;
+	}
 	GenMMC1Init(info, 512, 256, ws, bs);
 }
 

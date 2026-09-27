@@ -2,7 +2,8 @@
 
 > 实测矩阵 **106P / 14F**（v1.8 收口时点；内部逻辑检测 42P/0F）。
 > 流水线与 baseline 已稳：`pass_to_fail=0`、内部逻辑检测 全绿。
-> **当前进度（2026-09-27）**：矩阵 **107P / 13F**，grade **B**，已清 **① 056**（commit `8010a3f`，run 98267393461）。
+> **当前进度（2026-09-27，v1.18.2）**：矩阵 **108P / 12F**，grade **B**，
+> 已清 **① 056**（`8010a3f`）与 **② 078**（v1.18.2），blargg 147P/30F，advisory 10.0%。
 
 ## 0. 本批已收掉的非精度项（对照）
 
@@ -32,7 +33,7 @@
 
 | id | 套件 | 现象 |
 |---|---|---|
-| 078 | lidnariq serom | MMC1 SEROM/SHROM 约束，$6000=0xC3 |
+| ~~078~~ | lidnariq serom | **已清零**（v1.18.2）：submapper 5 + PRG-RAM=0 → `$6000` 未映射 → 矩阵 108P/12F |
 | 093 | tepples bntest-aorom | BxROM/BNROM 边界，$6000=0x27 |
 | 077 | holy_mapperel | 13 mapper 聚合，47 ROM 循环 |
 | 096/097 | fme7 | FME-7 IRQ ack / WRAM |

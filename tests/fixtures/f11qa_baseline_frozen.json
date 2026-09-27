@@ -80,7 +80,7 @@
     "kgmqa-075-mmc3bigchrram-tepples": true,
     "kgmqa-076-test28-tepples": true,
     "kgmqa-077-holy-mapperel-tepples": false,
-    "kgmqa-078-serom-lidnariq": false,
+    "kgmqa-078-serom-lidnariq": true,
     "kgmqa-079-exram-quietust": true,
     "kgmqa-080-scanline-quietust": true,
     "kgmqa-081-fds-irq-tests-sour": false,

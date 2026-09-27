@@ -23,7 +23,7 @@
 > **关联**：`docs/tech/F11QA.md`、`docs/tech/precision.md`、`docs/tech/f11qa-accuracy-backlog.md`、
 > `tests/tests.json`、`tests/fixtures/blargg_known_fail.json`
 >
-> **当前进度**（截至 `b6fe92a`，run **98267393461**）：**107P / 13F**（grade **B** 不变）·
+> **当前进度**（截至 v1.18.2）：**108P / 13F**（grade **B** 不变）· L1 已清 **2/14**（① 056、② 078）· blargg **147P / 30F** · advisory-FAIL **10.0%** · `pass_to_fail=0` / `fail_to_pass=2`（L2 两项 + 矩阵 078）。
 > L1 已清 **1/14**（① 056）· blargg **147P / 30F** · advisory-FAIL **10.8%** ·
 > `pass_to_fail=0` / `fail_to_pass=1`。
 > 上表为**原始基线**（`b0658c9` / run 98252605787），保留作对照；进度以本行为准。
@@ -108,7 +108,7 @@ v1.8 把 F11QA 门槛抬到 **120 用例 / R4 四硬门禁 / grade B**。本计�
 | 难度 | Tier | 用例 | 主题 | 预估 | 建议顺序 | 状态 |
 |---|---|---|---|---|---|---|
 | ★☆☆☆☆ | **T0** | kgmqa-056 | 指令周期表 2 条非法指令 | 1–3 天 | 1 | **DONE** |
-| ★★☆☆☆ | **T0** | kgmqa-078 | MMC1 SEROM/SHROM 板约束 | 2–4 天 | 2 | TODO |
+| ★★☆☆☆ | **T0** | kgmqa-078 | MMC1 SEROM/SHROM 板约束 | 2–4 天 | 2 | **DONE** |
 | ★★☆☆☆ | **T0** | kgmqa-038 | `LDA abs,x` dummy read | 3–5 天 | 3 | TODO |
 | ★★☆☆☆ | **T1** | kgmqa-097 | FME-7 WRAM 映射 | 2–4 天 | 4 | TODO |
 | ★★★☆☆ | **T1** | kgmqa-096 | FME-7 IRQ ack | 3–7 天 | 5 | TODO |
@@ -243,7 +243,7 @@ advisory-FAIL 占比                11.7% -> 10.8%
 
 ---
 
-### ② T0 · kgmqa-078-serom-lidnariq　`TODO`
+### ② T0 · kgmqa-078-serom-lidnariq　`DONE`　`v1.18.2`
 
 | 字段 | 值 |
 |---|---|
@@ -268,6 +268,99 @@ advisory-FAIL 占比                11.7% -> 10.8%
 **验收**：kgmqa-078 PASS；`serom.nes` L2 PASS。
 
 **风险**：低–中。约束过严可能影响普通 MMC1 游戏 ROM 的 bank 切换；用 mapper_byte_diff + 商业 ROM smoke 兜底。
+
+#### ② 实际执行记录（v1.18.2）
+
+**原计划的根因判断是错的。**计划写「MMC1 SEROM/SHROM bank 宽度约束未建模」——
+实测后发现**有两个独立缺陷，且第一个完全掩盖了第二个**。
+
+##### 缺陷 1（真正让矩阵变红的那一个）：`$6000` 根本没被映射
+
+ROM 头部（NES 2.0）：`PRG=32K CHR=8K mapper=1 submapper=5 **PRG-RAM=0**`。
+`DetectMMC1WRAMSize()` 只对 **NES 2.0** 板信头部字段，
+所以本板拿到 **0 KB WRAM**；而**同一颗 ROM 若写成 iNES 1.0**，
+该函数会落到函数开头的 `int ws = 8;` 默认值、拿到 8 KB。
+
+后果：`$6000` 无读/写 handler，blargg 的结果寄存器写不进去，
+runner 读回一个常量 —— 这正是 `value=0xC3 diag=[0xC3,0xC3,0xC3]` 的由来。
+**它与 mapper 行为无关**：无论 MMC1 怎么译码，矩阵都报同一个 0xC3。
+
+**证明**（零成本 header patch，无需改代码）：把 byte10 低半字节改成 7
+（= 8 KB PRG-RAM），其余字节不动 ——
+
+```
+ORIGINAL  (PRG-RAM=0) : exit=1  value=0xC3  diag=[0xC3,0xC3,0xC3]  FAIL
+EXPERIMENT(PRG-RAM=8K): exit=0  value=0x00  diag=[0x00,0x00,0x00]  PASS
+```
+
+##### 缺陷 2：submapper 5「Fixed PRG」语义缺失（规范正确，但本 ROM 测不出来）
+
+ROM 自带的字符串就是答案：
+
+```
+Submapper 5 has been allocated for the SEROM, SHROM, and SH1ROM PCBs,
+which do not support PRG banking at all.
+```
+
+NES 2.0 规范：mapper 001 submapper 5 = Fixed PRG，
+**PRG ROM A14 直接接 CPU A14，不经 MMC1**。而 `bmap[]` 只按 mapper 号索引，
+submapper 从来到不了 mapper 层。
+
+**诚实结论：这一项不是让 078 转 PASS 的原因。**A/B 实测——
+同一 ROM 内容、同样 8 KB PRG-RAM，只改 submapper 字节：
+
+| submapper | isFixedPRG | 结果 |
+|---|---|---|
+| 0（plain MMC1） | 否 | **PASS** |
+| 5（Fixed PRG） | 是 | **PASS** |
+
+两者都 PASS。原因：PRG 只有 32 KB 时 `PRGmask16=1`，
+32K 模式下 `(prg_reg & ~1) & 1` 恒为 0，与固定映射**数值上完全相同**。
+探针可见 fixed-PRG 在 9 次同步中确实改掉了 2 次映射，
+但本 ROM 无法据此判负。保留该实现是因为它符合规范、且改动面为零；
+**不要用「重跑这个测试」去验证它** —— 验证要换一个 >32K PRG 的板。
+
+##### 实际改动
+
+仅 `src/boards/mmc1.cpp`：
+
+1. `Mapper1_Init()`：NES 2.0 + submapper 5 且头部 PRG-RAM 为空时，
+   `ws` 回退到 8 KB（**承载项**）。submapper 5 不约束 PRG RAM，
+   真实 SEROM/SHROM 板（Dr. Mario / Tetris / Boulder Dash…）也都带 8K。
+2. 新增 `static int isFixedPRG` + `MMC1PRG()` 开头的固定分支：
+   恒 `setprg16(0x8000, 0)` / `setprg16(0xC000, PRGmask16[0])`，
+   忽略 `DRegs[0]` 模式位、`DRegs[3]` bank 寄存器、`DRegs[1]` bit4 别名。
+   寄存器仍正常锁存，CHR / mirroring / savestate 形状不变。
+3. 新增 env-gated 探针 `FCEUX11_MMC1_PROBE=1`（写 **stderr**，
+   因为 `FCEU_printf` → `FCEUD_Message` → driver 回调，
+   headless runner 从不安装 message 回调，探针会被静默吞掉）。
+
+**影响面**：仅 mapper 001 submapper 5 且 PRG-RAM 字段为空的镜像。
+整个 fixture 集里**只有 `serom.nes` 一个**。
+`GenMMC1Init` 用 `&=` 与 loader 按真实尺寸算出的 mask 取交，只能收窄不能放宽，
+因此不存在越界读。
+
+##### 验证（全部实测）
+
+```
+serom.nes 单 ROM      exit=0  value=0x00  diag=[0x00,0x00,0x00]  PASS
+ctest 内部逻辑检测     34/34 PASS（含 mapper_byte_diff、golden_savestate）
+blargg 全量 177 ROM    147P / 30F（与 ① 后基线完全一致，零回归）
+迁移矩阵               107P/13F -> 108P/12F   grade B 不变
+                       fail_to_pass=1 (kgmqa-078)  pass_to_pass=107
+                       pass_to_fail=0            new_test=0
+                       Oracle A 42P/0F          Oracle B 66P/12F
+advisory-FAIL 占比      10.8% -> 10.0%（cap 15%）
+f11qa_baseline_frozen  kgmqa-078  false -> true（同 PR 更新，见 §7.1）
+```
+
+**无金标重生成**：`mapper_byte_diff` 与 `golden_savestate` 均通过，
+`Mmc1Cart::save_mapper_state()` 未加入 `isFixedPRG`
+（它由 ROM 头确定性推导，入 savestate 反而会污染跨镜像比对）。
+
+> **可复用教训**：`value` 是一个**恒定**的字节、且 256 字节 diag 区全是同一个值时，
+> 先怀疑**探针寄存器本身没被映射**（`$6000` 在无 RAM 的板上不可写），
+> 而不是去改被测逻辑。改 ROM 头部一个字节做 A/B 是零成本分辨手段。
 
 ---
 
@@ -645,7 +738,7 @@ NMI 与 BRK 交互的周期对齐差 1；L2 中 `cpu_int_3/4/5` 同族失败（N
 
 | Phase | 窗口 | 包含 | 出口指标 | 进度 |
 |---|---|---|---|---|
-| **α 指令时序与板级约束** | 1–2 周 | ① 056 → ② 078 → ③ 038 | 14F → **11F**；advisory ≤ 9.2% | **1/3（14F→13F）** |
+| **α 指令时序与板级约束** | 1–2 周 | ① 056 → ② 078 → ③ 038 | 14F → **11F**；advisory ≤ 9.2% | **2/3（14F→12F）** |
 | **β Mapper/DMA** | 2–4 周 | ④ 097 → ⑤ 096 → ⑥ 050 → ⑦ 051 | 13F → **9F**；L2 中 DMA 组观察 | 未开始 |
 | **γ 中断模型** | 1–2 月 | ⑧ 037（+ L2 cpu_int_*） | 9F → **8F**；L2 中断组清零 | 未开始 |
 | **δ 长周期精度项** | 1–2 季 | ⑨ 049、⑩ 099、⑪ 107、⑫ 108 | 每项独立里程碑；不强制同窗完成 | 未开始 |
@@ -731,7 +824,7 @@ ctest --test-dir build -C Release --output-on-failure
 | # | kgmqa | 难度 | Tier | 状态 | PR / commit | 矩阵结果 |
 |---|---|---|---|---|---|---|
 | 1 | 056-instr-timing | ★☆☆☆☆ | T0 | **DONE** | `8010a3f`（run 98267393461） | **PASS** |
-| 2 | 078-serom | ★★☆☆☆ | T0 | TODO | | FAIL |
+| 2 | 078-serom | ★★☆☆☆ | T0 | **DONE** | v1.18.2（MMC1 submapper-5） | **PASS** |
 | 3 | 038-instr-misc | ★★☆☆☆ | T0 | TODO | | FAIL |
 | 4 | 097-fme7ram | ★★☆☆☆ | T1 | TODO | | FAIL |
 | 5 | 096-fme7ack | ★★★☆☆ | T1 | TODO | | FAIL |
@@ -746,10 +839,11 @@ ctest --test-dir build -C Release --output-on-failure
 | 14 | 081-fds-irq | ★★★★★ | T4 | TODO | | FAIL |
 
 **原始基线快照**：`b0658c9` / run 98252605787 / 106P-14F / grade B。
-**当前进度快照**：`b6fe92a` / run 98267393461 / **107P-13F** / grade B / 已完成 1、剩余 13。
+**当前进度快照**：v1.18.2 / **108P-12F** / grade B / 已完成 2、剩余 12。
+（矩阵 108P/**12**F —— §八 状态表的 13 行中 ② 078 已转 PASS。）
 任何一行从 FAIL→PASS，先更新矩阵数字，再更新 backlog，最后更新本表。
 
-**完成度汇总（截至当前进度快照）**：**1 / 14 已完成（7%）**，13 项未开始。
+**完成度汇总（截至当前进度快照）**：**2 / 14 已完成（14%）**，12 项未开始。
 按易→难排序的逐项完成度见 [README §完成度速查](README.md#完成度速查)。
 注意排序中的一处修正：**⑬ 077 的成本是派生的**（= ②+④+⑤ 剩余 + L2 MMC3 IRQ 组），
 不按 star 数独立排期，见 §2.1。
@@ -763,7 +857,7 @@ ctest --test-dir build -C Release --output-on-failure
 | A-055 cpu_reset_regs | **已清零**（PASS） |
 | B-093 bntest | **已清零**（PASS） |
 | A-038 / 056 / 037 | 仍在 FAIL，分别对应本计划 ③①⑧ |
-| B-078 / 077 / 096 / 097 | 仍在 FAIL，分别对应 ②⑬⑤④ |
+| B-078 | **已清零**（v1.18.2，矩阵 108P/12F） |
 | C-049/050/051/099/107/108 | 仍在 FAIL，对应 ⑨⑥⑦⑩⑪⑫ |
 | C-106 vaus | **已 PASS**（本基线） |
 | C-081 fds_irq | 仍在 FAIL（0xFE 加载），对应 ⑭ |

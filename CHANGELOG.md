@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — v1.18.2：kgmqa-078 MMC1 SEROM/SHROM（矩阵 108P / 12F）
+
+- **`kgmqa-078-serom-lidnariq` 清零**：`lidnariq/serom/serom.nes` 由 FAIL（`0xC3`）转 PASS（`0x00`）。
+  迁移矩阵 **107P/13F → 108P/12F**，grade **B** 不变，`pass_to_fail=0`、`fail_to_pass=1`、`new_test=0`；
+  内部逻辑检测 42P/0F 无回归，blargg 全量 **147P/30F** 不变，advisory-FAIL 10.8% → **10.0%**。
+- **实际根因与原计划不同**（`src/boards/mmc1.cpp`）：
+  - **承载项**：ROM 头为 NES 2.0 `mapper=1 submapper=5 PRG-RAM=0`，而 `DetectMMC1WRAMSize()` 只对 NES 2.0 板信头部字段 —— 同一 ROM 写成 iNES 1.0 则会落到该函数的 8 KB 默认值。0 KB WRAM 导致 `$6000` 无 handler，blargg 结果寄存器写不进去，runner 读回常量 `0xC3`，**与 mapper 译码无关**。现于 submapper 5 且头部为空时回退 8 KB。
+  - **规范项**：补齐 NES 2.0 submapper 5「Fixed PRG」语义（PRG ROM A14 硬接 CPU A14，PRG bank 寄存器无效）。`bmap[]` 只按 mapper 号索引，此前 submapper 从未到达 mapper 层。该改动符合规范并改变真实映射，但**本 ROM 无法据此判负**（32 KB PRG 时 `PRGmask16=1`，普通 MMC1 与固定映射数值相同）。
+- **新增 env-gated 探针** `FCEUX11_MMC1_PROBE=1`：打印板几何与每次 PRG 同步的实际 / 普通 MMC1 映射。走 **stderr** —— `FCEU_printf` 经 `FCEUD_Message` → driver 回调，headless runner 从不安装 message 回调，走它会被静默吞掉。
+- **冻结基线** `f11qa_baseline_frozen.json`：`kgmqa-078` `false` → `true`（同 PR 更新，避免已修项被后续项重复计入 `fail_to_pass`）。
+- **无金标重生成**：`mapper_byte_diff` 与 `golden_savestate` 通过；`Mmc1Cart::save_mapper_state()` 有意不含 `isFixedPRG`（由 ROM 头确定性推导，纳入 savestate 会污染跨镜像比对）。
+
+
 ### Added — v1.18 R4 gate green at grade B（2026-09-26）
 
 - **R4 gate（`f11qa.yml`）**：`total==120`、`fail_to_pass==0`、`vendor_state` 三态、
