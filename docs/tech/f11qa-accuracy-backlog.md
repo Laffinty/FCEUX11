@@ -36,7 +36,8 @@
 | ~~078~~ | lidnariq serom | **已清零**（v1.18.2）：submapper 5 + PRG-RAM=0 → `$6000` 未映射 → 矩阵 108P/12F |
 | 093 | tepples bntest-aorom | BxROM/BNROM 边界，$6000=0x27 |
 | 077 | holy_mapperel | 13 mapper 聚合，47 ROM 循环 |
-| 096/097 | fme7 | FME-7 IRQ ack / WRAM |
+| 097 | fme7ramtest | **非精度债**（2026-09-27 改判）：survey ROM 不实现 `$6000` 结果协议，静态扫描 PRG 对 `$6000` 绝对寻址 0 处；FME-7 WRAM 映射经 `FCEUX11_FME7_PROBE=1` 实测与上游 62256 期望逐字节一致。处置待人工授权 |
+| 096 | fme7acktest | FME-7 IRQ ack |
 
 **优先 093**：单 mapper 边界，比聚合套件好定位。
 

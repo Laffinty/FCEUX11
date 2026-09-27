@@ -23,6 +23,30 @@
 #include "simple_carts.h"          // v1.8 Phase E.2 step 9.6
 #include "legacy_expansion_audio.h"  // v1.8 Phase G
 
+#include <cstdio>
+#include <cstdlib>
+
+// v1.18.3 kgmqa-097 probe (FCEUX11_FME7_PROBE=1): dumps the FME-7 register 8
+// writes and the $6000-$7FFF window traffic so the fme7ramtest survey ROM can
+// be read off the wire instead of guessed at. Writes to stderr on purpose --
+// FCEU_printf goes through FCEUD_Message -> driver callback, and the headless
+// blargg/f11qa runner never installs one, so FCEU_printf output is silently
+// swallowed. Silent otherwise, so ctest 34/34 is unaffected. Kept in-tree: it
+// is the evidence behind the register-8 model documented in
+// docs/plans/long-term-evolution/T1-Mapper与DMA.md ④.
+#define M69_PROBE_LOG(...) do { if (m69_probe_on()) { std::fprintf(stderr, __VA_ARGS__); std::fflush(stderr); } } while (0)
+
+static bool m69_probe_on() {
+	static const bool on = []() {
+		const char* e = std::getenv("FCEUX11_FME7_PROBE");
+		return e && e[0] == '1' && e[1] == '\0';
+	}();
+	return on;
+}
+
+// Event budget: the 8 KiB pattern fill alone is 8192 writes.
+static int m69_probe_budget = 400;
+
 static uint8 cmdreg, preg[4], creg[8], mirr;
 static uint8 IRQa;
 static int32 IRQCount;
@@ -62,15 +86,26 @@ static void Sync(void) {
 }
 
 static DECLFW(M69WRAMWrite) {
-	if ((preg[3] & 0xC0) == 0xC0)
+	bool hit = (preg[3] & 0xC0) == 0xC0;
+	if (hit)
 		CartBW(A, V);
+	if (m69_probe_on() && m69_probe_budget-- > 0)
+		std::fprintf(stderr, "M69_WR A=%04X preg3=%02X v=%02X ram=%d\n", A, preg[3], V, (int)hit);
 }
 
 static DECLFR(M69WRAMRead) {
+	uint8 r;
 	if ((preg[3] & 0xC0) == 0x40)
-		return g_cpu.native_layout().DB;
+		r = g_cpu.native_layout().DB;
 	else
-		return CartBR(A);
+		r = CartBR(A);
+	if (m69_probe_on()) {
+		if (A == 0x6900)
+			std::fprintf(stderr, "M69_BANKTAG reg8=%02X $6900 -> %02X\n", preg[3], r);
+		else if (m69_probe_budget-- > 0)
+			std::fprintf(stderr, "M69_RD A=%04X preg3=%02X -> %02X\n", A, preg[3], r);
+	}
+	return r;
 }
 
 static DECLFW(M69Write0) {
@@ -87,7 +122,7 @@ static DECLFW(M69Write1) {
 	case 0x5: creg[5] = V; Sync(); break;
 	case 0x6: creg[6] = V; Sync(); break;
 	case 0x7: creg[7] = V; Sync(); break;
-	case 0x8: preg[3] = V; Sync(); break;
+	case 0x8: preg[3] = V; Sync(); M69_PROBE_LOG("M69_REG8 v=%02X wramsize=%u\n", V, (unsigned)WRAMSIZE); break;
 	case 0x9: preg[0] = V; Sync(); break;
 	case 0xA: preg[1] = V; Sync(); break;
 	case 0xB: preg[2] = V; Sync(); break;
@@ -264,6 +299,11 @@ void Mapper69_Init(CartInfo *info) {
 		WRAMSIZE = info->wram_size + info->battery_wram_size;
 	else
 		WRAMSIZE = 8192;
+	M69_PROBE_LOG("M69_INIT ines2=%d wram=%u battery_wram=%u -> WRAMSIZE=%u "
+	               "submapper=%d CRC32=%08X\n",
+	               info->ines2 ? 1 : 0, (unsigned)info->wram_size,
+	               (unsigned)info->battery_wram_size, (unsigned)WRAMSIZE,
+	               info->submapper, (unsigned)info->CRC32);
 	WRAM_owner = FCEU_gmalloc_unique(WRAMSIZE);  // v0.3.6: RAII-wrapped
 	WRAM = WRAM_owner.get();
 	SetupCartPRGMapping(0x10, WRAM, WRAMSIZE, 1);

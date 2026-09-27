@@ -14,7 +14,7 @@
 
 | 序 | kgmqa | 主题 | 预估 | 状态 |
 |---|---|---|---|---|
-| 4 | **097** fme7ramtest | FME-7 WRAM 映射 | 2–4 天 | TODO |
+| 4 | **097** fme7ramtest | FME-7 WRAM 映射 | 2–4 天 | TODO（**已改判**：非 mapper 缺陷，不可修，见下 ④） |
 | 5 | **096** fme7acktest | FME-7 IRQ ack | 3–7 天 | TODO |
 | 6 | **050** dummy_writes | OAM DMA dummy write | 4–7 天 | TODO |
 | 7 | **051** exec_space | IO 空间取指 / bus dispatch | 4–7 天 | TODO |
@@ -37,21 +37,41 @@
 |---|---|
 | ROM | `tepples/fme7/fme7ramtest.nes` |
 | 错误码 | `0x01` |
-| known_limit | FME-7 WRAM mapping edge |
+| known_limit | FME-7 WRAM mapping edge　**← 已过时，见下** |
 
-### 根因
+> **STATUS: 根因改判（2026-09-27）。本项不是 mapper 缺陷，也不可修。**
+> 完整证据在主报告 [`FCEUX11-v1.18_F11QA残留精度长期演进计划.md`](FCEUX11-v1.18_F11QA残留精度长期演进计划.md) §三④
+> 「④ 调查记录」—— 按证据归属规则，本卡只留指针。
+>
+> 要点三条：
+>
+> 1. `fme7ramtest` 是 **survey ROM**，不使用 blargg 的 `$6000` 结果协议。
+>    静态扫描：PRG 里对 `$6000` 的绝对寻址指令 **0 处**，对 `$6900` **恰 2 处**
+>    （`STA $6900` / `LDA $6900`），与上游 `main.s` 的 `check_bank_numbers` 逐字吻合。
+>    `$6000` 里的 `0x01` 是 `check_for_wram` 写的 9 字节 RAM 图样首字节。
+> 2. **FME-7 WRAM 映射本身是对的**：`FCEUX11_FME7_PROBE=1` 实测 bank tag
+>    `C0 C1 C2 C3 C0 C1 C2 C3`（两个 8 字节组），与上游 README
+>    「With 62256 (32Kx8)」期望输出逐字节相同；`WRAMSIZE=32768` 是 ROM 头部
+>    有意声明（`64 << header[10]`，FCEUX 遗留布局 `ram_size` 在 offset 10）。
+> 3. harness 判 PASS 的唯一条件是 `probe_addr` 处读到 `0x00`
+>    （`blargg.rs:316`），`probe_addr` 恒为 `0x6000` 且 `tests.json` 无 per-case 覆盖。
+>    **换 `$6900` 得到 `0xC0`，也不是 `0x00`** —— 没有可行地址。
+>
+> 顺带发现 `reg8 = 40-7F` 档 `Sync()`（映 PRG ROM）与读 handler（open bus）不自洽，
+> **本 ROM 测不出，故不改**（同 038 纪律：无法验证的核心时序改动不合项目纪律）。
 
-FME-7（Sunsoft 5B）**WRAM 映射寄存器**边界未完整建模（bank 号 / 使能 / $6000 窗口）。
+### 步骤（原计划，已作废）
 
-### 步骤
-
-- [ ] 读 FME-7 WRAM 映射写逻辑
-- [ ] 补全边界（含 bank 使能关闭时的总线行为）
-- [ ] 单 ROM 验证
+- [x] 读 FME-7 WRAM 映射写逻辑
+- [x] 静态扫描 ROM + 上游源码比对
+- [x] env-gated 探针实测 reg8 轨迹与 bank tag
+- [ ] ~~补全边界~~ —— 无缺陷可补；处置待人工授权（主报告 §三④ 表 A/B/C）
 
 ### 验收
 
-kgmqa-097 PASS。  
+kgmqa-097 PASS。
+→ **不可达**（见上方证据）。需要人工在「有据 known_limit / backlog 标注 / 换 ROM」之间选一个。
+
 ### 风险：低。
 
 ---
@@ -133,8 +153,10 @@ kgmqa-051 PASS；`fceux11_bench_bus_dispatch` 无明显回退。
 
 ## 包出口检查
 
-- [ ] 四项矩阵均 PASS
+- [ ] 四项矩阵均 PASS　·　**4/4 不可达**：④ 097 已改判为「非 mapper 缺陷」
+      （survey ROM 不实现 `$6000` 协议，见 ④ 段），实际可达上限为 **3/4**
 - [ ] L1 FAIL 降至 **9**（= T0 余 2 + 037 + T3 四项 + T4 两项；自当前 13F 起算）
+      ·　**若 097 按「有据 known_limit」处置，实际目标为 10**
 - [ ] `pass_to_fail = 0`（尤其 MMC3 / dma_sync 哨兵）
 - [ ] 内部逻辑检测全绿
 - [ ] 097/096 可同分支但 **分 commit**

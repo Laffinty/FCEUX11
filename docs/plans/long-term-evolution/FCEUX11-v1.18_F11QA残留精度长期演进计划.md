@@ -109,7 +109,7 @@ v1.8 把 F11QA 门槛抬到 **120 用例 / R4 四硬门禁 / grade B**。本计�
 |---|---|---|---|---|---|---|
 | ★☆☆☆☆ | **T0** | kgmqa-056 | 指令周期表 2 条非法指令 | 1–3 天 | 1 | **DONE** |
 | ★★☆☆☆ | **T0** | kgmqa-078 | MMC1 SEROM/SHROM 板约束 | 2–4 天 | 2 | **DONE** |
-| ★★☆☆☆ | **T1** | kgmqa-097 | FME-7 WRAM 映射 | 2–4 天 | 3 | TODO |
+| ★★☆☆☆ | **T1** | kgmqa-097 | FME-7 WRAM 映射 | 2–4 天 | 3 | TODO（**已改判：非 mapper 缺陷**，见 §三④） |
 | ★★★☆☆ | **T1** | kgmqa-096 | FME-7 IRQ ack | 3–7 天 | 4 | TODO |
 | ★★★☆☆ | **T1** | kgmqa-050 | OAM DMA dummy write | 4–7 天 | 5 | TODO |
 | ★★★☆☆ | **T1** | kgmqa-051 | 从 IO 空间取指 / bus dispatch | 4–7 天 | 6 | TODO |
@@ -544,21 +544,21 @@ open-bus 混入（`01-222.cpp:75`、`158B.cpp:57`、`170.cpp:43`、`178.cpp:128/
 
 ---
 
-### ④ T1 · kgmqa-097-fme7ramtest-tepples　`TODO`
+### ④ T1 · kgmqa-097-fme7ramtest-tepples　`TODO`（**2026-09-27 调查后根因改判：不是 mapper 缺陷，见下**）
 
 | 字段 | 值 |
 |---|---|
-| 难度 | ★★☆☆☆ |
+| 难度 | ★★☆☆☆ → **不适用（非 mapper 缺陷）** |
 | 层 / 通道 | Boards / B |
 | ROM | `tepples/fme7/fme7ramtest.nes` |
 | 错误码 | `0x01` |
-| known_limit | FME-7 WRAM mapping edge |
+| known_limit | FME-7 WRAM mapping edge　**← 已过时，见下** |
 
-**现象**：`$6000` 窗口 WRAM 映射边界失败（diag `[02,04,08]` 系列为分项偏移）。
+**现象（计划原文的判断）**：`$6000` 窗口 WRAM 映射边界失败（diag `[02,04,08]` 系列为分项偏移）。
 
-**根因**：FME-7（Sunsoft 5B）WRAM 映射寄存器边界未完整建模（bank 号 / 使能位 / 窗口）。
+**原根因**：FME-7（Sunsoft 5B）WRAM 映射寄存器边界未完整建模（bank 号 / 使能位 / 窗口）。
 
-**攻关步骤**
+**攻关步骤（原计划）**
 
 1. 读 FME-7 mapper 实现的 WRAM 映射寄存器写逻辑。
 2. 对照 tepples 测试期望补全边界（含 bank 使能关闭时的总线行为）。
@@ -567,6 +567,94 @@ open-bus 混入（`01-222.cpp:75`、`158B.cpp:57`、`170.cpp:43`、`178.cpp:128/
 **验收**：kgmqa-097 PASS。
 
 **风险**：低。
+
+#### ④ 调查记录（2026-09-27，v1.18.3 任务）—— **未修复；根因改判**
+
+本轮没有交出修复，因为**没有缺陷可修**。以下全部是量出来的，不是推断。
+
+##### 结论先行：`$6000 = 0x01` 是 ROM 自己写的**测试图样字节**，不是结果码
+
+`fme7ramtest` 是一条 **survey ROM（勘测式测试）**，**不使用 blargg 的 `$6000` 结果协议**。
+静态扫描 fixture（`tests/fixtures/fme7ramtest.nes`，40976 B）的 32 KiB PRG：
+
+| 目标 | 绝对寻址指令数 | 指令（PRG 相对偏移） |
+|---|---|---|
+| `$6000` | **0** | —— |
+| `$6900` | **2** | `PRG+06138 STA abs $6900` / `PRG+06146 LDA abs $6900` |
+
+与上游 `pinobatch/little-things-nes/fme7ramtest/src/main.s` 逐字吻合：
+`check_bank_numbers` 用 `sta $6900` 暂存 bank tag、用 `lda $6900` 读回，
+**全文件没有任何 `sta $6000`**。结果文字（"No WRAM found at $6000-$7FFF" /
+"WRAM banks at $6000"）只画在屏幕上。
+
+`$6000` 里的值来自 `check_for_wram` 的 9 字节 RAM 图样：
+`lda #$C0 / sta $A000 / asl a / asl a` 后 `rol a` 循环写入，首字节恒为 **`0x01`**。
+实测 `value=0x01 diag=[0x02,0x04,0x08]` 正是该图样的前 4 字节
+（`01 02 04 08 10 20 40 80 00`）—— 一一对应，不是巧合。
+
+harness 侧判定只有一条（`src/rust/crates/f11qa/src/runner/blargg.rs:316`）：
+`let passed = value == 0x00;`，`probe_addr` 恒为 `0x6000`
+（`tests.json` 无 per-case probe 地址字段）。
+**换任何地址都不成立**：改读 `$6900` 得到的是 `0xC0`（bank 0 的 tag），也不是 `0x00`。
+
+> **因此 kgmqa-097 在当前 harness 下结构上不可能转 PASS。**
+> 这不是 mapper 的问题，也不是「精度缺口」。
+
+##### FME-7 WRAM 映射本身是对的（探针实测，非推理）
+
+新增 env-gated 探针 `FCEUX11_FME7_PROBE=1`（`src/boards/69.cpp`，写 stderr——
+`FCEU_printf` 走 driver 回调，headless runner 从不安装，会被静默吞掉）：
+
+```
+M69_INIT ines2=1 wram=32768 battery_wram=0 -> WRAMSIZE=32768 submapper=0 CRC32=9F5C1791
+```
+
+`WRAMSIZE=32768` 是 **ROM 有意声明**的，不是 loader 走偏：
+header `4E 45 53 1A 02 01 50 48 00 00 09 00`，
+FCEUX 遗留 `FceuInesHeader` 布局把 `ram_size` 放在 **offset 10**，
+`64 << (0x09 & 0x0F) = 32768`。这与上游 bug 731 里 tepples 报的
+「FCEUX r3218 识别出 NES 2.0 头：Total WRAM size: 32768」完全相同 ——
+ROM 头部就是照 FCEUX 的约定造的，cah4e3 在 r3220 让 mapper 认这个值。
+
+ROM 读回每个 bank 的 tag（`$6900`，`check_bank_numbers` 的 check 循环，X 从 15 递减）：
+
+```
+reg8=CF→C3  CE→C2  CD→C1  CC→C0  CB→C3  CA→C2  C9→C1  C8→C0
+reg8=C7→C3  C6→C2  C5→C1  C4→C0  C3→C3  C2→C2  C1→C1  C0→C0
+```
+
+即屏幕 hexdump `C0: C0 C1 C2 C3 C0 C1 C2 C3` / `C8: C0 C1 C2 C3 C0 C1 C2 C3`，
+与上游 README「With 62256 (32Kx8)」的期望输出**逐字节相同**
+（README 原文：`00: C0 C1 C2 C3 C0 C1 C2 C3` / `08: C0 C1 C2 C3 C0 C1 C2 C3`）。
+
+另外 `check_for_wram` 能跑完 `check_bank_numbers`（探针抓到 16+16 次 reg8 写）
+即证明 8 KiB 图样的写入-回读校验**已通过** —— 8 KiB 窗口映射本身没问题。
+
+##### 顺带发现一处真实不一致：**本 ROM 测不出，故不改**
+
+`src/boards/69.cpp` 的 reg 8 模式表（上游 `main.s` 注释给定）：
+`00-3F: ROM; 40-7F: open bus; C0-FF: RAM`，bit6 = RAM/ROM select，bit7 = WRAM +CE。
+
+| reg8 | `Sync()` 映射 | `M69WRAMRead` | `M69WRAMWrite` | 是否自洽 |
+|---|---|---|---|---|
+| `00-3F` | PRG ROM | `CartBR`（ROM） | 丢弃 | ✓ |
+| `40-7F` | **PRG ROM** | 返回 `DB`（open bus） | 丢弃 | **✗ 读/映射打架** |
+| `80-BF` | PRG ROM | `CartBR`（ROM） | 丢弃 | ✓ |
+| `C0-FF` | WRAM banked | `CartBR`（RAM） | `CartBW` | ✓ |
+
+`40-7F` 档 `Sync()` 把 PRG ROM 映到 `$6000-$7FFF`，而读 handler 声称是 open bus；
+读 handler 优先，所以实际可观察行为是 open bus（与硬件一致），
+但映射表自相矛盾。**按 038 的纪律（无法验证的核心时序改动不合项目纪律）本轮不改** ——
+`main.s` 自己写明「This ROM does not currently test open bus behavior」，
+没有 fixture 能证伪；且本项目 open bus 本身就是死的（见 ③：`set_db()` 零调用点）。
+
+##### 处置：待人工授权
+
+| 选项 | 内容 | 代价 |
+|---|---|---|
+| A（推荐） | 记为**有据 known_limit**：「survey ROM 不实现 `$6000` 协议，mapper 行为经探针验证与上游期望一致」 | 需人工授权改 `tests.json` 的 `known_limit` + 走 `test_set_diff` |
+| B | 保留 FAIL 但在 backlog 标注「非精度债」，不进 T1 出口计数 | T1 包出口 13→9 需重算 |
+| C | 更换为能报告 pass/fail 的 FME-7 用例 | 上游该族只有 survey（ramtest）与 IRQ（acktest = ⑤） |
 
 ---
 
@@ -968,7 +1056,7 @@ ctest --test-dir build -C Release --output-on-failure
 | 1 | 056-instr-timing | ★☆☆☆☆ | T0 | **DONE** | `8010a3f`（run 98267393461） | **PASS** |
 | 2 | 078-serom | ★★☆☆☆ | T0 | **DONE** | v1.18.2（MMC1 submapper-5） | **PASS** |
 | 3 | 038-instr-misc | ★★★★☆ | T0 | TODO（**已重估**，阻塞点见 §三③） | | FAIL |
-| 4 | 097-fme7ram | ★★☆☆☆ | T1 | TODO | | FAIL |
+| 4 | 097-fme7ram | ★★☆☆☆（**已改判**） | T1 | TODO（**非 mapper 缺陷**：survey ROM 无 `$6000` 协议，mapper 经探针验证正确，见 §三④） | | FAIL（结构性） |
 | 5 | 096-fme7ack | ★★★☆☆ | T1 | TODO | | FAIL |
 | 6 | 050-dummy-writes | ★★★☆☆ | T1 | TODO | | FAIL |
 | 7 | 051-exec-space | ★★★☆☆ | T1 | TODO | | FAIL |
