@@ -648,13 +648,33 @@ reg8=C7→C3  C6→C2  C5→C1  C4→C0  C3→C3  C2→C2  C1→C1  C0→C0
 `main.s` 自己写明「This ROM does not currently test open bus behavior」，
 没有 fixture 能证伪；且本项目 open bus 本身就是死的（见 ③：`set_db()` 零调用点）。
 
-##### 处置：待人工授权
+##### 处置：**A 已授权执行（2026-09-28）**
 
-| 选项 | 内容 | 代价 |
+人工在 2026-09-28 选定 **A：记为有据 known_limit**。
+
+已改 `tests/tests.json` 的 `kgmqa-097-fme7ramtest-tepples` 条目：
+`known_limit` 换成带证据的完整表述，`provenance` 追加
+`known-limit (2026-09-28 human-authorized): survey ROM does not implement the
+$6000 result protocol ... NOT an accuracy debt`。
+`failure_means` 仍为 `advisory`，**未加 `known-limit` tag**（`grade.rs` 不读 tag，
+加了只会误导），用例数仍 120。
+
+> **`known_limit` 字段是纯文档，不参与任何机械判定。**
+> `report/grade.rs::compute_grade` 只读 `failure_means`、`pass_to_fail`、
+> `new_test`、`test_set_diff` 是否存在、`summary.failed/skipped`；
+> **从不读 `known_limit` 字符串，也从不读 tag**。
+> 因此本次改动：矩阵仍 **108P / 12F**、grade 仍 **B**、
+> `pass_to_fail = 0`、`fail_to_pass = 0`、`new_test = 0`。
+> `test_set_diff` 评审也未被触发 —— 没有增删任何 `test_id`，
+> `new_test` 桶按构造为空（`report/matrix.rs:257-259`）。
+> 这次改动的价值是**语义**：把「不是 mapper 缺陷」写进机器可读的清单，
+> 避免下一个会话再按精度缺口去查一遍。
+
+| 备选 | 内容 | 状态 |
 |---|---|---|
-| A（推荐） | 记为**有据 known_limit**：「survey ROM 不实现 `$6000` 协议，mapper 行为经探针验证与上游期望一致」 | 需人工授权改 `tests.json` 的 `known_limit` + 走 `test_set_diff` |
-| B | 保留 FAIL 但在 backlog 标注「非精度债」，不进 T1 出口计数 | T1 包出口 13→9 需重算 |
-| C | 更换为能报告 pass/fail 的 FME-7 用例 | 上游该族只有 survey（ramtest）与 IRQ（acktest = ⑤） |
+| **A（已选）** | 有据 known_limit，写入 `tests.json` | ✅ 2026-09-28 授权执行 |
+| B | 仅 backlog 标注，不动 `tests.json` | 未选 |
+| C | 更换为能报告 pass/fail 的 FME-7 用例 | 未选（上游该族只有 survey 与 IRQ = ⑤） |
 
 ---
 
@@ -1056,7 +1076,7 @@ ctest --test-dir build -C Release --output-on-failure
 | 1 | 056-instr-timing | ★☆☆☆☆ | T0 | **DONE** | `8010a3f`（run 98267393461） | **PASS** |
 | 2 | 078-serom | ★★☆☆☆ | T0 | **DONE** | v1.18.2（MMC1 submapper-5） | **PASS** |
 | 3 | 038-instr-misc | ★★★★☆ | T0 | TODO（**已重估**，阻塞点见 §三③） | | FAIL |
-| 4 | 097-fme7ram | ★★☆☆☆（**已改判**） | T1 | TODO（**非 mapper 缺陷**：survey ROM 无 `$6000` 协议，mapper 经探针验证正确，见 §三④） | | FAIL（结构性） |
+| 4 | 097-fme7ram | ★★☆☆☆（**已改判**） | T1 | **已处置**（2026-09-28 授权 A：有据 known_limit）—— 非 mapper 缺陷，survey ROM 无 `$6000` 协议，见 §三④ | | FAIL（结构性，不可修） |
 | 5 | 096-fme7ack | ★★★☆☆ | T1 | TODO | | FAIL |
 | 6 | 050-dummy-writes | ★★★☆☆ | T1 | TODO | | FAIL |
 | 7 | 051-exec-space | ★★★☆☆ | T1 | TODO | | FAIL |

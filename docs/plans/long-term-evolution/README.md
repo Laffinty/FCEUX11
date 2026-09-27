@@ -107,9 +107,12 @@ T4 聚合与 FDS（081 先加载后 IRQ；077 随 β 顺带，β 收口即重估
    反过来，`FCEUX11_FME7_PROBE=1` 实测 bank tag 为
    `C0 C1 C2 C3 C0 C1 C2 C3`（两组），与上游 README「With 62256 (32Kx8)」
    期望输出**逐字节相同** —— **FME-7 WRAM 映射本身是对的**。
-   排期上 097 从「2–4 天可收的单点」移出 T1 排期，
-   处置（有据 known_limit / 仅 backlog 标注 / 换 ROM）**待人工授权**。
-   详见主报告 §三④ 调查记录。
+   排期上 097 从「2–4 天可收的单点」移出 T1 排期。
+   **处置已于 2026-09-28 人工授权 A**：改 `tests/tests.json` 的 `known_limit` +
+   `provenance` 为带证据表述。**注意 `known_limit` 字段不参与任何机械判定**
+   （`grade.rs::compute_grade` 只读 `failure_means` / `pass_to_fail` / `new_test` /
+   `test_set_diff` / `summary.failed`），所以矩阵仍 108P/12F、grade 仍 B ——
+   改动买的是语义，不是数字。详见主报告 §三④ 调查记录。
 
 > **方法论**：把「实测确证」和「未验证假设」分开写，比给一个干脆的结论有用。
 > 上一轮就是因为把推理当结论，才需要事后收回。

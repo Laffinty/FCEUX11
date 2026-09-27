@@ -14,7 +14,7 @@
 
 | 序 | kgmqa | 主题 | 预估 | 状态 |
 |---|---|---|---|---|
-| 4 | **097** fme7ramtest | FME-7 WRAM 映射 | 2–4 天 | TODO（**已改判**：非 mapper 缺陷，不可修，见下 ④） |
+| 4 | **097** fme7ramtest | FME-7 WRAM 映射 | — | **已处置**（2026-09-28 授权 A：非 mapper 缺陷，见下 ④） |
 | 5 | **096** fme7acktest | FME-7 IRQ ack | 3–7 天 | TODO |
 | 6 | **050** dummy_writes | OAM DMA dummy write | 4–7 天 | TODO |
 | 7 | **051** exec_space | IO 空间取指 / bus dispatch | 4–7 天 | TODO |
@@ -65,12 +65,16 @@
 - [x] 读 FME-7 WRAM 映射写逻辑
 - [x] 静态扫描 ROM + 上游源码比对
 - [x] env-gated 探针实测 reg8 轨迹与 bank tag
-- [ ] ~~补全边界~~ —— 无缺陷可补；处置待人工授权（主报告 §三④ 表 A/B/C）
+- [x] ~~补全边界~~ —— 无缺陷可补
+- [x] **处置：2026-09-28 人工授权 A（有据 known_limit）**，已改 `tests/tests.json`
+      的 `known_limit` + `provenance`。`failure_means` 仍 `advisory`，用例数仍 120
 
 ### 验收
 
 kgmqa-097 PASS。
-→ **不可达**（见上方证据）。需要人工在「有据 known_limit / backlog 标注 / 换 ROM」之间选一个。
+→ **不可达**（见上方证据）。已于 2026-09-28 以「有据 known_limit」处置，
+   矩阵仍 108P/12F、grade 仍 B —— **`known_limit` 字段不参与任何机械判定**，
+   本次改动的价值是语义，不是数字。
 
 ### 风险：低。
 

@@ -3347,12 +3347,12 @@
         "wram"
       ],
       "failure_means": "advisory",
-      "provenance": "tepples fme7ramtest; F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: FME-7 WRAM mapping edge",
+      "provenance": "tepples fme7ramtest; F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit (2026-09-28 human-authorized): survey ROM does not implement the $6000 result protocol, so it can never report PASS; NOT an accuracy debt",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "tepples/fme7/fme7ramtest.nes",
       "vendor_state": "vendored",
       "protocol": "$6000",
-      "known_limit": "FME-7 WRAM mapping edge"
+      "known_limit": "survey ROM does not implement the blargg $6000 result protocol: static scan of the 32 KiB PRG finds 0 absolute accesses to $6000 and exactly 2 to $6900 (STA/LDA $6900), matching upstream pinobatch/little-things-nes fme7ramtest/src/main.s verb for verb; results are drawn on screen only. Harness PASS requires probe_addr==0x00 (runner/blargg.rs:316) and probe_addr is pinned to $6000 with no per-case override; reading $6900 instead yields $C0, so no address can pass. FME-7 WRAM mapping itself is correct: FCEUX11_FME7_PROBE=1 measures bank tags C0 C1 C2 C3 C0 C1 C2 C3 (both groups), identical to the upstream README expected output for the 62256 (32 KiB) mod, and WRAMSIZE=32768 is the value the ROM header declares on purpose. Evidence: docs/plans/long-term-evolution/ FCEUX11-v1.18 report, section §三④. Authorized 2026-09-28."
     },
     {
       "kgmqa_id": "kgmqa-098-famicom-audio-swap-tests",
