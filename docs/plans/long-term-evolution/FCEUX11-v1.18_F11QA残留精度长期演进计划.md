@@ -967,7 +967,7 @@ ctest --test-dir build -C Release --output-on-failure
 |---|---|---|---|---|---|---|
 | 1 | 056-instr-timing | ★☆☆☆☆ | T0 | **DONE** | `8010a3f`（run 98267393461） | **PASS** |
 | 2 | 078-serom | ★★☆☆☆ | T0 | **DONE** | v1.18.2（MMC1 submapper-5） | **PASS** |
-| 3 | 038-instr-misc | ★★☆☆☆ | T0 | TODO | | FAIL |
+| 3 | 038-instr-misc | ★★★★☆ | T0 | TODO（**已重估**，阻塞点见 §三③） | | FAIL |
 | 4 | 097-fme7ram | ★★☆☆☆ | T1 | TODO | | FAIL |
 | 5 | 096-fme7ack | ★★★☆☆ | T1 | TODO | | FAIL |
 | 6 | 050-dummy-writes | ★★★☆☆ | T1 | TODO | | FAIL |
