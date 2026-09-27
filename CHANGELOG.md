@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added — v1.8 R4 gate green at grade B（2026-09-26）
+### Added — v1.18 R4 gate green at grade B（2026-09-26）
 
 - **R4 gate（`f11qa.yml`）**：`total==120`、`fail_to_pass==0`、`vendor_state` 三态、
   `advisory-FAIL ≤ 15%`、`grade ∉ {D,E}` 全部机器可验证；`engine.git_rev` 编译期戳。

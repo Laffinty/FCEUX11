@@ -2,7 +2,7 @@
 
 # FCEUX11
 
-[![Version](https://img.shields.io/badge/version-v1.8-blue)](https://github.com/Laffinty/FCEUX11/releases)
+[![Version](https://img.shields.io/badge/version-v1.18-blue)](https://github.com/Laffinty/FCEUX11/releases)
 [![License](https://img.shields.io/badge/license-GPL--v2-green)](COPYING)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?logo=windows)](https://www.microsoft.com/windows/windows-11)
 [![Qt](https://img.shields.io/badge/Qt-6.8%20LTS-41CD52?logo=qt)](https://www.qt.io)
@@ -131,8 +131,8 @@ FCEUX11 ships **F11QA** (formerly KagamiQA), a dual-channel automated quality as
 
 ## 版本历史 / Changelog
 
-详见 [CHANGELOG.md](CHANGELOG.md)。当前主线为 **v1.8**（上一稳定发布 **v1.17**）。
-See [CHANGELOG.md](CHANGELOG.md). Mainline is **v1.8** (previous stable **v1.17**).
+详见 [CHANGELOG.md](CHANGELOG.md)。当前主线为 **v1.18**（上一稳定发布 **v1.17**）。
+See [CHANGELOG.md](CHANGELOG.md). Mainline is **v1.18** (previous stable **v1.17**).
 
 ---
 
