@@ -23,6 +23,12 @@
 > **关联**：`docs/tech/F11QA.md`、`docs/tech/precision.md`、`docs/tech/f11qa-accuracy-backlog.md`、
 > `tests/tests.json`、`tests/fixtures/blargg_known_fail.json`
 >
+> **当前进度**（截至 `b6fe92a`，run **98267393461**）：**107P / 13F**（grade **B** 不变）·
+> L1 已清 **1/14**（① 056）· blargg **147P / 30F** · advisory-FAIL **10.8%** ·
+> `pass_to_fail=0` / `fail_to_pass=1`。
+> 上表为**原始基线**（`b0658c9` / run 98252605787），保留作对照；进度以本行为准。
+> **L1 剩余 13 项的完成度与排序见 §八。**
+
 > **文档集**（可独立领用执行）：
 > [`README.md`](README.md) ·
 > [`T0-指令时序与板级约束.md`](T0-指令时序与板级约束.md) ·
@@ -99,25 +105,39 @@ v1.8 把 F11QA 门槛抬到 **120 用例 / R4 四硬门禁 / grade B**。本计�
 4. **是否依赖上游 cascade**（聚合项等单点突破后自然收敛）
 5. **是否属于业界著名难点**（$2007 read buffer、多制式 TV、外设扫描协议）
 
-| 难度 | Tier | 用例 | 主题 | 预估 | 建议顺序 |
-|---|---|---|---|---|---|
-| ★☆☆☆☆ | **T0** | kgmqa-056 | 指令周期表 2 条非法指令 | 1–3 天 | 1 |
-| ★★☆☆☆ | **T0** | kgmqa-078 | MMC1 SEROM/SHROM 板约束 | 2–4 天 | 2 |
-| ★★☆☆☆ | **T0** | kgmqa-038 | `LDA abs,x` dummy read | 3–5 天 | 3 |
-| ★★☆☆☆ | **T1** | kgmqa-097 | FME-7 WRAM 映射 | 2–4 天 | 4 |
-| ★★★☆☆ | **T1** | kgmqa-096 | FME-7 IRQ ack | 3–7 天 | 5 |
-| ★★★☆☆ | **T1** | kgmqa-050 | OAM DMA dummy write | 4–7 天 | 6 |
-| ★★★☆☆ | **T1** | kgmqa-051 | 从 IO 空间取指 / bus dispatch | 4–7 天 | 7 |
-| ★★★★☆ | **T2** | kgmqa-037 | 中断轮询下沉 + hijack | 1–2 周 | 8 |
-| ★★★★★ | **T3** | kgmqa-049 | bisqwit $2007 read buffer | 2–4 周 | 9 |
-| ★★★★★ | **T3** | kgmqa-099 | NTSC/PAL/Dendy TV 时序 | 2–4 周 | 10 |
-| ★★★★★ | **T3** | kgmqa-107 | SNES 鼠标扫描协议 | 1–2 周 | 11 |
-| ★★★★★ | **T3** | kgmqa-108 | FC 麦克风扫描协议 | 1–2 周 | 12 |
-| ★★★★★ | **T4** | kgmqa-077 | Holy Mapperel 13 mapper 聚合 | cascade | 13 |
-| ★★★★★ | **T4** | kgmqa-081 | FDS 加载路径 + IRQ 子系统 | 2–4 周 | 14 |
+| 难度 | Tier | 用例 | 主题 | 预估 | 建议顺序 | 状态 |
+|---|---|---|---|---|---|---|
+| ★☆☆☆☆ | **T0** | kgmqa-056 | 指令周期表 2 条非法指令 | 1–3 天 | 1 | **DONE** |
+| ★★☆☆☆ | **T0** | kgmqa-078 | MMC1 SEROM/SHROM 板约束 | 2–4 天 | 2 | TODO |
+| ★★☆☆☆ | **T0** | kgmqa-038 | `LDA abs,x` dummy read | 3–5 天 | 3 | TODO |
+| ★★☆☆☆ | **T1** | kgmqa-097 | FME-7 WRAM 映射 | 2–4 天 | 4 | TODO |
+| ★★★☆☆ | **T1** | kgmqa-096 | FME-7 IRQ ack | 3–7 天 | 5 | TODO |
+| ★★★☆☆ | **T1** | kgmqa-050 | OAM DMA dummy write | 4–7 天 | 6 | TODO |
+| ★★★☆☆ | **T1** | kgmqa-051 | 从 IO 空间取指 / bus dispatch | 4–7 天 | 7 | TODO |
+| ★★★★☆ | **T2** | kgmqa-037 | 中断轮询下沉 + hijack | 1–2 周 | 8 | TODO |
+| ★★★★★ | **T3** | kgmqa-049 | bisqwit $2007 read buffer | 2–4 周 | 9 | TODO |
+| ★★★★★ | **T3** | kgmqa-099 | NTSC/PAL/Dendy TV 时序 | 2–4 周 | 10 | TODO |
+| ★★★★★ | **T3** | kgmqa-107 | SNES 鼠标扫描协议 | 1–2 周 | 11 | TODO |
+| ★★★★★ | **T3** | kgmqa-108 | FC 麦克风扫描协议 | 1–2 周 | 12 | TODO |
+| ★★★★★（**派生**） | **T4** | kgmqa-077 | Holy Mapperel 13 mapper 聚合 | **随上游变** | **10′** | TODO |
+| ★★★★★ | **T4** | kgmqa-081 | FDS 加载路径 + IRQ 子系统 | 2–4 周 | 14 | TODO |
 
 > **独立性**：每个 Tier 内条目可并行、可单独开分支/PR；跨 Tier 建议顺序执行，
 > 但 T1 四项彼此无代码耦合，可按人力切分。
+
+### 2.1 ⑬ 077 的成本是派生的，不按 star 数排期
+
+077 是 47 子 ROM 聚合器，**没有独立根因**。它的真实剩余成本 =
+**② 078（MMC1 组）+ ④ 097 / ⑤ 096（FME-7 组）+ L2 MMC3 IRQ 组**的剩余部分。
+按 star 数把它压到 ⑪⑫ 之后、押到 ε 阶段，会让一条「已经在做」的活被当成「最后的大块」而漏排。
+
+**排期口径（取代原 ε 阶段无条件收口）**：
+
+1. 077 **不单独立项**，随 ②④⑤ 顺带推进，不额外占窗口；
+2. **β（T1）收口时立即重估** 077 剩余子 ROM 数，而非等到 ε；
+3. 重估后若剩余子 ROM ≤ 10 且不含 MMC3 IRQ 组 → 提前并入 δ 尾部；
+4. 若剩余仍集中在 MMC3 IRQ 组 → 归入 T2 模型级工作的副产品，单独立项；
+5. **度量只看子组完成数**，不看 077 总码（47/47 是合取，滞后于任何子项）。
 
 ---
 
@@ -128,7 +148,25 @@ v1.8 把 F11QA 门槛抬到 **120 用例 / R4 四硬门禁 / grade B**。本计�
 
 ---
 
-### ① T0 · kgmqa-056-instr-timing-blargg　`TODO`
+### ① T0 · kgmqa-056-instr-timing-blargg　`DONE`　`8010a3f`
+
+> **已交付**（2026-09-27，v1.18.1）。CI run **98267393461** 实测：
+> kgmqa-056 `exit=0 / 0x00 / PASS`；L2 `instr_timing` / `instr_timing_v2_1` FAIL→PASS
+> （`instr_timing_v2_2` 保持 PASS）；blargg 全量 **145/32 → 147/30**；
+> 矩阵 **106P/14F → 107P/13F**；`pass_to_fail=0` / `fail_to_pass=1`；
+> 内部逻辑检测 42P/0F 不变；`nestest` / `cpu_dummy_reads` 哨兵 PASS。
+>
+> **实际改动**（与原计划的两处偏差，均已验证）：
+> - `CycTable[0xE2]` 3→2 —— 非法 NOP imm，与计划一致；
+> - `0xBB` 计划写的是「周期 4→5」，**实际根因更深一层**：该 opcode 用的是
+>   `RMW_ABY`（带假写回），既周期语义错（缺 `GetABIRD` 的跨页 +1）又有多余写回。
+>   改为 `LD_ABY`（只读）后一次解决两个问题；
+> - 附带修正 `tests/tests.json` 的 `kgmqa-056 --frames` 300→3000 ——
+>   原值与 manifest 不符，300 帧跑不完测试、报「仍在运行」的假码，**掩盖了真实周期表结果**。
+>   即：只改周期表不足以让该用例转 PASS，帧数是并行的第二个必要条件。
+>
+> **对计划的影响**：★☆☆☆☆ 的真实成本是「周期表 2 处 + opcode 语义 1 处 + manifest 帧数 1 处」。
+> 后续 T0-③（038）若也卡在「明明改了却不转 PASS」，先查 `tests/tests.json` 的 `--frames` 与 manifest 是否一致。
 
 | 字段 | 值 |
 |---|---|
@@ -166,8 +204,42 @@ NOPs and alternate SBC timing is wrong
 4. 全量硬件一致性检测对账（145/32 不得回退）。
 
 **验收**：kgmqa-056 矩阵 PASS；L2 中 `instr_timing*.nes` 转 PASS；`fail_to_pass≥1`、`pass_to_fail=0`。
+→ **已达成**：`fail_to_pass=2`（L2 两项）、`pass_to_fail=0`；blargg 147/30。
 
 **风险**：低。周期表变更可能影响帧对齐类 golden（若 runner 按帧截取）；出现 `pass_to_fail` 则回滚并查 frame budget。
+→ **未触发**：`nestest` / `instr_test_v5` / `cpu_dummy_reads` 均 PASS，goldens 无需重生成。
+
+#### ① 实际执行记录（v1.18.1，commit `8010a3f`）
+
+CI run **98267393461** 实测：
+
+```
+kgmqa-056-instr-timing-blargg    exit=0  value=0x00  status=PASS
+L2 instr_timing.nes              FAIL -> PASS
+L2 instr_timing_v2_1.nes         FAIL -> PASS
+L2 instr_timing_v2_2.nes         PASS (unchanged)
+blargg 全量 177 ROM              145/32 -> 147/30
+迁移矩阵                          106P/14F -> 107P/13F
+pass_to_fail / fail_to_pass       0 / 2
+内部逻辑检测                       42P/0F (unchanged)
+nestest.nes (CPU 金标)             PASS
+cpu_dummy_reads.nes (哨兵)        PASS
+grade                             B (unchanged)
+advisory-FAIL 占比                11.7% -> 10.8%
+```
+
+**实际改动 vs 原计划的偏差（两条，都已验证，勿照原计划重做）**：
+
+1. **`0xBB` 的根因比计划写得更深一层。**原计划判断是「跨页少 1 个周期，补 +1 即可」；
+   实测该 opcode 走的是 `RMW_ABY` —— 读-改-写宏，**既周期语义错（缺 `GetABIRD` 的跨页 +1）
+   又带一次多余写回**。改为 `LD_ABY`（只读）后两个问题一并解决。
+   `src/ops_table.inc` 由 `scripts/generate_x6502_dispatch.py` 重新生成，不要手改。
+2. **周期表改对了，用例仍不会转 PASS —— 帧数是第二个必要条件。**
+   `tests/tests.json` 里 `kgmqa-056` 的 `--frames` 原为 `300`，而 manifest 规定 `3000`。
+   300 帧跑不完整个测试，runner 报「仍在运行」的假错误码，**把真实的周期表结果掩盖了**。已改为 3000。
+
+> **对后续项的可复用教训**：若某项「代码明显改对了但矩阵仍 FAIL」，先核对 `tests/tests.json` 的
+> `--frames` 与 `manifest` 是否一致 —— 这是零成本的一步，且症状（假错误码）与真实失败无法区分。
 
 ---
 
@@ -571,14 +643,17 @@ NMI 与 BRK 交互的周期对齐差 1；L2 中 `cpu_int_3/4/5` 同族失败（N
 
 ## 五、阶段编排（供独立、逐步优化）
 
-| Phase | 窗口 | 包含 | 出口指标 |
-|---|---|---|---|
-| **α 指令时序与板级约束** | 1–2 周 | ① 056 → ② 078 → ③ 038 | 14F → **11F**；advisory ≤ 9.2% |
-| **β Mapper/DMA** | 2–4 周 | ④ 097 → ⑤ 096 → ⑥ 050 → ⑦ 051 | 14F → **7F**；L2 中 DMA 组观察 |
-| **γ 中断模型** | 1–2 月 | ⑧ 037（+ L2 cpu_int_*） | 14F → **6F**；L2 中断组清零 |
-| **δ 长周期精度项** | 1–2 季 | ⑨ 049、⑩ 099、⑪ 107、⑫ 108 | 每项独立里程碑；不强制同窗完成 |
-| **ε 收敛** | 随 δ | ⑬ 077 cascade、⑭ 081（先加载后 IRQ） | 14F → **0F** 或有据 known_limit |
-| **ζ 评级** | 末 | L2 eventually_pass 清零、advisory&lt;5% | grade **A** 评审 |
+| Phase | 窗口 | 包含 | 出口指标 | 进度 |
+|---|---|---|---|---|
+| **α 指令时序与板级约束** | 1–2 周 | ① 056 → ② 078 → ③ 038 | 14F → **11F**；advisory ≤ 9.2% | **1/3（14F→13F）** |
+| **β Mapper/DMA** | 2–4 周 | ④ 097 → ⑤ 096 → ⑥ 050 → ⑦ 051 | 13F → **9F**；L2 中 DMA 组观察 | 未开始 |
+| **γ 中断模型** | 1–2 月 | ⑧ 037（+ L2 cpu_int_*） | 9F → **8F**；L2 中断组清零 | 未开始 |
+| **δ 长周期精度项** | 1–2 季 | ⑨ 049、⑩ 099、⑪ 107、⑫ 108 | 每项独立里程碑；不强制同窗完成 | 未开始 |
+| **ε 收敛** | 随 β/δ | ⑬ 077（**β 收口即重估**，见 §2.1）、⑭ 081（先加载后 IRQ） | 8F → **0F** 或有据 known_limit | 未开始 |
+| **ζ 评级** | 末 | L2 eventually_pass 清零、advisory<5% | grade **A** 评审 | 未开始 |
+
+> **Phase 出口数字已按 ① 实际达成的 13F 重算。**原表以 14F 起算；α 若中途停摆，
+> β/γ 的目标数会虚高 1（β 出口写 7F 时实际应为 8F）。口径：**以实际起点为准，不以计划值倒推。**
 
 **工作方式（每项通用）**
 
@@ -620,11 +695,34 @@ ctest --test-dir build -C Release --output-on-failure
 | 风险 | 信号 | 处置 |
 |---|---|---|
 | `pass_to_fail > 0` | 矩阵迁移 | **立即回滚**该 PR，禁止带回归合并 |
+| `fail_to_pass > 0` | 矩阵迁移 | **不是风险信号**，是精度进展（见 §7.1） |
 | 内部逻辑检测红灯 | ctest | 同上，blocking |
 | advisory 超 15% | R4 gate | 门禁失败；禁止用改 `failure_means` 绕过 |
 | golden 抖动 | frame/savestate hash 变 | 停；确认是否“有意变更”；否则回滚 |
 | L2 静默回退 | 145/32 数字下降 | 对照 `blargg_full_baseline.json` 查漂移 |
 | 聚合项假进展 | 077 仍 FAIL | 按 mapper 组核对子 ROM，不看总码 |
+
+### 7.1 R4 gate 的方向：`fail_to_pass` 是进展，不是违规
+
+**已修（`b6fe92a`）**：R4 gate 原先守 `fail_to_pass != 0`，等于「**修好任何一项残留 FAIL 都会被门禁拦红**」——
+与本计划的目的正好相反。首次应用就撞上了：① 056 修完后 run 98267393461 报
+`fail_to_pass=1`、全绿之外唯此一项红。
+
+现语义（`.github/workflows/f11qa.yml`）：
+
+| 指标 | 含义 | 门禁 |
+|---|---|---|
+| `pass_to_fail` | 基线 PASS → 当前 FAIL，**回归** | **硬门禁，非 0 即红** |
+| `fail_to_pass` | 基线 FAIL → 当前 PASS，**精度进展** | 信息行，不阻断 |
+| `new_test` | 清单扩项 | 走 `test_set_diff` 评审，非门禁 |
+
+**为什么可以不再重复守 `fail_to_pass`**：防扩项作弊已由 runner 结构性保证 ——
+`report/matrix.rs:257-259` 把基线中不存在的 `test_id` 路由进 `new_test` 桶，
+构造上就落不到 `fail_to_pass` 里。
+
+**对剩余 13 项的意义**：每修好一项，`fail_to_pass` 必然 +1，CI 不再拦。
+但 `tests/fixtures/f11qa_baseline_frozen.json` 仍需**随每项修复同步更新**（把该 id 由 false 改 true），
+否则下一项的 `fail_to_pass` 会把已修项重复计入。**每清一项，冻结基线必须同 PR 更新** —— 这已是一条隐含纪律，补在此处。
 
 ---
 
@@ -632,7 +730,7 @@ ctest --test-dir build -C Release --output-on-failure
 
 | # | kgmqa | 难度 | Tier | 状态 | PR / commit | 矩阵结果 |
 |---|---|---|---|---|---|---|
-| 1 | 056-instr-timing | ★☆☆☆☆ | T0 | TODO | | FAIL |
+| 1 | 056-instr-timing | ★☆☆☆☆ | T0 | **DONE** | `8010a3f`（run 98267393461） | **PASS** |
 | 2 | 078-serom | ★★☆☆☆ | T0 | TODO | | FAIL |
 | 3 | 038-instr-misc | ★★☆☆☆ | T0 | TODO | | FAIL |
 | 4 | 097-fme7ram | ★★☆☆☆ | T1 | TODO | | FAIL |
@@ -644,11 +742,17 @@ ctest --test-dir build -C Release --output-on-failure
 | 10 | 099-240pee | ★★★★★ | T3 | TODO | | FAIL |
 | 11 | 107-mset | ★★★★★ | T3 | TODO | | FAIL |
 | 12 | 108-mict | ★★★★★ | T3 | TODO | | FAIL |
-| 13 | 077-holy-mapperel | ★★★★★ | T4 | TODO | | FAIL |
+| 13 | 077-holy-mapperel | ★★★★★（**派生**） | T4 | TODO | | FAIL |
 | 14 | 081-fds-irq | ★★★★★ | T4 | TODO | | FAIL |
 
-**基线快照**：`b0658c9` / run 98252605787 / 106P-14F / grade B。
+**原始基线快照**：`b0658c9` / run 98252605787 / 106P-14F / grade B。
+**当前进度快照**：`b6fe92a` / run 98267393461 / **107P-13F** / grade B / 已完成 1、剩余 13。
 任何一行从 FAIL→PASS，先更新矩阵数字，再更新 backlog，最后更新本表。
+
+**完成度汇总（截至当前进度快照）**：**1 / 14 已完成（7%）**，13 项未开始。
+按易→难排序的逐项完成度见 [README §完成度速查](README.md#完成度速查)。
+注意排序中的一处修正：**⑬ 077 的成本是派生的**（= ②+④+⑤ 剩余 + L2 MMC3 IRQ 组），
+不按 star 数独立排期，见 §2.1。
 
 ---
 
