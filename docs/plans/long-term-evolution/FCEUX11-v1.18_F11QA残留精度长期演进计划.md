@@ -28,10 +28,11 @@
 > · `pass_to_fail = 0` / `fail_to_pass = 0`（2026-09-28 全量矩阵实测：
 > 120 用例，`new_test=0`，`test_set_diff` added/removed 均为空）。
 > **L1 终态分布**：**2 DONE**（① 056、② 078 —— **T0 收口 2/2**）·
-> **1 abandon**（④ 097，非精度债）· **1 defer**（③ 038，Tier 已改判为 T3）·
-> **10 项未开始**。
+> **2 abandon**（④ 097、⑤ 096，均为 survey ROM，非精度债）·
+> **1 defer**（③ 038，Tier 已改判为 T3）· **9 项未开始**。
 > **defer / abandon 不改动矩阵预期值** —— 矩阵仍 12F，12 个 FAIL 全部保留。
-> 口径与完整论证见 **§2.2**；逐项完成度与排序见 **§八**。
+> **T1 只剩 2 项可攻关**（050 / 051）。口径与完整论证见 **§2.2**；
+> 逐项完成度与排序见 **§八**。
 > 上表为**原始基线**（`b0658c9` / run 98252605787），保留作对照。
 
 > **文档集**（可独立领用执行）：
@@ -115,7 +116,8 @@ v1.8 把 F11QA 门槛抬到 **120 用例 / R4 四硬门禁 / grade B**。本计�
 | ★☆☆☆☆ | **T0** | kgmqa-056 | 指令周期表 2 条非法指令 | 1–3 天 | 1 | **DONE** |
 | ★★☆☆☆ | **T0** | kgmqa-078 | MMC1 SEROM/SHROM 板约束 | 2–4 天 | 2 | **DONE** |
 | — | **移出** | kgmqa-097 | FME-7 WRAM 映射 | — | — | **abandon**（经查非精度债，见 §2.2） |
-| ★★★☆☆ | **T1** | kgmqa-096 | FME-7 IRQ ack | 3–7 天 | 4 | TODO |
+| — | **移出** | kgmqa-096 | FME-7 IRQ ack | — | — | **abandon**（survey ROM；**留有真实 ack bug 不修**，见 §2.2 ⑸） |
+| ★★★☆☆ | **T1** | kgmqa-096 | FME-7 IRQ ack | 3–7 天 | 4′ | **abandon**（survey ROM，代码不动，见 §2.2 ⑸） |
 | ★★★☆☆ | **T1** | kgmqa-050 | OAM DMA dummy write | 4–7 天 | 5 | TODO |
 | ★★★☆☆ | **T1** | kgmqa-051 | 从 IO 空间取指 / bus dispatch | 4–7 天 | 6 | TODO |
 | ★★★★☆ | **T3** | kgmqa-038 | CPU 数据总线锁存（049 前哨） | 1–2 周 | 7′ | **defer**（★2→★4 / 风险低→中，见 §2.2） |
@@ -144,7 +146,7 @@ v1.8 把 F11QA 门槛抬到 **120 用例 / R4 四硬门禁 / grade B**。本计�
 4. 若剩余仍集中在 MMC3 IRQ 组 → 归入 T2 模型级工作的副产品，单独立项；
 5. **度量只看子组完成数**，不看 077 总码（47/47 是合取，滞后于任何子项）。
 
-### 2.2 两项重估裁定：⑶ 038 **defer** / ⑷ 097 **abandon**
+### 2.2 三项重估裁定：⑶ 038 **defer** / ⑷ 097 **abandon** / ⑸ 096 **abandon**
 
 > **裁定口径**（与「DONE / TODO」并列的第三种终态）：
 > **defer** = 仍属精度债，留待后续窗口做，不阻塞 release；
@@ -155,6 +157,7 @@ v1.8 把 F11QA 门槛抬到 **120 用例 / R4 四硬门禁 / grade B**。本计�
 |---|---|---|---|---|---|---|---|
 | ③ **038** | T0 | **T3**（排在 049 之前） | ★★☆☆☆ / 3–5 天 | **★★★★☆ / 1–2 周** | 低 | **中** | **defer** —— 留待以后解决 |
 | ④ **097** | T1 | **移出活跃排期** | ★★☆☆☆ / 2–4 天 | **不适用（无缺陷）** | 低 | **无** | **abandon** —— 彻底放弃 |
+| ⑸ **096** | T1 | **移出活跃排期** | ★★★☆☆ / 3–7 天 | **不适用（无缺陷）**<br>*（但存在真实 ack bug，见下）* | 中 | **无**（不改动即无风险） | **abandon** —— 彻底放弃，**代码不动** |
 
 #### ⑶ 038：Tier T0 → T3，裁定 defer
 
@@ -202,9 +205,84 @@ T0 卡的出口条件「三项均 PASS」按 **2/2** 计，038 移出后 T0 不�
 | 从 `tests.json` 删除该用例 | `test_set_diff.removed` 非空；矩阵变 119 用例 / 108P-11F；**grade 仍 B**（`new_fails` 只看 `new_test` 桶，删掉的进 `removed`；且 `baseline_supplied=true`） | ❌ 未做 —— 属 `test_set_diff` 评审范围，不在本次授权内 |
 | 把 `failure_means` 升为 `blocking` | grade 由 B 降 **D** | ❌ 不考虑 |
 
-**T1 因此调整为三项可攻关**（096 / 050 / 051），包出口从 4/4 改为 **3/3**。
-**⑬ 077 的成本口径随之微调**：原写「077 = ②+④+⑤ 剩余」，其中 ④（097）已 abandon，
-故改为 **077 = ⑤（096）剩余 + L2 MMC3 IRQ 组**。
+**T1 ⑷ 裁定 abandon 后**可攻关三项；**⑸ 096 也于同日裁定 abandon（代码不动）**，
+故 **T1 最终只有两项可攻关**（050 / 051），包出口 4/4 → **2/2**。
+**⑬ 077 的成本口径随之两次收窄**：原写「077 = ②+④+⑤ 剩余」，
+现 **② 已 DONE、④⑸ 均 abandon** → **077 = 仅 L2 MMC3 IRQ 组**。
+
+#### ⑸ 096：Tier 移出活跃排期，裁定 abandon，**代码不动**（2026-09-28）
+
+**裁定方式与 ⑷ 不同：这一项经查「不是精度债」，但同时暴露了一个真实 ack bug，
+人工选择只裁定 abandon、保留代码现状。** 下面是两件事，必须分开看。
+
+##### ⑸-1 为什么 abandon：它也是 survey ROM，改 mapper 也不会转 PASS
+
+矩阵报的 `value=0xA2 diag=[0x0F,0x8E,0x00]`，与
+**PRG ROM bank 3 offset 0-3 逐字节相同**（`A2 0F 8E 00` 本身就是 6502 指令：
+`LDX #imm` / `BPL` / `STX abs` / `BRK`）。成因链：
+
+1. 上游 `fme7acktest/src/fme7.s` 的 `init_fme7` 把 **reg 8 写成 3**；
+2. `preg[3] & 0xC0 == 0` → `Sync()` 走 `setprg8(0x6000, 3)` → `$6000-$7FFF` 是 **PRG ROM**；
+3. 按硬件这**是正确的**：reg 8 的 bit7 是 6264 的 +CE、bit6 是 RAM/ROM select，
+   `$03` 两位都是 0 → 选中 PRG ROM。**不是模拟器的 bug。**
+4. 静态扫描 32 KiB PRG：对 `$6000` 的绝对寻址指令 **0 处**。
+   测试结果写在零页 `test_results`（8 字节），只画到屏幕上。
+
+harness 判 PASS 仍需 `probe_addr == 0x00`（`blargg.rs:316`），而 `probe_addr` 恒为 `$6000`。
+**与 ⑷ 同理：没有任何 mapper 改动能让 kgmqa-096 转 PASS。**
+至此 T1 的两个 FME-7 用例（⑷ 097、⑸ 096）**都是 survey ROM**。
+
+##### ⑸-2 但确实存在一个真实精度 bug：**故意不修，留档**
+
+上游测试作者 README 直接给了各实现的实测对照表：
+
+| 写 $0D | PowerPak / Everdrive（**硬件**） | FCEUX11 现状 | 判定 |
+|---|---|---|---|
+| `$00` | Acked | Acked | ✓ |
+| `$01` | **No ack** | **Acked** | **✗** |
+| `$80` | Acked | Acked | ✓ |
+| `$81` | **No ack** | **Acked** | **✗** |
+| `$0E=$FF` | No ack | No ack | ✓ |
+| `$0F=$FF` | No ack | No ack | ✓ |
+
+**2 / 6 错。** 现状 `src/boards/69.cpp`：
+
+```c
+case 0xD: IRQa = V; X6502_IRQEnd(FCEU_IQEXT); break;   // 无条件 ack
+```
+
+**硬件规则：bit 0 == 0 才 ack。** 三方独立一致：PowerPak、Everdrive（两个硬件实现）
+与 Nintendulator（Quietust 按 Oliveira 的实测改的）。
+
+> **⚠️ nesdev wiki 现在写着「All writes to this register acknowledge an active IRQ」——
+> 那是照 FCEUX 的行为改的，与硬件实测相反。以硬件为准。**
+> 该页脚注：`Test performed in 2015 by Oliveira using IRQ acknowledge test ROM on NESdev BBS`。
+> 另注：wiki 把 bit 7 描述为「IRQ Counter Enable，0 = Disable Counter Decrement」，
+> 但这与 PowerPak 实测**自相矛盾**（若 bit7=0 真停计数器，PowerPak 上 `$0D=$01`
+> 就不可能出现第二次 IRQ，与实测 "No ack" 冲突）。**故 bit 7 语义无证据，本项不动。**
+
+**若将来要修，最小改动是 1 行**（只门控 ack，不碰使能位）：
+
+```c
+case 0xD: IRQa = V; if (!(V & 1)) X6502_IRQEnd(FCEU_IQEXT); break;
+```
+
+**为什么这轮不修（人工裁定）**：
+1. 该 survey ROM 无法报 pass/fail → **改完验证不了**。按 038 纪律
+   （「无法验证的核心时序改动不合项目纪律」），本应回退。
+2. 修它需要一个**新的 ctest 用例**（用 `AWrite[]` 驱动 `$8000`/`$A000`、
+   读 `X.IRQlow & FCEU_IQEXT` 断言 ack 行为）—— 基础设施齐备
+   （`bus_test.cpp` 已证 `AWrite[]` 可用、`mapper_reset_test.cpp` 已证
+   `LoadGame` 可用、`cpu_test.cpp` 已证 `X` 状态可读），
+   但那是**新增测试基建**，属独立工作项，不在本轮范围。
+3. `IRQa = V` 用整字节当使能位，按规范应是 bit 0 = IRQ enable、bit 7 = counter enable。
+   但**改它会动到真实 FME-7 游戏（Batman: Return of the Joker / Gimmick!）的 IRQ 时序**，
+   而 bit 7 语义本身有争议（见上）—— 典型的不可验证改动。
+
+**留档结论**：ack bug **已知、已定位、有三方硬件证据、一行可修**，
+但在本轮**明确选择不修**。它影响真实 FME-7 游戏的 IRQ 应答行为，
+**不体现在任何 F11QA 指标上**（096 无论修不修都是 FAIL）。
+将来若有人碰 mapper 69，请先读本节。
 
 ---
 
@@ -746,7 +824,7 @@ $6000 result protocol ... NOT an accuracy debt`。
 
 ---
 
-### ⑤ T1 · kgmqa-096-fme7acktest-tepples　`TODO`
+### ⑤ （已移出活跃排期）· kgmqa-096-fme7acktest-tepples　**abandon**（**2026-09-28 裁定：survey ROM + 真实 ack bug 故意不修**，见 §2.2 ⑸）
 
 | 字段 | 值 |
 |---|---|
@@ -1057,10 +1135,10 @@ NMI 与 BRK 交互的周期对齐差 1；L2 中 `cpu_int_3/4/5` 同族失败（N
 | Phase | 窗口 | 包含 | 出口指标 | 进度 |
 |---|---|---|---|---|
 | **α 指令时序与板级约束** | ~~1–2 周~~→~~3–4 周~~ | ① 056 → ② 078 | ~~14F → 11F~~ | **2/2 DONE · 14F → 12F · advisory 11.7%→10.0%** ✅ 收口（③ 038 已按 §2.2 移出本阶段） |
-| **β Mapper/DMA** | 2–4 周 | ⑤ 096 → ⑥ 050 → ⑦ 051 | 12F → **9F**；L2 中 DMA 组观察 | 未开始（**3 项可攻关**，④ 097 已 abandon） |
-| **γ 中断模型** | 1–2 月 | ⑧ 037（+ L2 cpu_int_*） | 9F → **8F**；L2 中断组清零 | 未开始 |
+| **β Mapper/DMA** | 2 周 | ⑥ 050 → ⑦ 051 | 12F → **10F**；L2 中 DMA 组观察 | 未开始（**仅 2 项可攻关**，④ 097 与 ⑤ 096 均已 abandon） |
+| **γ 中断模型** | 1–2 月 | ⑧ 037（+ L2 cpu_int_*） | 10F → **9F**；L2 中断组清零 | 未开始 |
 | **δ 长周期精度项** | 1–2 季 | **③ 038（S0+S1 前置）**、⑨ 049、⑩ 099、⑪ 107、⑫ 108 | 每项独立里程碑；不强制同窗完成 | 未开始（**038 为 defer，见 §2.2**） |
-| **ε 收敛** | 随 β/δ | ⑬ 077（**β 收口即重估**，成本已改为 ⑤ + L2 MMC3 IRQ 组，见 §2.2）、⑭ 081 | 8F → **0F** 或有据 known_limit | 未开始 |
+| **ε 收敛** | 随 β/δ | ⑬ 077（成本已收窄为**仅 L2 MMC3 IRQ 组**，见 §2.2）、⑭ 081 | 9F → **0F** 或有据 known_limit | 未开始 |
 | **ζ 评级** | 末 | L2 eventually_pass 清零、advisory<5% | grade **A** 评审 | 未开始 |
 
 > **Phase 出口数字一律以实际起点为准，不以计划值倒推。**
@@ -1147,7 +1225,7 @@ ctest --test-dir build -C Release --output-on-failure
 | 2 | 078-serom | ★★☆☆☆ | T0 | **DONE** | v1.18.2（MMC1 submapper-5） | **PASS** |
 | 3 | 038-instr-misc | ★★★★☆（★2→★4） | **T3**（原 T0） | **defer** —— 风险低→中，1–2 周，不占独立窗口；S0+S1 为 049 铺路，见 §2.2 | | FAIL（defer） |
 | 4 | 097-fme7ram | —（无缺陷） | **移出**（原 T1） | **abandon** —— 2026-09-28 裁定彻底放弃；非 mapper 缺陷，survey ROM 无 `$6000` 协议，见 §2.2 / §三④ | | FAIL（结构性，abandon） |
-| 5 | 096-fme7ack | ★★★☆☆ | T1 | TODO | | FAIL |
+| 5 | 096-fme7ack | —（无缺陷） | **移出**（原 T1） | **abandon**（2026-09-28 裁定，**代码不动**）—— survey ROM，`$6000` = PRG ROM bank 3 字节；**留有真实 ack bug 明确不修**，见 §2.2 ⑸ | | FAIL（结构性，abandon） |
 | 6 | 050-dummy-writes | ★★★☆☆ | T1 | TODO | | FAIL |
 | 7 | 051-exec-space | ★★★☆☆ | T1 | TODO | | FAIL |
 | 8 | 037-cpu-int-2 | ★★★★☆ | T2 | TODO | | FAIL |
@@ -1164,15 +1242,16 @@ ctest --test-dir build -C Release --output-on-failure
 任何一行从 FAIL→PASS，先更新矩阵数字，再更新 backlog，最后更新本表。
 
 **完成度汇总（截至当前进度快照）**：**2 / 14 DONE（14%）**；
-**1 项 abandon**（④ 097，非精度债，§2.2）、**1 项 defer**（③ 038，§2.2）、
-**10 项未开始**。按易→难排序的逐项完成度见 [README §完成度速查](README.md#完成度速查)。
+**2 项 abandon**（④ 097、⑤ 096，均非精度债，§2.2）、**1 项 defer**（③ 038，§2.2）、
+**9 项未开始**。按易→难排序的逐项完成度见 [README §完成度速查](README.md#完成度速查)。
 
 两处口径修正：
 
-1. **⑬ 077 的成本是派生的** —— 已随 §2.2 再修正为
-   **⑤ 096 剩余 + L2 MMC3 IRQ 组**（原写作 ②+④+⑤，但 ④ 097 已 abandon），见 §2.1。
+1. **⑬ 077 的成本是派生的** —— 已随 §2.2 **两次收窄**，现为
+   **仅 L2 MMC3 IRQ 组**（② 078 已 DONE、④ 097 与 ⑤ 096 均 abandon），见 §2.1。
 2. **`defer` / `abandon` 是与 DONE / TODO 并列的第三、第四种终态**，
    口径见 §2.2。defer 项仍计入未清零数，abandon 项**不再计入精度债**。
+   **T1 因此只剩 2 项可攻关**（050 / 051）。
 
 ---
 

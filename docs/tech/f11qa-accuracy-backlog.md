@@ -31,13 +31,18 @@
 
 ### B. Mapper 边界（4）
 
+> **2026-09-28 更新**：本组 4 项里 **2 项已裁定 abandon**（097 / 096），
+> 两者都是 tepples 的 **survey ROM**（不实现 blargg `$6000` 协议，改 mapper 也不会转 PASS）。
+> 本组**实际只剩 093** 可攻。详见
+> [`long-term-evolution/README.md`](../plans/long-term-evolution/README.md) 与主报告 §2.2。
+
 | id | 套件 | 现象 |
 |---|---|---|
 | ~~078~~ | lidnariq serom | **已清零**（v1.18.2）：submapper 5 + PRG-RAM=0 → `$6000` 未映射 → 矩阵 108P/12F |
 | 093 | tepples bntest-aorom | BxROM/BNROM 边界，$6000=0x27 |
 | 077 | holy_mapperel | 13 mapper 聚合，47 ROM 循环 |
 | 097 | fme7ramtest | **abandon（彻底放弃攻关）** —— 非精度债。survey ROM 不实现 `$6000` 结果协议（静态扫描 32 KiB PRG 对 `$6000` 绝对寻址 **0 处**、对 `$6900` 恰 2 处）；harness 判 PASS 需 `probe_addr==0x00` 而 `probe_addr` 恒为 `$6000`，换读 `$6900` 得 `$C0`，**无 mapper 改动可使其转 PASS**。FME-7 WRAM 映射经 `FCEUX11_FME7_PROBE=1` 实测与上游 62256 期望逐字节一致。2026-09-28 授权 A：已写入 `tests.json` 的 `known_limit`（纯文档字段，不改评级） |
-| 096 | fme7acktest | FME-7 IRQ ack |
+| 096 | fme7acktest | **abandon（放弃攻关，代码不动）** —— 同样是 survey ROM：`value=0xA2 diag=[0x0F,0x8E,0x00]` 与 **PRG ROM bank 3 offset 0-3 逐字节相同**（`init_fme7` 写 reg 8=3 → `$6000` 映 PRG ROM，按硬件正确）；对 `$6000` 绝对寻址 0 处。**但留有一个真实 ack bug 明确不修**：硬件（PowerPak / Everdrive + Nintendulator 三方一致）为 **bit 0 == 0 才 ack**，现状 `case 0xD: IRQa = V; X6502_IRQEnd(...);` 无条件 ack → `$0D=$01` / `$0D=$81` 两项应 No ack 却 Acked。一行可修的改法已留档在主报告 §2.2 ⑸。该 bug 影响真实 FME-7 游戏（Batman RJ / Gimmick!）IRQ 应答，**不体现在任何 F11QA 指标上** |
 
 **优先 093**：单 mapper 边界，比聚合套件好定位。
 
