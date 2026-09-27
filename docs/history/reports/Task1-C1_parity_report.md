@@ -174,7 +174,7 @@ The C-1 harness only uses the existing `kagami_bridge_*` functions
 per-ROM `reset_after` and the sticky 0x81 polling reset.
 
 This is intentional — the existing FFI surface is the minimal contract
-Track C requires for Oracle B, and adding FFI for C-2/C-3 will be
+Track C requires for Hardware Consistency Check, and adding FFI for C-2/C-3 will be
 scoped per subtask.
 
 ---

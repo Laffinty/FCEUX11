@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Oracle B suite gate: run f11qa_blargg_runner over blargg_manifest.json
+"""Hardware Consistency Check suite gate: run f11qa_blargg_runner over blargg_manifest.json
 and exit 0 iff every FAIL is in blargg_known_fail.json (no unexpected fails).
 
 The raw batch exits 1 whenever any known-fail ROM is still failing (33 today),

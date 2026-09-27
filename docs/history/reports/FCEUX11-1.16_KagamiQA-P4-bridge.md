@@ -106,7 +106,7 @@ normalscanlines = 241;
    - 预期：`status=PASS`（P4-1 修复在此路径下生效）
 3. `fceux11_blargg_runner.exe --manifest fixtures/blargg_manifest.json`
    - 预期：17 PASS 保持，ppu_vbl_nmi 从 FAIL→PASS
-4. `ctest --test-dir build` 全绿（Oracle A 无回归）
+4. `ctest --test-dir build` 全绿（内部逻辑检测 无回归）
 
 ## 四、回滚方案
 
@@ -116,4 +116,4 @@ normalscanlines = 241;
 
 - **P4-1**：此 bridge 完成后，P4-1 的 VBL-cycle-1 修复立即可在 headless 下验证
 - **P4-3**：此后所有 CPU/PPU/APU 精度修复均可使用 `--baseline` + `--save-baseline` 进行 transition_matrix 差分验证
-- **P5**：此 bridge 消灭了 newppu=1 在 headless 下的最后一个障碍——P5 开工门禁"收益预期重估"可以用实际 Oracle B 数据支撑
+- **P5**：此 bridge 消灭了 newppu=1 在 headless 下的最后一个障碍——P5 开工门禁"收益预期重估"可以用实际 硬件一致性检测 数据支撑

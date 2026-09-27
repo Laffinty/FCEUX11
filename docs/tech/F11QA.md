@@ -1,16 +1,16 @@
-# F11QA — FCEUX11 双 Oracle 质量防线
+# F11QA — FCEUX11 双通道 质量防线
 
 > **版本**：v1.8（原 KagamiQA；改名与收口见
 > [`docs/history/plans/FCEUX11-v1.8_收口验收.md`](../history/plans/FCEUX11-v1.8_收口验收.md)）
-> **性质**：双 Oracle（Oracle A 回归 + Oracle B 硬件一致性）自动化测试系统
+> **性质**：双通道（内部逻辑检测 + 硬件一致性检测）自动化测试系统
 > **覆盖率（CI 产物快照 — commit `f19fa7d`，`f11qa.yml` R4 gate passed）**：
 >
 > | 维度 | 数值 | 来源 |
 > |---|---|---|
 > | `tests/tests.json` 清单条目 | 120（kgmqa-001 ~ kgmqa-120） | v1.8 扁平清单 |
 > | 迁移矩阵 PASS / FAIL | 106 / 14 | `f11qa_migration_matrix.json`（grade B） |
-> | Oracle A（CTest） | 42P / 0F | ctest 全绿 |
-> | Oracle B（blargg 177 ROM） | 145 PASS / 32 FAIL | `f11qa_blargg_runner --manifest` |
+> | 内部逻辑检测（CTest） | 42P / 0F | ctest 全绿 |
+> | 硬件一致性检测（blargg 177 ROM） | 145 PASS / 32 FAIL | `f11qa_blargg_runner --manifest` |
 > | advisory known-limit 占比 | 14/120 = 11.7%（cap 15%） | R4 gate + precision.md §4 |
 > | 发布评级 | **B (release)** | grade.rs；R4 四项硬门禁全过 |
 >
@@ -41,12 +41,12 @@ F11QA（原 KagamiQA，「鏡」QA）是一个**双通道、零耦合的模拟�
 
 | 来源 | 示例 | 检测方式 |
 |------|------|----------|
-| **内部逻辑错误** | C++ 重构引入的 reg 读写错位、边界溢出、空指针 | CTest 单元/回归测试（Oracle A） |
-| **硬件行为偏差** | PPU VBL 时序偏差 1 个 cycle、APU 长度计数器时钟对齐错误 | blargg $6000 协议 ROM（Oracle B） |
+| **内部逻辑错误** | C++ 重构引入的 reg 读写错位、边界溢出、空指针 | CTest 单元/回归测试（内部逻辑检测） |
+| **硬件行为偏差** | PPU VBL 时序偏差 1 个 cycle、APU 长度计数器时钟对齐错误 | blargg $6000 协议 ROM（硬件一致性检测） |
 
-这两个通道**完全解耦**、**互不污染**。Oracle A 是传统的软件回归测试（对比 golden hash），Oracle B 是对照真实 NES 硬件的金标准（「硬件怎么说，我们就得怎么做」）。
+这两个通道**完全解耦**、**互不污染**。内部逻辑检测 是传统的软件回归测试（对比 golden hash），硬件一致性检测 是对照真实 NES 硬件的金标准（「硬件怎么说，我们就得怎么做」）。
 
-### 1.2 双 Oracle 架构
+### 1.2 双通道 架构
 
 ```
 ┌──────────────────────────────────────────────────┐
@@ -55,8 +55,8 @@ F11QA（原 KagamiQA，「鏡」QA）是一个**双通道、零耦合的模拟�
 ├──────────────────────────────────────────────────┤
 │                                                   │
 │  ┌──────────────┐       ┌──────────────────────┐ │
-│  │  Oracle A     │       │  Oracle B             │ │
-│  │  (软件回归)    │       │  (硬件一致性)          │ │
+│  │  内部逻辑检测   │       │  硬件一致性检测        │ │
+│  │  (软件回归)    │       │  (硬件对齐)            │ │
 │  ├──────────────┤       ├──────────────────────┤ │
 │  │ • 34 CTest   │       │ • 177 blargg ROM     │ │
 │  │ • 单元测试    │       │ • $6000 协议         │ │
@@ -78,7 +78,7 @@ F11QA（原 KagamiQA，「鏡」QA）是一个**双通道、零耦合的模拟�
 └──────────────────────────────────────────────────┘
 ```
 
-### 1.3 $6000 协议（Oracle B 核心）
+### 1.3 $6000 协议（硬件一致性检测 核心）
 
 Blargg 的测试 ROM 使用 **内存映射结果协议**：
 
@@ -99,14 +99,14 @@ ROM 的典型运行模式：
 > ⚠️ **旧公式已作废**，保留于此仅供追溯：
 >
 > ```
-> 权威性 = ROM覆盖率 × Oracle独立性 × CI常驻因子
+> 权威性 = ROM覆盖率 × 通道独立性 × CI常驻因子
 > v1.16:  1.00 × 0.50 × 0.50 ≈ 0.25
 > v1.15:  0.13 × 1.00 × 0.00 = 0.00
 > ```
 >
 > **废止理由**（Stage-2 §十·五）：三个因子里只有 ROM 覆盖率是测量量，另两个是二元自评 ——
 > 同一份代码、同一天，作者自评得 `1.00`、审计复评得 `0.25`，**一个能被自己写成满分的数不是度量**。
-> 且「Oracle 独立性」「CI 常驻」本质是**卫生条件**（不满足则结论无效，满足了也不增加真理含量），
+> 且「通道独立性」「CI 常驻」本质是**卫生条件**（不满足则结论无效，满足了也不增加真理含量），
 > 把它们乘进权威性等于主张「跑得勤 = 更接近真理」。乘积形式还会让任一因子为 0 时总分归零，
 > 掩盖其余部分的真实进展。
 
@@ -114,7 +114,7 @@ ROM 的典型运行模式：
 
 ```
 【卫生门槛】（二元；不满足则以下度量无效）
-  ☑ Oracle A/B 判定通道物理隔离
+  ☑ 内部逻辑检测 / 硬件一致性检测 判定通道物理隔离
   ☑ 判定逻辑与 manifest schema 声明一致
   ☑ 迁移矩阵不含结构性失真（new_test 桶 + test_set_diff）
   ☑ 产物可追溯：matrix 带真实 engine.git_rev
@@ -123,21 +123,21 @@ ROM 的典型运行模式：
 【权威性度量】（仅在全部门槛满足时有意义）
   外部真理覆盖率 = 177 / 177 blargg ROM（manifest 与落盘 1:1）
   已知失败清单   = 47 项中 8 项 FAIL（Phase 4.4 扩展后），每条含 $6000 码 / 诊断串 / 分类 tag
-  oracle 来源数  = 1（blargg）
+  检测来源数  = 1（blargg）
 ```
 
 **Phase 4.5 runppu 决策**（2026-08-06，本会话正式签发；详见 `docs/history/plans/FCEUX11-1.16_KagamiQA-P5-权威性构建计划.md`）：
 
-> **P5 runppu 重批推迟到 v1.17+**。理由：8 项已知限制全部归类于深模型族（CPU/PPU 寄存器/DMA 层），与渲染路径解耦，runppu 切换**零精度收益** + 引入新回归风险。Phase 1-4 已闭环（双 Oracle 稳定 + 33 FAIL 全部归类 + Lua 集成完整 + R4 Gate 验证），满足 P5 设定的"维持稳定基线"目标。
+> **P5 runppu 重批推迟到 v1.17+**。理由：8 项已知限制全部归类于深模型族（CPU/PPU 寄存器/DMA 层），与渲染路径解耦，runppu 切换**零精度收益** + 引入新回归风险。Phase 1-4 已闭环（双通道 稳定 + 33 FAIL 全部归类 + Lua 集成完整 + R4 Gate 验证），满足 P5 设定的"维持稳定基线"目标。
 >
-> v1.17+ 重新评估 runppu 的 3 个重启条件：(a) 深模型族突破；(b) 新独立外部 oracle 引入；(c) per-cycle 联合仿真就绪。
+> v1.17+ 重新评估 runppu 的 3 个重启条件：(a) 深模型族突破；(b) 新独立外部检测通道 引入；(c) per-cycle 联合仿真就绪。
 
-**「oracle 来源数」为什么单列**：当前唯一的外部真理来源是 blargg ROM 套件，因此
+**「检测来源数」为什么单列**：当前唯一的外部真理来源是 blargg ROM 套件，因此
 **权威性上限 = 该套件对真实硅片的保真度**。ROM 覆盖率从 13% 提到 100%，只是把这一个来源用尽，
 不会突破它。继续提升权威性的路径是**引入相互独立、可彼此证伪的新来源**（NESdev 其他套件、
 TASVideos 精度表、第二个模拟器差分、真机采集），而非在同一来源里继续堆测试数量。
 
-**权威性不要求 Oracle B 全部 PASS**。精确知道什么失败，比「全绿但不测」更权威。已知失败清单本身就是防线的一部分。
+**权威性不要求 硬件一致性检测 全部 PASS**。精确知道什么失败，比「全绿但不测」更权威。已知失败清单本身就是防线的一部分。
 
 ### 1.5 分级标准（v1.17，Task 5）
 
@@ -180,7 +180,7 @@ TASVideos 精度表、第二个模拟器差分、真机采集），而非在同�
 # 3. 编译（确保已构建）
 .\scripts\do_build.ps1 -Config Release
 
-# 4. 运行 Oracle B — blargg 全量批处理
+# 4. 运行 硬件一致性检测 — blargg 全量批处理
 cd tests
 ..\build\tests\fceux11_blargg_runner.exe --manifest fixtures/blargg_manifest.json
 ```
@@ -217,7 +217,7 @@ Failed: 56
 > 让 `--manifest` 路径消费它，可一次性收掉 `0x81` 的 6 项；`0x80` 的 12 项则需逐 ROM 校准 `frames`。
 
 
-### 2.2 运行 Oracle A（CTest 回归）
+### 2.2 运行 内部逻辑检测（CTest 回归）
 
 ```powershell
 # 全量回归（排除性能基准测试）
@@ -246,7 +246,7 @@ cargo run --release -p f11qa -- `
 | 文件 | 内容 |
 |------|------|
 | `f11qa_migration_matrix.json` | SWE-bench 同构迁移矩阵：`fail_to_pass` / `pass_to_pass` / `pass_to_fail` / `fail_to_fail` / `new_test` |
-| `f11qa_accuracy_table.md` | Oracle B 精度对照表（Markdown），每个 ROM 的 PASS/FAIL + 错误码 |
+| `f11qa_accuracy_table.md` | 硬件一致性检测 精度对照表（Markdown），每个 ROM 的 PASS/FAIL + 错误码 |
 | `f11qa_baseline_next.json` | 当前运行快照，保存为下次对比的基线 |
 
 ### 2.4 基线漂移检测
@@ -312,8 +312,8 @@ P5 升级后，`lua_runner` 会捕获 Lua `assert()` / `error()` 输出并解析
 
 KagamiQA 在每次 push 到 `main` 或 `wip_1.16` 分支时自动运行（`.github/workflows/kagami-qa.yml`）：
 
-1. **Oracle A**：`ctest --output-on-failure -LE perf`
-2. **Oracle B**：`kagami_qa_blargg_runner --manifest tests/fixtures/blargg_manifest.json`
+1. **内部逻辑检测**：`ctest --output-on-failure -LE perf`
+2. **硬件一致性检测**：`kagami_qa_blargg_runner --manifest tests/fixtures/blargg_manifest.json`
 3. **迁移矩阵生成**：`kagami-qa-runner` 产出 JSON + 精度表
 4. **Artifact 上传**：矩阵、精度表、基线作为 workflow artifact 保存 30 天
 5. **基线漂移警报**：PASS→FAIL 自动在 PR 下评论红色警报（`gh pr comment`）
@@ -337,7 +337,7 @@ KagamiQA 的核心组件可以**独立于 FCEUX11 项目**运行，用于测试�
 | kagami-qa-runner | `src/rust/crates/kagami-qa/` | 纯 Rust，无 C++ 链接依赖（subprocess 模式） |
 | 分析脚本 | `scripts/analyze_blargg_results.ps1` | 结果分类统计 |
 
-### 3.2 对第三方模拟器运行 Oracle B
+### 3.2 对第三方模拟器运行 硬件一致性检测
 
 **前提**：第三方模拟器必须提供一个可执行文件，接受 `--rom <path> --frames N` 参数，运行后通过 stdout 输出 `BLARGG_RESULT:` 行。
 
@@ -531,13 +531,13 @@ C ABI 桥接模式参考 `src/kagami_bridge.h` + `src/rust/crates/kagami-qa/src/
 | 迁移矩阵 schema | `report/matrix.rs` | serde | SWE-bench 同构 JSON 格式 |
 | 下载脚本 | `scripts/download_blargg_roms.ps1` | PowerShell | 独立运行 |
 
-### 4.5 自定义 Oracle 扩展
+### 4.5 自定义检测通道扩展
 
-KagamiQA 的 Oracle 架构可以扩展以支持**非 blargg 测试 ROM**：
+F11QA 的检测通道架构可以扩展以支持**非 blargg 测试 ROM**：
 
-1. **Oracle C（性能基准）**：已有 `bench_tolerance_test`（Oracle B / benchmark layer）
-2. **Oracle D（内存泄漏）**：可接入 AddressSanitizer / Valgrind 输出
-3. **Oracle E（确定性）**：同一 ROM 连续运行 2 次，比对 savestate hash 是否一致
+1. **性能基准检测**：已有 `bench_tolerance_test`（benchmark layer）
+2. **内存泄漏检测**：可接入 AddressSanitizer / Valgrind 输出
+3. **确定性检测**：同一 ROM 连续运行 2 次，比对 savestate hash 是否一致
 
 只需在 `tests.json` 中添加条目并实现对应的 adapter（或复用 `SubprocessAdapter` + 新的 CLI 工具）。
 
@@ -548,7 +548,7 @@ KagamiQA 的 Oracle 架构可以扩展以支持**非 blargg 测试 ROM**：
 ```
 FCEUX11/
 ├── tests/
-│   ├── tests.json                          ← 47 条测试清单（27 Oracle A + 20 Oracle B；Phase 4.4 扩 8 项）
+│   ├── tests.json                          ← 47 条测试清单（27 内部逻辑检测 + 20 硬件一致性检测；Phase 4.4 扩 8 项）
 │   ├── fixtures/
 │   │   ├── blargg/                         ← 177 blargg ROM (cpu/ppu/apu/mmc3/)
 │   │   ├── blargg_manifest.json            ← ROM 清单（name/path/frames/probe_addr/reset_after；v1.17 H-1 全条目含 reset_after）
@@ -597,7 +597,7 @@ FCEUX11/
 │   └── analyze_blargg_results.ps1          ← 结果分析/分类
 ├── .github/workflows/
 │   ├── ci.yml                              ← 主 CI（build + ctest + benchmark）
-│   └── kagami-qa.yml                       ← KagamiQA CI（Oracle A+B + 矩阵 + grade + 漂移检测）
+│   └── kagami-qa.yml                       ← KagamiQA CI（内部逻辑检测 + 硬件一致性检测 + 矩阵 + grade + 漂移检测）
 └── docs/tech/
     ├── KagamiQA.md                         ← 本文档
     ├── R5_instrument_first_data.md         ← v1.17 R5 (E-1) PPU VBL/NMI 探针数据（Track-B）
@@ -609,13 +609,13 @@ FCEUX11/
 
 ## 六、FAQ
 
-### Q: 为什么 Oracle B 有 60 个 FAIL 还算「防线」？
+### Q: 为什么 硬件一致性检测 有 60 个 FAIL 还算「防线」？
 
 **A:** 精确知道 60 个 ROM 失败（有错误码、有诊断字符串、有分类标记），比「假装全绿但只测了 22 个 ROM」权威得多。已知失败清单是**版本化的**——每个新版本可以精确回答「哪些以前失败现在通过了（FAIL→PASS）」和「哪些以前通过现在回归了（PASS→FAIL）」。
 
-### Q: 我可以只运行 Oracle B 而不用 Oracle A 吗？
+### Q: 我可以只运行 硬件一致性检测 而不用 内部逻辑检测 吗？
 
-**A:** 可以。`kagami-qa-runner` 的 `--manifest` 参数指向任何只包含 Oracle B 条目的 JSON 清单。双 Oracle 不是耦合的——它们是独立通道。
+**A:** 可以。`kagami-qa-runner` 的 `--manifest` 参数指向任何只包含 硬件一致性检测 条目的 JSON 清单。双通道 不是耦合的——它们是独立通道。
 
 ### Q: 如何把 KagamiQA 用于我自己的模拟器项目？
 

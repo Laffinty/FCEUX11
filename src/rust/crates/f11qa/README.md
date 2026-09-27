@@ -5,10 +5,10 @@ KagamiQA（「鏡」QA）是 FCEUX11 的**双通道、零耦合模拟器精度�
 清单条目的形式成为它的子项，由 `kagami-qa-runner` 统一调度、判定、报告与门禁。
 
 > v1.17 定位（`docs/history/plans/FCEUX11-1.17_计划.md`）：把 KagamiQA 从「FCEUX11 的附属测试框架」升级为
-> 「测试体系的唯一归属与唯一门禁」。本文档对应 v1.17 实态（47 条清单 / 双 Oracle / CI 闭环 /
+> 「测试体系的唯一归属与唯一门禁」。本文档对应 v1.17 实态（47 条清单 / 双通道 / CI 闭环 /
 > 七层架构）。
 
-## 双 Oracle 架构
+## 双通道 架构
 
 ```
 ┌──────────────────────────────────────────────────┐
@@ -16,7 +16,7 @@ KagamiQA（「鏡」QA）是 FCEUX11 的**双通道、零耦合模拟器精度�
 │  cli/args.rs · cli/run_subprocess.rs             │
 │  cli/run_direct.rs · cli/run_report.rs           │
 ├──────────────────────────────────────────────────┤
-│  Oracle A（软件回归）     Oracle B（硬件一致性）   │
+│  内部逻辑检测（软件回归）     硬件一致性检测（硬件对齐）   │
 │  • CTest 单元/回归测试    • 177 blargg $6000 ROM  │
 │  • exit code + stdout    • load→step×N→probe     │
 │  • oracle/regression.rs  • oracle/hardware.rs    │
@@ -26,8 +26,8 @@ KagamiQA（「鏡」QA）是 FCEUX11 的**双通道、零耦合模拟器精度�
 └──────────────────────────────────────────────────┘
 ```
 
-- **Oracle A**（回归等价）：「和上一版一样吗」——判定通道 `oracle/regression.rs`。
-- **Oracle B**（外部真理）：「和真实硬件一致吗」——blargg `$6000` 协议，判定通道
+- **内部逻辑检测**（回归等价）：「和上一版一样吗」——判定通道 `oracle/regression.rs`。
+- **硬件一致性检测**（外部真理）：「和真实硬件一致吗」——blargg `$6000` 协议，判定通道
   `oracle/hardware.rs`。
 - 两个通道**物理隔离、互不污染**；判定逻辑只存在于 L4。
 
@@ -39,7 +39,7 @@ L6  report/     matrix.rs · baseline.rs（grade.rs 为任务 5 预留）
 L5  runner/     scheduler.rs · direct.rs（共享 in-process 执行核心）
 L4  oracle/     regression.rs(A) · hardware.rs(B)   ← 判定通道隔离
 L3  adapter/    trait_def.rs · subprocess.rs · direct.rs
-L2  manifest/   schema.rs · parser.rs（oracle-as-data）
+L2  manifest/   schema.rs · parser.rs（expectation-as-data）
 L1  core/       config.rs · error.rs（框架中立）
 ```
 
@@ -75,11 +75,11 @@ CLI 参数（`kagami-qa-runner --help` 语义，完整语法见 `cli/args.rs`）
 
 | 参数 | 默认 | 说明 |
 |------|------|------|
-| `--manifest` | `tests/tests.json` | 测试清单（oracle-as-data） |
+| `--manifest` | `tests/tests.json` | 测试清单（expectation-as-data） |
 | `--bin-dir` | `build/tests` | 测试二进制目录 |
 | `--output` | `kagamiqa_migration_matrix.json` | 迁移矩阵 JSON |
 | `--working-dir` | 当前目录 | 子进程工作目录 |
-| `--accuracy-table` | — | Oracle B 精度表（Markdown） |
+| `--accuracy-table` | — | 硬件一致性检测 精度表（Markdown） |
 | `--known-fail` | — | 版本化已知失败清单 |
 | `--baseline` | — | 上轮快照（对比迁移） |
 | `--save-baseline` | — | 保存本轮快照 |

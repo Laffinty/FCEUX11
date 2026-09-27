@@ -49,7 +49,7 @@ baseline 更新需与代码变更同等级 review**）。177 ROM：PASS 144 / FA
 | `ppu_frame_diff_test` | XBuf 可见区 61440 字节裸 memcmp，金标 `tests/fixtures/golden_frames/` | 拒绝 PNG/PPM（理由见测试头注释）；**仅在有意的 PPU 变更落地时重生成** |
 | `golden_hashes.json` | 多 ROM 帧 CRC/MD5 链 | R5/R6 若发生真实精度回归需追加 diff 行 |
 | `golden_savestate_test` | savestate 字节金标 | 见 §3 禁忌 |
-| blargg 177 ROM | F11QA 双 Oracle（A 回归 / B 硬件一致性） | 见 F11QA.md |
+| blargg 177 ROM | F11QA 双通道（A 回归 / B 硬件一致性） | 见 F11QA.md |
 | 游戏级锚（注释级） | Knight Rider→ppudead、Super Donkey Kong→OAMADDR、3-D WorldRunner→dot257、SMB3/Crystalis→MMC3 hook、Bee 52→FRAMESKIP | 改注释锚指向的行为前先跑对应游戏 |
 
 ## 3. 禁忌清单（改了会碎东西）

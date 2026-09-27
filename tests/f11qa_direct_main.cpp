@@ -21,7 +21,7 @@ extern "C" {
 
 int main(int argc, char** argv) {
     // Pass control to the Rust side. The Rust main parses CLI args,
-    // loads the test manifest, and runs all Oracle B tests in-process
+    // loads the test manifest, and runs all Hardware Consistency Check tests in-process
     // using the C ABI bridge.
     return kagami_qa_direct_main(argc, const_cast<const char**>(argv));
 }

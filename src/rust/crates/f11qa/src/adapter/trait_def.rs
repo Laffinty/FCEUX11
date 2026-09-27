@@ -18,11 +18,11 @@ pub struct TestResult {
 /// Mirrors the ROM/script fields from TestInput but is adapter-agnostic.
 #[derive(Debug, Clone)]
 pub struct InputSpec {
-    /// Path to a ROM file (for Oracle B / hardware tests).
+    /// Path to a ROM file (for Hardware Consistency Check / hardware tests).
     pub rom_path: Option<String>,
     /// Path to a Lua script (for software-side dynamic tests).
     pub script_path: Option<String>,
-    /// Number of frames to run (for Oracle B tests).
+    /// Number of frames to run (for Hardware Consistency Check tests).
     pub frames: u32,
     /// Probe address for $6000 protocol.
     pub probe_addr: u32,
@@ -55,7 +55,7 @@ impl InputSpec {
 ///
 /// Stage-2 S-2: this used to be hardcoded to 300 with the comment "can be
 /// overridden in manifest" — but nothing ever overrode it, so direct mode ran
-/// every Oracle B ROM for exactly 300 frames while subprocess mode honored the
+/// every Hardware Consistency Check ROM for exactly 300 frames while subprocess mode honored the
 /// per-test budget. Any ROM needing a longer run reported `$6000 == 0x80`
 /// ("still running") and was scored as a failure. That is a direct/subprocess
 /// parity break, not a ROM defect.

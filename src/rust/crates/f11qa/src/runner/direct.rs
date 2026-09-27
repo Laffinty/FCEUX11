@@ -37,7 +37,7 @@ use crate::manifest::schema::TestManifest;
 /// Run every ROM-driven test in the manifest through a direct adapter.
 ///
 /// Only entries with `input.rom` set are driven here — in-process mode
-/// targets Oracle B hardware tests; script-driven entries remain on the
+/// targets Hardware Consistency Check hardware tests; script-driven entries remain on the
 /// subprocess path. Every outcome (including load / step / probe errors,
 /// panics and timeouts) is recorded as a `TestResult` so the caller can
 /// count verdicts and blocking failures without re-interpreting raw

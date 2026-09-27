@@ -21,7 +21,7 @@ pub enum ErrorKind {
     TestExecFailed,
     /// Test exceeded timeout.
     Timeout,
-    /// Oracle comparison mismatch.
+    /// Check comparison mismatch (Internal Logic / Hardware Consistency).
     OracleMismatch,
     /// I/O error.
     IoError,

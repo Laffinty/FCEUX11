@@ -97,7 +97,7 @@ $2000 写边沿的 NMI 采样窗口（NMI-enable/disable 与 VBL 置位/清除�
 | 2 | 改动后探针证实 cycle 恒 0（帧修复生效）| ✅ |
 | 3 | vbl_05 主修复目标 PASS | ✅ |
 | 4 | vbl PASS 基线（01/03/04/09）零回归 | ✅ |
-| 5 | Oracle A（ctest -LE perf，全量重建后）33/33 | ✅ |
+| 5 | 内部逻辑检测（ctest -LE perf，全量重建后）33/33 | ✅ |
 | 6 | golden savestate 无需重生（无运行期起始值变更，nestest 哈希已在上提交重生）| ✅（待全量确认）|
 | 7 | 未开新分支、savestate chunk 结构未动 | ✅ |
 

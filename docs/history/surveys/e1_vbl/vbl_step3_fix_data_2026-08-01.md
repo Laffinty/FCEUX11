@@ -25,7 +25,7 @@
 
 ---
 
-## 2. Oracle A 回归
+## 2. 内部逻辑检测 回归
 
 ```
 $ ctest --test-dir build-c1 --build-config Release --output-on-failure -LE perf
@@ -34,7 +34,7 @@ $ ctest --test-dir build-c1 --build-config Release --output-on-failure -LE perf
 Total Test time (real) =  23.11 sec
 ```
 
-✅ **34/34 PASS** —— `runppu(3)` 不影响 Oracle A 任何测试。
+✅ **34/34 PASS** —— `runppu(3)` 不影响 内部逻辑检测 任何测试。
 
 ---
 
@@ -139,7 +139,7 @@ E1 NMI_ENTRY sl=241 cycle=36 x=0x01 pc=0xE350
 
 ### 6.1 本步 fix 结论：**成功但不完整**
 
-✅ **情形 A** 触发（vbl_05 改善 + PASS ROM 全部保持 + Oracle A 34/34 PASS）：
+✅ **情形 A** 触发（vbl_05 改善 + PASS ROM 全部保持 + 内部逻辑检测 34/34 PASS）：
 - vbl_05 失败机制已**部分修复**（X 序列改善 9/10 行）
 - 没有引入任何回归
 

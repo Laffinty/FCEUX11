@@ -102,7 +102,8 @@ pub struct TransitionEntry {
 }
 
 // ---------------------------------------------------------------------------
-// Oracle breakdown — separate accounting for A (regression) vs B (hardware).
+// Dual-channel breakdown — separate accounting for Internal Logic Check
+// (regression) vs Hardware Consistency Check (hardware).
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Serialize)]
@@ -437,7 +438,7 @@ mod tests {
         assert!(m.baseline_drift.is_empty());
     }
 
-    // ---- Oracle breakdown ----
+    // ---- Dual-channel breakdown ----
 
     #[test]
     fn oracle_breakdown_splits_a_and_b() {

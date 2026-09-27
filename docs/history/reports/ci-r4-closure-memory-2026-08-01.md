@@ -22,8 +22,8 @@ FCEUX11 v1.16 `docs/继续任务.txt` 把 R4（CI 闭环）的处方交给了独
   ```
   R4 gate passed: git_rev=1156ca1, total=39, passed=35, failed=4, fail_to_pass=0 [OK]
   ```
-- **Oracle A**：33/33 ctest PASS（含 `kagami_qa_direct_smoke` 6.49s，从第二轮 32/33 修复）
-- **Oracle B**：121/56（真实精度口径恢复，从第二轮 0/177 全 0xFE 加载失败修复）
+- **内部逻辑检测**：33/33 ctest PASS（含 `kagami_qa_direct_smoke` 6.49s，从第二轮 32/33 修复）
+- **硬件一致性检测**：121/56（真实精度口径恢复，从第二轮 0/177 全 0xFE 加载失败修复）
 - **blargg fixtures**：177/177 present（CI 校验步零错）
 - **runner 路径**：`src/rust/target/x86_64-pc-windows-msvc/release/kagami-qa-runner.exe`（三元组优先）
 
@@ -33,7 +33,7 @@ FCEUX11 v1.16 `docs/继续任务.txt` 把 R4（CI 闭环）的处方交给了独
 
 | 缺口 | 来源（第二轮暴露） | 第三轮实测 |
 |---|---|---|
-| A | blargg ROM 在 CI 不存在 → Oracle B 全 `0xFE` 加载失败 | 校验步 `177/177 present`；Oracle B `121/56` |
+| A | blargg ROM 在 CI 不存在 → 硬件一致性检测 全 `0xFE` 加载失败 | 校验步 `177/177 present`；硬件一致性检测 `121/56` |
 | A-衍生 | `kagami_qa_direct_smoke` 同因失败 → ctest `32/33` | ctest `33/33`，`kagami_qa_direct_smoke` PASS 6.49s |
 | B | runner 三元组路径不存在 → 矩阵步被静默 skip | 三元组路径命中 |
 

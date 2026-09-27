@@ -1,5 +1,5 @@
 @echo off
-REM KagamiQA P2 — build C++ blargg runner and run Oracle B suite.
+REM KagamiQA P2 — build C++ blargg runner and run Hardware Consistency Check suite.
 REM
 REM Run this from a Visual Studio Developer Command Prompt:
 REM   Start → Visual Studio 2026 → Developer Command Prompt for VS 2026

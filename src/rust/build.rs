@@ -235,7 +235,7 @@ fn merge_headers(
     output.push_str("\n/* === Stage-2 C-1: in-process direct runner entry === */\n");
     output.push_str("/**\n");
     output.push_str(" * Main entry point called from C++ (f11qa_direct_main.cpp).\n");
-    output.push_str(" * Parses CLI args and runs Oracle B tests in-process.\n");
+    output.push_str(" * Parses CLI args and runs Hardware Consistency Check tests in-process.\n");
     output.push_str(" */\n");
     output.push_str("int32_t kagami_qa_direct_main(int32_t argc, const char *const *argv);\n");
 

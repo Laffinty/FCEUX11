@@ -1,7 +1,7 @@
 # FCEUX11 v1.16 精度收敛 — 三阶段构建方案（P2 深化版）
 
 > **编制日期**：2026-08-01（**2026-08-02 深化修订**：E-1 Step 1.3 状态回填——vbl_05 PASS、读侧/边沿分源、行号校准；**2026-08-04 修订**：Phase 3.2 桶 A+B.3+B.4 完成、§3 Step 3.1 报告桶分类修订为精准版（CPU 13 / PPU 4 / vbl 5 / MMC3 12 / sprdma 2 = 36）、§5 桶 B 拆分为 B.1+B.2 / B.3+B.4、桶 C 拆分为 PPU 真实精度 4 / vbl 已知 5、Step 3.3 数字同步 20 项剩余；
-> **2026-08-05 修订**：Phase 3.2 桶 C `ppu_open_bus` 0x03 → 0x00 PASS（`23b0cdd`）——600ms 时间衰减 + A2007 palette per-bit + A2004 整字节刷新，三处小改零回归；桶 C 2/4 收敛 + 2/4 已知限制；Oracle B 143/34 → 144/33（+1 PASS）；§5 桶 C 状态同步，新增 `FCEUX11_OPENDECAY_PROBE` 探针文档；
+> **2026-08-05 修订**：Phase 3.2 桶 C `ppu_open_bus` 0x03 → 0x00 PASS（`23b0cdd`）——600ms 时间衰减 + A2007 palette per-bit + A2004 整字节刷新，三处小改零回归；桶 C 2/4 收敛 + 2/4 已知限制；硬件一致性检测 143/34 → 144/33（+1 PASS）；§5 桶 C 状态同步，新增 `FCEUX11_OPENDECAY_PROBE` 探针文档；
 > **2026-08-05 修订 2（Phase 3.2 全桶收口）**：桶 C 余项（oam_stress + ppu_vbl_nmi）记入已知限制（`116a602 c(known-limit)`），桶 D（sprdma 2）探针调查完成 + 记入已知限制（`4a7f7e2 d(probe)`），桶 B.1+B.2（9 项 CPU 中断/时序）记入已知限制（`eaf4fe1 b(known-limit)`）。**Phase 3 Step 3.2 全部 33 FAIL 已分类**：1 PASS（cpu_dummy_writes_ppu 863e9d7）+ 32 已知限制（0xFE cpu_interrupts 永久跳过 1 + 真实精度 31）。可直接进 Step 3.3。）
 > **2026-08-03 修订**：Step 1.2 闭合可行性评估——测试源码实证 1 dot/行漂移为亚指令粒度、残量在差值中抵消
 > （漂移被帧边界重同步摧毁，非"未建模"）、NMI 取消时序缺口（小修）、决定性残量探针定夺深模型；
@@ -13,7 +13,7 @@
 > - `docs/history/surveys/p2_instrument/P2_precision_instrument_handoff.md`（E-1/E-3 交接档案，含 6 探针清单）
 > - **本次联机研究**（2026-08-01）：NESdev Wiki（APU Frame Counter / PPU frame timing / NMI）+ blargg 原始测试包源码
 >   （`christopherpow/nes-test-roms`：`ppu_vbl_nmi/source/*.s`、`blargg_apu_2005.07.30/source/*.asm` + readme/tests.txt、`apu_reset/readme.txt`）
-> - **用户决策（2026-08-01）**：P3（第二 oracle 来源）暂不做，"先确保精度再谈别的"。P3 已在验收报告中标注暂缓。
+> - **用户决策（2026-08-01）**：P3（第二检测来源）暂不做，"先确保精度再谈别的"。P3 已在验收报告中标注暂缓。
 >
 > **性质**：可执行的构建方案。每个 Phase/Step 含 目标 / 文件:行号 / 改法 / instrument 验证 / 回归集 / 证伪判据。**不是**对交接档案结论的推翻，而是用联机资料把交接档案中"未闭合"的两项（R5-E1、R6-缺陷1）钉到可动手的精度。
 >
@@ -29,7 +29,7 @@
 >   - Step 3.2 桶 D (sprdma 2) ✅ 已完成(`4a7f7e2`)— 2/2 已知限制（深模型族）
 >   - Step 3.2 桶 B.1+B.2 (CPU 9) ✅ 已完成(`eaf4fe1`)— 9/9 已知限制（深模型族）
 >   - Step 3.3 全量回归与验收复检 ⏳ 下一步
-> - **Oracle A 100% pass**(自 `7ea1d0c` 起的 golden nestest 已稳定);Oracle B **144 PASS**;33 FAIL = 32 已知限制 + 1 PASS（cpu_dummy_writes_ppu）
+> - **内部逻辑检测 100% pass**(自 `7ea1d0c` 起的 golden nestest 已稳定);硬件一致性检测 **144 PASS**;33 FAIL = 32 已知限制 + 1 PASS（cpu_dummy_writes_ppu）
 >
 > **2026-08-03 复核**:基线重跑确认 vbl_02=0x01(行 04 应 `- -` 实为 `- V`,仅差 1 行)、vbl_06=0x01
 > (行 04-06 应 `- -`/`V -`/`V -` 实为 `V N`,行 07-09 已对)。Step 1.2 闭合可行性评估见 §3 Step 1.2 块
@@ -48,7 +48,7 @@
 ## 0. 前置硬约束（沿用交接档案 §0，逐条强制，违反即回滚）
 
 1. **instrument-first 是前置硬约束**：任何代码改动前，先加 env-gated probe 采集真实时序，用数据证实/证伪假设。
-2. **每步强制回归**：Oracle A `ctest -LE perf` 34/34 + 相关 ROM 全量，任一红即回滚该步。
+2. **每步强制回归**：内部逻辑检测 `ctest -LE perf` 34/34 + 相关 ROM 全量，任一红即回滚该步。
 3. **savestate 兼容**：不得改 `FHCN`/`FCNT`/`IQFM` chunk 名/大小/序（`sound.cpp:1462-1466`）。改运行期起始值会碎
    `golden_savestate_test` / `savestate_regression_test`（MD5 固定参照）——**按 `tests/CMakeLists.txt:348` 用
    `fceux11_golden_savestate_test --generate` 重生 golden 索引**（这是预期流程，不是事故）。
@@ -140,7 +140,7 @@
 >   `vbl_step1_2_closure_assessment_2026-08-03.md`，**用户决策：有时间再推进**）、
 >   **vbl_07/08 = $2000 边沿采样**（对 NMIDELAY 5-12 全扫免疫，独立子问题）、
 >   **vbl_10 = Step 1.4 even/odd**（独立机制）。
-> - **Phase 2（R6/APU）已执行（顺序经用户确认）**：**Step 2.1 相位分离 ✅**（2026-08-01，`e3(step2.1)`）+ **Step 2.2 写路径延迟+jitter 一阶近似 ✅**（2026-08-02，`e3(step2.2)`，**`apu_single_4_jitter` 0x02→0x00 PASS**，40 ROM 零回归，Oracle A 33/33）+ **Step 2.2 深化 ✅**（2026-08-02，`e3(step2.2-deep)`：cycle-position 帧计数器，**single_5/6 + reset_4017_timing/written + apu_test 全转 PASS，7 个 bucket-C sub-test 全闭合**，Oracle B 135 PASS 无 apu_* 失败）。
+> - **Phase 2（R6/APU）已执行（顺序经用户确认）**：**Step 2.1 相位分离 ✅**（2026-08-01，`e3(step2.1)`）+ **Step 2.2 写路径延迟+jitter 一阶近似 ✅**（2026-08-02，`e3(step2.2)`，**`apu_single_4_jitter` 0x02→0x00 PASS**，40 ROM 零回归，内部逻辑检测 33/33）+ **Step 2.2 深化 ✅**（2026-08-02，`e3(step2.2-deep)`：cycle-position 帧计数器，**single_5/6 + reset_4017_timing/written + apu_test 全转 PASS，7 个 bucket-C sub-test 全闭合**，硬件一致性检测 135 PASS 无 apu_* 失败）。
 > - **Phase 2 剩余**：**Step 2.3 已实测证伪（2026-08-02）**——当前 `V&0x2` 即原始 bit7（5-step），
 >   已是硬件正确实现；方案改法 `V&0x1` 方向相反（会使 $40 触发 clock、$80 不触发），实测
 >   `apu_single_1_len_ctr` 0x00→0x04 回归（见 `docs/history/surveys/e6_apu/p2_step2_3_falsification_2026-08-02.md`）。
@@ -156,9 +156,9 @@
 
 | Phase | 目标 | 验收门 | 对应 |
 |---|---|---|---|
-| **Phase 1** | E-1 PPU VBL/NMI 收敛：`vbl_01`~`vbl_10` 全 10 ROM 返回 `$6000=0x00` | Oracle A 34/34；`blargg_ppu_vbl_nmi` 升 blocking | §十 R5 |
-| **Phase 2** | E-3 APU 帧计数器收敛：7 个 bucket-C sub-test 全转 PASS | Oracle A 34/34；`apu_01`~`apu_11` + `pal_apu_*` + `apu_mixer_*` 不回归 | §十 R6 |
-| **Phase 3** | 全量精度收敛与收尾：blargg 真实精度 FAIL 面下降、迁移矩阵 39/39 | Oracle A/B 全绿；matrix `passed=39`；README 数字回填 | §十 完成判据 |
+| **Phase 1** | E-1 PPU VBL/NMI 收敛：`vbl_01`~`vbl_10` 全 10 ROM 返回 `$6000=0x00` | 内部逻辑检测 34/34；`blargg_ppu_vbl_nmi` 升 blocking | §十 R5 |
+| **Phase 2** | E-3 APU 帧计数器收敛：7 个 bucket-C sub-test 全转 PASS | 内部逻辑检测 34/34；`apu_01`~`apu_11` + `pal_apu_*` + `apu_mixer_*` 不回归 | §十 R6 |
+| **Phase 3** | 全量精度收敛与收尾：blargg 真实精度 FAIL 面下降、迁移矩阵 39/39 | 内部逻辑检测 / 硬件一致性检测 全绿；matrix `passed=39`；README 数字回填 | §十 完成判据 |
 
 ---
 
@@ -187,7 +187,7 @@
 
 > **✅ 2026-08-01 实测状态**：
 > - 抑制机制已实现（`ppu.cpp A2002` 标记 + `ppu_rendering.cpp` VBL 块消费 + `(241,0-1)` NMI 取消），
->   **Oracle A 34/34 + Oracle B 121/56 全量零回归**。
+>   **内部逻辑检测 34/34 + 硬件一致性检测 121/56 全量零回归**。
 > - vbl_02 **未修复**：探针显示测量行 read1 从未落在 (240,340)，抑制大多在 sync 自旋读上触发（硬件上合法）。
 > - vbl_06/07/08 部分改善（需真基线确认）。vbl_06 rows 05-06 的 NMI 抑制未达成（CPU 在指令边界先于读检查 NMI）。
 > - **深层根因确认**：帧边界 CPU↔PPU 读时序偏移 ~2-3 dot（与 vbl_05 "NMI 早 ~2 指令"同源）——指向 CPU 侧模型（Step 1.3），
@@ -199,7 +199,7 @@
 读于 (sl241, c0-1) `X6502_IRQEnd(FCEU_IQNMI)` 取消 NMI；`ppu_rendering.cpp` VBL 块消费标记。`runppu(3)` 在 NMI 开启时无条件执行（帧长一致）。
 env-gated 探针 `E1 P2002_READ` / `E1 VBL_SUPPRESSED`。
 
-**实测结论**：全量零回归（Oracle A 34/34、Oracle B 121/56）；vbl_02 **未闭合**——测量 read1 从未落在抑制点
+**实测结论**：全量零回归（内部逻辑检测 34/34、硬件一致性检测 121/56）；vbl_02 **未闭合**——测量 read1 从未落在抑制点
 （探针证实抑制大多在 sync 自旋读触发）；vbl_06/07/08 部分改善。**残余工作并入 Step 1.3**（CPU 侧时序根因）。
 
 > **🔍 2026-08-02 读侧调查（`vbl_step1_3_read_suppression_2026-08-02.md`）**：vbl_02/06 未闭合的精确机制已定位——
@@ -236,7 +236,7 @@ env-gated 探针 `E1 P2002_READ` / `E1 VBL_SUPPRESSED`。
 > **2026-08-02 实测（第一轮，部分落地）**：✅ **NMI latch 延迟 1 指令边界已落地**
 > （`x6502.cpp TriggerNMI` fresh 标记：VBL 路径 latch 在两次 CPU run 之间置位，
 > 立即派发早 1 指令；6502 指令结束采样语义下应推迟一个边界）。实测：vbl_05 首行
-> X 2→3（`[2,2,2,2,2,1,...]`→`[3,3,3,3,2,2,...]`），Oracle A 33/33 零回归，
+> X 2→3（`[2,2,2,2,2,1,...]`→`[3,3,3,3,2,2,...]`），内部逻辑检测 33/33 零回归，
 > vbl_01/03/04/09 保持 PASS。🔍 **未闭合**：flag 置位相位漂移需 CPU 侧子周期
 > 采样建模（见下），vbl_02/05/06/07/08/10 仍未 PASS。完整数据见
 > `docs/history/surveys/e1_vbl/vbl_step1_3_nmi_sampling_2026-08-02.md`。
@@ -249,7 +249,7 @@ env-gated 探针 `E1 P2002_READ` / `E1 VBL_SUPPRESSED`。
 > - **NMIDELAY 校准 3 → 8**：`X6502_Run(8)` = 8 dots ≈ 2.67 周期预算于 latch 前。扫参：
 >   7 → `[4,3,...]`（偏早 1 指令）、**8 → `[4,4,4,3,3,3,3,3,3,2]`（与期望完全一致）**、9 → `[4,4,4,4,3,...]`（转变行晚 1）。
 > - **实测**：vbl_05 **PASS（$6000=0x00）——证伪判据主项达成**；vbl 全 10 ROM 零回归（01/03/04/09 基线保持）；
->   APU 18 ROM 零回归；Oracle A 33/33（golden nestest 哈希已重生，`7ea1d0c`）。
+>   APU 18 ROM 零回归；内部逻辑检测 33/33（golden nestest 哈希已重生，`7ea1d0c`）。
 >   完整数据见 `docs/history/surveys/e1_vbl/vbl_step1_3_deep_x6502run_2026-08-02.md`。
 >
 > **深层根因定位（本轮决定性数据）**：vbl_05 的 `_count` 残量（= CPU↔PPU 帧相位）
@@ -289,18 +289,18 @@ vbl_02/06/07/08 $6000=0x00（未达成）；vbl_04（当前 PASS）不回归（�
 >   修复需**亚指令级写时序**（CPU/PPU 联合仿真改造，与 vbl_02/06 深模型同族，收敛无保证）。
 > - **扫参证伪**：FCEUX11_E1_GATEDOT(336-340) × FCEUX11_E1_SKIPDOT(339-341) 共 15 配置，无任何配置产生 8,8,9,7。
 > - **处置**：vbl_10 记录为有据已知限制（0x03），不排入当前序列；代码保持基线，保留 E1 SKIP_DEC / E1 W2001 探针
->   （env-gated 零影响，供未来深模型调查复用）。PASS 基线 01/03/04/05/09 零回归，Oracle A 34/34。
+>   （env-gated 零影响，供未来深模型调查复用）。PASS 基线 01/03/04/05/09 零回归，内部逻辑检测 34/34。
 
 **文件**：`src/ppu_rendering.cpp:2058-2074`（even/odd 跳点，pre-render 行末 (339,261)→(0,0)；文档早期引用的 1979-1994 为过时行号）
 **改法（原案，已被调查证伪路径）**：先插桩记录跳点 dot 与 BG-enable/disable 事件的相对位置，确认"跳点偏晚/偏早"后按数据移动。`vbl_09` 当前 PASS 且依赖跳点位置，盲目移动必回归。**实测**：跳点位置本身与硬件真值一致（skip dot 340），问题在写侧接受边界，非跳点位置。
 **注意**：`idleSynch` 存于 savestate（`ppu_state.cpp:69` tag "IDLS"），改 toggle 时机会 invalidate `golden_savestate_test` 哈希 → 需 `--generate` 重生。
-**证伪判据（未达成，已定案为限制）**：`vbl_10` 输出 `08 08 09 07`（$6000=0x00）——需亚指令级写时序，收敛无保证；`vbl_09` $6000 保持 `0x00`（✅ 保持）；Oracle A 34/34（✅ 保持）。
+**证伪判据（未达成，已定案为限制）**：`vbl_10` 输出 `08 08 09 07`（$6000=0x00）——需亚指令级写时序，收敛无保证；`vbl_09` $6000 保持 `0x00`（✅ 保持）；内部逻辑检测 34/34（✅ 保持）。
 
 ### Phase 1 强制回归集（每步后必跑，任一红即回滚该步）
 
 - `vbl_01_basics` / `vbl_03_clear_time` / `vbl_04_nmi_control` / `vbl_09_even_odd_frames`（PASS 基线）
-- `fceux11_rom_regression_test`（Oracle A，13 ROM × 60 帧 CRC32，`tests/tests.json:38`，blocking）
-- `fceux11_golden_savestate_test` + `fceux11_savestate_regression_test`（Oracle A，blocking）
+- `fceux11_rom_regression_test`（内部逻辑检测，13 ROM × 60 帧 CRC32，`tests/tests.json:38`，blocking）
+- `fceux11_golden_savestate_test` + `fceux11_savestate_regression_test`（内部逻辑检测，blocking）
 - 全量 `ctest -LE perf`（34/34）
 - 每步前 `scripts/do_build.ps1` 全量重建
 
@@ -325,7 +325,7 @@ vbl_02/06/07/08 $6000=0x00（未达成）；vbl_04（当前 PASS）不回归（�
 
 > **✅ 实测状态**：已实现 `FCEUSND_Reset(bool is_power)`（power: IRQFrameMode=0x0 + fcnt=1；reset: 保留最后
 > IRQFrameMode + fcnt=1），`fceu.cpp`/`FCEUSND_Power` 调用点区分。探针证实 power-on 后 fcnt 序列 1,2,3,0、
-> IRQ 于第 4 个 quarter=29830 置位；40 ROM 零 PASS→FAIL、Oracle A 34/34、golden 重生（仅 fhcnt/fcnt 起始值
+> IRQ 于第 4 个 quarter=29830 置位；40 ROM 零 PASS→FAIL、内部逻辑检测 34/34、golden 重生（仅 fhcnt/fcnt 起始值
 > 变更）。完整数据见 `docs/history/surveys/e6_apu/p2_step2_1_fix_data_2026-08-01.md`。
 
 **文件**：`src/sound.cpp:1247-1300`（`FCEUSND_Reset`）、`src/fceu.cpp:896-901`（软复位调用点）
@@ -371,7 +371,7 @@ vbl_02/06/07/08 $6000=0x00（未达成）；vbl_04（当前 PASS）不回归（�
 >   jitter 相位 = 写时刻 `g_cpu.timestamp & 1`。完整数据见
 >   `docs/history/surveys/e6_apu/p2_step2_2_data_2026-08-02.md`。
 > - ✅ **`apu_single_4_jitter` 0x02 → 0x00 PASS**；40 ROM APU 全量零 PASS→FAIL；
->   Oracle A 33/33（golden 重生，`fds_bios.fc0` 仅 5 字节 fhcnt/fcnt 运行期值变更）。
+>   内部逻辑检测 33/33（golden 重生，`fds_bios.fc0` 仅 5 字节 fhcnt/fcnt 运行期值变更）。
 > - ⚠️ **`apu_single_5/6` 0x02 → 0x04 未闭合**（"first too soon"→"second too soon"）：
 >   hook 量化方差（±2-3 cyc）超出 blargg ±1 cyc 容差，**参数级不可收敛**（offset 0-4、
 >   fhinc 7457.5/7458、分数 offset、fcnt==3 +1、tsdelta 递减 全部证伪）。需 cycle-accurate
@@ -388,7 +388,7 @@ vbl_02/06/07/08 $6000=0x00（未达成）；vbl_04（当前 PASS）不回归（�
 >   + power/reset 起始相位 D=4 + IRQ flag/line 分离。
 > - **结果**：**`apu_single_5/6`、`apu_reset_4017_timing/written`、`apu_test`
 >   全转 PASS——Phase 2 目标 7 个 bucket-C sub-test 全闭合**；APU 52 ROM 零 apu_* 失败；
->   Oracle B 135 PASS（基线 121）；golden 重生（compare-layout 仅 SFSND/FHCN 变化）。
+>   硬件一致性检测 135 PASS（基线 121）；golden 重生（compare-layout 仅 SFSND/FHCN 变化）。
 > - runner 升级：`--reset-after` 后按 0x81 协议自动多次复位（4017_written 需两次）。
 
 ### Step 2.3 — ~~5-step 立即 clock 触发条件修正（V&0x1 而非 V&0x2）~~（**已证伪，2026-08-02**）
@@ -429,13 +429,13 @@ vbl_02/06/07/08 $6000=0x00（未达成）；vbl_04（当前 PASS）不回归（�
 
 > **✅ 2026-08-04 落地状态**(详见 `docs/history/reports/FCEUX11-1.16_P3-Step31_harness_cleanup_2026-08-04.md`):
 >
-> **基线(2026-08-04 06:00 Oracle B)**: 177 ROMs,**126 PASS / 51 FAIL**
+> **基线(2026-08-04 06:00 硬件一致性检测)**: 177 ROMs,**126 PASS / 51 FAIL**
 > - 0x80 × 13(帧预算不足)
 > - 0x81 × 8("Press RESET" 中途复位)
 > - 0xFE × 1(`cpu_interrupts.nes` 永久跳过)
 > - 0x01-0x09 × 29(真实精度)
 >
-> **修后(2026-08-04 07:00 Oracle B)**: 177 ROMs,**141 PASS / 36 FAIL** ✅
+> **修后(2026-08-04 07:00 硬件一致性检测)**: 177 ROMs,**141 PASS / 36 FAIL** ✅
 > - 0x80 × **0**(全清零)
 > - 0x81 × **0**(全清零)
 > - 0xFE × 1(永久跳过不变)
@@ -448,7 +448,7 @@ vbl_02/06/07/08 $6000=0x00（未达成）；vbl_04（当前 PASS）不回归（�
 > - `scripts/analyze_blargg_results.ps1`:加注释说明 `reset_after` 字段含义
 >
 > **验证**:
-> - Oracle A `ctest -LE perf`:33/33 PASS(不变)
+> - 内部逻辑检测 `ctest -LE perf`:33/33 PASS(不变)
 > - 0x80 桶:13 → 0 ✅
 > - 0x81 桶:8 → 0 ✅
 > - 真实精度净修正:15 ROM PASS + 6 ROM 露出真实精度码(预期行为)
@@ -457,7 +457,7 @@ vbl_02/06/07/08 $6000=0x00（未达成）；vbl_04（当前 PASS）不回归（�
 >
 > **剩余 36 项 FAIL** 进入 Step 3.2,详见报告 §3 分类(按子系统:**CPU 13**(含 0xFE 永久跳过 1)/ **PPU 4** / **vbl 5** / **MMC3 12** / **sprdma 2** = 36;35 真实精度 + 1 永久跳过)
 >
-> 分类详细(2026-08-04 06:00 Step 3.1 后 Oracle B 实测):
+> 分类详细(2026-08-04 06:00 Step 3.1 后 硬件一致性检测 实测):
 > - **CPU 13**:`cpu_dummy_writes_oam` 0x06 / `cpu_dummy_writes_ppu` 0x09 / `cpu_exec_space_ppuio` 0x05 / `cpu_int_2/3/4/5_nmi_brk/nmi_irq/irq_dma/branch_irq` 0x01×4 / `cpu_reset_regs` 0x02 / `instr_misc` 0x01 / `instr_misc_03_dummy` 0x03 / `instr_timing` 0x01 / `instr_timing_v2_1` 0x03 / `cpu_interrupts` 0xFE(永久跳过)
 > - **PPU 4**:`oam_stress` 0x01 / `ppu_open_bus` 0x03 / `ppu_read_buffer` 0x0E / `ppu_vbl_nmi` 0x01
 > - **vbl 5**:`vbl_02_set_time` 0x01 / `vbl_06_suppression` 0x01 / `vbl_07_nmi_on_timing` 0x01 / `vbl_08_nmi_off_timing` 0x01 / `vbl_10_even_odd_timing` 0x03(均 Phase 1 Step 1.3/1.4 已知限制,CPU/PPU 联合时序族)
@@ -466,11 +466,11 @@ vbl_02/06/07/08 $6000=0x00（未达成）；vbl_04（当前 PASS）不回归（�
 >
 > 修订前报告原文"CPU 11 / PPU 11 / MMC3 12 / APU 2 / 永久跳过 1 = 37"分类与实测 36 不符(漏算了 vbl 5 项单独列出;APU 2 实为 sprdma 2;CPU 11 应为 12)。本修订为实地核对后的精准分类。
 >
-> **📌 后续收敛注记(2026-08-05)**:以上为 Step 3.1 后 36 FAIL 历史基线快照。桶 C 调查(`863e9d7`)已收敛 `ppu_read_buffer`(0x0E) + 顺带修复 `cpu_dummy_writes_ppu`(0x09),当前 Oracle B 为 **143 PASS / 34 FAIL**,剩余 34 项 FAIL 分类见 §5 Step 3.2 各桶。
+> **📌 后续收敛注记(2026-08-05)**:以上为 Step 3.1 后 36 FAIL 历史基线快照。桶 C 调查(`863e9d7`)已收敛 `ppu_read_buffer`(0x0E) + 顺带修复 `cpu_dummy_writes_ppu`(0x09),当前 硬件一致性检测 为 **143 PASS / 34 FAIL**,剩余 34 项 FAIL 分类见 §5 Step 3.2 各桶。
 
 ### Step 3.2 — 剩余真实精度 FAIL 重分桶 + 逐个收敛【**🚧 进行中 2026-08-04**】
 
-- 重跑全量 Oracle B（Phase 1/2 落地后基线），把剩余真实精度 FAIL 按子系统分桶（CPU 时序 / PPU 渲染 / OAM / DMA / APU 残余 / 其他）
+- 重跑全量 硬件一致性检测（Phase 1/2 落地后基线），把剩余真实精度 FAIL 按子系统分桶（CPU 时序 / PPU 渲染 / OAM / DMA / APU 残余 / 其他）
 - 每桶一个独立 PR，沿用 instrument-first + 强制回归纪律；每个 FAIL 保留 $6000 码 + 诊断串 + 根因结论
 - 无法在不回归前提下收敛的项 → 记录为**有据已知限制**（带错误码、诊断、根因、已尝试方案），符合 §十·五"精确知道什么失败"原则
 
@@ -479,7 +479,7 @@ vbl_02/06/07/08 $6000=0x00（未达成）；vbl_04（当前 PASS）不回归（�
 > **桶 A — MMC3 (12 ROMs)** ✅ **已完成** → 12/12 全记入有据已知限制
 > - 根因:0x02 IRQ counter reload 边角场景(单 PR 不闭合);0x03/0x04 A12 via PPUADDR 未实现(Mapper 4 无 PPU_hook);0x09 scanline 0 IRQ 时机
 > - 详:`docs/history/surveys/mmc3/stepA_investigation_2026-08-04.md`
-> - 探针保留:`FCEUX11_MMC3_PROBE=1` env-gated(零侵入,Oracle A 33/33 不变),供未来深模型调研复用
+> - 探针保留:`FCEUX11_MMC3_PROBE=1` env-gated(零侵入,内部逻辑检测 33/33 不变),供未来深模型调研复用
 > - 提交:`m(a-investigation)`(`f4a072a`)
 >
 > **桶 B — CPU (12 ROMs 真实精度 + 1 永久跳过)**：
@@ -517,15 +517,15 @@ vbl_02/06/07/08 $6000=0x00（未达成）；vbl_04（当前 PASS）不回归（�
 >     + `docs/history/surveys/ppu_bucketC/opendecay_probe_2026-08-05.md`（ppu_open_bus
 >     instrument-first 数据 + 修复方案）
 >     + `docs/history/surveys/ppu_bucketC/bucketC_residue_2026-08-05.md`（桶 C 余项定案）
-> - 验证:Oracle B **144 PASS / 33 FAIL**（基线 141/36，+3 PASS 零回归）;
->   Oracle A 100% pass
+> - 验证:硬件一致性检测 **144 PASS / 33 FAIL**（基线 141/36，+3 PASS 零回归）;
+>   Internal Logic Check 100% pass
 > - 提交:`c(fix)`(`863e9d7`)+ `c(fix)`(`23b0cdd`)+ `c(known-limit)`(`116a602`)
 > - 探针保留:`FCEUX11_OPENDECAY_PROBE=1` env-gated（零侵入）,
 >   供未来深模型调查复用
 >
 > **桶 C.1 — vbl (5 ROMs, Phase 1 已知限制)** ✅ **已记录（不在本桶重做）**
 > - vbl_02/06/07/08/10 均在 Phase 1 Step 1.2/1.3/1.4 调查中定案为深模型族限制
-> - 探针 `FCEUX11_E1_TRACE` 已落地保留(零侵入,Oracle A 33/33 不变)
+> - 探针 `FCEUX11_E1_TRACE` 已落地保留(零侵入,内部逻辑检测 33/33 不变)
 > - 待深模型族突破后统一处理
 >
 > **桶 D — sprdma (2 ROMs)** ✅ **已完成**（`4a7f7e2 d(probe)`,2026-08-05）→ 2/2 记入已知限制（深模型族）
@@ -541,7 +541,7 @@ vbl_02/06/07/08 $6000=0x00（未达成）；vbl_04（当前 PASS）不回归（�
 ### Step 3.3 — 全量回归 + 验收复检（100% 完美交付判据）
 
 > **2026-08-05 数字同步 2**(Step 3.1 + Step 3.2 全部桶已知限制定案后基线):
-> - Oracle B:**144 PASS / 33 FAIL**(基线 177 ROMs;Phase 3 Step 3.2 全部完成)
+> - 硬件一致性检测:**144 PASS / 33 FAIL**(基线 177 ROMs;Phase 3 Step 3.2 全部完成)
 >   - PASS (1 真实精度): `ppu_read_buffer` (`863e9d7`)+ `cpu_dummy_writes_ppu` (`863e9d7` 顺带)+ `ppu_open_bus` (`23b0cdd`)
 >   - 已知限制 (32): 桶 A 12 + 桶 B 11 (B.3+B.4 2 + B.1+B.2 9) + 桶 C 余项 2 + 桶 D 2 + 桶 C.1 5
 > - 0x80/0x81 桶:**已清零**(Step 3.1 完成)
@@ -550,8 +550,8 @@ vbl_02/06/07/08 $6000=0x00（未达成）；vbl_04（当前 PASS）不回归（�
 > - **修复路径**:深模型族突破后统一处理（per-cycle CPU/PPU/DMA 联合仿真改造）——见 §6 主要风险表
 > - **Phase 3 净增**:基线 143/34 → 最终 144/33（+1 PASS,零回归）
 
-- [ ] Oracle A：`ctest -LE perf` 100% pass + `kagamiqa_migration_matrix.json` 生成
-- [ ] Oracle B：全量重跑,FAIL 全带码+分类(已知限制类 PASS 数无变化即可)
+- [ ] 内部逻辑检测：`ctest -LE perf` 100% pass + `kagamiqa_migration_matrix.json` 生成
+- [ ] 硬件一致性检测：全量重跑,FAIL 全带码+分类(已知限制类 PASS 数无变化即可)
 - [ ] 迁移矩阵：`total=39`,按 Step 3.2 实际收敛度调整 PASS/FAIL 数（基线：144/33，桶 E cpu_interrupts 永久跳过 0xFE 1 项不计入 PASS 数）;`lua_joypad_test`/`lua_memory_test` 视实现进度转 PASS 或保留有据 advisory
 - [ ] README CN/EN + `docs/tech/KagamiQA.md` 三处数字与锚 commit 由 CI 产物回填(R2 路径 A)
 - [ ] CI 实跑一轮全绿(R4 Gate 通过)

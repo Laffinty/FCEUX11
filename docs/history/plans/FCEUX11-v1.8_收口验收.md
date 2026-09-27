@@ -24,8 +24,8 @@
 | 通道 | 数值 |
 |---|---|
 | 矩阵 | 120 总 / **106 PASS / 14 FAIL** / **Grade B** |
-| Oracle A | 42P / 0F |
-| Oracle B (blargg) | 145P / 32F |
+| 内部逻辑检测 | 42P / 0F |
+| 硬件一致性检测 (blargg) | 145P / 32F |
 | advisory-FAIL | 14/120 = 11.7%（cap 15%） |
 | fail_to_pass / pass_to_fail | 0 / 0 |
 | vendor_state | v=43 a=13 p=22 |

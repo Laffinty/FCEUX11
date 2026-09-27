@@ -23,7 +23,7 @@
 | M6 "公共领域"措辞 | →"社区惯例/上游无 LICENSE" | ✅ **通过** — KagamiQA.md + 下载脚本头注释均已修正 |
 | L1 第三方 ROM 归因 | 补充 blargg/nestest 归因 | ✅ **通过** — DERIVATIVE_WORK_NOTICE.txt 已补充完整 |
 
-**未处理项**（7 项，均未在 commit 中触及）：S3（Oracle A 3 失败测试）、M3（ppu_rendering_lut 构建损坏）、M5（P4-bridge 报告归类）、M7（COPYRIGHT_AUDIT 范围）、L2（脚本 ROM 数）、L3（main.rs 空 config）、L4（CALL_PPUREAD 判空）。
+**未处理项**（7 项，均未在 commit 中触及）：S3（内部逻辑检测 3 失败测试）、M3（ppu_rendering_lut 构建损坏）、M5（P4-bridge 报告归类）、M7（COPYRIGHT_AUDIT 范围）、L2（脚本 ROM 数）、L3（main.rs 空 config）、L4（CALL_PPUREAD 判空）。
 
 ---
 
@@ -219,14 +219,14 @@ v1.16:  1.00  × 0.50  × 0.50  ≈ 0.25  (transitioning: baseline solid, CI for
 **验证 2 — README 中文行**：✅ 已修正
 
 ```
-| Oracle A（回归测试） | 34 个 CTest 单元/回归/边界测试（来自 39 条清单条目），每次 push 全量运行 |
+| 内部逻辑检测（回归） | 34 个 CTest 单元/回归/边界测试（来自 39 条清单条目），每次 push 全量运行 |
 ```
 （修复前是 "39 个 CTest"）
 
 **验证 3 — README 英文行**：🔴 **未修正**
 
 ```
-line 118: | **Oracle A (regression)** | 39 CTest unit/regression/boundary tests, full run on every push, zero-diff gating |
+line 118: | **Internal Logic Check (regression)** | 39 CTest unit/regression/boundary tests, full run on every push, zero-diff gating |
 ```
 
 英文行仍是 "39 CTest"，与中文行的 "34 CTest（39 清单）" 不一致。
@@ -287,7 +287,7 @@ mapper_*.nes, test_fds.fds, test_nsf.nsf
 
 | 问题 | 状态 | 实测确认 |
 |------|------|---------|
-| **S3** Oracle A 3 失败测试 | 🔴 未处理 | commit stat 无 ppu_rendering_lut/lua_bit/direct_smoke 相关改动 |
+| **S3** 内部逻辑检测 3 失败测试 | 🔴 未处理 | commit stat 无 ppu_rendering_lut/lua_bit/direct_smoke 相关改动 |
 | **M3** ppu_rendering_lut 构建损坏 | 🔴 未处理 | 完整重建后 exe 仍是 `0000` 文件头（2MB 占位），`file` 报 `data`，PowerShell 报"文件或目录损坏且无法读取" |
 | **M5** P4-bridge 报告归类 | 🔴 未处理 | 报告仍含 2 处"既有配置问题/与本次修改无关"归类 |
 | **M7** COPYRIGHT_AUDIT 范围 | 🔴 未处理 | scope 仍是 `src/ directory`，不含 fixtures |
@@ -295,7 +295,7 @@ mapper_*.nes, test_fds.fds, test_nsf.nsf
 | **L3** main.rs 空 config | 🔴 未处理 | `main.rs:186` 仍 `adapter.init(&scheduler_config_default())` |
 | **L4** CALL_PPUREAD 判空 | 🔴 未处理 | `ppu.cpp:301` 仍 `#define CALL_PPUREAD(A) (FFCEUX_PPURead(A))`（不判空） |
 
-**特别说明 — M3 是真实构建缺陷**：`ppu_rendering_lut_test.exe` 在 do_build 完整重建后仍是 2MB 的 `0000` 占位文件（非 PE 格式）。这不是"配置问题"，是 CMake 生成规则或自定义命令的 bug —— 某个 `add_custom_command` 产物（可能是 LUT 生成脚本）未正确产出有效 PE，而是写入了空/占位数据。此测试在 Oracle A 中注册为 CTest 但永远无法运行。
+**特别说明 — M3 是真实构建缺陷**：`ppu_rendering_lut_test.exe` 在 do_build 完整重建后仍是 2MB 的 `0000` 占位文件（非 PE 格式）。这不是"配置问题"，是 CMake 生成规则或自定义命令的 bug —— 某个 `add_custom_command` 产物（可能是 LUT 生成脚本）未正确产出有效 PE，而是写入了空/占位数据。此测试在 内部逻辑检测 中注册为 CTest 但永远无法运行。
 
 ---
 
@@ -324,7 +324,7 @@ CMake build failed
 |--------|------|---------|--------|
 | 🔴 严重 | S1 runner .exe | **未生效**（修复 bug） | 需改 `EXE_EXTENSION`→`EXE_SUFFIX` 或加 `.` |
 | 🔴 严重 | S2 direct 编译 | ✅ 通过 | — |
-| 🔴 严重 | S3 Oracle A 失败 | 未处理 | — |
+| 🔴 严重 | S3 内部逻辑检测 失败 | 未处理 | — |
 | 🔴 严重 | S4 bug JSON | ✅ 通过 | — |
 | 🟡 中等 | M1 drift 检测 | ✅ 通过 | — |
 | 🟡 中等 | M2 Lua 假阳性 | 代码✅ / 端到端🟡 | do_build LNK1104 + Rust ABI |
@@ -351,8 +351,8 @@ CMake build failed
 
 | 因子 | 审计时 | 修复后 | 变化 |
 |------|--------|--------|------|
-| ROM 覆盖率 | 1.00 | 1.00 | 不变（Oracle B 基线仍可复现） |
-| Oracle 独立性 | 0.50 | 0.50 | **不变**（S1 未生效，迁移矩阵仍失效） |
+| ROM 覆盖率 | 1.00 | 1.00 | 不变（硬件一致性检测 基线仍可复现） |
+| 通道独立性 | 0.50 | 0.50 | **不变**（S1 未生效，迁移矩阵仍失效） |
 | CI 常驻因子 | 0.50 | 0.50 | **不变**（drift 检测虽实现 M1，但输入源 matrix 仍坏） |
 
 **权威性得分**：1.00 × 0.50 × 0.50 = **0.25**（与审计复评一致，未提升）。

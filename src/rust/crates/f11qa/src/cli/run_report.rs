@@ -136,7 +136,7 @@ pub fn generate(input: ReportInput) -> Result<i32, Box<dyn std::error::Error>> {
     }
 
     println!(
-        "Oracle A: {}P / {}F | Oracle B: {}P / {}F",
+        "Internal Logic Check: {}P / {}F | Hardware Consistency Check: {}P / {}F",
         matrix.oracle_breakdown.a_regression.pass,
         matrix.oracle_breakdown.a_regression.fail,
         matrix.oracle_breakdown.b_hardware.pass,
@@ -144,7 +144,7 @@ pub fn generate(input: ReportInput) -> Result<i32, Box<dyn std::error::Error>> {
     );
 
     // -------------------------------------------------------------------
-    // Oracle B — parse blargg $6000 results from stdout and generate the
+    // Hardware Consistency Check — parse blargg $6000 results from stdout and generate the
     // accuracy comparison table + known-failure cross-check.
     // -------------------------------------------------------------------
     let mut all_blargg_results = Vec::new();
@@ -164,7 +164,7 @@ pub fn generate(input: ReportInput) -> Result<i32, Box<dyn std::error::Error>> {
             .count();
         let bfailed = btotal - bpassed;
         eprintln!(
-            "Oracle B (blargg): {} total, {} PASS, {} FAIL",
+            "Hardware Consistency Check (blargg): {} total, {} PASS, {} FAIL",
             btotal, bpassed, bfailed
         );
 

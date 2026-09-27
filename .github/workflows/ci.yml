@@ -70,7 +70,7 @@ jobs:
           restore-keys: |
             vcpkg-
 
-      # R4-1 (2026-08-07): F11QA Oracle B / direct runner depend on
+      # R4-1 (2026-08-07): F11QA Hardware Consistency Check / direct runner depend on
       # tests/fixtures/blargg/**/*.nes. These ROMs are NOT in git (the
       # .gitignore `*.nes` exception only covers top-level fixtures, not
       # subdirectories) — they are fetched from the christopherpow/nes-test-roms
@@ -92,7 +92,7 @@ jobs:
         run: ./scripts/download_blargg_roms.ps1
 
       # Cross-check the manifest: every ROM the manifest promises must
-      # actually be on disk before Oracle B / direct runner may claim to
+      # actually be on disk before Hardware Consistency Check / direct runner may claim to
       # have tested it. download_blargg_roms.ps1 reports failures but never
       # sets a non-zero exit code, so a partially-downloaded fixture tree
       # would silently be reported as a full run without this gate.
@@ -109,7 +109,7 @@ jobs:
           if ($missing.Count -gt 0) {
             foreach ($p in ($missing | Select-Object -First 10)) { Write-Host "::error::missing ROM: $p" }
             if ($missing.Count -gt 10) { Write-Host "::error::... and $($missing.Count - 10) more" }
-            Write-Host "::error::blargg fixture tree is incomplete - Oracle A direct runner and Oracle B blargg suite would fail. Check scripts/download_blargg_roms.ps1 and the upstream mirror."
+            Write-Host "::error::blargg fixture tree is incomplete - Internal Logic Check direct runner and Hardware Consistency Check blargg suite would fail. Check scripts/download_blargg_roms.ps1 and the upstream mirror."
             exit 1
           }
 

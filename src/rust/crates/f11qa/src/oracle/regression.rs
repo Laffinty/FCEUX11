@@ -1,4 +1,4 @@
-// P1: Oracle A (regression-equivalence) is simple exit-code comparison.
+// P1: Internal Logic Check (regression-equivalence) is simple exit-code comparison.
 // The subprocess adapter checks `exit_code == expected.exit_code`.
 // P2+ will add frame hash / WAV diff / mapper state comparison here.
 

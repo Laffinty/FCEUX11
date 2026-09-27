@@ -1,7 +1,7 @@
 # FCEUX11 v1.16 KagamiQA P5 权威性构建计划
 
-> **性质**：P5 runppu 重批 + 权威性加固，交付一个覆盖率 ≥80%、CI 常驻、frame-by-frame 可驱动的独立双 oracle 测试系统。
-> **前提**：P0–P4 已交付（39 条清单、blargg 22 ROM 基线、Oracle A 全绿、Oracle B 17/22 PASS、01-vbl_basics FAIL→PASS）。
+> **性质**：P5 runppu 重批 + 权威性加固，交付一个覆盖率 ≥80%、CI 常驻、frame-by-frame 可驱动的独立双通道 测试系统。
+> **前提**：P0–P4 已交付（39 条清单、blargg 22 ROM 基线、内部逻辑检测 全绿、硬件一致性检测 17/22 PASS、01-vbl_basics FAIL→PASS）。
 > **分支**：`wip_1.16`
 
 ---
@@ -16,8 +16,8 @@
 
 | 门禁 | v1.16 状态 | 评估 |
 |---|---|---|
-| Oracle A 全绿 | ✅ ctest 33/33 PASS（CI run #31/#32/#33）| ✅ |
-| Oracle B 清单稳定 | ✅ Phase 3 33 FAIL 全部归类（32 已知限制 + 1 永久跳过）| ✅ |
+| 内部逻辑检测 全绿 | ✅ ctest 33/33 PASS（CI run #31/#32/#33）| ✅ |
+| 硬件一致性检测 清单稳定 | ✅ Phase 3 33 FAIL 全部归类（32 已知限制 + 1 永久跳过）| ✅ |
 | 收益预期重估通过 | ⏳ 见下 | ✅ 评估完成，决策推迟 |
 
 **收益分析**（基于 Phase 3 + Phase 4 数据）：
@@ -25,7 +25,7 @@
 | 指标 | 值 | 来源 |
 |---|---|---|
 | blargg PASS 率 | 144/177 = **81.4%** | `blargg_full_results.json`（Phase 3 基线，未变）|
-| Phase 4.4 测试清单扩展 | 39 → 47（+8 Oracle B 桶代表）| commit 370a3af，run #33 success |
+| Phase 4.4 测试清单扩展 | 39 → 47（+8 硬件一致性检测 桶代表）| commit 370a3af，run #33 success |
 | tests.json FAIL 计数 | 47 项中 8 项 FAIL（全部 advisory 已知限制）| Phase 4.4 验证 |
 | 已知限制归类 | 32 项 = MMC3 12 + CPU 9 + CPU B.3+B.4 2 + sprdma 2 + PPU 2 + vbl 5 | Phase 3 收口 |
 | 永久跳过 | 1 项（cpu_interrupts 0xFE）| Phase 3 记录 |
@@ -47,7 +47,7 @@
 | 维度 | runppu 切换 | 保持现状 |
 |---|---|---|
 | 精度提升 | 0（深模型族限制与渲染路径无关）| 0 |
-| 风险 | 引入新回归（渲染路径变更 → 可能破坏 39 PASS Oracle A + 12 PASS Oracle B 监控）| 0 |
+| 风险 | 引入新回归（渲染路径变更 → 可能破坏 39 PASS 内部逻辑检测 + 12 PASS 硬件一致性检测 监控）| 0 |
 | 工作量 | QA 全量回归 177 ROM × 600 帧 ≈ 3 分钟 × 完整 oracle + savestate 兼容性验证 | 0 |
 | savestate 兼容性 | 可能破坏（savestate 哈希与 runppu 参数耦合）| 不变 |
 | 决策时点 | Phase 3 完成后已显示无收益信号；Phase 4 4 项 must-pass 全部闭环 | v1.16 收口期稳定基线 |
@@ -57,7 +57,7 @@
 推迟 **不**等于放弃 runppu 路径。当以下任一条件成熟时，v1.17+ 可重启 P5 评估：
 
 1. **深模型族突破**：32 已知限制中 ≥1 项被**非 runppu 路径**修复，揭示剩余限制的根因更清晰
-2. **新外部 oracle 引入**：NESdev 其他套件 / TASVideos 精度表 / 真机采集等独立来源出现，可与 runppu 形成对照
+2. **新外部检测通道 引入**：NESdev 其他套件 / TASVideos 精度表 / 真机采集等独立来源出现，可与 runppu 形成对照
 3. **CPU/PPU 联合仿真**：per-cycle 联合仿真路径就绪，可定量验证 runppu 是否影响深模型族
 
 ### 对 P5 §三 的影响
@@ -74,7 +74,7 @@ v1.16 收口期 P5 计划以"5A/5B/5C/5E 完成，5D 推迟"结项。
 
 ## 〇、TL;DR
 
-KagamiQA 当前是一个**可工作的原型**：清单驱动、双 oracle 分离、迁移矩阵产出均已实现。但它还不是一个**权威的质量防线**——原因有三：
+KagamiQA 当前是一个**可工作的原型**：清单驱动、双通道 分离、迁移矩阵产出均已实现。但它还不是一个**权威的质量防线**——原因有三：
 
 1. **ROM 覆盖率仅 ~13%**（22/174 blargg ROM），大量精度风险不可见
 2. **CI 未集成**，每次都是手动运行 → §十"平行王国化"风险已兑现
@@ -85,8 +85,8 @@ KagamiQA 当前是一个**可工作的原型**：清单驱动、双 oracle 分�
 - **blargg 覆盖率 ≥80%**（≥140 ROM，覆盖全部子类）
 - **CI 常驻**（每次 push 触发，迁移矩阵自动产出）
 - **in-process 通道打通**（runner 经 C ABI 直接驱动 core，不再 fork 子进程）
-- **Oracle A 全绿不退化**
-- **Oracle B 基线完整版本化**
+- **内部逻辑检测 全绿不退化**
+- **硬件一致性检测 基线完整版本化**
 
 ---
 
@@ -95,7 +95,7 @@ KagamiQA 当前是一个**可工作的原型**：清单驱动、双 oracle 分�
 ### 1.1 权威性 = 信号可信度
 
 ```
-权威性得分 = ROM覆盖率 × Oracle独立性 × CI常驻因子
+权威性得分 = ROM覆盖率 × 通道独立性 × CI常驻因子
 
 当前:  0.13 × 1.0 × 0.0 = 0.00  ← 原型
 目标:  0.80 × 1.0 × 1.0 = 0.80  ← 防线
@@ -103,13 +103,13 @@ KagamiQA 当前是一个**可工作的原型**：清单驱动、双 oracle 分�
 
 | 因子 | 含义 | 测量方法 |
 |---|---|---|
-| ROM 覆盖率 | Oracle B 覆盖的 blargg ROM 比例 | `coverage = tested_roms / 174` |
-| Oracle 独立性 | A/B 两个 oracle 是否完全解耦、互不污染 | 二元：双通道分离 = 1.0 |
+| ROM 覆盖率 | 硬件一致性检测 覆盖的 blargg ROM 比例 | `coverage = tested_roms / 174` |
+| 通道独立性 | A/B 两个 oracle 是否完全解耦、互不污染 | 二元：双通道分离 = 1.0 |
 | CI 常驻因子 | 是否每次 push 自动运行 | 二元：接入 CI = 1.0 |
 
 ### 1.2 权威性不要求的事
 
-- **不要求 Oracle B 全绿**：已知失败清单本身就是权威性的一部分——精确知道什么失败，比"全绿但不测"更权威
+- **不要求 硬件一致性检测 全绿**：已知失败清单本身就是权威性的一部分——精确知道什么失败，比"全绿但不测"更权威
 - **不要求跨项目迁移**（§1.3 非目标 2）：SutAdapter 抽象层已预留，但 v1.16 不接入第二个被测物
 - **不要求 100% ROM 覆盖**：~174 个 ROM 中有部分属于同一测试的不同版本（如 instr_test-v3/v4/v5），去重后有效覆盖 ~140 个即可 ≥80%
 
@@ -139,7 +139,7 @@ KagamiQA 当前是一个**可工作的原型**：清单驱动、双 oracle 分�
 
 目标：
 - GitHub Actions workflow：每次 push 到 `wip_1.16` / `main` 触发
-- Job 矩阵：`KagamiQA (Oracle A)` + `KagamiQA (Oracle B)`
+- Job 矩阵：`KagamiQA (内部逻辑检测)` + `KagamiQA (硬件一致性检测)`
 - 报告上传为 workflow artifact
 - baseline drift 检测 → PR comment（红色警报）
 
@@ -152,7 +152,7 @@ KagamiQA 当前是一个**可工作的原型**：清单驱动、双 oracle 分�
 
 目标：
 - runner 支持 `--direct` flag，走 `Fceux11DirectAdapter` 路径
-- Oracle B 测试：load ROM → step() × N frames → read_oracle_probe(0x6000) → 判定
+- 硬件一致性检测 测试：load ROM → step() × N frames → read_oracle_probe(0x6000) → 判定
 - 不需要 fork 子进程、不需要 blargg_runner 二进制
 
 ### 2.4 Lua 判定精度
@@ -173,9 +173,9 @@ KagamiQA 当前是一个**可工作的原型**：清单驱动、双 oracle 分�
 |---|---|---|
 | A1. 下载完整 blargg 套件 | `tests/fixtures/blargg/` 下 ~174 ROM | 脚本化（已有 `download_blargg_roms.ps1`，扩参数） |
 | A2. 生成 blargg_manifest.json（全量） | 每个 ROM 条目含 name / path / frames / probe_addr | 脚本化 |
-| A3. 全量跑批 → Oracle B 原始基线 | `blargg_full_baseline.json`（每个 ROM 的 result_code + diag + duration） | 跑批 <10 分钟 |
+| A3. 全量跑批 → 硬件一致性检测 原始基线 | `blargg_full_baseline.json`（每个 ROM 的 result_code + diag + duration） | 跑批 <10 分钟 |
 | A4. 分类：PASS / KNOWN_FAIL / EXPECTED_FAIL | 标记每个 FAIL 是否 expected_to_eventually_pass | 对照 TASVideos 上游 FCEUX 表格 |
-| A5. 更新 tests.json 清单 | 为每个 blargg ROM 添加清单条目（Oracle B） | 脚本生成 |
+| A5. 更新 tests.json 清单 | 为每个 blargg ROM 添加清单条目（硬件一致性检测） | 脚本生成 |
 | A6. 更新 blargg_known_fail.json | 全量已知失败清单，版本化 | 手动审核 |
 | A7. 重新生成精度对照表 | `docs/FCEUX11-1.16_KagamiQA-P5-accuracy-table.md` | runner 自动生成 |
 
@@ -188,13 +188,13 @@ KagamiQA 当前是一个**可工作的原型**：清单驱动、双 oracle 分�
 | 步骤 | 产出 | 工作量 |
 |---|---|---|
 | B1. 创建 GitHub Actions workflow | `.github/workflows/kagami-qa.yml` | 单文件 |
-| B2. Oracle A job（ctest 封装） | 跑全部 A 类测试，收集 exit code | 复现 `ctest` 行为 |
-| B3. Oracle B job（blargg runner） | 跑全量 blargg suite | 调用 `fceux11_blargg_runner --manifest` |
+| B2. 内部逻辑检测 job（ctest 封装） | 跑全部 A 类测试，收集 exit code | 复现 `ctest` 行为 |
+| B3. 硬件一致性检测 job（blargg runner） | 跑全量 blargg suite | 调用 `fceux11_blargg_runner --manifest` |
 | B4. 迁移矩阵生成 | 调 `kagami-qa-runner` 产出 JSON → upload artifact | 复用 runner CLI |
 | B5. baseline drift 检测 | 对照上次 run 的 baseline，标红 PASS→FAIL | Rust baseline.rs 从 stub 升级为真实实现 |
 | B6. PR comment 集成 | 若 PASS→FAIL 非空 → 在 PR 下自动评论红色警报 | GitHub API |
 
-**退出条件**：push 到 `wip_1.16` 触发 workflow，Oracle A + Oracle B 均自动运行，迁移矩阵作为 artifact 可下载。
+**退出条件**：push 到 `wip_1.16` 触发 workflow，内部逻辑检测 + 硬件一致性检测 均自动运行，迁移矩阵作为 artifact 可下载。
 
 ### Phase 5C：in-process runner 打通
 
@@ -204,10 +204,10 @@ KagamiQA 当前是一个**可工作的原型**：清单驱动、双 oracle 分�
 |---|---|---|
 | C1. CMake 目标：`kagami_qa_direct_runner` | 链接 `fceux11_core + fceux11_drivers_null + kagami-qa` 的单一可执行文件 | CMakeLists.txt 修改 |
 | C2. main.rs 增加 `--direct` flag | 选择 `Fceux11DirectAdapter` 而非 `SubprocessAdapter` | Rust CLI 扩展 |
-| C3. Oracle B 直接驱动路径 | load(rom) → step() × N → read_oracle_probe(0x6000) → 判定 | Rust 侧实现 |
+| C3. 硬件一致性检测 直接驱动路径 | load(rom) → step() × N → read_oracle_probe(0x6000) → 判定 | Rust 侧实现 |
 | C4. 对照验证 | `--direct` 产出与 subprocess 模式一致 | 跑 blargg 全量对比 |
 
-**退出条件**：`kagami-qa-runner --direct` 对 Oracle B 全量产出与 subprocess 模式 100% 一致。
+**退出条件**：`kagami-qa-runner --direct` 对 硬件一致性检测 全量产出与 subprocess 模式 100% 一致。
 
 ### Phase 5D：runppu 精度攻坚（条件触发）
 
@@ -217,12 +217,12 @@ KagamiQA 当前是一个**可工作的原型**：清单驱动、双 oracle 分�
 |---|---|---|
 | D1. 基于全量 baseline 识别 runppu-relevant 失败 | 分类：哪些 FAIL 是 PPU 时序 → 可被 runppu 修复 | 对照 TASVideos 表格 |
 | D2. ppu_vbl_nmi 02-vbl_set_time 修复 | VBL cycle 0→1 shift（已知方向，需精确 cycle 计算） | 代码改动 + 实测验证 |
-| D3. 逐项攻破 PPU 时序失败 | 每次改动后跑 Oracle A 全量 + Oracle B 全量 | 迭代 |
+| D3. 逐项攻破 PPU 时序失败 | 每次改动后跑 内部逻辑检测 全量 + 硬件一致性检测 全量 | 迭代 |
 | D4. 最终迁移矩阵产出 | FAIL_TO_PASS 列表 + PASS_TO_PASS 全量 | runner 自动生成 |
 
-**退出条件**：≥1 项新 PPU 时序修复（非 VBL period 修复）产生 FAIL→PASS，Oracle A 零回归。
+**退出条件**：≥1 项新 PPU 时序修复（非 VBL period 修复）产生 FAIL→PASS，内部逻辑检测 零回归。
 
-**若重估不通过**（D1 发现无 runppu-relevant 失败）：冻结 D2-D4，附重估理由，P5 以"双 oracle 系统验证通过"结项。
+**若重估不通过**（D1 发现无 runppu-relevant 失败）：冻结 D2-D4，附重估理由，P5 以"双通道 系统验证通过"结项。
 
 ### Phase 5E：Lua 判定精度加固
 
@@ -239,8 +239,8 @@ KagamiQA 当前是一个**可工作的原型**：清单驱动、双 oracle 分�
 | 门禁 | 度量方法 | 阈值 |
 |---|---|---|
 | blargg ROM 覆盖率 | `tested_roms / 174` | ≥80% (≥140 ROM) |
-| Oracle A 全绿 | `rom_regression_test` 0 差异 | 100% |
-| Oracle B 基线完整 | `blargg_known_fail.json` 含全量 FAIL 条目 | 100% 分类 |
+| 内部逻辑检测 全绿 | `rom_regression_test` 0 差异 | 100% |
+| 硬件一致性检测 基线完整 | `blargg_known_fail.json` 含全量 FAIL 条目 | 100% 分类 |
 | CI 常驻 | workflow 在每次 push 触发 | ✅ |
 | 迁移矩阵 JSON 可获取 | GitHub Actions artifact | 每次 run 产出 |
 | in-process 一致性 | `--direct` vs subprocess 对比 | 100% |
@@ -257,7 +257,7 @@ KagamiQA 当前是一个**可工作的原型**：清单驱动、双 oracle 分�
 | blargg 全量跑批超时 | 中 | 低 | 单 ROM 平均 ~200ms × 174 = ~35s——远低于 3 分钟阈值 |
 | CI runner 无 Qt 环境 | 中 | 高 | 用 `fceux11_add_headless_test_executable` + null driver——CI 不需要 GUI |
 | in-process runner 链接 C++ core 失败 | 中 | 中 | CMake 目标可 fallback 到 subprocess 模式——CI 不阻塞 |
-| runppu 改动触发 Oracle A 回归 | 中 | 高 | 每次改动后立即跑 Oracle A——回归即 revert |
+| runppu 改动触发 内部逻辑检测 回归 | 中 | 高 | 每次改动后立即跑 内部逻辑检测——回归即 revert |
 
 ---
 
@@ -265,9 +265,9 @@ KagamiQA 当前是一个**可工作的原型**：清单驱动、双 oracle 分�
 
 1. **新 PPU 是唯一方向**：绝不回退到旧 PPU。旧 PPU 无 PPU dot 概念，无法通过 blargg cycle 级测试。
 2. **AI 不得修改已入库的 expected 值**：基线更新走与代码同级评审。
-3. **Oracle A 全绿是每次修改的前置条件**：任何精度修复前必须先确认回归全绿。
+3. **内部逻辑检测 全绿是每次修改的前置条件**：任何精度修复前必须先确认回归全绿。
 4. **先收编后新建**：全量 blargg ROM 必须先入清单再改代码。
-5. **headless 是 Oracle B 的基础**：CI 环境无 GUI，所有测试必须在 headless 下运行。
+5. **headless 是 硬件一致性检测 的基础**：CI 环境无 GUI，所有测试必须在 headless 下运行。
 
 ---
 

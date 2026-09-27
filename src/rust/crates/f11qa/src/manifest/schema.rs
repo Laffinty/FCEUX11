@@ -101,10 +101,10 @@ pub struct TestInput {
     /// Optional working directory override.
     #[serde(default)]
     pub working_dir: Option<String>,
-    /// P2: ROM path for Oracle B / ROM-based tests.
+    /// P2: ROM path for Hardware Consistency Check / ROM-based tests.
     #[serde(default)]
     pub rom: Option<String>,
-    /// P2: Probe address for Oracle B $6000 protocol (default 0x6000).
+    /// P2: Probe address for Hardware Consistency Check $6000 protocol (default 0x6000).
     #[serde(default)]
     pub probe_addr: Option<u32>,
     /// P3: Lua script path for Lua script channel (run via fceux11_lua_runner).
@@ -113,7 +113,7 @@ pub struct TestInput {
     /// v1.17 H-1: if > 0, the runner steps this many frames, then issues a
     /// soft reset, then steps the remaining frames. -1 = no mid-run reset
     /// (default). 0 = reset immediately after load. This is a sibling
-    /// parameter to `probe_addr` / `frames` — same scope (Oracle B driving),
+    /// parameter to `probe_addr` / `frames` — same scope (Hardware Consistency Check driving),
     /// same shape (i64 default), same justification (blargg `$6000` protocol
     /// has ROMs that need a one-shot reset partway through to converge).
     ///

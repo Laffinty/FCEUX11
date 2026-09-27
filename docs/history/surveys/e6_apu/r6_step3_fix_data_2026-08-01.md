@@ -161,6 +161,6 @@ enable 写后 IRQ 在 ~4 quarters 置，blargg 在 ~4.5 quarters 读 → 已置 
 |---|---|
 | 缺陷 2（$4017 清标志） | ✅ 修复（R6-2a，apu_single_3 PASS，apu_test 推进越过 irq_flag） |
 | 缺陷 1（帧计数器相位） | ⏸ 暂停（3 次假设证伪，根因在 blargg 定时器语义） |
-| Oracle A ctest | ✅ 34/34（probe 静默时） |
+| 内部逻辑检测 ctest | ✅ 34/34（probe 静默时） |
 | golden savestate | ✅ 未碎（回滚后） |
 | wip_1.16 HEAD | `f66b042`（诊断记录）+ 本轮 probe（未 commit） |

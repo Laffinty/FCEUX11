@@ -7,7 +7,7 @@
 > **前置**：v1.17 已合并至 main（`docs/history/plans/FCEUX11-1.17_计划.md` STATUS: COMPLETED）；冻结基线 `tests/fixtures/f11qa_baseline_frozen.json` 已落地
 > **关联**：`docs/tech/F11QA.md`（将改名 `F11QA.md`）、`docs/history/plans/FCEUX11-1.16_KagamiQA-PLAN.md`、`docs/history/plans/FCEUX11-1.16_KagamiQA-P5-权威性构建计划.md`、`docs/history/plans/FCEUX11-Stage3-权威性迭代与通用化路线.md`、`docs/history/checklists/v2.0_removal_checklist.md`
 > **ROM 镜像源**：`https://github.com/Laffinty/f11qa-rom-mirror`（OWNER `@Laffinty`；接受 PD/CC0/zlib/GPL-2/GPL-3/MIT/BSD/Apache；ROM bytes 不接受 PR，OWNER 单人 vendor；详见 §四 §4.6 接入协议 + 镜像源内 `LICENSES.md` / `SHA256SUMS.txt` / `docs/ROM_SOURCE_MAP.md`）
-> **路线图位置**：v1.15 完成 v1.x C++ 现代化；v1.16 完成 F11QA 双 Oracle 闭环；v1.17 完成 F11QA 统合 + 遗留精度收敛；**v1.8 = F11QA 改名 F11QA + 扁平清单改造 + 第三方 ROM 套件扩展（覆盖率从 180 → ~290 ROM）+ 接入 `Laffinty/f11qa-rom-mirror` 镜像源（单一权威源 / git tag pin）+ 许可证合规链**
+> **路线图位置**：v1.15 完成 v1.x C++ 现代化；v1.16 完成 F11QA 双通道 闭环；v1.17 完成 F11QA 统合 + 遗留精度收敛；**v1.8 = F11QA 改名 F11QA + 扁平清单改造 + 第三方 ROM 套件扩展（覆盖率从 180 → ~290 ROM）+ 接入 `Laffinty/f11qa-rom-mirror` 镜像源（单一权威源 / git tag pin）+ 许可证合规链**
 
 ---
 
@@ -18,22 +18,22 @@ v1.8 的三项主任务与性质：
 | # | 任务 | 性质 | 目标 |
 |---|---|---|---|
 | 1 | F11QA → **F11QA** 重命名 | 命名统一 | 测试体系名称与项目代号（FCEUX11 → F11）一致；去 "Kagami" 残留字样；CI workflow / docs / commit history 批量改名 |
-| 2 | **扁平清单重组**（Oracle A/B 二分 → 1..N + kind 标签） | 架构调整 | 弃用 `oracle_type` 字段，引入 10 种 `kind` 标签；保留全部 47 个 v1.17 用例并重新编号为 `kgmqa-001 ~ kgmqa-120` |
+| 2 | **扁平清单重组**（内部逻辑检测 / 硬件一致性检测二分 → 1..N + kind 标签） | 架构调整 | 弃用 `oracle_type` 字段，引入 10 种 `kind` 标签；保留全部 47 个 v1.17 用例并重新编号为 `kgmqa-001 ~ kgmqa-120` |
 | 3 | **第三方 ROM 套件扩展**（从 blargg 180 → 多作者 18-22 套件 / ~290 ROM）+ **接入 `Laffinty/f11qa-rom-mirror` 镜像源** | 覆盖率提升 + 供应链简化 | 通过镜像源（git tag pin `mirror_ref`）单一权威源统一管理 18-22 套件；license manifest 校验直接对照镜像源的 `LICENSES.md` + `SHA256SUMS.txt` snapshot；22 个独立 downloader → 1 个 `fetch_roms_from_mirror.ps1` |
 
-**一句话收束**：v1.8 把 v1.17 的「双 oracle 测试原型」升级为「**覆盖 120 用例 / ~290 ROM / 单一 mirror 源 / 100% GPL-2 兼容**的扁平、可审计、可机器门禁的统一测试体系」，并以 **F11QA** 为正式名称对外。
+**一句话收束**：v1.8 把 v1.17 的「双通道 测试原型」升级为「**覆盖 120 用例 / ~290 ROM / 单一 mirror 源 / 100% GPL-2 兼容**的扁平、可审计、可机器门禁的统一测试体系」，并以 **F11QA** 为正式名称对外。
 
 **量化收敛目标**：
 
 | 维度 | v1.17（基线） | v1.8 目标 |
 |---|---|---|
-| 用例总数 | 47（Oracle A 27 + Oracle B 20） | **120**（`kgmqa-001 ~ kgmqa-120`） |
+| 用例总数 | 47（内部逻辑检测 27 + 硬件一致性检测 20） | **120**（`kgmqa-001 ~ kgmqa-120`） |
 | ROM 套件覆盖 | 1（blargg 180 ROM） | **18-22** 套件 / ~290 ROM（按 mirror 实际 vendor 进度逐条标 `vendor_state`） |
 | 第三方作者 | 1（blargg） | **17**（blargg / bisqwit / kevtris nestest / pinobatch Holy Mapperel & 240pee / Quietust / rainwarrior / tepples / AWJ / natt / N-K / Drag / TakuikaNinja / Sour / lidnariq / 3gengames / Rahsennor / Flubba） |
 | ROM fetch 源 | 单脚本（blargg） | **单一镜像源** `Laffinty/f11qa-rom-mirror`（git tag pin `mirror_ref`） |
 | Downloader 数 | 1 个 | **1 个** `scripts/fetch_roms_from_mirror.ps1` |
 | 许可证明示 | 隐式 | **每条用例显式** + mirror `LICENSES.md` snapshot 校验（kgmqa-117） |
-| 类型分组 | Oracle A/B 二分 | **10 种 kind 标签**（flat tag，不是层级） |
+| 类型分组 | 内部逻辑检测 / 硬件一致性检测二分 | **10 种 kind 标签**（flat tag，不是层级） |
 | 命名 | F11QA | **F11QA**（Kagami 残留清零） |
 | R4 gate 阈值 | `total ≥ 39`，`grade ∈ {A,B,C}` | `total == 120`，**`mirror_snapshot_check` PASS** 为前置 |
 | 总工期 | — | **12 周**（节省 2 周；Phase 3 downloader batch 2 周 → 0.5 周） |
@@ -102,7 +102,7 @@ echo ".git/" >> .sed_exclude
 
 ### 2.1 弃用 `oracle_type`，引入 `kind` 标签
 
-**问题**：v1.17 把用例分成 Oracle A（CTest 回归）/ Oracle B（硬件 ROM）。这层划分在 P5 阶段有意义（双 oracle 差分测试），但 v1.17 合并为统一 runner 后，"Oracle A vs B" 的边界已经模糊（Lua 测试、smoke 测试、benchmark 测试都属于"非硬件 ROM"，却被混在 Oracle A 内）。继续保留二分结构只会让 `kind` 表达力受限。
+**问题**：v1.17 把用例分成 内部逻辑检测（CTest 回归）/ 硬件一致性检测（硬件 ROM）。这层划分在 P5 阶段有意义（双通道 差分测试），但 v1.17 合并为统一 runner 后，"内部逻辑检测 vs B" 的边界已经模糊（Lua 测试、smoke 测试、benchmark 测试都属于"非硬件 ROM"，却被混在 内部逻辑检测 内）。继续保留二分结构只会让 `kind` 表达力受限。
 
 **方案**：**完全弃用 `oracle_type` 字段，引入 10 种 `kind` flat tag**。每条用例可同时有多个 `kind`（multi-tag），无层级关系。
 
@@ -110,7 +110,7 @@ echo ".git/" >> .sed_exclude
 
 | kind | 含义 | v1.17 映射 | 数量（v1.8） |
 |---|---|---|---|
-| `unit-cpp` | C++ 单元测试（链接引擎），CTEST 框架 | 全部 Oracle A "unit" tag | 19 |
+| `unit-cpp` | C++ 单元测试（链接引擎），CTEST 框架 | 全部 内部逻辑检测 "unit" tag | 19 |
 | `unit-hdr` | Header-only C++（不链引擎） | enum_class_bitflags_test | 1 |
 | `unit-rust` | Rust 单元 / 集成测试（f11qa → f11qa crate 内部 #[test]） | 0（v1.17 缺失） | 3（新增） |
 | `harness-cpp` | C++ harness（字节级差分，CRC32/MD5） | rom/savestate/frame/wav/mapper diff 测试 | 6 |
@@ -1069,7 +1069,7 @@ on:
 本计划 v0.2 待用户确认以下 10 个决策点。**决策 1-10 全部回签后进入施工期（Phase 1 启动）**。
 
 - [x] **决策 1**：是否接受 `F11QA → F11QA` 重命名（含 git mv + active docs + workflow 改名，历史归档与 commit 保持原状）？ — **✅ 用户回签（v0.1）**
-- [x] **决策 2**：是否接受扁平清单 + 10 种 `kind` multi-tag 模型（替代 Oracle A/B 二分）？ — **✅ 用户回签（v0.1）**
+- [x] **决策 2**：是否接受扁平清单 + 10 种 `kind` multi-tag 模型（替代 内部逻辑检测 / 硬件一致性检测二分）？ — **✅ 用户回签（v0.1）**
 - [x] **决策 3**：是否纳入 §三 F 节列出的 65 项第三方 ROM 用例（kgmqa-048 ~ kgmqa-112）？ — **✅ 用户回签（v0.1）**
 - [x] **决策 4**（v0.1 原方案）：是否接受"每套件独立 downloader + license manifest + SHA-256 校验"模式？ — **⚠️ v0.2 修订**：被决策 7 完全替换，不再适用
 - [x] **决策 5**：总目标数 **120 项**（kgmqa-001 ~ kgmqa-120）是否符合 v1.8 期望？ — **✅ 用户回签（v0.1）**
@@ -1153,8 +1153,8 @@ on:
 
 | 旧术语（F11QA） | 新术语（F11QA v1.8） | 说明 |
 |---|---|---|
-| Oracle A | `kind: unit-cpp / unit-hdr / unit-rust / harness-cpp / lua-api / smoke / static-analysis` | 旧 Oracle A 拆分为多种 kind |
-| Oracle B | `kind: rom-suite / harness-rust` | 旧 Oracle B 主要对应这两类 |
+| 内部逻辑检测 | `kind: unit-cpp / unit-hdr / unit-rust / harness-cpp / lua-api / smoke / static-analysis` | 旧内部逻辑检测 拆分为多种 kind |
+| 硬件一致性检测 | `kind: rom-suite / harness-rust` | 旧硬件一致性检测 主要对应这两类 |
 | Oracle type | `kind` (multi-tag) | 字段废弃 |
 | `id` | `kgmqa_id` | 重命名 |
 | `f11qa-v1.17` | `f11qa-v1.8` | suite_id |

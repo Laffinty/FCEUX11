@@ -10,7 +10,7 @@
 
 ## 0. 摘要
 
-桶 B (CPU 时序/中断) 含 **3 项 ROM FAIL**（Step 3.1 后期 Oracle B，按 P2 方案 §3 B.3+B.4 优先级排序）：
+桶 B (CPU 时序/中断) 含 **3 项 ROM FAIL**（Step 3.1 后期 硬件一致性检测，按 P2 方案 §3 B.3+B.4 优先级排序）：
 
 | 错误码 | 数量 | ROM | 子类型 |
 |---|---|---|---|
@@ -78,7 +78,7 @@ stx SPRADDR   ; OAMADDR=0
 - 仅修改 `src/ppu.cpp`（+75/-3 行）
 - 新增 env-gated 函数 + B2004/A2004/B2005/B2006 探针
 - 复用现有 `e1_ppu_trace_on` 模式的 include 风格
-- 默认静默（Oracle A 34/34 不变）
+- 默认静默（内部逻辑检测 34/34 不变）
 
 ### 2.3 关键实测数据（cpu_dummy_writes_oam × 3000 帧）
 

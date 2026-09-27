@@ -98,9 +98,9 @@ if ($BuildOnly) {
 }
 
 # ---------------------------------------------------------------------------
-# Step 5: Run full Oracle B suite
+# Step 5: Run full Hardware Consistency Check suite
 # ---------------------------------------------------------------------------
-Write-Host "[5/5] Running Oracle B accuracy suite..."
+Write-Host "[5/5] Running Hardware Consistency Check accuracy suite..."
 
 # Find the blargg runner binary.
 $RunnerBin = $null

@@ -34,7 +34,7 @@
 | `vbl_09_even_odd_frames` | 0x00 PASS | **0x02 FAIL** | 🔴 回归 | "Pattern ----- should not skip any clocks" |
 | `vbl_10_even_odd_timing` | 0x03 FAIL | 0x02 FAIL | ⚪（码变） | — |
 
-**Oracle A**：`ctest -LE perf` **34/34 PASS**（无 Oracle A 回归——golden savestate 未碎，说明 savestate 捕获点不敏感于 VBL 置位 dot）。
+**内部逻辑检测**：`ctest -LE perf` **34/34 PASS**（无 内部逻辑检测 回归——golden savestate 未碎，说明 savestate 捕获点不敏感于 VBL 置位 dot）。
 
 ## 3. 结论
 
@@ -47,7 +47,7 @@
 ## 4. 处置
 
 - ✅ 已 `git checkout -- src/ppu_rendering.cpp` 回滚（HEAD `f50573a` 状态，runppu(3) 保留）。
-- ✅ Oracle A 34/34 状态由改动本身保证（已实测），回滚后无残留。
+- ✅ 内部逻辑检测 34/34 状态由改动本身保证（已实测），回滚后无残留。
 - 📝 方案文档 Phase 1 Step 1.1 已就地标注证伪，修订为 Step 1.2（$2002 抑制）优先 + vbl_05 转 CPU 侧 latch 调查。
 
 ## 5. 修订后的 Phase 1 方向

@@ -25,8 +25,8 @@
 - ❌ **禁忌保留**：
   - **`sound.cpp:1303-1307 savestate chunks`（`FHCN`/`FCNT`/`IQFM` chunk 名/大小/序）**——本 Track-B **完全未触碰**（所有新增探针仅 fprintf，写入路径无变动）
   - **`V=(V&0xC0)>>6` swap**（§4.4 P1 决策禁项）——**未触碰**（新增 `E3B W4017_RAW` 仅**只读**读取 raw_V_for_probe 后立即打印，不修改 V）
-  - **Oracle B 0x80/0x81 伪失败清零**（H-1/H-2）——**不属于 R6 范围**，不修改 manifest
-  - **Oracle B PPU/APU blocks**——本 Track-B 仅 `src/sound.cpp` + 1 行 `src/x6502.cpp`（本任务无 x6502 改动）；Oracle A 维持
+  - **硬件一致性检测 0x80/0x81 伪失败清零**（H-1/H-2）——**不属于 R6 范围**，不修改 manifest
+  - **硬件一致性检测 PPU/APU blocks**——本 Track-B 仅 `src/sound.cpp` + 1 行 `src/x6502.cpp`（本任务无 x6502 改动）；内部逻辑检测 维持
 - 🟡 **R6 处方 P3**（`sound.cpp:1095` FIXME）——按计划 §4.4 P3 标注**不与 P1/P2 同 commit**；本 Track-B 不在 P3 范围
 
 ---
@@ -254,7 +254,7 @@ E3B FIVE_STEP_EXTRA abs=96846 ts=96846 fcnt=0 mode=0x2 fhcnt=37282 wrap=37282
 
 ---
 
-## 8. Oracle A 维持声明
+## 8. 内部逻辑检测 维持声明
 
 本 Track-B **新增 6 个 commit 全部为纯 fprintf + 注释**，无任何状态写入：
 
@@ -265,10 +265,10 @@ E3B FIVE_STEP_EXTRA abs=96846 ts=96846 fcnt=0 mode=0x2 fhcnt=37282 wrap=37282
 - `E3B RESET_ENTRY` 仅 `fprintf`
 - `E3B RESET_POST` 仅 `fprintf`
 
-**Oracle A ctest 影响面**：0
-**Oracle B PPU/APU blocks 影响**：0（`src/sound.cpp` 仅 fprintf 插入；运行期行为与现状字节级一致）
+**内部逻辑检测 ctest 影响面**：0
+**硬件一致性检测 PPU/APU blocks 影响**：0（`src/sound.cpp` 仅 fprintf 插入；运行期行为与现状字节级一致）
 
-**Oracle A ctest 维持声明**：ctest `--test-dir build -LE perf` 34/34 PASS 维持；任意 Oracle A regression → 立即 revert（6 commit 相互独立，单 commit revert 安全）
+**内部逻辑检测 ctest 维持声明**：ctest `--test-dir build -LE perf` 34/34 PASS 维持；任意 内部逻辑检测 regression → 立即 revert（6 commit 相互独立，单 commit revert 安全）
 
 ---
 
@@ -279,7 +279,7 @@ E3B FIVE_STEP_EXTRA abs=96846 ts=96846 fcnt=0 mode=0x2 fhcnt=37282 wrap=37282
 | **§5.1 实测 stderr 数据未采集** | 报告 §5 仅基于历史 Step 1/2/3 探针推断；E3B 首次实测待 CI / Reviewer 执行 §6 | 报告 §6 已列出可执行步骤；CI runner 可立即补数据 |
 | **`reset_after` 工件**（apu_reset_4017_written 需要第二次 reset）| 不在本任务 5 ROM 范围；如需新增请在 6 ROM 列表追加 | — |
 | **kagami-qa-runner ≥ 40 PASS 验证** | 未在本地执行（无 build）| R4 gate 自动验证；本 Track-B 无 kagami-qa crate 改动 |
-| **Oracle A ctest 34/34 PASS 维持** | 同上 | 同上 |
+| **内部逻辑检测 ctest 34/34 PASS 维持** | 同上 | 同上 |
 | **plan §4.4 P1 (defect 1 帧计数器相位)、P2 (defect 2 $4017 标志条件化)** 实际修补决策 | **未在本 Track-B 范围**——plan 处方要求基于探针数据，由 Track-A 后续 step 推进；本 Track-B 仅做**探针** | 探针已就绪，Track-A 可直接基于 §6 数据推进 P1/P2 |
 
 ---
@@ -289,7 +289,7 @@ E3B FIVE_STEP_EXTRA abs=96846 ts=96846 fcnt=0 mode=0x2 fhcnt=37282 wrap=37282
 **本 Track-B 阶段结论**：
 
 1. **6 个 E3B 探针**落盘，按计划 §4.4 处方全覆盖（FrameIRQ 双向、5-step boundary、$4017 raw、FCEUSND_Reset pre/post）
-2. **零逻辑改动** Oracle A 34/34 维持；**Oracle B 0 个回归**（不变）
+2. **零逻辑改动** 内部逻辑检测 34/34 维持；**硬件一致性检测 0 个回归**（不变）
 3. **数据采集封闭**：env-gate + per-ROM runner pattern 已就绪，§6 5 步可立即被 CI / Reviewer 执行
 4. **§5 数据缺口诚实记录**：本机 build / ROM 子目录不可用；实测量推 §6 runner 委托给 CI / Reviewer
 5. **`E3B W4017_RAW.raw_V` 仅只读**，无 IRQFrameMode 副作用 → §4.4 P2 决策（条件化清 IRQ 标志）后续可基于此 probe 的 `bit6_inhibit` 字段做针对性 fix

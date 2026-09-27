@@ -91,17 +91,17 @@ Launch `fceux11.exe`, load a game via **File → Open ROM**, play with keyboard 
 
 ## 质量保障 / Quality Assurance — F11QA
 
-FCEUX11 内置一套名为 **F11QA**（原 KagamiQA）的双 Oracle 自动化质量保障系统，在 CI 上常驻运行：
+FCEUX11 内置一套名为 **F11QA**（原 KagamiQA）的双通道 自动化质量保障系统，在 CI 上常驻运行：
 
 | 组件 | 说明 |
 |------|------|
-| **Oracle A（回归测试）** | CTest 注册测试 + 120 项扁平清单中的 unit/harness 条目，每次 push 全量运行 |
-| **Oracle B（硬件精度测试）** | 78 项 rom-suite 代表（vendor_state 三态）+ 177 个 [blargg](https://github.com/christopherpow/nes-test-roms) `$6000` 协议 ROM 全量批处理，覆盖 CPU/PPU/APU/MMC3 |
+| **内部逻辑检测（回归）** | CTest 注册测试 + 120 项扁平清单中的 unit/harness 条目，每次 push 全量运行 |
+| **硬件一致性检测（硬件对齐）** | 78 项 rom-suite 代表（vendor_state 三态）+ 177 个 [blargg](https://github.com/christopherpow/nes-test-roms) `$6000` 协议 ROM 全量批处理，覆盖 CPU/PPU/APU/MMC3 |
 | **迁移矩阵** | 每次 CI 产出 `f11qa_migration_matrix.json`（artifact），追踪 PASS→FAIL 回归与 FAIL→PASS 进展 |
 | **R4 门禁** | `total==120`、`fail_to_pass==0`、vendor_state 三态、advisory≤15%、grade∉{D,E} 机器校验 |
 
 > **当前 CI 矩阵**（`f11qa.yml`，`engine.git_rev=f19fa7d`，R4 gate passed，grade **B**）：
-> **120 项 / 106 PASS / 14 FAIL**；Oracle A **42P/0F**，Oracle B **64P/14F**
+> **120 项 / 106 PASS / 14 FAIL**；内部逻辑检测 **42P/0F**，硬件一致性检测 **64P/14F**
 > （blargg 全量 **145P/32F**）；advisory known-limit 14/120 = 11.7%（cap 15%）；
 > **0 条 PASS→FAIL 漂移**。数字以 CI artifact 的 `engine.git_rev` 为准；
 > 详见 [`docs/tech/F11QA.md`](docs/tech/F11QA.md) 与
@@ -109,17 +109,17 @@ FCEUX11 内置一套名为 **F11QA**（原 KagamiQA）的双 Oracle 自动化质
 
 **实现细节、原理、独立化运行**请参阅 [`docs/tech/F11QA.md`](docs/tech/F11QA.md)。
 
-FCEUX11 ships **F11QA** (formerly KagamiQA), a dual-oracle automated quality assurance system that runs continuously in CI:
+FCEUX11 ships **F11QA** (formerly KagamiQA), a dual-channel automated quality assurance system that runs continuously in CI:
 
 | Component | Description |
 |-----------|-------------|
-| **Oracle A (regression)** | CTest suite + unit/harness entries of the 120-case flat manifest, full run on every push |
-| **Oracle B (hardware accuracy)** | 78 rom-suite representatives (vendor_state tri-state) + 177 [blargg](https://github.com/christopherpow/nes-test-roms) `$6000`-protocol ROMs covering CPU/PPU/APU/MMC3 |
+| **Internal Logic Check (regression)** | CTest suite + unit/harness entries of the 120-case flat manifest, full run on every push |
+| **Hardware Consistency Check (hardware accuracy)** | 78 rom-suite representatives (vendor_state tri-state) + 177 [blargg](https://github.com/christopherpow/nes-test-roms) `$6000`-protocol ROMs covering CPU/PPU/APU/MMC3 |
 | **Migration Matrix** | `f11qa_migration_matrix.json` per CI run, tracking PASS→FAIL regressions and FAIL→PASS progress |
 | **R4 Gate** | Machine-checked: `total==120`, `fail_to_pass==0`, vendor_state, advisory≤15%, grade∉{D,E} |
 
 > **Current CI matrix** (`f11qa.yml`, `engine.git_rev=f19fa7d`, R4 gate passed, grade **B**):
-> **120 cases / 106 PASS / 14 FAIL**; Oracle A **42P/0F**, Oracle B **64P/14F**
+> **120 cases / 106 PASS / 14 FAIL**; Internal Logic Check **42P/0F**, Hardware Consistency Check **64P/14F**
 > (blargg batch **145P/32F**); advisory known-limits 14/120 = 11.7% (cap 15%);
 > **0 PASS→FAIL drifts**. Source of truth is `engine.git_rev` in the CI artifact;
 > see [`docs/tech/F11QA.md`](docs/tech/F11QA.md) and the

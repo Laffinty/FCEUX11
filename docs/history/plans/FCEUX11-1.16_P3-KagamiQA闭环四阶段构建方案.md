@@ -3,7 +3,7 @@
 > **编制日期**：2026-08-05（**承前**：2026-08-01 P2 三阶段方案 → 已收口至 `docs/history/plans/FCEUX11-1.16_P2-精度收敛三阶段构建方案.md`，本方案为 v1.16 收口期新一阶段规划）
 > **性质**：可执行构建方案。Phase 1-3 已闭环（精度收敛 100% 落地）；Phase 4 = KagamiQA 系统闭环 + v1.16 发布门禁。
 > **分支**：`wip_1.16`（沿用 P2 决策）
-> **核心命题**：把精度侧"已知 33 项 FAIL（32 已知限制 + 1 永久跳过）"的稳定基线，**完整交付到 v1.16 发布门禁**——含 CI Gate、文档回填、Lua bindings 集成、Oracle B 覆盖扩展、P5 runppu 决策五大缺口。
+> **核心命题**：把精度侧"已知 33 项 FAIL（32 已知限制 + 1 永久跳过）"的稳定基线，**完整交付到 v1.16 发布门禁**——含 CI Gate、文档回填、Lua bindings 集成、硬件一致性检测 覆盖扩展、P5 runppu 决策五大缺口。
 
 ---
 
@@ -15,16 +15,16 @@
 |---|---|---|---|
 | **1** | E-1 PPU VBL/NMI 深度收敛 | ✅ 闭环 | vbl_05 PASS, vbl 5/10 PASS（`5581769` + 探针族） |
 | **2** | E-3 APU 帧计数器深度收敛 | ✅ 闭环 | 7 个 bucket-C sub-test 全 PASS（`f5e7cd0`） |
-| **3** | 全量精度收敛（Step 3.1 + 3.2）| ✅ 闭环 | Oracle B 144/177 PASS；33 FAIL 全部归类（`f4a072a` `57d3e88` `863e9d7` `23b0cdd` `4a7f7e2` `116a602` `eaf4fe1`） |
-| **4** | KagamiQA 系统闭环 + v1.16 发布 | ⏳ **本次** | CI Gate / 文档回填 / Lua bindings / Oracle B 覆盖 / P5 决策 |
+| **3** | 全量精度收敛（Step 3.1 + 3.2）| ✅ 闭环 | 硬件一致性检测 144/177 PASS；33 FAIL 全部归类（`f4a072a` `57d3e88` `863e9d7` `23b0cdd` `4a7f7e2` `116a602` `eaf4fe1`） |
+| **4** | KagamiQA 系统闭环 + v1.16 发布 | ⏳ **本次** | CI Gate / 文档回填 / Lua bindings / 硬件一致性检测 覆盖 / P5 决策 |
 
-**Phase 4 不解决任何"fceux11 精度"问题**——所有精度收敛已在 Phase 3 完成。Phase 4 解决的是**测试系统本身的工程化缺口**：让 CI 自动验证、文档自动同步、Lua 通道完整、Oracle B 覆盖深度足够、P5 决策有据。
+**Phase 4 不解决任何"fceux11 精度"问题**——所有精度收敛已在 Phase 3 完成。Phase 4 解决的是**测试系统本身的工程化缺口**：让 CI 自动验证、文档自动同步、Lua 通道完整、硬件一致性检测 覆盖深度足够、P5 决策有据。
 
 ---
 
 ## 一、现状盘点（2026-08-05 commit `7fd3f19`）
 
-### 1.1 双 Oracle 运行态
+### 1.1 双通道 运行态
 
 ```
 $ kagami-qa-runner.exe --manifest tests/tests.json
@@ -32,7 +32,7 @@ Loaded 39 test entries.
 Total:   39
 Passed:  35
 Failed:  4
-Oracle A: 25P / 2F | Oracle B: 10P / 2F
+Internal Logic Check: 25P / 2F | Hardware Consistency Check: 10P / 2F
 ```
 
 | Oracle | PASS | FAIL | 来源 |
@@ -68,9 +68,9 @@ PPU 真实精度 2 — bucket C 余项 (oam_stress 0x01, ppu_vbl_nmi 0x01) — �
 | **G1** 本会话 8 commit 未通过 CI Gate | CI 集成 | 阻塞 v1.16 发布 | `.github/workflows/kagami-qa.yml` last successful = `1156ca1` (2026-07-31) |
 | **G2** README + `docs/tech/KagamiQA.md` §0 表格数字未回填 | 文档同步 | 阻塞 v1.16 发布 | 表格仍引 `1156ca1`，违反 §0 "禁止手改" 纪律 |
 | **G3** Lua bindings 缺失 | Lua 集成 | `lua_joypad_test` + `lua_memory_test` 永远 FAIL（已 advisory）| `tests.json` provenance 已记录 P3 路径 |
-| **G4** tests.json Oracle B 12 项 vs blargg 177 项 | 覆盖深度 | 迁移矩阵追踪深度不足 | tests.json 是"金标准小集合"但需明确分工 |
+| **G4** tests.json 硬件一致性检测 12 项 vs blargg 177 项 | 覆盖深度 | 迁移矩阵追踪深度不足 | tests.json 是"金标准小集合"但需明确分工 |
 | **G5** P5 runppu 重批决策 | 权威性 | v1.16 是否启动 runppu 切换 | P5 计划已写，门禁未评估 |
-| **G6** perf 标签测试排除 | Oracle A | `ctest -LE perf` 排除部分测试 | 33/33 非 perf + perf 未跑 |
+| **G6** perf 标签测试排除 | 内部逻辑检测 | `ctest -LE perf` 排除部分测试 | 33/33 非 perf + perf 未跑 |
 
 ---
 
@@ -109,7 +109,7 @@ PPU 真实精度 2 — bucket C 余项 (oam_stress 0x01, ppu_vbl_nmi 0x01) — �
 
 #### 4.1.3 回归门禁
 
-- `ctest -LE perf`：Oracle A 全绿（包括 Lua 类）
+- `ctest -LE perf`：内部逻辑检测 全绿（包括 Lua 类）
 - `kagami-qa-runner.exe --manifest tests/tests.json`：35/39 → 37/39（Lua 2 项转 PASS）
 - `tests/tests.json` 改后 commit 单独 1 PR（`lua(bindings)` 前缀）
 
@@ -124,8 +124,8 @@ PPU 真实精度 2 — bucket C 余项 (oam_stress 0x01, ppu_vbl_nmi 0x01) — �
    - `src\rust\target\x86_64-pc-windows-msvc\release\kagami-qa-runner.exe --manifest tests/tests.json --bin-dir build/tests --output build/kagamiqa_migration_matrix.json` 39 项跑通
 2. **Push 到 `wip_1.16`**：触发 `.github/workflows/kagami-qa.yml`
 3. **CI 内核对**（看 GitHub Actions 日志）：
-   - `Oracle A` 步骤：`100% tests passed`
-   - `Oracle B` 步骤：`Total: 39, Passed: 35, Failed: 4`（与本地一致；Lua 收尾后 Passed: 37）
+   - `内部逻辑检测` 步骤：`100% tests passed`
+   - `硬件一致性检测` 步骤：`Total: 39, Passed: 35, Failed: 4`（与本地一致；Lua 收尾后 Passed: 37）
    - `engine.git_rev = 7fd3f19`（或更新）
 4. **R4 Gate 通过判定**：CI artifact `kagamiqa_migration_matrix.json` 含本会话 commit + 数字一致
 
@@ -150,25 +150,25 @@ PPU 真实精度 2 — bucket C 余项 (oam_stress 0x01, ppu_vbl_nmi 0x01) — �
 
 **验证**：人工 review + 文档 vs CI artifact 哈希对比
 
-### 4.4 Oracle B 覆盖深度扩展（G4）
+### 4.4 硬件一致性检测 覆盖深度扩展（G4）
 
-**目标**：明确 tests.json 与 blargg manifest 的分工，必要时扩 tests.json Oracle B 关键桶代表项。
+**目标**：明确 tests.json 与 blargg manifest 的分工，必要时扩 tests.json 硬件一致性检测 关键桶代表项。
 
 **当前状态**：
-- `tests/tests.json` Oracle B：12 项（含 vbl_05 / ppu_open_bus / mmc3_test_2 / cpu_dummy_writes_* / 等）
-- `fixtures/blargg_manifest.json` Oracle B：177 项（独立跑批）
+- `tests/tests.json` 硬件一致性检测：12 项（含 vbl_05 / ppu_open_bus / mmc3_test_2 / cpu_dummy_writes_* / 等）
+- `fixtures/blargg_manifest.json` 硬件一致性检测：177 项（独立跑批）
 
 **方案**：
-1. **保持 tests.json 12 项作为"金标准小集合"**——Oracle A + Oracle B 各桶的代表项，覆盖深度优先
-2. **Oracle B 全量 batch run 作为二级报告**——`fceux11_blargg_runner.exe --manifest fixtures/blargg_manifest.json` 单独跑，不进迁移矩阵
-3. **补全建议**：如需扩 tests.json Oracle B，按 §1.1 桶分类增补：
+1. **保持 tests.json 12 项作为"金标准小集合"**——内部逻辑检测 + 硬件一致性检测 各桶的代表项，覆盖深度优先
+2. **硬件一致性检测 全量 batch run 作为二级报告**——`fceux11_blargg_runner.exe --manifest fixtures/blargg_manifest.json` 单独跑，不进迁移矩阵
+3. **补全建议**：如需扩 tests.json 硬件一致性检测，按 §1.1 桶分类增补：
    - 桶 A 关键项：mmc3_test_2（已含），补 mmc3_4_scanline_timing
    - 桶 B 关键项：cpu_int_2_nmi_brk（验证 vbl 中断族收敛状态）
    - 桶 C 关键项：ppu_read_buffer（已 PASS，作为 PASS 监控）
    - 桶 D 关键项：sprdma_dmc_dma（已知限制，监控）
    - 总数目标：~18-20 项（增 6-8 项）
 
-**验证**：迁移矩阵总条目 39 → 47-49；Oracle B 仍 2-4 项 FAIL（与已知限制一致）
+**验证**：迁移矩阵总条目 39 → 47-49；硬件一致性检测 仍 2-4 项 FAIL（与已知限制一致）
 
 ### 4.5 P5 runppu 重批决策（G5）
 
@@ -177,8 +177,8 @@ PPU 真实精度 2 — bucket C 余项 (oam_stress 0x01, ppu_vbl_nmi 0x01) — �
 **门禁评估**（P5 §0.2 锁定的 3 条件）：
 | 门禁 | 当前状态 | 评估 |
 |---|---|---|
-| Oracle A 全绿 | ✅ 33/33 ctest PASS（本地） | 待 CI Gate 验证 |
-| Oracle B 清单稳定 | ✅ 33 FAIL 全部归类（32 已知限制 + 1 永久跳过） | ✅ |
+| 内部逻辑检测 全绿 | ✅ 33/33 ctest PASS（本地） | 待 CI Gate 验证 |
+| 硬件一致性检测 清单稳定 | ✅ 33 FAIL 全部归类（32 已知限制 + 1 永久跳过） | ✅ |
 | 收益预期重估通过 | ⏳ 待评估 | 本次决策点 |
 
 **收益分析**（基于 Phase 3 数据）：
@@ -191,7 +191,7 @@ PPU 真实精度 2 — bucket C 余项 (oam_stress 0x01, ppu_vbl_nmi 0x01) — �
 
 **理由**：
 1. P5 收益分析显示 runppu 切换**零精度收益**（深模型族在 CPU/PPU/DMA 层，与渲染路径解耦）
-2. Phase 4 1-4 全部完成后，v1.16 已达到"双 Oracle 稳定 + 33 FAIL 全部归类 + Lua 集成完整 + CI Gate 验证"——满足 P5 设定的"维持稳定基线"目标
+2. Phase 4 1-4 全部完成后，v1.16 已达到"双通道 稳定 + 33 FAIL 全部归类 + Lua 集成完整 + CI Gate 验证"——满足 P5 设定的"维持稳定基线"目标
 3. runppu 重批推迟到 v1.17+，届时 P5 计划可单独评估（如深模型族突破后再决策）
 
 **改法**：
@@ -251,7 +251,7 @@ PPU 真实精度 2 — bucket C 余项 (oam_stress 0x01, ppu_vbl_nmi 0x01) — �
 | 桶 B.1+B.2（CPU 9） | ✅ 9/9 已知限制 | `eaf4fe1` |
 | 桶 C.1（vbl 5） | ✅ Phase 1 已记录 | — |
 
-**产出**：Oracle B 144/177 PASS；33 FAIL = 32 已知限制 + 1 永久跳过（全部归类）
+**产出**：硬件一致性检测 144/177 PASS；33 FAIL = 32 已知限制 + 1 永久跳过（全部归类）
 
 ---
 
@@ -276,7 +276,7 @@ PPU 真实精度 2 — bucket C 余项 (oam_stress 0x01, ppu_vbl_nmi 0x01) — �
            ├─ Phase 4.3: 文档同步
            │  (README + KagamiQA.md 数字回填)
            │
-           ├─ Phase 4.4: Oracle B 覆盖扩展
+           ├─ Phase 4.4: 硬件一致性检测 覆盖扩展
            │  (tests.json 12 → ~18-20 项)
            │
            ├─ Phase 4.5: P5 runppu 决策
@@ -295,7 +295,7 @@ PPU 真实精度 2 — bucket C 余项 (oam_stress 0x01, ppu_vbl_nmi 0x01) — �
 | **G1** CI Gate | 本会话 8 commit 未经 CI 验证 | 4.2 | `kagami-qa.yml` 通过 R4 Gate，artifact `git_rev = HEAD` |
 | **G2** 文档回填 | README + KagamiQA.md 数字过时 | 4.3 | 三处 commit 锚更新到本会话 HEAD |
 | **G3** Lua bindings | `lua_joypad_test` + `lua_memory_test` 永远 FAIL | 4.1 | 两项从 advisory → blocking，tests.json 同步，全 PASS |
-| **G4** Oracle B 覆盖 | tests.json 12 项 vs 177 项 | 4.4 | tests.json Oracle B 扩至 ~18-20 项关键桶代表 |
+| **G4** 硬件一致性检测 覆盖 | tests.json 12 项 vs 177 项 | 4.4 | tests.json 硬件一致性检测 扩至 ~18-20 项关键桶代表 |
 | **G5** P5 决策 | runppu 重批门禁未评估 | 4.5 | P5 计划更新 + 决策记录 |
 | **G6** perf 标签 | `ctest -LE perf` 排除部分测试 | (本会话不修) | 接受 v1.16 不变 |
 
@@ -310,7 +310,7 @@ PPU 真实精度 2 — bucket C 余项 (oam_stress 0x01, ppu_vbl_nmi 0x01) — �
 | **CI Gate 缓存冷启动**（vcpkg + Qt 6.8.0 源码编译 ~60 min） | R4-0 已 fix 缓存 key；首次 push 触发后永久缓存 |
 | **Lua bindings 实现错误引入回归** | 4.1.1 + 4.1.2 各起独立 PR + 单独 ctest 验证 + tests.json 同步 |
 | **P5 runppu 决策错误** | 4.5 提供详细收益分析 + 推迟到 v1.17+，保持 v1.16 稳定基线 |
-| **Oracle B 覆盖扩展引入测试不稳定** | 4.4 仅补"已稳定 PASS"或"已记录已知限制"项，不引入新失败面 |
+| **硬件一致性检测 覆盖扩展引入测试不稳定** | 4.4 仅补"已稳定 PASS"或"已记录已知限制"项，不引入新失败面 |
 | **文档回填手工失误** | 4.3 严格遵守 §0 纪律：CI artifact 写入，禁止手改 |
 
 ### 禁忌清单（沿用 P2 §6）
@@ -348,7 +348,7 @@ PPU 真实精度 2 — bucket C 余项 (oam_stress 0x01, ppu_vbl_nmi 0x01) — �
 
 ### 8.2 可选项（nice-to-have）
 
-- [ ] **Phase 4.4**：tests.json Oracle B 扩至 ~18-20 项
+- [ ] **Phase 4.4**：tests.json 硬件一致性检测 扩至 ~18-20 项
 - [ ] **Phase 4.6**：v1.16 release tag + GitHub Release notes
 
 ### 8.3 防御线（不是 blocker）

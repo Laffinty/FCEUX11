@@ -30,7 +30,7 @@ jobs:
     # R4-0 (2026-07-31): raised 45 -> 180. Run 82956632293 was killed by the
     # 45-minute cap while still inside the CMake configure step, building
     # Qt 6.8.0 from source ("Installing 30/33 qtbase[...]"), so build / ctest /
-    # Oracle B / migration matrix never ran. This is an upper bound, not a
+    # Hardware Consistency Check / migration matrix never ran. This is an upper bound, not a
     # reservation: once the vcpkg cache below is primed, the configure step
     # skips vcpkg entirely (see CMakeLists.txt:7) and a full run takes ~15 min.
     # The 180 covers the ONE cold priming run.
@@ -194,7 +194,7 @@ jobs:
           Copy-Item target/x86_64-pc-windows-msvc/release/f11qa-runner.exe ${{ github.workspace }}/build/tests/ -Force
 
       # -----------------------------------------------------------------------
-      # Test ROM fixtures (Oracle B + rom-suite 用例)
+      # Test ROM fixtures (硬件一致性检测 + rom-suite 用例)
       # -----------------------------------------------------------------------
       # v1.8 §四 §4.6: 单 fetch 脚本取代 v1.17 的 22 个 download_<suite>_roms.ps1
       # download_blargg_roms.ps1 只下 blargg 套件；fetch_roms_from_mirror.py
@@ -229,9 +229,9 @@ jobs:
 
       # blargg_manifest.json 的 177 条 path 用的是 christopherpow 下载器命名
       # （apu_01_len_ctr.nes）；f11qa-rom-mirror 里的同套件是另一套命名
-      # （apu_test_1-len_ctr.nes），basename 仅 14/177 重合。Oracle B 必须用
+      # （apu_test_1-len_ctr.nes），basename 仅 14/177 重合。硬件一致性检测 必须用
       # download_blargg_roms.ps1 落盘的目录树，否则 LoadGame 全挂 0xFE。
-      - name: Download blargg suite ROMs (Oracle B fixtures)
+      - name: Download blargg suite ROMs (Hardware Consistency Check fixtures)
         shell: pwsh
         run: |
           if (-not (Test-Path tests/fixtures/blargg_manifest.json)) {
@@ -249,19 +249,19 @@ jobs:
           $missCount = [int]($missing | Select-Object -First 1)
           Write-Host "blargg manifest paths missing: $missCount / 177"
           if ($missCount -gt 0) {
-            Write-Host "::error::$missCount blargg ROM paths missing from manifest layout; Oracle B cannot run"
+            Write-Host "::error::$missCount blargg ROM paths missing from manifest layout; Hardware Consistency Check cannot run"
             exit 1
           }
 
       # -----------------------------------------------------------------------
-      # Oracle A — CTest regression suite
+      # Internal Logic Check — CTest regression suite
       # -----------------------------------------------------------------------
-      - name: Oracle A — CTest
+      - name: Internal Logic Check — CTest
         run: ctest --test-dir build --build-config Release --output-on-failure -LE perf
         continue-on-error: true  # capture results even if some tests fail
 
       # -----------------------------------------------------------------------
-      # Oracle B — Blargg $6000 test ROM suite (180 ROM batch)
+      # Hardware Consistency Check — Blargg $6000 test ROM suite (180 ROM batch)
       # -----------------------------------------------------------------------
       # R4-2 (2026-08-08): prepend the vcpkg bin dir to PATH. On the WARM
       # cache path (vcpkg skipped), applocal deployment does NOT copy Qt/
@@ -269,7 +269,7 @@ jobs:
       # above). blargg_runner links fceux11_drivers_qt, so without the
       # install-tree bin on PATH the exe dies with STATUS_DLL_NOT_FOUND
       # (0xC0000135). Same pattern as ci.yml's ROM Regression step.
-      - name: Oracle B — Blargg Suite
+      - name: Hardware Consistency Check — Blargg Suite
         working-directory: tests
         run: |
           $env:PATH = "${{ github.workspace }}/vcpkg_installed/x64-windows/bin;${{ github.workspace }}/vcpkg_installed/x64-windows/debug/bin;$env:PATH"
@@ -279,7 +279,7 @@ jobs:
             $exitCode = $LASTEXITCODE
             Write-Host "Blargg suite exit code: $exitCode"
           } else {
-            Write-Host "::error::f11qa_blargg_runner.exe not built; Oracle B cannot run. Expected at $runner"
+            Write-Host "::error::f11qa_blargg_runner.exe not built; Hardware Consistency Check cannot run. Expected at $runner"
             exit 1
           }
         shell: pwsh
@@ -390,8 +390,8 @@ jobs:
             Write-Host "Total:   $($m.summary.total)"
             Write-Host "Passed:  $($m.summary.passed)"
             Write-Host "Failed:  $($m.summary.failed)"
-            Write-Host "Oracle A: $($m.oracle_breakdown.a_regression.pass)P / $($m.oracle_breakdown.a_regression.fail)F"
-            Write-Host "Oracle B: $($m.oracle_breakdown.b_hardware.pass)P / $($m.oracle_breakdown.b_hardware.fail)F"
+            Write-Host "Internal Logic Check: $($m.oracle_breakdown.a_regression.pass)P / $($m.oracle_breakdown.a_regression.fail)F"
+            Write-Host "Hardware Consistency Check: $($m.oracle_breakdown.b_hardware.pass)P / $($m.oracle_breakdown.b_hardware.fail)F"
             if ($m.summary.vendor_state) {
               Write-Host "Vendor state: vendored=$($m.summary.vendor_state.vendored) advisory=$($m.summary.vendor_state.advisory) pending-vendor=$($m.summary.vendor_state.pending_vendor)"
             }

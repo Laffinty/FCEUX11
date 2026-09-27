@@ -10,7 +10,7 @@
 
 ## 一、本地预检（步骤 1）
 
-### 1.1 ctest -LE perf（Oracle A）
+### 1.1 ctest -LE perf（内部逻辑检测）
 
 | 项 | 值 |
 |---|---|
@@ -33,12 +33,12 @@ Total Test time (real) =  33.92 sec
 
 > 备注：方案文档口径写 "33/33 ctest PASS（本地）"，本地预检实测 34 项（含 kagami_qa_direct_smoke）通过。100% 与方案一致。
 
-### 1.2 kagami-qa-runner（Oracle B + Migration Matrix）
+### 1.2 kagami-qa-runner（硬件一致性检测 + Migration Matrix）
 
 | 项 | 值 |
 |---|---|
 | 命令 | `kagami-qa-runner.exe --manifest tests/tests.json --bin-dir build/tests --output build/kagamiqa_migration_matrix.json --accuracy-table build/kagamiqa_accuracy_table.md --known-fail tests/fixtures/blargg_known_fail.json --save-baseline build/kagamiqa_baseline_next.json` |
-| 退出码 | 1（已知 2 项 Oracle B 限制；与方案一致） |
+| 退出码 | 1（已知 2 项 硬件一致性检测 限制；与方案一致） |
 | 时长 | 27.19 秒 |
 | 日志 | `build/kagamiqa_run_local3.log` |
 
@@ -49,8 +49,8 @@ Total Test time (real) =  33.92 sec
 | Total | 39 | 39 | ✅ |
 | Passed | 37 | 37（Lua 收尾后）| ✅ |
 | Failed | 2 | 2 | ✅ |
-| Oracle A | 27P / 0F | 27P / 0F | ✅ |
-| Oracle B | 10P / 2F | 10P / 2F | ✅ |
+| Internal Logic Check | 27P / 0F | 27P / 0F | ✅ |
+| Hardware Consistency Check | 10P / 2F | 10P / 2F | ✅ |
 | engine.git_rev | **78a9d7f** | 7fd3f19（或更新） | ✅ |
 
 > 注：runner 二进制初次为 21:29 编译，git_rev=7fd3f19（旧）。force rebuild 后（设置 `FCEUX11_GIT_REV=78a9d7f`）嵌入当前 HEAD。本地第三次运行后 git_rev=78a9d7f，与 HEAD 一致。
@@ -106,8 +106,8 @@ Total Test time (real) =  33.92 sec
 | 11 | Build C++ | success | 24 min（vcpkg 命中后主编译） |
 | 12 | Build kagami-qa-runner | success | 12 秒 |
 | 13-15 | blargg ROM cache/fetch/verify | success | fixture 完整 |
-| **16** | **Oracle A — CTest** | **success** | ctest -LE perf 通过 |
-| **17** | **Oracle B — Blargg Suite** | **success** | continue-on-error（已知限制 2 项） |
+| **16** | **内部逻辑检测 — CTest** | **success** | ctest -LE perf 通过 |
+| **17** | **硬件一致性检测 — Blargg Suite** | **success** | continue-on-error（已知限制 2 项） |
 | **18** | **KagamiQA — Migration Matrix** | **success** | matrix.json 生成 |
 | 19 | Upload Artifacts | success | `kagamiqa-results` 1.44 KB |
 | 21 | Print Summary | success | |
@@ -133,8 +133,8 @@ step #22 conclusion: **success** → R4 Gate 通过。
 
 | 验收项 | 状态 |
 |---|---|
-| Oracle A 步骤 100% tests passed（ctest -LE perf） | ✅ |
-| Oracle B Total 39, Passed 37, Failed 2（与本地一致） | ✅ |
+| 内部逻辑检测 步骤 100% tests passed（ctest -LE perf） | ✅ |
+| 硬件一致性检测 Total 39, Passed 37, Failed 2（与本地一致） | ✅ |
 | `engine.git_rev = 78a9d7f`（与 HEAD 一致） | ✅ |
 | CI artifact `kagamiqa_migration_matrix.json` 含本会话 HEAD | ✅ |
 | R4 Gate step #22 conclusion: success | ✅ |
@@ -152,7 +152,7 @@ step #22 conclusion: **success** → R4 Gate 通过。
 | Phase 4.3 README + KagamiQA.md 数字与 CI artifact 一致 | ⏳ 下一步 |
 | Phase 4.5 P5 决策正式记录 | ⏳ 下一步 |
 
-Phase 4.2 闭环。本地 + CI 双 Oracle 数字一致，R4 Gate 已签发成功。
+Phase 4.2 闭环。本地 + CI 双通道 数字一致，R4 Gate 已签发成功。
 
 ---
 

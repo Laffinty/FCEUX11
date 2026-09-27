@@ -331,7 +331,7 @@ FCEUX11 强制使用 **MSVC 2022+** 工具链，不支持 MinGW / clang / MSYS2�
 
 ## 10. F11QA — 编译与运行
 
-F11QA 是 FCEUX11 的双 Oracle 质量保障系统。详见 [`docs/tech/F11QA.md`](tech/F11QA.md)。
+F11QA 是 FCEUX11 的双通道 质量保障系统。详见 [`docs/tech/F11QA.md`](tech/F11QA.md)。
 
 ### 10.1 编译 F11QA 组件
 
@@ -345,7 +345,7 @@ F11QA 是 FCEUX11 的双 Oracle 质量保障系统。详见 [`docs/tech/F11QA.md
 单独（重新）编译 F11QA 组件：
 
 ```powershell
-# blargg $6000 ROM runner (Oracle B 执行器)
+# blargg $6000 ROM runner (硬件一致性检测 执行器)
 cmake --build build --config Release --target f11qa_blargg_runner
 
 # Lua 脚本 runner
@@ -381,13 +381,13 @@ cargo build --release -p f11qa
 
 > 从 christopherpow/nes-test-roms GitHub 镜像下载 **180 个** blargg $6000 协议测试 ROM 到 `tests/fixtures/blargg/`。
 
-### 10.4 运行 Oracle A（CTest 回归）
+### 10.4 运行 内部逻辑检测（CTest 回归）
 
 ```powershell
 ctest --test-dir build --build-config Release --output-on-failure -LE perf
 ```
 
-### 10.5 运行 Oracle B（blargg 全量批处理）
+### 10.5 运行 硬件一致性检测（blargg 全量批处理）
 
 ```powershell
 cd tests
@@ -410,7 +410,7 @@ cargo run --release -p f11qa -- `
 
 F11QA 在 CI 上自动运行（`.github/workflows/f11qa.yml`）：
 - 每次 push 到 `main` / `wip_1.16` 触发
-- Oracle A + Oracle B 全量运行
+- 内部逻辑检测 + 硬件一致性检测 全量运行
 - 迁移矩阵 + 精度对照表作为 artifact 上传
 - PASS→FAIL 基线漂移自动 PR 评论警报
 - **`R4 Gate` 步**：矩阵缺失 / `engine.git_rev` 为 `unknown` / `summary.total < 39` /

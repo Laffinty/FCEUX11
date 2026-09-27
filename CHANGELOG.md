@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **advisory known-limit 15% 护栏**（precision.md §4）：禁止无评审把 blocking 改
   advisory / 净增；调整须带 `provenance` 根因。当前 14/120 = 11.7%。
 - **矩阵**：120 项 kgmqa 清单，**106P / 14F**，**Grade B (release)**；
-  Oracle A 42P/0F，Oracle B blargg **145P/32F**。
+  内部逻辑检测 42P/0F，硬件一致性检测 blargg **145P/32F**。
 - **精度攻关**（`docs/tech/f11qa-accuracy-backlog.md`）：
   - A-055 `cpu_reset_regs` 清零（上电 P=$34 S=$FD；软复位 P|=I、S-=3；$6000==$81 握手复位）
   - B-093 `bntest` 清零（ANROM $6000 窗口误吞协议写）
@@ -48,9 +48,9 @@ Task 3（遗留收敛核查）成果。
 
 | 通道 | 数量 | PASS / FAIL | 备注 |
 |---|---|---|---|
-| **Oracle A** (ctest + 测试清单) | 27 + CTest-only | 33/33 (100%) | ctest `-LE perf` 全绿 |
-| **Oracle B** (tests.json 桶代表) | 20 | 12P / 8F | 8 FAIL 全部 advisory 已知限制 |
-| **Oracle B** (blargg 全量 177 ROM) | 177 | 144P / 33F | 81.4% PASS 率（与 v1.16 终态一致，无回归） |
+| **内部逻辑检测** (ctest + 测试清单) | 27 + CTest-only | 33/33 (100%) | ctest `-LE perf` 全绿 |
+| **硬件一致性检测** (tests.json 桶代表) | 20 | 12P / 8F | 8 FAIL 全部 advisory 已知限制 |
+| **硬件一致性检测** (blargg 全量 177 ROM) | 177 | 144P / 33F | 81.4% PASS 率（与 v1.16 终态一致，无回归） |
 | **总测试条目** (kagami-qa-runner) | 47 | 39P / 8F | **Grade C (acceptable)** |
 | **cargo test** (kagami-qa lib) | 178 | 178P / 0F | 含新迁移 harness 单元测试 |
 
@@ -83,40 +83,40 @@ Task 3（遗留收敛核查）成果。
 
 ## [1.16] - 2026-08-06
 
-**Codename: KagamiQA closure.** FCEUX11 v1.16 ships a CI-resident dual-oracle
+**Codename: KagamiQA closure.** FCEUX11 v1.16 ships a CI-resident dual-channel
 quality defense system (`kagami-qa`), backed by 47 test entries in `tests.json`
 + 177 blargg `$6000` ROMs. All Phase 1-4 must-pass items closed (R4 Gate
 sign-off on `wip_1.16`, CI runs #31/#32/#33/#34). See
 `docs/history/plans/FCEUX11-1.16_P3-KagamiQA闭环四阶段构建方案.md` for the full closure plan.
 
-### Summary (KagamiQA 双 Oracle 质量防线)
+### Summary (KagamiQA 双通道 质量防线)
 
 | 通道 | 数量 | PASS / FAIL | 备注 |
 |---|---|---|---|
-| **Oracle A** (ctest + 测试清单) | 27 + 6 CTest-only | 33/33 (100%) | ctest `-LE perf` 全绿 |
-| **Oracle B** (tests.json 桶代表) | 20 | 12P / 8F | 8 FAIL 全部 advisory 已知限制 |
-| **Oracle B** (blargg 全量 177 ROM) | 177 | 144P / 33F | 81.4% PASS 率 |
+| **内部逻辑检测** (ctest + 测试清单) | 27 + 6 CTest-only | 33/33 (100%) | ctest `-LE perf` 全绿 |
+| **硬件一致性检测** (tests.json 桶代表) | 20 | 12P / 8F | 8 FAIL 全部 advisory 已知限制 |
+| **硬件一致性检测** (blargg 全量 177 ROM) | 177 | 144P / 33F | 81.4% PASS 率 |
 | **总测试条目** (kagami-qa-runner) | 47 | 39P / 8F | R4 Gate 通过 |
 | **CI 常驻** | ✅ | `kagami-qa.yml` 每次 push 自动跑 | runs #31-#34 success |
 | **R4 Gate** | ✅ | matrix `git_rev` 真实 commit hash + `fail_to_pass=0` 反作弊 | run #31/#32/#33/#34 |
 
 ### Added — KagamiQA 框架（Phase 4 收口）
 
-- **`kagami-qa.yml` CI workflow** — `Oracle A` (ctest) + `Oracle B` (blargg 全量) +
+- **`kagami-qa.yml` CI workflow** — `内部逻辑检测` (ctest) + `硬件一致性检测` (blargg 全量) +
   迁移矩阵生成 + R4 Gate（`engine.git_rev` 真实 commit + `total ≥ 39` +
   `fail_to_pass = 0` 反作弊门禁）。runs #31/#32/#33/#34 success，约 25 分钟/次。
 - **Lua bindings 完整化**（Phase 4.1, commit `78a9d7f`）：
   - `joypad.get/set` 返回 number bitmask（FCEUX 兼容契约）
   - `memory.readwrite/readwordsigned/getregister/registerexec` 完整
-  - `lua_joypad_test` + `lua_memory_test` 由 advisory 升为 blocking，Oracle A 27/27 全绿
-- **Oracle B 覆盖深度扩展**（Phase 4.4, commit `370a3af`）：
+  - `lua_joypad_test` + `lua_memory_test` 由 advisory 升为 blocking，内部逻辑检测 27/27 全绿
+- **硬件一致性检测 覆盖深度扩展**（Phase 4.4, commit `370a3af`）：
   - `tests.json` 39 → 47 项（+8 桶代表：MMC3 2 + CPU 2 + PPU 3 + sprdma 1）
   - 2 项 PASS 监控：`blargg_vbl_05_nmi_timing`（Phase 1 修复）、`blargg_ppu_read_buffer`（Phase 3 修复）
   - 6 项 advisory 已知限制（桶 A/B/C/D 完整覆盖）
 - **P5 runppu 决策正式记录**（Phase 4.5, commit `357ab59`）：
   - **保持当前 PPU，runppu 切换推迟到 v1.17+**
   - 32 已知限制均属深模型族（CPU/PPU 寄存器/DMA 层），与渲染路径解耦，runppu 切换零精度收益
-  - v1.17+ 重启条件：(a) 深模型族突破；(b) 新独立外部 oracle 引入；(c) per-cycle 联合仿真
+  - v1.17+ 重启条件：(a) 深模型族突破；(b) 新独立外部检测通道 引入；(c) per-cycle 联合仿真
 - **CI 数字回填纪律**（Phase 4.3, commit `18464e6`）：
   - `docs/tech/KagamiQA.md` §0 + `readme.md` 锚同步到 CI artifact `engine.git_rev=78a9d7f` (run #31)
   - §0 纪律块由"禁止手改"软化为"以 CI artifact 为准"（Phase 4.2 R4 Gate 闭环后已 CI 同步）
@@ -155,7 +155,7 @@ sign-off on `wip_1.16`, CI runs #31/#32/#33/#34). See
 ### Changed
 
 - **`src/version.h`** — `FCEU_VERSION_MINOR` 15 → 16；`FCEU_HOTFIX_TAG` 清空；`FCEU_DISPLAY_VERSION` "v1.15 (hotfix6)" → "v1.16"（commit `7c2356b`）。
-- **`tests/tests.json`** — 39 → 47 项 Oracle 桶代表；6 项 Oracle B 桶代表由 Phase 3 known_fail 提升到 tests.json（仍 advisory）。
+- **`tests/tests.json`** — 39 → 47 项检测桶代表；6 项 硬件一致性检测 桶代表由 Phase 3 known_fail 提升到 tests.json（仍 advisory）。
 - **`tests/fixtures/blargg_manifest.json`** — 22 → 177 条目（S-1 清掉 3 个重复死条目后 180 → 177）。
 - **`tests/fixtures/blargg_known_fail.json`** — 22 → 60 条分类（`code`, `diag`, `eventually_pass`, `runppu` 字段标准化）。
 - **`.github/workflows/kagami-qa.yml`** — R4-0（vcpkg cache 修复）+ R4-1（blargg ROM fixtures 补齐）落地。

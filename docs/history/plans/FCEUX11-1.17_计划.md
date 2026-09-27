@@ -7,7 +7,7 @@
 > **状态**：✅ **主体已施工（2026-08-08）**；冻结基线生效为后续收敛项
 > **前置**：v1.16 最终验收通过（`docs/history/reports/FCEUX11-1.16_最终验收报告.md`，11/11 项闭合）
 > **关联**：`docs/tech/KagamiQA.md`、`docs/history/plans/FCEUX11-Stage3-权威性迭代与通用化路线.md`、`docs/history/plans/FCEUX11-1.16_KagamiQA-P5-权威性构建计划.md`、`docs/history/checklists/v2.0_removal_checklist.md`
-> **路线图位置**：v1.15 完成 v1.x C++ 现代化；v1.16 完成 KagamiQA 双 Oracle 闭环；**v1.17 = KagamiQA 统合（测试体系单一归属）+ 遗留精度收敛 + 分级标准落地**
+> **路线图位置**：v1.15 完成 v1.x C++ 现代化；v1.16 完成 KagamiQA 双通道 闭环；**v1.17 = KagamiQA 统合（测试体系单一归属）+ 遗留精度收敛 + 分级标准落地**
 
 ---
 
@@ -19,7 +19,7 @@ v1.17 的五项任务及其性质：
 |---|---|---|---|
 | 1 | 可迁移 C++ 测试 → KagamiQA Rust 体系 | 代码迁移（~2,900 LOC） | 消除 C++ harness 双实现，全部测试由 kagami-qa-runner 单一调度 |
 | 2 | 不可迁移 C++ 测试耦合 KagamiQA + 源码区隔 | 结构重组 | KagamiQA 资产集中落位（`tests/kagami/`），与 FCEUX11 引擎代码物理区隔 |
-| 3 | v1.16 遗留项收敛 | 精度攻坚 + harness 修复 | Oracle B 伪失败 18 项清零，真实精度 FAIL 面下降，矩阵数字收敛 |
+| 3 | v1.16 遗留项收敛 | 精度攻坚 + harness 修复 | 硬件一致性检测 伪失败 18 项清零，真实精度 FAIL 面下降，矩阵数字收敛 |
 | 4 | KagamiQA 架构规范化 | 重构 | 明确七层依赖层级，消除 main.rs god file 与 direct_entry 重复；补 runner `--filter` 与 direct 看门狗；视作一个整体 |
 | 5 | A–E 分级通过标准 | 新功能 | 测试结果有机器可算、可审计的发布等级 |
 
@@ -34,14 +34,14 @@ v1.17 的五项任务及其性质：
 | 维度 | 数值 | 来源 |
 |---|---|---|
 | CTest 注册测试 | 34（`-LE perf` 实跑 33，全 PASS） | `tests/CMakeLists.txt` / CI |
-| `tests.json` 清单条目 | **47**（Oracle A 27 + Oracle B 20） | `python` 解析确认 |
+| `tests.json` 清单条目 | **47**（内部逻辑检测 27 + 硬件一致性检测 20） | `python` 解析确认 |
 | 当前矩阵 PASS / FAIL | **39 / 8**（8 FAIL 全部 advisory 已知限制） | CI matrix artifact |
 | blargg 落盘 ROM | **177**（cpu 58 / apu 52 / ppu 49 / mmc3 18） | 文件系统计数 |
-| Oracle B 全量 | 144 PASS / 33 FAIL（0x80×12 + 0x81×6 **全清零**，剩余 33 全真实精度深模型族） | `blargg_full_output.txt` |
+| 硬件一致性检测 全量 | 144 PASS / 33 FAIL（0x80×12 + 0x81×6 **全清零**，剩余 33 全真实精度深模型族） | `blargg_full_output.txt` |
 | 已知限制归类 | 32 项深模型族（MMC3 12 / CPU 11 / sprdma 2 / PPU 2 / VBL 5）+ 1 永久跳过 | Phase 3 收口 |
 | cargo test（kagami-qa） | **187/187 PASS**（v1.17 7 commit 净增 + 内部重构换路径零回归） | `cargo test --release -p kagami-qa` |
 | CI 触发分支 | `main` / `wip_1.16` / `wip_v1.17`（v1.17 A0 已修） | workflow 声明 |
-| 权威性口径 | 门槛全绿 + 度量：外部真理覆盖 177/177、oracle 来源数 = 1 | KagamiQA.md §1.4 |
+| 权威性口径 | 门槛全绿 + 度量：外部真理覆盖 177/177、检测来源数 = 1 | KagamiQA.md §1.4 |
 
 **关键判定**：v1.16 是「构建可靠、测试可信（ctest 维度）、失败诚实标注」的版本。遗留精度项（E-1/E-3）与 harness 缺口（0x80/0x81）已正确归类为 advisory。v1.17 H-1/H-2 收敛后，0x80×12 + 0x81×6 = 18 项伪失败全清（manifest 全字段 + 帧预算校准），剩余 33 FAIL 全部进入「**冻结基线**」（`tests/fixtures/kagamiqa_baseline_frozen.json` 8 项 test_set 入口 + Blargg 文件级 33 项）——CI 改用冻结 baseline 后，runner 输出 **B 级**（`fail_to_fail` 8 项，§十三.1 收口）。
 
@@ -56,12 +56,12 @@ v1.17 的五项任务及其性质：
 | Harness | `tests/blargg_runner.cpp` | 533 | 合并进 Rust `direct_entry`（同能力已有第二份实现，消除双实现） |
 | Harness | `tests/lua_runner.cpp` | 435 | Rust Lua runner（复用 `fceux11-lua` crate bindings + C ABI 桥） |
 | Harness | `tests/kagami_direct_main.cpp` | 27 | 删除 C++ 壳，入口并入 Rust CLI |
-| ROM Oracle | `tests/rom_regression_test.cpp` | 329 | Rust harness：load→run N 帧→CRC32 比对 |
-| ROM Oracle | `tests/savestate_regression_test.cpp` | 325 | 同上（MD5 savestate） |
-| ROM Oracle | `tests/core/mapper_byte_diff_test.cpp` | 442 | 同上（mapper 状态字节） |
-| ROM Oracle | `tests/core/apu_wav_diff_test.cpp` | 304 | 同上（WAV 采样） |
-| ROM Oracle | `tests/core/ppu_frame_diff_test.cpp` | 253 | 同上（像素帧） |
-| ROM Oracle | `tests/fixtures/golden/golden_savestate_test.cpp` | ~250 | 同上（.fc0 往返） |
+| ROM 检测 | `tests/rom_regression_test.cpp` | 329 | Rust harness：load→run N 帧→CRC32 比对 |
+| ROM 检测 | `tests/savestate_regression_test.cpp` | 325 | 同上（MD5 savestate） |
+| ROM 检测 | `tests/core/mapper_byte_diff_test.cpp` | 442 | 同上（mapper 状态字节） |
+| ROM 检测 | `tests/core/apu_wav_diff_test.cpp` | 304 | 同上（WAV 采样） |
+| ROM 检测 | `tests/core/ppu_frame_diff_test.cpp` | 253 | 同上（像素帧） |
+| ROM 检测 | `tests/fixtures/golden/golden_savestate_test.cpp` | ~250 | 同上（.fc0 往返） |
 | 公共设施 | `tests/core/test_helpers.h` | 144 | Rust `test_helpers.rs`（golden 加载 / CRC32 / 比较器） |
 
 ### 2.2 可行性依据
@@ -170,13 +170,13 @@ src/kagami/                          ← 引擎侧桥接（决策点 3.4，建�
 | **H-2** | 0x80 的 12 项逐 ROM 校准 `frames` 预算 | 未做 | 🟢 低 | harness 修复 |
 | **M-1** | 矩阵数字收敛（当前 39/47，8 FAIL 全 advisory） | 部分（lua 2 项已转 PASS） | 🟡 中 | 收敛 |
 | **P5** | runppu 重批重新评估 | 推迟，3 个重启条件当前均未满足 | — | 不投入 |
-| **R7（P3）** | 第二 oracle 来源 | 用户 2026-08-01 决策暂缓 | — | 不投入 |
+| **R7（P3）** | 第二检测来源 | 用户 2026-08-01 决策暂缓 | — | 不投入 |
 
 ### 4.2 H-1 / H-2：harness 修复（v1.17 必做，低垂果实）
 
 - **H-1**：`--reset-after` 已在 runner 实现（E-2），缺口是 manifest 无逐 ROM 字段 + 批处理路径未消费。改法：`blargg_manifest.json` 每条目加 `reset_after: N`（默认 -1），`blargg_runner.cpp --manifest` 路径逐 ROM 传递。预期收掉 0x81 的 6 项。
 - **H-2**：0x80 的 12 项逐 ROM 实测校准 `frames` 预算（参照 `blargg_cpu_instrs` 300→3000 的先例）。
-- **收益**：Oracle B 全量口径从 121/56 变为更干净（伪失败 18 项清零后只剩真实精度 FAIL），56 FAIL 的分类记录（`docs/tech/KagamiQA.md` §2.1）同步刷新。
+- **收益**：硬件一致性检测 全量口径从 121/56 变为更干净（伪失败 18 项清零后只剩真实精度 FAIL），56 FAIL 的分类记录（`docs/tech/KagamiQA.md` §2.1）同步刷新。
 
 ### 4.3 R5（E-1）：PPU VBL/NMI 边沿时序
 
@@ -193,11 +193,11 @@ src/kagami/                          ← 引擎侧桥接（决策点 3.4，建�
 
 **强制回归集（每步后必跑，任一红即 revert）**：
 - `vbl_01_basics`、`vbl_04_nmi_control`、`vbl_09_even_odd_frames`（PASS 基线）
-- `rom_regression_test` + `golden_savestate_test` + `savestate_regression_test`（Oracle A，blocking）
+- `rom_regression_test` + `golden_savestate_test` + `savestate_regression_test`（内部逻辑检测，blocking）
 - 全量 `ctest -LE perf`（须维持 34/34）
 - 每步前 `scripts/do_build.ps1` 全量重建（增量 exe 可能比源码旧）
 
-**证伪判据**：`vbl_05` 行 00-06 由 `1` 翻为 `2` 且 `vbl_01` 保持 `0x00`；若 `vbl_01` 翻红 → 主循环补偿失效，回路径 (c)。若多轮仍无法在「不回归 Oracle A」前提下修复 → 记录为**有据已知限制**（带错误码、诊断串、根因、已尝试方案），不强求 PASS。
+**证伪判据**：`vbl_05` 行 00-06 由 `1` 翻为 `2` 且 `vbl_01` 保持 `0x00`；若 `vbl_01` 翻红 → 主循环补偿失效，回路径 (c)。若多轮仍无法在「不回归 内部逻辑检测」前提下修复 → 记录为**有据已知限制**（带错误码、诊断串、根因、已尝试方案），不强求 PASS。
 
 ### 4.4 R6（E-3）：APU 帧计数器相位 + $4017 标志
 
@@ -224,9 +224,9 @@ src/kagami/                          ← 引擎侧桥接（决策点 3.4，建�
 
 | 门禁 | 阈值 |
 |---|---|
-| H-1/H-2 | Oracle B 全量 0x80/0x81 清零（或全部转真实精度分类），56 FAIL 分类表刷新 |
-| R5 | `vbl_01`~`vbl_10` 全 10 ROM 返回 0x00；`blargg_ppu_vbl_nmi` 升 blocking；Oracle A 维持 34/34 |
-| R6 | 7 个 bucket-C sub-test 全转 PASS；`apu_*`/`pal_apu_*` 不回归；Oracle A 维持 34/34 |
+| H-1/H-2 | 硬件一致性检测 全量 0x80/0x81 清零（或全部转真实精度分类），56 FAIL 分类表刷新 |
+| R5 | `vbl_01`~`vbl_10` 全 10 ROM 返回 0x00；`blargg_ppu_vbl_nmi` 升 blocking；内部逻辑检测 维持 34/34 |
+| R6 | 7 个 bucket-C sub-test 全转 PASS；`apu_*`/`pal_apu_*` 不回归；内部逻辑检测 维持 34/34 |
 | 整体 | 矩阵 advisory FAIL 数下降，分级向 B 级靠拢（见任务 5） |
 
 ---
@@ -240,7 +240,7 @@ src/kagami/                          ← 引擎侧桥接（决策点 3.4，建�
 3. **层间依赖无显式声明**：模块齐全但边界靠自觉，无可见性控制。
 4. **schema 领域泄漏**：`TestInput` 含 `rom`/`probe_addr`/`frames`（Stage-3 §3.1 已标记 `DOMAIN-LEAK`）。
 5. **C++ 资产散落**（任务 2.2）。
-6. **`kagami-qa/README.md` 过时**：仍写「30 CTest tests」「P2+ Roadmap 未来时」，与 v1.16 实际状态（47 条目/双 Oracle/CI 闭环）严重脱节。
+6. **`kagami-qa/README.md` 过时**：仍写「30 CTest tests」「P2+ Roadmap 未来时」，与 v1.16 实际状态（47 条目/双通道/CI 闭环）严重脱节。
 
 ### 5.2 目标层级（自上而下单向依赖）
 
@@ -354,7 +354,7 @@ Phase D  遗留收敛（任务 3，全程并行轨）
   ├─ H-1/H-2（必做）
   ├─ R5/R6（instrument-first，独立 PR）
   └─ M-1 矩阵收敛
-        验收：Oracle B 伪失败 18 项清零；advisory 数量下降；分级向 B 级靠拢
+        验收：硬件一致性检测 伪失败 18 项清零；advisory 数量下降；分级向 B 级靠拢
 ```
 
 **并行性说明**：Phase D（任务 3）与 Phase A/B/C（测试体系重构）零代码耦合（前者动 `ppu_rendering.cpp`/`sound.cpp`/manifest 数据，后者动 `tests/`/`kagami-qa crate`），可并行推进。唯一交叉点是任务 1 迁移 ppu/apu golden 测试的时序（见 2.6）。
@@ -398,8 +398,8 @@ Phase D  遗留收敛（任务 3，全程并行轨）
 ## 十、非目标（v1.17 内明确不做）
 
 1. **不做核心 Rust 化**：核心内部单元测试（任务 2 归类）跟随核心迁移节奏（v2.x），v1.17 不做 CPU/PPU/APU 热路径 Rust 化。
-2. **不做 runppu 切换**：P5 重启条件（深模型突破 / 新独立 oracle / per-cycle 联合仿真）当前均未满足，维持 v1.16 决策。
-3. **不引入第二 oracle 来源**（R7/P3）：维持用户 2026-08-01 决策（P2 精度优先）。
+2. **不做 runppu 切换**：P5 重启条件（深模型突破 / 新独立检测通道 / per-cycle 联合仿真）当前均未满足，维持 v1.16 决策。
+3. **不引入第二检测来源**（R7/P3）：维持用户 2026-08-01 决策（P2 精度优先）。
 4. **不做跨项目通用化**：遵循 Stage-3 结论——n=1 条件下不推进代码通用化，不向共享 schema 加领域字段、不向 SutAdapter 加方法。
 5. **不退役 C++ 语言/平台测试**（`enum_class_bitflags_test` 等）：标记「随 v2.0 退役」，v1.17 不投入、不翻译。
 6. **不追求 A 级**：v1.17 目标是「从 C 级出发向 B 级靠拢」，A 级（零已知限制）不设时间表。
@@ -427,7 +427,7 @@ Phase D  遗留收敛（任务 3，全程并行轨）
 | 2 | `日期：2026-08-07` | 已收口 | 改 `2026-08-07 草案 / 2026-08-08 主体施工` |
 | 3 | §〇「C 级（8 项 advisory）→ 靠拢 B 级」 | B 级机器化条件 = **冻结基线生效**（无新增已知限制） | 在 §〇或 §六补一句「B 级判定器依赖 `kagamiqa_baseline_frozen.*` 落地」 |
 | 4 | §一 基线快照 `cargo test 40/40 PASS` | 实测 **187/187** | 改 187 |
-| 5 | §一「Oracle B 全量 121 PASS / 56 FAIL」 | 实测 **144 / 33**（H-1/H-2 清零 23 项） | 改 144/33，并注明分类变化（0x80×12 + 0x81×6 全清，剩余 33 全深模型族）|
+| 5 | §一「硬件一致性检测 全量 121 PASS / 56 FAIL」 | 实测 **144 / 33**（H-1/H-2 清零 23 项） | 改 144/33，并注明分类变化（0x80×12 + 0x81×6 全清，剩余 33 全深模型族）|
 | 6 | §九 整体完成判据 7 个 checkbox | 5/7 可勾选 | 勾掉可勾项，未勾项注明残留原因 |
 
 ### 11.2 应改（实质性偏差，4 处）
@@ -482,7 +482,7 @@ Phase D  遗留收敛（任务 3，全程并行轨）
 
 | 轨道 | 范围 | 关键 commit | 落地状态 |
 |------|------|-------------|----------|
-| **Track A**（任务 2 + H-1/H-2 harness） | `tests/kagami/` 落位 + manifest 登记核对 + `reset_after` 全字段 + 0x80 帧预算校准 | `4b105f6`（merge）→ `99f628d`（merge-fix）→ `3286a68`（duplicate test_helpers.h） | H-1/H-2 ✓（Oracle B 56→33 FAIL） |
+| **Track A**（任务 2 + H-1/H-2 harness） | `tests/kagami/` 落位 + manifest 登记核对 + `reset_after` 全字段 + 0x80 帧预算校准 | `4b105f6`（merge）→ `99f628d`（merge-fix）→ `3286a68`（duplicate test_helpers.h） | H-1/H-2 ✓（硬件一致性检测 56→33 FAIL） |
 | **Track B**（任务 3 R5/R6 instrument-first） | E-1 PPU VBL 探针 7 提交 + E-3 APU 探针 6 提交 + 数据报告 + 核查结论 | `6fa0600`（merge）→ `f81cdc4`…`5fb111a`（e3/e1 probes）→ `3d60357`、`32fc76d`（数据报告）→ `4c7aec4`（核查结论） | R5 5 项 → 已知限制；R6 7 项 → PASS（不动 sound.cpp）|
 | **Track C**（任务 1 Rust harness） | blargg（C1）+ rom_regression（C2）+ savestate_regression（C3）+ mapper_byte_diff + lua + FFI + 71 单测 | `571cac7`（merge）→ `223d503`、`19266e2`（C2/C3 parity）→ `08797ac`（final report）→ `d634e54`、`d162e0e`、`0ec4654`（开关切换）| blargg / lua / rom_regression / savestate_regression / mapper_byte_diff 全迁完；`apu_wav_diff` / `ppu_frame_diff` 按 §二.6 暂留 |
 
@@ -540,7 +540,7 @@ python tools\generate_baseline_frozen.py --matrix build\kagamiqa_migration_matri
 
 | 项 | 出处 | 备注 |
 |---|---|---|
-| `report/pdf.rs` 一页 PDF 报告 | 任务 5.3 报告能力延伸（实施中追加） | 零外部依赖、含 grade letter + stat cards + oracle split + fail table + footer；`cli/args.rs` 新增 `--pdf-report <path>` 标志；`cli/run_report.rs` 写入逻辑；CI 工作流已挂载 + 上传 artifact |
+| `report/pdf.rs` 一页 PDF 报告 | 任务 5.3 报告能力延伸（实施中追加） | 零外部依赖、含 grade letter + stat cards + dual-channel split + fail table + footer；`cli/args.rs` 新增 `--pdf-report <path>` 标志；`cli/run_report.rs` 写入逻辑；CI 工作流已挂载 + 上传 artifact |
 | CHANGELOG v1.17 章节 | v1.17 收口产物（`4c7aec4`） | 覆盖 Task 1 迁移 + Task 3 收敛，影响 §一表与 §六.3 |
 | 三轨并行 Track A/B/C | v1.17 实际执行方式 | 印证 §八"任务 3 与 1/4 零耦合"假设 |
 | `tests/fixtures/kagamiqa_baseline_frozen.json`（冻结基线 + tool）| §十三.1 落地 | 8 项已知限制冻结；`tools/generate_baseline_frozen.py` 提供一键重生；runner `--baseline` 已切到 frozen，机器化产出 B 级 |

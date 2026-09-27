@@ -72,7 +72,7 @@ CPU 下一边界不采样。
 | vbl_05_nmi_timing | PASS 0x00 | **FAIL 0x01**（diag `00 255` = NMI 未触发） | ❌ 回归 |
 | vbl_09_even_odd_frames | PASS 0x00 | PASS 0x00 | ✅ |
 
-其余：vbl_02/06/07/08/10 维持 FAIL（码不变）。Oracle A（`ctest -LE perf`）修复前后均 **34/34**。
+其余：vbl_02/06/07/08/10 维持 FAIL（码不变）。内部逻辑检测（`ctest -LE perf`）修复前后均 **34/34**。
 
 ## 6. 根因：缺口修复与深模型绑定
 
@@ -110,7 +110,7 @@ vbl_04/05 的 VBL 轮询读同样落在 (241,0)（模拟器 ~2-3 dot 帧边界�
 | vbl_09_even_odd_frames | PASS | PASS | PASS ✅ |
 | vbl_10_even_odd_timing | FAIL 0x03 | FAIL 0x03 | FAIL 0x03 ✅ |
 
-Oracle A（`ctest -LE perf`）：回滚后 **34/34**。回归归因确认 = NMI 取消修复本身。
+内部逻辑检测（`ctest -LE perf`）：回滚后 **34/34**。回归归因确认 = NMI 取消修复本身。
 
 ---
 *实验完。结论：缺口真实、机制正确、落地绑定深模型 → 有据已知限制，不排入当前序列。*

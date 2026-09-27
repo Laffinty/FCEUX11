@@ -29,7 +29,7 @@
 1. 先读 blargg 05 内部每行的具体 timing 序列
 2. 把 NMI 触发时机作为显式 cycle+dot 参数（非「立即 / +1」二分）
 3. 同时考虑 `$2002` 读点相位（blargg sync_vbl 用）
-4. 每次改一处，独立回归 01 / 04 / Oracle A / 05 单条
+4. 每次改一处，独立回归 01 / 04 / 内部逻辑检测 / 05 单条
 
 完整记录见 `memory/e1-step2-attempt-2026-07-30.md`。
 代码 HEAD = 当前 release branch tip，PPU 段无变化。
@@ -116,7 +116,7 @@ VBL 在 cycle 0。两者不一致 → 整个 §1 表读数失真、§3「sync_vb
 
 1. **先做 05_nmi_timing**：失败模式最干净 —— 单 cycle 偏晚，归因
    直接。可能改一处 `ppu_rendering.cpp` 的 NMI 注入时刻。
-   - 风险：会改 NMI 时序；必须回归 01/04/Oracle A。
+   - 风险：会改 NMI 时序；必须回归 01/04/内部逻辑检测。
 2. **再做 02_set_time**：与 05 互补，验 VBL **set** 沿（sl 241 的 dot 0/1）。
 3. **06/07/08 一组**：NMI gating 相关，验 VBL **clear** 沿 + NMI enable/
    disable 路径。
@@ -134,7 +134,7 @@ VBL 在 cycle 0。两者不一致 → 整个 §1 表读数失真、§3「sync_vb
 
 - `vbl_01_basics` (PASS 基线)
 - `vbl_04_nmi_control` (NMI enable/disable 路径 PASS 基线)
-- Oracle A: `fceux11_rom_regression_test` + `fceux11_golden_savestate_test`
+- Internal Logic Check: `fceux11_rom_regression_test` + `fceux11_golden_savestate_test`
 
 ## 6. 不要照抄的章节（接手必读）
 

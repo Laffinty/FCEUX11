@@ -1,7 +1,7 @@
 # F11QA v1.8 精度攻关 backlog（2026-09-26 启动）
 
-> 实测矩阵 **106P / 14F**（Oracle A 42P/0F，Oracle B 61P/17F）。
-> 流水线与 baseline 已稳：`pass_to_fail=0`、`fail_to_pass=0`、Oracle A 全绿。
+> 实测矩阵 **106P / 14F**（内部逻辑检测 42P/0F，硬件一致性检测 61P/17F）。
+> 流水线与 baseline 已稳：`pass_to_fail=0`、`fail_to_pass=0`、内部逻辑检测 全绿。
 > 剩余 17 项为 **vendored 第三方 ROM 真实精度缺口**，是 R4 grade D 的唯一原因。
 
 ## 0. 本批已收掉的非精度项（对照）
@@ -53,7 +53,7 @@
 
 - **Instrument-first**（precision.md §4）：改时序前先上 env-gated 探针
 - 每项必须带「探针数据 + 根因」才能标 known_limit，禁止无据 FAIL
-- 单点提交 + Oracle B 全量对账（144/33 不得回退）
+- 单点提交 + 硬件一致性检测 全量对账（144/33 不得回退）
 - golden 金标仅在有意 PPU 变更时重生成
 
 ## 3. 阶段出口

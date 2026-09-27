@@ -4,7 +4,7 @@
 > **验收分支**：`wip_1.16`（报告出具时 HEAD = `93834f2`，验收基线 `0f7d2b6`，工作树干净）
 > **验收人**：独立验收（ZCode agent）
 > **验收方法**：文档审阅 + 代码级核对 + **实测复现**（非仅采信文档结论）
-> **验收范围**：v1.16 构建（KagamiQA 双 Oracle 测试系统）从 P0–P5 → Stage-2 → S 系列收官的全链路
+> **验收范围**：v1.16 构建（KagamiQA 双通道 测试系统）从 P0–P5 → Stage-2 → S 系列收官的全链路
 > **关联文档**：`docs/history/plans/FCEUX11-1.16_Stage2-构建计划.md`、`docs/history/reports/FCEUX11-1.16_KagamiQA-{审计报告,修复验证报告}.md`、`docs/history/checklists/FCEUX11-1.16_KagamiQA-遗留问题与构建难题.md`、`docs/history/surveys/e1_vbl/FCEUX11-1.16_E-1-VBL调查记录.md`
 >
 > **报告结构**：§一~§九 为验收事实与裁定（v1.16 通过验收）；§十 为**推进至 100% 完美交付的整改建议**（P0 文档收尾 / P1 CI 闭环 / P2 精度收敛 / P3 权威性提升，含文件:行号、改法、回归集、证伪判据）。
@@ -19,7 +19,7 @@
 > 3. **报告措辞与实际接管核对范围不一致**已在 §〇、§四.2、§五、§六、§九 添加诚实标注，区分"独立核对"与"采信"
 > 4. **§一.2 验收基线 HEAD** 与 §一.1 版本演进脉络已就地更新
 >
-> **验收通过判定本身仍成立**（构建 + Oracle A ctest 34/34 独立实测通过）。本接管修订不构成对原验收的否定，仅补记接管核对的事实并修订 §十 处方的可执行性。
+> **验收通过判定本身仍成立**（构建 + 内部逻辑检测 ctest 34/34 独立实测通过）。本接管修订不构成对原验收的否定，仅补记接管核对的事实并修订 §十 处方的可执行性。
 >
 > ---
 >
@@ -29,7 +29,7 @@
 > 作业在 `Configure CMake` 步撞 `timeout-minutes: 45` 被取消，卡在 vcpkg 从源码编译 Qt 6.8.0。
 >
 > - **根因不在 KagamiQA**：两个 workflow 共有的 vcpkg 缓存路径缺陷（缓存空目录 + `${{ env.LOCALAPPDATA }}` 展开为空串），
->   导致缓存从未生效、每轮冷编 Qt。Oracle A/B、判定链路、S-4 stamp 在本轮**根本没有获得执行机会**。
+>   导致缓存从未生效、每轮冷编 Qt。内部逻辑检测 / 硬件一致性检测、判定链路、S-4 stamp 在本轮**根本没有获得执行机会**。
 > - **整改 R4-0 已落地**（新增 release-only overlay triplet + `VCPKG_INSTALLED_DIR` + 缓存路径收窄 + timeout 45→180
 >   + 把 R4 证伪判据机器化的 `R4 Gate` 步）；**纯 CI + 文档，零代码变更**。
 > - **R4-0 本身未经 CI 验证**，须待下一轮 CI 判定。
@@ -50,7 +50,7 @@
 >
 > **暴露两个此前被本地环境掩盖的 CI 缺口**（均**非** R4-0 引入，是 CI 第一次真正跑到这些步骤才显形）：
 > - **缺口 A**：`.gitignore:108` 的 `*.nes` 使 177 个 blargg ROM 全部不在仓库（本地 177 / 仓库 0），
->   而 workflow 从未调用已有的 `scripts/download_blargg_roms.ps1` → Oracle B **177/0 PASS/177 FAIL**
+>   而 workflow 从未调用已有的 `scripts/download_blargg_roms.ps1` → 硬件一致性检测 **177/0 PASS/177 FAIL**
 >   （全为 `0xFE` + `duration_ms:0` 的**加载失败**签名，非精度失败）；`kagami_qa_direct_smoke` 同因失败，
 >   CI 上 ctest 为 32/33 而本地同 commit 为 34/34
 > - **缺口 B**：`src/rust/.cargo/config.toml` 设 `build.target`，产物在 `target/x86_64-pc-windows-msvc/release/`，
@@ -67,7 +67,7 @@
 >
 > **🚨 2026-08-01 第四次接管修订：用户决策 —— P3 暂不做（精度优先）**
 >
-> 用户明确决策：**暂不实施 P3（R7 第二独立 oracle 来源）**，理由为"先确保精度再谈别的"。
+> 用户明确决策：**暂不实施 P3（R7 第二独立检测通道 来源）**，理由为"先确保精度再谈别的"。
 > 资源全部投向 P2 精度收敛（E-1 / E-3）；P3 由"路线项"降级为"P2 收敛后的候选"，完成判据中 R7 标注**暂缓**。
 > 后续若重开 P3，须按 §十 R7 的路径评估（PPU 专项独立套件为最低成本入口）。
 > 本决策已同步标注于 §十 整改总览、§十 R7 小节与 §十 完成判据。
@@ -81,23 +81,23 @@
 > **🚨 2026-07-31 重要校正（独立接管核对的诚实补记）**
 >
 > 上方"实测复现"措辞经本会话（commit `1fa88f2` 之后）独立核对后修正：
-> - **Oracle A ctest 34/34** — 本会话独立 do_build.ps1 + ctest 实跑确认 ✅
-> - **Oracle A cargo 40/40** — 本会话**未**实跑（采信 §三.2 自报）
-> - **Oracle B 177 / 121 / 56** — 本会话**未**实跑全量（采信 §三.3 自报，仅跑 vbl_01_basics 单 ROM 验基线 + 验 R5 Step 1 处方）
+> - **内部逻辑检测 ctest 34/34** — 本会话独立 do_build.ps1 + ctest 实跑确认 ✅
+> - **内部逻辑检测 cargo 40/40** — 本会话**未**实跑（采信 §三.2 自报）
+> - **硬件一致性检测 177 / 121 / 56** — 本会话**未**实跑全量（采信 §三.3 自报，仅跑 vbl_01_basics 单 ROM 验基线 + 验 R5 Step 1 处方）
 > - **迁移矩阵 35/39 / `git_rev=623dd39`** — 本会话**未**实跑 matrix（采信 §三.4 自报）
 > - **代码级修复 13/13** — 本会话仅独立核对 #1, #2, #4-6, #10-11 共 7/13 项；#3, #7-9, #12-13 共 6/13 项采信 §五
 > - **E-3 APU 桶 C 分桶** — 本会话**未**跑 apu_*.nes（采信 memory `apu-e3-current-state-2026-07-30`）
 > - **§十 R5 Step 1 处方** — 本会话**已实测且发现数学错误**（详见 §十 R5 Step 1 "🚨 实测校准" 块），已 git revert
 > - **§十 R5 Steps 2-4 / R6 处方** — 本会话**未实测**（按用户决策暂停）
 >
-> 因此 §〇 表格的"独立实测证据"列**应理解为"原始验收报告自报 + 本会话选择性独立核对"**，并非全部维度均经独立复现。**验收通过判定本身仍成立**（构建 + Oracle A ctest 独立通过 + 报告其余声明采信 + §十 处方失信不构成构建/测试基础设施层面的阻塞）。
+> 因此 §〇 表格的"独立实测证据"列**应理解为"原始验收报告自报 + 本会话选择性独立核对"**，并非全部维度均经独立复现。**验收通过判定本身仍成立**（构建 + 内部逻辑检测 ctest 独立通过 + 报告其余声明采信 + §十 处方失信不构成构建/测试基础设施层面的阻塞）。
 
 | 维度 | 结论 | 独立实测证据 |
 |------|------|------------|
 | 构建 | ✅ 通过 | `build-c1` = Ninja + Release + Rust ON，一次成功，无 C1041/LNK1104/LNK2019/LNK2005 |
-| Oracle A（ctest） | ✅ **34/34 = 100%** | 实跑 `ctest -C Release -LE perf`，0 失败，含此前 3 个红灯全转 PASS；**本会话独立复现确认** |
-| Oracle A（cargo） | ✅ **40/40** | 实跑 `cargo test -p kagami-qa`，0 失败（**本会话采信 §三.2**） |
-| Oracle B（blargg 全量） | ✅ 可复现 | 实跑 `--manifest`：**177 总 / 121 PASS / 56 FAIL**，与文档一致（**本会话采信 §三.3**） |
+| 内部逻辑检测（ctest） | ✅ **34/34 = 100%** | 实跑 `ctest -C Release -LE perf`，0 失败，含此前 3 个红灯全转 PASS；**本会话独立复现确认** |
+| 内部逻辑检测（cargo） | ✅ **40/40** | 实跑 `cargo test -p kagami-qa`，0 失败（**本会话采信 §三.2**） |
+| 硬件一致性检测（blargg 全量） | ✅ 可复现 | 实跑 `--manifest`：**177 总 / 121 PASS / 56 FAIL**，与文档一致（**本会话采信 §三.3**） |
 | 迁移矩阵 | ✅ 可追溯 | `git_rev=623dd39`，35/39 PASS，4 FAIL 均为有据已知失败（**本会话采信 §三.4**） |
 | 判定链路可信性 | ✅ 已修复 | `stdout_contains` 生效、`timeout_seconds` 生效、`fail_to_pass` 不含新增测试（Phase 0.5） |
 | 代码级修复 | ⚠️ **7/13 独立核对 / 6/13 采信** | 逐条核对源码，文件:行号证据齐全（见 §三） |
@@ -174,7 +174,7 @@ build-c1/CMakeCache.txt:
 | `kagami_qa_direct_runner.exe` | Phase C 后生成 | ✅ 存在，1,650,688 字节，有效 PE | Phase C 端到端联合构建**已打通** |
 | `fceux11_ppu_rendering_lut_test.exe` | M3 `/GL-` 后为有效 PE | ✅ `MZ` 头正常，4,114,432 字节 | M3 LTCG 崩溃修复**已生效** |
 | 全部 40+ 测试 exe | 全部生成 | ✅ `ls tests/*.exe` 全部存在且近期重编 | 构建完整 |
-| `fceux11_blargg_runner.exe` | Oracle B 驱动 | ✅ 4,129,792 字节，可独立运行产出 `$6000` 码 | — |
+| `fceux11_blargg_runner.exe` | 硬件一致性检测 驱动 | ✅ 4,129,792 字节，可独立运行产出 `$6000` 码 | — |
 
 ### 2.3 四个构建难题的闭环
 
@@ -189,7 +189,7 @@ build-c1/CMakeCache.txt:
 
 ## 三、测试验收
 
-### 3.1 Oracle A — ctest 全量实测（核心验收项）
+### 3.1 内部逻辑检测 — ctest 全量实测（核心验收项）
 
 **实跑命令**：
 ```
@@ -212,9 +212,9 @@ Total Test time (real) = 17.70 sec
 | 33 | `lua_bit_test_headless` | ❌ Failed（5 个 bit 库 bug + 假 PASS） | ✅ Passed 0.03 sec | Phase B（1 实现 bug + 4 测试期望值纠错 + runner 判定加固） |
 | 34 | `kagami_qa_direct_smoke` | ❌ Not Run（runner 从未构建） | ✅ Passed 6.42 sec | Phase C（staticlib + 系统库 + 依赖建模 + S-2 帧预算） |
 
-**判定**：Oracle A「全绿」声明**实测成立**。审计报告 §2.2 称「91% 非『全绿』」是审计时点的真实状态，经 Stage-2 修复后已不再成立——这正是验收的意义所在。
+**判定**：内部逻辑检测「全绿」声明**实测成立**。审计报告 §2.2 称「91% 非『全绿』」是审计时点的真实状态，经 Stage-2 修复后已不再成立——这正是验收的意义所在。
 
-### 3.2 Oracle A — cargo 单元测试实测
+### 3.2 内部逻辑检测 — cargo 单元测试实测
 
 **实跑命令**：`cargo test -p kagami-qa`（在 `src/rust/`）
 
@@ -226,7 +226,7 @@ Total Test time (real) = 17.70 sec
 - `new_test_bucket_keeps_baseline_buckets_clean` / `new_test_failing_also_goes_to_new_test_bucket` / `new_test_passing_goes_to_new_test_bucket` → 证明 0.5-d：新增测试入 `new_test` 桶，不灌水 `fail_to_pass`
 - `test_set_diff_*` 三项 → 证明 0.5-4：用例集合变更可见、可 diff
 
-### 3.3 Oracle B — blargg 全量实测
+### 3.3 硬件一致性检测 — blargg 全量实测
 
 **实跑命令**：
 ```
@@ -374,7 +374,7 @@ oracle_breakdown: { A_regression: {pass:25, fail:2}, B_hardware: {pass:10, fail:
 
 ```
 【卫生门槛】
-  ☑ Oracle A/B 判定通道物理隔离
+  ☑ 内部逻辑检测 / 硬件一致性检测 判定通道物理隔离
   ☑ 判定逻辑与 manifest schema 声明一致        （0.5-1 / 0.5-2 实测）
   ☑ 迁移矩阵不含结构性失真                      （0.5-3 / 0.5-4 实测，fail_to_pass=0）
   ☑ 产物可追溯：matrix 带真实 git_rev=623dd39   （S-4 实测）
@@ -385,14 +385,14 @@ oracle_breakdown: { A_regression: {pass:25, fail:2}, B_hardware: {pass:10, fail:
 【权威性度量】
   外部真理覆盖率 = 177 / 177 blargg ROM（manifest 与磁盘 1:1，死条目 0）
   已知失败清单   = 迁移矩阵 4 项 + blargg 全量 56 项，全部带错误码/分类
-  oracle 来源数  = 1（blargg）—— 覆盖率已到顶，提升须引入新来源
+  检测来源数  = 1（blargg）—— 覆盖率已到顶，提升须引入新来源
 ```
 
 > **🚧 2026-07-31 接管后状态（第二次修订：CI 已实跑一轮，失败）**
 > - CI 卫生门槛 #5 仍 ☐ 未闭合，但**阻塞点已从「未触发」变为「已触发、因依赖治理缺陷失败」**
 > - **CI run `82956632293`（commit `10f1e05`）实测结果：作业在 `Configure CMake` 步撞 `timeout-minutes: 45` 被取消**，
 >   卡在 vcpkg manifest 模式从源码编译 Qt 6.8.0（`Installing 30/33 qtbase[...]` → `Building x64-windows-dbg`）。
->   build / ctest / Oracle B / matrix 四步全部未执行，未产出任何 matrix 产物。
+>   build / ctest / 硬件一致性检测 / matrix 四步全部未执行，未产出任何 matrix 产物。
 > - **根因不在 KagamiQA**，在两个 workflow 共有的 vcpkg 缓存路径缺陷（缓存的是空目录 + `${{ env.LOCALAPPDATA }}` 展开为空串），
 >   导致缓存从未生效、每轮都冷编 Qt。完整证据链见 `docs/history/reports/FCEUX11-1.16_CI-R4-实跑诊断.md`
 > - 整改 **R4-0** 已落地（纯 CI + 文档，零代码变更）；**但整改本身尚未经 CI 验证**，须待下一轮 CI 判定
@@ -404,7 +404,7 @@ oracle_breakdown: { A_regression: {pass:25, fail:2}, B_hardware: {pass:10, fail:
 > - 上方"R4-0 已修待验 / 验收标准 #5 仍 🟡 / §十 R4 仍待触发"已全部过期。
 >   CI 第三轮（commit `1156ca1`、run `83107636049` 推断、作业 78 min）R4 Gate 全项绿灯
 >   `git_rev=1156ca1, total=39, passed=35, failed=4, fail_to_pass=0 [OK]`；
->   Oracle A ctest 33/33；Oracle B 121/56；blargg fixtures 177/177；runner 三元组路径命中。
+>   内部逻辑检测 ctest 33/33；硬件一致性检测 121/56；blargg fixtures 177/177；runner 三元组路径命中。
 > - 验收标准 #5 由 🟡 → ✅；§六 卫生门槛 #5 由 ☐ → ☑；§十 R4 / R4-1 完成判据已勾。
 > - 完整证据链见 `docs/history/reports/FCEUX11-1.16_CI-R4-实跑诊断.md` §七。
 >
@@ -418,8 +418,8 @@ oracle_breakdown: { A_regression: {pass:25, fail:2}, B_hardware: {pass:10, fail:
 > - **R4 Gate 全项绿灯**：`R4 gate passed: git_rev=1156ca1, total=39, passed=35, failed=4, fail_to_pass=0 [OK]`
 > - **R4-1 全项实测生效**：
 >   - `blargg fixtures: 177 / 177 present`（校验步零错）
->   - Oracle A ctest `100% tests passed, 0 tests failed out of 33`，`33/33 Test #34: kagami_qa_direct_smoke ... Passed 6.49 sec`（从第二轮 32/33 回到 33/33）
->   - Oracle B `Total: 177 / Passed: 121 / Failed: 56`，每条 FAIL 带真实 `$6000` 码（真实精度口径恢复）
+>   - 内部逻辑检测 ctest `100% tests passed, 0 tests failed out of 33`，`33/33 Test #34: kagami_qa_direct_smoke ... Passed 6.49 sec`（从第二轮 32/33 回到 33/33）
+>   - 硬件一致性检测 `Total: 177 / Passed: 121 / Failed: 56`，每条 FAIL 带真实 `$6000` 码（真实精度口径恢复）
 >   - `Using runner: src/rust/target/x86_64-pc-windows-msvc/release/kagami-qa-runner.exe`（三元组路径优先命中）
 > - **§六.5 假设落地为结论**：`actions/cache@v4` 在 failed 作业下**也**不保存 cache（run `83046118885` 是 gate 主动 `exit 1` 的 failed，本轮 cache miss 直接证实）。cache 仅在成功作业下保存。本轮 cache 已 saved（`17:24:04`），下次跑应秒级命中
 > - **R4 至此完全闭合**——§九.1 标准 #5 由 🟡 → ✅；§十 完成判据 R4 勾掉；README 中英文 + `docs/tech/KagamiQA.md` 三处锚按 R2 路径 A 刷新为 `1156ca1`
@@ -466,14 +466,14 @@ Stage-2 §一 对遗留文档做了 3 项勘误，本次确认全部已就地更
 > 用户已推送并触发 CI run `82956632293`（commit `10f1e05`）。**该轮未能产出 matrix**：作业在
 > `Configure CMake` 步撞 `timeout-minutes: 45` 被取消，卡在 vcpkg 从源码编译 Qt 6.8.0。
 > 根因是两个 workflow 共有的缓存路径缺陷（详见 `docs/history/reports/FCEUX11-1.16_CI-R4-实跑诊断.md`），
-> **与 KagamiQA 本身无关**——Oracle A/B、判定链路、S-4 stamp 在本轮根本没有获得执行机会。
+> **与 KagamiQA 本身无关**——内部逻辑检测 / 硬件一致性检测、判定链路、S-4 stamp 在本轮根本没有获得执行机会。
 > 整改 R4-0 已落地但尚未经 CI 验证。本条建议**升级为 §十 R4 的前置子项 R4-0**，且状态由「未做」改为「已修待验」。
 
 ### 8.2 已知精度遗留（独立成项，不属本次构建验收范围）
 
 | 项 | 性质 | 当前状态 | 建议处置 |
 |----|------|---------|---------|
-| E-1 PPU VBL/NMI 边沿时序 | 真实模拟精度，10 ROM 中 6 FAIL | advisory，诊断已归档（`E-1-VBL调查记录.md` + `e1_survey/`） | 独立 PR，每改一处回归 `vbl_01/04` + Oracle A |
+| E-1 PPU VBL/NMI 边沿时序 | 真实模拟精度，10 ROM 中 6 FAIL | advisory，诊断已归档（`E-1-VBL调查记录.md` + `e1_survey/`） | 独立 PR，每改一处回归 `vbl_01/04` + 内部逻辑检测 |
 | E-3 APU 桶 C（7 项子测试精度） | 真实模拟精度 | advisory，已分桶 | 独立 PR |
 | blargg 全量 38 项真实精度 FAIL | 含 E-1/E-3 子集 + 其余 | 逐项带 `$6000` 码分类 | 按优先级逐步收敛 |
 
@@ -493,8 +493,8 @@ v2.0 清理项 E 系列、i18n 债务 H 系列、GUI/movie 层 TODO F 系列、5
 | 2 | 本地 `ctest -LE perf` 与 CI 一致 | 逐项比对 | ✅ **34/34 = 100%** | ✅ |
 | 3 | `lua_bit_test_headless` PASS | Phase B | ✅ Passed 0.03s | ✅ |
 | 4 | `kagami_qa_direct_smoke` PASS | Phase C | ✅ Passed 6.42s | ✅ |
-| 5 | migration matrix 由 CI 产出且 passed 率有据可查 | Phase D | ✅ **CI 第三轮（commit `1156ca1`，作业 78 min）**：R4 Gate 全项绿灯，`git_rev=1156ca1, total=39, passed=35, failed=4, fail_to_pass=0`；Oracle A ctest 33/33（`kagami_qa_direct_smoke` 6.49s PASS）、Oracle B 121/56（真实精度口径恢复）；详见 `docs/history/reports/FCEUX11-1.16_CI-R4-实跑诊断.md` §七 | ✅ |
-| 6 | Oracle B ROM 覆盖 ≥80%，失败项显式标注 | Phase D | ✅ 177/177 = 100%，失败项带码+分类 | ✅ |
+| 5 | migration matrix 由 CI 产出且 passed 率有据可查 | Phase D | ✅ **CI 第三轮（commit `1156ca1`，作业 78 min）**：R4 Gate 全项绿灯，`git_rev=1156ca1, total=39, passed=35, failed=4, fail_to_pass=0`；内部逻辑检测 ctest 33/33（`kagami_qa_direct_smoke` 6.49s PASS）、硬件一致性检测 121/56（真实精度口径恢复）；详见 `docs/history/reports/FCEUX11-1.16_CI-R4-实跑诊断.md` §七 | ✅ |
+| 6 | 硬件一致性检测 ROM 覆盖 ≥80%，失败项显式标注 | Phase D | ✅ 177/177 = 100%，失败项带码+分类 | ✅ |
 | 7 | README/KagamiQA.md 数字由 CI 产物回填，中英一致 | Phase D | ✅ 34/39/177 中英一致 | ✅ |
 | 8 | 遗留文档 3 处过期记载已更正 | Phase 0 | ✅ | ✅ |
 | 9 | 判定链路与 schema 声明一致 | Phase 0.5 | ✅ cargo test 40/40 | ✅ |
@@ -526,14 +526,14 @@ v2.0 清理项 E 系列、i18n 债务 H 系列、GUI/movie 层 TODO F 系列、5
 **裁定依据**：
 
 1. **构建可靠**：Ninja + Release 一次成功，四个历史构建难题全部闭环，关键产物（direct runner、LUT 测试）均为有效 PE。**（本会话独立 do_build.ps1 复现确认 ✅）**
-2. **测试可信（ctest 维度）**：ctest 34/34 经独立实跑确认 ✅；cargo 40/40 采信 §三.2 未独立验证；Oracle B 177/121/56 采信 §三.3 未独立验证。三个历史红灯全转 PASS，每个都有可追溯的 commit 与代码级证据。
+2. **测试可信（ctest 维度）**：ctest 34/34 经独立实跑确认 ✅；cargo 40/40 采信 §三.2 未独立验证；硬件一致性检测 177/121/56 采信 §三.3 未独立验证。三个历史红灯全转 PASS，每个都有可追溯的 commit 与代码级证据。
 3. **判定链路可信**：Phase 0.5 修复了「判定逻辑与 schema 声明不符」「超时不生效」「fail_to_pass 可灌水」三类隐性失真——这些是比构建失败更危险的「跑出来了但结论是错的」型缺陷，现已根治并有单元测试钉死。
 4. **失败诚实**：E-1/E-3 及 38 项真实精度 FAIL 均显式标注为 advisory，带错误码与分类，未静默跳过；56 项中 18 项 harness 问题的区分被保留，避免高估缺陷面。**（E-3 桶 C 分桶本会话未独立验证）**
 5. **文档与实测一致**：本次对每条关键声明做实测复现，**对 ctest / 7/13 代码修复 / check_expected line numbers / vbl_01 baseline / 4 处文档勘误 等 7 类关键声明独立核对**，未发现实质性偏差；仅 3 处文档措辞/行号需后续修正（§五）。**§十 R5 Step 1 处方含数学错误已记录并修订（不影响验收通过判定，仅影响 §十 处方完整性）；R6 处方标为 instrument-first 前置硬约束。**
 
 **前置条件**：合并到 `main` 前，建议在 CI 上实跑一轮 `kagami-qa.yml`（验收标准 #5 的最后一公里），确认 CI 环境下 matrix artifact 与 `git_rev` 同样正确。
 
-**后续路线**：E-1 / E-3 精度遗留按独立 PR 推进；v2.0 清理项等单独立项。后续权威性提升路径是**增加相互独立的 oracle 来源**（NESdev 其他套件、TASVideos 精度表、第二模拟器差分、真机采集），而非继续增加同一来源（blargg）的测试数量——当前 `oracle 来源数 = 1` 已是该来源的覆盖率天花板。
+**后续路线**：E-1 / E-3 精度遗留按独立 PR 推进；v2.0 清理项等单独立项。后续权威性提升路径是**增加相互独立的 oracle 来源**（NESdev 其他套件、TASVideos 精度表、第二模拟器差分、真机采集），而非继续增加同一来源（blargg）的测试数量——当前 `检测来源数 = 1` 已是该来源的覆盖率天花板。
 
 > **🚧 2026-07-31 接管后补充**
 >
@@ -545,9 +545,9 @@ v2.0 清理项 E 系列、i18n 债务 H 系列、GUI/movie 层 TODO F 系列、5
 >   **R4-1** 已落地待验，需用户重新触发
 > - P2 R5（E-1 PPU） — ⚠️ Step 1 处方已修订并 revert；Steps 2-4 需先 instrument-first 验证
 > - P2 R6（E-3 APU） — ⚠️ 处方未经实测，需 instrument-first 验证
-> - P3 R7（第二 oracle 来源） — 未启动
+> - P3 R7（第二检测来源） — 未启动
 >
-> 验收通过判定本身**仍然成立**（构建 + Oracle A ctest 实测通过），但 §十 "100% 完美交付" 路径需在 P2 R5/R6 instrument 落地后再评估时效性。
+> 验收通过判定本身**仍然成立**（构建 + 内部逻辑检测 ctest 实测通过），但 §十 "100% 完美交付" 路径需在 P2 R5/R6 instrument 落地后再评估时效性。
 >
 > **🚧 2026-08-01 第三轮接管修订：P1 闭环**
 >
@@ -576,7 +576,7 @@ v2.0 清理项 E 系列、i18n 债务 H 系列、GUI/movie 层 TODO F 系列、5
 | | R4 CI 实跑一轮 `kagami-qa.yml` | 卫生门槛 #5 未闭合 | 验收 #5 转 ✅ | 是 |
 | **P2 精度收敛** | R5 E-1 PPU VBL/NMI 边沿时序 | 真实精度，6 ROM FAIL | blargg_ppu_vbl_nmi 转 PASS | 否（独立 PR） |
 | | R6 E-3 APU 帧计数器相位 + $4017 标志 | 真实精度，7 sub-test FAIL | 7 项转 PASS | 否（独立 PR） |
-| **P3 权威性提升** | R7 引入第二个独立 oracle 来源 | oracle 来源数=1 已到顶 | 突破 blargg 单一来源天花板 | 否（**暂缓**：用户 2026-08-01 决策 P3 暂不做，P2 精度优先） |
+| **P3 权威性提升** | R7 引入第二个独立检测通道 来源 | 检测来源数=1 已到顶 | 突破 blargg 单一来源天花板 | 否（**暂缓**：用户 2026-08-01 决策 P3 暂不做，P2 精度优先） |
 
 ---
 
@@ -650,7 +650,7 @@ v2.0 清理项 E 系列、i18n 债务 H 系列、GUI/movie 层 TODO F 系列、5
 >
 > - 作业 `00:03:33` 起跑，`Configure CMake` 步 `00:04:09` 开始，`00:48:39` `##[error]The operation was canceled.` —— 撞 `timeout-minutes: 45`
 > - 取消时仍在 vcpkg manifest 模式从源码编 Qt 6.8.0：`Installing 30/33 qtbase[...]` → `Building x64-windows-dbg`（debug/release 两份都编）
-> - build / kagami-qa-runner / Oracle A ctest / Oracle B / Migration Matrix **五步全部未执行**
+> - build / kagami-qa-runner / 内部逻辑检测 ctest / 硬件一致性检测 / Migration Matrix **五步全部未执行**
 > - `##[warning]No files were found with the provided path: build/kagamiqa_migration_matrix.json`
 >
 > **根因不在 KagamiQA**，在两个 workflow 共有的 vcpkg 缓存路径缺陷：
@@ -707,18 +707,18 @@ v2.0 清理项 E 系列、i18n 债务 H 系列、GUI/movie 层 TODO F 系列、5
 
 #### R4-1. 补齐 blargg ROM fixtures 与 runner 三元组路径（已落地，待 CI 验证）
 
-第二轮 CI 让流水线第一次真正跑到 Oracle A/B 与矩阵生成，随即暴露两个**此前被本地环境掩盖**的缺口。
+第二轮 CI 让流水线第一次真正跑到 内部逻辑检测 / 硬件一致性检测 与矩阵生成，随即暴露两个**此前被本地环境掩盖**的缺口。
 两者均**非 R4-0 引入**。
 
 **缺口 A —— blargg ROM 在 CI 上根本不存在**
 
-- Oracle B 实测 `Total: 177 / Passed: 0 / Failed: 177`，逐条 `{"value":"0xFE","diag":[229,246,127],"duration_ms":0}`
+- 硬件一致性检测 实测 `Total: 177 / Passed: 0 / Failed: 177`，逐条 `{"value":"0xFE","diag":[229,246,127],"duration_ms":0}`
   —— 这是**加载不到 ROM** 的签名，**不是**精度失败
-- Oracle A 的 `kagami_qa_direct_smoke` 同因失败（`kagami_bridge_load_rom(...) failed: rc=-2`），
+- 内部逻辑检测 的 `kagami_qa_direct_smoke` 同因失败（`kagami_bridge_load_rom(...) failed: rc=-2`），
   致 CI 上 ctest 为 **32/33**，而同一 commit 本地为 34/34
 - 根因：`.gitignore:108` 的 `*.nes` 把全部 ROM 排除出仓库（实测本地磁盘 **177** 个、`git ls-files` **0** 个）。
   这本身是有意设计——ROM 从镜像拉取而非入库，项目已备有 `scripts/download_blargg_roms.ps1`——
-  **但两个 workflow 从未调用过它**。CI 历史上一直在对着空 fixture 树跑 Oracle B
+  **但两个 workflow 从未调用过它**。CI 历史上一直在对着空 fixture 树跑 硬件一致性检测
 
 **改法**：新增 `Cache blargg ROMs`（key 跟随下载脚本哈希，因 ROM 清单声明在脚本内）+ `Fetch blargg test ROMs`
 + **`Verify blargg ROM fixtures against manifest`**。第三步不可省：下载脚本汇总失败数但**从不设非零退出码**，
@@ -751,7 +751,7 @@ v2.0 清理项 E 系列、i18n 债务 H 系列、GUI/movie 层 TODO F 系列、5
 | E | runner 解析：两者皆无 | `::error::` 列出查找路径，exit 1 |
 
 **R4-1 的诚实边界**：**尚未经 CI 验证**。ROM 补齐后 CI 的 ctest 预期回到 33/33（`-LE perf`）、
-Oracle B 回到 121/56 口径，但这些均需下一轮实测确认，本处不预判。
+硬件一致性检测 回到 121/56 口径，但这些均需下一轮实测确认，本处不预判。
 另：本轮缓存是否已保存**未获证实**（日志包不含 Post 步骤输出）；理论上 `actions/cache@v4` 在
 **failed**（而非 cancelled）时会保存，本轮是 gate 主动 `exit 1` 的 failed，故大概率已存——
 下一轮 `Cache vcpkg` 步会给出确定答案。
@@ -791,7 +791,7 @@ Oracle B 回到 121/56 口径，但这些均需下一轮实测确认，本处不
 >
 > 本会话（commit `1fa88f2` 之后）按下方 Step 1 字面处方实测：
 > - 改动：`PPU_status |= 0x80` → `runppu(1)` → `if (VBlankON) TriggerNMI()`，`delay: 20→19`
-> - 构建成功，ctest 34/34 PASS（Oracle A 无回归）
+> - 构建成功，ctest 34/34 PASS（内部逻辑检测 无回归）
 > - **但 vbl_01_basics 翻红**：$6000=0x08 "VBL period is too long with BG off"（sub-test #8）
 >
 > 根因（数学推导）：Working config 时序结构
@@ -860,8 +860,8 @@ for(int dot=(S==0?delay:0);dot<(kLineTime-1);dot++) runppu(1);  // S=0 跑 321 c
 
 **强制回归集（每步后必跑，任一红即 revert）**：
 - `vbl_01_basics`、`vbl_04_nmi_control`、`vbl_09_even_odd_frames`（PASS 基线）
-- `fceux11_rom_regression_test`（Oracle A，13 ROM × 60 帧 CRC32，`tests/tests.json:38`，blocking）
-- `fceux11_golden_savestate_test` + `fceux11_savestate_regression_test`（Oracle A，blocking）
+- `fceux11_rom_regression_test`（内部逻辑检测，13 ROM × 60 帧 CRC32，`tests/tests.json:38`，blocking）
+- `fceux11_golden_savestate_test` + `fceux11_savestate_regression_test`（内部逻辑检测，blocking）
 - 全量 `ctest -LE perf`（须维持 34/34）
 - 每步前 `scripts/do_build.ps1` 全量重建（E-1 调查记录 §0 教训：增量 exe 可能比源码旧好几个 commit）
 
@@ -927,14 +927,14 @@ for(int dot=(S==0?delay:0);dot<(kLineTime-1);dot++) runppu(1);  // S=0 跑 321 c
 
 ### P3 — 权威性提升（路线项，不阻塞）
 
-#### R7. 引入第二个独立 oracle 来源
+#### R7. 引入第二个独立检测通道 来源
 
 > **🚨 2026-08-01 用户决策：P3 暂不做（暂缓）**
 >
 > 用户明确决策暂不实施本项（"先确保精度再谈别的"）。本节保留作为 P2 收敛后的候选路线，内容未改动。
 > 重开条件：P2（E-1/E-3）收敛或钉死为有据已知限制之后。
 
-**问题**：当前 `oracle 来源数 = 1`（blargg）。ROM 覆盖率已达 177/177 = 100%，但这是**单一来源的天花板**——继续增加 blargg 测试数不提升真理含量，只是把同一来源用尽。Stage-2 §十·五 已把此项列入度量使其可见。
+**问题**：当前 `检测来源数 = 1`（blargg）。ROM 覆盖率已达 177/177 = 100%，但这是**单一来源的天花板**——继续增加 blargg 测试数不提升真理含量，只是把同一来源用尽。Stage-2 §十·五 已把此项列入度量使其可见。
 
 **路径（相互独立、可彼此证伪的来源）**：
 
@@ -945,7 +945,7 @@ for(int dot=(S==0?delay:0);dot<(kLineTime-1);dot++) runppu(1);  // S=0 跑 321 c
 | 第二模拟器差分 | 跑同一 ROM 比对帧输出/状态 | 独立实现互证 | 高（需第二引擎） |
 | 真机采集 | 录制真机 `$6000`/帧输出 | 终极真理 | 高（需硬件） |
 
-**建议**：先做「NESdev 其他套件」（成本最低，复用 `fceux11_blargg_runner.exe` 的 `$6000` 协议与 manifest 机制），把 `oracle 来源数` 从 1 提到 2。这比继续打磨 blargg 的 38 项精度 FAIL 更能提升权威性上限。
+**建议**：先做「NESdev 其他套件」（成本最低，复用 `fceux11_blargg_runner.exe` 的 `$6000` 协议与 manifest 机制），把 `检测来源数` 从 1 提到 2。这比继续打磨 blargg 的 38 项精度 FAIL 更能提升权威性上限。
 
 ---
 
@@ -955,15 +955,15 @@ for(int dot=(S==0?delay:0);dot<(kLineTime-1);dot++) runppu(1);  // S=0 跑 321 c
 
 - [ ] **R1-R3**：`grep` 验证文档零偏差（符号名/行号/注释/锚 commit 三处一致）
 - [x] **R4-0**：workflow vcpkg 缓存缺陷已修（`VCPKG_INSTALLED_DIR` + release-only overlay triplet + 缓存路径收窄 + R4 Gate）—— **已由第二轮 CI（run 83046118885）实测生效**：配置步 48.4 min 成功、1151/1151 链接完成、gate 正确判红
-- [x] **R4-1**：补 blargg ROM 拉取+manifest 逐条校验、runner 三元组路径解析、BuildGuide 路径更正 —— **已由第三轮 CI（commit `1156ca1`）实测全项生效**（177/177 ROM + Oracle A 33/33 + Oracle B 121/56 + runner 三元组路径命中）；5 用例本地实测 + 1 轮 CI 验证
+- [x] **R4-1**：补 blargg ROM 拉取+manifest 逐条校验、runner 三元组路径解析、BuildGuide 路径更正 —— **已由第三轮 CI（commit `1156ca1`）实测全项生效**（177/177 ROM + 内部逻辑检测 33/33 + 硬件一致性检测 121/56 + runner 三元组路径命中）；5 用例本地实测 + 1 轮 CI 验证
 - [x] **R4**：CI 第三轮（commit `1156ca1`、run `83107636049` 推断、作业 78 min）—— `engine.git_rev=1156ca1`、`passed=35`、`R4 Gate` 步输出 `[OK]`、验收标准 #5 转 ✅；详见诊断文档 §七
-- [ ] **R5**：`vbl_01`~`vbl_10` 全 10 ROM 返回 `0x00`；`blargg_ppu_vbl_nmi` 升 `blocking`；Oracle A 维持 34/34
-- [ ] **R6**：7 个 bucket-C sub-test 全转 PASS；`apu_01`~`apu_11` + `pal_apu_*` 不回归；Oracle A 维持 34/34
-- [ ] **R7**（可选，**暂缓**）：`oracle 来源数 ≥ 2`（用户 2026-08-01 决策 P3 暂不做，P2 精度优先；重开条件见 §十 R7）
+- [ ] **R5**：`vbl_01`~`vbl_10` 全 10 ROM 返回 `0x00`；`blargg_ppu_vbl_nmi` 升 `blocking`；内部逻辑检测 维持 34/34
+- [ ] **R6**：7 个 bucket-C sub-test 全转 PASS；`apu_01`~`apu_11` + `pal_apu_*` 不回归；内部逻辑检测 维持 34/34
+- [ ] **R7**（可选，**暂缓**）：`检测来源数 ≥ 2`（用户 2026-08-01 决策 P3 暂不做，P2 精度优先；重开条件见 §十 R7）
 - [ ] 迁移矩阵 `passed` 由 35 → 39（4 FAIL 清零，`lua_joypad_test`/`lua_memory_test` 视实现进度转 PASS 或保留有据 advisory）
 - [ ] blargg 全量真实精度 FAIL 面由 38 项下降
 
-> **注意**：R5/R6 是模拟精度攻关，存在「修好一个弄坏另一个」的经典风险，必须严格遵循每步强制回归。若某 ROM 经多轮仍无法在「不回归 Oracle A」前提下修复，应记录为**有据已知限制**（带错误码、诊断串、根因结论、已尝试方案），而非强求 PASS——这本身仍是工程诚实性，符合 §十·五「精确知道什么失败，比『全绿但不测』更权威」的原则。
+> **注意**：R5/R6 是模拟精度攻关，存在「修好一个弄坏另一个」的经典风险，必须严格遵循每步强制回归。若某 ROM 经多轮仍无法在「不回归 内部逻辑检测」前提下修复，应记录为**有据已知限制**（带错误码、诊断串、根因结论、已尝试方案），而非强求 PASS——这本身仍是工程诚实性，符合 §十·五「精确知道什么失败，比『全绿但不测』更权威」的原则。
 
 ---
 

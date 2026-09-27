@@ -20,8 +20,8 @@
 | 0x01 | `oam_stress` | 🚧 已知限制（深模型族） |
 | 0x01 | `ppu_vbl_nmi` | 🚧 已知限制（CPU 侧读采样量化，Phase 1 vbl_02 同族） |
 
-**Oracle B**: 144 PASS / 33 FAIL（基线 143/34，+1 PASS，零回归）。
-**Oracle A**: 100% pass（`ctest -LE perf`）。
+**硬件一致性检测**: 144 PASS / 33 FAIL（基线 143/34，+1 PASS，零回归）。
+**内部逻辑检测**: 100% pass（`ctest -LE perf`）。
 
 ---
 
@@ -44,7 +44,7 @@
    ```
 4. **atexit 摘要**：进程退出时一次性汇总 writes / reads2000 / decay_checks / final_PPUGenLatch。
 
-零侵入：`FCEUX11_OPENDECAY_PROBE` 未设置时所有日志分支早退；Oracle A 33/33 不变。
+零侵入：`FCEUX11_OPENDECAY_PROBE` 未设置时所有日志分支早退；内部逻辑检测 33/33 不变。
 
 ### 1.2 关键数据（ppu_open_bus × 600 frames）
 
@@ -184,7 +184,7 @@ BLARGG_RESULT: rom=ppu_open_bus.nes addr=0x6000 value=0x00
 ```
 （基线 0x03 "Decay value should become zero by one second"）
 
-### 3.2 Oracle B 全量回归
+### 3.2 硬件一致性检测 全量回归
 
 | 指标 | 基线（`863e9d7` 桶 C） | 本次（`23b0cdd`） | Δ |
 |---|---|---|---|
@@ -206,7 +206,7 @@ BLARGG_RESULT: rom=ppu_open_bus.nes addr=0x6000 value=0x00
 
 零回归：`ppu_read_buffer` 仍 PASS，`cpu_dummy_writes_ppu` 仍 PASS，其余 31 项 FAIL 与基线逐字一致。
 
-### 3.3 Oracle A
+### 3.3 Internal Logic Check
 
 `ctest -LE perf`: 100% tests passed（25 非 perf 测试全绿，0 failed）。
 

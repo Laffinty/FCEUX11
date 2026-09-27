@@ -58,22 +58,22 @@ unit test).
 
 ---
 
-## 4. Oracle A regression result
+## 4. Internal Logic Check regression result
 
 **Cannot be measured in this worktree** — no `build/` directory
 exists, so `ctest --test-dir build -LE perf` cannot run. The Track C
 discipline requires:
 
-> Oracle A must stay green: ctest --test-dir build -LE perf → 34/34.
+> Internal Logic Check must stay green: ctest --test-dir build -LE perf → 34/34.
 
-No Track C change touches Oracle A (no changes to `tests/CMakeLists.txt`
+No Track C change touches Internal Logic Check (no changes to `tests/CMakeLists.txt`
 or any test source other than the new Rust harness modules and the
 incremental `src/kagami_bridge.*` FFI additions). The Track A
-integration commit is the right place to verify Oracle A stays at
+integration commit is the right place to verify Internal Logic Check stays at
 34/34 after the C++ deletion + CMake target swap.
 
-**No `src/rust/Cargo.lock` change would break Oracle A** because
-Oracle A is CTest-only; Rust changes are isolated to the
+**No `src/rust/Cargo.lock` change would break Internal Logic Check** because
+Internal Logic Check is CTest-only; Rust changes are isolated to the
 `kagami-qa` crate which has its own test suite.
 
 ---
@@ -117,7 +117,7 @@ full CMake + Qt6 + SDL2 + vcpkg toolchain is required to:
 
 1. Build the C++ test binaries (`fceux11_blargg_runner`,
    `fceux11_rom_regression_test`, `fceux11_savestate_regression_test`).
-2. Run `ctest -LE perf` to verify Oracle A stays at 34/34.
+2. Run `ctest -LE perf` to verify Internal Logic Check stays at 34/34.
 3. Run the new Rust harnesses against the live FCEUX11 core for
    runtime parity verification.
 
@@ -195,7 +195,7 @@ graceful degradation consistent with the existing Task 4 watchdog
 | Unit tests (`cargo test -p kagami-qa`) | ✅ 142 passed (was 71; +71 new) |
 | Parity reports | ✅ All three in `docs/history/reports/Task1-{C1,C2,C3}_parity_report.md` |
 | C++ deletion + tests.json update | ⏸ Deferred to Track A post-parity-verification |
-| Oracle A regression check | ⏸ Deferred to Track A (no `build/` here) |
+| Internal Logic Check regression check | ⏸ Deferred to Track A (no `build/` here) |
 | Runtime parity diff (177/177, 780/780, 12/12) | ⏸ Deferred to Track A (no vcpkg here) |
 
 ---

@@ -12,7 +12,7 @@
 
 ## 0. 摘要
 
-桶 C (PPU 真实精度) 含 **4 项 ROM FAIL**（Step 3.1 后期 Oracle B）：
+桶 C (PPU 真实精度) 含 **4 项 ROM FAIL**（Step 3.1 后期 硬件一致性检测）：
 
 | 错误码 | ROM | 状态 |
 |---|---|---|
@@ -28,7 +28,7 @@
 - `ppu_open_bus` 0x03 → 0x00 PASS（`23b0cdd`，2026-08-05，3 处 PPU bug：
   600ms 时间衰减 + A2007 palette 高 2 位 + A2004 整字节刷新）
 
-Oracle B 141 → 143 → 144 PASS，34 → 33 FAIL 与基线逐一一致，**零回归**。
+硬件一致性检测 141 → 143 → 144 PASS，34 → 33 FAIL 与基线逐一一致，**零回归**。
 
 ---
 
@@ -127,15 +127,15 @@ palette 分支改用 `RefreshAddr & 0x1F`（get_2007access 更新后的真值）
 |---|---|
 | `ppu_read_buffer` × 3000 frames | ✅ 0x00 PASS（基线 0x0E） |
 | `cpu_dummy_writes_ppu` × 300 frames | ✅ 0x00 PASS（基线 0x09） |
-| Oracle A `ctest -LE perf` | ✅ 34/34（构建时全量） |
-| Oracle B 全量 177 ROMs | ✅ **143 PASS / 34 FAIL**（基线 141/36，+2 PASS） |
+| 内部逻辑检测 `ctest -LE perf` | ✅ 34/34（构建时全量） |
+| 硬件一致性检测 全量 177 ROMs | ✅ **143 PASS / 34 FAIL**（基线 141/36，+2 PASS） |
 | 零 PASS→FAIL 回归 | ✅ 34 项 FAIL 与基线逐一一致 |
 
 **剩余 3 项**（桶 C 未收敛）：
 - `ppu_open_bus` 0x03 "Decay value should become zero by one second"——PPU open
   bus 电容放电衰减（PPUGenLatch 需随时间衰减到 0），许多模拟器不实现或简化
 - `oam_stress` 0x01——OAM 压力测试，与桶 B 发现的 PPU 隐式 OAM 改写可能同族
-- `ppu_vbl_nmi` 0x01——NMI 触发时序（manifest frames=300 不足，需 3000；Oracle B
+- `ppu_vbl_nmi` 0x01——NMI 触发时序（manifest frames=300 不足，需 3000；硬件一致性检测
   3000 frames 下为 0x01，测试 2 of 10 vbl_set_time 失败，与 Phase 1 vbl_02 同族）
 
 ---

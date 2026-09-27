@@ -14,7 +14,7 @@ b32d071 P4-report: full §八 report format (transition_matrix + baseline)
 cda40fe Revert "P4-2: APU length counter unconditional reload" (被 blargg 证伪)
 562f0e8 P4-2: APU length counter (WRONG — reverted)
 592201e P4-1: PPU VBL NMI timing fix + blargg $6004+ diagnostic enhancement
-7618472 P2+P3: Oracle B 接入 + Qt 解耦 + Lua 通道
+7618472 P2+P3: 硬件一致性检测 接入 + Qt 解耦 + Lua 通道
 1180b41 P1: 收编 + headless 全款
 ```
 
@@ -29,7 +29,7 @@ cda40fe Revert "P4-2: APU length counter unconditional reload" (被 blargg 证�
 | 项目 | 状态 | 说明 |
 |------|------|------|
 | 计划文档 | ✅ | `docs/history/plans/FCEUX11-1.16_KagamiQA-PLAN.md` |
-| 代码级交叉验证 | ✅ | 审计了 30 CTest / 7 Rust crate / Lua 引擎 / 双 oracle 缺失实证 |
+| 代码级交叉验证 | ✅ | 审计了 30 CTest / 7 Rust crate / Lua 引擎 / 双通道 缺失实证 |
 | 技术选型 | ✅ | Rust + Lua/JSON 双通道 + SutAdapter trait |
 
 ### P1：收编 + headless 全款
@@ -47,7 +47,7 @@ cda40fe Revert "P4-2: APU length counter unconditional reload" (被 blargg 证�
 | Rust 测试 | ✅ | 22/22 PASS |
 | **P1 退出条件** | ✅ | 全部达成 |
 
-### P2：Oracle B 接入
+### P2：硬件一致性检测 接入
 
 | 项目 | 状态 | 说明 |
 |------|------|------|
@@ -59,7 +59,7 @@ cda40fe Revert "P4-2: APU length counter unconditional reload" (被 blargg 证�
 | ROM fixtures | ✅ | `tests/fixtures/blargg/` — 22 个 .nes 全部就位 |
 | **P2 退出条件** | ✅ | 全部达成 |
 
-**Oracle B 基线（旧 PPU, newppu=0）**：
+**硬件一致性检测 基线（旧 PPU, newppu=0）**：
 
 | 类别 | PASS | FAIL | ERROR |
 |------|------|------|-------|
@@ -156,7 +156,7 @@ cda40fe Revert "P4-2: APU length counter unconditional reload" (被 blargg 证�
 
 **推荐调试方式**：Visual Studio Debug 配置，在 `FCEUX_PPU_Loop` 的 `for (int sl = 0; sl < normalscanlines; sl++)` 行设断点，逐 scanline 跟踪。若未到达此行，断点上移至 VBlank 区 `PPU_status = 0` 行。
 
-**强调**：此问题的解决方案是**继续追查并修复新 PPU 的 headless 渲染路径**，绝不可回退到旧 PPU。旧 PPU 没有 PPU dot 概念，无法通过 blargg 的 cycle 级精度测试——回退等于放弃 Oracle B 的权威性。
+**强调**：此问题的解决方案是**继续追查并修复新 PPU 的 headless 渲染路径**，绝不可回退到旧 PPU。旧 PPU 没有 PPU dot 概念，无法通过 blargg 的 cycle 级精度测试——回退等于放弃 硬件一致性检测 的权威性。
 
 ### 3.2 P4-2：APU length counter 修复被证伪
 
@@ -181,8 +181,8 @@ KagamiQA 框架 (src/rust/crates/kagami-qa/)
 ├── adapter/        SutAdapter trait + SubprocessAdapter
 ├── runner/         TestScheduler + manifest_snapshot()
 ├── oracle/
-│   ├── regression.rs   Oracle A: exit-code 判定
-│   └── hardware.rs     Oracle B: blargg $6000 协议 + accuracy table
+│   ├── regression.rs   内部逻辑检测: exit-code 判定
+│   └── hardware.rs     硬件一致性检测: blargg $6000 协议 + accuracy table
 ├── report/
 │   ├── matrix.rs       完整 §八 报告 + transition_matrix
 │   └── baseline.rs     baseline I/O + drift 检测 (stub)
@@ -190,7 +190,7 @@ KagamiQA 框架 (src/rust/crates/kagami-qa/)
 
 测试基础设施
 ├── tests/tests.json                   39 条目清单
-├── tests/blargg_runner.cpp            Oracle B 执行器
+├── tests/blargg_runner.cpp            硬件一致性检测 执行器
 ├── tests/lua_runner.cpp              Lua 通道执行器
 ├── tests/headless_smoke_test.cpp     P1 headless 冒烟
 ├── tests/fixtures/blargg/            22 ROM
@@ -223,7 +223,7 @@ KagamiQA 框架 (src/rust/crates/kagami-qa/)
 
 ```bash
 fceux11_blargg_runner --rom fixtures/blargg/ppu/ppu_vbl_nmi.nes --frames 300
-# 预期：status=PASS（首个 Oracle B FAIL→PASS）
+# 预期：status=PASS（首个 硬件一致性检测 FAIL→PASS）
 ```
 
 ### 优先级 3：增强 CPU 诊断
@@ -239,6 +239,6 @@ fceux11_blargg_runner --rom fixtures/blargg/ppu/ppu_vbl_nmi.nes --frames 300
 ## 六、关键约束重申
 
 1. **新 PPU 是唯一方向**：旧 PPU (`FCEUPPU_Loop`) 没有 PPU dot 概念，无法通过 blargg 的 cycle 级精度测试。FCEUX11 的性能优化以新 PPU 为核心。
-2. **headless 是 Oracle B 的基础**：自动化测试必须在无 GUI 环境下运行。Qt GUI driver 不可作为测试依赖。
-3. **Oracle A 全绿是每次修改的前置条件**：任何精度修复前必须先跑 `ctest` 确认无回归。
+2. **headless 是 硬件一致性检测 的基础**：自动化测试必须在无 GUI 环境下运行。Qt GUI driver 不可作为测试依赖。
+3. **内部逻辑检测 全绿是每次修改的前置条件**：任何精度修复前必须先跑 `ctest` 确认无回归。
 4. **AI 不得修改已入库的 expected 值**：基线更新走与代码同级评审。

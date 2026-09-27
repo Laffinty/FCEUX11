@@ -31,7 +31,7 @@
 
 | 检查 | 结果 |
 |---|---|
-| Oracle A `ctest -LE perf` | **33/33 PASS**（config_store_test 为 Qt 环境问题，与核心无关）|
+| 内部逻辑检测 `ctest -LE perf` | **33/33 PASS**（config_store_test 为 Qt 环境问题，与核心无关）|
 | vbl_01 / 03 / 04 / 09（PASS 基线）| 全部保持 PASS ✓ |
 | vbl_05_nmi_timing | 0x01，X 序列 **[2,2,2,2,2,1,1,1,1,1] → [3,3,3,3,2,2,2,2,2,2]**（首行 +1）|
 | vbl_02 / 06 / 07 / 08 / 10 | 0x01 / 0x01 / 0x01 / 0x01 / 0x03（未翻红，亦未闭合）|
@@ -87,7 +87,7 @@ count  lastpc  DPC    X
 
 ## 5. 本轮净效果与遗留
 
-- **净效果**：vbl_05 首行 X 2→3（仍差 1 迭代）；其余 ROM 状态不变；Oracle A 零回归。
+- **净效果**：vbl_05 首行 X 2→3（仍差 1 迭代）；其余 ROM 状态不变；内部逻辑检测 零回归。
 - **遗留**：vbl_02/05/06/07/08/10 仍未闭合；flag 置位相位漂移的 CPU 侧建模是下一步。
   探针（VBL_ENTER lastpc/count、NMI_SET/DEFER/DISPATCH）与扫参数据保留在
   `build/e1_vbl05*.err`、`build/e1_d*.err`。

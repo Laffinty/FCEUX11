@@ -15,7 +15,7 @@
 //! │  │      │  8 advisory known-limit failure(s) ...        │     (top-left)
 //! │  └─■────┘                                               │
 //! │  [Total 47] [Passed 39] [Failed 8] [Skipped 0]          │  ← stat cards
-//! │  ▓ ORACLE A 27P/0F   ▓ ORACLE B 12P/8F                   │  ← oracle split
+//! │  ▓ INTERNAL LOGIC CHECK 27P/0F   ▓ HARDWARE CONSISTENCY CHECK 12P/8F                   │  ← dual-channel split
 //! │  FAIL DETAILS (8 advisory known-limits)                  │
 //! │  #  TEST ID                     EXIT  DURATION           │
 //! │  1  blargg_ppu_vbl_nmi            1    16236ms           │  ← detail rows
@@ -255,13 +255,13 @@ pub fn build_grade_report(matrix: &MigrationMatrix) -> Vec<u8> {
         c.text("/F1", 7.5, x + 12.0, cards_y - 34.0, GREY, label);
     }
 
-    // ---- Oracle split ----------------------------------------------------
+    // ---- Dual-channel split ----------------------------------------------
     let oracle_y = cards_y - card_h - 20.0;
     let a = &matrix.oracle_breakdown.a_regression;
     let b = &matrix.oracle_breakdown.b_hardware;
     let oracle_h = 40.0;
     let half_w = (CONTENT_W - gap) / 2.0;
-    // Oracle A card
+    // Internal Logic Check card
     c.fill(FAINT);
     c.rect(MARGIN, oracle_y - oracle_h, half_w, oracle_h);
     c.fill(GOOD);
@@ -272,7 +272,7 @@ pub fn build_grade_report(matrix: &MigrationMatrix) -> Vec<u8> {
         MARGIN + 14.0,
         oracle_y - 16.0,
         INK,
-        &format!("ORACLE A — REGRESSION"),
+        &format!("INTERNAL LOGIC CHECK — REGRESSION"),
     );
     c.text(
         "/F2",
@@ -282,7 +282,7 @@ pub fn build_grade_report(matrix: &MigrationMatrix) -> Vec<u8> {
         INK,
         &format!("{}P / {}F", a.pass, a.fail),
     );
-    // Oracle B card
+    // Hardware Consistency Check card
     let bx = MARGIN + half_w + gap;
     c.fill(FAINT);
     c.rect(bx, oracle_y - oracle_h, half_w, oracle_h);
@@ -295,7 +295,7 @@ pub fn build_grade_report(matrix: &MigrationMatrix) -> Vec<u8> {
         bx + 14.0,
         oracle_y - 16.0,
         INK,
-        "ORACLE B — HARDWARE",
+        "HARDWARE CONSISTENCY CHECK — HARDWARE",
     );
     c.text(
         "/F2",
@@ -329,7 +329,7 @@ pub fn build_grade_report(matrix: &MigrationMatrix) -> Vec<u8> {
     c.text("/F2", 7.5, MARGIN + 24.0, head_y - 8.0, GREY, "TEST ID");
     c.text("/F2", 7.5, MARGIN + 330.0, head_y - 8.0, GREY, "EXIT");
     c.text("/F2", 7.5, MARGIN + 400.0, head_y - 8.0, GREY, "DURATION");
-    c.text("/F2", 7.5, MARGIN + 470.0, head_y - 8.0, GREY, "ORACLE");
+    c.text("/F2", 7.5, MARGIN + 470.0, head_y - 8.0, GREY, "CHECK");
 
     // rows — clamp to what fits the page (24 rows max, plenty for one page)
     let row_h = 17.0;
@@ -357,7 +357,12 @@ pub fn build_grade_report(matrix: &MigrationMatrix) -> Vec<u8> {
             GREY,
             &format!("{:>6}ms", d.duration_ms),
         );
-        c.text("/F1", 8.0, MARGIN + 470.0, y - 8.0, GREY, &d.oracle_type);
+        let check_label = match d.oracle_type.as_str() {
+            "A" => "ILC",
+            "B" => "HCC",
+            other => other,
+        };
+        c.text("/F1", 8.0, MARGIN + 470.0, y - 8.0, GREY, check_label);
     }
 
     // ---- Grade reasons ---------------------------------------------------

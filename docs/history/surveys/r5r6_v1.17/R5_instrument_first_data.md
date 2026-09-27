@@ -25,8 +25,8 @@
 - ❌ **禁忌保留**：
   - `ppu_rendering.cpp:1567 delay 旋钮`（现 `const int delay = 20;` 在 1621 行；原任务描述引用历史行号已失效，**未触碰**）
   - `ppu_rendering.cpp:2057` 跳点块（**未触碰**——vbl_10 已按 v1.16 决策记录为「有据已知限制」）
-  - **Oracle A PPU/APU blocks 未变更**（`tests/CMakeLists.txt` PPU/APU 测试块字面不变）
-- 🟡 **基线 Oracle B PPU/APU blocks**（vbl_* / apu_*）—本阶段不动 PPU/APU 引擎逻辑，**无回归风险**
+  - **内部逻辑检测 PPU/APU blocks 未变更**（`tests/CMakeLists.txt` PPU/APU 测试块字面不变）
+- 🟡 **基线 硬件一致性检测 PPU/APU blocks**（vbl_* / apu_*）—本阶段不动 PPU/APU 引擎逻辑，**无回归风险**
 
 ---
 
@@ -233,12 +233,12 @@ E1B VBL_SET abs=68224 sl=240 cycle=341 count=0 lastpc=9003 PPU_status_pre=0x00
 **禁忌条款再次核验**（commit-by-commit）：
 
 - ❌ `ppu_rendering.cpp:1567 delay 旋钮` — **未触碰**（commit `fd9a526` 等 5 个均不改 `delay = 20;`；既有 `e1_nmi_delay()` 旋钮在 env `FCEUX11_E1_NMIDELAY=8` 默认值不变）
-- ❌ Oracle A PPU/APU blocks — **未触碰**（`tests/CMakeLists.txt` PPU/APU 测试块字面 unchanged）
+- ❌ 内部逻辑检测 PPU/APU blocks — **未触碰**（`tests/CMakeLists.txt` PPU/APU 测试块字面 unchanged）
 - ❌ sound.cpp:1303-1307 savestate chunks — **未触碰**（仅 sound.cpp 探针，但都在本任务 R6 范围）
 
 ---
 
-## 8. Oracle A 维持声明
+## 8. 内部逻辑检测 维持声明
 
 本 Track-B **新增 5 个 commit 全部为纯 fprintf + 注释**，无任何状态写入：
 
@@ -248,9 +248,9 @@ E1B VBL_SET abs=68224 sl=240 cycle=341 count=0 lastpc=9003 PPU_status_pre=0x00
 - `E1B EVEN_ODD_GATE` 仅 `fprintf`
 - `E1B NMI_LATCH_CALLEE` 仅 `fprintf` × 2（既有 E1 NMI_SET 保持原样）
 
-**Oracle A ctest 影响面**：0（probes 零运行时开销；env 未设时所有 `if (e1_trace_on())` fold 到 `if(false)`，编译期消除分支代价）
+**内部逻辑检测 ctest 影响面**：0（probes 零运行时开销；env 未设时所有 `if (e1_trace_on())` fold 到 `if(false)`，编译期消除分支代价）
 
-**Oracle A ctest 维持声明**：ctest `--test-dir build -LE perf` 34/34 PASS 维持；任意 Oracle A regression → 立即 revert（5 commit 相互独立，单 commit revert 安全）
+**内部逻辑检测 ctest 维持声明**：ctest `--test-dir build -LE perf` 34/34 PASS 维持；任意 内部逻辑检测 regression → 立即 revert（5 commit 相互独立，单 commit revert 安全）
 
 ---
 
@@ -260,7 +260,7 @@ E1B VBL_SET abs=68224 sl=240 cycle=341 count=0 lastpc=9003 PPU_status_pre=0x00
 |---|---|---|
 | **§5.1 实测 stderr 数据未采集** | 报告 §5 仅基于历史 Step 1.x 探针推断；E1B 首次实测待 CI / Reviewer 执行 §6 步骤 | 报告 §6 已列出可执行步骤；CI runner 可立即补数据 |
 | **kagami-qa-runner ≥ 40 PASS 验证** | 未在本地执行（无 build）| 计划 §五 R4 gate 自动验证；本 Track-B 无 R4 gate 触发（仅 E1B 探针代码，非 kagami-qa crate 改动）|
-| **Oracle A ctest 34/34 PASS 维持** | 同上 | 同上 |
+| **内部逻辑检测 ctest 34/34 PASS 维持** | 同上 | 同上 |
 | **`delay 旋钮`扫参**（FCEUX11_E1_NMIDELAY 0..12）| E1B 探针不受 sweep 影响；既有的 `e1_nmi_delay()` 与 vbl_05 Step 1.3 deep 已收敛到 `nd=8`（vbl_step1_3_deep_x6502run_2026-08-02.md §4 唯一解）| 本 Track-B 不重做 sweep；保留 sweeper entrypoint (`FCEUX11_E1_NMIDELAY`) |
 
 ---
@@ -270,7 +270,7 @@ E1B VBL_SET abs=68224 sl=240 cycle=341 count=0 lastpc=9003 PPU_status_pre=0x00
 **本 Track-B 阶段结论**：
 
 1. **5 个 E1B 探针**落盘，按计划 §4.3 处方的 5 个目标位置（PPU 块三件套 + x6502.cpp TriggerNMI + even/odd 跳点）全覆盖
-2. **零逻辑改动** Oracle A 34/34 维持；**Oracle B 0 个回归**（不变）
+2. **零逻辑改动** 内部逻辑检测 34/34 维持；**硬件一致性检测 0 个回归**（不变）
 3. **数据采集封闭**：env-gate + per-ROM runner pattern 已就绪，§6 6 步可立即被 CI / Reviewer 执行
 4. **§5 数据缺口诚实记录**：本机 build / ROM 子目录不可用；实测量推 §6 runner 委托给 CI / Reviewer
 

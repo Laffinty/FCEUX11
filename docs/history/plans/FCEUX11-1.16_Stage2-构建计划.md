@@ -18,7 +18,7 @@
 | A 构建环境 | **6/6 ✅** | 裸 PowerShell 一次成功，自动选 Ninja，四个构建难题全部不复现 |
 | B Lua bit | **4/4 ✅** | — |
 | C direct runner | **5/5 ✅** | C-2 / C-4 被 C-1 的推荐解法吸收，无需单独实施 |
-| D Oracle B / CI | **4/4 ✅** | D-2 残留的 3 个「缺失 ROM」经查为命名错配，S-1 已清零 |
+| D 硬件一致性检测 / CI | **4/4 ✅** | D-2 残留的 3 个「缺失 ROM」经查为命名错配，S-1 已清零 |
 | E 精度收尾 | **1/3** | E-2 ✅；**E-1 未收敛**（两次尝试被证伪）；**E-3 仅完成实测分桶** |
 
 **实测数字**：`ctest` **34/34 (100%)**、`cargo test -p kagami-qa` **40/40**、
@@ -144,7 +144,7 @@ $ grep -rn "_FCEUX11_CORE_LIBS\|_FCEUX11_OPENGL_LIBS" --include=*.txt --include=
 
 仅有的两处出现就是这两处引用点，**定义处不存在**。CMake 对未定义变量静默展开为空，所以 `ntdll` / `userenv` / `ws2_32` / `dbghelp`（Rust std 必需）从未被链接。注释写着「matching `fceux11_add_headless_test_executable`」，但那个 helper 在 `tests/CMakeLists.txt:66` 是显式写 `ntdll` 的——这里是照抄注释没照抄代码。
 
-### N-3 🟡 Oracle B 的 ROM 覆盖率远低于文档宣称
+### N-3 🟡 硬件一致性检测 的 ROM 覆盖率远低于文档宣称
 
 | 口径 | 数量 |
 |---|---|
@@ -170,7 +170,7 @@ Phase A    构建环境根治              6 PR   ← 解决 §2.1~§2.4，这�
    ├─ Phase B  Lua bit 库归零        4 PR   ← 独立，可与 C 并行
    ├─ Phase C  direct runner 端到端   5 PR   ← 独立，可与 B 并行
    │
-Phase D    Oracle B 覆盖率与 CI 权威性 4 PR   ← 依赖 A（构建）+ C（可选）
+Phase D    硬件一致性检测 覆盖率与 CI 权威性 4 PR   ← 依赖 A（构建）+ C（可选）
    │
 Phase E    精度遗留与收尾            3 PR   ← 依赖 A + D 的可复现构建
 ```
@@ -248,7 +248,7 @@ let prev_passed = prev.results.get(&r.test_id).copied().unwrap_or(false);
 
 ### 现状澄清（避免过度恐慌）
 
-`tests/blargg_runner.cpp:425,441` 把判定编码进了退出码（`fail_count > 0 ? 1 : 0` / `r.passed ? 0 : 1`），因此 **Oracle B 当前没有产生误报**。0.5-a/b/c 是**潜伏缺陷**而非正在犯的错误。但 0.5-d 是**当前就在生效**的指标失真。
+`tests/blargg_runner.cpp:425,441` 把判定编码进了退出码（`fail_count > 0 ? 1 : 0` / `r.passed ? 0 : 1`），因此 **硬件一致性检测 当前没有产生误报**。0.5-a/b/c 是**潜伏缺陷**而非正在犯的错误。但 0.5-d 是**当前就在生效**的指标失真。
 
 | PR | 内容 | 文件 | 验收 |
 |---|---|---|---|
@@ -409,7 +409,7 @@ kernel32.lib ntdll.lib userenv.lib ws2_32.lib dbghelp.lib /defaultlib:libcmt
 
 ---
 
-## 八、Phase D — Oracle B 覆盖率与 CI 权威性
+## 八、Phase D — 硬件一致性检测 覆盖率与 CI 权威性
 
 **目标**：让权威性指标建立在真实数据上，而非废 matrix。
 
@@ -482,21 +482,21 @@ kernel32.lib ntdll.lib userenv.lib ws2_32.lib dbghelp.lib /defaultlib:libcmt
 | 3 | `lua_bit_test_headless` PASS | Phase B | ✅ PASS |
 | 4 | `kagami_qa_direct_smoke` PASS（不再 `Not Run`） | Phase C | ✅ PASS（S-2 修好帧预算奇偶后 6.99s） |
 | 5 | migration matrix 由 CI 产出且 passed 率有据可查 | Phase D | 🟡 本地 **35/39**、`git_rev=623dd39` 可追溯（S-4）；CI 侧 workflow 已就绪但本会话未触发 |
-| 6 | Oracle B ROM 覆盖 ≥80%，失败项显式标注 | Phase D | ✅ **177/177 = 100%**（manifest 与磁盘 1:1，死条目 0）；失败项带 `$6000` 码与分类 tag |
+| 6 | 硬件一致性检测 ROM 覆盖 ≥80%，失败项显式标注 | Phase D | ✅ **177/177 = 100%**（manifest 与磁盘 1:1，死条目 0）；失败项带 `$6000` 码与分类 tag |
 | 7 | README / KagamiQA.md 的数字由 CI 产物回填，中英一致 | Phase D | ✅ `bc72b20` 已统一 |
 | 8 | 遗留文档的 3 处过期记载已更正 | Phase 0 | ✅ `b53a7a0` |
 | 9 | **判定链路与 schema 声明一致**：`stdout_contains` 生效、超时生效、`regression.rs` 在调用链上 | Phase 0.5；负向用例（退出码 0 但 stdout 不符）必须判 FAIL | ✅ `36bd311` + `7bf7771`；`cargo test -p kagami-qa` **40/40** |
 | 10 | **`fail_to_pass` 不含新增测试** | Phase 0.5；新增通过用例落入 `new_test` 桶 | ✅ `dfe0710` + `39c758b` |
 | 11 | **权威性按修订口径分离陈述**，不再输出单一乘积分数 | 见 §十·五 | ✅ 见下方「收官口径」 |
 
-**Oracle A 目标**：33 项中 33 PASS（当前 31 PASS / 1 FAIL / 1 Not Run）。Phase B 解决 FAIL，Phase C 解决 Not Run。
+**内部逻辑检测 目标**：33 项中 33 PASS（当前 31 PASS / 1 FAIL / 1 Not Run）。Phase B 解决 FAIL，Phase C 解决 Not Run。
 → **已达成**：`ctest` 34/34 全 PASS。
 
 ### 收官口径（2026-07-30，按 §十·五 的「门槛 + 度量分离」陈述）
 
 ```
 【卫生门槛】
-  ☑ Oracle A/B 判定通道物理隔离
+  ☑ 内部逻辑检测 / 硬件一致性检测 判定通道物理隔离
   ☑ 判定逻辑与 manifest schema 声明一致        （0.5-1 / 0.5-2）
   ☑ 迁移矩阵不含结构性失真                      （0.5-3 / 0.5-4）
   ☑ 产物可追溯：matrix 带真实 git_rev            （S-4；此前恒为 "unknown"）
@@ -508,7 +508,7 @@ kernel32.lib ntdll.lib userenv.lib ws2_32.lib dbghelp.lib /defaultlib:libcmt
                    · blargg_ppu_vbl_nmi  E-1 未收敛，$6000=0x01，逐 ROM 诊断已归档
                    · blargg_suite        聚合项，含 E-1/E-3 的已知失败
                    · lua_joypad_test / lua_memory_test  unimplemented-coverage
-  oracle 来源数  = 1（blargg）—— 覆盖率已到顶，继续提升权威性必须引入新来源
+  检测来源数  = 1（blargg）—— 覆盖率已到顶，继续提升权威性必须引入新来源
 ```
 
 **`blargg_suite` 全量实测（177 ROM，`git_rev=623dd39`）：121 PASS / 56 FAIL**，
@@ -534,7 +534,7 @@ kernel32.lib ntdll.lib userenv.lib ws2_32.lib dbghelp.lib /defaultlib:libcmt
 现行公式（`docs/tech/KagamiQA.md` §1.4、P5 计划 §1.1）：
 
 ```
-权威性 = ROM覆盖率 × Oracle独立性 × CI常驻因子
+权威性 = ROM覆盖率 × 通道独立性 × CI常驻因子
 ```
 
 **建议在 Stage-2 内废止这个单一乘积分数**，理由有二：
@@ -545,15 +545,15 @@ kernel32.lib ntdll.lib userenv.lib ws2_32.lib dbghelp.lib /defaultlib:libcmt
 
 ### 理由二：它把卫生条件当成了权威来源
 
-真正承载权威性的**只有 Oracle B**——因为只有它对照外部真理（真实 NES 硬件，经 blargg ROM 的 `$6000` 协议中介）。Oracle A 全套（`mapper_byte_diff` / `apu_wav_diff` / `ppu_frame_diff` / `golden_savestate`）本质是 characterization testing，只能回答「和上一版一样吗」，**永远无法回答「对吗」**。PLAN §2.4 自己写得很清楚：「无一个 oracle 回答『与真实硬件是否一致』」。
+真正承载权威性的**只有 硬件一致性检测**——因为只有它对照外部真理（真实 NES 硬件，经 blargg ROM 的 `$6000` 协议中介）。内部逻辑检测 全套（`mapper_byte_diff` / `apu_wav_diff` / `ppu_frame_diff` / `golden_savestate`）本质是 characterization testing，只能回答「和上一版一样吗」，**永远无法回答「对吗」**。PLAN §2.4 自己写得很清楚：「无一个 oracle 回答『与真实硬件是否一致』」。
 
-而「Oracle 独立性」和「CI 常驻」是**卫生条件**：不满足则结论无效，满足了也不增加真理含量。把 CI 常驻算作权威性的三分之一，等价于主张「跑得勤 = 更接近真理」——这不成立。乘积形式还有个副作用：任一因子为 0 则总分为 0，这掩盖了「其余部分其实已经做好」的事实，无法反映渐进改善。
+而「通道独立性」和「CI 常驻」是**卫生条件**：不满足则结论无效，满足了也不增加真理含量。把 CI 常驻算作权威性的三分之一，等价于主张「跑得勤 = 更接近真理」——这不成立。乘积形式还有个副作用：任一因子为 0 则总分为 0，这掩盖了「其余部分其实已经做好」的事实，无法反映渐进改善。
 
 ### 修订口径：门槛 + 度量分离陈述
 
 ```
 【卫生门槛】（二元，不满足则以下度量无效）
-  □ Oracle A/B 判定通道物理隔离
+  □ 内部逻辑检测 / 硬件一致性检测 判定通道物理隔离
   □ 判定逻辑与 manifest schema 声明一致      ← Phase 0.5 新增
   □ 迁移矩阵不含结构性失真                    ← Phase 0.5 新增
   □ CI 常驻，指标由 CI 产物回填而非手写
@@ -561,20 +561,20 @@ kernel32.lib ntdll.lib userenv.lib ws2_32.lib dbghelp.lib /defaultlib:libcmt
 【权威性度量】（仅在全部门槛满足时有意义）
   外部真理覆盖率 = 已接入的 blargg ROM / 177
   已知失败清单   = 每条含错误码、诊断串、分类标记
-  oracle 来源数  = 当前 1（blargg）
+  检测来源数  = 当前 1（blargg）
 ```
 
 ### 保留原设计中正确的部分
 
 KagamiQA.md §1.4 的这句判断应当保留并前置：
 
-> **「权威性不要求 Oracle B 全部 PASS。精确知道什么失败，比『全绿但不测』更权威。已知失败清单本身就是防线的一部分。」**
+> **「权威性不要求 硬件一致性检测 全部 PASS。精确知道什么失败，比『全绿但不测』更权威。已知失败清单本身就是防线的一部分。」**
 
 这是成熟的工程认识论——把已知失败清单当作防线的组成部分，而非污点。修订口径把它落成了可检查的字段要求（每条已知失败必须带错误码、诊断串、分类标记），而不只是一句态度。
 
-### 关于「oracle 来源数」这一新增项
+### 关于「检测来源数」这一新增项
 
-当前 `oracle 来源数 = 1`。这意味着 **KagamiQA 的权威性上限 = blargg ROM 套件对真实硅片的保真度**——ROM 覆盖率从 13% 提到 100%，也只是把这一个来源用尽，不会突破它。若未来要继续提升权威性，路径是**增加相互独立、可以彼此证伪的 oracle 来源**（NESdev 其他测试套件、TASVideos 精度表、第二个模拟器的差分比对、真机采集），而非继续增加同一来源的测试数量。此项列入度量是为了让这个天花板**在指标上可见**，避免用覆盖率的增长掩盖来源的单一。
+当前 `检测来源数 = 1`。这意味着 **KagamiQA 的权威性上限 = blargg ROM 套件对真实硅片的保真度**——ROM 覆盖率从 13% 提到 100%，也只是把这一个来源用尽，不会突破它。若未来要继续提升权威性，路径是**增加相互独立、可以彼此证伪的 oracle 来源**（NESdev 其他测试套件、TASVideos 精度表、第二个模拟器的差分比对、真机采集），而非继续增加同一来源的测试数量。此项列入度量是为了让这个天花板**在指标上可见**，避免用覆盖率的增长掩盖来源的单一。
 
 ---
 
@@ -585,7 +585,7 @@ KagamiQA.md §1.4 的这句判断应当保留并前置：
 | 风险 | 等级 | 说明 | 收官判定 |
 |---|---|---|---|
 | C-4 的 LNK2005 重复 std | 🔴 高 | 这是唯一未能通过只读手段排除的链接风险（未运行链接器）。推荐解法（复用根 crate staticlib）可绕开，但需实测 | ✅ **已排除**。推荐解法落地后 `LNK2005` 命中数 0；C-4 无需单独实施 |
-| direct 模式的**运行时**正确性 | 🟡 中 | Phase C 全部论证只覆盖链接成功。进程内驱动模拟器是否与 subprocess 模式等价，完全未验证 | ⚠️ **实测发现并修复一处不对等**：direct 模式无视 manifest 的 `--frames`（恒 300 帧），见 S-2。修复后 4 条 Oracle B 用例 direct 与 subprocess 结论一致 |
+| direct 模式的**运行时**正确性 | 🟡 中 | Phase C 全部论证只覆盖链接成功。进程内驱动模拟器是否与 subprocess 模式等价，完全未验证 | ⚠️ **实测发现并修复一处不对等**：direct 模式无视 manifest 的 `--frames`（恒 300 帧），见 S-2。修复后 4 条 硬件一致性检测 用例 direct 与 subprocess 结论一致 |
 | E-1 VBL 周期调整 | 🟡 中 | 精度问题存在「修好一个测试、弄坏另一个」的经典风险，必须回归全部 `ppu_vbl_nmi` 子测试 | 🔴 **风险已兑现**：1-cycle NMI delay 尝试使 `05` 的行 00-01 转好、02-07 仍错，证明不是单参数问题，已 revert |
 | A-3 `/Z7` 的产物膨胀 | 🟢 低 | 嵌入式调试信息会增大 .obj；对 `fceux11_core.lib` 中 512 KiB LUT 的影响需实测确认可接受 | ✅ 可接受：`fceux11_core.lib` 102 MB、构建与 ctest 全程正常 |
 | c2.dll bug 的真实触发条件 | 🟢 低 | A-6 是基于「可能泛化」的保险，成本近零。若上游 MSVC 修复，`/GL-` 变成无害的历史包袱 | 维持原判 |

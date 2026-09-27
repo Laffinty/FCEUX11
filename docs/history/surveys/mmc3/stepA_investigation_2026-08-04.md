@@ -10,7 +10,7 @@
 
 ## 0. 摘要
 
-桶 A (MMC3) 含 **12 项 ROM FAIL**(Step 3.1 后期 Oracle B):
+桶 A (MMC3) 含 **12 项 ROM FAIL**(Step 3.1 后期 硬件一致性检测):
 
 | 错误码 | 数量 | 子类型 |
 |---|---|---|
@@ -35,7 +35,7 @@
 2. **`MMC3_hb` (line ~273)**: 记录每个扫描线末尾的 counter 状态
 3. **`ClockMMC3Counter` (line ~211)**: 记录每次时钟前的 count/latch/reload/enabled,以及 IRQ 是否触发
 
-**零侵入性**:probe 仅在 env=1 时输出 stderr;默认静默(Oracle A 33/33 不变)。
+**零侵入性**:probe 仅在 env=1 时输出 stderr;默认静默(内部逻辑检测 33/33 不变)。
 
 ### 1.2 探针实测数据
 
@@ -174,7 +174,7 @@ static void ClockMMC3Counter(void) {
 ### 4.2 探针保留(env-gated,零侵入)
 
 - `FCEUX11_MMC3_PROBE=1` 启用 probe 输出
-- 现有 PASS ROM 与 Oracle A 不受影响
+- 现有 PASS ROM 与 内部逻辑检测 不受影响
 - 后续深模型调研时可复用
 
 ### 4.3 推荐下一步

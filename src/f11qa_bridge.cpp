@@ -113,7 +113,7 @@ int kagami_bridge_emulate_frame(void) {
 }
 
 // ---------------------------------------------------------------------------
-// Oracle probes
+// Check probes
 // ---------------------------------------------------------------------------
 uint8_t kagami_bridge_read_byte(uint16_t addr) {
     if (addr < 0x10000) {

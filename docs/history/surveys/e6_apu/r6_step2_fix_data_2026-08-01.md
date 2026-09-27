@@ -48,7 +48,7 @@
 
 ---
 
-## 2. Oracle A 回归
+## 2. 内部逻辑检测 回归
 
 ```
 $ do_build.ps1 -Config Release -BuildDir build-c1 (13 min)

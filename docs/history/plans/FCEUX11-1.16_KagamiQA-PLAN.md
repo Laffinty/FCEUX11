@@ -3,7 +3,7 @@
 > **报告性质**：工程化构建计划（P0 转译）。基于桌面《FCEUX11 v1.16 独立测试系统可行性与方向性评估》方向性报告，经代码级交叉验证后转译为可执行方案。
 > **分支**：`wip_1.16`（全流程在此分支进行）
 > **框架命名**：KagamiQA
-> **核心命题**：把 FCEUX11 现有但散落的测试资产收编为一个独立存在的、清单驱动的、双 oracle 的、机器可判定的测试框架——既是 FCEUX11 的质量防线，也是 AI 代理的"阅卷机"，且框架核心可迁移到其他多种项目。
+> **核心命题**：把 FCEUX11 现有但散落的测试资产收编为一个独立存在的、清单驱动的、双通道 的、机器可判定的测试框架——既是 FCEUX11 的质量防线，也是 AI 代理的"阅卷机"，且框架核心可迁移到其他多种项目。
 > **本阶段（P0）范围**：仅产出本计划文档。零代码改动。
 
 ---
@@ -13,7 +13,7 @@
 **可行。** 方向性报告的三个核心判断经代码级验证全部成立，并补充两个工程化校正：
 
 1. **测试系统独立化是"收编"而非"新建"**——FCEUX11 已有 30 项 CTest、golden master、bench 协议、i18n 门禁构成的"影子测试系统"，资产齐全，缺的是统一清单、统一 runner、统一报告、统一生命周期。
-2. **双 oracle 分离是系统灵魂**——现有 oracle 全是"回归等价"（回答"与昨天是否一致"），无一个"硬件一致性"（回答"与真实硬件是否一致"）。KagamiQA 的核心动作是补上 Oracle B。
+2. **双通道 分离是系统灵魂**——现有 oracle 全是"回归等价"（回答"与昨天是否一致"），无一个"硬件一致性"（回答"与真实硬件是否一致"）。KagamiQA 的核心动作是补上 硬件一致性检测。
 3. **独立测试系统是精度对齐与 runppu 重批的前置条件**——依赖序为：测试系统 → 精度基线 → 精度攻关 → runppu 重批，而非三线并进。
 
 **两个工程化校正**（不构成否决项，决定分阶段策略）：
@@ -32,9 +32,9 @@
 ```
 P0 报告转译（本次）
   └─ P1 收编 + headless 全款
-       └─ P2 Oracle B 接入（零代码修改）
+       └─ P2 硬件一致性检测 接入（零代码修改）
             └─ P3 软件侧输入通道（Lua 解耦）
-                 └─ P4 精度攻关（双 oracle 护栏下）
+                 └─ P4 精度攻关（双通道 护栏下）
                       └─ P5 runppu 重批（条件解冻）
 ```
 
@@ -43,9 +43,9 @@ P0 报告转译（本次）
 源自方向性报告 §八，本计划在此边界内设计细节：
 
 1. **先收编后新建**：现有 30 项 CTest 与全部脚本门禁必须先迁移进清单体系，禁止绕开它们另起炉灶。
-2. **Oracle 类型是清单一等字段**：每个测例必须声明属于 A（回归等价）还是 B（硬件一致性）；无 oracle 类型的测例不得入库。
+2. **检测通道类型是清单一等字段**：每个测例必须声明属于 A（回归等价）还是 B（硬件一致性）；无 oracle 类型的测例不得入库。
 3. **接入精度判据的阶段不允许修改任何模拟器源代码**；已知失败清单是独立交付物。
-4. **runppu 重批的开工条件**写成显式门禁：Oracle A 全绿 + Oracle B 清单稳定 + 收益预期重估通过，三者缺一不可。
+4. **runppu 重批的开工条件**写成显式门禁：内部逻辑检测 全绿 + 硬件一致性检测 清单稳定 + 收益预期重估通过，三者缺一不可。
 5. **报告格式先于 runner 定稿**（JSON 迁移矩阵为最小内核），因为报告是人与 AI 共同的接口。
 6. **基线更新走与代码变更同级的评审**，并在报告中标红每次基线漂移。
 7. **AI 不得修改已入库的 `expected` 值**，只能新增条目；基线更新走与代码同级评审（反 gaming）。
@@ -91,7 +91,7 @@ P0 报告转译（本次）
 - **样本脚本**：`tests/lua_scripts/` 已有 16 个 Lua 测试脚本（test_emu / test_memory / test_joypad / test_movie / test_savestate / test_ppu 等）
 - **约束**：`lua-engine.cpp` 当前 include 了 `drivers/Qt/sdl.h` / `fceuWrapper.h` / TasEditor 系列，硬依赖 Qt——Lua 引擎当前无法 headless 独立运行。**P3 解耦**后 Lua 成为软件侧动态测例通道。
 
-### 2.4 双 oracle 缺失实证
+### 2.4 双通道 缺失实证
 
 现有 oracle 全是回归等价（golden master / characterization testing）：
 
@@ -103,7 +103,7 @@ P0 报告转译（本次）
 
 **无一个 oracle 回答"与真实硬件是否一致"**。这就是 readme 里"继承 FCEUX 卓越模拟精度"目前尚属营销语言的根因——没有可证伪的判据。
 
-### 2.5 `$6000` 协议落地路径（Oracle B 的工程基础）
+### 2.5 `$6000` 协议落地路径（硬件一致性检测 的工程基础）
 
 blargg 硬件测试 ROM 的现代协议是 **$6000 内存映射结果协议**：测试 ROM 把 PASS/FAIL 与状态码写入 $6000–$6003，headless 运行 N 帧后读取内存即可判定，**完全不需要截图比对或人工读屏**。
 
@@ -115,7 +115,7 @@ extern readfunc  (& ARead )[0x10000];
 extern writefunc (& BWrite)[0x10000];
 ```
 
-Oracle B 的判定核心即 `ARead[0x6000](0x6000)` ——读取 blargg 写入的结果码。这条路径已存在，P2 接入时无需改模拟器源码。
+硬件一致性检测 的判定核心即 `ARead[0x6000](0x6000)` ——读取 blargg 写入的结果码。这条路径已存在，P2 接入时无需改模拟器源码。
 
 ### 2.6 两个工程化校正点
 
@@ -191,7 +191,7 @@ KagamiQA 框架核心通过 `SutAdapter` trait 与被测物解耦（详见 §五
 | 判据 | 含义 | 本计划落地 |
 |---|---|---|
 | 清单驱动 | AI 读 JSON 生成测例（数据非代码），可 schema 校验 | ✅ tests.json 清单 |
-| oracle as data | 预期值是清单字段而非代码 assert，可版本化 | ✅ `expected` 字段 |
+| expectation-as-data | 预期值是清单字段而非代码 assert，可版本化 | ✅ `expected` 字段 |
 | 机器可判定输出 | 迁移矩阵 JSON，AI 读 FAIL_TO_PASS 即判补丁对错 | ✅ §六报告格式 |
 | failure_means 设防 | 每条清单回答"失败意味什么"，防 AI 生成空转测试 | ✅ `failure_means` 字段 |
 | 跨项目可迁移 | 框架核心与被测物解耦，FCEUX11 只是 adapter 之一 | ✅ §五 SutAdapter |
@@ -231,7 +231,7 @@ KagamiQA crate 内部分两层：
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  KagamiQA 框架核心层（被测物无关 · 可迁移）              │
-│  manifest 解析 · runner 调度 · 双 oracle 判定           │
+│  manifest 解析 · runner 调度 · 双通道 判定           │
 │  迁移矩阵报告 · 基线治理                                 │
 │  仅依赖 SutAdapter trait，不依赖任何具体被测物           │
 └────────────┬───────────────────────────────────────────┘
@@ -255,7 +255,7 @@ pub trait SutAdapter {
     fn load(&mut self, input: &InputSpec) -> Result<()>;
     /// 推进一步（一帧 / 一个事件循环 / 一次 tick）
     fn step(&mut self) -> Result<()>;
-    /// 读取 oracle 探针（Oracle B 的 $6000 结果码；Oracle A 的快照点）
+    /// 读取 oracle 探针（硬件一致性检测 的 $6000 结果码；内部逻辑检测 的快照点）
     fn read_oracle_probe(&self, addr: u32) -> Result<u8>;
     /// 快照当前状态（用于 golden master / savestate 比对）
     fn snapshot(&self) -> Result<Vec<u8>>;
@@ -276,7 +276,7 @@ pub trait SutAdapter {
 
 - tests.json schema 与解析器
 - runner 调度逻辑
-- 双 oracle 判定逻辑
+- 双通道 判定逻辑
 - 迁移矩阵报告生成
 - 基线治理规则
 
@@ -310,10 +310,10 @@ src/rust/crates/kagami-qa/
     │   ├── mod.rs
     │   ├── scheduler.rs        ← 按 oracle_type / tag / layer 分组调度
     │   └── watchdog.rs         ← 超时看门狗
-    ├── oracle/                 ← 双 oracle 判定
+    ├── oracle/                 ← 双通道 判定
     │   ├── mod.rs
-    │   ├── regression.rs       ← Oracle A：回归等价（memcmp / hash）
-    │   └── hardware.rs         ← Oracle B：硬件一致性（$6000 协议）
+    │   ├── regression.rs       ← 内部逻辑检测：回归等价（memcmp / hash）
+    │   └── hardware.rs         ← 硬件一致性检测：硬件一致性（$6000 协议）
     ├── report/                 ← 迁移矩阵 JSON
     │   ├── mod.rs
     │   ├── matrix.rs           ← FAIL_TO_PASS / PASS_TO_PASS / PASS_TO_FAIL
@@ -323,7 +323,7 @@ src/rust/crates/kagami-qa/
         └── fceux11.rs          ← FCEUX11 adapter（C ABI link core）
 ```
 
-### 6.2 双 Oracle 并列结构
+### 6.2 双通道 并列结构
 
 ```
         ┌──────────────── 测例清单（tests.json / Lua）────────────────┐
@@ -334,7 +334,7 @@ src/rust/crates/kagami-qa/
                     ┌────────────────┴────────────────┐
                     │                                 │
               ┌─────▼─────┐                     ┌─────▼─────┐
-              │ Oracle A  │                     │ Oracle B  │
+              │ Internal Logic Check  │                     │ Hardware Consistency Check  │
               │ 回归等价  │                     │ 硬件一致性 │
               │           │                     │           │
               │ 现有 golden│                     │ blargg    │
@@ -353,7 +353,7 @@ src/rust/crates/kagami-qa/
                           └─────────────────┘
 ```
 
-**为什么必须分离**：Oracle A 要求"行为不变"，Oracle B 的攻关恰恰要求"行为改变"（向真实硬件靠拢）。若混在一个判定通道，每次精度修复都会被 golden diff 误判为回归。分离后，精度攻关的完成定义清晰：**目标 ROM 在 Oracle B 下 FAIL→PASS，且 Oracle A 全集保持 PASS→PASS**。
+**为什么必须分离**：内部逻辑检测 要求"行为不变"，硬件一致性检测 的攻关恰恰要求"行为改变"（向真实硬件靠拢）。若混在一个判定通道，每次精度修复都会被 golden diff 误判为回归。分离后，精度攻关的完成定义清晰：**目标 ROM 在 硬件一致性检测 下 FAIL→PASS，且 内部逻辑检测 全集保持 PASS→PASS**。
 
 ### 6.3 headless Null Driver
 
@@ -364,7 +364,7 @@ src/rust/crates/kagami-qa/
 - 由 KagamiQA runner 经 C ABI 驱动 `fceu11::Initialize` / `LoadGame` / `Emulate`
 - **P1 补齐全款**：下沉 `nes_shm_t` 解除 `fceu.cpp` 对 Qt 的残留依赖
 
-### 6.4 `$6000` 协议（Oracle B 落地）
+### 6.4 `$6000` 协议（硬件一致性检测 落地）
 
 ```
 KagamiQA runner                  FCEUX11 adapter
@@ -481,7 +481,7 @@ KagamiQA runner                  FCEUX11 adapter
 | `oracle_type` | ✅ | "A" 或 "B"（一等字段，无值不得入库） |
 | `layer` | ✅ | core / ui / i18n / perf |
 | `input` | ✅ | 输入描述（rom / frames / 等） |
-| `expected` | ✅ | 预期值（oracle as data） |
+| `expected` | ✅ | 预期值（expectation-as-data） |
 | `timeout_seconds` | ✅ | 超时看门狗 |
 | `tags` | ✗ | 过滤标签 |
 | `failure_means` | ✅ | 失败语义（防空转测试，AI 友好） |
@@ -554,7 +554,7 @@ KagamiQA runner                  FCEUX11 adapter
 - **不接入 blargg、不改模拟器源码**
 - **退出条件**：现有 30 CTest 全部能经 KagamiQA runner 跑通并产出迁移矩阵 JSON；headless 可在无 Qt 环境运行
 
-### P2：Oracle B 接入（零代码修改）
+### P2：硬件一致性检测 接入（零代码修改）
 - 建 blargg ROM 套件清单 + 已知失败清单基线
 - headless 跑批读 `$6000`，产出 FAIL/PASS 矩阵
 - 产出"FCEUX11 精度对照表"（对标 TASVideos 表格格式）
@@ -568,17 +568,17 @@ KagamiQA runner                  FCEUX11 adapter
 - 确立 tests.json + Lua 双通道统一调度
 - **退出条件**：Lua 测试脚本可经 KagamiQA headless 运行并产出判定
 
-### P4：精度攻关（双 oracle 护栏下）
-- 在 Oracle A 全绿 + Oracle B 清单稳定前提下，修模拟器
-- 目标 ROM 在 Oracle B 下 FAIL→PASS 即胜利
+### P4：精度攻关（双通道 护栏下）
+- 在 内部逻辑检测 全绿 + 硬件一致性检测 清单稳定前提下，修模拟器
+- 目标 ROM 在 硬件一致性检测 下 FAIL→PASS 即胜利
 - 全绿非 v1.16 承诺（"清单收窄即胜利"）
-- **退出条件**：至少一项 FAIL→PASS；Oracle A 全集保持 PASS→PASS
+- **退出条件**：至少一项 FAIL→PASS；内部逻辑检测 全集保持 PASS→PASS
 
 ### P5：runppu 重批（条件解冻）
-- **开工门禁**（约束 4）：Oracle A 全绿 + Oracle B 清单稳定 + 收益预期重估通过
-- runppu 重批是 timing rewrite，双 oracle 齐备才能区分"时序改对了"与"改得和以前不一样但都错"
+- **开工门禁**（约束 4）：内部逻辑检测 全绿 + 硬件一致性检测 清单稳定 + 收益预期重估通过
+- runppu 重批是 timing rewrite，双通道 齐备才能区分"时序改对了"与"改得和以前不一样但都错"
 - 测试系统成人礼：若能在 runppu 这类改动上给出可信 FAIL/PASS 信号，系统通过"典范"成人礼
-- **退出条件**：runppu 重批完成且双 oracle 给出可信信号；或收益预期重估未通过则继续冻结
+- **退出条件**：runppu 重批完成且双通道 给出可信信号；或收益预期重估未通过则继续冻结
 
 ---
 
@@ -588,7 +588,7 @@ KagamiQA runner                  FCEUX11 adapter
 |---|---|---|---|---|---|
 | 基线资产腐化 | golden/bench 基线无人维护，失败变常态噪声 | 中 | 高 | 基线版本化 + 更新同评审级（约束 6）；bench 用统计协议（中位数 + 阈值） | P1 |
 | 性能测试抖动污染信任 | bench 本质噪声测量，与确定性测试共用判定语义 | 高 | 中 | 单独通道、统计判定、重复验证；现有 R4 协议（warmup3+测7丢极值）已可收编 | P1 |
-| 错误固化 | golden master 把当前（可能错误）行为刻成基准 | 中 | 高 | 双 oracle 分离；Oracle B 判 FAIL 的行为在 Oracle A 中标记"已知错误基线"；P1 审计 golden_hashes | P1 |
+| 错误固化 | golden master 把当前（可能错误）行为刻成基准 | 中 | 高 | 双通道 分离；硬件一致性检测 判 FAIL 的行为在 内部逻辑检测 中标记"已知错误基线"；P1 审计 golden_hashes | P1 |
 | 平行王国化 | 独立系统脱离 CI 与发布流程，无人运行 | 中 | 高 | 从第一天起接入 CI；报告发布到 GitHub Pages（项目已有 Pages 管线） | P1+ |
 | 范围膨胀 | "典范"野心导致过度工程（多平台、多被测物、插件） | 中 | 中 | 三条非目标（§1.3）写进首页；跨项目能力仅预留不实接 | 全程 |
 | Qt UI 层测不到 | headless 天然绕开 GUI | 高 | 中 | 承认边界：UI 层走 Qt offscreen smoke 独立通道，不强行纳入核心 harness | P1 |
@@ -613,7 +613,7 @@ hotfix5/6 的三轮翻译审计（209→122→47）证明多层验证价值，�
 
 **空转测试**：AI 生成的测试通过但不断言有意义的东西。对策——清单条目入库时必须回答"这条测例失败时意味着什么"（`failure_means` 字段），无答案者不得入库。这是 SWE-bench Verified 人工过滤"可解性"做法的清单化翻版。
 
-**错误固化**：golden master 把当前行为刻成基准，而当前行为可能错。对策——Oracle A 与 Oracle B 分离，任何被 Oracle B 判 FAIL 的行为，其在 Oracle A 的 golden 基线必须标记"已知错误基线，允许被精度修复打破"。这两个设防都不增代码量，只增清单字段与治理规则。
+**错误固化**：golden master 把当前行为刻成基准，而当前行为可能错。对策——内部逻辑检测 与 硬件一致性检测 分离，任何被 硬件一致性检测 判 FAIL 的行为，其在 内部逻辑检测 的 golden 基线必须标记"已知错误基线，允许被精度修复打破"。这两个设防都不增代码量，只增清单字段与治理规则。
 
 ### 11.3 建设期的 AI 甜蜜点
 
@@ -629,8 +629,8 @@ hotfix5/6 的三轮翻译审计（209→122→47）证明多层验证价值，�
 | P1 | 现有 30 CTest 全部经 KagamiQA runner 跑通；迁移矩阵 JSON 产出；headless 无 Qt 运行；golden_hashes 审计完成；nes_shm 下沉完成 |
 | P2 | blargg 全套件跑批 <3 分钟；精度对照表入库；已知失败清单版本化；零模拟器代码修改 |
 | P3 | Lua 测试脚本可经 KagamiQA headless 运行并产出判定；双通道统一调度 |
-| P4 | 至少一项 Oracle B FAIL→PASS；Oracle A 全集 PASS→PASS |
-| P5 | runppu 重批完成且双 oracle 给出可信信号；或收益重估未过则继续冻结（附理由） |
+| P4 | 至少一项 硬件一致性检测 FAIL→PASS；内部逻辑检测 全集 PASS→PASS |
+| P5 | runppu 重批完成且双通道 给出可信信号；或收益重估未过则继续冻结（附理由） |
 
 ---
 
@@ -639,7 +639,7 @@ hotfix5/6 的三轮翻译审计（209→122→47）证明多层验证价值，�
 | 报告原则/约束 | 本计划落地 |
 |---|---|
 | 原则 1 清单驱动 | §七 tests.json schema |
-| 原则 2 双 oracle 分离 | §6.2 + oracle_type 一等字段 |
+| 原则 2 双通道 分离 | §6.2 + oracle_type 一等字段 |
 | 原则 3 headless 被测接口 | §6.3 Null Driver + P1 nes_shm 下沉 |
 | 原则 4 机器可判定输出 | §八 迁移矩阵 JSON |
 | 原则 5 基线版本化与治理 | §1.2 约束 6 + provenance 字段 + baseline_drift 标红 |
@@ -655,4 +655,4 @@ hotfix5/6 的三轮翻译审计（209→122→47）证明多层验证价值，�
 
 ## 十四、一句话收束
 
-**v1.16 这个命题的可行性不是"能不能建一个测试系统"，而是"敢不敢承认现有散件已经是系统的零件"。** KagamiQA 的工作是收编它们、补上硬件 oracle、把判定权交给机器——精度对齐和 runppu 重批会从"高风险愿望"变成"护栏内的普通工作"，而这套系统本身，会成为 FCEUX11 在 AI Coding 时代留下的最有复用价值的工程资产：它的框架核心可迁移，它的方法论可陈述，它的人机接口无需信任。
+**v1.16 这个命题的可行性不是"能不能建一个测试系统"，而是"敢不敢承认现有散件已经是系统的零件"。** KagamiQA 的工作是收编它们、补上硬件检测通道、把判定权交给机器——精度对齐和 runppu 重批会从"高风险愿望"变成"护栏内的普通工作"，而这套系统本身，会成为 FCEUX11 在 AI Coding 时代留下的最有复用价值的工程资产：它的框架核心可迁移，它的方法论可陈述，它的人机接口无需信任。

@@ -102,7 +102,7 @@
 | 桶 C.1（vbl） | 5 | 0 | 5 | ✅ Phase 1 已记录 |
 | **Phase 3 Step 3.2 合计** | **33** | **1** | **32** | |
 
-> 注：表格统计 1 PASS 来自桶 B.3+B.4 的 `cpu_dummy_writes_ppu`（`863e9d7`）；桶 C 的 `ppu_read_buffer` + `ppu_open_bus` 已计入 Phase 3 总账（Oracle B 144 PASS）。
+> 注：表格统计 1 PASS 来自桶 B.3+B.4 的 `cpu_dummy_writes_ppu`（`863e9d7`）；桶 C 的 `ppu_read_buffer` + `ppu_open_bus` 已计入 Phase 3 总账（硬件一致性检测 144 PASS）。
 
 ---
 

@@ -225,7 +225,7 @@ vbl_02 测试"VBL 标志何时对 CPU 可见"。如果真实硬件 VBL 在 sl=24
 
 #### 选项 Y：直接试 (b) + 全 ROM 回归
 
-按 §十 R5 Step 1 修订路径 (b) 改 pre-loop `<=delay`，跑 10 vbl ROM + Oracle A 34/34 + ppudead 相关 ROM（SDK 修复验证）。
+按 §十 R5 Step 1 修订路径 (b) 改 pre-loop `<=delay`，跑 10 vbl ROM + 内部逻辑检测 34/34 + ppudead 相关 ROM（SDK 修复验证）。
 **风险**：可能让 vbl_01 / vbl_04 从 PASS 翻 FAIL，且 vbl_02 / vbl_05 不一定修好。
 
 #### 选项 Z：暂缓 E-1，转 R6

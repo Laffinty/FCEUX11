@@ -8,7 +8,7 @@
 > |---|---|---|---|---|
 > | 第一轮 | `82956632293` | `10f1e05` | 配置步 45 min timeout 被取消，五步全 skip | §一~§五（整改 = **R4-0**） |
 > | 第二轮 | `83046118885` | `efaa363` | **R4-0 全项生效**（配置步 48.4 min 成功、1151/1151 链接完成）；暴露 blargg ROM 缺失 + runner 路径两个新缺口 | §六（整改 = **R4-1**） |
-> | 第三轮 | `83107636049`（推断，见 §7 注） | `1156ca1` | **R4 闭合、R4-1 全项实测生效**（配置步 47.88 min 冷编成功、177/177 ROM、Oracle A 33/33、Oracle B 121/56、R4 Gate `[OK]`） | §七（**R4 闭环**） |
+> | 第三轮 | `83107636049`（推断，见 §7 注） | `1156ca1` | **R4 闭合、R4-1 全项实测生效**（配置步 47.88 min 冷编成功、177/177 ROM、内部逻辑检测 33/33、硬件一致性检测 121/56、R4 Gate `[OK]`） | §七（**R4 闭环**） |
 >
 > **R4 已由第三轮 CI（commit `1156ca1`）闭环**。`actions/cache@v4` 在 failed 作业下不保存 cache 已实测确认
 > （第二轮 failed → 第三轮 cache miss 直接证实），cache 仅在成功作业下保存，故正确节奏是
@@ -29,7 +29,7 @@
 | 6 | vcpkg 缓存从未存在过 | `Cache not found for input keys: vcpkg-13cac6ff...c5476, vcpkg-`（`:1144`）。连宽松 restore-key `vcpkg-` 都未命中 → 该 key 前缀下历史上**从未保存过任何条目** |
 | 7 | 缓存路径缺陷 1 | 缓存步实测入参 `path: vcpkg_installed`（仓库根）。但 manifest 模式实际装到 **`build/vcpkg_installed`** —— 日志 `D:/a/FCEUX11/FCEUX11/build/vcpkg_installed/vcpkg/blds/dbus/src/...`（`:2154`）。缓存的是一个空目录 |
 | 8 | 缓存路径缺陷 2 | 第二条路径实测渲染为字面量 **`\vcpkg\archives`**（`cat -A` 确认前缀无内容）。`${{ env.LOCALAPPDATA }}` 在 workflow 级 `env` 上下文中**展开为空串**（该上下文不含 runner 环境变量）→ vcpkg 真正的二进制缓存目录从未被缓存 |
-| 9 | 后续四步全部未执行 | Build C++ / kagami-qa-runner / Oracle A ctest / Oracle B / Migration Matrix 均被 skip |
+| 9 | 后续四步全部未执行 | Build C++ / kagami-qa-runner / 内部逻辑检测 ctest / 硬件一致性检测 / Migration Matrix 均被 skip |
 | 10 | matrix 未产出，且几乎无声 | `##[warning]No files were found with the provided path: build/kagamiqa_migration_matrix.json`；`Print Summary` 因 `Test-Path` 为假而**一行数字都没打印**，只输出了 `KagamiQA P5 CI Run Complete` 标题 |
 | 11 | `ci.yml` 有同一缺陷 | `ci.yml:36-44`（整改前）缓存块与 `kagami-qa.yml` 逐字相同；差别仅在 `ci.yml` 未设 `timeout-minutes`（默认 360），故它是硬扛冷编而非被掐 |
 
@@ -51,12 +51,12 @@ GitHub Actions 缓存永远为空（事实 6）
       ↓
 配置步耗时远超 45 分钟 → 撞 timeout 被取消（事实 4）
       ↓
-build / ctest / Oracle B / matrix 全 skip（事实 9）
+build / ctest / 硬件一致性检测 / matrix 全 skip（事实 9）
       ↓
 R4 的三项证伪判据（git_rev / passed=35 / fail_to_pass=0）无从核验
 ```
 
-**这不是 KagamiQA 的缺陷**：Oracle A/B、判定链路、迁移矩阵、S-4 编译期 stamp 在本轮 CI 中根本没有获得执行机会。验收报告 §九.2 的通过判定不受本次影响。
+**这不是 KagamiQA 的缺陷**：内部逻辑检测 / 硬件一致性检测、判定链路、迁移矩阵、S-4 编译期 stamp 在本轮 CI 中根本没有获得执行机会。验收报告 §九.2 的通过判定不受本次影响。
 
 ### 一处顺带发现的潜伏脆弱
 
@@ -180,17 +180,17 @@ R4 的三项证伪判据（git_rev / passed=35 / fail_to_pass=0）无从核验
 
 **实测**：
 
-- Oracle B：`Total: 177 / Passed: 0 / Failed: 177`，逐条为
+- 硬件一致性检测：`Total: 177 / Passed: 0 / Failed: 177`，逐条为
   `{"value":"0xFE","diag":[229,246,127],"status":"FAIL","duration_ms":0}` ——
   `0xFE` + `duration_ms: 0` 是**加载不到 ROM** 的签名，不是精度失败
-- Oracle A：`kagami_qa_direct_smoke` 红，
+- 内部逻辑检测：`kagami_qa_direct_smoke` 红，
   `kagami_bridge_load_rom('fixtures/blargg/ppu/ppu_vbl_nmi.nes') failed: rc=-2`（4 项中 3 项 LOAD_ERROR）
   → CI 上 ctest 为 **32/33**，而同一 commit 本地是 34/34
 
 **根因**：`.gitignore:108` 的 `*.nes` 把全部 ROM 排除出仓库（实测：本地磁盘 **177** 个 `.nes`，
 `git ls-files tests/fixtures/blargg` 返回 **0**）。这本身是**有意设计**——ROM 从镜像拉取而非入库，
 项目已备有 `scripts/download_blargg_roms.ps1`——**但两个 workflow 从未调用过它**。
-即 CI 历史上一直在对着空的 fixture 树跑 Oracle B。
+即 CI 历史上一直在对着空的 fixture 树跑 硬件一致性检测。
 
 **修复（R4-1）**：新增三步——`Cache blargg ROMs`（key 跟随下载脚本哈希，因 ROM 清单声明在脚本里）、
 `Fetch blargg test ROMs`、`Verify blargg ROM fixtures against manifest`。
@@ -259,16 +259,16 @@ cargo 产物落在 `target/x86_64-pc-windows-msvc/release/`；而 workflow 检�
 |---|---|---|
 | matrix 产出 | `Report written to: build/kagamiqa_migration_matrix.json`（`17:23:16`） | ✅ |
 | `engine.git_rev` 非空非 `unknown` | `git_rev=1156ca1`；与 `git rev-parse HEAD` 短哈希完全一致；`build/src/fceux_git_info.cpp` 内 `#define FCEUX_GIT_REV "1156ca1cf6a729af10265a1aec10717af7bcff8b"`（`17:03:08`，由配置步 echo 写入） | ✅ S-4 编译期 stamp 在 CI 生效 |
-| `summary` = 39/35/4 | Print Summary 步输出 `Total: 39 / Passed: 35 / Failed: 4`（`17:23:17`）；`Oracle A: 25P / 2F \| Oracle B: 10P / 2F` → 27 + 12 = 39，与本地一致 | ✅ |
+| `summary` = 39/35/4 | Print Summary 步输出 `Total: 39 / Passed: 35 / Failed: 4`（`17:23:17`）；`内部逻辑检测: 25P / 2F \| 硬件一致性检测: 10P / 2F` → 27 + 12 = 39，与本地一致 | ✅ |
 | `transition_matrix.fail_to_pass` = 0 | R4 Gate 输出 `fail_to_pass=0 [OK]` | ✅ Phase 0.5-d 反 gaming 加固在 CI 生效 |
-| 4 FAIL 项性质 | per-oracle 拆分与 §十 R4 预期一一对应：`lua_joypad_test` / `lua_memory_test` 在 Oracle A（25P/2F）；`blargg_ppu_vbl_nmi` / `blargg_suite` 聚合在 Oracle B（10P/2F）。`test_id` 字符串未 echo 到 stdout 但 2+2=4 与预期吻合 | ✅ |
+| 4 FAIL 项性质 | per-oracle 拆分与 §十 R4 预期一一对应：`lua_joypad_test` / `lua_memory_test` 在 内部逻辑检测（25P/2F）；`blargg_ppu_vbl_nmi` / `blargg_suite` 聚合在 硬件一致性检测（10P/2F）。`test_id` 字符串未 echo 到 stdout 但 2+2=4 与预期吻合 | ✅ |
 | `kagamiqa-results` artifact 上传 | 上传步 `if: always()` 且未与 R4 Gate 共用 exit code；矩阵已落地且 R4 Gate `[OK]` 未报 `##[warning]No files` → 高置信已上传 | ✅（高置信，非直接证据） |
 
 ### 7.2 R4-1 全项实测生效（每一项都针对第二轮暴露的缺口验证）
 
 | 第二轮缺口 | 本轮实测 |
 |---|---|
-| **缺口 A**：blargg ROM 在 CI 不存在 → Oracle B 全 0xFE 加载失败 | `blargg fixtures: 177 / 177 present`（`17:20:35`，校验步零错零警告）；Oracle B `Total: 177 / Passed: 121 / Failed: 56`（`17:22:52`），每条 FAIL 带真实 `$6000` 码（`0x01/0x02/0x03/0x06/0x80/0x81/0x09/0xFE` 等）与 diag_string |
+| **缺口 A**：blargg ROM 在 CI 不存在 → 硬件一致性检测 全 0xFE 加载失败 | `blargg fixtures: 177 / 177 present`（`17:20:35`，校验步零错零警告）；硬件一致性检测 `Total: 177 / Passed: 121 / Failed: 56`（`17:22:52`），每条 FAIL 带真实 `$6000` 码（`0x01/0x02/0x03/0x06/0x80/0x81/0x09/0xFE` 等）与 diag_string |
 | **缺口 A 衍生**：`kagami_qa_direct_smoke` 同因失败 → CI ctest 32/33 | ctest `100% tests passed, 0 tests failed out of 33`（`17:20:56`）；`33/33 Test #34: kagami_qa_direct_smoke ........... Passed 6.49 sec` → 从 32/33 回到 33/33 |
 | **缺口 B**：runner 三元组路径不存在 → 矩阵步被静默 skip | `Using runner: src/rust/target/x86_64-pc-windows-msvc/release/kagami-qa-runner.exe`（`17:22:52`，三元组路径优先命中，避开了 `target/release/` 下的陈旧副本） |
 
@@ -300,7 +300,7 @@ cargo 产物落在 `target/x86_64-pc-windows-msvc/release/`；而 workflow 检�
 
 - **总耗时 78 分钟**（16:05:51 → 17:24:06），与第二轮 75 分钟几乎一致——两次都是冷跑。
   下一次（第四轮）应降至 ~15 分钟
-- **`cpu_interrupts.nes`** 在 Oracle B 输出 `value: 0xFE, diag: [222,176,97], duration_ms: 0`，
+- **`cpu_interrupts.nes`** 在 硬件一致性检测 输出 `value: 0xFE, diag: [222,176,97], duration_ms: 0`，
   与第二轮的 `0xFE + diag: [229,246,127]` **diag 不同** → 这是 **runner 超时签名**（测试 hang 后被 kill），
   不是 ROM 加载不到。其余 55 FAIL 都带真实 diag_string，不影响总数（121/56）
 - **作业末尾 `##[warning]Node.js 20 is deprecated`**——纯运维提示，与产物无关
@@ -329,7 +329,7 @@ cargo 产物落在 `target/x86_64-pc-windows-msvc/release/`；而 workflow 检�
 - **R4-0 已由第二轮 CI 实测验证**（§六.1），不再是处方；**R4-1（§六.2/6.3）尚未经 CI 验证**（已于 2026-08-01 由第三轮实测解除，见 §七.2），
   只做了本地 YAML 解析、5 个用例的逻辑实测（§六.4）。R4-1 是否真能让矩阵产出，已由第三轮实测确认（§七.2）
 - **未证实缓存是否已保存**（§六.5）—— **已由第三轮实测推翻为结论**：cache 在 failed 作业下也不保存（§七.3）
-- **未处理 Oracle A 在 CI 与本地的口径差**：ROM 补齐后 CI 的 ctest 预期回到 33/33（`-LE perf`），
+- **未处理 内部逻辑检测 在 CI 与本地的口径差**：ROM 补齐后 CI 的 ctest 预期回到 33/33（`-LE perf`），
   **已由第三轮实测确认**：33/33，`kagami_qa_direct_smoke` 6.49s PASS（§七.2）
 
 ---

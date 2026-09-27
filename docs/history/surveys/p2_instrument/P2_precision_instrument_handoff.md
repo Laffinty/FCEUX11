@@ -15,7 +15,7 @@
 > 以下来自 `docs/history/reports/FCEUX11-1.16_最终验收报告.md` §十 R5/R6 的"🚨 实测校准"块与 `docs/继续任务.txt`：
 >
 > 1. **instrument-first 是前置硬约束**：任何代码改动前，必须先加 env-gated probe 采集真实时序，用数据证伪/证实假设。
-> 2. **每步强制回归**：Oracle A ctest 34/34 + 相关 ROM 全量，任一红即回滚。
+> 2. **每步强制回归**：内部逻辑检测 ctest 34/34 + 相关 ROM 全量，任一红即回滚。
 > 3. **savestate 兼容**：不得改 `FHCN`/`FCNT`/`IQFM` chunk 名/大小/序（sound.cpp:1303-1307），仅改运行期起始值；改运行期起始值会碎 `golden_savestate_test` / `savestate_regression_test`（MD5 固定参照），需重生 golden 索引（`tests/fixtures/golden/golden_index.json` 等）。
 > 4. **不开新分支**：v1.16 系开发直接在 `wip_1.16` 分支进行（用户明确要求）。
 
@@ -67,7 +67,7 @@
 
 1. **修 VBL flag 置位相位本身**（而非 NMI 延迟）：`PPU_status |= 0x80` 从 cycle 0 移到 cycle 1（真实硬件 sl 241 dot 1），观察 vbl_05 10 行是否同时收敛
 2. **instrument-first 验证**：在 `$2002` 读时记录 sl/cycle（vbl_05 每行读点），对齐 blargg 期望相位
-3. 每改一处强制回归 `vbl_01/04/09`（PASS 基线）+ Oracle A
+3. 每改一处强制回归 `vbl_01/04/09`（PASS 基线）+ 内部逻辑检测
 
 ---
 
@@ -176,7 +176,7 @@ R4015 fcnt=1  fhcnt=357960  sirq=0x40  ← blargg 读时 IRQ 已置 → FAIL
 - **R6 缺陷 2**：✅ 已修复（apu_single_3 PASS）
 - **R5 vbl_05**：⏸ 有据已知限制（runppu(3) partial fix 保留，per-row 相位漂移根因）
 - **R6 缺陷 1**：⏸ 暂停（3 假设证伪，blargg wait_n 语义未完全反汇编）
-- **Oracle A**：✅ 34/34 无回归
+- **内部逻辑检测**：✅ 34/34 无回归
 - **golden savestate**：✅ 未碎（所有失败实验均已回滚）
 
 ---

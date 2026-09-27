@@ -12,13 +12,13 @@
 
 | 项 | 前 (2026-08-04 06:00) | 后 (2026-08-04 07:00) | 变化 |
 |---|---|---|---|
-| Oracle B PASS | 126 | **141** | **+15** |
-| Oracle B FAIL | 51 | **36** | **-15** |
+| Hardware Consistency Check PASS | 126 | **141** | **+15** |
+| Hardware Consistency Check FAIL | 51 | **36** | **-15** |
 | 0x80 (harness) | 13 | **0** | **-13** ✅ |
 | 0x81 (harness) | 8 | **0** | **-8** ✅ |
 | 0xFE (永久跳过) | 1 | 1 | 0 |
 | 0x01-0x09 (精度) | 29 | **35** | **+6** (见 §2) |
-| Oracle A `ctest -LE perf` | 34/34 | 34/34 | 不变 |
+| 内部逻辑检测 `ctest -LE perf` | 34/34 | 34/34 | 不变 |
 
 **结论**: 21 项 harness 问题**全部归零**。其中 15 项 ROM 现在 PASS,6 项原来被 0x80/0x81 掩盖的 ROM 现在显示其真实精度失败码(0x01-0x0E)——这是**预期且正确**的结果:把"未跑完"变成"已知精度问题",符合 §十·五"精确知道什么失败"原则。
 
@@ -124,7 +124,7 @@ instr_v3_all.nes            instr_v3_official.nes
 instr_v5_07_abs_xy.nes
 ```
 
-注意: `cpu_exec_space_apu.nes` 此前 PASS (旧 baseline 121/56) 但在 2026-08-04 06:00 Oracle B 中变 0x80——经诊断是**帧预算 600 不够**(实际需 ~600 帧,但 2026-08-04 06:00 测时刚好边界),提升至 3000 帧后稳定 PASS。
+注意: `cpu_exec_space_apu.nes` 此前 PASS (旧 baseline 121/56) 但在 2026-08-04 06:00 硬件一致性检测 中变 0x80——经诊断是**帧预算 600 不够**(实际需 ~600 帧,但 2026-08-04 06:00 测时刚好边界),提升至 3000 帧后稳定 PASS。
 
 ---
 
@@ -177,11 +177,11 @@ instr_v5_07_abs_xy.nes
 | 单 ROM 验证:`--reset-after 60 --rom apu_reset_4015.nes` PASS | ✅(0x00) |
 | manifest `reset_after` 8 个 ROM | ✅ 7 PASS + 1 露出精度(0x02) |
 | manifest `frames` 13 个 ROM | ✅ 9 PASS + 4 露出精度(0x01/0x03/0x06/0x0E) |
-| Oracle B 全量 | ✅ 141/177 PASS (was 126) |
+| 硬件一致性检测 全量 | ✅ 141/177 PASS (was 126) |
 | 0x80 桶 | ✅ 13 → 0 |
 | 0x81 桶 | ✅ 8 → 0 |
 | 0xFE `cpu_interrupts.nes` | ✅ 保持永久跳过 |
-| Oracle A `ctest -LE perf` | ✅ 34/34 |
+| Internal Logic Check `ctest -LE perf` | ✅ 34/34 |
 | 无 PASS→FAIL 回归 | ✅(露出项为已知 harness 掩盖) |
 
 ---
@@ -219,8 +219,8 @@ tests/fixtures/blargg_manifest.json                      |   +23
 ### 6.2 Step 3.3(全量回归与验收复检)
 
 按 P2 方案 §5 Step 3.3 清单:
-- Oracle A `ctest -LE perf` 34/34
-- Oracle B 全 PASS(或带码 FAIL 全部分类)
+- Internal Logic Check `ctest -LE perf` 34/34
+- 硬件一致性检测 全 PASS(或带码 FAIL 全部分类)
 - 迁移矩阵 `passed=39`(Step 3.2 后评估)
 - README CN/EN + `docs/tech/KagamiQA.md` 数字回填
 - `blargg_ppu_vbl_nmi` 升 blocking

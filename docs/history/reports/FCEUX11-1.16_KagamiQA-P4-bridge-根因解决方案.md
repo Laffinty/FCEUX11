@@ -3,7 +3,7 @@
 > **日期**：2026-07-28
 > **分支**：`wip_1.16`
 > **对应问题**：构建状态报告 §3.1「P4-bridge：新 PPU 正常渲染路径挂起」
-> **性质**：独立根因分析 + 已验证修复（代码已落地，Oracle A 回归全绿）
+> **性质**：独立根因分析 + 已验证修复（代码已落地，内部逻辑检测 回归全绿）
 > **关键结论**：报告所述「帧 3 挂起」实为 **`FFCEUX_PPURead` 空指针解引用导致的进程崩溃**（非死循环式挂起）。根因是 `PPU_ResetHooks()` 在生产初始化链中**从未被调用**，致使 `ResetGameLoaded()` 清空的 `FFCEUX_PPURead` 指针在 LoadGame 完成后保持 `NULL`。新 PPU 渲染路径首次 `CALL_PPUREAD` 即解引用 NULL。
 
 ---
@@ -64,7 +64,7 @@ if (ppudead) {                              // 1524 — 帧 1、2 走此分支
 
 ppudead 分支（1524-1545）**从不调用 `CALL_PPUREAD`**（它只 `runppu()` 推进周期 + 触发 NMI，然后 `goto finish`）。所以前两帧平安无事。帧 3 是第一个进入 1625 scanline 循环的帧，第一个 `bgdata::Record::Read()` 的第一行 `CALL_PPUREAD` 就解引用 NULL。
 
-### 2.4 为何此 bug 长期潜伏（旧 PPU Oracle A 一直全绿）
+### 2.4 为何此 bug 长期潜伏（旧 PPU 内部逻辑检测 一直全绿）
 
 `CALL_PPUREAD` 的全部调用点（grep 确认）：
 
@@ -79,8 +79,8 @@ ppudead 分支（1524-1545）**从不调用 `CALL_PPUREAD`**（它只 `runppu()`
 **旧 PPU 渲染路径（`RefreshLine`/`DoLine`/`pputile.inc`/`pputile_template.h`）完全不调用 `CALL_PPUREAD`**（grep `pputile.inc` = 0 处，`pputile_template.h` = 0 处）。旧 PPU 用 `VPage[]`/`vnapage[]` 直接数组索引读取 pattern data，绕过了 `FFCEUX_PPURead` 钩子。
 
 因此：
-- **旧 PPU（`newppu=0`）渲染从不触碰 `FFCEUX_PPURead`** → `NULL` 无害 → Oracle A 回归测试全绿。
-- 旧 PPU 下只有 CPU 主动读 `$2007`（ppu.cpp:512）才会调 `CALL_PPUREAD`；Oracle A 的回归测试 ROM（如 nestest）若不读 `$2007`，就不触发 NULL。
+- **旧 PPU（`newppu=0`）渲染从不触碰 `FFCEUX_PPURead`** → `NULL` 无害 → 内部逻辑检测 回归测试全绿。
+- 旧 PPU 下只有 CPU 主动读 `$2007`（ppu.cpp:512）才会调 `CALL_PPUREAD`；内部逻辑检测 的回归测试 ROM（如 nestest）若不读 `$2007`，就不触发 NULL。
 - **新 PPU（`newppu=1`）渲染路径每帧调用 `CALL_PPUREAD` 数千次**，首次即崩。
 
 这正是该 bug 在 P4-bridge 之前从未暴露的原因——P4-bridge 是首次在 headless 下启用新 PPU 渲染路径的尝试。
@@ -197,7 +197,7 @@ void PPU_ResetHooks() {
 ```
 $ --frames 3
 BLARGG_RESULT: rom=ppu_vbl_nmi.nes addr=0x6000 value=0x80 diag=[0xDE,0xB0,0x61] status=FAIL duration_ms=6
-EXIT=1    ← 不再是 127 崩溃；exit 1 = 测试失败（正常的 Oracle B FAIL 退出码）
+EXIT=1    ← 不再是 127 崩溃；exit 1 = 测试失败（正常的 硬件一致性检测 FAIL 退出码）
 
 $ --frames 300
 BLARGG_RESULT: rom=ppu_vbl_nmi.nes addr=0x6000 value=0x01 diag=[0xDE,0xB0,0x61] status=FAIL duration_ms=493
@@ -210,15 +210,15 @@ While running test 1 of 10
 EXIT=1    ← 300 帧正常完成（493ms），输出完整诊断字符串
 ```
 
-**核心阻塞问题（崩溃）已彻底消除**。新 PPU headless 渲染路径首次跑通，Oracle B 现在能拿到真实的 ROM 诊断输出——这正是 P4-bridge 期待的状态。
+**核心阻塞问题（崩溃）已彻底消除**。新 PPU headless 渲染路径首次跑通，硬件一致性检测 现在能拿到真实的 ROM 诊断输出——这正是 P4-bridge 期待的状态。
 
-### 4.4 Oracle A 回归验证（关键约束 #3）
+### 4.4 内部逻辑检测 回归验证（关键约束 #3）
 
 修复后运行 ctest + 关键测试单独验证：
 
 | 测试 | 结果 | 说明 |
 |------|------|------|
-| `rom_regression_test`（Oracle A 核心） | **PASSED** | 720 帧对比，0 mismatch。nestest 13/13 ROM 全过 |
+| `rom_regression_test`（内部逻辑检测 核心） | **PASSED** | 720 帧对比，0 mismatch。nestest 13/13 ROM 全过 |
 | `ppu_test`（含 `PPU_ResetHooks` 断言） | **24/24 PASSED** | 包括 `PPU_ResetHooks restores FFCEUX_PPURead to default` 与 `engine runs 1 frame after PPU_ResetHooks` |
 | `smoke_test` / `headless_smoke_test` / `blargg_smoke` | PASSED | |
 | `savestate_regression_test` / `golden_savestate_test` | PASSED | 存档兼容性无影响 |
@@ -228,7 +228,7 @@ EXIT=1    ← 300 帧正常完成（493ms），输出完整诊断字符串
 | `ppu_test`（ctest 内 BAD_COMMAND） | ⚠ 既有配置问题 | ctest 从 `build/` 运行时 WORKING_DIRECTORY 解析错误；手动从 `tests/` 运行 24/24 PASS。**与本次修改无关** |
 | `lua_bit_test_headless` | ⚠ 既有配置问题 + 真实 Lua 库 bug | CMake 配置中 `WORKING_DIRECTORY=tests` 与参数 `tests/lua_scripts/test_bit.lua` 路径前缀重复，解析为 `tests/tests/lua_scripts/...` 找不到。**与本次修改无关**（修改仅触及 ppu.cpp + ppu_core.cpp） |
 
-**结论**：修复对 Oracle A 零回归。ctest 报告的 2 个「失败」中 ppu_test 为既有工作目录配置问题，lua_bit_test_headless 为路径前缀 + Lua bit 库 bug 双重问题（P5 M2 修复后 5 个 FAIL 将被正确检测）。均非 P4-bridge 代码回归（手动从正确目录运行均通过）。
+**结论**：修复对 内部逻辑检测 零回归。ctest 报告的 2 个「失败」中 ppu_test 为既有工作目录配置问题，lua_bit_test_headless 为路径前缀 + Lua bit 库 bug 双重问题（P5 M2 修复后 5 个 FAIL 将被正确检测）。均非 P4-bridge 代码回归（手动从正确目录运行均通过）。
 
 ---
 
@@ -275,8 +275,8 @@ PPU_status = 0;                    // 1582: VBL 清零
 ### 5.3 这是下一阶段（P4-1 精度调优）的工作，非阻塞
 
 此问题与本次 crash 修复**性质不同**：
-- crash 修复解决的是「路径根本走不通」（阻塞性，Oracle B 完全无法运行）。
-- 「too long #8」是「路径走通后的精度偏差」（非阻塞，Oracle B 已能产出诊断，可迭代）。
+- crash 修复解决的是「路径根本走不通」（阻塞性，硬件一致性检测 完全无法运行）。
+- 「too long #8」是「路径走通后的精度偏差」（非阻塞，硬件一致性检测 已能产出诊断，可迭代）。
 
 这正是报告「优先级 2：渲染路径通后立即验证 P4-1」所期待的状态——现在路径通了，可以基于真实诊断迭代时序。建议的下一步见 §六。
 
@@ -286,7 +286,7 @@ PPU_status = 0;                    // 1582: VBL 清零
 
 ### 6.1 优先级 1（已完成）：crash 修复
 
-`PPU_ResetHooks()` 调用补入 `FCEUPPU_Power()`。**已落地、已验证、Oracle A 零回归**。建议立即提交（commit message 示例）：
+`PPU_ResetHooks()` 调用补入 `FCEUPPU_Power()`。**已落地、已验证、内部逻辑检测 零回归**。建议立即提交（commit message 示例）：
 
 ```
 fix(ppu): restore FFCEUX_PPURead/Write hooks in FCEUPPU_Power
@@ -308,7 +308,7 @@ and may override. Also restore FFCEUX_PPUWrite in PPU_ResetHooks for
 completeness (CALL_PPUWRITE already guards NULL, but consistency).
 
 Verified: blargg ppu_vbl_nmi --frames 300 no longer crashes (was
-exit 127, now completes with real diagnostic). Oracle A regression
+exit 127, now completes with real diagnostic). Internal Logic Check regression
 0 mismatches (rom_regression_test 720 frames). ppu_test 24/24 PASS.
 ```
 
@@ -320,7 +320,7 @@ exit 127, now completes with real diagnostic). Oracle A regression
 2. **实验 B**：保留 `runppu(1)`，但调整 sl 241 第一行的 cycle 计算，消除 §5.2 可疑点 1 的「342 vs 341」偏差。可能需要让 `S==0` 的内层循环从 `delay` 改为 `delay-1`，或调整 `runppu(1)` 与 `delay` 的关系。
 3. **实验 C**：核查 `PPU_status = 0`（1582）的时机是否对应真机 prerender scanline cycle 1，而非 scanline 边界。
 
-每次实验后，Oracle A 回归（rom_regression_test）必须保持 0 mismatch。
+每次实验后，内部逻辑检测 回归（rom_regression_test）必须保持 0 mismatch。
 
 ### 6.3 优先级 3：headless runner 的 newppu 设置时序（次要）
 
@@ -381,9 +381,9 @@ src/ppu_core.cpp |  1 +
 
 > 报告 §六「关键约束重申」
 
-1. **新 PPU 是唯一方向** ✅ —— 本修复**不回退旧 PPU**，而是让新 PPU headless 路径首次跑通。旧 PPU 因不调 `CALL_PPUREAD` 而免于此 bug，但这不构成「用旧 PPU」的理由——新 PPU 的 cycle 级精度是 Oracle B 的权威性基础。
-2. **headless 是 Oracle B 的基础** ✅ —— 修复后 headless 新 PPU 可完整运行 300 帧，Oracle B 不再依赖 GUI。
-3. **Oracle A 全绿是每次修改的前置条件** ✅ —— `rom_regression_test` 720 帧 0 mismatch，`ppu_test` 24/24 PASS。
+1. **新 PPU 是唯一方向** ✅ —— 本修复**不回退旧 PPU**，而是让新 PPU headless 路径首次跑通。旧 PPU 因不调 `CALL_PPUREAD` 而免于此 bug，但这不构成「用旧 PPU」的理由——新 PPU 的 cycle 级精度是 硬件一致性检测 的权威性基础。
+2. **headless 是 硬件一致性检测 的基础** ✅ —— 修复后 headless 新 PPU 可完整运行 300 帧，硬件一致性检测 不再依赖 GUI。
+3. **内部逻辑检测 全绿是每次修改的前置条件** ✅ —— `rom_regression_test` 720 帧 0 mismatch，`ppu_test` 24/24 PASS。
 4. **AI 不得修改已入库的 expected 值** ✅ —— 本修复不触及任何 baseline / golden hash / expected 值，仅修复初始化链的函数指针恢复遗漏。
 
 ---

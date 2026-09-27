@@ -253,13 +253,13 @@ if (VBlankON) {
 
 **风险评估**：
 - 可能让 vbl_01_basics / vbl_04_nmi_control 从 PASS 翻 FAIL
-- 需全 vbl_* ROM + Oracle A 34/34 双重回归
+- 需全 vbl_* ROM + 内部逻辑检测 34/34 双重回归
 
 ### 5.3 下一步建议（须用户决策）
 
 #### 选项 X1：直接试 (d) — CPU 侧延迟 NMI dispatch 3 PPU dot（推荐先试）
 
-最小修改：在 `ppu_rendering.cpp:1572` 前加 `runppu(3);`。跑 10 vbl ROM + Oracle A 34/34 回归。
+最小修改：在 `ppu_rendering.cpp:1572` 前加 `runppu(3);`。跑 10 vbl ROM + 内部逻辑检测 34/34 回归。
 
 #### 选项 X2：先加更多 CPU probe 再决定 fix
 

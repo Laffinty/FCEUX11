@@ -1,7 +1,7 @@
 # FCEUX11 v1.16 KagamiQA 独立审计报告
 
 > **审计日期**：2026-07-28
-> **审计范围**：KagamiQA 双 Oracle 测试系统的检测精度、可靠性、可信性、权威性，以及第三方 ROM/NES 文件的版权与许可证合规性
+> **审计范围**：KagamiQA 双通道 测试系统的检测精度、可靠性、可信性、权威性，以及第三方 ROM/NES 文件的版权与许可证合规性
 > **审计方法**：文档审阅 + 代码级核对 + 实际运行复现 + 许可证追溯
 > **审计分支**：`wip_1.16` (HEAD = `7c2356b`)
 > **审计人**：独立审计（ZCode agent）
@@ -10,11 +10,11 @@
 
 ## 〇、审计结论速览（TL;DR）
 
-KagamiQA 是一个**设计理念优秀、部分可复现、但存在多处文档与实现不符**的测试系统。其核心价值（双 Oracle 分离、$6000 协议、清单驱动、SutAdapter 抽象）在架构层面成立，且 Oracle B 的硬件一致性基线经实测**可复现**。但在**权威性所依赖的"CI 常驻"与"机器可判定"两个支柱上存在严重实现缺陷**，导致系统目前**未能达成其宣称的"防线"地位**。版权合规方面，ROM 来源合法但"公共领域"声明未经证实，存在归因缺口。
+KagamiQA 是一个**设计理念优秀、部分可复现、但存在多处文档与实现不符**的测试系统。其核心价值（双通道 分离、$6000 协议、清单驱动、SutAdapter 抽象）在架构层面成立，且 硬件一致性检测 的硬件一致性基线经实测**可复现**。但在**权威性所依赖的"CI 常驻"与"机器可判定"两个支柱上存在严重实现缺陷**，导致系统目前**未能达成其宣称的"防线"地位**。版权合规方面，ROM 来源合法但"公共领域"声明未经证实，存在归因缺口。
 
 | 维度 | 评级 | 一句话结论 |
 |------|------|-----------|
-| 检测精度 | 🟡 部分 | Oracle B 基线真实可复现（120P/60F），但 Oracle A 非全绿、Lua 判定有假阳性 |
+| 检测精度 | 🟡 部分 | 硬件一致性检测 基线真实可复现（120P/60F），但 内部逻辑检测 非全绿、Lua 判定有假阳性 |
 | 可靠性 | 🔴 不足 | 迁移矩阵 runner 有 Windows `.exe` bug，全量测试报"program not found"；direct runner 无法编译 |
 | 可信性 | 🟡 部分 | 精度数据可信，但"全绿""通道打通""drift 检测"等声明与实现不符 |
 | 权威性 | 🔴 未达成 | 权威性公式自评 1.00，但 CI 常驻因子与迁移矩阵实际均不工作，真实权威性 ≈ 0.13 |
@@ -32,7 +32,7 @@ KagamiQA 是一个**设计理念优秀、部分可复现、但存在多处文档
 |------|------|
 | `docs/history/plans/FCEUX11-1.16_KagamiQA-PLAN.md` | P0 总体计划（39KB，14 章） |
 | `docs/history/reports/FCEUX11-1.16_KagamiQA-P0-P4-构建状态报告.md` | P0–P4 状态报告 |
-| `docs/history/obsolete/FCEUX11-1.16_KagamiQA-P2-accuracy-table.md` | Oracle B 精度对照表 |
+| `docs/history/obsolete/FCEUX11-1.16_KagamiQA-P2-accuracy-table.md` | 硬件一致性检测 精度对照表 |
 | `docs/history/reports/FCEUX11-1.16_KagamiQA-P4-bridge.md` | P4-bridge 修复计划 |
 | `docs/history/reports/FCEUX11-1.16_KagamiQA-P4-bridge-根因解决方案.md` | P4-bridge NULL deref 根因分析 |
 | `docs/history/plans/FCEUX11-1.16_KagamiQA-P5-权威性构建计划.md` | P5 权威性构建计划 |
@@ -45,7 +45,7 @@ KagamiQA 是一个**设计理念优秀、部分可复现、但存在多处文档
 
 ## 二、检测精度审计
 
-### 2.1 Oracle B（硬件一致性）—— 基线真实可复现 ✅
+### 2.1 硬件一致性检测（硬件对齐）—— 基线真实可复现 ✅
 
 **文档声称**：180 个 blargg ROM，120 PASS / 60 FAIL，覆盖 CPU/PPU/APU/MMC3。
 
@@ -59,17 +59,17 @@ Passed: 120
 Failed: 60
 ```
 
-**结论**：Oracle B 基线 **120P/60F 完全可复现**，与 `blargg_full_baseline.json` 和 `blargg_known_fail.json` 的声明一致。ROM 覆盖率 180/180 = 100%（去重后 ≥140，满足 P5 ≥80% 门禁）。这是 KagamiQA **最扎实、最可信**的部分。
+**结论**：硬件一致性检测 基线 **120P/60F 完全可复现**，与 `blargg_full_baseline.json` 和 `blargg_known_fail.json` 的声明一致。ROM 覆盖率 180/180 = 100%（去重后 ≥140，满足 P5 ≥80% 门禁）。这是 KagamiQA **最扎实、最可信**的部分。
 
 **精度改进实证**：`vbl_01_basics.nes` 经实测确为 PASS（`value=0x00`），与文档声称的"P4 首个 FAIL→PASS"一致，`known_fail.json` 正确记录其为"previously_fixed_p4 — confirmed still PASS in P5 baseline"。精度攻关的 FAIL→PASS 信号**真实**。
 
 **已知失败分类的可信性**：`blargg_known_fail.json` 对 60 个 FAIL 逐条标注 `category` / `code` / `eventually_pass` / `runppu` / `reason`，其中 9 条标记为 `runppu=true`（VBL/NMI/PPU 时序相关），为后续精度攻关提供了可信的优先级排序。随机抽验 `ppu_vbl_nmi.nes` 实测返回 `value=0x80` + 完整诊断字符串，与 known_fail 记录的 `code=0x80` 一致。
 
-### 2.2 Oracle A（回归等价）—— 非全绿 ⚠️
+### 2.2 内部逻辑检测（回归等价）—— 非全绿 ⚠️
 
 **文档声称**（多处反复强调）：
-- P0–P4 状态报告：「Oracle A 全绿是每次修改的前置条件」
-- P5 计划 §四门禁：「Oracle A 全绿 | `rom_regression_test` 0 差异 | 100%」
+- P0–P4 状态报告：「内部逻辑检测 全绿是每次修改的前置条件」
+- P5 计划 §四门禁：「内部逻辑检测 全绿 | `rom_regression_test` 0 差异 | 100%」
 - README：「39 个 CTest … 零差异门禁」
 - KagamiQA.md：「39 CTest 回归」
 
@@ -86,7 +86,7 @@ The following tests FAILED:
 	 34 - kagami_qa_direct_smoke (Not Run)
 ```
 
-**结论**：Oracle A **实际为 30/33 通过（91%），并非"全绿"**。三个失败：
+**结论**：内部逻辑检测 **实际为 30/33 通过（91%），并非"全绿"**。三个失败：
 
 | 测试 | 失败性质 | 文档归类 | 审计判定 |
 |------|---------|---------|---------|
@@ -123,8 +123,8 @@ LUA_RESULT: script=test_bit.lua status=PASS duration_ms=2 details=script complet
 
 | 子项 | 评级 | 证据 |
 |------|------|------|
-| Oracle B 硬件一致性 | ✅ 优秀 | 120P/60F 可复现，vbl_01 FAIL→PASS 可复现，known_fail 分类详实 |
-| Oracle A 回归等价 | ⚠️ 部分 | 30/33，3 个真实失败被文档归为"既有配置问题"，实际含构建损坏与 Lua bug |
+| 硬件一致性检测 硬件一致性 | ✅ 优秀 | 120P/60F 可复现，vbl_01 FAIL→PASS 可复现，known_fail 分类详实 |
+| 内部逻辑检测 回归等价 | ⚠️ 部分 | 30/33，3 个真实失败被文档归为"既有配置问题"，实际含构建损坏与 Lua bug |
 | Lua 判定 | 🔴 不足 | 假阳性：5 个真实 FAIL 被判 PASS，P5 声明的修复未生效 |
 | 精度攻关信号 | ✅ 可信 | vbl_01_basics FAIL→PASS 真实，诊断字符串完整 |
 
@@ -143,7 +143,7 @@ $ cargo run --release -p kagami-qa -- --manifest ../../tests/tests.json --bin-di
 Total:   39
 Passed:  0
 Failed:  39
-Oracle A: 0P / 27F | Oracle B: 0P / 12F
+Internal Logic Check: 0P / 27F | Hardware Consistency Check: 0P / 12F
 ```
 
 **所有 39 个测试全部失败**，错误信息统一为：
@@ -180,7 +180,7 @@ let bin_path = if test.input.binary.contains('/') || test.input.binary.contains(
 
 ### 3.2 In-process direct runner —— 无法编译 🔴
 
-**文档声称**（KagamiQA.md §2.5、P5 计划 §5C、README v1.16 亮点）：「in-process runner 通道打通（C ABI 直驱 core）」「`kagami-qa-runner --direct` 对 Oracle B 全量产出与 subprocess 模式 100% 一致」。
+**文档声称**（KagamiQA.md §2.5、P5 计划 §5C、README v1.16 亮点）：「in-process runner 通道打通（C ABI 直驱 core）」「`kagami-qa-runner --direct` 对 硬件一致性检测 全量产出与 subprocess 模式 100% 一致」。
 
 **实测复现**：
 
@@ -227,7 +227,7 @@ pub fn detect_drift(
 
 **文档声称**（P4-bridge 根因解决方案）：`FFCEUX_PPURead` 空指针解引用导致帧 3 崩溃，修复方案是在 `FCEUPPU_Power()` 调用 `PPU_ResetHooks()`。
 
-**实测复现**：`ppu_vbl_nmi.nes --frames 300` 正常完成（493ms），输出完整诊断字符串，不再崩溃（exit 1 = 测试失败，非 exit 127 = 崩溃）。Oracle A `rom_regression_test` 720 帧 0 mismatch。**此修复真实、有效、已验证**。这是 KagamiQA 工程质量最高的一笔 —— 根因分析精确到 file:line，修复最小化（+11 行），回归零影响。
+**实测复现**：`ppu_vbl_nmi.nes --frames 300` 正常完成（493ms），输出完整诊断字符串，不再崩溃（exit 1 = 测试失败，非 exit 127 = 崩溃）。内部逻辑检测 `rom_regression_test` 720 帧 0 mismatch。**此修复真实、有效、已验证**。这是 KagamiQA 工程质量最高的一笔 —— 根因分析精确到 file:line，修复最小化（+11 行），回归零影响。
 
 ### 3.5 可靠性总评
 
@@ -249,7 +249,7 @@ pub fn detect_drift(
 | 文档声明 | 实测结果 | 一致性 |
 |---------|---------|--------|
 | 「39 CTest 全绿」 | 30/33 通过（91%） | ❌ 不符 |
-| 「Oracle A 全绿是每次修改的前置条件」 | 3 个失败存在 | ❌ 不符 |
+| 「内部逻辑检测 全绿是每次修改的前置条件」 | 3 个失败存在 | ❌ 不符 |
 | 「180 blargg ROM」 | 180 ROM 实测存在 | ✅ 一致 |
 | 「120 PASS / 60 FAIL」 | 实测 120P/60F 可复现 | ✅ 一致 |
 | 「vbl_01_basics FAIL→PASS」 | 实测 PASS | ✅ 一致 |
@@ -276,7 +276,7 @@ P4-bridge 根因解决方案 §4.4 将 `ppu_rendering_lut_test` 和 `lua_bit_tes
 
 ### 4.4 可信性总评
 
-KagamiQA 的**精度数据（Oracle B 基线）可信**，但其**系统成熟度声明不可信**。文档将一个"Oracle B 基线已建立 + crash 已修复 + 框架骨架已搭好"的原型，描述为"权威性 1.00 的 CI 常驻防线"。权威性公式的三个因子中，ROM 覆盖率（1.00）成立，但 Oracle 独立性（1.00）因迁移矩阵失效而名存实亡，CI 常驻因子（1.00）因 matrix 步骤产废数据而仅形式成立。**真实权威性 ≈ 0.13 × 0.5 × 0.5 ≈ 0.03**，远非 1.00。
+KagamiQA 的**精度数据（硬件一致性检测 基线）可信**，但其**系统成熟度声明不可信**。文档将一个"硬件一致性检测 基线已建立 + crash 已修复 + 框架骨架已搭好"的原型，描述为"权威性 1.00 的 CI 常驻防线"。权威性公式的三个因子中，ROM 覆盖率（1.00）成立，但 通道独立性（1.00）因迁移矩阵失效而名存实亡，CI 常驻因子（1.00）因 matrix 步骤产废数据而仅形式成立。**真实权威性 ≈ 0.13 × 0.5 × 0.5 ≈ 0.03**，远非 1.00。
 
 ---
 
@@ -284,27 +284,27 @@ KagamiQA 的**精度数据（Oracle B 基线）可信**，但其**系统成熟�
 
 ### 5.1 权威性公式复核
 
-文档定义：`权威性 = ROM覆盖率 × Oracle独立性 × CI常驻因子`
+文档定义：`权威性 = ROM覆盖率 × 通道独立性 × CI常驻因子`
 
 | 因子 | 文档自评 | 审计复评 | 理由 |
 |------|---------|---------|------|
 | ROM 覆盖率 | 1.00 | **1.00** | 180/180 ROM 实测可复现，满足 ≥80% 门禁 |
-| Oracle 独立性 | 1.00 | **0.50** | A/B 通道在架构上解耦（设计正确），但 Oracle A 的迁移矩阵通道完全失效（runner bug），Oracle A 的"全绿"声明不实，独立性被打折 |
-| CI 常驻因子 | 1.00 | **0.50** | workflow 存在且会触发，但 matrix 生成步骤产出无效数据（全失败），drift 检测是 stub，CI 的"防线"功能仅 Oracle B 的 blargg 批跑部分真正生效 |
+| 通道独立性 | 1.00 | **0.50** | A/B 通道在架构上解耦（设计正确），但 内部逻辑检测 的迁移矩阵通道完全失效（runner bug），内部逻辑检测 的"全绿"声明不实，独立性被打折 |
+| CI 常驻因子 | 1.00 | **0.50** | workflow 存在且会触发，但 matrix 生成步骤产出无效数据（全失败），drift 检测是 stub，CI 的"防线"功能仅 硬件一致性检测 的 blargg 批跑部分真正生效 |
 
 **审计权威性得分**：1.00 × 0.50 × 0.50 = **0.25**（文档自评 1.00）。
 
 ### 5.2 权威性的真正支柱
 
 KagamiQA 当前**真正生效**的权威性来源：
-1. **Oracle B blargg 批跑**（120P/60F 可复现）—— 这是唯一端到端工作的精度信号。
+1. **硬件一致性检测 blargg 批跑**（120P/60F 可复现）—— 这是唯一端到端工作的精度信号。
 2. **P4-bridge crash fix**（新 PPU headless 路径打通）—— 工程质量高。
 3. **Rust 单元测试 22/22**（框架内部逻辑正确）。
 
 **未生效**的权威性支柱：
 1. 迁移矩阵四象限（runner bug）—— 无法回答"补丁对不对"。
 2. baseline drift 检测（stub）—— 无法自动标红回归。
-3. Oracle A "全绿"门禁（3 失败）—— 门禁本身有漏洞。
+3. 内部逻辑检测 "全绿"门禁（3 失败）—— 门禁本身有漏洞。
 4. in-process direct 通道（编译失败）—— 无法帧级调试。
 5. Lua 断言判定（假阳性）—— Lua 测试信号不可信。
 
@@ -395,7 +395,7 @@ KagamiQA 当前**真正生效**的权威性来源：
 |---|------|------|------|
 | S1 | 迁移矩阵 runner Windows `.exe` bug，39/39 全失败 | 迁移矩阵功能完全失效，transition_matrix 永远空，CI matrix 步骤产废数据 | `adapter/subprocess.rs:38-49` |
 | S2 | direct runner Rust 2024 unsafe 编译失败 | in-process 通道从未工作，P5 §5C 退出条件未达成，README "通道打通"声明不实 | `lib.rs:39-43` (`direct_entry` 模块) |
-| S3 | Oracle A 非全绿（30/33），文档反复声称"全绿" | "Oracle A 全绿是前置条件"的门禁形同虚设 | ctest 实测 + 多处文档 |
+| S3 | 内部逻辑检测 非全绿（30/33），文档反复声称"全绿" | "内部逻辑检测 全绿是前置条件"的门禁形同虚设 | ctest 实测 + 多处文档 |
 | S4 | `kagamiqa_migration_matrix.json` 入库为 bug 产物 | 误导后续读者，将 runner bug 误读为"测试全失败" | 仓库根目录 |
 
 ### 🟡 中等（影响可信性）
@@ -404,7 +404,7 @@ KagamiQA 当前**真正生效**的权威性来源：
 |---|------|------|------|
 | M1 | baseline drift 检测为 stub（返回空） | PR 红色警报功能不工作 | `baseline.rs:54-66` |
 | M2 | Lua 判定假阳性（5 FAIL 被判 PASS） | Lua 测试信号不可信，P5 §5E 退出条件未达成 | `lua_runner.cpp` + `tests/lua_scripts/test_bit.lua` |
-| M3 | `ppu_rendering_lut_test.exe` 构建损坏（非 PE） | Oracle A 含一个无法执行的测试 | `build/tests/fceux11_ppu_rendering_lut_test.exe` |
+| M3 | `ppu_rendering_lut_test.exe` 构建损坏（非 PE） | 内部逻辑检测 含一个无法执行的测试 | `build/tests/fceux11_ppu_rendering_lut_test.exe` |
 | M4 | "39 CTest"措辞误导（实为清单条目数，CTest 注册 34） | 文档夸大测试规模 | README + KagamiQA.md |
 | M5 | P4-bridge 报告将真实缺陷（构建损坏、Lua bug）归为"配置问题" | 阻碍缺陷修复 | P4-bridge 根因方案 §4.4 |
 | M6 | blargg "公共领域"声明未证实 | 版权声明准确性问题 | KagamiQA.md §3.1/§4.4, download 脚本 |
@@ -428,7 +428,7 @@ KagamiQA 当前**真正生效**的权威性来源：
 1. **修复 runner `.exe` bug**（S1）：在 `subprocess.rs` 的 `candidate.exists()` 前，当 binary 名无扩展名时追加 `std::env::consts::EXE_EXTENSION`。修复后重跑 runner 验证 39 条目可执行，重新生成 `kagamiqa_migration_matrix.json`。
 2. **修复 direct runner 编译**（S2）：在 `lib.rs` `direct_entry` 模块的 unsafe 操作外包 `unsafe { }` 块，或在函数头加 `#[allow(unused_unsafe)]` / 调整 lint。验证 `kagami_qa_direct_runner.exe` 可生成。
 3. **移除或标注 bug 产物 JSON**（S4）：从仓库移除 `kagamiqa_migration_matrix.json`，或在文件头加 `"_warning": "runner bug artifact, not real results"`，待 S1 修复后重新生成。
-4. **修复或排除 Oracle A 失败测试**（S3）：
+4. **修复或排除 内部逻辑检测 失败测试**（S3）：
    - `ppu_rendering_lut_test`：重建该目标，确认 exe 为有效 PE。
    - `lua_bit_test`：修复 Lua bit 库的 5 个位运算 bug，或修正 runner 判定逻辑。
    - `kagami_qa_direct_smoke`：依赖 S2 修复。
@@ -448,7 +448,7 @@ KagamiQA 当前**真正生效**的权威性来源：
 
 ### 8.4 保持优势
 
-12. **保持 Oracle B 基线的版本化治理**：`blargg_known_fail.json` 的分类质量是 KagamiQA 最有价值的资产，应继续保持逐条 reason + runppu 标记 + eventually_pass 标记的纪律。
+12. **保持 硬件一致性检测 基线的版本化治理**：`blargg_known_fail.json` 的分类质量是 KagamiQA 最有价值的资产，应继续保持逐条 reason + runppu 标记 + eventually_pass 标记的纪律。
 13. **保持 P4-bridge 式的根因分析质量**：NULL deref 根因方案（file:line 级证据链 + 实证复现 + 最小修复 + 零回归验证）是工程文档的典范，建议作为后续缺陷分析的模板。
 
 ---
@@ -492,7 +492,7 @@ KagamiQA 当前**真正生效**的权威性来源：
 | runner .exe bug | `src/rust/crates/kagami-qa/src/adapter/subprocess.rs:38-49` |
 | direct runner 编译失败 | `src/rust/crates/kagami-qa/src/lib.rs:39-43` |
 | drift stub | `src/rust/crates/kagami-qa/src/report/baseline.rs:54-66` |
-| Oracle B 基线 | `tests/fixtures/blargg_full_baseline.json` |
+| 硬件一致性检测 基线 | `tests/fixtures/blargg_full_baseline.json` |
 | 已知失败清单 | `tests/fixtures/blargg_known_fail.json` |
 | CI workflow | `.github/workflows/kagami-qa.yml` |
 | ROM 下载脚本 | `scripts/download_blargg_roms.ps1` |

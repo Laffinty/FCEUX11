@@ -56,10 +56,10 @@ E3 FSU fcnt=0 mode=0x0 fhcnt=0   sirq=0x0   ← IRQ 于第 4 个 quarter 置位�
 **结论**：40 个 APU ROM **零 PASS→FAIL 回归**；未闭合项全部指向方案 §1.4 三步根因的剩余两块
 （② W4017→IRQ ~1-2 周期延迟；③ jitter），与方案预期一致。
 
-## 4. Oracle A / B
+## 4. Internal Logic Check / Hardware Consistency Check
 
-- **Oracle A**：`ctest -LE perf` → **34/34**（golden 重生后）
-- **Oracle B**：全量 177 ROM → **PASS=121 FAIL=56**，与 CI-R4 基线（commit `1156ca1`）**完全一致，零计数回归**
+- **内部逻辑检测**：`ctest -LE perf` → **34/34**（golden 重生后）
+- **硬件一致性检测**：全量 177 ROM → **PASS=121 FAIL=56**，与 CI-R4 基线（commit `1156ca1`）**完全一致，零计数回归**
   （`rom_regression_test` 视觉 CRC 亦 PASS → 无渲染回归）
 - 注：manifest 批量模式不带 `--reset-after`/mixer 2400，`apu_reset_*` 显示 0x81、`apu_mixer_*` 显示 0x80
   属已知 harness 类 FAIL（方案 §5 Step 3.1 分桶），非精度回归

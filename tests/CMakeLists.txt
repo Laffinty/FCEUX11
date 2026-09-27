@@ -565,7 +565,7 @@ if(FCEUX11_BUILD_TESTS)
                 "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
     endif()
 
-    # F11QA P2 — blargg $6000 test ROM runner (Oracle B executor).
+    # F11QA P2 — blargg $6000 test ROM runner (Hardware Consistency Check executor).
     # v1.17 Task1-C1: migrated to Rust (f11qa_blargg_runner target below);
     # C++ blargg_runner.cpp deleted after 177/177 parity verified (9488773).
 
@@ -633,7 +633,7 @@ if(FCEUX11_BUILD_TESTS)
             __HEADLESS_DRIVER__
         )
 
-        # P5: CTest entry for direct runner Oracle B validation.
+        # P5: CTest entry for direct runner Hardware Consistency Check validation.
         # Compares direct mode output vs subprocess mode to verify parity.
         #
         # Stage-2 fix (f11qa_direct_smoke WORKING_DIRECTORY): the

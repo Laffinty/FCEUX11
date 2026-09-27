@@ -97,9 +97,9 @@ length#1 与 length#2 的间距必须是 **14916** 周期（29832−14916），�
 
 - **APU 52 ROM**：全部 PASS（mixer 需 `--frames 2400`；reset 需 `--reset-after`；
   sprdma_dmc_dma×2 为既有 DMA 时序失败，旧模型同样 FAIL，与本次无关）。
-- **Oracle A**（`ctest -LE perf`，全量重建后）：32/33；唯一失败
+- **内部逻辑检测**（`ctest -LE perf`，全量重建后）：32/33；唯一失败
   `config_store_test` 仅链接 Qt6::Core、不链接模拟器核心，为沙箱 `.config` 权限环境问题。
-- **Oracle B**（177 ROM，mixer 2400f + reset-after）：**PASS 135**（基线 121，+14），
+- **硬件一致性检测**（177 ROM，mixer 2400f + reset-after）：**PASS 135**（基线 121，+14），
   FAIL 42 全为既有 CPU/mapper/PPU/harness/E-1 项，**无任何 apu_* 失败**。
 - **golden savestate**：重生 8 个 .fc0 + golden_index.json + savestate 12 哈希；
   `--compare-layout` 确认 diff 仅 **SFSND/FHCN** 字段（fhcnt 值语义），无 chunk 结构漂移。
@@ -120,8 +120,8 @@ length#1 与 length#2 的间距必须是 **14916** 周期（29832−14916），�
 | 2 | 参考实现对照（RustyNES/Mesen2 frame_counter.rs） | ✅ |
 | 3 | 关键 ROM 逐一闭合（single_4/5/6、reset×2、apu_test） | ✅ |
 | 4 | APU 52 ROM 全量零 PASS→FAIL | ✅ |
-| 5 | Oracle A 32/33（config_store 环境问题，与核心无关） | ✅ |
-| 6 | Oracle B 135 PASS，无 apu_* 失败 | ✅ |
+| 5 | 内部逻辑检测 32/33（config_store 环境问题，与核心无关） | ✅ |
+| 6 | 硬件一致性检测 135 PASS，无 apu_* 失败 | ✅ |
 | 7 | golden 重生 + compare-layout 仅 FHCN 变化 | ✅ |
 | 8 | 未开新分支（wip_1.16）、savestate chunk 结构未变 | ✅ |
 

@@ -232,7 +232,7 @@ set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/ppu_sprite_lut.cpp PROPE
 
 ---
 
-## 三、Oracle A 当前状态
+## 三、内部逻辑检测 当前状态
 
 ```
 94% tests passed, 2 tests failed out of 33

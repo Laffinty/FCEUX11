@@ -366,7 +366,7 @@ def main():
         cases, args.snapshot_dir, args.output_dir, args.dry_run, sha_index)
     log('')
 
-    # 5. 部署 blargg 套件树（Oracle B / blargg_manifest.json 用）
+    # 5. 部署 blargg 套件树（硬件一致性检测 / blargg_manifest.json 用）
     # tests.json 的 rom-suite 用例只覆盖「每套件代表 ROM」，而
     # fixtures/blargg_manifest.json 引用的是 fixtures/blargg/** 下 177 个
     # $6000 ROM。整棵 blargg/ 目录从镜像快照按相对路径落到 output_dir，
@@ -390,7 +390,7 @@ def main():
                 n_blargg += 1
             log(f"[blargg-suite] deployed {n_blargg} files -> {blargg_dst}")
     else:
-        log(f"[blargg-suite] snapshot has no blargg/ tree; Oracle B will fail LoadGame")
+        log(f"[blargg-suite] snapshot has no blargg/ tree; Hardware Consistency Check will fail LoadGame")
     log('')
     log('=== fetch summary ===')
     log(f"  copied (vendored + sha256-ok): {ok}")

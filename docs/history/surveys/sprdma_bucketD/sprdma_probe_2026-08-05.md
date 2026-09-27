@@ -18,7 +18,7 @@
 
 **根因诊断**：完整修复需要 Mesen2 风格的 per-cycle DMA 仲裁状态机（带 cycle parity tracking、DMC 中止/插入、halt/dummy cycle 区分），改动面过大，超出方案 §5 评估的"改动面小"预算。
 
-**Oracle B**：144 PASS / 33 FAIL（与基线持平，零回归）。探针 `FCEUX11_OPENDECAY_PROBE` env-gated 保留，供未来深模型调研复用。
+**硬件一致性检测**：144 PASS / 33 FAIL（与基线持平，零回归）。探针 `FCEUX11_OPENDECAY_PROBE` env-gated 保留，供未来深模型调研复用。
 
 ---
 
@@ -94,7 +94,7 @@ for (x = 0; x < 256; x++) {
 ```
 
 **实测**：
-- Oracle B 144/33（无回归）
+- 硬件一致性检测 144/33（无回归）
 - 部分 SPR DMA 触发 DMC DMCDMA，elapsed 偶尔从 512 → 516（1 次 DMC DMA = 4 cycles）
 - 测试仍 FAIL（527/528 与 516 之间仍有差距）
 - 每 $4014 写 256 次 hook 调用，~$2.5 μs 开销/帧（可忽略）
@@ -212,7 +212,7 @@ void NesCpu::ProcessPendingDma(uint16_t readAddress, MemoryOperationType opType)
 
 - 0 项代码改动
 - 与桶 A（MMC3 12）+ 桶 B.3+B.4（CPU 2）+ Phase 1 vbl 5 共 **23 项** 已知限制
-- Oracle B 仍 144 PASS / 33 FAIL（仅 5 项待深模型族突破：桶 B.1+B.2 9 + 桶 C 余项 + 桶 D 残项）
+- 硬件一致性检测 仍 144 PASS / 33 FAIL（仅 5 项待深模型族突破：桶 B.1+B.2 9 + 桶 C 余项 + 桶 D 残项）
 
 ---
 
