@@ -36,7 +36,11 @@ static void x6502_op_02(X6502* xp)
               _jammed=1;
     	  _PC--;
     	  
-    /* LAR */
+    /* LAR (LAS abs,Y) — 0xBB is a READ that ANDs memory with S into A,X,S.
+       The CycTable base = 4 cycles; GetABIRD inside LD_ABY adds +1 on a page
+       cross (so 5 total), matching blargg instr_timing "BB was 4, should be 5
+       (cross)".  Using RMW_ABY here would skip the page-cross penalty and also
+       write the read value back to memory, both wrong for LAS. */
     return;
 }
 
@@ -154,7 +158,11 @@ static void x6502_op_12(X6502* xp)
               _jammed=1;
     	  _PC--;
     	  
-    /* LAR */
+    /* LAR (LAS abs,Y) — 0xBB is a READ that ANDs memory with S into A,X,S.
+       The CycTable base = 4 cycles; GetABIRD inside LD_ABY adds +1 on a page
+       cross (so 5 total), matching blargg instr_timing "BB was 4, should be 5
+       (cross)".  Using RMW_ABY here would skip the page-cross penalty and also
+       write the read value back to memory, both wrong for LAS. */
     return;
 }
 
@@ -281,7 +289,11 @@ static void x6502_op_22(X6502* xp)
               _jammed=1;
     	  _PC--;
     	  
-    /* LAR */
+    /* LAR (LAS abs,Y) — 0xBB is a READ that ANDs memory with S into A,X,S.
+       The CycTable base = 4 cycles; GetABIRD inside LD_ABY adds +1 on a page
+       cross (so 5 total), matching blargg instr_timing "BB was 4, should be 5
+       (cross)".  Using RMW_ABY here would skip the page-cross penalty and also
+       write the read value back to memory, both wrong for LAS. */
     return;
 }
 
@@ -399,7 +411,11 @@ static void x6502_op_32(X6502* xp)
               _jammed=1;
     	  _PC--;
     	  
-    /* LAR */
+    /* LAR (LAS abs,Y) — 0xBB is a READ that ANDs memory with S into A,X,S.
+       The CycTable base = 4 cycles; GetABIRD inside LD_ABY adds +1 on a page
+       cross (so 5 total), matching blargg instr_timing "BB was 4, should be 5
+       (cross)".  Using RMW_ABY here would skip the page-cross penalty and also
+       write the read value back to memory, both wrong for LAS. */
     return;
 }
 
@@ -522,7 +538,11 @@ static void x6502_op_42(X6502* xp)
               _jammed=1;
     	  _PC--;
     	  
-    /* LAR */
+    /* LAR (LAS abs,Y) — 0xBB is a READ that ANDs memory with S into A,X,S.
+       The CycTable base = 4 cycles; GetABIRD inside LD_ABY adds +1 on a page
+       cross (so 5 total), matching blargg instr_timing "BB was 4, should be 5
+       (cross)".  Using RMW_ABY here would skip the page-cross penalty and also
+       write the read value back to memory, both wrong for LAS. */
     return;
 }
 
@@ -649,7 +669,11 @@ static void x6502_op_52(X6502* xp)
               _jammed=1;
     	  _PC--;
     	  
-    /* LAR */
+    /* LAR (LAS abs,Y) — 0xBB is a READ that ANDs memory with S into A,X,S.
+       The CycTable base = 4 cycles; GetABIRD inside LD_ABY adds +1 on a page
+       cross (so 5 total), matching blargg instr_timing "BB was 4, should be 5
+       (cross)".  Using RMW_ABY here would skip the page-cross penalty and also
+       write the read value back to memory, both wrong for LAS. */
     return;
 }
 
@@ -770,7 +794,11 @@ static void x6502_op_62(X6502* xp)
               _jammed=1;
     	  _PC--;
     	  
-    /* LAR */
+    /* LAR (LAS abs,Y) — 0xBB is a READ that ANDs memory with S into A,X,S.
+       The CycTable base = 4 cycles; GetABIRD inside LD_ABY adds +1 on a page
+       cross (so 5 total), matching blargg instr_timing "BB was 4, should be 5
+       (cross)".  Using RMW_ABY here would skip the page-cross penalty and also
+       write the read value back to memory, both wrong for LAS. */
     return;
 }
 
@@ -902,7 +930,11 @@ static void x6502_op_72(X6502* xp)
               _jammed=1;
     	  _PC--;
     	  
-    /* LAR */
+    /* LAR (LAS abs,Y) — 0xBB is a READ that ANDs memory with S into A,X,S.
+       The CycTable base = 4 cycles; GetABIRD inside LD_ABY adds +1 on a page
+       cross (so 5 total), matching blargg instr_timing "BB was 4, should be 5
+       (cross)".  Using RMW_ABY here would skip the page-cross penalty and also
+       write the read value back to memory, both wrong for LAS. */
     return;
 }
 
@@ -1139,7 +1171,11 @@ static void x6502_op_92(X6502* xp)
               _jammed=1;
     	  _PC--;
     	  
-    /* LAR */
+    /* LAR (LAS abs,Y) — 0xBB is a READ that ANDs memory with S into A,X,S.
+       The CycTable base = 4 cycles; GetABIRD inside LD_ABY adds +1 on a page
+       cross (so 5 total), matching blargg instr_timing "BB was 4, should be 5
+       (cross)".  Using RMW_ABY here would skip the page-cross penalty and also
+       write the read value back to memory, both wrong for LAS. */
     return;
 }
 
@@ -1380,7 +1416,11 @@ static void x6502_op_B2(X6502* xp)
               _jammed=1;
     	  _PC--;
     	  
-    /* LAR */
+    /* LAR (LAS abs,Y) — 0xBB is a READ that ANDs memory with S into A,X,S.
+       The CycTable base = 4 cycles; GetABIRD inside LD_ABY adds +1 on a page
+       cross (so 5 total), matching blargg instr_timing "BB was 4, should be 5
+       (cross)".  Using RMW_ABY here would skip the page-cross penalty and also
+       write the read value back to memory, both wrong for LAS. */
     return;
 }
 
@@ -1445,7 +1485,7 @@ static void x6502_op_BA(X6502* xp)
 static void x6502_op_BB(X6502* xp)
 {
     (void)xp;
-     RMW_ABY(_S&=x;_A=_X=_S;X_ZN(_X));
+     LD_ABY(_S&=x;_A=_X=_S;X_ZN(_X));
     /* LAX */
     return;
 }
@@ -1615,7 +1655,11 @@ static void x6502_op_D2(X6502* xp)
               _jammed=1;
     	  _PC--;
     	  
-    /* LAR */
+    /* LAR (LAS abs,Y) — 0xBB is a READ that ANDs memory with S into A,X,S.
+       The CycTable base = 4 cycles; GetABIRD inside LD_ABY adds +1 on a page
+       cross (so 5 total), matching blargg instr_timing "BB was 4, should be 5
+       (cross)".  Using RMW_ABY here would skip the page-cross penalty and also
+       write the read value back to memory, both wrong for LAS. */
     return;
 }
 
@@ -1847,7 +1891,11 @@ static void x6502_op_F2(X6502* xp)
               _jammed=1;
     	  _PC--;
     	  
-    /* LAR */
+    /* LAR (LAS abs,Y) — 0xBB is a READ that ANDs memory with S into A,X,S.
+       The CycTable base = 4 cycles; GetABIRD inside LD_ABY adds +1 on a page
+       cross (so 5 total), matching blargg instr_timing "BB was 4, should be 5
+       (cross)".  Using RMW_ABY here would skip the page-cross penalty and also
+       write the read value back to memory, both wrong for LAS. */
     return;
 }
 

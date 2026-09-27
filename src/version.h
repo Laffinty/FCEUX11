@@ -56,10 +56,10 @@
 #define FCEU_COMPILER_DETAIL ""
 #endif
 
-// v1.17 — F11QA closure + release build
+// v1.18.1 — F11QA residual accuracy T0 (kgmqa-056 instr_timing E2/BB fix)
 inline constexpr int FCEU_VERSION_MAJOR = 1;
-inline constexpr int FCEU_VERSION_MINOR = 17;
-inline constexpr int FCEU_VERSION_PATCH = 0;
+inline constexpr int FCEU_VERSION_MINOR = 18;
+inline constexpr int FCEU_VERSION_PATCH = 1;
 inline constexpr int FCEU_VERSION_TWEAK = 0;
 
 inline constexpr int FCEU_VERSION_NUMERIC = (FCEU_VERSION_MAJOR * 10000) + (FCEU_VERSION_MINOR * 100) + FCEU_VERSION_PATCH;
@@ -67,12 +67,11 @@ inline constexpr int FCEU_VERSION_MAJOR_DECODE(int x) { return x / 10000; }
 inline constexpr int FCEU_VERSION_MINOR_DECODE(int x) { return (x / 100) % 100; }
 inline constexpr int FCEU_VERSION_PATCH_DECODE(int x) { return x % 100; }
 
-// v1.17 final release — no hotfix tag (this is not a hotfix).
-// Clear FCEU_HOTFIX_TAG to "" for final release builds.
+// v1.18.1 release — no hotfix tag.
 #define FCEU_HOTFIX_TAG ""
 
-#define FCEU_VERSION_STRING "1.17 " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
-#define FCEU_DISPLAY_VERSION "v1.17"
+#define FCEU_VERSION_STRING "1.18.1 " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
+#define FCEU_DISPLAY_VERSION "v1.18.1"
 #define FCEU_NAME_AND_VERSION FCEU_NAME " " FCEU_DISPLAY_VERSION
 
 // FCEUX11 Contributors — Derivative work based on FCEUX

@@ -1758,7 +1758,7 @@
           "--tests-json",
           "tests/tests.json",
           "--frames",
-          "300"
+          "3000"
         ]
       },
       "expected": {

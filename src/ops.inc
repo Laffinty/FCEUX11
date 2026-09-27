@@ -404,8 +404,12 @@ case 0xF2:ADDCYC(0xFF);
 	  _PC--;
 	  break;
 
-/* LAR */
-case 0xBB: RMW_ABY(_S&=x;_A=_X=_S;X_ZN(_X));
+/* LAR (LAS abs,Y) — 0xBB is a READ that ANDs memory with S into A,X,S.
+   The CycTable base = 4 cycles; GetABIRD inside LD_ABY adds +1 on a page
+   cross (so 5 total), matching blargg instr_timing "BB was 4, should be 5
+   (cross)".  Using RMW_ABY here would skip the page-cross penalty and also
+   write the read value back to memory, both wrong for LAS. */
+case 0xBB: LD_ABY(_S&=x;_A=_X=_S;X_ZN(_X));
 
 /* LAX */
 case 0xA7: LD_ZP(LDA;LDX);
