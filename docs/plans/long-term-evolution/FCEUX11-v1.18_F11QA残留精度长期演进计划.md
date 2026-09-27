@@ -109,18 +109,18 @@ v1.8 把 F11QA 门槛抬到 **120 用例 / R4 四硬门禁 / grade B**。本计�
 |---|---|---|---|---|---|---|
 | ★☆☆☆☆ | **T0** | kgmqa-056 | 指令周期表 2 条非法指令 | 1–3 天 | 1 | **DONE** |
 | ★★☆☆☆ | **T0** | kgmqa-078 | MMC1 SEROM/SHROM 板约束 | 2–4 天 | 2 | **DONE** |
-| **★★★★☆** | **T0** | kgmqa-038 | 指令 dummy read 总线可观测性 | **1–2 周** | **8** | TODO（**已重估，见 §三③**） |
-| ★★☆☆☆ | **T1** | kgmqa-097 | FME-7 WRAM 映射 | 2–4 天 | 4 | TODO |
-| ★★★☆☆ | **T1** | kgmqa-096 | FME-7 IRQ ack | 3–7 天 | 5 | TODO |
-| ★★★☆☆ | **T1** | kgmqa-050 | OAM DMA dummy write | 4–7 天 | 6 | TODO |
-| ★★★☆☆ | **T1** | kgmqa-051 | 从 IO 空间取指 / bus dispatch | 4–7 天 | 7 | TODO |
-| ★★★★☆ | **T2** | kgmqa-037 | 中断轮询下沉 + hijack | 1–2 周 | 9 | TODO |
-| ★★★★★ | **T3** | kgmqa-049 | bisqwit $2007 read buffer | 2–4 周 | 10 | TODO |
+| ★★☆☆☆ | **T1** | kgmqa-097 | FME-7 WRAM 映射 | 2–4 天 | 3 | TODO |
+| ★★★☆☆ | **T1** | kgmqa-096 | FME-7 IRQ ack | 3–7 天 | 4 | TODO |
+| ★★★☆☆ | **T1** | kgmqa-050 | OAM DMA dummy write | 4–7 天 | 5 | TODO |
+| ★★★☆☆ | **T1** | kgmqa-051 | 从 IO 空间取指 / bus dispatch | 4–7 天 | 6 | TODO |
+| ★★★★☆ | **T0** | kgmqa-038 | 指令 dummy read 总线可观测性 | 1–2 周 | 7 | TODO（**已重估，见 §三③**） |
+| ★★★★☆ | **T2** | kgmqa-037 | 中断轮询下沉 + hijack | 1–2 周 | 8 | TODO |
+| ★★★★★ | **T3** | kgmqa-049 | bisqwit $2007 read buffer | 2–4 周 | 9 | TODO |
 | ★★★★★ | **T3** | kgmqa-099 | NTSC/PAL/Dendy TV 时序 | 2–4 周 | 10 | TODO |
 | ★★★★★ | **T3** | kgmqa-107 | SNES 鼠标扫描协议 | 1–2 周 | 11 | TODO |
 | ★★★★★ | **T3** | kgmqa-108 | FC 麦克风扫描协议 | 1–2 周 | 12 | TODO |
 | ★★★★★（**派生**） | **T4** | kgmqa-077 | Holy Mapperel 13 mapper 聚合 | **随上游变** | **10′** | TODO |
-| ★★★★★ | **T4** | kgmqa-081 | FDS 加载路径 + IRQ 子系统 | 2–4 周 | 14 | TODO |
+| ★★★★★ | **T4** | kgmqa-081 | FDS 加载路径 + IRQ 子系统 | 2–4 周 | 13 | TODO |
 
 > **独立性**：每个 Tier 内条目可并行、可单独开分支/PR；跨 Tier 建议顺序执行，
 > 但 T1 四项彼此无代码耦合，可按人力切分。

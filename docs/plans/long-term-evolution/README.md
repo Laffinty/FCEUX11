@@ -46,11 +46,11 @@ T4 聚合与 FDS（081 先加载后 IRQ；077 随 β 顺带，β 收口即重估
 |---|---|---|---|---|---|---|
 | 1 | 056 | ★☆☆☆☆ | T0 | 指令周期表 E2/BB | 1–3 天 | **DONE** |
 | 2 | 078 | ★★☆☆☆ | T0 | MMC1 SEROM/SHROM 板约束 | 2–4 天 | **DONE** |
-| 3 | 038 | ★★☆☆☆ | T0 | `LDA abs,x` dummy read | 3–5 天 | TODO |
-| 4 | 097 | ★★☆☆☆ | T1 | FME-7 WRAM 映射 | 2–4 天 | TODO |
-| 5 | 096 | ★★★☆☆ | T1 | FME-7 IRQ ack | 3–7 天 | TODO |
-| 6 | 050 | ★★★☆☆ | T1 | OAM DMA dummy write | 4–7 天 | TODO |
-| 7 | 051 | ★★★☆☆ | T1 | IO 空间取指 / bus dispatch | 4–7 天 | TODO |
+| 3 | 097 | ★★☆☆☆ | T1 | FME-7 WRAM 映射 | 2–4 天 | TODO |
+| 4 | 096 | ★★★☆☆ | T1 | FME-7 IRQ ack | 3–7 天 | TODO |
+| 5 | 050 | ★★★☆☆ | T1 | OAM DMA dummy write | 4–7 天 | TODO |
+| 6 | 051 | ★★★☆☆ | T1 | IO 空间取指 / bus dispatch | 4–7 天 | TODO |
+| 7 | 038 | ★★★★☆ | T0 | 指令 dummy read 总线可观测性 | 1–2 周 | TODO（**已重估**） |
 | 8 | 037 | ★★★★☆ | T2 | 中断轮询下沉 + hijack | 1–2 周 | TODO |
 | 9 | 049 | ★★★★★ | T3 | `$2007` 读缓冲 | 2–4 周 | TODO |
 | 10 | 099 | ★★★★★ | T3 | NTSC/PAL/Dendy TV 时序 | 2–4 周 | TODO |
