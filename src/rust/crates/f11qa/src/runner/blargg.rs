@@ -39,10 +39,13 @@
 //!
 //! For each entry, the harness:
 //! 1. Loads the ROM via `adapter.load(rom_path)`.
-//! 2. If `reset_after >= 0`, runs `reset_after` frames, calls
-//!    `adapter.reset()`, then resumes. While `$6000 == 0x81` and ≥ 20
-//!    frames have elapsed since the reset, presses RESET again every 6
-//!    frames (apu_reset_4017_written needs a second reset).
+//! 2. If `reset_after >= 0`, polls `$probe_addr` every 6 frames until the
+//!    ROM raises the `run_at_reset.s` handshake `$6000 == 0x81`, then
+//!    presses RESET once. (A fixed-frame reset fires before the handshake
+//!    on `cpu_reset_regs` and leaves `num_resets==0`.) While `$6000` stays
+//!    `$81` and ≥ 20 frames have elapsed since that reset, `apu_reset_*`
+//!    ROMs get one more RESET every 6 frames (`apu_reset_4017_written`
+//!    needs a second reset).
 //! 3. Reads `$probe_addr`, plus `$probe_addr+1..+3` as diagnostics, and
 //!    `$probe_addr+4+` as the optional ASCII detail string (blargg error
 //!    text). For FAIL cases, re-samples the diag string one frame later.
@@ -94,8 +97,9 @@ pub struct BlarggManifestEntry {
     pub frames: u32,
     pub probe_addr: u32,
     pub description: String,
-    /// -1 means "no reset" (legacy behaviour). ≥0 means press RESET at
-    /// this frame and continue.
+    /// -1 means "no reset handshake". ≥0 enables the `$6000==0x81`
+    /// reset-handshake path (the value is reported as `reset_after_used`;
+    /// the actual RESET press waits for the handshake, not for this frame).
     pub reset_after: i32,
 }
 
@@ -651,8 +655,12 @@ mod tests {
         step_limit: u32,
         // Count of resets invoked.
         reset_calls: u32,
-        // The frames-to-emulate before the per-ROM 0x81 polling kicks in.
+        // Value reported after reset() has been pressed at least once
+        // (or immediately, when handshake_before_reset is false).
         post_reset_probe_value: u8,
+        // Simulate `run_at_reset.s`: $6000 reads as 0x81 until the first
+        // reset(), then switches to post_reset_probe_value.
+        handshake_before_reset: bool,
     }
 
     impl ScriptedAdapter {
@@ -665,6 +673,7 @@ mod tests {
                 step_limit: u32::MAX,
                 reset_calls: 0,
                 post_reset_probe_value: 0x00,
+                handshake_before_reset: false,
             }
         }
     }
@@ -692,7 +701,13 @@ mod tests {
             Ok(())
         }
         fn read_oracle_probe(&self, addr: u32) -> Result<u8, QaError> {
-            Ok(self.probe_table.get(&addr).copied().unwrap_or(self.post_reset_probe_value))
+            if let Some(v) = self.probe_table.get(&addr) {
+                return Ok(*v);
+            }
+            if self.handshake_before_reset && self.reset_calls == 0 {
+                return Ok(0x81);
+            }
+            Ok(self.post_reset_probe_value)
         }
         fn reset(&mut self) -> Result<(), QaError> {
             self.reset_calls += 1;
@@ -868,12 +883,14 @@ mod tests {
     #[test]
     fn reset_after_presses_reset_then_completes() {
         let mut a = ScriptedAdapter::new();
+        // run_at_reset.s handshake: $6000=$81 until RESET is pressed.
+        a.handshake_before_reset = true;
         a.post_reset_probe_value = 0x00;
         let entry = make_entry("with_reset", 60, 30);
         let r = run_one_rom(&mut a, &entry, None).unwrap();
         assert!(r.passed);
         assert_eq!(r.reset_after_used, 30);
-        // reset() is called once for the post-reset_after + once for
+        // reset() is called once for the $81 handshake + once for
         // the final cleanup call.
         assert_eq!(a.reset_calls, 2);
     }
@@ -891,10 +908,12 @@ mod tests {
     #[test]
     fn cli_reset_after_override_wins_when_entry_has_none() {
         let mut a = ScriptedAdapter::new();
+        a.handshake_before_reset = true;
         a.post_reset_probe_value = 0x00;
         let entry = make_entry("no_entry_reset", 60, -1);
         let r = run_one_rom(&mut a, &entry, Some(20)).unwrap();
         assert_eq!(r.reset_after_used, 20);
+        // $81 handshake reset + final cleanup reset.
         assert_eq!(a.reset_calls, 2);
     }
 
@@ -910,14 +929,15 @@ mod tests {
 
     #[test]
     fn sticky_0x81_triggers_extra_reset_after_cooldown() {
-        // The probe returns 0x81 for >20 frames after the first reset.
-        // We expect a second reset() call inside the polling loop.
+        // Sticky $6000==$81 after the first reset. A-055 only re-presses
+        // RESET for `apu_reset_*` ROMs (apu_reset_4017_written needs it);
+        // other sticky ROMs must not be stomped.
         let mut a = ScriptedAdapter::new();
         a.post_reset_probe_value = 0x81;
-        let entry = make_entry("sticky", 60, 30);
+        let entry = make_entry("apu_reset_sticky", 60, 30);
         let _ = run_one_rom(&mut a, &entry, None).unwrap();
-        // 1 reset for reset_after + 1 reset for the sticky 0x81 +
-        // 1 reset for final cleanup = 3.
+        // 1 reset for the $81 handshake + ≥1 reset for the sticky 0x81 +
+        // 1 reset for final cleanup = ≥3.
         assert!(
             a.reset_calls >= 3,
             "expected ≥3 resets, got {}",
