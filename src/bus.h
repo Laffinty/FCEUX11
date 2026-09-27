@@ -41,6 +41,35 @@ class Ppu;
 
 namespace fceu11 {
 
+// -----------------------------------------------------------------
+// kgmqa-038 S0a experiment (FCEUX11_BUSDB=1): make the CPU data bus live.
+//
+// `Cpu::set_db()` has existed since v1.4 but had ZERO call sites, so
+// X6502::DB never changed and every open-bus reader (::ANull, CartBROB,
+// the mapper protection reads, input.cpp:148) saw a constant. This wires
+// the read path to latch the value the CPU actually put on the bus, which
+// is what the 2A03 does after any transfer.
+//
+// Declared as plain externs rather than by including cpu.h here: bus.h is
+// deliberately lean (see the forward-declaration note above) and is pulled
+// into every hot-path translation unit. bus.cpp already includes x6502.h.
+//
+// `g_busdb_slot` is resolved once in Bus::init() to &g_cpu.layout().DB --
+// it cannot be a constant initialiser because g_cpu is a function-local
+// static (cpu.h) whose address is not a link-time constant.
+//
+// Read path only. Writes are deliberately NOT latched: the S1 discrimination
+// experiment only needs dummy reads, and not touching write() halves the
+// hot-path surface and the number of open-bus readers that can change.
+//
+// OFF by default, so ctest 34/34 and the 120-case matrix are unaffected and
+// golden savestates (state.cpp serialises DB) do not drift. Turning it on is
+// expected to change input.cpp:148 (controller reads mix in DB & 0xC0) and
+// the DB byte of every savestate -- see the plan before enabling by default.
+// -----------------------------------------------------------------
+extern bool     g_busdb_enabled;
+extern uint8_t* g_busdb_slot;
+
 class FCEUX11_CACHE_ALIGN Bus {
 public:
     // -----------------------------------------------------------------
@@ -72,7 +101,13 @@ public:
     // cache-line layout (see cart.cpp:254-255 pre-Phase-2).
     // -----------------------------------------------------------------
     __forceinline uint8_t read(uint16_t addr) const noexcept {
-        return aread_[addr](addr);
+        // kgmqa-038 S0a: latch the value this read put on the CPU data bus.
+        // Default-off branch, so the emitted code for the shipped build is
+        // a predicted-not-taken test around one store.
+        const uint8_t r = aread_[addr](addr);
+        if (g_busdb_enabled)
+            *g_busdb_slot = r;
+        return r;
     }
     __forceinline void write(uint16_t addr, uint8_t val) const noexcept {
         bwrite_[addr](addr, val);

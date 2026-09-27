@@ -24,12 +24,18 @@
 
 #include <cstring>  // memset
 #include <cstdio>   // fprintf stderr DEBUG
+#include <cstdlib> // getenv
 
 #include "fceu.h"   // ::ANull, ::BNull (DECLFR/DECLFW expansion)
 #include "ppu.h"    // ::PPUCHRRAM, ::PPUNTARAM, ::vnapage, ::NTARAM
 #include "x6502.h"  // g_cpu (for ::ANull's return value)
 
 namespace fceu11 {
+
+// kgmqa-038 S0a -- definitions for the two symbols declared in bus.h.
+// Both are written by Bus::init(); read by the inlined Bus::read().
+bool     g_busdb_enabled = false;
+uint8_t* g_busdb_slot    = nullptr;
 
 // ---------------------------------------------------------------------------
 // Class layout assertions.
@@ -89,6 +95,17 @@ Bus::Bus() noexcept {
 // PowerNES) — idempotent.
 // ---------------------------------------------------------------------------
 void Bus::init() noexcept {
+    // kgmqa-038 S0a: opt-in via FCEUX11_BUSDB=1. Parsed here (not in the
+    // hot path) and re-parsed on every game load, matching the
+    // "idempotent, called again on each load" contract of init().
+    {
+        const char* e = std::getenv("FCEUX11_BUSDB");
+        g_busdb_enabled = (e && e[0] == '1' && e[1] == '\0');
+    }
+    // Resolve the slot once. g_cpu is a function-local static (cpu.h:170),
+    // so its address is only obtainable at runtime; taking &DB here is
+    // safe and stable for the lifetime of the process.
+    g_busdb_slot = &g_cpu.native_layout().DB;
     for (uint32_t x = 0; x < 0x10000; x++) {
         aread_[x]  = ANullImpl;
         bwrite_[x] = BNullImpl;

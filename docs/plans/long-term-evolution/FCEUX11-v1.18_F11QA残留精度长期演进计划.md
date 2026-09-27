@@ -177,14 +177,100 @@ T0 卡的出口条件「三项均 PASS」按 **2/2** 计，038 移出后 T0 不�
 **性价比最高的顺序是「038 的 S0+S1 → 再开 049」，而不是直接进 049。**
 排期上它不占 δ 的独立窗口，只作为 049 的开工前置。
 
-**风险为什么从「低」升到「中」。** S0 让 `DB` 活起来会改变**每一次未映射读**的返回值，
-仓库里至少 6 处 mapper 保护逻辑依赖 `DB` 做 open-bus 混入
-（`01-222.cpp:75`、`158B.cpp:57`、`170.cpp:43`、`178.cpp:128/130`、
-`235.cpp:68/71`、`cart.cpp:113-120` 的 `CartBROB`），
-必须逐项对账，不能只看 038 转绿。
+**风险为什么从「低」升到「高」（2026-09-28 修正）**。计划原文写「至少 6 个 mapper
+依赖 DB」，**实测低估**：活跃读取点是 **20+ 处**，横跨
+`cart.cpp:116` CartBROB / `bus.cpp:56` / `fceu.cpp:265` / `fds.cpp:165` /
+`fds_sound.cpp:73,74,76,117` / `input.cpp:148` / `state.cpp:129` /
+以及 15 个 board 文件（158B、170、178、225、235、69、bandai×2、coolgirl、
+dance2000、fns、ghostbusters63in1、**mmc1:78**、mmc3:593/595、mmc5、
+sachen×4、pec-586、yoko）。且计划点名的 `01-222.cpp:75`
+**已经是注释掉的代码**（`// return g_cpu...DB;`），引用过时。
 
-**仍未修复。** 本项自 2026-09-27 调查后**一次都没动过代码**
-（唯一一次 `GetABIRD` 改动已按纪律回退）。defer 期间不投入。
+**两处计划完全没提到的要害**：
+
+| 位置 | 影响 |
+|---|---|
+| `input.cpp:148` | 手柄读 `ret \|= DB & 0xC0` → DB 一变，**所有输入测试**（porttest / allpads / mset / mict / spadtest）全部受影响 |
+| `state.cpp:129` | `DB` 被序列化进 savestate（1 字节 `"DB"`）→ DB 一变，**golden savestate hash 漂移**，按纪律须人工授权重生成 |
+
+#### ⑶-1 S0a + S1 判别实验实测（2026-09-28）—— **主假设不成立**
+
+按人工拍板（只记读路径 + env-gated 开关 + 金标走授权重生成）实施了 S0a。
+**S0a 完成了它的使命，结论是负的。**
+
+**实施**（`src/bus.h` +37/-1、`src/bus.cpp` +17）：
+
+```cpp
+// bus.h — 只在读路径锁存；写路径刻意不动
+__forceinline uint8_t read(uint16_t addr) const noexcept {
+    const uint8_t r = aread_[addr](addr);
+    if (g_busdb_enabled) *g_busdb_slot = r;   // FCEUX11_BUSDB=1，默认关
+    return r;
+}
+```
+
+`g_busdb_slot` 在 `Bus::init()` 里解析为 `&g_cpu.layout().DB`（`g_cpu` 是
+`cpu.h:170` 的函数内 static，地址不是链接期常量，只能运行时取）。
+
+**S1 结果**（同一二进制，`instr_misc_03_dummy.nes`）：
+
+```
+frames=600   开关关: value=0x03  Failed #3  diag=[0xDE,0xB0,0x61]
+frames=600   开关开: value=0x03  Failed #3  diag=[0xDE,0xB0,0x61]   ← 完全相同
+frames=3000  开关关: value=0x03  Failed #3
+frames=3000  开关开: value=0x03  Failed #3                          ← 完全相同
+```
+
+**结论：让 `DB` 活起来不能让 038 前进一步。主假设不成立。**
+
+#### ⑶-2 与 2026-09-27 记录的交叉验证
+
+| 独立变量 | 何时 | 结果 |
+|---|---|---|
+| ① 改 `GetABIRD` 加硬件 dummy read | 2026-09-27 | **无变化**（改动已回退） |
+| ② 让 `DB` 活起来（本轮 S0a） | 2026-09-28 | **无变化** |
+
+**两个独立变量都无效** → 038 的阻塞点**既不是 dummy read 的有无，也不是 open bus 的值**。
+
+#### ⑶-3 新线索：`GetIX` 从未被查过
+
+2026-09-27 调查那张表里有一行当时没被追：
+
+| 形式 | 宏 | dummy read |
+|---|---|---|
+| `LDA abs,x` / `abs,y` | `GetABIRD` | 仅跨页时 |
+| `LDA (z),y` | `GetIYRD` | 仅跨页时 |
+| **`LDA (z,x)` / `STA (z,x)`** | **`GetIX`** | **完全没有，也没有跨页周期** |
+
+而 ROM 自带字符串列出的 8 种被测形式**正包含 `LDA (z,x)` 与 `STA (z,x)`**。
+上一轮的探针只统计了 **33 次 abs 索引读**（`GetABIRD` 路径），
+**根本没看 `GetIX`**。ROM 字符串另称
+「Test requires `$2002` mirroring every 8 bytes to `$3FFA`」——
+测试是**经 `$2000-$3FFF` 镜像观察的**。
+
+**候选假设**：`(z,x)` 形式缺 dummy read → `LDA $2002` 这类读少了 PPU latch 填充。
+**未验证**。这与 open bus 无关，所以 S0a 帮不上忙是预期的，不是实验失败。
+
+**S2 因此需要重新定义**：原计划 S2 = 「补齐 8 种指令形式的 dummy read 时序/取值」，
+其前提（dummy read / open bus 是原因）已被上面两个负结果削弱。
+新候选是「`GetIX` 补 dummy read + 跨页周期」，**需要新探针，属独立调查**，
+按纪律先出 PLAN 再动手。
+
+#### ⑶-4 S0a 的零回归确认（开关默认关）
+
+```
+ctest                    34/34 PASS
+blargg 177 ROM           147P / 30F（与 v1.18.2 基线逐项一致）
+bench_bus_dispatch  关   48.205 ms（0.803 ms/frame），StdDev 0.4%
+bench_bus_dispatch  开   48.612 ms（0.810 ms/frame），StdDev 1.7%
+```
+
+**出厂默认（关）零性能损失** —— 差值 0.8% 落在噪声内。
+S0a 本身**不构成精度进展**，它的价值是**排除了一个假设**，
+且**为将来真的做 S2 铺好了路**（活的读总线值这一层已经有了，
+S2 不必从零搭）。
+
+**仍未修复。** 本项 2026-09-28 起维持 **defer**，不占独立窗口。
 
 #### ⑷ 097：Tier 移出活跃排期，裁定 abandon
 

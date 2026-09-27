@@ -23,7 +23,7 @@
 | id | ROM | code | 根因（known_fail / precision.md） |
 |---|---|---|---|
 | 055 | cpu_reset_registers | 0x81 | 复位后 A/X/Y/P/S 初值；诊断串 `A  X  Y  P  S` |
-| 038 | instr_misc | 0x01 / 0x03 | **defer（留待以后解决）** ★★☆☆☆ → **★★★★☆ / 1–2 周 / 风险 低→中**，Tier **T0 → T3**（排在 049 之前，兼作其开工前置）：阻塞点为 open bus 恒定（`Cpu::set_db()` 零调用点 → `::ANull` 返回常量），非「`LDA abs,x` dummy read 不完整」。最小判别实验 S0+S1（1–3 天）。defer 期间不投入 |
+| 038 | instr_misc | 0x01 / 0x03 | **defer（留待以后解决）** ★★☆☆☆ → **★★★★☆ / 1–2 周 / 风险 低→高**，Tier **T0 → T3**。**S0a+S1 判别实验已做（2026-09-28），结论为负**：只记读路径 + `FCEUX11_BUSDB` 开关（默认关）后，`instr_misc_03_dummy` 在开关关/开、600/3000 帧下**结果完全相同**；加上 2026-09-27「改 `GetABIRD` 加 dummy read 也无变化」—— **两个独立变量都无效**，阻塞点既不是 dummy read 的有无也不是 open bus 的值。DB 活跃读取点实测 **20+ 处**（含 `input.cpp:148` 手柄读混入、`state.cpp:129` DB 进 savestate）。**S2 需重新定义**，新线索：`GetIX`（`LDA/STA (z,x)`）完全没有 dummy read 与跨页周期，却正在 ROM 声明的 8 种被测形式里 |
 | ~~056~~ | instr_timing | ~~0x80~~ | **已清零**（v1.18.1）：`CycTable[0xE2]` 3→2；`0xBB` 由 `RMW_ABY` 改 `LD_ABY`（含跨页 +1，去多余写回） |
 | 037 | cpu_int_2_nmi_brk | 0x01 | 中断仅在指令边界轮询（x6502.cpp:515-579） |
 
