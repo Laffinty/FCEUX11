@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="dark" />
 <meta name="theme-color" content="#080a09" />
-<title>FCEUX11 — Émulateur NES/Famicom pour Windows · v1.18</title>
-<meta name="description" content="FCEUX11 v1.18 — émulateur NES/Famicom basé sur FCEUX, optimisé pour Windows. Qt 6.8 + C++20, 12 langues avec détection automatique, outils de débogage, éditeur TAS, scripts Lua et sauvegardes fiables. v1.18 unifie le portail qualité KagamiQA et migre les harnesses de test principaux vers Rust ; le taux blargg reste à 81,4 %." />
+<title>FCEUX11 — Émulateur NES/Famicom pour Windows · v1.18.1</title>
+<meta name="description" content="FCEUX11 v1.18.1 — émulateur NES/Famicom basé sur FCEUX, optimisé pour Windows. Qt 6.8 + C++20, 12 langues avec détection automatique, outils de débogage, éditeur TAS, scripts Lua et sauvegardes fiables. Une toute nouvelle suite de tests automatisée F11QA garde chaque publication ; v1.18.1 corrige deux erreurs de chronométrage et porte le taux de réussite officiel à 83,1 % (147/177), sans aucune régression." />
 <meta name="keywords" content="FCEUX11, FCEUX, NES emulator, FC emulator, Famicom emulator, Windows emulator, TAS editor, Qt6, C++20, game emulator, 8-bit, multi-language, 12 languages, Arabic, RTL, ROM hacking, debugger, Lua scripting" />
 <meta name="author" content="Laffinty" />
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
@@ -32,8 +32,8 @@
 
 <meta property="og:site_name" content="FCEUX11" />
 <meta property="og:type" content="website" />
-<meta property="og:title" content="FCEUX11 — Émulateur NES/Famicom pour Windows · v1.18" />
-<meta property="og:description" content="FCEUX11 v1.18 — émulateur NES/Famicom basé sur FCEUX, optimisé pour Windows. Qt 6.8 + C++20, 12 langues avec détection automatique, outils de débogage, éditeur TAS, scripts Lua et sauvegardes fiables. v1.18 unifie le portail qualité KagamiQA et migre les harnesses de test principaux vers Rust ; le taux blargg reste à 81,4 %." />
+<meta property="og:title" content="FCEUX11 — Émulateur NES/Famicom pour Windows · v1.18.1" />
+<meta property="og:description" content="FCEUX11 v1.18.1 — émulateur NES/Famicom basé sur FCEUX, optimisé pour Windows. Qt 6.8 + C++20, 12 langues avec détection automatique, outils de débogage, éditeur TAS, scripts Lua et sauvegardes fiables. Une toute nouvelle suite de tests automatisée F11QA garde chaque publication ; v1.18.1 corrige deux erreurs de chronométrage et porte le taux de réussite officiel à 83,1 % (147/177), sans aucune régression." />
 <meta property="og:url" content="https://laffinty.github.io/FCEUX11/fr/" />
 <meta property="og:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <meta property="og:locale" content="fr_FR" />
@@ -56,8 +56,8 @@
 <meta name="msvalidate.01" content="" />
 
 <meta name="twitter:card" content="summary" />
-<meta name="twitter:title" content="FCEUX11 — Émulateur NES/Famicom pour Windows · v1.18" />
-<meta name="twitter:description" content="FCEUX11 v1.18 — émulateur NES/Famicom basé sur FCEUX, optimisé pour Windows. Qt 6.8 + C++20, 12 langues avec détection automatique, outils de débogage, éditeur TAS, scripts Lua et sauvegardes fiables. v1.18 unifie le portail qualité KagamiQA et migre les harnesses de test principaux vers Rust ; le taux blargg reste à 81,4 %." />
+<meta name="twitter:title" content="FCEUX11 — Émulateur NES/Famicom pour Windows · v1.18.1" />
+<meta name="twitter:description" content="FCEUX11 v1.18.1 — émulateur NES/Famicom basé sur FCEUX, optimisé pour Windows. Qt 6.8 + C++20, 12 langues avec détection automatique, outils de débogage, éditeur TAS, scripts Lua et sauvegardes fiables. Une toute nouvelle suite de tests automatisée F11QA garde chaque publication ; v1.18.1 corrige deux erreurs de chronométrage et porte le taux de réussite officiel à 83,1 % (147/177), sans aucune régression." />
 <meta name="twitter:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -72,8 +72,8 @@
   "name":"FCEUX11",
   "applicationCategory":"GameApplication",
   "operatingSystem":"Windows 11",
-  "description":"FCEUX11 v1.18 — émulateur NES/Famicom basé sur FCEUX, optimisé pour Windows. Qt 6.8 + C++20, 12 langues avec détection automatique, outils de débogage, éditeur TAS, scripts Lua et sauvegardes fiables. v1.18 unifie le portail qualité KagamiQA et migre les harnesses de test principaux vers Rust ; le taux blargg reste à 81,4 %.",
-  "softwareVersion":"1.18",
+  "description":"FCEUX11 v1.18.1 — émulateur NES/Famicom basé sur FCEUX, optimisé pour Windows. Qt 6.8 + C++20, 12 langues avec détection automatique, outils de débogage, éditeur TAS, scripts Lua et sauvegardes fiables. Une toute nouvelle suite de tests automatisée F11QA garde chaque publication ; v1.18.1 corrige deux erreurs de chronométrage et porte le taux de réussite officiel à 83,1 % (147/177), sans aucune régression.",
+  "softwareVersion":"1.18.1",
   "license":"https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt",
   "url":"https://laffinty.github.io/FCEUX11/fr/",
   "downloadUrl":"https://github.com/Laffinty/FCEUX11/releases",
@@ -207,40 +207,26 @@
   <div class="wrap">
     <div class="whatsnew-head reveal">
       <div class="kicker">Nouveautés</div>
-      <h2>v1.18</h2>
-      <div class="sub">Publié le 2026-08-08 · récapitulatif v1.16 → v1.17</div>
+      <h2>v1.18.1</h2>
+      <div class="sub">Publié le 2026-09-27 · suite de tests F11QA + premier gain de précision</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3>Portail qualité unifié KagamiQA</h3>
-          <p>KagamiQA est désormais l'unique propriétaire et gardien du système de tests : chaque push exécute le dual-channel check (Internal Logic Check + Hardware Consistency Check) et produit une matrice de migration.</p>
+          <h3>Une toute nouvelle suite de tests automatisée (F11QA)</h3>
+          <p>Nous avons bâti une toute nouvelle suite de tests automatisée : chaque mise à jour la lance intégralement et automatiquement, toute modification qui affecte le comportement d'un jeu bloque la publication, et chaque gain de précision de l'émulateur y est mesuré.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">02</div>
         <div class="wn-text">
-          <h3>Harnesses de test migrés vers Rust</h3>
-          <p>La régression ROM/savestate, le diff d'octets des mappers et le runner Lua sont passés de C++ à Rust avec une parité de 100 %.</p>
-        </div>
-      </div>
-      <div class="wn-item">
-        <div class="wn-num">03</div>
-        <div class="wn-text">
-          <h3>Ligne de base de précision confirmée, aucune régression</h3>
-          <p>La suite officielle blargg reste à 81,4 % (144/177 PASS) ; les 52 ROM de convergence APU/PPU/DMC passent toutes.</p>
-        </div>
-      </div>
-      <div class="wn-item">
-        <div class="wn-num">04</div>
-        <div class="wn-text">
-          <h3>Ligne de défense résidente dans le CI</h3>
-          <p>La dérive de ligne de base PASS→FAIL publie automatiquement une alerte rouge sur les PR et chaque exécution archive sa matrice de migration comme artefact CI.</p>
+          <h3>La précision progresse encore</h3>
+          <p>Deux erreurs de chronométrage dans le jeu d'instructions du processeur sont corrigées, portant le taux de réussite des tests officiels de 145/177 à 147/177 (83,1 %), sans aucune modification du comportement des jeux ; une mauvaise appréciation dans le processus de test lui-même est également corrigée, de sorte que les futurs gains de précision ne sont plus freinés.</p>
         </div>
       </div>
     </div>
-    <div class="wn-cta reveal">
+     reveal">
       <a href="https://github.com/Laffinty/FCEUX11/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Voir le journal complet →</a>
     </div>
   </div>

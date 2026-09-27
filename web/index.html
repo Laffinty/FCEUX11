@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="dark" />
 <meta name="theme-color" content="#080a09" />
-<title>FCEUX11 — NES/Famicom Emulator for Windows · v1.18</title>
-<meta name="description" content="FCEUX11 v1.18 — a FCEUX-based NES/Famicom emulator optimized for Windows. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. v1.18 unifies the KagamiQA quality gate and migrates core test harnesses to Rust; blargg pass rate holds at 81.4%." />
+<title>FCEUX11 — NES/Famicom Emulator for Windows · v1.18.1</title>
+<meta name="description" content="FCEUX11 v1.18.1 — a FCEUX-based NES/Famicom emulator optimized for Windows. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. A brand-new F11QA automated test suite guards every release; v1.18.1 corrects two instruction timing errors, raising the official pass rate to 83.1% (147/177) with zero regressions." />
 <meta name="keywords" content="FCEUX11, FCEUX, NES emulator, FC emulator, Famicom emulator, Windows emulator, TAS editor, Qt6, C++20, game emulator, 8-bit, multi-language, 12 languages, Arabic, RTL, ROM hacking, debugger, Lua scripting" />
 <meta name="author" content="Laffinty" />
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
@@ -32,8 +32,8 @@
 
 <meta property="og:site_name" content="FCEUX11" />
 <meta property="og:type" content="website" />
-<meta property="og:title" content="FCEUX11 — NES/Famicom Emulator for Windows · v1.18" />
-<meta property="og:description" content="FCEUX11 v1.18 — a FCEUX-based NES/Famicom emulator optimized for Windows. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. v1.18 unifies the KagamiQA quality gate and migrates core test harnesses to Rust; blargg pass rate holds at 81.4%." />
+<meta property="og:title" content="FCEUX11 — NES/Famicom Emulator for Windows · v1.18.1" />
+<meta property="og:description" content="FCEUX11 v1.18.1 — a FCEUX-based NES/Famicom emulator optimized for Windows. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. A brand-new F11QA automated test suite guards every release; v1.18.1 corrects two instruction timing errors, raising the official pass rate to 83.1% (147/177) with zero regressions." />
 <meta property="og:url" content="https://laffinty.github.io/FCEUX11/" />
 <meta property="og:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <meta property="og:locale" content="en_US" />
@@ -56,8 +56,8 @@
 <meta name="msvalidate.01" content="" />
 
 <meta name="twitter:card" content="summary" />
-<meta name="twitter:title" content="FCEUX11 — NES/Famicom Emulator for Windows · v1.18" />
-<meta name="twitter:description" content="FCEUX11 v1.18 — a FCEUX-based NES/Famicom emulator optimized for Windows. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. v1.18 unifies the KagamiQA quality gate and migrates core test harnesses to Rust; blargg pass rate holds at 81.4%." />
+<meta name="twitter:title" content="FCEUX11 — NES/Famicom Emulator for Windows · v1.18.1" />
+<meta name="twitter:description" content="FCEUX11 v1.18.1 — a FCEUX-based NES/Famicom emulator optimized for Windows. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. A brand-new F11QA automated test suite guards every release; v1.18.1 corrects two instruction timing errors, raising the official pass rate to 83.1% (147/177) with zero regressions." />
 <meta name="twitter:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -72,8 +72,8 @@
   "name":"FCEUX11",
   "applicationCategory":"GameApplication",
   "operatingSystem":"Windows 11",
-  "description":"FCEUX11 v1.18 — a FCEUX-based NES/Famicom emulator optimized for Windows. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. v1.18 unifies the KagamiQA quality gate and migrates core test harnesses to Rust; blargg pass rate holds at 81.4%.",
-  "softwareVersion":"1.18",
+  "description":"FCEUX11 v1.18.1 — a FCEUX-based NES/Famicom emulator optimized for Windows. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. A brand-new F11QA automated test suite guards every release; v1.18.1 corrects two instruction timing errors, raising the official pass rate to 83.1% (147/177) with zero regressions.",
+  "softwareVersion":"1.18.1",
   "license":"https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt",
   "url":"https://laffinty.github.io/FCEUX11/",
   "downloadUrl":"https://github.com/Laffinty/FCEUX11/releases",
@@ -207,40 +207,26 @@
   <div class="wrap">
     <div class="whatsnew-head reveal">
       <div class="kicker">What's new</div>
-      <h2>v1.18</h2>
-      <div class="sub">Released 2026-08-08 · v1.16 → v1.17 recap</div>
+      <h2>v1.18.1</h2>
+      <div class="sub">Released 2026-09-27 · F11QA test suite + first accuracy milestone</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3>KagamiQA unified quality gate</h3>
-          <p>KagamiQA is now the single owner and gate of the test system: dual-channel (Internal Logic Check + Hardware Consistency Check) runs on every push and produces a migration matrix.</p>
+          <h3>A brand-new automated test suite (F11QA)</h3>
+          <p>We've built a brand-new automated test suite: every update runs the full suite automatically, any change that affects how a game runs blocks the release, and every gain in emulator accuracy is measured against it.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">02</div>
         <div class="wn-text">
-          <h3>Core test harnesses migrated to Rust</h3>
-          <p>ROM/savestate regression, mapper byte-diff and the Lua runner moved from C++ to Rust with 100% parity.</p>
-        </div>
-      </div>
-      <div class="wn-item">
-        <div class="wn-num">03</div>
-        <div class="wn-text">
-          <h3>Accuracy baseline confirmed, no regressions</h3>
-          <p>Official blargg suite holds at 81.4% (144/177 PASS); all 52 APU/PPU/DMC convergence ROMs PASS.</p>
-        </div>
-      </div>
-      <div class="wn-item">
-        <div class="wn-num">04</div>
-        <div class="wn-text">
-          <h3>Defense line stays resident in CI</h3>
-          <p>Baseline drift (PASS→FAIL) auto-posts a red alert on PRs; every run archives its migration matrix as a CI artifact.</p>
+          <h3>Accuracy improved again</h3>
+          <p>Two timing errors in the CPU instruction set are corrected, lifting the official test pass rate from 145/177 to 147/177 (83.1%) with no change to how any game runs; a misjudgement in the test process itself is fixed too, so no future accuracy work is held up by it.</p>
         </div>
       </div>
     </div>
-    <div class="wn-cta reveal">
+     reveal">
       <a href="https://github.com/Laffinty/FCEUX11/blob/main/CHANGELOG.md" target="_blank" rel="noopener">View full changelog →</a>
     </div>
   </div>
