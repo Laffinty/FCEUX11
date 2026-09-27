@@ -23,7 +23,7 @@
 | id | ROM | code | 根因（known_fail / precision.md） |
 |---|---|---|---|
 | 055 | cpu_reset_registers | 0x81 | 复位后 A/X/Y/P/S 初值；诊断串 `A  X  Y  P  S` |
-| 038 | instr_misc | 0x01 / 0x03 | **已重估 ★★★★☆ / 1–2 周 / 风险中**（原 ★★☆☆☆ / 3–5 天）：阻塞点为 open bus 恒定（`set_db` 零调用）；先做 S0+S1（1–3 天）拿判别结论 |
+| 038 | instr_misc | 0x01 / 0x03 | **defer（留待以后解决）** ★★☆☆☆ → **★★★★☆ / 1–2 周 / 风险 低→中**，Tier **T0 → T3**（排在 049 之前，兼作其开工前置）：阻塞点为 open bus 恒定（`Cpu::set_db()` 零调用点 → `::ANull` 返回常量），非「`LDA abs,x` dummy read 不完整」。最小判别实验 S0+S1（1–3 天）。defer 期间不投入 |
 | ~~056~~ | instr_timing | ~~0x80~~ | **已清零**（v1.18.1）：`CycTable[0xE2]` 3→2；`0xBB` 由 `RMW_ABY` 改 `LD_ABY`（含跨页 +1，去多余写回） |
 | 037 | cpu_int_2_nmi_brk | 0x01 | 中断仅在指令边界轮询（x6502.cpp:515-579） |
 
@@ -36,7 +36,7 @@
 | ~~078~~ | lidnariq serom | **已清零**（v1.18.2）：submapper 5 + PRG-RAM=0 → `$6000` 未映射 → 矩阵 108P/12F |
 | 093 | tepples bntest-aorom | BxROM/BNROM 边界，$6000=0x27 |
 | 077 | holy_mapperel | 13 mapper 聚合，47 ROM 循环 |
-| 097 | fme7ramtest | **非精度债**（2026-09-27 改判 / 2026-09-28 处置）：survey ROM 不实现 `$6000` 结果协议，静态扫描 PRG 对 `$6000` 绝对寻址 0 处；FME-7 WRAM 映射经 `FCEUX11_FME7_PROBE=1` 实测与上游 62256 期望逐字节一致。已按授权 A 写入 `tests.json` 的 `known_limit`（纯文档字段，不改评级） |
+| 097 | fme7ramtest | **abandon（彻底放弃攻关）** —— 非精度债。survey ROM 不实现 `$6000` 结果协议（静态扫描 32 KiB PRG 对 `$6000` 绝对寻址 **0 处**、对 `$6900` 恰 2 处）；harness 判 PASS 需 `probe_addr==0x00` 而 `probe_addr` 恒为 `$6000`，换读 `$6900` 得 `$C0`，**无 mapper 改动可使其转 PASS**。FME-7 WRAM 映射经 `FCEUX11_FME7_PROBE=1` 实测与上游 62256 期望逐字节一致。2026-09-28 授权 A：已写入 `tests.json` 的 `known_limit`（纯文档字段，不改评级） |
 | 096 | fme7acktest | FME-7 IRQ ack |
 
 **优先 093**：单 mapper 边界，比聚合套件好定位。
