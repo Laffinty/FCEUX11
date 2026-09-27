@@ -3,7 +3,7 @@
 > **STATUS: OPEN**（2026-09-27 立项，尚未开工）
 > **模块名**：**GBAEUX11**（FCEUX11 Rust 侧的第二模拟核心）
 > **版本**：v2.0（BETA 阶段）
-> **日期**：2026-09-27 立项 / 2026-09-27 二次修订（按联网核查修正音频链路；M4A 延期至 GA 后）
+> **日期**：2026-09-27 立项 / 2026-09-27 二次修订（M4A 延期至 GA 后）/ 三次修订（音频接口契约更正为 `WriteSound(int32*)`）
 > **分支**：S0 开工时创建
 > **前置**：v1.18.1 已发布（`main` @ `3e33f2b`）；F11QA R4 gate green，grade B
 > **关联**：`src/rust/crates/f11qa/README.md`、`docs/tech/precision.md`、`COPYRIGHT_AUDIT.md`、`DERIVATIVE_WORK_NOTICE.txt`
@@ -24,6 +24,7 @@ v2.0 只做一件事：**让 FCEUX11 能运行 GBA 游戏**，前端完全复用
 | 5 | 测试 | **暂不接入 F11QA**，改手工实测清单 |
 | 6 | 标识 | 所有 GBA 画面左上角常驻 `BETA` 水印 |
 | 7 | 键位 | BETA 阶段采用 **NES 兼容键位**模式 |
+| 8 | 音频 | **复用现有声卡接口**（`WriteSound(int32*, int)`），与 NES 共用设置与 UI（见 §4.2） |
 
 **一句话收束**：GBAEUX11 是与 NES 核心**并列**的第二模拟核心（GBA 不是 mapper 概念，不进 `boards/`）；核心用 Rust 写、经 cbindgen C ABI 接入既有 `fceux11_rust` 静态库，前端零重写。
 
@@ -34,7 +35,7 @@ v2.0 只做一件事：**让 FCEUX11 能运行 GBA 游戏**，前端完全复用
 ### 1.1 做
 
 - `.gba` ROM 识别、加载、运行
-- 视频输出（240×160）、音频输出（**i16 单声道**，对接 SDL 现有链路）
+- 视频输出（240×160）、音频输出（**int32 单声道 / ±32768**，经 `WriteSound` 复用现有声卡接口）
 - 存档：`.srm` 电池存档（SRAM / Flash 64K·128K / EEPROM 512B·8K）、即时存档
 - 键位：NES 兼容模式（8 键一一映射 + L/R 附加键）
 - `BETA` 水印常驻左上角
@@ -131,7 +132,7 @@ int  gba_init(void);
 int  gba_load_rom(const char *path);
 int  gba_step_frame(void);
 int  gba_frame_buffer(uint8_t *dst, uint32_t len);   // 240*160*4 RGBA，含 BETA 水印
-int  gba_read_audio(int16_t *dst, uint32_t frames);  // f32 立体声 → i16 单声道
+int  gba_read_audio(int32_t *dst, uint32_t frames);  // f32 立体声 → int32 单声道（±32768）
 int  gba_set_buttons(uint16_t mask);
 int  gba_battery_read(uint8_t *dst, uint32_t cap);
 int  gba_battery_write(const uint8_t *src, uint32_t len);
@@ -139,19 +140,50 @@ int  gba_savestate(uint8_t *dst, uint32_t cap, uint32_t *written);
 int  gba_kill(void);
 ```
 
-### 4.2 音频链路（已核实）
+### 4.2 音频链路（已核实，复用现有声卡接口）
 
-`src/drivers/Qt/sdl-sound.cpp:256-259` 实际契约：
+> **决议（2026-09-27）**：GBAEUX11 **复用 FCEUX11 现有声卡接口**，不自持 SDL 设备。
+> 收益：采样率 / 音量 / 缓冲 / 静音 / Turbo 抑制等设置与 NES 共用同一套 UI 与同一份配置，无分叉。
+
+生产侧接口在 `src/drivers/Qt/dface.h`：
 
 ```c
-spec.freq    = s_SampleRate;   // 采样率
-spec.format  = AUDIO_S16SYS;   // i16
-spec.channels = 1;             // 单声道
-spec.samples = 512;            // 2 的幂；samplesPerFrame >= 1024 时改 1024
+int    InitSound();
+void   WriteSound(int32 *Buffer, int Count);   // ← GBAEUX11 每帧调用
+int    KillSound();
+uint32 GetMaxSound();                          // 环形缓冲总容量
+uint32 GetWriteSound();                        // 当前剩余可写空间
 ```
 
-故 **GBAEUX11 必须输出 i16 单声道**，而非直通立体声。
-唯一格式转换点：`f32 交织立体声 → i16 单声道下混`（含饱和截断）。GBA 帧率 59.7275 Hz，`samplesPerFrame = 采样率 / 59.7275`。
+**关键契约（易错点）**：
+
+| 项 | 事实 | 出处 |
+|---|---|---|
+| 送入缓冲类型 | **`int32`，单声道**（非 i16） | `dface.h:12` |
+| 幅度范围 | **±32768**（即已按 int16 幅度产出） | `sdl-sound.cpp:77,167` |
+| 设备侧格式 | `AUDIO_S16SYS` / `channels=1` / `samples=512`（≥1024 时改 1024） | `sdl-sound.cpp:256-259` |
+| 降位时机 | SDL 回调 `fillaudio` 内 `sample = s_Buffer[s_BufferRead]` **直接截断**，无缩放 | `sdl-sound.cpp:167` |
+| 每帧样本数 | `Count = samplesPerFrame = 采样率 / 帧率`；GBA 帧率 59.7275 Hz | `sdl-sound.cpp:263` |
+| 背压 | 写前用 `GetWriteSound()` 判剩余空间 | `sdl-sound.cpp:345-348` |
+| 音量 | **`WriteSound` 不施加音量**，NES 侧由 `sound.cpp` 混音阶段完成 → **GBAEUX11 须自行应用 `FSettings.SoundVolume`** | `sdl-sound.cpp:354-366` |
+| Turbo 抑制 | `WriteSound` 内建 `(NoWaiting & 0x01) \|\| turbo` 时直接返回 | `sdl-sound.cpp:363-367` |
+
+**设备开关与设置**（`src/io_api.h:199-228`）：
+
+```c
+namespace fceu11 {
+    void Sound(int Rate);                 // 开设备
+    void SetSoundQuality(int quality);
+    void SetSoundVolume(uint32 volume);
+    void SetTriangleVolume / SetSquareVolume / SetNoiseVolume / SetPCMVolume;
+}
+void FCEUD_SoundToggle(void);
+void FCEUD_SoundVolumeAdjust(int);
+```
+
+> 旧的 `FCEUI_Sound` / `FCEUI_SetSoundVolume` 已标记 `FCEUX11_DEPRECATED`，新代码一律用 `fceu11::` 命名空间版本。
+
+**故 GBAEUX11 的唯一格式转换点为**：`f32 交织立体声 → int32 单声道`（下混 + ×32768 + 饱和截断），而非转 i16。
 
 ---
 
@@ -274,7 +306,7 @@ BETA 只承诺「8 键零学习成本」；L/R 属附加键，可重绑定。
 |---|---|---|---|
 | **S0** | 建 `f11gba` crate，vendor 核心，建 `ATTRIBUTION.md` | `cargo check` 过；CMake 产出含新符号的 `fceux11_rust.lib` | 2–3 天 |
 | **S1** | 移植 `hle-bios.s`，删 `swieq 0xF00000`，自建 16KB；真 BIOS 回退配置项 | 两种 BIOS 均能启动 ROM 到游戏画面 | 2–3 天 |
-| **S2** | C ABI + Qt 前端：`.gba` 识别、240×160 渲染、i16 单声道音频链路、`BETA` 水印 | 可玩游戏，画面/音频正常 | 1–2 周 |
+| **S2** | C ABI + Qt 前端：`.gba` 识别、240×160 渲染、音频接入 `WriteSound`、`BETA` 水印 | 可玩游戏，画面/音频正常 | 1–2 周 |
 | **S3** | NES 兼容键位、`.srm` 存档、即时存档 | 存档跨会话可读；键位符合 §7.2 | 1 周 |
 | **S4** | 手工实测清单，逐游戏过 | 清单内游戏全部可玩并记录已知限制 | 长尾 |
 
@@ -301,7 +333,7 @@ BETA 只承诺「8 键零学习成本」；L/R 属附加键，可重绑定。
 | **R4** | ~~M4A 实现难度未知~~ **已关闭** | 核查确认非可玩性前提；已延期至 GA 后（§六.2） | 不阻塞 BETA |
 | **R5** | **巴士因子**。上游 73 star、实质 1–2 人维护 | 上游停摆则需自维护全部 19.5K 行 | MIT 无法律障碍；R1 缓解 |
 | **R6** | **水印污染帧校验** | 未来接入 F11QA 时基线不可比 | 开关可关；接入测试时以关闭状态建基线 |
-| **R7** | **音频下混失真**。f32 立体声 → i16 单声道为有损转换 | 音质低于直连 | GBA 原始音源以单声道为主，实际影响有限；S2 实测确认 |
+| **R7** | **音频下混失真**。f32 立体声 → 单声道为有损转换 | 音质低于直连 | GBA 原始音源以单声道为主，实际影响有限；S2 实测确认。另须自行应用 `FSettings.SoundVolume`（`WriteSound` 不施加音量，§4.2） |
 | **R8** | **BETA 无 M4A 增强**。混音沿用原驱动的 sample-and-hold | 音质弱于 mGBA / NanoBoyAdvance | 已在 §6.2 显式声明；GA 后 P1 补齐 |
 
 ---
@@ -335,7 +367,7 @@ BETA 只承诺「8 键零学习成本」；L/R 属附加键，可重绑定。
 | # | 事项 | 状态 |
 |---|---|---|
 | 1 | ~~M4A 是否保留在 BETA 范围~~ | ✅ **已决议：延期至 2.0 GA 之后**（§六.2） |
-| 2 | GBAEUX11 音频：复用现有 `FCEUSS_*` 声卡接口（推荐，音量/采样率设置统一生效），还是自持 SDL 设备（隔离性好但设置分叉） | ⏳ 待定，S2 开工前须定 |
+| 2 | ~~GBAEUX11 音频走哪条路~~ | ✅ **已决议：复用现有声卡接口**，契约见 §4.2 |
 | 3 | 阶段分支命名 | S0 开工时确定 |
 | 4 | 实测游戏清单（版权与来源） | S4 前确定 |
 | 5 | 2.0 正式版是否移除 `BETA` 水印 | 计划移除，GA 前确认 |
