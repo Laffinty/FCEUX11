@@ -23,7 +23,7 @@
 | id | ROM | code | 根因（known_fail / precision.md） |
 |---|---|---|---|
 | 055 | cpu_reset_registers | 0x81 | 复位后 A/X/Y/P/S 初值；诊断串 `A  X  Y  P  S` |
-| 038 | instr_misc | 0x01 / 0x03 | **2026-09-27 根因改判，未修复**：阻塞点为缺 CPU 数据总线模型（`set_db` 零调用），非「abs,x dummy read」；预估待重估 |
+| 038 | instr_misc | 0x01 / 0x03 | **已重估 ★★★★☆ / 1–2 周 / 风险中**（原 ★★☆☆☆ / 3–5 天）：阻塞点为 open bus 恒定（`set_db` 零调用）；先做 S0+S1（1–3 天）拿判别结论 |
 | ~~056~~ | instr_timing | ~~0x80~~ | **已清零**（v1.18.1）：`CycTable[0xE2]` 3→2；`0xBB` 由 `RMW_ABY` 改 `LD_ABY`（含跨页 +1，去多余写回） |
 | 037 | cpu_int_2_nmi_brk | 0x01 | 中断仅在指令边界轮询（x6502.cpp:515-579） |
 
