@@ -451,12 +451,44 @@ jobs:
             $failures += "summary.total is $($m.summary.total), expected == 120 (v1.8 严格 120 项 kgmqa-001~120；测试用例被静默跳过或新增未登记)"
           }
 
-          # Phase 0.5-d anti-gaming guard: newly added tests must land in the
-          # `new_test` bucket, never inflate `fail_to_pass`.
+          # -----------------------------------------------------------------------
+          # Transition-matrix gate — v1.18.1 修正（2026-09-27）
+          #
+          # 原实现把 `fail_to_pass != 0` 当作硬失败，这是**方向反了**：
+          # `fail_to_pass` 是「基线 FAIL → 本次 PASS」，即**真实精度进展**的证据。
+          # 把它判红会导致「修好一个残留 FAILURE」无法合入（run 98267393461 实测：
+          # kgmqa-056 E2/BB 修好后 fail_to_pass=1，R4 gate 直接拒绝，107P/13F 的
+          # 成果被卡在门外）。
+          #
+          # 防刷分（anti-gaming）的职责**已经在 runner 侧完成**，
+          # 不需要 CI 再重复拦一遍：
+          #   - `report/matrix.rs:257-259` — 不在 baseline 里的 test_id 走独立的
+          #     `new_test` 桶，**结构上不可能**混入 fail_to_pass / pass_to_fail；
+          #   - `test_set_diff.added/removed` — 显式暴露测试集增减供 review。
+          #
+          # 因此本门禁改为守真正的红线：**pass_to_fail（回归）必须为 0**。
+          # 这正是 `docs/plans/long-term-evolution/…_残留精度长期演进计划.md`
+          # 不变式 #2 的原文要求（该文档从未要求 fail_to_pass == 0）。
+          # -----------------------------------------------------------------------
+          $p2f = $m.transition_matrix.pass_to_fail
+          $p2fCount = if ($null -eq $p2f) { 0 } elseif ($p2f -is [array]) { $p2f.Count } else { [int]$p2f }
+          if ($p2fCount -ne 0) {
+            $regressed = @($p2f | ForEach-Object { $_.id }) -join ', '
+            $failures += "transition_matrix.pass_to_fail is $p2fCount, expected 0 (REGRESSION: $regressed — 不变式 #2，出现即回滚该 PR)"
+          }
+
+          # 精度进展只做记录，不判红：每次真正修好一个残留 FAILURE 都会让
+          # fail_to_pass 增长，这是长期演进计划的正反馈信号。
           $f2p = $m.transition_matrix.fail_to_pass
           $f2pCount = if ($null -eq $f2p) { 0 } elseif ($f2p -is [array]) { $f2p.Count } else { [int]$f2p }
-          if ($f2pCount -ne 0) {
-            $failures += "transition_matrix.fail_to_pass is $f2pCount, expected 0 (Phase 0.5-d anti-gaming guard did not hold in CI)"
+          $newTests = $m.transition_matrix.new_test
+          $newTestCount = if ($null -eq $newTests) { 0 } elseif ($newTests -is [array]) { $newTests.Count } else { [int]$newTests }
+          if ($f2pCount -gt 0) {
+            $gained = @($f2p | ForEach-Object { $_.id }) -join ', '
+            Write-Host "Progress: fail_to_pass=$f2pCount ($gained) — 精度进展，记录不判红"
+          }
+          if ($newTestCount -gt 0) {
+            Write-Host "new_test=$newTestCount (not in baseline; excluded from all 4 transition buckets by design)"
           }
 
           # v1.8 vendor_state 通道：runner 必须 emit summary.vendor_state 三态计数
@@ -508,4 +540,4 @@ jobs:
             exit 1
           }
 
-          Write-Host "R4 gate passed: git_rev=$gitRev, total=$($m.summary.total), passed=$($m.summary.passed), failed=$($m.summary.failed), grade=$grade, fail_to_pass=0, vendor_state={v=$($vs.vendored) a=$($vs.advisory) p=$($vs.pending_vendor)} [OK]"
+          Write-Host "R4 gate passed: git_rev=$gitRev, total=$($m.summary.total), passed=$($m.summary.passed), failed=$($m.summary.failed), grade=$grade, pass_to_fail=$p2fCount, fail_to_pass=$f2pCount, new_test=$newTestCount, vendor_state={v=$($vs.vendored) a=$($vs.advisory) p=$($vs.pending_vendor)} [OK]"

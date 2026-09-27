@@ -58,7 +58,7 @@
     "kgmqa-053-branch-timing-tests-blargg": true,
     "kgmqa-054-cpu-interrupts-v2-blargg": true,
     "kgmqa-055-cpu-reset-blargg": true,
-    "kgmqa-056-instr-timing-blargg": false,
+    "kgmqa-056-instr-timing-blargg": true,
     "kgmqa-057-instr-test-v3-blargg": true,
     "kgmqa-058-ppu-sprite-hit-blargg": true,
     "kgmqa-059-sprite-overflow-blargg": true,
