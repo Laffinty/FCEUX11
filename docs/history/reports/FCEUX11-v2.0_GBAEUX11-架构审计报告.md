@@ -1,5 +1,10 @@
 # 架构审计报告（r3 · 终审）— FCEUX11 v2.0 GBAEUX11 构建计划
 
+> **STATUS: COMPLETED**
+> **归档日期**：2026-09-27（2026-09-27 自 `docs/plans/` 移入；审计轮次已收口，r3 终审批准 S0 与 S1）
+> **关联计划**：`docs/plans/FCEUX11-v2.0_GBAEUX11构建计划.md`（r6，已处置本报告全部发现）
+> **上游**：`https://github.com/RIP-Comm/clementine` @ `ee77922dd293b70e945458e104f3b2de794f0151`
+
 | 项 | 内容 |
 |---|---|
 | **审计对象** | `docs/plans/FCEUX11-v2.0_GBAEUX11构建计划.md`（r5 稿） |

@@ -93,6 +93,7 @@
 | `Task1-C2_parity_report.md` | 🔵 | Track-C C-2：ROM 回归 parity（同上） |
 | `Task1-C3_parity_report.md` | 🔵 | Track-C C-3：savestate 回归 parity（同上） |
 | `Task1-TrackC-Final-Report.md` | 🔵 | Track-C 汇总（含迁移 parity 纪律，同上） |
+| `FCEUX11-v2.0_GBAEUX11-架构审计报告.md` | 🔵 | GBAEUX11 v2.0 开工前架构审计，三轮 r1/r2/r3（r3 终审批准 S0 与 S1）；18 项 F 系列 + N 系列发现，全部已由 `docs/plans/FCEUX11-v2.0_GBAEUX11构建计划.md` r6 处置 |
 | `microsoft_ui_migration_feasibility_report.md` | 🟡 | v2.x UI 迁移可行性预研（2026-09-19 自 docs/tech 移入） |
 | `null_pointer_defects_v1.15_audit.md` | 🟢 | v1.15 空指针审计 5 项（v2.0 待修清单仍有效，同上） |
 | `phase4_2_ci_gate_verification.md` | 🔵 | Phase 4.2 R4 Gate 验收记录（同上） |

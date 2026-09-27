@@ -6,7 +6,7 @@
 > **日期**：2026-09-27 立项 / 二次（M4A 延期）/ 三次（音频契约）/ 四次（r1 审计）/ 五次（定稿）/ **六次（r3 终审，具名上游 + SWI 扩展点修正）**
 > **分支**：S0 开工时创建
 > **前置**：v1.18.1 已发布（`main` @ `3e33f2b`）；F11QA R4 gate green，grade B
-> **关联**：`docs/plans/FCEUX11-v2.0_GBAEUX11构建计划_架构审计报告.md`（r3 终审）、`COPYRIGHT_AUDIT.md`、`DERIVATIVE_WORK_NOTICE.txt`
+> **关联**：`docs/history/reports/FCEUX11-v2.0_GBAEUX11-架构审计报告.md`（r3 终审，已归档）、`COPYRIGHT_AUDIT.md`、`DERIVATIVE_WORK_NOTICE.txt`
 
 ---
 
@@ -545,7 +545,7 @@ SWI 拦截点**已在上游核心中存在**，无需新建：
 
 ## 十三、第三方架构审计响应
 
-审计报告：[`FCEUX11-v2.0_GBAEUX11构建计划_架构审计报告.md`](./FCEUX11-v2.0_GBAEUX11构建计划_架构审计报告.md)
+审计报告：[`docs/history/reports/FCEUX11-v2.0_GBAEUX11-架构审计报告.md`](../history/reports/FCEUX11-v2.0_GBAEUX11-架构审计报告.md)（已归档）
 
 | 轮次 | 日期 | 结论 | 本计划的响应 |
 |---|---|---|---|
