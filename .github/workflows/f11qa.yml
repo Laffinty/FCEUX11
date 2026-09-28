@@ -1,7 +1,13 @@
 # FCEUX11 v1.8 F11QA — CI Workflow
 #
-# Runs the v1.8 QA pipeline on every push to wip1.8 / main. Produces a
+# Runs the v1.8 QA pipeline on every push to wip1.8 / wip2.0 / main. Produces a
 # migration matrix artifact, accuracy table, and baseline drift report.
+#
+# wip2.0 (2026-09-28): added so the GBAEUX11 line is verified on its own branch
+# before it merges. It carries a 22K-line vendored core (crates/gba-core) and new
+# build glue (src/gba/, the swi_hook seam in gba-core), none of which the local
+# NES gates cover -- the jsmolka suite and the R4 gate in this workflow do.
+# F11QA is therefore the first external check of that work.
 #
 # v1.8 changes (commit WIP, Phase 7 R4 gate upgrade):
 #   * Trigger branches: wip_1.16 → wip1.8
@@ -19,9 +25,9 @@ name: F11QA
 
 on:
   push:
-    branches: [main, wip1.8]
+    branches: [main, wip1.8, wip2.0]
   pull_request:
-    branches: [main, wip1.8]
+    branches: [main, wip1.8, wip2.0]
   workflow_dispatch:  # allow manual trigger
 
 jobs:
