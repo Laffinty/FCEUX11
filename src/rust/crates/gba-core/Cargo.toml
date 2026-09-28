@@ -1,0 +1,49 @@
+# Vendored GBA hardware emulation core.
+#
+# Source: https://github.com/RIP-Comm/clementine
+#   crate        : emu/  (hardware core only; ui/ and src/main.rs discarded)
+#   baseline     : ee77922dd293b70e945458e104f3b2de794f0151
+#   license      : MIT -- Copyright (c) 2024 RIPsters  (see ./LICENSE)
+#
+# repository/license are inlined because upstream took them from workspace
+# inheritance, and this workspace defines neither field.
+#
+# This is a separate path dependency, not a `vendor/` directory inside another
+# crate's `src/`: Cargo does not compile `.rs` files living in `vendor/`
+# outside `src/` (v2.0 plan section 4).
+#
+# Do NOT add or strip upstream file headers. Of the 45 upstream sources only
+# src/cpu/thumb/alu_instructions.rs carries any copyright/licence line, so
+# the MIT attribution duty is discharged by ./LICENSE + ../f11gba/ATTRIBUTION.md
+# rather than by per-file headers.
+
+[package]
+name = "gba-core"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/RIP-Comm/clementine"
+description = "Vendored GBA hardware emulation core (from clementine, MIT)."
+
+# All four were `{ workspace = true }` upstream. This workspace declares no
+# [workspace.dependencies] table, so the inheritance is inlined here. The
+# `serde` entry also has to spell out `features = ["derive"]`, because that is
+# what the upstream workspace was supplying.
+[dependencies]
+rtrb = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_with = "3"
+tracing = "0.1"
+rand = { version = "0.8", optional = true }
+
+[features]
+default = []
+
+[lints.clippy]
+complexity = "warn"
+correctness = "warn"
+nursery = "warn"
+pedantic = "warn"
+perf = "warn"
+style = "warn"
+suspicious = "warn"

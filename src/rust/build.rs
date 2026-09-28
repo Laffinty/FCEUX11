@@ -141,6 +141,7 @@ fn main() {
     println!("cargo:rerun-if-changed=crates/fceux11-lua/src");
     println!("cargo:rerun-if-changed=crates/fceux11-core/src");
     println!("cargo:rerun-if-changed=crates/f11qa/src");
+    println!("cargo:rerun-if-changed=crates/gba-core/src");
 }
 
 fn find_cbindgen() -> String {
@@ -238,6 +239,14 @@ fn merge_headers(
     output.push_str(" * Parses CLI args and runs Hardware Consistency Check tests in-process.\n");
     output.push_str(" */\n");
     output.push_str("int32_t kagami_qa_direct_main(int32_t argc, const char *const *argv);\n");
+
+    // v2.0 GBAEUX11 (S0). The GBA C ABI is declared by this root crate,
+    // not by a separate crate: rustc 1.96 fat LTO cannot load the bitcode of
+    // a tiny facade rlib in the dependency chain, so the ABI lives here
+    // alongside kagami_qa_direct_main. S2 replaces these two probes with the
+    // real section 4.1 surface.
+    output.push_str("uint32_t gba_abi_revision(void);\n");
+    output.push_str("uint32_t gba_core_probe(void);\n");
 
     output.push_str("\n#ifdef __cplusplus\n}\n#endif\n\n");
     output.push_str("#endif /* FCEUX11_RUST_H */\n");

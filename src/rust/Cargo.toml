@@ -27,6 +27,18 @@ fceux11-debug = { path = "crates/fceux11-debug" }
 fceux11-lua = { path = "crates/fceux11-lua" }
 fceux11-core = { path = "crates/fceux11-core" }
 f11qa = { path = "crates/f11qa" }
+# v2.0 S0: GBAEUX11. `optional` so a NES-only build (--features without
+# `gba`) physically drops the GBA core from the graph -- plan invariant 8.
+#
+# NOTE: the vendored core is depended on DIRECTLY rather than through an
+# f11gba facade crate. rustc 1.96 fat LTO fails to load the bitcode of a
+# tiny rlib sitting between the root and a large path dependency -- it
+# reports `failed to load bitcode of module f11gba-...-cgu.0.rcgu.o` with an
+# empty diagnostic, and reproduces with f11gba holding nothing but one
+# trivial extern "C" function and no gba-core dependency at all. Depending on
+# gba-core directly and keeping the C ABI in this root file avoids it and
+# matches the shape kagami_qa_direct_main already uses. See plan section 14.
+gba-core = { path = "crates/gba-core", optional = true }
 
 [features]
 # Stage-2 §七 (C-1): Pass-through to f11qa's `direct-adapter` feature.
@@ -39,6 +51,12 @@ f11qa = { path = "crates/f11qa" }
 # Always on in CMake builds (see src/rust/CMakeLists.txt) — dead-code
 # elimination keeps the unused FFI paths free at runtime.
 direct-adapter = ["f11qa/direct-adapter"]
+
+# v2.0 GBAEUX11. Present by default so S0 can assert the
+# "fceux11_rust.lib contains the new symbol" exit criterion; a NES-only
+# build turns it off with --no-default-features.
+gba = ["dep:gba-core"]
+default = ["direct-adapter", "gba"]
 
 [dev-dependencies]
 # Enable FFI stubs only during Rust workspace tests so cargo test can link
