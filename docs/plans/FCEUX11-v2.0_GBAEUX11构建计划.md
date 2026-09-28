@@ -1,10 +1,10 @@
 # FCEUX11 v2.0 构建计划 — GBAEUX11 模块（GBA 运行能力移植）
 
-> **STATUS: FINAL（r6 · 采纳 r3 终审）**（2026-09-27 六次修订；执行期发现按 §十一 回写，变更须记入 §十四）
+> **STATUS: FINAL（r8 · S1 开工前的矛盾点排查与路线重定）**（2026-09-28 多次修订；执行期发现按 §十一 回写，变更须记入 §十四）
 > **模块名**：**GBAEUX11**（FCEUX11 Rust 侧的第二模拟核心）
 > **版本**：v2.0（BETA 阶段）
-> **日期**：2026-09-27 立项 / 二次（M4A 延期）/ 三次（音频契约）/ 四次（r1 审计）/ 五次（定稿）/ **六次（r3 终审，具名上游 + SWI 扩展点修正）**
-> **分支**：S0 开工时创建
+> **日期**：2026-09-27 立项 / 二次（M4A 延期）/ 三次（音频契约）/ 四次（r1 审计）/ 五次（定稿）/ 六次（r3 终审，具名上游 + SWI 扩展点修正）/ **七次（r7，S0 执行期回写）** / **八次（r8，GBA 逻辑层 crate → 模块）**
+> **分支**：`wip2.0`（S0 开工时创建，已建）
 > **前置**：v1.18.1 已发布（`main` @ `3e33f2b`）；F11QA R4 gate green，grade B
 > **关联**：`docs/history/reports/FCEUX11-v2.0_GBAEUX11-架构审计报告.md`（r3 终审，已归档）、`COPYRIGHT_AUDIT.md`、`DERIVATIVE_WORK_NOTICE.txt`
 
@@ -75,8 +75,12 @@ v2.0 只做一件事：**让 FCEUX11 能运行 GBA 游戏**，前端复用现有
 
 > **命名纪律（分层，勿混淆）**：
 > - **构建计划文档**（含本节）必须具名上游，供构建 agent 与审查者直接定位代码库。
-> - **源代码 / 架构 / crate / 目录命名**继续使用功能性命名（`f11gba` / `gba-core` / `vendor/`），不散落上游标识。
+> - **源代码 / 架构 / 目录命名**继续使用功能性命名（`src/gba/` / `crates/gba-core/`），不散落上游标识。
 > - **`ATTRIBUTION.md`** 保留完整出处与 MIT 许可全文（发行合规层）。
+>
+> **crate 名订正（r8）**：原写「`f11gba` / `gba-core` / `vendor/`」。其中 `f11gba`
+> **不再是 crate 名** —— 工具链约束使其无法作为独立 crate 存在，见 §十四 r8。
+> 现在只有一个新 crate（`gba-core`），GBA 逻辑层是根 crate 内的**模块** `src/gba/`。
 
 ### 2.1 基本事实
 
@@ -154,54 +158,61 @@ v2.0 只做一件事：**让 FCEUX11 能运行 GBA 游戏**，前端复用现有
 
 ## 四、目录布局
 
-> **S0 实测偏离（2026-09-28，详见 §十四 r7）：`f11gba` 独立 crate 未能落地，
-> GBA 的 C ABI 改由根 crate `src/rust/src/lib.rs` 直接持有。**
-> 原布局：
-```
-src/rust/crates/
-├── f11gba/                      # 新增 crate
-│   ├── Cargo.toml
-│   ├── ATTRIBUTION.md           # 上游来源、许可、基线 SHA（唯一权威出处）
-│   ├── bios/
-│   │   ├── stub.s               # 自建 stub BIOS 源码（ARM 汇编）
-│   │   ├── stub.bin             # 预汇编 16KB 产物（入库，免工具链依赖）
-│   │   └── REGENERATE.md        # 重新汇编的步骤与校验哈希
-│   ├── src/
-│   │   ├── lib.rs
-│   │   ├── ffi.rs               # cbindgen 导出
-│   │   ├── swi/                 # SWI 原生实现（替代 BIOS 代码）
-│   │   │   ├── mod.rs           #   分发表 0x00–0x2A
-│   │   │   ├── decompress.rs    #   LZ77 / Huffman / RL / UnFilter
-│   │   │   ├── bitunpack.rs
-│   │   │   ├── math.rs          #   Div / Sqrt / ArcTan / ArcTan2
-│   │   │   ├── affine.rs        #   BgAffineSet / ObjAffineSet
-│   │   │   ├── memory.rs        #   CpuSet / CpuFastSet / RegisterRamReset
-│   │   │   └── wait.rs          #   Halt / Stop / IntrWait / VBlankIntrWait / SoftReset
-│   │   ├── save.rs              # 存档类型覆盖、.srm 布局、RTC 区
-│   │   └── overlay.rs           # BETA 水印
-│   └── build.rs
-└── gba-core/                    # vendor 核心 = 独立 path 依赖 crate
-    └── src/                     # 保留上游文件头，仅新增 SWI hook（§5.4）
-```
-
-**偏离**：S0 实际落地为
-
+> **r8 修订（2026-09-28）**：原计划的 `f11gba` **独立 crate 已被证明不可构建** ——
+> rustc 1.96 fat LTO 无法加载依赖链中第二个 archive 的 bitcode，六组对照实验
+> 证明唯一变量是「是不是独立 crate」，与代码量、依赖关系、泛型均无关。
+> 因此 GBA 逻辑层降级为**根 crate 的模块** `src/gba/`。详见 §十四 r8 与 R14。
+>
+> **原布局（已作废）**：
+> ```
+> src/rust/crates/
+> ├── f11gba/                      # 独立 crate —— 不可构建，见 r8
+> │   ├── ATTRIBUTION.md
+> │   ├── bios/{stub.s, stub.bin, REGENERATE.md}
+> │   ├── src/{lib.rs, ffi.rs, swi/*, save.rs, overlay.rs}
+> │   └── build.rs
+> └── gba-core/
+> ```
+>
+> **现行布局**：
 ```
 src/rust/
-├── src/lib.rs                   # GBA C ABI 由根 crate 直接持有（见 §十四 r7）
+├── src/
+│   ├── lib.rs                    # GBA C ABI 持有点 + swi_hook 注册
+│   └── gba/                      # GBA 逻辑层（根 crate 模块，非独立 crate）
+│       ├── mod.rs
+│       ├── ffi.rs                # C ABI（§4.1 的全部函数，S2 落地）
+│       ├── bios/
+│       │   ├── stub.s            # 自建 stub BIOS 源码（ARM 汇编）
+│       │   ├── stub.bin          # 预汇编 16KB 产物（入库，免工具链依赖）
+│       │   └── REGENERATE.md     # 重新汇编的步骤与校验哈希
+│       ├── swi/                  # SWI 原生实现（替代 BIOS 代码）
+│       │   ├── mod.rs            #   分发表 0x00–0x2A
+│       │   ├── decompress.rs     #   LZ77 / Huffman / RL / UnFilter
+│       │   ├── bitunpack.rs
+│       │   ├── math.rs           #   Div / Sqrt / ArcTan / ArcTan2
+│       │   ├── affine.rs         #   BgAffineSet / ObjAffineSet
+│       │   ├── memory.rs         #   CpuSet / CpuFastSet / RegisterRamReset
+│       │   └── wait.rs           #   Halt / Stop / IntrWait / VBlankIntrWait
+│       ├── save.rs               # 存档类型覆盖、.srm 布局、RTC 区
+│       └── overlay.rs            # BETA 水印
 └── crates/
-    ├── gba-core/                # vendor 核心 = 独立 path 依赖 crate ✅ 已建
-    │   ├── Cargo.toml           # 依赖全部内联（本 workspace 无 workspace.dependencies）
-    │   ├── LICENSE              # 上游 MIT 全文逐字副本
-    │   ├── ATTRIBUTION.md       # 上游来源 / 许可 / 基线 SHA / 本地修改（唯一权威出处）
-    │   └── src/                 # 45 文件，**与上游逐字节相同，0 处修改**
-    └── （f11gba 待 S1 有了实质 SWI 代码后按证据重建）
+    └── gba-core/                 # vendor 核心 = 独立 path 依赖 crate
+        ├── Cargo.toml            # 依赖全部内联（本 workspace 无 workspace.dependencies）
+        ├── LICENSE               # 上游 MIT 全文逐字副本
+        ├── ATTRIBUTION.md        # 上游来源 / 许可 / 基线 SHA / 本地修改（唯一权威出处）
+        └── src/                  # 45 文件与上游逐字节相同（S0 状态）；S1b 起有本地修改
 ```
 
-`bios/stub.s`、`swi/` 等尚未开工（S1）。`ATTRIBUTION.md` 因 `f11gba` 未建立而落在
-`gba-core/` —— 出处本就属于被 vendor 的代码，这个位置比原计划更贴切。
+**为什么不降级成「全塞进 lib.rs」而保留模块目录**：计划 §四 的意图是「GBA 逻辑
+独立成层 + 清晰的 C ABI 边界」，这两点由**模块目录**同样满足；被工具链否掉的
+只有**编译单元边界**这一层。将来 rustc 修复该缺陷后，模块可在不改调用方的前提下
+升级为独立 crate。
 
-**Cargo 语义（修正前版冲突）**：`vendor/` 置于 crate 根下、位于 `src/` 之外时 **Cargo 不会编译其中的 `.rs`**。故采用**独立 path 依赖 crate**（`crates/gba-core/`，自带 `Cargo.toml`），而非 `#[path]` 挂载或塞进 `src/vendor/`。
+**Cargo 语义（修正前版冲突）**：`vendor/` 置于 crate 根下、位于 `src/` 之外时
+**Cargo 不会编译其中的 `.rs`**。故 vendor 核心仍采用**独立 path 依赖 crate**
+（`crates/gba-core/`，自带 `Cargo.toml`），而非 `#[path]` 挂载或塞进 `src/vendor/`。
+此条只针对 **vendor 的 .rs**；我们自己写的代码没有该限制，可直接放 `src/gba/`。
 
 **stub BIOS 工具链**：`stub.bin` **入库**，`stub.s` 同时入库。正常构建与 CI **不需要 ARM 汇编器**；`REGENERATE.md` 记录用 `arm-none-eabi-as` 重新生成的方法与产物 SHA-256。避免在 Windows/MSVC 工具链上引入新构建依赖。
 
@@ -302,7 +313,7 @@ gba_step_frame()
    驱动层：gba_render_audio(buf, cap, &n) → WriteSound(buf, n)
 ```
 
-**调用方只调 `WriteSound`**；下混、增益、截断、分数采样全部在 `f11gba` 内完成，`WriteSound` 仅作环形缓冲搬运。
+**调用方只调 `WriteSound`**；下混、增益、截断、分数采样全部在 `src/gba/` 内完成，`WriteSound` 仅作环形缓冲搬运。
 
 **立体声取舍（诚实表述）**：GBA 硬件为立体声（2×PSG + 2×Direct Sound，可声像）。BETA 受限于 `WriteSound` 的单声道设备契约而放弃立体声。改为立体声需另开 SDL 设备，与「复用现有声卡」决议冲突，故留待 GA 后评估。
 
@@ -330,8 +341,8 @@ gba_step_frame()
 
 | 层 | 职责 | 实现位置 |
 |---|---|---|
-| **stub BIOS（16KB）** | 复位向量 → 跳转到卡带入口；异常向量；IRQ 经 `0x03007FFC` 间接跳转 | `bios/stub.s`，约 30 条指令 |
-| **SWI 语义** | 0x00–0x2A 的实际功能 | `f11gba/src/swi/`，Rust |
+| **stub BIOS（16KB）** | 复位向量 → 跳转到卡带入口；异常向量；IRQ 经 `0x03007FFC` 间接跳转 | `src/gba/bios/stub.s`，约 30 条指令 |
+| **SWI 语义** | 0x00–0x2A 的实际功能 | `src/gba/swi/`，Rust |
 
 SWI 拦截点**已在上游核心中存在**，无需新建：
 
@@ -342,9 +353,38 @@ SWI 拦截点**已在上游核心中存在**，无需新建：
 | `arm7tdmi.rs:1322` | `_ => false` —— 未覆盖的 SWI 回落真 BIOS |
 | `arm7tdmi.rs:1327` | `swi_return()` 辅助函数 |
 
-**故 S1 的实际工作量是「向 `handle_swi_hle` 的 `match` 补分支 + 实现算法」，而非搭建拦截机制。**
+> **r8 关键补充：`handle_swi_hle` 是私有 `fn`，不是 `pub`**（2026-09-28 核源）。
+> 这意味着「SWI 实现放在我们这边、核心调用」**不能靠改自己的 crate 完成** ——
+> 必须先让核心愿意转交控制权。原文「S1 的实际工作量是向 `handle_swi_hle` 的
+> `match` 补分支」隐含了「我们能改那个 `match`」，成立的前提是代码在同一个
+> crate 内；在 r8 的模块化布局下**不成立**。见下方「扩展点接线」。
+
+#### 扩展点接线（gba-core 的本地修改，共 4 处）
+
+gba-core 暴露一个**可选回调字段**，由根 crate 在 `gba_init()` 时注入。
+根 crate 用**函数指针**传入，不产生第二个 rlib 依赖（这是 r8 唯一可行的接法）：
+
+| # | gba-core 改动 | 目的 |
+|---|---|---|
+| 1 | `Arm7tdmi` 新增 `#[serde(skip)] pub swi_hook: Option<SwiHook>` | 存放外部实现；`serde(skip)` 保证不进 savestate |
+| 2 | `pub type SwiHook = fn(&mut Arm7tdmi, u32, Psr, u32) -> bool;` | 回调签名：拿得到 `&mut self`，故 hook 内可读写 BIOS flags、寄存器 |
+| 3 | `handle_swi_hle` 开头：`if let Some(h) = self.swi_hook { if h(self, …) { return true; } }` | **先问外部**，未处理才走核心自己的 match |
+| 4 | `swi_return`（及 hook 需要的 `bus` 访问）提升为 `pub` | 让 hook 能正确设置返回地址与内存 |
+
+**优先级语义**：hook 先于核心 match 被询问，因此 `src/gba/swi/` 可以**覆盖**
+核心已有的实现（如 T1-b 的 wait 类），也可以只补核心缺失的部分（T1-d / T2）。
+两者共存不冲突。
+
+**这 4 处改动落在 R1 允许的「仅 SWI hook」补丁集内**，须记入
+`crates/gba-core/ATTRIBUTION.md` 的本地修改节（§十一 第 2 项）。
+`gba-core` 在 **S0 结束时是 0 处修改**（已逐文件 sha256 验证），本地修改自 **S1b** 起。
 
 > **前版表述更正**：r5 曾称「两处各插入 hook、约 50–100 行、跨 2–3 文件」。此说法不准确——扩展点本已存在，改动集中于 `handle_swi_hle` 一处 `match`。但**「hook 小」不等于「SWI 语义小」**：真正的工作量在算法实现（LZ77 / Huffman / RL / 仿射 / wait 类），见 §5.3。
+>
+> **r8 再次更正**：上一条「改动集中于 `handle_swi_hle` 一处 `match`」在 r8 布局下**不成立**——
+> 该函数是 gba-core 的私有方法，我们的模块无法触及。改为「gba-core 暴露 hook 字段 +
+> 根 crate 注入实现」，共 4 处本地修改（见上方「扩展点接线」）。工作量级仍是「小」，
+> 但落点从「改一处 match」变成「改 4 处 + 一条注册链」。
 
 ### 5.3 SWI 实现分档
 
@@ -364,11 +404,22 @@ SWI 拦截点**已在上游核心中存在**，无需新建：
 | 档 | SWI | 上游现状 | 缺口 |
 |---|---|---|---|
 | **T1-a** | `CpuSet` `CpuFastSet` `Div` `DivArm` `SoftReset` | ✅ 已实现 | 无（回归验证即可） |
-| **T1-b** | `Halt` `Stop` `IntrWait` `VBlankIntrWait` | ⚠️ **空壳** | **必须真做**：halt 到中断、ack IF/IE 语义 |
+| **T1-b** | `Halt` `Stop` `IntrWait` `VBlankIntrWait` | ⚠️ **不仅空壳，机制本身不存在**（见下） | **必须新建 CPU 状态**：halt/stop 字段 + ARM/Thumb 两条 step 路径 + 恢复条件 |
 | **T1-c** | `RegisterRamReset` | ⚠️ **部分实现** | IWRAM 清空缺失，须按 GBATEK 补全或显式记入已知限制 |
 | **T1-d** | `Lz77UnCompWram/Vram` `HuffmanUnComp` `RlUnCompWram/Vram` `GetBiosChecksum` | ❌ **未 HLE**，回落真 BIOS | **必须补全**，缺则图形管线主干失效 |
 | **T2** | `Sqrt` `ArcTan` `ArcTan2` `BgAffineSet` `ObjAffineSet` `BitUnPack` | ❌ 未 HLE | 影响 mode 7 / 精灵缩放 / 部分 2D |
 | **T3** | `Diff*UnFilter`×3 `MidiKey2Freq` `MultiBoot` `SoundDriver*` 段 | ❌ 未 HLE | 低频；声音段依 §六 可 Nop |
+
+> **T1-b 缺口比原表严重（2026-09-28 核源）**：原文称四个 wait 类分支是「空壳」，
+> 暗示只要把 `swi_return` 换成真逻辑即可。实测**上游根本没有 halt 机制**：
+> - `Arm7tdmi`（`arm7tdmi.rs:144-169`）**没有 halted / stopped 任何字段**；
+> - `step()`（`:705` 起，ARM 与 Thumb 各一条路径）**没有 halt 分支**，
+>   每步都直接检查 IRQ 并执行指令。
+>
+> 所以 T1-b 至少要：给 `Arm7tdmi` 加状态字段（须 `#[serde(...)]` 兼顾 savestate）、
+> 在两条 `step` 路径都插入 halt 判据、实现 `Halt`（任意使能中断恢复）与
+> `Stop`（等 LCD 控制器）恢复条件的差异。**这是 CPU 模型级改动，不是 1 周的补丁。**
+> 已在 `src/gba/swi/wait.rs` 的模块注释中记录同一事实。
 
 `ArcTan` 需与 BIOS 的 16.16 定点多项式**逐位对齐**，是 T2 中唯一高风险项，单独设验证点。
 
@@ -485,10 +536,11 @@ SWI 拦截点**已在上游核心中存在**，无需新建：
 
 | 阶段 | 内容 | 出口标准 | 估 |
 |---|---|---|---|
-| **S0** | ~~建 `f11gba` + `gba-core` 两个 crate~~ → **实际落地**：vendor `gba-core`（`f11gba` 因工具链缺陷未建，见 §十四 r7）+ 根 crate 持 GBA C ABI + `ATTRIBUTION.md`；确定 ROM 来源策略 | `cargo check` 过；CMake 产出含新符号的 `fceux11_rust.lib`；NES 构建零回归 | 3–5 天 | **✅ 已完成**（2026-09-28） |
-| **S1a** | 回归验证 T1-a（已实现项）；**T1-b 真做**：`Halt`/`Stop`/`IntrWait`/`VBlankIntrWait` 的真等待语义 | jsmolka `arm`/`thumb` 通过；可启动到游戏画面；wait 类有专项验证（非空壳） | 1 周 |
-| **S1b** | **T1-c** `RegisterRamReset` 补 IWRAM；**T1-d** 解压类：`Lz77×2` / `Huffman` / `Rl×2` / `GetBiosChecksum` | **jsmolka `memory.gba` 在 stub BIOS 下全绿**（判据重定义，见下） | 1–1.5 周 |
-| **S1c** | **T2**：`Sqrt` / `ArcTan`×2 / `BgAffineSet` / `ObjAffineSet` / `BitUnPack` | 逐位对齐验证；mode 7 与精灵缩放样例通过 | 1–1.5 周 |
+| **S0** | ~~建 `f11gba` + `gba-core` 两个 crate~~ → **实际落地**：vendor `gba-core` + 根 crate 持 GBA C ABI + `ATTRIBUTION.md`；确定 ROM 来源策略 | `cargo check` 过；CMake 产出含新符号的 `fceux11_rust.lib`；NES 构建零回归 | 3–5 天 | **✅ 已完成**（2026-09-28） |
+| **S0'** | 建立 SWI 扩展点接线：gba-core 的 4 处本地修改 + 根 crate 注册链（§5.2「扩展点接线」） | `gba_swi_probe()` 经真实 SWI 调用返回正确分派结果；`cargo check` + staticlib 符号检查 + NES 零回归 | 1–2 天 | 未开始 |
+| **S1a** | 回归验证 T1-a（已实现项）；**T1-b 真做**：给 `Arm7tdmi` 加 halt/stop 状态、在 ARM+Thumb 两条 `step` 路径插入判据、实现 `Halt`/`Stop`/`IntrWait`/`VBlankIntrWait` | jsmolka `arm`/`thumb` 通过；可启动到游戏画面；wait 类有专项验证（非空壳，且 CPU 确实停住） | ~~1 周~~ → **2–3 周**（见 §5.3 T1-b 注） | 未开始 |
+| **S1b** | **T1-c** `RegisterRamReset` 补 IWRAM；**T1-d** 解压类：`Lz77×2` / `Huffman` / `Rl×2` / `GetBiosChecksum` | **jsmolka `memory.gba` 在 stub BIOS 下全绿**（判据重定义，见下） | 1–1.5 周 | 未开始 |
+| **S1c** | **T2**：`Sqrt` / `ArcTan`×2 / `BgAffineSet` / `ObjAffineSet` / `BitUnPack` | 逐位对齐验证；mode 7 与精灵缩放样例通过 | 1–1.5 周 | 未开始 |
 | **S2** | C ABI + Qt 前端：`.gba` 识别、240×160 渲染、音频接入（含 §4.2 分数采样）、RTC 暴露、`BETA` 水印 | 可玩游戏，画面/音频正常；**性能验收线达标**（见下）；30 分钟无音画漂移 | 2 周 |
 | **S3** | NES 兼容键位、`.srm` 存档（含覆盖机制与跨模拟器互通）、即时存档（含**加载后重挂 `init_audio`**）、RTC | 存档跨会话可读、跨模拟器字节级互通、键位符合 §7.2、**savestate 往返后音频不哑** | 1–1.5 周 |
 | **S4** | 手工实测清单逐游戏过 | 清单内游戏可玩，已知限制逐条编目 | 长尾 |
@@ -542,7 +594,7 @@ SWI 拦截点**已在上游核心中存在**，无需新建：
 | **R11** | **sample-and-hold 音质**。核心以 S&H 上采样，存在镜像/混叠 | 音质弱于高阶重采样 | 已知取舍，非缺陷；如需改善须改核心或自行重采样 |
 | **R12** | **分数采样实现错误**。`int` 帧长无法表达 738.35，若实现偷懒取整必长期漂移 | 音画不同步 | ABI 分离错误码与样本数（§4.1）；30 分钟无漂移为 S2 硬判据 |
 | **R13** | **wait 类空壳被误当已实现**（上游 `0x02` / `0x03..=0x05` 均为 `swi_return`） | 游戏以 100% CPU 空转、耗电、行为异常 | S1a 硬性要求真实现，并设专项验证 |
-| **R14** | **rustc fat LTO 拒绝加载极小 facade rlib 的 bitcode**（2026-09-28 S0 实测，见 §十四 r7） | GBA C ABI 无法经 `f11gba` 中转进 staticlib，构建直接失败 | **已规避**：根 crate 直接依赖 `gba-core` 并自持 ABI（与 `kagami_qa_direct_main` 同形状）。S1 若重建 `f11gba` 须先验证其体积足够大，否则沿用根 crate 持有 ABI |
+| **R14** | **rustc 1.96 fat LTO 拒绝加载依赖链中第二个 archive 的 bitcode**（2026-09-28 六组对照实验，见 §十四 r8） | GBA 逻辑若做成独立 crate（`f11gba`），构建直接失败，报空诊断的 `failed to load bitcode of module …-cgu.0.rcgu.o` | **已规避并已定位**：唯一变量是「是不是独立 crate」，与代码量（2 函数 vs 381 行）、依赖关系（有无 gba-core）、泛型均无关；`lto = "thin"` 可绕过但会波及 NES 侧性能。**现行方案**：GBA 逻辑降级为根 crate 模块 `src/gba/`，经 gba-core 的 hook 字段注入（§5.2），不走 rlib 边界。**复查触发条件**：rustc 升级后重跑 §十四 r8 的六组对照 |
 
 ---
 
@@ -558,7 +610,12 @@ SWI 拦截点**已在上游核心中存在**，无需新建：
 5. **BETA 水印在发布构建中不可关闭**：`gba_set_overlay(0)` 在发布构建返回 `GBA_ERR_STATE`；仅测试构建可关（§7.1）。
 6. **HLE 与真 BIOS 双路径均须可用**，真 BIOS 须过长度与校验和双检。
 7. **延期项须显式声明**：M4A、立体声、wait cycle、F11QA 接入均为**已决议的范围取舍**，不是遗漏；不得在 BETA 文案中暗示具备。
-8. **GBA 侧为独立可裁剪项**：置于 cargo feature + CMake option 之后，NES-only 构建可物理剔除，结构性保证不变式 1。
+8. **GBA 侧为独立可裁剪项**：置于 cargo feature `gba` + CMake option 之后，NES-only 构建（`--no-default-features`）下 `gba-core` 整个 crate 退出依赖图、`src/gba/` 被 `#[cfg]` 剔除，**结构性保证不变式 1**。
+   > **r8 说明**：本条最初设想由「独立 crate + feature」实现。降级为根 crate 模块后
+   > **可裁剪性不变**——`gba-core` 仍是 `optional = true` 的独立依赖，
+   > 关闭 feature 时连整个 22K 行的 vendor 树都不参与编译；
+   > `src/gba/` 由 `#[cfg(feature = "gba")] pub mod gba;` 控制。
+   > 与原设想唯一的差别是 GBA 逻辑代码本身不进 NES-only 构建的编译单元。
 
 ---
 
@@ -634,6 +691,7 @@ SWI 拦截点**已在上游核心中存在**，无需新建：
 | **N-11** | 上游当前强制真 BIOS，`bios.gba` 基线依赖真 BIOS | **采纳** | `bios.gba` **移出 BETA 判据**；S1b 判据改为「`memory.gba` 在 stub 下全绿」；新增 §8.1 P5 |
 | **N-07** | `gba_set_overlay` 与「无运行时入口」冲突 | **采纳** | §7.1 改为「ABI 恒导出，发布构建中 `gba_set_overlay(0)` 返回 `GBA_ERR_STATE`」；不变式 5 同步 |
 | **N-08** | R1「仅 SWI hook」措辞；S1a 出口过度承诺 | **采纳** | §5.2 加「前版表述更正」注；S1a 出口改为「wait 类有专项验证」 |
+| **N-08 补**（r8 自查） | 上述「扩展点已存在」隐含它**可被我们触及**。实测 `handle_swi_hle` 是**私有 `fn`**，外部无法调用或替换 | **补入 §5.2** | §5.2「扩展点接线」小节：gba-core 4 处本地修改 + 根 crate 注册链 |
 
 ### 13.3 自评与放行
 
@@ -663,5 +721,6 @@ SWI 拦截点**已在上游核心中存在**，无需新建：
 | **r5** | 2026-09-27 | **定稿**：STATUS → FINAL；新增 §7.7 ROM 来源策略（玩家自备，同 NES）；关闭 §十二 全部未决项 | 用户裁定 |
 | **r6** | 2026-09-27 | **采纳 r3 终审**：① §二.0 上游具名（clementine + URL + 基线 SHA + issue #204）；② §5.2 更正 SWI 扩展点为**已存在的 `handle_swi_hle`**；③ §5.3 按 T1-a/b/c/d 重分档，wait 类与 `RegisterRamReset` 降级为「空壳/部分实现」；④ §4.2 撤回「复用 `frmRateAdjRatio`」，改为自持定点累加 + 残余结转，ABI 分离错误码与样本数；⑤ `bios.gba` 移出 BETA 判据；⑥ savestate 后重挂音频；⑦ 新增 R11/R12/R13 | r3 终审（批准 S0/S1） |
 | **r7** | 2026-09-28 | **S0 执行期回写**（§十一 第 1、2 项已执行）。实测发现与订正：① 核心规模 45 文件 **22,311 行**（原文 19,547 是 PowerShell 口径少计），R5 同步；② 基线 SHA **正是上游 `main` 当前 HEAD**，无漂移；③ `BackupType::detect` 是**私有 fn**，且实际匹配含计划漏列的 `SRAM_F_V`；④ savestate 上游**只有 derive、无任何序列化 API**，格式与版本策略须自定；⑤ 45 个源文件中 **44 个无版权头**，「保留上游文件头」改由 `LICENSE` + `ATTRIBUTION.md` 承担；⑥ **`f11gba` 独立 crate 未能落地**（新增 R14），GBA C ABI 改由根 crate 持有；⑦ 关闭 **R10**：`GLOB_RECURSE` → `CONFIGURE_DEPENDS`；⑧ 不变式 1 基线由 v1.16 的 `106P/14F` 订正为 `108P/12F`；⑨ §4.1 `gba_set_overlay` 重复声明去重 | S0 执行 + 实测 |
+| **r8** | 2026-09-28 | **全面矛盾点排查与路线重定**（S1 开工前）。r7 的第 ⑥ 条只记录了「`f11gba` 未落地」这一**现象**，未定位**规律**，其缓解措施「等 S1 有了实质代码后重建」随后被实验证伪。本轮以六组对照实验定位并给出可行路线：<br>**① R14 定位**：唯一变量是「是不是独立 crate」。与代码量（2 个探针函数 vs **381 行真实 SWI 代码**）、依赖关系（依赖 gba-core vs **零依赖**）、是否含泛型**全部无关**；删空 target 后复现（排除陈旧产物）；`lto = "thin"` 可绕过但波及 NES 侧性能，不采用。已撤回 r7 期间的错误推断「模块 hash 未变 = 未重新编译」——该 hash 是固定的 LTO cache key，仅随 `Cargo.toml` 变化，重编后不变恰恰说明失败可稳定复现。<br>**② 路线**：GBA 逻辑降级为根 crate **模块** `src/gba/`，经 gba-core 新增的 `swi_hook` 字段注入；实验证实 4 个 C ABI 符号全部进入 `fceux11_rust.lib`。<br>**③ 架构矛盾**：`handle_swi_hle` 是**私有 `fn`**，r7 及之前的「向其 match 补分支」在模块化布局下不成立 → 补 §5.2「扩展点接线」（gba-core 4 处本地修改 + 注册链），并补记 §13.2 N-08。<br>**④ 工作量重估**：T1-b 的缺口不是「空壳待填」而是**机制不存在**——`Arm7tdmi` 无 halted/stopped 字段、两条 `step` 路径无 halt 分支（已核源 `:144-169` / `:705`）。S1a 由 **1 周上调为 2–3 周**，并在 §八 新增 **S0'** 阶段承载扩展点接线。<br>**⑤ 不变式 8 复核**：可裁剪性**不变**（`gba-core` 仍为 `optional` 独立依赖，关闭 feature 时整个 vendor 树退出编译图）。 | 六组对照实验 + 核源 |
 
 > **定稿后的变更纪律**：本计划状态为 FINAL。执行期若发现计划与实态不符，**先记入本表再改**，不得静默偏离 §八 的阶段出口标准与 §十 的不变式。
