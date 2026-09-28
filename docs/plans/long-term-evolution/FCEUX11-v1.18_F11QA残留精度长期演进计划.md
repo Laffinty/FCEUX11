@@ -1334,7 +1334,7 @@ ctest --test-dir build -C Release --output-on-failure
 |---|---|---|---|---|---|---|
 | 1 | 056-instr-timing | ★☆☆☆☆ | T0 | **DONE** | `8010a3f`（run 98267393461） | **PASS** |
 | 2 | 078-serom | ★★☆☆☆ | T0 | **DONE** | v1.18.2（MMC1 submapper-5） | **PASS** |
-| 3 | 038-instr-misc | ★★★★☆（★2→★4） | **T3**（原 T0） | **defer** —— 风险低→中，1–2 周，不占独立窗口；S0+S1 为 049 铺路，见 §2.2 | | FAIL（defer） |
+| 3 | 038-instr-misc | ★★★★☆（★2→★4） | **T3**（原 T0） | **defer** —— 风险低→**高**，1–2 周，不占独立窗口。**S0a+S1 已于 2026-09-28 实测，结论为负**（开关关/开结果完全相同，主假设不成立）；S2 需重新定义，候选 `GetIX`。见 §2.2 ⑶ | | FAIL（defer） |
 | 4 | 097-fme7ram | —（无缺陷） | **移出**（原 T1） | **abandon** —— 2026-09-28 裁定彻底放弃；非 mapper 缺陷，survey ROM 无 `$6000` 协议，见 §2.2 / §三④ | | FAIL（结构性，abandon） |
 | 5 | 096-fme7ack | —（无缺陷） | **移出**（原 T1） | **abandon**（2026-09-28 裁定，**代码不动**）—— survey ROM，`$6000` = PRG ROM bank 3 字节；**留有真实 ack bug 明确不修**，见 §2.2 ⑸ | | FAIL（结构性，abandon） |
 | 6 | 050-dummy-writes | ★★★☆☆ | T1 | TODO | | FAIL |
