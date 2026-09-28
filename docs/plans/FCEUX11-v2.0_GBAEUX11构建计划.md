@@ -359,25 +359,31 @@ SWI 拦截点**已在上游核心中存在**，无需新建：
 > `match` 补分支」隐含了「我们能改那个 `match`」，成立的前提是代码在同一个
 > crate 内；在 r8 的模块化布局下**不成立**。见下方「扩展点接线」。
 
-#### 扩展点接线（gba-core 的本地修改，共 4 处）
+#### 扩展点接线（gba-core 的本地修改，共 5 处）
 
 gba-core 暴露一个**可选回调字段**，由根 crate 在 `gba_init()` 时注入。
 根 crate 用**函数指针**传入，不产生第二个 rlib 依赖（这是 r8 唯一可行的接法）：
 
 | # | gba-core 改动 | 目的 |
 |---|---|---|
-| 1 | `Arm7tdmi` 新增 `#[serde(skip)] pub swi_hook: Option<SwiHook>` | 存放外部实现；`serde(skip)` 保证不进 savestate |
-| 2 | `pub type SwiHook = fn(&mut Arm7tdmi, u32, Psr, u32) -> bool;` | 回调签名：拿得到 `&mut self`，故 hook 内可读写 BIOS flags、寄存器 |
-| 3 | `handle_swi_hle` 开头：`if let Some(h) = self.swi_hook { if h(self, …) { return true; } }` | **先问外部**，未处理才走核心自己的 match |
-| 4 | `swi_return`（及 hook 需要的 `bus` 访问）提升为 `pub` | 让 hook 能正确设置返回地址与内存 |
+| 1 | `pub type SwiHook = fn(&mut Arm7tdmi, u32, Psr, u32) -> bool;` | 回调签名：拿得到 `&mut self`，故 hook 内可读写 BIOS flags、寄存器。用 `fn` 指针而非 trait object，保证依赖单向：根 crate 依赖 gba-core，反之不成立 |
+| 2 | `Arm7tdmi` 新增 `#[serde(skip)] pub swi_hook: Option<SwiHook>` | 存放外部实现；`serde(skip)` 保证不进 savestate（函数指针无可恢复语义，载入存档也不应依赖它） |
+| 3 | `impl Default for Arm7tdmi` 初始化为 `None` | 手工 `Default` impl 必须补上，否则编译不过 |
+| 4 | `handle_swi_hle` 开头：`if let Some(h) = self.swi_hook { if h(self, …) { return true; } }` | **先问外部**，未处理才走核心自己的 match |
+| 5 | `swi_return`（及 hook 需要的 `bus` 访问）提升为 `pub` | 没有它，hook 能服务调用却无法从调用返回 |
+
+> **r8 原文写「4 处」，实为 5 处** —— 漏了 `Default` impl 的字段初始化。
+> 已在 S0' 实施时按实际改动数订正，并同步到 `crates/gba-core/ATTRIBUTION.md` §3.2 / §4。
 
 **优先级语义**：hook 先于核心 match 被询问，因此 `src/gba/swi/` 可以**覆盖**
 核心已有的实现（如 T1-b 的 wait 类），也可以只补核心缺失的部分（T1-d / T2）。
 两者共存不冲突。
 
-**这 4 处改动落在 R1 允许的「仅 SWI hook」补丁集内**，须记入
-`crates/gba-core/ATTRIBUTION.md` 的本地修改节（§十一 第 2 项）。
-`gba-core` 在 **S0 结束时是 0 处修改**（已逐文件 sha256 验证），本地修改自 **S1b** 起。
+**这 5 处改动落在 R1 允许的「仅 SWI hook」补丁集内**，不改动任何上游逻辑：
+现有 match 分支、`_ => false` 回落、以及其余全部函数体原样保留。
+须记入 `crates/gba-core/ATTRIBUTION.md` 的本地修改节（§十一 第 2 项）。
+`gba-core` 在 **S0 结束时是 0 处修改**（已逐文件 sha256 验证），
+**本地修改自 S0' 起**（r8 原文误写「自 S1b 起」—— S0' 就要接线，已订正）。
 
 > **前版表述更正**：r5 曾称「两处各插入 hook、约 50–100 行、跨 2–3 文件」。此说法不准确——扩展点本已存在，改动集中于 `handle_swi_hle` 一处 `match`。但**「hook 小」不等于「SWI 语义小」**：真正的工作量在算法实现（LZ77 / Huffman / RL / 仿射 / wait 类），见 §5.3。
 >

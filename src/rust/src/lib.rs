@@ -114,38 +114,27 @@ pub unsafe extern "C" fn kagami_qa_lua_main(
 }
 
 // =========================================================================
-// v2.0 GBAEUX11 (S0) -- C ABI probes over the vendored GBA core.
+// v2.0 GBAEUX11 -- C ABI ownership and the GBA logic layer.
 //
-// Two separate mechanisms have to line up for a GBA symbol to exist in
-// fceux11_rust.lib, and this file is where both are satisfied:
+// Three things have to line up for a GBA symbol to exist in
+// fceux11_rust.lib, and this file is where two of them are satisfied:
 //
 // 1. Reachability. cargo's staticlib does not propagate `#[no_mangle]`
 //    symbols out of rlib dependencies, and LTO strips anything the root
 //    crate never references -- the identical problem documented above for
-//    kagami_qa_direct_main. A wrapper here is the reference that keeps the
-//    symbol alive.
-// 2. No facade rlib. rustc 1.96 fat LTO fails to load the bitcode of a tiny
-//    intermediate rlib (reported as an empty
-//    `failed to load bitcode of module ...-cgu.0.rcgu.o`), reproducing even
-//    when that facade holds a single trivial function and no dependency.
-//    Owning the ABI here avoids the extra rlib entirely.
-//
-// S0 exports two probes and nothing else; both are side-effect free so they
-// cannot perturb NES behaviour. S2 replaces them with the real section 4.1
-// surface, each function needing the same treatment.
-// =========================================================================
+//    kagami_qa_direct_main. The extern "C" functions below are the
+//    references that keep them alive.
+// 2. No facade rlib. rustc 1.96 fat LTO fails to load the bitcode of a
+//    second archive in this chain (an empty-diagnostic
+//    `failed to load bitcode of module ...-cgu.0.rcgu.o`); six controlled
+//    experiments showed the only variable is whether the GBA code is its
+//    own crate, not its size or dependencies. `gba` is therefore a plain
+//    module of this crate, not a `crates/f11gba` rlib. See the v2.0 plan's
+//    R14 and the r8 entry in its change log.
+// 3. The seam to the vendored core. `gba-core`'s `handle_swi_hle` is a
+//    private method, so it cannot be extended from out here. S0' gave
+//    `Arm7tdmi` an `swi_hook` field, and `gba::install_swi_hook` fills it
+//    with a plain `fn` pointer -- one-directional, so no crate dependency
+//    is created.
 #[cfg(feature = "gba")]
-#[unsafe(no_mangle)]
-pub extern "C" fn gba_abi_revision() -> u32 {
-    0
-}
-
-/// S0 plumbing probe: the entry-point address the vendored core's
-/// cartridge-header parser reports for an all-zero 0xC0-byte header.
-/// Referencing gba-core from here is also what proves the vendored core
-/// actually reaches the staticlib.
-#[cfg(feature = "gba")]
-#[unsafe(no_mangle)]
-pub extern "C" fn gba_core_probe() -> u32 {
-    gba_core::cartridge_header::CartridgeHeader::new(&[0u8; 0xC0]).entry_point_address()
-}
+pub mod gba;

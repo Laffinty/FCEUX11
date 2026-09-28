@@ -166,6 +166,15 @@ pub struct Arm7tdmi {
     decoded_thumb: Option<ThumbModeOpcode>,
 
     pub current_cycle: u64,
+
+    /// External SWI implementation, consulted before the built-in `match`.
+    ///
+    /// `serde(skip)`: a function pointer is not meaningful to restore, and
+    /// loading a savestate must never resurrect or depend on it. The
+    /// embedder re-installs it after a load, the same way it re-installs
+    /// audio state.
+    #[serde(skip)]
+    pub swi_hook: Option<SwiHook>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -229,6 +238,7 @@ impl Default for Arm7tdmi {
             fetched_thumb: None,
             decoded_thumb: None,
             current_cycle: 0,
+            swi_hook: None,
         };
 
         // Setting ARM mode at startup
@@ -1042,6 +1052,15 @@ impl Arm7tdmi {
     /// Handle SWI calls with High-Level Emulation
     /// Returns true if handled, false if BIOS should handle it
     fn handle_swi_hle(&mut self, swi_num: u32, old_cpsr: Psr, return_addr: u32) -> bool {
+        // v2.0 S0': give the embedder first refusal. `get` on a Copy field
+        // keeps the borrow of `self` from overlapping the `&mut self` we
+        // hand to the hook.
+        if let Some(hook) = self.swi_hook {
+            if hook(self, swi_num, old_cpsr, return_addr) {
+                return true;
+            }
+        }
+
         match swi_num {
             // SWI 0x00: SoftReset - Reset the GBA
             0x00 => {
@@ -1323,8 +1342,12 @@ impl Arm7tdmi {
         }
     }
 
-    /// Helper to return from a SWI HLE implementation
-    const fn swi_return(&mut self, old_cpsr: Psr, return_addr: u32) {
+    /// Helper to return from a SWI HLE implementation.
+    ///
+    /// v2.0 S0': made `pub` so an installed `SwiHook` can complete its own
+    /// return sequence; without it a hook could service the call but not
+    /// return from it.
+    pub const fn swi_return(&mut self, old_cpsr: Psr, return_addr: u32) {
         // Restore old CPU state
         self.cpsr = old_cpsr;
 
@@ -1335,6 +1358,27 @@ impl Arm7tdmi {
         self.flush_pipeline();
     }
 }
+
+/// Optional external SWI implementation, supplied by the embedder.
+///
+/// v2.0 S0' (GBAEUX11): the real GBA BIOS implements SWI 0x00-0x2A in
+/// machine code. `handle_swi_hle` below covers 0x00-0x0C only, and its
+/// `_ => false` arm falls through to the real BIOS image -- which a stub
+/// BIOS does not implement, so the behaviour would be undefined. The
+/// embedder installs one of these to take priority over the built-in
+/// `match`, which both fills the gaps and allows overriding the arms that
+/// exist but are shells.
+///
+/// Takes `&mut Arm7tdmi` so implementations can read and write the BIOS
+/// interrupt flags at 03007FF8h, set the return address via `swi_return`,
+/// and touch the register file. Returning `false` means "not handled" and
+/// falls through to the built-in `match`.
+///
+/// A plain `fn` pointer (not a trait object) keeps `Arm7tdmi` `Copy`-free
+/// and, more importantly, keeps this crate free of any back-reference to
+/// the embedder: the embedder is a *caller* of this crate, not a
+/// dependency of it.
+pub type SwiHook = fn(&mut Arm7tdmi, u32, Psr, u32) -> bool;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum HalfwordTransferKind {

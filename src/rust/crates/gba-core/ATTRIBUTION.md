@@ -67,32 +67,53 @@ inheritance:
 
 `[lints.clippy]` was carried over unchanged.
 
-### 3.2 Source files — **none modified**
+### 3.2 Source files — 5 local changes, all S0' extension-point wiring
 
-`crates/gba-core/src/**` is byte-identical to upstream `emu/src/**`. Verified at
-vendor time by direct copy. The only planned source change is the SWI
-`match` extension inside `handle_swi_hle` (plan section 5.2), which lands in
-**S1b**, not S0 — and even then it is additive (`_ => false` branches already
-exist at `arm7tdmi.rs:1322`, so a failing SWI falls back rather than trapping).
+`crates/gba-core/src/**` was byte-identical to upstream `emu/src/**` at the end
+of **S0** (verified file-by-file with SHA-256). Local edits begin at **S0'**, when
+the core was given the hook it needs before any SWI can be supplied from
+outside — `handle_swi_hle` is a private method, so there is no other way.
 
-### 3.3 `crates/f11gba` — new crate, no upstream code
+All five are in `src/cpu/arm7tdmi.rs`:
 
-`f11gba` is entirely new: the C ABI boundary. It depends on `gba-core` by path
-and adds no third-party code. Its C ABI surface is specified in the v2.0 plan
-section 4.1; S0 exports only the `gba_abi_revision()` probe symbol, with the
-real surface landing in S2.
+| # | Change | Why |
+|---|--------|-----|
+| 1 | Added `pub type SwiHook = fn(&mut Arm7tdmi, u32, Psr, u32) -> bool;` | Lets the embedder service SWI 0x00-0x2A. A plain `fn` pointer, not a trait object, keeps the dependency one-directional: the embedder calls this crate, never the reverse. |
+| 2 | Added `#[serde(skip)] pub swi_hook: Option<SwiHook>` on `Arm7tdmi` | The field itself. `serde(skip)` because a function pointer has no meaning to restore, and loading a savestate must not depend on it. |
+| 3 | `impl Default for Arm7tdmi` initialises it to `None` | Required by the manual `Default` impl. |
+| 4 | `handle_swi_hle` consults the hook before its own `match` | The seam. The hook gets first refusal, so it can both fill gaps and override the arms that exist but are shells. |
+| 5 | `swi_return` made `pub` | Without it a hook could service a call but not return from it. |
+
+No upstream logic was altered: the existing `match` arms, the `_ => false`
+fallback, and every other function body are untouched.
+
+> Upstream line references (for a future re-vendor check): struct at
+> `cpu/arm7tdmi.rs:144`, `Default` at `:217`, hook dispatch site
+> `handle_swi_hle` at `:1044`, `swi_return` at `:1327`.
+
+### 3.3 `src/gba/` — new code, no upstream content
+
+`src/rust/src/gba/` is entirely first-party: the SWI implementations and the
+C ABI. It is a plain **module of the root crate**, not a `crates/f11gba`
+crate — see the v2.0 plan's R14 and the r8 entry for why a separate crate does
+not build on rustc 1.96 fat LTO. Its C ABI surface is specified in the v2.0
+plan section 4.1; S0' exposes the probe surface only, with the real surface
+landing in S2.
 
 ## 4. Patch-set size
 
 | Item | Status |
 |---|---|
-| `gba-core` source patches | **0** (byte-identical to upstream) |
+| `gba-core` source changes | **5**, all S0' hook wiring in one file (`src/cpu/arm7tdmi.rs`); no upstream logic altered |
 | `gba-core/Cargo.toml` | rewritten (metadata only, no version changes) |
-| `crates/f11gba` | new, 100% first-party |
+| `src/gba/` | new, 100% first-party, 5 files |
 
-The plan's risk **R1** says "keep the patch set minimal (SWI hook only)". As of
-S0 the patch set is empty, which is the strongest possible position for that
-risk.
+The plan's risk **R1** says "keep the patch set minimal (SWI hook only)". Five
+additive edits in a single file, none of which change upstream behaviour, is
+the tightest position that is still reachable — the alternative (implementing
+SWI inside this crate) would be a far larger divergence.
+
+Every change is `#[serde(skip)]`-safe and therefore invisible to savestates.
 
 ## 5. Update procedure
 

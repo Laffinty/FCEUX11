@@ -247,6 +247,9 @@ fn merge_headers(
     // real section 4.1 surface.
     output.push_str("uint32_t gba_abi_revision(void);\n");
     output.push_str("uint32_t gba_core_probe(void);\n");
+    output.push_str("uint32_t gba_swi_probe(void);\n");
+    output.push_str("uint32_t gba_swi_count(void);\n");
+    output.push_str("uint32_t gba_probe_lz77_header(uint32_t raw);\n");
 
     output.push_str("\n#ifdef __cplusplus\n}\n#endif\n\n");
     output.push_str("#endif /* FCEUX11_RUST_H */\n");
