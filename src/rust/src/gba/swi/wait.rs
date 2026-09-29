@@ -82,6 +82,15 @@ impl IntrWaitRequest {
         }
     }
 
+    /// Whether the flag this request waits for is present, in either mode.
+    ///
+    /// This is the *wake-up* test, and it has to ignore the mode: `AlwaysWait`
+    /// refuses to short-circuit before sleeping, but a sleeping CPU that
+    /// refuses to wake up would hang the machine forever.
+    pub fn is_set(&self, flags: u8) -> bool {
+        flags & BIOS_FLAGS_MASK & self.wanted == self.wanted
+    }
+
     /// The flags word after this wait completes. Only the wanted bits are
     /// cleared; the BIOS never touches bits the caller did not ask about.
     pub fn flags_after(&self, flags: u8) -> u8 {

@@ -11,24 +11,139 @@ pub mod wait;
 use gba_core::cpu::arm7tdmi::Arm7tdmi;
 use gba_core::cpu::psr::Psr;
 
+use wait::{IntrWaitRequest, LowPower};
+
 /// Handle one SWI.
 ///
 /// Returns `true` if we serviced it (the core then returns from the
 /// exception), `false` to let the core's own `match` try.
 pub fn dispatch(cpu: &mut Arm7tdmi, swi_num: u32, old_cpsr: Psr, return_addr: u32) -> bool {
-    let _ = (cpu, old_cpsr, return_addr);
     #[cfg(test)]
     note_dispatch(swi_num);
     let swi = Swi::from_raw(swi_num);
-    if tracing_enabled() {
-        match swi {
-            Some(s) => eprintln!("[gba] swi {swi_num:#04x} {}: not implemented", s.name()),
-            None => eprintln!("[gba] swi {swi_num:#04x}: outside 0x00-0x2A"),
+    match swi {
+        Some(Swi::Halt) | Some(Swi::Stop) => {
+            enter_low_power(cpu, old_cpsr, return_addr, swi);
+            true
+        }
+        Some(Swi::IntrWait) | Some(Swi::VBlankIntrWait) => {
+            enter_intr_wait(cpu, old_cpsr, return_addr, swi_num);
+            true
+        }
+        None | Some(_) => {
+            if tracing_enabled() {
+                match swi {
+                    Some(s) => eprintln!("[gba] swi {swi_num:#04x} {}: not implemented", s.name()),
+                    None => eprintln!("[gba] swi {swi_num:#04x}: outside 0x00-0x2A"),
+                }
+            }
+            false
         }
     }
-    // S0' proves the seam only: nothing is claimed yet, so every call falls
-    // through to the core's own match and then to the real BIOS. S1 claims
-    // numbers one at a time (T1-b first, then T1-d, then T2).
+}
+
+/// Park the core until an enabled interrupt arrives.
+///
+/// `Halt` and `Stop` share everything except *why* the CPU wakes, and the
+/// difference is not modelled this round: both wake on any enabled interrupt.
+/// GBATEK has `Stop` exit on a condition selected through the control
+/// register at `04000301h`; games essentially never use `Stop`, and modelling
+/// that register faithfully is recorded as a known limitation rather than
+/// guessed at. `wake_hook = None` is what makes the core's guard treat any
+/// enabled interrupt as sufficient.
+fn enter_low_power(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32, swi: Option<Swi>) {
+    if tracing_enabled() {
+        if let Some(mode) = swi.and_then(|s| match s {
+            Swi::Halt => Some(LowPower::Halt),
+            Swi::Stop => Some(LowPower::Stop),
+            _ => None,
+        }) {
+            eprintln!("[gba] swi {}: entering {mode:?}", mode.swi_number());
+        }
+    }
+    PENDING_INTR_WAIT.with(|pending| pending.set(None));
+    cpu.wake_hook = None;
+    // Return to the caller *first*, then sleep: the instruction after the SWI
+    // is the one the CPU stops at, which is what makes a resume land in the
+    // right place.
+    cpu.swi_return(old_cpsr, return_addr);
+    cpu.halted = true;
+}
+
+// The `IntrWait` / `VBlankIntrWait` request the machine is currently asleep on.
+//
+// Thread-local because the wake predicate the core stores is a bare `fn`
+// pointer with nowhere to carry state. One simulation thread per machine is
+// the §4.1 contract, so this is one outstanding wait at a time.
+thread_local! {
+    static PENDING_INTR_WAIT: std::cell::Cell<Option<IntrWaitRequest>> =
+        const { std::cell::Cell::new(None) };
+}
+
+fn read_bios_flags(cpu: &mut Arm7tdmi) -> u8 {
+    cpu.bus.read_byte(wait::BIOS_FLAGS_ADDR as usize)
+}
+
+fn write_bios_flags(cpu: &mut Arm7tdmi, flags: u8) {
+    cpu.bus.write_byte(wait::BIOS_FLAGS_ADDR as usize, flags);
+}
+
+/// Serve an `IntrWait`, or sleep until its flag arrives.
+fn enter_intr_wait(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32, swi_num: u32) {
+    let request = if swi_num == Swi::VBlankIntrWait as u32 {
+        wait::vblank_intr_wait()
+    } else {
+        // r0 is a mask of the flags to wait for, r1 selects the mode.
+        IntrWaitRequest::decode(cpu.registers.register_at(0), cpu.registers.register_at(1))
+    };
+
+    if request.is_unsatisfiable() {
+        // The BIOS would block forever on a request that names no defined
+        // flag. Returning instead of hanging turns a wedged machine into a
+        // visible no-op, and the trace says which number it was.
+        if tracing_enabled() {
+            eprintln!("[gba] swi {swi_num:#04x}: IntrWait names no defined flag, returning");
+        }
+        cpu.swi_return(old_cpsr, return_addr);
+        return;
+    }
+
+    let flags = read_bios_flags(cpu);
+    if request.satisfied_by(flags) {
+        // Already satisfied: take the flag we were asked for and go. The BIOS
+        // clears the flag it consumed, which is what lets a later
+        // `VBlankIntrWait` wait for the *next* frame.
+        write_bios_flags(cpu, request.flags_after(flags));
+        cpu.swi_return(old_cpsr, return_addr);
+        return;
+    }
+
+    PENDING_INTR_WAIT.with(|pending| pending.set(Some(request)));
+    cpu.wake_hook = Some(wake_for_intr_wait);
+    cpu.swi_return(old_cpsr, return_addr);
+    cpu.halted = true;
+}
+
+/// Wake predicate: keep sleeping until the awaited flag is set, then consume it.
+///
+/// Returning `true` means "stay asleep", which is what lets one interrupt wake
+/// a `Halt` but not an `IntrWait` that is waiting for a different group.
+fn wake_for_intr_wait(cpu: &mut Arm7tdmi) -> bool {
+    let Some(request) = PENDING_INTR_WAIT.with(|pending| pending.take()) else {
+        return false;
+    };
+    let flags = read_bios_flags(cpu);
+    if !request.is_set(flags) {
+        PENDING_INTR_WAIT.with(|pending| pending.set(Some(request)));
+        if tracing_enabled() {
+            eprintln!(
+                "[gba] IntrWake: flag {:#04x} not set yet, staying asleep",
+                flags
+            );
+        }
+        return true;
+    }
+    write_bios_flags(cpu, request.flags_after(flags));
     false
 }
 
@@ -36,8 +151,7 @@ pub fn dispatch(cpu: &mut Arm7tdmi, swi_num: u32, old_cpsr: Psr, return_addr: u3
 ///
 /// Off by default: stderr in a shipping build is a firehose, and the jsmolka
 /// suite drives thousands of SWIs. The S0' self-test turns it on.
-static TRACE_SWI: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
+static TRACE_SWI: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// Turn SWI tracing on or off. Simulation thread only.
 pub fn set_trace(on: bool) {
@@ -197,7 +311,7 @@ impl Swi {
 
 #[cfg(test)]
 mod tests {
-    use super::{Swi, dispatch, take_last_dispatch};
+    use super::{Swi, dispatch, read_bios_flags, take_last_dispatch, write_bios_flags};
     use crate::gba::install_swi_hook;
     use gba_core::gba::Gba;
 
@@ -264,19 +378,307 @@ mod tests {
         assert_eq!(swi_seen_by_dispatch(0x2B), Some(0x2B));
     }
 
-    /// S0' claims nothing: every number falls through to the core's own
-    /// match. Claiming is S1's job, and this test is what fails the day one
-    /// lands without its own coverage.
+    /// S0' claimed nothing and this test was written to fail the day a number
+    /// landed. It has now been replaced by the claim set S1a-1 actually
+    /// implements: the wait family, and nothing else.
     #[test]
-    fn s0_dispatch_claims_nothing() {
+    fn dispatch_claims_exactly_the_wait_family() {
+        let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
+        let cpsr = gba.cpu.cpsr;
+        let claimed: Vec<u32> = (0..=0xFFu32)
+            .filter(|n| dispatch(&mut gba.cpu, *n, cpsr, ROM_BASE))
+            .collect();
+        for expected in [
+            Swi::Halt as u32,
+            Swi::Stop as u32,
+            Swi::IntrWait as u32,
+            Swi::VBlankIntrWait as u32,
+        ] {
+            assert!(
+                claimed.contains(&expected),
+                "SWI {expected:#04x} must be claimed"
+            );
+        }
+        // Everything outside the wait family still has to fall through to the
+        // core, so T1-d (decompressors) and T2 (math) can land one at a time.
+        assert_eq!(
+            claimed,
+            vec![
+                Swi::Halt as u32,
+                Swi::Stop as u32,
+                Swi::IntrWait as u32,
+                Swi::VBlankIntrWait as u32
+            ],
+            "only the wait family is claimed so far"
+        );
+    }
+
+    /// A number we decline must leave the machine exactly as it was -- no
+    /// sleep, no wake predicate, no BIOS flag touched. This is what lets the
+    /// core's own `match` and the real BIOS keep their say for every number we
+    /// have not implemented yet.
+    #[test]
+    fn declining_a_number_has_no_side_effects() {
         let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
         let cpsr = gba.cpu.cpsr;
         for n in 0..=0xFFu32 {
+            let is_wait = matches!(
+                Swi::from_raw(n),
+                Some(Swi::Halt | Swi::Stop | Swi::IntrWait | Swi::VBlankIntrWait)
+            );
+            if is_wait {
+                continue;
+            }
+            assert!(!dispatch(&mut gba.cpu, n, cpsr, ROM_BASE), "{n:#04x}");
+            assert!(!gba.cpu.halted, "SWI {n:#04x} parked the machine");
             assert!(
-                !dispatch(&mut gba.cpu, n, cpsr, ROM_BASE),
-                "S0' must not claim SWI {n:#04x}"
+                gba.cpu.wake_hook.is_none(),
+                "SWI {n:#04x} installed a wake predicate"
             );
         }
+        assert_eq!(
+            read_bios_flags(&mut gba.cpu),
+            0,
+            "declining must not touch the BIOS flag word"
+        );
+    }
+
+    /// A cartridge whose entry point is the given ARM program.
+    ///
+    /// The words start at ROM offset 8: the pipeline executes the instruction
+    /// at `PC` after a warm-up, and setting the program counter to
+    /// `ROM_BASE + 8` makes offset 8 the one that runs.
+    fn cart_with_program(words: &[u32]) -> Vec<u8> {
+        let mut rom = vec![0u8; 0x200];
+        for (i, word) in words.iter().enumerate() {
+            let at = 8 + i * 4;
+            rom[at..at + 4].copy_from_slice(&word.to_le_bytes());
+        }
+        rom[0xC0..0xC4].copy_from_slice(&ROM_BASE.to_le_bytes());
+        rom
+    }
+
+    /// A machine already positioned to run `cart_with_program`.
+    fn machine(program: &[u32]) -> gba_core::gba::Gba {
+        let mut gba = Gba::new([0u8; 0x4000], &cart_with_program(program));
+        install_swi_hook(&mut gba);
+        gba.cpu.registers.set_program_counter(ROM_BASE + 8);
+        gba
+    }
+
+    /// Run until the CPU parks, and report whether it did.
+    fn run_until_halted(gba: &mut gba_core::gba::Gba, max_steps: usize) -> bool {
+        (0..max_steps).any(|_| {
+            gba.step();
+            gba.cpu.halted
+        })
+    }
+
+    /// Run a fixed number of cycles. Used where the point is that the CPU
+    /// keeps going, so "did it park" is not the question being asked.
+    fn run(gba: &mut gba_core::gba::Gba, steps: usize) {
+        for _ in 0..steps {
+            gba.step();
+        }
+    }
+
+    const IRQ_HALT: u32 = 0xE3A0_5034; // mov r5, #0x34
+    const PARK: u32 = 0xEAFF_FFFE; // b .
+
+    /// `Halt` has to actually stop the CPU: the instruction after the SWI must
+    /// not run, and the machine must keep advancing anyway, because that is
+    /// what lets an interrupt ever arrive.
+    #[test]
+    fn halt_stops_the_cpu_and_the_machine_keeps_running() {
+        let program = [arm_swi(0x02), IRQ_HALT, PARK];
+        let mut gba = machine(&program);
+        assert!(run_until_halted(&mut gba, 32), "SWI 0x02 did not halt");
+
+        let cycles_at_halt = gba.cpu.current_cycle;
+        for _ in 0..64 {
+            gba.step();
+        }
+        assert!(
+            gba.cpu.halted,
+            "a Halt with interrupts disabled must stay asleep"
+        );
+        assert_eq!(
+            gba.cpu.registers.register_at(5),
+            0,
+            "the instruction after SWI 0x02 ran while halted"
+        );
+        assert!(
+            gba.cpu.current_cycle > cycles_at_halt,
+            "the machine clock stopped while the CPU slept"
+        );
+    }
+
+    /// Arm a keypad interrupt, the one source a test can raise without
+    /// waiting a frame for VBlank. IF is *not* written directly: on hardware
+    /// (and in this core) writing 1 to a request bit clears it, so software
+    /// cannot conjure a pending interrupt -- it has to come from a peripheral.
+    fn press_key_to_raise_an_irq(gba: &mut gba_core::gba::Gba) {
+        // KEYCNT: bit 14 enables the interrupt, bits 0-9 select the keys,
+        // bit 15 would mean AND; 0 means "any selected key".
+        gba.cpu.bus.keypad.key_interrupt_control = (1 << 14) | 0x0001;
+        // KEYINPUT is active low: clear bit 0 to press A.
+        gba.cpu.bus.keypad.key_input &= !0x0001;
+        gba.cpu.bus.write_half_word(0x0400_0200, 1 << 12); // IE  = keypad
+        gba.cpu.bus.write_half_word(0x0400_0208, 0x0001); // IME = enable
+    }
+
+    /// An enabled interrupt wakes `Halt`, and it is taken in the same cycle:
+    /// the CPU must land on the BIOS IRQ vector, not execute one more
+    /// instruction first.
+    ///
+    /// The interrupt is raised *after* the CPU parks. Raising it first would
+    /// have the IRQ taken long before the cartridge reached its `SWI`.
+    #[test]
+    fn halt_wakes_on_an_enabled_interrupt() {
+        let program = [arm_swi(0x02), IRQ_HALT, PARK];
+        let mut gba = machine(&program);
+        assert!(run_until_halted(&mut gba, 32), "SWI 0x02 did not halt");
+        assert!(gba.cpu.halted, "it should still be asleep before the IRQ");
+
+        press_key_to_raise_an_irq(&mut gba);
+
+        // The keypad raises IF from the bus step, so the wake lands on a later
+        // cycle than the one where the key state was written -- the same lag
+        // real hardware has between a key press and the interrupt.
+        let woke = (0..8).any(|_| {
+            gba.step();
+            !gba.cpu.halted
+        });
+        assert!(woke, "an enabled interrupt must wake a Halt");
+        assert_eq!(
+            gba.cpu.registers.program_counter(),
+            0x18,
+            "the IRQ must be taken on the same cycle we wake, not a cycle later"
+        );
+    }
+
+    /// With the master enable clear, nothing wakes the CPU -- a machine left
+    /// asleep with interrupts off is how a hang reproduces.
+    #[test]
+    fn halt_does_not_wake_while_interrupts_are_masked() {
+        let program = [arm_swi(0x02), IRQ_HALT, PARK];
+        let mut gba = machine(&program);
+        gba.cpu.bus.write_half_word(0x0400_0200, 0x0001); // IE = VBlank
+        gba.cpu.bus.write_half_word(0x0400_0202, 0x0001); // IF = VBlank
+        gba.cpu.bus.write_half_word(0x0400_0208, 0x0000); // IME = disabled
+
+        assert!(run_until_halted(&mut gba, 32), "SWI 0x02 did not halt");
+        for _ in 0..64 {
+            gba.step();
+        }
+        assert!(gba.cpu.halted, "a pending but masked IRQ must not wake us");
+    }
+
+    /// `IntrWait` is the reason the wake predicate exists: an interrupt is
+    /// pending, but the wait is for one specific BIOS flag, and until the game
+    /// reports it the CPU stays asleep. `Halt` would have woken here.
+    #[test]
+    fn intr_wait_ignores_interrupts_it_did_not_ask_for() {
+        // r0 = 1 (VBlank flag), r1 = 0 (return if already set).
+        let program = [
+            0xE3A0_0001,   // mov r0, #1
+            arm_swi(0x04), // swi IntrWait
+            IRQ_HALT,
+            PARK,
+        ];
+        let mut gba = machine(&program);
+        assert!(
+            run_until_halted(&mut gba, 32),
+            "SWI 0x04 should have slept waiting for the VBlank flag"
+        );
+
+        // Now a keypad interrupt actually arrives, and the game's handler has
+        // not reported the flag yet. A Halt would wake here; IntrWait must not.
+        press_key_to_raise_an_irq(&mut gba);
+        run(&mut gba, 32);
+        assert!(
+            gba.cpu.halted,
+            "a pending IRQ must not satisfy an IntrWait that wants a flag"
+        );
+        assert_eq!(read_bios_flags(&mut gba.cpu), 0, "no flag was reported");
+
+        // Now the game's handler reports VBlank, and the wait is over.
+        write_bios_flags(&mut gba.cpu, 0x01);
+        gba.step();
+        assert!(!gba.cpu.halted, "the reported flag must wake the wait");
+    }
+
+    /// A satisfied wait consumes the flag it was waiting for. That is what
+    /// lets the next `VBlankIntrWait` wait for the *next* frame instead of
+    /// returning immediately forever.
+    #[test]
+    fn intr_wait_consumes_the_flag_it_waited_for() {
+        let program = [
+            0xE3A0_0001,   // mov r0, #1
+            arm_swi(0x04), // swi IntrWait -- already satisfied, must not sleep
+            IRQ_HALT,
+            PARK,
+        ];
+        let mut gba = machine(&program);
+        write_bios_flags(&mut gba.cpu, 0x01 | 0x02);
+
+        run(&mut gba, 16);
+        assert!(
+            !gba.cpu.halted,
+            "an already-set flag must not make us sleep"
+        );
+        assert_eq!(
+            gba.cpu.registers.register_at(5),
+            0x34,
+            "the SWI returned and execution carried on"
+        );
+        assert_eq!(
+            read_bios_flags(&mut gba.cpu),
+            0x02,
+            "the waited-for bit must be cleared, the others untouched"
+        );
+    }
+
+    /// `VBlankIntrWait` is `IntrWait(1, 1)`, and the trailing 1 is the whole
+    /// point: it must sleep even when the flag is already set.
+    #[test]
+    fn vblank_intr_wait_always_sleeps() {
+        let program = [arm_swi(0x05), IRQ_HALT, PARK];
+        let mut gba = machine(&program);
+        write_bios_flags(&mut gba.cpu, 0x01);
+
+        assert!(
+            run_until_halted(&mut gba, 32),
+            "execution never reached the SWI"
+        );
+        assert!(
+            gba.cpu.halted,
+            "VBlankIntrWait must always sleep, flag or no flag"
+        );
+    }
+
+    /// A request that names none of the four defined flags can never be
+    /// satisfied. The BIOS would block forever; we return instead, so a
+    /// mistaken argument shows up as a no-op rather than a wedged machine.
+    #[test]
+    fn intr_wait_on_an_undefined_flag_returns_instead_of_hanging() {
+        let program = [
+            0xE3A0_0010,   // mov r0, #0x10 -- bit 4, not a defined flag
+            arm_swi(0x04), // swi IntrWait
+            IRQ_HALT,
+            PARK,
+        ];
+        let mut gba = machine(&program);
+        run(&mut gba, 16);
+        assert!(
+            !gba.cpu.halted,
+            "an unsatisfiable wait must not park the CPU"
+        );
+        assert_eq!(
+            gba.cpu.registers.register_at(5),
+            0x34,
+            "the SWI returned and execution carried on"
+        );
     }
 
     /// `from_raw` is the table S1 will claim numbers out of; a number it

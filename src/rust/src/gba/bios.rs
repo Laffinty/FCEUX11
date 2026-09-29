@@ -160,14 +160,8 @@ mod tests {
     use gba_core::gba::Gba;
 
     fn word(addr: usize) -> u32 {
-        u32::from_le_bytes([
-            STUB[addr],
-            STUB[addr + 1],
-            STUB[addr + 2],
-            STUB[addr + 3],
-        ])
+        u32::from_le_bytes([STUB[addr], STUB[addr + 1], STUB[addr + 2], STUB[addr + 3]])
     }
-
     /// The image is exactly the BIOS aperture, and nothing outside the vectors
     /// and the two code blocks is populated. A stray write into the middle of
     /// the aperture would decode as instructions and run at some address we do

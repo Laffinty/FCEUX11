@@ -74,7 +74,9 @@ of **S0** (verified file-by-file with SHA-256). Local edits begin at **S0'**, wh
 the core was given the hook it needs before any SWI can be supplied from
 outside — `handle_swi_hle` is a private method, so there is no other way.
 
-All five are in `src/cpu/arm7tdmi.rs`:
+All nine are in `src/cpu/arm7tdmi.rs`:
+
+**S0' — the SWI seam (5)**
 
 | # | Change | Why |
 |---|--------|-----|
@@ -84,12 +86,30 @@ All five are in `src/cpu/arm7tdmi.rs`:
 | 4 | `handle_swi_hle` consults the hook before its own `match` | The seam. The hook gets first refusal, so it can both fill gaps and override the arms that exist but are shells. |
 | 5 | `swi_return` made `pub` | Without it a hook could service a call but not return from it. |
 
-No upstream logic was altered: the existing `match` arms, the `_ => false`
-fallback, and every other function body are untouched.
+**S1a-1 — the halt mechanism (4)**
 
-> Upstream line references (for a future re-vendor check): struct at
-> `cpu/arm7tdmi.rs:144`, `Default` at `:217`, hook dispatch site
-> `handle_swi_hle` at `:1044`, `swi_return` at `:1327`.
+The wait family needs the core to *stop executing instructions*, and that
+cannot be done from outside this crate: `Bus::step` is `pub(crate)`
+(`bus.rs:1214`), so an embedder has no way to advance the LCD and timers
+without also stepping the CPU. This is the documented breach of the plan's
+risk R1 ("keep the patch set minimal — SWI hook only"), registered as **R15**.
+
+| # | Change | Why |
+|---|--------|-----|
+| 6 | Added `pub halted: bool` on `Arm7tdmi` | The state the four wait-class SWIs need. Serialized, not skipped: a halted CPU is real machine state, and a savestate that lost it would resume a game that was supposed to be asleep. |
+| 7 | Added `pub type WakeHook = fn(&mut Arm7tdmi) -> bool;` and `#[serde(skip)] pub wake_hook: Option<WakeHook>` | `Halt` wakes on any enabled interrupt, but `IntrWait` must stay asleep until the *specific* BIOS flag it asked for appears, and `IntrWait(1, 1)` must not return early even when that flag is already set. Those are BIOS-level semantics the core cannot know, so it asks once per halted cycle. |
+| 8 | `impl Default for Arm7tdmi` initialises `halted: false` and `wake_hook: None` | Same reason as #3. |
+| 9 | `step()` gained a halt guard, and `Arm7tdmi::new` clears the CPSR I bit | The guard runs no instruction but still calls `bus.step()`, so peripherals keep their clocks — which is the only reason an interrupt can arrive. It sits **once**, before the ARM/Thumb `match`, so one insertion covers both execution paths, and the pipeline is left untouched so the CPU resumes on the instruction it would have run next. The I-bit clear is the other half of the BIOS reset state this crate already pre-initialises (see `initialize_stack_pointers`): ARM resets with CPSR bit 7 set, nothing else in the crate ever cleared it, and a permanently masked CPU can never take an interrupt. |
+
+Upstream line references (for a future re-vendor check): struct at
+`cpu/arm7tdmi.rs:144`, `Default` at `:217`, hook dispatch site
+`handle_swi_hle` at `:1044`, `swi_return` at `:1327`, `step()` at `:705`,
+`Bus::step` at `bus.rs:1214`, `Arm7tdmi::new` at `:830`.
+
+> Entries 6-9 do change upstream behaviour — the `0x02` and `0x03..=0x05` arms
+> and the `_ => false` fallback are untouched, but `step()` now has a branch it
+> did not have. That is deliberate and is what the embedder's wait family needs;
+> it is the reason R15 exists.
 
 ### 3.3 `src/gba/` — new code, no upstream content
 
@@ -104,16 +124,27 @@ landing in S2.
 
 | Item | Status |
 |---|---|
-| `gba-core` source changes | **5**, all S0' hook wiring in one file (`src/cpu/arm7tdmi.rs`); no upstream logic altered |
+| `gba-core` source changes | **9**, all in one file (`src/cpu/arm7tdmi.rs`): 5 S0' hook wiring (no upstream logic altered) + 4 S1a-1 halt mechanism (**does change `step()`** — see R15) |
 | `gba-core/Cargo.toml` | rewritten (metadata only, no version changes) |
-| `src/gba/` | new, 100% first-party, 5 files |
+| `src/gba/` | new, 100% first-party, 6 files |
 
 The plan's risk **R1** says "keep the patch set minimal (SWI hook only)". Five
 additive edits in a single file, none of which change upstream behaviour, is
 the tightest position that is still reachable — the alternative (implementing
 SWI inside this crate) would be a far larger divergence.
 
-Every change is `#[serde(skip)]`-safe and therefore invisible to savestates.
+**S1a-1 breaks that constraint and says so.** Four more edits (total **9**)
+add the halt mechanism, and unlike the first five they *do* change behaviour:
+`step()` gains a branch. This is not a preference — `Bus::step` being
+`pub(crate)` leaves no way to park the CPU from outside this crate — and it is
+registered as **R15** in the v2.0 plan rather than slipped in here. The four
+edits are kept as small as the feature allows: one guard, one state flag, one
+callback, one `Default` line each.
+
+The first five edits are `#[serde(skip)]`-safe and therefore invisible to
+savestates. Of the new four, `halted` is **serialized** (it is machine state);
+`wake_hook` is skipped like the SWI hook, and the embedder re-installs it after
+a load.
 
 ## 5. Update procedure
 

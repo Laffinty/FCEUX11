@@ -175,6 +175,23 @@ pub struct Arm7tdmi {
     /// audio state.
     #[serde(skip)]
     pub swi_hook: Option<SwiHook>,
+
+    /// Whether the CPU is halted: `SWI 0x02` (Halt), `SWI 0x03` (Stop) and
+    /// the wait family (`0x04`/`0x05`) all park the core here until an enabled
+    /// interrupt arrives, and peripherals keep running meanwhile.
+    ///
+    /// v2.0 S1a-1. Serialized, not skipped: a halted CPU is a real machine
+    /// state, and a savestate that lost it would resume a game that was
+    /// supposed to be asleep.
+    pub halted: bool,
+
+    /// Whether to stay asleep, consulted once per halted cycle.
+    ///
+    /// `serde(skip)` for the same reason as [`Self::swi_hook`]: a function
+    /// pointer has no savestate meaning, and the embedder re-installs both
+    /// hooks after a load.
+    #[serde(skip)]
+    pub wake_hook: Option<WakeHook>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -239,6 +256,8 @@ impl Default for Arm7tdmi {
             decoded_thumb: None,
             current_cycle: 0,
             swi_hook: None,
+            halted: false,
+            wake_hook: None,
         };
 
         // Setting ARM mode at startup
@@ -714,6 +733,33 @@ impl Arm7tdmi {
     /// Returns `true` if `VBlank` just started (a new frame is ready to display).
     pub fn step(&mut self) -> bool {
         self.current_cycle += 1;
+
+        // v2.0 S1a-1: a halted core runs no instructions, but the machine
+        // keeps running -- the LCD, the timers and DMA all keep their clocks,
+        // and that is the only reason an interrupt can ever arrive. The
+        // pipeline is deliberately left untouched, so the CPU resumes on the
+        // instruction it would have executed next.
+        //
+        // One guard here covers both execution paths: the ARM and Thumb arms
+        // of the `match` below share this function, so there is no second
+        // place where a halted CPU could slip through.
+        if self.halted {
+            let stay_asleep = match self.wake_hook {
+                Some(hook) => hook(self),
+                None => false,
+            };
+            let wake = !self.cpsr.irq_disable() && self.bus.is_irq_pending() && !stay_asleep;
+            if !wake {
+                return self.bus.step();
+            }
+            self.halted = false;
+            // Take the interrupt in the same cycle we wake, the way hardware
+            // does. Falling through would let one more instruction run before
+            // the handler is entered.
+            self.handle_exception(ExceptionType::Irq);
+            return self.bus.step();
+        }
+
         let initial_mode = self.cpsr.cpu_state();
 
         match initial_mode {
@@ -837,6 +883,18 @@ impl Arm7tdmi {
         // Initialize stack pointers for different modes
         // These values match what the GBA BIOS sets up
         cpu.initialize_stack_pointers();
+
+        // v2.0 S1a-1: leave the reset state the BIOS boot code would leave
+        // behind -- IRQs unmasked. `Psr::from(Mode::Supervisor)` starts with
+        // the ARM reset value, where CPSR bit 7 (I) is set, and nothing else
+        // in this crate ever clears it. A machine whose I bit stays set can
+        // never take an interrupt, so every game would sit in its `Halt`
+        // forever, and no test of the wait family could ever pass.
+        //
+        // The stub BIOS could clear it with `MSR CPSR_f, r0`; doing it here
+        // keeps the boot image free of an instruction whose core-side
+        // implementation is not verified yet.
+        cpu.cpsr.set_irq_disable(false);
 
         cpu
     }
@@ -1379,6 +1437,20 @@ impl Arm7tdmi {
 /// the embedder: the embedder is a *caller* of this crate, not a
 /// dependency of it.
 pub type SwiHook = fn(&mut Arm7tdmi, u32, Psr, u32) -> bool;
+
+/// Optional predicate consulted on every cycle the CPU spends halted.
+///
+/// v2.0 S1a-1 (GBAEUX11): `Halt` wakes on any enabled interrupt, but
+/// `IntrWait` has to stay asleep until the *specific* BIOS interrupt flag it
+/// was asked for is set, and `IntrWait(1, 1)` must not return early even if
+/// that flag is already set. The core cannot know any of that -- those are
+/// BIOS-level semantics -- so it asks, once per halted cycle, and continues
+/// sleeping while the answer is `true`.
+///
+/// Called only when an enabled interrupt is actually pending, so the common
+/// case costs one atomic-free `Option` read. Takes `&mut Arm7tdmi` so the
+/// implementation can read and clear the flag word at 03007FF8h.
+pub type WakeHook = fn(&mut Arm7tdmi) -> bool;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum HalfwordTransferKind {
