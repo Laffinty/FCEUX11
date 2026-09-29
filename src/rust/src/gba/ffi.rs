@@ -114,23 +114,24 @@ mod tests {
     /// the broken length decode survived.
     #[test]
     fn lz77_probe_reports_output_length_or_rejects() {
-        // Composed from the fields rather than written out: the size field
-        // starts at bit 24, so a hand-written word is easy to get wrong in a
-        // way that hides the bug this test exists for.
-        let unit_header = 0xA4 | (0x20 << 24) | (1 << 31);
-        let byte_header = 0x40 | (0x30 << 24);
+        // Composed from signature + size, the way a real block reads:
+        // `10 00 20 00` is an LZ77 block of 0x2000 bytes. Written as a literal
+        // it is easy to transpose the halves, which is how the two previous
+        // versions of this test ended up certifying a wrong decode.
+        let lz77_block: u32 = 0x10 | (0x2000 << 8);
+        let rl_block: u32 = 0x30 | (0x1234 << 8);
         assert_eq!(
-            gba_probe_lz77_header(unit_header),
-            0x20 * 8,
-            "unit-flagged headers are scaled to bytes"
+            gba_probe_lz77_header(lz77_block),
+            0x2000,
+            "the size is the top three bytes"
         );
         assert_eq!(
-            gba_probe_lz77_header(byte_header),
-            0x30,
-            "byte counts pass through untouched"
+            gba_probe_lz77_header(rl_block),
+            0x1234,
+            "run-length blocks share the header layout"
         );
         assert_eq!(
-            gba_probe_lz77_header(0),
+            gba_probe_lz77_header(0x10),
             0,
             "a zero output length is corrupt"
         );
