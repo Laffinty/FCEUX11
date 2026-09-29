@@ -107,18 +107,27 @@ mod tests {
     /// The LZ77 probe answers in output bytes and rejects a corrupt header
     /// with zero, which is the only value a caller can tell apart from a
     /// one-byte result.
+    ///
+    /// The headers here carry a non-zero compressed length, because a real one
+    /// always does. The pre-S1b probe test used `0x8000_0100`, whose low 24
+    /// bits are zero -- precisely the case that never occurs, and the reason
+    /// the broken length decode survived.
     #[test]
     fn lz77_probe_reports_output_length_or_rejects() {
-        // Bit 31 set: the second field counts 8-byte units. 0x100 units.
+        // Composed from the fields rather than written out: the size field
+        // starts at bit 24, so a hand-written word is easy to get wrong in a
+        // way that hides the bug this test exists for.
+        let unit_header = 0xA4 | (0x20 << 24) | (1 << 31);
+        let byte_header = 0x40 | (0x30 << 24);
         assert_eq!(
-            gba_probe_lz77_header(0x8000_0100),
-            0x100 * 8,
+            gba_probe_lz77_header(unit_header),
+            0x20 * 8,
             "unit-flagged headers are scaled to bytes"
         );
         assert_eq!(
-            gba_probe_lz77_header(0x200),
-            0x200,
-            "byte counts pass through"
+            gba_probe_lz77_header(byte_header),
+            0x30,
+            "byte counts pass through untouched"
         );
         assert_eq!(
             gba_probe_lz77_header(0),
