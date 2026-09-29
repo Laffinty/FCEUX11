@@ -1383,7 +1383,7 @@ build plan (section 11 item 3) points at instead.
 
 | Vendored crate | Upstream | Licence | Baseline commit | Attribution record |
 |---|---|---|---|---|
-| `src/rust/crates/gba-core/` (GBAEUX11 v2.0 S0, vendored 2026-09-28) | [clementine](https://github.com/RIP-Comm/clementine) — `emu/` hardware core only | MIT | `ee77922dd293b70e945458e104f3b2de794f0151` | [`src/rust/crates/gba-core/ATTRIBUTION.md`](../src/rust/crates/gba-core/ATTRIBUTION.md) · verbatim `LICENSE` copy · local patch set (5 SWI-hook edits) listed in that file |
+| `src/rust/crates/gba-core/` (GBAEUX11 v2.0 S0, vendored 2026-09-28) | [clementine](https://github.com/RIP-Comm/clementine) — `emu/` hardware core only | MIT | `ee77922dd293b70e945458e104f3b2de794f0151` | [`src/rust/crates/gba-core/ATTRIBUTION.md`](../src/rust/crates/gba-core/ATTRIBUTION.md) · verbatim `LICENSE` copy · local patch set (**9** edits: 5 SWI-hook wiring, 4 adding a halt guard that alters `step()` — risk R15) listed in that file |
 
 Local modifications are the project's own work and carry FCEUX11's licence;
 the upstream terms continue to apply to the vendored files they are applied to.

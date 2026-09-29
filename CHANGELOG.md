@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — GBAEUX11 v2.0 S1a-0 / S1a-1：stub BIOS 自建，wait 家族由空壳转真实现
+
+- **stub BIOS**（`src/gba/bios.rs`）：16 KB 镜像由 `const fn` 逐字写入，不引入交叉汇编器。
+  含复位向量（写 `WAITCNT=0x4317` 后跳卡带入口）、异常向量、IRQ 经 `0x03007FFC` 间接跳转
+  （对空指针做保护——跳过调用，而不是跳回复位制造新的未定义行为），其余向量一律自旋。
+  6 项锁测试，其中「合成卡带真的拿到控制权」是端到端判据。
+- **wait 家族真实现**（`T1-b`）：`Halt` / `Stop` / `IntrWait` / `VBlankIntrWait` 四个号码此前在核心里
+  是 `swi_return` 空壳——CPU 照常空转 100%，游戏不会停也不会被唤醒。现由核心的 `halted` 状态
+  加唤醒 hook 承接待机语义，四项转为真实现（6 项锁测试 + 变异验证）。
+  补丁集由 5 处增至 **9 处**，超出 R1「补丁集仅 SWI hook」的范围，登记为计划 **R15**。
+- **顺带修掉第二个上游缺陷**：ARM 复位时 CPSR 的 I 位为 1，核心内再无别处清它——
+  一个永久屏蔽中断的 CPU 永远取不到中断，任何游戏都会卡死在 `Halt` 里，而 wait 家族
+  的测试无一能过。已在 `Arm7tdmi::new` 清该位。
+- 锁测试 6 → **24 项**全绿；`ctest` **34/34**；`cargo check` 默认与 `--no-default-features` 两态均通过。
+
+### Fixed — GBAEUX11 v2.0：LZ77 压缩头解析的字段读法（两次读错，第二次是自己「修」错的）
+
+- 输出长度此前读成 `raw & 0x0FFFFFFF`，把**签名字节**并了进去；改过一次，改成 `(raw >> 24) & 0x7F`
+  —— 那是 **NDS/Wii** 的布局。**GBA 的正确读法是 `raw >> 8`**：字节 0 是签名（`0x10`/`0x20`/`0x30`），
+  字节 1–3 才是 24 位解压长度。两次的错误都被自建测试盖章通过，因为两次的测试向量都用了
+  低 24 位为零的头——真实文件不可能出现。现按字段拼装向量，并对越界字段 assert。
+
 ### Added — GBAEUX11 v2.0 S0 / S0'：GBA 核心接入构建链，SWI 接缝打通
 
 - **GBA 核心 vendor 进仓库**（clementine `emu/`，MIT，基线 `ee77922`），根 crate 持有 C ABI，

@@ -67,7 +67,7 @@ inheritance:
 
 `[lints.clippy]` was carried over unchanged.
 
-### 3.2 Source files — 5 local changes, all S0' extension-point wiring
+### 3.2 Source files — 9 local changes, all in `src/cpu/arm7tdmi.rs`
 
 `crates/gba-core/src/**` was byte-identical to upstream `emu/src/**` at the end
 of **S0** (verified file-by-file with SHA-256). Local edits begin at **S0'**, when
@@ -128,10 +128,8 @@ landing in S2.
 | `gba-core/Cargo.toml` | rewritten (metadata only, no version changes) |
 | `src/gba/` | new, 100% first-party, 6 files |
 
-The plan's risk **R1** says "keep the patch set minimal (SWI hook only)". Five
-additive edits in a single file, none of which change upstream behaviour, is
-the tightest position that is still reachable — the alternative (implementing
-SWI inside this crate) would be a far larger divergence.
+The plan's risk **R1** says "keep the patch set minimal (SWI hook only)". That
+constraint held for the first five edits and then broke — see below.
 
 **S1a-1 breaks that constraint and says so.** Four more edits (total **9**)
 add the halt mechanism, and unlike the first five they *do* change behaviour:
