@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — GBAEUX11 v2.0 S0 / S0'：GBA 核心接入构建链，SWI 接缝打通
+
+- **GBA 核心 vendor 进仓库**（clementine `emu/`，MIT，基线 `ee77922`），根 crate 持有 C ABI，
+  `CMake → cargo → staticlib → header` 链路接通；GBA 逻辑作为根 crate 的模块存在而非独立 crate
+  （rustc 1.96 fat LTO 跨不过中间那层 rlib，见计划 R14 / r8）。关闭 `gba` feature 时整棵 vendor 树
+  退出编译图，NES 侧不承担任何成本。
+- **SWI 接缝打通**：核心侧新增 `swi_hook` 扩展点（共 5 处本地修改，登记在
+  `src/rust/crates/gba-core/ATTRIBUTION.md`），根 crate 在初始化时用函数指针注入。ROM 里真实的
+  `SWI` 指令会带着它编码的号码进到我们的分派函数 —— 这一点由 6 项锁测试证明，不是靠「指针装上了」
+  这种删掉调用点也照样成立的弱断言。
+- **顺带修掉一个会让模拟器直接崩的缺陷**：`gba_core_probe()` / `gba_swi_probe()` 传了过短的卡带镜像，
+  核心解析卡带头越界 panic；这两个函数是 `extern "C"`，panic 无法 unwind，实测整个进程被带走
+  （`0xc0000409`）。此前它们只被检查过「符号在不在库里」，从未被真正调用过。
+- NES 零回归：`ctest` 34/34；`cargo check` 默认与 `--no-default-features` 两态均通过。
+
 ### Fixed — v1.18.2：kgmqa-078 MMC1 SEROM/SHROM（矩阵 108P / 12F）
 
 - **`kgmqa-078-serom-lidnariq` 清零**：`lidnariq/serom/serom.nes` 由 FAIL（`0xC3`）转 PASS（`0x00`）。

@@ -17,6 +17,8 @@ use gba_core::cpu::psr::Psr;
 /// exception), `false` to let the core's own `match` try.
 pub fn dispatch(cpu: &mut Arm7tdmi, swi_num: u32, old_cpsr: Psr, return_addr: u32) -> bool {
     let _ = (cpu, old_cpsr, return_addr);
+    #[cfg(test)]
+    note_dispatch(swi_num);
     let swi = Swi::from_raw(swi_num);
     if tracing_enabled() {
         match swi {
@@ -44,6 +46,33 @@ pub fn set_trace(on: bool) {
 
 fn tracing_enabled() -> bool {
     TRACE_SWI.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+// Records the number the core last handed to `dispatch`.
+//
+// The core reaches us through a raw function pointer, so there is no other
+// way for a test to see that a real `SWI` instruction actually arrived --
+// `swi_hook.is_some()` only proves we were installed, which the core would
+// honour even if the call site were deleted. Compiled out of every build
+// that is not a test, and thread-local because the test harness runs tests
+// in parallel and one test's `SWI` must not answer another's question.
+#[cfg(test)]
+thread_local! {
+    static LAST_DISPATCH: std::cell::Cell<u32> = const { std::cell::Cell::new(u32::MAX) };
+}
+
+#[cfg(test)]
+fn note_dispatch(swi_num: u32) {
+    LAST_DISPATCH.with(|slot| slot.set(swi_num));
+}
+
+/// The number [`dispatch`] was last called with on this thread, or `None`
+/// since the last read. A real SWI number is a byte, so `u32::MAX` is
+/// unambiguous.
+#[cfg(test)]
+fn take_last_dispatch() -> Option<u32> {
+    let seen = LAST_DISPATCH.with(|slot| slot.replace(u32::MAX));
+    (seen != u32::MAX).then_some(seen)
 }
 
 /// BIOS software-interrupt numbers, as encoded by the ARM `SWI` immediate.
@@ -163,5 +192,104 @@ impl Swi {
             Swi::MultiBoot => "MultiBoot",
             Swi::HardReset => "HardReset",
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Swi, dispatch, take_last_dispatch};
+    use crate::gba::install_swi_hook;
+    use gba_core::gba::Gba;
+
+    /// Where a cartridge is mapped; ROM offset 0 lives at this address.
+    const ROM_BASE: u32 = 0x0800_0000;
+
+    /// ARM encoding of `SWI n` with the `always` condition: `cond 1111 imm24`.
+    fn arm_swi(n: u32) -> u32 {
+        0xEF00_0000 | (n & 0xFF)
+    }
+
+    /// A cartridge whose opening instructions are `SWI n`.
+    ///
+    /// The word is repeated across the first pipeline window on purpose. The
+    /// core recovers the immediate from `PC-8`, and how many fetch steps it
+    /// takes to get there is the core's own bookkeeping; padding keeps this
+    /// test about *our* seam instead of re-testing the pipeline.
+    fn cartridge_with_swi(n: u32) -> Vec<u8> {
+        let mut rom = vec![0u8; 0x200];
+        for word in rom[..0xC0].chunks_exact_mut(4) {
+            word.copy_from_slice(&arm_swi(n).to_le_bytes());
+        }
+        rom[0xC0..0xC4].copy_from_slice(&ROM_BASE.to_le_bytes());
+        rom
+    }
+
+    /// Boot a machine whose ROM starts with `SWI n` and report the number
+    /// `dispatch` was handed, or `None` if the core never asked.
+    fn swi_seen_by_dispatch(n: u32) -> Option<u32> {
+        let _ = take_last_dispatch();
+        let mut gba = Gba::new([0u8; 0x4000], &cartridge_with_swi(n));
+        install_swi_hook(&mut gba);
+        // The ARM7TDMI pipeline executes the instruction at PC-8, and the
+        // core recovers the immediate from that same address, so PC starts
+        // one instruction past the SWI we want it to run.
+        gba.cpu.registers.set_program_counter(ROM_BASE + 8);
+        (0..32).find_map(|_| {
+            gba.step();
+            take_last_dispatch()
+        })
+    }
+
+    /// The S0' exit criterion: a real `SWI` instruction in a real cartridge
+    /// has to reach *our* function, carrying the number it encoded. Checking
+    /// only that the hook pointer was installed would pass even if the core's
+    /// call site were gone.
+    #[test]
+    fn core_calls_our_dispatch_with_the_encoded_swi_number() {
+        // Spread over the documented range: the first number, the first one
+        // past the core's own match, and one from the middle.
+        for n in [0x00u32, 0x0B, 0x12] {
+            assert_eq!(
+                swi_seen_by_dispatch(n),
+                Some(n),
+                "SWI {n:#04x} never reached swi::dispatch"
+            );
+        }
+    }
+
+    /// The seam is consulted before any range check, so an undefined number
+    /// still reaches us -- which is what lets S1 claim it.
+    #[test]
+    fn dispatch_is_consulted_for_numbers_outside_the_bios_range() {
+        assert_eq!(swi_seen_by_dispatch(0x2B), Some(0x2B));
+    }
+
+    /// S0' claims nothing: every number falls through to the core's own
+    /// match. Claiming is S1's job, and this test is what fails the day one
+    /// lands without its own coverage.
+    #[test]
+    fn s0_dispatch_claims_nothing() {
+        let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
+        let cpsr = gba.cpu.cpsr;
+        for n in 0..=0xFFu32 {
+            assert!(
+                !dispatch(&mut gba.cpu, n, cpsr, ROM_BASE),
+                "S0' must not claim SWI {n:#04x}"
+            );
+        }
+    }
+
+    /// `from_raw` is the table S1 will claim numbers out of; a number it
+    /// maps has to survive the round trip to its BIOS name.
+    #[test]
+    fn every_mapped_number_round_trips_through_its_name() {
+        for n in 0..=0x2Au32 {
+            let Some(swi) = Swi::from_raw(n) else {
+                continue;
+            };
+            assert_eq!(swi as u32, n);
+            assert!(!swi.name().is_empty());
+        }
+        assert_eq!(Swi::from_raw(0x2B), None);
     }
 }
