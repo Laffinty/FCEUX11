@@ -681,6 +681,118 @@ mod tests {
         );
     }
 
+    // ---- T1-a regression -------------------------------------------------
+    //
+    // S1a-1 claims four SWI numbers, which puts the core's own implementations
+    // of the rest one layer further away than they were. These measure them
+    // through the real path -- a cartridge executing the instruction, not a
+    // call into the core -- so what is verified is the whole seam, not just
+    // the arithmetic.
+
+    /// `MOV r1, #imm` for an 8-bit immediate.
+    const fn mov_r1(v: u32) -> u32 {
+        0xE3A0_1000 | (v & 0xFF)
+    }
+    /// `MVN r0, r0` -- all ones.
+    const MVN_R0_R0: u32 = 0xE3E0_0000;
+    /// `BIC r0, r0, #6`
+    const BIC_R0_R0_6: u32 = 0xE3C0_0006;
+    /// `LDR r0, [pc, #12]`
+    const LDR_R0_PC_12: u32 = 0xE59F_000C;
+    /// `LDR r1, [pc, #12]`
+    const LDR_R1_PC_12: u32 = 0xE59F_100C;
+    /// `LDR r2, [pc, #12]`
+    const LDR_R2_PC_12: u32 = 0xE59F_200C;
+    /// Halt, so a test can stop the machine and read the results.
+    const SWI_HALT_WORD: u32 = 0xEF00_0002;
+
+    /// `Div` (0x06) is signed, truncates toward zero, and leaves the absolute
+    /// quotient in r3 -- the three properties games depend on.
+    #[test]
+    fn t1a_div_is_signed_and_truncates_toward_zero() {
+        // r0 = -7 has to be assembled: an ARM immediate is an 8-bit value, so
+        // neither `mov r0, #0xF9` (+249) nor a single rotated byte reaches it.
+        //   mov r0, #0 ; mvn r0, r0 ; bic r0, r0, #6 ; mov r1, #3
+        let program = [
+            0xE3A0_0000,
+            MVN_R0_R0,
+            BIC_R0_R0_6,
+            mov_r1(3),
+            arm_swi(0x06),
+            SWI_HALT_WORD,
+        ];
+        let mut gba = machine(&program);
+        assert!(run_until_halted(&mut gba, 32), "did not reach the Halt");
+
+        assert_eq!(gba.cpu.registers.register_at(0) as i32, -2, "quotient");
+        assert_eq!(gba.cpu.registers.register_at(1) as i32, -1, "remainder");
+        assert_eq!(
+            gba.cpu.registers.register_at(3) as i32,
+            2,
+            "absolute quotient"
+        );
+    }
+
+    /// `CpuFastSet` (0x0C) moves 32-bit blocks and is what the C runtime and
+    /// the decompressors actually call. The three arguments are 16-bit
+    /// constants, so they are loaded from a literal pool placed after the
+    /// `Halt` -- the return address of the SWI is the instruction right after
+    /// it, so anything between the SWI and the pool would be executed.
+    #[test]
+    fn t1a_cpu_fast_set_moves_32_bit_blocks() {
+        const SRC: u32 = 0x0300_0000;
+        const DST: u32 = 0x0300_0100;
+        // r2: block count in bits 8-23, bit 26 selects 32-bit access.
+        const COUNT_32BIT_4: u32 = 0x0400_0000 | 4 << 8;
+
+        let program = [
+            LDR_R0_PC_12,
+            LDR_R1_PC_12,
+            LDR_R2_PC_12,
+            arm_swi(0x0C),
+            SWI_HALT_WORD,
+            SRC,
+            DST,
+            COUNT_32BIT_4,
+        ];
+        let mut gba = machine(&program);
+        for i in 0..4u32 {
+            gba.cpu
+                .bus
+                .write_word((SRC + i * 4) as usize, 0x1111_0000 | i);
+        }
+        assert!(run_until_halted(&mut gba, 32), "did not reach the Halt");
+
+        for i in 0..4u32 {
+            assert_eq!(
+                gba.cpu.bus.read_word((DST + i * 4) as usize),
+                0x1111_0000 | i,
+                "word {i} was not copied"
+            );
+        }
+    }
+
+    /// Our claim set must not swallow the numbers the core implements. This is
+    /// the invariant that keeps T1-d and T2 free to land one at a time.
+    #[test]
+    fn t1a_dispatch_leaves_the_other_core_arms_reachable() {
+        let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
+        let cpsr = gba.cpu.cpsr;
+        for n in [
+            Swi::SoftReset,
+            Swi::RegisterRamReset,
+            Swi::Div,
+            Swi::DivArm,
+            Swi::CpuSet,
+            Swi::CpuFastSet,
+        ] {
+            assert!(
+                !dispatch(&mut gba.cpu, n as u32, cpsr, ROM_BASE),
+                "SWI {n:?} must fall through to the core"
+            );
+        }
+    }
+
     /// `from_raw` is the table S1 will claim numbers out of; a number it
     /// maps has to survive the round trip to its BIOS name.
     #[test]
