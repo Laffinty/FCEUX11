@@ -241,6 +241,60 @@ mod tests {
         assert_eq!(gba.cpu.bus.read_half_word(0x0400_0204), 0x4317);
     }
 
+    /// The IRQ vector is the one piece of the stub that a test cannot reach by
+    /// booting: something has to be *pending* for the vector to be entered.
+    /// This drives the whole chain -- boot, exception, the vector's push, the
+    /// indirect call through `03007FFC`, the game's `bx lr`, the pop, and the
+    /// return -- and is the path every game with an interrupt handler depends
+    /// on. Nothing above tests it, and S1b's jsmolka gate would hit it
+    /// immediately.
+    #[test]
+    fn irq_vector_calls_the_handler_installed_at_03007ffc() {
+        const HANDLER: u32 = 0x0800_0100;
+        // The cartridge parks at its entry point; the handler lives elsewhere.
+        let mut rom = vec![0u8; 0x200];
+        for word in rom[8..0xC0].chunks_exact_mut(4) {
+            word.copy_from_slice(&BRANCH_SELF.to_le_bytes());
+        }
+        rom[0xC0..0xC4].copy_from_slice(&0x0800_0000u32.to_le_bytes());
+        // The handler: mark that it ran, then return to the BIOS stub.
+        rom[0x100..0x104].copy_from_slice(&0xE3A0_5034u32.to_le_bytes()); // mov r5,#0x34
+        rom[0x104..0x108].copy_from_slice(&0xE12F_FF1Eu32.to_le_bytes()); // bx lr
+
+        let mut gba = Gba::new(STUB, &rom);
+        install_swi_hook(&mut gba);
+        gba.cpu.bus.write_word(0x0300_7FFC, HANDLER);
+
+        for _ in 0..16 {
+            gba.step();
+        }
+        assert_eq!(
+            gba.cpu.registers.register_at(5),
+            0,
+            "the cartridge should be running before the interrupt"
+        );
+
+        // Press a key, with the keypad interrupt armed, then let it fire.
+        gba.cpu.bus.keypad.key_interrupt_control = (1 << 14) | 0x0001;
+        gba.cpu.bus.keypad.key_input &= !0x0001;
+        gba.cpu.bus.write_half_word(0x0400_0200, 1 << 12); // IE  = keypad
+        gba.cpu.bus.write_half_word(0x0400_0208, 0x0001); // IME = enable
+        for _ in 0..16 {
+            gba.step();
+        }
+
+        assert_eq!(
+            gba.cpu.registers.register_at(5),
+            0x34,
+            "the handler installed at 03007FFC was never called"
+        );
+        let pc = gba.cpu.registers.program_counter();
+        assert!(
+            (0x0800_0000..0x0800_0200).contains(&pc),
+            "the BIOS stub did not return to the interrupted code: PC={pc:#010x}"
+        );
+    }
+
     /// The SWI vector is only reached when `dispatch` declines a number, and
     /// `Halt` is the first one S1a will claim. This test fixes the expectation
     /// that the stub does *not* implement it: claiming is our job, the vector
