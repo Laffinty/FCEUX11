@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — GBAEUX11 v2.0 S1b-c：register RAM reset 补全
+
+- **`RegisterRamReset`（SWI 0x01）认领并补全**。上游只做了四块内存的清零，主动跳过 IWRAM（源码 TODO
+  自承「会打断游戏自己装的 IRQ 处理程序」），而 bits 5–7 干脆只有三行「未实现」注释、没有代码。
+  现补 IWRAM 清零（**保留末 `0x200` 字节**——三个栈指针、IRQ 向量、BIOS 中断标志都在那里，正是
+  上游不敢清的那块）与 `0x80` 位的 IE / IF / WAITCNT / IME 复位。
+- bits 5/6（复位 SIO 与声音寄存器）**有意不做**并编入已知限制：声音寄存器复位与 M4A 延期绑定，
+  GA 前无游戏依赖。宁可留缺口，不凭记忆写硬件行为。
+- 认领一个 SWI 是**全有全无**的：分派返回真之后，核心自己那条分支一行都不跑。所以 bits 0/2/3/4
+  （EWRAM / 调色板 / VRAM / OAM）也一并重写在同一处地址上——只补 IWRAM 会让本来能用的四位倒退。
+- 锁测试 27 → **42 项**；三处变异验证（IWRAM 尾部越界 / 去掉 I/O 复位 / 取消认领）分别让 3、2、8
+  项转红。`cargo check` 两态通过，`ctest` **34/34**。
+
 ### Added — GBAEUX11 v2.0 S1a-0 / S1a-1：stub BIOS 自建，wait 家族由空壳转真实现
 
 - **stub BIOS**（`src/gba/bios.rs`）：16 KB 镜像由 `const fn` 逐字写入，不引入交叉汇编器。

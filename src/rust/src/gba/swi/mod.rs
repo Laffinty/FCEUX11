@@ -6,11 +6,13 @@
 //! to the real BIOS image.
 
 pub mod decompress;
+pub mod ram_reset;
 pub mod wait;
 
 use gba_core::cpu::arm7tdmi::Arm7tdmi;
 use gba_core::cpu::psr::Psr;
 
+use ram_reset::{IE, IF, IME, RamResetRequest, WAITCNT};
 use wait::{IntrWaitRequest, LowPower};
 
 /// Handle one SWI.
@@ -22,6 +24,10 @@ pub fn dispatch(cpu: &mut Arm7tdmi, swi_num: u32, old_cpsr: Psr, return_addr: u3
     note_dispatch(swi_num);
     let swi = Swi::from_raw(swi_num);
     match swi {
+        Some(Swi::RegisterRamReset) => {
+            serve_register_ram_reset(cpu, old_cpsr, return_addr);
+            true
+        }
         Some(Swi::Halt) | Some(Swi::Stop) => {
             enter_low_power(cpu, old_cpsr, return_addr, swi);
             true
@@ -40,6 +46,42 @@ pub fn dispatch(cpu: &mut Arm7tdmi, swi_num: u32, old_cpsr: Psr, return_addr: u3
             false
         }
     }
+}
+
+/// Serve `RegisterRamReset` (0x01).
+///
+/// Claiming this number is all-or-nothing: the core's own arm never runs
+/// behind us, so bits 0/2/3/4 are reimplemented here at the same addresses
+/// rather than left to it. What it never did is the IWRAM clear (bit 1) and
+/// the `0x80` I/O reset; those are the reason this arm exists. See the v2.0
+/// plan r15 and known limits L5 / L6.
+fn serve_register_ram_reset(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32) {
+    let request = RamResetRequest::decode(cpu.registers.register_at(0));
+
+    for region in request.regions() {
+        for addr in region.start..region.end {
+            cpu.bus.write_byte(addr as usize, 0);
+        }
+    }
+
+    if request.resets_io() {
+        // IF is write-one-to-clear, so 0xFFFF acknowledges every pending
+        // interrupt; the other three are plain zero.
+        cpu.bus.write_half_word(IE as usize, 0);
+        cpu.bus.write_half_word(IF as usize, 0xFFFF);
+        cpu.bus.write_half_word(WAITCNT as usize, 0);
+        cpu.bus.write_half_word(IME as usize, 0);
+    }
+
+    // Say so rather than letting a game believe its SIO registers were reset.
+    let unimplemented = request.wants_unimplemented_groups();
+    if unimplemented != 0 && tracing_enabled() {
+        eprintln!(
+            "[gba] swi 0x01: register group {unimplemented:#04x} left alone (known limit L6)"
+        );
+    }
+
+    cpu.swi_return(old_cpsr, return_addr);
 }
 
 /// Park the core until an enabled interrupt arrives.
@@ -311,7 +353,7 @@ impl Swi {
 
 #[cfg(test)]
 mod tests {
-    use super::{Swi, dispatch, read_bios_flags, take_last_dispatch, write_bios_flags};
+    use super::{Swi, dispatch, ram_reset, read_bios_flags, take_last_dispatch, write_bios_flags};
     use crate::gba::install_swi_hook;
     use gba_core::gba::Gba;
 
@@ -379,16 +421,18 @@ mod tests {
     }
 
     /// S0' claimed nothing and this test was written to fail the day a number
-    /// landed. It has now been replaced by the claim set S1a-1 actually
-    /// implements: the wait family, and nothing else.
+    /// landed. S1a-1 replaced it with the wait family, and S1b-c has added
+    /// `RegisterRamReset`. Everything else still has to fall through, so
+    /// T1-d (decompressors) and T2 (math) can land one at a time.
     #[test]
-    fn dispatch_claims_exactly_the_wait_family() {
+    fn dispatch_claims_exactly_what_is_implemented() {
         let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
         let cpsr = gba.cpu.cpsr;
         let claimed: Vec<u32> = (0..=0xFFu32)
             .filter(|n| dispatch(&mut gba.cpu, *n, cpsr, ROM_BASE))
             .collect();
         for expected in [
+            Swi::RegisterRamReset as u32,
             Swi::Halt as u32,
             Swi::Stop as u32,
             Swi::IntrWait as u32,
@@ -399,17 +443,18 @@ mod tests {
                 "SWI {expected:#04x} must be claimed"
             );
         }
-        // Everything outside the wait family still has to fall through to the
+        // Everything outside the claim set still has to fall through to the
         // core, so T1-d (decompressors) and T2 (math) can land one at a time.
         assert_eq!(
             claimed,
             vec![
+                Swi::RegisterRamReset as u32,
                 Swi::Halt as u32,
                 Swi::Stop as u32,
                 Swi::IntrWait as u32,
                 Swi::VBlankIntrWait as u32
             ],
-            "only the wait family is claimed so far"
+            "only the wait family and RegisterRamReset are claimed so far"
         );
     }
 
@@ -422,11 +467,17 @@ mod tests {
         let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
         let cpsr = gba.cpu.cpsr;
         for n in 0..=0xFFu32 {
-            let is_wait = matches!(
+            let is_claimed = matches!(
                 Swi::from_raw(n),
-                Some(Swi::Halt | Swi::Stop | Swi::IntrWait | Swi::VBlankIntrWait)
+                Some(
+                    Swi::RegisterRamReset
+                        | Swi::Halt
+                        | Swi::Stop
+                        | Swi::IntrWait
+                        | Swi::VBlankIntrWait
+                )
             );
-            if is_wait {
+            if is_claimed {
                 continue;
             }
             assert!(!dispatch(&mut gba.cpu, n, cpsr, ROM_BASE), "{n:#04x}");
@@ -774,13 +825,17 @@ mod tests {
 
     /// Our claim set must not swallow the numbers the core implements. This is
     /// the invariant that keeps T1-d and T2 free to land one at a time.
+    ///
+    /// `RegisterRamReset` was on this list until S1b-c claimed it -- that is
+    /// the one entry whose removal is a change in behaviour rather than an
+    /// omission, and it is why claiming a number means reimplementing the
+    /// whole of it (plan r15).
     #[test]
     fn t1a_dispatch_leaves_the_other_core_arms_reachable() {
         let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
         let cpsr = gba.cpu.cpsr;
         for n in [
             Swi::SoftReset,
-            Swi::RegisterRamReset,
             Swi::Div,
             Swi::DivArm,
             Swi::CpuSet,
@@ -791,6 +846,197 @@ mod tests {
                 "SWI {n:?} must fall through to the core"
             );
         }
+    }
+
+    // ---- S1b-c: RegisterRamReset ---------------------------------------
+    //
+    // Claiming a number is all-or-nothing, so these are measured through the
+    // real `dispatch` and assert what the machine looks like afterwards --
+    // not that a function returned.
+
+    /// A machine with the hook installed and a flag byte staged in `r0`.
+    fn gba_for_ram_reset(flags: u8) -> Gba {
+        let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
+        install_swi_hook(&mut gba);
+        gba.cpu.registers.set_register_at(0, flags as u32);
+        gba
+    }
+
+    /// Run `RegisterRamReset` with the staged `r0`.
+    fn run_ram_reset(gba: &mut Gba) {
+        let cpsr = gba.cpu.cpsr;
+        assert!(
+            dispatch(&mut gba.cpu, Swi::RegisterRamReset as u32, cpsr, ROM_BASE),
+            "0x01 must be claimed"
+        );
+    }
+
+    /// Bit 0 clears EWRAM but keeps the last `0x200` bytes. The core already
+    /// did this, so it is a regression guard on our reimplementation rather
+    /// than a new feature -- claiming the number took the duty over.
+    #[test]
+    fn register_ram_reset_clears_ewram_and_keeps_its_tail() {
+        let mut gba = gba_for_ram_reset(ram_reset::CLEAR_EWRAM);
+        gba.cpu.bus.write_byte(0x0200_0000, 0xAB);
+        gba.cpu.bus.write_byte(0x0203_FDFF, 0xCD);
+        gba.cpu.bus.write_byte(0x0203_FE00, 0x11);
+        gba.cpu.bus.write_byte(0x0203_FFFF, 0x22);
+
+        run_ram_reset(&mut gba);
+
+        assert_eq!(gba.cpu.bus.read_byte(0x0200_0000), 0, "EWRAM base cleared");
+        assert_eq!(
+            gba.cpu.bus.read_byte(0x0203_FDFF),
+            0,
+            "last cleared byte"
+        );
+        assert_eq!(
+            gba.cpu.bus.read_byte(0x0203_FE00),
+            0x11,
+            "the 0x200 tail must survive"
+        );
+        assert_eq!(
+            gba.cpu.bus.read_byte(0x0203_FFFF),
+            0x22,
+            "the 0x200 tail must survive"
+        );
+    }
+
+    /// Bit 1 clears IWRAM, keeping the last `0x200` -- where the BIOS flags,
+    /// the IRQ vector and the three stack pointers live. This is the gap the
+    /// core left open with a TODO (known limit L5).
+    #[test]
+    fn register_ram_reset_clears_iwram_and_keeps_the_bios_tail() {
+        let mut gba = gba_for_ram_reset(ram_reset::CLEAR_IWRAM);
+        gba.cpu.bus.write_byte(0x0300_0000, 0xAB);
+        gba.cpu.bus.write_byte(0x0300_7DFF, 0xCD);
+        gba.cpu.bus.write_byte(0x0300_7FF8, 0x11);
+        gba.cpu.bus.write_byte(0x0300_7FFC, 0x22);
+
+        run_ram_reset(&mut gba);
+
+        assert_eq!(gba.cpu.bus.read_byte(0x0300_0000), 0, "IWRAM base cleared");
+        assert_eq!(
+            gba.cpu.bus.read_byte(0x0300_7DFF),
+            0,
+            "last cleared byte"
+        );
+        assert_eq!(
+            gba.cpu.bus.read_byte(0x0300_7FF8),
+            0x11,
+            "BIOS interrupt flags must survive"
+        );
+        assert_eq!(
+            gba.cpu.bus.read_byte(0x0300_7FFC),
+            0x22,
+            "the IRQ vector must survive"
+        );
+    }
+
+    /// The three regions the core already handled still work now that we own
+    /// the number. This is the "claiming is all-or-nothing" tax, paid.
+    #[test]
+    fn register_ram_reset_still_clears_palette_vram_and_oam() {
+        let mut gba = gba_for_ram_reset(
+            ram_reset::CLEAR_PALETTE | ram_reset::CLEAR_VRAM | ram_reset::CLEAR_OAM,
+        );
+        gba.cpu.bus.write_byte(0x0500_0000, 0xAB);
+        gba.cpu.bus.write_byte(0x0600_0000, 0xAB);
+        gba.cpu.bus.write_byte(0x0601_7FFF, 0xAB);
+        gba.cpu.bus.write_byte(0x0700_03FF, 0xAB);
+
+        run_ram_reset(&mut gba);
+
+        assert_eq!(gba.cpu.bus.read_byte(0x0500_0000), 0, "palette");
+        assert_eq!(gba.cpu.bus.read_byte(0x0600_0000), 0, "VRAM base");
+        assert_eq!(gba.cpu.bus.read_byte(0x0601_7FFF), 0, "VRAM top");
+        assert_eq!(gba.cpu.bus.read_byte(0x0700_03FF), 0, "OAM top");
+    }
+
+    /// A flag byte with no bits set must leave the machine alone. Without
+    /// this, "claims the number" and "clears everything" would be the same
+    /// test.
+    #[test]
+    fn register_ram_reset_with_no_flags_clears_nothing() {
+        let mut gba = gba_for_ram_reset(0);
+        gba.cpu.bus.write_byte(0x0200_0000, 0xAB);
+        gba.cpu.bus.write_byte(0x0600_0000, 0xAB);
+
+        run_ram_reset(&mut gba);
+
+        assert_eq!(gba.cpu.bus.read_byte(0x0200_0000), 0xAB, "EWRAM untouched");
+        assert_eq!(gba.cpu.bus.read_byte(0x0600_0000), 0xAB, "VRAM untouched");
+    }
+
+    /// Bit `0x80` zeroes IE/WAITCNT/IME and acknowledges every pending IF
+    /// flag. The core had three comments and no code here.
+    #[test]
+    fn register_ram_reset_zeroes_the_io_registers() {
+        let mut gba = gba_for_ram_reset(ram_reset::RESET_IO);
+        gba.cpu.bus.write_half_word(ram_reset::IE as usize, 0xFFFF);
+        gba.cpu.bus.write_half_word(ram_reset::WAITCNT as usize, 0x4317);
+        gba.cpu.bus.write_half_word(ram_reset::IME as usize, 1);
+
+        run_ram_reset(&mut gba);
+
+        assert_eq!(gba.cpu.bus.read_half_word(ram_reset::IE as usize), 0);
+        assert_eq!(gba.cpu.bus.read_half_word(ram_reset::WAITCNT as usize), 0);
+        assert_eq!(gba.cpu.bus.read_half_word(ram_reset::IME as usize), 0);
+    }
+
+    /// The IF half of bit `0x80` has to be measured against a flag that is
+    /// genuinely raised, because IF is write-one-to-clear: there is no
+    /// software way to stage one, and `interrupt_control` is private to the
+    /// core. So the keypad raises it the way hardware does. IE and IME stay
+    /// off so the raised flag is not immediately turned into an IRQ.
+    #[test]
+    fn register_ram_reset_acknowledges_pending_interrupts() {
+        // Keypad is IF bit 12 on GBA; bit 7 (SIO) and bits 13-15 are the
+        // other sources. The core's `IrqType::get_idx_in_if` agrees.
+        const KEYPAD_IF: u16 = 1 << 12;
+
+        let mut gba = gba_for_ram_reset(ram_reset::RESET_IO);
+        gba.cpu.bus.keypad.key_interrupt_control = (1 << 14) | 0x0001;
+        gba.cpu.bus.keypad.key_input &= !0x0001;
+        for _ in 0..16 {
+            gba.step();
+        }
+        assert_eq!(
+            gba.cpu.bus.read_half_word(ram_reset::IF as usize) & KEYPAD_IF,
+            KEYPAD_IF,
+            "the keypad flag must be raised, or this test proves nothing"
+        );
+
+        run_ram_reset(&mut gba);
+
+        assert_eq!(
+            gba.cpu.bus.read_half_word(ram_reset::IF as usize),
+            0,
+            "every pending flag must be acknowledged"
+        );
+    }
+
+    /// The call must return to the caller, not wedge the machine. The
+    /// core's own arm ends in `swi_return` and so does ours, and that is what
+    /// puts the PC on the return address.
+    #[test]
+    fn register_ram_reset_returns_to_the_caller() {
+        const RETURN_ADDR: u32 = 0x18;
+        let mut gba = gba_for_ram_reset(ram_reset::CLEAR_VRAM);
+        gba.cpu.registers.set_program_counter(0x30);
+        let cpsr = gba.cpu.cpsr;
+        assert!(dispatch(
+            &mut gba.cpu,
+            Swi::RegisterRamReset as u32,
+            cpsr,
+            RETURN_ADDR
+        ));
+        assert_eq!(
+            gba.cpu.registers.program_counter(),
+            RETURN_ADDR as usize,
+            "the SWI must return to its caller rather than park"
+        );
+        assert!(!gba.cpu.halted, "the SWI must not park the machine");
     }
 
     /// `from_raw` is the table S1 will claim numbers out of; a number it
