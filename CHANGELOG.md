@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — GBAEUX11 v2.0 S1d-a：LZ77 与 RLE 解压器
+
+- **`Lz77UnCompWram/Vram`（0x10/0x11）与 `RlUnCompWram/Vram`（0x13/0x14）认领并实现**。
+  压缩块只有解压后长度、没有压缩长度，所以解压是走游标逐字节进行的；回溯窗口 4 KB
+  按格式的 `+1` 距离偏置与 `+3` 长度偏置展开。
+- **Vram 两个变体按半字写**。这不是形式问题：真实 BIOS 的解压器是攒够半个字再写一次，
+  而逐字节写 VRAM 会被硬件复制到整个半字、OBJ 区的那一字节还会被直接丢弃 —— 两种写法
+  出来的结果都是错的。
+- **标志字节按低位优先消费**。GBA 与 NDS/Wii 的解压器扫的是同一个字节、方向相反。
+  这一条普通往返测试抓不到（纯字面量流两种读法输出完全相同），所以单设了一条把它钉死的用例。
+- **坏块一个字节都不写**：签名不符、长度为零、回溯越过已写起点、长度越界、数据截断，
+  一律确定性地拒绝并在 trace 里说明，不让半路出错的流在目标区留下「看起来正常」的垃圾。
+- 锁测试 42 → **60 项**；三处变异验证（改回 MSB 优先 → 7 项红；VRAM 退回字节写 → 1 项红；
+  去掉签名检查 → 1 项红）。`cargo check` 两态通过，`ctest` **34/34**。
+
 ### Added — GBAEUX11 v2.0 S1b-c：register RAM reset 补全
 
 - **`RegisterRamReset`（SWI 0x01）认领并补全**。上游只做了四块内存的清零，主动跳过 IWRAM（源码 TODO

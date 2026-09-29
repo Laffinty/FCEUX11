@@ -15,6 +15,27 @@ use gba_core::cpu::psr::Psr;
 use ram_reset::{IE, IF, IME, RamResetRequest, WAITCNT};
 use wait::{IntrWaitRequest, LowPower};
 
+use decompress::{
+    BusLike, DecompressError, LZ77_SIGNATURE, MachinePort, RL_SIGNATURE, lz77_decompress,
+    parse_lz77_header, rl_decompress,
+};
+
+/// The core's bus, seen through the one slice of it the decompressors use.
+///
+/// Implementing it here rather than in `decompress.rs` keeps that file free of
+/// any mention of the vendor crate.
+impl BusLike for gba_core::bus::Bus {
+    fn read_byte(&mut self, addr: usize) -> u8 {
+        self.read_byte(addr)
+    }
+    fn write_byte(&mut self, addr: usize, byte: u8) {
+        self.write_byte(addr, byte);
+    }
+    fn write_half_word(&mut self, addr: usize, value: u16) {
+        self.write_half_word(addr, value);
+    }
+}
+
 /// Handle one SWI.
 ///
 /// Returns `true` if we serviced it (the core then returns from the
@@ -26,6 +47,13 @@ pub fn dispatch(cpu: &mut Arm7tdmi, swi_num: u32, old_cpsr: Psr, return_addr: u3
     match swi {
         Some(Swi::RegisterRamReset) => {
             serve_register_ram_reset(cpu, old_cpsr, return_addr);
+            true
+        }
+        Some(swi @ (Swi::Lz77UnCompWram
+        | Swi::Lz77UnCompVram
+        | Swi::RlUnCompWram
+        | Swi::RlUnCompVram)) => {
+            serve_decompress(cpu, old_cpsr, return_addr, swi);
             true
         }
         Some(Swi::Halt) | Some(Swi::Stop) => {
@@ -46,6 +74,80 @@ pub fn dispatch(cpu: &mut Arm7tdmi, swi_num: u32, old_cpsr: Psr, return_addr: u3
             false
         }
     }
+}
+
+/// Which of the three LZ-style algorithms a decompress SWI number runs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Compression {
+    Lz77,
+    Rl,
+}
+
+/// Serve one of the decompress SWIs (0x10 / 0x11 / 0x13 / 0x14).
+///
+/// `r0` is the compressed block, `r1` the destination. The header is a
+/// signature byte plus a 24-bit decompressed size; the block carries **no
+/// compressed length**, which is why the algorithms read through a cursor
+/// rather than a slice.
+///
+/// A failure returns without writing anything: the algorithms refuse before
+/// they produce output, so a bad block leaves the destination exactly as it
+/// was (plan r16 ②). Returning beats falling through -- falling through would
+/// land on the core's `_ => false` and then on the stub BIOS's unimplemented
+/// `0x08` vector.
+fn serve_decompress(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32, swi: Swi) {
+    let (algorithm, halfword) = match swi {
+        Swi::Lz77UnCompWram => (Compression::Lz77, false),
+        Swi::Lz77UnCompVram => (Compression::Lz77, true),
+        Swi::RlUnCompWram => (Compression::Rl, false),
+        Swi::RlUnCompVram => (Compression::Rl, true),
+        _ => return,
+    };
+    let signature = match algorithm {
+        Compression::Lz77 => LZ77_SIGNATURE,
+        Compression::Rl => RL_SIGNATURE,
+    };
+
+    let src = cpu.registers.register_at(0);
+    let dest = cpu.registers.register_at(1);
+
+    // The header is a byte at a time: a word read on this bus rotates, and a
+    // halfword read would mask the signature we are about to check.
+    let mut raw = 0u32;
+    for i in 0..4 {
+        raw |= u32::from(cpu.bus.read_byte((src + i) as usize)) << (i * 8);
+    }
+    let header = parse_lz77_header(raw);
+
+    let refusal = if header.signature != signature {
+        Some(DecompressError::BadSignature {
+            expected: signature,
+            found: header.signature,
+        })
+    } else if header.output_len == 0 || header.output_len > decompress::LZ77_MAX_OUTPUT {
+        Some(DecompressError::BadOutputLength)
+    } else {
+        None
+    };
+    if let Some(error) = refusal {
+        if tracing_enabled() {
+            eprintln!("[gba] swi {swi:?} at 0x{src:08X}: {error}, not decompressing");
+        }
+        cpu.swi_return(old_cpsr, return_addr);
+        return;
+    }
+
+    let mut port = MachinePort::new(&mut cpu.bus, src + 4, dest, halfword);
+    let outcome = match algorithm {
+        Compression::Lz77 => lz77_decompress(&mut port, header.output_len),
+        Compression::Rl => rl_decompress(&mut port, header.output_len),
+    };
+    if let Err(error) = outcome {
+        if tracing_enabled() {
+            eprintln!("[gba] swi {swi:?} at 0x{src:08X}: {error}");
+        }
+    }
+    cpu.swi_return(old_cpsr, return_addr);
 }
 
 /// Serve `RegisterRamReset` (0x01).
@@ -353,7 +455,10 @@ impl Swi {
 
 #[cfg(test)]
 mod tests {
-    use super::{Swi, dispatch, ram_reset, read_bios_flags, take_last_dispatch, write_bios_flags};
+    use super::{
+        LZ77_SIGNATURE, RL_SIGNATURE, Swi, dispatch, ram_reset, read_bios_flags, take_last_dispatch,
+        write_bios_flags,
+    };
     use crate::gba::install_swi_hook;
     use gba_core::gba::Gba;
 
@@ -437,6 +542,10 @@ mod tests {
             Swi::Stop as u32,
             Swi::IntrWait as u32,
             Swi::VBlankIntrWait as u32,
+            Swi::Lz77UnCompWram as u32,
+            Swi::Lz77UnCompVram as u32,
+            Swi::RlUnCompWram as u32,
+            Swi::RlUnCompVram as u32,
         ] {
             assert!(
                 claimed.contains(&expected),
@@ -444,7 +553,7 @@ mod tests {
             );
         }
         // Everything outside the claim set still has to fall through to the
-        // core, so T1-d (decompressors) and T2 (math) can land one at a time.
+        // core, so Huffman and the T2 math numbers can land one at a time.
         assert_eq!(
             claimed,
             vec![
@@ -452,9 +561,13 @@ mod tests {
                 Swi::Halt as u32,
                 Swi::Stop as u32,
                 Swi::IntrWait as u32,
-                Swi::VBlankIntrWait as u32
+                Swi::VBlankIntrWait as u32,
+                Swi::Lz77UnCompWram as u32,
+                Swi::Lz77UnCompVram as u32,
+                Swi::RlUnCompWram as u32,
+                Swi::RlUnCompVram as u32,
             ],
-            "only the wait family and RegisterRamReset are claimed so far"
+            "only RegisterRamReset, the wait family and the LZ77/RLE pair are claimed"
         );
     }
 
@@ -475,6 +588,10 @@ mod tests {
                         | Swi::Stop
                         | Swi::IntrWait
                         | Swi::VBlankIntrWait
+                        | Swi::Lz77UnCompWram
+                        | Swi::Lz77UnCompVram
+                        | Swi::RlUnCompWram
+                        | Swi::RlUnCompVram
                 )
             );
             if is_claimed {
@@ -1037,6 +1154,147 @@ mod tests {
             "the SWI must return to its caller rather than park"
         );
         assert!(!gba.cpu.halted, "the SWI must not park the machine");
+    }
+
+    // ---- S1d-a: the LZ77 / RLE decompressors ---------------------------
+
+    /// Assemble a GBA compression header: a signature byte plus a 24-bit
+    /// little-endian size. Never a hand-written literal.
+    fn header_word(signature: u8, output_len: u32) -> [u8; 4] {
+        assert!(output_len <= 0x00FF_FFFF, "the size field is 24 bits");
+        [
+            signature,
+            (output_len & 0xFF) as u8,
+            ((output_len >> 8) & 0xFF) as u8,
+            ((output_len >> 16) & 0xFF) as u8,
+        ]
+    }
+
+    /// A machine with the hook installed, and a block staged in IWRAM.
+    fn gba_with_block(signature: u8, output_len: u32, body: &[u8]) -> (Gba, u32, u32) {
+        let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
+        install_swi_hook(&mut gba);
+        let src = 0x0300_0000u32;
+        let dest = 0x0300_2000u32;
+
+        let mut at = src;
+        for byte in header_word(signature, output_len) {
+            gba.cpu.bus.write_byte(at as usize, byte);
+            at += 1;
+        }
+        for byte in body {
+            gba.cpu.bus.write_byte(at as usize, *byte);
+            at += 1;
+        }
+        (gba, src, dest)
+    }
+
+    /// `0x10` decompresses a block into WRAM through the real dispatch, and
+    /// the bytes land where `r1` pointed.
+    #[test]
+    fn lz77_uncomp_wram_decompresses_through_the_dispatch() {
+        let payload: [u8; 8] = [0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02, 0x03, 0x04];
+        let mut body = vec![0x00u8];
+        body.extend_from_slice(&payload);
+
+        let (mut gba, src, dest) = gba_with_block(LZ77_SIGNATURE, payload.len() as u32, &body);
+        gba.cpu.registers.set_register_at(0, src);
+        gba.cpu.registers.set_register_at(1, dest);
+        let cpsr = gba.cpu.cpsr;
+        assert!(dispatch(&mut gba.cpu, Swi::Lz77UnCompWram as u32, cpsr, ROM_BASE));
+
+        for (i, expected) in payload.iter().enumerate() {
+            assert_eq!(
+                gba.cpu.bus.read_byte((dest as usize) + i),
+                *expected,
+                "output byte {i}"
+            );
+        }
+    }
+
+    /// `0x13` is the same shape of call for a run-length block.
+    #[test]
+    fn rl_uncomp_wram_decompresses_through_the_dispatch() {
+        // Control 0x82 => repeat the next byte five times, then control 0x00
+        // with one literal.
+        let body = vec![0x82u8, 0x5A, 0x00, 0x99];
+        let (mut gba, src, dest) = gba_with_block(RL_SIGNATURE, 6, &body);
+        gba.cpu.registers.set_register_at(0, src);
+        gba.cpu.registers.set_register_at(1, dest);
+        let cpsr = gba.cpu.cpsr;
+        assert!(dispatch(&mut gba.cpu, Swi::RlUnCompWram as u32, cpsr, ROM_BASE));
+
+        let got: Vec<u8> = (0..6)
+            .map(|i| gba.cpu.bus.read_byte(dest as usize + i))
+            .collect();
+        assert_eq!(got, vec![0x5A, 0x5A, 0x5A, 0x5A, 0x5A, 0x99]);
+    }
+
+    /// `0x11` is the same algorithm but stores halfwords, which is the only
+    /// thing that makes it correct for VRAM. Measured through the real bus,
+    /// where a byte write would have been duplicated across the halfword and
+    /// an OBJ-region byte dropped.
+    #[test]
+    fn lz77_uncomp_vram_stores_halfwords() {
+        let payload: [u8; 4] = [0x11, 0x22, 0x33, 0x44];
+        let mut body = vec![0x00u8];
+        body.extend_from_slice(&payload);
+
+        let (mut gba, src, _) = gba_with_block(LZ77_SIGNATURE, payload.len() as u32, &body);
+        let vram = 0x0600_0000u32;
+        gba.cpu.registers.set_register_at(0, src);
+        gba.cpu.registers.set_register_at(1, vram);
+        let cpsr = gba.cpu.cpsr;
+        assert!(dispatch(&mut gba.cpu, Swi::Lz77UnCompVram as u32, cpsr, ROM_BASE));
+
+        for (i, expected) in payload.iter().enumerate() {
+            assert_eq!(
+                gba.cpu.bus.read_byte(vram as usize + i),
+                *expected,
+                "VRAM byte {i}"
+            );
+        }
+    }
+
+    /// A block whose signature belongs to a different algorithm must be left
+    /// alone -- decoding an RLE block as LZ77 would write plausible-looking
+    /// garbage over whatever `r1` pointed at.
+    #[test]
+    fn a_block_with_the_wrong_signature_is_not_decompressed() {
+        let payload: [u8; 8] = [0x11; 8];
+        let mut body = vec![0x00u8];
+        body.extend_from_slice(&payload);
+
+        // A valid LZ77 body, submitted as RLE.
+        let (mut gba, src, dest) = gba_with_block(LZ77_SIGNATURE, 8, &body);
+        gba.cpu.registers.set_register_at(0, src);
+        gba.cpu.registers.set_register_at(1, dest);
+        let cpsr = gba.cpu.cpsr;
+        assert!(dispatch(&mut gba.cpu, Swi::RlUnCompWram as u32, cpsr, ROM_BASE));
+
+        for i in 0..8 {
+            assert_eq!(
+                gba.cpu.bus.read_byte(dest as usize + i),
+                0,
+                "a refused block must leave the destination alone (byte {i})"
+            );
+        }
+    }
+
+    /// A zero declared size is refused for the same reason.
+    #[test]
+    fn a_zero_length_block_is_refused() {
+        let (mut gba, src, dest) = gba_with_block(LZ77_SIGNATURE, 0, &[0x00]);
+        gba.cpu.registers.set_register_at(0, src);
+        gba.cpu.registers.set_register_at(1, dest);
+        gba.cpu.bus.write_byte(dest as usize, 0x7E);
+        let cpsr = gba.cpu.cpsr;
+        assert!(dispatch(&mut gba.cpu, Swi::Lz77UnCompWram as u32, cpsr, ROM_BASE));
+        assert_eq!(
+            gba.cpu.bus.read_byte(dest as usize),
+            0x7E,
+            "a zero-length block must write nothing"
+        );
     }
 
     /// `from_raw` is the table S1 will claim numbers out of; a number it
