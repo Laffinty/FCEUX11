@@ -8,6 +8,7 @@
 pub mod checksum;
 pub mod decompress;
 pub mod ram_reset;
+pub mod trig;
 pub mod wait;
 
 use gba_core::cpu::arm7tdmi::Arm7tdmi;
@@ -54,6 +55,12 @@ pub fn dispatch(cpu: &mut Arm7tdmi, swi_num: u32, old_cpsr: Psr, return_addr: u3
     match swi {
         Some(Swi::GetBiosChecksum) => {
             serve_bios_checksum(cpu, old_cpsr, return_addr);
+            true
+        }
+        Some(Swi::ArcTan) => {
+            let angle = trig::arctan(cpu.registers.register_at(0) as i16);
+            cpu.registers.set_register_at(0, u32::from(angle as u16));
+            cpu.swi_return(old_cpsr, return_addr);
             true
         }
         Some(Swi::RegisterRamReset) => {
@@ -610,6 +617,7 @@ mod tests {
             Swi::Stop as u32,
             Swi::IntrWait as u32,
             Swi::VBlankIntrWait as u32,
+            Swi::ArcTan as u32,
             Swi::GetBiosChecksum as u32,
             Swi::Lz77UnCompWram as u32,
             Swi::Lz77UnCompVram as u32,
@@ -623,8 +631,8 @@ mod tests {
             );
         }
         // Everything outside the claim set still has to fall through to the
-        // core, so the T2 math numbers can land one at a time. The order is
-        // the numeric scan order, which is what the collect above produces.
+        // core, so the T2 numbers can land one at a time. The order is the
+        // numeric scan order, which is what the collect above produces.
         assert_eq!(
             claimed,
             vec![
@@ -633,6 +641,7 @@ mod tests {
                 Swi::Stop as u32,
                 Swi::IntrWait as u32,
                 Swi::VBlankIntrWait as u32,
+                Swi::ArcTan as u32,
                 Swi::GetBiosChecksum as u32,
                 Swi::Lz77UnCompWram as u32,
                 Swi::Lz77UnCompVram as u32,
@@ -640,8 +649,9 @@ mod tests {
                 Swi::RlUnCompWram as u32,
                 Swi::RlUnCompVram as u32,
             ],
-            "0x0D, RegisterRamReset, the wait family and all four decompressors \
-             are claimed; only the T2 math numbers are not"
+            "0x09, 0x0D, RegisterRamReset, the wait family and all four \
+             decompressors are claimed; 0x08, 0x0A and the T2 affine/bit \
+             numbers are not"
         );
     }
 
@@ -658,6 +668,7 @@ mod tests {
                 Swi::from_raw(n),
                 Some(
                     Swi::GetBiosChecksum
+                        | Swi::ArcTan
                         | Swi::RegisterRamReset
                         | Swi::Halt
                         | Swi::Stop
