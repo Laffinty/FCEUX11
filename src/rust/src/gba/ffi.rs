@@ -72,11 +72,106 @@ pub extern "C" fn gba_probe_lz77_header(raw: u32) -> u32 {
     h.output_len
 }
 
+/// S2 probe: how big a machine state actually is, in bytes.
+///
+/// Not a diagnostic to be removed. The savestate ABI in r31 is shaped around
+/// this number — a state that is nearly a megabyte is why `gba_savestate_load`
+/// writes into state we own rather than handing a value back across `extern
+/// "C"`, where the caller's stack would have to hold it. Measured rather than
+/// estimated, because the whole design rests on it.
+#[unsafe(no_mangle)]
+pub extern "C" fn gba_probe_cpu_size() -> u64 {
+    std::mem::size_of::<gba_core::cpu::arm7tdmi::Arm7tdmi>() as u64
+}
+
+#[cfg(test)]
+mod drift_guard {
+    //! The GBA C ABI is declared by hand in `build.rs`, not generated.
+    //!
+    //! `build.rs` runs cbindgen against each *member* crate; the GBA ABI lives
+    //! in the root crate, which cbindgen is never pointed at. So the list in
+    //! `build.rs` is written out by a person, and a function added to Rust but
+    //! forgotten there produces a library the C++ side cannot call — with no
+    //! error anywhere. That is exactly what happened to the whole of S2-a:
+    //! `gba_load_rom`, `gba_frame_buffer` and the rest compiled, tested green,
+    //! and were absent from the staticlib and the header.
+    //!
+    //! This module is the guard. It reads the merged header that `build.rs`
+    //! just wrote and asserts that every `gba_` function this crate exports is
+    //! declared in it. Adding an export without declaring it fails the build.
+
+    /// Every `gba_` function this crate exports, by name.
+    ///
+    /// Written out rather than discovered by scanning the source: a scan would
+    /// pick up test-only helpers and the `use` aliases, and would silently
+    /// shrink if the scanner itself broke.
+    const EXPORTED: &[&str] = &[
+        // S0' probes.
+        "gba_abi_revision",
+        "gba_core_probe",
+        "gba_swi_count",
+        "gba_swi_probe",
+        "gba_probe_lz77_header",
+        "gba_probe_cpu_size",
+        // S2-a lifecycle and frame.
+        "gba_init",
+        "gba_rom_loaded",
+        "gba_unload_rom",
+        "gba_last_error",
+        "gba_load_rom",
+        "gba_reset",
+        "gba_step_frame",
+        "gba_frame_buffer_size",
+        "gba_frame_buffer",
+        "gba_set_overlay",
+    ];
+
+    /// The generated header, as `build.rs` wrote it.
+    fn header() -> String {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/fceux11_rust.h");
+        std::fs::read_to_string(path).unwrap_or_else(|e| {
+            panic!("the merged header at {path} must exist: {e}")
+        })
+    }
+
+    /// Every export is declared in the header the C++ side includes.
+    #[test]
+    fn the_gba_c_abi_is_declared_for_every_exported_function() {
+        let header = header();
+        let missing: Vec<&str> = EXPORTED
+            .iter()
+            .copied()
+            .filter(|name| !header.contains(name))
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "these are exported from Rust but not declared in fceux11_rust.h, \
+             so C++ cannot call them: {missing:?}. Add them to the hand-written \
+             list in build.rs and to EXPORTED here."
+        );
+    }
+
+    /// And the error codes the functions return are named, not magic numbers.
+    #[test]
+    fn the_error_codes_are_named_in_the_header() {
+        let header = header();
+        for name in [
+            "GBA_OK",
+            "GBA_ERR_NO_ROM",
+            "GBA_ERR_BAD_ROM",
+            "GBA_ERR_STATE",
+            "GBA_ERR_CAPACITY",
+        ] {
+            assert!(header.contains(name), "{name} is not declared in the header");
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        ZERO_CARTRIDGE, gba_abi_revision, gba_core_probe, gba_probe_lz77_header, gba_swi_count,
-        gba_swi_probe,
+        ZERO_CARTRIDGE, gba_abi_revision, gba_core_probe, gba_probe_cpu_size,
+        gba_probe_lz77_header, gba_swi_count, gba_swi_probe,
     };
 
     /// Every symbol this module exports is called from the acceptance run, so
@@ -101,6 +196,28 @@ mod tests {
         assert!(
             gba_swi_count() > 0,
             "the SWI dispatch table must not be empty"
+        );
+    }
+
+    /// The machine state's size, measured.
+    ///
+    /// Recorded because r31's ABI shape depends on it: this is why a state is
+    /// never returned by value across `extern "C"`.
+    ///
+    /// The threshold is 64K rather than "big": the frame buffer alone is
+    /// 240x160x2 = 76,800 bytes of it, which is over half the total, and the
+    /// R12 caller's default 1 MB stack has to hold the state, the decoded
+    /// state and serde's own frames at once. The variable-length stores
+    /// (WRAM, VRAM, ROM) are heap allocations behind `Vec`, so they are *not*
+    /// counted here -- r30 initially estimated the state at "close to a
+    /// megabyte" and that was wrong by an order of magnitude.
+    #[test]
+    fn the_machine_state_is_too_large_to_return_by_value() {
+        let size = gba_probe_cpu_size();
+        assert!(
+            size > 64 * 1024,
+            "the state is {size} bytes; if that ever becomes small, r31's \
+             by-value prohibition can be revisited"
         );
     }
 

@@ -243,13 +243,45 @@ fn merge_headers(
     // v2.0 GBAEUX11 (S0). The GBA C ABI is declared by this root crate,
     // not by a separate crate: rustc 1.96 fat LTO cannot load the bitcode of
     // a tiny facade rlib in the dependency chain, so the ABI lives here
-    // alongside kagami_qa_direct_main. S2 replaces these two probes with the
-    // real section 4.1 surface.
+    // alongside kagami_qa_direct_main.
+    //
+    // These are written out by hand rather than generated: `build.rs` runs
+    // cbindgen per *member* crate, and the GBA ABI is in the root crate,
+    // which cbindgen is never pointed at. S0 left the five probes; S2-a adds
+    // the lifecycle and frame surface from `src/gba/frame.rs`. S2-b adds the
+    // savestate surface from `src/gba/save.rs`.
+    //
+    // A hand-written list is a real risk -- a function can exist in Rust and
+    // be missing here, which is exactly what happened to S2-a's exports.
+    // `the_gba_c_abi_is_declared_for_every_exported_function` in
+    // `src/gba/ffi.rs` is the guard: it fails the build if the two drift.
+    output.push_str("/* v2.0 GBAEUX11 error codes (plan section 4.1) */\n");
+    output.push_str("#define GBA_OK 0\n");
+    output.push_str("#define GBA_ERR_NO_ROM 1\n");
+    output.push_str("#define GBA_ERR_BAD_ROM 2\n");
+    output.push_str("#define GBA_ERR_BIOS 3\n");
+    output.push_str("#define GBA_ERR_STATE 4\n");
+    output.push_str("#define GBA_ERR_CAPACITY 6\n\n");
+
+    output.push_str("/* v2.0 GBAEUX11 C ABI */\n");
     output.push_str("uint32_t gba_abi_revision(void);\n");
     output.push_str("uint32_t gba_core_probe(void);\n");
     output.push_str("uint32_t gba_swi_probe(void);\n");
     output.push_str("uint32_t gba_swi_count(void);\n");
     output.push_str("uint32_t gba_probe_lz77_header(uint32_t raw);\n");
+    output.push_str("uint64_t gba_probe_cpu_size(void);\n\n");
+
+    output.push_str("/* Lifecycle and frame (S2-a) */\n");
+    output.push_str("int32_t gba_init(void);\n");
+    output.push_str("int32_t gba_rom_loaded(void);\n");
+    output.push_str("int32_t gba_unload_rom(void);\n");
+    output.push_str("int32_t gba_last_error(uint8_t *dst, uint32_t cap);\n");
+    output.push_str("int32_t gba_load_rom(const char *path);\n");
+    output.push_str("int32_t gba_reset(void);\n");
+    output.push_str("int32_t gba_step_frame(void);\n");
+    output.push_str("int32_t gba_frame_buffer_size(uint32_t *out_size);\n");
+    output.push_str("int32_t gba_frame_buffer(uint8_t *dst, uint32_t cap);\n");
+    output.push_str("int32_t gba_set_overlay(int32_t enable);\n");
 
     output.push_str("\n#ifdef __cplusplus\n}\n#endif\n\n");
     output.push_str("#endif /* FCEUX11_RUST_H */\n");

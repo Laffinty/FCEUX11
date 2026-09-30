@@ -46,7 +46,6 @@
 //! below, which asserts the data rather than the hooks.
 
 use gba_core::cpu::arm7tdmi::Arm7tdmi;
-use gba_core::gba::Gba;
 
 /// The four bytes every savestate starts with.
 ///
@@ -123,7 +122,9 @@ pub fn load(bytes: &[u8]) -> Result<Box<Arm7tdmi>, SaveError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Gba, SAVESTATE_MAGIC, SAVESTATE_VERSION, SaveError, load, save};
+    use gba_core::gba::Gba;
+
+    use super::{SAVESTATE_MAGIC, SAVESTATE_VERSION, SaveError, load, save};
 
     /// A fresh machine, used where the state itself is irrelevant.
     fn fresh_machine() -> Box<Gba> {
