@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — 全仓显式启用 `/EHsc`，4 个测试目标恢复可编译（MSVC 14.51）
+
+- MSVC **默认不启用** C++ 异常展开语义，而 `<iostream>`、`<chrono>` 等标准库头在
+  实例化时会发出 C4530。本仓库**全仓从未声明过 `/EHsc`** —— 主工程一直没出问题，
+  是因为它的编译单元消费 PCH，PCH 自身带 `/EHsc`;而 4 个用裸 `add_executable` 的
+  目标既无 PCH 也无 Qt 依赖可继承，于是在自己的编译里直接实例化那些头。
+- MSVC 14.51 起把 C4530 升格为 `/WX` 错误，4 个测试目标因此编不过
+  （`C2220`），连累整个 `ctest` 无法执行。**升级才坏**与**一直缺失**是同一件事的两面。
+- 在根 `CMakeLists.txt` 的 `add_compile_options` 中与 `/W4 /WX /sdl` 并列加入
+  `/EHsc`。选目录级而非局部补那 4 个目标：这条缺失从来不是它们的属性，而是全仓口径
+  缺失，下一个裸 `add_executable` 的新测试会原地再踩。
+- 因果用最小复现坐实（5 行探针 + `/W4 /WX`：不加复现 C4530→C2220，加则通过），
+  不是「改完碰巧绿了」。
+- **本条改的是 NES 侧构建配置，非 GBA 代码**，经明确指示后才动手。
+
 ### Fixed — GBAEUX11 v2.0 S1c-e：`ArcTan`（0x09）的取整顺序此前不逐位对齐 BIOS
 
 - BIOS 首个 Horner 项是 `-((i * i) >> 14)`:先移位,后取负。此前实现写成
