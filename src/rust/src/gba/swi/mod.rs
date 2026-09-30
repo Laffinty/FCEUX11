@@ -5,6 +5,7 @@
 //! returns `false`, and the core falls through to its built-in arms and then
 //! to the real BIOS image.
 
+pub mod checksum;
 pub mod decompress;
 pub mod ram_reset;
 pub mod wait;
@@ -45,6 +46,10 @@ pub fn dispatch(cpu: &mut Arm7tdmi, swi_num: u32, old_cpsr: Psr, return_addr: u3
     note_dispatch(swi_num);
     let swi = Swi::from_raw(swi_num);
     match swi {
+        Some(Swi::GetBiosChecksum) => {
+            serve_bios_checksum(cpu, old_cpsr, return_addr);
+            true
+        }
         Some(Swi::RegisterRamReset) => {
             serve_register_ram_reset(cpu, old_cpsr, return_addr);
             true
@@ -147,6 +152,17 @@ fn serve_decompress(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32, swi: Sw
             eprintln!("[gba] swi {swi:?} at 0x{src:08X}: {error}");
         }
     }
+    cpu.swi_return(old_cpsr, return_addr);
+}
+
+/// Serve `GetBiosChecksum` (0x0D).
+///
+/// GBATEK's contract is "Parameters: None. Return: r0=Checksum" -- one register,
+/// nothing read. Writing `r1` and `r3` as some implementations do would be
+/// writing past the contract, and a caller that came to depend on those values
+/// would be depending on whatever the BIOS happened to leave there.
+fn serve_bios_checksum(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32) {
+    cpu.registers.set_register_at(0, checksum::checksum());
     cpu.swi_return(old_cpsr, return_addr);
 }
 
@@ -542,6 +558,7 @@ mod tests {
             Swi::Stop as u32,
             Swi::IntrWait as u32,
             Swi::VBlankIntrWait as u32,
+            Swi::GetBiosChecksum as u32,
             Swi::Lz77UnCompWram as u32,
             Swi::Lz77UnCompVram as u32,
             Swi::RlUnCompWram as u32,
@@ -554,6 +571,8 @@ mod tests {
         }
         // Everything outside the claim set still has to fall through to the
         // core, so Huffman and the T2 math numbers can land one at a time.
+        // The order is the numeric scan order, which is what the collect above
+        // produces -- an unordered set here would not pin anything.
         assert_eq!(
             claimed,
             vec![
@@ -562,12 +581,14 @@ mod tests {
                 Swi::Stop as u32,
                 Swi::IntrWait as u32,
                 Swi::VBlankIntrWait as u32,
+                Swi::GetBiosChecksum as u32,
                 Swi::Lz77UnCompWram as u32,
                 Swi::Lz77UnCompVram as u32,
                 Swi::RlUnCompWram as u32,
                 Swi::RlUnCompVram as u32,
             ],
-            "only RegisterRamReset, the wait family and the LZ77/RLE pair are claimed"
+            "0x0D, RegisterRamReset, the wait family and the LZ77/RLE pair \
+             are claimed; Huffman and the T2 math numbers are not"
         );
     }
 
@@ -583,7 +604,8 @@ mod tests {
             let is_claimed = matches!(
                 Swi::from_raw(n),
                 Some(
-                    Swi::RegisterRamReset
+                    Swi::GetBiosChecksum
+                        | Swi::RegisterRamReset
                         | Swi::Halt
                         | Swi::Stop
                         | Swi::IntrWait
@@ -1295,6 +1317,62 @@ mod tests {
             0x7E,
             "a zero-length block must write nothing"
         );
+    }
+
+    // ---- S1d-b: GetBiosChecksum ----------------------------------------
+
+    /// `0x0D` leaves the GBA BIOS checksum in `r0` and nothing else.
+    ///
+    /// Asserted as a literal rather than against the constant, because the
+    /// constant is the thing under test -- comparing the two would pass no
+    /// matter what either was.
+    #[test]
+    fn get_bios_checksum_returns_the_gba_value_in_r0() {
+        let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
+        install_swi_hook(&mut gba);
+        let cpsr = gba.cpu.cpsr;
+        assert!(dispatch(&mut gba.cpu, Swi::GetBiosChecksum as u32, cpsr, ROM_BASE));
+        assert_eq!(
+            gba.cpu.registers.register_at(0),
+            0xBA_AE_187F,
+            "r0 must carry the GBA BIOS checksum"
+        );
+    }
+
+    /// GBATEK says "Parameters: None. Return: r0=Checksum" -- so the other
+    /// outgoing registers are not ours to write. Some implementations stuff
+    /// `r1 = 1` and `r3 = 0x4000`; a caller that started depending on those
+    /// would be depending on values the BIOS never promised.
+    #[test]
+    fn get_bios_checksum_leaves_the_other_registers_alone() {
+        let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
+        install_swi_hook(&mut gba);
+        for reg in [1usize, 3] {
+            gba.cpu.registers.set_register_at(reg, 0xDEAD_BEEF);
+        }
+        let cpsr = gba.cpu.cpsr;
+        assert!(dispatch(&mut gba.cpu, Swi::GetBiosChecksum as u32, cpsr, ROM_BASE));
+        for reg in [1usize, 3] {
+            assert_eq!(
+                gba.cpu.registers.register_at(reg),
+                0xDEAD_BEEF,
+                "r{reg} is not part of the contract and must be untouched"
+            );
+        }
+    }
+
+    /// The call returns rather than parking the machine, like every other
+    /// claimed number.
+    #[test]
+    fn get_bios_checksum_returns_to_the_caller() {
+        const RETURN_ADDR: u32 = 0x18;
+        let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
+        install_swi_hook(&mut gba);
+        gba.cpu.registers.set_program_counter(0x30);
+        let cpsr = gba.cpu.cpsr;
+        assert!(dispatch(&mut gba.cpu, Swi::GetBiosChecksum as u32, cpsr, RETURN_ADDR));
+        assert_eq!(gba.cpu.registers.program_counter(), RETURN_ADDR as usize);
+        assert!(!gba.cpu.halted);
     }
 
     /// `from_raw` is the table S1 will claim numbers out of; a number it

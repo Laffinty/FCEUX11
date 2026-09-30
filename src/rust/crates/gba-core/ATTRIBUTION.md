@@ -126,7 +126,7 @@ landing in S2.
 |---|---|
 | `gba-core` source changes | **9**, all in one file (`src/cpu/arm7tdmi.rs`): 5 S0' hook wiring (no upstream logic altered) + 4 S1a-1 halt mechanism (**does change `step()`** — see R15) |
 | `gba-core/Cargo.toml` | rewritten (metadata only, no version changes) |
-| `src/gba/` | new, 100% first-party, 7 files |
+| `src/gba/` | new, 100% first-party, 8 files |
 
 The plan's risk **R1** says "keep the patch set minimal (SWI hook only)". That
 constraint held for the first five edits and then broke — see below.

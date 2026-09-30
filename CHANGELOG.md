@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — GBAEUX11 v2.0 S1d-b：BIOS 校验和查询
+
+- **`GetBiosChecksum`（0x0D）认领并实现**，返回 GBA BIOS 的校验和 `0xBAAE187F`。
+  按 GBATEK 的契约，这个调用**没有参数、只写 r0**——不额外设置 r1/r3，有些实现会塞
+  `r1=1`、`r3=0x4000`，但那不在契约内，调用方一旦依赖上就是在依赖 BIOS 随手留下的值。
+- 返回值是**固定的 retail 值而非当前镜像的实际校验和**：本项目跑的是自建 stub BIOS，
+  它的校验和是一个任何游戏都没见过的数字，不构成可识别的信号。代价是据此分岔逻辑的程序
+  会以为自己在 retail 硬件上运行——这是为兼容性做的有意取舍，已记为已知限制。
+- 锁测试 60 → **65 项**；变异验证（换成 NDS 口径 + 多写 r1/r3）→ 2 项红。
+
 ### Added — GBAEUX11 v2.0 S1d-a：LZ77 与 RLE 解压器
 
 - **`Lz77UnCompWram/Vram`（0x10/0x11）与 `RlUnCompWram/Vram`（0x13/0x14）认领并实现**。
