@@ -294,10 +294,8 @@ impl<B: BusLike> ByteSink for MachinePort<'_, B> {
             match self.pending.take() {
                 Some(lo) => {
                     let addr = (self.dest - 1) & !1;
-                    self.bus.write_half_word(
-                        addr as usize,
-                        u16::from(lo) | (u16::from(byte) << 8),
-                    );
+                    self.bus
+                        .write_half_word(addr as usize, u16::from(lo) | (u16::from(byte) << 8));
                 }
                 None => self.pending = Some(byte),
             }
@@ -351,19 +349,21 @@ pub fn lz77_decompress<P: ByteSource + ByteSink>(
 ) -> Result<u32, DecompressError> {
     let mut window = Window::new();
     let mut flag = 0u8;
-    let mut token = 0u8;
+    let mut consumed = 0u8;
 
     while window.written() < output_len {
-        if token == 0 {
+        if consumed == 0 {
             flag = port.next_byte().ok_or(DecompressError::Truncated)?;
         }
-        // The flag byte is consumed **low bit first** on GBA: token *n* of the
-        // eight is bit *n*. The NDS/Wii routine scans the same byte the other
-        // way round, and getting this backwards still yields a stream that
-        // decompresses and round-trips -- just with its blocks in a different
-        // order -- so only a targeted test pins it.
-        let is_reference = flag & (1 << token) != 0;
-        token = (token + 1) % 8;
+        // The flag byte is consumed **high bit first**: block *n* of the eight
+        // is bit *7 - n*. The BIOS does it with `ldrb` / `lsl #24` / then
+        // `lsls #1` + `bcs` in a loop of eight, which drains bits 24..31 --
+        // that is, the byte's bit 0 up to its bit 7, so the *first* carry out
+        // is bit 7. GBATEK, the `gba` crate and both Nintenlord-derived
+        // compressors agree. See the v2.0 plan r17 for the evidence and for
+        // why this was briefly the other way round.
+        let is_reference = flag & (1 << (7 - consumed)) != 0;
+        consumed = (consumed + 1) % 8;
 
         if is_reference {
             let hi = port.next_byte().ok_or(DecompressError::Truncated)?;
@@ -385,12 +385,13 @@ pub fn lz77_decompress<P: ByteSource + ByteSink>(
                 // Read from the window *before* pushing, so a run that
                 // overlaps itself -- which is the whole point of RLE inside
                 // LZ77 -- repeats the byte it just wrote.
-                let byte = window
-                    .get(distance)
-                    .ok_or(DecompressError::BackReferenceBeforeStart {
-                        distance,
-                        written: window.written(),
-                    })?;
+                let byte =
+                    window
+                        .get(distance)
+                        .ok_or(DecompressError::BackReferenceBeforeStart {
+                            distance,
+                            written: window.written(),
+                        })?;
                 window.push(byte);
                 port.push(byte);
             }
@@ -453,8 +454,8 @@ pub fn rl_decompress<P: ByteSource + ByteSink>(
 #[cfg(test)]
 mod tests {
     use super::{
-        LZ77_MAX_OUTPUT, LZ77_SIGNATURE, RL_SIGNATURE, check_output_len, lz77_header,
-        parse_lz77_header,
+        check_output_len, lz77_header, parse_lz77_header, LZ77_MAX_OUTPUT, LZ77_SIGNATURE,
+        RL_SIGNATURE,
     };
 
     /// Assemble a header from its parts: signature byte plus a 24-bit size.
@@ -522,7 +523,7 @@ mod tests {
 
 #[cfg(test)]
 mod algorithm {
-    use super::{ByteSink, ByteSource, DecompressError, lz77_decompress, rl_decompress};
+    use super::{lz77_decompress, rl_decompress, ByteSink, ByteSource, DecompressError};
 
     /// One store issued to memory, so a test can tell a byte write from a
     /// halfword one. That difference is the whole point of the `Vram` numbers.
@@ -651,7 +652,7 @@ mod algorithm {
     fn lz77_body_with_reference(distance_field: u16, length_field: u16) -> Vec<u8> {
         let mut body = vec![0x00];
         body.extend_from_slice(&(0..=7u8).collect::<Vec<u8>>());
-        body.push(0b0000_0001);
+        body.push(0b1000_0000);
         let block = ((length_field & 0x0F) << 12) | (distance_field & 0x0FFF);
         body.push((block >> 8) as u8);
         body.push((block & 0xFF) as u8);
@@ -684,33 +685,38 @@ mod algorithm {
         assert_eq!(port.dst, input);
     }
 
-    /// The flag byte is scanned **low bit first**. This is the one detail a
-    /// round-trip test cannot catch: an MSB-first decoder reading an all-
-    /// literal stream produces the identical output, so the round trip stays
-    /// green and only a stream that *mixes* the two kinds of token can tell
-    /// them apart.
+    /// The flag byte is scanned **high bit first**. This is the one detail a
+    /// round-trip test cannot catch: an all-literal stream decodes to the same
+    /// bytes either way, so the round trip stays green and only a stream that
+    /// *mixes* literals and back-references can tell the two orders apart.
+    ///
+    /// Pinned from both ends, because getting it backwards is silent: every
+    /// block after the first mismatched one still parses, the output is just
+    /// wrong. See the v2.0 plan r17 -- this file briefly implemented the
+    /// opposite order on the strength of a single source, and a targeted test
+    /// pinned it there just as firmly.
     #[test]
-    fn the_flag_byte_is_read_low_bit_first() {
-        // Bit 0 set => token 9 is a back-reference, repeating the byte at
-        // distance 1 three times.
+    fn the_flag_byte_is_read_msb_first() {
+        // Nine blocks: eight literals then a back-reference. Block 9 is bit 7
+        // of the second flag byte, so that is the bit that must be set.
         let mut port = SlicePort::new(lz77_body_with_reference(0, 0));
         lz77_decompress(&mut port, 11).unwrap();
         assert_eq!(
             port.dst,
             vec![0, 1, 2, 3, 4, 5, 6, 7, 7, 7, 7],
-            "bit 0 set must mean a reference, which is only true if the \
-             flag byte is scanned from the low bit"
+            "bit 7 of the ninth block's flag must mean a reference, which \
+             is only true if the byte is scanned from the high bit"
         );
     }
 
-    /// The mirror image of the test above: bit 7 set and bit 0 clear must be
+    /// The mirror image of the test above: bit 0 set and bit 7 clear must be
     /// a *literal* under the same rule. Together the two pin the order from
     /// both ends, so a decoder that reverses it fails one or the other.
     #[test]
-    fn bit_seven_set_and_bit_zero_clear_is_a_literal() {
+    fn bit_zero_set_and_bit_seven_clear_is_a_literal() {
         let mut body = vec![0x00];
         body.extend_from_slice(&(0..=7u8).collect::<Vec<u8>>());
-        body.push(0b1000_0000);
+        body.push(0b0000_0001);
         body.push(0x99);
 
         let mut port = SlicePort::new(body);
@@ -745,7 +751,11 @@ mod algorithm {
         // two and not one.
         let mut port = SlicePort::new(lz77_body_with_reference(1, 0));
         lz77_decompress(&mut port, 11).unwrap();
-        assert_eq!(&port.dst[8..], &[6, 7, 6], "distance field 1 reaches back 2");
+        assert_eq!(
+            &port.dst[8..],
+            &[6, 7, 6],
+            "distance field 1 reaches back 2"
+        );
     }
 
     /// A run may overlap itself: distance 1 with a length of 18 is how a
@@ -757,12 +767,16 @@ mod algorithm {
         // length field 15 (=> 18 bytes), distance field 0 (=> back 1).
         let mut body = vec![0x00];
         body.extend_from_slice(&[0x11; 8]);
-        body.push(0b0000_0001);
+        body.push(0b1000_0000);
         body.extend_from_slice(&[0xF0, 0x00]);
 
         let mut port = SlicePort::new(body);
         lz77_decompress(&mut port, 26).unwrap();
-        assert_eq!(port.dst, vec![0x11; 26], "the run must repeat through itself");
+        assert_eq!(
+            port.dst,
+            vec![0x11; 26],
+            "the run must repeat through itself"
+        );
     }
 
     /// The window is 12 bits, so a block can reach at most 4096 bytes back --
@@ -773,20 +787,23 @@ mod algorithm {
         // follows is the one the decoder reaches.
         let mut body = lz77_literal_body(&vec![0x5Au8; 4096]);
         // Distance field 0xFFF => back 4096, the format's maximum.
-        body.push(0b0000_0001);
+        body.push(0b1000_0000);
         body.extend_from_slice(&[0x0F, 0xFF]);
 
         let mut port = SlicePort::new(body);
         lz77_decompress(&mut port, 4099).unwrap();
         assert_eq!(port.dst.len(), 4099);
-        assert!(port.dst.iter().all(|b| *b == 0x5A), "the window wrapped cleanly");
+        assert!(
+            port.dst.iter().all(|b| *b == 0x5A),
+            "the window wrapped cleanly"
+        );
     }
 
     #[test]
     fn a_reference_before_the_start_is_refused() {
         // The very first token is a back-reference, so there is nothing to
         // reach back to.
-        let body = vec![0b0000_0001, 0x00, 0x00];
+        let body = vec![0b1000_0000, 0x00, 0x00];
         let mut port = SlicePort::new(body);
         assert_eq!(
             lz77_decompress(&mut port, 8),
@@ -805,7 +822,7 @@ mod algorithm {
     fn a_run_past_the_declared_length_is_refused() {
         let mut body = vec![0x00];
         body.extend_from_slice(&(0..=7u8).collect::<Vec<u8>>());
-        body.push(0b0000_0001);
+        body.push(0b1000_0000);
         body.extend_from_slice(&[0x00, 0x00]); // distance 1, length 3
 
         let mut port = SlicePort::new(body);
@@ -896,6 +913,10 @@ mod algorithm {
             vec![Store::Half(0, 0x3412)],
             "the odd tail must not reach memory at all"
         );
-        assert_eq!(half.dst, vec![0x12, 0x34, 0x56], "the stream still produced 3");
+        assert_eq!(
+            half.dst,
+            vec![0x12, 0x34, 0x56],
+            "the stream still produced 3"
+        );
     }
 }
