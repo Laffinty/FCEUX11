@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — GBAEUX11 v2.0 S1c-b：解压类 SWI 的号码整体错位一格
+
+- **此前把 `0x0E` 当作 `BitUnPack`、完全没有 `0x0F`，并把 `0x10`–`0x1F` 依次错配**。正确的
+  GBA 编号是 `0x0E BgAffineSet`、`0x0F ObjAffineSet`、`0x10 BitUnPack`、`0x11 LZ77Wram`、
+  `0x12 LZ77Vram`、`0x13 HuffUnComp`、`0x14 RLWram`、`0x15 RLVram`。
+- 后果是真实游戏调 `SWI 0x11`（LZ77 写回 WRAM）会拿到写 VRAM 的版本、调 `0x13`（Huffman）
+  会拿到 RLE——**每个都静默做错事，不崩也不越界**。压缩算法本身没问题，认领号码错了。
+- 之所以 84 项测试全绿：唯一的结构性测试只验「号码表与枚举**互相自洽**」，两边同时错位一格
+  照样绿。已补一条**按号码独立写死名称**的锁测试，并断言 `0x2B` 之上无名。
+- 顺带把「核心的 `Sqrt` 是对的」从推断变成结论：补 4 项锁测试（契约锚点 13 例、`0..=20000`
+  穷举、全部 65535 个完全平方数及两侧、GBATEK 取整例的 floor 语义）全部通过，故确认不认领。
+- 锁测试 84 → **89 项**；`ctest` **34/34**。
+
 ### Fixed — GBAEUX11 v2.0 S1c-a：反正切此前返回的是「输入减半」
 
 - **`ArcTan`（SWI 0x09）此前由上游核心实现，实现是 `let result = (tan / 2) as u32;`** —— 把输入减半当作反正切，只在输入恰好为 1.0 时碰巧对上正确值，负输入经 `as u32` 变成巨大的无符号数。调用它的程序（mode 7 旋转、精灵缩放、AI 瞄准）会拿到错误角度，**且不崩、不挂住、不会被任何现有门禁发现**。该路径零测试覆盖。

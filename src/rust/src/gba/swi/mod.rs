@@ -431,23 +431,35 @@ pub enum Swi {
     CpuSet = 0x0B,
     CpuFastSet = 0x0C,
     GetBiosChecksum = 0x0D,
-    BitUnPack = 0x0E,
-    Lz77UnCompWram = 0x10,
-    Lz77UnCompVram = 0x11,
-    HuffUnComp = 0x12,
-    RlUnCompWram = 0x13,
-    RlUnCompVram = 0x14,
-    Diff8BitUnFilterWram = 0x15,
-    Diff8BitUnFilterVram = 0x16,
-    Diff16BitUnFilter = 0x17,
-    SoundBias = 0x18,
-    SoundDriverInit = 0x19,
-    MidiKey2Freq = 0x1A,
+    BgAffineSet = 0x0E,
+    ObjAffineSet = 0x0F,
+    BitUnPack = 0x10,
+    Lz77UnCompWram = 0x11,
+    Lz77UnCompVram = 0x12,
+    HuffUnComp = 0x13,
+    RlUnCompWram = 0x14,
+    RlUnCompVram = 0x15,
+    Diff8BitUnFilterWram = 0x16,
+    Diff8BitUnFilterVram = 0x17,
+    Diff16BitUnFilter = 0x18,
+    SoundBias = 0x19,
+    SoundDriverInit = 0x1A,
     SoundDriverMode = 0x1B,
     SoundDriverMain = 0x1C,
-    SoundDriverClear = 0x1D,
-    MultiBoot = 0x1E,
-    HardReset = 0x1F,
+    SoundDriverVSync = 0x1D,
+    SoundChannelClear = 0x1E,
+    MidiKey2Freq = 0x1F,
+    MusicPlayerOpen = 0x20,
+    MusicPlayerStart = 0x21,
+    MusicPlayerStop = 0x22,
+    MusicPlayerContinue = 0x23,
+    MusicPlayerFadeOut = 0x24,
+    MultiBoot = 0x25,
+    HardReset = 0x26,
+    CustomHalt = 0x27,
+    SoundDriverVSyncOff = 0x28,
+    SoundDriverVSyncOn = 0x29,
+    SoundGetJumpList = 0x2A,
 }
 
 impl Swi {
@@ -469,23 +481,35 @@ impl Swi {
             0x0B => Swi::CpuSet,
             0x0C => Swi::CpuFastSet,
             0x0D => Swi::GetBiosChecksum,
-            0x0E => Swi::BitUnPack,
-            0x10 => Swi::Lz77UnCompWram,
-            0x11 => Swi::Lz77UnCompVram,
-            0x12 => Swi::HuffUnComp,
-            0x13 => Swi::RlUnCompWram,
-            0x14 => Swi::RlUnCompVram,
-            0x15 => Swi::Diff8BitUnFilterWram,
-            0x16 => Swi::Diff8BitUnFilterVram,
-            0x17 => Swi::Diff16BitUnFilter,
-            0x18 => Swi::SoundBias,
-            0x19 => Swi::SoundDriverInit,
-            0x1A => Swi::MidiKey2Freq,
+            0x0E => Swi::BgAffineSet,
+            0x0F => Swi::ObjAffineSet,
+            0x10 => Swi::BitUnPack,
+            0x11 => Swi::Lz77UnCompWram,
+            0x12 => Swi::Lz77UnCompVram,
+            0x13 => Swi::HuffUnComp,
+            0x14 => Swi::RlUnCompWram,
+            0x15 => Swi::RlUnCompVram,
+            0x16 => Swi::Diff8BitUnFilterWram,
+            0x17 => Swi::Diff8BitUnFilterVram,
+            0x18 => Swi::Diff16BitUnFilter,
+            0x19 => Swi::SoundBias,
+            0x1A => Swi::SoundDriverInit,
             0x1B => Swi::SoundDriverMode,
             0x1C => Swi::SoundDriverMain,
-            0x1D => Swi::SoundDriverClear,
-            0x1E => Swi::MultiBoot,
-            0x1F => Swi::HardReset,
+            0x1D => Swi::SoundDriverVSync,
+            0x1E => Swi::SoundChannelClear,
+            0x1F => Swi::MidiKey2Freq,
+            0x20 => Swi::MusicPlayerOpen,
+            0x21 => Swi::MusicPlayerStart,
+            0x22 => Swi::MusicPlayerStop,
+            0x23 => Swi::MusicPlayerContinue,
+            0x24 => Swi::MusicPlayerFadeOut,
+            0x25 => Swi::MultiBoot,
+            0x26 => Swi::HardReset,
+            0x27 => Swi::CustomHalt,
+            0x28 => Swi::SoundDriverVSyncOff,
+            0x29 => Swi::SoundDriverVSyncOn,
+            0x2A => Swi::SoundGetJumpList,
             _ => return None,
         })
     }
@@ -507,6 +531,8 @@ impl Swi {
             Swi::CpuSet => "CpuSet",
             Swi::CpuFastSet => "CpuFastSet",
             Swi::GetBiosChecksum => "GetBiosChecksum",
+            Swi::BgAffineSet => "BgAffineSet",
+            Swi::ObjAffineSet => "ObjAffineSet",
             Swi::BitUnPack => "BitUnPack",
             Swi::Lz77UnCompWram => "Lz77UnCompWram",
             Swi::Lz77UnCompVram => "Lz77UnCompVram",
@@ -518,12 +544,22 @@ impl Swi {
             Swi::Diff16BitUnFilter => "Diff16BitUnFilter",
             Swi::SoundBias => "SoundBias",
             Swi::SoundDriverInit => "SoundDriverInit",
-            Swi::MidiKey2Freq => "MidiKey2Freq",
             Swi::SoundDriverMode => "SoundDriverMode",
             Swi::SoundDriverMain => "SoundDriverMain",
-            Swi::SoundDriverClear => "SoundDriverClear",
+            Swi::SoundDriverVSync => "SoundDriverVSync",
+            Swi::SoundChannelClear => "SoundChannelClear",
+            Swi::MidiKey2Freq => "MidiKey2Freq",
+            Swi::MusicPlayerOpen => "MusicPlayerOpen",
+            Swi::MusicPlayerStart => "MusicPlayerStart",
+            Swi::MusicPlayerStop => "MusicPlayerStop",
+            Swi::MusicPlayerContinue => "MusicPlayerContinue",
+            Swi::MusicPlayerFadeOut => "MusicPlayerFadeOut",
             Swi::MultiBoot => "MultiBoot",
             Swi::HardReset => "HardReset",
+            Swi::CustomHalt => "CustomHalt",
+            Swi::SoundDriverVSyncOff => "SoundDriverVSyncOff",
+            Swi::SoundDriverVSyncOn => "SoundDriverVSyncOn",
+            Swi::SoundGetJumpList => "SoundGetJumpList",
         }
     }
 }
@@ -1438,6 +1474,212 @@ mod tests {
         assert!(dispatch(&mut gba.cpu, Swi::GetBiosChecksum as u32, cpsr, RETURN_ADDR));
         assert_eq!(gba.cpu.registers.program_counter(), RETURN_ADDR as usize);
         assert!(!gba.cpu.halted);
+    }
+
+    // ---- S1c-a: the T2 numbers the core already gets right -----------
+
+    /// A machine parked in a loop of `SWI 0x08`, reused across many inputs.
+    ///
+    /// One boot, many calls: booting per assertion turns a 65k-case sweep into
+    /// millions of emulated steps, which is its own kind of wrong.
+    struct CoreSwiRig {
+        gba: Gba,
+    }
+
+    impl CoreSwiRig {
+        fn new(swi: Swi) -> Self {
+            let mut gba = Gba::new([0u8; 0x4000], &cartridge_with_swi(swi as u32));
+            install_swi_hook(&mut gba);
+            Self { gba }
+        }
+
+        /// Call the BIOS function with `r0` set, and report the resulting `r0`.
+        ///
+        /// This goes through a real `SWI` instruction, not a direct call to
+        /// `dispatch`: the core only reaches its own `match` after our hook
+        /// declines, and that happens inside the exception path. Calling
+        /// `dispatch` alone exercises our half of the seam and leaves `r0`
+        /// untouched, which reads as "the core got it wrong" when the truth is
+        /// that the core never ran.
+        fn call(&mut self, r0: u32) -> u32 {
+            let _ = take_last_dispatch();
+            self.gba.cpu.registers.set_register_at(0, r0);
+            // The core recovers the SWI immediate from `PC-8`, so PC starts
+            // one instruction past it.
+            self.gba.cpu.registers.set_program_counter(ROM_BASE + 8);
+            for _ in 0..32 {
+                self.gba.step();
+                if take_last_dispatch().is_some() {
+                    break;
+                }
+            }
+            self.gba.cpu.registers.register_at(0)
+        }
+    }
+
+    /// `0x08 Sqrt` is left to the core, so the contract has to be checked
+    /// against it rather than assumed to hold.
+    ///
+    /// GBATEK: the result is an **integer**, so `Sqrt(2)` returns 1; fractional
+    /// precision is obtained by shifting the *input* left, and the result is an
+    /// unsigned 16-bit value. Two consequences fall out, and both are load
+    /// bearing: the answer is a floor, and it always fits in 16 bits.
+    #[test]
+    fn the_core_sqrt_matches_the_contract() {
+        let mut rig = CoreSwiRig::new(Swi::Sqrt);
+        for (input, want) in [
+            (0u32, 0u32),
+            (1, 1),
+            (2, 1), // GBATEK's own example
+            (3, 1),
+            (4, 2),
+            (8, 2),
+            (9, 3),
+            (15, 3),
+            (16, 4),
+            (0xFFFF, 255),
+            (0x1_0000, 256),
+            (0x4000_0000, 0x8000),
+            (0xFFFF_FFFF, 0xFFFF), // the largest answer, and it still fits
+        ] {
+            assert_eq!(
+                rig.call( input),
+                want,
+                "Sqrt({input:#x})"
+            );
+        }
+    }
+
+    /// Exhaustive over a small range, because "integer square root" has three
+    /// ways to be subtly wrong -- rounding instead of flooring, an off-by-one
+    /// at a perfect square, and a wrong answer exactly at the boundaries.
+    #[test]
+    fn the_core_sqrt_is_a_floor_for_every_small_input() {
+        let mut rig = CoreSwiRig::new(Swi::Sqrt);
+        for n in 0u32..=20_000 {
+            let want = (n as f64).sqrt() as u32;
+            assert_eq!(rig.call( n), want, "Sqrt({n})");
+        }
+    }
+
+    /// Every perfect square, and the values on either side of it.
+    #[test]
+    fn the_core_sqrt_is_exact_at_every_perfect_square() {
+        let mut rig = CoreSwiRig::new(Swi::Sqrt);
+        for root in 1u32..=0xFFFF {
+            let square = root * root;
+            assert_eq!(
+                rig.call( square),
+                root,
+                "Sqrt({square})"
+            );
+            if square > 0 {
+                assert_eq!(
+                    rig.call( square - 1),
+                    root - 1,
+                    "Sqrt({}) is one below a perfect square",
+                    square - 1
+                );
+            }
+            if square < 0xFFFF_FFFF {
+                assert_eq!(
+                    rig.call( square + 1),
+                    root,
+                    "Sqrt({}) is one above a perfect square",
+                    square + 1
+                );
+            }
+        }
+    }
+
+    /// The GBATEK example, read as the contract states it rather than as its
+    /// prose rounds it: `Sqrt(2 shl 30)` is a floor, so it is one below the
+    /// rounded `1.41421 shl 15` the documentation writes. Pinning the floor is
+    /// the whole point -- the alternative is a half-up rounding nobody
+    /// specified.
+    #[test]
+    fn the_core_sqrt_floors_where_the_documentation_rounds() {
+        let mut rig = CoreSwiRig::new(Swi::Sqrt);
+        let input = 2u32 << 30;
+        let got = rig.call( input);
+        assert_eq!(got, 46340, "floor(sqrt(2^31))");
+        assert_eq!(
+            got * got <= input,
+            true,
+            "the result must not exceed the input's root"
+        );
+        assert!(
+            (got + 1) * (got + 1) > input,
+            "and one more must exceed it, or the answer is not a floor"
+        );
+    }
+
+    /// Every documented SWI number, and the name it must carry.
+    ///
+    /// This table is written from the specification rather than from the
+    /// enum, and that is the entire point. The round-trip test above only
+    /// proves the enum and `from_raw` *agree* -- if both were shifted by one,
+    /// every SWI would still be named, just after the wrong function, and
+    /// everything would stay green while games got the wrong algorithm.
+    #[test]
+    fn every_number_carries_the_name_the_specification_gives_it() {
+        // Transcribed from the GBA column of the BIOS function summary. The
+        // range 0x10 onward is where the previous table was wrong by one.
+        const EXPECTED: &[(u32, &str)] = &[
+            (0x00, "SoftReset"),
+            (0x01, "RegisterRamReset"),
+            (0x02, "Halt"),
+            (0x03, "Stop"),
+            (0x04, "IntrWait"),
+            (0x05, "VBlankIntrWait"),
+            (0x06, "Div"),
+            (0x07, "DivArm"),
+            (0x08, "Sqrt"),
+            (0x09, "ArcTan"),
+            (0x0A, "ArcTan2"),
+            (0x0B, "CpuSet"),
+            (0x0C, "CpuFastSet"),
+            (0x0D, "GetBiosChecksum"),
+            (0x0E, "BgAffineSet"),
+            (0x0F, "ObjAffineSet"),
+            (0x10, "BitUnPack"),
+            (0x11, "Lz77UnCompWram"),
+            (0x12, "Lz77UnCompVram"),
+            (0x13, "HuffUnComp"),
+            (0x14, "RlUnCompWram"),
+            (0x15, "RlUnCompVram"),
+            (0x16, "Diff8BitUnFilterWram"),
+            (0x17, "Diff8BitUnFilterVram"),
+            (0x18, "Diff16BitUnFilter"),
+            (0x19, "SoundBias"),
+            (0x1A, "SoundDriverInit"),
+            (0x1B, "SoundDriverMode"),
+            (0x1C, "SoundDriverMain"),
+            (0x1D, "SoundDriverVSync"),
+            (0x1E, "SoundChannelClear"),
+            (0x1F, "MidiKey2Freq"),
+            (0x20, "MusicPlayerOpen"),
+            (0x21, "MusicPlayerStart"),
+            (0x22, "MusicPlayerStop"),
+            (0x23, "MusicPlayerContinue"),
+            (0x24, "MusicPlayerFadeOut"),
+            (0x25, "MultiBoot"),
+            (0x26, "HardReset"),
+            (0x27, "CustomHalt"),
+            (0x28, "SoundDriverVSyncOff"),
+            (0x29, "SoundDriverVSyncOn"),
+            (0x2A, "SoundGetJumpList"),
+        ];
+        for (number, name) in EXPECTED {
+            let swi = Swi::from_raw(*number)
+                .unwrap_or_else(|| panic!("{number:#04x} is documented but unmapped"));
+            assert_eq!(swi as u32, *number, "{name} is not at {number:#04x}");
+            assert_eq!(swi.name(), *name, "SWI {number:#04x}");
+        }
+        // And nothing beyond the documented range claims a name.
+        for n in 0x2Bu32..=0xFF {
+            assert!(Swi::from_raw(n).is_none(), "{n:#04x} is not a BIOS call");
+        }
     }
 
     /// `from_raw` is the table S1 will claim numbers out of; a number it
