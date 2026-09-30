@@ -65,6 +65,14 @@ pub fn dispatch(cpu: &mut Arm7tdmi, swi_num: u32, old_cpsr: Psr, return_addr: u3
             cpu.swi_return(old_cpsr, return_addr);
             true
         }
+        Some(Swi::ArcTan2) => {
+            let x = cpu.registers.register_at(0) as i16;
+            let y = cpu.registers.register_at(1) as i16;
+            cpu.registers
+                .set_register_at(0, u32::from(trig::arctan2(x, y)));
+            cpu.swi_return(old_cpsr, return_addr);
+            true
+        }
         Some(Swi::RegisterRamReset) => {
             serve_register_ram_reset(cpu, old_cpsr, return_addr);
             true
@@ -826,6 +834,7 @@ mod tests {
                 Swi::IntrWait as u32,
                 Swi::VBlankIntrWait as u32,
                 Swi::ArcTan as u32,
+                Swi::ArcTan2 as u32,
                 Swi::GetBiosChecksum as u32,
                 Swi::BgAffineSet as u32,
                 Swi::ObjAffineSet as u32,
@@ -836,8 +845,8 @@ mod tests {
                 Swi::RlUnCompWram as u32,
                 Swi::RlUnCompVram as u32,
             ],
-            "0x09, 0x0D, 0x0E, 0x0F, 0x10, RegisterRamReset, the wait family \
-             and all four decompressors are claimed; 0x08 and 0x0A are not"
+            "0x09, 0x0A, 0x0D, 0x0E, 0x0F, 0x10, RegisterRamReset, the wait \
+             family and all four decompressors are claimed; only 0x08 is not"
         );
     }
 
@@ -868,6 +877,7 @@ mod tests {
                         | Swi::BitUnPack
                         | Swi::BgAffineSet
                         | Swi::ObjAffineSet
+                        | Swi::ArcTan2
                 )
             );
             if is_claimed {
