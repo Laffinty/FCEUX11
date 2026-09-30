@@ -17,8 +17,8 @@ use ram_reset::{IE, IF, IME, RamResetRequest, WAITCNT};
 use wait::{IntrWaitRequest, LowPower};
 
 use decompress::{
-    BusLike, DecompressError, LZ77_SIGNATURE, MachinePort, RL_SIGNATURE, lz77_decompress,
-    parse_lz77_header, rl_decompress,
+    BusLike, DecompressError, HUFFMAN_TYPE, HuffmanPort, LZ77_SIGNATURE, MachinePort, RL_SIGNATURE,
+    huffman_decompress, lz77_decompress, parse_huffman_header, parse_lz77_header, rl_decompress,
 };
 
 /// The core's bus, seen through the one slice of it the decompressors use.
@@ -34,6 +34,12 @@ impl BusLike for gba_core::bus::Bus {
     }
     fn write_half_word(&mut self, addr: usize, value: u16) {
         self.write_half_word(addr, value);
+    }
+    fn read_word(&mut self, addr: usize) -> u32 {
+        self.read_word(addr)
+    }
+    fn write_word(&mut self, addr: usize, value: u32) {
+        self.write_word(addr, value);
     }
 }
 
@@ -61,6 +67,10 @@ pub fn dispatch(cpu: &mut Arm7tdmi, swi_num: u32, old_cpsr: Psr, return_addr: u3
             serve_decompress(cpu, old_cpsr, return_addr, swi);
             true
         }
+        Some(Swi::HuffUnComp) => {
+            serve_huffman(cpu, old_cpsr, return_addr);
+            true
+        }
         Some(Swi::Halt) | Some(Swi::Stop) => {
             enter_low_power(cpu, old_cpsr, return_addr, swi);
             true
@@ -79,6 +89,48 @@ pub fn dispatch(cpu: &mut Arm7tdmi, swi_num: u32, old_cpsr: Psr, return_addr: u3
             false
         }
     }
+}
+
+/// Serve `HuffUnComp` (0x12).
+///
+/// Unlike LZ77 and RLE there is no Wram/Vram split: VRAM is word addressed, so
+/// the BIOS only ever produces whole words. The element width and the
+/// decompressed size share the signature byte (`0x20 | width`), and the size
+/// counts **bytes** -- the store loop retires four of them per word.
+fn serve_huffman(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32) {
+    let src = cpu.registers.register_at(0) & !3;
+    let dest = cpu.registers.register_at(1);
+
+    // The header is a byte at a time: a word read on this bus rotates, and a
+    // halfword read would mask the signature we are about to check.
+    let mut raw = 0u32;
+    for i in 0..4 {
+        raw |= u32::from(cpu.bus.read_byte((src + i) as usize)) << (i * 8);
+    }
+    let header = parse_huffman_header(raw);
+
+    if header.signature != HUFFMAN_TYPE {
+        if tracing_enabled() {
+            eprintln!(
+                "[gba] swi 0x12 at 0x{src:08X}: type nibble is {:#04x}, not Huffman",
+                header.signature
+            );
+        }
+        cpu.swi_return(old_cpsr, return_addr);
+        return;
+    }
+
+    // The port's byte cursor starts at the length byte, not at the header:
+    // the four header bytes were just read directly off the bus above, and
+    // re-reading them as part of the node table would be reading a table of
+    // a wildly wrong length.
+    let mut port = HuffmanPort::new(&mut cpu.bus, src + 4, dest);
+    if let Err(error) = huffman_decompress(&mut port, header.element_bits, header.output_len) {
+        if tracing_enabled() {
+            eprintln!("[gba] swi 0x12 at 0x{src:08X}: {error}");
+        }
+    }
+    cpu.swi_return(old_cpsr, return_addr);
 }
 
 /// Which of the three LZ-style algorithms a decompress SWI number runs.
@@ -561,6 +613,7 @@ mod tests {
             Swi::GetBiosChecksum as u32,
             Swi::Lz77UnCompWram as u32,
             Swi::Lz77UnCompVram as u32,
+            Swi::HuffUnComp as u32,
             Swi::RlUnCompWram as u32,
             Swi::RlUnCompVram as u32,
         ] {
@@ -570,9 +623,8 @@ mod tests {
             );
         }
         // Everything outside the claim set still has to fall through to the
-        // core, so Huffman and the T2 math numbers can land one at a time.
-        // The order is the numeric scan order, which is what the collect above
-        // produces -- an unordered set here would not pin anything.
+        // core, so the T2 math numbers can land one at a time. The order is
+        // the numeric scan order, which is what the collect above produces.
         assert_eq!(
             claimed,
             vec![
@@ -584,11 +636,12 @@ mod tests {
                 Swi::GetBiosChecksum as u32,
                 Swi::Lz77UnCompWram as u32,
                 Swi::Lz77UnCompVram as u32,
+                Swi::HuffUnComp as u32,
                 Swi::RlUnCompWram as u32,
                 Swi::RlUnCompVram as u32,
             ],
-            "0x0D, RegisterRamReset, the wait family and the LZ77/RLE pair \
-             are claimed; Huffman and the T2 math numbers are not"
+            "0x0D, RegisterRamReset, the wait family and all four decompressors \
+             are claimed; only the T2 math numbers are not"
         );
     }
 
@@ -612,6 +665,7 @@ mod tests {
                         | Swi::VBlankIntrWait
                         | Swi::Lz77UnCompWram
                         | Swi::Lz77UnCompVram
+                        | Swi::HuffUnComp
                         | Swi::RlUnCompWram
                         | Swi::RlUnCompVram
                 )
