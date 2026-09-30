@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — GBAEUX11 v2.0 S1c-d：认领仿射变换 `BgAffineSet`（0x0E）与 `ObjAffineSet`（0x0F）
+
+- 认领第 14、15 个号码。仿射变换是 mode 7 与精灵缩放旋转的主干,符号错了**画面整体上下
+  颠倒** —— 不崩、不越界,只是画错。
+- **纠正了一处规格书的错误**:GBATEK 的 A–D 表格把 `B` 与 `C` **都**写成正的
+  `Sin(alpha)/xMag`、`Sin(alpha)/yMag`,那不是旋转矩阵。tonc(coranac/libgba)与
+  mGBA 两位不同作者**独立一致**给出 `pb` 为负、`pc` 为正,按 3:1 裁决。变异验证:
+  按 GBATEK 那个错法实现后 **6 项锁测试转红**,报出的矩阵正是那个颠倒的形状。
+- **另一处只有 mGBA 写明的规格**:源条目步长 **20 字节 = 18 字节字段 + 2 字节对齐
+  padding**。GBATEK 与 CowBite 的结构体只描述到 18 字节,按字面布局走则**第一个条目
+  完全正确、第二个起整体偏 2 字节** —— 单条目测试必过,不崩不越界。故锁测试用两个
+  不同 scale 的条目 + 在 padding 填毒值。变异验证:步长改 18 → 恰好 2 项转红,且都只红
+  在第二个条目。
+- `r3` 语义两条都锁死:`BgAffineSet` **不读 `r3`**(对四种取值结果必须完全相同);
+  `ObjAffineSet` 的 `r3` 是四个元素之间的步长,`r3=8` 时 OAM 组内填充字节原样保留。
+- 旋转角**只取高 8 位**,GBATEK 明说低 8 位被 BIOS 忽略;已用 256×256 全组合的性质
+  测试钉死,而不是单点示例。
+- 锁测试 102 → **122 项**;`cargo check` 两态通过。
+- ⚠️ **NES 零回归仍未取得**(L11 / L12):4 个测试目标缺 `/EHsc`,MSVC 14.51 下撞
+  `/WX`。已 `git stash` 在干净树复现,与本改动无关。
+
 ### Added — GBAEUX11 v2.0 S1c-c：认领 `BitUnPack`（0x10）
 
 - 认领第 13 个号码。`BitUnPack` 用于提高位图/图块数据的色深（1bpp 单色字模转成 4bpp

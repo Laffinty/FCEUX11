@@ -5,6 +5,7 @@
 //! returns `false`, and the core falls through to its built-in arms and then
 //! to the real BIOS image.
 
+pub mod affine;
 pub mod bitunpack;
 pub mod checksum;
 pub mod decompress;
@@ -81,6 +82,14 @@ pub fn dispatch(cpu: &mut Arm7tdmi, swi_num: u32, old_cpsr: Psr, return_addr: u3
         }
         Some(Swi::BitUnPack) => {
             serve_bit_unpack(cpu, old_cpsr, return_addr);
+            true
+        }
+        Some(Swi::BgAffineSet) => {
+            serve_bg_affine_set(cpu, old_cpsr, return_addr);
+            true
+        }
+        Some(Swi::ObjAffineSet) => {
+            serve_obj_affine_set(cpu, old_cpsr, return_addr);
             true
         }
         Some(Swi::Halt) | Some(Swi::Stop) => {
@@ -281,6 +290,75 @@ fn unpack_bitunpack(
         cpu.bus.write_word(dest + i * 4, *word);
     }
     Ok(())
+}
+
+/// Serve `BgAffineSet` (0x0E).
+///
+/// `r0` = source, `r1` = destination, `r2` = count. **`r3` is not read** --
+/// mGBA touches only `gprs[0..2]`, and the claim that `r3` is an "offset
+/// between calculations" has no source behind it.
+///
+/// Each source entry is [`affine::BG_SOURCE_STRIDE`] bytes, which is two
+/// more than its fields occupy. Walking by the field layout instead would
+/// leave the first entry correct and skew every later one by two bytes.
+fn serve_bg_affine_set(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32) {
+    let src = cpu.registers.register_at(0) as usize;
+    let dest = cpu.registers.register_at(1) as usize;
+    let count = cpu.registers.register_at(2);
+
+    for i in 0..count {
+        let at = src + i as usize * affine::BG_SOURCE_STRIDE;
+        let source = affine::BgSource {
+            origin_x: cpu.read_word(at) as i32,
+            origin_y: cpu.read_word(at + 4) as i32,
+            screen_x: cpu.read_half_word(at + 8, true) as i16,
+            screen_y: cpu.read_half_word(at + 10, true) as i16,
+            scale_x: cpu.read_half_word(at + 12, true) as i16,
+            scale_y: cpu.read_half_word(at + 14, true) as i16,
+            angle: cpu.read_half_word(at + 16, false) as u16,
+        };
+        let out = affine::bg_compute(&source);
+        let to = dest + i as usize * affine::BG_DEST_STRIDE;
+        cpu.bus.write_half_word(to, out.pa as u16);
+        cpu.bus.write_half_word(to + 2, out.pb as u16);
+        cpu.bus.write_half_word(to + 4, out.pc as u16);
+        cpu.bus.write_half_word(to + 6, out.pd as u16);
+        cpu.bus.write_word(to + 8, out.start_x as u32);
+        cpu.bus.write_word(to + 12, out.start_y as u32);
+    }
+    cpu.swi_return(old_cpsr, return_addr);
+}
+
+/// Serve `ObjAffineSet` (0x0F).
+///
+/// `r0` = source, `r1` = destination, `r2` = count, `r3` = the stride between
+/// the four matrix elements of consecutive output sets, in bytes. 2 stores
+/// them back to back; 8 matches OAM, where each set sits 32 bytes apart.
+///
+/// Unlike `BgAffineSet` there is no reference point to compute: an affine
+/// sprite's position comes from its OAM attributes, so only the matrix is
+/// written.
+fn serve_obj_affine_set(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32) {
+    let src = cpu.registers.register_at(0) as usize;
+    let dest = cpu.registers.register_at(1) as usize;
+    let count = cpu.registers.register_at(2);
+    let offset = cpu.registers.register_at(3) as usize;
+
+    for i in 0..count {
+        let at = src + i as usize * affine::OBJ_SOURCE_STRIDE;
+        let source = affine::ObjSource {
+            scale_x: cpu.read_half_word(at, true) as i16,
+            scale_y: cpu.read_half_word(at + 2, true) as i16,
+            angle: cpu.read_half_word(at + 4, false) as u16,
+        };
+        let m = affine::matrix(source.scale_x, source.scale_y, source.angle);
+        let to = dest + i as usize * offset * 4;
+        cpu.bus.write_half_word(to, m.pa as u16);
+        cpu.bus.write_half_word(to + offset, m.pb as u16);
+        cpu.bus.write_half_word(to + offset * 2, m.pc as u16);
+        cpu.bus.write_half_word(to + offset * 3, m.pd as u16);
+    }
+    cpu.swi_return(old_cpsr, return_addr);
 }
 
 /// Serve `GetBiosChecksum` (0x0D).
@@ -636,10 +714,11 @@ impl Swi {
 #[cfg(test)]
 mod tests {
     use super::{
-        LZ77_SIGNATURE, RL_SIGNATURE, Swi, dispatch, ram_reset, read_bios_flags, take_last_dispatch,
-        write_bios_flags,
+        LZ77_SIGNATURE, RL_SIGNATURE, Swi, affine, dispatch, ram_reset, read_bios_flags,
+        take_last_dispatch, write_bios_flags,
     };
     use crate::gba::install_swi_hook;
+    use gba_core::cpu::arm7tdmi::Arm7tdmi;
     use gba_core::gba::Gba;
 
     /// Where a cartridge is mapped; ROM offset 0 lives at this address.
@@ -748,6 +827,8 @@ mod tests {
                 Swi::VBlankIntrWait as u32,
                 Swi::ArcTan as u32,
                 Swi::GetBiosChecksum as u32,
+                Swi::BgAffineSet as u32,
+                Swi::ObjAffineSet as u32,
                 Swi::BitUnPack as u32,
                 Swi::Lz77UnCompWram as u32,
                 Swi::Lz77UnCompVram as u32,
@@ -755,8 +836,8 @@ mod tests {
                 Swi::RlUnCompWram as u32,
                 Swi::RlUnCompVram as u32,
             ],
-            "0x09, 0x0D, 0x10, RegisterRamReset, the wait family and all four \
-             decompressors are claimed; 0x08, 0x0A and the affine numbers are not"
+            "0x09, 0x0D, 0x0E, 0x0F, 0x10, RegisterRamReset, the wait family \
+             and all four decompressors are claimed; 0x08 and 0x0A are not"
         );
     }
 
@@ -785,6 +866,8 @@ mod tests {
                         | Swi::RlUnCompWram
                         | Swi::RlUnCompVram
                         | Swi::BitUnPack
+                        | Swi::BgAffineSet
+                        | Swi::ObjAffineSet
                 )
             );
             if is_claimed {
@@ -1764,5 +1847,236 @@ mod tests {
             assert!(!swi.name().is_empty());
         }
         assert_eq!(Swi::from_raw(0x2B), None);
+    }
+
+    // ---------------------------------------------------------------- affine
+    //
+    // The pure-maths tests live in `affine.rs`. What is left is the part that
+    // only shows up once the entries are laid out in memory: the strides, and
+    // the `r3` step. Both are single-sourced (mGBA only) and both fail
+    // silently -- a wrong stride leaves the first entry perfect.
+
+    /// Somewhere to stage a source array in IWRAM.
+    const AFFINE_SCRATCH: usize = 0x0300_2000;
+    /// Somewhere to collect a destination array in IWRAM.
+    const AFFINE_OUT: usize = 0x0300_3000;
+
+    /// Write a `BgAffineSet` source entry at `at`, padding the last 2 bytes of
+    /// its 20-byte stride with a recognisable filler.
+    ///
+    /// The filler is the point: if the stride is wrong, entry 1 reads those
+    /// two bytes as the low half of its first field and the result is
+    /// garbage that no amount of single-entry testing would notice.
+    fn write_bg_source(
+        cpu: &mut Arm7tdmi,
+        at: usize,
+        origin_x: i32,
+        origin_y: i32,
+        screen_x: i16,
+        screen_y: i16,
+        scale_x: i16,
+        scale_y: i16,
+        angle: u16,
+    ) {
+        cpu.bus.write_word(at, origin_x as u32);
+        cpu.bus.write_word(at + 4, origin_y as u32);
+        cpu.bus.write_half_word(at + 8, screen_x as u16);
+        cpu.bus.write_half_word(at + 10, screen_y as u16);
+        cpu.bus.write_half_word(at + 12, scale_x as u16);
+        cpu.bus.write_half_word(at + 14, scale_y as u16);
+        cpu.bus.write_half_word(at + 16, angle);
+        cpu.bus.write_half_word(at + 18, 0xDEAD);
+    }
+
+    /// Read back one 16-byte destination entry as its six fields.
+    fn read_bg_dest(cpu: &mut Arm7tdmi, at: usize) -> [i32; 6] {
+        [
+            cpu.read_half_word(at, true) as i32,
+            cpu.read_half_word(at + 2, true) as i32,
+            cpu.read_half_word(at + 4, true) as i32,
+            cpu.read_half_word(at + 6, true) as i32,
+            cpu.read_word(at + 8) as i32,
+            cpu.read_word(at + 12) as i32,
+        ]
+    }
+
+    /// A machine with our hook installed and empty scratch memory.
+    fn affine_machine() -> Arm7tdmi {
+        let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
+        install_swi_hook(&mut gba);
+        gba.cpu
+    }
+
+    /// **The stride test that the single-entry case cannot make.**
+    ///
+    /// Two entries with *different* scale ratios. With a correct 20-byte
+    /// stride both are read correctly; with the 18-byte field layout, entry 1
+    /// starts two bytes early and its `origin_x` picks up the `0xDEAD`
+    /// padding of entry 0. Entry 0's result is identical either way, which is
+    /// exactly why a one-entry test proves nothing here.
+    #[test]
+    fn bg_affine_set_reads_the_second_entry_at_the_right_stride() {
+        let mut cpu = affine_machine();
+        write_bg_source(&mut cpu, AFFINE_SCRATCH, 0x1000, 0x1000, 0, 0, 0x0100, 0x0100, 0);
+        write_bg_source(
+            &mut cpu,
+            AFFINE_SCRATCH + 20,
+            0x2000,
+            0x2000,
+            0,
+            0,
+            0x0080,
+            0x0080,
+            0,
+        );
+
+        cpu.registers.set_register_at(0, AFFINE_SCRATCH as u32);
+        cpu.registers.set_register_at(1, AFFINE_OUT as u32);
+        cpu.registers.set_register_at(2, 2);
+        let cpsr = cpu.cpsr;
+        let ret = 0x0300_0000;
+        assert!(dispatch(&mut cpu, 0x0E, cpsr, ret));
+
+        let first = read_bg_dest(&mut cpu, AFFINE_OUT);
+        let second = read_bg_dest(&mut cpu, AFFINE_OUT + 16);
+        // Entry 0: unit scale, identity matrix, reference point unchanged.
+        assert_eq!((first[0], first[1], first[2], first[3]), (0x0100, 0, 0, 0x0100));
+        assert_eq!((first[4], first[5]), (0x1000, 0x1000));
+        // Entry 1: half scale, so both diagonals are 0x0080, and its
+        // reference point is its own centre -- 0x2000, not 0x1000.
+        assert_eq!(
+            (second[0], second[1], second[2], second[3]),
+            (0x0080, 0, 0, 0x0080),
+            "the second entry's scale was read from the wrong offset"
+        );
+        assert_eq!(
+            (second[4], second[5]),
+            (0x2000, 0x2000),
+            "the second entry's origin picked up the padding"
+        );
+    }
+
+    /// The stride is 20 bytes for *three* entries too, not just the second.
+    #[test]
+    fn bg_affine_set_walks_every_entry_at_twenty_bytes() {
+        let mut cpu = affine_machine();
+        for i in 0..3usize {
+            let centre = (i as i32 + 1) * 0x1000;
+            write_bg_source(
+                &mut cpu,
+                AFFINE_SCRATCH + i * 20,
+                centre,
+                centre,
+                0,
+                0,
+                0x0100,
+                0x0100,
+                0,
+            );
+        }
+        cpu.registers.set_register_at(0, AFFINE_SCRATCH as u32);
+        cpu.registers.set_register_at(1, AFFINE_OUT as u32);
+        cpu.registers.set_register_at(2, 3);
+        let cpsr = cpu.cpsr;
+        assert!(dispatch(&mut cpu, 0x0E, cpsr, 0x0300_0000));
+
+        for i in 0..3usize {
+            let entry = read_bg_dest(&mut cpu, AFFINE_OUT + i * 16);
+            let expected = (i as i32 + 1) * 0x1000;
+            assert_eq!(
+                (entry[4], entry[5]),
+                (expected, expected),
+                "entry {i} read its origin from the wrong offset"
+            );
+        }
+    }
+
+    /// `BgAffineSet` ignores `r3`.
+    ///
+    /// mGBA reads only `gprs[0..2]`. The stray claim that `r3` is an "offset
+    /// between calculations" has no source, so a nonzero `r3` must change
+    /// nothing -- otherwise a game that happens to leave junk in `r3` would
+    /// get a different matrix from us than from the BIOS.
+    #[test]
+    fn bg_affine_set_ignores_r3() {
+        let mut results = Vec::new();
+        for r3 in [0u32, 2, 8, 0xFFFF_FFFF] {
+            let mut cpu = affine_machine();
+            write_bg_source(&mut cpu, AFFINE_SCRATCH, 0x1000, 0x1000, 4, 8, 0x0100, 0x0100, 0x2000);
+            cpu.registers.set_register_at(0, AFFINE_SCRATCH as u32);
+            cpu.registers.set_register_at(1, AFFINE_OUT as u32);
+            cpu.registers.set_register_at(2, 1);
+            cpu.registers.set_register_at(3, r3);
+            let cpsr = cpu.cpsr;
+            assert!(dispatch(&mut cpu, 0x0E, cpsr, 0x0300_0000));
+            results.push(read_bg_dest(&mut cpu, AFFINE_OUT));
+        }
+        for (i, r) in results.iter().enumerate().skip(1) {
+            assert_eq!(results[0], *r, "r3 value {i} changed the result");
+        }
+    }
+
+    /// `ObjAffineSet` honours `r3` as the stride between the four elements.
+    ///
+    /// With `r3 = 2` the four halfwords are contiguous. With `r3 = 8` they sit
+    /// at 0, 8, 16, 24 -- OAM's layout, where each set occupies half a
+    /// 32-byte group.
+    #[test]
+    fn obj_affine_set_honours_r3_as_the_element_stride() {
+        for (offset, expected_gap) in [(2u32, 2usize), (8, 8)] {
+            let mut cpu = affine_machine();
+            cpu.bus.write_half_word(AFFINE_SCRATCH, 0x0100); // scale_x
+            cpu.bus.write_half_word(AFFINE_SCRATCH + 2, 0x0100); // scale_y
+            cpu.bus.write_half_word(AFFINE_SCRATCH + 4, 0x4000); // a quarter turn
+            cpu.registers.set_register_at(0, AFFINE_SCRATCH as u32);
+            cpu.registers.set_register_at(1, AFFINE_OUT as u32);
+            cpu.registers.set_register_at(2, 1);
+            cpu.registers.set_register_at(3, offset);
+            let cpsr = cpu.cpsr;
+            assert!(dispatch(&mut cpu, 0x0F, cpsr, 0x0300_0000));
+
+            let matrix_at = |cpu: &mut Arm7tdmi, k: usize| cpu.read_half_word(AFFINE_OUT + k * expected_gap, true) as i32;
+            assert_eq!(matrix_at(&mut cpu, 0), 0, "cos(90) is 0");
+            assert_eq!(matrix_at(&mut cpu, 1), -0x0100, "pb carries the minus");
+            assert_eq!(matrix_at(&mut cpu, 2), 0x0100);
+            assert_eq!(matrix_at(&mut cpu, 3), 0);
+        }
+    }
+
+    /// `ObjAffineSet` leaves the bytes between the elements alone at `r3 = 8`.
+    ///
+    /// With OAM's stride there is 8 bytes of the group's own layout sitting
+    /// between `pa` and `pb`; those must survive. A writer that packed the
+    /// four elements contiguously would corrupt the OAM entry around it.
+    #[test]
+    fn obj_affine_set_leaves_the_oam_bytes_between_elements_alone() {
+        let mut cpu = affine_machine();
+        cpu.bus.write_half_word(AFFINE_SCRATCH, 0x0100);
+        cpu.bus.write_half_word(AFFINE_SCRATCH + 2, 0x0100);
+        cpu.bus.write_half_word(AFFINE_SCRATCH + 4, 0x0000);
+        for word in 0..16u32 {
+            cpu.bus.write_word(AFFINE_OUT + word as usize * 4, 0x5A5A_5A5A);
+        }
+        cpu.registers.set_register_at(0, AFFINE_SCRATCH as u32);
+        cpu.registers.set_register_at(1, AFFINE_OUT as u32);
+        cpu.registers.set_register_at(2, 1);
+        cpu.registers.set_register_at(3, affine::OBJ_OAM_OFFSET);
+        let cpsr = cpu.cpsr;
+        assert!(dispatch(&mut cpu, 0x0F, cpsr, 0x0300_0000));
+
+        // The four elements were written...
+        for k in 0..4usize {
+            let at = AFFINE_OUT + k * 8;
+            assert_ne!(cpu.read_word(at), 0x5A5A_5A5A, "element {k} not written");
+        }
+        // ...and the halfwords in between still hold the filler.
+        for k in 0..4usize {
+            let at = AFFINE_OUT + k * 8 + 4;
+            assert_eq!(
+                cpu.read_word(at),
+                0x5A5A_5A5A,
+                "the bytes before element {k} were clobbered"
+            );
+        }
     }
 }

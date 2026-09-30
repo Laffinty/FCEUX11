@@ -30,8 +30,12 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 | 阶段 | 状态 |
 |---|---|
 | S0 / S0' / S1a-0 / S1a-1 / S1b | ✅ 已完成 |
-| **S1c** | **进行中**：`0x09` ArcTan ✅ · `0x08` Sqrt 已验证不认领 · `0x10` BitUnPack ✅。认领 **13** 个号码。<br>**剩余**：`0x0E BgAffineSet`、`0x0F ObjAffineSet`、`0x0A` ArcTan2（r26 改判为应认领） |
+| **S1c** | **进行中**：`0x09` ArcTan ✅ · `0x08` Sqrt 已验证不认领 · `0x10` BitUnPack ✅ · `0x0E`/`0x0F` 仿射 ✅。认领 **15** 个号码。<br>**剩余**：`0x0A` ArcTan2（r26 改判为应认领） |
 | S2 / S3 / S4 | 未开始 |
+
+> ⚠️ **不变式 1（NES 零回归）当前无证据**（计划 L11 / L12）。`ctest` 因 4 个测试目标
+> 缺 `/EHsc` 而在 MSVC 14.51 下编不过，与 v2.0 无关（已 `git stash` 在干净树复现）。
+> 在该环境修好前，**不要把「跑过 cargo test」当作 NES 侧已验证**。
 
 v2.0 对 vendor 树的本地修改**集中在 `src/rust/crates/gba-core/src/cpu/arm7tdmi.rs` 一个文件，
 共 9 处**（S0' 接线 5 处 + S1a-1 的 halt 机制 4 处），其余 44 个 vendor 文件零改动——
