@@ -5,6 +5,7 @@
 //! returns `false`, and the core falls through to its built-in arms and then
 //! to the real BIOS image.
 
+pub mod bitunpack;
 pub mod checksum;
 pub mod decompress;
 pub mod ram_reset;
@@ -76,6 +77,10 @@ pub fn dispatch(cpu: &mut Arm7tdmi, swi_num: u32, old_cpsr: Psr, return_addr: u3
         }
         Some(Swi::HuffUnComp) => {
             serve_huffman(cpu, old_cpsr, return_addr);
+            true
+        }
+        Some(Swi::BitUnPack) => {
+            serve_bit_unpack(cpu, old_cpsr, return_addr);
             true
         }
         Some(Swi::Halt) | Some(Swi::Stop) => {
@@ -212,6 +217,70 @@ fn serve_decompress(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32, swi: Sw
         }
     }
     cpu.swi_return(old_cpsr, return_addr);
+}
+
+/// Serve `BitUnPack` (0x10).
+///
+/// Widens bitmap or tile data to a higher colour depth. Reads a description
+/// block through `r2`, then streams the source into the destination as 32-bit
+/// words. A description we cannot honour is traced and the call returns
+/// without writing, rather than filling the destination with something
+/// plausible-looking.
+fn serve_bit_unpack(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32) {
+    let src = cpu.registers.register_at(0) as usize;
+    let dest = cpu.registers.register_at(1) as usize;
+    let desc = cpu.registers.register_at(2) as usize;
+
+    let info = bitunpack::UnpackInfo {
+        source_len: cpu.read_half_word(desc, false) as u16,
+        source_width: cpu.bus.read_byte(desc + 2),
+        dest_width: cpu.bus.read_byte(desc + 3),
+        offset_and_zero: cpu.read_word(desc + 4),
+    };
+
+    let outcome = unpack_bitunpack(cpu, src, dest, &info);
+    if let Err(error) = outcome {
+        if tracing_enabled() {
+            eprintln!("[gba] swi BitUnPack at 0x{src:08X}: {error}");
+        }
+    }
+    cpu.swi_return(old_cpsr, return_addr);
+}
+
+/// Pull the source through the bus and push the unpacked words back out.
+///
+/// Split from [`serve_bit_unpack`] so the memory traffic lives in one place
+/// and the packing logic in `bitunpack.rs` stays bus-free.
+fn unpack_bitunpack(
+    cpu: &mut Arm7tdmi,
+    src: usize,
+    dest: usize,
+    info: &bitunpack::UnpackInfo,
+) -> Result<(), bitunpack::BitUnpackError> {
+    // Validate before reading: a bad width must not cost a bus read, and the
+    // source length is attacker-controlled so the buffer has to match it.
+    if !matches!(info.source_width, 1 | 2 | 4 | 8) {
+        return Err(bitunpack::BitUnpackError::BadSourceWidth(info.source_width));
+    }
+    if !matches!(info.dest_width, 1 | 2 | 4 | 8 | 16 | 32) {
+        return Err(bitunpack::BitUnpackError::BadDestWidth(info.dest_width));
+    }
+    if dest % 4 != 0 {
+        return Err(bitunpack::BitUnpackError::MisalignedDest(dest));
+    }
+
+    let mut source = vec![0u8; usize::from(info.source_len)];
+    for (i, slot) in source.iter_mut().enumerate() {
+        *slot = cpu.bus.read_byte(src + i);
+    }
+
+    let mut words = vec![0u32; bitunpack::required_words(info)];
+    let written = bitunpack::unpack_into(&source, &mut words, info)?;
+
+    for (i, word) in words[..written].iter().enumerate() {
+        cpu.bus.write_word(dest + i * 4, *word);
+    }
+    Ok(())
 }
 
 /// Serve `GetBiosChecksum` (0x0D).
@@ -679,15 +748,15 @@ mod tests {
                 Swi::VBlankIntrWait as u32,
                 Swi::ArcTan as u32,
                 Swi::GetBiosChecksum as u32,
+                Swi::BitUnPack as u32,
                 Swi::Lz77UnCompWram as u32,
                 Swi::Lz77UnCompVram as u32,
                 Swi::HuffUnComp as u32,
                 Swi::RlUnCompWram as u32,
                 Swi::RlUnCompVram as u32,
             ],
-            "0x09, 0x0D, RegisterRamReset, the wait family and all four \
-             decompressors are claimed; 0x08, 0x0A and the T2 affine/bit \
-             numbers are not"
+            "0x09, 0x0D, 0x10, RegisterRamReset, the wait family and all four \
+             decompressors are claimed; 0x08, 0x0A and the affine numbers are not"
         );
     }
 
@@ -715,6 +784,7 @@ mod tests {
                         | Swi::HuffUnComp
                         | Swi::RlUnCompWram
                         | Swi::RlUnCompVram
+                        | Swi::BitUnPack
                 )
             );
             if is_claimed {

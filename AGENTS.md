@@ -25,16 +25,18 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 
 > `docs/plans/long-term-evolution/` 是 **NES 侧** F11QA 残留精度的长期演进，与 v2.0 无关，别混。
 
-## 当前进度（2026-09-29）
+## 当前进度（2026-09-30）
 
 | 阶段 | 状态 |
 |---|---|
-| S0 / S0' / S1a-0 / S1a-1 | ✅ 已完成 |
-| **S1b** | **下一步**：T1-d 三个解压器 + T1-c `RegisterRamReset`。位级格式见计划 §十四 r13 |
-| S1c / S2 / S3 / S4 | 未开始 |
+| S0 / S0' / S1a-0 / S1a-1 / S1b | ✅ 已完成 |
+| **S1c** | **进行中**：`0x09` ArcTan ✅ · `0x08` Sqrt 已验证不认领 · `0x10` BitUnPack ✅。认领 **13** 个号码。<br>**剩余**：`0x0E BgAffineSet`、`0x0F ObjAffineSet`、`0x0A` ArcTan2（r26 改判为应认领） |
+| S2 / S3 / S4 | 未开始 |
 
-v2.0 全部改动的本地修改**集中在 `src/rust/crates/gba-core/src/cpu/arm7tdmi.rs` 一个文件**，
-其余 44 个 vendor 文件零改动——改动前先确认这一点是否仍成立。
+v2.0 对 vendor 树的本地修改**集中在 `src/rust/crates/gba-core/src/cpu/arm7tdmi.rs` 一个文件，
+共 9 处**（S0' 接线 5 处 + S1a-1 的 halt 机制 4 处），其余 44 个 vendor 文件零改动——
+改动前先确认这一点是否仍成立。第 6–9 处**确实改变上游行为**（`step()` 新增守卫、
+`Arm7tdmi::new` 清 CPSR 的 I 位），不再属于 R1 所说的「仅 SWI hook」，见计划 **R15**。
 
 ## 代码地图
 
@@ -68,7 +70,7 @@ $env:PATH="D:\Project\FCEUX11\vcpkg_installed\x64-windows\bin;$env:PATH"
 & "D:\Program Files\CMake\bin\ctest.exe" --test-dir D:\Project\FCEUX11\build -j 4
 ```
 
-### 六个坑
+### 七个坑
 
 1. **不加载 MSVC 环境就连标准库头都找不到**（`cl.exe` 在，`INCLUDE` 不在）。先 `call vcvars64.bat`。
 2. **`cargo test -p fceux11-rust` 必须加 `--no-default-features --features gba`**。默认 feature
@@ -79,6 +81,12 @@ $env:PATH="D:\Project\FCEUX11\vcpkg_installed\x64-windows\bin;$env:PATH"
    只保证**自己新写的行**符合 rustfmt，别整仓跑 `cargo fmt`。
 6. **Ninja 对头文件变更不可靠**：改完 `src/version.h` 之类的「只被头文件引用」的值，
    可能不会触发重编，链接日志有 `Linking` 而二进制里还是旧值。改完要回**产物**里确认。
+7. **`build/` 的 Ninja 定位可能漂移，且 MSVC 升级会让既有测试编不过**（2026-09-30 实测，
+   记为 **L11**）。症状：`CMAKE_MAKE_PROGRAM-NOTFOUND` → 「Generator: build tool execution
+   failed」；修好后又见 `C2220 以下警告被视为错误`，出自 **MSVC 14.51** 的
+   `__msvc_ostream.hpp` / `chrono`。**这不是 v2.0 改动引起的** —— 判据是
+   `git stash` 后在干净树上能否复现同样失败。Ninja 本体在
+   `…\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe`（不在 PATH）。
 
 ## 纪律（这几条都是被违反过之后写下来的）
 
