@@ -426,6 +426,7 @@ dependencies = [
  "fceux11-media",
  "fceux11-utils",
  "gba-core",
+ "serde_json",
 ]
 
 [[package]]

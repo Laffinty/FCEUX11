@@ -40,6 +40,27 @@ f11qa = { path = "crates/f11qa" }
 # matches the shape kagami_qa_direct_main already uses. See plan section 14.
 gba-core = { path = "crates/gba-core", optional = true }
 
+# v2.0 S2-b: savestate serialization. The vendored core derives Serialize /
+# Deserialize on every state struct but ships no serialization API and no
+# format dependency of its own, so the format and the version policy are ours
+# to choose (plan r7, section 2.1).
+#
+# postcard was evaluated first and REJECTED (plan r30): it is a no-alloc
+# format and the core's state carries six Vec<u8> (bios, rom, working_ram,
+# working_iram, sram, and the RTC command buffer), so it does not even
+# compile against Arm7tdmi. serde_json is what the workspace already builds
+# (f11qa depends on it), it does allocate, and a measured round trip of a
+# real Arm7tdmi comes back with r0 and pc identical. It is the wrong shape
+# for a hot on-disk file -- large and slow -- so the final on-disk format
+# stays open (r30) and this serves the first cut.
+#
+# This does NOT reintroduce R14. R14 was about a *path* crate wedged between
+# the root and a large dependency (plan r8's six controlled experiments: the
+# only variable was "is it its own crate"). A registry dependency is not
+# that, and a full CMake Release build with lto = true and panic = "abort"
+# is green with these dependencies present.
+serde_json = { version = "1", optional = true }
+
 [features]
 # Stage-2 §七 (C-1): Pass-through to f11qa's `direct-adapter` feature.
 # When enabled, f11qa compiles the `direct.rs` FFI adapter and the
@@ -55,7 +76,7 @@ direct-adapter = ["f11qa/direct-adapter"]
 # v2.0 GBAEUX11. Present by default so S0 can assert the
 # "fceux11_rust.lib contains the new symbol" exit criterion; a NES-only
 # build turns it off with --no-default-features.
-gba = ["dep:gba-core"]
+gba = ["dep:gba-core", "dep:serde_json"]
 default = ["direct-adapter", "gba"]
 
 [dev-dependencies]

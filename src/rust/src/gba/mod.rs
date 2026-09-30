@@ -25,6 +25,7 @@
 
 pub mod bios;
 pub mod ffi;
+pub mod save;
 pub mod swi;
 
 /// Install our SWI implementation into a freshly created core.
