@@ -323,6 +323,15 @@ fn merge_headers(
     output.push_str("void     gba_set_buttons(uint16_t mask);\n");
     output.push_str("int32_t  gba_buttons(uint16_t *out_mask);\n");
 
+    output.push_str("\n/* Cartridge battery save (S3-1). gba_battery_write refuses on a */\n");
+    output.push_str("/* cartridge with no save hardware -- see plan section 7.3. */\n");
+    output.push_str("int32_t  gba_battery_save_type(void);\n");
+    output.push_str("int32_t  gba_set_save_type(int32_t save_type);\n");
+    output.push_str("int32_t  gba_battery_size(uint32_t *out_size);\n");
+    output.push_str("int32_t  gba_battery_read(uint8_t *dst, uint32_t cap);\n");
+    output.push_str("int32_t  gba_battery_write(const uint8_t *src, uint32_t len);\n");
+    output.push_str("int32_t  gba_battery_take_dirty(void);\n");
+
     output.push_str("\n#ifdef __cplusplus\n}\n#endif\n\n");
     output.push_str("#endif /* FCEUX11_RUST_H */\n");
 

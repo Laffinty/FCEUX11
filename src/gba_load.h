@@ -130,3 +130,26 @@ void fceu11_gba_configure_audio(uint32_t device_rate, uint32_t volume);
 /// and 59.7275 fps that is 738 or 739, alternating -- and a caller that assumed
 /// a fixed 738 would drift by about 21 samples a second.
 uint32_t fceu11_gba_audio(int32_t* dst, uint32_t cap);
+
+// ---- the battery save (v2.0 S3-1) ---------------------------------------
+//
+// A `.srm` is the raw contents of the cartridge's save memory: no header, no
+// length, no padding. That is the format mGBA reads and writes, and a bare
+// image is the only shape another emulator is likely to accept.
+//
+// Which is exactly why a cartridge with **no** save hardware must refuse the
+// write rather than invent 32 KB of it: the file would look like a real save,
+// and the next game write would clobber it. Plan section 7.3 requires the
+// refusal, and `gba_battery_write` enforces it on the core side.
+
+/// Read `<cartridge>.srm` into the machine, if one exists.
+///
+/// Called after a cartridge is loaded. Silent when there is no save file or no
+/// save hardware: a first run is not an error.
+void fceu11_gba_load_battery(void);
+
+/// Write the save memory out if it changed.
+///
+/// Called every frame (it is one flag test) and again on teardown. A cart with
+/// no save hardware is skipped rather than written.
+void fceu11_gba_flush_battery(void);

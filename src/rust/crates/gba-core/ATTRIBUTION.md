@@ -161,7 +161,7 @@ landing in S2.
 
 | Item | Status |
 |---|---|
-| `gba-core` source changes | **14**, across 3 files: 9 in `src/cpu/arm7tdmi.rs` (5 S0' hook wiring, no upstream logic altered + 4 S1a-1 halt mechanism, **does change `step()`** — see R15) + 3 in `src/cpu/hardware/rtc.rs` + 2 in `src/cpu/hardware/internal_memory.rs` (S2-b3 real-time clock; **no upstream behaviour change**, see §3.2.1) |
+| `gba-core` source changes | **16**, across 4 files: 9 in `src/cpu/arm7tdmi.rs` (5 S0' hook wiring, no upstream logic altered + 4 S1a-1 halt mechanism, **does change `step()`** — see R15) + 3 in `src/cpu/hardware/rtc.rs` + 4 in `src/cpu/hardware/internal_memory.rs` (3 S2-b3 real-time clock + 2 S3-1 battery save; **neither changes behaviour when nothing is overridden**, see §3.2.1) |
 | `gba-core/Cargo.toml` | rewritten (metadata only, no version changes) |
 | `src/gba/` | new, 100% first-party, 9 files |
 
@@ -190,6 +190,14 @@ the embedder does not use them.** The R1 constraint ("keep the patch set minimal
 was already registered as broken by S1a-1; this is a second, smaller breach of
 the same kind, and the patch set is now 14 entries over 3 files rather than 9
 over 1.
+
+**S3-1 adds two more to that same file, for the same reason** — the battery save
+needs a way to ask what kind of save hardware is present (`backup_type`) and a
+way to correct it (`set_backup_type`, which resizes the backing buffer and keeps
+the old contents up to the shorter length). `battery_data`, `load_battery` and
+`take_save_dirty` were already `pub`, so those two are the *only* reason the file
+is touched at all. Neither changes behaviour when the host overrides nothing,
+which is the normal case. The set is now **16 entries over 4 files**.
 
 ## 5. Update procedure
 

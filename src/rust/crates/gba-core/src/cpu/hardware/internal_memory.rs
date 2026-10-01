@@ -241,6 +241,40 @@ impl InternalMemory {
         &self.sram
     }
 
+    /// The detected (or forced) save hardware type.
+    ///
+    /// v2.0 S3-1, patch 15. A getter and nothing else: the host needs to know
+    /// what it is looking at before it writes, because writing a save file to a
+    /// cartridge with no save hardware, or with the wrong width, destroys the
+    /// file the next time the game writes it back. `detect()` and
+    /// `buffer_size()` are both private, so there was no way to ask.
+    #[must_use]
+    pub const fn backup_type(&self) -> BackupType {
+        self.backup_type
+    }
+
+    /// Force a save hardware type, for a cart whose signature was missing or
+    /// wrong.
+    ///
+    /// v2.0 S3-1, patch 16. Resizes the backing buffer to the new type's size
+    /// and **keeps the old contents up to the shorter of the two lengths**, so
+    /// correcting a misdetected type does not throw away the save that is
+    /// already there. The old contents beyond the new capacity are dropped --
+    /// there is nowhere to put them.
+    ///
+    /// Erased flash and SRAM both read as 0xFF, so a new buffer is filled with
+    /// it rather than zeros; a fresh save must not look like a formatted one.
+    pub fn set_backup_type(&mut self, backup_type: BackupType) {
+        self.backup_type = backup_type;
+        let wanted = backup_type.buffer_size();
+        if self.sram.len() != wanted {
+            let mut resized = vec![0xFF; wanted];
+            let keep = self.sram.len().min(wanted);
+            resized[..keep].copy_from_slice(&self.sram[..keep]);
+            self.sram = resized;
+        }
+    }
+
     /// Load a battery save file into the save memory, truncating or leaving the
     /// tail untouched if the sizes differ.
     pub fn load_battery(&mut self, data: &[u8]) {

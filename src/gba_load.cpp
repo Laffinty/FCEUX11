@@ -25,6 +25,11 @@
 #include "gba_load.h"
 
 #include <string>
+#include <vector>
+
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 
 #include "drivers/common/nes_shm.h"
 #include "fceu.h"
@@ -102,9 +107,104 @@ bool fceu11_gba_active(void)
 	return g_gbaActive;
 }
 
+static bool read_file(const std::string& path, std::vector<uint8_t>& out)
+{
+	std::ifstream file(path, std::ios::binary);
+	if (!file.is_open()) return false;
+	out.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+	return true;
+}
+static bool write_file(const std::string& path, const std::vector<uint8_t>& data)
+{
+	std::ofstream file(path, std::ios::binary | std::ios::trunc);
+	if (!file.is_open()) return false;
+	if (!data.empty())
+	{
+		file.write(reinterpret_cast<const char*>(data.data()),
+		           static_cast<std::streamsize>(data.size()));
+	}
+	return file.good();
+}
+
+namespace
+{
+	/// The `.srm` that belongs to a cartridge: same directory, same stem.
+	///
+	/// Empty when the ROM path has no parent to strip, which happens only for a
+	/// bare filename -- and a bare filename cannot be opened either, so there is
+	/// nothing to be relative to.
+	std::string battery_path_for(const std::string& rom)
+	{
+		std::error_code ec;
+		const std::filesystem::path rom_path(rom);
+		const std::filesystem::path parent = rom_path.parent_path();
+		if (parent.empty())
+		{
+			return std::string();
+		}
+		std::filesystem::path save = parent / (rom_path.stem().string() + ".srm");
+		return save.string();
+	}
+}  // namespace
+
+void fceu11_gba_load_battery()
+{
+	if (!g_gbaActive) return;
+	// A cartridge with no save hardware has nothing to restore, and asking for
+	// one would be refused anyway -- so ask first and say nothing if not.
+	if (gba_battery_save_type() == 0) return;
+
+	const std::string path = battery_path_for(g_gbaPath);
+	if (path.empty()) return;
+
+	std::error_code ec;
+	if (!std::filesystem::exists(path, ec) || ec)
+	{
+		// No save file yet. A first run is not a problem worth a message.
+		return;
+	}
+
+	std::vector<uint8_t> data;
+	if (!read_file(path, data)) return;
+	if (gba_battery_write(data.data(), static_cast<uint32_t>(data.size())) != GBA_OK)
+	{
+		FCEU_PrintError("The GBA save file could not be restored.");
+		return;
+	}
+	FCEU_printf("GBA: restored save from %s (%u bytes)\n", path.c_str(), static_cast<unsigned>(data.size()));
+}
+
+void fceu11_gba_flush_battery()
+{
+	if (!g_gbaActive) return;
+	// The flag is *taken* by the core, so asking is how this function learns
+	// there is anything to do. A false here means already flushed.
+	if (gba_battery_take_dirty() == 0) return;
+	if (gba_battery_save_type() == 0) return;  // nothing to write, and must not guess
+
+	uint32_t size = 0;
+	if (gba_battery_size(&size) != GBA_OK || size == 0) return;
+	std::vector<uint8_t> data(size);
+	if (gba_battery_read(data.data(), size) != GBA_OK) return;
+
+	const std::string path = battery_path_for(g_gbaPath);
+	if (path.empty()) return;
+	if (write_file(path, data))
+	{
+		FCEU_printf("GBA: wrote save to %s (%u bytes)\n", path.c_str(), static_cast<unsigned>(size));
+	}
+	else
+	{
+		FCEU_PrintError("The GBA save could not be written.");
+	}
+}
+
 void fceu11_gba_deactivate(void)
 {
 	if (!g_gbaActive) return;
+	// Flush before the machine goes, or the last few seconds of play are lost.
+	// This is the one place a save must not be skipped.
+	fceu11_gba_flush_battery();
 	gba_unload_rom();
 	g_gbaActive = false;
 	g_gbaPath.clear();
@@ -179,6 +279,10 @@ void fceu11_gba_step_frame(void)
 	// `pixBufIdx` stay entirely the NES blitter's, which is what lets the NES
 	// path remain byte-for-byte unchanged.
 	if (nes_shm) nes_shm->blitUpdated.store(1, std::memory_order_release);
+
+	// And if the game wrote its save memory, put it on disk. One flag test per
+	// frame; the write only happens when something actually changed.
+	fceu11_gba_flush_battery();
 }
 
 const uint8_t* fceu11_gba_frame()
@@ -291,6 +395,10 @@ int GbaLoad(const char* name, FCEUFILE* fp)
 
 	g_gbaActive = true;
 	g_gbaPath = name;
+
+	// The save file, if there is one. Loaded *after* the machine is built so it
+	// lands in a buffer already sized for the detected type.
+	fceu11_gba_load_battery();
 
 	FCEU_printf("GBA: loaded %s\n", name);
 	return LOADER_OK;

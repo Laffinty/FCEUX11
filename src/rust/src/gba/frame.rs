@@ -29,6 +29,7 @@
 
 use std::sync::{Mutex, OnceLock};
 
+use gba_core::cpu::hardware::internal_memory::BackupType;
 use gba_core::cpu::hardware::keypad::GbaButton;
 use gba_core::gba::Gba;
 
@@ -672,7 +673,177 @@ pub extern "C" fn gba_buttons(out_mask: *mut u16) -> i32 {
     }
 }
 
-/// Read a NUL-terminated byte string, or `None` if it is not valid UTF-8.
+/// Which save hardware the cartridge has, as a small integer for the host.
+///
+/// 0 none, 1 SRAM 32K, 2 Flash 64K, 3 Flash 128K, 4 EEPROM. The numbering is
+/// this module's, not the core's enum order, so that adding a type upstream
+/// cannot silently renumber a value a host is comparing against.
+const SAVE_TYPE_NONE: i32 = 0;
+const SAVE_TYPE_SRAM: i32 = 1;
+const SAVE_TYPE_FLASH64: i32 = 2;
+const SAVE_TYPE_FLASH128: i32 = 3;
+const SAVE_TYPE_EEPROM: i32 = 4;
+
+fn save_type_code(backup: BackupType) -> i32 {
+    match backup {
+        BackupType::None => SAVE_TYPE_NONE,
+        BackupType::Sram => SAVE_TYPE_SRAM,
+        BackupType::Flash64 => SAVE_TYPE_FLASH64,
+        BackupType::Flash128 => SAVE_TYPE_FLASH128,
+        BackupType::Eeprom => SAVE_TYPE_EEPROM,
+    }
+}
+
+fn save_type_from_code(code: i32) -> Option<BackupType> {
+    match code {
+        SAVE_TYPE_NONE => Some(BackupType::None),
+        SAVE_TYPE_SRAM => Some(BackupType::Sram),
+        SAVE_TYPE_FLASH64 => Some(BackupType::Flash64),
+        SAVE_TYPE_FLASH128 => Some(BackupType::Flash128),
+        SAVE_TYPE_EEPROM => Some(BackupType::Eeprom),
+        _ => None,
+    }
+}
+
+/// The save hardware this cartridge has, or [`SAVE_TYPE_NONE`].
+///
+/// # Safety
+/// The caller must be the simulation thread.
+#[unsafe(no_mangle)]
+pub extern "C" fn gba_battery_save_type() -> i32 {
+    match with_machine(|machine| {
+        save_type_code(machine.gba.cpu.bus.internal_memory.backup_type())
+    }) {
+        Ok(code) => code,
+        Err(_) => SAVE_TYPE_NONE,
+    }
+}
+
+/// Force the save hardware type, for a cartridge the signature scan got wrong.
+///
+/// Takes one of the codes [`gba_battery_save_type`] returns. An unrecognised
+/// code is `GBA_ERR_STATE` rather than a silent "no save hardware": a host that
+/// passes a stale value should be told, not obeyed.
+///
+/// Changing the type keeps the existing save up to the shorter of the two
+/// sizes, so correcting a misdetection does not throw the save away.
+///
+/// # Safety
+/// The caller must be the simulation thread.
+#[unsafe(no_mangle)]
+pub extern "C" fn gba_set_save_type(save_type: i32) -> i32 {
+    let Some(backup) = save_type_from_code(save_type) else {
+        return GBA_ERR_STATE;
+    };
+    // SAFETY: simulation thread.
+    match with_machine(|machine| {
+        machine.gba.cpu.bus.internal_memory.set_backup_type(backup);
+    }) {
+        Ok(()) => GBA_OK,
+        Err(code) => code,
+    }
+}
+
+/// Bytes the battery save currently occupies.
+///
+/// # Safety
+/// `out_size` must point to a writable `u32`, and the caller must be the
+/// simulation thread.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gba_battery_size(out_size: *mut u32) -> i32 {
+    if out_size.is_null() {
+        return GBA_ERR_STATE;
+    }
+    // SAFETY: checked non-null above.
+    match with_machine(|machine| {
+        *out_size = machine.gba.cpu.bus.internal_memory.battery_data().len() as u32;
+    }) {
+        Ok(()) => GBA_OK,
+        Err(code) => code,
+    }
+}
+
+/// Copy the battery save out, raw.
+///
+/// The bytes are exactly what goes in a `.srm`: no header, no padding, no
+/// length. That is the format mGBA uses, and a bare image is the only one
+/// another emulator is likely to read.
+///
+/// # Safety
+/// `dst` must point to `cap` writable bytes, and the caller must be the
+/// simulation thread.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gba_battery_read(dst: *mut u8, cap: u32) -> i32 {
+    if dst.is_null() {
+        return GBA_ERR_STATE;
+    }
+    // SAFETY: simulation thread.
+    match with_machine(|machine| {
+        let data = machine.gba.cpu.bus.internal_memory.battery_data();
+        if cap < data.len() as u32 {
+            return GBA_ERR_CAPACITY;
+        }
+        // SAFETY: `cap >= data.len()` and `dst` has `cap` writable bytes.
+        unsafe { std::ptr::copy_nonoverlapping(data.as_ptr(), dst, data.len()) };
+        GBA_OK
+    }) {
+        Ok(code) => code,
+        Err(code) => code,
+    }
+}
+
+/// Replace the battery save from `src`.
+///
+/// **Refuses on a cartridge with no save hardware.** Plan section 7.3 requires
+/// it and the reason is not ceremony: writing 32 KB of a save file to a cart
+/// that has no save memory, and then letting the game write back over it,
+/// destroys a file the user may have had for years. An unknown medium is a
+/// refusal, not a guess.
+///
+/// # Safety
+/// `src` must point to `len` readable bytes, and the caller must be the
+/// simulation thread.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gba_battery_write(src: *const u8, len: u32) -> i32 {
+    if src.is_null() {
+        return GBA_ERR_STATE;
+    }
+    // SAFETY: simulation thread.
+    match with_machine(|machine| {
+        let memory = &mut machine.gba.cpu.bus.internal_memory;
+        if memory.backup_type() == BackupType::None {
+            return GBA_ERR_STATE;
+        }
+        // SAFETY: the caller guarantees `len` readable bytes at `src`.
+        let data = unsafe { std::slice::from_raw_parts(src, len as usize) };
+        memory.load_battery(data);
+        GBA_OK
+    }) {
+        Ok(code) => code,
+        Err(code) => code,
+    }
+}
+
+/// Whether the save memory has been written since this was last called.
+///
+/// Takes the flag, so a caller that polls it owns the flush. Asking twice
+/// without writing in between gets `false` the second time, which is the
+/// point.
+///
+/// # Safety
+/// The caller must be the simulation thread.
+#[unsafe(no_mangle)]
+pub extern "C" fn gba_battery_take_dirty() -> i32 {
+    // SAFETY: simulation thread.
+    match with_machine(|machine| {
+        i32::from(machine.gba.cpu.bus.internal_memory.take_save_dirty())
+    }) {
+        Ok(flag) => flag,
+        Err(_) => 0,
+    }
+}
+
+    /// Read a NUL-terminated byte string, or `None` if it is not valid UTF-8.
 fn read_c_string<'a>(ptr: *const u8) -> Option<&'a [u8]> {
     let mut len = 0usize;
     // SAFETY: the caller guarantees a NUL terminator exists; we stop at the
@@ -722,11 +893,13 @@ mod tests {
         GBA_ERR_BAD_ROM, GBA_ERR_BIOS, GBA_ERR_CAPACITY, GBA_ERR_NO_ROM, GBA_ERR_STATE,
         GBA_ERR_UNSUPPORTED, GBA_OK, MIN_CARTRIDGE, gba_frame_buffer, gba_frame_buffer_size,
         gba_init, gba_load_rom_bytes, gba_reset, gba_rom_loaded, gba_rtc_set_time, gba_rtc_time,
-        gba_savestate_load, gba_savestate_save, gba_savestate_size, gba_set_buttons,
-        gba_set_overlay, gba_step_frame, gba_unload_rom, gba_buttons, read_c_string, scale5,
-        with_machine,
+        gba_battery_read, gba_battery_save_type, gba_battery_size, gba_battery_take_dirty,
+        gba_battery_write, gba_savestate_load, gba_savestate_save, gba_savestate_size,
+        gba_set_buttons, gba_set_overlay, gba_set_save_type, gba_step_frame, gba_unload_rom,
+        gba_buttons, read_c_string, scale5, with_machine,
     };
-    use gba_core::cpu::hardware::keypad::GbaButton;
+    use gba_core::cpu::hardware::internal_memory::BackupType;
+use gba_core::cpu::hardware::keypad::GbaButton;
     use crate::gba::audio::{
         gba_audio_underruns, gba_render_audio, gba_samples_per_frame_fixed, gba_set_output_rate,
     };
@@ -1810,6 +1983,200 @@ mod tests {
                 unsafe { gba_savestate_load(buffer.as_ptr(), 8) },
                 GBA_ERR_NO_ROM
             );
+        });
+    }
+
+    // ---- the battery save (S3-1) -------------------------------------------
+
+    /// A cartridge with no save hardware refuses a save write, and says why.
+    ///
+    /// Plan section 7.3 requires this and the reason is not ceremony: writing a
+    /// save file to a cart with no save memory, then letting the game write back
+    /// over it, destroys a file the user may have had for years. The default
+    /// test cartridge carries no `SRAM_V` marker, so this is exactly the
+    /// ambiguous case, and "refuse" is the only answer the plan allows.
+    #[test]
+    fn a_cartridge_with_no_save_hardware_refuses_a_save_write() {
+        exclusively(|| {
+            with_loaded_machine();
+            // The cartridge() fixture has no save-type marker, so the scan finds
+            // nothing. If that stops being true, this test is lying.
+            assert_eq!(gba_battery_save_type(), 0, "the fixture now has save hardware");
+
+            let data = [0x5Au8; 64];
+            // SAFETY: `data` is 64 readable bytes.
+            let code = unsafe { gba_battery_write(data.as_ptr(), data.len() as u32) };
+            assert_eq!(code, GBA_ERR_STATE, "an unknown medium must be refused");
+        });
+    }
+
+    /// A forced save type makes the cartridge writable, and the size follows it.
+    ///
+    /// The sizes are the point: SRAM 32K, Flash 64K, Flash 128K, EEPROM 32K, and
+    /// a host that sized its file from the *previous* type would write a
+    /// truncated save.
+    #[test]
+    fn a_forced_save_type_sizes_the_buffer() {
+        exclusively(|| {
+            with_loaded_machine();
+            for (code, size) in [(1, 0x8000usize), (2, 0x1_0000), (3, 0x2_0000), (4, 0x8000)] {
+                assert_eq!(gba_set_save_type(code), GBA_OK, "save type {code}");
+                assert_eq!(gba_battery_save_type(), code, "save type {code} did not take");
+                let mut reported = 0u32;
+                // SAFETY: `reported` is a live local.
+                assert_eq!(unsafe { gba_battery_size(&mut reported) }, GBA_OK);
+                assert_eq!(reported as usize, size, "save type {code} size");
+            }
+            // And back to none, which makes it unwritable again.
+            assert_eq!(gba_set_save_type(0), GBA_OK);
+            let data = [0x11u8; 8];
+            // SAFETY: `data` is 8 readable bytes.
+            assert_eq!(
+                unsafe { gba_battery_write(data.as_ptr(), 8) },
+                GBA_ERR_STATE,
+                "back to no save hardware"
+            );
+        });
+    }
+
+    /// A save survives a round trip; a short one loads without clearing the rest.
+    #[test]
+    fn a_save_round_trips_and_a_short_write_keeps_the_rest() {
+        exclusively(|| {
+            with_loaded_machine();
+            assert_eq!(gba_set_save_type(1), GBA_OK); // SRAM, 32K
+
+            let mut full = vec![0u8; 0x8000];
+            for (index, byte) in full.iter_mut().enumerate() {
+                *byte = (index % 251) as u8;
+            }
+            // SAFETY: `full` is 0x8000 readable bytes.
+            assert_eq!(unsafe { gba_battery_write(full.as_ptr(), 0x8000) }, GBA_OK);
+
+            let mut read_back = vec![0u8; 0x8000];
+            // SAFETY: `read_back` is 0x8000 writable bytes.
+            assert_eq!(unsafe { gba_battery_read(read_back.as_mut_ptr(), 0x8000) }, GBA_OK);
+            assert_eq!(read_back, full, "the save did not survive the round trip");
+
+            // A short file loads its bytes and leaves the rest **untouched** --
+            // not zeroed. The core documents exactly that, and a host restoring
+            // a save written by an older, smaller emulator depends on it, so
+            // the assertion is against the original contents rather than
+            // against a constant: "untouched" is the claim, not "zero".
+            let short = [0xC3u8; 16];
+            // SAFETY: `short` is 16 readable bytes.
+            assert_eq!(unsafe { gba_battery_write(short.as_ptr(), 16) }, GBA_OK);
+            read_back.iter_mut().for_each(|byte| *byte = 0);
+            // SAFETY: `read_back` is 0x8000 writable bytes.
+            assert_eq!(unsafe { gba_battery_read(read_back.as_mut_ptr(), 0x8000) }, GBA_OK);
+            assert_eq!(&read_back[..16], &short[..], "the short file did not load");
+            assert_eq!(
+                &read_back[16..],
+                &full[16..],
+                "a short file changed the rest of the save"
+            );
+
+            // A buffer too small is refused rather than truncated.
+            let mut tiny = [0u8; 16];
+            // SAFETY: `tiny` is 16 writable bytes.
+            assert_eq!(
+                unsafe { gba_battery_read(tiny.as_mut_ptr(), 16) },
+                GBA_ERR_CAPACITY
+            );
+        });
+    }
+
+    /// Switching type keeps the save, up to the shorter of the two sizes.
+    ///
+    /// This is what makes `gba_set_save_type` a correction rather than a reset:
+    /// a user forcing the right type onto a misdetected cart must not lose what
+    /// is already there.
+    #[test]
+    fn switching_save_type_keeps_what_fits() {
+        exclusively(|| {
+            with_loaded_machine();
+            assert_eq!(gba_set_save_type(1), GBA_OK); // SRAM, 32K
+            let data = [0x77u8; 0x8000];
+            // SAFETY: `data` is 0x8000 readable bytes.
+            assert_eq!(unsafe { gba_battery_write(data.as_ptr(), 0x8000) }, GBA_OK);
+
+            // Up to Flash128: bigger, so all 32K survives.
+            assert_eq!(gba_set_save_type(3), GBA_OK);
+            let mut read_back = vec![0u8; 0x2_0000];
+            // SAFETY: `read_back` is 0x20000 writable bytes.
+            assert_eq!(unsafe { gba_battery_read(read_back.as_mut_ptr(), 0x2_0000) }, GBA_OK);
+            assert_eq!(&read_back[..0x8000], &data[..], "the save was dropped going up");
+
+            // Back down to SRAM: the first 32K is still the save. The tail is a
+            // fresh buffer's 0xFF rather than a copy of bytes we no longer fit.
+            assert_eq!(gba_set_save_type(1), GBA_OK);
+            read_back.iter_mut().for_each(|byte| *byte = 0);
+            // SAFETY: `read_back` is 0x20000 writable bytes; only 0x8000 is read.
+            unsafe { gba_battery_read(read_back.as_mut_ptr(), 0x2_0000) };
+            assert_eq!(&read_back[..0x8000], &data[..], "the save was dropped coming down");
+        });
+    }
+
+    /// An unrecognised save type is refused, not rounded to "none".
+    ///
+    /// A host holding a stale value should be told. Quietly treating it as "no
+    /// save hardware" would also *return* `GBA_OK`, leaving the user
+    /// wondering why their override did nothing.
+    #[test]
+    fn an_unknown_save_type_is_refused() {
+        exclusively(|| {
+            with_loaded_machine();
+            for code in [-1, 5, 99, i32::MAX] {
+                assert_eq!(gba_set_save_type(code), GBA_ERR_STATE, "save type {code} accepted");
+            }
+            assert_eq!(gba_set_save_type(1), GBA_OK);
+            assert_eq!(gba_battery_save_type(), 1, "a refused set changed the type");
+        });
+    }
+
+    /// The dirty flag is taken, so a caller that polls it owns the flush.
+    #[test]
+    fn the_save_dirty_flag_is_taken_not_merely_read() {
+        exclusively(|| {
+            with_loaded_machine();
+            assert_eq!(gba_set_save_type(1), GBA_OK);
+            assert_eq!(gba_battery_take_dirty(), 0, "a freshly built machine is clean");
+
+            // Write through the machine's own memory, the way a game does.
+            with_machine(|machine| {
+                machine.gba.cpu.bus.internal_memory.write_at(0x0E00_0000, 0x42);
+            })
+            .expect("loaded");
+            assert_eq!(gba_battery_take_dirty(), 1, "the write was not noticed");
+            assert_eq!(gba_battery_take_dirty(), 0, "the flag was not taken");
+
+            // And loading a save file is *not* a device write, so the host is
+            // not told to flush it straight back out again.
+            let data = [0x99u8; 32];
+            // SAFETY: `data` is 32 readable bytes.
+            assert_eq!(unsafe { gba_battery_write(data.as_ptr(), 32) }, GBA_OK);
+            assert_eq!(
+                gba_battery_take_dirty(),
+                0,
+                "a host-side save load was mistaken for a device write"
+            );
+        });
+    }
+
+    /// With nothing loaded, the save surface reports it instead of crashing.
+    #[test]
+    fn the_save_surface_reports_no_rom() {
+        exclusively(|| {
+            gba_unload_rom();
+            assert_eq!(gba_battery_save_type(), 0);
+            let mut size = 0u32;
+            // SAFETY: `size` is a live local.
+            assert_eq!(unsafe { gba_battery_size(&mut size) }, GBA_ERR_NO_ROM);
+            let data = [0u8; 8];
+            // SAFETY: `data` is 8 readable bytes.
+            assert_eq!(unsafe { gba_battery_write(data.as_ptr(), 8) }, GBA_ERR_NO_ROM);
+            assert_eq!(gba_set_save_type(1), GBA_ERR_NO_ROM);
+            assert_eq!(gba_battery_take_dirty(), 0);
         });
     }
 }
