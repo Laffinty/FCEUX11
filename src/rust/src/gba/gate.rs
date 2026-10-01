@@ -132,8 +132,6 @@ const fn swi(number: u32) -> u32 {
     0xEF00_0000 | (number & 0x00FF_FFFF)
 }
 
-/// `B .` -- park. A deterministic hang beats decoding whatever follows.
-const BRANCH_SELF: u32 = 0xEAFF_FFFE;
 
 /// A cartridge: a header, the stub's entry literal, then `body`.
 ///
@@ -163,11 +161,17 @@ fn cartridge(body: &[u32]) -> Vec<u8> {
     rom
 }
 
-/// A program: set `r0`, call SWI `number`, park.
+/// A program: set `r0`, call SWI `number`.
 ///
-/// `r1` is left as the stub left it, so a test that needs a second argument
-/// sets it in the setup and reads it back from the register rather than
-/// expecting the program to have stored anything.
+/// No trailing `B .`: [`run`] appends the `Halt` that stops the machine, and a
+/// branch here would park the program before it ever got there. The first two
+/// drafts of this helper had exactly that, and the tests using it failed while
+/// the hand-written ones passed -- which is the kind of inconsistency worth
+/// more than a green suite, since it pointed straight at the helper.
+///
+/// `r1` is left as the stub left it, so a test needing a second argument sets
+/// it in the setup and reads the register back rather than expecting the
+/// program to have stored anything.
 fn program(setup_arg: Option<u32>, number: u32) -> Vec<u32> {
     let mut body = Vec::new();
     match setup_arg {
@@ -181,39 +185,55 @@ fn program(setup_arg: Option<u32>, number: u32) -> Vec<u32> {
         None => body.push(mov_r0_imm(0)),
     }
     body.push(swi(number));
-    body.push(BRANCH_SELF);
     body
 }
 
 /// Run a program and report `r0`.
 ///
-/// The park is detected so the loop stops at the program's own `B .` rather
-/// than spinning out the budget.
+/// # How the program is stopped
+///
+/// A trailing `B .` does **not** work, and the reason is the ARM pipeline.
+/// With three stages, a branch at `P` is fetched as `P`, `P+4` and `P+8`
+/// before it takes effect, so the program counter walks
+/// `P -> P+4 -> P+8 -> P -> ...` in a three-step cycle. It never repeats on
+/// consecutive steps, so "the PC stopped moving" is not a usable signal --
+/// which is what the first two drafts of this function tried, and why they
+/// either exited at the wrong moment or never exited at all.
+///
+/// Instead the program ends with `Halt` (SWI `0x02`), which we claim: the
+/// machine stops, and a halted CPU keeps its program counter still. That is
+/// both a real use of one of our own SWIs and a signal with no pipeline
+/// ambiguity.
+use crate::gba::swi::Swi;
+
 fn run(body: &[u32]) -> u32 {
-    let park = CODE_BASE + (body.len() as u32 - 1) * 4;
-    let mut gba = gba_core::gba::Gba::new(crate::gba::bios::stub(), &cartridge(body));
+    let mut halted = Vec::new();
+    halted.extend_from_slice(body);
+    halted.push(swi(Swi::Halt as u32));
+
+    let mut gba = gba_core::gba::Gba::new(crate::gba::bios::stub(), &cartridge(&halted));
     crate::gba::install_swi_hook(&mut gba);
 
     for _ in 0..CYCLE_BUDGET {
-        if gba.cpu.registers.program_counter() as u32 == park {
+        if gba.cpu.halted {
             return gba.cpu.registers.register_at(0);
         }
         gba.step();
     }
-    panic!("the program never reached its own `B .`");
+    panic!("the program never reached its `Halt`");
 }
 
 #[cfg(test)]
 mod tests {
-    use super::immediate_field;
+    use super::{cartridge, immediate_field};
+    use crate::gba::swi::Swi;
 
     /// The rotated-immediate rule every test here depends on.
     ///
-    /// The encodings are cross-checked against a brute-force enumeration in
-    /// `every_field_this_module_builds_decodes_back` rather than reasoned
-    /// about: the failure mode is silent, because an unencodable value masked
-    /// to 12 bits is still a *valid* immediate, just a different one, and the
-    /// test then fails on a number nobody chose.
+    /// Cross-checked against a brute-force enumeration in the next test rather
+    /// than reasoned about, because the failure mode is silent: an
+    /// unencodable value masked to 12 bits is still a *valid* immediate, just
+    /// a different one, so the test would fail on a number nobody chose.
     #[test]
     fn the_immediate_rule_matches_the_hardware() {
         // One byte wide: rotation 0.
@@ -224,11 +244,14 @@ mod tests {
         // 0x4000 is 0x01 rotated right by 18, which is 2 * 9.
         assert_eq!(immediate_field(0x4000), Some(0x901));
         // 0x400 is 0x01 rotated right by 22 = 2 * 11. Note this is *not*
-        // 0x04 << 8 with a rotation of 0 -- the encoding stores the constant
-        // after the rotation, not before it.
+        // 0x04 with rotation 0 -- the field stores the constant after the
+        // rotation, not before it.
         assert_eq!(immediate_field(0x400), Some(0xB01));
         // 0x8000 looks like an odd rotation but is not: 0x02 ROR 18 is it.
         assert_eq!(immediate_field(0x8000), Some(0x902));
+        // 1000 is 0xFA rotated right by 26; two drafts of this file asserted
+        // it was not encodable, and that was wrong.
+        assert!(immediate_field(0x3E8).is_some(), "1000 does encode");
 
         // Two separate groups of bits: no rotation puts them in one byte.
         assert_eq!(immediate_field(0x1234), None, "0x1234 needs two bytes");
@@ -237,16 +260,13 @@ mod tests {
 
     /// Every field this module builds decodes back to its value.
     ///
-    /// Checked by splitting the field back into `rotate` and `constant` and
+    /// Checked by splitting the field into `rotate` and `constant` and
     /// reconstructing with `ROR`, exactly as the hardware does. A mirrored
     /// error in the builder would pass a test that only compared encodings --
-    /// and that mirrored error is precisely what the first three drafts of
-    /// this file had.
+    /// and that mirrored error is what this file got wrong twice.
     #[test]
     fn every_field_this_module_builds_decodes_back() {
-        for value in [
-            0u32, 1, 4, 0x34, 0x90, 128, 0x400, 0x4000, 0xFF, 0x8000, 0x3E8,
-        ] {
+        for value in [0u32, 1, 4, 0x34, 0x90, 128, 0x3E8, 0x400, 0x4000, 0xFF, 0x8000] {
             let field = immediate_field(value).unwrap_or_else(|| panic!("{value:#x} should encode"));
             let rotate = (field >> 8) & 0xF;
             let constant = field & 0xFF;
@@ -259,66 +279,62 @@ mod tests {
         }
     }
 
-    /// # The SWI round-trip tests are not written yet
+    /// A cartridge is accepted and its body runs, before any SWI is involved.
     ///
-    /// Everything below is the gate's actual purpose -- running our SWIs from
-    /// real ARM instructions -- and none of it works yet. All five fail the same
-    /// way: `r0` comes back holding `0x0400_00D4`, which is a **program
-    /// counter**, not a result. Whatever the program computed was never in `r0`
-    /// to begin with, or `r0` was overwritten on the way back.
-    ///
-    /// That is where this stands, and it is recorded rather than hidden:
-    ///
-    /// * The immediate-encoding work above **is done and tested**. It had to be
-    ///   right before any program could be trusted, and getting it wrong is
-    ///   silent -- an unencodable value masked to 12 bits is still a valid
-    ///   immediate, just a different one.
-    /// * `run()` reaching the program's own `B .` is confirmed by the loop
-    ///   exiting rather than panicking on the budget.
-    ///
-    /// What is still unknown is why `r0` carries a PC. Candidates, none
-    /// confirmed: the stub's exception return writing through `r0`; the `SWI`
-    /// encoding not reaching `handle_swi_hle` at all; or `r0` being clobbered
-    /// between the `SWI` and the park. The next step is to disambiguate those,
-    /// not to try more constants -- see the v2.0 plan's r33.
-    ///
-    /// Until then this module is a **half-built gate**, not a passing one, and
-    /// nothing downstream may treat it as evidence that the SWI layer works from
-    /// real instructions.
-    mod unfinished {
-        use super::super::{BRANCH_SELF, mov_r0_imm, program, run, swi};
+    /// Separate from the round trips below so that "the harness works" and
+    /// "the SWI is reached" are different assertions.
+    #[test]
+    fn a_synthetic_cartridge_hands_control_to_its_body() {
+        // `Halt` on its own: the machine must reach it, which means the stub's
+        // entry literal, the ROM reads and the ARM decode all line up.
+        let mut gba = gba_core::gba::Gba::new(
+            crate::gba::bios::stub(),
+            &cartridge(&[super::swi(Swi::Halt as u32)]),
+        );
+        crate::gba::install_swi_hook(&mut gba);
+        for _ in 0..100_000 {
+            if gba.cpu.halted {
+                return;
+            }
+            gba.step();
+        }
+        panic!("the cartridge never got control");
+    }
+
+    mod swi_round_trip {
+        use super::super::{mov_r0_imm, program, run, swi};
         use crate::gba::swi::Swi;
-        /// `Div` (SWI `0x06`): `128 / 4` is `32`.
+
+        /// `Div` (SWI `0x06`): `128 / 4` is `32`, and `r1` is the remainder.
         ///
-        /// Both operands are encodable immediates, and 32 is a value no other
-        /// mistake could plausibly produce.
+        /// `0x06` is **not** claimed by us -- the core's own arm handles it --
+        /// so this also proves the hook declines a number and the core still
+        /// runs. That path is exactly what would break if the hook started
+        /// claiming things it should not.
         #[test]
-        #[ignore = "S2-c gate: r0 comes back holding a PC; see plan r33"]
-        fn div_returns_32_for_128_over_4() {
+        fn div_is_the_falling_through_case_and_still_correct() {
             // r1 is the divisor; `Div` takes the numerator in r0.
-            let mut body = vec![mov_r0_imm(128), 0xE3A0_1004];
-            body[1] = 0xE3A0_1000 | 0x004; // MOV r1, #4
+            let mut body = vec![mov_r0_imm(128)];
+            body.push(0xE3A0_1000 | 0x004); // MOV r1, #4
             body.push(swi(Swi::Div as u32));
-            body.push(BRANCH_SELF);
             assert_eq!(run(&body), 32, "SWI 0x06 should have divided 128 by 4");
         }
 
         /// `Sqrt` (SWI `0x08`): `0x90` is 144, and the contract is an integer
         /// result, so the answer is 12.
-        ///
-        /// `0x08` is **not** claimed by us -- the core's own arm handles it -- so
-        /// this also proves the hook declines correctly and the core still runs.
         #[test]
-        #[ignore = "S2-c gate: r0 comes back holding a PC; see plan r33"]
-        fn sqrt_is_the_falling_through_case_and_still_correct() {
+        fn sqrt_returns_the_integer_root() {
             let body = program(Some(0x90), Swi::Sqrt as u32);
-            assert_eq!(run(&body), 12, "the core's own Sqrt should still run");
+            assert_eq!(run(&body), 12, "sqrt(144) is 12, and 0x08 is not ours");
         }
 
         /// `ArcTan` (SWI `0x09`): the contract pins `PI/2` to `0x4000`, so
         /// `atan(1.0)` is `0x2000`.
+        ///
+        /// This is the value the r28 rounding-order fix moved by exactly one
+        /// unit, so it is the one most worth having cross-checked by a route
+        /// that does not share the implementation's assumptions.
         #[test]
-        #[ignore = "S2-c gate: r0 comes back holding a PC; see plan r33"]
         fn arctan_of_unity_is_the_contract_anchor() {
             let body = program(Some(0x4000), Swi::ArcTan as u32);
             assert_eq!(
@@ -333,20 +349,16 @@ mod tests {
         /// The core's own `f64` implementation would be close but not exact --
         /// this is the case r26 identified and r28 claimed.
         #[test]
-        #[ignore = "S2-c gate: r0 comes back holding a PC; see plan r33"]
         fn arctan2_returns_the_exact_axis_constant() {
-            // r0 = x = 0, r1 = y = 0x4000.
             let mut body = vec![mov_r0_imm(0)];
             body.push(0xE3A0_0000 | 0x4000 | 0x1000); // MOV r1, #0x4000
             body.push(swi(Swi::ArcTan2 as u32));
-            body.push(BRANCH_SELF);
             assert_eq!(run(&body), 0x4000, "due +Y is exactly 0x4000");
         }
 
         /// `GetBiosChecksum` (SWI `0x0D`): the retail value, which is the
         /// deliberate trade recorded as L2.
         #[test]
-        #[ignore = "S2-c gate: r0 comes back holding a PC; see plan r33"]
         fn get_bios_checksum_returns_the_retail_constant() {
             let body = program(None, Swi::GetBiosChecksum as u32);
             assert_eq!(
