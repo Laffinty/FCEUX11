@@ -248,20 +248,43 @@ fn gba_load_rom_bytes(rom: &[u8]) -> i32 {
 
 /// Reset the machine, keeping the cartridge.
 ///
-/// Note that the *core* reset is still a stub -- this has always returned
-/// `GBA_OK` without touching the CPU, and a real reset needs `SoftReset`
-/// (`0x00`) semantics that belong with the savestate work in S2-b2. What it
-/// does do is clear the audio frame accounting, because a residual carried
-/// across a reset is a frame boundary from the previous run, and the underrun
-/// total should be per-run.
+/// Takes the ROM out of the running machine and builds a fresh one from it, so
+/// the machine really is put back to its initial state: registers, working and
+/// video RAM, the frame buffer, the audio ring and the sample clock all start
+/// over, and the SWI hook is re-installed by the same path that installs it on a
+/// load.
+///
+/// # What this is, precisely
+///
+/// A **power-on reset**, not the BIOS `SoftReset` (SWI `0x00`). SoftReset resets
+/// the CPU state and jumps back to `0x00000000` while **leaving memory alone**;
+/// this one re-initialises memory as well. The reason for the choice is what a
+/// Reset button means to the person pressing it, and that FCEUX11's own NES
+/// reset is a hard reset too. The cost is recorded rather than glossed: a
+/// program that relies on SoftReset *preserving* memory sees different
+/// behaviour here. That is a choice about what the button does — it is not the
+/// absence of a reset, which was known limitation L14.
+///
+/// The ROM is moved out rather than copied: the machine it came from is being
+/// discarded, and a cartridge can be 32 MB.
+///
+/// # Safety
+/// The caller must be the simulation thread.
 #[unsafe(no_mangle)]
 pub extern "C" fn gba_reset() -> i32 {
-    // SAFETY: simulation thread.
-    with_machine(|machine| {
-        machine.audio.reset();
-        GBA_OK
-    })
-    .unwrap_or(GBA_ERR_NO_ROM)
+    let rom = match with_machine(|machine| {
+        std::mem::take(&mut machine.gba.cpu.bus.internal_memory.rom)
+    }) {
+        Ok(rom) => rom,
+        Err(code) => return code,
+    };
+    // A zero-length ROM means the machine was in no state worth resetting;
+    // building from it would silently install a machine that can never boot.
+    if rom.is_empty() {
+        return GBA_ERR_NO_ROM;
+    }
+    set_machine(Machine::new(&rom));
+    GBA_OK
 }
 
 /// Bytes one frame occupies: 240x160 RGBA, watermark included.
@@ -1294,6 +1317,120 @@ mod tests {
     }
 
     // ---- the cartridge real-time clock (S2-b3) ------------------------------
+
+    /// A reset puts the machine back where it started, and keeps the cartridge.
+    ///
+    /// This is the test behind striking known limit **L14** ("`gba_reset()` does
+    /// not reset the core"). It checks four things separately, because "reset"
+    /// is four claims and an implementation that does three of them still looks
+    /// right at a glance:
+    ///
+    /// - the **program counter** is back at the reset vector,
+    /// - **working RAM** no longer holds what was written to it,
+    /// - the **SWI hook** is installed again (a rebuilt machine that came back
+    ///   without one would answer no BIOS call at all), and
+    /// - the **cartridge is still loaded** — a reset that unloads the game is
+    ///   the one behaviour that would be worse than not resetting.
+    #[test]
+    fn a_reset_rewinds_the_machine_and_keeps_the_cartridge() {
+        exclusively(|| {
+            with_loaded_machine();
+            let rom_before = with_machine(|m| m.gba.cpu.bus.internal_memory.rom.len())
+                .expect("loaded");
+            let pc_before = with_machine(|m| m.gba.cpu.registers.program_counter())
+                .expect("loaded");
+
+            // Run a frame, scribble over working RAM, and press a button, so
+            // that "reset" has something to actually undo.
+            assert_eq!(gba_step_frame(), GBA_OK);
+            with_machine(|m| {
+                for offset in 0..64u32 {
+                    m.gba.cpu.bus.write_byte((0x0200_0000 + offset) as usize, 0xA5);
+                }
+            })
+            .expect("loaded");
+            gba_set_buttons(GbaButton::A as u16);
+
+            assert_eq!(gba_reset(), GBA_OK);
+
+            with_machine(|m| {
+                assert_eq!(
+                    m.gba.cpu.registers.program_counter(),
+                    pc_before,
+                    "the program counter was not rewound"
+                );
+                for offset in 0..64u32 {
+                    let got = m.gba.cpu.bus.read_byte((0x0200_0000 + offset) as usize);
+                    assert_ne!(
+                        got, 0xA5,
+                        "working RAM still holds what was written at +{offset}"
+                    );
+                }
+                assert!(
+                    m.gba.cpu.swi_hook.is_some(),
+                    "the rebuilt machine came back without its SWI hook"
+                );
+            })
+            .expect("loaded");
+
+            // Buttons do not survive a reset either: the core's keypad starts
+            // with all ten released, and a stuck A would be invisible until a
+            // game acted on it.
+            let mut mask = 0xFFFFu16;
+            // SAFETY: `mask` is a live local.
+            assert_eq!(unsafe { gba_buttons(&mut mask) }, GBA_OK);
+            assert_eq!(mask, 0, "a button survived the reset: {mask:#06b}");
+
+            assert_eq!(
+                gba_rom_loaded(),
+                1,
+                "the reset unloaded the cartridge"
+            );
+            assert_eq!(
+                with_machine(|m| m.gba.cpu.bus.internal_memory.rom.len()).expect("loaded"),
+                rom_before,
+                "the cartridge changed across the reset"
+            );
+        });
+    }
+
+    /// A second reset is as harmless as the first, and a reset of nothing is a
+    /// refusal rather than an empty machine.
+    ///
+    /// The second half is the one that matters: rebuilding from a zero-length
+    /// ROM would install a machine whose cartridge is empty, which boots to
+    /// nothing and then reports "loaded". Refusing keeps "no cartridge" and
+    /// "broken cartridge" distinguishable.
+    ///
+    /// The empty-ROM guard is **unreachable through the public ABI** — a machine
+    /// only exists if `gba_load_rom_bytes` accepted a cartridge, and that
+    /// demands `MIN_CARTRIDGE` bytes — so the test empties the ROM behind the
+    /// guard rather than pretending the public path reaches it. The first
+    /// version of this test asserted the refusal with nothing loaded, and passed
+    /// for the wrong reason: that goes through `with_machine`'s "no machine"
+    /// error, never reaching the guard at all. Removing the guard left it green.
+    #[test]
+    fn a_reset_is_idempotent_and_refuses_an_empty_machine() {
+        exclusively(|| {
+            gba_unload_rom();
+            assert_eq!(gba_reset(), GBA_ERR_NO_ROM, "reset with nothing loaded");
+            assert_eq!(gba_rom_loaded(), 0, "and it must not install a machine");
+
+            with_loaded_machine();
+            assert_eq!(gba_reset(), GBA_OK);
+            assert_eq!(gba_reset(), GBA_OK, "a second reset is not an error");
+            assert_eq!(gba_rom_loaded(), 1);
+
+            // Now the unreachable case, reached on purpose.
+            with_machine(|m| m.gba.cpu.bus.internal_memory.rom.clear()).expect("loaded");
+            assert_eq!(
+                gba_reset(),
+                GBA_ERR_NO_ROM,
+                "a machine with no cartridge must refuse to rebuild"
+            );
+            assert_eq!(gba_rom_loaded(), 1, "the machine survived a refused reset");
+        });
+    }
 
     /// The clock is pinned, reported and released through the C ABI.
     ///
