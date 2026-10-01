@@ -62,3 +62,34 @@ void fceu11_gba_step_frame(void);
 /// in S3. Section 7.2's mapping is A/B/Select/Start to the same, the D-pad to
 /// the same, and NES's shoulder buttons onto L and R.
 uint16_t fceu11_gba_button_mask(void);
+
+// ---- stage 2': the frame (v2.0 S2-b4) ------------------------------------
+//
+// The GBA owns its own frame buffer rather than writing the NES pixel pool.
+// Two reasons, and the second is the one that matters:
+//
+//  1. The pool is sized and indexed for the NES frame; a 240x160 producer
+//     writing into it would leave the NES viewer reading a half-old frame.
+//  2. `nes_shm::blitUpdated` is a shared "a new frame is ready" flag, and
+//     reusing *that* is fine — it is the same window and the same GUI thread.
+//     So the handshake is shared and the buffer is not. The NES pool is still
+//     only ever written by the NES blitter.
+
+/// The current GBA frame as RGBA, 240x160, or null when no GBA is running.
+///
+/// Valid until the next call to [`fceu11_gba_step_frame`]. The pointer is into
+/// storage this module owns; the viewer copies it out rather than keeping it.
+const uint8_t* fceu11_gba_frame();
+
+/// Width of the frame [`fceu11_gba_frame`] returns, in pixels.
+uint32_t fceu11_gba_frame_width();
+
+/// Height of the frame [`fceu11_gba_frame`] returns, in pixels.
+uint32_t fceu11_gba_frame_height();
+
+/// Whether a frame has arrived since the viewer last asked.
+///
+/// Lets the viewer skip re-uploading an unchanged frame on the repaints that
+/// are not frame boundaries. Bumps on every emulated frame, wraps at 32 bits,
+/// and is only ever compared for inequality — a wrap is harmless.
+uint32_t fceu11_gba_frame_serial();

@@ -43,6 +43,14 @@ namespace
 	bool g_gbaActive = false;
 	std::string g_gbaPath;
 
+	// The GBA's own frame, RGBA. 240x160x4 is 153,600 bytes.
+	constexpr uint32_t kGbaFrameWidth = 240;
+	constexpr uint32_t kGbaFrameHeight = 160;
+	constexpr size_t kGbaFrameBytes =
+		static_cast<size_t>(kGbaFrameWidth) * kGbaFrameHeight * 4;
+	std::vector<uint8_t> g_frame;
+	uint32_t g_frameSerial = 0;
+
 	// Where a GBA ROM's identifying byte lives, and its value. 0xB2 is the
 	// "fixed value" the GBA header must carry for the BIOS to boot the cart;
 	// every retail and homebrew cartridge has it, and no NES/UNIF/FDS/NSF file
@@ -142,7 +150,7 @@ void fceu11_gba_step_frame(void)
 	// every button the mask does not name.
 	gba_set_buttons(fceu11_gba_button_mask());
 
-	// One frame. That is the whole of stage 1.
+	// One frame of emulation, then one frame of pixels.
 	//
 	// Audio is deliberately **not** drained here even though the samples are
 	// already available and `WriteSound` is the same call the NES side makes.
@@ -150,9 +158,47 @@ void fceu11_gba_step_frame(void)
 	// core library: calling across that edge is a link-time dependency the core
 	// must not have, and the four F11QA test executables prove it -- they link
 	// `fceux11_core` without the driver, so the unresolved `WriteSound` breaks
-	// every one of them. Audio therefore belongs to stage 3, in the Qt layer,
+	// every one of them. Audio therefore belongs to stage 3', in the Qt layer,
 	// where the device is; the samples stay in the core's ring until then.
-	gba_step_frame();
+	if (gba_step_frame() != GBA_OK) return;
+
+	// Pull the frame out of the core into our own buffer. `gba_frame_buffer`
+	// is the only way to get at it, and it applies the `BETA` watermark on the
+	// way out, so the picture the viewer receives is the picture a player sees.
+	if (g_frame.size() != kGbaFrameBytes) g_frame.assign(kGbaFrameBytes, 0);
+	uint32_t size = 0;
+	if (gba_frame_buffer_size(&size) != GBA_OK || size != kGbaFrameBytes) return;
+	if (gba_frame_buffer(g_frame.data(), size) != GBA_OK) return;
+
+	++g_frameSerial;
+
+	// The one shared signal: "a new frame is ready". This is what makes the
+	// GUI repaint -- `transferVideoBuffer` gates BOTH the copy and the redraw on
+	// it, and the 120 Hz timer goes through the same gate, so without this
+	// nothing would ever be drawn. Note what is *not* touched: `pixBufPool` and
+	// `pixBufIdx` stay entirely the NES blitter's, which is what lets the NES
+	// path remain byte-for-byte unchanged.
+	if (nes_shm) nes_shm->blitUpdated.store(1, std::memory_order_release);
+}
+
+const uint8_t* fceu11_gba_frame()
+{
+	return g_gbaActive ? g_frame.data() : nullptr;
+}
+
+uint32_t fceu11_gba_frame_width()
+{
+	return kGbaFrameWidth;
+}
+
+uint32_t fceu11_gba_frame_height()
+{
+	return kGbaFrameHeight;
+}
+
+uint32_t fceu11_gba_frame_serial()
+{
+	return g_frameSerial;
 }
 
 // ---------------------------------------------------------------------------

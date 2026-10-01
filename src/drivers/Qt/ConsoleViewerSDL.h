@@ -27,11 +27,13 @@ class ConsoleViewSDL_t : public QWidget, public ConsoleViewerBase
 		void reset(void);
 		void cleanup(void);
 		void render(void);
+		// v2.0 S2-b4 stage 2': the GBA half of the viewer. Separate texture,
+		// separate buffer, separate letterbox maths -- see the definition.
+		void renderGbaFrame(void);
 		void queueRedraw(void){ render(); };
 		int  driver(void){ return VIDEO_DRIVER_SDL; };
 
 		void transfer2LocalBuffer(void);
-
 		void setVsyncEnable( bool ena );
 		void setLinearFilterEnable( bool ena );
 
@@ -97,6 +99,18 @@ class ConsoleViewSDL_t : public QWidget, public ConsoleViewerBase
 	SDL_Texture  *sdlTexture;
 	SDL_Cursor   *sdlCursor;
 	//SDL_Rect      sdlViewport;
+
+	// v2.0 S2-b4 stage 2'. The GBA's own texture, 240x160, created on first
+	// GBA frame and destroyed in cleanup(). It is deliberately *not* the NES
+	// texture above: a second machine with a different size gets its own
+	// surface, so the NES path needs no change at all. `sdlGbaTexture` is
+	// matched by the `Gba` rule in gba::decoupling, so this file being on that
+	// guard's allowlist is not optional bookkeeping -- it is how the guard
+	// knows a GBA member exists here.
+	SDL_Texture  *sdlGbaTexture;
+	// The serial of the frame currently on that texture, so a repaint that is
+	// not a frame boundary does not re-upload 150 KB.
+	uint32_t      sdlGbaTextureSerial;
 
 	// hotfix1 P1-17 (H-22): debounce SDL resource recreation so a live
 	// drag-resize doesn't tear down and rebuild the SDL renderer /

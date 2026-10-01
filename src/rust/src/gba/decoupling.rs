@@ -69,6 +69,13 @@ mod tests {
         "fceuWrapper.cpp",
         "fceu.cpp",
         "ConsoleFile.cpp",
+        // v2.0 S2-b4 stage 2' (r44 ⑤): the viewer. It needs the session flag
+        // and the frame accessors, and it owns a GBA texture. Both files are
+        // listed because the header carries the member as well as the cpp
+        // carrying the include -- a half-registration would leave the other
+        // half invisible to the guard.
+        "ConsoleViewerSDL.cpp",
+        "ConsoleViewerSDL.h",
     ];
 
     /// The one file allowed to call the GBA C ABI.
@@ -215,9 +222,15 @@ mod tests {
     /// `PRGBanks`, `logBankNumCbox`, `bookmarkPreviewPopup` and friends all
     /// contain the three letters. A guard that fires on noise gets turned off,
     /// and a turned-off guard protects nothing — so "mentions GBA" has to mean
-    /// "names one of *our* symbols", which is what these four prefixes are.
+    /// "names one of *our* symbols", which is what these five patterns are.
+    ///
+    /// The bare `Gba` is the one that had to be added later (r44 ⑤): stage 2'
+    /// puts a `sdlGbaTexture` member in the viewer, and that name matches none
+    /// of the other four. **A GBA-only member could otherwise walk straight
+    /// past the guard** — the rule was not too strict, it was too narrow. Still
+    /// case-sensitive, so `RGBA` / `PRGBanks` / `logBank` stay out.
     fn gba_mentioning_files() -> Vec<String> {
-        const MENTIONS: [&str; 4] = ["gba_", "fceu11_gba", "GbaLoad", "gba_load"];
+        const MENTIONS: [&str; 5] = ["gba_", "fceu11_gba", "GbaLoad", "gba_load", "Gba"];
         stripped_sources()
             .into_iter()
             .filter(|(_, code)| MENTIONS.iter().any(|needle| code.contains(needle)))
@@ -261,6 +274,26 @@ mod tests {
              Invariant 9 wants each touch point to be a decision: add the file there \
              with a reason, in the same commit that adds the reference."
         );
+    }
+
+    /// The scan finds a GBA-specific name even when nothing calls the ABI.
+    ///
+    /// The `Gba` rule exists because of a member called `sdlGbaTexture`: it
+    /// carries no `gba_` prefix, no `fceu11_gba`, and is not `GbaLoad` or
+    /// `gba_load`, so it matched none of the four earlier patterns and the
+    /// viewer could hold a GBA texture without the allowlist noticing. The
+    /// assertion is that the viewer is *in* the found set — which is only true
+    /// because the rule catches it.
+    #[test]
+    fn a_gba_specific_name_is_enough_to_need_the_allowlist() {
+        let found = gba_mentioning_files();
+        for viewer in ["ConsoleViewerSDL.cpp", "ConsoleViewerSDL.h"] {
+            assert!(
+                found.iter().any(|name| name == viewer),
+                "{viewer} holds GBA state but the scan did not find it -- the rule is \
+                 too narrow again, and a GBA member is walking past the guard"
+            );
+        }
     }
 
     /// The allowlist is not stale: every name in it is still a real file.
