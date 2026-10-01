@@ -26,6 +26,9 @@
 #include <stdint.h>
 #include <limits.h>
 #include <vector>
+
+#include <SDL.h>
+#include <vector>
 #include "utils/unzip.h"
 
 #include <QFileInfo>
@@ -1375,6 +1378,19 @@ int  fceuWrapperUpdate( void )
 				g_gbaSessionActive = active;
 				fceuWrapper_sync_gba_audio(active);
 			}
+
+			// The two shoulders, read as raw key state and pushed in.
+			//
+			// Not from `joy[]`: on the default NES layout Z and X are already
+			// bound to A and B, so deriving L from the pad would make L a
+			// second A. `getKeyState` reads the full scancode table, which the
+			// event loop fills for every key whether or not anything is bound to
+			// it -- so it answers for a key the NES side has never heard of.
+			//
+			// This runs on the emulation thread and reads a table the GUI thread
+			// wrote, which is the same discipline `joy[]` already has.
+			fceu11_gba_set_shoulder_keys(getKeyState(SDLK_z) != 0,
+			                             getKeyState(SDLK_x) != 0);
 
 			fceu11_gba_step_frame();
 

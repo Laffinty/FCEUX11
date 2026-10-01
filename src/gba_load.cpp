@@ -56,6 +56,11 @@ namespace
 	std::vector<uint8_t> g_frame;
 	uint32_t g_frameSerial = 0;
 
+	// The two shoulder keys, pushed in by the Qt layer each frame. See
+	// fceu11_gba_button_mask for why these do not come from the NES pad.
+	bool g_shoulderL = false;
+	bool g_shoulderR = false;
+
 	// Where a GBA ROM's identifying byte lives, and its value. 0xB2 is the
 	// "fixed value" the GBA header must carry for the BIOS to boot the cart;
 	// every retail and homebrew cartridge has it, and no NES/UNIF/FDS/NSF file
@@ -70,6 +75,18 @@ namespace
 
 	// GBA button bits, from the core's `GbaButton` (keypad.rs). A set bit means
 	// held.
+	// Plan section 7.2's defaults for the two shoulders a NES pad does not
+	// have. Read as raw key state, so they work whatever Z and X are bound to
+	// on the NES side -- which is the whole point of reading them separately
+	// rather than deriving them from the pad.
+	//
+	// The state is pushed in by the Qt layer rather than read here. This file is
+	// in the core library, and `Qt/input.h` cannot be included from here: it
+	// uses `FAMILYKEYBOARD_NUM_BUTTONS` before anything defines it, the same
+	// trap `dface.h` sets. So the keyboard stays entirely on the Qt side and
+	// `fceu11_gba_set_shoulder_keys` hands over two booleans. A binding table
+	// that let a player move them is the key-configuration work; changing these
+	// two lines is the temporary way to try a different pair.
 	enum GbaButtonBit : uint16_t
 	{
 		kGbaA = 1u << 0,
@@ -217,8 +234,8 @@ const std::string& fceu11_gba_path(void)
 
 uint16_t fceu11_gba_button_mask(void)
 {
-	// Player 1. The NES side has no second player's worth of bindings to offer
-	// a GBA, and a game that needs two GBA pads is not what section 7.2 promises.
+	// Player 1. The NES side has only two worth of bindings to offer a GBA, and
+	// a game that needs two GBA pads is not what section 7.2 promises.
 	const uint8_t pad = joy[0];
 
 	uint16_t mask = 0;
@@ -231,14 +248,25 @@ uint16_t fceu11_gba_button_mask(void)
 	if (pad & kNesLeft) mask |= kGbaLeft;
 	if (pad & kNesRight) mask |= kGbaRight;
 
-	// L and R are deliberately left at zero. Section 7.2 wants them on Z and X,
-	// but on a NES pad those keys are *already* bound to something -- very often
-	// to A and B -- so "L is the Z key" would quietly make L a second A. Which
-	// key each shoulder gets is the binding work section S3 does, and until
-	// then an unbound shoulder is honest where a guessed one is not.
-	(void)kGbaL;
-	(void)kGbaR;
+	// L and R come from the raw key state the Qt layer pushed in, NOT from the
+	// pad above.
+	//
+	// Section 7.2 wants them on Z and X. A NES pad has no shoulders, and on the
+	// default layout Z and X are already bound to A and B -- so deriving L from
+	// `joy[]` would make L a second copy of A, which is the exact failure these
+	// two lines exist to avoid. `g_keyState` is a full scancode table written for
+	// every SDL_KEYDOWN/KEYUP whether or not the key is bound to anything
+	// (`input.cpp:1366`), so the Qt layer can read a key the NES side ignores.
+	if (g_shoulderL) mask |= kGbaL;
+	if (g_shoulderR) mask |= kGbaR;
+
 	return mask;
+}
+
+void fceu11_gba_set_shoulder_keys(bool l_down, bool r_down)
+{
+	g_shoulderL = l_down;
+	g_shoulderR = r_down;
 }
 
 void fceu11_gba_step_frame(void)

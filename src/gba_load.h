@@ -61,7 +61,26 @@ void fceu11_gba_step_frame(void);
 /// binding table yet, and inventing one is the key-mapping work the plan puts
 /// in S3. Section 7.2's mapping is A/B/Select/Start to the same, the D-pad to
 /// the same, and NES's shoulder buttons onto L and R.
+///
+/// L and R are the exception and come from
+/// [`fceu11_gba_set_shoulder_keys`] instead of the pad, because on the default
+/// NES layout Z and X are already bound to A and B -- reading them off the pad
+/// would make L a second copy of A.
 uint16_t fceu11_gba_button_mask(void);
+
+/// Report the raw state of the two shoulder keys, as the Qt layer sees them.
+///
+/// Pushed in rather than read here because this file is in the core library:
+/// `Qt/input.h` cannot be included from it (it uses
+/// `FAMILYKEYBOARD_NUM_BUTTONS` before anything defines it, the same trap
+/// `dface.h` sets), so the keyboard stays on the Qt side and hands over two
+/// booleans. `g_keyState` is a full scancode table written for every
+/// `SDL_KEYDOWN`/`SDL_KEYUP` whether or not the key is bound to anything
+/// (`input.cpp:1366`), which is what lets a GBA read a key the NES side
+/// ignores.
+///
+/// Both are full states, not edges: a key not reported this frame is up.
+void fceu11_gba_set_shoulder_keys(bool l_down, bool r_down);
 
 // ---- stage 2': the frame (v2.0 S2-b4) ------------------------------------
 //
