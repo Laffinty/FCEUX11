@@ -26,6 +26,7 @@
 pub mod bios;
 pub mod ffi;
 pub mod frame;
+pub mod gate;
 pub mod overlay;
 pub mod save;
 pub mod swi;
