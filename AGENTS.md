@@ -59,12 +59,13 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 | S2-b4 阶段 2' 画面 | ✅（r44）—— GBA 自己的帧缓冲 + 纹理 + 3:2 信箱 |
 | S2-b4 阶段 3' 音频排空 + 限速 | ✅（r45）—— 限速切到 59.7275 |
 | S3-1 电池存档（`.srm`） | ✅（r46）—— 读写通路 + 手动覆盖存档类型 |
-| S3-2 L/R 按键绑定 | **未开始 ← 下一步** |
-| S3-3 即时存档的 C++ 侧接线与菜单 | 未开始 |
-| S4 手工实测 | 未开始 |
+| S3-2 L/R 按键绑定 | ✅（r47）—— 读原始 scancode；绑定表仍硬编码 Z/X |
+| S3-3 即时存档的 C++ 侧接线与菜单 | ✅（r48）—— 分支落在 `FCEUSS_Save`/`FCEUSS_Load` |
+| S3 余项 | ⬜ RTC 的 C++ 接线（ABI 已有、零调用）、`gba_set_save_type` 无 UI |
+| S4 手工实测 | 未开始 —— **需真实 `.gba` 资产，本环境做不了** |
 
-**导出符号 34 个**：探针 6 + 生命周期/帧 10 + 音频 5 + savestate 3 + RTC 2 + 输入 2 + 电池 6。
-**GBA 锁测试 234 项全绿**（1 条 `#[ignore]` 的测量工具）。
+**导出符号 34 个**（S3-3 零新增）：探针 6 + 生命周期/帧 10 + 音频 5 + savestate 3 + RTC 2 + 输入 2 + 电池 6。
+**GBA 锁测试 235 项全绿**（2 条 `#[ignore]` 的测量工具：r37 的栈探针 + r48 的体积探针）。
 
 > ⚠️ **不变式 1 的判据是 F11QA 矩阵 `108P/12F`**，本机跑的是它的**本地近似**
 > `ctest`（34 项）。当前状态 **`ctest` 33/34**，唯一失败的 `bench_tolerance_test`
@@ -76,7 +77,9 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 > 仍成立 + NES 未回归」。**`.srm` 布局（= 核心 `sram` 原始内容，mGBA 的格式）
 > 同理无法验证**，故 GA 门禁第 4 条「跨模拟器字节级互通」仍开放。
 
-v2.0 对 vendor 树的本地修改是 **16 处、跨 4 个文件**（2026-10-01 实测）：
+v2.0 对 vendor 树的本地修改是 **16 处、跨 3 个源文件**（2026-10-02 用
+`git log --name-only --diff-filter=M -- src/rust/crates/gba-core/src/` 实测得出，
+不是手数；第 4 个文件是 `Cargo.toml` 的元数据重写，不算源改动）：
 
 | 文件 | 处数 | 内容 |
 |---|---|---|
@@ -88,20 +91,38 @@ v2.0 对 vendor 树的本地修改是 **16 处、跨 4 个文件**（2026-10-01 
 文件」**（r38 ④ / r46 ①）—— 改动前先确认这一点是否仍成立，`rtc.rs` 与
 `internal_memory.rs` 都要查。重新 vendor 时看 `ATTRIBUTION.md` §3.2 与 §3.2.1。
 
-## 下一步：S3-2（L / R 按键绑定）
+## 下一步：S3 收尾的两项接线（都不是新功能）
 
-§7.2 要求 8 键一一映射（**已做**，依据 `drivers/Qt/input.cpp:1514-1531,1538`
-的实际位序）外加 **L 默认 Z、R 默认 X**。**后两个刻意留空到现在**，理由记在
-r40 ⑤ 与计划 §十二 第 8 条：Z / X 在 NES 手柄上往往已绑给 A / B，把 L 做成
-「Z 键」会让 L 变成第二个 A。
+S3-1 / S3-2 / S3-3 都已落地。S3 出口判据里剩下没接线的只有两项，**两者的 ABI
+都已存在，缺的只是 C++ 侧调用**：
 
-**解法已查明**：`g_keyState` 是**全 scancode 表**，`input.cpp:1366` 对每个
-`SDL_KEYDOWN` / `SDL_KEYUP` 都写它，**与该键是否绑给 NES 无关**；`getKeyState()`
-（`input.h:34`）按 scancode 读它。所以 L / R 应直接读**原始按键状态**，
-不走 `joy[]`。
+1. **RTC**：`gba_rtc_set_time` / `gba_rtc_time` 两个导出在 `frame.rs`，C++ 侧
+   **零调用**。r38 刻意没有导出「是否 RTC 卡带」，所以接线前要先想清楚
+   凭什么判断当前卡带带 RTC —— 否则会给非 RTC 卡带开一个假开关。
+2. **手动覆盖存档类型**：`gba_set_save_type` 有导出、无 UI。§7.3 的硬要求是
+   「类型不明时拒绝写入」，核心侧已强制；UI 侧要不要给玩家一个手动选择，
+   属产品决定。
 
-跨线程读 `g_keyState` 与 NES 侧读 `joy[]` 是同一档纪律（都是 GUI 线程写、模拟
-线程读的 `uint8_t[]`），**不比既有做法更差** —— 但这一点值得在实施时写进注释。
+**S4（手工实测）在本环境做不了** —— 没有 `.gba` 资产，且按不变式 9 不打算接外部
+基准。GA 门禁第 3 条已在 r43 闭合（已知限制 8 条），第 4 条「`.srm` 跨模拟器字节级
+互通」仍开放。
+
+## S3-3 实施时踩到的三件事（给下一个接手的人）
+
+1. **`FCEUSS_Save` / `FCEUSS_Load` 是所有即时存档入口的唯一收敛点**：10 个槽位、
+   Save/Load State As、F8/F9（`ConsoleFile.cpp:389,399`）、热键
+   （`src/input.cpp:1065,1082`）全部汇到这两个函数。分支插在「文件已开、序列化器
+   未到」之间，文件名生成、备份拷贝、undo 记账、槽位标记**全部复用**，菜单因此
+   免费获得。
+2. **菜单门控此前是灰的，原因是结构性的**：`FCEU_IsValidUI` 判 `!GameInfo`，而
+   `.gba` 装载时 `ResetGameLoaded()` → `FCEU_CloseGame()` 已把 `GameInfo` 置空
+   （`fceu.cpp:201-202`），`GbaLoad` 从不构造它。必须拆组放行 savestate 六项，
+   **录像三项与 `VIEWSLOTS` 保持 `GameInfo` 判据**（不变式 9 红线：录像须显式
+   声明不可用）。
+3. **一个我查到底后自己证伪的推断**：我以为 `FileBase` 会残留上一局 NES 的值，
+   导致 GBA 存档覆盖别人的存档位。**不成立** —— `GetFileBase()` 在
+   `fceu.cpp:459` 对每个文件（含 `.gba`）都调用。记在这里是因为它看起来非常可信，
+   而「看起来可信」正是这类缺陷的特征。
 
 ## 代码地图
 
@@ -116,9 +137,10 @@ src/rust/src/gba/            一手 GBA 逻辑（根 crate 的模块，不是独
   gate.rs                    真实 ARM 指令流的自建门禁
   save.rs                    savestate 编解码（serde_json + 指纹 + 侧车 + 工作线程）
   rtc.rs                     RTC 固定时刻覆盖 + 芯片级端到端测试
-  decoupling.rs              三条解耦守卫 + 两条自检
+  decoupling.rs              四条解耦守卫 + 两条自检（含 S3-3 的 state.cpp 位置守卫）
   swi/…                      dispatch 与各 SWI 的实现
-src/gba_load.{h,cpp}         C++ 侧唯一的 GBA 触碰点：装载器 + 会话状态 + 每帧步进 + 帧缓冲 + 存档文件
+src/gba_load.{h,cpp}         C++ 侧唯一的 GBA C ABI 调用点：装载器 + 会话状态 + 每帧步进 + 帧缓冲 + `.srm` / savestate 文件
+src/state.cpp                即时存档：仅 `FCEUSS_Save` / `FCEUSS_Load` 两处分支（唯一收敛点）
 src/drivers/Qt/ConsoleViewerSDL.{h,cpp}   GBA 的呈现分支（NES 那一侧逐字不动）
 src/drivers/Qt/fceuWrapper.cpp            每帧分支 + 限速/音量/音频排空
 src/rust/crates/gba-core/    vendor 的 GBA 硬件核心（clementine, MIT）

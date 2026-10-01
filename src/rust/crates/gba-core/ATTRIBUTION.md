@@ -67,7 +67,7 @@ inheritance:
 
 `[lints.clippy]` was carried over unchanged.
 
-### 3.2 Source files — 14 local changes across 3 files
+### 3.2 Source files — 16 local changes across 3 files
 
 `crates/gba-core/src/**` was byte-identical to upstream `emu/src/**` at the end
 of **S0** (verified file-by-file with SHA-256). Local edits begin at **S0'**, when
@@ -161,7 +161,7 @@ landing in S2.
 
 | Item | Status |
 |---|---|
-| `gba-core` source changes | **16**, across 4 files: 9 in `src/cpu/arm7tdmi.rs` (5 S0' hook wiring, no upstream logic altered + 4 S1a-1 halt mechanism, **does change `step()`** — see R15) + 3 in `src/cpu/hardware/rtc.rs` + 4 in `src/cpu/hardware/internal_memory.rs` (3 S2-b3 real-time clock + 2 S3-1 battery save; **neither changes behaviour when nothing is overridden**, see §3.2.1) |
+| `gba-core` source changes | **16**, across **3** source files: 9 in `src/cpu/arm7tdmi.rs` (5 S0' hook wiring, no upstream logic altered + 4 S1a-1 halt mechanism, **does change `step()`** — see R15) + 3 in `src/cpu/hardware/rtc.rs` + 4 in `src/cpu/hardware/internal_memory.rs` (3 S2-b3 real-time clock + 2 S3-1 battery save; **neither changes behaviour when nothing is overridden**, see §3.2.1). **The "3" is measured, not counted by hand**: `git log --name-only --diff-filter=M -- src/rust/crates/gba-core/src/` names exactly those three files and no others. An earlier draft of this table said "4 files" while enumerating three — the fourth was `Cargo.toml`, which is the row below and is not a source change |
 | `gba-core/Cargo.toml` | rewritten (metadata only, no version changes) |
 | `src/gba/` | new, 100% first-party, 9 files |
 

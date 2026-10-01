@@ -822,4 +822,146 @@ mod tests {
             "CODEC_STACK is {CODEC_STACK}, below the 2 MB release peak"
         );
     }
+
+    /// How many numbers a JSON subtree holds, at any depth.
+    ///
+    /// Bytes *per number* is the figure that decides the on-disk format: a
+    /// `Vec<u8>` costs one decimal number and a comma per byte, so the ratio is
+    /// what a binary or base64 encoding would divide out.
+    fn count_numbers(value: &serde_json::Value) -> usize {
+        match value {
+            serde_json::Value::Number(_) => 1,
+            serde_json::Value::Array(items) => items.iter().map(count_numbers).sum(),
+            serde_json::Value::Object(entries) => entries.values().map(count_numbers).sum(),
+            _ => 0,
+        }
+    }
+
+    /// The byte arrays in a payload, biggest first, named by their key.
+    ///
+    /// The whole machine arrives under one `cpu` key, so a top-level split
+    /// cannot say *which* memory is expensive -- and that is the question a
+    /// format decision turns on. A byte array is recognised by being an array
+    /// of plain integers, which is what every memory region in the core is and
+    /// what no other field in the state is.
+    fn byte_arrays(value: &serde_json::Value, path: &str, out: &mut Vec<(String, usize)>) {
+        match value {
+            serde_json::Value::Array(items) => {
+                let all_numbers = items
+                    .iter()
+                    .all(|item| matches!(item, serde_json::Value::Number(_)));
+                if all_numbers && !items.is_empty() {
+                    out.push((path.to_owned(), items.len()));
+                }
+                for (index, item) in items.iter().enumerate() {
+                    byte_arrays(item, &format!("{path}[{index}]"), out);
+                }
+            }
+            serde_json::Value::Object(entries) => {
+                for (key, child) in entries {
+                    byte_arrays(child, &format!("{path}.{key}"), out);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// What one state costs on disk and in time.
+    ///
+    /// **Ignored by default, because it reports rather than gates.** These
+    /// numbers are what plan limitation **L13** turns on: the payload is JSON,
+    /// so working RAM and the frame buffer are arrays of decimal numbers, and
+    /// L13's own resolution date reads "when the instant-save wiring lands" --
+    /// which is the phase this measurement belongs to. Asserting a ceiling here
+    /// would go stale the moment the core grows a memory region, so what this
+    /// test actually asserts is only that a state round-trips; the rest is
+    /// printed for whoever has to choose a format.
+    ///
+    /// ```text
+    /// cargo test -p fceux11-rust --no-default-features --features gba --lib \
+    ///     measure_a_state_on_disk -- --ignored --nocapture
+    /// ```
+    #[test]
+    #[ignore = "a measurement tool: it reports the numbers L13 turns on, it does not gate them"]
+    fn measure_a_state_on_disk() {
+        const REPEATS: u32 = 20;
+
+        let machine = stepped_machine(64);
+        let fingerprint = RomFingerprint::of(&machine);
+        let audio = AudioState {
+            phase: 123_457,
+            rate: 48_000,
+        };
+
+        let started = std::time::Instant::now();
+        let mut encoded = None;
+        for _ in 0..REPEATS {
+            encoded = Some(save(&machine.cpu, &fingerprint, audio, None).expect("serialize"));
+        }
+        let encode = started.elapsed() / REPEATS;
+        let state = encoded.expect("encoded at least once");
+        let total = state.header.len() + state.payload.len();
+
+        // The path the C ABI takes, thread spawn included: that spawn is part of
+        // what a player waits for, so measuring `load` alone would flatter it.
+        let bytes: Vec<u8> = state
+            .header
+            .iter()
+            .chain(state.payload.iter())
+            .copied()
+            .collect();
+        let started = std::time::Instant::now();
+        for _ in 0..REPEATS {
+            assert!(load_on_worker(bytes.clone()).expect("a worker").is_ok());
+        }
+        let decode = started.elapsed() / REPEATS;
+
+        let tree: serde_json::Value =
+            serde_json::from_slice(&state.payload).expect("the payload is the JSON we wrote");
+        let mut parts: Vec<(String, usize, usize)> = tree
+            .as_object()
+            .expect("an object at the top")
+            .iter()
+            .map(|(key, value)| {
+                let len = serde_json::to_vec(value).expect("re-encode a subtree").len();
+                (key.clone(), len, count_numbers(value))
+            })
+            .collect();
+        parts.sort_by_key(|(_, len, _)| std::cmp::Reverse(*len));
+
+        let mut arrays = Vec::new();
+        byte_arrays(&tree, "cpu", &mut arrays);
+        arrays.sort_by_key(|(_, len)| std::cmp::Reverse(*len));
+        // The total has to come from the whole list, not the printed head: the
+        // scanline buffers are 228 separate small arrays, so truncating first
+        // would leave out a region that is a real share of the file.
+        let raw: usize = arrays.iter().map(|(_, len)| *len).sum();
+        let shown = arrays.len().min(8);
+        arrays.truncate(shown);
+
+        println!("state: {total} bytes (header {} + payload {})", state.header.len(), state.payload.len());
+        println!("  {total} B = {:.1} KiB, {REPEATS} repeats, debug timings unless --release", total as f64 / 1024.0);
+        println!("encode: {encode:?}   decode (worker, spawn included): {decode:?}");
+        println!("largest top-level fields:");
+        for (key, len, numbers) in &parts {
+            let per = if *numbers == 0 {
+                f64::NAN
+            } else {
+                *len as f64 / *numbers as f64
+            };
+            println!("  {key:<20} {len:>9} B  {numbers:>9} numbers  {per:>5.2} B/number");
+        }
+        println!("largest byte arrays (path, element count):");
+        for (path, len) in &arrays {
+            println!("  {path:<48} {len:>8} B raw");
+        }
+        let count = arrays.len();
+        println!(
+            "  every byte array in the state holds {raw} B raw; the {count} largest are above"
+        );
+        println!(
+            "  JSON costs {:.2} B per raw byte, so a byte-for-byte format lands near {raw} B",
+            total as f64 / raw as f64
+        );
+    }
 }

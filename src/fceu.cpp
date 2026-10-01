@@ -1362,14 +1362,27 @@ bool FCEU_IsValidUI(EFCEUI ui) {
 		if (FCEUMOV_Mode(MOVIEMODE_TASEDITOR)) return false;
 		break;
 
-	case FCEUI_RECORDMOVIE:
-	case FCEUI_PLAYMOVIE:
+	// A GBA session has no `GameInfo`: `GbaLoad` never makes one, and the load
+	// chain closes the previous NES game before it runs. So the `!GameInfo` test
+	// these cases share would grey out every one of them for a machine that
+	// saves states perfectly well, and the savestate items get a GBA exception.
+	//
+	// Recording and playback deliberately do not. A movie is NES-specific
+	// state, and invariant 9 requires a GBA session to declare it unavailable
+	// rather than offer one that cannot work -- so those stay on `GameInfo`
+	// alone, and so does the slot viewer, which reads NES slot metadata.
 	case FCEUI_QUICKSAVE:
 	case FCEUI_QUICKLOAD:
 	case FCEUI_SAVESTATE:
 	case FCEUI_LOADSTATE:
 	case FCEUI_NEXTSAVESTATE:
 	case FCEUI_PREVIOUSSAVESTATE:
+		if (!GameInfo && !fceu11_gba_active()) return false;
+		if (FCEUMOV_Mode(MOVIEMODE_TASEDITOR)) return false;
+		break;
+
+	case FCEUI_RECORDMOVIE:
+	case FCEUI_PLAYMOVIE:
 	case FCEUI_VIEWSLOTS:
 		if (!GameInfo) return false;
 		if (FCEUMOV_Mode(MOVIEMODE_TASEDITOR)) return false;

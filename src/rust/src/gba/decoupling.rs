@@ -33,8 +33,11 @@
 //! | `fceu.cpp` | the loader chain — one "open this file" entry point |
 //! | `ConsoleFile.cpp` | the open dialog's filter list, so a `.gba` can be picked |
 //!
-//! Nothing else. When stage 2' adds its own presentation path it adds its
-//! entries **here**, explicitly and in the same commit that adds the code —
+//! | `ConsoleViewerSDL.{h,cpp}` | the GBA presentation path — its own texture and its own draw call, reached from one branch in `render()` |
+//! | `state.cpp` | the savestate path — one branch in `FCEUSS_Save` / `FCEUSS_Load`, which every entry point already funnels through |
+//!
+//! Nothing else. When a stage adds its own touch point it adds its entries
+//! **here**, explicitly and in the same commit that adds the code —
 //! which is the whole point: a new touch point has to be a decision rather than
 //! a consequence.
 //!
@@ -76,6 +79,13 @@ mod tests {
         // half invisible to the guard.
         "ConsoleViewerSDL.cpp",
         "ConsoleViewerSDL.h",
+        // v2.0 S3-3: the savestate path. `FCEUSS_Save` and `FCEUSS_Load` are the
+        // one place every entry point already funnels through -- the ten slots,
+        // Save/Load State As, F8/F9 and the hotkeys all call them -- so the GBA
+        // branch goes there rather than into each caller. It is still a
+        // decision that has to be written down, which is why this entry exists
+        // instead of the branch being invisible.
+        "state.cpp",
     ];
 
     /// The one file allowed to call the GBA C ABI.
@@ -346,6 +356,84 @@ mod tests {
                  entry makes this guard look like coverage while checking nothing"
             );
         }
+    }
+
+    /// The GBA branch in the savestate path stays where it was put.
+    ///
+    /// `state.cpp` is the NES savestate implementation, and the whole argument
+    /// for S3-3's branch living there is that `FCEUSS_Save` and `FCEUSS_Load`
+    /// are the one pair every entry point already funnels through — the ten
+    /// slots, Save/Load State As and F8/F9 all call them and nothing else. That
+    /// argument holds only while the GBA mentions stay inside those two
+    /// functions. A `gba_active()` check added to the movie backup, the undo
+    /// bookkeeping or the slot viewer would still be a plausible-looking edit,
+    /// would still compile, and would still pass the allowlist guard — while
+    /// quietly putting the second machine inside NES code that has no reason to
+    /// know about it.
+    ///
+    /// **The assertion is two-sided on purpose.** "No mention outside those two
+    /// functions" is satisfied perfectly well by a file with no mentions at
+    /// all, so this also asserts the branch is still there. A guard that goes
+    /// green when the thing it guards has been deleted is not a guard.
+    ///
+    /// **What it does not catch**, stated rather than implied: it is a
+    /// function-level check, so a GBA test added *inside* `FCEUSS_Load` next
+    /// to the branch still passes. The two functions are already allowed to
+    /// know about the GBA; the claim is about where the file does, not about
+    /// every line within it.
+    #[test]
+    fn the_savestate_branch_is_the_only_gba_in_the_state_file() {
+        const BRANCH_HOSTS: [&str; 2] = ["FCEUSS_Save", "FCEUSS_Load"];
+
+        let sources: std::collections::HashMap<String, String> =
+            stripped_sources().into_iter().collect();
+        let code = sources.get("state.cpp").unwrap_or_else(|| {
+            panic!("state.cpp is not in the tree; the guard would check nothing")
+        });
+
+        assert!(
+            mentions_gba(code),
+            "state.cpp no longer mentions GBA at all -- either the S3-3 branch was removed, \
+             or it was renamed past the point where the scan recognises it. The savestate path \
+             would then hand a NES state to a GBA machine, and the assertion below would pass \
+             for the wrong reason."
+        );
+
+        // The function a line belongs to, taken as the last column-zero definition
+        // above it. A line that opens no parentheses, starts with `#`, or ends in
+        // `;` is a statement rather than a header, and is not treated as one.
+        // A mention that no header accounts for is attributed to the empty string
+        // and fails, which is the direction a mistake in this heuristic has to go.
+        let mut current = String::new();
+        let mut outside: Vec<(usize, String)> = Vec::new();
+        for (index, line) in code.lines().enumerate() {
+            if !line.starts_with(char::is_whitespace)
+                && !line.starts_with('#')
+                && line.contains('(')
+                && !line.trim_end().ends_with(';')
+            {
+                if let Some(open) = line.find('(') {
+                    let name = line[..open]
+                        .rsplit(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+                        .next()
+                        .unwrap_or_default();
+                    if !name.is_empty() {
+                        current = name.to_owned();
+                    }
+                }
+            }
+            if mentions_gba(line) && !BRANCH_HOSTS.contains(&current.as_str()) {
+                outside.push((index + 1, current.clone()));
+            }
+        }
+
+        assert!(
+            outside.is_empty(),
+            "state.cpp mentions GBA outside FCEUSS_Save / FCEUSS_Load, at {outside:?} \
+             (line, enclosing function). The branch belongs in those two because they are \
+             the single point every savestate entry point already passes through; anywhere \
+             else it puts the second machine into NES code with no reason to know about it."
+        );
     }
 
     /// The two guards are looking at a real tree.

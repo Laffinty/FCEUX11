@@ -172,3 +172,36 @@ void fceu11_gba_load_battery(void);
 /// Called every frame (it is one flag test) and again on teardown. A cart with
 /// no save hardware is skipped rather than written.
 void fceu11_gba_flush_battery(void);
+
+// ---- the instant savestate (v2.0 S3-3) ------------------------------------
+//
+// A slot is the *same* file the NES side already writes: `FCEU_MakeFName`
+// derives it from the loaded file's stem, and that call happens for a `.gba`
+// too, so a GBA session gets `<stem>.fc1` and never touches a NES game's
+// slots. The two formats are not interchangeable and the core knows it --
+// `gba_savestate_load` compares the ROM fingerprint and refuses a state that
+// belongs to another cartridge, so a slot can never be read into the wrong
+// machine even by accident.
+//
+// The C ABI wants the simulation thread. That is not a new constraint here:
+// the Qt menus reach this under `FCEU_WRAPPER_LOCK()`, which the emulation
+// thread has to win inside `fceuWrapperUpdate` before it steps anything, and
+// the hotkey path arrives on the emulation thread itself. The NES serialiser
+// in `FCEUSS_Save` is standing on exactly the same ground.
+
+/// Write the running machine's state to `path`.
+///
+/// Reports whether anything was written. A false means no GBA session, a path
+/// that could not be written, or a machine that would not serialise -- the
+/// caller owns the message, because it knows whether this was a slot or a
+/// "Save State As".
+bool fceu11_gba_savestate_save(const char* path);
+
+/// Read a state back from `path`, replacing the running machine.
+///
+/// Reports whether the machine took it. A false leaves the running machine
+/// exactly as it was: the core checks the cartridge fingerprint before it
+/// touches anything, so a state from another game is a refusal rather than a
+/// corrupted session.
+bool fceu11_gba_savestate_load(const char* path);
+
