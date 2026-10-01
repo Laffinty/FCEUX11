@@ -25,6 +25,7 @@
 
 pub mod audio;
 pub mod bios;
+pub mod decoupling;
 pub mod ffi;
 pub mod frame;
 pub mod gate;

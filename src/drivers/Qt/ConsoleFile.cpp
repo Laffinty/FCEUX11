@@ -1,4 +1,4 @@
-// ConsoleEmuControl.cpp
+﻿// ConsoleEmuControl.cpp
 //
 
 /* FCE Ultra - NES/Famicom Emulator
