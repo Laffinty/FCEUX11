@@ -305,6 +305,11 @@ fn merge_headers(
     );
     output.push_str("int32_t gba_savestate_load(const uint8_t *src, uint32_t len);\n");
 
+    output.push_str("\n/* Cartridge real-time clock (S2-b3). A pinned clock does not */\n");
+    output.push_str("/* advance; enable == 0 releases the pin and restores the host. */\n");
+    output.push_str("int32_t gba_rtc_set_time(int64_t unix_secs, int32_t enable);\n");
+    output.push_str("int32_t gba_rtc_time(int64_t *out_unix_secs);\n");
+
     output.push_str("\n#ifdef __cplusplus\n}\n#endif\n\n");
     output.push_str("#endif /* FCEUX11_RUST_H */\n");
 

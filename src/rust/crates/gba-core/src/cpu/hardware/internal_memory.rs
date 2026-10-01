@@ -287,6 +287,24 @@ impl Default for InternalMemory {
 }
 
 impl InternalMemory {
+    /// The cartridge's real-time clock, read-only.
+    ///
+    /// v2.0 S2-b3. An accessor rather than a public field because nothing
+    /// outside this module drives GPIO: the chip's *protocol* is reached
+    /// through `write` and `sio` on the way in and out of `read_rom`, and this
+    /// pair is for its *time*, which the embedder has to be able to pin.
+    #[must_use]
+    pub const fn rtc(&self) -> &super::rtc::Rtc {
+        &self.rtc
+    }
+
+    /// The cartridge's real-time clock, mutable.
+    ///
+    /// See [`InternalMemory::rtc`].
+    pub fn rtc_mut(&mut self) -> &mut super::rtc::Rtc {
+        &mut self.rtc
+    }
+
     fn read_rom(&self, address: usize) -> u8 {
         // GPIO port region (for RTC in Pokemon Fire Red/Leaf Green)
         // Located at ROM addresses 0xC4-0xC9 (16-bit aligned)

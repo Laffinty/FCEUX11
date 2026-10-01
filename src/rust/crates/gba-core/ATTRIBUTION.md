@@ -67,14 +67,14 @@ inheritance:
 
 `[lints.clippy]` was carried over unchanged.
 
-### 3.2 Source files — 9 local changes, all in `src/cpu/arm7tdmi.rs`
+### 3.2 Source files — 14 local changes across 3 files
 
 `crates/gba-core/src/**` was byte-identical to upstream `emu/src/**` at the end
 of **S0** (verified file-by-file with SHA-256). Local edits begin at **S0'**, when
 the core was given the hook it needs before any SWI can be supplied from
 outside — `handle_swi_hle` is a private method, so there is no other way.
 
-All nine are in `src/cpu/arm7tdmi.rs`:
+Entries 1-9 are all in `src/cpu/arm7tdmi.rs`:
 
 **S0' — the SWI seam (5)**
 
@@ -111,6 +111,43 @@ Upstream line references (for a future re-vendor check): struct at
 > did not have. That is deliberate and is what the embedder's wait family needs;
 > it is the reason R15 exists.
 
+#### 3.2.1 S2-b3 — the real-time clock, 5 more changes in 2 more files
+
+**This is the first time the patch set stopped being one file, and that is the
+part worth recording.** Until now every local change was in
+`src/cpu/arm7tdmi.rs`; the S2-b3 work put two edits in `src/cpu/hardware/rtc.rs`
+and two in `src/cpu/hardware/internal_memory.rs`. Anyone re-vendoring has to
+check three files, not one.
+
+The S3511 implementation itself was left alone. It is complete, and to a game it
+is already transparent: `InternalMemory` marks a cartridge as having the chip
+the first time the game writes a GPIO register, feeds the pin state to
+`Rtc::write`, and hands `Rtc::sio()` back on a read. **What was missing was not
+the feature but the ability to verify it** — `current_unix_secs()` reads
+`SystemTime::now()` from a private free function with no way in, which leaves the
+core's own RTC test comparing the chip against the host clock read at the same
+moment. A self-comparison cannot fail for a wrong date conversion, and that test
+reads one byte of the seven, so the weekday, hour, minute and second have no
+coverage at all.
+
+| # | Change | Why |
+|---|---|---|
+| 10 | `rtc.rs`: added `time_override: Option<i64>` to `Rtc`, **serialized** | A fixed instant to report instead of the host clock. `None` is upstream's behaviour untouched. Serialized on purpose: a state taken with the clock pinned has to come back pinned, or the override silently reverts itself on the next load. |
+| 11 | `rtc.rs`: `set_time_override` / `time_override` accessors, and a private `now_unix_secs()` | The injection point and the read-back. Three small members rather than a clock trait, so the embedder's surface stays a setter and a getter. |
+| 12 | `rtc.rs`: the two `datetime_bytes(current_unix_secs())` call sites now read `self.now_unix_secs()` | The whole point of #10 and #11. The date/time read (command 2) and the time-only read (command 3) are the only two places the chip asks what time it is. |
+| 13 | `internal_memory.rs`: `pub const fn rtc(&self) -> &Rtc` | The `rtc` field is private and the root crate has to reach it. An accessor rather than a public field because nothing outside the module drives GPIO — the *protocol* goes through `write`/`sio`, and this is only for the *time*. |
+| 14 | `internal_memory.rs`: `pub fn rtc_mut(&mut self) -> &mut Rtc` | Same reason, for pinning. `Bus::internal_memory` and `Arm7tdmi.bus` were already `pub`, so no change to `bus.rs` was needed. |
+
+Upstream line references (for a future re-vendor check): `Rtc` struct at
+`cpu/hardware/rtc.rs:39`, `current_unix_secs` at `:214`, the two read commands in
+`decode_command` at `:146-155`, `InternalMemory::rtc` field at
+`cpu/hardware/internal_memory.rs:182`.
+
+> **These 5 do not change upstream behaviour** — with no override set, the chip
+> reports the host clock exactly as before. The difference is that the behaviour
+> is now *reachable*, which is what lets a test assert a date instead of
+> asserting that two reads of the same clock agree.
+
 ### 3.3 `src/gba/` — new code, no upstream content
 
 `src/rust/src/gba/` is entirely first-party: the SWI implementations and the
@@ -124,9 +161,9 @@ landing in S2.
 
 | Item | Status |
 |---|---|
-| `gba-core` source changes | **9**, all in one file (`src/cpu/arm7tdmi.rs`): 5 S0' hook wiring (no upstream logic altered) + 4 S1a-1 halt mechanism (**does change `step()`** — see R15) |
+| `gba-core` source changes | **14**, across 3 files: 9 in `src/cpu/arm7tdmi.rs` (5 S0' hook wiring, no upstream logic altered + 4 S1a-1 halt mechanism, **does change `step()`** — see R15) + 3 in `src/cpu/hardware/rtc.rs` + 2 in `src/cpu/hardware/internal_memory.rs` (S2-b3 real-time clock; **no upstream behaviour change**, see §3.2.1) |
 | `gba-core/Cargo.toml` | rewritten (metadata only, no version changes) |
-| `src/gba/` | new, 100% first-party, 8 files |
+| `src/gba/` | new, 100% first-party, 9 files |
 
 The plan's risk **R1** says "keep the patch set minimal (SWI hook only)". That
 constraint held for the first five edits and then broke — see below.
@@ -143,6 +180,16 @@ The first five edits are `#[serde(skip)]`-safe and therefore invisible to
 savestates. Of the new four, `halted` is **serialized** (it is machine state);
 `wake_hook` is skipped like the SWI hook, and the embedder re-installs it after
 a load.
+
+**S2-b3 breaks the "one file" property that held until then** (see §3.2.1), and
+that is the honest cost of making the clock verifiable: the `rtc` field is
+private and `current_unix_secs()` has no external seam, so there is no version of
+this that touches zero vendor files. Five more edits, two more files, total
+**14** — and, unlike S1a-1, **none of them changes what the hardware does when
+the embedder does not use them.** The R1 constraint ("keep the patch set minimal")
+was already registered as broken by S1a-1; this is a second, smaller breach of
+the same kind, and the patch set is now 14 entries over 3 files rather than 9
+over 1.
 
 ## 5. Update procedure
 

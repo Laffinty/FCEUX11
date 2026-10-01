@@ -34,6 +34,7 @@ use gba_core::gba::Gba;
 use crate::gba::audio::{self, AudioOut};
 use crate::gba::bios;
 use crate::gba::overlay::{self, Overlay};
+use crate::gba::rtc;
 use crate::gba::save::{self, SaveError, WireState};
 use crate::gba::swi;
 use crate::gba::swi::wait::IntrWaitRequest;
@@ -534,6 +535,64 @@ pub unsafe extern "C" fn gba_savestate_load(src: *const u8, len: u32) -> i32 {
     with_machine(|machine| apply_state(machine, wire)).unwrap_or(GBA_ERR_NO_ROM)
 }
 
+/// Pin the cartridge real-time clock to a fixed moment, or release it.
+///
+/// `unix_secs` is seconds since the Unix epoch, the same unit
+/// [`gba_rtc_time`] reports. `enable` is the switch: zero releases the pin and
+/// the machine follows the host clock again, and any other value pins it.
+///
+/// The switch is a parameter rather than a sentinel value on purpose. An
+/// earlier draft used `0` to mean "release", which quietly made the Unix epoch
+/// itself impossible to pin -- and the epoch is the one instant a test wants to
+/// be able to state, because its expected date is computable by hand.
+///
+/// A pinned clock does not advance. That is the point of it: a lock test needs
+/// a date it can state, and someone debugging a game's clock wants the date they
+/// picked. A game that wants time to pass has the host clock, which is the
+/// default.
+///
+/// # Safety
+/// The caller must be the simulation thread.
+#[unsafe(no_mangle)]
+pub extern "C" fn gba_rtc_set_time(unix_secs: i64, enable: i32) -> i32 {
+    // SAFETY: simulation thread.
+    with_machine(|machine| {
+        if enable != 0 {
+            rtc::set_time_override(&mut machine.gba, unix_secs);
+        } else {
+            rtc::clear_time_override(&mut machine.gba);
+        }
+        GBA_OK
+    })
+    .unwrap_or(GBA_ERR_NO_ROM)
+}
+
+/// The moment the cartridge's real-time clock reports right now.
+///
+/// Whatever [`gba_rtc_set_time`] pinned, or the host clock when nothing is
+/// pinned. This is the value the game would read over GPIO, not the state of
+/// the pin — the two differ exactly when the clock is following the host, and
+/// a caller that wants to know which it is has the value either way.
+///
+/// # Safety
+/// `out_unix_secs` must point to a writable `i64`, and the caller must be the
+/// simulation thread.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gba_rtc_time(out_unix_secs: *mut i64) -> i32 {
+    if out_unix_secs.is_null() {
+        return GBA_ERR_STATE;
+    }
+    match with_machine(|machine| machine.gba.cpu.bus.internal_memory.rtc().time_override()) {
+        Ok(pinned) => {
+            let now = pinned.unwrap_or_else(rtc::now_unix_secs);
+            // SAFETY: checked non-null above.
+            unsafe { *out_unix_secs = now };
+            GBA_OK
+        }
+        Err(code) => code,
+    }
+}
+
 /// Read a NUL-terminated byte string, or `None` if it is not valid UTF-8.
 fn read_c_string<'a>(ptr: *const u8) -> Option<&'a [u8]> {
     let mut len = 0usize;
@@ -583,7 +642,8 @@ mod tests {
     use super::{
         GBA_ERR_BAD_ROM, GBA_ERR_BIOS, GBA_ERR_CAPACITY, GBA_ERR_NO_ROM, GBA_ERR_STATE,
         GBA_ERR_UNSUPPORTED, GBA_OK, MIN_CARTRIDGE, gba_frame_buffer, gba_frame_buffer_size,
-        gba_init, gba_load_rom_bytes, gba_reset, gba_rom_loaded, gba_savestate_load,
+        gba_init, gba_load_rom_bytes, gba_reset, gba_rom_loaded, gba_rtc_set_time, gba_rtc_time,
+        gba_savestate_load,
         gba_savestate_save, gba_savestate_size, gba_set_overlay, gba_step_frame, gba_unload_rom,
         read_c_string, scale5, with_machine,
     };
@@ -1049,6 +1109,51 @@ mod tests {
     }
 
     // ---- savestates (S2-b2) ------------------------------------------------
+
+    // ---- the cartridge real-time clock (S2-b3) ------------------------------
+
+    /// The clock is pinned, reported and released through the C ABI.
+    ///
+    /// The export is two parameters rather than one for a reason worth pinning
+    /// down here: a `0` sentinel would have made the Unix epoch unpinnable, and
+    /// the epoch is the one instant whose expected date can be written out by
+    /// hand. So this pins the epoch and asserts the chip-level consequence
+    /// through the machine the caller actually has.
+    #[test]
+    fn the_clock_is_pinned_reported_and_released_through_the_abi() {
+        exclusively(|| {
+            with_loaded_machine();
+
+            let mut now = 0i64;
+            // SAFETY: `out` is a live local.
+            assert_eq!(unsafe { gba_rtc_time(&mut now) }, GBA_OK);
+            assert!(now > 1_577_836_800, "an unpinned clock read {now}");
+
+            assert_eq!(gba_rtc_set_time(0, 1), GBA_OK, "the epoch must be pinnable");
+            // SAFETY: `out` is a live local.
+            assert_eq!(unsafe { gba_rtc_time(&mut now) }, GBA_OK);
+            assert_eq!(now, 0, "the pin did not take");
+
+            // And the release is a separate switch, not a magic value.
+            assert_eq!(gba_rtc_set_time(0, 0), GBA_OK);
+            // SAFETY: `out` is a live local.
+            assert_eq!(unsafe { gba_rtc_time(&mut now) }, GBA_OK);
+            assert!(now > 1_577_836_800, "releasing did not restore the host clock");
+        });
+    }
+
+    /// With nothing loaded, the clock surface says so rather than crashing.
+    #[test]
+    fn the_clock_surface_reports_no_rom() {
+        exclusively(|| {
+            gba_unload_rom();
+            assert_eq!(gba_rtc_set_time(0, 1), GBA_ERR_NO_ROM);
+            let mut now = 0i64;
+            // SAFETY: `out` is a live local.
+            assert_eq!(unsafe { gba_rtc_time(&mut now) }, GBA_ERR_NO_ROM);
+            assert_eq!(now, 0, "it wrote a time with no machine to report one");
+        });
+    }
 
     /// The error codes are the ones section 4.1 lists, in its order.
     ///

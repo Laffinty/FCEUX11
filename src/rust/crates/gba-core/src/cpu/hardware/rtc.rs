@@ -50,6 +50,36 @@ pub struct Rtc {
     sio_out: bool,
     /// Control register. Bit 6 selects 24-hour mode, which games expect.
     control: u8,
+    /// A fixed instant to report instead of the host clock.
+    ///
+    /// v2.0 S2-b3. `None` is the real thing: an S3511 on a cartridge is a real
+    /// chip, and the host clock is what a player expects their game to see.
+    /// `Some` exists for the two things that cannot work without it — a lock
+    /// test cannot assert a date it does not control, and someone debugging a
+    /// game's clock wants a date they chose.
+    ///
+    /// Serialized, and that is deliberate: a state taken while the clock is
+    /// pinned has to come back pinned, or the override is a trap that reverts
+    /// itself on the next load.
+    time_override: Option<i64>,
+}
+
+impl Rtc {
+    /// Pin the clock to a fixed instant, or `None` to follow the host clock.
+    pub fn set_time_override(&mut self, unix_secs: Option<i64>) {
+        self.time_override = unix_secs;
+    }
+
+    /// The pinned instant, if there is one.
+    #[must_use]
+    pub const fn time_override(&self) -> Option<i64> {
+        self.time_override
+    }
+
+    /// The time this chip reports, pinned or live.
+    fn now_unix_secs(&self) -> i64 {
+        self.time_override.unwrap_or_else(current_unix_secs)
+    }
 }
 
 impl Rtc {
@@ -145,12 +175,12 @@ impl Rtc {
             }
             // Date and time, 7 BCD bytes.
             (2, true) => {
-                self.buffer = datetime_bytes(current_unix_secs());
+                self.buffer = datetime_bytes(self.now_unix_secs());
                 self.begin_reading();
             }
             // Time only, 3 BCD bytes.
             (3, true) => {
-                self.buffer = datetime_bytes(current_unix_secs())[4..7].to_vec();
+                self.buffer = datetime_bytes(self.now_unix_secs())[4..7].to_vec();
                 self.begin_reading();
             }
             // Reset.
