@@ -13,6 +13,10 @@ void WriteSound(int32 *Buffer, int Count);
 int KillSound(void);
 uint32 GetMaxSound(void);
 uint32 GetWriteSound(void);
+// v2.0 S2-b4 stage 3': the rate the device was opened at, which is not always
+// the rate that was asked for. For a machine whose resampler is built around
+// it. See the definition in sdl-sound.cpp.
+uint32 FCEUD_GetSoundRate(void);
 bool FCEUD_SoundIsMuted(void);
 void FCEUD_MuteSoundOutput(bool value);
 void FCEUD_MuteSoundWindow(bool value);

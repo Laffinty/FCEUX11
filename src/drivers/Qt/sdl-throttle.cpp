@@ -37,6 +37,9 @@ static FCEU::timeStampRecord DesiredFrameTime, HalfFrameTime, QuarterFrameTime, 
 static double desired_frametime = (1.0 / 60.099823);
 static double desired_frameRate = (60.099823);
 static double baseframeRate     = (60.099823);
+// v2.0 S2-b4 stage 3'. 0 means "follow the video system". Set by whoever owns
+// a second machine with its own frame rate; see SetThrottleBaseRateOverride.
+static double s_baseRateOverride = 0.0;
 static double frameDeltaCur = 0.0;
 static double frameDeltaMin = 1.0;
 static double frameDeltaMax = 0.0;
@@ -179,6 +182,23 @@ void resetFrameTiming(void)
 #define LOGMUL 1.259921049894873
 
 /**
+ * Pin the pacing rate, or hand it back to the video system.
+ *
+ * v2.0 S2-b4 stage 3'. Re-tims immediately so the new rate is in force before
+ * this returns -- a caller that set an override and kept going would otherwise
+ * pace one frame at the old rate.
+ *
+ * This file deliberately does not know which machine asked, or why. The GBA
+ * session works that out and calls this; nothing here mentions it.
+ */
+void
+SetThrottleBaseRateOverride(double hz)
+{
+	s_baseRateOverride = (hz > 0.0) ? hz : 0.0;
+	RefreshThrottleFPS();
+}
+
+/**
  * Refreshes the FPS throttling variables.
  */
 void
@@ -189,6 +209,16 @@ RefreshThrottleFPS(void)
 	int32_t T;
 
 	hz = ( ((double)fps) / 16777216.0 );
+
+	// v2.0 S2-b4 stage 3'. A second machine can pin its own pacing rate. The
+	// override is applied here rather than at getBaseFrameRate() on purpose:
+	// the value that actually paces frames is DesiredFrameTime, computed just
+	// below, so overriding only the read-out would leave the frame clock on the
+	// video system's rate while the reported rate said otherwise.
+	if (s_baseRateOverride > 0.0)
+	{
+		hz = s_baseRateOverride;
+	}
 
 	desired_frametime = 1.0 / ( hz * g_fpsScale );
 

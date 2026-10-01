@@ -213,8 +213,14 @@ mod tests {
             .collect()
     }
 
+    /// Whether stripped source mentions anything of ours.
+    fn mentions_gba(code: &str) -> bool {
+        const MENTIONS: [&str; 5] = ["gba_", "fceu11_gba", "GbaLoad", "gba_load", "Gba"];
+        MENTIONS.iter().any(|needle| code.contains(needle))
+    }
+
     /// Files that mention GBA in any form — the ABI, the C++ wrapper symbols,
-    /// the loader, or the module's own header.
+    /// the loader, the module's own header, or a GBA-specific member name.
     ///
     /// Case-sensitive and prefix-anchored, which is the whole difficulty. The
     /// first version matched a bare lowercased `"gba"` substring and reported
@@ -230,12 +236,41 @@ mod tests {
     /// past the guard** — the rule was not too strict, it was too narrow. Still
     /// case-sensitive, so `RGBA` / `PRGBanks` / `logBank` stay out.
     fn gba_mentioning_files() -> Vec<String> {
-        const MENTIONS: [&str; 5] = ["gba_", "fceu11_gba", "GbaLoad", "gba_load", "Gba"];
         stripped_sources()
             .into_iter()
-            .filter(|(_, code)| MENTIONS.iter().any(|needle| code.contains(needle)))
+            .filter(|(_, code)| mentions_gba(code))
             .map(|(name, _)| name)
             .collect()
+    }
+
+    /// The throttle and the sound device know nothing about a second machine.
+    ///
+    /// v2.0 S2-b4 stage 3'. Those four files carry the GBA's needs without
+    /// naming it: the throttle takes a base-rate override, the sound device
+    /// exposes the rate it opened at, and the GBA half of the work sits in
+    /// `gba_load.cpp` and `fceuWrapper.cpp` instead. That is the decoupling
+    /// claim, and **without this test it is only true because somebody read
+    /// four files** — a property that erodes the first time someone reaches
+    /// for the convenient thing.
+    ///
+    /// Checked on code with comments and literals stripped, so a file may
+    /// explain itself in prose without tripping this.
+    #[test]
+    fn the_timing_and_sound_files_stay_gba_free() {
+        const MUST_STAY_CLEAN: [&str; 4] =
+            ["sdl-throttle.cpp", "throttle.h", "sdl-sound.cpp", "dface.h"];
+        let sources: std::collections::HashMap<String, String> = stripped_sources().into_iter().collect();
+        for name in MUST_STAY_CLEAN {
+            let code = sources
+                .get(name)
+                .unwrap_or_else(|| panic!("{name} is not in the tree; the guard would check nothing"));
+            assert!(
+                !mentions_gba(code),
+                "{name} refers to the GBA. That is allowed -- it just has to be registered \
+                 in ALLOWED with a reason, because a second machine reaching into the timing \
+                 or sound layer is the coupling invariant 9 exists to prevent."
+            );
+        }
     }
 
     /// The C ABI is called from exactly one C++ file.

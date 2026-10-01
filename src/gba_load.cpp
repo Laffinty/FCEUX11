@@ -201,6 +201,30 @@ uint32_t fceu11_gba_frame_serial()
 	return g_frameSerial;
 }
 
+double fceu11_gba_base_rate()
+{
+	// CPU clock / cycles per video frame. See gba_load.h for why this is
+	// written here rather than exported.
+	return 16777216.0 / (228.0 * 1232.0);
+}
+
+void fceu11_gba_configure_audio(uint32_t device_rate, uint32_t volume)
+{
+	if (!g_gbaActive) return;
+	if (device_rate > 0) gba_set_output_rate(device_rate);
+	gba_set_volume(volume);
+}
+
+uint32_t fceu11_gba_audio(int32_t* dst, uint32_t cap)
+{
+	if (!g_gbaActive || (dst == NULL) || (cap == 0)) return 0;
+	uint32_t produced = 0;
+	if (gba_render_audio(dst, cap, &produced) != GBA_OK) return 0;
+	// Never report more than was asked for: the caller sized a buffer, and a
+	// larger number here would be an out-of-bounds read on its side.
+	return (produced > cap) ? cap : produced;
+}
+
 // ---------------------------------------------------------------------------
 // Loading
 // ---------------------------------------------------------------------------

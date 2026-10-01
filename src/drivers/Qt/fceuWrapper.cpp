@@ -1,4 +1,4 @@
-﻿/* FCE Ultra - NES/Famicom Emulator
+/* FCE Ultra - NES/Famicom Emulator
  *
  * Copyright notice for this file:
  *  Copyright (C) 2020 mjbudd77
@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <limits.h>
+#include <vector>
 #include "utils/unzip.h"
 
 #include <QFileInfo>
@@ -1257,6 +1258,47 @@ bool fceuWrapperIsLocked(void)
 	return mutexLocks.load(std::memory_order_acquire) > 0;
 }
 
+static std::vector<int32_t> s_gbaAudio;
+// The session state as of the last frame, so the re-configure above runs once
+// per transition instead of every frame. Emulation thread only, like the rest
+// of what is in this file.
+static bool g_gbaSessionActive = false;
+
+// v2.0 S2-b4 stage 3'. Everything the GBA needs from the sound device, done
+// where the device is.
+//
+// The core cannot do any of this: `WriteSound`, the negotiated sample rate and
+// the host volume are all in the Qt driver layer, and `gba_load.cpp` is in the
+// core library. Reaching across would put the driver into `fceux11_core`'s
+// link graph and break the four F11QA test executables, which link the core
+// without the driver. So the core hands out samples and this file pushes them.
+//
+// Two things happen here, deliberately in different places:
+//
+//  * **On a session flip**: the rate, the volume and the pacing target. All
+//    three are properties of the *session*, not of a frame, and re-applying
+//    them every frame would both waste work and make them impossible to reason
+//    about. The flip is detected by comparing against last frame's value, so
+//    loading a .gba and later loading a .nes each get exactly one re-configure.
+//
+//  * **Every frame**: the drain, because the sample count is fractional and
+//    changes frame to frame.
+static void fceuWrapper_sync_gba_audio(bool active)
+{
+	// The device's rate, not the configured one: `InitSound` falls back to a
+	// supported value when asked for something it cannot open, and the core's
+	// resampler has to be built around what was actually opened.
+	fceu11_gba_configure_audio(FCEUD_GetSoundRate(),
+	                          static_cast<uint32>(FSettings.SoundVolume));
+
+	// The pacing target. A GBA frame is 59.7275 fps where NTSC is 60.098823;
+	// leaving the video system's rate in force would run the machine 0.62% fast,
+	// which is a drift of about 26 ms a second -- the exact thing the fractional
+	// audio accumulator exists to prevent, arriving through the timing side
+	// instead of the sample-count side.
+	SetThrottleBaseRateOverride(active ? fceu11_gba_base_rate() : 0.0);
+}
+
 int  fceuWrapperUpdate( void )
 {
 	bool lock_acq;
@@ -1324,7 +1366,36 @@ int  fceuWrapperUpdate( void )
 		// a picture.
 		if ( fceu11_gba_active() )
 		{
+			// Re-configure only when the session actually changed. `active` is
+			// the value from *last* frame, so a freshly loaded .gba costs one
+			// call here and then nothing until a .nes replaces it.
+			const bool active = fceu11_gba_active();
+			if ( active != g_gbaSessionActive )
+			{
+				g_gbaSessionActive = active;
+				fceuWrapper_sync_gba_audio(active);
+			}
+
 			fceu11_gba_step_frame();
+
+			// Drain this frame's audio. The count is whatever the core's
+			// fractional accumulator says -- 738 or 739 at 44100 Hz, alternating
+			// -- and `GetWriteSound()` is the only safe bound: `WriteSound`
+			// consumes everything it is handed and blocks the emulation thread
+			// when the ring is full.
+			const uint32_t room = GetWriteSound();
+			if ( (room > 0) && (s_gbaAudio.size() < room) )
+			{
+				s_gbaAudio.resize(room);
+			}
+			if ( room > 0 )
+			{
+				const uint32_t produced = fceu11_gba_audio(s_gbaAudio.data(), room);
+				if ( produced > 0 )
+				{
+					WriteSound(s_gbaAudio.data(), static_cast<int>(produced));
+				}
+			}
 		}		else
 		{
 			DoFun(frameskip, periodic_saves);

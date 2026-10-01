@@ -93,3 +93,40 @@ uint32_t fceu11_gba_frame_height();
 /// are not frame boundaries. Bumps on every emulated frame, wraps at 32 bits,
 /// and is only ever compared for inequality — a wrap is harmless.
 uint32_t fceu11_gba_frame_serial();
+
+// ---- stage 3': audio (v2.0 S2-b4) ----------------------------------------
+//
+// The core holds the samples; the Qt layer pushes them at the device. The
+// split is not a convenience: `WriteSound` lives in the Qt driver library and
+// this file is in the core library, so calling across that edge would put a
+// link-time dependency on the driver into `fceux11_core` -- and the four F11QA
+// test executables link the core without the driver, so every one of them would
+// fail to link. That is invariant 9's allowed coupling ③, used at the only
+// layer where it is safe.
+
+/// The GBA's video frame rate, for pacing.
+///
+/// 16777216 / (228 * 1232): the CPU clock over the cycles in one video frame.
+/// Spelled out rather than quoted as "59.7275" so the derivation is checkable
+/// against `audio.rs`'s `CPU_CLOCK` and `FRAME_CYCLES`, which is where the audio
+/// side derives the same number. **If either moves, the other must move with
+/// it** — the two are the same hardware constant written twice, on purpose,
+/// rather than a constant that would have needed a new C ABI export just to be
+/// read once.
+double fceu11_gba_base_rate();
+
+/// Hand the device's rate and the host's volume to the core.
+///
+/// Must be called when a GBA session starts, before the first frame. The rate
+/// is the *negotiated* one (what the device opened at), which is not always
+/// what was asked for; the volume is the 0-150 scale the NES side uses, and it
+/// has to be applied here because the sound device applies none.
+void fceu11_gba_configure_audio(uint32_t device_rate, uint32_t volume);
+
+/// Drain up to `cap` mono int32 samples of this frame's audio.
+///
+/// Returns the number written, or 0 when there is nothing yet. The count is
+/// whatever the core's fractional accumulator says for this frame -- at 44100 Hz
+/// and 59.7275 fps that is 738 or 739, alternating -- and a caller that assumed
+/// a fixed 738 would drift by about 21 samples a second.
+uint32_t fceu11_gba_audio(int32_t* dst, uint32_t cap);
