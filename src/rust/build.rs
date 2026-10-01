@@ -267,7 +267,14 @@ fn merge_headers(
     output.push_str("#define GBA_ERR_NO_ROM 1\n");
     output.push_str("#define GBA_ERR_BAD_ROM 2\n");
     output.push_str("#define GBA_ERR_BIOS 3\n");
-    output.push_str("#define GBA_ERR_STATE 4\n");
+    // r37 ⑤: the enum in plan section 4.1 has seven members, and these are
+    // their values. `UNSUPPORTED` was added and `STATE` moved to 5 — before that
+    // this block skipped 4 entirely, so every code from there up was off by one
+    // and nothing noticed, because nothing on the C++ side compares against
+    // them yet. `the_error_codes_reach_the_generated_header` in
+    // `src/gba/ffi.rs` is what keeps the two lists from drifting again.
+    output.push_str("#define GBA_ERR_UNSUPPORTED 4\n");
+    output.push_str("#define GBA_ERR_STATE 5\n");
     output.push_str("#define GBA_ERR_CAPACITY 6\n\n");
 
     output.push_str("/* v2.0 GBAEUX11 C ABI */\n");
@@ -309,6 +316,12 @@ fn merge_headers(
     output.push_str("/* advance; enable == 0 releases the pin and restores the host. */\n");
     output.push_str("int32_t gba_rtc_set_time(int64_t unix_secs, int32_t enable);\n");
     output.push_str("int32_t gba_rtc_time(int64_t *out_unix_secs);\n");
+
+    output.push_str("\n/* Input (S2-b4 stage 1). A set bit means held. Bit layout is  */\n");
+    output.push_str("/* the core's GbaButton, in order: A B Select Start Right Left  */\n");
+    output.push_str("/* Up Down R L. */\n");
+    output.push_str("void     gba_set_buttons(uint16_t mask);\n");
+    output.push_str("int32_t  gba_buttons(uint16_t *out_mask);\n");
 
     output.push_str("\n#ifdef __cplusplus\n}\n#endif\n\n");
     output.push_str("#endif /* FCEUX11_RUST_H */\n");

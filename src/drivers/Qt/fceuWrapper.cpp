@@ -34,6 +34,7 @@
 #include "Qt/config.h"
 #include "Qt/dface.h"
 #include "Qt/fceuWrapper.h"
+#include "gba_load.h"
 #include "Qt/input.h"
 #include "input/input_manager.h"
 #include "Qt/sdl.h"
@@ -1310,11 +1311,28 @@ int  fceuWrapperUpdate( void )
 
 	if ( GameInfo )
 	{
-		DoFun(frameskip, periodic_saves);
+		// v2.0 S2-b4 stage 1: the frame step branches on which machine is
+		// active. A GBA session must not reach `DoFun`, which is hard-wired to
+		// the NES core and its globals (`XBuf`, `WaveFinal`), and must not
+		// reach the hex editor's memory read either -- it would be reporting a
+		// NES address space for a machine that does not have one.
+		//
+		// No `signalFrameFinished()` in the GBA branch: that handshake exists to
+		// tell the GUI a *new* frame is in the pool, and stage 1 puts nothing
+		// there. The GUI's 120 Hz timer keeps repainting the cleared pool, which
+		// is the black screen this stage ships. Stage 2 is what makes it carry
+		// a picture.
+		if ( fceu11_gba_active() )
+		{
+			fceu11_gba_step_frame();
+		}		else
+		{
+			DoFun(frameskip, periodic_saves);
 
-		hexEditorUpdateMemoryValues();
+			hexEditorUpdateMemoryValues();
+		}
 
-		if ( consoleWindow )
+		if ( consoleWindow && !fceu11_gba_active() )
 		{
 			consoleWindow->emulatorThread->signalFrameFinished();
 		}

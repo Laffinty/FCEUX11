@@ -29,6 +29,7 @@
 
 use std::sync::{Mutex, OnceLock};
 
+use gba_core::cpu::hardware::keypad::GbaButton;
 use gba_core::gba::Gba;
 
 use crate::gba::audio::{self, AudioOut};
@@ -593,6 +594,61 @@ pub unsafe extern "C" fn gba_rtc_time(out_unix_secs: *mut i64) -> i32 {
     }
 }
 
+/// Set the buttons the machine sees, as a mask of the ones currently held.
+///
+/// Bit 0 is A, 1 is B, 2 is Select, 3 is Start, 4-7 are the D-pad
+/// (Right, Left, Up, Down) and 8-9 are R and L -- the core's own
+/// `GbaButton` layout, which plan section 7.2's NES-compatible mapping lands on
+/// one for one. **A set bit means held.** The core's `KEYINPUT` register is
+/// active low, so the inversion happens here, once, rather than in the host.
+///
+/// A full state rather than a delta: the host reads input every frame and sets
+/// everything that is down, so a button released without being in the mask is
+/// released. That removes the failure mode where a missed call leaves a key
+/// stuck down.
+///
+/// # Safety
+/// The caller must be the simulation thread. Section 4.1 already confines every
+/// call in this file to that one thread.
+///
+/// `void` per section 4.1, and honestly so: the host has nothing to decide on
+/// failure. It sets buttons unconditionally before each frame, and the answer to
+/// "the machine was not loaded" is the same either way -- the next load starts
+/// with every button released, because the machine is built fresh.
+#[unsafe(no_mangle)]
+pub extern "C" fn gba_set_buttons(mask: u16) {
+    // SAFETY: simulation thread.
+    let _ = with_machine(|machine| {
+        for button in GbaButton::ALL {
+            machine.gba.cpu.bus.keypad.set_button(button, mask & (button as u16) != 0);
+        }
+    });
+}
+
+/// The buttons the machine currently sees, as a mask of the ones held.
+///
+/// Not in section 4.1's list, and added because the counterpart is useless
+/// without it: a test that sets a mask and wants to know the core agreed has
+/// otherwise to go and read `KEYINPUT` through the bus. Read-only view of the
+/// same state [`gba_set_buttons`] writes.
+///
+/// # Safety
+/// The caller must be the simulation thread.
+#[unsafe(no_mangle)]
+pub extern "C" fn gba_buttons(out_mask: *mut u16) -> i32 {
+    if out_mask.is_null() {
+        return GBA_ERR_STATE;
+    }
+    match with_machine(|machine| machine.gba.cpu.bus.keypad.key_input) {
+        Ok(active_low) => {
+            // SAFETY: checked non-null above.
+            unsafe { *out_mask = !active_low & 0x03FF };
+            GBA_OK
+        }
+        Err(code) => code,
+    }
+}
+
 /// Read a NUL-terminated byte string, or `None` if it is not valid UTF-8.
 fn read_c_string<'a>(ptr: *const u8) -> Option<&'a [u8]> {
     let mut len = 0usize;
@@ -643,10 +699,11 @@ mod tests {
         GBA_ERR_BAD_ROM, GBA_ERR_BIOS, GBA_ERR_CAPACITY, GBA_ERR_NO_ROM, GBA_ERR_STATE,
         GBA_ERR_UNSUPPORTED, GBA_OK, MIN_CARTRIDGE, gba_frame_buffer, gba_frame_buffer_size,
         gba_init, gba_load_rom_bytes, gba_reset, gba_rom_loaded, gba_rtc_set_time, gba_rtc_time,
-        gba_savestate_load,
-        gba_savestate_save, gba_savestate_size, gba_set_overlay, gba_step_frame, gba_unload_rom,
-        read_c_string, scale5, with_machine,
+        gba_savestate_load, gba_savestate_save, gba_savestate_size, gba_set_buttons,
+        gba_set_overlay, gba_step_frame, gba_unload_rom, gba_buttons, read_c_string, scale5,
+        with_machine,
     };
+    use gba_core::cpu::hardware::keypad::GbaButton;
     use crate::gba::audio::{
         gba_audio_underruns, gba_render_audio, gba_samples_per_frame_fixed, gba_set_output_rate,
     };
@@ -1109,6 +1166,132 @@ mod tests {
     }
 
     // ---- savestates (S2-b2) ------------------------------------------------
+
+    // ---- input (S2-b4 stage 1) ---------------------------------------------
+
+    /// Every one of the ten buttons, one at a time, reaches the core under the
+    /// bit the host uses.
+    ///
+    /// Ten separate cases on purpose. A single "press all ten" test would pass
+    /// against **any** permutation of the bit layout — which is exactly the
+    /// mistake worth catching here, since the layout is a claim about hardware
+    /// that nothing else in the build checks. Each button is also read back on
+    /// its own, so a permutation fails loudly instead of quietly swapping two
+    /// keys.
+    #[test]
+    fn each_button_lands_on_its_own_bit() {
+        exclusively(|| {
+            with_loaded_machine();
+            for (index, button) in GbaButton::ALL.into_iter().enumerate() {
+                gba_set_buttons(0);
+                gba_set_buttons(1 << index);
+
+                let mut mask = 0u16;
+                // SAFETY: `mask` is a live local.
+                assert_eq!(unsafe { gba_buttons(&mut mask) }, GBA_OK);
+                assert_eq!(
+                    mask,
+                    1 << index,
+                    "{} is on bit {index}, not {mask:#06b}",
+                    button.name()
+                );
+                assert_eq!(
+                    mask.count_ones(),
+                    1,
+                    "{} also pressed something else: {mask:#06b}",
+                    button.name()
+                );
+            }
+        });
+    }
+
+    /// The mask is a full state, not a delta: whatever is absent is released.
+    ///
+    /// The host sets input every frame, so a key that is not in the mask must be
+    /// up. A setter that only ever pressed would leave the last key stuck down
+    /// for the rest of the session, and nothing in the frame path would notice.
+    #[test]
+    fn a_button_absent_from_the_mask_is_released() {
+        exclusively(|| {
+            with_loaded_machine();
+            gba_set_buttons(GbaButton::A as u16 | GbaButton::L as u16);
+            gba_set_buttons(GbaButton::A as u16);
+
+            let mut mask = 0u16;
+            // SAFETY: `mask` is a live local.
+            assert_eq!(unsafe { gba_buttons(&mut mask) }, GBA_OK);
+            assert_eq!(
+                mask,
+                GbaButton::A as u16,
+                "L was not released: {mask:#06b}"
+            );
+        });
+    }
+
+    /// Nothing held is nothing held, from a fresh machine.
+    #[test]
+    fn a_fresh_machine_reports_no_buttons() {
+        exclusively(|| {
+            with_loaded_machine();
+            let mut mask = 0xFFFFu16;
+            // SAFETY: `mask` is a live local.
+            assert_eq!(unsafe { gba_buttons(&mut mask) }, GBA_OK);
+            assert_eq!(mask, 0, "a machine with no input reports {mask:#06b}");
+        });
+    }
+
+    /// Buttons travel with a savestate, and come back with the machine.
+    ///
+    /// `Keypad::key_input` is serialized, so this needs no re-installation —
+    /// unlike the hooks, which is worth asserting rather than assuming, since
+    /// "the function pointers come back unset" is the documented rule nearby and
+    /// a reader would reasonably guess input behaves the same way.
+    #[test]
+    fn buttons_survive_a_savestate_round_trip() {
+        exclusively(|| {
+            with_loaded_machine();
+            gba_set_buttons(GbaButton::B as u16 | GbaButton::Start as u16);
+            let mut size = 0u32;
+            // SAFETY: live local out-param.
+            assert_eq!(unsafe { gba_savestate_size(&mut size) }, GBA_OK);
+            let mut buffer = vec![0u8; size as usize];
+            let mut written = 0u32;
+            // SAFETY: the buffer is `size` writable bytes.
+            assert_eq!(
+                unsafe { gba_savestate_save(buffer.as_mut_ptr(), size, &mut written) },
+                GBA_OK
+            );
+
+            gba_set_buttons(0);
+            // SAFETY: the buffer holds `written` readable bytes.
+            assert_eq!(
+                unsafe { gba_savestate_load(buffer.as_ptr(), written) },
+                GBA_OK
+            );
+
+            let mut mask = 0u16;
+            // SAFETY: `mask` is a live local.
+            assert_eq!(unsafe { gba_buttons(&mut mask) }, GBA_OK);
+            assert_eq!(
+                mask,
+                (GbaButton::B as u16) | (GbaButton::Start as u16),
+                "the held buttons did not come back: {mask:#06b}"
+            );
+        });
+    }
+
+    /// With nothing loaded, the input surface is inert rather than crashing.
+    #[test]
+    fn the_input_surface_reports_no_rom() {
+        exclusively(|| {
+            gba_unload_rom();
+            gba_set_buttons(GbaButton::A as u16);
+            let mut mask = 0xFFFFu16;
+            // SAFETY: `mask` is a live local.
+            assert_eq!(unsafe { gba_buttons(&mut mask) }, GBA_ERR_NO_ROM);
+            assert_eq!(mask, 0xFFFF, "it wrote a mask with no machine to read");
+        });
+    }
 
     // ---- the cartridge real-time clock (S2-b3) ------------------------------
 

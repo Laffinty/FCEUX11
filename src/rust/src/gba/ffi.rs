@@ -100,6 +100,11 @@ mod drift_guard {
     //! just wrote and asserts that every `gba_` function this crate exports is
     //! declared in it. Adding an export without declaring it fails the build.
 
+    use crate::gba::frame::{
+        GBA_ERR_BAD_ROM, GBA_ERR_BIOS, GBA_ERR_CAPACITY, GBA_ERR_NO_ROM, GBA_ERR_STATE,
+        GBA_ERR_UNSUPPORTED, GBA_OK,
+    };
+
     /// Every `gba_` function the root crate actually exports, discovered by
     /// reading the sources.
     ///
@@ -165,6 +170,49 @@ mod drift_guard {
             root.display()
         );
         names
+    }
+
+    /// The error codes in the generated header are the ones this module defines.
+    ///
+    /// Added after the codes were found to have drifted: `build.rs` gained
+    /// `GBA_ERR_UNSUPPORTED` and moved `GBA_ERR_STATE` to 5, and the header on
+    /// disk kept `STATE 4` and no `UNSUPPORTED` at all — so every code from
+    /// there up was off by one, and a C++ caller comparing against the header
+    /// would have been comparing against the wrong number.
+    ///
+    /// It stayed invisible for a *structural* reason worth writing down, because
+    /// the obvious guard does not cover it. The header is a **checked-in file in
+    /// the source tree**, and it is written by whichever build runs last. This
+    /// repository has two independent cargo target directories — `cargo test`
+    /// uses `src/rust/target`, the CMake build uses `build/src/rust/target` —
+    /// and each runs `build.rs` on its own schedule. So a stale header is not
+    /// merely "forgot to rebuild": one graph can regenerate it while the other
+    /// leaves its own older copy, and the file's contents depend on which
+    /// finished last.
+    ///
+    /// The export guard beside this one discovers function declarations from the
+    /// source. These are `#define`s, so nothing else was looking at them; this
+    /// test is what makes the second list non-hand-maintained.
+    #[test]
+    fn the_error_codes_reach_the_generated_header() {
+        let header = header();
+        for (name, value) in [
+            ("GBA_OK", GBA_OK),
+            ("GBA_ERR_NO_ROM", GBA_ERR_NO_ROM),
+            ("GBA_ERR_BAD_ROM", GBA_ERR_BAD_ROM),
+            ("GBA_ERR_BIOS", GBA_ERR_BIOS),
+            ("GBA_ERR_UNSUPPORTED", GBA_ERR_UNSUPPORTED),
+            ("GBA_ERR_STATE", GBA_ERR_STATE),
+            ("GBA_ERR_CAPACITY", GBA_ERR_CAPACITY),
+        ] {
+            let expected = format!("#define {name} {value}\n");
+            assert!(
+                header.contains(&expected),
+                "the generated header is missing `{}`, or defines it differently -- \
+                 build.rs writes the list, this test is what notices when the two disagree",
+                expected.trim()
+            );
+        }
     }
 
     /// The generated header, as `build.rs` wrote it.

@@ -175,6 +175,7 @@ set(SRC_CORE
   	${CMAKE_CURRENT_SOURCE_DIR}/fds.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/fds_sound.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/file.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/gba_load.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/emufile.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/filter.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/ines.cpp
