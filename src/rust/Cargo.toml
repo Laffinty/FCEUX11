@@ -61,6 +61,21 @@ gba-core = { path = "crates/gba-core", optional = true }
 # is green with these dependencies present.
 serde_json = { version = "1", optional = true }
 
+# v2.0 S2-b1: the audio ring. `Gba::init_audio` hands back an
+# `rtrb::Consumer<f32>`, and the consumer end has to be *stored* on this side
+# of the FFI boundary, so the root crate has to be able to name the type.
+#
+# This adds no new crate to the build: gba-core already depends on rtrb 0.3,
+# and an identical requirement here unifies onto the same 0.3.5 rather than
+# pulling a second copy in. Same reasoning as the serde_json entry above, and
+# for the same reason it does not reintroduce R14 -- that risk was a *path*
+# crate wedged between the root and a large dependency (plan r8), and rtrb is
+# a registry crate sitting off to one side, not on that path.
+#
+# Optional so a NES-only build (--no-default-features) keeps invariant 8:
+# neither the ring nor the vendored core enters the graph.
+rtrb = { version = "0.3", optional = true }
+
 [features]
 # Stage-2 §七 (C-1): Pass-through to f11qa's `direct-adapter` feature.
 # When enabled, f11qa compiles the `direct.rs` FFI adapter and the
@@ -76,7 +91,7 @@ direct-adapter = ["f11qa/direct-adapter"]
 # v2.0 GBAEUX11. Present by default so S0 can assert the
 # "fceux11_rust.lib contains the new symbol" exit criterion; a NES-only
 # build turns it off with --no-default-features.
-gba = ["dep:gba-core", "dep:serde_json"]
+gba = ["dep:gba-core", "dep:serde_json", "dep:rtrb"]
 default = ["direct-adapter", "gba"]
 
 [dev-dependencies]

@@ -23,6 +23,7 @@
 //! stay one-directional: the root crate depends on `gba-core`, never the
 //! reverse.
 
+pub mod audio;
 pub mod bios;
 pub mod ffi;
 pub mod frame;

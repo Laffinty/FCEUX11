@@ -31,6 +31,7 @@ use std::sync::{Mutex, OnceLock};
 
 use gba_core::gba::Gba;
 
+use crate::gba::audio::{self, AudioOut};
 use crate::gba::bios;
 use crate::gba::overlay::{self, Overlay};
 
@@ -61,20 +62,33 @@ const MIN_CARTRIDGE: usize = 0x200;
 ///
 /// Wrapped rather than a bare `static mut` so that "there is no machine" is a
 /// representable state instead of a null check at every call site.
-struct Machine {
-    gba: Box<Gba>,
+pub(crate) struct Machine {
+    pub(crate) gba: Box<Gba>,
     overlay: Overlay,
+    /// The audio sink and its per-frame accounting (S2-b1). Owned here for the
+    /// same reason the machine is: the ring's consumer end has to be stored on
+    /// this side, and it has to die with the machine.
+    pub(crate) audio: AudioOut,
 }
 
 impl Machine {
     fn new(rom: &[u8]) -> Self {
         let mut gba = Box::new(Gba::new(bios::stub(), rom));
         crate::gba::install_swi_hook(&mut gba);
+        // The host rate is whatever `gba_set_output_rate` last recorded. Read
+        // it here rather than storing it on the machine, so a rate set before
+        // the ROM was loaded still lands on this machine.
+        let rate = audio::configured_rate();
+        let rx = gba.init_audio(rate, audio::RING_SLOTS);
+        let mut audio = AudioOut::new(rate);
+        audio.set_volume(audio::configured_volume());
+        audio.attach(rx, rate);
         Self {
             gba,
             // A debug build may turn the watermark off; a release build may
             // not. See plan section 7.1 and invariant 5.
             overlay: Overlay::for_build(cfg!(not(debug_assertions))),
+            audio,
         }
     }
 }
@@ -101,11 +115,16 @@ fn machine_slot() -> &'static Mutex<Option<Machine>> {
 
 /// Run `body` against the machine, or report that none is loaded.
 ///
+/// # Visibility
+/// `pub(crate)` because `audio.rs` has to reach the same machine: the ring's
+/// consumer end and the frame accounting both live on it, and duplicating the
+/// lock here would put two guards on one state.
+///
 /// A poisoned lock means a previous call panicked while holding it. The state
 /// is then of unknown validity, so it is dropped rather than reused: an
 /// emulator that keeps going on a half-torn-down machine is worse than one
 /// that reports "no ROM".
-fn with_machine<R>(body: impl FnOnce(&mut Machine) -> R) -> Result<R, i32> {
+pub(crate) fn with_machine<R>(body: impl FnOnce(&mut Machine) -> R) -> Result<R, i32> {
     let mut guard = match machine_slot().lock() {
         Ok(guard) => guard,
         Err(_) => {
@@ -214,10 +233,21 @@ fn gba_load_rom_bytes(rom: &[u8]) -> i32 {
 }
 
 /// Reset the machine, keeping the cartridge.
+///
+/// Note that the *core* reset is still a stub -- this has always returned
+/// `GBA_OK` without touching the CPU, and a real reset needs `SoftReset`
+/// (`0x00`) semantics that belong with the savestate work in S2-b2. What it
+/// does do is clear the audio frame accounting, because a residual carried
+/// across a reset is a frame boundary from the previous run, and the underrun
+/// total should be per-run.
 #[unsafe(no_mangle)]
 pub extern "C" fn gba_reset() -> i32 {
     // SAFETY: simulation thread.
-    with_machine(|_| GBA_OK).unwrap_or(GBA_ERR_NO_ROM)
+    with_machine(|machine| {
+        machine.audio.reset();
+        GBA_OK
+    })
+    .unwrap_or(GBA_ERR_NO_ROM)
 }
 
 /// Bytes one frame occupies: 240x160 RGBA, watermark included.
@@ -295,10 +325,17 @@ pub extern "C" fn gba_step_frame() -> i32 {
         let mut cycles = 0u64;
         while cycles < CYCLE_LIMIT {
             if machine.gba.step() {
-                return GBA_OK;
+                break;
             }
             cycles += 1;
         }
+        // The audio for this frame is whatever the core pushed while the CPU
+        // ran, so the drain belongs here and not in `gba_render_audio`: by the
+        // time a caller asks for samples the core may already be half a frame
+        // into the next one. Draining on a wedged machine is still correct --
+        // it produces the silence the clock asks for, and counts it, rather
+        // than leaving last frame's samples to be replayed.
+        machine.audio.advance_frame();
         GBA_OK
     })
     .unwrap_or(GBA_ERR_NO_ROM)
@@ -354,6 +391,10 @@ mod tests {
         GBA_ERR_BAD_ROM, GBA_ERR_CAPACITY, GBA_ERR_NO_ROM, GBA_ERR_STATE, GBA_OK, MIN_CARTRIDGE,
         gba_frame_buffer, gba_frame_buffer_size, gba_init, gba_load_rom_bytes, gba_reset,
         gba_rom_loaded, gba_set_overlay, gba_step_frame, gba_unload_rom, read_c_string, scale5,
+        with_machine,
+    };
+    use crate::gba::audio::{
+        gba_audio_underruns, gba_render_audio, gba_samples_per_frame_fixed, gba_set_output_rate,
     };
     use crate::gba::overlay::{FRAME_BYTES, SCREEN_HEIGHT, SCREEN_WIDTH};
 
@@ -633,5 +674,173 @@ mod tests {
         let bytes = b"roms/game.gba\0trailing garbage that must not be read";
         let got = read_c_string(bytes.as_ptr()).expect("valid");
         assert_eq!(std::str::from_utf8(got).expect("utf8"), "roms/game.gba");
+    }
+
+    // ---- audio, across the machine (S2-b1) ---------------------------------
+    //
+    // These live here rather than in `audio.rs` because they touch the one
+    // global machine, and `exclusively` is the only thing that makes that
+    // safe *and* isolated. A second lock in `audio.rs` would be a second
+    // guard on the same state, which is the mistake r32 already made once.
+
+    /// The per-frame ratio, cross-multiplied against the unreduced one.
+    ///
+    /// `rate * 280896 / 16777216`, kept unreduced so this is an independent
+    /// check on the reduction rather than a restatement of it.
+    fn assert_ratio_is(rate: u32, num: u32, den: u32) {
+        assert_eq!(
+            u64::from(num) * 16_777_216,
+            u64::from(den) * u64::from(rate) * 280_896,
+            "{num}/{den} is not {rate} * 280896 / 16777216"
+        );
+    }
+
+    /// A rate set with no ROM loaded still reaches the machine built later.
+    ///
+    /// The C++ side initialises audio before it knows what it is loading, so
+    /// this ordering is the normal one rather than an edge case.
+    #[test]
+    fn a_rate_set_before_a_rom_is_loaded_reaches_the_machine_that_loads_afterwards() {
+        exclusively(|| {
+            gba_unload_rom();
+            assert_eq!(
+                gba_set_output_rate(22_050),
+                GBA_OK,
+                "a rate set with no machine is remembered, not refused"
+            );
+            with_loaded_machine();
+            let (num, den) = with_machine(|machine| machine.audio.ratio()).expect("loaded");
+            assert_ratio_is(22_050, num, den);
+            gba_set_output_rate(44_100);
+        });
+    }
+
+    /// The first frame is short by construction, and nothing drifts after it.
+    ///
+    /// This is the end-to-end pass: the real core, the real ring, the real
+    /// clock. It checks the *plumbing and the count*, not that a game makes a
+    /// sound -- the synthetic cartridge never programs `SOUNDCNT_L`, so the
+    /// samples are silence. The number is the thing under test.
+    ///
+    /// The startup transient is real and is not a fault. Emulation begins at
+    /// the top of a frame, but `Gba::step` reports VBlank at scanline 160 of
+    /// 228, so the first drain happens after 197,120 cycles rather than a full
+    /// 280,896. At 44.1 kHz that is 518 samples against the 738 the clock asks
+    /// for: a 220-sample shortfall, about five milliseconds, once per ROM load.
+    ///
+    /// What matters is that it is a *constant* offset rather than a rate error.
+    /// Measured over 100 frames at 44.1 kHz, `underruns` goes 220 at frame 1,
+    /// 221 by frame 20, and then does not move again -- and the ring settles at
+    /// two slots. A drift of the kind R12 describes would instead grow in
+    /// proportion to the frame count, and that is what the second half of this
+    /// test rules out. The 30-minute run of plan section 8 remains a manual
+    /// exit criterion; a unit test covering 100 frames is what a unit test can
+    /// honestly assert.
+    #[test]
+    fn the_startup_transient_is_a_constant_offset_and_does_not_drift() {
+        exclusively(|| {
+            with_loaded_machine();
+            assert_eq!(gba_set_output_rate(44_100), GBA_OK);
+
+            for _ in 0..20 {
+                assert_eq!(gba_step_frame(), GBA_OK);
+            }
+            let settled = gba_audio_underruns();
+            assert!(
+                (200..=260).contains(&settled),
+                "the startup transient is about 220 samples, got {settled}"
+            );
+
+            for _ in 0..80 {
+                assert_eq!(gba_step_frame(), GBA_OK);
+            }
+            let later = gba_audio_underruns();
+            assert!(
+                later - settled <= 2,
+                "the shortfall grew from {settled} to {later} over 80 frames: that is drift"
+            );
+        });
+    }
+
+    /// A drained frame has the length the clock's own fraction says it has.
+    #[test]
+    fn a_stepped_frame_delivers_audio_of_the_calculated_length() {
+        exclusively(|| {
+            with_loaded_machine();
+            assert_eq!(gba_set_output_rate(44_100), GBA_OK);
+            // Two frames: the first is the startup transient described above,
+            // and the second is a whole one.
+            assert_eq!(gba_step_frame(), GBA_OK);
+            assert_eq!(gba_step_frame(), GBA_OK);
+
+            let (mut num, mut den) = (0u32, 0u32);
+            // SAFETY: both out-pointers are live locals.
+            assert_eq!(
+                unsafe { gba_samples_per_frame_fixed(&mut num, &mut den) },
+                GBA_OK
+            );
+            assert_ratio_is(44_100, num, den);
+            let lo = num / den;
+            let hi = lo + 1;
+
+            let mut buffer = vec![0i32; 8_192];
+            let mut written = 0u32;
+            // SAFETY: the buffer has 8192 elements, well over one frame.
+            let status =
+                unsafe { gba_render_audio(buffer.as_mut_ptr(), buffer.len() as u32, &mut written) };
+            assert_eq!(status, GBA_OK);
+            assert!((lo..=hi).contains(&written), "{written} is not {lo} or {hi}");
+            assert!(written > 0, "a frame carries audio, not nothing");
+        });
+    }
+
+    /// Reading audio with nothing loaded says so, rather than returning zeroes
+    /// that look like a working stream.
+    #[test]
+    fn render_audio_without_a_rom_reports_no_rom() {
+        exclusively(|| {
+            gba_unload_rom();
+            let mut buffer = vec![0i32; 64];
+            let mut written = 0u32;
+            // SAFETY: the buffer has 64 elements and `written` is a local.
+            let status = unsafe {
+                gba_render_audio(buffer.as_mut_ptr(), buffer.len() as u32, &mut written)
+            };
+            assert_eq!(status, GBA_ERR_NO_ROM);
+            assert_eq!(gba_audio_underruns(), 0);
+        });
+    }
+
+    /// A zero rate is refused instead of silently producing an empty stream.
+    #[test]
+    fn a_zero_sample_rate_is_refused() {
+        exclusively(|| {
+            gba_unload_rom();
+            assert_eq!(
+                gba_set_output_rate(0),
+                GBA_ERR_STATE,
+                "the core's own resampler drops every sample at rate 0"
+            );
+            with_loaded_machine();
+            let (num, den) = with_machine(|machine| machine.audio.ratio()).expect("loaded");
+            assert!(num > 0, "the refused rate must not have been applied");
+            assert_ratio_is(44_100, num, den);
+        });
+    }
+
+    /// A reset starts the audio run over.
+    #[test]
+    fn a_reset_starts_the_audio_run_over() {
+        exclusively(|| {
+            with_loaded_machine();
+            assert_eq!(gba_step_frame(), GBA_OK);
+            gba_reset();
+            assert_eq!(gba_audio_underruns(), 0, "the counter is per-run");
+            // And the frame accounting starts from the floor of the ratio.
+            let (mut num, mut den) = (0u32, 0u32);
+            // SAFETY: both out-pointers are live locals.
+            unsafe { gba_samples_per_frame_fixed(&mut num, &mut den) };
+            assert_eq!(num / den, with_machine(|m| m.audio.peek()).expect("loaded"));
+        });
     }
 }

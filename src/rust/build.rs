@@ -142,6 +142,13 @@ fn main() {
     println!("cargo:rerun-if-changed=crates/fceux11-core/src");
     println!("cargo:rerun-if-changed=crates/f11qa/src");
     println!("cargo:rerun-if-changed=crates/gba-core/src");
+    // The GBA ABI below is hand-written from the root crate's sources, so this
+    // build script has to re-run when those change or the merged header goes
+    // stale. It was missing from this list, which is why adding five audio
+    // exports recompiled the library and left fceux11_rust.h untouched -- a
+    // library the C++ side could link but not call. `src/gba` rather than
+    // `src/lib.rs`, because it is the module tree that holds the exports.
+    println!("cargo:rerun-if-changed=src/gba");
 }
 
 fn find_cbindgen() -> String {
@@ -282,6 +289,13 @@ fn merge_headers(
     output.push_str("int32_t gba_frame_buffer_size(uint32_t *out_size);\n");
     output.push_str("int32_t gba_frame_buffer(uint8_t *dst, uint32_t cap);\n");
     output.push_str("int32_t gba_set_overlay(int32_t enable);\n");
+
+    output.push_str("\n/* Audio (S2-b1) */\n");
+    output.push_str("int32_t gba_set_output_rate(uint32_t rate);\n");
+    output.push_str("int32_t gba_set_volume(uint32_t volume);\n");
+    output.push_str("int32_t gba_render_audio(int32_t *dst, uint32_t cap, uint32_t *out_frames);\n");
+    output.push_str("void gba_samples_per_frame_fixed(uint32_t *num, uint32_t *den);\n");
+    output.push_str("uint32_t gba_audio_underruns(void);\n");
 
     output.push_str("\n#ifdef __cplusplus\n}\n#endif\n\n");
     output.push_str("#endif /* FCEUX11_RUST_H */\n");

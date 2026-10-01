@@ -100,31 +100,72 @@ mod drift_guard {
     //! just wrote and asserts that every `gba_` function this crate exports is
     //! declared in it. Adding an export without declaring it fails the build.
 
-    /// Every `gba_` function this crate exports, by name.
+    /// Every `gba_` function the root crate actually exports, discovered by
+    /// reading the sources.
     ///
-    /// Written out rather than discovered by scanning the source: a scan would
-    /// pick up test-only helpers and the `use` aliases, and would silently
-    /// shrink if the scanner itself broke.
-    const EXPORTED: &[&str] = &[
-        // S0' probes.
-        "gba_abi_revision",
-        "gba_core_probe",
-        "gba_swi_count",
-        "gba_swi_probe",
-        "gba_probe_lz77_header",
-        "gba_probe_cpu_size",
-        // S2-a lifecycle and frame.
-        "gba_init",
-        "gba_rom_loaded",
-        "gba_unload_rom",
-        "gba_last_error",
-        "gba_load_rom",
-        "gba_reset",
-        "gba_step_frame",
-        "gba_frame_buffer_size",
-        "gba_frame_buffer",
-        "gba_set_overlay",
-    ];
+    /// This used to be a hand-written list, and that made the guard useless:
+    /// it compared one hand-maintained list against a header built from
+    /// another hand-maintained list, so adding an export to neither kept it
+    /// green. That is the symmetric-bug shape -- two lists wrong in the same
+    /// way cancel out, and any assertion that only checks self-consistency
+    /// cannot see it. The whole of S2-a slipped through exactly that way:
+    /// ten exports compiled, tested green, and were absent from the header.
+    ///
+    /// So the left side is discovered rather than written. The anchor is
+    /// `#[no_mangle]` on the line above the function: a test helper or a `use`
+    /// alias has no such attribute, and every real export has one.
+    fn exported_names() -> Vec<String> {
+        fn walk(dir: &std::path::Path, out: &mut Vec<String>) {
+            let Ok(entries) = std::fs::read_dir(dir) else {
+                return;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    walk(&path, out);
+                } else if path.extension().is_some_and(|e| e == "rs") {
+                    collect_from(&path, out);
+                }
+            }
+        }
+
+        fn collect_from(path: &std::path::Path, out: &mut Vec<String>) {
+            let Ok(text) = std::fs::read_to_string(path) else {
+                return;
+            };
+            let lines: Vec<&str> = text.lines().collect();
+            for (index, line) in lines.iter().enumerate() {
+                // The attribute sits on the line before the signature.
+                let anchored = index > 0 && lines[index - 1].contains("no_mangle");
+                if !anchored {
+                    continue;
+                }
+                if let Some(start) = line.find("fn gba_") {
+                    let rest = &line[start + 3..];
+                    let name: String = rest
+                        .chars()
+                        .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                        .collect();
+                    if !name.is_empty() {
+                        out.push(name);
+                    }
+                }
+            }
+        }
+
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/gba");
+        let mut names = Vec::new();
+        walk(&root, &mut names);
+        names.sort();
+        names.dedup();
+        assert!(
+            !names.is_empty(),
+            "no gba_ exports were discovered under {} -- if the scan broke, this \
+             guard would pass while checking nothing",
+            root.display()
+        );
+        names
+    }
 
     /// The generated header, as `build.rs` wrote it.
     fn header() -> String {
@@ -134,20 +175,25 @@ mod drift_guard {
         })
     }
 
-    /// Every export is declared in the header the C++ side includes.
+    /// Every export the sources declare is in the header the C++ side includes.
+    ///
+    /// The right side is the header *on disk*, which is what makes this more
+    /// than a tautology: `build.rs` only rewrites it when one of its
+    /// `rerun-if-changed` paths moved, so a stale header is caught here even
+    /// when both sides agree on paper.
     #[test]
     fn the_gba_c_abi_is_declared_for_every_exported_function() {
         let header = header();
-        let missing: Vec<&str> = EXPORTED
-            .iter()
-            .copied()
-            .filter(|name| !header.contains(name))
+        let missing: Vec<String> = exported_names()
+            .into_iter()
+            .filter(|name| !header.contains(name.as_str()))
             .collect();
         assert!(
             missing.is_empty(),
             "these are exported from Rust but not declared in fceux11_rust.h, \
              so C++ cannot call them: {missing:?}. Add them to the hand-written \
-             list in build.rs and to EXPORTED here."
+             list in build.rs. If the header is simply out of date, build.rs did \
+             not re-run -- check that its rerun-if-changed list covers src/gba."
         );
     }
 
