@@ -13,7 +13,7 @@ pub mod ram_reset;
 pub mod trig;
 pub mod wait;
 
-use gba_core::cpu::arm7tdmi::Arm7tdmi;
+use gba_core::cpu::arm7tdmi::{Arm7tdmi, WakeHook};
 use gba_core::cpu::psr::Psr;
 
 use ram_reset::{IE, IF, IME, RamResetRequest, WAITCNT};
@@ -519,6 +519,31 @@ fn wake_for_intr_wait(cpu: &mut Arm7tdmi) -> bool {
     }
     write_bios_flags(cpu, request.flags_after(flags));
     false
+}
+
+/// The `IntrWait` the machine is currently asleep on, for the savestate codec.
+///
+/// `PENDING_INTR_WAIT` is a `thread_local` because the wake predicate the core
+/// stores is a bare `fn` pointer with nowhere to carry state. That makes it
+/// invisible to serde, and the consequence is silent rather than loud: the
+/// `halted` flag *is* serialized, so a state taken inside `VBlankIntrWait`
+/// comes back asleep — just asleep on the wrong condition, waking on any
+/// enabled interrupt. Plan section 4.1 already confines these calls to the
+/// simulation thread, which is the thread this reads.
+pub(crate) fn pending_intr_wait() -> Option<IntrWaitRequest> {
+    PENDING_INTR_WAIT.with(|pending| pending.get())
+}
+
+/// Re-arm a pending `IntrWait` after a savestate load, or clear it.
+///
+/// The wake predicate and the request it reads are two halves of one thing, so
+/// this sets both: restoring the request without the predicate would leave the
+/// core waking on any interrupt, and installing the predicate without the
+/// request would make `wake_for_intr_wait` return `false` immediately, which is
+/// the same bug wearing a different hat.
+pub(crate) fn restore_intr_wait(request: Option<IntrWaitRequest>, cpu: &mut Arm7tdmi) {
+    PENDING_INTR_WAIT.with(|pending| pending.set(request));
+    cpu.wake_hook = request.map(|_| wake_for_intr_wait as WakeHook);
 }
 
 /// Whether to echo SWI dispatches to stderr.

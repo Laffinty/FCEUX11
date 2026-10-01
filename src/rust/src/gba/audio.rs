@@ -306,6 +306,28 @@ impl AudioOut {
         self.clock = SampleClock::new(rate);
     }
 
+    /// Where the sample clock has got to: the residual, and the rate it is
+    /// counted in.
+    ///
+    /// For the savestate codec. `phase` is what makes the next frame's sample
+    /// count exact, and it is this side's state rather than the core's — the
+    /// core has its own cycle-accurate accumulator, and dropping ours would put
+    /// a sub-sample error into every frame after a load.
+    #[must_use]
+    pub fn clock_state(&self) -> (u64, u32) {
+        (self.clock.phase, self.clock.rate)
+    }
+
+    /// Resume the clock where a savestate left it.
+    ///
+    /// Must come **after** [`AudioOut::attach`], which restarts the clock from
+    /// zero because the ring it points at is a new object. The old residual is
+    /// only meaningful once it is put back, and putting it back before the
+    /// attach would silently discard it.
+    pub fn restore_clock(&mut self, phase: u64, rate: u32) {
+        self.clock = SampleClock { phase, rate };
+    }
+
     /// Set the output volume on the 0-150 scale.
     pub fn set_volume(&mut self, volume: u32) {
         self.volume = volume;

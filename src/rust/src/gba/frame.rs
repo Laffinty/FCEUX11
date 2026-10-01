@@ -34,6 +34,9 @@ use gba_core::gba::Gba;
 use crate::gba::audio::{self, AudioOut};
 use crate::gba::bios;
 use crate::gba::overlay::{self, Overlay};
+use crate::gba::save::{self, SaveError, WireState};
+use crate::gba::swi;
+use crate::gba::swi::wait::IntrWaitRequest;
 
 /// Error codes, matching plan section 4.1's enum.
 pub const GBA_OK: i32 = 0;
@@ -43,9 +46,18 @@ pub const GBA_ERR_NO_ROM: i32 = 1;
 pub const GBA_ERR_BAD_ROM: i32 = 2;
 /// A BIOS problem: neither a user BIOS nor the built-in stub could be used.
 pub const GBA_ERR_BIOS: i32 = 3;
+/// The request names something this build does not implement: a savestate
+/// written by a newer version, or a file that is not a GBA savestate at all.
+///
+/// Distinct from [`GBA_ERR_STATE`] because the caller's next move differs. A
+/// state that is not ours will never load, whatever the caller does; a state
+/// that is ours but does not fit *this* machine — the wrong cartridge — is
+/// worth a different ROM.
+pub const GBA_ERR_UNSUPPORTED: i32 = 4;
 /// The request is not legal in this state — including trying to turn the
-/// `BETA` watermark off in a release build.
-pub const GBA_ERR_STATE: i32 = 4;
+/// `BETA` watermark off in a release build, and restoring a state onto a
+/// cartridge it was not taken from.
+pub const GBA_ERR_STATE: i32 = 5;
 /// The caller's buffer is too small. Never returned by a function that does
 /// not also report the required size.
 pub const GBA_ERR_CAPACITY: i32 = 6;
@@ -341,6 +353,187 @@ pub extern "C" fn gba_step_frame() -> i32 {
     .unwrap_or(GBA_ERR_NO_ROM)
 }
 
+// ---- savestates (v2.0 S2-b2) ------------------------------------------------
+//
+// The shape is section 4.1's: the caller owns the buffer. There is no
+// `gba_savestate_free` here, and that is deliberate — section 4.1's archive
+// list does not have one either, because `gba_savestate_save` writes into a
+// buffer the caller already owns. Plan r31 ③ had proposed a `free` for a
+// shape where we allocate; r37 ⑤ resolved the conflict in favour of the
+// section, and with it goes the `cap` round-trip r31 ④ was about.
+//
+// The stack: encoding runs here, on the caller's thread, where the measurement
+// says 48 KB is enough. Decoding does not fit there -- it needs 2 MB and a
+// `QThread` has 1 -- so `gba_savestate_load` hands it to a worker with its
+// own. See `save.rs` for the numbers.
+
+/// The whole state as bytes, or an error code.
+fn encode_machine(machine: &Machine) -> Result<Vec<u8>, i32> {
+    let wire = save::save(
+        &machine.gba.cpu,
+        &save::RomFingerprint::of(&machine.gba),
+        save::AudioState::capture(&machine.audio),
+        swi::pending_intr_wait().map(save::PendingWait::of),
+    )
+    .map_err(|_| GBA_ERR_STATE)?;
+    let mut bytes = Vec::with_capacity(wire.header.len() + wire.payload.len());
+    bytes.extend_from_slice(&wire.header);
+    bytes.extend_from_slice(&wire.payload);
+    Ok(bytes)
+}
+
+/// Put a decoded state back into the one machine this process has.
+///
+/// Four things did not travel with the state and have to be rebuilt here,
+/// which is the whole content of this function:
+///
+/// 1. **the ROM and the BIOS** — the core marks them `#[serde(skip)]`, so the
+///    decoded machine has neither. [`Gba::new`] takes the cartridge back and
+///    rebuilds the header, which is a plain struct with no `Serialize` derive
+///    and therefore could not have been in the payload either;
+/// 2. **the SWI hook**, a function pointer the derive cannot carry;
+/// 3. **the audio ring**, a channel rather than data — and with it the
+///    residual, which is only meaningful if the rate has not changed;
+/// 4. **a pending `IntrWait`**, which lives in a `thread_local` and is
+///    invisible to serde entirely.
+///
+/// The swap is `mem::swap` rather than an assignment on purpose: an assignment
+/// would move 82 KB through this frame, and the whole arrangement of this
+/// module exists so that no machine-sized value ever sits on a caller's stack.
+fn apply_state(machine: &mut Machine, mut wire: WireState) -> i32 {
+    // The ROM is not in the payload, so a state only means anything next to
+    // the cartridge it was taken from. Checking this first means a refusal
+    // leaves the running machine untouched.
+    if save::RomFingerprint::of(&machine.gba) != wire.fingerprint {
+        return GBA_ERR_STATE;
+    }
+
+    let rom = std::mem::take(&mut machine.gba.cpu.bus.internal_memory.rom);
+    let mut fresh = Box::new(Gba::new(bios::stub(), &rom));
+    std::mem::swap(&mut fresh.cpu, wire.cpu.as_mut());
+    machine.gba = fresh;
+
+    crate::gba::install_swi_hook(&mut machine.gba);
+    let pending: Option<IntrWaitRequest> = wire.pending_wait.map(save::PendingWait::to_request);
+    swi::restore_intr_wait(pending, &mut machine.gba.cpu);
+
+    // A new ring, then the residual on top of the clock `attach` just reset.
+    // The watermark is a build-level setting rather than machine state, so it
+    // is left alone; the volume is the host's, so it is left alone too.
+    let rate = audio::configured_rate();
+    let rx = machine.gba.init_audio(rate, audio::RING_SLOTS);
+    machine.audio.attach(rx, rate);
+    machine.audio.clear_underruns();
+    if wire.audio.rate() == rate {
+        machine.audio.restore_clock(wire.audio.phase(), rate);
+    }
+    // A residual counted in another rate's units is not a residual, and the
+    // alternative -- honouring it -- is the sub-sample-per-frame drift section
+    // 4.2 exists to rule out. `attach` has already left the clock at zero,
+    // which is the only correct answer in that case.
+
+    GBA_OK
+}
+
+/// Bytes one savestate occupies, header included.
+///
+/// Reports the real number by writing one and measuring it. The payload is
+/// JSON, so its length is not something that can be computed without doing the
+/// work, and an estimate that is too small would make `gba_savestate_save` fail
+/// in a way the caller cannot tell from a corrupt state.
+///
+/// A caller that would rather not pay for the extra encode can skip this and
+/// pass a generous buffer, then read the size `gba_savestate_save` reports when
+/// it returns `GBA_ERR_CAPACITY`.
+///
+/// # Safety
+/// The caller must be the simulation thread.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gba_savestate_size(out_size: *mut u32) -> i32 {
+    if out_size.is_null() {
+        return GBA_ERR_STATE;
+    }
+    match with_machine(|machine| encode_machine(machine)) {
+        Ok(Ok(bytes)) => {
+            let len = u32::try_from(bytes.len()).unwrap_or(u32::MAX);
+            // SAFETY: checked non-null above.
+            unsafe { *out_size = len };
+            GBA_OK
+        }
+        Ok(Err(code)) => code,
+        Err(code) => code,
+    }
+}
+
+/// Write the current state into `dst`.
+///
+/// `dst` must be at least [`gba_savestate_size`] bytes. If it is not, nothing
+/// is written and `*out_written` receives the size that would have worked, so
+/// one retry is enough.
+///
+/// # Safety
+/// `dst` must point to `cap` writable bytes, `out_written` to a writable
+/// `u32`, and the caller must be the simulation thread.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gba_savestate_save(
+    dst: *mut u8,
+    cap: u32,
+    out_written: *mut u32,
+) -> i32 {
+    if dst.is_null() || out_written.is_null() {
+        return GBA_ERR_STATE;
+    }
+    let bytes = match with_machine(|machine| encode_machine(machine)) {
+        Ok(Ok(bytes)) => bytes,
+        Ok(Err(code)) | Err(code) => return code,
+    };
+    let len = u32::try_from(bytes.len()).unwrap_or(u32::MAX);
+    // SAFETY: non-null pointers checked above; the copy is bounded by `cap`.
+    unsafe {
+        if cap < len {
+            *out_written = len;
+            return GBA_ERR_CAPACITY;
+        }
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), dst, bytes.len());
+        *out_written = len;
+    }
+    GBA_OK
+}
+
+/// Restore a state, replacing whatever the machine is doing.
+///
+/// The state's cartridge must be the one that is loaded; a mismatch is
+/// `GBA_ERR_STATE` and the running machine is left alone.
+///
+/// # Safety
+/// `src` must point to `len` readable bytes, and the caller must be the
+/// simulation thread. Section 4.1 already confines every call in this file to
+/// that one thread, and this one depends on it: the pending `IntrWait` is a
+/// `thread_local`, so a load on another thread would arm the wait somewhere the
+/// CPU will never look.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gba_savestate_load(src: *const u8, len: u32) -> i32 {
+    if src.is_null() {
+        return GBA_ERR_STATE;
+    }
+    // Judge the machine before the file. A caller with nothing loaded has a
+    // bigger problem than a bad file, and every other function in this file
+    // answers `GBA_ERR_NO_ROM` first — returning "unsupported" here would make
+    // a caller's "no cartridge" look like "your save is from the future".
+    if with_machine(|_| ()).is_err() {
+        return GBA_ERR_NO_ROM;
+    }
+    // SAFETY: the caller guarantees `len` readable bytes at `src`.
+    let bytes = unsafe { std::slice::from_raw_parts(src, len as usize) }.to_vec();
+    let wire = match save::load_on_worker(bytes) {
+        None => return GBA_ERR_STATE,
+        Some(Err(SaveError::NotOurs | SaveError::FutureVersion(_))) => return GBA_ERR_UNSUPPORTED,
+        Some(Err(SaveError::Payload)) => return GBA_ERR_STATE,
+        Some(Ok(wire)) => wire,
+    };
+    with_machine(|machine| apply_state(machine, wire)).unwrap_or(GBA_ERR_NO_ROM)
+}
+
 /// Read a NUL-terminated byte string, or `None` if it is not valid UTF-8.
 fn read_c_string<'a>(ptr: *const u8) -> Option<&'a [u8]> {
     let mut len = 0usize;
@@ -388,15 +581,19 @@ mod tests {
     use std::sync::{Mutex, OnceLock};
 
     use super::{
-        GBA_ERR_BAD_ROM, GBA_ERR_CAPACITY, GBA_ERR_NO_ROM, GBA_ERR_STATE, GBA_OK, MIN_CARTRIDGE,
-        gba_frame_buffer, gba_frame_buffer_size, gba_init, gba_load_rom_bytes, gba_reset,
-        gba_rom_loaded, gba_set_overlay, gba_step_frame, gba_unload_rom, read_c_string, scale5,
-        with_machine,
+        GBA_ERR_BAD_ROM, GBA_ERR_BIOS, GBA_ERR_CAPACITY, GBA_ERR_NO_ROM, GBA_ERR_STATE,
+        GBA_ERR_UNSUPPORTED, GBA_OK, MIN_CARTRIDGE, gba_frame_buffer, gba_frame_buffer_size,
+        gba_init, gba_load_rom_bytes, gba_reset, gba_rom_loaded, gba_savestate_load,
+        gba_savestate_save, gba_savestate_size, gba_set_overlay, gba_step_frame, gba_unload_rom,
+        read_c_string, scale5, with_machine,
     };
     use crate::gba::audio::{
         gba_audio_underruns, gba_render_audio, gba_samples_per_frame_fixed, gba_set_output_rate,
     };
     use crate::gba::overlay::{FRAME_BYTES, SCREEN_HEIGHT, SCREEN_WIDTH};
+    use crate::gba::save;
+    use crate::gba::swi;
+    use crate::gba::swi::wait::IntrWaitRequest;
 
     /// A cartridge the core will accept: a real entry point, and a `SWI 0`
     /// reset at the start so the machine has something to do.
@@ -424,15 +621,22 @@ mod tests {
     /// nothing to do with the code.
     ///
     /// The lock is taken on a dedicated thread so the guard lives exactly as
-    /// long as the body, and a poisoned lock from a panicking test cannot
-    /// wedge every later one.
+    /// long as the body.
+    ///
+    /// A poisoned lock — a test that panicked while holding it — is recovered
+    /// from rather than propagated, because the alternative is worse than the
+    /// failure it hides: a panicking test poisons the mutex, every later test's
+    /// `lock()` returns `Err`, and if that is ignored the tests run *without*
+    /// isolation and fail for reasons that have nothing to do with them. That
+    /// is not hypothetical — it is what happened the first time this suite ran
+    /// a test that failed, and one real failure turned into fourteen.
     fn exclusively(body: impl FnOnce() + Send + 'static) {
         static TEST_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
         let lock = TEST_LOCK.get_or_init(|| Mutex::new(()));
         std::thread::scope(|scope| {
             scope
                 .spawn(|| {
-                    let _guard = lock.lock();
+                    let _guard = lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
                     body();
                 })
                 .join()
@@ -841,6 +1045,346 @@ mod tests {
             // SAFETY: both out-pointers are live locals.
             unsafe { gba_samples_per_frame_fixed(&mut num, &mut den) };
             assert_eq!(num / den, with_machine(|m| m.audio.peek()).expect("loaded"));
+        });
+    }
+
+    // ---- savestates (S2-b2) ------------------------------------------------
+
+    /// The error codes are the ones section 4.1 lists, in its order.
+    ///
+    /// Worth a test of its own because these are numbers a C++ caller
+    /// compares against, and because S2-a shipped `GBA_ERR_STATE = 4` with no
+    /// `GBA_ERR_UNSUPPORTED` at all — one short of the enum, so every code from
+    /// there up was off by one and nothing noticed. The C++ side has no callers
+    /// yet, which is the only reason that could be true and also the reason it
+    /// is still cheap to fix.
+    #[test]
+    fn the_error_codes_are_the_ones_the_specification_lists() {
+        assert_eq!(
+            [
+                GBA_OK,
+                GBA_ERR_NO_ROM,
+                GBA_ERR_BAD_ROM,
+                GBA_ERR_BIOS,
+                GBA_ERR_UNSUPPORTED,
+                GBA_ERR_STATE,
+                GBA_ERR_CAPACITY,
+            ],
+            [0, 1, 2, 3, 4, 5, 6]
+        );
+    }
+
+    /// Save the state, run on, load it back: the machine is where it was left.
+    ///
+    /// The whole point of the export, and the reason the restore is four
+    /// separate acts rather than one: a codec that round trips the bytes but
+    /// forgets to re-arm the hooks produces a machine that decodes perfectly
+    /// and then does nothing.
+    #[test]
+    fn a_state_round_trips_through_the_abi() {
+        exclusively(|| {
+            with_loaded_machine();
+            assert_eq!(gba_step_frame(), GBA_OK);
+
+            // Something worth losing, written *before* the save: a recognisable
+            // value in working RAM.
+            with_machine(|machine| {
+                for offset in 0..32u32 {
+                    machine.gba.cpu.bus.write_byte(
+                        (0x0200_1000 + offset) as usize,
+                        0x5A ^ offset as u8,
+                    );
+                }
+            })
+            .expect("loaded");
+
+            let mut size = 0u32;
+            // SAFETY: `out_size` is a live local.
+            assert_eq!(unsafe { gba_savestate_size(&mut size) }, GBA_OK);
+            assert!(size > 0, "a running machine must have a state to write");
+
+            let mut buffer = vec![0u8; size as usize];
+            let mut written = 0u32;
+            // SAFETY: the buffer is `size` writable bytes and `written` is live.
+            let code = unsafe { gba_savestate_save(buffer.as_mut_ptr(), size, &mut written) };
+            assert_eq!(code, GBA_OK);
+            assert_eq!(written, size, "wrote a different number of bytes than it measured");
+
+            // And then run on, so the state is demonstrably not the present:
+            // step a frame, and wipe the marker the state carries.
+            assert_eq!(gba_step_frame(), GBA_OK);
+            with_machine(|machine| {
+                for offset in 0..32u32 {
+                    machine
+                        .gba
+                        .cpu
+                        .bus
+                        .write_byte((0x0200_1000 + offset) as usize, 0);
+                }
+            })
+            .expect("loaded");
+
+            // SAFETY: `buffer` holds `written` readable bytes.
+            let code = unsafe { gba_savestate_load(buffer.as_ptr(), written) };
+            assert_eq!(code, GBA_OK, "a state we just wrote must load");
+
+            for offset in 0..32u32 {
+                let got = with_machine(|machine| {
+                    machine.gba.cpu.bus.read_byte((0x0200_1000 + offset) as usize)
+                })
+                .expect("loaded");
+                assert_eq!(got, 0x5A ^ offset as u8, "working RAM differs at +{offset}");
+            }
+        });
+    }
+
+    /// A loaded machine has its SWI hook back.
+    ///
+    /// `swi_hook` is a function pointer and cannot be serialized, so the
+    /// restore has to put it back by hand. Miss that and the machine comes back
+    /// unable to answer the first BIOS call the game makes — which is every
+    /// game, immediately, and with no error anywhere.
+    #[test]
+    fn a_loaded_machine_has_its_hooks_back() {
+        exclusively(|| {
+            with_loaded_machine();
+
+            // Park it inside an IntrWait *before* saving -- that is the state
+            // worth saving, and the whole point: a machine asleep on a
+            // condition, which is where a game spends nearly all of its time.
+            with_machine(|machine| {
+                swi::restore_intr_wait(
+                    Some(IntrWaitRequest {
+                        wanted: crate::gba::swi::wait::VBLANK_FLAG,
+                        mode: crate::gba::swi::wait::WaitMode::AlwaysWait,
+                    }),
+                    &mut machine.gba.cpu,
+                );
+                machine.gba.cpu.halted = true;
+            })
+            .expect("loaded");
+            assert!(
+                with_machine(|m| m.gba.cpu.wake_hook.is_some()).expect("loaded"),
+                "the wait was not armed"
+            );
+
+            let mut size = 0u32;
+            // SAFETY: live local out-param.
+            assert_eq!(unsafe { gba_savestate_size(&mut size) }, GBA_OK);
+            let mut buffer = vec![0u8; size as usize];
+            let mut written = 0u32;
+            // SAFETY: the buffer is `size` writable bytes.
+            assert_eq!(
+                unsafe { gba_savestate_save(buffer.as_mut_ptr(), size, &mut written) },
+                GBA_OK
+            );
+
+            // Now run on, so the live machine is demonstrably elsewhere.
+            with_machine(|machine| {
+                swi::restore_intr_wait(None, &mut machine.gba.cpu);
+                machine.gba.cpu.halted = false;
+            })
+            .expect("loaded");
+
+            // SAFETY: the buffer holds `written` readable bytes.
+            assert_eq!(
+                unsafe { gba_savestate_load(buffer.as_ptr(), written) },
+                GBA_OK
+            );
+
+            with_machine(|machine| {
+                assert!(
+                    machine.gba.cpu.swi_hook.is_some(),
+                    "the SWI hook did not come back"
+                );
+                assert!(
+                    machine.gba.cpu.wake_hook.is_some(),
+                    "a machine loaded from inside a wait came back as a plain Halt"
+                );
+                assert!(
+                    machine.gba.cpu.halted,
+                    "the machine was awake when the state was taken asleep"
+                );
+            })
+            .expect("loaded");
+            let pending = swi::pending_intr_wait().expect("the wait condition was dropped");
+            assert_eq!(pending.wanted, crate::gba::swi::wait::VBLANK_FLAG);
+        });
+    }
+
+    /// The sample clock resumes where the state left it.
+    #[test]
+    fn a_loaded_machine_resumes_its_sample_clock() {
+        exclusively(|| {
+            with_loaded_machine();
+
+            // A residual worth keeping, set *before* the save.
+            with_machine(|m| m.audio.restore_clock(123_457, 44_100)).expect("loaded");
+            assert_eq!(
+                with_machine(|m| m.audio.clock_state().0).expect("loaded"),
+                123_457,
+                "the setup did not move the clock"
+            );
+
+            let mut size = 0u32;
+            // SAFETY: live local out-param.
+            assert_eq!(unsafe { gba_savestate_size(&mut size) }, GBA_OK);
+            let mut buffer = vec![0u8; size as usize];
+            let mut written = 0u32;
+            // SAFETY: the buffer is `size` writable bytes.
+            assert_eq!(
+                unsafe { gba_savestate_save(buffer.as_mut_ptr(), size, &mut written) },
+                GBA_OK
+            );
+
+            // Run on, so the live clock is demonstrably elsewhere.
+            with_machine(|m| m.audio.restore_clock(0, 44_100)).expect("loaded");
+
+            // SAFETY: the buffer holds `written` readable bytes.
+            assert_eq!(
+                unsafe { gba_savestate_load(buffer.as_ptr(), written) },
+                GBA_OK
+            );
+            assert_eq!(
+                with_machine(|m| m.audio.clock_state().0).expect("loaded"),
+                123_457,
+                "the residual did not come back, so every frame after the load is short"
+            );
+        });
+    }
+
+    /// A state from another cartridge is refused, and the machine keeps going.
+    ///
+    /// The ROM is not in the payload, so nothing but this check stands between
+    /// a state and a machine it has no business describing. The refusal has to
+    /// leave the running machine alone, or "wrong game" becomes "corrupted
+    /// session".
+    #[test]
+    fn a_state_from_another_cartridge_is_refused() {
+        exclusively(|| {
+            with_loaded_machine();
+            let mut size = 0u32;
+            // SAFETY: live local out-param.
+            assert_eq!(unsafe { gba_savestate_size(&mut size) }, GBA_OK);
+            let mut buffer = vec![0u8; size as usize];
+            let mut written = 0u32;
+            // SAFETY: the buffer is `size` writable bytes.
+            assert_eq!(
+                unsafe { gba_savestate_save(buffer.as_mut_ptr(), size, &mut written) },
+                GBA_OK
+            );
+
+            // A different cartridge: same shape, different bytes.
+            let mut other = cartridge();
+            other[0x100] = 0xFF;
+            assert_eq!(gba_load_rom_bytes(&other), GBA_OK);
+
+            // SAFETY: the buffer holds `written` readable bytes.
+            let code = unsafe { gba_savestate_load(buffer.as_ptr(), written) };
+            assert_eq!(code, GBA_ERR_STATE, "another game's state was accepted");
+            assert_eq!(
+                gba_step_frame(),
+                GBA_OK,
+                "and the refusal left a machine that still runs"
+            );
+        });
+    }
+
+    /// A short buffer is reported, not written into.
+    ///
+    /// The caller gets the number it needs so one retry is enough; a save that
+    /// silently truncated would be indistinguishable from a corrupt state.
+    #[test]
+    fn a_short_buffer_reports_the_size_it_needs() {
+        exclusively(|| {
+            with_loaded_machine();
+            let mut size = 0u32;
+            // SAFETY: live local out-param.
+            assert_eq!(unsafe { gba_savestate_size(&mut size) }, GBA_OK);
+
+            let mut tiny = vec![0u8; 16];
+            let mut written = 0u32;
+            // SAFETY: the buffer is 16 writable bytes and `written` is live.
+            let code = unsafe { gba_savestate_save(tiny.as_mut_ptr(), 16, &mut written) };
+            assert_eq!(code, GBA_ERR_CAPACITY);
+            assert_eq!(written, size, "it did not say what would have worked");
+            assert!(
+                tiny.iter().all(|byte| *byte == 0),
+                "it wrote into a buffer it had already refused"
+            );
+        });
+    }
+
+    /// A file that is not a GBA savestate, or one from a newer build, is
+    /// `GBA_ERR_UNSUPPORTED` — never a decode failure the caller cannot
+    /// distinguish from corruption.
+    #[test]
+    fn a_state_this_build_cannot_read_is_unsupported() {
+        exclusively(|| {
+            with_loaded_machine();
+            let mut size = 0u32;
+            // SAFETY: live local out-param.
+            assert_eq!(unsafe { gba_savestate_size(&mut size) }, GBA_OK);
+            let mut buffer = vec![0u8; size as usize];
+            let mut written = 0u32;
+            // SAFETY: the buffer is `size` writable bytes.
+            assert_eq!(
+                unsafe { gba_savestate_save(buffer.as_mut_ptr(), size, &mut written) },
+                GBA_OK
+            );
+
+            // Not ours: the magic is gone.
+            let mut foreign = buffer.clone();
+            foreign[0] = b'X';
+            // SAFETY: `foreign` holds `written` readable bytes.
+            assert_eq!(
+                unsafe { gba_savestate_load(foreign.as_ptr(), written) },
+                GBA_ERR_UNSUPPORTED
+            );
+
+            // Ours, but from the future.
+            let mut future = buffer.clone();
+            let bumped = (save::SAVESTATE_VERSION + 1).to_le_bytes();
+            future[4..8].copy_from_slice(&bumped);
+            // SAFETY: `future` holds `written` readable bytes.
+            assert_eq!(
+                unsafe { gba_savestate_load(future.as_ptr(), written) },
+                GBA_ERR_UNSUPPORTED
+            );
+
+            // Ours, right version, damaged payload: that *is* our corruption.
+            let mut damaged = buffer.clone();
+            damaged[written as usize - 1] = b'!';
+            // SAFETY: `damaged` holds `written` readable bytes.
+            let code = unsafe { gba_savestate_load(damaged.as_ptr(), written) };
+            assert!(
+                code == GBA_ERR_STATE || code == GBA_OK,
+                "a damaged payload reported {code}"
+            );
+        });
+    }
+
+    /// With nothing loaded, the archive surface says so rather than crashing.
+    #[test]
+    fn the_archive_surface_reports_no_rom() {
+        exclusively(|| {
+            gba_unload_rom();
+            let mut size = 0u32;
+            // SAFETY: live local out-param.
+            assert_eq!(unsafe { gba_savestate_size(&mut size) }, GBA_ERR_NO_ROM);
+
+            let mut buffer = [0u8; 8];
+            let mut written = 0u32;
+            // SAFETY: the buffer is 8 writable bytes.
+            assert_eq!(
+                unsafe { gba_savestate_save(buffer.as_mut_ptr(), 8, &mut written) },
+                GBA_ERR_NO_ROM
+            );
+            // SAFETY: the buffer is 8 readable bytes.
+            assert_eq!(
+                unsafe { gba_savestate_load(buffer.as_ptr(), 8) },
+                GBA_ERR_NO_ROM
+            );
         });
     }
 }

@@ -297,6 +297,14 @@ fn merge_headers(
     output.push_str("void gba_samples_per_frame_fixed(uint32_t *num, uint32_t *den);\n");
     output.push_str("uint32_t gba_audio_underruns(void);\n");
 
+    output.push_str("\n/* Savestates (S2-b2). The caller owns the buffer: there is no */\n");
+    output.push_str("/* gba_savestate_free, because gba_savestate_save writes into one. */\n");
+    output.push_str("int32_t gba_savestate_size(uint32_t *out_size);\n");
+    output.push_str(
+        "int32_t gba_savestate_save(uint8_t *dst, uint32_t cap, uint32_t *out_written);\n",
+    );
+    output.push_str("int32_t gba_savestate_load(const uint8_t *src, uint32_t len);\n");
+
     output.push_str("\n#ifdef __cplusplus\n}\n#endif\n\n");
     output.push_str("#endif /* FCEUX11_RUST_H */\n");
 

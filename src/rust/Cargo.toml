@@ -61,6 +61,18 @@ gba-core = { path = "crates/gba-core", optional = true }
 # is green with these dependencies present.
 serde_json = { version = "1", optional = true }
 
+# v2.0 S2-b2: the codec derives Serialize / Deserialize on its own wire types
+# (the ROM fingerprint, the audio residual, the pending IntrWait, and the
+# wrapper that carries them beside the core's machine).
+#
+# `serde` was already in the graph -- serde_json depends on it and gba-core
+# derives through it -- so only the `derive` feature and a direct dependency
+# edge are new. The same reasoning as the serde_json entry above applies, and
+# for the same reason it does NOT reintroduce R14: a registry crate sitting off
+# to the side is not a path crate wedged between the root and a large
+# dependency.
+serde = { version = "1", features = ["derive"], optional = true }
+
 # v2.0 S2-b1: the audio ring. `Gba::init_audio` hands back an
 # `rtrb::Consumer<f32>`, and the consumer end has to be *stored* on this side
 # of the FFI boundary, so the root crate has to be able to name the type.
@@ -91,7 +103,7 @@ direct-adapter = ["f11qa/direct-adapter"]
 # v2.0 GBAEUX11. Present by default so S0 can assert the
 # "fceux11_rust.lib contains the new symbol" exit criterion; a NES-only
 # build turns it off with --no-default-features.
-gba = ["dep:gba-core", "dep:serde_json", "dep:rtrb"]
+gba = ["dep:gba-core", "dep:serde", "dep:serde_json", "dep:rtrb"]
 default = ["direct-adapter", "gba"]
 
 [dev-dependencies]

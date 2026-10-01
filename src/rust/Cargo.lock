@@ -427,6 +427,7 @@ dependencies = [
  "fceux11-utils",
  "gba-core",
  "rtrb",
+ "serde",
  "serde_json",
 ]
 
