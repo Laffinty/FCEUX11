@@ -33,9 +33,21 @@ pub const BIOS_SIZE: usize = 0x4000;
 const WAITCNT_ADDR: u32 = 0x0400_0204;
 const WAITCNT_DEFAULT: u32 = 0x4317;
 
-/// Cartridge header field holding the entry point, at `080000C0h`. Bit 0 of
-/// the loaded word is the Thumb bit, which is why the boot ends in `BX`.
-const CART_HEADER_ENTRY: u32 = 0x0800_00C0;
+/// Where a cartridge's code begins.
+///
+/// **Not a header field.** A GBA cartridge has no "entry point" word: the
+/// machine resets into the BIOS, the BIOS branches to `08000000h`, and the
+/// cartridge's own `b` at offset 0 takes it wherever it likes. The word at
+/// `080000C0h` is the *Nintendo reserved* slot, which holds a branch
+/// instruction like any other code -- on a commercial cartridge it is
+/// routinely `E3A0xxxx`, a `mov`.
+///
+/// The first draft of this file read `0x080000C0` and branched to it, on the
+/// reasoning that a "0xC0 must hold the entry address" convention had been
+/// observed somewhere. It had not: it had been assumed, then written into
+/// four lock tests that built cartridges to match, and the suite went green
+/// over a boot sequence no real cartridge can survive. See r49.
+const CART_ENTRY: u32 = 0x0800_0000;
 
 /// Pointer to the game's interrupt handler, at `03007FFC`.
 const IRQ_HANDLER_PTR: u32 = 0x0300_7FFC;
@@ -56,7 +68,7 @@ const STMFD_SP_R0_R3_R12_LR: u32 = 0xE92D_500F;
 const LDMFD_SP_R0_R3_R12_LR: u32 = 0xE8BD_500F;
 /// `LDR r2, [pc, #8]` -- the literal pool that follows the IRQ handler.
 const LDR_R2_PC_8: u32 = 0xE59F_2008;
-/// `LDR r2, [r2]`
+/// `LDR r2, [r2]` -- the IRQ vector's indirect load of the handler pointer.
 const LDR_R2_R2: u32 = 0xE592_2000;
 /// `CMP r2, #0`
 const CMP_R2_ZERO: u32 = 0xE352_0000;
@@ -68,23 +80,29 @@ const ADD_LR_PC: u32 = 0xE28F_E000;
 const BX_R2: u32 = 0xE12F_FF12;
 /// `SUBS pc, lr, #4` -- return from an exception.
 const SUBS_PC_LR_4: u32 = 0xE25E_F004;
-/// `LDR r2, [pc, #12]` -- reaches the third boot literal at `0x60`.
+/// `LDR r0, [pc, #12]` -- reaches the first boot literal at `0x54`.
 ///
 /// All three boot loads share one rule: the base is `PC + 8`, the ARM reading
 /// of the program counter, so a load at `A` with offset `N` addresses
-/// `A + 8 + N`. The literals start at `BOOT_CODE + 0x18`.
-const LDR_R0_PC_16: u32 = 0xE59F_0010;
-/// `LDR r1, [pc, #16]`
-const LDR_R1_PC_16: u32 = 0xE59F_1010;
-/// `LDR r2, [pc, #12]`
-const LDR_R2_PC_12_BOOT: u32 = 0xE59F_200C;
+/// `A + 8 + N`. The literals sit immediately after the boot code.
+const LDR_R0_PC_12: u32 = 0xE59F_000C;
+/// `LDR r1, [pc, #12]`
+const LDR_R1_PC_12: u32 = 0xE59F_100C;
 /// `STRH r1, [r0]`
 const STRH_R1_R0: u32 = 0xE1C0_10B0;
+/// `LDR r2, [pc, #8]` -- reaches the third boot literal at `0x5C`.
+const LDR_R2_PC_8_BOOT: u32 = 0xE59F_2008;
 /// `B .` -- park here. A deterministic hang beats executing whatever the
 /// surrounding aperture happens to decode as.
 const BRANCH_SELF: u32 = 0xEAFF_FFFE;
 /// `B 0x40` -- the reset stub's jump into the boot code.
 const BRANCH_BOOT: u32 = 0xEA00_000E;
+
+/// Where the boot code's literal pool begins: five instructions, then three
+/// words. Kept as a named constant because the tests and the S4 probe all
+/// address it by arithmetic, and that arithmetic is exactly what went wrong
+/// once already.
+const BOOT_LITERALS: usize = BOOT_CODE + 0x14;
 
 const fn put_word(image: &mut [u8; BIOS_SIZE], addr: usize, word: u32) {
     let bytes = word.to_le_bytes();
@@ -98,7 +116,7 @@ const fn put_word(image: &mut [u8; BIOS_SIZE], addr: usize, word: u32) {
 const fn put_literals(image: &mut [u8; BIOS_SIZE], addr: usize) {
     put_word(image, addr, WAITCNT_ADDR);
     put_word(image, addr + 4, WAITCNT_DEFAULT);
-    put_word(image, addr + 8, CART_HEADER_ENTRY);
+    put_word(image, addr + 8, CART_ENTRY);
 }
 
 const fn build() -> [u8; BIOS_SIZE] {
@@ -130,15 +148,16 @@ const fn build() -> [u8; BIOS_SIZE] {
     put_word(&mut image, 0x38, LDMFD_SP_R0_R3_R12_LR);
     put_word(&mut image, 0x3C, SUBS_PC_LR_4);
 
-    // Boot code: program the cartridge wait states, then jump to the entry
-    // point the cartridge header names.
-    put_word(&mut image, BOOT_CODE + 0x00, LDR_R0_PC_16);
-    put_word(&mut image, BOOT_CODE + 0x04, LDR_R1_PC_16);
+    // Boot code: program the cartridge wait states, then branch to the
+    // cartridge's first word. Five instructions and nothing else -- in
+    // particular there is no dereference, because there is nothing at
+    // 080000C0h to dereference.
+    put_word(&mut image, BOOT_CODE + 0x00, LDR_R0_PC_12);
+    put_word(&mut image, BOOT_CODE + 0x04, LDR_R1_PC_12);
     put_word(&mut image, BOOT_CODE + 0x08, STRH_R1_R0);
-    put_word(&mut image, BOOT_CODE + 0x0C, LDR_R2_PC_12_BOOT);
-    put_word(&mut image, BOOT_CODE + 0x10, LDR_R2_R2);
-    put_word(&mut image, BOOT_CODE + 0x14, BX_R2);
-    put_literals(&mut image, BOOT_CODE + 0x18);
+    put_word(&mut image, BOOT_CODE + 0x0C, LDR_R2_PC_8_BOOT);
+    put_word(&mut image, BOOT_CODE + 0x10, BX_R2);
+    put_literals(&mut image, BOOT_LITERALS);
 
     image
 }
@@ -154,7 +173,12 @@ pub const fn stub() -> [u8; BIOS_SIZE] {
 
 #[cfg(test)]
 mod tests {
-    use super::{BIOS_SIZE, BOOT_CODE, BRANCH_BOOT, BRANCH_SELF, STUB};
+    use super::{
+        BIOS_SIZE, BOOT_CODE, BOOT_LITERALS, BRANCH_BOOT, BRANCH_SELF, BX_R2, CART_ENTRY,
+        LDR_R0_PC_12, LDR_R1_PC_12, LDR_R2_PC_8_BOOT, STUB, STRH_R1_R0,
+    };
+
+
     use crate::gba::install_swi_hook;
     use crate::gba::swi::Swi;
     use gba_core::gba::Gba;
@@ -176,7 +200,7 @@ mod tests {
         let last = *populated.last().expect("the image cannot be empty");
         assert_eq!(
             last,
-            BOOT_CODE + 0x18 + 8,
+            BOOT_LITERALS + 8,
             "unexpected word past the boot literals"
         );
         // Everything between the end of the IRQ vector and the boot code is
@@ -198,21 +222,43 @@ mod tests {
         }
     }
 
+    /// A cartridge shaped the way a real one is: a branch at offset 0 into the
+    /// code at `CODE_AT`, and `MOV r5, #MARK` there.
+    ///
+    /// The branch matters. A cartridge's first word is a real instruction the
+    /// machine runs, so a test ROM that only fills the code region would be
+    /// exercising a cartridge that does not exist.
+    const CODE_AT: usize = 0xC0;
+    const MARK: u32 = 0x34;
+    const MOV_R5_MARK: u32 = 0xE3A0_5000 | MARK;
+
+    /// `b` at ROM offset 0 to `CODE_AT`, encoded the way the core decodes it:
+    /// the target is `PC + 8 + (offset << 2)`, and at offset 0 that is
+    /// `8 + (offset << 2)`.
+    fn branch_to(target: usize) -> u32 {
+        let offset = ((target - 8) / 4) as u32;
+        0xEA00_0000 | (offset & 0x00FF_FFFF)
+    }
+
+    /// A cartridge whose entry code parks after marking `r5`.
+    ///
+    /// `0xC0` is the *Nintendo reserved* slot on a real cartridge, so putting
+    /// the branch target there is both what hardware does and what makes the
+    /// word the old boot sequence used to read land on an instruction rather
+    /// than an address.
+    fn cartridge_entering_code() -> Vec<u8> {
+        let mut rom = vec![0u8; 0x200];
+        rom[..4].copy_from_slice(&branch_to(CODE_AT).to_le_bytes());
+        rom[CODE_AT..CODE_AT + 4].copy_from_slice(&MOV_R5_MARK.to_le_bytes());
+        rom
+    }
+
     /// The whole chain, end to end: a zeroed BIOS does nothing, a stub BIOS
     /// programs `WAITCNT` and hands control to the cartridge. Asserting on the
     /// register the cartridge writes is what proves the `BX` landed.
     #[test]
     fn boot_hands_control_to_the_cartridge() {
-        // `MOV r5, #0x34` then park. 0x34 is one byte wide, so unlike a
-        // 16-bit constant it is encodable as a rotated ARM immediate.
-        let mut rom = vec![0u8; 0x200];
-        for (i, chunk) in rom[..0xC0].chunks_exact_mut(4).enumerate() {
-            let word = if i == 0 { 0xE3A0_5034 } else { BRANCH_SELF };
-            chunk.copy_from_slice(&word.to_le_bytes());
-        }
-        rom[0xC0..0xC4].copy_from_slice(&0x0800_0000u32.to_le_bytes());
-
-        let mut gba = Gba::new(STUB, &rom);
+        let mut gba = Gba::new(STUB, &cartridge_entering_code());
         install_swi_hook(&mut gba);
         for _ in 0..16 {
             gba.step();
@@ -220,8 +266,59 @@ mod tests {
 
         assert_eq!(
             gba.cpu.registers.register_at(5),
-            0x34,
-            "the cartridge entry point never ran"
+            MARK,
+            "the cartridge entry code never ran"
+        );
+    }
+
+    /// The boot branches to `08000000h`, not to whatever word sits at
+    /// `080000C0h`.
+    ///
+    /// The first version of this file read the reserved slot and branched to
+    /// its contents. On the cartridge this was written against that was
+    /// self-consistent; on a commercial one the reserved slot holds a `mov`,
+    /// so the `BX` landed in the unmapped `0xExxxxxx` region and every real
+    /// game was a black screen. The suite could not see it, because the
+    /// cartridges in it were built to the same wrong convention.
+    ///
+    /// So the guard is about the *address*, asserted on its own: the boot's
+    /// entry literal is `08000000h`, full stop. A cartridge that puts code at
+    /// `0xC0` reaches it through its own branch, and that path is covered by
+    /// `boot_hands_control_to_the_cartridge`.
+    #[test]
+    fn the_boot_branches_to_the_start_of_the_cartridge() {
+        // The address is written out rather than naming `CART_ENTRY`. A guard
+        // that compares the image against the constant it is guarding is a
+        // guard that passes for any value the constant is given: changing
+        // `CART_ENTRY` to `0x0800_00C0` turned the whole suite green, which is
+        // the original bug, reproduced in the test that was written to catch
+        // it.
+        assert_eq!(
+            word(BOOT_LITERALS + 8),
+            0x0800_0000,
+            "the boot's entry literal must be 08000000h, not a word read out of the cartridge"
+        );
+        assert_eq!(
+            CART_ENTRY, 0x0800_0000,
+            "CART_ENTRY is the constant the boot is built from; the image check above \
+             is the one that holds when it drifts"
+        );
+
+        // The whole boot sequence, in order. Asserting the sequence rather
+        // than one slot is what makes "the dereference came back" fail: it
+        // would be a sixth instruction, and the `BX` would no longer be last.
+        let expected = [
+            LDR_R0_PC_12,
+            LDR_R1_PC_12,
+            STRH_R1_R0,
+            LDR_R2_PC_8_BOOT,
+            BX_R2,
+        ];
+        let actual: Vec<u32> = (0..expected.len()).map(|i| word(BOOT_CODE + i * 4)).collect();
+        assert_eq!(
+            actual, expected,
+            "the boot sequence changed; five instructions ending in BX r2, and no dereference \
+             between the load and the branch, is what a cartridge can actually survive"
         );
     }
 
@@ -229,12 +326,7 @@ mod tests {
     /// that reads it back must see the cartridge profile, not zero.
     #[test]
     fn boot_programs_the_cartridge_wait_states() {
-        let rom = {
-            let mut r = vec![0u8; 0x200];
-            r[0xC0..0xC4].copy_from_slice(&0x0800_0000u32.to_le_bytes());
-            r
-        };
-        let mut gba = Gba::new(STUB, &rom);
+        let mut gba = Gba::new(STUB, &cartridge_entering_code());
         for _ in 0..16 {
             gba.step();
         }
@@ -251,12 +343,13 @@ mod tests {
     #[test]
     fn irq_vector_calls_the_handler_installed_at_03007ffc() {
         const HANDLER: u32 = 0x0800_0100;
-        // The cartridge parks at its entry point; the handler lives elsewhere.
+        // The cartridge's entry code parks; the handler lives elsewhere.
         let mut rom = vec![0u8; 0x200];
+        rom[..4].copy_from_slice(&branch_to(CODE_AT).to_le_bytes());
         for word in rom[8..0xC0].chunks_exact_mut(4) {
             word.copy_from_slice(&BRANCH_SELF.to_le_bytes());
         }
-        rom[0xC0..0xC4].copy_from_slice(&0x0800_0000u32.to_le_bytes());
+        rom[CODE_AT..CODE_AT + 4].copy_from_slice(&BRANCH_SELF.to_le_bytes());
         // The handler: mark that it ran, then return to the BIOS stub.
         rom[0x100..0x104].copy_from_slice(&0xE3A0_5034u32.to_le_bytes()); // mov r5,#0x34
         rom[0x104..0x108].copy_from_slice(&0xE12F_FF1Eu32.to_le_bytes()); // bx lr

@@ -912,19 +912,22 @@ use gba_core::cpu::hardware::keypad::GbaButton;
     use crate::gba::bios;
     use gba_core::gba::Gba;
 
-    /// A cartridge the core will accept: a real entry point, and a `SWI 0`
-    /// reset at the start so the machine has something to do.
+    /// A cartridge the core will accept, shaped the way a real one is: a
+    /// branch at offset 0 into the code, and `SWI 0` (SoftReset) there.
+    ///
+    /// Both halves matter. The stub BIOS branches to `08000000h` and lets the
+    /// cartridge's own first instruction decide where the code is, so a test
+    /// ROM whose branch does not reach its code runs the branch instead of
+    /// the SWI and the test fails for a reason that has nothing to do with the
+    /// ABI it is exercising.
     fn cartridge() -> Vec<u8> {
+        const CODE_AT: usize = 0xC0;
         let mut rom = vec![0u8; 0x200];
-        // Branch at 0x00 to 0xC0, where a `SWI 0` (SoftReset) sits.
-        rom[0] = 0x04;
-        rom[1] = 0x00;
-        rom[2] = 0x00;
-        rom[3] = 0xEA;
-        for (i, word) in rom[0xC0..0xC4].chunks_exact_mut(4).enumerate() {
-            let _ = i;
-            word.copy_from_slice(&0xEF00_0000u32.to_le_bytes());
-        }
+        // `b` at offset 0: the target is `PC + 8 + (offset << 2)`, and at
+        // offset 0 that is `8 + (offset << 2)`. Same encoding the core decodes.
+        let offset = ((CODE_AT - 8) / 4) as u32;
+        rom[..4].copy_from_slice(&(0xEA00_0000 | (offset & 0x00FF_FFFF)).to_le_bytes());
+        rom[CODE_AT..CODE_AT + 4].copy_from_slice(&0xEF00_0000u32.to_le_bytes());
         rom
     }
 
@@ -2299,34 +2302,34 @@ use gba_core::cpu::hardware::keypad::GbaButton;
         let mut gba = Gba::new(bios::stub(), &rom);
         crate::gba::install_swi_hook(&mut gba);
 
-        println!("\nboot:");
-        println!("  PC right after reset : 0x{:08X}  ({})", gba.cpu.registers.program_counter(), region_of(gba.cpu.registers.program_counter()));
-
         let mut regions: std::collections::HashMap<&'static str, u64> = std::collections::HashMap::new();
         let mut addresses: std::collections::HashMap<usize, u64> = std::collections::HashMap::new();
         let mut checkpoints: Vec<(u64, usize, usize)> = Vec::new();
-        let mut ever_lit = 0usize;
-        let mut first_lit_at = None;
-        let mut frames_seen_lit = 0u64;
+        let mut distinct_screens: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
+        let mut in_cart = 0u64;
+        let mut samples = 0u64;
+        let mut first_cart = None;
 
         for step in 1..=STEPS {
             gba.step();
             if step % SAMPLE_EVERY == 0 {
+                samples += 1;
                 let pc = gba.cpu.registers.program_counter();
                 *regions.entry(region_of(pc)).or_insert(0) += 1;
                 *addresses.entry(pc).or_insert(0) += 1;
+                if (0x0800_0000..0x0E00_0000).contains(&pc) {
+                    in_cart += 1;
+                    first_cart.get_or_insert(pc);
+                }
             }
             // Looking at every pixel on every step would cost more than the
             // emulation itself, so the screen is sampled, not polled.
-            if step % 100_000 == 0 {
-                let (lit, total, _) = screen_report(&gba);
-                if lit > 0 {
-                    ever_lit = lit;
-                    frames_seen_lit += 1;
-                    if first_lit_at.is_none() {
-                        first_lit_at = Some(step);
-                    }
-                }
+            if step % 1_250_000 == 0 {
+                let (lit, total, top) = screen_report(&gba);
+                distinct_screens.insert(
+                    top.iter().map(|(r, g, b, _)| format!("{r}{g}{b}")).collect(),
+                );
                 checkpoints.push((step, lit, total));
             }
         }
@@ -2349,6 +2352,24 @@ use gba_core::cpu::hardware::keypad::GbaButton;
         for (name, count) in region_rows {
             println!("      {name:<26} {count:>8} samples");
         }
+        println!(
+            "  inside the cartridge : {in_cart} of {samples} ({:.1} %)",
+            in_cart as f64 * 100.0 / samples as f64
+        );
+
+        // A cartridge the CPU never reached is a boot regression, not a
+        // property of the game, and the two look identical on screen. Saying so
+        // in words is the difference between "this game is Alpha" and "the
+        // stub BIOS is broken", and this is the test that found the second
+        // one once already.
+        if in_cart == 0 {
+            println!(
+                "\n  ** THE CPU NEVER REACHED THE CARTRIDGE. That is a broken stub BIOS,\n  \
+                 not a game that has not drawn yet. Check `bios::CART_ENTRY`. **"
+            );
+        } else {
+            println!("  first cart address    : 0x{:08X}", first_cart.unwrap_or(0));
+        }
 
         println!("\n  most visited addresses (a tight loop shows up here):");
         let mut hot: Vec<(&usize, &u64)> = addresses.iter().collect();
@@ -2357,110 +2378,14 @@ use gba_core::cpu::hardware::keypad::GbaButton;
             println!("      0x{addr:08X}  ({:<24}) {count:>8} samples", region_of(**addr));
         }
 
-        println!("\n  screen over time (sampled every 100k instructions):");
-        for (step, lit, _) in checkpoints.iter().step_by((checkpoints.len() / 12).max(1)) {
-            println!("      after {:>10} steps: {lit:>6} lit", step);
+        println!("\n  screen over time (sampled every 1.25M instructions):");
+        for (step, lit, _) in &checkpoints {
+            println!("      after {step:>10} steps: {lit:>6} lit");
         }
-        match first_lit_at {
-            Some(step) => println!(
-                "\n  first non-black pixels at instruction {step}; {frames_seen_lit} samples had content (max {ever_lit} lit)"
-            ),
-            None => println!("\n  the screen never left black in {STEPS} instructions"),
-        }
-
-        // ---- The same cartridge, with the stub's boot sequence corrected ----
-        //
-        // Two things in `bios::build` are wrong for a real cartridge, and both
-        // have to be right for the boot to land:
-        //
-        //  1. **The entry literal.** The stub reads what it believes is the
-        //     entry point from `0x080000C0`. On the GBA the word at `0xC0` is
-        //     the "Nintendo reserved" slot, which holds *an ARM branch
-        //     instruction*, not an address -- on this cartridge `E3A00012`,
-        //     `mov r0, #0x12`. A cartridge simply starts at `0x08000000`, and
-        //     its own `b` at `0x00` takes it from there.
-        //  2. **The extra dereference.** The boot does `LDR r2, [r2]` after
-        //     loading the address, i.e. it assumes the cartridge stores a
-        //     *pointer to* the entry point. GBA cartridges store no such field,
-        //     so that load reads the branch instruction at `0x00` instead and
-        //     the `BX` lands back in the unmapped region.
-        //
-        // The production image is untouched: this is a copy, inside a
-        // diagnostic, and it is the whole answer only if the cartridge starts
-        // running once both are corrected.
-        const ENTRY_LITERAL: usize = 0x40 + 0x18 + 8; // BOOT_CODE + 0x18, third literal
-        const DEREF_SLOT: usize = 0x40 + 0x10; // BOOT_CODE + 0x10: `LDR r2, [r2]`
-        const NOP: u32 = 0xE1A0_0000; // `MOV r0, r0`
-
-        let mut patched = bios::stub();
-        patched[ENTRY_LITERAL..ENTRY_LITERAL + 4].copy_from_slice(&0x0800_0000u32.to_le_bytes());
-        patched[DEREF_SLOT..DEREF_SLOT + 4].copy_from_slice(&NOP.to_le_bytes());
-
-        let mut gba = Gba::new(patched, &rom);
-        crate::gba::install_swi_hook(&mut gba);
-        let mut in_cart = 0u64;
-        let mut samples = 0u64;
-        let mut first_cart = None;
-        let mut regions_after: std::collections::HashMap<&'static str, u64> =
-            std::collections::HashMap::new();
-        for step in 1..=STEPS {
-            gba.step();
-            if step % SAMPLE_EVERY == 0 {
-                samples += 1;
-                let pc = gba.cpu.registers.program_counter();
-                *regions_after.entry(region_of(pc)).or_insert(0) += 1;
-                if (0x0800_0000..0x0E00_0000).contains(&pc) {
-                    in_cart += 1;
-                    first_cart.get_or_insert(pc);
-                }
-            }
-        }
-        let (lit, total, top) = screen_report(&gba);
-        let pc = gba.cpu.registers.program_counter();
-
-        println!("\n\n==== same cartridge, stub entry literal + deref both corrected ====");
-        println!("  PC                   : 0x{:08X}  ({})", pc, region_of(pc));
-        println!("  CPU halted           : {}", gba.cpu.halted);
-        println!("  samples inside cart  : {in_cart} of {samples} ({:.1} %)", in_cart as f64 * 100.0 / samples as f64);
-        match first_cart {
-            Some(first) => println!("  first cart address    : 0x{first:08X}"),
-            None => println!("  the CPU never reached the cartridge"),
-        }
-        println!("  screen               : {lit} of {total} pixels lit ({:.2} %)", lit as f64 * 100.0 / total as f64);
-        for (r, g, b, n) in top {
-            println!("      rgb({r:>2},{g:>2},{b:>2})  {n:>6} pixels");
-        }
-        println!("  where the PC was after the fix:");
-        let mut rows: Vec<(&&str, &u64)> = regions_after.iter().collect();
-        rows.sort_by_key(|(_, count)| std::cmp::Reverse(**count));
-        for (name, count) in rows.iter().take(8) {
-            println!("      {name:<26} {count:>8} samples");
-        }
-
-        // A fully lit screen that is one flat colour says the LCD path works
-        // but nothing has been drawn into it yet. Whether the game is still
-        // filling that screen in, or is waiting for something it will never
-        // get, is a different question -- and the screen over time answers it.
-        let mut gba = Gba::new(patched, &rom);
-        crate::gba::install_swi_hook(&mut gba);
-        println!("\n  screen over time, from a fresh boot:");
-        let mut distinct_screens: std::collections::HashSet<String> = std::collections::HashSet::new();
-        for checkpoint in 1..=24u64 {
-            for _ in 0..(STEPS / 24) {
-                gba.step();
-            }
-            let (lit, total, top) = screen_report(&gba);
-            let signature: String =
-                top.iter().map(|(r, g, b, _)| format!("{r}{g}{b}")).collect();
-            distinct_screens.insert(signature);
-            println!(
-                "      after {:>10} steps: {lit:>6}/{total} lit, commonest rgb({},{},{})",
-                checkpoint * (STEPS / 24),
-                top.first().map_or((0, 0, 0), |(r, g, b, _)| (*r, *g, *b)).0,
-                top.first().map_or((0, 0, 0), |(r, g, b, _)| (*r, *g, *b)).1,
-                top.first().map_or((0, 0, 0), |(r, g, b, _)| (*r, *g, *b)).2,
-            );
-        }
-        println!("  distinct top-colour sets seen: {}", distinct_screens.len());
+        println!(
+            "  distinct top-colour sets over the whole run: {} \
+             (1 means the picture never changed)",
+            distinct_screens.len()
+        );
     }
 }

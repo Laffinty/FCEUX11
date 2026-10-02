@@ -68,10 +68,10 @@
 //! The host reads `r0` after the program parks. That is the whole contract:
 //! the SWI wrote its return value into `r0`, and nothing else touches it.
 
-/// The entry-address literal sits here, and the program starts just past it.
-const LITERAL_OFFSET: usize = 0xC0;
-
-/// Where the program body starts.
+/// Where the program body starts: the `0xC0` slot, which on a real cartridge
+/// holds a branch, and `0xC4`, which is where a branch from `0x00` would
+/// land. Either is fine; what matters is that the boot reaches the cartridge
+/// and the cartridge's own first instruction reaches the body.
 const CODE_OFFSET: usize = 0xC4;
 
 /// The address the body runs at.
@@ -133,24 +133,24 @@ const fn swi(number: u32) -> u32 {
 }
 
 
-/// A cartridge: a header, the stub's entry literal, then `body`.
+/// A cartridge: a header, an entry branch, then `body`.
 ///
-/// The stub BIOS does **not** execute the cartridge's entry branch; it loads
-/// a literal and branches to it, which is how the real BIOS reaches
-/// `CartridgeHeader`'s entry point. So `LITERAL_OFFSET` holds the program's
-/// address as a literal and the code starts after it. Putting code at
-/// `0xC0` instead makes the machine read its first instruction as a jump
-/// target and wander off -- which is what the first draft of this file did.
+/// The stub BIOS branches to `08000000h` and stops there; the cartridge's own
+/// first instruction decides where its code is. So this one has to be a real
+/// cartridge: a `b` at offset 0, reached by the boot, landing on `body`. The
+/// stub does **not** read a word out of the cartridge and branch to it -- an
+/// earlier version of the stub believed `0xC0` held the entry address, and
+/// these tests were built to match it, which is how a boot no real cartridge
+/// survives went green. See r49.
 fn cartridge(body: &[u32]) -> Vec<u8> {
     let mut rom = vec![0u8; 0x200];
 
-    // A real cartridge opens with a branch to its code. Nothing executes it,
-    // but it belongs there.
+    // A real cartridge opens with a branch to its code, and this one is
+    // executed: the boot lands at ROM offset 0.
     let offset = CODE_BASE.wrapping_sub(0x0800_0000 + 8);
     rom[..4].copy_from_slice(&(0xEA00_0000 | ((offset >> 2) & 0x00FF_FFFF)).to_le_bytes());
     // Main unit code 0x00 marks a GBA cartridge.
     rom[0xB3] = 0x00;
-    rom[LITERAL_OFFSET..LITERAL_OFFSET + 4].copy_from_slice(&CODE_BASE.to_le_bytes());
 
     let end = CODE_OFFSET + body.len() * 4;
     assert!(end <= rom.len(), "the program does not fit in the image");

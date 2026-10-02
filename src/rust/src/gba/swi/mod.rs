@@ -773,7 +773,6 @@ mod tests {
         for word in rom[..0xC0].chunks_exact_mut(4) {
             word.copy_from_slice(&arm_swi(n).to_le_bytes());
         }
-        rom[0xC0..0xC4].copy_from_slice(&ROM_BASE.to_le_bytes());
         rom
     }
 
@@ -933,7 +932,6 @@ mod tests {
             let at = 8 + i * 4;
             rom[at..at + 4].copy_from_slice(&word.to_le_bytes());
         }
-        rom[0xC0..0xC4].copy_from_slice(&ROM_BASE.to_le_bytes());
         rom
     }
 
