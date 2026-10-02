@@ -2353,6 +2353,22 @@ use gba_core::cpu::hardware::keypad::GbaButton;
             })
     }
 
+    /// How long a probe should run, in emulated steps.
+    ///
+    /// `GBA_PROBE_STEPS` overrides it, because the interesting question is
+    /// frequently "would it get there eventually" and the default is a
+    /// *guess* about how long that is. At 280,896 cycles a frame, 30 million
+    /// steps is under two seconds of GBA time -- which is less than a
+    /// commercial game's fade-in, so a game that looks wedged at the default
+    /// may simply not have been run long enough. A probe that cannot be given
+    /// more time reports "stuck" when it means "not yet".
+    fn probe_steps(default: u64) -> u64 {
+        std::env::var("GBA_PROBE_STEPS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(default)
+    }
+
     /// Run a real cartridge and report what the core actually did with it.
     ///
     /// **Ignored by default, and it only prints.** This is the S4 diagnostic:
@@ -2380,7 +2396,7 @@ use gba_core::cpu::hardware::keypad::GbaButton;
         /// Total instructions to run. Roughly ten seconds of emulated GBA at
         /// a few million instructions a second, which is far past the point
         /// where a booting game has either drawn something or given up.
-        const STEPS: u64 = 30_000_000;
+        let STEPS: u64 = probe_steps(30_000_000);
         /// How often to sample the program counter.
         const SAMPLE_EVERY: u64 = 1_000;
 
@@ -2563,7 +2579,7 @@ use gba_core::cpu::hardware::keypad::GbaButton;
     #[test]
     #[ignore = "a diagnostic probe for S4: it needs a real .gba and only reports"]
     fn probe_why_a_game_stalls() {
-        const STEPS: u64 = 30_000_000;
+        let STEPS: u64 = probe_steps(30_000_000);
         const SNAPSHOT_EVERY: u64 = 1_000_000;
 
         let Some(path) = probe_rom_path() else {
@@ -2765,6 +2781,161 @@ use gba_core::cpu::hardware::keypad::GbaButton;
                 }
             );
         }
+    }
+
+    // ---- what one frame of a stuck game actually changes ----------------
+    //
+    // The trace above shows *which* instructions run and the register dump
+    // shows what the machine is polling, but neither shows where a
+    // `LDR r2, [pc, #n]` actually pointed -- the disassembler renders a
+    // PC-relative literal load as a plain immediate. Memory traffic is not
+    // subject to that: what a frame writes is a fact about the machine, not a
+    // decoding of the ROM.
+
+    /// The memory a game changes in one frame of its stuck loop.
+    ///
+    /// **Ignored by default, and it only prints.**
+    ///
+    /// The window is one burst, opened by waiting for the machine to fall
+    /// asleep and closed by it doing so again. Waiting for the sleep rather
+    /// than counting steps is what makes the window a whole frame: a game
+    /// that sleeps on `VBlankIntrWait` runs a few hundred instructions and
+    /// then stops, and an arbitrary step count lands somewhere inside that
+    /// or inside the next sleep.
+    ///
+    /// ```text
+    /// set GBA_PROBE_ROM=C:\path\to\game.gba
+    /// cargo test -p fceux11-rust --release --no-default-features --features gba --lib \
+    ///     probe_what_one_frame_changes -- --ignored --nocapture
+    /// ```
+    #[test]
+    #[ignore = "a diagnostic probe for S4: it needs a real .gba and only reports"]
+    fn probe_what_one_frame_changes() {
+        const WARMUP: u64 = 5_000_000;
+        /// Hard cap on waiting for the machine to settle into its loop. If it
+        /// never sleeps, this probe has no window to report and says so rather
+        /// than inventing one.
+        const SETTLE_LIMIT: u64 = 4_000_000;
+        /// Hard cap on the burst itself.
+        const BURST_LIMIT: u64 = 20_000;
+        /// Enough for several frames of a loop that touches a handful of
+        /// variables; the report aggregates by address, so this bounds the
+        /// scan, not the number of variables.
+        const MAX_EVENTS: usize = 4_000;
+
+        let Some(path) = probe_rom_path() else {
+            println!("no .gba found -- set GBA_PROBE_ROM to a path, or put one on the Desktop");
+            return;
+        };
+        let rom = std::fs::read(&path).expect("read the cartridge");
+        println!("cartridge : {}", path.display());
+
+        let mut gba = Gba::new(bios::stub(), &rom);
+        crate::gba::install_swi_hook(&mut gba);
+
+        for _ in 0..WARMUP {
+            gba.step();
+        }
+        println!("state after the warm-up: {}", state_line(&mut gba));
+
+        let mut settled = 0;
+        while !gba.cpu.halted && settled < SETTLE_LIMIT {
+            gba.step();
+            settled += 1;
+        }
+        if !gba.cpu.halted {
+            println!(
+                "  the machine never went to sleep in {SETTLE_LIMIT} steps, so it is\n  \
+                 spinning rather than waiting and this probe has no frame to open"
+            );
+            return;
+        }
+        // Sleeping is the *end* of a frame, not the start. Recording from here
+        // would watch a machine that is still asleep and report an empty frame
+        // for a game that is running perfectly well, so wait for it to wake
+        // before opening the window.
+        let mut slept = 0;
+        while gba.cpu.halted && slept < SETTLE_LIMIT {
+            gba.step();
+            slept += 1;
+        }
+        if gba.cpu.halted {
+            println!("  it never woke up in {SETTLE_LIMIT} steps; there is no frame to report");
+            return;
+        }
+        println!(
+            "  it fell asleep {settled} steps after the warm-up and stayed asleep\n  \
+             {slept} more; opening the window when it wakes\n"
+        );
+
+        // IWRAM only. It is 32 KB, which is small enough to rescan every step,
+        // and it is where a game keeps its flags -- the thing this probe is
+        // looking for. EWRAM is 256 KB and would dominate the run time.
+        const IWRAM_BASE: usize = 0x0300_0000;
+        const IWRAM_WORDS: usize = 0x8000 / 2;
+        let mut prev: Vec<u16> = (0..IWRAM_WORDS)
+            .map(|i| gba.cpu.bus.read_half_word(IWRAM_BASE + i * 2))
+            .collect();
+
+        let mut events: Vec<(u32, u16, u16, u32)> = Vec::new();
+        let mut truncated = false;
+        let mut burst = 0u64;
+        while burst < BURST_LIMIT {
+            gba.step();
+            burst += 1;
+            if gba.cpu.halted {
+                break;
+            }
+            let pc = gba.cpu.registers.program_counter() as u32;
+            for i in 0..IWRAM_WORDS {
+                let v = gba.cpu.bus.read_half_word(IWRAM_BASE + i * 2);
+                if v != prev[i] {
+                    events.push((IWRAM_BASE as u32 + (i * 2) as u32, prev[i], v, pc));
+                    prev[i] = v;
+                }
+            }
+            if events.len() >= MAX_EVENTS {
+                truncated = true;
+                break;
+            }
+        }
+
+        // Aggregated by address, not listed event by event. A loop that repeats
+        // produces thousands of lines that differ only in a counter's value,
+        // and the line that matters is "these are the only addresses that ever
+        // change" -- which an event log buries.
+        let mut by_addr: std::collections::BTreeMap<u32, (u64, u16, u16, u32)> =
+            std::collections::BTreeMap::new();
+        for (addr, old, new, pc) in &events {
+            let slot = by_addr.entry(*addr).or_insert((0, *old, *new, *pc));
+            slot.0 += 1;
+            slot.2 = *new;
+        }
+
+        println!(
+            "frame ran {burst} steps and produced {} IWRAM writes across {} addresses{}:",
+            events.len(),
+            by_addr.len(),
+            if truncated { " (truncated)" } else { "" }
+        );
+        println!("    address     changes   from      to        last writer");
+        for (addr, (count, first, last, pc)) in &by_addr {
+            println!(
+                "    0x{addr:08X}  {count:>7}   0x{first:04X}   0x{last:04X}   0x{pc:08X}"
+            );
+        }
+        if by_addr.len() <= 24 {
+            println!("\n  the whole frame, in order:");
+            for (addr, old, new, pc) in &events {
+                println!("    [0x{addr:08X}] 0x{old:04X} -> 0x{new:04X}   (pc 0x{pc:08X})");
+            }
+        }
+        println!("\nstate at the end of the frame: {}", state_line(&mut gba));
+        println!(
+            "  DISPCNT 0x{:04X}, palette[0] 0x{:04X}",
+            io16(&mut gba, 0x0400_0000),
+            io16(&mut gba, 0x0500_0000)
+        );
     }
 
     // ---- the on-screen size of a GBA frame -----------------------------
