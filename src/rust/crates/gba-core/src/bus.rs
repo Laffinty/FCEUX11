@@ -1361,6 +1361,19 @@ impl Bus {
         }
     }
 
+    /// Total master cycles elapsed, including the ones spent on memory
+    /// wait states.
+    ///
+    /// `Arm7tdmi::current_cycle` counts *instructions*, which is not the same
+    /// thing: an instruction that touches a GamePak ROM line costs several
+    /// master cycles, and this core adds those to `cycles_count` separately.
+    /// Anything that has to line up with another emulator's timing -- a
+    /// frame-aligned dump, a differential trace -- needs the master count, and
+    /// there was no way to read it from outside this module.
+    pub fn master_cycles(&self) -> u64 {
+        self.cycles_count
+    }
+
     const fn waitcnt(&self) -> u16 {
         self.interrupt_control.wait_state_control
     }

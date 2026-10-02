@@ -2983,6 +2983,203 @@ use gba_core::cpu::hardware::keypad::GbaButton;
         );
     }
 
+    // ---- a dump in the same format as the reference ---------------------
+    //
+    // The point of the whole exercise: two cores, one cartridge, one line of
+    // state per frame, and a diff. Everything before this file was guessing
+    // at what the game wanted; a diff says where the two machines actually
+    // stop agreeing, which is a fact rather than an opinion.
+    //
+    // The format is duplicated from the reference dumper on purpose. The two
+    // sides have to agree on the text, and a shared header would be a header
+    // that cannot be shared across the two checkouts.
+
+    /// FNV-1a over an address range, read one halfword at a time.
+    ///
+    /// Byte at a time rather than word at a time, so that the result matches
+    /// the reference dumper's loop exactly; a hash that differs only in how it
+    /// consumed the bytes would report a divergence on frame 0 and waste the
+    /// whole comparison.
+    fn hash_range(gba: &mut Gba, start: u32, end: u32) -> u32 {
+        let mut h: u32 = 0x811C_9DC5;
+        let mut addr = start;
+        while addr < end {
+            let v = u32::from(gba.cpu.bus.read_half_word(addr as usize)) & 0xFFFF;
+            h ^= v & 0xFF;
+            h = h.wrapping_mul(0x0100_0193);
+            h ^= (v >> 8) & 0xFF;
+            h = h.wrapping_mul(0x0100_0193);
+            addr += 2;
+        }
+        h
+    }
+
+    /// One line of state per step, in the reference tracer's format.
+    fn trace_line(gba: &mut Gba, index: u32) -> String {
+        let pc = gba.cpu.registers.program_counter();
+        // Read before the closure below, which holds the bus mutably.
+        let cycles = gba.cpu.bus.master_cycles() as u32;
+        let mut io = |a: u32| gba.cpu.bus.read_half_word(a as usize) & 0xFFFF;
+        format!(
+            "T{index:08} cyc={:08X} pc={pc:08X} r0={:08X} r1={:08X} r2={:08X} r3={:08X} \
+             DISPCNT={:04X} DISPSTAT={:04X} VCOUNT={:04X} BG0CNT={:04X} IE={:04X} IF={:04X} \
+             WAITCNT={:04X} IME={:04X}",
+            cycles,
+            gba.cpu.registers.register_at(0),
+            gba.cpu.registers.register_at(1),
+            gba.cpu.registers.register_at(2),
+            gba.cpu.registers.register_at(3),
+            io(0x0400_0000),
+            io(0x0400_0004),
+            io(0x0400_0006),
+            io(0x0400_0008),
+            io(0x0400_0200),
+            io(0x0400_0202),
+            io(0x0400_0204),
+            io(0x0400_0208),
+        )
+    }
+
+    /// One frame of state, in the reference dumper's line format.
+    fn dump_line(gba: &mut Gba, frame: usize) -> String {
+        let pc = gba.cpu.registers.program_counter();
+        let sp = gba.cpu.registers.register_at(13);
+        let r0 = gba.cpu.registers.register_at(0);
+        let r1 = gba.cpu.registers.register_at(1);
+        let r2 = gba.cpu.registers.register_at(2);
+        let r3 = gba.cpu.registers.register_at(3);
+        // Read before the closure below, which holds the bus mutably.
+        let cycles = gba.cpu.bus.master_cycles() as u32;
+
+        let mut io = |a: u32| gba.cpu.bus.read_half_word(a as usize) & 0xFFFF;
+        let dispcnt = io(0x0400_0000);
+        let dispstat = io(0x0400_0004);
+        let vcount = io(0x0400_0006);
+        let bg0cnt = io(0x0400_0008);
+        let ie = io(0x0400_0200);
+        let iff = io(0x0400_0202);
+        let waitcnt = io(0x0400_0204);
+        let ime = io(0x0400_0208);
+
+        let iwram = hash_range(gba, 0x0300_0000, 0x0300_8000);
+        let ewram = hash_range(gba, 0x0200_0000, 0x0201_0000);
+        let vram = hash_range(gba, 0x0600_0000, 0x0601_8000);
+        let pal = hash_range(gba, 0x0500_0000, 0x0500_0400);
+        let oam = hash_range(gba, 0x0700_0000, 0x0700_0400);
+        let rom = hash_range(gba, 0x0800_0000, 0x0800_8000);
+
+        format!(
+            "F{frame:06} cyc={:08X} pc={pc:08X} sp={sp:08X} r0={r0:08X} r1={r1:08X} \
+             r2={r2:08X} r3={r3:08X} DISPCNT={dispcnt:04X} DISPSTAT={dispstat:04X} \
+             VCOUNT={vcount:04X} BG0CNT={bg0cnt:04X} IE={ie:04X} IF={iff:04X} \
+             WAITCNT={waitcnt:04X} IME={ime:04X} iwram={iwram:08X} eWRAM={ewram:08X} \
+             vram={vram:08X} pal={pal:08X} oam={oam:08X} rom={rom:08X}",
+            cycles,
+        )
+    }
+
+    /// Emit a per-frame dump for diffing against the reference core.
+    ///
+    /// **Ignored by default, and it only prints.** Needs a real cartridge, and
+    /// the output is only meaningful next to the other core's dump of the same
+    /// cartridge over the same number of frames.
+    ///
+    /// ```text
+    /// set GBA_PROBE_ROM=C:\path\to\game.gba
+    /// set GBA_PROBE_FRAMES=1800
+    /// set GBA_PROBE_OUT=D:\path\to\ours.txt
+    /// cargo test -p fceux11-rust --release --no-default-features --features gba --lib \
+    ///     dump_frames_like_the_reference -- --ignored --nocapture
+    /// ```
+    #[test]
+    #[ignore = "a diagnostic probe for S4: it needs a real .gba and only reports"]
+    fn dump_frames_like_the_reference() {
+        let frames: usize = std::env::var("GBA_PROBE_FRAMES")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(1800);
+        let out = std::env::var("GBA_PROBE_OUT").unwrap_or_else(|_| "ours.txt".to_string());
+        // The sample period, in cycles. Coarse enough to stay comparable
+        // across two cores that do not agree on where a "frame" ends, fine
+        // enough to localise a divergence to within one period.
+        let period: u64 = std::env::var("GBA_PROBE_PERIOD")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(280_896);
+
+
+        let Some(path) = probe_rom_path() else {
+            println!("no .gba found -- set GBA_PROBE_ROM to a path, or put one on the Desktop");
+            return;
+        };
+        let rom = std::fs::read(&path).expect("read the cartridge");
+        println!("cartridge : {}", path.display());
+
+        let mut gba = Gba::new(bios::stub(), &rom);
+        crate::gba::install_swi_hook(&mut gba);
+
+        let mut lines = String::with_capacity(frames * 160);
+        let mut frames_done = 0usize;
+
+        // Trace mode: one line per step, so the two dumps can be matched on
+        // the cycle number instead of on an index. The reference core's very
+        // first step spans 459,223 cycles, so sampling only at targets is
+        // blind over the first frame and a half -- which is where the
+        // divergence turns out to be.
+        if let Ok(limit) = std::env::var("GBA_PROBE_TRACE") {
+            let limit: u64 = limit.parse().expect("GBA_PROBE_TRACE is a cycle count");
+            let mut lines = String::new();
+            let mut n = 0u32;
+            while gba.cpu.bus.master_cycles() < limit {
+                gba.step();
+                lines.push_str(&trace_line(&mut gba, n));
+                lines.push('\n');
+                n += 1;
+            }
+            std::fs::write(&out, lines.as_bytes()).expect("write the trace");
+            println!("traced to {} cycles, {n} steps -> {out}", gba.cpu.bus.master_cycles());
+            return;
+        }
+        lines.push_str(&format!("# rom={} frames={frames}\n", path.display()));
+        for frame in 0..frames {
+            // A cycle ruler, not a frame ruler. The two cores do not agree on
+            // where a "frame" ends: `Bus::step` catches the LCD up inside a
+            // `while` loop, and a VBlank-timed DMA can push it many scanlines
+            // past the edge it just signalled. Frame N on one side is
+            // therefore not the same instant as frame N on the other, and
+            // diffing by frame index reports a divergence that is only a
+            // difference in pacing -- which is exactly the false lead that
+            // produced "IWRAM diverges at frame 2" the first time round.
+            //
+            // One frame is 228 scanlines x 308 pixels x 4 cycles. Both sides
+            // sample at the same master cycle, a landmark both can hit exactly.
+            let target = (frame as u64 + 1) * period;
+            let mut guard = 8 * period;
+            while gba.cpu.bus.master_cycles() < target {
+                gba.step();
+                guard -= 1;
+                if guard == 0 {
+                    println!("frame {frame}: cycle target {target} not reached");
+                    frames_done = frame;
+                    return write_dump(&out, &mut lines, frames_done);
+                }
+            }
+            frames_done = frame + 1;
+            lines.push_str(&dump_line(&mut gba, frame));
+            lines.push('\n');
+        }
+
+        write_dump(&out, &mut lines, frames);
+    }
+
+    fn write_dump(out: &str, lines: &mut String, frames: usize) {
+        let _ = frames;
+        std::fs::write(out, lines.as_bytes()).expect("write the dump");
+        println!("wrote {frames} frames to {out}");
+    }
+
+    // ---- the on-screen size of a GBA frame -----------------------------
+
     // ---- the on-screen size of a GBA frame -----------------------------
     //
     // The arithmetic lives in C++ (`fceu11_gba_draw_size` in `gba_load.cpp`,

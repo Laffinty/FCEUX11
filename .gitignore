@@ -193,3 +193,12 @@ build/*_baseline*.json
 build/*_accuracy*.md
 build/*_results*.json
 build/*_output*.txt
+
+# ---------------------------------------------------------------------------
+# Local research scratch (third-party source trees, reference builds).
+# Never part of the project, never committed, never referenced in tracked
+# text. Everything the project needs is already recorded in
+# docs/plans/FCEUX11-v2.0_GBAEUX11构建计划.md; this directory exists purely so
+# that a reference checkout has somewhere to live that git will not see.
+# ---------------------------------------------------------------------------
+/Research_only/
