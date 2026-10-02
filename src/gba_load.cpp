@@ -35,8 +35,9 @@
 #include "fceu.h"
 #include "rust/fceux11_rust.h"
 
-// The NES pad state, and the video pool both sessions share.
-extern uint8 joy[4];
+// The video pool both sessions share. `joy[]` is deliberately *not* declared
+// here any more: it was the GBA's button source until r51, and reading it did
+// nothing at all, because the NES core is the only thing that writes it.
 extern nes_shm_t* nes_shm;
 
 // ---------------------------------------------------------------------------
@@ -56,10 +57,16 @@ namespace
 	std::vector<uint8_t> g_frame;
 	uint32_t g_frameSerial = 0;
 
-	// The two shoulder keys, pushed in by the Qt layer each frame. See
-	// fceu11_gba_button_mask for why these do not come from the NES pad.
-	bool g_shoulderL = false;
-	bool g_shoulderR = false;
+	// The pad, pushed in by the Qt layer each frame in `GbaPadBit` order. See
+	// fceu11_gba_button_mask for why it does not come from the NES side.
+	//
+	// There is deliberately no translation table from NES bits here. Section
+	// 7.2's mapping is applied in the Qt layer, where the user's actual key
+	// bindings live: A->A, B->B, Select->Select, Start->Start, the four
+	// directions to the same, and the two NES shoulder keys to L and R.
+	// Translating here instead meant reading `joy[]`, which the NES core is
+	// the only writer of, and a GBA session does not run it.
+	uint16_t g_padState = 0;
 
 	// Where a GBA ROM's identifying byte lives, and its value. 0xB2 is the
 	// "fixed value" the GBA header must carry for the BIOS to boot the cart;
@@ -72,51 +79,6 @@ namespace
 	// checks the length itself; this is only so a truncated file is not read
 	// past its end here.
 	constexpr long kHeaderProbeBytes = 0xC0;
-
-	// GBA button bits, from the core's `GbaButton` (keypad.rs). A set bit means
-	// held.
-	// Plan section 7.2's defaults for the two shoulders a NES pad does not
-	// have. Read as raw key state, so they work whatever Z and X are bound to
-	// on the NES side -- which is the whole point of reading them separately
-	// rather than deriving them from the pad.
-	//
-	// The state is pushed in by the Qt layer rather than read here. This file is
-	// in the core library, and `Qt/input.h` cannot be included from here: it
-	// uses `FAMILYKEYBOARD_NUM_BUTTONS` before anything defines it, the same
-	// trap `dface.h` sets. So the keyboard stays entirely on the Qt side and
-	// `fceu11_gba_set_shoulder_keys` hands over two booleans. A binding table
-	// that let a player move them is the key-configuration work; changing these
-	// two lines is the temporary way to try a different pair.
-	enum GbaButtonBit : uint16_t
-	{
-		kGbaA = 1u << 0,
-		kGbaB = 1u << 1,
-		kGbaSelect = 1u << 2,
-		kGbaStart = 1u << 3,
-		kGbaRight = 1u << 4,
-		kGbaLeft = 1u << 5,
-		kGbaUp = 1u << 6,
-		kGbaDown = 1u << 7,
-		kGbaR = 1u << 8,
-		kGbaL = 1u << 9,
-	};
-
-	// The NES pad's own bit order, read out of the Qt input backend rather than
-	// assumed: `UpdateGamepad` sets bit 4 on "up", rejects 5 as its opposite and
-	// 7 as the opposite of 6 ("left"), and treats `JS == 15` as A+B+Start+Select
-	// (`drivers/Qt/input.cpp:1514-1531,1538`). So: 0 A, 1 B, 2 Select, 3 Start,
-	// 4 Up, 5 Down, 6 Left, 7 Right.
-	enum NesButtonBit : uint8_t
-	{
-		kNesA = 1u << 0,
-		kNesB = 1u << 1,
-		kNesSelect = 1u << 2,
-		kNesStart = 1u << 3,
-		kNesUp = 1u << 4,
-		kNesDown = 1u << 5,
-		kNesLeft = 1u << 6,
-		kNesRight = 1u << 7,
-	};
 }  // namespace
 
 bool fceu11_gba_active(void)
@@ -286,39 +248,57 @@ const std::string& fceu11_gba_path(void)
 
 uint16_t fceu11_gba_button_mask(void)
 {
-	// Player 1. The NES side has only two worth of bindings to offer a GBA, and
-	// a game that needs two GBA pads is not what section 7.2 promises.
-	const uint8_t pad = joy[0];
-
-	uint16_t mask = 0;
-	if (pad & kNesA) mask |= kGbaA;
-	if (pad & kNesB) mask |= kGbaB;
-	if (pad & kNesSelect) mask |= kGbaSelect;
-	if (pad & kNesStart) mask |= kGbaStart;
-	if (pad & kNesUp) mask |= kGbaUp;
-	if (pad & kNesDown) mask |= kGbaDown;
-	if (pad & kNesLeft) mask |= kGbaLeft;
-	if (pad & kNesRight) mask |= kGbaRight;
-
-	// L and R come from the raw key state the Qt layer pushed in, NOT from the
-	// pad above.
+	// Whatever the Qt layer pushed in this frame, in the core's own bit order.
 	//
-	// Section 7.2 wants them on Z and X. A NES pad has no shoulders, and on the
-	// default layout Z and X are already bound to A and B -- so deriving L from
-	// `joy[]` would make L a second copy of A, which is the exact failure these
-	// two lines exist to avoid. `g_keyState` is a full scancode table written for
-	// every SDL_KEYDOWN/KEYUP whether or not the key is bound to anything
-	// (`input.cpp:1366`), so the Qt layer can read a key the NES side ignores.
-	if (g_shoulderL) mask |= kGbaL;
-	if (g_shoulderR) mask |= kGbaR;
-
-	return mask;
+	// The translation from keys to GBA bits happens up there, where the user's
+	// actual bindings live. This module has no way to ask: `joy[]` is written
+	// by `UpdateGP` copying out of the NES controller port register
+	// (`input.cpp:231`), and a GBA session does not run the NES core, so
+	// nothing ever writes that register and `joy[]` stays zero. Reading it
+	// here is what left all eight face and d-pad buttons dead while L and R
+	// worked.
+	return g_padState;
 }
 
-void fceu11_gba_set_shoulder_keys(bool l_down, bool r_down)
+void fceu11_gba_set_pad_state(uint16_t mask)
 {
-	g_shoulderL = l_down;
-	g_shoulderR = r_down;
+	g_padState = mask;
+}
+
+GbaDrawSize fceu11_gba_draw_size(int view_w, int view_h)
+{
+	// Native size. A GBA frame is 240x160 and no video mode makes it anything
+	// else, so this is a constant rather than a query.
+	constexpr int native_w = 240;
+	constexpr int native_h = 160;
+
+	GbaDrawSize size{0, 0, true};
+
+	// The largest whole multiple that fits on both axes. Integer division
+	// floors, which is what "largest whole multiple" means.
+	const int by_width = view_w / native_w;
+	const int by_height = view_h / native_h;
+	int factor = by_width < by_height ? by_width : by_height;
+
+	if (factor >= 1)
+	{
+		size.width = native_w * factor;
+		size.height = native_h * factor;
+		return size;
+	}
+
+	// The viewport cannot hold the picture at 1:1. Fractional it is, so a
+	// window narrower than 240 shows a small correct picture rather than a
+	// clipped one. 240x160 is not the invariant here; the aspect ratio is.
+	size.integral = false;
+	const float sx = static_cast<float>(view_w) / static_cast<float>(native_w);
+	const float sy = static_cast<float>(view_h) / static_cast<float>(native_h);
+	const float scale = sx < sy ? sx : sy;
+	size.width = static_cast<int>(static_cast<float>(native_w) * scale);
+	size.height = static_cast<int>(static_cast<float>(native_h) * scale);
+	if (size.width < 1) size.width = 1;
+	if (size.height < 1) size.height = 1;
+	return size;
 }
 
 void fceu11_gba_step_frame(void)

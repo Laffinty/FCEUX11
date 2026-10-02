@@ -440,13 +440,12 @@ void ConsoleViewQWidget_t::renderGbaFrame(QPainter& painter)
 		return;
 	}
 
-	float scale = static_cast<float>(view_width) / static_cast<float>(width);
-	const float yScale = static_cast<float>(view_height) / static_cast<float>(height);
-	if (yScale < scale) scale = yScale;
-	if (scale > 1.0f) scale = 1.0f;
+	// Whole multiples only, shared with the other two drivers. See
+	// `fceu11_gba_draw_size`.
+	const GbaDrawSize draw = fceu11_gba_draw_size(view_width, view_height);
 
-	int destW = static_cast<int>(static_cast<float>(width) * scale);
-	int destH = static_cast<int>(static_cast<float>(height) * scale);
+	int destW = draw.width;
+	int destH = draw.height;
 	if (destW < 1) destW = 1;
 	if (destH < 1) destH = 1;
 

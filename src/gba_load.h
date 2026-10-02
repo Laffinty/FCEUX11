@@ -55,32 +55,49 @@ const std::string& fceu11_gba_path(void);
 /// which are stage 3.
 void fceu11_gba_step_frame(void);
 
-/// Build the GBA-side button mask from the NES input state.
+/// The state of a GBA pad, in the core's own bit order.
 ///
-/// Stage 1 reads the NES pad, because that is what exists: there is no GBA
-/// binding table yet, and inventing one is the key-mapping work the plan puts
-/// in S3. Section 7.2's mapping is A/B/Select/Start to the same, the D-pad to
-/// the same, and NES's shoulder buttons onto L and R.
-///
-/// L and R are the exception and come from
-/// [`fceu11_gba_set_shoulder_keys`] instead of the pad, because on the default
-/// NES layout Z and X are already bound to A and B -- reading them off the pad
-/// would make L a second copy of A.
-uint16_t fceu11_gba_button_mask(void);
+/// This is the GBA `Keypad` layout (`gba-core`'s `GbaButton`), not the NES one:
+/// the two disagree about the d-pad, and the NES table is what
+/// `fceu11_gba_button_mask` used to read.
+enum GbaPadBit : uint16_t
+{
+	kGbaPadA = 1u << 0,
+	kGbaPadB = 1u << 1,
+	kGbaPadSelect = 1u << 2,
+	kGbaPadStart = 1u << 3,
+	kGbaPadRight = 1u << 4,
+	kGbaPadLeft = 1u << 5,
+	kGbaPadUp = 1u << 6,
+	kGbaPadDown = 1u << 7,
+	kGbaPadR = 1u << 8,
+	kGbaPadL = 1u << 9,
+};
 
-/// Report the raw state of the two shoulder keys, as the Qt layer sees them.
+/// Hand the pad state to the GBA module for the frame about to be stepped.
 ///
-/// Pushed in rather than read here because this file is in the core library:
-/// `Qt/input.h` cannot be included from it (it uses
+/// Pushed in rather than read here because this file is in the core library and
+/// `Qt/input.h` cannot be included from it: that header uses
 /// `FAMILYKEYBOARD_NUM_BUTTONS` before anything defines it, the same trap
-/// `dface.h` sets), so the keyboard stays on the Qt side and hands over two
-/// booleans. `g_keyState` is a full scancode table written for every
-/// `SDL_KEYDOWN`/`SDL_KEYUP` whether or not the key is bound to anything
-/// (`input.cpp:1366`), which is what lets a GBA read a key the NES side
-/// ignores.
+/// `dface.h` sets. So the keyboard stays on the Qt side and hands over a mask,
+/// built there from the bindings the user actually has.
 ///
-/// Both are full states, not edges: a key not reported this frame is up.
-void fceu11_gba_set_shoulder_keys(bool l_down, bool r_down);
+/// A full state, not a delta: a button the mask does not name is released.
+///
+/// **Why not `joy[]`**, which is what this used to read: `joy[]` is the NES
+/// side's own value, written by `UpdateGP` copying out of the NES controller
+/// port register (`input.cpp:231`). A GBA session does not run the NES core,
+/// so nothing writes that register, so `joy[]` stays zero and the game never
+/// sees a key. That is the whole reason the eight face and d-pad buttons were
+/// dead while L and R worked -- those two came from `g_keyState` instead, and
+/// the eight that went through `joy[]` never had a value to read.
+void fceu11_gba_set_pad_state(uint16_t mask);
+
+/// The button mask for the frame about to be stepped.
+///
+/// Player 1. The NES side has only two worth of bindings to offer a GBA, and a
+/// game that needs two GBA pads is not what plan section 7.2 promises.
+uint16_t fceu11_gba_button_mask(void);
 
 // ---- stage 2': the frame (v2.0 S2-b4) ------------------------------------
 //
@@ -197,11 +214,43 @@ void fceu11_gba_flush_battery(void);
 /// "Save State As".
 bool fceu11_gba_savestate_save(const char* path);
 
-/// Read a state back from `path`, replacing the running machine.
+/// Report that the state is read back from a real machine, replacing the
+/// running one.
 ///
 /// Reports whether the machine took it. A false leaves the running machine
 /// exactly as it was: the core checks the cartridge fingerprint before it
 /// touches anything, so a state from another game is a refusal rather than a
 /// corrupted session.
 bool fceu11_gba_savestate_load(const char* path);
+
+// ---- the picture's size on screen (v2.0 S4) -------------------------------
+//
+// A GBA frame is 240x160 and never any other size, so the only question each
+// video driver asks about it is "how big, and where". Both are answered here
+// rather than in the drivers, because the three of them would otherwise each
+// work it out separately and eventually disagree -- which is exactly what
+// happened with the first version, where all three refused to scale past 1:1
+// and a 240x160 picture sat in the middle of a 528x506 window looking broken.
+
+/// The size a GBA frame is drawn at inside a `view_w` x `view_h` viewport.
+///
+/// **Integer multiples only.** A factor of 1.5 or 2.5 resamples 240x160 into
+/// pixels that are in no one row or column of the source, and a GBA picture is
+/// mostly flat-shaded sprites and crisp text, so it smears where the NES
+/// path's non-integer scaling is merely soft. When the viewport cannot hold
+/// even 1:1 -- a window narrower than 240 -- the fit falls back to a fractional
+/// scale rather than refusing to draw, because a small correct picture beats
+/// a clipped one.
+///
+/// The result is centred by the caller, which is what leaves the letterbox.
+struct GbaDrawSize
+{
+	int width;
+	int height;
+	/// Which path produced it, for the caller's own comment or assertion. Not
+	/// used for drawing.
+	bool integral;
+};
+
+GbaDrawSize fceu11_gba_draw_size(int view_w, int view_h);
 

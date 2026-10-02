@@ -819,15 +819,11 @@ void ConsoleViewGL_t::renderGbaFrame(void)
 		gbaTextureSerial = serial;
 	}
 
-	float scale = static_cast<float>(view_width)  / static_cast<float>(texture_width);
-	const float yscale = static_cast<float>(view_height) / static_cast<float>(texture_height);
-	if (yscale < scale) scale = yscale;
-	if (scale > 1.0f) scale = 1.0f;
-
-	int rw = static_cast<int>(static_cast<float>(texture_width)  * scale);
-	int rh = static_cast<int>(static_cast<float>(texture_height) * scale);
-	if (rw < 1) rw = 1;
-	if (rh < 1) rh = 1;
+	// Whole multiples only, shared with the other two drivers. See
+	// `fceu11_gba_draw_size`.
+	const GbaDrawSize draw = fceu11_gba_draw_size(view_width, view_height);
+	const int rw = draw.width;
+	const int rh = draw.height;
 
 	const int sx = (view_width - rw) / 2;
 	const int sy = (view_height - rh) / 2;

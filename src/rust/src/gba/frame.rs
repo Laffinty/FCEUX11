@@ -2388,4 +2388,181 @@ use gba_core::cpu::hardware::keypad::GbaButton;
             distinct_screens.len()
         );
     }
+
+    // ---- the on-screen size of a GBA frame -----------------------------
+    //
+    // The arithmetic lives in C++ (`fceu11_gba_draw_size` in `gba_load.cpp`,
+    // because that is where the three video drivers can reach it without three
+    // copies). It is pure integer logic, so it is mirrored here and pinned --
+    // a rule that decides how big a picture is drawn is worth a test even when
+    // the thing under test is on the other side of the FFI.
+    //
+    // What is *not* mirrored: the drivers themselves. r50 is what happens when
+    // the same decision is written out three times and only one of them is
+    // ever looked at.
+
+    /// The rule `fceu11_gba_draw_size` implements, restated.
+    ///
+    /// A GBA frame is 240x160 and no video mode makes it anything else, so the
+    /// only question is how large a whole multiple of it fits.
+    fn gba_draw_size(view_w: i32, view_h: i32) -> (i32, i32, bool) {
+        const NATIVE_W: i32 = 240;
+        const NATIVE_H: i32 = 160;
+        let factor = (view_w / NATIVE_W).min(view_h / NATIVE_H);
+        if factor >= 1 {
+            return (NATIVE_W * factor, NATIVE_H * factor, true);
+        }
+        let scale = (view_w as f32 / NATIVE_W as f32).min(view_h as f32 / NATIVE_H as f32);
+        (
+            ((NATIVE_W as f32) * scale) as i32,
+            ((NATIVE_H as f32) * scale) as i32,
+            false,
+        )
+    }
+
+    /// The picture is scaled up to fill the window, at a whole multiple.
+    ///
+    /// The first version of this refused to go past 1:1, which left a 240x160
+    /// picture sitting in the middle of a 528x506 window looking like a bug
+    /// rather than a feature. A GBA picture is mostly flat-shaded sprites and
+    /// crisp text, so a non-integer factor smears it -- the whole point of
+    /// insisting on integers.
+    #[test]
+    fn a_gba_frame_fills_the_window_at_a_whole_multiple() {
+        for (view_w, view_h) in [(528, 506), (1280, 720), (800, 600), (1920, 1080)] {
+            let (w, h, integral) = gba_draw_size(view_w, view_h);
+            assert!(integral, "{view_w}x{view_h} should scale by a whole factor");
+            assert!(
+                w % 240 == 0 && h % 160 == 0,
+                "{view_w}x{view_h} gave {w}x{h}, which is not a whole multiple of 240x160"
+            );
+            assert_eq!(
+                w * 160,
+                h * 240,
+                "{view_w}x{view_h} gave {w}x{h}, which distorts the 3:2 aspect"
+            );
+            // Filling means "as large as fits", so the smaller axis has to be
+            // the binding one -- one more factor would overflow it.
+            assert!(
+                w <= view_w && h <= view_h,
+                "{view_w}x{view_h} gave {w}x{h}, which does not fit"
+            );
+            let next_w = w + 240;
+            let next_h = h + 160;
+            assert!(
+                next_w > view_w || next_h > view_h,
+                "{view_w}x{view_h} stopped at {w}x{h} with room for a larger multiple"
+            );
+        }
+    }
+
+    /// A viewport too small for 1:1 shrinks rather than clipping.
+    ///
+    /// The alternative is a picture wider than the window, which shows a
+    /// cropped fragment of a game -- strictly worse than a small correct one,
+    /// and the kind of thing that reads as a crash.
+    #[test]
+    fn a_viewport_smaller_than_the_frame_shrinks_instead_of_clipping() {
+        for (view_w, view_h) in [(160, 120), (240, 100), (100, 160), (239, 159)] {
+            let (w, h, integral) = gba_draw_size(view_w, view_h);
+            assert!(!integral, "{view_w}x{view_h} cannot hold 1:1");
+            assert!(w >= 1 && h >= 1, "{view_w}x{view_h} gave {w}x{h}");
+            assert!(
+                w <= view_w && h <= view_h,
+                "{view_w}x{view_h} gave {w}x{h}, which is clipped"
+            );
+        }
+    }
+
+    // ---- the pad ----------------------------------------------------------------
+    //
+    // The GBA side of the pad is two things that have to agree: the bit layout
+    // `GbaPadBit` publishes to the C++ side, and the core's own keypad. The
+    // failure this pins down is a *mapping* one, so the assertion is about
+    // which GBA bit each NES button ends up on -- the thing that is invisible
+    // in a screenshot and shows up as "up moves right".
+
+    /// The GBA bit each NES button index maps to, in `GamePadNames` order.
+    ///
+    /// This is the table `fceuWrapper.cpp` builds from the user's bindings, and
+    /// it is positional: the GBA bits happen to be in the same order as the NES
+    /// button indices for the first eight, which is a coincidence worth stating
+    /// rather than assuming -- add a button and the coincidence stops.
+    const NES_BUTTON_TO_GBA: [(u8, u16); 8] = [
+        (0, 1 << 0), // A
+        (1, 1 << 1), // B
+        (2, 1 << 2), // Select
+        (3, 1 << 3), // Start
+        (4, 1 << 6), // Up    -- NOT bit 4
+        (5, 1 << 7), // Down  -- NOT bit 5
+        (6, 1 << 5), // Left  -- NOT bit 6
+        (7, 1 << 4), // Right -- NOT bit 7
+    ];
+
+    /// The face buttons agree bit-for-bit, the d-pad does not.
+    ///
+    /// The property worth pinning: the d-pad is a **permutation** of the NES
+    /// d-pad's four bits, not a copy. `GamePadNames` orders the directions Up,
+    /// Down, Left, Right and the core's `Keypad` orders them Right, Left, Up,
+    /// Down, so mapping one onto the other positionally produces a d-pad that
+    /// still does *something* under every key -- a rotated one, wrong in a way
+    /// no screenshot or smoke test will ever catch.
+    ///
+    /// The permutation is checked by its *values* rather than by comparing
+    /// against an identity: sorting a permutation of a set always reproduces
+    /// that set, so `sorted == expected` cannot tell a reorder from a copy. The
+    /// two positional checks below are what actually make the copy fail.
+    #[test]
+    fn the_face_buttons_match_and_the_dpad_does_not() {
+        for (nes_bit, gba_bit) in NES_BUTTON_TO_GBA.iter().take(4) {
+            assert_eq!(*gba_bit, 1u16 << nes_bit, "face button {nes_bit}");
+        }
+
+        // Each d-pad direction lands somewhere other than its own NES bit, and
+        // the four targets are the NES d-pad's four bits with none left over.
+        // Together those two facts are exactly "a permutation and not a copy":
+        // drop in `1 << nes_bit` and the first check turns red.
+        let dpad: Vec<u16> = NES_BUTTON_TO_GBA.iter().skip(4).map(|(_, b)| *b).collect();
+        for (offset, (nes_bit, gba_bit)) in NES_BUTTON_TO_GBA.iter().skip(4).enumerate() {
+            let nes_dpad_bit = 1u16 << (4 + offset as u8);
+            assert_ne!(
+                *gba_bit, nes_dpad_bit,
+                "NES d-pad bit {} maps to the same GBA bit, so the explicit table has \
+                 collapsed back into a positional mapping -- which is the bug it exists \
+                 to prevent, because every key would still do something",
+                4 + offset
+            );
+        }
+        let mut sorted = dpad.clone();
+        sorted.sort_unstable();
+        assert_eq!(
+            sorted,
+            vec![1u16 << 4, 1u16 << 5, 1u16 << 6, 1u16 << 7],
+            "the d-pad must use exactly the NES d-pad's four bits, each once"
+        );
+    }
+
+    /// A held pad reaches the core as the bits the core reads.
+    ///
+    /// End of the C++-side contract, tested from this side: whatever the Qt
+    /// layer pushes through `gba_set_buttons` is what the core's keypad holds.
+    #[test]
+    fn a_pushed_mask_reaches_the_core_unchanged() {
+        exclusively(|| {
+            gba_load_rom_bytes(&cartridge());
+            for (nes_bit, gba_bit) in NES_BUTTON_TO_GBA {
+                gba_set_buttons(gba_bit);
+                let mut read = 0u16;
+                assert_eq!(gba_buttons(&mut read), GBA_OK);
+                assert_eq!(
+                    read, gba_bit,
+                    "NES button {nes_bit} should be GBA bit 0x{gba_bit:04X} alone"
+                );
+            }
+            gba_set_buttons(0);
+            let mut read = 1u16;
+            assert_eq!(gba_buttons(&mut read), GBA_OK);
+            assert_eq!(read, 0, "releasing every button must leave the pad empty");
+        });
+    }
 }

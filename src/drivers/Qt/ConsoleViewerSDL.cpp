@@ -705,21 +705,14 @@ void ConsoleViewSDL_t::renderGbaFrame(void)
 		sdlGbaTextureSerial = serial;
 	}
 
-	// Fit the 3:2 picture into the viewport, centred, never upscaled past the
-	// widget. Integer-ish: one float multiply and an int cast, which is what
-	// every other path in this file ends up doing too.
-	float scale = static_cast<float>(view_width) / static_cast<float>(width);
-	const float yscale = static_cast<float>(view_height) / static_cast<float>(height);
-	if (yscale < scale) scale = yscale;
-	if (scale > 1.0f) scale = 1.0f;
-
-	int destW = static_cast<int>(static_cast<float>(width) * scale);
-	int destH = static_cast<int>(static_cast<float>(height) * scale);
-	if (destW < 1) destW = 1;
-	if (destH < 1) destH = 1;
+	// Fill the viewport at a whole multiple, letterboxing the remainder.
+	// `fceu11_gba_draw_size` owns the arithmetic; see the header for why it is
+	// integer-only and why three copies of that decision were a bad idea.
+	const GbaDrawSize draw = fceu11_gba_draw_size(view_width, view_height);
 
 	SDL_Rect source = {0, 0, static_cast<int>(width), static_cast<int>(height)};
-	SDL_Rect dest = {(view_width - destW) / 2, (view_height - destH) / 2, destW, destH};
+	SDL_Rect dest = {(view_width - draw.width) / 2, (view_height - draw.height) / 2,
+	                 draw.width, draw.height};
 
 	if (bgColor)
 	{

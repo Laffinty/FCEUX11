@@ -42,6 +42,10 @@
 #include "Qt/input.h"
 #include "input/input_manager.h"
 #include "Qt/sdl.h"
+// v2.0 S4: the GBA pad is built from the user's actual bindings, which live in
+// `GamePad[0].bmap` -- declared here, not in `Qt/input.h`. Reading them is what
+// makes a rebind carry over to the GBA instead of being frozen at compile time.
+#include "Qt/sdl-joystick.h"
 #include "Qt/sdl-video.h"
 #include "common/nes_shm.h"
 #include "Qt/AviRecord.h"
@@ -1379,18 +1383,59 @@ int  fceuWrapperUpdate( void )
 				fceuWrapper_sync_gba_audio(active);
 			}
 
-			// The two shoulders, read as raw key state and pushed in.
+			// The whole pad, read as raw key state and pushed in.
 			//
-			// Not from `joy[]`: on the default NES layout Z and X are already
-			// bound to A and B, so deriving L from the pad would make L a
-			// second A. `getKeyState` reads the full scancode table, which the
-			// event loop fills for every key whether or not anything is bound to
-			// it -- so it answers for a key the NES side has never heard of.
+			// Read from the **binding table**, not from `joy[]`. `joy[]` is
+			// written by `UpdateGP` copying out of the NES controller port
+			// register (`input.cpp:231`), and a GBA session does not run the NES
+			// core, so nothing writes it and it stays zero -- which is why every
+			// button that went through it was dead. Reading the binding table
+			// directly is also what makes a rebind carry over: the keys below are
+			// whatever port 1 is bound to right now, not a table frozen at
+			// compile time.
+			//
+			// `GamePad[0].bmap` is indexed [config][button] and holds the
+			// user's binding; `ButtType == BUTTC_KEYBOARD` distinguishes a
+			// keyboard binding from a joystick axis or button, and only the
+			// keyboard ones can be read through `getKeyState`. That is the same
+			// test `DTestButton` applies one layer up.
 			//
 			// This runs on the emulation thread and reads a table the GUI thread
 			// wrote, which is the same discipline `joy[]` already has.
-			fceu11_gba_set_shoulder_keys(getKeyState(SDLK_z) != 0,
-			                             getKeyState(SDLK_x) != 0);
+			uint16_t pad = 0;
+			{
+				// Button order is `GamePadNames`: A, B, Select, Start, Up, Down,
+				// Left, Right -- and the GBA bits are the same eight in the same
+				// order, so the mapping below is positional. TurboA/TurboB (8, 9)
+				// have no GBA equivalent and are deliberately not read.
+				static const uint16_t kGbaBitForNesButton[GAMEPAD_NUM_BUTTONS] = {
+					kGbaPadA, kGbaPadB, kGbaPadSelect, kGbaPadStart,
+					kGbaPadUp, kGbaPadDown, kGbaPadLeft, kGbaPadRight,
+					0, 0,
+				};
+				for (int config = 0; config < GamePad_t::NUM_CONFIG; config++)
+				{
+					for (int button = 0; button < 8; button++)
+					{
+						const uint16_t bit = kGbaBitForNesButton[button];
+						if (bit == 0) continue;
+						if (pad & bit) continue;   // an earlier config already set it
+						if (testButtonBinding(&GamePad[0].bmap[config][button]) != 0)
+						{
+							pad |= bit;
+						}
+					}
+				}
+
+				// L and R have no NES button to come from, so they are read
+				// directly. Z and X are the plan's choice (section 7.2), and on
+				// the default NES layout they are already bound to A and B --
+				// which is exactly why they cannot be *derived* from the pad:
+				// L would come out as a second A.
+				if (getKeyState(SDLK_z) != 0) pad |= kGbaPadL;
+				if (getKeyState(SDLK_x) != 0) pad |= kGbaPadR;
+			}
+			fceu11_gba_set_pad_state(pad);
 
 			fceu11_gba_step_frame();
 
