@@ -430,9 +430,17 @@ void ConsoleViewQWidget_t::renderGbaFrame(QPainter& painter)
 	// reallocated underneath us.
 	if (gbaImageSerial != serial)
 	{
+		// `Format_RGBA8888`, **not** `Format_ARGB32`, and the reason is byte
+		// order rather than naming. Both describe 32-bit pixels, but the legacy
+		// formats are laid out as a native `uint32_t` -- on little-endian
+		// `Format_ARGB32` (0xffRRGGBB) is B, G, R, A in memory. `Format_RGBA8888`
+		// is the one that stores R, G, B, A in memory on little-endian, which
+		// is what the ABI hands us. Picking `Format_ARGB32` "because the pixels
+		// have alpha" is the same mistake as the SDL path: right idea, wrong
+		// bytes, and it shows as a picture that is in every other way perfect.
 		gbaImage = QImage(reinterpret_cast<const uchar*>(frame),
 		                  static_cast<int>(width), static_cast<int>(height),
-		                  static_cast<int>(width) * 4, QImage::Format_ARGB32);
+		                  static_cast<int>(width) * 4, QImage::Format_RGBA8888);
 		gbaImageSerial = serial;
 	}
 	if (gbaImage.isNull())

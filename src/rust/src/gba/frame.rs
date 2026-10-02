@@ -862,13 +862,26 @@ fn frame_bytes(machine: &Machine) -> Vec<u8> {
     let mut out = Vec::with_capacity(overlay::FRAME_BYTES);
     for row in buffer.iter() {
         for pixel in row.iter() {
-            // The core's 15-bit colour is BGR with five bits per channel and
-            // a clear top bit; the ABI promises 8-bit RGBA, so each channel is
-            // scaled by bit replication rather than shifted, or a pure red
-            // would come out 248 instead of 255.
-            out.push(scale5(pixel.blue()));
-            out.push(scale5(pixel.green()));
+            // **Red first**, because this is RGBA and the core's word is BGR.
+            //
+            // The core's colour is the GBA's hardware BGR555: `red()` reads bits
+            // 0..=4 and `blue()` reads 10..=14. Those accessors are named for
+            // the hardware correctly, and `Color::from_rgb` packs to match --
+            // so nothing is wrong inside the core. The error was here: the first
+            // byte of an RGBA buffer is the *red* slot, and it was being given
+            // `blue()`.
+            //
+            // It reads as a plausible line of code, and it produces a picture
+            // in which every colour is wrong while everything else -- layout,
+            // timing, scaling -- is obviously right. A pink ground came out
+            // blue and a blue status bar came out orange: the exact signature of
+            // red and blue trading places.
+            //
+            // Each channel is scaled by bit replication rather than shifted, or
+            // a pure red would come out 248 instead of 255.
             out.push(scale5(pixel.red()));
+            out.push(scale5(pixel.green()));
+            out.push(scale5(pixel.blue()));
             out.push(0xFF);
         }
     }
@@ -896,7 +909,7 @@ mod tests {
         gba_battery_read, gba_battery_save_type, gba_battery_size, gba_battery_take_dirty,
         gba_battery_write, gba_savestate_load, gba_savestate_save, gba_savestate_size,
         gba_set_buttons, gba_set_overlay, gba_set_save_type, gba_step_frame, gba_unload_rom,
-        gba_buttons, read_c_string, scale5, with_machine,
+        gba_buttons, machine_slot, read_c_string, scale5, with_machine, frame_bytes,
     };
     use gba_core::cpu::hardware::internal_memory::BackupType;
 use gba_core::cpu::hardware::keypad::GbaButton;
@@ -1103,6 +1116,90 @@ use gba_core::cpu::hardware::keypad::GbaButton;
             // that is somehow all watermark.
             let opaque = out.chunks_exact(4).filter(|p| p[3] == 0xFF).count();
             assert!(opaque > FRAME_BYTES / 4 / 2, "only {opaque} opaque pixels");
+        });
+    }
+
+    /// A pure red pixel leaves as R in the first byte.
+    ///
+    /// **The test above could not have caught red and blue trading places**, and
+    /// the reason is worth keeping in mind: every colour it looks at is
+    /// neutral. The watermark is white, and it checks the alpha of everything
+    /// else. A channel swap is invisible in grey, so a frame that is entirely
+    /// watermark-coloured passes either way.
+    ///
+    /// So this one plants a saturated colour in the core's own buffer and reads
+    /// the real conversion path, including the watermark step. Red is the
+    /// strictest probe available: it is zero in two channels, so a swap cannot
+    /// be absorbed by a tolerance.
+    #[test]
+    fn a_saturated_colour_keeps_its_channels() {
+        use gba_core::cpu::hardware::lcd::Color;
+
+        exclusively(|| {
+            with_loaded_machine();
+
+            // Everything that touches the machine happens inside this block,
+            // and the guard is dropped at the end of it -- **before** any
+            // assertion runs.
+            //
+            // That ordering is not tidiness. A failing `assert!` unwinds while
+            // the slot's `MutexGuard` is still alive, which poisons the lock,
+            // and every later test in the crate that touches the machine then
+            // dies on a poisoned lock instead of on its own merits. One real
+            // failure became twenty-five unrelated ones the first time this
+            // test was written: the same safe-versus-isolated split the module
+            // already documents, reached from the other direction.
+            let probed: [[u8; 4]; 3] = {
+                let mut slot = machine_slot()
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                let machine = slot.as_mut().expect("with_loaded_machine loaded one");
+
+                // Three corners of the 5-bit colour cube, chosen so each is
+                // zero in two channels and full in the third.
+                let probes = [
+                    (0u32, 0u32, Color::from_rgb(31, 0, 0)),
+                    (1, 0, Color::from_rgb(0, 31, 0)),
+                    (0, 1, Color::from_rgb(0, 0, 31)),
+                ];
+                let saved: Vec<Color> = probes
+                    .iter()
+                    .map(|(y, x, _)| machine.gba.cpu.bus.lcd.buffer[*y as usize][*x as usize])
+                    .collect();
+                for (y, x, colour) in &probes {
+                    machine.gba.cpu.bus.lcd.buffer[*y as usize][*x as usize] = *colour;
+                }
+
+                let bytes = frame_bytes(machine);
+                let at = |y: usize, x: usize| -> [u8; 4] {
+                    let start = (y * 240 + x) * 4;
+                    [bytes[start], bytes[start + 1], bytes[start + 2], bytes[start + 3]]
+                };
+                let read = [at(0, 0), at(1, 0), at(0, 1)];
+
+                // Put the machine back even so, so the next test in this
+                // module sees the machine it left behind.
+                for ((y, x, _), original) in probes.iter().zip(&saved) {
+                    machine.gba.cpu.bus.lcd.buffer[*y as usize][*x as usize] = *original;
+                }
+                read
+            };
+
+            assert_eq!(
+                probed[0],
+                [255, 0, 0, 255],
+                "red pixel lost its channel"
+            );
+            assert_eq!(
+                probed[1],
+                [0, 255, 0, 255],
+                "green pixel lost its channel"
+            );
+            assert_eq!(
+                probed[2],
+                [0, 0, 255, 255],
+                "blue pixel lost its channel -- the buffer is RGBA, so blue is the third byte"
+            );
         });
     }
 

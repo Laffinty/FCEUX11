@@ -668,12 +668,20 @@ void ConsoleViewSDL_t::renderGbaFrame(void)
 		return;
 	}
 
-	// Same format as the NES texture, so both go through the same renderer
-	// with the same pixel layout. This is the "share the infrastructure" half
-	// of the deal; the texture itself is ours.
+	// **Not** the same format as the NES texture, and the difference is the
+	// whole bug this comment exists to prevent.
+	//
+	// The NES texture is `ARGB8888` over `localBuf`, a packed `uint32_t` in
+	// xRGB order -- on little-endian that is B, G, R, A in memory, which is
+	// exactly what `ARGB8888` asks for. The GBA buffer is the ABI's RGBA bytes,
+	// so it needs a format whose *memory* order is R, G, B, A: on little-endian
+	// that is `ABGR8888` (0xAABBGGRR, stored R first). Asking SDL for
+	// `ARGB8888` here while handing it RGBA bytes trades red and blue -- the
+	// same symptom as getting the ABI order wrong, from a completely separate
+	// cause, and one that a screenshot of a mostly-white screen hides.
 	if (sdlGbaTexture == NULL)
 	{
-		sdlGbaTexture = SDL_CreateTexture(sdlRenderer, SDL_PIXELFORMAT_ARGB8888,
+		sdlGbaTexture = SDL_CreateTexture(sdlRenderer, SDL_PIXELFORMAT_ABGR8888,
 		                                  SDL_TEXTUREACCESS_STREAMING,
 		                                  static_cast<int>(width),
 		                                  static_cast<int>(height));
