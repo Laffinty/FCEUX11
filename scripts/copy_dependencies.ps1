@@ -1,5 +1,7 @@
-# FCEUX11 Dependency Deployment Script (v0.2.1)
-# Copies required runtime DLLs from vcpkg installed directory.
+# FCEUX11 Dependency Deployment Script (v0.2.2)
+# Copies required runtime DLLs from vcpkg installed directory, then deploys
+# the license texts the distribution must carry (vcpkg port copyrights, the
+# vendored GBA core's MIT LICENSE, the project's own COPYING).
 param(
     [Parameter(Mandatory=$true)]
     [string]$ExecutablePath,
@@ -108,9 +110,42 @@ foreach ($dll in $transitive) {
     if (-not (Test-Path $dst)) {
         Copy-Item $src -Destination $dst -Force
         Write-Host "  [COPY] $dll (transitive)" -ForegroundColor Green
-        $copited++
+        $copied++
+    }
+}
+
+# Third pass: deploy the license texts a distribution must carry.
+#  * vcpkg ports ship a per-port `copyright` under <installed>/<triplet>/share;
+#  * the vendored GBA core is MIT — its full text must accompany the
+#    distribution (src/rust/crates/gba-core/LICENSE);
+#  * the project's own GPL text (COPYING) travels with the binary.
+$licenseDir = Join-Path $OutputDir "licenses"
+New-Item -ItemType Directory -Path $licenseDir -Force | Out-Null
+$copiedLicenses = 0
+
+$vcpkgShare = Join-Path (Split-Path $vcpkgBin -Parent) "share"
+if (Test-Path $vcpkgShare) {
+    Get-ChildItem $vcpkgShare -Directory | ForEach-Object {
+        $copyright = Join-Path $_.FullName "copyright"
+        if (Test-Path $copyright) {
+            Copy-Item $copyright -Destination (Join-Path $licenseDir ($_.Name + ".txt")) -Force
+            $copiedLicenses++
+        }
+    }
+}
+
+foreach ($pair in @(
+    @{ src = Join-Path $PSScriptRoot "..\src\rust\crates\gba-core\LICENSE"; name = "gba-core-LICENSE.txt" },
+    @{ src = Join-Path $PSScriptRoot "..\COPYING";                          name = "COPYING.txt" }
+)) {
+    if (Test-Path $pair.src) {
+        Copy-Item $pair.src -Destination (Join-Path $licenseDir $pair.name) -Force
+        $copiedLicenses++
+    } else {
+        Write-Host "  [WARN] license source missing: $($pair.src)" -ForegroundColor Yellow
     }
 }
 
 Write-Host "`nDone! Copied $copied DLLs, skipped $skipped system DLLs." -ForegroundColor Green
+Write-Host "Deployed $copiedLicenses license files to $licenseDir" -ForegroundColor Green
 Write-Host "Output: $OutputDir" -ForegroundColor Cyan
