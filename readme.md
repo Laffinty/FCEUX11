@@ -2,7 +2,7 @@
 
 # FCEUX11
 
-[![Version](https://img.shields.io/badge/version-v1.18-blue)](https://github.com/Laffinty/FCEUX11/releases)
+[![Version](https://img.shields.io/badge/version-v2.0-blue)](https://github.com/Laffinty/FCEUX11/releases)
 [![License](https://img.shields.io/badge/license-GPL--v2-green)](COPYING)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?logo=windows)](https://www.microsoft.com/windows/windows-11)
 [![Qt](https://img.shields.io/badge/Qt-6.8%20LTS-41CD52?logo=qt)](https://www.qt.io)
@@ -16,9 +16,9 @@
 
 ## 简介 / Introduction
 
-**FCEUX11** 是基于 [FCEUX](https://fceux.com) 的 NES/Famicom 模拟器衍生项目，针对 **Windows** 平台深度优化。在继承 FCEUX 卓越模拟精度的同时，采用 Qt6 图形界面重塑了现代 Windows 原生体验，并提供 12 种语言的多语言支持，以及面向开发者和速通玩家的调试与 TAS 工具集。项目持续推进内部核心重构与性能优化工作，致力于让模拟器在高负载场景下依旧保持高效、流畅与稳定。
+**FCEUX11** 是基于 [FCEUX](https://fceux.com) 的 NES/Famicom 模拟器衍生项目，针对 **Windows** 平台深度优化。在继承 FCEUX 卓越模拟精度的同时，采用 Qt6 图形界面重塑了现代 Windows 原生体验，并提供 12 种语言的多语言支持，以及面向开发者和速通玩家的调试与 TAS 工具集。项目持续推进内部核心重构与性能优化工作，致力于让模拟器在高负载场景下依旧保持高效、流畅与稳定。新增实验性 Game Boy Advance（GBA） 模拟支持，复用现有 UI、存档系统、热键与调试基础设施；GBA 功能处于 Beta 阶段，自带画面水印，部分硬件特性尚未完整实现。
 
-**FCEUX11** is a derivative of the [FCEUX](https://fceux.com) NES/Famicom emulator, optimized for **Windows**. It inherits FCEUX's renowned emulation accuracy while delivering a polished, modern Windows-native experience powered by Qt6, with 12-language localization and a full suite of debugging and TAS tools for developers and speedrunners. Ongoing internal refactoring and performance optimization keeps the emulator efficient, smooth, and stable even under heavy load.
+**FCEUX11** is a derivative of the [FCEUX](https://fceux.com) NES/Famicom emulator, optimized for **Windows**. It inherits FCEUX's renowned emulation accuracy while delivering a polished, modern Windows-native experience powered by Qt6, with 12-language localization and a full suite of debugging and TAS tools for developers and speedrunners. Ongoing internal refactoring and performance optimization keeps the emulator efficient, smooth, and stable even under heavy load. Experimental Game Boy Advance (GBA) emulation support has been added, reusing the existing UI, save-state system, hotkeys and debugging infrastructure; GBA features are in Beta, the picture carries a watermark, and some hardware features are not yet fully implemented.
 
 ---
 
@@ -35,6 +35,7 @@
 | **多语言界面**：支持 **12 种语言** —— 简体中文、繁体中文、英文、日语、韩语、西班牙语、法语、德语、越南语、泰语、印地语（beta）、阿拉伯语（beta）；首启自动按系统区域设置匹配语言，切换语言后菜单、对话框即时全部重译；阿拉伯语自动启用从右到左布局。 | **Multi-language UI**: **12 languages** — Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Spanish, French, German, Vietnamese, Thai, Hindi (beta), and Arabic (beta). Auto-detected from system locale on first launch, instant retranslate on switch, and automatic right-to-left layout for Arabic. |
 | **自定义调色板**：加载外部调色板文件，自由调整画面色彩。 | **Custom Palettes**: Load custom palette files to fine-tune color rendering. |
 | **即时存档**：随时随地保存 / 读取进度，支持自动存档历史记录。 | **Save States**: Save / load anywhere with automatic state history. |
+| **实验性 GBA 模拟 (BETA)**：支持 ROM 加载、BIOS SWI 系统调用、音频输出、电池存档（`.srm`）、即时存档、手柄输入、整数倍画面缩放；内置诊断探针用于硬件行为定位，Beta 水印不可关闭。 | **Experimental GBA Emulation (BETA)**: ROM loading, BIOS SWI system calls, audio output, battery saves (`.srm`), save states, controller input, and integer-scaled display; a built-in diagnostic probe helps pinpoint hardware behaviour, and the Beta watermark cannot be disabled. |
 
 ---
 
@@ -131,8 +132,8 @@ FCEUX11 ships **F11QA** (formerly KagamiQA), a dual-channel automated quality as
 
 ## 版本历史 / Changelog
 
-详见 [CHANGELOG.md](CHANGELOG.md)。当前主线为 **v1.18**（上一稳定发布 **v1.17**）。
-See [CHANGELOG.md](CHANGELOG.md). Mainline is **v1.18** (previous stable **v1.17**).
+详见 [CHANGELOG.md](CHANGELOG.md)。当前主线为 **v2.0.0**（上一稳定发布 **v1.18**）。
+See [CHANGELOG.md](CHANGELOG.md). Mainline is **v2.0.0** (previous stable **v1.18**).
 
 ---
 
