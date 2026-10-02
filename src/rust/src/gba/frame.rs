@@ -2705,10 +2705,7 @@ use gba_core::cpu::hardware::keypad::GbaButton;
         /// a game that sleeps on `VBlankIntrWait` runs a few instructions per
         /// frame and nothing at all in between -- a window shorter than a frame
         /// reports an empty trace for a machine that is in fact looping.
-        const TRACE_STEPS: u64 = 400_000;
-        /// Lines of trace to keep. The channel drops entries when it fills, so
-        /// the buffer is drained every step and only the tail is held.
-        const KEEP: usize = 200;
+        const TRACE_STEPS: u64 = 600_000;
 
         let Some(path) = probe_rom_path() else {
             println!("no .gba found -- set GBA_PROBE_ROM to a path, or put one on the Desktop");
@@ -2727,27 +2724,38 @@ use gba_core::cpu::hardware::keypad::GbaButton;
         println!("state at the end of the warm-up: {warm}\n");
 
         gba.cpu.disasm_enabled = true;
-        let mut trace: std::collections::VecDeque<String> =
-            std::collections::VecDeque::with_capacity(KEEP);
+        // One whole burst, from the wake to the next sleep, with the registers
+        // beside each instruction. The registers are the point: the
+        // disassembler renders `LDR r2, [pc, #imm]` as a plain immediate, so
+        // without them a PC-relative literal load is unreadable and the trace
+        // cannot say which register the game was working with.
+        let mut trace: Vec<String> = Vec::new();
         let mut entries = 0u64;
-        for _ in 0..TRACE_STEPS {
+        let mut burst = 0u64;
+        let mut woke = false;
+        while burst < TRACE_STEPS {
             gba.step();
+            burst += 1;
             if let Some(rx) = gba.disasm_rx.as_mut() {
                 while let Ok(entry) = rx.pop() {
                     entries += 1;
-                    if trace.len() == KEEP {
-                        trace.pop_front();
-                    }
-                    trace.push_back(entry.format());
+                    let regs: Vec<String> = (0..4)
+                        .map(|i| {
+                            let v = gba.cpu.registers.register_at(i);
+                            format!("r{i}={v:08X}")
+                        })
+                        .collect();
+                    trace.push(format!("{:44} | {}", entry.format(), regs.join(" ")));
+                    woke = true;
                 }
+            }
+            if woke && gba.cpu.halted {
+                break;
             }
         }
         gba.cpu.disasm_enabled = false;
 
-        println!(
-            "traced {TRACE_STEPS} steps, {entries} instructions disassembled, \
-             last {KEEP} kept:\n"
-        );
+        println!("one burst: {burst} steps, {entries} instructions, {} kept\n", trace.len());
         for line in &trace {
             println!("    {line}");
         }
@@ -2878,6 +2886,7 @@ use gba_core::cpu::hardware::keypad::GbaButton;
             .collect();
 
         let mut events: Vec<(u32, u16, u16, u32)> = Vec::new();
+        let mut polls: Vec<String> = Vec::new();
         let mut truncated = false;
         let mut burst = 0u64;
         while burst < BURST_LIMIT {
@@ -2887,6 +2896,26 @@ use gba_core::cpu::hardware::keypad::GbaButton;
                 break;
             }
             let pc = gba.cpu.registers.program_counter() as u32;
+            // A load out of the IO window is a poll, and a poll is what a game
+            // stuck on a hardware event looks like. This records the rows where
+            // some register points into that window, so the report can name the
+            // register instead of leaving "it spins on a halfword" as the
+            // answer. `r0` is included because a halfword load often puts the
+            // address in one register and the result in another.
+            for reg in 0..4usize {
+                let at = gba.cpu.registers.register_at(reg);
+                if (0x0400_0000..0x0400_0400).contains(&at) {
+                    let others: Vec<String> = (0..4)
+                        .filter(|o| *o != reg)
+                        .map(|o| format!("r{o}=0x{:08X}", gba.cpu.registers.register_at(o)))
+                        .collect();
+                    let value = gba.cpu.bus.read_half_word(at as usize);
+                    polls.push(format!(
+                        "  pc 0x{pc:08X}  r{reg}=0x{at:08X} reads 0x{value:04X}   {}",
+                        others.join(" ")
+                    ));
+                }
+            }
             for i in 0..IWRAM_WORDS {
                 let v = gba.cpu.bus.read_half_word(IWRAM_BASE + i * 2);
                 if v != prev[i] {
@@ -2930,6 +2959,22 @@ use gba_core::cpu::hardware::keypad::GbaButton;
                 println!("    [0x{addr:08X}] 0x{old:04X} -> 0x{new:04X}   (pc 0x{pc:08X})");
             }
         }
+        if polls.is_empty() {
+            println!("  it never pointed a register at an IO register this frame");
+        } else {
+            // Deduplicated by PC: a poll loop re-enters the same few
+            // instructions thousands of times and the interesting content is
+            // which address each one touches, not how often.
+            let mut seen = std::collections::BTreeSet::new();
+            println!("  loads out of the IO window, one line per distinct pc:");
+            for line in &polls {
+                let key = line.split_whitespace().nth(1).unwrap_or("").to_string();
+                if seen.insert(key) {
+                    println!("{line}");
+                }
+            }
+        }
+
         println!("\nstate at the end of the frame: {}", state_line(&mut gba));
         println!(
             "  DISPCNT 0x{:04X}, palette[0] 0x{:04X}",
