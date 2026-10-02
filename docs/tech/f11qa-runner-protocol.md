@@ -114,7 +114,7 @@ fn rom_local_path(mirror_path: &str) -> PathBuf {
 
 ## 5. vendor_state 三态
 
-`docs/f11qa-vendor-state.md` 定义了 78 项 rom-suite 用例的 vendor_state：
+`docs/tech/f11qa-vendor-state.md` 定义了 78 项 rom-suite 用例的 vendor_state：
 
 - ✅ **vendored** — ROM 字节已纳入镜像源，runner 跑通 = PASS，挂 = FAIL
 - ⏸ **advisory** — 已知 ROM 字节暂时拿不到（如上游删档 / 协议不明），runner 跳过不 fail_to_pass
@@ -156,7 +156,7 @@ Phase 5 已把全部 stub 换成真实协议分发（`rom_runner.rs`）：
 "寄存器 / 屏幕 / log 差分"描述的是套件**内部测试对象**，不是结果上报通道。
 若某 ROM 在 CI 实战中被证实不走 `$6000`（如需屏幕 hash / log diff 黄金值），
 在 tests.json 该条目加 `protocol: "<新协议>"` 并在 `rom_runner.rs` 的 `match protocol` 加分支即可，
-无需改路由骨架。协议细节可写 `docs/f11qa-runner-protocol-<suite>.md`。
+无需改路由骨架。协议细节可写 `docs/tech/f11qa-runner-protocol-<suite>.md`。
 
 ## 7. 与 v1.17 f11qa_blargg_runner 的关系
 

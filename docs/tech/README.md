@@ -18,6 +18,9 @@
 | [constants.md](constants.md) | **模数与经验常数总表**：时钟频率、帧时序、APU 序列、混音公式、行为性魔数、性能约束 | 写代码/review 前速查 |
 | [precision.md](precision.md) | 精度治理：已知失败面及根因、黄金回归体系、**禁忌清单**、纪律规则、调查数据索引 | 动任何时序代码**之前必读** |
 | [F11QA.md](F11QA.md) | F11QA 测试框架：双通道、口径、CI 数字回填纪律、迁移指南 | 测试体系、CI 门禁 |
+| [f11qa-runner-protocol.md](f11qa-runner-protocol.md) | ROM runner 调度协议：`$6000` 协议的调用骨架、vendor_state 三态、扩展新协议的落点 | 改 `rom_runner.rs` / 加 ROM 协议 |
+| [f11qa-vendor-state.md](f11qa-vendor-state.md) | 78 项 rom-suite 用例的 vendor_state 逐项状态、镜像源 HEAD 与接入路径 | 判断某个 ROM 用例为什么被跳过 |
+| [f11qa-accuracy-backlog.md](f11qa-accuracy-backlog.md) | 精度欠账台账：已知失败面、归因与优先级 | 规划精度工作、排期 |
 | [multi-machine-integration.md](multi-machine-integration.md) | **接第二台模拟机**：允许耦合的封闭清单、两类守卫（抓「已存在」与抓「缺失」）、跨系统状态读取规则 | 要加新机器 / 改 GBA 接线 |
 | [gba-traps.md](gba-traps.md) | **四种让测试看起来在保护你、实际不保护的形态**：夹具固化假设、断言引用被测常量、守卫抓不到缺失、读到函数之外 | 写任何检查之前 |
 | [ffi-boundaries.md](ffi-boundaries.md) | **跨 FFI 工程约束**：手写 ABI 与 cbindgen 分工、生成头双 target 争用、大对象出参、栈约束实测、safe vs isolated | 加导出 / 查「符号在却调不到」 |
