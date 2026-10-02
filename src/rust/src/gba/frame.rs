@@ -2656,6 +2656,88 @@ use gba_core::cpu::hardware::keypad::GbaButton;
         println!("  BG0CNT               : 0x{:04X}", io16(&mut gba, 0x0400_0008));
     }
 
+    // ---- what a stuck game is actually doing ----------------------------
+    //
+    // The other two probes report *state*. A game that never changes its
+    // picture and never changes its registers leaves nothing to state --
+    // every reading is the same reading. What is wanted there is the
+    // sequence, and the vendored core already carries a disassembler
+    // (`DisasmEntry::format`), so the trace is read out of the machine rather
+    // than decoded by hand from the ROM. Hand-decoding is how the previous
+    // two rounds went wrong.
+
+    /// A rolling execution trace of a game that has stopped changing.
+    ///
+    /// **Ignored by default, and it only prints.**
+    ///
+    /// The warm-up matters: the interesting instructions are the ones executed
+    /// *after* the machine has settled into whatever it is doing, and a trace
+    /// taken from step zero is mostly the boot sequence.
+    ///
+    /// ```text
+    /// set GBA_PROBE_ROM=C:\path\to\game.gba
+    /// cargo test -p fceux11-rust --release --no-default-features --features gba --lib \
+    ///     probe_trace_a_stuck_game -- --ignored --nocapture
+    /// ```
+    #[test]
+    #[ignore = "a diagnostic probe for S4: it needs a real .gba and only reports"]
+    fn probe_trace_a_stuck_game() {
+        /// Run this long before tracing, so the trace is the settled behaviour
+        /// rather than the boot sequence.
+        const WARMUP: u64 = 5_000_000;
+        /// How many instructions to trace. Sized to span a whole frame, because
+        /// a game that sleeps on `VBlankIntrWait` runs a few instructions per
+        /// frame and nothing at all in between -- a window shorter than a frame
+        /// reports an empty trace for a machine that is in fact looping.
+        const TRACE_STEPS: u64 = 400_000;
+        /// Lines of trace to keep. The channel drops entries when it fills, so
+        /// the buffer is drained every step and only the tail is held.
+        const KEEP: usize = 200;
+
+        let Some(path) = probe_rom_path() else {
+            println!("no .gba found -- set GBA_PROBE_ROM to a path, or put one on the Desktop");
+            return;
+        };
+        let rom = std::fs::read(&path).expect("read the cartridge");
+        println!("cartridge : {}", path.display());
+
+        let mut gba = Gba::new(bios::stub(), &rom);
+        crate::gba::install_swi_hook(&mut gba);
+
+        for _ in 0..WARMUP {
+            gba.step();
+        }
+        let warm = state_line(&mut gba);
+        println!("state at the end of the warm-up: {warm}\n");
+
+        gba.cpu.disasm_enabled = true;
+        let mut trace: std::collections::VecDeque<String> =
+            std::collections::VecDeque::with_capacity(KEEP);
+        let mut entries = 0u64;
+        for _ in 0..TRACE_STEPS {
+            gba.step();
+            if let Some(rx) = gba.disasm_rx.as_mut() {
+                while let Ok(entry) = rx.pop() {
+                    entries += 1;
+                    if trace.len() == KEEP {
+                        trace.pop_front();
+                    }
+                    trace.push_back(entry.format());
+                }
+            }
+        }
+        gba.cpu.disasm_enabled = false;
+
+        println!(
+            "traced {TRACE_STEPS} steps, {entries} instructions disassembled, \
+             last {KEEP} kept:\n"
+        );
+        for line in &trace {
+            println!("    {line}");
+        }
+        println!("\nstate at the end of the trace: {}", state_line(&mut gba));
+    }
+
     // ---- the on-screen size of a GBA frame -----------------------------
     //
     // The arithmetic lives in C++ (`fceu11_gba_draw_size` in `gba_load.cpp`,
