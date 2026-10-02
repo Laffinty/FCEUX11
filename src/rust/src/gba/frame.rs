@@ -2736,6 +2736,35 @@ use gba_core::cpu::hardware::keypad::GbaButton;
             println!("    {line}");
         }
         println!("\nstate at the end of the trace: {}", state_line(&mut gba));
+
+        // The registers, because "spin on a halfword until some bits appear"
+        // is not an answer -- the address and the mask are. Reading them out
+        // of the machine is also the only way to be sure which one of the
+        // several hundred IO registers the game is actually polling.
+        let regs: Vec<String> = (0..8)
+            .map(|i| {
+                let v = gba.cpu.registers.register_at(i);
+                format!("r{i}=0x{v:08X}")
+            })
+            .collect();
+        println!("registers    : {}", regs.join(" "));
+        println!("sp           = 0x{:08X}", gba.cpu.registers.register_at(13));
+        let r2 = gba.cpu.registers.register_at(2);
+        let r3 = gba.cpu.registers.register_at(3);
+        println!("r2 (polled address) = 0x{r2:08X}");
+        println!("r3 (bit mask)       = 0x{r3:08X}");
+        if (0x0400_0000..0x0400_0400).contains(&r2) {
+            println!(
+                "  -> the register there reads 0x{:04X}, so the wait is on bits {:04X} which are {}",
+                gba.cpu.bus.read_half_word(r2 as usize),
+                r3 & 0xFFFF,
+                if (u32::from(gba.cpu.bus.read_half_word(r2 as usize)) & (r3 & 0xFFFF)) == 0 {
+                    "NEVER SET"
+                } else {
+                    "set"
+                }
+            );
+        }
     }
 
     // ---- the on-screen size of a GBA frame -----------------------------
