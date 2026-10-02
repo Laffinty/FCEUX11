@@ -7,6 +7,15 @@
 //! registers -- no core state -- and because it is the part that can be
 //! exhaustively unit-tested without a running CPU.
 //!
+//! # The flag word is the BIOS's to write, and ours did not
+//!
+//! This module is the model of the function; where its *input* comes from is
+//! the parent module's business, and the parent no longer reads the word.
+//! The reason is in `pending_intr_groups`: the word is written by the BIOS's
+//! interrupt handler, our stub handler does not write it, and the consequence
+//! was that every `VBlankIntrWait` slept forever. The arithmetic below is
+//! unchanged and still correct; it is now fed the hardware's own `IF & IE`.
+//!
 //! # Why nothing here is wired up yet
 //!
 //! Measured 2026-09-28 against the vendored baseline `ee77922d`:
@@ -93,6 +102,13 @@ impl IntrWaitRequest {
 
     /// The flags word after this wait completes. Only the wanted bits are
     /// cleared; the BIOS never touches bits the caller did not ask about.
+    ///
+    /// **No caller.** The HLE reads its groups from `IF & IE` rather than from
+    /// the flag word -- see `pending_intr_groups` in the parent module for why
+    /// -- and on hardware the acknowledgement belongs to the game's interrupt
+    /// handler, not to the wait. This stays as the BIOS-side statement of the
+    /// same rule, because a module that models a BIOS function and quietly
+    /// drops half of it is worse than one that says which half it left out.
     pub fn flags_after(&self, flags: u8) -> u8 {
         (flags & BIOS_FLAGS_MASK) & !self.wanted
     }

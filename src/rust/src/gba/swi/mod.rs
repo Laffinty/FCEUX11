@@ -454,12 +454,32 @@ thread_local! {
         const { std::cell::Cell::new(None) };
 }
 
-fn read_bios_flags(cpu: &mut Arm7tdmi) -> u8 {
-    cpu.bus.read_byte(wait::BIOS_FLAGS_ADDR as usize)
-}
-
-fn write_bios_flags(cpu: &mut Arm7tdmi, flags: u8) {
-    cpu.bus.write_byte(wait::BIOS_FLAGS_ADDR as usize, flags);
+/// The four interrupt groups an `IntrWait` can name, as the hardware has them.
+///
+/// # Why this does not read `03007FF8h`
+///
+/// The obvious place to look is the BIOS flag word at `03007FF8h`, and reading
+/// it is what this module used to do. That was wrong, and wrong in a way no
+/// unit test could see: on hardware the word is written by the **BIOS's own**
+/// interrupt handler, and our stub handler only saves registers, calls the
+/// pointer at `03007FFC` and restores (`bios.rs`). Nothing in the system ever
+/// wrote the word, so `wake_for_intr_wait` polled a value that was pinned at
+/// zero and every `VBlankIntrWait` in every game slept forever.
+///
+/// Measured on two commercial cartridges (`Mario Kart - Super Circuit`, which
+/// shows a white screen, and `Super Mario Advance 4`, which draws and then
+/// freezes): 1322 entries into the IRQ vector, the game's handler running, and
+/// `03007FF8h` still zero at every sample. The games were not failing to
+/// report anything -- nobody was listening for it.
+///
+/// `IF & IE` is the same information one link earlier in the chain, and it is
+/// maintained by hardware rather than by software, so it cannot rot this way.
+/// Bits 0-3 of `IF` are VBlank, HBlank, VCount match and DMA, which is exactly
+/// the set a wait can name, hence the mask.
+fn pending_intr_groups(cpu: &mut Arm7tdmi) -> u8 {
+    let ie = cpu.bus.read_half_word(IE as usize);
+    let iff = cpu.bus.read_half_word(IF as usize);
+    ((iff & ie) & u16::from(wait::BIOS_FLAGS_MASK)) as u8
 }
 
 /// Serve an `IntrWait`, or sleep until its flag arrives.
@@ -482,12 +502,14 @@ fn enter_intr_wait(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32, swi_num:
         return;
     }
 
-    let flags = read_bios_flags(cpu);
-    if request.satisfied_by(flags) {
-        // Already satisfied: take the flag we were asked for and go. The BIOS
-        // clears the flag it consumed, which is what lets a later
-        // `VBlankIntrWait` wait for the *next* frame.
-        write_bios_flags(cpu, request.flags_after(flags));
+    let groups = pending_intr_groups(cpu);
+    if request.satisfied_by(groups) {
+        // Already satisfied: go. Nothing is consumed here on purpose -- on
+        // hardware the group's request bit is cleared by the game's own
+        // interrupt handler when it acknowledges, which is what lets a later
+        // `VBlankIntrWait` wait for the *next* frame instead of returning
+        // immediately forever. Clearing it here would take the acknowledgement
+        // away from the software that is entitled to it.
         cpu.swi_return(old_cpsr, return_addr);
         return;
     }
@@ -506,18 +528,17 @@ fn wake_for_intr_wait(cpu: &mut Arm7tdmi) -> bool {
     let Some(request) = PENDING_INTR_WAIT.with(|pending| pending.take()) else {
         return false;
     };
-    let flags = read_bios_flags(cpu);
-    if !request.is_set(flags) {
+    let groups = pending_intr_groups(cpu);
+    if !request.is_set(groups) {
         PENDING_INTR_WAIT.with(|pending| pending.set(Some(request)));
         if tracing_enabled() {
             eprintln!(
-                "[gba] IntrWake: flag {:#04x} not set yet, staying asleep",
-                flags
+                "[gba] IntrWake: groups {groups:#04x} do not include {:#04x}, staying asleep",
+                request.wanted
             );
         }
         return true;
     }
-    write_bios_flags(cpu, request.flags_after(flags));
     false
 }
 
@@ -747,8 +768,8 @@ impl Swi {
 #[cfg(test)]
 mod tests {
     use super::{
-        LZ77_SIGNATURE, RL_SIGNATURE, Swi, affine, dispatch, ram_reset, read_bios_flags,
-        take_last_dispatch, write_bios_flags,
+        LZ77_SIGNATURE, RL_SIGNATURE, Swi, affine, dispatch, pending_intr_groups, ram_reset,
+        take_last_dispatch,
     };
     use crate::gba::install_swi_hook;
     use gba_core::cpu::arm7tdmi::Arm7tdmi;
@@ -915,9 +936,9 @@ mod tests {
             );
         }
         assert_eq!(
-            read_bios_flags(&mut gba.cpu),
+            pending_intr_groups(&mut gba.cpu),
             0,
-            "declining must not touch the BIOS flag word"
+            "declining must not conjure an interrupt group"
         );
     }
 
@@ -1052,11 +1073,15 @@ mod tests {
     }
 
     /// `IntrWait` is the reason the wake predicate exists: an interrupt is
-    /// pending, but the wait is for one specific BIOS flag, and until the game
-    /// reports it the CPU stays asleep. `Halt` would have woken here.
+    /// pending, but the wait is for one specific group, and a pending group
+    /// the wait did not name must not wake it. `Halt` would have woken here.
+    ///
+    /// The pending state is raised the way hardware raises it -- through a
+    /// peripheral, never by writing `IF`, which is write-one-to-clear -- so this
+    /// test cannot pass by poking a register that no real program can reach.
     #[test]
     fn intr_wait_ignores_interrupts_it_did_not_ask_for() {
-        // r0 = 1 (VBlank flag), r1 = 0 (return if already set).
+        // r0 = 1 (VBlank), r1 = 0 (return if already pending).
         let program = [
             0xE3A0_0001,   // mov r0, #1
             arm_swi(0x04), // swi IntrWait
@@ -1066,63 +1091,88 @@ mod tests {
         let mut gba = machine(&program);
         assert!(
             run_until_halted(&mut gba, 32),
-            "SWI 0x04 should have slept waiting for the VBlank flag"
+            "SWI 0x04 should have slept waiting for VBlank"
         );
 
-        // Now a keypad interrupt actually arrives, and the game's handler has
-        // not reported the flag yet. A Halt would wake here; IntrWait must not.
+        // Now a keypad interrupt actually arrives. Its `IF` bit is 12, well
+        // outside the four groups a wait can name, so it must not satisfy a
+        // wait for VBlank -- and it must not wake us either, because the game
+        // has not acknowledged anything yet.
         press_key_to_raise_an_irq(&mut gba);
         run(&mut gba, 32);
         assert!(
             gba.cpu.halted,
-            "a pending IRQ must not satisfy an IntrWait that wants a flag"
+            "a pending IRQ from another group must not satisfy a VBlank wait"
         );
-        assert_eq!(read_bios_flags(&mut gba.cpu), 0, "no flag was reported");
+        assert_eq!(
+            gba.cpu.bus.read_half_word(0x0400_0202) & 0x0001,
+            0,
+            "no VBlank was ever requested"
+        );
 
-        // Now the game's handler reports VBlank, and the wait is over.
-        write_bios_flags(&mut gba.cpu, 0x01);
-        gba.step();
-        assert!(!gba.cpu.halted, "the reported flag must wake the wait");
+        // Now the LCD really does start a frame: VBlank is enabled in DISPSTAT
+        // and in IE, so `IF & IE` gains bit 0 and the wait is over.
+        gba.cpu.bus.write_half_word(0x0400_0004, 0x0008); // DISPSTAT: VBlank IRQ
+        gba.cpu.bus.write_half_word(0x0400_0200, (1 << 12) | 0x0001); // IE
+        let woke = (0..400_000).any(|_| {
+            gba.step();
+            !gba.cpu.halted
+        });
+        assert!(woke, "a real VBlank must wake a VBlankIntrWait");
     }
 
-    /// A satisfied wait consumes the flag it was waiting for. That is what
-    /// lets the next `VBlankIntrWait` wait for the *next* frame instead of
-    /// returning immediately forever.
+    /// The acknowledgement belongs to the game's interrupt handler, not to the
+    /// wait. This is the contract that replaced "the HLE clears the flag it
+    /// consumed": if the wait cleared `IF` itself, a handler that had not yet
+    /// run would find its interrupt already gone.
     #[test]
-    fn intr_wait_consumes_the_flag_it_waited_for() {
+    fn intr_wait_leaves_the_acknowledgement_to_the_game() {
         let program = [
-            0xE3A0_0001,   // mov r0, #1
-            arm_swi(0x04), // swi IntrWait -- already satisfied, must not sleep
+            arm_swi(0x05), // VBlankIntrWait
             IRQ_HALT,
             PARK,
         ];
         let mut gba = machine(&program);
-        write_bios_flags(&mut gba.cpu, 0x01 | 0x02);
+        gba.cpu.bus.write_half_word(0x0400_0004, 0x0008); // DISPSTAT: VBlank IRQ
+        gba.cpu.bus.write_half_word(0x0400_0200, 0x0001); // IE = VBlank
+        gba.cpu.bus.write_half_word(0x0400_0208, 0x0001); // IME = enable
 
-        run(&mut gba, 16);
+        // Establish that it is asleep before polling for the wake. A loop that
+        // only tests `!halted` returns on its first iteration, because a CPU
+        // that has not reached its `SWI` yet is not halted either -- and then
+        // the assertion below would be reading a machine that never slept.
         assert!(
-            !gba.cpu.halted,
-            "an already-set flag must not make us sleep"
+            run_until_halted(&mut gba, 32),
+            "execution never reached the SWI"
         );
-        assert_eq!(
-            gba.cpu.registers.register_at(5),
-            0x34,
-            "the SWI returned and execution carried on"
-        );
-        assert_eq!(
-            read_bios_flags(&mut gba.cpu),
-            0x02,
-            "the waited-for bit must be cleared, the others untouched"
+        assert!(gba.cpu.halted, "VBlankIntrWait did not sleep");
+
+        let woke = (0..400_000).any(|_| {
+            gba.step();
+            !gba.cpu.halted
+        });
+        assert!(woke, "VBlankIntrWait did not return on a real frame");
+
+        // IF still carries the request: nothing in the wait consumed it.
+        assert_ne!(
+            gba.cpu.bus.read_half_word(0x0400_0202) & 0x0001,
+            0,
+            "the wait cleared the request bit, which is the handler's job"
         );
     }
 
     /// `VBlankIntrWait` is `IntrWait(1, 1)`, and the trailing 1 is the whole
-    /// point: it must sleep even when the flag is already set.
+    /// point: it must sleep even when the group it names is already pending.
+    ///
+    /// Pending is staged the way hardware stages it -- `IF` and `IE` both
+    /// carrying bit 0, with the LCD's VBlank request never enabled so nothing
+    /// will clear it underneath the test.
     #[test]
     fn vblank_intr_wait_always_sleeps() {
         let program = [arm_swi(0x05), IRQ_HALT, PARK];
         let mut gba = machine(&program);
-        write_bios_flags(&mut gba.cpu, 0x01);
+        gba.cpu.bus.write_half_word(0x0400_0200, 0x0001); // IE  = VBlank
+        gba.cpu.bus.write_half_word(0x0400_0202, 0x0001); // IF  = VBlank
 
         assert!(
             run_until_halted(&mut gba, 32),
@@ -1130,7 +1180,7 @@ mod tests {
         );
         assert!(
             gba.cpu.halted,
-            "VBlankIntrWait must always sleep, flag or no flag"
+            "VBlankIntrWait must always sleep, pending or not"
         );
     }
 

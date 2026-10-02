@@ -2329,6 +2329,30 @@ use gba_core::cpu::hardware::keypad::GbaButton;
         (lit, total, top)
     }
 
+    /// Which `.gba` a diagnostic probe should run.
+    ///
+    /// `GBA_PROBE_ROM` wins; otherwise the Desktop is scanned. Three probes
+    /// each re-implementing this is the r50 shape -- the same decision written
+    /// down more than once, with nothing keeping the copies in step.
+    fn probe_rom_path() -> Option<std::path::PathBuf> {
+        if let Ok(path) = std::env::var("GBA_PROBE_ROM") {
+            let path = std::path::PathBuf::from(path);
+            return path.is_file().then_some(path);
+        }
+        let desktop = std::path::Path::new(&std::env::var("USERPROFILE").unwrap_or_default())
+            .join("Desktop");
+        std::fs::read_dir(&desktop)
+            .ok()?
+            .flatten()
+            .map(|entry| entry.path())
+            .find(|path| {
+                path.is_file()
+                    && path
+                        .extension()
+                        .is_some_and(|ext| ext.eq_ignore_ascii_case("gba"))
+            })
+    }
+
     /// Run a real cartridge and report what the core actually did with it.
     ///
     /// **Ignored by default, and it only prints.** This is the S4 diagnostic:
@@ -2360,24 +2384,7 @@ use gba_core::cpu::hardware::keypad::GbaButton;
         /// How often to sample the program counter.
         const SAMPLE_EVERY: u64 = 1_000;
 
-        let desktop = std::path::Path::new(&std::env::var("USERPROFILE").unwrap_or_default())
-            .join("Desktop");
-        let candidates: Vec<std::path::PathBuf> = match std::env::var("GBA_PROBE_ROM") {
-            Ok(path) => vec![std::path::PathBuf::from(path)],
-            Err(_) => std::fs::read_dir(&desktop)
-                .map(|entries| {
-                    entries
-                        .flatten()
-                        .map(|entry| entry.path())
-                        .filter(|path| {
-                            path.extension()
-                                .is_some_and(|ext| ext.eq_ignore_ascii_case("gba"))
-                        })
-                        .collect()
-                })
-                .unwrap_or_default(),
-        };
-        let Some(path) = candidates.into_iter().find(|path| path.is_file()) else {
+        let Some(path) = probe_rom_path() else {
             println!("no .gba found -- set GBA_PROBE_ROM to a path, or put one on the Desktop");
             return;
         };
@@ -2484,6 +2491,169 @@ use gba_core::cpu::hardware::keypad::GbaButton;
              (1 means the picture never changed)",
             distinct_screens.len()
         );
+    }
+
+    // ---- why did a game stop? --------------------------------------------
+    //
+    // `probe_a_real_cartridge` answers "did the game reach its own code". It
+    // cannot answer "what was the machine waiting for when it stopped", and
+    // that second question is what decides whether a frozen screen is the
+    // game's business or ours.
+    //
+    // This exists because the two commercial carts on this machine stop in
+    // completely different places and present completely differently -- one
+    // freezes on a drawn screen, the other is white from the first sample --
+    // and the only thing that tells them apart is the register state at the
+    // moment each one stopped.
+
+    /// Read one of the GBA's IO registers.
+    fn io16(gba: &mut Gba, addr: u32) -> u16 {
+        gba.cpu.bus.read_half_word(addr as usize)
+    }
+
+    /// Read a 32-bit word built out of two IO reads.
+    ///
+    /// Composed rather than calling a word-wide reader because every word-wide
+    /// access in this program goes through the bus's own word path, and a
+    /// halfword read is the same access the firmware itself makes.
+    fn io32(gba: &mut Gba, addr: u32) -> u32 {
+        u32::from(io16(gba, addr)) | (u32::from(io16(gba, addr + 2)) << 16)
+    }
+
+    /// One line of machine state, in the order that answers "what is it
+    /// waiting for": the CPU's own gates, then the interrupt plumbing, then
+    /// the two places a wait can block on.
+    fn state_line(gba: &mut Gba) -> String {
+        // Every value is read into a local before the format string is built.
+        // Doing it inline does not borrow-check: one immutable read of `gba`
+        // stays alive across the whole argument list and the bus reads after
+        // it need `&mut`.
+        let pc = gba.cpu.registers.program_counter();
+        let halted = gba.cpu.halted;
+        let irq_disabled = u8::from(gba.cpu.cpsr.irq_disable());
+        let dispcnt = io16(gba, 0x0400_0000);
+        let blank = dispcnt & 0x0080 != 0;
+        let dispstat = io16(gba, 0x0400_0004);
+        let vcount = io16(gba, 0x0400_0006);
+        let ie = io16(gba, 0x0400_0200);
+        let iff = io16(gba, 0x0400_0202);
+        let ime = io16(gba, 0x0400_0208);
+        let bios_flags = gba.cpu.bus.read_byte(0x0300_7FF8);
+        let irq_ptr = io32(gba, 0x0300_7FFC);
+
+        format!(
+            "pc=0x{pc:08X} halted={halted:<5} I={irq_disabled} \
+             DISPCNT=0x{dispcnt:04X}{} DISPSTAT=0x{dispstat:04X} VCOUNT={vcount:<3} \
+             IE=0x{ie:04X} IF=0x{iff:04X} IME=0x{ime:04X} \
+             BIOSFLAGS=0x{bios_flags:02X} IRQPTR=0x{irq_ptr:08X}",
+            if blank { " *BLANK*" } else { "" },
+        )
+    }
+
+    /// Run a real cartridge and report what it was waiting for when it stopped.
+    ///
+    /// **Ignored by default, and it only prints.** Purely observational: it
+    /// reads registers and counts, and it writes nothing into the core.
+    ///
+    /// ```text
+    /// set GBA_PROBE_ROM=C:\path\to\game.gba
+    /// cargo test -p fceux11-rust --release --no-default-features --features gba --lib \
+    ///     probe_why_a_game_stalls -- --ignored --nocapture
+    /// ```
+    #[test]
+    #[ignore = "a diagnostic probe for S4: it needs a real .gba and only reports"]
+    fn probe_why_a_game_stalls() {
+        const STEPS: u64 = 30_000_000;
+        const SNAPSHOT_EVERY: u64 = 1_000_000;
+
+        let Some(path) = probe_rom_path() else {
+            println!("no .gba found -- set GBA_PROBE_ROM to a path, or put one on the Desktop");
+            return;
+        };
+        let rom = std::fs::read(&path).expect("read the cartridge");
+        println!("cartridge : {}", path.display());
+
+        let mut gba = Gba::new(bios::stub(), &rom);
+        crate::gba::install_swi_hook(&mut gba);
+
+        // The BIOS IRQ handler lives at 0x18 in the stub and is the only code
+        // that runs there, so a PC inside the vector block means an interrupt
+        // was actually taken -- as opposed to merely requested, which is all
+        // that reading IF would tell us.
+        let mut irq_entries = 0u64;
+        let mut first_halt = None;
+        let mut halt_episodes = 0u64;
+        let mut was_halted = false;
+        // The BIOS intr-wait flag word is what a sleeping CPU polls, so the
+        // count of writes to it is the whole question; watching the value go
+        // from zero to non-zero is enough, since a flag only ever gets set.
+        let mut flags_went_nonzero_at = None;
+        let mut blank_at = None;
+        let mut irq_ptr_at = None;
+        // Edge counts, because a level sampled once a million steps apart
+        // cannot tell "raised every frame and acknowledged" from "never
+        // raised" -- and that is exactly the ambiguity that decides whether an
+        // `IntrWait` on this group can ever be satisfied.
+        let mut prev_if = 0u16;
+        let mut vblank_requests = 0u64;
+        let mut hblank_requests = 0u64;
+
+        for step in 1..=STEPS {
+            gba.step();
+
+            let pc = gba.cpu.registers.program_counter();
+            if pc < 0x40 {
+                irq_entries += 1;
+            }
+
+            let iff = gba.cpu.bus.read_half_word(0x0400_0202);
+            if (iff & 0x0001) != 0 && (prev_if & 0x0001) == 0 {
+                vblank_requests += 1;
+            }
+            if (iff & 0x0002) != 0 && (prev_if & 0x0002) == 0 {
+                hblank_requests += 1;
+            }
+            prev_if = iff;
+
+            if gba.cpu.halted && !was_halted {
+                if first_halt.is_none() {
+                    first_halt = Some(step);
+                }
+                halt_episodes += 1;
+            }
+            was_halted = gba.cpu.halted;
+
+            if step % SNAPSHOT_EVERY == 0 {
+                if flags_went_nonzero_at.is_none()
+                    && gba.cpu.bus.read_byte(0x0300_7FF8) != 0
+                {
+                    flags_went_nonzero_at = Some(step);
+                }
+                if blank_at.is_none() && io16(&mut gba, 0x0400_0000) & 0x0080 != 0 {
+                    blank_at = Some(step);
+                }
+                if irq_ptr_at.is_none() && io32(&mut gba, 0x0300_7FFC) != 0 {
+                    irq_ptr_at = Some(step);
+                }
+                let (lit, _, _) = screen_report(&gba);
+                println!("after {step:>10}: {lit:>6} lit  {}", state_line(&mut gba));
+            }
+        }
+
+        println!("\nsummary over {STEPS} instructions:");
+        println!("  first halt           : {first_halt:?}");
+        println!("  halt episodes        : {halt_episodes}");
+        println!("  BIOS IRQ entries     : {irq_entries} steps spent in the vector");
+        println!("  VBlank requests (IF) : {vblank_requests}");
+        println!("  HBlank requests (IF) : {hblank_requests}");
+        println!("  BIOSFLAGS first set  : {flags_went_nonzero_at:?}");
+        println!("  forced blank first on: {blank_at:?}");
+        println!("  IRQ handler installed: {irq_ptr_at:?}");
+        println!("  wake hook installed  : {}", gba.cpu.wake_hook.is_some());
+        println!("  final                : {}", state_line(&mut gba));
+        println!("  palette entry 0      : 0x{:04X}", io16(&mut gba, 0x0500_0000));
+        println!("  WAITCNT              : 0x{:04X}", io16(&mut gba, 0x0400_0204));
+        println!("  BG0CNT               : 0x{:04X}", io16(&mut gba, 0x0400_0008));
     }
 
     // ---- the on-screen size of a GBA frame -----------------------------
