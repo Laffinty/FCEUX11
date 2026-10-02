@@ -55,7 +55,16 @@ set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT Embedded)
 #   New code must compile clean under /WX.
 # v1.0: continues the v0.3.16 LTS /WX policy unchanged.
 # v0.3.1: /wd4996 is transitional — will be removed after strcpy/sprintf/vsprintf cleanup in v0.3.5
-add_compile_options(/W4 /WX /permissive- /guard:cf /GS /sdl
+# v2.0 (L11/L12): /EHsc added. MSVC does not enable C++ exception unwind semantics
+#   by default, and the standard library headers that use them (__msvc_ostream.hpp,
+#   <chrono>) emit C4530 when instantiated without it. The main library never hit
+#   this because its translation units consume a PCH that carries /EHsc; targets
+#   built with a bare add_executable — with no PCH and no Qt to inherit from —
+#   instantiate those headers directly and fail. That stayed hidden until MSVC
+#   14.51 promoted C4530 to a /WX error, which broke four test targets. Declaring
+#   it here fixes those and any future bare target, and states the policy
+#   explicitly instead of leaving it to be inherited by accident.
+add_compile_options(/W4 /WX /permissive- /guard:cf /GS /sdl /EHsc
     /utf-8  # v1.0: tell cl.exe to interpret source as UTF-8 (not system code page 936)
     /wd4996  # transitional: deprecated POSIX/CRT functions (strncpy/strncat in safe_string.h)
     /wd4100  # pre-existing: unreferenced parameter (event handlers, virtuals)

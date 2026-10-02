@@ -1,0 +1,2086 @@
+//! Memory bus connecting the CPU to all hardware components.
+//!
+//! The [`Bus`] is the central hub through which the ARM7TDMI CPU accesses all memory
+//! and I/O registers. It implements address decoding to route reads and writes to the
+//! appropriate hardware component.
+//!
+//! # Memory Map Overview
+//!
+//! See [`gba`](crate::gba) for the complete GBA memory map. The bus routes addresses:
+//!
+//! | Address Range       | Component                           | Handler               |
+//! |---------------------|-------------------------------------|-----------------------|
+//! | `0x0000_0000-3FFF`  | BIOS (with read protection)         | [`InternalMemory`]    |
+//! | `0x0200_0000-3FFF`  | Work RAM (256KB, mirrored)          | [`InternalMemory`]    |
+//! | `0x0300_0000-7FFF`  | Internal RAM (32KB, mirrored)       | [`InternalMemory`]    |
+//! | `0x0400_0000-005F`  | LCD I/O registers                   | [`Lcd`]               |
+//! | `0x0400_0060-00AF`  | Sound registers                     | [`Sound`]             |
+//! | `0x0400_00B0-00FF`  | DMA registers                       | [`Dma`]               |
+//! | `0x0400_0100-011F`  | Timer registers                     | [`Timers`]            |
+//! | `0x0400_0120-01FF`  | Serial/Keypad registers             | [`Serial`]/[`Keypad`] |
+//! | `0x0400_0200-FFFF`  | Interrupt control                   | [`InterruptControl`]  |
+//! | `0x0500_0000-03FF`  | Palette RAM (1KB, mirrored)         | [`Lcd`] memory        |
+//! | `0x0600_0000-17FFF` | VRAM (96KB, mirrored)               | [`Lcd`] memory        |
+//! | `0x0700_0000-03FF`  | OAM (1KB, mirrored)                 | [`Lcd`] memory        |
+//! | `0x0800_0000+`      | Game Pak ROM/Flash                  | [`InternalMemory`]    |
+//!
+//! # Memory Access Sizes
+//!
+//! The bus supports three access sizes, each with alignment requirements:
+//! - **Byte** (8-bit): Any address
+//! - **Halfword** (16-bit): Must be 2-byte aligned (address & 1 == 0)
+//! - **Word** (32-bit): Must be 4-byte aligned (address & 3 == 0)
+//!
+//! Unaligned accesses are force-aligned with a warning logged.
+//!
+//! # Special Behaviors
+//!
+//! ## BIOS Read Protection
+//! The BIOS can only be read when the program counter is within the BIOS region
+//! (`0x0000-0x3FFF`). Reads from outside return the last fetched BIOS opcode.
+//!
+//! ## Video Memory Write Restrictions
+//! - **OAM**: Byte writes are ignored (must use halfword/word)
+//! - **VRAM**: Byte writes are duplicated to both bytes of a halfword
+//! - **Palette RAM**: Byte writes are duplicated to both bytes of a halfword
+//!
+//! ## Interrupt Acknowledge
+//! Writing `1` to a bit in the Interrupt Request Flags register (`0x0400_0202`)
+//! clears that interrupt flag (acknowledges it).
+//!
+//! # Timing
+//!
+//! The bus tracks cycle counts for memory accesses. Different memory regions have
+//! different wait states, though currently a simplified 1-cycle model is used.
+//! The `step` method advances timers and LCD state each CPU cycle.
+
+use std::collections::HashMap;
+
+use serde::{Deserialize, Serialize};
+
+use crate::bitwise::Bits;
+use crate::cpu::hardware::dma::{Dma, Registers};
+use crate::cpu::hardware::get_unmasked_address;
+use crate::cpu::hardware::internal_memory::InternalMemory;
+use crate::cpu::hardware::interrupt_control::InterruptControl;
+use crate::cpu::hardware::keypad::Keypad;
+use crate::cpu::hardware::lcd::Lcd;
+use crate::cpu::hardware::serial::Serial;
+use crate::cpu::hardware::sound::Sound;
+use crate::cpu::hardware::timers::Timers;
+
+#[allow(clippy::large_stack_frames)] // to avoid stack overflow due to large arrays
+#[derive(Default, Serialize, Deserialize)]
+pub struct Bus {
+    pub internal_memory: InternalMemory,
+    pub lcd: Lcd,
+    sound: Sound,
+    dma: Dma,
+    timers: Timers,
+    serial: Serial,
+    pub keypad: Keypad,
+    interrupt_control: InterruptControl,
+    cycles_count: u64,
+    /// Number of 4-cycle LCD pixel ticks already serviced. Used to keep the LCD
+    /// pixel clock in sync with `cycles_count` even when instructions advance the
+    /// cycle counter by more than one at a time.
+    #[serde(default)]
+    lcd_ticks_done: u64,
+    /// Number of CPU cycles already accounted to the timers, so each `step`
+    /// advances them by exactly the cycles elapsed since the last service.
+    ///
+    /// This is a transient clock, not game state, so it is not serialized, it is
+    /// resynced to `cycles_count` after loading a save state. Keeping it out of
+    /// the layout also stops internal timing changes from breaking old saves.
+    #[serde(skip)]
+    timer_cycles_done: u64,
+    /// Set while the bus is servicing an instruction fetch, so the `GamePak`
+    /// prefetch buffer timing is applied only to the opcode stream.
+    #[serde(skip)]
+    in_opcode_fetch: bool,
+    last_used_address: usize,
+    unused_region: HashMap<usize, u8>,
+    /// Tracks the last opcode fetched from BIOS for read protection
+    last_bios_opcode: u32,
+    /// Tracks the current program counter
+    current_pc: usize,
+}
+
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub(crate) enum IrqType {
+    VBlank,
+    HBlank,
+    VCount,
+    Timer0,
+    Timer1,
+    Timer2,
+    Timer3,
+    Dma0,
+    Dma1,
+    Dma2,
+    Dma3,
+    Keypad,
+}
+
+impl IrqType {
+    const fn get_idx_in_if(self) -> u8 {
+        match self {
+            Self::VBlank => 0,
+            Self::HBlank => 1,
+            Self::VCount => 2,
+            Self::Timer0 => 3,
+            Self::Timer1 => 4,
+            Self::Timer2 => 5,
+            Self::Timer3 => 6,
+            Self::Dma0 => 8,
+            Self::Dma1 => 9,
+            Self::Dma2 => 10,
+            Self::Dma3 => 11,
+            Self::Keypad => 12,
+        }
+    }
+
+    /// IRQ source for a DMA channel index (0-3).
+    const fn dma(idx: usize) -> Self {
+        match idx {
+            0 => Self::Dma0,
+            1 => Self::Dma1,
+            2 => Self::Dma2,
+            _ => Self::Dma3,
+        }
+    }
+}
+impl Bus {
+    fn read_interrupt_control_raw(&self, address: usize) -> u8 {
+        match address {
+            0x0400_0200 => self.interrupt_control.interrupt_enable.get_byte(0),
+            0x0400_0201 => self.interrupt_control.interrupt_enable.get_byte(1),
+            0x0400_0202 => self.interrupt_control.interrupt_request.get_byte(0),
+            0x0400_0203 => self.interrupt_control.interrupt_request.get_byte(1),
+            0x0400_0204 => self.interrupt_control.wait_state_control.get_byte(0),
+            0x0400_0205 => self.interrupt_control.wait_state_control.get_byte(1),
+            0x0400_0208 => self.interrupt_control.interrupt_master_enable.get_byte(0),
+            0x0400_0209 => self.interrupt_control.interrupt_master_enable.get_byte(1),
+            0x0400_0300 => self.interrupt_control.post_boot_flag.get_byte(0),
+            0x0400_0301 => self.interrupt_control.power_down_control.get_byte(0),
+            0x0400_0410 => self.interrupt_control.purpose_unknown.get_byte(0),
+            0x0400_0206
+            | 0x0400_0207
+            | 0x400_020A..=0x400_02FF
+            | 0x0400_0302..=0x0400_040F
+            | 0x0400_0411 => {
+                tracing::debug!("read on unused memory 0x{address:08X}");
+                *self.unused_region.get(&address).unwrap_or(&0)
+            }
+            _ => match address & 0xFFFF {
+                0x800 => self.interrupt_control.internal_memory_control.get_byte(0),
+                0x801 => self.interrupt_control.internal_memory_control.get_byte(1),
+                0x802 => self.interrupt_control.internal_memory_control.get_byte(2),
+                0x803 => self.interrupt_control.internal_memory_control.get_byte(3),
+                _ => {
+                    tracing::debug!("read on unused memory 0x{address:08X}");
+                    *self.unused_region.get(&address).unwrap_or(&0)
+                }
+            },
+        }
+    }
+
+    fn write_interrupt_control_raw(&mut self, address: usize, value: u8) {
+        match address {
+            0x0400_0200 => self.interrupt_control.interrupt_enable.set_byte(0, value),
+            0x0400_0201 => self.interrupt_control.interrupt_enable.set_byte(1, value),
+            0x0400_0202 => {
+                // Writing 1 to a bit clears it (acknowledges the interrupt)
+                self.interrupt_control.interrupt_request &= !u16::from(value);
+            }
+            0x0400_0203 => {
+                // Writing 1 to a bit clears it (acknowledges the interrupt)
+                self.interrupt_control.interrupt_request &= !(u16::from(value) << 8);
+            }
+            0x0400_0204 => self.interrupt_control.wait_state_control.set_byte(0, value),
+            0x0400_0205 => self.interrupt_control.wait_state_control.set_byte(1, value),
+            0x0400_0208 => {
+                self.interrupt_control
+                    .interrupt_master_enable
+                    .set_byte(0, value);
+            }
+            0x0400_0209 => {
+                self.interrupt_control
+                    .interrupt_master_enable
+                    .set_byte(1, value);
+            }
+            0x0400_0300 => self.interrupt_control.post_boot_flag.set_byte(0, value),
+            0x0400_0301 => self.interrupt_control.power_down_control.set_byte(0, value),
+            0x0400_0410 => self.interrupt_control.purpose_unknown.set_byte(0, value),
+            0x0400_0206
+            | 0x0400_0207
+            | 0x0400_020A..=0x0400_02FF
+            | 0x0400_0302..=0x0400_040F
+            | 0x0400_0411 => {
+                tracing::debug!("write on unused memory");
+                self.unused_region.insert(address, value);
+            }
+            _ => match address & 0xFFFF {
+                0x800 => self
+                    .interrupt_control
+                    .internal_memory_control
+                    .set_byte(0, value),
+                0x801 => self
+                    .interrupt_control
+                    .internal_memory_control
+                    .set_byte(1, value),
+                0x802 => self
+                    .interrupt_control
+                    .internal_memory_control
+                    .set_byte(2, value),
+                0x803 => self
+                    .interrupt_control
+                    .internal_memory_control
+                    .set_byte(3, value),
+                _ => {
+                    tracing::debug!("write on unused memory");
+                    self.unused_region.insert(address, value);
+                }
+            },
+        }
+    }
+
+    fn read_keypad_raw(&self, address: usize) -> u8 {
+        match address {
+            0x0400_0130 => self.keypad.key_input.get_byte(0),
+            0x0400_0131 => self.keypad.key_input.get_byte(1),
+            0x0400_0132 => self.keypad.key_interrupt_control.get_byte(0),
+            0x0400_0133 => self.keypad.key_interrupt_control.get_byte(1),
+            _ => panic!("Keypad read address is out of bound"),
+        }
+    }
+
+    fn write_keypad_raw(&mut self, address: usize, value: u8) {
+        match address {
+            // KEYINPUT (0x0400_0130-0131) is read-only on real hardware.
+            // Writes are ignored - button state is controlled by actual input.
+            0x0400_0130 | 0x0400_0131 => {}
+            0x0400_0132 => self.keypad.key_interrupt_control.set_byte(0, value),
+            0x0400_0133 => self.keypad.key_interrupt_control.set_byte(1, value),
+            _ => panic!("Keypad write address is out of bound"),
+        }
+    }
+
+    fn read_serial_raw(&self, address: usize) -> u8 {
+        match address {
+            0x0400_0120 => self.serial.sio_data_32_multi_data_0_data_1.get_byte(0),
+            0x0400_0121 => self.serial.sio_data_32_multi_data_0_data_1.get_byte(1),
+            0x0400_0122 => self.serial.sio_data_32_multi_data_0_data_1.get_byte(2),
+            0x0400_0123 => self.serial.sio_data_32_multi_data_0_data_1.get_byte(3),
+            0x0400_0124 => self.serial.sio_multi_data_2.get_byte(0),
+            0x0400_0125 => self.serial.sio_multi_data_2.get_byte(1),
+            0x0400_0126 => self.serial.sio_multi_data_3.get_byte(0),
+            0x0400_0127 => self.serial.sio_multi_data_3.get_byte(1),
+            0x0400_0128 => self.serial.sio_control_register.get_byte(0),
+            0x0400_0129 => self.serial.sio_control_register.get_byte(1),
+            0x0400_012A => self.serial.sio_multi_data_send_data_8.get_byte(0),
+            0x0400_012B => self.serial.sio_multi_data_send_data_8.get_byte(1),
+            0x0400_0134 => self.serial.sio_mode_select.get_byte(0),
+            0x0400_0135 => self.serial.sio_mode_select.get_byte(1),
+            0x0400_0136 => self.serial.infrared_register.get_byte(0),
+            0x0400_0137 => self.serial.infrared_register.get_byte(1),
+            0x0400_0140 => self.serial.sio_joy_bus_control.get_byte(0),
+            0x0400_0141 => self.serial.sio_joy_bus_control.get_byte(1),
+            0x0400_0150 => self.serial.sio_joy_bus_receive_data.get_byte(0),
+            0x0400_0151 => self.serial.sio_joy_bus_receive_data.get_byte(1),
+            0x0400_0152 => self.serial.sio_joy_bus_receive_data.get_byte(2),
+            0x0400_0153 => self.serial.sio_joy_bus_receive_data.get_byte(3),
+            0x0400_0154 => self.serial.sio_joy_bus_transmit_data.get_byte(0),
+            0x0400_0155 => self.serial.sio_joy_bus_transmit_data.get_byte(1),
+            0x0400_0156 => self.serial.sio_joy_bus_transmit_data.get_byte(2),
+            0x0400_0157 => self.serial.sio_joy_bus_transmit_data.get_byte(3),
+            0x0400_0158 => self.serial.sio_joy_bus_receive_status.get_byte(0),
+            0x0400_0159 => self.serial.sio_joy_bus_receive_status.get_byte(1),
+            0x0400_012C..=0x0400_012F
+            | 0x0400_0138..=0x0400_0141
+            | 0x0400_0142..=0x0400_014F
+            | 0x0400_015A..=0x0400_01FF => {
+                tracing::debug!("read on unused memory {address:x}");
+                *self.unused_region.get(&address).unwrap_or(&0)
+            }
+            _ => panic!("Serial read address is out of bound: {address:#010x}"),
+        }
+    }
+
+    fn write_serial_raw(&mut self, address: usize, value: u8) {
+        match address {
+            0x0400_0120 => self
+                .serial
+                .sio_data_32_multi_data_0_data_1
+                .set_byte(0, value),
+            0x0400_0121 => self
+                .serial
+                .sio_data_32_multi_data_0_data_1
+                .set_byte(1, value),
+            0x0400_0122 => self
+                .serial
+                .sio_data_32_multi_data_0_data_1
+                .set_byte(2, value),
+            0x0400_0123 => self
+                .serial
+                .sio_data_32_multi_data_0_data_1
+                .set_byte(3, value),
+            0x0400_0124 => self.serial.sio_multi_data_2.set_byte(0, value),
+            0x0400_0125 => self.serial.sio_multi_data_2.set_byte(1, value),
+            0x0400_0126 => self.serial.sio_multi_data_3.set_byte(0, value),
+            0x0400_0127 => self.serial.sio_multi_data_3.set_byte(1, value),
+            0x0400_0128 => self.serial.sio_control_register.set_byte(0, value),
+            0x0400_0129 => self.serial.sio_control_register.set_byte(1, value),
+            0x0400_012A => self.serial.sio_multi_data_send_data_8.set_byte(0, value),
+            0x0400_012B => self.serial.sio_multi_data_send_data_8.set_byte(1, value),
+            0x0400_0134 => self.serial.sio_mode_select.set_byte(0, value),
+            0x0400_0135 => self.serial.sio_mode_select.set_byte(1, value),
+            0x0400_0136 => self.serial.infrared_register.set_byte(0, value),
+            0x0400_0137 => self.serial.infrared_register.set_byte(1, value),
+            0x0400_0140 => self.serial.sio_joy_bus_control.set_byte(0, value),
+            0x0400_0141 => self.serial.sio_joy_bus_control.set_byte(1, value),
+            0x0400_0150 => self.serial.sio_joy_bus_receive_data.set_byte(0, value),
+            0x0400_0151 => self.serial.sio_joy_bus_receive_data.set_byte(1, value),
+            0x0400_0152 => self.serial.sio_joy_bus_receive_data.set_byte(2, value),
+            0x0400_0153 => self.serial.sio_joy_bus_receive_data.set_byte(3, value),
+            0x0400_0154 => self.serial.sio_joy_bus_transmit_data.set_byte(0, value),
+            0x0400_0155 => self.serial.sio_joy_bus_transmit_data.set_byte(1, value),
+            0x0400_0156 => self.serial.sio_joy_bus_transmit_data.set_byte(2, value),
+            0x0400_0157 => self.serial.sio_joy_bus_transmit_data.set_byte(3, value),
+            0x0400_0158 => self.serial.sio_joy_bus_receive_status.set_byte(0, value),
+            0x0400_0159 => self.serial.sio_joy_bus_receive_status.set_byte(1, value),
+            0x0400_012C..=0x0400_012F
+            | 0x0400_0138..=0x0400_0139
+            | 0x0400_0142..=0x0400_014F
+            | 0x0400_015A..=0x0400_01FF => {
+                tracing::debug!("write on unused memory {address:x}");
+                self.unused_region.insert(address, value);
+            }
+            _ => {
+                tracing::debug!("Serial write to unhandled address: 0x{address:08X}");
+                self.unused_region.insert(address, value);
+            }
+        }
+    }
+
+    fn read_timers_raw(&self, address: usize) -> u8 {
+        match address {
+            0x0400_0100 => self.timers.tm0cnt_l.get_byte(0),
+            0x0400_0101 => self.timers.tm0cnt_l.get_byte(1),
+            0x0400_0102 => self.timers.tm0cnt_h.get_byte(0),
+            0x0400_0103 => self.timers.tm0cnt_h.get_byte(1),
+            0x0400_0104 => self.timers.tm1cnt_l.get_byte(0),
+            0x0400_0105 => self.timers.tm1cnt_l.get_byte(1),
+            0x0400_0106 => self.timers.tm1cnt_h.get_byte(0),
+            0x0400_0107 => self.timers.tm1cnt_h.get_byte(1),
+            0x0400_0108 => self.timers.tm2cnt_l.get_byte(0),
+            0x0400_0109 => self.timers.tm2cnt_l.get_byte(1),
+            0x0400_010A => self.timers.tm2cnt_h.get_byte(0),
+            0x0400_010B => self.timers.tm2cnt_h.get_byte(1),
+            0x0400_010C => self.timers.tm3cnt_l.get_byte(0),
+            0x0400_010D => self.timers.tm3cnt_l.get_byte(1),
+            0x0400_010E => self.timers.tm3cnt_h.get_byte(0),
+            0x0400_010F => self.timers.tm3cnt_h.get_byte(1),
+            0x0400_0110..=0x0400_011F => self.unused_region.get(&address).map_or(0, |v| *v),
+            _ => panic!("Timers read address is out of bound"),
+        }
+    }
+
+    fn write_timers_raw(&mut self, address: usize, value: u8) {
+        match address {
+            // Timer 0 reload (writing to CNT_L sets reload value, not counter)
+            0x0400_0100 => {
+                let mut reload = self.timers.tm0_reload; // Use reload as base for byte write
+                reload.set_byte(0, value);
+                self.timers.set_reload(0, reload);
+            }
+            0x0400_0101 => {
+                let mut reload = self.timers.tm0_reload;
+                reload.set_byte(1, value);
+                self.timers.set_reload(0, reload);
+            }
+            // Timer 0 control
+            0x0400_0102 => {
+                let mut control = self.timers.tm0cnt_h;
+                control.set_byte(0, value);
+                self.timers.set_control(0, control);
+            }
+            0x0400_0103 => {
+                let mut control = self.timers.tm0cnt_h;
+                control.set_byte(1, value);
+                self.timers.set_control(0, control);
+            }
+            // Timer 1 reload
+            0x0400_0104 => {
+                let mut reload = self.timers.tm1_reload;
+                reload.set_byte(0, value);
+                self.timers.set_reload(1, reload);
+            }
+            0x0400_0105 => {
+                let mut reload = self.timers.tm1_reload;
+                reload.set_byte(1, value);
+                self.timers.set_reload(1, reload);
+            }
+            // Timer 1 control
+            0x0400_0106 => {
+                let mut control = self.timers.tm1cnt_h;
+                control.set_byte(0, value);
+                self.timers.set_control(1, control);
+            }
+            0x0400_0107 => {
+                let mut control = self.timers.tm1cnt_h;
+                control.set_byte(1, value);
+                self.timers.set_control(1, control);
+            }
+            // Timer 2 reload
+            0x0400_0108 => {
+                let mut reload = self.timers.tm2_reload;
+                reload.set_byte(0, value);
+                self.timers.set_reload(2, reload);
+            }
+            0x0400_0109 => {
+                let mut reload = self.timers.tm2_reload;
+                reload.set_byte(1, value);
+                self.timers.set_reload(2, reload);
+            }
+            // Timer 2 control
+            0x0400_010A => {
+                let mut control = self.timers.tm2cnt_h;
+                control.set_byte(0, value);
+                self.timers.set_control(2, control);
+            }
+            0x0400_010B => {
+                let mut control = self.timers.tm2cnt_h;
+                control.set_byte(1, value);
+                self.timers.set_control(2, control);
+            }
+            // Timer 3 reload
+            0x0400_010C => {
+                let mut reload = self.timers.tm3_reload;
+                reload.set_byte(0, value);
+                self.timers.set_reload(3, reload);
+            }
+            0x0400_010D => {
+                let mut reload = self.timers.tm3_reload;
+                reload.set_byte(1, value);
+                self.timers.set_reload(3, reload);
+            }
+            // Timer 3 control
+            0x0400_010E => {
+                let mut control = self.timers.tm3cnt_h;
+                control.set_byte(0, value);
+                self.timers.set_control(3, control);
+            }
+            0x0400_010F => {
+                let mut control = self.timers.tm3cnt_h;
+                control.set_byte(1, value);
+                self.timers.set_control(3, control);
+            }
+            0x0400_0110..=0x0400_011F => {
+                tracing::debug!("write on unused memory {address:x}");
+                self.unused_region.insert(address, value);
+            }
+            _ => panic!("Timers write address is out of bound"),
+        }
+    }
+
+    fn read_dma_raw(&self, address: usize) -> u8 {
+        let read_dma_bank = |channel: &Registers, address: usize| match address {
+            0 => channel.source_address.get_byte(0),
+            1 => channel.source_address.get_byte(1),
+            2 => channel.source_address.get_byte(2),
+            3 => channel.source_address.get_byte(3),
+            4 => channel.destination_address.get_byte(0),
+            5 => channel.destination_address.get_byte(1),
+            6 => channel.destination_address.get_byte(2),
+            7 => channel.destination_address.get_byte(3),
+            8 => channel.word_count.get_byte(0),
+            9 => channel.word_count.get_byte(1),
+            10 => channel.control.get_byte(0),
+            11 => channel.control.get_byte(1),
+            _ => panic!("DMA channel read address is out of bound"),
+        };
+
+        match address {
+            0x0400_00B0..=0x0400_00BB => {
+                read_dma_bank(&self.dma.channels[0], address - 0x0400_00B0)
+            }
+            0x0400_00BC..=0x0400_00C7 => {
+                read_dma_bank(&self.dma.channels[1], address - 0x0400_00BC)
+            }
+            0x0400_00C8..=0x0400_00D3 => {
+                read_dma_bank(&self.dma.channels[2], address - 0x0400_00C8)
+            }
+            0x0400_00D4..=0x0400_00DF => {
+                read_dma_bank(&self.dma.channels[3], address - 0x0400_00D4)
+            }
+            0x0400_00E0..=0x0400_00FF => {
+                tracing::debug!("read on unused memory 0x{address:08X}");
+                self.unused_region.get(&address).map_or(0, |v| *v)
+            }
+            _ => panic!("DMA read address is out of bound"),
+        }
+    }
+
+    fn write_dma_raw(&mut self, address: usize, value: u8) {
+        let write_dma_bank = |channel: &mut Registers, address: usize, value: u8| match address {
+            0 => channel.source_address.set_byte(0, value),
+            1 => channel.source_address.set_byte(1, value),
+            2 => channel.source_address.set_byte(2, value),
+            3 => channel.source_address.set_byte(3, value),
+            4 => channel.destination_address.set_byte(0, value),
+            5 => channel.destination_address.set_byte(1, value),
+            6 => channel.destination_address.set_byte(2, value),
+            7 => channel.destination_address.set_byte(3, value),
+            8 => channel.word_count.set_byte(0, value),
+            9 => channel.word_count.set_byte(1, value),
+            10 => channel.control.set_byte(0, value),
+            11 => channel.control.set_byte(1, value),
+            _ => panic!("DMA channel write-address is out of bound"),
+        };
+
+        match address {
+            0x0400_00B0..=0x0400_00BB => {
+                write_dma_bank(&mut self.dma.channels[0], address - 0x0400_00B0, value);
+            }
+            0x0400_00BC..=0x0400_00C7 => {
+                write_dma_bank(&mut self.dma.channels[1], address - 0x0400_00BC, value);
+            }
+            0x0400_00C8..=0x0400_00D3 => {
+                write_dma_bank(&mut self.dma.channels[2], address - 0x0400_00C8, value);
+            }
+            0x0400_00D4..=0x0400_00DF => {
+                write_dma_bank(&mut self.dma.channels[3], address - 0x0400_00D4, value);
+            }
+            0x0400_00E0..=0x0400_00FF => {
+                tracing::debug!("write on unused memory");
+                self.unused_region.insert(address, value);
+            }
+            _ => panic!("Not implemented write memory address: {address:x}"),
+        }
+
+        // After writing DMA registers, check if an immediate transfer was triggered
+        self.check_and_execute_dma();
+    }
+
+    /// Latch newly enabled DMA channels and run any immediate (timing 0) one.
+    fn check_and_execute_dma(&mut self) {
+        if let Some(channel_idx) = self.dma.check_immediate_transfer() {
+            self.run_dma_block(channel_idx);
+        }
+    }
+
+    /// Run the DMA channels triggered by an LCD timing event (1 = `VBlank`,
+    /// 2 = `HBlank`). Each runs one latched block of transfers.
+    fn run_event_dma(&mut self, timing: u16) {
+        let triggered = self.dma.channels_for_timing(timing);
+        for (idx, &active) in triggered.iter().enumerate() {
+            if active {
+                self.run_dma_block(idx);
+            }
+        }
+    }
+
+    /// Transfer one channel's currently latched block of units, then apply the
+    /// repeat or disable rules.
+    fn run_dma_block(&mut self, idx: usize) {
+        let is_32bit = self.dma.channels[idx].control.get_bit(10);
+        let count = self.dma.channels[idx].internal_count;
+
+        for _ in 0..count {
+            let source = self.dma.channels[idx].internal_source as usize;
+            let dest = self.dma.channels[idx].internal_dest as usize;
+
+            if is_32bit {
+                let value = self.read_word(source);
+                self.write_word(dest, value);
+            } else {
+                let value = self.read_half_word(source);
+                self.write_half_word(dest, value);
+            }
+
+            self.dma.advance(idx, is_32bit);
+        }
+
+        // Control bit 14 raises the DMA-complete interrupt once the block has
+        // been transferred. Repeating channels raise it on each completed block.
+        if self.dma.channels[idx].control.get_bit(14) {
+            self.request_interrupt(IrqType::dma(idx));
+        }
+
+        self.dma.finish_block(idx);
+    }
+
+    /// Pop the DMA sound channels clocked by the given timer and refill any FIFO
+    /// that dropped to half through its sound DMA channel.
+    fn feed_dma_sound(&mut self, timer: u8) {
+        let refill = self.sound.on_timer_overflow(timer);
+        if refill[0] {
+            self.run_fifo_dma(0x0400_00A0);
+        }
+        if refill[1] {
+            self.run_fifo_dma(0x0400_00A4);
+        }
+    }
+
+    /// Run the sound DMA channels feeding the FIFO at `dest`. FIFO DMA always
+    /// moves four 32-bit units into the fixed FIFO address and leaves the
+    /// channel enabled (it is set up to repeat).
+    fn run_fifo_dma(&mut self, dest: u32) {
+        // Only DMA1 and DMA2 can drive the sound FIFOs, in special timing mode.
+        for idx in 1..=2 {
+            let channel = &self.dma.channels[idx];
+            let is_fifo = channel.control.get_bit(15)
+                && channel.control.get_bits(12..=13) == 3
+                && channel.destination_address == dest;
+            if !is_fifo {
+                continue;
+            }
+
+            let src_control = channel.control.get_bits(7..=8);
+            for _ in 0..4 {
+                let source = self.dma.channels[idx].internal_source as usize;
+                let value = self.read_word(source);
+                self.write_word(dest as usize, value);
+
+                // The destination is fixed; only the source pointer advances.
+                let channel = &mut self.dma.channels[idx];
+                match src_control {
+                    0 => channel.internal_source = channel.internal_source.wrapping_add(4),
+                    1 => channel.internal_source = channel.internal_source.wrapping_sub(4),
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    fn read_sound_raw(&self, address: usize) -> u8 {
+        match address {
+            0x0400_0060 => self.sound.channel1_sweep.get_byte(0),
+            0x0400_0061 => self.sound.channel1_sweep.get_byte(1),
+            0x0400_0062 => self.sound.channel1_duty_length_envelope.get_byte(0),
+            0x0400_0063 => self.sound.channel1_duty_length_envelope.get_byte(1),
+            0x0400_0064 => self.sound.channel1_frequency_control.get_byte(0),
+            0x0400_0065 => self.sound.channel1_frequency_control.get_byte(1),
+            0x0400_0068 => self.sound.channel2_duty_length_envelope.get_byte(0),
+            0x0400_0069 => self.sound.channel2_duty_length_envelope.get_byte(1),
+            0x0400_006C => self.sound.channel2_frequency_control.get_byte(0),
+            0x0400_006D => self.sound.channel2_frequency_control.get_byte(1),
+            0x0400_0070 => self.sound.channel3_stop_wave_ram_select.get_byte(0),
+            0x0400_0071 => self.sound.channel3_stop_wave_ram_select.get_byte(1),
+            0x0400_0072 => self.sound.channel3_length_volume.get_byte(0),
+            0x0400_0073 => self.sound.channel3_length_volume.get_byte(1),
+            0x0400_0074 => self.sound.channel3_frequency_control.get_byte(0),
+            0x0400_0075 => self.sound.channel3_frequency_control.get_byte(1),
+            0x0400_0078 => self.sound.channel4_length_envelope.get_byte(0),
+            0x0400_0079 => self.sound.channel4_length_envelope.get_byte(1),
+            0x0400_007C => self.sound.channel4_frequency_control.get_byte(0),
+            0x0400_007D => self.sound.channel4_frequency_control.get_byte(1),
+            0x0400_0080 => self.sound.control_stereo_volume_enable.get_byte(0),
+            0x0400_0081 => self.sound.control_stereo_volume_enable.get_byte(1),
+            0x0400_0082 => self.sound.control_mixing_dma_control.get_byte(0),
+            0x0400_0083 => self.sound.control_mixing_dma_control.get_byte(1),
+            0x0400_0084 => self.sound.control_sound_on_off.get_byte(0),
+            0x0400_0085 => self.sound.control_sound_on_off.get_byte(1),
+            0x0400_0088 => self.sound.sound_pwm_control.get_byte(0),
+            0x0400_0089 => self.sound.sound_pwm_control.get_byte(1),
+            0x0400_0090..=0x0400_009F => {
+                self.sound.channel3_wave_pattern_ram[address - 0x0400_0090]
+            }
+            // The DMA sound FIFOs are write-only on hardware.
+            0x0400_00A0..=0x0400_00A7 => 0,
+            0x0400_0066..=0x0400_0067
+            | 0x0400_006A..=0x0400_006B
+            | 0x0400_006E..=0x0400_006F
+            | 0x0400_0076..=0x0400_0077
+            | 0x0400_007A..=0x0400_007B
+            | 0x0400_007E..=0x0400_007F
+            | 0x0400_0086..=0x0400_0087
+            | 0x0400_008A..=0x0400_008F
+            | 0x0400_00A8..=0x0400_00AF => {
+                tracing::debug!("read on unused memory {address:x}");
+                self.unused_region.get(&address).map_or(0, |v| *v)
+            }
+            _ => {
+                tracing::warn!("read on out-of-bound sound address {address:x}");
+                0
+            }
+        }
+    }
+
+    fn write_sound_raw(&mut self, address: usize, value: u8) {
+        match address {
+            0x0400_0060 => self.sound.channel1_sweep.set_byte(0, value),
+            0x0400_0061 => self.sound.channel1_sweep.set_byte(1, value),
+            0x0400_0062 => self.sound.channel1_duty_length_envelope.set_byte(0, value),
+            0x0400_0063 => self.sound.channel1_duty_length_envelope.set_byte(1, value),
+            0x0400_0064 => self.sound.channel1_frequency_control.set_byte(0, value),
+            0x0400_0065 => self.sound.channel1_frequency_control.set_byte(1, value),
+            0x0400_0068 => self.sound.channel2_duty_length_envelope.set_byte(0, value),
+            0x0400_0069 => self.sound.channel2_duty_length_envelope.set_byte(1, value),
+            0x0400_006C => self.sound.channel2_frequency_control.set_byte(0, value),
+            0x0400_006D => self.sound.channel2_frequency_control.set_byte(1, value),
+            0x0400_0070 => self.sound.channel3_stop_wave_ram_select.set_byte(0, value),
+            0x0400_0071 => self.sound.channel3_stop_wave_ram_select.set_byte(1, value),
+            0x0400_0072 => self.sound.channel3_length_volume.set_byte(0, value),
+            0x0400_0073 => self.sound.channel3_length_volume.set_byte(1, value),
+            0x0400_0074 => self.sound.channel3_frequency_control.set_byte(0, value),
+            0x0400_0075 => self.sound.channel3_frequency_control.set_byte(1, value),
+            0x0400_0078 => self.sound.channel4_length_envelope.set_byte(0, value),
+            0x0400_0079 => self.sound.channel4_length_envelope.set_byte(1, value),
+            0x0400_007C => self.sound.channel4_frequency_control.set_byte(0, value),
+            0x0400_007D => self.sound.channel4_frequency_control.set_byte(1, value),
+            0x0400_0080 => self.sound.control_stereo_volume_enable.set_byte(0, value),
+            0x0400_0081 => self.sound.control_stereo_volume_enable.set_byte(1, value),
+            0x0400_0082 => self.sound.control_mixing_dma_control.set_byte(0, value),
+            0x0400_0083 => {
+                self.sound.control_mixing_dma_control.set_byte(1, value);
+                // High byte holds the FIFO reset bits: bit 3 (SOUNDCNT_H bit 11)
+                // for channel A, bit 7 (bit 15) for channel B.
+                if value.get_bit(3) {
+                    self.sound.reset_fifo(0);
+                }
+                if value.get_bit(7) {
+                    self.sound.reset_fifo(1);
+                }
+            }
+            0x0400_0084 => self.sound.control_sound_on_off.set_byte(0, value),
+            0x0400_0085 => self.sound.control_sound_on_off.set_byte(1, value),
+            0x0400_0088 => self.sound.sound_pwm_control.set_byte(0, value),
+            0x0400_0089 => self.sound.sound_pwm_control.set_byte(1, value),
+            0x0400_0090..=0x0400_009F => {
+                self.sound.channel3_wave_pattern_ram[address - 0x0400_0090] = value;
+            }
+            0x0400_00A0..=0x0400_00A3 => self.sound.push_fifo(0, value),
+            0x0400_00A4..=0x0400_00A7 => self.sound.push_fifo(1, value),
+            0x0400_0066..=0x0400_0067
+            | 0x0400_006A..=0x0400_006B
+            | 0x0400_006E..=0x0400_006F
+            | 0x0400_0076..=0x0400_0077
+            | 0x0400_007A..=0x0400_007B
+            | 0x0400_007E..=0x0400_007F
+            | 0x0400_0086..=0x0400_0087
+            | 0x0400_008A..=0x0400_008F
+            | 0x0400_00A8..=0x0400_00AF => {
+                tracing::debug!("write on unused memory, {address:x}");
+                self.unused_region.insert(address, value);
+            }
+            _ => {
+                tracing::warn!("write on out-of-bound sound address {address:x}");
+            }
+        }
+
+        // Let the PSG channels react to triggers, length reloads and DAC-off
+        // writes once the raw register byte is in place.
+        if (0x0400_0060..=0x0400_007F).contains(&address) {
+            self.sound.psg_register_written(address, value);
+        }
+    }
+
+    fn read_lcd_raw(&self, address: usize) -> u8 {
+        match address {
+            0x0400_0000 => self.lcd.registers.dispcnt.get_byte(0),
+            0x0400_0001 => self.lcd.registers.dispcnt.get_byte(1),
+            0x0400_0002 => self.lcd.registers.green_swap.get_byte(0),
+            0x0400_0003 => self.lcd.registers.green_swap.get_byte(1),
+            0x0400_0004 => self.lcd.registers.dispstat.get_byte(0),
+            0x0400_0005 => self.lcd.registers.dispstat.get_byte(1),
+            0x0400_0006 => self.lcd.registers.vcount.get_byte(0),
+            0x0400_0007 => self.lcd.registers.vcount.get_byte(1),
+            0x0400_0008 => self.lcd.registers.bg0cnt.get_byte(0),
+            0x0400_0009 => self.lcd.registers.bg0cnt.get_byte(1),
+            0x0400_000A => self.lcd.registers.bg1cnt.get_byte(0),
+            0x0400_000B => self.lcd.registers.bg1cnt.get_byte(1),
+            0x0400_000C => self.lcd.registers.bg2cnt.get_byte(0),
+            0x0400_000D => self.lcd.registers.bg2cnt.get_byte(1),
+            0x0400_000E => self.lcd.registers.bg3cnt.get_byte(0),
+            0x0400_000F => self.lcd.registers.bg3cnt.get_byte(1),
+            0x0400_0010 => self.lcd.registers.bg0hofs.get_byte(0),
+            0x0400_0011 => self.lcd.registers.bg0hofs.get_byte(1),
+            0x0400_0012 => self.lcd.registers.bg0vofs.get_byte(0),
+            0x0400_0013 => self.lcd.registers.bg0vofs.get_byte(1),
+            0x0400_0014 => self.lcd.registers.bg1hofs.get_byte(0),
+            0x0400_0015 => self.lcd.registers.bg1hofs.get_byte(1),
+            0x0400_0016 => self.lcd.registers.bg1vofs.get_byte(0),
+            0x0400_0017 => self.lcd.registers.bg1vofs.get_byte(1),
+            0x0400_0018 => self.lcd.registers.bg2hofs.get_byte(0),
+            0x0400_0019 => self.lcd.registers.bg2hofs.get_byte(1),
+            0x0400_001A => self.lcd.registers.bg2vofs.get_byte(0),
+            0x0400_001B => self.lcd.registers.bg2vofs.get_byte(1),
+            0x0400_001C => self.lcd.registers.bg3hofs.get_byte(0),
+            0x0400_001D => self.lcd.registers.bg3hofs.get_byte(1),
+            0x0400_001E => self.lcd.registers.bg3vofs.get_byte(0),
+            0x0400_001F => self.lcd.registers.bg3vofs.get_byte(1),
+            0x0400_0020 => self.lcd.registers.bg2pa.get_byte(0),
+            0x0400_0021 => self.lcd.registers.bg2pa.get_byte(1),
+            0x0400_0022 => self.lcd.registers.bg2pb.get_byte(0),
+            0x0400_0023 => self.lcd.registers.bg2pb.get_byte(1),
+            0x0400_0024 => self.lcd.registers.bg2pc.get_byte(0),
+            0x0400_0025 => self.lcd.registers.bg2pc.get_byte(1),
+            0x0400_0026 => self.lcd.registers.bg2pd.get_byte(0),
+            0x0400_0027 => self.lcd.registers.bg2pd.get_byte(1),
+            0x0400_0028 => self.lcd.registers.bg2x.get_byte(0),
+            0x0400_0029 => self.lcd.registers.bg2x.get_byte(1),
+            0x0400_002A => self.lcd.registers.bg2x.get_byte(2),
+            0x0400_002B => self.lcd.registers.bg2x.get_byte(3),
+            0x0400_002C => self.lcd.registers.bg2y.get_byte(0),
+            0x0400_002D => self.lcd.registers.bg2y.get_byte(1),
+            0x0400_002E => self.lcd.registers.bg2y.get_byte(2),
+            0x0400_002F => self.lcd.registers.bg2y.get_byte(3),
+            0x0400_0030 => self.lcd.registers.bg3pa.get_byte(0),
+            0x0400_0031 => self.lcd.registers.bg3pa.get_byte(1),
+            0x0400_0032 => self.lcd.registers.bg3pb.get_byte(0),
+            0x0400_0033 => self.lcd.registers.bg3pb.get_byte(1),
+            0x0400_0034 => self.lcd.registers.bg3pc.get_byte(0),
+            0x0400_0035 => self.lcd.registers.bg3pc.get_byte(1),
+            0x0400_0036 => self.lcd.registers.bg3pd.get_byte(0),
+            0x0400_0037 => self.lcd.registers.bg3pd.get_byte(1),
+            0x0400_0038 => self.lcd.registers.bg3x.get_byte(0),
+            0x0400_0039 => self.lcd.registers.bg3x.get_byte(1),
+            0x0400_003A => self.lcd.registers.bg3x.get_byte(2),
+            0x0400_003B => self.lcd.registers.bg3x.get_byte(3),
+            0x0400_003C => self.lcd.registers.bg3y.get_byte(0),
+            0x0400_003D => self.lcd.registers.bg3y.get_byte(1),
+            0x0400_003E => self.lcd.registers.bg3y.get_byte(2),
+            0x0400_003F => self.lcd.registers.bg3y.get_byte(3),
+            0x0400_0040 => self.lcd.registers.win0h.get_byte(0),
+            0x0400_0041 => self.lcd.registers.win0h.get_byte(1),
+            0x0400_0042 => self.lcd.registers.win1h.get_byte(0),
+            0x0400_0043 => self.lcd.registers.win1h.get_byte(1),
+            0x0400_0044 => self.lcd.registers.win0v.get_byte(0),
+            0x0400_0045 => self.lcd.registers.win0v.get_byte(1),
+            0x0400_0046 => self.lcd.registers.win1v.get_byte(0),
+            0x0400_0047 => self.lcd.registers.win1v.get_byte(1),
+            0x0400_0048 => self.lcd.registers.winin.get_byte(0),
+            0x0400_0049 => self.lcd.registers.winin.get_byte(1),
+            0x0400_004A => self.lcd.registers.winout.get_byte(0),
+            0x0400_004B => self.lcd.registers.winout.get_byte(1),
+            0x0400_004C => self.lcd.registers.mosaic.get_byte(0),
+            0x0400_004D => self.lcd.registers.mosaic.get_byte(1),
+            0x0400_0050 => self.lcd.registers.bldcnt.get_byte(0),
+            0x0400_0051 => self.lcd.registers.bldcnt.get_byte(1),
+            0x0400_0052 => self.lcd.registers.bldalpha.get_byte(0),
+            0x0400_0053 => self.lcd.registers.bldalpha.get_byte(1),
+            0x0400_0054 => self.lcd.registers.bldy.get_byte(0),
+            0x0400_0055 => self.lcd.registers.bldy.get_byte(1),
+            0x0400_004E..=0x0400_004F | 0x0400_0056..=0x0400_005F => {
+                tracing::debug!("read on unused memory 0x{address:08X}");
+                self.unused_region.get(&address).map_or(0, |v| *v)
+            }
+            _ => panic!("LCD read address is out of bound"),
+        }
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn write_lcd_raw(&mut self, address: usize, value: u8) {
+        match address {
+            0x0400_0000 => {
+                self.lcd.registers.dispcnt.set_byte(0, value);
+            }
+            0x0400_0001 => {
+                self.lcd.registers.dispcnt.set_byte(1, value);
+            }
+            0x0400_0002 => self.lcd.registers.green_swap.set_byte(0, value),
+            0x0400_0003 => self.lcd.registers.green_swap.set_byte(1, value),
+            0x0400_0004 => self.lcd.registers.dispstat.set_byte(0, value),
+            0x0400_0005 => self.lcd.registers.dispstat.set_byte(1, value),
+            0x0400_0008 => self.lcd.registers.bg0cnt.set_byte(0, value),
+            0x0400_0006 => self.lcd.registers.vcount.set_byte(0, value),
+            0x0400_0007 => self.lcd.registers.vcount.set_byte(1, value),
+            0x0400_0009 => self.lcd.registers.bg0cnt.set_byte(1, value),
+            0x0400_000A => self.lcd.registers.bg1cnt.set_byte(0, value),
+            0x0400_000B => self.lcd.registers.bg1cnt.set_byte(1, value),
+            0x0400_000C => self.lcd.registers.bg2cnt.set_byte(0, value),
+            0x0400_000D => self.lcd.registers.bg2cnt.set_byte(1, value),
+            0x0400_000E => self.lcd.registers.bg3cnt.set_byte(0, value),
+            0x0400_000F => self.lcd.registers.bg3cnt.set_byte(1, value),
+            0x0400_0010 => self.lcd.registers.bg0hofs.set_byte(0, value),
+            0x0400_0011 => self.lcd.registers.bg0hofs.set_byte(1, value),
+            0x0400_0012 => self.lcd.registers.bg0vofs.set_byte(0, value),
+            0x0400_0013 => self.lcd.registers.bg0vofs.set_byte(1, value),
+            0x0400_0014 => self.lcd.registers.bg1hofs.set_byte(0, value),
+            0x0400_0015 => self.lcd.registers.bg1hofs.set_byte(1, value),
+            0x0400_0016 => self.lcd.registers.bg1vofs.set_byte(0, value),
+            0x0400_0017 => self.lcd.registers.bg1vofs.set_byte(1, value),
+            0x0400_0018 => self.lcd.registers.bg2hofs.set_byte(0, value),
+            0x0400_0019 => self.lcd.registers.bg2hofs.set_byte(1, value),
+            0x0400_001A => self.lcd.registers.bg2vofs.set_byte(0, value),
+            0x0400_001B => self.lcd.registers.bg2vofs.set_byte(1, value),
+            0x0400_001C => self.lcd.registers.bg3hofs.set_byte(0, value),
+            0x0400_001D => self.lcd.registers.bg3hofs.set_byte(1, value),
+            0x0400_001E => self.lcd.registers.bg3vofs.set_byte(0, value),
+            0x0400_001F => self.lcd.registers.bg3vofs.set_byte(1, value),
+            0x0400_0020 => self.lcd.registers.bg2pa.set_byte(0, value),
+            0x0400_0021 => self.lcd.registers.bg2pa.set_byte(1, value),
+            0x0400_0022 => self.lcd.registers.bg2pb.set_byte(0, value),
+            0x0400_0023 => self.lcd.registers.bg2pb.set_byte(1, value),
+            0x0400_0024 => self.lcd.registers.bg2pc.set_byte(0, value),
+            0x0400_0025 => self.lcd.registers.bg2pc.set_byte(1, value),
+            0x0400_0026 => self.lcd.registers.bg2pd.set_byte(0, value),
+            0x0400_0027 => self.lcd.registers.bg2pd.set_byte(1, value),
+            0x0400_0028..=0x0400_002B => {
+                self.lcd
+                    .registers
+                    .bg2x
+                    .set_byte(u8::try_from(address & 3).unwrap(), value);
+                self.lcd.registers.reload_internal_bg2x();
+            }
+            0x0400_002C..=0x0400_002F => {
+                self.lcd
+                    .registers
+                    .bg2y
+                    .set_byte(u8::try_from(address & 3).unwrap(), value);
+                self.lcd.registers.reload_internal_bg2y();
+            }
+            0x0400_0030 => self.lcd.registers.bg3pa.set_byte(0, value),
+            0x0400_0031 => self.lcd.registers.bg3pa.set_byte(1, value),
+            0x0400_0032 => self.lcd.registers.bg3pb.set_byte(0, value),
+            0x0400_0033 => self.lcd.registers.bg3pb.set_byte(1, value),
+            0x0400_0034 => self.lcd.registers.bg3pc.set_byte(0, value),
+            0x0400_0035 => self.lcd.registers.bg3pc.set_byte(1, value),
+            0x0400_0036 => self.lcd.registers.bg3pd.set_byte(0, value),
+            0x0400_0037 => self.lcd.registers.bg3pd.set_byte(1, value),
+            0x0400_0038..=0x0400_003B => {
+                self.lcd
+                    .registers
+                    .bg3x
+                    .set_byte(u8::try_from(address & 3).unwrap(), value);
+                self.lcd.registers.reload_internal_bg3x();
+            }
+            0x0400_003C..=0x0400_003F => {
+                self.lcd
+                    .registers
+                    .bg3y
+                    .set_byte(u8::try_from(address & 3).unwrap(), value);
+                self.lcd.registers.reload_internal_bg3y();
+            }
+            0x0400_0040 => self.lcd.registers.win0h.set_byte(0, value),
+            0x0400_0041 => self.lcd.registers.win0h.set_byte(1, value),
+            0x0400_0042 => self.lcd.registers.win1h.set_byte(0, value),
+            0x0400_0043 => self.lcd.registers.win1h.set_byte(1, value),
+            0x0400_0044 => self.lcd.registers.win0v.set_byte(0, value),
+            0x0400_0045 => self.lcd.registers.win0v.set_byte(1, value),
+            0x0400_0046 => self.lcd.registers.win1v.set_byte(0, value),
+            0x0400_0047 => self.lcd.registers.win1v.set_byte(1, value),
+            0x0400_0048 => self.lcd.registers.winin.set_byte(0, value),
+            0x0400_0049 => self.lcd.registers.winin.set_byte(1, value),
+            0x0400_004A => self.lcd.registers.winout.set_byte(0, value),
+            0x0400_004B => self.lcd.registers.winout.set_byte(1, value),
+            0x0400_004C => self.lcd.registers.mosaic.set_byte(0, value),
+            0x0400_004D => self.lcd.registers.mosaic.set_byte(1, value),
+            // 0x0400_004E, 0x0400_004F are not used
+            0x0400_0050 => self.lcd.registers.bldcnt.set_byte(0, value),
+            0x0400_0051 => self.lcd.registers.bldcnt.set_byte(1, value),
+            0x0400_0052 => self.lcd.registers.bldalpha.set_byte(0, value),
+            0x0400_0053 => self.lcd.registers.bldalpha.set_byte(1, value),
+            0x0400_0054 => self.lcd.registers.bldy.set_byte(0, value),
+            0x0400_0055 => self.lcd.registers.bldy.set_byte(1, value),
+            0x0400_004E..=0x0400_004F | 0x0400_0056..=0x0400_005F => {
+                tracing::debug!("write on unused memory");
+                self.unused_region.insert(address, value);
+            }
+            _ => panic!("LCD write address is out of bound"),
+        }
+    }
+
+    /// Reads a single byte from the given address.
+    ///
+    /// Unimplemented addresses return zero and are logged at debug level.
+    #[must_use]
+    pub fn read_raw(&self, address: usize) -> u8 {
+        // Mask address to 32-bit to handle potential overflow issues
+        let address = address & 0xFFFF_FFFF;
+        match address {
+            0x0000_0000..=0x0000_3FFF => {
+                // BIOS read protection: if PC is outside BIOS, return last BIOS opcode
+                if self.current_pc >= 0x4000 {
+                    // Return the appropriate byte from last_bios_opcode
+                    self.last_bios_opcode
+                        .get_byte(u8::try_from(address & 0b11).unwrap_or_default())
+                } else {
+                    self.internal_memory.read_at(address)
+                }
+            }
+            // ROM (0x08-0x0D) plus the GamePak SRAM/Flash region (0x0E-0x0F),
+            // which mirrors its backup memory across the whole upper space.
+            (0x0200_0000..=0x03FF_FFFF) | (0x0800_0000..=0x0FFF_FFFF) => {
+                self.internal_memory.read_at(address)
+            }
+            0x0400_0000..=0x0400_005F => self.read_lcd_raw(address),
+            0x0400_0060..=0x0400_00AF => self.read_sound_raw(address),
+            0x0400_00B0..=0x0400_00FF => self.read_dma_raw(address),
+            0x0400_0100..=0x0400_011F => self.read_timers_raw(address),
+            0x0400_0130..=0x0400_0133 => self.read_keypad_raw(address),
+            0x0400_0120..=0x0400_012F | 0x0400_0134..=0x0400_01FF => self.read_serial_raw(address),
+            0x0400_0200..=0x04FF_FFFF => self.read_interrupt_control_raw(address),
+            0x0500_0000..=0x05FF_FFFF => {
+                let unmasked_address =
+                    get_unmasked_address(address, 0x00FF_FF00, 0xFF00_00FF, 8, 4);
+
+                match unmasked_address {
+                    0x0500_0000..=0x0500_01FF => {
+                        self.lcd.memory.bg_palette_ram[unmasked_address - 0x0500_0000]
+                    }
+                    0x0500_0200..=0x0500_03FF => {
+                        self.lcd.memory.obj_palette_ram[unmasked_address - 0x0500_0200]
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            0x0600_0000..=0x06FF_FFFF => {
+                let unmasked_address =
+                    get_unmasked_address(address, 0x00FF_0000, 0xFF00_FFFF, 16, 2);
+
+                // VRAM is 64k+32k+32k with the last two 32k being one mirrors of each other
+                match unmasked_address {
+                    0x0600_0000..=0x0601_7FFF => {
+                        self.lcd.memory.video_ram[unmasked_address - 0x0600_0000]
+                    }
+                    0x0601_8000..=0x0601_FFFF => {
+                        self.lcd.memory.video_ram[unmasked_address - 0x0600_0000 - 0x8000]
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            0x0700_0000..=0x07FF_FFFF => {
+                let unmasked_address =
+                    get_unmasked_address(address, 0x00FF_FF00, 0xFF00_00FF, 8, 4);
+
+                self.lcd.memory.obj_attributes[unmasked_address - 0x0700_0000]
+            }
+            0x000_4000..=0x1FF_FFFF | 0x1000_0000..=0xFFFF_FFFF => {
+                tracing::debug!("read on unused memory {address:x}");
+                *self.unused_region.get(&address).unwrap_or(&0)
+            }
+            _ => {
+                tracing::debug!("read on unimplemented memory address: {address:08X}");
+                0
+            }
+        }
+    }
+
+    /// Writes a single byte to the given address.
+    ///
+    /// Writes to unimplemented addresses are ignored and logged at debug level.
+    pub fn write_raw(&mut self, address: usize, value: u8) {
+        // Mask address to 32-bit to handle potential overflow issues
+        let address = address & 0xFFFF_FFFF;
+        match address {
+            0x0000_0000..=0x0000_3FFF | 0x0200_0000..=0x03FF_FFFF | 0x0800_0000..=0x0FFF_FFFF => {
+                self.internal_memory.write_at(address, value);
+            }
+            0x0400_0000..=0x0400_005F => self.write_lcd_raw(address, value),
+            0x0400_0060..=0x0400_00AF => self.write_sound_raw(address, value),
+            0x0400_00B0..=0x0400_00FF => self.write_dma_raw(address, value),
+            0x0400_0100..=0x0400_011F => self.write_timers_raw(address, value),
+            0x0400_0120..=0x0400_012F | 0x0400_0134..=0x0400_01FF => {
+                self.write_serial_raw(address, value);
+            }
+            0x0400_0130..=0x0400_0133 => self.write_keypad_raw(address, value),
+            0x0400_0200..=0x04FF_FFFF => self.write_interrupt_control_raw(address, value),
+            0x0500_0000..=0x05FF_FFFF => {
+                let unmasked_address =
+                    get_unmasked_address(address, 0x00FF_FF00, 0xFF00_00FF, 8, 4);
+
+                match unmasked_address {
+                    0x0500_0000..=0x0500_01FF => {
+                        self.lcd.memory.bg_palette_ram[unmasked_address - 0x0500_0000] = value;
+                    }
+                    0x0500_0200..=0x0500_03FF => {
+                        self.lcd.memory.obj_palette_ram[unmasked_address - 0x0500_0200] = value;
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            0x0600_0000..=0x06FF_FFFF => {
+                let unmasked_address =
+                    get_unmasked_address(address, 0x00FF_0000, 0xFF00_FFFF, 16, 2);
+
+                // VRAM is 64k+32k+32k with the last two 32k being one mirrors of each other
+                match unmasked_address {
+                    0x0600_0000..=0x0601_7FFF => {
+                        self.lcd.memory.video_ram[unmasked_address - 0x0600_0000] = value;
+                    }
+                    0x0601_8000..=0x0601_FFFF => {
+                        self.lcd.memory.video_ram[unmasked_address - 0x0600_0000 - 0x8000] = value;
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            0x700_0000..=0x7FF_FFFF => {
+                let unmasked_address =
+                    get_unmasked_address(address, 0x00FF_FF00, 0xFF00_00FF, 8, 4);
+
+                self.lcd.memory.obj_attributes[unmasked_address - 0x0700_0000] = value;
+            }
+            0x000_4000..=0x1FF_FFFF | 0x1000_0000..=0xFFFF_FFFF => {
+                tracing::debug!("write on unused memory {address:x}");
+                self.unused_region.insert(address, value);
+            }
+            _ => {
+                tracing::debug!(
+                    "write on unimplemented memory address 0x{address:08X} with value 0x{value:02X}"
+                );
+            }
+        }
+    }
+
+    pub fn read_byte(&mut self, address: usize) -> u8 {
+        self.cycles_count += self.access_cycles(address, 1);
+
+        self.last_used_address = address;
+
+        self.read_raw(address)
+    }
+
+    pub fn write_byte(&mut self, address: usize, value: u8) {
+        self.cycles_count += self.access_cycles(address, 1);
+
+        self.last_used_address = address;
+
+        // Special handling for video memory byte writes
+        match address {
+            // in OAM (object attributes map) byte writes are ignored
+            0x0700_0000..=0x07FF_FFFF => {
+                tracing::debug!("OAM byte write ignored");
+                return;
+            }
+            // VRAM byte writes: a write to BG VRAM is duplicated across the
+            // aligned halfword, while a write to OBJ VRAM is ignored. The
+            // BG/OBJ boundary is 0x10000 in tile modes and 0x14000 in bitmap
+            // modes.
+            0x0600_0000..=0x06FF_FFFF => {
+                let unmasked_address =
+                    get_unmasked_address(address, 0x00FF_0000, 0xFF00_FFFF, 16, 2);
+
+                // De-mirror the last 32K so the offset is within the real 96K.
+                let offset = unmasked_address - 0x0600_0000;
+                let vram_offset = if offset >= 0x1_8000 {
+                    offset - 0x8000
+                } else {
+                    offset
+                };
+
+                let bg_mode = self.lcd.registers.dispcnt & 0b111;
+                let obj_boundary = if bg_mode >= 3 { 0x1_4000 } else { 0x1_0000 };
+
+                if vram_offset < obj_boundary {
+                    // BG VRAM: duplicate the byte across the halfword.
+                    let aligned_address = address & !1;
+                    self.write_raw(aligned_address, value);
+                    self.write_raw(aligned_address + 1, value);
+                } else {
+                    tracing::debug!("VRAM byte write to OBJ region ignored at 0x{address:08X}");
+                }
+                return;
+            }
+            // in palette RAM byte writes are duplicated into halfwords
+            0x0500_0000..=0x05FF_FFFF => {
+                // Write as halfword with byte duplicated, aligned to halfword boundary
+                let aligned_address = address & !1;
+                self.write_raw(aligned_address, value);
+                self.write_raw(aligned_address + 1, value);
+                return;
+            }
+            _ => {}
+        }
+
+        self.write_raw(address, value);
+    }
+
+    /// Resync the transient timer clock after loading a save state, so the
+    /// first `step` does not advance the timers by the whole restored
+    /// `cycles_count`. The timer counters themselves are part of the save.
+    pub const fn resync_after_load(&mut self) {
+        self.timer_cycles_done = self.cycles_count;
+    }
+
+    /// Account for internal (I) cycles, where the CPU does work without touching
+    /// the bus (e.g. the iterations of a multiply). They still advance the clock,
+    /// so the timers and LCD pick them up on the next `step`.
+    pub(crate) const fn add_internal_cycles(&mut self, cycles: u64) {
+        self.cycles_count += cycles;
+    }
+
+    /// Total CPU cycles accounted so far. Used in tests to assert timing.
+    #[cfg(test)]
+    pub(crate) const fn cycles(&self) -> u64 {
+        self.cycles_count
+    }
+
+    /// Step all peripherals (timers, LCD, etc.) for one CPU cycle.
+    ///
+    /// Returns `true` if `VBlank` just started (a new frame is ready).
+    pub(crate) fn step(&mut self) -> bool {
+        self.cycles_count += 1;
+        let mut vblank_started = false;
+
+        // Advance the timers by the cycles elapsed since they were last serviced,
+        // which includes the memory wait states added during this instruction.
+        let timer_cycles = self.cycles_count - self.timer_cycles_done;
+        self.timer_cycles_done = self.cycles_count;
+        let timer_result = self.timers.step(timer_cycles);
+        if timer_result.timer0_overflow {
+            self.request_interrupt(IrqType::Timer0);
+        }
+        if timer_result.timer1_overflow {
+            self.request_interrupt(IrqType::Timer1);
+        }
+        if timer_result.timer2_overflow {
+            self.request_interrupt(IrqType::Timer2);
+        }
+        if timer_result.timer3_overflow {
+            self.request_interrupt(IrqType::Timer3);
+        }
+
+        // DMA sound channels are clocked by timer 0/1 overflows, independent of
+        // whether those timers raise an IRQ.
+        if timer_result.timer0_raw_overflow {
+            self.feed_dma_sound(0);
+        }
+        if timer_result.timer1_raw_overflow {
+            self.feed_dma_sound(1);
+        }
+        self.sound.step(timer_cycles);
+
+        // A pixel takes 4 cycles to get drawn. `cycles_count` is bumped both here
+        // (one cycle per instruction) and by every memory access, so an instruction
+        // can advance it by several cycles at once. Step the LCD once for each
+        // 4-cycle tick that has elapsed since it was last serviced, otherwise the
+        // pixel clock falls behind whenever memory traffic is heavy (the previous
+        // `cycles_count % 4 == 0` check dropped every tick that didn't land exactly
+        // on a multiple of 4, freezing VCOUNT during memory-bound code).
+        let ticks_owed = self.cycles_count >> 2;
+        while self.lcd_ticks_done < ticks_owed {
+            self.lcd_ticks_done += 1;
+            let lcd_output = self.lcd.step();
+
+            if lcd_output.request_hblank_irq {
+                self.request_interrupt(IrqType::HBlank);
+            }
+
+            if lcd_output.request_vblank_irq {
+                self.request_interrupt(IrqType::VBlank);
+            }
+
+            // HBlank-timed DMA fires at the start of each visible scanline.
+            if lcd_output.entered_hblank {
+                self.run_event_dma(2);
+            }
+
+            // Signal a ready frame whenever the LCD enters VBlank, regardless of
+            // whether the VBlank IRQ is enabled. Games that poll DISPSTAT (e.g. the
+            // jsmolka test ROMs) never enable the IRQ but still need the display to
+            // refresh.
+            if lcd_output.entered_vblank {
+                vblank_started = true;
+                // VBlank-timed DMA fires once when VBlank begins.
+                self.run_event_dma(1);
+            }
+
+            if lcd_output.request_vcount_irq {
+                self.request_interrupt(IrqType::VCount);
+            }
+        }
+
+        // The keypad interrupt is level based, so re-request it while the
+        // selected key combination is held.
+        if self.keypad.irq_condition_met() {
+            self.request_interrupt(IrqType::Keypad);
+        }
+
+        vblank_started
+    }
+
+    pub(crate) fn request_interrupt(&mut self, irq_type: IrqType) {
+        self.interrupt_control
+            .interrupt_request
+            .set_bit(irq_type.get_idx_in_if(), true);
+    }
+
+    #[must_use]
+    pub fn with_memory(memory: InternalMemory) -> Self {
+        Self {
+            internal_memory: memory,
+            ..Default::default()
+        }
+    }
+
+    /// Attach the host audio sink so the DMA sound engine can emit samples at
+    /// `output_rate` Hz.
+    pub fn set_audio_out(&mut self, producer: rtrb::Producer<f32>, output_rate: u32) {
+        self.sound.set_audio_out(producer, output_rate);
+    }
+
+    /// Detach the audio sink before a save state load, so it survives the CPU
+    /// being replaced by the deserialized one.
+    pub const fn take_audio_out(&mut self) -> (Option<rtrb::Producer<f32>>, u32) {
+        self.sound.take_audio_out()
+    }
+
+    /// Reinstall the audio sink after a save state load.
+    pub fn restore_audio_out(&mut self, producer: Option<rtrb::Producer<f32>>, output_rate: u32) {
+        self.sound.restore_audio_out(producer, output_rate);
+    }
+
+    /// Wait-state cycles for a single memory access of `size` bytes (1, 2 or 4)
+    /// at `address`. Models the per-region bus widths and the `GamePak` wait
+    /// states programmed in `WAITCNT`, including the cheaper sequential (S)
+    /// timing when the access immediately follows the previous one.
+    ///
+    /// The `GamePak` prefetch buffer is still not modelled, so a code fetch
+    /// after a data access is charged a non-sequential cycle even though
+    /// prefetch would often hide it.
+    fn access_cycles(&self, address: usize, size: u64) -> u64 {
+        let region = (address >> 24) & 0xF;
+        match region {
+            // EWRAM: 16-bit bus with 2 default wait states, doubled for 32-bit
+            0x2 if size == 4 => 6,
+            0x2 => 3,
+            // Palette and VRAM: 16-bit bus, one extra cycle for 32-bit accesses
+            0x5 | 0x6 if size == 4 => 2,
+            // GamePak ROM mirrors: timing from WAITCNT per wait-state region
+            0x8..=0xD => {
+                let sequential = address.wrapping_sub(self.last_used_address) as u64 == size;
+                // With the prefetch buffer enabled, a sequential opcode fetch is
+                // delivered from the buffer at one cycle per 16-bit unit instead
+                // of paying the ROM wait states. This is the optimistic case
+                // where the prefetcher has kept up, which holds for the tight
+                // loops that dominate ROM execution.
+                if self.in_opcode_fetch && sequential && self.waitcnt().get_bit(14) {
+                    size / 2
+                } else {
+                    self.gamepak_cycles(region, size, sequential)
+                }
+            }
+            // GamePak SRAM: 8-bit bus, WAITCNT SRAM wait
+            0xE | 0xF => 1 + Self::nwait(self.waitcnt().get_bits(0..=1)),
+            // 32-bit bus with no wait states (BIOS, IWRAM, I/O, OAM), the
+            // 16-bit single-access regions above, and anything unmapped
+            _ => 1,
+        }
+    }
+
+    const fn waitcnt(&self) -> u16 {
+        self.interrupt_control.wait_state_control
+    }
+
+    /// The single byte an 8-bit-bus store writes: the value rotated right by the
+    /// address's low bits, then its low byte. Addresses are well below 4 GiB and
+    /// taking the low byte is the intent, so the casts cannot lose data.
+    #[allow(clippy::cast_possible_truncation)]
+    const fn bus8_store_byte(value: u32, address: usize) -> u8 {
+        value.rotate_right(8 * (address as u32 & 3)) as u8
+    }
+
+    /// Map a `WAITCNT` first-access (N) wait code to its cycle count.
+    const fn nwait(code: u16) -> u64 {
+        match code {
+            0 => 4,
+            1 => 3,
+            2 => 2,
+            _ => 8,
+        }
+    }
+
+    /// Non-sequential (N) and sequential (S) wait cycles for a `GamePak` ROM
+    /// wait-state region, read from `WAITCNT`.
+    fn gamepak_waits(&self, region: usize) -> (u64, u64) {
+        let w = self.waitcnt();
+        match region {
+            // WS0: sequential wait is 1 or 2
+            0x8 | 0x9 => (
+                Self::nwait(w.get_bits(2..=3)),
+                if w.get_bit(4) { 1 } else { 2 },
+            ),
+            // WS1: sequential wait is 1 or 4
+            0xA | 0xB => (
+                Self::nwait(w.get_bits(5..=6)),
+                if w.get_bit(7) { 1 } else { 4 },
+            ),
+            // WS2: sequential wait is 1 or 8
+            _ => (
+                Self::nwait(w.get_bits(8..=9)),
+                if w.get_bit(10) { 1 } else { 8 },
+            ),
+        }
+    }
+
+    /// `GamePak` ROM access cycles. A 32-bit access is two 16-bit bus accesses:
+    /// the first sequential or not depending on the caller, the second always
+    /// sequential since it immediately follows the first.
+    fn gamepak_cycles(&self, region: usize, size: u64, sequential: bool) -> u64 {
+        let (n_wait, s_wait) = self.gamepak_waits(region);
+        let first = 1 + if sequential { s_wait } else { n_wait };
+        if size == 4 { first + 1 + s_wait } else { first }
+    }
+
+    /// Read a 32-bit opcode from memory, applying the `GamePak` prefetch buffer
+    /// timing for sequential fetches.
+    pub fn read_opcode_word(&mut self, address: usize) -> u32 {
+        self.in_opcode_fetch = true;
+        let value = self.read_word(address);
+        self.in_opcode_fetch = false;
+        value
+    }
+
+    /// Read a 16-bit opcode from memory, applying the `GamePak` prefetch buffer
+    /// timing for sequential fetches.
+    pub fn read_opcode_half_word(&mut self, address: usize) -> u16 {
+        self.in_opcode_fetch = true;
+        let value = self.read_half_word(address);
+        self.in_opcode_fetch = false;
+        value
+    }
+
+    pub fn read_word(&mut self, mut address: usize) -> u32 {
+        self.cycles_count += self.access_cycles(address, 4);
+
+        self.last_used_address = address;
+
+        // The GamePak SRAM/Flash region is an 8-bit bus: a wider read returns
+        // the single byte replicated across all lanes.
+        if (0x0E00_0000..=0x0FFF_FFFF).contains(&address) {
+            return u32::from(self.read_raw(address)) * 0x0101_0101;
+        }
+
+        if address & 3 != 0 {
+            address &= !3;
+        }
+
+        // Fast path: read 4 bytes at once for contiguous memory regions.
+        // This avoids 4 separate calls through the address-decode match.
+        if let Some(word) = self.internal_memory.try_read_word(address) {
+            return word;
+        }
+
+        let part_0: u32 = self.read_raw(address).into();
+        let part_1: u32 = self.read_raw(address + 1).into();
+        let part_2: u32 = self.read_raw(address + 2).into();
+        let part_3: u32 = self.read_raw(address + 3).into();
+
+        part_3 << 24_u32 | part_2 << 16_u32 | part_1 << 8_u32 | part_0
+    }
+
+    /// Writes a 32-bit word to the given address.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value cannot be split into bytes (should not happen).
+    pub fn write_word(&mut self, mut address: usize, value: u32) {
+        self.cycles_count += self.access_cycles(address, 4);
+
+        self.last_used_address = address;
+
+        // The GamePak SRAM/Flash region is an 8-bit bus: a wider write stores a
+        // single byte, the one selected by rotating the value by the address.
+        if (0x0E00_0000..=0x0FFF_FFFF).contains(&address) {
+            self.write_raw(address, Self::bus8_store_byte(value, address));
+            return;
+        }
+
+        if address & 3 != 0 {
+            address &= !3;
+        }
+
+        let part_0: u8 = value.get_bits(0..=7).try_into().unwrap();
+        let part_1: u8 = value.get_bits(8..=15).try_into().unwrap();
+        let part_2: u8 = value.get_bits(16..=23).try_into().unwrap();
+        let part_3: u8 = value.get_bits(24..=31).try_into().unwrap();
+
+        self.write_raw(address, part_0);
+        self.write_raw(address + 1, part_1);
+        self.write_raw(address + 2, part_2);
+        self.write_raw(address + 3, part_3);
+    }
+
+    pub fn read_half_word(&mut self, mut address: usize) -> u16 {
+        self.cycles_count += self.access_cycles(address, 2);
+
+        self.last_used_address = address;
+
+        // Serial EEPROM in the upper Game Pak region is clocked out one bit per
+        // halfword read (via DMA).
+        if self.internal_memory.is_eeprom_access(address) {
+            return self.internal_memory.eeprom_read();
+        }
+
+        // The GamePak SRAM/Flash region is an 8-bit bus: a halfword read returns
+        // the single byte replicated across both lanes.
+        if (0x0E00_0000..=0x0FFF_FFFF).contains(&address) {
+            return u16::from(self.read_raw(address)) * 0x0101;
+        }
+
+        if address & 1 != 0 {
+            address &= !1;
+        }
+
+        // Fast path: read 2 bytes at once for contiguous memory regions.
+        if let Some(half) = self.internal_memory.try_read_half_word(address) {
+            return half;
+        }
+
+        let part_0: u16 = self.read_raw(address).into();
+        let part_1: u16 = self.read_raw(address + 1).into();
+
+        part_1 << 8 | part_0
+    }
+
+    /// Writes a 16-bit halfword to the given address.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value cannot be split into bytes (should not happen).
+    pub fn write_half_word(&mut self, mut address: usize, value: u16) {
+        self.cycles_count += self.access_cycles(address, 2);
+
+        self.last_used_address = address;
+
+        // Serial EEPROM: a DMA halfword write clocks one bit in.
+        if self.internal_memory.is_eeprom_access(address) {
+            self.internal_memory.eeprom_write(value);
+            return;
+        }
+
+        // The GamePak SRAM/Flash region is an 8-bit bus: a halfword write stores
+        // a single byte, the one selected by rotating the value by the address.
+        if (0x0E00_0000..=0x0FFF_FFFF).contains(&address) {
+            self.write_raw(address, Self::bus8_store_byte(u32::from(value), address));
+            return;
+        }
+
+        if address & 1 != 0 {
+            address &= !1;
+        }
+
+        let part_0: u8 = value.get_bits(0..=7).try_into().unwrap();
+        let part_1: u8 = value.get_bits(8..=15).try_into().unwrap();
+
+        self.write_raw(address, part_0);
+        self.write_raw(address + 1, part_1);
+    }
+
+    /// Returns true if there is an enabled interrupt pending
+    #[must_use]
+    pub const fn is_irq_pending(&self) -> bool {
+        // Only 14 interrupt sources exist. Bits 14-15 of IE/IF are unused, and
+        // only bit 0 of IME is meaningful. Mask them so stray upper bits cannot
+        // spoof a pending interrupt.
+        const IRQ_MASK: u16 = 0x3FFF;
+
+        (self.interrupt_control.interrupt_master_enable & 1 == 1)
+            && (self.interrupt_control.interrupt_enable
+                & self.interrupt_control.interrupt_request
+                & IRQ_MASK
+                != 0)
+    }
+
+    /// Updates the current program counter for BIOS read protection
+    pub const fn set_current_pc(&mut self, pc: usize) {
+        self.current_pc = pc;
+    }
+
+    /// Updates the last BIOS opcode for BIOS read protection
+    pub const fn set_last_bios_opcode(&mut self, opcode: u32) {
+        self.last_bios_opcode = opcode;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{bus::Bus, cpu::hardware::internal_memory::InternalMemory};
+
+    #[test]
+    fn completed_dma_with_irq_bit_requests_interrupt() {
+        let mut bus = Bus::default();
+
+        // Channel 0: enable (15), IRQ on completion (14), 32-bit (10), one unit,
+        // immediate timing. Source EWRAM, destination IWRAM.
+        bus.dma.channels[0].source_address = 0x0200_0000;
+        bus.dma.channels[0].destination_address = 0x0300_0000;
+        bus.dma.channels[0].word_count = 1;
+        bus.dma.channels[0].control = (1 << 15) | (1 << 14) | (1 << 10);
+        bus.dma.check_immediate_transfer();
+
+        bus.run_dma_block(0);
+
+        assert_ne!(
+            bus.interrupt_control.interrupt_request & (1 << 8),
+            0,
+            "DMA0 completion must set IF bit 8"
+        );
+    }
+
+    #[test]
+    fn vram_byte_write_ignored_in_obj_region_tile_mode() {
+        let mut bus = Bus::default();
+        bus.lcd.registers.dispcnt = 0; // tile mode 0, OBJ starts at 0x10000
+
+        // BG region: duplicated across the halfword.
+        bus.write_byte(0x0600_0000, 0xCD);
+        assert_eq!(bus.lcd.memory.video_ram[0], 0xCD);
+        assert_eq!(bus.lcd.memory.video_ram[1], 0xCD);
+
+        // OBJ region: ignored.
+        bus.write_byte(0x0601_0000, 0xAB);
+        assert_eq!(bus.lcd.memory.video_ram[0x1_0000], 0);
+    }
+
+    #[test]
+    fn vram_byte_write_boundary_is_mode_dependent() {
+        let mut bus = Bus::default();
+        bus.lcd.registers.dispcnt = 3; // bitmap mode 3, OBJ starts at 0x14000
+
+        // 0x10000 is BG in bitmap mode, so it is duplicated.
+        bus.write_byte(0x0601_0000, 0x11);
+        assert_eq!(bus.lcd.memory.video_ram[0x1_0000], 0x11);
+        assert_eq!(bus.lcd.memory.video_ram[0x1_0001], 0x11);
+
+        // 0x14000 is OBJ in bitmap mode, so it is ignored.
+        bus.write_byte(0x0601_4000, 0x22);
+        assert_eq!(bus.lcd.memory.video_ram[0x1_4000], 0);
+    }
+
+    #[test]
+    fn irq_pending_masks_unused_high_bits() {
+        let mut bus = Bus::default();
+
+        // IME with only a stray high bit set must not count as enabled.
+        bus.interrupt_control.interrupt_master_enable = 0x8000;
+        bus.interrupt_control.interrupt_enable = 0x0001;
+        bus.interrupt_control.interrupt_request = 0x0001;
+        assert!(!bus.is_irq_pending());
+
+        // A match only in the unused bits 14-15 must not fire.
+        bus.interrupt_control.interrupt_master_enable = 1;
+        bus.interrupt_control.interrupt_enable = 0x4000;
+        bus.interrupt_control.interrupt_request = 0x4000;
+        assert!(!bus.is_irq_pending());
+
+        // A real match in a valid bit does fire.
+        bus.interrupt_control.interrupt_enable = 0x0001;
+        bus.interrupt_control.interrupt_request = 0x0001;
+        assert!(bus.is_irq_pending());
+    }
+
+    #[test]
+    fn internal_memory_control_register_round_trips() {
+        // The register lives at 0x0400_0800..0803. A byte written there must be
+        // readable back, which the old `address & 0b111` mask made impossible.
+        let mut bus = Bus::default();
+
+        for (i, byte) in [0x11, 0x22, 0x33, 0x44].into_iter().enumerate() {
+            bus.write_raw(0x0400_0800 + i, byte);
+        }
+
+        for (i, expected) in [0x11, 0x22, 0x33, 0x44].into_iter().enumerate() {
+            assert_eq!(bus.read_raw(0x0400_0800 + i), expected);
+        }
+    }
+
+    #[test]
+    fn rom_fast_paths_match_each_window_and_rom_end_behavior() {
+        let rom = [1, 2, 3, 4, 5, 6, 7, 8];
+        let mut bus = Bus::with_memory(InternalMemory::new([0; 0x4000], &rom));
+
+        for base in [0x0800_0000, 0x0A00_0000, 0x0C00_0000] {
+            assert_eq!(bus.read_word(base), 0x0403_0201);
+            assert_eq!(bus.read_half_word(base), 0x0201);
+        }
+
+        // Reads past the loaded ROM use Game Pak open-bus behavior instead of
+        // wrapping back to the first ROM bytes.
+        assert_eq!(bus.read_word(0x0800_0008), 0x0005_0004);
+        assert_eq!(bus.read_half_word(0x0800_0008), 0x0004);
+    }
+
+    #[test]
+    fn access_cycles_constant_regions() {
+        let bus = Bus::default();
+        // 32-bit bus, no wait states.
+        assert_eq!(bus.access_cycles(0x0300_0000, 4), 1); // IWRAM word
+        assert_eq!(bus.access_cycles(0x0000_0000, 2), 1); // BIOS halfword
+        // EWRAM 16-bit bus: 3 cycles, doubled for a 32-bit access.
+        assert_eq!(bus.access_cycles(0x0200_0000, 1), 3);
+        assert_eq!(bus.access_cycles(0x0200_0000, 4), 6);
+        // VRAM: extra cycle only for 32-bit.
+        assert_eq!(bus.access_cycles(0x0600_0000, 2), 1);
+        assert_eq!(bus.access_cycles(0x0600_0000, 4), 2);
+    }
+
+    #[test]
+    fn gamepak_sequential_is_cheaper_than_non_sequential() {
+        let mut bus = Bus::default(); // WAITCNT = 0 -> WS0 N=4, S=2
+
+        // A fetch far from the previous access is non-sequential: 1 + N.
+        // The default last_used_address is 0, far from the ROM region.
+        assert_eq!(bus.access_cycles(0x0800_0000, 2), 1 + 4);
+
+        // The next halfword right after it is sequential: 1 + S.
+        bus.last_used_address = 0x0800_0000;
+        assert_eq!(bus.access_cycles(0x0800_0002, 2), 1 + 2);
+
+        // A 32-bit access is two halfword accesses: non-sequential then
+        // sequential = (1 + N) + (1 + S), and (1 + S) + (1 + S) when sequential.
+        bus.last_used_address = 0;
+        assert_eq!(bus.access_cycles(0x0800_0000, 4), (1 + 4) + (1 + 2));
+        bus.last_used_address = 0x0800_0000 - 4;
+        assert_eq!(bus.access_cycles(0x0800_0000, 4), (1 + 2) + (1 + 2));
+    }
+
+    #[test]
+    #[allow(clippy::field_reassign_with_default)]
+    fn prefetch_makes_sequential_opcode_fetches_cheap() {
+        let mut bus = Bus::default(); // WAITCNT = 0 -> WS0 N=4, S=2
+
+        // Without prefetch, even a sequential opcode fetch pays the ROM waits.
+        bus.in_opcode_fetch = true;
+        bus.last_used_address = 0x0800_0000 - 4;
+        assert_eq!(bus.access_cycles(0x0800_0000, 4), (1 + 2) + (1 + 2));
+
+        // Enable the prefetch buffer (WAITCNT bit 14).
+        bus.interrupt_control.wait_state_control = 1 << 14;
+
+        // A sequential opcode fetch now comes from the buffer: one cycle per
+        // 16-bit unit (two for a word, one for a halfword).
+        bus.last_used_address = 0x0800_0000 - 4;
+        assert_eq!(bus.access_cycles(0x0800_0000, 4), 2);
+        bus.last_used_address = 0x0800_0000 - 2;
+        assert_eq!(bus.access_cycles(0x0800_0000, 2), 1);
+
+        // A non-sequential fetch (a branch target) still pays the full waits.
+        bus.last_used_address = 0;
+        assert_eq!(bus.access_cycles(0x0800_0000, 4), (1 + 4) + (1 + 2));
+
+        // A data access never benefits from the prefetch buffer.
+        bus.in_opcode_fetch = false;
+        bus.last_used_address = 0x0800_0000 - 4;
+        assert_eq!(bus.access_cycles(0x0800_0000, 4), (1 + 2) + (1 + 2));
+    }
+
+    #[test]
+    fn test_write_lcd_reg() {
+        let mut bus = Bus::default();
+        let address = 0x0400_0048; // WININ lower byte
+
+        bus.write_raw(address, 10);
+
+        assert_eq!(bus.lcd.registers.winin, 10);
+
+        let address = 0x0400_0049; // WININ higher byte
+
+        bus.write_raw(address, 5);
+        assert_eq!(bus.lcd.registers.winin, (5 << 8) | 0x0A);
+    }
+
+    #[test]
+    fn test_read_lcd_reg() {
+        let mut bus = Bus::default();
+        let address = 0x0400_0048; // WININ lower byte
+
+        bus.lcd.registers.winin = (5 << 8) | 0x0A;
+
+        assert_eq!(bus.read_raw(address), 10);
+
+        let address = 0x0400_0049; // WININ higher byte
+
+        assert_eq!(bus.read_raw(address), 5);
+    }
+
+    #[test]
+    fn test_write_timer_register() {
+        let mut bus = Bus::default();
+        let address = 0x0400_0100;
+
+        // Writing to TM0CNT_L sets the reload value, not the counter directly
+        bus.write_raw(address, 10);
+        assert_eq!(bus.timers.tm0_reload, 10);
+    }
+
+    #[test]
+    fn test_read_timer_register() {
+        let mut bus = Bus::default();
+        let address = 0x0400_0100;
+
+        bus.timers.tm0cnt_l = (5 << 8) | 0x0A;
+
+        assert_eq!(bus.read_raw(address), 10);
+    }
+
+    #[test]
+    fn write_bg_palette_ram() {
+        let mut bus = Bus::default();
+        let address = 0x0500_0008;
+
+        bus.write_raw(address, 10);
+        assert_eq!(bus.lcd.memory.bg_palette_ram[8], 10);
+    }
+
+    #[test]
+    fn read_bg_palette_ram() {
+        let mut bus = Bus::default();
+        bus.lcd.memory.bg_palette_ram[8] = 15;
+
+        let address = 0x0500_0008;
+        let value = bus.read_raw(address);
+
+        assert_eq!(value, 15);
+    }
+
+    #[test]
+    fn test_last_byte_bg_palette_ram() {
+        let mut bus = Bus::default();
+
+        let address = 0x0500_01FF;
+        bus.write_raw(address, 5);
+
+        assert_eq!(bus.lcd.memory.bg_palette_ram[0x1FF], 5);
+    }
+
+    #[test]
+    fn write_obj_palette_ram() {
+        let mut bus = Bus::default();
+        let address = 0x0500_0208;
+
+        bus.write_raw(address, 10);
+        assert_eq!(bus.lcd.memory.obj_palette_ram[8], 10);
+    }
+
+    #[test]
+    fn read_obj_palette_ram() {
+        let mut bus = Bus::default();
+        bus.lcd.memory.obj_palette_ram[8] = 15;
+
+        let address = 0x0500_0208;
+
+        let value = bus.read_raw(address);
+
+        assert_eq!(value, 15);
+    }
+
+    #[test]
+    fn test_last_byte_obj_palette_ram() {
+        let mut bus = Bus::default();
+
+        let address = 0x0500_03FF;
+        bus.write_raw(address, 5);
+
+        assert_eq!(bus.lcd.memory.obj_palette_ram[0x1FF], 5);
+    }
+
+    #[test]
+    fn write_vram() {
+        let mut bus = Bus::default();
+        let address = 0x0600_0004;
+
+        bus.write_raw(address, 23);
+        assert_eq!(bus.lcd.memory.video_ram[4], 23);
+    }
+
+    #[test]
+    fn read_vram() {
+        let mut bus = Bus::default();
+        bus.lcd.memory.video_ram[4] = 15;
+
+        let address = 0x0600_0004;
+        let value = bus.read_raw(address);
+
+        assert_eq!(value, 15);
+    }
+
+    #[test]
+    fn test_last_byte_vram() {
+        let mut bus = Bus::default();
+
+        let address = 0x0601_7FFF;
+        bus.write_raw(address, 5);
+
+        assert_eq!(bus.lcd.memory.video_ram[0x0001_7FFF], 5);
+    }
+
+    #[test]
+    fn test_mirror_bg_palette() {
+        let mut bus = Bus::default();
+        bus.lcd.memory.bg_palette_ram[0x134] = 5;
+
+        assert_eq!(bus.read_raw(0x0500_0134), 5);
+        assert_eq!(bus.read_raw(0x0500_0534), 5);
+        assert_eq!(bus.read_raw(0x0501_2534), 5);
+        assert_eq!(bus.read_raw(0x05FF_FD34), 5);
+
+        bus.write_raw(0x0500_0134, 10);
+        assert_eq!(bus.lcd.memory.bg_palette_ram[0x134], 10);
+
+        bus.write_raw(0x0500_0534, 11);
+        assert_eq!(bus.lcd.memory.bg_palette_ram[0x134], 11);
+
+        bus.write_raw(0x0501_2534, 12);
+        assert_eq!(bus.lcd.memory.bg_palette_ram[0x134], 12);
+
+        bus.write_raw(0x05FF_FD34, 13);
+        assert_eq!(bus.lcd.memory.bg_palette_ram[0x134], 13);
+    }
+
+    #[test]
+    fn test_mirror_obj_palette() {
+        let mut bus = Bus::default();
+        bus.lcd.memory.obj_palette_ram[0x134] = 5;
+
+        assert_eq!(bus.read_raw(0x0500_0334), 5);
+        assert_eq!(bus.read_raw(0x0500_0734), 5);
+        assert_eq!(bus.read_raw(0x0501_2734), 5);
+        assert_eq!(bus.read_raw(0x05FF_FF34), 5);
+
+        bus.write_raw(0x0500_0334, 10);
+        assert_eq!(bus.lcd.memory.obj_palette_ram[0x134], 10);
+
+        bus.write_raw(0x0500_0734, 11);
+        assert_eq!(bus.lcd.memory.obj_palette_ram[0x134], 11);
+
+        bus.write_raw(0x0501_2734, 12);
+        assert_eq!(bus.lcd.memory.obj_palette_ram[0x134], 12);
+
+        bus.write_raw(0x05FF_FF34, 13);
+        assert_eq!(bus.lcd.memory.obj_palette_ram[0x134], 13);
+    }
+
+    #[test]
+    fn test_mirror_vram() {
+        let mut bus = Bus::default();
+        bus.lcd.memory.video_ram[0x0000_9345] = 5;
+
+        assert_eq!(bus.read_raw(0x0600_9345), 5);
+        assert_eq!(bus.read_raw(0x0602_9345), 5);
+        assert_eq!(bus.read_raw(0x0612_9345), 5);
+        assert_eq!(bus.read_raw(0x06FE_9345), 5);
+
+        bus.write_raw(0x0600_9345, 1);
+        assert_eq!(bus.lcd.memory.video_ram[0x0000_9345], 1);
+
+        bus.write_raw(0x0602_9345, 2);
+        assert_eq!(bus.lcd.memory.video_ram[0x0000_9345], 2);
+
+        bus.write_raw(0x0612_9345, 3);
+        assert_eq!(bus.lcd.memory.video_ram[0x0000_9345], 3);
+
+        bus.write_raw(0x06FE_9345, 4);
+        assert_eq!(bus.lcd.memory.video_ram[0x0000_9345], 4);
+
+        bus.lcd.memory.video_ram[0x0001_1345] = 10;
+        assert_eq!(bus.read_raw(0x0601_9345), 10);
+        assert_eq!(bus.read_raw(0x0613_1345), 10);
+    }
+
+    #[test]
+    fn test_mirror_oam() {
+        let mut bus = Bus::default();
+        bus.lcd.memory.obj_attributes[0x134] = 5;
+
+        assert_eq!(bus.read_raw(0x0700_0134), 5);
+        assert_eq!(bus.read_raw(0x0700_0534), 5);
+        assert_eq!(bus.read_raw(0x0700_F534), 5);
+        assert_eq!(bus.read_raw(0x07FF_FD34), 5);
+
+        bus.write_raw(0x0700_0134, 10);
+        assert_eq!(bus.lcd.memory.obj_attributes[0x134], 10);
+
+        bus.write_raw(0x0700_0534, 11);
+        assert_eq!(bus.lcd.memory.obj_attributes[0x134], 11);
+
+        bus.write_raw(0x0700_F534, 12);
+        assert_eq!(bus.lcd.memory.obj_attributes[0x134], 12);
+
+        bus.write_raw(0x07FF_FD34, 13);
+        assert_eq!(bus.lcd.memory.obj_attributes[0x134], 13);
+    }
+
+    #[test]
+    fn test_timer_reload_vs_counter() {
+        let mut bus = Bus::default();
+
+        // Set reload value via write to TM0CNT_L
+        bus.write_raw(0x0400_0100, 0x34); // low byte
+        bus.write_raw(0x0400_0101, 0x12); // high byte
+
+        // Reload value should be set
+        assert_eq!(bus.timers.tm0_reload, 0x1234);
+
+        // Counter should still be 0 (reload only takes effect when timer starts)
+        assert_eq!(bus.timers.tm0cnt_l, 0);
+
+        // Reading TM0CNT_L returns counter value, not reload
+        assert_eq!(bus.read_raw(0x0400_0100), 0);
+        assert_eq!(bus.read_raw(0x0400_0101), 0);
+    }
+
+    #[test]
+    fn test_timer_control_write() {
+        let mut bus = Bus::default();
+
+        // Write control register TM0CNT_H
+        bus.write_raw(0x0400_0102, 0x80); // Enable timer (bit 7)
+        assert!(bus.timers.tm0cnt_h & 0x80 != 0);
+
+        // Write prescaler value
+        bus.write_raw(0x0400_0102, 0x01); // Prescaler F/64
+        assert_eq!(bus.timers.tm0cnt_h & 0x03, 0x01);
+    }
+
+    #[test]
+    fn test_interrupt_request_acknowledge() {
+        let mut bus = Bus::default();
+
+        // Set some interrupt request flags directly
+        bus.interrupt_control.interrupt_request = 0b0000_0000_0000_0111; // VBlank, HBlank, VCount
+
+        // Verify flags are set
+        assert_eq!(bus.read_raw(0x0400_0202), 0x07);
+
+        // Acknowledge VBlank by writing 1 to bit 0
+        bus.write_raw(0x0400_0202, 0x01);
+
+        // VBlank flag should be cleared, others remain
+        assert_eq!(
+            bus.interrupt_control.interrupt_request,
+            0b0000_0000_0000_0110
+        );
+
+        // Acknowledge remaining flags
+        bus.write_raw(0x0400_0202, 0x06);
+        assert_eq!(bus.interrupt_control.interrupt_request, 0);
+    }
+
+    #[test]
+    fn test_interrupt_enable_read_write() {
+        let mut bus = Bus::default();
+
+        // Write to interrupt enable register
+        bus.write_raw(0x0400_0200, 0xFF);
+        bus.write_raw(0x0400_0201, 0x3F);
+
+        assert_eq!(bus.interrupt_control.interrupt_enable, 0x3FFF);
+
+        // Read it back
+        assert_eq!(bus.read_raw(0x0400_0200), 0xFF);
+        assert_eq!(bus.read_raw(0x0400_0201), 0x3F);
+    }
+
+    #[test]
+    fn test_interrupt_master_enable() {
+        let mut bus = Bus::default();
+
+        // IME is disabled by default
+        assert_eq!(bus.interrupt_control.interrupt_master_enable, 0);
+
+        // Enable IME
+        bus.write_raw(0x0400_0208, 0x01);
+        assert_eq!(bus.interrupt_control.interrupt_master_enable, 1);
+
+        // Read it back
+        assert_eq!(bus.read_raw(0x0400_0208), 0x01);
+
+        // Disable IME
+        bus.write_raw(0x0400_0208, 0x00);
+        assert_eq!(bus.interrupt_control.interrupt_master_enable, 0);
+    }
+}

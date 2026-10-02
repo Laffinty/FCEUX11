@@ -40,6 +40,7 @@
 #include "input.h"
 #include "core_api.h"
 #include "io_api.h"
+#include "gba_load.h"
 #include "net_api.h"
 #include "diag_api.h"
 #include "driver_callbacks.h"
@@ -464,6 +465,34 @@ void FCEUSS_Save(const char *fname, bool display_message)
 		return;
 	}
 
+	// A GBA session's state is the Rust core's own, not the NES's. The branch
+	// sits here rather than at the top of the function on purpose: the file
+	// name, the backup copy, the undo bookkeeping and the slot status below are
+	// all machine-independent, so they are reused rather than reimplemented,
+	// and the only thing that differs is the serialiser two dozen lines down.
+	//
+	// `st` has already been opened, which is harmless: the GBA writer opens the
+	// same path itself and truncates it, and this file is what decides that a
+	// failed open reports the standard error rather than a silent no-op.
+	if (fceu11_gba_active())
+	{
+		delete st;
+		if (!fceu11_gba_savestate_save(fn.c_str()))
+		{
+			if (display_message)
+				FCEU_DispMessage("State %d save error.", 0, CurrentState);
+			return;
+		}
+		if (!fname)
+		{
+			SaveStateStatus[CurrentState] = 1;
+			if (display_message)
+				FCEU_DispMessage("State %d saved.", 0, CurrentState);
+		}
+		redoSS = false;	//we have a new savestate so redo is not possible
+		return;
+	}
+
 	#ifdef _S9XLUA_H
 	if (!internalSaveLoad)
 	{
@@ -730,6 +759,35 @@ bool FCEUSS_Load(const char *fname, bool display_message)
 		}
 		SaveStateStatus[CurrentState] = 0;
 		return false;
+	}
+
+	// The GBA's own state, for the same reason and with the same placement as
+	// the save branch in FCEUSS_Save: the file name, the open and the existence
+	// check above are shared, and only the reader differs. Reaching here means
+	// the slot exists; whether the core will *take* it is a separate question,
+	// and it answers that itself -- a state for another cartridge leaves the
+	// running machine alone.
+	if (fceu11_gba_active())
+	{
+		if (!fceu11_gba_savestate_load(fn.c_str()))
+		{
+			SaveStateStatus[CurrentState] = 0;
+			return false;
+		}
+		if (fname)
+		{
+			char szFilename[260]={0};
+			splitpath(fname, 0, 0, szFilename, 0);
+			if (display_message)
+				FCEU_DispMessage("State %s loaded.", 0, szFilename);
+		}
+		else
+		{
+			SaveStateStatus[CurrentState] = 1;
+			if (display_message)
+				FCEU_DispMessage("State %d loaded.", 0, CurrentState);
+		}
+		return true;
 	}
 
 	//If in bot mode, don't do a backup when loading.

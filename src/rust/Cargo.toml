@@ -27,6 +27,66 @@ fceux11-debug = { path = "crates/fceux11-debug" }
 fceux11-lua = { path = "crates/fceux11-lua" }
 fceux11-core = { path = "crates/fceux11-core" }
 f11qa = { path = "crates/f11qa" }
+# v2.0 S0: GBAEUX11. `optional` so a NES-only build (--features without
+# `gba`) physically drops the GBA core from the graph -- plan invariant 8.
+#
+# NOTE: the vendored core is depended on DIRECTLY rather than through an
+# f11gba facade crate. rustc 1.96 fat LTO fails to load the bitcode of a
+# tiny rlib sitting between the root and a large path dependency -- it
+# reports `failed to load bitcode of module f11gba-...-cgu.0.rcgu.o` with an
+# empty diagnostic, and reproduces with f11gba holding nothing but one
+# trivial extern "C" function and no gba-core dependency at all. Depending on
+# gba-core directly and keeping the C ABI in this root file avoids it and
+# matches the shape kagami_qa_direct_main already uses. See plan section 14.
+gba-core = { path = "crates/gba-core", optional = true }
+
+# v2.0 S2-b: savestate serialization. The vendored core derives Serialize /
+# Deserialize on every state struct but ships no serialization API and no
+# format dependency of its own, so the format and the version policy are ours
+# to choose (plan r7, section 2.1).
+#
+# postcard was evaluated first and REJECTED (plan r30): it is a no-alloc
+# format and the core's state carries six Vec<u8> (bios, rom, working_ram,
+# working_iram, sram, and the RTC command buffer), so it does not even
+# compile against Arm7tdmi. serde_json is what the workspace already builds
+# (f11qa depends on it), it does allocate, and a measured round trip of a
+# real Arm7tdmi comes back with r0 and pc identical. It is the wrong shape
+# for a hot on-disk file -- large and slow -- so the final on-disk format
+# stays open (r30) and this serves the first cut.
+#
+# This does NOT reintroduce R14. R14 was about a *path* crate wedged between
+# the root and a large dependency (plan r8's six controlled experiments: the
+# only variable was "is it its own crate"). A registry dependency is not
+# that, and a full CMake Release build with lto = true and panic = "abort"
+# is green with these dependencies present.
+serde_json = { version = "1", optional = true }
+
+# v2.0 S2-b2: the codec derives Serialize / Deserialize on its own wire types
+# (the ROM fingerprint, the audio residual, the pending IntrWait, and the
+# wrapper that carries them beside the core's machine).
+#
+# `serde` was already in the graph -- serde_json depends on it and gba-core
+# derives through it -- so only the `derive` feature and a direct dependency
+# edge are new. The same reasoning as the serde_json entry above applies, and
+# for the same reason it does NOT reintroduce R14: a registry crate sitting off
+# to the side is not a path crate wedged between the root and a large
+# dependency.
+serde = { version = "1", features = ["derive"], optional = true }
+
+# v2.0 S2-b1: the audio ring. `Gba::init_audio` hands back an
+# `rtrb::Consumer<f32>`, and the consumer end has to be *stored* on this side
+# of the FFI boundary, so the root crate has to be able to name the type.
+#
+# This adds no new crate to the build: gba-core already depends on rtrb 0.3,
+# and an identical requirement here unifies onto the same 0.3.5 rather than
+# pulling a second copy in. Same reasoning as the serde_json entry above, and
+# for the same reason it does not reintroduce R14 -- that risk was a *path*
+# crate wedged between the root and a large dependency (plan r8), and rtrb is
+# a registry crate sitting off to one side, not on that path.
+#
+# Optional so a NES-only build (--no-default-features) keeps invariant 8:
+# neither the ring nor the vendored core enters the graph.
+rtrb = { version = "0.3", optional = true }
 
 [features]
 # Stage-2 §七 (C-1): Pass-through to f11qa's `direct-adapter` feature.
@@ -39,6 +99,12 @@ f11qa = { path = "crates/f11qa" }
 # Always on in CMake builds (see src/rust/CMakeLists.txt) — dead-code
 # elimination keeps the unused FFI paths free at runtime.
 direct-adapter = ["f11qa/direct-adapter"]
+
+# v2.0 GBAEUX11. Present by default so S0 can assert the
+# "fceux11_rust.lib contains the new symbol" exit criterion; a NES-only
+# build turns it off with --no-default-features.
+gba = ["dep:gba-core", "dep:serde", "dep:serde_json", "dep:rtrb"]
+default = ["direct-adapter", "gba"]
 
 [dev-dependencies]
 # Enable FFI stubs only during Rust workspace tests so cargo test can link

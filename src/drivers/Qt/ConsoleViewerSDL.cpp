@@ -29,6 +29,10 @@
 #include "Qt/throttle.h"
 #include "Qt/fceuWrapper.h"
 #include "Qt/ConsoleViewerSDL.h"
+// v2.0 S2-b4 stage 2'. The only GBA thing this file knows, and it is the
+// session flag plus the frame accessors -- never the C ABI itself, which
+// gba_load.cpp is the sole caller of. gba::decoupling enforces both halves.
+#include "gba_load.h"
 #include <QImage>
 #include "Qt/ConsoleUtilities.h"
 #include "Qt/ConsoleWindow.h"
@@ -85,6 +89,11 @@ ConsoleViewSDL_t::ConsoleViewSDL_t(QWidget *parent)
 	sdlRenderer = NULL;
 	sdlTexture  = NULL;
 	sdlCursor   = NULL;
+	// v2.0 S2-b4 stage 2': created lazily on the first GBA frame, destroyed in
+	// cleanup(). Null here means "no GBA has been on screen since the last
+	// cleanup", which is also the state after a GBA session ends.
+	sdlGbaTexture       = NULL;
+	sdlGbaTextureSerial = 0;
 
 	vsyncEnabled = false;
 	mouseButtonMask = 0;
@@ -227,6 +236,16 @@ double ConsoleViewSDL_t::getAspectRatio(void)
 
 void ConsoleViewSDL_t::transfer2LocalBuffer(void)
 {
+	// v2.0 S2-b4 stage 2'. A GBA frame lives in the GBA module's own buffer
+	// (see gba_load.h), so there is nothing in the NES pixel pool to copy and
+	// nothing here that would be read: render() hands off to renderGbaFrame()
+	// before it looks at localBuf. Skipping it saves a 1.2 MB memcpy per
+	// repaint. Everything below this line is the NES path, unchanged.
+	if (fceu11_gba_active())
+	{
+		return;
+	}
+
 	int i=0, hq = 0, bufIdx;
 	int numPixels = nes_shm->video.ncol.load(std::memory_order_acquire) * nes_shm->video.nrow.load(std::memory_order_acquire);
 	unsigned int cpSize = numPixels * 4;
@@ -356,7 +375,16 @@ int ConsoleViewSDL_t::init(void)
 
 void ConsoleViewSDL_t::cleanup(void)
 {
-	if (sdlTexture) 
+	// v2.0 S2-b4 stage 2'. The GBA texture is ours, so we destroy it here. It is
+	// created lazily, so this is normally a no-op -- which is the point: a
+	// session that never played a GBA allocates nothing.
+	if (sdlGbaTexture)
+	{
+		SDL_DestroyTexture(sdlGbaTexture);
+		sdlGbaTexture = NULL;
+		sdlGbaTextureSerial = 0;
+	}
+	if (sdlTexture)
 	{
 		SDL_DestroyTexture(sdlTexture);
 		sdlTexture = NULL;		
@@ -611,8 +639,107 @@ void  ConsoleViewSDL_t::getNormalizedCursorPos( double &x, double &y )
 	//printf("Normalized Cursor (%f,%f) \n", x, y );
 }
 
+// v2.0 S2-b4 stage 2'. The GBA's half of the viewer.
+//
+// Deliberately its own texture, its own buffer and its own letterbox maths
+// rather than a GBA case inside render(). Three reasons, in order of weight:
+//
+//  1. The NES texture is sized from nes_shm->video and the NES scale maths
+//     reads the same fields. Sizing a GBA picture through them would change
+//     what the NES viewer computes on a GBA session, and a GBA picture is
+//     240x160 where the NES is 256x240 -- different aspect, not a mode of the
+//     same one.
+//  2. The NES path applies preScaler (hq2x/hq3x), user scale limits and a
+//     configurable aspect ratio. None of those apply to a GBA: it is always
+//     3:2, never pre-scaled, and its scale is not user-limited. So this is not
+//     a copy of that maths, it is a smaller different one.
+//  3. The NES code below the hand-off in render() is left byte-for-byte alone,
+//     which is the property that makes "GBA cannot regress the NES" true by
+//     construction rather than by testing.
+void ConsoleViewSDL_t::renderGbaFrame(void)
+{
+	const uint32_t width = fceu11_gba_frame_width();
+	const uint32_t height = fceu11_gba_frame_height();
+	const uint8_t* frame = fceu11_gba_frame();
+	const uint32_t serial = fceu11_gba_frame_serial();
+
+	if ((sdlRenderer == NULL) || (frame == NULL) || (width == 0) || (height == 0))
+	{
+		return;
+	}
+
+	// Same format as the NES texture, so both go through the same renderer
+	// with the same pixel layout. This is the "share the infrastructure" half
+	// of the deal; the texture itself is ours.
+	if (sdlGbaTexture == NULL)
+	{
+		sdlGbaTexture = SDL_CreateTexture(sdlRenderer, SDL_PIXELFORMAT_ARGB8888,
+		                                  SDL_TEXTUREACCESS_STREAMING,
+		                                  static_cast<int>(width),
+		                                  static_cast<int>(height));
+		if (sdlGbaTexture == NULL)
+		{
+			printf("[SDL] Failed to create the GBA texture: %u x %u\n", width, height);
+			return;
+		}
+		sdlGbaTextureSerial = serial;
+	}
+
+	if (sdlGbaTextureSerial != serial)
+	{
+		uint8_t* textureBuffer = NULL;
+		int rowPitch = 0;
+		SDL_LockTexture(sdlGbaTexture, NULL, reinterpret_cast<void**>(&textureBuffer), &rowPitch);
+		if (textureBuffer != NULL)
+		{
+			// rowPitch can exceed width*4; only the first width pixels of each
+			// row are ours, so the copy is a row loop rather than one memcpy.
+			const size_t rowBytes = static_cast<size_t>(width) * 4;
+			for (uint32_t row = 0; row < height; row++)
+			{
+				memcpy(textureBuffer + static_cast<size_t>(row) * rowPitch,
+				       frame + static_cast<size_t>(row) * rowBytes, rowBytes);
+			}
+		}
+		SDL_UnlockTexture(sdlGbaTexture);
+		sdlGbaTextureSerial = serial;
+	}
+
+	// Fill the viewport at a whole multiple, letterboxing the remainder.
+	// `fceu11_gba_draw_size` owns the arithmetic; see the header for why it is
+	// integer-only and why three copies of that decision were a bad idea.
+	const GbaDrawSize draw = fceu11_gba_draw_size(view_width, view_height);
+
+	SDL_Rect source = {0, 0, static_cast<int>(width), static_cast<int>(height)};
+	SDL_Rect dest = {(view_width - draw.width) / 2, (view_height - draw.height) / 2,
+	                 draw.width, draw.height};
+
+	if (bgColor)
+	{
+		SDL_SetRenderDrawColor(sdlRenderer, bgColor->red(), bgColor->green(), bgColor->blue(), 255);
+	}
+	else
+	{
+		SDL_SetRenderDrawColor(sdlRenderer, 30, 69, 40, 255);
+	}
+	SDL_RenderClear(sdlRenderer);
+	SDL_RenderCopy(sdlRenderer, sdlGbaTexture, &source, &dest);
+	SDL_RenderPresent(sdlRenderer);
+
+	videoBufferSwapMark();
+}
+
 void ConsoleViewSDL_t::render(void)
 {
+	// v2.0 S2-b4 stage 2'. The one hand-off. A GBA session draws through
+	// renderGbaFrame() and returns; everything below is the NES path, and it is
+	// not reached in a GBA session.
+	if (fceu11_gba_active())
+	{
+		renderGbaFrame();
+		return;
+	}
+
 	int nesWidth  = GL_NES_WIDTH;
 	int nesHeight = GL_NES_HEIGHT;
 	float ixScale = 1.0;

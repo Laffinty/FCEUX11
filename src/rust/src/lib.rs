@@ -112,3 +112,29 @@ pub unsafe extern "C" fn kagami_qa_lua_main(
     // SAFETY: argv is constructed by the C caller per the C-ABI contract.
     unsafe { f11qa::lua_entry::kagami_qa_lua_main(argc, argv) }
 }
+
+// =========================================================================
+// v2.0 GBAEUX11 -- C ABI ownership and the GBA logic layer.
+//
+// Three things have to line up for a GBA symbol to exist in
+// fceux11_rust.lib, and this file is where two of them are satisfied:
+//
+// 1. Reachability. cargo's staticlib does not propagate `#[no_mangle]`
+//    symbols out of rlib dependencies, and LTO strips anything the root
+//    crate never references -- the identical problem documented above for
+//    kagami_qa_direct_main. The extern "C" functions below are the
+//    references that keep them alive.
+// 2. No facade rlib. rustc 1.96 fat LTO fails to load the bitcode of a
+//    second archive in this chain (an empty-diagnostic
+//    `failed to load bitcode of module ...-cgu.0.rcgu.o`); six controlled
+//    experiments showed the only variable is whether the GBA code is its
+//    own crate, not its size or dependencies. `gba` is therefore a plain
+//    module of this crate, not a `crates/f11gba` rlib. See the v2.0 plan's
+//    R14 and the r8 entry in its change log.
+// 3. The seam to the vendored core. `gba-core`'s `handle_swi_hle` is a
+//    private method, so it cannot be extended from out here. S0' gave
+//    `Arm7tdmi` an `swi_hook` field, and `gba::install_swi_hook` fills it
+//    with a plain `fn` pointer -- one-directional, so no crate dependency
+//    is created.
+#[cfg(feature = "gba")]
+pub mod gba;

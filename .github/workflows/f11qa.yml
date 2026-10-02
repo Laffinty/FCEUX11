@@ -1,7 +1,27 @@
 # FCEUX11 v1.8 F11QA — CI Workflow
 #
-# Runs the v1.8 QA pipeline on every push to wip1.8 / main. Produces a
+# Runs the v1.8 QA pipeline on every push to wip1.8 / wip2.0 / main. Produces a
 # migration matrix artifact, accuracy table, and baseline drift report.
+#
+# wip2.0 (2026-09-28): added so the GBAEUX11 line is verified on its own branch
+# before it merges. It carries a 22K-line vendored core (crates/gba-core) and new
+# build glue (src/gba/, the swi_hook seam in gba-core).
+#
+# What this workflow actually checks for the GBA work -- and what it does not
+# (corrected 2026-09-30, see plan r17; the previous text here claimed the
+# jsmolka suite covered it, and there is no jsmolka step in this file):
+#   * YES: it compiles. `gba` is in Cargo.toml's `default` features, so the
+#     CMake-driven staticlib build compiles the vendored core and src/gba/ on a
+#     clean machine. That is a real signal, and it is the only one.
+#   * NO: none of the GBA lock tests run here. There is no `cargo test` step,
+#     so the SWI suite (currently 60 tests) is never executed in CI.
+#   * NO: no jsmolka, no GBA accuracy matrix. The v1.8 NES gates below
+#     (ctest, blargg, the migration matrix, the R4 gate) test NES only.
+#
+# Consequence: a GBA correctness claim is still backed solely by the
+# project's own tests plus whatever external reading went into the plan. That
+# gap is what the S1b-c / S1d-a reversals (r12, r13, r17) kept falling into.
+# The first true external GBA signal is jsmolka `memory.gba`, scheduled for S2.
 #
 # v1.8 changes (commit WIP, Phase 7 R4 gate upgrade):
 #   * Trigger branches: wip_1.16 → wip1.8
@@ -19,9 +39,9 @@ name: F11QA
 
 on:
   push:
-    branches: [main, wip1.8]
+    branches: [main, wip1.8, wip2.0]
   pull_request:
-    branches: [main, wip1.8]
+    branches: [main, wip1.8, wip2.0]
   workflow_dispatch:  # allow manual trigger
 
 jobs:

@@ -339,6 +339,24 @@ GetMaxSound(void)
 }
 
 /**
+ * Returns the rate the device was actually opened at, in Hz.
+ *
+ * v2.0 S2-b4 stage 3'. Added for a second machine whose resampler is built
+ * around the rate: it has to be told the rate the *device* negotiated, not the
+ * rate the configuration asked for, and the two differ whenever `InitSound`
+ * fell back to a supported value.
+ *
+ * Reads the same static `InitSound` wrote, so a caller cannot see a different
+ * rate than the one the buffer was sized against. Says nothing about which
+ * machine is running -- that is for the caller's own bookkeeping.
+ */
+uint32
+FCEUD_GetSoundRate(void)
+{
+	return(s_SampleRate);
+}
+
+/**
  * Returns the amount of free space in the audio buffer.
  */
 uint32

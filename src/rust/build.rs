@@ -141,6 +141,14 @@ fn main() {
     println!("cargo:rerun-if-changed=crates/fceux11-lua/src");
     println!("cargo:rerun-if-changed=crates/fceux11-core/src");
     println!("cargo:rerun-if-changed=crates/f11qa/src");
+    println!("cargo:rerun-if-changed=crates/gba-core/src");
+    // The GBA ABI below is hand-written from the root crate's sources, so this
+    // build script has to re-run when those change or the merged header goes
+    // stale. It was missing from this list, which is why adding five audio
+    // exports recompiled the library and left fceux11_rust.h untouched -- a
+    // library the C++ side could link but not call. `src/gba` rather than
+    // `src/lib.rs`, because it is the module tree that holds the exports.
+    println!("cargo:rerun-if-changed=src/gba");
 }
 
 fn find_cbindgen() -> String {
@@ -238,6 +246,91 @@ fn merge_headers(
     output.push_str(" * Parses CLI args and runs Hardware Consistency Check tests in-process.\n");
     output.push_str(" */\n");
     output.push_str("int32_t kagami_qa_direct_main(int32_t argc, const char *const *argv);\n");
+
+    // v2.0 GBAEUX11 (S0). The GBA C ABI is declared by this root crate,
+    // not by a separate crate: rustc 1.96 fat LTO cannot load the bitcode of
+    // a tiny facade rlib in the dependency chain, so the ABI lives here
+    // alongside kagami_qa_direct_main.
+    //
+    // These are written out by hand rather than generated: `build.rs` runs
+    // cbindgen per *member* crate, and the GBA ABI is in the root crate,
+    // which cbindgen is never pointed at. S0 left the five probes; S2-a adds
+    // the lifecycle and frame surface from `src/gba/frame.rs`. S2-b adds the
+    // savestate surface from `src/gba/save.rs`.
+    //
+    // A hand-written list is a real risk -- a function can exist in Rust and
+    // be missing here, which is exactly what happened to S2-a's exports.
+    // `the_gba_c_abi_is_declared_for_every_exported_function` in
+    // `src/gba/ffi.rs` is the guard: it fails the build if the two drift.
+    output.push_str("/* v2.0 GBAEUX11 error codes (plan section 4.1) */\n");
+    output.push_str("#define GBA_OK 0\n");
+    output.push_str("#define GBA_ERR_NO_ROM 1\n");
+    output.push_str("#define GBA_ERR_BAD_ROM 2\n");
+    output.push_str("#define GBA_ERR_BIOS 3\n");
+    // r37 ⑤: the enum in plan section 4.1 has seven members, and these are
+    // their values. `UNSUPPORTED` was added and `STATE` moved to 5 — before that
+    // this block skipped 4 entirely, so every code from there up was off by one
+    // and nothing noticed, because nothing on the C++ side compares against
+    // them yet. `the_error_codes_reach_the_generated_header` in
+    // `src/gba/ffi.rs` is what keeps the two lists from drifting again.
+    output.push_str("#define GBA_ERR_UNSUPPORTED 4\n");
+    output.push_str("#define GBA_ERR_STATE 5\n");
+    output.push_str("#define GBA_ERR_CAPACITY 6\n\n");
+
+    output.push_str("/* v2.0 GBAEUX11 C ABI */\n");
+    output.push_str("uint32_t gba_abi_revision(void);\n");
+    output.push_str("uint32_t gba_core_probe(void);\n");
+    output.push_str("uint32_t gba_swi_probe(void);\n");
+    output.push_str("uint32_t gba_swi_count(void);\n");
+    output.push_str("uint32_t gba_probe_lz77_header(uint32_t raw);\n");
+    output.push_str("uint64_t gba_probe_cpu_size(void);\n\n");
+
+    output.push_str("/* Lifecycle and frame (S2-a) */\n");
+    output.push_str("int32_t gba_init(void);\n");
+    output.push_str("int32_t gba_rom_loaded(void);\n");
+    output.push_str("int32_t gba_unload_rom(void);\n");
+    output.push_str("int32_t gba_last_error(uint8_t *dst, uint32_t cap);\n");
+    output.push_str("int32_t gba_load_rom(const char *path);\n");
+    output.push_str("int32_t gba_reset(void);\n");
+    output.push_str("int32_t gba_step_frame(void);\n");
+    output.push_str("int32_t gba_frame_buffer_size(uint32_t *out_size);\n");
+    output.push_str("int32_t gba_frame_buffer(uint8_t *dst, uint32_t cap);\n");
+    output.push_str("int32_t gba_set_overlay(int32_t enable);\n");
+
+    output.push_str("\n/* Audio (S2-b1) */\n");
+    output.push_str("int32_t gba_set_output_rate(uint32_t rate);\n");
+    output.push_str("int32_t gba_set_volume(uint32_t volume);\n");
+    output.push_str("int32_t gba_render_audio(int32_t *dst, uint32_t cap, uint32_t *out_frames);\n");
+    output.push_str("void gba_samples_per_frame_fixed(uint32_t *num, uint32_t *den);\n");
+    output.push_str("uint32_t gba_audio_underruns(void);\n");
+
+    output.push_str("\n/* Savestates (S2-b2). The caller owns the buffer: there is no */\n");
+    output.push_str("/* gba_savestate_free, because gba_savestate_save writes into one. */\n");
+    output.push_str("int32_t gba_savestate_size(uint32_t *out_size);\n");
+    output.push_str(
+        "int32_t gba_savestate_save(uint8_t *dst, uint32_t cap, uint32_t *out_written);\n",
+    );
+    output.push_str("int32_t gba_savestate_load(const uint8_t *src, uint32_t len);\n");
+
+    output.push_str("\n/* Cartridge real-time clock (S2-b3). A pinned clock does not */\n");
+    output.push_str("/* advance; enable == 0 releases the pin and restores the host. */\n");
+    output.push_str("int32_t gba_rtc_set_time(int64_t unix_secs, int32_t enable);\n");
+    output.push_str("int32_t gba_rtc_time(int64_t *out_unix_secs);\n");
+
+    output.push_str("\n/* Input (S2-b4 stage 1). A set bit means held. Bit layout is  */\n");
+    output.push_str("/* the core's GbaButton, in order: A B Select Start Right Left  */\n");
+    output.push_str("/* Up Down R L. */\n");
+    output.push_str("void     gba_set_buttons(uint16_t mask);\n");
+    output.push_str("int32_t  gba_buttons(uint16_t *out_mask);\n");
+
+    output.push_str("\n/* Cartridge battery save (S3-1). gba_battery_write refuses on a */\n");
+    output.push_str("/* cartridge with no save hardware -- see plan section 7.3. */\n");
+    output.push_str("int32_t  gba_battery_save_type(void);\n");
+    output.push_str("int32_t  gba_set_save_type(int32_t save_type);\n");
+    output.push_str("int32_t  gba_battery_size(uint32_t *out_size);\n");
+    output.push_str("int32_t  gba_battery_read(uint8_t *dst, uint32_t cap);\n");
+    output.push_str("int32_t  gba_battery_write(const uint8_t *src, uint32_t len);\n");
+    output.push_str("int32_t  gba_battery_take_dirty(void);\n");
 
     output.push_str("\n#ifdef __cplusplus\n}\n#endif\n\n");
     output.push_str("#endif /* FCEUX11_RUST_H */\n");

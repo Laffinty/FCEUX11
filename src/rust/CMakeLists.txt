@@ -47,7 +47,14 @@ set(RUST_STATIC_LIB ${CARGO_TARGET_DIR}/${RUST_TARGET}/release/fceux11_rust.lib)
 set(RUST_MERGED_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/fceux11_rust.h)
 
 # Track Rust source files so CMake rebuilds the staticlib when they change.
-file(GLOB_RECURSE RUST_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.rs ${CMAKE_CURRENT_SOURCE_DIR}/crates/*.rs)
+# v2.0 S0: CONFIGURE_DEPENDS closes risk R10. Plain GLOB_RECURSE is
+# evaluated only at configure time, so a .rs file appearing later --
+# e.g. the whole crates/f11gba tree -- never reaches DEPENDS, and editing
+# it silently reuses the stale fceux11_rust.lib with no error.
+# CONFIGURE_DEPENDS re-globs at build time and re-configures on delta.
+file(GLOB_RECURSE RUST_SOURCE_FILES CONFIGURE_DEPENDS
+     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.rs
+     ${CMAKE_CURRENT_SOURCE_DIR}/crates/*.rs)
 
 add_custom_command(
     OUTPUT ${RUST_STATIC_LIB} ${RUST_MERGED_HEADER}
@@ -55,7 +62,7 @@ add_custom_command(
         cargo build --manifest-path ${CARGO_MANIFEST}
                     --target ${RUST_TARGET}
                     --release
-                    --features direct-adapter
+                    --features direct-adapter,gba
     DEPENDS ${RUST_SOURCE_FILES} ${CARGO_MANIFEST}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Building Rust crate (target: ${RUST_TARGET}, features=direct-adapter)..."

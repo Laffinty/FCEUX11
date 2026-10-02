@@ -18,9 +18,13 @@
 | [constants.md](constants.md) | **模数与经验常数总表**：时钟频率、帧时序、APU 序列、混音公式、行为性魔数、性能约束 | 写代码/review 前速查 |
 | [precision.md](precision.md) | 精度治理：已知失败面及根因、黄金回归体系、**禁忌清单**、纪律规则、调查数据索引 | 动任何时序代码**之前必读** |
 | [F11QA.md](F11QA.md) | F11QA 测试框架：双通道、口径、CI 数字回填纪律、迁移指南 | 测试体系、CI 门禁 |
+| [multi-machine-integration.md](multi-machine-integration.md) | **接第二台模拟机**：允许耦合的封闭清单、两类守卫（抓「已存在」与抓「缺失」）、跨系统状态读取规则 | 要加新机器 / 改 GBA 接线 |
+| [gba-traps.md](gba-traps.md) | **四种让测试看起来在保护你、实际不保护的形态**：夹具固化假设、断言引用被测常量、守卫抓不到缺失、读到函数之外 | 写任何检查之前 |
+| [ffi-boundaries.md](ffi-boundaries.md) | **跨 FFI 工程约束**：手写 ABI 与 cbindgen 分工、生成头双 target 争用、大对象出参、栈约束实测、safe vs isolated | 加导出 / 查「符号在却调不到」 |
 
 阅读顺序建议：新人先 [constants.md](constants.md) 建立量纲，再按任务读对应模块文档；
 任何时序/精度改动先过 [precision.md](precision.md) §3 禁忌清单。
+**写任何测试或守卫之前，先过 [gba-traps.md](gba-traps.md) §5 的三问。**
 
 ## 2. 内容组织约定（每个模块文档四段式）
 

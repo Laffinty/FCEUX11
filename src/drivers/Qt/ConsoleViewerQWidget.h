@@ -50,6 +50,14 @@ class ConsoleViewQWidget_t : public QWidget, public ConsoleViewerBase
 		void   setCursor( Qt::CursorShape s );
 		void   setBgColor( QColor &c );
 
+// v2.0 S2-b4 stage 2'. The GBA picture, and the counter that says which frame
+// it wraps. A `QImage` over the core's buffer is a view, not a copy, so it is
+// only valid until the next `gba_step_frame` -- exactly as long as `paintEvent`
+// needs it.
+		void   renderGbaFrame( QPainter &painter );
+		QImage gbaImage;
+		uint32_t gbaImageSerial;
+
 		QSize   size(void){ return QWidget::size(); };
 		QCursor cursor(void){ return QWidget::cursor(); };
 		void    setMinimumSize(const QSize &s){ return QWidget::setMinimumSize(s); };

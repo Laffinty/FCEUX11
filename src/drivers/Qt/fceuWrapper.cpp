@@ -1,4 +1,4 @@
-﻿/* FCE Ultra - NES/Famicom Emulator
+/* FCE Ultra - NES/Famicom Emulator
  *
  * Copyright notice for this file:
  *  Copyright (C) 2020 mjbudd77
@@ -25,6 +25,10 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <limits.h>
+#include <vector>
+
+#include <SDL.h>
+#include <vector>
 #include "utils/unzip.h"
 
 #include <QFileInfo>
@@ -34,9 +38,14 @@
 #include "Qt/config.h"
 #include "Qt/dface.h"
 #include "Qt/fceuWrapper.h"
+#include "gba_load.h"
 #include "Qt/input.h"
 #include "input/input_manager.h"
 #include "Qt/sdl.h"
+// v2.0 S4: the GBA pad is built from the user's actual bindings, which live in
+// `GamePad[0].bmap` -- declared here, not in `Qt/input.h`. Reading them is what
+// makes a rebind carry over to the GBA instead of being frozen at compile time.
+#include "Qt/sdl-joystick.h"
 #include "Qt/sdl-video.h"
 #include "common/nes_shm.h"
 #include "Qt/AviRecord.h"
@@ -1256,6 +1265,47 @@ bool fceuWrapperIsLocked(void)
 	return mutexLocks.load(std::memory_order_acquire) > 0;
 }
 
+static std::vector<int32_t> s_gbaAudio;
+// The session state as of the last frame, so the re-configure above runs once
+// per transition instead of every frame. Emulation thread only, like the rest
+// of what is in this file.
+static bool g_gbaSessionActive = false;
+
+// v2.0 S2-b4 stage 3'. Everything the GBA needs from the sound device, done
+// where the device is.
+//
+// The core cannot do any of this: `WriteSound`, the negotiated sample rate and
+// the host volume are all in the Qt driver layer, and `gba_load.cpp` is in the
+// core library. Reaching across would put the driver into `fceux11_core`'s
+// link graph and break the four F11QA test executables, which link the core
+// without the driver. So the core hands out samples and this file pushes them.
+//
+// Two things happen here, deliberately in different places:
+//
+//  * **On a session flip**: the rate, the volume and the pacing target. All
+//    three are properties of the *session*, not of a frame, and re-applying
+//    them every frame would both waste work and make them impossible to reason
+//    about. The flip is detected by comparing against last frame's value, so
+//    loading a .gba and later loading a .nes each get exactly one re-configure.
+//
+//  * **Every frame**: the drain, because the sample count is fractional and
+//    changes frame to frame.
+static void fceuWrapper_sync_gba_audio(bool active)
+{
+	// The device's rate, not the configured one: `InitSound` falls back to a
+	// supported value when asked for something it cannot open, and the core's
+	// resampler has to be built around what was actually opened.
+	fceu11_gba_configure_audio(FCEUD_GetSoundRate(),
+	                          static_cast<uint32>(FSettings.SoundVolume));
+
+	// The pacing target. A GBA frame is 59.7275 fps where NTSC is 60.098823;
+	// leaving the video system's rate in force would run the machine 0.62% fast,
+	// which is a drift of about 26 ms a second -- the exact thing the fractional
+	// audio accumulator exists to prevent, arriving through the timing side
+	// instead of the sample-count side.
+	SetThrottleBaseRateOverride(active ? fceu11_gba_base_rate() : 0.0);
+}
+
 int  fceuWrapperUpdate( void )
 {
 	bool lock_acq;
@@ -1310,11 +1360,111 @@ int  fceuWrapperUpdate( void )
 
 	if ( GameInfo )
 	{
-		DoFun(frameskip, periodic_saves);
+		// v2.0 S2-b4 stage 1: the frame step branches on which machine is
+		// active. A GBA session must not reach `DoFun`, which is hard-wired to
+		// the NES core and its globals (`XBuf`, `WaveFinal`), and must not
+		// reach the hex editor's memory read either -- it would be reporting a
+		// NES address space for a machine that does not have one.
+		//
+		// No `signalFrameFinished()` in the GBA branch: that handshake exists to
+		// tell the GUI a *new* frame is in the pool, and stage 1 puts nothing
+		// there. The GUI's 120 Hz timer keeps repainting the cleared pool, which
+		// is the black screen this stage ships. Stage 2 is what makes it carry
+		// a picture.
+		if ( fceu11_gba_active() )
+		{
+			// Re-configure only when the session actually changed. `active` is
+			// the value from *last* frame, so a freshly loaded .gba costs one
+			// call here and then nothing until a .nes replaces it.
+			const bool active = fceu11_gba_active();
+			if ( active != g_gbaSessionActive )
+			{
+				g_gbaSessionActive = active;
+				fceuWrapper_sync_gba_audio(active);
+			}
 
-		hexEditorUpdateMemoryValues();
+			// The whole pad, read as raw key state and pushed in.
+			//
+			// Read from the **binding table**, not from `joy[]`. `joy[]` is
+			// written by `UpdateGP` copying out of the NES controller port
+			// register (`input.cpp:231`), and a GBA session does not run the NES
+			// core, so nothing writes it and it stays zero -- which is why every
+			// button that went through it was dead. Reading the binding table
+			// directly is also what makes a rebind carry over: the keys below are
+			// whatever port 1 is bound to right now, not a table frozen at
+			// compile time.
+			//
+			// `GamePad[0].bmap` is indexed [config][button] and holds the
+			// user's binding; `ButtType == BUTTC_KEYBOARD` distinguishes a
+			// keyboard binding from a joystick axis or button, and only the
+			// keyboard ones can be read through `getKeyState`. That is the same
+			// test `DTestButton` applies one layer up.
+			//
+			// This runs on the emulation thread and reads a table the GUI thread
+			// wrote, which is the same discipline `joy[]` already has.
+			uint16_t pad = 0;
+			{
+				// Button order is `GamePadNames`: A, B, Select, Start, Up, Down,
+				// Left, Right -- and the GBA bits are the same eight in the same
+				// order, so the mapping below is positional. TurboA/TurboB (8, 9)
+				// have no GBA equivalent and are deliberately not read.
+				static const uint16_t kGbaBitForNesButton[GAMEPAD_NUM_BUTTONS] = {
+					kGbaPadA, kGbaPadB, kGbaPadSelect, kGbaPadStart,
+					kGbaPadUp, kGbaPadDown, kGbaPadLeft, kGbaPadRight,
+					0, 0,
+				};
+				for (int config = 0; config < GamePad_t::NUM_CONFIG; config++)
+				{
+					for (int button = 0; button < 8; button++)
+					{
+						const uint16_t bit = kGbaBitForNesButton[button];
+						if (bit == 0) continue;
+						if (pad & bit) continue;   // an earlier config already set it
+						if (testButtonBinding(&GamePad[0].bmap[config][button]) != 0)
+						{
+							pad |= bit;
+						}
+					}
+				}
 
-		if ( consoleWindow )
+				// L and R have no NES button to come from, so they are read
+				// directly. Z and X are the plan's choice (section 7.2), and on
+				// the default NES layout they are already bound to A and B --
+				// which is exactly why they cannot be *derived* from the pad:
+				// L would come out as a second A.
+				if (getKeyState(SDLK_z) != 0) pad |= kGbaPadL;
+				if (getKeyState(SDLK_x) != 0) pad |= kGbaPadR;
+			}
+			fceu11_gba_set_pad_state(pad);
+
+			fceu11_gba_step_frame();
+
+			// Drain this frame's audio. The count is whatever the core's
+			// fractional accumulator says -- 738 or 739 at 44100 Hz, alternating
+			// -- and `GetWriteSound()` is the only safe bound: `WriteSound`
+			// consumes everything it is handed and blocks the emulation thread
+			// when the ring is full.
+			const uint32_t room = GetWriteSound();
+			if ( (room > 0) && (s_gbaAudio.size() < room) )
+			{
+				s_gbaAudio.resize(room);
+			}
+			if ( room > 0 )
+			{
+				const uint32_t produced = fceu11_gba_audio(s_gbaAudio.data(), room);
+				if ( produced > 0 )
+				{
+					WriteSound(s_gbaAudio.data(), static_cast<int>(produced));
+				}
+			}
+		}		else
+		{
+			DoFun(frameskip, periodic_saves);
+
+			hexEditorUpdateMemoryValues();
+		}
+
+		if ( consoleWindow && !fceu11_gba_active() )
 		{
 			consoleWindow->emulatorThread->signalFrameFinished();
 		}

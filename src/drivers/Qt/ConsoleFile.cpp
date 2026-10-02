@@ -214,11 +214,15 @@ void consoleWin_t::openROMFile(void)
 	QDir d;
 
 	const QStringList filters(
-			{ "All Useable files (*.nes *.NES *.nsf *.NSF *.fds *.FDS *.unf *.UNF *.unif *.UNIF *.zip *.ZIP, *.7z *.7zip)",
+			{ "All Useable files (*.nes *.NES *.nsf *.NSF *.fds *.FDS *.unf *.UNF *.unif *.UNIF *.gba *.GBA *.zip *.ZIP, *.7z *.7zip)",
            "NES files (*.nes *.NES)",
            "NSF files (*.nsf *.NSF)",
            "UNF files (*.unf *.UNF *.unif *.UNIF)",
            "FDS files (*.fds *.FDS)",
+	          // v2.0 S2-b4 stage 1. Listed so a .gba can be picked; the loader
+	          // chain recognises it by its header, not by this extension, so one
+	          // picked through `Any files` would work too.
+	          "GBA files (*.gba *.GBA)",
            "Any files (*)"
          });
 

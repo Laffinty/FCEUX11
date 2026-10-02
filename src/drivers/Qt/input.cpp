@@ -1441,6 +1441,15 @@ DTestButton(ButtConfig *bc, bool isFKB)
 	return 0;
 }
 
+// v2.0 S4: the one place outside this file that needs to ask whether a binding
+// is down. See the note in input.h for why the keyboard-only `getKeyState` is
+// not enough -- the d-pad is bound to joystick axes by default, and reading an
+// axis as a keycode answers "not pressed" forever.
+int testButtonBinding(const ButtConfig* bc)
+{
+	return DTestButton(const_cast<ButtConfig*>(bc));
+}
+
 #define MK(x)                     \
 	{                             \
 		BUTTC_KEYBOARD, 0, (x), 0 \

@@ -74,6 +74,11 @@ class ConsoleViewGL_t : public QOpenGLWindow,
 
 	void buildTextures(void);
 	void buildBgTexture(void);
+// v2.0 S2-b4 stage 2'. The GBA's own texture, and the counter that says which
+// frame it holds. Built on the first GBA paint and rebuilt if the picture
+// changes shape.
+	void buildGbaTexture(void);
+	void renderGbaFrame(void);
 	void calcPixRemap(void);
 	void doRemap(void);
 	void renderBg(void);
@@ -95,6 +100,10 @@ class ConsoleViewGL_t : public QOpenGLWindow,
 	int  txtHeight;
 	GLuint gltexture;
 	GLuint bgTexture;
+	GLuint gbaTexture;
+	int    gbaTextureWidth;
+	int    gbaTextureHeight;
+	uint32_t gbaTextureSerial;
 	bool   linearFilter;
 	bool   forceAspect;
 	bool   autoScaleEna;

@@ -32,6 +32,19 @@ extern ARGPSTRUCT InputArgs[];
 void ParseGIInput(FCEUGI *GI);
 void setHotKeys(void);
 int getKeyState( int k );
+
+// Whether a binding is held right now, whatever kind of binding it is.
+//
+// v2.0 S4. `DTestButton` knows both shapes a binding can take -- a keyboard
+// key, and a joystick axis or button packed with flags into `ButtonNum` -- and
+// the keyboard-only `getKeyState` path silently reads an axis as a keycode and
+// answers "not pressed" forever. The d-pad is bound to axes by default here, so
+// a GBA reading the pad through the keyboard path alone got a pad that could
+// never move.
+//
+// Exposed rather than duplicated: the alternative is a second implementation
+// of "is this binding down", which is the sort of copy that drifts.
+int testButtonBinding(const ButtConfig* bc);
 int ButtonConfigBegin();
 void ButtonConfigEnd();
 void ConfigButton(char *text, ButtConfig *bc);

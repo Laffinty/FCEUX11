@@ -57,6 +57,7 @@ extern FCEUXCart* cart;
 #include "file.h"
 #include "vsuni.h"
 #include "ines.h"
+#include "gba_load.h"
 #include "driver_callbacks.h"
 extern void RefreshThrottleFPS();
 
@@ -409,6 +410,7 @@ int UNIFLoad(const char *name, FCEUFILE *fp);
 int iNESLoad(const char *name, FCEUFILE *fp, int OverwriteVidMode);
 int FDSLoad(const char *name, FCEUFILE *fp);
 int NSFLoad(const char *name, FCEUFILE *fp);
+int GbaLoad(const char *name, FCEUFILE *fp);
 
 //name should be UTF-8, hopefully, or else there may be trouble
 // v0.3.10 P4.1: definition lives in fceu11:: per plan v3 §5 v0.3.10;
@@ -503,9 +505,31 @@ FCEUGI *fceu11::LoadGameVirtual(const char *name, int OverwriteVidMode, bool sil
 			if (load_result == LOADER_INVALID_FORMAT)
 			{
 				load_result = FDSLoad(fullname.c_str(), fp);
+				if (load_result == LOADER_INVALID_FORMAT)
+				{
+					// GBA last, on purpose. The chain only advances on
+					// LOADER_INVALID_FORMAT, so a loader that mis-recognises
+					// something can only ever be reached by a file that already
+					// failed every NES format — which makes "a new loader can
+					// break an existing one" a question that has an answer
+					// rather than a risk. It also means no existing format pays
+					// the sniffing cost.
+					load_result = GbaLoad(fullname.c_str(), fp);
+				}
 			}
 		}
-	}	
+	}
+
+	// A GBA session is not a NES cart, and everything between here and the end
+	// of the success branch assumes one: PowerNES, the palette, cheats, the
+	// Game Genie, auto-resume. Running them would power up an NES core with no
+	// cartridge behind it and then load a palette for a machine that has no
+	// palette. So the branch is left entirely, and the load ends here.
+	if (load_result == LOADER_OK && fceu11_gba_active())
+	{
+		FCEU_fclose(fp);
+		return GameInfo;
+	}
 	if (load_result == LOADER_OK)
 	{
 
@@ -1338,14 +1362,27 @@ bool FCEU_IsValidUI(EFCEUI ui) {
 		if (FCEUMOV_Mode(MOVIEMODE_TASEDITOR)) return false;
 		break;
 
-	case FCEUI_RECORDMOVIE:
-	case FCEUI_PLAYMOVIE:
+	// A GBA session has no `GameInfo`: `GbaLoad` never makes one, and the load
+	// chain closes the previous NES game before it runs. So the `!GameInfo` test
+	// these cases share would grey out every one of them for a machine that
+	// saves states perfectly well, and the savestate items get a GBA exception.
+	//
+	// Recording and playback deliberately do not. A movie is NES-specific
+	// state, and invariant 9 requires a GBA session to declare it unavailable
+	// rather than offer one that cannot work -- so those stay on `GameInfo`
+	// alone, and so does the slot viewer, which reads NES slot metadata.
 	case FCEUI_QUICKSAVE:
 	case FCEUI_QUICKLOAD:
 	case FCEUI_SAVESTATE:
 	case FCEUI_LOADSTATE:
 	case FCEUI_NEXTSAVESTATE:
 	case FCEUI_PREVIOUSSAVESTATE:
+		if (!GameInfo && !fceu11_gba_active()) return false;
+		if (FCEUMOV_Mode(MOVIEMODE_TASEDITOR)) return false;
+		break;
+
+	case FCEUI_RECORDMOVIE:
+	case FCEUI_PLAYMOVIE:
 	case FCEUI_VIEWSLOTS:
 		if (!GameInfo) return false;
 		if (FCEUMOV_Mode(MOVIEMODE_TASEDITOR)) return false;
