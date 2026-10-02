@@ -2911,7 +2911,7 @@ const char *DefaultGamePadDevice[GAMEPAD_NUM_DEVICES] =
 	{"Keyboard", "None", "None", "None"};
 const int DefaultGamePad[GAMEPAD_NUM_DEVICES][GAMEPAD_NUM_BUTTONS] =
 	{{SDLK_f, SDLK_d, SDLK_s, SDLK_RETURN,
-	  SDLK_UP, SDLK_DOWN, SDLK_LEFT, SDLK_RIGHT, -1, -1},
+	  SDLK_UP, SDLK_DOWN, SDLK_LEFT, SDLK_RIGHT, SDLK_e, SDLK_r},
 	 {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
 	 {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
 	 {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1}};

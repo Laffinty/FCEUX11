@@ -1406,8 +1406,8 @@ int  fceuWrapperUpdate( void )
 			{
 				// Button order is `GamePadNames`: A, B, Select, Start, Up, Down,
 				// Left, Right -- and the GBA bits are the same eight in the same
-				// order, so the mapping below is positional. TurboA/TurboB (8, 9)
-				// have no GBA equivalent and are deliberately not read.
+				// order, so the mapping below is positional. The remaining two
+				// slots (8, 9) are handled separately below, as L and R.
 				static const uint16_t kGbaBitForNesButton[GAMEPAD_NUM_BUTTONS] = {
 					kGbaPadA, kGbaPadB, kGbaPadSelect, kGbaPadStart,
 					kGbaPadUp, kGbaPadDown, kGbaPadLeft, kGbaPadRight,
@@ -1427,13 +1427,36 @@ int  fceuWrapperUpdate( void )
 					}
 				}
 
-				// L and R have no NES button to come from, so they are read
-				// directly. Z and X are the plan's choice (section 7.2), and on
-				// the default NES layout they are already bound to A and B --
-				// which is exactly why they cannot be *derived* from the pad:
-				// L would come out as a second A.
-				if (getKeyState(SDLK_z) != 0) pad |= kGbaPadL;
-				if (getKeyState(SDLK_x) != 0) pad |= kGbaPadR;
+				// L and R come from the two NES buttons that have no NES
+				// equivalent, rather than from hard-coded keys.
+				//
+				// They used to be read as Z and X directly, which meant two
+				// things were true at once and neither was visible: the
+				// bindings in the input dialog had no effect on them, and the
+				// keys they did read were keys the NES side already uses --
+				// Z and X are A and B on the default layout, so L was a second
+				// A and R a second B. The dialog still calls them TurboA and
+				// TurboB, which is a name the NES core has never consumed
+				// (`JS` is built from the first eight buttons only), so
+				// repurposing the two slots costs the NES side nothing.
+				//
+				// Read through `testButtonBinding` rather than
+				// `getKeyState`, because a binding can be a joystick axis and
+				// not only a key -- the same trap the d-pad fell into.
+				for (int config = 0; config < GamePad_t::NUM_CONFIG; config++)
+				{
+					if ((pad & kGbaPadL) && (pad & kGbaPadR)) break;
+					if (!(pad & kGbaPadL)
+					    && testButtonBinding(&GamePad[0].bmap[config][8]) != 0)
+					{
+						pad |= kGbaPadL;
+					}
+					if (!(pad & kGbaPadR)
+					    && testButtonBinding(&GamePad[0].bmap[config][9]) != 0)
+					{
+						pad |= kGbaPadR;
+					}
+				}
 			}
 			fceu11_gba_set_pad_state(pad);
 

@@ -654,6 +654,44 @@ int GamePad_t::setMapping(const char *map)
 	return 0;
 }
 //********************************************************************************
+// Does one button field name something the emulator can actually resolve?
+//
+// `k` on its own is not garbage: it is a keyboard binding with no key name
+// behind it, which is the exact shape a profile takes when it gets written
+// while the active map is empty. A length or emptiness test passes it, but
+// `SDL_GetKeyFromName("")` returns SDLK_UNKNOWN, so reading it back leaves
+// ButtonNum at -1 and every key in the input dialog renders blank -- and
+// because Save writes that same shape out again, the blank map reproduces
+// itself on every reopen. So a field only counts if it resolves.
+//
+// This mirrors `convText2ButtConfig`'s cases deliberately: the two have to
+// agree on what a usable field looks like, and the cheap way to guarantee
+// that is for one to be derived from the other.
+static bool buttConfigTextIsUsable(const char *txt)
+{
+	if (txt[0] == 0)
+	{
+		return false;
+	}
+	if (txt[0] == 'k')
+	{
+		return SDL_GetKeyFromName(&txt[1]) != SDLK_UNKNOWN;
+	}
+	if ((txt[0] == 'b') && isdigit(txt[1]))
+	{
+		return true;
+	}
+	if ((txt[0] == 'h') && isdigit(txt[1]) && (txt[2] == '.') && isdigit(txt[3]))
+	{
+		return true;
+	}
+	if ((txt[0] == 'a') || (txt[1] == 'a'))
+	{
+		return true;
+	}
+	return false;
+}
+//********************************************************************************
 int GamePad_t::getMapFromFile(const char *filename, nesGamePadMap_t *gpm)
 {
 	int i = 0;
@@ -679,8 +717,17 @@ int GamePad_t::getMapFromFile(const char *filename, nesGamePadMap_t *gpm)
 			i++;
 		}
 
-		if (i < 32)
-			continue; // need at least 32 chars for a valid line entry
+		// After comment stripping, a usable line needs at least two
+		// comma-separated fields. `parseMapping` always reads the first two as
+		// the GUID and the name, so a one-field line would hand it an
+		// uninitialised buffer for the second.
+		//
+		// The test used to be `i < 32`, on the theory that a line had to be at
+		// least as long as an SDL GUID. Keyboard profiles are not GUID-prefixed
+		// and are routinely shorter than that, so a perfectly good profile
+		// could be read without a single line surviving to be parsed.
+		if (i == 0 || strchr(line, ',') == NULL)
+			continue;
 
 		i = 0;
 		while (isspace(line[i]))
@@ -690,6 +737,38 @@ int GamePad_t::getMapFromFile(const char *filename, nesGamePadMap_t *gpm)
 	}
 
 	::fclose(fp);
+
+	// A file that resolves to nothing is a failure, not a success.
+	//
+	// Without this, any file that merely *existed* was accepted wholesale, so
+	// `input/keyboard/默认.txt` -- a profile of ten bare `k` fields, saved from
+	// an already-blank map -- loaded as a valid mapping that bound every button
+	// to nothing. `loadProfile` then reported success, so `loadDefaults()`
+	// never ran and the real defaults in `DefaultGamePad` were never reached.
+	// The user got an input dialog with every key blank and no way to tell
+	// that apart from having cleared them by hand.
+	//
+	// Reporting failure here sends the caller back to `loadDefaults()`.
+	{
+		int usable = 0;
+
+		for (int c = 0; c < 4; c++)
+		{
+			for (int b = 0; b < GAMEPAD_NUM_BUTTONS; b++)
+			{
+				if (buttConfigTextIsUsable(gpm->conf[c].btn[b]))
+				{
+					usable++;
+					break;
+				}
+			}
+		}
+		if (usable == 0)
+		{
+			gpm->clearMapping();
+			return -1;
+		}
+	}
 
 	return 0;
 }
@@ -897,6 +976,11 @@ int GamePad_t::getDefaultMap(const char *guid)
 				bmap[0][x].DeviceNum = 0;
 				bmap[0][x].ButtonNum = DefaultGamePad[portNum][x];
 			}
+			// Success. The defaults are in place, so saying "failed" here
+			// would send the caller looking for a profile that does not exist
+			// and, in the paths that act on a non-zero return, re-apply
+			// defaults over them.
+			return 0;
 		}
 	}
 	return -1;
@@ -987,6 +1071,16 @@ int GamePad_t::saveCurrentMapToFile(const char *name)
 
 		for (i = 0; i < GAMEPAD_NUM_BUTTONS; i++)
 		{
+			if (bmap[c][i].ButtonNum < 0)
+			{
+				// Unbound. `SDL_GetKeyName(-1)` would produce an empty name
+				// and the field would go out as a bare `k`, which is the
+				// poison shape that `getMapFromFile` now rejects -- so saving
+				// an incomplete map would quietly destroy the rest of it on the
+				// next load. Omit the field instead: a missing field is
+				// read back as unbound, which is what it is.
+				continue;
+			}
 			if (bmap[c][i].ButtType == BUTTC_KEYBOARD)
 			{
 				int j=0,k=0; const char *keyName;
