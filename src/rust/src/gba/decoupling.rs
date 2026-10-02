@@ -33,13 +33,26 @@
 //! | `fceu.cpp` | the loader chain — one "open this file" entry point |
 //! | `ConsoleFile.cpp` | the open dialog's filter list, so a `.gba` can be picked |
 //!
-//! | `ConsoleViewerSDL.{h,cpp}` | the GBA presentation path — its own texture and its own draw call, reached from one branch in `render()` |
+//! | `ConsoleViewer{SDL, QWidget, GL}.{h,cpp}` | the three video drivers, **each** of which has to draw a GBA session — see below for why the list is not optional |
 //! | `state.cpp` | the savestate path — one branch in `FCEUSS_Save` / `FCEUSS_Load`, which every entry point already funnels through |
 //!
 //! Nothing else. When a stage adds its own touch point it adds its entries
 //! **here**, explicitly and in the same commit that adds the code —
 //! which is the whole point: a new touch point has to be a decision rather than
 //! a consequence.
+//!
+//! # Why the allowlist is not enough on its own
+//!
+//! Every entry above is a file that *mentions* the GBA, so the list can only
+//! ever police the ones that already know it exists. A file that should mention
+//! it and does not is invisible here — and that is not a hypothetical: stage
+//! 2' gave only one of the three video drivers a GBA branch, so a player on
+//! either of the other two got a black screen while every guard stayed green.
+//!
+//! So the other half of the obligation is written down separately, as
+//! [`VIEWERS`]: a fixed list of files that **must** reach the GBA. A guard that
+//! only catches what exists cannot catch what is missing, and a missing branch
+//! is exactly what a blind spot looks like from the inside.
 //!
 //! # Why the source is stripped before matching
 //!
@@ -86,7 +99,134 @@ mod tests {
         // decision that has to be written down, which is why this entry exists
         // instead of the branch being invisible.
         "state.cpp",
+        // v2.0 S2-b4 stage 2', completed properly in r50: the other two
+        // drivers. Stage 2' registered only the SDL one, and the OpenGL
+        // driver -- what a machine with a discrete GPU actually selects --
+        // drew a GBA session as an empty screen with nothing red anywhere.
+        // Listed per-file, `.h` alongside `.cpp`, because the headers carry
+        // the GBA texture and serial members.
+        "ConsoleViewerQWidget.cpp",
+        "ConsoleViewerQWidget.h",
+        "ConsoleViewerGL.cpp",
+        "ConsoleViewerGL.h",
     ];
+
+    /// The three video drivers, with the function that paints them.
+    ///
+    /// A GBA session is drawn by exactly one of these depending on which
+    /// driver the user has selected, and all three have to know about it.
+    ///
+    /// The *painting* function, not the file. The first version of this check
+    /// only asked whether the file mentioned GBA anywhere, and that is a
+    /// different and much weaker claim: disabling the branch with
+    /// `if (false && fceu11_gba_active())` left the guard green, because
+    /// `renderGbaFrame` is still defined in the file. A branch that exists but
+    /// is not reached draws exactly as little as a branch that does not exist,
+    /// so the guard has to look where the decision is made.
+    const VIEWERS: [(&str, &str, &str); 3] = [
+        ("ConsoleViewerSDL.cpp", "ConsoleViewSDL_t", "render"),
+        ("ConsoleViewerQWidget.cpp", "ConsoleViewQWidget_t", "paintEvent"),
+        ("ConsoleViewerGL.cpp", "ConsoleViewGL_t", "paintGL"),
+    ];
+
+    /// The text of one member function's body, from its qualified definition
+    /// to its closing brace.
+    ///
+    /// Deliberately crude: member functions here are defined as
+    /// `void ConsoleView...::name(`, one per line at column 0, and the file
+    /// is already stripped of comments and string literals, so counting braces
+    /// is enough. A real parser would be a dependency this project has no
+    /// reason to take for one check.
+    ///
+    /// **Braces, not "the next member".** Two earlier versions tried the
+    /// cheaper marker and both were wrong in ways a guard cannot afford:
+    /// stopping at the next `void ` of any kind cut the scan short inside a
+    /// file with helper functions, and stopping at the next member of the same
+    /// class ran off the end of the last one -- so a function that had lost its
+    /// GBA branch still "contained" GBA text from whatever followed it. A guard
+    /// that reads the wrong span is worse than no guard: it goes green for text
+    /// the function never executes.
+    fn function_body<'a>(code: &'a str, class: &str, painter: &str) -> &'a str {
+        let marker = format!("void {class}::{painter}(");
+        let Some(start) = code.find(&marker) else {
+            panic!("{marker} is not in the file; the guard would check nothing");
+        };
+        let body = &code[start..];
+        let mut depth = 0i32;
+        for (offset, ch) in body.char_indices() {
+            match ch {
+                '{' => depth += 1,
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return &body[..offset + 1];
+                    }
+                }
+                _ => {}
+            }
+        }
+        panic!("{marker} has no closing brace; the guard would check nothing");
+    }
+
+    /// Every video driver draws a GBA session.
+    ///
+    /// **This is the check whose absence let r50 through.** The allowlist guard
+    /// asks "does a file that mentions GBA need registering?" -- so a driver
+    /// that *should* branch on the GBA and does not is invisible to it. Stage
+    /// 2' gave only `ConsoleViewerSDL` a branch, and the OpenGL driver -- what a
+    /// machine with a discrete GPU selects, which is most of them -- drew a GBA
+    /// session as an empty screen with every guard green.
+    ///
+    /// A guard that only catches what exists cannot catch what is missing, and
+    /// a missing branch is exactly what a blind spot looks like from inside. So
+    /// the obligation is stated positively on a **fixed list**: these three
+    /// paint functions must each reach the GBA. A fourth driver is a
+    /// deliberate edit here rather than a silent omission.
+    ///
+    /// **What it still cannot see, measured rather than assumed.** This is a
+    /// text check, so it catches a branch that was *never written* -- deleting
+    /// the GBA branch from `ConsoleViewerGL.cpp` turns it red, which is the
+    /// failure that actually happened. It does not catch a branch that is
+    /// present and unreachable (`if (false && fceu11_gba_active())` leaves it
+    /// green); that was tried and is a property of matching text, not a bug in
+    /// the check. Deciding reachability needs a real parser, which is a
+    /// dependency this project has no reason to take for one assertion.
+    #[test]
+    fn every_viewer_draws_the_gba() {
+        let sources: std::collections::HashMap<String, String> =
+            stripped_sources().into_iter().collect();
+        let mut missing: Vec<&str> = Vec::new();
+        for (viewer, class, painter) in VIEWERS {
+            let Some(code) = sources.get(viewer) else {
+                panic!("{viewer} is not in the tree; this guard would check nothing");
+            };
+            let body = function_body(code, class, painter);
+            if !mentions_gba(body) {
+                missing.push(viewer);
+            }
+        }
+        assert!(
+            missing.is_empty(),
+            "{missing:?} paint nothing for a GBA session, because their paint function \
+             never asks whether one is running. A player on that driver gets a black screen \
+             and no other guard can see it: the allowlist only asks whether a file that \
+             *mentions* GBA is registered, and a driver that forgot to is silent. Add the \
+             branch to the paint function, then register the file in ALLOWED."
+        );
+    }
+
+    /// The three drivers are all on the allowlist, so a GBA branch in one of
+    /// them cannot be written without the touch point being recorded.
+    #[test]
+    fn every_viewer_is_on_the_allowlist() {
+        for (viewer, _, _) in VIEWERS {
+            assert!(
+                ALLOWED.contains(&viewer),
+                "{viewer} draws a GBA session but is not in ALLOWED -- every touch \
+                 point has to be a decision, written down, in the same commit as the code"
+            );
+        }
+    }
 
     /// The one file allowed to call the GBA C ABI.
     const SOLE_ABI_CALLER: &str = "gba_load.cpp";

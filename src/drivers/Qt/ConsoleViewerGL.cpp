@@ -43,6 +43,9 @@
 #include "Qt/fceuWrapper.h"
 #include "Qt/ConsoleViewerGL.h"
 #include "Qt/ConsoleUtilities.h"
+// v2.0 S2-b4 stage 2': the GBA's frame. Registered in `decoupling.rs` ALLOWED
+// in the same commit -- see the guard `every_viewer_knows_about_the_gba`.
+#include "gba_load.h"
 #include "Qt/ConsoleWindow.h"
 #include "Qt/keyscan.h"
 
@@ -78,6 +81,14 @@ ConsoleViewGL_t::ConsoleViewGL_t(QWindow *parent)
 	view_height = 224;
 	gltexture   = 0;
 	bgTexture   = 0;
+	// v2.0 S2-b4 stage 2'. Zeroed, not "none seen": a serial no real frame
+	// carries makes the first GBA paint upload, where initialising it to the
+	// live value would skip that upload and show nothing until the picture
+	// changed shape.
+	gbaTexture       = 0;
+	gbaTextureWidth  = 0;
+	gbaTextureHeight = 0;
+	gbaTextureSerial = 0;
 	devPixRatio = 1.0f;
 	aspectRatio = 1.0f;
 	aspectX     = 1.0f;
@@ -350,10 +361,18 @@ void ConsoleViewGL_t::cleanupGL(void)
 	 	glDeleteTextures(1, &gltexture);
 	 	gltexture=0;
 	 }
-	 if (bgTexture) 
+	 if (bgTexture)
 	 {
 	 	glDeleteTextures(1, &bgTexture);
 	 	bgTexture=0;
+	 }
+	 // v2.0 S2-b4 stage 2'. Ours, like the two above, and leaked the same way
+	 // if left out: a GBA session creates it lazily, and a context that goes
+	 // away afterwards would otherwise keep the name alive.
+	 if (gbaTexture)
+	 {
+	 	glDeleteTextures(1, &gbaTexture);
+	 	gbaTexture=0;
 	 }
 
 	delete vao; vao = nullptr;
@@ -732,6 +751,119 @@ void ConsoleViewGL_t::renderFrame(void)
 	shaderProgram->release();
 }
 
+// v2.0 S2-b4 stage 2' / r50: the GBA's half of this viewer.
+//
+// The shader, the VAO and the projection maths are the same infrastructure the
+// NES path uses, and this reuses all of it. What differs is the texture and
+// the geometry, for the three reasons `ConsoleViewerSDL.cpp` lists: 240x160
+// rather than 256x240, always 3:2, never pre-scaled.
+//
+// One difference that is not about the GBA at all: the NES buffer uploads as
+// `GL_BGRA` because it is a packed `uint32_t` in xRGB order, while the core
+// hands us RGBA bytes. Uploading those as BGRA swaps red and blue, which on a
+// mostly-grey boot screen is very nearly invisible and on a real one would
+// turn the whole picture the wrong colour -- so this path says `GL_RGBA`.
+//
+// It exists because it did not. Stage 2' added the GBA path to the SDL viewer
+// only, and neither this viewer nor the QWidget one had a branch for a GBA
+// session, so a GBA run on either painted nothing. See
+// `every_viewer_knows_about_the_gba` in `decoupling.rs`.
+void ConsoleViewGL_t::buildGbaTexture(void)
+{
+	if (gbaTexture)
+	{
+		glDeleteTextures(1, &gbaTexture);
+		gbaTexture = 0;
+	}
+
+	const int w = static_cast<int>(fceu11_gba_frame_width());
+	const int h = static_cast<int>(fceu11_gba_frame_height());
+	if (w <= 0 || h <= 0) return;
+
+	glGenTextures(1, &gbaTexture);
+	glBindTexture(GL_TEXTURE_2D, gbaTexture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
+	                linearFilter ? GL_LINEAR : GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+	                linearFilter ? GL_LINEAR : GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+}
+
+void ConsoleViewGL_t::renderGbaFrame(void)
+{
+	const int texture_width  = static_cast<int>(fceu11_gba_frame_width());
+	const int texture_height = static_cast<int>(fceu11_gba_frame_height());
+	const uint8_t* frame     = fceu11_gba_frame();
+	const uint32_t serial     = fceu11_gba_frame_serial();
+
+	if (frame == NULL || texture_width <= 0 || texture_height <= 0) return;
+
+	// Created on the first GBA paint, and rebuilt when the picture changes
+	// shape. A serial of 0 is a real possibility after ~4 billion frames, so
+	// the shape check is the load-bearing one and the serial only avoids
+	// re-uploading identical pixels.
+	if (!gbaTexture || gbaTextureWidth != texture_width || gbaTextureHeight != texture_height)
+	{
+		buildGbaTexture();
+		gbaTextureWidth  = texture_width;
+		gbaTextureHeight = texture_height;
+		gbaTextureSerial = 0;
+	}
+	if (gbaTextureSerial != serial)
+	{
+		glBindTexture(GL_TEXTURE_2D, gbaTexture);
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texture_width, texture_height,
+		                GL_RGBA, GL_UNSIGNED_BYTE, frame);
+		gbaTextureSerial = serial;
+	}
+
+	float scale = static_cast<float>(view_width)  / static_cast<float>(texture_width);
+	const float yscale = static_cast<float>(view_height) / static_cast<float>(texture_height);
+	if (yscale < scale) scale = yscale;
+	if (scale > 1.0f) scale = 1.0f;
+
+	int rw = static_cast<int>(static_cast<float>(texture_width)  * scale);
+	int rh = static_cast<int>(static_cast<float>(texture_height) * scale);
+	if (rw < 1) rw = 1;
+	if (rh < 1) rh = 1;
+
+	const int sx = (view_width - rw) / 2;
+	const int sy = (view_height - rh) / 2;
+
+	glViewport(sx, sy, rw, rh);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, gbaTexture);
+
+	projectionMatrix.setToIdentity();
+	projectionMatrix.ortho(0.0, static_cast<float>(rw), 0.0, static_cast<float>(rh), -1.0, 1.0);
+
+	// Whole texture, every time: the GBA picture is uploaded whole, so u and v
+	// are 1 rather than the NES path's "how much of a bigger texture is this".
+	float vertices[] = {
+		// pos       // tex
+		0.0f, 0.0f,                                                        0.0f, 1.0f,
+		static_cast<float>(rw), 0.0f,                                      1.0f, 1.0f,
+		static_cast<float>(rw), static_cast<float>(rh),                    1.0f, 0.0f,
+		0.0f, static_cast<float>(rh),                                       0.0f, 0.0f
+	};
+
+	shaderProgram->bind();
+	vao->bind();
+	vbo->bind();
+	vbo->allocate(vertices, sizeof(vertices));
+	ebo->bind();
+
+	shaderProgram->setUniformValue("uProjection", projectionMatrix);
+	shaderProgram->setUniformValue("uTexture", 0);
+
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, nullptr);
+
+	vao->release();
+	shaderProgram->release();
+}
+
 void ConsoleViewGL_t::paintGL(void)
 {
 	if ( !glFunctionsInitialized )
@@ -749,6 +881,16 @@ void ConsoleViewGL_t::paintGL(void)
 		glClearColor( 30.0/255.0, 69.0/255.0, 40.0/255.0, 1.0f);
 	}
 	glClear(GL_COLOR_BUFFER_BIT);
+
+	// v2.0 S2-b4 stage 2'. Before the `GameInfo` test below, which is a NES
+	// test: a GBA session has no `GameInfo` by construction, so falling
+	// through it would draw the background image and never the game.
+	if (fceu11_gba_active())
+	{
+		renderGbaFrame();
+		nes_shm->render_count.fetch_add(1, std::memory_order_relaxed);
+		return;
+	}
 
 	extern FCEUGI *GameInfo;
 	if ( GameInfo == nullptr )

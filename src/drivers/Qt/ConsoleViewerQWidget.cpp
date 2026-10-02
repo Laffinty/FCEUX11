@@ -32,6 +32,9 @@
 #include "Qt/ConsoleViewerQWidget.h"
 #include "Qt/ConsoleUtilities.h"
 #include "Qt/ConsoleWindow.h"
+// v2.0 S2-b4 stage 2': the GBA's frame. Registered in `decoupling.rs` ALLOWED
+// in the same commit -- see the guard `every_viewer_knows_about_the_gba`.
+#include "gba_load.h"
 
 extern unsigned int gui_draw_area_width;
 extern unsigned int gui_draw_area_height;
@@ -50,6 +53,11 @@ ConsoleViewQWidget_t::ConsoleViewQWidget_t(QWidget *parent)
 	setPalette(pal);
 
 	bgColor = nullptr;
+	// v2.0 S2-b4 stage 2'. A null image and a serial no real frame has means
+	// the first GBA paint uploads; initialising the serial to the live value
+	// instead would skip that upload and show an empty picture until the next
+	// frame happened to differ.
+	gbaImageSerial = 0;
 
 	if ( win )
 	{
@@ -382,9 +390,96 @@ void  ConsoleViewQWidget_t::getNormalizedCursorPos( double &x, double &y )
 	//printf("Normalized Cursor (%f,%f) \n", x, y );
 }
 
+// v2.0 S2-b4 stage 2' / r50: the GBA's half of this viewer.
+//
+// Same shape as the SDL viewer's `renderGbaFrame`, and the same three reasons
+// (see `ConsoleViewerSDL.cpp`): the GBA's picture is 240x160 where the NES is
+// 256x240, it is always 3:2 and never pre-scaled, and the scale limits and
+// aspect options below do not apply to it. So it gets its own small piece of
+// maths rather than a GBA case threaded through the NES one -- which also
+// leaves everything from `transfer2LocalBuffer` down untouched.
+//
+// It exists at all because it did not. S2-b4 stage 2' added the GBA path to
+// the SDL viewer only, and the two other viewers have no branch for a GBA
+// session at all. A GBA run on either of them painted nothing and the reason
+// was invisible: a file with no `gba` in it never trips the decoupling
+// allowlist, so the guard that was supposed to cover this could not see it.
+// `every_viewer_knows_about_the_gba` in `decoupling.rs` is that blind spot,
+// turned into a check.
+void ConsoleViewQWidget_t::renderGbaFrame(QPainter& painter)
+{
+	const uint32_t width  = fceu11_gba_frame_width();
+	const uint32_t height = fceu11_gba_frame_height();
+	const uint8_t* frame  = fceu11_gba_frame();
+	const uint32_t serial = fceu11_gba_frame_serial();
+
+	if (frame == NULL || width == 0 || height == 0)
+	{
+		return;
+	}
+
+	// Wrapping the core's buffer rather than copying into storage of our own:
+	// `QImage` over a `const uchar*` is a view, so there is no per-frame copy
+	// at all, and it is valid for exactly as long as `paintEvent` needs it --
+	// until the next `gba_step_frame` overwrites it.
+	//
+	// The bytes are RGBA with no padding and `width` is that same 240, so
+	// bytesPerLine is `width * 4` and the whole picture is one buffer.
+	// `gbaImageSerial` still earns its keep: rebuilding the wrapper is free,
+	// but a stale view would show the *previous* frame if the buffer were ever
+	// reallocated underneath us.
+	if (gbaImageSerial != serial)
+	{
+		gbaImage = QImage(reinterpret_cast<const uchar*>(frame),
+		                  static_cast<int>(width), static_cast<int>(height),
+		                  static_cast<int>(width) * 4, QImage::Format_ARGB32);
+		gbaImageSerial = serial;
+	}
+	if (gbaImage.isNull())
+	{
+		return;
+	}
+
+	float scale = static_cast<float>(view_width) / static_cast<float>(width);
+	const float yScale = static_cast<float>(view_height) / static_cast<float>(height);
+	if (yScale < scale) scale = yScale;
+	if (scale > 1.0f) scale = 1.0f;
+
+	int destW = static_cast<int>(static_cast<float>(width) * scale);
+	int destH = static_cast<int>(static_cast<float>(height) * scale);
+	if (destW < 1) destW = 1;
+	if (destH < 1) destH = 1;
+
+	if (bgColor)
+	{
+		painter.fillRect(0, 0, view_width, view_height, *bgColor);
+	}
+	else
+	{
+		painter.fillRect(0, 0, view_width, view_height, QColor(30, 69, 40));
+	}
+
+	painter.setRenderHint(QPainter::SmoothPixmapTransform, linearFilter);
+	painter.drawImage(QRect((view_width - destW) / 2, (view_height - destH) / 2,
+	                        destW, destH),
+	                  gbaImage);
+}
+
 void ConsoleViewQWidget_t::paintEvent(QPaintEvent *event)
 {
 	QPainter painter(this);
+
+	// v2.0 S2-b4 stage 2'. Before the NES scale maths below, which reads
+	// `nes_shm->video` and would compute a 256x240 letterbox for a picture that
+	// is 240x160.
+	if (fceu11_gba_active())
+	{
+		renderGbaFrame(painter);
+		videoBufferSwapMark();
+		nes_shm->render_count.fetch_add(1, std::memory_order_relaxed);
+		return;
+	}
+
 	int nesWidth  = GL_NES_WIDTH;
 	int nesHeight = GL_NES_HEIGHT;
 	float ixScale = 1.0;
