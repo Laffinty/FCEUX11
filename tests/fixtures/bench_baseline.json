@@ -11,21 +11,22 @@
     "iterations, measured on the same machine class.",
     "",
     "The 1 percent tolerance gate from v1.3 Legion is the ASPIRATIONAL",
-    "target. v1.3-v1.5 shipped 2.5 percent. r54 (2026-10-03) raised it",
-    "to 5 percent: within a single capture the 5 medians already spread",
-    "2.8 percent (156.3-160.7 ms), so 2.5 sat inside this host's noise",
-    "band and flaked on unchanged code; a -j 4 ctest run overshoots ~10",
-    "percent, which is why CI excludes this test with -LE perf. Run the",
-    "gate serially with no concurrent load. Real regressions on this",
-    "project have been >100 percent (the pre-r54 baseline), so 5 still",
-    "gates. An earlier draft of this note blamed in-suite drift measured",
-    "while a cargo build ran concurrently; a clean re-run disproved it."
+    "target. v1.3-v1.5 shipped 2.5; r54 set 5; r55 (2026-10-03) set 10.",
+    "Reason: on this dev box the mixed full-frame bench is clock-context",
+    "dominated -- the same binary read 132.9 ms fully warmed, ~145 ms in",
+    "a ctest suite, and ~163 ms right after a 33-test suite (+23 percent",
+    "overall), while CPU and PPU agree within 2 percent across contexts.",
+    "No fixed tolerance is deterministic here, so this test is ADVISORY",
+    "on this box: the deterministic local gate is ctest -LE perf. Chase",
+    "only large sustained shifts; real regressions on this project have",
+    "been >100 percent (the pre-r54 baseline). CI excludes wall-clock",
+    "gates entirely (-LE perf; 20+ percent runner noise)."
   ],
   "version":             "v1.3.0",
   "captured_at":         "2026-10-03",
-  "captured_from_commit": "a482f25053c618013ce579e1a7a3303a35ad9be3",
+  "captured_from_commit": "1f01e9a2c5681fbc3fab13baec594a05c266ad1b",
   "captured_on":         "Windows_NT, Microsoft Windows 10.0.26200 , AMD64",
-  "tolerance_pct":       5.0,
+  "tolerance_pct":       10.0,
   "benchmarks": [
     {
       "name":             "bench_cpu_frame",
@@ -34,7 +35,7 @@
       "frames_per_iter":  60,
       "iterations":       5,
       "metric":           "median_total_ms",
-      "baseline_ms":      156.304,
+      "baseline_ms":      144.604,
       "unit":             "milliseconds for 60 frames"
     },
     {
@@ -44,7 +45,7 @@
       "frames_per_iter":  60,
       "iterations":       5,
       "metric":           "median_total_ms",
-      "baseline_ms":      153.296,
+      "baseline_ms":      142.559,
       "unit":             "milliseconds for 60 frames"
     },
     {
@@ -54,7 +55,7 @@
       "frames_per_iter":  60,
       "iterations":       5,
       "metric":           "median_total_ms",
-      "baseline_ms":      143.377,
+      "baseline_ms":      132.880,
       "unit":             "milliseconds for 60 frames (CPU+PPU+APU)"
     }
   ]

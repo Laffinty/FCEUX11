@@ -56,10 +56,10 @@
 #define FCEU_COMPILER_DETAIL ""
 #endif
 
-// v1.18.2 — F11QA residual accuracy T0 (kgmqa-078 MMC1 submapper-5 fixed PRG)
-inline constexpr int FCEU_VERSION_MAJOR = 1;
-inline constexpr int FCEU_VERSION_MINOR = 18;
-inline constexpr int FCEU_VERSION_PATCH = 2;
+// v2.0.0 — GBAEUX11 v2.0（GBA 作为第二台机）发布线；NES 侧基线 F11QA 108P/12F
+inline constexpr int FCEU_VERSION_MAJOR = 2;
+inline constexpr int FCEU_VERSION_MINOR = 0;
+inline constexpr int FCEU_VERSION_PATCH = 0;
 inline constexpr int FCEU_VERSION_TWEAK = 0;
 
 inline constexpr int FCEU_VERSION_NUMERIC = (FCEU_VERSION_MAJOR * 10000) + (FCEU_VERSION_MINOR * 100) + FCEU_VERSION_PATCH;
@@ -67,11 +67,11 @@ inline constexpr int FCEU_VERSION_MAJOR_DECODE(int x) { return x / 10000; }
 inline constexpr int FCEU_VERSION_MINOR_DECODE(int x) { return (x / 100) % 100; }
 inline constexpr int FCEU_VERSION_PATCH_DECODE(int x) { return x % 100; }
 
-// v1.18.2 release — no hotfix tag.
+// v2.0.0 release — no hotfix tag.
 #define FCEU_HOTFIX_TAG ""
 
-#define FCEU_VERSION_STRING "1.18.2 " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
-#define FCEU_DISPLAY_VERSION "v1.18.2"
+#define FCEU_VERSION_STRING "2.0.0 " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
+#define FCEU_DISPLAY_VERSION "v2.0"
 #define FCEU_NAME_AND_VERSION FCEU_NAME " " FCEU_DISPLAY_VERSION
 
 // FCEUX11 Contributors — Derivative work based on FCEUX
