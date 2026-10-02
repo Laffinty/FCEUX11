@@ -94,6 +94,33 @@ pub struct Bus {
     /// the layout also stops internal timing changes from breaking old saves.
     #[serde(skip)]
     timer_cycles_done: u64,
+
+    /// Diagnostic: how many DMA blocks have been run since power on, and how
+    /// many units they moved in total.
+    ///
+    /// Neither is machine state, so neither is serialized. They exist because
+    /// a single DMA block is charged to `cycles_count` through the ordinary bus
+    /// path -- every unit costs a read and a write, each with its own wait
+    /// states -- and `cycles_count` also drives how far the LCD catches up. A
+    /// game whose per-frame work is 128 KB of DMA therefore ends up paying for
+    /// a whole scanline's worth of LCD time inside one instruction, and the only
+    /// way to tell that apart from "the emulator is just slow" is to count the
+    /// blocks and the units.
+    #[serde(skip)]
+    pub dma_blocks_run: u64,
+    /// Units moved by every DMA block run so far. See [`Self::dma_blocks_run`].
+    #[serde(skip)]
+    pub dma_units_moved: u64,
+    /// Diagnostic: how many sound-FIFO DMA fills have run.
+    ///
+    /// Separate from [`Self::dma_blocks_run`] because `run_fifo_dma` does not go
+    /// through `run_dma_block` -- it is four units, triggered by a timer
+    /// overflow rather than by a write to a channel's control register, and
+    /// repeating for as long as the timer keeps overflowing. A timer set so
+    /// that it overflows every cycle therefore turns this into a per-instruction
+    /// cost that the block counter cannot see at all.
+    #[serde(skip)]
+    pub fifo_dma_runs: u64,
     /// Set while the bus is servicing an instruction fetch, so the `GamePak`
     /// prefetch buffer timing is applied only to the opcode stream.
     #[serde(skip)]
@@ -587,6 +614,9 @@ impl Bus {
         let is_32bit = self.dma.channels[idx].control.get_bit(10);
         let count = self.dma.channels[idx].internal_count;
 
+        self.dma_blocks_run += 1;
+        self.dma_units_moved += u64::from(count);
+
         for _ in 0..count {
             let source = self.dma.channels[idx].internal_source as usize;
             let dest = self.dma.channels[idx].internal_dest as usize;
@@ -638,6 +668,7 @@ impl Bus {
             }
 
             let src_control = channel.control.get_bits(7..=8);
+            self.fifo_dma_runs += 1;
             for _ in 0..4 {
                 let source = self.dma.channels[idx].internal_source as usize;
                 let value = self.read_word(source);

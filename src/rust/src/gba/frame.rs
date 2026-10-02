@@ -3023,7 +3023,7 @@ use gba_core::cpu::hardware::keypad::GbaButton;
         format!(
             "T{index:08} cyc={:08X} pc={pc:08X} r0={:08X} r1={:08X} r2={:08X} r3={:08X} \
              DISPCNT={:04X} DISPSTAT={:04X} VCOUNT={:04X} BG0CNT={:04X} IE={:04X} IF={:04X} \
-             WAITCNT={:04X} IME={:04X}",
+             WAITCNT={:04X} IME={:04X} dma={} dmu={}",
             cycles,
             gba.cpu.registers.register_at(0),
             gba.cpu.registers.register_at(1),
@@ -3037,6 +3037,8 @@ use gba_core::cpu::hardware::keypad::GbaButton;
             io(0x0400_0202),
             io(0x0400_0204),
             io(0x0400_0208),
+            gba.cpu.bus.dma_blocks_run,
+            gba.cpu.bus.dma_units_moved,
         )
     }
 
@@ -3061,20 +3063,30 @@ use gba_core::cpu::hardware::keypad::GbaButton;
         let waitcnt = io(0x0400_0204);
         let ime = io(0x0400_0208);
 
-        let iwram = hash_range(gba, 0x0300_0000, 0x0300_8000);
-        let ewram = hash_range(gba, 0x0200_0000, 0x0201_0000);
-        let vram = hash_range(gba, 0x0600_0000, 0x0601_8000);
-        let pal = hash_range(gba, 0x0500_0000, 0x0500_0400);
-        let oam = hash_range(gba, 0x0700_0000, 0x0700_0400);
-        let rom = hash_range(gba, 0x0800_0000, 0x0800_8000);
+        // Deliberately no memory hashes here. They are taken once at the end
+        // instead, because hashing 65k halfwords through the bus charges
+        // `access_cycles` to `cycles_count` -- and `cycles_count` is the clock
+        // this line reports. A dump that hashes on every sample inflates the
+        // very number it is measuring, by about two billion cycles over a
+        // twenty-thousand-sample run. The IO reads below are eight halfwords
+        // and do not matter; a quarter of a million of them would.
+        let iwram = 0;
+        let ewram = 0;
+        let vram = 0;
+        let pal = 0;
+        let oam = 0;
+        let rom = 0;
 
         format!(
             "F{frame:06} cyc={:08X} pc={pc:08X} sp={sp:08X} r0={r0:08X} r1={r1:08X} \
              r2={r2:08X} r3={r3:08X} DISPCNT={dispcnt:04X} DISPSTAT={dispstat:04X} \
              VCOUNT={vcount:04X} BG0CNT={bg0cnt:04X} IE={ie:04X} IF={iff:04X} \
              WAITCNT={waitcnt:04X} IME={ime:04X} iwram={iwram:08X} eWRAM={ewram:08X} \
-             vram={vram:08X} pal={pal:08X} oam={oam:08X} rom={rom:08X}",
+             vram={vram:08X} pal={pal:08X} oam={oam:08X} rom={rom:08X} \
+             dma={} dmu={}",
             cycles,
+            gba.cpu.bus.dma_blocks_run,
+            gba.cpu.bus.dma_units_moved,
         )
     }
 
@@ -3120,6 +3132,9 @@ use gba_core::cpu::hardware::keypad::GbaButton;
 
         let mut lines = String::with_capacity(frames * 160);
         let mut frames_done = 0usize;
+        // Rate-limited sampling: one sample per period cycles at most, each
+        // labelled with the cycle it was really taken at.
+        let mut last_sample = gba.cpu.bus.master_cycles();
 
         // Trace mode: one line per step, so the two dumps can be matched on
         // the cycle number instead of on an index. The reference core's very
@@ -3138,35 +3153,59 @@ use gba_core::cpu::hardware::keypad::GbaButton;
             }
             std::fs::write(&out, lines.as_bytes()).expect("write the trace");
             println!("traced to {} cycles, {n} steps -> {out}", gba.cpu.bus.master_cycles());
+            println!(
+                "DMA: {} blocks, {} units, {:.1} cycles per block",
+                gba.cpu.bus.dma_blocks_run,
+                gba.cpu.bus.dma_units_moved,
+                if gba.cpu.bus.dma_blocks_run == 0 {
+                    0.0
+                } else {
+                    gba.cpu.bus.master_cycles() as f64 / gba.cpu.bus.dma_blocks_run as f64
+                }
+            );
             return;
         }
         lines.push_str(&format!("# rom={} frames={frames}\n", path.display()));
         for frame in 0..frames {
-            // A cycle ruler, not a frame ruler. The two cores do not agree on
-            // where a "frame" ends: `Bus::step` catches the LCD up inside a
-            // `while` loop, and a VBlank-timed DMA can push it many scanlines
-            // past the edge it just signalled. Frame N on one side is
-            // therefore not the same instant as frame N on the other, and
-            // diffing by frame index reports a divergence that is only a
-            // difference in pacing -- which is exactly the false lead that
-            // produced "IWRAM diverges at frame 2" the first time round.
+            // Rate-limited sampling, for the same reason as the reference side:
+            // a rigid target grid collapses whenever one step runs a whole
+            // frame's worth of cycles, and a DMA does exactly that. A 0x8000
+            // unit transfer costs about 164,000 cycles here -- 3 to read
+            // EWRAM, 2 to write VRAM, per 32-bit unit -- so after one DMA every
+            // target in between is already in the past and those samples
+            // collapse into the next one.
             //
-            // One frame is 228 scanlines x 308 pixels x 4 cycles. Both sides
-            // sample at the same master cycle, a landmark both can hit exactly.
-            let target = (frame as u64 + 1) * period;
-            let mut guard = 8 * period;
-            while gba.cpu.bus.master_cycles() < target {
-                gba.step();
-                guard -= 1;
-                if guard == 0 {
-                    println!("frame {frame}: cycle target {target} not reached");
-                    frames_done = frame;
-                    return write_dump(&out, &mut lines, frames_done);
-                }
+            // Emit whenever at least `period` cycles have passed since the last
+            // sample, and label each with the cycle it was really taken at, so
+            // the two dumps can be matched on that number with a tolerance
+            // instead of on a line index.
+            gba.step();
+            if gba.cpu.bus.master_cycles().wrapping_sub(last_sample) >= period {
+                last_sample = gba.cpu.bus.master_cycles();
+                lines.push_str(&dump_line(&mut gba, frame));
+                lines.push('\n');
             }
-            frames_done = frame + 1;
-            lines.push_str(&dump_line(&mut gba, frame));
+        }
+
+        {
+            // The hashes, once, now that no further cycle is reported after
+            // this point and so nothing can be skewed by having taken them.
+            let tail = format!(
+                "# final hashes iwram={:08X} eWRAM={:08X} vram={:08X} pal={:08X} \
+                 oam={:08X} rom={:08X} cyc={:08X} dma={} dmu={}",
+                hash_range(&mut gba, 0x0300_0000, 0x0300_8000),
+                hash_range(&mut gba, 0x0200_0000, 0x0201_0000),
+                hash_range(&mut gba, 0x0600_0000, 0x0601_8000),
+                hash_range(&mut gba, 0x0500_0000, 0x0500_0400),
+                hash_range(&mut gba, 0x0700_0000, 0x0700_0400),
+                hash_range(&mut gba, 0x0800_0000, 0x0800_8000),
+                gba.cpu.bus.master_cycles() as u32,
+                gba.cpu.bus.dma_blocks_run,
+                gba.cpu.bus.dma_units_moved,
+            );
+            lines.push_str(&tail);
             lines.push('\n');
+            println!("{tail}");
         }
 
         write_dump(&out, &mut lines, frames);
