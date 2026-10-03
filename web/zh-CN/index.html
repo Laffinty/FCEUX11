@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="dark" />
 <meta name="theme-color" content="#080a09" />
-<title>FCEUX11 — 为 Windows 深度优化的 NES/Famicom 模拟器 · v1.18.1</title>
-<meta name="description" content="FCEUX11 v1.18.1 — 基于 FCEUX 的 NES/Famicom 模拟器，专为 Windows 优化。Qt 6.8 + C++20 构建，12 种界面语言自动识别，调试工具、TAS 编辑器、Lua 脚本，存档稳定可靠。全新自动化测试套件 F11QA 为每次发布把关；v1.18.1 修正两处指令时序偏差，官方测试通过率升至 83.1%（147/177），游戏运行无任何回退。" />
-<meta name="keywords" content="FCEUX11, FCEUX, NES emulator, FC emulator, Famicom emulator, Windows emulator, TAS editor, Qt6, C++20, game emulator, 8-bit, multi-language, 12 languages, Arabic, RTL, ROM hacking, debugger, Lua scripting" />
+<title>FCEUX11 — 为 Windows 深度优化的 NES/Famicom 模拟器 · v2.0</title>
+<meta name="description" content="FCEUX11 v2.0 — 基于 FCEUX 的 NES/Famicom 模拟器，专为 Windows 优化，现新增试验性 Game Boy Advance（GBA）模拟支持。Qt 6.8 + C++20 构建，12 种界面语言自动识别，调试工具、TAS 编辑器、Lua 脚本，存档稳定可靠。GBA 与 NES 侧完全解耦，当前处于 Beta 阶段；全新自动化测试套件 F11QA 为每次发布把关，任何游戏都不会退步。" />
+<meta name="keywords" content="FCEUX11, FCEUX, NES emulator, FC emulator, Famicom emulator, GBA emulator, Game Boy Advance, Windows emulator, TAS editor, Qt6, C++20, game emulator, 8-bit, multi-language, 12 languages, Arabic, RTL, ROM hacking, debugger, Lua scripting" />
 <meta name="author" content="Laffinty" />
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
 <meta name="generator" content="FCEUX11" />
@@ -32,8 +32,8 @@
 
 <meta property="og:site_name" content="FCEUX11" />
 <meta property="og:type" content="website" />
-<meta property="og:title" content="FCEUX11 — 为 Windows 深度优化的 NES/Famicom 模拟器 · v1.18.1" />
-<meta property="og:description" content="FCEUX11 v1.18.1 — 基于 FCEUX 的 NES/Famicom 模拟器，专为 Windows 优化。Qt 6.8 + C++20 构建，12 种界面语言自动识别，调试工具、TAS 编辑器、Lua 脚本，存档稳定可靠。全新自动化测试套件 F11QA 为每次发布把关；v1.18.1 修正两处指令时序偏差，官方测试通过率升至 83.1%（147/177），游戏运行无任何回退。" />
+<meta property="og:title" content="FCEUX11 — 为 Windows 深度优化的 NES/Famicom 模拟器 · v2.0" />
+<meta property="og:description" content="FCEUX11 v2.0 — 基于 FCEUX 的 NES/Famicom 模拟器，专为 Windows 优化，现新增试验性 Game Boy Advance（GBA）模拟支持。Qt 6.8 + C++20 构建，12 种界面语言自动识别，调试工具、TAS 编辑器、Lua 脚本，存档稳定可靠。GBA 与 NES 侧完全解耦，当前处于 Beta 阶段；全新自动化测试套件 F11QA 为每次发布把关，任何游戏都不会退步。" />
 <meta property="og:url" content="https://laffinty.github.io/FCEUX11/zh-CN/" />
 <meta property="og:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <meta property="og:locale" content="zh_CN" />
@@ -56,8 +56,8 @@
 <meta name="msvalidate.01" content="" />
 
 <meta name="twitter:card" content="summary" />
-<meta name="twitter:title" content="FCEUX11 — 为 Windows 深度优化的 NES/Famicom 模拟器 · v1.18.1" />
-<meta name="twitter:description" content="FCEUX11 v1.18.1 — 基于 FCEUX 的 NES/Famicom 模拟器，专为 Windows 优化。Qt 6.8 + C++20 构建，12 种界面语言自动识别，调试工具、TAS 编辑器、Lua 脚本，存档稳定可靠。全新自动化测试套件 F11QA 为每次发布把关；v1.18.1 修正两处指令时序偏差，官方测试通过率升至 83.1%（147/177），游戏运行无任何回退。" />
+<meta name="twitter:title" content="FCEUX11 — 为 Windows 深度优化的 NES/Famicom 模拟器 · v2.0" />
+<meta name="twitter:description" content="FCEUX11 v2.0 — 基于 FCEUX 的 NES/Famicom 模拟器，专为 Windows 优化，现新增试验性 Game Boy Advance（GBA）模拟支持。Qt 6.8 + C++20 构建，12 种界面语言自动识别，调试工具、TAS 编辑器、Lua 脚本，存档稳定可靠。GBA 与 NES 侧完全解耦，当前处于 Beta 阶段；全新自动化测试套件 F11QA 为每次发布把关，任何游戏都不会退步。" />
 <meta name="twitter:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -72,8 +72,8 @@
   "name":"FCEUX11",
   "applicationCategory":"GameApplication",
   "operatingSystem":"Windows 11",
-  "description":"FCEUX11 v1.18.1 — 基于 FCEUX 的 NES/Famicom 模拟器，专为 Windows 优化。Qt 6.8 + C++20 构建，12 种界面语言自动识别，调试工具、TAS 编辑器、Lua 脚本，存档稳定可靠。全新自动化测试套件 F11QA 为每次发布把关；v1.18.1 修正两处指令时序偏差，官方测试通过率升至 83.1%（147/177），游戏运行无任何回退。",
-  "softwareVersion":"1.18.1",
+  "description":"FCEUX11 v2.0 — 基于 FCEUX 的 NES/Famicom 模拟器，专为 Windows 优化，现新增试验性 Game Boy Advance（GBA）模拟支持。Qt 6.8 + C++20 构建，12 种界面语言自动识别，调试工具、TAS 编辑器、Lua 脚本，存档稳定可靠。GBA 与 NES 侧完全解耦，当前处于 Beta 阶段；全新自动化测试套件 F11QA 为每次发布把关，任何游戏都不会退步。",
+  "softwareVersion":"2.0",
   "license":"https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt",
   "url":"https://laffinty.github.io/FCEUX11/zh-CN/",
   "downloadUrl":"https://github.com/Laffinty/FCEUX11/releases",
@@ -139,7 +139,7 @@
 
 <header class="hero" id="top">
   <div class="wrap">
-    <div class="pill reveal"><span class="dot"></span><span>v1.18</span></div>
+    <div class="pill reveal"><span class="dot"></span><span>v2.0</span></div>
     <h1 class="reveal"><span class="grad">FCEUX</span><span class="dim">11</span></h1>
     <p class="tagline reveal"><span class="tagline-title">基于 FCEUX 的 NES/Famicom 模拟器，为 Windows 深度优化</span><br>继承核心精度，重塑原生体验，界面支持 12 种语言。</p>
     <div class="cta reveal">
@@ -158,7 +158,7 @@
       <div class="feat">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 2v6h6V2M7 8h10l2 12H5z"/></svg></div>
         <h3>精确模拟</h3>
-        <p>完整支持 NES、Famicom 及扩展芯片</p>
+        <p>完整支持 NES/Famicom 以及试验性支持 Game Boy Advance (GBA)</p>
       </div>
       <div class="feat">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 14a9 9 0 0 1 18 0"/><path d="M12 14l5-5"/><circle cx="12" cy="14" r="1.2" fill="currentColor" stroke="none"/></svg></div>
@@ -197,8 +197,9 @@
     </div>
     <div class="about-body reveal">
       <p>FCEUX11 是基于 <em>FCEUX</em> 的 NES/Famicom 模拟器衍生项目，针对 <em>Windows</em> 平台深度优化。</p>
-      <p>在继承 FCEUX 卓越模拟精度的同时，基于 <em>Qt 6</em> 打造现代化 Windows 原生界面，并支持 <em>12 种界面语言</em>，同时为开发者和速通玩家准备了完整的调试与 TAS 工具集。</p>
-      <p>我们持续重构核心代码、优化运行性能，让模拟器在高负载下依然保持流畅稳定。无论你是想重温童年经典，还是深耕 ROM Hack 与逆向研究，FCEUX11 都能流畅驾驭各类 NES 游戏。</p>
+      <p>在继承 FCEUX 卓越模拟精度的同时，采用 <em>Qt 6</em> 图形界面重塑了现代 Windows 原生体验，并提供 <em>12 种语言</em>的多语言支持，以及面向开发者和速通玩家的调试与 TAS 工具集。</p>
+      <p>项目持续推进内部核心重构与性能优化工作，致力于让模拟器在高负载场景下依旧保持高效、流畅与稳定。</p>
+      <p>新增实验性 Game Boy Advance（GBA）模拟支持，复用现有 UI、存档系统、热键与调试基础设施；GBA 功能处于 Beta 阶段，自带画面水印，部分硬件特性尚未完整实现。</p>
     </div>
   </div>
 </section>
@@ -207,25 +208,31 @@
   <div class="wrap">
     <div class="whatsnew-head reveal">
       <div class="kicker">本次更新</div>
-      <h2>v1.18.1</h2>
-      <div class="sub">2026-09-27 发布 · F11QA 测试体系 + 首项精度演进</div>
+      <h2>v2.0</h2>
+      <div class="sub">2026-10-03 发布 · 实验性 Game Boy Advance（GBA）模拟支持</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
+        <div class="wn-text">
+          <h3>实验性新增 Game Boy Advance（GBA）模拟支持</h3>
+          <p>新增实验性 Game Boy Advance（GBA）模拟功能，现已支持 .gba 卡带，并与 NES 侧完全解耦。同时修复输入设置重开后键位全空、GBA 真实卡带无法启动、部分显卡驱动下 GBA 黑屏、GBA 画面红蓝通道互换，以及核心 VBlankIntrWait 自锁。</p>
+        </div>
+      </div>
+      <div class="wn-item">
+        <div class="wn-num">02</div>
         <div class="wn-text">
           <h3>全新自动化测试套件 F11QA</h3>
           <p>建立了一套全新的自动化测试套件，每次更新都会自动跑完全部测试，任何一处改动影响到游戏运行，都无法发布，模拟器精度的每一次提升，均可被这套测试套件量化。</p>
         </div>
       </div>
       <div class="wn-item">
-        <div class="wn-num">02</div>
+        <div class="wn-num">03</div>
         <div class="wn-text">
           <h3>模拟精度再提升</h3>
           <p>修正了 CPU 指令时序上的两处偏差，官方测试通过率由 145/177 提升至 147/177（83.1%），全部游戏运行表现无任何回退；测试流程自身的一处误判同步修正，后续每一项精度改进均不再受阻。</p>
         </div>
       </div>
-    </div>
      <div class="wn-cta reveal">
       <a href="https://github.com/Laffinty/FCEUX11/blob/main/CHANGELOG.md" target="_blank" rel="noopener">查看完整更新日志 →</a>
     </div>
