@@ -82,11 +82,11 @@ Precompiled binaries are available on the **[GitHub Releases](https://github.com
 ## 快速开始 / Quick Start
 
 1. 启动 `fceux11.exe`。
-2. 通过 **File → Open ROM** 加载游戏（支持 `.nes` / `.fds` / `.nsf` / `.unf`）。
+2. 通过 **File → Open ROM** 加载游戏（支持 `.nes` / `.fds` / `.nsf` / `.unf`）；实验性 GBA（Beta）可直接打开 `.gba` 卡带，画面带 `BETA` 水印，个别游戏存在已知问题。
 3. 键盘或手柄游戏；输入映射在 **Options → Input Config** 调整。
 4. **I** 快速存档，**P** 快速读档。
 
-Launch `fceux11.exe`, load a game via **File → Open ROM**, play with keyboard or gamepad (remap in **Options → Input Config**). Press **I** to quick-save, **P** to quick-load.
+Launch `fceux11.exe`, load a game via **File → Open ROM** (NES: `.nes` / `.fds` / `.nsf` / `.unf`; experimental GBA (Beta): `.gba` cartridges open from the same dialog, frames carry a `BETA` watermark, and a few games have known issues), play with keyboard or gamepad (remap in **Options → Input Config**). Press **I** to quick-save, **P** to quick-load.
 
 ---
 
