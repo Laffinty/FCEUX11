@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — Mario Kart Super Circuit 白屏：SWI 停机唤醒后重执行 SWI
+
+- 停机唤醒路径上 IRQ 的返回地址比真机少算了一个流水线宽度：`SUBS PC, LR, #4`
+  重新落回 `SWI 5`（VBlankIntrWait）本身，而不是它之后的续接点。所有「先等帧、
+  再干活」的程序从此不再前进 —— `Mario Kart - Super Circuit` 引导的 16 个校验
+  任务全部注册在第一次等待的续接点里，被吞后引导永久卡死、强制空白永不解除
+  （r53 修复的「唤醒自锁」暴露出的第二个卡点，见构建计划 §9.1 L16）。
+- 修复：唤醒取 IRQ 前把 PC 呈现为流水线约定（Thumb +4 / Arm +8），返回精确落在
+  SWI 之后的续接点，即真机语义（`LR = 返回地址 + 4`）。
+- 实测（MKSC，3000 万步探针，同机前后）：`DISPCNT` 0x0080 → 0x1E40（解除强制
+  空白）、`IE` 0x2001 → 0x2005（游戏自开 VCounter IRQ）、调色板出现真实内容、
+  IWRAM 代码开始执行 —— 与 mGBA 0.10.5 的引导里程碑一致。SMA4 无回归（其每帧
+  工作在 IRQ 处理器侧，此前重执行 SWI 恰好无害，故能玩）。
+
 ### Fixed — VBlankIntrWait 永远等不到唤醒（一个自锁）
 
 - HLE 的 `IntrWait` / `VBlankIntrWait`（SWI 0x04/0x05）以 `0x03007FF8` 标志字为

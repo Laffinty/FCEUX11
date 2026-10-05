@@ -67,7 +67,7 @@ inheritance:
 
 `[lints.clippy]` was carried over unchanged.
 
-### 3.2 Source files — 16 local changes across 3 files
+### 3.2 Source files — 17 local changes across 3 files
 
 `crates/gba-core/src/**` was byte-identical to upstream `emu/src/**` at the end
 of **S0** (verified file-by-file with SHA-256). Local edits begin at **S0'**, when
@@ -148,6 +148,23 @@ Upstream line references (for a future re-vendor check): `Rtc` struct at
 > is now *reachable*, which is what lets a test assert a date instead of
 > asserting that two reads of the same clock agree.
 
+#### 3.2.2 v2.0.1 (plan r56) — the wake-IRQ return address, 1 more change in `arm7tdmi.rs`
+
+| # | Change | Why |
+|---|--------|-----|
+| 17 | The halt-wake path in `step()` presents the PC in pipeline convention (`PC += 4` Thumb / `+= 8` Arm) before taking a pending IRQ | `enter_intr_wait` parks the CPU with PC at the SWI's **return address** — the next instruction to execute — which is not the convention `lr_offset` subtracts the pipeline width from. The wake-IRQ therefore computed `LR = PC`, and the BIOS return `SUBS PC, LR, #4` re-entered the SWI itself, swallowing the continuation after it. Hardware computes `LR = return address + 4`; the presentation reproduces that in either state. A wait-then-work program — Mario Kart Super Circuit registers its 16 boot tasks from the continuation of the very first `VBlankIntrWait` — lost the work entirely (plan §9.1 L16, the white screen of r53 ⑧). |
+
+Upstream line references: the insertion sits inside the local halt guard in
+`step()` (upstream `step()` at `cpu/arm7tdmi.rs:705`, local wake site at
+`:760-782` after the S1a-1 guard); `lr_offset` itself is untouched.
+
+> **This entry does change upstream behaviour** — a second, deliberate breach
+> of the same kind as S1a-1 (R15): without it, every wake from a
+> wait-class SWI re-executed the SWI, which no software can observe as
+> correct. Locked by
+> `an_irq_return_from_a_swi_halt_lands_after_the_swi` (mutation-checked:
+> reverting the presentation turns it red).
+
 ### 3.3 `src/gba/` — new code, no upstream content
 
 `src/rust/src/gba/` is entirely first-party: the SWI implementations and the
@@ -161,7 +178,7 @@ landing in S2.
 
 | Item | Status |
 |---|---|
-| `gba-core` source changes | **16**, across **3** source files: 9 in `src/cpu/arm7tdmi.rs` (5 S0' hook wiring, no upstream logic altered + 4 S1a-1 halt mechanism, **does change `step()`** — see R15) + 3 in `src/cpu/hardware/rtc.rs` + 4 in `src/cpu/hardware/internal_memory.rs` (3 S2-b3 real-time clock + 2 S3-1 battery save; **neither changes behaviour when nothing is overridden**, see §3.2.1). **The "3" is measured, not counted by hand**: `git log --name-only --diff-filter=M -- src/rust/crates/gba-core/src/` names exactly those three files and no others. An earlier draft of this table said "4 files" while enumerating three — the fourth was `Cargo.toml`, which is the row below and is not a source change |
+| `gba-core` source changes | **17**, across **3** source files: 10 in `src/cpu/arm7tdmi.rs` (5 S0' hook wiring, no upstream logic altered + 4 S1a-1 halt mechanism, **does change `step()`** — see R15 + 1 v2.0.1 r56 wake-IRQ return address, see §3.2.2) + 3 in `src/cpu/hardware/rtc.rs` + 4 in `src/cpu/hardware/internal_memory.rs` (3 S2-b3 real-time clock + 2 S3-1 battery save; **neither changes behaviour when nothing is overridden**, see §3.2.1). **The "3" is measured, not counted by hand**: `git log --name-only --diff-filter=M -- src/rust/crates/gba-core/src/` names exactly those three files and no others. An earlier draft of this table said "4 files" while enumerating three — the fourth was `Cargo.toml`, which is the row below and is not a source change |
 | `gba-core/Cargo.toml` | rewritten (metadata only, no version changes) |
 | `src/gba/` | new, 100% first-party, 9 files |
 
@@ -197,7 +214,16 @@ way to correct it (`set_backup_type`, which resizes the backing buffer and keeps
 the old contents up to the shorter length). `battery_data`, `load_battery` and
 `take_save_dirty` were already `pub`, so those two are the *only* reason the file
 is touched at all. Neither changes behaviour when the host overrides nothing,
-which is the normal case. The set is now **16 entries over 4 files**.
+which is the normal case. The set was **16 entries over 3 files** at that point
+(the "4 files" written here before r56 was a slip — the fourth file was
+`Cargo.toml`, which is not a source change; see §3.3's measured note).
+
+**v2.0.1 (r56) adds one more to `arm7tdmi.rs`** — the wake-IRQ return address
+must land *after* the SWI that halted, not on it (see §3.2.2 for the mechanism
+and the cartridge that exposed it). Unlike S2-b3/S3-1 this one **does change
+what the hardware does on every wake from a wait-class SWI**, in the direction
+of the real machine; locked by a mutation-checked lock test. The set is now
+**17 entries over 3 files**.
 
 ## 5. Update procedure
 

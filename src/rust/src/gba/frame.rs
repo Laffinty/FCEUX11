@@ -2699,13 +2699,21 @@ use gba_core::cpu::hardware::keypad::GbaButton;
     #[ignore = "a diagnostic probe for S4: it needs a real .gba and only reports"]
     fn probe_trace_a_stuck_game() {
         /// Run this long before tracing, so the trace is the settled behaviour
-        /// rather than the boot sequence.
-        const WARMUP: u64 = 5_000_000;
+        /// rather than the boot sequence. `GBA_PROBE_WARMUP` overrides it, so a
+        /// window early in the boot (which the default overshoots) can be traced.
+        let WARMUP: u64 = std::env::var("GBA_PROBE_WARMUP")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(5_000_000);
         /// How many instructions to trace. Sized to span a whole frame, because
         /// a game that sleeps on `VBlankIntrWait` runs a few instructions per
         /// frame and nothing at all in between -- a window shorter than a frame
         /// reports an empty trace for a machine that is in fact looping.
-        const TRACE_STEPS: u64 = 600_000;
+        /// `GBA_PROBE_TRACESTEPS` overrides it for a tight early-boot window.
+        let TRACE_STEPS: u64 = std::env::var("GBA_PROBE_TRACESTEPS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(600_000);
 
         let Some(path) = probe_rom_path() else {
             println!("no .gba found -- set GBA_PROBE_ROM to a path, or put one on the Desktop");

@@ -1208,6 +1208,88 @@ mod tests {
         );
     }
 
+    /// An IRQ taken on the wake from a SWI halt must return to the
+    /// instruction *after* the SWI, not to the SWI itself.
+    ///
+    /// `enter_intr_wait` leaves PC at the return address -- the next
+    /// instruction to execute -- which is not the pipeline convention
+    /// `lr_offset` subtracts the pipeline width from. Taking the exception
+    /// there computed `LR = PC`, so the BIOS return `SUBS PC, LR, #4`
+    /// re-entered the SWI itself, and every continuation that followed a wait
+    /// never ran. Mario Kart Super Circuit registers its 16 boot tasks from
+    /// the continuation of the very first `VBlankIntrWait`; with the swallow
+    /// the registration loop never advanced and the boot span forever on a
+    /// forced-blank screen (plan §十四 r56).
+    ///
+    /// The vector below acknowledges the VBlank the way a game handler does,
+    /// which is what makes the two paths distinguishable: with the swallow,
+    /// the re-executed wait finds its group freshly cleared and goes back to
+    /// sleep, so the continuation never runs at all.
+    #[test]
+    fn an_irq_return_from_a_swi_halt_lands_after_the_swi() {
+        // BIOS: the IRQ vector branches to an acknowledge stub that clears
+        // the VBlank request like a game handler, then takes the canonical
+        // exception return. Assembled with keystone and read back with
+        // capstone; bytes embedded verbatim (discipline 4: no hand encoding).
+        let mut bios = [0u8; 0x4000];
+        bios[0x18..0x1C].copy_from_slice(&0xEA00_003Au32.to_le_bytes()); // b 0x108
+        bios[0x108..0x120].copy_from_slice(&[
+            0x01, 0x03, 0xA0, 0xE3, // 0x108: mov  r0, #0x04000000
+            0x02, 0x0C, 0x80, 0xE3, // 0x10C: orr  r0, r0, #0x200
+            0x02, 0x00, 0x80, 0xE3, // 0x110: orr  r0, r0, #2        ; 0x04000202
+            0x01, 0x10, 0xA0, 0xE3, // 0x114: mov  r1, #1
+            0xB0, 0x10, 0xC0, 0xE1, // 0x118: strh r1, [r0]          ; ack VBlank
+            0x04, 0xF0, 0x5E, 0xE2, // 0x11C: subs pc, lr, #4
+        ]);
+
+        // The continuation under test: a counter increment between the wait
+        // and the park. Exactly one run per wake is the contract.
+        let program = [
+            arm_swi(0x05), // sleep on VBlank; the halt leaves PC at [1]
+            0xE284_4001,   // add r4, r4, #1 -- the continuation
+            IRQ_HALT,      // mov r5, #0x34 -- the established past-the-wait sentinel
+            PARK,          // b .
+        ];
+        let mut gba = Gba::new(bios, &cart_with_program(&program));
+        install_swi_hook(&mut gba);
+        gba.cpu.registers.set_program_counter(ROM_BASE + 8);
+        gba.cpu.bus.write_half_word(0x0400_0004, 0x0008); // DISPSTAT: VBlank IRQ
+        gba.cpu.bus.write_half_word(0x0400_0200, 0x0001); // IE = VBlank
+        gba.cpu.bus.write_half_word(0x0400_0208, 0x0001); // IME = enable
+
+        assert!(
+            run_until_halted(&mut gba, 32),
+            "execution never reached the SWI"
+        );
+        let woke = (0..400_000).any(|_| {
+            gba.step();
+            !gba.cpu.halted
+        });
+        assert!(woke, "a real VBlank must wake the wait");
+
+        // The wake is observed the moment the exception is taken -- the CPU
+        // is still inside the vector's acknowledge stub. Run until the
+        // sentinel instruction past the continuation has executed.
+        let parked = (0..64).any(|_| {
+            gba.step();
+            gba.cpu.registers.register_at(5) == 0x34
+        });
+        assert!(parked, "execution never reached the sentinel past the wait");
+
+        assert_eq!(
+            gba.cpu.registers.register_at(4),
+            1,
+            "the continuation after the wait ran {} times, not exactly once -- \
+             with the return-address swallow it never runs at all",
+            gba.cpu.registers.register_at(4)
+        );
+        assert_eq!(
+            gba.cpu.registers.register_at(5),
+            0x34,
+            "execution did not continue past the wait"
+        );
+    }
+
     // ---- T1-a regression -------------------------------------------------
     //
     // S1a-1 claims four SWI numbers, which puts the core's own implementations

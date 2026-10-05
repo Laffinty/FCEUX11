@@ -753,6 +753,24 @@ impl Arm7tdmi {
                 return self.bus.step();
             }
             self.halted = false;
+            // v2.0.1 r56: the halt left PC at the SWI's return address -- the
+            // next instruction to execute -- which is not the pipeline
+            // convention `lr_offset` subtracts the pipeline width from. Taking
+            // the IRQ here computed `LR = PC`, so the BIOS return
+            // `SUBS PC, LR, #4` re-entered the SWI itself and swallowed the
+            // continuation after it. Hardware computes `LR = return address +
+            // 4`; presenting the PC in pipeline convention is what reproduces
+            // that, in either state. A wait-then-work program -- Mario Kart
+            // Super Circuit registers its 16 boot tasks from the continuation
+            // of the very first `VBlankIntrWait` -- loses the work entirely,
+            // which is the white screen r53 ⑧ recorded.
+            let pipeline_width = match self.cpsr.cpu_state() {
+                CpuState::Thumb => 4,
+                CpuState::Arm => 8,
+            };
+            let resume_pc = self.registers.program_counter();
+            self.registers
+                .set_program_counter((resume_pc + pipeline_width) as u32);
             // Take the interrupt in the same cycle we wake, the way hardware
             // does. Falling through would let one more instruction run before
             // the handler is entered.
