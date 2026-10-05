@@ -13,7 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   重新落回 `SWI 5`（VBlankIntrWait）本身，而不是它之后的续接点。所有「先等帧、
   再干活」的程序从此不再前进 —— `Mario Kart - Super Circuit` 引导的 16 个校验
   任务全部注册在第一次等待的续接点里，被吞后引导永久卡死、强制空白永不解除
-  （r53 修复的「唤醒自锁」暴露出的第二个卡点，见构建计划 §9.1 L16）。
+  （r53 修复的「唤醒自锁」暴露出的第二个卡点；限制编目见 AGENTS.md「GBA 长尾」
+  节，原构建计划 §9.1 L16 已随 r57 归档）。
 - 修复：唤醒取 IRQ 前把 PC 呈现为流水线约定（Thumb +4 / Arm +8），返回精确落在
   SWI 之后的续接点，即真机语义（`LR = 返回地址 + 4`）。
 - 实测（MKSC，3000 万步探针，同机前后）：`DISPCNT` 0x0080 → 0x1E40（解除强制
@@ -33,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   SMA4 在同状态下推进快了约 38%（它此前有相当一部分时间在白等）。
 - **如实记录：MKSC 仍白屏。** 唤醒修好后暴露出第二个独立卡点（游戏主动保持强制
   空白、等一个无人置位的 IWRAM 标志），未定位。GBA 为 Beta（画面带水印），
-  完整已知限制见构建计划 §9.1。
+  完整已知限制见 AGENTS.md「GBA 长尾」节。
 
 ### Fixed — 输入设置「设好键位、重开就全空」
 

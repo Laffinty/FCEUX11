@@ -113,4 +113,4 @@ include」都会撞到。**
 - [gba-traps.md](gba-traps.md) — 上面每一层的「怎么发现的」，以及四种测试失效形态
 - [ffi-boundaries.md](ffi-boundaries.md) — 跨 FFI 的具体工程约束
 - [../audit/gba-third-party.md](../audit/gba-third-party.md) — 上游代码归属与许可
-- v2.0 计划 `docs/plans/FCEUX11-v2.0_GBAEUX11构建计划.md` §十 不变式 9
+- v2.0 计划 `docs/history/plans/FCEUX11-v2.0_GBAEUX11构建计划.md` §十 不变式 9

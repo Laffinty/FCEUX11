@@ -677,3 +677,37 @@ c01c897  v1.13: version bump 1.12 → 1.13
 3. Smoke test: start → open .nes → open .zip → menu → sound → input → OpenGL
 4. Confirm with Process Explorer: Qt6Network.dll not loaded
 5. After verification: delete backup and temp directories
+
+---
+
+## v2.0 GBAEUX11 Build Plan (2026-09-27 ~ 2026-10-05, archived)
+
+**Archive**: [`docs/history/plans/FCEUX11-v2.0_GBAEUX11构建计划.md`](plans/FCEUX11-v2.0_GBAEUX11构建计划.md)（r57 用户裁决收口，内容冻结；变更记录 r1–r57 与不变式全文在案）
+
+**Scope**: GBA 运行能力移植 —— vendored GBA 硬件核心（clementine, MIT）+ 一手 SWI HLE/生命周期/呈现/音频/存档，作为 FCEUX11 的第二模拟核心（GBAEUX11，Beta 带水印）。
+
+### Key Deliverables
+- S0/S0'：vendor 接线 + SWI hook 缝（16 个认领号码）；S1a：wait 家族 + 停机机制（R15）；S1b：分发契约
+- S2-a/b：生命周期、帧缓冲、水印、音频 ABI（分数采样）、savestate、RTC、真实指令流自建门禁
+- S2-b4/S3：装载/输入/emu 循环分叉、画面（3:2 信箱）、音频排空 + 限速 59.7275、电池存档、L/R 绑定、即时存档 C++ 接线
+- 解耦不变式：GBA 不接入任何质量检测系统；NES 侧帧池/纹理/缩放/调色板/TAS 零 GBA 引用（`decoupling.rs` 守卫强制）
+
+### Key Bug Fixes（均由真卡带发现，锁测试抓不到）
+- r53：`VBlankIntrWait` 自锁 —— 唤醒判据从 BIOS 标志字改为硬件 `IF & IE`
+- r56：SWI 停机唤醒 IRQ 返回地址差一个流水线宽度 —— 唤醒重执行 SWI、吞掉 wait-then-work 续接点（MKSC 白屏根因；SMA4 因工作在 IRQ 处理器侧幸免）
+
+### Gate Status at Closure
+- GBA 锁测试 **244 全绿**（变异验证文化：每条缺陷修复配变异可红测试）
+- `ctest` 33/34（唯一失败 = advisory 的 `bench_tolerance_test`，r55 ③ 口径）；NES 侧零回归
+- 导出 C ABI 符号 34 个；vendor 补丁集 17 处（ATTRIBUTION §3.2 全录）
+
+### Long Tail（承接位置：AGENTS.md「长尾」节）
+- S3 两项接线挂起（RTC C++ 侧、save-type UI——有 ABI 有锁测试，触发条件出现再做）
+- S4 兼容性报告驱动（跑不动的游戏单独立项，先例 r53/r56）
+- §9.1 八条开放限制（L1/L2/L4/L6/L7/L10/L13/L15，r42/r54 裁决 Alpha 阶段长期开放）
+
+### Key Commits
+```
+39ed900  v2.0.0 发布（主界面 v2.0）
+61d5756  r56 — SWI 停机唤醒 IRQ 返回地址补流水线宽度，修 MKSC 白屏
+```

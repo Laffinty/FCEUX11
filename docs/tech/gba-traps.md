@@ -107,4 +107,4 @@ r50 我写下「堆损坏是 CRT 混用导致的」。实测支持「进程里�
 
 - [multi-machine-integration.md](multi-machine-integration.md) — 上面每条在接第二台机器时的具体做法
 - [ffi-boundaries.md](ffi-boundaries.md) — §3 的「合成夹具」在 FFI 场景下的特殊形态
-- v2.0 计划 `docs/plans/FCEUX11-v2.0_GBAEUX11构建计划.md` §十四 r49 / r50
+- v2.0 计划 `docs/history/plans/FCEUX11-v2.0_GBAEUX11构建计划.md` §十四 r49 / r50

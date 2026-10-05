@@ -2,12 +2,12 @@
 
 > **STATUS: COMPLETED**
 > **归档日期**：2026-09-27（2026-09-27 自 `docs/plans/` 移入；审计轮次已收口，r3 终审批准 S0 与 S1）
-> **关联计划**：`docs/plans/FCEUX11-v2.0_GBAEUX11构建计划.md`（r6，已处置本报告全部发现）
+> **关联计划**：`docs/history/plans/FCEUX11-v2.0_GBAEUX11构建计划.md`（r6，已处置本报告全部发现）
 > **上游**：`https://github.com/RIP-Comm/clementine` @ `ee77922dd293b70e945458e104f3b2de794f0151`
 
 | 项 | 内容 |
 |---|---|
-| **审计对象** | `docs/plans/FCEUX11-v2.0_GBAEUX11构建计划.md`（r5 稿） |
+| **审计对象** | `docs/history/plans/FCEUX11-v2.0_GBAEUX11构建计划.md`（r5 稿） |
 | **审计类型** | 终审（上游源码核验 + 用户指令澄清后的裁定修订） |
 | **审计日期** | 2026-09-27 |
 | **上游已核验** | **clementine** — `https://github.com/RIP-Comm/clementine`（MIT，73 star，edition 2024） |
@@ -201,4 +201,4 @@ S0 = 建 crate、vendor clementine、落地 `ATTRIBUTION.md`、`cargo check`。
 **结论：S0、S1 放行。** S1 记住三件事——wait 类要真做、解压 SWI 要补全、`RegisterRamReset` 别当已完成。N-01（分数样本）在 S2 前修完即可。
 
 **审计人**：架构评审（终审）
-**关联**：`docs/plans/FCEUX11-v2.0_GBAEUX11构建计划.md`（r5）· 上游 `RIP-Comm/clementine`
+**关联**：`docs/history/plans/FCEUX11-v2.0_GBAEUX11构建计划.md`（r5）· 上游 `RIP-Comm/clementine`
