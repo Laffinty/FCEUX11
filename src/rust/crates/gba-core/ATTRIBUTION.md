@@ -67,7 +67,7 @@ inheritance:
 
 `[lints.clippy]` was carried over unchanged.
 
-### 3.2 Source files — 22 local changes across 4 files
+### 3.2 Source files — 23 local changes across 5 files
 
 `crates/gba-core/src/**` was byte-identical to upstream `emu/src/**` at the end
 of **S0** (verified file-by-file with SHA-256). Local edits begin at **S0'**, when
@@ -289,6 +289,36 @@ hypothesis is worth more than one that can only confirm it.**
 > `0xE1D100F0` — the same word as `LDRH` with bits 6-5 set to `10b`. Worth
 > recording because the failure looked exactly like a core bug in sign extension,
 > and a red test is not evidence until you know *whose* mistake it is.
+
+#### 3.2.7 v2.0.1 (plan r17) — the timer prescaler read the wrong register, 1 more change in `timers.rs`
+
+The first local change outside `cpu/arm7tdmi.rs` to alter what hardware does.
+
+| # | Change | Why |
+|---|--------|-----|
+| 24 | `timers.rs`: the divider is taken from the **low** register's latched reload value (`get_prescaler(self.tm0_reload)`, and a `reload` parameter threaded into `step_timer` for timers 1-3) instead of from the high control register. `get_prescaler`'s own doc comment now says which register it wants. | The prescaler occupies **bits 0-1 of `TMxCNT_L`** — the same bits as the counter and reload value. The high register `TMxCNT_H` holds cascade (bit 2), IRQ (bit 6) and enable (bit 7) and no divider at all. Reading it from there yields `0x0080 & 3 == 0`, i.e. **divide by one, forever**: measured `{4147, 4148, 4149, 4150}` for divide-by-{1, 64, 256, 1024}, where the only thing that varied was the counter's starting value. mGBA agrees (`timer.c:124`, `prescaleTable[4] = { 0, 6, 8, 10 }`, indexed by the low register's `& 0x0003`). |
+
+The value is read from the **latched reload**, not from the running counter,
+because the counter's low two bits advance as it runs; the divider is latched on
+each write to `TMxCNT_L`, which is exactly when `set_reload` runs.
+
+**Two of this crate's own tests had the defect locked green**, and both had to
+change in the same commit — the same shape as §3.2.6 and the v2.0.1 P0 finding:
+
+* `prescaler_divides_and_carries_remainder` set its divider with
+  `set_control(0, ENABLE | IRQ | 0b01)`, i.e. in the **control** word, and passed
+  because the implementation read the divider from there too. Worse, its setup
+  was *impossible on real hardware*: it wanted a one-tick wrap period, which
+  forces `reload = 0xFFFF`, whose low two bits select divide-by-1024. Only a
+  split between the two registers let it hold both at once.
+* `cascade_ticks_once_per_lower_overflow` used the same impossible pairing
+  (timer 0, `reload = 0xFFFF`, "overflows every cycle") and now uses
+  `0xFFF0` — prescaler 1, period of 16 ticks.
+
+`the_ags_prescaler_cases_hold_for_every_divider` is new and asserts all four of
+the `AGS` `TIMER PRESCALER` expectations `{4096, 64, 16, 4}` separately, so
+passing on one divider cannot hide a failure on another. The small cases are the
+ones that catch a divider that is simply never applied.
 
 ### 3.3 `src/gba/` — new code, no upstream content
 
