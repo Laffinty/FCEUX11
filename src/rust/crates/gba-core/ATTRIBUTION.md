@@ -67,7 +67,7 @@ inheritance:
 
 `[lints.clippy]` was carried over unchanged.
 
-### 3.2 Source files — 22 local changes across 4 files (r17 #24 reverted, see §3.2.7)
+### 3.2 Source files — 26 live local changes across 5 files (the reverted #24 and #27 keep their numbers but are not counted)
 
 `crates/gba-core/src/**` was byte-identical to upstream `emu/src/**` at the end
 of **S0** (verified file-by-file with SHA-256). Local edits begin at **S0'**, when
@@ -358,6 +358,31 @@ the `AGS` `TIMER PRESCALER` expectations `{4096, 64, 16, 4}` separately, so
 passing on one divider cannot hide a failure on another. The small cases are the
 ones that catch a divider that is simply never applied.
 
+#### 3.2.10 v2.0.1 (plan r34) — the prefetch hit was sequenced against `last_used_address`, which every data access clobbers: 1 more change in `bus.rs`
+
+| # | Change | Why |
+|---|--------|-----|
+| 28 | `bus.rs`: the `WAITCNT` bit-14 fast path for opcode fetches now decides "continues the instruction stream" against a new `last_opcode_fetch`, updated only by Game Pak opcode fetches (via `note_opcode_fetch` from `read_opcode_word` / `read_opcode_half_word`), not against `last_used_address`, which every data access overwrites. The hit cost is unchanged (`size/2`). | The AGS `PREFETCH BUFFER` test times the cartridge's `sub_800326C` — arm TM0 at ÷1, eight `ldr r2,[TM0CNT]`, read the counter — and expects **24** cycles with `WAITCNT = 0x4014` (prefetch on) against **51** with `0x0014` (off); the two settings differ in bit 14 alone. On the old condition every fetch inside that loop follows a data access, so every fetch was priced non-sequential and the fast path never fired: **both cases measured 51**. Hardware's prefetcher keeps the buffer filled across data accesses and refills past a Game Pak data read during the idle cycles that follow; sequencing the hit on the fetch stream instead of the last *access* is what expresses that. Pinned by `the_ags_prefetch_window_reads_24_buffered_and_51_unbuffered` — the routine embedded byte-for-byte from `ags.gba` at its original address, both `WAITCNT` cases asserted literally against the cartridge's own `cmp` immediates. Mutations: re-sequencing the hit onto `last_used_address`, or disabling the fast path, both make case 0 read 51 and the test red. |
+
+Measured readings, first hand: before the fix **both** cases read 51 (root-crate
+probe `measure_the_ags_prefetch_case_under_both_waitcnt_settings`, running the
+real cartridge code); after, **24 / 51**. The AGS scorecard (harness, 4800
+frames, savestate-judged) moved **24/33 → 25/33** with every other item
+unchanged. The remaining three cycles of the old 27-vs-24 gap were localised by
+a per-step TM0 counter trace to the enable step's speculative fetch — the trace
+record lives in the probe.
+
+> ⚠️ **mGBA is not a usable reference for this test.** Its waitstate tables
+> ignore bit 14 entirely (the flag only feeds `GBAMemoryStall`, whose model
+> prices this window *below* hardware), and its AGS run never reaches the
+> MEMORY class (stuck in the settings-checksum loop even with SRAM forced).
+> Nothing above is derived from mGBA.
+
+Patch count after this change: **26 live changes across 5 files** —
+`arm7tdmi.rs` 13, `bus.rs` 3, `timers.rs` 3, `rtc.rs` 3,
+`internal_memory.rs` 4 — derived from the per-section tables above, not from
+the (drift-prone) running totals; the reverted #24 and #27 are not counted.
+
 ### 3.3 `src/gba/` — new code, no upstream content
 
 `src/rust/src/gba/` is entirely first-party: the SWI implementations and the
@@ -389,7 +414,7 @@ never ran at all. `AGENTS.md` now runs both crates in its gate command.
 
 | Item | Status |
 |---|---|
-| `gba-core` source changes | **22**, across **4** source files: 13 in `src/cpu/arm7tdmi.rs` (5 S0' hook wiring, no upstream logic altered + 4 S1a-1 halt mechanism, **does change `step()`** — see R15 + 1 v2.0.1 r56 wake-IRQ return address, see §3.2.2 + 1 v2.0.1 P0 ARM SWI number at bits 16-23, **changes what an ARM-mode BIOS call does**, see §3.2.3 + 2 v2.0.1 r5 halfword-load width tests, §3.2.5, **tests only**) + 3 in `src/cpu/hardware/rtc.rs` + 4 in `src/cpu/hardware/internal_memory.rs` (3 S2-b3 real-time clock + 2 S3-1 battery save; **neither changes behaviour when nothing is overridden**, see §3.2.1) + 2 in `src/bus.rs` (1 test-only block, see §3.2.4 + 1 **the S-cycle double-billing fix, which changes what every instruction costs**, see §3.2.6). **The file list is measured, not counted by hand**: `git log --name-only --diff-filter=M -- src/rust/crates/gba-core/src/` names exactly those files. Earlier drafts of this table said "4 files" while enumerating three and then "3" while the fourth was `Cargo.toml`; `bus.rs` is the first source file outside `cpu/` to be modified, and entry 20 was briefly used twice (§3.2.5) |
+| `gba-core` source changes | **26** live, across **5** source files (the reverted #24 and #27 are not counted): 13 in `src/cpu/arm7tdmi.rs` (5 S0' hook wiring, no upstream logic altered + 4 S1a-1 halt mechanism, **does change `step()`** — see R15 + 1 v2.0.1 r56 wake-IRQ return address, see §3.2.2 + 1 v2.0.1 P0 ARM SWI number at bits 16-23, **changes what an ARM-mode BIOS call does**, see §3.2.3 + 2 v2.0.1 r5 halfword-load width tests, §3.2.5, **tests only**) + 3 in `src/cpu/hardware/rtc.rs` + 4 in `src/cpu/hardware/internal_memory.rs` (3 S2-b3 real-time clock + 2 S3-1 battery save; **neither changes behaviour when nothing is overridden**, see §3.2.1) + 3 in `src/bus.rs` (1 test-only block, see §3.2.4 + 1 **the S-cycle double-billing fix, which changes what every instruction costs**, see §3.2.6 + 1 **the prefetch hit re-sequenced onto the fetch stream, which changes when ROM opcode fetches cost 1 cycle per halfword**, see §3.2.10) + 3 in `src/cpu/hardware/timers.rs` (1 r17 prescaler register + 2 r22 cascade-bit and start delay, see §3.2.7/§3.2.8). **The file list is measured, not counted by hand**: `git log --name-only --diff-filter=M -- src/rust/crates/gba-core/src/` names exactly those files. Earlier drafts of this table said "4 files" while enumerating three and then "3" while the fourth was `Cargo.toml`; `bus.rs` is the first source file outside `cpu/` to be modified, and entry 20 was briefly used twice (§3.2.5) |
 | `gba-core/Cargo.toml` | rewritten (metadata only) + one restored `[dev-dependencies]` section, see §3.5 |
 | `src/gba/` | new, 100% first-party, 9 files |
 

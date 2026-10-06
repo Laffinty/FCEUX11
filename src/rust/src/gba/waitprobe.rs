@@ -729,10 +729,21 @@ fn load_ags_rom() -> Vec<u8> {
 /// Read the AGS `PREFETCH BUFFER` case on this core, by running the cartridge's
 /// own routine.
 ///
+/// # Status (r34): working
+///
+/// The head below is the reason the first three attempts never reached the
+/// routine — it was written as the **Thumb** halfwords `0x4801`/`0x4700` while
+/// the cartridge is entered in ARM mode, so the machine consumed one
+/// conditional ARM instruction and derailed. With the ARM encodings it runs,
+/// and on the fixed core it reads **24 / 51**, the cartridge's own expected
+/// values, for the `0x4014` / `0x0014` WAITCNT cases. The root-crate gate
+/// equivalent is `the_ags_prefetch_window_reads_24_buffered_and_51_unbuffered`
+/// in `gba-core`, which replays the same routine from embedded bytes.
+///
 /// The routine is not re-created here. `ags.gba` already contains it at
 /// `0x0800326C`, in the GamePak, where its own fetches cost real wait states —
-/// which is the whole point of the test. Only the cartridge head is replaced, so
-/// the BIOS hands control to that address instead of to the AGS's own entry.
+/// which is the whole point of the test. Only the cartridge head is replaced,
+/// so the BIOS hands control to that address instead of to the AGS's own entry.
 ///
 /// Its shape (literal pool read from the ROM, not hand-computed): enable TM0
 /// divide-by-one, do eight dummy reads of the timer register, then read the
@@ -743,6 +754,10 @@ fn load_ags_rom() -> Vec<u8> {
 /// carries on into the rest of the cartridge afterwards and would overwrite it.
 /// Watching a register costs no cycles; reading TM0 through the bus would cost
 /// one per sample and perturb the very thing being measured (r13's lesson).
+///
+/// The per-step `(pc, delta, cumulative)` trace is the decomposition record:
+/// it is what localised the last three cycles to the enable step's
+/// speculative fetch when the buffered model was being chosen (r34).
 #[test]
 #[ignore = "prints a measurement to compare by hand; see the module docs"]
 fn measure_the_ags_prefetch_case_under_both_waitcnt_settings() {
@@ -755,13 +770,21 @@ fn measure_the_ags_prefetch_case_under_both_waitcnt_settings() {
     // stub BIOS overwrites it during boot, which showed up as both cases
     // measuring identically.
     let mut rom = load_ags_rom();
-    // ARM head that interworks: `ldr r0, [pc, #4]` / `bx r0` / literal holding
+    // ARM head that interworks: `ldr r0, [pc, #0]` / `bx r0` / literal holding
     // the odd routine address. A plain `ldr pc, [pc, #-4]` cannot be used -- this
     // core's LDR PC does not switch processor state, so a Thumb entry point
     // loaded that way is executed as ARM and the run derails immediately
     // (observed: final PC 0x0000000C).
-    rom[..2].copy_from_slice(&0x4801u16.to_le_bytes()); // ldr r0, [pc, #4]
-    rom[2..4].copy_from_slice(&0x4700u16.to_le_bytes()); // bx r0
+    //
+    // Why the previous three attempts never reached the routine: the head was
+    // written as the **Thumb** halfwords 0x4801/0x4700 while execution enters
+    // the cartridge in ARM mode, so the machine consumed 0x47004801 as one
+    // conditional ARM instruction and derailed. Both words below are the ARM
+    // encodings, and each was verified by disassembling this exact image
+    // (`armdis.py head_check.bin 0 0xC arm`): `ldr r0, [pc]` / `bx r0`, with
+    // the literal landing at 0x08000008 where `[pc]` reads it.
+    rom[0..4].copy_from_slice(&0xE59F_0000u32.to_le_bytes()); // ldr r0, [pc, #0]
+    rom[4..8].copy_from_slice(&0xE12F_FF10u32.to_le_bytes()); // bx r0
     rom[8..12].copy_from_slice(&ROUTINE.to_le_bytes());
     let mut gba = Gba::new(crate::gba::bios::stub(), &rom);
     crate::gba::install_swi_hook(&mut gba);
@@ -775,10 +798,22 @@ fn measure_the_ags_prefetch_case_under_both_waitcnt_settings() {
     let mut entries = 0u32;
     let mut r4_seen: Vec<u32> = Vec::new();
     let mut readings: Vec<u32> = Vec::new();
+    // Research: per-step master-cycle deltas across each measurement window,
+    // so the charging can be decomposed instead of guessed at. The deltas are
+    // sampled from the host after every `gba.step()` and cost no clock cycles.
+    let mut trace: Vec<(u32, u64, u64)> = Vec::new(); // (pc, delta, cum)
+    let mut traces: Vec<Vec<(u32, u64, u64)>> = Vec::new();
     for _ in 0..400_000 {
+        let before = gba.cpu.bus.master_cycles();
         gba.step();
+        let after = gba.cpu.bus.master_cycles();
         let r4 = gba.cpu.registers.register_at(4);
         let r0 = gba.cpu.registers.register_at(0);
+        if inside {
+            let pc = gba.cpu.registers.program_counter() as u32;
+            let last_cum = trace.last().map(|t| t.2).unwrap_or(0);
+            trace.push((pc, after - before, last_cum + (after - before)));
+        }
         if r4_seen.len() < 6 && !r4_seen.contains(&r4) {
             r4_seen.push(r4);
         }
@@ -788,16 +823,24 @@ fn measure_the_ags_prefetch_case_under_both_waitcnt_settings() {
                 // comparison at exit trivially equal.
                 r0_at_entry = r0;
                 entries += 1;
+                trace.clear();
             }
             inside = true;
         } else if inside {
             inside = false;
+            traces.push(std::mem::take(&mut trace));
             if r0 != r0_at_entry {
                 readings.push(r0);
             }
             if readings.len() == 2 {
                 break;
             }
+        }
+    }
+    for (index, one) in traces.iter().enumerate() {
+        println!("  window trace {} (pc, per-step delta, cumulative):", index);
+        for (pc, delta, cum) in one {
+            println!("    pc={pc:08X} delta={delta:>2} cum={cum}");
         }
     }
 

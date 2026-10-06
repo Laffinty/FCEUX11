@@ -126,6 +126,16 @@ pub struct Bus {
     #[serde(skip)]
     in_opcode_fetch: bool,
     last_used_address: usize,
+    /// Address of the most recent opcode fetch from the `GamePak` ROM regions.
+    ///
+    /// The prefetch buffer holds the halfwords that follow it, so an opcode
+    /// fetch continuing that stream is a buffer hit. Deliberately *not*
+    /// [`Self::last_used_address`]: that register is clobbered by every data
+    /// access, while a data access outside the fetch stream never displaces
+    /// the buffered words -- the prefetcher simply keeps them (and refills
+    /// past a Game Pak data read during the idle cycles that follow it).
+    #[serde(skip)]
+    last_opcode_fetch: usize,
     unused_region: HashMap<usize, u8>,
     /// Tracks the last opcode fetched from BIOS for read protection
     last_bios_opcode: u32,
@@ -1406,12 +1416,24 @@ impl Bus {
             // GamePak ROM mirrors: timing from WAITCNT per wait-state region
             0x8..=0xD => {
                 let sequential = address.wrapping_sub(self.last_used_address) as u64 == size;
-                // With the prefetch buffer enabled, a sequential opcode fetch is
-                // delivered from the buffer at one cycle per 16-bit unit instead
-                // of paying the ROM wait states. This is the optimistic case
-                // where the prefetcher has kept up, which holds for the tight
-                // loops that dominate ROM execution.
-                if self.in_opcode_fetch && sequential && self.waitcnt().get_bit(14) {
+                // With the prefetch buffer enabled, an opcode fetch that
+                // continues the instruction stream is delivered from the
+                // buffer at one cycle per 16-bit unit instead of paying the
+                // ROM wait states. The buffer holds the halfwords following
+                // the last fetch, and the prefetcher keeps them filled across
+                // everything that does not displace them -- including the
+                // data accesses of a load or store to I/O, IWRAM, EWRAM or
+                // VRAM, and the idle cycles after a Game Pak data read, which
+                // is when it refills. Sequencing the hit against
+                // `last_opcode_fetch` rather than `last_used_address` is what
+                // expresses that: the AGS PREFETCH BUFFER test times a
+                // ten-fetch window at 24 cycles buffered against 51
+                // unbuffered, and an unbuffered model reads 51 in both of its
+                // WAITCNT cases.
+                if self.in_opcode_fetch
+                    && self.waitcnt().get_bit(14)
+                    && address.wrapping_sub(self.last_opcode_fetch) as u64 == size
+                {
                     size / 2
                 } else {
                     self.gamepak_cycles(region, size, sequential)
@@ -1497,6 +1519,7 @@ impl Bus {
     pub fn read_opcode_word(&mut self, address: usize) -> u32 {
         self.in_opcode_fetch = true;
         let value = self.read_word(address);
+        self.note_opcode_fetch(address);
         self.in_opcode_fetch = false;
         value
     }
@@ -1506,8 +1529,20 @@ impl Bus {
     pub fn read_opcode_half_word(&mut self, address: usize) -> u16 {
         self.in_opcode_fetch = true;
         let value = self.read_half_word(address);
+        self.note_opcode_fetch(address);
         self.in_opcode_fetch = false;
         value
+    }
+
+    /// Record an opcode fetch for the prefetch buffer model.
+    ///
+    /// Only Game Pak fetches advance the buffer; a fetch from BIOS or IWRAM
+    /// leaves the buffered ROM words alone, so code returning to ROM can still
+    /// hit what was queued before it left (the queue is eight halfwords deep).
+    fn note_opcode_fetch(&mut self, address: usize) {
+        if (0x8..=0xF).contains(&((address >> 24) & 0xF)) {
+            self.last_opcode_fetch = address;
+        }
     }
 
     pub fn read_word(&mut self, mut address: usize) -> u32 {
@@ -1949,21 +1984,37 @@ mod tests {
         // in as the specification.
         bus.in_opcode_fetch = true;
         bus.last_used_address = 0x0800_0000 - 4;
+        bus.last_opcode_fetch = 0x0800_0000 - 4;
         assert_eq!(bus.access_cycles(0x0800_0000, 4), (1 + 2) + (1 + 2) - 1);
 
-        // Enable the prefetch buffer (WAITCNT bit 14).
+        // Enable the prefetch buffer (WAITCNT bit 14) and let the previous
+        // fetch have primed it.
         bus.interrupt_control.wait_state_control = 1 << 14;
+        bus.last_opcode_fetch = 0x0800_0000 - 4;
 
-        // A sequential opcode fetch now comes from the buffer: one cycle per
-        // 16-bit unit (two for a word, one for a halfword), and neither of
-        // those cycles is a wait state, so the fetch is free.
-        bus.last_used_address = 0x0800_0000 - 4;
+        // A fetch continuing the instruction stream now comes from the
+        // buffer: one cycle per 16-bit unit (two for a word, one for a
+        // halfword), and neither of those cycles is a wait state, so the
+        // fetch is free. The hit is sequenced against `last_opcode_fetch`,
+        // not `last_used_address` -- a data access in between does not
+        // displace the buffered words. (`access_cycles` is a pure query, so
+        // each case primes the buffer explicitly the way a completed fetch
+        // would have.)
+        bus.last_used_address = 0x0300_0000; // an IWRAM data access happened
         assert_eq!(bus.access_cycles(0x0800_0000, 4), 2 - 1);
-        bus.last_used_address = 0x0800_0000 - 2;
-        assert_eq!(bus.access_cycles(0x0800_0000, 2), 1 - 1);
+        bus.last_opcode_fetch = 0x0800_0000;
+        assert_eq!(bus.access_cycles(0x0800_0002, 2), 1 - 1);
+
+        // The same holds after a Game Pak data read: the prefetcher refills
+        // the words past it during the idle cycles that follow, which is what
+        // lets the AGS PREFETCH BUFFER window read 24. Only an address that
+        // does not continue the stream misses.
+        bus.last_used_address = 0x0800_3294; // a PC-relative literal was read
+        bus.last_opcode_fetch = 0x0800_0000;
+        assert_eq!(bus.access_cycles(0x0800_0002, 2), 1 - 1);
 
         // A non-sequential fetch (a branch target) still pays the full waits.
-        bus.last_used_address = 0;
+        bus.last_opcode_fetch = 0;
         assert_eq!(bus.access_cycles(0x0800_0000, 4), (1 + 4) + (1 + 2) - 1);
 
         // A data access never benefits from the prefetch buffer, and is billed
@@ -2298,5 +2349,117 @@ mod tests {
         // Disable IME
         bus.write_raw(0x0400_0208, 0x00);
         assert_eq!(bus.interrupt_control.interrupt_master_enable, 0);
+    }
+
+    /// The AGS `PREFETCH BUFFER` measurement, replayed on this core.
+    ///
+    /// The routine is the cartridge's own `sub_800326C`, byte for byte from
+    /// `ags.gba` (sha1 `5c73fb40…`, ROM offset `0x326C`), placed at its
+    /// original address: the whole point of the measurement is that the
+    /// routine's own fetches pay Game Pak timing, so a copy in IWRAM would
+    /// measure something else. It arms TM0 at divide-by-one, does eight dummy
+    /// reads of the timer, and returns the counter in r0.
+    ///
+    /// The expected values are the cartridge's own `cmp` immediates, read
+    /// straight from the ROM (plan r32): **24** with `WAITCNT = 0x4014`
+    /// (prefetch enabled) and **51** with `WAITCNT = 0x0014` (disabled). The
+    /// two settings differ in bit 14 alone, so this pins the prefetch model
+    /// from both sides: the buffered window is 27 cycles shorter, which no
+    /// per-fetch constant can produce -- only the hits themselves can.
+    ///
+    /// The host enters the routine directly (Thumb entry, `lr` parked on a
+    /// self-branch) rather than through the cartridge's `bl`; the measured
+    /// window opens seven instructions deep, where the fetch stream has long
+    /// converged. The real cartridge path -- full AGS boot through the
+    /// `Research_only` harness and the root-crate probe -- reads the same two
+    /// numbers (plan r34).
+    ///
+    /// # Mutation
+    ///
+    /// Sequencing the hit against `last_used_address` instead (the defect this
+    /// replaces) makes case 0 miss every post-load fetch and read 51, exactly
+    /// like the unbuffered case; disabling the bit-14 fast path does the same.
+    /// Both directions verified red (r34).
+    #[test]
+    fn the_ags_prefetch_window_reads_24_buffered_and_51_unbuffered() {
+        use crate::cpu::arm7tdmi::Arm7tdmi;
+        use crate::cpu::psr::CpuState;
+
+        /// `sub_800326C` verbatim: 12 Thumb instructions, a padding halfword
+        /// and the two PC-relative literals at `+0x28` / `+0x2C`.
+        const ROUTINE: [u8; 48] = [
+            0xF0, 0xB5, 0x09, 0x4C, 0x00, 0x25, 0x25, 0x60, // push, ldr r4, movs, str
+            0x08, 0x4E, 0x26, 0x60, 0x22, 0x68, 0x22, 0x68, // ldr r6, str, 2x ldr r2
+            0x22, 0x68, 0x22, 0x68, 0x22, 0x68, 0x22, 0x68, // 4x ldr r2
+            0x22, 0x68, 0x22, 0x68, 0x20, 0x88, 0x25, 0x60, // 2x ldr r2, ldrh r0, str
+            0xF0, 0xBC, 0x02, 0xBC, 0x08, 0x47, 0x00, 0x00, // pops, bx r1, padding
+            0x00, 0x01, 0x00, 0x04, // literal: 0x04000100
+            0x00, 0x00, 0x80, 0x00, // literal: 0x00800000
+        ];
+        const ROUTINE_BASE: u32 = 0x0800_326C; // its original ROM offset
+
+        // Transcription guards: the halfwords the measurement turns on.
+        assert_eq!(u16::from_le_bytes([ROUTINE[0], ROUTINE[1]]), 0xB5F0);
+        assert_eq!(
+            u32::from_le_bytes(ROUTINE[40..44].try_into().unwrap()),
+            0x0400_0100
+        );
+        assert_eq!(
+            u32::from_le_bytes(ROUTINE[44..48].try_into().unwrap()),
+            0x0080_0000
+        );
+
+        for (waitcnt, expected) in [(0x4014u16, 24u32), (0x0014, 51)] {
+            let mut rom = vec![0u8; 0x4000];
+            // A Thumb self-branch (`b .`) for the routine to return to.
+            rom[0..2].copy_from_slice(&0xE7FEu16.to_le_bytes());
+            let at = ROUTINE_BASE as usize & 0x00FF_FFFF;
+            rom[at..at + ROUTINE.len()].copy_from_slice(&ROUTINE);
+
+            let mut cpu = Arm7tdmi::new(Bus::with_memory(InternalMemory::new(
+                [0; 0x4000],
+                &rom,
+            )));
+            cpu.cpsr.set_cpu_state(CpuState::Thumb);
+            // Odd address: the entry bit that says Thumb, as `bx` would set it.
+            cpu.registers.set_program_counter(ROUTINE_BASE + 1);
+            cpu.registers.set_register_at(14, 0x0800_0001); // return to the self-branch
+            // r0 carries a marker so "the routine ran" is observable: its
+            // final `ldrh r0, [r4]` overwrites it with the counter reading.
+            cpu.registers.set_register_at(0, 0xDEAD_BEEF);
+            cpu.bus.interrupt_control.wait_state_control = waitcnt;
+
+            let mut returned = false;
+            // `r4 == TM0CNT` is the routine's own convention from its second
+            // instruction to its epilogue `pop`; catching it mid-run proves
+            // the body executed. (After the return r4 is restored to the
+            // caller's value, so it proves nothing there.)
+            let mut seen_tm0_in_r4 = false;
+            for _ in 0..400 {
+                cpu.step();
+                if cpu.registers.register_at(4) == 0x0400_0100 {
+                    seen_tm0_in_r4 = true;
+                }
+                if cpu.registers.program_counter() as u32 & 0x0FFF_FFFE == 0x0800_0000 {
+                    returned = true;
+                    break;
+                }
+            }
+
+            let r0 = cpu.registers.register_at(0);
+            let evidence = format!(
+                "returned={returned} seen_tm0_in_r4={seen_tm0_in_r4} r0={r0:#010x} \
+                 pc={:#010x} tm0cnt_h={:#04x} waitcnt={waitcnt:#06x}",
+                cpu.registers.program_counter(),
+                cpu.bus.read_half_word(0x0400_0102),
+            );
+            assert!(returned, "the routine never returned: {evidence}");
+            assert!(seen_tm0_in_r4, "the routine body never ran: {evidence}");
+            // It stopped the timer behind itself (the final `str r5, [r4]`).
+            assert_eq!(cpu.bus.read_half_word(0x0400_0102) & 0x80, 0, "{evidence}");
+            assert_ne!(r0, 0xDEAD_BEEF, "the reading never landed: {evidence}");
+
+            assert_eq!(r0, expected, "WAITCNT {waitcnt:#06x}");
+        }
     }
 }
