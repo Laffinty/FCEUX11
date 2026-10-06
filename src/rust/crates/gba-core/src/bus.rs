@@ -1362,7 +1362,40 @@ impl Bus {
     /// The `GamePak` prefetch buffer is still not modelled, so a code fetch
     /// after a data access is charged a non-sequential cycle even though
     /// prefetch would often hide it.
+    /// Wait-state cycles for a single memory access of `size` bytes (1, 2 or 4)
+    /// at `address`, less the cycle the caller has already charged.
+    ///
+    /// # Why an opcode fetch is charged one cycle less
+    ///
+    /// On this part the instruction fetch **is** the instruction's S-cycle --
+    /// the two overlap and there is only ever one cycle for them. But
+    /// `bus::step` already charges that S-cycle once per step, and a fetch
+    /// went through here as well, so every instruction was billed twice for
+    /// the same cycle: a straight-line register operation cost 2 instead of 1,
+    /// and a taken branch cost 6 instead of the hardware's 2S + 1N = 3. The
+    /// `AGS` `TIMER PRESCALER` test times 1024 iterations of `SUBS` + `BNE`
+    /// and expects 4096; this core measured 8192.
+    ///
+    /// The subtraction is deliberately `1`, not "the sequential wait states".
+    /// mGBA bills an opcode fetch at the *sequential* wait, which is an
+    /// assumption that the prefetcher kept up -- that assumption is what the
+    /// v2.0.1 plan calls the optimistic approximation, and modelling it is
+    /// the P3 phase's job. The S/N decision below is unchanged, so this
+    /// removes the double-billing without importing the prefetch assumption.
+    ///
+    /// Data accesses keep their full cost: a load or store has its own non-
+    /// pipelined cycle (the 1N) on top of the instruction's S-cycle.
     fn access_cycles(&self, address: usize, size: u64) -> u64 {
+        let cost = self.access_cycles_full(address, size);
+        if self.in_opcode_fetch {
+            cost.saturating_sub(1)
+        } else {
+            cost
+        }
+    }
+
+    /// The unmodified per-access cost, before the fetch adjustment above.
+    fn access_cycles_full(&self, address: usize, size: u64) -> u64 {
         let region = (address >> 24) & 0xF;
         match region {
             // EWRAM: 16-bit bus with 2 default wait states, doubled for 32-bit
@@ -1904,26 +1937,38 @@ mod tests {
     fn prefetch_makes_sequential_opcode_fetches_cheap() {
         let mut bus = Bus::default(); // WAITCNT = 0 -> WS0 N=4, S=2
 
-        // Without prefetch, even a sequential opcode fetch pays the ROM waits.
+        // An opcode fetch is charged its wait states only: the S-cycle is the
+        // instruction's own, already billed by `bus::step`, so a 32-bit
+        // sequential fetch here is `(1 + 2) + (1 + 2) - 1`.
+        //
+        // The `-1` is a hardware fact, not a fitted constant: on this part the
+        // fetch *is* the S-cycle, and before this was separated the same cycle
+        // was billed twice -- which is what made the `AGS` TIMER PRESCALER test
+        // read 8192 instead of 4096. An earlier version of this test asserted
+        // the full `(1 + 2) + (1 + 2)`, i.e. it had locked the double-billing
+        // in as the specification.
         bus.in_opcode_fetch = true;
         bus.last_used_address = 0x0800_0000 - 4;
-        assert_eq!(bus.access_cycles(0x0800_0000, 4), (1 + 2) + (1 + 2));
+        assert_eq!(bus.access_cycles(0x0800_0000, 4), (1 + 2) + (1 + 2) - 1);
 
         // Enable the prefetch buffer (WAITCNT bit 14).
         bus.interrupt_control.wait_state_control = 1 << 14;
 
         // A sequential opcode fetch now comes from the buffer: one cycle per
-        // 16-bit unit (two for a word, one for a halfword).
+        // 16-bit unit (two for a word, one for a halfword), and neither of
+        // those cycles is a wait state, so the fetch is free.
         bus.last_used_address = 0x0800_0000 - 4;
-        assert_eq!(bus.access_cycles(0x0800_0000, 4), 2);
+        assert_eq!(bus.access_cycles(0x0800_0000, 4), 2 - 1);
         bus.last_used_address = 0x0800_0000 - 2;
-        assert_eq!(bus.access_cycles(0x0800_0000, 2), 1);
+        assert_eq!(bus.access_cycles(0x0800_0000, 2), 1 - 1);
 
         // A non-sequential fetch (a branch target) still pays the full waits.
         bus.last_used_address = 0;
-        assert_eq!(bus.access_cycles(0x0800_0000, 4), (1 + 4) + (1 + 2));
+        assert_eq!(bus.access_cycles(0x0800_0000, 4), (1 + 4) + (1 + 2) - 1);
 
-        // A data access never benefits from the prefetch buffer.
+        // A data access never benefits from the prefetch buffer, and is billed
+        // in full: a load or store has its own non-pipelined cycle on top of
+        // the instruction's S-cycle.
         bus.in_opcode_fetch = false;
         bus.last_used_address = 0x0800_0000 - 4;
         assert_eq!(bus.access_cycles(0x0800_0000, 4), (1 + 2) + (1 + 2));

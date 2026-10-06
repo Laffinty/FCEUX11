@@ -1618,6 +1618,316 @@ mod tests {
         assert_eq!(cpu.registers.register_at(14), 24 - 4);
     }
 
+    /// ARM7TDMI per-instruction cycle costs, pinned to the hardware.
+    ///
+    /// # Why these are `fail_to_pass`
+    ///
+    /// The `AGS` Aging Cartridge v7.0 `TIMER PRESCALER` test times 1024
+    /// iterations of `SUBS` + `BNE` and expects **4096** — four cycles per
+    /// iteration, which is the sum of the two values below (1 + 3). This core
+    /// measured **8195**: roughly double.
+    ///
+    /// These tests therefore assert the *hardware* numbers, and they are
+    /// **expected to be red until the billing is fixed**. That is deliberate,
+    /// and it is the whole point of writing them this way. The tempting
+    /// alternative — assert whatever the core currently does, watch the suite
+    /// go green, and call that coverage — would lock the defect in as the
+    /// specification, which is the v2.0.1 P0 failure mode (a gate that mirrors
+    /// the implementation's belief rather than the hardware's). See ATTRIBUTION
+    /// §3.2.6.
+    ///
+    /// # How the cost is measured
+    ///
+    /// Marginal, not absolute. `run_block` is called with two lengths and the
+    /// per-instruction cost is the *difference*, which cancels the pipeline
+    /// fill, the entry bookkeeping and any fixed overhead. Measuring the total
+    /// instead would fold every constant into the number and make a test that
+    /// could pass for the wrong reason.
+    mod instruction_cycles {
+        use super::{Arm7tdmi, CpuState};
+
+        /// IWRAM, where the wait states are zero and only the base cycle
+        /// shows up -- which is the point.
+        const CODE: usize = 0x0300_0000;
+        const CODE_U32: u32 = 0x0300_0000;
+
+        /// `SUBS r0, r0, #1` -- a register operation with no memory access,
+        /// which also sets the flags (opcode `0010` = SUB, S = bit 20 = 1).
+        const SUBS_R0: u32 = 0xE250_0001;
+        /// `SUBS r1, r1, #1` -- the same instruction on a different register,
+        /// because the loop's counter is compared by the `BNE` that follows.
+        ///
+        /// The loop's original bug was **not** a mis-decoded opcode: these two
+        /// constants differ only in Rn/Rd, and a first pass that reused `r0`
+        /// here measured a counter the branch never read.
+        const SUBS_R1: u32 = 0xE251_1001;
+        /// `MOV r1, #imm` -- sets the loop counter.
+        ///
+        /// The immediate is an 8-bit value plus a count of even right
+        /// rotations, so a count cannot simply be OR-ed into the low bits: that
+        /// would set the *rotation* field instead. `mov r1, #1024` is
+        /// `0xE3A01B01` -- rotate 11, constant 1 -- and OR-ing 1024 in would
+        /// have produced a rotation of 4 and a value of 0, which is how the
+        /// first version of this test came to measure a loop of one.
+        const MOV_R1: u32 = 0xE3A0_1000;
+        /// `MOV r1, #value`, refusing a value that cannot be encoded rather
+        /// than silently emitting a different instruction.
+        fn mov_r1_imm(value: u32) -> u32 {
+            let mut rotate = 0u32;
+            while rotate < 16 {
+                let constant = value.rotate_right((32 - rotate * 2) & 31);
+                if constant >> 8 == 0 {
+                    return MOV_R1 | (rotate << 8) | constant;
+                }
+                rotate += 1;
+            }
+            panic!("{value} is not an encodable ARM immediate");
+        }
+        /// `BNE` three words back, to the `SUBS` just above it: the AGS loop.
+        /// Target = PC + 8 + (imm24 << 2), so -3 words to reach the `SUBS`
+        /// one word above this branch. The same encoding the cartridge uses.
+        const BNE_BACK: u32 = 0x1AFF_FFFD;
+        /// `BNE` over the next word -- never taken; falls straight through.
+        const BNE_OVER: u32 = 0x0AFF_0000;
+        /// `B .` -- parks the program so the run terminates.
+        const PARK: u32 = 0xEAFF_FFFE;
+
+        /// Run a block of IWRAM code and report the master cycles it took.
+        fn run_block(words: &[u32]) -> u64 {
+            let mut cpu = Arm7tdmi::default();
+            for (index, word) in words.iter().enumerate() {
+                cpu.bus.write_word(CODE + index * 4, *word);
+            }
+            cpu.registers.set_program_counter(CODE_U32);
+            let start = cpu.bus.master_cycles();
+            for _ in 0..400_000 {
+                if cpu.registers.program_counter() == CODE + words.len() * 4 {
+                    break;
+                }
+                cpu.step();
+            }
+            assert_eq!(
+                cpu.registers.program_counter(),
+                CODE + words.len() * 4,
+                "the block did not run to completion"
+            );
+            cpu.bus.master_cycles() - start
+        }
+
+        /// `MOV r1, #count` then `count` iterations of `SUBS` + taken `BNE`.
+        ///
+        /// This is the `AGS` loop verbatim in shape: the branch is taken until
+        /// the counter hits zero, so the run length is the iteration count.
+        ///
+        /// The run is bracketed on **r1 reaching zero**, never on the program
+        /// counter. The fetch pointer runs ahead speculatively past the `BNE`,
+        /// so a PC-based exit fires on the first pass -- before the branch has
+        /// redirected -- and reports a loop that ran once when it ran every
+        /// time. That trap cost this file two rounds; the state of a register
+        /// the loop itself is driving has no such ambiguity.
+        fn loop_cost(count: u32) -> u64 {
+            let mut cpu = Arm7tdmi::default();
+            let words = [mov_r1_imm(count), SUBS_R1, BNE_BACK, PARK];
+            for (index, word) in words.iter().enumerate() {
+                cpu.bus.write_word(CODE + index * 4, *word);
+            }
+            cpu.registers.set_program_counter(CODE_U32);
+            let start = cpu.bus.master_cycles();
+            // `armed` matters: the machine comes up with r1 == 0, so an
+            // unarmed "r1 == 0" test would stop on the very first step, before
+            // the `MOV` had run, and every count would measure the same thing.
+            let mut armed = false;
+            for _ in 0..400_000 {
+                let counter = cpu.registers.register_at(1);
+                if counter == count {
+                    armed = true;
+                }
+                if armed && counter == 0 {
+                    break;
+                }
+                cpu.step();
+            }
+            assert_eq!(
+                cpu.registers.register_at(1),
+                0,
+                "the loop did not reach its count in {count}"
+            );
+            cpu.bus.master_cycles() - start
+        }
+
+        /// Cost of one straight-line instruction, as a difference.
+        ///
+        /// The difference cancels the pipeline fill and the fixed entry cost,
+        /// which an absolute count would fold in and could then pass for the
+        /// wrong reason.
+        fn straight_line_cost() -> f64 {
+            let short: Vec<u32> = std::iter::repeat_n(SUBS_R0, 64)
+                .chain(std::iter::once(PARK))
+                .collect();
+            let long: Vec<u32> = std::iter::repeat_n(SUBS_R0, 192)
+                .chain(std::iter::once(PARK))
+                .collect();
+            (run_block(&long) - run_block(&short)) as f64 / 128.0
+        }
+
+        /// Cost of a not-taken branch, as a difference over a straight line of
+        /// the same instruction.
+        fn not_taken_branch_cost() -> f64 {
+            let short: Vec<u32> = std::iter::repeat_n(BNE_OVER, 64)
+                .chain(std::iter::once(PARK))
+                .collect();
+            let long: Vec<u32> = std::iter::repeat_n(BNE_OVER, 192)
+                .chain(std::iter::once(PARK))
+                .collect();
+            (run_block(&long) - run_block(&short)) as f64 / 128.0
+        }
+
+        /// Cost of one `SUBS` + taken `BNE` iteration, as a difference.
+        fn loop_iteration_cost() -> f64 {
+            (loop_cost(1024) - loop_cost(1)) as f64 / 1023.0
+        }
+
+        /// A straight-line ARM instruction is one S-cycle. The fetch *is* the
+        /// S-cycle on this part: it overlaps the previous instruction's
+        /// execute, so it is not billed again on top.
+        #[test]
+        fn a_straight_line_instruction_costs_one_cycle() {
+            assert_eq!(
+                straight_line_cost(),
+                1.0,
+                "a register operation in IWRAM is 1S; charging the fetch again \
+                 on top of the S-cycle is the double-billing this test exists to catch"
+            );
+        }
+
+        /// A not-taken conditional branch is one cycle too -- it occupies one
+        /// S-cycle, and the next fetch is simply the following instruction's.
+        #[test]
+        fn a_not_taken_branch_costs_one_cycle() {
+            assert_eq!(
+                not_taken_branch_cost(),
+                1.0,
+                "a not-taken BNE is 1S, one cycle; it does not refill the \
+                 pipeline, so it must cost the same as any other instruction"
+            );
+        }
+
+        /// A taken branch is 2S + 1N: the branch itself, one more S-cycle, and
+        /// the non-pipelined refill fetch. Derived by subtraction so that it
+        /// cannot be satisfied by an error in the straight-line figure.
+        #[test]
+        fn a_taken_branch_costs_three_cycles() {
+            let taken = loop_iteration_cost() - straight_line_cost();
+            assert_eq!(
+                taken, 3.0,
+                "2S + 1N; the refill steps that execute nothing must not be \
+                 billed at the full instruction price"
+            );
+        }
+
+        /// The `AGS` calibration: 1024 iterations of `SUBS` + taken `BNE` cost
+        /// 4096 cycles, and the AGS prescaler test reads exactly that many
+        /// through `TM0` at divide-by-one.
+        ///
+        /// This is the number the whole line B investigation hangs on, so it is
+        /// asserted directly and not only through its parts.
+        #[test]
+        fn the_ags_prescaler_loop_costs_4096_cycles() {
+            assert_eq!(
+                loop_iteration_cost() * 1024.0,
+                4096.0,
+                "the AGS TIMER PRESCALER test expects 4096 for 1024 iterations"
+            );
+        }
+
+        /// The decode half of the same claim, kept next to the timing half so
+        /// a failure says which one moved. Without it, a mis-encoded opcode
+        /// would make the timing tests measure a different instruction and
+        /// still look like a billing failure.
+        #[test]
+        fn the_three_shapes_under_test_decode_as_named() {
+            use crate::cpu::arm::instructions::ArmModeInstruction;
+
+            assert!(matches!(
+                Arm7tdmi::decode(SUBS_R0),
+                ArmModeInstruction::DataProcessing { .. }
+            ));
+            assert!(matches!(
+                Arm7tdmi::decode(BNE_BACK),
+                ArmModeInstruction::Branch { .. }
+            ));
+            assert!(matches!(
+                Arm7tdmi::decode(BNE_OVER),
+                ArmModeInstruction::Branch { .. }
+            ));
+        }
+
+        /// The bare `Arm7tdmi::default()` machine has to be in ARM mode, in a
+        /// mode whose banked registers are the ones this module writes, with a
+        /// Bus that keeps what was written to it, and with a loop that actually
+        /// iterates.
+        ///
+        /// All four were checked in one test because each one presents the same
+        /// symptom -- "the loop ran once" -- and a diagnostic that reports a
+        /// symptom instead of a cause is what made the first version of these
+        /// tests measure nothing at all.
+        #[test]
+        fn the_bare_test_machine_can_run_the_loop() {
+            let mut cpu = Arm7tdmi::default();
+
+            // 1. Mode of execution. A machine left in Thumb would decode this
+            //    ARM word stream as Thumb and never branch as written.
+            assert_eq!(
+                cpu.cpsr.cpu_state() as u8,
+                CpuState::Arm as u8,
+                "the bare machine must be in ARM state or the loop decodes as Thumb"
+            );
+
+            // 2. The banked-register question, asked and answered rather than
+            //    assumed. `0x13` is **Supervisor** (SVC), not User -- User is
+            //    `0x10` -- so r13 *is* banked here, and a write to register 13
+            //    would not come back. This window touches no r13, which is why
+            //    the SVC banking is harmless here; the check is kept so that a
+            //    future version of this test that does use the stack says why
+            //    it is safe rather than assuming it.
+            let mode = cpu.cpsr.mode() as u8;
+            assert!(
+                mode == 0x13,
+                "the bare machine is expected in Supervisor (0x13); it is 0x{mode:02x}"
+            );
+
+            // 3. One Bus, and it keeps its writes -- a second Bus instance would
+            //    accept the code and the CPU would execute zeros.
+            for (index, word) in [mov_r1_imm(4u32), SUBS_R1, BNE_BACK, PARK]
+                .into_iter()
+                .enumerate()
+            {
+                cpu.bus.write_word(CODE + index * 4, word);
+            }
+            for (index, word) in [mov_r1_imm(4u32), SUBS_R1, BNE_BACK, PARK]
+                .into_iter()
+                .enumerate()
+            {
+                assert_eq!(
+                    cpu.bus.read_word(CODE + index * 4),
+                    word,
+                    "IWRAM did not keep word {index}"
+                );
+            }
+
+            // 4. And the loop really iterates. Delegated to `loop_cost`, which
+            //    brackets on the counter rather than on PC: a PC-based exit
+            //    fires on the speculative fetch and reports a loop of one for a
+            //    loop that ran every time. `loop_cost` asserts the count was
+            //    reached, so reaching here at all is the assertion.
+            let spent = loop_cost(4);
+            assert!(
+                spent > 0,
+                "the BNE loop ran but charged no cycles at all"
+            );
+        }
+    }
+
     #[test]
     #[should_panic(expected = "subtract with overflow")]
     fn arm_unknown_instruction() {
