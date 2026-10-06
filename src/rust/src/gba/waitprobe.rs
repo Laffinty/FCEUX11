@@ -435,6 +435,104 @@ fn observe_when_the_timer_starts_counting() {
     println!("  a lag that never reaches zero means the counter starts late");
 }
 
+/// `sub_8009294` — the AGS `TIMER CONNECT` routine — **as the machine code
+/// actually present in the cartridge**, not re-encoded.
+///
+/// Read from `Research_only/gbatech/ags.gba` (sha1 `5c73fb40…`), ROM offset
+/// `0x9294`, 26 words up to and including the PC-relative literal at `+0x64`.
+/// It is copied verbatim because the routine's `ldr r4, [pc, #0x54]` reaches
+/// that literal 0x5c bytes past the instruction, so every word has to keep its
+/// relative position; re-encoding would put a different value on the bus for the
+/// sake of a routine that already exists in a form we can read.
+///
+/// The three assertions are what make this trustworthy rather than a pile of
+/// hex: they pin the parts the measurement turns on — TM3 enabled first while
+/// its reload is still 0, TM0 enabled last, the two `mov r0, r0` between the
+/// loop and the read, and the read being off TM3.
+const AGS_CONNECT: [u32; 26] = [
+    0xE82D4FF0, 0xE3A02B01, 0xE59F4054, 0xE3A0B000, 0xE584B000, 0xE584B004, 0xE584B008, 0xE584B00C,
+    0xE3A05721, 0xE584500C, 0xE1855000, 0xE5845008, 0xE5845004, 0xE5845000, 0xE2522001, 0x1AFFFFFD,
+    0xE1A00000, 0xE1A00000, 0xE1D400BC, 0xE584B000, 0xE584B004, 0xE584B008, 0xE584B00C, 0xE9BD4FF0,
+    0xE12FFF1E, 0x04000100,
+];
+
+#[test]
+fn the_extracted_connect_routine_is_the_one_the_plan_describes() {
+    // TM3 is enabled first, while its reload is still 0 — that ordering is the
+    // whole reason TM3 can read 512 at all.
+    assert_eq!(AGS_CONNECT[9], 0xE584_500C, "TM3 = 0x00840000");
+    assert_eq!(AGS_CONNECT[7], 0xE584_B00C, "the zeroing pass reaches TM3 too");
+    // TM0 is enabled last, so its own counting window is the full loop.
+    assert_eq!(AGS_CONNECT[13], 0xE584_5000, "TM0 = 0x0084FFFE");
+    // Two no-ops between the loop and the read, and the read is off TM3.
+    assert_eq!(AGS_CONNECT[16], 0xE1A0_0000);
+    assert_eq!(AGS_CONNECT[17], 0xE1A0_0000);
+    assert_eq!(AGS_CONNECT[18], 0xE1D4_00BC, "ldrh r0, [r4, #0xc]");
+    assert_eq!(AGS_CONNECT[25], 0x0400_0100, "the PC-relative literal");
+}
+
+/// Run the real routine and read what it reads.
+///
+/// The wrapper passes `65534` as the routine's first argument, and the stub BIOS
+/// clobbers `r0` long before the routine starts, so it cannot simply be preset
+/// — but `mov r2, #0x400` is the routine's second instruction, and a host-side
+/// register write **costs no clock cycles**. Watching `r2` and writing `r0` the
+/// moment it reads 0x400 therefore costs nothing measurable, and the `orr` that
+/// needs it is still eight instructions away.
+///
+/// Exit is bracketed on the loop counter, never on PC: the fetch pointer runs
+/// ahead speculatively past the `bne`. `r2 == 0` on its own could be true at step
+/// zero, so the run is armed by first seeing the program write 0x400.
+#[test]
+#[ignore = "prints a measurement to compare by hand; see the module docs"]
+fn run_the_real_ags_connect_routine() {
+    let mut gba = Gba::new(crate::gba::bios::stub(), &cartridge_branches_to_iwram());
+    crate::gba::install_swi_hook(&mut gba);
+
+    for (index, word) in AGS_CONNECT.iter().enumerate() {
+        gba.cpu.bus.write_word(PROGRAM_BASE + index * 4, *word);
+    }
+
+    let mut armed = false;
+    let mut supplied_argument = false;
+    let mut loop_done_at = 0u64;
+    for step in 0..400_000u64 {
+        let r2 = gba.cpu.registers.register_at(2);
+        if !armed {
+            if r2 == 0x400 {
+                armed = true;
+            }
+        } else {
+            if r2 == 0x400 && !supplied_argument {
+                gba.cpu.registers.set_register_at(0, 65534);
+                supplied_argument = true;
+            }
+            if r2 == 0 {
+                loop_done_at = step;
+                break;
+            }
+        }
+        gba.step();
+    }
+    assert!(armed, "the routine never started");
+    assert!(supplied_argument, "missed the window to supply the argument");
+
+    // The falling-through `bne`, the two no-ops and the `ldrh` itself.
+    let mut reading = 0xFFFF;
+    for _ in 0..16 {
+        gba.step();
+        reading = gba.cpu.registers.register_at(0);
+        if reading != 65534 {
+            break;
+        }
+    }
+
+    println!("AGS TIMER CONNECT, real machine code from ags.gba");
+    println!("  loop finished at step {loop_done_at}");
+    println!("  TM3 read by the routine = {reading}   (AGS expects 512)");
+    println!("  TIMER CONNECT: {}", if reading == 512 { "PASS" } else { "FAIL" });
+}
+
 #[test]
 #[ignore = "prints a measurement to compare by hand; see the module docs"]
 fn measure_the_scanline_periods_by_polling_dispstat() {

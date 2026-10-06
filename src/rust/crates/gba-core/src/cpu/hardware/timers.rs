@@ -515,6 +515,89 @@ mod tests {
         assert_eq!(t.tm3cnt_l, 512);
     }
 
+    /// Research-only probe: sweep the phase of the four enables in `sub_8009294`.
+    ///
+    /// The real routine enables TM3 first (while its reload is still 0), then
+    /// TM2, TM1 and TM0 with three separate stores a few cycles apart. The
+    /// earlier probe fired all four enables at the same instant, which cannot
+    /// represent that, and it read 512 anyway — so either the phase does not
+    /// matter or the model is missing something.
+    ///
+    /// This answers it directly: sweep the spacing between enables and whether
+    /// cascaded timers work off their own start delay, and report every
+    /// combination that lands on the cartridge's 512. If none does, the gap is
+    /// not a phase problem and this line of attack is finished.
+    #[test]
+    #[ignore = "prints a measurement to compare by hand"]
+    fn sweep_the_phase_of_the_four_enables() {
+        const CONTROL: u16 = 0x0084;
+        const EXPECTED: u16 = 512;
+
+        println!("AGS TIMER CONNECT phase sweep");
+        println!("  (TM3 enabled first with reload 0; TM0 last; reading is TM3)");
+        println!("   spacing = cycles between successive enables");
+        println!("   extra   = cycles after the 4096-cycle loop, before the read");
+        print!("   extra: ");
+        for extra in 0..5u64 {
+            print!("{extra:>6}");
+        }
+        println!();
+
+        let mut hits = 0;
+        for spacing in 0..16u64 {
+            print!("  {spacing:>2}:     ");
+            for extra in 0..5u64 {
+                let mut t = Timers::default();
+                t.set_reload(3, 0);
+                t.set_control(3, CONTROL);
+                for timer in 0..3 {
+                    t.step(spacing);
+                    t.set_reload(timer, 0xFFFE);
+                    t.set_control(timer, CONTROL);
+                }
+                // Measured from **timer 0's** enable, which is the last of the
+                // four: the loop (4096) plus the two `mov r0, r0`. The spacing
+                // sits *before* that point and must not be subtracted from it.
+                t.step(4096 + extra);
+
+                let reading = t.tm3cnt_l;
+                if reading == EXPECTED {
+                    hits += 1;
+                }
+                print!("{reading:>6}");
+            }
+            println!();
+        }
+        println!("  combinations: 80, matches for {EXPECTED}: {hits}");
+
+        // Does the *chunking* of `step` matter? The bus drains timers once per
+        // instruction with whatever has accumulated, while the sweep above hands
+        // the whole window over in one call. A cascade chain can lose a tick at
+        // those boundaries, and the real machine never sees the one-big-call
+        // shape — so this is the most likely place the model and the cartridge
+        // part company.
+        println!();
+        println!("  chunked the way the bus actually drains it:");
+        for chunk in [1u64, 2, 4] {
+            let mut t = Timers::default();
+            t.set_reload(3, 0);
+            t.set_control(3, CONTROL);
+            for timer in 0..3 {
+                t.step(2);
+                t.set_reload(timer, 0xFFFE);
+                t.set_control(timer, CONTROL);
+            }
+            let mut left = 4098;
+            while left > 0 {
+                let n = chunk.min(left);
+                t.step(n);
+                left -= n;
+            }
+            println!("    chunk {chunk} -> TM3 = {}", t.tm3cnt_l);
+        }
+        println!("    one call of 4098 -> TM3 = 512 (see above)");
+    }
+
     /// A start delay that is consumed once, not re-armed every step: the
     /// remainder must survive across calls instead of resetting.
     ///
