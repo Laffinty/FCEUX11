@@ -33,6 +33,9 @@ pub mod overlay;
 pub mod rtc;
 pub mod save;
 pub mod swi;
+/// Research-only measurement tool for the v2.0.1 wait-state work. Every test
+/// in it is `#[ignore]`d, so it adds no gate; it exists to print numbers.
+pub mod waitprobe;
 
 /// Install our SWI implementation into a freshly created core.
 ///
