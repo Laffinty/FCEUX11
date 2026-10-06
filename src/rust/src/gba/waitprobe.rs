@@ -53,16 +53,27 @@
 //! the cartridge. The `N + S` pricing is therefore sound and the whole gap is
 //! the window's instruction and I/O cost.
 //!
-//! **What is not settled:** the prescaler probe cannot produce a reading yet.
-//! After 20 000 `gba.step()` calls its loop counter has only fallen from 1024
-//! to 182, and the loop body is two instructions -- so roughly twelve `step()`
-//! calls pass per iteration even though `Gba::step` is documented as "one CPU
-//! instruction cycle". That 12:1 contradiction is unexplained: either `step()`
-//! is not one instruction in this configuration, or this probe is miscounting.
-//! **Do not read it as "the core runs 12x slow"** -- that would contradict
-//! commercial ROMs running at the right frame rate, so at least one of the two
-//! readings is wrong. Until "`step()` equals one instruction" is pinned down,
-//! this probe cannot settle the accounting question.
+//! **What the prescaler probe found (r6):** bracketing on the **loop counter**
+//! rather than on PC, the measurement is clean — and it shows this core
+//! spends **twice** the hardware's cycles on pure instruction execution. The
+//! `SUBS` + `BNE` loop lives entirely in IWRAM and touches neither the Game Pak
+//! nor any wait state, so `access_cycles` is not involved: 8.00 cycles per
+//! iteration against the real 4.00, with `master_cycles` and the TM0 reading
+//! agreeing in the same 2x direction. That is a separate defect line from the
+//! WAIT window's 3-cycle constant, and it is the one that accounts for the
+//! AGS `TIMER PRESCALER` failure.
+//!
+//! # Why the bracketing is on the counter
+//!
+//! Watching for the PC to reach the instruction *after* the loop fires two
+//! steps into the first iteration: the fetch pointer runs ahead speculatively
+//! past the `BNE` before the branch redirects, so the post-loop address is
+//! visited on **every** pass. That produced a nonsense "12 steps per
+//! instruction" ratio which was nearly reported as a 12x slowdown. The counter
+//! has no such property: 1023 means the first decrement happened, 0 means the
+//! loop finished, whatever the pipeline is doing. **A measurement that brackets
+//! on a speculative observation needs the bracket moved before its numbers are
+//! believed.**
 //!
 //! # Two dead ends worth not repeating
 //!
@@ -212,6 +223,24 @@ const PRESCALER: [u32; 43] = [
 const PRESCALER_ITERATIONS: u32 = 1024;
 const PRESCALER_EXPECTED: u32 = 4096;
 
+/// `SUBS r1, r1, #1` and the `LDRH r0, [r4]` that follows the loop, by word
+/// index in [`PRESCALER`].
+///
+/// Kept for reference rather than used to bracket the measurement: the fetch
+/// pointer visits the post-loop address on *every* pass, because it runs ahead
+/// speculatively past the `BNE` before the branch redirects. Bracketing on the
+/// counter is immune to that; bracketing on these addresses is not.
+const PRESCALER_LOOP_WORD: usize = 23;
+const PRESCALER_AFTER_LOOP_WORD: usize = 25;
+
+/// Both constants exist for documentation; the measurement brackets on the
+/// counter instead. Silence the unused lint without pretending they are used.
+#[allow(dead_code)]
+const _: () = {
+    let _ = PRESCALER_LOOP_WORD;
+    let _ = PRESCALER_AFTER_LOOP_WORD;
+};
+
 #[test]
 #[ignore = "prints a measurement to compare by hand; see the module docs"]
 fn measure_the_ags_prescaler_loop() {
@@ -224,27 +253,80 @@ fn measure_the_ags_prescaler_loop() {
             .write_word(PROGRAM_BASE + index * 4, *word);
     }
 
-    for _ in 0..20_000 {
+    // Three observables, so that "the loop is slow" and "the boot ate the
+    // steps" cannot be confused for one another again.
+    //
+    // Bracketing is done on the **loop counter**, not on PC. An earlier
+    // version watched for the PC to reach the instruction after the loop and
+    // fired two steps into the first iteration: the fetch pointer runs ahead
+    // speculatively past the `BNE` before the branch redirects, so the address
+    // after the loop is visited on every pass. The counter has no such
+    // property -- 1023 means the first decrement happened and 0 means the loop
+    // is finished, whatever the pipeline is doing.
+    let mut entry: Option<(usize, u64)> = None;
+    let mut exit: Option<(usize, u64)> = None;
+    let mut boot_steps = None;
+
+    for step in 0..200_000 {
+        let pc = gba.cpu.registers.program_counter();
+        if boot_steps.is_none() && pc == PROGRAM_BASE {
+            boot_steps = Some(step);
+        }
+        let counter = gba.cpu.registers.register_at(1);
+        if entry.is_none() && counter == PRESCALER_ITERATIONS - 1 {
+            entry = Some((step, gba.cpu.bus.master_cycles()));
+        }
+        if entry.is_some() && exit.is_none() && counter == 0 {
+            exit = Some((step, gba.cpu.bus.master_cycles()));
+            // A few more instructions so the `LDRH` actually executes.
+            for _ in 0..8 {
+                gba.step();
+            }
+            break;
+        }
         gba.step();
     }
 
     let measured = gba.cpu.registers.register_at(0);
     let loop_counter = gba.cpu.registers.register_at(1);
     let pc = gba.cpu.registers.program_counter();
+
     println!("AGS TIMER PRESCALER loop");
-    println!("  PC        = {pc:#010x} (in program: {})", (PROGRAM_BASE..PROGRAM_BASE + 0x100).contains(&pc));
+    println!("  PC        = {pc:#010x}");
+    println!("  boot reached the program at step {boot_steps:?} (0-based; the stub BIOS before it)");
     println!("  loop counter r1 = {loop_counter} (0 means the loop finished)");
-    println!("  iterations = {PRESCALER_ITERATIONS}");
-    println!("  measured  = {measured}");
-    println!("  AGS expects= {PRESCALER_EXPECTED}");
+    match (entry, exit) {
+        (Some((entry_step, entry_cycles)), Some((exit_step, exit_cycles))) => {
+            println!("  loop entry  : step {entry_step}, master_cycles {entry_cycles}");
+            println!("  loop exit   : step {exit_step}, master_cycles {exit_cycles}");
+            println!(
+                "  steps in loop       = {} (expected ~{})",
+                exit_step - entry_step,
+                PRESCALER_ITERATIONS as usize * 2 - 1
+            );
+            println!(
+                "  steps per iteration = {:.2} (one step should be one instruction)",
+                (exit_step - entry_step) as f64 / (PRESCALER_ITERATIONS - 1) as f64
+            );
+            println!(
+                "  master_cycles delta = {} (expected ~{PRESCALER_EXPECTED})",
+                exit_cycles - entry_cycles
+            );
+        }
+        (entry, exit) => println!(
+            "  loop not bracketed: entry={} exit={} (budget or path problem)",
+            entry.is_some(),
+            exit.is_some()
+        ),
+    }
+    println!("  TM0 reading = {measured} (AGS expects {PRESCALER_EXPECTED})");
     println!(
         "  per iteration = {:.2} cycles (AGS: {:.2})",
         f64::from(measured) / f64::from(PRESCALER_ITERATIONS),
         f64::from(PRESCALER_EXPECTED) / f64::from(PRESCALER_ITERATIONS)
     );
     println!(
-        "  delta = {:+}",
+        "  delta vs AGS = {:+}",
         measured as i64 - PRESCALER_EXPECTED as i64
     );
-    println!("  master cycles = {}", gba.cpu.bus.master_cycles());
 }
