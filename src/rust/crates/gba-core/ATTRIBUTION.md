@@ -67,7 +67,7 @@ inheritance:
 
 `[lints.clippy]` was carried over unchanged.
 
-### 3.2 Source files — 17 local changes across 3 files
+### 3.2 Source files — 18 local changes across 3 files
 
 `crates/gba-core/src/**` was byte-identical to upstream `emu/src/**` at the end
 of **S0** (verified file-by-file with SHA-256). Local edits begin at **S0'**, when
@@ -165,6 +165,47 @@ Upstream line references: the insertion sits inside the local halt guard in
 > `an_irq_return_from_a_swi_halt_lands_after_the_swi` (mutation-checked:
 > reverting the presentation turns it red).
 
+#### 3.2.3 v2.0.1 (plan P0) — the ARM SWI number, 1 more change in `arm7tdmi.rs`
+
+Upstream reads the SWI number of an ARM-mode `SWI` out of the **low byte** of
+the instruction (`swi_instr & 0xFF`, in the `HLE` block of `handle_exception`).
+The ARM7TDMI puts that number in **bits 16-23**; the low 8 bits are a comment
+field. Three independent sources agree on bits 16-23: the GBA BIOS itself, the
+ARM-mode convention every assembler emits (`swi 0x60000`), and mGBA 0.10.5,
+which decodes `0xEF060000` as SWI `06` where this crate decoded `0x00`.
+
+| # | Change | Why |
+|---|--------|-----|
+| 18 | The ARM branch of the SWI-number extraction is now `(swi_instr >> 16) & 0xFF`; the Thumb branch is untouched | Number `0x06` (`Div`) read as `0x00` (`SoftReset`), so **every** ARM-mode BIOS call became a soft reset: registers zeroed, PC back to `08000000h`, cartridge re-entered. A ROM whose diagnostic path calls a BIOS function from ARM mode restarts itself forever and hangs on a blank screen. The THUMB branch was already correct, which is exactly why the THUMB-mode suites passed while the ARM-mode ones hung — the split was the tell. |
+
+This one is worth registering in more detail than its size suggests, because
+**upstream is wrong here rather than merely incomplete**, so a re-vendor that
+takes a newer revision may well "restore" the low-byte read and silently undo
+it. Check it first.
+
+The same defect was invisible to this project's own suite for a reason worth
+recording next to it: `src/gba/gate.rs` and `src/gba/swi/mod.rs` built their
+ARM `SWI` words with the number in the **low byte** as well, so the tests were
+written to match the bug and the whole set stayed green through it. Both
+encoders were corrected in the same change (`0xEF00_0000 | (n & 0xFF) << 16`),
+which is first-party code and so is not part of this count.
+
+Locked by two gate tests, `the_number_lives_at_bits_16_23` and
+`the_low_byte_is_not_also_a_number`. Both are mutation-checked, and the second
+one exists for a reason beyond coverage: it pins the decision **not** to accept
+the low-byte encoding as a fallback. A fallback is the tempting repair for a
+library that got this wrong, and adopting it would both invent a hardware
+behaviour and re-hide the defect behind the very programs that were wrong.
+
+> **This entry changes upstream behaviour, in the direction of the real
+> machine.** Note that the first draft of the negative lock test above was
+> **invalid** and was caught by mutation: it used an ARM `SWI` terminator to
+> decide whether the program stopped, so a core reading the wrong byte read the
+> *terminator* as `SoftReset`, and the test passed under the mutation it was
+> meant to catch. The terminator was replaced by watching `r0` — a `Div` writes
+> the quotient there, a `SoftReset` zeroes it — which needs no exit condition and
+> is unaffected by the convention under test.
+
 ### 3.3 `src/gba/` — new code, no upstream content
 
 `src/rust/src/gba/` is entirely first-party: the SWI implementations and the
@@ -178,7 +219,7 @@ landing in S2.
 
 | Item | Status |
 |---|---|
-| `gba-core` source changes | **17**, across **3** source files: 10 in `src/cpu/arm7tdmi.rs` (5 S0' hook wiring, no upstream logic altered + 4 S1a-1 halt mechanism, **does change `step()`** — see R15 + 1 v2.0.1 r56 wake-IRQ return address, see §3.2.2) + 3 in `src/cpu/hardware/rtc.rs` + 4 in `src/cpu/hardware/internal_memory.rs` (3 S2-b3 real-time clock + 2 S3-1 battery save; **neither changes behaviour when nothing is overridden**, see §3.2.1). **The "3" is measured, not counted by hand**: `git log --name-only --diff-filter=M -- src/rust/crates/gba-core/src/` names exactly those three files and no others. An earlier draft of this table said "4 files" while enumerating three — the fourth was `Cargo.toml`, which is the row below and is not a source change |
+| `gba-core` source changes | **18**, across **3** source files: 11 in `src/cpu/arm7tdmi.rs` (5 S0' hook wiring, no upstream logic altered + 4 S1a-1 halt mechanism, **does change `step()`** — see R15 + 1 v2.0.1 r56 wake-IRQ return address, see §3.2.2 + 1 v2.0.1 P0 ARM SWI number at bits 16-23, **changes what an ARM-mode BIOS call does**, see §3.2.3) + 3 in `src/cpu/hardware/rtc.rs` + 4 in `src/cpu/hardware/internal_memory.rs` (3 S2-b3 real-time clock + 2 S3-1 battery save; **neither changes behaviour when nothing is overridden**, see §3.2.1). **The "3" is measured, not counted by hand**: `git log --name-only --diff-filter=M -- src/rust/crates/gba-core/src/` names exactly those three files and no others. An earlier draft of this table said "4 files" while enumerating three — the fourth was `Cargo.toml`, which is the row below and is not a source change |
 | `gba-core/Cargo.toml` | rewritten (metadata only, no version changes) |
 | `src/gba/` | new, 100% first-party, 9 files |
 
@@ -224,6 +265,15 @@ and the cartridge that exposed it). Unlike S2-b3/S3-1 this one **does change
 what the hardware does on every wake from a wait-class SWI**, in the direction
 of the real machine; locked by a mutation-checked lock test. The set is now
 **17 entries over 3 files**.
+
+**v2.0.1 (P0) adds one more to the same file** — the ARM SWI number comes from
+bits 16-23, not the low byte (see §3.2.3). This one has a property none of the
+others share: **upstream is wrong, not merely incomplete**, so a re-vendor can
+lose it by taking a newer upstream revision that still reads the low byte. It is
+also the only entry whose *absence* this project's own test suite could not
+have caught, because the suite encoded ARM `SWI` words the same wrong way — two
+first-party encoders had to be corrected in the same change for the fix to be
+observable at all. The set is now **18 entries over 3 files**.
 
 ## 5. Update procedure
 

@@ -128,8 +128,23 @@ const fn is_encodable_immediate(value: u32) -> bool {
 }
 
 /// `SWI number`.
+///
+/// The 8-bit number lives in **bits 16-23** of the 32-bit ARM encoding; bits
+/// 0-7 are a comment field that real hardware ignores, and it is bits 16-23
+/// that the BIOS reads.
+///
+/// An earlier draft of this function was `0xEF00_0000 | (number & 0x00FF_FFFF)`,
+/// which put the number in the **low byte** -- where it happened to agree with
+/// the core's own misreading of the instruction. Every program below was
+/// therefore validating the wrong encoding, and this gate, whose entire
+/// purpose is to catch a wrong assumption about the seam, could not have
+/// caught that one. See the v2.0.1 plan's change record, r1.
 const fn swi(number: u32) -> u32 {
-    0xEF00_0000 | (number & 0x00FF_FFFF)
+    assert!(
+        number < 0x100,
+        "the SWI number is 8 bits and lives at bits 16-23"
+    );
+    0xEF00_0000 | (number << 16)
 }
 
 
@@ -221,6 +236,35 @@ fn run(body: &[u32]) -> u32 {
         gba.step();
     }
     panic!("the program never reached its `Halt`");
+}
+
+/// Step `body` for at most `budget` cycles, and report whether `r0` ever held
+/// `value`.
+///
+/// # Why not a `Halt` terminator
+///
+/// The obvious way to stop a program here is the same `Halt` [`run`] appends,
+/// and using it would have made the tests below worthless: an ARM `SWI`
+/// terminator is subject to the very convention under test, so a core that
+/// reads the wrong byte reads the terminator as `0x00` -- `SoftReset` -- and
+/// loops instead of stopping. A test asserting "this program does not stop"
+/// would then pass under the very mutation it is supposed to catch.
+///
+/// `r0` is the observable instead. It needs no terminator and no exit
+/// condition, and the two directions of the convention push it opposite ways:
+/// a `Div` writes the quotient, while a `SoftReset` zeroes `r0` and re-enters
+/// the cartridge, which sets it back to the dividend.
+fn r0_ever_held(body: &[u32], budget: usize, value: u32) -> bool {
+    let mut gba = gba_core::gba::Gba::new(crate::gba::bios::stub(), &cartridge(body));
+    crate::gba::install_swi_hook(&mut gba);
+
+    for _ in 0..budget {
+        if gba.cpu.registers.register_at(0) == value {
+            return true;
+        }
+        gba.step();
+    }
+    false
 }
 
 #[cfg(test)]
@@ -365,6 +409,93 @@ mod tests {
                 run(&body),
                 0xBA_AE_187F,
                 "the retail checksum, per known limit L2"
+            );
+        }
+    }
+
+    /// Where an ARM `SWI` keeps its 8-bit number -- and what the other 8
+    /// bits are for.
+    ///
+    /// The words below are written out as literals rather than built through
+    /// [`swi`], so that what is pinned is the *hardware* convention and not
+    /// whatever this module's own encoder happens to emit. The one place the
+    /// encoder is checked is a deliberate assertion, not a silent dependency.
+    mod arm_swi_numbering {
+        use super::super::{mov_r0_imm, r0_ever_held, swi, CODE_OFFSET};
+        use crate::gba::swi::Swi;
+
+        /// `cond 1111 imm24` with `0x06` at bits 16-23: `Div`, written the
+        /// way ARM-mode code writes it -- `swi 0x060000`.
+        const SWI_060000: u32 = 0xEF06_0000;
+
+        /// The same number in the low byte. Hardware reads bits 16-23, so
+        /// this encoding is `SWI 0x000000`: `0x00`, i.e. `SoftReset`.
+        const SWI_IN_LOW_BYTE: u32 = 0xEF00_0006;
+
+        /// `MOV r1, #4` -- the divisor.
+        const MOV_R1_4: u32 = 0xE3A0_1004;
+
+        /// `MOV r0, r0` -- a spin that leaves the register alone.
+        const NOP_R0: u32 = 0xE1A0_0000;
+
+        /// What `Div` leaves in `r0` for `128 / 4`.
+        const QUOTIENT: u32 = 32;
+
+        /// Cycles each direction is allowed.
+        ///
+        /// Reaching the quotient takes under a dozen instructions, so the
+        /// budget is set by the direction that must *not* arrive: a `SoftReset`
+        /// re-enters the cartridge and tries again, and this is thousands of
+        /// restarts -- enough to tell "restarting" from "slow", without
+        /// spending the budget [`run`] uses on a test that should be fast.
+        const BUDGET: usize = 50_000;
+
+        /// `r0 = 128`, `r1 = 4`, then `swi_word`, then spin to the end of the
+        /// image.
+        ///
+        /// The spin is not padding. A program that ran off the end of its own
+        /// body would execute the image's zero words, and a zero word is
+        /// `ANDEQ r0, r0, r0` -- which clears the very register these tests
+        /// read. `MOV r0, r0` spins forever without disturbing it.
+        fn dividing_by_four(swi_word: u32) -> Vec<u32> {
+            let mut program = vec![mov_r0_imm(128), MOV_R1_4, swi_word];
+            program.resize((0x200 - CODE_OFFSET) / 4, NOP_R0);
+            program
+        }
+
+        /// The canonical encoding runs `Div`.
+        ///
+        /// This is the assertion the gate never had. Its own encoder put the
+        /// number in the low byte, where it happened to agree with the core
+        /// misreading that same byte, so the pair was self-consistent and every
+        /// other test here stayed green straight through a real defect.
+        #[test]
+        fn the_number_lives_at_bits_16_23() {
+            assert_eq!(
+                swi(Swi::Div as u32),
+                SWI_060000,
+                "this module's encoder has to agree with the hardware convention"
+            );
+            assert!(
+                r0_ever_held(&dividing_by_four(SWI_060000), BUDGET, QUOTIENT),
+                "swi 0x060000 is Div, and 128 / 4 is 32"
+            );
+        }
+
+        /// The low byte is a comment field, and it stays one.
+        ///
+        /// Worth pinning because the tempting repair for a software library
+        /// that got this wrong is to accept **both** encodings. That would
+        /// invent a hardware behaviour to accommodate a bug, and it would put
+        /// the bug back under cover: under a fallback the low-byte programs
+        /// this module used to build would start working again, and nothing
+        /// would notice that the convention had gone unguarded a second time.
+        #[test]
+        fn the_low_byte_is_not_also_a_number() {
+            assert!(
+                !r0_ever_held(&dividing_by_four(SWI_IN_LOW_BYTE), BUDGET, QUOTIENT),
+                "0xEF000006 is SWI 0x000000 on hardware -- a soft reset, which \
+                 zeroes r0 and re-enters the cartridge -- not Div"
             );
         }
     }

@@ -682,17 +682,21 @@ impl Arm7tdmi {
         // HLE: For SWI, implement common BIOS functions directly
         if matches!(exception_type, ExceptionType::SoftwareInterrupt) {
             // Get the SWI number from the instruction
-            // For Thumb: bits 0-7 of the instruction
-            // For ARM: bits 0-23 of the instruction (but GBA BIOS only uses 0-7)
+            // For Thumb: the imm8 of the 16-bit encoding, i.e. bits 0-7
+            // For ARM: bits 16-23 of the 32-bit encoding. The low 8 bits are
+            // a comment field on real hardware, so `swi 0x060000` is Div.
+            // Reading the low byte instead made every ARM-mode BIOS call a
+            // SoftReset (number 0) and hung any ROM whose diagnostic path
+            // calls one. See FCEUX11 ATTRIBUTION.md section 3.2.3.
             let swi_num = if matches!(old_cpsr.cpu_state(), CpuState::Thumb) {
                 // Thumb SWI: read the byte before the return address
                 let swi_pc = (next_ins as u32).wrapping_sub(2);
                 u32::from(self.bus.read_byte(swi_pc as usize))
             } else {
-                // ARM SWI: read the word at PC-8 and extract bits 0-23
+                // ARM SWI: read the word at PC-8 and take bits 16-23
                 let swi_pc = (next_ins as u32).wrapping_sub(4);
                 let swi_instr = self.bus.read_word(swi_pc as usize);
-                swi_instr & 0xFF // GBA BIOS only uses lower 8 bits
+                (swi_instr >> 16) & 0xFF
             };
 
             // Try to handle the SWI with HLE

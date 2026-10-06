@@ -779,8 +779,13 @@ mod tests {
     const ROM_BASE: u32 = 0x0800_0000;
 
     /// ARM encoding of `SWI n` with the `always` condition: `cond 1111 imm24`.
+    ///
+    /// The 8-bit number is at **bits 16-23**; bits 0-7 are a comment field.
+    /// This used to OR it into the low byte, which matched the core's then
+    /// wrong decoding (v2.0.1 plan, change record r1) -- so these tests were
+    /// exercising the bug, not the convention.
     fn arm_swi(n: u32) -> u32 {
-        0xEF00_0000 | (n & 0xFF)
+        0xEF00_0000 | (n & 0xFF) << 16
     }
 
     /// A cartridge whose opening instructions are `SWI n`.
@@ -1313,7 +1318,8 @@ mod tests {
     /// `LDR r2, [pc, #12]`
     const LDR_R2_PC_12: u32 = 0xE59F_200C;
     /// Halt, so a test can stop the machine and read the results.
-    const SWI_HALT_WORD: u32 = 0xEF00_0002;
+    /// Number 0x02 at bits 16-23, which is where an ARM `SWI` keeps it.
+    const SWI_HALT_WORD: u32 = 0xEF02_0000;
 
     /// `Div` (0x06) is signed, truncates toward zero, and leaves the absolute
     /// quotient in r3 -- the three properties games depend on.
