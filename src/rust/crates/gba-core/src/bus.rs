@@ -627,7 +627,18 @@ impl Bus {
         self.dma_blocks_run += 1;
         self.dma_units_moved += u64::from(count);
 
+        // A DMA start costs three cycles (mGBA dma.c: "DMAs take 3 cycles to
+        // start"), and the clocked peripherals keep running for as long as
+        // the block does: the cartridges' memory tests drive a DMA whose
+        // source is the *running* TM0 counter and require the sampled values
+        // to advance by exactly one unit cost per transfer. Draining before
+        // each unit is what makes those samples move; without it the counter
+        // is frozen and every unit reads the same value.
+        self.cycles_count += 3;
+        self.drain_clocked_peripherals();
+
         for _ in 0..count {
+            self.drain_clocked_peripherals();
             let source = self.dma.channels[idx].internal_source as usize;
             let dest = self.dma.channels[idx].internal_dest as usize;
 
@@ -649,6 +660,41 @@ impl Bus {
         }
 
         self.dma.finish_block(idx);
+    }
+
+    /// Advance the timers and the sound clock by everything charged to
+    /// `cycles_count` since the last drain.
+    ///
+    /// `step` calls this once per instruction; `run_dma_block` calls it
+    /// before every unit it transfers, because a unit whose source is a
+    /// timer register must sample the counter at the time that unit's read
+    /// happens, not at the last instruction boundary.
+    fn drain_clocked_peripherals(&mut self) {
+        let timer_cycles = self.cycles_count - self.timer_cycles_done;
+        self.timer_cycles_done = self.cycles_count;
+        let timer_result = self.timers.step(timer_cycles);
+        if timer_result.timer0_overflow {
+            self.request_interrupt(IrqType::Timer0);
+        }
+        if timer_result.timer1_overflow {
+            self.request_interrupt(IrqType::Timer1);
+        }
+        if timer_result.timer2_overflow {
+            self.request_interrupt(IrqType::Timer2);
+        }
+        if timer_result.timer3_overflow {
+            self.request_interrupt(IrqType::Timer3);
+        }
+
+        // DMA sound channels are clocked by timer 0/1 overflows, independent of
+        // whether those timers raise an IRQ.
+        if timer_result.timer0_raw_overflow {
+            self.feed_dma_sound(0);
+        }
+        if timer_result.timer1_raw_overflow {
+            self.feed_dma_sound(1);
+        }
+        self.sound.step(timer_cycles);
     }
 
     /// Pop the DMA sound channels clocked by the given timer and refill any FIFO
@@ -1258,31 +1304,7 @@ impl Bus {
 
         // Advance the timers by the cycles elapsed since they were last serviced,
         // which includes the memory wait states added during this instruction.
-        let timer_cycles = self.cycles_count - self.timer_cycles_done;
-        self.timer_cycles_done = self.cycles_count;
-        let timer_result = self.timers.step(timer_cycles);
-        if timer_result.timer0_overflow {
-            self.request_interrupt(IrqType::Timer0);
-        }
-        if timer_result.timer1_overflow {
-            self.request_interrupt(IrqType::Timer1);
-        }
-        if timer_result.timer2_overflow {
-            self.request_interrupt(IrqType::Timer2);
-        }
-        if timer_result.timer3_overflow {
-            self.request_interrupt(IrqType::Timer3);
-        }
-
-        // DMA sound channels are clocked by timer 0/1 overflows, independent of
-        // whether those timers raise an IRQ.
-        if timer_result.timer0_raw_overflow {
-            self.feed_dma_sound(0);
-        }
-        if timer_result.timer1_raw_overflow {
-            self.feed_dma_sound(1);
-        }
-        self.sound.step(timer_cycles);
+        self.drain_clocked_peripherals();
 
         // A pixel takes 4 cycles to get drawn. `cycles_count` is bumped both here
         // (one cycle per instruction) and by every memory access, so an instruction
@@ -2460,6 +2482,120 @@ mod tests {
             assert_ne!(r0, 0xDEAD_BEEF, "the reading never landed: {evidence}");
 
             assert_eq!(r0, expected, "WAITCNT {waitcnt:#06x}");
+        }
+    }
+
+    /// The AGS memory-class DMA timing check, replayed on this core.
+    ///
+    /// The cartridge's `TimeDmaToAndFromMemory_U16/U32` (ags_aging asm,
+    /// `sub_800CD3C.s`, `0x0800CF8C` / `0x0800D118`) arm TM0 at divide-by-one
+    /// and run a DMA3 whose **source is fixed at 0x04000100** — the running
+    /// counter — writing 128 halfwords (U16) or 64 words (U32) into the region
+    /// under test, copying the region back, and requiring the copy to be an
+    /// arithmetic progression: each successive sample of the counter must sit
+    /// exactly one unit-cost later than the previous one. The expected steps
+    /// are the cartridge's own formulas (`unit_size` is the destination's
+    /// wait-state count):
+    ///
+    /// ```text
+    /// U16 step = unit_size + 2
+    /// U32 step = (unit_size + 1) * (32 / bit_width) + 1
+    /// ```
+    ///
+    /// which is precisely "one unit = source read + destination write":
+    /// I/O(1) + EWRAM16(3) = 4, I/O(1) + EWRAM32(6) = 7, I/O(1) +
+    /// palette/VRAM32(2) = 3, I/O(1) + IWRAM/OAM32(1) = 2. Every value the
+    /// cartridge checks across its five memory tests is pinned below.
+    ///
+    /// For the progression to hold at all, the timers must tick **while the
+    /// block runs** — a DMA that samples a frozen counter returns the same
+    /// value 128 times (step 0), which is exactly what this core used to do
+    /// and why all five memory tests failed on bits 3/4 (plan r34/r36).
+    ///
+    /// The total-cost assertions also pin the start latency: a block costs
+    /// the enabling write plus 3 cycles (mGBA: "DMAs take 3 cycles to start")
+    /// plus one unit cost per unit.
+    ///
+    /// # Mutation
+    ///
+    /// Dropping the per-unit peripheral drain makes every step 0; dropping
+    /// the +3 start latency makes every total 3 short; both verified red.
+    #[test]
+    fn the_ags_dma_progression_steps_match_region_wait_states() {
+        // (destination, u16_step, u32_step) — the cartridge's own table.
+        const CASES: [(u32, u64, u64); 5] = [
+            (0x0200_0000, 4, 7), // EWRAM: waits 2, 16-bit bus
+            (0x0300_0000, 2, 2), // IWRAM: waits 0, 32-bit bus
+            (0x0500_0000, 2, 3), // palette: waits 0, 16-bit bus
+            (0x0600_0000, 2, 3), // VRAM: waits 0, 16-bit bus
+            (0x0700_0000, 2, 2), // OAM: waits 0, 32-bit bus
+        ];
+
+        for (dest, u16_step, u32_step) in CASES {
+            // ---- U16: 128 halfword units, source fixed on the counter ----
+            {
+                let mut bus = Bus::default();
+                bus.write_word(0x0400_0100, 0); // TM0 counter = 0, stopped
+                bus.write_word(0x0400_0100, 0x0080_0000); // arm, divide by one
+                bus.write_word(0x0400_00D4, 0x0400_0100); // SAD: the counter
+                bus.write_word(0x0400_00D8, dest);
+                bus.write_half_word(0x0400_00DC, 0x80); // 128 units
+                let before = bus.master_cycles();
+                // Enable + source fixed (bits 7-8 = 2) + 16-bit + immediate.
+                bus.write_half_word(0x0400_00DE, 0x8100);
+                let after = bus.master_cycles();
+                assert_eq!(
+                    after - before,
+                    1 + 3 + 128 * u16_step,
+                    "{dest:08X} U16 total (write 1 + start 3 + 128 units)"
+                );
+                let mut previous = None;
+                for i in 0..128u32 {
+                    let sample = bus.read_half_word(dest as usize + i as usize * 2);
+                    if let Some(prev) = previous {
+                        assert_eq!(
+                            sample.wrapping_sub(prev),
+                            u16_step as u16,
+                            "{dest:08X} U16 step at halfword {i}"
+                        );
+                    }
+                    previous = Some(sample);
+                }
+            }
+            // ---- U32: 64 word units; odd halfwords are TM0CNT_H ----
+            {
+                let mut bus = Bus::default();
+                bus.write_word(0x0400_0100, 0);
+                bus.write_word(0x0400_0100, 0x0080_0000);
+                bus.write_word(0x0400_00D4, 0x0400_0100);
+                bus.write_word(0x0400_00D8, dest);
+                bus.write_half_word(0x0400_00DC, 0x40); // 64 words
+                let before = bus.master_cycles();
+                bus.write_half_word(0x0400_00DE, 0x8500); // + 32-bit (bit 10)
+                let after = bus.master_cycles();
+                assert_eq!(
+                    after - before,
+                    1 + 3 + 64 * u32_step,
+                    "{dest:08X} U32 total (write 1 + start 3 + 64 units)"
+                );
+                let mut previous = None;
+                for k in 0..64u32 {
+                    let word = bus.read_word(dest as usize + k as usize * 4);
+                    let low = (word & 0xFFFF) as u16;
+                    let high = (word >> 16) as u16;
+                    if let Some(prev) = previous {
+                        assert_eq!(
+                            low.wrapping_sub(prev),
+                            u32_step as u16,
+                            "{dest:08X} U32 step at word {k}"
+                        );
+                    }
+                    // The odd halfword of every unit is TM0CNT_H, which the
+                    // helper reads back and requires unchanged.
+                    assert_eq!(high, 0x0080, "{dest:08X} U32 high halfword {k}");
+                    previous = Some(low);
+                }
+            }
         }
     }
 }

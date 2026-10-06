@@ -67,7 +67,7 @@ inheritance:
 
 `[lints.clippy]` was carried over unchanged.
 
-### 3.2 Source files — 26 live local changes across 5 files (the reverted #24 and #27 keep their numbers but are not counted)
+### 3.2 Source files — 27 live local changes across 5 files (the reverted #24 and #27 keep their numbers but are not counted)
 
 `crates/gba-core/src/**` was byte-identical to upstream `emu/src/**` at the end
 of **S0** (verified file-by-file with SHA-256). Local edits begin at **S0'**, when
@@ -378,10 +378,26 @@ record lives in the probe.
 > MEMORY class (stuck in the settings-checksum loop even with SRAM forced).
 > Nothing above is derived from mGBA.
 
-Patch count after this change: **26 live changes across 5 files** —
-`arm7tdmi.rs` 13, `bus.rs` 3, `timers.rs` 3, `rtc.rs` 3,
+Patch count after this change: **27 live changes across 5 files** —
+`arm7tdmi.rs` 13, `bus.rs` 4, `timers.rs` 3, `rtc.rs` 3,
 `internal_memory.rs` 4 — derived from the per-section tables above, not from
 the (drift-prone) running totals; the reverted #24 and #27 are not counted.
+
+#### 3.2.11 v2.0.1 (plan r36) — the timers froze during a DMA block, and DMA had no start latency: 1 more change in `bus.rs`
+
+| # | Change | Why |
+|---|--------|-----|
+| 29 | `bus.rs`: the timer/sound drain that `step` ran once per instruction is extracted into `drain_clocked_peripherals()`, and `run_dma_block` now charges **+3 cycles of start latency** and drains **before every unit** it transfers. Per-unit costs keep coming from the ordinary access paths (source read + destination write). | The AGS memory-class tests (`TimeDmaToAndFromMemory_U16/U32`) arm TM0 and run a DMA whose **source is fixed at 0x04000100 — the running counter** — then require the destination samples to form an arithmetic progression stepping exactly one unit cost per transfer (`unit_size + 2` for 16-bit units, `(unit_size+1)*(32/bit_width)+1` for 32-bit; source: ags_aging `sub_800CD3C.s` and the callers in `sub_80020A0.c`/`sub_8002488.c`). With the drain only at instruction boundaries, every unit sampled a **frozen counter** — step 0 — which failed all five memory tests (EWRAM/IWRAM/palette/VRAM/OAM) on bits 3/4. The per-unit prices were already right: the ordinary access costs sum to every expectation (I/O 1 + EWRAM16 3 = 4; I/O 1 + EWRAM32 6 = 7; I/O 1 + palette/VRAM32 2 = 3; I/O 1 + IWRAM/OAM32 1 = 2), matching mGBA's `GBADMAService` model (2 + nonseq/seq waitstates per region, first unit nonseq) value for value. Pinned by `the_ags_dma_progression_steps_match_region_wait_states` — ten cases, one per region and width, asserting the step and the total block cost as literals. Mutations: removing the per-unit drain makes every step 0; removing the +3 makes every total 3 short; both red. |
+
+AGS after this change: **30/33** — the five memory tests went green
+(MEMORY class 9/9), nothing else moved. Known simplification, not gated by
+any AGS case: a DMA touching ROM prices every unit non-sequential (mGBA
+switches to sequential after the first unit); ROM-source DMAs are slightly
+overcharged. `DMA DISPLAY START` and `DMA PRIORITY` remain red — they exercise
+the timing-3 trigger and channel arbitration, which are separate mechanisms
+with their own RE to come.
+
+Patch count after this change: **27 live changes across 5 files**.
 
 ### 3.3 `src/gba/` — new code, no upstream content
 
@@ -414,7 +430,7 @@ never ran at all. `AGENTS.md` now runs both crates in its gate command.
 
 | Item | Status |
 |---|---|
-| `gba-core` source changes | **26** live, across **5** source files (the reverted #24 and #27 are not counted): 13 in `src/cpu/arm7tdmi.rs` (5 S0' hook wiring, no upstream logic altered + 4 S1a-1 halt mechanism, **does change `step()`** — see R15 + 1 v2.0.1 r56 wake-IRQ return address, see §3.2.2 + 1 v2.0.1 P0 ARM SWI number at bits 16-23, **changes what an ARM-mode BIOS call does**, see §3.2.3 + 2 v2.0.1 r5 halfword-load width tests, §3.2.5, **tests only**) + 3 in `src/cpu/hardware/rtc.rs` + 4 in `src/cpu/hardware/internal_memory.rs` (3 S2-b3 real-time clock + 2 S3-1 battery save; **neither changes behaviour when nothing is overridden**, see §3.2.1) + 3 in `src/bus.rs` (1 test-only block, see §3.2.4 + 1 **the S-cycle double-billing fix, which changes what every instruction costs**, see §3.2.6 + 1 **the prefetch hit re-sequenced onto the fetch stream, which changes when ROM opcode fetches cost 1 cycle per halfword**, see §3.2.10) + 3 in `src/cpu/hardware/timers.rs` (1 r17 prescaler register + 2 r22 cascade-bit and start delay, see §3.2.7/§3.2.8). **The file list is measured, not counted by hand**: `git log --name-only --diff-filter=M -- src/rust/crates/gba-core/src/` names exactly those files. Earlier drafts of this table said "4 files" while enumerating three and then "3" while the fourth was `Cargo.toml`; `bus.rs` is the first source file outside `cpu/` to be modified, and entry 20 was briefly used twice (§3.2.5) |
+| `gba-core` source changes | **27** live, across **5** source files (the reverted #24 and #27 are not counted): 13 in `src/cpu/arm7tdmi.rs` (5 S0' hook wiring, no upstream logic altered + 4 S1a-1 halt mechanism, **does change `step()`** — see R15 + 1 v2.0.1 r56 wake-IRQ return address, see §3.2.2 + 1 v2.0.1 P0 ARM SWI number at bits 16-23, **changes what an ARM-mode BIOS call does**, see §3.2.3 + 2 v2.0.1 r5 halfword-load width tests, §3.2.5, **tests only**) + 3 in `src/cpu/hardware/rtc.rs` + 4 in `src/cpu/hardware/internal_memory.rs` (3 S2-b3 real-time clock + 2 S3-1 battery save; **neither changes behaviour when nothing is overridden**, see §3.2.1) + 4 in `src/bus.rs` (1 test-only block, see §3.2.4 + 1 **the S-cycle double-billing fix, which changes what every instruction costs**, see §3.2.6 + 1 **the prefetch hit re-sequenced onto the fetch stream, which changes when ROM opcode fetches cost 1 cycle per halfword**, see §3.2.10 + 1 **the DMA block now drains the clocked peripherals per unit and charges a 3-cycle start latency, which changes what a DMA costs and lets timers tick mid-block**, see §3.2.11) + 3 in `src/cpu/hardware/timers.rs` (1 r17 prescaler register + 2 r22 cascade-bit and start delay, see §3.2.7/§3.2.8). **The file list is measured, not counted by hand**: `git log --name-only --diff-filter=M -- src/rust/crates/gba-core/src/` names exactly those files. Earlier drafts of this table said "4 files" while enumerating three and then "3" while the fourth was `Cargo.toml`; `bus.rs` is the first source file outside `cpu/` to be modified, and entry 20 was briefly used twice (§3.2.5) |
 | `gba-core/Cargo.toml` | rewritten (metadata only) + one restored `[dev-dependencies]` section, see §3.5 |
 | `src/gba/` | new, 100% first-party, 9 files |
 
