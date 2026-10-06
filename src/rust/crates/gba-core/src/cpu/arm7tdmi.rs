@@ -1630,6 +1630,67 @@ mod tests {
         cpu.execute_arm(op_code);
     }
 
+    /// `LDRH` writes the whole 32-bit destination register, zero-extended.
+    ///
+    /// This exists because a differential probe (`src/rust/src/gba/waitprobe.rs`)
+    /// read back a value too large to have come from a 16-bit load, and the
+    /// obvious suspect — `LDRH` leaving the upper half of its destination
+    /// register stale — had to be either confirmed or ruled out before the
+    /// probe's reading could be trusted at all.
+    ///
+    /// It is ruled out here: the destination is preloaded with all ones, so a
+    /// load that only wrote the low half would leave `0xFFFF_1234` and fail.
+    /// `LDRD`'s 64-bit form is deliberately not covered — it is undefined on
+    /// this part and the core treats those encodings as `STRH`.
+    #[test]
+    fn arm_ldrh_zero_extends_into_the_whole_destination_register() {
+        const BASE: u32 = 0x0300_1000;
+        // LDRH r0, [r1]: `AL 01 P=1 U=1 I=1 W=0 L=1 Rn=r1 Rd=r0 offset=0`.
+        const LDRH_R0_R1: u32 = 0xE1D1_00B0;
+        const STORED: u16 = 0x1234;
+
+        let mut cpu = Arm7tdmi::default();
+        let op_code: ArmModeOpcode = Arm7tdmi::decode(LDRH_R0_R1);
+
+        cpu.registers.set_register_at(0, 0xFFFF_FFFF);
+        cpu.registers.set_register_at(1, BASE);
+        cpu.bus.write_half_word(BASE as usize, STORED);
+
+        cpu.execute_arm(op_code);
+
+        assert_eq!(
+            cpu.registers.register_at(0),
+            u32::from(STORED),
+            "LDRH must replace the whole register, not just its low half"
+        );
+    }
+
+    /// The signed halfword load sign-extends rather than zero-extending, so
+    /// the two are not interchangeable and the pair pins both.
+    #[test]
+    fn arm_ldrsh_sign_extends_from_bit_15() {
+        const BASE: u32 = 0x0300_1000;
+        // LDRSH r0, [r1]: same as LDRH but with the transfer kind field
+        // (SH, bits 6-5 of the offset) set to 10b instead of the LDRH bit 4.
+        const LDRSH_R0_R1: u32 = 0xE1D1_00F0;
+        const STORED: u16 = 0x9234;
+
+        let mut cpu = Arm7tdmi::default();
+        let op_code: ArmModeOpcode = Arm7tdmi::decode(LDRSH_R0_R1);
+
+        cpu.registers.set_register_at(0, 0xFFFF_FFFF);
+        cpu.registers.set_register_at(1, BASE);
+        cpu.bus.write_half_word(BASE as usize, STORED);
+
+        cpu.execute_arm(op_code);
+
+        assert_eq!(
+            cpu.registers.register_at(0),
+            0xFFFF_9234_u32,
+            "bit 15 set must sign-extend to all ones, not zero-extend"
+        );
+    }
+
     #[test]
     fn arm_block_data_transfer() {
         // Use EWRAM base address for tests (0x02000000)

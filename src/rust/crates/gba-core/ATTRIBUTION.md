@@ -67,7 +67,7 @@ inheritance:
 
 `[lints.clippy]` was carried over unchanged.
 
-### 3.2 Source files — 19 local changes across 4 files
+### 3.2 Source files — 21 local changes across 4 files
 
 `crates/gba-core/src/**` was byte-identical to upstream `emu/src/**` at the end
 of **S0** (verified file-by-file with SHA-256). Local edits begin at **S0'**, when
@@ -227,6 +227,27 @@ Mutation-checked both ways: corrupting any one of the 28 expected values turns
 `the_ags_expectations_are_one_overhead_and_a_wait_state_formula` red, and so does
 moving the overhead constant off 8.
 
+#### 3.2.5 v2.0.1 (plan r5) — `LDRH` / `LDRSH` destination width, 2 more changes in `arm7tdmi.rs`
+
+Tests only, in the existing `mod tests`.
+
+| # | Change | Why |
+|---|--------|-----|
+| 20 | `arm7tdmi.rs`: `arm_ldrh_zero_extends_into_the_whole_destination_register` | Written to **try to refute** a candidate, not to confirm it. The differential probe in `src/rust/src/gba/waitprobe.rs` read back a value too large to have come from a 16-bit load, and the obvious suspect was `LDRH` leaving the upper half of its destination register stale. The test preloads the destination with `0xFFFF_FFFF` and stores `0x1234`, so a load that only wrote the low half would leave `0xFFFF_1234` and fail. It passes: **`LDRH` is correct and the candidate is dead.** |
+| 21 | `arm7tdmi.rs`: `arm_ldrsh_sign_extends_from_bit_15` | The pairing test. Zero-extension and sign-extension are the two halves of "what does a halfword load leave in the register", and pinning only one of them would let the other rot. Stores `0x9234` with bit 15 set and requires `0xFFFF_9234`. |
+
+Both are worth having beyond this round: they are the cheapest available check
+on a whole family of halfword transfers, and the first of them is a worked
+example of the discipline in AGENTS.md — **a test that can kill your own
+hypothesis is worth more than one that can only confirm it.**
+
+> The second test failed on its first run, and the fault was in the test: the
+> `LDRSH` opcode was hand-built with the transfer-kind field written into the
+> `Rd` slot (`0xE1D190B0`, so it targeted r9). The correct encoding is
+> `0xE1D100F0` — the same word as `LDRH` with bits 6-5 set to `10b`. Worth
+> recording because the failure looked exactly like a core bug in sign extension,
+> and a red test is not evidence until you know *whose* mistake it is.
+
 ### 3.3 `src/gba/` — new code, no upstream content
 
 `src/rust/src/gba/` is entirely first-party: the SWI implementations and the
@@ -258,7 +279,7 @@ never ran at all. `AGENTS.md` now runs both crates in its gate command.
 
 | Item | Status |
 |---|---|
-| `gba-core` source changes | **19**, across **4** source files: 11 in `src/cpu/arm7tdmi.rs` (5 S0' hook wiring, no upstream logic altered + 4 S1a-1 halt mechanism, **does change `step()`** — see R15 + 1 v2.0.1 r56 wake-IRQ return address, see §3.2.2 + 1 v2.0.1 P0 ARM SWI number at bits 16-23, **changes what an ARM-mode BIOS call does**, see §3.2.3) + 3 in `src/cpu/hardware/rtc.rs` + 4 in `src/cpu/hardware/internal_memory.rs` (3 S2-b3 real-time clock + 2 S3-1 battery save; **neither changes behaviour when nothing is overridden**, see §3.2.1) + 1 in `src/bus.rs` (2 tests, no production line touched, see §3.2.4). **The file list is measured, not counted by hand**: `git log --name-only --diff-filter=M -- src/rust/crates/gba-core/src/` names exactly those files. Earlier drafts of this table said "4 files" while enumerating three and then "3" while the fourth was `Cargo.toml`; `bus.rs` is the first source file outside `cpu/` to be modified, and it is tests only |
+| `gba-core` source changes | **21**, across **4** source files: 13 in `src/cpu/arm7tdmi.rs` (5 S0' hook wiring, no upstream logic altered + 4 S1a-1 halt mechanism, **does change `step()`** — see R15 + 1 v2.0.1 r56 wake-IRQ return address, see §3.2.2 + 1 v2.0.1 P0 ARM SWI number at bits 16-23, **changes what an ARM-mode BIOS call does**, see §3.2.3 + 2 v2.0.1 r5 halfword-load width tests, §3.2.5, **tests only**) + 3 in `src/cpu/hardware/rtc.rs` + 4 in `src/cpu/hardware/internal_memory.rs` (3 S2-b3 real-time clock + 2 S3-1 battery save; **neither changes behaviour when nothing is overridden**, see §3.2.1) + 1 in `src/bus.rs` (2 tests, no production line touched, see §3.2.4). **The file list is measured, not counted by hand**: `git log --name-only --diff-filter=M -- src/rust/crates/gba-core/src/` names exactly those files. Earlier drafts of this table said "4 files" while enumerating three and then "3" while the fourth was `Cargo.toml`; `bus.rs` is the first source file outside `cpu/` to be modified, and it is tests only |
 | `gba-core/Cargo.toml` | rewritten (metadata only) + one restored `[dev-dependencies]` section, see §3.5 |
 | `src/gba/` | new, 100% first-party, 9 files |
 
@@ -327,6 +348,12 @@ core's behaviour was made against a suite that covered only the embedder's side
 of the seam. The count went from "246 green in the root crate" to "246 + 227",
 and the first run of the 227 was green too — which is the outcome worth having
 before anyone starts changing the timing model in §3.2.4.
+
+**v2.0.1 (r5) adds two more to `arm7tdmi.rs`, both tests only** — the
+halfword-load width pair, written to try to kill a candidate defect rather than
+to confirm one (see §3.2.5). They killed it. The set is now **21 entries over 4
+files**, and the entry count has stopped being the interesting number: **three
+of the last four entries change no production line at all.**
 
 ## 5. Update procedure
 

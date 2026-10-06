@@ -43,18 +43,26 @@
 //! applied to that boot value. **So the program runs as disassembled and
 //! `WAITCNT` is not defective.**
 //!
+//! The obvious suspect for the too-large value the probe read back — `LDRH`
+//! leaving the upper half of its destination register — has since been
+//! **ruled out** by a direct test in the core
+//! (`arm_ldrh_zero_extends_into_the_whole_destination_register`).
+//!
 //! With the boot value accounted for, the per-read cost is `3 + n_wait` on both
 //! sides and the entire difference is a constant: 15 cycles here against 12 on
 //! the cartridge. The `N + S` pricing is therefore sound and the whole gap is
 //! the window's instruction and I/O cost.
 //!
-//! **What is not settled:** the prescaler probe reads back `r0 = 0x4000204`,
-//! and the wait probe reads back the *same* value. An `ldrh` writes only 16
-//! bits, so the upper half is stale — a candidate that **`LDRH` does not
-//! zero-extend into the full 32-bit register**. That is a lead, not a finding:
-//! no direct test has been written, and it is why
-//! `measure_the_ags_prescaler_loop` cannot be used to settle the accounting
-//! question yet.
+//! **What is not settled:** the prescaler probe cannot produce a reading yet.
+//! After 20 000 `gba.step()` calls its loop counter has only fallen from 1024
+//! to 182, and the loop body is two instructions -- so roughly twelve `step()`
+//! calls pass per iteration even though `Gba::step` is documented as "one CPU
+//! instruction cycle". That 12:1 contradiction is unexplained: either `step()`
+//! is not one instruction in this configuration, or this probe is miscounting.
+//! **Do not read it as "the core runs 12x slow"** -- that would contradict
+//! commercial ROMs running at the right frame rate, so at least one of the two
+//! readings is wrong. Until "`step()` equals one instruction" is pinned down,
+//! this probe cannot settle the accounting question.
 //!
 //! # Two dead ends worth not repeating
 //!
@@ -190,12 +198,14 @@ fn measure_the_ags_wait_state_window() {
 /// WAIT window turns on: is that gap a per-access cost or a per-instruction one?
 ///
 /// Assembled form of `prescaler.asm`.
-const PRESCALER: [u32; 33] = [
-    0xE3A04000, 0xE3844C01, 0xE3844000, 0xE3844301, 0xE3A06000, 0xE5846000, 0xE3A06000,
-    0xE3866000, 0xE3866502, 0xE3866000, 0xE5846000, 0xE3A01B01, 0xE3A07000, 0xE2511001,
-    0x1AFFFFFD, 0xE1D400B0, 0xE3A06000, 0xE5846000, 0xE3A01B01, 0xE3A02000, 0xE3A03000,
-    0xE3A05000, 0xE3A06000, 0xE3A07000, 0xE3A08000, 0xE3A09000, 0xE3A0A000, 0xE3A0B000,
-    0xE3A0C000, 0xE3A0D000, 0xE3A0E000, 0xE3A0F000, 0xEAFFFFFE,
+const PRESCALER: [u32; 43] = [
+    0xE3A04000, 0xE3844C01, 0xE3844000, 0xE3844301, 0xE3A06000, 0xE3A08000, 0xE3888C02,
+    0xE3888000, 0xE3888301, 0xE5886000, 0xE3A08008, 0xE3888C02, 0xE3888000, 0xE3888301,
+    0xE5886000, 0xE5846000, 0xE3A06000, 0xE3866000, 0xE3866502, 0xE3866000, 0xE5846000,
+    0xE3A01B01, 0xE3A07000, 0xE2511001, 0x1AFFFFFD, 0xE1D400B0, 0xE3A06000, 0xE5846000,
+    0xE3A01B01, 0xE3A02000, 0xE3A03000, 0xE3A05000, 0xE3A06000, 0xE3A07000, 0xE3A08000,
+    0xE3A09000, 0xE3A0A000, 0xE3A0B000, 0xE3A0C000, 0xE3A0D000, 0xE3A0E000, 0xE3A0F000,
+    0xEAFFFFFE,
 ];
 
 /// Iterations the AGS prescaler test runs, and the cycles it expects.
@@ -214,14 +224,16 @@ fn measure_the_ags_prescaler_loop() {
             .write_word(PROGRAM_BASE + index * 4, *word);
     }
 
-    for _ in 0..8000 {
+    for _ in 0..20_000 {
         gba.step();
     }
 
     let measured = gba.cpu.registers.register_at(0);
+    let loop_counter = gba.cpu.registers.register_at(1);
     let pc = gba.cpu.registers.program_counter();
     println!("AGS TIMER PRESCALER loop");
     println!("  PC        = {pc:#010x} (in program: {})", (PROGRAM_BASE..PROGRAM_BASE + 0x100).contains(&pc));
+    println!("  loop counter r1 = {loop_counter} (0 means the loop finished)");
     println!("  iterations = {PRESCALER_ITERATIONS}");
     println!("  measured  = {measured}");
     println!("  AGS expects= {PRESCALER_EXPECTED}");
