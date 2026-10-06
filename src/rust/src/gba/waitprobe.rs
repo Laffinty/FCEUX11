@@ -89,6 +89,7 @@
 
 #![cfg(test)]
 
+use gba_core::bus::Bus;
 use gba_core::gba::Gba;
 
 /// IWRAM where the measurement block is placed.
@@ -658,6 +659,58 @@ fn the_extracted_wrapper_matches_the_source_it_claims_to_be() {
         u32::from(AGS_CALL_FROM_STACK[26]) | (u32::from(AGS_CALL_FROM_STACK[27]) << 16),
         0x0800_F179
     );
+}
+
+/// Research-only probe: what does this core charge for a DMA right now?
+///
+/// The AGS memory tests time `TimeDmaToAndFromMemory` against the cartridge's
+/// own expectation, and P1 wants that number adjusted. This measures the raw
+/// per-transfer cost for each region pair so the gap can be compared with the
+/// model rather than guessed at.
+///
+/// Immediate (timing 0) DMA runs synchronously on the control write, so the
+/// master-clock delta across that one write is the whole cost of the block.
+///
+/// `#[ignore]`d because it prints: a number to compare by hand is a
+/// measurement, and a measurement is not a gate.
+#[test]
+#[ignore = "prints a measurement to compare by hand; see the module docs"]
+fn measure_what_a_dma_costs_in_each_region_pair() {
+    const REGIONS: [(&str, u32); 6] = [
+        ("EWRAM", 0x0200_0000),
+        ("IWRAM", 0x0300_0000),
+        ("PALETTE", 0x0500_0000),
+        ("VRAM", 0x0600_0000),
+        ("OAM", 0x0700_0000),
+        ("ROM", 0x0800_0000),
+    ];
+    // The DMA count register holds N-1, so this is exactly 0x400 units.
+    const UNITS: u32 = 0x400;
+    const COUNT: u16 = UNITS as u16 - 1;
+
+    println!("DMA cost on this core: master cycles for a 0x400-unit block");
+    println!("    src -> dst");
+    for (src_name, src) in REGIONS {
+        for (dst_name, dst) in REGIONS {
+            let mut bus = Bus::default();
+            bus.write_word(0x0400_00B0, src); // DMA0 source
+            bus.write_word(0x0400_00B4, dst); // DMA0 destination
+            bus.write_half_word(0x0400_00B8, COUNT); // count is N-1
+            // Control halfword is the one that starts an immediate transfer:
+            // enable (15), timing 0 (immediate), 32-bit (10).
+            let before = bus.master_cycles();
+            bus.write_half_word(0x0400_00BA, (1 << 15) | (1 << 10));
+            let after = bus.master_cycles();
+
+            let per_unit = (after - before) as f64 / f64::from(UNITS);
+            println!(
+                "  {src_name:>7} -> {dst_name:<7} total {:>6}  per unit {per_unit:.3}",
+                after - before
+            );
+        }
+    }
+    println!("  (mGBA's model, plan section 5: a fixed +3 per transfer start,");
+    println!("   then each unit priced by its own source and destination waits)");
 }
 
 #[test]

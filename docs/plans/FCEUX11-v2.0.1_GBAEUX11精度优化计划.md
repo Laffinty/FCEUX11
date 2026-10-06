@@ -45,7 +45,7 @@
 | **P4** | 定时器（预分频 + 使能边界） | ✅ **关闭（出口达成）** | r21–r22 落地两处修复：使能启动延迟 `start_delay = 2`（→ PRESCALER 转绿）、TM0 cascade 位使级联链停摆（→ CONNECT 转绿）。r25：**AGS `TIMER` 三项全过 `OOO`**，两处修复各对应一个红项、无重叠、无新增失败；MEMORY 多 2 项转绿，LCD/DMA 未变。r23/r24 另有副产品（`Test_CallFromStack_ASM` 的定位与提取）。r26 ②：`start_delay = 2` 的锚点由 **1 个更正为 3 个**（另两项 WAIT 类测试），不再是单点拟合，但仍是以 AGS 为准绳的标定值 |
 | **线 A** | 访问层 +1 单位差 | ✅ **关闭（已被吸收）** | r26 ①：两个目标测试 `WAIT STATE WAIT CONTROL` / `CARTRIDGE RAM WAIT CONTROL` 在 r21 即由红转绿 ⇒ 「窗口内恒定 3 周期」差已被指令计费修复链吸收 |
 | **P3** | 预取缓冲真模型 | ⬜ 未开工 | r26 ④：`PREFETCH BUFFER` 一直红且它是 §四 的目标测试，与「P3 未开工」自洽；取指地基已清，乐观近似仍在 |
-| **P1** | DMA 传输时序 | 🔧 **只读调查完成，待实施** | r27：目标锁定为 **7 项**（`CPU EXTERNAL/INTERNAL WORK RAM`、`PALETTE RAM`、`VRAM`、`OAM` 五项 MEMORY + `DMA DISPLAY START` + `DMA PRIORITY`），五项 MEMORY 经确认共用 `TimeDmaToAndFromMemory` 计时器。反汇编能力已就位（**无需安装**，`armdis.py` + rustup 自带 llvm-objdump），两个计时函数 `0x80128d8`/`0x800e020` 已定位确认。**期望周期表未取出**，故 §五 验证 ① 的常量锁测试还不能写。**另有一条先于实现的线索：failMask 恒为 24（6 项过 4 项）⇒ 不是「全错」，是「部分错」** |
+| **P1** | DMA 传输时序 | ⏸ **回退中，等第一手期望值** | r27 目标锁定 7 项（五项 MEMORY + `DMA DISPLAY START` + `DMA PRIORITY`），反汇编能力已就位（`armdis.py`，无需安装）。r29/r30：新探针量出本核每单元的 DMA 周期（表见 r29 ②，有效），但据此做的 N−1 计数修复**被 AGS 成绩单否决并已回退**（`DMA0..3 ADDRESS CONTROL` 四项 + `DMA H BLANK START` 由绿转红，24/33 → 19/33）。**⇒ 下一步必须先取出 `TimeDmaToAndFromMemory` 的期望周期表（`0x8012a60` 的 89 分支状态机），否则「应该多少」只能靠猜，猜错的代价已实测为 5 个真回归** |
 | ~~CARTRIDGE TYPE FLAG~~ | 由绿转红的判定 | ❌ **作废（前提证伪）** | r26 ③：r20/r21/r22 三列**全为 O，从未转红**。r12 ⑪ 的记述把 `PREFETCH BUFFER`（一直红）与它（一直绿）读反了 |
 
 ### 待裁决区
@@ -57,7 +57,7 @@
 
 **当前在飞**：工作区含 r26 的改动（未提交）。r21–r26 六个 commit 在本地，**领先 `origin/wip2.0.1`，未 push**。
 **下一步**：**所有 Phase 均已关闭或未开工，没有「进行中」的项。** 未开工的两项按 r20 ③ 定案的顺序：**① P1（DMA 时序，开工前先重测基线）→ ② P3（预取真模型，§四）**。P3 是本计划最后一块大的行为缺口（取指地基已清）。另：开放项（`start_delay` 的独立取证）可随时穿插，不阻塞。
-**门禁基线**：`gba-core` **240/0** + 根 crate 248/0 + `ctest -LE perf` 33/33。
+**门禁基线**：`gba-core` **241/0** + 根 crate 248/0 + `ctest -LE perf` 33/33。
 
 > ⚠️ **提交前不变式（r28 新增）**：**每个 `#[test]` 都必须出现在 `cargo test -- --list` 里。**
 > r28 的 review 发现一段 doc 注释吞掉过 `#[test]`，使一个锁测试静默失效若干轮——它不会红，只是不在了，而套件照样全绿。rustc 早就在警告 `function ... is never used`，**是测试计数把它掩盖了**。守卫：`Research_only/gbatech/check_tests_alive.py`。同族第三次（r10 / AGENTS.md 纪律 10）。
@@ -898,3 +898,55 @@ r0 的注入零成本：例程第 2 条是 `mov r2,#0x400`，而 `set_register_a
 **⑦ review 其余结论**：`advance()` 的边界处理正确（`min` 防部分消耗、`cycles == 0` 提前返回、`as u8` 因 `start_delay` 上界 255 而安全、无 panic 路径）；`get_prescaler` 的 `unreachable!()` 不可达（`control & 0b11` 只能是 0..=3）；`set_control` 的 `match timer` 有 `_ => {}` 兜底；TM0 cascade 修复有 `timer_zero_keeps_counting_when_the_cascade_bit_is_set` 覆盖且变异可红；探针 `run_the_real_wrapper_around_the_real_connect_routine` 是 `#[ignore]` 且**故意保持失败**，不进门禁。
 
 **门禁（r28 复测）**：`gba-core` **240/0** · 根 crate **248/0** · 两态 `cargo check` 通过 · `ctest -LE perf` **33/33** · 12 + 10 个 `#[test]` 全部经 `--list` 验证存活。
+
+**[P1] r29**（2026-10-06）—— **先量后改，结果与 §五 的假设不同：真正的缺陷不是「缺 +3 起始开销」，而是「每次 DMA 少搬一个单元」。计数寄存器的 N−1 约定只对零值成立。**
+
+**① 换了路子，理由充分**：`TimeDmaToAndFromMemory` 的计时实现在 `0x8012a60`，是一张**按内存区域码（0x20..0x78）跳转的 89 分支状态机**，把期望周期表逆出来是独立量级的 RE。**改为先量本核心现在给 DMA 记多少周期**，再拿它和 §五 记录的 mGBA 模型对话 —— 这条路不需要任何 AGS 常数。
+
+**② 新探针 `measure_what_a_dma_costs_in_each_region_pair`**（`#[ignore]`，走公开寄存器写路径；immediate DMA 在控制字写入时同步执行，故 `master_cycles` 的增量就是整块开销）。⚠️ **它第一版就把单元数写错了**：`COUNT = 0x1000-1` 是 4096 个单元，却除以 `0x400`（1024），报出来的「每单元」全大 4 倍。**修正后才取用读数。**
+修正后的每单元周期（32 位传输）：
+
+| | →EWRAM | →IWRAM | →PALETTE/VRAM | →OAM/ROM |
+|---|---|---|---|---|
+| **EWRAM →** | 12 | 7 | 8 | 7 |
+| **IWRAM →** | 7 | 2 | 3 | 2 |
+| **PALETTE/VRAM →** | 8 | 3 | 4 | 3 |
+| **OAM/ROM →** | 7 | 2 | 3 | 2 |
+
+**③ 读数里的落点**：每行的总量都精确等于 `每单元 × 1023 + 1`，那个 `+1` 是控制字写入本身的 1 个周期。**⇒ 寄存器写 0x3FF（应为 1024 个单元）时，本核只搬了 1023 个。**
+
+**④ 缺陷（一行）**：`dma.rs` 的 `reload_count` 返回计数寄存器的**原始值**，而硬件语义是 **N−1**。
+**⑤ 证据来自代码自身，不需要外部手册**：`zero_word_count_latches_channel_maximum` 的注释写着「count 0 表示通道最大值」—— **那正是 N−1 约定的零值特例**。代码对 0 用对了约定，对一般 N 却没有；**这是一处内部不自洽**，改它是消除不一致而不是引入拟合值。
+
+**⑥ 三条既有测试把缺陷锁成了绿色**（与 r17 的 `prescaler_divides_and_carries_remainder` 同型）：`enabling_latches_internal_registers_for_any_timing`（4→5）、`finish_block_repeats_or_disables`（4→5）、`advance_increments_pointers_and_decrements_count`（1→2）。**已按新约定重新推导期望值**，并把 N−1 约定写进 `enabled_channel` 的文档注释（此前它是隐含的，这正是缺陷能长期存活的土壤）。新增 `a_non_zero_count_register_moves_one_more_unit_than_it_reads` 钉住约定本身，含 `0x3FFF → 0x4000` 的上界。
+
+**⑦ 变异验证**：去掉 `+1` → **四条同时转红**，有效。
+
+**⑧ 这解释了 failMask 的形状**：§五 假设「缺 +3 起始开销」会让每个检查都失败；实测 failMask 恒为 24（6 项过 4 项）。**少一个单元在大块里不可见、在小块里致命**，这才是与该形状相符的解释。**⇒ 起始开销这条仍待独立验证，不因本条成立而被确认。**
+
+**门禁（r29）**：`gba-core` **241/0**（+1 新测试）· 根 crate **248/0** · 两态 `cargo check` 通过 · 变异验证两向有效。
+
+**[P1] r30**（2026-10-06）—— **r29 的 DMA 计数修复被 AGS 成绩单否决，已回退。这是本轮最有价值的负结果。**
+
+**① 做了什么**：r29 按 N−1 约定把 `reload_count` 改成 `count as u32 + 1`，并重推了三条锁测试。单元测试全绿、变异验证两向有效、`ctest` 33/33、MKSC/SMA4 冒烟无回归。
+**② 但 AGS 复跑否决了它**：
+
+| | r22（修复前） | r30 试改 |
+|---|---|---|
+| 通过数 | **24/33** | **19/33** |
+| `DMA0/1/2/3 ADDRESS CONTROL` | O O O O | **X X X X** |
+| `DMA H BLANK START` | O | **X** |
+
+**③ 坏掉的五项全是「传输之后指针落点」类测试。** 这个形状很说明问题：多搬一个单元，源/目的指针就多走一格，落点检查随之失败。**AGS 卡带是真实硬件的判官，它说这个行为是错的。**
+
+**④ 结论与处置**：
+· **回退。** 「寄存器 0x3FF → 本核搬 1023 个单元」这个**测量**是真的，r29 的读数表仍然有效。
+· **但从它推出「应当搬 1024」是错的。** 测量只说了「现在是多少」，没说「应该是多少」；后者我是用 N−1 约定**推**出来的，而那张成绩单正好否掉了这个推论。
+· **⚠️ 因此 r29 ⑧ 那句「少一个单元更能解释 failMask 形状」不成立，撤回。** 它同样是一个未经判官验证的推论 —— 我刚犯过一次，就又犯了一次。**正确做法是先取 AGS 的期望值，而不是先改实现再让成绩单来裁决。**
+· 这也说明 **AGS 的 `TIME DMA` 期望周期表无法绕开**：没有它，「应该多少」就只能靠猜，而猜错的代价是 5 个真回归。
+
+**⑤ 唯一被这次失败证实的东西**：`DMA ADDRESS CONTROL` 这一族测试**能查出单元计数错误**，且它们此前是绿的 —— 也就是说，**上游 vendor 的计数实现至少在 AGS 的用例下是正确的**。r16 读到的 vendor 行为在这个维度上没有被本项目改动过，现在有了运行证据而不只是「没人动过」。
+
+**⑥ 保留的部分**：新探针 `measure_what_a_dma_costs_in_each_region_pair` 留下的每区域 DMA 周期表**仍然是有效的一手数据**（它描述的是回退后的当前核心）。ATTRIBUTION §3.2.9 与 r29 的修复描述一并撤回。
+
+**门禁（回退后）**：`gba-core` **240/0** · 根 crate 248/0 · 两态 `cargo check` 通过 · `ctest -LE perf` 33/33 · SMA4 哈希与 r22 逐位相同 · MKSC 仍到标题画面。**AGS 回到 24/33。**

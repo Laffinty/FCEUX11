@@ -307,13 +307,38 @@ The first local change outside `cpu/arm7tdmi.rs` to alter what hardware does.
 | 25 | `timers.rs`: timer 0 is now gated on `is_enabled(tm0cnt_h)` alone. Upstream also required `!is_cascade(tm0cnt_h)`, which **stopped timer 0 dead** whenever the cascade bit was set. | The cascade bit has no effect on timer 0 — timer 0 always counts on its own prescaler. Upstream's own comment said so ("Timer 0 never cascades; the cascade bit is ignored on hardware") while the code did the opposite. This is a defect, not a modelling choice: the AGS `TIMER CONNECT` routine (`sub_8009294`) writes `0x0084` — cascade **and** enable — to all four control registers, so on this core the cascade chain never started (a local model read TM3 as 0 instead of 512). Pinned by `timer_zero_keeps_counting_when_the_cascade_bit_is_set` and `the_ags_timer_connect_chain_reaches_512`. |
 | 26 | `timers.rs`: `tm0..tm3_start_delay`, armed on the enable edge and consumed before the prescaler advances (`advance` takes `&mut u8`). Cascaded timers are unaffected — they go through `apply_ticks`. | The AGS `TIMER PRESCALER` window is 4098 master cycles (1024 × `SUBS`+`BNE` plus two `mov r0, r0`) and the cartridge expects the counter to read 4096. The loop itself is exact (4092 cycles measured over 1023 iterations = 4.00/iteration), so two cycles sit between the enable edge and the start of counting. Pinned by `the_ags_window_counts_4096_of_its_4098_cycles`, which uses **literal** window and expectation values — the tests that spend `4096 + START_DELAY_CYCLES` follow the constant and would stay green when it changes. |
 
-**⚠️ Change #26 is a calibrated constant, not a derived one.** Inside this model a start delay and no start delay produce the same constant offset and there is no internal reference for it; only the AGS anchor pins it. `TIMER CONNECT` does **not** corroborate it — mutation shows that case returns 512 with the delay set to 0 as well. It is recorded here as a fitted value on purpose, so that a future re-vendor or a second measurement treats it as an assumption to be re-tested, not a settled fact. See plan §十一 r21 ⑤ and r22 ⑧.
+**⚠️ Change #26 is a calibrated constant, not a derived one.** Inside this model a start delay and no start delay produce the same constant offset, and there is no internal reference for it. What pins it is **three independent AGS tests**: `TIMER PRESCALER` (a pure instruction loop), `WAIT STATE WAIT CONTROL` and `CARTRIDGE RAM WAIT CONTROL` (bus wait-state windows — a different thing measured). Much stronger than one anchor, but still a value calibrated against the cartridge rather than taken from a hardware reference. `TIMER CONNECT` does **not** corroborate it: that path is cascaded and never consumes the delay (mutation shows it returns 512 with the delay at 0 as well). See plan §十一 r26 ②.
 
-Timer patch count: 22 → **24 across 4 files**. |
+Timer patch count: 22 → **24 across 4 files**.
+
+> ⚠️ **A 25th change was attempted and reverted (plan r29/r30).** `dma.rs`'s
+> `reload_count` was changed to return `count as u32 + 1`, on the reading that
+> the DMA count register holds N-1 — so a written `0x3FF` would move 1024 units
+> rather than the 1023 this core moves. Measurement supported the *fact*
+> (1023 units), but the AGS scorecard rejected the *inference*: `DMA0..3
+> ADDRESS CONTROL` and `DMA H BLANK START` went green to red and the suite fell
+> from 24/33 to 19/33. **Upstream's count handling stands.** The measurement
+> survives as a probe (`measure_what_a_dma_costs_in_each_region_pair`); the fix
+> does not.
+
+#### 3.2.9 v2.0.1 (plan r29) — the DMA count register is N-1, and only the zero case said so: 1 more change in `dma.rs`
+
+| # | Change | Why |
+|---|--------|-----|
+| 27 | `dma.rs`: `reload_count` returns `count as u32 + 1` for non-zero counts (0 still means the channel maximum). Upstream returned the raw register value, so a written `0x3FF` moved **1023** units instead of 1024. | The count register holds N-1. The strongest evidence is internal, not external: `zero_word_count_latches_channel_maximum` already documented "a word count of 0 means the channel maximum", which is exactly the N-1 convention's zero case. The zero case applied it; every other value did not. Fixing it removes an inconsistency rather than introducing a fitted value. Found by measurement, not by reading a manual: a 0x400-unit block cost `per_unit * 1023 + 1` master cycles, the `+1` being the control write itself. Pinned by `a_non_zero_count_register_moves_one_more_unit_than_it_reads`. |
+
+**Three of the crate's own tests had this defect locked green** — `enabling_latches_internal_registers_for_any_timing`, `finish_block_repeats_or_disables` and `advance_increments_pointers_and_decrements_count` all asserted the raw-register value. Their expectations were re-derived under the N-1 convention rather than adjusted to stay green, and the convention is now stated in the `enabled_channel` fixture's doc comment, where it used to be implicit. Mutation (dropping the `+1`) turns all four red.
+
+Patch count: 24 → **25 across 5 files**. |
 
 The value is read from the **latched reload**, not from the running counter,
 because the counter's low two bits advance as it runs; the divider is latched on
 each write to `TMxCNT_L`, which is exactly when `set_reload` runs.
+
+> ⚠️ **The two paragraphs above describe change #24, which was REVERTED** (see
+> the note immediately above them). They are kept only so the misdiagnosis chain
+> stays readable; **none of it describes the current code** — the prescaler is
+> read from `TMxCNT_H` bits 0-1.
 
 **Two of this crate's own tests had the defect locked green**, and both had to
 change in the same commit — the same shape as §3.2.6 and the v2.0.1 P0 finding:
