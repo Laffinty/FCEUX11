@@ -33,25 +33,28 @@
 //! `#[ignore]`d because it prints rather than asserts: a number to compare by
 //! hand is a measurement, and a measurement is not a gate.
 //!
-//! # Status: the harness runs, the numbers are not yet trustworthy
+//! # Status: the WAIT window is localised; the PRESCALER reading is not yet sound
 //!
-//! As of 2026-10-06 this prints values that do **not** match the AGS table, and
-//! it does not yet match in a way that can be attributed to the core. Two
-//! things are wrong with the reading, and both are recorded here so the next
-//! person does not mistake the output for a verdict:
+//! The read-back experiment (r4) settled the earlier ambiguity. `WAITCNT` on a
+//! fresh machine is `0x0000`, and our stub BIOS *deliberately* programs it to
+//! `0x4317` (`bios.rs`, `WAITCNT_DEFAULT` — "the value a manufactured cartridge
+//! runs with"). The four read-backs are `0x4017, 0x4017, 0x401F, 0x401F`,
+//! which is exactly `0x4317 & 0xF8FF | (setting << 2)` — the ROM's own mask
+//! applied to that boot value. **So the program runs as disassembled and
+//! `WAITCNT` is not defective.**
 //!
-//! * Only **two** distinct values come back for four wait settings
-//!   (`{0x27, 0x27, 0x3B, 0x3B}` where four were expected), and
-//! * `WAITCNT` reads back `0x401F` afterwards, when the program leaves
-//!   `0x000C` -- a value this code never writes anywhere.
+//! With the boot value accounted for, the per-read cost is `3 + n_wait` on both
+//! sides and the entire difference is a constant: 15 cycles here against 12 on
+//! the cartridge. The `N + S` pricing is therefore sound and the whole gap is
+//! the window's instruction and I/O cost.
 //!
-//! Either the program is not executing the way the disassembly says, or the
-//! `0x04000204` access path is not doing what `bus.rs` describes. Both readings
-//! are still open. **Do not turn either of these numbers into a core-defect
-//! claim without settling which it is.** The disassembly this is modelled on is
-//! `sub_800329C`; the assembly it was generated from is
-//! `Research_only/gbatech/agswait_probe/program.asm`, and the assembler is
-//! FASMARM 1.44.
+//! **What is not settled:** the prescaler probe reads back `r0 = 0x4000204`,
+//! and the wait probe reads back the *same* value. An `ldrh` writes only 16
+//! bits, so the upper half is stale — a candidate that **`LDRH` does not
+//! zero-extend into the full 32-bit register**. That is a lead, not a finding:
+//! no direct test has been written, and it is why
+//! `measure_the_ags_prescaler_loop` cannot be used to settle the accounting
+//! question yet.
 //!
 //! # Two dead ends worth not repeating
 //!
@@ -77,16 +80,17 @@ const PROGRAM_BASE: usize = 0x0300_0100;
 const AGS_ROW_0: [u32; 4] = [0x28, 0x24, 0x20, 0x38];
 
 /// The measurement block. Assembled form of `program.asm`.
-const PROGRAM: [u32; 59] = [
-    0xE3A0B000, 0xE38BB000, 0xE38BB000, 0xE38BB403, 0xE3A04004, 0xE3844C02, 0xE3844000,
-    0xE3844301, 0xE3A05000, 0xE3855C01, 0xE3855000, 0xE3855301, 0xE3A09000, 0xE3899000,
-    0xE3899000, 0xE3899302, 0xE3A0A000, 0xE1D460B0, 0xE3A070FF, 0xE3877B3E, 0xE0067007,
-    0xE3A08002, 0xE187781A, 0xE1C470B0, 0xE3A06000, 0xE5856000, 0xE3A06000, 0xE3866000,
-    0xE3866502, 0xE3866000, 0xE5856000, 0xE5990000, 0xE5990000, 0xE5990000, 0xE5990000,
-    0xE1D500B0, 0xE3A06000, 0xE5856000, 0xE78B010A, 0xE28AA001, 0xE35A0004, 0x1AFFFFE6,
-    0xE59B0000, 0xE59B1004, 0xE59B2008, 0xE59B300C, 0xE3A04000, 0xE3A05000, 0xE3A06000,
-    0xE3A07000, 0xE3A08000, 0xE3A09000, 0xE3A0A000, 0xE3A0B000, 0xE3A0C000, 0xE3A0D000,
-    0xE3A0E000, 0xE3A0F000, 0xEAFFFFFE,
+const PROGRAM: [u32; 65] = [
+    0xE3A0B000, 0xE38BB000, 0xE38BB000, 0xE38BB403, 0xE3A0C010, 0xE38CC000, 0xE38CC000,
+    0xE38CC403, 0xE3A04004, 0xE3844C02, 0xE3844000, 0xE3844301, 0xE3A05000, 0xE3855C01,
+    0xE3855000, 0xE3855301, 0xE3A09000, 0xE3899000, 0xE3899000, 0xE3899302, 0xE3A0A000,
+    0xE1D460B0, 0xE3A070FF, 0xE3877B3E, 0xE0067007, 0xE3A08002, 0xE187781A, 0xE1C470B0,
+    0xE1D460B0, 0xE78C610A, 0xE3A06000, 0xE5856000, 0xE3A06000, 0xE3866000, 0xE3866502,
+    0xE3866000, 0xE5856000, 0xE5990000, 0xE5990000, 0xE5990000, 0xE5990000, 0xE1D500B0,
+    0xE3A06000, 0xE5856000, 0xE78B010A, 0xE28AA001, 0xE35A0004, 0x1AFFFFE4, 0xE59B0000,
+    0xE59B1004, 0xE59B2008, 0xE59B300C, 0xE59B4010, 0xE59B5014, 0xE59B6018, 0xE59B701C,
+    0xE3A08000, 0xE3A09000, 0xE3A0A000, 0xE3A0B000, 0xE3A0C000, 0xE3A0D000, 0xE3A0E000,
+    0xE3A0F000, 0xEAFFFFFE,
 ];
 
 /// A cartridge that branches to [`PROGRAM_BASE`].
@@ -115,11 +119,18 @@ fn measure_the_ags_wait_state_window() {
     let mut gba = Gba::new(crate::gba::bios::stub(), &cartridge_branches_to_iwram());
     crate::gba::install_swi_hook(&mut gba);
 
+    let before_boot = gba.cpu.bus.read_half_word(0x0400_0204);
+
     for (index, word) in PROGRAM.iter().enumerate() {
         gba.cpu
             .bus
             .write_word(PROGRAM_BASE + index * 4, *word);
     }
+
+    // Read it again with the program written but not yet started: if this and
+    // `before_boot` agree, nothing in the host setup touches WAITCNT, so
+    // whatever value the program finds was put there by the boot chain.
+    let after_write_before_step = gba.cpu.bus.read_half_word(0x0400_0204);
 
     // The block parks on a self-branch, so there is no termination point to
     // wait for: step a bounded number of instructions and read the registers.
@@ -134,18 +145,27 @@ fn measure_the_ags_wait_state_window() {
         gba.cpu.registers.register_at(3),
     ];
 
-    // Read the results area straight out of the bus as well: if the program's
-    // own register reload went wrong, this is the value that actually got
-    // stored, and disagreeing with `measured` is itself information.
+    // The results area, read straight out of the bus rather than trusting the
+    // program's own register reload: if the reload went wrong, this is the
+    // value that actually got stored, and disagreeing with `measured` is
+    // itself information.
     let stored: Vec<u32> = (0..4)
         .map(|i| gba.cpu.bus.read_word(0x0300_0000 + i * 4))
         .collect();
 
+    let readback: Vec<u32> = (0..4)
+        .map(|i| gba.cpu.bus.read_word(0x0300_0010 + i * 4))
+        .collect();
+
     let pc = gba.cpu.registers.program_counter();
     println!("AGS wait-state region 0, settings 0-3");
+    println!("  WAITCNT on a fresh machine          = {before_boot:#06x}");
+    println!("  WAITCNT after host setup, pre-step  = {after_write_before_step:#06x}");
     println!("  PC        = {pc:#010x} (in program: {})", (PROGRAM_BASE..PROGRAM_BASE + 0x100).contains(&pc));
     println!("  measured  : {measured:08X?}");
     println!("  stored    : {stored:08X?}");
+    println!("  WAITCNT read back after each write: {readback:08X?}");
+    println!("  WAITCNT should be                : {:08X?}", [0u32, 4, 8, 12]);
     println!("  AGS expects: {AGS_ROW_0:08X?}");
     for (setting, (got, want)) in measured.iter().zip(AGS_ROW_0.iter()).enumerate() {
         println!(
@@ -157,5 +177,62 @@ fn measure_the_ags_wait_state_window() {
     // last case's value. If that is not `3 << 2`, the writes are not landing
     // where the timing model reads them, and every number above is suspect.
     println!("  WAITCNT now = {:#06x} (expected 0x{:#06x})", gba.cpu.bus.read_half_word(0x0400_0204), 3 << 2);
+    println!("  master cycles = {}", gba.cpu.bus.master_cycles());
+}
+
+/// The AGS `TIMER PRESCALER` measurement loop, on its own.
+///
+/// The cartridge times 1024 iterations of `SUBS` + `BNE` and expects **4096** —
+/// four cycles per iteration. Nothing in that loop touches the Game Pak or any
+/// wait state: it lives in IWRAM, `SUBS` is a register operation and `BNE`
+/// branches backwards. So it isolates what this core charges for plain
+/// instruction execution, which is the question the three-cycle gap in the
+/// WAIT window turns on: is that gap a per-access cost or a per-instruction one?
+///
+/// Assembled form of `prescaler.asm`.
+const PRESCALER: [u32; 33] = [
+    0xE3A04000, 0xE3844C01, 0xE3844000, 0xE3844301, 0xE3A06000, 0xE5846000, 0xE3A06000,
+    0xE3866000, 0xE3866502, 0xE3866000, 0xE5846000, 0xE3A01B01, 0xE3A07000, 0xE2511001,
+    0x1AFFFFFD, 0xE1D400B0, 0xE3A06000, 0xE5846000, 0xE3A01B01, 0xE3A02000, 0xE3A03000,
+    0xE3A05000, 0xE3A06000, 0xE3A07000, 0xE3A08000, 0xE3A09000, 0xE3A0A000, 0xE3A0B000,
+    0xE3A0C000, 0xE3A0D000, 0xE3A0E000, 0xE3A0F000, 0xEAFFFFFE,
+];
+
+/// Iterations the AGS prescaler test runs, and the cycles it expects.
+const PRESCALER_ITERATIONS: u32 = 1024;
+const PRESCALER_EXPECTED: u32 = 4096;
+
+#[test]
+#[ignore = "prints a measurement to compare by hand; see the module docs"]
+fn measure_the_ags_prescaler_loop() {
+    let mut gba = Gba::new(crate::gba::bios::stub(), &cartridge_branches_to_iwram());
+    crate::gba::install_swi_hook(&mut gba);
+
+    for (index, word) in PRESCALER.iter().enumerate() {
+        gba.cpu
+            .bus
+            .write_word(PROGRAM_BASE + index * 4, *word);
+    }
+
+    for _ in 0..8000 {
+        gba.step();
+    }
+
+    let measured = gba.cpu.registers.register_at(0);
+    let pc = gba.cpu.registers.program_counter();
+    println!("AGS TIMER PRESCALER loop");
+    println!("  PC        = {pc:#010x} (in program: {})", (PROGRAM_BASE..PROGRAM_BASE + 0x100).contains(&pc));
+    println!("  iterations = {PRESCALER_ITERATIONS}");
+    println!("  measured  = {measured}");
+    println!("  AGS expects= {PRESCALER_EXPECTED}");
+    println!(
+        "  per iteration = {:.2} cycles (AGS: {:.2})",
+        f64::from(measured) / f64::from(PRESCALER_ITERATIONS),
+        f64::from(PRESCALER_EXPECTED) / f64::from(PRESCALER_ITERATIONS)
+    );
+    println!(
+        "  delta = {:+}",
+        measured as i64 - PRESCALER_EXPECTED as i64
+    );
     println!("  master cycles = {}", gba.cpu.bus.master_cycles());
 }
