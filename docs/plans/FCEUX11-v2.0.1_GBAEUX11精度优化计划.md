@@ -57,7 +57,11 @@
 
 **当前在飞**：工作区含 r26 的改动（未提交）。r21–r26 六个 commit 在本地，**领先 `origin/wip2.0.1`，未 push**。
 **下一步**：**所有 Phase 均已关闭或未开工，没有「进行中」的项。** 未开工的两项按 r20 ③ 定案的顺序：**① P1（DMA 时序，开工前先重测基线）→ ② P3（预取真模型，§四）**。P3 是本计划最后一块大的行为缺口（取指地基已清）。另：开放项（`start_delay` 的独立取证）可随时穿插，不阻塞。
-**门禁基线**：`gba-core` 239/0 + 根 crate 248/0 + `ctest -LE perf` 33/33。
+**门禁基线**：`gba-core` **240/0** + 根 crate 248/0 + `ctest -LE perf` 33/33。
+
+> ⚠️ **提交前不变式（r28 新增）**：**每个 `#[test]` 都必须出现在 `cargo test -- --list` 里。**
+> r28 的 review 发现一段 doc 注释吞掉过 `#[test]`，使一个锁测试静默失效若干轮——它不会红，只是不在了，而套件照样全绿。rustc 早就在警告 `function ... is never used`，**是测试计数把它掩盖了**。守卫：`Research_only/gbatech/check_tests_alive.py`。同族第三次（r10 / AGENTS.md 纪律 10）。
+> ⚠️ **改动仓库源文件禁用 `Get-Content`/`Set-Content` 往返**（AGENTS.md 坑 11 的编码那一半）：无 BOM 的 UTF-8 文件会被按 GBK 读入再按 UTF-8 写出，全文非 ASCII 双重编码。要改字节就用 `[System.IO.File]::ReadAllBytes/WriteAllBytes` 或编辑工具。
 
 > ⚠️ **门禁盲区（r24 后仍成立）**：
 > ① `start_delay = 2` 只有 PRESCALER 一个锚点。相位扫描实测：常数取 0 时 CONNECT **80/80** 全给 512 ⇒ 它对该常数不敏感，**不构成第二个锚点**。它是拟合常数。
@@ -882,3 +886,15 @@ r0 的注入零成本：例程第 2 条是 `mov r2,#0x400`，而 `set_register_a
 **⑤ 未完成的部分（如实登记）**：`TimeDmaToAndFromMemory_*` 只是薄封装，真正的计时在 `0x8012a4c`，而那里又调 `0x8013b24` / `0x8015764` / `0x80129d8` / `0x80139b0` 等多层子函数；从已读到的部分看它是**多次采样 + 阈值判定**（可见 `cmp r0,#0x25`、`cmp r0,#0x7` 之类的取样数与门限）。**期望周期表仍未取出**，§五 验证 ① 的「常量锁测试」因此还不能写。**这是一段需要单独排期的逆向工作，不应在实现 DMA 时序的同时顺手做掉。**
 
 **⑥ 现行实现**（`bus.rs:613` `run_dma_block`）：无起始开销；逐单元借用 `read_word/write_word`；**会改写 `last_used_address`**（与 CPU 的顺序流纠缠）；无 DMA 自己的 S/N 模式。
+
+**[P4] r28**（2026-10-06，push 前 review）—— **review 抓到一条我自己在会话中途制造的假绿：一段 doc 注释吞掉了一个 `#[test]`，锁测试静默死了若干轮。已修复并加不变式守卫。**
+
+**① 事故经过**：做变异验证时用了 `(Get-Content $f -Raw) | Set-Content -Encoding UTF8`。`timers.rs` 无 BOM，PowerShell 5.1 的 `Get-Content` 按系统 ANSI 码页（GBK）读入、写回时按 UTF-8 输出 ⇒ **全文非 ASCII 字符双重编码**。这正是 AGENTS.md **坑 11** 的失败模式，而我踩的是**编码**那一半（此前只防住了行尾）。
+**② 后果**：`the_ags_prescaler_cases_hold_for_every_divider` 的 `#[test]` 被吞进 `///` 行内，函数退化成「永不被调用的私有 fn」。rustc 其实一直在警告 `function ... is never used`，**而我的测试计数一直算着它** —— 死测试不会红，只是不在了。
+**③ 它复活后是红的**：左 4160 / 右 64。根因是被吞掉的还有同一条注释末尾的 `t.set_control(0, 0)` —— 缺了「先失能」这一步就没有 0→1 边沿，计数器不清零，4096 + 64 = 4160。**这正是那条注释自己警告的失效模式**，被它自己演示了一遍。
+**④ 正确的计数**：`gba-core` 是 **240/0**（2 条 `#[ignore]` 探针），不是会话中途读到的 237/239。**237 那个数含一个死测试。**
+**⑤ 已加不变式守卫**：`Research_only/gbatech/check_tests_alive.py` —— 扫描源码里所有 `#[test] fn`，逐个断言它们出现在 `cargo test -- --list` 里。**「文件里的测试数」不是检查，「测试确实在跑」才是。** 同一条教训的第三次出现（r10「编不过的测试等于不存在」、AGENTS.md 纪律 10「全绿也可能是从没跑过」）。
+**⑥ 本轮修复未改动任何生产代码**，只恢复了 `#[test]`、重排了注释、删掉一段垃圾注释；diff 里没有任何逻辑变更。因此 r21/r22/r26 的 AGS 读数依然成立，无需重跑。
+**⑦ review 其余结论**：`advance()` 的边界处理正确（`min` 防部分消耗、`cycles == 0` 提前返回、`as u8` 因 `start_delay` 上界 255 而安全、无 panic 路径）；`get_prescaler` 的 `unreachable!()` 不可达（`control & 0b11` 只能是 0..=3）；`set_control` 的 `match timer` 有 `_ => {}` 兜底；TM0 cascade 修复有 `timer_zero_keeps_counting_when_the_cascade_bit_is_set` 覆盖且变异可红；探针 `run_the_real_wrapper_around_the_real_connect_routine` 是 `#[ignore]` 且**故意保持失败**，不进门禁。
+
+**门禁（r28 复测）**：`gba-core` **240/0** · 根 crate **248/0** · 两态 `cargo check` 通过 · `ctest -LE perf` **33/33** · 12 + 10 个 `#[test]` 全部经 `--list` 验证存活。

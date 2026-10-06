@@ -69,16 +69,22 @@ impl Timers {
     ///
     /// The AGS `TIMER PRESCALER` routine enables TM0 and then measures 1024
     /// iterations of `SUBS` + `BNE` plus two `mov r0, r0`, a window of 4098
-    /// master cycles, and expects the counter to read 4096 鈥?two cycles short of
-    /// the window. The loop itself is exact (4092 cycles measured over 1023
+    /// master cycles, and expects the counter to read 4096 -- two cycles short
+    /// of the window. The loop itself is exact (4092 cycles measured over 1023
     /// iterations, 4.00 per iteration), so the two cycles are the ones between
     /// the enable edge and the start of counting, not the loop.
     ///
     /// Calibrated against that anchor rather than derived: within this model a
     /// start delay and no start delay produce the same constant offset, and
-    /// there is no internal reference for the constant. It is a fitted value,
-    /// held only because a second anchor (`CONNECT`, plan r21 鈶? is required to
-    /// agree before P4 counts as closed.
+    /// there is no internal reference for the constant.
+    ///
+    /// Three independent AGS tests pin it -- `TIMER PRESCALER` (a pure
+    /// instruction loop), `WAIT STATE WAIT CONTROL` and `CARTRIDGE RAM WAIT
+    /// CONTROL` (bus wait-state windows, a different thing measured). That is
+    /// much stronger than one anchor, but it is still a value calibrated
+    /// against the cartridge rather than a figure taken from a hardware
+    /// reference. Plan r26 ②. It does **not** need `TIMER CONNECT`, which
+    /// rides the cascade path and never consumes this delay at all.
     const START_DELAY_CYCLES: u8 = 2;
 
     /// Get prescaler divider from control register bits 0-1
@@ -353,17 +359,28 @@ mod tests {
         assert_eq!(t.tm0cnt_l, 0xFFFF);
     }
 
-    /// AGS PRESCALER 鐨勭獥鍙ｅ舰鐘讹紙纭欢鏍″噯鍊硷級锛歍MxCNT_H bit0-1 閫夊垎棰戯紝
-    /// 璁℃暟鍣ㄤ粠 0 璧锋暟锛?096 涓?IWRAM 闆剁瓑寰呭懆鏈熷悗璇绘暟 = 4096/鍒嗛銆?    ///
-    /// 绐楀彛鏄?**4098** 涓富鍛ㄦ湡鑰屼笉鏄?4096锛欰GS 渚嬬▼鍦?1024 娆?`SUBS`+`BNE`
-    /// 寰幆涔嬪悗銆佽璁℃暟鍣ㄤ箣鍓嶏紝杩樻墽琛屼袱鏉?`mov r0, r0`銆傞偅涓ゆ潯鎸囦护鐨?2 涓懆鏈?    /// 钀藉湪浣胯兘杈规部涓庤捣鏁颁箣闂达紝琚?`START_DELAY_CYCLES` 鍚告敹锛屾墍浠ヨ鏁板埌鐨勪粛
-    /// 鏄?4096 鈥斺€?杩欐鏄湰娴嬭瘯鑳介拤浣忛偅涓父鏁扮殑鍘熷洜銆?    ///
-    /// 鍙樺紓锛歚START_DELAY_CYCLES` 鏀瑰洖 0锛屆? 妗ｈ浆绾紙璇诲埌 4098锛夈€?    #[test]
+    /// The AGS `TIMER PRESCALER` window, in the cartridge's own terms:
+    /// `TMxCNT_H` bits 0-1 pick the divider, the counter starts at 0, and
+    /// 4096 zero-wait IWRAM cycles later the reading is 4096/divider.
+    ///
+    /// The window is **4098** master cycles, not 4096: after its 1024
+    /// `SUBS`+`BNE` iterations and before it reads the counter, the AGS
+    /// routine executes two `mov r0, r0`. Those two cycles fall between
+    /// the enable edge and the start of counting and are absorbed by
+    /// `START_DELAY_CYCLES`, so what gets counted is still 4096 -- which is
+    /// what makes this the test that pins the constant.
+    ///
+    /// Mutation: `START_DELAY_CYCLES` back to 0 turns this red (reads 4098).
+    #[test]
     fn the_ags_prescaler_cases_hold_for_every_divider() {
         let mut t = Timers::default();
         let expected = [4096u32, 64, 16, 4];
         for (field, want) in expected.iter().enumerate() {
-            // AGS 渚嬬▼鐨勪袱娈靛紡锛氬厛鍐?HI=0 澶辫兘锛屽啀鍐欎娇鑳?鍒嗛锛?2 浣嶅啓鐨勪袱涓崐瀛楋級銆?            // 涓嶅け鑳藉垯 0->1 杈规部涓嶆垚绔嬶紝璁℃暟鍣ㄤ笉娓呴浂锛堟湰娴嬭瘯绗竴鐗堝氨姝诲湪杩欙級銆?            t.set_control(0, 0);
+            // AGS's two-stage write: HI=0 to disable first, then enable
+            // plus the divider (32-bit write, two halfwords). Skipping the
+            // disable leaves no 0->1 edge, so the counter is never cleared --
+            // which is exactly how this test read 4160 before the repair.
+            t.set_control(0, 0);
             t.set_reload(0, 0);
             t.set_control(0, ENABLE | field as u16);
             t.step(4096 + u64::from(Timers::START_DELAY_CYCLES));
@@ -405,7 +422,7 @@ mod tests {
     /// window written as a **literal**.
     ///
     /// The other timer tests spend `4096 + START_DELAY_CYCLES`, which means they
-    /// follow the constant and stay green when it changes 鈥?a gate written as a
+    /// follow the constant and stay green when it changes --a gate written as a
     /// mirror of the thing it is supposed to police. This one does not: the AGS
     /// window is 4098 master cycles and the cartridge expects the counter to
     /// read 4096, and both numbers are written down here. Changing the constant
@@ -414,7 +431,11 @@ mod tests {
     #[test]
     fn the_ags_window_counts_4096_of_its_4098_cycles() {
         let mut t = Timers::default();
-        t.set_control(0, 0);
+            // AGS's two-stage write: HI=0 to disable first, then enable
+            // plus the divider (32-bit write, two halfwords). Skipping the
+            // disable leaves no 0->1 edge, so the counter is never cleared --
+            // which is where this test's first version died.
+            t.set_control(0, 0);
         t.set_reload(0, 0);
         t.set_control(0, ENABLE); // divide by one
 
@@ -601,14 +622,14 @@ mod tests {
     /// A start delay that is consumed once, not re-armed every step: the
     /// remainder must survive across calls instead of resetting.
     ///
-    /// Discriminates a *re-arm* bug, not the constant's value 鈥?with the delay
+    /// Discriminates a *re-arm* bug, not the constant's value --with the delay
     /// at 0 this stays green, which is correct: `the_ags_window_counts_4096_of_
     /// its_4098_cycles` is the test that pins the value.
     #[test]
     fn the_start_delay_is_consumed_once_and_not_re_armed() {
         let mut t = Timers::default();
         t.set_reload(0, 0);
-        t.set_control(0, ENABLE); // 梅1
+        t.set_control(0, ENABLE);
 
         // One cycle at a time: the first START_DELAY_CYCLES do nothing, then
         // counting resumes. If the delay were re-armed per step the counter
