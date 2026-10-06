@@ -529,8 +529,135 @@ fn run_the_real_ags_connect_routine() {
 
     println!("AGS TIMER CONNECT, real machine code from ags.gba");
     println!("  loop finished at step {loop_done_at}");
-    println!("  TM3 read by the routine = {reading}   (AGS expects 512)");
+    println!("  TM3 read by the routine = {}   (AGS expects 512)", reading);
     println!("  TIMER CONNECT: {}", if reading == 512 { "PASS" } else { "FAIL" });
+}
+
+/// `Test_CallFromStack_ASM` — the wrapper every AGS timing test goes through —
+    /// **as the machine code in the cartridge**, not re-encoded. THUMB, 28
+    /// halfwords from ROM offset `0xF150`, ending with the 32-bit literal that
+    /// holds its own return address.
+    ///
+    /// Read from `ags.gba` (sha1 `5c73fb40…`), cross-checked against
+    /// `asm/sub_800F150.s`. The assertion below is what makes it usable as an
+    /// input: `blx sp` is the instruction that matters — it is the edge into the
+    /// stack copy, and it also plants the return address in `lr` for the routine
+    /// to come back through.
+    const AGS_CALL_FROM_STACK: [u16; 28] = [
+        0xB590, 0xB082, 0x466F, 0x603A, 0x607B, 0x1A0C, 0x466A, 0x1B12, 0x4695, 0x2100, 0x5843,
+        0x5053, 0x3104, 0x42A1, 0xD1FA, 0x4805, 0x4686, 0x6838, 0x6879, 0x4768, 0x44A5, 0xB002,
+        0xBC90, 0xBC02, 0x4708, 0x0000, 0xF179, 0x0800,
+    ];
+
+/// Run the real wrapper around the real routine — the full path every AGS
+    /// timing test actually takes.
+    ///
+    /// ⚠️ **This probe does not work yet; it asserts rather than reporting.** The
+    /// routine on its own reads 512 (see `run_the_real_ags_connect_routine`) and
+    /// the cartridge still reports `TIMER CONNECT` failing, so the wrapper is the
+    /// one link that has been reasoned about but never actually executed here.
+    /// Getting it to run means putting four arguments into a **Thumb** routine
+    /// entered through an odd `ldr pc`, and that has not been made to work: the
+    /// four `write_half_word` calls land (the readback proves it), the PC does
+    /// reach the wrapper and later the routine, but the wrapper's `push` has not
+    /// been observed to move `sp` at the point the arguments have to be supplied,
+    /// so the window is missed.
+    ///
+    /// It is kept, and it fails loudly, because a probe that quietly prints
+    /// "FAIL" for a run that never reached the routine would be indistinguishable
+    /// from a hardware verdict — the exact confusion this project keeps paying
+    /// for. Fixing it means running the wrapper from ROM as a real cartridge
+    /// would, or instrumenting `sp` from inside rather than watching it from out.
+    #[test]
+    #[ignore = "prints a measurement to compare by hand; see the module docs"]
+fn run_the_real_wrapper_around_the_real_connect_routine() {
+    const WRAPPER: usize = 0x0300_0200;
+    const ROUTINE: usize = 0x0300_0400;
+    const ROUTINE_BYTES: usize = 0x68;
+
+    let mut rom = vec![0u8; 0x200];
+    rom[..4].copy_from_slice(&0xE51F_F004u32.to_le_bytes());
+    // Odd address: entering Thumb state is what the wrapper is compiled as.
+    rom[4..8].copy_from_slice(&((WRAPPER as u32) | 1).to_le_bytes());
+
+    let mut gba = Gba::new(crate::gba::bios::stub(), &rom);
+    crate::gba::install_swi_hook(&mut gba);
+
+    for (index, half) in AGS_CALL_FROM_STACK.iter().enumerate() {
+        gba.cpu.bus.write_half_word(WRAPPER + index * 2, *half);
+    }
+    // Read back what actually landed: a silent failure here looks exactly like a
+    // CPU that cannot execute Thumb, which is the kind of false conclusion this
+    // project has already paid for once (r4 ④'s `b`-to-IWRAM trap).
+    let readback: Vec<u16> = (0..6)
+        .map(|i| gba.cpu.bus.read_half_word(WRAPPER + i * 2))
+        .collect();
+    println!("  wrapper halfwords read back: {readback:04X?}");
+    for (index, word) in AGS_CONNECT.iter().enumerate() {
+        gba.cpu.bus.write_word(ROUTINE + index * 4, *word);
+    }
+
+    let boot_sp = gba.cpu.registers.register_at(13);
+    let mut injected = false;
+    let mut injected_at: Option<u64> = None;
+    let mut seen_argument = false;
+    let mut reading = u32::MAX;
+    let mut step = 0;
+
+    while step < 400_000 {
+        step += 1;
+        if !injected && gba.cpu.registers.register_at(13) != boot_sp {
+            gba.cpu.registers.set_register_at(0, ROUTINE as u32);
+            gba.cpu
+                .registers
+                .set_register_at(1, (ROUTINE + ROUTINE_BYTES) as u32);
+            gba.cpu.registers.set_register_at(2, 65534);
+            gba.cpu.registers.set_register_at(3, 0);
+            injected = true;
+            injected_at = Some(step);
+        }
+        gba.step();
+
+        let r0 = gba.cpu.registers.register_at(0);
+        // `ldr r0, [r7]` restores the first argument just before the branch, so
+        // seeing it means the wrapper really took its path.
+        if r0 == 65534 {
+            seen_argument = true;
+        } else if seen_argument && reading == u32::MAX {
+            reading = r0;
+            break;
+        }
+    }
+
+    // Refuse to print a verdict this probe did not earn. Getting the four
+    // arguments into a Thumb routine entered through an odd `ldr pc` has not
+    // worked reliably yet, and a run that silently reports "FAIL" here would be
+    // indistinguishable from a real hardware verdict — which is the one thing
+    // this probe exists to avoid.
+    assert!(
+        injected && seen_argument && reading != u32::MAX,
+        "the probe did not reach the routine: injected={injected} at {injected_at:?}, \
+         argument seen={seen_argument}, reading={reading:#x}"
+    );
+    println!("AGS TIMER CONNECT through the real Test_CallFromStack_ASM");
+    println!("  TM3 read by the routine = {reading}   (AGS expects 512)");
+    println!(
+        "  TIMER CONNECT: {}",
+        if reading == 512 { "PASS" } else { "FAIL" }
+    );
+}
+
+#[test]
+fn the_extracted_wrapper_matches_the_source_it_claims_to_be() {
+    assert_eq!(AGS_CALL_FROM_STACK[0], 0xB590, "push {{r4, r7, lr}}");
+    assert_eq!(AGS_CALL_FROM_STACK[3], 0x603A, "str r2, [{{r7}}]");
+    assert_eq!(AGS_CALL_FROM_STACK[4], 0x607B, "str r3, [{{r7, #4}}]");
+    assert_eq!(AGS_CALL_FROM_STACK[19], 0x4768, "blx sp — the edge into the copy");
+    // The 32-bit literal at the end is the wrapper's own return address.
+    assert_eq!(
+        u32::from(AGS_CALL_FROM_STACK[26]) | (u32::from(AGS_CALL_FROM_STACK[27]) << 16),
+        0x0800_F179
+    );
 }
 
 #[test]
