@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — vendor 核心的 227 项单元测试从来没有跑过（门禁里少了一层）
+
+- vendor 时丢了 `[dev-dependencies]`，六个测试模块 `use pretty_assertions`（上游
+  workspace 提供过），于是 `cargo test -p gba-core` **根本编不过**。而门禁只跑根
+  crate 的 246 项 —— 所以这 227 项不是「失败」，是「不存在」，而且没有任何一层会
+  报警。`bus.rs` 的全部时序测试都在这一批里。
+- 补回 `pretty_assertions = "1"` 后首次运行：**227 项全绿**。门禁命令已加入
+  `cargo test -p gba-core --lib`，两个 crate 都要跑。
+- 归属：ATTRIBUTION §3.5（第 20 处补丁）。
+
+### Added — AGS 老化卡 WAIT 类的权威期望值落成常量锁测试
+
+- 从 Normmatt/`ags_aging` 反编译取到两个测试的期望值：`WAIT STATE WAIT CONTROL`
+  3×8 共 24 项、`CARTRIDGE RAM WAIT CONTROL` 4 项。**没有直接采信** —— 反编译对应
+  的 `aging.gba` sha1 与我们手上那个 ROM 不同，先把两个测量函数的 literal pool
+  （`0x04000204`、`0x04000100`、写掩码 `0xf8ff`/`0xfcff`、连对齐填充字节）与我们的
+  ROM 逐字节对拍，全部相同才使用。
+- 顺带查清这两个测试的机制与原先设想不同：它们**不测 open-bus**，`0x04000100`
+  是 **TM0CNT_L**，测试是「启动定时器 ÷1 → 4 次 Game Pak 读 → 读回计数器」；函数体
+  由 `Test_CallFromStack_ASM` 拷到栈上执行，所以取指全在 IWRAM，被测窗口里只有那
+  4 次读。
+- 这 28 个值被本仓库**现有**的等待周期公式全部命中，残差恒为 8 周期（= 4 次读之外
+  的窗口开销），因此写成常量锁测试钉住该公式；两个方向都做过变异验证。
+- ⚠️ **由此推翻 v2.0.1 计划 P2 的立论前提**：P2 假设「S/N 判据错 → WAIT 类红」，
+  但 AGS 测的是**同一地址连读 4 次**，而 `last_used_address` 存起始地址使同址重读
+  恰好每次都判非顺序 —— 判对了。所以 P2 按现定义大概率不会让这两个测试转 0，
+  真实原因更可能在预取近似或定时器边界。**已在计划 §十一 r2 登记，S/N 重构暂缓，
+  等裁决。**
+- 归属：ATTRIBUTION §3.2.4（`bus.rs` 第 19 处补丁，**仅测试**，未动生产代码）。
+
 ### Fixed — ARM 模式的 BIOS 调用编号取错字节，ARM 模式程序一律自复位卡死
 
 - ARM7TDMI 的 `SWI` 把 8 位调用编号放在**指令的 bits 16-23**，低 8 位是注释字段。

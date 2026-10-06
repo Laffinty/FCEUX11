@@ -67,7 +67,7 @@ inheritance:
 
 `[lints.clippy]` was carried over unchanged.
 
-### 3.2 Source files — 18 local changes across 3 files
+### 3.2 Source files — 19 local changes across 4 files
 
 `crates/gba-core/src/**` was byte-identical to upstream `emu/src/**` at the end
 of **S0** (verified file-by-file with SHA-256). Local edits begin at **S0'**, when
@@ -206,6 +206,27 @@ behaviour and re-hide the defect behind the very programs that were wrong.
 > the quotient there, a `SoftReset` zeroes it — which needs no exit condition and
 > is unaffected by the convention under test.
 
+#### 3.2.4 v2.0.1 (plan P2 groundwork) — the `AGS` wait-state expectations, 1 more change in `bus.rs`
+
+Tests only. No production line in this crate is touched by this entry, which is
+also why it is the first local change outside `cpu/` — and the first one that
+could be made at all, see §3.5.
+
+| # | Change | Why |
+|---|--------|-----|
+| 19 | `bus.rs`: two new tests in the existing `mod tests`, plus three test-only constants and two test-only helpers (`ags_waitcnt`, `four_loads`). No production line is touched. | Pins the `GamePak` wait-state arithmetic to the `AGS` Aging Cartridge v7.0's own expected values, decoded from the Normmatt/`ags_aging` disassembly (`src/sub_8002CAC.c` `sub_80030E8`, and `src/sub_80031B8.c` `sub_80031B8` against the measurement routines in `src/sub_800326C.arm.s`). The 28 authoritative values — 24 ROM wait-state cases plus 4 cartridge-RAM cases — are reproduced exactly by the crate's **existing** `access_cycles` / `gamepak_cycles` / `gamepak_waits`, with a single fixed overhead of 8 cycles for the cartridge's measurement window. That the same 8 falls out of all 28 cases is what makes the table a check on the formula rather than a fit to it. |
+
+The disassembly targets `aging.gba` with sha1 `c67e0a5e…`; our AGS v7.0 (Rev 1)
+is `5c73fb40…`. The two binaries are **not** the same build, so the table was not
+assumed to apply: both measurement functions' literal pools — `0x04000204`,
+`0x04000100`, and the `0xf8ff` / `0xfcff` write masks, padding byte included —
+are byte-identical in our ROM, and those literals are what decide what gets
+measured.
+
+Mutation-checked both ways: corrupting any one of the 28 expected values turns
+`the_ags_expectations_are_one_overhead_and_a_wait_state_formula` red, and so does
+moving the overhead constant off 8.
+
 ### 3.3 `src/gba/` — new code, no upstream content
 
 `src/rust/src/gba/` is entirely first-party: the SWI implementations and the
@@ -215,12 +236,30 @@ not build on rustc 1.96 fat LTO. Its C ABI surface is specified in the v2.0
 plan section 4.1; S0' exposes the probe surface only, with the real surface
 landing in S2.
 
+### 3.5 `Cargo.toml` — the dropped `[dev-dependencies]`, and 227 tests that never ran
+
+The vendoring kept `[dependencies]` and did not carry `[dev-dependencies]` over.
+Upstream's tests `use pretty_assertions` in six modules, so `cargo test -p
+gba-core` did not compile — and because the project's gate only ever ran
+`cargo test -p fceux11-rust`, **nothing had noticed**.
+
+| # | Change | Why |
+|---|--------|-----|
+| 20 | Added `[dev-dependencies] pretty_assertions = "1"` to `Cargo.toml` | Restores the section upstream had. First run after adding it: **227 tests, 0 failed.** The crate's entire unit-test suite — including every `GamePak` timing test in `bus.rs`, which is where the v2.0.1 precision work is aimed — had been unreachable rather than failing. |
+
+This is worth more than its one line. A vendored crate whose tests cannot compile
+is a crate whose tests do not exist, and "the suite is green" is a sentence that
+can be true of a suite nobody ever invoked. It is also the same shape as the P0
+finding in §3.2.3 one commit earlier — a gate that cannot fail is not a gate —
+arrived at from the opposite direction: there the gate ran and was blind, here it
+never ran at all. `AGENTS.md` now runs both crates in its gate command.
+
 ## 4. Patch-set size
 
 | Item | Status |
 |---|---|
-| `gba-core` source changes | **18**, across **3** source files: 11 in `src/cpu/arm7tdmi.rs` (5 S0' hook wiring, no upstream logic altered + 4 S1a-1 halt mechanism, **does change `step()`** — see R15 + 1 v2.0.1 r56 wake-IRQ return address, see §3.2.2 + 1 v2.0.1 P0 ARM SWI number at bits 16-23, **changes what an ARM-mode BIOS call does**, see §3.2.3) + 3 in `src/cpu/hardware/rtc.rs` + 4 in `src/cpu/hardware/internal_memory.rs` (3 S2-b3 real-time clock + 2 S3-1 battery save; **neither changes behaviour when nothing is overridden**, see §3.2.1). **The "3" is measured, not counted by hand**: `git log --name-only --diff-filter=M -- src/rust/crates/gba-core/src/` names exactly those three files and no others. An earlier draft of this table said "4 files" while enumerating three — the fourth was `Cargo.toml`, which is the row below and is not a source change |
-| `gba-core/Cargo.toml` | rewritten (metadata only, no version changes) |
+| `gba-core` source changes | **19**, across **4** source files: 11 in `src/cpu/arm7tdmi.rs` (5 S0' hook wiring, no upstream logic altered + 4 S1a-1 halt mechanism, **does change `step()`** — see R15 + 1 v2.0.1 r56 wake-IRQ return address, see §3.2.2 + 1 v2.0.1 P0 ARM SWI number at bits 16-23, **changes what an ARM-mode BIOS call does**, see §3.2.3) + 3 in `src/cpu/hardware/rtc.rs` + 4 in `src/cpu/hardware/internal_memory.rs` (3 S2-b3 real-time clock + 2 S3-1 battery save; **neither changes behaviour when nothing is overridden**, see §3.2.1) + 1 in `src/bus.rs` (2 tests, no production line touched, see §3.2.4). **The file list is measured, not counted by hand**: `git log --name-only --diff-filter=M -- src/rust/crates/gba-core/src/` names exactly those files. Earlier drafts of this table said "4 files" while enumerating three and then "3" while the fourth was `Cargo.toml`; `bus.rs` is the first source file outside `cpu/` to be modified, and it is tests only |
+| `gba-core/Cargo.toml` | rewritten (metadata only) + one restored `[dev-dependencies]` section, see §3.5 |
 | `src/gba/` | new, 100% first-party, 9 files |
 
 The plan's risk **R1** says "keep the patch set minimal (SWI hook only)". That
@@ -274,6 +313,20 @@ also the only entry whose *absence* this project's own test suite could not
 have caught, because the suite encoded ARM `SWI` words the same wrong way — two
 first-party encoders had to be corrected in the same change for the fix to be
 observable at all. The set is now **18 entries over 3 files**.
+
+**v2.0.1 (P2 groundwork) adds the first one outside `cpu/`, and the first one
+that is tests only** — two `bus.rs` tests holding the `AGS` Aging Cartridge's own
+expected wait-state values (see §3.2.4). Production code is untouched, so unlike
+every earlier entry this one cannot change what a game observes. It is
+**19 entries over 4 files**, and the fourth file is a file the previous sentence
+in this document had to be corrected about twice.
+
+**And the number that matters more than any of them: 227 tests in this crate
+were never being run** (see §3.5). Every claim this document makes about the
+core's behaviour was made against a suite that covered only the embedder's side
+of the seam. The count went from "246 green in the root crate" to "246 + 227",
+and the first run of the 227 was green too — which is the outcome worth having
+before anyone starts changing the timing model in §3.2.4.
 
 ## 5. Update procedure
 

@@ -68,7 +68,7 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 | v2.0.1 P2–P5 | ⬜ 时序类精度（S/N 跟踪 → 预取 → DMA → 定时器 → LCD），每项独立立项，依序见 v2.0.1 计划 §八 |
 
 **导出符号 34 个**（S3-3 零新增）：探针 6 + 生命周期/帧 10 + 音频 5 + savestate 3 + RTC 2 + 输入 2 + 电池 6。
-**GBA 锁测试 246 项全绿**（7 条 `#[ignore]` 的测量/诊断工具：r37 栈探针、r48 体积探针、S4 的探针与差分转储等；r56 新增 1 条唤醒返回地址锁测试，v2.0.1 P0 新增 2 条 ARM SWI 编号锁测试）。
+**GBA 锁测试 246 项全绿 + vendor 核心自测 227 项全绿**（7 条 `#[ignore]` 的测量/诊断工具：r37 栈探针、r48 体积探针、S4 的探针与差分转储等；r56 新增 1 条唤醒返回地址锁测试，v2.0.1 P0 新增 2 条 ARM SWI 编号锁测试；P2 先行工作项在 `gba-core` 侧新增 2 条 WAIT 期望值测试）。
 
 > ⚠️ **不变式 1 的判据是 F11QA 矩阵 `108P/12F`**，本机跑的是它的**本地近似**
 > `ctest`。**本地确定性门禁 = `ctest -LE perf`（33 项，须全绿）**；
@@ -84,21 +84,22 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 > r54（**用户裁决 2026-10-03：接受 GBA 模块不完美**）解除，验证转 S4 长尾；
 > **GBA 长期 Alpha，不阻塞本体发版。**
 
-v2.0 对 vendor 树的本地修改是 **18 处、跨 3 个源文件**（2026-10-02 用
+v2.0 对 vendor 树的本地修改是 **19 处、跨 4 个源文件**（2026-10-02 用
 `git log --name-only --diff-filter=M -- src/rust/crates/gba-core/src/` 实测得出，
-不是手数；第 4 个文件是 `Cargo.toml` 的元数据重写，不算源改动；r56 增 1 处，
-v2.0.1 P0 再增 1 处）：
+不是手数；第 5 个文件是 `Cargo.toml`，不算源改动；r56 增 1 处，
+v2.0.1 P0 增 1 处、P2 先行工作项再增 1 处）：
 
 | 文件 | 处数 | 内容 |
 |---|---|---|
 | `src/cpu/arm7tdmi.rs` | 11 | S0' 接线 5 处 + S1a-1 的 halt 机制 4 处 + r56 的唤醒 IRQ 返回地址 1 处（**改变行为**，见 ATTRIBUTION §3.2.2）+ v2.0.1 P0 的 ARM SWI 编号位 1 处（**改变行为**，见 ATTRIBUTION §3.2.3） |
+| `src/bus.rs` | 1 | v2.0.1 P2 先行工作项：**只有测试**（AGS 老化卡的 WAIT 类期望值，28 项），未动任何生产代码 —— 见 ATTRIBUTION §3.2.4 |
 | `src/cpu/hardware/rtc.rs` | 3 | S2-b3：固定时刻覆盖（**不改变上游行为**） |
 | `src/cpu/hardware/internal_memory.rs` | 4 | S2-b3 的 `rtc()` / `rtc_mut()` 2 处 + S3-1 的 `backup_type()` / `set_backup_type()` 2 处 |
 
 **后三个文件里的改动都不改变「不覆盖时的行为」。** 但**补丁集已不再是「集中在一个
-文件」**（r38 ④ / r46 ①）—— 改动前先确认这一点是否仍成立，`rtc.rs` 与
-`internal_memory.rs` 都要查。重新 vendor 时看 `ATTRIBUTION.md` §3.2 与
-§3.2.1–§3.2.3。
+文件」**（r38 ④ / r46 ①）—— 改动前先确认这一点是否仍成立，`rtc.rs`、
+`internal_memory.rs`、`bus.rs` 都要查。重新 vendor 时看 `ATTRIBUTION.md` §3.2 与
+§3.2.1–§3.2.4、§3.5。
 
 > ⚠️ **§3.2.3 那一处与上面 17 处性质不同：上游是错的，不是不完整。** 重新 vendor
 > 时新版上游很可能仍读低字节，**合并会把修复悄悄覆盖回去且无人报警**，所以它是
@@ -180,6 +181,11 @@ $vc = "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary
 
 # GBA 锁测试
 cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p fceux11-rust --no-default-features --features gba --lib"
+# vendor 核心自己的单元测试（227 项）。**这一条以前不存在**：vendoring 丢了
+# [dev-dependencies]，pretty_assertions 缺失使 `cargo test -p gba-core` 根本编不过，
+# 而门禁只跑根 crate，于是这 227 项一直「不存在」而不是「失败」。bus.rs 的时序测试
+# 全在这里，P2 之后要在时序模型上动手，先把它跑起来。
+cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p gba-core --lib"
 
 # 两态 feature 检查（第二态同时复核不变式 8：关 feature 时 vendor 树退出编译图）
 cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo check --workspace --no-default-features"
@@ -261,3 +267,9 @@ $env:PATH="D:\Project\FCEUX11\vcpkg_installed\x64-windows\bin;$env:PATH"
    后来又发现它**太松的另一半**：`sdlGbaTexture` 匹配不上任何判据，**一个 GBA 专属
    成员可以完全躲开守卫**。判据要**大小写敏感 + 前缀锚定**，匹配前**先剥掉注释与
    字符串字面量**，并且**宁可漏也不要误报**。
+10. **编不过的测试等于不存在，「全绿」也可能是从没跑过。** `gba-core` 的 227 项单元
+   测试因为 vendor 时丢了 `[dev-dependencies]`（`pretty_assertions`）而**根本编不过**，
+   而门禁只跑根 crate，于是它们「不存在」而不是「失败」，没有任何一层报警。**加一条
+   门禁命令不等于它会跑** —— 新增门禁后要**当场看到它的测试计数**，计数为 0 或「跑不
+   起来」都算没加。这一条与第 9 条同族：守卫失效的两种方式是**误报**与**根本不执行**，
+   后者更隐蔽，因为它连红都不红。

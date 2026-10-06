@@ -39,6 +39,14 @@ rand = { version = "0.8", optional = true }
 [features]
 default = []
 
+[dev-dependencies]
+# Upstream's workspace supplied this to the crate's own unit tests; the
+# vendoring kept `[dependencies]` and dropped this section, so six test modules
+# in this crate failed to compile. Nothing ran `cargo test -p gba-core` while
+# that was true, so the crate's whole test suite -- 92 tests, including every
+# Game Pak timing test in bus.rs -- was unreachable rather than failing.
+pretty_assertions = "1"
+
 [lints.clippy]
 complexity = "warn"
 correctness = "warn"

@@ -200,3 +200,28 @@ Super Circuit logo + 1P 选择提示），逐帧哈希 99fa53fb → ce0662c6 →
 本次证据范围内，手测仍待用户确认。
 
 ⑧ NES 侧零触碰：`git diff` 仅 `src/rust/crates/gba-core/src/cpu/arm7tdmi.rs` + `src/rust/src/gba/`（`gate.rs`、`swi/mod.rs`）+ 四份文档。 | 实施 + 变异验证 + 复跑 |
+
+**r2**（2026-10-06）—— **P2 先行工作项完成，且它推翻了 P2 的立论前提。**
+**① 权威材料到手并逐字节验证。** 计划的 `sub_800326C.arm.s` 不在本地（`AGSTests-main.zip` 是另一个项目 —— 一份 C 重实现，不是反编译）。克隆 Normmatt/`ags_aging` 取得。**它与我们手上那个 ROM 不是同一个 build**（`checksum.sha1` 是 `c67e0a5e…`，我们的 AGS v7.0 Rev 1 是 `5c73fb40…`）—— **所以没有直接采信它的期望值**，而是先把两个测量函数的 literal pool 与我们的 ROM 对拍：`0x04000204`、`0x04000100`、写掩码 `0xf8ff` / `0xfcff`、连对齐填充字节**全部逐字节相同**。决定「测什么」的就是这些字面量，不是 sha1。
+
+**② 28 个期望值全部取到（第一手，非记忆）**：
+`WAIT STATE WAIT CONTROL`（`sub_8002CAC.c` / `sub_80030E8`，`i`=0..2 × `j`=0..7，测 `sub_800329C`）
+```
+{ 0x28,0x24,0x20,0x38,0x24,0x20,0x1C,0x34 }
+{ 0x30,0x2C,0x28,0x40,0x24,0x20,0x1C,0x34 }
+{ 0x40,0x3C,0x38,0x50,0x24,0x20,0x1C,0x34 }
+```
+`CARTRIDGE RAM WAIT CONTROL`（`sub_80031B8.c`，`i`=0..3，测 `sub_8003310`）：`{ 0x1C, 0x18, 0x14, 0x2C }`（与 §三 记的「已知值」一致）。
+
+**③ 这两个测试的机制与 §三 的假设不同，值得单独记一笔。** 它们**不测 open-bus**：`0x04000100` 不是未映射地址，是 **TM0CNT_L**。`sub_800329C` 把 `0x00800000` 写进它（计数器清零、bit7 置 1 = 启动、分频 ÷1），做 4 次 `ldr r3,[r2]`，再 `ldrh` 读回计数器。**所以这是一个「用定时器数总线周期」的时序测试。** 又因 `Test_CallFromStack_ASM` 会先把函数体拷到栈上再 `bx sp` 执行（`asm/sub_800F150.s`），指令取指全部在 IWRAM，被测窗口里只有那 4 次 Game Pak 读。
+
+**④ ⚠️ 前提被推翻：这 28 个值，本仓库现有的等待周期公式已经全部算对了。** 把它们代入本仓库的 `access_cycles` / `gamepak_cycles` / `gamepak_waits`（非顺序字读 = `(1+N) + (1+S)`），三行 24 项 + RAM 4 项**全部命中**，且残差**恒为 8 周期**（= 被测窗口里 4 次读之外的开销：两次 I/O 写、读回与指令开销）。28 个独立用例落同一个常数，这张表因此是**对公式的检验而不是对公式的拟合**。
+已写成锁测试 `the_ags_expectations_are_one_overhead_and_a_wait_state_formula`，两个方向都做过变异验证（改任一期望值转红；把 8 改成 7 也转红）。
+
+**⑤ 推论（对 §三 与 §八 的直接后果）：P2 按现在的定义做不到「两个 WAIT 类转 0」。** 计划的前提是「S/N 判据错 → 每次数据访问被误判非顺序 → WAIT 类红」。但 AGS 的测量是**同一个地址连读 4 次**，而本仓库的 `last_used_address` 存的是**上一次访问的起始地址**，于是同址重读算出 `0 != 4` → 每次都判非顺序，**这恰好是对的**。所以 S/N 粒度不是这两个测试失败的原因，改它大概率不会让它们转 0。真实原因更可能在别处（§三 提到的预取乐观近似，或 P4 的定时器边界）。
+**据此：暂不动 `bus.rs` 的 S/N 重构，先向用户报告并等裁决** —— 按纪律，在前提被自己证伪后继续照原计划改时序模型，是纯浪费。
+
+**⑥ 顺带修掉一个更基础的问题：`gba-core` 的 227 项单元测试从来没有跑过。** 写测试时 `cargo test -p gba-core` 编不过：vendoring 丢了 `[dev-dependencies]`，六个测试模块 `use pretty_assertions`（上游 workspace 提供过）。而门禁只跑根 crate 的 246 项，**所以这 227 项是「不存在」而不是「失败」**。补回 `pretty_assertions = "1"` 后首次运行：**227 项全绿**。`bus.rs` 的时序测试（`access_cycles_constant_regions` / `gamepak_sequential_is_cheaper_than_non_sequential` / `prefetch_makes_sequential_opcode_fetches_cheap`）全在这一批里 —— **P2 要在时序模型上动手，先把它的回归网恢复，这一步是它的前提而不是附带工作。** 门禁命令已加入 `cargo test -p gba-core --lib`。
+**登记**：ATTRIBUTION 新增 §3.2.4（`bus.rs` 第 19 处补丁，**仅测试**）与 §3.5（`Cargo.toml` 补回 dev-dep，第 20 处）。补丁集 18 处/3 文件 → **19 处/4 文件**，首次有 `cpu/` 之外的源文件。
+
+**⑦ 待办（本 Phase 未做）**：MKSC 可玩性仍待手测；§八 的阶段顺序是否要按 ⑤ 重排，等用户裁决。 | 只读调查 + 反编译对拍 + 常量锁测试 |

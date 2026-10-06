@@ -1772,6 +1772,133 @@ mod tests {
         assert_eq!(bus.access_cycles(0x0800_0000, 4), (1 + 2) + (1 + 2));
     }
 
+    /// What the `AGS` Aging Cartridge v7.0 expects of the three `GamePak` ROM
+    /// wait-state regions.
+    ///
+    /// First-hand source: the Normmatt/`ags_aging` disassembly, `src/sub_8002CAC.c`
+    /// (`sub_80030E8`), which loops `i` over 0-2 and `j` over 0-7 and compares
+    /// each measurement against this table. The measurement function itself is
+    /// `sub_800329C` in `src/sub_800326C.arm.s`.
+    ///
+    /// The 28 values below were checked against the ROM actually in use rather
+    /// than assumed to match: the disassembly targets `aging.gba` with sha1
+    /// `c67e0a5e...`, while our AGS v7.0 (Rev 1) is `5c73fb40...`, so the two
+    /// binaries are **not** the same build. What makes the table usable is that
+    /// the literal pool of both measurement functions is byte-identical in our
+    /// ROM -- `0x04000204`, `0x04000100`, and the `0xf8ff` / `0xfcff` write
+    /// masks, padding byte included -- which is the part that decides what is
+    /// measured. A sha1 that differs somewhere else in a 4 MB ROM is not
+    /// evidence that the table does not apply; matching bytes are.
+    const AGS_WAIT_STATE: [[u16; 8]; 3] = [
+        [0x28, 0x24, 0x20, 0x38, 0x24, 0x20, 0x1C, 0x34],
+        [0x30, 0x2C, 0x28, 0x40, 0x24, 0x20, 0x1C, 0x34],
+        [0x40, 0x3C, 0x38, 0x50, 0x24, 0x20, 0x1C, 0x34],
+    ];
+
+    /// What the same cartridge expects of the cartridge-RAM wait control:
+    /// `src/sub_80031B8.c` (`sub_80031B8`), `i` over 0-3, measured by
+    /// `sub_8003310` in `src/sub_800326C.arm.s`.
+    const AGS_CARTRIDGE_RAM_WAIT: [u16; 4] = [0x1C, 0x18, 0x14, 0x2C];
+
+    /// The part of an `AGS` measurement that is **not** the four loads it times.
+    ///
+    /// `sub_800329C` starts `TM0` at divide-by-one, issues four `LDR r3, [r2]`
+    /// from a `GamePak` address, and reads the counter back with `LDRH` before
+    /// returning -- all of the code itself runs from the stack, because
+    /// `Test_CallFromStack_ASM` copies the function there before branching to
+    /// it. So the counter covers the four loads *plus* the stores either side of
+    /// them and their instruction overhead. That residue is 8 cycles, and it is
+    /// 8 for **all twenty-eight** measurements -- four `LDR`s at one constant
+    /// address are every time non-sequential, and the residue does not depend on
+    /// the wait setting. Twenty-eight independent cases landing on one constant
+    /// is what licenses calling it a constant rather than a fitted fudge.
+    const AGS_WINDOW_OVERHEAD: u64 = 8;
+
+    /// Set `WAITCNT` the way `sub_800329C` does, and return a bus ready to be
+    /// charged for one `GamePak` access in `region`.
+    ///
+    /// The write mask and the `3 * i + 2` field offset are the ROM's, not ours:
+    /// `sub_800329C` keeps the other wait fields and writes `setting` three bits
+    /// up per region, which is why `setting` 4-7 lands on the *sequential* field
+    /// and so changes a different number of cycles than 0-3 does.
+    fn ags_waitcnt(region: u32, setting: u32) -> Bus {
+        let mut bus = Bus::default();
+        bus.interrupt_control.wait_state_control =
+            (bus.waitcnt() & 0xF8FF) | ((setting << (3 * region + 2)) as u16);
+        bus
+    }
+
+    /// Four 32-bit loads from one address, which is what the cartridge times.
+    ///
+    /// Driven through `access_cycles` with the address bookkeeping the public
+    /// accessors perform, the same way the three timing tests above do. Repeating
+    /// one address is deliberate: the cartridge re-reads the same `r2` four
+    /// times, and an access that does not advance the address is non-sequential
+    /// every time.
+    fn four_loads(bus: &mut Bus, address: usize) -> u64 {
+        (0..4)
+            .map(|_| {
+                let spent = bus.access_cycles(address, 4);
+                bus.last_used_address = address;
+                spent
+            })
+            .sum()
+    }
+
+    /// The whole `AGS` table follows from one overhead and this crate's
+    /// wait-state arithmetic.
+    ///
+    /// A test of the *constants* rather than of any code path: if it is the only
+    /// thing that ever fails, the table above was transcribed wrongly, and that
+    /// is worth catching before it is used to judge an emulator. Mutation-checked
+    /// -- changing any one expected value turns it red.
+    #[test]
+    fn the_ags_expectations_are_one_overhead_and_a_wait_state_formula() {
+        for (region, row) in AGS_WAIT_STATE.iter().enumerate() {
+            for (setting, expected) in row.iter().enumerate() {
+                let mut bus = ags_waitcnt(region as u32, setting as u32);
+                let base = 0x0800_0000 + ((region as u32) << 25);
+                let loads = four_loads(&mut bus, base as usize);
+                assert_eq!(
+                    u64::from(*expected),
+                    loads + AGS_WINDOW_OVERHEAD,
+                    "WS{region} setting {setting}: {loads} load cycles + \
+                     {AGS_WINDOW_OVERHEAD} overhead should be {expected:#04x}"
+                );
+            }
+        }
+        for (setting, expected) in AGS_CARTRIDGE_RAM_WAIT.iter().enumerate() {
+            let mut bus = Bus::default();
+            bus.interrupt_control.wait_state_control =
+                (bus.waitcnt() & 0xFCFF) | setting as u16;
+            let loads = four_loads(&mut bus, 0x0E00_0000);
+            assert_eq!(
+                u64::from(*expected),
+                loads + AGS_WINDOW_OVERHEAD,
+                "cartridge RAM setting {setting}: {loads} load cycles + \
+                 {AGS_WINDOW_OVERHEAD} overhead should be {expected:#04x}"
+            );
+        }
+    }
+
+    /// An access that does not advance the address is non-sequential, every time.
+    ///
+    /// This is the property the `AGS` wait tests rest on, and it is the one the
+    /// current bookkeeping gets right for the wrong reason: `last_used_address`
+    /// holds the *start* of the previous access, so re-reading the same address
+    /// compares as `0 != 4` and lands on non-sequential by arithmetic accident.
+    /// The same bookkeeping calls a *mixed-width* sequence wrong.
+    #[test]
+    #[allow(clippy::field_reassign_with_default)]
+    fn repeating_one_address_is_never_sequential() {
+        let mut bus = Bus::default();
+        for _ in 0..4 {
+            let spent = bus.access_cycles(0x0800_0000, 4);
+            bus.last_used_address = 0x0800_0000;
+            assert_eq!(spent, (1 + 4) + (1 + 2), "a repeated address pays N again");
+        }
+    }
+
     #[test]
     #[allow(clippy::field_reassign_with_default)]
     fn prefetch_makes_sequential_opcode_fetches_cheap() {
