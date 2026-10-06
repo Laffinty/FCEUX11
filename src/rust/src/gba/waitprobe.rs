@@ -279,6 +279,77 @@ const AGS_HBLANK_WHEN_CLEAR: (u16, u16) = (0xD1, 0xE3);
 /// driving, so the window is architecturally exact. Not on PC: the fetch
 /// pointer runs ahead speculatively, which is the third time that trap has cost
 /// this project a measurement.
+/// Measure the scanline periods by polling `DISPSTAT` from the host.
+///
+/// # Why this replaced the AGS-routine probe
+///
+/// The transcription of `sub_8003D38` measured 57536-60159 cycles and split
+/// its samples 11 / 445, which is nowhere near this core's 960 / 272 geometry.
+/// A measurement that disagrees with the thing it is measuring is a broken
+/// ruler, so that version is not the one to iterate on.
+///
+/// This one needs no measurement program at all. Each turn of the loop is one
+/// `gba.step()` (one instruction, hence one master cycle) plus one
+/// `read_half_word` of an I/O register (`access_cycles` returns 1 for the
+/// 32-bit-bus no-wait regions), so **the loop advances the master clock by
+/// exactly 2 and that is known rather than fitted**. The CPU only has to be
+/// doing something, because the LCD advances off the master clock and not off
+/// instruction retires.
+///
+/// Resolution is therefore 2 cycles, which is far finer than either period, and
+/// nothing has to be calibrated after the fact.
+#[test]
+#[ignore = "prints a measurement to compare by hand; see the module docs"]
+fn measure_the_scanline_periods_by_polling_dispstat() {
+    let mut gba = Gba::new(crate::gba::bios::stub(), &cartridge_branches_to_iwram());
+    crate::gba::install_swi_hook(&mut gba);
+
+    // Park the CPU so it cannot interfere; the LCD runs off the master clock.
+    gba.cpu
+        .bus
+        .write_word(PROGRAM_BASE, 0xEAFF_FFFE); // b .
+
+    const DISPSTAT: usize = 0x0400_0004;
+    let mut last = gba.cpu.bus.read_half_word(DISPSTAT) & 2;
+    let mut previous_at = gba.cpu.bus.master_cycles();
+    let mut active: Vec<u64> = Vec::new();
+    let mut blank: Vec<u64> = Vec::new();
+
+    for _ in 0..2_000_000 {
+        gba.step();
+        let now = gba.cpu.bus.master_cycles();
+        let bit = gba.cpu.bus.read_half_word(DISPSTAT) & 2;
+        if bit != last {
+            // The interval that just ended: bit set means the active period
+            // finished, matching the cartridge's own classification.
+            let span = now - previous_at;
+            if bit != 0 {
+                active.push(span);
+            } else {
+                blank.push(span);
+            }
+            previous_at = now;
+            last = bit;
+            if active.len() >= 20 && blank.len() >= 20 {
+                break;
+            }
+        }
+    }
+
+    let show = |name: &str, v: &[u64]| {
+        let mut d = v.to_vec();
+        d.sort_unstable();
+        d.dedup();
+        println!("  {name}: n={} distinct={d:?}", v.len());
+    };
+    println!("scanline periods, sampled from the host (2 cycles per sample)");
+    show("entered H-BLANK (active period)", &active);
+    show("left H-BLANK (h-blank period)", &blank);
+    println!("  geometry predicts 960 active and 272 h-blank");
+    println!("  AGS wants the *measured* windows, which include the cartridge's");
+    println!("  own read-back cost: active [0x3df,0x3f1], h-blank [0xd1,0xe3]");
+}
+
 #[test]
 #[ignore = "prints a measurement to compare by hand; see the module docs"]
 fn measure_the_ags_hblank_periods() {
