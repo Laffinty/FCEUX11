@@ -57,13 +57,7 @@ pub struct Timers {
 }
 
 impl Timers {
-    /// Get prescaler divider from the **low** register's bits 0-1.
-    ///
-    /// The prescaler shares bits 0-1 with the counter and the reload value;
-    /// the high register holds cascade (bit 2), IRQ (bit 6) and enable (bit 7)
-    /// and no divider at all. Pass the latched reload value, not the high
-    /// register — reading the divider from `TMxCNT_H` makes it permanently 1,
-    /// because the only bits set there are enable and IRQ.
+    /// Get prescaler divider from control register bits 0-1
     fn get_prescaler(control: u16) -> u32 {
         match control & 0b11 {
             0 => 1,    // F/1
@@ -150,16 +144,16 @@ impl Timers {
                 &mut self.tm0cnt_l,
                 self.tm0_reload,
                 &mut self.tm0_prescaler_counter,
-                Self::get_prescaler(self.tm0_reload),
+                Self::get_prescaler(self.tm0cnt_h),
                 cycles,
             )
         } else {
             0
         };
 
-        let tm1 = self.step_timer(self.tm1cnt_h, self.tm1_reload, cycles, tm0, 1);
-        let tm2 = self.step_timer(self.tm2cnt_h, self.tm2_reload, cycles, tm1, 2);
-        let tm3 = self.step_timer(self.tm3cnt_h, self.tm3_reload, cycles, tm2, 3);
+        let tm1 = self.step_timer(self.tm1cnt_h, cycles, tm0, 1);
+        let tm2 = self.step_timer(self.tm2cnt_h, cycles, tm1, 2);
+        let tm3 = self.step_timer(self.tm3cnt_h, cycles, tm2, 3);
 
         TimerOverflowResult {
             timer0_overflow: tm0 > 0 && Self::is_irq_enabled(self.tm0cnt_h),
@@ -174,28 +168,12 @@ impl Timers {
     /// Advance one of timers 1..=3 and return how many times it overflowed.
     /// In cascade mode it ticks once per overflow of the timer below it,
     /// otherwise it is driven by its own prescaler.
-    ///
-    /// `control` is the **high** register: cascade, IRQ and enable live there.
-    /// The prescaler does not — it is bits 0-1 of the low register, the same
-    /// bits the counter and reload value use — so it comes from `reload`, which
-    /// is latched on every write to `TMxCNT_L`. Reading it from the running
-    /// counter instead would let the divider change as the counter's low bits
-    /// advance, and reading it from `control` (which is what this did) made
-    /// every timer divide by one: `0x0080` & 3 == 0, always.
-    fn step_timer(
-        &mut self,
-        control: u16,
-        reload: u16,
-        cycles: u64,
-        prev_overflows: u32,
-        timer: usize,
-    ) -> u32 {
+    fn step_timer(&mut self, control: u16, cycles: u64, prev_overflows: u32, timer: usize) -> u32 {
         if !Self::is_enabled(control) {
             return 0;
         }
 
-        let prescaler = Self::get_prescaler(reload);
-        let (counter, reload_value, prescaler_counter) = match timer {
+        let (counter, reload, prescaler_counter) = match timer {
             1 => (
                 &mut self.tm1cnt_l,
                 self.tm1_reload,
@@ -214,9 +192,15 @@ impl Timers {
         };
 
         if Self::is_cascade(control) {
-            Self::apply_ticks(counter, reload_value, prev_overflows)
+            Self::apply_ticks(counter, reload, prev_overflows)
         } else {
-            Self::advance(counter, reload_value, prescaler_counter, prescaler, cycles)
+            Self::advance(
+                counter,
+                reload,
+                prescaler_counter,
+                Self::get_prescaler(control),
+                cycles,
+            )
         }
     }
 
@@ -292,54 +276,34 @@ mod tests {
     #[test]
     fn prescaler_divides_and_carries_remainder() {
         let mut t = Timers::default();
-        // The divider is bits 0-1 of the LOW register, so it goes into the
-        // reload value, not the control word. An earlier version of this test
-        // put `0b01` in the control word and passed -- because the
-        // implementation read the divider from there too. Both were wrong
-        // together, which is exactly the shape of a gate that cannot fail.
-        t.set_reload(0, 0b01); // prescaler 64, and a long wrap period
-        t.set_control(0, ENABLE | IRQ);
+        t.set_reload(0, 0xFFFF); // wrap period of one tick
+        t.set_control(0, ENABLE | IRQ | 0b01); // prescaler 64
 
-        assert_eq!(t.tm0cnt_l, 0b01, "enabling loads the counter from reload");
+        // 63 cycles: not enough for a single tick.
+        assert!(!t.step(63).timer0_overflow);
+        assert_eq!(t.tm0cnt_l, 0xFFFF);
 
-        // 63 cycles is not enough for a single tick.
-        t.step(63);
-        assert_eq!(t.tm0cnt_l, 0b01);
-
-        // The 64th cycle produces one tick.
-        t.step(1);
-        assert_eq!(t.tm0cnt_l, 0b01 + 1);
+        // The 64th cycle produces one tick, which overflows the reloaded counter.
+        let r = t.step(1);
+        assert!(r.timer0_overflow);
+        assert_eq!(t.tm0cnt_l, 0xFFFF);
     }
 
-    /// The `AGS` `TIMER PRESCALER` expectations, one divider at a time.
-    ///
-    /// The cartridge times 1024 iterations of `SUBS` + `BNE` and expects
-    /// `{4096, 64, 16, 4}` for divide-by-{1, 64, 256, 1024}. Each case is
-    /// asserted separately, so passing on one divider cannot hide a failure
-    /// on another -- and the small cases are the ones that catch a divider
-    /// that is simply never applied.
+    /// AGS PRESCALER 的窗口形状（硬件校准值）：TMxCNT_H bit0-1 选分频，
+    /// 计数器从 0 起数，4096 个 IWRAM 零等待周期后读数 = 4096/分频。
+    /// 变异：改回从 reload 低两位取分频，四档同时转红。
     #[test]
     fn the_ags_prescaler_cases_hold_for_every_divider() {
-        // (prescaler code, expected ticks over a 4096-cycle span)
-        const CASES: [(u16, u64); 4] = [(0b00, 4096), (0b01, 64), (0b10, 16), (0b11, 4)];
-        const SPAN: u64 = 4096;
-
-        for (code, expected) in CASES {
-            let mut t = Timers::default();
-            // A reload of `code` both sets the counter and carries the divider
-            // in the same bits, exactly as a write to TMxCNT_L does on
-            // hardware. The wrap period is 0x10000 - code, far beyond SPAN,
-            // so the counter's advance *is* the tick count.
-            t.set_reload(0, code);
-            t.set_control(0, ENABLE | IRQ);
-
-            let before = t.tm0cnt_l;
-            t.step(SPAN);
-            assert_eq!(
-                u64::from(t.tm0cnt_l.wrapping_sub(before)),
-                expected,
-                "divider code {code:#04b} over {SPAN} cycles should tick {expected} times"
-            );
+        let mut t = Timers::default();
+        let expected = [4096u32, 64, 16, 4];
+        for (field, want) in expected.iter().enumerate() {
+            // AGS 例程的两段式：先写 HI=0 失能，再写使能+分频（32 位写的两个半字）。
+            // 不失能则 0->1 边沿不成立，计数器不清零（本测试第一版就死在这）。
+            t.set_control(0, 0);
+            t.set_reload(0, 0);
+            t.set_control(0, ENABLE | field as u16);
+            t.step(4096);
+            assert_eq!(t.tm0cnt_l as u32, *want, "prescaler field {field}");
         }
     }
 
@@ -358,11 +322,8 @@ mod tests {
     #[test]
     fn cascade_ticks_once_per_lower_overflow() {
         let mut t = Timers::default();
-        // Timer 0: prescaler 1 (low bits 00) with a period of 16 ticks. It
-        // cannot be a period of one tick and a prescaler of 1 at the same
-        // time -- a one-tick period means reload 0xFFFF, whose low two bits
-        // select divide-by-1024.
-        t.set_reload(0, 0xFFF0);
+        // Timer 0 overflows every cycle (period of one tick).
+        t.set_reload(0, 0xFFFF);
         t.set_control(0, ENABLE);
 
         // Timer 1 cascades, period of two ticks.
@@ -371,7 +332,7 @@ mod tests {
 
         // Three timer-0 overflows advance the cascade timer three ticks,
         // which is one and a half of its two-tick period: one overflow.
-        let r = t.step(16 * 3);
+        let r = t.step(3);
         assert!(r.timer1_overflow);
         assert_eq!(t.tm1cnt_l, 0xFFFF);
     }

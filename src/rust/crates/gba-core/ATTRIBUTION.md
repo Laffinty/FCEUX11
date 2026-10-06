@@ -67,7 +67,7 @@ inheritance:
 
 `[lints.clippy]` was carried over unchanged.
 
-### 3.2 Source files — 23 local changes across 5 files
+### 3.2 Source files — 22 local changes across 4 files (r17 #24 reverted, see §3.2.7)
 
 `crates/gba-core/src/**` was byte-identical to upstream `emu/src/**` at the end
 of **S0** (verified file-by-file with SHA-256). Local edits begin at **S0'**, when
@@ -297,6 +297,8 @@ The first local change outside `cpu/arm7tdmi.rs` to alter what hardware does.
 | # | Change | Why |
 |---|--------|-----|
 | 24 | `timers.rs`: the divider is taken from the **low** register's latched reload value (`get_prescaler(self.tm0_reload)`, and a `reload` parameter threaded into `step_timer` for timers 1-3) instead of from the high control register. `get_prescaler`'s own doc comment now says which register it wants. | The prescaler occupies **bits 0-1 of `TMxCNT_L`** — the same bits as the counter and reload value. The high register `TMxCNT_H` holds cascade (bit 2), IRQ (bit 6) and enable (bit 7) and no divider at all. Reading it from there yields `0x0080 & 3 == 0`, i.e. **divide by one, forever**: measured `{4147, 4148, 4149, 4150}` for divide-by-{1, 64, 256, 1024}, where the only thing that varied was the counter's starting value. mGBA agrees (`timer.c:124`, `prescaleTable[4] = { 0, 6, 8, 10 }`, indexed by the low register's `& 0x0003`). |
+
+**REVERTED (plan r19, 2026-10-06).** The hardware model above is wrong. The prescaler selection lives in **`TMxCNT_H` bits 0-1** (GBATEK; mGBA `timer.c:124` — its `control` operand *is* the value written to `TMxCNT_H`, not "the low register"). The AGS aging cartridge's own PRESCALER routine writes `(j<<16)|0x800000`, i.e. `TMxCNT_H = 0x0080|j` — enable (bit 7) + prescaler (bits 0-1), standard layout — and its expectation table `{4096, 64, 16, 4}` only fits that layout. Change #24 is reverted (`get_prescaler(self.tm0cnt_h)`, the upstream form; the two unit-test fixtures restored to control-word encoding). Timer patch count returns to 22 across 4 files. This entry is retained as a record of the misdiagnosis chain (r15 probe never set the prescaler field → r16 misread mGBA → r17 wrong-direction fix → r18 AGS decode caught it → r19 adjudication). See plan §十一 r19. |
 
 The value is read from the **latched reload**, not from the running counter,
 because the counter's low two bits advance as it runs; the divider is latched on
