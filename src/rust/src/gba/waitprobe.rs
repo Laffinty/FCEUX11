@@ -241,6 +241,102 @@ const _: () = {
     let _ = PRESCALER_AFTER_LOOP_WORD;
 };
 
+/// Where the H-BLANK measurement program puts its sample pairs.
+///
+/// Halfword `2k` is the `DISPSTAT` sample and halfword `2k+1` is the counter
+/// reading for sample `k`, which is the layout `sub_8003D38` writes.
+const HBLANK_SAMPLES: usize = 456;
+const HBLANK_SAMPLE_BASE: usize = 0x0300_0000;
+const HBLANK_SAMPLE_END: u32 = (HBLANK_SAMPLE_BASE + HBLANK_SAMPLES * 4) as u32;
+
+/// A transcription of the AGS Aging Cartridge's H-BLANK measurement routine,
+/// `sub_8003D38` in `src/sub_8003C88.arm.s`, made position independent so it can
+/// be copied into IWRAM and branched to. Assembled form of
+/// `agswait_probe/hblankmeas.asm`.
+///
+/// The program arms TM0 at divide-by-one, polls `DISPSTAT` bit 1 until it
+/// changes, reads TM0 at that instant, re-arms, and stores the pair. Running it
+/// here and printing the readings puts this core's numbers and the cartridge's
+/// expected windows on the same ruler -- which is the one experiment both the
+/// leftover `AGS` `TIMER` failures and the `H BLANK STATUS` failure both need.
+const HBLANK_MEASURER: [u32; 39] = [
+    0xE3A00000, 0xE3800000, 0xE3800000, 0xE3800403, 0xE3A01F72, 0xE3A04000, 0xE3844C01,
+    0xE3844000, 0xE3844301, 0xE3A05000, 0xE5845000, 0xE3A06000, 0xE3866000, 0xE3866502,
+    0xE3866000, 0xE5846000, 0xE3A07004, 0xE3877000, 0xE3877000, 0xE3877301, 0xE3A08002,
+    0xE1A01101, 0xE0811000, 0xE1D720B0, 0xE0023008, 0xE1D790B0, 0xE009A008, 0xE153000A,
+    0xE1A0300A, 0x0AFFFFFA, 0xE1D4B0B0, 0xE5845000, 0xE5846000, 0xE0C090B2, 0xE0C0B0B2,
+    0xE1500001, 0x1AFFFFF3, 0xE5845000, 0xEAFFFFFE,
+];
+
+/// The windows the cartridge's own test demands (`sub_8003A1C`).
+const AGS_HBLANK_WHEN_SET: (u16, u16) = (0x3DF, 0x3F1);
+const AGS_HBLANK_WHEN_CLEAR: (u16, u16) = (0xD1, 0xE3);
+
+/// Run the AGS H-BLANK measurement on this core and print what it sees.
+///
+/// Bracketed on **r0**, the program's own writeback pointer, armed by the
+/// pointer reaching the end of the buffer -- a register the program itself is
+/// driving, so the window is architecturally exact. Not on PC: the fetch
+/// pointer runs ahead speculatively, which is the third time that trap has cost
+/// this project a measurement.
+#[test]
+#[ignore = "prints a measurement to compare by hand; see the module docs"]
+fn measure_the_ags_hblank_periods() {
+    let mut gba = Gba::new(crate::gba::bios::stub(), &cartridge_branches_to_iwram());
+    crate::gba::install_swi_hook(&mut gba);
+
+    for (index, word) in HBLANK_MEASURER.iter().enumerate() {
+        gba.cpu
+            .bus
+            .write_word(PROGRAM_BASE + index * 4, *word);
+    }
+
+    let mut armed = false;
+    for _ in 0..4_000_000 {
+        if gba.cpu.registers.register_at(0) >= HBLANK_SAMPLE_END {
+            armed = true;
+            break;
+        }
+        gba.step();
+    }
+    assert!(armed, "the measurement never filled its sample buffer");
+
+    // Sample pairs: the DISPSTAT sample, then the counter reading.
+    let mut when_set: Vec<u32> = Vec::new();
+    let mut when_clear: Vec<u32> = Vec::new();
+    for k in 0..HBLANK_SAMPLES {
+        let at = HBLANK_SAMPLE_BASE + k * 4;
+        let dispstat = gba.cpu.bus.read_half_word(at) as u32;
+        let counter = gba.cpu.bus.read_half_word(at + 2) as u32;
+        if dispstat & 2 != 0 {
+            when_set.push(counter);
+        } else {
+            when_clear.push(counter);
+        }
+    }
+
+    let summarise = |name: &str, values: &[u32], window: (u16, u16)| {
+        let mut distinct = values.to_vec();
+        distinct.sort_unstable();
+        distinct.dedup();
+        let inside = values
+            .iter()
+            .filter(|v| **v >= u32::from(window.0) && **v <= u32::from(window.1))
+            .count();
+        println!("  {name}: n={} distinct={distinct:?}", values.len());
+        println!(
+            "    AGS window [{:#05x}, {:#05x}] -> {inside}/{} inside",
+            window.0, window.1, values.len()
+        );
+    };
+
+    println!("AGS H-BLANK STATUS measurement, run on this core");
+    summarise("entered H-BLANK (active period)", &when_set, AGS_HBLANK_WHEN_SET);
+    summarise("left H-BLANK (h-blank period)", &when_clear, AGS_HBLANK_WHEN_CLEAR);
+    println!("  our geometry: 240 visible + 68 h-blank dots at 4 cycles each");
+    println!("   => 960 active, 272 h-blank, 228 lines, 280896 cycles per frame");
+}
+
 #[test]
 #[ignore = "prints a measurement to compare by hand; see the module docs"]
 fn measure_the_ags_prescaler_loop() {
