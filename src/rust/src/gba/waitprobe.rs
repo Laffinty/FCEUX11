@@ -337,9 +337,17 @@ fn measure_every_ags_prescaler_case() {
         }
 
         gba.cpu.bus.write_word(TM0, 0); // counter 0, stopped
+        // The divider belongs in `TMxCNT_H` bits 0-1, so it has to travel in the
+        // high half — `(j << 16) | 0x800000`, which is exactly what the AGS
+        // routine writes. This used to be `| prescaler`, which put the code in
+        // the *low* half: that is the counter/reload, so every case armed
+        // `TMxCNT_H = 0x0080` (divide by one) and the only thing that varied was
+        // where the counter started. The table it produced, {4147, 4148, 4149,
+        // 4150}, was an artifact of that and never exercised three of the four
+        // dividers — see plan r21.
         gba.cpu
             .bus
-            .write_word(TM0, 0x0080_0000 | prescaler as u32); // enable, prescaler
+            .write_word(TM0, 0x0080_0000 | ((prescaler as u32) << 16));
 
         let mut done = false;
         for _ in 0..200_000 {
@@ -362,6 +370,69 @@ fn measure_every_ags_prescaler_case() {
     }
     println!("  (only the divide-by-one case is inside a tolerance that hides an");
     println!("   offset; the other three are single-digit numbers)");
+}
+
+/// Does the counter start moving on the enable edge, or is there a lag?
+///
+/// Plan r19 says an enable edge should take ~2 cycles before the counter moves,
+/// and calibrates that constant by requiring the divide-by-one AGS case to come
+/// out at exactly 4096. **That is a constant fitted to a single anchor** — the
+/// same shape as the `-4` constant r12 retracted for being fitted. So this probe
+/// measures the lag instead of fitting it: sample TM0 every cycle from the edge
+/// and read the offset straight off the table.
+///
+/// Both columns are printed, so the answer needs no prediction at all. If
+/// counting begins on the edge the counter tracks the clock and the lag column
+/// is a constant; if it begins late, the lag column is that constant minus the
+/// delay, and the constant is whatever the slope implies. Either way the number
+/// is read off, not assumed.
+///
+/// The edge is at a *known* clock value: `write_word` charges `access_cycles`
+/// before it stores, so the enabling byte is written on the last of the charged
+/// cycles and `master_cycles` sampled straight after the call **is** the edge.
+/// Nothing here is hand-encoded — the program is the assembled `divtest.asm`
+/// block already in this file, and this case arms from the host because that is
+/// the only shape in which the edge lands on a clock value I can name. (The bus
+/// drains timers at instruction boundaries, so a store from a program and a
+/// store from the host are the same event to this model.)
+#[test]
+#[ignore = "prints a measurement to compare by hand; see the module docs"]
+fn observe_when_the_timer_starts_counting() {
+    const TM0: usize = 0x0400_0100;
+    const SAMPLES: usize = 24;
+
+    let mut gba = Gba::new(crate::gba::bios::stub(), &cartridge_branches_to_iwram());
+    crate::gba::install_swi_hook(&mut gba);
+
+    for (index, word) in DIVTEST.iter().enumerate() {
+        gba.cpu.bus.write_word(PROGRAM_BASE + index * 4, *word);
+    }
+
+    gba.cpu.bus.write_word(TM0, 0); // counter 0, stopped
+
+    // Drain the host's own setup writes while the timer is still stopped. Left
+    // in, they land in the same `timers.step` batch as the first real sample and
+    // show up as a bogus lag on sample 0.
+    for _ in 0..4 {
+        gba.step();
+    }
+
+    gba.cpu.bus.write_word(TM0, 0x0080_0000); // enable + divide by one
+    let edge = gba.cpu.bus.master_cycles();
+
+    println!("TM0 sampled every cycle from the enable edge (divide by one)");
+    println!("    sample   cycles since edge   TM0    lag");
+    for sample in 0..SAMPLES {
+        gba.step();
+        let cycles = gba.cpu.bus.master_cycles() - edge;
+        let counter = u64::from(gba.cpu.bus.read_half_word(TM0));
+        println!(
+            "    {sample:>6}   {cycles:>17}   {counter:>4}   {:>5}",
+            cycles as i64 - counter as i64
+        );
+    }
+    println!("  a constant lag column means counting starts immediately;");
+    println!("  a lag that never reaches zero means the counter starts late");
 }
 
 #[test]
