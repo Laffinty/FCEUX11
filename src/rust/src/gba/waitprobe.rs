@@ -713,6 +713,119 @@ fn measure_what_a_dma_costs_in_each_region_pair() {
     println!("   then each unit priced by its own source and destination waits)");
 }
 
+/// The AGS cartridge image, loaded at run time.
+///
+/// Deliberately not `include_bytes!`: that would embed a 4 MB commercial ROM in
+/// the test binary, and the image is gitignored research material that only this
+/// `#[ignore]`d probe needs.
+fn load_ags_rom() -> Vec<u8> {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../Research_only/gbatech/ags.gba"
+    );
+    std::fs::read(path).unwrap_or_else(|e| panic!("cannot read {path}: {e}"))
+}
+
+/// Read the AGS `PREFETCH BUFFER` case on this core, by running the cartridge's
+/// own routine.
+///
+/// The routine is not re-created here. `ags.gba` already contains it at
+/// `0x0800326C`, in the GamePak, where its own fetches cost real wait states —
+/// which is the whole point of the test. Only the cartridge head is replaced, so
+/// the BIOS hands control to that address instead of to the AGS's own entry.
+///
+/// Its shape (literal pool read from the ROM, not hand-computed): enable TM0
+/// divide-by-one, do eight dummy reads of the timer register, then read the
+/// counter — so the reading is how many cycles those eight I/O reads took.
+///
+/// The result comes back in `r0`, and the routine leaves the timer stopped
+/// behind it. `r0` is watched rather than sampled at the end because the CPU
+/// carries on into the rest of the cartridge afterwards and would overwrite it.
+/// Watching a register costs no cycles; reading TM0 through the bus would cost
+/// one per sample and perturb the very thing being measured (r13's lesson).
+#[test]
+#[ignore = "prints a measurement to compare by hand; see the module docs"]
+fn measure_the_ags_prefetch_case_under_both_waitcnt_settings() {
+    const ROUTINE: u32 = 0x0800_3011; // Thumb entry of sub_8003010
+    const TM0CNT: usize = 0x0400_0100;
+
+    // Run the cartridge's own test rather than re-creating its two cases.
+    // `sub_8003010` programs WAITCNT itself between the two measurements, and
+    // asking the host to write WAITCNT before the first step does not work: the
+    // stub BIOS overwrites it during boot, which showed up as both cases
+    // measuring identically.
+    let mut rom = load_ags_rom();
+    // ARM head that interworks: `ldr r0, [pc, #4]` / `bx r0` / literal holding
+    // the odd routine address. A plain `ldr pc, [pc, #-4]` cannot be used -- this
+    // core's LDR PC does not switch processor state, so a Thumb entry point
+    // loaded that way is executed as ARM and the run derails immediately
+    // (observed: final PC 0x0000000C).
+    rom[..2].copy_from_slice(&0x4801u16.to_le_bytes()); // ldr r0, [pc, #4]
+    rom[2..4].copy_from_slice(&0x4700u16.to_le_bytes()); // bx r0
+    rom[8..12].copy_from_slice(&ROUTINE.to_le_bytes());
+    let mut gba = Gba::new(crate::gba::bios::stub(), &rom);
+    crate::gba::install_swi_hook(&mut gba);
+
+    // `sub_8003010` calls `sub_800326C` twice, and that helper keeps TM0CNT in
+    // r4 across its body and restores it on the way out. Watching r4 brackets
+    // each measurement; r0 changes once per measurement, carrying the reading.
+    // Both are register reads, so neither costs a cycle.
+    let mut inside = false;
+    let mut r0_at_entry = 0;
+    let mut entries = 0u32;
+    let mut r4_seen: Vec<u32> = Vec::new();
+    let mut readings: Vec<u32> = Vec::new();
+    for _ in 0..400_000 {
+        gba.step();
+        let r4 = gba.cpu.registers.register_at(4);
+        let r0 = gba.cpu.registers.register_at(0);
+        if r4_seen.len() < 6 && !r4_seen.contains(&r4) {
+            r4_seen.push(r4);
+        }
+        if r4 == TM0CNT as u32 {
+            if !inside {
+                // Only on entry: refreshing this every step would make the
+                // comparison at exit trivially equal.
+                r0_at_entry = r0;
+                entries += 1;
+            }
+            inside = true;
+        } else if inside {
+            inside = false;
+            if r0 != r0_at_entry {
+                readings.push(r0);
+            }
+            if readings.len() == 2 {
+                break;
+            }
+        }
+    }
+
+    let expected = [0x18u32, 0x33];
+    // Refuse to print readings this probe did not earn. Three attempts at
+    // entering the Thumb routine from the cartridge head all failed to reach it
+    // (`r4` never became TM0CNT, final PC landed in low memory), and an earlier
+    // version of this probe duly printed a plausible-looking 41 that was just
+    // whatever `r0` happened to hold. A measurement that cannot be shown to
+    // have run is worse than no measurement, because it gets quoted.
+    assert_eq!(
+        entries, 2,
+        "the cartridge routine was not reached twice (entries={entries}, \
+         r4 seen={r4_seen:?}, final PC={:#010x})",
+        gba.cpu.registers.program_counter()
+    );
+    assert_eq!(readings.len(), 2, "only {readings:?} came back");
+
+    for (index, want) in expected.iter().enumerate() {
+        let got = readings[index];
+        println!(
+            "  case {index}  expected {want:<3} measured {got:<5} delta {:+}  {}",
+            got as i64 - *want as i64,
+            if got == *want { "PASS" } else { "FAIL" }
+        );
+    }
+}
+
 #[test]
 #[ignore = "prints a measurement to compare by hand; see the module docs"]
 fn measure_the_scanline_periods_by_polling_dispstat() {
