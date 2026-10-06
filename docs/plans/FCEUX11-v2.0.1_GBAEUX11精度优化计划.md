@@ -189,6 +189,14 @@ Research_only\gbatech\gbaharness.exe <ags.gba> 4800 <outdir> <label>
 ⑥ **jsmolka arm / bios 复跑：两处都由「白屏挂死」变为正常判卷，且落在计划预测的测试号上** —— arm 显示 `Failed test 234`（ARM7TDMI 的 MSR 别名怪癖，报告 §六 的冷门设计差异，非本 Phase 范围）、bios 显示 `Failed test 001`（报告 §七：bios 套件 4 项全是 stub BIOS 的 open-bus 设计差异）。**这两个读数与外测报告里「把 ROM 改迁就缺陷」那组变异 ROM 的读数逐字一致** —— 即核心侧修好之后的行为，等价于当初用 ROM 变异证明的因果。
 
 ⑦ **SMA4 冒烟无回归**：harness 600 帧仍启动到语言选择画面（与 r51 手测、外测报告一致）。
-**⚠️ MKSC 本轮无法复跑：`Research_only/` 下没有该 ROM**（用户提供的商业卡带，未入库）。r56 已由用户确认可运行；本 Phase 未触碰 SWI 之外的任何代码路径，但「MKSC 在修复后仍可运行」这一条**本轮无证据**，如实记为未验。
+**MKSC 冒烟无回归，闭环**（用户 2026-10-06 补充提供 ROM 路径，复制到
+`Research_only\gbatech\mksc.gba` 后跑 harness）：1200 帧**启动到标题画面**（Mario Kart
+Super Circuit logo + 1P 选择提示），逐帧哈希 99fa53fb → ce0662c6 → 660b1a25 → d55214cb
+→ 57a8d625 每档都在变，机器在真跑不是冻帧。**顺带核了 BETA 水印完好**：按
+`overlay.rs` 的字形表逐点取样，两帧各 55 个字形像素**全部为纯白 (255,255,255)** ——
+缩略图上看着像被游戏盖住了，实际是缩略图混叠，若不是逐点取样就会误报一条不存在的
+缺陷。
+**⚠️ 但「可玩性」仍未验证**：harness 只证明能启动到标题画面，进赛、操控、音频都不在
+本次证据范围内，手测仍待用户确认。
 
 ⑧ NES 侧零触碰：`git diff` 仅 `src/rust/crates/gba-core/src/cpu/arm7tdmi.rs` + `src/rust/src/gba/`（`gate.rs`、`swi/mod.rs`）+ 四份文档。 | 实施 + 变异验证 + 复跑 |
