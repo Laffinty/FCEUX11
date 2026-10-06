@@ -298,6 +298,72 @@ const AGS_HBLANK_WHEN_CLEAR: (u16, u16) = (0xD1, 0xE3);
 ///
 /// Resolution is therefore 2 cycles, which is far finer than either period, and
 /// nothing has to be calibrated after the fact.
+/// `mov r1, #1024` + `SUBS`/`BNE` loop + `LDRH r0, [r4]` + an end marker.
+///
+/// Assembled form of `agswait_probe/divtest.asm`. The host arms TM0 and leaves
+/// `r4 = 0x04000100`; it recognises the end by `r7`, which this program writes
+/// exactly once and only when it is done.
+const DIVTEST: [u32; 10] = [
+    0xE3A04000, 0xE3844C01, 0xE3844000, 0xE3844301, 0xE3A01B01, 0xE2511001, 0x1AFFFFFD,
+    0xE1D400B0, 0xE3A07C7F, 0xEAFFFFFE,
+];
+
+/// What the AGS `TIMER PRESCALER` test expects, by prescaler code.
+///
+/// One test covers all four: a fixed small offset is invisible at 4096 and fatal
+/// at 4, which is the whole reason the `÷1` result being right did not make the
+/// AGS row green.
+const AGS_PRESCALER_EXPECTED: [u32; 4] = [4096, 64, 16, 4];
+const DIVIDER_NAMES: [&str; 4] = ["÷1", "÷64", "÷256", "÷1024"];
+
+/// Read the AGS `TIMER PRESCALER` case for each prescaler.
+///
+/// The timer is armed from the host (`0x0080_0000 | prescaler` to TM0CNT, which
+/// sets divide-by-one plus enable in the high half and the prescaler code plus
+/// a zero counter in the low half), the loop runs 1024 iterations of
+/// `SUBS` + `BNE`, and the result comes back in `r0`.
+#[test]
+#[ignore = "prints a measurement to compare by hand; see the module docs"]
+fn measure_every_ags_prescaler_case() {
+    const TM0: usize = 0x0400_0100;
+
+    println!("AGS TIMER PRESCALER, one prescaler at a time (1024 iterations each)");
+    for (prescaler, expected) in AGS_PRESCALER_EXPECTED.iter().enumerate() {
+        let mut gba = Gba::new(crate::gba::bios::stub(), &cartridge_branches_to_iwram());
+        crate::gba::install_swi_hook(&mut gba);
+
+        for (index, word) in DIVTEST.iter().enumerate() {
+            gba.cpu.bus.write_word(PROGRAM_BASE + index * 4, *word);
+        }
+
+        gba.cpu.bus.write_word(TM0, 0); // counter 0, stopped
+        gba.cpu
+            .bus
+            .write_word(TM0, 0x0080_0000 | prescaler as u32); // enable, prescaler
+
+        let mut done = false;
+        for _ in 0..200_000 {
+            if gba.cpu.registers.register_at(7) == 0x7F00 {
+                done = true;
+                break;
+            }
+            gba.step();
+        }
+        assert!(done, "{}: the loop never finished", DIVIDER_NAMES[prescaler]);
+
+        let read = gba.cpu.registers.register_at(0);
+        println!(
+            "  {:<6} expected {:<5} measured {:<5} delta {:+}",
+            DIVIDER_NAMES[prescaler],
+            expected,
+            read,
+            read as i64 - *expected as i64
+        );
+    }
+    println!("  (only the divide-by-one case is inside a tolerance that hides an");
+    println!("   offset; the other three are single-digit numbers)");
+}
+
 #[test]
 #[ignore = "prints a measurement to compare by hand; see the module docs"]
 fn measure_the_scanline_periods_by_polling_dispstat() {
