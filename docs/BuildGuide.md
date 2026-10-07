@@ -150,7 +150,7 @@ $env:VCPKG_ROOT = "$PWD\vcpkg"
 .\scripts\copy_dependencies.ps1 -ExecutablePath .\build\src\fceux11.exe -OutputDir .\dist
 
 # 打包
-Compress-Archive -Path dist\* -DestinationPath FCEUX11-v2.0-win64.zip
+Compress-Archive -Path dist\* -DestinationPath FCEUX11-v2.0.1-win64.zip
 ```
 
 `dist` 目录可直接运行，复制到任意 Windows 11 电脑都能启动。

@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.1] - 2026-10-07
 
 ### Fixed — vendor 核心的 227 项单元测试从来没有跑过（门禁里少了一层）
 
@@ -79,6 +79,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   空白）、`IE` 0x2001 → 0x2005（游戏自开 VCounter IRQ）、调色板出现真实内容、
   IWRAM 代码开始执行 —— 与 mGBA 0.10.5 的引导里程碑一致。SMA4 无回归（其每帧
   工作在 IRQ 处理器侧，此前重执行 SWI 恰好无害，故能玩）。
+
+## [2.0.0] - 2026-10-03
 
 ### Fixed — VBlankIntrWait 永远等不到唤醒（一个自锁）
 
