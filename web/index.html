@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark" />
 <meta name="theme-color" content="#080a09" />
 <title>FCEUX11 — NES/Famicom Emulator for Windows · v2.0</title>
-<meta name="description" content="FCEUX11 v2.0 — a FCEUX-based NES/Famicom emulator optimized for Windows, now with experimental Game Boy Advance (GBA) emulation. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. GBA is fully decoupled from the NES side and is in Beta; a brand-new F11QA automated test suite guards every release, so no game ever regresses." />
+<meta name="description" content="FCEUX11 v2.0 — a FCEUX-based NES/Famicom emulator optimized for Windows, now with experimental Game Boy Advance (GBA) emulation. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. GBA is fully decoupled from the NES side and is in Beta; its accuracy continues to be refined against hardware tests." />
 <meta name="keywords" content="FCEUX11, FCEUX, NES emulator, FC emulator, Famicom emulator, GBA emulator, Game Boy Advance, Windows emulator, TAS editor, Qt6, C++20, game emulator, 8-bit, multi-language, 12 languages, Arabic, RTL, ROM hacking, debugger, Lua scripting" />
 <meta name="author" content="Laffinty" />
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
@@ -33,7 +33,7 @@
 <meta property="og:site_name" content="FCEUX11" />
 <meta property="og:type" content="website" />
 <meta property="og:title" content="FCEUX11 — NES/Famicom Emulator for Windows · v2.0" />
-<meta property="og:description" content="FCEUX11 v2.0 — a FCEUX-based NES/Famicom emulator optimized for Windows, now with experimental Game Boy Advance (GBA) emulation. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. GBA is fully decoupled from the NES side and is in Beta; a brand-new F11QA automated test suite guards every release, so no game ever regresses." />
+<meta property="og:description" content="FCEUX11 v2.0 — a FCEUX-based NES/Famicom emulator optimized for Windows, now with experimental Game Boy Advance (GBA) emulation. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. GBA is fully decoupled from the NES side and is in Beta; its accuracy continues to be refined against hardware tests." />
 <meta property="og:url" content="https://laffinty.github.io/FCEUX11/" />
 <meta property="og:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <meta property="og:locale" content="en_US" />
@@ -57,7 +57,7 @@
 
 <meta name="twitter:card" content="summary" />
 <meta name="twitter:title" content="FCEUX11 — NES/Famicom Emulator for Windows · v2.0" />
-<meta name="twitter:description" content="FCEUX11 v2.0 — a FCEUX-based NES/Famicom emulator optimized for Windows, now with experimental Game Boy Advance (GBA) emulation. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. GBA is fully decoupled from the NES side and is in Beta; a brand-new F11QA automated test suite guards every release, so no game ever regresses." />
+<meta name="twitter:description" content="FCEUX11 v2.0 — a FCEUX-based NES/Famicom emulator optimized for Windows, now with experimental Game Boy Advance (GBA) emulation. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. GBA is fully decoupled from the NES side and is in Beta; its accuracy continues to be refined against hardware tests." />
 <meta name="twitter:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -72,7 +72,7 @@
   "name":"FCEUX11",
   "applicationCategory":"GameApplication",
   "operatingSystem":"Windows 11",
-  "description":"FCEUX11 v2.0 — a FCEUX-based NES/Famicom emulator optimized for Windows, now with experimental Game Boy Advance (GBA) emulation. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. GBA is fully decoupled from the NES side and is in Beta; a brand-new F11QA automated test suite guards every release, so no game ever regresses.",
+  "description":"FCEUX11 v2.0 — a FCEUX-based NES/Famicom emulator optimized for Windows, now with experimental Game Boy Advance (GBA) emulation. Qt 6.8 + C++20. 12 UI languages with auto locale detection, debugging tools, TAS editor, Lua scripting, and rock-solid save states. GBA is fully decoupled from the NES side and is in Beta; its accuracy continues to be refined against hardware tests.",
   "softwareVersion":"2.0",
   "license":"https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt",
   "url":"https://laffinty.github.io/FCEUX11/",
@@ -222,15 +222,22 @@
       <div class="wn-item">
         <div class="wn-num">02</div>
         <div class="wn-text">
-          <h3>A brand-new automated test suite (F11QA)</h3>
-          <p>We've built a brand-new automated test suite: every update runs the full suite automatically, any change that affects how a game runs blocks the release, and every gain in emulator accuracy is measured against it.</p>
+          <h3>Mario Kart: Super Circuit failing to start — fixed</h3>
+          <p>Mario Kart: Super Circuit previously displayed a white screen and stopped responding on boot: when an interrupt woke the processor from its sleep state, the return address did not account for one instruction's width, and the same system call was executed twice after the wake; following the fix, a frame-by-frame verification across 1200 frames confirms that the display keeps updating and reaches the title screen. The same round of fixes also addressed a defect in BIOS calls made by ARM-mode programs: the emulator previously read the call number from an incorrect bit field, causing every call to be treated as a system reset and the program to enter a reset loop at startup. These defects had persisted while all internal tests passed and were ultimately uncovered by real-cartridge testing; the corresponding diagnostic tooling has been strengthened accordingly.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">03</div>
         <div class="wn-text">
-          <h3>Accuracy improved again</h3>
-          <p>Two timing errors in the CPU instruction set are corrected, lifting the official test pass rate from 145/177 to 147/177 (83.1%) with no change to how any game runs; a misjudgement in the test process itself is fixed too, so no future accuracy work is held up by it.</p>
+          <h3>Instruction timing and timer corrections</h3>
+          <p>Verification against the official hardware tests confirmed that the fetch and execute phases of each processor instruction were previously billed twice, doubling the counted cost of every instruction; pricing now follows the real machine. Three timer defects are corrected: the prescaler divider was read from the wrong register and always operated at 1×, cascading one timer into another did not take effect, and the fixed startup delay present on real hardware is now emulated. All three timer entries of the hardware test card now pass.</p>
+        </div>
+      </div>
+      <div class="wn-item">
+        <div class="wn-num">04</div>
+        <div class="wn-text">
+          <h3>Prefetch and DMA timing corrections (benchmark 24/33 → 30/33)</h3>
+          <p>Two further mechanisms now match the real machine. For the instruction prefetch buffer, any data access previously interrupted the prefetch-hit determination; hits are now judged solely on the instruction fetch stream, and both prefetch measurements match the official expected values exactly. During DMA (bulk memory transfer), the timers previously stopped entirely; they now continue counting per transferred unit as on the real machine, and the fixed delay at the start of each transfer is accounted for. All five memory-timing tests pass, raising the hardware benchmark score from 24/33 to 30/33; the remaining two entries (DMA display-start trigger and channel priority) are planned for follow-up work.</p>
         </div>
       </div>
      <div class="wn-cta reveal">

@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark" />
 <meta name="theme-color" content="#080a09" />
 <title>FCEUX11 — Émulateur NES/Famicom pour Windows · v2.0</title>
-<meta name="description" content="FCEUX11 v2.0 — émulateur NES/Famicom dérivé de FCEUX, optimisé pour Windows, désormais avec une émulation expérimentale de Game Boy Advance (GBA). Qt 6.8 + C++20. 12 langues avec détection automatique, outils de débogage, éditeur TAS, scripts Lua et sauvegardes fiables. Le GBA est entièrement découplé du côté NES et en phase Beta ; une toute nouvelle suite de tests automatisée (F11QA) contrôle chaque publication, donc aucun jeu ne régresse." />
+<meta name="description" content="FCEUX11 v2.0 — émulateur NES/Famicom dérivé de FCEUX, optimisé pour Windows, désormais avec une émulation expérimentale de Game Boy Advance (GBA). Qt 6.8 + C++20. 12 langues avec détection automatique, outils de débogage, éditeur TAS, scripts Lua et sauvegardes fiables. Le GBA est entièrement découplé du côté NES et en phase Beta ; sa précision continue d'être affinée à l'aide de tests matériels." />
 <meta name="keywords" content="FCEUX11, FCEUX, NES emulator, FC emulator, Famicom emulator, GBA emulator, Game Boy Advance, Windows emulator, TAS editor, Qt6, C++20, game emulator, 8-bit, multi-language, 12 languages, Arabic, RTL, ROM hacking, debugger, Lua scripting" />
 <meta name="author" content="Laffinty" />
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
@@ -33,7 +33,7 @@
 <meta property="og:site_name" content="FCEUX11" />
 <meta property="og:type" content="website" />
 <meta property="og:title" content="FCEUX11 — Émulateur NES/Famicom pour Windows · v2.0" />
-<meta property="og:description" content="FCEUX11 v2.0 — émulateur NES/Famicom dérivé de FCEUX, optimisé pour Windows, désormais avec une émulation expérimentale de Game Boy Advance (GBA). Qt 6.8 + C++20. 12 langues avec détection automatique, outils de débogage, éditeur TAS, scripts Lua et sauvegardes fiables. Le GBA est entièrement découplé du côté NES et en phase Beta ; une toute nouvelle suite de tests automatisée (F11QA) contrôle chaque publication, donc aucun jeu ne régresse." />
+<meta property="og:description" content="FCEUX11 v2.0 — émulateur NES/Famicom dérivé de FCEUX, optimisé pour Windows, désormais avec une émulation expérimentale de Game Boy Advance (GBA). Qt 6.8 + C++20. 12 langues avec détection automatique, outils de débogage, éditeur TAS, scripts Lua et sauvegardes fiables. Le GBA est entièrement découplé du côté NES et en phase Beta ; sa précision continue d'être affinée à l'aide de tests matériels." />
 <meta property="og:url" content="https://laffinty.github.io/FCEUX11/fr/" />
 <meta property="og:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 <meta property="og:locale" content="fr_FR" />
@@ -57,7 +57,7 @@
 
 <meta name="twitter:card" content="summary" />
 <meta name="twitter:title" content="FCEUX11 — Émulateur NES/Famicom pour Windows · v2.0" />
-<meta name="twitter:description" content="FCEUX11 v2.0 — émulateur NES/Famicom dérivé de FCEUX, optimisé pour Windows, désormais avec une émulation expérimentale de Game Boy Advance (GBA). Qt 6.8 + C++20. 12 langues avec détection automatique, outils de débogage, éditeur TAS, scripts Lua et sauvegardes fiables. Le GBA est entièrement découplé du côté NES et en phase Beta ; une toute nouvelle suite de tests automatisée (F11QA) contrôle chaque publication, donc aucun jeu ne régresse." />
+<meta name="twitter:description" content="FCEUX11 v2.0 — émulateur NES/Famicom dérivé de FCEUX, optimisé pour Windows, désormais avec une émulation expérimentale de Game Boy Advance (GBA). Qt 6.8 + C++20. 12 langues avec détection automatique, outils de débogage, éditeur TAS, scripts Lua et sauvegardes fiables. Le GBA est entièrement découplé du côté NES et en phase Beta ; sa précision continue d'être affinée à l'aide de tests matériels." />
 <meta name="twitter:image" content="https://raw.githubusercontent.com/Laffinty/FCEUX11/refs/heads/main/icons/app.ico" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -72,7 +72,7 @@
   "name":"FCEUX11",
   "applicationCategory":"GameApplication",
   "operatingSystem":"Windows 11",
-  "description":"FCEUX11 v2.0 — émulateur NES/Famicom dérivé de FCEUX, optimisé pour Windows, désormais avec une émulation expérimentale de Game Boy Advance (GBA). Qt 6.8 + C++20. 12 langues avec détection automatique, outils de débogage, éditeur TAS, scripts Lua et sauvegardes fiables. Le GBA est entièrement découplé du côté NES et en phase Beta ; une toute nouvelle suite de tests automatisée (F11QA) contrôle chaque publication, donc aucun jeu ne régresse.",
+  "description":"FCEUX11 v2.0 — émulateur NES/Famicom dérivé de FCEUX, optimisé pour Windows, désormais avec une émulation expérimentale de Game Boy Advance (GBA). Qt 6.8 + C++20. 12 langues avec détection automatique, outils de débogage, éditeur TAS, scripts Lua et sauvegardes fiables. Le GBA est entièrement découplé du côté NES et en phase Beta ; sa précision continue d'être affinée à l'aide de tests matériels.",
   "softwareVersion":"2.0",
   "license":"https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt",
   "url":"https://laffinty.github.io/FCEUX11/fr/",
@@ -222,15 +222,22 @@
       <div class="wn-item">
         <div class="wn-num">02</div>
         <div class="wn-text">
-          <h3>Une toute nouvelle suite de tests automatisée (F11QA)</h3>
-          <p>Nous avons bâti une toute nouvelle suite de tests automatisée : chaque mise à jour la lance intégralement et automatiquement, toute modification qui affecte le comportement d'un jeu bloque la publication, et chaque gain de précision de l'émulateur y est mesuré.</p>
+          <h3>Correction du démarrage de Mario Kart: Super Circuit</h3>
+          <p>Mario Kart: Super Circuit affichait un écran blanc et cessait de répondre au démarrage : lorsqu'une interruption réveillait le processeur de son état de veille, l'adresse de retour ne prenait pas en compte la largeur d'une instruction et le même appel système était exécuté deux fois après le réveil ; après correction, une vérification image par image sur 1200 images confirme que l'affichage continue de s'actualiser et atteint l'écran-titre. La même série de corrections a également résolu un défaut des appels BIOS des programmes en mode ARM : le numéro d'appel était auparavant lu dans un champ de bits erroné, si bien que chaque appel était traité comme une réinitialisation du système et que le programme entrait dans une boucle de réinitialisation dès le démarrage. Ces deux défauts ont persisté alors que tous les tests internes réussissaient, et n'ont été révélés qu'à l'issue de tests sur cartouches réelles ; les moyens de diagnostic ont été renforcés en conséquence.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">03</div>
         <div class="wn-text">
-          <h3>La précision progresse encore</h3>
-          <p>Deux erreurs de chronométrage dans le jeu d'instructions du processeur sont corrigées, portant le taux de réussite des tests officiels de 145/177 à 147/177 (83,1 %), sans aucune modification du comportement des jeux ; une mauvaise appréciation dans le processus de test lui-même est également corrigée, de sorte que les futurs gains de précision ne sont plus freinés.</p>
+          <h3>Corrections du chronométrage des instructions et des minuteries</h3>
+          <p>La vérification contre les tests matériels officiels a confirmé que les phases d'extraction et d'exécution de chaque instruction étaient facturées deux fois, doublant le coût compté de chaque instruction ; la facturation suit désormais la machine réelle. Trois défauts des minuteries sont corrigés : le diviseur du prédiviseur était lu dans le mauvais registre et fonctionnait toujours à 1×, la cascade entre minuteries ne prenait pas effet, et le délai fixe de démarrage présent sur le matériel réel est désormais émulé. Les trois entrées de minuteries de la carte de test matérielle réussissent désormais.</p>
+        </div>
+      </div>
+      <div class="wn-item">
+        <div class="wn-num">04</div>
+        <div class="wn-text">
+          <h3>Corrections du préchargement et du DMA (référence 24/33 → 30/33)</h3>
+          <p>Deux mécanismes supplémentaires correspondent désormais à la machine réelle. Pour le tampon de préchargement d'instructions, tout accès aux données interrompait auparavant la détermination de succès ; celle-ci repose désormais uniquement sur le flux d'instructions, et les deux mesures de préchargement correspondent exactement aux valeurs attendues officielles. Pendant le DMA (transfert de mémoire en masse), les minuteries s'arrêtaient totalement ; elles continuent désormais de compter par unité transférée comme sur la machine réelle, et le délai fixe au début de chaque transfert est pris en compte. Les cinq tests de chronométrage mémoire réussissent, portant le score global de référence matérielle de 24/33 à 30/33 ; les deux entrées restantes (déclenchement d'affichage DMA et priorité des canaux) sont prévues pour la suite.</p>
         </div>
       </div>
      <div class="wn-cta reveal">
