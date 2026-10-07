@@ -186,9 +186,12 @@ void fceu11_gba_load_battery(void);
 
 /// Write the save memory out if it changed.
 ///
-/// Called every frame (it is one flag test) and again on teardown. A cart with
-/// no save hardware is skipped rather than written.
-void fceu11_gba_flush_battery(void);
+/// Called every frame, and **rate-limited**: a cartridge that rewrites its save
+/// memory continuously (GT Championship does) would otherwise turn that into a
+/// 32 KB file write per frame. `force` skips the limit and is what the teardown
+/// and savestate paths use, so the last seconds of play are never waiting on a
+/// timer. A cart with no save hardware is skipped rather than written.
+void fceu11_gba_flush_battery(bool force = false);
 
 // ---- the instant savestate (v2.0 S3-3) ------------------------------------
 //

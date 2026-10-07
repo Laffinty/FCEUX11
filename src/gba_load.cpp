@@ -24,6 +24,7 @@
 
 #include "gba_load.h"
 
+#include <chrono>
 #include <string>
 #include <vector>
 
@@ -188,9 +189,49 @@ void fceu11_gba_load_battery()
 	FCEU_printf("GBA: restored save from %s (%u bytes)\n", shown.c_str(), static_cast<unsigned>(data.size()));
 }
 
-void fceu11_gba_flush_battery()
+/// A monotonic millisecond clock, local to this file.
+///
+/// Deliberately not `FCEUD_GetTime()`: that is declared in the Qt driver's
+/// header, and this file belongs to the core library, which the F11QA test
+/// executables link with no driver at all. `std::chrono` needs nothing linked
+/// in, and `steady_clock` cannot run backwards when the wall clock is adjusted.
+static uint64_t monotonic_ms()
+{
+    using namespace std::chrono;
+    return static_cast<uint64_t>(
+        duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count());
+}
+
+/// Shortest gap between two battery writes to disk, in milliseconds.
+///
+/// The per-frame caller is wrong for at least one real cartridge: `GT
+/// Championship` rewrites its save memory every frame, so the core re-dirties
+/// the flag sixty times a second and the previous code turned that into a 32 KB
+/// file write per frame. On a synced or scanned directory that is enough to make
+/// the whole emulator look frozen.
+///
+/// The flag is not the bug -- `take_save_dirty()` clears it correctly -- the
+/// cartridge is simply chatty, and flushing on every dirty frame is a policy
+/// this host chose. One second is the interval commercial emulators use, and
+/// because the teardown and savestate paths flush unconditionally, nothing is
+/// lost that a crash could not have lost anyway.
+constexpr uint64_t kBatteryFlushIntervalMs = 1000;
+
+void fceu11_gba_flush_battery(bool force)
 {
 	if (!g_gbaActive) return;
+
+	// The throttle is tested **before** the flag is taken, and that ordering is
+	// load-bearing: `take_dirty()` clears the flag, so taking it here and then
+	// deciding not to write would drop the change on the floor. Returning
+	// without asking leaves the flag set and the next frame asks again.
+	static uint64_t last_flush_ms = 0;
+	if (!force)
+	{
+		const uint64_t now = monotonic_ms();
+		if (now - last_flush_ms < kBatteryFlushIntervalMs) return;
+	}
+
 	// The flag is *taken* by the core, so asking is how this function learns
 	// there is anything to do. A false here means already flushed.
 	if (gba_battery_take_dirty() == 0) return;
@@ -205,6 +246,7 @@ void fceu11_gba_flush_battery()
 	if (path.empty()) return;
 	if (write_file(path, data))
 	{
+		last_flush_ms = monotonic_ms();
 		const std::string shown = to_utf8(path);
 		FCEU_printf("GBA: wrote save to %s (%u bytes)\n", shown.c_str(), static_cast<unsigned>(size));
 	}
@@ -275,8 +317,9 @@ void fceu11_gba_deactivate(void)
 {
 	if (!g_gbaActive) return;
 	// Flush before the machine goes, or the last few seconds of play are lost.
-	// This is the one place a save must not be skipped.
-	fceu11_gba_flush_battery();
+	// This is the one place a save must not be skipped -- hence `force`, which
+	// is what the rate limit would otherwise defer.
+	fceu11_gba_flush_battery(true);
 	gba_unload_rom();
 	g_gbaActive = false;
 	g_gbaPath.clear();
@@ -382,7 +425,8 @@ void fceu11_gba_step_frame(void)
 	if (nes_shm) nes_shm->blitUpdated.store(1, std::memory_order_release);
 
 	// And if the game wrote its save memory, put it on disk. One flag test per
-	// frame; the write only happens when something actually changed.
+	// frame; the write is rate-limited, so a cartridge that rewrites its save
+	// memory continuously costs one write per interval rather than per frame.
 	fceu11_gba_flush_battery();
 }
 
