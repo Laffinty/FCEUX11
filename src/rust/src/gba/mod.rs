@@ -49,3 +49,50 @@ pub mod waitprobe;
 pub fn install_swi_hook(gba: &mut gba_core::gba::Gba) {
     gba.cpu.swi_hook = Some(swi::dispatch);
 }
+
+/// # Crash diagnostics -- TEMPORARY (v2.0.1 S4)
+///
+/// The release profile sets `panic = "abort"`
+/// (`src/rust/Cargo.toml`), so a panic anywhere in the core ends the process.
+/// The default hook prints `file:line` to stderr first, and on this machine
+/// that is exactly what does **not** happen: the S4 triage captured a
+/// fast-fail 7 with an empty stderr. An empty stderr is the interesting fact --
+/// it means whatever aborted did not go through a Rust panic either.
+///
+/// This records the panic to a file so the next occurrence names itself. The
+/// path comes from `FCEUX11_DIAG_LOG`, which the C++ `main()` sets to the
+/// directory the executable lives in, so both halves of the diagnosis land in
+/// one `fceux_diag.log` beside the binary.
+///
+/// The previous hook is kept and called afterwards, so normal panic reporting
+/// is unchanged for anyone reading a console.
+pub fn install_diagnostic_hooks() {
+    use std::io::Write;
+    use std::sync::Once;
+
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
+        let previous = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            let path = std::env::var("FCEUX11_DIAG_LOG")
+                .unwrap_or_else(|_| "fceux_diag.log".to_string());
+            // Opened per call and flushed immediately: this runs while the
+            // process is already unwinding toward abort, so a buffered stream
+            // would lose exactly the text it exists to preserve.
+            if let Ok(mut file) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&path)
+            {
+                let _ = writeln!(
+                    file,
+                    "\n=== RUST PANIC (thread {:?}) ===\n{}\n",
+                    std::thread::current().id(),
+                    info
+                );
+                let _ = file.flush();
+            }
+            previous(info);
+        }));
+    });
+}

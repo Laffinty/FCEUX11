@@ -223,6 +223,11 @@ pub extern "C" fn gba_last_error(_dst: *mut u8, _cap: u32) -> i32 {
 /// the simulation thread.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn gba_load_rom(path: *const u8) -> i32 {
+    // v2.0.1 S4: first Rust entry point of a GBA session, so it is the earliest
+    // point at which a core panic could still be attributed to us. See
+    // `crate::gba::install_diagnostic_hooks`.
+    crate::gba::install_diagnostic_hooks();
+
     if path.is_null() {
         return GBA_ERR_BAD_ROM;
     }

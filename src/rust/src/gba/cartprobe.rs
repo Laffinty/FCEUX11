@@ -77,6 +77,7 @@ mod tests {
 
     use gba_core::gba::Gba;
 
+    use crate::gba::audio::{self, AudioOut};
     use crate::gba::bios;
     use crate::gba::install_swi_hook;
 
@@ -84,6 +85,11 @@ mod tests {
     /// number the production `gba_step_frame` uses, so a step count printed here
     /// is directly comparable with what the emulator is really doing per frame.
     const CYCLE_LIMIT: u64 = 16 * 280_896;
+
+    /// The host rate the Qt layer pushes in the first frame of a GBA session
+    /// (`fceuWrapper_sync_gba_audio` -> `fceu11_gba_configure_audio` ->
+    /// `gba_set_output_rate`). 44100 is what FCEUX11 asks its device for.
+    const DEVICE_RATE: u32 = 44100;
 
     /// Frames run before any measurement, so power-on transients (BIOS boot,
     /// the first WAITCNT programming, the first sound-FIFO fill) are not counted
@@ -163,8 +169,22 @@ mod tests {
         }
     }
 
-    /// Run one frame, sampling as it goes.
-    fn run_frame(gba: &mut Gba, hottest: &mut BTreeMap<u32, u32>) -> Frame {
+    /// Run one frame exactly the way production does, audio included.
+    ///
+    /// The audio is not decoration. `Machine::new` wires a sample ring and
+    /// `gba_step_frame` calls `advance_frame` at the end of every frame, while
+    /// the Qt layer drains `render` into the sound device right after — and a
+    /// release build compiles with `panic = "abort"`, so a panic anywhere on
+    /// that path takes the whole emulator down with no message on screen. A
+    /// probe that leaves the ring unwired is therefore not the same program the
+    /// user runs, and its "all three cartridges are fine" is not evidence about
+    /// the shipping configuration.
+    fn run_frame(
+        gba: &mut Gba,
+        audio_out: &mut AudioOut,
+        samples: &mut [i32],
+        hottest: &mut BTreeMap<u32, u32>,
+    ) -> Frame {
         let mut steps: u64 = 0;
         let mut seen_timing = [0u8; 4];
         let blocks_before = gba.cpu.bus.dma_blocks_run;
@@ -188,6 +208,15 @@ mod tests {
             steps += 1;
         }
 
+        // Production order: the frame's audio is clocked forward first, then the
+        // caller drains it.
+        audio_out.advance_frame();
+        let cap = samples.len() as u32;
+        let mut written = 0u32;
+        // SAFETY: `samples` is a live slice of `cap` writable i32s, which is
+        // what `render` copies into, and `written` is a live local.
+        let _ = unsafe { audio_out.render(samples.as_mut_ptr(), cap, &mut written) };
+
         Frame::new(steps, steps >= CYCLE_LIMIT, gba.cpu.bus.dma_blocks_run - blocks_before, seen_timing, frame_hash(gba))
     }
 
@@ -206,10 +235,33 @@ mod tests {
         let mut gba = Gba::new(bios::stub(), &rom);
         install_swi_hook(&mut gba);
 
+        // Audio, wired exactly as `Machine::new` does it: the ring, the volume
+        // and the host rate the Qt layer will ask for.
+        let boot_rate = audio::configured_rate();
+        let rx = gba.init_audio(boot_rate, audio::RING_SLOTS);
+        let mut audio_out = AudioOut::new(boot_rate);
+        audio_out.set_volume(audio::configured_volume());
+        audio_out.attach(rx, boot_rate);
+        let mut samples: Vec<i32> = vec![0; 2 * 5 * (DEVICE_RATE as usize / 60).max(1) + 64];
+
         let mut hottest: BTreeMap<u32, u32> = BTreeMap::new();
         for _ in 0..WARMUP_FRAMES {
-            let _ = run_frame(&mut gba, &mut hottest);
+            let _ = run_frame(&mut gba, &mut audio_out, &mut samples, &mut hottest);
         }
+
+        // The Qt layer reconfigures on the session's first frame
+        // (`fceuWrapper_sync_gba_audio`), which rebuilds the ring at the device
+        // rate. Do the same here rather than assuming the boot rate is final.
+        audio_out.set_rate(DEVICE_RATE);
+        let rx = gba.init_audio(DEVICE_RATE, audio::RING_SLOTS);
+        audio_out.attach(rx, DEVICE_RATE);
+        println!(
+            "audio: boot rate {} -> device rate {}, ring {} slots, buffer {} samples",
+            boot_rate,
+            DEVICE_RATE,
+            audio::RING_SLOTS,
+            samples.len()
+        );
 
         let dma_units_at_start = gba.cpu.bus.dma_units_moved;
         let mut seen_timing = [0u8; 4];
@@ -219,7 +271,7 @@ mod tests {
         let mut dma_blocks_in_window = 0u64;
 
         for _ in 0..MEASURE_FRAMES {
-            let frame = run_frame(&mut gba, &mut hottest);
+            let frame = run_frame(&mut gba, &mut audio_out, &mut samples, &mut hottest);
             steps_all.push(frame.steps);
             if frame.hit_limit {
                 limit_hits += 1;
@@ -230,6 +282,7 @@ mod tests {
             }
             *hashes.entry(frame.hash).or_insert(0usize) += 1;
         }
+        println!("audio underruns: {}", audio_out.underruns());
 
         let min = steps_all.iter().copied().min().unwrap_or(0);
         let max = steps_all.iter().copied().max().unwrap_or(0);

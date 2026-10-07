@@ -19,6 +19,10 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <exception>
+#include <mutex>
+#include <string>
+#include <typeinfo>
 #include <SDL.h>
 #include <QApplication>
 #include <QSplashScreen>
@@ -35,6 +39,11 @@
 
 #ifdef WIN32
 #include <windows.h>
+// Types only, and only after <windows.h>: dbghelp.h declares SYMBOL_INFOW in
+// terms of HANDLE/BOOL/DWORD64, so including it earlier is a wall of errors.
+// Every dbghelp *function* is reached through GetProcAddress in
+// `fceux_diag::symbols`, so this must not become a link-time dependency.
+#include <dbghelp.h>
 #include <io.h>
 #include <fcntl.h>
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
@@ -105,9 +114,224 @@ static bool showSplashScreen(void)
 	return kShowSplash.get();
 }
 
+// ---------------------------------------------------------------------------
+// v2.0.1 S4 crash diagnostics -- TEMPORARY
+//
+// Two reproductions of "loading a .gba aborts the process" ended in a
+// fast-fail 7 (`_FAST_FAIL_FATAL_APP_EXIT`, i.e. `abort()`) with **nothing on
+// stdout or stderr**. A silent abort rules out the two explanations that would
+// have been easy to fix: a Rust panic prints its `file:line` through the panic
+// hook before aborting, and an uncaught C++ exception prints
+// "terminate called after throwing..." through `std::terminate`. Neither
+// appeared, so the abort is coming from a path that says nothing about
+// itself, and reading the source did not converge on it.
+//
+// So the process is asked to say it itself. This block installs a terminate
+// handler that records the exception (when there is one), a symbolised stack,
+// and the module each frame belongs to, then aborts as before. The Rust side
+// (`gba::install_diagnostic_hooks`) appends to the same file, named through
+// `FCEUX11_DIAG_LOG` so both halves land in one place.
+//
+// The log is only written when something actually goes wrong, and this is
+// meant to come back out once the fault is fixed.
+// ---------------------------------------------------------------------------
+namespace fceux_diag
+{
+	// Beside the executable, so it is found next to the thing that died
+	// rather than wherever the working directory happened to be.
+	std::string log_path()
+	{
+		static std::string cached = []
+		{
+			char buf[MAX_PATH] = { 0 };
+			DWORD n = GetModuleFileNameA(nullptr, buf, MAX_PATH);
+			std::string dir = (n > 0) ? std::string(buf, buf + n) : std::string();
+			const size_t slash = dir.find_last_of("\\/");
+			dir = (slash == std::string::npos) ? std::string(".") : dir.substr(0, slash);
+			return dir + "\\fceux_diag.log";
+		}();
+		return cached;
+	}
+
+	// Append-only, opened per call. A crash handler cannot assume a stream is
+	// healthy, and reopening is what makes this survive the case it exists for.
+	void append(const std::string& text)
+	{
+		static std::mutex io_lock;
+		std::lock_guard<std::mutex> guard(io_lock);
+		if (FILE* f = std::fopen(log_path().c_str(), "ab"))
+		{
+			std::fwrite(text.data(), 1, text.size(), f);
+			std::fflush(f);
+			std::fclose(f);
+		}
+	}
+
+	// dbghelp is loaded by hand rather than linked: this file must not grow a
+	// link-time dependency on a library that exists only to explain a crash.
+	struct Symbols
+	{
+		HMODULE dll = nullptr;
+		BOOL (WINAPI* init)(HANDLE, PCSTR, BOOL) = nullptr;
+		DWORD (WINAPI* options)(DWORD) = nullptr;
+		BOOL (WINAPI* from_addr)(HANDLE, DWORD64, DWORD64*, PSYMBOL_INFOW) = nullptr;
+		BOOL (WINAPI* line_from_addr)(HANDLE, DWORD64, PDWORD64, PIMAGEHLP_LINE64) = nullptr;
+		bool ready = false;
+	};
+
+	Symbols& symbols()
+	{
+		static Symbols s;
+		if (!s.ready)
+		{
+			s.ready = true;  // set first: no re-entry from the loader
+			s.dll = LoadLibraryA("dbghelp.dll");
+			if (s.dll)
+			{
+				s.init = reinterpret_cast<decltype(s.init)>(GetProcAddress(s.dll, "SymInitialize"));
+				s.options = reinterpret_cast<decltype(s.options)>(GetProcAddress(s.dll, "SymSetOptions"));
+				s.from_addr = reinterpret_cast<decltype(s.from_addr)>(GetProcAddress(s.dll, "SymFromAddrW"));
+				s.line_from_addr = reinterpret_cast<decltype(s.line_from_addr)>(GetProcAddress(s.dll, "SymGetLineFromAddr64"));
+				if (s.init && s.options && s.from_addr && s.line_from_addr)
+				{
+					s.options(SYMOPT_UNDNAME | SYMOPT_LOAD_LINES | SYMOPT_FAIL_CRITICAL_ERRORS);
+					char exe[MAX_PATH] = { 0 };
+					GetModuleFileNameA(nullptr, exe, MAX_PATH);
+					s.init(GetCurrentProcess(), exe, TRUE);
+				}
+			}
+		}
+		return s;
+	}
+
+	void write_backtrace()
+	{
+		Symbols& sym = symbols();
+		void* frames[62] = { nullptr };
+		const USHORT n = CaptureStackBackTrace(1, 62, frames, nullptr);
+
+		char line[1024];
+		std::snprintf(line, sizeof(line), "  backtrace: %u frames (dbghelp %s)\r\n",
+			(unsigned)n, sym.from_addr ? "loaded" : "UNAVAILABLE");
+		append(line);
+
+		for (USHORT i = 0; i < n; ++i)
+		{
+			const DWORD64 addr = reinterpret_cast<DWORD64>(frames[i]);
+			wchar_t symbol[512] = { 0 };
+			char file[MAX_PATH] = "?";
+			unsigned file_line = 0;
+			DWORD64 mod_base = 0;
+
+			// The symbol name and the file:line come from two different calls,
+			// because SYMBOL_INFOW has no FileName/LineNumber at all -- those
+			// live in IMAGEHLP_LINE64. The module is identified by its base
+			// address rather than by name: neither struct exposes a module name
+			// that is available here, and base+offset is enough to place a frame.
+			if (sym.from_addr)
+			{
+				// SYMBOL_INFOW is 88 bytes on x64 and its `Name[1]` has to sit
+				// in the same allocation, hence the trailing scratch space.
+				alignas(8) char buf[sizeof(SYMBOL_INFOW) + 512] = { 0 };
+				SYMBOL_INFOW* info = reinterpret_cast<SYMBOL_INFOW*>(buf);
+				info->SizeOfStruct = sizeof(SYMBOL_INFOW);
+				info->MaxNameLen = 511;
+				DWORD64 disp = 0;
+				if (sym.from_addr(GetCurrentProcess(), addr, &disp, info))
+				{
+					if (info->Name) wcscpy_s(symbol, 512, info->Name);
+					mod_base = info->ModBase;
+				}
+			}
+			if (sym.line_from_addr)
+			{
+				// This SDK's IMAGEHLP_LINE64 carries only SizeOfStruct, Key,
+				// LineNumber, FileName and Address -- the module base is only
+				// available from SYMBOL_INFOW, so it is not read here.
+				IMAGEHLP_LINE64 info = { 0 };
+				info.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
+				DWORD64 disp = 0;
+				if (sym.line_from_addr(GetCurrentProcess(), addr, &disp, &info))
+				{
+					if (info.FileName) strcpy_s(file, MAX_PATH, info.FileName);
+					file_line = (unsigned)info.LineNumber;
+				}
+			}
+
+			if (symbol[0] || file_line)
+			{
+				char module[64];
+				if (mod_base)
+				{
+					std::snprintf(module, sizeof(module), "mod+%llX",
+						(unsigned long long)(addr - mod_base));
+				}
+				else
+				{
+					std::strcpy(module, "?");
+				}
+				std::snprintf(line, sizeof(line), "    #%02u %016llX  [%s]  %s  %s:%u\r\n",
+					(unsigned)i, (unsigned long long)addr, module,
+					symbol[0] ? "fn" : "  ", file, file_line);
+			}
+			else
+			{
+				// Without symbols the raw address still bounds the search: it can
+				// be compared against the module list in a fresh crash dump.
+				std::snprintf(line, sizeof(line), "    #%02u %016llX  (no symbols)\r\n",
+					(unsigned)i, (unsigned long long)addr);
+			}
+			append(line);
+		}
+	}
+
+	void terminate_handler()
+	{
+		char head[128];
+		std::snprintf(head, sizeof(head), "\r\n=== C++ std::terminate  thread %lu ===\r\n",
+			(unsigned long)GetCurrentThreadId());
+		append(head);
+
+		// Re-throwing inside the handler is legal and is the only way to learn
+		// *what* was in flight: the handler is called with the exception
+		// already active, and rethrow_exception is the documented way to reach
+		// it without a nested catch being required.
+		try
+		{
+			if (std::current_exception())
+			{
+				std::rethrow_exception(std::current_exception());
+			}
+		}
+		catch (const std::exception& e)
+		{
+			char buf[1024];
+			std::snprintf(buf, sizeof(buf), "  exception: std::exception: %s\r\n", e.what());
+			append(buf);
+		}
+		catch (...)
+		{
+			append("  exception: (not derived from std::exception)\r\n");
+		}
+
+		write_backtrace();
+		append("  (no message on stderr => not an uncaught C++ exception; see notes)\r\n");
+		std::abort();
+	}
+
+	void install()
+	{
+		// The Rust half reads this to find the same file.
+		SetEnvironmentVariableA("FCEUX11_DIAG_LOG", log_path().c_str());
+		std::set_terminate(terminate_handler);
+	}
+}  // namespace fceux_diag
+
 int main( int argc, char *argv[] )
 {
 	int retval = 0;
+
+	fceux_diag::install();
 
 	// Set the default QSurfaceFormat BEFORE creating QApplication. The v0.3.14
 	// OpenGL backend uses QOpenGLWindow + #version 330 core shaders, which

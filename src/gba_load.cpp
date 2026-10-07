@@ -86,44 +86,78 @@ bool fceu11_gba_active(void)
 	return g_gbaActive;
 }
 
-static bool read_file(const std::string& path, std::vector<uint8_t>& out)
+/// Build a `std::filesystem::path` from UTF-8 bytes.
+///
+/// The paths reaching this file are UTF-8: Qt's `toStdString()` produces UTF-8,
+/// and `gba_load_rom` reads the same bytes back through `from_utf8`. The
+/// `path(const char*)` constructor decodes them as the **ANSI code page**
+/// instead, and that is where a non-ASCII cartridge name used to die: the
+/// mis-decoded path could not be mapped back onto the code page, so
+/// `path::string()` threw "No mapping for the Unicode character exists in the
+/// target multi-byte code page", and that exception escaped through the Qt
+/// event loop into `std::terminate` -- the whole emulator went down while
+/// merely opening a ROM, with nothing on stderr to say so.
+///
+/// C++20's `path(char8_t-sequence)` is the constructor that means "these bytes
+/// are UTF-8", and unlike `string()` it cannot fail. `std::filesystem::u8path`
+/// says the same thing but is deprecated in C++20.
+static std::filesystem::path path_from_utf8(const std::string& utf8)
 {
-	std::ifstream file(path, std::ios::binary);
-	if (!file.is_open()) return false;
-	out.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
-	return true;
+    return std::filesystem::path(std::u8string(utf8.begin(), utf8.end()));
 }
-static bool write_file(const std::string& path, const std::vector<uint8_t>& data)
+
+/// The inverse, for messages. `u8string()` cannot fail either, which is rather
+/// the point: printing a path must never be able to throw.
+static std::string to_utf8(const std::filesystem::path& path)
 {
-	std::ofstream file(path, std::ios::binary | std::ios::trunc);
-	if (!file.is_open()) return false;
-	if (!data.empty())
-	{
-		file.write(reinterpret_cast<const char*>(data.data()),
-		           static_cast<std::streamsize>(data.size()));
-	}
-	return file.good();
+    const std::u8string utf8 = path.u8string();
+    return std::string(reinterpret_cast<const char*>(utf8.c_str()));
+}
+
+static bool read_file(const std::filesystem::path& path, std::vector<uint8_t>& out)
+{
+    // The path overload, not the `const char*` one: on Windows the latter
+    // re-encodes through the code page and mangles anything non-ASCII.
+    std::ifstream file(path, std::ios::binary);
+    if (!file.is_open()) return false;
+    out.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+    return true;
+}
+static bool write_file(const std::filesystem::path& path, const std::vector<uint8_t>& data)
+{
+    std::ofstream file(path, std::ios::binary | std::ios::trunc);
+    if (!file.is_open()) return false;
+    if (!data.empty())
+    {
+        file.write(reinterpret_cast<const char*>(data.data()),
+                   static_cast<std::streamsize>(data.size()));
+    }
+    return file.good();
 }
 
 namespace
 {
-	/// The `.srm` that belongs to a cartridge: same directory, same stem.
-	///
-	/// Empty when the ROM path has no parent to strip, which happens only for a
-	/// bare filename -- and a bare filename cannot be opened either, so there is
-	/// nothing to be relative to.
-	std::string battery_path_for(const std::string& rom)
-	{
-		std::error_code ec;
-		const std::filesystem::path rom_path(rom);
-		const std::filesystem::path parent = rom_path.parent_path();
-		if (parent.empty())
-		{
-			return std::string();
-		}
-		std::filesystem::path save = parent / (rom_path.stem().string() + ".srm");
-		return save.string();
-	}
+    /// The `.srm` that belongs to a cartridge: same directory, same stem.
+    ///
+    /// Empty when the ROM path has no parent to strip, which happens only for a
+    /// bare filename -- and a bare filename cannot be opened either, so there is
+    /// nothing to be relative to.
+    ///
+    /// A `std::filesystem::path` rather than a `std::string`, and never
+    /// `string()` on it: this value has to survive a cartridge named in any
+    /// script, and `string()` is the call that cannot promise that.
+    std::filesystem::path battery_path_for(const std::string& rom)
+    {
+        const std::filesystem::path rom_path = path_from_utf8(rom);
+        const std::filesystem::path parent = rom_path.parent_path();
+        if (parent.empty())
+        {
+            return std::filesystem::path();
+        }
+        std::u8string stem = rom_path.stem().u8string();
+        stem += u8".srm";
+        return parent / stem;
+    }
 }  // namespace
 
 void fceu11_gba_load_battery()
@@ -133,7 +167,7 @@ void fceu11_gba_load_battery()
 	// one would be refused anyway -- so ask first and say nothing if not.
 	if (gba_battery_save_type() == 0) return;
 
-	const std::string path = battery_path_for(g_gbaPath);
+	const std::filesystem::path path = battery_path_for(g_gbaPath);
 	if (path.empty()) return;
 
 	std::error_code ec;
@@ -150,7 +184,8 @@ void fceu11_gba_load_battery()
 		FCEU_PrintError("The GBA save file could not be restored.");
 		return;
 	}
-	FCEU_printf("GBA: restored save from %s (%u bytes)\n", path.c_str(), static_cast<unsigned>(data.size()));
+	const std::string shown = to_utf8(path);
+	FCEU_printf("GBA: restored save from %s (%u bytes)\n", shown.c_str(), static_cast<unsigned>(data.size()));
 }
 
 void fceu11_gba_flush_battery()
@@ -166,11 +201,12 @@ void fceu11_gba_flush_battery()
 	std::vector<uint8_t> data(size);
 	if (gba_battery_read(data.data(), size) != GBA_OK) return;
 
-	const std::string path = battery_path_for(g_gbaPath);
+	const std::filesystem::path path = battery_path_for(g_gbaPath);
 	if (path.empty()) return;
 	if (write_file(path, data))
 	{
-		FCEU_printf("GBA: wrote save to %s (%u bytes)\n", path.c_str(), static_cast<unsigned>(size));
+		const std::string shown = to_utf8(path);
+		FCEU_printf("GBA: wrote save to %s (%u bytes)\n", shown.c_str(), static_cast<unsigned>(size));
 	}
 	else
 	{
@@ -197,7 +233,12 @@ bool fceu11_gba_savestate_save(const char* path)
 	if (gba_savestate_save(data.data(), size, &written) != GBA_OK) return false;
 	data.resize(written);
 
-	if (!write_file(path, data))
+	// UTF-8, like every other path this file handles: the same conversion the
+	// battery save went through, and for the same reason -- a state file named
+	// after a non-ASCII cartridge would otherwise die the same way.
+	const std::filesystem::path save_path = path_from_utf8(path);
+
+	if (!write_file(save_path, data))
 	{
 		FCEU_PrintError("The GBA state could not be written.");
 		return false;
@@ -211,7 +252,7 @@ bool fceu11_gba_savestate_load(const char* path)
 	if (!g_gbaActive || !path || !*path) return false;
 
 	std::vector<uint8_t> data;
-	if (!read_file(path, data)) return false;
+	if (!read_file(path_from_utf8(path), data)) return false;
 	if (data.empty()) return false;
 
 	// The core compares the ROM fingerprint before it touches the machine, so a
