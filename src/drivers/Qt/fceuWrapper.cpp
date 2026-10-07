@@ -443,7 +443,44 @@ CloseGame(void)
 		tasWin->requestWindowClose();
 	}
 
-	fceu11::CloseGame();
+	// v2.0.1 S4 -- a GBA session is torn down by its own module, and the NES
+	// teardown is skipped for it.
+	//
+	// `fceu11::CloseGame()` is actively harmful to a GBA session, in two
+	// independent ways:
+	//
+	//  1. It calls `GameInterface(GI_CLOSE)`. `GameInterface` is assigned in
+	//     exactly one place -- inside `FCEUXLoad`, which only the iNES/NSF/
+	//     UNIF/FDS loaders reach, and only when one of them claims the file.
+	//     `GbaLoad` never assigns it. In a process that has only ever opened a
+	//     `.gba` it is still the null pointer it was zero-initialised to, so
+	//     that line is a call through null. (After a NES game has been opened
+	//     it is worse than null: it still points at `FCEUXGameInterface`, so
+	//     the NES close runs against a machine that is not an NES.)
+	//  2. It writes a "-resume" NES savestate when `AutoResumePlay` is on,
+	//     from a machine that has no NES state to save, into the slot the user
+	//     keeps their real states in.
+	//
+	// The guard is `fceu11_gba_active()`, which is false for every NES session,
+	// so the NES branch below is reached byte-for-byte unchanged. That is the
+	// whole reason this lives in the Qt layer rather than inside
+	// `FCEU_CloseGame()`: the core file stays exactly as it was.
+	//
+	// The `GameInfo` free is here rather than left to the core because
+	// `LoadGameVirtual` allocates one *before* it runs the loader chain
+	// (`fceu.cpp`), so a GBA session does own one even though `GbaLoad` never
+	// populates it. Skipping the NES teardown would otherwise leak it on every
+	// open/close cycle.
+	if ( fceu11_gba_active() )
+	{
+		fceu11_gba_deactivate();
+		delete GameInfo;
+		GameInfo = 0;
+	}
+	else
+	{
+		fceu11::CloseGame();
+	}
 
 	DriverKill();
 	isloaded = 0;

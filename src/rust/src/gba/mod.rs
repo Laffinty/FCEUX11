@@ -25,6 +25,11 @@
 
 pub mod audio;
 pub mod bios;
+/// Research-only measurement tool for the S4 compatibility triage: run real
+/// cartridges and report whether each is wedged, and whether it is armed for a
+/// DMA start timing this core never fires. Every test in it is `#[ignore]`d, so
+/// it adds no gate; it exists to print numbers.
+pub mod cartprobe;
 pub mod decoupling;
 pub mod ffi;
 pub mod frame;
