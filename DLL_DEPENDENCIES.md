@@ -1,8 +1,13 @@
-# FCEUX11 DLL Dependencies (v1.15 hotfix4)
+# FCEUX11 DLL Dependencies (v2.0)
 
 > **Toolchain**: MSVC 2022+ + vcpkg (Qt 6.8 LTS / SDL2)
 > **Deployment**: Use `cmake --install` or `scripts\copy_dependencies.ps1`
 > **Last refreshed from**: `C:\Users\ikrx2\Desktop\fceux11-v1.15_hotfix4-windows-amd64`
+>
+> **v2.0 note**: the vcpkg dependency set is unchanged since v1.15 (`vcpkg.json` last
+> touched in v1.15 LTS), so the DLL list below still applies. The Rust core (Lua
+> engine and the experimental GBA core) is **statically linked** into `fceux11.exe`
+> — it adds no runtime DLL.
 
 ---
 

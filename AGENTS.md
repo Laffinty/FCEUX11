@@ -20,7 +20,7 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 | 文档 | 管什么 |
 |---|---|
 | `docs/history/plans/FCEUX11-v2.0_GBAEUX11构建计划.md` | **已收口归档（r57）**：范围、阶段编排（§八）、已知限制（§9.1）、**不变式（§十）**、变更记录（§十四 r1–r57）——历史与取证事实源，**内容冻结不再续写**；长尾承接见下方「长尾」节 |
-| `docs/plans/FCEUX11-v2.0.1_GBAEUX11精度优化计划.md` | **v2.0.1 精度优化（OPEN）**：按 Phase 独立立项（P0 已完成；P2→P3→P1/P4、P5 待做）。依据是外部测试报告 `docs/tech/gba-external-test-report-2026-10.md`（jsmolka 13 ROM + AGS 老化卡 v7.0），harness 与全部证据在 `Research_only/gbatech/`。**长尾的时序类精度缺口从那里接手** |
+| `docs/history/plans/FCEUX11-v2.0.1_GBAEUX11精度优化计划.md` | **已收口归档（用户裁决 2026-10-07）**：P0/线B/P4/线A/P3/P1 全部完成，**AGS 最终 30/33**；内容冻结不再续写。剩余 DMA DISPLAY START 与 DMA PRIORITY 两项 RE 见「长尾」节 |
 | `src/rust/crates/gba-core/ATTRIBUTION.md` | 上游出处、本地补丁集**逐处**说明、重新 vendor 流程 |
 | `COPYRIGHT_AUDIT.md` §5 | Rust vendor 树在 `src/` C/C++ 扫描范围之外的归属声明 |
 
@@ -130,8 +130,12 @@ v2.0 GBA 计划建设期已收口归档（r57 用户裁决）。剩余长尾全�
    状态下存在（测试自己的编码器与缺陷同错），靠外部参照才暴露。**推论：新增
    门禁时先问「这条断言的通过原因，与它要验的那条路径是不是同一条」**——
    r33 记过一次、v2.0.1 P0 又记一次，两次都是「测试与实现同错，闭环自洽」。
-   时序类精度缺口改由 v2.0.1 计划接手，不再记在本节。
-4. **§9.1 八条开放限制**（L1/L2/L4/L6/L7/L10/L13/L15）：r42/r54 裁决 Alpha
+4. **DMA 两项时序 RE**（报告驱动，v2.0.1 归档后移交）：`DMA DISPLAY START`
+   （timing=3 触发未实现）与 `DMA PRIORITY`（通道仲裁）各需自己的 RE；
+   方法与常数出处见归档计划 `docs/history/plans/FCEUX11-v2.0.1_GBAEUX11精度优化计划.md`。
+   另有唯一取证待办：`start_delay = 2` 目前仍是以 AGS 为准绳的标定值，需要
+   独立于 AGS 的来源（GBATEK TMxCNT_H 写入时序说明或第二套参照实现）。
+5. **§9.1 八条开放限制**（L1/L2/L4/L6/L7/L10/L13/L15）：r42/r54 裁决 Alpha
    阶段长期开放，无需工作；全文见归档计划 §9.1。
 
 ## S3-3 实施时踩到的三件事（给下一个接手的人）

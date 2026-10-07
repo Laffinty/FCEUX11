@@ -1,6 +1,6 @@
 # FCEUX11 编译指南 / Build Guide
 
-> **适用版本**：FCEUX11 v1.16+
+> **适用版本**：FCEUX11 v2.0+
 > **目标平台**：Windows 11 22H2+（64-bit）
 > **预计首次编译时间**：30-60 分钟（取决于网络和 CPU）
 
@@ -150,7 +150,7 @@ $env:VCPKG_ROOT = "$PWD\vcpkg"
 .\scripts\copy_dependencies.ps1 -ExecutablePath .\build\src\fceux11.exe -OutputDir .\dist
 
 # 打包
-Compress-Archive -Path dist\* -DestinationPath FCEUX11-v1.16-win64.zip
+Compress-Archive -Path dist\* -DestinationPath FCEUX11-v2.0-win64.zip
 ```
 
 `dist` 目录可直接运行，复制到任意 Windows 11 电脑都能启动。
@@ -262,7 +262,7 @@ cmake -S . -B build-cpp -G Ninja -DFCEUX11_RUST_ENABLED=OFF
 cmake --build build-cpp
 ```
 
-> Lua 功能需要 Rust crate；禁用 Rust 后 Lua 脚本功能不可用，其余正常。
+> Lua 功能需要 Rust crate；禁用 Rust 后 Lua 脚本功能不可用。实验性 GBA 模拟（BETA，v2.0 起）同样由 Rust crate 提供，禁用 Rust 后也不可用；NES 其余功能正常。
 
 ### 8.3 关闭单元测试
 

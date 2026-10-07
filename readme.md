@@ -27,6 +27,7 @@
 | 中文 | English |
 |------|---------|
 | **精确模拟**：完整支持 NES、Famicom 及各类 Mapper 扩展芯片，画面与音效高度还原。 | **Accurate Emulation**: Full NES / Famicom / mapper support with faithful graphics and audio. |
+| **实验性 GBA 模拟 (BETA)**：支持 ROM 加载、BIOS SWI 系统调用、音频输出、电池存档（`.srm`）、即时存档、手柄输入、整数倍画面缩放；内置诊断探针用于硬件行为定位，Beta 水印不可关闭。 | **Experimental GBA Emulation (BETA)**: ROM loading, BIOS SWI system calls, audio output, battery saves (`.srm`), save states, controller input, and integer-scaled display; a built-in diagnostic probe helps pinpoint hardware behaviour, and the Beta watermark cannot be disabled. |
 | **调试工具**：内置 CPU/PPU 调试器、十六进制编辑器、内存搜索与监视、代码/数据日志。 | **Debugging Tools**: CPU/PPU debugger, hex editor, RAM search/watch, code/data logger. |
 | **TAS 编辑器**：逐帧录制并精确编辑按键输入，轻松制作工具辅助速通（TAS）录像。 | **TAS Editor**: Frame-by-frame recording and precise input editing for Tool-Assisted Speedruns. |
 | **Lua 脚本**：通过 Lua 接口编写脚本，实现自定义屏幕叠加显示、自动化操作、内存数据读取等高级玩法。 | **Lua Scripting**: Custom on-screen displays, automation, and memory access via Lua. |
@@ -35,12 +36,8 @@
 | **多语言界面**：支持 **12 种语言** —— 简体中文、繁体中文、英文、日语、韩语、西班牙语、法语、德语、越南语、泰语、印地语（beta）、阿拉伯语（beta）；首启自动按系统区域设置匹配语言，切换语言后菜单、对话框即时全部重译；阿拉伯语自动启用从右到左布局。 | **Multi-language UI**: **12 languages** — Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Spanish, French, German, Vietnamese, Thai, Hindi (beta), and Arabic (beta). Auto-detected from system locale on first launch, instant retranslate on switch, and automatic right-to-left layout for Arabic. |
 | **自定义调色板**：加载外部调色板文件，自由调整画面色彩。 | **Custom Palettes**: Load custom palette files to fine-tune color rendering. |
 | **即时存档**：随时随地保存 / 读取进度，支持自动存档历史记录。 | **Save States**: Save / load anywhere with automatic state history. |
-| **实验性 GBA 模拟 (BETA)**：支持 ROM 加载、BIOS SWI 系统调用、音频输出、电池存档（`.srm`）、即时存档、手柄输入、整数倍画面缩放；内置诊断探针用于硬件行为定位，Beta 水印不可关闭。 | **Experimental GBA Emulation (BETA)**: ROM loading, BIOS SWI system calls, audio output, battery saves (`.srm`), save states, controller input, and integer-scaled display; a built-in diagnostic probe helps pinpoint hardware behaviour, and the Beta watermark cannot be disabled. |
 
 ---
-
-> **已知移除 / Known Removal**：自 v1.15 (hotfix4) 起，**NetPlay（联机对战）** 正式移除——上游 FCEUX 的该功能本已不可用（`config.cpp` 原注 "netplay is broken"），本版本清理了其 CLI 选项与不可达代码，核心 `netplay.cpp` 保留以维持存档兼容。详见 [CHANGELOG.md](CHANGELOG.md)。
-> Since v1.15 (hotfix4), **NetPlay** has been formally removed — it was already broken upstream. Related CLI options and unreachable code were cleaned up; core `netplay.cpp` is kept for savestate compatibility. See [CHANGELOG.md](CHANGELOG.md).
 
 ## 系统要求 / System Requirements
 
@@ -87,46 +84,6 @@ Precompiled binaries are available on the **[GitHub Releases](https://github.com
 4. **I** 快速存档，**P** 快速读档。
 
 Launch `fceux11.exe`, load a game via **File → Open ROM** (NES: `.nes` / `.fds` / `.nsf` / `.unf`; experimental GBA (Beta): `.gba` cartridges open from the same dialog, frames carry a `BETA` watermark, and a few games have known issues), play with keyboard or gamepad (remap in **Options → Input Config**). Press **I** to quick-save, **P** to quick-load.
-
----
-
-## 质量保障 / Quality Assurance — F11QA
-
-FCEUX11 内置一套名为 **F11QA**（原 KagamiQA）的双通道 自动化质量保障系统，在 CI 上常驻运行：
-
-| 组件 | 说明 |
-|------|------|
-| **内部逻辑检测（回归）** | CTest 注册测试 + 120 项扁平清单中的 unit/harness 条目，每次 push 全量运行 |
-| **硬件一致性检测（硬件对齐）** | 78 项 rom-suite 代表（vendor_state 三态）+ 177 个 [blargg](https://github.com/christopherpow/nes-test-roms) `$6000` 协议 ROM 全量批处理，覆盖 CPU/PPU/APU/MMC3 |
-| **迁移矩阵** | 每次 CI 产出 `f11qa_migration_matrix.json`（artifact），追踪 PASS→FAIL 回归与 FAIL→PASS 进展 |
-| **R4 门禁** | `total==120`、`fail_to_pass==0`、vendor_state 三态、advisory≤15%、grade∉{D,E} 机器校验 |
-
-> **当前 CI 矩阵**（`f11qa.yml`，`engine.git_rev=f19fa7d`，R4 gate passed，grade **B**）：
-> **120 项 / 106 PASS / 14 FAIL**；内部逻辑检测 **42P/0F**，硬件一致性检测 **64P/14F**
-> （blargg 全量 **145P/32F**）；advisory known-limit 14/120 = 11.7%（cap 15%）；
-> **0 条 PASS→FAIL 漂移**。数字以 CI artifact 的 `engine.git_rev` 为准；
-> 详见 [`docs/tech/F11QA.md`](docs/tech/F11QA.md) 与
-> [`docs/history/plans/FCEUX11-v1.8_收口验收.md`](docs/history/plans/FCEUX11-v1.8_收口验收.md)。
-
-**实现细节、原理、独立化运行**请参阅 [`docs/tech/F11QA.md`](docs/tech/F11QA.md)。
-
-FCEUX11 ships **F11QA** (formerly KagamiQA), a dual-channel automated quality assurance system that runs continuously in CI:
-
-| Component | Description |
-|-----------|-------------|
-| **Internal Logic Check (regression)** | CTest suite + unit/harness entries of the 120-case flat manifest, full run on every push |
-| **Hardware Consistency Check (hardware accuracy)** | 78 rom-suite representatives (vendor_state tri-state) + 177 [blargg](https://github.com/christopherpow/nes-test-roms) `$6000`-protocol ROMs covering CPU/PPU/APU/MMC3 |
-| **Migration Matrix** | `f11qa_migration_matrix.json` per CI run, tracking PASS→FAIL regressions and FAIL→PASS progress |
-| **R4 Gate** | Machine-checked: `total==120`, `fail_to_pass==0`, vendor_state, advisory≤15%, grade∉{D,E} |
-
-> **Current CI matrix** (`f11qa.yml`, `engine.git_rev=f19fa7d`, R4 gate passed, grade **B**):
-> **120 cases / 106 PASS / 14 FAIL**; Internal Logic Check **42P/0F**, Hardware Consistency Check **64P/14F**
-> (blargg batch **145P/32F**); advisory known-limits 14/120 = 11.7% (cap 15%);
-> **0 PASS→FAIL drifts**. Source of truth is `engine.git_rev` in the CI artifact;
-> see [`docs/tech/F11QA.md`](docs/tech/F11QA.md) and the
-> [v1.8 closeout sheet](docs/history/plans/FCEUX11-v1.8_收口验收.md).
-
-**For implementation details, principles, and standalone operation**, see [`docs/tech/F11QA.md`](docs/tech/F11QA.md).
 
 ---
 
