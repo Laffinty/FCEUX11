@@ -45,7 +45,7 @@
 
 | # | 盲区 | 证据（✅实测） | 处置 |
 |---|---|---|---|
-| M1 | `bench_tolerance_test` 三档（cpu/ppu/full）全部 `soundq=0` 走低质量路径，**真实游玩的 NeoFilterSound 484 抽头 FIR 根本不在基线内**（`tests/f11qa/benchmarks/bench_tolerance_test.cpp:96-99`） | ✅ | 新增 **soundq=1 测量位**（bench_full_frame 加第四档或独立 bench），基线重采后再动 A5 |
+| M1 | `bench_tolerance_test` 五档（cpu/ppu/full/**apu/bus_dispatch**，`bench_tolerance_test.cpp:53-59`）全部 `soundq=0` 走低质量路径（`:96-99` 仅设采样率，全文件无 `SetSoundQuality` 调用），**真实游玩的 NeoFilterSound 484 抽头 FIR 根本不在基线内** | ✅ | 新增 **soundq=1 测量位**（bench_full_frame 加 soundq=1 变体档或独立 bench），基线重采后再动 A5 |
 | M2 | GBA 帧导出/savestate 无微基准，C1/C2 的收益只能靠体感 | ✅ | 借用现成 `#[ignore]` 探针（`save.rs:885` `measure_a_state_on_disk`）扩一个帧导出计时探针，只作量级参照不进 ctest |
 
 **验收**：新测量位跑出稳定读数（best-of-3 口径同 baseline_v1.10.json 方法论）；
@@ -61,11 +61,11 @@
 
 | 项 | 位置（✅实测） | 现状 |
 |---|---|---|
-| A1-a DebugCycle 每指令无条件执行 | `src/x6502.cpp:606` → `src/debug.cpp:901-963` | 每条 6502 指令先做：vblank 浮点换算（`debug.cpp:909`，含 double 除法）、`GameInfo` 判定（:917）、**重新取指 1–3 次 `GetMem`**（:922-936，与真取指重复）、寻址解码再 0–2 次 `GetMem`（:938-954），然后才在 :956 判断「有没有断点/单步/计数断」决定要不要进 `breakpoint()`。**零断点时整段纯浪费** |
+| A1-a DebugCycle 每指令无条件执行 | `src/x6502.cpp:606` → `src/debug.cpp:901-963` | 每条 6502 指令先做：vblank 浮点换算（`debug.cpp:909`，含 double 除法）、`GameInfo` 判定（:917）、**重新取指 1–3 次 `GetMem`**（:922-936，与真取指重复）、寻址解码再 0–2 次 `GetMem`（:938-954），然后才在 :956 判断「有没有断点/单步/计数断」（9 路 OR：numWPs/step/runline/stepout/watchpoint flags/badopbreak/break_on_cycles/break_on_instructions）决定要不要进 `breakpoint()`。**零断点时整段纯浪费** |
 | A1-b 每指令调试记账 | `src/x6502.cpp:608`（`IncrementInstructionsCounters` 跨 TU 调用 + 两次全局自增，`debug.cpp:601-604`）、`:611`（`e1_last_pc = _PC` 每指令存，仅供 env-gated E-1 探针消费）、`:621`（`map_irq_hook()` 每指令 atomic acquire，`cpu.h:131-133`） | 无任何开关 |
 | A1-c viewer 回调链 | `src/ppu_rendering.cpp:787`、`:1313` → `driver_callbacks.cpp:182-187` 间接调用 → 窗口空判早退 | 每帧 480+ 次调用链 |
 
-**改法**：文件级 `debugger_active` 快速门（条件现成：`debug.cpp:956` 的 8 路 OR 加上
+**改法**：文件级 `debugger_active` 快速门（条件现成：`debug.cpp:956` 的 9 路 OR 加上
 `debug_loggingCD` 与 TraceLogger logging 状态）；A1-b 三件套并入门控（`e1_last_pc` 移入
 `e1_cpu_trace_on()` 内；irq hook 指针改普通读 + mapper init 处一次同步）；
 A1-c 同门。**门打开时行为逐字节不变**——`GetMem` 在 debug 路径本就置 `fceuindbg`
@@ -77,13 +77,13 @@ A1-c 同门。**门打开时行为逐字节不变**——`GetMem` 在 debug 路�
 
 ### A2 APU 帧计数器批量步进（收益高，风险中）
 
-- 位置（✅实测）：`src/x6502.cpp:623-624` 每指令调 `FCEU_SoundCPUHook` →
+- 位置（✅实测）：`src/x6502.cpp:623-624` 每指令调 `FCEU_SoundCPUHook`（overclocking 时跳过）→
   `src/sound.cpp:685`，体内 `while(rem>0){ rem--; FrameCounterTick(); }`（:706-722），
   `FrameCounterTick` 是 5-6 次串行比较链（:570-634）。
 - 现状：每帧 ~29,830 次循环迭代+函数调用，只为打 4-5 个定拍事件
   （7457/14913/22371/29828-30）与 `$4017` 写的复位成熟点（fc_reset_in）。
 - 改法：批量步进——算 `min(下一事件, fc_reset_in)` 一次跳转，事件边界精确命中再触发；
-  **fc_reset_in 的 3/4 周期奇偶抖动语义保持**（`sound.cpp:1256-1262` 注释）。
+  **fc_reset_in 的 3/4 周期奇偶抖动语义保持**（`sound.cpp:1254-1259` 注释）。
 - 风险：APU 帧计数器/IRQ 是 blargg APU 测试与金标音频的时序敏感区。
   **先写 fail-to-pass 时序锁测试再改**（instrument-first），哨兵：
   blargg APU 全套、`apu_wav_diff_test`、golden_wav 三件、矩阵 031/054。
@@ -103,7 +103,7 @@ A1-c 同门。**门打开时行为逐字节不变**——`GetMem` 在 debug 路�
 
 - `src/video.cpp:254` `memcpy(XBackBuf, XBuf, 256*256)` 64KB/帧——收窄为「有消费者才拷」
   （暂停重绘 `fceu.cpp:840`、截图、录像 HUD 逐个盘点后挂开关）。风险中：消费者盘点不全会出花屏。
-- `src/sound.cpp:1337-1338` memset 覆盖 `[left, 40000)` ≈160KB，下帧只写 ≤SOUNDTS≈3 万项
+- `src/sound.cpp:1338` memset 覆盖 `[left, 40000)` ≈160KB（`:1337` 的 memmove 保留 FIR carryover，勿动），下帧只写 ≤SOUNDTS≈3 万项
   ——收窄到 `[left, left+SOUNDTS)`。注意 hotfix3 D-4 REVERTED 的教训（:1327-1336 注释）：
   **trailing memset 必须保留**，只许收窄范围不许删除。
 
@@ -165,7 +165,7 @@ A1-c 同门。**门打开时行为逐字节不变**——`GetMem` 在 debug 路�
 
 ### B3 Lua 调试 API 补 range 系（小件）
 
-`memory.readbyterange`/`writebyterange`（现仅 10 个导出，`bindings/memory.rs:20-104`）。
+`memory.readbyterange`/`writebyterange`（现仅 9 个导出，`src/rust/crates/fceux11-lua/src/bindings/memory.rs:19-112`）。
 验收：`tests/lua_scripts/test_memory.lua` 加用例。
 
 ### B4 断点上限与条件表达式（可选，视需求）
@@ -187,7 +187,7 @@ A1-c 同门。**门打开时行为逐字节不变**——`GetMem` 在 debug 路�
 ### C1 帧导出热路径（主菜）
 
 - 现状（✅实测）：`frame.rs:321-334` `gba_frame_buffer` 每次调用
-  **2×153.6KB `Vec` 分配 + 3 次全帧写/拷**（`frame_bytes` 转换写入 :865-893、
+  **2×153.6KB `Vec` 分配 + 3 次全帧写/拷**（`frame_bytes` 转换写入 :865-894、
   `copy_from_slice` :329、`copy_nonoverlapping` 到 dst :333）+ 逐像素标量 BGR555→RGBA
   （38,400 像素 × `scale5`）。C++ 侧消费零分配（`gba_load.cpp:412`）。
 - 改法：① 复用常驻缓冲消掉两次分配；② 转换**直写 dst** 合并一整份拷贝；
@@ -198,7 +198,7 @@ A1-c 同门。**门打开时行为逐字节不变**——`GetMem` 在 debug 路�
 
 ### C2 savestate 延迟（双编码 + 指纹缓存）
 
-- 现状（✅实测）：每次保存 = **2 次全量 JSON 编码**（`gba_load.cpp:267-275` 先
+- 现状（✅实测）：每次保存 = **2 次全量 JSON 编码**（`gba_load.cpp:263-276`，调用在 :271/:275，先
   `gba_savestate_size` 量大小再 `gba_savestate_save` 再编码，release 单次 2.4ms）；
   每次存/读档全 ROM 重算 FNV-1a 指纹（`save.rs:141`、`frame.rs:405/438`，
   4-32MB 卡带为 ms 级）。
@@ -209,7 +209,7 @@ A1-c 同门。**门打开时行为逐字节不变**——`GetMem` 在 debug 路�
 ### C3 GBA 诊断工具文档化 + 计数更正（DEBUG 方向）
 
 - 把 GBA 探针族写成一页 HOWTO：`FCEUX11_DIAG_LOG`、`GBA_PROBE_*` 环境变量族、
-  r53/r56 复用探针（`frame.rs:2669-2677` `probe_why_a_game_stalls`、
+  r53/r56 复用探针（`frame.rs:2586-2678` `probe_why_a_game_stalls`、
   `frame.rs:3120` `dump_frames_like_the_reference` 差分转储）触发方式
   （`cargo test … -- --ignored --nocapture` + ROM 路径）。
 - **更正 AGENTS.md**：「7 条 `#[ignore]`」实测为 **20 条**（save.rs 2 + frame.rs 5 +
@@ -326,8 +326,9 @@ cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\build\tests && .\fceu
 # GBA 锁测试
 cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p fceux11-rust --no-default-features --features gba --lib"
 
-# 长期难题单项（示例：050）
-& build\tests\f11qa-rom-runner.exe --kgmqa-id kgmqa-050-cpu-dummy-writes-bisqwit --tests-json tests\tests.json --frames 3000
+# 长期难题单项（示例：050）。注意：f11qa-rom-runner 不是 CMake 目标，是 f11qa crate 的
+# Cargo [[bin]]（src/rust/crates/f11qa/Cargo.toml:15），产物路径见 f11qa-runner-protocol.md:172
+& src\rust\target\x86_64-pc-windows-msvc\debug\f11qa-rom-runner.exe --kgmqa-id kgmqa-050-cpu-dummy-writes-bisqwit --frames 3000
 ```
 
 ---
@@ -354,3 +355,4 @@ cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo tes
 | # | 日期 | 内容 |
 |---|---|---|
 | r1 | 2026-11-04 | 初稿：只读扫描（NES 性能/调试、GBA 性能/调试）+ 长期难题 10 项可行性重估 + 排期与出口判据。未动任何代码 |
+| r2 | 2026-11-04 | 拍板前三路复核（NES 坐标 / GBA 坐标与计数 / 长期难题事实基础），修正 8 处：① M1 档位实为五档非三档（bench_tolerance_test.cpp:53-59，补 apu/bus_dispatch；soundq=0 断言本身成立）；② debug.cpp:956 是 9 路 OR 非 8 路；③ A2 奇偶抖动注释坐标 :1254-1259；④ A4 memset 单独在 :1338（:1337 是 memmove 保 FIR carryover）；⑤ B3 lua memory 导出实为 9 个非 10 个，补全路径与行号；⑥ C3 probe_why_a_game_stalls 函数体在 frame.rs:2586-2678（原引 :2669-2677 只是尾部 println 段）；⑦ C2 双编码调用坐标精确到 :263-276/:271/:275；⑧ §九 runner 产物路径修正——f11qa-rom-runner 是 Cargo [[bin]] 非 CMake 目标，在 src\rust\target\…\debug\ 而非 build\tests\。复核同时确认：20 条 #[ignore] 分组计数、GBA 266−18=248 与 vendor 244−2=242 测试数、长期难题 10 项未收口清单、全部哨兵测试 ID、108P/12F 出处均属实 |
