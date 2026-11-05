@@ -25,6 +25,7 @@
 #include "ppu.h"
 
 #include <cstdlib>   // P2 Phase 3 Step 3.2 桶 C — opendecay_atexit (std::atexit)
+#include <filesystem> // D4 取证探针（kgmqa-050）：FCEUX11_OAMBUS_PROBE 输出目录自建
 #include "ppu_rendering.h"
 #include "ppu_state.h"
 #include "nsf.h"
@@ -596,6 +597,345 @@ static bool opendecay_init() {
 	return true;
 }
 
+// ----------------------------------------------------------------------------
+// D4 取证探针 — OAM 总线轨迹 + SPRAM 改写监视（kgmqa-050 OAM DMA dummy
+// writes 的前置调查工具，2026-11-06）。只观测、不修复：B4014 的现行实现
+// （本文件 for(x=0;x<256;x++) X6502_DMW(0x2004, X6502_DMR(t+x))）没有
+// halt/对齐周期、没有 DMC 仲裁；历史深查
+// （docs/history/surveys/cpu_bucketB/stepB_investigation_2026-08-04.md）
+// 还实测过 SPRAM[0x36] 在同一 CPU ts 的 2 个 PPU dot 窗口内被非 B2004
+// 路径改写、写者未定位。本探针为后续裁决提供证据面：
+//
+//   1) trace.bin：DMA 循环内每条 CPU 总线事件
+//      (cpu_ts, ppu_dot, ppu_sl, addr, rw, data, oamaddr_before/after)。
+//      ppu_dot/sl 取 ppur.status（架构精确态，纪律 11：不绑 PC/取指指针）。
+//   2) spram_diff.log：探针启用时维护 256 字节 shadow copy，在 B2003 写
+//      出口 / A2004 读入口 / B2004 写入口（catch-up 返回点）/ 每 DMA 字节
+//      边界比对 SPRAM 与 shadow，任何 diff 立即 dump（dot, sl, oamaddr,
+//      旧值, 新值, 最近一次带标签写者）。带标签写者清单三处：B2004 两个
+//      写分支、savestate 载入（ppu_state.cpp FCEUPPU_LoadState 出口一处
+//      调用，本探针在 ppu.cpp 之外的唯一触碰点）；其余 = 「无标签 diff」
+//      = 隐式写者直接证据。armed 条件是架构精确态
+//      （PPU[3]==0x36 && PPUON==0，sticky armed 标志）：机器上电态常为 0，
+//      不先确认「已被程序写成目标值」就判命中会在第 0 步触发（纪律 11）。
+//   3) FCEUX11_OAMBUS_PROBE=<dir> 指定输出目录；未设或空 = 探针完全不
+//      激活（零运行成本，静态 bool 一次性读 env 的 e1_cpu_trace_on 惯例）。
+//
+// 不碰金标路径、不修 B4014 行为本身；修复按探针裁决另立项。
+static bool oambus_probe_on() {
+	static const bool on = []() {
+		const char* e = std::getenv("FCEUX11_OAMBUS_PROBE");
+		return e && e[0] != '\0';
+	}();
+	return on;
+}
+
+static const char* oambus_probe_dir() {
+	static const char* dir = []() {
+		const char* e = std::getenv("FCEUX11_OAMBUS_PROBE");
+		return (e && e[0] != '\0') ? e : (const char*)nullptr;
+	}();
+	return dir;
+}
+
+// Fixed-width binary trace record (24 bytes, natural alignment on x64).
+// rw codes: 0 = CPU read, 1 = CPU write to $2004, 2 = DMA burst start,
+// 3 = DMA burst end. cpu_ts / ppu_dot / ppu_sl are sampled AFTER the bus
+// op completes (X6502_DMR/X6502_DMW each charge one CPU cycle via ADDCYC),
+// oamaddr_before/after bracket the op itself.
+struct OamBusTraceRec {
+	uint64_t cpu_ts;
+	int32_t  ppu_dot;
+	int32_t  ppu_sl;
+	uint32_t addr;
+	uint8_t  rw;
+	uint8_t  data;
+	uint8_t  oamaddr_before;
+	uint8_t  oamaddr_after;
+};
+static_assert(sizeof(OamBusTraceRec) == 24, "keep the on-disk trace record layout fixed");
+
+enum OamBusWriterTag : uint8_t {
+	OAMBUS_WR_NONE = 0,
+	OAMBUS_WR_B2004_NEWPPU = 1,
+	OAMBUS_WR_B2004_LEGACY = 2,
+	OAMBUS_WR_STATE_LOAD = 3,
+};
+
+enum OamBusWhere : uint8_t {
+	OAMBUS_WHERE_DMA_BYTE = 0,
+	OAMBUS_WHERE_B2004_PRE = 1,
+	OAMBUS_WHERE_B2004_READ = 2,
+	OAMBUS_WHERE_B2003_WRITE = 3,
+	OAMBUS_WHERE_STATE_LOAD = 4,
+};
+
+static const char* oambus_where_name(uint8_t w) {
+	switch (w) {
+		case OAMBUS_WHERE_DMA_BYTE:   return "dma_byte";
+		case OAMBUS_WHERE_B2004_PRE:  return "b2004_pre";
+		case OAMBUS_WHERE_B2004_READ: return "b2004_read";
+		case OAMBUS_WHERE_B2003_WRITE: return "b2003_write";
+		case OAMBUS_WHERE_STATE_LOAD: return "state_load";
+	}
+	return "?";
+}
+
+static const char* oambus_writer_tag_name(uint8_t t) {
+	switch (t) {
+		case OAMBUS_WR_B2004_NEWPPU: return "B2004_NEWPPU";
+		case OAMBUS_WR_B2004_LEGACY: return "B2004_LEGACY";
+		case OAMBUS_WR_STATE_LOAD:   return "STATE_LOAD";
+	}
+	return "NONE";
+}
+
+static FILE* s_oambus_trace_fp = nullptr;
+static FILE* s_oambus_diff_fp = nullptr;
+static bool  s_oambus_files_ready = false;   // one-shot file init attempted
+static bool  s_oambus_active = false;        // false when file open failed
+static bool  s_oambus_armed = false;         // sticky; arch-exact arm condition
+static uint8_t s_oambus_shadow[0x100];
+static uint64_t s_oambus_trace_bytes = 0;
+static bool  s_oambus_trace_capped = false;
+static uint32_t s_oambus_diff_events = 0;
+static uint32_t s_oambus_dma_bursts = 0;
+static uint32_t s_oambus_dma_bytes = 0;
+static constexpr uint64_t OAMBUS_TRACE_CAP_BYTES = 256ull * 1024 * 1024;
+
+// Last tagged writer (probe-only evidence state; see the block comment).
+static uint8_t  s_oambus_lw_tag = OAMBUS_WR_NONE;
+static uint8_t  s_oambus_lw_idx = 0;
+static uint8_t  s_oambus_lw_val = 0;
+static uint64_t s_oambus_lw_ts = 0;
+static int32_t  s_oambus_lw_dot = 0;
+static int32_t  s_oambus_lw_sl = 0;
+
+static inline uint64_t oambus_now_ts() {
+	return g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref();
+}
+
+// One-shot output setup. Creates <dir> if missing; on failure the probe
+// self-disables (better dead than noisy) and says so once on stderr.
+// Forward decl: the atexit handler is defined below (same order hazard as
+// the opendecay block's forward declarations).
+static void oambus_probe_atexit();
+static void oambus_probe_init_files() {
+	if (s_oambus_files_ready) return;
+	s_oambus_files_ready = true;
+	const char* dir = oambus_probe_dir();
+	if (!dir) return;
+	std::error_code ec;
+	std::filesystem::create_directories(dir, ec);
+	char path[1024];
+	std::snprintf(path, sizeof(path), "%s/trace.bin", dir);
+	s_oambus_trace_fp = std::fopen(path, "wb");
+	std::snprintf(path, sizeof(path), "%s/spram_diff.log", dir);
+	s_oambus_diff_fp = std::fopen(path, "w");
+	if (!s_oambus_trace_fp || !s_oambus_diff_fp) {
+		std::fprintf(stderr,
+			"OAMBUS PROBE ERROR: cannot open trace.bin/spram_diff.log under '%s' — probe disabled\n",
+			dir);
+		if (s_oambus_trace_fp) { std::fclose(s_oambus_trace_fp); s_oambus_trace_fp = nullptr; }
+		if (s_oambus_diff_fp)  { std::fclose(s_oambus_diff_fp);  s_oambus_diff_fp = nullptr; }
+		return;
+	}
+	// 8-byte trace header: magic + record size, so a truncated or
+	// layout-drifted stream is detectable by the offline reader.
+	const uint8_t hdr[8] = { 'O', 'A', 'M', 'B', '1', 24, 0, 0 };
+	s_oambus_trace_bytes += std::fwrite(hdr, 1, sizeof(hdr), s_oambus_trace_fp);
+	s_oambus_active = true;
+	std::fprintf(s_oambus_diff_fp,
+		"OAMBUS PROBE begin dir=%s trace_cap=%llu bytes\n",
+		dir, (unsigned long long)OAMBUS_TRACE_CAP_BYTES);
+	std::fflush(s_oambus_diff_fp);
+	std::atexit(oambus_probe_atexit);
+}
+
+static void oambus_probe_atexit() {
+	if (!oambus_probe_on()) return;
+	if (s_oambus_diff_fp) {
+		std::fprintf(s_oambus_diff_fp,
+			"OAMBUS PROBE end dma_bursts=%u dma_bytes=%u diff_events=%u armed=%d trace_bytes=%llu\n",
+			s_oambus_dma_bursts, s_oambus_dma_bytes, s_oambus_diff_events,
+			s_oambus_armed ? 1 : 0, (unsigned long long)s_oambus_trace_bytes);
+		std::fclose(s_oambus_diff_fp);
+		s_oambus_diff_fp = nullptr;
+	}
+	if (s_oambus_trace_fp) {
+		std::fflush(s_oambus_trace_fp);
+		std::fclose(s_oambus_trace_fp);
+		s_oambus_trace_fp = nullptr;
+	}
+}
+
+static void oambus_trace_write(const OamBusTraceRec& rec) {
+	if (!s_oambus_trace_fp || s_oambus_trace_capped) return;
+	if (s_oambus_trace_bytes >= OAMBUS_TRACE_CAP_BYTES) {
+		s_oambus_trace_capped = true;
+		std::fprintf(stderr,
+			"OAMBUS PROBE: trace.bin hit %llu-byte cap — further records dropped (spram_diff.log continues)\n",
+			(unsigned long long)OAMBUS_TRACE_CAP_BYTES);
+		return;
+	}
+	s_oambus_trace_bytes += std::fwrite(&rec, 1, sizeof(rec), s_oambus_trace_fp);
+}
+
+static inline OamBusTraceRec oambus_make_rec(uint32_t addr, uint8_t rw,
+	uint8_t data, uint8_t oam_before, uint8_t oam_after) {
+	OamBusTraceRec r;
+	r.cpu_ts = oambus_now_ts();
+	r.ppu_dot = ppur.status.cycle;
+	r.ppu_sl = ppur.status.sl;
+	r.addr = addr;
+	r.rw = rw;
+	r.data = data;
+	r.oamaddr_before = oam_before;
+	r.oamaddr_after = oam_after;
+	return r;
+}
+
+// Armed check — architecture-exact state only (PPU[3], PPU[1]); sticky.
+// Callers must treat arming as "the target state has actually been
+// established by the program", never as a step-0 default (纪律 11).
+static inline void oambus_arm_check() {
+	if (s_oambus_armed) return;
+	if (PPU[3] == 0x36 && (PPU[1] & 0x18) == 0) {
+		s_oambus_armed = true;
+		if (s_oambus_active) {
+			// Baseline at the arming instant: from here on, any SPRAM
+			// change not routed through a tagged writer is evidence.
+			std::memcpy(s_oambus_shadow, SPRAM, 0x100);
+			std::fprintf(s_oambus_diff_fp,
+				"OAMBUS ARMED cpu_ts=%llu dot=%d sl=%d oamaddr=0x%02X PPUON=0 — shadow synced, monitoring SPRAM rewrites\n",
+				(unsigned long long)oambus_now_ts(),
+				ppur.status.cycle, ppur.status.sl, (unsigned)PPU[3]);
+			std::fflush(s_oambus_diff_fp);
+		}
+	}
+}
+
+// SPRAM vs shadow comparison. Diffs (i.e. writes that did NOT go through a
+// tagged writer) are dumped immediately, one line per byte, then the shadow
+// is resynced so each rewrite is reported once.
+static void oambus_compare(uint8_t where) {
+	if (!oambus_probe_on()) return;
+	oambus_probe_init_files();
+	if (!s_oambus_active) return;
+	oambus_arm_check();
+	if (!s_oambus_armed) return;
+	if (std::memcmp(SPRAM, s_oambus_shadow, 0x100) == 0) return;
+	const uint32_t event = ++s_oambus_diff_events;
+	for (int i = 0; i < 0x100; ++i) {
+		if (SPRAM[i] == s_oambus_shadow[i]) continue;
+		std::fprintf(s_oambus_diff_fp,
+			"OAMBUS DIFF event=%u where=%s cpu_ts=%llu dot=%d sl=%d oamaddr=0x%02X "
+			"idx=0x%02X old=0x%02X new=0x%02X last_writer=%s "
+			"lw_idx=0x%02X lw_val=0x%02X lw_ts=%llu lw_dot=%d lw_sl=%d\n",
+			event, oambus_where_name(where),
+			(unsigned long long)oambus_now_ts(),
+			ppur.status.cycle, ppur.status.sl, (unsigned)PPU[3],
+			(unsigned)i, (unsigned)s_oambus_shadow[i], (unsigned)SPRAM[i],
+			oambus_writer_tag_name(s_oambus_lw_tag),
+			(unsigned)s_oambus_lw_idx, (unsigned)s_oambus_lw_val,
+			(unsigned long long)s_oambus_lw_ts,
+			s_oambus_lw_dot, s_oambus_lw_sl);
+	}
+	std::fflush(s_oambus_diff_fp);
+	std::memcpy(s_oambus_shadow, SPRAM, 0x100);
+}
+
+// Tagged-writer notification, called by the B2004 write branches right after
+// the SPRAM store. Records the last tagged writer and keeps the shadow in
+// step, so a tagged write never shows up as a diff.
+static inline void oambus_tag_spram_write(uint8_t idx, uint8_t val, uint8_t tag) {
+	if (!oambus_probe_on()) return;
+	oambus_probe_init_files();
+	s_oambus_lw_tag = tag;
+	s_oambus_lw_idx = idx;
+	s_oambus_lw_val = val;
+	s_oambus_lw_ts = oambus_now_ts();
+	s_oambus_lw_dot = ppur.status.cycle;
+	s_oambus_lw_sl = ppur.status.sl;
+	if (s_oambus_active) s_oambus_shadow[idx] = val;
+	oambus_arm_check();
+}
+
+// Non-static: ppu_state.cpp FCEUPPU_LoadState calls this once per savestate
+// load, after the SFORMAT restore has wholesale-copied SPRAM. It tags the
+// restore as a known writer and resyncs the shadow, so a state load is never
+// mistaken for an implicit OAM writer. Diffs against the pre-load shadow are
+// summarized on one line (expected noise from a wholesale restore), not
+// reported as DIFF events.
+void oambus_probe_notify_state_load() {
+	if (!oambus_probe_on()) return;
+	oambus_probe_init_files();
+	s_oambus_lw_tag = OAMBUS_WR_STATE_LOAD;
+	s_oambus_lw_idx = 0xFF;   // wholesale: 256 bytes, no single index
+	s_oambus_lw_val = 0;
+	s_oambus_lw_ts = oambus_now_ts();
+	s_oambus_lw_dot = ppur.status.cycle;
+	s_oambus_lw_sl = ppur.status.sl;
+	oambus_arm_check();
+	if (s_oambus_active) {
+		uint32_t changed = 0;
+		for (int i = 0; i < 0x100; ++i)
+			if (SPRAM[i] != s_oambus_shadow[i]) ++changed;
+		std::fprintf(s_oambus_diff_fp,
+			"OAMBUS STATE_LOAD cpu_ts=%llu dot=%d sl=%d oamaddr=0x%02X bytes_changed_vs_shadow=%u (shadow resynced)\n",
+			(unsigned long long)s_oambus_lw_ts,
+			s_oambus_lw_dot, s_oambus_lw_sl, (unsigned)PPU[3], changed);
+		std::fflush(s_oambus_diff_fp);
+		std::memcpy(s_oambus_shadow, SPRAM, 0x100);
+	}
+}
+
+// Power-on / game-load reset: re-baseline the shadow against freshly
+// randomized SPRAM and clear the armed flag. Files stay open across power
+// cycles in the same process.
+static void oambus_probe_power_reset() {
+	if (!oambus_probe_on()) return;
+	oambus_probe_init_files();
+	s_oambus_armed = false;
+	std::memcpy(s_oambus_shadow, SPRAM, 0x100);
+	s_oambus_lw_tag = OAMBUS_WR_NONE;
+	if (s_oambus_diff_fp) {
+		std::fprintf(s_oambus_diff_fp,
+			"OAMBUS POWER RESET cpu_ts=%llu — armed=0, shadow resynced\n",
+			(unsigned long long)oambus_now_ts());
+		std::fflush(s_oambus_diff_fp);
+	}
+}
+
+// --- B4014 DMA burst helpers (probe branch; ops are byte-identical to the
+// --- uninstrumented loop: read half first, then the $2004 write half).
+
+static void oambus_dma_start(uint32_t page_base, uint8_t page) {
+	++s_oambus_dma_bursts;
+	oambus_trace_write(oambus_make_rec(page_base, 2, page,
+		(uint8_t)PPU[3], (uint8_t)PPU[3]));
+}
+
+static void oambus_dma_byte(uint32_t addr) {
+	// Byte-boundary SPRAM compare: catches any rewrite that happened since
+	// the previous boundary, BEFORE this byte's tagged write lands.
+	oambus_compare(OAMBUS_WHERE_DMA_BYTE);
+	const uint8_t oam_before = (uint8_t)PPU[3];
+	const uint8_t data = X6502_DMR(addr);
+	oambus_trace_write(oambus_make_rec(addr, 0, data,
+		oam_before, (uint8_t)PPU[3]));
+	const uint8_t oam_w_before = (uint8_t)PPU[3];
+	X6502_DMW(0x2004, data);
+	oambus_trace_write(oambus_make_rec(0x2004, 1, data,
+		oam_w_before, (uint8_t)PPU[3]));
+	++s_oambus_dma_bytes;
+}
+
+static void oambus_dma_end() {
+	oambus_trace_write(oambus_make_rec(0, 3, 0, (uint8_t)PPU[3], (uint8_t)PPU[3]));
+	if (s_oambus_trace_fp) std::fflush(s_oambus_trace_fp);
+}
+
 static DECLFR(A2002) {
 	if (newppu) [[unlikely]] {
 		//once we thought we clear latches here, but that caused midframe glitches.
@@ -646,6 +986,9 @@ static DECLFR(A2002) {
 }
 
 static DECLFR(A2004) {
+	// D4 取证探针：$2004 读入口比对——oam_read_test 正是从这里采 OAM，
+	// 在返回值出来之前抓 diff 让「读数不可靠」与「SPRAM 被改」可对上时刻。
+	oambus_compare(OAMBUS_WHERE_B2004_READ);
 	if (newppu) [[unlikely]] {
 		if ((ppur.status.sl < 241) && PPUON) {
 			// from cycles 0 to 63, the
@@ -1000,9 +1343,15 @@ static DECLFW(B2003) {
 	opendecay_log_write(V);
 	PPU[3] = V;
 	PPUSPL = V & 0x7;
+	// D4 取证探针：写出口比对。测试把 OAMADDR 钉到 0x36 走的就是这条
+	// （PPU[3]==0x36 && PPUON==0 同时是探针的 armed 条件——架构精确态）。
+	oambus_compare(OAMBUS_WHERE_B2003_WRITE);
 }
 
 static DECLFW(B2004) {
+	// D4 取证探针：写入口比对（catch-up 返回点语义——抓「上一次比对之后、
+	// 本次带标签写落地之前」的隐式改写）。
+	oambus_compare(OAMBUS_WHERE_B2004_PRE);
 	PPUGenLatch = V;
 	opendecay_log_write(V);
 	if (newppu) [[unlikely]] {
@@ -1012,13 +1361,18 @@ static DECLFW(B2004) {
 		if ((PPU[3] & 3) == 2)
 			V &= 0xE3;
 		SPRAM[PPU[3]] = V;
+		// D4 取证探针：登记带标签写者（此时 PPU[3] 即被写单元，自增之前）。
+		oambus_tag_spram_write((uint8_t)PPU[3], V, OAMBUS_WR_B2004_NEWPPU);
 		PPU[3] = (PPU[3] + 1) & 0xFF;
 	} else {
 		if (PPUSPL >= 8) {
-			if (PPU[3] >= 8)
+			if (PPU[3] >= 8) {
 				SPRAM[PPU[3]] = V;
+				oambus_tag_spram_write((uint8_t)PPU[3], V, OAMBUS_WR_B2004_LEGACY);
+			}
 		} else {
 			SPRAM[PPUSPL] = V;
+			oambus_tag_spram_write((uint8_t)PPUSPL, V, OAMBUS_WR_B2004_LEGACY);
 		}
 		PPU[3]++;
 		PPUSPL++;
@@ -1142,8 +1496,19 @@ static DECLFW(B4014) {
 	// SPR DMA duration for future investigation.
 	const uint32 cycle_before = g_cpu.timestamp_base() + (uint32)g_cpu.timestamp_ref();
 
-	for (x = 0; x < 256; x++)
-		X6502_DMW(0x2004, X6502_DMR(t + x));
+	// D4 取证探针（kgmqa-050）：probe 分支与下方原循环逐字节等价（先读后写、
+	// 同样的 X6502_DMR/DMW 与计费），只多了轨迹记录与字节边界 shadow 比对。
+	// 探针关闭时走原循环，零行为变化。不修 B4014 行为本身。
+	if (oambus_probe_on()) {
+		oambus_probe_init_files();
+		oambus_dma_start(t, V);
+		for (x = 0; x < 256; x++)
+			oambus_dma_byte(t + x);
+		oambus_dma_end();
+	} else {
+		for (x = 0; x < 256; x++)
+			X6502_DMW(0x2004, X6502_DMR(t + x));
+	}
 
 	const uint32 cycle_after = g_cpu.timestamp_base() + (uint32)g_cpu.timestamp_ref();
 	opendecay_log_sprdma_event(cycle_before, cycle_after, (uint32)x);
@@ -1163,6 +1528,9 @@ void FCEUPPU_Power(void) {
 	FCEU_MemoryRand(NTARAM, 0x800, true);
 	FCEU_MemoryRand(PALRAM.data(), 0x20, true);
 	FCEU_MemoryRand(SPRAM, 0x100, true);
+	// D4 取证探针（kgmqa-050）：SPRAM 刚被随机化，重定 shadow 基线并清 armed
+	// 标志；探针关闭时内部第一行就返回。
+	oambus_probe_power_reset();
 	// palettes can only store values up to $3F, and PALRAM X4/X8/XC are mirrors of X0 for rendering purposes (UPALRAM is used for $2007 readback)
 	for (x = 0; x < 0x20; ++x) PALRAM[x] &= 0x3F;
 	UPALRAM[0] = PALRAM[0x04];

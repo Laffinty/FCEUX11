@@ -43,9 +43,16 @@
 // ----------------------------------------------------------------------------
 static uint16 TempAddrT, RefreshAddrT;
 
+// D4 取证探针（kgmqa-050）：定义在 ppu.cpp，非 static。本文件是 ppu.cpp
+// 之外唯一调用点——SFORMAT 恢复在 FCEUPPU_LoadState 被调到之前已整块
+// memcpy 过 SPRAM，这里把整载登记为「带标签写者」并重同步 shadow，
+// 避免把 savestate 载入误判成隐式 OAM 写者。探针未启用时内部第一行返回。
+void oambus_probe_notify_state_load();
+
 void FCEUPPU_LoadState(int version) {
 	TempAddr = TempAddrT;
 	RefreshAddr = RefreshAddrT;
+	oambus_probe_notify_state_load();
 }
 
 SFORMAT FCEUPPU_STATEINFO[] = {
