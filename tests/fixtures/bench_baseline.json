@@ -23,9 +23,9 @@
     "gates entirely (-LE perf; 20+ percent runner noise)."
   ],
   "version":             "v1.3.0",
-  "captured_at":         "2026-10-03",
-  "captured_from_commit": "1f01e9a2c5681fbc3fab13baec594a05c266ad1b",
-  "captured_on":         "Windows_NT, Microsoft Windows 10.0.26200 , AMD64",
+  "captured_at":         "2026-11-05",
+  "captured_from_commit": "2e1a2e776d61ea055bb2fd14f4f6f73c8c2d622a",
+  "captured_on":         "Windows_NT, Microsoft Windows 10.0.26300 , AMD64",
   "tolerance_pct":       10.0,
   "benchmarks": [
     {
@@ -35,7 +35,7 @@
       "frames_per_iter":  60,
       "iterations":       5,
       "metric":           "median_total_ms",
-      "baseline_ms":      144.604,
+      "baseline_ms":      46.356,
       "unit":             "milliseconds for 60 frames"
     },
     {
@@ -45,7 +45,7 @@
       "frames_per_iter":  60,
       "iterations":       5,
       "metric":           "median_total_ms",
-      "baseline_ms":      142.559,
+      "baseline_ms":      46.554,
       "unit":             "milliseconds for 60 frames"
     },
     {
@@ -55,8 +55,18 @@
       "frames_per_iter":  60,
       "iterations":       5,
       "metric":           "median_total_ms",
-      "baseline_ms":      132.880,
+      "baseline_ms":      48.632,
       "unit":             "milliseconds for 60 frames (CPU+PPU+APU)"
+    },
+    {
+      "name":             "bench_full_frame_hq",
+      "binary":           "fceux11_bench_tolerance_test",
+      "rom":              "fixtures/mapper_mmc3.nes",
+      "frames_per_iter":  60,
+      "iterations":       7,
+      "metric":           "median_total_ms",
+      "baseline_ms":      78.588,
+      "unit":             "milliseconds for 60 frames"
     }
   ]
 }
