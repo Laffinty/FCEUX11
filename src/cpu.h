@@ -126,10 +126,19 @@ public:
     // hotfix3 B-5b: the legacy map_irq_hook_ref() accessor (returning
     // MapIRQHook&) is removed. All ~50 mapper files now go through
     // set_map_irq_hook() (which stores atomically with release
-    // ordering), and the hot path reads via map_irq_hook() (atomic
-    // acquire load).
+    // ordering), and the hot path reads via map_irq_hook().
+    //
+    // A1 (v2.0.2 P1): the hot-path load is relaxed, not acquire. The only
+    // hot reader is x6502.cpp's per-instruction hook dispatch; acquire costs
+    // the same single mov on x86 but documents a barrier the compiler must
+    // honour, which kept the pointer pinned to memory every instruction. The
+    // pointer only changes on game load/unload (ResetGameLoaded clears it,
+    // board init sets it), which runs on the emulation thread ahead of any
+    // read, so ordering between the two is guaranteed by program order; the
+    // atomic is kept for that single-thread visibility, not for cross-thread
+    // release/acquire pairing.
     MapIRQHook map_irq_hook() const noexcept {
-        return map_irq_hook_.load(std::memory_order_acquire);
+        return map_irq_hook_.load(std::memory_order_relaxed);
     }
     void set_map_irq_hook(MapIRQHook h) noexcept {
         map_irq_hook_.store(h, std::memory_order_release);

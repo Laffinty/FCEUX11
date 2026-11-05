@@ -38,6 +38,7 @@
 #include "../../ppu.h"
 #include "../../debug.h"
 #include "../../palette.h"
+#include "../../driver_callbacks.h"
 
 #include "Qt/ppuViewer.h"
 #include "Qt/main.h"
@@ -51,6 +52,16 @@
 #include "Qt/ConfigStore.h"
 
 static ppuViewerDialog_t *ppuViewWindow = NULL;
+
+// A1 (v2.0.2 P1): keep the core-side fast-gate flag in step with the two PPU
+// viewer windows (this file owns both pointers; the sprite viewer's
+// destructor calls in here from its own TU). The core reads the flag 240
+// times per frame to skip FCEUD_UpdatePPUView when both windows are closed.
+void sync_ppu_view_flags(void)
+{
+	fceu11::g_driver().ppu_view_open =
+		(ppuViewWindow != NULL) || (spriteViewWindow != NULL);
+}
 spriteViewerDialog_t *spriteViewWindow = NULL;
 
 int openPPUViewWindow( QWidget *parent )
@@ -83,6 +94,7 @@ int openOAMViewWindow( QWidget *parent )
 	spriteViewWindow = new spriteViewerDialog_t(parent);
 
 	spriteViewWindow->show();
+	sync_ppu_view_flags();
 
 	return 0;
 }
@@ -121,6 +133,7 @@ ppuViewerDialog_t::ppuViewerDialog_t(QWidget *parent)
 	ColorMenuItem *tileSelColorAct[2], *tileGridColorAct[2];
 
 	ppuViewWindow = this;
+	sync_ppu_view_flags();
 
 	menuBar = new QMenuBar(this);
 
@@ -356,6 +369,7 @@ ppuViewerDialog_t::~ppuViewerDialog_t(void)
 {
 	updateTimer->stop();
 	ppuViewWindow = NULL;
+	sync_ppu_view_flags();
 
 	static const fceu11::qt::TypedConfig<QByteArray> kGeometry(
 		"ppuViewer/geometry", QByteArray());

@@ -285,10 +285,14 @@ spriteViewerDialog_t::spriteViewerDialog_t(QWidget *parent)
 spriteViewerDialog_t::~spriteViewerDialog_t(void)
 {
 	extern spriteViewerDialog_t *spriteViewWindow;
+	// A1 (v2.0.2 P1): keep the core-side gate flag in step; the helper lives
+	// next to both window pointers in ppuViewer.cpp.
+	extern void sync_ppu_view_flags(void);
 	if (this == spriteViewWindow)
 	{
 		spriteViewWindow = NULL;
 	}
+	sync_ppu_view_flags();
 	g_config->setOption("SDL.OAM_ShowPosHex", showPosHex->isChecked());
 }
 

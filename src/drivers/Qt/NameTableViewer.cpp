@@ -40,6 +40,7 @@
 #include "../../ines.h"
 #include "../../debug.h"
 #include "../../palette.h"
+#include "../../driver_callbacks.h"
 
 #include "Qt/ColorMenu.h"
 #include "Qt/ConsoleWindow.h"
@@ -166,6 +167,9 @@ ppuNameTableViewerDialog_t::ppuNameTableViewerDialog_t(QWidget *parent)
 #endif
 
 	nameTableViewWindow = this;
+	// A1 (v2.0.2 P1): the core skips FCEUD_UpdateNTView while this flag is
+	// clear; raise it for the window's whole lifetime (cleared in the dtor).
+	fceu11::g_driver().nt_view_open = 1;
 
 	g_config->getOption("SDL.NT_DrawScrollLines",   &drawScrollLines);
 	g_config->getOption("SDL.NT_DrawTileGridLines", &drawTileGridLines);
@@ -599,6 +603,7 @@ ppuNameTableViewerDialog_t::~ppuNameTableViewerDialog_t(void)
 
 	updateTimer->stop();
 	nameTableViewWindow = NULL;
+	fceu11::g_driver().nt_view_open = 0;
 
 	settings.setValue("ntViewer/geometry", saveGeometry());
 

@@ -608,7 +608,10 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
    IncrementInstructionsCounters();
 
    _PI=_P;
-   e1_last_pc = (uint16)_PC;
+   // A1 (v2.0.2 P1): the E-1 probe is the only consumer of this variable, and
+   // every reader sits behind the same env gate, so the write pays nothing
+   // when the probe is off.
+   if (e1_cpu_trace_on()) e1_last_pc = (uint16)_PC;
    b1=RdMem(_PC);
 
    ADDCYC(CycTable[b1]);

@@ -47,6 +47,7 @@
 #include "types.h"
 #include "x6502.h"
 #include "fceu.h"
+#include "driver_callbacks.h"
 #include "ppu.h"
 #include "ppu_rendering.h"
 #include "ppu_state.h"
@@ -784,7 +785,13 @@ void DoLine(void) {
 			GameHBIRQHook();
 	}
 
-	DEBUG(FCEUD_UpdateNTView(sl, 0));
+	// A1 (v2.0.2 P1): gated on the viewer window being open, not on debugger
+	// activity -- the NT viewer refreshes through this callback even with zero
+	// breakpoints set, so the debugger condition would freeze it. The flag is
+	// a plain int the Qt side keeps in step with the window's lifetime; with
+	// the window closed this used to be an indirect call that Qt immediately
+	// returned from, 240 times per frame.
+	DEBUG(if (fceu11::g_driver().nt_view_open) FCEUD_UpdateNTView(sl, 0));
 
 	if (SpriteON)
 		RefreshSprites();

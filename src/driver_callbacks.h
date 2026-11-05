@@ -12,8 +12,9 @@
 //   4. g_driver() 访问器 __forceinline，使 MSVC 在 LTO 前即可将 g_driver()->fn()
 //      优化为直接 call（plan §6.4 验证手段）。
 //
-// 字段全集：43 个 = 40 live (plan §2.1) + 3 audit §5 增补
-// （get_keyboard_state / taseditor_disable_run_function / get_thread_name）。
+// 字段全集：43 个函数指针 = 40 live (plan §2.1) + 3 audit §5 增补
+// （get_keyboard_state / taseditor_disable_run_function / get_thread_name），
+// 另有 3 个状态位 int（A1 v2.0.2，见结构体尾部「State flags」节）。
 
 #pragma once
 
@@ -32,7 +33,7 @@ struct ArchiveScanRecord;       // src/file.h:103
 namespace fceu11 {
 
 // ===========================================================================
-// DriverCallbacks — Core→Driver 回调表（POD，43 函数指针字段）
+// DriverCallbacks — Core→Driver 回调表（POD，43 函数指针字段 + 3 状态位 int）
 // ===========================================================================
 struct DriverCallbacks {
     // ---- Batch 1: Messages & lifecycle (Phase C) ----
@@ -109,6 +110,20 @@ struct DriverCallbacks {
     void  (*get_keyboard_state)(void* out) = nullptr;              // fceux11_lua_GetKeyboardState
     void  (*taseditor_disable_run_function)() = nullptr;           // 取代 core 持有 taseditor_lua
     const char* (*get_thread_name)() = nullptr;                    // QThread::currentThread()->objectName()
+
+    // ---- State flags (A1, v2.0.2 P1) —— 不是回调：Qt 驱动写、core 热路径只读 ----
+    //
+    // 这三个 int 是 A1 快速门的条件位。它们不遵守「字段全部为函数指针」的
+    // Batch 注记，因为反向（core 每 480 次/帧间接调用 Qt 再判空早退）正是
+    // A1-c 要剪掉的浪费；普通 int 让 core 侧的判断折叠为一次内存读。
+    // Qt 侧在窗口/开关的生命周期锚点置位（TraceLogger.cpp toggleLoggingOnOff、
+    // NameTableViewer.cpp open/~dtor、ppuViewer.cpp open/~dtor）。
+    // 语义与被门控的 Qt 早退逐一对齐：trace_logging 对 FCEUD_TraceInstruction
+    // 的 logging 早退；nt/ppu_view_open 对两个 viewer wrapper 的窗口判空早退
+    // （ppu_view_open 是 PPU 与 Sprite 两个窗口的合并状态）。
+    int trace_logging = 0;                                         // TraceLogger 正在记录
+    int nt_view_open = 0;                                          // NameTableViewer 窗口打开
+    int ppu_view_open = 0;                                         // PPU 或 Sprite viewer 窗口打开
 };
 
 // POD 不变量（plan §2.4 验收）。static_assert 在编译期触发：

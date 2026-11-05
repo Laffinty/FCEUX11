@@ -55,6 +55,7 @@
 #include "../../ines.h"
 #include "../../nsf.h"
 #include "../../movie.h"
+#include "../../driver_callbacks.h"
 
 #include "common/os_utils.h"
 
@@ -578,6 +579,14 @@ void TraceLoggerDialog_t::toggleLoggingOnOff(void)
 		startStopButton->setIcon( style()->standardIcon( QStyle::SP_MediaStop ) );
 		logging = 1;
 	}
+
+	// A1 (v2.0.2 P1): mirror the switch into the core-side fast gate, so the
+	// per-instruction DebugCycle body (and the FCEUD_TraceInstruction call at
+	// its end) is skipped outright while logging is off. The transient
+	// pauses in logMaxLinesChanged / clearLog are deliberately NOT mirrored:
+	// during them the Qt side sets logging=0 anyway, so the gate staying
+	// open changes nothing -- FCEUD_TraceInstruction still early-exits.
+	fceu11::g_driver().trace_logging = logging;
 }
 //----------------------------------------------------
 void TraceLoggerDialog_t::showBufferWarning(void)

@@ -12,6 +12,7 @@
 #include "io_api.h"
 #include "net_api.h"
 #include "diag_api.h"
+#include "driver_callbacks.h"
 #include "ppu.h"
 #include "rust/fceux11_rust.h"
 
@@ -903,6 +904,19 @@ void DebugCycle()
 	uint8 opcode[3] = {0};
 	uint16 A = 0, tmp;
 	int size;
+
+	// A1 (v2.0.2 P1): fast gate. Everything below this point serves the
+	// debugger or a logger; with none of them active it is pure overhead paid
+	// per instruction (~10 float ops + 1-3 re-fetched GetMem + addressing
+	// decode), and nothing observable depends on it: the GetMem calls here run
+	// with fceuindbg raised, so they never advance hardware state, and the two
+	// loggers below early-exit on their own flags anyway. The condition is the
+	// same 9-way test that guards breakpoint() below, plus the two logger
+	// switches -- identical reads, so gating cannot change a decision the body
+	// would have made. When any flag is set the whole body runs byte-for-byte
+	// as before.
+	if (!(numWPs || dbgstate.step || dbgstate.runline || dbgstate.stepout || watchpoint[64].flags || dbgstate.badopbreak || break_on_cycles || break_on_instructions || break_asap || debug_loggingCD || fceu11::g_driver().trace_logging))
+		return;
 
 	if (g_cpu.scanline_ref() == 240)
 	{
