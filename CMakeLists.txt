@@ -129,6 +129,12 @@ endif()
 
 option(FCEUX11_BUILD_TESTS "Build smoke and regression tests" ON)
 option(FCEUX11_ENABLE_I18N "Enable internationalization (i18n) support" ON)
+# B2 (v2.0.2 P2): declare the function profiler switch. src/CMakeLists.txt
+# has consumed this variable since v1.x but it was never option()-declared,
+# so the profiler was unconditionally OFF and un-togglable — the "half-built"
+# state §三 B2 records. OFF keeps FCEU_PROFILE_FUNC expanding to an empty
+# statement: zero instructions, zero data, binary identical to today.
+option(FCEU_PROFILER_ENABLE "Compile in FCEU function profiler (FCEU_PROFILE_FUNC probes + Rust backend; ON builds need their own build dir and are not gated)" OFF)
 # v0.3.16 LTS closure / v1.0 carries over: project-wide deprecation
 # control. Per plan v3 §6.3, the FCEUI_* compat shims (250+ inline
 # wrappers in core_api.h / io_api.h / net_api.h / diag_api.h / movie.h)
