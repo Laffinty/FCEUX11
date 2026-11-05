@@ -39,6 +39,50 @@ local readback = memory.readbyte(0x0000)
 check("writebyte/readbyte round-trip", readback == 0x42)
 memory.writebyte(0x0000, orig)  -- restore
 
+-- readbyterange: returns a string of the requested length (upstream FCEUX
+-- semantics: "Get a length bytes starting at the given address and return
+-- it as a string")
+local r = memory.readbyterange(0x0000, 4)
+check("readbyterange returns string", type(r) == "string")
+check("readbyterange length", type(r) == "string" and #r == 4)
+
+-- readbyterange length 0: empty string
+local r0 = memory.readbyterange(0x0000, 0)
+check("readbyterange length 0 is empty string", type(r0) == "string" and #r0 == 0)
+
+-- readbyterange negative length: returns nothing (upstream returns no values)
+check("readbyterange negative length is nil", memory.readbyterange(0x0000, -1) == nil)
+
+-- readbyterange past the end of the address space: no clamp in the range
+-- function itself, follows GetMem's 16-bit masking — must not crash
+local rwrap = memory.readbyterange(0xFFFF, 2)
+check("readbyterange at 0xFFFF wraps, no crash", type(rwrap) == "string" and #rwrap == 2)
+
+-- writebyterange + readbyterange round-trip (string in, string out)
+local orig2 = memory.readbyterange(0x0100, 4)
+local bytes = string.char(0x11, 0x22, 0x33, 0x44)  -- Lua 5.1: no \x escapes
+memory.writebyterange(0x0100, bytes)
+local rb = memory.readbyterange(0x0100, 4)
+check("writebyterange/readbyterange round-trip", rb == bytes)
+check("writebyterange byte-level values",
+      rb:byte(1) == 0x11 and rb:byte(2) == 0x22 and rb:byte(3) == 0x33 and rb:byte(4) == 0x44)
+memory.writebyterange(0x0100, orig2)  -- restore
+
+-- writebyterange empty string: no-op, must not crash
+memory.writebyterange(0x0100, "")
+check("writebyterange empty string", true)
+
+-- writebyterange out of range (>= 0x8000 PRG ROM): silently ignored like
+-- writebyte (BWrite only handles < 0x8000) — value must be unchanged
+local rom0 = memory.readbyte(0x8000)
+memory.writebyterange(0x8000, string.char(0xAA, 0xBB))
+check("writebyterange to ROM ignored", memory.readbyte(0x8000) == rom0)
+
+-- writebyterange past the end of the address space: wraps like the read
+-- side, must not crash
+memory.writebyterange(0xFFFF, string.char(0x5A))
+check("writebyterange at 0xFFFF wraps, no crash", true)
+
 -- getregister
 local pc = memory.getregister("pc")
 check("getregister('pc') returns number", type(pc) == "number")

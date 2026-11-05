@@ -55,6 +55,40 @@ pub fn register(lua: &Lua) -> Result<Table> {
         })?,
     )?;
 
+    // v2.0.2 B3: readbyterange — length bytes starting at addr as a Lua
+    // string (matches upstream FCEUX semantics: negative length returns
+    // nothing, zero length returns the empty string; no clamping here —
+    // address handling follows fceux11_lua_GetMem, which masks to 16 bit).
+    memory.set(
+        "readbyterange",
+        lua.create_function(|lua, (addr, len): (u32, i64)| {
+            if len < 0 {
+                return Ok(mlua::Value::Nil);
+            }
+            let mut buf = Vec::with_capacity(len as usize);
+            for i in 0..len {
+                let a = addr.wrapping_add(i as u32);
+                buf.push(unsafe { crate::fceux11_lua_GetMem(a) });
+            }
+            Ok(mlua::Value::String(lua.create_string(&buf)?))
+        })?,
+    )?;
+
+    // v2.0.2 B3: writebyterange — write each byte of the string in order,
+    // byte by byte, through the same BWrite path as writebyte (so the
+    // out-of-range semantics are identical: ROM/upper addresses are
+    // silently ignored, no crash).
+    memory.set(
+        "writebyterange",
+        lua.create_function(|_, (addr, data): (u32, mlua::String)| {
+            for (i, &b) in data.as_bytes().iter().enumerate() {
+                let a = addr.wrapping_add(i as u32);
+                unsafe { crate::fceux11_lua_BWrite(a, b) };
+            }
+            Ok(())
+        })?,
+    )?;
+
     memory.set(
         "getregister",
         lua.create_function(|_, name: mlua::String| {
@@ -112,4 +146,72 @@ pub fn register(lua: &Lua) -> Result<Table> {
     )?;
 
     Ok(memory)
+}
+
+// ---------------------------------------------------------------------------
+// v2.0.2 B3 — readbyterange / writebyterange unit tests
+//
+// These run under `cargo test -p fceux11-lua` where the FFI layer is the
+// test-only stub (`ffi_stubs.rs`: GetMem -> 0, BWrite -> no-op). They pin
+// the shape/edge semantics of the range exports (string result, negative
+// length -> nil, zero length -> empty string, write path does not panic);
+// value-level round-trip is covered by tests/lua_scripts/test_memory.lua
+// against the real bus (kgmqa-046).
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn memory_table(lua: &Lua) -> Table {
+        register(lua).unwrap()
+    }
+
+    #[test]
+    fn readbyterange_returns_string_of_requested_length() {
+        let lua = Lua::new();
+        let memory = memory_table(&lua);
+        let f: Function = memory.get("readbyterange").unwrap();
+        let s: mlua::String = f.call((0u32, 8i64)).unwrap();
+        assert_eq!(s.as_bytes().len(), 8);
+    }
+
+    #[test]
+    fn readbyterange_zero_length_is_empty_string() {
+        let lua = Lua::new();
+        let memory = memory_table(&lua);
+        let f: Function = memory.get("readbyterange").unwrap();
+        let s: mlua::String = f.call((0u32, 0i64)).unwrap();
+        assert_eq!(s.as_bytes().len(), 0);
+    }
+
+    #[test]
+    fn readbyterange_negative_length_returns_nil() {
+        let lua = Lua::new();
+        let memory = memory_table(&lua);
+        let f: Function = memory.get("readbyterange").unwrap();
+        let v: mlua::Value = f.call((0u32, -1i64)).unwrap();
+        assert!(matches!(v, mlua::Value::Nil));
+    }
+
+    #[test]
+    fn writebyterange_accepts_string_and_does_not_panic() {
+        let lua = Lua::new();
+        let memory = memory_table(&lua);
+        let w: Function = memory.get("writebyterange").unwrap();
+        let r: Function = memory.get("readbyterange").unwrap();
+        w.call::<()>((0x100u32, "abc")).unwrap();
+        // Stub BWrite is a no-op and stub GetMem returns 0, so the write
+        // must not have panicked and the read must still be a string.
+        let s: mlua::String = r.call((0x100u32, 3i64)).unwrap();
+        assert_eq!(s.as_bytes().len(), 3);
+    }
+
+    #[test]
+    fn writebyterange_empty_string_is_accepted() {
+        let lua = Lua::new();
+        let memory = memory_table(&lua);
+        let w: Function = memory.get("writebyterange").unwrap();
+        w.call::<()>((0u32, "")).unwrap();
+    }
 }
