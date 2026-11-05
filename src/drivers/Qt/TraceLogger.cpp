@@ -70,19 +70,9 @@
 #include "Qt/SymbolicDebug.h"
 #include "Qt/fceuWrapper.h"
 
-#define LOG_REGISTERS 0x00000001
-#define LOG_PROCESSOR_STATUS 0x00000002
-#define LOG_NEW_INSTRUCTIONS 0x00000004
-#define LOG_NEW_DATA 0x00000008
-#define LOG_TO_THE_LEFT 0x00000010
-#define LOG_FRAMES_COUNT 0x00000020
-#define LOG_MESSAGES 0x00000040
-#define LOG_BREAKPOINTS 0x00000080
-#define LOG_SYMBOLIC 0x00000100
-#define LOG_CODE_TABBING 0x00000200
-#define LOG_CYCLES_COUNT 0x00000400
-#define LOG_INSTRUCTIONS_COUNT 0x00000800
-#define LOG_BANK_NUMBER 0x00001000
+// B1: LOG_* 选项位、logging_options、traceRecord_t 及其方法已迁往
+// src/trace_common.{h,cpp}（纯剪切）；本文件经 TraceLogger.h 间接包含。
+// 下方残留的 LOG_LINE_MAX_LEN 等长度宏在本文件内仅剩注释引用，原样保留。
 
 #define LOG_LINE_MAX_LEN 160
 // Frames count - 1+6+1 symbols
@@ -99,20 +89,26 @@
 // 148 symbols total
 #define LOG_AXYSTATE_MAX_LEN 21
 #define LOG_PROCSTATUS_MAX_LEN 12
-#define LOG_TABS_MASK 31
 #define LOG_ADDRESS_MAX_LEN 13
 #define LOG_DATA_MAX_LEN 11
 #define LOG_DISASSEMBLY_MAX_LEN 46
 #define NL_MAX_MULTILINE_COMMENT_LEN 1000
 
 static int logging = 0;
-static int logging_options = LOG_REGISTERS | LOG_PROCESSOR_STATUS | LOG_TO_THE_LEFT | LOG_MESSAGES | LOG_BREAKPOINTS | LOG_CODE_TABBING;
-static int oldcodecount = 0, olddatacount = 0;
+// B1: logging_options 与 oldcodecount/olddatacount 已迁往 trace_common.cpp
+//（logging_options 为共享全局，本文件经 trace_common.h 引用）。
 
 static std::unique_ptr<traceRecord_t[]> recBuf;
 static int recBufMax = 0;
 static int recBufNum = 0;
 static int recBufHead = 0;
+// B1 :1363 治理①：traceLogWindow==NULL 时（且记录不是为 undo/step-back 而
+// 流入的）跳过 recBuf 拷贝。窗口 open 置真；窗口析构时回落到
+// externalTraceStart —— 调试器经 FCEUD_TraceLoggerStart() 无窗口开日志
+// （SDL.DebugAutoStartTraceLogger，专供 Step Back）时 recBuf 必须继续流入，
+// 否则 step-back 回退的是陈旧记录，属可观察回归。
+static bool recBufEnabled = false;
+static bool externalTraceStart = false;
 static std::unique_ptr<traceRecord_t[]> logBuf;
 static int logBufMax = 3000000;
 // logBufHead and logBufTail are volatile because they are shared use by both the emulation and disk logger threads.
@@ -419,6 +415,10 @@ TraceLoggerDialog_t::~TraceLoggerDialog_t(void)
 	}
 
 	traceLogWindow = NULL;
+
+	// B1 :1363 治理①：窗口没了就停掉 recBuf 流入，除非日志是为
+	// step-back（调试器无窗口外部启动）而流的。
+	recBufEnabled = externalTraceStart;
 
 	//printf("Trace Logger Window Deleted\n");
 }
@@ -933,296 +933,6 @@ void TraceLoggerDialog_t::logNewMapDataChanged(int state)
 	g_config->setOption("SDL.TraceLogNewData", (logging_options & LOG_NEW_DATA) ? 1 : 0 );
 }
 //----------------------------------------------------
-traceRecord_t::traceRecord_t(void)
-{
-	cpu.PC = 0;
-	cpu.A = 0;
-	cpu.X = 0;
-	cpu.Y = 0;
-	cpu.S = 0;
-	cpu.P = 0;
-
-	opCode[0] = 0;
-	opCode[1] = 0;
-	opCode[2] = 0;
-	opSize = 0;
-	asmTxtSize = 0;
-	asmTxt[0] = 0;
-
-	cycleCount = 0;
-	instrCount = 0;
-	flags = 0;
-
-	callAddr = -1;
-	romAddr = -1;
-	bank = -1;
-	skippedLines = 0;
-}
-//----------------------------------------------------
-int traceRecord_t::appendAsmText(const char *txt)
-{
-	int i = 0;
-
-	while (txt[i] != 0)
-	{
-		asmTxt[asmTxtSize] = txt[i];
-		i++;
-		asmTxtSize++;
-	}
-	asmTxt[asmTxtSize] = 0;
-
-	return 0;
-}
-//----------------------------------------------------
-static int convToXchar(int i)
-{
-	int c = 0;
-
-	if ((i >= 0) && (i < 10))
-	{
-		c = i + '0';
-	}
-	else if (i < 16)
-	{
-		c = (i - 10) + 'A';
-	}
-	return c;
-}
-//----------------------------------------------------
-int traceRecord_t::convToText(char *txt, int *len)
-{
-	int i = 0, j = 0;
-	char stmp[128];
-	char str_axystate[32], str_procstatus[32];
-
-	str_axystate[0] = 0;
-	str_procstatus[0] = 0;
-
-	txt[0] = 0;
-	if (opSize == 0)
-	{
-		j = 0;
-		while (asmTxt[j] != 0)
-		{
-			txt[i] = asmTxt[j];
-			i++;
-			j++;
-		}
-		txt[i] = 0;
-
-		return -1;
-	}
-
-	if (skippedLines > 0)
-	{
-		snprintf( stmp, sizeof(stmp), "(%d lines skipped) ", skippedLines);
-
-		j = 0;
-		while (stmp[j] != 0)
-		{
-			txt[i] = stmp[j];
-			i++;
-			j++;
-		}
-	}
-
-	// Start filling the str_temp line: Frame count, Cycles count, Instructions count, AXYS state, Processor status, Tabs, Address, Data, Disassembly
-	if (logging_options & LOG_FRAMES_COUNT)
-	{
-		snprintf( stmp, sizeof(stmp), "f%-6llu ", (long long unsigned int)frameCount);
-
-		j = 0;
-		while (stmp[j] != 0)
-		{
-			txt[i] = stmp[j];
-			i++;
-			j++;
-		}
-	}
-
-	if (logging_options & LOG_CYCLES_COUNT)
-	{
-		snprintf( stmp, sizeof(stmp), "c%-11llu ", (long long unsigned int)cycleCount);
-
-		j = 0;
-		while (stmp[j] != 0)
-		{
-			txt[i] = stmp[j];
-			i++;
-			j++;
-		}
-	}
-
-	if (logging_options & LOG_INSTRUCTIONS_COUNT)
-	{
-		snprintf( stmp, sizeof(stmp), "i%-11llu ", (long long unsigned int)instrCount);
-
-		j = 0;
-		while (stmp[j] != 0)
-		{
-			txt[i] = stmp[j];
-			i++;
-			j++;
-		}
-	}
-
-	if (logging_options & LOG_REGISTERS)
-	{
-		snprintf(str_axystate, sizeof(str_axystate), "A:%02X X:%02X Y:%02X S:%02X ", (cpu.A), (cpu.X), (cpu.Y), (cpu.S));
-	}
-
-	if (logging_options & LOG_PROCESSOR_STATUS)
-	{
-		int tmp = cpu.P ^ 0xFF;
-		snprintf(str_procstatus, sizeof(str_procstatus), "P:%c%c%c%c%c%c%c%c ",
-				'N' | (tmp & 0x80) >> 2,
-				'V' | (tmp & 0x40) >> 1,
-				'U' | (tmp & 0x20),
-				'B' | (tmp & 0x10) << 1,
-				'D' | (tmp & 0x08) << 2,
-				'I' | (tmp & 0x04) << 3,
-				'Z' | (tmp & 0x02) << 4,
-				'C' | (tmp & 0x01) << 5);
-	}
-
-	if (logging_options & LOG_TO_THE_LEFT)
-	{
-		if (logging_options & LOG_REGISTERS)
-		{
-			j = 0;
-			while (str_axystate[j] != 0)
-			{
-				txt[i] = str_axystate[j];
-				i++;
-				j++;
-			}
-		}
-		if (logging_options & LOG_PROCESSOR_STATUS)
-		{
-			j = 0;
-			while (str_procstatus[j] != 0)
-			{
-				txt[i] = str_procstatus[j];
-				i++;
-				j++;
-			}
-		}
-	}
-
-	if (logging_options & LOG_CODE_TABBING)
-	{
-		// add spaces at the beginning of the line according to stack pointer
-		int spaces = (0xFF - cpu.S) & LOG_TABS_MASK;
-
-		while (spaces > 0)
-		{
-			txt[i] = ' ';
-			i++;
-			spaces--;
-		}
-	}
-	else if (logging_options & LOG_TO_THE_LEFT)
-	{
-		txt[i] = ' ';
-		i++;
-	}
-
-	if (logging_options & LOG_BANK_NUMBER)
-	{
-		if (cpu.PC >= 0x8000)
-		{
-			snprintf( stmp, sizeof(stmp), "$%02X:%04X: ", bank, cpu.PC);
-		}
-		else
-		{
-			snprintf( stmp, sizeof(stmp), "  $%04X: ", cpu.PC);
-		}
-	}
-	else
-	{
-		snprintf( stmp, sizeof(stmp), "$%04X: ", cpu.PC);
-	}
-	j = 0;
-	while (stmp[j] != 0)
-	{
-		txt[i] = stmp[j];
-		i++;
-		j++;
-	}
-
-	for (j = 0; j < opSize; j++)
-	{
-		txt[i] = convToXchar((opCode[j] >> 4) & 0x0F);
-		i++;
-		txt[i] = convToXchar(opCode[j] & 0x0F);
-		i++;
-		txt[i] = ' ';
-		i++;
-	}
-	while (j < 3)
-	{
-		txt[i] = ' ';
-		i++;
-		txt[i] = ' ';
-		i++;
-		txt[i] = ' ';
-		i++;
-		j++;
-	}
-	j = 0;
-	while (asmTxt[j] != 0)
-	{
-		txt[i] = asmTxt[j];
-		i++;
-		j++;
-	}
-	if (callAddr >= 0)
-	{
-		snprintf( stmp, sizeof(stmp), " (from $%04X)", callAddr);
-
-		j = 0;
-		while (stmp[j] != 0)
-		{
-			txt[i] = stmp[j];
-			i++;
-			j++;
-		}
-	}
-
-	if (!(logging_options & LOG_TO_THE_LEFT))
-	{
-		if (logging_options & LOG_REGISTERS)
-		{
-			j = 0;
-			while (str_axystate[j] != 0)
-			{
-				txt[i] = str_axystate[j];
-				i++;
-				j++;
-			}
-		}
-		if (logging_options & LOG_PROCESSOR_STATUS)
-		{
-			j = 0;
-			while (str_procstatus[j] != 0)
-			{
-				txt[i] = str_procstatus[j];
-				i++;
-				j++;
-			}
-		}
-	}
-
-	txt[i] = 0;
-
-	if (len)
-	{
-		*len = i;
-	}
-
-	return 0;
-}
-//----------------------------------------------------
 int initTraceLogBuffer(int maxRecs)
 {
 	if (maxRecs != recBufMax)
@@ -1266,17 +976,25 @@ void openTraceLoggerWindow(QWidget *parent)
 	traceLogWindow = new TraceLoggerDialog_t(parent);
 
 	traceLogWindow->show();
+
+	// B1 :1363 治理①：窗口打开，环形缓冲重新需要流入。
+	recBufEnabled = true;
 }
 //----------------------------------------------------
 static void pushToLogBuffer(traceRecord_t &rec)
 {
 
-	recBuf[recBufHead] = rec;
-	recBufHead = (recBufHead + 1) % recBufMax;
-
-	if ( recBufNum < recBufMax )
+	// B1 :1363 治理①：traceLogWindow==NULL 且记录不是为 undo/step-back 而
+	// 流入时，跳过 recBuf 拷贝（recBuf 无人读）。见 recBufEnabled 处的注释。
+	if ( recBufEnabled && recBuf )
 	{
-		recBufNum++;
+		recBuf[recBufHead] = rec;
+		recBufHead = (recBufHead + 1) % recBufMax;
+
+		if ( recBufNum < recBufMax )
+		{
+			recBufNum++;
+		}
 	}
 
 	if ( logBuf )
@@ -1335,6 +1053,14 @@ int FCEUD_TraceLoggerStart(void)
 		}
 		logging = 1;
 	}
+	// B1 :1363 治理①：traceLogWindow==NULL 的启动只能来自调试器
+	//（SDL.DebugAutoStartTraceLogger，Step Back 专用）—— recBuf 是
+	// step-back 的数据源，必须继续流入。
+	if (traceLogWindow == NULL)
+	{
+		externalTraceStart = true;
+		recBufEnabled = true;
+	}
 	return logging;
 }
 //----------------------------------------------------
@@ -1369,198 +1095,44 @@ void fceWrapper_FlushTrace()
 }
 
 //----------------------------------------------------
+// B1：采集体已迁往 trace_common.cpp 的 fce11_trace_capture。本函数只剩
+// Qt 门控与 sink 下发（pushToLogBuffer），记录字节流与迁移前逐字节一致。
 //todo: really speed this up
+static void qtTraceSink(traceRecord_t &rec, void *user)
+{
+	(void)user;
+
+	pushToLogBuffer(rec);
+}
+
+//----------------------------------------------------
+// B1：Qt 侧在驱动加载时把 DisassembleWithDebug 注入采集体（它在
+// drivers/Qt/SymbolicDebug.cpp，core 不能链接），保证符号/寄存器注释等
+// 输出与迁移前逐字节一致。
+static int qtTraceDisasm(int addr, uint8 *opcode, int flags, char *str)
+{
+	return DisassembleWithDebug(addr, opcode, flags, str);
+}
+
+namespace
+{
+	struct QtTraceHooksInstall
+	{
+		QtTraceHooksInstall(void)
+		{
+			fce11_trace_set_disassembler(qtTraceDisasm);
+		}
+	};
+	QtTraceHooksInstall s_qtTraceHooksInstall;
+}
+
+//----------------------------------------------------
 void fceWrapper_TraceInstruction(uint8 *opcode, int size)
 {
 	if (!logging)
 		return;
 
-	traceRecord_t rec;
-
-	char asmTxt[256];
-	unsigned int addr = g_cpu.native_layout().PC;
-	static int unloggedlines = 0;
-	int asmFlags = ASM_DEBUG_TRACES;
-
-	rec.cpu.PC = g_cpu.native_layout().PC;
-	rec.cpu.A = g_cpu.native_layout().A;
-	rec.cpu.X = g_cpu.native_layout().X;
-	rec.cpu.Y = g_cpu.native_layout().Y;
-	rec.cpu.S = g_cpu.native_layout().S;
-	rec.cpu.P = g_cpu.native_layout().P;
-
-	for (int i = 0; i < size; i++)
-	{
-		rec.opCode[i] = opcode[i];
-	}
-	rec.opSize = size;
-	rec.romAddr = GetPRGAddress(addr);
-	rec.bank = getBank(addr);
-
-	rec.frameCount = currFrameCounter;
-	rec.instrCount = total_instructions;
-
-	int64 counter_value = timestampbase + (uint64)g_cpu.timestamp_ref() - total_cycles_base;
-	if (counter_value < 0) // sanity check
-	{
-		ResetDebugStatisticsCounters();
-		counter_value = 0;
-	}
-	rec.cycleCount = counter_value;
-
-	if (logging_options & LOG_SYMBOLIC)
-	{
-		asmFlags |= ASM_DEBUG_SYMS | ASM_DEBUG_REGS;
-	}
-
-	// if instruction executed from the RAM, skip this, log all instead
-	// TODO: loops folding mame-lyke style
-	if (rec.romAddr != -1)
-	{
-		if (((logging_options & LOG_NEW_INSTRUCTIONS) && (oldcodecount != codecount)) ||
-			((logging_options & LOG_NEW_DATA) && (olddatacount != datacount)))
-		{
-			//something new was logged
-			oldcodecount = codecount;
-			olddatacount = datacount;
-			if (unloggedlines > 0)
-			{
-				//snprintf(str_result, sizeof(str_result), "(%d lines skipped)", unloggedlines);
-				rec.skippedLines = unloggedlines;
-				unloggedlines = 0;
-			}
-		}
-		else
-		{
-			if ((logging_options & LOG_NEW_INSTRUCTIONS) ||
-				(logging_options & LOG_NEW_DATA))
-			{
-				if (FCEUI_GetLoggingCD())
-				{
-					unloggedlines++;
-				}
-				return;
-			}
-		}
-	}
-
-	if ((addr + size) > 0xFFFF)
-	{
-		//snprintf(str_data, sizeof(str_data), "%02X        ", opcode[0]);
-		//snprintf(str_disassembly, sizeof(str_disassembly), "OVERFLOW");
-		rec.flags |= 0x01;
-	}
-	else
-	{
-		char *a = 0;
-		switch (size)
-		{
-		case 0:
-			//snprintf(str_disassembly, sizeof(str_disassembly),"UNDEFINED");
-			rec.flags |= 0x02;
-			break;
-		case 1:
-		{
-			DisassembleWithDebug(addr + 1, opcode, asmFlags, asmTxt);
-			// special case: an RTS opcode
-			if (opcode[0] == 0x60)
-			{
-				// add the beginning address of the subroutine that we exit from
-				unsigned int caller_addr = GetMem(((g_cpu.native_layout().S) + 1) | 0x0100) + (GetMem(((g_cpu.native_layout().S) + 2) | 0x0100) << 8) - 0x2;
-				if (GetMem(caller_addr) == 0x20)
-				{
-					// this was a JSR instruction - take the subroutine address from it
-					unsigned int call_addr = GetMem(caller_addr + 1) + (GetMem(caller_addr + 2) << 8);
-					rec.callAddr = call_addr;
-				}
-			}
-			a = asmTxt;
-			break;
-		}
-		case 2:
-			DisassembleWithDebug(addr + 2, opcode, asmFlags, asmTxt);
-			a = asmTxt;
-			break;
-		case 3:
-			DisassembleWithDebug(addr + 3, opcode, asmFlags, asmTxt);
-			a = asmTxt;
-			break;
-		}
-
-		if (a)
-		{
-			rec.appendAsmText(a);
-		}
-	}
-
-	switch ( opcode[0] )
-	{
-		// Zero page
-		case 0x85: // STA - Store Accumulator
-		case 0x86: // STX - Store X Register
-		case 0x84: // STY - Store Y Register
-		case 0xC6: // DEC - Decrement Memory
-		case 0xE6: // INC - Increment Memory
-			rec.writeAddr = opcode[1];
-		break;
-		// Absolute
-		case 0x8D: // STA - Store Accumulator
-		case 0x8E: // STX - Store X Register
-		case 0x8C: // STY - Store Y Register
-		case 0xCE: // DEC - Decrement Memory
-		case 0xEE: // INC - Increment Memory
-			rec.writeAddr = opcode[1] | opcode[2] << 8;
-		break;
-		// Indirect X
-		case 0x81: // STA - Store A Register
-			rec.writeAddr = (opcode[1] + g_cpu.native_layout().X) & 0xFF;
-			rec.writeAddr = GetMem((rec.writeAddr)) | (GetMem(((rec.writeAddr)+1)&0xff))<<8;
-		break;
-		// Indirect Y
-		case 0x91: // STA - Store A Register
-			rec.writeAddr  = GetMem(opcode[1]) | (GetMem((opcode[1]+1)&0xff))<<8;
-			rec.writeAddr += g_cpu.native_layout().Y;
-		break;
-		// Zero Page X
-		case 0x95: // STA - Store Accumulator
-		case 0x94: // STY - Store Y Register
-		case 0xD6: // DEC - Decrement Memory
-		case 0xF6: // INC - Increment Memory
-			rec.writeAddr = (opcode[1]+ g_cpu.native_layout().X) & 0xFF;
-		break;
-		// Zero Page Y
-		case 0x96: // STX - Store X Register
-			rec.writeAddr = (opcode[1]+ g_cpu.native_layout().Y) & 0xFF;
-		break;
-		default:
-			rec.writeAddr = -1;
-		break;
-	}
-
-	if ( rec.writeAddr >= 0 )
-	{
-		rec.preWriteVal = GetMem( rec.writeAddr );
-	}
-	else
-	{
-		rec.preWriteVal = 0;
-	}
-
-	pushToLogBuffer(rec);
-
-	return; // TEST
-	// All of the following log text creation is very cpu intensive, to keep emulation
-	// running realtime save data and have a separate thread do this translation.
-
-	//if (size == 1 && GetMem(addr) == 0x60)
-	//{
-	//	// special case: an RTS opcode
-	//	// add "----------" to emphasize the end of subroutine
-	//	static const char* emphasize = " -------------------------------------------------------------------------------------------------------------------------";
-	//	strncat(str_disassembly, emphasize, LOG_DISASSEMBLY_MAX_LEN - strlen(str_disassembly) - 1);
-	//}
-
-	return;
+	fce11_trace_instruction(opcode, size, (uint32_t)logging_options, qtTraceSink, NULL);
 }
 //----------------------------------------------------
 QTraceLogView::QTraceLogView(QWidget *parent)

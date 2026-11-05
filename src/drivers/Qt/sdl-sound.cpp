@@ -27,6 +27,7 @@
 #include "utils/memory.h"
 #include "common/nes_shm.h"
 #include "Qt/throttle.h"
+#include "../../profiler.h" // B2②: WriteSound 探点（OFF 态展开为空）
 
 #include <cstdio>
 #include <cstring>
@@ -372,6 +373,7 @@ void
 WriteSound(int32 *buf,
            int Count)
 {
+	FCEU_PROFILE_FUNC(prof, "WriteSound"); // B2② 探点
 
 	int uflowMode = 0;
 	int ovrFlowSkip = 1;

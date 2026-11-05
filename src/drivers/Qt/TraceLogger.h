@@ -24,42 +24,9 @@
 #include "Qt/ConsoleDebugger.h"
 #include "../../debug.h"
 
-struct traceRecord_t
-{
-	struct
-	{
-		uint16_t PC;
-		uint8_t A;
-		uint8_t X;
-		uint8_t Y;
-		uint8_t S;
-		uint8_t P;
-	} cpu;
-
-	uint8_t opCode[3];
-	uint8_t opSize;
-	uint8_t asmTxtSize;
-	uint8_t preWriteVal;
-	char asmTxt[64];
-
-	uint64_t frameCount;
-	uint64_t cycleCount;
-	uint64_t instrCount;
-	uint64_t flags;
-
-	int32_t callAddr;
-	int32_t romAddr;
-	int32_t bank;
-	int32_t skippedLines;
-
-	int32_t writeAddr;
-
-	traceRecord_t(void);
-
-	int appendAsmText(const char *txt);
-
-	int convToText(char *line, int *len = 0);
-};
+// B1: traceRecord_t / LOG_* 选项位 / logging_options 迁往 src/trace_common.h
+//（纯剪切，Qt-free，供无头 TraceLogger 共用）。
+#include "../../trace_common.h"
 
 class QTraceLogView : public QWidget
 {

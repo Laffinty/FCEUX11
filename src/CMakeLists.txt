@@ -170,8 +170,10 @@ set(SRC_CORE
   	${CMAKE_CURRENT_SOURCE_DIR}/debug.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/debugsymboltable.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/drawing.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/driver_callbacks.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/driver_callbacks.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/fceu.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/headless_trace.cpp   # B1: TraceLogger 无头入口（FCEUX11_TRACE）
+  	${CMAKE_CURRENT_SOURCE_DIR}/trace_common.cpp     # B1: TraceLogger 采集体/记录格式 Qt-free 共享层
   	${CMAKE_CURRENT_SOURCE_DIR}/fds.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/fds_sound.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/file.cpp

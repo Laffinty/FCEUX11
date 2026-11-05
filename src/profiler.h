@@ -57,6 +57,12 @@ namespace FCEU
 		unsigned int numCalls;
 		unsigned int recursionCount;
 
+		// B2③: record_take 桥接 —— Rust 侧 map/registry 自 ABI 改为 u64 id
+		// 定址后，push/pop 需要传 id 而非裸指针。id 在记录构造时 take 一次，
+		// 与记录同生命周期（静态记录永不 drop；registry 条目数 = 探点数，
+		// 有界）。
+		uint64_t rustId;
+
 		funcProfileRecord(const char *fileNameStringLiteral,
 				  const int   fileLineNumber,
 				  const char *funcNameStringLiteral,
@@ -99,7 +105,7 @@ namespace FCEU
 				      const int   fileLineNumber,
 				      const char *funcNameStringLiteral,
 				      const char *commentStringLiteral,
-				      funcProfileRecord *rec );
+				      uint64_t record_id );
 
 			funcProfileRecord *findRecord(const char *fileNameStringLiteral,
 					      const int   fileLineNumber,
@@ -147,6 +153,12 @@ namespace FCEU
 
 
 int FCEU_profiler_log_thread_activity(void);
+
+// B2③: 汇总报告 —— 遍历所有已注册线程的 profilerFuncMap（Rust 后端
+// iterate），按 sum 降序输出 func / file:line / numCalls / sum / avg / min /
+// max / %total 表。仅在 __FCEU_PROFILER_ENABLE__ 构建中存在；调用点
+// fceu11::Kill() 末尾（此时模拟线程已停，跨线程读记录是安全的）。
+int FCEU_profiler_report(FILE *out);
 
 #else  // __FCEU_PROFILER_ENABLE__ not defined
 

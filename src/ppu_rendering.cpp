@@ -56,6 +56,7 @@
 #include "ppu_sprite_lut.h"   // hotfix2 P0-1: kSpriteIdxLUT
 #include "pputile_template.h" // hotfix2 P0-3: template<uint8 Flags> FetchAndDrawTile
 #include "compiler_attrs.h"   // hotfix2 §16.6: FCEU_BSWAP64, FCEU_UNLIKELY, ...
+#include "profiler.h"         // B2②: DoLine / RefreshLine 探点（OFF 态展开为空）
 #include "nsf.h"
 #include "sound.h"
 #include "file.h"
@@ -297,6 +298,7 @@ static int norecurse = 0;
 
 // lasttile is really "second to last tile."
 static void RefreshLine(int lastpixel) {
+	FCEU_PROFILE_FUNC(prof, "RefreshLine"); // B2② 探点（重入由 norecurse 守卫，安全）
 	// v1.5 Prism §2.2 (Batch 2): pshift[2] / atlatch were static
 	// locals here (persistent across scanlines, lifetime = process).
 	// They migrate into fceu11::g_ppu.bg_latch_[] / bg_latch_h_; the
@@ -681,6 +683,7 @@ static void Fixit1(void) {
 extern void MMC5_hb(int);
 // DoLine is non-static: FCEUPPU_Loop (still in ppu.cpp) calls it.
 void DoLine(void) {
+	FCEU_PROFILE_FUNC(prof, "DoLine"); // B2② 探点
 	// hotfix2 P1-7 (MAP-4): cache scanline into a local int; use the
 	// value-return `g_cpu.scanline()` accessor so the compiler can
 	// keep the counter in a register across the function. The old

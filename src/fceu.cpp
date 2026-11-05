@@ -59,6 +59,7 @@ extern FCEUXCart* cart;
 #include "ines.h"
 #include "gba_load.h"
 #include "driver_callbacks.h"
+#include "headless_trace.h"   // B1: TraceLogger 无头入口（FCEUX11_TRACE）
 extern void RefreshThrottleFPS();
 
 #ifdef _S9XLUA_H
@@ -615,6 +616,11 @@ FCEUGI *fceu11::LoadGame(const char *name, int OverwriteVidMode, bool silent)
 //Return: Flag that indicates whether the function was succesful or not.
 // v0.3.10 P4.1: see LoadGameVirtual comment above.
 bool fceu11::Initialize() {
+	// B1: TraceLogger 无头入口。FCEUX11_TRACE 未设时零开销（一次 getenv）；
+	// 已设且 Qt TraceLogger 槽未被占时安装无头采集器并打开 A1 状态位。
+	// 调用点唯一（设计约束，见 headless_trace.h）。
+	headless_trace_init();
+
 	srand(time(0));
 
 	if (!FCEU_InitVirtualVideo()) {
@@ -691,6 +697,15 @@ void fceu11::Kill() {
 		currCartInfo->cart_obj = nullptr;
 	}
 	fceu11::assign_cart(nullptr);
+
+	// B1: 无头 trace 落盘收尾（未激活时是零开销 no-op）。
+	fceu11::headless_trace_flush();
+
+	// B2③: profiler 汇总报告。仅 __FCEU_PROFILER_ENABLE__ 构建存在；
+	// 此时模拟线程已停，跨线程读探点记录安全。
+	#ifdef __FCEU_PROFILER_ENABLE__
+	FCEU_profiler_report(stdout);
+	#endif
 }
 
 int rapidAlternator = 0;
