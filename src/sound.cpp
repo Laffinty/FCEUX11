@@ -633,6 +633,75 @@ static void FrameCounterTick(void)
  }
 }
 
+// A2 (APU frame-counter batch stepping, 2026-11-06): landing table for the
+// batched advance in FCEU_SoundCPUHook. Returns the smallest event position
+// of the CURRENT sequencer table (PAL, 5-step) that is strictly greater than
+// pos. These constants mirror the comparison chain in FrameCounterTick
+// below, which remains the SOLE firing authority — this function only
+// decides where a batched advance lands (one cycle before the boundary;
+// FrameCounterTick's own fhcnt++ performs the landing and the firing), so
+// any drift between the two shows up as a missed event in
+// apu_frame_timing_test (kgmqa-121), which locks the per-cycle behavior
+// against an independent reference model.
+//
+// Equivalence argument (per-cycle -> batched), over one hook call:
+//  - On an open interval between two event positions the per-cycle model
+//    is pure state increment (fhcnt++ with no side effects), so consuming
+//    those cycles in one jump is indistinguishable from consuming them
+//    one at a time.
+//  - An event fires only on an exact-hit boundary, and FrameCounterTick
+//    reads only (fhcnt, PAL, IRQFrameMode, SIRQStat) at that boundary —
+//    never "how many cycles were consumed since the last boundary".
+//  - The $4017 reset countdown window is frozen in the per-cycle model
+//    (no fhcnt advance, no event), so consuming the whole frozen span in
+//    one jump is exact; the maturation side effects (fhcnt/fcnt restart,
+//    optional 5-step immediate clock) happen on the same cycle as before
+//    (when fc_reset_in hits 0 within the call).
+//  - IRQFrameMode is written immediately by Write_IRQFM while the sequence
+//    restart matures later; the freeze covers the whole write->maturation
+//    window, so no tick ever walks the old position against the new table.
+static int32_t FcNextEventPos(int32_t pos)
+{
+ const bool pal = PAL != 0;
+ const bool five_step = (IRQFrameMode & 0x2) != 0;
+ if (!pal && !five_step)
+ {  // NTSC 4-step
+  if (pos < 7457)  return 7457;
+  if (pos < 14913) return 14913;
+  if (pos < 22371) return 22371;
+  if (pos < 29828) return 29828;
+  if (pos < 29829) return 29829;
+  if (pos < 29830) return 29830;
+  return pos + 1;   // unreachable in normal flow (wrap resets at 29830)
+ }
+ if (!pal)
+ {  // NTSC 5-step
+  if (pos < 7457)  return 7457;
+  if (pos < 14913) return 14913;
+  if (pos < 22371) return 22371;
+  if (pos < 37281) return 37281;
+  if (pos < 37282) return 37282;
+  return pos + 1;   // unreachable in normal flow (wrap resets at 37282)
+ }
+ if (!five_step)
+ {  // PAL 4-step
+  if (pos < 8313)  return 8313;
+  if (pos < 16627) return 16627;
+  if (pos < 24939) return 24939;
+  if (pos < 33252) return 33252;
+  if (pos < 33253) return 33253;
+  if (pos < 33254) return 33254;
+  return pos + 1;   // unreachable in normal flow (wrap resets at 33254)
+ }
+ // PAL 5-step
+ if (pos < 8313)  return 8313;
+ if (pos < 16627) return 16627;
+ if (pos < 24939) return 24939;
+ if (pos < 41565) return 41565;
+ if (pos < 41566) return 41566;
+ return pos + 1;   // unreachable in normal flow (wrap resets at 41566)
+}
+
 // Compat wrapper kept for the 5-step immediate clock path (write maturation):
 // fires one quarter+half step without IRQ side effects.
 void FrameSoundUpdate(void)
@@ -703,10 +772,25 @@ void FCEU_SoundCPUHook(int cycles)
  const int32_t fhcnt_at_entry = fhcnt;
  bool fired_quarter = false;
  int32_t rem = cycles;
+ // A2 (2026-11-06): batch stepping. Behavior is identical to the previous
+ // one-cycle-per-iteration loop (see the equivalence argument above
+ // FcNextEventPos); the change only removes the per-cycle interpreter
+ // overhead. Two branches:
+ //  1. Pending-$4017 countdown: the sequencer is frozen (the old loop's
+ //     `continue` skipped FrameCounterTick for the whole window), so jump
+ //     min(fc_reset_in, rem) cycles at once; the maturation cycle lands
+ //     exactly (fhcnt=0, fcnt=0, optional 5-step immediate clock), and
+ //     any remainder of the call then runs the new sequence.
+ //  2. Normal run: advance to (next event position - 1) in one jump and
+ //     let the untouched per-cycle fire chain FrameCounterTick() consume
+ //     the final cycle (its own fhcnt++ lands on the boundary and fires).
+ //     When rem is exhausted before the boundary, just advance fhcnt.
  while (rem > 0) {
-  rem--;
   if (fc_reset_in > 0) {
-   if (--fc_reset_in == 0) {
+   const int32_t step = (fc_reset_in < rem) ? fc_reset_in : rem;
+   fc_reset_in -= step;
+   rem -= step;
+   if (fc_reset_in == 0) {
     // Pending $4017 write takes effect: new sequence starts at cycle 0.
     fhcnt = 0;
     fcnt = 0;
@@ -718,7 +802,19 @@ void FCEU_SoundCPUHook(int cycles)
    }
    continue;
   }
-  FrameCounterTick();
+  const int32_t next = FcNextEventPos(fhcnt);   // strictly > fhcnt
+  const int32_t gap = next - fhcnt;
+  if (gap > rem) {
+   // Boundary beyond this call: consume the rest, no event.
+   fhcnt += rem;
+   rem = 0;
+  } else {
+   // Land exactly on the boundary via FrameCounterTick's own fhcnt++;
+   // that landing consumes exactly one more cycle of rem.
+   fhcnt += gap - 1;
+   rem -= gap;
+   FrameCounterTick();
+  }
  }
  // P2 Phase 2 Step 2.2 (2026-08-01): windowed per-call trace, armed by the
  // last $4017 write. Records ts/cycles/fhcnt before+after so the

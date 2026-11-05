@@ -4179,6 +4179,32 @@
       ],
       "failure_means": "blocking",
       "provenance": "v1.8 新增: fceux11::State Rust 对偶 C++ 测试; F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+    },
+    {
+      "kgmqa_id": "kgmqa-121-apu-frame-timing",
+      "legacy_id": null,
+      "title": "APU 帧计数器逐周期时序锁测试 (A2 特性化基线)",
+      "kind": [
+        "unit-cpp"
+      ],
+      "layer": "core",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "fceux11_apu_frame_timing_test",
+        "working_dir": "tests"
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 120,
+      "tags": [
+        "unit",
+        "apu",
+        "timing"
+      ],
+      "failure_means": "blocking",
+      "provenance": "A2 (APU 帧计数器批量步进) 步骤1 特性化基线; 2026-11-06"
     }
   ]
 }

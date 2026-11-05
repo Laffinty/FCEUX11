@@ -186,6 +186,17 @@ if(FCEUX11_BUILD_TESTS)
              COMMAND fceux11_apu_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
+    # kgmqa-121 — APU frame-counter cycle-exact lock tests (A2 baseline).
+    # Per-cycle driver: FCEU_SoundCPUHook(1) each cycle, no Emulate;
+    # characterization baseline for the A2 batch-stepping work item.
+    fceux11_add_test_executable(fceux11_apu_frame_timing_test
+        f11qa/core/apu_frame_timing_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME apu_frame_timing_test
+             COMMAND fceux11_apu_frame_timing_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
     fceux11_add_test_executable(fceux11_bus_test
         f11qa/core/bus_test.cpp
         git_info_stub.cpp
