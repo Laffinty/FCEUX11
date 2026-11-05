@@ -69,7 +69,9 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 | v2.0.1 P1 | 🔧 **计时已落地并验收（r36）**：`TimeDmaToAndFromMemory_U16/U32` 检查 = 源固定读运行中的 TM0、逐半字等差步长校验（步长 = 源访问+目标访问）。缺陷 = DMA 期间定时器冻结 + 缺 +3 起始；修复 = `drain_clocked_peripherals()` 抽取 + `run_dma_block` 块首 +3、每单元前排水。**五个 MEMORY 测试全部转绿（MEMORY 9/9），AGS 25/33 → 30/33**。剩余 `DMA DISPLAY START`（timing=3 触发未实现）与 `DMA PRIORITY`（通道仲裁）是新失败面，各需自己的 RE，记入长尾 |
 
 **导出符号 34 个**（S3-3 零新增）：探针 6 + 生命周期/帧 10 + 音频 5 + savestate 3 + RTC 2 + 输入 2 + 电池 6。
-**GBA 锁测试 248 项全绿 + vendor 核心自测 242 项全绿**（7 条 `#[ignore]` 的测量/诊断工具：r37 栈探针、r48 体积探针、S4 的探针与差分转储等；r56 新增 1 条唤醒返回地址锁测试，v2.0.1 P0 新增 2 条 ARM SWI 编号锁测试；P2 先行工作项在 `gba-core` 侧新增 2 条 WAIT 期望值测试 + r5 的 2 条半字载入宽度测试 + r12 的 4 条 fail_to_pass 指令周期测试 + r17 的 1 条 AGS 四档分频测试 + v2.0.1 P4 的定时器锁测试 + **r34 的 1 条预取窗口锁测试**——AGS 例程 48 字节内嵌、断言字面量 24/51、变异两向可红）。
+**GBA 锁测试 249 项全绿 + vendor 核心自测 242 项全绿**（**21 条 `#[ignore]` 的测量/诊断工具**：root crate 19 = save.rs 2 + frame.rs 6 + waitprobe.rs 10 + cartprobe.rs 1，vendor 2 = gba-core timers；r37 栈探针、r48 体积探针、S4 的探针与差分转储、v2.0.2 P0 的 M2 帧导出计时探针 `measure_frame_export` 等——完整触发方式见 `docs/tech/gba_probe_howto.md`；r56 新增 1 条唤醒返回地址锁测试，v2.0.1 P0 新增 2 条 ARM SWI 编号锁测试；P2 先行工作项在 `gba-core` 侧新增 2 条 WAIT 期望值测试 + r5 的 2 条半字载入宽度测试 + r12 的 4 条 fail_to_pass 指令周期测试 + r17 的 1 条 AGS 四档分频测试 + v2.0.1 P4 的定时器锁测试 + **r34 的 1 条预取窗口锁测试**——AGS 例程 48 字节内嵌、断言字面量 24/51、变异两向可红）。
+
+> **C3 更正（2026-11-05，v2.0.2 P0/P1 后）**：旧文「7 条 `#[ignore]`」与「248 项」均为过时计数，实测 21 条 / 249 项。另注：decoupling/gate/waitprobe 的守卫与探针**全部 `#[cfg(test)]`**，常驻开销为零——它们不构成运行期强制。
 
 > ⚠️ **不变式 1 的判据是 F11QA 矩阵 `108P/12F`**，本机跑的是它的**本地近似**
 > `ctest`。**本地确定性门禁 = `ctest -LE perf`（33 项，须全绿）**；
