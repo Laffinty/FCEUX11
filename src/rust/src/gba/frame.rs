@@ -325,12 +325,15 @@ pub unsafe extern "C" fn gba_frame_buffer(dst: *mut u8, cap: u32) -> i32 {
     // SAFETY: simulation thread; `dst` is non-null and at least FRAME_BYTES.
     unsafe {
         with_machine(|machine| {
-            let mut frame = vec![0u8; overlay::FRAME_BYTES];
-            frame.copy_from_slice(&frame_bytes(machine));
+            // C1 (v2.0.2 P1): the conversion writes straight into the caller's
+            // buffer. One full-frame write where there used to be three (a
+            // per-pixel push, a copy_from_slice, a copy_nonoverlapping) and
+            // no allocation where there used to be two Vecs per call.
+            let frame = std::slice::from_raw_parts_mut(dst, overlay::FRAME_BYTES);
+            write_frame_bytes(machine, frame);
             if machine.overlay.enabled() {
-                overlay::draw(&mut frame);
+                overlay::draw(frame);
             }
-            std::ptr::copy_nonoverlapping(frame.as_ptr(), dst, overlay::FRAME_BYTES);
             GBA_OK
         })
     }
@@ -861,46 +864,100 @@ fn read_c_string<'a>(ptr: *const u8) -> Option<&'a [u8]> {
     }
 }
 
-/// Expand the core's 5-5-5 BGR words into the RGBA bytes the ABI promises.
-fn frame_bytes(machine: &Machine) -> Vec<u8> {
-    let buffer = &machine.gba.cpu.bus.lcd.buffer;
-    let mut out = Vec::with_capacity(overlay::FRAME_BYTES);
-    for row in buffer.iter() {
-        for pixel in row.iter() {
-            // **Red first**, because this is RGBA and the core's word is BGR.
-            //
-            // The core's colour is the GBA's hardware BGR555: `red()` reads bits
-            // 0..=4 and `blue()` reads 10..=14. Those accessors are named for
-            // the hardware correctly, and `Color::from_rgb` packs to match --
-            // so nothing is wrong inside the core. The error was here: the first
-            // byte of an RGBA buffer is the *red* slot, and it was being given
-            // `blue()`.
-            //
-            // It reads as a plausible line of code, and it produces a picture
-            // in which every colour is wrong while everything else -- layout,
-            // timing, scaling -- is obviously right. A pink ground came out
-            // blue and a blue status bar came out orange: the exact signature of
-            // red and blue trading places.
-            //
-            // Each channel is scaled by bit replication rather than shifted, or
-            // a pure red would come out 248 instead of 255.
-            out.push(scale5(pixel.red()));
-            out.push(scale5(pixel.green()));
-            out.push(scale5(pixel.blue()));
-            out.push(0xFF);
-        }
-    }
-    out
-}
-
-/// Widen a 5-bit channel to 8 bits by replicating the high bits.
+/// Widen a 5-bit channel to 8 bits by replicating the high bits, usable from
+/// a `const fn` (no `debug_assert` -- the LUT builder only feeds it 5-bit
+/// values by construction; the runtime [`scale5`] keeps the assert).
 ///
 /// `0b00000 -> 0`, `0b11111 -> 255`, and everything in between stays
 /// monotonic -- a plain `<< 3` would map 31 to 248 and leave the brightest
 /// value short of white, which is visible on a saturated screen.
+const fn scale5_const(value: u8) -> u8 {
+    (value << 3) | (value >> 2)
+}
+
+/// The whole [`write_frame_bytes`] conversion, as one table.
+///
+/// Index by the core's raw BGR555 word, get the RGBA u32 the ABI promises.
+/// Built at compile time from the same per-channel rule [`scale5`] implements,
+/// and pinned entry-by-entry to the scalar reference (the core's own `red()` /
+/// `green()` / `blue()` accessors through [`scale5`]) by an exhaustive test --
+/// the table cannot drift from the formula without turning that test red.
+///
+/// 128 KB of table replaces what the M2 probe measured as ~85 % of the export
+/// cost: 38,400 per-pixel trips through gba-core's `get_bits` (a
+/// `RangeInclusive` object and a computed mask per channel, in another crate,
+/// so not even inlineable). One indexed load and one store per pixel now.
+static BGR555_TO_RGBA: [u32; 32768] = build_bgr555_to_rgba();
+
+const fn build_bgr555_to_rgba() -> [u32; 32768] {
+    let mut table = [0u32; 32768];
+    let mut word = 0usize;
+    while word < 32768 {
+        // **Red first**, because this is RGBA and the core's word is BGR --
+        // see the long comment in [`write_frame_bytes`] for the swap this
+        // encoding once got wrong.
+        let r = scale5_const((word & 0x1F) as u8) as u32;
+        let g = scale5_const(((word >> 5) & 0x1F) as u8) as u32;
+        let b = scale5_const(((word >> 10) & 0x1F) as u8) as u32;
+        // Little-endian bytes in memory: R, G, B, A.
+        table[word] = r | (g << 8) | (b << 16) | (0xFF_u32 << 24);
+        word += 1;
+    }
+    table
+}
+
+/// Write the current frame into `out` as RGBA bytes.
+///
+/// `out` must be at least [`overlay::FRAME_BYTES`] long; [`gba_frame_buffer`]
+/// hands it the caller's buffer directly, so the conversion is the only
+/// full-frame write on the export path.
+fn write_frame_bytes(machine: &Machine, out: &mut [u8]) {
+    let buffer = &machine.gba.cpu.bus.lcd.buffer;
+    for (chunk, pixel) in out.chunks_exact_mut(4).zip(buffer.as_flattened()) {
+        chunk.copy_from_slice(&BGR555_TO_RGBA[pixel.0 as usize].to_le_bytes());
+    }
+}
+
+/// The conversion [`write_frame_bytes`] implements, one word at a time,
+/// spelled with the core's own accessors.
+///
+/// This is the reference the exhaustive LUT test checks the table against --
+/// and the exact shape the conversion had before the table, kept so a future
+/// change to either side has something to disagree with.
+#[cfg(test)]
+fn bgr555_to_rgba_scalar(word: u16) -> [u8; 4] {
+    // **Red first**, because this is RGBA and the core's word is BGR.
+    //
+    // The core's colour is the GBA's hardware BGR555: `red()` reads bits
+    // 0..=4 and `blue()` reads 10..=14. Those accessors are named for
+    // the hardware correctly, and `Color::from_rgb` packs to match --
+    // so nothing is wrong inside the core. The error was here: the first
+    // byte of an RGBA buffer is the *red* slot, and it was being given
+    // `blue()`.
+    //
+    // It reads as a plausible line of code, and it produces a picture
+    // in which every colour is wrong while everything else -- layout,
+    // timing, scaling -- is obviously right. A pink ground came out
+    // blue and a blue status bar came out orange: the exact signature of
+    // red and blue trading places.
+    //
+    // Each channel is scaled by bit replication rather than shifted, or
+    // a pure red would come out 248 instead of 255.
+    let pixel = gba_core::cpu::hardware::lcd::Color(word);
+    [
+        scale5(pixel.red()),
+        scale5(pixel.green()),
+        scale5(pixel.blue()),
+        0xFF,
+    ]
+}
+
+/// Widen a 5-bit channel to 8 bits by replicating the high bits.
+///
+/// The runtime half of [`scale5_const`], with the assertion back in place.
 fn scale5(value: u8) -> u8 {
     debug_assert!(value < 32);
-    (value << 3) | (value >> 2)
+    scale5_const(value)
 }
 
 #[cfg(test)]
@@ -914,7 +971,8 @@ mod tests {
         gba_battery_read, gba_battery_save_type, gba_battery_size, gba_battery_take_dirty,
         gba_battery_write, gba_savestate_load, gba_savestate_save, gba_savestate_size,
         gba_set_buttons, gba_set_overlay, gba_set_save_type, gba_step_frame, gba_unload_rom,
-        gba_buttons, machine_slot, read_c_string, scale5, with_machine, frame_bytes,
+        gba_buttons, machine_slot, read_c_string, scale5, with_machine, write_frame_bytes,
+        bgr555_to_rgba_scalar, BGR555_TO_RGBA,
     };
     use gba_core::cpu::hardware::internal_memory::BackupType;
 use gba_core::cpu::hardware::keypad::GbaButton;
@@ -1175,7 +1233,8 @@ use gba_core::cpu::hardware::keypad::GbaButton;
                     machine.gba.cpu.bus.lcd.buffer[*y as usize][*x as usize] = *colour;
                 }
 
-                let bytes = frame_bytes(machine);
+                let mut bytes = vec![0u8; FRAME_BYTES];
+                write_frame_bytes(machine, &mut bytes);
                 let at = |y: usize, x: usize| -> [u8; 4] {
                     let start = (y * 240 + x) * 4;
                     [bytes[start], bytes[start + 1], bytes[start + 2], bytes[start + 3]]
@@ -1256,6 +1315,23 @@ use gba_core::cpu::hardware::keypad::GbaButton;
             let watermark = out.chunks_exact(4).filter(|p| p[3] == 240).count();
             assert!(watermark > 0, "no watermark pixel reached the caller's buffer");
         });
+    }
+
+    /// The LUT agrees with the scalar conversion for **every** possible word.
+    ///
+    /// [`BGR555_TO_RGBA`] replaced a per-pixel scalar conversion with a table,
+    /// so the two are checked against each other exhaustively: 32,768 words,
+    /// the reference spelled with the core's own `red()`/`green()`/`blue()`
+    /// accessors through [`scale5`]. This is the mutation check for C1 -- break
+    /// the table's build, the byte order, or the red-first rule, and this goes
+    /// red; the saturated-colour test next to it only samples three corners.
+    #[test]
+    fn the_bgr555_lut_matches_the_scalar_reference_exhaustively() {
+        for word in 0u16..=0x7FFF {
+            let expect = bgr555_to_rgba_scalar(word);
+            let got = BGR555_TO_RGBA[word as usize].to_le_bytes();
+            assert_eq!(got, expect, "word {word:#06x}");
+        }
     }
 
     /// Whether the watermark can be turned off depends on the build, and the
@@ -3285,16 +3361,22 @@ use gba_core::cpu::hardware::keypad::GbaButton;
             gba_unload_rom();
             assert_eq!(gba_load_rom_bytes(&rom), GBA_OK);
             let mut dst = vec![0u8; FRAME_BYTES];
+            let mut conv_scratch = vec![0u8; FRAME_BYTES];
 
             for frame in 0..WARMUP + frames {
                 let stepped = std::time::Instant::now();
                 assert_eq!(gba_step_frame(), GBA_OK, "frame {frame} must step");
                 let step = stepped.elapsed();
 
-                // The conversion alone: the part C1 wants to fold into a
-                // single write into `dst`.
+                // The conversion alone: the part C1 turned into a table walk
+                // writing straight into the destination buffer. The scratch is
+                // allocated once outside the timed section, so this prices the
+                // conversion, not an allocation.
                 let converted = std::time::Instant::now();
-                with_machine(|m| frame_bytes(m)).expect("the machine is loaded");
+                with_machine(|m| {
+                    write_frame_bytes(m, &mut conv_scratch);
+                })
+                .expect("the machine is loaded");
                 let convert = converted.elapsed();
 
                 // The whole production export: both allocations, all the
