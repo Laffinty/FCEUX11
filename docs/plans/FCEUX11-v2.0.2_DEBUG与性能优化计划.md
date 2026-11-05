@@ -53,7 +53,7 @@
 
 ---
 
-## 二、NES 性能线（线 A）
+## 二、NES 性能线（线 A）—— ✅ A1/A2/A3/A4 已落地（r5/r6）；A5、A6、A7 未动
 
 > 全部 ✅实测 有代码坐标。收益量级以「60 帧 / 68.7ms 基线」为参照系。
 
@@ -138,7 +138,7 @@ A1-c 同门。**门打开时行为逐字节不变**——`GetMem` 在 debug 路�
 
 ---
 
-## 三、NES DEBUG 线（线 B）
+## 三、NES DEBUG 线（线 B）—— ✅ B1/B2 已落地（r6）；B3/B4/B5 未动（B5 永久封口）
 
 > 依据：调试设施盘点（✅实测读码，环境变量全表见附录 A）。
 
@@ -272,8 +272,8 @@ A1-c 同门。**门打开时行为逐字节不变**——`GetMem` 在 debug 路�
 |---|---|---|
 | **P0 测量口径** | ✅ 已落地（r3）：M1（soundq=1 bench 位 + 基线重采）、M2（GBA 计时探针） | 无 |
 | **P1 低风险高收益** | ✅ 已落地（r5）：A1（调试门控三合一，cpu_frame −18%；手工清单待 GUI 实测）、C1（帧导出 −92%）、C2（savestate 2×→1× 编码） | P0 |
-| **P2 深化** | A2（APU 批量步进，先锁测试）、A3、A4、B1、B2 | P1 |
-| **P3 长期难题首批** | D4、D9、D7-A | 可与 P2 并行（不同文件域） |
+| **P2 深化** | ✅ 已落地（r6）：A2（批量步进 −15/−18%，五向变异）、A3（−12%）、A4-2（WAVEDUMP 等价；A4-1 主方案否决存档）、B1（无头 trace）、B2（option+探点+报告） | P1 |
+| **P3 长期难题首批** | D9 ✅（r6，kgmqa-107 协议四缺陷修复+桥注入面；mset 端到端 0xFC 需真实交互，advisory 如实记录）；D7-A **关闭为「前提证伪，零改动」**（0xFE 根因 = headless 缺 BaseDirectory/BIOS 门控缺失，重分类待业主裁决）；D4 探针已落地、修复落点改向（0x06 → $2004 读路径合成读），修复立项待裁决 | 可与 P2 并行（不同文件域） |
 | **P4 视余量** | A5（FIR SIMD）、B3、D7-B、D3 里程碑、D5+A6（同窗） | P0 的 M1；A6 需全套回归护甲 |
 | **专线** | D1（037，独占分支） | 独立窗口 |
 | **决策等待** | D8 | 业主拍板 |
@@ -359,3 +359,4 @@ cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo tes
 | r3 | 2026-11-05 | **P0 落地**（M1+M2，只加测量位不改生产行为）。**M1**：bench 第六档 `bench_full_frame_hq`（BenchConfig 改配置驱动 `sound`/`soundq` 两字段，替代原 strcmp 特判；soundq=1 在 `core_init()` 后设 `fceu11::SetSoundQuality`——`FSettings` 每次 `fceu11::Initialize` 清零，跨档不存活）；新增 `--only=<name>`（单档）与 `--json`（单行 JSON 沉到 stdout 末行，与独立 bench 二进制同 schema）两旗标；`generate_bench_baseline.ps1` 加第四采集行（args 字段）。同上下文对照：soundq=0 full_frame 49.4 ms/60帧 vs hq 80.6 ms（**+63%** = HQ 渲染器 + NeoFilterSound FIR 真实在跑）；hq 三遍重复 79.4/79.4/81.2 ms（±1%，稳定）。基线照 ps1 流程重采（best-of-5，4 条目，hq=78.588 ms，tolerance 10.0 不变），重采后对照全 PASS（hq +1.07%）。**M2**：`measure_frame_export` 探针（frame.rs 测试模块，`exclusively` 纪律走真 ABI 路径 `gba_step_frame`+`gba_frame_buffer`，60 帧预热后计时，`GBA_PROBE_FRAMES` 可调）。合成卡带实测（--release）：全链 **252 µs/帧（min 234）= 59.7275 Hz 帧预算的 1.51%**，其中标量 BGR555→RGBA 转换 ~213 µs（**~85%**）——即 C1 的对象；转换成本与像素内容无关，读数可作 C1 量级参照。**真卡带读数待补**：原 `Research_only\gbatech\mksc.gba` 副本已不在本机，设 `GBA_PROBE_ROM` 即可复跑。门禁：GBA 锁测试 248 全绿（#[ignore] 18→19，C3 的计数更正落地时按 21 算）、`ctest -LE perf` 33 全绿、bench 基线对照全 PASS。实施中两处偏差已修：`--only --json` 的 JSON 必须是 stdout 末行（ps1 取末行，首版把摘要排在了后面）；`exclusively` 要求 `Send + 'static`，探针的采样与报告整体移入闭包 |
 | r4 | 2026-11-05 | 文档状态修订：STATUS 由 DRAFT 改 ACTIVE（P0 已落地见 r3），§一标题与 §六 P0 行加完成标记。无实质内容变更 |
 | r5 | 2026-11-05 | **P1 落地**（A1→C1→C2，四提交：55d82d0 / 672bcf3 / 6d88c56 / 本条）。**A1**：门 = breakpoint() 的 9 路 OR + `debug_loggingCD` + trace_logging，`DebugCycle` 入口早退（实施修正①：9 路实含 `break_asap`，本文案原枚举漏列）；`e1_last_pc` 写入入 `e1_cpu_trace_on()` 门；`map_irq_hook` 热路径 load **acquire→relaxed**（未采计划原文「普通读+mapper init 一次性同步」——cpu.h hotfix3 B-5a 的 happens-before 注释即为此设计，relaxed 保单线程可见性、去编译器屏障负担，x86 同一条 mov）；**A1-b 记录偏差**：`IncrementInstructionsCounters` **不门控**——实施核对发现 `lua getTotalInstructions` 与 TraceLogger `instrCount` 在零调试特征时也消费，门控=读数停滞，故保留每指令记账（本条 A1-b 三件套只落两件）；**A1-c 实施修正②**：viewer 门条件是**窗口状态**（DriverCallbacks 新增 `nt_view_open`/`ppu_view_open`/`trace_logging` 三个状态位 int，Qt 在窗口构造/析构与 TraceLogger Start/Stop 置位），不是调试器状态——零断点开窗也要刷新，原文「同门」照抄会开窗黑屏；kgmqa-048 不可达（trace 由 ROM 写内存日志 $02/$03，不经 `FCEUD_TraceInstruction`）。实测：`bench_cpu_frame` 46.356→37.8/38.2/38.5 ms（**≈−18%**，目标 ≥5%）；`ctest -LE perf` 33 全绿。**C1**：`write_frame_bytes` 直写 dst + **32768 项 const fn 全字 LUT**（原案 ③ 的 scale5 小表升级为全字表，①常驻缓冲被「直写 dst」整体取代——消费方 g_frame 恰为 FRAME_BYTES 持久缓冲，无需 Machine 加字段）；全帧写 3→1、分配 2→0；穷举等价测试（32768 字 vs 标量参照=核心自身访问器）即变异验证。实测：M2 探针全链 **252→20.6 µs/帧（−92%）**、转换 213→19.9 µs、预算占比 1.51%→0.12%；锁测试 **249 全绿（+1）**。**C2**：C++ 侧宽 buffer（2MB）+`GBA_ERR_CAPACITY` 重试一次，**推翻 gba_load.cpp:263-269 当年「不值得第二次 buffer」的记录决策**（P0 口径落地后：每存一次白付 2.22ms 编码）；指纹（全 ROM FNV-1a）入 `Machine` 字段装载时算一次，encode/apply_state 读缓存，失效随机器整体换弃自动成立，载荷格式零变化；更正 save.rs「a few microseconds」过时注释。实测：状态 1,047,878 B、单次编码 2.22 ms（save 路径 2×→1×，load 移出全 ROM 哈希）；`measure_a_state_on_disk` 对照不变（探针本就自缓存指纹）；ctest 33 全绿、bench 六档对照全 PASS（full_frame 同吃 A1 红利 48.6→40.9）。**A1 未闭合项**：手工九场景（watchpoint/Step Into/Run Line/Step Out/Step Over/Break on PC/Bad Op/cycles/instructions 超限、CD Logger+TraceLogger、Lua break_asap、NSF 播放、viewer 刷新）待用户 GUI 实测——ctest 抓不到这类回归（§七 3） |
+| r6 | 2026-11-06 | **P2+P3 多 agent 批次落地**（C3 + 六提交：241860f / cfa970c / 05bfc1f / 39b92db / adc45ae / 062ce84 / 4c34cbf；5 份调查 PLAN 由并行只读 agent 产出、用户全批后三波实施）。**C3**：GBA 探针 HOWTO 落档 docs/tech/gba_probe_howto.md；AGENTS.md 计数更正（#[ignore] 7→21、锁测试 248→249、cfg(test) 零开销注记）。**B2①**：`FCEU_PROFILER_ENABLE` option 声明（此前从未声明=永远 OFF 且打不开）。**D9**：协议四缺陷修复（byte0 签名 0xFF/0x00 交替、dy 灵敏度补齐的不对称 bug、倍率 ×1/×2/×4、6 位幅度+bit6 溢出）+ 测试桥 `kagami_bridge_set_input`/sut_input 注入面（原 SI_NONE 硬编码，ROM 摸不到任何输入设备）+ ptr 传持久零缓冲（原 nullptr 每帧必崩）；锁测试 input_snesmouse_test（向量按字段拼装），变异 M-A..M-D 四向红；**A5 状态入档实测 golden_savestate 漂移 +22B 按裁决撤销**；mset 端到端 0xFC=需真实鼠标交互（advisory 如实记录，不硬造 headless 注入）。**D7-A 关闭为「前提证伪，零改动」**：字节取证证明该 .fds 是教科书 kind=1（"FDS\x1a"@0、1 边、65516=16+65500 自洽）；0xFE 真根因 = headless 从不调 `SetBaseDirectory`（唯一调用点在 Qt config.cpp）→ BaseDirectory 空 → BIOS 查找落到盘根 → 加载失败；**旁证 082/083/084 PASS 也被证伪**（ROM 不在镜像里，advisory skip 路径）；且 $6000 判据对「从未跑起来」也是假绿（--frames 1 即 0x00）。**重分类（BIOS 门控 skip/known-limit）待业主裁决**。**A3+A4-2**：见对应提交；等价证明 = XDUMP（XBuf+XDBuf 全帧）0/840 diff + WAVEDUMP 0/180 diff；变异 M1（023 5/5 红）/M2'（仅 XDBuf 红 418、xbuf 盲——探针存在性实证）/M3'（仅 xbuf 红 418）/V2（删 memset 复刻 D-4，180/180 红）全红→绿；**实施哨兵修正：kgmqa-024 只跑低质量路径、到不了 HQ 分支 memset（调查设计漏洞），A4-2 等价证据以 WAVEDUMP 为准——此发现是 A5 的前置（A5 需先建 HQ golden WAV）**；A4-1 主方案（消费计数门控）被盘点否决（savestate chunk-8 任意帧异步消费→金标漂移，谓词恒真），结论存档进 video.cpp 注释防后人实施。bench：ppu_frame 46.554→40.8-41.0（−12%）。**D4 探针**：FCEUX11_OAMBUS_PROBE 落地（默认静默）；冒烟带**阴性证据**——kgmqa-050 失败窗口 2000 帧 0 次 DMA burst、0 次 SPRAM 改写，历史报告的「SPRAM[0x36] 非 B2004 改写」未复现，0x06 落点改向 **$2004 读路径（newppu spr_read 合成读）**，修复立项待裁决。**A2**：批量步进（FcNextEventPos 落位表 + FrameCounterTick 保为唯一点火权威 + 倒计时一次跳），kgmqa-121 锁测试（59 断言，独立参照模型、字段拼装、S1-S5 场景）；变异 M-A..M-E 五向全红（27/4/12/11/14）→ 还原绿；bench_apu_frame 39.9→33.2-35.1（−15%）、full_frame 40.9→33.4-33.6（−18%），远超 3% 止损线；**CI 177-ROM blargg 全批本地不可跑，PR 检查单待 CI**。**B1+B2**：trace_common 纯剪切（452 行删除逐行迁移审计、Qt 行为不变）+ headless_trace（FCEUX11_TRACE，与 A1 门同窗置位）；:1363 治理三件（recBufEnabled 门/无头丢弃+overrun/memo）；反汇编经钩子注入（无头回落 core Disassemble，归一化 diff 需处理）；无头冒烟 6.25M 行完整；B2 探点+报告+**修复 ON 分支预存编译错误**（profiler.cpp 裸指针 vs Rust u64 id ABI——ON 构建此前在 HEAD 编不过，「编不过=不存在」又一例）。**ctest -LE perf 35/34→35 项全绿**（+input_snesmouse_test、+apu_frame_timing_test）。**实施过程记录**：三个 agent 超时由主会话接续收口；一个 agent 把 M3 变异留在树上被审阅发现并清除——「变异验证的红必须由主会话复跑留档」成为新惯例。**待业主裁决**：① kgmqa-081 重分类（BIOS 门控）；② D4 修复立项（落点已改向 $2004 读路径）；③ mset headless 注入面是否立项；④ A1 手工九场景 GUI 实测仍未闭合 |
