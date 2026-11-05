@@ -3224,6 +3224,124 @@ use gba_core::cpu::hardware::keypad::GbaButton;
         write_dump(&out, &mut lines, frames);
     }
 
+    /// What exporting one frame costs the CPU.
+    ///
+    /// **Ignored by default, because it reports rather than gates.** These are
+    /// the numbers work item **C1** (v2.0.2 P0) turns on: `gba_frame_buffer`
+    /// allocates two full-frame `Vec`s and makes three full-frame writes per
+    /// call, and C1's claim is that a resident buffer plus a conversion that
+    /// writes straight into `dst` removes them. Asserting a ceiling would go
+    /// stale the moment the hardware or the host changes, so this only
+    /// reports: the whole export per frame, the pixel conversion alone, and
+    /// both against the frame budget.
+    ///
+    /// It runs the real ABI path -- `gba_step_frame` to the frame boundary,
+    /// then `gba_frame_buffer` -- on the shared machine, under the same
+    /// exclusive discipline as the lock tests, so the numbers include the
+    /// mutex and the FFI boundary a player actually pays. The conversion is
+    /// timed separately (it re-locks and converts without exporting), which
+    /// is one extra conversion the production path does not do; it prices the
+    /// part of the export C1 is about.
+    ///
+    /// ```text
+    /// set GBA_PROBE_ROM=C:\path\to\game.gba
+    /// cargo test -p fceux11-rust --release --no-default-features --features gba --lib \
+    ///     measure_frame_export -- --ignored --nocapture
+    /// ```
+    ///
+    /// With no `GBA_PROBE_ROM` it looks on the Desktop, and if it finds
+    /// nothing it says so and returns. **Debug numbers are meaningless here**;
+    /// for this one `--release` is not optional.
+    #[test]
+    #[ignore = "a measurement tool: it reports the numbers C1 turns on, it does not gate them"]
+    fn measure_frame_export() {
+        // Everything lives inside the closure: `exclusively` runs its body on
+        // a dedicated thread and requires `Send + 'static`, so the samples
+        // and the report are built and printed there rather than borrowed.
+        exclusively(|| {
+            // Frames measured. `GBA_PROBE_FRAMES` overrides it, same as the
+            // dump probe -- more frames is the only way to tighten these.
+            let frames: usize = std::env::var("GBA_PROBE_FRAMES")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(300);
+            // Frames run before the timer starts: boot frames are black-screen
+            // work, and the first timed frame should not pay anyone's cold
+            // cache.
+            const WARMUP: usize = 60;
+
+            let Some(path) = probe_rom_path() else {
+                println!("no .gba found -- set GBA_PROBE_ROM to a path, or put one on the Desktop");
+                return;
+            };
+            let rom = std::fs::read(&path).expect("read the cartridge");
+            println!("cartridge : {}", path.display());
+            println!("{frames} frames after {WARMUP} warm-up; timings are meaningless without --release");
+
+            let mut step_ms: Vec<f64> = Vec::with_capacity(frames);
+            let mut convert_us: Vec<f64> = Vec::with_capacity(frames);
+            let mut export_us: Vec<f64> = Vec::with_capacity(frames);
+
+            gba_unload_rom();
+            assert_eq!(gba_load_rom_bytes(&rom), GBA_OK);
+            let mut dst = vec![0u8; FRAME_BYTES];
+
+            for frame in 0..WARMUP + frames {
+                let stepped = std::time::Instant::now();
+                assert_eq!(gba_step_frame(), GBA_OK, "frame {frame} must step");
+                let step = stepped.elapsed();
+
+                // The conversion alone: the part C1 wants to fold into a
+                // single write into `dst`.
+                let converted = std::time::Instant::now();
+                with_machine(|m| frame_bytes(m)).expect("the machine is loaded");
+                let convert = converted.elapsed();
+
+                // The whole production export: both allocations, all the
+                // copies, the overlay and the mutex.
+                // SAFETY: single-threaded under `exclusively`, per the
+                // module's threading rule.
+                let exported = std::time::Instant::now();
+                assert_eq!(
+                    unsafe { gba_frame_buffer(dst.as_mut_ptr(), FRAME_BYTES as u32) },
+                    GBA_OK
+                );
+                let export = exported.elapsed();
+
+                if frame >= WARMUP {
+                    step_ms.push(step.as_secs_f64() * 1e3);
+                    convert_us.push(convert.as_secs_f64() * 1e6);
+                    export_us.push(export.as_secs_f64() * 1e6);
+                }
+            }
+            gba_unload_rom();
+
+            let mean = |v: &[f64]| v.iter().sum::<f64>() / v.len() as f64;
+            let min = |v: &[f64]| v.iter().cloned().fold(f64::INFINITY, f64::min);
+            // The rate the throttling loop targets (S2-b4 phase 3'), not 60.0.
+            let budget_us = 1e6 / 59.7275;
+
+            println!("\nframe budget: {budget_us:.0} µs (59.7275 Hz)");
+            println!(
+                "  emulated frame        mean {:>9.3} ms   min {:>9.3} ms",
+                mean(&step_ms),
+                min(&step_ms)
+            );
+            println!(
+                "  conversion only       mean {:>9.1} µs   min {:>9.1} µs   {:>5.2} % of budget (mean)",
+                mean(&convert_us),
+                min(&convert_us),
+                mean(&convert_us) / budget_us * 100.0
+            );
+            println!(
+                "  full gba_frame_buffer mean {:>9.1} µs   min {:>9.1} µs   {:>5.2} % of budget (mean)",
+                mean(&export_us),
+                min(&export_us),
+                mean(&export_us) / budget_us * 100.0
+            );
+        });
+    }
+
     fn write_dump(out: &str, lines: &mut String, frames: usize) {
         let _ = frames;
         std::fs::write(out, lines.as_bytes()).expect("write the dump");

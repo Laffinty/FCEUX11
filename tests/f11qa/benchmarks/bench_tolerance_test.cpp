@@ -47,15 +47,24 @@ struct BenchConfig {
     const char* name;
     const char* rom;
     int         frames;
+    int         sound;   // 1 = enable sound output (FCEUI_Sound 48000)
+    int         soundq;  // quality passed to fceu11::SetSoundQuality (0 = low path)
 };
 
 // Match the v0.3.0 baseline binaries.
 static const BenchConfig kBenchs[] = {
-    { "bench_cpu_frame",    "fixtures/nestest.nes",     60 },
-    { "bench_ppu_frame",    "fixtures/mapper_nrom.nes", 60 },
-    { "bench_full_frame",   "fixtures/mapper_mmc3.nes", 60 },
-    { "bench_apu_frame",    "fixtures/mapper_mmc3.nes", 60 },
-    { "bench_bus_dispatch", "fixtures/nestest.nes",     60 },
+    { "bench_cpu_frame",     "fixtures/nestest.nes",     60, 0, 0 },
+    { "bench_ppu_frame",     "fixtures/mapper_nrom.nes", 60, 0, 0 },
+    { "bench_full_frame",    "fixtures/mapper_mmc3.nes", 60, 1, 0 },
+    { "bench_apu_frame",     "fixtures/mapper_mmc3.nes", 60, 1, 0 },
+    { "bench_bus_dispatch",  "fixtures/nestest.nes",     60, 0, 0 },
+    // M1 (v2.0.2 P0): the real-game high-quality sound path. soundq >= 1
+    // selects the HQ channel renderers plus the NeoFilterSound 484-tap FIR
+    // in FlushEmulateSound (sound.cpp) — the path every previous slot
+    // skipped, because FSettings.soundq resets to 0 in fceu11::Initialize()
+    // and nothing ever set it. Measures the whole HQ pipeline, not the FIR
+    // in isolation; that is the path A5 targets.
+    { "bench_full_frame_hq", "fixtures/mapper_mmc3.nes", 60, 1, 1 },
 };
 static const int kNumBenchs = sizeof(kBenchs) / sizeof(kBenchs[0]);
 
@@ -93,9 +102,15 @@ static double run_bench(const BenchConfig& cfg, const RunConfig& rc) {
     FCEUGI* gi = load_rom(cfg.rom);
     if (!gi) { core_shutdown(); return -1.0; }
 
-    if (std::strcmp(cfg.name, "bench_full_frame") == 0 ||
-        std::strcmp(cfg.name, "bench_apu_frame") == 0) {
+    // Sound setup is config-driven now (was a name-dispatch special case).
+    // Must happen after core_init(): fceu11::Initialize() memsets FSettings,
+    // so soundq does not survive across slots. Same place as before, so the
+    // existing slots' behaviour is unchanged.
+    if (cfg.sound) {
         FCEUI_Sound(48000);
+        if (cfg.soundq) {
+            fceu11::SetSoundQuality(cfg.soundq);
+        }
     }
 
     uint8*  xbuf = nullptr;
@@ -219,10 +234,16 @@ int main(int argc, char** argv) {
     std::setvbuf(stdout, nullptr, _IONBF, 0);
 
     bool generate = false;
+    bool json_out = false;
+    const char* only_name = nullptr;
     RunConfig rc;
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--generate") == 0) {
             generate = true;
+        } else if (std::strncmp(argv[i], "--only=", 7) == 0) {
+            only_name = argv[i] + 7;
+        } else if (std::strcmp(argv[i], "--json") == 0) {
+            json_out = true;
         } else if (std::strncmp(argv[i], "--warmup-iterations=", 20) == 0) {
             int v = std::atoi(argv[i] + 20);
             rc.warmup_iterations = (v >= 0) ? v : 0;
@@ -266,8 +287,24 @@ int main(int argc, char** argv) {
 
     std::vector<std::string> results_name;
     std::vector<double>      results_ms;
+    const BenchConfig*       only_cfg = nullptr;
+
+    if (only_name) {
+        bool found = false;
+        for (int i = 0; i < kNumBenchs; ++i) {
+            if (std::strcmp(kBenchs[i].name, only_name) == 0) { found = true; break; }
+        }
+        if (!found) {
+            std::printf("FAIL: --only: no such benchmark: %s\n", only_name);
+            return 1;
+        }
+    }
 
     for (int i = 0; i < kNumBenchs; ++i) {
+        if (only_name && std::strcmp(kBenchs[i].name, only_name) != 0) {
+            continue;
+        }
+        only_cfg = &kBenchs[i];
         std::printf("[%d/%d] %s (%d frames)\n",
                     i + 1, kNumBenchs, kBenchs[i].name, kBenchs[i].frames);
         double ms = run_bench(kBenchs[i], rc);
@@ -281,7 +318,7 @@ int main(int argc, char** argv) {
         results_name.push_back(kBenchs[i].name);
         results_ms.push_back(ms);
 
-        if (generate || baseline_text == "{}") {
+        if (generate || only_name || baseline_text == "{}") {
             // Skip comparison; just record.
             std::printf("  (baseline not enforced this run)\n");
             ++ctx.passed;
@@ -313,6 +350,26 @@ int main(int argc, char** argv) {
             std::printf("  FAIL: regression exceeds max-regression threshold\n");
             ++ctx.failed;
         }
+    }
+
+    if (only_name && json_out) {
+        // M1 (v2.0.2 P0): single-line JSON matching the standalone bench
+        // binaries' --json schema, so generate_bench_baseline.ps1 can
+        // harvest this slot the same way it harvests theirs. The summary is
+        // printed first because the ps1 grabs the LAST line of stdout, and
+        // the standalone binaries also end with their JSON.
+        int exit_code = report_and_exit(ctx, "Bench tolerance test suite");
+        if (results_ms.size() == 1 && only_cfg) {
+            std::printf(
+                "{\"name\": \"%s\", \"binary\": \"fceux11_bench_tolerance_test\", "
+                "\"rom\": \"%s\", \"frames_per_iter\": %d, \"iterations\": %d, "
+                "\"metric\": \"median_total_ms\", \"median_total_ms\": %.3f, "
+                "\"unit\": \"milliseconds for %d frames\"}\n",
+                only_cfg->name, only_cfg->rom, only_cfg->frames,
+                rc.meas_iterations, results_ms[0], only_cfg->frames);
+        }
+        // (on failure results_ms is empty; the FAIL line above is the report)
+        return exit_code;
     }
 
     if (generate) {

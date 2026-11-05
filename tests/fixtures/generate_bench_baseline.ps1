@@ -34,6 +34,12 @@ $binaries = @(
     @{ name='bench_cpu_frame';  binary='fceux11_bench_x6502_exec'; rom='fixtures/nestest.nes' }
     @{ name='bench_ppu_frame';  binary='fceux11_bench_ppu_render'; rom='fixtures/mapper_nrom.nes' }
     @{ name='bench_full_frame'; binary='fceux11_bench_apu_mix';    rom='fixtures/mapper_mmc3.nes' }
+    # M1 (v2.0.2 P0): the soundq=1 slot lives inside bench_tolerance_test
+    # (real-game HQ sound path: HQ renderers + NeoFilterSound 484-tap FIR).
+    # --only/--json makes it emit the same single-line JSON the standalone
+    # binaries emit, so the harvesting loop below needs no special casing
+    # beyond this args field.
+    @{ name='bench_full_frame_hq'; binary='fceux11_bench_tolerance_test'; args='--only=bench_full_frame_hq'; rom='fixtures/mapper_mmc3.nes' }
 )
 
 # v1.3 Legion Phase 7.3: take the BEST (lowest) of N runs as the
@@ -53,11 +59,13 @@ $rows = @()
 foreach ($b in $binaries) {
     $exe = Join-Path $benchDir $b.binary
     if (-not (Test-Path "$exe.exe")) { throw "missing $exe.exe" }
-    Write-Host "Running $($b.binary) --json x$outerIterations ..."
+    $extraArgs = @()
+    if ($b.args) { $extraArgs = $b.args -split ' ' }
+    Write-Host "Running $($b.binary) --json $($b.args) x$outerIterations ..."
     $meds = @()
     $meta = $null
     for ($k = 0; $k -lt $outerIterations; $k++) {
-        $line = & "$exe.exe" --json 2>$null | Select-Object -Last 1
+        $line = & "$exe.exe" @extraArgs --json 2>$null | Select-Object -Last 1
         if (-not $line) { throw "no JSON output from $($b.binary) (iter $k)" }
         $j = $line | ConvertFrom-Json
         $meds += [double]$j.median_total_ms
