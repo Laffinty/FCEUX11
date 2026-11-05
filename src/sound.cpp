@@ -1335,7 +1335,58 @@ int FlushEmulateSound(void)
    // FIR carryover in [0, left); the memset re-zeros the accumulation
    // region for the next call.
    memmove(WaveHi, WaveHi+SOUNDTS-left, left*sizeof(uint32));
-   memset(WaveHi+left, 0, sizeof(WaveHi)-left*sizeof(uint32));
+   // A4-2 (v2.0.2 trailing memset narrowing): zero only what the next
+   // HQ frame can actually write, not the whole array tail. Every HQ
+   // writer into WaveHi is bounded by [ChannelBC[x], SOUNDTS) — the
+   // channel renderers (RDoSQ/RDoTriangle/RDoNoise/RDoPCM at
+   // sound.cpp:598/760/766/965/553), the mapper expansion writers
+   // (sound.cpp:817 D=&WaveHi[ChannelBC[x]], fds_sound.cpp:194), the
+   // dequantising tmpo loop (sound.cpp:1315, [soundtsoffs,
+   // soundtsoffs+ref)) and FCEU11_ExpHiFill — and after this function
+   // ChannelBC[x] and soundtsoffs are both set to `left` (below /
+   // sound.cpp:1368). g_cpu.sound_timestamp_ref() resets to 0 at every
+   // frame boundary (fceu.cpp:883), so next frame's highest touched
+   // index is SOUNDTS' - 1 = ref' + left - 1. The current frame's
+   // SOUNDTS = ref + left_prev (soundtsoffs is still the previous
+   // frame's value here), hence SOUNDTS+1 = ref + left_prev + 1 covers
+   // ref' whenever ref' <= ref + left_prev + 1 — per-frame cycle counts
+   // differ by at most 1-2 (29780/29781 NTSC alternation), so the
+   // left_prev slack plus the +1 makes this safe with margin. Clamp to
+   // the array tail (40000-left) for the SOUNDTS+left >= 40000 corner.
+   {
+    int32 a4_zero = (int32)(SOUNDTS + 1);
+    const int32 a4_cap = (int32)(sizeof(WaveHi)/sizeof(WaveHi[0])) - left;
+    if (a4_zero > a4_cap) a4_zero = a4_cap;
+    if (a4_zero > 0)
+     memset(WaveHi+left, 0, (size_t)a4_zero*sizeof(uint32));
+   }
+
+   // A4-2 (v2.0.2 trailing memset narrowing) equivalence probe --
+   // env-gated, silent by default, NOT part of any ctest gate. When
+   // FCEUX11_A4_WAVEDUMP=<dir> is set, dump WaveHi[0..SOUNDTS) of every
+   // high-quality frame into <dir> as f%06d_wave.bin (SOUNDTS*4 raw
+   // bytes, dumped right after the trailing memset). Golden captured
+   // with the pre-change build must byte-diff empty against the
+   // post-change build. Only fires on the FSettings.soundq>=1 branch
+   // (the only code that owns this memset) -- drive it via
+   // bench_tolerance_test's bench_full_frame_hq slot (soundq=1), since
+   // the kgmqa-024 / apu_test harnesses run the low-quality path and
+   // never reach this line.
+   {
+    const char* a4_dir = std::getenv("FCEUX11_A4_WAVEDUMP");
+    if(a4_dir && a4_dir[0])
+    {
+     static uint32 a4_seq = 0;
+     char path[512];
+     std::snprintf(path, sizeof(path), "%s/f%06u_wave.bin", a4_dir, (unsigned)a4_seq);
+     if(FILE *f = std::fopen(path, "wb"))
+     {
+      std::fwrite(WaveHi, sizeof(uint32), (size_t)SOUNDTS, f);
+      std::fclose(f);
+     }
+     a4_seq++;
+    }
+   }
 
    FCEU11_ExpHiSync(&GameExpSound, left);
    for(x=0;x<5;x++)

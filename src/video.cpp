@@ -396,6 +396,35 @@ void FCEU_PutImage(void)
 		}
 	} else DrawMessage(false);
 
+	// A3 (v2.0.2 DoLine post-processing merge) equivalence probe --
+	// env-gated, silent by default, NOT part of any ctest gate. When
+	// FCEUX11_A3_XDUMP=<dir> is set, dump the full 256x256 XBuf and
+	// XDBuf of every frame into <dir> as f%06d_xbuf.bin /
+	// f%06d_xdbuf.bin. Usage: dump a golden with the pre-change build,
+	// re-dump after the change, diff the two directories (must be
+	// byte-identical). XDBuf has no golden of its own (kgmqa-023 pins
+	// only the visible 256x240 XBuf), which is why this probe exists:
+	// the dtarget fill and the deemphasis branches in DoLine()
+	// (ppu_rendering.cpp) are only fully pinned by it.
+	{
+		static int a3_frame_seq = 0;
+		const char* a3_dir = std::getenv("FCEUX11_A3_XDUMP");
+		if (a3_dir && a3_dir[0] && XBuf && XDBuf) {
+			char path[512];
+			std::snprintf(path, sizeof(path), "%s/f%06d_xbuf.bin", a3_dir, a3_frame_seq);
+			if (FILE* f = std::fopen(path, "wb")) {
+				std::fwrite(XBuf, 1, 256 * 256, f);
+				std::fclose(f);
+			}
+			std::snprintf(path, sizeof(path), "%s/f%06d_xdbuf.bin", a3_dir, a3_frame_seq);
+			if (FILE* f = std::fopen(path, "wb")) {
+				std::fwrite(XDBuf, 1, 256 * 256, f);
+				std::fclose(f);
+			}
+		}
+		a3_frame_seq++;
+	}
+
 }
 void snapAVI()
 {

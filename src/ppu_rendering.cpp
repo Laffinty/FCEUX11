@@ -735,35 +735,31 @@ void DoLine(void) {
 		}
 	}
 
+	// A3 (v2.0.2): the three 64-iteration H-06 loops below collapsed
+	// into fceu11::fceu_dwrmw_andor (utils/simd_fill.h), which keeps the
+	// same memcpy-semantic (x & mask) | bits per 4 bytes. The (mask,
+	// bits) pairs are expression-identical to the loops they replaced:
+	//   0x7 branch:        tmp = (tmp & 0x3f3f3f3f) | 0xc0c0c0c0
+	//   emphasis branch:   tmp |= 0x40404040  ==  (tmp & 0xffffffff) | 0x40404040
+	//   no-emphasis:       tmp = (tmp & 0x3f3f3f3f) | 0x80808080
+	// hotfix1 P2-5 (H-06) history lives on in that helper: the buffer is
+	// a uint8_t row of XBuf and is never touched through a uint32_t*
+	// lvalue.
 	if ((PPU[1] >> 5) == 0x7) {
-		for (x = 63; x >= 0; x--) {
-			uint32_t tmp;
-			std::memcpy(&tmp, &target[x << 2], 4);
-			tmp = (tmp & 0x3f3f3f3f) | 0xc0c0c0c0;
-			std::memcpy(&target[x << 2], &tmp, 4);
-		}
-	} else if (PPU[1] & 0xE0)
-		for (x = 63; x >= 0; x--) {
-			uint32_t tmp;
-			std::memcpy(&tmp, &target[x << 2], 4);
-			tmp |= 0x40404040;
-			std::memcpy(&target[x << 2], &tmp, 4);
-		}
-	else
-		for (x = 63; x >= 0; x--) {
-			uint32_t tmp;
-			std::memcpy(&tmp, &target[x << 2], 4);
-			tmp = (tmp & 0x3f3f3f3f) | 0x80808080;
-			std::memcpy(&target[x << 2], &tmp, 4);
-		}
-
-	// hotfix1 P2-5 (H-06): dtarget is uint8*; uint32* store is
-	// strict-aliasing UB. Compute into a local and memcpy the 4 bytes.
-	for (x = 63; x >= 0; x--) {
-		uint32_t tmp = ((PPU[1]>>5)<<0) | ((PPU[1]>>5)<<8)
-		             | ((PPU[1]>>5)<<16) | ((PPU[1]>>5)<<24);
-		std::memcpy(&dtarget[x << 2], &tmp, 4);
+		fceu11::fceu_dwrmw_andor(target, 0x3f3f3f3f, 0xc0c0c0c0, 256);
+	} else if (PPU[1] & 0xE0) {
+		fceu11::fceu_dwrmw_andor(target, 0xffffffff, 0x40404040, 256);
+	} else {
+		fceu11::fceu_dwrmw_andor(target, 0x3f3f3f3f, 0x80808080, 256);
 	}
+
+	// A3 (v2.0.2): the dtarget fill is a plain 4-byte-pattern memset of
+	// (PPU[1]>>5) replicated — identical bytes to the previous
+	// 64-iteration loop. dtarget is uint8* (XDBuf row); FCEU_dwmemset
+	// (hotfix2 P2-1 ALIAS-1 redirect) is memcpy-semantic, so H-06 does
+	// not reopen here.
+	FCEU_dwmemset(dtarget, (PPU[1]>>5) | ((PPU[1]>>5)<<8)
+	                       | ((PPU[1]>>5)<<16) | ((PPU[1]>>5)<<24), 256);
 
 	sphitx = 0x100;
 

@@ -76,4 +76,59 @@ void fceu_dwmemset(uint8_t* dst, uint32_t pattern, size_t n_bytes) noexcept {
     }
 }
 
+// A3 (v2.0.2 DoLine post-processing merge): memcpy-semantic read-modify-
+// write over `n_bytes` bytes of `dst`, applying `(x & mask) | bits` per
+// 4-byte group. Replaces the three 64-iteration uint32-tmp/memcpy loops
+// in DoLine() (ppu_rendering.cpp) that applied the deemphasis bits to an
+// XBuf row; the (mask, bits) pairs there are (0x3f3f3f3f, 0xc0c0c0c0),
+// (0xffffffff, 0x40404040) and (0x3f3f3f3f, 0x80808080) — each proven
+// expression-identical to the loop it replaced.
+//
+// Aliasing discipline is the same as fceu_dwmemset above (hotfix2 P2-1 /
+// hotfix1 P2-5 H-06): `dst` is a uint8_t row of XBuf; it is NEVER
+// accessed through a uint32_t* lvalue. Every scalar step stages the 4
+// bytes through a local uint32_t via memcpy; the AVX2 path uses
+// unaligned load/store intrinsics which are char-semantic per the Intel
+// intrinsic model.
+//
+// `n_bytes` MUST be a positive multiple of 4 (the sole caller passes
+// 256). `mask`/`bits` are replicated 8x across the 256-bit AVX2 vector,
+// so the vector path computes exactly the same bytes as the scalar one.
+FCEU_ALWAYS_INLINE
+void fceu_dwrmw_andor(uint8_t* dst, uint32_t mask, uint32_t bits, size_t n_bytes) noexcept {
+    if (n_bytes == 0) return;
+
+#if defined(__AVX2__)
+    if (fceu11::simd::have_avx2() && n_bytes >= 64) {
+        const __m256i vmask = _mm256_set1_epi32(static_cast<int>(mask));
+        const __m256i vbits = _mm256_set1_epi32(static_cast<int>(bits));
+        size_t i = 0;
+        for (; i + 32 <= n_bytes; i += 32) {
+            __m256i v = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(dst + i));
+            v = _mm256_and_si256(v, vmask);
+            v = _mm256_or_si256(v, vbits);
+            _mm256_storeu_si256(reinterpret_cast<__m256i*>(dst + i), v);
+        }
+        // Tail (n_bytes is a multiple of 4, so 0..28 bytes remain).
+        for (; i < n_bytes; i += 4) {
+            uint32_t tmp;
+            std::memcpy(&tmp, dst + i, 4);
+            tmp = (tmp & mask) | bits;
+            std::memcpy(dst + i, &tmp, 4);
+        }
+        return;
+    }
+#endif
+
+    // Scalar fallback: 4-byte stride, staged through a local uint32_t
+    // via memcpy (never a uint32_t* lvalue cast on dst — that is the
+    // H-06 strict-aliasing trap this helper exists to retire).
+    for (size_t i = 0; i < n_bytes; i += 4) {
+        uint32_t tmp;
+        std::memcpy(&tmp, dst + i, 4);
+        tmp = (tmp & mask) | bits;
+        std::memcpy(dst + i, &tmp, 4);
+    }
+}
+
 }  // namespace fceu11
