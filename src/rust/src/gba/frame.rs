@@ -80,6 +80,15 @@ const MIN_CARTRIDGE: usize = 0x200;
 pub(crate) struct Machine {
     pub(crate) gba: Box<Gba>,
     overlay: Overlay,
+    /// The ROM identity, computed once at load (C2, v2.0.2 P1).
+    ///
+    /// The fingerprint is a full-ROM FNV-1a -- milliseconds for a 32 MB
+    /// cartridge -- and every savestate save and load needs it. It is a pure
+    /// function of the ROM bytes, so it is computed here and kept: the machine
+    /// dies with its ROM ([`set_machine`] / unload replace the whole machine),
+    /// so the cache is invalidated for free, and [`apply_state`]'s in-place
+    /// core swap rebuilds around the same cartridge by construction.
+    fingerprint: save::RomFingerprint,
     /// The audio sink and its per-frame accounting (S2-b1). Owned here for the
     /// same reason the machine is: the ring's consumer end has to be stored on
     /// this side, and it has to die with the machine.
@@ -98,11 +107,13 @@ impl Machine {
         let mut audio = AudioOut::new(rate);
         audio.set_volume(audio::configured_volume());
         audio.attach(rx, rate);
+        let fingerprint = save::RomFingerprint::of(&gba);
         Self {
             gba,
             // A debug build may turn the watermark off; a release build may
             // not. See plan section 7.1 and invariant 5.
             overlay: Overlay::for_build(cfg!(not(debug_assertions))),
+            fingerprint,
             audio,
         }
     }
@@ -405,7 +416,10 @@ pub extern "C" fn gba_step_frame() -> i32 {
 fn encode_machine(machine: &Machine) -> Result<Vec<u8>, i32> {
     let wire = save::save(
         &machine.gba.cpu,
-        &save::RomFingerprint::of(&machine.gba),
+        // C2 (v2.0.2 P1): the machine's cached fingerprint -- a whole-ROM
+        // FNV-1a per encode used to sit on this line, twice per save through
+        // the C++ size-then-save pattern.
+        &machine.fingerprint,
         save::AudioState::capture(&machine.audio),
         swi::pending_intr_wait().map(save::PendingWait::of),
     )
@@ -438,7 +452,13 @@ fn apply_state(machine: &mut Machine, mut wire: WireState) -> i32 {
     // The ROM is not in the payload, so a state only means anything next to
     // the cartridge it was taken from. Checking this first means a refusal
     // leaves the running machine untouched.
-    if save::RomFingerprint::of(&machine.gba) != wire.fingerprint {
+    //
+    // C2 (v2.0.2 P1): the fingerprint is the machine's own cached copy -- the
+    // whole-ROM FNV-1a no longer runs on every load. The cache cannot go
+    // stale here: the swap below rebuilds the core around the *same* ROM
+    // (taken out of this machine at :445), which is the one cartridge the
+    // fingerprint was computed from.
+    if machine.fingerprint != wire.fingerprint {
         return GBA_ERR_STATE;
     }
 

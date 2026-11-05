@@ -260,19 +260,26 @@ bool fceu11_gba_savestate_save(const char* path)
 {
 	if (!g_gbaActive || !path || !*path) return false;
 
-	// Two encodes, not one: `gba_savestate_size` serialises a state to measure
-	// it, then `gba_savestate_save` serialises it again into our buffer. That is
-	// the ABI's documented contract rather than an oversight -- the payload is
-	// JSON, so its length cannot be computed without doing the work -- and at
-	// the measured 2.4 ms a release encode it is not worth a second buffer or a
-	// hand-rolled size estimate. A wrong estimate would fail as a capacity
-	// error the caller cannot tell from a corrupt state.
-	uint32_t size = 0;
-	if (gba_savestate_size(&size) != GBA_OK || size == 0) return false;
-
-	std::vector<uint8_t> data(size);
+	// One encode, not two (C2, v2.0.2 P1). This used to call
+	// `gba_savestate_size` first -- which serialises a full state to measure
+	// it -- and then `gba_savestate_save`, paying the measured ~2.4 ms encode
+	// twice per save. The ABI's documented alternative is exactly the retry
+	// loop below: pass a generous buffer, and on GBA_ERR_CAPACITY read the
+	// size that would have worked from *out_written and retry once. The
+	// generous first guess is 2 MB against a measured ~1 MB state, so the
+	// retry path exists for unusually large ROM states, not for the common
+	// case.
+	constexpr uint32_t kFirstGuess = 2u * 1024u * 1024u;
+	std::vector<uint8_t> data(kFirstGuess);
 	uint32_t written = 0;
-	if (gba_savestate_save(data.data(), size, &written) != GBA_OK) return false;
+	int32_t rc = gba_savestate_save(data.data(), static_cast<uint32_t>(data.size()), &written);
+	if (rc == GBA_ERR_CAPACITY)
+	{
+		data.resize(written);
+		written = 0;
+		rc = gba_savestate_save(data.data(), static_cast<uint32_t>(data.size()), &written);
+	}
+	if (rc != GBA_OK || written == 0) return false;
 	data.resize(written);
 
 	// UTF-8, like every other path this file handles: the same conversion the

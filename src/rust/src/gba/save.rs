@@ -117,7 +117,9 @@ pub const CODEC_STACK: usize = 16 * 1024 * 1024;
 /// "01"), so together they name a game, a region and a revision. The
 /// one-byte `calculated_checksum` the header carries is deliberately **not**
 /// used: it covers 156 bytes and would not notice a re-dump. `content_hash` is
-/// FNV-1a over the whole cartridge, which is a few microseconds once per load.
+/// FNV-1a over the whole cartridge -- milliseconds for a 32 MB ROM, which is
+/// why C2 (v2.0.2) computes it once at load and caches it on the machine
+/// rather than paying it on every savestate save and load.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RomFingerprint {
