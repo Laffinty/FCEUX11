@@ -99,7 +99,8 @@ pub mod blargg_entry {
         };
 
         let mut adapter = Fceux11DirectAdapter::new().with_newppu();
-        let (code, line) = run_single(&mut adapter, &rom_path, cli.frames, cli.reset_after);
+        let (code, line) =
+            run_single(&mut adapter, &rom_path, cli.frames, cli.reset_after, cli.sut_input.clone());
         let _ = std::io::stdout().write_all(line.as_bytes());
         code
     }

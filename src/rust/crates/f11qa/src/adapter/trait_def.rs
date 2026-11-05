@@ -32,6 +32,10 @@ pub struct InputSpec {
     /// > 0 = step N frames, reset, step remaining frames. See TestInput
     /// for the manifest-side meaning.
     pub reset_after: i64,
+    /// D9 (kgmqa-107): per-port input device to attach before load_rom,
+    /// indexed by port (`[port0_esi, port1_esi]`, git.h SI_* values).
+    /// None = bridge default (SI_NONE on both ports).
+    pub sut_input: Option<Vec<u8>>,
 }
 
 // Default frame budget when the manifest entry does not state one.
@@ -47,6 +51,7 @@ impl InputSpec {
             frames: frames_from_args(&test.input.args).unwrap_or(DEFAULT_FRAMES),
             probe_addr: test.input.probe_addr.unwrap_or(0x6000),
             reset_after: test.input.reset_after,
+            sut_input: test.input.sut_input.clone(),
         }
     }
 }

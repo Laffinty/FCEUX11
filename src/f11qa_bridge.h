@@ -44,6 +44,21 @@ int kagami_bridge_full_reset(void);
 /// Tear down the emulator and free resources.
 void kagami_bridge_kill(void);
 
+/// Attach an input device to a standard controller port (D9 / kgmqa-107).
+///
+/// `esi_type` is the SI_* integer value from git.h — e.g. SI_NONE = 0,
+/// SI_SNES_MOUSE = 8. Call after kagami_bridge_init() and before
+/// kagami_bridge_load_rom(); the setting persists across loads because
+/// nothing in the core load path overrides the port driver (only the Qt
+/// driver would).
+///
+/// The SI_SNES_MOUSE branch of SetInputStuff does not touch GameInfo, so
+/// this is safe before a ROM is loaded.
+///
+/// Returns 0 on success, -1 on a bad port (must be 0 or 1), -2 when the
+/// bridge is not initialised.
+int kagami_bridge_set_input(int port, int esi_type);
+
 /// Enable the new PPU (newppu = 1).  Must be called after init and
 /// before load_rom for the new-PPU rendering path.
 void kagami_bridge_set_newppu(int on);

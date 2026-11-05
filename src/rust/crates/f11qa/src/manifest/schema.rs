@@ -125,6 +125,13 @@ pub struct TestInput {
     /// which breaks the direct adapter (reset() unloads the ROM).
     #[serde(default = "default_reset_after")]
     pub reset_after: i64,
+    /// D9 (kgmqa-107): per-port input device the SUT must attach BEFORE
+    /// load_rom, as `[port0_esi, port1_esi]` (git.h SI_* integer values —
+    /// e.g. SI_NONE = 0, SI_SNES_MOUSE = 8). Absent = leave the bridge's
+    /// SI_NONE default on both ports. Only consumed by the direct adapter
+    /// path; subprocess-style runners forward it as `--sut-input`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sut_input: Option<Vec<u8>>,
 }
 
 /// Default `reset_after`: -1 → no mid-run reset.

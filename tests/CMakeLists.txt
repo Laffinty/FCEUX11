@@ -194,6 +194,19 @@ if(FCEUX11_BUILD_TESTS)
              COMMAND fceux11_bus_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
+    # D9 / kgmqa-107 chain — SNES mouse protocol lock tests. Drives
+    # FCEU_InitSNESMouse() through the INPUTC interface directly (no ROM);
+    # asserts the report byte stream (signature alternation, 6-bit
+    # magnitude + overflow, sensitivity x1/x2/x4). No savestate roundtrip:
+    # A5 was withdrawn (would drift the frozen savestate baselines).
+    fceux11_add_test_executable(fceux11_input_snesmouse_test
+        f11qa/core/input_snesmouse_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME input_snesmouse_test
+             COMMAND fceux11_input_snesmouse_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
     fceux11_add_test_executable(fceux11_mapper_core_test
         f11qa/core/mapper_test.cpp
         git_info_stub.cpp

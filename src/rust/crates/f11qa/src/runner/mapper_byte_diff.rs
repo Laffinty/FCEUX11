@@ -347,6 +347,7 @@ where
         frames: case.frames,
         probe_addr: 0x6000,
         reset_after: -1,
+        sut_input: None,
     };
     adapter.load(&spec)?;
     for _ in 0..case.frames {

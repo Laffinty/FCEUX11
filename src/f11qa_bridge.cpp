@@ -73,6 +73,31 @@ void kagami_bridge_kill(void) {
 }
 
 // ---------------------------------------------------------------------------
+// Input device selection (D9 / kgmqa-107)
+// ---------------------------------------------------------------------------
+int kagami_bridge_set_input(int port, int esi_type) {
+    if (port < 0 || port > 1) {
+        std::fprintf(stderr, "kagami_bridge_set_input: bad port %d\n", port);
+        return -1;
+    }
+    if (!g_initialised) {
+        std::fprintf(stderr, "kagami_bridge_set_input: not initialised\n");
+        return -2;
+    }
+    // Same shape as the init-time SI_NONE default; the SI_SNES_MOUSE branch
+    // of SetInputStuff (input.cpp:522) does not depend on GameInfo.
+    // ptr must NOT be nullptr for real device drivers: FCEU_UpdateInput()
+    // (input.cpp:421) hands joyports[port].ptr straight to the driver's
+    // Update every frame, and e.g. UpdateSNESMouse reads ptr[0..2]
+    // unconditionally — a null ptr would fault on frame 1. The headless
+    // bridge injects no movement, so a persistent zero buffer is exactly
+    // the "idle device" state.
+    static int32 zero_input[3] = {0, 0, 0};
+    FCEUI_SetInput(port, static_cast<ESI>(esi_type), zero_input, 0);
+    return 0;
+}
+
+// ---------------------------------------------------------------------------
 // ROM loading
 // ---------------------------------------------------------------------------
 int kagami_bridge_load_rom(const char *path) {

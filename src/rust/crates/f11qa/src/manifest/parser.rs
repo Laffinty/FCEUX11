@@ -153,6 +153,51 @@ mod tests {
     }
 
     #[test]
+    fn parse_v1_8_sut_input_field() {
+        // D9 (kgmqa-107): `sut_input` = [port0_esi, port1_esi] (git.h SI_*
+        // values, e.g. SI_SNES_MOUSE = 8). Absent field must stay None.
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let json = r#"{
+            "schema_version": "1.8",
+            "cases": [
+                {
+                    "kgmqa_id": "kgmqa-107-mset-rainwarrior",
+                    "title": "rainwarrior mset (SNES mouse)",
+                    "kind": ["rom-suite"],
+                    "oracle_type": "B",
+                    "layer": "core",
+                    "input": {
+                        "binary": "f11qa-rom-runner",
+                        "args": ["--kgmqa-id", "kgmqa-107-mset-rainwarrior", "--frames", "600"],
+                        "sut_input": [8, 0]
+                    },
+                    "expected": { "exit_code": 0 },
+                    "failure_means": "advisory",
+                    "provenance": "mset"
+                },
+                {
+                    "kgmqa_id": "kgmqa-101-allpads-tepples",
+                    "title": "no sut_input present",
+                    "kind": ["rom-suite"],
+                    "oracle_type": "B",
+                    "layer": "core",
+                    "input": { "binary": "f11qa-rom-runner" },
+                    "expected": { "exit_code": 0 },
+                    "failure_means": "advisory",
+                    "provenance": "tepples"
+                }
+            ]
+        }"#;
+        tmp.as_file().write_all(json.as_bytes()).unwrap();
+
+        let m = load_manifest(tmp.path()).unwrap();
+        let with_input = m.get("kgmqa-107-mset-rainwarrior").unwrap();
+        assert_eq!(with_input.input.sut_input, Some(vec![8u8, 0u8]));
+        let without_input = m.get("kgmqa-101-allpads-tepples").unwrap();
+        assert_eq!(without_input.input.sut_input, None);
+    }
+
+    #[test]
     fn rejects_wrong_schema_version() {
         let tmp = tempfile::NamedTempFile::new().unwrap();
         let json = r#"{"schema_version": "1.7", "cases": []}"#;

@@ -8,6 +8,11 @@ parse_deps = false
 
 [export]
 prefix = ""
+# D9 (kgmqa-107): keep the shared generated header byte-frozen when the
+# direct adapter gains a bridge FFI declaration. kagami_bridge_* symbols
+# are declared to C++ from the hand-written src/f11qa_bridge.h; the Rust
+# side declares them in its own extern blocks (adapter/direct.rs).
+exclude = ["kagami_bridge_set_input"]
 
 [export.rename]
 "Md5Context" = "md5_context"

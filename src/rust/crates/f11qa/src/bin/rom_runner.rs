@@ -147,6 +147,29 @@ fn main() -> ExitCode {
     // Dispatch: real protocols (Phase 5 — no more protocol-stub)
     let protocol = resolve_protocol(&case, &kgmqa_id);
 
+    // D9 (kgmqa-107): manifest `sut_input` ([port0_esi, port1_esi]) becomes
+    // a forwarded `--sut-input port=type[,port=type...]` flag for the
+    // $6000 blargg runner. Ignored by every other protocol.
+    let sut_input_arg: Option<(String, String)> = case
+        .get("input") // tests.json nests sut_input inside the `input` object
+        .and_then(|i| i.get("sut_input"))
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            let specs: Vec<String> = arr
+                .iter()
+                .enumerate()
+                .filter_map(|(port, v)| {
+                    v.as_u64().map(|t| format!("{}={}", port, t as u8))
+                })
+                .collect();
+            if specs.is_empty() {
+                None
+            } else {
+                Some(("--sut-input".to_string(), specs.join(",")))
+            }
+        })
+        .flatten();
+
     eprintln!(
         "[f11qa-rom-runner] kgmqa_id={} protocol={} kind={:?} vendor_state={:?} mirror_path={:?}",
         kgmqa_id, protocol, kind, vendor_state, mirror_path
@@ -160,7 +183,7 @@ fn main() -> ExitCode {
     match protocol.as_str() {
         PROTO_NESTEST => dispatch_nestest(&kgmqa_id, mirror_path, &forwarded),
         PROTO_AGGREGATE => dispatch_aggregate(&kgmqa_id, &case, &forwarded),
-        PROTO_6000 => dispatch_blargg(&kgmqa_id, mirror_path, &forwarded),
+        PROTO_6000 => dispatch_blargg(&kgmqa_id, mirror_path, &forwarded, sut_input_arg),
         other => {
             eprintln!(
                 "[fail] unknown protocol {:?} for {} (expected '{}', '{}', '{}')",
@@ -199,6 +222,7 @@ fn dispatch_blargg(
     kgmqa_id: &str,
     mirror_path: &str,
     forwarded: &[String],
+    sut_input_arg: Option<(String, String)>,
 ) -> ExitCode {
     let rom_local = rom_local_path(mirror_path);
     if !rom_local.exists() {
@@ -216,6 +240,10 @@ fn dispatch_blargg(
         "--kgmqa-id".to_string(),
         kgmqa_id.to_string(),
     ];
+    if let Some((flag, value)) = sut_input_arg {
+        args.push(flag);
+        args.push(value);
+    }
     args.extend_from_slice(forwarded);
     spawn_blargg(&args)
 }

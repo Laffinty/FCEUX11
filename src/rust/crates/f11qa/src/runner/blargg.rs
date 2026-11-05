@@ -101,6 +101,11 @@ pub struct BlarggManifestEntry {
     /// reset-handshake path (the value is reported as `reset_after_used`;
     /// the actual RESET press waits for the handshake, not for this frame).
     pub reset_after: i32,
+    /// D9 (kgmqa-107): per-port input device to attach before load_rom
+    /// (`[port0_esi, port1_esi]`, git.h SI_* values). None for blargg
+    /// manifest entries (blargg_manifest.json carries no such field);
+    /// the rom-runner dispatcher fills it from tests.json `sut_input`.
+    pub sut_input: Option<Vec<u8>>,
 }
 
 /// Parsed view of a `blargg_manifest.json` document.
@@ -197,6 +202,7 @@ fn parse_entry(obj: &str) -> BlarggManifestEntry {
         probe_addr,
         description,
         reset_after,
+        sut_input: None,
     }
 }
 
@@ -267,6 +273,7 @@ pub fn run_one_rom<A: SutAdapter + ?Sized>(
         frames: entry.frames,
         probe_addr: entry.probe_addr,
         reset_after: entry.reset_after as i64,
+        sut_input: entry.sut_input.clone(),
     };
     adapter.load(&spec)?;
 
@@ -449,6 +456,7 @@ pub fn run_single<A: SutAdapter + ?Sized>(
     rom_path: &str,
     frames: u32,
     reset_after: i32,
+    sut_input: Option<Vec<u8>>,
 ) -> (i32, String) {
     let entry = BlarggManifestEntry {
         name: rom_basename(rom_path),
@@ -458,6 +466,7 @@ pub fn run_single<A: SutAdapter + ?Sized>(
         probe_addr: 0x6000,
         description: String::new(),
         reset_after: -1, // entry-level "no override"; CLI takes precedence
+        sut_input,
     };
     let result = match run_one_rom(adapter, &entry, Some(reset_after)) {
         Ok(r) => r,
@@ -556,6 +565,9 @@ pub struct BlarggCliArgs {
     pub manifest_path: Option<PathBuf>,
     pub frames: u32,
     pub reset_after: i32,
+    /// D9 (kgmqa-107): `--sut-input 0=8[,1=0]...` — per-port SI_* values,
+    /// stored port-indexed (`vec![8, 0]` = port0 SNES mouse, port1 none).
+    pub sut_input: Option<Vec<u8>>,
 }
 
 impl Default for BlarggCliArgs {
@@ -565,6 +577,7 @@ impl Default for BlarggCliArgs {
             manifest_path: None,
             frames: 300,
             reset_after: -1,
+            sut_input: None,
         }
     }
 }
@@ -602,6 +615,38 @@ pub fn parse_cli_args(args: &[String]) -> Result<BlarggCliArgs, String> {
                 out.reset_after = v
                     .parse::<i32>()
                     .map_err(|e| format!("Invalid --reset-after value '{}': {}", v, e))?;
+            }
+            // D9 (kgmqa-107): per-port input device, e.g. `--sut-input 0=8`
+            // or `--sut-input 0=8,1=0` (port=SI_* from git.h). Stored
+            // port-indexed; ports not listed stay at the bridge default.
+            "--sut-input" => {
+                let v = iter
+                    .next()
+                    .ok_or_else(|| "Missing value for --sut-input".to_string())?;
+                let mut ports = out.sut_input.clone().unwrap_or_else(|| vec![0u8, 0u8]);
+                for spec in v.split(',') {
+                    let spec = spec.trim();
+                    if spec.is_empty() {
+                        continue;
+                    }
+                    let (port_s, type_s) = spec.split_once('=').ok_or_else(|| {
+                        format!("Invalid --sut-input spec '{}': expected port=type", spec)
+                    })?;
+                    let port: usize = port_s.trim().parse::<usize>().map_err(|e| {
+                        format!("Invalid --sut-input port '{}': {}", port_s, e)
+                    })?;
+                    if port > 1 {
+                        return Err(format!(
+                            "Invalid --sut-input port {}: only ports 0/1 exist",
+                            port
+                        ));
+                    }
+                    let esi: u8 = type_s.trim().parse::<u8>().map_err(|e| {
+                        format!("Invalid --sut-input type '{}': {}", type_s, e)
+                    })?;
+                    ports[port] = esi;
+                }
+                out.sut_input = Some(ports);
             }
             // Dispatcher-forwarded tags: accepted and ignored by the blargg
             // harness itself. f11qa-rom-runner injects --kgmqa-id (case id)
@@ -724,6 +769,7 @@ mod tests {
             probe_addr: 0x6000,
             description: format!("test {}", name),
             reset_after,
+            sut_input: None,
         }
     }
 
@@ -812,6 +858,30 @@ mod tests {
         assert_eq!(a.rom_path.as_deref(), Some("x.nes"));
         assert_eq!(a.frames, 120);
         assert_eq!(a.reset_after, 30);
+        assert_eq!(a.sut_input, None);
+    }
+
+    #[test]
+    fn cli_parses_sut_input() {
+        // D9 (kgmqa-107): `--sut-input 0=8,1=0` → port-indexed [8, 0];
+        // a partial list keeps the unlisted port at the bridge default.
+        let a = parse_cli_args(&[
+            "--sut-input".to_string(),
+            "0=8,1=0".to_string(),
+        ])
+        .unwrap();
+        assert_eq!(a.sut_input, Some(vec![8u8, 0u8]));
+
+        let b = parse_cli_args(&[
+            "--sut-input".to_string(),
+            "1=8".to_string(),
+        ])
+        .unwrap();
+        assert_eq!(b.sut_input, Some(vec![0u8, 8u8]));
+
+        assert!(parse_cli_args(&["--sut-input".to_string(), "2=8".to_string()]).is_err());
+        assert!(parse_cli_args(&["--sut-input".to_string(), "0=mouse".to_string()]).is_err());
+        assert!(parse_cli_args(&["--sut-input".to_string(), "08".to_string()]).is_err());
     }
 
     #[test]
@@ -1154,7 +1224,7 @@ mod tests {
     fn single_run_returns_zero_on_pass() {
         let mut a = ScriptedAdapter::new();
         a.post_reset_probe_value = 0x00;
-        let (code, line) = run_single(&mut a, "x.nes", 10, -1);
+        let (code, line) = run_single(&mut a, "x.nes", 10, -1, None);
         assert_eq!(code, 0);
         assert!(line.starts_with("BLARGG_RESULT: rom=x.nes "));
         assert!(line.contains("status=PASS"));
@@ -1164,7 +1234,7 @@ mod tests {
     fn single_run_returns_one_on_fail() {
         let mut a = ScriptedAdapter::new();
         a.post_reset_probe_value = 0x81;
-        let (code, line) = run_single(&mut a, "x.nes", 10, -1);
+        let (code, line) = run_single(&mut a, "x.nes", 10, -1, None);
         assert_eq!(code, 1);
         assert!(line.contains("status=FAIL"));
     }
@@ -1188,7 +1258,7 @@ mod tests {
             }
         }
         let mut a = FailLoadAdapter;
-        let (code, line) = run_single(&mut a, "missing.nes", 10, -1);
+        let (code, line) = run_single(&mut a, "missing.nes", 10, -1, None);
         assert_eq!(code, 1);
         assert!(line.contains("value=0xFE"));
         assert!(line.contains("status=FAIL"));

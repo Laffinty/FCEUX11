@@ -383,6 +383,7 @@ where
         frames: FRAMES_TO_RUN,
         probe_addr: 0x6000,
         reset_after: -1,
+        sut_input: None,
     };
     adapter.load(&spec)?;
     for frame in 0..FRAMES_TO_RUN {

@@ -27,6 +27,13 @@ unsafe extern "C" {
     fn kagami_bridge_full_reset() -> i32;
     fn kagami_bridge_kill();
     fn kagami_bridge_set_newppu(on: i32);
+    // D9 (kgmqa-107): attach an input device to a standard port BEFORE
+    // load_rom. esi_type is the git.h SI_* integer (SI_NONE=0,
+    // SI_SNES_MOUSE=8). NOTE: this symbol is excluded from the generated
+    // fceux11_rust.h (cbindgen.toml [export] exclude) — the C++ side gets
+    // it from the hand-written src/f11qa_bridge.h, keeping the shared
+    // generated header byte-frozen.
+    fn kagami_bridge_set_input(port: i32, esi_type: i32) -> i32;
     // NOTE: `kagami_bridge_read_ppu` / `kagami_bridge_extract_frame_buffer`
     // / `kagami_bridge_save_state` are declared in the runner modules that
     // actually call them (rom_regression, savestate_regression, etc.) —
@@ -123,6 +130,25 @@ impl SutAdapter for Fceux11DirectAdapter {
             // golden baseline (blargg → new PPU; regression/savestate → legacy).
             unsafe { kagami_bridge_set_newppu(if self.use_newppu { 1 } else { 0 }); }
             self.initialized = true;
+        }
+
+        // D9 (kgmqa-107): attach the SUT input devices BEFORE load_rom.
+        // The port driver set here survives the load (nothing in the core
+        // load path overrides joyports[].type), so ROMs that poll an
+        // input peripheral (SNES mouse etc.) see it from frame 0.
+        if let Some(ref ports) = input.sut_input {
+            for (port, &esi_type) in ports.iter().enumerate() {
+                if port > 1 {
+                    break; // only ports 0/1 exist
+                }
+                let rc = unsafe { kagami_bridge_set_input(port as i32, esi_type as i32) };
+                if rc != 0 {
+                    return Err(QaError::unsupported(format!(
+                        "kagami_bridge_set_input(port={}, type={}) failed: rc={}",
+                        port, esi_type, rc
+                    )));
+                }
+            }
         }
 
         if let Some(ref rom) = input.rom_path {
