@@ -1635,7 +1635,21 @@ int FCEUX_PPU_Loop(int skip) {
 		//Not sure if this is correct.  According to Matt Conte and my own tests, it is.
 		//Timing is probably off, though.
 		//NOTE:  Not having this here breaks a Super Donkey Kong game.
-		PPU[3] = PPUSPL = 0;
+		// D4 (kgmqa-050) fix 2026-11-07: this zeroing is the bulk model of
+		// the hardware "OAMADDR <- 0 during dots 257-320 of visible and
+		// pre-render scanlines" behaviour, which on real hardware runs only
+		// while rendering is enabled. On frames where rendering never ran
+		// (PPUMASK bits 4-3 both clear for the whole frame) the PPU leaves
+		// OAMADDR alone. Zeroing unconditionally here corrupts a live
+		// OAMADDR the CPU programmed mid-sequence: blargg
+		// cpu_dummy_writes_oam oam_read_test (kgmqa-050, error 0x06 "OAM
+		// reads are unreliable") lost exactly one $2004 read this way —
+		// OAMADDR=0xEA destroyed 4 CPU cycles before the read (sl 240->241,
+		// PPU1==0), read returned SPRAM[0]=0xA1 instead of SPRAM[0xEA]=0x62
+		// (FCEUX11_OAMDBG trace 2026-11-07, .zcode/agent-d4fix forensics).
+		// PPUON == (PPU[1] & 0x18), same predicate as ppu.cpp A2004.
+		if (PPU[1] & 0x18)
+			PPU[3] = PPUSPL = 0;
 		const int delay = 20;
 
 		ppur.status.sl = 241;	//for sprite reads

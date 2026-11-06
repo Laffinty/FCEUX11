@@ -12,6 +12,8 @@
 //   * scanline/dot accessors return values in valid ranges
 //   * ppu_getScroll returns non-negative coordinates
 //   * The framebuffer changes between frames (no frozen-output bug)
+//   * D4 (kgmqa-050): OAMADDR survives VBL entry while rendering is off
+//     (new-PPU core), and $2004 reads return SPRAM[OAMADDR]
 
 #include "test_helpers.h"
 
@@ -249,6 +251,79 @@ void test_resethooks(TestContext& ctx) {
     FCEU11_EXPECT(ctx, true, "engine runs 1 frame after PPU_ResetHooks");
 }
 
+// ---------------------------------------------------------------------------
+// D4 (kgmqa-050) lock — OAMADDR must survive VBL entry while rendering is
+// off (new-PPU core).
+//
+// Hardware semantics (nesdev "PPU OAMADDR"): the PPU zeroes OAMADDR during
+// dots 257-320 of the visible and pre-render scanlines, which runs only
+// while rendering is enabled. With rendering disabled the PPU never touches
+// OAMADDR. blargg's cpu_dummy_writes_oam oam_read_test (kgmqa-050) depends
+// on exactly that: 4096 iterations of "program OAMADDR=X via $2003, write
+// OAM[X] via $2004, 7 more OAM writes, re-program OAMADDR=X, read $2004"
+// all with rendering off.
+//
+// The new-PPU frame loop (FCEUX_PPU_Loop, ppu_rendering.cpp VBL entry,
+// sl 240->241) zeroed PPU[3] unconditionally — the bulk model of the
+// sprite-fetch OAMADDR clear — also on frames where rendering never ran.
+// Forensics 2026-11-07 (FCEUX11_OAMDBG trace): exactly one $2004 read lost
+// its OAMADDR this way (0xEA destroyed 4 CPU cycles before the read at
+// sl 240->241, PPU1==0; read returned SPRAM[0]=0xA1 instead of
+// SPRAM[0xEA]=0x62) -> error 0x06 "OAM reads are unreliable".
+//
+// This test pins the fixed behaviour on the same face the criterion uses
+// (architecture-exact planted state per disciplines 5/11: planted SPRAM,
+// rendering off, OAMADDR programmed through the real $2003 write path,
+// frames crossed one at a time, $2004 read through the real ARead
+// dispatch). Red on pre-fix code: PPU[3] reads back 0 after the frame
+// boundary and the $2004 read returns SPRAM[0].
+// ---------------------------------------------------------------------------
+void test_oamaddr_preserved_vbl_rendering_off(TestContext& ctx) {
+    // Planted OAM contents: slot 0 and the target slot 0x42 hold distinct
+    // values so a read through a corrupted OAMADDR=0 is distinguishable
+    // from the correct one.
+    SPRAM[0x00] = 0x11;
+    SPRAM[0x42] = 0xA7;
+    // Program OAMADDR through the real register write path (not a bare
+    // PPU[3] store — same dispatch the ROM's `sta SPRADDR` takes).
+    BWrite[0x2003](0x2003, 0x42);
+    FCEU11_EXPECT(ctx, PPU[3] == 0x42,
+                  "OAMADDR programmed to 0x42 via $2003 write path");
+
+    // Each emulate_n(1) = one crossing of the sl 240->241 VBL entry in the
+    // new-PPU frame loop (the exact fixed site). nestest has not enabled
+    // rendering ($2001) yet at these two early boundaries, so with the fix
+    // the gate must not fire on either; pre-fix the zeroing is
+    // unconditional and both assertions go red.
+    emulate_n(1);
+    FCEU11_EXPECT(ctx, PPU[3] == 0x42,
+                  "OAMADDR survives VBL entry 1 (rendering off)");
+    emulate_n(1);
+    FCEU11_EXPECT(ctx, PPU[3] == 0x42,
+                  "OAMADDR survives VBL entry 2 (rendering off)");
+
+    // Read $2004 through the real CPU read dispatch. nestest has turned
+    // background rendering on by this point ($2001=0x0E), which would send
+    // the read down the sprite-eval synthetic path; force PPUMASK=0 via
+    // the real register write path with no emulation in between, so the
+    // read deterministically takes the rendering-off direct-read path the
+    // criterion (oam_read_test) exercises.
+    BWrite[0x2001](0x2001, 0x00);
+    const uint8_t got = ARead[0x2004](0x2004);
+    char dbg[192];
+    std::snprintf(dbg, sizeof(dbg),
+                  "$2004 read returns SPRAM[0x42]=0xA7 with rendering off "
+                  "(got 0x%02X, PPU1=0x%02X, sl=%d, dot=%d; pre-fix: "
+                  "SPRAM[0]=0x11 via VBL-entry zeroed OAMADDR)",
+                  (unsigned)got, (unsigned)PPU[1],
+                  newppu_get_scanline(), newppu_get_dot());
+    FCEU11_EXPECT(ctx, got == 0xA7, dbg);
+    FCEU11_EXPECT(ctx, PPU[3] == 0x42,
+                  "$2004 read does not modify OAMADDR");
+    FCEU11_EXPECT(ctx, SPRAM[0x00] == 0x11 && SPRAM[0x42] == 0xA7,
+                  "planted SPRAM bytes untouched across the window");
+}
+
 int main() {
     std::setvbuf(stdout, nullptr, _IONBF, 0);
 
@@ -278,6 +353,21 @@ int main() {
     test_resethooks(ctx);
 
     fceu11::CloseGame();
+
+    // D4 (kgmqa-050) lock test runs on the new-PPU core — the criterion
+    // path (the kgmqa blargg runner forces newppu). The ROM is reloaded
+    // AFTER the core switch so power-on (and with it new_ppu_reset /
+    // ppur.reset()) happens under the running core; the 12 tests above
+    // stay on the default core untouched.
+    const int ppu_core_before = newppu;
+    if (!newppu) FCEU_TogglePPU();
+    if (load_rom(kRom)) {
+        emulate_n(1);
+        test_oamaddr_preserved_vbl_rendering_off(ctx);
+        fceu11::CloseGame();
+    }
+    if (!ppu_core_before && newppu) FCEU_TogglePPU();  // restore core
+
     core_shutdown();
 
     return report_and_exit(ctx, "PPU test suite");
