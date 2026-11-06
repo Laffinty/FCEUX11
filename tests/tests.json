@@ -2731,12 +2731,12 @@
         "irq"
       ],
       "failure_means": "advisory",
-      "provenance": "Sour FdsIrqTests v7 (patched); F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: FDS IRQ timing subsystem; not v1.8 focus",
+      "provenance": "Sour FdsIrqTests v7 (patched); F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: FDS IRQ timing subsystem; not v1.8 focus; reclassified 2026-11-07 (human ruling): BIOS-gated known-limit — headless never loads the ROM (0xFE, missing copyrighted FDS BIOS), not accuracy debt; supersedes the known-limit note above; forensics: docs/history/surveys/fds_bios_gating/README.md",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "sour/fdsirqtests/fdsirqtestsV7_patched.fds",
       "vendor_state": "vendored",
       "protocol": "$6000",
-      "known_limit": "FDS IRQ timing subsystem; not v1.8 focus"
+      "known_limit": "BIOS-gated (reclassified 2026-11-07, baseline unchanged): NOT an FDS IRQ accuracy defect. The ROM is a well-formed kind=1 FDS image (header magic at 0, header[4]=1 side, 65516=16+65500 self-consistent). The case cannot start headless: the harness never calls fceu11::SetBaseDirectory (only call site src/drivers/Qt/config.cpp:509), so BaseDirectory is empty and FCEU_MakeFName(FCEUMKF_FDSROM) (src/file.cpp:764) assembles a drive-root \\disksys.rom; the copyrighted FDS BIOS is absent, FDSLoad returns LOADER_HANDLED_ERROR, LoadGame returns NULL, and the runner emits the hard-coded 0xFE ROM-load-failure marker (src/rust/crates/f11qa/src/runner/blargg.rs:476,531). Sibling 082/083/084 PASSes are advisory-skip artifacts (takuikaninja ROMs not in mirror), not evidence that FDS BIOS is reachable. $6000 false-green trap: with a fake BIOS, $6000=0x00 after 600 frames is clean never-booted RAM (--frames 1 yields the same 0x00), so the $6000 criterion cannot distinguish a real PASS from a never-started core even once BIOS is solved. Preconditions for any future real FDS run: (1) lawfully obtained disksys.rom, (2) a core-started discriminator before trusting $6000; cf. tests/f11qa/core/fds_load_test.cpp:191-193 TSKIP precedent. Forensics and reproduction: docs/history/surveys/fds_bios_gating/README.md"
     },
     {
       "kgmqa_id": "kgmqa-082-fds-mirroring-takuikaninja",
