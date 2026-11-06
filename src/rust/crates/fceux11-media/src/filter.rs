@@ -384,17 +384,22 @@ unsafe fn fir_pair_avx2(in_slice: &[i32], coeffs: &[i32], base: usize) -> (i64, 
 
     // Horizontal reduction. vpmuludq leaves u64 in lanes 0/2 only, but the
     // even+odd pairs fill all four lanes, so summing the stored lanes is
-    // exact (unused lanes are zero).
+    // exact (unused lanes are zero). Edition-2024 `unsafe_op_in_unsafe_fn`
+    // requires explicit unsafe blocks even inside an unsafe fn.
     let mut lanes = [0u64; 4];
-    _mm256_storeu_si256(lanes.as_mut_ptr() as *mut __m256i, t_a);
+    // SAFETY: lanes is 32 bytes; storing one __m256i.
+    unsafe { _mm256_storeu_si256(lanes.as_mut_ptr() as *mut __m256i, t_a) };
     let t_a_total = (lanes[0] + lanes[1]) + (lanes[2] + lanes[3]);
-    _mm256_storeu_si256(lanes.as_mut_ptr() as *mut __m256i, t_b);
+    // SAFETY: as above.
+    unsafe { _mm256_storeu_si256(lanes.as_mut_ptr() as *mut __m256i, t_b) };
     let t_b_total = (lanes[0] + lanes[1]) + (lanes[2] + lanes[3]);
 
     let mut sums = [0i32; 8];
-    _mm256_storeu_si256(sums.as_mut_ptr() as *mut __m256i, s_a);
+    // SAFETY: sums is 32 bytes; storing one __m256i.
+    unsafe { _mm256_storeu_si256(sums.as_mut_ptr() as *mut __m256i, s_a) };
     let sum_a = sums.iter().fold(0i64, |a, &v| a + v as i64);
-    _mm256_storeu_si256(sums.as_mut_ptr() as *mut __m256i, s_b);
+    // SAFETY: as above.
+    unsafe { _mm256_storeu_si256(sums.as_mut_ptr() as *mut __m256i, s_b) };
     let sum_b = sums.iter().fold(0i64, |a, &v| a + v as i64);
 
     let mut acc = (t_a_total >> 6) as i64 - 1024 * sum_a;

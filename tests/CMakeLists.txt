@@ -196,6 +196,12 @@ if(FCEUX11_BUILD_TESTS)
     add_test(NAME apu_frame_timing_test
              COMMAND fceux11_apu_frame_timing_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    # CI 114390042265: without the vcpkg PATH injection below, this binary
+    # launched with no usable DLL set on the runner and sat alive (no output)
+    # until the 1500s default timeout killed it. Local runs never saw this
+    # because the dev session prepends the vcpkg bin dir to PATH manually.
+    # Explicit short TIMEOUT so any future launch pathology fails in minutes.
+    set_tests_properties(apu_frame_timing_test PROPERTIES TIMEOUT 300)
 
     fceux11_add_test_executable(fceux11_bus_test
         f11qa/core/bus_test.cpp
@@ -217,6 +223,8 @@ if(FCEUX11_BUILD_TESTS)
     add_test(NAME input_snesmouse_test
              COMMAND fceux11_input_snesmouse_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    # Same CI-launch pathology as apu_frame_timing_test above; see that note.
+    set_tests_properties(input_snesmouse_test PROPERTIES TIMEOUT 300)
 
     fceux11_add_test_executable(fceux11_mapper_core_test
         f11qa/core/mapper_test.cpp
@@ -480,6 +488,7 @@ if(FCEUX11_BUILD_TESTS)
             cpu_test ppu_test apu_test bus_test mapper_core_test
         savestate_core_test golden_savestate_test bench_tolerance_test
         ppu_frame_diff_test apu_wav_diff_test apu_wav_hq_diff_test
+        apu_frame_timing_test input_snesmouse_test
         cart_class_test fds_load_test
         driver_callbacks_test core_driver_boundary_test
         ppu_rendering_lut_test ppu_phase_c_test ppu_phase_d_test
