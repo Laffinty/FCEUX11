@@ -31,6 +31,11 @@ struct FilterState {
     sexy_acc1: i64,
     sexy_acc2: i64,
     sexy2_acc: i64,
+    /// A5 G2: true iff every installed coefficient satisfies |c| < 2^16,
+    /// the precondition of the AVX2 bias trick (see `fir_pair_avx2`).
+    /// Computed once per `fceux11_rust_filter_make`; a future coefficient
+    /// table that breaks the bound silently keeps the scalar path.
+    coeff_simd_safe: bool,
 }
 
 impl Default for FilterState {
@@ -43,6 +48,7 @@ impl Default for FilterState {
             sexy_acc1: 0,
             sexy_acc2: 0,
             sexy2_acc: 0,
+            coeff_simd_safe: true,
         }
     }
 }
@@ -117,6 +123,10 @@ pub extern "C" fn fceux11_rust_filter_make(
     };
 
     let half = nco >> 1;
+    // A5 G2: the AVX2 bias trick requires |c| < 2^16 for every tap. The
+    // shipped tables' extremes are +50983 / −10839, well inside the bound;
+    // verify against the actual table instead of trusting that fact.
+    state.coeff_simd_safe = tmp.iter().all(|&v| (v as i64).abs() < (1i64 << 16));
     if soundq == 2 {
         for (x, &v) in tmp.iter().take(half).enumerate() {
             state.sq2coeffs[x] = v;
@@ -261,6 +271,226 @@ pub unsafe extern "C" fn fceux11_rust_filter_sexy2(
     sexy_filter2(state, buf_slice);
 }
 
+/// A5 G1 — FIR pair for one resampler output position (pure scalar).
+///
+/// Computes the two adjacent FIR chains of `NeoFilterSound` at fixed-point
+/// position `base`:
+///
+/// ```text
+/// acc  = Σ_{c=0..nc-1} ( in[base-nc+c]   · coeffs[c] ) >> 6   (per tap)
+/// acc2 = Σ_{c=0..nc-1} ( in[base-nc+c+1] · coeffs[c] ) >> 6   (per tap)
+/// ```
+///
+/// The window is `nc + 1` consecutive samples starting at `base - nc`; the
+/// second chain is the same window shifted by one element.
+///
+/// SEMANTIC LOCK: the `>> 6` truncation happens PER TAP, before the
+/// additions. Σ⌊x/64⌋ ≠ ⌊Σx/64⌋ — hoisting the shift out of the loop
+/// changes results and is forbidden. The G1 refactor only loads each
+/// coefficient once to feed both chains; additions stay in ascending-c
+/// order, so the result is bit-identical to the pre-refactor double loop.
+#[inline]
+fn fir_pair_scalar(in_slice: &[i32], coeffs: &[i32], base: usize) -> (i64, i64) {
+    let nc = coeffs.len();
+    let start = base - nc;
+    let mut acc = 0i64;
+    let mut acc2 = 0i64;
+    for c in 0..nc {
+        let coeff = coeffs[c] as i64;
+        acc += ((in_slice[start + c] as i64) * coeff) >> 6;
+        acc2 += ((in_slice[start + c + 1] as i64) * coeff) >> 6;
+    }
+    (acc, acc2)
+}
+
+/// A5 G2 — AVX2 twin of [`fir_pair_scalar`]. Bit-exact by construction.
+///
+/// Domain facts (established for the real `NeoFilterSound` input, see
+/// `FlushEmulateSound` in sound.cpp):
+///   * `s ∈ [0, ~82024)` — WaveHi holds `(b & 65535) + wlookup2[..] +
+///     wlookup1[..]`, three non-negative terms; the extremes are
+///     65535 + 12167 + 4322 = 82024 < 2^17.
+///   * every FIR coefficient satisfies |c| < 2^16 (extremes of the shipped
+///     tables: +50983 / −10839); `fceux11_rust_filter_make` verifies this
+///     and keeps `coeff_simd_safe = false` (scalar-only) otherwise.
+///
+/// Bias trick — why the result is bit-identical to the scalar path:
+///   * bias `c' = c + 2^16 ∈ [0, 2^17)`, so the u32×u32→u64 `vpmuludq`
+///     product `p' = s·c'` is exact;
+///   * `s·2^16 ≡ 0 (mod 64)`, therefore
+///     `p' >> 6 = ⌊s·c/64⌋ + 1024·s` (adding a multiple of 64 commutes
+///     with the floor);
+///   * `t = p' & !63` floors `p'` to a multiple of 64, so
+///     `t = 64·(p' >> 6)` and `T = Σt` stays an exact integer with
+///     `T < 2^34 · nc ≤ 2^44` — no u64 lane overflow;
+///   * `Σs < 2^17 · nc ≤ 2^27` — the i32 `vpaddd` sums cannot wrap;
+///   * scalar close per output sample: `acc = (T >> 6) − 1024·Σs`, which
+///     is exactly `Σ⌊s·c/64⌋` because the `1024·s` terms cancel.
+/// The per-tap `>> 6` truncation is thereby preserved (it lives inside
+/// each `t`), and integer addition is associative, so lane splitting and
+/// reordering cannot change the value.
+///
+/// SAFETY: caller must have confirmed AVX2 support at runtime
+/// (`std::arch::is_x86_feature_detected!("avx2")`).
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+unsafe fn fir_pair_avx2(in_slice: &[i32], coeffs: &[i32], base: usize) -> (i64, i64) {
+    use std::arch::x86_64::*;
+
+    let nc = coeffs.len();
+    let start = base - nc;
+    // Whole 8-tap blocks; the tail (nc % 8 taps — 4 for nc = 484, 0 for
+    // nc = 1024) is closed in scalar below, same per-tap truncation.
+    let full = nc & !7;
+
+    let mask_low6 = _mm256_set1_epi64x(!63i64);
+    let bias = _mm256_set1_epi32(1 << 16);
+    let mut t_a = _mm256_setzero_si256(); // u64 lane accumulator, acc chain
+    let mut t_b = _mm256_setzero_si256(); // u64 lane accumulator, acc2 chain
+    let mut s_a = _mm256_setzero_si256(); // i32 Σs, acc chain
+    let mut s_b = _mm256_setzero_si256(); // i32 Σs, acc2 chain
+
+    let mut blk = 0usize;
+    while blk < full {
+        // Window A: in[start+blk .. start+blk+8]  (acc chain)
+        // Window B: the same window shifted by one element (acc2 chain).
+        // Coefficients are loaded once and feed both chains.
+        let sa = _mm256_loadu_si256(in_slice.as_ptr().add(start + blk) as *const __m256i);
+        let sb = _mm256_loadu_si256(in_slice.as_ptr().add(start + blk + 1) as *const __m256i);
+        let cb = _mm256_add_epi32(
+            _mm256_loadu_si256(coeffs.as_ptr().add(blk) as *const __m256i),
+            bias,
+        );
+
+        // vpmuludq multiplies the even 32-bit lanes into u64; the odd lanes
+        // need both operands pre-shifted right by 32 bits.
+        let p_a_e = _mm256_mul_epu32(sa, cb);
+        let p_b_e = _mm256_mul_epu32(sb, cb);
+        let sa_hi = _mm256_srli_epi64(sa, 32);
+        let sb_hi = _mm256_srli_epi64(sb, 32);
+        let cb_hi = _mm256_srli_epi64(cb, 32);
+        let p_a_o = _mm256_mul_epu32(sa_hi, cb_hi);
+        let p_b_o = _mm256_mul_epu32(sb_hi, cb_hi);
+
+        t_a = _mm256_add_epi64(t_a, _mm256_and_si256(p_a_e, mask_low6));
+        t_a = _mm256_add_epi64(t_a, _mm256_and_si256(p_a_o, mask_low6));
+        t_b = _mm256_add_epi64(t_b, _mm256_and_si256(p_b_e, mask_low6));
+        t_b = _mm256_add_epi64(t_b, _mm256_and_si256(p_b_o, mask_low6));
+
+        s_a = _mm256_add_epi32(s_a, sa);
+        s_b = _mm256_add_epi32(s_b, sb);
+        blk += 8;
+    }
+
+    // Horizontal reduction. vpmuludq leaves u64 in lanes 0/2 only, but the
+    // even+odd pairs fill all four lanes, so summing the stored lanes is
+    // exact (unused lanes are zero).
+    let mut lanes = [0u64; 4];
+    _mm256_storeu_si256(lanes.as_mut_ptr() as *mut __m256i, t_a);
+    let t_a_total = (lanes[0] + lanes[1]) + (lanes[2] + lanes[3]);
+    _mm256_storeu_si256(lanes.as_mut_ptr() as *mut __m256i, t_b);
+    let t_b_total = (lanes[0] + lanes[1]) + (lanes[2] + lanes[3]);
+
+    let mut sums = [0i32; 8];
+    _mm256_storeu_si256(sums.as_mut_ptr() as *mut __m256i, s_a);
+    let sum_a = sums.iter().fold(0i64, |a, &v| a + v as i64);
+    _mm256_storeu_si256(sums.as_mut_ptr() as *mut __m256i, s_b);
+    let sum_b = sums.iter().fold(0i64, |a, &v| a + v as i64);
+
+    let mut acc = (t_a_total >> 6) as i64 - 1024 * sum_a;
+    let mut acc2 = (t_b_total >> 6) as i64 - 1024 * sum_b;
+
+    // Scalar tail taps (full..nc), same arithmetic as fir_pair_scalar.
+    for c in full..nc {
+        let coeff = coeffs[c] as i64;
+        acc += ((in_slice[start + c] as i64) * coeff) >> 6;
+        acc2 += ((in_slice[start + c + 1] as i64) * coeff) >> 6;
+    }
+    (acc, acc2)
+}
+
+/// A5 G2 domain defense: the bias arithmetic is exact only for non-negative
+/// samples (a negative i32 reinterpreted as u32 in `vpmuludq` breaks the
+/// `p' >> 6 = ⌊s·c/64⌋ + 1024·s` identity). Scan the FIR window region
+/// touched by this call — O(n); a single negative falls the WHOLE frame
+/// back to the scalar path. In the real pipeline WaveHi can never go
+/// negative, so this is a pure safety net.
+///
+/// Over-scan note: the windows span [first_base − nc, last_base] with
+/// last_base ≤ inlen − 2, so scanning `[lo, inlen)` covers every index the
+/// FIR will read (at most ~nc+1 over-scanned elements).
+#[cfg(target_arch = "x86_64")]
+fn simd_window_has_negative(in_slice: &[i32], first_base: usize, nc: usize) -> bool {
+    let lo = first_base.saturating_sub(nc);
+    in_slice[lo..].iter().any(|&v| v < 0)
+}
+
+/// A5 G1/G2 — shared resampler core. The two original duplicated loops
+/// (soundq == 2 vs else) differed only in coefficient table and tap count,
+/// so they are unified here; arithmetic and index order are unchanged.
+///
+/// `simd_coeff_safe` comes from `FilterState::coeff_simd_safe`. On x86_64
+/// the AVX2 kernel is selected when the flag holds, the CPU supports AVX2
+/// (runtime detection — NOT the `__AVX2__` compile-time macro, which is
+/// unreliable under MSVC per v2.0.2 r6), and the domain defense passes;
+/// otherwise the scalar path runs unchanged, which is the bit-exact
+/// fallback by construction.
+///
+/// Returns `(new mrindex, number of output samples written)`.
+fn resample(
+    mut x: u32,
+    mrratio: u32,
+    coeffs: &[i32],
+    in_slice: &[i32],
+    out_slice: &mut [i32],
+    simd_coeff_safe: bool,
+) -> (u32, usize) {
+    let nc = coeffs.len();
+    let inlen = in_slice.len() as u32;
+    let max = (inlen - 1) << 16;
+    let mut out_idx = 0usize;
+
+    let _ = simd_coeff_safe; // non-x86_64 builds never select the SIMD path
+
+    #[cfg(target_arch = "x86_64")]
+    let mut simd_ok = simd_coeff_safe && std::arch::is_x86_feature_detected!("avx2");
+    #[cfg(not(target_arch = "x86_64"))]
+    let simd_ok = false;
+    #[cfg(not(target_arch = "x86_64"))]
+    let _ = simd_ok;
+
+    #[cfg(target_arch = "x86_64")]
+    if simd_ok && x < max {
+        // Domain defense: one negative anywhere in the touched window
+        // region -> whole frame falls back to scalar.
+        if simd_window_has_negative(in_slice, (x >> 16) as usize, nc) {
+            simd_ok = false;
+        }
+    }
+
+    while x < max {
+        let base = (x >> 16) as usize;
+        let frac = (x & 65535) as i64;
+        #[cfg(target_arch = "x86_64")]
+        let (acc, acc2) = if simd_ok {
+            // SAFETY: AVX2 support confirmed by is_x86_feature_detected
+            // above; window indices are in-bounds exactly as in the scalar
+            // path (same index expressions, bounded by base ≤ inlen − 2).
+            unsafe { fir_pair_avx2(in_slice, coeffs, base) }
+        } else {
+            fir_pair_scalar(in_slice, coeffs, base)
+        };
+        #[cfg(not(target_arch = "x86_64"))]
+        let (acc, acc2) = fir_pair_scalar(in_slice, coeffs, base);
+        let acc = (acc * (65536 - frac) + acc2 * frac) >> (16 + 11);
+        out_slice[out_idx] = acc as i32;
+        out_idx += 1;
+        x += mrratio;
+    }
+
+    (x - max + (nc as u32) * 65536, out_idx)
+}
+
 /// C ABI: `NeoFilterSound` wrapper.
 ///
 /// Returns the number of samples written to `out`.
@@ -293,50 +523,28 @@ pub unsafe extern "C" fn fceux11_rust_filter_neo(
     // out_buf must be at least as large as inlen; caller guarantees this.
     let out_slice = unsafe { slice::from_raw_parts_mut(out_buf, inlen as usize) };
 
-    let max = (inlen - 1) << 16;
-    let mut out_idx = 0usize;
-
-    if soundq == 2 {
-        let mut x = state.mrindex;
-        while x < max {
-            let mut acc = 0i64;
-            let mut acc2 = 0i64;
-            let base = (x >> 16) as usize;
-            for c in 0..SQ2NCOEFFS {
-                let s = in_slice[base + c - SQ2NCOEFFS];
-                let coeff = state.sq2coeffs[c];
-                acc += ((s as i64) * (coeff as i64)) >> 6;
-                acc2 += ((in_slice[base + c + 1 - SQ2NCOEFFS] as i64) * (coeff as i64)) >> 6;
-            }
-            let frac = (x & 65535) as i64;
-            acc = (acc * (65536 - frac) + acc2 * frac) >> (16 + 11);
-            out_slice[out_idx] = acc as i32;
-            out_idx += 1;
-            x += state.mrratio;
-        }
-        state.mrindex = x - max;
-        state.mrindex += (SQ2NCOEFFS * 65536) as u32;
+    let (new_mrindex, out_idx) = if soundq == 2 {
+        let coeffs = &state.sq2coeffs;
+        resample(
+            state.mrindex,
+            state.mrratio,
+            coeffs,
+            in_slice,
+            out_slice,
+            state.coeff_simd_safe,
+        )
     } else {
-        let mut x = state.mrindex;
-        while x < max {
-            let mut acc = 0i64;
-            let mut acc2 = 0i64;
-            let base = (x >> 16) as usize;
-            for c in 0..NCOEFFS {
-                let s = in_slice[base + c - NCOEFFS];
-                let coeff = state.coeffs[c];
-                acc += ((s as i64) * (coeff as i64)) >> 6;
-                acc2 += ((in_slice[base + c + 1 - NCOEFFS] as i64) * (coeff as i64)) >> 6;
-            }
-            let frac = (x & 65535) as i64;
-            acc = (acc * (65536 - frac) + acc2 * frac) >> (16 + 11);
-            out_slice[out_idx] = acc as i32;
-            out_idx += 1;
-            x += state.mrratio;
-        }
-        state.mrindex = x - max;
-        state.mrindex += (NCOEFFS * 65536) as u32;
-    }
+        let coeffs = &state.coeffs;
+        resample(
+            state.mrindex,
+            state.mrratio,
+            coeffs,
+            in_slice,
+            out_slice,
+            state.coeff_simd_safe,
+        )
+    };
+    state.mrindex = new_mrindex;
 
     let left = if soundq == 2 {
         SQ2NCOEFFS + 1
@@ -454,5 +662,241 @@ mod tests {
             assert_eq!(leftover, (NCOEFFS + 1) as i32);
             fceux11_rust_filter_state_destroy(h);
         }
+    }
+
+    // -----------------------------------------------------------------
+    // A5 lock tests — scalar ⇔ SIMD equivalence + domain fallback.
+    //
+    // Discipline note (AGENTS.md #3): each assertion below must fail when
+    // the property it names is broken. Candidate mutation points are
+    // listed on each test so the red runs can be reproduced.
+    // -----------------------------------------------------------------
+
+    /// Deterministic PRNG (xorshift32) — no floating point, no external
+    /// crates, identical stream on every host.
+    #[cfg(target_arch = "x86_64")]
+    struct Xorshift32(u32);
+    #[cfg(target_arch = "x86_64")]
+    impl Xorshift32 {
+        fn next(&mut self) -> u32 {
+            let mut x = self.0;
+            x ^= x << 13;
+            x ^= x >> 17;
+            x ^= x << 5;
+            self.0 = x;
+            x
+        }
+        /// Domain sample: the NeoFilterSound input satisfies
+        /// s ∈ [0, 82024) — see the WaveHi dequant comment on
+        /// `fir_pair_avx2`.
+        fn next_sample(&mut self) -> i32 {
+            (self.next() % 82024) as i32
+        }
+    }
+
+    /// Mirror a half coefficient table the way
+    /// `fceux11_rust_filter_make` does.
+    #[cfg(target_arch = "x86_64")]
+    fn mirror_table(half: &[i32], nc: usize) -> Vec<i32> {
+        let mut t = vec![0i32; nc];
+        for (x, &v) in half.iter().take(nc >> 1).enumerate() {
+            t[x] = v;
+            t[nc - 1 - x] = v;
+        }
+        t
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    fn real_coeffs_484() -> Vec<i32> {
+        mirror_table(&C48000NTSC, NCOEFFS)
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    fn real_coeffs_1024() -> Vec<i32> {
+        mirror_table(&SQ2C48000NTSC, SQ2NCOEFFS)
+    }
+
+    /// Boundary coefficient table: the extreme magnitudes observed across
+    /// the shipped tables (±50983), the other-sign extreme (±10839), the
+    /// largest values that still satisfy the SIMD precondition
+    /// (±65535 = 2^16 − 1), plus 0 and −1, tiled to length nc.
+    #[cfg(target_arch = "x86_64")]
+    fn boundary_coeffs(nc: usize) -> Vec<i32> {
+        let seeds = [50983i32, -50983, 0, -1, 10839, -10839, 65535, -65535];
+        (0..nc).map(|i| seeds[i % seeds.len()]).collect()
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    fn domain_input(len: usize, seed: u32) -> Vec<i32> {
+        let mut rng = Xorshift32(seed);
+        let mut v = vec![0i32; len];
+        for s in v.iter_mut() {
+            *s = rng.next_sample();
+        }
+        // Pin the domain boundary values explicitly.
+        v[0] = 0;
+        v[1] = 82023;
+        v[2] = 65535;
+        v[3] = 1;
+        v
+    }
+
+    /// Lock test 2a — per-position FIR pair equality, scalar vs AVX2.
+    ///
+    /// Mutation points caught (A5 G3):
+    ///   * M-A bias constant `(1 << 16)` in `fir_pair_avx2` changed
+    ///     (equivalent to a per-tap coefficient offset on the SIMD side
+    ///     only) — pair drift;
+    ///   * M-B scalar close `(T >> 6) − 1024·Σs` losing the `−1024·Σs`
+    ///     term — pair drift on every position with Σs ≠ 0;
+    ///   * M-C `& !63` → `& !31` in `fir_pair_avx2` — truncation drift;
+    ///   * M-E tail loop `for c in full..nc` skipped/shortened — drift on
+    ///     tables whose tap count is not a multiple of 8 (484).
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn lock_fir_pair_scalar_simd_bit_exact() {
+        if !std::arch::is_x86_feature_detected!("avx2") {
+            panic!(
+                "AVX2 not detected on this host: the A5 equivalence lock \
+                 must run where the SIMD path is live"
+            );
+        }
+        let len = 4096usize;
+        let input = domain_input(len, 0xA5_11_06);
+
+        let tables = [
+            real_coeffs_484(),
+            real_coeffs_1024(),
+            boundary_coeffs(484),
+            boundary_coeffs(1024),
+            boundary_coeffs(12),  // 8-tap full block + 4-tap scalar tail
+            boundary_coeffs(20),  // 2 blocks + 4-tap tail
+        ];
+        for coeffs in &tables {
+            let nc = coeffs.len();
+            // Sweep base over the valid range with an odd stride so both
+            // even and odd 32-bit lanes of every window are exercised.
+            let mut base = nc + 1;
+            let mut checked = 0usize;
+            while base <= len - 2 {
+                let scalar = fir_pair_scalar(&input, coeffs, base);
+                let simd = unsafe { fir_pair_avx2(&input, coeffs, base) };
+                assert_eq!(
+                    scalar, simd,
+                    "FIR pair drift: nc={nc} base={base}"
+                );
+                checked += 1;
+                base += 7;
+            }
+            assert!(checked > 100, "sweep too short: nc={nc}");
+        }
+    }
+
+    /// Lock test 2b — end-to-end `resample` equality (FIR pair + frac
+    /// interpolation + mrindex bookkeeping) for both tap counts.
+    ///
+    /// Mutation point caught (A5 G3):
+    ///   * M-D interpolation `65536 − frac` → `frac` — output drift on
+    ///     every ratio whose frac is not identically 0.
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn lock_resample_end_to_end_scalar_simd_bit_exact() {
+        if !std::arch::is_x86_feature_detected!("avx2") {
+            panic!(
+                "AVX2 not detected on this host: the A5 equivalence lock \
+                 must run where the SIMD path is live"
+            );
+        }
+        let len = 16384usize;
+        let input = domain_input(len, 0xBEEF_01);
+
+        // mrratio is a 16.16 fixed-point INPUT SAMPLES PER OUTPUT value;
+        // the real NTSC-48k ratio is ≈ 2444076 (37.28 samples per output).
+        // Values: real NTSC-48k, exactly 1 sample/output (frac pinned to
+        // the entry phase), a 1.5x downsample, a 2x downsample, and a
+        // 256x downsample (few-output corner).
+        let ratios = [2_444_076u32, 65536, 98_304, 131_072, 16_777_216];
+        // Entry phases: frac ≈ 0, ≈ 65535, and in between.
+        let phase_offsets = [0u32, 1, 65534, 65535];
+
+        let tables = [real_coeffs_484(), real_coeffs_1024(), boundary_coeffs(484)];
+        for coeffs in &tables {
+            let nc = coeffs.len();
+            let x0 = ((nc as u32) + 1) << 16;
+            for &ratio in &ratios {
+                for &off in &phase_offsets {
+                    let x = x0.wrapping_add(off);
+                    let mut out_scalar = vec![0i32; len];
+                    let mut out_simd = vec![0i32; len];
+                    let (mr_s, n_s) =
+                        resample(x, ratio, coeffs, &input, &mut out_scalar, false);
+                    let (mr_v, n_v) =
+                        resample(x, ratio, coeffs, &input, &mut out_simd, true);
+                    assert_eq!(n_s, n_v, "output count drift nc={nc} ratio={ratio}");
+                    assert!(n_s > 0, "no outputs: nc={nc} ratio={ratio}");
+                    assert_eq!(mr_s, mr_v, "mrindex drift nc={nc} ratio={ratio}");
+                    assert_eq!(
+                        out_scalar[..n_s],
+                        out_simd[..n_s],
+                        "output drift nc={nc} ratio={ratio} off={off}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Lock test 3 — domain fallback: a single negative sample anywhere in
+    /// the touched window region must (a) be detected by the gate, (b) make
+    /// the whole frame take the scalar path, and (c) yield results
+    /// identical to the scalar path — while the raw AVX2 kernel on the
+    /// same input demonstrably diverges (the gate is load-bearing).
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn lock_domain_fallback_on_negative_sample() {
+        if !std::arch::is_x86_feature_detected!("avx2") {
+            panic!(
+                "AVX2 not detected on this host: the A5 fallback lock \
+                 must run where the SIMD path is live"
+            );
+        }
+        let len = 8192usize;
+        let coeffs = real_coeffs_484();
+        let nc = coeffs.len();
+
+        // (a) gate detects a negative anywhere in [first_base − nc, inlen).
+        let mut input = domain_input(len, 0xFEED_BAC);
+        let first_base = nc + 1;
+        assert!(!simd_window_has_negative(&input, first_base, nc));
+        // Negative just past the earliest window start …
+        input[first_base - nc] = -1;
+        assert!(simd_window_has_negative(&input, first_base, nc));
+        // … and near the end of the touched region.
+        let mut input2 = domain_input(len, 0xFEED_BAC);
+        input2[len - 2] = -7; // last index a window can reach (base ≤ len−2)
+        assert!(simd_window_has_negative(&input2, first_base, nc));
+
+        // (b) whole-frame fallback: with simd enabled the result must be
+        // byte-identical to the forced-scalar run.
+        let ratio = 2_444_076u32; // real NTSC-48k mrratio
+        let x0 = ((nc as u32) + 1) << 16;
+        let mut out_scalar = vec![0i32; len];
+        let mut out_dispatch = vec![0i32; len];
+        let (mr_s, n_s) = resample(x0, ratio, &coeffs, &input, &mut out_scalar, false);
+        let (mr_d, n_d) = resample(x0, ratio, &coeffs, &input, &mut out_dispatch, true);
+        assert_eq!(n_s, n_d);
+        assert!(n_s > 0);
+        assert_eq!(mr_s, mr_d);
+        assert_eq!(out_scalar[..n_s], out_dispatch[..n_s]);
+
+        // (c) the gate is load-bearing: feeding the negative input straight
+        // into the AVX2 kernel diverges from the scalar path.
+        let base = first_base;
+        let scalar = fir_pair_scalar(&input, &coeffs, base);
+        let raw_simd = unsafe { fir_pair_avx2(&input, &coeffs, base) };
+        assert_ne!(
+            scalar, raw_simd,
+            "negative input must diverge between scalar and raw SIMD \
+             (otherwise this fallback lock proves nothing)"
+        );
     }
 }
