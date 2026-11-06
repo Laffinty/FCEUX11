@@ -89,6 +89,7 @@ baseline 更新需与代码变更同等级 review**）。177 ROM：PASS 144 / FA
 | `e6_apu/` | APU 帧计数器链（r6_step*）+ R6 仪器数据 | §1.3 DMC/帧计数器证据 |
 | `r5r6_v1.17/` | v1.17 R5/R6 迁移核查与仪器数据 | §2 黄金回归现状 |
 | `p2_instrument/` | P2 精度收敛交接档案（8 份 survey 汇总） | §3/§4 禁忌与纪律的出处 |
+| `oam_dma_dummy_write/` | **kgmqa-050 OAM DMA dummy write 取证调查页（D4，2026-11-06）**：探针 `FCEUX11_OAMBUS_PROBE` 的产物格式、**四个触发面**（含 armed 条件）、复现步骤、已有阴性结论、下一轮 RE 切入点 | §1 已知失败面中 050 的取证入口 |
 
 ## 6. 相关文档
 

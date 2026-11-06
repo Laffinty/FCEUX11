@@ -38,8 +38,8 @@ cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo tes
 |---|---|---|
 | `probe_a_real_cartridge` | 跑 N 步报告 PC 区域分布/点亮率/热点地址；CPU 没到卡带 = stub BIOS 断 | `GBA_PROBE_STEPS`（默认 30M） |
 | `probe_why_a_game_stalls` | 卡死游戏的寄存器/中断现场 | 同上 |
-| `probe_trace_a_stuck_game` | 卡死轨迹 | 同上 + `GBA_PROBE_TRACE` |
-| `probe_what_one_frame_changes` | 一次帧边界改了哪些内存半字 | 同上 |
+| `probe_trace_a_stuck_game` | 卡死轨迹 | `GBA_PROBE_WARMUP`（默认 5M）+ `GBA_PROBE_TRACESTEPS`（默认 600K）。⚠️ **不读 `GBA_PROBE_TRACE`** —— 该变量只被 `dump_frames_like_the_reference` 读（2026-11-06 核实更正） |
+| `probe_what_one_frame_changes` | 一次帧边界改了哪些内存半字 | 不用环境变量（步数是硬编码常量，`:2931`） |
 | `dump_frames_like_the_reference` | 逐帧差分转储（对拍 mGBA 等参照） | `GBA_PROBE_FRAMES`（默认 1800）、`GBA_PROBE_OUT`（默认 ours.txt）、`GBA_PROBE_PERIOD`（默认 280896）、`GBA_PROBE_TRACE` |
 
 ### frame.rs —— 计时探针（1 条）

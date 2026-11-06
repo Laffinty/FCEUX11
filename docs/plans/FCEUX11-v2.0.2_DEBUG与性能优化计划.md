@@ -3,7 +3,7 @@
 > **STATUS: ACTIVE——P0 测量口径已落地（2026-11-05，读数见 §十 r3）；P1 起逐工作项先 PLAN 后动手**
 > **立项目标**：以 DEBUG（调试能力/排查效率）与性能优化为主，另对
 > `docs/plans/long-term-evolution/` 的 10 项长期难题做**可行性重估**，可行者并入本计划。
-> **基线**：`4c75fe8`（v2.0.1 收口后）· 矩阵 **108P / 12F** · grade B · `ctest -LE perf` **33 项全绿**
+> **基线**：`4c75fe8`（v2.0.1 收口后）· 矩阵 **108P / 12F** · grade B · `ctest -LE perf` **36 项全绿**（计数随新增测试增长：v2.0.1 收口时 33 → r6 加 `input_snesmouse_test`/`apu_frame_timing_test` ⇒ 35 → 本轮 36；以 `ctest -N -LE perf` 的 `Total Tests` 为准）
 > **产出定位**：只立项、排期、定验收；实施按工作项逐个开独立任务，先 PLAN 后动手的纪律不变。
 >
 > **文档内证据分级**（贯穿全文）：
@@ -29,7 +29,7 @@
 
 **不变式（继承 AGENTS.md，红灯即停）**：
 
-1. **NES 零回归**：`ctest -LE perf` 33 项全绿；矩阵 `pass_to_fail = 0`；金标哈希
+1. **NES 零回归**：`ctest -LE perf` 36 项全绿；矩阵 `pass_to_fail = 0`；金标哈希
    （golden_hashes / golden_savestate）不动，要动须人工授权。
 2. **变异验证**：每条新锁测试都要能把「修复前的值」改回去看到它转红；全绿不算证据。
 3. **instrument-first**：改行为前先上探针/测量（`docs/tech/precision.md` §4）。
@@ -64,6 +64,8 @@
 | A1-a DebugCycle 每指令无条件执行 | `src/x6502.cpp:606` → `src/debug.cpp:901-963` | 每条 6502 指令先做：vblank 浮点换算（`debug.cpp:909`，含 double 除法）、`GameInfo` 判定（:917）、**重新取指 1–3 次 `GetMem`**（:922-936，与真取指重复）、寻址解码再 0–2 次 `GetMem`（:938-954），然后才在 :956 判断「有没有断点/单步/计数断」（9 路 OR：numWPs/step/runline/stepout/watchpoint flags/badopbreak/break_on_cycles/break_on_instructions）决定要不要进 `breakpoint()`。**零断点时整段纯浪费** |
 | A1-b 每指令调试记账 | `src/x6502.cpp:608`（`IncrementInstructionsCounters` 跨 TU 调用 + 两次全局自增，`debug.cpp:601-604`）、`:611`（`e1_last_pc = _PC` 每指令存，仅供 env-gated E-1 探针消费）、`:621`（`map_irq_hook()` 每指令 atomic acquire，`cpu.h:131-133`） | 无任何开关 |
 | A1-c viewer 回调链 | `src/ppu_rendering.cpp:787`、`:1313` → `driver_callbacks.cpp:182-187` 间接调用 → 窗口空判早退 | 每帧 480+ 次调用链 |
+| ⚠️ **A1-c 的实际覆盖面小于 r5 声称**（2026-11-06 读码核实） | `ppu_view_open` 在 core 侧**只写不读**：写方 `src/drivers/Qt/ppuViewer.cpp:62`，声明 `src/driver_callbacks.h:126`，**core 侧零读点**。实际生效的门只有 `nt_view_open`（读点 `src/ppu_rendering.cpp:793`，在 `DoLine()` 内 ⇒ **仅旧 PPU 路径**；新 PPU 路径 `:1778-1779` 无门）。PPU/Sprite viewer 的 `FCEUD_UpdatePPUView`（`:1319`、`:1778`）**仍是每帧间接调用** | ⇒ **A1-c 实际只剪掉了 NT viewer 那条链**。不构成缺陷（行为正确、只是收益低于预期），但**任何「viewer 已全部剪枝」的说法都不成立** |
+| ⚠️ **A1 的可观察行为变化**（2026-11-06 读码核实） | `vblankScanLines` / `vblankPixel` 的计算在 `src/debug.cpp:921-929`，**位于门内**；消费者是调试器 PPU 页签的扫描线/像素显示（`src/drivers/Qt/ConsoleDebugger.cpp:4346-4361`） | ⇒ **零断点时调试器 PPU 页签的 vblank 读数会停在旧值**。不是崩溃，但读数不对；手工验收时看到此现象**不应判红** |
 
 **改法**：文件级 `debugger_active` 快速门（条件现成：`debug.cpp:956` 的 9 路 OR 加上
 `debug_loggingCD` 与 TraceLogger logging 状态）；A1-b 三件套并入门控（`e1_last_pc` 移入
@@ -107,7 +109,7 @@ A1-c 同门。**门打开时行为逐字节不变**——`GetMem` 在 debug 路�
   ——收窄到 `[left, left+SOUNDTS)`。注意 hotfix3 D-4 REVERTED 的教训（:1327-1336 注释）：
   **trailing memset 必须保留**，只许收窄范围不许删除。
 
-### A5 NeoFilterSound 无损 SIMD（收益高，仅 soundq≥1 真实路径；前置 = M1）—— 🔶 G0-G3 已落地（2026-11-06，−43%；**G3 五项变异留证见 §十 r8**；⚠️ **两项「门禁无牙」发现同批查明**：M-D 插值权重方向原无人看守、HQ golden 对 FIR 变异结构性无感）
+### A5 NeoFilterSound 无损 SIMD（收益高，仅 soundq≥1 真实路径；前置 = M1）—— ✅ G0-G3 已落地（2026-11-06，−43%；**G3 五项变异留证见 §十 r8**；⚠️ **两项「门禁无牙」发现**：M-D 插值权重方向原无人看守（r8 已补绝对金标准向量锁测试）、HQ golden 对 FIR 变异无感（**r9 已闭合**：新增自建 AC fixture + 非静默 fail-fast 断言，两道 golden 门禁现各有牙））
 
 - 位置（✅实测）：`src/rust/crates/fceux11-media/src/filter.rs:299-339`，
   `NCOEFFS=484 / SQ2NCOEFFS=1024`（fcoeffs.rs:8-9），每输出样本 2×484 次 i64 乘累加
@@ -115,7 +117,19 @@ A1-c 同门。**门打开时行为逐字节不变**——`GetMem` 在 debug 路�
 - 现状：i64 点积在 AVX2 无廉价乘加 ⇒ 自动矢量化基本无效（⚠️未实测反汇编）；
   WaveHi 样本有效位在高 16 位（`sound.cpp:781` `&(~0xFFFF)`）。
 - 改法：先无损重构（acc2 复用相邻载入、内层手动 SIMD 保 bit-exact），16 位重写列为
-  有损备选**不做**。哨兵：`apu_wav_diff_test` + golden_wav 逐字节。
+  有损备选**不做**。
+- ⚠️ **哨兵更正（r8 实测推翻原文，r9 已修复）**：原文写「哨兵：`apu_wav_diff_test` +
+  golden_wav 逐字节」——**该哨兵当时对 FIR 变异结构性无牙**：两个 golden 的捕获样本
+  **全为 0**（各 799 样本）。真因不是「FIR 输入为零」，而是 fixture ROM 的 PRG 是
+  `0xEA` NOP sled（不写任何 APU 寄存器）⇒ FIR 输入是**恒定 DC** ⇒ 下游 `SexyFilter`
+  （隔直 IIR）把 DC 衰减到 0 且捕获帧早已收敛 ⇒ 任何保持纯 DC 特性的 FIR 变化都不可观测。
+  实证：改 bias / 改系数表 ⇒ golden 仍绿；注入 DC ⇒ 仍绿；注入 AC ⇒ 转红。
+  **✅ r9 已闭合**：新增自建 fixture `tests/fixtures/apu_square.nes`（周期性方波 = AC
+  内容，自建资产无许可问题，`.gitignore` 已加白名单），并给两道门禁加「捕获必须非静默」
+  fail-fast 断言。**变异验证**：FIR bias 改坏 ⇒ **HQ golden 转红**；`SexyFilter` 改坏 ⇒
+  **低质量 golden 转红** ⇒ 两道门禁各自有牙、覆盖不同代码路径（低质量路径按设计不经过
+  `fir_pair_avx2`）。**⇒ A5 的红源现为三重**：Rust 锁测试（52 项）+ HQ golden（管 FIR）
+  + 低质量 golden（管 SexyFilter/DC 隔直）。
 
 ### A6 bus 直读快路径 —— 单独立项，排最后（收益最高，风险最高）
 
@@ -301,7 +315,7 @@ A1-c 同门。**门打开时行为逐字节不变**——`GetMem` 在 debug 路�
 
 ## 八、整包出口判据
 
-- [ ] `ctest -LE perf` 33 项全绿；矩阵 `pass_to_fail = 0`
+- [ ] `ctest -LE perf` 36 项全绿；矩阵 `pass_to_fail = 0`
 - [ ] 金标三件套零漂移（或漂移均有人工授权记录）
 - [ ] bench：cpu_frame 与 soundq=1 档位实测改善（读数入库，advisory）
 - [ ] A1 手工调试场景清单全过
@@ -311,10 +325,12 @@ A1-c 同门。**门打开时行为逐字节不变**——`GetMem` 在 debug 路�
 - [ ] AGENTS.md 计数更正与 GBA 探针 HOWTO 落档
 - [ ] **A5 G3 变异留证**：M-A/M-B/M-C/M-E 四项各有「转红即预期断言」的留证（✅ r8）；
       M-D 由绝对金标准向量锁测试覆盖（✅ r8，`lock_resample_interpolation_golden_vector`）
-- ⚠️ **已知未闭合（留证待裁决，r8）**：`apu_wav_hq_diff_test` 对 FIR 变异**结构性无感**
-      ——捕获样本恒为静音（真因：fixture ROM 的 PRG 是 NOP sled，不写 APU ⇒ FIR 输入纯 DC
-      ⇒ 下游 SexyFilter 隔直后归零）。**它不得作为 A5 的红源**；补 AC 输入需新增会写 APU
-      的专用 fixture ROM + 「捕获必须非静默」fail-fast 断言（待裁决：fixture 来源与许可）。
+- [x] **HQ/low 质量 golden 门禁对音频算术有牙**（✅ r9）：新增自建 AC fixture
+      `tests/fixtures/apu_square.nes`（周期性方波）+ 两道门禁的「捕获必须非静默」
+      fail-fast 断言。变异验证：FIR bias 改坏 ⇒ **HQ golden 转红**；`SexyFilter`
+      `mul1` 改坏 ⇒ **低质量 golden 转红** ⇒ 两道门禁各自有牙、覆盖不同代码路径
+- ⚠️ **仍需人工**：A1 手工 GUI 验收（22 项清单已成文 `docs/tech/debug-regression-checklist.md`，
+      **尚未有人执行** ⇒ 文档就绪 ≠ 验收通过）
 
 ## 九、复验命令
 
@@ -339,22 +355,71 @@ cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo tes
 
 ---
 
-## 附录 A · 环境变量开关全表（✅实测，B 线改动同步本表）
+## 附录 A · 环境变量开关全表（✅实测 2026-11-06 全表重核，B 线改动同步本表）
+
+> **坐标口径**：统一写 **`getenv` 所在行**（不是函数定义行、不是 `#[ignore]` 属性行）。
+> 旧表曾混用三种口径，导致坐标漂移与一处完全失效（本轮已全部校准）。
+> **三张表必须分开看**：A 表是**运行期**环境变量（设了就能用）；B 表是**编译期**开关
+> （设环境变量开不了）；C 表是上游沿用的配置变量（非探针）。旧表把三者混列，
+> 会让人「设了环境变量发现没反应」而误判表错了。
+
+### A · 运行期环境变量（探针 / 诊断）
+
+| 变量 | 取值形式 | 位置（getenv 行） | 作用 | 默认 / 触发条件 |
+|---|---|---|---|---|
+| `FCEUX11_BUSDB=1` | 严格 `"1"` | `src/bus.cpp:102` | 每次总线**读**把读值锁存进 CPU DB 字节 | 关。⚠️ **会改行为**（改 controller 读的 `DB&0xC0` 与每个 savestate 的 DB 字节） |
+| `FCEUX11_E1_TRACE=1` | 严格 `"1"` | `src/ppu.cpp:353`、`ppu_rendering.cpp:1530`、`x6502.cpp:400` | PPU/NMI/CPU 事件 stderr trace（前缀 `E1`/`E1B`） | 关。多数点在 **new-PPU 路径**内；`$2000/$2001` 写与 CPU 侧不分路径 |
+| `FCEUX11_E1_NMIDELAY=N` | 整数（`atoi`） | `src/ppu_rendering.cpp:1547` | NMI 锁存前授予的 CPU 预算（1 单位 = 1/3 dot） | 默认 `8`（= 生产值）。⚠️ **这是行为开关、不是日志开关**——调用点不在 `e1_trace_on()` 门内，单独设就改 NMI 注入时机；仅 new-PPU 路径生效 |
+| `FCEUX11_OPENDECAY_PROBE=1` | 严格 `"1"` | `src/ppu.cpp:373` | PPUGenLatch open-bus 衰减观测 + SPR DMA 事件日志 + atexit 汇总 | 关 |
+| `FCEUX11_E3_TRACE=1` | 严格 `"1"` | `src/sound.cpp:48` | APU 帧计数器状态机（每 quarter）+ `$4017` 写 + `$4015` 读 + IRQ 起止 + 复位事件（前缀 `E3`/`E3B`）——**远不止 `$4017` 写** | 关。进程启动后设无效（首次调用即缓存） |
+| `FCEUX11_MMC1_PROBE=1` | 严格 `"1"` | `src/boards/mmc1.cpp:39` | ①初始化几何（声明 PRG/CHR/WRAM/BRAM vs 实际 ROM 大小、ines2/submapper/CRC32、PRG/CHR mask）②每次 MMC1PRG 同步后 `$8000`/`$C000` 的**实际** bank 映射 | 关 |
+| `FCEUX11_MMC3_PROBE=1` | 严格 `"1"` | `src/boards/mmc3.cpp:52` | MMC3 扫描线 IRQ / A12 时钟事件 | 关 |
+| `FCEUX11_FME7_PROBE=1` | 严格 `"1"` | `src/boards/69.cpp:41` | ①初始化几何（ines2/wram/battery_wram/实际 WRAMSIZE/submapper/CRC32）②寄存器 8 写事件——**「bank tag」是文档侧叫法，代码打的是这两类** | 关 |
+| `FCEUX11_OAMBUS_PROBE=<dir>` | **非空即开；值 = 输出目录** | `src/ppu.cpp:627`（判定）、`:635`（取目录） | D4 取证：`<dir>/trace.bin`（SPR DMA 期间每条 CPU 总线事件，24 字节定长，`static_assert` 锁布局）+ `<dir>/spram_diff.log`（SPRAM shadow 比对 diff） | 关。未设或空 ⇒ **完全不激活**（零成本）；目录自动创建；打不开则自禁用并 stderr 报一次 |
+| `FCEUX11_A3_XDUMP=<dir>` | **非空即开；值 = 输出目录** | `src/video.cpp:411` | A3 逐字节对拍：每渲染帧 dump `XBuf`/`XDBuf` 各 256×256 到 `<dir>/f%06d_xbuf.bin`/`f%06d_xdbuf.bin` | 关。落点在 `FCEU_PutImage()` 内 |
+| `FCEUX11_A4_WAVEDUMP=<dir>` | **非空即开；值 = 输出目录** | `src/sound.cpp:1472` | A4-2 等价性对拍：dump `WaveHi[0..SOUNDTS)` 到 `<dir>/f%06u_wave.bin`（dump 点在 trailing memset 之后） | 关。⚠️ **只在 `FSettings.soundq>=1` 分支**触发 ⇒ 低质量路径（kgmqa-024 等）**永远到不了**，须走 `bench_full_frame_hq` 槽 |
+| `FCEUX11_TRACE=1` 或 `<path>` | `"1"` ⇒ 默认文件名 `fceux11-trace.log`（相对 cwd）；其它非空值 ⇒ **该值即日志路径** | `src/headless_trace.cpp:104`（判定 `:107`、路径语义 `:126`、安装 `:135`、置位 `:137`）；唯一调用点 `src/fceu.cpp:622` | B1 无头 TraceLogger 入口（与 Qt TraceLogger 同采集体同格式） | 关（未设 ⇒ 零开销零产物）。仅当 Qt TraceLogger 未占槽才安装；装上后置 `trace_logging=1` ⇒ 打开 A1 的 `DebugCycle` 快门 |
+| `FCEUX11_DIAG_LOG=<path>` | 完整文件路径 | **写入方** `src/drivers/Qt/main.cpp:325`；**读取方** `src/rust/src/gba/mod.rs:77` | C++ `std::terminate` 栈回溯 + Rust panic 追加写到**同一个** `fceux_diag.log` | ⚠️ **内部握手变量、不是用户开关**：外部设置会被 `main.cpp` 的 `install()` 无条件覆盖成 `<exe目录>\fceux_diag.log` |
+| `FCEUX11_BENCH_BASELINE=<path>` | 路径 | `tests/f11qa/benchmarks/bench_tolerance_test.cpp:270` | bench 容差对照基线 JSON 路径（文件内另有 `tolerance_pct`，缺省 2.0%） | 缺省 `fixtures/bench_baseline.json`；CI 显式设它（`.github/workflows/ci.yml:385`） |
+| `FCEUX11_GBA_PROBE_DIR=<dir>` | 目录（**必填**） | `src/rust/src/gba/cartprobe.rs:351` | 批量卡带老化报告（逐个 `.gba` 跑，打印 steps/frame、DMA 计数、逐帧哈希、WEDGED/FROZEN 判定） | 必填。未设 ⇒ **panic 并打印指引**（非静默跳过） |
+| `GBA_PROBE_ROM=<path>` | 文件路径 | `src/rust/src/gba/frame.rs:2439` | 指定探针跑哪个 `.gba` | 未设 ⇒ 扫 `%USERPROFILE%\Desktop` 下第一个 `.gba`；都没有 ⇒ 打印提示并优雅返回 |
+| `GBA_PROBE_STEPS=<n>` | 整数 | `frame.rs:2467` | 探针步数上限（`probe_a_real_cartridge` / `probe_why_a_game_stalls`） | 30,000,000。`probe_what_one_frame_changes`（`:2931`）**不读**它 |
+| `GBA_PROBE_WARMUP=<n>` | 整数 | `frame.rs:2805` | `probe_trace_a_stuck_game` 追踪前的预热步数 | 5,000,000 |
+| `GBA_PROBE_TRACESTEPS=<n>` | 整数 | `frame.rs:2814` | `probe_trace_a_stuck_game` 追踪的指令条数 | 600,000 |
+| `GBA_PROBE_FRAMES=<n>` | 整数 | `frame.rs:3218`（dump，默认 1800）／`frame.rs:3360`（`measure_frame_export`，默认 300） | 帧数 | ⚠️ **两个探针默认值不同**，须分列 |
+| `GBA_PROBE_OUT=<path>` | 文件路径 | `frame.rs:3222` | `dump_frames_like_the_reference` 的输出文件 | `ours.txt`（与 mGBA 参照核 dump 对拍用） |
+| `GBA_PROBE_PERIOD=<cycles>` | 整数 | `frame.rs:3226` | 帧采样周期（cycles） | 280,896 |
+| `GBA_PROBE_TRACE=<cycles>` | 整数（**cycle 数**；解析失败 panic） | `frame.rs:3253` | `dump_frames_like_the_reference` 切「逐步 trace」模式 | 不设 = 周期采样模式。⚠️ **只被该探针读**——`probe_trace_a_stuck_game` 用的是 WARMUP/TRACESTEPS |
+| `GBA_PROBE_DIR=decode\|encode` | 枚举字符串 | `src/rust/src/gba/save.rs:760` | 栈探针的编解码方向 | `decode`（其它值一律按 decode 走） |
+| `GBA_PROBE_STACK_BYTES=<bytes>` | 整数 | `save.rs:761` | 栈探针的线程栈大小 | 常量 `CODEC_STACK`。小栈下该探针**故意**把进程带崩（`#[ignore]`） |
+
+### B · 编译期开关（**设环境变量开不了**）
+
+| 开关 | 声明位置 | 默认 | 怎么开 |
+|---|---|---|---|
+| `FCEU_PROFILER_ENABLE` | `CMakeLists.txt:137`（**r6 才补上 `option()` 声明，此前从未声明 = 永远 OFF 且打不开**） | OFF | `cmake -DFCEU_PROFILER_ENABLE=ON`；**需独立 build 目录**，ON 的构建不受门禁 |
+| Cargo feature `gba` | `src/rust/Cargo.toml:106` | 在 `default` 里 | 测试命令须 `--no-default-features --features gba` |
+| Cargo feature `direct-adapter` | `src/rust/Cargo.toml:101` | 在 `default` 里 | 同上；**默认 feature 引 `kagami_bridge_*`（只有 C++ 链接才有），测试二进制直接 LNK2019** |
+| CMake `FCEUX11_BUILD_TESTS` | `CMakeLists.txt:130` | ON | `-DFCEUX11_BUILD_TESTS=OFF` |
+| CMake `FCEUX11_ENABLE_I18N` | `CMakeLists.txt:131` | ON | — |
+| CMake `FCEUX11_ENABLE_RUST` | `src/rust/CMakeLists.txt:1` | ON | `-DFCEUX11_ENABLE_RUST=OFF` |
+| CMake `FCEUX11_LUA_RUST_ENABLED` | `src/CMakeLists.txt:125` | ON | — |
+| CMake `FCEUX11_WGI_BACKEND` | `src/CMakeLists.txt:126` | OFF | Windows.Gaming.Input 手柄后端 |
+| CMake `FCEUX11_DIRECT_STORAGE_PROBE` | `src/CMakeLists.txt:132` | ON | DirectStorage 1.2 NVMe 探测脚手架 |
+| CMake `FCEUX11_ASAN` / `FCEUX11_UBSAN` | `CMakeLists.txt:198` / `:199` | OFF | 仅 MSVC；须 Debug 构建 |
+| CMake `FCEUX11_PGO` / `FCEUX11_PGO_USE` | `CMakeLists.txt:95` / `:96` | OFF | 仅 MSVC |
+| CMake `FCEUX11_SHOW_DEPRECATION_WARNINGS` | `CMakeLists.txt:149` | OFF | 显示 `FCEUI_*` 废弃告警 |
+| CMake `ENABLE_LINT_CPPCHECK` | `CMakeLists.txt:158` | OFF | cppcheck 静态分析 |
+| **构建期** env `FCEUX11_GIT_REV` | `src/rust/crates/f11qa/build.rs:18`（→`cargo:rustc-env`，`:24`） | — | 编译期盖进 f11qa 报告的 `git_rev` 字段。**必须在构建/运行 cargo 之前设**，运行期设无效 |
+
+### C · 上游沿用的配置类变量（非探针，登记以免漏读）
 
 | 变量 | 位置 | 作用 |
 |---|---|---|
-| `FCEUX11_BUSDB=1` | `src/bus.cpp:102` | CPU 数据总线 DB 记录（kgmqa-038 实验，默认关） |
-| `FCEUX11_E1_TRACE=1` | `src/ppu.cpp:352`、`ppu_rendering.cpp:1524`、`x6502.cpp:400` | PPU/NMI/CPU 事件 trace |
-| `FCEUX11_E1_NMIDELAY=N` | `src/ppu_rendering.cpp:1541` | NMI 注入延迟，默认 8 |
-| `FCEUX11_OPENDECAY_PROBE=1` | `src/ppu.cpp:372` | open-bus 衰减 + SPR DMA 事件日志 |
-| `FCEUX11_E3_TRACE=1` | `src/sound.cpp:48` | APU $4017 写 trace |
-| `FCEUX11_MMC1_PROBE=1` | `src/boards/mmc1.cpp:39` | MMC1 板几何/映射 dump |
-| `FCEUX11_MMC3_PROBE=1` | `src/boards/mmc3.cpp:52` | MMC3 扫描线 IRQ 探针 |
-| `FCEUX11_FME7_PROBE=1` | `src/boards/69.cpp:41` | FME-7 bank tag dump |
-| `FCEUX11_DIAG_LOG=<path>` | `src/drivers/Qt/main.cpp:325` / `gba/mod.rs:77` | Rust panic 落盘 |
-| `FCEUX11_GBA_PROBE_DIR` + `GBA_PROBE_*` 族 | `cartprobe.rs:351`、`frame.rs:2343-3157`、`save.rs:758` | GBA 卡带/时序/帧差分探针 |
-| `FCEUX11_BENCH_BASELINE` | `bench_tolerance_test.cpp:249` | bench 基线 JSON |
-| （B1 新增）`FCEUX11_TRACE` | — | TraceLogger 无头入口 |
+| `FCEUX_HOME` | `src/drivers/Qt/config.cpp:449` | 覆盖应用基目录（Windows 默认是 exe 所在目录） |
+| `FCEUX_CONFIG_DIR` | `src/drivers/Qt/config.cpp:450` | 覆盖配置目录（优先级高于 `FCEUX_HOME`） |
+| `FCEUX_ROM_PATH` | `src/drivers/Qt/ConsoleFile.cpp:235`、`:328` | ROM 打开对话框的起始目录 |
+| `LUA_PATH` | `src/drivers/Qt/LuaControl.cpp:323` | Lua 模块搜索路径 |
 
 ## 十、变更记录
 
@@ -368,3 +433,4 @@ cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo tes
 | r6 | 2026-11-06 | **P2+P3 多 agent 批次落地**（C3 + 六提交：241860f / cfa970c / 05bfc1f / 39b92db / adc45ae / 062ce84 / 4c34cbf；5 份调查 PLAN 由并行只读 agent 产出、用户全批后三波实施）。**C3**：GBA 探针 HOWTO 落档 docs/tech/gba_probe_howto.md；AGENTS.md 计数更正（#[ignore] 7→21、锁测试 248→249、cfg(test) 零开销注记）。**B2①**：`FCEU_PROFILER_ENABLE` option 声明（此前从未声明=永远 OFF 且打不开）。**D9**：协议四缺陷修复（byte0 签名 0xFF/0x00 交替、dy 灵敏度补齐的不对称 bug、倍率 ×1/×2/×4、6 位幅度+bit6 溢出）+ 测试桥 `kagami_bridge_set_input`/sut_input 注入面（原 SI_NONE 硬编码，ROM 摸不到任何输入设备）+ ptr 传持久零缓冲（原 nullptr 每帧必崩）；锁测试 input_snesmouse_test（向量按字段拼装），变异 M-A..M-D 四向红；**A5 状态入档实测 golden_savestate 漂移 +22B 按裁决撤销**；mset 端到端 0xFC=需真实鼠标交互（advisory 如实记录，不硬造 headless 注入）。**D7-A 关闭为「前提证伪，零改动」**：字节取证证明该 .fds 是教科书 kind=1（"FDS\x1a"@0、1 边、65516=16+65500 自洽）；0xFE 真根因 = headless 从不调 `SetBaseDirectory`（唯一调用点在 Qt config.cpp）→ BaseDirectory 空 → BIOS 查找落到盘根 → 加载失败；**旁证 082/083/084 PASS 也被证伪**（ROM 不在镜像里，advisory skip 路径）；且 $6000 判据对「从未跑起来」也是假绿（--frames 1 即 0x00）。**重分类（BIOS 门控 skip/known-limit）待业主裁决**。**A3+A4-2**：见对应提交；等价证明 = XDUMP（XBuf+XDBuf 全帧）0/840 diff + WAVEDUMP 0/180 diff；变异 M1（023 5/5 红）/M2'（仅 XDBuf 红 418、xbuf 盲——探针存在性实证）/M3'（仅 xbuf 红 418）/V2（删 memset 复刻 D-4，180/180 红）全红→绿；**实施哨兵修正：kgmqa-024 只跑低质量路径、到不了 HQ 分支 memset（调查设计漏洞），A4-2 等价证据以 WAVEDUMP 为准——此发现是 A5 的前置（A5 需先建 HQ golden WAV）**；A4-1 主方案（消费计数门控）被盘点否决（savestate chunk-8 任意帧异步消费→金标漂移，谓词恒真），结论存档进 video.cpp 注释防后人实施。bench：ppu_frame 46.554→40.8-41.0（−12%）。**D4 探针**：FCEUX11_OAMBUS_PROBE 落地（默认静默）；冒烟带**阴性证据**——kgmqa-050 失败窗口 2000 帧 0 次 DMA burst、0 次 SPRAM 改写，历史报告的「SPRAM[0x36] 非 B2004 改写」未复现，0x06 落点改向 **$2004 读路径（newppu spr_read 合成读）**，修复立项待裁决。**A2**：批量步进（FcNextEventPos 落位表 + FrameCounterTick 保为唯一点火权威 + 倒计时一次跳），kgmqa-121 锁测试（59 断言，独立参照模型、字段拼装、S1-S5 场景）；变异 M-A..M-E 五向全红（27/4/12/11/14）→ 还原绿；bench_apu_frame 39.9→33.2-35.1（−15%）、full_frame 40.9→33.4-33.6（−18%），远超 3% 止损线；**CI 177-ROM blargg 全批本地不可跑，PR 检查单待 CI**。**B1+B2**：trace_common 纯剪切（452 行删除逐行迁移审计、Qt 行为不变）+ headless_trace（FCEUX11_TRACE，与 A1 门同窗置位）；:1363 治理三件（recBufEnabled 门/无头丢弃+overrun/memo）；反汇编经钩子注入（无头回落 core Disassemble，归一化 diff 需处理）；无头冒烟 6.25M 行完整；B2 探点+报告+**修复 ON 分支预存编译错误**（profiler.cpp 裸指针 vs Rust u64 id ABI——ON 构建此前在 HEAD 编不过，「编不过=不存在」又一例）。**ctest -LE perf 35/34→35 项全绿**（+input_snesmouse_test、+apu_frame_timing_test）。**实施过程记录**：三个 agent 超时由主会话接续收口；一个 agent 把 M3 变异留在树上被审阅发现并清除——「变异验证的红必须由主会话复跑留档」成为新惯例。**待业主裁决**：① kgmqa-081 重分类（BIOS 门控）；② D4 修复立项（落点已改向 $2004 读路径）；③ mset headless 注入面是否立项；④ A1 手工九场景 GUI 实测仍未闭合 |
 | r7 | 2026-11-06 | **P4 批次（用户中断收尾，三提交：34ce329 / 0da9ad4 / 726e872）**。**B3** ✅：lua memory 导出 9→11（readbyterange 对齐上游语义：负长 nil/0 长空串/掩码回绕；writebyterange 上游无此函数、按计划走 writebyte 同一 BWrite 路径，零新增 FFI）；test_memory.lua +13 用例；Rust 49/49、kgmqa-046 exit 0、用例翻转变异 0→1 红。**A5 G0-G2** ✅：G0 = apu_wav_hq_diff_test 进门禁（SetSoundQuality(1) 走 HQ 分支；nrom/mmc1/vrc6 三 ROM；int16 WAV + **int32 pcm32 裸 dump 双锁**；golden 由改动前构建 --generate 采出、两连 VERIFY 确定才提交，VERIFY 默认缺 golden 即红）；G1 标量无损重构（acc2 复用，逐项 >>6 语义保留）；G2 AVX2（`#[target_feature]`+运行时探测，**绕开 MSVC `__AVX2__` 宏陷阱**；偏置系数 c'=c+2^16 使 vpmuludq 精确、低 6 位不变、收口 (T>>6)−1024·Σs 逐位等于标量；标量路径零改动=天然回退；O(n) 负值域守卫）。锁：filter.rs 单测 51/51（穷举等价+域回落+端到端）、HQ golden VERIFY 逐字节过。**实测 bench_full_frame_hq 78.588→44.9/45.0/45.1（−43%）**。**G3 变异 M-A..M-E 未做——收口前置**（变异点已按 PLAN §4 备好：系数+1/删修正项/!63→!31/插值翻/尾部块失效；红由主会话复跑留档）。**D3 调查完成，前提被实跑取证改写**：kgmqa-049 在 HEAD **不是精度 FAIL 而是 harness 伪 FAIL**——tests.json `--frames 600` 时 $6000=0x80（仍在跑），1300+ 帧两连 0x00=PASS（完成窗口 1200-1300，newppu 路径）；M1/M2 从核心改动降级为预算修正+文档；M0 状态机文档骨架已交（渲染期隐式填充 VRAMBuffer 未实现，如实记录）；M3（衰减）确认 defer（049 对衰减速率零约束）。**三项裁决待业主**：① tests.json 预算 600→2000 + provenance 改写；② frozen baseline 049 false→true（人工授权流程）；③ M0 文档归档。变异映射 M-A..M-E 已备（预算变异 M-E 证明 L-2 有牙）。**A6+D5 同窗 PLAN 已出、不含实施、待拍板**（要点：A6 直读快路径三条红线=DB 锁存/Genie 影子表（**存量零测试覆盖，必补 genie_wrap_test**）/fceuindbg 资格表白名单；D5 fetch 通道最小改动面=x6502.cpp:615 一处 RdFetch + 探针 S-D5-0 先行；锁测试五件套+S0-S5 串行拆序 16-24 天；采纳线 bench_bus_dispatch ≥5%、退化线 3%；038/049/050 失败模式不得变化）。**基础设施事项**：push 被远端拒（`fatal error in commit_refs_rules`，空提交亦拒——**仓库服务端规则于 892f402 成功 push 后变更，需业主查 GitHub Rulesets/分支保护**；本地 11 提交安全待推）。中断无损：无变异残留、rust.h 干净、36/36 全绿。**下会话工作单**：A5-G3 五变异 → 049 裁决落地 → A6+D5 拍板 → bench 基线重采（读数已大幅下移：cpu 33 / ppu 40 / apu 33 / full 33 / hq 45 ms）→ push |
 | r8 | 2026-11-06 | **A5 G3 变异验证完成（5 agent 并行，隔离副本）——并查出两项「门禁无牙」缺陷，同批修复一项、留证另一项。** **方法**：五个变异点全在 `filter.rs` 同一文件上，故用 `git worktree --detach` 建 5 份物理隔离副本（**不建任何分支**），每副本独立 `cargo test -p fceux11-media`；主树零改动。**基线**：51/51 全绿（19.4s）。**四项有牙**（转红均为预期断言 `lock_fir_pair_scalar_simd_bit_exact`，且各自命中**不同**的暴露面）：**M-A** bias `1<<16`→`1<<17`（漂移 = 1024·Σs，余 0，定量吻合）；**M-B** 删 `−1024·Σs` 修正项（漂移 = 1024·Σs，余 0，与 M-A 同值 ⇒ 二者数学等价，2a 内互为冗余，已记）；**M-C** `& !63`→`& !31`（漂移仅 +108/+111，1 LSB 级截断漂移仍被咬住）；**M-E** 尾部 tap 循环 `full..nc`→`full..full`（暴露面落在**真实 484 抽头表** nc=484，非仅边界表）。每项均「变异→预期断言转红→还原→51/51 复绿」，主树 `git status` 全程干净。**⚠️ M-D 无牙（首项真实发现）**：插值权重翻转 `65536−frac`→`frac`（`filter.rs:485`）下 **51/51 全绿、0 项转红**；探针实证该变异**是活的**（输入幅度 300/1000/4000 下输出哈希与逐样本值全变），非 no-op。**根因 = 共因盲区**：插值位于 `resample` 内 `if simd_ok{AVX2}else{标量}` 分叉**之后**，标量与 SIMD **共用同一条公式**；2a/2b/3 号三条锁全是**相对比较**（此路对彼路），共因变异时两边同步漂移 ⇒ 断言恒成立。**且 `filter.rs` 原 doc comment 声称 2b 能抓 M-D —— 实测不准确**（AGENTS.md「通过原因必须与要验的状态是同一个可观测量」的第三例）。**⚠️ HQ golden 对 FIR 变异结构性无感（第二项发现，主树独立复核）**：HQ golden 与低质量 golden 的**捕获样本全为 0**（各 799 样本，最大绝对值 0）。真因**不是**「FIR 输入为零」——管线探针实测 FIR 输入是**恒定 DC 4185**（非零）、FIR 输出恒定 34682，是下游 `SexyFilter`（隔直 IIR）把 DC 衰减到恰好 0，且**捕获帧早已收敛**（#59/#149/#209 三帧 out_maxabs 均 0）；纯 DC 输入 ⇒ 任何保持纯 DC 特性的 FIR 变化都不可观测。**实证矩阵**：M-A（bias）、M-B（系数表）下 HQ golden 仍 **PASSED 3/3**；对照实验注入 **DC** 偏置 → 仍绿，注入 **AC** 分量 → **转红**（offset 44）⇒ 通路是活的、golden 机制没坏，缺的是含 AC 的输入。**主树复核**：主树施加 M-D → 构建 → 跑 `apu_wav_hq_diff_test` → **仍 PASSED 3/3**（独立复现取证 agent 结论）。**连带发现**：低质量 golden（kgmqa-024）**同病**（三文件 body 非零字节数均为 0）⇒ 非 HQ 独有，是共用 fixture ROM 集合的通病。**已落地修复（一项）**：新增 `lock_resample_interpolation_golden_vector`（`filter.rs`，360 行纯新增、0 删除，既有锁测试一字未改）——**绝对金标准向量**：期望值由测试模块内**独立参考实现**从线性插值定义 `f(base+t)=f(base)+(f(base+1)−f(base))·t` 推导（`golden_fir`/`golden_resample`），**不调用被测代码、不比较两个实现**；另含 frac=0 / frac=65535 / 单调滑动三个**方向锚点**（直陈语义，不比较实现）。**主树实测**：未变异 52/52 全绿；M-D 下**仅新测试转红**（51 passed/1 failed，2a/2b/3 号全绿 ⇒ 共因盲区被精确堵住），诊断字段 `flipped-weight-would-give=313501` 与实际输出**完全相等**（机器确认「M-D=翻转权重」）；M-A/M-B/M-C/M-E 下新测试亦**全部转红**（覆盖面 = 2a ∪ 2b ∪ {M-D}，M-D 是唯一只有它能抓的）。**doc comment 更正**：`filter.rs` 2b 的 doc comment 已从「M-D 由 2b 抓住」改为如实写明其**只覆盖非对称变异与 mrindex 记账、不覆盖插值权重方向**，并指向新测试。**未修（留证待裁决）**：HQ golden 的 AC 输入缺失（需新增会写 APU 的专用 fixture ROM + 「捕获必须非静默」fail-fast 断言；`tests/fixtures/generate_test_roms.py:251,296` 的 fixture PRG 是 `0xEA` NOP sled，**不写任何 APU 寄存器**；已提交 195 个 ROM 中除 `nestest.nes` 外全为 NOP-sled mapper ROM，发声 ROM 均未被 git 跟踪 ⇒ 补救须先决定 fixture 来源与许可）。**门禁现状**：media crate 52/52（+1）；`apu_wav_hq_diff_test` 仍绿（**但须知其对 FIR 变异无牙，不得作为 A5 的红源**）。**环境事实（与本改动无关）**：`ninja -j 12` 并发归档触发 `LNK1104`（多个 `lib.exe` 争写 `.lib`），**`-j 1` 串行构建稳定通过**——本轮所有构建均用 `-j 1`。**教训归档**：「锁测试全绿」≠「有牙」；**相对比较型锁测试对共因变异结构性无感**，凡要验「共享路径上的语义」必须用绝对金标准或独立参照实现。 |
+| r9 | 2026-11-06 | **低难度批次（4 agent 并行 + 主会话）——r8 留下的「HQ golden 无牙」缺口已闭合：两道音频 golden 门禁第一次真正有牙。** **批次切分（按文件域互斥）**：① 环境变量表核实（**纯只读**）② A1 手工验收清单成文（新建 `docs/tech/debug-regression-checklist.md`）③ D4/050 取证调查页（新建 surveys 页）④ 发声 fixture ROM（**由主会话接管完成**：该 agent 卡在副本 CMake/vcpkg manifest 联网，耗时超限；成果与变异验证由主会话亲自做完并留证）。**① 附录 A 全表重核**（改写为**三张表**：运行期环境变量 26 条 / 编译期开关 14 条 / 上游配置变量 4 条）：查出 **4 处坐标漂移 + 1 处完全失效**（`FCEUX11_BENCH_BASELINE` 旧记 `bench_tolerance_test.cpp:249`，**实际 :270**——旧坐标处已无该内容）、**3 个整族漏项**（`FCEUX11_OAMBUS_PROBE` / `FCEUX11_A3_XDUMP` / `FCEUX11_A4_WAVEDUMP` 表里完全没有）、5 处描述过时（`E3_TRACE` 实际含帧计数器+`$4017`+`$4015`+IRQ+复位，远不止「`$4017` 写」）；并把「编译期开关」与「运行期 env」分开（`FCEU_PROFILER_ENABLE` 是 CMake option，设 env 开不了）。**顺带更正 `docs/tech/gba_probe_howto.md:41`**：原写「`probe_trace_a_stuck_game` 用 `GBA_PROBE_TRACE`」**与代码不符**（该探针读 `GBA_PROBE_WARMUP`/`GBA_PROBE_TRACESTEPS`；`GBA_PROBE_TRACE` 只被 `dump_frames_like_the_reference` 读）。**② A1 手工验收清单成文**（643 行，**22 个可勾选项**，覆盖 r5 全部 15 个场景关键词 + 1 个 A1-b 反向项）：每项给出**可照做的步骤 + 绿/红判据 + A1 关联的代码坐标**；含「为什么这批项不可自动化」的代码依据（ctest 注册**全空**回调表 ⇒ viewer 回调恒 nullptr；`break_asap` 需真实指令流）；§七**如实记录 7 处「入口不存在/命名不符」**（如无 "Break on PC" 菜单项——r5 那个名字零命中，实际入口是 Add+Execute 与 Run To Cursor 两个；Lua 侧无 `getTotalInstructions`/`break_asap` 这两个名字，实际 API 是 `debugger.getinstructionscount()`/`debugger.hitbreakpoint()`）。**清单查出的两处 r5 偏差（主会话独立复核确认）**：① **`ppu_view_open` 在 core 侧只写不读**（写方 `ppuViewer.cpp:62`，core 侧**零读点**）⇒ **A1-c 实际只剪掉了 NT viewer 那条链**，PPU/Sprite viewer 的 `FCEUD_UpdatePPUView`（`ppu_rendering.cpp:1319`、`:1778`）**仍是每帧间接调用**（不构成缺陷，但「viewer 已全部剪枝」的说法不成立）；② **`vblankScanLines`/`vblankPixel` 的计算在门内**（`debug.cpp:921-929`）⇒ **零断点时调试器 PPU 页签的 vblank 读数停在旧值**（A1 的可观察行为变化，非崩溃）。**③ D4/050 取证调查页**（`docs/history/surveys/oam_dma_dummy_write/`，651 行 + 复跑产物）：按仓库规则归 `docs/history/surveys/`（`docs/tech/README.md` §3 明写「过程性记录不进 tech/」），并在 `docs/tech/precision.md` §5 调查链索引登记。**主会话复跑探针补齐证据**（原 r6 数字只有 commit message + 计划表格两处二手记录，仓库内无产物）：050 复跑**复现 `value=0x06 status=FAIL`**、**`armed=1`**（⇒ r6 的「0 次 SPRAM 改写」**不是「从未 armed」的平凡真值**，是有效阴性证据；此条 r6 未记录）、`dma_bursts=0 / diff_events=0`；另跑 kgmqa-110 作**阳性对照**（`dma_bursts=75164 / dma_bytes=19241984 / armed=1 / status=PASS`）⇒ 探针在真实 DMA 场景下确实在记录。产物只留 `spram_diff.log` + 复现命令（`trace.bin` 在 110 对照下 2000 帧写满 256 MB 上限，不适合入库）。**④ ★核心成果：HQ/low 质量 golden 门禁第一次真正有牙。** 新增**自建** fixture `tests/fixtures/apu_square.nes`（`generate_test_roms.py` 新增 `generate_apu_square_rom()`：6502 程序 `$4017=0` → `$4015=1` → `$4000=0xBF`（50% 占空比、音量 15）→ `$4001=0`（关 sweep）→ `$4002=0x40`/`$4003=0x08`（周期 0x408）→ 死循环 ⇒ **周期性方波 = AC 内容**；**自建资产、无第三方许可问题**）：**`.gitignore` 加白名单** `!tests/fixtures/apu_square.nes`（否则 CI 上门禁会因缺 ROM 而失败）。**实测捕获特征**：HQ 799/799 样本非零、峰值 |幅度| **3231**、逐样本变化（-2755,-2718,-2712,-2806,…,835）；低质量 734/734 非零、峰值 **2776**、含明显跳变（-2693→384→2771）。**同时给两道门禁加「捕获必须非静默」fail-fast 断言**（只对 `apusq` 生效——其余三个 ROM 按构造就是静音，加了会立刻变红且无意义）。**变异验证（两轮，主树实测）**：① FIR bias `1<<16`→`1<<17` ⇒ **HQ golden 转红**（`byte mismatch ... offset 44`，3 passed/1 failed）、**低质量 golden 仍绿**；② `SexyFilter` `mul1` 94→95 ⇒ **低质量 golden 转红**（`offset 46`）、**HQ golden 也红**（HQ 路径同样经过 SexyFilter）。⇒ **两道门禁各自有牙且覆盖不同代码路径**：HQ 管 FIR/AVX2 内核，低质量管 SexyFilter/DC 隔直；**低质量路径按设计根本不经过 `fir_pair_avx2`**（`sexy_filter_*` 不调 `resample`）⇒ 旧口径「golden 逐字节 = 守住 FIR」**是错的**。**门禁现状**：media 52/52、GBA 249/249、vendor 242/242、`ctest -LE perf` **36/36**。**其他低难度项**：bench 基线**补两档**（`bench_apu_frame`/`bench_bus_dispatch` 此前报「no baseline entry」= 无门禁运行；**A2 优化的正是 APU 却恰恰没有 APU 基线**）⇒ 6 档全有基线、对照偏差 +0.06%~+2.41% 全 PASS；顺带**修 `generate_bench_baseline.ps1` 的路径 bug**（相对路径 `'fixtures/bench_baseline.json'` 由 .NET `GetFullPath` 解析，**不随 `Set-Location` 走** ⇒ 写到仓库根而失败；改用 `$PSScriptRoot` 锚定）。**文档计数统一**：`ctest -LE perf` **33→36**（计划 §头/§〇/§八 + AGENTS.md）。**陷阱清单扩容**：`docs/tech/gba-traps.md` 由四种→**六种**（新增「相对比较型锁测试对共因变异结构性无感」「门禁捕获内容为空 ⇒ 哑弹」）。**教训**：**「golden 逐字节过」不等于「守住了它声称守住的东西」**——门禁的价值取决于它捕获的信号**是否含被测路径的可观测量**；全零/纯 DC 捕获会让任何算术改动不可观测。 |

@@ -300,10 +300,66 @@ def generate_nsf():
     print(f"Generated {path} (NSF, {len(header) + len(prg)} bytes)")
 
 
+def generate_apu_square_rom():
+    """Generate a NROM ROM whose APU emits a PERIODIC SQUARE WAVE (AC content).
+
+    v2.0.2 A5-G3 follow-up (2026-11-06).  Why this exists:
+
+    Every other fixture ROM here has a PRG that is a `0xEA` NOP sled, so it
+    never writes an APU register -> the whole audio chain is silent.  That
+    made `apu_wav_hq_diff_test` (and the older kgmqa-024 `apu_wav_diff_test`)
+    pin down NOTHING about the filter: the captured samples were all zero,
+    and a zero signal stays zero no matter what the FIR coefficients are.
+    Measured 2026-11-06: with a NOP-sled ROM the HQ capture is a constant
+    DC (-1) that the downstream `SexyFilter` (DC-blocking IIR) decays to
+    exactly 0 before the capture frame -- so changing the FIR bias, the
+    coefficient table, or the interpolation was UNOBSERVABLE in the golden.
+
+    A periodic square wave is AC content: it survives the DC blocker, so
+    the golden actually depends on the filter's arithmetic.  Measured on
+    this ROM: 799/799 captured samples non-zero, peak |amplitude| 3231,
+    and consecutive samples differ (i.e. a waveform, not a constant).
+
+    The program (6502):
+        LDA #$00 : STA $4017   ; 5-step mode, no frame IRQ
+        LDA #$01 : STA $4015   ; enable pulse channel 1
+        LDA #$BF : STA $4000   ; duty 50%, constant volume 15
+        LDA #$00 : STA $4001   ; sweep off
+        LDA #$40 : STA $4002   ; timer low
+        LDA #$08 : STA $4003   ; timer high -> period 0x408
+        JMP self
+    """
+    path = os.path.join(SCRIPT_DIR, "apu_square.nes")
+    header = make_ines_header(0)  # NROM
+
+    prg = bytearray([0xEA] * (PRG_SIZE * 16384))  # NOP sled, patched below
+    code = bytearray()
+    # LDA #imm (A9) / STA abs (8D lo hi)
+    code += bytes([0xA9, 0x00, 0x8D, 0x17, 0x40])  # $4017 = 0
+    code += bytes([0xA9, 0x01, 0x8D, 0x15, 0x40])  # $4015 = 1 (pulse 1 on)
+    code += bytes([0xA9, 0xBF, 0x8D, 0x00, 0x40])  # $4000 = duty 50%, vol 15
+    code += bytes([0xA9, 0x00, 0x8D, 0x01, 0x40])  # $4001 = sweep off
+    code += bytes([0xA9, 0x40, 0x8D, 0x02, 0x40])  # $4002 = timer low
+    code += bytes([0xA9, 0x08, 0x8D, 0x03, 0x40])  # $4003 = timer high
+    loop_at = 0x8000 + len(code)
+    code += bytes([0x4C, loop_at & 0xFF, (loop_at >> 8) & 0xFF])  # JMP self
+    prg[0:len(code)] = code
+
+    # Reset vector at $FFFC.
+    prg[PRG_SIZE * 16384 - 4] = 0x00
+    prg[PRG_SIZE * 16384 - 3] = 0x80
+
+    with open(path, "wb") as f:
+        f.write(header)
+        f.write(prg)
+    print(f"Generated {path} (NROM, AC square wave, {len(header) + len(prg)} bytes)")
+
+
 def main():
     generate_ines_roms()
     generate_fds()
     generate_nsf()
+    generate_apu_square_rom()
     print("\nAll fixtures generated.")
 
 

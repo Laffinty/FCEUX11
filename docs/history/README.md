@@ -15,7 +15,7 @@
 |------|------|------|
 | `plans/` | 历史构建/实施计划与路线图（已完成 🔵 或暂缓 🟡） | hotfix1~5 PLAN、Stage-2、v1.x Roadmap |
 | `reports/` | 阶段完成、验证、审计、验收报告 | hotfix2/3 phase 报告、KagamiQA 审计/验收、最终验收报告 |
-| `surveys/` | 调查与实验数据（按调查链分子目录：`e1_vbl/` PPU VBL/NMI、`e6_apu/` APU 帧计数器、`r5r6_v1.17/`、`p2_instrument/`，另有 cpu_bucketB、mmc3、ppu_bucketC、sprdma_bucketD） | vbl_step*、r6_step* |
+| `surveys/` | 调查与实验数据（按调查链分子目录：`e1_vbl/` PPU VBL/NMI、`e6_apu/` APU 帧计数器、`r5r6_v1.17/`、`p2_instrument/`、`oam_dma_dummy_write/` OAM DMA dummy write，另有 cpu_bucketB、mmc3、ppu_bucketC、sprdma_bucketD） | vbl_step*、r6_step* |
 | `checklists/` | 接入清单、移除清单、问题清单、手工场景 | blargg 接入清单、v2.0 移除清单 |
 | `obsolete/` | **已被取代**的文档（仅作审计链保留，文件顶部有 🔴 OBSOLETE 横幅） | 翻译质量复测报告（v2） |
 | `history.md` | v1.4 ~ v1.13 综合构建史（早期单文件已合并于此） | — |
@@ -133,6 +133,13 @@
 | 文件 | 说明 |
 |------|------|
 | `P2_precision_instrument_handoff.md` | P2 调查交接档案（8 份 survey 汇总、instrument-first 纪律与 savestate 禁忌出处） |
+
+### 2.6b `surveys/oam_dma_dummy_write/` — kgmqa-050 OAM DMA dummy write 取证链（在途 🟢，2026-11-06 建）
+
+| 文件 | 说明 |
+|------|------|
+| `kgmqa-050_OAM-DMA-dummy-write_取证调查页.md` | D4 的**唯一 RE 入口页**：探针 `FCEUX11_OAMBUS_PROBE` 的产物格式、**四个触发面**（含 armed 条件）、复现步骤、已有阴性结论、下一轮切入点。证据强度按 `[实测]/[读码]/[历史]/[未确定]` 分级标注 |
+| `probe_2026-11-06/` | 复跑归档：`spram_diff.log`（探针文本汇总）+ `README.md`（复现命令、050 阴性读数、110 阳性对照读数）。`trace.bin` 因 110 在 2000 帧内写满 256 MB 上限而不入库，改由复现命令重现 |
 
 ### 2.6a 其他链（未逐文件列表，按文件名自明）
 

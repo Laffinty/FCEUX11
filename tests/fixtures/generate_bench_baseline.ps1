@@ -13,6 +13,17 @@
 # Or, on the CI runner:
 #   working-directory: ${{ github.workspace }}/tests
 #   run: pwsh -File ../tests/fixtures/generate_bench_baseline.ps1
+#
+# v2.0.2 P4 (2026-11-06): the output path is now anchored to
+# $PSScriptRoot instead of the relative 'fixtures/bench_baseline.json'.
+# Reason: PowerShell's [System.IO.Path]::GetFullPath() resolves against
+# the PROCESS current directory, which does NOT track Set-Location --
+# so the relative path landed in the repo root (D:\...\FCEUX11\fixtures\)
+# and the write failed with DirectoryNotFoundException even though
+# Get-Location reported tests/. $PSScriptRoot is always correct.
+#
+# The bench binaries themselves still need cwd = tests/ (their ROM paths
+# are relative: 'fixtures/xxx.nes'), so the caller must still cd there.
 
 $ErrorActionPreference = 'Stop'
 
@@ -40,6 +51,13 @@ $binaries = @(
     # binaries emit, so the harvesting loop below needs no special casing
     # beyond this args field.
     @{ name='bench_full_frame_hq'; binary='fceux11_bench_tolerance_test'; args='--only=bench_full_frame_hq'; rom='fixtures/mapper_mmc3.nes' }
+    # v2.0.2 P4 (2026-11-06): the two slots that were MISSING from the
+    # baseline. bench_tolerance_test reported "no baseline entry" for
+    # both, so they were running UNGATED -- and bench_apu_frame is
+    # exactly the slot A2 (APU frame-counter batch step) optimises, so
+    # the one metric that most needed a baseline had none.
+    @{ name='bench_apu_frame';     binary='fceux11_bench_apu_frame';      rom='fixtures/mapper_mmc3.nes' }
+    @{ name='bench_bus_dispatch';  binary='fceux11_bench_bus_dispatch';   rom='fixtures/nestest.nes' }
 )
 
 # v1.3 Legion Phase 7.3: take the BEST (lowest) of N runs as the
@@ -95,7 +113,7 @@ foreach ($b in $binaries) {
     }
 }
 
-$baselinePath = 'fixtures/bench_baseline.json'
+$baselinePath = Join-Path $PSScriptRoot 'bench_baseline.json'
 $commit       = (git rev-parse HEAD 2>$null)
 if (-not $commit) { $commit = 'unknown' }
 $capturedAt   = (Get-Date -Format 'yyyy-MM-dd')

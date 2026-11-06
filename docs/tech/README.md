@@ -24,10 +24,13 @@
 | [multi-machine-integration.md](multi-machine-integration.md) | **接第二台模拟机**：允许耦合的封闭清单、两类守卫（抓「已存在」与抓「缺失」）、跨系统状态读取规则 | 要加新机器 / 改 GBA 接线 |
 | [gba-traps.md](gba-traps.md) | **四种让测试看起来在保护你、实际不保护的形态**：夹具固化假设、断言引用被测常量、守卫抓不到缺失、读到函数之外 | 写任何检查之前 |
 | [ffi-boundaries.md](ffi-boundaries.md) | **跨 FFI 工程约束**：手写 ABI 与 cbindgen 分工、生成头双 target 争用、大对象出参、栈约束实测、safe vs isolated | 加导出 / 查「符号在却调不到」 |
+| [debug-regression-checklist.md](debug-regression-checklist.md) | **调试器手工回归验收清单（A1 门控三合一）**：逐项可照做的步骤 + 绿/红判据 + 代码坐标；含「入口不存在/命名不符」的读码记录 | A1 验收、动调试门控之前 |
+| [gba_probe_howto.md](gba_probe_howto.md) | **GBA 探针 HOWTO**：每个 `#[ignore]` 探针的用途、触发环境变量、参数与判读 | 跑 GBA 探针 / 查「探针怎么触发」 |
+| [gba-external-test-report-2026-10.md](gba-external-test-report-2026-10.md) | GBA 外部参照实现的对比测试报告 | 评估 GBA 精度时的外部对照 |
 
 阅读顺序建议：新人先 [constants.md](constants.md) 建立量纲，再按任务读对应模块文档；
 任何时序/精度改动先过 [precision.md](precision.md) §3 禁忌清单。
-**写任何测试或守卫之前，先过 [gba-traps.md](gba-traps.md) §5 的三问。**
+**写任何测试或守卫之前，先过 [gba-traps.md](gba-traps.md) §7 的三问。**
 
 ## 2. 内容组织约定（每个模块文档四段式）
 

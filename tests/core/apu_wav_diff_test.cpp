@@ -52,11 +52,37 @@ struct RomTestCase {
 
 static const RomTestCase tests[] = {
     // v1.6 Phase A baseline ROMs.
-    // Frame counts chosen to produce stable, non-silent audio output.
     { "fixtures/mapper_nrom.nes",  "nrom",  60 },
     { "fixtures/mapper_mmc1.nes",  "mmc1",  90 },
     { "fixtures/mapper_vrc6.nes",  "vrc6",  60 },
+    // v2.0.2 A5-G3 (2026-11-06): the ONLY case whose capture carries AC
+    // content. The three ROMs above have a NOP-sled PRG (see
+    // tests/fixtures/generate_test_roms.py) and never write an APU
+    // register, so their capture is a constant DC that the downstream
+    // SexyFilter (DC-blocking IIR) decays to exactly 0 before the capture
+    // frame -- measured 2026-11-06: 734/734 captured samples are 0.
+    //
+    // NOTE the original comment above ("Frame counts chosen to produce
+    // stable, non-silent audio output") was never verified: the captures
+    // were silent. apu_square.nes emits a periodic square wave (AC),
+    // which survives the DC blocker, so this golden really depends on
+    // the filter's arithmetic.
+    //
+    // SCOPE (measured 2026-11-06): this harness runs the LOW-quality
+    // path (soundq == 0), which goes through SexyFilter -- NOT through
+    // NeoFilterSound. The 484-tap FIR and its AVX2 kernel are therefore
+    // NOT exercised here at all: a mutation of `fir_pair_avx2` leaves
+    // this golden GREEN (verified: bias 1<<16 -> 1<<17 => still PASSED).
+    // ⇒ This gate covers the SexyFilter / DC-blocker arithmetic; the
+    // FIR is covered by the HQ harness (apu_wav_hq_diff_test) and by the
+    // Rust lock tests in filter.rs.
+    { "fixtures/apu_square.nes",   "apusq", 60 },
 };
+
+// The three NOP-sled ROMs are silent by construction, so "the capture
+// must be non-silent" can only be asserted for the AC case. Applying it
+// to the silent ones would fail immediately and for no useful reason.
+static const char* NON_SILENT_CASE = "apusq";
 
 static const int NUM_TESTS = sizeof(tests) / sizeof(tests[0]);
 
@@ -253,6 +279,42 @@ int main(int argc, char** argv)
             std::printf("  RESULT: capture failed\n");
             ++failures;
             continue;
+        }
+
+        // v2.0.2 A5-G3 (2026-11-06): FAIL-FAST on an empty capture.
+        //
+        // A golden whose captured samples are all zero pins down NOTHING
+        // about the filter: a zero signal stays zero whatever the filter's
+        // coefficients or arithmetic are. Measured 2026-11-06: the three
+        // NOP-sled ROMs captured a constant DC that the downstream
+        // SexyFilter (DC-blocking IIR) decayed to exactly 0, so a mutated
+        // filter still matched this golden -- the gate was a "dumb shell".
+        //
+        // The assertion turns that silent degradation into a RED gate, so a
+        // future fixture change that drops the signal cannot slip through
+        // unnoticed. It is asserted ONLY for the AC case (apu_square.nes):
+        // the other three ROMs are silent by construction.
+        if (std::strcmp(tc.name, NON_SILENT_CASE) == 0) {
+            // The WAV body starts after the 44-byte RIFF header; samples
+            // are 16-bit little-endian mono.
+            size_t nonzero = 0;
+            size_t sampleCount = (wav.size() > WAV_HEADER_SIZE)
+                               ? (wav.size() - WAV_HEADER_SIZE) / 2 : 0;
+            for (size_t s = 0; s + 1 < wav.size(); s += 2) {
+                if (s < WAV_HEADER_SIZE) continue;
+                uint16_t raw = (uint16_t)wav[s] | ((uint16_t)wav[s + 1] << 8);
+                if (raw != 0) ++nonzero;
+            }
+            if (nonzero == 0) {
+                std::printf("  RESULT: capture is entirely silent "
+                            "(0/%zu non-zero samples) -- the golden would pin "
+                            "down nothing about the filter\n",
+                            sampleCount);
+                ++failures;
+                continue;
+            }
+            std::printf("  ok    capture carries signal (%zu/%zu non-zero samples)\n",
+                        nonzero, sampleCount);
         }
 
         std::string gpath = goldenPath(tc.name);

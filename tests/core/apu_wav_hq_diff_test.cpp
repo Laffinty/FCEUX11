@@ -69,7 +69,26 @@ static const RomTestCase tests[] = {
     { "fixtures/mapper_nrom.nes",  "nrom",  60 },
     { "fixtures/mapper_mmc1.nes",  "mmc1",  90 },
     { "fixtures/mapper_vrc6.nes",  "vrc6",  60 },
+    // v2.0.2 A5-G3 (2026-11-06): the ONLY case whose capture carries AC
+    // content. The three ROMs above have a NOP-sled PRG (see
+    // tests/fixtures/generate_test_roms.py) and never write an APU
+    // register, so their capture is a constant DC that the downstream
+    // SexyFilter (DC-blocking IIR) decays to exactly 0 before the
+    // capture frame -- measured: 799/799 captured samples are 0.
+    //
+    // Consequence (measured, not theoretical): with those three, a
+    // change to the FIR bias / coefficient table / interpolation was
+    // UNOBSERVABLE in the golden -- injecting DC kept it green, only
+    // injecting AC turned it red. apu_square.nes emits a periodic
+    // square wave, i.e. AC, so its golden genuinely depends on the
+    // filter's arithmetic.
+    { "fixtures/apu_square.nes",   "apusq", 60 },
 };
+
+// The three NOP-sled ROMs are silent by construction, so "the capture
+// must be non-silent" can only be asserted for the AC case. Applying it
+// to the silent ones would fail immediately and for no useful reason.
+static const char* NON_SILENT_CASE = "apusq";
 
 static const int NUM_TESTS = sizeof(tests) / sizeof(tests[0]);
 
@@ -298,6 +317,37 @@ int main(int argc, char** argv)
             std::printf("  RESULT: capture failed\n");
             ++failures;
             continue;
+        }
+
+        // v2.0.2 A5-G3 (2026-11-06): FAIL-FAST on an empty capture.
+        //
+        // A golden whose captured samples are all zero pins down NOTHING
+        // about the filter: a zero signal stays zero whatever the FIR
+        // coefficients, the bias constant or the interpolation weights are.
+        // Measured 2026-11-06 on the three NOP-sled ROMs: the capture was
+        // a constant DC that the downstream SexyFilter (DC-blocking IIR)
+        // decayed to exactly 0, so a mutated filter still matched the
+        // golden -- the gate was a "dumb shell".
+        //
+        // The assertion turns that silent degradation into a RED gate, so a
+        // future fixture change that drops the signal cannot slip through
+        // unnoticed. It is asserted ONLY for the AC case (apu_square.nes):
+        // the other three ROMs are silent by construction.
+        if (std::strcmp(tc.name, NON_SILENT_CASE) == 0) {
+            size_t nonzero = 0;
+            for (int32_t s : pcm32) {
+                if (s != 0) ++nonzero;
+            }
+            if (nonzero == 0) {
+                std::printf("  RESULT: capture is entirely silent "
+                            "(0/%zu non-zero samples) -- the golden would pin "
+                            "down nothing about the filter\n",
+                            pcm32.size());
+                ++failures;
+                continue;
+            }
+            std::printf("  ok    capture carries signal (%zu/%zu non-zero samples)\n",
+                        nonzero, pcm32.size());
         }
 
         if (generateMode) {
