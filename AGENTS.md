@@ -48,6 +48,11 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 
 ## 当前进度（2026-10-07）
 
+> ⚠️ **本节只覆盖 GBA（v2.0）线。NES 侧的工作在
+> `docs/plans/FCEUX11-v2.0.2_DEBUG与性能优化计划.md`**（v2.0.2 = DEBUG 与性能优化，
+> 独立排期，**不要**与本节的 GBA 阶段表混读；其 §十 变更记录是 NES 侧的事实源）。
+> 另见 `docs/plans/long-term-evolution/`（F11QA 残留精度的长期演进，与 v2.0.2 并行但不同批）。
+
 | 阶段 | 状态 |
 |---|---|
 | S0 / S0' / S1a-0 / S1a-1 / S1b / S1c | ✅ 已完成（S1c：认领 16 个号码） |
@@ -207,7 +212,7 @@ $env:PATH="D:\Project\FCEUX11\vcpkg_installed\x64-windows\bin;$env:PATH"
 & "D:\Program Files\CMake\bin\ctest.exe" --test-dir D:\Project\FCEUX11\build -j 4
 ```
 
-### 十一个坑
+### 十二个坑
 
 1. **不加载 MSVC 环境就连标准库头都找不到**（`cl.exe` 在，`INCLUDE` 不在）。先 `call vcvars64.bat`。
 2. **`cargo test -p fceux11-rust` 必须加 `--no-default-features --features gba`**。默认 feature
@@ -245,9 +250,21 @@ $env:PATH="D:\Project\FCEUX11\vcpkg_installed\x64-windows\bin;$env:PATH"
     `the_error_codes_reach_the_generated_header` 守这一条。**改完 `build.rs` 请直接查
     头文件的内容，不要假定构建跑过就等于它更新了。**
 11. **不要用 PowerShell 的 `WriteAllText` / `WriteAllLines` 改仓库里的源文件。**
-    前者会剥掉 UTF-8 BOM，后两者按 `Environment.NewLine`（CRLF）重排行尾 —— 仓库
-    是 LF，于是**整个文件在 diff 里显示为改动**（计划文档被这么搞成 885 插入 / 876 删除，
-    而真实改动只有 10 行）。今天为此返工三次。**用编辑工具，或改完立刻核对行尾。**
+    前者会剥掉 UTF-8 BOM，后两者按 `Environment.NewLine`（CRLF）重排行尾。
+    **⚠️ 行尾口径已更正（2026-11-06 实测）**：「仓库是 LF」只对 **git blob 存储**成立
+    （blob 内无 CR 字符）；**工作树文件因 `core.autocrlf=true` 且仓库无 `.gitattributes`
+    ⇒ 检出后统一是 CRLF**（抽样 20 个 `src/**` 源文件：纯 CRLF 20、纯 LF 0）。
+    当年计划文档被搞成 885 插入 / 876 删除，根因是**行尾被整体重写**（不是内容大改）。
+    **判据**：改了文件后先看 `git diff --numstat` —— 插入/删除行数远超真实改动量
+    ⇒ 就是行尾被动了。**用编辑工具原地替换，或改完立刻核对行尾**；
+    `git apply` 移植补丁时注意源副本的行尾形态（CRLF 副本的补丁会把目标写成 CRLF）。
+    今天为此返工三次。
+12. **本机 `ninja -j 12`（默认并行 = CPU 数）会在归档阶段偶发 `LNK1104 无法打开 xxx.lib`。**
+    2026-11-06 实测：症状是**连续失败在不同的 `.lib` 上**（先 `fceux11_utils.lib`、
+    后 `fceux11_boards.lib`），且**手动单跑同一条 `lib.exe` 命令却成功**（EXIT=0）——
+    即多个 `lib.exe` 并发归档时争写同一输出。**解法：`ninja -C build -j 1` 串行构建**，
+    本轮所有构建均用 `-j 1`，稳定通过。**判据**：LNK1104 且手动跑同一命令能过 ⇒ 并发归档冲突，
+    别去清缓存或改构建配置（**L11 的判据仍适用**：先在干净树上确认不是自己改动引起的）。
 
 ## 纪律（这几条都是被违反过之后写下来的）
 
@@ -294,3 +311,27 @@ $env:PATH="D:\Project\FCEUX11\vcpkg_installed\x64-windows\bin;$env:PATH"
    **判据**：一个测量若需要「多跑一会儿看看」才成立，它就没有夹住窗口。
    **同族**：变异验证里「测了改前的值」是同一类错误的另一面 —— 断言的**通过原因**必须
    与它**要验的状态**是同一个可观测量。
+12. **「相对比较型」锁测试对「共因变异」结构性无感 —— 要验共享路径上的语义，必须用绝对金标准。**
+   2026-11-06 的 A5 G3 实测：`filter.rs` 的三条锁（`lock_fir_pair_scalar_simd_bit_exact` /
+   `lock_resample_end_to_end_scalar_simd_bit_exact` / `lock_domain_fallback_on_negative_sample`）
+   **全是「此路对彼路」的相对比较**。而 `resample` 的插值公式位于 `if simd_ok{AVX2}else{标量}`
+   分叉**之后** ⇒ 标量与 SIMD **共用同一条公式**。于是把插值权重翻转
+   （`65536-frac` → `frac`）这条变异让**两边同步漂移**，三条锁**全部全绿**（51/51），
+   而探针证明该变异**确实改变了真实输出**（非 no-op）。
+   **判据**：断言若只比较「两条都经过被测代码的路径」，它对「该路径自身的语义错误」永远瞎。
+   要验这种语义，期望值必须来自**独立参照实现**或**绝对金标准向量**（本轮新增
+   `lock_resample_interpolation_golden_vector`：期望值由线性插值定义推导、不调用被测代码）。
+   **这是纪律 3 的第三例**（前两例见 r43 与 S3-1 实施记录）—— 且这次连**代码注释里的
+   覆盖声明**（「M-D 由 2b 抓住」）都是错的，注释写于实测之前。
+   **推论**：写锁测试时，「这条测试声称覆盖 X」必须**实测验证**该覆盖，不能靠推理断言。
+13. **门禁的「捕获内容」要验证它非空 —— 全零/静音的 golden 是无牙门禁。**
+   2026-11-06 实测：`apu_wav_hq_diff_test` 与 kgmqa-024 低质量 golden 的**捕获样本全为 0**
+   （各 799 样本）。真因**不是**「FIR 输入为零」——管线探针实测 FIR 输入是**恒定 DC 4185**
+   （非零），是下游 `SexyFilter`（隔直 IIR）把 DC 衰减到 0，且**捕获帧早已收敛**；
+   纯 DC ⇒ 任何保持纯 DC 特性的 FIR 变化都不可观测。实证：改 bias / 改系数表 ⇒ golden 仍绿；
+   注入 **DC** 偏置 ⇒ 仍绿；注入 **AC** 分量 ⇒ **转红**（通路是活的，机制没坏，缺的是含 AC 的输入）。
+   **判据**：新增 golden 门禁必须**断言捕获内容非零**（fail-fast），否则它会在某次
+   fixture 更换后静默退化成「哑弹」，且没有任何一层报警。**这与第 10 条同族**：
+   守卫失效的第三种方式是「**捕获不到任何东西**」。
+   根因侧的可查线索：`tests/fixtures/generate_test_roms.py:251,296` 的 fixture PRG 是
+   `0xEA` NOP sled（不写任何 APU 寄存器）⇒ 音频链全程静音。

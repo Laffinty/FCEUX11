@@ -795,9 +795,23 @@ mod tests {
     /// Lock test 2b — end-to-end `resample` equality (FIR pair + frac
     /// interpolation + mrindex bookkeeping) for both tap counts.
     ///
-    /// Mutation point caught (A5 G3):
-    ///   * M-D interpolation `65536 − frac` → `frac` — output drift on
-    ///     every ratio whose frac is not identically 0.
+    /// SCOPE — what this lock does and does NOT cover (A5 G3, measured):
+    ///   * It compares the scalar run against the SIMD run, i.e. it is a
+    ///     RELATIVE comparison between two paths that SHARE the code
+    ///     under test. It therefore catches asymmetries (a defect that
+    ///     moves only the SIMD side, e.g. M-A / M-B / M-C / M-E) and
+    ///     the mrindex bookkeeping.
+    ///   * It does NOT cover the fractional interpolation weights
+    ///     themselves. The interpolation lives in `resample` AFTER the
+    ///     scalar/SIMD fork (see `resample`), so both sides of this
+    ///     assertion use the same interpolation expression. Flipping
+    ///     them (`65536 - frac` → `frac`, mutation M-D) moves both
+    ///     sides identically and this lock stays GREEN — measured:
+    ///     M-D leaves 2a, 2b and lock 3 all green (51/51).
+    ///   * The interpolation weight direction is covered instead by
+    ///     `lock_resample_interpolation_golden_vector`, which pins
+    ///     absolute expected values derived from the definition of
+    ///     linear interpolation.
     #[test]
     #[cfg(target_arch = "x86_64")]
     fn lock_resample_end_to_end_scalar_simd_bit_exact() {
@@ -898,5 +912,365 @@ mod tests {
             "negative input must diverge between scalar and raw SIMD \
              (otherwise this fallback lock proves nothing)"
         );
+    }
+
+    // -----------------------------------------------------------------
+    // A5 G3 follow-up — ABSOLUTE golden-vector lock for the fractional
+    // interpolation of `resample`.
+    //
+    // Why this test exists (A5 G3, measured):
+    //   * Lock 2a (`fir_pair` scalar vs AVX2), lock 2b (`resample`
+    //     scalar vs AVX2) and lock 3 (SIMD-gated vs forced scalar) are
+    //     all RELATIVE comparisons: each one compares two paths that
+    //     share the code under test.
+    //   * The fractional interpolation lives in `resample` AFTER the
+    //     scalar/SIMD fork, so BOTH sides of every relative lock use
+    //     the same interpolation expression. Flipping the weights
+    //     (`65536 - frac` -> `frac`, mutation M-D) therefore moves the
+    //     real output (probe: input amplitudes 300 / 1000 / 4000 give
+    //     different output hashes and different per-sample values)
+    //     while every one of those relative locks stays green.
+    //   * => the relative locks cannot see the interpolation at all.
+    //     (The doc comment on lock 2b claiming it catches M-D is
+    //     wrong; measured M-D leaves 2b green.)
+    //
+    // What this test does instead: it pins ABSOLUTE expected values
+    // produced by a reference implementation that lives in this test
+    // module and derives the result from the DEFINITION of linear
+    // interpolation (see `golden_resample`), so the reason the test
+    // passes is the very property under test — which of the two
+    // adjacent FIR windows carries which weight. Nothing here compares
+    // two implementations of the interpolation, and the expectation
+    // never calls the code under test.
+    //
+    // The AVX2 dispatch is pinned to the same absolute values, so the
+    // SIMD-side mutations (M-A bias constant, M-B missing `-1024*Σs`,
+    // M-C `!63` -> `!31`, M-E skipped tail taps) are caught here too,
+    // on top of lock 2a.
+    // -----------------------------------------------------------------
+
+    /// Golden reference for ONE FIR evaluation — the documented spec of
+    /// `fir_pair_scalar`:
+    ///
+    /// ```text
+    /// acc = Σ_{c=0..nc-1} ⌊ in[base-nc+c] · coeffs[c] / 64 ⌋
+    /// ```
+    ///
+    /// (floor per tap, then sum — `⌊Σx⌋ ≠ Σ⌊x⌋`, the per-tap
+    /// truncation is part of the spec). Re-derived here on purpose: the
+    /// reference must not share code with the artifact it judges.
+    #[cfg(target_arch = "x86_64")]
+    fn golden_fir(input: &[i32], coeffs: &[i32], base: usize) -> i64 {
+        let nc = coeffs.len();
+        let start = base - nc;
+        let mut acc = 0i64;
+        for c in 0..nc {
+            let tap = (input[start + c] as i64) * (coeffs[c] as i64);
+            acc += tap >> 6;
+        }
+        acc
+    }
+
+    /// One golden output sample: the interpolated value plus the two
+    /// FIR endpoints it was blended from (kept for the direction
+    /// anchors and for failure diagnostics).
+    #[cfg(target_arch = "x86_64")]
+    #[derive(Clone, Copy, Debug)]
+    struct GoldenSample {
+        x: u32,
+        acc: i64,
+        acc2: i64,
+        value: i32,
+    }
+
+    /// Independent reference implementation of the `resample` output
+    /// stream.
+    ///
+    /// Ground truth — the resampler reads the input at the 16.16 fixed
+    /// point position `x`, i.e. at the real position `base + t` with
+    /// `base = x >> 16` and `t = frac / 65536`, `frac = x & 0xFFFF`.
+    /// The FIR is evaluated at the two adjacent window starts and the
+    /// result is linearly interpolated:
+    ///
+    /// ```text
+    /// f(base + t) = (1 - t)·f(base) + t·f(base + 1)
+    ///             = f(base) + (f(base + 1) - f(base))·t
+    /// ```
+    ///
+    /// so `base` carries the weight `(1 - t)` and `base + 1` carries
+    /// the weight `t`. The FIR result carries a fixed 2^-11 output
+    /// scale, so the integer output sample is `floor(f / 2^11)`.
+    ///
+    /// The fractional part is kept exact as a numerator over 2^16 and
+    /// the output scale is applied by one floor division by
+    /// 2^27 = 2^16 · 2^11 — the same value the implementation produces,
+    /// but reached from the interpolation identity instead of copied
+    /// from the implementation's expression. Flipping the weights
+    /// (`acc·frac + acc2·(65536 - frac)`) is equivalent to
+    /// interpolating at `base + (1 - t)` — the wrong position — and
+    /// therefore disagrees with this reference wherever the two
+    /// endpoints differ.
+    #[cfg(target_arch = "x86_64")]
+    fn golden_resample(
+        input: &[i32],
+        coeffs: &[i32],
+        x0: u32,
+        mrratio: u32,
+    ) -> Vec<GoldenSample> {
+        let max = ((input.len() as u32) - 1) << 16;
+        let mut out = Vec::new();
+        let mut x = x0;
+        while x < max {
+            let base = (x >> 16) as usize;
+            let frac = (x & 0xFFFF) as i64;
+            let acc = golden_fir(input, coeffs, base);
+            let acc2 = golden_fir(input, coeffs, base + 1);
+            // f = acc + (acc2 - acc)·t, t = frac/65536, carried exactly
+            // as a numerator over 2^16; then the fixed 2^-11 output
+            // scale (floor division by 2^27 = 2^16 · 2^11).
+            let numer = (acc as i128) * 65536 + ((acc2 - acc) as i128) * (frac as i128);
+            out.push(GoldenSample {
+                x,
+                acc,
+                acc2,
+                value: (numer >> 27) as i32,
+            });
+            x = x.wrapping_add(mrratio);
+        }
+        out
+    }
+
+    /// Run `resample` for a single output position and return that
+    /// output sample. The ratio is large enough to leave the loop after
+    /// one sample, so the first (and only) output corresponds to `x`.
+    #[cfg(target_arch = "x86_64")]
+    fn resample_first(input: &[i32], coeffs: &[i32], x: u32, simd: bool) -> i32 {
+        let mut out = vec![0i32; input.len()];
+        let (_mr, n) = resample(x, 1 << 30, coeffs, input, &mut out, simd);
+        assert!(n >= 1, "resample produced no output for x={x}");
+        out[0]
+    }
+
+    /// Structured probe input: a slow ramp plus a fast square wave plus
+    /// dither, all inside the legal domain [0, 82024). The square wave
+    /// makes adjacent FIR windows differ strongly, which is what makes
+    /// the fractional interpolation observable at all — the output
+    /// scale divides the FIR result by 2^11, so a small window-to-
+    /// window delta would vanish in the output.
+    #[cfg(target_arch = "x86_64")]
+    fn structured_input(len: usize, seed: u32) -> Vec<i32> {
+        let mut rng = Xorshift32(seed);
+        let mut v = vec![0i32; len];
+        for (i, s) in v.iter_mut().enumerate() {
+            let ramp = ((i * 37) % 65536) as i32;
+            let square = if (i / 3) % 2 == 0 { 8000 } else { 0 };
+            let dither = (rng.next() % 2048) as i32;
+            *s = (ramp + square + dither).min(82023);
+        }
+        v
+    }
+
+    /// Lock test 4 — absolute golden vector for the `resample`
+    /// fractional interpolation.
+    ///
+    /// Covers the common-cause blind spot of locks 2a / 2b / 3: those
+    /// compare two paths that share the interpolation expression, so a
+    /// weight flip (M-D) moves both sides identically and they stay
+    /// green. This test instead compares `resample` against an
+    /// independently derived expectation (see `golden_resample`), so
+    /// the "pass reason" IS the property under test — which of the two
+    /// adjacent FIR windows carries which interpolation weight.
+    ///
+    /// Mutation points caught (A5 G3):
+    ///   * M-D interpolation `65536 - frac` → `frac` — the golden value
+    ///     is derived from `f(base + t) = f(base) + (f(base+1) -
+    ///     f(base))·t`, so a flipped weight (interpolating at
+    ///     `base + (1 - t)`) disagrees on essentially every output
+    ///     sample, and the frac = 0 direction anchor fires at once;
+    ///   * M-A bias constant, M-B missing `-1024·Σs`, M-C `!63` → `!31`,
+    ///     M-E skipped tail taps — the AVX2 dispatch is pinned to the
+    ///     same absolute golden values, so any SIMD-side drift shows up
+    ///     here as a mismatch against an absolute number.
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn lock_resample_interpolation_golden_vector() {
+        if !std::arch::is_x86_feature_detected!("avx2") {
+            panic!(
+                "AVX2 not detected on this host: the A5 interpolation golden \
+                 lock must run where the SIMD path is live"
+            );
+        }
+        let len = 2048usize;
+        let inputs = [
+            ("domain", domain_input(len, 0x5AFE_7A1E)),
+            ("structured", structured_input(len, 0x0BAD_C0DE)),
+        ];
+        let tables = [
+            ("real484", real_coeffs_484()),
+            ("real1024", real_coeffs_1024()),
+            ("boundary484", boundary_coeffs(484)),
+        ];
+        // mrratio is 16.16 fixed-point INPUT SAMPLES PER OUTPUT: the real
+        // NTSC-48k ratio (frac steps by 19244 -> a rich frac sequence),
+        // exactly 1 sample/output (frac pinned to the entry phase), a
+        // 1.5x downsample (frac alternates over two values) and a 256x
+        // downsample (few-output corner).
+        let ratios = [2_444_076u32, 65536, 98_304, 16_777_216];
+        // Entry phases: frac ≈ 0, ≈ 1, just below and just above the
+        // degenerate mid-point (32768, where both weights are equal).
+        let phases = [0u32, 1, 32_767, 65_535];
+
+        for (tname, coeffs) in &tables {
+            let nc = coeffs.len();
+            for (iname, input) in &inputs {
+                for &ratio in &ratios {
+                    for &phase in &phases {
+                        let x0 = ((nc as u32) + 1) << 16;
+                        let x = x0.wrapping_add(phase);
+                        let golden = golden_resample(input, coeffs, x, ratio);
+                        assert!(
+                            !golden.is_empty(),
+                            "no golden samples: table={tname} input={iname} \
+                             ratio={ratio} phase={phase}"
+                        );
+
+                        let mut out_scalar = vec![0i32; len];
+                        let mut out_simd = vec![0i32; len];
+                        let (mr_s, n_s) =
+                            resample(x, ratio, coeffs, input, &mut out_scalar, false);
+                        let (mr_v, n_v) =
+                            resample(x, ratio, coeffs, input, &mut out_simd, true);
+                        assert_eq!(
+                            n_s, n_v,
+                            "output count drift: table={tname} input={iname} \
+                             ratio={ratio} phase={phase}"
+                        );
+                        assert_eq!(
+                            mr_s, mr_v,
+                            "mrindex drift: table={tname} input={iname} \
+                             ratio={ratio} phase={phase}"
+                        );
+                        assert_eq!(
+                            n_s,
+                            golden.len(),
+                            "golden/output count mismatch: table={tname} \
+                             input={iname} ratio={ratio} phase={phase}"
+                        );
+
+                        for (i, g) in golden.iter().enumerate() {
+                            let frac = (g.x & 0xFFFF) as i64;
+                            // Diagnostic only: what a flipped-weight
+                            // implementation would have produced here.
+                            let flipped =
+                                ((g.acc * frac) + (g.acc2 * (65536 - frac))) >> 27;
+                            assert_eq!(
+                                out_scalar[i],
+                                g.value,
+                                "golden-vector mismatch (interpolation weight \
+                                 direction / FIR arithmetic): table={tname} \
+                                 input={iname} ratio={ratio} phase={phase} \
+                                 idx={i} x={} resample={} golden={} acc={} \
+                                 acc2={} flipped-weight-would-give={flipped}",
+                                g.x,
+                                out_scalar[i],
+                                g.value,
+                                g.acc,
+                                g.acc2,
+                            );
+                            assert_eq!(
+                                out_simd[i],
+                                g.value,
+                                "golden-vector mismatch on the AVX2 dispatch \
+                                 (interpolation weight direction / FIR \
+                                 arithmetic): table={tname} input={iname} \
+                                 ratio={ratio} phase={phase} idx={i} x={} \
+                                 resample={} golden={} acc={} acc2={} \
+                                 flipped-weight-would-give={flipped}",
+                                g.x,
+                                out_simd[i],
+                                g.value,
+                                g.acc,
+                                g.acc2,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        // ---- Direction anchors -------------------------------------
+        // The interpolation must slide from the FIR at `base` towards
+        // the FIR at `base + 1` as the fractional part grows:
+        //   frac = 0     -> the output IS the FIR at `base`
+        //   frac = 65535 -> the output HAS REACHED the FIR at `base + 1`
+        // These state the semantics directly; they compare no two
+        // implementations, so a weight flip is caught by construction.
+        for (tname, coeffs) in &tables {
+            let nc = coeffs.len();
+            let base = nc + 1;
+            for (iname, input) in &inputs {
+                let acc = golden_fir(input, coeffs, base);
+                let acc2 = golden_fir(input, coeffs, base + 1);
+                assert_ne!(
+                    acc, acc2,
+                    "degenerate probe: the two FIR endpoints must differ \
+                     (table={tname} input={iname})"
+                );
+                let rising = acc2 > acc;
+
+                // frac = 0: the read position is exactly `base`, so the
+                // output must be the FIR at `base` and nothing else.
+                let x_zero = (base as u32) << 16;
+                for &simd in &[false, true] {
+                    let out = resample_first(input, coeffs, x_zero, simd);
+                    assert_eq!(
+                        out as i64,
+                        acc >> 11,
+                        "interpolation weight direction: at frac=0 the \
+                         output must be the FIR at `base` ({acc} >> 11), \
+                         not the FIR at `base + 1` ({acc2} >> 11) \
+                         [simd={simd} table={tname} input={iname}]"
+                    );
+                }
+
+                // frac = 65535: the read position is one LSB short of
+                // `base + 1`, so the output must have reached the FIR
+                // at `base + 1` (the residual is the truncated part of
+                // the 1/65536 remainder, i.e. |acc - acc2| / 2^27).
+                let x_max = ((base as u32) << 16) | 65_535;
+                let slack = ((acc - acc2).abs() >> 27) + 1;
+                for &simd in &[false, true] {
+                    let out = resample_first(input, coeffs, x_max, simd) as i64;
+                    assert!(
+                        (out - (acc2 >> 11)).abs() <= slack,
+                        "interpolation weight direction: at frac=65535 the \
+                         output must have reached the FIR at `base + 1` \
+                         ({} >> 11 = {}, slack={slack}), got {out} \
+                         [simd={simd} table={tname} input={iname}]",
+                        acc2,
+                        acc2 >> 11,
+                    );
+                }
+
+                // Monotonic slide: as frac grows the output must move
+                // monotonically from one endpoint towards the other.
+                let mut prev: Option<i64> = None;
+                for &frac in &[0u32, 16_384, 32_768, 49_152, 65_535] {
+                    let x = ((base as u32) << 16) | frac;
+                    let v = resample_first(input, coeffs, x, false) as i64;
+                    if let Some(p) = prev {
+                        let ok = if rising { v >= p } else { v <= p };
+                        assert!(
+                            ok,
+                            "interpolation weight direction: the output must \
+                             move monotonically with frac (table={tname} \
+                             input={iname} frac={frac} prev={p} now={v} \
+                             acc={acc} acc2={acc2})"
+                        );
+                    }
+                    prev = Some(v);
+                }
+            }
+        }
     }
 }
