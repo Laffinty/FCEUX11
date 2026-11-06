@@ -25,9 +25,11 @@
 #include <cstring>  // memset
 #include <cstdio>   // fprintf stderr DEBUG
 #include <cstdlib> // getenv
+#include <filesystem> // D5 取证探针：FCEUX11_FETCH_PROBE 输出目录自建
 
 #include "fceu.h"   // ::ANull, ::BNull (DECLFR/DECLFW expansion)
 #include "ppu.h"    // ::PPUCHRRAM, ::PPUNTARAM, ::vnapage, ::NTARAM
+#include "ppu_core.h" // D5 取证探针：ppur（sl/cycle 取架构精确态，纪律 11）
 #include "x6502.h"  // g_cpu (for ::ANull's return value)
 
 namespace fceu11 {
@@ -36,6 +38,183 @@ namespace fceu11 {
 // Both are written by Bus::init(); read by the inlined Bus::read().
 bool     g_busdb_enabled = false;
 uint8_t* g_busdb_slot    = nullptr;
+
+// D5 取证探针 (FCEUX11_FETCH_PROBE) -- definition for the symbol declared
+// in bus.h. Written by X6502 just before the opcode-fetch read; consumed
+// by the inlined Bus::read().
+bool g_fetchprobe_fetch_pending = false;
+
+// ---------------------------------------------------------------------------
+// D5 取证探针 — opcode-fetch 轨迹记录（2026-11-07）。只观测、不修复：
+// 为 v2.0.2 A6/DB 直读快路径的后续 S2「read_fetch 通道」收集证据面——
+// opcode fetch 触及的地址域分布（尤其 IO $4000-$401F 域占比）以及每条
+// fetch 的返回值（DB 锁存语义在 Genie/开放总线/IO 路径上读到什么）。
+//
+// 机制（与 ppu.cpp 的 OAMBUS 探针同一套惯例）：
+//   1) FCEUX11_FETCH_PROBE=<dir> 指定输出目录；未设或空 = 探针完全不
+//      激活（一次性 static 解析 env，e1_cpu_trace_on 惯例）。
+//   2) CPU 侧（x6502.cpp opcode fetch 点）只在探针开启时置
+//      g_fetchprobe_fetch_pending；Bus::read()（bus.h 热路径）消费该标记
+//      并在本读上调用 fetch_probe_record。探针关闭时 pending 全程为
+//      false，常驻代价 = 每读一次预测不跳的全局载入+分支，零 I/O。
+//   3) 只观测、不改任何返回语义：record 只读时间戳与 ppur 状态、追加
+//      二进制记录，不碰 aread_ / DB / 任何仿真状态。cpu_ts 采样于该读
+//      完成之后、ADDCYC 计费之前（即「fetch 时刻」的架构精确态；
+//      ppu sl/cycle 同点采样——不绑 PC/取指指针，纪律 11）。
+//
+// 产物（<dir> 下）：
+//   * fetch_trace.bin：8 字节头（'F','E','T','H',版本1,记录24字节）+
+//     固定 24 字节记录。256 MB 上限，超出后丢弃后续记录并提示一次。
+//   * summary.log + stderr：atexit 输出总 fetch 数与地址域分桶计数
+//     （ram/ppu/io/expo/sram/prg）——io 域占比是本探针的主问题。
+// ---------------------------------------------------------------------------
+struct FetchTraceRec {
+	uint64_t cpu_ts;
+	uint32_t addr;
+	int32_t  ppu_sl;
+	int32_t  ppu_dot;
+	uint8_t  data;
+	uint8_t  pad[3];
+};
+static_assert(sizeof(FetchTraceRec) == 24, "keep the on-disk fetch record layout fixed");
+
+static const char* fetch_probe_dir() {
+	static const char* dir = []() {
+		const char* e = std::getenv("FCEUX11_FETCH_PROBE");
+		return (e && e[0] != '\0') ? e : (const char*)nullptr;
+	}();
+	return dir;
+}
+
+static FILE*    s_fetch_fp = nullptr;
+static FILE*    s_fetch_summary_fp = nullptr;
+static bool     s_fetch_files_ready = false;   // one-shot file init attempted
+static bool     s_fetch_active = false;        // false when file open failed
+static uint64_t s_fetch_bytes = 0;
+static bool     s_fetch_capped = false;
+static constexpr uint64_t FETCH_TRACE_CAP_BYTES = 256ull * 1024 * 1024;
+
+// Address-domain buckets for the summary. Index order is fixed so the
+// offline reader can rely on the column layout.
+enum FetchDomain : int {
+	FETCH_DOM_RAM  = 0,   // $0000-$1FFF (RAM + mirrors)
+	FETCH_DOM_PPU  = 1,   // $2000-$3FFF (PPU regs + mirrors)
+	FETCH_DOM_IO   = 2,   // $4000-$401F — the headline bucket
+	FETCH_DOM_EXPO = 3,   // $4020-$5FFF
+	FETCH_DOM_SRAM = 4,   // $6000-$7FFF
+	FETCH_DOM_PRG  = 5,   // $8000-$FFFF
+	FETCH_DOM_COUNT
+};
+static uint64_t s_fetch_domain_counts[FETCH_DOM_COUNT] = {};
+static uint64_t s_fetch_total = 0;
+
+static const char* fetch_probe_domain_name(int d) {
+	static const char* names[FETCH_DOM_COUNT] = {
+		"ram", "ppu", "io", "expo", "sram", "prg"
+	};
+	return names[d];
+}
+
+// One-shot output setup. Creates <dir> if missing; on failure the probe
+// self-disables (better dead than noisy) and says so once on stderr.
+static void fetch_probe_atexit();
+static void fetch_probe_init_files() {
+	if (s_fetch_files_ready) return;
+	s_fetch_files_ready = true;
+	const char* dir = fetch_probe_dir();
+	if (!dir) return;
+	std::error_code ec;
+	std::filesystem::create_directories(dir, ec);
+	char path[1024];
+	std::snprintf(path, sizeof(path), "%s/fetch_trace.bin", dir);
+	s_fetch_fp = std::fopen(path, "wb");
+	std::snprintf(path, sizeof(path), "%s/summary.log", dir);
+	s_fetch_summary_fp = std::fopen(path, "w");
+	if (!s_fetch_fp || !s_fetch_summary_fp) {
+		std::fprintf(stderr,
+			"FETCH PROBE ERROR: cannot open fetch_trace.bin/summary.log under '%s' — probe disabled\n",
+			dir);
+		if (s_fetch_fp) { std::fclose(s_fetch_fp); s_fetch_fp = nullptr; }
+		if (s_fetch_summary_fp) { std::fclose(s_fetch_summary_fp); s_fetch_summary_fp = nullptr; }
+		return;
+	}
+	// 8-byte trace header: magic + version + record size, so a truncated
+	// or layout-drifted stream is detectable by the offline reader.
+	const uint8_t hdr[8] = { 'F', 'E', 'T', 'H', 1, 24, 0, 0 };
+	s_fetch_bytes += std::fwrite(hdr, 1, sizeof(hdr), s_fetch_fp);
+	s_fetch_active = true;
+	std::fprintf(s_fetch_summary_fp,
+		"FETCH PROBE begin dir=%s trace_cap=%llu bytes\n",
+		dir, (unsigned long long)FETCH_TRACE_CAP_BYTES);
+	std::fflush(s_fetch_summary_fp);
+	std::atexit(fetch_probe_atexit);
+}
+
+static void fetch_probe_atexit() {
+	if (!s_fetch_active) return;
+	if (s_fetch_summary_fp) {
+		std::fprintf(s_fetch_summary_fp,
+			"FETCH PROBE end total=%llu trace_bytes=%llu%s\n",
+			(unsigned long long)s_fetch_total,
+			(unsigned long long)s_fetch_bytes,
+			s_fetch_capped ? " (CAPPED)" : "");
+		uint64_t pct_den = s_fetch_total ? s_fetch_total : 1;
+		for (int d = 0; d < FETCH_DOM_COUNT; ++d) {
+			std::fprintf(s_fetch_summary_fp, "  %-4s %12llu  %5.2f%%\n",
+				fetch_probe_domain_name(d),
+				(unsigned long long)s_fetch_domain_counts[d],
+				100.0 * (double)s_fetch_domain_counts[d] / (double)pct_den);
+		}
+		std::fflush(s_fetch_summary_fp);
+		std::fclose(s_fetch_summary_fp);
+		s_fetch_summary_fp = nullptr;
+	}
+	if (s_fetch_fp) {
+		std::fflush(s_fetch_fp);
+		std::fclose(s_fetch_fp);
+		s_fetch_fp = nullptr;
+	}
+	// stderr mirror: the smoke-run reader looks here first.
+	std::fprintf(stderr, "FETCH PROBE end total=%llu", (unsigned long long)s_fetch_total);
+	for (int d = 0; d < FETCH_DOM_COUNT; ++d) {
+		std::fprintf(stderr, " %s=%llu",
+			fetch_probe_domain_name(d),
+			(unsigned long long)s_fetch_domain_counts[d]);
+	}
+	std::fprintf(stderr, "\n");
+}
+
+void fetch_probe_record(uint32_t addr, uint8_t data) noexcept {
+	// One-shot init; only reachable while the probe is on (pending-consume
+	// path in Bus::read).
+	if (!s_fetch_files_ready) fetch_probe_init_files();
+	if (!s_fetch_active) return;
+
+	++s_fetch_total;
+	++s_fetch_domain_counts[
+		addr < 0x2000 ? FETCH_DOM_RAM  :
+		addr < 0x4000 ? FETCH_DOM_PPU  :
+		addr < 0x4020 ? FETCH_DOM_IO   :
+		addr < 0x6000 ? FETCH_DOM_EXPO :
+		addr < 0x8000 ? FETCH_DOM_SRAM : FETCH_DOM_PRG];
+
+	if (!s_fetch_fp || s_fetch_capped) return;
+	if (s_fetch_bytes >= FETCH_TRACE_CAP_BYTES) {
+		s_fetch_capped = true;
+		std::fprintf(stderr,
+			"FETCH PROBE: fetch_trace.bin hit %llu-byte cap — further records dropped (summary.log continues)\n",
+			(unsigned long long)FETCH_TRACE_CAP_BYTES);
+		return;
+	}
+	FetchTraceRec rec;
+	rec.cpu_ts  = g_cpu.timestamp_base() + (uint64_t)g_cpu.timestamp_ref();
+	rec.addr    = addr;
+	rec.ppu_sl  = ppur.status.sl;
+	rec.ppu_dot = ppur.status.cycle;
+	rec.data    = data;
+	rec.pad[0] = rec.pad[1] = rec.pad[2] = 0;
+	s_fetch_bytes += std::fwrite(&rec, 1, sizeof(rec), s_fetch_fp);
+}
 
 // ---------------------------------------------------------------------------
 // Class layout assertions.

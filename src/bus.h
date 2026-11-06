@@ -70,6 +70,18 @@ namespace fceu11 {
 extern bool     g_busdb_enabled;
 extern uint8_t* g_busdb_slot;
 
+// -----------------------------------------------------------------
+// D5 取证探针 (FCEUX11_FETCH_PROBE, 2026-11-07): opcode-fetch 来源标记。
+// X6502 在探针开启时于每条指令的 opcode fetch 读（x6502.cpp 的
+// b1=RdMem(_PC)）之前置 g_fetchprobe_fetch_pending；下面这个 __forceinline
+// 的 read() 消费该标记并把 (addr, data) 交给 bus.cpp 的 fetch_probe_record。
+// 只观测、不改返回语义。默认关闭：pending 全程为 false，常驻代价是每读
+// 一次预测不跳的全局载入+分支（与上面 g_busdb_enabled 分支同一档），
+// 零 I/O。记录器、轨迹格式与地址域汇总见 bus.cpp 的探针块注释。
+// -----------------------------------------------------------------
+extern bool g_fetchprobe_fetch_pending;
+void fetch_probe_record(uint32_t addr, uint8_t data) noexcept;
+
 class FCEUX11_CACHE_ALIGN Bus {
 public:
     // -----------------------------------------------------------------
@@ -107,6 +119,14 @@ public:
         const uint8_t r = aread_[addr](addr);
         if (g_busdb_enabled)
             *g_busdb_slot = r;
+        // D5 取证探针 (FCEUX11_FETCH_PROBE): consume the opcode-fetch origin
+        // marker (see the block comment above g_fetchprobe_fetch_pending).
+        // Default-off branch, same cost class as the DB latch above; the
+        // recorder is called only while the probe is on and never alters r.
+        if (g_fetchprobe_fetch_pending) {
+            g_fetchprobe_fetch_pending = false;
+            fetch_probe_record(addr, r);
+        }
         return r;
     }
     __forceinline void write(uint16_t addr, uint8_t val) const noexcept {

@@ -409,6 +409,22 @@ static bool e1_cpu_trace_on() {
 static uint16 e1_last_pc = 0;
 uint16 fceu11_e1_last_pc() { return e1_last_pc; }
 
+// D5 取证探针 (FCEUX11_FETCH_PROBE, 2026-11-07): one-shot env parse, the
+// e1_cpu_trace_on convention. When on, the CPU sets
+// fceu11::g_fetchprobe_fetch_pending right before the opcode-fetch read
+// (b1=RdMem(_PC) below); the inlined Bus::read() consumes the marker on
+// that read and routes (addr, data) to bus.cpp's fetch_probe_record.
+// Off by default: pending stays false for the whole process, so the only
+// resident cost is one static-bool load + predicted-not-taken branch per
+// instruction. Recorder / trace format / domain summary: bus.cpp.
+static bool d5_fetch_probe_on() {
+ static const bool on = []() {
+  const char* e = std::getenv("FCEUX11_FETCH_PROBE");
+  return e && e[0] != '\0';
+ }();
+ return on;
+}
+
 static uint64 e1_cpu_abs() {
  return g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref();
 }
@@ -612,6 +628,9 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
    // every reader sits behind the same env gate, so the write pays nothing
    // when the probe is off.
    if (e1_cpu_trace_on()) e1_last_pc = (uint16)_PC;
+   // D5 取证探针 (FCEUX11_FETCH_PROBE): mark this read as an opcode fetch.
+   // Consumed (and cleared) inside Bus::read — no return semantics touched.
+   if (d5_fetch_probe_on()) fceu11::g_fetchprobe_fetch_pending = true;
    b1=RdMem(_PC);
 
    ADDCYC(CycTable[b1]);
