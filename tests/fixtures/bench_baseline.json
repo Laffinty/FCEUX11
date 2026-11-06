@@ -23,8 +23,8 @@
     "gates entirely (-LE perf; 20+ percent runner noise)."
   ],
   "version":             "v1.3.0",
-  "captured_at":         "2026-11-06",
-  "captured_from_commit": "800b3f81293d7209d1284a1b68a08200e1fdfeb5",
+  "captured_at":         "2026-11-07",
+  "captured_from_commit": "caf62d46ecf18bd8b8ce5e10ac095e9c0b7e1f80",
   "captured_on":         "Windows_NT, Microsoft Windows 10.0.26300 , AMD64",
   "tolerance_pct":       10.0,
   "benchmarks": [
@@ -35,7 +35,7 @@
       "frames_per_iter":  60,
       "iterations":       5,
       "metric":           "median_total_ms",
-      "baseline_ms":      36.419,
+      "baseline_ms":      34.049,
       "unit":             "milliseconds for 60 frames"
     },
     {
@@ -45,7 +45,7 @@
       "frames_per_iter":  60,
       "iterations":       5,
       "metric":           "median_total_ms",
-      "baseline_ms":      31.383,
+      "baseline_ms":      29.174,
       "unit":             "milliseconds for 60 frames"
     },
     {
@@ -55,7 +55,7 @@
       "frames_per_iter":  60,
       "iterations":       5,
       "metric":           "median_total_ms",
-      "baseline_ms":      34.012,
+      "baseline_ms":      32.135,
       "unit":             "milliseconds for 60 frames (CPU+PPU+APU)"
     },
     {
@@ -65,7 +65,7 @@
       "frames_per_iter":  60,
       "iterations":       7,
       "metric":           "median_total_ms",
-      "baseline_ms":      44.337,
+      "baseline_ms":      41.006,
       "unit":             "milliseconds for 60 frames"
     },
     {
@@ -75,7 +75,7 @@
       "frames_per_iter":  60,
       "iterations":       5,
       "metric":           "median_total_ms",
-      "baseline_ms":      34.252,
+      "baseline_ms":      32.017,
       "unit":             "milliseconds for 60 frames (APU)"
     },
     {
@@ -85,7 +85,7 @@
       "frames_per_iter":  60,
       "iterations":       5,
       "metric":           "median_total_ms",
-      "baseline_ms":      36.335,
+      "baseline_ms":      33.861,
       "unit":             "milliseconds for 60 frames (Bus dispatch)"
     }
   ]
