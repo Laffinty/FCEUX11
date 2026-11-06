@@ -1487,7 +1487,7 @@
           "--tests-json",
           "tests/tests.json",
           "--frames",
-          "600"
+          "2000"
         ]
       },
       "expected": {
@@ -1500,7 +1500,7 @@
         "read-buffer"
       ],
       "failure_means": "advisory",
-      "provenance": "bisqwit ppu_read_buffer; F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: bisqwit \\ read-buffer monster test; open-bus/decay path incomplete",
+      "provenance": "bisqwit ppu_read_buffer; F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: bisqwit \\ read-buffer monster test; open-bus/decay path incomplete; frame budget corrected 2026-11-07 (human ruling): completion window measured 1200-1300 frames (two deterministic reruns), 600 was a harness pseudo-fail (0x80 = still running); core $2007 read buffer already conforms — no core change",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "bisqwit/test_ppu_read_buffer.nes",
       "vendor_state": "vendored",
@@ -1565,7 +1565,7 @@
           "--tests-json",
           "tests/tests.json",
           "--frames",
-          "300"
+          "400"
         ]
       },
       "expected": {
@@ -1578,12 +1578,12 @@
         "exec-space"
       ],
       "failure_means": "advisory",
-      "provenance": "bisqwit cpu_exec_space (apu); F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: execute-from-IO-space edge; bus dispatch coverage gap",
+      "provenance": "bisqwit cpu_exec_space (apu); F11QA-recast-2026-09-21; mirror-ref-2026-09-24; frame budget corrected 2026-11-07 (human ruling): completion measured ~316 frames (FCEUX11_FETCH_PROBE trace + terminal spin loop forensics), 300 was a harness pseudo-fail (0x80 = still running); IO-space fetch semantics verified hardware-correct (open-bus fetch returns last-bus value $40=RTI via the DB-latch model, probe: 31 IO fetches / 2.58M total), supersedes the known-limit note above",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "bisqwit/test_cpu_exec_space_apu.nes",
       "vendor_state": "vendored",
       "protocol": "$6000",
-      "known_limit": "execute-from-IO-space edge; bus dispatch coverage gap"
+      "known_limit": "superseded 2026-11-07: IO-space fetch verified correct (see provenance); residual PPU-side wait_vblank phase competition (~0.9 frame x ~25 sessions) is bucket C.1 vbl known-limit, not bus"
     },
     {
       "kgmqa_id": "kgmqa-052-cpu-flag-concurrency-bisqwit",
