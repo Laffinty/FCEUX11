@@ -61,6 +61,20 @@ static uint8_t g_test_write_called = 0;
 static uint32_t g_test_write_last_addr = 0;
 static uint8_t  g_test_write_last_val = 0;
 
+// S2 fetch-channel test: gamepad pattern buffer (must outlive FCEUI_SetInput,
+// which stores the pointer — same lifetime discipline as the pad in
+// test_fceuindbg_suppression, which is function-static for this reason).
+static uint32_t g_fetch_pad = 0x0A;
+
+// S2 fetch-channel test: open-bus handler twin. bus.cpp's ANullImpl (what
+// PowerNES installs across every unregistered address) is file-local, and
+// fceu.cpp's ::ANull is static — the test carries its own byte-identical
+// twin (same body: return the latched DB) so the exec-from-IO miniature can
+// guarantee GENUINE open bus under the probe addresses.
+static uint8_t fetch_openbus_read_fn(uint32_t) {
+    return g_cpu.db();   // global-inline alias of fceu11::cpu_instance() (cpu.h:179)
+}
+
 static uint8_t test_read_fn(uint32 A) {
     ++g_test_read_called;
     return g_test_read_storage;
@@ -475,6 +489,153 @@ void test_genie_wrap(TestContext& ctx) {
     g_genie_game_val = 0;
 }
 
+// ---------------------------------------------------------------------------
+// S2 (A6+D5, 2026-11-07): read_fetch 通道锁（bus.h read_fetch / x6502.cpp
+// RdFetch：CPU opcode fetch 已改道）。S1 探针证据（kgmqa-051，600 帧、
+// 554 万取指）：IO $4000-$401F 31 次、expo $4020-$40FF 224 次取指全部返回
+// $40=RTI（开放总线 = DB 锁存值，ROM 用 STY $24 预驱动）——与真机一致，
+// 分叉白名单为空，read_fetch 是 read 的纯别名（共享锁存尾，委托实现）。
+// 本测试把「今天为什么可以不分叉」钉成锁，未来任何分叉必须先红后改：
+//   L1  exec-from-IO 语义：DB 预置 $40 后 read_fetch($4000/$4014/$4018/
+//       $4020/$5FFF) 返回 $40 —— 051 的 JMP $40XX → RTI 微缩模型。
+//   L2  取指锁存尾：每次 read_fetch 之后 g_busdb_slot == 返回值。
+//   L3  链式开放总线：取指返回值 ≠ 取指前 DB 时（真 handler），下一个
+//       开放总线读看到的是取指锁存的新值 —— 绕过锁存尾的变异在此转红。
+//   L4  handler 一致性（expo 域）：read_fetch 派发到 SetReadHandler 注册
+//       的 handler（调用计数与返回值），用后恢复。
+//   L5  副作用保真（PPU 域）：read_fetch($2002) 看到 VBlank 位并清掉 ——
+//       未来 ppuio 类分叉若在取指路径抑制副作用，此锁转红（M-D5-2' 靶）。
+//   L6  副作用保真（IO 域）+ fceuindbg：read_fetch($4016) 推进控制器移位
+//       寄存器（真机：从 $4016 取指 = 一次真读）；fceuindbg=1 时不推进
+//       （守卫在 handler 内，通道不旁路、也不新增抑制）。
+//   L7  全 64K 扫描：read_fetch(a) 之后 DB 锁存 == 返回值 —— 锁存尾的
+//       全地址空间合同（委托共享的结构性背书）。
+//   L8  探针标记消费：pending 置位后经 read_fetch 归零（S1 探针静默性的
+//       活性侧；S0 的 bus_db_latch 锁的是静默侧）。
+// 变异：M-D5-1' = read_fetch 退化成裸表读（绕过锁存尾）→ L2/L3/L7 红；
+//       M-D5-2' = read_fetch 加 $2002 副作用抑制分叉 → L5 红（分叉只影响
+//       取指通道、常规仿真不在 PPU 域取指，ppu_test 无感 —— 计划原文的
+//       「034/041 或 ppu_test 红」前提是分叉已存在，实测记此偏差）。
+// ---------------------------------------------------------------------------
+void test_bus_fetch_channel(TestContext& ctx) {
+    using fceu11::g_bus;
+    FCEU11_EXPECT(ctx, fceu11::g_busdb_enabled,
+                  "BUSDB on: fetch-channel latch locks are assertable");
+    if (!fceu11::g_busdb_enabled || !fceu11::g_busdb_slot) return;
+
+    // The exec-from-IO miniature needs GENUINE open bus under the probe
+    // addresses: earlier suites in this process (test_register_handler /
+    // test_open_bus) leave test_read_fn installed over $4000-$4001 and
+    // $5000-$5FFF and never restore it. Force the open-bus twin over the
+    // probe ranges, then put back exactly what we found — the lock must
+    // not depend on leftover registration state (S1 discipline: the pass
+    // reason must be the asserted path, not an unrelated leftover).
+    struct RangeSave { uint16_t lo, hi; readfunc saved; };
+    RangeSave ranges[] = {
+        { 0x4000, 0x4014, nullptr },
+        { 0x4018, 0x401F, nullptr },
+        { 0x4020, 0x5FFF, nullptr },
+    };
+    for (RangeSave& r : ranges) {
+        r.saved = GetReadHandler(r.lo);
+        SetReadHandler(r.lo, r.hi, fetch_openbus_read_fn);
+    }
+
+    // --- L1/L2: exec-from-IO open-bus miniature (the 051 RTI chain) ---
+    struct FetchStep { uint16_t addr; const char* what; };
+    const FetchStep steps[] = {
+        { 0x4000, "open-bus fetch $4000 returns the pre-driven DB $40 (051 RTI byte)" },
+        { 0x4014, "open-bus fetch $4014 returns DB $40" },
+        { 0x4018, "open-bus fetch $4018 returns DB $40" },
+        { 0x4020, "open-bus fetch $4020 (expo start) returns DB $40" },
+        { 0x5FFF, "open-bus fetch $5FFF (expo end) returns DB $40" },
+    };
+    for (const FetchStep& s : steps) {
+        *fceu11::g_busdb_slot = 0x40;  // 051 pre-drives DB=$40 via STY $24
+        const uint8_t v = g_bus.read_fetch(s.addr);
+        FCEU11_EXPECT(ctx, v == 0x40, s.what);
+        FCEU11_EXPECT(ctx, *fceu11::g_busdb_slot == v,
+                      "  ...and the fetch latched DB == returned (L2)");
+    }
+
+    // --- L3: the fetch-latched DB feeds the NEXT open-bus read ---
+    FCEUI_SetInput(0, static_cast<ESI>(SI_GAMEPAD), &g_fetch_pad, 0);
+    joy[0] = 0x0A;
+    joy[1] = 0;
+    BWrite[0x4016](0x4016, 1);
+    BWrite[0x4016](0x4016, 0);
+    *fceu11::g_busdb_slot = 0x5A;      // stale open-bus value ≠ handler's byte
+    const uint8_t f16 = g_bus.read_fetch(0x4016);  // real handler: (DB&0xC0)|bit0
+    FCEU11_EXPECT(ctx, f16 == 0x40,
+                  "read_fetch($4016) returns the handler byte, not the stale DB");
+    const uint8_t n20 = g_bus.read(0x4020);
+    FCEU11_EXPECT(ctx, n20 == f16,
+                  "next open-bus read sees the FETCH-latched DB ($40), not the stale $5A");
+    FCEUI_SetInput(0, static_cast<ESI>(SI_NONE), nullptr, 0);
+
+    // restore the handler state we found (leftover registrations included)
+    for (RangeSave& r : ranges) {
+        SetReadHandler(r.lo, r.hi, r.saved);
+    }
+
+    // --- L4: handler identity in the expo domain ---
+    g_test_read_called  = 0;
+    g_test_read_storage = 0x63;
+    readfunc saved_5000 = GetReadHandler(0x5000);
+    SetReadHandler(0x5000, 0x50FF, test_read_fn);
+    const uint8_t hv = g_bus.read_fetch(0x5000);
+    FCEU11_EXPECT(ctx, hv == 0x63 && g_test_read_called == 1,
+                  "read_fetch dispatches to the registered handler (expo domain)");
+    SetReadHandler(0x5000, 0x50FF, saved_5000);
+
+    // --- L5: side-effect fidelity, PPU domain ($2002) ---
+    PPU[2] |= 0x80;
+    const uint8_t st = g_bus.read_fetch(0x2002);
+    FCEU11_EXPECT(ctx, (st & 0x80) != 0,
+                  "read_fetch($2002) sees the VBlank bit (side effects preserved)");
+    FCEU11_EXPECT(ctx, (PPU[2] & 0x80) == 0,
+                  "read_fetch($2002) clears the VBlank flag exactly like a read");
+
+    // --- L6: side-effect fidelity, IO domain ($4016) + fceuindbg ---
+    FCEUI_SetInput(0, static_cast<ESI>(SI_GAMEPAD), &g_fetch_pad, 0);
+    joy[0] = 0x0A;
+    joy[1] = 0;
+    BWrite[0x4016](0x4016, 1);
+    BWrite[0x4016](0x4016, 0);
+    const uint8_t q1 = g_bus.read_fetch(0x4016) & 1;  // bit0 (A=0), advances
+    const uint8_t q2 = g_bus.read_fetch(0x4016) & 1;  // bit1 (B=1): the FETCH advanced
+    FCEU11_EXPECT(ctx, q1 == 0 && q2 == 1,
+                  "read_fetch($4016) advances the shift register (hardware: fetch = real read)");
+    ::fceuindbg = 1;
+    const uint8_t q3 = g_bus.read_fetch(0x4016) & 1;  // bit2 (Select=0), suppressed
+    const uint8_t q4 = g_bus.read_fetch(0x4016) & 1;
+    ::fceuindbg = 0;
+    FCEU11_EXPECT(ctx, q3 == 0 && q3 == q4,
+                  "fceuindbg=1 read_fetch($4016) does not advance (handler guard, not channel)");
+    FCEUI_SetInput(0, static_cast<ESI>(SI_NONE), nullptr, 0);
+
+    // --- L7: full 64K sweep — the latch tail holds at every address ---
+    bool latch_all = true;
+    for (uint32_t a = 0; a < 0x10000; ++a) {
+        const uint8_t r = g_bus.read_fetch(static_cast<uint16_t>(a));
+        latch_all = latch_all && (*fceu11::g_busdb_slot == r);
+    }
+    FCEU11_EXPECT(ctx, latch_all,
+                  "64K sweep: read_fetch latches DB == returned at every address");
+
+    // --- L8: probe-marker consumption through the fetch channel ---
+    fceu11::g_fetchprobe_fetch_pending = true;
+    const uint8_t pv = g_bus.read_fetch(0x4000);
+    FCEU11_EXPECT(ctx, !fceu11::g_fetchprobe_fetch_pending,
+                  "read_fetch consumes the fetch-probe marker (S1 consume path, active side)");
+    FCEU11_EXPECT(ctx, *fceu11::g_busdb_slot == pv,
+                  "the probe-consume read still latches DB == returned");
+
+    // --- PRG sanity: value equality with the read channel (side-effect-free) ---
+    FCEU11_EXPECT(ctx, g_bus.read_fetch(0x8123) == ARead[0x8123](0x8123),
+                  "read_fetch == read on PRG (mapper-0, side-effect-free domain)");
+}
+
 int main() {
     std::setvbuf(stdout, nullptr, _IONBF, 0);
 
@@ -512,6 +673,12 @@ int main() {
     test_bus_db_latch(ctx);
     test_fceuindbg_suppression(ctx);
     test_genie_wrap(ctx);
+
+    // A6+D5 S2: the read_fetch opcode-fetch channel. Runs after Genie (its
+    // teardown restored the PRG handlers); the 64K sweep in the middle of
+    // the test is side-effect heavy ($2002/$4015/$4016 reads), so nothing
+    // that asserts on PPU/controller state may follow it in this process.
+    test_bus_fetch_channel(ctx);
 
     fceu11::CloseGame();
     core_shutdown();

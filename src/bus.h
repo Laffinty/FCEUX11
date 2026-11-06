@@ -129,6 +129,41 @@ public:
         }
         return r;
     }
+    // -----------------------------------------------------------------
+    // S2 (A6+D5, 2026-11-07): opcode-fetch channel. The CPU's opcode
+    // fetch (x6502.cpp RdFetch: b1=RdFetch(_PC)) routes through here;
+    // every data/operand read stays on read().
+    //
+    // Fork whitelist = EMPTY, and that is evidence, not a placeholder:
+    // the S1 fetch-probe trace of kgmqa-051 (bisqwit cpu_exec_space,
+    // 600 frames, 5.54M fetches) shows every fetch the ROM issues into
+    // the IO ($4000-$401F, 31 fetches) and expo ($4020-$40FF, 224
+    // fetches) domains must behave EXACTLY like a data read:
+    //   * open-bus source = the latched DB (ANull) — that is what makes
+    //     the fetched byte $40 = RTI and returns execution to the test
+    //     loop (the ROM pre-drives DB=$40 via `STY $24` before its
+    //     `JMP $40XX`; all 255 probed IO/expo fetches returned $40);
+    //   * handler side effects survive ($4016 fetch = a real controller
+    //     read on hardware, shift register advances);
+    //   * the DB-latch tail latches the fetched byte like any read.
+    // So read_fetch is a pure alias of read() today — shared tail by
+    // delegation, zero behavioural delta, same machine code after
+    // inlining. Its reason to exist is the single seam for a future
+    // evidence-backed fetch/read divergence (e.g. the cpu_exec_space
+    // ppuio variant's instruction-prefetch semantics). Rules for any
+    // future fork: (a) the fork predicate goes here, with the probe
+    // citation in the comment; (b) tests/f11qa/core/bus_test.cpp
+    // test_bus_fetch_channel gets its whitelist-domain block extended
+    // in the same commit; (c) the 64K equivalence lock L7 must be
+    // re-derived for the forked domain, never silently excluded.
+    // -----------------------------------------------------------------
+    __forceinline uint8_t read_fetch(uint16_t addr) const noexcept {
+        // Fork whitelist: no probed address domain shows a fetch/read
+        // semantic split (see the block comment above) — nothing forks.
+        // if (/* evidence-cited fork domain */) { ...forked semantics... }
+        return read(addr);
+    }
+
     __forceinline void write(uint16_t addr, uint8_t val) const noexcept {
         bwrite_[addr](addr, val);
     }

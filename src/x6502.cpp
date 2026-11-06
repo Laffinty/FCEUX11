@@ -59,6 +59,22 @@ static INLINE uint8 RdMem(unsigned int A)
  return(_DB);
 }
 
+// S2 (A6+D5, 2026-11-07): opcode-fetch channel. Same shape as RdMem but
+// routed through Bus::read_fetch — the single seam where an evidence-
+// backed fetch/read semantic divergence would land (bus.h block comment;
+// S1 probe evidence: kgmqa-051 IO/expo fetches behave exactly like reads,
+// so the channel is a pure alias today). Only the opcode fetch point below
+// uses it; operand and data reads stay on RdMem (S1 evidence: the
+// exec-space criterion exercises opcode fetches only).
+static INLINE uint8 RdFetch(unsigned int A)
+{
+ _DB=fceu11::g_bus.read_fetch(static_cast<uint16_t>(A));
+ #ifdef _S9XLUA_H
+ CallRegisteredLuaMemHook(A, 1, _DB, LUAMEMHOOK_READ);
+ #endif
+ return(_DB);
+}
+
 //normal memory write
 static INLINE void WrMem(unsigned int A, uint8 V)
 {
@@ -630,8 +646,9 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
    if (e1_cpu_trace_on()) e1_last_pc = (uint16)_PC;
    // D5 取证探针 (FCEUX11_FETCH_PROBE): mark this read as an opcode fetch.
    // Consumed (and cleared) inside Bus::read — no return semantics touched.
+   // S2: the fetch itself goes through the read_fetch channel (RdFetch).
    if (d5_fetch_probe_on()) fceu11::g_fetchprobe_fetch_pending = true;
-   b1=RdMem(_PC);
+   b1=RdFetch(_PC);
 
    ADDCYC(CycTable[b1]);
 
