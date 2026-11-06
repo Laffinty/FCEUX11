@@ -257,6 +257,22 @@ if(FCEUX11_BUILD_TESTS)
              COMMAND fceux11_apu_wav_diff_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
+    # v2.0.2 A5 — audio WAV diff regression test, HIGH-QUALITY path.
+    # Companion of apu_wav_diff_test: FCEUI_Sound(48000) + SetSoundQuality(1)
+    # after LoadGame reaches the FSettings.soundq >= 1 branch of
+    # FlushEmulateSound (HQ channel renderers + WaveHi dequant + the
+    # 484-tap NeoFilterSound FIR that A5 SIMD targets). Captures BOTH an
+    # int16 WAV (kgmqa-024 format, 48000 Hz) and a raw int32 mix-buffer
+    # dump, memcmp'd against fixtures/golden_wav_hq/<rom>.{wav,pcm32}.
+    # 0-sample tolerance. VERIFY is the default; goldens missing -> red.
+    fceux11_add_test_executable(fceux11_apu_wav_hq_diff_test
+        core/apu_wav_hq_diff_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME apu_wav_hq_diff_test
+             COMMAND fceux11_apu_wav_hq_diff_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
     # v1.7 Cartograph §6.2 — Cart class surface tests.
     # Phase A skeleton: 12 [SKIP] tests that compile + link. Phase E/F
     # will fill in real assertions for Cart lifecycle, MirrorMode enum,
@@ -463,7 +479,7 @@ if(FCEUX11_BUILD_TESTS)
             core_state_test
             cpu_test ppu_test apu_test bus_test mapper_core_test
         savestate_core_test golden_savestate_test bench_tolerance_test
-        ppu_frame_diff_test apu_wav_diff_test
+        ppu_frame_diff_test apu_wav_diff_test apu_wav_hq_diff_test
         cart_class_test fds_load_test
         driver_callbacks_test core_driver_boundary_test
         ppu_rendering_lut_test ppu_phase_c_test ppu_phase_d_test
