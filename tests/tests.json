@@ -1224,7 +1224,7 @@
       "failure_means": "blocking",
       "provenance": "S2.5 gate G-2 (r20): mounts the ROM that kgmqa-040 legacy name claims; survey cpu_interrupt_hijack 12.7",
       "mirror_ref": "v1.8.0-mirror",
-      "mirror_path": "blargg/ppu/vbl_05_nmi_timing.nes",
+      "mirror_path": "blargg/ppu/05-nmi_timing.nes",
       "vendor_state": "vendored",
       "protocol": "$6000"
     },
