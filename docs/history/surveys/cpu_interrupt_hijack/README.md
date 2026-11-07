@@ -1,6 +1,6 @@
 # kgmqa-037 中断轮询下沉 + hijack（D1 专线）—— S0 调查页
 
-> **STATUS: OPEN**（S0 完成：取证落档 + 两拍对照表；S1 = INTLEDGER 探针 + 锁测试）
+> **STATUS: OPEN**（S0+S1+S2 完成 2026-11-07：取证落档、INTLEDGER 探针+锁测试、两拍模型+向量级 hijack；S3–S5 未动。S2 实施记录见 §10）
 > 落地：2026-11-07（v2.0.2 计划 r12 的 D1 专线 PLAN，S0 阶段）
 > 上位卡：`docs/plans/long-term-evolution/T2-中断时序.md`（分项计划 T2 第 1 步）
 > 设计裁定（r12）：**线时刻账本**——本仓无每访问周期步进，Mesen2 两拍不可照抄。
@@ -32,7 +32,7 @@ dummy 读），因此可被劫持。
 
 | 注入时刻 ↓ / 在飞实体 → | BRK（执行中） | NMI 序列（执行中） | IRQ 序列（执行中） | branch（执行中） |
 |---|---|---|---|---|
-| **NMI 在 BRK 轮询点后置位** | **hijack**：序列继续、向量=$FFFA、B=0（BRK 变 NMI 服务） | —（按排队） | 向量劫持同右 | 末周期窗口：派发提前 1 周期、PC=目标 |
+| **NMI 在 BRK 轮询点后置位** | **hijack**：序列继续、向量=$FFFA、B=0（BRK 变 NMI 服务）（⚠ S2 实测更正：B=1 保留——向量级劫持，见 §10） | —（按排队） | 向量劫持同右 | 末周期窗口：派发提前 1 周期、PC=目标 |
 | **IRQ 在 BRK 轮询点后置位** | 与 BRK 同向量 $FFFE、B=0（等价劫持，仅 B 位差） | 同左 | — | 同右（branch-delay） |
 | **NMI 在 IRQ/BRK 序列执行中置位** | 向量劫持：本序列读 $FFFA、B 保持 0 | 第二次 NMI 排队、首次返回后立即服务 | 向量劫持：$FFFE→$FFFA | — |
 | **branch 已取指、线在末周期前置位** | — | — | — | **branch-delay**：轮询点后移到末周期，目标首指令前派发 |
@@ -81,7 +81,7 @@ NMIDELAY=8 的实际授予量随指令对齐波动（`[实测]` VBL_ENTER→AFTE
 | NMI assert（VBL 路径） | 帧边界量化处置线；fresh 推迟一边界；dispatch−set = DEFER 与派发边界间在飞指令长度（2..7 周期，min=2） | cycle N 末采样、N+1 生效；dispatch−assert ≥ 在飞指令余长 | 基线：delta≥2 且 DEFER 记录在 set 同刻 |
 | NMI2（$2000 边沿） | 边界 1：NMI2→NMI 转换；边界 2：派发（else-if 链天然两级） | 同上两拍 | 基线：转换记录→派发记录顺序 |
 | IRQ（EXT/FCOUNT/DPCM） | 注入后**第一个** loop-top 即派发（无 fresh；set 可等于 dispatch 同刻）；I 旗标置位时挂起不派发 | 倒数第二周期末线值生效 → dispatch ≥ set + 在飞指令余长 | 基线：首边界即派发；目标（S2）：delta≥2 |
-| hijack（BRK 在飞 + NMI 置位） | BRK 完整执行（压栈 B=1、向量 $FFFE）**然后** NMI 派发（B=0、$FFFA）= 两次序列、栈 6 字节 | 单序列：opcode 槽 dummy 读、B=0、$FFFA、栈 3 字节 | 目标（S2 fail-to-pass） |
+| hijack（BRK 在飞 + NMI 置位） | BRK 完整执行（压栈 B=1、向量 $FFFE）**然后** NMI 派发（B=0、$FFFA）= 两次序列、栈 6 字节 | 单序列：opcode 槽 dummy 读、B=0、$FFFA、栈 3 字节（⚠ S2 实测更正：B=1 保留，见 §10） | 目标（S2 fail-to-pass） |
 | branch-delay | 分支完整执行后边界派发 | 末周期窗口采样，派发提前 1 周期 | 目标（S5 fail-to-pass） |
 
 ## 6. 探针与复跑
@@ -129,7 +129,7 @@ set/set/clear 拓扑在本 ROM 也活跃）；NMI release=334 = ppu.cpp 的
 |---|---|---|
 | 基线 B0-B7 | 线锁存即时性、fresh 一边界推迟、切片周期 2+7、单/双序列栈形、NMI2 两级转换、NMI 无视 I、I 置位挂起、TEMP 一次性、BRK 先于 NMI（B=1/B=0 字节序） | 838 项全绿 |
 | 目标 T-D1-2 | 两拍：边界注入 EXT 首切片不派发、派发落在轮询点后边界 | 3 条 RED（S2 转绿） |
-| 目标 T-D1-3 | hijack：单序列（S−3）、B=0、NMI 向量；BRK 槽 PC+2 形状 pin | 2 条 RED + 2 条两态绿 pin（S2 转绿） |
+| 目标 T-D1-3 | hijack：单序列（S−3）、B=0、NMI 向量；BRK 槽 PC+2 形状 pin（⚠ S2 实测更正：B=1 保留，见 §10） | 2 条 RED + 2 条两态绿 pin（S2 转绿） |
 | 目标 T-D1-4 | branch-delay：分支切片内不派发、压分支目标 PC | 4 条 RED（S5 转绿） |
 
 S1 实测 **FTP RED=9 / GREEN=2**（T-D1-4d 现红机理：现行为 stale 边界先派发
@@ -142,5 +142,40 @@ S1 实测 **FTP RED=9 / GREEN=2**（T-D1-4d 现红机理：现行为 stale 边�
 | **M-D1-0** | `g_e1_nmi_fresh = true` 置位处短路（TriggerNMI） | 基线 fresh 推迟断言红 | **11 项红**（B1/B1a/B5a/B5b + B5c/B5d/B6-2/B2/B3/B3b/B4b——stale 边界先派发把 CPU 送进 ROM NMI 处理器，后续栈形/向量断言全部失准） | 838 全绿复现 ✓ |
 | **M-D1-1** | 参照模型 `kSeqCycles` 7→9（期望值污染） | 周期计费断言红 | **2 项红**（B5b、I2a-2，恰为预测面；FTP 计数 9/2 不动） | 838 全绿复现 ✓ |
 
+## 10. S2 实施记录（2026-11-07，数据节）
+
+**落地形态**：① 采样点＝指令 dispatch 后（poll point），派发＝下一 loop-top；`g_intl_pending`（0 无/1 NMI/2 IRQ）承载采样结果，不入 savestate（闸门 #1）。② `g_e1_nmi_fresh` 退休（两拍采样天然产生同一时刻；连带 E1 NMI_DEFER 输出消失、INTLEDGER decision=3 恒 0、M-D1-0 失效→由下表 M-D1-2/2b 替代）。③ BRK hijack＝向量级（见下）。
+
+**⚠ 模型更正（B 位，纪律 12 第四例）**：S0/S1 期判「hijack 压栈 B=0」有误。blargg README 原文（christopherpow/nes-test-roms 镜像；nesdev.org 全程 403 未取到）：
+
+```
+36  00  00 NMI interrupting BRK, with B bit set on stack
+```
+
+`2-nmi_and_brk.s` 实证：`nmi:` 处理器 `pla` 取的正是 NMI 序列压栈的 P（`sta <nmi_flag` ＝行首字节）⇒ 行 4-8 期望 `36 00 00` ＝ 压栈 P 含 B=1（BRK 自身 push 保留）＋ irq_flag=00（$FFFE 处理器未运行）＋ X=00（BRK 的 PC+2 槽形状）。**正确模型＝向量级劫持**：push 序列原样、仅向量读 $FFFE→$FFFA、消线。S1 断言 B3/T-D1-3b 与首版实现同源于该误读 ⇒ 锁测试全绿不证明此语义，靠外部参照暴露。另两处 harness 暴露的实现修正：压栈显式 `_P|U_FLAG|B_FLAG`（首版 `_P|U_FLAG` 的 B 位随 _P 残留浮动——真机偶然正确、power-on P=$34 的 harness 立刻暴露）；B4b/T-D1-3d 预算 30→7（30 会让 nestest NMI 处理器 RTI 弹栈、PC 离开向量；7＝边界持有 0＋劫持序列 7＝架构精确态）。
+
+**037 行级对比**（`--frames 3000`；行 4-8 ＝ NMI 落在 BRK 7 周期窗口内的 5 档）：
+
+| 行 | blargg 参照 | S0 基线 | S2 | 判定 |
+|---|---|---|---|---|
+| 1 | 27 36 00 | 27 36 00 | 27 36 00 | ✓ |
+| 2-3 | 26 36 00 | 26 36 00 | 26 36 00 | ✓ |
+| 4-5 | 36 00 00 | 26 36 00 | **36 00 00** | ✓（S2 修正） |
+| 6-8 | 36 00 00 | 26（行6）/ 27（行7-8） | 27 36 00 | ✗（G5 残差，见下） |
+| 9-10 | 27 36 00 | 27 36 00 | 27 36 00 | ✓ |
+
+S0 5/10 → S2 **7/10**。**行 6-8 根因（S2 模型不可达，需独立 RE）**：`ppu_rendering.cpp` 的 VBL 块＝先 `X6502_Run(8)` 跑完 8 周期预算（CLC＋BRK 都完整执行）**再** `TriggerNMI()` ⇒ 线断言时刻量化在指令边界、对该 5 档时序总落在 BRK 完成之后；硬件要求线在 BRK 序列中段（1–5 周期窗口）置位并劫持向量。r5 的 NMIDELAY 扫参已证明无固定 D 同时满足 vbl_05 的派发 PC 与转变行（040 调参不可动）⇒ 周期级线断言精度是 G5 量化近似的独立缺口，不是 poll/hijack 模型问题。**037 最终判据＝`check_crc $B0D44BB7`（对 10 行打印流 CRC），行 6-8 不匹配 ⇒ CRC 失败 ⇒ FAIL 0x01。**
+
+**变异验证**（纪律 3；apply→目标构建→红→revert→构建→绿；红面全部与预判一致）：
+
+| 变异 | 施加点 | 红面（cpu_test 实测） |
+|---|---|---|
+| M-D1-2 | poll point 的 `g_intl_pending=1` 赋值短路 | 9 红：B1b/B1c/B5b/B5c/B5d/C4/C5/B6-1/B6-2（全部 NMI 派发基线；T-D1-2/3、T-D1-4a/b 不依赖该路径保持绿） |
+| M-D1-2b | poll point 的 `g_intl_pending=2` 赋值短路 | 7 红：I2a-5/6/7、B7-3、T-D1-2c、T-D1-4d |
+| M-D1-3 | hijack 向量 $FFFA→$FFFE | 2 红：B4b、T-D1-3d |
+| M-D1-14 | `X6502_NmiHijacked` 消线去除 | 1 红：B2b（预算 7 下第二次派发不发生，可观测量＝线状态） |
+
+其余读数（cpu_test 850/850、FTP 9红/2绿→1红/10绿、哨兵 6/6、ctest 36/36、金标三件套零漂移、闸门 #2 实际形态与 T-D1-4c 的 $204/$205 常数疑点）见 v2.0.2 计划 §十 **r18**。工具：`build/d1_s2_patch2.py`、`build/d1_s2_mutation.py`。
+
 ---
-*调查页完（S0+S1）。S2 起的实施记录记 v2.0.2 计划 §十 变更记录，本页只补数据节。*
+*调查页完（S0+S1+S2）。S3 起的实施记录记 v2.0.2 计划 §十 变更记录，本页只补数据节。*
