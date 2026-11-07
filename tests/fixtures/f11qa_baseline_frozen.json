@@ -117,7 +117,7 @@
     "kgmqa-112-nesstress-flubba": true,
     "kgmqa-113-i18n-regression": true,
     "kgmqa-114-menu-slot-check": true,
-    "kgmqa-115-bench-tolerance": true,
+    "kgmqa-115-bench-tolerance": false,
     "kgmqa-116-headless-smoke": true,
     "kgmqa-117-mirror-snapshot-check": true,
     "kgmqa-118-config-store-rust": true,

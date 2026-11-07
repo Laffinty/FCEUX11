@@ -4016,8 +4016,9 @@
         "perf",
         "benchmark"
       ],
-      "failure_means": "blocking",
-      "provenance": "v1.17 bench_tolerance_test; R4 gate 性能门禁; F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
+      "failure_means": "advisory",
+      "provenance": "v1.17 bench_tolerance_test; R4 gate 性能门禁; F11QA-recast-2026-09-21; mirror-ref-2026-09-24; reclassified 2026-11-07 (human ruling): wall-clock bench — PASS/FAIL is not cross-machine comparable, so it is moved out of the accuracy-regression judgment and recorded only (never red); see known_limit",
+      "known_limit": "Wall-clock benchmark: PASS/FAIL is not cross-machine comparable, so this case must not drive the accuracy-regression judgment. Root cause: the tolerance test compares median wall-clock milliseconds against a baseline captured on another host (tests/fixtures/bench_baseline.json, re-captured 2026-11-07 on the dev box in eb664a3), while the R4 gate runs it on a slower CI runner, so a plain tolerance overrun surfaces as PASS-to-FAIL with no code change at all (CI run 70 reported pass_to_fail=1 kgmqa-115; run 69 on the previous baseline did not). This is the only path that did not honor the repo doctrine already applied to the same measurement elsewhere: ctest excludes bench by LABELS perf plus ctest -LE perf, the ci.yml bench step is continue-on-error, and bench_baseline.json itself states that CI excludes wall-clock gates entirely. Per human ruling 2026-11-07: failure_means blocking-to-advisory and the frozen baseline entry true-to-false, so the case is recorded only (fail_to_fail, or fail_to_pass on a host fast enough to meet the tolerance) and can never enter pass_to_fail nor drag the grade to D. Real performance regressions stay covered by ctest -LE perf and the ci.yml bench step, which are advisory on wall-clock by design (AGENTS.md r55)."
     },
     {
       "kgmqa_id": "kgmqa-116-headless-smoke",
