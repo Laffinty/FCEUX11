@@ -1567,7 +1567,7 @@
           "--tests-json",
           "tests/tests.json",
           "--frames",
-          "300"
+          "400"
         ]
       },
       "expected": {
@@ -1580,7 +1580,7 @@
         "dummy-writes"
       ],
       "failure_means": "advisory",
-      "provenance": "bisqwit cpu_dummy_writes (oam); F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: dummy writes to OAM DMA / PPU region; RMW macro OK, DMA path not",
+      "provenance": "bisqwit cpu_dummy_writes (oam); F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: dummy writes to OAM DMA / PPU region; RMW macro OK, DMA path not; budget 300->400 (r23): completion window ~316-400 measured (300f FAIL=still-running, 400/600/2000f PASS 0x00), r12 049/051 同类预算伪 FAIL 修正",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "bisqwit/cpu_dummy_writes_oam.nes",
       "vendor_state": "vendored",
